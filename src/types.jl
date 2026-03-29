@@ -220,7 +220,11 @@ struct SimParams
     imaginary_time::Bool
     normalize_every::Int
     save_every::Int
+    rotating_frame_omega::Float64
 end
+
+SimParams(dt, n_steps, imaginary_time, normalize_every, save_every) =
+    SimParams(dt, n_steps, imaginary_time, normalize_every, save_every, 0.0)
 
 function SimParams(;
     dt::Float64,
@@ -228,10 +232,11 @@ function SimParams(;
     imaginary_time::Bool=false,
     normalize_every::Int=imaginary_time ? 1 : 0,
     save_every::Int=max(1, n_steps ÷ 100),
+    rotating_frame_omega::Float64=0.0,
 )
     dt > 0 || throw(ArgumentError("dt must be positive"))
     n_steps > 0 || throw(ArgumentError("n_steps must be positive"))
-    SimParams(dt, n_steps, imaginary_time, normalize_every, save_every)
+    SimParams(dt, n_steps, imaginary_time, normalize_every, save_every, rotating_frame_omega)
 end
 
 # --- Simulation State (mutable) ---

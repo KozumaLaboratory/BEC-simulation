@@ -115,6 +115,20 @@ function make_workspace(;
     kinetic_phase = prepare_kinetic_phase(grid, sim_params.dt; imaginary_time=sim_params.imaginary_time)
     V = evaluate_potential(potential, grid)
 
+    omega = sim_params.rotating_frame_omega
+    if abs(omega) > 1e-15 && N >= 2
+        @inbounds for I in CartesianIndices(grid.config.n_points)
+            r_perp_sq = grid.x[1][I[1]]^2 + grid.x[2][I[2]]^2
+            V[I] += 0.5 * omega^2 * r_perp_sq
+        end
+    end
+
+    effective_zeeman = if abs(omega) > 1e-15
+        _shift_zeeman_for_rotating_frame(zeeman, omega)
+    else
+        zeeman
+    end
+
     ddi = if enable_ddi
         if isnan(c_dd) && atom.mu_mag > 0.0
             throw(ArgumentError(
@@ -185,7 +199,15 @@ function make_workspace(;
     end
 
     Workspace(
-        state, plans, kinetic_phase, V, density_buf, sm, grid, atom, ws_interactions, zeeman, potential, sim_params,
+        state, plans, kinetic_phase, V, density_buf, sm, grid, atom, ws_interactions, effective_zeeman, potential, sim_params,
         ddi, ddi_bufs, raman, loss, ddi_pad, batched_kinetic, tensor_cache,
     )
 end
+
+_shift_zeeman_for_rotating_frame(z::ZeemanParams, omega::Float64) =
+    ZeemanParams(z.p - omega, z.q)
+_shift_zeeman_for_rotating_frame(z::TimeDependentZeeman, omega::Float64) =
+    TimeDependentZeeman(t -> begin
+        zp = z.B_func(t)
+        ZeemanParams(zp.p - omega, zp.q)
+    end)

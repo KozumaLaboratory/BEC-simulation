@@ -14,7 +14,10 @@ function split_step!(ws::Workspace{N}) where {N}
 
     @timeit_debug TIMER "half_potential" _half_potential_step!(ws, dt / 2, n_comp, N, it)
 
+    omega = ws.sim_params.rotating_frame_omega
+    @timeit_debug TIMER "coriolis" _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, it)
     @timeit_debug TIMER "kinetic" apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
+    @timeit_debug TIMER "coriolis" _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, it)
 
     @timeit_debug TIMER "half_potential" _half_potential_step!(ws, dt / 2, n_comp, N, it)
 
@@ -144,9 +147,12 @@ One Strang step with explicit dt (no sim_params dependency).
 V(dt/2) K(dt) V(dt/2).
 """
 function _strang_core!(ws::Workspace{N}, dt::Float64, n_comp::Int) where {N}
+    omega = ws.sim_params.rotating_frame_omega
     _half_potential_step!(ws, dt / 2, n_comp, N, false)
+    _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, false)
     _update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, dt)
     apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
+    _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, false)
     _half_potential_step!(ws, dt / 2, n_comp, N, false)
     nothing
 end
@@ -162,23 +168,79 @@ function _yoshida_core!(ws::Workspace{N}, dt::Float64, n_comp::Int) where {N}
     w1 = _YOSHIDA_W1
     w0 = _YOSHIDA_W0
     wm = (w1 + w0) / 2
+    omega = ws.sim_params.rotating_frame_omega
 
     _half_potential_step!(ws, w1 * dt / 2, n_comp, N, false)
 
+    _apply_coriolis_step!(ws.state.psi, ws.grid, omega, w1 * dt / 2, false)
     _update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, w1 * dt)
     apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
+    _apply_coriolis_step!(ws.state.psi, ws.grid, omega, w1 * dt / 2, false)
 
     _half_potential_step!(ws, wm * dt, n_comp, N, false)
 
+    _apply_coriolis_step!(ws.state.psi, ws.grid, omega, w0 * dt / 2, false)
     _update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, w0 * dt)
     apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
+    _apply_coriolis_step!(ws.state.psi, ws.grid, omega, w0 * dt / 2, false)
 
     _half_potential_step!(ws, wm * dt, n_comp, N, false)
 
+    _apply_coriolis_step!(ws.state.psi, ws.grid, omega, w1 * dt / 2, false)
     _update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, w1 * dt)
     apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
+    _apply_coriolis_step!(ws.state.psi, ws.grid, omega, w1 * dt / 2, false)
 
     _half_potential_step!(ws, w1 * dt / 2, n_comp, N, false)
+    nothing
+end
+
+"""
+Apply Coriolis step exp(iΩ·L_z·dt) via 3-shear FFT decomposition.
+
+Implements the -Ω·L_z term from the rotating frame Hamiltonian H_rot = H - Ω·J_z.
+L_z = x·p_y - y·p_x is the orbital angular momentum.
+
+Real time: spatial rotation by angle Ω·dt.
+Imaginary time: rotation by imaginary angle with real exponential shear factors
+(stable for small Ωτ, renormalized each ITP step).
+"""
+function _apply_coriolis_step!(psi::AbstractArray{ComplexF64}, grid::Grid{N},
+                                omega::Float64, dt::Float64,
+                                imaginary_time::Bool) where {N}
+    N < 2 && return nothing
+    abs(omega) < 1e-15 && return nothing
+
+    theta = omega * dt
+
+    if imaginary_time
+        a_y = tanh(theta / 2)
+        a_x = -sinh(theta)
+    else
+        a_y = tan(theta / 2)
+        a_x = -sin(theta)
+    end
+
+    _apply_1d_shear_batch!(psi, grid.x[1], grid.k[2], 2, 1, a_y, imaginary_time)
+    _apply_1d_shear_batch!(psi, grid.x[2], grid.k[1], 1, 2, a_x, imaginary_time)
+    _apply_1d_shear_batch!(psi, grid.x[1], grid.k[2], 2, 1, a_y, imaginary_time)
+    nothing
+end
+
+function _apply_1d_shear_batch!(psi::AbstractArray{ComplexF64},
+                                 coord_vals::Vector{Float64}, k_vals::Vector{Float64},
+                                 fft_dim::Int, coord_dim::Int,
+                                 factor::Float64, imaginary_time::Bool)
+    abs(factor) < 1e-30 && return nothing
+
+    psi_k = fft(psi, fft_dim)
+
+    @inbounds for I in CartesianIndices(size(psi_k))
+        arg = factor * coord_vals[I[coord_dim]] * k_vals[I[fft_dim]]
+        psi_k[I] *= imaginary_time ? exp(arg) : cis(arg)
+    end
+
+    psi .= ifft(psi_k, fft_dim)
     nothing
 end
 
