@@ -95,6 +95,7 @@ function find_ground_state(;
     dt_max::Float64=10.0 * dt,
     fft_flags=FFTW.MEASURE,
     target_magnetization::Union{Nothing,Float64}=nothing,
+    rotating_frame_omega::Float64=0.0,
 )
     psi0 = if psi_init === nothing
         sys = SpinSystem(atom.F)
@@ -111,13 +112,14 @@ function find_ground_state(;
         return _find_ground_state_adaptive(;
             grid, atom, interactions, zeeman, potential,
             dt, n_steps, tol, psi0, enable_ddi, c_dd, secular_ddi, dt_max, fft_flags,
+            rotating_frame_omega,
         )
     end
 
     use_constrained = target_magnetization !== nothing
     norm_every = use_constrained ? 0 : 1
     sp = SimParams(; dt, n_steps, imaginary_time=true, normalize_every=norm_every,
-                   save_every=max(1, n_steps ÷ 10))
+                   save_every=max(1, n_steps ÷ 10), rotating_frame_omega)
     ws = make_workspace(; grid, atom, interactions, zeeman, potential, sim_params=sp,
                         psi_init=psi0, enable_ddi, c_dd, secular_ddi, fft_flags)
 
@@ -172,6 +174,7 @@ Strategy: run check_every steps, then evaluate energy.
 function _find_ground_state_adaptive(;
     grid, atom, interactions, zeeman, potential,
     dt, n_steps, tol, psi0, enable_ddi, c_dd, secular_ddi=false, dt_max, fft_flags=FFTW.MEASURE,
+    rotating_frame_omega::Float64=0.0,
 )
     current_dt = dt
     check_every = max(1, n_steps ÷ 100)
@@ -179,7 +182,7 @@ function _find_ground_state_adaptive(;
     psi_backup = similar(psi0)
 
     sp = SimParams(; dt=current_dt, n_steps=check_every, imaginary_time=true,
-                   normalize_every=1, save_every=check_every)
+                   normalize_every=1, save_every=check_every, rotating_frame_omega)
     ws = make_workspace(; grid, atom, interactions, zeeman, potential,
                         sim_params=sp, psi_init=psi_current, enable_ddi, c_dd, secular_ddi, fft_flags)
     E_prev = total_energy(ws)
@@ -361,12 +364,14 @@ function scan_continuation(;
 
         ws = r.workspace
         phase_info = classify_phase(ws.state.psi, atom.F, grid, sm)
+        detailed = classify_phase_detailed(ws.state.psi, atom.F, grid, sm)
 
         push!(results, (
             param=val,
             energy=r.energy,
             converged=r.converged,
             phase=phase_info.phase,
+            phase_info=detailed,
             psi=copy(ws.state.psi),
         ))
 
@@ -377,9 +382,82 @@ function scan_continuation(;
     results
 end
 
+"""
+    scan_phase_diagram_2d(; param1_values, param2_values, make_interactions, grid, atom, ...) → Matrix{NamedTuple}
+
+2D parameter sweep with continuation from neighboring points.
+Scans along param1 first (inner loop), using continuation from the previous param1 point.
+At each new param2 value, restarts from the end of the previous param2 row.
+
+Returns a Matrix of NamedTuples with shape `(length(param1_values), length(param2_values))`.
+"""
+function scan_phase_diagram_2d(;
+    param1_values::AbstractVector{Float64},
+    param2_values::AbstractVector{Float64},
+    make_interactions::Function,
+    grid,
+    atom,
+    initial_state::Symbol=:polar,
+    n_steps_continuation::Int=500,
+    n_steps_fresh::Int=5000,
+    energy_jump_threshold::Float64=0.1,
+    kwargs...,
+)
+    n1 = length(param1_values)
+    n2 = length(param2_values)
+    sm = spin_matrices(atom.F)
+
+    results = Matrix{NamedTuple}(undef, n1, n2)
+    prev_row_psi = nothing
+
+    for (j, v2) in enumerate(param2_values)
+        prev_psi = prev_row_psi
+        prev_energy = NaN
+
+        for (i, v1) in enumerate(param1_values)
+            interactions = make_interactions(v1, v2)
+
+            r = if prev_psi !== nothing
+                find_ground_state(; grid, atom, interactions,
+                                  psi_init=copy(prev_psi),
+                                  n_steps=n_steps_continuation, kwargs...)
+            else
+                find_ground_state(; grid, atom, interactions,
+                                  initial_state, n_steps=n_steps_fresh, kwargs...)
+            end
+
+            if !isnan(prev_energy) &&
+               abs(r.energy - prev_energy) / max(abs(prev_energy), 1e-30) > energy_jump_threshold
+                r = find_ground_state_multistart(; grid, atom, interactions,
+                                                  n_steps=n_steps_fresh, kwargs...)
+            end
+
+            ws = r.workspace
+            detailed = classify_phase_detailed(ws.state.psi, atom.F, grid, sm)
+
+            results[i, j] = (
+                param1=v1, param2=v2,
+                energy=r.energy, converged=r.converged,
+                phase=detailed.phase, phase_info=detailed,
+                psi=copy(ws.state.psi),
+            )
+
+            prev_psi = copy(ws.state.psi)
+            prev_energy = r.energy
+
+            if i == 1
+                prev_row_psi = copy(ws.state.psi)
+            end
+        end
+    end
+
+    results
+end
+
 function _rebuild_workspace_with_dt(ws::Workspace{N}, new_dt::Float64) where {N}
     sp = SimParams(new_dt, ws.sim_params.n_steps, true,
-                   ws.sim_params.normalize_every, ws.sim_params.save_every)
+                   ws.sim_params.normalize_every, ws.sim_params.save_every,
+                   ws.sim_params.rotating_frame_omega)
     kinetic_phase = prepare_kinetic_phase(ws.grid, new_dt; imaginary_time=true)
     batched_kinetic = _make_batched_kinetic_cache(ws.state.psi, kinetic_phase, N)
 

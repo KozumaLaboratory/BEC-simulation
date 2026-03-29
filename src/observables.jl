@@ -216,6 +216,104 @@ function biaxiality_parameter(lambda1, lambda2, lambda3)
 end
 
 """
+    multipole_order_parameters(psi, F, ndim; density_cutoff=1e-10) → Dict{Int,Array{Float64,N}}
+
+Local multipole order parameters O_k(r) for ranks k = 0, 2, 4, ..., 2F.
+
+O_k(r) = Σ_{q=-k}^{k} |Q_{kq}(r)|² / n(r)²
+
+where Q_{kq} = Σ_m CG(F,m;k,q|F,m+q) ψ*_{m+q} ψ_m.
+
+Returns Dict mapping rank k to spatial array of O_k values.
+"""
+function multipole_order_parameters(psi::AbstractArray{ComplexF64}, F::Int, ndim::Int;
+                                     density_cutoff::Float64=1e-10)
+    D = 2F + 1
+    n_pts = ntuple(d -> size(psi, d), ndim)
+    n_total = total_density(psi, ndim)
+
+    result = Dict{Int,Array{Float64,ndim}}()
+    for k in 0:2:2F
+        O_k = zeros(Float64, n_pts)
+        cg_pairs = Dict{Int,Vector{Tuple{Int,Int,Float64}}}()
+        for q in -k:k
+            pairs = Tuple{Int,Int,Float64}[]
+            for m in -F:F
+                mp = m + q
+                abs(mp) > F && continue
+                cg_val = clebsch_gordan(F, m, k, q, F, mp)
+                abs(cg_val) < 1e-15 && continue
+                push!(pairs, (F - m + 1, F - mp + 1, cg_val))
+            end
+            isempty(pairs) || (cg_pairs[q] = pairs)
+        end
+
+        @inbounds for I in CartesianIndices(n_pts)
+            n_total[I] > density_cutoff || continue
+            inv_n_sq = 1.0 / (n_total[I]^2)
+            for q in -k:k
+                haskey(cg_pairs, q) || continue
+                Qkq = zero(ComplexF64)
+                for (c_m, c_mp, cg_val) in cg_pairs[q]
+                    Qkq += cg_val * conj(psi[I, c_mp]) * psi[I, c_m]
+                end
+                O_k[I] += abs2(Qkq) * inv_n_sq
+            end
+        end
+        result[k] = O_k
+    end
+    result
+end
+
+"""
+    multipole_spectrum(psi, F, grid; density_cutoff=1e-10) → Dict{Int,Float64}
+
+Density-weighted average of each multipole order parameter.
+Returns Dict mapping rank k to ⟨O_k⟩ = ∫ O_k(r) n²(r) dV / ∫ n²(r) dV.
+"""
+function multipole_spectrum(psi::AbstractArray{ComplexF64}, F::Int, grid::Grid{N};
+                             density_cutoff::Float64=1e-10) where {N}
+    ops = multipole_order_parameters(psi, F, N; density_cutoff)
+    n_total = total_density(psi, N)
+    dV = cell_volume(grid)
+    n_sq = n_total .^ 2
+    w_sum = sum(n_sq) * dV
+    w_sum < 1e-30 && return Dict{Int,Float64}(k => 0.0 for k in keys(ops))
+
+    Dict{Int,Float64}(
+        k => sum(O_k .* n_sq) * dV / w_sum
+        for (k, O_k) in ops
+    )
+end
+
+"""
+    structure_factor(psi, grid) → Array{Float64,N}
+
+Static structure factor S(k) = |δn(k)|² / N_grid from density fluctuations.
+Useful for detecting supersolid/modulated phases.
+"""
+function structure_factor(psi::AbstractArray{ComplexF64}, grid::Grid{N}) where {N}
+    n = total_density(psi, N)
+    n_mean = sum(n) / prod(size(n))
+    delta_n = n .- n_mean
+    delta_n_k = FFTW.fft(delta_n)
+    abs2.(delta_n_k) ./ prod(size(n))
+end
+
+"""
+    modulation_contrast(psi, ndim) → Float64
+
+Density modulation contrast (n_max - n_min) / (n_max + n_min).
+Returns 0 for uniform density, approaches 1 for strong modulation.
+"""
+function modulation_contrast(psi::AbstractArray{ComplexF64}, ndim::Int)
+    n = total_density(psi, ndim)
+    n_max = maximum(n)
+    n_min = minimum(n)
+    (n_max - n_min) / (n_max + n_min + eps(Float64))
+end
+
+"""
     pair_amplitude_spectrum(psi, F, grid) → NamedTuple
 
 Integrated pair amplitude spectrum over all even-S channels.
@@ -225,8 +323,9 @@ Returns `(amplitudes, channel_weights)` where:
 - `channel_weights::Dict{Int, Float64}`: S => Σ_M ∫|A_{SM}|² dV
 """
 function pair_amplitude_spectrum(psi::AbstractArray{ComplexF64}, F::Int, grid::Grid{N}) where {N}
-    cg_table = precompute_cg_table(F)
+    cg = precompute_cg_array(F)
     dV = cell_volume(grid)
+    n_pts = ntuple(d -> size(psi, d), N)
 
     amplitudes = Dict{Tuple{Int,Int},Float64}()
     channel_weights = Dict{Int,Float64}()
@@ -234,7 +333,7 @@ function pair_amplitude_spectrum(psi::AbstractArray{ComplexF64}, F::Int, grid::G
     for S in 0:2:(2F)
         w = 0.0
         for M in -S:S
-            A = pair_amplitude(psi, F, S, M, N, cg_table)
+            A = _pair_amplitude_fast(psi, F, S, M, N, n_pts, cg)
             val = sum(abs2, A) * dV
             amplitudes[(S, M)] = val
             w += val
@@ -243,4 +342,28 @@ function pair_amplitude_spectrum(psi::AbstractArray{ComplexF64}, F::Int, grid::G
     end
 
     (amplitudes=amplitudes, channel_weights=channel_weights)
+end
+
+function _pair_amplitude_fast(psi, F::Int, S::Int, M::Int, ndim::Int,
+                               n_pts, cg::CGArrayTable)
+    D = 2F + 1
+    A = zeros(ComplexF64, n_pts)
+
+    pairs = Tuple{Int,Int,Float64}[]
+    for m1 in -F:F
+        m2 = M - m1
+        abs(m2) > F && continue
+        cg_val = cg_lookup(cg, S, M, m1)
+        abs(cg_val) < 1e-15 && continue
+        push!(pairs, (F - m1 + 1, F - m2 + 1, cg_val))
+    end
+
+    @inbounds for I in CartesianIndices(n_pts)
+        s = zero(ComplexF64)
+        for (c1, c2, cg_val) in pairs
+            s += cg_val * psi[I, c1] * psi[I, c2]
+        end
+        A[I] = s
+    end
+    A
 end

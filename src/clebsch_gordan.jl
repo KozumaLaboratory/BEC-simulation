@@ -178,3 +178,45 @@ function precompute_cg_table(F::Int)
     end
     table
 end
+
+"""
+    CGArrayTable
+
+Dense 3D array for O(1) CG coefficient lookups.
+Indexed as `data[S÷2+1, M+2F+1, m1+F+1]` for CG(F,m1;F,M-m1|S,M).
+"""
+struct CGArrayTable
+    data::Array{Float64, 3}
+    F::Int
+end
+
+@inline function cg_lookup(cg::CGArrayTable, S::Int, M::Int, m1::Int)
+    S_idx = S ÷ 2 + 1
+    M_idx = M + 2 * cg.F + 1
+    m1_idx = m1 + cg.F + 1
+    @inbounds cg.data[S_idx, M_idx, m1_idx]
+end
+
+"""
+    precompute_cg_array(F) → CGArrayTable
+
+Dense array version of `precompute_cg_table` for O(1) lookups.
+Stores CG(F,m1;F,m2|S,M) indexed by (S, M, m1) with m2 = M - m1.
+"""
+function precompute_cg_array(F::Int)
+    n_S = F + 1
+    n_M = 4F + 1
+    n_m1 = 2F + 1
+    data = zeros(Float64, n_S, n_M, n_m1)
+    for S in 0:2:2F
+        for M in -S:S
+            for m1 in -F:F
+                m2 = M - m1
+                abs(m2) > F && continue
+                val = clebsch_gordan(F, m1, F, m2, S, M)
+                data[S ÷ 2 + 1, M + 2F + 1, m1 + F + 1] = val
+            end
+        end
+    end
+    CGArrayTable(data, F)
+end

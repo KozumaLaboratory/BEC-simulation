@@ -118,7 +118,7 @@ export apply_nematic_step!
 export apply_tensor_interaction_step!, make_tensor_interaction_cache
 
 # Clebsch-Gordan / Wigner coefficients
-export wigner_3j, clebsch_gordan, wigner_6j, precompute_cg_table
+export wigner_3j, clebsch_gordan, wigner_6j, precompute_cg_table, precompute_cg_array, CGArrayTable
 
 # Losses
 export apply_loss_step!
@@ -131,7 +131,8 @@ export split_step!, prepare_kinetic_phase
 
 # Observables
 export total_density, component_density, magnetization
-export spin_density_vector, total_norm, total_energy
+export spin_density_vector, total_norm, total_energy, energy_decomposition
+export structure_factor, modulation_contrast
 export probability_current, orbital_angular_momentum
 export superfluid_velocity, total_angular_momentum, spin_texture_charge
 export superfluid_vorticity, berry_curvature, singlet_pair_amplitude
@@ -139,6 +140,7 @@ export pair_amplitude, pair_amplitude_spectrum
 export majorana_stars, icosahedral_order_parameter
 export spherical_harmonic, spinor_angular_density
 export nematic_tensor_eigenvalues, biaxiality_parameter
+export multipole_order_parameters, multipole_spectrum
 export get_cn
 
 # Diagnostics
@@ -147,12 +149,14 @@ export compute_quadratic_zeeman, compute_quadratic_zeeman_dimless
 export healing_length_contact, healing_length_spin, healing_length_ddi
 export thomas_fermi_radius, thomas_fermi_radius_harmonic
 export phase_diagram_point, component_populations, make_conservation_monitor
-export classify_phase, estimate_splitting_error, validate_conservation
+export classify_phase, classify_phase_detailed
+export estimate_splitting_error, validate_conservation
 export power_spectrum
 export bogoliubov_spectrum
 
 # Simulation
 export find_ground_state, find_ground_state_multistart, scan_continuation
+export scan_phase_diagram_2d
 export find_phase_boundary
 export run_simulation!, run_simulation_checkpointed!
 export run_simulation_adaptive!, run_simulation_yoshida!, make_workspace, init_psi
