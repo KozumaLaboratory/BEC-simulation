@@ -217,7 +217,7 @@ function _tensor_step_point!(
             entry.cg_prod * conj(spinor[entry.c_mu]) * spinor[entry.c_nu]
     end
 
-    eig = eigen(Hermitian(h))
+    eig = eigen!(Hermitian(h))
     vals = eig.values
     vecs = eig.vectors
 
