@@ -1,9 +1,11 @@
 """
-Total energy (approximate, using current wavefunction).
+    energy_decomposition(ws) → NamedTuple
 
-E = E_kin + E_trap + E_Zeeman + E_int(c0) + E_int(c1) + E_ddi + E_LHY + E_tensor + E_Raman
+Decompose total energy into individual contributions.
+
+Returns `(kinetic, trap, zeeman, density, spin, ddi, lhy, tensor, raman, total)`.
 """
-function total_energy(ws::Workspace{N}) where {N}
+function energy_decomposition(ws::Workspace{N}) where {N}
     psi = ws.state.psi
     grid = ws.grid
     n_comp = ws.spin_matrices.system.n_components
@@ -15,9 +17,6 @@ function total_energy(ws::Workspace{N}) where {N}
     zee = zeeman_at(ws.zeeman, ws.state.t)
     E_zee = _zeeman_energy(psi, zee, ws.spin_matrices.system, n_comp, N, n_pts, dV)
 
-    # When tensor_cache is active, it handles ALL contact interactions (c₀ through c_{2F}).
-    # ws.interactions.c0/c1 are guaranteed zero by make_workspace, but skip explicitly
-    # to avoid computing unnecessary spin density vectors.
     E_c0 = if ws.tensor_cache === nothing
         _density_interaction_energy(psi, ws.interactions.c0, n_comp, N, n_pts, dV)
     else
@@ -30,7 +29,8 @@ function total_energy(ws::Workspace{N}) where {N}
     end
 
     E_ddi = if ws.ddi !== nothing
-        _ddi_energy(psi, ws.spin_matrices, ws.ddi, ws.ddi_bufs, n_comp, N, n_pts, dV)
+        _ddi_energy(psi, ws.spin_matrices, ws.ddi, ws.ddi_bufs, n_comp, N, n_pts, dV;
+                    ddi_padded=ws.ddi_padded)
     else
         0.0
     end
@@ -50,7 +50,14 @@ function total_energy(ws::Workspace{N}) where {N}
         0.0
     end
 
-    E_kin + E_trap + E_zee + E_c0 + E_c1 + E_ddi + E_lhy + E_tensor + E_raman
+    E_total = E_kin + E_trap + E_zee + E_c0 + E_c1 + E_ddi + E_lhy + E_tensor + E_raman
+    (kinetic=E_kin, trap=E_trap, zeeman=E_zee,
+     density=E_c0, spin=E_c1, ddi=E_ddi, lhy=E_lhy,
+     tensor=E_tensor, raman=E_raman, total=E_total)
+end
+
+function total_energy(ws::Workspace{N}) where {N}
+    energy_decomposition(ws).total
 end
 
 function _kinetic_energy(psi, grid, plans, fft_buf, n_comp, ndim, n_pts, dV)
@@ -88,6 +95,11 @@ function _density_interaction_energy(psi, c0, n_comp, ndim, n_pts, dV)
     0.5 * c0 * sum(n .^ 2) * dV
 end
 
+"""
+LHY energy in the scalar (fully-polarized) approximation: E_LHY = (2/5) c_lhy ∫ n^{5/2} dV.
+This does NOT account for spin-dependent corrections relevant to spinor droplets.
+For spinor LHY, the correction depends on Bogoliubov modes of the full spin-F system.
+"""
 function _lhy_energy(psi, c_lhy, n_comp, ndim, n_pts, dV)
     n = total_density(psi, ndim)
     E = 0.0
@@ -108,7 +120,18 @@ function _nematic_energy(psi, F, c2, ndim, n_pts, dV)
     0.5 * c2 * sum(abs2, A) * dV
 end
 
-function _ddi_energy(psi, sm::SpinMatrices{D}, ddi, ddi_bufs, n_comp, ndim, n_pts, dV) where {D}
+function _ddi_energy(psi, sm::SpinMatrices{D}, ddi, ddi_bufs, n_comp, ndim, n_pts, dV;
+                     ddi_padded=nothing) where {D}
+    if ddi_padded !== nothing
+        _compute_and_convolve_ddi_padded!(psi, sm, ddi, ddi_padded, Val(D), ndim, n_pts)
+        E = 0.0
+        @inbounds for I in CartesianIndices(n_pts)
+            E += ddi_padded.Phi_x_pad[I] * ddi_padded.Fx_pad[I] +
+                 ddi_padded.Phi_y_pad[I] * ddi_padded.Fy_pad[I] +
+                 ddi_padded.Phi_z_pad[I] * ddi_padded.Fz_pad[I]
+        end
+        return 0.5 * E * dV
+    end
     _compute_spin_density!(ddi_bufs.Fx_r, ddi_bufs.Fy_r, ddi_bufs.Fz_r, psi, sm, Val(D), ndim, n_pts)
     compute_ddi_potential!(ddi, ddi_bufs)
     E = 0.0
