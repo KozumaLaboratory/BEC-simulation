@@ -1,9 +1,17 @@
 include(joinpath(@__DIR__, "eu151_params.jl"))
 using Printf, Random, FFTW, JLD2
 
-function run_edh_physical()
+# ================================================================
+# Eu151 EdH from pure mF=+6 initial state
+#
+# Strategy: compute scalar ground state WITHOUT DDI (pure mF=+6
+# density profile), then switch on DDI + c₁ for real-time dynamics.
+# This isolates the EdH cascade from ground-state mixing artifacts.
+# ================================================================
+
+function run_edh_pure_mf6()
     println("=" ^ 70)
-    println("  Eu151 EdH — Physical parameters (40 ms, 64³)")
+    println("  Eu151 EdH — Pure mF=+6 initial state (40 ms, 64³)")
     println("=" ^ 70)
 
     N_GRID = 64
@@ -29,42 +37,32 @@ function run_edh_physical()
     @printf("ε_dd=%.3f, DDI instability γ_max ≈ %.0f ω (e-fold %.0f μs)\n\n",
         EU_ε_dd, EU_c_dd * n_peak * 6, EU_t_unit * 1e6 / (EU_c_dd * n_peak * 6))
 
-    # Ground state WITH DDI (physical equilibrium)
-    cache_file = joinpath(@__DIR__, "cache_eu151_gs_ddi_$(N_GRID).jld2")
+    # Ground state WITHOUT DDI → pure mF=+6 density profile
+    cache_file = joinpath(@__DIR__, "cache_eu151_gs_3d_$(N_GRID).jld2")
     psi_gs = if isfile(cache_file)
-        println("Loading cached ground state (with DDI)")
+        println("Loading cached scalar ground state (no DDI)")
         load(cache_file, "psi")
     else
-        println("Computing ground state with DDI (this takes a while)...")
-        # First: rough scalar ground state without DDI as starting point
-        gs0 = find_ground_state(;
-            grid, atom,
-            interactions=InteractionParams(EU_c_total, 0.0),
-            zeeman=ZeemanParams(100.0, 0.0),
-            potential=trap,
-            dt=0.005, n_steps=5000, tol=1e-8,
-            initial_state=:ferromagnetic,
-            enable_ddi=false,
-            fft_flags=FFTW.MEASURE,
-        )
-        println("  scalar GS energy: $(round(total_energy(gs0.workspace), sigdigits=6))")
-        # Then: refine with DDI enabled (ferromagnetic + strong Zeeman keeps m=+F)
+        println("Computing scalar ground state (no DDI)...")
         gs = find_ground_state(;
             grid, atom,
             interactions=InteractionParams(EU_c_total, 0.0),
             zeeman=ZeemanParams(100.0, 0.0),
             potential=trap,
-            dt=0.001, n_steps=100000, tol=1e-9,
-            psi_init=gs0.workspace.state.psi,
-            enable_ddi=true, c_dd=EU_c_dd,
-            adaptive_dt=true, dt_max=0.005,
+            dt=0.005, n_steps=20000, tol=1e-9,
+            initial_state=:ferromagnetic,
+            enable_ddi=false,
             fft_flags=FFTW.MEASURE,
         )
-        println("  DDI GS energy: $(round(total_energy(gs.workspace), sigdigits=6))")
+        println("  energy: $(round(total_energy(gs.workspace), sigdigits=6))")
         println("  converged: $(gs.converged)")
         save(cache_file, "psi", gs.workspace.state.psi)
         gs.workspace.state.psi
     end
+
+    # Verify purity
+    pops_gs = [sum(abs2, @view(psi_gs[:,:,:,c])) * dV for c in 1:D]
+    @printf("Initial P(+6)=%.6f (should be ~1.0)\n\n", pops_gs[1])
 
     psi = copy(psi_gs)
     Random.seed!(42)
@@ -168,7 +166,7 @@ function run_edh_physical()
     wall = time() - t0
     @printf("\n%d steps in %.0fs (%.2fs/step)\n", n_total, wall, wall / n_total)
 
-    outfile = joinpath(@__DIR__, "edh_physical_64.jld2")
+    outfile = joinpath(@__DIR__, "edh_pure_mf6_64.jld2")
     jldsave(outfile;
         snapshots=snapshots,
         snapshot_times_ms=snapshot_times_ms,
@@ -196,4 +194,4 @@ function run_edh_physical()
     end
 end
 
-run_edh_physical()
+run_edh_pure_mf6()
