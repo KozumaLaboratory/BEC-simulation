@@ -277,4 +277,59 @@ using FFTW
             @test r.phase == :ferromagnetic
         end
     end
+
+    @testset "Detailed phase classification" begin
+        @testset "ferromagnetic F=1" begin
+            grid = make_grid(GridConfig(64, 10.0))
+            sm = spin_matrices(1)
+            sys = SpinSystem(1)
+            psi = init_psi(grid, sys; state=:ferromagnetic)
+            r = classify_phase_detailed(psi, 1, grid, sm)
+            @test r.spin_order > 0.9
+            @test r.biaxiality ≈ 0.0 atol = 0.1
+            @test r.Q6 ≈ 0.0 atol = 1e-10
+            @test isfinite(r.star_entropy)
+            @test r.phase == :ferromagnetic
+            @test haskey(r.channel_weights, 0) || haskey(r.channel_weights, 2)
+            @test isfinite(r.magnetization_density)
+        end
+
+        @testset "polar F=1" begin
+            grid = make_grid(GridConfig(64, 10.0))
+            sm = spin_matrices(1)
+            sys = SpinSystem(1)
+            psi = init_psi(grid, sys; state=:polar)
+            r = classify_phase_detailed(psi, 1, grid, sm)
+            @test r.nematic_order ≈ 1.0 rtol = 1e-10
+            @test r.spin_order ≈ 0.0 atol = 1e-10
+            @test isfinite(r.biaxiality)
+            @test isfinite(r.star_entropy)
+            @test r.phase == :polar
+        end
+
+        @testset "all fields finite for F=2" begin
+            grid = make_grid(GridConfig(32, 10.0))
+            sm = spin_matrices(2)
+            sys = SpinSystem(2)
+            psi = init_psi(grid, sys; state=:ferromagnetic)
+            r = classify_phase_detailed(psi, 2, grid, sm)
+            @test isfinite(r.spin_order)
+            @test isfinite(r.nematic_order)
+            @test isfinite(r.biaxiality)
+            @test isfinite(r.Q6)
+            @test isfinite(r.star_entropy)
+            @test isfinite(r.magnetization_density)
+        end
+
+        @testset "vacuum returns zeros" begin
+            grid = make_grid(GridConfig(32, 10.0))
+            sm = spin_matrices(1)
+            psi = zeros(ComplexF64, 32, 3)
+            r = classify_phase_detailed(psi, 1, grid, sm)
+            @test r.phase == :vacuum
+            @test r.spin_order == 0.0
+            @test r.biaxiality == 0.0
+            @test r.Q6 == 0.0
+        end
+    end
 end

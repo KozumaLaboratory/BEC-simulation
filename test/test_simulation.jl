@@ -168,4 +168,79 @@ using FFTW
         @test length(result.energies) == 6
         @test all(n -> abs(n - 1.0) < 1e-8, result.norms)
     end
+
+    @testset "Coriolis step norm preservation (2D)" begin
+        config = GridConfig((32, 32), (10.0, 10.0))
+        grid = make_grid(config)
+        sys = SpinSystem(1)
+        psi = init_psi(grid, sys; state=:polar)
+        dV = cell_volume(grid)
+        norm_before = sum(abs2, psi) * dV
+
+        SpinorBEC._apply_coriolis_step!(psi, grid, 0.5, 0.01, false)
+        norm_after = sum(abs2, psi) * dV
+        @test norm_after ≈ norm_before rtol = 1e-10
+    end
+
+    @testset "Coriolis step no-op for omega=0" begin
+        config = GridConfig((16, 16), (10.0, 10.0))
+        grid = make_grid(config)
+        sys = SpinSystem(1)
+        psi = init_psi(grid, sys; state=:ferromagnetic)
+        psi_copy = copy(psi)
+
+        SpinorBEC._apply_coriolis_step!(psi, grid, 0.0, 0.01, false)
+        @test psi ≈ psi_copy
+    end
+
+    @testset "Coriolis step no-op for 1D" begin
+        config = GridConfig(32, 10.0)
+        grid = make_grid(config)
+        sys = SpinSystem(1)
+        psi = init_psi(grid, sys; state=:polar)
+        psi_copy = copy(psi)
+
+        SpinorBEC._apply_coriolis_step!(psi, grid, 1.0, 0.01, false)
+        @test psi ≈ psi_copy
+    end
+
+    @testset "SimParams rotating_frame_omega" begin
+        sp = SimParams(; dt=0.01, n_steps=100, rotating_frame_omega=0.5)
+        @test sp.rotating_frame_omega == 0.5
+
+        sp2 = SimParams(0.01, 100, false, 1, 10)
+        @test sp2.rotating_frame_omega == 0.0
+    end
+
+    @testset "Rotating frame: centrifugal + Zeeman shift in workspace" begin
+        config = GridConfig((16, 16), (10.0, 10.0))
+        grid = make_grid(config)
+        interactions = InteractionParams(1.0, 0.0)
+        omega = 0.3
+
+        sp = SimParams(; dt=0.01, n_steps=10, imaginary_time=true,
+                        rotating_frame_omega=omega)
+        ws = make_workspace(; grid, atom=Rb87, interactions, sim_params=sp,
+                            fft_flags=FFTW.ESTIMATE)
+
+        center_idx = CartesianIndex(8, 8)
+        corner_idx = CartesianIndex(1, 1)
+        @test ws.potential_values[corner_idx] > ws.potential_values[center_idx]
+
+        zee = SpinorBEC.zeeman_at(ws.zeeman, 0.0)
+        @test zee.p ≈ -omega
+    end
+
+    @testset "find_ground_state with rotating_frame_omega" begin
+        config = GridConfig((16, 16), (10.0, 10.0))
+        grid = make_grid(config)
+        interactions = InteractionParams(5.0, 0.0)
+        trap = HarmonicTrap(1.0, 1.0)
+
+        r = find_ground_state(; grid, atom=Rb87, interactions, potential=trap,
+                                dt=0.005, n_steps=200,
+                                rotating_frame_omega=0.3, fft_flags=FFTW.ESTIMATE)
+        @test isfinite(r.energy)
+        @test !any(isnan, r.workspace.state.psi)
+    end
 end
