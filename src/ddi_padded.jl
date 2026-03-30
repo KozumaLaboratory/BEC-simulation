@@ -3,7 +3,10 @@ Build zero-padded DDI context for reduced aliasing.
 
 Doubles grid size in each dimension. Builds Q tensor and rFFT plans on padded grid.
 """
-function make_ddi_padded(grid::Grid{N}, atom::AtomSpecies; c_dd::Float64=compute_c_dd(atom), fft_flags=FFTW.MEASURE, secular::Bool=false) where {N}
+function make_ddi_padded(grid::Grid{N}, atom::AtomSpecies;
+    c_dd::Float64=compute_c_dd(atom), fft_flags=FFTW.MEASURE, secular::Bool=false,
+    quasi_2d::Bool=false, l_z::Float64=0.0,
+) where {N}
     n_pts = grid.config.n_points
     padded_shape = ntuple(d -> 2 * n_pts[d], N)
     rk_shape = rfft_output_shape(padded_shape)
@@ -33,8 +36,13 @@ function make_ddi_padded(grid::Grid{N}, atom::AtomSpecies; c_dd::Float64=compute
         k_sq_rk[I] = k2
     end
 
-    _build_q_tensor!(Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz,
-                     kx_r, ky, kz, k_sq_rk, rk_shape; secular)
+    if quasi_2d && N == 2
+        _build_q_tensor_quasi2d!(Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz,
+                                  kx_r, ky, k_sq_rk, rk_shape, l_z)
+    else
+        _build_q_tensor!(Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz,
+                         kx_r, ky, kz, k_sq_rk, rk_shape; secular)
+    end
 
     rplans = make_rfft_plans(padded_shape; flags=fft_flags)
 

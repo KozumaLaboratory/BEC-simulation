@@ -98,6 +98,8 @@ function make_workspace(;
     loss::Union{Nothing,LossParams}=nothing,
     fft_flags=FFTW.MEASURE,
     ddi_padding::Bool=false,
+    quasi_2d_ddi::Bool=false,
+    l_z_ddi::Float64=0.0,
 ) where {N}
     sys = SpinSystem(atom.F)
     sm = spin_matrices(atom.F)
@@ -139,7 +141,8 @@ function make_workspace(;
             ))
         end
         c_dd_val = isnan(c_dd) ? compute_c_dd(atom) : c_dd
-        make_ddi_params(grid, atom; c_dd=c_dd_val, secular=secular_ddi)
+        make_ddi_params(grid, atom; c_dd=c_dd_val, secular=secular_ddi,
+                        quasi_2d=quasi_2d_ddi, l_z=l_z_ddi)
     else
         nothing
     end
@@ -154,7 +157,8 @@ function make_workspace(;
 
     ddi_pad = if ddi_padding && ddi !== nothing
         c_dd_val = isnan(c_dd) ? compute_c_dd(atom) : ddi.C_dd
-        make_ddi_padded(grid, atom; c_dd=c_dd_val, fft_flags, secular=secular_ddi)
+        make_ddi_padded(grid, atom; c_dd=c_dd_val, fft_flags, secular=secular_ddi,
+                        quasi_2d=quasi_2d_ddi, l_z=l_z_ddi)
     else
         nothing
     end
@@ -198,9 +202,15 @@ function make_workspace(;
         tc, interactions
     end
 
+    coriolis_cache = if sim_params.rotating_frame_omega != 0.0 && N >= 2
+        _make_coriolis_cache(psi; flags=fft_flags)
+    else
+        nothing
+    end
+
     Workspace(
         state, plans, kinetic_phase, V, density_buf, sm, grid, atom, ws_interactions, effective_zeeman, potential, sim_params,
-        ddi, ddi_bufs, raman, loss, ddi_pad, batched_kinetic, tensor_cache,
+        ddi, ddi_bufs, raman, loss, ddi_pad, batched_kinetic, tensor_cache, coriolis_cache,
     )
 end
 

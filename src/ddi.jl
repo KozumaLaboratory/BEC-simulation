@@ -40,15 +40,81 @@ function _build_q_tensor!(Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz,
 end
 
 """
-    make_ddi_params(grid, atom; c_dd, secular=false)
+    _quasi_2d_kernel(k_perp, l_z) → Float64
 
-Build DDI k-space tensor Q_αβ(k) stored at rfft half-shape.
+Quasi-2D DDI kernel h(k⊥ l_z) from z-integrated dipolar interaction.
 
-When `secular=true`, uses the secular (Larmor-averaged) approximation valid when
-the Larmor precession frequency ω_L ≫ c_dd × peak_density. If this condition is
-not satisfied, the full (non-secular) tensor should be used instead.
+    h(u) = 2/3 - u√(π/2) erfcx(u/√2)
+
+where u = k⊥ · l_z.
+
+Limits: h(0) = 2/3 (repulsive), h(∞) → -1/3 (attractive).
 """
-function make_ddi_params(grid::Grid{N}, atom::AtomSpecies; c_dd::Float64=compute_c_dd(atom), secular::Bool=false) where {N}
+function _quasi_2d_kernel(k_perp::Float64, l_z::Float64)
+    u = k_perp * l_z
+    u < 1e-15 && return 2.0 / 3.0
+    2.0 / 3.0 - u * sqrt(π / 2.0) * erfcx(u / sqrt(2.0))
+end
+
+"""
+Build Q tensor for quasi-2D DDI (secular approximation) on a 2D grid.
+
+Q_zz = h(k⊥ l_z), Q_xx = Q_yy = -Q_zz/2, off-diagonal = 0.
+"""
+function _build_q_tensor_quasi2d!(Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz,
+                                   kx, ky, k_squared, n_pts::NTuple{2,Int}, l_z::Float64)
+    @inbounds for I in CartesianIndices(n_pts)
+        k2 = k_squared[I]
+        k_perp = sqrt(k2)
+        qzz = _quasi_2d_kernel(k_perp, l_z)
+        Q_zz[I] = qzz
+        Q_xx[I] = -qzz / 2.0
+        Q_yy[I] = -qzz / 2.0
+        Q_xy[I] = 0.0
+        Q_xz[I] = 0.0
+        Q_yz[I] = 0.0
+    end
+    nothing
+end
+
+function make_ddi_params(grid::Grid{N}, atom::AtomSpecies;
+    c_dd::Float64=compute_c_dd(atom), secular::Bool=false,
+    quasi_2d::Bool=false, l_z::Float64=0.0,
+) where {N}
+    if quasi_2d
+        N == 2 || throw(ArgumentError("quasi_2d DDI requires a 2D grid (N=2), got N=$N"))
+        l_z > 0.0 || throw(ArgumentError("quasi_2d DDI requires l_z > 0, got l_z=$l_z"))
+        return _make_ddi_params_quasi2d(grid, c_dd, l_z)
+    end
+    _make_ddi_params_full(grid, atom; c_dd, secular)
+end
+
+function _make_ddi_params_quasi2d(grid::Grid{2}, c_dd::Float64, l_z::Float64)
+    n_pts = grid.config.n_points
+    rk_shape = rfft_output_shape(n_pts)
+
+    Q_xx = zeros(Float64, rk_shape)
+    Q_xy = zeros(Float64, rk_shape)
+    Q_xz = zeros(Float64, rk_shape)
+    Q_yy = zeros(Float64, rk_shape)
+    Q_yz = zeros(Float64, rk_shape)
+    Q_zz = zeros(Float64, rk_shape)
+
+    kx_r = collect(rfftfreq(n_pts[1], n_pts[1] * grid.dk[1]))
+    ky = grid.k[2]
+
+    k_sq_rk = zeros(Float64, rk_shape)
+    @inbounds for I in CartesianIndices(rk_shape)
+        k_sq_rk[I] = kx_r[I[1]]^2 + ky[I[2]]^2
+    end
+
+    _build_q_tensor_quasi2d!(Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz,
+                              kx_r, ky, k_sq_rk, rk_shape, l_z)
+
+    DDIParams{2}(c_dd, Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz)
+end
+
+function _make_ddi_params_full(grid::Grid{N}, atom::AtomSpecies; c_dd::Float64=compute_c_dd(atom), secular::Bool=false) where {N}
     if secular
         @warn "DDI secular approximation: ensure ω_Larmor ≫ c_dd × peak_density" maxlog=1
     end

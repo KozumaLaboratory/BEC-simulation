@@ -205,6 +205,46 @@
         @test_logs (:warn, r"secular approximation") make_ddi_params(grid, Eu151; secular=true)
     end
 
+    @testset "Quasi-2D DDI kernel" begin
+        @testset "h(0, l_z) = 2/3" begin
+            @test SpinorBEC._quasi_2d_kernel(0.0, 1.0) ≈ 2.0 / 3.0 atol = 1e-14
+        end
+
+        @testset "h(large_k, l_z) → -1/3" begin
+            @test SpinorBEC._quasi_2d_kernel(100.0, 1.0) ≈ -1.0 / 3.0 atol = 0.01
+        end
+
+        @testset "make_ddi_params 2D quasi_2d succeeds" begin
+            config = GridConfig((16, 16), (10.0, 10.0))
+            grid = make_grid(config)
+            ddi = make_ddi_params(grid, Eu151; c_dd=1.0, quasi_2d=true, l_z=1.0)
+            @test ddi isa DDIParams
+            @test maximum(abs, ddi.Q_xy) == 0.0
+            @test maximum(abs, ddi.Q_xz) == 0.0
+            @test maximum(abs, ddi.Q_yz) == 0.0
+            @test ddi.Q_xx ≈ -ddi.Q_zz ./ 2.0
+        end
+
+        @testset "quasi_2d on 1D grid → ArgumentError" begin
+            config = GridConfig(16, 10.0)
+            grid = make_grid(config)
+            @test_throws ArgumentError make_ddi_params(grid, Eu151; c_dd=1.0, quasi_2d=true, l_z=1.0)
+        end
+
+        @testset "quasi_2d with l_z=0 → ArgumentError" begin
+            config = GridConfig((16, 16), (10.0, 10.0))
+            grid = make_grid(config)
+            @test_throws ArgumentError make_ddi_params(grid, Eu151; c_dd=1.0, quasi_2d=true, l_z=0.0)
+        end
+
+        @testset "quasi-2D Q_zz at k=0 is 2/3" begin
+            config = GridConfig((16, 16), (10.0, 10.0))
+            grid = make_grid(config)
+            ddi = make_ddi_params(grid, Eu151; c_dd=1.0, quasi_2d=true, l_z=1.0)
+            @test ddi.Q_zz[1, 1] ≈ 2.0 / 3.0 atol = 1e-12
+        end
+    end
+
     @testset "DDI requires explicit c_dd for dipolar atoms" begin
         config = GridConfig((8,), (10.0,))
         grid = make_grid(config)
