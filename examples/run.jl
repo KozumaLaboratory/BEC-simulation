@@ -2,25 +2,25 @@ using SpinorBEC
 
 function run_and_save(yaml_path)
     println("Loading: $yaml_path")
-    config = load_experiment(yaml_path)
+    config = load_config(yaml_path)
     println("Running: $(config.name)")
 
-    result = run_experiment(config)
+    result = run_config(config)
 
-    if result.ground_state_energy !== nothing
+    if haskey(result, :ground_state_energy)
         println("  Ground state: E=$(result.ground_state_energy), converged=$(result.ground_state_converged)")
     end
 
-    for (i, (name, sim)) in enumerate(zip(result.phase_names, result.phase_results))
-        println("  Phase $i ($name): t=$(sim.times[1])→$(sim.times[end]), E=$(sim.energies[end])")
+    if haskey(result, :phase_results)
+        for (i, (name, sim)) in enumerate(zip(result.phase_names, result.phase_results))
+            println("  Phase $i ($name): t=$(sim.times[1])→$(sim.times[end]), E=$(sim.energies[end])")
+        end
     end
 
-    out_path = replace(yaml_path, r"\.yaml$" => "_result.jld2")
-    save_experiment_result(out_path, result)
-    println("  Saved: $out_path\n")
+    println()
 end
 
-path = length(ARGS) >= 1 ? ARGS[1] : joinpath(@__DIR__, "rb87_quench_dynamics.yaml")
+path = length(ARGS) >= 1 ? ARGS[1] : joinpath(@__DIR__, "eu151")
 
 if isdir(path)
     yamls = sort(filter(f -> endswith(f, ".yaml"), readdir(path; join=true)))

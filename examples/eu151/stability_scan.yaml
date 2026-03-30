@@ -2,8 +2,10 @@
 # For each point: find ground state, then perturb-and-evolve to measure
 # growth rate and dominant unstable k-mode (roton/EdH instability).
 
-phase_scan:
+experiment:
+  version: 3
   name: "Eu151 stability scan"
+  type: phase_scan
 
   system:
     atom: Eu151
@@ -36,8 +38,6 @@ phase_scan:
           from: -0.01389
           to: 0.02778
           n_points: 8
-
-  strategy:
     continuation:
       enabled: true
       n_steps: 1000
@@ -48,6 +48,12 @@ phase_scan:
     perturbation: 1.0e-4
     n_steps: 300
     sample_every: 10
+
+  observables:
+    always: [norm, magnetization]
+    on_save: [energy]
+    final_only: [phase_classification, structure_factor]
+    spatial_sampling: 0.1
 
   output:
     dir: results/eu151_stability_scan

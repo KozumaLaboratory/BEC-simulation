@@ -1,8 +1,10 @@
 # Eu151 2D phase diagram: c1_ratio x quadratic Zeeman q.
 # Uses continuation from neighboring points for efficiency.
 
-phase_scan:
+experiment:
+  version: 3
   name: "Eu151 2D c1_ratio x q"
+  type: phase_scan
 
   system:
     atom: Eu151
@@ -40,12 +42,21 @@ phase_scan:
           from: -0.5
           to: 2.0
           n_points: 9
-
-  strategy:
     continuation:
       enabled: true
       n_steps: 1500
       energy_jump_threshold: 0.1
+    per_point_overrides:
+      - parameter: c1_ratio
+        range: { from: -0.002, to: 0.002 }
+        n_steps: 8000
+        tol: 1.0e-10
+
+  observables:
+    always: [norm, magnetization]
+    on_save: [energy]
+    final_only: [phase_classification]
+    spatial_sampling: 0.1
 
   output:
     dir: results/eu151_phase_scan_2d

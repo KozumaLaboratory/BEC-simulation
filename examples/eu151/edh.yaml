@@ -41,7 +41,9 @@
 # ================================================================
 
 experiment:
+  version: 3
   name: "Eu151 Einstein-de Haas (3D)"
+  type: dynamics
 
   system:
     atom: Eu151
@@ -89,7 +91,17 @@ experiment:
       duration: 27.6
       dt: 0.002
       save_every: 50
+      integrator:
+        method: adaptive
+        tol: 1.0e-4
+        dt_min: 1.0e-4
+        dt_max: 0.01
       noise_amplitude: 0.001
       zeeman:
         p: 0.39
         q: 0.0
+
+  observables:
+    always: [norm, magnetization]
+    on_save: [energy, populations]
+    spatial_sampling: 0.1

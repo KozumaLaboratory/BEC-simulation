@@ -11,7 +11,9 @@
 # ================================================================
 
 experiment:
+  version: 3
   name: "Spin-1 2D dynamics"
+  type: dynamics
 
   system:
     atom: Rb87

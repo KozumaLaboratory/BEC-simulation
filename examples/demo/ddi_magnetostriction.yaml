@@ -14,7 +14,9 @@
 # ================================================================
 
 experiment:
+  version: 3
   name: "DDI magnetostriction (spin-1, 3D)"
+  type: dynamics
 
   system:
     atom: Rb87
@@ -43,6 +45,7 @@ experiment:
       duration: 1.0
       dt: 0.002
       save_every: 100
+      integrator: adaptive
       zeeman:
         p: 0.0
         q:

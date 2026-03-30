@@ -1,8 +1,10 @@
 # Eu151 1D phase scan: c1_ratio sweep with multistart ITP.
 # Scans c1_ratio from ferromagnetic to antiferromagnetic regime.
 
-phase_scan:
+experiment:
+  version: 3
   name: "Eu151 1D c1_ratio scan"
+  type: phase_scan
 
   system:
     atom: Eu151
@@ -35,8 +37,6 @@ phase_scan:
           from: -0.01389
           to: 0.02778
           n_points: 10
-
-  strategy:
     continuation:
       enabled: true
       n_steps: 1000
@@ -45,6 +45,17 @@ phase_scan:
       enabled: true
       initial_states: [polar, ferromagnetic, uniform, antiferromagnetic]
       n_random: 0
+    per_point_overrides:
+      - parameter: c1_ratio
+        range: { from: -0.002, to: 0.002 }
+        n_steps: 8000
+        tol: 1.0e-10
+
+  observables:
+    always: [norm, magnetization]
+    on_save: [energy, populations]
+    final_only: [phase_classification, multipole_spectrum]
+    spatial_sampling: 0.1
 
   output:
     dir: results/eu151_phase_scan_1d

@@ -3,8 +3,10 @@
 # via bisection on rotating_frame_omega. Relevant for magnetic vortex
 # and polar-core vortex states from EdH effect.
 
-phase_scan:
+experiment:
+  version: 3
   name: "Eu151 Jz-constrained scan"
+  type: phase_scan
 
   system:
     atom: Eu151
@@ -36,6 +38,12 @@ phase_scan:
     tolerance: 0.05
     max_iter: 15
     omega_range: [-10.0, 10.0]
+
+  observables:
+    always: [norm, magnetization]
+    on_save: [energy]
+    final_only: [phase_classification]
+    spatial_sampling: 0.1
 
   output:
     dir: results/eu151_jz_scan
