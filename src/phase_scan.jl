@@ -1,6 +1,6 @@
 # --- Phase Scan Runner ---
 
-function _sweep_values(sv::SweepValues)
+function _sweep_values(sv::ScanValues)
     range(sv.from, sv.to; length=sv.n_points)
 end
 
@@ -142,7 +142,7 @@ function _run_parameter_1d(config::PhaseScanConfig, scan::ParameterScan,
     axis = scan.axes[1]
     values = collect(_sweep_values(axis.values))
     F = atom.F
-    c_total = config.c_total
+    c_total = _compute_c_total(config)
     strategy = config.strategy
     base_state = _base_sweep_state(config)
 
@@ -209,7 +209,7 @@ function _run_parameter_2d(config::PhaseScanConfig, scan::ParameterScan,
     vals2 = collect(_sweep_values(ax2.values))
     n1, n2 = length(vals1), length(vals2)
     F = atom.F
-    c_total = config.c_total
+    c_total = _compute_c_total(config)
     strategy = config.strategy
     base_state = _base_sweep_state(config)
 

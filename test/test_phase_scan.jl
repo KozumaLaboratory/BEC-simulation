@@ -47,7 +47,7 @@ using FFTW
         @test config.scan isa ParameterScan
         @test length(config.scan.axes) == 1
         @test config.scan.axes[1].parameter == :c1_ratio
-        @test config.scan.axes[1].values isa SweepValues
+        @test config.scan.axes[1].values isa ScanValues
         @test config.scan.axes[1].values.n_points == 5
         @test config.strategy.continuation.enabled == true
         @test config.strategy.continuation.n_steps == 50
@@ -336,7 +336,7 @@ using FFTW
     end
 
     @testset "_sweep_values" begin
-        sv = SweepValues(0.0, 1.0, 5)
+        sv = ScanValues(0.0, 1.0, 5)
         vals = collect(SpinorBEC._sweep_values(sv))
         @test length(vals) == 5
         @test vals[1] ≈ 0.0
@@ -448,10 +448,22 @@ using FFTW
     end
 
     @testset "Type constructors" begin
-        @test_throws ArgumentError SweepValues(0.0, 1.0, 1)
+        @test_throws ArgumentError ScanValues(0.0, 1.0, 1)
         @test_throws ArgumentError ContinuationConfig(true, 0, 0.1)
         @test_throws ArgumentError ContinuationConfig(true, 100, -0.1)
         @test_throws ArgumentError ScanStabilityConfig(true, -1.0, 300, 10)
+
+        # ParameterScan validation
+        @test_throws ArgumentError ParameterScan(ScanAxis[])
+        axis = ScanAxis(:c1_ratio, ScanValues(0.0, 1.0, 3))
+        @test ParameterScan([axis]).axes[1].parameter == :c1_ratio
+        @test_throws ArgumentError ParameterScan([axis, axis, axis])
+
+        # ConstrainedJzScan validation
+        @test_throws ArgumentError ConstrainedJzScan(Float64[], 0.05, 15, (-10.0, 10.0))
+        @test_throws ArgumentError ConstrainedJzScan([0.0], -0.1, 15, (-10.0, 10.0))
+        @test_throws ArgumentError ConstrainedJzScan([0.0], 0.05, 0, (-10.0, 10.0))
+        @test_throws ArgumentError ConstrainedJzScan([0.0], 0.05, 15, (10.0, -10.0))
 
         c = ContinuationConfig()
         @test c.enabled == true

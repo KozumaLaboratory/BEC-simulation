@@ -398,20 +398,20 @@ end
 
 # --- Phase Scan Types ---
 
-struct SweepValues
+struct ScanValues
     from::Float64
     to::Float64
     n_points::Int
 
-    function SweepValues(from::Float64, to::Float64, n_points::Int)
+    function ScanValues(from::Float64, to::Float64, n_points::Int)
         n_points >= 2 || throw(ArgumentError("n_points must be >= 2"))
         new(from, to, n_points)
     end
 end
 
-struct SweepAxis
+struct ScanAxis
     parameter::Symbol
-    values::Union{SweepValues,Vector{Float64}}
+    values::Union{ScanValues,Vector{Float64}}
 end
 
 struct ContinuationConfig
@@ -446,7 +446,12 @@ ScanStrategyConfig() = ScanStrategyConfig(ContinuationConfig(), MultiStartConfig
 abstract type AbstractScanSpec end
 
 struct ParameterScan <: AbstractScanSpec
-    axes::Vector{SweepAxis}
+    axes::Vector{ScanAxis}
+
+    function ParameterScan(axes::Vector{ScanAxis})
+        1 <= length(axes) <= 2 || throw(ArgumentError("ParameterScan requires 1 or 2 axes, got $(length(axes))"))
+        new(axes)
+    end
 end
 
 struct ConstrainedJzScan <: AbstractScanSpec
@@ -454,6 +459,15 @@ struct ConstrainedJzScan <: AbstractScanSpec
     tolerance::Float64
     max_iter::Int
     omega_range::Tuple{Float64,Float64}
+
+    function ConstrainedJzScan(target_values::Vector{Float64}, tolerance::Float64,
+                               max_iter::Int, omega_range::Tuple{Float64,Float64})
+        !isempty(target_values) || throw(ArgumentError("target_values must not be empty"))
+        tolerance > 0 || throw(ArgumentError("tolerance must be positive"))
+        max_iter > 0 || throw(ArgumentError("max_iter must be positive"))
+        omega_range[1] < omega_range[2] || throw(ArgumentError("omega_range must satisfy lo < hi"))
+        new(target_values, tolerance, max_iter, omega_range)
+    end
 end
 
 struct ScanStabilityConfig

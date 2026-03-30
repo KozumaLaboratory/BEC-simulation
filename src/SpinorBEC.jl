@@ -175,7 +175,7 @@ export SystemConfig, ExperimentConfig, ExperimentResult
 export load_experiment, load_experiment_from_string, run_experiment, seed_noise
 
 # Phase scan
-export SweepValues, SweepAxis, ContinuationConfig, ScanStabilityConfig, ScanOutputConfig
+export ScanValues, ScanAxis, ContinuationConfig, ScanStabilityConfig, ScanOutputConfig
 export MultiStartConfig, ScanStrategyConfig, AbstractScanSpec, ParameterScan, ConstrainedJzScan
 export ScanGroundStateConfig, PhaseScanConfig
 export load_phase_scan, load_phase_scan_from_string, run_phase_scan

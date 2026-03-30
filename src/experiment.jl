@@ -270,11 +270,16 @@ struct PhaseScanConfig
     name::String
     system::SystemConfig
     ground_state::ScanGroundStateConfig
-    c_total::Float64
     scan::AbstractScanSpec
     strategy::ScanStrategyConfig
     stability::ScanStabilityConfig
     output::ScanOutputConfig
+end
+
+function _compute_c_total(config::PhaseScanConfig)
+    F = resolve_atom(config.system.atom_name).F
+    ip = config.system.interactions
+    ip.c0 + F^2 * ip.c1
 end
 
 function load_phase_scan(path::String)
@@ -294,10 +299,6 @@ function _parse_phase_scan(d::Dict)
     system = _parse_system(d["system"])
     gs = _parse_scan_ground_state(d["ground_state"])
 
-    F = resolve_atom(system.atom_name).F
-    ip = system.interactions
-    c_total = ip.c0 + F^2 * ip.c1
-
     scan_d = d["scan"]
     scan_type = Symbol(scan_d["type"])
     scan = if scan_type == :parameter
@@ -313,7 +314,7 @@ function _parse_phase_scan(d::Dict)
     stab = haskey(d, "stability") ? _parse_scan_stability(d["stability"]) : ScanStabilityConfig()
     output = haskey(d, "output") ? _parse_scan_output(d["output"]) : ScanOutputConfig()
 
-    PhaseScanConfig(name, system, gs, c_total, scan, strategy, stab, output)
+    PhaseScanConfig(name, system, gs, scan, strategy, stab, output)
 end
 
 function _parse_scan_ground_state(d::Dict)
@@ -339,7 +340,7 @@ end
 
 function _parse_parameter_scan(d::Dict)
     axes_data = d["axes"]
-    axes = SweepAxis[_parse_sweep_axis(a) for a in axes_data]
+    axes = ScanAxis[_parse_sweep_axis(a) for a in axes_data]
     ParameterScan(axes)
 end
 
@@ -377,11 +378,11 @@ function _parse_sweep_axis(d::Dict)
     param = Symbol(d["parameter"])
     vals = d["values"]
     values = if vals isa Dict
-        SweepValues(Float64(vals["from"]), Float64(vals["to"]), Int(vals["n_points"]))
+        ScanValues(Float64(vals["from"]), Float64(vals["to"]), Int(vals["n_points"]))
     else
         Float64[Float64(v) for v in vals]
     end
-    SweepAxis(param, values)
+    ScanAxis(param, values)
 end
 
 function _parse_continuation(d::Dict)
