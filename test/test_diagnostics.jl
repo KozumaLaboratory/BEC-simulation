@@ -248,6 +248,49 @@ using FFTW
         end
     end
 
+    @testset "Stability analysis" begin
+        @testset "stable state has small growth rate" begin
+            grid = make_grid(GridConfig(64, 10.0))
+            interactions = InteractionParams(10.0, 0.0)
+            trap = HarmonicTrap(1.0)
+            sp = SimParams(; dt=0.001, n_steps=200, imaginary_time=false, save_every=200)
+            ws = make_workspace(; grid, atom=Rb87, interactions, potential=trap,
+                                sim_params=sp, fft_flags=FFTW.ESTIMATE)
+            result = analyze_stability(ws; n_steps=100, sample_every=10)
+            @test isfinite(result.growth_rate)
+            @test length(result.time_series) == 10
+            @test length(result.sk_series) == 10
+            @test isfinite(result.k_peak)
+        end
+
+        @testset "restores state after analysis" begin
+            grid = make_grid(GridConfig(64, 10.0))
+            interactions = InteractionParams(10.0, 0.0)
+            trap = HarmonicTrap(1.0)
+            sp = SimParams(; dt=0.001, n_steps=200, imaginary_time=false, save_every=200)
+            ws = make_workspace(; grid, atom=Rb87, interactions, potential=trap,
+                                sim_params=sp, fft_flags=FFTW.ESTIMATE)
+            psi_before = copy(ws.state.psi)
+            t_before = ws.state.t
+            analyze_stability(ws; n_steps=50, sample_every=10)
+            @test ws.state.psi ≈ psi_before
+            @test ws.state.t ≈ t_before
+        end
+
+        @testset "structure factor arrays have correct size" begin
+            grid = make_grid(GridConfig(64, 10.0))
+            interactions = InteractionParams(10.0, 0.0)
+            sp = SimParams(; dt=0.001, n_steps=200, imaginary_time=false, save_every=200)
+            ws = make_workspace(; grid, atom=Rb87, interactions,
+                                potential=HarmonicTrap(1.0),
+                                sim_params=sp, fft_flags=FFTW.ESTIMATE)
+            result = analyze_stability(ws; n_steps=30, sample_every=10)
+            for sk in result.sk_series
+                @test size(sk) == grid.config.n_points
+            end
+        end
+    end
+
     @testset "Phase classification" begin
         grid = make_grid(GridConfig(64, 10.0))
         sm = spin_matrices(1)
