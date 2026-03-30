@@ -117,6 +117,21 @@
         @test r_z.omega != r_x.omega
     end
 
+    @testset "DDI anomalous matrix differs from normal matrix" begin
+        F = 1
+        D = 3
+        sm = spin_matrices(F)
+        # Generic spinor (not an eigenstate of F_z)
+        spinor = normalize(ComplexF64[1.0, 0.5 + 0.3im, 0.2 - 0.1im])
+        c_dd = 5.0
+        Q_ab = SpinorBEC._q_tensor_direction([0.0, 0.0, 1.0])
+        h, M_mat = SpinorBEC._bdg_ddi_matrices(spinor, F, D, sm, c_dd, Q_ab)
+        # Normal and anomalous must be different for generic spinor
+        @test !isapprox(h, M_mat, atol=1e-10)
+        # Anomalous matrix should be symmetric: M_{ij} = M_{ji}
+        @test M_mat ≈ transpose(M_mat)
+    end
+
     @testset "BdGResult fields" begin
         result = bogoliubov_spectrum(;
             spinor=ComplexF64[0.0, 1.0, 0.0],

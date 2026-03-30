@@ -97,10 +97,17 @@ end
 
 """
 LHY energy in the scalar (fully-polarized) approximation: E_LHY = (2/5) c_lhy ∫ n^{5/2} dV.
-This does NOT account for spin-dependent corrections relevant to spinor droplets.
-For spinor LHY, the correction depends on Bogoliubov modes of the full spin-F system.
+
+This uses the scalar BEC Lee-Huang-Yang correction proportional to n^{5/2}.
+For spinor condensates (n_comp > 1), the true LHY correction depends on the
+Bogoliubov spectrum of the full spin-F system and can differ qualitatively
+(e.g., spinor droplets in 39K, spin-dependent depletion). Use with caution
+when spin degrees of freedom are dynamically active.
 """
 function _lhy_energy(psi, c_lhy, n_comp, ndim, n_pts, dV)
+    if n_comp > 1
+        @warn "LHY energy uses scalar (fully-polarized) approximation for a spinor condensate (n_comp=$n_comp). Spin-dependent LHY corrections are not included." maxlog=1
+    end
     n = total_density(psi, ndim)
     E = 0.0
     @inbounds for I in CartesianIndices(n_pts)

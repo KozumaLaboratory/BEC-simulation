@@ -134,6 +134,15 @@ function apply_kinetic_step_batched!(psi, cache::BatchedKineticCache)
     nothing
 end
 
+function _make_coriolis_cache(psi; flags=FFTW.MEASURE)
+    plan_buf = similar(psi)
+    fwd1 = plan_fft!(plan_buf, 1; flags)
+    inv1 = plan_ifft!(plan_buf, 1; flags)
+    fwd2 = plan_fft!(plan_buf, 2; flags)
+    inv2 = plan_ifft!(plan_buf, 2; flags)
+    CoriolisCache(fwd1, inv1, fwd2, inv2)
+end
+
 function _update_batched_kinetic_phase!(cache::BatchedKineticCache, k_squared, dt)
     kp = cache.kinetic_phase_bc
     ndim = ndims(kp) - 1

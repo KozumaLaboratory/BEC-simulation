@@ -179,19 +179,15 @@ function _bdg_ddi_matrices(spinor, F, D, sm, c_dd, Q_ab)
         end
     end
 
-    # Anomalous DDI: same structure for uniform case
-    # M^DDI_{mm'} = c_dd Σ_{ab} Q_{ab} Σ_ν (F_a)_{m,ν} (F_b)_{m',M-ν} ζ_ν ζ_{M-ν}
-    # For simplicity, use the same F·⟨F⟩ form
+    # Anomalous DDI: outer product of F_a·ζ vectors
+    # M^DDI_{m,m'} = c_dd Σ_{ab} Q_{ab} (F_a·ζ)_m (F_b·ζ)_{m'}
+    fa_zeta = [F_mats[a] * spinor for a in 1:3]
     M_mat = zeros(ComplexF64, D, D)
-    for a in 1:3
-        for b in 1:3
-            fb_zeta = F_mats[b] * spinor
-            for i in 1:D
-                for j in 1:D
-                    M_mat[i, j] += c_dd * Q_ab[a, b] * F_mats[a][i, j] *
-                        sum(spinor[k] * fb_zeta[k] for k in 1:D)
-                end
-            end
+    for a in 1:3, b in 1:3
+        coeff = c_dd * Q_ab[a, b]
+        abs(coeff) < 1e-30 && continue
+        for i in 1:D, j in 1:D
+            M_mat[i, j] += coeff * fa_zeta[a][i] * fa_zeta[b][j]
         end
     end
 

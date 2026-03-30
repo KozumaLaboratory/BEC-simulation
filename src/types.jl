@@ -333,6 +333,15 @@ struct BatchedKineticCache{P,IP}
     kinetic_phase_bc::Array{ComplexF64}
 end
 
+# --- Coriolis Cache (in-place FFT plans for 3-shear decomposition) ---
+
+struct CoriolisCache{P1,IP1,P2,IP2}
+    fwd_dim1::P1
+    inv_dim1::IP1
+    fwd_dim2::P2
+    inv_dim2::IP2
+end
+
 # --- Tensor Interaction Cache (general-F) ---
 
 struct TensorInteractionCache
@@ -389,7 +398,7 @@ end
 
 # --- Workspace ---
 
-struct Workspace{N,A,P,IP,SM<:SpinMatrices,ZEE,DDI,DDIB,RAM,LOSS,DDIP,BK,TC}
+struct Workspace{N,A,P,IP,SM<:SpinMatrices,ZEE,DDI,DDIB,RAM,LOSS,DDIP,BK,TC,CC}
     state::SimState{N,A}
     fft_plans::FFTPlans{P,IP}
     kinetic_phase::Array{ComplexF64,N}
@@ -409,4 +418,5 @@ struct Workspace{N,A,P,IP,SM<:SpinMatrices,ZEE,DDI,DDIB,RAM,LOSS,DDIP,BK,TC}
     ddi_padded::DDIP
     batched_kinetic::BK
     tensor_cache::TC
+    coriolis_cache::CC
 end
