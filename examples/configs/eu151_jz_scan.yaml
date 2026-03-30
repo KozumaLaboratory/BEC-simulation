@@ -1,0 +1,43 @@
+# Eu151 Jz-constrained ground state scan.
+# Finds ground states with specific total angular momentum J_z = L_z + S_z
+# via bisection on rotating_frame_omega. Relevant for magnetic vortex
+# and polar-core vortex states from EdH effect.
+
+phase_scan:
+  name: "Eu151 Jz-constrained scan"
+
+  system:
+    atom: Eu151
+    grid:
+      n_points: [32, 32]
+      box_size: [12.0, 12.0]
+    interactions:
+      c_total: 4689.0
+      c1_ratio: 0.0
+    ddi:
+      enabled: true
+      c_dd: 7647.0
+
+  ground_state:
+    dt: 0.005
+    n_steps: 5000
+    tol: 1.0e-8
+    initial_state: polar
+    zeeman:
+      p: 0.39
+      q: 0.0
+    potential:
+      type: harmonic
+      omega: [1.0, 1.0]
+
+  scan:
+    type: constrained_jz
+    target_values: [0.0, 1.0, 2.0, 4.0, 6.0]
+    tolerance: 0.05
+    max_iter: 15
+    omega_range: [-10.0, 10.0]
+
+  output:
+    dir: results/eu151_jz_scan
+    csv: true
+    save_psi: false

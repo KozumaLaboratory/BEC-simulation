@@ -1,0 +1,52 @@
+# Eu151 1D phase scan: c1_ratio sweep with multistart ITP.
+# Scans c1_ratio from ferromagnetic to antiferromagnetic regime.
+
+phase_scan:
+  name: "Eu151 1D c1_ratio scan"
+
+  system:
+    atom: Eu151
+    grid:
+      n_points: 32
+      box_size: 8.0
+    interactions:
+      c_total: 4689.0
+      c1_ratio: 0.0
+    ddi:
+      enabled: false
+
+  ground_state:
+    dt: 0.005
+    n_steps: 3000
+    tol: 1.0e-8
+    initial_state: polar
+    zeeman:
+      p: 0.39
+      q: 0.0
+    potential:
+      type: harmonic
+      omega: [1.0]
+
+  scan:
+    type: parameter
+    axes:
+      - parameter: c1_ratio
+        values:
+          from: -0.01389
+          to: 0.02778
+          n_points: 10
+
+  strategy:
+    continuation:
+      enabled: true
+      n_steps: 1000
+      energy_jump_threshold: 0.1
+    multistart:
+      enabled: true
+      initial_states: [polar, ferromagnetic, uniform, antiferromagnetic]
+      n_random: 0
+
+  output:
+    dir: results/eu151_phase_scan_1d
+    csv: true
+    save_psi: false
