@@ -229,12 +229,22 @@ function _majorana_star_entropy(spinor::AbstractVector{ComplexF64}, F::Int)
 end
 
 function _mean_majorana_entropy(psi, F::Int, ndim::Int, n_total, dV;
-                                density_cutoff::Float64=1e-10)
+                                density_cutoff::Float64=1e-10,
+                                sampling::Float64=1.0)
     D = 2F + 1
     n_pts = ntuple(d -> size(psi, d), ndim)
+    all_indices = vec(collect(CartesianIndices(n_pts)))
+    indices = if sampling < 1.0
+        rng = Random.MersenneTwister(0)
+        n_sample = max(1, round(Int, length(all_indices) * sampling))
+        perm = Random.randperm(rng, length(all_indices))
+        all_indices[perm[1:n_sample]]
+    else
+        all_indices
+    end
     w_sum = 0.0
     s_sum = 0.0
-    @inbounds for I in CartesianIndices(n_pts)
+    @inbounds for I in indices
         ni = n_total[I]
         ni > density_cutoff || continue
         spinor = Vector{ComplexF64}(undef, D)
@@ -274,7 +284,7 @@ Returns `(spin_order, nematic_order, biaxiality, Q6, star_entropy,
           channel_weights, magnetization_density, phase)`.
 """
 function classify_phase_detailed(psi::AbstractArray{ComplexF64}, F::Int, grid::Grid{N},
-                                 sm::SpinMatrices) where {N}
+                                 sm::SpinMatrices; sampling::Float64=1.0) where {N}
     D = 2F + 1
     dV = cell_volume(grid)
     n_pts = ntuple(d -> size(psi, d), N)
@@ -306,10 +316,10 @@ function classify_phase_detailed(psi::AbstractArray{ComplexF64}, F::Int, grid::G
     biax = biaxiality_parameter(l1, l2, l3)
     mean_biax = _density_weighted_mean(biax, n_total, dV)
 
-    Q6_field = icosahedral_order_parameter(psi, grid, sm)
+    Q6_field = icosahedral_order_parameter(psi, grid, sm; sampling)
     mean_Q6 = _density_weighted_mean(Q6_field, n_total, dV)
 
-    star_entropy = _mean_majorana_entropy(psi, F, N, n_total, dV)
+    star_entropy = _mean_majorana_entropy(psi, F, N, n_total, dV; sampling)
 
     sys = sm.system
     Mz = magnetization(psi, grid, sys) / n_sum

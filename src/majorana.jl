@@ -274,7 +274,8 @@ Returns `Array{Float64,N}` (0 everywhere for F < 6).
 """
 function icosahedral_order_parameter(psi::AbstractArray{ComplexF64}, grid::Grid{N},
                                      sm::SpinMatrices{D};
-                                     density_cutoff::Float64=1e-10) where {D,N}
+                                     density_cutoff::Float64=1e-10,
+                                     sampling::Float64=1.0) where {D,N}
     F = sm.system.F
     n_comp = sm.system.n_components
     n_pts = ntuple(d -> size(psi, d), N)
@@ -283,7 +284,17 @@ function icosahedral_order_parameter(psi::AbstractArray{ComplexF64}, grid::Grid{
 
     n = _total_density(psi, n_comp, N, n_pts)
 
-    @inbounds for I in CartesianIndices(n_pts)
+    all_indices = vec(collect(CartesianIndices(n_pts)))
+    indices = if sampling < 1.0
+        rng = Random.MersenneTwister(0)
+        n_sample = max(1, round(Int, length(all_indices) * sampling))
+        perm = Random.randperm(rng, length(all_indices))
+        all_indices[perm[1:n_sample]]
+    else
+        all_indices
+    end
+
+    @inbounds for I in indices
         n[I] > density_cutoff || continue
         spinor = _get_spinor(psi, I, Val(D))
         inv_norm = 1.0 / sqrt(real(dot(spinor, spinor)))

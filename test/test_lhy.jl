@@ -107,6 +107,7 @@
     @testset "YAML parsing of c_lhy" begin
         yaml = """
         experiment:
+          type: dynamics
           name: lhy_test
           system:
             atom: Rb87
@@ -117,9 +118,16 @@
               c0: 10.0
               c1: -0.5
               c_lhy: 100.0
+          ground_state:
+            dt: 0.01
+            n_steps: 10
+            tol: 1e-4
+            potential:
+              type: harmonic
+              omega: [1.0]
           sequence: []
         """
-        cfg = load_experiment_from_string(yaml)
+        cfg = load_config_from_string(yaml)
         @test cfg.system.interactions.c_lhy == 100.0
     end
 
@@ -154,6 +162,7 @@
     @testset "YAML without c_lhy defaults to 0" begin
         yaml = """
         experiment:
+          type: dynamics
           name: no_lhy_test
           system:
             atom: Rb87
@@ -163,9 +172,16 @@
             interactions:
               c0: 10.0
               c1: -0.5
+          ground_state:
+            dt: 0.01
+            n_steps: 10
+            tol: 1e-4
+            potential:
+              type: harmonic
+              omega: [1.0]
           sequence: []
         """
-        cfg = load_experiment_from_string(yaml)
+        cfg = load_config_from_string(yaml)
         @test cfg.system.interactions.c_lhy == 0.0
     end
 end

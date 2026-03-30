@@ -16,6 +16,7 @@
     @testset "YAML parsing" begin
         yaml_str = """
         experiment:
+          type: dynamics
           name: "test experiment"
           system:
             atom: Rb87
@@ -67,7 +68,7 @@
                 type: none
         """
 
-        config = load_experiment_from_string(yaml_str)
+        config = load_config_from_string(yaml_str)
 
         @test config.name == "test experiment"
         @test config.system.atom_name == :Rb87
@@ -88,9 +89,9 @@
         @test gs.potential.type == :harmonic
         @test gs.potential.params["omega"] == [1.0]
 
-        @test length(config.sequence) == 3
+        @test length(config.spec.sequence) == 3
 
-        ramp = config.sequence[1]
+        ramp = config.spec.sequence[1]
         @test ramp.name == "ramp"
         @test ramp.duration == 1.0
         @test ramp.dt == 0.01
@@ -102,11 +103,11 @@
         @test ramp.zeeman_q.value == 0.0
         @test ramp.potential !== nothing
 
-        hold = config.sequence[2]
+        hold = config.spec.sequence[2]
         @test hold.name == "hold"
         @test hold.potential === nothing  # inherits
 
-        release = config.sequence[3]
+        release = config.spec.sequence[3]
         @test release.name == "release"
         @test release.potential.type == :none
     end
@@ -114,6 +115,7 @@
     @testset "YAML parsing - DDI" begin
         yaml_str = """
         experiment:
+          type: dynamics
           name: "ddi test"
           system:
             atom: Eu151
@@ -126,10 +128,17 @@
             ddi:
               enabled: true
               c_dd: 1.5e-5
+          ground_state:
+            dt: 0.01
+            n_steps: 10
+            tol: 1e-4
+            potential:
+              type: harmonic
+              omega: [1.0]
           sequence: []
         """
 
-        config = load_experiment_from_string(yaml_str)
+        config = load_config_from_string(yaml_str)
         @test config.system.ddi.enabled == true
         @test config.system.ddi.c_dd == 1.5e-5
         @test config.system.atom_name == :Eu151
@@ -138,6 +147,7 @@
     @testset "YAML parsing - minimal" begin
         yaml_str = """
         experiment:
+          type: dynamics
           name: "minimal"
           system:
             atom: Na23
@@ -147,19 +157,26 @@
             interactions:
               c0: 1.0
               c1: 0.1
+          ground_state:
+            dt: 0.01
+            n_steps: 10
+            tol: 1e-4
+            potential:
+              type: harmonic
+              omega: [1.0]
           sequence: []
         """
 
-        config = load_experiment_from_string(yaml_str)
+        config = load_config_from_string(yaml_str)
         @test config.system.atom_name == :Na23
         @test config.system.grid_n_points == [32]
-        @test config.ground_state === nothing
-        @test isempty(config.sequence)
+        @test isempty(config.spec.sequence)
     end
 
     @testset "YAML parsing - gravity" begin
         yaml_str = """
         experiment:
+          type: dynamics
           name: "gravity test"
           system:
             atom: Rb87
@@ -179,7 +196,7 @@
               axis: 1
           sequence: []
         """
-        config = load_experiment_from_string(yaml_str)
+        config = load_config_from_string(yaml_str)
         gs = config.ground_state
         @test gs.potential.type == :gravity
         @test gs.potential.params["g"] == 9.81
@@ -189,6 +206,7 @@
     @testset "YAML parsing - crossed_dipole" begin
         yaml_str = """
         experiment:
+          type: dynamics
           name: "dipole test"
           system:
             atom: Rb87
@@ -218,7 +236,7 @@
                   direction: [0, 1, 0]
           sequence: []
         """
-        config = load_experiment_from_string(yaml_str)
+        config = load_config_from_string(yaml_str)
         gs = config.ground_state
         @test gs.potential.type == :crossed_dipole
         @test gs.potential.params["polarizability"] == 1.5e-37
@@ -228,6 +246,7 @@
     @testset "YAML parsing - composite (list)" begin
         yaml_str = """
         experiment:
+          type: dynamics
           name: "composite test"
           system:
             atom: Rb87
@@ -249,7 +268,7 @@
                 axis: 1
           sequence: []
         """
-        config = load_experiment_from_string(yaml_str)
+        config = load_config_from_string(yaml_str)
         gs = config.ground_state
         @test gs.potential.type == :composite
         components = gs.potential.params["components"]
@@ -261,6 +280,7 @@
     @testset "YAML parsing - noise_amplitude" begin
         yaml_with_noise = """
         experiment:
+          type: dynamics
           name: "noise test"
           system:
             atom: Rb87
@@ -270,6 +290,13 @@
             interactions:
               c0: 1.0
               c1: 0.0
+          ground_state:
+            dt: 0.01
+            n_steps: 10
+            tol: 1e-4
+            potential:
+              type: harmonic
+              omega: [1.0]
           sequence:
             - name: noisy
               duration: 1.0
@@ -288,14 +315,15 @@
                 p: 0.0
                 q: 0.0
         """
-        config = load_experiment_from_string(yaml_with_noise)
-        @test config.sequence[1].noise_amplitude == 0.05
-        @test config.sequence[2].noise_amplitude === nothing
+        config = load_config_from_string(yaml_with_noise)
+        @test config.spec.sequence[1].noise_amplitude == 0.05
+        @test config.spec.sequence[2].noise_amplitude === nothing
     end
 
-    @testset "run_experiment integration" begin
+    @testset "run_config integration" begin
         yaml_str = """
         experiment:
+          type: dynamics
           name: "integration test"
           system:
             atom: Rb87
@@ -331,8 +359,8 @@
                 omega: [1.0]
         """
 
-        config = load_experiment_from_string(yaml_str)
-        result = run_experiment(config; verbose=false)
+        config = load_config_from_string(yaml_str)
+        result = run_config(config; verbose=false)
 
         @test result.ground_state_energy !== nothing
         @test result.ground_state_energy isa Float64
@@ -346,9 +374,10 @@
         @test all(n -> n > 0, sim.norms)
     end
 
-    @testset "run_experiment integration - noise_amplitude" begin
+    @testset "run_config integration - noise_amplitude" begin
         yaml_str = """
         experiment:
+          type: dynamics
           name: "noise integration"
           system:
             atom: Rb87
@@ -383,18 +412,19 @@
                 omega: [1.0]
         """
 
-        config = load_experiment_from_string(yaml_str)
-        @test config.sequence[1].noise_amplitude == 0.01
-        result = run_experiment(config; verbose=false)
+        config = load_config_from_string(yaml_str)
+        @test config.spec.sequence[1].noise_amplitude == 0.01
+        result = run_config(config; verbose=false)
         @test length(result.phase_results) == 1
         @test result.phase_names == ["noisy_evolve"]
         sim = result.phase_results[1]
         @test all(n -> n > 0, sim.norms)
     end
 
-    @testset "run_experiment integration - composite potential" begin
+    @testset "run_config integration - composite potential" begin
         yaml_str = """
         experiment:
+          type: dynamics
           name: "composite integration"
           system:
             atom: Rb87
@@ -421,9 +451,9 @@
           sequence: []
         """
 
-        config = load_experiment_from_string(yaml_str)
+        config = load_config_from_string(yaml_str)
         @test config.ground_state.potential.type == :composite
-        result = run_experiment(config; verbose=false)
+        result = run_config(config; verbose=false)
         @test result.ground_state_energy !== nothing
         @test result.ground_state_energy isa Float64
     end

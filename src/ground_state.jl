@@ -100,6 +100,8 @@ function find_ground_state(;
     Jz_tol::Float64=0.01,
     Jz_max_iter::Int=20,
     Jz_omega_range::Tuple{Float64,Float64}=(-5.0, 5.0),
+    quasi_2d_ddi::Bool=false,
+    l_z_ddi::Float64=0.0,
 )
     psi0 = if psi_init === nothing
         sys = SpinSystem(atom.F)
@@ -117,6 +119,7 @@ function find_ground_state(;
             initial_state, psi_init=psi0, enable_ddi, c_dd, secular_ddi,
             adaptive_dt, dt_max, fft_flags, target_magnetization,
             target_Jz, Jz_tol, Jz_max_iter, Jz_omega_range,
+            quasi_2d_ddi, l_z_ddi,
         )
     end
 
@@ -128,7 +131,7 @@ function find_ground_state(;
         return _find_ground_state_adaptive(;
             grid, atom, interactions, zeeman, potential,
             dt, n_steps, tol, psi0, enable_ddi, c_dd, secular_ddi, dt_max, fft_flags,
-            rotating_frame_omega,
+            rotating_frame_omega, quasi_2d_ddi, l_z_ddi,
         )
     end
 
@@ -137,7 +140,8 @@ function find_ground_state(;
     sp = SimParams(; dt, n_steps, imaginary_time=true, normalize_every=norm_every,
                    save_every=max(1, n_steps ÷ 10), rotating_frame_omega)
     ws = make_workspace(; grid, atom, interactions, zeeman, potential, sim_params=sp,
-                        psi_init=psi0, enable_ddi, c_dd, secular_ddi, fft_flags)
+                        psi_init=psi0, enable_ddi, c_dd, secular_ddi, fft_flags,
+                        quasi_2d_ddi, l_z_ddi)
 
     n_comp = ws.spin_matrices.system.n_components
     N_dim = length(grid.config.n_points)
@@ -191,6 +195,7 @@ function _find_ground_state_adaptive(;
     grid, atom, interactions, zeeman, potential,
     dt, n_steps, tol, psi0, enable_ddi, c_dd, secular_ddi=false, dt_max, fft_flags=FFTW.MEASURE,
     rotating_frame_omega::Float64=0.0,
+    quasi_2d_ddi::Bool=false, l_z_ddi::Float64=0.0,
 )
     current_dt = dt
     check_every = max(1, n_steps ÷ 100)
@@ -200,7 +205,8 @@ function _find_ground_state_adaptive(;
     sp = SimParams(; dt=current_dt, n_steps=check_every, imaginary_time=true,
                    normalize_every=1, save_every=check_every, rotating_frame_omega)
     ws = make_workspace(; grid, atom, interactions, zeeman, potential,
-                        sim_params=sp, psi_init=psi_current, enable_ddi, c_dd, secular_ddi, fft_flags)
+                        sim_params=sp, psi_init=psi_current, enable_ddi, c_dd, secular_ddi, fft_flags,
+                        quasi_2d_ddi, l_z_ddi)
     E_prev = total_energy(ws)
     converged = false
     total_steps = 0
@@ -481,6 +487,7 @@ function _find_ground_state_Jz(;
     initial_state, psi_init, enable_ddi, c_dd, secular_ddi,
     adaptive_dt, dt_max, fft_flags, target_magnetization,
     target_Jz, Jz_tol, Jz_max_iter, Jz_omega_range,
+    quasi_2d_ddi::Bool=false, l_z_ddi::Float64=0.0,
 )
     omega_lo, omega_hi = Jz_omega_range
     prev_psi = psi_init
@@ -497,6 +504,7 @@ function _find_ground_state_Jz(;
             enable_ddi, c_dd, secular_ddi,
             adaptive_dt, dt_max, fft_flags, target_magnetization,
             rotating_frame_omega=omega_trial,
+            quasi_2d_ddi, l_z_ddi,
         )
 
         ws = r.workspace

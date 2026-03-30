@@ -3,7 +3,8 @@ using FFTW
 @testset "Phase Scan" begin
     @testset "YAML parsing - 1D parameter scan" begin
         yaml = """
-        phase_scan:
+        experiment:
+          type: phase_scan
           name: "test 1D"
           system:
             atom: Rb87
@@ -32,7 +33,6 @@ using FFTW
                   from: -0.01
                   to: 0.03
                   n_points: 5
-          strategy:
             continuation:
               enabled: true
               n_steps: 50
@@ -42,23 +42,25 @@ using FFTW
             csv: true
             save_psi: false
         """
-        config = load_phase_scan_from_string(yaml)
+        config = load_config_from_string(yaml)
         @test config.name == "test 1D"
-        @test config.scan isa ParameterScan
-        @test length(config.scan.axes) == 1
-        @test config.scan.axes[1].parameter == :c1_ratio
-        @test config.scan.axes[1].values isa ScanValues
-        @test config.scan.axes[1].values.n_points == 5
-        @test config.strategy.continuation.enabled == true
-        @test config.strategy.continuation.n_steps == 50
-        @test config.stability.enabled == false
+        @test config.spec.scan isa ParameterScan
+        @test length(config.spec.scan.axes) == 1
+        @test config.spec.scan.axes[1].parameter == :c1_ratio
+        @test config.spec.scan.axes[1].values isa ScanValues
+        @test config.spec.scan.axes[1].values.n_points == 5
+        @test config.spec.scan.continuation.enabled == true
+        @test config.spec.scan.continuation.n_steps == 50
+        @test config.spec.stability.enabled == false
         @test config.output.dir == "/tmp/test_phase_scan"
         @test config.ground_state.rotating_frame_omega == 0.0
+        @test config.ground_state.enable_ddi === nothing
     end
 
     @testset "YAML parsing - 2D parameter scan" begin
         yaml = """
-        phase_scan:
+        experiment:
+          type: phase_scan
           name: "test 2D"
           system:
             atom: Rb87
@@ -89,18 +91,19 @@ using FFTW
             dir: /tmp/test_phase_scan_2d
             csv: false
         """
-        config = load_phase_scan_from_string(yaml)
-        @test config.scan isa ParameterScan
-        @test length(config.scan.axes) == 2
-        @test config.scan.axes[1].parameter == :c1_ratio
-        @test config.scan.axes[2].parameter == :zeeman_q
-        @test config.scan.axes[2].values isa Vector{Float64}
-        @test length(config.scan.axes[2].values) == 3
+        config = load_config_from_string(yaml)
+        @test config.spec.scan isa ParameterScan
+        @test length(config.spec.scan.axes) == 2
+        @test config.spec.scan.axes[1].parameter == :c1_ratio
+        @test config.spec.scan.axes[2].parameter == :zeeman_q
+        @test config.spec.scan.axes[2].values isa Vector{Float64}
+        @test length(config.spec.scan.axes[2].values) == 3
     end
 
     @testset "YAML parsing - constrained Jz scan" begin
         yaml = """
-        phase_scan:
+        experiment:
+          type: phase_scan
           name: "test Jz"
           system:
             atom: Rb87
@@ -124,17 +127,18 @@ using FFTW
             max_iter: 5
             omega_range: [-5.0, 5.0]
         """
-        config = load_phase_scan_from_string(yaml)
-        @test config.scan isa ConstrainedJzScan
-        @test length(config.scan.target_values) == 3
-        @test config.scan.tolerance == 0.1
-        @test config.scan.max_iter == 5
-        @test config.scan.omega_range == (-5.0, 5.0)
+        config = load_config_from_string(yaml)
+        @test config.spec.scan isa ConstrainedJzScan
+        @test length(config.spec.scan.target_values) == 3
+        @test config.spec.scan.tolerance == 0.1
+        @test config.spec.scan.max_iter == 5
+        @test config.spec.scan.omega_range == (-5.0, 5.0)
     end
 
     @testset "YAML parsing - stability" begin
         yaml = """
-        phase_scan:
+        experiment:
+          type: phase_scan
           name: "test stability"
           system:
             atom: Rb87
@@ -162,16 +166,17 @@ using FFTW
             n_steps: 50
             sample_every: 5
         """
-        config = load_phase_scan_from_string(yaml)
-        @test config.stability.enabled == true
-        @test config.stability.perturbation == 1e-3
-        @test config.stability.n_steps == 50
-        @test config.stability.sample_every == 5
+        config = load_config_from_string(yaml)
+        @test config.spec.stability.enabled == true
+        @test config.spec.stability.perturbation == 1e-3
+        @test config.spec.stability.n_steps == 50
+        @test config.spec.stability.sample_every == 5
     end
 
-    @testset "YAML parsing - multistart in strategy" begin
+    @testset "YAML parsing - multistart in scan" begin
         yaml = """
-        phase_scan:
+        experiment:
+          type: phase_scan
           name: "test multistart"
           system:
             atom: Rb87
@@ -194,22 +199,22 @@ using FFTW
             axes:
               - parameter: zeeman_p
                 values: [0.0, 1.0]
-          strategy:
             multistart:
               enabled: true
               initial_states: [polar, ferromagnetic]
               n_random: 2
         """
-        config = load_phase_scan_from_string(yaml)
-        @test config.strategy.multistart.enabled == true
-        @test config.strategy.multistart.initial_states == [:polar, :ferromagnetic]
-        @test config.strategy.multistart.n_random == 2
+        config = load_config_from_string(yaml)
+        @test config.spec.scan.multistart.enabled == true
+        @test config.spec.scan.multistart.initial_states == [:polar, :ferromagnetic]
+        @test config.spec.scan.multistart.n_random == 2
         @test config.ground_state.target_magnetization == 0.5
     end
 
     @testset "YAML parsing - quasi_2d DDI" begin
         yaml = """
-        phase_scan:
+        experiment:
+          type: phase_scan
           name: "test quasi-2d"
           system:
             atom: Eu151
@@ -237,7 +242,7 @@ using FFTW
               - parameter: c1_ratio
                 values: [0.0, 0.01]
         """
-        config = load_phase_scan_from_string(yaml)
+        config = load_config_from_string(yaml)
         @test config.system.ddi.enabled == true
         @test config.system.ddi.quasi_2d == true
         @test config.system.ddi.l_z ≈ 0.847
@@ -245,7 +250,8 @@ using FFTW
 
     @testset "YAML parsing - rotating_frame_omega" begin
         yaml = """
-        phase_scan:
+        experiment:
+          type: phase_scan
           name: "test rotating"
           system:
             atom: Rb87
@@ -269,14 +275,15 @@ using FFTW
               - parameter: rotating_frame_omega
                 values: [0.0, 0.5, 1.0]
         """
-        config = load_phase_scan_from_string(yaml)
+        config = load_config_from_string(yaml)
         @test config.ground_state.rotating_frame_omega == 0.5
-        @test config.scan.axes[1].parameter == :rotating_frame_omega
+        @test config.spec.scan.axes[1].parameter == :rotating_frame_omega
     end
 
-    @testset "YAML parsing - default strategy" begin
+    @testset "YAML parsing - default scan options" begin
         yaml = """
-        phase_scan:
+        experiment:
+          type: phase_scan
           name: "test defaults"
           system:
             atom: Rb87
@@ -299,15 +306,16 @@ using FFTW
               - parameter: c1_ratio
                 values: [0.0, 0.01]
         """
-        config = load_phase_scan_from_string(yaml)
-        @test config.strategy.continuation.enabled == true
-        @test config.strategy.continuation.n_steps == 1000
-        @test config.strategy.multistart.enabled == false
+        config = load_config_from_string(yaml)
+        @test config.spec.scan.continuation.enabled == true
+        @test config.spec.scan.continuation.n_steps == 1000
+        @test config.spec.scan.multistart.enabled == false
     end
 
     @testset "YAML parsing - constrained_jz defaults" begin
         yaml = """
-        phase_scan:
+        experiment:
+          type: phase_scan
           name: "test Jz defaults"
           system:
             atom: Rb87
@@ -328,11 +336,110 @@ using FFTW
             type: constrained_jz
             target_values: [0.0, 1.0]
         """
-        config = load_phase_scan_from_string(yaml)
-        @test config.scan isa ConstrainedJzScan
-        @test config.scan.tolerance == 0.05
-        @test config.scan.max_iter == 15
-        @test config.scan.omega_range == (-10.0, 10.0)
+        config = load_config_from_string(yaml)
+        @test config.spec.scan isa ConstrainedJzScan
+        @test config.spec.scan.tolerance == 0.05
+        @test config.spec.scan.max_iter == 15
+        @test config.spec.scan.omega_range == (-10.0, 10.0)
+    end
+
+    @testset "YAML parsing - enable_ddi override" begin
+        yaml = """
+        experiment:
+          type: phase_scan
+          name: "test enable_ddi"
+          system:
+            atom: Rb87
+            grid:
+              n_points: 8
+              box_size: 6.0
+            interactions:
+              c0: 100.0
+              c1: -5.0
+            ddi:
+              enabled: true
+              c_dd: 100.0
+          ground_state:
+            dt: 0.01
+            n_steps: 100
+            tol: 1e-6
+            enable_ddi: false
+            potential:
+              type: harmonic
+              omega: [1.0]
+          scan:
+            type: parameter
+            axes:
+              - parameter: c1_ratio
+                values: [0.0, 0.01]
+        """
+        config = load_config_from_string(yaml)
+        @test config.system.ddi.enabled == true
+        @test config.ground_state.enable_ddi == false
+    end
+
+    @testset "Unified GroundStateConfig" begin
+        yaml_exp = """
+        experiment:
+          type: dynamics
+          name: unified_gs_test
+          system:
+            atom: Rb87
+            grid:
+              n_points: 8
+              box_size: 6.0
+            interactions:
+              c0: 10.0
+              c1: -1.0
+          ground_state:
+            dt: 0.01
+            n_steps: 100
+            tol: 1.0e-6
+            target_magnetization: 0.5
+            rotating_frame_omega: 0.3
+            potential:
+              type: harmonic
+              omega: [1.0]
+          sequence: []
+        """
+        cfg = load_config_from_string(yaml_exp)
+        gs = cfg.ground_state
+        @test gs isa GroundStateConfig
+        @test gs.target_magnetization == 0.5
+        @test gs.rotating_frame_omega == 0.3
+        @test gs.enable_ddi === nothing
+
+        yaml_scan = """
+        experiment:
+          type: phase_scan
+          name: unified_gs_scan
+          system:
+            atom: Rb87
+            grid:
+              n_points: 8
+              box_size: 6.0
+            interactions:
+              c0: 10.0
+              c1: -1.0
+          ground_state:
+            dt: 0.01
+            n_steps: 100
+            tol: 1e-6
+            target_magnetization: 0.5
+            rotating_frame_omega: 0.3
+            potential:
+              type: harmonic
+              omega: [1.0]
+          scan:
+            type: parameter
+            axes:
+              - parameter: c1_ratio
+                values: [0.0, 0.01]
+        """
+        cfg2 = load_config_from_string(yaml_scan)
+        @test cfg2.ground_state isa GroundStateConfig
+        @test cfg2.ground_state.target_magnetization == 0.5
+        @test cfg2.ground_state.rotating_frame_omega == 0.3
     end
 
     @testset "_sweep_values" begin
@@ -396,7 +503,8 @@ using FFTW
 
     @testset "Tiny 1D scan" begin
         yaml = """
-        phase_scan:
+        experiment:
+          type: phase_scan
           name: "tiny scan"
           system:
             atom: Rb87
@@ -418,7 +526,6 @@ using FFTW
             axes:
               - parameter: zeeman_q
                 values: [0.0, 0.5, 1.0]
-          strategy:
             continuation:
               enabled: false
               n_steps: 30
@@ -428,8 +535,8 @@ using FFTW
             csv: true
             save_psi: false
         """
-        config = load_phase_scan_from_string(yaml)
-        results = run_phase_scan(config; verbose=false)
+        config = load_config_from_string(yaml)
+        results = run_config(config; verbose=false)
 
         @test length(results) == 3
         for r in results
@@ -445,6 +552,93 @@ using FFTW
         @test startswith(lines[1], "zeeman_q,")
 
         rm("/tmp/test_tiny_scan"; recursive=true, force=true)
+    end
+
+    @testset "YAML parsing - per_point_overrides" begin
+        yaml = """
+        experiment:
+          type: phase_scan
+          name: "test overrides"
+          system:
+            atom: Rb87
+            grid:
+              n_points: 8
+              box_size: 6.0
+            interactions:
+              c0: 100.0
+              c1: -5.0
+          ground_state:
+            dt: 0.01
+            n_steps: 100
+            tol: 1e-6
+            potential:
+              type: harmonic
+              omega: [1.0]
+          scan:
+            type: parameter
+            axes:
+              - parameter: c1_ratio
+                values:
+                  from: -0.02
+                  to: 0.03
+                  n_points: 5
+            per_point_overrides:
+              - parameter: c1_ratio
+                range:
+                  from: -0.005
+                  to: 0.005
+                n_steps: 10000
+                tol: 1.0e-10
+        """
+        config = load_config_from_string(yaml)
+        @test length(config.spec.scan.per_point_overrides) == 1
+        ov = config.spec.scan.per_point_overrides[1]
+        @test ov.parameter == :c1_ratio
+        @test ov.range == (-0.005, 0.005)
+        @test ov.overrides[:n_steps] == 10000
+        @test ov.overrides[:tol] == 1e-10
+    end
+
+    @testset "ScanPointOverride validation" begin
+        @test_throws ArgumentError ScanPointOverride(:c1_ratio, (0.0, 1.0), Dict{Symbol,Any}())
+        @test_throws ArgumentError ScanPointOverride(:c1_ratio, (0.0, 1.0),
+            Dict{Symbol,Any}(:unknown_key => 1))
+        @test_throws ArgumentError ScanPointOverride(:c1_ratio, (1.0, 0.0),
+            Dict{Symbol,Any}(:n_steps => 100))
+        ov = ScanPointOverride(:c1_ratio, (0.0, 1.0),
+            Dict{Symbol,Any}(:n_steps => 500, :tol => 1e-10))
+        @test ov.overrides[:n_steps] == 500
+    end
+
+    @testset "_resolve_overrides" begin
+        pot = PotentialConfig(:harmonic, Dict{String,Any}("omega" => [1.0]))
+        gs = GroundStateConfig(0.01, 100, 1e-6, :polar, ZeemanParams(0.0, 0.0),
+                               pot, nothing, nothing, 0.0)
+
+        ov = ScanPointOverride(:c1_ratio, (-0.005, 0.005),
+            Dict{Symbol,Any}(:n_steps => 5000, :tol => 1e-10))
+
+        # In range
+        r = SpinorBEC._resolve_overrides(gs, [ov], Dict{Symbol,Float64}(:c1_ratio => 0.001))
+        @test r.n_steps == 5000
+        @test r.tol == 1e-10
+        @test r.dt == 0.01
+        @test r.initial_state == :polar
+
+        # Out of range
+        r2 = SpinorBEC._resolve_overrides(gs, [ov], Dict{Symbol,Float64}(:c1_ratio => 0.02))
+        @test r2.n_steps == 100
+        @test r2.tol == 1e-6
+
+        # No overrides
+        r3 = SpinorBEC._resolve_overrides(gs, ScanPointOverride[], Dict{Symbol,Float64}(:c1_ratio => 0.0))
+        @test r3.n_steps == 100
+    end
+
+    @testset "ParameterScan with default overrides" begin
+        axis = ScanAxis(:c1_ratio, ScanValues(0.0, 1.0, 3))
+        ps = ParameterScan([axis])
+        @test isempty(ps.per_point_overrides)
     end
 
     @testset "Type constructors" begin
@@ -472,15 +666,17 @@ using FFTW
         s = ScanStabilityConfig()
         @test s.enabled == false
 
-        o = ScanOutputConfig()
-        @test o.dir == "results"
-
         ms = MultiStartConfig()
         @test ms.enabled == false
         @test ms.n_random == 0
 
-        st = ScanStrategyConfig()
-        @test st.continuation.enabled == true
-        @test st.multistart.enabled == false
+        # GroundStateConfig validation
+        pot = PotentialConfig(:harmonic, Dict{String,Any}("omega" => [1.0]))
+        @test_throws ArgumentError GroundStateConfig(
+            -0.01, 100, 1e-6, :polar, ZeemanParams(0.0, 0.0), pot, nothing, nothing, 0.0)
+        @test_throws ArgumentError GroundStateConfig(
+            0.01, 0, 1e-6, :polar, ZeemanParams(0.0, 0.0), pot, nothing, nothing, 0.0)
+        @test_throws ArgumentError GroundStateConfig(
+            0.01, 100, -1e-6, :polar, ZeemanParams(0.0, 0.0), pot, nothing, nothing, 0.0)
     end
 end

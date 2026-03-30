@@ -135,6 +135,7 @@ using SpinorBEC
     @testset "YAML adaptive_dt parsing" begin
         yaml = """
         experiment:
+          type: dynamics
           name: adaptive_test
           system:
             atom: Rb87
@@ -144,6 +145,13 @@ using SpinorBEC
             interactions:
               c0: 1.0
               c1: 0.0
+          ground_state:
+            dt: 0.01
+            n_steps: 10
+            tol: 1e-4
+            potential:
+              type: harmonic
+              omega: [1.0]
           sequence:
             - name: fixed_phase
               duration: 1.0
@@ -163,18 +171,21 @@ using SpinorBEC
                 p: 0.0
                 q: 0.0
         """
-        cfg = load_experiment_from_string(yaml)
-        @test cfg.sequence[1].adaptive_dt === nothing
-        @test cfg.sequence[2].adaptive_dt !== nothing
-        @test cfg.sequence[2].adaptive_dt.dt_init == 0.005
-        @test cfg.sequence[2].adaptive_dt.dt_min == 0.0001
-        @test cfg.sequence[2].adaptive_dt.dt_max == 0.05
-        @test cfg.sequence[2].adaptive_dt.tol == 0.002
+        cfg = load_config_from_string(yaml)
+        @test cfg.spec.sequence[1].integrator.method === :strang
+        @test cfg.spec.sequence[1].integrator.params === nothing
+        @test cfg.spec.sequence[2].integrator.method === :adaptive
+        @test cfg.spec.sequence[2].integrator.params !== nothing
+        @test cfg.spec.sequence[2].integrator.params.dt_init == 0.005
+        @test cfg.spec.sequence[2].integrator.params.dt_min == 0.0001
+        @test cfg.spec.sequence[2].integrator.params.dt_max == 0.05
+        @test cfg.spec.sequence[2].integrator.params.tol == 0.002
     end
 
     @testset "YAML adaptive_dt error_mode parsing" begin
         yaml = """
         experiment:
+          type: dynamics
           name: richardson_test
           system:
             atom: Rb87
@@ -184,6 +195,13 @@ using SpinorBEC
             interactions:
               c0: 1.0
               c1: 0.0
+          ground_state:
+            dt: 0.01
+            n_steps: 10
+            tol: 1e-4
+            potential:
+              type: harmonic
+              omega: [1.0]
           sequence:
             - name: default_mode
               duration: 1.0
@@ -203,14 +221,15 @@ using SpinorBEC
                 p: 0.0
                 q: 0.0
         """
-        cfg = load_experiment_from_string(yaml)
-        @test cfg.sequence[1].adaptive_dt.error_mode === :step_change
-        @test cfg.sequence[2].adaptive_dt.error_mode === :richardson
+        cfg = load_config_from_string(yaml)
+        @test cfg.spec.sequence[1].integrator.params.error_mode === :step_change
+        @test cfg.spec.sequence[2].integrator.params.error_mode === :richardson
     end
 
     @testset "YAML adaptive_dt defaults" begin
         yaml = """
         experiment:
+          type: dynamics
           name: adaptive_defaults
           system:
             atom: Rb87
@@ -220,6 +239,13 @@ using SpinorBEC
             interactions:
               c0: 1.0
               c1: 0.0
+          ground_state:
+            dt: 0.01
+            n_steps: 10
+            tol: 1e-4
+            potential:
+              type: harmonic
+              omega: [1.0]
           sequence:
             - name: phase1
               duration: 1.0
@@ -229,15 +255,111 @@ using SpinorBEC
                 p: 0.0
                 q: 0.0
         """
-        cfg = load_experiment_from_string(yaml)
-        ad = cfg.sequence[1].adaptive_dt
+        cfg = load_config_from_string(yaml)
+        @test cfg.spec.sequence[1].integrator.method === :adaptive
+        ad = cfg.spec.sequence[1].integrator.params
         @test ad.dt_init == 0.002   # falls back to phase dt
         @test ad.dt_max == 0.02     # 10 * dt
     end
 
-    @testset "run_experiment with adaptive_dt" begin
+    @testset "IntegratorConfig type" begin
+        ic = IntegratorConfig()
+        @test ic.method === :strang
+        @test ic.params === nothing
+
+        ic2 = IntegratorConfig(:yoshida, AdaptiveDtParams(; dt_init=0.01))
+        @test ic2.method === :yoshida
+        @test ic2.params.dt_init == 0.01
+
+        @test_throws ArgumentError IntegratorConfig(:unknown)
+        @test_throws ArgumentError IntegratorConfig(:adaptive, nothing)
+    end
+
+    @testset "YAML integrator string shorthand" begin
         yaml = """
         experiment:
+          type: dynamics
+          name: integrator_shorthand
+          system:
+            atom: Rb87
+            grid:
+              n_points: 32
+              box_size: 10.0
+            interactions:
+              c0: 1.0
+              c1: 0.0
+          ground_state:
+            dt: 0.01
+            n_steps: 10
+            tol: 1e-4
+            potential:
+              type: harmonic
+              omega: [1.0]
+          sequence:
+            - name: strang_phase
+              duration: 1.0
+              dt: 0.01
+              integrator: strang
+            - name: yoshida_phase
+              duration: 1.0
+              dt: 0.01
+              integrator: yoshida
+            - name: adaptive_phase
+              duration: 1.0
+              dt: 0.01
+              integrator: adaptive
+        """
+        cfg = load_config_from_string(yaml)
+        @test cfg.spec.sequence[1].integrator.method === :strang
+        @test cfg.spec.sequence[1].integrator.params === nothing
+        @test cfg.spec.sequence[2].integrator.method === :yoshida
+        @test cfg.spec.sequence[2].integrator.params !== nothing
+        @test cfg.spec.sequence[3].integrator.method === :adaptive
+        @test cfg.spec.sequence[3].integrator.params !== nothing
+    end
+
+    @testset "YAML integrator dict form" begin
+        yaml = """
+        experiment:
+          type: dynamics
+          name: integrator_dict
+          system:
+            atom: Rb87
+            grid:
+              n_points: 32
+              box_size: 10.0
+            interactions:
+              c0: 1.0
+              c1: 0.0
+          ground_state:
+            dt: 0.01
+            n_steps: 10
+            tol: 1e-4
+            potential:
+              type: harmonic
+              omega: [1.0]
+          sequence:
+            - name: adaptive_dict
+              duration: 1.0
+              dt: 0.01
+              integrator:
+                method: adaptive
+                tol: 1.0e-4
+                dt_min: 1.0e-5
+                dt_max: 0.05
+        """
+        cfg = load_config_from_string(yaml)
+        ic = cfg.spec.sequence[1].integrator
+        @test ic.method === :adaptive
+        @test ic.params.tol == 1e-4
+        @test ic.params.dt_min == 1e-5
+        @test ic.params.dt_max == 0.05
+    end
+
+    @testset "run_config with adaptive_dt" begin
+        yaml = """
+        experiment:
+          type: dynamics
           name: adaptive_integration
           system:
             atom: Rb87
@@ -272,8 +394,8 @@ using SpinorBEC
                 type: harmonic
                 omega: [1.0]
         """
-        config = load_experiment_from_string(yaml)
-        result = run_experiment(config; verbose=false)
+        config = load_config_from_string(yaml)
+        result = run_config(config; verbose=false)
         @test length(result.phase_results) == 1
         sim = result.phase_results[1]
         @test length(sim.times) >= 2

@@ -28,7 +28,7 @@ struct PhaseConfig
     zeeman_q::RampOrConstant
     potential::Union{Nothing,PotentialConfig}
     noise_amplitude::Union{Nothing,Float64}
-    adaptive_dt::Union{Nothing,AdaptiveDtParams}
+    integrator::IntegratorConfig
 end
 
 struct GroundStateConfig
@@ -38,7 +38,21 @@ struct GroundStateConfig
     initial_state::Symbol
     zeeman::ZeemanParams
     potential::PotentialConfig
-    enable_ddi::Bool
+    enable_ddi::Union{Nothing,Bool}
+    target_magnetization::Union{Nothing,Float64}
+    rotating_frame_omega::Float64
+
+    function GroundStateConfig(dt::Float64, n_steps::Int, tol::Float64,
+                               initial_state::Symbol, zeeman::ZeemanParams,
+                               potential::PotentialConfig, enable_ddi::Union{Nothing,Bool},
+                               target_magnetization::Union{Nothing,Float64},
+                               rotating_frame_omega::Float64)
+        dt > 0 || throw(ArgumentError("dt must be positive"))
+        n_steps > 0 || throw(ArgumentError("n_steps must be positive"))
+        tol > 0 || throw(ArgumentError("tol must be positive"))
+        new(dt, n_steps, tol, initial_state, zeeman, potential,
+            enable_ddi, target_magnetization, rotating_frame_omega)
+    end
 end
 
 struct DDIConfig
@@ -61,21 +75,6 @@ struct SystemConfig
     loss::Union{Nothing,LossParams}
 end
 
-struct ExperimentConfig
-    name::String
-    system::SystemConfig
-    ground_state::Union{Nothing,GroundStateConfig}
-    sequence::Vector{PhaseConfig}
-end
-
-struct ExperimentResult
-    config::ExperimentConfig
-    ground_state_energy::Union{Nothing,Float64}
-    ground_state_converged::Union{Nothing,Bool}
-    phase_results::Vector{SimulationResult}
-    phase_names::Vector{String}
-end
-
 # --- Atom Registry ---
 
 const ATOM_REGISTRY = Dict{Symbol,AtomSpecies}(
@@ -89,27 +88,7 @@ function resolve_atom(name::Symbol)
     ATOM_REGISTRY[name]
 end
 
-# --- YAML Parsing ---
-
-function load_experiment(path::String)
-    data = YAML.load_file(path)
-    exp_data = get(data, "experiment", data)
-    _parse_experiment(exp_data)
-end
-
-function load_experiment_from_string(yaml_str::String)
-    data = YAML.load(yaml_str)
-    exp_data = get(data, "experiment", data)
-    _parse_experiment(exp_data)
-end
-
-function _parse_experiment(d::Dict)
-    name = get(d, "name", "unnamed")
-    system = _parse_system(d["system"])
-    gs = haskey(d, "ground_state") ? _parse_ground_state(d["ground_state"]) : nothing
-    seq = haskey(d, "sequence") ? [_parse_phase(p) for p in d["sequence"]] : PhaseConfig[]
-    ExperimentConfig(name, system, gs, seq)
-end
+# --- YAML Parsing Helpers ---
 
 function _parse_system(d::Dict)
     atom_name = Symbol(d["atom"])
@@ -166,9 +145,16 @@ function _parse_ground_state(d::Dict)
 
     pot = _parse_potential_config(get(d, "potential", Dict("type" => "none")))
 
-    gs_enable_ddi = Bool(get(d, "enable_ddi", false))
+    enable_ddi = let v = get(d, "enable_ddi", nothing)
+        v === nothing ? nothing : Bool(v)
+    end
+    target_mag = let v = get(d, "target_magnetization", nothing)
+        v === nothing ? nothing : Float64(v)
+    end
+    rotating_frame_omega = Float64(get(d, "rotating_frame_omega", 0.0))
 
-    GroundStateConfig(dt, n_steps, tol, initial_state, zeeman, pot, gs_enable_ddi)
+    GroundStateConfig(dt, n_steps, tol, initial_state, zeeman, pot,
+                      enable_ddi, target_mag, rotating_frame_omega)
 end
 
 function _parse_phase(d::Dict)
@@ -187,20 +173,54 @@ function _parse_phase(d::Dict)
         v === nothing ? nothing : Float64(v)
     end
 
-    adaptive = if haskey(d, "adaptive_dt")
+    integrator = if haskey(d, "integrator")
+        _parse_integrator(d["integrator"], dt)
+    elseif haskey(d, "adaptive_dt")
         ad = d["adaptive_dt"]
-        AdaptiveDtParams(;
+        params = AdaptiveDtParams(;
             dt_init=Float64(get(ad, "dt_init", dt)),
             dt_min=Float64(get(ad, "dt_min", 1e-5)),
             dt_max=Float64(get(ad, "dt_max", 10 * dt)),
             tol=Float64(get(ad, "tol", 1e-3)),
             error_mode=Symbol(get(ad, "error_mode", "step_change")),
         )
+        IntegratorConfig(:adaptive, params)
     else
-        nothing
+        IntegratorConfig()
     end
 
-    PhaseConfig(name, duration, dt, save_every, zeeman_p, zeeman_q, pot, noise_amp, adaptive)
+    PhaseConfig(name, duration, dt, save_every, zeeman_p, zeeman_q, pot, noise_amp, integrator)
+end
+
+function _parse_integrator(v, dt::Float64)
+    if v isa AbstractString
+        method = Symbol(v)
+        if method == :strang
+            return IntegratorConfig(:strang, nothing)
+        elseif method == :yoshida
+            return IntegratorConfig(:yoshida, AdaptiveDtParams(; dt_init=dt))
+        elseif method == :adaptive
+            return IntegratorConfig(:adaptive, AdaptiveDtParams(; dt_init=dt))
+        else
+            throw(ArgumentError("Unknown integrator method: $v"))
+        end
+    elseif v isa Dict
+        method = Symbol(get(v, "method", "strang"))
+        if method == :strang
+            return IntegratorConfig(:strang, nothing)
+        else
+            params = AdaptiveDtParams(;
+                dt_init=Float64(get(v, "dt_init", dt)),
+                dt_min=Float64(get(v, "dt_min", 1e-5)),
+                dt_max=Float64(get(v, "dt_max", 10 * dt)),
+                tol=Float64(get(v, "tol", 1e-3)),
+                error_mode=Symbol(get(v, "error_mode", "step_change")),
+            )
+            return IntegratorConfig(method, params)
+        end
+    else
+        throw(ArgumentError("integrator must be a string or dict, got $(typeof(v))"))
+    end
 end
 
 function _parse_ramp_or_constant(v)::RampOrConstant
@@ -253,95 +273,36 @@ function _parse_c_extra(inter::Dict, ::Int)
     c_extra
 end
 
-# --- Phase Scan Configuration ---
-
-struct ScanGroundStateConfig
-    dt::Float64
-    n_steps::Int
-    tol::Float64
-    initial_state::Symbol
-    zeeman::ZeemanParams
-    potential::PotentialConfig
-    target_magnetization::Union{Nothing,Float64}
-    rotating_frame_omega::Float64
-end
-
-struct PhaseScanConfig
-    name::String
-    system::SystemConfig
-    ground_state::ScanGroundStateConfig
-    scan::AbstractScanSpec
-    strategy::ScanStrategyConfig
-    stability::ScanStabilityConfig
-    output::ScanOutputConfig
-end
-
-function _compute_c_total(config::PhaseScanConfig)
-    F = resolve_atom(config.system.atom_name).F
-    ip = config.system.interactions
-    ip.c0 + F^2 * ip.c1
-end
-
-function load_phase_scan(path::String)
-    data = YAML.load_file(path)
-    ps_data = get(data, "phase_scan", data)
-    _parse_phase_scan(ps_data)
-end
-
-function load_phase_scan_from_string(yaml_str::String)
-    data = YAML.load(yaml_str)
-    ps_data = get(data, "phase_scan", data)
-    _parse_phase_scan(ps_data)
-end
-
-function _parse_phase_scan(d::Dict)
-    name = get(d, "name", "unnamed scan")
-    system = _parse_system(d["system"])
-    gs = _parse_scan_ground_state(d["ground_state"])
-
-    scan_d = d["scan"]
-    scan_type = Symbol(scan_d["type"])
-    scan = if scan_type == :parameter
-        _parse_parameter_scan(scan_d)
-    elseif scan_type == :constrained_jz
-        _parse_constrained_jz_scan(scan_d)
-    else
-        throw(ArgumentError("Unknown scan type: $scan_type. Supported: parameter, constrained_jz"))
-    end
-
-    strategy = haskey(d, "strategy") ? _parse_strategy(d["strategy"]) : ScanStrategyConfig()
-
-    stab = haskey(d, "stability") ? _parse_scan_stability(d["stability"]) : ScanStabilityConfig()
-    output = haskey(d, "output") ? _parse_scan_output(d["output"]) : ScanOutputConfig()
-
-    PhaseScanConfig(name, system, gs, scan, strategy, stab, output)
-end
-
-function _parse_scan_ground_state(d::Dict)
-    dt = Float64(d["dt"])
-    n_steps = Int(d["n_steps"])
-    tol = Float64(d["tol"])
-    initial_state = Symbol(get(d, "initial_state", "polar"))
-
-    z = get(d, "zeeman", Dict())
-    zeeman = ZeemanParams(Float64(get(z, "p", 0.0)), Float64(get(z, "q", 0.0)))
-
-    pot = _parse_potential_config(get(d, "potential", Dict("type" => "none")))
-
-    target_mag = let v = get(d, "target_magnetization", nothing)
-        v === nothing ? nothing : Float64(v)
-    end
-
-    rotating_frame_omega = Float64(get(d, "rotating_frame_omega", 0.0))
-
-    ScanGroundStateConfig(dt, n_steps, tol, initial_state, zeeman, pot,
-                          target_mag, rotating_frame_omega)
-end
+# --- Scan Parsing Helpers ---
 
 function _parse_parameter_scan(d::Dict)
     axes_data = d["axes"]
     axes = ScanAxis[_parse_sweep_axis(a) for a in axes_data]
-    ParameterScan(axes)
+    cont = haskey(d, "continuation") ? _parse_continuation(d["continuation"]) : ContinuationConfig()
+    ms = haskey(d, "multistart") ? _parse_multistart(d["multistart"]) : MultiStartConfig()
+    overrides = if haskey(d, "per_point_overrides")
+        ScanPointOverride[_parse_point_override(o) for o in d["per_point_overrides"]]
+    else
+        ScanPointOverride[]
+    end
+    ParameterScan(axes, cont, ms, overrides)
+end
+
+function _parse_point_override(d::Dict)
+    parameter = Symbol(d["parameter"])
+    r = d["range"]
+    range_val = (Float64(r["from"]), Float64(r["to"]))
+    overrides = Dict{Symbol,Any}()
+    for k in [:n_steps, :tol, :dt]
+        sk = string(k)
+        if haskey(d, sk)
+            overrides[k] = k == :n_steps ? Int(d[sk]) : Float64(d[sk])
+        end
+    end
+    if haskey(d, "initial_state")
+        overrides[:initial_state] = Symbol(d["initial_state"])
+    end
+    ScanPointOverride(parameter, range_val, overrides)
 end
 
 function _parse_constrained_jz_scan(d::Dict)
@@ -355,12 +316,6 @@ function _parse_constrained_jz_scan(d::Dict)
         (-10.0, 10.0)
     end
     ConstrainedJzScan(target_values, tolerance, max_iter, omega_range)
-end
-
-function _parse_strategy(d::Dict)
-    cont = haskey(d, "continuation") ? _parse_continuation(d["continuation"]) : ContinuationConfig()
-    ms = haskey(d, "multistart") ? _parse_multistart(d["multistart"]) : MultiStartConfig()
-    ScanStrategyConfig(cont, ms)
 end
 
 function _parse_multistart(d::Dict)
@@ -398,11 +353,4 @@ function _parse_scan_stability(d::Dict)
     n_steps = Int(get(d, "n_steps", 300))
     sample_every = Int(get(d, "sample_every", 10))
     ScanStabilityConfig(enabled, perturbation, n_steps, sample_every)
-end
-
-function _parse_scan_output(d::Dict)
-    dir = String(get(d, "dir", "results"))
-    csv = Bool(get(d, "csv", true))
-    save_psi = Bool(get(d, "save_psi", false))
-    ScanOutputConfig(dir, csv, save_psi)
 end

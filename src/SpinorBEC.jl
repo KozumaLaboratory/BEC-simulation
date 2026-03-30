@@ -54,14 +54,16 @@ include("adaptive.jl")
 include("yoshida.jl")
 include("experiment.jl")
 include("experiment_runner.jl")
+include("config.jl")
 include("phase_scan.jl")
+include("config_runner.jl")
 include("io.jl")
 include("unitful_support.jl")
 
 # Types
 export GridConfig, Grid, SpinSystem, SpinMatrices
 export AtomSpecies, InteractionParams, ZeemanParams, LossParams, TensorInteractionCache
-export SimParams, SimState, FFTPlans, RFFTPlans, Workspace, AdaptiveDtParams
+export SimParams, SimState, FFTPlans, RFFTPlans, Workspace, AdaptiveDtParams, IntegratorConfig
 export TOFParams, BdGResult
 export HarmonicTrap, NoPotential, GravityPotential, CompositePotential
 
@@ -166,19 +168,16 @@ export run_simulation!, run_simulation_checkpointed!
 export run_simulation_adaptive!, run_simulation_yoshida!, make_workspace, init_psi
 
 # I/O
-export save_state, load_state, save_experiment_result, load_experiment_result
+export save_state, load_state
 
-# Experiment
+# Config types
 export ConstantValue, LinearRamp, RampOrConstant, interpolate_value
-export PotentialConfig, PhaseConfig, GroundStateConfig, DDIConfig
-export SystemConfig, ExperimentConfig, ExperimentResult
-export load_experiment, load_experiment_from_string, run_experiment, seed_noise
-
-# Phase scan
-export ScanValues, ScanAxis, ContinuationConfig, ScanStabilityConfig, ScanOutputConfig
-export MultiStartConfig, ScanStrategyConfig, AbstractScanSpec, ParameterScan, ConstrainedJzScan
-export ScanGroundStateConfig, PhaseScanConfig
-export load_phase_scan, load_phase_scan_from_string, run_phase_scan
+export PotentialConfig, PhaseConfig, GroundStateConfig, DDIConfig, SystemConfig
+export ScanValues, ScanAxis, ContinuationConfig, ScanStabilityConfig, ScanPointOverride
+export MultiStartConfig, AbstractScanSpec, ParameterScan, ConstrainedJzScan
+export AbstractExperimentSpec, GroundStateExperiment, DynamicsExperiment, ScanExperiment
+export PerturbationConfig, OutputConfig, ObservablesConfig, UnifiedConfig
+export load_config, load_config_from_string, run_config, seed_noise
 
 # Units
 export Units

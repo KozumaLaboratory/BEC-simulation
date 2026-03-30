@@ -60,6 +60,7 @@
     @testset "YAML c_total/c1_ratio parsing" begin
         yaml_str = """
         experiment:
+          type: dynamics
           name: "constraint test"
           system:
             atom: Eu151
@@ -72,9 +73,16 @@
             ddi:
               enabled: true
               c_dd: 7647.0
+          ground_state:
+            dt: 0.01
+            n_steps: 10
+            tol: 1e-4
+            potential:
+              type: harmonic
+              omega: [1.0]
           sequence: []
         """
-        config = load_experiment_from_string(yaml_str)
+        config = load_config_from_string(yaml_str)
         ip = config.system.interactions
         @test ip.c0 + 36 * ip.c1 ≈ 4689.0 rtol=1e-4
         @test ip.c1 / ip.c0 ≈ 0.02778 rtol=1e-4
@@ -83,6 +91,7 @@
     @testset "YAML c_total with c1_ratio=0" begin
         yaml_str = """
         experiment:
+          type: dynamics
           name: "zero ratio test"
           system:
             atom: Eu151
@@ -91,9 +100,16 @@
               box_size: [10.0]
             interactions:
               c_total: 4689.0
+          ground_state:
+            dt: 0.01
+            n_steps: 10
+            tol: 1e-4
+            potential:
+              type: harmonic
+              omega: [1.0]
           sequence: []
         """
-        config = load_experiment_from_string(yaml_str)
+        config = load_config_from_string(yaml_str)
         ip = config.system.interactions
         @test ip.c0 ≈ 4689.0
         @test ip.c1 ≈ 0.0
@@ -192,6 +208,7 @@
     @testset "YAML c_total with c_extra" begin
         yaml_str = """
         experiment:
+          type: dynamics
           name: "c_extra test"
           system:
             atom: Eu151
@@ -203,9 +220,16 @@
               c1_ratio: 0.02778
               c4: 50.0
               c6: -20.0
+          ground_state:
+            dt: 0.01
+            n_steps: 10
+            tol: 1e-4
+            potential:
+              type: harmonic
+              omega: [1.0]
           sequence: []
         """
-        config = load_experiment_from_string(yaml_str)
+        config = load_config_from_string(yaml_str)
         ip = config.system.interactions
         @test ip.c0 + 36 * ip.c1 ≈ 4689.0 rtol=1e-4
         @test length(ip.c_extra) >= 5
@@ -216,6 +240,7 @@
     @testset "YAML explicit c0/c1 still works" begin
         yaml_str = """
         experiment:
+          type: dynamics
           name: "explicit test"
           system:
             atom: Rb87
@@ -225,9 +250,16 @@
             interactions:
               c0: 10.0
               c1: -0.5
+          ground_state:
+            dt: 0.01
+            n_steps: 10
+            tol: 1e-4
+            potential:
+              type: harmonic
+              omega: [1.0]
           sequence: []
         """
-        config = load_experiment_from_string(yaml_str)
+        config = load_config_from_string(yaml_str)
         @test config.system.interactions.c0 == 10.0
         @test config.system.interactions.c1 == -0.5
     end

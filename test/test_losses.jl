@@ -224,6 +224,7 @@
         yaml = """
         experiment:
           name: loss_test
+          type: dynamics
           system:
             atom: Rb87
             grid:
@@ -235,9 +236,16 @@
             losses:
               gamma_dr: 1.0e-3
               L3: 2.0e-5
+          ground_state:
+            dt: 0.01
+            n_steps: 10
+            tol: 1e-4
+            potential:
+              type: harmonic
+              omega: [1.0]
           sequence: []
         """
-        cfg = load_experiment_from_string(yaml)
+        cfg = load_config_from_string(yaml)
         @test cfg.system.loss !== nothing
         @test cfg.system.loss.gamma_dr ≈ 1e-3
         @test cfg.system.loss.L3 ≈ 2e-5
@@ -247,6 +255,7 @@
         yaml = """
         experiment:
           name: no_loss_test
+          type: dynamics
           system:
             atom: Rb87
             grid:
@@ -255,9 +264,16 @@
             interactions:
               c0: 1.0
               c1: 0.0
+          ground_state:
+            dt: 0.01
+            n_steps: 10
+            tol: 1e-4
+            potential:
+              type: harmonic
+              omega: [1.0]
           sequence: []
         """
-        cfg = load_experiment_from_string(yaml)
+        cfg = load_config_from_string(yaml)
         @test cfg.system.loss === nothing
     end
 
@@ -265,6 +281,7 @@
         yaml = """
         experiment:
           name: noise_test
+          type: dynamics
           system:
             atom: Rb87
             grid:
@@ -273,6 +290,13 @@
             interactions:
               c0: 1.0
               c1: 0.0
+          ground_state:
+            dt: 0.01
+            n_steps: 10
+            tol: 1e-4
+            potential:
+              type: harmonic
+              omega: [1.0]
           sequence:
             - name: noisy_phase
               duration: 1.0
@@ -282,9 +306,9 @@
               duration: 1.0
               dt: 0.01
         """
-        cfg = load_experiment_from_string(yaml)
-        @test cfg.sequence[1].noise_amplitude == 0.001
-        @test cfg.sequence[2].noise_amplitude === nothing
+        cfg = load_config_from_string(yaml)
+        @test cfg.spec.sequence[1].noise_amplitude == 0.001
+        @test cfg.spec.sequence[2].noise_amplitude === nothing
     end
 
     @testset "_add_noise! changes psi but preserves norm" begin
@@ -321,6 +345,7 @@
         yaml = """
         experiment:
           name: ddi_gs_test
+          type: dynamics
           system:
             atom: Rb87
             grid:
@@ -341,8 +366,8 @@
               omega: [1.0]
           sequence: []
         """
-        cfg = load_experiment_from_string(yaml)
-        @test cfg.ground_state.enable_ddi == false
+        cfg = load_config_from_string(yaml)
+        @test cfg.ground_state.enable_ddi === nothing
     end
 
     @testset "2D loss step" begin

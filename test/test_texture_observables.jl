@@ -197,6 +197,7 @@ using LinearAlgebra
         @testset "backward compat (no c_extra)" begin
             yaml = """
             experiment:
+              type: dynamics
               name: test
               system:
                 atom: Rb87
@@ -206,9 +207,16 @@ using LinearAlgebra
                 interactions:
                   c0: 100.0
                   c1: -5.0
+              ground_state:
+                dt: 0.01
+                n_steps: 10
+                tol: 1e-4
+                potential:
+                  type: harmonic
+                  omega: [1.0]
               sequence: []
             """
-            config = load_experiment_from_string(yaml)
+            config = load_config_from_string(yaml)
             ip = config.system.interactions
             @test ip.c0 == 100.0
             @test ip.c1 == -5.0
@@ -218,6 +226,7 @@ using LinearAlgebra
         @testset "with c2, c3" begin
             yaml = """
             experiment:
+              type: dynamics
               name: test
               system:
                 atom: Rb87
@@ -229,9 +238,16 @@ using LinearAlgebra
                   c1: -5.0
                   c2: 3.0
                   c3: 1.5
+              ground_state:
+                dt: 0.01
+                n_steps: 10
+                tol: 1e-4
+                potential:
+                  type: harmonic
+                  omega: [1.0]
               sequence: []
             """
-            config = load_experiment_from_string(yaml)
+            config = load_config_from_string(yaml)
             ip = config.system.interactions
             @test ip.c0 == 100.0
             @test ip.c1 == -5.0

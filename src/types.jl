@@ -374,6 +374,40 @@ struct AdaptiveDtParams
     end
 end
 
+struct IntegratorConfig
+    method::Symbol
+    params::Union{Nothing,AdaptiveDtParams}
+
+    function IntegratorConfig(method::Symbol,
+                              params::Union{Nothing,AdaptiveDtParams}=nothing)
+        method in (:strang, :yoshida, :adaptive) || throw(ArgumentError(
+            "integrator method must be :strang, :yoshida, or :adaptive, got :$method"))
+        if method == :adaptive && params === nothing
+            throw(ArgumentError("adaptive integrator requires AdaptiveDtParams"))
+        end
+        new(method, params)
+    end
+end
+
+IntegratorConfig() = IntegratorConfig(:strang, nothing)
+
+struct ObservablesConfig
+    always::Vector{Symbol}
+    on_save::Vector{Symbol}
+    final_only::Vector{Symbol}
+    spatial_sampling::Float64
+
+    function ObservablesConfig(always::Vector{Symbol}, on_save::Vector{Symbol},
+                               final_only::Vector{Symbol}, spatial_sampling::Float64)
+        0.0 < spatial_sampling <= 1.0 || throw(ArgumentError(
+            "spatial_sampling must be in (0, 1], got $spatial_sampling"))
+        new(always, on_save, final_only, spatial_sampling)
+    end
+end
+
+ObservablesConfig() = ObservablesConfig(
+    [:norm, :magnetization], [:energy], Symbol[], 1.0)
+
 struct TOFParams
     t_tof::Float64
     gradient::Float64
@@ -436,23 +470,44 @@ end
 
 MultiStartConfig() = MultiStartConfig(false, [:polar, :ferromagnetic, :uniform, :antiferromagnetic], 0)
 
-struct ScanStrategyConfig
-    continuation::ContinuationConfig
-    multistart::MultiStartConfig
-end
-
-ScanStrategyConfig() = ScanStrategyConfig(ContinuationConfig(), MultiStartConfig())
-
 abstract type AbstractScanSpec end
+
+struct ScanPointOverride
+    parameter::Symbol
+    range::Tuple{Float64,Float64}
+    overrides::Dict{Symbol,Any}
+
+    function ScanPointOverride(parameter::Symbol,
+                               range::Tuple{Float64,Float64},
+                               overrides::Dict{Symbol,Any})
+        allowed = Set([:n_steps, :tol, :dt, :initial_state])
+        for k in keys(overrides)
+            k in allowed || throw(ArgumentError(
+                "Unknown override key: $k. Allowed: $allowed"))
+        end
+        isempty(overrides) && throw(ArgumentError(
+            "Override must specify at least one field"))
+        range[1] <= range[2] || throw(ArgumentError(
+            "Override range must satisfy from <= to"))
+        new(parameter, range, overrides)
+    end
+end
 
 struct ParameterScan <: AbstractScanSpec
     axes::Vector{ScanAxis}
+    continuation::ContinuationConfig
+    multistart::MultiStartConfig
+    per_point_overrides::Vector{ScanPointOverride}
 
-    function ParameterScan(axes::Vector{ScanAxis})
+    function ParameterScan(axes::Vector{ScanAxis}, continuation::ContinuationConfig,
+                           multistart::MultiStartConfig,
+                           per_point_overrides::Vector{ScanPointOverride}=ScanPointOverride[])
         1 <= length(axes) <= 2 || throw(ArgumentError("ParameterScan requires 1 or 2 axes, got $(length(axes))"))
-        new(axes)
+        new(axes, continuation, multistart, per_point_overrides)
     end
 end
+
+ParameterScan(axes::Vector{ScanAxis}) = ParameterScan(axes, ContinuationConfig(), MultiStartConfig())
 
 struct ConstrainedJzScan <: AbstractScanSpec
     target_values::Vector{Float64}
@@ -486,14 +541,6 @@ end
 
 ScanStabilityConfig() = ScanStabilityConfig(false, 1e-4, 300, 10)
 
-struct ScanOutputConfig
-    dir::String
-    csv::Bool
-    save_psi::Bool
-end
-
-ScanOutputConfig() = ScanOutputConfig("results", true, false)
-
 # --- Workspace ---
 
 struct Workspace{N,A,P,IP,SM<:SpinMatrices,ZEE,DDI,DDIB,RAM,LOSS,DDIP,BK,TC,CC}
@@ -518,3 +565,30 @@ struct Workspace{N,A,P,IP,SM<:SpinMatrices,ZEE,DDI,DDIB,RAM,LOSS,DDIP,BK,TC,CC}
     tensor_cache::TC
     coriolis_cache::CC
 end
+
+# --- Unified Config v3 (base types) ---
+
+abstract type AbstractExperimentSpec end
+
+struct GroundStateExperiment <: AbstractExperimentSpec end
+
+struct PerturbationConfig
+    amplitude::Float64
+    seed::Union{Nothing,Int}
+
+    function PerturbationConfig(amplitude::Float64, seed::Union{Nothing,Int})
+        amplitude > 0 || throw(ArgumentError("perturbation amplitude must be positive"))
+        new(amplitude, seed)
+    end
+end
+
+struct OutputConfig
+    dir::String
+    csv::Bool
+    save_psi::Bool
+    checkpoint_enabled::Bool
+    checkpoint_interval::Int
+    seed::Union{Nothing,Int}
+end
+
+OutputConfig() = OutputConfig("results", true, false, false, 1000, nothing)

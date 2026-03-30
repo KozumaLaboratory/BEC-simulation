@@ -48,4 +48,6 @@ using SpinorBEC
     include("test_tof.jl")
     include("test_bogoliubov.jl")
     include("test_analytical_validation.jl")
+    include("test_phase_scan.jl")
+    include("test_config.jl")
 end
