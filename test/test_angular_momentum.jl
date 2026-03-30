@@ -216,6 +216,41 @@ using LinearAlgebra
         @test abs(Jz_final - Jz0) < 0.15
     end
 
+    @testset "target_Jz ground state search" begin
+        @testset "1D + target_Jz → ArgumentError" begin
+            grid = make_grid(GridConfig(32, 10.0))
+            @test_throws ArgumentError find_ground_state(;
+                grid, atom=Rb87, interactions=InteractionParams(10.0, -0.5),
+                potential=HarmonicTrap(1.0), target_Jz=1.0, n_steps=100,
+                fft_flags=FFTW.ESTIMATE)
+        end
+
+        @testset "2D target_Jz=0 converges near zero" begin
+            grid = make_grid(GridConfig((32, 32), (10.0, 10.0)))
+            r = find_ground_state(;
+                grid, atom=Rb87,
+                interactions=InteractionParams(10.0, -0.5),
+                potential=HarmonicTrap(1.0, 1.0),
+                target_Jz=0.0, Jz_tol=0.1, Jz_max_iter=5,
+                n_steps=200, dt=0.005, fft_flags=FFTW.ESTIMATE)
+            @test haskey(r, :Jz)
+            @test haskey(r, :omega)
+            @test abs(r.Jz) < 0.5
+        end
+    end
+
+    @testset "validate_conservation with track_Jz" begin
+        grid = make_grid(GridConfig((32, 32), (10.0, 10.0)))
+        sp = SimParams(; dt=0.001, n_steps=100, imaginary_time=false, save_every=100)
+        ws = make_workspace(; grid, atom=Rb87,
+            interactions=InteractionParams(10.0, -0.5),
+            potential=HarmonicTrap(1.0, 1.0),
+            sim_params=sp, fft_flags=FFTW.ESTIMATE)
+        result = validate_conservation(ws; n_steps=20, track_Jz=true)
+        @test haskey(result, :Jz_drift)
+        @test isfinite(result.Jz_drift)
+    end
+
     @testset "probability_current: 2D components" begin
         grid = make_grid(GridConfig((32, 32), (10.0, 10.0)))
         sys = SpinSystem(1)

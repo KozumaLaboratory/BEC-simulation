@@ -96,12 +96,28 @@ function find_ground_state(;
     fft_flags=FFTW.MEASURE,
     target_magnetization::Union{Nothing,Float64}=nothing,
     rotating_frame_omega::Float64=0.0,
+    target_Jz::Union{Nothing,Float64}=nothing,
+    Jz_tol::Float64=0.01,
+    Jz_max_iter::Int=20,
+    Jz_omega_range::Tuple{Float64,Float64}=(-5.0, 5.0),
 )
     psi0 = if psi_init === nothing
         sys = SpinSystem(atom.F)
         init_psi(grid, sys; state=initial_state)
     else
         copy(psi_init)
+    end
+
+    if target_Jz !== nothing
+        N_dim = length(grid.config.n_points)
+        N_dim >= 2 || throw(ArgumentError(
+            "target_Jz requires N ≥ 2 (need orbital angular momentum). Got N=$N_dim."))
+        return _find_ground_state_Jz(;
+            grid, atom, interactions, zeeman, potential, dt, n_steps, tol,
+            initial_state, psi_init=psi0, enable_ddi, c_dd, secular_ddi,
+            adaptive_dt, dt_max, fft_flags, target_magnetization,
+            target_Jz, Jz_tol, Jz_max_iter, Jz_omega_range,
+        )
     end
 
     _validate_itp_zeeman(zeeman, atom.F, dt)
@@ -454,6 +470,64 @@ function scan_phase_diagram_2d(;
     results
 end
 
+"""
+Bisection on rotating_frame_omega to find ground state with target J_z.
+
+Higher Ω shifts the energy minimum to lower J_z, so:
+  J_z(Ω) is a decreasing function of Ω.
+"""
+function _find_ground_state_Jz(;
+    grid, atom, interactions, zeeman, potential, dt, n_steps, tol,
+    initial_state, psi_init, enable_ddi, c_dd, secular_ddi,
+    adaptive_dt, dt_max, fft_flags, target_magnetization,
+    target_Jz, Jz_tol, Jz_max_iter, Jz_omega_range,
+)
+    omega_lo, omega_hi = Jz_omega_range
+    prev_psi = psi_init
+
+    best_result = nothing
+    best_Jz = NaN
+    best_omega = 0.0
+
+    for iter in 1:Jz_max_iter
+        omega_trial = (omega_lo + omega_hi) / 2.0
+        r = find_ground_state(;
+            grid, atom, interactions, zeeman, potential, dt, n_steps, tol,
+            initial_state, psi_init=copy(prev_psi),
+            enable_ddi, c_dd, secular_ddi,
+            adaptive_dt, dt_max, fft_flags, target_magnetization,
+            rotating_frame_omega=omega_trial,
+        )
+
+        ws = r.workspace
+        plans = ws.fft_plans
+        sys = ws.spin_matrices.system
+        Jz = total_angular_momentum(ws.state.psi, grid, plans, sys)
+
+        if best_result === nothing || abs(Jz - target_Jz) < abs(best_Jz - target_Jz)
+            best_result = r
+            best_Jz = Jz
+            best_omega = omega_trial
+        end
+
+        if abs(Jz - target_Jz) < Jz_tol
+            return (workspace=r.workspace, converged=r.converged, energy=r.energy,
+                    dE=r.dE, dpsi=r.dpsi, Jz=Jz, omega=omega_trial)
+        end
+
+        if Jz > target_Jz
+            omega_lo = omega_trial
+        else
+            omega_hi = omega_trial
+        end
+
+        prev_psi = copy(ws.state.psi)
+    end
+
+    (workspace=best_result.workspace, converged=false, energy=best_result.energy,
+     dE=best_result.dE, dpsi=best_result.dpsi, Jz=best_Jz, omega=best_omega)
+end
+
 function _rebuild_workspace_with_dt(ws::Workspace{N}, new_dt::Float64) where {N}
     sp = SimParams(new_dt, ws.sim_params.n_steps, true,
                    ws.sim_params.normalize_every, ws.sim_params.save_every,
@@ -465,6 +539,6 @@ function _rebuild_workspace_with_dt(ws::Workspace{N}, new_dt::Float64) where {N}
         ws.state, ws.fft_plans, kinetic_phase, ws.potential_values, ws.density_buf,
         ws.spin_matrices, ws.grid, ws.atom, ws.interactions,
         ws.zeeman, ws.potential, sp, ws.ddi, ws.ddi_bufs, ws.raman, ws.loss,
-        ws.ddi_padded, batched_kinetic, ws.tensor_cache,
+        ws.ddi_padded, batched_kinetic, ws.tensor_cache, ws.coriolis_cache,
     )
 end
