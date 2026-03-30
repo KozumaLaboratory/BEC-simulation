@@ -35,6 +35,66 @@ using LinearAlgebra
         end
     end
 
+    @testset "detect_point_group" begin
+        @testset "F=1 ferromagnetic → trivial" begin
+            spinor = ComplexF64[1.0, 0.0, 0.0]
+            @test detect_point_group(spinor, 1) == :trivial
+        end
+
+        @testset "F=0 → trivial" begin
+            spinor = ComplexF64[1.0]
+            @test detect_point_group(spinor, 0) == :trivial
+        end
+
+        @testset "returns a Symbol" begin
+            spinor = zeros(ComplexF64, 13)
+            spinor[1] = 1.0
+            spinor[6] = im * sqrt(11.0)
+            spinor[11] = sqrt(7.0)
+            spinor ./= norm(spinor)
+            pg = detect_point_group(spinor, 6)
+            @test pg isa Symbol
+        end
+    end
+
+    @testset "point group helpers" begin
+        @testset "reference spectra self-consistent" begin
+            for (name, pts) in [
+                (:tet, SpinorBEC._make_tetrahedron_vertices()),
+                (:oct, SpinorBEC._make_octahedron_vertices()),
+                (:cube, SpinorBEC._make_cube_vertices()),
+                (:icosa, SpinorBEC._make_icosahedron_vertices()),
+            ]
+                spec = SpinorBEC._pairwise_distance_spectrum(pts)
+                @test issorted(spec)
+                @test all(s -> 0 ≤ s ≤ π, spec)
+            end
+        end
+
+        @testset "icosahedron has 12 vertices" begin
+            @test length(SpinorBEC._make_icosahedron_vertices()) == 12
+        end
+
+        @testset "spectrum RMS is 0 for identical" begin
+            v = [1.0, 2.0, 3.0]
+            @test SpinorBEC._spectrum_rms(v, v) ≈ 0.0 atol = 1e-15
+        end
+
+        @testset "spectrum RMS Inf for different lengths" begin
+            @test SpinorBEC._spectrum_rms([1.0], [1.0, 2.0]) == Inf
+        end
+    end
+
+    @testset "classify_phase_detailed includes point_group" begin
+        grid = make_grid(GridConfig(32, 10.0))
+        sm = spin_matrices(1)
+        sys = SpinSystem(1)
+        psi = init_psi(grid, sys; state=:ferromagnetic)
+        r = SpinorBEC.classify_phase_detailed(psi, 1, grid, sm)
+        @test hasproperty(r, :point_group)
+        @test r.point_group isa Symbol
+    end
+
     @testset "icosahedral_order_parameter" begin
         @testset "F < 6 returns zeros" begin
             grid = make_grid(GridConfig(32, 10.0))
