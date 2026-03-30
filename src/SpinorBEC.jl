@@ -8,6 +8,7 @@ using YAML
 using Unitful
 using TimerOutputs
 using Random
+using SpecialFunctions: erfcx
 
 const TIMER = TimerOutput()
 
@@ -77,6 +78,7 @@ export Rb87, Na23, Eu151
 export compute_interaction_params, compute_interaction_params_general_f, compute_c0, compute_c_dd, compute_a_dd
 export interaction_params_from_constraint, compute_c_total, compute_c_dd_dimless, linear_zeeman_p
 export compute_eu151_interactions
+export lima_pelster_Q5, compute_c_lhy_with_ddi
 
 # DDI
 export DDIParams, DDIBuffers, DDIPaddedContext, make_ddi_params, make_ddi_buffers, make_ddi_padded
@@ -137,7 +139,7 @@ export probability_current, orbital_angular_momentum
 export superfluid_velocity, total_angular_momentum, spin_texture_charge
 export superfluid_vorticity, berry_curvature, singlet_pair_amplitude
 export pair_amplitude, pair_amplitude_spectrum
-export majorana_stars, icosahedral_order_parameter
+export majorana_stars, icosahedral_order_parameter, detect_point_group
 export spherical_harmonic, spinor_angular_density
 export nematic_tensor_eigenvalues, biaxiality_parameter
 export multipole_order_parameters, multipole_spectrum
@@ -152,6 +154,7 @@ export phase_diagram_point, component_populations, make_conservation_monitor
 export classify_phase, classify_phase_detailed
 export estimate_splitting_error, validate_conservation
 export power_spectrum
+export analyze_stability
 export bogoliubov_spectrum
 
 # Simulation

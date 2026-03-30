@@ -135,13 +135,17 @@ via 6j transform.
 
 Processes even-rank entries k ∈ {2, 4, ..., 2F} from `c_extra`, where
 `c_extra[idx]` = c_{idx+1} (i.e. c_extra[1]=c₂, c_extra[3]=c₄, c_extra[5]=c₆).
-Odd-rank and zero entries are skipped.
+Odd-rank entries are skipped — note that Kawaguchi-Ueda's "c₃" (coupling to the
+S=2 pair channel) is NOT a rank-3 tensor operator. To include such pair-channel
+couplings, use `_make_tensor_cache_from_channels` with explicit g_S values instead.
 """
 function _c_extra_to_delta_gS(F::Int, c_extra::Vector{Float64})
     for (idx, val) in enumerate(c_extra)
         k = idx + 1
         if abs(val) > 1e-30 && isodd(k)
-            @warn "c_extra[$idx] (c$k) is odd-rank and will be ignored; only even-rank couplings (c2, c4, ...) contribute" maxlog=1
+            @warn "c_extra[$idx] (c$k) is odd-rank and will be ignored. " *
+                 "If this is a Kawaguchi-Ueda pair-channel coupling (e.g. c₃ → S=2 channel), " *
+                 "use _make_tensor_cache_from_channels(F, Dict(S => g_S, ...)) instead." maxlog=1
         end
     end
     c_dict = Dict{Int,Float64}()
@@ -235,4 +239,89 @@ Dimensionless linear Zeeman shift: p = g_F × μ_B × B / (ℏ × omega_ref).
 """
 function linear_zeeman_p(atom::AtomSpecies, B::Float64, omega_ref::Float64)
     atom.g_F * Units.MU_BOHR * B / (Units.HBAR * omega_ref)
+end
+
+# --- Lima-Pelster DDI-corrected LHY ---
+
+"""
+    _gauss_legendre(n, a, b) → (nodes, weights)
+
+n-point Gauss-Legendre quadrature on [a, b].
+"""
+function _gauss_legendre(n::Int, a::Float64, b::Float64)
+    nodes = zeros(Float64, n)
+    weights = zeros(Float64, n)
+    m = div(n + 1, 2)
+    mid = (a + b) / 2
+    half = (b - a) / 2
+
+    for i in 1:m
+        z = cos(π * (i - 0.25) / (n + 0.5))
+        for _ in 1:100
+            p1 = 1.0
+            p2 = 0.0
+            for j in 1:n
+                p3 = p2
+                p2 = p1
+                p1 = ((2j - 1) * z * p2 - (j - 1) * p3) / j
+            end
+            pp = n * (z * p1 - p2) / (z^2 - 1.0)
+            dz = p1 / pp
+            z -= dz
+            abs(dz) < 1e-15 && break
+        end
+        nodes[i] = mid - half * z
+        nodes[n + 1 - i] = mid + half * z
+        w = 2.0 * half / ((1.0 - z^2) * (n * (z * 1.0 - 0.0))^2)
+        pp_final = 0.0
+        p1 = 1.0; p2 = 0.0
+        for j in 1:n
+            p3 = p2; p2 = p1
+            p1 = ((2j - 1) * z * p2 - (j - 1) * p3) / j
+        end
+        pp_final = n * (z * p1 - p2) / (z^2 - 1.0)
+        w = 2.0 * half / ((1.0 - z^2) * pp_final^2)
+        weights[i] = w
+        weights[n + 1 - i] = w
+    end
+    (nodes, weights)
+end
+
+"""
+    lima_pelster_Q5(eps_dd) → Float64
+
+Lima-Pelster correction factor Q₅(ε_dd) for the LHY energy of a dipolar BEC:
+
+    Q₅ = ∫₀^π (sinθ / 2) [1 + ε_dd(3cos²θ - 1)]^{5/2} dθ
+
+Ref: Lima & Pelster, PRA 84, 041604(R) (2011).
+
+Returns 1.0 for ε_dd=0. Throws DomainError if the integrand becomes negative
+(argument < 0 inside the 5/2 power).
+"""
+function lima_pelster_Q5(eps_dd::Float64)
+    abs(eps_dd) < 1e-15 && return 1.0
+
+    nodes, weights = _gauss_legendre(20, 0.0, Float64(π))
+    s = 0.0
+    for i in eachindex(nodes)
+        theta = nodes[i]
+        ct = cos(theta)
+        arg = 1.0 + eps_dd * (3.0 * ct^2 - 1.0)
+        arg < 0.0 && throw(DomainError(arg,
+            "Negative argument in Q₅ integrand at θ=$(theta): " *
+            "1 + ε_dd(3cos²θ-1) = $arg for ε_dd=$eps_dd"))
+        s += weights[i] * sin(theta) / 2.0 * arg^(5 / 2)
+    end
+    s
+end
+
+"""
+    compute_c_lhy_with_ddi(c_lhy_scalar, eps_dd) → Float64
+
+Apply the Lima-Pelster DDI correction to a scalar LHY coefficient:
+    c_lhy_corrected = c_lhy_scalar × Q₅(ε_dd)
+"""
+function compute_c_lhy_with_ddi(c_lhy_scalar::Float64, eps_dd::Float64)
+    c_lhy_scalar * lima_pelster_Q5(eps_dd)
 end

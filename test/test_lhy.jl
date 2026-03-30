@@ -123,6 +123,34 @@
         @test cfg.system.interactions.c_lhy == 100.0
     end
 
+    @testset "Lima-Pelster Q5" begin
+        @testset "Q5(0) = 1" begin
+            @test lima_pelster_Q5(0.0) ≈ 1.0 atol = 1e-14
+        end
+
+        @testset "Q5 monotonically increasing" begin
+            prev = lima_pelster_Q5(0.0)
+            for eps in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+                q = lima_pelster_Q5(eps)
+                @test q > prev
+                prev = q
+            end
+        end
+
+        @testset "Q5(0.5) agrees with numerical integration" begin
+            @test lima_pelster_Q5(0.5) ≈ 1.3899 rtol = 0.01
+        end
+
+        @testset "negative arg throws DomainError" begin
+            @test_throws DomainError lima_pelster_Q5(1.5)
+        end
+
+        @testset "compute_c_lhy_with_ddi" begin
+            @test compute_c_lhy_with_ddi(1.0, 0.0) ≈ 1.0 atol = 1e-14
+            @test compute_c_lhy_with_ddi(2.0, 0.5) ≈ 2.0 * lima_pelster_Q5(0.5)
+        end
+    end
+
     @testset "YAML without c_lhy defaults to 0" begin
         yaml = """
         experiment:
