@@ -45,9 +45,12 @@ struct DDIConfig
     enabled::Bool
     c_dd::Union{Nothing,Float64}
     secular::Bool
+    quasi_2d::Bool
+    l_z::Float64
 end
 
-DDIConfig() = DDIConfig(false, nothing, false)
+DDIConfig() = DDIConfig(false, nothing, false, false, 0.0)
+DDIConfig(enabled, c_dd, secular) = DDIConfig(enabled, c_dd, secular, false, 0.0)
 
 struct SystemConfig
     atom_name::Symbol
@@ -135,7 +138,9 @@ function _parse_system(d::Dict)
         enabled = get(dd, "enabled", false)
         c_dd = haskey(dd, "c_dd") ? Float64(dd["c_dd"]) : nothing
         secular = Bool(get(dd, "secular", false))
-        DDIConfig(enabled, c_dd, secular)
+        quasi_2d = Bool(get(dd, "quasi_2d", false))
+        l_z = Float64(get(dd, "l_z", 0.0))
+        DDIConfig(enabled, c_dd, secular, quasi_2d, l_z)
     else
         DDIConfig()
     end
@@ -246,4 +251,157 @@ function _parse_c_extra(inter::Dict, ::Int)
         haskey(inter, "c$n") && (c_extra[n - 1] = Float64(inter["c$n"]))
     end
     c_extra
+end
+
+# --- Phase Scan Configuration ---
+
+struct ScanGroundStateConfig
+    dt::Float64
+    n_steps::Int
+    tol::Float64
+    initial_state::Symbol
+    zeeman::ZeemanParams
+    potential::PotentialConfig
+    target_magnetization::Union{Nothing,Float64}
+    rotating_frame_omega::Float64
+end
+
+struct PhaseScanConfig
+    name::String
+    system::SystemConfig
+    ground_state::ScanGroundStateConfig
+    c_total::Float64
+    scan::AbstractScanSpec
+    strategy::ScanStrategyConfig
+    stability::ScanStabilityConfig
+    output::ScanOutputConfig
+end
+
+function load_phase_scan(path::String)
+    data = YAML.load_file(path)
+    ps_data = get(data, "phase_scan", data)
+    _parse_phase_scan(ps_data)
+end
+
+function load_phase_scan_from_string(yaml_str::String)
+    data = YAML.load(yaml_str)
+    ps_data = get(data, "phase_scan", data)
+    _parse_phase_scan(ps_data)
+end
+
+function _parse_phase_scan(d::Dict)
+    name = get(d, "name", "unnamed scan")
+    system = _parse_system(d["system"])
+    gs = _parse_scan_ground_state(d["ground_state"])
+
+    F = resolve_atom(system.atom_name).F
+    ip = system.interactions
+    c_total = ip.c0 + F^2 * ip.c1
+
+    scan_d = d["scan"]
+    scan_type = Symbol(scan_d["type"])
+    scan = if scan_type == :parameter
+        _parse_parameter_scan(scan_d)
+    elseif scan_type == :constrained_jz
+        _parse_constrained_jz_scan(scan_d)
+    else
+        throw(ArgumentError("Unknown scan type: $scan_type. Supported: parameter, constrained_jz"))
+    end
+
+    strategy = haskey(d, "strategy") ? _parse_strategy(d["strategy"]) : ScanStrategyConfig()
+
+    stab = haskey(d, "stability") ? _parse_scan_stability(d["stability"]) : ScanStabilityConfig()
+    output = haskey(d, "output") ? _parse_scan_output(d["output"]) : ScanOutputConfig()
+
+    PhaseScanConfig(name, system, gs, c_total, scan, strategy, stab, output)
+end
+
+function _parse_scan_ground_state(d::Dict)
+    dt = Float64(d["dt"])
+    n_steps = Int(d["n_steps"])
+    tol = Float64(d["tol"])
+    initial_state = Symbol(get(d, "initial_state", "polar"))
+
+    z = get(d, "zeeman", Dict())
+    zeeman = ZeemanParams(Float64(get(z, "p", 0.0)), Float64(get(z, "q", 0.0)))
+
+    pot = _parse_potential_config(get(d, "potential", Dict("type" => "none")))
+
+    target_mag = let v = get(d, "target_magnetization", nothing)
+        v === nothing ? nothing : Float64(v)
+    end
+
+    rotating_frame_omega = Float64(get(d, "rotating_frame_omega", 0.0))
+
+    ScanGroundStateConfig(dt, n_steps, tol, initial_state, zeeman, pot,
+                          target_mag, rotating_frame_omega)
+end
+
+function _parse_parameter_scan(d::Dict)
+    axes_data = d["axes"]
+    axes = SweepAxis[_parse_sweep_axis(a) for a in axes_data]
+    ParameterScan(axes)
+end
+
+function _parse_constrained_jz_scan(d::Dict)
+    target_values = Float64[Float64(v) for v in d["target_values"]]
+    tolerance = Float64(get(d, "tolerance", 0.05))
+    max_iter = Int(get(d, "max_iter", 15))
+    omega_range = if haskey(d, "omega_range")
+        r = d["omega_range"]
+        (Float64(r[1]), Float64(r[2]))
+    else
+        (-10.0, 10.0)
+    end
+    ConstrainedJzScan(target_values, tolerance, max_iter, omega_range)
+end
+
+function _parse_strategy(d::Dict)
+    cont = haskey(d, "continuation") ? _parse_continuation(d["continuation"]) : ContinuationConfig()
+    ms = haskey(d, "multistart") ? _parse_multistart(d["multistart"]) : MultiStartConfig()
+    ScanStrategyConfig(cont, ms)
+end
+
+function _parse_multistart(d::Dict)
+    enabled = Bool(get(d, "enabled", false))
+    states = if haskey(d, "initial_states")
+        Symbol[Symbol(s) for s in d["initial_states"]]
+    else
+        Symbol[:polar, :ferromagnetic, :uniform, :antiferromagnetic]
+    end
+    n_random = Int(get(d, "n_random", 0))
+    MultiStartConfig(enabled, states, n_random)
+end
+
+function _parse_sweep_axis(d::Dict)
+    param = Symbol(d["parameter"])
+    vals = d["values"]
+    values = if vals isa Dict
+        SweepValues(Float64(vals["from"]), Float64(vals["to"]), Int(vals["n_points"]))
+    else
+        Float64[Float64(v) for v in vals]
+    end
+    SweepAxis(param, values)
+end
+
+function _parse_continuation(d::Dict)
+    enabled = Bool(get(d, "enabled", true))
+    n_steps = Int(get(d, "n_steps", 1000))
+    threshold = Float64(get(d, "energy_jump_threshold", 0.1))
+    ContinuationConfig(enabled, n_steps, threshold)
+end
+
+function _parse_scan_stability(d::Dict)
+    enabled = Bool(get(d, "enabled", false))
+    perturbation = Float64(get(d, "perturbation", 1e-4))
+    n_steps = Int(get(d, "n_steps", 300))
+    sample_every = Int(get(d, "sample_every", 10))
+    ScanStabilityConfig(enabled, perturbation, n_steps, sample_every)
+end
+
+function _parse_scan_output(d::Dict)
+    dir = String(get(d, "dir", "results"))
+    csv = Bool(get(d, "csv", true))
+    save_psi = Bool(get(d, "save_psi", false))
+    ScanOutputConfig(dir, csv, save_psi)
 end

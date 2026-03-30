@@ -396,6 +396,90 @@ struct BdGResult
     unstable::Bool
 end
 
+# --- Phase Scan Types ---
+
+struct SweepValues
+    from::Float64
+    to::Float64
+    n_points::Int
+
+    function SweepValues(from::Float64, to::Float64, n_points::Int)
+        n_points >= 2 || throw(ArgumentError("n_points must be >= 2"))
+        new(from, to, n_points)
+    end
+end
+
+struct SweepAxis
+    parameter::Symbol
+    values::Union{SweepValues,Vector{Float64}}
+end
+
+struct ContinuationConfig
+    enabled::Bool
+    n_steps::Int
+    energy_jump_threshold::Float64
+
+    function ContinuationConfig(enabled::Bool, n_steps::Int, energy_jump_threshold::Float64)
+        n_steps > 0 || throw(ArgumentError("n_steps must be positive"))
+        energy_jump_threshold > 0 || throw(ArgumentError("energy_jump_threshold must be positive"))
+        new(enabled, n_steps, energy_jump_threshold)
+    end
+end
+
+ContinuationConfig() = ContinuationConfig(true, 1000, 0.1)
+
+struct MultiStartConfig
+    enabled::Bool
+    initial_states::Vector{Symbol}
+    n_random::Int
+end
+
+MultiStartConfig() = MultiStartConfig(false, [:polar, :ferromagnetic, :uniform, :antiferromagnetic], 0)
+
+struct ScanStrategyConfig
+    continuation::ContinuationConfig
+    multistart::MultiStartConfig
+end
+
+ScanStrategyConfig() = ScanStrategyConfig(ContinuationConfig(), MultiStartConfig())
+
+abstract type AbstractScanSpec end
+
+struct ParameterScan <: AbstractScanSpec
+    axes::Vector{SweepAxis}
+end
+
+struct ConstrainedJzScan <: AbstractScanSpec
+    target_values::Vector{Float64}
+    tolerance::Float64
+    max_iter::Int
+    omega_range::Tuple{Float64,Float64}
+end
+
+struct ScanStabilityConfig
+    enabled::Bool
+    perturbation::Float64
+    n_steps::Int
+    sample_every::Int
+
+    function ScanStabilityConfig(enabled::Bool, perturbation::Float64, n_steps::Int, sample_every::Int)
+        perturbation > 0 || throw(ArgumentError("perturbation must be positive"))
+        n_steps > 0 || throw(ArgumentError("n_steps must be positive"))
+        sample_every > 0 || throw(ArgumentError("sample_every must be positive"))
+        new(enabled, perturbation, n_steps, sample_every)
+    end
+end
+
+ScanStabilityConfig() = ScanStabilityConfig(false, 1e-4, 300, 10)
+
+struct ScanOutputConfig
+    dir::String
+    csv::Bool
+    save_psi::Bool
+end
+
+ScanOutputConfig() = ScanOutputConfig("results", true, false)
+
 # --- Workspace ---
 
 struct Workspace{N,A,P,IP,SM<:SpinMatrices,ZEE,DDI,DDIB,RAM,LOSS,DDIP,BK,TC,CC}

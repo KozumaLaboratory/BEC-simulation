@@ -54,6 +54,7 @@ include("adaptive.jl")
 include("yoshida.jl")
 include("experiment.jl")
 include("experiment_runner.jl")
+include("phase_scan.jl")
 include("io.jl")
 include("unitful_support.jl")
 
@@ -172,6 +173,12 @@ export ConstantValue, LinearRamp, RampOrConstant, interpolate_value
 export PotentialConfig, PhaseConfig, GroundStateConfig, DDIConfig
 export SystemConfig, ExperimentConfig, ExperimentResult
 export load_experiment, load_experiment_from_string, run_experiment, seed_noise
+
+# Phase scan
+export SweepValues, SweepAxis, ContinuationConfig, ScanStabilityConfig, ScanOutputConfig
+export MultiStartConfig, ScanStrategyConfig, AbstractScanSpec, ParameterScan, ConstrainedJzScan
+export ScanGroundStateConfig, PhaseScanConfig
+export load_phase_scan, load_phase_scan_from_string, run_phase_scan
 
 # Units
 export Units
