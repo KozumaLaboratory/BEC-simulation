@@ -331,7 +331,8 @@ function classify_phase_detailed(psi::AbstractArray{ComplexF64}, F::Int, grid::G
         return (spin_order=0.0, nematic_order=0.0, biaxiality=0.0,
                 Q6=0.0, star_entropy=0.0,
                 channel_weights=Dict{Int,Float64}(), magnetization_density=0.0,
-                phase=:vacuum, point_group=:trivial)
+                phase=:vacuum, point_group=:trivial,
+                multipole_fingerprint=Dict{Int,Float64}())
     end
 
     fx, fy, fz = spin_density_vector(psi, sm, N)
