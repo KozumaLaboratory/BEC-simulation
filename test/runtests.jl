@@ -2,6 +2,7 @@ using Test
 using SpinorBEC
 
 @testset "SpinorBEC" begin
+    include("test_atoms.jl")
     include("test_grid.jl")
     include("test_spin_matrices.jl")
     include("test_propagators.jl")

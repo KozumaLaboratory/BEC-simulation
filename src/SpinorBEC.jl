@@ -74,8 +74,16 @@ export load_fftw_wisdom, save_fftw_wisdom
 # Spin
 export spin_matrices
 
-# Atoms
-export Rb87, Na23, Eu151
+# Atoms — alkali metals
+export Li7, Na23, K39, K41, Rb85, Rb87, Cs133
+# Atoms — magnetic lanthanides
+export Cr52, Dy164, Dy162, Er168, Er166, Eu151
+# Atoms — spinless
+export Ca40, Sr84, Sr86, Sr88, Yb170, Yb174, Yb176
+# Atoms — metastable
+export He4star
+# Atom registry
+export ATOM_REGISTRY, resolve_atom
 
 # Interactions
 export compute_interaction_params, compute_interaction_params_general_f, compute_c0, compute_c_dd, compute_a_dd

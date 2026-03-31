@@ -75,19 +75,6 @@ struct SystemConfig
     loss::Union{Nothing,LossParams}
 end
 
-# --- Atom Registry ---
-
-const ATOM_REGISTRY = Dict{Symbol,AtomSpecies}(
-    :Rb87 => Rb87,
-    :Na23 => Na23,
-    :Eu151 => Eu151,
-)
-
-function resolve_atom(name::Symbol)
-    haskey(ATOM_REGISTRY, name) || throw(ArgumentError("Unknown atom: $name. Available: $(keys(ATOM_REGISTRY))"))
-    ATOM_REGISTRY[name]
-end
-
 # --- YAML Parsing Helpers ---
 
 function _parse_system(d::Dict)
