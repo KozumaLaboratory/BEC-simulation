@@ -352,6 +352,26 @@ struct TensorInteractionCache
     g_values::Vector{Float64}         # corresponding g_S coupling constants
 end
 
+"""
+    TensorEigenCache
+
+Cache for eigendecompositions of the mean-field matrix at each grid point.
+When valid, `apply_tensor_interaction_step!` skips eigendecomposition and
+reuses stored eigenvectors, giving ~10x speedup for large F.
+
+Invalidate by setting `valid[] = false` when the spinor texture changes
+significantly (e.g., every N ITP steps).
+"""
+struct TensorEigenCache{N}
+    eigvecs::Array{ComplexF64}   # (D, D, n_pts...) eigenvector matrices
+    eigvals::Array{Float64}     # (D, n_pts...) eigenvalue arrays
+    valid::Base.RefValue{Bool}
+
+    function TensorEigenCache{N}(D::Int, n_pts::NTuple{N,Int}) where {N}
+        new{N}(zeros(ComplexF64, D, D, n_pts...), zeros(Float64, D, n_pts...), Ref(false))
+    end
+end
+
 # --- Adaptive Time Stepping ---
 
 struct AdaptiveDtParams

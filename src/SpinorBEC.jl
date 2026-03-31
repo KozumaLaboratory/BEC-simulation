@@ -130,7 +130,7 @@ export apply_spin_mixing_step!
 export apply_nematic_step!
 
 # Tensor interaction (general-F)
-export apply_tensor_interaction_step!, make_tensor_interaction_cache
+export apply_tensor_interaction_step!, make_tensor_interaction_cache, TensorEigenCache
 
 # Clebsch-Gordan / Wigner coefficients
 export wigner_3j, clebsch_gordan, wigner_6j, precompute_cg_table, precompute_cg_array, CGArrayTable

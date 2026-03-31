@@ -1,3 +1,17 @@
+"""
+Wavefunction L2 relative change for ITP stability monitoring.
+Detects spin texture divergence that energy monitoring alone misses.
+"""
+function _wavefunction_l2_change_itp(psi_new, psi_old)
+    diff_sq = 0.0
+    old_sq = 0.0
+    @inbounds for i in eachindex(psi_new, psi_old)
+        diff_sq += abs2(psi_new[i] - psi_old[i])
+        old_sq += abs2(psi_old[i])
+    end
+    diff_sq / max(old_sq, 1e-300)
+end
+
 const _ITP_EXPONENT_LIMIT = 50.0
 const _ITP_DDI_WARN_EXPONENT = 20.0
 
@@ -237,7 +251,11 @@ function _find_ground_state_adaptive(;
 
         E = total_energy(ws)
 
-        if isnan(E) || E > E_prev
+        # L2 wavefunction change — detects spin texture divergence even when energy drops
+        l2_change = _wavefunction_l2_change_itp(ws.state.psi, psi_backup)
+
+        if isnan(E) || E > E_prev || l2_change > 0.5
+            # Reject: energy increased OR spin texture changed too rapidly
             copyto!(ws.state.psi, psi_backup)
             current_dt = max(current_dt * 0.5, 1e-8)
             ws = _rebuild_workspace_with_dt(ws, current_dt)
@@ -252,7 +270,9 @@ function _find_ground_state_adaptive(;
                 break
             end
             E_prev = E
-            new_dt = min(current_dt * 1.1, dt_max)
+            # Grow dt only if L2 change is moderate
+            grow_factor = l2_change < 0.1 ? 1.1 : 1.0
+            new_dt = min(current_dt * grow_factor, dt_max)
             if new_dt != current_dt
                 current_dt = new_dt
                 ws = _rebuild_workspace_with_dt(ws, current_dt)
