@@ -8,8 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 julia --project=. -e 'using Pkg; Pkg.test()'                    # run all tests
 julia --project=. -e 'using SpinorBEC; include("test/test_X.jl")' # single test file
 julia --project=. -e 'using Pkg; Pkg.instantiate()'              # install deps
-julia --project=. examples/bench/bench_eu151.jl                  # benchmark (with tracing)
-julia --project=. examples/run.jl examples/configs/              # run all YAML configs
+julia --project=. bench/bench_eu151.jl                  # benchmark (with tracing)
+julia --project=. examples/run.jl examples/              # run all YAML configs
 ```
 
 ## Architecture
@@ -61,7 +61,7 @@ Tensor step replaces SM + nematic when `TensorInteractionCache` is active. Subst
 - `make_workspace(; ...) → Workspace` then `run_simulation!(ws)` — real-time dynamics
 - `run_simulation_adaptive!` / `run_simulation_yoshida!` — adaptive dt
 - `load_config("path.yaml")` then `run_config(config)` — YAML-driven (v3 schema)
-- `examples/run.jl` — batch YAML runner (default: `examples/configs/`)
+- `examples/run.jl` — batch YAML runner (default: `examples/`)
 
 ### Tracing
 
@@ -83,5 +83,5 @@ println(TIMER); disable_tracing!()
 - New structs must go in `types.jl` (included first)
 - Julia 1.12: inner constructors only (method overwriting forbidden during precompilation)
 - 21 atom species in `atoms.jl` + `ATOM_REGISTRY`; `resolve_atom(:Name)` for YAML lookup
-- YAML configs in `examples/configs/` follow schema in `config.jl` (v3) or `experiment.jl` (legacy)
+- YAML configs in `examples/` follow schema in `config.jl` (v3) or `experiment.jl` (legacy)
 - Workspace is fully parameterized — auto-inferred constructor, no explicit type params needed

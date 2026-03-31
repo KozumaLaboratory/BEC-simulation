@@ -39,5 +39,5 @@ jobs:
       - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
       - name: Run quick benchmark
-        run: julia --project=. examples/bench/bench_quick.jl
+        run: julia --project=. bench/bench_quick.jl
         timeout-minutes: 5

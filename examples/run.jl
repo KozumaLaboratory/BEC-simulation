@@ -89,7 +89,7 @@ function run_and_save(yaml_path)
     println()
 end
 
-path = length(ARGS) >= 1 ? ARGS[1] : joinpath(@__DIR__, "configs")
+path = length(ARGS) >= 1 ? ARGS[1] : @__DIR__
 
 if isdir(path)
     yamls = sort(filter(f -> endswith(f, ".yaml"), readdir(path; join=true)))

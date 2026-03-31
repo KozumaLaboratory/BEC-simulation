@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "examples/configs/output/*.html"
+      - "examples/output/*.html"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -26,10 +26,10 @@ jobs:
       - name: Prepare site
         run: |
           mkdir _site
-          if ls examples/configs/output/*.html 1>/dev/null 2>&1; then
-            first=$(ls examples/configs/output/*.html | head -1)
+          if ls examples/output/*.html 1>/dev/null 2>&1; then
+            first=$(ls examples/output/*.html | head -1)
             cp "$first" _site/index.html
-            for f in examples/configs/output/*.html; do
+            for f in examples/output/*.html; do
               cp "$f" "_site/$(basename "$f")"
             done
           else

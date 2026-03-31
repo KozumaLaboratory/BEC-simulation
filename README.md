@@ -11,8 +11,8 @@ Spin- $F$ Bose-Einstein condensate simulator solving the spinor Gross-Pitaevskii
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
 
 # Run a YAML config → JLD2 output → interactive HTML dashboard
-julia --project=. examples/run.jl examples/configs/li7_ferromagnetic_quench.yaml
-julia --project=. examples/visualize_dashboard.jl examples/configs/output/li7_ferromagnetic_quench.jld2
+julia --project=. examples/run.jl examples/li7_ferromagnetic_quench.yaml
+julia --project=. examples/visualize_dashboard.jl examples/output/li7_ferromagnetic_quench.jld2
 
 # Tests
 julia --project=. -e 'using Pkg; Pkg.test()'
@@ -62,7 +62,7 @@ Dimensionless units: $\hbar = m = \omega_{\mathrm{ref}} = 1$ . Physical quantiti
 
 **Large- $D$** ( $D{=}13$ , Eu151): `MVector`/`Matrix` instead of `SMatrix`, $O(D)$ raising/lowering. 167 GiB → 43 MiB alloc, 5.7x speedup on $32^3$ .
 
-## Examples (`examples/configs/`)
+## Examples
 
 | Config | Physics | Grid |
 |--------|---------|------|
