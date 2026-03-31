@@ -135,7 +135,7 @@ function run_simulation_checkpointed!(ws::Workspace{N};
         ws.state, ws.fft_plans, ws.kinetic_phase, ws.potential_values, ws.density_buf,
         ws.spin_matrices, ws.grid, ws.atom, ws.interactions,
         ws.zeeman, ws.potential, sp_remain, ws.ddi, ws.ddi_bufs, ws.raman, ws.loss,
-        ws.ddi_padded, ws.batched_kinetic, ws.tensor_cache, ws.coriolis_cache,
+        ws.ddi_padded, ws.batched_kinetic, ws.tensor_cache, ws.coriolis_cache, ws.spinor_lhy_cache,
     )
 
     result = run_simulation!(ws_remain; callback=checkpoint_cb)

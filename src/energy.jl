@@ -35,7 +35,9 @@ function energy_decomposition(ws::Workspace{N}) where {N}
         0.0
     end
 
-    E_lhy = ws.interactions.c_lhy != 0.0 ? _lhy_energy(psi, ws.interactions.c_lhy, n_comp, N, n_pts, dV) : 0.0
+    c_lhy_eff = ws.spinor_lhy_cache !== nothing ? ws.spinor_lhy_cache.c_lhy_eff[] : ws.interactions.c_lhy
+    E_lhy = c_lhy_eff != 0.0 ? _lhy_energy(psi, c_lhy_eff, n_comp, N, n_pts, dV;
+        spinor_lhy=ws.spinor_lhy_cache !== nothing) : 0.0
 
     E_tensor = if ws.tensor_cache !== nothing
         _tensor_interaction_energy(psi, ws.tensor_cache, N, n_pts, dV)
@@ -104,8 +106,8 @@ Bogoliubov spectrum of the full spin-F system and can differ qualitatively
 (e.g., spinor droplets in 39K, spin-dependent depletion). Use with caution
 when spin degrees of freedom are dynamically active.
 """
-function _lhy_energy(psi, c_lhy, n_comp, ndim, n_pts, dV)
-    if n_comp > 1
+function _lhy_energy(psi, c_lhy, n_comp, ndim, n_pts, dV; spinor_lhy::Bool=false)
+    if n_comp > 1 && !spinor_lhy
         @warn "LHY energy uses scalar (fully-polarized) approximation for a spinor condensate (n_comp=$n_comp). Spin-dependent LHY corrections are not included." maxlog=1
     end
     n = total_density(psi, ndim)

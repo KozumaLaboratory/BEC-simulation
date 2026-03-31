@@ -73,6 +73,12 @@ struct SystemConfig
     interactions::InteractionParams
     ddi::DDIConfig
     loss::Union{Nothing,LossParams}
+    spinor_lhy::Bool
+
+    SystemConfig(atom_name, grid_n_points, grid_box_size, interactions, ddi, loss) =
+        new(atom_name, grid_n_points, grid_box_size, interactions, ddi, loss, false)
+    SystemConfig(atom_name, grid_n_points, grid_box_size, interactions, ddi, loss, spinor_lhy) =
+        new(atom_name, grid_n_points, grid_box_size, interactions, ddi, loss, spinor_lhy)
 end
 
 # --- YAML Parsing Helpers ---
@@ -118,7 +124,10 @@ function _parse_system(d::Dict)
         nothing
     end
 
-    SystemConfig(atom_name, n_points, box_size, interactions, ddi, loss)
+    lhy_mode = Symbol(get(inter, "lhy_mode", "scalar"))
+    spinor_lhy = lhy_mode === :spinor
+
+    SystemConfig(atom_name, n_points, box_size, interactions, ddi, loss, spinor_lhy)
 end
 
 function _parse_ground_state(d::Dict)

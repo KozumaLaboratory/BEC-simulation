@@ -102,6 +102,7 @@ function find_ground_state(;
     Jz_omega_range::Tuple{Float64,Float64}=(-5.0, 5.0),
     quasi_2d_ddi::Bool=false,
     l_z_ddi::Float64=0.0,
+    spinor_lhy::Bool=false,
 )
     psi0 = if psi_init === nothing
         sys = SpinSystem(atom.F)
@@ -141,7 +142,7 @@ function find_ground_state(;
                    save_every=max(1, n_steps ÷ 10), rotating_frame_omega)
     ws = make_workspace(; grid, atom, interactions, zeeman, potential, sim_params=sp,
                         psi_init=psi0, enable_ddi, c_dd, secular_ddi, fft_flags,
-                        quasi_2d_ddi, l_z_ddi)
+                        quasi_2d_ddi, l_z_ddi, spinor_lhy)
 
     n_comp = ws.spin_matrices.system.n_components
     N_dim = length(grid.config.n_points)
@@ -547,6 +548,6 @@ function _rebuild_workspace_with_dt(ws::Workspace{N}, new_dt::Float64) where {N}
         ws.state, ws.fft_plans, kinetic_phase, ws.potential_values, ws.density_buf,
         ws.spin_matrices, ws.grid, ws.atom, ws.interactions,
         ws.zeeman, ws.potential, sp, ws.ddi, ws.ddi_bufs, ws.raman, ws.loss,
-        ws.ddi_padded, batched_kinetic, ws.tensor_cache, ws.coriolis_cache,
+        ws.ddi_padded, batched_kinetic, ws.tensor_cache, ws.coriolis_cache, ws.spinor_lhy_cache,
     )
 end

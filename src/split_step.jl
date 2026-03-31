@@ -52,9 +52,11 @@ function _half_potential_step!(ws::Workspace{N}, dt_half, n_comp, ndim, imaginar
     zee = zeeman_at(ws.zeeman, ws.state.t)
     zeeman_diag = zeeman_diagonal(zee, ws.spin_matrices)
 
+    c_lhy_eff = ws.spinor_lhy_cache !== nothing ? ws.spinor_lhy_cache.c_lhy_eff[] : ws.interactions.c_lhy
+
     @timeit_debug TIMER "diagonal" _diagonal_step_svec!(
         Val(N), ws.state.psi, ws.potential_values, zeeman_diag,
-        ws.interactions.c0, ws.interactions.c_lhy, dt_half / 2, ws.density_buf, imaginary_time,
+        ws.interactions.c0, c_lhy_eff, dt_half / 2, ws.density_buf, imaginary_time,
     )
 
     if ws.tensor_cache !== nothing
@@ -131,7 +133,7 @@ function _half_potential_step!(ws::Workspace{N}, dt_half, n_comp, ndim, imaginar
 
     @timeit_debug TIMER "diagonal" _diagonal_step_svec!(
         Val(N), ws.state.psi, ws.potential_values, zeeman_diag,
-        ws.interactions.c0, ws.interactions.c_lhy, dt_half / 2, ws.density_buf, imaginary_time,
+        ws.interactions.c0, c_lhy_eff, dt_half / 2, ws.density_buf, imaginary_time,
     )
 end
 

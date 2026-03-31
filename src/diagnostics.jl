@@ -363,7 +363,7 @@ function estimate_splitting_error(ws::Workspace{N}) where {N}
         ws.state, ws.fft_plans, kinetic_phase_half, ws.potential_values, ws.density_buf,
         ws.spin_matrices, ws.grid, ws.atom, ws.interactions,
         ws.zeeman, ws.potential, sp_half, ws.ddi, ws.ddi_bufs, ws.raman, ws.loss,
-        ws.ddi_padded, bk_half, ws.tensor_cache, ws.coriolis_cache,
+        ws.ddi_padded, bk_half, ws.tensor_cache, ws.coriolis_cache, ws.spinor_lhy_cache,
     )
 
     split_step!(ws_half)

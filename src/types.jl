@@ -430,6 +430,24 @@ struct BdGResult
     unstable::Bool
 end
 
+# --- Spinor LHY Cache ---
+
+"""
+    SpinorLHYCache
+
+Stores the effective LHY coefficient computed from the full spinor Bogoliubov spectrum.
+The coefficient `c_lhy_eff` replaces the scalar `c_lhy` in the diagonal potential step
+and energy calculation when spinor-dependent LHY corrections are active.
+
+Update manually via `update_spinor_lhy!`.
+"""
+struct SpinorLHYCache
+    c_lhy_eff::Base.RefValue{Float64}
+    c_lhy_base::Float64
+
+    SpinorLHYCache(c_lhy_eff::Float64, c_lhy_base::Float64) = new(Ref(c_lhy_eff), c_lhy_base)
+end
+
 # --- Phase Scan Types ---
 
 struct ScanValues
@@ -543,7 +561,7 @@ ScanStabilityConfig() = ScanStabilityConfig(false, 1e-4, 300, 10)
 
 # --- Workspace ---
 
-struct Workspace{N,A,P,IP,SM<:SpinMatrices,ZEE,DDI,DDIB,RAM,LOSS,DDIP,BK,TC,CC}
+struct Workspace{N,A,P,IP,SM<:SpinMatrices,ZEE,DDI,DDIB,RAM,LOSS,DDIP,BK,TC,CC,SLC}
     state::SimState{N,A}
     fft_plans::FFTPlans{P,IP}
     kinetic_phase::Array{ComplexF64,N}
@@ -564,6 +582,7 @@ struct Workspace{N,A,P,IP,SM<:SpinMatrices,ZEE,DDI,DDIB,RAM,LOSS,DDIP,BK,TC,CC}
     batched_kinetic::BK
     tensor_cache::TC
     coriolis_cache::CC
+    spinor_lhy_cache::SLC
 end
 
 # --- Unified Config v3 (base types) ---

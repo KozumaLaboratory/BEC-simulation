@@ -100,6 +100,7 @@ function make_workspace(;
     ddi_padding::Bool=false,
     quasi_2d_ddi::Bool=false,
     l_z_ddi::Float64=0.0,
+    spinor_lhy::Bool=false,
 ) where {N}
     sys = SpinSystem(atom.F)
     sm = spin_matrices(atom.F)
@@ -208,9 +209,22 @@ function make_workspace(;
         nothing
     end
 
+    slhy_cache = if spinor_lhy && abs(ws_interactions.c_lhy) > 1e-30
+        zeta = _density_weighted_spinor(psi, N)
+        c_dd_val = ddi !== nothing ? ddi.C_dd : 0.0
+        zee_static = zeeman isa ZeemanParams ? zeeman : zeeman.B_func(0.0)
+        c_eff = compute_spinor_lhy_coefficient(;
+            spinor=zeta, F, interactions=ws_interactions,
+            zeeman=zee_static, c_dd=c_dd_val,
+        )
+        SpinorLHYCache(c_eff, ws_interactions.c_lhy)
+    else
+        nothing
+    end
+
     Workspace(
         state, plans, kinetic_phase, V, density_buf, sm, grid, atom, ws_interactions, effective_zeeman, potential, sim_params,
-        ddi, ddi_bufs, raman, loss, ddi_pad, batched_kinetic, tensor_cache, coriolis_cache,
+        ddi, ddi_bufs, raman, loss, ddi_pad, batched_kinetic, tensor_cache, coriolis_cache, slhy_cache,
     )
 end
 

@@ -90,6 +90,7 @@ export compute_interaction_params, compute_interaction_params_general_f, compute
 export interaction_params_from_constraint, compute_c_total, compute_c_dd_dimless, linear_zeeman_p
 export compute_eu151_interactions
 export lima_pelster_Q5, compute_c_lhy_with_ddi
+export compute_spinor_lhy_coefficient, update_spinor_lhy!, SpinorLHYCache
 
 # DDI
 export DDIParams, DDIBuffers, DDIPaddedContext, make_ddi_params, make_ddi_buffers, make_ddi_padded
