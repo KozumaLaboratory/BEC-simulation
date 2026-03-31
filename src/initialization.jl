@@ -101,7 +101,13 @@ function make_workspace(;
     quasi_2d_ddi::Bool=false,
     l_z_ddi::Float64=0.0,
     spinor_lhy::Bool=false,
+    quasi_2d_rescale::Bool=false,
 ) where {N}
+    # Quasi-2D: rescale 3D contact interactions to effective 2D values
+    if quasi_2d_rescale && l_z_ddi > 0
+        interactions = rescale_interactions_quasi2d(interactions, l_z_ddi)
+    end
+
     sys = SpinSystem(atom.F)
     sm = spin_matrices(atom.F)
 

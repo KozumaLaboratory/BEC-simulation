@@ -108,6 +108,7 @@ function _run_ground_state(config::UnifiedConfig, grid, atom, potential, ndim)
         rotating_frame_omega=gs.rotating_frame_omega,
         spinor_lhy=sys.spinor_lhy,
         Jz_method=gs.Jz_method,
+        quasi_2d_rescale=sys.ddi.rescale_interactions,
     )
 end
 
@@ -149,6 +150,7 @@ function _run_dynamics_sequence(config::UnifiedConfig, spec::DynamicsExperiment,
             loss=sys.loss,
             quasi_2d_ddi, l_z_ddi,
             spinor_lhy=sys.spinor_lhy,
+            quasi_2d_rescale=sys.ddi.rescale_interactions,
         )
         ws.state.t = t_offset
 

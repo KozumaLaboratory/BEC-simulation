@@ -104,6 +104,7 @@ function find_ground_state(;
     l_z_ddi::Float64=0.0,
     spinor_lhy::Bool=false,
     Jz_method::Symbol=:bisection,
+    quasi_2d_rescale::Bool=false,
 )
     psi0 = if psi_init === nothing
         sys = SpinSystem(atom.F)
@@ -152,7 +153,7 @@ function find_ground_state(;
                    save_every=max(1, n_steps ÷ 10), rotating_frame_omega)
     ws = make_workspace(; grid, atom, interactions, zeeman, potential, sim_params=sp,
                         psi_init=psi0, enable_ddi, c_dd, secular_ddi, fft_flags,
-                        quasi_2d_ddi, l_z_ddi, spinor_lhy)
+                        quasi_2d_ddi, l_z_ddi, spinor_lhy, quasi_2d_rescale)
 
     n_comp = ws.spin_matrices.system.n_components
     N_dim = length(grid.config.n_points)

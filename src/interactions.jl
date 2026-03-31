@@ -241,6 +241,49 @@ function linear_zeeman_p(atom::AtomSpecies, B::Float64, omega_ref::Float64)
     atom.g_F * Units.MU_BOHR * B / (Units.HBAR * omega_ref)
 end
 
+# --- Quasi-2D Dimensional Reduction ---
+
+"""
+    rescale_interactions_quasi2d(interactions, l_z) → InteractionParams
+
+Rescale 3D contact interaction parameters to effective 2D values by integrating
+out the z-direction Gaussian profile.
+
+For a harmonic confinement with oscillator length `l_z = √(ℏ/(mω_z))`,
+the effective 2D coupling is:
+
+    g_2D = g_3D / (√(2π) l_z)
+
+This applies uniformly to c₀, c₁, c_lhy, and all c_extra entries.
+The LHY coefficient additionally gets a dimensional factor: in quasi-2D,
+the LHY energy scales as n_2D^2 ln(n_2D) rather than n_3D^{5/2},
+but for simplicity this function applies the same Gaussian integration factor.
+
+# Arguments
+- `interactions::InteractionParams`: 3D interaction parameters
+- `l_z::Float64`: z-direction harmonic oscillator length (dimensionless)
+
+# Returns
+New `InteractionParams` with rescaled couplings.
+"""
+function rescale_interactions_quasi2d(interactions::InteractionParams, l_z::Float64)
+    l_z > 0 || throw(ArgumentError("l_z must be positive, got $l_z"))
+    factor = 1.0 / (sqrt(2π) * l_z)
+    c0_2d = interactions.c0 * factor
+    c1_2d = interactions.c1 * factor
+    c_lhy_2d = interactions.c_lhy * factor
+    c_extra_2d = interactions.c_extra .* factor
+    InteractionParams(c0_2d, c1_2d, c_lhy_2d, c_extra_2d)
+end
+
+"""
+    quasi2d_interaction_factor(l_z) → Float64
+
+Return the quasi-2D rescaling factor `1 / (√(2π) l_z)` for converting
+3D contact interaction parameters to effective 2D values.
+"""
+quasi2d_interaction_factor(l_z::Float64) = 1.0 / (sqrt(2π) * l_z)
+
 # --- Lima-Pelster DDI-corrected LHY ---
 
 """

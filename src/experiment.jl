@@ -63,6 +63,10 @@ struct DDIConfig
     secular::Bool
     quasi_2d::Bool
     l_z::Float64
+    rescale_interactions::Bool
+
+    DDIConfig(enabled, c_dd, secular, quasi_2d, l_z) = new(enabled, c_dd, secular, quasi_2d, l_z, false)
+    DDIConfig(enabled, c_dd, secular, quasi_2d, l_z, rescale) = new(enabled, c_dd, secular, quasi_2d, l_z, rescale)
 end
 
 DDIConfig() = DDIConfig(false, nothing, false, false, 0.0)
@@ -114,7 +118,8 @@ function _parse_system(d::Dict)
         secular = Bool(get(dd, "secular", false))
         quasi_2d = Bool(get(dd, "quasi_2d", false))
         l_z = Float64(get(dd, "l_z", 0.0))
-        DDIConfig(enabled, c_dd, secular, quasi_2d, l_z)
+        rescale = Bool(get(dd, "rescale_interactions", false))
+        DDIConfig(enabled, c_dd, secular, quasi_2d, l_z, rescale)
     else
         DDIConfig()
     end
