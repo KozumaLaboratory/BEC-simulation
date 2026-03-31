@@ -263,16 +263,51 @@ function _mean_majorana_entropy(psi, F::Int, ndim::Int, n_total, dV;
     s_sum / w_sum
 end
 
-function _label_phase(spin_order, nematic_order, channel_weights, F)
-    if spin_order > 0.9
-        :ferromagnetic
-    elseif nematic_order > 0.9
-        F == 1 ? :polar : :nematic
-    elseif get(channel_weights, 2F, 0.0) > 0.5
-        :cyclic
-    else
-        :mixed
+"""
+Classify the quantum phase from order parameters.
+
+For F=1: uses spin_order and nematic_order thresholds (ferro/polar/cyclic/mixed).
+For F≥2: integrates point group symmetry and biaxiality for finer classification
+of exotic phases (tetrahedral, octahedral, icosahedral, biaxial nematic).
+"""
+function _label_phase(spin_order, nematic_order, channel_weights, F;
+                      point_group::Symbol=:unknown, biaxiality::Float64=0.0)
+    # High spin order → ferromagnetic (all F)
+    if spin_order > 0.8
+        return :ferromagnetic
     end
+
+    # For F≥2, use point group symmetry for finer classification
+    if F >= 2 && point_group !== :unknown && point_group !== :trivial
+        if point_group === :I_h
+            return :icosahedral
+        elseif point_group === :O_h
+            return :octahedral
+        elseif point_group === :T_d
+            return :tetrahedral
+        elseif point_group === :D_nh
+            return :dihedral
+        end
+    end
+
+    # Nematic / polar
+    if nematic_order > 0.8
+        if F == 1
+            return :polar
+        end
+        # Biaxial nematic for F≥2
+        if biaxiality > 0.3
+            return :biaxial_nematic
+        end
+        return :nematic
+    end
+
+    # Cyclic: dominant weight in highest spin channel
+    if get(channel_weights, 2F, 0.0) > 0.5
+        return :cyclic
+    end
+
+    :mixed
 end
 
 """
@@ -324,14 +359,18 @@ function classify_phase_detailed(psi::AbstractArray{ComplexF64}, F::Int, grid::G
     sys = sm.system
     Mz = magnetization(psi, grid, sys) / n_sum
 
-    phase = _label_phase(spin_order, nematic_order, cw_norm, F)
-
     pg = _peak_point_group(psi, F, N, n_total, dV)
+
+    # Multipole fingerprint: density-weighted ⟨O_k⟩ for k = 0, 2, ..., 2F
+    mp_fp = multipole_spectrum(psi, F, grid)
+
+    phase = _label_phase(spin_order, nematic_order, cw_norm, F;
+                         point_group=pg, biaxiality=mean_biax)
 
     (spin_order=spin_order, nematic_order=nematic_order, biaxiality=mean_biax,
      Q6=mean_Q6, star_entropy=star_entropy,
      channel_weights=cw_norm, magnetization_density=Mz, phase=phase,
-     point_group=pg)
+     point_group=pg, multipole_fingerprint=mp_fp)
 end
 
 """

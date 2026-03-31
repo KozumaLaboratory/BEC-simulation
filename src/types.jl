@@ -430,6 +430,20 @@ struct BdGResult
     unstable::Bool
 end
 
+"""
+    DirectionalBdGResult
+
+Result of scanning the Bogoliubov spectrum over multiple k-directions.
+Identifies the most unstable direction and wavenumber for DDI-dominated systems.
+"""
+struct DirectionalBdGResult
+    directions::Vector{NTuple{3,Float64}}
+    results::Vector{BdGResult}
+    max_growth_rate::Float64
+    most_unstable_direction::NTuple{3,Float64}
+    most_unstable_k::Float64
+end
+
 # --- Spinor LHY Cache ---
 
 """

@@ -193,3 +193,92 @@ function _bdg_ddi_matrices(spinor, F, D, sm, c_dd, Q_ab)
 
     h, M_mat
 end
+
+"""
+    scan_bogoliubov_directions(; spinor, n0, F, interactions, zeeman, c_dd,
+        k_max, n_k, n_theta, n_phi) → DirectionalBdGResult
+
+Scan the Bogoliubov-de Gennes spectrum over multiple k-directions to find
+the most unstable mode. Essential for DDI-dominated systems where the
+instability threshold depends on the direction of the perturbation wavevector.
+
+For contact-only interactions (c_dd ≈ 0), the spectrum is isotropic and a
+single direction suffices.
+
+# Arguments
+- `spinor, n0, F, interactions, zeeman, c_dd`: passed to `bogoliubov_spectrum`
+- `k_max::Float64`: maximum wavenumber (default 10.0)
+- `n_k::Int`: k-points per direction (default 200)
+- `n_theta::Int`: polar angle samples in [0, π] (default 12)
+- `n_phi::Int`: azimuthal angle samples in [0, 2π) (default 12)
+
+# Returns
+`DirectionalBdGResult` with the full directional map and the most unstable mode.
+"""
+function scan_bogoliubov_directions(;
+    spinor::Vector{ComplexF64},
+    n0::Float64,
+    F::Int,
+    interactions::InteractionParams,
+    zeeman::ZeemanParams=ZeemanParams(),
+    c_dd::Float64=0.0,
+    k_max::Float64=10.0,
+    n_k::Int=200,
+    n_theta::Int=12,
+    n_phi::Int=12,
+)
+    # Contact-only: isotropic, single direction suffices
+    if abs(c_dd) < 1e-30
+        r = bogoliubov_spectrum(; spinor, n0, F, interactions, zeeman, c_dd, k_max, n_k)
+        k_peak = r.max_growth_rate > 1e-10 ? _find_most_unstable_k(r) : 0.0
+        return DirectionalBdGResult(
+            [(0.0, 0.0, 1.0)], [r], r.max_growth_rate, (0.0, 0.0, 1.0), k_peak,
+        )
+    end
+
+    # Build direction grid on unit sphere
+    directions = NTuple{3,Float64}[]
+    for it in 1:n_theta
+        theta = π * (it - 0.5) / n_theta
+        st, ct = sincos(theta)
+        for ip in 1:n_phi
+            phi = 2π * (ip - 1) / n_phi
+            sp, cp = sincos(phi)
+            push!(directions, (st * cp, st * sp, ct))
+        end
+    end
+
+    results = Vector{BdGResult}(undef, length(directions))
+    max_growth = 0.0
+    best_idx = 1
+
+    for (i, dir) in enumerate(directions)
+        r = bogoliubov_spectrum(; spinor, n0, F, interactions, zeeman, c_dd, k_max, n_k,
+                                  k_direction=dir)
+        results[i] = r
+        if r.max_growth_rate > max_growth
+            max_growth = r.max_growth_rate
+            best_idx = i
+        end
+    end
+
+    k_peak = max_growth > 1e-10 ? _find_most_unstable_k(results[best_idx]) : 0.0
+
+    DirectionalBdGResult(directions, results, max_growth, directions[best_idx], k_peak)
+end
+
+"""Find the wavenumber with the largest imaginary eigenvalue in a BdGResult."""
+function _find_most_unstable_k(r::BdGResult)
+    best_k = 0.0
+    best_g = 0.0
+    for ik in eachindex(r.k_values)
+        for j in axes(r.omega, 1)
+            g = imag(r.omega[j, ik])
+            if g > best_g
+                best_g = g
+                best_k = r.k_values[ik]
+            end
+        end
+    end
+    best_k
+end

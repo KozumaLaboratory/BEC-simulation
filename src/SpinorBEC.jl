@@ -64,7 +64,7 @@ include("unitful_support.jl")
 export GridConfig, Grid, SpinSystem, SpinMatrices
 export AtomSpecies, InteractionParams, ZeemanParams, LossParams, TensorInteractionCache
 export SimParams, SimState, FFTPlans, RFFTPlans, Workspace, AdaptiveDtParams, IntegratorConfig
-export TOFParams, BdGResult
+export TOFParams, BdGResult, DirectionalBdGResult
 export HarmonicTrap, NoPotential, GravityPotential, CompositePotential
 
 # Grid
@@ -168,7 +168,7 @@ export classify_phase, classify_phase_detailed
 export estimate_splitting_error, validate_conservation
 export power_spectrum
 export analyze_stability
-export bogoliubov_spectrum
+export bogoliubov_spectrum, scan_bogoliubov_directions
 
 # Simulation
 export find_ground_state, find_ground_state_multistart, scan_continuation

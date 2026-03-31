@@ -145,4 +145,48 @@
         @test result.max_growth_rate >= 0
         @test result.unstable isa Bool
     end
+
+    @testset "scan_bogoliubov_directions contact-only" begin
+        dr = scan_bogoliubov_directions(;
+            spinor=ComplexF64[0.0, 1.0, 0.0],
+            n0=1.0, F=1,
+            interactions=InteractionParams(10.0, 0.0),
+            k_max=5.0, n_k=20,
+        )
+        @test dr isa DirectionalBdGResult
+        @test length(dr.directions) == 1  # isotropic → single direction
+        @test length(dr.results) == 1
+        @test dr.max_growth_rate >= 0
+    end
+
+    @testset "scan_bogoliubov_directions with DDI" begin
+        dr = scan_bogoliubov_directions(;
+            spinor=ComplexF64[1.0, 0.0, 0.0],
+            n0=1.0, F=1,
+            interactions=InteractionParams(10.0, -0.5),
+            c_dd=5.0,
+            k_max=5.0, n_k=20,
+            n_theta=4, n_phi=4,
+        )
+        @test dr isa DirectionalBdGResult
+        @test length(dr.directions) == 16  # 4×4
+        @test length(dr.results) == 16
+        @test dr.max_growth_rate >= 0
+        @test length(dr.most_unstable_direction) == 3
+    end
+
+    @testset "scan finds anisotropic instability" begin
+        # Strong DDI should give direction-dependent growth rates
+        dr = scan_bogoliubov_directions(;
+            spinor=ComplexF64[1.0, 0.0, 0.0],
+            n0=1.0, F=1,
+            interactions=InteractionParams(10.0, -0.5),
+            c_dd=50.0,
+            k_max=10.0, n_k=50,
+            n_theta=4, n_phi=4,
+        )
+        growth_rates = [r.max_growth_rate for r in dr.results]
+        # Not all directions should have the same growth rate
+        @test !all(g ≈ growth_rates[1] for g in growth_rates) || dr.max_growth_rate < 1e-10
+    end
 end

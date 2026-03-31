@@ -375,4 +375,47 @@ using FFTW
             @test r.Q6 == 0.0
         end
     end
+
+    @testset "improved _label_phase" begin
+        @testset "backward compatible (no kwargs)" begin
+            @test SpinorBEC._label_phase(0.95, 0.1, Dict{Int,Float64}(), 1) == :ferromagnetic
+            @test SpinorBEC._label_phase(0.1, 0.95, Dict{Int,Float64}(), 1) == :polar
+            @test SpinorBEC._label_phase(0.1, 0.95, Dict{Int,Float64}(), 2) == :nematic
+            @test SpinorBEC._label_phase(0.1, 0.1, Dict(4 => 0.6), 2) == :cyclic
+            @test SpinorBEC._label_phase(0.1, 0.1, Dict{Int,Float64}(), 1) == :mixed
+        end
+
+        @testset "point group classification for F≥2" begin
+            @test SpinorBEC._label_phase(0.3, 0.3, Dict{Int,Float64}(), 3;
+                point_group=:T_d) == :tetrahedral
+            @test SpinorBEC._label_phase(0.3, 0.3, Dict{Int,Float64}(), 3;
+                point_group=:O_h) == :octahedral
+            @test SpinorBEC._label_phase(0.3, 0.3, Dict{Int,Float64}(), 6;
+                point_group=:I_h) == :icosahedral
+        end
+
+        @testset "biaxial nematic" begin
+            @test SpinorBEC._label_phase(0.3, 0.9, Dict{Int,Float64}(), 2;
+                biaxiality=0.5) == :biaxial_nematic
+            # Low biaxiality → regular nematic
+            @test SpinorBEC._label_phase(0.3, 0.9, Dict{Int,Float64}(), 2;
+                biaxiality=0.1) == :nematic
+        end
+
+        @testset "ferro overrides point group" begin
+            @test SpinorBEC._label_phase(0.95, 0.1, Dict{Int,Float64}(), 3;
+                point_group=:T_d) == :ferromagnetic
+        end
+    end
+
+    @testset "classify_phase_detailed includes multipole_fingerprint" begin
+        config = GridConfig(32, 10.0)
+        grid = make_grid(config)
+        sys = SpinSystem(1)
+        sm = spin_matrices(1)
+        psi = init_psi(grid, sys; state=:polar)
+        r = classify_phase_detailed(psi, 1, grid, sm)
+        @test haskey(r, :multipole_fingerprint)
+        @test r.multipole_fingerprint isa Dict{Int,Float64}
+    end
 end
