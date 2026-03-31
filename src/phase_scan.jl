@@ -329,6 +329,7 @@ function _run_scan(config::UnifiedConfig{ScanExperiment{ConstrainedJzScan}},
             Jz_tol=scan.tolerance,
             Jz_max_iter=scan.max_iter,
             Jz_omega_range=scan.omega_range,
+            Jz_method=gs.Jz_method,
         )
 
         psi = r.workspace.state.psi

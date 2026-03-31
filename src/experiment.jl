@@ -41,17 +41,19 @@ struct GroundStateConfig
     enable_ddi::Union{Nothing,Bool}
     target_magnetization::Union{Nothing,Float64}
     rotating_frame_omega::Float64
+    Jz_method::Symbol
 
     function GroundStateConfig(dt::Float64, n_steps::Int, tol::Float64,
                                initial_state::Symbol, zeeman::ZeemanParams,
                                potential::PotentialConfig, enable_ddi::Union{Nothing,Bool},
                                target_magnetization::Union{Nothing,Float64},
-                               rotating_frame_omega::Float64)
+                               rotating_frame_omega::Float64,
+                               Jz_method::Symbol=:bisection)
         dt > 0 || throw(ArgumentError("dt must be positive"))
         n_steps > 0 || throw(ArgumentError("n_steps must be positive"))
         tol > 0 || throw(ArgumentError("tol must be positive"))
         new(dt, n_steps, tol, initial_state, zeeman, potential,
-            enable_ddi, target_magnetization, rotating_frame_omega)
+            enable_ddi, target_magnetization, rotating_frame_omega, Jz_method)
     end
 end
 
@@ -148,9 +150,10 @@ function _parse_ground_state(d::Dict)
         v === nothing ? nothing : Float64(v)
     end
     rotating_frame_omega = Float64(get(d, "rotating_frame_omega", 0.0))
+    Jz_method = Symbol(get(d, "Jz_method", "bisection"))
 
     GroundStateConfig(dt, n_steps, tol, initial_state, zeeman, pot,
-                      enable_ddi, target_mag, rotating_frame_omega)
+                      enable_ddi, target_mag, rotating_frame_omega, Jz_method)
 end
 
 function _parse_phase(d::Dict)

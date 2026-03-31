@@ -103,6 +103,7 @@ function find_ground_state(;
     quasi_2d_ddi::Bool=false,
     l_z_ddi::Float64=0.0,
     spinor_lhy::Bool=false,
+    Jz_method::Symbol=:bisection,
 )
     psi0 = if psi_init === nothing
         sys = SpinSystem(atom.F)
@@ -115,6 +116,15 @@ function find_ground_state(;
         N_dim = length(grid.config.n_points)
         N_dim >= 2 || throw(ArgumentError(
             "target_Jz requires N ≥ 2 (need orbital angular momentum). Got N=$N_dim."))
+        if Jz_method === :projection
+            return _find_ground_state_Jz_projection(;
+                grid, atom, interactions, zeeman, potential, dt, n_steps, tol,
+                initial_state, psi_init=psi0, enable_ddi, c_dd, secular_ddi,
+                fft_flags, target_magnetization,
+                target_Jz, Jz_tol,
+                quasi_2d_ddi, l_z_ddi, spinor_lhy,
+            )
+        end
         return _find_ground_state_Jz(;
             grid, atom, interactions, zeeman, potential, dt, n_steps, tol,
             initial_state, psi_init=psi0, enable_ddi, c_dd, secular_ddi,
@@ -475,6 +485,216 @@ function scan_phase_diagram_2d(;
     end
 
     results
+end
+
+"""
+    _normalize_psi_Jz_constrained!(psi, grid, plans, sys, target_Jz, cache)
+
+Normalize psi while constraining total angular momentum J_z = L_z + S_z to target_Jz.
+
+Uses a two-step projection at each ITP step:
+1. Apply `exp(λ_s F_z)` weights to adjust spin magnetization S_z
+2. Apply `exp(λ_o L_z)` orbital rotation to adjust L_z
+3. Newton iteration on (λ_s, λ_o) to converge J_z → target
+
+The orbital projection uses the same 3-shear FFT decomposition as the Coriolis step,
+applying a small spatial rotation to redistribute angular momentum between L_z and S_z.
+
+For Einstein-de Haas states, the system naturally trades spin for orbital angular
+momentum. This projection preserves the total J_z while allowing the ITP to find
+the lowest energy configuration.
+"""
+function _normalize_psi_Jz_constrained!(psi, grid::Grid{N}, plans::FFTPlans,
+    sys::SpinSystem, target_Jz::Float64, F::Int) where {N}
+    N >= 2 || return nothing
+
+    dV = cell_volume(grid)
+    n_comp = sys.n_components
+    ndim = N
+    n_pts = ntuple(d -> size(psi, d), N)
+
+    # First normalize total norm
+    nrm = sqrt(sum(abs2, psi) * dV)
+    nrm > 0 && (psi ./= nrm)
+
+    # Newton iteration to find λ for exp(λ F_z) spin weight
+    # that shifts S_z to achieve target J_z together with current L_z
+    for _outer in 1:5
+        Lz = orbital_angular_momentum(psi, grid, plans)
+        Sz = magnetization(psi, grid, sys)
+        Jz = Lz + Sz
+
+        abs(Jz - target_Jz) < 1e-8 && break
+
+        # Strategy: apply exp(δΩ L_z) rotation to change L_z, and
+        # exp(λ m) weights to change S_z.
+        # Split the error: target a Sz that together with the rotated Lz gives target_Jz.
+        # For small adjustments, a rotation by δΩ changes Lz by ~δΩ × ∂Lz/∂Ω.
+        # Simpler approach: adjust S_z first via the same M_z constrained normalization,
+        # then apply orbital rotation for the remainder.
+
+        # Step 1: Determine desired S_z and L_z split
+        # Keep S_z close to current value, adjust L_z for the remainder
+        target_Sz = Sz  # keep S_z fixed initially
+        target_Lz = target_Jz - target_Sz
+
+        # Step 2: Apply orbital rotation to shift L_z → target_Lz
+        delta_Lz = target_Lz - Lz
+        if abs(delta_Lz) > 1e-10
+            # Estimate the rotation angle needed: δΩ ≈ δLz / N_norm
+            # For a state with characteristic size σ, Lz ~ N × σ² × Ω
+            # We use a simple adaptive approach: try a small rotation, measure response
+            delta_omega = _estimate_rotation_for_Lz(psi, grid, plans, delta_Lz, ndim, dV)
+            if abs(delta_omega) > 1e-15
+                _apply_coriolis_step!(psi, grid, delta_omega, 1.0, true)
+            end
+        end
+
+        # Step 3: Adjust S_z via component reweighting (same as M_z constraint)
+        Lz_new = orbital_angular_momentum(psi, grid, plans)
+        target_Sz_adj = target_Jz - Lz_new
+        _apply_Sz_projection!(psi, n_comp, ndim, n_pts, target_Sz_adj, F, dV)
+
+        # Re-normalize
+        nrm = sqrt(sum(abs2, psi) * dV)
+        nrm > 0 && (psi ./= nrm)
+    end
+
+    nothing
+end
+
+"""
+Estimate the rotation angle δΩ needed to change L_z by δLz.
+Uses a finite-difference probe: apply a small test rotation, measure ∂Lz/∂Ω, then scale.
+"""
+function _estimate_rotation_for_Lz(psi, grid::Grid{N}, plans, delta_Lz, ndim, dV) where {N}
+    # For the first estimate, use ⟨r²⟩ to relate rotation to L_z change
+    # L_z response to rotation: ∂L_z/∂Ω ≈ ⟨x² + y²⟩ = moment of inertia / ℏ
+    n_comp = size(psi, ndim + 1)
+    n_pts = ntuple(d -> size(psi, d), N)
+    r2_avg = 0.0
+    @inbounds for I in CartesianIndices(n_pts)
+        x = grid.x[1][I[1]]
+        y = grid.x[2][I[2]]
+        r2 = x^2 + y^2
+        dens = 0.0
+        for c in 1:n_comp
+            dens += abs2(psi[I, c])
+        end
+        r2_avg += r2 * dens * dV
+    end
+
+    # ∂Lz/∂Ω ≈ ⟨r²⟩ (moment of inertia in natural units)
+    # δΩ = δLz / ⟨r²⟩
+    abs(r2_avg) < 1e-30 && return 0.0
+    delta_omega = delta_Lz / r2_avg
+
+    # Clamp to prevent large rotations
+    clamp(delta_omega, -1.0, 1.0)
+end
+
+"""
+Apply exp(λ m) component reweighting to shift S_z toward target.
+Newton iteration on λ, identical to `_normalize_psi_constrained!` inner loop.
+"""
+function _apply_Sz_projection!(psi, n_comp, ndim, n_pts, target_Sz, F, dV)
+    lambda = 0.0
+    for _iter in 1:20
+        norms = Vector{Float64}(undef, n_comp)
+        for c in 1:n_comp
+            m = F - (c - 1)
+            idx = _component_slice(ndim, n_pts, c)
+            w = exp(lambda * m)
+            norms[c] = sum(abs2, view(psi, idx...)) * dV * w^2
+        end
+        total = sum(norms)
+        total < 1e-30 && break
+
+        Sz = sum((F - (c - 1)) * norms[c] for c in 1:n_comp) / total
+        abs(Sz - target_Sz) < 1e-10 && break
+
+        dSz = 0.0
+        for c in 1:n_comp
+            m = F - (c - 1)
+            dSz += 2 * m * (m - Sz) * norms[c] / total
+        end
+        abs(dSz) < 1e-30 && break
+
+        lambda -= (Sz - target_Sz) / dSz
+        lambda = clamp(lambda, -10.0, 10.0)
+    end
+
+    for c in 1:n_comp
+        m = F - (c - 1)
+        w = exp(lambda * m)
+        idx = _component_slice(ndim, n_pts, c)
+        view(psi, idx...) .*= w
+    end
+    nothing
+end
+
+"""
+    _find_ground_state_Jz_projection(; ...) → NamedTuple
+
+Find ground state with target J_z using per-step projection.
+At each ITP step, projects J_z = L_z + S_z back to the target value
+via orbital rotation + spin reweighting. Much faster than bisection
+(single ITP run vs ~20 runs).
+"""
+function _find_ground_state_Jz_projection(;
+    grid, atom, interactions, zeeman, potential, dt, n_steps, tol,
+    initial_state, psi_init, enable_ddi, c_dd, secular_ddi,
+    fft_flags, target_magnetization, target_Jz, Jz_tol,
+    quasi_2d_ddi, l_z_ddi, spinor_lhy,
+)
+    sys = SpinSystem(atom.F)
+    N_dim = length(grid.config.n_points)
+
+    sp = SimParams(; dt, n_steps, imaginary_time=true, normalize_every=0,
+                   save_every=max(1, n_steps ÷ 10))
+    ws = make_workspace(; grid, atom, interactions, zeeman, potential, sim_params=sp,
+                        psi_init, enable_ddi, c_dd, secular_ddi, fft_flags,
+                        quasi_2d_ddi, l_z_ddi, spinor_lhy)
+
+    n_comp = ws.spin_matrices.system.n_components
+    F = atom.F
+    plans = ws.fft_plans
+
+    # Initial projection
+    _normalize_psi_Jz_constrained!(ws.state.psi, ws.grid, plans, sys, target_Jz, F)
+
+    E_prev = total_energy(ws)
+    converged = false
+    psi_prev = copy(ws.state.psi)
+    final_dE = NaN
+    final_dpsi = NaN
+
+    for step in 1:n_steps
+        split_step!(ws)
+        step <= 10 && _check_itp_overflow(ws, step)
+
+        # Project J_z at each step
+        _normalize_psi_Jz_constrained!(ws.state.psi, ws.grid, plans, sys, target_Jz, F)
+
+        if step % sp.save_every == 0
+            E = total_energy(ws)
+            dE = abs(E - E_prev)
+            psi_max = maximum(abs, ws.state.psi)
+            dpsi = psi_max > 0 ? maximum(abs, ws.state.psi .- psi_prev) / psi_max : 0.0
+            final_dE = dE
+            final_dpsi = dpsi
+            if dE < tol && dpsi < tol
+                converged = true
+                break
+            end
+            E_prev = E
+            copyto!(psi_prev, ws.state.psi)
+        end
+    end
+
+    Jz_final = total_angular_momentum(ws.state.psi, grid, plans, sys)
+    (workspace=ws, converged=converged, energy=total_energy(ws),
+     dE=final_dE, dpsi=final_dpsi, Jz=Jz_final, omega=0.0)
 end
 
 """

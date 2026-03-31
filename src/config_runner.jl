@@ -107,6 +107,7 @@ function _run_ground_state(config::UnifiedConfig, grid, atom, potential, ndim)
         target_magnetization=gs.target_magnetization,
         rotating_frame_omega=gs.rotating_frame_omega,
         spinor_lhy=sys.spinor_lhy,
+        Jz_method=gs.Jz_method,
     )
 end
 
