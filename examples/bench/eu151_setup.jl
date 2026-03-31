@@ -1,4 +1,4 @@
-include(joinpath(@__DIR__, "..", "eu151", "eu151_params.jl"))
+include(joinpath(@__DIR__, "eu151_params.jl"))
 using JLD2
 
 function load_or_compute_gs(grid; cache_suffix="", trap=HarmonicTrap((1.0, 1.0, EU_λ_z)))

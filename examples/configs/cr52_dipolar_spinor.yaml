@@ -1,0 +1,64 @@
+# ================================================================
+# Cr52 dipolar spinor BEC with tensor interactions (2D)
+# ================================================================
+#
+# Physics:
+#   ⁵²Cr (F=3, μ=6μ_B) is the only atom with channel-resolved
+#   scattering lengths: a₂=112, a₄=58, a₆=-7 a₀ (Pasquiou et al. 2010).
+#   The c4/c6 keys activate the tensor interaction path (TensorInteractionCache),
+#   going beyond the minimal c₀/c₁ parametrization. DDI (c_dd=5.0)
+#   adds anisotropic long-range coupling. A Zeeman ramp probes
+#   spin-domain formation under competing contact + DDI.
+#
+# References:
+#   Werner et al. PRL 94, 183201 (2005) — first Cr BEC
+#   Pasquiou et al. PRA 81, 042716 (2010) — channel-resolved scattering
+#   Griesmaier et al. PRL 94, 160401 (2005) — first dipolar spinor BEC
+#
+# Units: dimensionless (ℏ = m = ω_ref = 1)
+# ================================================================
+
+experiment:
+  version: 3
+  name: "Cr52 dipolar spinor (2D)"
+  type: dynamics
+
+  system:
+    atom: Cr52
+    grid:
+      n_points: [32, 32]
+      box_size: [16.0, 16.0]
+    interactions:
+      c0: 20.0
+      c1: -0.3
+      c4: 0.8
+      c6: -0.2
+    ddi:
+      enabled: true
+      c_dd: 5.0
+
+  # Ferromagnetic ground state
+  ground_state:
+    dt: 0.002
+    n_steps: 5000
+    tol: 1.0e-10
+    initial_state: ferromagnetic
+    potential:
+      type: harmonic
+      omega: [1.0, 1.0]
+
+  sequence:
+    # Ramp quadratic Zeeman q: 0 → 1.0 to drive spin transitions
+    - name: zeeman_ramp
+      duration: 2.0
+      dt: 0.002
+      save_every: 100
+      integrator: adaptive
+      zeeman:
+        p: 0.0
+        q:
+          from: 0.0
+          to: 1.0
+      potential:
+        type: harmonic
+        omega: [1.0, 1.0]
