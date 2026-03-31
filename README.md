@@ -11,8 +11,8 @@ Spin- $F$ Bose-Einstein condensate simulator solving the spinor Gross-Pitaevskii
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
 
 # Run a YAML config → JLD2 output → interactive HTML dashboard
-julia --project=. examples/run.jl examples/li7_ferromagnetic_quench.yaml
-julia --project=. examples/visualize_dashboard.jl examples/output/li7_ferromagnetic_quench.jld2
+julia --project=. examples/run.jl examples/li7_quench.yaml
+julia --project=. examples/visualize_dashboard.jl examples/output/li7_quench.jld2
 
 # Tests
 julia --project=. -e 'using Pkg; Pkg.test()'
@@ -67,9 +67,9 @@ Dimensionless units: $\hbar = m = \omega_{\mathrm{ref}} = 1$ . Physical quantiti
 | Config | Physics | Grid |
 |--------|---------|------|
 | `eu151_edh.yaml` | Einstein-de Haas: DDI spin relaxation, $J_z$ conservation (Matsui 2026) | 3D $64^3$ |
-| `eu151_phase_diagram.yaml` | Phase diagram: quasi-2D DDI, $c_1/c_0$ sweep | 2D $64^2$ |
-| `li7_ferromagnetic_quench.yaml` | Polar→ferro quench: strong $c_1$ spin mixing | 3D $32^3$ |
-| `cr52_dipolar_spinor.yaml` | Tensor interactions: channel-resolved $c_4, c_6$ + DDI | 2D $32^2$ |
-| `dy164_quantum_droplet.yaml` | DDI + LHY quantum droplet, $F{=}8$ (17 components) | 2D $32^2$ |
+| `eu151_phase_scan.yaml` | Phase diagram: quasi-2D DDI, $c_1/c_0$ sweep | 2D $64^2$ |
+| `li7_quench.yaml` | Polar→ferro quench: strong $c_1$ spin mixing | 3D $32^3$ |
+| `cr52_tensor.yaml` | Tensor interactions: channel-resolved $c_4, c_6$ + DDI | 2D $32^2$ |
+| `dy164_droplet.yaml` | DDI + LHY quantum droplet, $F{=}8$ (17 components) | 2D $32^2$ |
 
 Pipeline: `run.jl` (YAML → JLD2) → `visualize_dashboard.jl` (JLD2 → HTML dashboard with 3D isosurface, populations, conservation).
