@@ -99,22 +99,6 @@ julia --project=. examples/run.jl examples/configs/  # runs all .yaml files
 julia --project=. examples/visualize_dashboard.jl examples/configs/output/li7_ferromagnetic_quench.jld2
 ```
 
-## Atom Species (21 built-in)
-
-All registered in `ATOM_REGISTRY`; resolved by name in YAML via `resolve_atom(:Li7)`.
-
-| Group | Species | $F$ | Key properties |
-|-------|---------|-----|----------------|
-| **Alkali** | Li7, Na23, K39, K41, Rb87 | 1 | $a_0, a_2$ known; Li7 strongly ferromagnetic ( $a_2{-}a_0 \approx {-}31\,a_B$ ), Na23 antiferromagnetic |
-| | Rb85 | 2 | Feshbach-tunable ( $a_s \approx {-}443\,a_B$ ) |
-| | Cs133 | 3 | Largest alkali ( $a_s \approx 280\,a_B$ ) |
-| **Dipolar** | Cr52 | 3 | $\mu{=}6\,\mu_B$ , channel-resolved $a_2/a_4/a_6$ (Pasquiou 2010) |
-| | Er166, Er168 | 6 | $\mu{=}6.98\,\mu_B$ |
-| | Dy162, Dy164 | 8 | $\mu{=}9.93\,\mu_B$ , strongest DDI ( $\varepsilon_{\mathrm{dd}} > 1$ ) |
-| | Eu151 | 6 | $\mu \approx 7\,\mu_B$ , $g_F{=}7/12$ (Matsui et al. Science 2026) |
-| **Spinless** | Ca40, Sr84/86/88, Yb170/174/176 | 0 | Scalar BEC benchmarks |
-| **Metastable** | He4star | 1 | $2^3S_1$ state, $\mu{=}2\,\mu_B$ |
-
 ## Physical Model
 
 $$H = \sum_m \int \psi_m^{*} \left[ -\frac{\nabla^2}{2} + V - pm + qm^2 + c_0 n + c_1 \langle\mathbf{F}\rangle \cdot \mathbf{F} + H_{\mathrm{ddi}} + c_{\mathrm{LHY}} n^{5/2} + H_{\mathrm{Raman}} \right] \psi_m \, d\mathbf{r}$$
