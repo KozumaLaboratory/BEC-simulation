@@ -41,7 +41,7 @@
             grid, atom=Rb87,
             interactions=InteractionParams(c0, 0.0),
             potential=HarmonicTrap(1.0),
-            dt=0.005, n_steps=5000, tol=1e-8,
+            dt=0.005, n_steps=2000, tol=1e-6,
         )
 
         ws = result.workspace

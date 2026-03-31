@@ -65,12 +65,11 @@ struct DDIConfig
     l_z::Float64
     rescale_interactions::Bool
 
+    DDIConfig() = new(false, nothing, false, false, 0.0, false)
+    DDIConfig(enabled, c_dd, secular) = new(enabled, c_dd, secular, false, 0.0, false)
     DDIConfig(enabled, c_dd, secular, quasi_2d, l_z) = new(enabled, c_dd, secular, quasi_2d, l_z, false)
     DDIConfig(enabled, c_dd, secular, quasi_2d, l_z, rescale) = new(enabled, c_dd, secular, quasi_2d, l_z, rescale)
 end
-
-DDIConfig() = DDIConfig(false, nothing, false, false, 0.0)
-DDIConfig(enabled, c_dd, secular) = DDIConfig(enabled, c_dd, secular, false, 0.0)
 
 struct SystemConfig
     atom_name::Symbol
