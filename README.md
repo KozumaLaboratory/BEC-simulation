@@ -153,43 +153,8 @@ Dimensionless units: $\hbar = m = \omega_{\mathrm{ref}} = 1$ throughout. Physica
 
 **Benchmarks** (`examples/bench/`): `bench_eu151.jl` (3D profiling), `bench_yoshida.jl` (integrator comparison), `convergence_test.jl` (dt/dx convergence).
 
-## Source Organization
-
-48 source files, ~8500 lines:
-
-| File | Lines | Responsibility |
-|------|------:|---------------|
-| `types.jl` | 594 | All struct definitions |
-| `ground_state.jl` | 552 | ITP, multistart, continuation, 2D scan |
-| `diagnostics.jl` | 587 | Healing lengths, conservation, stability analysis |
-| `observables.jl` | 369 | Density, magnetization, pair amplitudes, phase classification |
-| `experiment.jl` | 343 | Legacy YAML schema |
-| `config.jl` + `config_runner.jl` | 310 | Unified YAML config v3: load/run |
-| `phase_scan.jl` | 357 | Parameter/constrained-Jz scan |
-| `interactions.jl` | 327 | Contact, DDI params, constraint parameterization, LHY |
-| `atoms.jl` | 323 | 21 atom species + `ATOM_REGISTRY` |
-| `tensor_interaction.jl` | 312 | General- $F$ CG mean-field propagator |
-| `majorana.jl` | 308 | Majorana stars, $Q_6$ , point group detection |
-| `adaptive.jl` | 296 | Adaptive Strang + FSAL |
-| `split_step.jl` | 282 | Core splitting, Coriolis shear, rotating frame |
-| `ddi.jl` + `ddi_padded.jl` | 399 | DDI convolution (standard + zero-padded + quasi-2D) |
-| `clebsch_gordan.jl` | 222 | 3j/6j symbols, CG tables |
-| `SpinorBEC.jl` | 216 | Module definition, includes, exports |
-| `initialization.jl` | 223 | `init_psi`, `make_workspace` |
-| `bogoliubov.jl` | 195 | BdG spectrum (uniform) |
-| `spinor_utils.jl` | 166 | Spinor access, Euler rotation, matrix exp |
-| `propagators.jl` | 175 | Kinetic (batched + individual), diagonal step |
-| `energy.jl` | 165 | Energy decomposition |
-| *(28 more files)* | ~1700 | Simulation, Yoshida, I/O, potentials, Zeeman, optics, nematic, losses, Raman, TOF, currents, vorticity, etc. |
-
-50 test files, ~9100 lines, ~9000 test assertions.
-
 ## Testing
 
 ```bash
 julia --project=. -e 'using Pkg; Pkg.test()'
 ```
-
-## License
-
-MIT
