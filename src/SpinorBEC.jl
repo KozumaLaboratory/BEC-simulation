@@ -171,7 +171,7 @@ export analyze_stability
 export bogoliubov_spectrum, scan_bogoliubov_directions
 
 # Simulation
-export find_ground_state, find_ground_state_multistart, scan_continuation
+export find_ground_state, find_ground_state_multistart, scan_continuation, scan_continuation_bidirectional
 export scan_phase_diagram_2d
 export find_phase_boundary
 export run_simulation!, run_simulation_checkpointed!

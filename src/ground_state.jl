@@ -417,6 +417,59 @@ function scan_continuation(;
 end
 
 """
+    scan_continuation_bidirectional(; param_values, make_interactions, grid, atom, ...) → NamedTuple
+
+Forward-backward continuation scan for detecting metastable trapping at first-order
+phase transitions. Runs `scan_continuation` in both directions and compares energies
+at each point. Where the forward and backward scans disagree (energy difference
+exceeds `agreement_threshold`), takes the lower-energy result.
+
+Returns `(results, hysteresis)` where:
+- `results`: Vector of best (lowest energy) result at each parameter value
+- `hysteresis`: Vector of `(param, ΔE, phase_fwd, phase_bwd)` at disagreement points
+"""
+function scan_continuation_bidirectional(;
+    param_values::AbstractVector{Float64},
+    make_interactions::Function,
+    grid,
+    atom,
+    agreement_threshold::Float64=1e-4,
+    kwargs...,
+)
+    # Forward scan
+    fwd = scan_continuation(; param_values, make_interactions, grid, atom, kwargs...)
+
+    # Backward scan
+    bwd = scan_continuation(; param_values=reverse(param_values),
+                              make_interactions, grid, atom, kwargs...)
+    bwd = reverse(bwd)  # Align indices with forward scan
+
+    # Compare and take lower energy at each point
+    results = similar(fwd)
+    hysteresis = NamedTuple[]
+
+    for i in eachindex(param_values)
+        E_fwd = fwd[i].energy
+        E_bwd = bwd[i].energy
+        rel_diff = abs(E_fwd - E_bwd) / max(abs(E_fwd), abs(E_bwd), 1e-30)
+
+        if rel_diff > agreement_threshold
+            push!(hysteresis, (
+                param=param_values[i],
+                delta_E=E_fwd - E_bwd,
+                phase_forward=fwd[i].phase,
+                phase_backward=bwd[i].phase,
+            ))
+        end
+
+        results[i] = E_fwd <= E_bwd ? fwd[i] : bwd[i]
+    end
+
+    (results=results, hysteresis=hysteresis,
+     forward=fwd, backward=bwd)
+end
+
+"""
     scan_phase_diagram_2d(; param1_values, param2_values, make_interactions, grid, atom, ...) → Matrix{NamedTuple}
 
 2D parameter sweep with continuation from neighboring points.
