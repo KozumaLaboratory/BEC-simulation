@@ -6,6 +6,7 @@ authors = ["anko"]
 [deps]
 FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
 JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
+JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 PlotlyJS = "f0f68f2c-4968-5e81-91da-67840de0976a"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
@@ -25,6 +26,7 @@ SpinorBECPlotlyExt = "PlotlyJS"
 [compat]
 FFTW = "1"
 JLD2 = "0.4, 0.5"
+JSON = "0.21.4"
 Makie = "0.21, 0.22"
 PlotlyJS = "0.18"
 SpecialFunctions = "2.7.2"

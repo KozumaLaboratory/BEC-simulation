@@ -30,6 +30,7 @@ JuliaLocalPreferences.toml
 # Simulation caches and output
 *.jld2
 *.html
+**/output/
 
 # Allow Pages assets
 !examples/eu151/density_64.html
