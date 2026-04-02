@@ -19,10 +19,14 @@ end
 """
 Magnetization ⟨Fz⟩ = Σ_m m |ψ_m|² integrated over space.
 """
-function magnetization(psi::AbstractArray{ComplexF64}, grid::Grid{N}, sys::SpinSystem) where {N}
+function magnetization(
+    psi::AbstractArray{ComplexF64},
+    grid::Grid{N},
+    sys::SpinSystem,
+) where {N}
     dV = cell_volume(grid)
     Mz = 0.0
-    n_pts = ntuple(d -> size(psi, d), N)
+    n_pts = ntuple(d -> size(psi, d), Val(N))
     for (c, m) in enumerate(sys.m_values)
         idx = _component_slice(N, n_pts, c)
         Mz += m * sum(abs2, view(psi, idx...)) * dV
@@ -34,7 +38,11 @@ end
 Local spin density vector (Fx, Fy, Fz) at each spatial point.
 Returns a tuple of 3 arrays.
 """
-function spin_density_vector(psi::AbstractArray{ComplexF64}, sm::SpinMatrices{D}, ndim::Int) where {D}
+function spin_density_vector(
+    psi::AbstractArray{ComplexF64},
+    sm::SpinMatrices{D},
+    ndim::Int,
+) where {D}
     n_pts = ntuple(d -> size(psi, d), ndim)
 
     fx = zeros(Float64, n_pts)
@@ -62,20 +70,21 @@ function _compute_spin_density!(fx, fy, fz, psi, sm, ::Val{D}, ndim, n_pts) wher
     F = sm.system.F
     Ff1 = Float64(F * (F + 1))
     m_vals = ntuple(c -> Float64(F - (c - 1)), Val(D))
-    fp_coeffs = ntuple(c -> c == 1 ? 0.0 : sqrt(Ff1 - m_vals[c] * (m_vals[c] + 1.0)), Val(D))
+    fp_coeffs =
+        ntuple(c -> c == 1 ? 0.0 : sqrt(Ff1 - m_vals[c] * (m_vals[c] + 1.0)), Val(D))
 
     Threads.@threads for I in CartesianIndices(n_pts)
         @inbounds begin
             fz_val = 0.0
-            for c in 1:D
+            for c = 1:D
                 fz_val += m_vals[c] * abs2(psi[I, c])
             end
             fz[I] = fz_val
 
             fxy_re = 0.0
             fxy_im = 0.0
-            for c in 2:D
-                prod = conj(psi[I, c - 1]) * psi[I, c]
+            for c = 2:D
+                prod = conj(psi[I, c-1]) * psi[I, c]
                 fxy_re += fp_coeffs[c] * real(prod)
                 fxy_im += fp_coeffs[c] * imag(prod)
             end
@@ -99,7 +108,7 @@ function singlet_pair_amplitude(psi::AbstractArray{ComplexF64}, F::Int, ndim::In
 
     @inbounds for I in CartesianIndices(n_pts)
         s = zero(ComplexF64)
-        for c in 1:D
+        for c = 1:D
             m = F - (c - 1)
             c_pair = D - c + 1
             sign = iseven(F - m) ? 1.0 : -1.0
@@ -115,14 +124,20 @@ end
 
 Pair amplitude A_{SM}(r) = Σ_{m1} CG(F,m1;F,M-m1|S,M) ψ_{m1}(r) ψ_{M-m1}(r).
 """
-function pair_amplitude(psi::AbstractArray{ComplexF64}, F::Int, S::Int, M::Int,
-                        ndim::Int, cg_table::Dict{NTuple{4,Int},Float64})
+function pair_amplitude(
+    psi::AbstractArray{ComplexF64},
+    F::Int,
+    S::Int,
+    M::Int,
+    ndim::Int,
+    cg_table::Dict{NTuple{4,Int},Float64},
+)
     D = 2F + 1
     n_pts = ntuple(d -> size(psi, d), ndim)
     A = zeros(ComplexF64, n_pts)
 
     pairs = Tuple{Int,Int,Float64}[]
-    for m1 in -F:F
+    for m1 = (-F):F
         m2 = M - m1
         abs(m2) > F && continue
         cg = get(cg_table, (S, M, m1, m2), 0.0)
@@ -150,8 +165,12 @@ Compute eigenvalues of the traceless nematic tensor at each grid point.
 The rank-2 nematic tensor is N_{ab} = ⟨(F_a F_b + F_b F_a)/2⟩/n - F(F+1)/3 δ_{ab}.
 Returns three N-dim arrays (lambda1, lambda2, lambda3) sorted lambda1 >= lambda2 >= lambda3.
 """
-function nematic_tensor_eigenvalues(psi::AbstractArray{ComplexF64}, sm::SpinMatrices{D},
-                                     ndim::Int; density_cutoff::Float64=1e-10) where {D}
+function nematic_tensor_eigenvalues(
+    psi::AbstractArray{ComplexF64},
+    sm::SpinMatrices{D},
+    ndim::Int;
+    density_cutoff::Float64 = 1e-10,
+) where {D}
     n_pts = ntuple(d -> size(psi, d), ndim)
     F = sm.system.F
     shift = F * (F + 1) / 3.0
@@ -162,8 +181,8 @@ function nematic_tensor_eigenvalues(psi::AbstractArray{ComplexF64}, sm::SpinMatr
     F_mats = (Fx, Fy, Fz)
 
     sym_prods = Matrix{ComplexF64}[]
-    for a in 1:3
-        for b in a:3
+    for a = 1:3
+        for b = a:3
             push!(sym_prods, (F_mats[a] * F_mats[b] + F_mats[b] * F_mats[a]) / 2)
         end
     end
@@ -181,12 +200,12 @@ function nematic_tensor_eigenvalues(psi::AbstractArray{ComplexF64}, sm::SpinMatr
 
         nab = zeros(Float64, 3, 3)
         idx = 0
-        for a in 1:3
-            for b in a:3
+        for a = 1:3
+            for b = a:3
                 idx += 1
                 val = 0.0
-                for j in 1:D
-                    for k in 1:D
+                for j = 1:D
+                    for k = 1:D
                         val += real(conj(psi[I, j]) * sym_prods[idx][j, k] * psi[I, k])
                     end
                 end
@@ -226,19 +245,23 @@ where Q_{kq} = Σ_m CG(F,m;k,q|F,m+q) ψ*_{m+q} ψ_m.
 
 Returns Dict mapping rank k to spatial array of O_k values.
 """
-function multipole_order_parameters(psi::AbstractArray{ComplexF64}, F::Int, ndim::Int;
-                                     density_cutoff::Float64=1e-10)
+function multipole_order_parameters(
+    psi::AbstractArray{ComplexF64},
+    F::Int,
+    ndim::Int;
+    density_cutoff::Float64 = 1e-10,
+)
     D = 2F + 1
     n_pts = ntuple(d -> size(psi, d), ndim)
     n_total = total_density(psi, ndim)
 
     result = Dict{Int,Array{Float64,ndim}}()
-    for k in 0:2:2F
+    for k = 0:2:2F
         O_k = zeros(Float64, n_pts)
         cg_pairs = Dict{Int,Vector{Tuple{Int,Int,Float64}}}()
-        for q in -k:k
+        for q = (-k):k
             pairs = Tuple{Int,Int,Float64}[]
-            for m in -F:F
+            for m = (-F):F
                 mp = m + q
                 abs(mp) > F && continue
                 cg_val = clebsch_gordan(F, m, k, q, F, mp)
@@ -251,7 +274,7 @@ function multipole_order_parameters(psi::AbstractArray{ComplexF64}, F::Int, ndim
         @inbounds for I in CartesianIndices(n_pts)
             n_total[I] > density_cutoff || continue
             inv_n_sq = 1.0 / (n_total[I]^2)
-            for q in -k:k
+            for q = (-k):k
                 haskey(cg_pairs, q) || continue
                 Qkq = zero(ComplexF64)
                 for (c_m, c_mp, cg_val) in cg_pairs[q]
@@ -271,8 +294,12 @@ end
 Density-weighted average of each multipole order parameter.
 Returns Dict mapping rank k to ⟨O_k⟩ = ∫ O_k(r) n²(r) dV / ∫ n²(r) dV.
 """
-function multipole_spectrum(psi::AbstractArray{ComplexF64}, F::Int, grid::Grid{N};
-                             density_cutoff::Float64=1e-10) where {N}
+function multipole_spectrum(
+    psi::AbstractArray{ComplexF64},
+    F::Int,
+    grid::Grid{N};
+    density_cutoff::Float64 = 1e-10,
+) where {N}
     ops = multipole_order_parameters(psi, F, N; density_cutoff)
     n_total = total_density(psi, N)
     dV = cell_volume(grid)
@@ -280,10 +307,7 @@ function multipole_spectrum(psi::AbstractArray{ComplexF64}, F::Int, grid::Grid{N
     w_sum = sum(n_sq) * dV
     w_sum < 1e-30 && return Dict{Int,Float64}(k => 0.0 for k in keys(ops))
 
-    Dict{Int,Float64}(
-        k => sum(O_k .* n_sq) * dV / w_sum
-        for (k, O_k) in ops
-    )
+    Dict{Int,Float64}(k => sum(O_k .* n_sq) * dV / w_sum for (k, O_k) in ops)
 end
 
 """
@@ -322,17 +346,21 @@ Returns `(amplitudes, channel_weights)` where:
 - `amplitudes::Dict{Tuple{Int,Int}, Float64}`: (S,M) => ∫|A_{SM}(r)|² dV
 - `channel_weights::Dict{Int, Float64}`: S => Σ_M ∫|A_{SM}|² dV
 """
-function pair_amplitude_spectrum(psi::AbstractArray{ComplexF64}, F::Int, grid::Grid{N}) where {N}
+function pair_amplitude_spectrum(
+    psi::AbstractArray{ComplexF64},
+    F::Int,
+    grid::Grid{N},
+) where {N}
     cg = precompute_cg_array(F)
     dV = cell_volume(grid)
-    n_pts = ntuple(d -> size(psi, d), N)
+    n_pts = ntuple(d -> size(psi, d), Val(N))
 
     amplitudes = Dict{Tuple{Int,Int},Float64}()
     channel_weights = Dict{Int,Float64}()
 
-    for S in 0:2:(2F)
+    for S = 0:2:(2F)
         w = 0.0
-        for M in -S:S
+        for M = (-S):S
             A = _pair_amplitude_fast(psi, F, S, M, N, n_pts, cg)
             val = sum(abs2, A) * dV
             amplitudes[(S, M)] = val
@@ -341,16 +369,23 @@ function pair_amplitude_spectrum(psi::AbstractArray{ComplexF64}, F::Int, grid::G
         channel_weights[S] = w
     end
 
-    (amplitudes=amplitudes, channel_weights=channel_weights)
+    (amplitudes = amplitudes, channel_weights = channel_weights)
 end
 
-function _pair_amplitude_fast(psi, F::Int, S::Int, M::Int, ndim::Int,
-                               n_pts, cg::CGArrayTable)
+function _pair_amplitude_fast(
+    psi,
+    F::Int,
+    S::Int,
+    M::Int,
+    ndim::Int,
+    n_pts,
+    cg::CGArrayTable,
+)
     D = 2F + 1
     A = zeros(ComplexF64, n_pts)
 
     pairs = Tuple{Int,Int,Float64}[]
-    for m1 in -F:F
+    for m1 = (-F):F
         m2 = M - m1
         abs(m2) > F && continue
         cg_val = cg_lookup(cg, S, M, m1)

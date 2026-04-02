@@ -10,7 +10,7 @@ function energy_decomposition(ws::Workspace{N}) where {N}
     grid = ws.grid
     n_comp = ws.spin_matrices.system.n_components
     dV = cell_volume(grid)
-    n_pts = ntuple(d -> size(psi, d), N)
+    n_pts = ntuple(d -> size(psi, d), Val(N))
 
     E_kin = _kinetic_energy(psi, grid, ws.fft_plans, ws.state.fft_buf, n_comp, N, n_pts, dV)
     E_trap = _trap_energy(psi, ws.potential_values, n_comp, N, n_pts, dV)
@@ -23,19 +23,38 @@ function energy_decomposition(ws::Workspace{N}) where {N}
         0.0
     end
     E_c1 = if ws.tensor_cache === nothing
-        _spin_interaction_energy(psi, ws.spin_matrices, ws.interactions.c1, n_comp, N, n_pts, dV)
+        _spin_interaction_energy(
+            psi,
+            ws.spin_matrices,
+            ws.interactions.c1,
+            n_comp,
+            N,
+            n_pts,
+            dV,
+        )
     else
         0.0
     end
 
     E_ddi = if ws.ddi !== nothing
-        _ddi_energy(psi, ws.spin_matrices, ws.ddi, ws.ddi_bufs, n_comp, N, n_pts, dV;
-                    ddi_padded=ws.ddi_padded)
+        _ddi_energy(
+            psi,
+            ws.spin_matrices,
+            ws.ddi,
+            ws.ddi_bufs,
+            n_comp,
+            N,
+            n_pts,
+            dV;
+            ddi_padded = ws.ddi_padded,
+        )
     else
         0.0
     end
 
-    E_lhy = ws.interactions.c_lhy != 0.0 ? _lhy_energy(psi, ws.interactions.c_lhy, n_comp, N, n_pts, dV) : 0.0
+    E_lhy =
+        ws.interactions.c_lhy != 0.0 ?
+        _lhy_energy(psi, ws.interactions.c_lhy, n_comp, N, n_pts, dV) : 0.0
 
     E_tensor = if ws.tensor_cache !== nothing
         _tensor_interaction_energy(psi, ws.tensor_cache, N, n_pts, dV)
@@ -51,9 +70,18 @@ function energy_decomposition(ws::Workspace{N}) where {N}
     end
 
     E_total = E_kin + E_trap + E_zee + E_c0 + E_c1 + E_ddi + E_lhy + E_tensor + E_raman
-    (kinetic=E_kin, trap=E_trap, zeeman=E_zee,
-     density=E_c0, spin=E_c1, ddi=E_ddi, lhy=E_lhy,
-     tensor=E_tensor, raman=E_raman, total=E_total)
+    (
+        kinetic = E_kin,
+        trap = E_trap,
+        zeeman = E_zee,
+        density = E_c0,
+        spin = E_c1,
+        ddi = E_ddi,
+        lhy = E_lhy,
+        tensor = E_tensor,
+        raman = E_raman,
+        total = E_total,
+    )
 end
 
 function total_energy(ws::Workspace{N}) where {N}
@@ -62,7 +90,7 @@ end
 
 function _kinetic_energy(psi, grid, plans, fft_buf, n_comp, ndim, n_pts, dV)
     E = 0.0
-    for c in 1:n_comp
+    for c = 1:n_comp
         idx = _component_slice(ndim, n_pts, c)
         fft_buf .= view(psi, idx...)
         plans.forward * fft_buf
@@ -73,7 +101,7 @@ end
 
 function _trap_energy(psi, V_trap, n_comp, ndim, n_pts, dV)
     E = 0.0
-    for c in 1:n_comp
+    for c = 1:n_comp
         idx = _component_slice(ndim, n_pts, c)
         E += sum(V_trap .* abs2.(view(psi, idx...))) * dV
     end
@@ -83,7 +111,7 @@ end
 function _zeeman_energy(psi, zeeman, sys, n_comp, ndim, n_pts, dV)
     zee = zeeman_energies(zeeman, sys)
     E = 0.0
-    for c in 1:n_comp
+    for c = 1:n_comp
         idx = _component_slice(ndim, n_pts, c)
         E += zee[c] * sum(abs2, view(psi, idx...)) * dV
     end
@@ -127,39 +155,80 @@ function _nematic_energy(psi, F, c2, ndim, n_pts, dV)
     0.5 * c2 * sum(abs2, A) * dV
 end
 
-function _ddi_energy(psi, sm::SpinMatrices{D}, ddi, ddi_bufs, n_comp, ndim, n_pts, dV;
-                     ddi_padded=nothing) where {D}
+function _ddi_energy(
+    psi,
+    sm::SpinMatrices{D},
+    ddi,
+    ddi_bufs,
+    n_comp,
+    ndim,
+    n_pts,
+    dV;
+    ddi_padded = nothing,
+) where {D}
     if ddi_padded !== nothing
         _compute_and_convolve_ddi_padded!(psi, sm, ddi, ddi_padded, Val(D), ndim, n_pts)
         E = 0.0
         @inbounds for I in CartesianIndices(n_pts)
-            E += ddi_padded.Phi_x_pad[I] * ddi_padded.Fx_pad[I] +
-                 ddi_padded.Phi_y_pad[I] * ddi_padded.Fy_pad[I] +
-                 ddi_padded.Phi_z_pad[I] * ddi_padded.Fz_pad[I]
+            E +=
+                ddi_padded.Phi_x_pad[I] * ddi_padded.Fx_pad[I] +
+                ddi_padded.Phi_y_pad[I] * ddi_padded.Fy_pad[I] +
+                ddi_padded.Phi_z_pad[I] * ddi_padded.Fz_pad[I]
         end
         return 0.5 * E * dV
     end
-    _compute_spin_density!(ddi_bufs.Fx_r, ddi_bufs.Fy_r, ddi_bufs.Fz_r, psi, sm, Val(D), ndim, n_pts)
+    _compute_spin_density!(
+        ddi_bufs.Fx_r,
+        ddi_bufs.Fy_r,
+        ddi_bufs.Fz_r,
+        psi,
+        sm,
+        Val(D),
+        ndim,
+        n_pts,
+    )
     compute_ddi_potential!(ddi, ddi_bufs)
     E = 0.0
     @inbounds for I in CartesianIndices(n_pts)
-        E += ddi_bufs.Phi_x[I] * ddi_bufs.Fx_r[I] +
-             ddi_bufs.Phi_y[I] * ddi_bufs.Fy_r[I] +
-             ddi_bufs.Phi_z[I] * ddi_bufs.Fz_r[I]
+        E +=
+            ddi_bufs.Phi_x[I] * ddi_bufs.Fx_r[I] +
+            ddi_bufs.Phi_y[I] * ddi_bufs.Fy_r[I] +
+            ddi_bufs.Phi_z[I] * ddi_bufs.Fz_r[I]
     end
     0.5 * E * dV
 end
 
-function _raman_energy(psi, sm::SpinMatrices{D}, raman::RamanCoupling{N},
-                       grid::Grid{N}, ndim, n_pts, dV) where {D,N}
+function _raman_energy(
+    psi,
+    sm::SpinMatrices{D},
+    raman::RamanCoupling{N},
+    grid::Grid{N},
+    ndim,
+    n_pts,
+    dV,
+) where {D,N}
+    F = sm.system.F
+    Ff1 = Float64(F * (F + 1))
+    m_vals = ntuple(c -> Float64(F - (c - 1)), Val(D))
+    fp_coeffs =
+        ntuple(c -> c == 1 ? 0.0 : sqrt(Ff1 - m_vals[c] * (m_vals[c] + 1.0)), Val(D))
+
     E = 0.0
     @inbounds for I in CartesianIndices(n_pts)
         kr = sum(ntuple(d -> raman.k_eff[d] * grid.x[d][I[d]], Val(N)))
         phase = exp(1im * kr)
-        H_R = raman.delta * sm.Fz +
-              (raman.Omega_R / 2) * (phase * sm.Fp + conj(phase) * sm.Fm)
-        spinor = _get_spinor(psi, I, Val(D))
-        E += real(dot(spinor, SMatrix{D,D,ComplexF64}(H_R) * spinor)) * dV
+
+        fz_val = 0.0
+        for c = 1:D
+            fz_val += m_vals[c] * abs2(psi[I, c])
+        end
+
+        fp_val = zero(ComplexF64)
+        for c = 2:D
+            fp_val += fp_coeffs[c] * conj(psi[I, c-1]) * psi[I, c]
+        end
+
+        E += (raman.delta * fz_val + raman.Omega_R * real(phase * fp_val)) * dV
     end
     E
 end

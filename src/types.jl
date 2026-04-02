@@ -9,13 +9,15 @@ struct GridConfig{N}
     box_size::NTuple{N,Float64}
 
     function GridConfig{N}(n_points::NTuple{N,Int}, box_size::NTuple{N,Float64}) where {N}
-        all(n -> n > 0 && iseven(n), n_points) || throw(ArgumentError("n_points must be positive even integers"))
+        all(n -> n > 0 && iseven(n), n_points) ||
+            throw(ArgumentError("n_points must be positive even integers"))
         all(L -> L > 0, box_size) || throw(ArgumentError("box_size must be positive"))
         new{N}(n_points, box_size)
     end
 end
 
-GridConfig(n_points::NTuple{N,Int}, box_size::NTuple{N,Float64}) where {N} = GridConfig{N}(n_points, box_size)
+GridConfig(n_points::NTuple{N,Int}, box_size::NTuple{N,Float64}) where {N} =
+    GridConfig{N}(n_points, box_size)
 GridConfig(n_points::Int, box_size::Float64) = GridConfig{1}((n_points,), (box_size,))
 
 spatial_dims(::GridConfig{N}) where {N} = N
@@ -42,7 +44,7 @@ end
 function SpinSystem(F::Int)
     F >= 0 || throw(ArgumentError("F must be non-negative"))
     n = 2F + 1
-    SpinSystem(F, n, collect(F:-1:-F))
+    SpinSystem(F, n, collect(F:-1:(-F)))
 end
 
 # --- Spin Matrices ---
@@ -94,14 +96,31 @@ struct AtomSpecies
     scattering_lengths::Dict{Int,Float64}
     Delta_E_hf::Float64
 
-    function AtomSpecies(name, mass, F, a0, a2, mu_mag, g_F, scattering_lengths;
-                         Delta_E_hf::Float64=0.0)
+    function AtomSpecies(
+        name,
+        mass,
+        F,
+        a0,
+        a2,
+        mu_mag,
+        g_F,
+        scattering_lengths;
+        Delta_E_hf::Float64 = 0.0,
+    )
         a_s = F == 1 ? (a0 + 2a2) / 3 : a0
         new(name, mass, F, a0, a2, a_s, mu_mag, g_F, scattering_lengths, Delta_E_hf)
     end
 
-    function AtomSpecies(name, mass, F, a0, a2, mu_mag, g_F::Real;
-                         Delta_E_hf::Float64=0.0)
+    function AtomSpecies(
+        name,
+        mass,
+        F,
+        a0,
+        a2,
+        mu_mag,
+        g_F::Real;
+        Delta_E_hf::Float64 = 0.0,
+    )
         sl = if F == 1 && (a0 != 0.0 || a2 != 0.0)
             Dict{Int,Float64}(0 => a0, 2 => a2)
         else
@@ -111,13 +130,21 @@ struct AtomSpecies
         new(name, mass, F, a0, a2, a_s, mu_mag, Float64(g_F), sl, Delta_E_hf)
     end
 
-    function AtomSpecies(name, mass, F, a0, a2, mu_mag, scattering_lengths::Dict;
-                         Delta_E_hf::Float64=0.0)
+    function AtomSpecies(
+        name,
+        mass,
+        F,
+        a0,
+        a2,
+        mu_mag,
+        scattering_lengths::Dict;
+        Delta_E_hf::Float64 = 0.0,
+    )
         a_s = F == 1 ? (a0 + 2a2) / 3 : a0
         new(name, mass, F, a0, a2, a_s, mu_mag, 0.0, scattering_lengths, Delta_E_hf)
     end
 
-    function AtomSpecies(name, mass, F, a0, a2, mu_mag; Delta_E_hf::Float64=0.0)
+    function AtomSpecies(name, mass, F, a0, a2, mu_mag; Delta_E_hf::Float64 = 0.0)
         sl = if F == 1 && (a0 != 0.0 || a2 != 0.0)
             Dict{Int,Float64}(0 => a0, 2 => a2)
         else
@@ -149,9 +176,12 @@ struct InteractionParams
     c_extra::Vector{Float64}
 
     InteractionParams(c0::Float64, c1::Float64) = new(c0, c1, 0.0, Float64[])
-    InteractionParams(c0::Float64, c1::Float64, c_extra::Vector{Float64}) = new(c0, c1, 0.0, c_extra)
-    InteractionParams(c0::Float64, c1::Float64, c_lhy::Float64) = new(c0, c1, c_lhy, Float64[])
-    InteractionParams(c0::Float64, c1::Float64, c_lhy::Float64, c_extra::Vector{Float64}) = new(c0, c1, c_lhy, c_extra)
+    InteractionParams(c0::Float64, c1::Float64, c_extra::Vector{Float64}) =
+        new(c0, c1, 0.0, c_extra)
+    InteractionParams(c0::Float64, c1::Float64, c_lhy::Float64) =
+        new(c0, c1, c_lhy, Float64[])
+    InteractionParams(c0::Float64, c1::Float64, c_lhy::Float64, c_extra::Vector{Float64}) =
+        new(c0, c1, c_lhy, c_extra)
 end
 
 function get_cn(ip::InteractionParams, n::Int)
@@ -170,8 +200,8 @@ end
 
 ZeemanParams() = ZeemanParams(0.0, 0.0)
 
-struct TimeDependentZeeman
-    B_func::Function  # t -> ZeemanParams
+struct TimeDependentZeeman{T<:Function}
+    B_func::T  # t -> ZeemanParams
 end
 
 # --- Raman Coupling ---
@@ -229,14 +259,21 @@ SimParams(dt, n_steps, imaginary_time, normalize_every, save_every) =
 function SimParams(;
     dt::Float64,
     n_steps::Int,
-    imaginary_time::Bool=false,
-    normalize_every::Int=imaginary_time ? 1 : 0,
-    save_every::Int=max(1, n_steps ÷ 100),
-    rotating_frame_omega::Float64=0.0,
+    imaginary_time::Bool = false,
+    normalize_every::Int = imaginary_time ? 1 : 0,
+    save_every::Int = max(1, n_steps ÷ 100),
+    rotating_frame_omega::Float64 = 0.0,
 )
     dt > 0 || throw(ArgumentError("dt must be positive"))
     n_steps > 0 || throw(ArgumentError("n_steps must be positive"))
-    SimParams(dt, n_steps, imaginary_time, normalize_every, save_every, rotating_frame_omega)
+    SimParams(
+        dt,
+        n_steps,
+        imaginary_time,
+        normalize_every,
+        save_every,
+        rotating_frame_omega,
+    )
 end
 
 # --- Simulation State (mutable) ---
@@ -361,15 +398,22 @@ struct AdaptiveDtParams
     tol::Float64
     error_mode::Symbol
 
-    function AdaptiveDtParams(; dt_init::Float64=0.001, dt_min::Float64=1e-5,
-                               dt_max::Float64=0.01, tol::Float64=1e-3,
-                               error_mode::Symbol=:step_change)
+    function AdaptiveDtParams(;
+        dt_init::Float64 = 0.001,
+        dt_min::Float64 = 1e-5,
+        dt_max::Float64 = 0.01,
+        tol::Float64 = 1e-3,
+        error_mode::Symbol = :step_change,
+    )
         dt_init > 0 || throw(ArgumentError("dt_init must be positive"))
         dt_min > 0 || throw(ArgumentError("dt_min must be positive"))
         dt_max >= dt_min || throw(ArgumentError("dt_max must be >= dt_min"))
         tol > 0 || throw(ArgumentError("tol must be positive"))
-        error_mode in (:step_change, :richardson) || throw(ArgumentError(
-            "error_mode must be :step_change or :richardson, got :$error_mode"))
+        error_mode in (:step_change, :richardson) || throw(
+            ArgumentError(
+                "error_mode must be :step_change or :richardson, got :$error_mode",
+            ),
+        )
         new(dt_init, dt_min, dt_max, tol, error_mode)
     end
 end
@@ -378,10 +422,15 @@ struct IntegratorConfig
     method::Symbol
     params::Union{Nothing,AdaptiveDtParams}
 
-    function IntegratorConfig(method::Symbol,
-                              params::Union{Nothing,AdaptiveDtParams}=nothing)
-        method in (:strang, :yoshida, :adaptive) || throw(ArgumentError(
-            "integrator method must be :strang, :yoshida, or :adaptive, got :$method"))
+    function IntegratorConfig(
+        method::Symbol,
+        params::Union{Nothing,AdaptiveDtParams} = nothing,
+    )
+        method in (:strang, :yoshida, :adaptive) || throw(
+            ArgumentError(
+                "integrator method must be :strang, :yoshida, or :adaptive, got :$method",
+            ),
+        )
         if method == :adaptive && params === nothing
             throw(ArgumentError("adaptive integrator requires AdaptiveDtParams"))
         end
@@ -397,16 +446,20 @@ struct ObservablesConfig
     final_only::Vector{Symbol}
     spatial_sampling::Float64
 
-    function ObservablesConfig(always::Vector{Symbol}, on_save::Vector{Symbol},
-                               final_only::Vector{Symbol}, spatial_sampling::Float64)
-        0.0 < spatial_sampling <= 1.0 || throw(ArgumentError(
-            "spatial_sampling must be in (0, 1], got $spatial_sampling"))
+    function ObservablesConfig(
+        always::Vector{Symbol},
+        on_save::Vector{Symbol},
+        final_only::Vector{Symbol},
+        spatial_sampling::Float64,
+    )
+        0.0 < spatial_sampling <= 1.0 || throw(
+            ArgumentError("spatial_sampling must be in (0, 1], got $spatial_sampling"),
+        )
         new(always, on_save, final_only, spatial_sampling)
     end
 end
 
-ObservablesConfig() = ObservablesConfig(
-    [:norm, :magnetization], [:energy], Symbol[], 1.0)
+ObservablesConfig() = ObservablesConfig([:norm, :magnetization], [:energy], Symbol[], 1.0)
 
 struct TOFParams
     t_tof::Float64
@@ -420,7 +473,7 @@ struct TOFParams
     end
 end
 
-TOFParams(; t_tof::Float64, gradient::Float64=0.0, imaging_axis::Int=3) =
+TOFParams(; t_tof::Float64, gradient::Float64 = 0.0, imaging_axis::Int = 3) =
     TOFParams(t_tof, gradient, imaging_axis)
 
 struct BdGResult
@@ -455,7 +508,8 @@ struct ContinuationConfig
 
     function ContinuationConfig(enabled::Bool, n_steps::Int, energy_jump_threshold::Float64)
         n_steps > 0 || throw(ArgumentError("n_steps must be positive"))
-        energy_jump_threshold > 0 || throw(ArgumentError("energy_jump_threshold must be positive"))
+        energy_jump_threshold > 0 ||
+            throw(ArgumentError("energy_jump_threshold must be positive"))
         new(enabled, n_steps, energy_jump_threshold)
     end
 end
@@ -468,7 +522,8 @@ struct MultiStartConfig
     n_random::Int
 end
 
-MultiStartConfig() = MultiStartConfig(false, [:polar, :ferromagnetic, :uniform, :antiferromagnetic], 0)
+MultiStartConfig() =
+    MultiStartConfig(false, [:polar, :ferromagnetic, :uniform, :antiferromagnetic], 0)
 
 abstract type AbstractScanSpec end
 
@@ -477,18 +532,20 @@ struct ScanPointOverride
     range::Tuple{Float64,Float64}
     overrides::Dict{Symbol,Any}
 
-    function ScanPointOverride(parameter::Symbol,
-                               range::Tuple{Float64,Float64},
-                               overrides::Dict{Symbol,Any})
+    function ScanPointOverride(
+        parameter::Symbol,
+        range::Tuple{Float64,Float64},
+        overrides::Dict{Symbol,Any},
+    )
         allowed = Set([:n_steps, :tol, :dt, :initial_state])
         for k in keys(overrides)
-            k in allowed || throw(ArgumentError(
-                "Unknown override key: $k. Allowed: $allowed"))
+            k in allowed ||
+                throw(ArgumentError("Unknown override key: $k. Allowed: $allowed"))
         end
-        isempty(overrides) && throw(ArgumentError(
-            "Override must specify at least one field"))
-        range[1] <= range[2] || throw(ArgumentError(
-            "Override range must satisfy from <= to"))
+        isempty(overrides) &&
+            throw(ArgumentError("Override must specify at least one field"))
+        range[1] <= range[2] ||
+            throw(ArgumentError("Override range must satisfy from <= to"))
         new(parameter, range, overrides)
     end
 end
@@ -499,15 +556,20 @@ struct ParameterScan <: AbstractScanSpec
     multistart::MultiStartConfig
     per_point_overrides::Vector{ScanPointOverride}
 
-    function ParameterScan(axes::Vector{ScanAxis}, continuation::ContinuationConfig,
-                           multistart::MultiStartConfig,
-                           per_point_overrides::Vector{ScanPointOverride}=ScanPointOverride[])
-        1 <= length(axes) <= 2 || throw(ArgumentError("ParameterScan requires 1 or 2 axes, got $(length(axes))"))
+    function ParameterScan(
+        axes::Vector{ScanAxis},
+        continuation::ContinuationConfig,
+        multistart::MultiStartConfig,
+        per_point_overrides::Vector{ScanPointOverride} = ScanPointOverride[],
+    )
+        1 <= length(axes) <= 2 ||
+            throw(ArgumentError("ParameterScan requires 1 or 2 axes, got $(length(axes))"))
         new(axes, continuation, multistart, per_point_overrides)
     end
 end
 
-ParameterScan(axes::Vector{ScanAxis}) = ParameterScan(axes, ContinuationConfig(), MultiStartConfig())
+ParameterScan(axes::Vector{ScanAxis}) =
+    ParameterScan(axes, ContinuationConfig(), MultiStartConfig())
 
 struct ConstrainedJzScan <: AbstractScanSpec
     target_values::Vector{Float64}
@@ -515,12 +577,17 @@ struct ConstrainedJzScan <: AbstractScanSpec
     max_iter::Int
     omega_range::Tuple{Float64,Float64}
 
-    function ConstrainedJzScan(target_values::Vector{Float64}, tolerance::Float64,
-                               max_iter::Int, omega_range::Tuple{Float64,Float64})
+    function ConstrainedJzScan(
+        target_values::Vector{Float64},
+        tolerance::Float64,
+        max_iter::Int,
+        omega_range::Tuple{Float64,Float64},
+    )
         !isempty(target_values) || throw(ArgumentError("target_values must not be empty"))
         tolerance > 0 || throw(ArgumentError("tolerance must be positive"))
         max_iter > 0 || throw(ArgumentError("max_iter must be positive"))
-        omega_range[1] < omega_range[2] || throw(ArgumentError("omega_range must satisfy lo < hi"))
+        omega_range[1] < omega_range[2] ||
+            throw(ArgumentError("omega_range must satisfy lo < hi"))
         new(target_values, tolerance, max_iter, omega_range)
     end
 end
@@ -531,7 +598,12 @@ struct ScanStabilityConfig
     n_steps::Int
     sample_every::Int
 
-    function ScanStabilityConfig(enabled::Bool, perturbation::Float64, n_steps::Int, sample_every::Int)
+    function ScanStabilityConfig(
+        enabled::Bool,
+        perturbation::Float64,
+        n_steps::Int,
+        sample_every::Int,
+    )
         perturbation > 0 || throw(ArgumentError("perturbation must be positive"))
         n_steps > 0 || throw(ArgumentError("n_steps must be positive"))
         sample_every > 0 || throw(ArgumentError("sample_every must be positive"))
