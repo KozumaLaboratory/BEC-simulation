@@ -10,9 +10,13 @@ Column-integrated along `imaging_axis`.
 Returns `Dict(m => density_2d)` for each m component.
 For 1D grids, returns `Dict(m => density_1d)` (no column integration needed).
 """
-function simulate_tof(psi::AbstractArray{ComplexF64}, grid::Grid{N},
-                      sys::SpinSystem, params::TOFParams;
-                      fft_plans::Union{Nothing,FFTPlans}=nothing) where {N}
+function simulate_tof(
+    psi::AbstractArray{ComplexF64},
+    grid::Grid{N},
+    sys::SpinSystem,
+    params::TOFParams;
+    fft_plans::Union{Nothing,FFTPlans} = nothing,
+) where {N}
     D = sys.n_components
     n_pts = grid.config.n_points
     plans = fft_plans !== nothing ? fft_plans : make_fft_plans(n_pts)
@@ -23,7 +27,7 @@ function simulate_tof(psi::AbstractArray{ComplexF64}, grid::Grid{N},
 
     result = Dict{Int,Array{Float64}}()
 
-    for c in 1:D
+    for c = 1:D
         m = sys.m_values[c]
         idx = _component_slice(N, n_pts, c)
         psi_c = copy(view(psi, idx...))
@@ -58,7 +62,7 @@ function simulate_tof(psi::AbstractArray{ComplexF64}, grid::Grid{N},
 
             # Column integrate along imaging_axis
             ax = min(params.imaging_axis, N)
-            integrated = dropdims(sum(mom_density; dims=ax); dims=ax)
+            integrated = dropdims(sum(mom_density; dims = ax); dims = ax)
             result[m] = integrated
         end
     end
@@ -66,7 +70,12 @@ function simulate_tof(psi::AbstractArray{ComplexF64}, grid::Grid{N},
     result
 end
 
-function _circshift_axis(arr::AbstractArray{T,N}, shift::Int, axis::Int, ::Val{N}) where {T,N}
+function _circshift_axis(
+    arr::AbstractArray{T,N},
+    shift::Int,
+    axis::Int,
+    ::Val{N},
+) where {T,N}
     shifts = ntuple(d -> d == axis ? shift : 0, Val(N))
     circshift(arr, shifts)
 end

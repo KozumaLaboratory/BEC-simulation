@@ -50,7 +50,15 @@ function _parse_v3(d::Dict)
     observables = _parse_observables(get(d, "observables", Dict()))
 
     if exp_type == :ground_state
-        return UnifiedConfig(version, name, system, gs, GroundStateExperiment(), output, observables)
+        return UnifiedConfig(
+            version,
+            name,
+            system,
+            gs,
+            GroundStateExperiment(),
+            output,
+            observables,
+        )
     elseif exp_type == :dynamics
         spec = _parse_v3_dynamics(d)
         return UnifiedConfig(version, name, system, gs, spec, output, observables)
@@ -58,8 +66,11 @@ function _parse_v3(d::Dict)
         spec = _parse_v3_phase_scan(d)
         return UnifiedConfig(version, name, system, gs, spec, output, observables)
     else
-        throw(ArgumentError(
-            "Unknown experiment type: $exp_type. Supported: ground_state, dynamics, phase_scan"))
+        throw(
+            ArgumentError(
+                "Unknown experiment type: $exp_type. Supported: ground_state, dynamics, phase_scan",
+            ),
+        )
     end
 end
 
@@ -91,7 +102,9 @@ function _parse_v3_phase_scan(d::Dict)
         throw(ArgumentError("Unknown scan type: $scan_type"))
     end
 
-    stab = haskey(d, "stability") ? _parse_scan_stability(d["stability"]) : ScanStabilityConfig()
+    stab =
+        haskey(d, "stability") ? _parse_scan_stability(d["stability"]) :
+        ScanStabilityConfig()
 
     ScanExperiment(scan, stab)
 end

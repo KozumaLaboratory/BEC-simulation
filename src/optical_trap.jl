@@ -11,7 +11,7 @@ struct CrossedDipoleTrap{N} <: AbstractPotential
     polarizability::Float64  # J/(W/m²), scalar polarizability α
 end
 
-CrossedDipoleTrap(beams, pol; dims::Int=3) = CrossedDipoleTrap{dims}(beams, pol)
+CrossedDipoleTrap(beams, pol; dims::Int = 3) = CrossedDipoleTrap{dims}(beams, pol)
 
 function evaluate_potential(trap::CrossedDipoleTrap{N}, grid::Grid{N}) where {N}
     V = zeros(Float64, grid.config.n_points)
@@ -21,7 +21,12 @@ function evaluate_potential(trap::CrossedDipoleTrap{N}, grid::Grid{N}) where {N}
     V
 end
 
-function _add_beam_potential!(V::Array{Float64,N}, beam::GaussianBeam, grid::Grid{N}, alpha::Float64) where {N}
+function _add_beam_potential!(
+    V::Array{Float64,N},
+    beam::GaussianBeam,
+    grid::Grid{N},
+    alpha::Float64,
+) where {N}
     w0 = beam.waist
     P = beam.power
     I0 = 2 * P / (π * w0^2)

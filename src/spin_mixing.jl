@@ -4,7 +4,7 @@ function apply_spin_mixing_step!(
     c1::Float64,
     dt_frac::Float64,
     ndim::Int;
-    imaginary_time::Bool=false,
+    imaginary_time::Bool = false,
 ) where {D}
     abs(c1) < 1e-30 && return nothing
     n_pts = ntuple(d -> size(psi, d), ndim)
@@ -36,7 +36,8 @@ function _spin_mixing_loop!(psi, sm, c1, dt_frac, ::Val{D}, n_pts, imaginary_tim
     Ff1 = Float64(F * (F + 1))
     m_vals = SVector{D,Float64}(ntuple(c -> F - (c - 1), Val(D)))
     m_vals_t = ntuple(c -> Float64(F - (c - 1)), Val(D))
-    fp_coeffs = ntuple(c -> c == 1 ? 0.0 : sqrt(Ff1 - m_vals_t[c] * (m_vals_t[c] + 1.0)), Val(D))
+    fp_coeffs =
+        ntuple(c -> c == 1 ? 0.0 : sqrt(Ff1 - m_vals_t[c] * (m_vals_t[c] + 1.0)), Val(D))
 
     V_Fy = sm.Fy_eigvecs
     Vt_Fy = sm.Fy_eigvecs_adj
@@ -47,19 +48,31 @@ function _spin_mixing_loop!(psi, sm, c1, dt_frac, ::Val{D}, n_pts, imaginary_tim
             spinor = _get_spinor(psi, I, Val(D))
 
             fz_val = 0.0
-            for c in 1:D
+            for c = 1:D
                 fz_val += m_vals_t[c] * abs2(spinor[c])
             end
             fxy_re = 0.0
             fxy_im = 0.0
-            for c in 2:D
+            for c = 2:D
                 prod = conj(spinor[c-1]) * spinor[c]
                 fxy_re += fp_coeffs[c] * real(prod)
                 fxy_im += fp_coeffs[c] * imag(prod)
             end
 
-            new_spinor = _apply_euler_spin_rotation(spinor, c1 * fxy_re, c1 * fxy_im, c1 * fz_val,
-                dt_frac, F, m_vals, V_Fy, Vt_Fy, λ_Fy, sm, imaginary_time)
+            new_spinor = _apply_euler_spin_rotation(
+                spinor,
+                c1 * fxy_re,
+                c1 * fxy_im,
+                c1 * fz_val,
+                dt_frac,
+                F,
+                m_vals,
+                V_Fy,
+                Vt_Fy,
+                λ_Fy,
+                sm,
+                imaginary_time,
+            )
             _set_spinor!(psi, I, new_spinor, Val(D))
         end
     end

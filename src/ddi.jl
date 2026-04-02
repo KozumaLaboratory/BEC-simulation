@@ -4,15 +4,30 @@
 Shared Q tensor construction for both padded and unpadded DDI.
 Q_αβ(k) = k̂_α k̂_β - δ_αβ/3 (or secular approximation).
 """
-function _build_q_tensor!(Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz,
-                          kx, ky, kz, k_squared, n_pts::NTuple{N,Int};
-                          secular::Bool=false) where {N}
+function _build_q_tensor!(
+    Q_xx,
+    Q_xy,
+    Q_xz,
+    Q_yy,
+    Q_yz,
+    Q_zz,
+    kx,
+    ky,
+    kz,
+    k_squared,
+    n_pts::NTuple{N,Int};
+    secular::Bool = false,
+) where {N}
     @inbounds for I in CartesianIndices(n_pts)
         k2 = k_squared[I]
         if k2 == 0.0
             # Q(k=0) is undefined (0/0); physically the mean dipole field vanishes
-            Q_xx[I] = 0.0; Q_yy[I] = 0.0; Q_zz[I] = 0.0
-            Q_xy[I] = 0.0; Q_xz[I] = 0.0; Q_yz[I] = 0.0
+            Q_xx[I] = 0.0;
+            Q_yy[I] = 0.0;
+            Q_zz[I] = 0.0
+            Q_xy[I] = 0.0;
+            Q_xz[I] = 0.0;
+            Q_yz[I] = 0.0
             continue
         end
 
@@ -61,8 +76,19 @@ Build Q tensor for quasi-2D DDI (secular approximation) on a 2D grid.
 
 Q_zz = h(k⊥ l_z), Q_xx = Q_yy = -Q_zz/2, off-diagonal = 0.
 """
-function _build_q_tensor_quasi2d!(Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz,
-                                   kx, ky, k_squared, n_pts::NTuple{2,Int}, l_z::Float64)
+function _build_q_tensor_quasi2d!(
+    Q_xx,
+    Q_xy,
+    Q_xz,
+    Q_yy,
+    Q_yz,
+    Q_zz,
+    kx,
+    ky,
+    k_squared,
+    n_pts::NTuple{2,Int},
+    l_z::Float64,
+)
     @inbounds for I in CartesianIndices(n_pts)
         k2 = k_squared[I]
         k_perp = sqrt(k2)
@@ -77,9 +103,13 @@ function _build_q_tensor_quasi2d!(Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz,
     nothing
 end
 
-function make_ddi_params(grid::Grid{N}, atom::AtomSpecies;
-    c_dd::Float64=compute_c_dd(atom), secular::Bool=false,
-    quasi_2d::Bool=false, l_z::Float64=0.0,
+function make_ddi_params(
+    grid::Grid{N},
+    atom::AtomSpecies;
+    c_dd::Float64 = compute_c_dd(atom),
+    secular::Bool = false,
+    quasi_2d::Bool = false,
+    l_z::Float64 = 0.0,
 ) where {N}
     if quasi_2d
         N == 2 || throw(ArgumentError("quasi_2d DDI requires a 2D grid (N=2), got N=$N"))
@@ -108,13 +138,29 @@ function _make_ddi_params_quasi2d(grid::Grid{2}, c_dd::Float64, l_z::Float64)
         k_sq_rk[I] = kx_r[I[1]]^2 + ky[I[2]]^2
     end
 
-    _build_q_tensor_quasi2d!(Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz,
-                              kx_r, ky, k_sq_rk, rk_shape, l_z)
+    _build_q_tensor_quasi2d!(
+        Q_xx,
+        Q_xy,
+        Q_xz,
+        Q_yy,
+        Q_yz,
+        Q_zz,
+        kx_r,
+        ky,
+        k_sq_rk,
+        rk_shape,
+        l_z,
+    )
 
     DDIParams{2}(c_dd, Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz)
 end
 
-function _make_ddi_params_full(grid::Grid{N}, atom::AtomSpecies; c_dd::Float64=compute_c_dd(atom), secular::Bool=false) where {N}
+function _make_ddi_params_full(
+    grid::Grid{N},
+    atom::AtomSpecies;
+    c_dd::Float64 = compute_c_dd(atom),
+    secular::Bool = false,
+) where {N}
     if secular
         @warn "DDI secular approximation: ensure ω_Larmor ≫ c_dd × peak_density" maxlog=1
     end
@@ -136,20 +182,38 @@ function _make_ddi_params_full(grid::Grid{N}, atom::AtomSpecies; c_dd::Float64=c
     k_sq_rk = zeros(Float64, rk_shape)
     @inbounds for I in CartesianIndices(rk_shape)
         k2 = kx_r[I[1]]^2
-        if N >= 2; k2 += ky[I[2]]^2; end
-        if N >= 3; k2 += kz[I[3]]^2; end
+        if N >= 2
+            ;
+            k2 += ky[I[2]]^2;
+        end
+        if N >= 3
+            ;
+            k2 += kz[I[3]]^2;
+        end
         k_sq_rk[I] = k2
     end
 
-    _build_q_tensor!(Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz,
-                     kx_r, ky, kz, k_sq_rk, rk_shape; secular)
+    _build_q_tensor!(
+        Q_xx,
+        Q_xy,
+        Q_xz,
+        Q_yy,
+        Q_yz,
+        Q_zz,
+        kx_r,
+        ky,
+        kz,
+        k_sq_rk,
+        rk_shape;
+        secular,
+    )
 
     DDIParams{N}(C_dd, Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz)
 end
 
-function make_ddi_buffers(n_pts::NTuple{N,Int}; flags=FFTW.MEASURE) where {N}
+function make_ddi_buffers(n_pts::NTuple{N,Int}; flags = FFTW.MEASURE) where {N}
     rk_shape = rfft_output_shape(n_pts)
-    rplans = make_rfft_plans(n_pts; flags=flags)
+    rplans = make_rfft_plans(n_pts; flags = flags)
     DDIBuffers(
         rplans,
         zeros(Float64, n_pts),       # Fx_r
@@ -172,8 +236,13 @@ Compute spin density into Float64 buffers, rfft, tensor contraction at half-shap
 Uses 6 rFFTs (3 forward + 3 inverse), each ~2× cheaper than full FFT.
 """
 function _compute_and_convolve_ddi!(
-    psi, sm, ddi::DDIParams{N}, bufs::DDIBuffers,
-    ::Val{D}, ndim, n_pts,
+    psi,
+    sm,
+    ddi::DDIParams{N},
+    bufs::DDIBuffers,
+    ::Val{D},
+    ndim,
+    n_pts,
 ) where {D,N}
     _compute_spin_density!(bufs.Fx_r, bufs.Fy_r, bufs.Fz_r, psi, sm, Val(D), ndim, n_pts)
 
@@ -189,9 +258,12 @@ function _compute_and_convolve_ddi!(
             fk_x = bufs.Fx_rk[I]
             fk_y = bufs.Fy_rk[I]
             fk_z = bufs.Fz_rk[I]
-            bufs.Phi_x_rk[I] = C * (ddi.Q_xx[I] * fk_x + ddi.Q_xy[I] * fk_y + ddi.Q_xz[I] * fk_z)
-            bufs.Phi_y_rk[I] = C * (ddi.Q_xy[I] * fk_x + ddi.Q_yy[I] * fk_y + ddi.Q_yz[I] * fk_z)
-            bufs.Phi_z_rk[I] = C * (ddi.Q_xz[I] * fk_x + ddi.Q_yz[I] * fk_y + ddi.Q_zz[I] * fk_z)
+            bufs.Phi_x_rk[I] =
+                C * (ddi.Q_xx[I] * fk_x + ddi.Q_xy[I] * fk_y + ddi.Q_xz[I] * fk_z)
+            bufs.Phi_y_rk[I] =
+                C * (ddi.Q_xy[I] * fk_x + ddi.Q_yy[I] * fk_y + ddi.Q_yz[I] * fk_z)
+            bufs.Phi_z_rk[I] =
+                C * (ddi.Q_xz[I] * fk_x + ddi.Q_yz[I] * fk_y + ddi.Q_zz[I] * fk_z)
         end
     end
 
@@ -217,9 +289,12 @@ function compute_ddi_potential!(ddi::DDIParams{N}, bufs::DDIBuffers) where {N}
         fk_x = bufs.Fx_rk[I]
         fk_y = bufs.Fy_rk[I]
         fk_z = bufs.Fz_rk[I]
-        bufs.Phi_x_rk[I] = C * (ddi.Q_xx[I] * fk_x + ddi.Q_xy[I] * fk_y + ddi.Q_xz[I] * fk_z)
-        bufs.Phi_y_rk[I] = C * (ddi.Q_xy[I] * fk_x + ddi.Q_yy[I] * fk_y + ddi.Q_yz[I] * fk_z)
-        bufs.Phi_z_rk[I] = C * (ddi.Q_xz[I] * fk_x + ddi.Q_yz[I] * fk_y + ddi.Q_zz[I] * fk_z)
+        bufs.Phi_x_rk[I] =
+            C * (ddi.Q_xx[I] * fk_x + ddi.Q_xy[I] * fk_y + ddi.Q_xz[I] * fk_z)
+        bufs.Phi_y_rk[I] =
+            C * (ddi.Q_xy[I] * fk_x + ddi.Q_yy[I] * fk_y + ddi.Q_yz[I] * fk_z)
+        bufs.Phi_z_rk[I] =
+            C * (ddi.Q_xz[I] * fk_x + ddi.Q_yz[I] * fk_y + ddi.Q_zz[I] * fk_z)
     end
 
     mul!(bufs.Phi_x, rp.inverse, bufs.Phi_x_rk)
@@ -238,11 +313,19 @@ function apply_ddi_step!(
     bufs::DDIBuffers,
     dt_frac::Float64,
     ndim::Int;
-    imaginary_time::Bool=false,
+    imaginary_time::Bool = false,
 ) where {D,N}
     n_pts = ntuple(d -> size(psi, d), Val(N))
 
-    @timeit_debug TIMER "ddi_convolve" _compute_and_convolve_ddi!(psi, sm, ddi, bufs, Val(D), ndim, n_pts)
+    @timeit_debug TIMER "ddi_convolve" _compute_and_convolve_ddi!(
+        psi,
+        sm,
+        ddi,
+        bufs,
+        Val(D),
+        ndim,
+        n_pts,
+    )
 
     F = sm.system.F
     m_vals = SVector{D,Float64}(ntuple(c -> F - (c - 1), Val(D)))
@@ -258,8 +341,20 @@ function apply_ddi_step!(
             phi_z = bufs.Phi_z[I]
 
             spinor = _get_spinor(psi, I, Val(D))
-            new_spinor = _apply_euler_spin_rotation(spinor, phi_x, phi_y, phi_z,
-                                              dt_frac, F, m_vals, V_Fy, Vt_Fy, λ_Fy, sm, imaginary_time)
+            new_spinor = _apply_euler_spin_rotation(
+                spinor,
+                phi_x,
+                phi_y,
+                phi_z,
+                dt_frac,
+                F,
+                m_vals,
+                V_Fy,
+                Vt_Fy,
+                λ_Fy,
+                sm,
+                imaginary_time,
+            )
             _set_spinor!(psi, I, new_spinor, Val(D))
         end
     end

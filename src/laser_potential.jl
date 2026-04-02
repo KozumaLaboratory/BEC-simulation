@@ -10,18 +10,24 @@ struct LaserBeamPotential{N} <: AbstractPotential
     position::NTuple{N,Float64}
     direction::NTuple{N,Float64}
 
-    function LaserBeamPotential{N}(beam::OpticalBeam, polarizability::Float64,
-                                    position::NTuple{N,Float64},
-                                    direction::NTuple{N,Float64}) where {N}
+    function LaserBeamPotential{N}(
+        beam::OpticalBeam,
+        polarizability::Float64,
+        position::NTuple{N,Float64},
+        direction::NTuple{N,Float64},
+    ) where {N}
         d_norm = sqrt(sum(d^2 for d in direction))
         dir_normalized = ntuple(i -> direction[i] / d_norm, N)
         new{N}(beam, polarizability, position, dir_normalized)
     end
 end
 
-function LaserBeamPotential(beam::OpticalBeam, polarizability::Float64,
-                            position::NTuple{N,Float64},
-                            direction::NTuple{N,Float64}) where {N}
+function LaserBeamPotential(
+    beam::OpticalBeam,
+    polarizability::Float64,
+    position::NTuple{N,Float64},
+    direction::NTuple{N,Float64},
+) where {N}
     LaserBeamPotential{N}(beam, polarizability, position, direction)
 end
 

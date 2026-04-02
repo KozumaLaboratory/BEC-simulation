@@ -11,8 +11,8 @@ function find_phase_boundary(;
     make_interactions::Function,
     grid,
     atom,
-    tol::Float64=0.01,
-    max_bisections::Int=20,
+    tol::Float64 = 0.01,
+    max_bisections::Int = 20,
     kwargs...,
 )
     sm = spin_matrices(atom.F)
@@ -29,13 +29,13 @@ function find_phase_boundary(;
     n_eval = 2
 
     phase_a != phase_b || return (
-        boundary_value=(a + b) / 2,
-        phase_left=phase_a,
-        phase_right=phase_b,
-        n_evaluations=n_eval,
+        boundary_value = (a + b) / 2,
+        phase_left = phase_a,
+        phase_right = phase_b,
+        n_evaluations = n_eval,
     )
 
-    for _ in 1:max_bisections
+    for _ = 1:max_bisections
         abs(b - a) < tol && break
         mid = (a + b) / 2
         phase_mid = _classify_at(mid)
@@ -50,9 +50,9 @@ function find_phase_boundary(;
     end
 
     (
-        boundary_value=(a + b) / 2,
-        phase_left=phase_a,
-        phase_right=phase_b,
-        n_evaluations=n_eval,
+        boundary_value = (a + b) / 2,
+        phase_left = phase_a,
+        phase_right = phase_b,
+        n_evaluations = n_eval,
     )
 end

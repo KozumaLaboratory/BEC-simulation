@@ -5,7 +5,8 @@ function _build_potential(pc::PotentialConfig, ndim::Int)
         omega_raw = get(pc.params, "omega", nothing)
         omega_raw === nothing && throw(ArgumentError("Harmonic potential requires omega"))
         omega = _to_float_vec(omega_raw)
-        length(omega) == ndim || throw(ArgumentError("omega length must match grid dimensions ($ndim)"))
+        length(omega) == ndim ||
+            throw(ArgumentError("omega length must match grid dimensions ($ndim)"))
         HarmonicTrap(NTuple{ndim,Float64}(omega))
     elseif pc.type == :gravity
         g = Float64(get(pc.params, "g", 9.81))
@@ -54,8 +55,10 @@ end
 function _add_noise!(psi, amplitude, n_components, ndim, grid)
     n_pts = ntuple(d -> size(psi, d), ndim)
     dV = cell_volume(grid)
-    dominant = argmax([sum(abs2, view(psi, _component_slice(ndim, n_pts, c)...)) for c in 1:n_components])
-    for c in 1:n_components
+    dominant = argmax([
+        sum(abs2, view(psi, _component_slice(ndim, n_pts, c)...)) for c = 1:n_components
+    ])
+    for c = 1:n_components
         c == dominant && continue
         idx = _component_slice(ndim, n_pts, c)
         view(psi, idx...) .+= amplitude .* randn(ComplexF64, n_pts)
@@ -64,8 +67,14 @@ function _add_noise!(psi, amplitude, n_components, ndim, grid)
     psi ./= norm
 end
 
-function seed_noise(psi_gs, n_components::Int, ndim::Int, grid::Grid;
-                    amplitude::Float64=0.001, seed::Int=42)
+function seed_noise(
+    psi_gs,
+    n_components::Int,
+    ndim::Int,
+    grid::Grid;
+    amplitude::Float64 = 0.001,
+    seed::Int = 42,
+)
     psi = copy(psi_gs)
     Random.seed!(seed)
     _add_noise!(psi, amplitude, n_components, ndim, grid)

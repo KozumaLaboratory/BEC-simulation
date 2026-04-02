@@ -1,6 +1,10 @@
-function init_psi(grid::Grid{N}, sys::SpinSystem;
-                  state::Symbol=:polar, seed::Int=42,
-                  helix_k::NTuple{N,Float64}=ntuple(_ -> 0.0, N)) where {N}
+function init_psi(
+    grid::Grid{N},
+    sys::SpinSystem;
+    state::Symbol = :polar,
+    seed::Int = 42,
+    helix_k::NTuple{N,Float64} = ntuple(_ -> 0.0, N),
+) where {N}
     n_pts = grid.config.n_points
     psi = zeros(ComplexF64, n_pts..., sys.n_components)
     F = sys.F
@@ -15,11 +19,11 @@ function init_psi(grid::Grid{N}, sys::SpinSystem;
     elseif state == :ferromagnetic
         _set_component!(psi, gauss, N, n_pts, 1)
     elseif state == :uniform
-        for c in 1:D
+        for c = 1:D
             _set_component!(psi, gauss / sqrt(D), N, n_pts, c)
         end
     elseif state == :antiferromagnetic
-        for c in 1:D
+        for c = 1:D
             m = F - (c - 1)
             sign = iseven(F - m) ? 1.0 : -1.0
             _set_component!(psi, sign * gauss / sqrt(D), N, n_pts, c)
@@ -28,7 +32,7 @@ function init_psi(grid::Grid{N}, sys::SpinSystem;
         rng = Random.MersenneTwister(seed)
         psi .= randn(rng, ComplexF64, size(psi))
         @inbounds for I in CartesianIndices(n_pts)
-            for c in 1:D
+            for c = 1:D
                 psi[I, c] *= gauss[I]
             end
         end
@@ -38,7 +42,7 @@ function init_psi(grid::Grid{N}, sys::SpinSystem;
             theta = sum(ntuple(d -> helix_k[d] * grid.x[d][I[d]], Val(N)))
             ct = cos(theta)
             st = sin(theta)
-            for c in 1:D
+            for c = 1:D
                 m = F - (c - 1)
                 if c == 1
                     psi[I, c] = gauss[I] * complex(ct, st)^F
@@ -47,12 +51,12 @@ function init_psi(grid::Grid{N}, sys::SpinSystem;
                 end
             end
             spinor = Vector{ComplexF64}(undef, D)
-            for c in 1:D
+            for c = 1:D
                 spinor[c] = psi[I, c]
             end
             rot = exp(-1im * theta * Matrix(sm.Fy))
-            rotated = rot * [c == 1 ? complex(gauss[I]) : zero(ComplexF64) for c in 1:D]
-            for c in 1:D
+            rotated = rot * [c == 1 ? complex(gauss[I]) : zero(ComplexF64) for c = 1:D]
+            for c = 1:D
                 psi[I, c] = rotated[c]
             end
         end
@@ -70,7 +74,7 @@ function _gaussian(grid::Grid{N}, sigma::NTuple{N,Float64}) where {N}
     g = zeros(Float64, grid.config.n_points)
     @inbounds for I in CartesianIndices(grid.config.n_points)
         s = 0.0
-        for d in 1:N
+        for d = 1:N
             s += grid.x[d][I[d]]^2 / (2 * sigma[d]^2)
         end
         g[I] = exp(-s)
@@ -87,19 +91,19 @@ function make_workspace(;
     grid::Grid{N},
     atom::AtomSpecies,
     interactions::InteractionParams,
-    zeeman::Union{ZeemanParams,TimeDependentZeeman}=ZeemanParams(),
-    potential::AbstractPotential=NoPotential(),
+    zeeman::Union{ZeemanParams,TimeDependentZeeman} = ZeemanParams(),
+    potential::AbstractPotential = NoPotential(),
     sim_params::SimParams,
-    psi_init::Union{Nothing,AbstractArray{ComplexF64}}=nothing,
-    enable_ddi::Bool=false,
-    c_dd::Float64=NaN,
-    secular_ddi::Bool=false,
-    raman::Union{Nothing,RamanCoupling{N}}=nothing,
-    loss::Union{Nothing,LossParams}=nothing,
-    fft_flags=FFTW.MEASURE,
-    ddi_padding::Bool=false,
-    quasi_2d_ddi::Bool=false,
-    l_z_ddi::Float64=0.0,
+    psi_init::Union{Nothing,AbstractArray{ComplexF64}} = nothing,
+    enable_ddi::Bool = false,
+    c_dd::Float64 = NaN,
+    secular_ddi::Bool = false,
+    raman::Union{Nothing,RamanCoupling{N}} = nothing,
+    loss::Union{Nothing,LossParams} = nothing,
+    fft_flags = FFTW.MEASURE,
+    ddi_padding::Bool = false,
+    quasi_2d_ddi::Bool = false,
+    l_z_ddi::Float64 = 0.0,
 ) where {N}
     sys = SpinSystem(atom.F)
     sm = spin_matrices(atom.F)
@@ -113,8 +117,12 @@ function make_workspace(;
     fft_buf = zeros(ComplexF64, grid.config.n_points)
     state = SimState{N,typeof(psi)}(psi, fft_buf, 0.0, 0)
 
-    plans = make_fft_plans(grid.config.n_points; flags=fft_flags)
-    kinetic_phase = prepare_kinetic_phase(grid, sim_params.dt; imaginary_time=sim_params.imaginary_time)
+    plans = make_fft_plans(grid.config.n_points; flags = fft_flags)
+    kinetic_phase = prepare_kinetic_phase(
+        grid,
+        sim_params.dt;
+        imaginary_time = sim_params.imaginary_time,
+    )
     V = evaluate_potential(potential, grid)
 
     omega = sim_params.rotating_frame_omega
@@ -133,22 +141,30 @@ function make_workspace(;
 
     ddi = if enable_ddi
         if isnan(c_dd) && atom.mu_mag > 0.0
-            throw(ArgumentError(
-                "enable_ddi=true for dipolar atom $(atom.name) but c_dd not specified. " *
-                "compute_c_dd(atom) returns SI units which are incompatible with dimensionless grids. " *
-                "Pass c_dd in dimensionless units: c_dd = N × μ₀μ² / (ℏω × a_ho³). " *
-                "See compute_c_dd_dimless()."
-            ))
+            throw(
+                ArgumentError(
+                    "enable_ddi=true for dipolar atom $(atom.name) but c_dd not specified. " *
+                    "compute_c_dd(atom) returns SI units which are incompatible with dimensionless grids. " *
+                    "Pass c_dd in dimensionless units: c_dd = N × μ₀μ² / (ℏω × a_ho³). " *
+                    "See compute_c_dd_dimless().",
+                ),
+            )
         end
         c_dd_val = isnan(c_dd) ? compute_c_dd(atom) : c_dd
-        make_ddi_params(grid, atom; c_dd=c_dd_val, secular=secular_ddi,
-                        quasi_2d=quasi_2d_ddi, l_z=l_z_ddi)
+        make_ddi_params(
+            grid,
+            atom;
+            c_dd = c_dd_val,
+            secular = secular_ddi,
+            quasi_2d = quasi_2d_ddi,
+            l_z = l_z_ddi,
+        )
     else
         nothing
     end
 
     ddi_bufs = if ddi !== nothing
-        make_ddi_buffers(grid.config.n_points; flags=fft_flags)
+        make_ddi_buffers(grid.config.n_points; flags = fft_flags)
     else
         nothing
     end
@@ -157,13 +173,20 @@ function make_workspace(;
 
     ddi_pad = if ddi_padding && ddi !== nothing
         c_dd_val = isnan(c_dd) ? compute_c_dd(atom) : ddi.C_dd
-        make_ddi_padded(grid, atom; c_dd=c_dd_val, fft_flags, secular=secular_ddi,
-                        quasi_2d=quasi_2d_ddi, l_z=l_z_ddi)
+        make_ddi_padded(
+            grid,
+            atom;
+            c_dd = c_dd_val,
+            fft_flags,
+            secular = secular_ddi,
+            quasi_2d = quasi_2d_ddi,
+            l_z = l_z_ddi,
+        )
     else
         nothing
     end
 
-    batched_kinetic = _make_batched_kinetic_cache(psi, kinetic_phase, N; flags=fft_flags)
+    batched_kinetic = _make_batched_kinetic_cache(psi, kinetic_phase, N; flags = fft_flags)
 
     F = atom.F
     # Tensor interaction path activation:
@@ -180,7 +203,11 @@ function make_workspace(;
     # map them to g_S channel couplings directly via _make_tensor_cache_from_channels,
     # bypassing c_extra entirely.
     has_higher_c_extra = any(
-        i -> iseven(i + 1) && (i + 1) >= 4 && (i + 1) <= 2F && abs(interactions.c_extra[i]) > 1e-30,
+        i ->
+            iseven(i + 1) &&
+            (i + 1) >= 4 &&
+            (i + 1) <= 2F &&
+            abs(interactions.c_extra[i]) > 1e-30,
         eachindex(interactions.c_extra),
     )
 
@@ -193,24 +220,44 @@ function make_workspace(;
     else
         tc = make_tensor_interaction_cache(F, interactions)
         if tc !== nothing && (abs(interactions.c0) > 1e-30 || abs(interactions.c1) > 1e-30)
-            throw(ArgumentError(
-                "tensor_cache active with non-zero c0=$(interactions.c0), c1=$(interactions.c1). " *
-                "When tensor_cache handles all channels, set c0=c1=0 in InteractionParams " *
-                "to avoid double-counting (diagonal step still uses c0, tensor step includes c0+c1)."
-            ))
+            throw(
+                ArgumentError(
+                    "tensor_cache active with non-zero c0=$(interactions.c0), c1=$(interactions.c1). " *
+                    "When tensor_cache handles all channels, set c0=c1=0 in InteractionParams " *
+                    "to avoid double-counting (diagonal step still uses c0, tensor step includes c0+c1).",
+                ),
+            )
         end
         tc, interactions
     end
 
     coriolis_cache = if sim_params.rotating_frame_omega != 0.0 && N >= 2
-        _make_coriolis_cache(psi; flags=fft_flags)
+        _make_coriolis_cache(psi; flags = fft_flags)
     else
         nothing
     end
 
     Workspace(
-        state, plans, kinetic_phase, V, density_buf, sm, grid, atom, ws_interactions, effective_zeeman, potential, sim_params,
-        ddi, ddi_bufs, raman, loss, ddi_pad, batched_kinetic, tensor_cache, coriolis_cache,
+        state,
+        plans,
+        kinetic_phase,
+        V,
+        density_buf,
+        sm,
+        grid,
+        atom,
+        ws_interactions,
+        effective_zeeman,
+        potential,
+        sim_params,
+        ddi,
+        ddi_bufs,
+        raman,
+        loss,
+        ddi_pad,
+        batched_kinetic,
+        tensor_cache,
+        coriolis_cache,
     )
 end
 

@@ -6,7 +6,7 @@ function evaluate_potential(trap::HarmonicTrap{N}, grid::Grid{N}) where {N}
     V = zeros(Float64, grid.config.n_points)
     @inbounds for I in CartesianIndices(grid.config.n_points)
         s = 0.0
-        for d in 1:N
+        for d = 1:N
             s += trap.omega[d]^2 * grid.x[d][I[d]]^2
         end
         V[I] = 0.5 * s

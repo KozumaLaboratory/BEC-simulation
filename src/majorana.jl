@@ -6,7 +6,7 @@ where ψ_{F-k} is the component with m = F-k (index k+1).
 function _majorana_polynomial(spinor::AbstractVector{ComplexF64}, F::Int)
     n = 2F + 1
     coeffs = Vector{ComplexF64}(undef, n)
-    for k in 0:2F
+    for k = 0:2F
         coeffs[k+1] = (-1)^k * sqrt(binomial(2F, k)) * spinor[k+1]
     end
     coeffs
@@ -31,12 +31,12 @@ function majorana_stars(spinor::AbstractVector{ComplexF64}, F::Int)
     if deg == 1
         roots = [-coeffs[1] / coeffs[2]]
     else
-        c = coeffs[1:deg+1]
+        c = coeffs[1:(deg+1)]
         companion = zeros(ComplexF64, deg, deg)
-        for i in 1:deg-1
+        for i = 1:(deg-1)
             companion[i+1, i] = 1.0
         end
-        for i in 1:deg
+        for i = 1:deg
             companion[i, deg] = -c[i] / c[deg+1]
         end
         roots = eigvals(companion)
@@ -88,11 +88,12 @@ function _steinhardt_q6(points::Vector{NTuple{3,Float64}})
     N == 0 && return 0.0
 
     s = 0.0
-    @inbounds for i in 1:N
-        for j in 1:N
-            costh = points[i][1] * points[j][1] +
-                    points[i][2] * points[j][2] +
-                    points[i][3] * points[j][3]
+    @inbounds for i = 1:N
+        for j = 1:N
+            costh =
+                points[i][1] * points[j][1] +
+                points[i][2] * points[j][2] +
+                points[i][3] * points[j][3]
             costh = clamp(costh, -1.0, 1.0)
             s += _legendre_p6(costh)
         end
@@ -107,11 +108,15 @@ end
 function _pairwise_distance_spectrum(points::Vector{NTuple{3,Float64}})
     n = length(points)
     dists = Float64[]
-    for i in 1:n
-        for j in (i+1):n
+    for i = 1:n
+        for j = (i+1):n
             costh = clamp(
-                points[i][1]*points[j][1] + points[i][2]*points[j][2] + points[i][3]*points[j][3],
-                -1.0, 1.0)
+                points[i][1]*points[j][1] +
+                points[i][2]*points[j][2] +
+                points[i][3]*points[j][3],
+                -1.0,
+                1.0,
+            )
             push!(dists, acos(costh))
         end
     end
@@ -133,12 +138,14 @@ function _make_icosahedron_vertices()
         push!(raw, (s1, s2 * phi, 0.0))
         push!(raw, (s2 * phi, 0.0, s1))
     end
-    map(p -> let r = sqrt(p[1]^2 + p[2]^2 + p[3]^2); (p[1]/r, p[2]/r, p[3]/r) end, raw)
+    map(p -> let r = sqrt(p[1]^2 + p[2]^2 + p[3]^2);
+        (p[1]/r, p[2]/r, p[3]/r)
+    end, raw)
 end
 
 function _make_octahedron_vertices()
     verts = NTuple{3,Float64}[]
-    for d in 1:3, s in (-1.0, 1.0)
+    for d = 1:3, s in (-1.0, 1.0)
         v = ntuple(i -> i == d ? s : 0.0, 3)
         push!(verts, v)
     end
@@ -155,10 +162,12 @@ function _make_cube_vertices()
 end
 
 function _make_tetrahedron_vertices()
-    [(1.0, 1.0, 1.0) ./ sqrt(3.0),
-     (1.0, -1.0, -1.0) ./ sqrt(3.0),
-     (-1.0, 1.0, -1.0) ./ sqrt(3.0),
-     (-1.0, -1.0, 1.0) ./ sqrt(3.0)]
+    [
+        (1.0, 1.0, 1.0) ./ sqrt(3.0),
+        (1.0, -1.0, -1.0) ./ sqrt(3.0),
+        (-1.0, 1.0, -1.0) ./ sqrt(3.0),
+        (-1.0, -1.0, 1.0) ./ sqrt(3.0),
+    ]
 end
 
 const _REF_ICOSAHEDRON = _pairwise_distance_spectrum(_make_icosahedron_vertices())
@@ -177,7 +186,7 @@ pairwise angular distance spectrum against reference polyhedra.
 Returns `:I_h` (icosahedral), `:O_h` (octahedral/cubic), `:T_d` (tetrahedral),
 `:D_nh` (dihedral), `:trivial` (all stars clustered), or `:unknown`.
 """
-function detect_point_group(spinor::AbstractVector{ComplexF64}, F::Int; tol::Float64=0.15)
+function detect_point_group(spinor::AbstractVector{ComplexF64}, F::Int; tol::Float64 = 0.15)
     n_stars = 2F
     n_stars == 0 && return :trivial
 
@@ -193,10 +202,14 @@ function detect_point_group(spinor::AbstractVector{ComplexF64}, F::Int; tol::Flo
     end
 
     max_spread = 0.0
-    for i in eachindex(finite_pts), j in (i+1):length(finite_pts)
+    for i in eachindex(finite_pts), j = (i+1):length(finite_pts)
         costh = clamp(
-            finite_pts[i][1]*finite_pts[j][1] + finite_pts[i][2]*finite_pts[j][2] + finite_pts[i][3]*finite_pts[j][3],
-            -1.0, 1.0)
+            finite_pts[i][1]*finite_pts[j][1] +
+            finite_pts[i][2]*finite_pts[j][2] +
+            finite_pts[i][3]*finite_pts[j][3],
+            -1.0,
+            1.0,
+        )
         max_spread = max(max_spread, acos(costh))
     end
     max_spread < 0.1 && return :trivial
@@ -258,7 +271,7 @@ function _peak_point_group(psi, F::Int, ndim::Int, n_total, dV)
 
     spinor = Vector{ComplexF64}(undef, D)
     norm_sq = 0.0
-    @inbounds for c in 1:D
+    @inbounds for c = 1:D
         spinor[c] = psi[max_I, c]
         norm_sq += abs2(psi[max_I, c])
     end
@@ -272,10 +285,13 @@ Local icosahedral order parameter at each spatial point.
 At each point: spinor → Majorana stars → sphere points → Steinhardt Q₆.
 Returns `Array{Float64,N}` (0 everywhere for F < 6).
 """
-function icosahedral_order_parameter(psi::AbstractArray{ComplexF64}, grid::Grid{N},
-                                     sm::SpinMatrices{D};
-                                     density_cutoff::Float64=1e-10,
-                                     sampling::Float64=1.0) where {D,N}
+function icosahedral_order_parameter(
+    psi::AbstractArray{ComplexF64},
+    grid::Grid{N},
+    sm::SpinMatrices{D};
+    density_cutoff::Float64 = 1e-10,
+    sampling::Float64 = 1.0,
+) where {D,N}
     F = sm.system.F
     n_comp = sm.system.n_components
     n_pts = ntuple(d -> size(psi, d), N)

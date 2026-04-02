@@ -1,8 +1,12 @@
 """
 FFT-based partial derivative ∂f/∂x_dim of an N-dim real array.
 """
-function _fft_partial_derivative(f::AbstractArray{Float64,N}, grid::Grid{N},
-                                 plans::FFTPlans, dim::Int) where {N}
+function _fft_partial_derivative(
+    f::AbstractArray{Float64,N},
+    grid::Grid{N},
+    plans::FFTPlans,
+    dim::Int,
+) where {N}
     n_pts = size(f)
     buf = Array{ComplexF64,N}(undef, n_pts)
     buf .= f
@@ -22,8 +26,11 @@ end
 FFT-based gradient of an N-dim real array.
 Returns `NTuple{N, Array{Float64,N}}`. Reuses a single forward FFT.
 """
-function _fft_gradient(f::AbstractArray{Float64,N}, grid::Grid{N},
-                       plans::FFTPlans) where {N}
+function _fft_gradient(
+    f::AbstractArray{Float64,N},
+    grid::Grid{N},
+    plans::FFTPlans,
+) where {N}
     n_pts = size(f)
     f_k = Array{ComplexF64,N}(undef, n_pts)
     f_k .= f

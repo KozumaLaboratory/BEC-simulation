@@ -14,8 +14,12 @@ m = -F is stable (no downward transitions exist).
 Applied as: ψ_m → ψ_m × exp(-rate_m × n(r) × dt / 2)
 """
 function apply_loss_step!(
-    psi::AbstractArray{ComplexF64}, loss::LossParams, F::Int, dt::Float64,
-    n_components::Int, ndim::Int,
+    psi::AbstractArray{ComplexF64},
+    loss::LossParams,
+    F::Int,
+    dt::Float64,
+    n_components::Int,
+    ndim::Int,
 )
     n_pts = ntuple(d -> size(psi, d), ndim)
     buf = zeros(Float64, n_pts)
@@ -23,8 +27,12 @@ function apply_loss_step!(
 end
 
 function apply_loss_step!(
-    psi::AbstractArray{ComplexF64}, loss::LossParams, F::Int, dt::Float64,
-    n_components::Int, ndim::Int,
+    psi::AbstractArray{ComplexF64},
+    loss::LossParams,
+    F::Int,
+    dt::Float64,
+    n_components::Int,
+    ndim::Int,
     density_buf::AbstractArray{Float64},
 )
     loss.gamma_dr < 1e-30 && loss.L3 < 1e-30 && return nothing
@@ -34,7 +42,7 @@ function apply_loss_step!(
 
     gamma_rates = _dipolar_relaxation_rates(F, loss.gamma_dr)
 
-    for c in 1:n_components
+    for c = 1:n_components
         rate = gamma_rates[c] + loss.L3
         rate < 1e-30 && continue
 
@@ -62,7 +70,7 @@ function _dipolar_relaxation_rates(F::Int, gamma_dr::Float64)
     raw = Vector{Float64}(undef, D)
 
     raw_sum = 0.0
-    for c in 1:D
+    for c = 1:D
         m = F - (c - 1)
         s = 0.0
         for q in (-1, -2)
@@ -78,5 +86,5 @@ function _dipolar_relaxation_rates(F::Int, gamma_dr::Float64)
     raw_sum < 1e-30 && return zeros(Float64, D)
 
     Z = raw_sum / D
-    [gamma_dr * raw[c] / Z for c in 1:D]
+    [gamma_dr * raw[c] / Z for c = 1:D]
 end

@@ -205,73 +205,34 @@ const Eu151 = AtomSpecies(
 
 # ⁴⁰Ca: ground state (¹S₀, I=0)
 #   a_s ≈ 443 a₀ (Kraft et al. PRA 2009)
-const Ca40 = AtomSpecies(
-    "40Ca",
-    39.962590850 * Units.AMU,
-    0,
-    443.0 * Units.BOHR_RADIUS,
-    0.0,
-)
+const Ca40 =
+    AtomSpecies("40Ca", 39.962590850 * Units.AMU, 0, 443.0 * Units.BOHR_RADIUS, 0.0)
 
 # ⁸⁴Sr: ground state (¹S₀, I=0)
 #   a_s ≈ 123 a₀ (Martinez de Escobar et al. PRA 2008)
-const Sr84 = AtomSpecies(
-    "84Sr",
-    83.913425 * Units.AMU,
-    0,
-    123.0 * Units.BOHR_RADIUS,
-    0.0,
-)
+const Sr84 = AtomSpecies("84Sr", 83.913425 * Units.AMU, 0, 123.0 * Units.BOHR_RADIUS, 0.0)
 
 # ⁸⁶Sr: ground state (¹S₀, I=0)
 #   a_s ≈ 800 a₀ (Martinez de Escobar et al. PRA 2008)
-const Sr86 = AtomSpecies(
-    "86Sr",
-    85.909260 * Units.AMU,
-    0,
-    800.0 * Units.BOHR_RADIUS,
-    0.0,
-)
+const Sr86 = AtomSpecies("86Sr", 85.909260 * Units.AMU, 0, 800.0 * Units.BOHR_RADIUS, 0.0)
 
 # ⁸⁸Sr: ground state (¹S₀, I=0)
 #   a_s ≈ -2 a₀ (Stellmer et al. PRL 2013)
-const Sr88 = AtomSpecies(
-    "88Sr",
-    87.905612 * Units.AMU,
-    0,
-    -2.0 * Units.BOHR_RADIUS,
-    0.0,
-)
+const Sr88 = AtomSpecies("88Sr", 87.905612 * Units.AMU, 0, -2.0 * Units.BOHR_RADIUS, 0.0)
 
 # ¹⁷⁰Yb: ground state (¹S₀, I=0)
 #   a_s ≈ 64 a₀ (Kitagawa et al. PRA 2008)
-const Yb170 = AtomSpecies(
-    "170Yb",
-    169.934761 * Units.AMU,
-    0,
-    64.0 * Units.BOHR_RADIUS,
-    0.0,
-)
+const Yb170 = AtomSpecies("170Yb", 169.934761 * Units.AMU, 0, 64.0 * Units.BOHR_RADIUS, 0.0)
 
 # ¹⁷⁴Yb: ground state (¹S₀, I=0)
 #   a_s ≈ 105 a₀ (Kitagawa et al. PRA 2008)
-const Yb174 = AtomSpecies(
-    "174Yb",
-    173.938862 * Units.AMU,
-    0,
-    105.0 * Units.BOHR_RADIUS,
-    0.0,
-)
+const Yb174 =
+    AtomSpecies("174Yb", 173.938862 * Units.AMU, 0, 105.0 * Units.BOHR_RADIUS, 0.0)
 
 # ¹⁷⁶Yb: ground state (¹S₀, I=0)
 #   a_s ≈ -24 a₀ (Kitagawa et al. PRA 2008)
-const Yb176 = AtomSpecies(
-    "176Yb",
-    175.942572 * Units.AMU,
-    0,
-    -24.0 * Units.BOHR_RADIUS,
-    0.0,
-)
+const Yb176 =
+    AtomSpecies("176Yb", 175.942572 * Units.AMU, 0, -24.0 * Units.BOHR_RADIUS, 0.0)
 
 # --- Metastable Helium ---
 
@@ -318,6 +279,7 @@ const ATOM_REGISTRY = Dict{Symbol,AtomSpecies}(
 )
 
 function resolve_atom(name::Symbol)
-    haskey(ATOM_REGISTRY, name) || throw(ArgumentError("Unknown atom: $name. Available: $(keys(ATOM_REGISTRY))"))
+    haskey(ATOM_REGISTRY, name) ||
+        throw(ArgumentError("Unknown atom: $name. Available: $(keys(ATOM_REGISTRY))"))
     ATOM_REGISTRY[name]
 end

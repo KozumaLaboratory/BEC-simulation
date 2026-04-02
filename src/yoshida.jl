@@ -8,11 +8,12 @@ measure of splitting error that the L2 estimator misses.
 PI controller exponent: (tol/err)^{1/(p+1)} with p=4 (4th-order global).
 Cost: ~4 Strang steps per accepted step; benefits from larger dt at same accuracy.
 """
-function run_simulation_yoshida!(ws::Workspace{N};
-    adaptive::AdaptiveDtParams=AdaptiveDtParams(),
+function run_simulation_yoshida!(
+    ws::Workspace{N};
+    adaptive::AdaptiveDtParams = AdaptiveDtParams(),
     t_end::Float64,
     save_interval::Float64,
-    callback::Union{Nothing,Function}=nothing,
+    callback::Union{Nothing,Function} = nothing,
 ) where {N}
     n_comp = ws.spin_matrices.system.n_components
     sys = ws.spin_matrices.system
@@ -62,7 +63,15 @@ function run_simulation_yoshida!(ws::Workspace{N};
         end
 
         if ws.loss !== nothing
-            apply_loss_step!(ws.state.psi, ws.loss, sys.F, dt_step, n_comp, N, ws.density_buf)
+            apply_loss_step!(
+                ws.state.psi,
+                ws.loss,
+                sys.F,
+                dt_step,
+                n_comp,
+                N,
+                ws.density_buf,
+            )
         end
 
         ws.state.t += dt_step
@@ -93,6 +102,10 @@ function run_simulation_yoshida!(ws::Workspace{N};
         _record_snapshot!(times, energies, norms, mags, snapshots, ws, sys)
     end
 
-    (result=SimulationResult(times, energies, norms, mags, snapshots),
-     n_accepted=n_accepted, n_rejected=n_rejected, final_dt=dt)
+    (
+        result = SimulationResult(times, energies, norms, mags, snapshots),
+        n_accepted = n_accepted,
+        n_rejected = n_rejected,
+        final_dt = dt,
+    )
 end

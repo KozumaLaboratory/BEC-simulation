@@ -3,7 +3,7 @@ function make_grid(config::GridConfig{N}) where {N}
         n = config.n_points[d]
         L = config.box_size[d]
         dx = L / n
-        collect(range(-L / 2 + dx / 2, L / 2 - dx / 2, length=n))
+        collect(range(-L / 2 + dx / 2, L / 2 - dx / 2, length = n))
     end
 
     dx = ntuple(d -> config.box_size[d] / config.n_points[d], N)
@@ -26,7 +26,7 @@ function _compute_k_squared(k::NTuple{N,Vector{Float64}}, n_points::NTuple{N,Int
     ksq = zeros(Float64, n_points)
     @inbounds for I in CartesianIndices(n_points)
         s = 0.0
-        for d in 1:N
+        for d = 1:N
             s += k[d][I[d]]^2
         end
         ksq[I] = s
@@ -34,21 +34,21 @@ function _compute_k_squared(k::NTuple{N,Vector{Float64}}, n_points::NTuple{N,Int
     ksq
 end
 
-function make_fft_plans(spatial_shape::NTuple{N,Int}; flags=FFTW.MEASURE) where {N}
+function make_fft_plans(spatial_shape::NTuple{N,Int}; flags = FFTW.MEASURE) where {N}
     buf = zeros(ComplexF64, spatial_shape)
-    fwd = plan_fft!(buf; flags=flags)
-    inv = plan_ifft!(buf; flags=flags)
+    fwd = plan_fft!(buf; flags = flags)
+    inv = plan_ifft!(buf; flags = flags)
     FFTPlans(fwd, inv)
 end
 
 rfft_output_shape(n_pts::NTuple{N,Int}) where {N} = (n_pts[1] ÷ 2 + 1, n_pts[2:end]...)
 
-function make_rfft_plans(spatial_shape::NTuple{N,Int}; flags=FFTW.MEASURE) where {N}
+function make_rfft_plans(spatial_shape::NTuple{N,Int}; flags = FFTW.MEASURE) where {N}
     rk_shape = rfft_output_shape(spatial_shape)
     real_buf = zeros(Float64, spatial_shape)
     complex_buf = zeros(ComplexF64, rk_shape)
-    fwd = plan_rfft(real_buf; flags=flags)
-    inv = plan_irfft(complex_buf, spatial_shape[1]; flags=flags)
+    fwd = plan_rfft(real_buf; flags = flags)
+    inv = plan_irfft(complex_buf, spatial_shape[1]; flags = flags)
     RFFTPlans{N,typeof(fwd),typeof(inv)}(fwd, inv, rk_shape)
 end
 

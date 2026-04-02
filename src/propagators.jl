@@ -1,4 +1,8 @@
-function prepare_kinetic_phase(grid::Grid{N}, dt::Float64; imaginary_time::Bool=false) where {N}
+function prepare_kinetic_phase(
+    grid::Grid{N},
+    dt::Float64;
+    imaginary_time::Bool = false,
+) where {N}
     if imaginary_time
         ComplexF64.(@. exp(-0.5 * grid.k_squared * dt))
     else
@@ -16,7 +20,7 @@ function apply_kinetic_step!(
 )
     n_pts = ntuple(d -> size(psi, d), ndim)
 
-    for c in 1:n_components
+    for c = 1:n_components
         idx = _component_slice(ndim, n_pts, c)
         psi_view = view(psi, idx...)
 
@@ -38,26 +42,42 @@ function apply_diagonal_potential_step!(
     n_components::Int,
     ndim::Int,
     density_buf::AbstractArray{Float64};
-    imaginary_time::Bool=false,
-    c_lhy::Float64=0.0,
+    imaginary_time::Bool = false,
+    c_lhy::Float64 = 0.0,
 )
     n_pts = ntuple(d -> size(psi, d), ndim)
     _total_density!(density_buf, psi, n_components, ndim, n_pts)
     zee_shift = imaginary_time ? minimum(zeeman_diag) : 0.0
-    for c in 1:n_components
+    for c = 1:n_components
         idx = _component_slice(ndim, n_pts, c)
         psi_view = view(psi, idx...)
         if imaginary_time
             if c_lhy == 0.0
-                @. psi_view *= exp(-(V_trap + (zeeman_diag[c] - zee_shift) + c0 * density_buf) * dt_frac)
+                @. psi_view *= exp(
+                    -(V_trap + (zeeman_diag[c] - zee_shift) + c0 * density_buf) * dt_frac,
+                )
             else
-                @. psi_view *= exp(-(V_trap + (zeeman_diag[c] - zee_shift) + c0 * density_buf + c_lhy * density_buf * sqrt(density_buf)) * dt_frac)
+                @. psi_view *= exp(
+                    -(
+                        V_trap +
+                        (zeeman_diag[c] - zee_shift) +
+                        c0 * density_buf +
+                        c_lhy * density_buf * sqrt(density_buf)
+                    ) * dt_frac,
+                )
             end
         else
             if c_lhy == 0.0
                 @. psi_view *= cis(-(V_trap + zeeman_diag[c] + c0 * density_buf) * dt_frac)
             else
-                @. psi_view *= cis(-(V_trap + zeeman_diag[c] + c0 * density_buf + c_lhy * density_buf * sqrt(density_buf)) * dt_frac)
+                @. psi_view *= cis(
+                    -(
+                        V_trap +
+                        zeeman_diag[c] +
+                        c0 * density_buf +
+                        c_lhy * density_buf * sqrt(density_buf)
+                    ) * dt_frac,
+                )
             end
         end
     end
@@ -73,19 +93,38 @@ function apply_diagonal_potential_step!(
     n_components::Int,
     ndim::Int,
     density_buf::AbstractArray{Float64};
-    imaginary_time::Bool=false,
-    c_lhy::Float64=0.0,
+    imaginary_time::Bool = false,
+    c_lhy::Float64 = 0.0,
 ) where {D}
-    _diagonal_step_svec!(Val(ndim), psi, V_trap, zeeman_diag, c0, c_lhy, dt_frac, density_buf, imaginary_time)
+    _diagonal_step_svec!(
+        Val(ndim),
+        psi,
+        V_trap,
+        zeeman_diag,
+        c0,
+        c_lhy,
+        dt_frac,
+        density_buf,
+        imaginary_time,
+    )
 end
 
-function _diagonal_step_svec!(::Val{N}, psi, V_trap, zeeman_diag::SVector{D,Float64},
-    c0, c_lhy, dt_frac, density_buf, imaginary_time) where {N,D}
+function _diagonal_step_svec!(
+    ::Val{N},
+    psi,
+    V_trap,
+    zeeman_diag::SVector{D,Float64},
+    c0,
+    c_lhy,
+    dt_frac,
+    density_buf,
+    imaginary_time,
+) where {N,D}
     n_pts = ntuple(d -> size(psi, d), Val(N))
 
     @inbounds for I in CartesianIndices(n_pts)
         s = 0.0
-        for c in 1:D
+        for c = 1:D
             s += abs2(psi[I, c])
         end
         density_buf[I] = s
@@ -93,13 +132,14 @@ function _diagonal_step_svec!(::Val{N}, psi, V_trap, zeeman_diag::SVector{D,Floa
 
     if imaginary_time
         zee_shift = minimum(zeeman_diag)
-        zee_dt = SVector{D,Float64}(ntuple(c -> (zeeman_diag[c] - zee_shift) * dt_frac, Val(D)))
+        zee_dt =
+            SVector{D,Float64}(ntuple(c -> (zeeman_diag[c] - zee_shift) * dt_frac, Val(D)))
         zee_exp = SVector{D,Float64}(ntuple(c -> exp(-zee_dt[c]), Val(D)))
         @inbounds for I in CartesianIndices(n_pts)
             n = density_buf[I]
             V_int = c0 * n + c_lhy * n * sqrt(n)
             exp_base = exp(-(V_trap[I] + V_int) * dt_frac)
-            for c in 1:D
+            for c = 1:D
                 psi[I, c] *= exp_base * zee_exp[c]
             end
         end
@@ -110,7 +150,7 @@ function _diagonal_step_svec!(::Val{N}, psi, V_trap, zeeman_diag::SVector{D,Floa
             n = density_buf[I]
             V_int = c0 * n + c_lhy * n * sqrt(n)
             cis_base = cis(-(V_trap[I] + V_int) * dt_frac)
-            for c in 1:D
+            for c = 1:D
                 psi[I, c] *= cis_base * zee_cis[c]
             end
         end
@@ -118,7 +158,7 @@ function _diagonal_step_svec!(::Val{N}, psi, V_trap, zeeman_diag::SVector{D,Floa
     nothing
 end
 
-function _make_batched_kinetic_cache(psi, kinetic_phase, ndim; flags=FFTW.MEASURE)
+function _make_batched_kinetic_cache(psi, kinetic_phase, ndim; flags = FFTW.MEASURE)
     plan_buf = similar(psi)
     dims = ntuple(identity, ndim)
     fwd = plan_fft!(plan_buf, dims; flags)
@@ -134,7 +174,7 @@ function apply_kinetic_step_batched!(psi, cache::BatchedKineticCache)
     nothing
 end
 
-function _make_coriolis_cache(psi; flags=FFTW.MEASURE)
+function _make_coriolis_cache(psi; flags = FFTW.MEASURE)
     plan_buf = similar(psi)
     fwd1 = plan_fft!(plan_buf, 1; flags)
     inv1 = plan_ifft!(plan_buf, 1; flags)
@@ -153,10 +193,16 @@ function _update_batched_kinetic_phase!(cache::BatchedKineticCache, k_squared, d
     nothing
 end
 
-function _total_density!(buf::AbstractArray{Float64}, psi::AbstractArray{ComplexF64}, n_components::Int, ndim::Int, n_pts)
+function _total_density!(
+    buf::AbstractArray{Float64},
+    psi::AbstractArray{ComplexF64},
+    n_components::Int,
+    ndim::Int,
+    n_pts,
+)
     @inbounds for I in CartesianIndices(n_pts)
         s = 0.0
-        for c in 1:n_components
+        for c = 1:n_components
             s += abs2(psi[I, c])
         end
         buf[I] = s
@@ -167,7 +213,7 @@ end
 function _total_density(psi::AbstractArray{ComplexF64}, n_components::Int, ndim::Int, n_pts)
     idx1 = _component_slice(ndim, n_pts, 1)
     n = abs2.(view(psi, idx1...))
-    for c in 2:n_components
+    for c = 2:n_components
         idx = _component_slice(ndim, n_pts, c)
         n .+= abs2.(view(psi, idx...))
     end

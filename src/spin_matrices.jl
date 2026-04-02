@@ -7,7 +7,7 @@ function spin_matrices(F::Int)
     Fm_dense = zeros(ComplexF64, n, n)
     Fz_dense = zeros(ComplexF64, n, n)
 
-    for i in 1:n
+    for i = 1:n
         Fz_dense[i, i] = m[i]
     end
 
@@ -15,7 +15,7 @@ function spin_matrices(F::Int)
     # Matrix element: ⟨F,m'|F+|F,m⟩ = √(F(F+1)-m(m+1)) δ_{m',m+1}
     # Row index i corresponds to m[i], col j to m[j]
     # We need m[i] = m[j] + 1
-    for j in 1:n, i in 1:n
+    for j = 1:n, i = 1:n
         if m[i] == m[j] + 1
             Fp_dense[i, j] = sqrt(F * (F + 1) - m[j] * (m[j] + 1))
         end
@@ -38,7 +38,7 @@ function spin_matrices(F::Int)
     eig_Fy = eigen(Hermitian(Fy_dense))
     # Euler angle recurrence in spinor_utils.jl assumes eigenvalues are -F, -F+1, ..., F.
     # eigen(Hermitian(...)) guarantees ascending order; verify unit spacing.
-    @assert all(i -> abs(eig_Fy.values[i+1] - eig_Fy.values[i] - 1.0) < 1e-10, 1:n-1) (
+    @assert all(i -> abs(eig_Fy.values[i+1] - eig_Fy.values[i] - 1.0) < 1e-10, 1:(n-1)) (
         "Fy eigenvalues not uniformly spaced: $(eig_Fy.values)"
     )
     V_Fy = Matrix{ComplexF64}(eig_Fy.vectors)

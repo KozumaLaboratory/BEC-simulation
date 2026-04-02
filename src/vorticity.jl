@@ -4,9 +4,12 @@ Superfluid vorticity ω = ∇ × v_s.
 - 2D: returns `Array{Float64,2}` (scalar ω_z = ∂v_y/∂x - ∂v_x/∂y)
 - 3D: returns `NTuple{3, Array{Float64,3}}` (full curl)
 """
-function superfluid_vorticity(psi::AbstractArray{ComplexF64}, grid::Grid{N},
-                              plans::FFTPlans;
-                              density_cutoff::Float64=1e-10) where {N}
+function superfluid_vorticity(
+    psi::AbstractArray{ComplexF64},
+    grid::Grid{N},
+    plans::FFTPlans;
+    density_cutoff::Float64 = 1e-10,
+) where {N}
     N >= 2 || return 0.0
     v = superfluid_velocity(psi, grid, plans; density_cutoff)
     if N == 2
@@ -44,9 +47,13 @@ where ŝ = f/|f| is the unit spin direction (f = ⟨F⟩ spin density vector).
 - 2D: returns `Array{Float64,2}` (Ω_z)
 - 3D: returns `NTuple{3, Array{Float64,3}}` (pseudo-vector)
 """
-function berry_curvature(psi::AbstractArray{ComplexF64}, grid::Grid{N},
-                         plans::FFTPlans, sm::SpinMatrices;
-                         density_cutoff::Float64=1e-10) where {N}
+function berry_curvature(
+    psi::AbstractArray{ComplexF64},
+    grid::Grid{N},
+    plans::FFTPlans,
+    sm::SpinMatrices;
+    density_cutoff::Float64 = 1e-10,
+) where {N}
     n_pts = ntuple(d -> size(psi, d), N)
     N >= 2 || return zeros(Float64, n_pts)
 
@@ -85,9 +92,13 @@ Topological skyrmion charge Q = (1/4π) ∫ Ω d²r.
 2D only; returns 0.0 for other dimensions.
 Delegates to `berry_curvature` where ŝ = f/|f| is the unit spin vector.
 """
-function spin_texture_charge(psi::AbstractArray{ComplexF64}, grid::Grid{N},
-                             plans::FFTPlans, sm::SpinMatrices;
-                             density_cutoff::Float64=1e-10) where {N}
+function spin_texture_charge(
+    psi::AbstractArray{ComplexF64},
+    grid::Grid{N},
+    plans::FFTPlans,
+    sm::SpinMatrices;
+    density_cutoff::Float64 = 1e-10,
+) where {N}
     N == 2 || return 0.0
     omega = berry_curvature(psi, grid, plans, sm; density_cutoff)
     dV = cell_volume(grid)

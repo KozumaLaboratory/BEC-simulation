@@ -63,12 +63,14 @@ include("unitful_support.jl")
 # Types
 export GridConfig, Grid, SpinSystem, SpinMatrices
 export AtomSpecies, InteractionParams, ZeemanParams, LossParams, TensorInteractionCache
-export SimParams, SimState, FFTPlans, RFFTPlans, Workspace, AdaptiveDtParams, IntegratorConfig
+export SimParams,
+    SimState, FFTPlans, RFFTPlans, Workspace, AdaptiveDtParams, IntegratorConfig
 export TOFParams, BdGResult
 export HarmonicTrap, NoPotential, GravityPotential, CompositePotential
 
 # Grid
-export make_grid, make_fft_plans, make_rfft_plans, rfft_output_shape, cell_volume, n_spatial_points
+export make_grid,
+    make_fft_plans, make_rfft_plans, rfft_output_shape, cell_volume, n_spatial_points
 export load_fftw_wisdom, save_fftw_wisdom
 
 # Spin
@@ -86,13 +88,16 @@ export He4star
 export ATOM_REGISTRY, resolve_atom
 
 # Interactions
-export compute_interaction_params, compute_interaction_params_general_f, compute_c0, compute_c_dd, compute_a_dd
-export interaction_params_from_constraint, compute_c_total, compute_c_dd_dimless, linear_zeeman_p
+export compute_interaction_params,
+    compute_interaction_params_general_f, compute_c0, compute_c_dd, compute_a_dd
+export interaction_params_from_constraint,
+    compute_c_total, compute_c_dd_dimless, linear_zeeman_p
 export compute_eu151_interactions
 export lima_pelster_Q5, compute_c_lhy_with_ddi
 
 # DDI
-export DDIParams, DDIBuffers, DDIPaddedContext, make_ddi_params, make_ddi_buffers, make_ddi_padded
+export DDIParams,
+    DDIBuffers, DDIPaddedContext, make_ddi_params, make_ddi_buffers, make_ddi_padded
 export compute_ddi_potential!, apply_ddi_step!
 
 # Potentials
@@ -131,7 +136,8 @@ export apply_nematic_step!
 export apply_tensor_interaction_step!, make_tensor_interaction_cache
 
 # Clebsch-Gordan / Wigner coefficients
-export wigner_3j, clebsch_gordan, wigner_6j, precompute_cg_table, precompute_cg_array, CGArrayTable
+export wigner_3j,
+    clebsch_gordan, wigner_6j, precompute_cg_table, precompute_cg_array, CGArrayTable
 
 # Losses
 export apply_loss_step!

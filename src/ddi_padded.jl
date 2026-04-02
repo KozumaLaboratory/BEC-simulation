@@ -3,16 +3,22 @@ Build zero-padded DDI context for reduced aliasing.
 
 Doubles grid size in each dimension. Builds Q tensor and rFFT plans on padded grid.
 """
-function make_ddi_padded(grid::Grid{N}, atom::AtomSpecies;
-    c_dd::Float64=compute_c_dd(atom), fft_flags=FFTW.MEASURE, secular::Bool=false,
-    quasi_2d::Bool=false, l_z::Float64=0.0,
+function make_ddi_padded(
+    grid::Grid{N},
+    atom::AtomSpecies;
+    c_dd::Float64 = compute_c_dd(atom),
+    fft_flags = FFTW.MEASURE,
+    secular::Bool = false,
+    quasi_2d::Bool = false,
+    l_z::Float64 = 0.0,
 ) where {N}
     n_pts = grid.config.n_points
     padded_shape = ntuple(d -> 2 * n_pts[d], N)
     rk_shape = rfft_output_shape(padded_shape)
 
     dx = grid.dx
-    kx_r = collect(rfftfreq(padded_shape[1], padded_shape[1] * 2π / (padded_shape[1] * dx[1])))
+    kx_r =
+        collect(rfftfreq(padded_shape[1], padded_shape[1] * 2π / (padded_shape[1] * dx[1])))
     k_full = ntuple(N) do d
         n = padded_shape[d]
         dk = 2π / (n * dx[d])
@@ -31,28 +37,71 @@ function make_ddi_padded(grid::Grid{N}, atom::AtomSpecies;
     k_sq_rk = zeros(Float64, rk_shape)
     @inbounds for I in CartesianIndices(rk_shape)
         k2 = kx_r[I[1]]^2
-        if N >= 2; k2 += ky[I[2]]^2; end
-        if N >= 3; k2 += kz[I[3]]^2; end
+        if N >= 2
+            ;
+            k2 += ky[I[2]]^2;
+        end
+        if N >= 3
+            ;
+            k2 += kz[I[3]]^2;
+        end
         k_sq_rk[I] = k2
     end
 
     if quasi_2d && N == 2
-        _build_q_tensor_quasi2d!(Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz,
-                                  kx_r, ky, k_sq_rk, rk_shape, l_z)
+        _build_q_tensor_quasi2d!(
+            Q_xx,
+            Q_xy,
+            Q_xz,
+            Q_yy,
+            Q_yz,
+            Q_zz,
+            kx_r,
+            ky,
+            k_sq_rk,
+            rk_shape,
+            l_z,
+        )
     else
-        _build_q_tensor!(Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz,
-                         kx_r, ky, kz, k_sq_rk, rk_shape; secular)
+        _build_q_tensor!(
+            Q_xx,
+            Q_xy,
+            Q_xz,
+            Q_yy,
+            Q_yz,
+            Q_zz,
+            kx_r,
+            ky,
+            kz,
+            k_sq_rk,
+            rk_shape;
+            secular,
+        )
     end
 
-    rplans = make_rfft_plans(padded_shape; flags=fft_flags)
+    rplans = make_rfft_plans(padded_shape; flags = fft_flags)
 
     DDIPaddedContext(
-        padded_shape, rplans,
-        Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz,
-        zeros(Float64, padded_shape), zeros(Float64, padded_shape), zeros(Float64, padded_shape),
-        zeros(ComplexF64, rk_shape), zeros(ComplexF64, rk_shape), zeros(ComplexF64, rk_shape),
-        zeros(ComplexF64, rk_shape), zeros(ComplexF64, rk_shape), zeros(ComplexF64, rk_shape),
-        zeros(Float64, padded_shape), zeros(Float64, padded_shape), zeros(Float64, padded_shape),
+        padded_shape,
+        rplans,
+        Q_xx,
+        Q_xy,
+        Q_xz,
+        Q_yy,
+        Q_yz,
+        Q_zz,
+        zeros(Float64, padded_shape),
+        zeros(Float64, padded_shape),
+        zeros(Float64, padded_shape),
+        zeros(ComplexF64, rk_shape),
+        zeros(ComplexF64, rk_shape),
+        zeros(ComplexF64, rk_shape),
+        zeros(ComplexF64, rk_shape),
+        zeros(ComplexF64, rk_shape),
+        zeros(ComplexF64, rk_shape),
+        zeros(Float64, padded_shape),
+        zeros(Float64, padded_shape),
+        zeros(Float64, padded_shape),
     )
 end
 
@@ -61,8 +110,13 @@ Compute DDI potential using zero-padded rFFT convolution.
 Pads spin density into 2× grid, convolves in k-space, crops back.
 """
 function _compute_and_convolve_ddi_padded!(
-    psi, sm, ddi::DDIParams{N}, ctx::DDIPaddedContext{N},
-    ::Val{D}, ndim, n_pts,
+    psi,
+    sm,
+    ddi::DDIParams{N},
+    ctx::DDIPaddedContext{N},
+    ::Val{D},
+    ndim,
+    n_pts,
 ) where {D,N}
     ctx.Fx_pad .= 0
     ctx.Fy_pad .= 0
@@ -81,9 +135,12 @@ function _compute_and_convolve_ddi_padded!(
         fk_x = ctx.Fx_pad_rk[I]
         fk_y = ctx.Fy_pad_rk[I]
         fk_z = ctx.Fz_pad_rk[I]
-        ctx.Phi_x_pad_rk[I] = C * (ctx.Q_xx[I] * fk_x + ctx.Q_xy[I] * fk_y + ctx.Q_xz[I] * fk_z)
-        ctx.Phi_y_pad_rk[I] = C * (ctx.Q_xy[I] * fk_x + ctx.Q_yy[I] * fk_y + ctx.Q_yz[I] * fk_z)
-        ctx.Phi_z_pad_rk[I] = C * (ctx.Q_xz[I] * fk_x + ctx.Q_yz[I] * fk_y + ctx.Q_zz[I] * fk_z)
+        ctx.Phi_x_pad_rk[I] =
+            C * (ctx.Q_xx[I] * fk_x + ctx.Q_xy[I] * fk_y + ctx.Q_xz[I] * fk_z)
+        ctx.Phi_y_pad_rk[I] =
+            C * (ctx.Q_xy[I] * fk_x + ctx.Q_yy[I] * fk_y + ctx.Q_yz[I] * fk_z)
+        ctx.Phi_z_pad_rk[I] =
+            C * (ctx.Q_xz[I] * fk_x + ctx.Q_yz[I] * fk_y + ctx.Q_zz[I] * fk_z)
     end
 
     mul!(ctx.Phi_x_pad, rp.inverse, ctx.Phi_x_pad_rk)
@@ -103,11 +160,19 @@ function apply_ddi_step!(
     dt_frac::Float64,
     ndim::Int,
     ddi_padded::DDIPaddedContext{N};
-    imaginary_time::Bool=false,
+    imaginary_time::Bool = false,
 ) where {D,N}
     n_pts = ntuple(d -> size(psi, d), Val(N))
 
-    @timeit_debug TIMER "ddi_convolve_padded" _compute_and_convolve_ddi_padded!(psi, sm, ddi, ddi_padded, Val(D), ndim, n_pts)
+    @timeit_debug TIMER "ddi_convolve_padded" _compute_and_convolve_ddi_padded!(
+        psi,
+        sm,
+        ddi,
+        ddi_padded,
+        Val(D),
+        ndim,
+        n_pts,
+    )
 
     F = sm.system.F
     m_vals = SVector{D,Float64}(ntuple(c -> F - (c - 1), Val(D)))
@@ -123,8 +188,20 @@ function apply_ddi_step!(
             phi_z = ddi_padded.Phi_z_pad[I]
 
             spinor = _get_spinor(psi, I, Val(D))
-            new_spinor = _apply_euler_spin_rotation(spinor, phi_x, phi_y, phi_z,
-                                              dt_frac, F, m_vals, V_Fy, Vt_Fy, λ_Fy, sm, imaginary_time)
+            new_spinor = _apply_euler_spin_rotation(
+                spinor,
+                phi_x,
+                phi_y,
+                phi_z,
+                dt_frac,
+                F,
+                m_vals,
+                V_Fy,
+                Vt_Fy,
+                λ_Fy,
+                sm,
+                imaginary_time,
+            )
             _set_spinor!(psi, I, new_spinor, Val(D))
         end
     end

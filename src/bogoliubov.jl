@@ -20,15 +20,15 @@ function bogoliubov_spectrum(;
     n0::Float64,
     F::Int,
     interactions::InteractionParams,
-    zeeman::ZeemanParams=ZeemanParams(),
-    c_dd::Float64=0.0,
-    k_max::Float64=10.0,
-    n_k::Int=200,
-    k_direction::NTuple{3,Float64}=(0.0, 0.0, 1.0),
+    zeeman::ZeemanParams = ZeemanParams(),
+    c_dd::Float64 = 0.0,
+    k_max::Float64 = 10.0,
+    n_k::Int = 200,
+    k_direction::NTuple{3,Float64} = (0.0, 0.0, 1.0),
 )
     D = 2F + 1
-    length(spinor) == D || throw(DimensionMismatch(
-        "spinor length $(length(spinor)) != 2F+1 = $D"))
+    length(spinor) == D ||
+        throw(DimensionMismatch("spinor length $(length(spinor)) != 2F+1 = $D"))
 
     cg_table = precompute_cg_table(F)
 
@@ -64,7 +64,7 @@ function bogoliubov_spectrum(;
     # Chemical potential
     mu = real(sum(c -> (zee[c] + n0 * h_mf[c, c]) * abs2(spinor[c]), 1:D))
 
-    k_values = collect(range(0, k_max, length=n_k))
+    k_values = collect(range(0, k_max, length = n_k))
     omega = zeros(ComplexF64, 2D, n_k)
     max_growth = 0.0
 
@@ -73,7 +73,7 @@ function bogoliubov_spectrum(;
 
         # L_{mm'} = (ek - μ + zee_m)δ_{mm'} + 2n₀ h_{mm'}
         L = 2n0 .* h_mf
-        for i in 1:D
+        for i = 1:D
             L[i, i] += ek - mu + zee[i]
         end
 
@@ -82,9 +82,9 @@ function bogoliubov_spectrum(;
         # BdG: σ_z H, where H = [L M; M* L*]
         H_bdg = zeros(ComplexF64, 2D, 2D)
         H_bdg[1:D, 1:D] .= L
-        H_bdg[1:D, D+1:2D] .= M_sc
-        H_bdg[D+1:2D, 1:D] .= .-conj.(M_sc)
-        H_bdg[D+1:2D, D+1:2D] .= .-conj.(L)
+        H_bdg[1:D, (D+1):2D] .= M_sc
+        H_bdg[(D+1):2D, 1:D] .= .-conj.(M_sc)
+        H_bdg[(D+1):2D, (D+1):2D] .= .-conj.(L)
 
         evals = eigvals(H_bdg)
         omega[:, ik] .= evals
@@ -100,15 +100,15 @@ end
 
 function _bdg_normal_matrix(spinor, F, D, g_dict, cg_table)
     h = zeros(ComplexF64, D, D)
-    for S in 0:2:2F
+    for S = 0:2:2F
         gS = get(g_dict, S, 0.0)
         abs(gS) < 1e-30 && continue
-        for m in -F:F
+        for m = (-F):F
             cm = F - m + 1
-            for mp in -F:F
+            for mp = (-F):F
                 cmp = F - mp + 1
                 val = zero(ComplexF64)
-                for mu in -F:F
+                for mu = (-F):F
                     M = m + mu
                     abs(M) > S && continue
                     nu = M - mp
@@ -116,7 +116,7 @@ function _bdg_normal_matrix(spinor, F, D, g_dict, cg_table)
                     cg1 = get(cg_table, (S, M, m, mu), 0.0)
                     cg2 = get(cg_table, (S, M, mp, nu), 0.0)
                     abs(cg1 * cg2) < 1e-30 && continue
-                    val += cg1 * cg2 * conj(spinor[F - mu + 1]) * spinor[F - nu + 1]
+                    val += cg1 * cg2 * conj(spinor[F-mu+1]) * spinor[F-nu+1]
                 end
                 h[cm, cmp] += gS * val
             end
@@ -127,26 +127,26 @@ end
 
 function _bdg_anomalous_matrix(spinor, F, D, g_dict, cg_table)
     M_mat = zeros(ComplexF64, D, D)
-    for S in 0:2:2F
+    for S = 0:2:2F
         gS = get(g_dict, S, 0.0)
         abs(gS) < 1e-30 && continue
-        for M_val in -S:S
+        for M_val = (-S):S
             A_SM = zero(ComplexF64)
-            for mu in -F:F
+            for mu = (-F):F
                 nu = M_val - mu
                 abs(nu) > F && continue
                 cg = get(cg_table, (S, M_val, mu, nu), 0.0)
                 abs(cg) < 1e-30 && continue
-                A_SM += cg * spinor[F - mu + 1] * spinor[F - nu + 1]
+                A_SM += cg * spinor[F-mu+1] * spinor[F-nu+1]
             end
             abs(A_SM) < 1e-30 && continue
 
-            for m in -F:F
+            for m = (-F):F
                 mp = M_val - m
                 abs(mp) > F && continue
                 cg = get(cg_table, (S, M_val, m, mp), 0.0)
                 abs(cg) < 1e-30 && continue
-                M_mat[F - m + 1, F - mp + 1] += gS * cg * A_SM
+                M_mat[F-m+1, F-mp+1] += gS * cg * A_SM
             end
         end
     end
@@ -155,8 +155,8 @@ end
 
 function _q_tensor_direction(k_hat::Vector{Float64})
     Q = zeros(Float64, 3, 3)
-    for a in 1:3
-        for b in 1:3
+    for a = 1:3
+        for b = 1:3
             Q[a, b] = k_hat[a] * k_hat[b] - (a == b ? 1.0 / 3.0 : 0.0)
         end
     end
@@ -173,20 +173,20 @@ function _bdg_ddi_matrices(spinor, F, D, sm, c_dd, Q_ab)
 
     # Normal: h^DDI_{mm'} = c_dd Σ_{ab} Q_{ab} <F_b> (F_a)_{mm'}
     h = zeros(ComplexF64, D, D)
-    for a in 1:3
-        for b in 1:3
+    for a = 1:3
+        for b = 1:3
             h .+= c_dd * Q_ab[a, b] * f_exp[b] .* F_mats[a]
         end
     end
 
     # Anomalous DDI: outer product of F_a·ζ vectors
     # M^DDI_{m,m'} = c_dd Σ_{ab} Q_{ab} (F_a·ζ)_m (F_b·ζ)_{m'}
-    fa_zeta = [F_mats[a] * spinor for a in 1:3]
+    fa_zeta = [F_mats[a] * spinor for a = 1:3]
     M_mat = zeros(ComplexF64, D, D)
-    for a in 1:3, b in 1:3
+    for a = 1:3, b = 1:3
         coeff = c_dd * Q_ab[a, b]
         abs(coeff) < 1e-30 && continue
-        for i in 1:D, j in 1:D
+        for i = 1:D, j = 1:D
             M_mat[i, j] += coeff * fa_zeta[a][i] * fa_zeta[b][j]
         end
     end

@@ -2,7 +2,11 @@
 Probability current density j(r) = Σ_c Im(ψ_c* ∇ψ_c).
 Returns NTuple{N, Array{Float64,N}} of current components.
 """
-function probability_current(psi::AbstractArray{ComplexF64}, grid::Grid{N}, plans::FFTPlans) where {N}
+function probability_current(
+    psi::AbstractArray{ComplexF64},
+    grid::Grid{N},
+    plans::FFTPlans,
+) where {N}
     n_comp = size(psi, N + 1)
     n_pts = ntuple(d -> size(psi, d), N)
 
@@ -10,14 +14,14 @@ function probability_current(psi::AbstractArray{ComplexF64}, grid::Grid{N}, plan
     psi_k = zeros(ComplexF64, n_pts)
     dpsi = zeros(ComplexF64, n_pts)
 
-    for c in 1:n_comp
+    for c = 1:n_comp
         idx = _component_slice(N, n_pts, c)
         psi_c = view(psi, idx...)
 
         psi_k .= psi_c
         plans.forward * psi_k
 
-        for d in 1:N
+        for d = 1:N
             @inbounds for I in CartesianIndices(n_pts)
                 dpsi[I] = im * grid.k[d][I[d]] * psi_k[I]
             end
@@ -35,7 +39,11 @@ end
 Orbital angular momentum ⟨Lz⟩ = ∫ Σ_c ψ_c* (-i)(x ∂_y - y ∂_x) ψ_c d^N r.
 Returns 0.0 for 1D grids.
 """
-function orbital_angular_momentum(psi::AbstractArray{ComplexF64}, grid::Grid{N}, plans::FFTPlans) where {N}
+function orbital_angular_momentum(
+    psi::AbstractArray{ComplexF64},
+    grid::Grid{N},
+    plans::FFTPlans,
+) where {N}
     N >= 2 || return 0.0
 
     n_comp = size(psi, N + 1)
@@ -48,7 +56,7 @@ function orbital_angular_momentum(psi::AbstractArray{ComplexF64}, grid::Grid{N},
 
     Lz = 0.0
 
-    for c in 1:n_comp
+    for c = 1:n_comp
         idx = _component_slice(N, n_pts, c)
         psi_c = view(psi, idx...)
 
@@ -77,8 +85,12 @@ Superfluid velocity v_d = j_d / n at each spatial point.
 Returns `NTuple{N, Array{Float64,N}}`.
 Points with density below `density_cutoff` are set to zero.
 """
-function superfluid_velocity(psi::AbstractArray{ComplexF64}, grid::Grid{N}, plans::FFTPlans;
-                             density_cutoff::Float64=1e-10) where {N}
+function superfluid_velocity(
+    psi::AbstractArray{ComplexF64},
+    grid::Grid{N},
+    plans::FFTPlans;
+    density_cutoff::Float64 = 1e-10,
+) where {N}
     j = probability_current(psi, grid, plans)
     n = total_density(psi, N)
     n_pts = ntuple(d -> size(psi, d), N)
@@ -87,7 +99,7 @@ function superfluid_velocity(psi::AbstractArray{ComplexF64}, grid::Grid{N}, plan
     @inbounds for I in CartesianIndices(n_pts)
         if n[I] > density_cutoff
             inv_n = 1.0 / n[I]
-            for d in 1:N
+            for d = 1:N
                 v[d][I] = j[d][I] * inv_n
             end
         end
@@ -99,8 +111,12 @@ end
 Total angular momentum J_z = L_z + S_z.
 L_z = `orbital_angular_momentum`, S_z = `magnetization`.
 """
-function total_angular_momentum(psi::AbstractArray{ComplexF64}, grid::Grid{N},
-                                plans::FFTPlans, sys::SpinSystem) where {N}
+function total_angular_momentum(
+    psi::AbstractArray{ComplexF64},
+    grid::Grid{N},
+    plans::FFTPlans,
+    sys::SpinSystem,
+) where {N}
     Lz = orbital_angular_momentum(psi, grid, plans)
     Sz = magnetization(psi, grid, sys)
     Lz + Sz

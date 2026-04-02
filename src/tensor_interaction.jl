@@ -12,10 +12,10 @@ so c_0 and c_1 in InteractionParams should be zero.
 function make_tensor_interaction_cache(
     F::Int,
     scattering_lengths::Dict{Int,Float64};
-    dims::Int=3,
-    length_scale::Float64=1.0,
-    N_atoms::Int=1,
-    mass::Float64=1.0,
+    dims::Int = 3,
+    length_scale::Float64 = 1.0,
+    N_atoms::Int = 1,
+    mass::Float64 = 1.0,
 )
     isempty(scattering_lengths) && return nothing
 
@@ -32,7 +32,7 @@ function make_tensor_interaction_cache(
 
     active_channels = Int[]
     g_values = Float64[]
-    for S in 0:2:2F
+    for S = 0:2:2F
         haskey(scattering_lengths, S) || continue
         a_S = scattering_lengths[S]
         g_S_3d = 4π * hbar^2 * a_S / mass
@@ -59,10 +59,13 @@ The `basis` keyword controls how the values in `InteractionParams` are interpret
 Returns `nothing` if no channels with S >= 3 have nonzero coupling after transform
 (nematic handles c2 alone).
 """
-function make_tensor_interaction_cache(F::Int, interactions::InteractionParams;
-                                       basis::Symbol=:coupling)
+function make_tensor_interaction_cache(
+    F::Int,
+    interactions::InteractionParams;
+    basis::Symbol = :coupling,
+)
     c_dict = Dict{Int,Float64}()
-    for k in 0:2:2F
+    for k = 0:2:2F
         ck = get_cn(interactions, k)
         abs(ck) > 1e-30 && (c_dict[k] = ck)
     end
@@ -81,7 +84,7 @@ function make_tensor_interaction_cache(F::Int, interactions::InteractionParams;
 
     active_channels = Int[]
     g_values = Float64[]
-    for S in 0:2:2F
+    for S = 0:2:2F
         gS = get(g_dict, S, 0.0)
         abs(gS) > 1e-30 || continue
         push!(active_channels, S)
@@ -106,7 +109,7 @@ Returns `nothing` if no channels have nonzero coupling.
 function _make_tensor_cache_from_channels(F::Int, g_dict::Dict{Int,Float64})
     active_channels = Int[]
     g_values = Float64[]
-    for S in 0:2:2F
+    for S = 0:2:2F
         gS = get(g_dict, S, 0.0)
         abs(gS) > 1e-30 || continue
         push!(active_channels, S)
@@ -133,7 +136,7 @@ function apply_tensor_interaction_step!(
     sm::SpinMatrices,
     dt::Float64,
     ndim::Int;
-    imaginary_time::Bool=false,
+    imaginary_time::Bool = false,
 )
     D = cache.D
     n_pts = ntuple(d -> size(psi, d), ndim)
@@ -141,14 +144,23 @@ function apply_tensor_interaction_step!(
     hf_entries = _precompute_hf_entries(cache)
 
     nthr = Threads.maxthreadid()
-    spinor_bufs = [Vector{ComplexF64}(undef, D) for _ in 1:nthr]
-    h_bufs = [Matrix{ComplexF64}(undef, D, D) for _ in 1:nthr]
-    tmp_bufs = [Vector{ComplexF64}(undef, D) for _ in 1:nthr]
+    spinor_bufs = [Vector{ComplexF64}(undef, D) for _ = 1:nthr]
+    h_bufs = [Matrix{ComplexF64}(undef, D, D) for _ = 1:nthr]
+    tmp_bufs = [Vector{ComplexF64}(undef, D) for _ = 1:nthr]
 
     Threads.@threads for I in CartesianIndices(n_pts)
         tid = Threads.threadid()
-        @inbounds _tensor_step_point!(psi, I, cache, hf_entries, dt, imaginary_time,
-                                       spinor_bufs[tid], h_bufs[tid], tmp_bufs[tid])
+        @inbounds _tensor_step_point!(
+            psi,
+            I,
+            cache,
+            hf_entries,
+            dt,
+            imaginary_time,
+            spinor_bufs[tid],
+            h_bufs[tid],
+            tmp_bufs[tid],
+        )
     end
     nothing
 end
@@ -167,14 +179,14 @@ function _precompute_hf_entries(cache::TensorInteractionCache)
 
     entries = HFEntry[]
     for (si, S) in enumerate(cache.active_channels)
-        for m in -F:F
-            for mu in -F:F
+        for m = (-F):F
+            for mu = (-F):F
                 M = m + mu
                 abs(M) > S && continue
                 cg_m_mu = get(cache.cg_table, (S, M, m, mu), 0.0)
                 abs(cg_m_mu) < 1e-15 && continue
 
-                for mp in -F:F
+                for mp = (-F):F
                     nu = M - mp  # m + mu - m'
                     abs(nu) > F && continue
                     cg_mp_nu = get(cache.cg_table, (S, M, mp, nu), 0.0)
@@ -193,7 +205,8 @@ function _precompute_hf_entries(cache::TensorInteractionCache)
 end
 
 function _tensor_step_point!(
-    psi, I,
+    psi,
+    I,
     cache::TensorInteractionCache,
     hf_entries::Vector{HFEntry},
     dt::Float64,
@@ -204,7 +217,7 @@ function _tensor_step_point!(
 )
     D = cache.D
 
-    @inbounds for c in 1:D
+    @inbounds for c = 1:D
         spinor[c] = psi[I, c]
     end
 
@@ -213,25 +226,28 @@ function _tensor_step_point!(
 
     fill!(h, zero(ComplexF64))
     for entry in hf_entries
-        @inbounds h[entry.c_m, entry.c_mp] += cache.g_values[entry.ch_idx] *
-            entry.cg_prod * conj(spinor[entry.c_mu]) * spinor[entry.c_nu]
+        @inbounds h[entry.c_m, entry.c_mp] +=
+            cache.g_values[entry.ch_idx] *
+            entry.cg_prod *
+            conj(spinor[entry.c_mu]) *
+            spinor[entry.c_nu]
     end
 
     eig = eigen!(Hermitian(h))
     vals = eig.values
     vecs = eig.vectors
 
-    @inbounds for k in 1:D
+    @inbounds for k = 1:D
         s = zero(ComplexF64)
-        for j in 1:D
+        for j = 1:D
             s += conj(vecs[j, k]) * spinor[j]
         end
         tmp[k] = (imaginary_time ? exp(-vals[k] * dt) : cis(-vals[k] * dt)) * s
     end
 
-    @inbounds for i in 1:D
+    @inbounds for i = 1:D
         s = zero(ComplexF64)
-        for k in 1:D
+        for k = 1:D
             s += vecs[i, k] * tmp[k]
         end
         psi[I, i] = s
@@ -253,7 +269,7 @@ function _tensor_interaction_energy(psi, cache::TensorInteractionCache, ndim, n_
     E = 0.0
     for I in CartesianIndices(n_pts)
         spinor = Vector{ComplexF64}(undef, D)
-        @inbounds for c in 1:D
+        @inbounds for c = 1:D
             spinor[c] = psi[I, c]
         end
 
@@ -266,8 +282,8 @@ function _tensor_interaction_energy(psi, cache::TensorInteractionCache, ndim, n_
 
         offset = 0
         for (si, S) in enumerate(cache.active_channels)
-            for mi in 1:(2S+1)
-                E += 0.5 * cache.g_values[si] * abs2(A_SM[offset + mi])
+            for mi = 1:(2S+1)
+                E += 0.5 * cache.g_values[si] * abs2(A_SM[offset+mi])
             end
             offset += 2S + 1
         end
@@ -286,9 +302,9 @@ function _precompute_pair_entries(cache::TensorInteractionCache)
     F = cache.F
     entries = PairEntry[]
     for (si, S) in enumerate(cache.active_channels)
-        for M in -S:S
+        for M = (-S):S
             a_idx = _a_index(cache.active_channels, si, M)
-            for m1 in -F:F
+            for m1 = (-F):F
                 m2 = M - m1
                 abs(m2) > F && continue
                 cg_val = get(cache.cg_table, (S, M, m1, m2), 0.0)
@@ -304,7 +320,7 @@ end
 
 function _a_index(active_channels::Vector{Int}, si::Int, M::Int)
     offset = 0
-    for i in 1:(si-1)
+    for i = 1:(si-1)
         offset += 2 * active_channels[i] + 1
     end
     S = active_channels[si]

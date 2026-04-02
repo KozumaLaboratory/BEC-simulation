@@ -9,10 +9,11 @@ struct LinearRamp
     to::Float64
 end
 
-const RampOrConstant = Union{ConstantValue, LinearRamp}
+const RampOrConstant = Union{ConstantValue,LinearRamp}
 
 interpolate_value(v::ConstantValue, ::Float64) = v.value
-interpolate_value(v::LinearRamp, t_frac::Float64) = v.from + (v.to - v.from) * clamp(t_frac, 0.0, 1.0)
+interpolate_value(v::LinearRamp, t_frac::Float64) =
+    v.from + (v.to - v.from) * clamp(t_frac, 0.0, 1.0)
 
 struct PotentialConfig
     type::Symbol
@@ -42,16 +43,31 @@ struct GroundStateConfig
     target_magnetization::Union{Nothing,Float64}
     rotating_frame_omega::Float64
 
-    function GroundStateConfig(dt::Float64, n_steps::Int, tol::Float64,
-                               initial_state::Symbol, zeeman::ZeemanParams,
-                               potential::PotentialConfig, enable_ddi::Union{Nothing,Bool},
-                               target_magnetization::Union{Nothing,Float64},
-                               rotating_frame_omega::Float64)
+    function GroundStateConfig(
+        dt::Float64,
+        n_steps::Int,
+        tol::Float64,
+        initial_state::Symbol,
+        zeeman::ZeemanParams,
+        potential::PotentialConfig,
+        enable_ddi::Union{Nothing,Bool},
+        target_magnetization::Union{Nothing,Float64},
+        rotating_frame_omega::Float64,
+    )
         dt > 0 || throw(ArgumentError("dt must be positive"))
         n_steps > 0 || throw(ArgumentError("n_steps must be positive"))
         tol > 0 || throw(ArgumentError("tol must be positive"))
-        new(dt, n_steps, tol, initial_state, zeeman, potential,
-            enable_ddi, target_magnetization, rotating_frame_omega)
+        new(
+            dt,
+            n_steps,
+            tol,
+            initial_state,
+            zeeman,
+            potential,
+            enable_ddi,
+            target_magnetization,
+            rotating_frame_omega,
+        )
     end
 end
 
@@ -89,7 +105,7 @@ function _parse_system(d::Dict)
         c1_ratio = Float64(get(inter, "c1_ratio", 0.0))
         F_atom = resolve_atom(atom_name).F
         c_extra = _parse_c_extra(inter, F_atom)
-        interaction_params_from_constraint(; c_total, c1_ratio, F=F_atom, c_extra)
+        interaction_params_from_constraint(; c_total, c1_ratio, F = F_atom, c_extra)
     else
         c0 = Float64(inter["c0"])
         c1 = Float64(inter["c1"])
@@ -140,8 +156,17 @@ function _parse_ground_state(d::Dict)
     end
     rotating_frame_omega = Float64(get(d, "rotating_frame_omega", 0.0))
 
-    GroundStateConfig(dt, n_steps, tol, initial_state, zeeman, pot,
-                      enable_ddi, target_mag, rotating_frame_omega)
+    GroundStateConfig(
+        dt,
+        n_steps,
+        tol,
+        initial_state,
+        zeeman,
+        pot,
+        enable_ddi,
+        target_mag,
+        rotating_frame_omega,
+    )
 end
 
 function _parse_phase(d::Dict)
@@ -165,18 +190,28 @@ function _parse_phase(d::Dict)
     elseif haskey(d, "adaptive_dt")
         ad = d["adaptive_dt"]
         params = AdaptiveDtParams(;
-            dt_init=Float64(get(ad, "dt_init", dt)),
-            dt_min=Float64(get(ad, "dt_min", 1e-5)),
-            dt_max=Float64(get(ad, "dt_max", 10 * dt)),
-            tol=Float64(get(ad, "tol", 1e-3)),
-            error_mode=Symbol(get(ad, "error_mode", "step_change")),
+            dt_init = Float64(get(ad, "dt_init", dt)),
+            dt_min = Float64(get(ad, "dt_min", 1e-5)),
+            dt_max = Float64(get(ad, "dt_max", 10 * dt)),
+            tol = Float64(get(ad, "tol", 1e-3)),
+            error_mode = Symbol(get(ad, "error_mode", "step_change")),
         )
         IntegratorConfig(:adaptive, params)
     else
         IntegratorConfig()
     end
 
-    PhaseConfig(name, duration, dt, save_every, zeeman_p, zeeman_q, pot, noise_amp, integrator)
+    PhaseConfig(
+        name,
+        duration,
+        dt,
+        save_every,
+        zeeman_p,
+        zeeman_q,
+        pot,
+        noise_amp,
+        integrator,
+    )
 end
 
 function _parse_integrator(v, dt::Float64)
@@ -185,9 +220,9 @@ function _parse_integrator(v, dt::Float64)
         if method == :strang
             return IntegratorConfig(:strang, nothing)
         elseif method == :yoshida
-            return IntegratorConfig(:yoshida, AdaptiveDtParams(; dt_init=dt))
+            return IntegratorConfig(:yoshida, AdaptiveDtParams(; dt_init = dt))
         elseif method == :adaptive
-            return IntegratorConfig(:adaptive, AdaptiveDtParams(; dt_init=dt))
+            return IntegratorConfig(:adaptive, AdaptiveDtParams(; dt_init = dt))
         else
             throw(ArgumentError("Unknown integrator method: $v"))
         end
@@ -197,11 +232,11 @@ function _parse_integrator(v, dt::Float64)
             return IntegratorConfig(:strang, nothing)
         else
             params = AdaptiveDtParams(;
-                dt_init=Float64(get(v, "dt_init", dt)),
-                dt_min=Float64(get(v, "dt_min", 1e-5)),
-                dt_max=Float64(get(v, "dt_max", 10 * dt)),
-                tol=Float64(get(v, "tol", 1e-3)),
-                error_mode=Symbol(get(v, "error_mode", "step_change")),
+                dt_init = Float64(get(v, "dt_init", dt)),
+                dt_min = Float64(get(v, "dt_min", 1e-5)),
+                dt_max = Float64(get(v, "dt_max", 10 * dt)),
+                tol = Float64(get(v, "tol", 1e-3)),
+                error_mode = Symbol(get(v, "error_mode", "step_change")),
             )
             return IntegratorConfig(method, params)
         end
@@ -254,8 +289,8 @@ function _parse_c_extra(inter::Dict, ::Int)
     end
     max_n < 2 && return Float64[]
     c_extra = zeros(Float64, max_n - 1)
-    for n in 2:max_n
-        haskey(inter, "c$n") && (c_extra[n - 1] = Float64(inter["c$n"]))
+    for n = 2:max_n
+        haskey(inter, "c$n") && (c_extra[n-1] = Float64(inter["c$n"]))
     end
     c_extra
 end
@@ -265,7 +300,9 @@ end
 function _parse_parameter_scan(d::Dict)
     axes_data = d["axes"]
     axes = ScanAxis[_parse_sweep_axis(a) for a in axes_data]
-    cont = haskey(d, "continuation") ? _parse_continuation(d["continuation"]) : ContinuationConfig()
+    cont =
+        haskey(d, "continuation") ? _parse_continuation(d["continuation"]) :
+        ContinuationConfig()
     ms = haskey(d, "multistart") ? _parse_multistart(d["multistart"]) : MultiStartConfig()
     overrides = if haskey(d, "per_point_overrides")
         ScanPointOverride[_parse_point_override(o) for o in d["per_point_overrides"]]
