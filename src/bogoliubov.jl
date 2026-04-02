@@ -30,26 +30,8 @@ function bogoliubov_spectrum(;
     length(spinor) == D ||
         throw(DimensionMismatch("spinor length $(length(spinor)) != 2F+1 = $D"))
 
-    cg_table = precompute_cg_table(F)
+    h_mf, M_anom, zee, D_out = _bdg_contact_matrices(spinor, F, interactions, zeeman)
 
-    # Build channel couplings g_S from c0, c1, c_extra
-    g_dict = _c0c1_to_gS(F, interactions.c0, interactions.c1)
-    if !isempty(interactions.c_extra)
-        g_delta = _c_extra_to_delta_gS(F, interactions.c_extra)
-        g_dict = merge(+, g_dict, g_delta)
-    end
-
-    # Zeeman energies
-    sys = SpinSystem(F)
-    zee = zeeman_energies(zeeman, sys)
-
-    # Normal mean-field: h_{mm'} = Σ_S g_S Σ_{M,μ} CG(m,μ|S,M) CG(m',ν|S,M) ζ*_μ ζ_ν
-    h_mf = _bdg_normal_matrix(spinor, F, D, g_dict, cg_table)
-
-    # Anomalous matrix: M_{mm'} = Σ_S g_S Σ_M CG(m,m'|S,M) A_{SM}
-    M_anom = _bdg_anomalous_matrix(spinor, F, D, g_dict, cg_table)
-
-    # DDI contributions
     if abs(c_dd) > 1e-30
         sm = spin_matrices(F)
         k_hat = collect(k_direction)
@@ -57,21 +39,43 @@ function bogoliubov_spectrum(;
         k_norm > 0 && (k_hat ./= k_norm)
         Q_ab = _q_tensor_direction(k_hat)
         h_ddi, M_ddi = _bdg_ddi_matrices(spinor, F, D, sm, c_dd, Q_ab)
-        h_mf .+= h_ddi
-        M_anom .+= M_ddi
+        h_mf = h_mf .+ h_ddi
+        M_anom = M_anom .+ M_ddi
     end
 
-    # Chemical potential
+    k_values, omega, max_growth = _bdg_k_scan(h_mf, M_anom, zee, n0, D, spinor, k_max, n_k)
+    BdGResult(k_values, omega, max_growth, max_growth > 1e-10)
+end
+
+function _bdg_contact_matrices(spinor, F, interactions, zeeman)
+    D = 2F + 1
+    cg_table = precompute_cg_table(F)
+
+    g_dict = _c0c1_to_gS(F, interactions.c0, interactions.c1)
+    if !isempty(interactions.c_extra)
+        g_delta = _c_extra_to_delta_gS(F, interactions.c_extra)
+        g_dict = merge(+, g_dict, g_delta)
+    end
+
+    sys = SpinSystem(F)
+    zee = zeeman_energies(zeeman, sys)
+
+    h_mf = _bdg_normal_matrix(spinor, F, D, g_dict, cg_table)
+    M_anom = _bdg_anomalous_matrix(spinor, F, D, g_dict, cg_table)
+
+    h_mf, M_anom, zee, D
+end
+
+function _bdg_k_scan(h_mf, M_anom, zee, n0, D, spinor, k_max, n_k)
     mu = real(sum(c -> (zee[c] + n0 * h_mf[c, c]) * abs2(spinor[c]), 1:D))
 
-    k_values = collect(range(0, k_max, length = n_k))
+    k_values = collect(range(0, k_max; length = n_k))
     omega = zeros(ComplexF64, 2D, n_k)
     max_growth = 0.0
 
     for (ik, k) in enumerate(k_values)
         ek = k^2 / 2
 
-        # L_{mm'} = (ek - μ + zee_m)δ_{mm'} + 2n₀ h_{mm'}
         L = 2n0 .* h_mf
         for i = 1:D
             L[i, i] += ek - mu + zee[i]
@@ -79,7 +83,6 @@ function bogoliubov_spectrum(;
 
         M_sc = n0 .* M_anom
 
-        # BdG: σ_z H, where H = [L M; M* L*]
         H_bdg = zeros(ComplexF64, 2D, 2D)
         H_bdg[1:D, 1:D] .= L
         H_bdg[1:D, (D+1):2D] .= M_sc
@@ -95,7 +98,158 @@ function bogoliubov_spectrum(;
         end
     end
 
-    BdGResult(k_values, omega, max_growth, max_growth > 1e-10)
+    k_values, omega, max_growth
+end
+
+function _default_directions()
+    raw = [
+        (1.0, 0.0, 0.0),
+        (0.0, 1.0, 0.0),
+        (0.0, 0.0, 1.0),
+        (1.0, 1.0, 0.0),
+        (1.0, 0.0, 1.0),
+        (0.0, 1.0, 1.0),
+        (1.0, -1.0, 0.0),
+        (1.0, 0.0, -1.0),
+        (0.0, 1.0, -1.0),
+        (1.0, 1.0, 1.0),
+        (1.0, 1.0, -1.0),
+        (1.0, -1.0, 1.0),
+        (-1.0, 1.0, 1.0),
+    ]
+    map(raw) do d
+        n = sqrt(d[1]^2 + d[2]^2 + d[3]^2)
+        (d[1] / n, d[2] / n, d[3] / n)
+    end
+end
+
+"""
+    bogoliubov_instability_scan(; spinor, n0, F, interactions, zeeman, c_dd,
+                                  k_max, n_k, directions)
+
+Scan Bogoliubov instabilities across multiple k-directions.
+
+Returns `InstabilityMap` with growth rates for each (k, direction) pair,
+identifying the most unstable mode and predicting the density-wave wavelength.
+
+`directions` can be `:auto` (13 unique axis/edge/body-diagonal directions) or
+a `Vector{NTuple{3,Float64}}` of custom directions.
+"""
+function bogoliubov_instability_scan(;
+    spinor::Vector{ComplexF64},
+    n0::Float64,
+    F::Int,
+    interactions::InteractionParams,
+    zeeman::ZeemanParams = ZeemanParams(),
+    c_dd::Float64 = 0.0,
+    k_max::Float64 = 10.0,
+    n_k::Int = 200,
+    directions::Union{Symbol,Vector{NTuple{3,Float64}}} = :auto,
+)
+    D = 2F + 1
+    length(spinor) == D ||
+        throw(DimensionMismatch("spinor length $(length(spinor)) != 2F+1 = $D"))
+
+    dirs = directions === :auto ? _default_directions() : directions
+    n_dir = length(dirs)
+
+    h_contact, M_contact, zee, _ = _bdg_contact_matrices(spinor, F, interactions, zeeman)
+
+    has_ddi = abs(c_dd) > 1e-30
+    sm = has_ddi ? spin_matrices(F) : nothing
+
+    growth_rates = zeros(Float64, n_k, n_dir)
+    k_values = collect(range(0, k_max; length = n_k))
+
+    global_max = 0.0
+    best_k = 0.0
+    best_dir = dirs[1]
+
+    for (id, dir) in enumerate(dirs)
+        if has_ddi
+            k_hat = collect(dir)
+            k_norm = norm(k_hat)
+            k_norm > 0 && (k_hat ./= k_norm)
+            Q_ab = _q_tensor_direction(k_hat)
+            h_ddi, M_ddi = _bdg_ddi_matrices(spinor, F, D, sm, c_dd, Q_ab)
+            h_mf = h_contact .+ h_ddi
+            M_anom = M_contact .+ M_ddi
+        else
+            h_mf = h_contact
+            M_anom = M_contact
+        end
+
+        _, omega, _ = _bdg_k_scan(h_mf, M_anom, zee, n0, D, spinor, k_max, n_k)
+
+        for ik = 1:n_k
+            max_g = 0.0
+            for ie = 1:2D
+                g = imag(omega[ie, ik])
+                g > max_g && (max_g = g)
+            end
+            growth_rates[ik, id] = max_g
+            if max_g > global_max
+                global_max = max_g
+                best_k = k_values[ik]
+                best_dir = dir
+            end
+        end
+    end
+
+    unstable = global_max > 1e-10
+
+    k_lo = Inf
+    k_hi = -Inf
+    if unstable
+        for id = 1:n_dir, ik = 1:n_k
+            if growth_rates[ik, id] > 1e-10
+                k = k_values[ik]
+                k < k_lo && (k_lo = k)
+                k > k_hi && (k_hi = k)
+            end
+        end
+    else
+        k_lo = 0.0
+        k_hi = 0.0
+    end
+
+    wavelength = unstable && best_k > 0 ? 2π / best_k : Inf
+
+    InstabilityMap(
+        k_values,
+        dirs,
+        growth_rates,
+        global_max,
+        unstable,
+        best_k,
+        best_dir,
+        (k_lo, k_hi),
+        wavelength,
+    )
+end
+
+"""
+    suggest_grid_params(imap; ndim=2, margin=2.0)
+
+Suggest grid parameters that resolve the instability found in `imap`.
+
+Returns `(; n_points::NTuple{N,Int}, box_size::NTuple{N,Float64})` or
+`nothing` if the system is stable.
+"""
+function suggest_grid_params(imap::InstabilityMap; ndim::Int = 2, margin::Float64 = 2.0)
+    imap.unstable || return nothing
+
+    k_lo, k_hi = imap.k_unstable_range
+    k_min = max(k_lo, 1e-10)
+
+    box_L = margin * 2π / k_min
+    k_nyquist_needed = margin * k_hi
+    n_raw = ceil(Int, 2 * box_L * k_nyquist_needed / (2π))
+    n_pts = n_raw + (n_raw % 2)
+
+    box_size = ntuple(_ -> box_L, ndim)
+    n_points = ntuple(_ -> n_pts, ndim)
+    (; n_points, box_size)
 end
 
 function _bdg_normal_matrix(spinor, F, D, g_dict, cg_table)

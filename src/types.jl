@@ -483,6 +483,18 @@ struct BdGResult
     unstable::Bool
 end
 
+struct InstabilityMap
+    k_values::Vector{Float64}
+    directions::Vector{NTuple{3,Float64}}
+    growth_rates::Matrix{Float64}
+    max_growth_rate::Float64
+    unstable::Bool
+    most_unstable_k::Float64
+    most_unstable_direction::NTuple{3,Float64}
+    k_unstable_range::Tuple{Float64,Float64}
+    predicted_wavelength::Float64
+end
+
 # --- Phase Scan Types ---
 
 struct ScanValues

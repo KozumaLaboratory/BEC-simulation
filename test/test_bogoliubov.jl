@@ -145,4 +145,97 @@
         @test result.max_growth_rate >= 0
         @test result.unstable isa Bool
     end
+
+    @testset "Instability scan: stable system" begin
+        F = 1
+        spinor = ComplexF64[0.0, 1.0, 0.0]
+        imap = bogoliubov_instability_scan(;
+            spinor, n0=1.0, F,
+            interactions=InteractionParams(10.0, 2.0),
+            zeeman=ZeemanParams(0.0, 1.0),
+            k_max=5.0, n_k=30,
+        )
+
+        @test imap isa InstabilityMap
+        @test !imap.unstable
+        @test imap.predicted_wavelength == Inf
+        @test suggest_grid_params(imap) === nothing
+    end
+
+    @testset "Instability scan: DDI direction anisotropy" begin
+        F = 1
+        spinor = ComplexF64[1.0, 0.0, 0.0]
+        imap = bogoliubov_instability_scan(;
+            spinor, n0=1.0, F,
+            interactions=InteractionParams(5.0, -2.0),
+            c_dd=10.0,
+            k_max=5.0, n_k=30,
+        )
+
+        @test imap isa InstabilityMap
+        @test length(imap.directions) == 13
+        @test size(imap.growth_rates) == (30, 13)
+        max_per_dir = [maximum(imap.growth_rates[:, id]) for id in 1:13]
+        @test !all(x -> x ≈ max_per_dir[1], max_per_dir)
+    end
+
+    @testset "Instability scan: no DDI → all directions equal" begin
+        F = 1
+        spinor = ComplexF64[1.0, 0.0, 0.0]
+        imap = bogoliubov_instability_scan(;
+            spinor, n0=1.0, F,
+            interactions=InteractionParams(5.0, -2.0),
+            c_dd=0.0,
+            k_max=5.0, n_k=30,
+        )
+
+        max_per_dir = [maximum(imap.growth_rates[:, id]) for id in 1:length(imap.directions)]
+        @test all(x -> isapprox(x, max_per_dir[1]; atol=1e-12), max_per_dir)
+    end
+
+    @testset "Instability scan: single direction matches bogoliubov_spectrum" begin
+        F = 1
+        spinor = ComplexF64[1.0, 0.0, 0.0]
+        dir = (0.0, 0.0, 1.0)
+
+        ref = bogoliubov_spectrum(;
+            spinor, n0=1.0, F,
+            interactions=InteractionParams(5.0, -2.0),
+            c_dd=5.0,
+            k_direction=dir,
+            k_max=5.0, n_k=30,
+        )
+
+        imap = bogoliubov_instability_scan(;
+            spinor, n0=1.0, F,
+            interactions=InteractionParams(5.0, -2.0),
+            c_dd=5.0,
+            k_max=5.0, n_k=30,
+            directions=[dir],
+        )
+
+        @test isapprox(ref.max_growth_rate, maximum(imap.growth_rates); atol=1e-12)
+        @test imap.k_values ≈ ref.k_values
+    end
+
+    @testset "suggest_grid_params: even n_points, Nyquist satisfied" begin
+        F = 1
+        spinor = ComplexF64[1.0, 0.0, 0.0]
+        imap = bogoliubov_instability_scan(;
+            spinor, n0=1.0, F,
+            interactions=InteractionParams(5.0, -2.0),
+            c_dd=10.0,
+            k_max=5.0, n_k=30,
+        )
+
+        if imap.unstable
+            gp = suggest_grid_params(imap; ndim=2, margin=2.0)
+            @test gp !== nothing
+            @test length(gp.n_points) == 2
+            @test length(gp.box_size) == 2
+            @test all(n -> n % 2 == 0, gp.n_points)
+            k_nyq = π * gp.n_points[1] / gp.box_size[1]
+            @test k_nyq >= 2.0 * imap.k_unstable_range[2]
+        end
+    end
 end
