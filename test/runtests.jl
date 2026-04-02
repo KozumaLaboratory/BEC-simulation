@@ -51,4 +51,9 @@ using SpinorBEC
     include("test_analytical_validation.jl")
     include("test_phase_scan.jl")
     include("test_config.jl")
+    include("test_energy.jl")
+    include("test_initialization.jl")
+    include("test_spinor_utils.jl")
+    include("test_types_validation.jl")
+    include("test_currents.jl")
 end
