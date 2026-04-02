@@ -14,9 +14,11 @@ function run_simulation_yoshida!(
     t_end::Float64,
     save_interval::Float64,
     callback::Union{Nothing,Function} = nothing,
+    composition::Union{Symbol,NamedTuple{(:a,:b)}} = :yoshida,
 ) where {N}
     n_comp = ws.spin_matrices.system.n_components
     sys = ws.spin_matrices.system
+    comp = composition isa Symbol ? _resolve_composition(composition) : composition
 
     dt = clamp(adaptive.dt_init, adaptive.dt_min, adaptive.dt_max)
 
@@ -50,7 +52,7 @@ function run_simulation_yoshida!(
         psi_strang .= ws.state.psi
 
         ws.state.psi .= psi_old
-        _yoshida_core!(ws, dt_step, n_comp)
+        _aba_step!(ws, dt_step, n_comp, comp.a, comp.b)
 
         err = _wavefunction_l2_change(ws.state.psi, psi_strang)
 

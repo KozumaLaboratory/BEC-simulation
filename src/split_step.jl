@@ -220,6 +220,44 @@ S₄(dt) = S₂(w₁·dt) ∘ S₂(w₀·dt) ∘ S₂(w₁·dt)  with w₀ + 2w�
 const _YOSHIDA_W1 = 1.0 / (2.0 - 2.0^(1 / 3))
 const _YOSHIDA_W0 = 1.0 - 2.0 * _YOSHIDA_W1
 
+const _COMP_YOSHIDA = let w1 = _YOSHIDA_W1, w0 = _YOSHIDA_W0, wm = (w1 + w0) / 2
+    (a = (w1 / 2, wm, wm, w1 / 2), b = (w1, w0, w1))
+end
+
+const _COMP_SUZUKI = let p = 1.0 / (4.0 - 4.0^(1 / 3)), q = 1.0 - 4.0 * p
+    (a = (p / 2, p, (p + q) / 2, (q + p) / 2, p, p / 2), b = (p, p, q, p, p))
+end
+
+const _COMP_BLANES_MOAN_S6 = let
+    a1 = 0.0792036964311957
+    a2 = 0.353172906049774
+    a3 = -0.0420650803577195
+    a4 = 1.0 - 2.0 * (a1 + a2 + a3)
+    b1 = 0.209515106613362
+    b2 = -0.143851773179818
+    b3 = 0.5 - b1 - b2
+    (a = (a1, a2, a3, a4, a3, a2, a1), b = (b1, b2, b3, b3, b2, b1))
+end
+
+const _COMP_OMELYAN_PEFRL = let
+    xi = 0.1786178958448091
+    lam = -0.2123418310626054
+    chi = -0.06626458266981849
+    a3 = 1.0 - 2.0 * (chi + xi)
+    b1 = (1.0 - 2.0 * lam) / 2.0
+    (a = (xi, chi, a3, chi, xi), b = (b1, lam, lam, b1))
+end
+
+function _resolve_composition(sym::Symbol)
+    sym === :yoshida && return _COMP_YOSHIDA
+    sym === :suzuki && return _COMP_SUZUKI
+    sym === :blanes_moan_s6 && return _COMP_BLANES_MOAN_S6
+    sym === :omelyan_pefrl && return _COMP_OMELYAN_PEFRL
+    throw(ArgumentError(
+        "Unknown composition: $sym. Use :yoshida, :suzuki, :blanes_moan_s6, or :omelyan_pefrl",
+    ))
+end
+
 """
 One Strang step with explicit dt (no sim_params dependency).
 V(dt/2) K(dt) V(dt/2).
@@ -312,6 +350,33 @@ function _yoshida_core!(ws::Workspace{N}, dt::Float64, n_comp::Int) where {N}
     )
 
     _half_potential_step!(ws, w1 * dt / 2, n_comp, N, false)
+    nothing
+end
+
+"""
+Generalized ABA composition step with independent V/K weight tuples.
+
+V(a₁dt) · K(b₁dt) · V(a₂dt) · K(b₂dt) · ... · K(bₛdt) · V(aₛ₊₁dt)
+
+Specializes on (Sv, Sk) type parameters → loop unrolled at compile time.
+Supports both Strang-derived (Yoshida, Suzuki) and optimized (independent a,b) methods.
+"""
+function _aba_step!(
+    ws::Workspace{N}, dt::Float64, n_comp::Int,
+    a::NTuple{Sv,Float64}, b::NTuple{Sk,Float64},
+) where {N,Sv,Sk}
+    omega = ws.sim_params.rotating_frame_omega
+
+    _half_potential_step!(ws, a[1] * dt, n_comp, N, false)
+
+    for i in 1:Sk
+        _apply_coriolis_step!(ws.state.psi, ws.grid, omega, b[i] * dt / 2, false, ws.coriolis_cache)
+        _update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, b[i] * dt)
+        apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
+        _apply_coriolis_step!(ws.state.psi, ws.grid, omega, b[i] * dt / 2, false, ws.coriolis_cache)
+
+        _half_potential_step!(ws, a[i + 1] * dt, n_comp, N, false)
+    end
     nothing
 end
 
