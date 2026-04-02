@@ -65,11 +65,12 @@ end
 """
 Symmetric inner splitting (all non-commuting operators symmetrized for 2nd-order accuracy):
 
-    diag(dt/4) → SM(dt/4) → nematic/tensor(dt/4) → raman(dt/4) → DDI(dt/2)
-              → raman(dt/4) → nematic/tensor(dt/4) → SM(dt/4) → diag(dt/4)
+    diag(dt/4) → SM(dt/4) → nematic(dt/4) → tensor(dt/4) → raman(dt/4) → DDI(dt/2)
+              → raman(dt/4) → tensor(dt/4) → nematic(dt/4) → SM(dt/4) → diag(dt/4)
 
-When tensor_cache is active, it handles ALL contact interactions (c₀ through c_{2F}),
-so spin_mixing (c₁) and nematic (c₂) are skipped to avoid double-counting.
+Additive dispatch: SM (c₁) and nematic (c₂) always run (auto-skip when coupling ≈ 0).
+Tensor cache, when active, handles only the residual channels (c₄, c₆, ...).
+Scattering-lengths path: c₀=c₁=0 in ws_interactions, so SM/nematic skip; tensor handles all.
 
 DDI is innermost (most expensive: 6 FFTs). Cheaper operators wrap symmetrically.
 """
@@ -95,29 +96,29 @@ function _half_potential_step!(
         imaginary_time,
     )
 
+    @timeit_debug TIMER "spin_mixing" apply_spin_mixing_step!(
+        ws.state.psi,
+        ws.spin_matrices,
+        ws.interactions.c1,
+        dt_half / 2,
+        ndim;
+        imaginary_time,
+    )
+
+    @timeit_debug TIMER "nematic" apply_nematic_step!(
+        ws.state.psi,
+        ws.interactions,
+        ws.spin_matrices.system.F,
+        dt_half / 2,
+        ndim;
+        imaginary_time,
+    )
+
     if ws.tensor_cache !== nothing
         @timeit_debug TIMER "tensor" apply_tensor_interaction_step!(
             ws.state.psi,
             ws.tensor_cache,
             ws.spin_matrices,
-            dt_half / 2,
-            ndim;
-            imaginary_time,
-        )
-    else
-        @timeit_debug TIMER "spin_mixing" apply_spin_mixing_step!(
-            ws.state.psi,
-            ws.spin_matrices,
-            ws.interactions.c1,
-            dt_half / 2,
-            ndim;
-            imaginary_time,
-        )
-
-        @timeit_debug TIMER "nematic" apply_nematic_step!(
-            ws.state.psi,
-            ws.interactions,
-            ws.spin_matrices.system.F,
             dt_half / 2,
             ndim;
             imaginary_time,
@@ -180,25 +181,25 @@ function _half_potential_step!(
             ndim;
             imaginary_time,
         )
-    else
-        @timeit_debug TIMER "nematic" apply_nematic_step!(
-            ws.state.psi,
-            ws.interactions,
-            ws.spin_matrices.system.F,
-            dt_half / 2,
-            ndim;
-            imaginary_time,
-        )
-
-        @timeit_debug TIMER "spin_mixing" apply_spin_mixing_step!(
-            ws.state.psi,
-            ws.spin_matrices,
-            ws.interactions.c1,
-            dt_half / 2,
-            ndim;
-            imaginary_time,
-        )
     end
+
+    @timeit_debug TIMER "nematic" apply_nematic_step!(
+        ws.state.psi,
+        ws.interactions,
+        ws.spin_matrices.system.F,
+        dt_half / 2,
+        ndim;
+        imaginary_time,
+    )
+
+    @timeit_debug TIMER "spin_mixing" apply_spin_mixing_step!(
+        ws.state.psi,
+        ws.spin_matrices,
+        ws.interactions.c1,
+        dt_half / 2,
+        ndim;
+        imaginary_time,
+    )
 
     @timeit_debug TIMER "diagonal" _diagonal_step_svec!(
         Val(N),

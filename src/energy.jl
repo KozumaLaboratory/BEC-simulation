@@ -17,24 +17,10 @@ function energy_decomposition(ws::Workspace{N}) where {N}
     zee = zeeman_at(ws.zeeman, ws.state.t)
     E_zee = _zeeman_energy(psi, zee, ws.spin_matrices.system, n_comp, N, n_pts, dV)
 
-    E_c0 = if ws.tensor_cache === nothing
-        _density_interaction_energy(psi, ws.interactions.c0, n_comp, N, n_pts, dV)
-    else
-        0.0
-    end
-    E_c1 = if ws.tensor_cache === nothing
-        _spin_interaction_energy(
-            psi,
-            ws.spin_matrices,
-            ws.interactions.c1,
-            n_comp,
-            N,
-            n_pts,
-            dV,
-        )
-    else
-        0.0
-    end
+    E_c0 = abs(ws.interactions.c0) > 1e-30 ?
+        _density_interaction_energy(psi, ws.interactions.c0, n_comp, N, n_pts, dV) : 0.0
+    E_c1 = abs(ws.interactions.c1) > 1e-30 ?
+        _spin_interaction_energy(psi, ws.spin_matrices, ws.interactions.c1, n_comp, N, n_pts, dV) : 0.0
 
     E_ddi = if ws.ddi !== nothing
         _ddi_energy(
@@ -56,11 +42,12 @@ function energy_decomposition(ws::Workspace{N}) where {N}
         ws.interactions.c_lhy != 0.0 ?
         _lhy_energy(psi, ws.interactions.c_lhy, n_comp, N, n_pts, dV) : 0.0
 
-    E_tensor = if ws.tensor_cache !== nothing
-        _tensor_interaction_energy(psi, ws.tensor_cache, N, n_pts, dV)
-    else
+    E_tensor = begin
+        e = 0.0
         c2 = get_cn(ws.interactions, 2)
-        c2 != 0.0 ? _nematic_energy(psi, ws.spin_matrices.system.F, c2, N, n_pts, dV) : 0.0
+        abs(c2) > 1e-30 && (e += _nematic_energy(psi, ws.spin_matrices.system.F, c2, N, n_pts, dV))
+        ws.tensor_cache !== nothing && (e += _tensor_interaction_energy(psi, ws.tensor_cache, N, n_pts, dV))
+        e
     end
 
     E_raman = if ws.raman !== nothing

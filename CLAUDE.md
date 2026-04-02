@@ -48,12 +48,16 @@ Access helpers (`spinor_utils.jl`): `_component_slice`, `_get_spinor`/`_set_spin
 ### Split-Step Pipeline (`split_step.jl`)
 
 Strang splitting (2nd-order symmetric):
-1. Half potential: `diag(dt/4) → SM(dt/4) → nematic(dt/4) → Raman(dt/4) → DDI(dt/2) → [mirror]`
+1. Half potential: `diag(dt/4) → SM(dt/4) → nematic(dt/4) → tensor(dt/4) → Raman(dt/4) → DDI(dt/2) → [mirror]`
 2. Full kinetic (batched FFT → phase → batched IFFT)
 3. Half potential (mirror)
 4. Loss step (real-time only)
 
-Tensor step replaces SM + nematic when `TensorInteractionCache` is active. Substeps auto-skip when coupling ≈ 0. Instrumented with `@timeit_debug TIMER`.
+Additive dispatch: SM (c₁) and nematic (c₂) always run; tensor cache handles only residual
+channels (c₄, c₆, ...). All substeps auto-skip when coupling ≈ 0. When `has_higher_c_extra`
+(e.g. c₀+c₁+c₄), initialization builds tensor cache from residual Δg_S only, keeping c₀/c₁
+in `ws.interactions` for the fast diagonal/SM paths. Scattering-lengths path (c₀=c₁=0) is
+unchanged: SM/nematic skip, tensor handles all channels. Instrumented with `@timeit_debug TIMER`.
 
 ### Entry Points
 

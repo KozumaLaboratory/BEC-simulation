@@ -247,8 +247,9 @@
 
         ws = make_workspace(; grid, atom, interactions, sim_params=sp)
         @test ws.tensor_cache !== nothing
-        @test ws.interactions.c0 ≈ 0.0
-        @test ws.interactions.c1 ≈ 0.0
+        @test ws.interactions.c0 ≈ 4000.0
+        @test ws.interactions.c1 ≈ 20.0
+        @test isempty(ws.interactions.c_extra)
 
         dV = cell_volume(grid)
         norm0 = sum(abs2, ws.state.psi) * dV
@@ -304,6 +305,59 @@
         dV = cell_volume(grid)
         pop_m2 = sum(abs2, @view(psi[:, 1])) * dV
         @test pop_m2 > 0.9
+    end
+
+    @testset "Split-channel energy equivalence" begin
+        F = 2
+        D = 2F + 1
+        grid = make_grid(GridConfig((16,), (10.0,)))
+        dV = cell_volume(grid)
+        psi = randn(ComplexF64, grid.config.n_points[1], D)
+        norm = sqrt(sum(abs2, psi) * dV)
+        psi ./= norm
+        n_pts = grid.config.n_points
+
+        c0, c1 = 50.0, 5.0
+        c_extra = [0.0, 0.0, 2.0]  # c4
+
+        g_base = SpinorBEC._c0c1_to_gS(F, c0, c1)
+        g_delta = SpinorBEC._c_extra_to_delta_gS(F, c_extra)
+        g_total = merge(+, g_base, g_delta)
+        cache_total = SpinorBEC._make_tensor_cache_from_channels(F, g_total)
+        E_total = SpinorBEC._tensor_interaction_energy(psi, cache_total, 1, n_pts, dV)
+
+        E_c0 = SpinorBEC._density_interaction_energy(psi, c0, D, 1, n_pts, dV)
+        sm = spin_matrices(F)
+        E_c1 = SpinorBEC._spin_interaction_energy(psi, sm, c1, D, 1, n_pts, dV)
+        cache_residual = SpinorBEC._make_tensor_cache_from_channels(F, g_delta)
+        E_residual = cache_residual !== nothing ?
+            SpinorBEC._tensor_interaction_energy(psi, cache_residual, 1, n_pts, dV) : 0.0
+
+        @test E_total ≈ E_c0 + E_c1 + E_residual rtol = 1e-10
+    end
+
+    @testset "Split-channel norm conservation" begin
+        F = 6
+        grid = make_grid(GridConfig((16,), (10.0,)))
+
+        c_extra = zeros(Float64, 5)
+        c_extra[3] = 50.0  # c4
+        interactions = InteractionParams(4000.0, 20.0, 0.0, c_extra)
+        atom = AtomSpecies("test-f6", 1e-25, 6, 0.0, 0.0, 0.0, 0.0)
+        sp = SimParams(; dt=0.001, n_steps=100)
+
+        ws = make_workspace(; grid, atom, interactions, sim_params=sp)
+        @test ws.tensor_cache !== nothing
+        @test ws.interactions.c0 ≈ 4000.0
+        @test ws.interactions.c1 ≈ 20.0
+
+        dV = cell_volume(grid)
+        norm0 = sum(abs2, ws.state.psi) * dV
+        for _ in 1:100
+            split_step!(ws)
+        end
+        norm_final = sum(abs2, ws.state.psi) * dV
+        @test abs(norm_final - norm0) / norm0 < 1e-10
     end
 
     @testset "Workspace without tensor cache" begin

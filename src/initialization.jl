@@ -212,11 +212,9 @@ function make_workspace(;
     )
 
     tensor_cache, ws_interactions = if has_higher_c_extra
-        g_base = _c0c1_to_gS(F, interactions.c0, interactions.c1)
         g_delta = _c_extra_to_delta_gS(F, interactions.c_extra)
-        g_total = merge(+, g_base, g_delta)
-        tc = _make_tensor_cache_from_channels(F, g_total)
-        tc, InteractionParams(0.0, 0.0, interactions.c_lhy, Float64[])
+        tc = _make_tensor_cache_from_channels(F, g_delta)
+        tc, InteractionParams(interactions.c0, interactions.c1, interactions.c_lhy, Float64[])
     else
         tc = make_tensor_interaction_cache(F, interactions)
         if tc !== nothing && (abs(interactions.c0) > 1e-30 || abs(interactions.c1) > 1e-30)
