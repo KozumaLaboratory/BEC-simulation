@@ -89,15 +89,42 @@ struct SystemConfig
     interactions::InteractionParams
     ddi::DDIConfig
     loss::Union{Nothing,LossParams}
+    quasi_2d::Bool
+    l_z::Float64
 end
 
+SystemConfig(atom_name, n_points, box_size, interactions, ddi, loss) =
+    SystemConfig(atom_name, n_points, box_size, interactions, ddi, loss, false, 0.0)
+
 # --- YAML Parsing Helpers ---
+
+function _scale_interactions_quasi_2d(ip::InteractionParams, l_z::Float64)
+    factor = 1.0 / (sqrt(2π) * l_z)
+    if ip.c_lhy != 0.0
+        @warn "c_lhy scaling under quasi-2D is approximate; 2D LHY requires logarithmic treatment"
+    end
+    InteractionParams(
+        ip.c0 * factor,
+        ip.c1 * factor,
+        ip.c_lhy * factor,
+        isempty(ip.c_extra) ? Float64[] : ip.c_extra .* factor,
+    )
+end
 
 function _parse_system(d::Dict)
     atom_name = Symbol(d["atom"])
     g = d["grid"]
     n_points = _to_int_vec(g["n_points"])
     box_size = _to_float_vec(g["box_size"])
+
+    quasi_2d = Bool(get(d, "quasi_2d", false))
+    l_z = Float64(get(d, "l_z", 0.0))
+
+    if quasi_2d
+        length(n_points) == 2 ||
+            throw(ArgumentError("quasi_2d requires a 2D grid, got $(length(n_points))D"))
+        l_z > 0 || throw(ArgumentError("quasi_2d requires l_z > 0, got $l_z"))
+    end
 
     inter = d["interactions"]
     interactions = if haskey(inter, "c_total")
@@ -115,16 +142,20 @@ function _parse_system(d::Dict)
         InteractionParams(c0, c1, c_lhy, c_extra)
     end
 
+    if quasi_2d
+        interactions = _scale_interactions_quasi_2d(interactions, l_z)
+    end
+
     ddi = if haskey(d, "ddi")
         dd = d["ddi"]
         enabled = get(dd, "enabled", false)
         c_dd = haskey(dd, "c_dd") ? Float64(dd["c_dd"]) : nothing
         secular = Bool(get(dd, "secular", false))
-        quasi_2d = Bool(get(dd, "quasi_2d", false))
-        l_z = Float64(get(dd, "l_z", 0.0))
-        DDIConfig(enabled, c_dd, secular, quasi_2d, l_z)
+        ddi_q2d = Bool(get(dd, "quasi_2d", quasi_2d))
+        ddi_lz = Float64(get(dd, "l_z", l_z))
+        DDIConfig(enabled, c_dd, secular, ddi_q2d, ddi_lz)
     else
-        DDIConfig()
+        DDIConfig(false, nothing, false, quasi_2d, l_z)
     end
 
     loss = if haskey(d, "losses")
@@ -134,7 +165,7 @@ function _parse_system(d::Dict)
         nothing
     end
 
-    SystemConfig(atom_name, n_points, box_size, interactions, ddi, loss)
+    SystemConfig(atom_name, n_points, box_size, interactions, ddi, loss, quasi_2d, l_z)
 end
 
 function _parse_ground_state(d::Dict)

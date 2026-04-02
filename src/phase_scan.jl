@@ -23,8 +23,10 @@ function _apply_sweep_param(
     value::Float64;
     c_total::Float64,
     F::Int,
+    quasi_2d::Bool = false,
+    l_z::Float64 = 0.0,
 )
-    _apply_param(state, Val(param), value; c_total, F)
+    _apply_param(state, Val(param), value; c_total, F, quasi_2d, l_z)
 end
 
 function _apply_param(
@@ -33,6 +35,8 @@ function _apply_param(
     value::Float64;
     c_total::Float64,
     F::Int,
+    quasi_2d::Bool = false,
+    l_z::Float64 = 0.0,
 )
     ip = interaction_params_from_constraint(;
         c_total,
@@ -40,6 +44,9 @@ function _apply_param(
         F,
         c_extra = copy(state.interactions.c_extra),
     )
+    if quasi_2d
+        ip = _scale_interactions_quasi_2d(ip, l_z)
+    end
     merge(state, (interactions = ip,))
 end
 
@@ -244,7 +251,14 @@ function _run_parameter_1d(
     values = collect(_sweep_values(axis.values))
     F = atom.F
     ip = config.system.interactions
-    c_total = ip.c0 + F^2 * ip.c1
+    sys_q2d = config.system.quasi_2d
+    sys_lz = config.system.l_z
+    c_total = if sys_q2d
+        factor = sqrt(2π) * sys_lz
+        (ip.c0 * factor) + F^2 * (ip.c1 * factor)
+    else
+        ip.c0 + F^2 * ip.c1
+    end
     base_state = _base_sweep_state(config)
 
     verbose && println("  1D sweep: $(axis.parameter), $(length(values)) points")
@@ -270,7 +284,10 @@ function _run_parameter_1d(
     prev_energy = NaN
 
     for (i, val) in enumerate(values)
-        state = _apply_sweep_param(base_state, axis.parameter, val; c_total, F)
+        state = _apply_sweep_param(
+            base_state, axis.parameter, val; c_total, F,
+            quasi_2d = sys_q2d, l_z = sys_lz,
+        )
         pv = Dict{Symbol,Float64}(axis.parameter => val)
 
         r = _run_single_point(
@@ -368,7 +385,14 @@ function _run_parameter_2d(
     n1, n2 = length(vals1), length(vals2)
     F = atom.F
     ip = config.system.interactions
-    c_total = ip.c0 + F^2 * ip.c1
+    sys_q2d = config.system.quasi_2d
+    sys_lz = config.system.l_z
+    c_total = if sys_q2d
+        factor = sqrt(2π) * sys_lz
+        (ip.c0 * factor) + F^2 * (ip.c1 * factor)
+    else
+        ip.c0 + F^2 * ip.c1
+    end
     base_state = _base_sweep_state(config)
 
     verbose && println("  2D sweep: $(ax1.parameter) ($n1) × $(ax2.parameter) ($n2)")
@@ -396,8 +420,14 @@ function _run_parameter_2d(
         prev_energy = NaN
 
         for (i, v1) in enumerate(vals1)
-            state = _apply_sweep_param(base_state, ax1.parameter, v1; c_total, F)
-            state = _apply_sweep_param(state, ax2.parameter, v2; c_total, F)
+            state = _apply_sweep_param(
+                base_state, ax1.parameter, v1; c_total, F,
+                quasi_2d = sys_q2d, l_z = sys_lz,
+            )
+            state = _apply_sweep_param(
+                state, ax2.parameter, v2; c_total, F,
+                quasi_2d = sys_q2d, l_z = sys_lz,
+            )
             pv = Dict{Symbol,Float64}(ax1.parameter => v1, ax2.parameter => v2)
 
             r = _run_single_point(
