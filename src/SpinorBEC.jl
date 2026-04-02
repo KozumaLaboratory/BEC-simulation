@@ -65,7 +65,7 @@ export GridConfig, Grid, SpinSystem, SpinMatrices
 export AtomSpecies, InteractionParams, ZeemanParams, LossParams, TensorInteractionCache
 export SimParams,
     SimState, FFTPlans, RFFTPlans, Workspace, AdaptiveDtParams, IntegratorConfig
-export TOFParams, BdGResult, InstabilityMap
+export TOFParams, BdGResult, InstabilityMap, HysteresisResult
 export HarmonicTrap, NoPotential, GravityPotential, CompositePotential
 
 # Grid
@@ -175,7 +175,8 @@ export analyze_stability
 export bogoliubov_spectrum, bogoliubov_instability_scan, suggest_grid_params
 
 # Simulation
-export find_ground_state, find_ground_state_multistart, scan_continuation
+export find_ground_state, find_ground_state_multistart, scan_continuation,
+    scan_continuation_bidirectional
 export scan_phase_diagram_2d
 export find_phase_boundary
 export run_simulation!, run_simulation_checkpointed!

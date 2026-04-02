@@ -619,6 +619,87 @@ function scan_continuation(;
     results
 end
 
+function _detect_hysteresis(
+    param_values::AbstractVector{Float64},
+    forward::Vector{NamedTuple},
+    backward::Vector{NamedTuple},
+)
+    n = length(param_values)
+    in_hysteresis = false
+    lo = 0.0
+    intervals = Tuple{Float64,Float64}[]
+
+    for i in 1:n
+        mismatch = forward[i].phase != backward[i].phase
+        if mismatch && !in_hysteresis
+            lo = param_values[i]
+            in_hysteresis = true
+        elseif !mismatch && in_hysteresis
+            push!(intervals, (lo, param_values[i - 1]))
+            in_hysteresis = false
+        end
+    end
+    if in_hysteresis
+        push!(intervals, (lo, param_values[n]))
+    end
+
+    transition_points = [(a + b) / 2 for (a, b) in intervals]
+    (intervals, transition_points)
+end
+
+"""
+    scan_continuation_bidirectional(; param_values, make_interactions, grid, atom, ...) → HysteresisResult
+
+Run forward and backward continuation scans to detect hysteresis in first-order transitions.
+"""
+function scan_continuation_bidirectional(;
+    param_values::AbstractVector{Float64},
+    make_interactions::Function,
+    grid,
+    atom,
+    initial_state_forward::Symbol = :polar,
+    initial_state_backward::Symbol = :polar,
+    energy_jump_threshold::Float64 = 0.1,
+    n_steps_continuation::Int = 500,
+    n_steps_fresh::Int = 5000,
+    kwargs...,
+)
+    forward = scan_continuation(;
+        param_values,
+        make_interactions,
+        grid,
+        atom,
+        initial_state = initial_state_forward,
+        energy_jump_threshold,
+        n_steps_continuation,
+        n_steps_fresh,
+        kwargs...,
+    )
+
+    backward_raw = scan_continuation(;
+        param_values = reverse(param_values),
+        make_interactions,
+        grid,
+        atom,
+        initial_state = initial_state_backward,
+        energy_jump_threshold,
+        n_steps_continuation,
+        n_steps_fresh,
+        kwargs...,
+    )
+
+    backward = reverse(backward_raw)
+    intervals, transition_pts = _detect_hysteresis(param_values, forward, backward)
+
+    HysteresisResult(
+        collect(Float64, param_values),
+        forward,
+        backward,
+        intervals,
+        transition_pts,
+    )
+end
+
 """
     scan_phase_diagram_2d(; param1_values, param2_values, make_interactions, grid, atom, ...) → Matrix{NamedTuple}
 

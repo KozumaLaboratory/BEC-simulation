@@ -495,6 +495,14 @@ struct InstabilityMap
     predicted_wavelength::Float64
 end
 
+struct HysteresisResult
+    param_values::Vector{Float64}
+    forward::Vector{NamedTuple}
+    backward::Vector{NamedTuple}
+    hysteresis_intervals::Vector{Tuple{Float64,Float64}}
+    transition_points::Vector{Float64}
+end
+
 # --- Phase Scan Types ---
 
 struct ScanValues
