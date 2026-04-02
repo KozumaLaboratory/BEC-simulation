@@ -1,5 +1,6 @@
-function run_simulation!(ws::Workspace{N};
-    callback::Union{Nothing,Function}=nothing,
+function run_simulation!(
+    ws::Workspace{N};
+    callback::Union{Nothing,Function} = nothing,
 ) where {N}
     sp = ws.sim_params
     sys = ws.spin_matrices.system
@@ -13,22 +14,60 @@ function run_simulation!(ws::Workspace{N};
     _record_snapshot!(times, energies, norms, mags, snapshots, ws, sys)
 
     if it
-        _run_simulation_standard!(ws, sp, sys, times, energies, norms, mags, snapshots; callback)
+        _run_simulation_standard!(
+            ws,
+            sp,
+            sys,
+            times,
+            energies,
+            norms,
+            mags,
+            snapshots;
+            callback,
+        )
     else
-        _run_simulation_leapfrog!(ws, sp, sys, times, energies, norms, mags, snapshots; callback)
+        _run_simulation_leapfrog!(
+            ws,
+            sp,
+            sys,
+            times,
+            energies,
+            norms,
+            mags,
+            snapshots;
+            callback,
+        )
     end
 
     SimulationResult(times, energies, norms, mags, snapshots)
 end
 
-function _run_simulation_standard!(ws::Workspace{N}, sp, sys, times, energies, norms, mags, snapshots;
-    callback=nothing,
+function _run_simulation_standard!(
+    ws::Workspace{N},
+    sp,
+    sys,
+    times,
+    energies,
+    norms,
+    mags,
+    snapshots;
+    callback = nothing,
 ) where {N}
-    for step in 1:sp.n_steps
+    t_start = time()
+    for step = 1:sp.n_steps
         split_step!(ws)
 
         if step % sp.save_every == 0
             _record_snapshot!(times, energies, norms, mags, snapshots, ws, sys)
+
+            elapsed = time() - t_start
+            frac = step / sp.n_steps
+            eta = frac > 0 ? elapsed / frac * (1 - frac) : NaN
+            println(
+                "  step $(step)/$(sp.n_steps) | t=$(round(ws.state.t; sigdigits=6)) " *
+                "E=$(round(energies[end]; sigdigits=8)) | $(round(elapsed; digits=1))s elapsed, ETA $(round(eta; digits=0))s",
+            )
+            flush(stdout)
 
             if callback !== nothing
                 callback(ws, step)
@@ -46,8 +85,16 @@ Mathematically identical to standard loop — no accuracy change.
 
 Also uses batched FFT for kinetic step (all components in one FFTW call).
 """
-function _run_simulation_leapfrog!(ws::Workspace{N}, sp, sys, times, energies, norms, mags, snapshots;
-    callback=nothing,
+function _run_simulation_leapfrog!(
+    ws::Workspace{N},
+    sp,
+    sys,
+    times,
+    energies,
+    norms,
+    mags,
+    snapshots;
+    callback = nothing,
 ) where {N}
     dt = sp.dt
     n_comp = sys.n_components
@@ -56,7 +103,7 @@ function _run_simulation_leapfrog!(ws::Workspace{N}, sp, sys, times, energies, n
     # Leapfrog: initial half potential step
     _half_potential_step!(ws, dt / 2, n_comp, N, false)
 
-    for step in 1:sp.n_steps
+    for step = 1:sp.n_steps
         apply_kinetic_step_batched!(ws.state.psi, bk)
 
         is_save = (step % sp.save_every == 0)
@@ -93,17 +140,20 @@ function _run_simulation_leapfrog!(ws::Workspace{N}, sp, sys, times, energies, n
     end
 end
 
-function run_simulation_checkpointed!(ws::Workspace{N};
-    checkpoint_dir::String="checkpoints",
-    checkpoint_every::Int=1000,
-    callback::Union{Nothing,Function}=nothing,
-    resume::Bool=false,
+function run_simulation_checkpointed!(
+    ws::Workspace{N};
+    checkpoint_dir::String = "checkpoints",
+    checkpoint_every::Int = 1000,
+    callback::Union{Nothing,Function} = nothing,
+    resume::Bool = false,
 ) where {N}
     mkpath(checkpoint_dir)
 
     if resume
-        existing = filter(f -> startswith(basename(f), "step_") && endswith(f, ".jld2"),
-                          readdir(checkpoint_dir, join=true))
+        existing = filter(
+            f -> startswith(basename(f), "step_") && endswith(f, ".jld2"),
+            readdir(checkpoint_dir, join = true),
+        )
         if !isempty(existing)
             sort!(existing)
             latest = existing[end]
@@ -118,7 +168,7 @@ function run_simulation_checkpointed!(ws::Workspace{N};
     remaining = ws.sim_params.n_steps - start_step
     remaining <= 0 && return run_simulation!(ws; callback)
 
-    checkpoint_cb = function(ws_cb, step)
+    checkpoint_cb = function (ws_cb, step)
         global_step = start_step + step
         if global_step % checkpoint_every == 0
             fname = joinpath(checkpoint_dir, "step_$(lpad(global_step, 8, '0')).jld2")
@@ -128,17 +178,38 @@ function run_simulation_checkpointed!(ws::Workspace{N};
     end
 
     sp_orig = ws.sim_params
-    sp_remain = SimParams(sp_orig.dt, remaining, sp_orig.imaginary_time,
-                          sp_orig.normalize_every, sp_orig.save_every)
-
-    ws_remain = Workspace(
-        ws.state, ws.fft_plans, ws.kinetic_phase, ws.potential_values, ws.density_buf,
-        ws.spin_matrices, ws.grid, ws.atom, ws.interactions,
-        ws.zeeman, ws.potential, sp_remain, ws.ddi, ws.ddi_bufs, ws.raman, ws.loss,
-        ws.ddi_padded, ws.batched_kinetic, ws.tensor_cache, ws.coriolis_cache,
+    sp_remain = SimParams(
+        sp_orig.dt,
+        remaining,
+        sp_orig.imaginary_time,
+        sp_orig.normalize_every,
+        sp_orig.save_every,
     )
 
-    result = run_simulation!(ws_remain; callback=checkpoint_cb)
+    ws_remain = Workspace(
+        ws.state,
+        ws.fft_plans,
+        ws.kinetic_phase,
+        ws.potential_values,
+        ws.density_buf,
+        ws.spin_matrices,
+        ws.grid,
+        ws.atom,
+        ws.interactions,
+        ws.zeeman,
+        ws.potential,
+        sp_remain,
+        ws.ddi,
+        ws.ddi_bufs,
+        ws.raman,
+        ws.loss,
+        ws.ddi_padded,
+        ws.batched_kinetic,
+        ws.tensor_cache,
+        ws.coriolis_cache,
+    )
+
+    result = run_simulation!(ws_remain; callback = checkpoint_cb)
 
     ws.state.t = ws_remain.state.t
     ws.state.step = start_step + remaining
