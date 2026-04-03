@@ -27,7 +27,7 @@ tensor_interaction → losses → split_step → raman → ddi → ddi_padded �
 optical_trap → optics → laser_potential → thomas_fermi → tof → fft_utils →
 observables → energy → currents → vorticity → diagnostics → bogoliubov →
 majorana → phase_classification → stability_analysis → spherical_harmonics →
-simulation_utils → initialization → ground_state → continuation → phase_boundary →
+initialization → ground_state → continuation → phase_boundary →
 simulation → adaptive → yoshida → experiment → experiment_runner →
 config → phase_scan → config_runner → io → unitful_support
 ```

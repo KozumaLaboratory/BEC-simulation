@@ -637,6 +637,16 @@ end
 
 ScanStabilityConfig() = ScanStabilityConfig(false, 1e-4, 300, 10)
 
+# --- Simulation Result ---
+
+struct SimulationResult
+    times::Vector{Float64}
+    energies::Vector{Float64}
+    norms::Vector{Float64}
+    magnetizations::Vector{Float64}
+    psi_snapshots::Vector{Array{ComplexF64}}
+end
+
 # --- Workspace ---
 
 struct Workspace{N,A,P,IP,SM<:SpinMatrices,ZEE,DDI,DDIB,RAM,LOSS,DDIP,BK,TC,CC,KPA<:AbstractArray,VPA<:AbstractArray,DBA<:AbstractArray,BACK<:AbstractBackend}
