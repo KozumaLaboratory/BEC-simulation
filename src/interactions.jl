@@ -264,6 +264,22 @@ function linear_zeeman_p(atom::AtomSpecies, B::Float64, omega_ref::Float64)
     atom.g_F * Units.MU_BOHR * B / (Units.HBAR * omega_ref)
 end
 
+# --- Quasi-2D LHY ---
+
+"""
+    compute_lhy_2d_params(c0_2d, l_z) → Quasi2DLHY
+
+Quasi-2D LHY correction: ε_LHY ∝ n² ln(n a²_2d).
+Ref: Petrov & Astrakharchik, PRL 117, 100401 (2016).
+"""
+function compute_lhy_2d_params(c0_2d::Float64, l_z::Float64)
+    γ_E = 0.5772156649015329
+    log_const = 2.0 * γ_E - 1.0 - log(2.0)
+    c_lhy_2d = c0_2d^2 / (4.0 * Float64(π))
+    a_2d_sq = l_z^2
+    Quasi2DLHY(c_lhy_2d, a_2d_sq, log_const)
+end
+
 # --- Lima-Pelster DDI-corrected LHY ---
 
 """

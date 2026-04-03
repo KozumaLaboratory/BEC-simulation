@@ -246,6 +246,26 @@ struct CompositePotential{N} <: AbstractPotential
     components::Vector{AbstractPotential}
 end
 
+# --- LHY Abstraction ---
+
+abstract type AbstractLHY end
+
+struct ScalarLHY <: AbstractLHY
+    c_lhy::Float64
+end
+
+struct Quasi2DLHY <: AbstractLHY
+    c_lhy_2d::Float64
+    a_2d_sq::Float64
+    log_const::Float64
+end
+
+struct SpinorLHYTable <: AbstractLHY
+    mode::Symbol
+    densities::Vector{Float64}
+    potential_values::Vector{Float64}
+end
+
 # --- Simulation Parameters ---
 
 struct SimParams
@@ -497,6 +517,21 @@ struct InstabilityMap
     most_unstable_direction::NTuple{3,Float64}
     k_unstable_range::Tuple{Float64,Float64}
     predicted_wavelength::Float64
+    angular_growth_map::Vector{Float64}
+end
+
+struct RotonParams
+    k_roton::Float64
+    omega_roton::Float64
+    roton_gap::Float64
+    has_roton::Bool
+end
+
+struct SupersolidPrediction
+    wavelength::Float64
+    pattern_type::Symbol
+    k_roton::Float64
+    angular_anisotropy::Float64
 end
 
 struct HysteresisResult
@@ -649,7 +684,7 @@ end
 
 # --- Workspace ---
 
-struct Workspace{N,A,P,IP,SM<:SpinMatrices,ZEE,DDI,DDIB,RAM,LOSS,DDIP,BK,TC,CC,KPA<:AbstractArray,VPA<:AbstractArray,DBA<:AbstractArray,BACK<:AbstractBackend}
+struct Workspace{N,A,P,IP,SM<:SpinMatrices,ZEE,DDI,DDIB,RAM,LOSS,DDIP,BK,TC,CC,KPA<:AbstractArray,VPA<:AbstractArray,DBA<:AbstractArray,BACK<:AbstractBackend,LHY}
     state::SimState{N,A}
     fft_plans::FFTPlans{P,IP}
     kinetic_phase::KPA
@@ -671,6 +706,7 @@ struct Workspace{N,A,P,IP,SM<:SpinMatrices,ZEE,DDI,DDIB,RAM,LOSS,DDIP,BK,TC,CC,K
     tensor_cache::TC
     coriolis_cache::CC
     backend::BACK
+    lhy::LHY
 end
 
 # --- Unified Config v3 (base types) ---

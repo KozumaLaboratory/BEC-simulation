@@ -53,6 +53,7 @@ function estimate_splitting_error(ws::Workspace{N}) where {N}
         ws.tensor_cache,
         ws.coriolis_cache,
         ws.backend,
+        ws.lhy,
     )
 
     split_step!(ws_half)

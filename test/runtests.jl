@@ -57,5 +57,10 @@ using SpinorBEC
     include("test_types_validation.jl")
     include("test_currents.jl")
     include("test_quasi_2d.jl")
+    include("test_quasi_2d_api.jl")
+    include("test_zeeman_midpoint.jl")
     include("test_ground_state.jl")
+    include("test_lhy_2d.jl")
+    include("test_bogoliubov_enhanced.jl")
+    include("test_spinor_lhy.jl")
 end

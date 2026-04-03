@@ -1,113 +1,46 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Spin-F BEC simulator (split-step Fourier, 1D/2D/3D). Primary target: ¹⁵¹Eu (F=6, 13 components). Dimensionless units: ℏ=m=ω_ref=1.
 
 ## Commands
 
 ```bash
-julia --project=. -e 'using Pkg; Pkg.test()'                    # run all tests
-julia --project=. -e 'using SpinorBEC; include("test/test_X.jl")' # single test file
-julia --project=. -e 'using Pkg; Pkg.instantiate()'              # install deps
-julia --project=. bench/bench_eu151.jl                  # benchmark (with tracing)
-julia --project=. examples/run.jl examples/              # run all YAML configs
+julia --project=. -e 'using Pkg; Pkg.test()'                     # all tests
+julia --project=. -e 'using SpinorBEC; include("test/test_X.jl")' # single test
+julia --project=. -e 'using Pkg; Pkg.instantiate()'               # install deps
 ```
 
-## Architecture
+## Key Architecture
 
-Spin-F BEC simulation via split-step Fourier in 1D/2D/3D. Dimensionless units: ℏ=m=ω_ref=1. Kinetic step: `exp(-ik²dt/2)`.
+**Wavefunction**: `psi[x, y, ..., c]` — spatial dims first, spinor last. c=1→m=F, c=D→m=−F.
 
-### Include Order (`SpinorBEC.jl`)
+**Split-step** (`split_step.jl`): `V(dt/2) Coriolis(dt/2) K(dt) Coriolis(dt/2) V(dt/2)`.
+Inner V is symmetric: `diag SM nematic tensor raman DDI raman tensor nematic SM diag`.
+All substeps auto-skip when coupling ≈ 0.
 
-`types.jl` must be first (all struct definitions, incl. `AbstractBackend`). `backend.jl` second. Rest follows dependency order:
+**Two interaction paths** (auto-selected in `make_workspace`):
+- **c₀/c₁ path**: diagonal(c₀) + spin_mixing(c₁) + nematic(c₂) + tensor(residual c₄,c₆,...)
+- **Scattering-lengths path** (Cr52 etc.): tensor handles ALL channels, c₀=c₁=0
 
-```
-types → backend → units → grid → spin_matrices → spinor_utils → clebsch_gordan → atoms →
-interactions → potentials → zeeman → propagators → spin_mixing → nematic →
-tensor_interaction → losses → split_step → raman → ddi → ddi_padded →
-optical_trap → optics → laser_potential → thomas_fermi → tof → fft_utils →
-observables → energy → currents → vorticity → diagnostics → bogoliubov →
-majorana → phase_classification → stability_analysis → spherical_harmonics →
-initialization → ground_state → continuation → phase_boundary →
-simulation → adaptive → yoshida → experiment → experiment_runner →
-config → phase_scan → config_runner → io → unitful_support
-```
+**Entry points**: `find_ground_state(;...)` (ITP), `make_workspace(;...) |> run_simulation!` (RTP), `load_config("x.yaml") |> run_config`.
 
-### Core Types (`types.jl`)
+## Conventions (do NOT "fix")
 
-- `GridConfig{N}`, `Grid{N}` — N-dim spatial grid with FFT wavenumbers
-- `SpinSystem(F)` — spin quantum number, `n_components = 2F+1`
-- `SpinMatrices{D}` — static spin-F matrices (Fx, Fy, Fz, F·F) as `SMatrix`
-- `SimState{N,A,B}` — mutable: wavefunction `psi`, FFT buffer, time, step counter
-- `Workspace{N,...}` — fully parameterized immutable container (18 type params incl. CoriolisCache, backend)
+- **DDI**: c_dd=μ₀μ² (no 4π), Q_αβ=k̂_αk̂_β−δ_αβ/3 (no 1/(4π)), Q(k=0)=0. Chain self-consistent.
+- **ITP Zeeman shift**: subtracts min(E_m) to prevent overflow. Not a bug.
+- **Scalar LHY**: `@warn` present. Known approximation.
+- **`save_state` elseif branch** (`ddi_padded.ddi.C_dd`): unreachable dead code (ddi_padded only exists when ddi≠nothing).
+- **Odd-rank c_extra ignored**: `@warn` present. KU's c₃≠rank-3 tensor.
+- **`compute_interaction_params_general_f` returns (0,0)**: by design (tensor_cache handles all).
+- **`_YOSHIDA_W0 < 0`**: correct (backward middle substep, all operators time-reversible).
 
-### Wavefunction Layout
+## ¹⁵¹Eu
 
-`psi` is `Array{ComplexF64, N+1}`: spatial dims first, spinor component last: `psi[x, y, ..., c]` for `c ∈ 1:2F+1`.
+F=6, g_J=1.9934, g_F≈1.163, μ≈6.977μ_B, a_s≈110a₀. 7 unknown scattering channels (S=0,2,...,12). Constraint: c₀+36c₁=4π(a_s/a_ho)N.
 
-Access helpers (`spinor_utils.jl`): `_component_slice`, `_get_spinor`/`_set_spinor!`, `_matvec`, `_apply_euler_spin_rotation`.
+## Constraints
 
-### Split-Step Pipeline (`split_step.jl`)
-
-Strang splitting (2nd-order symmetric):
-1. Half potential: `diag(dt/4) → SM(dt/4) → nematic(dt/4) → tensor(dt/4) → Raman(dt/4) → DDI(dt/2) → [mirror]`
-2. Full kinetic (batched FFT → phase → batched IFFT)
-3. Half potential (mirror)
-4. Loss step (real-time only)
-
-Additive dispatch: SM (c₁) and nematic (c₂) always run; tensor cache handles only residual
-channels (c₄, c₆, ...). All substeps auto-skip when coupling ≈ 0. When `has_higher_c_extra`
-(e.g. c₀+c₁+c₄), initialization builds tensor cache from residual Δg_S only, keeping c₀/c₁
-in `ws.interactions` for the fast diagonal/SM paths. Scattering-lengths path (c₀=c₁=0) is
-unchanged: SM/nematic skip, tensor handles all channels. Instrumented with `@timeit_debug TIMER`.
-
-### Entry Points
-
-- `find_ground_state(; grid, atom, ...)` — imaginary-time propagation
-- `make_workspace(; ...) → Workspace` then `run_simulation!(ws)` — real-time dynamics
-- `run_simulation_adaptive!` / `run_simulation_yoshida!` — adaptive dt
-- `load_config("path.yaml")` then `run_config(config)` — YAML-driven (v3 schema)
-- `examples/run.jl` — batch YAML runner (default: `examples/`)
-
-### Tracing
-
-```julia
-enable_tracing!(); reset_tracing!()
-# ... run ...
-println(TIMER); disable_tracing!()
-```
-
-## Performance Notes
-
-- **SMatrix{D,D} at D≥10**: heap-allocates. Use `Matrix`/`MVector` in hot loops, never SMatrix for D=13.
-- **`Threads.@threads` closures**: box captured untyped args (65 MiB/call at D=13). Prefer plain `@inbounds for`.
-- **`Val(ndim::Int)`**: dynamic dispatch. Use `Val(N)` from type parameter.
-- **`ntuple(f, ndim::Int)`**: type-unstable. Use `ntuple(f, Val(N))`.
-
-## Key Constraints
-
-- New structs must go in `types.jl` (included first)
-- Julia 1.12: inner constructors only (method overwriting forbidden during precompilation)
-- 21 atom species in `atoms.jl` + `ATOM_REGISTRY`; `resolve_atom(:Name)` for YAML lookup
-- YAML configs in `examples/` follow schema in `config.jl` (v3) or `experiment.jl` (legacy)
-- Workspace is fully parameterized — auto-inferred constructor, no explicit type params needed
-- `AbstractBackend` must be in `types.jl` (used in Workspace type param); `CPUBackend` + helpers in `backend.jl`
-
-## GPU (CUDA) Support
-
-Optional CUDA support via package extension `ext/SpinorBECCUDAExt/`. CPU is the default.
-
-```julia
-using SpinorBEC
-using CUDA  # triggers extension load
-
-ws = make_workspace(; grid, atom, interactions, sim_params, backend=CUDABackend())
-run_simulation!(ws)
-psi_cpu = Array(ws.state.psi)  # transfer back for analysis
-```
-
-**Phase 1 (current)**: psi + buffers on GPU. Kinetic (batched FFT) and diagonal (broadcast) steps run natively.
-Spin mixing, nematic, tensor, Raman, DDI fall back to CPU via host round-trip (auto-skipped when coupling ≈ 0).
-Energy computation transfers to host. Snapshots always saved as CPU arrays.
-
-**Backend abstraction** (`backend.jl`): `_zeros`, `_similar`, `_to_device`, `_to_host`, `_fft_kwargs`, `_is_gpu`.
-All struct buffer fields are parameterized with `AbstractArray` subtypes for device-agnostic allocation.
+- All structs in `types.jl` (included first). New structs go there.
+- Workspace has 18+ type params — never write explicit type params.
+- D=13 (Eu): SMatrix heap-allocates. Use Matrix/MVector in hot loops.
+- `Val(N)` from type parameter, not `Val(ndim::Int)`.

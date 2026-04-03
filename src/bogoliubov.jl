@@ -124,16 +124,40 @@ function _default_directions()
 end
 
 """
+    fibonacci_sphere_directions(n::Int) → Vector{NTuple{3,Float64}}
+
+Generate `n` approximately uniform directions on the upper hemisphere (z ≥ 0)
+using the Fibonacci spiral method. Exploits Q(k̂) = Q(-k̂) symmetry to scan
+only the upper hemisphere.
+"""
+function fibonacci_sphere_directions(n::Int)
+    n >= 1 || throw(ArgumentError("n must be >= 1, got $n"))
+    golden_ratio = (1.0 + sqrt(5.0)) / 2.0
+    dirs = NTuple{3,Float64}[]
+    for i in 0:(2n-1)
+        theta = acos(1.0 - (2.0 * i + 1.0) / (2n))
+        phi = 2.0 * Float64(π) * i / golden_ratio
+        x = sin(theta) * cos(phi)
+        y = sin(theta) * sin(phi)
+        z = cos(theta)
+        z >= 0 && push!(dirs, (x, y, z))
+    end
+    dirs
+end
+
+"""
     bogoliubov_instability_scan(; spinor, n0, F, interactions, zeeman, c_dd,
-                                  k_max, n_k, directions)
+                                  k_max, n_k, directions, n_directions)
 
 Scan Bogoliubov instabilities across multiple k-directions.
 
 Returns `InstabilityMap` with growth rates for each (k, direction) pair,
 identifying the most unstable mode and predicting the density-wave wavelength.
 
-`directions` can be `:auto` (13 unique axis/edge/body-diagonal directions) or
-a `Vector{NTuple{3,Float64}}` of custom directions.
+`directions` can be:
+- `:auto` — 13 unique axis/edge/body-diagonal directions
+- `:dense` — `n_directions` Fibonacci-spiral directions on upper hemisphere
+- a `Vector{NTuple{3,Float64}}` of custom directions
 """
 function bogoliubov_instability_scan(;
     spinor::Vector{ComplexF64},
@@ -145,12 +169,21 @@ function bogoliubov_instability_scan(;
     k_max::Float64 = 10.0,
     n_k::Int = 200,
     directions::Union{Symbol,Vector{NTuple{3,Float64}}} = :auto,
+    n_directions::Int = 100,
 )
     D = 2F + 1
     length(spinor) == D ||
         throw(DimensionMismatch("spinor length $(length(spinor)) != 2F+1 = $D"))
 
-    dirs = directions === :auto ? _default_directions() : directions
+    dirs = if directions === :auto
+        _default_directions()
+    elseif directions === :dense
+        fibonacci_sphere_directions(n_directions)
+    elseif directions === :planar
+        _planar_directions(n_directions)
+    else
+        directions
+    end
     n_dir = length(dirs)
 
     h_contact, M_contact, zee, _ = _bdg_contact_matrices(spinor, F, interactions, zeeman)
@@ -215,6 +248,8 @@ function bogoliubov_instability_scan(;
 
     wavelength = unstable && best_k > 0 ? 2π / best_k : Inf
 
+    angular_map = [maximum(view(growth_rates, :, id)) for id in 1:n_dir]
+
     InstabilityMap(
         k_values,
         dirs,
@@ -225,6 +260,7 @@ function bogoliubov_instability_scan(;
         best_dir,
         (k_lo, k_hi),
         wavelength,
+        angular_map,
     )
 end
 
@@ -346,4 +382,150 @@ function _bdg_ddi_matrices(spinor, F, D, sm, c_dd, Q_ab)
     end
 
     h, M_mat
+end
+
+"""
+    detect_roton(bdg::BdGResult) → RotonParams
+
+Detect roton minimum in the lowest positive-frequency branch.
+Returns `RotonParams(k_roton, ω_roton, gap, true)` if a local minimum exists
+at k > 0, or `RotonParams(0, 0, Inf, false)` otherwise.
+"""
+function detect_roton(bdg::BdGResult)
+    n_k = length(bdg.k_values)
+    D2 = size(bdg.omega, 1)
+
+    phonon_branch = zeros(Float64, n_k)
+    for ik in 1:n_k
+        min_pos = Inf
+        for ie in 1:D2
+            re = real(bdg.omega[ie, ik])
+            re > 1e-10 && re < min_pos && (min_pos = re)
+        end
+        phonon_branch[ik] = min_pos == Inf ? 0.0 : min_pos
+    end
+
+    k_skip = max(2, round(Int, 0.05 * n_k))
+
+    best_k = 0.0
+    best_omega = Inf
+    found = false
+
+    for ik in (k_skip+1):(n_k-1)
+        if phonon_branch[ik] < phonon_branch[ik-1] && phonon_branch[ik] < phonon_branch[ik+1]
+            if phonon_branch[ik] < best_omega
+                best_omega = phonon_branch[ik]
+                best_k = bdg.k_values[ik]
+                found = true
+            end
+        end
+    end
+
+    if !found
+        return RotonParams(0.0, 0.0, Inf, false)
+    end
+
+    max_before = maximum(phonon_branch[1:round(Int, searchsortedlast(bdg.k_values, best_k))])
+    gap = best_omega
+    RotonParams(best_k, best_omega, gap, true)
+end
+
+"""
+    _planar_directions(n) → Vector{NTuple{3,Float64}}
+
+Generate `n` evenly-spaced directions in the xy-plane (upper semicircle).
+"""
+function _planar_directions(n::Int)
+    n >= 1 || throw(ArgumentError("n must be >= 1"))
+    dirs = NTuple{3,Float64}[]
+    for i in 0:(n-1)
+        theta = Float64(π) * i / n
+        push!(dirs, (cos(theta), sin(theta), 0.0))
+    end
+    dirs
+end
+
+"""
+    predict_supersolid_params(imap::InstabilityMap) → SupersolidPrediction
+
+Predict supersolid pattern parameters from an instability map.
+"""
+function predict_supersolid_params(imap::InstabilityMap)
+    !imap.unstable && return SupersolidPrediction(Inf, :none, 0.0, 0.0)
+
+    wavelength = imap.predicted_wavelength
+    k_roton = imap.most_unstable_k
+
+    amap = imap.angular_growth_map
+    max_g = maximum(amap)
+    pos_vals = filter(x -> x > 1e-10, amap)
+    min_g = isempty(pos_vals) ? max_g : minimum(pos_vals)
+    anisotropy = max_g > 1e-10 ? max_g / max(min_g, 1e-30) : 0.0
+
+    pattern = if anisotropy > 3.0
+        :stripe
+    elseif anisotropy > 1.5
+        :triangular
+    else
+        :isotropic
+    end
+
+    SupersolidPrediction(wavelength, pattern, k_roton, anisotropy)
+end
+
+"""
+    instability_angular_map(; spinor, n0, F, interactions, zeeman, c_dd,
+                              k_max, n_k, n_theta, n_phi) → NamedTuple
+
+Dense (θ, φ) grid over upper hemisphere. Returns `(theta, phi, growth_map)`.
+"""
+function instability_angular_map(;
+    spinor::Vector{ComplexF64},
+    n0::Float64,
+    F::Int,
+    interactions::InteractionParams,
+    zeeman::ZeemanParams = ZeemanParams(),
+    c_dd::Float64 = 0.0,
+    k_max::Float64 = 10.0,
+    n_k::Int = 200,
+    n_theta::Int = 18,
+    n_phi::Int = 36,
+)
+    D = 2F + 1
+    length(spinor) == D ||
+        throw(DimensionMismatch("spinor length $(length(spinor)) != 2F+1 = $D"))
+
+    h_contact, M_contact, zee, _ = _bdg_contact_matrices(spinor, F, interactions, zeeman)
+    has_ddi = abs(c_dd) > 1e-30
+    sm = has_ddi ? spin_matrices(F) : nothing
+
+    theta_vals = collect(range(0.0, Float64(π) / 2; length = n_theta))
+    phi_vals = collect(range(0.0, 2.0 * Float64(π); length = n_phi + 1)[1:n_phi])
+    growth_map = zeros(Float64, n_theta, n_phi)
+
+    for it in 1:n_theta
+        for ip in 1:n_phi
+            st = sin(theta_vals[it])
+            ct = cos(theta_vals[it])
+            dir = (st * cos(phi_vals[ip]), st * sin(phi_vals[ip]), ct)
+
+            if has_ddi
+                k_hat = collect(dir)
+                k_norm = norm(k_hat)
+                k_norm > 0 && (k_hat ./= k_norm)
+                Q_ab = _q_tensor_direction(k_hat)
+                h_ddi, M_ddi = _bdg_ddi_matrices(spinor, F, D, sm, c_dd, Q_ab)
+                h_mf = h_contact .+ h_ddi
+                M_anom = M_contact .+ M_ddi
+            else
+                h_mf = h_contact
+                M_anom = M_contact
+            end
+
+            _, omega, max_g = _bdg_k_scan(h_mf, M_anom, zee, n0, D, spinor, k_max, n_k)
+            growth_map[it, ip] = max_g
+        end
+    end
+
+    (theta = theta_vals, phi = phi_vals, growth_map = growth_map)
 end

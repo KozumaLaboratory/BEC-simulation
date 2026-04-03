@@ -44,6 +44,7 @@ include("currents.jl")
 include("vorticity.jl")
 include("diagnostics.jl")
 include("bogoliubov.jl")
+include("lhy.jl")
 include("majorana.jl")
 include("phase_classification.jl")
 include("stability_analysis.jl")
@@ -68,9 +69,10 @@ export GridConfig, Grid, SpinSystem, SpinMatrices
 export AtomSpecies, InteractionParams, ZeemanParams, LossParams, TensorInteractionCache
 export SimParams,
     SimState, FFTPlans, RFFTPlans, Workspace, AdaptiveDtParams, IntegratorConfig
-export TOFParams, BdGResult, InstabilityMap, HysteresisResult
+export TOFParams, BdGResult, InstabilityMap, HysteresisResult, RotonParams, SupersolidPrediction
 export HarmonicTrap, NoPotential, GravityPotential, CompositePotential
 export AbstractBackend, CPUBackend, CUDABackend
+export AbstractLHY, ScalarLHY, Quasi2DLHY, SpinorLHYTable
 
 # Grid
 export make_grid,
@@ -98,6 +100,9 @@ export interaction_params_from_constraint,
     compute_c_total, compute_c_dd_dimless, linear_zeeman_p
 export compute_eu151_interactions
 export lima_pelster_Q5, compute_c_lhy_with_ddi
+export compute_lhy_2d_params
+export compute_spinor_lhy_two_channel, compute_spinor_lhy_table
+export scale_interactions_quasi_2d
 
 # DDI
 export DDIParams,
@@ -177,6 +182,8 @@ export estimate_splitting_error, validate_conservation
 export power_spectrum
 export analyze_stability
 export bogoliubov_spectrum, bogoliubov_instability_scan, suggest_grid_params
+export fibonacci_sphere_directions, detect_roton, predict_supersolid_params
+export instability_angular_map
 
 # Simulation
 export find_ground_state, find_ground_state_multistart, scan_continuation,

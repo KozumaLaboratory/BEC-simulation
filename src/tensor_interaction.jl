@@ -201,6 +201,7 @@ function _precompute_hf_entries(cache::TensorInteractionCache)
             end
         end
     end
+    sort!(entries; by = e -> (e.c_m, e.c_mp))
     entries
 end
 
@@ -231,6 +232,18 @@ function _tensor_step_point!(
             entry.cg_prod *
             conj(spinor[entry.c_mu]) *
             spinor[entry.c_nu]
+    end
+
+    offdiag_sq = 0.0
+    @inbounds for j = 1:D, i = 1:D
+        i != j && (offdiag_sq += abs2(h[i, j]))
+    end
+    if offdiag_sq * dt^2 < 1e-12
+        @inbounds for c = 1:D
+            phase = imaginary_time ? exp(-real(h[c, c]) * dt) : cis(-real(h[c, c]) * dt)
+            psi[I, c] = phase * spinor[c]
+        end
+        return nothing
     end
 
     eig = eigen!(Hermitian(h))

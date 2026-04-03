@@ -177,8 +177,12 @@ function split_step!(ws::Workspace{N}) where {N}
     dt = ws.sim_params.dt
     it = ws.sim_params.imaginary_time
     n_comp = ws.spin_matrices.system.n_components
+    t = ws.state.t
 
-    @timeit_debug TIMER "half_potential" _half_potential_step!(ws, dt / 2, n_comp, N, it)
+    t_eval_1 = it ? 0.0 : t + dt / 4
+    t_eval_2 = it ? 0.0 : t + 3dt / 4
+
+    @timeit_debug TIMER "half_potential" _half_potential_step!(ws, dt / 2, n_comp, N, it; t_eval = t_eval_1, t_start = it ? NaN : t)
 
     omega = ws.sim_params.rotating_frame_omega
     @timeit_debug TIMER "coriolis" _apply_coriolis_step!(
@@ -202,7 +206,7 @@ function split_step!(ws::Workspace{N}) where {N}
         ws.coriolis_cache,
     )
 
-    @timeit_debug TIMER "half_potential" _half_potential_step!(ws, dt / 2, n_comp, N, it)
+    @timeit_debug TIMER "half_potential" _half_potential_step!(ws, dt / 2, n_comp, N, it; t_eval = t_eval_2, t_start = it ? NaN : t + dt / 2)
 
     if !it && ws.loss !== nothing
         @timeit_debug TIMER "loss" apply_loss_step!(
@@ -245,19 +249,26 @@ function _half_potential_step!(
     dt_half,
     n_comp,
     ndim,
-    imaginary_time,
+    imaginary_time;
+    t_eval::Float64 = ws.state.t,
+    t_start::Float64 = NaN,
 ) where {N}
-    zee = zeeman_at(ws.zeeman, ws.state.t)
-    zeeman_diag = zeeman_diagonal(zee, ws.spin_matrices)
+    zeeman_diag_fwd = if !isnan(t_start) && ws.zeeman isa TimeDependentZeeman
+        zee_fwd = zeeman_at(ws.zeeman, t_start + dt_half / 4)
+        zeeman_diagonal(zee_fwd, ws.spin_matrices)
+    else
+        zee = zeeman_at(ws.zeeman, t_eval)
+        zeeman_diagonal(zee, ws.spin_matrices)
+    end
     gpu = _is_gpu(ws.state.psi)
 
     @timeit_debug TIMER "diagonal" _diagonal_step_svec!(
         Val(N),
         ws.state.psi,
         ws.potential_values,
-        zeeman_diag,
+        zeeman_diag_fwd,
         ws.interactions.c0,
-        ws.interactions.c_lhy,
+        ws.lhy !== nothing ? ws.lhy : ws.interactions.c_lhy,
         dt_half / 2,
         ws.density_buf,
         imaginary_time,
@@ -356,13 +367,20 @@ function _half_potential_step!(
         end
     end
 
+    zeeman_diag_bwd = if !isnan(t_start) && ws.zeeman isa TimeDependentZeeman
+        zee_bwd = zeeman_at(ws.zeeman, t_start + 3 * dt_half / 4)
+        zeeman_diagonal(zee_bwd, ws.spin_matrices)
+    else
+        zeeman_diag_fwd
+    end
+
     @timeit_debug TIMER "diagonal" _diagonal_step_svec!(
         Val(N),
         ws.state.psi,
         ws.potential_values,
-        zeeman_diag,
+        zeeman_diag_bwd,
         ws.interactions.c0,
-        ws.interactions.c_lhy,
+        ws.lhy !== nothing ? ws.lhy : ws.interactions.c_lhy,
         dt_half / 2,
         ws.density_buf,
         imaginary_time,
@@ -432,14 +450,14 @@ end
 One Strang step with explicit dt (no sim_params dependency).
 V(dt/2) K(dt) V(dt/2).
 """
-function _strang_core!(ws::Workspace{N}, dt::Float64, n_comp::Int) where {N}
+function _strang_core!(ws::Workspace{N}, dt::Float64, n_comp::Int; t_base::Float64 = ws.state.t) where {N}
     omega = ws.sim_params.rotating_frame_omega
-    _half_potential_step!(ws, dt / 2, n_comp, N, false)
+    _half_potential_step!(ws, dt / 2, n_comp, N, false; t_eval = t_base + dt / 4, t_start = t_base)
     _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, false, ws.coriolis_cache)
     _update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, dt)
     apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
     _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, false, ws.coriolis_cache)
-    _half_potential_step!(ws, dt / 2, n_comp, N, false)
+    _half_potential_step!(ws, dt / 2, n_comp, N, false; t_eval = t_base + 3dt / 4, t_start = t_base + dt / 2)
     nothing
 end
 
@@ -450,13 +468,14 @@ w₀ < 0 causes reverse evolution in the middle substep.
 All operators (kinetic, diagonal, DDI, spin-mixing, tensor) are unitary and time-reversible,
 so negative dt is valid. Tensor step uses eigendecomposition: exp(-iHdt) with dt<0 is exact.
 """
-function _yoshida_core!(ws::Workspace{N}, dt::Float64, n_comp::Int) where {N}
+function _yoshida_core!(ws::Workspace{N}, dt::Float64, n_comp::Int; t_base::Float64 = ws.state.t) where {N}
     w1 = _YOSHIDA_W1
     w0 = _YOSHIDA_W0
     wm = (w1 + w0) / 2
     omega = ws.sim_params.rotating_frame_omega
 
-    _half_potential_step!(ws, w1 * dt / 2, n_comp, N, false)
+    # V-step 1: covers [t_base, t_base + w1*dt/2], midpoint at t_base + w1*dt/4
+    _half_potential_step!(ws, w1 * dt / 2, n_comp, N, false; t_eval = t_base + w1 * dt / 4, t_start = t_base)
 
     _apply_coriolis_step!(
         ws.state.psi,
@@ -477,7 +496,9 @@ function _yoshida_core!(ws::Workspace{N}, dt::Float64, n_comp::Int) where {N}
         ws.coriolis_cache,
     )
 
-    _half_potential_step!(ws, wm * dt, n_comp, N, false)
+    # V-step 2: merged boundary, covers [t_base + w1*dt/2, t_base + w1*dt/2 + wm*dt]
+    t_v2 = t_base + w1 * dt / 2
+    _half_potential_step!(ws, wm * dt, n_comp, N, false; t_eval = t_v2 + wm * dt / 2, t_start = t_v2)
 
     _apply_coriolis_step!(
         ws.state.psi,
@@ -498,7 +519,10 @@ function _yoshida_core!(ws::Workspace{N}, dt::Float64, n_comp::Int) where {N}
         ws.coriolis_cache,
     )
 
-    _half_potential_step!(ws, wm * dt, n_comp, N, false)
+    # V-step 3: merged boundary, covers [t_base + (w1+w0)*dt/2 + wm*dt/2, ...]
+    # = [t_base + dt - w1*dt/2 - wm*dt, t_base + dt - w1*dt/2]
+    t_v3 = t_base + w1 * dt / 2 + wm * dt
+    _half_potential_step!(ws, wm * dt, n_comp, N, false; t_eval = t_v3 + wm * dt / 2, t_start = t_v3)
 
     _apply_coriolis_step!(
         ws.state.psi,
@@ -519,7 +543,8 @@ function _yoshida_core!(ws::Workspace{N}, dt::Float64, n_comp::Int) where {N}
         ws.coriolis_cache,
     )
 
-    _half_potential_step!(ws, w1 * dt / 2, n_comp, N, false)
+    # V-step 4: covers [t_base + dt - w1*dt/2, t_base + dt], midpoint at t_base + dt - w1*dt/4
+    _half_potential_step!(ws, w1 * dt / 2, n_comp, N, false; t_eval = t_base + dt - w1 * dt / 4, t_start = t_base + dt - w1 * dt / 2)
     nothing
 end
 
@@ -533,11 +558,14 @@ Supports both Strang-derived (Yoshida, Suzuki) and optimized (independent a,b) m
 """
 function _aba_step!(
     ws::Workspace{N}, dt::Float64, n_comp::Int,
-    a::NTuple{Sv,Float64}, b::NTuple{Sk,Float64},
+    a::NTuple{Sv,Float64}, b::NTuple{Sk,Float64};
+    t_base::Float64 = ws.state.t,
 ) where {N,Sv,Sk}
     omega = ws.sim_params.rotating_frame_omega
 
-    _half_potential_step!(ws, a[1] * dt, n_comp, N, false)
+    t_cur = 0.0
+    _half_potential_step!(ws, a[1] * dt, n_comp, N, false; t_eval = t_base + t_cur + a[1] * dt / 2, t_start = t_base + t_cur)
+    t_cur += a[1] * dt
 
     for i in 1:Sk
         _apply_coriolis_step!(ws.state.psi, ws.grid, omega, b[i] * dt / 2, false, ws.coriolis_cache)
@@ -545,7 +573,8 @@ function _aba_step!(
         apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
         _apply_coriolis_step!(ws.state.psi, ws.grid, omega, b[i] * dt / 2, false, ws.coriolis_cache)
 
-        _half_potential_step!(ws, a[i + 1] * dt, n_comp, N, false)
+        _half_potential_step!(ws, a[i + 1] * dt, n_comp, N, false; t_eval = t_base + t_cur + a[i + 1] * dt / 2, t_start = t_base + t_cur)
+        t_cur += a[i + 1] * dt
     end
     nothing
 end

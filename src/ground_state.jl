@@ -114,6 +114,8 @@ function find_ground_state(;
     Jz_omega_range::Tuple{Float64,Float64} = (-5.0, 5.0),
     quasi_2d_ddi::Bool = false,
     l_z_ddi::Float64 = 0.0,
+    quasi_2d::Bool = false,
+    l_z::Float64 = 0.0,
     backend::AbstractBackend = CPUBackend(),
 )
     psi0 = if psi_init === nothing
@@ -154,6 +156,8 @@ function find_ground_state(;
             Jz_omega_range,
             quasi_2d_ddi,
             l_z_ddi,
+            quasi_2d,
+            l_z,
             backend,
         )
     end
@@ -181,6 +185,8 @@ function find_ground_state(;
             rotating_frame_omega,
             quasi_2d_ddi,
             l_z_ddi,
+            quasi_2d,
+            l_z,
             backend,
         )
     end
@@ -209,6 +215,8 @@ function find_ground_state(;
         fft_flags,
         quasi_2d_ddi,
         l_z_ddi,
+        quasi_2d,
+        l_z,
         backend,
     )
 
@@ -314,6 +322,8 @@ function _find_ground_state_adaptive(;
     rotating_frame_omega::Float64 = 0.0,
     quasi_2d_ddi::Bool = false,
     l_z_ddi::Float64 = 0.0,
+    quasi_2d::Bool = false,
+    l_z::Float64 = 0.0,
     backend::AbstractBackend = CPUBackend(),
 )
     current_dt = dt
@@ -343,6 +353,8 @@ function _find_ground_state_adaptive(;
         fft_flags,
         quasi_2d_ddi,
         l_z_ddi,
+        quasi_2d,
+        l_z,
         backend,
     )
     E_prev = total_energy(ws)
@@ -581,6 +593,7 @@ function _rebuild_workspace_with_dt(ws::Workspace{N}, new_dt::Float64) where {N}
         ws.tensor_cache,
         ws.coriolis_cache,
         ws.backend,
+        ws.lhy,
     )
 end
 
@@ -616,6 +629,8 @@ function _find_ground_state_Jz(;
     Jz_omega_range,
     quasi_2d_ddi::Bool = false,
     l_z_ddi::Float64 = 0.0,
+    quasi_2d::Bool = false,
+    l_z::Float64 = 0.0,
     backend::AbstractBackend = CPUBackend(),
 )
     omega_lo, omega_hi = Jz_omega_range
@@ -648,6 +663,8 @@ function _find_ground_state_Jz(;
             rotating_frame_omega = omega_trial,
             quasi_2d_ddi,
             l_z_ddi,
+            quasi_2d,
+            l_z,
             backend,
         )
 

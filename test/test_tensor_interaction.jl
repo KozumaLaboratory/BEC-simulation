@@ -360,6 +360,75 @@
         @test abs(norm_final - norm0) / norm0 < 1e-10
     end
 
+    @testset "Diagonal fast-path: nearly-polarized spinor" begin
+        F = 2
+        D = 2F + 1
+        grid = make_grid(GridConfig((16,), (10.0,)))
+        n_pts = grid.config.n_points
+        dV = cell_volume(grid)
+
+        psi_full = zeros(ComplexF64, n_pts[1], D)
+        psi_diag = zeros(ComplexF64, n_pts[1], D)
+        for i in 1:n_pts[1]
+            psi_full[i, 1] = 1.0
+            psi_diag[i, 1] = 1.0
+            for c in 2:D
+                noise = 1e-4 * randn(ComplexF64)
+                psi_full[i, c] = noise
+                psi_diag[i, c] = noise
+            end
+        end
+
+        ip = InteractionParams(0.0, 0.0, 0.0, [5.0, 0.0, 3.0])
+        cache = make_tensor_interaction_cache(F, ip)
+        @test cache !== nothing
+        sm = spin_matrices(F)
+        dt = 0.001
+
+        apply_tensor_interaction_step!(psi_full, cache, sm, dt, 1)
+        apply_tensor_interaction_step!(psi_diag, cache, sm, dt, 1)
+
+        @test psi_full ≈ psi_diag atol = 1e-10
+    end
+
+    @testset "Diagonal fast-path: energy conservation" begin
+        F = 2
+        D = 2F + 1
+        grid = make_grid(GridConfig((16,), (10.0,)))
+        n_pts = grid.config.n_points
+        dV = cell_volume(grid)
+
+        psi = zeros(ComplexF64, n_pts[1], D)
+        for i in 1:n_pts[1]
+            psi[i, 1] = 1.0
+            for c in 2:D
+                psi[i, c] = 1e-4 * randn(ComplexF64)
+            end
+        end
+        norm0 = sum(abs2, psi) * dV
+
+        ip = InteractionParams(0.0, 0.0, 0.0, [5.0, 0.0, 3.0])
+        cache = make_tensor_interaction_cache(F, ip)
+        sm = spin_matrices(F)
+
+        for _ in 1:100
+            apply_tensor_interaction_step!(psi, cache, sm, 0.001, 1)
+        end
+        @test sum(abs2, psi) * dV ≈ norm0 rtol = 1e-10
+    end
+
+    @testset "HF entries sorted by (c_m, c_mp)" begin
+        F = 2
+        ip = InteractionParams(0.0, 0.0, 0.0, [5.0, 0.0, 3.0])
+        cache = make_tensor_interaction_cache(F, ip)
+        entries = SpinorBEC._precompute_hf_entries(cache)
+        for i in 2:length(entries)
+            prev = (entries[i-1].c_m, entries[i-1].c_mp)
+            cur = (entries[i].c_m, entries[i].c_mp)
+            @test prev <= cur
+        end
+    end
+
     @testset "Workspace without tensor cache" begin
         grid = make_grid(GridConfig((16,), (10.0,)))
         interactions = InteractionParams(100.0, 10.0)

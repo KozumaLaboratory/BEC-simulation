@@ -218,6 +218,81 @@
         @test imap.k_values ≈ ref.k_values
     end
 
+    @testset "angular_growth_map matches directions" begin
+        F = 1
+        spinor = ComplexF64[1.0, 0.0, 0.0]
+        imap = bogoliubov_instability_scan(;
+            spinor, n0=1.0, F,
+            interactions=InteractionParams(5.0, -2.0),
+            c_dd=10.0,
+            k_max=5.0, n_k=30,
+        )
+        @test length(imap.angular_growth_map) == length(imap.directions)
+        @test length(imap.angular_growth_map) == 13
+        for id in 1:length(imap.directions)
+            @test imap.angular_growth_map[id] ≈ maximum(imap.growth_rates[:, id])
+        end
+    end
+
+    @testset "fibonacci_sphere_directions" begin
+        dirs = fibonacci_sphere_directions(50)
+        @test length(dirs) >= 50
+        for d in dirs
+            @test d[3] >= 0  # upper hemisphere
+            @test abs(d[1]^2 + d[2]^2 + d[3]^2 - 1.0) < 1e-12  # unit norm
+        end
+    end
+
+    @testset ":dense mode returns enough directions" begin
+        F = 1
+        spinor = ComplexF64[0.0, 1.0, 0.0]
+        imap = bogoliubov_instability_scan(;
+            spinor, n0=1.0, F,
+            interactions=InteractionParams(10.0, 2.0),
+            zeeman=ZeemanParams(0.0, 1.0),
+            k_max=5.0, n_k=20,
+            directions=:dense,
+            n_directions=50,
+        )
+        @test length(imap.directions) >= 50
+        @test length(imap.angular_growth_map) == length(imap.directions)
+    end
+
+    @testset ":dense no DDI gives same max as :auto" begin
+        F = 1
+        spinor = ComplexF64[1.0, 0.0, 0.0]
+        imap_auto = bogoliubov_instability_scan(;
+            spinor, n0=1.0, F,
+            interactions=InteractionParams(5.0, -2.0),
+            c_dd=0.0, k_max=5.0, n_k=30,
+        )
+        imap_dense = bogoliubov_instability_scan(;
+            spinor, n0=1.0, F,
+            interactions=InteractionParams(5.0, -2.0),
+            c_dd=0.0, k_max=5.0, n_k=30,
+            directions=:dense, n_directions=50,
+        )
+        @test isapprox(imap_auto.max_growth_rate, imap_dense.max_growth_rate; atol=1e-12)
+    end
+
+    @testset ":dense with DDI covers similar range as :auto" begin
+        F = 1
+        spinor = ComplexF64[1.0, 0.0, 0.0]
+        imap_auto = bogoliubov_instability_scan(;
+            spinor, n0=1.0, F,
+            interactions=InteractionParams(5.0, -2.0),
+            c_dd=10.0, k_max=5.0, n_k=30,
+        )
+        imap_dense = bogoliubov_instability_scan(;
+            spinor, n0=1.0, F,
+            interactions=InteractionParams(5.0, -2.0),
+            c_dd=10.0, k_max=5.0, n_k=30,
+            directions=:dense, n_directions=200,
+        )
+        # Dense should find a peak within 1% of :auto (may miss exact axis directions)
+        @test imap_dense.max_growth_rate > 0.99 * imap_auto.max_growth_rate
+    end
+
     @testset "suggest_grid_params: even n_points, Nyquist satisfied" begin
         F = 1
         spinor = ComplexF64[1.0, 0.0, 0.0]

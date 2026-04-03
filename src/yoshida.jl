@@ -47,12 +47,13 @@ function run_simulation_yoshida!(
         is_clamped = dt_step < dt * 0.99
 
         psi_old .= ws.state.psi
+        t_base = ws.state.t
 
-        _strang_core!(ws, dt_step, n_comp)
+        _strang_core!(ws, dt_step, n_comp; t_base)
         psi_strang .= ws.state.psi
 
         ws.state.psi .= psi_old
-        _aba_step!(ws, dt_step, n_comp, comp.a, comp.b)
+        _aba_step!(ws, dt_step, n_comp, comp.a, comp.b; t_base)
 
         err = _wavefunction_l2_change(ws.state.psi, psi_strang)
 

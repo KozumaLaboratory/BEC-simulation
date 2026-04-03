@@ -122,7 +122,8 @@ function _run_simulation_leapfrog!(
     cc = ws.coriolis_cache
 
     # Leapfrog: initial half potential step
-    _half_potential_step!(ws, dt / 2, n_comp, N, false)
+    # First half-step covers [t, t+dt/2], midpoint at t+dt/4
+    _half_potential_step!(ws, dt / 2, n_comp, N, false; t_eval = ws.state.t + dt / 4, t_start = ws.state.t)
 
     for step = 1:sp.n_steps
         _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, false, cc)
@@ -133,12 +134,15 @@ function _run_simulation_leapfrog!(
         is_last = (step == sp.n_steps)
         need_split = is_save || is_last
 
+        t_now = ws.state.t
+
         if need_split
-            # Close current step with half potential
-            _half_potential_step!(ws, dt / 2, n_comp, N, false)
+            # Close current step: covers [t_now+dt/2, t_now+dt], midpoint at t_now+3dt/4
+            _half_potential_step!(ws, dt / 2, n_comp, N, false; t_eval = t_now + 3dt / 4, t_start = t_now + dt / 2)
         else
-            # Merged: close current + open next = full potential step
-            _half_potential_step!(ws, dt, n_comp, N, false)
+            # Merged: close [t_now+dt/2, t_now+dt] + open [t_now+dt, t_now+3dt/2]
+            # = full step [t_now+dt/2, t_now+3dt/2], midpoint at t_now+dt
+            _half_potential_step!(ws, dt, n_comp, N, false; t_eval = t_now + dt, t_start = t_now + dt / 2)
         end
 
         if ws.loss !== nothing
@@ -156,9 +160,9 @@ function _run_simulation_leapfrog!(
             end
         end
 
-        # Open next step if we split
+        # Open next step if we split: covers [t_now+dt, t_now+3dt/2], midpoint at t_now+dt+dt/4
         if need_split && !is_last
-            _half_potential_step!(ws, dt / 2, n_comp, N, false)
+            _half_potential_step!(ws, dt / 2, n_comp, N, false; t_eval = ws.state.t + dt / 4, t_start = ws.state.t)
         end
     end
 end
@@ -231,6 +235,7 @@ function run_simulation_checkpointed!(
         ws.tensor_cache,
         ws.coriolis_cache,
         ws.backend,
+        ws.lhy,
     )
 
     result = run_simulation!(ws_remain; callback = checkpoint_cb)

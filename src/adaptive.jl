@@ -50,7 +50,8 @@ function _wavefunction_l2_change(psi_new, psi_old)
 end
 
 @inline function _flush_fsal!(ws::Workspace{N}, fsal_dt, n_comp, ndim) where {N}
-    _half_potential_step!(ws, fsal_dt / 2, n_comp, ndim, false)
+    # Closing half: covers [t - fsal_dt/2, t], midpoint at t - fsal_dt/4
+    _half_potential_step!(ws, fsal_dt / 2, n_comp, ndim, false; t_eval = ws.state.t - fsal_dt / 4, t_start = ws.state.t - fsal_dt / 2)
     nothing
 end
 
@@ -120,13 +121,19 @@ function _adaptive_step_change_loop!(
         prev_fsal_deferred = fsal_deferred
         prev_fsal_dt = fsal_dt
 
+        t_now = ws.state.t
         if fsal_deferred && abs(fsal_dt - dt_step) < 1e-14
-            _half_potential_step!(ws, dt_step, n_comp, N, false)
+            # Merged: close prev [t-dt_step/2, t] + open new [t, t+dt_step/2]
+            # = full [t-dt_step/2, t+dt_step/2], midpoint at t
+            _half_potential_step!(ws, dt_step, n_comp, N, false; t_eval = t_now, t_start = t_now - dt_step / 2)
         elseif fsal_deferred
-            _half_potential_step!(ws, fsal_dt / 2, n_comp, N, false)
-            _half_potential_step!(ws, dt_step / 2, n_comp, N, false)
+            # Close prev: [t-fsal_dt/2, t], midpoint at t - fsal_dt/4
+            _half_potential_step!(ws, fsal_dt / 2, n_comp, N, false; t_eval = t_now - fsal_dt / 4, t_start = t_now - fsal_dt / 2)
+            # Open new: [t, t+dt_step/2], midpoint at t + dt_step/4
+            _half_potential_step!(ws, dt_step / 2, n_comp, N, false; t_eval = t_now + dt_step / 4, t_start = t_now)
         else
-            _half_potential_step!(ws, dt_step / 2, n_comp, N, false)
+            # Fresh open: [t, t+dt_step/2], midpoint at t + dt_step/4
+            _half_potential_step!(ws, dt_step / 2, n_comp, N, false; t_eval = t_now + dt_step / 4, t_start = t_now)
         end
         fsal_deferred = false
 
@@ -209,10 +216,10 @@ function _adaptive_step_change_loop!(
     )
 end
 
-@inline function _full_strang_step!(ws::Workspace{N}, dt_step, n_comp, bk) where {N}
-    _half_potential_step!(ws, dt_step / 2, n_comp, N, false)
+@inline function _full_strang_step!(ws::Workspace{N}, dt_step, n_comp, bk; t_base::Float64 = ws.state.t) where {N}
+    _half_potential_step!(ws, dt_step / 2, n_comp, N, false; t_eval = t_base + dt_step / 4, t_start = t_base)
     apply_kinetic_step_batched!(ws.state.psi, bk)
-    _half_potential_step!(ws, dt_step / 2, n_comp, N, false)
+    _half_potential_step!(ws, dt_step / 2, n_comp, N, false; t_eval = t_base + 3dt_step / 4, t_start = t_base + dt_step / 2)
     nothing
 end
 

@@ -98,7 +98,7 @@ SystemConfig(atom_name, n_points, box_size, interactions, ddi, loss) =
 
 # --- YAML Parsing Helpers ---
 
-function _scale_interactions_quasi_2d(ip::InteractionParams, l_z::Float64)
+function scale_interactions_quasi_2d(ip::InteractionParams, l_z::Float64)
     factor = 1.0 / (sqrt(2π) * l_z)
     if ip.c_lhy != 0.0
         @warn "c_lhy scaling under quasi-2D is approximate; 2D LHY requires logarithmic treatment"
@@ -143,7 +143,7 @@ function _parse_system(d::Dict)
     end
 
     if quasi_2d
-        interactions = _scale_interactions_quasi_2d(interactions, l_z)
+        interactions = scale_interactions_quasi_2d(interactions, l_z)
     end
 
     ddi = if haskey(d, "ddi")

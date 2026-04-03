@@ -87,6 +87,26 @@ function _set_component!(psi, vals, ndim, n_pts, c)
     view(psi, idx...) .= vals
 end
 
+function _extract_spinor(psi::AbstractArray{ComplexF64})
+    D = size(psi, ndims(psi))
+    n_pts = ntuple(d -> size(psi, d), ndims(psi) - 1)
+    peak_idx = argmax(sum(abs2, psi; dims=ndims(psi)))
+    spinor = Vector{ComplexF64}(undef, D)
+    for c in 1:D
+        spinor[c] = psi[peak_idx, c]
+    end
+    nrm = norm(spinor)
+    nrm > 1e-30 && (spinor ./= nrm)
+    spinor
+end
+
+function _default_spinor(F::Int)
+    D = 2F + 1
+    spinor = zeros(ComplexF64, D)
+    spinor[1] = 1.0
+    spinor
+end
+
 function make_workspace(;
     grid::Grid{N},
     atom::AtomSpecies,
@@ -104,8 +124,23 @@ function make_workspace(;
     ddi_padding::Bool = false,
     quasi_2d_ddi::Bool = false,
     l_z_ddi::Float64 = 0.0,
+    quasi_2d::Bool = false,
+    l_z::Float64 = 0.0,
     backend::AbstractBackend = CPUBackend(),
+    spinor_lhy::Union{Nothing,Symbol} = nothing,
 ) where {N}
+    if quasi_2d
+        N == 2 || throw(ArgumentError("quasi_2d requires 2D grid, got $(N)D"))
+        l_z > 0 || throw(ArgumentError("quasi_2d requires l_z > 0"))
+    end
+
+    effective_interactions = quasi_2d ? scale_interactions_quasi_2d(interactions, l_z) : interactions
+
+    if quasi_2d && enable_ddi
+        quasi_2d_ddi = true
+        l_z_ddi == 0.0 && (l_z_ddi = l_z)
+    end
+
     sys = SpinSystem(atom.F)
     sm = spin_matrices(atom.F)
 
@@ -220,30 +255,53 @@ function make_workspace(;
             iseven(i + 1) &&
             (i + 1) >= 4 &&
             (i + 1) <= 2F &&
-            abs(interactions.c_extra[i]) > 1e-30,
-        eachindex(interactions.c_extra),
+            abs(effective_interactions.c_extra[i]) > 1e-30,
+        eachindex(effective_interactions.c_extra),
     )
 
     tensor_cache, ws_interactions = if has_higher_c_extra
-        g_delta = _c_extra_to_delta_gS(F, interactions.c_extra)
+        g_delta = _c_extra_to_delta_gS(F, effective_interactions.c_extra)
         tc = _make_tensor_cache_from_channels(F, g_delta)
-        tc, InteractionParams(interactions.c0, interactions.c1, interactions.c_lhy, Float64[])
+        tc, InteractionParams(effective_interactions.c0, effective_interactions.c1, effective_interactions.c_lhy, Float64[])
     else
-        tc = make_tensor_interaction_cache(F, interactions)
-        if tc !== nothing && (abs(interactions.c0) > 1e-30 || abs(interactions.c1) > 1e-30)
+        tc = make_tensor_interaction_cache(F, effective_interactions)
+        if tc !== nothing && (abs(effective_interactions.c0) > 1e-30 || abs(effective_interactions.c1) > 1e-30)
             throw(
                 ArgumentError(
-                    "tensor_cache active with non-zero c0=$(interactions.c0), c1=$(interactions.c1). " *
+                    "tensor_cache active with non-zero c0=$(effective_interactions.c0), c1=$(effective_interactions.c1). " *
                     "When tensor_cache handles all channels, set c0=c1=0 in InteractionParams " *
                     "to avoid double-counting (diagonal step still uses c0, tensor step includes c0+c1).",
                 ),
             )
         end
-        tc, interactions
+        tc, effective_interactions
     end
 
     coriolis_cache = if sim_params.rotating_frame_omega != 0.0 && N >= 2
         _make_coriolis_cache(psi, backend; flags = fft_flags)
+    else
+        nothing
+    end
+
+    lhy = if spinor_lhy === :two_channel
+        n_max_est = psi_init !== nothing ? maximum(sum(abs2, psi_init; dims=ndims(psi_init))) * 3.0 : 100.0
+        compute_spinor_lhy_two_channel(;
+            F=atom.F, c0=ws_interactions.c0, c1=ws_interactions.c1,
+            c_dd=enable_ddi && !isnan(c_dd) ? c_dd : 0.0,
+            n_max=n_max_est,
+        )
+    elseif spinor_lhy === :full_bdg
+        n_max_est = psi_init !== nothing ? maximum(sum(abs2, psi_init; dims=ndims(psi_init))) * 3.0 : 100.0
+        spinor_init = psi_init !== nothing ? _extract_spinor(psi_init) : _default_spinor(atom.F)
+        compute_spinor_lhy_table(;
+            spinor=spinor_init, F=atom.F, interactions=ws_interactions,
+            c_dd=enable_ddi && !isnan(c_dd) ? c_dd : 0.0,
+            n_max=n_max_est,
+        )
+    elseif quasi_2d && abs(ws_interactions.c_lhy) > 1e-30
+        compute_lhy_2d_params(ws_interactions.c0, l_z)
+    elseif abs(ws_interactions.c_lhy) > 1e-30
+        ScalarLHY(ws_interactions.c_lhy)
     else
         nothing
     end
@@ -270,6 +328,7 @@ function make_workspace(;
         tensor_cache,
         coriolis_cache,
         backend,
+        lhy,
     )
 end
 

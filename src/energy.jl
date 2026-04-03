@@ -41,9 +41,13 @@ function energy_decomposition(ws::Workspace{N}) where {N}
         0.0
     end
 
-    E_lhy =
-        ws.interactions.c_lhy != 0.0 ?
-        _lhy_energy(psi, ws.interactions.c_lhy, n_comp, N, n_pts, dV) : 0.0
+    E_lhy = if ws.lhy !== nothing
+        _lhy_energy(psi, ws.lhy, n_comp, N, n_pts, dV)
+    elseif ws.interactions.c_lhy != 0.0
+        _lhy_energy(psi, ws.interactions.c_lhy, n_comp, N, n_pts, dV)
+    else
+        0.0
+    end
 
     E_tensor = begin
         e = 0.0
@@ -133,6 +137,32 @@ function _lhy_energy(psi, c_lhy, n_comp, ndim, n_pts, dV)
         E += ni * ni * sqrt(ni)
     end
     (2.0 / 5.0) * c_lhy * E * dV
+end
+
+function _lhy_energy(psi, lhy::ScalarLHY, n_comp, ndim, n_pts, dV)
+    _lhy_energy(psi, lhy.c_lhy, n_comp, ndim, n_pts, dV)
+end
+
+function _lhy_energy(psi, lhy::Quasi2DLHY, n_comp, ndim, n_pts, dV)
+    n = total_density(psi, ndim)
+    E = 0.0
+    @inbounds for I in CartesianIndices(n_pts)
+        ni = n[I]
+        ni < 1e-30 && continue
+        E += ni * ni * (log(ni * lhy.a_2d_sq) + lhy.log_const)
+    end
+    0.5 * lhy.c_lhy_2d * E * dV
+end
+
+function _lhy_energy(psi, lhy::SpinorLHYTable, n_comp, ndim, n_pts, dV)
+    n = total_density(psi, ndim)
+    E = 0.0
+    @inbounds for I in CartesianIndices(n_pts)
+        ni = n[I]
+        ni < 1e-30 && continue
+        E += _interpolate_1d(lhy.densities, lhy.potential_values, ni) * ni
+    end
+    E * dV
 end
 
 function _spin_interaction_energy(psi, sm, c1, n_comp, ndim, n_pts, dV)
