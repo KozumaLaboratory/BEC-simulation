@@ -57,4 +57,5 @@ using SpinorBEC
     include("test_types_validation.jl")
     include("test_currents.jl")
     include("test_quasi_2d.jl")
+    include("test_ground_state.jl")
 end
