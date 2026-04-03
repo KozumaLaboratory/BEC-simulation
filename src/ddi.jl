@@ -277,27 +277,37 @@ function _compute_and_convolve_ddi!(
     nothing
 end
 
-function _ddi_k_contraction!(bufs::DDIBuffers, ddi, C)
-    if bufs.Fx_r isa Array
-        rk_shape = bufs.rfft_plans.rk_shape
+function _ddi_k_contraction_core!(
+    Phi_x_rk, Phi_y_rk, Phi_z_rk,
+    Fx_rk, Fy_rk, Fz_rk,
+    Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz,
+    C, rk_shape, is_cpu::Bool,
+)
+    if is_cpu
         Threads.@threads for I in CartesianIndices(rk_shape)
             @inbounds begin
-                fk_x = bufs.Fx_rk[I]
-                fk_y = bufs.Fy_rk[I]
-                fk_z = bufs.Fz_rk[I]
-                bufs.Phi_x_rk[I] =
-                    C * (ddi.Q_xx[I] * fk_x + ddi.Q_xy[I] * fk_y + ddi.Q_xz[I] * fk_z)
-                bufs.Phi_y_rk[I] =
-                    C * (ddi.Q_xy[I] * fk_x + ddi.Q_yy[I] * fk_y + ddi.Q_yz[I] * fk_z)
-                bufs.Phi_z_rk[I] =
-                    C * (ddi.Q_xz[I] * fk_x + ddi.Q_yz[I] * fk_y + ddi.Q_zz[I] * fk_z)
+                fk_x = Fx_rk[I]
+                fk_y = Fy_rk[I]
+                fk_z = Fz_rk[I]
+                Phi_x_rk[I] = C * (Q_xx[I] * fk_x + Q_xy[I] * fk_y + Q_xz[I] * fk_z)
+                Phi_y_rk[I] = C * (Q_xy[I] * fk_x + Q_yy[I] * fk_y + Q_yz[I] * fk_z)
+                Phi_z_rk[I] = C * (Q_xz[I] * fk_x + Q_yz[I] * fk_y + Q_zz[I] * fk_z)
             end
         end
     else
-        @. bufs.Phi_x_rk = C * (ddi.Q_xx * bufs.Fx_rk + ddi.Q_xy * bufs.Fy_rk + ddi.Q_xz * bufs.Fz_rk)
-        @. bufs.Phi_y_rk = C * (ddi.Q_xy * bufs.Fx_rk + ddi.Q_yy * bufs.Fy_rk + ddi.Q_yz * bufs.Fz_rk)
-        @. bufs.Phi_z_rk = C * (ddi.Q_xz * bufs.Fx_rk + ddi.Q_yz * bufs.Fy_rk + ddi.Q_zz * bufs.Fz_rk)
+        @. Phi_x_rk = C * (Q_xx * Fx_rk + Q_xy * Fy_rk + Q_xz * Fz_rk)
+        @. Phi_y_rk = C * (Q_xy * Fx_rk + Q_yy * Fy_rk + Q_yz * Fz_rk)
+        @. Phi_z_rk = C * (Q_xz * Fx_rk + Q_yz * Fy_rk + Q_zz * Fz_rk)
     end
+end
+
+function _ddi_k_contraction!(bufs::DDIBuffers, ddi, C)
+    _ddi_k_contraction_core!(
+        bufs.Phi_x_rk, bufs.Phi_y_rk, bufs.Phi_z_rk,
+        bufs.Fx_rk, bufs.Fy_rk, bufs.Fz_rk,
+        ddi.Q_xx, ddi.Q_xy, ddi.Q_xz, ddi.Q_yy, ddi.Q_yz, ddi.Q_zz,
+        C, bufs.rfft_plans.rk_shape, bufs.Fx_r isa Array,
+    )
 end
 
 """

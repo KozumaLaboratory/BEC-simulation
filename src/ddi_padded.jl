@@ -173,22 +173,10 @@ function apply_ddi_step!(
 end
 
 function _ddi_padded_k_contraction!(ctx::DDIPaddedContext, C)
-    if ctx.Fx_pad isa Array
-        rk_shape = ctx.rfft_plans.rk_shape
-        @inbounds for I in CartesianIndices(rk_shape)
-            fk_x = ctx.Fx_pad_rk[I]
-            fk_y = ctx.Fy_pad_rk[I]
-            fk_z = ctx.Fz_pad_rk[I]
-            ctx.Phi_x_pad_rk[I] =
-                C * (ctx.Q_xx[I] * fk_x + ctx.Q_xy[I] * fk_y + ctx.Q_xz[I] * fk_z)
-            ctx.Phi_y_pad_rk[I] =
-                C * (ctx.Q_xy[I] * fk_x + ctx.Q_yy[I] * fk_y + ctx.Q_yz[I] * fk_z)
-            ctx.Phi_z_pad_rk[I] =
-                C * (ctx.Q_xz[I] * fk_x + ctx.Q_yz[I] * fk_y + ctx.Q_zz[I] * fk_z)
-        end
-    else
-        @. ctx.Phi_x_pad_rk = C * (ctx.Q_xx * ctx.Fx_pad_rk + ctx.Q_xy * ctx.Fy_pad_rk + ctx.Q_xz * ctx.Fz_pad_rk)
-        @. ctx.Phi_y_pad_rk = C * (ctx.Q_xy * ctx.Fx_pad_rk + ctx.Q_yy * ctx.Fy_pad_rk + ctx.Q_yz * ctx.Fz_pad_rk)
-        @. ctx.Phi_z_pad_rk = C * (ctx.Q_xz * ctx.Fx_pad_rk + ctx.Q_yz * ctx.Fy_pad_rk + ctx.Q_zz * ctx.Fz_pad_rk)
-    end
+    _ddi_k_contraction_core!(
+        ctx.Phi_x_pad_rk, ctx.Phi_y_pad_rk, ctx.Phi_z_pad_rk,
+        ctx.Fx_pad_rk, ctx.Fy_pad_rk, ctx.Fz_pad_rk,
+        ctx.Q_xx, ctx.Q_xy, ctx.Q_xz, ctx.Q_yy, ctx.Q_yz, ctx.Q_zz,
+        C, ctx.rfft_plans.rk_shape, ctx.Fx_pad isa Array,
+    )
 end

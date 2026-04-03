@@ -1,3 +1,22 @@
+function _record_snapshot!(times, energies, norms, mags, snapshots, ws, sys)
+    push!(times, ws.state.t)
+    push!(energies, total_energy(ws))
+    push!(norms, total_norm(ws.state.psi, ws.grid))
+    push!(mags, magnetization(ws.state.psi, ws.grid, sys))
+    push!(snapshots, Array(ws.state.psi))
+end
+
+function _check_energy_drift(energies, norms, E_now, nrm_now, t)
+    E_per_N = E_now / max(nrm_now, 1e-300)
+    if length(energies) >= 2
+        E_per_N_prev = energies[end] / max(norms[end], 1e-300)
+        de_rel = abs(E_per_N - E_per_N_prev) / max(abs(E_per_N_prev), 1e-300)
+        if de_rel > 0.01
+            @warn "E/N drift $(round(de_rel*100, digits=2))% between snapshots at t=$(round(t, digits=4))"
+        end
+    end
+end
+
 function run_simulation!(
     ws::Workspace{N};
     callback::Union{Nothing,Function} = nothing,
@@ -99,12 +118,16 @@ function _run_simulation_leapfrog!(
     dt = sp.dt
     n_comp = sys.n_components
     bk = ws.batched_kinetic
+    omega = sp.rotating_frame_omega
+    cc = ws.coriolis_cache
 
     # Leapfrog: initial half potential step
     _half_potential_step!(ws, dt / 2, n_comp, N, false)
 
     for step = 1:sp.n_steps
+        _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, false, cc)
         apply_kinetic_step_batched!(ws.state.psi, bk)
+        _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, false, cc)
 
         is_save = (step % sp.save_every == 0)
         is_last = (step == sp.n_steps)

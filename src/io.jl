@@ -1,8 +1,6 @@
 function save_state(filename::String, ws::Workspace)
     c_dd = if ws.ddi !== nothing
         ws.ddi.C_dd
-    elseif ws.ddi_padded !== nothing
-        ws.ddi_padded.ddi.C_dd
     else
         0.0
     end
