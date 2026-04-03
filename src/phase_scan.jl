@@ -1,4 +1,4 @@
-# --- Phase Scan Runner ---
+# --- Phase Scan Utilities ---
 
 function _sweep_values(sv::ScanValues)
     range(sv.from, sv.to; length = sv.n_points)

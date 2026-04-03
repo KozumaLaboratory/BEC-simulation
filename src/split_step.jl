@@ -1,3 +1,169 @@
+# --- Coriolis (rotating frame L_z) ---
+
+"""
+Apply Coriolis step exp(iΩ·L_z·dt) via 3-shear FFT decomposition.
+
+Implements the -Ω·L_z term from the rotating frame Hamiltonian H_rot = H - Ω·J_z.
+L_z = x·p_y - y·p_x is the orbital angular momentum.
+
+Real time: spatial rotation by angle Ω·dt.
+Imaginary time: rotation by imaginary angle with real exponential shear factors
+(stable for small Ωτ, renormalized each ITP step).
+"""
+function _apply_coriolis_step!(
+    psi::AbstractArray{ComplexF64},
+    grid::Grid{N},
+    omega::Float64,
+    dt::Float64,
+    imaginary_time::Bool,
+    cache::Union{Nothing,CoriolisCache} = nothing,
+) where {N}
+    N < 2 && return nothing
+    abs(omega) < 1e-15 && return nothing
+
+    theta = omega * dt
+
+    if imaginary_time
+        a_y = tanh(theta / 2)
+        a_x = -sinh(theta)
+    else
+        a_y = tan(theta / 2)
+        a_x = -sin(theta)
+    end
+
+    if cache !== nothing
+        _apply_1d_shear_batch!(
+            psi,
+            grid.x[1],
+            grid.k[2],
+            2,
+            1,
+            a_y,
+            imaginary_time,
+            cache.fwd_dim2,
+            cache.inv_dim2,
+        )
+        _apply_1d_shear_batch!(
+            psi,
+            grid.x[2],
+            grid.k[1],
+            1,
+            2,
+            a_x,
+            imaginary_time,
+            cache.fwd_dim1,
+            cache.inv_dim1,
+        )
+        _apply_1d_shear_batch!(
+            psi,
+            grid.x[1],
+            grid.k[2],
+            2,
+            1,
+            a_y,
+            imaginary_time,
+            cache.fwd_dim2,
+            cache.inv_dim2,
+        )
+    else
+        _apply_1d_shear_batch!(psi, grid.x[1], grid.k[2], 2, 1, a_y, imaginary_time)
+        _apply_1d_shear_batch!(psi, grid.x[2], grid.k[1], 1, 2, a_x, imaginary_time)
+        _apply_1d_shear_batch!(psi, grid.x[1], grid.k[2], 2, 1, a_y, imaginary_time)
+    end
+    nothing
+end
+
+function _apply_1d_shear_batch!(
+    psi::AbstractArray{ComplexF64},
+    coord_vals::Vector{Float64},
+    k_vals::Vector{Float64},
+    fft_dim::Int,
+    coord_dim::Int,
+    factor::Float64,
+    imaginary_time::Bool,
+)
+    abs(factor) < 1e-30 && return nothing
+
+    psi_k = fft(psi, fft_dim)
+
+    @inbounds for I in CartesianIndices(size(psi_k))
+        arg = factor * coord_vals[I[coord_dim]] * k_vals[I[fft_dim]]
+        psi_k[I] *= imaginary_time ? exp(arg) : cis(arg)
+    end
+
+    psi .= ifft(psi_k, fft_dim)
+    nothing
+end
+
+function _apply_1d_shear_batch!(
+    psi::AbstractArray{ComplexF64},
+    coord_vals::Vector{Float64},
+    k_vals::Vector{Float64},
+    fft_dim::Int,
+    coord_dim::Int,
+    factor::Float64,
+    imaginary_time::Bool,
+    fwd_plan,
+    inv_plan,
+)
+    abs(factor) < 1e-30 && return nothing
+
+    fwd_plan * psi
+
+    @inbounds for I in CartesianIndices(size(psi))
+        arg = factor * coord_vals[I[coord_dim]] * k_vals[I[fft_dim]]
+        psi[I] *= imaginary_time ? exp(arg) : cis(arg)
+    end
+
+    inv_plan * psi
+    nothing
+end
+
+# --- Split-step core ---
+
+function _run_on_host!(f, psi::Array)
+    f(psi)
+end
+
+function _run_on_host!(f, psi::AbstractArray)
+    psi_host = Array(psi)
+    f(psi_host)
+    copyto!(psi, psi_host)
+end
+
+"""
+GPU DDI step: convolve + rotation all on GPU using broadcast operations.
+"""
+function _apply_ddi_step_gpu!(ws, dt_half, ndim, imaginary_time)
+    D = ws.spin_matrices.system.n_components
+    N = ndims(ws.state.psi) - 1
+    n_pts = ntuple(d -> size(ws.state.psi, d), Val(N))
+
+    if ws.ddi_padded !== nothing
+        @timeit_debug TIMER "ddi_convolve_padded" _compute_and_convolve_ddi_padded!(
+            ws.state.psi, ws.spin_matrices, ws.ddi, ws.ddi_padded,
+            Val(D), ndim, n_pts,
+        )
+        phi_x = ws.ddi_padded.Phi_x_pad
+        phi_y = ws.ddi_padded.Phi_y_pad
+        phi_z = ws.ddi_padded.Phi_z_pad
+    else
+        @timeit_debug TIMER "ddi_convolve" _compute_and_convolve_ddi!(
+            ws.state.psi, ws.spin_matrices, ws.ddi, ws.ddi_bufs,
+            Val(D), ndim, n_pts,
+        )
+        phi_x = ws.ddi_bufs.Phi_x
+        phi_y = ws.ddi_bufs.Phi_y
+        phi_z = ws.ddi_bufs.Phi_z
+    end
+
+    @timeit_debug TIMER "ddi_rotation" _apply_ddi_rotation!(
+        ws.state.psi, phi_x, phi_y, phi_z,
+        ws.spin_matrices, dt_half, ndim;
+        imaginary_time,
+    )
+end
+
 """
 Perform one Strang-split time step: V(dt/2) K(dt) V(dt/2).
 
@@ -83,6 +249,7 @@ function _half_potential_step!(
 ) where {N}
     zee = zeeman_at(ws.zeeman, ws.state.t)
     zeeman_diag = zeeman_diagonal(zee, ws.spin_matrices)
+    gpu = _is_gpu(ws.state.psi)
 
     @timeit_debug TIMER "diagonal" _diagonal_step_svec!(
         Val(N),
@@ -96,110 +263,98 @@ function _half_potential_step!(
         imaginary_time,
     )
 
-    @timeit_debug TIMER "spin_mixing" apply_spin_mixing_step!(
-        ws.state.psi,
-        ws.spin_matrices,
-        ws.interactions.c1,
-        dt_half / 2,
-        ndim;
-        imaginary_time,
-    )
+    if abs(ws.interactions.c1) > 1e-30
+        @timeit_debug TIMER "spin_mixing" if gpu
+            _run_on_host!(ws.state.psi) do p
+                apply_spin_mixing_step!(p, ws.spin_matrices, ws.interactions.c1, dt_half / 2, ndim; imaginary_time)
+            end
+        else
+            apply_spin_mixing_step!(ws.state.psi, ws.spin_matrices, ws.interactions.c1, dt_half / 2, ndim; imaginary_time)
+        end
+    end
 
-    @timeit_debug TIMER "nematic" apply_nematic_step!(
-        ws.state.psi,
-        ws.interactions,
-        ws.spin_matrices.system.F,
-        dt_half / 2,
-        ndim;
-        imaginary_time,
-    )
+    c2 = get_cn(ws.interactions, 2)
+    if abs(c2) > 1e-30
+        @timeit_debug TIMER "nematic" if gpu
+            _run_on_host!(ws.state.psi) do p
+                apply_nematic_step!(p, ws.interactions, ws.spin_matrices.system.F, dt_half / 2, ndim; imaginary_time)
+            end
+        else
+            apply_nematic_step!(ws.state.psi, ws.interactions, ws.spin_matrices.system.F, dt_half / 2, ndim; imaginary_time)
+        end
+    end
 
     if ws.tensor_cache !== nothing
-        @timeit_debug TIMER "tensor" apply_tensor_interaction_step!(
-            ws.state.psi,
-            ws.tensor_cache,
-            ws.spin_matrices,
-            dt_half / 2,
-            ndim;
-            imaginary_time,
-        )
-    end
-
-    if ws.raman !== nothing
-        @timeit_debug TIMER "raman" apply_raman_step!(
-            ws.state.psi,
-            ws.spin_matrices,
-            ws.raman,
-            ws.grid,
-            dt_half / 2;
-            imaginary_time,
-        )
-    end
-
-    if ws.ddi !== nothing
-        if ws.ddi_padded !== nothing
-            @timeit_debug TIMER "ddi" apply_ddi_step!(
-                ws.state.psi,
-                ws.spin_matrices,
-                ws.ddi,
-                ws.ddi_bufs,
-                dt_half,
-                ndim,
-                ws.ddi_padded;
-                imaginary_time,
-            )
+        @timeit_debug TIMER "tensor" if gpu
+            _run_on_host!(ws.state.psi) do p
+                apply_tensor_interaction_step!(p, ws.tensor_cache, ws.spin_matrices, dt_half / 2, ndim; imaginary_time)
+            end
         else
-            @timeit_debug TIMER "ddi" apply_ddi_step!(
-                ws.state.psi,
-                ws.spin_matrices,
-                ws.ddi,
-                ws.ddi_bufs,
-                dt_half,
-                ndim;
-                imaginary_time,
-            )
+            apply_tensor_interaction_step!(ws.state.psi, ws.tensor_cache, ws.spin_matrices, dt_half / 2, ndim; imaginary_time)
         end
     end
 
     if ws.raman !== nothing
-        @timeit_debug TIMER "raman" apply_raman_step!(
-            ws.state.psi,
-            ws.spin_matrices,
-            ws.raman,
-            ws.grid,
-            dt_half / 2;
-            imaginary_time,
-        )
+        @timeit_debug TIMER "raman" if gpu
+            _run_on_host!(ws.state.psi) do p
+                apply_raman_step!(p, ws.spin_matrices, ws.raman, ws.grid, dt_half / 2; imaginary_time)
+            end
+        else
+            apply_raman_step!(ws.state.psi, ws.spin_matrices, ws.raman, ws.grid, dt_half / 2; imaginary_time)
+        end
+    end
+
+    if ws.ddi !== nothing
+        @timeit_debug TIMER "ddi" if gpu
+            _apply_ddi_step_gpu!(ws, dt_half, ndim, imaginary_time)
+        else
+            if ws.ddi_padded !== nothing
+                apply_ddi_step!(ws.state.psi, ws.spin_matrices, ws.ddi, ws.ddi_bufs, dt_half, ndim, ws.ddi_padded; imaginary_time)
+            else
+                apply_ddi_step!(ws.state.psi, ws.spin_matrices, ws.ddi, ws.ddi_bufs, dt_half, ndim; imaginary_time)
+            end
+        end
+    end
+
+    if ws.raman !== nothing
+        @timeit_debug TIMER "raman" if gpu
+            _run_on_host!(ws.state.psi) do p
+                apply_raman_step!(p, ws.spin_matrices, ws.raman, ws.grid, dt_half / 2; imaginary_time)
+            end
+        else
+            apply_raman_step!(ws.state.psi, ws.spin_matrices, ws.raman, ws.grid, dt_half / 2; imaginary_time)
+        end
     end
 
     if ws.tensor_cache !== nothing
-        @timeit_debug TIMER "tensor" apply_tensor_interaction_step!(
-            ws.state.psi,
-            ws.tensor_cache,
-            ws.spin_matrices,
-            dt_half / 2,
-            ndim;
-            imaginary_time,
-        )
+        @timeit_debug TIMER "tensor" if gpu
+            _run_on_host!(ws.state.psi) do p
+                apply_tensor_interaction_step!(p, ws.tensor_cache, ws.spin_matrices, dt_half / 2, ndim; imaginary_time)
+            end
+        else
+            apply_tensor_interaction_step!(ws.state.psi, ws.tensor_cache, ws.spin_matrices, dt_half / 2, ndim; imaginary_time)
+        end
     end
 
-    @timeit_debug TIMER "nematic" apply_nematic_step!(
-        ws.state.psi,
-        ws.interactions,
-        ws.spin_matrices.system.F,
-        dt_half / 2,
-        ndim;
-        imaginary_time,
-    )
+    if abs(c2) > 1e-30
+        @timeit_debug TIMER "nematic" if gpu
+            _run_on_host!(ws.state.psi) do p
+                apply_nematic_step!(p, ws.interactions, ws.spin_matrices.system.F, dt_half / 2, ndim; imaginary_time)
+            end
+        else
+            apply_nematic_step!(ws.state.psi, ws.interactions, ws.spin_matrices.system.F, dt_half / 2, ndim; imaginary_time)
+        end
+    end
 
-    @timeit_debug TIMER "spin_mixing" apply_spin_mixing_step!(
-        ws.state.psi,
-        ws.spin_matrices,
-        ws.interactions.c1,
-        dt_half / 2,
-        ndim;
-        imaginary_time,
-    )
+    if abs(ws.interactions.c1) > 1e-30
+        @timeit_debug TIMER "spin_mixing" if gpu
+            _run_on_host!(ws.state.psi) do p
+                apply_spin_mixing_step!(p, ws.spin_matrices, ws.interactions.c1, dt_half / 2, ndim; imaginary_time)
+            end
+        else
+            apply_spin_mixing_step!(ws.state.psi, ws.spin_matrices, ws.interactions.c1, dt_half / 2, ndim; imaginary_time)
+        end
+    end
 
     @timeit_debug TIMER "diagonal" _diagonal_step_svec!(
         Val(N),
@@ -213,6 +368,20 @@ function _half_potential_step!(
         imaginary_time,
     )
 end
+
+function _normalize_psi!(psi, grid, n_components, ndim)
+    dV = cell_volume(grid)
+    norm_sq = 0.0
+    n_pts = ntuple(d -> size(psi, d), ndim)
+    for c = 1:n_components
+        idx = _component_slice(ndim, n_pts, c)
+        norm_sq += sum(abs2, view(psi, idx...)) * dV
+    end
+    psi ./= sqrt(norm_sq)
+    nothing
+end
+
+# --- Integrator compositions (Yoshida, Suzuki, Blanes-Moan, Omelyan) ---
 
 """
 Yoshida 4th-order triple-jump coefficients.
@@ -378,136 +547,5 @@ function _aba_step!(
 
         _half_potential_step!(ws, a[i + 1] * dt, n_comp, N, false)
     end
-    nothing
-end
-
-"""
-Apply Coriolis step exp(iΩ·L_z·dt) via 3-shear FFT decomposition.
-
-Implements the -Ω·L_z term from the rotating frame Hamiltonian H_rot = H - Ω·J_z.
-L_z = x·p_y - y·p_x is the orbital angular momentum.
-
-Real time: spatial rotation by angle Ω·dt.
-Imaginary time: rotation by imaginary angle with real exponential shear factors
-(stable for small Ωτ, renormalized each ITP step).
-"""
-function _apply_coriolis_step!(
-    psi::AbstractArray{ComplexF64},
-    grid::Grid{N},
-    omega::Float64,
-    dt::Float64,
-    imaginary_time::Bool,
-    cache::Union{Nothing,CoriolisCache} = nothing,
-) where {N}
-    N < 2 && return nothing
-    abs(omega) < 1e-15 && return nothing
-
-    theta = omega * dt
-
-    if imaginary_time
-        a_y = tanh(theta / 2)
-        a_x = -sinh(theta)
-    else
-        a_y = tan(theta / 2)
-        a_x = -sin(theta)
-    end
-
-    if cache !== nothing
-        _apply_1d_shear_batch!(
-            psi,
-            grid.x[1],
-            grid.k[2],
-            2,
-            1,
-            a_y,
-            imaginary_time,
-            cache.fwd_dim2,
-            cache.inv_dim2,
-        )
-        _apply_1d_shear_batch!(
-            psi,
-            grid.x[2],
-            grid.k[1],
-            1,
-            2,
-            a_x,
-            imaginary_time,
-            cache.fwd_dim1,
-            cache.inv_dim1,
-        )
-        _apply_1d_shear_batch!(
-            psi,
-            grid.x[1],
-            grid.k[2],
-            2,
-            1,
-            a_y,
-            imaginary_time,
-            cache.fwd_dim2,
-            cache.inv_dim2,
-        )
-    else
-        _apply_1d_shear_batch!(psi, grid.x[1], grid.k[2], 2, 1, a_y, imaginary_time)
-        _apply_1d_shear_batch!(psi, grid.x[2], grid.k[1], 1, 2, a_x, imaginary_time)
-        _apply_1d_shear_batch!(psi, grid.x[1], grid.k[2], 2, 1, a_y, imaginary_time)
-    end
-    nothing
-end
-
-function _apply_1d_shear_batch!(
-    psi::AbstractArray{ComplexF64},
-    coord_vals::Vector{Float64},
-    k_vals::Vector{Float64},
-    fft_dim::Int,
-    coord_dim::Int,
-    factor::Float64,
-    imaginary_time::Bool,
-)
-    abs(factor) < 1e-30 && return nothing
-
-    psi_k = fft(psi, fft_dim)
-
-    @inbounds for I in CartesianIndices(size(psi_k))
-        arg = factor * coord_vals[I[coord_dim]] * k_vals[I[fft_dim]]
-        psi_k[I] *= imaginary_time ? exp(arg) : cis(arg)
-    end
-
-    psi .= ifft(psi_k, fft_dim)
-    nothing
-end
-
-function _apply_1d_shear_batch!(
-    psi::AbstractArray{ComplexF64},
-    coord_vals::Vector{Float64},
-    k_vals::Vector{Float64},
-    fft_dim::Int,
-    coord_dim::Int,
-    factor::Float64,
-    imaginary_time::Bool,
-    fwd_plan,
-    inv_plan,
-)
-    abs(factor) < 1e-30 && return nothing
-
-    fwd_plan * psi
-
-    @inbounds for I in CartesianIndices(size(psi))
-        arg = factor * coord_vals[I[coord_dim]] * k_vals[I[fft_dim]]
-        psi[I] *= imaginary_time ? exp(arg) : cis(arg)
-    end
-
-    inv_plan * psi
-    nothing
-end
-
-function _normalize_psi!(psi, grid, n_components, ndim)
-    dV = cell_volume(grid)
-    norm_sq = 0.0
-    n_pts = ntuple(d -> size(psi, d), ndim)
-    for c = 1:n_components
-        idx = _component_slice(ndim, n_pts, c)
-        norm_sq += sum(abs2, view(psi, idx...)) * dV
-    end
-    psi ./= sqrt(norm_sq)
     nothing
 end

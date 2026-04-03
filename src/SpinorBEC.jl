@@ -13,6 +13,7 @@ using SpecialFunctions: erfcx
 const TIMER = TimerOutput()
 
 include("types.jl")
+include("backend.jl")
 include("units.jl")
 include("grid.jl")
 include("spin_matrices.jl")
@@ -44,10 +45,13 @@ include("vorticity.jl")
 include("diagnostics.jl")
 include("bogoliubov.jl")
 include("majorana.jl")
+include("phase_classification.jl")
+include("stability_analysis.jl")
 include("spherical_harmonics.jl")
 include("simulation_utils.jl")
 include("initialization.jl")
 include("ground_state.jl")
+include("continuation.jl")
 include("phase_boundary.jl")
 include("simulation.jl")
 include("adaptive.jl")
@@ -67,6 +71,7 @@ export SimParams,
     SimState, FFTPlans, RFFTPlans, Workspace, AdaptiveDtParams, IntegratorConfig
 export TOFParams, BdGResult, InstabilityMap, HysteresisResult
 export HarmonicTrap, NoPotential, GravityPotential, CompositePotential
+export AbstractBackend, CPUBackend, CUDABackend
 
 # Grid
 export make_grid,

@@ -21,7 +21,6 @@ function _build_q_tensor!(
     @inbounds for I in CartesianIndices(n_pts)
         k2 = k_squared[I]
         if k2 == 0.0
-            # Q(k=0) is undefined (0/0); physically the mean dipole field vanishes
             Q_xx[I] = 0.0;
             Q_yy[I] = 0.0;
             Q_zz[I] = 0.0
@@ -152,7 +151,7 @@ function _make_ddi_params_quasi2d(grid::Grid{2}, c_dd::Float64, l_z::Float64)
         l_z,
     )
 
-    DDIParams{2}(c_dd, Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz)
+    DDIParams(c_dd, Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz)
 end
 
 function _make_ddi_params_full(
@@ -208,26 +207,44 @@ function _make_ddi_params_full(
         secular,
     )
 
-    DDIParams{N}(C_dd, Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz)
+    DDIParams(C_dd, Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz)
 end
 
-function make_ddi_buffers(n_pts::NTuple{N,Int}; flags = FFTW.MEASURE) where {N}
+function _ddi_params_to_device(ddi::DDIParams, backend::CPUBackend)
+    ddi
+end
+
+function _ddi_params_to_device(ddi::DDIParams, backend::AbstractBackend)
+    DDIParams(
+        ddi.C_dd,
+        _to_device(backend, ddi.Q_xx),
+        _to_device(backend, ddi.Q_xy),
+        _to_device(backend, ddi.Q_xz),
+        _to_device(backend, ddi.Q_yy),
+        _to_device(backend, ddi.Q_yz),
+        _to_device(backend, ddi.Q_zz),
+    )
+end
+
+function make_ddi_buffers(
+    n_pts::NTuple{N,Int}, backend::AbstractBackend = CPUBackend(); flags = FFTW.MEASURE,
+) where {N}
     rk_shape = rfft_output_shape(n_pts)
-    rplans = make_rfft_plans(n_pts; flags = flags)
+    rplans = make_rfft_plans(n_pts, backend; flags = flags)
     DDIBuffers(
         rplans,
-        zeros(Float64, n_pts),       # Fx_r
-        zeros(Float64, n_pts),       # Fy_r
-        zeros(Float64, n_pts),       # Fz_r
-        zeros(ComplexF64, rk_shape), # Fx_rk
-        zeros(ComplexF64, rk_shape), # Fy_rk
-        zeros(ComplexF64, rk_shape), # Fz_rk
-        zeros(ComplexF64, rk_shape), # Phi_x_rk
-        zeros(ComplexF64, rk_shape), # Phi_y_rk
-        zeros(ComplexF64, rk_shape), # Phi_z_rk
-        zeros(Float64, n_pts),       # Phi_x
-        zeros(Float64, n_pts),       # Phi_y
-        zeros(Float64, n_pts),       # Phi_z
+        _zeros(backend, Float64, n_pts...),       # Fx_r
+        _zeros(backend, Float64, n_pts...),       # Fy_r
+        _zeros(backend, Float64, n_pts...),       # Fz_r
+        _zeros(backend, ComplexF64, rk_shape...), # Fx_rk
+        _zeros(backend, ComplexF64, rk_shape...), # Fy_rk
+        _zeros(backend, ComplexF64, rk_shape...), # Fz_rk
+        _zeros(backend, ComplexF64, rk_shape...), # Phi_x_rk
+        _zeros(backend, ComplexF64, rk_shape...), # Phi_y_rk
+        _zeros(backend, ComplexF64, rk_shape...), # Phi_z_rk
+        _zeros(backend, Float64, n_pts...),       # Phi_x
+        _zeros(backend, Float64, n_pts...),       # Phi_y
+        _zeros(backend, Float64, n_pts...),       # Phi_z
     )
 end
 
@@ -252,25 +269,35 @@ function _compute_and_convolve_ddi!(
     mul!(bufs.Fz_rk, rp.forward, bufs.Fz_r)
 
     C = ddi.C_dd
-    rk_shape = rp.rk_shape
-    Threads.@threads for I in CartesianIndices(rk_shape)
-        @inbounds begin
-            fk_x = bufs.Fx_rk[I]
-            fk_y = bufs.Fy_rk[I]
-            fk_z = bufs.Fz_rk[I]
-            bufs.Phi_x_rk[I] =
-                C * (ddi.Q_xx[I] * fk_x + ddi.Q_xy[I] * fk_y + ddi.Q_xz[I] * fk_z)
-            bufs.Phi_y_rk[I] =
-                C * (ddi.Q_xy[I] * fk_x + ddi.Q_yy[I] * fk_y + ddi.Q_yz[I] * fk_z)
-            bufs.Phi_z_rk[I] =
-                C * (ddi.Q_xz[I] * fk_x + ddi.Q_yz[I] * fk_y + ddi.Q_zz[I] * fk_z)
-        end
-    end
+    _ddi_k_contraction!(bufs, ddi, C)
 
     mul!(bufs.Phi_x, rp.inverse, bufs.Phi_x_rk)
     mul!(bufs.Phi_y, rp.inverse, bufs.Phi_y_rk)
     mul!(bufs.Phi_z, rp.inverse, bufs.Phi_z_rk)
     nothing
+end
+
+function _ddi_k_contraction!(bufs::DDIBuffers, ddi, C)
+    if bufs.Fx_r isa Array
+        rk_shape = bufs.rfft_plans.rk_shape
+        Threads.@threads for I in CartesianIndices(rk_shape)
+            @inbounds begin
+                fk_x = bufs.Fx_rk[I]
+                fk_y = bufs.Fy_rk[I]
+                fk_z = bufs.Fz_rk[I]
+                bufs.Phi_x_rk[I] =
+                    C * (ddi.Q_xx[I] * fk_x + ddi.Q_xy[I] * fk_y + ddi.Q_xz[I] * fk_z)
+                bufs.Phi_y_rk[I] =
+                    C * (ddi.Q_xy[I] * fk_x + ddi.Q_yy[I] * fk_y + ddi.Q_yz[I] * fk_z)
+                bufs.Phi_z_rk[I] =
+                    C * (ddi.Q_xz[I] * fk_x + ddi.Q_yz[I] * fk_y + ddi.Q_zz[I] * fk_z)
+            end
+        end
+    else
+        @. bufs.Phi_x_rk = C * (ddi.Q_xx * bufs.Fx_rk + ddi.Q_xy * bufs.Fy_rk + ddi.Q_xz * bufs.Fz_rk)
+        @. bufs.Phi_y_rk = C * (ddi.Q_xy * bufs.Fx_rk + ddi.Q_yy * bufs.Fy_rk + ddi.Q_yz * bufs.Fz_rk)
+        @. bufs.Phi_z_rk = C * (ddi.Q_xz * bufs.Fx_rk + ddi.Q_yz * bufs.Fy_rk + ddi.Q_zz * bufs.Fz_rk)
+    end
 end
 
 """
@@ -303,6 +330,188 @@ function compute_ddi_potential!(ddi::DDIParams{N}, bufs::DDIBuffers) where {N}
     nothing
 end
 
+# --- DDI Euler spin rotation ---
+
+"""
+Apply Euler spin rotation from DDI dipolar field to the wavefunction.
+Operates on CPU arrays only (uses scalar indexing via _get_spinor/_set_spinor!).
+"""
+function _apply_ddi_rotation!(
+    psi::Array{ComplexF64},
+    phi_x::Array{Float64},
+    phi_y::Array{Float64},
+    phi_z::Array{Float64},
+    sm::SpinMatrices{D},
+    dt_frac::Float64,
+    ndim::Int;
+    imaginary_time::Bool = false,
+) where {D}
+    N = ndim
+    n_pts = ntuple(d -> size(psi, d), Val(N))
+    F = sm.system.F
+    m_vals = SVector{D,Float64}(ntuple(c -> F - (c - 1), Val(D)))
+
+    V_Fy = sm.Fy_eigvecs
+    Vt_Fy = sm.Fy_eigvecs_adj
+    λ_Fy = sm.Fy_eigvals
+
+    Threads.@threads for I in CartesianIndices(n_pts)
+        @inbounds begin
+            spinor = _get_spinor(psi, I, Val(D))
+            new_spinor = _apply_euler_spin_rotation(
+                spinor,
+                phi_x[I],
+                phi_y[I],
+                phi_z[I],
+                dt_frac,
+                F,
+                m_vals,
+                V_Fy,
+                Vt_Fy,
+                λ_Fy,
+                sm,
+                imaginary_time,
+            )
+            _set_spinor!(psi, I, new_spinor, Val(D))
+        end
+    end
+    nothing
+end
+
+"""
+GPU Euler spin rotation using CUBLAS gemm for V†·psi and V·w matmuls.
+Reshapes psi from (spatial..., D) to (N_spatial, D) for efficient BLAS.
+Replaces 4×D² broadcast calls with 4 CUBLAS gemm calls.
+"""
+function _gpu_matmul_Vdag!(W, P, conj_V, ::Val{D}) where {D}
+    if D > 7
+        mul!(W, P, conj_V)
+    else
+        for i = 1:D
+            wi = view(W, :, i)
+            cV_1i = conj_V[1, i]
+            p1 = view(P, :, 1)
+            @. wi = cV_1i * p1
+            for j = 2:D
+                cV_ji = conj_V[j, i]
+                pj = view(P, :, j)
+                @. wi += cV_ji * pj
+            end
+        end
+    end
+end
+
+function _gpu_matmul_V!(P, W, V_T, ::Val{D}) where {D}
+    if D > 7
+        mul!(P, W, V_T)
+    else
+        for i = 1:D
+            pi = view(P, :, i)
+            vT_1i = V_T[1, i]
+            w1 = view(W, :, 1)
+            @. pi = vT_1i * w1
+            for j = 2:D
+                vT_ji = V_T[j, i]
+                wj = view(W, :, j)
+                @. pi += vT_ji * wj
+            end
+        end
+    end
+end
+
+function _apply_ddi_rotation!(
+    psi::AbstractArray{ComplexF64},
+    phi_x::AbstractArray{Float64},
+    phi_y::AbstractArray{Float64},
+    phi_z::AbstractArray{Float64},
+    sm::SpinMatrices{D},
+    dt_frac::Float64,
+    ndim::Int;
+    imaginary_time::Bool = false,
+) where {D}
+    n_pts = ntuple(d -> size(psi, d), ndim)
+    N_spatial = prod(n_pts)
+    F = sm.system.F
+
+    P = reshape(psi, N_spatial, D)
+    W = reshape(similar(psi), N_spatial, D)
+
+    conj_V_cpu = conj(Matrix(sm.Fy_eigvecs))
+    V_T_cpu = Matrix(transpose(sm.Fy_eigvecs))
+    if D > 7
+        conj_V = similar(P, ComplexF64, D, D)
+        V_T = similar(P, ComplexF64, D, D)
+        copyto!(conj_V, conj_V_cpu)
+        copyto!(V_T, V_T_cpu)
+    else
+        conj_V = conj_V_cpu
+        V_T = V_T_cpu
+    end
+
+    spatial_idx = ntuple(d -> 1:n_pts[d], ndim)
+    phi_x_v = reshape(view(phi_x, spatial_idx...), N_spatial)
+    phi_y_v = reshape(view(phi_y, spatial_idx...), N_spatial)
+    phi_z_v = reshape(view(phi_z, spatial_idx...), N_spatial)
+
+    phi_mag = similar(phi_x_v)
+    alpha = similar(phi_x_v)
+    beta = similar(phi_x_v)
+    theta = similar(phi_x_v)
+    @. phi_mag = sqrt(phi_x_v^2 + phi_y_v^2 + phi_z_v^2)
+    @. alpha = atan(phi_y_v, phi_x_v)
+    @. beta = acos(clamp(phi_z_v / max(phi_mag, 1e-30), -1.0, 1.0))
+    @. theta = phi_mag * dt_frac
+
+    # Step 1: Rz(-α)
+    for c = 1:D
+        m_c = Float64(F - (c - 1))
+        pc = view(P, :, c)
+        @. pc = pc * cis(m_c * alpha)
+    end
+
+    # Step 2: Ry(-β) = V · diag(exp(+iβλ)) · V†
+    _gpu_matmul_Vdag!(W, P, conj_V, Val(D))
+    for i = 1:D
+        lam_i = Float64(-F + (i - 1))
+        wi = view(W, :, i)
+        @. wi = wi * cis(-lam_i * beta)
+    end
+    _gpu_matmul_V!(P, W, V_T, Val(D))
+
+    # Step 3: Dz(θ)
+    if imaginary_time
+        for c = 1:D
+            m_c = Float64(F - (c - 1))
+            pc = view(P, :, c)
+            @. pc = pc * exp(-m_c * theta)
+        end
+    else
+        for c = 1:D
+            m_c = Float64(F - (c - 1))
+            pc = view(P, :, c)
+            @. pc = pc * cis(-m_c * theta)
+        end
+    end
+
+    # Step 4: Ry(β) = V · diag(exp(-iβλ)) · V†
+    _gpu_matmul_Vdag!(W, P, conj_V, Val(D))
+    for i = 1:D
+        lam_i = Float64(-F + (i - 1))
+        wi = view(W, :, i)
+        @. wi = wi * cis(lam_i * beta)
+    end
+    _gpu_matmul_V!(P, W, V_T, Val(D))
+
+    # Step 5: Rz(α)
+    for c = 1:D
+        m_c = Float64(F - (c - 1))
+        pc = view(P, :, c)
+        @. pc = pc * cis(-m_c * alpha)
+    end
+
+    nothing
+end
+
 """
 Full DDI sub-step: compute spin density, rfft convolve, apply Euler spin rotation.
 """
@@ -327,36 +536,9 @@ function apply_ddi_step!(
         n_pts,
     )
 
-    F = sm.system.F
-    m_vals = SVector{D,Float64}(ntuple(c -> F - (c - 1), Val(D)))
-
-    V_Fy = sm.Fy_eigvecs
-    Vt_Fy = sm.Fy_eigvecs_adj
-    λ_Fy = sm.Fy_eigvals
-
-    @timeit_debug TIMER "ddi_rotation" Threads.@threads for I in CartesianIndices(n_pts)
-        @inbounds begin
-            phi_x = bufs.Phi_x[I]
-            phi_y = bufs.Phi_y[I]
-            phi_z = bufs.Phi_z[I]
-
-            spinor = _get_spinor(psi, I, Val(D))
-            new_spinor = _apply_euler_spin_rotation(
-                spinor,
-                phi_x,
-                phi_y,
-                phi_z,
-                dt_frac,
-                F,
-                m_vals,
-                V_Fy,
-                Vt_Fy,
-                λ_Fy,
-                sm,
-                imaginary_time,
-            )
-            _set_spinor!(psi, I, new_spinor, Val(D))
-        end
-    end
+    @timeit_debug TIMER "ddi_rotation" _apply_ddi_rotation!(
+        psi, bufs.Phi_x, bufs.Phi_y, bufs.Phi_z, sm, dt_frac, ndim;
+        imaginary_time,
+    )
     nothing
 end
