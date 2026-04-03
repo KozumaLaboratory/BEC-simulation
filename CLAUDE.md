@@ -18,10 +18,10 @@ Spin-F BEC simulation via split-step Fourier in 1D/2D/3D. Dimensionless units: �
 
 ### Include Order (`SpinorBEC.jl`)
 
-`types.jl` must be first (all struct definitions). Rest follows dependency order:
+`types.jl` must be first (all struct definitions, incl. `AbstractBackend`). `backend.jl` second. Rest follows dependency order:
 
 ```
-types → units → grid → spin_matrices → spinor_utils → clebsch_gordan → atoms →
+types → backend → units → grid → spin_matrices → spinor_utils → clebsch_gordan → atoms →
 interactions → potentials → zeeman → propagators → spin_mixing → nematic →
 tensor_interaction → losses → split_step → raman → ddi → ddi_padded →
 optical_trap → optics → laser_potential → thomas_fermi → tof → fft_utils →
@@ -36,8 +36,8 @@ config → phase_scan → config_runner → io → unitful_support
 - `GridConfig{N}`, `Grid{N}` — N-dim spatial grid with FFT wavenumbers
 - `SpinSystem(F)` — spin quantum number, `n_components = 2F+1`
 - `SpinMatrices{D}` — static spin-F matrices (Fx, Fy, Fz, F·F) as `SMatrix`
-- `SimState{N,A}` — mutable: wavefunction `psi`, time, step counter
-- `Workspace{N,...}` — fully parameterized immutable container (14 type params incl. CoriolisCache)
+- `SimState{N,A,B}` — mutable: wavefunction `psi`, FFT buffer, time, step counter
+- `Workspace{N,...}` — fully parameterized immutable container (18 type params incl. CoriolisCache, backend)
 
 ### Wavefunction Layout
 
@@ -89,3 +89,24 @@ println(TIMER); disable_tracing!()
 - 21 atom species in `atoms.jl` + `ATOM_REGISTRY`; `resolve_atom(:Name)` for YAML lookup
 - YAML configs in `examples/` follow schema in `config.jl` (v3) or `experiment.jl` (legacy)
 - Workspace is fully parameterized — auto-inferred constructor, no explicit type params needed
+- `AbstractBackend` must be in `types.jl` (used in Workspace type param); `CPUBackend` + helpers in `backend.jl`
+
+## GPU (CUDA) Support
+
+Optional CUDA support via package extension `ext/SpinorBECCUDAExt/`. CPU is the default.
+
+```julia
+using SpinorBEC
+using CUDA  # triggers extension load
+
+ws = make_workspace(; grid, atom, interactions, sim_params, backend=CUDABackend())
+run_simulation!(ws)
+psi_cpu = Array(ws.state.psi)  # transfer back for analysis
+```
+
+**Phase 1 (current)**: psi + buffers on GPU. Kinetic (batched FFT) and diagonal (broadcast) steps run natively.
+Spin mixing, nematic, tensor, Raman, DDI fall back to CPU via host round-trip (auto-skipped when coupling ≈ 0).
+Energy computation transfers to host. Snapshots always saved as CPU arrays.
+
+**Backend abstraction** (`backend.jl`): `_zeros`, `_similar`, `_to_device`, `_to_host`, `_fft_kwargs`, `_is_gpu`.
+All struct buffer fields are parameterized with `AbstractArray` subtypes for device-agnostic allocation.

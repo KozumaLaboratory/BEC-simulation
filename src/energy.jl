@@ -6,14 +6,17 @@ Decompose total energy into individual contributions.
 Returns `(kinetic, trap, zeeman, density, spin, ddi, lhy, tensor, raman, total)`.
 """
 function energy_decomposition(ws::Workspace{N}) where {N}
-    psi = ws.state.psi
+    psi = _to_host(ws.state.psi)
     grid = ws.grid
     n_comp = ws.spin_matrices.system.n_components
     dV = cell_volume(grid)
     n_pts = ntuple(d -> size(psi, d), Val(N))
 
-    E_kin = _kinetic_energy(psi, grid, ws.fft_plans, ws.state.fft_buf, n_comp, N, n_pts, dV)
-    E_trap = _trap_energy(psi, ws.potential_values, n_comp, N, n_pts, dV)
+    fft_buf = _is_gpu(ws.state.psi) ? zeros(ComplexF64, grid.config.n_points) : ws.state.fft_buf
+    plans = _is_gpu(ws.state.psi) ? make_fft_plans(grid.config.n_points; flags = FFTW.ESTIMATE) : ws.fft_plans
+    V_trap = _to_host(ws.potential_values)
+    E_kin = _kinetic_energy(psi, grid, plans, fft_buf, n_comp, N, n_pts, dV)
+    E_trap = _trap_energy(psi, V_trap, n_comp, N, n_pts, dV)
     zee = zeeman_at(ws.zeeman, ws.state.t)
     E_zee = _zeeman_energy(psi, zee, ws.spin_matrices.system, n_comp, N, n_pts, dV)
 

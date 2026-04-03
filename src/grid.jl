@@ -34,21 +34,31 @@ function _compute_k_squared(k::NTuple{N,Vector{Float64}}, n_points::NTuple{N,Int
     ksq
 end
 
-function make_fft_plans(spatial_shape::NTuple{N,Int}; flags = FFTW.MEASURE) where {N}
-    buf = zeros(ComplexF64, spatial_shape)
-    fwd = plan_fft!(buf; flags = flags)
-    inv = plan_ifft!(buf; flags = flags)
+function make_fft_plans(
+    spatial_shape::NTuple{N,Int},
+    backend::AbstractBackend = CPUBackend();
+    flags = FFTW.MEASURE,
+) where {N}
+    buf = _zeros(backend, ComplexF64, spatial_shape...)
+    kw = _fft_kwargs(backend, flags)
+    fwd = plan_fft!(buf; kw...)
+    inv = plan_ifft!(buf; kw...)
     FFTPlans(fwd, inv)
 end
 
 rfft_output_shape(n_pts::NTuple{N,Int}) where {N} = (n_pts[1] ÷ 2 + 1, n_pts[2:end]...)
 
-function make_rfft_plans(spatial_shape::NTuple{N,Int}; flags = FFTW.MEASURE) where {N}
+function make_rfft_plans(
+    spatial_shape::NTuple{N,Int},
+    backend::AbstractBackend = CPUBackend();
+    flags = FFTW.MEASURE,
+) where {N}
     rk_shape = rfft_output_shape(spatial_shape)
-    real_buf = zeros(Float64, spatial_shape)
-    complex_buf = zeros(ComplexF64, rk_shape)
-    fwd = plan_rfft(real_buf; flags = flags)
-    inv = plan_irfft(complex_buf, spatial_shape[1]; flags = flags)
+    real_buf = _zeros(backend, Float64, spatial_shape...)
+    complex_buf = _zeros(backend, ComplexF64, rk_shape...)
+    kw = _fft_kwargs(backend, flags)
+    fwd = plan_rfft(real_buf; kw...)
+    inv = plan_irfft(complex_buf, spatial_shape[1]; kw...)
     RFFTPlans{N,typeof(fwd),typeof(inv)}(fwd, inv, rk_shape)
 end
 

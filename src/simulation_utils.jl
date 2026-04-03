@@ -11,7 +11,7 @@ function _record_snapshot!(times, energies, norms, mags, snapshots, ws, sys)
     push!(energies, total_energy(ws))
     push!(norms, total_norm(ws.state.psi, ws.grid))
     push!(mags, magnetization(ws.state.psi, ws.grid, sys))
-    push!(snapshots, copy(ws.state.psi))
+    push!(snapshots, Array(ws.state.psi))
 end
 
 function _check_energy_drift(energies, norms, E_now, nrm_now, t)

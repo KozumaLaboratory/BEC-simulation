@@ -11,6 +11,7 @@ function make_ddi_padded(
     secular::Bool = false,
     quasi_2d::Bool = false,
     l_z::Float64 = 0.0,
+    backend::AbstractBackend = CPUBackend(),
 ) where {N}
     n_pts = grid.config.n_points
     padded_shape = ntuple(d -> 2 * n_pts[d], N)
@@ -79,29 +80,29 @@ function make_ddi_padded(
         )
     end
 
-    rplans = make_rfft_plans(padded_shape; flags = fft_flags)
+    rplans = make_rfft_plans(padded_shape, backend; flags = fft_flags)
 
     DDIPaddedContext(
         padded_shape,
         rplans,
-        Q_xx,
-        Q_xy,
-        Q_xz,
-        Q_yy,
-        Q_yz,
-        Q_zz,
-        zeros(Float64, padded_shape),
-        zeros(Float64, padded_shape),
-        zeros(Float64, padded_shape),
-        zeros(ComplexF64, rk_shape),
-        zeros(ComplexF64, rk_shape),
-        zeros(ComplexF64, rk_shape),
-        zeros(ComplexF64, rk_shape),
-        zeros(ComplexF64, rk_shape),
-        zeros(ComplexF64, rk_shape),
-        zeros(Float64, padded_shape),
-        zeros(Float64, padded_shape),
-        zeros(Float64, padded_shape),
+        _to_device(backend, Q_xx),
+        _to_device(backend, Q_xy),
+        _to_device(backend, Q_xz),
+        _to_device(backend, Q_yy),
+        _to_device(backend, Q_yz),
+        _to_device(backend, Q_zz),
+        _zeros(backend, Float64, padded_shape...),
+        _zeros(backend, Float64, padded_shape...),
+        _zeros(backend, Float64, padded_shape...),
+        _zeros(backend, ComplexF64, rk_shape...),
+        _zeros(backend, ComplexF64, rk_shape...),
+        _zeros(backend, ComplexF64, rk_shape...),
+        _zeros(backend, ComplexF64, rk_shape...),
+        _zeros(backend, ComplexF64, rk_shape...),
+        _zeros(backend, ComplexF64, rk_shape...),
+        _zeros(backend, Float64, padded_shape...),
+        _zeros(backend, Float64, padded_shape...),
+        _zeros(backend, Float64, padded_shape...),
     )
 end
 
@@ -130,18 +131,7 @@ function _compute_and_convolve_ddi_padded!(
     mul!(ctx.Fz_pad_rk, rp.forward, ctx.Fz_pad)
 
     C = ddi.C_dd  # C_dd from unpadded DDIParams; both are constructed with the same value
-    rk_shape = rp.rk_shape
-    @inbounds for I in CartesianIndices(rk_shape)
-        fk_x = ctx.Fx_pad_rk[I]
-        fk_y = ctx.Fy_pad_rk[I]
-        fk_z = ctx.Fz_pad_rk[I]
-        ctx.Phi_x_pad_rk[I] =
-            C * (ctx.Q_xx[I] * fk_x + ctx.Q_xy[I] * fk_y + ctx.Q_xz[I] * fk_z)
-        ctx.Phi_y_pad_rk[I] =
-            C * (ctx.Q_xy[I] * fk_x + ctx.Q_yy[I] * fk_y + ctx.Q_yz[I] * fk_z)
-        ctx.Phi_z_pad_rk[I] =
-            C * (ctx.Q_xz[I] * fk_x + ctx.Q_yz[I] * fk_y + ctx.Q_zz[I] * fk_z)
-    end
+    _ddi_padded_k_contraction!(ctx, C)
 
     mul!(ctx.Phi_x_pad, rp.inverse, ctx.Phi_x_pad_rk)
     mul!(ctx.Phi_y_pad, rp.inverse, ctx.Phi_y_pad_rk)
@@ -174,36 +164,31 @@ function apply_ddi_step!(
         n_pts,
     )
 
-    F = sm.system.F
-    m_vals = SVector{D,Float64}(ntuple(c -> F - (c - 1), Val(D)))
-
-    V_Fy = sm.Fy_eigvecs
-    Vt_Fy = sm.Fy_eigvecs_adj
-    λ_Fy = sm.Fy_eigvals
-
-    @timeit_debug TIMER "ddi_rotation" Threads.@threads for I in CartesianIndices(n_pts)
-        @inbounds begin
-            phi_x = ddi_padded.Phi_x_pad[I]
-            phi_y = ddi_padded.Phi_y_pad[I]
-            phi_z = ddi_padded.Phi_z_pad[I]
-
-            spinor = _get_spinor(psi, I, Val(D))
-            new_spinor = _apply_euler_spin_rotation(
-                spinor,
-                phi_x,
-                phi_y,
-                phi_z,
-                dt_frac,
-                F,
-                m_vals,
-                V_Fy,
-                Vt_Fy,
-                λ_Fy,
-                sm,
-                imaginary_time,
-            )
-            _set_spinor!(psi, I, new_spinor, Val(D))
-        end
-    end
+    @timeit_debug TIMER "ddi_rotation" _apply_ddi_rotation!(
+        psi, ddi_padded.Phi_x_pad, ddi_padded.Phi_y_pad, ddi_padded.Phi_z_pad,
+        sm, dt_frac, ndim;
+        imaginary_time,
+    )
     nothing
+end
+
+function _ddi_padded_k_contraction!(ctx::DDIPaddedContext, C)
+    if ctx.Fx_pad isa Array
+        rk_shape = ctx.rfft_plans.rk_shape
+        @inbounds for I in CartesianIndices(rk_shape)
+            fk_x = ctx.Fx_pad_rk[I]
+            fk_y = ctx.Fy_pad_rk[I]
+            fk_z = ctx.Fz_pad_rk[I]
+            ctx.Phi_x_pad_rk[I] =
+                C * (ctx.Q_xx[I] * fk_x + ctx.Q_xy[I] * fk_y + ctx.Q_xz[I] * fk_z)
+            ctx.Phi_y_pad_rk[I] =
+                C * (ctx.Q_xy[I] * fk_x + ctx.Q_yy[I] * fk_y + ctx.Q_yz[I] * fk_z)
+            ctx.Phi_z_pad_rk[I] =
+                C * (ctx.Q_xz[I] * fk_x + ctx.Q_yz[I] * fk_y + ctx.Q_zz[I] * fk_z)
+        end
+    else
+        @. ctx.Phi_x_pad_rk = C * (ctx.Q_xx * ctx.Fx_pad_rk + ctx.Q_xy * ctx.Fy_pad_rk + ctx.Q_xz * ctx.Fz_pad_rk)
+        @. ctx.Phi_y_pad_rk = C * (ctx.Q_xy * ctx.Fx_pad_rk + ctx.Q_yy * ctx.Fy_pad_rk + ctx.Q_yz * ctx.Fz_pad_rk)
+        @. ctx.Phi_z_pad_rk = C * (ctx.Q_xz * ctx.Fx_pad_rk + ctx.Q_yz * ctx.Fy_pad_rk + ctx.Q_zz * ctx.Fz_pad_rk)
+    end
 end

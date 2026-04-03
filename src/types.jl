@@ -2,6 +2,10 @@ using StaticArrays
 using LinearAlgebra
 using FFTW
 
+# --- Backend Abstraction ---
+
+abstract type AbstractBackend end
+
 # --- Grid Configuration ---
 
 struct GridConfig{N}
@@ -278,9 +282,9 @@ end
 
 # --- Simulation State (mutable) ---
 
-mutable struct SimState{N,A<:AbstractArray}
+mutable struct SimState{N,A<:AbstractArray,B<:AbstractArray{ComplexF64,N}}
     psi::A              # wavefunction: spatial dims... × n_components
-    fft_buf::Array{ComplexF64,N}  # spatial-only buffer for FFT
+    fft_buf::B          # spatial-only buffer for FFT (same device as psi)
     t::Float64
     step::Int
 end
@@ -302,30 +306,30 @@ end
 
 # --- DDI ---
 
-struct DDIParams{N}
+struct DDIParams{N,AQ<:AbstractArray{Float64,N}}
     C_dd::Float64
-    Q_xx::Array{Float64,N}
-    Q_xy::Array{Float64,N}
-    Q_xz::Array{Float64,N}
-    Q_yy::Array{Float64,N}
-    Q_yz::Array{Float64,N}
-    Q_zz::Array{Float64,N}
+    Q_xx::AQ
+    Q_xy::AQ
+    Q_xz::AQ
+    Q_yy::AQ
+    Q_yz::AQ
+    Q_zz::AQ
 end
 
-struct DDIBuffers{N,RP,IRP}
+struct DDIBuffers{N,RP,IRP,AR<:AbstractArray,AC<:AbstractArray}
     rfft_plans::RFFTPlans{N,RP,IRP}
-    Fx_r::Array{Float64,N}
-    Fy_r::Array{Float64,N}
-    Fz_r::Array{Float64,N}
-    Fx_rk::Array{ComplexF64,N}
-    Fy_rk::Array{ComplexF64,N}
-    Fz_rk::Array{ComplexF64,N}
-    Phi_x_rk::Array{ComplexF64,N}
-    Phi_y_rk::Array{ComplexF64,N}
-    Phi_z_rk::Array{ComplexF64,N}
-    Phi_x::Array{Float64,N}
-    Phi_y::Array{Float64,N}
-    Phi_z::Array{Float64,N}
+    Fx_r::AR
+    Fy_r::AR
+    Fz_r::AR
+    Fx_rk::AC
+    Fy_rk::AC
+    Fz_rk::AC
+    Phi_x_rk::AC
+    Phi_y_rk::AC
+    Phi_z_rk::AC
+    Phi_x::AR
+    Phi_y::AR
+    Phi_z::AR
 end
 
 # --- Loss Parameters ---
@@ -339,35 +343,35 @@ LossParams(gamma_dr::Float64) = LossParams(gamma_dr, 0.0)
 
 # --- DDI Padded Context ---
 
-struct DDIPaddedContext{N,RP,IRP}
+struct DDIPaddedContext{N,RP,IRP,AR<:AbstractArray,AC<:AbstractArray}
     padded_shape::NTuple{N,Int}
     rfft_plans::RFFTPlans{N,RP,IRP}
-    Q_xx::Array{Float64,N}
-    Q_xy::Array{Float64,N}
-    Q_xz::Array{Float64,N}
-    Q_yy::Array{Float64,N}
-    Q_yz::Array{Float64,N}
-    Q_zz::Array{Float64,N}
-    Fx_pad::Array{Float64,N}
-    Fy_pad::Array{Float64,N}
-    Fz_pad::Array{Float64,N}
-    Fx_pad_rk::Array{ComplexF64,N}
-    Fy_pad_rk::Array{ComplexF64,N}
-    Fz_pad_rk::Array{ComplexF64,N}
-    Phi_x_pad_rk::Array{ComplexF64,N}
-    Phi_y_pad_rk::Array{ComplexF64,N}
-    Phi_z_pad_rk::Array{ComplexF64,N}
-    Phi_x_pad::Array{Float64,N}
-    Phi_y_pad::Array{Float64,N}
-    Phi_z_pad::Array{Float64,N}
+    Q_xx::AR
+    Q_xy::AR
+    Q_xz::AR
+    Q_yy::AR
+    Q_yz::AR
+    Q_zz::AR
+    Fx_pad::AR
+    Fy_pad::AR
+    Fz_pad::AR
+    Fx_pad_rk::AC
+    Fy_pad_rk::AC
+    Fz_pad_rk::AC
+    Phi_x_pad_rk::AC
+    Phi_y_pad_rk::AC
+    Phi_z_pad_rk::AC
+    Phi_x_pad::AR
+    Phi_y_pad::AR
+    Phi_z_pad::AR
 end
 
 # --- Batched Kinetic Cache ---
 
-struct BatchedKineticCache{P,IP}
+struct BatchedKineticCache{P,IP,KP<:AbstractArray}
     forward::P
     inverse::IP
-    kinetic_phase_bc::Array{ComplexF64}
+    kinetic_phase_bc::KP
 end
 
 # --- Coriolis Cache (in-place FFT plans for 3-shear decomposition) ---
@@ -635,12 +639,12 @@ ScanStabilityConfig() = ScanStabilityConfig(false, 1e-4, 300, 10)
 
 # --- Workspace ---
 
-struct Workspace{N,A,P,IP,SM<:SpinMatrices,ZEE,DDI,DDIB,RAM,LOSS,DDIP,BK,TC,CC}
+struct Workspace{N,A,P,IP,SM<:SpinMatrices,ZEE,DDI,DDIB,RAM,LOSS,DDIP,BK,TC,CC,KPA<:AbstractArray,VPA<:AbstractArray,DBA<:AbstractArray,BACK<:AbstractBackend}
     state::SimState{N,A}
     fft_plans::FFTPlans{P,IP}
-    kinetic_phase::Array{ComplexF64,N}
-    potential_values::Array{Float64,N}
-    density_buf::Array{Float64,N}
+    kinetic_phase::KPA
+    potential_values::VPA
+    density_buf::DBA
     spin_matrices::SM
     grid::Grid{N}
     atom::AtomSpecies
@@ -656,6 +660,7 @@ struct Workspace{N,A,P,IP,SM<:SpinMatrices,ZEE,DDI,DDIB,RAM,LOSS,DDIP,BK,TC,CC}
     batched_kinetic::BK
     tensor_cache::TC
     coriolis_cache::CC
+    backend::BACK
 end
 
 # --- Unified Config v3 (base types) ---

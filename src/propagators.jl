@@ -12,7 +12,7 @@ end
 
 function apply_kinetic_step!(
     psi::AbstractArray{ComplexF64},
-    fft_buf::Array{ComplexF64},
+    fft_buf::AbstractArray{ComplexF64},
     kinetic_phase::AbstractArray{<:Number},
     plans::FFTPlans,
     n_components::Int,
@@ -111,7 +111,7 @@ end
 
 function _diagonal_step_svec!(
     ::Val{N},
-    psi,
+    psi::Array,
     V_trap,
     zeeman_diag::SVector{D,Float64},
     c0,
@@ -158,11 +158,54 @@ function _diagonal_step_svec!(
     nothing
 end
 
-function _make_batched_kinetic_cache(psi, kinetic_phase, ndim; flags = FFTW.MEASURE)
-    plan_buf = similar(psi)
+function _diagonal_step_svec!(
+    ::Val{N},
+    psi::AbstractArray,
+    V_trap,
+    zeeman_diag::SVector{D,Float64},
+    c0,
+    c_lhy,
+    dt_frac,
+    density_buf,
+    imaginary_time,
+) where {N,D}
+    n_pts = ntuple(d -> size(psi, d), Val(N))
+    idx1 = _component_slice(N, n_pts, 1)
+    density_buf .= abs2.(view(psi, idx1...))
+    for c = 2:D
+        idx = _component_slice(N, n_pts, c)
+        density_buf .+= abs2.(view(psi, idx...))
+    end
+    for c = 1:D
+        idx = _component_slice(N, n_pts, c)
+        psi_c = view(psi, idx...)
+        zee_c = zeeman_diag[c]
+        if imaginary_time
+            zee_shift = minimum(zeeman_diag)
+            if c_lhy == 0.0
+                @. psi_c *= exp(-(V_trap + (zee_c - zee_shift) + c0 * density_buf) * dt_frac)
+            else
+                @. psi_c *= exp(-(V_trap + (zee_c - zee_shift) + c0 * density_buf + c_lhy * density_buf * sqrt(density_buf)) * dt_frac)
+            end
+        else
+            if c_lhy == 0.0
+                @. psi_c *= cis(-(V_trap + zee_c + c0 * density_buf) * dt_frac)
+            else
+                @. psi_c *= cis(-(V_trap + zee_c + c0 * density_buf + c_lhy * density_buf * sqrt(density_buf)) * dt_frac)
+            end
+        end
+    end
+    nothing
+end
+
+function _make_batched_kinetic_cache(
+    psi, kinetic_phase, ndim, backend::AbstractBackend = CPUBackend(); flags = FFTW.MEASURE,
+)
+    plan_buf = _similar(backend, psi)
     dims = ntuple(identity, ndim)
-    fwd = plan_fft!(plan_buf, dims; flags)
-    inv = plan_ifft!(plan_buf, dims; flags)
+    kw = _fft_kwargs(backend, flags)
+    fwd = plan_fft!(plan_buf, dims; kw...)
+    inv = plan_ifft!(plan_buf, dims; kw...)
     kp_bc = reshape(kinetic_phase, size(kinetic_phase)..., 1)
     BatchedKineticCache(fwd, inv, kp_bc)
 end
@@ -174,12 +217,13 @@ function apply_kinetic_step_batched!(psi, cache::BatchedKineticCache)
     nothing
 end
 
-function _make_coriolis_cache(psi; flags = FFTW.MEASURE)
-    plan_buf = similar(psi)
-    fwd1 = plan_fft!(plan_buf, 1; flags)
-    inv1 = plan_ifft!(plan_buf, 1; flags)
-    fwd2 = plan_fft!(plan_buf, 2; flags)
-    inv2 = plan_ifft!(plan_buf, 2; flags)
+function _make_coriolis_cache(psi, backend::AbstractBackend = CPUBackend(); flags = FFTW.MEASURE)
+    plan_buf = _similar(backend, psi)
+    kw = _fft_kwargs(backend, flags)
+    fwd1 = plan_fft!(plan_buf, 1; kw...)
+    inv1 = plan_ifft!(plan_buf, 1; kw...)
+    fwd2 = plan_fft!(plan_buf, 2; kw...)
+    inv2 = plan_ifft!(plan_buf, 2; kw...)
     CoriolisCache(fwd1, inv1, fwd2, inv2)
 end
 
@@ -187,8 +231,13 @@ function _update_batched_kinetic_phase!(cache::BatchedKineticCache, k_squared, d
     kp = cache.kinetic_phase_bc
     ndim = ndims(kp) - 1
     n_pts = ntuple(d -> size(kp, d), ndim)
-    @inbounds for I in CartesianIndices(n_pts)
-        kp[I, 1] = cis(-0.5 * k_squared[I] * dt)
+    if kp isa Array
+        @inbounds for I in CartesianIndices(n_pts)
+            kp[I, 1] = cis(-0.5 * k_squared[I] * dt)
+        end
+    else
+        kp_view = selectdim(kp, ndim + 1, 1)
+        kp_view .= cis.(-0.5 .* k_squared .* dt)
     end
     nothing
 end

@@ -207,6 +207,7 @@ function run_simulation_checkpointed!(
         ws.batched_kinetic,
         ws.tensor_cache,
         ws.coriolis_cache,
+        ws.backend,
     )
 
     result = run_simulation!(ws_remain; callback = checkpoint_cb)

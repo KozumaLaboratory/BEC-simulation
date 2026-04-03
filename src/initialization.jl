@@ -104,6 +104,7 @@ function make_workspace(;
     ddi_padding::Bool = false,
     quasi_2d_ddi::Bool = false,
     l_z_ddi::Float64 = 0.0,
+    backend::AbstractBackend = CPUBackend(),
 ) where {N}
     sys = SpinSystem(atom.F)
     sm = spin_matrices(atom.F)
@@ -113,15 +114,19 @@ function make_workspace(;
     else
         copy(psi_init)
     end
+    psi = _to_device(backend, psi)
 
-    fft_buf = zeros(ComplexF64, grid.config.n_points)
-    state = SimState{N,typeof(psi)}(psi, fft_buf, 0.0, 0)
+    fft_buf = _zeros(backend, ComplexF64, grid.config.n_points...)
+    state = SimState{N,typeof(psi),typeof(fft_buf)}(psi, fft_buf, 0.0, 0)
 
-    plans = make_fft_plans(grid.config.n_points; flags = fft_flags)
-    kinetic_phase = prepare_kinetic_phase(
-        grid,
-        sim_params.dt;
-        imaginary_time = sim_params.imaginary_time,
+    plans = make_fft_plans(grid.config.n_points, backend; flags = fft_flags)
+    kinetic_phase = _to_device(
+        backend,
+        prepare_kinetic_phase(
+            grid,
+            sim_params.dt;
+            imaginary_time = sim_params.imaginary_time,
+        ),
     )
     V = evaluate_potential(potential, grid)
 
@@ -132,6 +137,7 @@ function make_workspace(;
             V[I] += 0.5 * omega^2 * r_perp_sq
         end
     end
+    V = _to_device(backend, V)
 
     effective_zeeman = if abs(omega) > 1e-15
         _shift_zeeman_for_rotating_frame(zeeman, omega)
@@ -163,13 +169,19 @@ function make_workspace(;
         nothing
     end
 
-    ddi_bufs = if ddi !== nothing
-        make_ddi_buffers(grid.config.n_points; flags = fft_flags)
+    ddi = if ddi !== nothing
+        _ddi_params_to_device(ddi, backend)
     else
         nothing
     end
 
-    density_buf = zeros(Float64, grid.config.n_points)
+    ddi_bufs = if ddi !== nothing
+        make_ddi_buffers(grid.config.n_points, backend; flags = fft_flags)
+    else
+        nothing
+    end
+
+    density_buf = _zeros(backend, Float64, grid.config.n_points...)
 
     ddi_pad = if ddi_padding && ddi !== nothing
         c_dd_val = isnan(c_dd) ? compute_c_dd(atom) : ddi.C_dd
@@ -181,12 +193,13 @@ function make_workspace(;
             secular = secular_ddi,
             quasi_2d = quasi_2d_ddi,
             l_z = l_z_ddi,
+            backend,
         )
     else
         nothing
     end
 
-    batched_kinetic = _make_batched_kinetic_cache(psi, kinetic_phase, N; flags = fft_flags)
+    batched_kinetic = _make_batched_kinetic_cache(psi, kinetic_phase, N, backend; flags = fft_flags)
 
     F = atom.F
     # Tensor interaction path activation:
@@ -230,7 +243,7 @@ function make_workspace(;
     end
 
     coriolis_cache = if sim_params.rotating_frame_omega != 0.0 && N >= 2
-        _make_coriolis_cache(psi; flags = fft_flags)
+        _make_coriolis_cache(psi, backend; flags = fft_flags)
     else
         nothing
     end
@@ -256,6 +269,7 @@ function make_workspace(;
         batched_kinetic,
         tensor_cache,
         coriolis_cache,
+        backend,
     )
 end
 
