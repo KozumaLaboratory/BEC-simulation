@@ -1,0 +1,182 @@
+"""
+Build zero-padded DDI context for reduced aliasing.
+
+Doubles grid size in each dimension. Builds Q tensor and rFFT plans on padded grid.
+"""
+function make_ddi_padded(
+    grid::Grid{N},
+    atom::AtomSpecies;
+    c_dd::Float64 = compute_c_dd(atom),
+    fft_flags = FFTW.MEASURE,
+    secular::Bool = false,
+    quasi_2d::Bool = false,
+    l_z::Float64 = 0.0,
+    backend::AbstractBackend = CPUBackend(),
+) where {N}
+    n_pts = grid.config.n_points
+    padded_shape = ntuple(d -> 2 * n_pts[d], N)
+    rk_shape = rfft_output_shape(padded_shape)
+
+    dx = grid.dx
+    kx_r =
+        collect(rfftfreq(padded_shape[1], padded_shape[1] * 2π / (padded_shape[1] * dx[1])))
+    k_full = ntuple(N) do d
+        n = padded_shape[d]
+        dk = 2π / (n * dx[d])
+        collect(fftfreq(n, n * dk))
+    end
+    ky = N >= 2 ? k_full[2] : Float64[]
+    kz = N >= 3 ? k_full[3] : Float64[]
+
+    Q_xx = zeros(Float64, rk_shape)
+    Q_xy = zeros(Float64, rk_shape)
+    Q_xz = zeros(Float64, rk_shape)
+    Q_yy = zeros(Float64, rk_shape)
+    Q_yz = zeros(Float64, rk_shape)
+    Q_zz = zeros(Float64, rk_shape)
+
+    k_sq_rk = zeros(Float64, rk_shape)
+    @inbounds for I in CartesianIndices(rk_shape)
+        k2 = kx_r[I[1]]^2
+        if N >= 2
+            ;
+            k2 += ky[I[2]]^2;
+        end
+        if N >= 3
+            ;
+            k2 += kz[I[3]]^2;
+        end
+        k_sq_rk[I] = k2
+    end
+
+    if quasi_2d && N == 2
+        _build_q_tensor_quasi2d!(
+            Q_xx,
+            Q_xy,
+            Q_xz,
+            Q_yy,
+            Q_yz,
+            Q_zz,
+            kx_r,
+            ky,
+            k_sq_rk,
+            rk_shape,
+            l_z,
+        )
+    else
+        _build_q_tensor!(
+            Q_xx,
+            Q_xy,
+            Q_xz,
+            Q_yy,
+            Q_yz,
+            Q_zz,
+            kx_r,
+            ky,
+            kz,
+            k_sq_rk,
+            rk_shape;
+            secular,
+        )
+    end
+
+    rplans = make_rfft_plans(padded_shape, backend; flags = fft_flags)
+
+    DDIPaddedContext(
+        padded_shape,
+        rplans,
+        _to_device(backend, Q_xx),
+        _to_device(backend, Q_xy),
+        _to_device(backend, Q_xz),
+        _to_device(backend, Q_yy),
+        _to_device(backend, Q_yz),
+        _to_device(backend, Q_zz),
+        _zeros(backend, Float64, padded_shape...),
+        _zeros(backend, Float64, padded_shape...),
+        _zeros(backend, Float64, padded_shape...),
+        _zeros(backend, ComplexF64, rk_shape...),
+        _zeros(backend, ComplexF64, rk_shape...),
+        _zeros(backend, ComplexF64, rk_shape...),
+        _zeros(backend, ComplexF64, rk_shape...),
+        _zeros(backend, ComplexF64, rk_shape...),
+        _zeros(backend, ComplexF64, rk_shape...),
+        _zeros(backend, Float64, padded_shape...),
+        _zeros(backend, Float64, padded_shape...),
+        _zeros(backend, Float64, padded_shape...),
+    )
+end
+
+"""
+Compute DDI potential using zero-padded rFFT convolution.
+Pads spin density into 2× grid, convolves in k-space, crops back.
+"""
+function _compute_and_convolve_ddi_padded!(
+    psi,
+    sm,
+    ddi::DDIParams{N},
+    ctx::DDIPaddedContext{N},
+    ::Val{D},
+    ndim,
+    n_pts,
+) where {D,N}
+    ctx.Fx_pad .= 0
+    ctx.Fy_pad .= 0
+    ctx.Fz_pad .= 0
+
+    _compute_spin_density!(ctx.Fx_pad, ctx.Fy_pad, ctx.Fz_pad, psi, sm, Val(D), ndim, n_pts)
+
+    rp = ctx.rfft_plans
+    mul!(ctx.Fx_pad_rk, rp.forward, ctx.Fx_pad)
+    mul!(ctx.Fy_pad_rk, rp.forward, ctx.Fy_pad)
+    mul!(ctx.Fz_pad_rk, rp.forward, ctx.Fz_pad)
+
+    C = ddi.C_dd  # C_dd from unpadded DDIParams; both are constructed with the same value
+    _ddi_padded_k_contraction!(ctx, C)
+
+    mul!(ctx.Phi_x_pad, rp.inverse, ctx.Phi_x_pad_rk)
+    mul!(ctx.Phi_y_pad, rp.inverse, ctx.Phi_y_pad_rk)
+    mul!(ctx.Phi_z_pad, rp.inverse, ctx.Phi_z_pad_rk)
+    nothing
+end
+
+"""
+Apply DDI step using zero-padded rFFT convolution when DDIPaddedContext is available.
+"""
+function apply_ddi_step!(
+    psi::AbstractArray{ComplexF64},
+    sm::SpinMatrices{D},
+    ddi::DDIParams{N},
+    bufs::DDIBuffers,
+    dt_frac::Float64,
+    ndim::Int,
+    ddi_padded::DDIPaddedContext{N};
+    imaginary_time::Bool = false,
+) where {D,N}
+    n_pts = ntuple(d -> size(psi, d), Val(N))
+
+    @timeit_debug TIMER "ddi_convolve_padded" _compute_and_convolve_ddi_padded!(
+        psi,
+        sm,
+        ddi,
+        ddi_padded,
+        Val(D),
+        ndim,
+        n_pts,
+    )
+
+    @timeit_debug TIMER "ddi_rotation" _apply_ddi_rotation!(
+        psi, ddi_padded.Phi_x_pad, ddi_padded.Phi_y_pad, ddi_padded.Phi_z_pad,
+        sm, dt_frac, ndim;
+        imaginary_time,
+    )
+    nothing
+end
+
+function _ddi_padded_k_contraction!(ctx::DDIPaddedContext, C)
+    _ddi_k_contraction_core!(
+        ctx.Phi_x_pad_rk, ctx.Phi_y_pad_rk, ctx.Phi_z_pad_rk,
+        ctx.Fx_pad_rk, ctx.Fy_pad_rk, ctx.Fz_pad_rk,
+        ctx.Q_xx, ctx.Q_xy, ctx.Q_xz, ctx.Q_yy, ctx.Q_yz, ctx.Q_zz,
+        C, ctx.rfft_plans.rk_shape, ctx.Fx_pad isa Array,
+    )
+end

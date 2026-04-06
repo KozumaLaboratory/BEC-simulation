@@ -1,0 +1,106 @@
+# ================================================================
+# Eu151 Spin Relaxation: m=-6 → m=-5 (Deterministic EdH)
+# ================================================================
+#
+# Clean experimental scenario (Matsui et al. Science 2026):
+#   1. Start: m = -6 fully polarized (strong field)
+#   2. Quench: B → 0 (or weak field)
+#   3. Observe: DDI-driven spin relaxation m=-6 → m=-5
+#   4. Result: Single quantized vortex (ΔL_z = -ℏ per atom transition)
+#
+# Key difference from random perturbation scenario:
+#   - Deterministic (no random noise)
+#   - Clean initial condition → clean vortex ring
+#   - Single vortex (Δm = +1 transition)
+#   - Scalar LHY justified (initially fully polarized)
+#
+# Parameters (dimensionless, ω_ref = 2π × 110 Hz):
+#   c0 ≈ 4689, c_dd ≈ 7647, c1 = 0 (DDI-only)
+#   Trap: (1.0, 1.0, 1.182) — matches (110, 110, 130) Hz
+#   N = 50000 atoms
+#   Grid: 64³ or 32³ for quick test
+#   Time scale: ~10 ω⁻¹ ≈ 14 ms
+# ================================================================
+
+experiment:
+  version: 3
+  name: "Eu151 m=-6 → m=-5 Spin Relaxation"
+  type: dynamics
+
+  system:
+    atom: Eu151
+    grid:
+      n_points: [64, 64, 64]  # Use 32³ for quick test
+      box_size: [16.0, 16.0, 16.0]
+    interactions:
+      c_total: 4689.0
+      c1_ratio: 0.0  # DDI-only (c1 unknown for Eu151)
+      c_lhy: 1135.0  # Lima-Pelster Q5 correction for ε_dd=0.544
+    ddi:
+      enabled: true
+      c_dd: 7647.0
+
+  # Ground state: m = -6 fully polarized at strong field
+  ground_state:
+    dt: 0.001
+    n_steps: 5000
+    tol: 1.0e-8
+    initial_state: ferromagnetic  # m = +F = +6
+    # Note: We'll manually flip to m=-6 by inverting field
+    zeeman:
+      p: -100.0  # Negative field → m = -F = -6 is ground state
+      q: 0.0
+    potential:
+      type: harmonic
+      omega: [1.0, 1.0, 1.182]  # (110, 110, 130) Hz
+    enable_ddi: true
+
+  sequence:
+    # ---- Phase 1: Fast quench to zero field ----
+    # Experimental timescale: ~0.2 ms ≈ 0.14 ω⁻¹
+    - name: field_quench
+      duration: 0.1
+      dt: 0.0005
+      save_every: 20
+      zeeman:
+        p:
+          from: -100.0
+          to: 0.0  # Zero field
+        q: 0.0
+      potential:
+        type: harmonic
+        omega: [1.0, 1.0, 1.182]
+
+    # ---- Phase 2: Spin relaxation at zero field ----
+    # DDI drives m=-6 → m=-5 deterministically
+    # No noise needed - clean initial state
+    # Duration: ~10 ω⁻¹ ≈ 14 ms (observe vortex formation)
+    - name: spin_relaxation
+      duration: 10.0
+      dt: 0.001
+      save_every: 100
+      integrator:
+        method: adaptive
+        tol: 1.0e-5
+        dt_min: 1.0e-4
+        dt_max: 0.005
+      zeeman:
+        p: 0.0
+        q: 0.0
+      potential:
+        type: harmonic
+        omega: [1.0, 1.0, 1.182]
+
+  observables:
+    always: [norm, magnetization, angular_momentum]
+    on_save: [energy, populations, energy_decomposition]
+    final_only: [phase_classification]
+    spatial_sampling: 0.5  # Save 50% of spatial data
+
+  output:
+    dir: "output/eu151_spin_relaxation"
+    csv: true
+    save_psi: true  # Save wavefunction for detailed analysis
+    checkpoint:
+      enabled: true
+      interval: 1000

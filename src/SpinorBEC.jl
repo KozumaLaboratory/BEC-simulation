@@ -13,65 +13,85 @@ using SpecialFunctions: erfcx
 
 const TIMER = TimerOutput()
 
+# ========================================
+# FOUNDATION: Core types, math, backend
+# ========================================
+
 # 1. Type definitions (must be first)
-include("types.jl")
+include("foundation/types.jl")
 
-# 2. Units (needed by atoms.jl and others)
-include("io/units.jl")
+# 2. Mathematical foundation
+include("foundation/grid.jl")
+include("foundation/fft_utils.jl")
+include("foundation/backend.jl")
+include("foundation/spin_matrices.jl")
+include("foundation/spinor_utils.jl")
+include("foundation/clebsch_gordan.jl")
+include("foundation/spherical_harmonics.jl")
 
-# 3. Mathematical foundation
-include("math/grid.jl")
-include("math/fft_utils.jl")
-include("math/backend.jl")
-include("math/spin_matrices.jl")
-include("math/spinor_utils.jl")
-include("math/clebsch_gordan.jl")
-include("math/spherical_harmonics.jl")
+# ========================================
+# HAMILTONIAN: Interactions & Potentials
+# ========================================
 
-# 4. Interactions
-include("interactions/interactions.jl")
-include("interactions/spin_mixing.jl")
-include("interactions/nematic.jl")
-include("interactions/tensor_interaction.jl")
-include("interactions/ddi.jl")
-include("interactions/ddi_padded.jl")
-include("interactions/lhy.jl")
-include("interactions/losses.jl")
+# 3. Interactions
+include("hamiltonian/interactions/interactions.jl")
+include("hamiltonian/interactions/spin_mixing.jl")
+include("hamiltonian/interactions/nematic.jl")
+include("hamiltonian/interactions/tensor_interaction.jl")
+include("hamiltonian/interactions/ddi.jl")
+include("hamiltonian/interactions/ddi_padded.jl")
+include("hamiltonian/interactions/lhy.jl")
+include("hamiltonian/interactions/losses.jl")
 
-# 5. Potentials
-include("potentials/potentials.jl")
-include("potentials/zeeman.jl")
-include("potentials/raman.jl")
-include("potentials/optics.jl")  # Must be before laser_potential (defines OpticalBeam)
-include("potentials/laser_potential.jl")
-include("potentials/optical_trap.jl")
+# 4. Potentials
+include("hamiltonian/potentials/potentials.jl")
+include("hamiltonian/potentials/zeeman.jl")
+include("hamiltonian/potentials/raman.jl")
+include("hamiltonian/potentials/optics.jl")  # Must be before laser_potential (defines OpticalBeam)
+include("hamiltonian/potentials/laser_potential.jl")
+include("hamiltonian/potentials/optical_trap.jl")
 
-# 6. Propagators (depend on interactions & potentials)
-include("physics/propagators.jl")
-include("physics/yoshida.jl")
+# 5. Propagators
+include("hamiltonian/propagators.jl")
+include("hamiltonian/yoshida.jl")
+include("hamiltonian/split_step.jl")
 
-# 7. Time evolution core
-include("physics/split_step.jl")
-include("physics/adaptive.jl")
+# ========================================
+# WORKFLOW: Initialization, I/O, monitoring, experiments
+# ========================================
 
-# 8. Initialization
-include("initial/atoms.jl")
-include("initial/thomas_fermi.jl")
-include("initial/initialization.jl")
+# 6. Units (needed by atoms.jl and others)
+include("workflow/io/units.jl")
 
-# 9. Monitoring system
-include("monitoring/ascii_plot.jl")
-include("monitoring/logging.jl")
-include("monitoring/resource_monitor.jl")
-include("monitoring/notifications.jl")
-include("monitoring/progress.jl")
-include("monitoring/live_monitor.jl")
+# 7. Initialization
+include("workflow/initialization/atoms.jl")
+include("workflow/initialization/thomas_fermi.jl")
+include("workflow/initialization/initialization.jl")
 
-# 10. Simulation engines
-include("physics/simulation.jl")
-include("physics/ground_state.jl")
+# 8. I/O
+include("workflow/io/io.jl")
+include("workflow/io/unitful_support.jl")
 
-# 11. Analysis & observables
+# 9. Monitoring system (needed by solvers)
+include("workflow/monitoring/ascii_plot.jl")
+include("workflow/monitoring/logging.jl")
+include("workflow/monitoring/resource_monitor.jl")
+include("workflow/monitoring/notifications.jl")
+include("workflow/monitoring/progress.jl")
+include("workflow/monitoring/live_monitor.jl")
+
+# 10. Experiments (defines config types needed by phases)
+include("workflow/experiments/adaptive_advice.jl")
+include("workflow/experiments/experiment.jl")  # Defines PhaseConfig, GroundStateConfig, etc.
+include("workflow/experiments/experiment_runner.jl")
+include("workflow/experiments/config.jl")  # Uses types from experiment.jl
+include("workflow/experiments/config_runner.jl")
+
+# ========================================
+# ANALYSIS: Observables & diagnostics
+# ========================================
+
+# 11. Analysis (needed by solvers)
 include("analysis/observables.jl")
 include("analysis/energy.jl")
 include("analysis/currents.jl")
@@ -81,23 +101,21 @@ include("analysis/majorana.jl")
 include("analysis/tof.jl")
 include("analysis/stability_analysis.jl")
 
-# 12. Experiment scenarios (must be before phases)
-include("experiments/adaptive_advice.jl")
-include("experiments/experiment.jl")  # Defines PhaseConfig, GroundStateConfig, etc.
-include("experiments/experiment_runner.jl")
-include("experiments/config.jl")  # Uses types from experiment.jl
-include("experiments/config_runner.jl")
+# 12. Phase exploration (needs experiments for ScanExperiment)
+include("analysis/phases/phase_classification.jl")
+include("analysis/phases/phase_boundary.jl")
+include("analysis/phases/phase_scan.jl")
+include("analysis/phases/bogoliubov.jl")
 
-# 13. Phase exploration
-include("phases/phase_classification.jl")
-include("phases/phase_boundary.jl")
-include("phases/phase_scan.jl")
-include("phases/continuation.jl")
-include("phases/bogoliubov.jl")
+# ========================================
+# SOLVERS: Ground state & time evolution
+# ========================================
 
-# 14. I/O (units.jl already included earlier)
-include("io/io.jl")
-include("io/unitful_support.jl")
+# 13. Solvers (depend on observables and monitoring)
+include("solvers/ground_state.jl")
+include("solvers/simulation.jl")
+include("solvers/adaptive.jl")
+include("solvers/continuation.jl")
 
 # Types
 export GridConfig, Grid, SpinSystem, SpinMatrices

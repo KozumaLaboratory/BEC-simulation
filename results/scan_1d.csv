@@ -1,0 +1,16 @@
+c1_ratio,phase,point_group,energy,spin_order,nematic_order,biaxiality,converged
+-0.01389,nematic,trivial,44.165846,0.0,1.0,1.0,true
+-0.0109136,nematic,trivial,38.318255,0.0,1.0,1.0,true
+-0.00793714,nematic,trivial,34.197098,0.0,1.0,1.0,true
+-0.00496071,nematic,trivial,31.126752,0.0,1.0,1.0,true
+-0.00198429,nematic,trivial,28.743465,0.0,1.0,1.0,true
+0.000992143,nematic,trivial,26.83402,0.0,1.0,1.0,true
+0.00396857,nematic,trivial,25.265165,0.0,1.0,1.0,true
+0.006945,nematic,trivial,23.949338,0.0,1.0,1.0,true
+0.00992143,nematic,trivial,22.826632,0.0,1.0,1.0,true
+0.0128979,nematic,trivial,21.854695,0.0,1.0,1.0,true
+0.0158743,nematic,trivial,21.002804,0.0,1.0,1.0,true
+0.0188507,nematic,trivial,20.248212,0.0,1.0,1.0,true
+0.0218271,nematic,trivial,19.573747,0.0,1.0,1.0,true
+0.0248036,nematic,trivial,18.966183,0.0,1.0,1.0,true
+0.02778,nematic,trivial,18.415139,0.0,1.0,1.0,true

@@ -1,0 +1,78 @@
+# ================================================================
+# Eu151 Spin Relaxation (Quick Test, 32³ grid)
+# ================================================================
+# Same as eu151_spin_relaxation.yaml but with:
+#   - 32³ grid (faster, ~5-10 min)
+#   - Shorter duration (5 ω⁻¹)
+#   - Coarser saves
+
+experiment:
+  version: 3
+  name: "Eu151 m=-6 → m=-5 (Quick Test 32³)"
+  type: dynamics
+
+  system:
+    atom: Eu151
+    grid:
+      n_points: [32, 32, 32]
+      box_size: [12.0, 12.0, 12.0]
+    interactions:
+      c_total: 4689.0
+      c1_ratio: 0.0
+      c_lhy: 1135.0
+    ddi:
+      enabled: true
+      c_dd: 7647.0
+
+  ground_state:
+    dt: 0.001
+    n_steps: 3000
+    tol: 1.0e-8
+    initial_state: ferromagnetic
+    zeeman:
+      p: -100.0  # m = -6
+      q: 0.0
+    potential:
+      type: harmonic
+      omega: [1.0, 1.0, 1.182]
+    enable_ddi: true
+
+  sequence:
+    - name: field_quench
+      duration: 0.1
+      dt: 0.0005
+      save_every: 20
+      zeeman:
+        p:
+          from: -100.0
+          to: 0.0
+        q: 0.0
+      potential:
+        type: harmonic
+        omega: [1.0, 1.0, 1.182]
+
+    - name: spin_relaxation
+      duration: 5.0
+      dt: 0.001
+      save_every: 50
+      integrator:
+        method: adaptive
+        tol: 1.0e-5
+        dt_min: 1.0e-4
+        dt_max: 0.005
+      zeeman:
+        p: 0.0
+        q: 0.0
+      potential:
+        type: harmonic
+        omega: [1.0, 1.0, 1.182]
+
+  observables:
+    always: [norm, magnetization, angular_momentum]
+    on_save: [energy, populations]
+    spatial_sampling: 1.0
+
+  output:
+    dir: "output/eu151_spin_relaxation_32"
+    csv: true
+    save_psi: false  # Faster without full psi saves
