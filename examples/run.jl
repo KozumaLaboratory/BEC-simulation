@@ -23,13 +23,17 @@ function run_and_save(yaml_path)
 
     result = run_config(config)
 
-    if haskey(result, :ground_state_energy)
-        println("  Ground state: E=$(result.ground_state_energy), converged=$(result.ground_state_converged)")
-    end
+    is_phase_scan = isa(result, AbstractArray)
 
-    if haskey(result, :phase_results)
-        for (i, (name, sim)) in enumerate(zip(result.phase_names, result.phase_results))
-            println("  Phase $i ($name): t=$(sim.times[1])→$(sim.times[end]), E=$(sim.energies[end])")
+    if !is_phase_scan
+        if haskey(result, :ground_state_energy)
+            println("  Ground state: E=$(result.ground_state_energy), converged=$(result.ground_state_converged)")
+        end
+
+        if haskey(result, :phase_results)
+            for (i, (name, sim)) in enumerate(zip(result.phase_names, result.phase_results))
+                println("  Phase $i ($name): t=$(sim.times[1])→$(sim.times[end]), E=$(sim.energies[end])")
+            end
         end
     end
 
@@ -55,31 +59,37 @@ function run_and_save(yaml_path)
     if gs.potential.type == :harmonic
         save_data["trap_omega"] = Float64.(gs.potential.params["omega"])
     end
-    if haskey(result, :ground_state_energy)
-        save_data["ground_state_energy"] = result.ground_state_energy
-        save_data["ground_state_converged"] = result.ground_state_converged
-    end
-    if haskey(result, :phase_results)
-        save_data["phase_names"] = result.phase_names
-        spec = config.spec
-        for (i, sim) in enumerate(result.phase_results)
-            save_data["phase_$(i)_times"] = sim.times
-            save_data["phase_$(i)_energies"] = sim.energies
-            save_data["phase_$(i)_norms"] = sim.norms
-            save_data["phase_$(i)_magnetizations"] = sim.magnetizations
-            save_data["phase_$(i)_psi_snapshots"] = sim.psi_snapshots
-            if i <= length(spec.sequence)
-                ph = spec.sequence[i]
-                p0, p1 = _ramp_endpoints(ph.zeeman_p)
-                q0, q1 = _ramp_endpoints(ph.zeeman_q)
-                save_data["phase_$(i)_zeeman"] = [p0, p1, q0, q1]
-                save_data["phase_$(i)_duration"] = ph.duration
+    
+    if !is_phase_scan
+        if haskey(result, :ground_state_energy)
+            save_data["ground_state_energy"] = result.ground_state_energy
+            save_data["ground_state_converged"] = result.ground_state_converged
+        end
+        if haskey(result, :phase_results)
+            save_data["phase_names"] = result.phase_names
+            spec = config.spec
+            for (i, sim) in enumerate(result.phase_results)
+                save_data["phase_$(i)_times"] = sim.times
+                save_data["phase_$(i)_energies"] = sim.energies
+                save_data["phase_$(i)_norms"] = sim.norms
+                save_data["phase_$(i)_magnetizations"] = sim.magnetizations
+                save_data["phase_$(i)_psi_snapshots"] = sim.psi_snapshots
+                if i <= length(spec.sequence)
+                    ph = spec.sequence[i]
+                    p0, p1 = _ramp_endpoints(ph.zeeman_p)
+                    q0, q1 = _ramp_endpoints(ph.zeeman_q)
+                    save_data["phase_$(i)_zeeman"] = [p0, p1, q0, q1]
+                    save_data["phase_$(i)_duration"] = ph.duration
+                end
             end
         end
+        if haskey(result, :psi)
+            save_data["psi"] = result.psi
+        end
+    else # is_phase_scan == true
+        save_data["phase_scan_results"] = result
     end
-    if haskey(result, :psi)
-        save_data["psi"] = result.psi
-    end
+
     jldopen(out, "w") do f
         for (k, v) in save_data
             f[k] = v

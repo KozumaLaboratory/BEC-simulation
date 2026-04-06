@@ -289,6 +289,7 @@ function run_simulation_checkpointed!(
     checkpoint_dir::String = "checkpoints",
     checkpoint_every::Int = 1000,
     callback::Union{Nothing,Function} = nothing,
+    callbacks::Union{Nothing,SimulationCallbacks} = nothing,
     resume::Bool = false,
 ) where {N}
     mkpath(checkpoint_dir)
@@ -310,16 +311,28 @@ function run_simulation_checkpointed!(
 
     start_step = ws.state.step
     remaining = ws.sim_params.n_steps - start_step
-    remaining <= 0 && return run_simulation!(ws; callback)
+    remaining <= 0 && return run_simulation!(ws; callback, callbacks)
 
-    checkpoint_cb = function (ws_cb, step)
-        global_step = start_step + step
-        if global_step % checkpoint_every == 0
-            fname = joinpath(checkpoint_dir, "step_$(lpad(global_step, 8, '0')).jld2")
-            save_state(fname, ws_cb)
-        end
-        callback !== nothing && callback(ws_cb, step)
-    end
+    # Create checkpoint callback compatible with new signature
+    checkpoint_callbacks = SimulationCallbacks(
+        on_snapshot = function (ws_cb, step, snapshot)
+            global_step = start_step + step
+            if global_step % checkpoint_every == 0
+                fname = joinpath(checkpoint_dir, "step_$(lpad(global_step, 8, '0')).jld2")
+                save_state(fname, ws_cb)
+            end
+            # Call user's old-style callback if provided (backward compatibility)
+            if callback !== nothing
+                callback(ws_cb, step)
+            end
+            # Call user's new callbacks if provided
+            if callbacks !== nothing && callbacks.on_snapshot !== nothing
+                callbacks.on_snapshot(ws_cb, step, snapshot)
+            end
+        end,
+        on_step = callbacks !== nothing ? callbacks.on_step : nothing,
+        on_complete = callbacks !== nothing ? callbacks.on_complete : nothing,
+    )
 
     sp_orig = ws.sim_params
     sp_remain = SimParams(
@@ -355,7 +368,7 @@ function run_simulation_checkpointed!(
         ws.lhy,
     )
 
-    result = run_simulation!(ws_remain; callback = checkpoint_cb)
+    result = run_simulation!(ws_remain; callbacks = checkpoint_callbacks)
 
     ws.state.t = ws_remain.state.t
     ws.state.step = start_step + remaining
