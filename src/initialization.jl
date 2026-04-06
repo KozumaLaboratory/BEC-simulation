@@ -17,7 +17,9 @@ function init_psi(
         mid = (D + 1) ÷ 2
         _set_component!(psi, gauss, N, n_pts, mid)
     elseif state == :ferromagnetic
-        _set_component!(psi, gauss, N, n_pts, 1)
+        _set_component!(psi, gauss, N, n_pts, 1)  # m = +F
+    elseif state == :ferromagnetic_min
+        _set_component!(psi, gauss, N, n_pts, D)  # m = -F
     elseif state == :uniform
         for c = 1:D
             _set_component!(psi, gauss / sqrt(D), N, n_pts, c)
