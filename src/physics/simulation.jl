@@ -1,3 +1,46 @@
+"""
+    SimulationCallbacks
+
+Event-driven callback system for simulation monitoring.
+
+# Fields
+- `on_step::Union{Nothing, Function}`: Called every step with `(ws, step, times, energies)`
+- `on_snapshot::Union{Nothing, Function}`: Called when snapshot is saved with `(ws, step, snapshot)`
+- `on_complete::Union{Nothing, Function}`: Called when simulation completes with `(ws, result)`
+
+# Example
+```julia
+callbacks = SimulationCallbacks(
+    on_step = (ws, step, times, energies) -> begin
+        if step % 100 == 0
+            @info "Step \$step" energy=energies[end]
+        end
+    end,
+    on_snapshot = (ws, step, snapshot) -> begin
+        # Custom snapshot processing
+    end
+)
+
+result = run_simulation!(ws, callbacks=callbacks)
+```
+"""
+struct SimulationCallbacks
+    on_step::Union{Nothing,Function}
+    on_snapshot::Union{Nothing,Function}
+    on_complete::Union{Nothing,Function}
+end
+
+SimulationCallbacks(;
+    on_step = nothing,
+    on_snapshot = nothing,
+    on_complete = nothing,
+) = SimulationCallbacks(on_step, on_snapshot, on_complete)
+
+# Backward compatibility: convert simple function to callbacks
+_normalize_callbacks(::Nothing) = SimulationCallbacks()
+_normalize_callbacks(f::Function) = SimulationCallbacks(on_snapshot = f)
+_normalize_callbacks(c::SimulationCallbacks) = c
+
 function _record_snapshot!(times, energies, norms, mags, snapshots, ws, sys)
     push!(times, ws.state.t)
     push!(energies, total_energy(ws))
@@ -17,13 +60,53 @@ function _check_energy_drift(energies, norms, E_now, nrm_now, t)
     end
 end
 
+"""
+    run_simulation!(ws::Workspace; callback=nothing, callbacks=nothing, live_monitor=nothing)
+
+Run time evolution simulation with optional event-driven monitoring.
+
+# Arguments
+- `ws::Workspace`: Simulation workspace
+- `callback::Union{Nothing,Function}`: Legacy callback (for backward compatibility)
+- `callbacks::Union{Nothing,SimulationCallbacks}`: Event-driven callbacks
+- `live_monitor::Union{Nothing,LiveMonitor}`: Real-time monitoring
+
+# Returns
+- `SimulationResult`: Times, energies, norms, magnetizations, and snapshots
+
+# Example
+```julia
+# Basic usage
+result = run_simulation!(ws)
+
+# With live monitoring
+monitor = LiveMonitor(output_file="live_data.json", update_interval=50)
+result = run_simulation!(ws, live_monitor=monitor)
+
+# With custom callbacks
+callbacks = SimulationCallbacks(
+    on_step = (ws, step, times, energies) -> @info "Step \$step",
+    on_snapshot = (ws, step, snapshot) -> save_debug("snapshot_\$step.jld2", snapshot)
+)
+result = run_simulation!(ws, callbacks=callbacks)
+```
+"""
 function run_simulation!(
     ws::Workspace{N};
     callback::Union{Nothing,Function} = nothing,
+    callbacks::Union{Nothing,SimulationCallbacks} = nothing,
+    live_monitor::Union{Nothing,LiveMonitor} = nothing,
 ) where {N}
     sp = ws.sim_params
     sys = ws.spin_matrices.system
     it = sp.imaginary_time
+
+    # Normalize callbacks (backward compatibility)
+    cbs = if callbacks !== nothing
+        callbacks
+    else
+        _normalize_callbacks(callback)
+    end
 
     times = Float64[]
     energies = Float64[]
@@ -41,8 +124,9 @@ function run_simulation!(
             energies,
             norms,
             mags,
-            snapshots;
-            callback,
+            snapshots,
+            cbs,
+            live_monitor,
         )
     else
         _run_simulation_leapfrog!(
@@ -53,12 +137,20 @@ function run_simulation!(
             energies,
             norms,
             mags,
-            snapshots;
-            callback,
+            snapshots,
+            cbs,
+            live_monitor,
         )
     end
 
-    SimulationResult(times, energies, norms, mags, snapshots)
+    result = SimulationResult(times, energies, norms, mags, snapshots)
+
+    # on_complete callback
+    if cbs.on_complete !== nothing
+        cbs.on_complete(ws, result)
+    end
+
+    return result
 end
 
 function _run_simulation_standard!(
@@ -69,13 +161,25 @@ function _run_simulation_standard!(
     energies,
     norms,
     mags,
-    snapshots;
-    callback = nothing,
+    snapshots,
+    callbacks::SimulationCallbacks,
+    live_monitor::Union{Nothing,LiveMonitor},
 ) where {N}
     t_start = time()
     for step = 1:sp.n_steps
         split_step!(ws)
 
+        # on_step callback (called every step)
+        if callbacks.on_step !== nothing
+            callbacks.on_step(ws, step, times, energies)
+        end
+
+        # Update live monitor (throttled internally)
+        if live_monitor !== nothing
+            update!(live_monitor, ws, step)
+        end
+
+        # Snapshot and logging
         if step % sp.save_every == 0
             _record_snapshot!(times, energies, norms, mags, snapshots, ws, sys)
 
@@ -88,8 +192,9 @@ function _run_simulation_standard!(
             )
             flush(stdout)
 
-            if callback !== nothing
-                callback(ws, step)
+            # on_snapshot callback
+            if callbacks.on_snapshot !== nothing
+                callbacks.on_snapshot(ws, step, snapshots[end])
             end
         end
     end
@@ -112,8 +217,9 @@ function _run_simulation_leapfrog!(
     energies,
     norms,
     mags,
-    snapshots;
-    callback = nothing,
+    snapshots,
+    callbacks::SimulationCallbacks,
+    live_monitor::Union{Nothing,LiveMonitor},
 ) where {N}
     dt = sp.dt
     n_comp = sys.n_components
@@ -152,11 +258,22 @@ function _run_simulation_leapfrog!(
         ws.state.t += dt
         ws.state.step += 1
 
+        # on_step callback (called every step)
+        if callbacks.on_step !== nothing
+            callbacks.on_step(ws, step, times, energies)
+        end
+
+        # Update live monitor (throttled internally)
+        if live_monitor !== nothing
+            update!(live_monitor, ws, step)
+        end
+
         if is_save
             _record_snapshot!(times, energies, norms, mags, snapshots, ws, sys)
 
-            if callback !== nothing
-                callback(ws, step)
+            # on_snapshot callback
+            if callbacks.on_snapshot !== nothing
+                callbacks.on_snapshot(ws, step, snapshots[end])
             end
         end
 

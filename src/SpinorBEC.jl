@@ -13,63 +13,91 @@ using SpecialFunctions: erfcx
 
 const TIMER = TimerOutput()
 
+# 1. Type definitions (must be first)
 include("types.jl")
-include("backend.jl")
-include("units.jl")
-include("grid.jl")
-include("spin_matrices.jl")
-include("spinor_utils.jl")
-include("clebsch_gordan.jl")
-include("atoms.jl")
-include("interactions.jl")
-include("potentials.jl")
-include("zeeman.jl")
-include("propagators.jl")
-include("spin_mixing.jl")
-include("nematic.jl")
-include("tensor_interaction.jl")
-include("losses.jl")
-include("split_step.jl")
-include("raman.jl")
-include("ddi.jl")
-include("ddi_padded.jl")
-include("optical_trap.jl")
-include("optics.jl")
-include("laser_potential.jl")
-include("thomas_fermi.jl")
-include("tof.jl")
-include("fft_utils.jl")
-include("observables.jl")
-include("energy.jl")
-include("currents.jl")
-include("vorticity.jl")
-include("diagnostics.jl")
-include("bogoliubov.jl")
-include("lhy.jl")
-include("majorana.jl")
-include("phase_classification.jl")
-include("stability_analysis.jl")
-include("spherical_harmonics.jl")
-include("initialization.jl")
-include("ascii_plot.jl")
-include("logging.jl")
-include("resource_monitor.jl")
-include("notifications.jl")
-include("adaptive_advice.jl")
-include("progress.jl")
-include("ground_state.jl")
-include("continuation.jl")
-include("phase_boundary.jl")
-include("simulation.jl")
-include("adaptive.jl")
-include("yoshida.jl")
-include("experiment.jl")
-include("experiment_runner.jl")
-include("config.jl")
-include("phase_scan.jl")
-include("config_runner.jl")
-include("io.jl")
-include("unitful_support.jl")
+
+# 2. Units (needed by atoms.jl and others)
+include("io/units.jl")
+
+# 3. Mathematical foundation
+include("math/grid.jl")
+include("math/fft_utils.jl")
+include("math/backend.jl")
+include("math/spin_matrices.jl")
+include("math/spinor_utils.jl")
+include("math/clebsch_gordan.jl")
+include("math/spherical_harmonics.jl")
+
+# 4. Interactions
+include("interactions/interactions.jl")
+include("interactions/spin_mixing.jl")
+include("interactions/nematic.jl")
+include("interactions/tensor_interaction.jl")
+include("interactions/ddi.jl")
+include("interactions/ddi_padded.jl")
+include("interactions/lhy.jl")
+include("interactions/losses.jl")
+
+# 5. Potentials
+include("potentials/potentials.jl")
+include("potentials/zeeman.jl")
+include("potentials/raman.jl")
+include("potentials/optics.jl")  # Must be before laser_potential (defines OpticalBeam)
+include("potentials/laser_potential.jl")
+include("potentials/optical_trap.jl")
+
+# 6. Propagators (depend on interactions & potentials)
+include("physics/propagators.jl")
+include("physics/yoshida.jl")
+
+# 7. Time evolution core
+include("physics/split_step.jl")
+include("physics/adaptive.jl")
+
+# 8. Initialization
+include("initial/atoms.jl")
+include("initial/thomas_fermi.jl")
+include("initial/initialization.jl")
+
+# 9. Monitoring system
+include("monitoring/ascii_plot.jl")
+include("monitoring/logging.jl")
+include("monitoring/resource_monitor.jl")
+include("monitoring/notifications.jl")
+include("monitoring/progress.jl")
+include("monitoring/live_monitor.jl")
+
+# 10. Simulation engines
+include("physics/simulation.jl")
+include("physics/ground_state.jl")
+
+# 11. Analysis & observables
+include("analysis/observables.jl")
+include("analysis/energy.jl")
+include("analysis/currents.jl")
+include("analysis/vorticity.jl")
+include("analysis/diagnostics.jl")
+include("analysis/majorana.jl")
+include("analysis/tof.jl")
+include("analysis/stability_analysis.jl")
+
+# 12. Experiment scenarios (must be before phases)
+include("experiments/adaptive_advice.jl")
+include("experiments/experiment.jl")  # Defines PhaseConfig, GroundStateConfig, etc.
+include("experiments/experiment_runner.jl")
+include("experiments/config.jl")  # Uses types from experiment.jl
+include("experiments/config_runner.jl")
+
+# 13. Phase exploration
+include("phases/phase_classification.jl")
+include("phases/phase_boundary.jl")
+include("phases/phase_scan.jl")
+include("phases/continuation.jl")
+include("phases/bogoliubov.jl")
+
+# 14. I/O (units.jl already included earlier)
+include("io/io.jl")
+include("io/unitful_support.jl")
 
 # Types
 export GridConfig, Grid, SpinSystem, SpinMatrices
@@ -199,6 +227,9 @@ export scan_phase_diagram_2d
 export find_phase_boundary
 export run_simulation!, run_simulation_checkpointed!
 export run_simulation_adaptive!, run_simulation_yoshida!, make_workspace, init_psi
+
+# Monitoring & Callbacks
+export SimulationCallbacks, LiveMonitor
 
 # I/O
 export save_state, load_state
