@@ -143,12 +143,16 @@ function _run_dynamics_sequence(
 
     phase_results = SimulationResult[]
     phase_names = String[]
+    phase_times = Float64[]
+    phase_rates = Float64[]
     t_offset = 0.0
     prev_potential_config = config.ground_state.potential
+    simulation_start = time()
 
     for (i, phase) in enumerate(spec.sequence)
-        verbose &&
-            println("Phase $i: $(phase.name) (duration=$(phase.duration), dt=$(phase.dt))")
+        if verbose
+            print_phase_header(phase.name, phase.duration, phase.dt, round(Int, phase.duration / phase.dt))
+        end
 
         pot_cfg = phase.potential !== nothing ? phase.potential : prev_potential_config
         potential = _build_potential(pot_cfg, ndim)
@@ -158,6 +162,9 @@ function _run_dynamics_sequence(
 
         n_steps = round(Int, phase.duration / phase.dt)
         sp = SimParams(; dt = phase.dt, n_steps, save_every = phase.save_every)
+
+        # Create progress reporter
+        progress = verbose ? ProgressReporter(phase.name, n_steps; print_every=max(1, div(n_steps, 50))) : nothing
 
         ws = make_workspace(;
             grid,
@@ -206,7 +213,22 @@ function _run_dynamics_sequence(
             )
             out.result
         else
-            run_simulation!(ws)
+            phase_start_time = time()
+            E_initial = total_energy(ws)
+
+            # Callback for progress reporting
+            callback = progress !== nothing ? (ws_cb, step) -> print_progress(progress, ws_cb, step) : nothing
+            result = run_simulation!(ws; callback)
+
+            if verbose
+                phase_elapsed = time() - phase_start_time
+                step_rate = n_steps / phase_elapsed
+                print_phase_summary(phase.name, phase_elapsed, E_initial, result.energies[end], step_rate)
+                push!(phase_times, phase_elapsed)
+                push!(phase_rates, step_rate)
+            end
+
+            result
         end
 
         psi_current = copy(ws.state.psi)
@@ -214,8 +236,11 @@ function _run_dynamics_sequence(
 
         push!(phase_results, sim_result)
         push!(phase_names, phase.name)
+    end
 
-        verbose && println("  final t=$(ws.state.t), E=$(sim_result.energies[end])")
+    if verbose && !isempty(phase_times)
+        total_time = time() - simulation_start
+        print_simulation_summary(total_time, phase_names, phase_times, phase_rates)
     end
 
     (phase_results, phase_names)
