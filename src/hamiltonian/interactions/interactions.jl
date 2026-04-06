@@ -349,14 +349,7 @@ function lima_pelster_Q5(eps_dd::Float64)
         theta = nodes[i]
         ct = cos(theta)
         arg = 1.0 + eps_dd * (3.0 * ct^2 - 1.0)
-        arg < 0.0 && throw(
-            DomainError(
-                arg,
-                "Negative argument in Q₅ integrand at θ=$(theta): " *
-                "1 + ε_dd(3cos²θ-1) = $arg for ε_dd=$eps_dd",
-            ),
-        )
-        s += weights[i] * sin(theta) / 2.0 * arg^(5 / 2)
+        s += weights[i] * sin(theta) / 2.0 * (arg >= 0.0 ? arg^(5 / 2) : 0.0)
     end
     s
 end

@@ -100,6 +100,7 @@ include("analysis/diagnostics.jl")
 include("analysis/majorana.jl")
 include("analysis/tof.jl")
 include("analysis/stability_analysis.jl")
+include("analysis/spin_rotation.jl")
 
 # 12. Phase exploration (needs experiments for ScanExperiment)
 include("analysis/phases/phase_classification.jl")
@@ -183,6 +184,10 @@ export LaserBeamPotential, crossed_laser_trap
 # Thomas-Fermi
 export thomas_fermi_density, init_psi_thomas_fermi
 export simulate_tof
+
+# Spin rotation & EdH/FL reproduction
+export spin_rotation_matrix, rotate_quantization_axis
+export dipolar_field, apply_edh_rotation, apply_fl_alignment, column_density
 
 # Propagators
 export apply_kinetic_step!, apply_kinetic_step_batched!, apply_diagonal_potential_step!

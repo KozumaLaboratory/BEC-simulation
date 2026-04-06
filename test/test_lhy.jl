@@ -149,8 +149,11 @@
             @test lima_pelster_Q5(0.5) ≈ 1.3899 rtol = 0.01
         end
 
-        @testset "negative arg throws DomainError" begin
-            @test_throws DomainError lima_pelster_Q5(1.5)
+        @testset "ε_dd > 1 returns finite positive Q5 (Wächtler-Santos extension)" begin
+            Q5 = lima_pelster_Q5(1.5)
+            @test Q5 > 0.0
+            @test isfinite(Q5)
+            @test Q5 > lima_pelster_Q5(1.0)
         end
 
         @testset "compute_c_lhy_with_ddi" begin
