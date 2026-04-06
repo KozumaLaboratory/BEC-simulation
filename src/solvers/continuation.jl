@@ -1,12 +1,34 @@
 """
-    scan_continuation(; param_values, make_interactions, grid, atom, ...) → Vector{NamedTuple}
+    _normalize_sweep_result(result) → NamedTuple
+
+Convert sweep callback return value to a NamedTuple of find_ground_state kwargs.
+Accepts InteractionParams (legacy) or NamedTuple (new API).
+"""
+_normalize_sweep_result(ip::InteractionParams) = (interactions = ip,)
+_normalize_sweep_result(nt::NamedTuple) = nt
+
+"""
+    scan_continuation(; param_values, make_params, grid, atom, ...) → Vector{NamedTuple}
 
 Sweep a parameter using continuation: use previous ground state as initial guess for
 next point. Falls back to multistart search on energy jumps.
+
+`make_params(val)` returns either:
+- `InteractionParams` (legacy — varies interactions only)
+- `NamedTuple` of `find_ground_state` kwargs to override at each point
+  e.g. `p -> (zeeman = ZeemanParams(p, 0.0),)` or
+  `c -> (c_dd = c, enable_ddi = c > 0)`
+
+All other kwargs are forwarded to `find_ground_state` as fixed defaults.
+
+# Legacy keyword
+
+`make_interactions` is accepted as an alias for `make_params` (backward compat).
 """
 function scan_continuation(;
     param_values::AbstractVector{Float64},
-    make_interactions::Function,
+    make_params::Union{Function,Nothing} = nothing,
+    make_interactions::Union{Function,Nothing} = nothing,
     grid,
     atom,
     initial_state::Symbol = :polar,
@@ -15,6 +37,8 @@ function scan_continuation(;
     n_steps_fresh::Int = 5000,
     kwargs...,
 )
+    sweep_fn = _resolve_sweep_fn(make_params, make_interactions)
+
     results = NamedTuple[]
     prev_psi = nothing
     prev_energy = NaN
@@ -22,25 +46,30 @@ function scan_continuation(;
     sm = spin_matrices(atom.F)
 
     for (i, val) in enumerate(param_values)
-        interactions = make_interactions(val)
+        overrides = _normalize_sweep_result(sweep_fn(val))
+        base = Dict{Symbol,Any}(kwargs)
+        for (k, v) in pairs(overrides)
+            base[k] = v
+        end
+        delete!(base, :n_steps)
+        delete!(base, :initial_state)
+        delete!(base, :psi_init)
 
         r = if prev_psi !== nothing
             find_ground_state(;
                 grid,
                 atom,
-                interactions,
                 psi_init = copy(prev_psi),
                 n_steps = n_steps_continuation,
-                kwargs...,
+                base...,
             )
         else
             find_ground_state(;
                 grid,
                 atom,
-                interactions,
                 initial_state,
                 n_steps = n_steps_fresh,
-                kwargs...,
+                base...,
             )
         end
 
@@ -50,9 +79,8 @@ function scan_continuation(;
             r = find_ground_state_multistart(;
                 grid,
                 atom,
-                interactions,
                 n_steps = n_steps_fresh,
-                kwargs...,
+                base...,
             )
         end
 
@@ -77,6 +105,16 @@ function scan_continuation(;
     end
 
     results
+end
+
+function _resolve_sweep_fn(make_params, make_interactions)
+    if make_params !== nothing
+        make_params
+    elseif make_interactions !== nothing
+        make_interactions
+    else
+        throw(ArgumentError("Either `make_params` or `make_interactions` must be provided"))
+    end
 end
 
 function _detect_hysteresis(
@@ -108,13 +146,16 @@ function _detect_hysteresis(
 end
 
 """
-    scan_continuation_bidirectional(; param_values, make_interactions, grid, atom, ...) → HysteresisResult
+    scan_continuation_bidirectional(; param_values, make_params, grid, atom, ...) → HysteresisResult
 
 Run forward and backward continuation scans to detect hysteresis in first-order transitions.
+
+See `scan_continuation` for the `make_params` / `make_interactions` interface.
 """
 function scan_continuation_bidirectional(;
     param_values::AbstractVector{Float64},
-    make_interactions::Function,
+    make_params::Union{Function,Nothing} = nothing,
+    make_interactions::Union{Function,Nothing} = nothing,
     grid,
     atom,
     initial_state_forward::Symbol = :polar,
@@ -124,9 +165,11 @@ function scan_continuation_bidirectional(;
     n_steps_fresh::Int = 5000,
     kwargs...,
 )
+    sweep_fn = _resolve_sweep_fn(make_params, make_interactions)
+
     forward = scan_continuation(;
         param_values,
-        make_interactions,
+        make_params = sweep_fn,
         grid,
         atom,
         initial_state = initial_state_forward,
@@ -138,7 +181,7 @@ function scan_continuation_bidirectional(;
 
     backward_raw = scan_continuation(;
         param_values = reverse(param_values),
-        make_interactions,
+        make_params = sweep_fn,
         grid,
         atom,
         initial_state = initial_state_backward,
@@ -161,18 +204,23 @@ function scan_continuation_bidirectional(;
 end
 
 """
-    scan_phase_diagram_2d(; param1_values, param2_values, make_interactions, grid, atom, ...) → Matrix{NamedTuple}
+    scan_phase_diagram_2d(; param1_values, param2_values, make_params, grid, atom, ...) → Matrix{NamedTuple}
 
 2D parameter sweep with continuation from neighboring points.
 Scans along param1 first (inner loop), using continuation from the previous param1 point.
 At each new param2 value, restarts from the end of the previous param2 row.
 
+`make_params(v1, v2)` returns either `InteractionParams` or a `NamedTuple` of overrides.
+
 Returns a Matrix of NamedTuples with shape `(length(param1_values), length(param2_values))`.
+
+See `scan_continuation` for the `make_params` / `make_interactions` interface.
 """
 function scan_phase_diagram_2d(;
     param1_values::AbstractVector{Float64},
     param2_values::AbstractVector{Float64},
-    make_interactions::Function,
+    make_params::Union{Function,Nothing} = nothing,
+    make_interactions::Union{Function,Nothing} = nothing,
     grid,
     atom,
     initial_state::Symbol = :polar,
@@ -181,6 +229,8 @@ function scan_phase_diagram_2d(;
     energy_jump_threshold::Float64 = 0.1,
     kwargs...,
 )
+    sweep_fn = _resolve_sweep_fn(make_params, make_interactions)
+
     n1 = length(param1_values)
     n2 = length(param2_values)
     sm = spin_matrices(atom.F)
@@ -193,25 +243,30 @@ function scan_phase_diagram_2d(;
         prev_energy = NaN
 
         for (i, v1) in enumerate(param1_values)
-            interactions = make_interactions(v1, v2)
+            overrides = _normalize_sweep_result(sweep_fn(v1, v2))
+            base = Dict{Symbol,Any}(kwargs)
+            for (k, v) in pairs(overrides)
+                base[k] = v
+            end
+            delete!(base, :n_steps)
+            delete!(base, :initial_state)
+            delete!(base, :psi_init)
 
             r = if prev_psi !== nothing
                 find_ground_state(;
                     grid,
                     atom,
-                    interactions,
                     psi_init = copy(prev_psi),
                     n_steps = n_steps_continuation,
-                    kwargs...,
+                    base...,
                 )
             else
                 find_ground_state(;
                     grid,
                     atom,
-                    interactions,
                     initial_state,
                     n_steps = n_steps_fresh,
-                    kwargs...,
+                    base...,
                 )
             end
 
@@ -221,9 +276,8 @@ function scan_phase_diagram_2d(;
                 r = find_ground_state_multistart(;
                     grid,
                     atom,
-                    interactions,
                     n_steps = n_steps_fresh,
-                    kwargs...,
+                    base...,
                 )
             end
 
