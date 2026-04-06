@@ -26,17 +26,13 @@ function energy_decomposition(ws::Workspace{N}) where {N}
         _spin_interaction_energy(psi, ws.spin_matrices, ws.interactions.c1, n_comp, N, n_pts, dV) : 0.0
 
     E_ddi = if ws.ddi !== nothing
-        _ddi_energy(
-            psi,
-            ws.spin_matrices,
-            ws.ddi,
-            ws.ddi_bufs,
-            n_comp,
-            N,
-            n_pts,
-            dV;
-            ddi_padded = ws.ddi_padded,
-        )
+        if _is_gpu(ws.ddi_bufs.Fx_r)
+            _ddi_energy_from_gpu(psi, ws.spin_matrices, ws.ddi, ws.ddi_bufs, n_comp, N, n_pts, dV;
+                ddi_padded = ws.ddi_padded)
+        else
+            _ddi_energy(psi, ws.spin_matrices, ws.ddi, ws.ddi_bufs, n_comp, N, n_pts, dV;
+                ddi_padded = ws.ddi_padded)
+        end
     else
         0.0
     end
@@ -214,6 +210,48 @@ function _ddi_energy(
             ddi_bufs.Phi_x[I] * ddi_bufs.Fx_r[I] +
             ddi_bufs.Phi_y[I] * ddi_bufs.Fy_r[I] +
             ddi_bufs.Phi_z[I] * ddi_bufs.Fz_r[I]
+    end
+    0.5 * E * dV
+end
+
+function _ddi_energy_from_gpu(
+    psi_host,
+    sm::SpinMatrices{D},
+    ddi_gpu,
+    ddi_bufs_gpu,
+    n_comp,
+    ndim,
+    n_pts,
+    dV;
+    ddi_padded = nothing,
+) where {D}
+    Fx_r = zeros(Float64, n_pts)
+    Fy_r = zeros(Float64, n_pts)
+    Fz_r = zeros(Float64, n_pts)
+    _compute_spin_density!(Fx_r, Fy_r, Fz_r, psi_host, sm, Val(D), ndim, n_pts)
+
+    ddi_host = DDIParams(ddi_gpu.C_dd, _to_host(ddi_gpu.Q_xx), _to_host(ddi_gpu.Q_xy),
+        _to_host(ddi_gpu.Q_xz), _to_host(ddi_gpu.Q_yy), _to_host(ddi_gpu.Q_yz), _to_host(ddi_gpu.Q_zz))
+    rfft_plans = make_rfft_plans(n_pts)
+    Fx_rk = rfft_plans.forward * Fx_r
+    Fy_rk = similar(Fx_rk)
+    Fz_rk = similar(Fx_rk)
+    Phi_x_rk = similar(Fx_rk)
+    Phi_y_rk = similar(Fx_rk)
+    Phi_z_rk = similar(Fx_rk)
+    Phi_x = similar(Fx_r)
+    Phi_y = similar(Fx_r)
+    Phi_z = similar(Fx_r)
+    bufs_host = DDIBuffers(rfft_plans, Fx_r, Fy_r, Fz_r, Fx_rk, Fy_rk, Fz_rk,
+        Phi_x_rk, Phi_y_rk, Phi_z_rk, Phi_x, Phi_y, Phi_z)
+
+    compute_ddi_potential!(ddi_host, bufs_host)
+
+    E = 0.0
+    @inbounds for I in CartesianIndices(n_pts)
+        E += bufs_host.Phi_x[I] * bufs_host.Fx_r[I] +
+             bufs_host.Phi_y[I] * bufs_host.Fy_r[I] +
+             bufs_host.Phi_z[I] * bufs_host.Fz_r[I]
     end
     0.5 * E * dV
 end

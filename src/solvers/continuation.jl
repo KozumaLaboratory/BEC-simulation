@@ -85,8 +85,9 @@ function scan_continuation(;
         end
 
         ws = r.workspace
-        phase_info = classify_phase(ws.state.psi, atom.F, grid, sm)
-        detailed = classify_phase_detailed(ws.state.psi, atom.F, grid, sm)
+        psi_host = _to_host(ws.state.psi)
+        phase_info = classify_phase(psi_host, atom.F, grid, sm)
+        detailed = classify_phase_detailed(psi_host, atom.F, grid, sm)
 
         push!(
             results,
@@ -96,7 +97,7 @@ function scan_continuation(;
                 converged = r.converged,
                 phase = phase_info.phase,
                 phase_info = detailed,
-                psi = copy(ws.state.psi),
+                psi = copy(psi_host),
             ),
         )
 
@@ -282,7 +283,8 @@ function scan_phase_diagram_2d(;
             end
 
             ws = r.workspace
-            detailed = classify_phase_detailed(ws.state.psi, atom.F, grid, sm)
+            psi_host = _to_host(ws.state.psi)
+            detailed = classify_phase_detailed(psi_host, atom.F, grid, sm)
 
             results[i, j] = (
                 param1 = v1,
@@ -291,7 +293,7 @@ function scan_phase_diagram_2d(;
                 converged = r.converged,
                 phase = detailed.phase,
                 phase_info = detailed,
-                psi = copy(ws.state.psi),
+                psi = copy(psi_host),
             )
 
             prev_psi = copy(ws.state.psi)

@@ -22,9 +22,10 @@ function find_eu151_gs_p_continuation(;
     p_values = [100.0, 50.0, 20.0, 10.0, 5.0, 2.0, 1.0, 0.5, 0.2, 0.1, 0.0],
     q_zeeman = 0.0,
     p_threshold = 5.0,
-    gs_steps = 3000,
+    gs_steps = 5000,
     gs_tol = 1e-8,
     save_dir = "output/eu151_p_continuation",
+    backend::AbstractBackend = CPUBackend(),
 )
     println("=" ^ 70)
     println("  Eu151 Ground State — p-continuation (Zeeman sweep)")
@@ -56,15 +57,16 @@ function find_eu151_gs_p_continuation(;
         param_values = Float64.(p_values),
         make_params = p -> (
             zeeman = ZeemanParams(p, q_zeeman),
-            dt = p > p_threshold ? 0.001 : 0.0005,
+            dt = p > p_threshold ? 0.0002 : 0.0001,
         ),
         grid,
         atom,
         interactions,
         potential = trap,
-        initial_state = :polar,
+        initial_state = :ferromagnetic,
         enable_ddi = true,
         c_dd,
+        backend,
         n_steps_continuation = gs_steps,
         n_steps_fresh = gs_steps * 2,
         energy_jump_threshold = 0.1,

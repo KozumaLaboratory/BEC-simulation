@@ -5,9 +5,21 @@ Spin-F BEC simulator (split-step Fourier, 1D/2D/3D). Primary target: ¹⁵¹Eu (
 ## Commands
 
 ```bash
-julia --project=. -e 'using Pkg; Pkg.test()'                     # all tests
+julia --project=. -e 'using Pkg; Pkg.test()'                     # all tests (~8600, ~5 min)
 julia --project=. -e 'using SpinorBEC; include("test/test_X.jl")' # single test
 julia --project=. -e 'using Pkg; Pkg.instantiate()'               # install deps
+LD_LIBRARY_PATH=/usr/lib/wsl/lib julia --project=.                # GPU (WSL2)
+```
+
+## Project Structure
+
+```
+src/
+├── foundation/      # types.jl, backend.jl, grid, spin matrices, CG coefficients
+├── hamiltonian/     # interactions, potentials (zeeman, trap, DDI, raman, LHY)
+├── solvers/         # ground_state (ITP), simulation (RTP), continuation, adaptive
+├── workflow/        # experiments (YAML config), initialization, io, monitoring
+└── analysis/        # energy, observables, phases, stability, diagnostics, TOF, vorticity
 ```
 
 ## Key Architecture
@@ -22,7 +34,16 @@ All substeps auto-skip when coupling ≈ 0.
 - **c₀/c₁ path**: diagonal(c₀) + spin_mixing(c₁) + nematic(c₂) + tensor(residual c₄,c₆,...)
 - **Scattering-lengths path** (Cr52 etc.): tensor handles ALL channels, c₀=c₁=0
 
-**Entry points**: `find_ground_state(;...)` (ITP), `make_workspace(;...) |> run_simulation!` (RTP), `load_config("x.yaml") |> run_config`.
+**Entry points**:
+- `find_ground_state(;...)` — ITP (imaginary time propagation)
+- `make_workspace(;...) |> run_simulation!` — RTP (real time propagation)
+- `load_config("x.yaml") |> run_config` — YAML-driven experiment
+- `scan_continuation(; make_params, ...)` — parameter sweep with continuation
+- `scan_phase_diagram_2d(; make_params, ...)` — 2D phase diagram
+
+**Continuation API**: `make_params(val) → NamedTuple` overrides any `find_ground_state` kwargs per sweep point. Legacy `make_interactions(val) → InteractionParams` also supported.
+
+**GPU**: `import CUDA` before `using SpinorBEC` to load CUDA extension. Pass `backend=CUDABackend()`. WSL2 needs `LD_LIBRARY_PATH=/usr/lib/wsl/lib`.
 
 ## Conventions (do NOT "fix")
 
