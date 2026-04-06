@@ -1,0 +1,78 @@
+# ================================================================
+# Eu151 Quick Test for Enhanced Monitoring (16³, 1分以内)
+# ================================================================
+# 新機能のデモ用超高速テスト:
+# - 16³ grid (32³の1/8)
+# - 短いステップ (0.5 ω⁻¹)
+# - 実行時間: ~30-60秒
+# ================================================================
+
+experiment:
+  version: 3
+  name: "Eu151 Enhanced Monitoring Demo (16³)"
+  type: dynamics
+
+  system:
+    atom: Eu151
+    grid:
+      n_points: [16, 16, 16]
+      box_size: [8.0, 8.0, 8.0]
+    interactions:
+      c_total: 4689.0
+      c1_ratio: 0.0
+      c_lhy: 1135.0
+    ddi:
+      enabled: true
+      c_dd: 7647.0
+
+  ground_state:
+    dt: 0.001
+    n_steps: 1000  # 短縮
+    tol: 1.0e-7    # 緩和
+    initial_state: ferromagnetic_min
+    zeeman:
+      p: -100.0
+      q: 0.0
+    potential:
+      type: harmonic
+      omega: [1.0, 1.0, 1.182]
+    enable_ddi: true
+
+  sequence:
+    # 短いクエンチ
+    - name: quench
+      duration: 0.05  # 0.1 → 0.05
+      dt: 0.001
+      save_every: 10
+      zeeman:
+        p:
+          from: -100.0
+          to: 0.0
+        q: 0.0
+      potential:
+        type: harmonic
+        omega: [1.0, 1.0, 1.182]
+
+    # 短い緩和
+    - name: relaxation
+      duration: 0.5   # 5.0 → 0.5
+      dt: 0.001
+      save_every: 10
+      integrator:
+        method: yoshida
+      zeeman:
+        p: 0.0
+        q: 0.0
+      potential:
+        type: harmonic
+        omega: [1.0, 1.0, 1.182]
+
+  observables:
+    always: [norm, magnetization]
+    on_save: [energy, populations]
+    spatial_sampling: 1.0
+
+  output:
+    dir: "output/eu151_test_16"
+    csv: true
+    save_psi: false  # 高速化
