@@ -8,6 +8,7 @@ using YAML
 using Unitful
 using TimerOutputs
 using Random
+using Printf
 using SpecialFunctions: erfcx
 
 const TIMER = TimerOutput()
@@ -50,6 +51,12 @@ include("phase_classification.jl")
 include("stability_analysis.jl")
 include("spherical_harmonics.jl")
 include("initialization.jl")
+include("ascii_plot.jl")
+include("logging.jl")
+include("resource_monitor.jl")
+include("notifications.jl")
+include("adaptive_advice.jl")
+include("progress.jl")
 include("ground_state.jl")
 include("continuation.jl")
 include("phase_boundary.jl")
