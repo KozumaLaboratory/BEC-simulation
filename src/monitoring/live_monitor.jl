@@ -90,13 +90,13 @@ Helper to compute population fractions for all components.
 """
 function compute_populations(ws::Workspace{N}) where {N}
     psi = ws.state.psi
-    D = size(psi, N)
+    D = size(psi, N + 1)  # Last dimension is component
     n_total = sum(abs2, psi)
 
     pops = Float64[]
     for c in 1:D
-        component_psi = _component_slice(N, size(psi)[1:N-1], c)
-        pop = sum(abs2, @view psi[component_psi..., c]) / n_total
+        # Simple slicing: all spatial dims, specific component
+        pop = sum(abs2, selectdim(psi, N + 1, c)) / n_total
         push!(pops, pop)
     end
 
