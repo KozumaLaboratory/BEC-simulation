@@ -9,7 +9,6 @@
 # magnetic vortex phase in the Eu151 phase diagram.
 
 experiment:
-  version: 3
   name: "Eu151 c1 phase search (FL vs uniform)"
   type: phase_scan
 

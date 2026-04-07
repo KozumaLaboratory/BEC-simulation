@@ -1,5 +1,4 @@
 experiment:
-  version: 3
   name: "Eu151 ground state (c1_ratio=0.001, quasi-2D)"
   type: ground_state
 

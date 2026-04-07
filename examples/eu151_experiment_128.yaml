@@ -9,7 +9,6 @@
 # ================================================================
 
 experiment:
-  version: 3
   name: "Eu151 m=-6→m=-5 Experiment (128³ full resolution)"
   type: dynamics
 

@@ -5,7 +5,6 @@
 # automatically from physical parameters.
 
 experiment:
-  version: 3
   name: "Eu151 Mz scan"
   type: phase_scan
 

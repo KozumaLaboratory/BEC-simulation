@@ -7,7 +7,6 @@
 # FL is the true ground state or just a metastable configuration.
 
 experiment:
-  version: 3
   name: "Eu151 FL vortex"
   type: ground_state
 

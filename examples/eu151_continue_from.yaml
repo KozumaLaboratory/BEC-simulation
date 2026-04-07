@@ -5,7 +5,6 @@
 # state with different parameters or longer evolution.
 
 experiment:
-  version: 3
   name: "Eu151 continue from saved psi"
   type: ground_state
 

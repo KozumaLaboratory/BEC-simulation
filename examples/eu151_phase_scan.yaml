@@ -20,7 +20,6 @@
 # ================================================================
 
 experiment:
-  version: 3
   name: "Eu151 phase diagram (quasi-2D)"
   type: phase_scan
 

@@ -8,7 +8,6 @@
 # ================================================================
 
 experiment:
-  version: 3
   name: "Eu151 Enhanced Monitoring Demo (16³)"
   type: dynamics
 

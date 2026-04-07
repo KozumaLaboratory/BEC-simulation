@@ -1,4 +1,6 @@
-# --- Unified Config v3: types + parser ---
+# --- Unified Config: types + parser ---
+
+const CONFIG_SCHEMA_VERSION = "1.0.0"
 
 struct DynamicsExperiment <: AbstractExperimentSpec
     sequence::Vector{PhaseConfig}
@@ -11,7 +13,6 @@ struct ScanExperiment{S<:AbstractScanSpec} <: AbstractExperimentSpec
 end
 
 struct UnifiedConfig{S<:AbstractExperimentSpec}
-    version::Int
     name::String
     system::SystemConfig
     ground_state::GroundStateConfig
@@ -34,13 +35,10 @@ end
 
 function _parse_config(data::Dict)
     exp_data = get(data, "experiment", data)
-    _parse_v3(exp_data)
+    _parse_experiment(exp_data)
 end
 
-# --- v3 parsing ---
-
-function _parse_v3(d::Dict)
-    version = Int(get(d, "version", 3))
+function _parse_experiment(d::Dict)
     name = get(d, "name", "unnamed")
     exp_type = Symbol(d["type"])
 
@@ -51,7 +49,6 @@ function _parse_v3(d::Dict)
 
     if exp_type == :ground_state
         return UnifiedConfig(
-            version,
             name,
             system,
             gs,
@@ -60,11 +57,11 @@ function _parse_v3(d::Dict)
             observables,
         )
     elseif exp_type == :dynamics
-        spec = _parse_v3_dynamics(d)
-        return UnifiedConfig(version, name, system, gs, spec, output, observables)
+        spec = _parse_dynamics(d)
+        return UnifiedConfig(name, system, gs, spec, output, observables)
     elseif exp_type == :phase_scan
-        spec = _parse_v3_phase_scan(d)
-        return UnifiedConfig(version, name, system, gs, spec, output, observables)
+        spec = _parse_phase_scan(d)
+        return UnifiedConfig(name, system, gs, spec, output, observables)
     else
         throw(
             ArgumentError(
@@ -74,7 +71,7 @@ function _parse_v3(d::Dict)
     end
 end
 
-function _parse_v3_dynamics(d::Dict)
+function _parse_dynamics(d::Dict)
     seq = haskey(d, "sequence") ? [_parse_phase(p) for p in d["sequence"]] : PhaseConfig[]
 
     perturbation = if haskey(d, "perturbation")
@@ -91,7 +88,7 @@ function _parse_v3_dynamics(d::Dict)
     DynamicsExperiment(seq, perturbation)
 end
 
-function _parse_v3_phase_scan(d::Dict)
+function _parse_phase_scan(d::Dict)
     scan_d = d["scan"]
     scan_type = Symbol(scan_d["type"])
     scan = if scan_type == :parameter

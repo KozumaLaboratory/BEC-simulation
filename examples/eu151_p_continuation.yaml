@@ -21,7 +21,6 @@
 # ================================================================
 
 experiment:
-  version: 3
   name: "Eu151 p-continuation (Zeeman sweep)"
   type: phase_scan
 

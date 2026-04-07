@@ -10,7 +10,6 @@
 # ================================================================
 
 experiment:
-  version: 3
   name: "Eu151 m=-6→m=-5 (Enhanced Monitoring)"
   type: dynamics
 

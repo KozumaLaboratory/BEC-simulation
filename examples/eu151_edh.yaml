@@ -41,7 +41,6 @@
 # ================================================================
 
 experiment:
-  version: 3
   name: "Eu151 Einstein-de Haas (3D)"
   type: dynamics
 

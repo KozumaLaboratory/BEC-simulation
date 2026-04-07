@@ -17,7 +17,6 @@
 # ================================================================
 
 experiment:
-  version: 3
   name: "Li7 ferromagnetic quench (3D)"
   type: dynamics
 
