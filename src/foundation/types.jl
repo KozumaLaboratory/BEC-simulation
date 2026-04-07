@@ -609,21 +609,41 @@ struct ScanPointOverride
     end
 end
 
+"""
+    ComparisonRunConfig
+
+One leg of a comparison scan: a named ground-state recipe (initial state +
+optional Mz constraint + optional init params) that is run at every scan point
+alongside the base configuration. Used to compare candidate ground states
+(e.g. uniform polarized vs FL vortex) on the same physical parameter sweep.
+"""
+struct ComparisonRunConfig
+    name::String
+    initial_state::Symbol
+    init_state_params::Dict{Symbol,Float64}
+    target_magnetization::Union{Nothing,Float64}
+end
+
+ComparisonRunConfig(name::String, initial_state::Symbol) =
+    ComparisonRunConfig(name, initial_state, Dict{Symbol,Float64}(), nothing)
+
 struct ParameterScan <: AbstractScanSpec
     axes::Vector{ScanAxis}
     continuation::ContinuationConfig
     multistart::MultiStartConfig
     per_point_overrides::Vector{ScanPointOverride}
+    comparison_runs::Vector{ComparisonRunConfig}
 
     function ParameterScan(
         axes::Vector{ScanAxis},
         continuation::ContinuationConfig,
         multistart::MultiStartConfig,
         per_point_overrides::Vector{ScanPointOverride} = ScanPointOverride[],
+        comparison_runs::Vector{ComparisonRunConfig} = ComparisonRunConfig[],
     )
         1 <= length(axes) <= 2 ||
             throw(ArgumentError("ParameterScan requires 1 or 2 axes, got $(length(axes))"))
-        new(axes, continuation, multistart, per_point_overrides)
+        new(axes, continuation, multistart, per_point_overrides, comparison_runs)
     end
 end
 

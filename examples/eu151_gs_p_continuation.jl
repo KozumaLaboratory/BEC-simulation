@@ -17,11 +17,14 @@ function find_eu151_gs_p_continuation(;
     p_values = [exp10.(range(5, -1; length=100)); 0.0],
     q_zeeman = 0.0,
     dt = 0.00005,
-    gs_steps_first = 5000,
-    gs_steps = 1000,
-    gs_tol = 1e-8,
+    gs_steps_first = 20000,
+    gs_steps = 5000,
+    gs_tol = 1e-5,
+    gs_tol_first = 1e-7,
     save_dir = "output/eu151_p_continuation",
     backend::AbstractBackend = CPUBackend(),
+    T_over_Tc::Float64 = 0.1,
+    noise_seed::Int = 42,
 )
     println("=" ^ 70)
     println("  Eu151 Ground State — p-continuation")
@@ -59,17 +62,27 @@ function find_eu151_gs_p_continuation(;
     results = NamedTuple[]
     psi_current = nothing
 
+    sys = SpinSystem(F)
+    psi_init_seeded = init_psi(grid, sys; state=:ferromagnetic)
+    add_thermal_noise!(psi_init_seeded, F; T_over_Tc, seed=noise_seed)
+    println("  Re-injecting thermal noise (T/T_c=$T_over_Tc, " *
+            "η=$(round(thermal_noise_amplitude(T_over_Tc)*100; digits=2))%) " *
+            "at every p step")
+    println()
+
     for (i, p) in enumerate(p_values)
         zeeman = ZeemanParams(p, q_zeeman)
+
+        psi_seed = psi_current === nothing ? psi_init_seeded : copy(psi_current)
+        add_thermal_noise!(psi_seed, F; T_over_Tc, seed=noise_seed + i)
 
         gs = find_ground_state(;
             grid, atom, interactions, zeeman,
             potential = trap,
             dt,
             n_steps = i == 1 ? gs_steps_first : gs_steps,
-            tol = gs_tol,
-            initial_state = psi_current === nothing ? :ferromagnetic : nothing,
-            psi_init = psi_current,
+            tol = i == 1 ? gs_tol_first : gs_tol,
+            psi_init = psi_seed,
             enable_ddi = true,
             c_dd,
             backend,

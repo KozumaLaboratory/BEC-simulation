@@ -4,7 +4,13 @@ function init_psi(
     state::Symbol = :polar,
     seed::Int = 42,
     helix_k::NTuple{N,Float64} = ntuple(_ -> 0.0, N),
+    init_theta::Real = 0.0,
+    init_phi::Real = 0.0,
+    init_vortex_charge::Real = 0,
 ) where {N}
+    init_theta_f = Float64(init_theta)
+    init_phi_f = Float64(init_phi)
+    init_vortex_charge_i = Int(init_vortex_charge)
     n_pts = grid.config.n_points
     psi = zeros(ComplexF64, n_pts..., sys.n_components)
     F = sys.F
@@ -36,6 +42,57 @@ function init_psi(
         @inbounds for I in CartesianIndices(n_pts)
             for c = 1:D
                 psi[I, c] *= gauss[I]
+            end
+        end
+    elseif state == :spin_coherent || state == :fl_vortex
+        # Spin-coherent state: at each grid point, the spinor points in the
+        # direction (sin θ cos φ, sin θ sin φ, cos θ), constructed as
+        # |ψ⟩ = Rz(φ) Ry(θ) |m=+F⟩.
+        #
+        # When init_vortex_charge ≠ 0, the azimuthal angle picks up
+        # ℓ × atan(y, x) so the spin texture has winding number ℓ. This
+        # generalizes the flower (FL) vortex (θ=π/2, ℓ=1).
+        #
+        # :fl_vortex is a backward-compat alias that forces θ=π/2, ℓ=1.
+        theta_use, vortex_charge_use = if state == :fl_vortex
+            N >= 2 || throw(ArgumentError(":fl_vortex requires N >= 2 (needs xy-plane)"))
+            (Float64(π) / 2, 1)
+        else
+            (init_theta_f, init_vortex_charge_i)
+        end
+        if vortex_charge_use != 0
+            N >= 2 || throw(
+                ArgumentError(
+                    ":spin_coherent with init_vortex_charge≠0 requires N >= 2",
+                ),
+            )
+        end
+
+        sm = spin_matrices(F)
+        U_y = exp(-1im * theta_use * Matrix(sm.Fy))
+        c_base = U_y[:, 1]  # column for |m=+F⟩
+
+        if vortex_charge_use == 0
+            # Uniform spin direction: precompute Rz(init_phi) c_base.
+            spinor_uniform = Vector{ComplexF64}(undef, D)
+            for c = 1:D
+                m = F - (c - 1)
+                spinor_uniform[c] = c_base[c] * cis(-m * init_phi_f)
+            end
+            @inbounds for I in CartesianIndices(n_pts)
+                for c = 1:D
+                    psi[I, c] = gauss[I] * spinor_uniform[c]
+                end
+            end
+        else
+            @inbounds for I in CartesianIndices(n_pts)
+                x = grid.x[1][I[1]]
+                y = grid.x[2][I[2]]
+                phi_local = init_phi_f + vortex_charge_use * atan(y, x)
+                for c = 1:D
+                    m = F - (c - 1)
+                    psi[I, c] = gauss[I] * c_base[c] * cis(-m * phi_local)
+                end
             end
         end
     elseif state == :spin_helix

@@ -7,6 +7,48 @@ function run_config(config::UnifiedConfig; verbose::Bool = true)
     _run_config(config, config.spec; verbose)
 end
 
+"""
+    _resolve_backend(name::Symbol) → AbstractBackend
+
+Resolve a YAML backend symbol to a concrete backend object. CUDABackend is
+constructed via `Base.invokelatest(Module.eval, ...)` so the runner does not
+depend on CUDA at load time. The user must `import CUDA` before calling.
+"""
+function _resolve_backend(name::Symbol)
+    if name == :cpu
+        return CPUBackend()
+    elseif name == :cuda || name == :gpu
+        # CUDABackend struct is always defined in backend.jl, but actual GPU
+        # methods come from the SpinorBECCUDAExt extension which only loads
+        # when the user has `import CUDA` in their session. The user is
+        # responsible for that import; downstream errors will be clear.
+        return CUDABackend()
+    else
+        throw(ArgumentError("Unknown backend: $name (expected :cpu or :cuda)"))
+    end
+end
+
+"""
+    _load_psi_init(path::Union{Nothing,String}) → Union{Nothing,Array}
+
+Load a psi array from a JLD2 file. Tries the keys "psi" then "psi_uniform"
+then "psi_fl" before giving up.
+"""
+function _load_psi_init(path::Union{Nothing,String})
+    path === nothing && return nothing
+    isfile(path) || throw(ArgumentError("psi_init_path file not found: $path"))
+    data = JLD2.load(path)
+    for key in ("psi", "psi_uniform", "psi_fl")
+        haskey(data, key) && return data[key]
+    end
+    throw(
+        ArgumentError(
+            "psi_init_path: $path contains no recognized psi key. " *
+            "Expected one of: psi, psi_uniform, psi_fl",
+        ),
+    )
+end
+
 # --- Ground state only ---
 
 function _run_config(config::UnifiedConfig, ::GroundStateExperiment; verbose::Bool = true)
@@ -104,6 +146,8 @@ function _run_ground_state(config::UnifiedConfig, grid, atom, potential, ndim)
     sys = config.system
     c_dd_val = sys.ddi.c_dd === nothing ? NaN : sys.ddi.c_dd
     gs_enable_ddi = something(gs.enable_ddi, sys.ddi.enabled)
+    backend = _resolve_backend(gs.backend)
+    psi_init = _load_psi_init(gs.psi_init_path)
 
     find_ground_state(;
         grid,
@@ -115,6 +159,8 @@ function _run_ground_state(config::UnifiedConfig, grid, atom, potential, ndim)
         n_steps = gs.n_steps,
         tol = gs.tol,
         initial_state = gs.initial_state,
+        init_state_params = gs.init_state_params,
+        psi_init = psi_init,
         enable_ddi = gs_enable_ddi,
         c_dd = c_dd_val,
         secular_ddi = sys.ddi.secular,
@@ -122,6 +168,7 @@ function _run_ground_state(config::UnifiedConfig, grid, atom, potential, ndim)
         l_z_ddi = sys.ddi.l_z,
         target_magnetization = gs.target_magnetization,
         rotating_frame_omega = gs.rotating_frame_omega,
+        backend = backend,
     )
 end
 

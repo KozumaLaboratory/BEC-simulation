@@ -9,6 +9,8 @@ using Unitful
 using TimerOutputs
 using Random
 using Printf
+using Dates
+using SHA
 using SpecialFunctions: erfcx
 
 const TIMER = TimerOutput()
@@ -67,6 +69,7 @@ include("workflow/io/units.jl")
 include("workflow/initialization/atoms.jl")
 include("workflow/initialization/thomas_fermi.jl")
 include("workflow/initialization/initialization.jl")
+include("workflow/initialization/thermal_noise.jl")
 
 # 8. I/O
 include("workflow/io/io.jl")
@@ -86,6 +89,7 @@ include("workflow/experiments/experiment.jl")  # Defines PhaseConfig, GroundStat
 include("workflow/experiments/experiment_runner.jl")
 include("workflow/experiments/config.jl")  # Uses types from experiment.jl
 include("workflow/experiments/config_runner.jl")
+include("workflow/experiments/run_registry.jl")
 
 # ========================================
 # ANALYSIS: Observables & diagnostics
@@ -183,6 +187,7 @@ export LaserBeamPotential, crossed_laser_trap
 
 # Thomas-Fermi
 export thomas_fermi_density, init_psi_thomas_fermi
+export add_thermal_noise!, add_thermal_noise, thermal_noise_amplitude, bec_critical_temperature
 export simulate_tof
 
 # Spin rotation & EdH/FL reproduction
@@ -265,6 +270,7 @@ export MultiStartConfig, AbstractScanSpec, ParameterScan, ConstrainedJzScan
 export AbstractExperimentSpec, GroundStateExperiment, DynamicsExperiment, ScanExperiment
 export PerturbationConfig, OutputConfig, ObservablesConfig, UnifiedConfig
 export load_config, load_config_from_string, run_config, seed_noise
+export run_yaml, run_status, list_runs, compute_run_file
 
 # Units
 export Units

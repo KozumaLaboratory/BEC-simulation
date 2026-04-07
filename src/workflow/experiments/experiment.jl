@@ -42,6 +42,9 @@ struct GroundStateConfig
     enable_ddi::Union{Nothing,Bool}
     target_magnetization::Union{Nothing,Float64}
     rotating_frame_omega::Float64
+    psi_init_path::Union{Nothing,String}
+    init_state_params::Dict{Symbol,Float64}
+    backend::Symbol
 
     function GroundStateConfig(
         dt::Float64,
@@ -53,10 +56,15 @@ struct GroundStateConfig
         enable_ddi::Union{Nothing,Bool},
         target_magnetization::Union{Nothing,Float64},
         rotating_frame_omega::Float64,
+        psi_init_path::Union{Nothing,String} = nothing,
+        init_state_params::Dict{Symbol,Float64} = Dict{Symbol,Float64}(),
+        backend::Symbol = :cpu,
     )
         dt > 0 || throw(ArgumentError("dt must be positive"))
         n_steps > 0 || throw(ArgumentError("n_steps must be positive"))
         tol > 0 || throw(ArgumentError("tol must be positive"))
+        backend in (:cpu, :cuda) ||
+            throw(ArgumentError("backend must be :cpu or :cuda, got $backend"))
         new(
             dt,
             n_steps,
@@ -67,6 +75,9 @@ struct GroundStateConfig
             enable_ddi,
             target_magnetization,
             rotating_frame_omega,
+            psi_init_path,
+            init_state_params,
+            backend,
         )
     end
 end
@@ -127,18 +138,30 @@ function _parse_system(d::Dict)
     end
 
     inter = d["interactions"]
-    interactions = if haskey(inter, "c_total")
-        c_total = Float64(inter["c_total"])
+    atom_obj = resolve_atom(atom_name)
+    F_atom = atom_obj.F
+    c_extra = _parse_c_extra(inter, F_atom)
+
+    # Resolve c_total: explicit, or compute from N_atoms + omega_ref
+    c_total_explicit = haskey(inter, "c_total") ? Float64(inter["c_total"]) : nothing
+    c_total_from_n = if haskey(inter, "N_atoms") && haskey(inter, "omega_ref")
+        N_atoms = Int(inter["N_atoms"])
+        omega_ref = Float64(inter["omega_ref"])
+        compute_c_total(atom_obj; N_atoms, omega_ref)
+    else
+        nothing
+    end
+
+    interactions = if c_total_explicit !== nothing || c_total_from_n !== nothing
+        c_total = something(c_total_explicit, c_total_from_n)
         c1_ratio = Float64(get(inter, "c1_ratio", 0.0))
-        F_atom = resolve_atom(atom_name).F
-        c_extra = _parse_c_extra(inter, F_atom)
-        interaction_params_from_constraint(; c_total, c1_ratio, F = F_atom, c_extra)
+        c_lhy = Float64(get(inter, "c_lhy", 0.0))
+        ip = interaction_params_from_constraint(; c_total, c1_ratio, F = F_atom, c_extra)
+        InteractionParams(ip.c0, ip.c1, c_lhy, ip.c_extra)
     else
         c0 = Float64(inter["c0"])
         c1 = Float64(inter["c1"])
         c_lhy = Float64(get(inter, "c_lhy", 0.0))
-        F_atom = resolve_atom(atom_name).F
-        c_extra = _parse_c_extra(inter, F_atom)
         InteractionParams(c0, c1, c_lhy, c_extra)
     end
 
@@ -149,7 +172,15 @@ function _parse_system(d::Dict)
     ddi = if haskey(d, "ddi")
         dd = d["ddi"]
         enabled = get(dd, "enabled", false)
-        c_dd = haskey(dd, "c_dd") ? Float64(dd["c_dd"]) : nothing
+        c_dd = if haskey(dd, "c_dd")
+            Float64(dd["c_dd"])
+        elseif haskey(inter, "N_atoms") && haskey(inter, "omega_ref")
+            N_atoms = Int(inter["N_atoms"])
+            omega_ref = Float64(inter["omega_ref"])
+            compute_c_dd_dimless(atom_obj; N_atoms, omega_ref)
+        else
+            nothing
+        end
         secular = Bool(get(dd, "secular", false))
         ddi_q2d = Bool(get(dd, "quasi_2d", quasi_2d))
         ddi_lz = Float64(get(dd, "l_z", l_z))
@@ -187,6 +218,15 @@ function _parse_ground_state(d::Dict)
     end
     rotating_frame_omega = Float64(get(d, "rotating_frame_omega", 0.0))
 
+    psi_init_path = let v = get(d, "psi_init_path", nothing)
+        v === nothing ? nothing : String(v)
+    end
+    init_state_params = let v = get(d, "init_state_params", nothing)
+        v === nothing ? Dict{Symbol,Float64}() :
+        Dict{Symbol,Float64}(Symbol(k) => Float64(val) for (k, val) in v)
+    end
+    backend = Symbol(lowercase(String(get(d, "backend", "cpu"))))
+
     GroundStateConfig(
         dt,
         n_steps,
@@ -197,6 +237,9 @@ function _parse_ground_state(d::Dict)
         enable_ddi,
         target_mag,
         rotating_frame_omega,
+        psi_init_path,
+        init_state_params,
+        backend,
     )
 end
 
@@ -340,7 +383,25 @@ function _parse_parameter_scan(d::Dict)
     else
         ScanPointOverride[]
     end
-    ParameterScan(axes, cont, ms, overrides)
+    comparison_runs = if haskey(d, "comparison_runs")
+        ComparisonRunConfig[_parse_comparison_run(r) for r in d["comparison_runs"]]
+    else
+        ComparisonRunConfig[]
+    end
+    ParameterScan(axes, cont, ms, overrides, comparison_runs)
+end
+
+function _parse_comparison_run(d::Dict)
+    name = String(d["name"])
+    initial_state = Symbol(d["initial_state"])
+    init_state_params = let v = get(d, "init_state_params", nothing)
+        v === nothing ? Dict{Symbol,Float64}() :
+        Dict{Symbol,Float64}(Symbol(k) => Float64(val) for (k, val) in v)
+    end
+    target_mag = let v = get(d, "target_magnetization", nothing)
+        v === nothing ? nothing : Float64(v)
+    end
+    ComparisonRunConfig(name, initial_state, init_state_params, target_mag)
 end
 
 function _parse_point_override(d::Dict)

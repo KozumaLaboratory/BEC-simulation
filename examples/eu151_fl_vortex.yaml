@@ -1,0 +1,41 @@
+# Eu151 FL (Flower) vortex ground state via YAML
+#
+# Initializes with the FL ansatz: spin direction (cos φ, sin φ, 0) at each
+# grid point, giving Mz=0 with perfect flux closure (∇·F=0).
+#
+# Compare resulting energy with the uniform Mz=-6 state to determine if
+# FL is the true ground state or just a metastable configuration.
+
+experiment:
+  version: 3
+  name: "Eu151 FL vortex"
+  type: ground_state
+
+  system:
+    atom: Eu151
+    grid:
+      n_points: [64, 64, 64]
+      box_size: [12.0, 12.0, 12.0]
+    interactions:
+      N_atoms: 50000
+      omega_ref: 691.15
+      c1_ratio: 0.0
+      c_lhy: 1135.0
+    ddi:
+      enabled: true
+
+  ground_state:
+    dt: 0.0001
+    n_steps: 10000
+    tol: 1.0e-7
+    initial_state: fl_vortex
+    zeeman:
+      p: 0.0
+      q: 0.0
+    potential:
+      type: harmonic
+      omega: [1.0, 1.0, 1.1818]
+
+  output:
+    dir: "results/eu151_fl_vortex"
+    save_psi: true

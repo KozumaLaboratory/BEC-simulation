@@ -488,12 +488,16 @@ function _apply_ddi_rotation!(
     end
     _gpu_matmul_V!(P, W, V_T, Val(D))
 
-    # Step 3: Dz(θ)
+    # Step 3: Dz(θ).
+    # ITP applies a constant -F shift so the largest factor is exp(0)=1
+    # (m=-F gets factor 1, m=+F gets exp(-2F·θ)). Without this shift the
+    # m=-F component gets exp(+F·θ) and explodes (constant shift is removed
+    # by the subsequent normalization step).
     if imaginary_time
         for c = 1:D
             m_c = Float64(F - (c - 1))
             pc = view(P, :, c)
-            @. pc = pc * exp(-m_c * theta)
+            @. pc = pc * exp(-(m_c + F) * theta)
         end
     else
         for c = 1:D

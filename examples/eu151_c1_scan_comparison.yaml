@@ -1,0 +1,71 @@
+# Eu151 c1_ratio scan with FL vortex vs uniform polarized comparison
+#
+# At each c1_ratio value, runs TWO ground-state calculations:
+#   - uniform_polarized: ferromagnetic_min state with target_Mz = -6
+#   - fl_vortex:         spin-coherent state with θ=π/2, vortex charge 1
+# and outputs both energies side-by-side for direct comparison.
+#
+# The transition c1_ratio where E_FL < E_uniform marks the boundary of the
+# magnetic vortex phase in the Eu151 phase diagram.
+
+experiment:
+  version: 3
+  name: "Eu151 c1 phase search (FL vs uniform)"
+  type: phase_scan
+
+  system:
+    atom: Eu151
+    grid:
+      n_points: [64, 64, 64]
+      box_size: [12.0, 12.0, 12.0]
+    interactions:
+      N_atoms: 50000
+      omega_ref: 691.15
+      c1_ratio: 0.0           # overridden by scan
+      c_lhy: 1135.0
+    ddi:
+      enabled: true
+
+  ground_state:
+    dt: 0.0001
+    n_steps: 5000
+    tol: 1.0e-7
+    initial_state: ferromagnetic_min   # used as fallback only
+    backend: cuda
+    zeeman:
+      p: 0.0
+      q: 0.0
+    potential:
+      type: harmonic
+      omega: [1.0, 1.0, 1.1818]
+
+  scan:
+    type: parameter
+    axes:
+      - parameter: c1_ratio
+        values:
+          from: -0.02
+          to: 0.0
+          n_points: 11
+    continuation:
+      enabled: true
+      n_steps: 5000
+      energy_jump_threshold: 1000.0
+    comparison_runs:
+      - name: uniform_polarized
+        initial_state: ferromagnetic_min
+        target_magnetization: -6.0
+      - name: fl_vortex
+        initial_state: spin_coherent
+        init_state_params:
+          init_theta: 1.5707963267948966   # π/2
+          init_vortex_charge: 1
+
+  observables:
+    always: [norm, magnetization]
+    on_save: [energy]
+
+  output:
+    dir: "results/eu151_c1_phase_search"
+    csv: true
+    save_psi: true

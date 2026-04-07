@@ -99,6 +99,7 @@ function find_ground_state(;
     n_steps = 10000,
     tol = 1e-10,
     initial_state = :polar,
+    init_state_params::Dict{Symbol,Float64} = Dict{Symbol,Float64}(),
     psi_init = nothing,
     enable_ddi::Bool = false,
     c_dd::Float64 = NaN,
@@ -120,7 +121,8 @@ function find_ground_state(;
 )
     psi0 = if psi_init === nothing
         sys = SpinSystem(atom.F)
-        init_psi(grid, sys; state = initial_state)
+        init_kwargs = pairs(init_state_params)
+        init_psi(grid, sys; state = initial_state, init_kwargs...)
     else
         copy(psi_init)
     end
@@ -329,7 +331,6 @@ function _find_ground_state_adaptive(;
     current_dt = dt
     check_every = max(1, n_steps ÷ 100)
     psi_current = copy(psi0)
-    psi_backup = similar(psi0)
 
     sp = SimParams(;
         dt = current_dt,
@@ -357,6 +358,7 @@ function _find_ground_state_adaptive(;
         l_z,
         backend,
     )
+    psi_backup = similar(ws.state.psi)
     E_prev = total_energy(ws)
     converged = false
     total_steps = 0

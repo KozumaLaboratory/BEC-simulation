@@ -145,9 +145,13 @@ Handles both real-time (Dz: cis) and imaginary-time (Dz: exp) propagation.
         v[i] = s
     end
 
-    # Dz(θ): RTP uses cis(-mθ), ITP uses exp(-mθ)
+    # Dz(θ): RTP uses cis(-mθ), ITP uses exp(-mθ).
+    # ITP applies a constant -F shift so the largest factor is exp(0)=1
+    # (m=-F gets factor 1, m=+F gets exp(-2F·θ)). Without this shift the
+    # m=-F component gets exp(+F·θ) and explodes (constant shift is removed
+    # by the subsequent normalization step).
     if imaginary_time
-        dz_r = exp(-F * theta)
+        dz_r = exp(-2.0 * F * theta)
         dz_step = exp(theta)
         @inbounds for c = 1:D
             v[c] *= dz_r

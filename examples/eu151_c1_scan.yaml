@@ -1,0 +1,60 @@
+# Eu151 c1_ratio scan via YAML
+#
+# Sweeps c1_ratio. Computes uniform Mz=-6 ground state at each c1_ratio.
+# Used to map out energy as a function of spin-dependent contact strength.
+#
+# Compare with FL vortex calculations (use initial_state: fl_vortex separately)
+# to find the critical c1_ratio where FL becomes the ground state.
+
+experiment:
+  version: 3
+  name: "Eu151 c1_ratio scan"
+  type: phase_scan
+
+  system:
+    atom: Eu151
+    grid:
+      n_points: [64, 64, 64]
+      box_size: [12.0, 12.0, 12.0]
+    interactions:
+      N_atoms: 50000
+      omega_ref: 691.15
+      c1_ratio: 0.0           # overridden by scan
+      c_lhy: 1135.0
+    ddi:
+      enabled: true
+
+  ground_state:
+    dt: 0.0001
+    n_steps: 5000
+    tol: 1.0e-7
+    initial_state: ferromagnetic_min
+    target_magnetization: -6.0
+    zeeman:
+      p: 0.0
+      q: 0.0
+    potential:
+      type: harmonic
+      omega: [1.0, 1.0, 1.1818]
+
+  scan:
+    type: parameter
+    axes:
+      - parameter: c1_ratio
+        values:
+          from: -0.02
+          to: 0.0
+          n_points: 11
+    continuation:
+      enabled: true
+      n_steps: 5000
+      energy_jump_threshold: 100.0
+
+  observables:
+    always: [norm, magnetization]
+    on_save: [energy]
+
+  output:
+    dir: "results/eu151_c1_scan"
+    csv: true
+    save_psi: true

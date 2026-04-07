@@ -12,6 +12,7 @@ function _base_sweep_state(config::UnifiedConfig{<:ScanExperiment})
         zeeman = config.ground_state.zeeman,
         c_dd_override = nothing,
         rotating_frame_omega = config.ground_state.rotating_frame_omega,
+        target_magnetization_override = nothing,
     )
 end
 
@@ -64,6 +65,15 @@ end
 
 function _apply_param(
     state::NamedTuple,
+    ::Val{:target_magnetization},
+    value::Float64;
+    kw...,
+)
+    merge(state, (target_magnetization_override = value,))
+end
+
+function _apply_param(
+    state::NamedTuple,
     ::Val{:rotating_frame_omega},
     value::Float64;
     kw...,
@@ -75,7 +85,8 @@ function _apply_param(::NamedTuple, ::Val{P}, ::Float64; kw...) where {P}
     throw(
         ArgumentError(
             "Unknown sweep parameter: $P. " *
-            "Supported: c1_ratio, zeeman_p, zeeman_q, c_dd, rotating_frame_omega",
+            "Supported: c1_ratio, zeeman_p, zeeman_q, c_dd, rotating_frame_omega, " *
+            "target_magnetization",
         ),
     )
 end
@@ -117,6 +128,7 @@ function _run_single_point(
     prev_psi = nothing,
     force_multistart::Bool = false,
     param_values::Dict{Symbol,Float64} = Dict{Symbol,Float64}(),
+    comparison_run::Union{Nothing,ComparisonRunConfig} = nothing,
 )
     gs = config.ground_state
     sys = config.system
@@ -131,6 +143,16 @@ function _run_single_point(
         scan.continuation.enabled && prev_psi !== nothing && !force_multistart
     n_steps = use_continuation ? scan.continuation.n_steps : resolved.n_steps
 
+    target_mz = state.target_magnetization_override !== nothing ?
+                state.target_magnetization_override :
+                gs.target_magnetization
+    initial_state_use = comparison_run !== nothing ?
+                        comparison_run.initial_state :
+                        resolved.initial_state
+    init_state_params_use = comparison_run !== nothing ?
+                            comparison_run.init_state_params :
+                            gs.init_state_params
+    backend = _resolve_backend(gs.backend)
     gs_kwargs = (;
         enable_ddi = something(gs.enable_ddi, sys.ddi.enabled),
         c_dd = c_dd_val,
@@ -138,8 +160,9 @@ function _run_single_point(
         quasi_2d_ddi = sys.ddi.quasi_2d,
         l_z_ddi = sys.ddi.l_z,
         fft_flags = FFTW.ESTIMATE,
-        target_magnetization = gs.target_magnetization,
+        target_magnetization = target_mz,
         rotating_frame_omega = state.rotating_frame_omega,
+        backend = backend,
     )
 
     result = if (scan.multistart.enabled && !use_continuation) || force_multistart
@@ -158,6 +181,24 @@ function _run_single_point(
         )
     else
         psi_init = use_continuation ? copy(prev_psi) : nothing
+        # Auto-rotation: if a target_magnetization scan changed Mz between
+        # this point and the previous one, rotate the carried-over psi by
+        # Δα around y so the constraint normalization has something to
+        # redistribute. Without this, a fully polarized state cannot relax
+        # toward a different Mz target.
+        if psi_init !== nothing &&
+           target_mz !== nothing &&
+           haskey(param_values, :target_magnetization)
+            F_a = atom.F
+            sys_a = SpinSystem(F_a)
+            prev_mz = magnetization(prev_psi, grid, sys_a)
+            α_target = acos(clamp(-target_mz / F_a, -1.0, 1.0))
+            α_prev = acos(clamp(-prev_mz / F_a, -1.0, 1.0))
+            Δα = α_target - α_prev
+            if abs(Δα) > 1e-12
+                psi_init = rotate_quantization_axis(psi_init, F_a, 0.0, Δα)
+            end
+        end
         find_ground_state(;
             grid,
             atom,
@@ -167,7 +208,8 @@ function _run_single_point(
             dt = resolved.dt,
             n_steps,
             tol = resolved.tol,
-            initial_state = resolved.initial_state,
+            initial_state = initial_state_use,
+            init_state_params = init_state_params_use,
             psi_init,
             gs_kwargs...,
         )
@@ -260,13 +302,17 @@ function _run_parameter_1d(
         ip.c0 + F^2 * ip.c1
     end
     base_state = _base_sweep_state(config)
+    comparison_runs = scan.comparison_runs
+    has_comparison = !isempty(comparison_runs)
 
-    verbose && println("  1D sweep: $(axis.parameter), $(length(values)) points")
+    verbose && println("  1D sweep: $(axis.parameter), $(length(values)) points" *
+                       (has_comparison ? " × $(length(comparison_runs)) runs" : ""))
 
     io = config.output.csv ? _open_csv(config.output.dir, "scan_1d.csv") : nothing
 
-    cols = Any[
-        axis.parameter,
+    cols = Any[axis.parameter]
+    has_comparison && push!(cols, :run_name)
+    append!(cols, [
         :phase,
         :point_group,
         :energy,
@@ -274,14 +320,17 @@ function _run_parameter_1d(
         :nematic_order,
         :biaxiality,
         :converged,
-    ]
+    ])
     config.spec.stability.enabled && append!(cols, [:growth_rate, :unstable, :k_peak])
     header = _write_csv(io, cols)
     verbose && println(header)
 
     results = NamedTuple[]
-    prev_psi = nothing
-    prev_energy = NaN
+    # Each comparison run has its own continuation chain (prev_psi).
+    # Without comparison, this is a single chain.
+    n_chains = has_comparison ? length(comparison_runs) : 1
+    prev_psis = Any[nothing for _ in 1:n_chains]
+    prev_energies = Float64[NaN for _ in 1:n_chains]
 
     for (i, val) in enumerate(values)
         state = _apply_sweep_param(
@@ -290,78 +339,98 @@ function _run_parameter_1d(
         )
         pv = Dict{Symbol,Float64}(axis.parameter => val)
 
-        r = _run_single_point(
-            config,
-            state,
-            grid,
-            atom,
-            sm,
-            potential,
-            ndim;
-            prev_psi,
-            param_values = pv,
-        )
+        runs_to_execute = if has_comparison
+            comparison_runs
+        else
+            [ComparisonRunConfig("", config.ground_state.initial_state)]
+        end
 
-        if scan.continuation.enabled &&
-           !isnan(prev_energy) &&
-           abs(r.energy - prev_energy) / max(abs(prev_energy), 1e-30) >
-           scan.continuation.energy_jump_threshold
+        for (j, run) in enumerate(runs_to_execute)
+            run_state = if has_comparison && run.target_magnetization !== nothing
+                merge(state, (target_magnetization_override = run.target_magnetization,))
+            else
+                state
+            end
+
             r = _run_single_point(
                 config,
-                state,
+                run_state,
                 grid,
                 atom,
                 sm,
                 potential,
                 ndim;
-                prev_psi = nothing,
-                force_multistart = scan.multistart.enabled,
+                prev_psi = prev_psis[j],
                 param_values = pv,
+                comparison_run = has_comparison ? run : nothing,
             )
-        end
 
-        info = r.phase_info
-        row_vals = Any[
-            round(val; sigdigits = 6),
-            info.phase,
-            info.point_group,
-            round(r.energy; sigdigits = 8),
-            round(info.spin_order; sigdigits = 4),
-            round(info.nematic_order; sigdigits = 4),
-            round(info.biaxiality; sigdigits = 4),
-            r.converged,
-        ]
-        if config.spec.stability.enabled && r.stability !== nothing
-            append!(
-                row_vals,
-                [
-                    round(r.stability.growth_rate; sigdigits = 4),
-                    r.stability.unstable,
-                    round(r.stability.k_peak; sigdigits = 4),
-                ],
+            if scan.continuation.enabled &&
+               !isnan(prev_energies[j]) &&
+               abs(r.energy - prev_energies[j]) / max(abs(prev_energies[j]), 1e-30) >
+               scan.continuation.energy_jump_threshold
+                r = _run_single_point(
+                    config,
+                    run_state,
+                    grid,
+                    atom,
+                    sm,
+                    potential,
+                    ndim;
+                    prev_psi = nothing,
+                    force_multistart = scan.multistart.enabled,
+                    param_values = pv,
+                    comparison_run = has_comparison ? run : nothing,
+                )
+            end
+
+            info = r.phase_info
+            row_vals = Any[round(val; sigdigits = 6)]
+            has_comparison && push!(row_vals, run.name)
+            append!(row_vals, [
+                info.phase,
+                info.point_group,
+                round(r.energy; sigdigits = 8),
+                round(info.spin_order; sigdigits = 4),
+                round(info.nematic_order; sigdigits = 4),
+                round(info.biaxiality; sigdigits = 4),
+                r.converged,
+            ])
+            if config.spec.stability.enabled && r.stability !== nothing
+                append!(
+                    row_vals,
+                    [
+                        round(r.stability.growth_rate; sigdigits = 4),
+                        r.stability.unstable,
+                        round(r.stability.k_peak; sigdigits = 4),
+                    ],
+                )
+            end
+
+            row = _write_csv(io, row_vals)
+            verbose && println(row)
+
+            push!(
+                results,
+                (
+                    param = val,
+                    run_name = has_comparison ? run.name : "",
+                    energy = r.energy,
+                    converged = r.converged,
+                    phase_info = info,
+                    stability = r.stability,
+                ),
             )
+
+            if config.output.save_psi
+                suffix = has_comparison ? "_$(run.name)" : ""
+                JLD2.jldsave(joinpath(config.output.dir, "psi_$(i)$(suffix).jld2");
+                             psi = r.psi)
+            end
+
+            prev_psis[j] = r.psi
+            prev_energies[j] = r.energy
         end
-
-        row = _write_csv(io, row_vals)
-        verbose && println(row)
-
-        push!(
-            results,
-            (
-                param = val,
-                energy = r.energy,
-                converged = r.converged,
-                phase_info = info,
-                stability = r.stability,
-            ),
-        )
-
-        if config.output.save_psi
-            JLD2.jldsave(joinpath(config.output.dir, "psi_$(i).jld2"); psi = r.psi)
-        end
-
-        prev_psi = r.psi
-        prev_energy = r.energy
     end
 
     io !== nothing && close(io)
