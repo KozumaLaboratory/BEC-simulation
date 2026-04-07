@@ -1,4 +1,4 @@
-# --- Unified Config v3: runner ---
+# --- Unified Config: runner ---
 
 function run_config(config::UnifiedConfig; verbose::Bool = true)
     if config.output.seed !== nothing

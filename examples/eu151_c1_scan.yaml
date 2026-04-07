@@ -53,7 +53,3 @@ experiment:
     always: [norm, magnetization]
     on_save: [energy]
 
-  output:
-    dir: "results/eu151_c1_scan"
-    csv: true
-    save_psi: true

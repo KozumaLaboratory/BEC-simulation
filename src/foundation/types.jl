@@ -729,7 +729,7 @@ struct Workspace{N,A,P,IP,SM<:SpinMatrices,ZEE,DDI,DDIB,RAM,LOSS,DDIP,BK,TC,CC,K
     lhy::LHY
 end
 
-# --- Unified Config v3 (base types) ---
+# --- Unified Config (base types) ---
 
 abstract type AbstractExperimentSpec end
 

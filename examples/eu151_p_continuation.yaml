@@ -75,7 +75,3 @@ experiment:
     on_save: [energy]
     final_only: [phase_classification, structure_factor]
 
-  output:
-    dir: "results/eu151_p_continuation"
-    csv: true
-    save_psi: true

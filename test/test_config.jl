@@ -1,8 +1,8 @@
-@testset "Unified Config v3" begin
-    @testset "v3 parsing - ground_state type" begin
+@testset "Unified Config" begin
+    @testset "parsing - ground_state type" begin
         yaml = """
         experiment:
-          version: 3
+          
           name: "gs only"
           type: ground_state
           system:
@@ -31,7 +31,7 @@
         """
         cfg = load_config_from_string(yaml)
         @test cfg isa UnifiedConfig{GroundStateExperiment}
-        @test cfg.version == 3
+        
         @test cfg.name == "gs only"
         @test cfg.system.atom_name == :Rb87
         @test cfg.system.grid_n_points == [32]
@@ -44,10 +44,10 @@
         @test cfg.output.save_psi == true
     end
 
-    @testset "v3 parsing - dynamics type" begin
+    @testset "parsing - dynamics type" begin
         yaml = """
         experiment:
-          version: 3
+          
           name: "dynamics test"
           type: dynamics
           system:
@@ -100,7 +100,7 @@
         @test cfg.output.seed == 123
     end
 
-    @testset "v3 parsing - dynamics without perturbation" begin
+    @testset "parsing - dynamics without perturbation" begin
         yaml = """
         experiment:
           type: dynamics
@@ -128,10 +128,10 @@
         @test isempty(cfg.spec.sequence)
     end
 
-    @testset "v3 parsing - phase_scan type" begin
+    @testset "parsing - phase_scan type" begin
         yaml = """
         experiment:
-          version: 3
+          
           name: "scan test"
           type: phase_scan
           system:
@@ -180,7 +180,7 @@
         @test cfg.spec.stability.perturbation == 1e-3
     end
 
-    @testset "v3 parsing - output defaults" begin
+    @testset "parsing - output defaults" begin
         yaml = """
         experiment:
           type: ground_state
@@ -210,7 +210,7 @@
         @test cfg.output.seed === nothing
     end
 
-    @testset "v3 parsing - checkpoint" begin
+    @testset "parsing - checkpoint" begin
         yaml = """
         experiment:
           type: ground_state
@@ -240,7 +240,7 @@
         @test cfg.output.checkpoint_interval == 500
     end
 
-    @testset "v3 parsing - c_total/c1_ratio" begin
+    @testset "parsing - c_total/c1_ratio" begin
         yaml = """
         experiment:
           type: ground_state
@@ -272,7 +272,7 @@
         @test c_total ≈ 4689.0 rtol=1e-10
     end
 
-    @testset "v3 parsing - unknown type error" begin
+    @testset "parsing - unknown type error" begin
         yaml = """
         experiment:
           type: unknown_type
@@ -538,7 +538,7 @@
               n_steps: 30
               energy_jump_threshold: 0.5
           output:
-            dir: /tmp/test_v3_scan
+            dir: /tmp/test_scan
             csv: true
             save_psi: false
         """
@@ -549,13 +549,13 @@
             @test haskey(r, :energy)
             @test isfinite(r.energy)
         end
-        rm("/tmp/test_v3_scan"; recursive=true, force=true)
+        rm("/tmp/test_scan"; recursive=true, force=true)
     end
 
-    @testset "v3 parsing - per_point_overrides in scan" begin
+    @testset "parsing - per_point_overrides in scan" begin
         yaml = """
         experiment:
-          version: 3
+          
           name: "override test"
           type: phase_scan
           system:
@@ -608,7 +608,7 @@
         @test ov2.overrides[:initial_state] == :ferromagnetic
     end
 
-    @testset "v3 parsing - constrained_jz scan" begin
+    @testset "parsing - constrained_jz scan" begin
         yaml = """
         experiment:
           type: phase_scan

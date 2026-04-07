@@ -35,6 +35,3 @@ experiment:
       type: harmonic
       omega: [1.0, 1.0, 1.1818]
 
-  output:
-    dir: "results/eu151_fl_vortex"
-    save_psi: true
