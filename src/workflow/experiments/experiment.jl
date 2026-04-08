@@ -25,11 +25,10 @@ struct PhaseConfig
     duration::Float64
     dt::Float64
     save_every::Int
-    zeeman_p::RampOrConstant
-    zeeman_q::RampOrConstant
-    potential::Union{Nothing,PotentialConfig}
-    noise_amplitude::Union{Nothing,Float64}
     integrator::IntegratorConfig
+    temperature_ratio::Union{Nothing,Float64}   # phase-start thermal noise (T/T_c)
+    noise_seed::Union{Nothing,Int}
+    override::Dict{String,Any}                   # applied to raw YAML before each phase
 end
 
 struct GroundStateConfig
@@ -45,6 +44,8 @@ struct GroundStateConfig
     psi_init_path::Union{Nothing,String}
     init_state_params::Dict{Symbol,Float64}
     backend::Symbol
+    temperature_ratio::Union{Nothing,Float64}  # T/T_c for add_thermal_noise!
+    noise_seed::Union{Nothing,Int}
 
     function GroundStateConfig(
         dt::Float64,
@@ -59,12 +60,16 @@ struct GroundStateConfig
         psi_init_path::Union{Nothing,String} = nothing,
         init_state_params::Dict{Symbol,Float64} = Dict{Symbol,Float64}(),
         backend::Symbol = :cpu,
+        temperature_ratio::Union{Nothing,Float64} = nothing,
+        noise_seed::Union{Nothing,Int} = nothing,
     )
         dt > 0 || throw(ArgumentError("dt must be positive"))
         n_steps > 0 || throw(ArgumentError("n_steps must be positive"))
         tol > 0 || throw(ArgumentError("tol must be positive"))
         backend in (:cpu, :cuda) ||
             throw(ArgumentError("backend must be :cpu or :cuda, got $backend"))
+        temperature_ratio === nothing || 0 < temperature_ratio < 1 ||
+            throw(ArgumentError("temperature_ratio must be in (0, 1), got $temperature_ratio"))
         new(
             dt,
             n_steps,
@@ -78,6 +83,8 @@ struct GroundStateConfig
             psi_init_path,
             init_state_params,
             backend,
+            temperature_ratio,
+            noise_seed,
         )
     end
 end
@@ -206,7 +213,10 @@ function _parse_ground_state(d::Dict)
     initial_state = Symbol(get(d, "initial_state", "polar"))
 
     z = get(d, "zeeman", Dict())
-    zeeman = ZeemanParams(Float64(get(z, "p", 0.0)), Float64(get(z, "q", 0.0)))
+    # p/q may be scalar (constant) or a {from,to} dict (ramp). For the
+    # GS typed config, collapse ramps to their `from` value; the dynamics
+    # runner inspects the raw dict directly when building TimeDependentZeeman.
+    zeeman = ZeemanParams(_zeeman_scalar(get(z, "p", 0.0)), _zeeman_scalar(get(z, "q", 0.0)))
 
     pot = _parse_potential_config(get(d, "potential", Dict("type" => "none")))
 
@@ -227,6 +237,13 @@ function _parse_ground_state(d::Dict)
     end
     backend = Symbol(lowercase(String(get(d, "backend", "cpu"))))
 
+    temperature_ratio = let v = get(d, "temperature_ratio", nothing)
+        v === nothing ? nothing : Float64(v)
+    end
+    noise_seed = let v = get(d, "noise_seed", nothing)
+        v === nothing ? nothing : Int(v)
+    end
+
     GroundStateConfig(
         dt,
         n_steps,
@@ -240,6 +257,8 @@ function _parse_ground_state(d::Dict)
         psi_init_path,
         init_state_params,
         backend,
+        temperature_ratio,
+        noise_seed,
     )
 end
 
@@ -249,14 +268,11 @@ function _parse_phase(d::Dict)
     dt = Float64(d["dt"])
     save_every = Int(get(d, "save_every", 1))
 
-    z = get(d, "zeeman", Dict())
-    zeeman_p = _parse_ramp_or_constant(get(z, "p", 0.0))
-    zeeman_q = _parse_ramp_or_constant(get(z, "q", 0.0))
-
-    pot = haskey(d, "potential") ? _parse_potential_config(d["potential"]) : nothing
-
-    noise_amp = let v = get(d, "noise_amplitude", nothing)
+    temp_ratio = let v = get(d, "temperature_ratio", nothing)
         v === nothing ? nothing : Float64(v)
+    end
+    phase_noise_seed = let v = get(d, "noise_seed", nothing)
+        v === nothing ? nothing : Int(v)
     end
 
     integrator = if haskey(d, "integrator")
@@ -275,16 +291,29 @@ function _parse_phase(d::Dict)
         IntegratorConfig()
     end
 
+    # Auto-migrate phase-level shortcuts into the override map so that
+    # {zeeman:, potential:} under a phase is equivalent to listing the
+    # corresponding paths under {override:}. Ramp forms {from, to} are
+    # passed through unchanged and re-interpreted by the dynamics runner.
+    override = parse_override_map(get(d, "override", Dict()))
+    if haskey(d, "zeeman")
+        z = d["zeeman"]
+        haskey(z, "p") && (override["ground_state.zeeman.p"] = z["p"])
+        haskey(z, "q") && (override["ground_state.zeeman.q"] = z["q"])
+    end
+    if haskey(d, "potential")
+        override["ground_state.potential"] = d["potential"]
+    end
+
     PhaseConfig(
         name,
         duration,
         dt,
         save_every,
-        zeeman_p,
-        zeeman_q,
-        pot,
-        noise_amp,
         integrator,
+        temp_ratio,
+        phase_noise_seed,
+        override,
     )
 end
 
@@ -318,6 +347,13 @@ function _parse_integrator(v, dt::Float64)
         throw(ArgumentError("integrator must be a string or dict, got $(typeof(v))"))
     end
 end
+
+"""
+Extract the scalar value from a YAML-parsed Zeeman entry. Scalars pass through;
+dicts of the form `{from, to}` (phase ramps) collapse to their `from` value
+for consumption by GS-only code paths.
+"""
+_zeeman_scalar(v) = v isa Dict ? Float64(v["from"]) : Float64(v)
 
 function _parse_ramp_or_constant(v)::RampOrConstant
     if v isa Dict
@@ -371,54 +407,29 @@ end
 
 # --- Scan Parsing Helpers ---
 
-function _parse_parameter_scan(d::Dict)
-    axes_data = d["axes"]
-    axes = ScanAxis[_parse_sweep_axis(a) for a in axes_data]
-    cont =
-        haskey(d, "continuation") ? _parse_continuation(d["continuation"]) :
-        ContinuationConfig()
-    ms = haskey(d, "multistart") ? _parse_multistart(d["multistart"]) : MultiStartConfig()
-    overrides = if haskey(d, "per_point_overrides")
-        ScanPointOverride[_parse_point_override(o) for o in d["per_point_overrides"]]
-    else
-        ScanPointOverride[]
-    end
+"""
+    _parse_override_scan(d::Dict) → OverrideScan
+
+Parse a scan dict with keys `zip:` or `product:` (mutually exclusive),
+optional `comparison_runs:` (list of `{name, override:}`), and optional
+`continuation:` / `auto_rotate_on_mz:` flags.
+"""
+function _parse_override_scan(d::Dict)
+    points = expand_scan_points(d)
+
     comparison_runs = if haskey(d, "comparison_runs")
-        ComparisonRunConfig[_parse_comparison_run(r) for r in d["comparison_runs"]]
+        Tuple{String,Dict{String,Any}}[
+            (String(r["name"]), parse_override_map(get(r, "override", Dict())))
+            for r in d["comparison_runs"]
+        ]
     else
-        ComparisonRunConfig[]
+        Tuple{String,Dict{String,Any}}[]
     end
-    ParameterScan(axes, cont, ms, overrides, comparison_runs)
-end
 
-function _parse_comparison_run(d::Dict)
-    name = String(d["name"])
-    initial_state = Symbol(d["initial_state"])
-    init_state_params = let v = get(d, "init_state_params", nothing)
-        v === nothing ? Dict{Symbol,Float64}() :
-        Dict{Symbol,Float64}(Symbol(k) => Float64(val) for (k, val) in v)
-    end
-    target_mag = let v = get(d, "target_magnetization", nothing)
-        v === nothing ? nothing : Float64(v)
-    end
-    ComparisonRunConfig(name, initial_state, init_state_params, target_mag)
-end
+    continuation = Bool(get(d, "continuation", false))
+    auto_rotate = Bool(get(d, "auto_rotate_on_mz", false))
 
-function _parse_point_override(d::Dict)
-    parameter = Symbol(d["parameter"])
-    r = d["range"]
-    range_val = (Float64(r["from"]), Float64(r["to"]))
-    overrides = Dict{Symbol,Any}()
-    for k in [:n_steps, :tol, :dt]
-        sk = string(k)
-        if haskey(d, sk)
-            overrides[k] = k == :n_steps ? Int(d[sk]) : Float64(d[sk])
-        end
-    end
-    if haskey(d, "initial_state")
-        overrides[:initial_state] = Symbol(d["initial_state"])
-    end
-    ScanPointOverride(parameter, range_val, overrides)
+    OverrideScan(points, comparison_runs, continuation, auto_rotate)
 end
 
 function _parse_constrained_jz_scan(d::Dict)
@@ -432,35 +443,6 @@ function _parse_constrained_jz_scan(d::Dict)
         (-10.0, 10.0)
     end
     ConstrainedJzScan(target_values, tolerance, max_iter, omega_range)
-end
-
-function _parse_multistart(d::Dict)
-    enabled = Bool(get(d, "enabled", false))
-    states = if haskey(d, "initial_states")
-        Symbol[Symbol(s) for s in d["initial_states"]]
-    else
-        Symbol[:polar, :ferromagnetic, :uniform, :antiferromagnetic]
-    end
-    n_random = Int(get(d, "n_random", 0))
-    MultiStartConfig(enabled, states, n_random)
-end
-
-function _parse_sweep_axis(d::Dict)
-    param = Symbol(d["parameter"])
-    vals = d["values"]
-    values = if vals isa Dict
-        ScanValues(Float64(vals["from"]), Float64(vals["to"]), Int(vals["n_points"]))
-    else
-        Float64[Float64(v) for v in vals]
-    end
-    ScanAxis(param, values)
-end
-
-function _parse_continuation(d::Dict)
-    enabled = Bool(get(d, "enabled", true))
-    n_steps = Int(get(d, "n_steps", 1000))
-    threshold = Float64(get(d, "energy_jump_threshold", 0.1))
-    ContinuationConfig(enabled, n_steps, threshold)
 end
 
 function _parse_scan_stability(d::Dict)

@@ -100,10 +100,10 @@ using SpinorBEC
         @test lp.L3 == 0.0
     end
 
-    @testset "ScanValues validation" begin
-        @test_throws ArgumentError ScanValues(0.0, 1.0, 1)
-        sv = ScanValues(0.0, 1.0, 10)
-        @test sv.n_points == 10
+    @testset "OverrideScan validation" begin
+        @test_throws ArgumentError OverrideScan(Dict{String,Any}[])
+        os = OverrideScan([Dict{String,Any}("a.b" => 1)])
+        @test length(os.points) == 1
     end
 
     @testset "TOFParams validation" begin

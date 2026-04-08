@@ -31,4 +31,5 @@ JuliaLocalPreferences.toml
 *.jld2
 *.html
 **/output/
+runs/
 

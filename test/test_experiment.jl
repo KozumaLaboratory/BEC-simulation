@@ -96,20 +96,19 @@
         @test ramp.duration == 1.0
         @test ramp.dt == 0.01
         @test ramp.save_every == 10
-        @test ramp.zeeman_p isa LinearRamp
-        @test ramp.zeeman_p.from == 0.0
-        @test ramp.zeeman_p.to == 0.5
-        @test ramp.zeeman_q isa ConstantValue
-        @test ramp.zeeman_q.value == 0.0
-        @test ramp.potential !== nothing
+        @test ramp.override["ground_state.zeeman.p"] isa Dict
+        @test ramp.override["ground_state.zeeman.p"]["from"] == 0.0
+        @test ramp.override["ground_state.zeeman.p"]["to"] == 0.5
+        @test ramp.override["ground_state.zeeman.q"] == 0.0
+        @test haskey(ramp.override, "ground_state.potential")
 
         hold = config.spec.sequence[2]
         @test hold.name == "hold"
-        @test hold.potential === nothing  # inherits
+        @test !haskey(hold.override, "ground_state.potential")
 
         release = config.spec.sequence[3]
         @test release.name == "release"
-        @test release.potential.type == :none
+        @test release.override["ground_state.potential"]["type"] == "none"
     end
 
     @testset "YAML parsing - DDI" begin
@@ -277,7 +276,7 @@
         @test components[2].type == :gravity
     end
 
-    @testset "YAML parsing - noise_amplitude" begin
+    @testset "YAML parsing - phase temperature_ratio" begin
         yaml_with_noise = """
         experiment:
           type: dynamics
@@ -301,7 +300,8 @@
             - name: noisy
               duration: 1.0
               dt: 0.01
-              noise_amplitude: 0.05
+              temperature_ratio: 0.1
+              noise_seed: 42
               zeeman:
                 p: 0.0
                 q: 0.0
@@ -316,8 +316,9 @@
                 q: 0.0
         """
         config = load_config_from_string(yaml_with_noise)
-        @test config.spec.sequence[1].noise_amplitude == 0.05
-        @test config.spec.sequence[2].noise_amplitude === nothing
+        @test config.spec.sequence[1].temperature_ratio == 0.1
+        @test config.spec.sequence[1].noise_seed == 42
+        @test config.spec.sequence[2].temperature_ratio === nothing
     end
 
     @testset "run_config integration" begin
@@ -374,7 +375,7 @@
         @test all(n -> n > 0, sim.norms)
     end
 
-    @testset "run_config integration - noise_amplitude" begin
+    @testset "run_config integration - phase temperature_ratio" begin
         yaml_str = """
         experiment:
           type: dynamics
@@ -403,7 +404,8 @@
               duration: 0.1
               dt: 0.001
               save_every: 50
-              noise_amplitude: 0.01
+              temperature_ratio: 0.05
+              noise_seed: 42
               zeeman:
                 p: 0.0
                 q: 0.1
@@ -413,7 +415,7 @@
         """
 
         config = load_config_from_string(yaml_str)
-        @test config.spec.sequence[1].noise_amplitude == 0.01
+        @test config.spec.sequence[1].temperature_ratio == 0.05
         result = run_config(config; verbose=false)
         @test length(result.phase_results) == 1
         @test result.phase_names == ["noisy_evolve"]

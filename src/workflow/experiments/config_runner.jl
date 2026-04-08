@@ -86,11 +86,11 @@ function _run_config(config::UnifiedConfig, spec::DynamicsExperiment; verbose::B
     psi_current = copy(gs_result.workspace.state.psi)
 
     if spec.perturbation !== nothing
-        if spec.perturbation.seed !== nothing
-            Random.seed!(spec.perturbation.seed)
-        end
-        n_components = 2 * atom.F + 1
-        _add_noise!(psi_current, spec.perturbation.amplitude, n_components, ndim, grid)
+        psi_current = add_thermal_noise(
+            psi_current, atom.F;
+            T_over_Tc = spec.perturbation.temperature_ratio,
+            seed = something(spec.perturbation.seed, 42),
+        )
     end
 
     phase_results, phase_names =
@@ -149,6 +149,20 @@ function _run_ground_state(config::UnifiedConfig, grid, atom, potential, ndim)
     backend = _resolve_backend(gs.backend)
     psi_init = _load_psi_init(gs.psi_init_path)
 
+    # Thermal fluctuation perturbation: build psi from initial_state then
+    # overlay Bose-Einstein-distributed noise scaled by T/T_c. Used to seed
+    # spontaneous symmetry breaking in ITP (vortex ground states, etc).
+    if psi_init === nothing && gs.temperature_ratio !== nothing
+        sys_obj = SpinSystem(atom.F)
+        psi_base = init_psi(grid, sys_obj; state = gs.initial_state,
+                            (k => v for (k, v) in gs.init_state_params)...)
+        psi_init = add_thermal_noise(
+            psi_base, atom.F;
+            T_over_Tc = gs.temperature_ratio,
+            seed = something(gs.noise_seed, 42),
+        )
+    end
+
     find_ground_state(;
         grid,
         atom,
@@ -181,19 +195,11 @@ function _run_dynamics_sequence(
     psi_current;
     verbose::Bool = true,
 )
-    sys = config.system
-    enable_ddi = sys.ddi.enabled
-    c_dd_val = sys.ddi.c_dd === nothing ? NaN : sys.ddi.c_dd
-    secular_ddi = sys.ddi.secular
-    quasi_2d_ddi = sys.ddi.quasi_2d
-    l_z_ddi = sys.ddi.l_z
-
     phase_results = SimulationResult[]
     phase_names = String[]
     phase_times = Float64[]
     phase_rates = Float64[]
     t_offset = 0.0
-    prev_potential_config = config.ground_state.potential
     simulation_start = time()
 
     for (i, phase) in enumerate(spec.sequence)
@@ -201,11 +207,29 @@ function _run_dynamics_sequence(
             print_phase_header(phase.name, phase.duration, phase.dt, round(Int, phase.duration / phase.dt))
         end
 
-        pot_cfg = phase.potential !== nothing ? phase.potential : prev_potential_config
-        potential = _build_potential(pot_cfg, ndim)
-        prev_potential_config = pot_cfg
+        # Apply phase override (if any) to the raw YAML and re-parse, so
+        # system/interactions/potential/DDI can switch between phases via
+        # the same mechanism as scan points.
+        phase_raw = isempty(phase.override) ? config.raw_data :
+                    apply_overrides(config.raw_data, phase.override)
+        phase_config = isempty(phase.override) ? config : _parse_config(phase_raw)
+        sys = phase_config.system
+        enable_ddi = sys.ddi.enabled
+        c_dd_val = sys.ddi.c_dd === nothing ? NaN : sys.ddi.c_dd
+        secular_ddi = sys.ddi.secular
+        quasi_2d_ddi = sys.ddi.quasi_2d
+        l_z_ddi = sys.ddi.l_z
 
-        zeeman = _build_zeeman(phase, t_offset)
+        # Potential: either the phase override brought in a new one, or the
+        # re-parsed phase_config inherits the base. Always rebuild from the
+        # re-parsed config so phase-level `potential:` (auto-migrated to
+        # override) is honored.
+        potential = _build_potential(phase_config.ground_state.potential, ndim)
+
+        # Zeeman: inspect the raw (override-applied) dict directly so that
+        # ramp-form values `{from, to}` build a TimeDependentZeeman linear
+        # ramp over the phase duration.
+        zeeman = _build_phase_zeeman(phase_raw, t_offset, phase.duration)
 
         n_steps = round(Int, phase.duration / phase.dt)
         sp = SimParams(; dt = phase.dt, n_steps, save_every = phase.save_every)
@@ -230,8 +254,13 @@ function _run_dynamics_sequence(
         )
         ws.state.t = t_offset
 
-        if phase.noise_amplitude !== nothing && phase.noise_amplitude > 0
-            _add_noise!(ws.state.psi, phase.noise_amplitude, 2 * atom.F + 1, ndim, grid)
+        if phase.temperature_ratio !== nothing
+            psi_noisy = add_thermal_noise(
+                ws.state.psi, atom.F;
+                T_over_Tc = phase.temperature_ratio,
+                seed = something(phase.noise_seed, 42),
+            )
+            ws.state.psi .= psi_noisy
         end
 
         sim_result = if phase.integrator.method == :adaptive

@@ -34,23 +34,42 @@ function _build_beam(d::Dict)
     GaussianBeam(wavelength, power, waist, position, direction)
 end
 
-function _build_zeeman(phase::PhaseConfig, t_offset::Float64)
-    p_is_const = phase.zeeman_p isa ConstantValue
-    q_is_const = phase.zeeman_q isa ConstantValue
-    duration = phase.duration
+"""
+    _build_phase_zeeman(phase_raw, t_offset, duration) → ZeemanParams or TimeDependentZeeman
 
-    if p_is_const && q_is_const
-        ZeemanParams(phase.zeeman_p.value, phase.zeeman_q.value)
+Build the per-phase Zeeman object directly from the override-applied raw
+YAML dict. Entries under `ground_state.zeeman.p`/`q` may be scalars
+(constant over the phase) or `{from, to}` dicts (linear ramp over the
+phase duration). If both p and q are scalar the result is a cheap
+constant `ZeemanParams`; otherwise it is a `TimeDependentZeeman` closure.
+"""
+function _build_phase_zeeman(phase_raw::Dict, t_offset::Float64, duration::Float64)
+    gs = get(phase_raw, "ground_state", Dict())
+    z = get(gs, "zeeman", Dict())
+    p_spec = get(z, "p", 0.0)
+    q_spec = get(z, "q", 0.0)
+
+    p_ramp = _zeeman_ramp(p_spec)
+    q_ramp = _zeeman_ramp(q_spec)
+
+    if p_ramp isa ConstantValue && q_ramp isa ConstantValue
+        ZeemanParams(p_ramp.value, q_ramp.value)
     else
         TimeDependentZeeman(t -> begin
             t_local = t - t_offset
             t_frac = duration > 0 ? t_local / duration : 0.0
-            p = interpolate_value(phase.zeeman_p, t_frac)
-            q = interpolate_value(phase.zeeman_q, t_frac)
-            ZeemanParams(p, q)
+            ZeemanParams(
+                interpolate_value(p_ramp, t_frac),
+                interpolate_value(q_ramp, t_frac),
+            )
         end)
     end
 end
+
+_zeeman_ramp(v::Dict) = haskey(v, "to") ?
+    LinearRamp(Float64(v["from"]), Float64(v["to"])) :
+    ConstantValue(Float64(v["from"]))
+_zeeman_ramp(v) = ConstantValue(Float64(v))
 
 function _add_noise!(psi, amplitude, n_components, ndim, grid)
     n_pts = ntuple(d -> size(psi, d), ndim)

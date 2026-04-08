@@ -19,6 +19,7 @@ struct UnifiedConfig{S<:AbstractExperimentSpec}
     spec::S
     output::OutputConfig
     observables::ObservablesConfig
+    raw_data::Dict
 end
 
 # --- Loader ---
@@ -35,10 +36,10 @@ end
 
 function _parse_config(data::Dict)
     exp_data = get(data, "experiment", data)
-    _parse_experiment(exp_data)
+    _parse_experiment(exp_data, exp_data)
 end
 
-function _parse_experiment(d::Dict)
+function _parse_experiment(d::Dict, raw::Dict = d)
     name = get(d, "name", "unnamed")
     exp_type = Symbol(d["type"])
 
@@ -47,21 +48,12 @@ function _parse_experiment(d::Dict)
     output = _parse_output_config(get(d, "output", Dict()))
     observables = _parse_observables(get(d, "observables", Dict()))
 
-    if exp_type == :ground_state
-        return UnifiedConfig(
-            name,
-            system,
-            gs,
-            GroundStateExperiment(),
-            output,
-            observables,
-        )
+    spec = if exp_type == :ground_state
+        GroundStateExperiment()
     elseif exp_type == :dynamics
-        spec = _parse_dynamics(d)
-        return UnifiedConfig(name, system, gs, spec, output, observables)
+        _parse_dynamics(d)
     elseif exp_type == :phase_scan
-        spec = _parse_phase_scan(d)
-        return UnifiedConfig(name, system, gs, spec, output, observables)
+        _parse_phase_scan(d)
     else
         throw(
             ArgumentError(
@@ -69,6 +61,7 @@ function _parse_experiment(d::Dict)
             ),
         )
     end
+    UnifiedConfig(name, system, gs, spec, output, observables, raw)
 end
 
 function _parse_dynamics(d::Dict)
@@ -76,11 +69,11 @@ function _parse_dynamics(d::Dict)
 
     perturbation = if haskey(d, "perturbation")
         pd = d["perturbation"]
-        amplitude = Float64(pd["amplitude"])
+        temp_ratio = Float64(pd["temperature_ratio"])
         seed = let v = get(pd, "seed", nothing)
             v === nothing ? nothing : Int(v)
         end
-        PerturbationConfig(amplitude, seed)
+        PerturbationConfig(temp_ratio, seed)
     else
         nothing
     end
@@ -90,13 +83,13 @@ end
 
 function _parse_phase_scan(d::Dict)
     scan_d = d["scan"]
-    scan_type = Symbol(scan_d["type"])
-    scan = if scan_type == :parameter
-        _parse_parameter_scan(scan_d)
+    scan_type = Symbol(get(scan_d, "type", "override"))
+    scan = if scan_type == :override
+        _parse_override_scan(scan_d)
     elseif scan_type == :constrained_jz
         _parse_constrained_jz_scan(scan_d)
     else
-        throw(ArgumentError("Unknown scan type: $scan_type"))
+        throw(ArgumentError("Unknown scan type: $scan_type. Use 'override' or 'constrained_jz'."))
     end
 
     stab =

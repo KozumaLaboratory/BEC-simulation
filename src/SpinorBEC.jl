@@ -85,6 +85,7 @@ include("workflow/monitoring/live_monitor.jl")
 
 # 10. Experiments (defines config types needed by phases)
 include("workflow/experiments/adaptive_advice.jl")
+include("workflow/experiments/config_override.jl")  # OverrideMap + scan expansion
 include("workflow/experiments/experiment.jl")  # Defines PhaseConfig, GroundStateConfig, etc.
 include("workflow/experiments/experiment_runner.jl")
 include("workflow/experiments/config.jl")  # Uses types from experiment.jl
@@ -265,12 +266,13 @@ export save_state, load_state
 # Config types
 export ConstantValue, LinearRamp, RampOrConstant, interpolate_value
 export PotentialConfig, PhaseConfig, GroundStateConfig, DDIConfig, SystemConfig
-export ScanValues, ScanAxis, ContinuationConfig, ScanStabilityConfig, ScanPointOverride
-export MultiStartConfig, AbstractScanSpec, ParameterScan, ConstrainedJzScan
+export ScanStabilityConfig
+export AbstractScanSpec, OverrideScan, ConstrainedJzScan
+export apply_override!, apply_overrides, expand_scan_points, parse_override_map
 export AbstractExperimentSpec, GroundStateExperiment, DynamicsExperiment, ScanExperiment
 export PerturbationConfig, OutputConfig, ObservablesConfig, UnifiedConfig
 export load_config, load_config_from_string, run_config, seed_noise
-export run_yaml, run_status, list_runs, compute_run_file
+export run_yaml, run_status, list_runs, compute_run_dir
 
 # Units
 export Units

@@ -277,7 +277,7 @@
         @test cfg.system.loss === nothing
     end
 
-    @testset "YAML parsing of noise_amplitude" begin
+    @testset "YAML parsing of phase temperature_ratio" begin
         yaml = """
         experiment:
           name: noise_test
@@ -301,14 +301,14 @@
             - name: noisy_phase
               duration: 1.0
               dt: 0.01
-              noise_amplitude: 0.001
+              temperature_ratio: 0.1
             - name: quiet_phase
               duration: 1.0
               dt: 0.01
         """
         cfg = load_config_from_string(yaml)
-        @test cfg.spec.sequence[1].noise_amplitude == 0.001
-        @test cfg.spec.sequence[2].noise_amplitude === nothing
+        @test cfg.spec.sequence[1].temperature_ratio == 0.1
+        @test cfg.spec.sequence[2].temperature_ratio === nothing
     end
 
     @testset "_add_noise! changes psi but preserves norm" begin

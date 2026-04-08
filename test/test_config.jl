@@ -70,7 +70,7 @@
               type: harmonic
               omega: [1.0]
           perturbation:
-            amplitude: 0.001
+            temperature_ratio: 0.1
             seed: 42
           sequence:
             - name: evolve
@@ -92,11 +92,11 @@
         cfg = load_config_from_string(yaml)
         @test cfg isa UnifiedConfig{DynamicsExperiment}
         @test cfg.spec.perturbation !== nothing
-        @test cfg.spec.perturbation.amplitude == 0.001
+        @test cfg.spec.perturbation.temperature_ratio == 0.1
         @test cfg.spec.perturbation.seed == 42
         @test length(cfg.spec.sequence) == 1
         @test cfg.spec.sequence[1].name == "evolve"
-        @test cfg.spec.sequence[1].zeeman_q isa LinearRamp
+        @test cfg.spec.sequence[1].override["ground_state.zeeman.q"] isa Dict
         @test cfg.output.seed == 123
     end
 
@@ -131,7 +131,6 @@
     @testset "parsing - phase_scan type" begin
         yaml = """
         experiment:
-          
           name: "scan test"
           type: phase_scan
           system:
@@ -150,17 +149,9 @@
               type: harmonic
               omega: [1.0]
           scan:
-            type: parameter
-            axes:
-              - parameter: c1_ratio
-                values:
-                  from: -0.01
-                  to: 0.03
-                  n_points: 5
-            continuation:
-              enabled: true
-              n_steps: 50
-              energy_jump_threshold: 0.2
+            zip:
+              system.interactions.c1: [-5.0, -2.0, 0.0, 2.0, 5.0]
+            continuation: true
           stability:
             enabled: true
             perturbation: 1e-3
@@ -172,10 +163,9 @@
         """
         cfg = load_config_from_string(yaml)
         @test cfg isa UnifiedConfig{<:ScanExperiment}
-        @test cfg.spec.scan isa ParameterScan
-        @test length(cfg.spec.scan.axes) == 1
-        @test cfg.spec.scan.axes[1].parameter == :c1_ratio
-        @test cfg.spec.scan.continuation.n_steps == 50
+        @test cfg.spec.scan isa OverrideScan
+        @test length(cfg.spec.scan.points) == 5
+        @test cfg.spec.scan.continuation == true
         @test cfg.spec.stability.enabled == true
         @test cfg.spec.stability.perturbation == 1e-3
     end
@@ -369,10 +359,10 @@
     end
 
     @testset "PerturbationConfig validation" begin
-        @test_throws ArgumentError PerturbationConfig(-0.001, nothing)
-        @test_throws ArgumentError PerturbationConfig(0.0, 42)
-        pc = PerturbationConfig(0.01, 42)
-        @test pc.amplitude == 0.01
+        @test_throws ArgumentError PerturbationConfig(-0.1, nothing)   # < 0
+        @test_throws ArgumentError PerturbationConfig(1.5, 42)          # > 1
+        pc = PerturbationConfig(0.1, 42)
+        @test pc.temperature_ratio == 0.1
         @test pc.seed == 42
     end
 
@@ -488,7 +478,7 @@
               type: harmonic
               omega: [1.0]
           perturbation:
-            amplitude: 0.01
+            temperature_ratio: 0.05
             seed: 42
           sequence:
             - name: evolve
@@ -529,14 +519,8 @@
               type: harmonic
               omega: [1.0]
           scan:
-            type: parameter
-            axes:
-              - parameter: zeeman_q
-                values: [0.0, 0.5]
-            continuation:
-              enabled: false
-              n_steps: 30
-              energy_jump_threshold: 0.5
+            zip:
+              ground_state.zeeman.q: [0.0, 0.5]
           output:
             dir: /tmp/test_scan
             csv: true
@@ -552,11 +536,10 @@
         rm("/tmp/test_scan"; recursive=true, force=true)
     end
 
-    @testset "parsing - per_point_overrides in scan" begin
+    @testset "parsing - comparison_runs" begin
         yaml = """
         experiment:
-          
-          name: "override test"
+          name: "comparison test"
           type: phase_scan
           system:
             atom: Rb87
@@ -574,38 +557,23 @@
               type: harmonic
               omega: [1.0]
           scan:
-            type: parameter
-            axes:
-              - parameter: c1_ratio
-                values:
-                  from: -0.02
-                  to: 0.03
-                  n_points: 5
-            per_point_overrides:
-              - parameter: c1_ratio
-                range:
-                  from: -0.005
-                  to: 0.005
-                n_steps: 5000
-                tol: 1.0e-10
-                dt: 0.005
-              - parameter: c1_ratio
-                range:
-                  from: 0.02
-                  to: 0.03
-                initial_state: ferromagnetic
+            zip:
+              system.interactions.c1: [-5.0, 0.0, 5.0]
+            comparison_runs:
+              - name: polar
+                override:
+                  ground_state.initial_state: polar
+                  ground_state.tol: 1.0e-10
+              - name: ferro
+                override:
+                  ground_state.initial_state: ferromagnetic
         """
         cfg = load_config_from_string(yaml)
-        @test cfg.spec.scan isa ParameterScan
-        @test length(cfg.spec.scan.per_point_overrides) == 2
-        ov1 = cfg.spec.scan.per_point_overrides[1]
-        @test ov1.parameter == :c1_ratio
-        @test ov1.range == (-0.005, 0.005)
-        @test ov1.overrides[:n_steps] == 5000
-        @test ov1.overrides[:tol] == 1e-10
-        @test ov1.overrides[:dt] == 0.005
-        ov2 = cfg.spec.scan.per_point_overrides[2]
-        @test ov2.overrides[:initial_state] == :ferromagnetic
+        @test cfg.spec.scan isa OverrideScan
+        @test length(cfg.spec.scan.comparison_runs) == 2
+        @test cfg.spec.scan.comparison_runs[1][1] == "polar"
+        @test cfg.spec.scan.comparison_runs[1][2]["ground_state.tol"] == 1e-10
+        @test cfg.spec.scan.comparison_runs[2][1] == "ferro"
     end
 
     @testset "parsing - constrained_jz scan" begin

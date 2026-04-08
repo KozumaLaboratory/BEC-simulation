@@ -544,111 +544,48 @@ end
 
 # --- Phase Scan Types ---
 
-struct ScanValues
-    from::Float64
-    to::Float64
-    n_points::Int
-
-    function ScanValues(from::Float64, to::Float64, n_points::Int)
-        n_points >= 2 || throw(ArgumentError("n_points must be >= 2"))
-        new(from, to, n_points)
-    end
-end
-
-struct ScanAxis
-    parameter::Symbol
-    values::Union{ScanValues,Vector{Float64}}
-end
-
-struct ContinuationConfig
-    enabled::Bool
-    n_steps::Int
-    energy_jump_threshold::Float64
-
-    function ContinuationConfig(enabled::Bool, n_steps::Int, energy_jump_threshold::Float64)
-        n_steps > 0 || throw(ArgumentError("n_steps must be positive"))
-        energy_jump_threshold > 0 ||
-            throw(ArgumentError("energy_jump_threshold must be positive"))
-        new(enabled, n_steps, energy_jump_threshold)
-    end
-end
-
-ContinuationConfig() = ContinuationConfig(true, 1000, 0.1)
-
-struct MultiStartConfig
-    enabled::Bool
-    initial_states::Vector{Symbol}
-    n_random::Int
-end
-
-MultiStartConfig() =
-    MultiStartConfig(false, [:polar, :ferromagnetic, :uniform, :antiferromagnetic], 0)
-
 abstract type AbstractScanSpec end
 
-struct ScanPointOverride
-    parameter::Symbol
-    range::Tuple{Float64,Float64}
-    overrides::Dict{Symbol,Any}
+"""
+    OverrideScan
 
-    function ScanPointOverride(
-        parameter::Symbol,
-        range::Tuple{Float64,Float64},
-        overrides::Dict{Symbol,Any},
+Scan spec built from path-based config overrides. Each scan point is one
+override map (a dict of dotted YAML paths → values) that the runner applies
+to the raw YAML dict and re-parses before running.
+
+Fields:
+- `points`: list of override maps, one per scan point. Generated from a
+  YAML `zip:` or `product:` block (see `expand_scan_points`).
+- `comparison_runs`: list of `(name, override)` pairs. When non-empty, every
+  scan point is run once per comparison run; the comparison override is
+  merged on top of the scan point override.
+- `continuation`: when true, the previous point's converged psi is reused
+  as the initial condition for the next point.
+- `auto_rotate_on_mz`: when true and `ground_state.target_magnetization`
+  changes between adjacent points, the carried-over psi is rotated by
+  Δα around y so the constraint normalization can redistribute populations.
+"""
+struct OverrideScan <: AbstractScanSpec
+    points::Vector{Dict{String,Any}}
+    comparison_runs::Vector{Tuple{String,Dict{String,Any}}}
+    continuation::Bool
+    auto_rotate_on_mz::Bool
+
+    function OverrideScan(
+        points::Vector{<:Dict},
+        comparison_runs::Vector{<:Tuple{<:AbstractString,<:Dict}} = Tuple{String,Dict{String,Any}}[],
+        continuation::Bool = false,
+        auto_rotate_on_mz::Bool = false,
     )
-        allowed = Set([:n_steps, :tol, :dt, :initial_state])
-        for k in keys(overrides)
-            k in allowed ||
-                throw(ArgumentError("Unknown override key: $k. Allowed: $allowed"))
-        end
-        isempty(overrides) &&
-            throw(ArgumentError("Override must specify at least one field"))
-        range[1] <= range[2] ||
-            throw(ArgumentError("Override range must satisfy from <= to"))
-        new(parameter, range, overrides)
+        isempty(points) && throw(ArgumentError("OverrideScan requires at least one point"))
+        new(
+            Dict{String,Any}[Dict{String,Any}(p) for p in points],
+            Tuple{String,Dict{String,Any}}[(String(n), Dict{String,Any}(o)) for (n, o) in comparison_runs],
+            continuation,
+            auto_rotate_on_mz,
+        )
     end
 end
-
-"""
-    ComparisonRunConfig
-
-One leg of a comparison scan: a named ground-state recipe (initial state +
-optional Mz constraint + optional init params) that is run at every scan point
-alongside the base configuration. Used to compare candidate ground states
-(e.g. uniform polarized vs FL vortex) on the same physical parameter sweep.
-"""
-struct ComparisonRunConfig
-    name::String
-    initial_state::Symbol
-    init_state_params::Dict{Symbol,Float64}
-    target_magnetization::Union{Nothing,Float64}
-end
-
-ComparisonRunConfig(name::String, initial_state::Symbol) =
-    ComparisonRunConfig(name, initial_state, Dict{Symbol,Float64}(), nothing)
-
-struct ParameterScan <: AbstractScanSpec
-    axes::Vector{ScanAxis}
-    continuation::ContinuationConfig
-    multistart::MultiStartConfig
-    per_point_overrides::Vector{ScanPointOverride}
-    comparison_runs::Vector{ComparisonRunConfig}
-
-    function ParameterScan(
-        axes::Vector{ScanAxis},
-        continuation::ContinuationConfig,
-        multistart::MultiStartConfig,
-        per_point_overrides::Vector{ScanPointOverride} = ScanPointOverride[],
-        comparison_runs::Vector{ComparisonRunConfig} = ComparisonRunConfig[],
-    )
-        1 <= length(axes) <= 2 ||
-            throw(ArgumentError("ParameterScan requires 1 or 2 axes, got $(length(axes))"))
-        new(axes, continuation, multistart, per_point_overrides, comparison_runs)
-    end
-end
-
-ParameterScan(axes::Vector{ScanAxis}) =
-    ParameterScan(axes, ContinuationConfig(), MultiStartConfig())
 
 struct ConstrainedJzScan <: AbstractScanSpec
     target_values::Vector{Float64}
@@ -736,12 +673,13 @@ abstract type AbstractExperimentSpec end
 struct GroundStateExperiment <: AbstractExperimentSpec end
 
 struct PerturbationConfig
-    amplitude::Float64
+    temperature_ratio::Float64   # T/T_c, Bose-Einstein distributed thermal noise
     seed::Union{Nothing,Int}
 
-    function PerturbationConfig(amplitude::Float64, seed::Union{Nothing,Int})
-        amplitude > 0 || throw(ArgumentError("perturbation amplitude must be positive"))
-        new(amplitude, seed)
+    function PerturbationConfig(temperature_ratio::Float64, seed::Union{Nothing,Int})
+        0 < temperature_ratio < 1 ||
+            throw(ArgumentError("temperature_ratio must be in (0, 1), got $temperature_ratio"))
+        new(temperature_ratio, seed)
     end
 end
 
