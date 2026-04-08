@@ -1,0 +1,65 @@
+# ================================================================
+# Dy164 quantum droplet / dipolar supersolid (2D)
+# ================================================================
+#
+# Physics:
+#   ¹⁶⁴Dy (F=8, μ=9.93μ_B) has the strongest magnetic dipole moment
+#   among ultracold atoms. When DDI exceeds contact interaction
+#   (c_dd/3 > c₀ at some angles), the mean-field becomes attractive
+#   and drives roton instability. The LHY (Lee-Huang-Yang) beyond-
+#   mean-field correction stabilizes against collapse, forming
+#   self-bound quantum droplets — a hallmark of dipolar quantum gases.
+#   F=8 gives 17 spinor components, showcasing large-spin capability.
+#
+# References:
+#   Lu et al. PRL 107, 190401 (2011) — first Dy BEC
+#   Tang et al. PRA 92, 022703 (2015) — Dy scattering lengths
+#   Kadau et al. Nature 530, 194 (2016) — quantum droplets in Dy
+#   Chomaz et al. Nat. Phys. 14, 442 (2018) — dipolar supersolid
+#
+# Units: dimensionless (ℏ = m = ω_ref = 1)
+# ================================================================
+
+experiment:
+  name: "Dy164 quantum droplet (2D)"
+  type: dynamics
+
+  system:
+    atom: Dy164
+    grid:
+      n_points: [32, 32]
+      box_size: [16.0, 16.0]
+    interactions:
+      c0: 20.0
+      c1: 0.0
+      c_lhy: 15.0
+    ddi:
+      enabled: true
+      c_dd: 65.0
+
+  # Polarized ground state (m=+F) with LHY stabilization
+  ground_state:
+    dt: 0.002
+    n_steps: 5000
+    tol: 1.0e-10
+    initial_state: ferromagnetic
+    zeeman:
+      p: 0.5
+      q: 0.0
+    potential:
+      type: harmonic
+      omega: [1.0, 1.0]
+
+  sequence:
+    # Remove polarizing field to seed instability, observe droplet formation
+    - name: droplet_formation
+      duration: 1.0
+      dt: 0.001
+      save_every: 50
+      integrator: adaptive
+      zeeman:
+        p: 0.0
+        q: 0.0
+      potential:
+        type: harmonic
+        omega: [1.0, 1.0]

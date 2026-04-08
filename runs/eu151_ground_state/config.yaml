@@ -1,0 +1,2 @@
+# Legacy migration: standalone ground state file from output/eu151_ground_state.jld2
+# Carries c0/c1/c_dd/grid params as extras.

@@ -1,0 +1,32 @@
+experiment:
+  name: "Eu151 ground state (large trap, c1_ratio=0.001, quasi-2D)"
+  type: ground_state
+
+  system:
+    atom: Eu151
+    grid:
+      n_points: [96, 96]
+      box_size: [48, 48]
+    interactions:
+      c0: 1.0
+      c1: 0.001
+    ddi:
+      enabled: true
+      c_dd: 7647.0
+      quasi_2d: true
+      l_z: 0.847
+
+  ground_state:
+    dt: 0.001
+    n_steps: 1500 # Increase steps for larger grid
+    tol: 1.0e-6
+    initial_state: polar
+    potential:
+      type: harmonic
+      omega: [0.5, 0.5] # Weaker trap to make the BEC larger
+    zeeman:
+      p: 0.0
+      q: 0.0
+
+  observables:
+    final_only: [psi, energy]

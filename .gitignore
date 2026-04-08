@@ -30,6 +30,6 @@ JuliaLocalPreferences.toml
 # Simulation caches and output
 *.jld2
 *.html
+!examples/*.html
 **/output/
-runs/
 

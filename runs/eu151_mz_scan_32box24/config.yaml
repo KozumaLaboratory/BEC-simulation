@@ -1,0 +1,3 @@
+# Legacy migration: 32³ box=24, early Mz scan with c1_ratio=1/36
+# Original script: examples/eu151_gs_mz_scan.jl (deprecated)
+# This dataset predates the YAML-driven workflow.

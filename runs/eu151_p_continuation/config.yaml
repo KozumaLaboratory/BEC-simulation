@@ -1,0 +1,65 @@
+# ================================================================
+# Eu151 ground state: p-continuation (Zeeman field sweep)
+# ================================================================
+#
+# Strategy:
+#   Start at large linear Zeeman p where the system is polarized
+#   (m=-F dominant, DDI acts on a near-scalar condensate, ITP stable).
+#   Gradually reduce p toward zero using continuation (previous ground
+#   state as initial condition for next point).
+#
+#   This avoids the ITP+DDI divergence that occurs when starting from
+#   non-polarized initial states with full DDI.
+#
+# Physics:
+#   p >> 1:  polarized (m=-6), DDI is weak perturbation
+#   p ~ 1:   spin texture develops, DDI drives flux closure
+#   p ~ 0:   ground state quantum phase (magnetic vortex, nematic, etc.)
+#
+# Units: dimensionless (hbar = m = omega_ref = 1), omega_ref = 2pi x 110 Hz
+#   Physical B = 2.6 nT corresponds to p ~ 0.39
+# ================================================================
+
+experiment:
+  name: "Eu151 p-continuation (Zeeman sweep)"
+  type: phase_scan
+
+  system:
+    atom: Eu151
+    grid:
+      n_points: [32, 32, 32]
+      box_size: [12.0, 12.0, 12.0]
+    interactions:
+      c_total: 4689.0
+      c1_ratio: 0.02778   # 1/36, Buchachenko AFM estimate
+    ddi:
+      enabled: true
+      c_dd: 7647.0
+
+  ground_state:
+    dt: 0.001
+    n_steps: 3000
+    tol: 1.0e-8
+    initial_state: polar
+    zeeman:
+      p: 100.0   # starting value (overridden by scan)
+      q: 0.0
+    potential:
+      type: harmonic
+      omega: [1.0, 1.0, 1.1818]   # 130/110
+
+  scan:
+    zip:
+      ground_state.zeeman.p: [100.0, 50.0, 20.0, 10.0, 5.0, 2.0, 1.0, 0.5, 0.2, 0.1, 0.0]
+    continuation: true
+
+  stability:
+    enabled: true
+    perturbation: 1.0e-4
+    n_steps: 300
+    sample_every: 10
+
+  observables:
+    always: [norm, magnetization]
+    on_save: [energy]
+    final_only: [phase_classification, structure_factor]

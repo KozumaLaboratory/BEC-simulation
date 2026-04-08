@@ -1,0 +1,55 @@
+# Eu151 3D Einstein-de Haas effect (Matsui et al. Science 2026)
+#
+# Strategy: find ground state WITHOUT DDI (DDI causes ITP divergence for
+# F=6 at c_dd×F²/3 ≫ c0), then turn DDI ON for the dynamics phase. The
+# phase override on the dynamics phase flips `system.ddi.enabled` without
+# requiring a separate config.
+#
+# Physical conditions:
+#   3D trap: ω = (110, 110, 130) Hz, N = 5×10⁴
+#   Initial: m=-6 polarized
+#   B = 2.6 nT → p ≈ 0.39 (spin relaxation regime)
+
+experiment:
+  name: "Eu151 3D EdH effect"
+  type: dynamics
+
+  system:
+    atom: Eu151
+    grid:
+      n_points: [32, 32, 32]
+      box_size: [12.0, 12.0, 12.0]
+    interactions:
+      N_atoms: 50000
+      omega_ref: 691.15
+      c1_ratio: -0.01
+    ddi:
+      enabled: false           # GS without DDI
+
+  ground_state:
+    dt: 0.001
+    n_steps: 3000
+    tol: 1.0e-7
+    initial_state: antiferromagnetic   # m=-F polarized
+    zeeman:
+      p: 0.39                  # B = 2.6 nT dimensionless
+      q: 0.0
+    potential:
+      type: harmonic
+      omega: [1.0, 1.0, 1.1818]    # 130/110
+    backend: cpu
+
+  sequence:
+    - name: dynamics
+      duration: 3.0            # ω⁻¹ ≈ 4.3 ms
+      dt: 0.0002
+      save_every: 750
+      override:
+        system.ddi.enabled: true   # DDI on for dynamics
+      zeeman:
+        p: 0.39
+        q: 0.0
+
+  observables:
+    always: [norm, magnetization]
+    on_save: [energy, populations]

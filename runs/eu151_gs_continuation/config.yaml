@@ -1,0 +1,53 @@
+# Eu151 ground state with DDI via c_dd continuation
+#
+# Ramps c_dd from 0 → 7647 in 6 steps, using each converged state as the
+# initial condition for the next step. Tracks the energy decomposition
+# and runs a final stability check.
+#
+# Differs from eu151_continuation_viz.yaml only in step count (6 vs 3).
+
+experiment:
+  name: "Eu151 GS c_dd continuation"
+  type: phase_scan
+
+  system:
+    atom: Eu151
+    grid:
+      n_points: [32, 32, 32]
+      box_size: [12.0, 12.0, 12.0]
+    interactions:
+      N_atoms: 50000
+      omega_ref: 691.15
+      c1_ratio: -0.01
+    ddi:
+      enabled: false           # overridden per point
+
+  ground_state:
+    dt: 0.001
+    n_steps: 3000
+    tol: 1.0e-8
+    initial_state: antiferromagnetic
+    zeeman:
+      p: 0.39
+      q: 0.0
+    potential:
+      type: harmonic
+      omega: [1.0, 1.0, 1.1818]
+    backend: cpu
+
+  scan:
+    zip:
+      system.ddi.c_dd:    [0.0,   1000.0, 2000.0, 4000.0, 6000.0, 7647.0]
+      system.ddi.enabled: [false, true,   true,   true,   true,   true]
+      ground_state.dt:    [0.001, 0.0005, 0.0005, 0.0005, 0.0005, 0.0005]
+    continuation: true
+
+  stability:
+    enabled: true
+    perturbation: 1.0e-4
+    n_steps: 1000
+    sample_every: 10
+
+  observables:
+    always: [norm, magnetization]
+    on_save: [energy, energy_decomposition]

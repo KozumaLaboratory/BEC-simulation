@@ -1,0 +1,77 @@
+# ================================================================
+# Li7 spin-1 ferromagnetic quench dynamics (3D)
+# ================================================================
+#
+# Physics:
+#   ⁷Li has strongly ferromagnetic spin interactions (a₂ - a₀ ≈ -31 a₀),
+#   much stronger than Rb87 (a₂ - a₀ ≈ -1.4 a₀). Starting from a polar
+#   (m=0) state stabilized by positive quadratic Zeeman q, quenching q→0
+#   triggers rapid spin mixing into m=±1 via parametric amplification.
+#   3D simulation reveals spin domain formation in all spatial dimensions.
+#
+# References:
+#   Abraham et al. PRA 55, R3299 (1997) — Li7 scattering lengths
+#   Sadler et al. Nature 443, 312 (2006) — polar-to-ferromagnetic quench
+#
+# Units: dimensionless (ℏ = m = ω_ref = 1)
+# ================================================================
+
+experiment:
+  name: "Li7 ferromagnetic quench (3D)"
+  type: dynamics
+
+  system:
+    atom: Li7
+    grid:
+      n_points: [32, 32, 32]
+      box_size: [8.0, 8.0, 8.0]
+    interactions:
+      c0: 30.0
+      c1: -100.0
+
+  # Polar ground state stabilized by large quadratic Zeeman
+  # q_critical = 2|c₁|n ≈ 14, so q=20 stabilizes polar phase
+  ground_state:
+    dt: 0.005
+    n_steps: 5000
+    tol: 1.0e-10
+    initial_state: polar
+    zeeman:
+      p: 0.0
+      q: 20.0
+    potential:
+      type: harmonic
+      omega: [1.0, 1.0, 1.0]
+
+  perturbation:
+    temperature_ratio: 0.05   # T/T_c, seeds parametric instability
+    seed: 42
+
+  sequence:
+    # Quench quadratic Zeeman: q=20→0 triggers parametric instability
+    # γ_max ≈ |c₁|n ≈ 7 ω → e-fold ~ 0.14 ω⁻¹
+    - name: quench
+      duration: 0.5
+      dt: 0.001
+      save_every: 25
+      zeeman:
+        p: 0.0
+        q:
+          from: 20.0
+          to: 0.0
+      potential:
+        type: harmonic
+        omega: [1.0, 1.0, 1.0]
+
+    # Hold and observe spin domain formation
+    - name: spin_mixing
+      duration: 5.0
+      dt: 0.001
+      save_every: 100
+      integrator: adaptive
+      zeeman:
+        p: 0.0
+        q: 0.0
+      potential:
+        type: harmonic
+        omega: [1.0, 1.0, 1.0]
