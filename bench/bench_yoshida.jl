@@ -23,7 +23,7 @@ sys = SpinSystem(atom.F)
 n_comp = sys.n_components
 
 function make_seeded_psi()
-    seed_noise(psi_gs, n_comp, 3, grid)
+    SpinorBEC.seed_noise(psi_gs, n_comp, 3, grid)
 end
 
 # --- Enable tracing ---

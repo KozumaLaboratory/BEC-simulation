@@ -587,6 +587,15 @@ struct OverrideScan <: AbstractScanSpec
     end
 end
 
+"""
+    ConstrainedJzScan
+
+Scan a list of target `J_z` values, bisecting on the rotating-frame `Ω`
+inside `find_ground_state` until the actual `J_z` matches the target within
+`tolerance`. This is the one scan type that does NOT fit the
+override-reparse model because the parameter being tuned (`Ω`) is resolved
+by a runtime feedback loop, not by patching the config tree.
+"""
 struct ConstrainedJzScan <: AbstractScanSpec
     target_values::Vector{Float64}
     tolerance::Float64

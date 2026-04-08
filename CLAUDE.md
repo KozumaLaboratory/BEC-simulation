@@ -37,11 +37,45 @@ All substeps auto-skip when coupling ≈ 0.
 **Entry points**:
 - `find_ground_state(;...)` — ITP (imaginary time propagation)
 - `make_workspace(;...) |> run_simulation!` — RTP (real time propagation)
-- `load_config("x.yaml") |> run_config` — YAML-driven experiment
+- `run_yaml("x.yaml")` — resumable YAML-driven experiment (directory-per-config, one jld2 per point, skips cached files on re-run)
+- `load_config("x.yaml") |> run_config` — in-memory YAML run (no resume)
 - `scan_continuation(; make_params, ...)` — parameter sweep with continuation
 - `scan_phase_diagram_2d(; make_params, ...)` — 2D phase diagram
 
-**Continuation API**: `make_params(val) → NamedTuple` overrides any `find_ground_state` kwargs per sweep point. Legacy `make_interactions(val) → InteractionParams` also supported.
+**YAML schema**: every parameter variation is expressed as a **config path override** — a dotted path into the raw YAML dict (e.g. `system.ddi.c_dd`, `ground_state.zeeman.p`) mapped to a new value. The runner applies the override, re-parses the experiment dict, and builds a fresh workspace.
+
+```yaml
+scan:
+  zip:                                  # 1D sweep (all paths must agree on length)
+    system.ddi.c_dd:      [0.0, 4000.0, 7647.0]
+    ground_state.zeeman.p: [100.0, 10.0, 1.0]
+  product:                              # N-dim Cartesian product
+    system.interactions.c1_ratio:     [-0.02, -0.01, 0.0]
+    ground_state.target_magnetization: [-6.0, -3.0, 0.0]
+  comparison_runs:                      # run multiple recipes at every point
+    - name: fl_vortex
+      override: {ground_state.initial_state: spin_coherent, ...}
+  continuation: true                    # reuse previous psi as initial condition
+  auto_rotate_on_mz: true               # rotate by Δα when target Mz changes
+```
+
+Dynamics phases use the same override mechanism to switch DDI / interactions / etc between phases:
+
+```yaml
+sequence:
+  - name: dynamics
+    duration: 3.0
+    dt: 0.0002
+    override:
+      system.ddi.enabled: true
+      ground_state.zeeman.p: {from: 2.0, to: 0.0}   # ramp → TimeDependentZeeman
+```
+
+Phase-level `zeeman:` and `potential:` at the top of a phase block are auto-migrated into the override map at parse time for convenience. `ConstrainedJzScan` is the one exception to the override model (bisects on Ω at runtime).
+
+**Noise**: both GS (`ground_state.temperature_ratio`) and phase noise (`phase.temperature_ratio` or `perturbation.temperature_ratio`) use Bose-Einstein thermal noise with `T/T_c ∈ (0, 1)`, driving `add_thermal_noise(psi, F; T_over_Tc, seed)`.
+
+**Continuation API** (direct-Julia, for benches/tests): `make_params(val) → NamedTuple` overrides any `find_ground_state` kwargs per sweep point. Legacy `make_interactions(val) → InteractionParams` also supported.
 
 **GPU**: `import CUDA` before `using SpinorBEC` to load CUDA extension. Pass `backend=CUDABackend()`. WSL2 needs `LD_LIBRARY_PATH=/usr/lib/wsl/lib`.
 

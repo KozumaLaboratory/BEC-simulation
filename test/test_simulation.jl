@@ -54,14 +54,14 @@ using FFTW
         psi_gs = init_psi(grid, sys; state=:ferromagnetic)
         dV = cell_volume(grid)
 
-        psi_noisy = seed_noise(psi_gs, sys.n_components, 1, grid)
+        psi_noisy = SpinorBEC.seed_noise(psi_gs, sys.n_components, 1, grid)
 
         @test psi_noisy !== psi_gs
         @test psi_noisy != psi_gs
         norm_noisy = sum(abs2, psi_noisy) * dV
         @test abs(norm_noisy - 1.0) < 1e-10
 
-        psi_noisy2 = seed_noise(psi_gs, sys.n_components, 1, grid)
+        psi_noisy2 = SpinorBEC.seed_noise(psi_gs, sys.n_components, 1, grid)
         @test psi_noisy ≈ psi_noisy2
     end
 

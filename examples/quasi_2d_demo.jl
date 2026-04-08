@@ -85,7 +85,7 @@ function run_quasi_2d_demo(;
 
     # --- Perturbation ---
     println("\nAdding noise perturbation (amp=$perturb_amp)...")
-    psi_perturbed = seed_noise(gs_psi, D, NDIM, grid; amplitude=perturb_amp, seed)
+    psi_perturbed = SpinorBEC.seed_noise(gs_psi, D, NDIM, grid; amplitude=perturb_amp, seed)
 
     # --- Dynamics: quench q→0 ---
     println("\nRunning dynamics (q=0, $(dyn_steps) steps, dt=$dyn_dt)...")

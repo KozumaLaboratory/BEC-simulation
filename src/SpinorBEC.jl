@@ -271,7 +271,7 @@ export AbstractScanSpec, OverrideScan, ConstrainedJzScan
 export apply_override!, apply_overrides, expand_scan_points, parse_override_map
 export AbstractExperimentSpec, GroundStateExperiment, DynamicsExperiment, ScanExperiment
 export PerturbationConfig, OutputConfig, ObservablesConfig, UnifiedConfig
-export load_config, load_config_from_string, run_config, seed_noise
+export load_config, load_config_from_string, run_config
 export run_yaml, run_status, list_runs, compute_run_dir
 
 # Units

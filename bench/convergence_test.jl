@@ -17,7 +17,7 @@ ndim = 3
 psi_gs = load(joinpath(@__DIR__, "cache_eu151_gs_3d.jld2"), "psi")
 
 # Seed noise ONCE and reuse for all tests
-psi_seeded = seed_noise(psi_gs, n_comp, ndim, grid)
+psi_seeded = SpinorBEC.seed_noise(psi_gs, n_comp, ndim, grid)
 
 t_test = 2.0e-3 / EU_t_unit
 println("t_test = $(round(t_test, digits=3)) ω⁻¹")
