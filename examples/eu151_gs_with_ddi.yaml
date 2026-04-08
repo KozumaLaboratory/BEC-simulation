@@ -1,0 +1,34 @@
+# Eu151 ground state WITH DDI enabled (no continuation).
+#
+# Direct ITP with DDI on from the start. Works here because c1_ratio=-0.01
+# keeps c1 small and the initial_state is the fully polarized m=-F, so
+# the DDI-induced instabilities grow slowly enough for ITP to converge.
+
+experiment:
+  name: "Eu151 GS with DDI"
+  type: ground_state
+
+  system:
+    atom: Eu151
+    grid:
+      n_points: [32, 32, 32]
+      box_size: [12.0, 12.0, 12.0]
+    interactions:
+      N_atoms: 50000
+      omega_ref: 691.15
+      c1_ratio: -0.01
+    ddi:
+      enabled: true
+
+  ground_state:
+    dt: 0.0005
+    n_steps: 10000
+    tol: 1.0e-8
+    initial_state: antiferromagnetic   # m=-F polarized
+    zeeman:
+      p: 0.39                           # B = 2.6 nT dimensionless
+      q: 0.0
+    potential:
+      type: harmonic
+      omega: [1.0, 1.0, 1.1818]
+    backend: cpu

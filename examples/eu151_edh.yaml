@@ -84,7 +84,7 @@ experiment:
         q: 0.0
 
     # ---- Phase 2: Spin relaxation at weak field ----
-    # noise_amplitude seeds DDI instability
+    # thermal noise seeds DDI instability
     # 40 ms ≈ 27.6 ω⁻¹
     - name: spin_relaxation
       duration: 27.6
@@ -95,7 +95,8 @@ experiment:
         tol: 1.0e-4
         dt_min: 1.0e-4
         dt_max: 0.01
-      noise_amplitude: 0.001
+      temperature_ratio: 0.1   # T/T_c
+      noise_seed: 42
       zeeman:
         p: 0.39
         q: 0.0

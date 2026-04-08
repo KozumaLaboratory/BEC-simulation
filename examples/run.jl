@@ -9,12 +9,12 @@ function output_path(yaml_path)
     joinpath(outdir, base * ".jld2")
 end
 
-function _ramp_endpoints(v::ConstantValue)
-    (v.value, v.value)
-end
-function _ramp_endpoints(v::LinearRamp)
-    (v.from, v.to)
-end
+# Extract (start, end) values from an override entry for Zeeman p/q.
+# Handles scalars (constants) and {from, to} dicts (ramps).
+_ramp_endpoints(v::Number) = (Float64(v), Float64(v))
+_ramp_endpoints(v::Dict) = haskey(v, "to") ?
+    (Float64(v["from"]), Float64(v["to"])) :
+    (Float64(v["from"]), Float64(v["from"]))
 
 function run_and_save(yaml_path)
     println("Loading: $yaml_path")
@@ -76,8 +76,10 @@ function run_and_save(yaml_path)
                 save_data["phase_$(i)_psi_snapshots"] = sim.psi_snapshots
                 if i <= length(spec.sequence)
                     ph = spec.sequence[i]
-                    p0, p1 = _ramp_endpoints(ph.zeeman_p)
-                    q0, q1 = _ramp_endpoints(ph.zeeman_q)
+                    p_spec = get(ph.override, "ground_state.zeeman.p", 0.0)
+                    q_spec = get(ph.override, "ground_state.zeeman.q", 0.0)
+                    p0, p1 = _ramp_endpoints(p_spec)
+                    q0, q1 = _ramp_endpoints(q_spec)
                     save_data["phase_$(i)_zeeman"] = [p0, p1, q0, q1]
                     save_data["phase_$(i)_duration"] = ph.duration
                 end

@@ -49,20 +49,9 @@ experiment:
       omega: [1.0, 1.0, 1.1818]   # 130/110
 
   scan:
-    type: parameter
-    axes:
-      - parameter: zeeman_p
-        values: [100.0, 50.0, 20.0, 10.0, 5.0, 2.0, 1.0, 0.5, 0.2, 0.1, 0.0]
-    continuation:
-      enabled: true
-      n_steps: 3000
-      energy_jump_threshold: 0.1
-    per_point_overrides:
-      - parameter: zeeman_p
-        range: { from: -0.1, to: 5.0 }
-        dt: 0.0005
-        n_steps: 5000
-        tol: 1.0e-9
+    zip:
+      ground_state.zeeman.p: [100.0, 50.0, 20.0, 10.0, 5.0, 2.0, 1.0, 0.5, 0.2, 0.1, 0.0]
+    continuation: true
 
   stability:
     enabled: true
@@ -74,4 +63,3 @@ experiment:
     always: [norm, magnetization]
     on_save: [energy]
     final_only: [phase_classification, structure_factor]
-
