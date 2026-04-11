@@ -8,12 +8,43 @@ function run_config(config::UnifiedConfig; verbose::Bool = true)
 end
 
 """
-    _resolve_backend(name::Symbol) → AbstractBackend
+    _maybe_run_tomography(config, psi, grid, atom; verbose) → result or nothing
 
-Resolve a YAML backend symbol to a concrete backend object. CUDABackend is
-constructed via `Base.invokelatest(Module.eval, ...)` so the runner does not
-depend on CUDA at load time. The user must `import CUDA` before calling.
+If the config has a `tomography:` block, run `spin_tomography` on the
+given psi and return the result. Otherwise return nothing.
 """
+function _maybe_run_tomography(config::UnifiedConfig, psi, grid, atom; verbose=true)
+    config.tomography === nothing && return nothing
+    td = config.tomography
+    F = atom.F
+
+    rotation_axis = Symbol(get(td, "rotation_axis", "y"))
+    theta_min = Float64(get(td, "theta_min", 0.0))
+    theta_max = Float64(get(td, "theta_max", Float64(π)))
+    n_angles = Int(get(td, "n_angles", 19))
+    reference_m = let v = get(td, "reference_m", nothing)
+        v === nothing ? nothing : Int(v)
+    end
+
+    tof_d = get(td, "tof", Dict())
+    t_tof = Float64(get(tof_d, "t_tof", 11.0))
+    gradient = Float64(get(tof_d, "gradient", 0.0))
+    imaging_axis = Int(get(tof_d, "imaging_axis", 3))
+    tof_params = TOFParams(t_tof, gradient, imaging_axis)
+
+    verbose && println("Running spin tomography ($n_angles angles, axis=$rotation_axis)...")
+
+    spin_tomography(
+        psi, grid, F;
+        rotation_axis,
+        theta_min,
+        theta_max,
+        n_angles,
+        tof_params,
+        reference_m,
+    )
+end
+
 function _resolve_backend(name::Symbol)
     if name == :cpu
         return CPUBackend()
@@ -63,11 +94,16 @@ function _run_config(config::UnifiedConfig, ::GroundStateExperiment; verbose::Bo
 
     verbose && println("  converged=$(result.converged), E=$(result.energy)")
 
+    psi = copy(result.workspace.state.psi)
+
+    tomo_result = _maybe_run_tomography(config, psi, grid, atom; verbose)
+
     (
         ground_state_energy = result.energy,
         ground_state_converged = result.converged,
-        psi = copy(result.workspace.state.psi),
+        psi = psi,
         workspace = result.workspace,
+        tomography = tomo_result,
     )
 end
 

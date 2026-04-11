@@ -20,6 +20,7 @@ struct UnifiedConfig{S<:AbstractExperimentSpec}
     output::OutputConfig
     observables::ObservablesConfig
     raw_data::Dict
+    tomography::Union{Nothing,Dict{String,Any}}
 end
 
 # --- Loader ---
@@ -61,7 +62,10 @@ function _parse_experiment(d::Dict, raw::Dict = d)
             ),
         )
     end
-    UnifiedConfig(name, system, gs, spec, output, observables, raw)
+    tomo = let v = get(d, "tomography", nothing)
+        v === nothing ? nothing : Dict{String,Any}(string(k) => val for (k, val) in v)
+    end
+    UnifiedConfig(name, system, gs, spec, output, observables, raw, tomo)
 end
 
 function _parse_dynamics(d::Dict)
