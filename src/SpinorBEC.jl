@@ -105,6 +105,7 @@ include("analysis/diagnostics.jl")
 include("analysis/majorana.jl")
 include("analysis/tof.jl")
 include("analysis/tomography.jl")
+include("analysis/faraday.jl")
 include("analysis/stability_analysis.jl")
 include("analysis/spin_rotation.jl")
 
@@ -191,6 +192,7 @@ export LaserBeamPotential, crossed_laser_trap
 export thomas_fermi_density, init_psi_thomas_fermi
 export add_thermal_noise!, add_thermal_noise, thermal_noise_amplitude, bec_critical_temperature
 export simulate_tof, spin_tomography, tomography_sinogram
+export FaradayParams, faraday_image, faraday_differential, detect_vortices_faraday
 
 # Spin rotation & EdH/FL reproduction
 export spin_rotation_matrix, rotate_quantization_axis
