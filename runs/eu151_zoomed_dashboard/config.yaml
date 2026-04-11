@@ -1,3 +1,0 @@
-# Legacy migration: eu151_ground_state_zoomed_for_dashboard.jld2
-# Contains a ground state followed by phase 1 dynamics snapshots.
-# Each snapshot is saved as one point_NNN.jld2.

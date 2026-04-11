@@ -1,3 +1,0 @@
-# Legacy migration: 101-point Zeeman p sweep (32³ box=12)
-# Original script: examples/eu151_gs_p_continuation.jl
-# Finer than examples/eu151_p_continuation.yaml (which has 11 points).
