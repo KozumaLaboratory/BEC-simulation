@@ -76,7 +76,7 @@ experiment:
     spatial_sampling: 0.25  # Save 25% of data (still ~100MB)
 
   output:
-    dir: "output/eu151_experiment_128"
+    dir: "runs/eu151_experiment_128"
     csv: true
     save_psi: true
     checkpoint:

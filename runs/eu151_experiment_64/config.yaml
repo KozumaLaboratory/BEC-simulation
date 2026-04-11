@@ -74,7 +74,7 @@ experiment:
     spatial_sampling: 0.5
 
   output:
-    dir: "output/eu151_experiment_64"
+    dir: "runs/eu151_experiment_64"
     csv: true
     save_psi: true
     checkpoint:

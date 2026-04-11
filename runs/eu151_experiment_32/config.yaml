@@ -83,6 +83,6 @@ experiment:
     spatial_sampling: 1.0  # Save all spatial data
 
   output:
-    dir: "output/eu151_experiment_32"
+    dir: "runs/eu151_experiment_32"
     csv: true
     save_psi: true  # Save full wavefunction for vortex visualization

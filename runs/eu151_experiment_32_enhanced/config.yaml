@@ -72,7 +72,7 @@ experiment:
     spatial_sampling: 1.0
 
   output:
-    dir: "output/eu151_experiment_32_enhanced"
+    dir: "runs/eu151_experiment_32_enhanced"
     csv: true
     save_psi: true
 
