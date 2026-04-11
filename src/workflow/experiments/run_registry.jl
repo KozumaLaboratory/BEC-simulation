@@ -233,26 +233,27 @@ end
     _compute_single_point(base_config, override, prev, auto_rotate) → NamedTuple
 
 Apply `override` to the base config's raw YAML dict, re-parse into a typed
-config, build the grid/potential, and run find_ground_state. If `prev` is
-non-nothing, its psi is used as initial condition (continuation), and if
-`auto_rotate` is true and the target Mz changed, the carried psi is rotated
-by Δα around y so the constraint normalization can redistribute populations.
+config, and run it via `run_config`. Works for ANY experiment type (GS,
+dynamics, etc). If `prev` is non-nothing and target Mz changed, rotate
+the carried psi for continuation.
 """
 function _compute_single_point(base_config::UnifiedConfig, override::Dict{String,Any},
                                prev, auto_rotate::Bool)
     raw = apply_overrides(base_config.raw_data, override)
-    config = _parse_config(raw)
+    # Strip the scan block so re-parse produces a single-shot experiment
+    # (not another ScanExperiment → infinite recursion)
+    raw_inner = get(raw, "experiment", raw)
+    raw_single = copy(raw_inner)
+    delete!(raw_single, "scan")
+    delete!(raw_single, "stability")
+    config = _parse_config(Dict("experiment" => raw_single))
 
     grid, atom, ndim = _setup_grid(config)
-    potential = _build_potential(config.ground_state.potential, ndim)
     sys = SpinSystem(atom.F)
+    target_mz = config.ground_state.target_magnetization
 
-    gs = config.ground_state
-    sys_cfg = config.system
-    c_dd_val = sys_cfg.ddi.c_dd === nothing ? NaN : sys_cfg.ddi.c_dd
-    backend = _resolve_backend(gs.backend)
-    target_mz = gs.target_magnetization
-
+    # Continuation: inject previous psi via psi_init_path or override
+    # For ground_state experiments, we handle continuation via psi_init
     psi_init = nothing
     if prev !== nothing
         psi_init = copy(prev.psi)
@@ -267,36 +268,80 @@ function _compute_single_point(base_config::UnifiedConfig, override::Dict{String
         end
     end
 
-    gs_result = find_ground_state(;
-        grid, atom,
-        interactions = sys_cfg.interactions,
-        zeeman = gs.zeeman,
-        potential,
-        dt = gs.dt,
-        n_steps = gs.n_steps,
-        tol = gs.tol,
-        initial_state = gs.initial_state,
-        init_state_params = gs.init_state_params,
-        psi_init = psi_init,
-        enable_ddi = something(gs.enable_ddi, sys_cfg.ddi.enabled),
-        c_dd = c_dd_val,
-        secular_ddi = sys_cfg.ddi.secular,
-        quasi_2d_ddi = sys_cfg.ddi.quasi_2d,
-        l_z_ddi = sys_cfg.ddi.l_z,
-        target_magnetization = target_mz,
-        rotating_frame_omega = gs.rotating_frame_omega,
-        backend = backend,
-    )
+    # For continuation, inject psi_init into the raw dict so re-parse picks it up.
+    # We use a temporary file approach or direct injection depending on type.
+    if psi_init !== nothing
+        # Direct GS computation with psi_init (bypass run_config for GS scan)
+        potential = _build_potential(config.ground_state.potential, ndim)
+        gs = config.ground_state
+        sys_cfg = config.system
+        c_dd_val = sys_cfg.ddi.c_dd === nothing ? NaN : sys_cfg.ddi.c_dd
+        backend = _resolve_backend(gs.backend)
 
-    psi_host = _to_host(gs_result.workspace.state.psi)
+        gs_result = find_ground_state(;
+            grid, atom,
+            interactions = sys_cfg.interactions,
+            zeeman = gs.zeeman,
+            potential,
+            dt = gs.dt,
+            n_steps = gs.n_steps,
+            tol = gs.tol,
+            initial_state = gs.initial_state,
+            init_state_params = gs.init_state_params,
+            psi_init = psi_init,
+            enable_ddi = something(gs.enable_ddi, sys_cfg.ddi.enabled),
+            c_dd = c_dd_val,
+            secular_ddi = sys_cfg.ddi.secular,
+            quasi_2d_ddi = sys_cfg.ddi.quasi_2d,
+            l_z_ddi = sys_cfg.ddi.l_z,
+            target_magnetization = target_mz,
+            rotating_frame_omega = gs.rotating_frame_omega,
+            backend = backend,
+        )
+        psi_host = _to_host(gs_result.workspace.state.psi)
+        mz_actual = target_mz !== nothing ? magnetization(psi_host, grid, sys) : NaN
+        return (
+            psi = psi_host,
+            energy = gs_result.energy,
+            dE = gs_result.dE,
+            dpsi = gs_result.dpsi,
+            converged = gs_result.converged,
+            mz_actual = mz_actual,
+            mz_target = target_mz === nothing ? NaN : target_mz,
+        )
+    end
+
+    # No continuation: use run_config which handles any experiment type
+    result = run_config(config; verbose = false)
+
+    # Extract psi and energy from whatever result type run_config returned
+    psi_host = if haskey(result, :psi)
+        _to_host(result.psi)
+    elseif haskey(result, :phase_results)
+        # Dynamics: final state from last phase
+        last_ws_psi = result.phase_results[end].psi_snapshots[end]
+        _to_host(last_ws_psi)
+    else
+        zeros(ComplexF64, 1)  # fallback
+    end
+
+    energy = if haskey(result, :ground_state_energy)
+        result.ground_state_energy
+    elseif haskey(result, :phase_results)
+        result.phase_results[end].energies[end]
+    else
+        NaN
+    end
+
+    converged = get(result, :ground_state_converged, true)
     mz_actual = target_mz !== nothing ? magnetization(psi_host, grid, sys) : NaN
 
     (
         psi = psi_host,
-        energy = gs_result.energy,
-        dE = gs_result.dE,
-        dpsi = gs_result.dpsi,
-        converged = gs_result.converged,
+        energy = energy,
+        dE = NaN,
+        dpsi = NaN,
+        converged = converged,
         mz_actual = mz_actual,
         mz_target = target_mz === nothing ? NaN : target_mz,
     )

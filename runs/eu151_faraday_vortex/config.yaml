@@ -1,14 +1,11 @@
 # D-3: Faraday imaging of quantum vortices in quasi-2D Eu151
 #
 # Simulates what a vortex looks like under Faraday rotation imaging at
-# -320 MHz detuning from the D1 line. The Faraday rotation angle φ(x,y)
-# is proportional to the column-integrated ⟨F_z⟩×n, so phase singularities
-# (vortex cores) appear as zeros of φ surrounded by sign-changing regions.
+# -320 MHz detuning from the D1 line (~Γ=5MHz for Eu, so Δ/Γ ≈ -64).
 #
-# Workflow:
-#   1. Find GS in quasi-2D with DDI (FL-like texture expected)
-#   2. Run Faraday imaging post-processing
-#   3. Detect vortex positions from zero-crossings
+# The Faraday rotation angle φ(x,y) ∝ ∫F_z n dz / Δ, so phase
+# singularities (vortex cores) appear as zeros of φ surrounded by
+# sign-changing regions.
 
 experiment:
   name: "Eu151 Faraday vortex imaging (quasi-2D)"
@@ -43,8 +40,7 @@ experiment:
       omega: [1.0, 1.0]
     backend: cpu
 
-  # Faraday imaging is called programmatically after run_config:
-  #   result = run_config(cfg)
-  #   img = faraday_image(result.psi, grid, 6;
-  #            params=FaradayParams(probe_axis=2, detuning=-64.0))
-  #   vortices = detect_vortices_faraday(result.psi, grid, 6)
+  faraday:
+    probe_axis: 2             # propagation along y (vertical)
+    detuning: -64.0           # Δ/Γ ≈ -320MHz / 5MHz
+    polarization: linear_x

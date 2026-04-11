@@ -21,6 +21,7 @@ struct UnifiedConfig{S<:AbstractExperimentSpec}
     observables::ObservablesConfig
     raw_data::Dict
     tomography::Union{Nothing,Dict{String,Any}}
+    faraday::Union{Nothing,Dict{String,Any}}
 end
 
 # --- Loader ---
@@ -49,23 +50,29 @@ function _parse_experiment(d::Dict, raw::Dict = d)
     output = _parse_output_config(get(d, "output", Dict()))
     observables = _parse_observables(get(d, "observables", Dict()))
 
-    spec = if exp_type == :ground_state
+    # If a `scan:` block is present, wrap ANY experiment type in a ScanExperiment.
+    # This allows dynamics + scan, ground_state + scan, etc.
+    spec = if haskey(d, "scan")
+        _parse_phase_scan(d)
+    elseif exp_type in (:ground_state, :phase_scan)
+        # phase_scan without scan: block is just a ground state computation
         GroundStateExperiment()
     elseif exp_type == :dynamics
         _parse_dynamics(d)
-    elseif exp_type == :phase_scan
-        _parse_phase_scan(d)
     else
         throw(
             ArgumentError(
-                "Unknown experiment type: $exp_type. Supported: ground_state, dynamics, phase_scan",
+                "Unknown experiment type: $exp_type. Supported: ground_state, dynamics",
             ),
         )
     end
     tomo = let v = get(d, "tomography", nothing)
         v === nothing ? nothing : Dict{String,Any}(string(k) => val for (k, val) in v)
     end
-    UnifiedConfig(name, system, gs, spec, output, observables, raw, tomo)
+    faraday = let v = get(d, "faraday", nothing)
+        v === nothing ? nothing : Dict{String,Any}(string(k) => val for (k, val) in v)
+    end
+    UnifiedConfig(name, system, gs, spec, output, observables, raw, tomo, faraday)
 end
 
 function _parse_dynamics(d::Dict)

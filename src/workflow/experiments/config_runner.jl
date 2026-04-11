@@ -13,6 +13,24 @@ end
 If the config has a `tomography:` block, run `spin_tomography` on the
 given psi and return the result. Otherwise return nothing.
 """
+function _maybe_run_faraday(config::UnifiedConfig, psi, grid, atom; verbose=true)
+    config.faraday === nothing && return nothing
+    fd = config.faraday
+    F = atom.F
+
+    probe_axis = Int(get(fd, "probe_axis", 3))
+    detuning = Float64(get(fd, "detuning", -64.0))
+    polarization = Symbol(get(fd, "polarization", "linear_x"))
+    include_vector_shift = Bool(get(fd, "include_vector_shift", false))
+
+    params = FaradayParams(;
+        probe_axis, detuning, polarization, include_vector_shift,
+    )
+
+    verbose && println("Running Faraday imaging (axis=$probe_axis, Δ/Γ=$detuning)...")
+    faraday_image(psi, grid, F; params)
+end
+
 function _maybe_run_tomography(config::UnifiedConfig, psi, grid, atom; verbose=true)
     config.tomography === nothing && return nothing
     td = config.tomography
@@ -97,6 +115,7 @@ function _run_config(config::UnifiedConfig, ::GroundStateExperiment; verbose::Bo
     psi = copy(result.workspace.state.psi)
 
     tomo_result = _maybe_run_tomography(config, psi, grid, atom; verbose)
+    faraday_result = _maybe_run_faraday(config, psi, grid, atom; verbose)
 
     (
         ground_state_energy = result.energy,
@@ -104,6 +123,7 @@ function _run_config(config::UnifiedConfig, ::GroundStateExperiment; verbose::Bo
         psi = psi,
         workspace = result.workspace,
         tomography = tomo_result,
+        faraday = faraday_result,
     )
 end
 
