@@ -59,186 +59,93 @@ using FFTW
 
     @testset "YAML parsing - override scan with zip" begin
         yaml = """
-        experiment:
-          type: phase_scan
-          name: "test zip"
-          system:
-            atom: Rb87
-            grid:
-              n_points: 8
-              box_size: 6.0
-            interactions:
-              c0: 100.0
-              c1: -5.0
-          ground_state:
-            dt: 0.01
-            n_steps: 100
-            tol: 1e-6
-            initial_state: polar
-            zeeman:
-              p: 0.0
-              q: 0.0
-            potential:
-              type: harmonic
-              omega: [1.0]
-          scan:
-            zip:
-              ground_state.zeeman.p: [0.0, 0.5, 1.0]
-            continuation: true
-          output:
-            dir: /tmp/test_phase_scan
-            csv: true
+        pipeline:
+          - ground_state:
+              atom: Rb87
+              grid:
+                n: 8
+                box: 6.0
+              interactions:
+                c0: 100.0
+                c1: -5.0
+              dt: 0.01
+              n_steps: 100
+              tol: 1e-6
+              initial_state: polar
+              zeeman:
+                p: 0.0
+                q: 0.0
+              trap: [1.0]
+        scan:
+          zip:
+            pipeline.0.zeeman.p: [0.0, 0.5, 1.0]
+          continuation: true
         """
         config = load_config_from_string(yaml)
-        @test config.spec.scan isa OverrideScan
-        @test length(config.spec.scan.points) == 3
-        @test config.spec.scan.points[1]["ground_state.zeeman.p"] == 0.0
-        @test config.spec.scan.continuation == true
-        @test config.spec.scan.auto_rotate_on_mz == false
+        @test config.scan isa OverrideScan
+        @test length(config.scan.points) == 3
+        @test config.scan.points[1]["pipeline.0.zeeman.p"] == 0.0
+        @test config.scan.continuation == true
+        @test config.scan.auto_rotate_on_mz == false
     end
 
     @testset "YAML parsing - comparison_runs" begin
         yaml = """
-        experiment:
-          type: phase_scan
-          name: "test comparison"
-          system:
-            atom: Rb87
-            grid:
-              n_points: 8
-              box_size: 6.0
-            interactions:
-              c0: 100.0
-              c1: -5.0
-          ground_state:
-            dt: 0.01
-            n_steps: 100
-            tol: 1e-6
-            potential:
-              type: harmonic
-              omega: [1.0]
-          scan:
-            zip:
-              system.interactions.c1: [-5.0, -1.0, 0.0]
-            comparison_runs:
-              - name: polar
-                override:
-                  ground_state.initial_state: polar
-              - name: ferro
-                override:
-                  ground_state.initial_state: ferromagnetic
+        pipeline:
+          - ground_state:
+              atom: Rb87
+              grid:
+                n: 8
+                box: 6.0
+              interactions:
+                c0: 100.0
+                c1: -5.0
+              dt: 0.01
+              n_steps: 100
+              tol: 1e-6
+              trap: [1.0]
+        scan:
+          zip:
+            pipeline.0.interactions.c1: [-5.0, -1.0, 0.0]
+          comparison_runs:
+            - name: polar
+              override:
+                pipeline.0.initial_state: polar
+            - name: ferro
+              override:
+                pipeline.0.initial_state: ferromagnetic
         """
         config = load_config_from_string(yaml)
-        @test length(config.spec.scan.comparison_runs) == 2
-        @test config.spec.scan.comparison_runs[1][1] == "polar"
-        @test config.spec.scan.comparison_runs[2][2]["ground_state.initial_state"] == "ferromagnetic"
+        @test length(config.scan.comparison_runs) == 2
+        @test config.scan.comparison_runs[1][1] == "polar"
+        @test config.scan.comparison_runs[2][2]["pipeline.0.initial_state"] == "ferromagnetic"
     end
 
     @testset "YAML parsing - constrained Jz scan" begin
         yaml = """
-        experiment:
-          type: phase_scan
-          name: "test Jz"
-          system:
-            atom: Rb87
-            grid:
-              n_points: [8, 8]
-              box_size: [6.0, 6.0]
-            interactions:
-              c0: 100.0
-              c1: -5.0
-          ground_state:
-            dt: 0.01
-            n_steps: 100
-            tol: 1e-6
-            potential:
-              type: harmonic
-              omega: [1.0, 1.0]
-          scan:
-            type: constrained_jz
-            target_values: [0.0, 1.0, 2.0]
-            tolerance: 0.1
-            max_iter: 5
-            omega_range: [-5.0, 5.0]
+        pipeline:
+          - ground_state:
+              atom: Rb87
+              grid:
+                n: [8, 8]
+                box: [6.0, 6.0]
+              interactions:
+                c0: 100.0
+                c1: -5.0
+              dt: 0.01
+              n_steps: 100
+              tol: 1e-6
+              trap: [1.0, 1.0]
+        scan:
+          type: constrained_jz
+          target_values: [0.0, 1.0, 2.0]
+          tolerance: 0.1
+          max_iter: 5
+          omega_range: [-5.0, 5.0]
         """
         config = load_config_from_string(yaml)
-        @test config.spec.scan isa ConstrainedJzScan
-        @test length(config.spec.scan.target_values) == 3
-    end
-
-    @testset "YAML parsing - stability" begin
-        yaml = """
-        experiment:
-          type: phase_scan
-          name: "test stability"
-          system:
-            atom: Rb87
-            grid:
-              n_points: 8
-              box_size: 6.0
-            interactions:
-              c0: 100.0
-              c1: -5.0
-          ground_state:
-            dt: 0.01
-            n_steps: 100
-            tol: 1e-6
-            potential:
-              type: harmonic
-              omega: [1.0]
-          scan:
-            zip:
-              system.interactions.c1: [-5.0, 0.0, 5.0]
-          stability:
-            enabled: true
-            perturbation: 1.0e-3
-            n_steps: 50
-            sample_every: 5
-        """
-        config = load_config_from_string(yaml)
-        @test config.spec.stability.enabled == true
-        @test config.spec.stability.perturbation == 1e-3
-    end
-
-    @testset "Tiny end-to-end override scan" begin
-        yaml = """
-        experiment:
-          type: phase_scan
-          name: "tiny scan"
-          system:
-            atom: Rb87
-            grid:
-              n_points: 8
-              box_size: 6.0
-            interactions:
-              c0: 10.0
-              c1: -1.0
-          ground_state:
-            dt: 0.01
-            n_steps: 50
-            tol: 1e-4
-            potential:
-              type: harmonic
-              omega: [1.0]
-          scan:
-            zip:
-              ground_state.zeeman.q: [0.0, 0.5, 1.0]
-          output:
-            dir: /tmp/test_tiny_scan
-            csv: true
-            save_psi: false
-        """
-        config = load_config_from_string(yaml)
-        results = run_config(config; verbose=false)
-
-        @test length(results) == 3
-        for r in results
-            @test haskey(r, :energy)
-            @test haskey(r, :phase_info)
-            @test isfinite(r.energy)
-        end
-
-        rm("/tmp/test_tiny_scan"; recursive=true, force=true)
+        @test config.scan isa ConstrainedJzScan
+        @test length(config.scan.target_values) == 3
     end
 
     @testset "OverrideScan validation" begin

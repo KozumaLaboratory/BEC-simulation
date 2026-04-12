@@ -267,17 +267,19 @@ export SimulationCallbacks, LiveMonitor
 # I/O
 export save_state, load_state
 
-# Config types
-export ConstantValue, LinearRamp, RampOrConstant, interpolate_value
-export PotentialConfig, PhaseConfig, GroundStateConfig, DDIConfig, SystemConfig
-export ScanStabilityConfig
-export AbstractScanSpec, OverrideScan, ConstrainedJzScan
-export apply_override!, apply_overrides, expand_scan_points, parse_override_map
-export AbstractExperimentSpec, GroundStateExperiment, DynamicsExperiment, ScanExperiment
-export PerturbationConfig, OutputConfig, ObservablesConfig, UnifiedConfig
-export load_config, load_config_from_string, run_config
+# Pipeline (primary API)
 export parse_pipeline, run_pipeline, PipelineConfig
 export run_yaml, run_status, list_runs, compute_run_dir
+export apply_override!, apply_overrides, expand_scan_points, parse_override_map
+export OverrideScan
+
+# Backward compat (old experiment: format — tests only)
+export load_config, load_config_from_string, run_config
+export UnifiedConfig, GroundStateExperiment, DynamicsExperiment, ScanExperiment
+export PotentialConfig, PhaseConfig, GroundStateConfig, DDIConfig, SystemConfig
+export ScanStabilityConfig, ConstrainedJzScan, AbstractScanSpec, AbstractExperimentSpec
+export PerturbationConfig, OutputConfig, ObservablesConfig
+export ConstantValue, LinearRamp, RampOrConstant, interpolate_value
 
 # Units
 export Units

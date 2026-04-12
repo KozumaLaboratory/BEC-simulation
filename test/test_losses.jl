@@ -36,10 +36,8 @@
 
         pop_after = [sum(abs2, psi[:, c]) for c in 1:3]
 
-        # c=1→m=+1, c=2→m=0, c=3→m=-1
-        # Rank-2 DDI: downward transitions (Δm=-1, Δm=-2)
-        # m=+1: Δm=-1 (→0) and Δm=-2 (→-1), m=0: Δm=-1 (→-1) only
-        # m=-1: no downward transitions → stable
+        # c=1->m=+1, c=2->m=0, c=3->m=-1
+        # m=-1: no downward transitions -> stable
         @test pop_after[3] ≈ pop_before[3] rtol = 1e-14
 
         # Both m=+1 and m=0 decay, but m=+1 decays faster (2 channels vs 1)
@@ -64,13 +62,6 @@
 
         pop_after = [sum(abs2, psi[:, c]) for c in 1:5]
 
-        # Rank-2 DDI downward transitions (Δm = -1, -2):
-        # m=+2: Δm=-1(→+1), Δm=-2(→0) — 2 channels, highest rate
-        # m=+1: Δm=-1(→0), Δm=-2(→-1) — 2 channels
-        # m=0:  Δm=-1(→-1), Δm=-2(→-2) — 2 channels
-        # m=-1: Δm=-1(→-2) only — 1 channel
-        # m=-2: none — stable
-
         # m=-2 (c=5) unchanged
         @test pop_after[5] ≈ pop_before[5] rtol = 1e-14
 
@@ -79,7 +70,7 @@
             @test pop_after[c] < pop_before[c]
         end
 
-        # m=+2 (c=1) has the highest rate (CG² for both Δm=-1 and Δm=-2 are large)
+        # m=+2 (c=1) has the highest rate
         @test pop_after[1] < pop_after[2]
         @test pop_after[1] < pop_after[3]
     end
@@ -100,7 +91,7 @@
             @test all(r -> r >= -1e-15, rates)
         end
 
-        # F=6: all non-terminal components have nonzero rates (Δm=-1 and/or Δm=-2)
+        # F=6: all non-terminal components have nonzero rates
         rates6 = SpinorBEC._dipolar_relaxation_rates(6, 0.5)
         @test all(r -> r > 0.01, rates6[1:12])
         @test rates6[13] ≈ 0.0 atol = 1e-15
@@ -211,8 +202,6 @@
             sim_params=sp,
             loss=LossParams(100.0, 100.0),
         )
-        # Imaginary time normalizes every step, but loss should not be applied
-        # If loss were applied during imaginary time the state would collapse
         for _ in 1:10
             split_step!(ws)
         end
@@ -222,93 +211,77 @@
 
     @testset "YAML parsing of losses" begin
         yaml = """
-        experiment:
-          name: loss_test
-          type: dynamics
-          system:
-            atom: Rb87
-            grid:
-              n_points: 64
-              box_size: 20.0
-            interactions:
-              c0: 1.0
-              c1: 0.0
-            losses:
-              gamma_dr: 1.0e-3
-              L3: 2.0e-5
-          ground_state:
-            dt: 0.01
-            n_steps: 10
-            tol: 1e-4
-            potential:
-              type: harmonic
-              omega: [1.0]
-          sequence: []
+        pipeline:
+          - ground_state:
+              atom: Rb87
+              grid:
+                n: 64
+                box: 20.0
+              interactions:
+                c0: 1.0
+                c1: 0.0
+              losses:
+                gamma_dr: 1.0e-3
+                L3: 2.0e-5
+              dt: 0.01
+              n_steps: 10
+              tol: 1e-4
+              trap: [1.0]
         """
         cfg = load_config_from_string(yaml)
-        @test cfg.system.loss !== nothing
-        @test cfg.system.loss.gamma_dr ≈ 1e-3
-        @test cfg.system.loss.L3 ≈ 2e-5
+        @test cfg isa PipelineConfig
+        p = cfg.steps[1].params
+        @test p["losses"]["gamma_dr"] == 1e-3
+        @test p["losses"]["L3"] == 2e-5
     end
 
-    @testset "YAML without losses: loss is nothing" begin
+    @testset "YAML without losses" begin
         yaml = """
-        experiment:
-          name: no_loss_test
-          type: dynamics
-          system:
-            atom: Rb87
-            grid:
-              n_points: 64
-              box_size: 20.0
-            interactions:
-              c0: 1.0
-              c1: 0.0
-          ground_state:
-            dt: 0.01
-            n_steps: 10
-            tol: 1e-4
-            potential:
-              type: harmonic
-              omega: [1.0]
-          sequence: []
+        pipeline:
+          - ground_state:
+              atom: Rb87
+              grid:
+                n: 64
+                box: 20.0
+              interactions:
+                c0: 1.0
+                c1: 0.0
+              dt: 0.01
+              n_steps: 10
+              tol: 1e-4
+              trap: [1.0]
         """
         cfg = load_config_from_string(yaml)
-        @test cfg.system.loss === nothing
+        p = cfg.steps[1].params
+        @test !haskey(p, "losses")
     end
 
     @testset "YAML parsing of phase temperature_ratio" begin
         yaml = """
-        experiment:
-          name: noise_test
-          type: dynamics
-          system:
-            atom: Rb87
-            grid:
-              n_points: 64
-              box_size: 20.0
-            interactions:
-              c0: 1.0
-              c1: 0.0
-          ground_state:
-            dt: 0.01
-            n_steps: 10
-            tol: 1e-4
-            potential:
-              type: harmonic
-              omega: [1.0]
-          sequence:
-            - name: noisy_phase
+        pipeline:
+          - ground_state:
+              atom: Rb87
+              grid:
+                n: 64
+                box: 20.0
+              interactions:
+                c0: 1.0
+                c1: 0.0
+              dt: 0.01
+              n_steps: 10
+              tol: 1e-4
+              trap: [1.0]
+          - dynamics:
               duration: 1.0
               dt: 0.01
               temperature_ratio: 0.1
-            - name: quiet_phase
+          - dynamics:
               duration: 1.0
               dt: 0.01
         """
         cfg = load_config_from_string(yaml)
-        @test cfg.spec.sequence[1].temperature_ratio == 0.1
-        @test cfg.spec.sequence[2].temperature_ratio === nothing
+        @test cfg.steps[2].params["temperature_ratio"] == 0.1
+        @test get(cfg.steps[3].params, "temperature_ratio", nothing) === nothing
     end
 
     @testset "_add_noise! changes psi but preserves norm" begin
@@ -343,31 +316,26 @@
 
     @testset "GroundStateConfig enable_ddi default" begin
         yaml = """
-        experiment:
-          name: ddi_gs_test
-          type: dynamics
-          system:
-            atom: Rb87
-            grid:
-              n_points: 64
-              box_size: 20.0
-            interactions:
-              c0: 1.0
-              c1: 0.0
-          ground_state:
-            dt: 0.01
-            n_steps: 100
-            tol: 1.0e-8
-            zeeman:
-              p: 0.0
-              q: 0.0
-            potential:
-              type: harmonic
-              omega: [1.0]
-          sequence: []
+        pipeline:
+          - ground_state:
+              atom: Rb87
+              grid:
+                n: 64
+                box: 20.0
+              interactions:
+                c0: 1.0
+                c1: 0.0
+              dt: 0.01
+              n_steps: 100
+              tol: 1.0e-8
+              zeeman:
+                p: 0.0
+                q: 0.0
+              trap: [1.0]
         """
         cfg = load_config_from_string(yaml)
-        @test cfg.ground_state.enable_ddi === nothing
+        p = cfg.steps[1].params
+        @test !haskey(p, "enable_ddi")
     end
 
     @testset "2D loss step" begin
@@ -384,7 +352,7 @@
         apply_loss_step!(psi, loss, 1, 0.01, 3, 2)
         pop_after = [sum(abs2, psi[:, :, c]) for c in 1:3]
 
-        # c=1→m=+1, c=2→m=0, c=3→m=-1
+        # c=1->m=+1, c=2->m=0, c=3->m=-1
         # m=-1 (c=3) unchanged
         @test pop_after[3] ≈ pop_before[3] rtol = 1e-14
         # m=+1,0 decay

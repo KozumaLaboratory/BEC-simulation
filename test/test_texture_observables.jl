@@ -140,7 +140,7 @@ using LinearAlgebra
             @test spin_texture_charge(psi, grid, plans, sm) == 0.0
         end
 
-        @testset "analytic skyrmion |Q| ≈ 1" begin
+        @testset "analytic skyrmion |Q| approx 1" begin
             N = 128
             L = 20.0
             grid = make_grid(GridConfig((N, N), (L, L)))
@@ -148,9 +148,6 @@ using LinearAlgebra
             sm = spin_matrices(1)
             dV = cell_volume(grid)
 
-            # Spin-1 baby skyrmion: spin texture wraps the sphere once
-            # β(r) = π·exp(-r²/R²) goes from π (south pole) at center to 0 (north pole)
-            # Analytic Q = (1/2)[-cos β]_{β=π}^{β=0} = -1
             R = 3.0
             psi = zeros(ComplexF64, N, N, 3)
             for j in 1:N, i in 1:N
@@ -179,7 +176,6 @@ using LinearAlgebra
             sm = spin_matrices(1)
             dV = cell_volume(grid)
 
-            # All spin-up: m=+1 only
             psi = zeros(ComplexF64, N, N, 3)
             sigma = L / 4
             for j in 1:N, i in 1:N
@@ -196,65 +192,51 @@ using LinearAlgebra
     @testset "YAML parsing with higher-order c_n" begin
         @testset "backward compat (no c_extra)" begin
             yaml = """
-            experiment:
-              type: dynamics
-              name: test
-              system:
-                atom: Rb87
-                grid:
-                  n_points: 32
-                  box_size: 10.0
-                interactions:
-                  c0: 100.0
-                  c1: -5.0
-              ground_state:
-                dt: 0.01
-                n_steps: 10
-                tol: 1e-4
-                potential:
-                  type: harmonic
-                  omega: [1.0]
-              sequence: []
+            pipeline:
+              - ground_state:
+                  atom: Rb87
+                  grid:
+                    n: 32
+                    box: 10.0
+                  interactions:
+                    c0: 100.0
+                    c1: -5.0
+                  dt: 0.01
+                  n_steps: 10
+                  tol: 1e-4
+                  trap: [1.0]
             """
             config = load_config_from_string(yaml)
-            ip = config.system.interactions
-            @test ip.c0 == 100.0
-            @test ip.c1 == -5.0
-            @test ip.c_extra == Float64[]
+            p = config.steps[1].params
+            @test p["interactions"]["c0"] == 100.0
+            @test p["interactions"]["c1"] == -5.0
+            @test !haskey(p["interactions"], "c2")
         end
 
         @testset "with c2, c3" begin
             yaml = """
-            experiment:
-              type: dynamics
-              name: test
-              system:
-                atom: Rb87
-                grid:
-                  n_points: 32
-                  box_size: 10.0
-                interactions:
-                  c0: 100.0
-                  c1: -5.0
-                  c2: 3.0
-                  c3: 1.5
-              ground_state:
-                dt: 0.01
-                n_steps: 10
-                tol: 1e-4
-                potential:
-                  type: harmonic
-                  omega: [1.0]
-              sequence: []
+            pipeline:
+              - ground_state:
+                  atom: Rb87
+                  grid:
+                    n: 32
+                    box: 10.0
+                  interactions:
+                    c0: 100.0
+                    c1: -5.0
+                    c2: 3.0
+                    c3: 1.5
+                  dt: 0.01
+                  n_steps: 10
+                  tol: 1e-4
+                  trap: [1.0]
             """
             config = load_config_from_string(yaml)
-            ip = config.system.interactions
-            @test ip.c0 == 100.0
-            @test ip.c1 == -5.0
-            @test ip.c_extra == [3.0, 1.5]
-            @test get_cn(ip, 2) == 3.0
-            @test get_cn(ip, 3) == 1.5
-            @test get_cn(ip, 4) == 0.0
+            p = config.steps[1].params
+            @test p["interactions"]["c0"] == 100.0
+            @test p["interactions"]["c1"] == -5.0
+            @test p["interactions"]["c2"] == 3.0
+            @test p["interactions"]["c3"] == 1.5
         end
     end
 

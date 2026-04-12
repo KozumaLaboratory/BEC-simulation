@@ -28,7 +28,7 @@ const PipelineStep = Union{GroundStateStep, DynamicsStep, AnalyzeStep}
 
 struct PipelineConfig
     steps::Vector{PipelineStep}
-    scan::Union{Nothing,OverrideScan}
+    scan::Union{Nothing,AbstractScanSpec}
     raw_data::Dict                   # full YAML dict for override re-parse
 end
 
@@ -39,7 +39,12 @@ function parse_pipeline(data::Dict)
     steps = PipelineStep[_parse_step(s) for s in pipe_data]
 
     scan = if haskey(data, "scan")
-        _parse_override_scan(data["scan"])
+        scan_d = data["scan"]
+        if get(scan_d, "type", nothing) == "constrained_jz"
+            _parse_constrained_jz_scan(scan_d)
+        else
+            _parse_override_scan(scan_d)
+        end
     else
         nothing
     end
@@ -137,8 +142,14 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev; verbos
         HarmonicTrap(omega)
     else
         pot_d = get(p, "potential", Dict("type" => "harmonic", "omega" => ones(ndim)))
-        _build_potential(PotentialConfig(Symbol(get(pot_d, "type", "harmonic")),
-            Dict{String,Any}(string(k) => v for (k, v) in pot_d if k != "type")), ndim)
+        if pot_d isa Vector
+            components = [PotentialConfig(Symbol(get(c, "type", "harmonic")),
+                Dict{String,Any}(string(k) => v for (k, v) in c if k != "type")) for c in pot_d]
+            _build_potential(PotentialConfig(:composite, Dict{String,Any}("components" => components)), ndim)
+        else
+            _build_potential(PotentialConfig(Symbol(get(pot_d, "type", "harmonic")),
+                Dict{String,Any}(string(k) => v for (k, v) in pot_d if k != "type")), ndim)
+        end
     end
 
     # ITP params

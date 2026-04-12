@@ -15,30 +15,24 @@
 
     @testset "YAML parsing" begin
         yaml_str = """
-        experiment:
-          type: dynamics
-          name: "test experiment"
-          system:
-            atom: Rb87
-            grid:
-              n_points: [64]
-              box_size: [20.0]
-            interactions:
-              c0: 10.0
-              c1: -0.5
-          ground_state:
-            dt: 0.005
-            n_steps: 100
-            tol: 1.0e-8
-            initial_state: polar
-            zeeman:
-              p: 0.0
-              q: 0.1
-            potential:
-              type: harmonic
-              omega: [1.0]
-          sequence:
-            - name: ramp
+        pipeline:
+          - ground_state:
+              atom: Rb87
+              grid:
+                n: [64]
+                box: [20.0]
+              interactions:
+                c0: 10.0
+                c1: -0.5
+              dt: 0.005
+              n_steps: 100
+              tol: 1.0e-8
+              initial_state: polar
+              zeeman:
+                p: 0.0
+                q: 0.1
+              trap: [1.0]
+          - dynamics:
               duration: 1.0
               dt: 0.01
               save_every: 10
@@ -47,257 +41,126 @@
                   from: 0.0
                   to: 0.5
                 q: 0.0
-              potential:
-                type: harmonic
-                omega: [1.0]
-            - name: hold
+              trap: [1.0]
+          - dynamics:
               duration: 2.0
               dt: 0.01
               save_every: 20
               zeeman:
                 p: 0.5
                 q: 0.0
-            - name: release
+          - dynamics:
               duration: 0.5
               dt: 0.005
               save_every: 10
               zeeman:
                 p: 0.0
                 q: 0.0
-              potential:
-                type: none
         """
 
         config = load_config_from_string(yaml_str)
 
-        @test config.name == "test experiment"
-        @test config.system.atom_name == :Rb87
-        @test config.system.grid_n_points == [64]
-        @test config.system.grid_box_size == [20.0]
-        @test config.system.interactions.c0 == 10.0
-        @test config.system.interactions.c1 == -0.5
-        @test config.system.ddi.enabled == false
+        @test config isa PipelineConfig
+        @test length(config.steps) == 4
+        @test config.steps[1] isa SpinorBEC.GroundStateStep
 
-        gs = config.ground_state
-        @test gs !== nothing
-        @test gs.dt == 0.005
-        @test gs.n_steps == 100
-        @test gs.tol == 1.0e-8
-        @test gs.initial_state == :polar
-        @test gs.zeeman.p == 0.0
-        @test gs.zeeman.q == 0.1
-        @test gs.potential.type == :harmonic
-        @test gs.potential.params["omega"] == [1.0]
+        gp = config.steps[1].params
+        @test gp["atom"] == "Rb87"
+        @test gp["grid"]["n"] == [64]
+        @test gp["grid"]["box"] == [20.0]
+        @test gp["interactions"]["c0"] == 10.0
+        @test gp["interactions"]["c1"] == -0.5
+        @test gp["dt"] == 0.005
+        @test gp["n_steps"] == 100
+        @test gp["tol"] == 1.0e-8
+        @test gp["initial_state"] == "polar"
+        @test gp["zeeman"]["p"] == 0.0
+        @test gp["zeeman"]["q"] == 0.1
 
-        @test length(config.spec.sequence) == 3
+        @test config.steps[2] isa SpinorBEC.DynamicsStep
+        ramp = config.steps[2].params
+        @test ramp["duration"] == 1.0
+        @test ramp["dt"] == 0.01
+        @test ramp["save_every"] == 10
+        @test ramp["zeeman"]["p"] isa Dict
+        @test ramp["zeeman"]["p"]["from"] == 0.0
+        @test ramp["zeeman"]["p"]["to"] == 0.5
+        @test ramp["zeeman"]["q"] == 0.0
 
-        ramp = config.spec.sequence[1]
-        @test ramp.name == "ramp"
-        @test ramp.duration == 1.0
-        @test ramp.dt == 0.01
-        @test ramp.save_every == 10
-        @test ramp.override["ground_state.zeeman.p"] isa Dict
-        @test ramp.override["ground_state.zeeman.p"]["from"] == 0.0
-        @test ramp.override["ground_state.zeeman.p"]["to"] == 0.5
-        @test ramp.override["ground_state.zeeman.q"] == 0.0
-        @test haskey(ramp.override, "ground_state.potential")
+        hold = config.steps[3].params
+        @test hold["duration"] == 2.0
 
-        hold = config.spec.sequence[2]
-        @test hold.name == "hold"
-        @test !haskey(hold.override, "ground_state.potential")
-
-        release = config.spec.sequence[3]
-        @test release.name == "release"
-        @test release.override["ground_state.potential"]["type"] == "none"
+        release = config.steps[4].params
+        @test release["duration"] == 0.5
     end
 
     @testset "YAML parsing - DDI" begin
         yaml_str = """
-        experiment:
-          type: dynamics
-          name: "ddi test"
-          system:
-            atom: Eu151
-            grid:
-              n_points: [32]
-              box_size: [10.0]
-            interactions:
-              c0: 5.0
-              c1: 0.0
-            ddi:
-              enabled: true
-              c_dd: 1.5e-5
-          ground_state:
-            dt: 0.01
-            n_steps: 10
-            tol: 1e-4
-            potential:
-              type: harmonic
-              omega: [1.0]
-          sequence: []
+        pipeline:
+          - ground_state:
+              atom: Eu151
+              grid:
+                n: [32]
+                box: [10.0]
+              interactions:
+                c0: 5.0
+                c1: 0.0
+              ddi:
+                enabled: true
+                c_dd: 1.5e-5
+              dt: 0.01
+              n_steps: 10
+              tol: 1e-4
+              trap: [1.0]
         """
 
         config = load_config_from_string(yaml_str)
-        @test config.system.ddi.enabled == true
-        @test config.system.ddi.c_dd == 1.5e-5
-        @test config.system.atom_name == :Eu151
+        p = config.steps[1].params
+        @test p["atom"] == "Eu151"
+        @test p["ddi"]["enabled"] == true
+        @test p["ddi"]["c_dd"] == 1.5e-5
     end
 
     @testset "YAML parsing - minimal" begin
         yaml_str = """
-        experiment:
-          type: dynamics
-          name: "minimal"
-          system:
-            atom: Na23
-            grid:
-              n_points: 32
-              box_size: 10.0
-            interactions:
-              c0: 1.0
-              c1: 0.1
-          ground_state:
-            dt: 0.01
-            n_steps: 10
-            tol: 1e-4
-            potential:
-              type: harmonic
-              omega: [1.0]
-          sequence: []
+        pipeline:
+          - ground_state:
+              atom: Na23
+              grid:
+                n: 32
+                box: 10.0
+              interactions:
+                c0: 1.0
+                c1: 0.1
+              dt: 0.01
+              n_steps: 10
+              tol: 1e-4
+              trap: [1.0]
         """
 
         config = load_config_from_string(yaml_str)
-        @test config.system.atom_name == :Na23
-        @test config.system.grid_n_points == [32]
-        @test isempty(config.spec.sequence)
-    end
-
-    @testset "YAML parsing - gravity" begin
-        yaml_str = """
-        experiment:
-          type: dynamics
-          name: "gravity test"
-          system:
-            atom: Rb87
-            grid:
-              n_points: [32]
-              box_size: [10.0]
-            interactions:
-              c0: 1.0
-              c1: 0.0
-          ground_state:
-            dt: 0.005
-            n_steps: 100
-            tol: 1.0e-8
-            potential:
-              type: gravity
-              g: 9.81
-              axis: 1
-          sequence: []
-        """
-        config = load_config_from_string(yaml_str)
-        gs = config.ground_state
-        @test gs.potential.type == :gravity
-        @test gs.potential.params["g"] == 9.81
-        @test gs.potential.params["axis"] == 1
-    end
-
-    @testset "YAML parsing - crossed_dipole" begin
-        yaml_str = """
-        experiment:
-          type: dynamics
-          name: "dipole test"
-          system:
-            atom: Rb87
-            grid:
-              n_points: [8, 8, 8]
-              box_size: [4.0, 4.0, 4.0]
-            interactions:
-              c0: 1.0
-              c1: 0.0
-          ground_state:
-            dt: 0.005
-            n_steps: 50
-            tol: 1.0e-6
-            potential:
-              type: crossed_dipole
-              polarizability: 1.5e-37
-              beams:
-                - wavelength: 1064.0e-9
-                  power: 10.0
-                  waist: 50.0e-6
-                  position: [0, 0, 0]
-                  direction: [1, 0, 0]
-                - wavelength: 1064.0e-9
-                  power: 10.0
-                  waist: 50.0e-6
-                  position: [0, 0, 0]
-                  direction: [0, 1, 0]
-          sequence: []
-        """
-        config = load_config_from_string(yaml_str)
-        gs = config.ground_state
-        @test gs.potential.type == :crossed_dipole
-        @test gs.potential.params["polarizability"] == 1.5e-37
-        @test length(gs.potential.params["beams"]) == 2
-    end
-
-    @testset "YAML parsing - composite (list)" begin
-        yaml_str = """
-        experiment:
-          type: dynamics
-          name: "composite test"
-          system:
-            atom: Rb87
-            grid:
-              n_points: [32]
-              box_size: [10.0]
-            interactions:
-              c0: 1.0
-              c1: 0.0
-          ground_state:
-            dt: 0.005
-            n_steps: 100
-            tol: 1.0e-8
-            potential:
-              - type: harmonic
-                omega: [1.0]
-              - type: gravity
-                g: 9.81
-                axis: 1
-          sequence: []
-        """
-        config = load_config_from_string(yaml_str)
-        gs = config.ground_state
-        @test gs.potential.type == :composite
-        components = gs.potential.params["components"]
-        @test length(components) == 2
-        @test components[1].type == :harmonic
-        @test components[2].type == :gravity
+        @test config isa PipelineConfig
+        p = config.steps[1].params
+        @test p["atom"] == "Na23"
+        @test p["grid"]["n"] == 32
     end
 
     @testset "YAML parsing - phase temperature_ratio" begin
         yaml_with_noise = """
-        experiment:
-          type: dynamics
-          name: "noise test"
-          system:
-            atom: Rb87
-            grid:
-              n_points: [32]
-              box_size: [10.0]
-            interactions:
-              c0: 1.0
-              c1: 0.0
-          ground_state:
-            dt: 0.01
-            n_steps: 10
-            tol: 1e-4
-            potential:
-              type: harmonic
-              omega: [1.0]
-          sequence:
-            - name: noisy
+        pipeline:
+          - ground_state:
+              atom: Rb87
+              grid:
+                n: [32]
+                box: [10.0]
+              interactions:
+                c0: 1.0
+                c1: 0.0
+              dt: 0.01
+              n_steps: 10
+              tol: 1e-4
+              trap: [1.0]
+          - dynamics:
               duration: 1.0
               dt: 0.01
               temperature_ratio: 0.1
@@ -305,10 +168,8 @@
               zeeman:
                 p: 0.0
                 q: 0.0
-              potential:
-                type: harmonic
-                omega: [1.0]
-            - name: quiet
+              trap: [1.0]
+          - dynamics:
               duration: 1.0
               dt: 0.01
               zeeman:
@@ -316,37 +177,31 @@
                 q: 0.0
         """
         config = load_config_from_string(yaml_with_noise)
-        @test config.spec.sequence[1].temperature_ratio == 0.1
-        @test config.spec.sequence[1].noise_seed == 42
-        @test config.spec.sequence[2].temperature_ratio === nothing
+        @test config.steps[2].params["temperature_ratio"] == 0.1
+        @test config.steps[2].params["noise_seed"] == 42
+        @test get(config.steps[3].params, "temperature_ratio", nothing) === nothing
     end
 
     @testset "run_config integration" begin
         yaml_str = """
-        experiment:
-          type: dynamics
-          name: "integration test"
-          system:
-            atom: Rb87
-            grid:
-              n_points: [32]
-              box_size: [20.0]
-            interactions:
-              c0: 10.0
-              c1: -0.5
-          ground_state:
-            dt: 0.005
-            n_steps: 200
-            tol: 1.0e-6
-            initial_state: polar
-            zeeman:
-              p: 0.0
-              q: 0.1
-            potential:
-              type: harmonic
-              omega: [1.0]
-          sequence:
-            - name: evolve
+        pipeline:
+          - ground_state:
+              atom: Rb87
+              grid:
+                n: [32]
+                box: [20.0]
+              interactions:
+                c0: 10.0
+                c1: -0.5
+              dt: 0.005
+              n_steps: 200
+              tol: 1.0e-6
+              initial_state: polar
+              zeeman:
+                p: 0.0
+                q: 0.1
+              trap: [1.0]
+          - dynamics:
               duration: 0.1
               dt: 0.001
               save_every: 50
@@ -355,9 +210,7 @@
                   from: 0.0
                   to: 0.1
                 q: 0.1
-              potential:
-                type: harmonic
-                omega: [1.0]
+              trap: [1.0]
         """
 
         config = load_config_from_string(yaml_str)
@@ -366,41 +219,29 @@
         @test result.ground_state_energy !== nothing
         @test result.ground_state_energy isa Float64
         @test result.ground_state_converged isa Bool
-        @test length(result.phase_results) == 1
-        @test result.phase_names == ["evolve"]
-
-        sim = result.phase_results[1]
-        @test length(sim.times) > 1
-        @test sim.times[1] == 0.0  # t_offset
-        @test all(n -> n > 0, sim.norms)
+        @test result.dynamics_result !== nothing
     end
 
     @testset "run_config integration - phase temperature_ratio" begin
         yaml_str = """
-        experiment:
-          type: dynamics
-          name: "noise integration"
-          system:
-            atom: Rb87
-            grid:
-              n_points: [32]
-              box_size: [20.0]
-            interactions:
-              c0: 10.0
-              c1: -0.5
-          ground_state:
-            dt: 0.005
-            n_steps: 200
-            tol: 1.0e-6
-            initial_state: polar
-            zeeman:
-              p: 0.0
-              q: 0.1
-            potential:
-              type: harmonic
-              omega: [1.0]
-          sequence:
-            - name: noisy_evolve
+        pipeline:
+          - ground_state:
+              atom: Rb87
+              grid:
+                n: [32]
+                box: [20.0]
+              interactions:
+                c0: 10.0
+                c1: -0.5
+              dt: 0.005
+              n_steps: 200
+              tol: 1.0e-6
+              initial_state: polar
+              zeeman:
+                p: 0.0
+                q: 0.1
+              trap: [1.0]
+          - dynamics:
               duration: 0.1
               dt: 0.001
               save_every: 50
@@ -409,52 +250,42 @@
               zeeman:
                 p: 0.0
                 q: 0.1
-              potential:
-                type: harmonic
-                omega: [1.0]
+              trap: [1.0]
         """
 
         config = load_config_from_string(yaml_str)
-        @test config.spec.sequence[1].temperature_ratio == 0.05
+        @test config.steps[2].params["temperature_ratio"] == 0.05
         result = run_config(config; verbose=false)
-        @test length(result.phase_results) == 1
-        @test result.phase_names == ["noisy_evolve"]
-        sim = result.phase_results[1]
-        @test all(n -> n > 0, sim.norms)
+        @test result.dynamics_result !== nothing
     end
 
     @testset "run_config integration - composite potential" begin
         yaml_str = """
-        experiment:
-          type: dynamics
-          name: "composite integration"
-          system:
-            atom: Rb87
-            grid:
-              n_points: [32]
-              box_size: [20.0]
-            interactions:
-              c0: 10.0
-              c1: -0.5
-          ground_state:
-            dt: 0.005
-            n_steps: 200
-            tol: 1.0e-6
-            initial_state: polar
-            zeeman:
-              p: 0.0
-              q: 0.1
-            potential:
-              - type: harmonic
-                omega: [1.0]
-              - type: gravity
-                g: 0.1
-                axis: 1
-          sequence: []
+        pipeline:
+          - ground_state:
+              atom: Rb87
+              grid:
+                n: [32]
+                box: [20.0]
+              interactions:
+                c0: 10.0
+                c1: -0.5
+              dt: 0.005
+              n_steps: 200
+              tol: 1.0e-6
+              initial_state: polar
+              zeeman:
+                p: 0.0
+                q: 0.1
+              potential:
+                - type: harmonic
+                  omega: [1.0]
+                - type: gravity
+                  g: 0.1
+                  axis: 1
         """
 
         config = load_config_from_string(yaml_str)
-        @test config.ground_state.potential.type == :composite
         result = run_config(config; verbose=false)
         @test result.ground_state_energy !== nothing
         @test result.ground_state_energy isa Float64

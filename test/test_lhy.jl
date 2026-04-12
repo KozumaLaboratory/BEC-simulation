@@ -106,29 +106,25 @@
 
     @testset "YAML parsing of c_lhy" begin
         yaml = """
-        experiment:
-          type: dynamics
-          name: lhy_test
-          system:
-            atom: Rb87
-            grid:
-              n_points: 64
-              box_size: 20.0
-            interactions:
-              c0: 10.0
-              c1: -0.5
-              c_lhy: 100.0
-          ground_state:
-            dt: 0.01
-            n_steps: 10
-            tol: 1e-4
-            potential:
-              type: harmonic
-              omega: [1.0]
-          sequence: []
+        pipeline:
+          - ground_state:
+              atom: Rb87
+              grid:
+                n: 64
+                box: 20.0
+              interactions:
+                c0: 10.0
+                c1: -0.5
+                c_lhy: 100.0
+              dt: 0.01
+              n_steps: 10
+              tol: 1e-4
+              trap: [1.0]
         """
         cfg = load_config_from_string(yaml)
-        @test cfg.system.interactions.c_lhy == 100.0
+        @test cfg isa PipelineConfig
+        p = cfg.steps[1].params
+        @test p["interactions"]["c_lhy"] == 100.0
     end
 
     @testset "Lima-Pelster Q5" begin
@@ -149,7 +145,7 @@
             @test lima_pelster_Q5(0.5) ≈ 1.3899 rtol = 0.01
         end
 
-        @testset "ε_dd > 1 returns finite positive Q5 (Wächtler-Santos extension)" begin
+        @testset "eps_dd > 1 returns finite positive Q5 (Waechtler-Santos extension)" begin
             Q5 = lima_pelster_Q5(1.5)
             @test Q5 > 0.0
             @test isfinite(Q5)
@@ -164,27 +160,22 @@
 
     @testset "YAML without c_lhy defaults to 0" begin
         yaml = """
-        experiment:
-          type: dynamics
-          name: no_lhy_test
-          system:
-            atom: Rb87
-            grid:
-              n_points: 64
-              box_size: 20.0
-            interactions:
-              c0: 10.0
-              c1: -0.5
-          ground_state:
-            dt: 0.01
-            n_steps: 10
-            tol: 1e-4
-            potential:
-              type: harmonic
-              omega: [1.0]
-          sequence: []
+        pipeline:
+          - ground_state:
+              atom: Rb87
+              grid:
+                n: 64
+                box: 20.0
+              interactions:
+                c0: 10.0
+                c1: -0.5
+              dt: 0.01
+              n_steps: 10
+              tol: 1e-4
+              trap: [1.0]
         """
         cfg = load_config_from_string(yaml)
-        @test cfg.system.interactions.c_lhy == 0.0
+        p = cfg.steps[1].params
+        @test get(p["interactions"], "c_lhy", 0.0) == 0.0
     end
 end

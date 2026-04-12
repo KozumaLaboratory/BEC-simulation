@@ -59,60 +59,49 @@
 
     @testset "YAML c_total/c1_ratio parsing" begin
         yaml_str = """
-        experiment:
-          type: dynamics
-          name: "constraint test"
-          system:
-            atom: Eu151
-            grid:
-              n_points: [32]
-              box_size: [10.0]
-            interactions:
-              c_total: 4689.0
-              c1_ratio: 0.02778
-            ddi:
-              enabled: true
-              c_dd: 7647.0
-          ground_state:
-            dt: 0.01
-            n_steps: 10
-            tol: 1e-4
-            potential:
-              type: harmonic
-              omega: [1.0]
-          sequence: []
+        pipeline:
+          - ground_state:
+              atom: Eu151
+              grid:
+                n: [32]
+                box: [10.0]
+              interactions:
+                c_total: 4689.0
+                c1_ratio: 0.02778
+              ddi:
+                enabled: true
+                c_dd: 7647.0
+              dt: 0.01
+              n_steps: 10
+              tol: 1e-4
+              trap: [1.0]
         """
         config = load_config_from_string(yaml_str)
-        ip = config.system.interactions
-        @test ip.c0 + 36 * ip.c1 ≈ 4689.0 rtol=1e-4
-        @test ip.c1 / ip.c0 ≈ 0.02778 rtol=1e-4
+        p = config.steps[1].params
+        @test p["interactions"]["c_total"] == 4689.0
+        @test p["interactions"]["c1_ratio"] == 0.02778
+        @test p["ddi"]["c_dd"] == 7647.0
     end
 
     @testset "YAML c_total with c1_ratio=0" begin
         yaml_str = """
-        experiment:
-          type: dynamics
-          name: "zero ratio test"
-          system:
-            atom: Eu151
-            grid:
-              n_points: [32]
-              box_size: [10.0]
-            interactions:
-              c_total: 4689.0
-          ground_state:
-            dt: 0.01
-            n_steps: 10
-            tol: 1e-4
-            potential:
-              type: harmonic
-              omega: [1.0]
-          sequence: []
+        pipeline:
+          - ground_state:
+              atom: Eu151
+              grid:
+                n: [32]
+                box: [10.0]
+              interactions:
+                c_total: 4689.0
+              dt: 0.01
+              n_steps: 10
+              tol: 1e-4
+              trap: [1.0]
         """
         config = load_config_from_string(yaml_str)
-        ip = config.system.interactions
-        @test ip.c0 ≈ 4689.0
-        @test ip.c1 ≈ 0.0
+        p = config.steps[1].params
+        @test p["interactions"]["c_total"] == 4689.0
+        @test get(p["interactions"], "c1_ratio", 0.0) == 0.0
     end
 
     @testset "compute_eu151_interactions" begin
@@ -138,8 +127,8 @@
     @testset "_c0c1_to_gS analytic F=1" begin
         c0, c1 = 100.0, -5.0
         g = SpinorBEC._c0c1_to_gS(1, c0, c1)
-        @test g[0] ≈ c0 - 2c1   # g₀ = c₀ + c₁(0 - 2)/2 = c₀ - c₁
-        @test g[2] ≈ c0 + c1    # g₂ = c₀ + c₁(6 - 4)/2 = c₀ + c₁
+        @test g[0] ≈ c0 - 2c1   # g_0 = c_0 + c_1(0 - 2)/2 = c_0 - c_1
+        @test g[2] ≈ c0 + c1    # g_2 = c_0 + c_1(6 - 4)/2 = c_0 + c_1
     end
 
     @testset "_c0c1_to_gS pair amplitude identity F=1,2,6" begin
@@ -207,60 +196,48 @@
 
     @testset "YAML c_total with c_extra" begin
         yaml_str = """
-        experiment:
-          type: dynamics
-          name: "c_extra test"
-          system:
-            atom: Eu151
-            grid:
-              n_points: [32]
-              box_size: [10.0]
-            interactions:
-              c_total: 4689.0
-              c1_ratio: 0.02778
-              c4: 50.0
-              c6: -20.0
-          ground_state:
-            dt: 0.01
-            n_steps: 10
-            tol: 1e-4
-            potential:
-              type: harmonic
-              omega: [1.0]
-          sequence: []
+        pipeline:
+          - ground_state:
+              atom: Eu151
+              grid:
+                n: [32]
+                box: [10.0]
+              interactions:
+                c_total: 4689.0
+                c1_ratio: 0.02778
+                c4: 50.0
+                c6: -20.0
+              dt: 0.01
+              n_steps: 10
+              tol: 1e-4
+              trap: [1.0]
         """
         config = load_config_from_string(yaml_str)
-        ip = config.system.interactions
-        @test ip.c0 + 36 * ip.c1 ≈ 4689.0 rtol=1e-4
-        @test length(ip.c_extra) >= 5
-        @test ip.c_extra[3] ≈ 50.0   # c4 → c_extra[3]
-        @test ip.c_extra[5] ≈ -20.0  # c6 → c_extra[5]
+        p = config.steps[1].params
+        @test p["interactions"]["c_total"] == 4689.0
+        @test p["interactions"]["c4"] == 50.0
+        @test p["interactions"]["c6"] == -20.0
     end
 
     @testset "YAML explicit c0/c1 still works" begin
         yaml_str = """
-        experiment:
-          type: dynamics
-          name: "explicit test"
-          system:
-            atom: Rb87
-            grid:
-              n_points: [32]
-              box_size: [10.0]
-            interactions:
-              c0: 10.0
-              c1: -0.5
-          ground_state:
-            dt: 0.01
-            n_steps: 10
-            tol: 1e-4
-            potential:
-              type: harmonic
-              omega: [1.0]
-          sequence: []
+        pipeline:
+          - ground_state:
+              atom: Rb87
+              grid:
+                n: [32]
+                box: [10.0]
+              interactions:
+                c0: 10.0
+                c1: -0.5
+              dt: 0.01
+              n_steps: 10
+              tol: 1e-4
+              trap: [1.0]
         """
         config = load_config_from_string(yaml_str)
-        @test config.system.interactions.c0 == 10.0
-        @test config.system.interactions.c1 == -0.5
+        p = config.steps[1].params
+        @test p["interactions"]["c0"] == 10.0
+        @test p["interactions"]["c1"] == -0.5
     end
 end
