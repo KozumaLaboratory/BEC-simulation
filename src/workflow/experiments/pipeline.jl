@@ -182,9 +182,27 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev; verbos
         backend,
     )
 
-    verbose && println("  E=$(round(gs.energy; sigdigits=6)) conv=$(gs.converged)")
-
     psi_out = copy(gs.workspace.state.psi)
+
+    if verbose
+        D = 2F + 1
+        dV = cell_volume(grid)
+        n_pts = grid.config.n_points
+        ndim_v = length(n_pts)
+        pops = Float64[]
+        for c in 1:D
+            idx = _component_slice(ndim_v, n_pts, c)
+            push!(pops, sum(abs2, view(psi_out, idx...)) * dV)
+        end
+        total = sum(pops)
+        pops ./= total
+        # Show top 3 populations
+        sorted_idx = sortperm(pops; rev=true)
+        top = [(F - (i-1), pops[i]) for i in sorted_idx[1:min(3, D)]]
+        pop_str = join(["m=$(m): $(round(p*100; digits=1))%" for (m, p) in top], ", ")
+        mz = sum((F - (c-1)) * pops[c] for c in 1:D)
+        println("  E=$(round(gs.energy; sigdigits=6)) conv=$(gs.converged) Mz=$(round(mz; digits=2)) [$pop_str]")
+    end
     step_result = Dict{Symbol,Any}(
         :ground_state_energy => gs.energy,
         :ground_state_converged => gs.converged,
