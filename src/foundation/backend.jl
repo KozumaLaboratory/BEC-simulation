@@ -11,3 +11,9 @@ _fft_kwargs(::CPUBackend, flags) = (; flags = flags)
 
 _is_gpu(::Array) = false
 _is_gpu(::AbstractArray) = true
+
+function _resolve_backend(name::Symbol)
+    name == :cpu && return CPUBackend()
+    name in (:cuda, :gpu) && return CUDABackend()
+    throw(ArgumentError("Unknown backend: $name"))
+end

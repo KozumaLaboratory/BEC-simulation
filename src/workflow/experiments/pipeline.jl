@@ -10,14 +10,6 @@
 #
 # scan: is orthogonal — overrides paths like `pipeline.1.zeeman.p`.
 
-# --- Helpers ---
-
-function _resolve_backend(name::Symbol)
-    name == :cpu && return CPUBackend()
-    name in (:cuda, :gpu) && return CUDABackend()
-    throw(ArgumentError("Unknown backend: $name"))
-end
-
 # --- Step types ---
 
 struct GroundStateStep
