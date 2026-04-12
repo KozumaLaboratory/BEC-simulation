@@ -281,7 +281,9 @@ function find_ground_state(;
             )
             flush(stdout)
 
-            if dE < tol && dpsi < tol
+            # Convergence by dE only — dpsi can stay large with persistent
+            # mass currents (DDI-driven vortex flow, FL texture, etc.)
+            if dE < tol
                 converged = true
                 break
             end
@@ -409,7 +411,9 @@ function _find_ground_state_adaptive(;
             )
             flush(stdout)
 
-            if dE < tol && dpsi < tol
+            # Convergence by dE only — dpsi can stay large with persistent
+            # mass currents (DDI-driven vortex flow, FL texture, etc.)
+            if dE < tol
                 converged = true
                 break
             end
