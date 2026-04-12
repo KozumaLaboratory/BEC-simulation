@@ -42,38 +42,50 @@ All substeps auto-skip when coupling ≈ 0.
 - `scan_continuation(; make_params, ...)` — parameter sweep with continuation
 - `scan_phase_diagram_2d(; make_params, ...)` — 2D phase diagram
 
-**YAML schema**: every parameter variation is expressed as a **config path override** — a dotted path into the raw YAML dict (e.g. `system.ddi.c_dd`, `ground_state.zeeman.p`) mapped to a new value. The runner applies the override, re-parses the experiment dict, and builds a fresh workspace.
+**YAML schema**: every parameter variation is expressed as a **config path override** — a dotted path into the raw YAML dict (e.g. `pipeline.0.ddi.c_dd`, `pipeline.0.zeeman.p`) mapped to a new value. The runner applies the override, re-parses the experiment dict, and builds a fresh workspace.
 
 ```yaml
-scan:
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [64, 64, 64], box: [20.0, 20.0, 20.0]}
+      interactions: {c_total: 4689, c1_ratio: 0.028}
+      ddi: {c_dd: 7647, enabled: true}
+      zeeman: {p: 100, q: 0}
+      trap: [1.0, 1.0, 1.182]
+      dt: 0.005
+      n_steps: 20000
+      tol: 1.0e-10
+      backend: cuda
+
+  - dynamics:                           # each phase is a separate step
+      duration: 3.0
+      dt: 0.001
+      ddi: true
+      zeeman: {p: {from: 100, to: 0.39}, q: 0}   # ramp → TimeDependentZeeman
+      save_every: 50
+      temperature_ratio: 0.1            # T/T_c thermal noise at phase start
+
+  - analyze:                            # post-processing (any number of entries)
+      - tomography: {axis: y, n_angles: 19}
+      - faraday: {detuning: -64, axis: 3}
+      - phase_classify: {}
+
+scan:                                   # orthogonal to pipeline
   zip:                                  # 1D sweep (all paths must agree on length)
-    system.ddi.c_dd:      [0.0, 4000.0, 7647.0]
-    ground_state.zeeman.p: [100.0, 10.0, 1.0]
+    pipeline.0.ddi.c_dd:    [0.0, 4000.0, 7647.0]
+    pipeline.0.zeeman.p:    [100.0, 10.0, 1.0]
   product:                              # N-dim Cartesian product
-    system.interactions.c1_ratio:     [-0.02, -0.01, 0.0]
-    ground_state.target_magnetization: [-6.0, -3.0, 0.0]
+    pipeline.0.interactions.c1_ratio:       [-0.02, -0.01, 0.0]
+    pipeline.0.target_magnetization:        [-6.0, -3.0, 0.0]
   comparison_runs:                      # run multiple recipes at every point
     - name: fl_vortex
-      override: {ground_state.initial_state: spin_coherent, ...}
+      override: {pipeline.0.initial_state: spin_coherent, ...}
   continuation: true                    # reuse previous psi as initial condition
-  auto_rotate_on_mz: true               # rotate by Δα when target Mz changes
+  auto_rotate_on_mz: true              # rotate by Δα when target Mz changes
 ```
 
-Dynamics phases use the same override mechanism to switch DDI / interactions / etc between phases:
-
-```yaml
-sequence:
-  - name: dynamics
-    duration: 3.0
-    dt: 0.0002
-    override:
-      system.ddi.enabled: true
-      ground_state.zeeman.p: {from: 2.0, to: 0.0}   # ramp → TimeDependentZeeman
-```
-
-Phase-level `zeeman:` and `potential:` at the top of a phase block are auto-migrated into the override map at parse time for convenience. `ConstrainedJzScan` is the one exception to the override model (bisects on Ω at runtime).
-
-**Noise**: both GS (`ground_state.temperature_ratio`) and phase noise (`phase.temperature_ratio` or `perturbation.temperature_ratio`) use Bose-Einstein thermal noise with `T/T_c ∈ (0, 1)`, driving `add_thermal_noise(psi, F; T_over_Tc, seed)`.
+**Noise**: both GS (`temperature_ratio`) and phase noise (`dynamics.temperature_ratio`) use Bose-Einstein thermal noise with `T/T_c ∈ (0, 1)`, driving `add_thermal_noise(psi, F; T_over_Tc, seed)`.
 
 **Continuation API** (direct-Julia, for benches/tests): `make_params(val) → NamedTuple` overrides any `find_ground_state` kwargs per sweep point. Legacy `make_interactions(val) → InteractionParams` also supported.
 

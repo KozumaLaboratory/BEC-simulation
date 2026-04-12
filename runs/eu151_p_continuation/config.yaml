@@ -20,46 +20,39 @@
 #   Physical B = 2.6 nT corresponds to p ~ 0.39
 # ================================================================
 
-experiment:
-  name: "Eu151 p-continuation (Zeeman sweep)"
-  type: phase_scan
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid:
+        n: [32, 32, 32]
+        box: [12.0, 12.0, 12.0]
+      interactions:
+        c_total: 4689.0
+        c1_ratio: 0.02778   # 1/36, Buchachenko AFM estimate
+      ddi:
+        enabled: true
+        c_dd: 7647.0
+      zeeman:
+        p: 100.0   # starting value (overridden by scan)
+        q: 0.0
+      trap: [1.0, 1.0, 1.1818]   # 130/110
+      dt: 0.001
+      n_steps: 3000
+      tol: 1.0e-8
+      initial_state: polar
 
-  system:
-    atom: Eu151
-    grid:
-      n_points: [32, 32, 32]
-      box_size: [12.0, 12.0, 12.0]
-    interactions:
-      c_total: 4689.0
-      c1_ratio: 0.02778   # 1/36, Buchachenko AFM estimate
-    ddi:
-      enabled: true
-      c_dd: 7647.0
+  - analyze:
+      - stability:
+          perturbation: 1.0e-4
+          n_steps: 300
+          sample_every: 10
 
-  ground_state:
-    dt: 0.001
-    n_steps: 3000
-    tol: 1.0e-8
-    initial_state: polar
-    zeeman:
-      p: 100.0   # starting value (overridden by scan)
-      q: 0.0
-    potential:
-      type: harmonic
-      omega: [1.0, 1.0, 1.1818]   # 130/110
+scan:
+  zip:
+    pipeline.0.zeeman.p: [100.0, 50.0, 20.0, 10.0, 5.0, 2.0, 1.0, 0.5, 0.2, 0.1, 0.0]
+  continuation: true
 
-  scan:
-    zip:
-      ground_state.zeeman.p: [100.0, 50.0, 20.0, 10.0, 5.0, 2.0, 1.0, 0.5, 0.2, 0.1, 0.0]
-    continuation: true
-
-  stability:
-    enabled: true
-    perturbation: 1.0e-4
-    n_steps: 300
-    sample_every: 10
-
-  observables:
-    always: [norm, magnetization]
-    on_save: [energy]
-    final_only: [phase_classification, structure_factor]
+observables:
+  always: [norm, magnetization]
+  on_save: [energy]
+  final_only: [phase_classification, structure_factor]

@@ -9,53 +9,37 @@
 #
 # ⚠️ Run AFTER Bug-1 (Coriolis) is confirmed fixed.
 
-experiment:
-  name: "Eu151 EdH 2D scan (hold_time × B_target)"
-  type: dynamics
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [64, 64, 64], box: [20.0, 20.0, 20.0]}
+      interactions:
+        N_atoms: 50000
+        omega_ref: 691.15
+        c1_ratio: 0.02778     # 1/36 Buchachenko
+      ddi: {enabled: true}
+      zeeman: {p: 100.0, q: 0.0}  # strong field polarizes m=+F
+      trap: [1.0, 1.0, 1.182]
+      dt: 0.005
+      n_steps: 20000
+      tol: 1.0e-10
+      initial_state: ferromagnetic
+      backend: cuda
 
-  system:
-    atom: Eu151
-    grid:
-      n_points: [64, 64, 64]
-      box_size: [20.0, 20.0, 20.0]
-    interactions:
-      N_atoms: 50000
-      omega_ref: 691.15
-      c1_ratio: 0.02778     # 1/36 Buchachenko
-    ddi:
-      enabled: true
-
-  ground_state:
-    dt: 0.005
-    n_steps: 20000
-    tol: 1.0e-10
-    initial_state: ferromagnetic
-    zeeman:
-      p: 100.0              # strong field polarizes m=+F
-      q: 0.0
-    potential:
-      type: harmonic
-      omega: [1.0, 1.0, 1.182]
-    backend: cuda
-
-  sequence:
-    - name: hold
+  - dynamics:
       duration: 6.91          # overridden by scan
       dt: 0.001
       save_every: 100
-      override:
-        system.ddi.enabled: true
-      zeeman:
-        p: 0.024              # overridden by scan
-        q: 0.0
+      ddi: true
+      zeeman: {p: 0.024, q: 0.0}  # overridden by scan
 
-  scan:
-    product:
-      # target field: 50, 100, 150, 200, 250, 300 μG → p values
-      sequence.0.zeeman.p: [0.008, 0.016, 0.024, 0.033, 0.041, 0.049]
-      # holding time: 1, 5, 10, 15, 20, 25 ms → ω⁻¹ units
-      sequence.0.duration: [0.69, 3.46, 6.91, 10.37, 13.82, 17.28]
+scan:
+  product:
+    # target field: 50, 100, 150, 200, 250, 300 μG → p values
+    pipeline.1.zeeman.p: [0.008, 0.016, 0.024, 0.033, 0.041, 0.049]
+    # holding time: 1, 5, 10, 15, 20, 25 ms → ω⁻¹ units
+    pipeline.1.duration: [0.69, 3.46, 6.91, 10.37, 13.82, 17.28]
 
-  observables:
-    always: [norm, magnetization]
-    on_save: [energy, populations]
+observables:
+  always: [norm, magnetization]
+  on_save: [energy, populations]

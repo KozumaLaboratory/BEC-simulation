@@ -7,40 +7,26 @@
 # singularities (vortex cores) appear as zeros of φ surrounded by
 # sign-changing regions.
 
-experiment:
-  name: "Eu151 Faraday vortex imaging (quasi-2D)"
-  type: ground_state
-
-  system:
-    atom: Eu151
-    grid:
-      n_points: [128, 128]
-      box_size: [16.0, 16.0]
-    quasi_2d: true
-    l_z: 0.9206
-    interactions:
-      c_total: 4689.0
-      c1_ratio: -0.01
-    ddi:
-      enabled: true
-      c_dd: 7647.0
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [128, 128], box: [16.0, 16.0]}
       quasi_2d: true
       l_z: 0.9206
+      interactions:
+        c_total: 4689.0
+        c1_ratio: -0.01
+      ddi: {enabled: true, c_dd: 7647.0, quasi_2d: true, l_z: 0.9206}
+      zeeman: {p: 0.0, q: 0.0}
+      trap: [1.0, 1.0]
+      dt: 0.001
+      n_steps: 5000
+      tol: 1.0e-8
+      initial_state: ferromagnetic
+      backend: cpu
 
-  ground_state:
-    dt: 0.001
-    n_steps: 5000
-    tol: 1.0e-8
-    initial_state: ferromagnetic
-    zeeman:
-      p: 0.0
-      q: 0.0
-    potential:
-      type: harmonic
-      omega: [1.0, 1.0]
-    backend: cpu
-
-  faraday:
-    probe_axis: 2             # propagation along y (vertical)
-    detuning: -64.0           # Δ/Γ ≈ -320MHz / 5MHz
-    polarization: linear_x
+  - analyze:
+      - faraday:
+          probe_axis: 2           # propagation along y (vertical)
+          detuning: -64.0         # Δ/Γ ≈ -320MHz / 5MHz
+          polarization: linear_x

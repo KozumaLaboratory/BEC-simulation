@@ -4,54 +4,33 @@
 # for real-time dynamics. Quasi-2D geometry with l_z = sqrt(ω_⊥/ω_z)
 # ≈ 0.9206.
 
-experiment:
-  name: "Quasi-2D Eu151 EdH dynamics"
-  type: dynamics
-
-  system:
-    atom: Eu151
-    grid:
-      n_points: [128, 128]
-      box_size: [16.0, 16.0]
-    quasi_2d: true
-    l_z: 0.9206          # sqrt(110/130)
-    interactions:
-      c_total: 4689.0
-      c1_ratio: -0.01
-    ddi:
-      enabled: false
-      c_dd: 7647.0
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [128, 128], box: [16.0, 16.0]}
       quasi_2d: true
-      l_z: 0.9206
+      l_z: 0.9206          # sqrt(110/130)
+      interactions:
+        c_total: 4689.0
+        c1_ratio: -0.01
+      ddi: {enabled: false, c_dd: 7647.0, quasi_2d: true, l_z: 0.9206}
+      zeeman: {p: 0.0, q: 0.0}
+      trap: [1.0, 1.0]
+      dt: 0.001
+      n_steps: 5000
+      tol: 1.0e-8
+      initial_state: ferromagnetic
+      backend: cpu
 
-  ground_state:
-    dt: 0.001
-    n_steps: 5000
-    tol: 1.0e-8
-    initial_state: ferromagnetic
-    zeeman:
-      p: 0.0
-      q: 0.0
-    potential:
-      type: harmonic
-      omega: [1.0, 1.0]
-    backend: cpu
-
-  perturbation:
-    temperature_ratio: 0.1    # T/T_c (η≈1.58%)
-    seed: 42
-
-  sequence:
-    - name: edh_dynamics
+  - dynamics:
       duration: 5.0
       dt: 1.0e-4
       save_every: 2500
-      override:
-        system.ddi.enabled: true
-      zeeman:
-        p: 0.0
-        q: 0.0
+      ddi: true
+      zeeman: {p: 0.0, q: 0.0}
+      temperature_ratio: 0.1     # T/T_c (η≈1.58%)
+      noise_seed: 42
 
-  observables:
-    always: [norm, magnetization]
-    on_save: [energy, populations]
+observables:
+  always: [norm, magnetization]
+  on_save: [energy, populations]

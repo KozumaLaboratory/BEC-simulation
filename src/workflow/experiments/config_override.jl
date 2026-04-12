@@ -23,19 +23,37 @@ the leaf to `value`. Mutates `d`.
 """
 function apply_override!(d::Dict, path::AbstractString, value)
     parts = split(path, '.')
-    cursor = d
+    cursor::Any = d
     for (i, part) in enumerate(parts)
         key = String(part)
         if i == length(parts)
-            cursor[key] = value
+            # Final segment: set value
+            if cursor isa AbstractVector
+                idx = parse(Int, key) + 1  # 0-based → 1-based
+                cursor[idx] = value
+            elseif cursor isa Dict
+                cursor[key] = value
+            end
             return d
         end
-        next = get(cursor, key, nothing)
-        if !(next isa Dict)
-            next = Dict{String,Any}()
-            cursor[key] = next
+        # Navigate: handle Dict keys, list indices, and single-key unwrap
+        if cursor isa AbstractVector
+            idx = parse(Int, key) + 1  # 0-based → 1-based
+            elem = cursor[idx]
+            # Auto-unwrap single-key dicts (pipeline steps like {ground_state: {...}})
+            if elem isa Dict && length(elem) == 1
+                cursor = first(values(elem))
+            else
+                cursor = elem
+            end
+        elseif cursor isa Dict
+            next = get(cursor, key, nothing)
+            if next === nothing
+                next = Dict{String,Any}()
+                cursor[key] = next
+            end
+            cursor = next
         end
-        cursor = next
     end
     d
 end

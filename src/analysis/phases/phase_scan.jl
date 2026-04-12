@@ -18,7 +18,7 @@ function _write_csv(io, values)
     row
 end
 
-# --- OverrideScan dispatch (in-memory; no JLD2, returns Vector) ---
+# --- OverrideScan dispatch (in-memory via pipeline; no JLD2, returns Vector) ---
 
 function _run_scan(
     config::UnifiedConfig{ScanExperiment{OverrideScan}},
@@ -35,52 +35,45 @@ function _run_scan(
     verbose && println("  override scan: $n_points points" *
                        (has_comparison ? " × $(length(scan.comparison_runs)) runs" : ""))
 
-    io = config.output.csv ? _open_csv(config.output.dir, "scan.csv") : nothing
-    cols = Any[:point, :run_name, :phase, :point_group, :energy,
-               :spin_order, :nematic_order, :biaxiality, :converged]
-    config.spec.stability.enabled && append!(cols, [:growth_rate, :unstable, :k_peak])
-    header = _write_csv(io, cols)
-    verbose && println(header)
-
-    chain_state = Dict{String,Any}()
     results = NamedTuple[]
 
     for (i, point_override) in enumerate(scan.points)
         runs = has_comparison ? scan.comparison_runs : [("", Dict{String,Any}())]
         for (run_name, cmp_override) in runs
             override = merge(point_override, cmp_override)
-            prev = scan.continuation ? get(chain_state, run_name, nothing) : nothing
-            r = _compute_single_point(config, override, prev, scan.auto_rotate_on_mz)
 
-            psi_for_phase = r.psi
-            info = classify_phase_detailed(
-                psi_for_phase, atom.F, grid, sm;
-                sampling = config.observables.spatial_sampling,
-            )
+            # Apply override to raw YAML, strip scan, run as pipeline or single config
+            raw = apply_overrides(config.raw_data, override)
+            raw_inner = get(raw, "experiment", raw)
+            raw_single = copy(raw_inner)
+            delete!(raw_single, "scan")
+            delete!(raw_single, "stability")
 
-            row_vals = Any[i, run_name, info.phase, info.point_group,
-                           round(r.energy; sigdigits = 8),
-                           round(info.spin_order; sigdigits = 4),
-                           round(info.nematic_order; sigdigits = 4),
-                           round(info.biaxiality; sigdigits = 4),
-                           r.converged]
-            row = _write_csv(io, row_vals)
-            verbose && println(row)
+            point_config = _parse_config(Dict("experiment" => raw_single))
+            point_result = run_config(point_config; verbose = false)
+
+            psi = if haskey(point_result, :psi)
+                point_result.psi
+            else
+                zeros(ComplexF64, 1)
+            end
+            energy = get(point_result, :ground_state_energy, NaN)
+            converged = get(point_result, :ground_state_converged, true)
+
+            info = classify_phase_detailed(psi, atom.F, grid, sm;
+                sampling = config.observables.spatial_sampling)
+
+            verbose && println("  [$i] $run_name E=$(round(energy; sigdigits=6)) phase=$(info.phase)")
 
             push!(results, (
                 index = i, run_name = run_name, override = override,
-                energy = r.energy, converged = r.converged,
-                phase_info = info, psi = r.psi,
-                mz_actual = r.mz_actual, mz_target = r.mz_target,
+                energy = energy, converged = converged,
+                phase_info = info, psi = psi,
+                mz_actual = NaN, mz_target = NaN,
             ))
-
-            if scan.continuation
-                chain_state[run_name] = (psi = r.psi, mz_actual = r.mz_actual)
-            end
         end
     end
 
-    io !== nothing && close(io)
     results
 end
 

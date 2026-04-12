@@ -5,46 +5,39 @@
 # point — the scan machinery is just used to hang the stability block
 # off an otherwise-trivial sweep.
 
-experiment:
-  name: "Eu151 stability analysis"
-  type: phase_scan
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid:
+        n: [32, 32, 32]
+        box: [12.0, 12.0, 12.0]
+      interactions:
+        N_atoms: 50000
+        omega_ref: 691.15
+        c1_ratio: -0.01
+      ddi:
+        enabled: false           # GS without DDI
+      zeeman:
+        p: 0.39
+        q: 0.0
+      trap: [1.0, 1.0, 1.1818]
+      dt: 0.001
+      n_steps: 5000
+      tol: 1.0e-8
+      initial_state: antiferromagnetic
+      backend: cpu
 
-  system:
-    atom: Eu151
-    grid:
-      n_points: [32, 32, 32]
-      box_size: [12.0, 12.0, 12.0]
-    interactions:
-      N_atoms: 50000
-      omega_ref: 691.15
-      c1_ratio: -0.01
-    ddi:
-      enabled: false           # GS without DDI
+  - analyze:
+      - stability:
+          perturbation: 1.0e-4
+          n_steps: 1000
+          sample_every: 10
 
-  ground_state:
-    dt: 0.001
-    n_steps: 5000
-    tol: 1.0e-8
-    initial_state: antiferromagnetic
-    zeeman:
-      p: 0.39
-      q: 0.0
-    potential:
-      type: harmonic
-      omega: [1.0, 1.0, 1.1818]
-    backend: cpu
+scan:
+  zip:
+    pipeline.0.ddi.enabled: [true]   # flip DDI on for the stability pass
 
-  scan:
-    zip:
-      system.ddi.enabled: [true]   # flip DDI on for the stability pass
-
-  stability:
-    enabled: true
-    perturbation: 1.0e-4
-    n_steps: 1000
-    sample_every: 10
-
-  observables:
-    always: [norm, magnetization]
-    on_save: [energy]
-    final_only: [phase_classification, structure_factor]
+observables:
+  always: [norm, magnetization]
+  on_save: [energy]
+  final_only: [phase_classification, structure_factor]

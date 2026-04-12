@@ -19,45 +19,38 @@
 #   See eu151_edh.yaml for full conversion formulae.
 # ================================================================
 
-experiment:
-  name: "Eu151 phase diagram (quasi-2D)"
-  type: phase_scan
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid:
+        n: [64, 64]
+        box: [12.0, 12.0]
+      interactions:
+        c_total: 4689.0
+        c1_ratio: 0.0
+      ddi:
+        enabled: true
+        c_dd: 7647.0
+        quasi_2d: true
+        l_z: 0.847  # a_ho_z / a_ho_perp = 1/sqrt(130/110)
+      zeeman:
+        p: 0.39
+        q: 0.0
+      trap: [1.0, 1.0]
+      dt: 0.005
+      n_steps: 5000
+      tol: 1.0e-8
+      initial_state: polar
 
-  system:
-    atom: Eu151
-    grid:
-      n_points: [64, 64]
-      box_size: [12.0, 12.0]
-    interactions:
-      c_total: 4689.0
-      c1_ratio: 0.0
-    ddi:
-      enabled: true
-      c_dd: 7647.0
-      quasi_2d: true
-      l_z: 0.847  # a_ho_z / a_ho_perp = 1/sqrt(130/110)
+scan:
+  zip:
+    pipeline.0.interactions.c1_ratio:
+      [-0.01389, -0.010914, -0.0079371, -0.0049607, -0.0019843,
+        0.00099214, 0.0039686, 0.006945, 0.0099214, 0.012898,
+        0.015874, 0.018851, 0.021827, 0.024804, 0.02778]
+  continuation: true
 
-  ground_state:
-    dt: 0.005
-    n_steps: 5000
-    tol: 1.0e-8
-    initial_state: polar
-    zeeman:
-      p: 0.39
-      q: 0.0
-    potential:
-      type: harmonic
-      omega: [1.0, 1.0]
-
-  scan:
-    zip:
-      system.interactions.c1_ratio:
-        [-0.01389, -0.010914, -0.0079371, -0.0049607, -0.0019843,
-          0.00099214, 0.0039686, 0.006945, 0.0099214, 0.012898,
-          0.015874, 0.018851, 0.021827, 0.024804, 0.02778]
-    continuation: true
-
-  observables:
-    always: [norm, magnetization]
-    on_save: [energy]
-    final_only: [phase_classification, structure_factor]
+observables:
+  always: [norm, magnetization]
+  on_save: [energy]
+  final_only: [phase_classification, structure_factor]

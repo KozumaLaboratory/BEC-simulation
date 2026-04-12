@@ -9,42 +9,31 @@
 #
 # The sinogram (angle × position) reveals the spin texture structure.
 
-experiment:
-  name: "Eu151 EdH spin tomography"
-  type: ground_state
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [64, 64, 64], box: [20.0, 20.0, 20.0]}
+      interactions:
+        N_atoms: 50000
+        omega_ref: 691.15
+        c1_ratio: 0.02778
+      ddi: {enabled: true}
+      zeeman: {p: 0.39, q: 0.0}
+      trap: [1.0, 1.0, 1.182]
+      dt: 0.0005
+      n_steps: 10000
+      tol: 1.0e-8
+      initial_state: antiferromagnetic
+      backend: cuda
 
-  system:
-    atom: Eu151
-    grid:
-      n_points: [64, 64, 64]
-      box_size: [20.0, 20.0, 20.0]
-    interactions:
-      N_atoms: 50000
-      omega_ref: 691.15
-      c1_ratio: 0.02778
-    ddi:
-      enabled: true
-
-  ground_state:
-    dt: 0.0005
-    n_steps: 10000
-    tol: 1.0e-8
-    initial_state: antiferromagnetic
-    zeeman:
-      p: 0.39
-      q: 0.0
-    potential:
-      type: harmonic
-      omega: [1.0, 1.0, 1.182]
-    backend: cuda
-
-  tomography:
-    rotation_axis: y
-    theta_min: 0.0
-    theta_max: 3.14159
-    n_angles: 19                # 0°, 10°, 20°, ..., 180°
-    reference_m: -6
-    tof:
-      t_tof: 11.0              # 16 ms in ω⁻¹ units
-      gradient: 0.5            # SG gradient strength
-      imaging_axis: 3
+  - analyze:
+      - tomography:
+          rotation_axis: y
+          theta_min: 0.0
+          theta_max: 3.14159
+          n_angles: 19            # 0°, 10°, 20°, ..., 180°
+          reference_m: -6
+          tof:
+            t_tof: 11.0          # 16 ms in ω⁻¹ units
+            gradient: 0.5        # SG gradient strength
+            imaging_axis: 3
