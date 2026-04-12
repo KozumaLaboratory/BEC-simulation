@@ -25,7 +25,7 @@ pipeline:
       n_steps: 3000
       tol: 1.0e-7
       initial_state: antiferromagnetic   # m=-F polarized
-      backend: cpu
+      backend: cuda
 
   - dynamics:
       duration: 3.0               # ω⁻¹ ≈ 4.3 ms

@@ -20,7 +20,7 @@ pipeline:
       n_steps: 5000
       tol: 1.0e-8
       initial_state: ferromagnetic
-      backend: cpu
+      backend: cuda
 
   - dynamics:
       duration: 5.0

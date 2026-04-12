@@ -25,7 +25,7 @@ pipeline:
       n_steps: 5000
       tol: 1.0e-8
       initial_state: antiferromagnetic
-      backend: cpu
+      backend: cuda
 
   - analyze:
       - stability:
