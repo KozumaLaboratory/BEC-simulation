@@ -20,7 +20,7 @@
               dt: 0.01
               n_steps: 10
               tol: 1e-4
-              trap: [1.0, 1.0]
+              potential: {type: harmonic, omega: [1.0, 1.0]}
         """
 
         config = load_config_from_string(yaml_str)
@@ -50,7 +50,7 @@
               zeeman:
                 p: 0.0
                 q: 0.0
-              trap: [1.0, 1.0]
+              potential: {type: harmonic, omega: [1.0, 1.0]}
         """
 
         config = load_config_from_string(yaml_str)

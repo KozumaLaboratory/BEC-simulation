@@ -31,7 +31,7 @@
               zeeman:
                 p: 0.0
                 q: 0.1
-              trap: [1.0]
+              potential: {type: harmonic, omega: [1.0]}
           - dynamics:
               duration: 1.0
               dt: 0.01
@@ -41,7 +41,7 @@
                   from: 0.0
                   to: 0.5
                 q: 0.0
-              trap: [1.0]
+              potential: {type: harmonic, omega: [1.0]}
           - dynamics:
               duration: 2.0
               dt: 0.01
@@ -111,7 +111,7 @@
               dt: 0.01
               n_steps: 10
               tol: 1e-4
-              trap: [1.0]
+              potential: {type: harmonic, omega: [1.0]}
         """
 
         config = load_config_from_string(yaml_str)
@@ -135,7 +135,7 @@
               dt: 0.01
               n_steps: 10
               tol: 1e-4
-              trap: [1.0]
+              potential: {type: harmonic, omega: [1.0]}
         """
 
         config = load_config_from_string(yaml_str)
@@ -159,7 +159,7 @@
               dt: 0.01
               n_steps: 10
               tol: 1e-4
-              trap: [1.0]
+              potential: {type: harmonic, omega: [1.0]}
           - dynamics:
               duration: 1.0
               dt: 0.01
@@ -168,7 +168,7 @@
               zeeman:
                 p: 0.0
                 q: 0.0
-              trap: [1.0]
+              potential: {type: harmonic, omega: [1.0]}
           - dynamics:
               duration: 1.0
               dt: 0.01
@@ -200,7 +200,7 @@
               zeeman:
                 p: 0.0
                 q: 0.1
-              trap: [1.0]
+              potential: {type: harmonic, omega: [1.0]}
           - dynamics:
               duration: 0.1
               dt: 0.001
@@ -210,7 +210,7 @@
                   from: 0.0
                   to: 0.1
                 q: 0.1
-              trap: [1.0]
+              potential: {type: harmonic, omega: [1.0]}
         """
 
         config = load_config_from_string(yaml_str)
@@ -240,7 +240,7 @@
               zeeman:
                 p: 0.0
                 q: 0.1
-              trap: [1.0]
+              potential: {type: harmonic, omega: [1.0]}
           - dynamics:
               duration: 0.1
               dt: 0.001
@@ -250,7 +250,7 @@
               zeeman:
                 p: 0.0
                 q: 0.1
-              trap: [1.0]
+              potential: {type: harmonic, omega: [1.0]}
         """
 
         config = load_config_from_string(yaml_str)

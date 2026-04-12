@@ -226,7 +226,7 @@
               dt: 0.01
               n_steps: 10
               tol: 1e-4
-              trap: [1.0]
+              potential: {type: harmonic, omega: [1.0]}
         """
         cfg = load_config_from_string(yaml)
         @test cfg isa PipelineConfig
@@ -249,7 +249,7 @@
               dt: 0.01
               n_steps: 10
               tol: 1e-4
-              trap: [1.0]
+              potential: {type: harmonic, omega: [1.0]}
         """
         cfg = load_config_from_string(yaml)
         p = cfg.steps[1].params
@@ -270,7 +270,7 @@
               dt: 0.01
               n_steps: 10
               tol: 1e-4
-              trap: [1.0]
+              potential: {type: harmonic, omega: [1.0]}
           - dynamics:
               duration: 1.0
               dt: 0.01
@@ -331,7 +331,7 @@
               zeeman:
                 p: 0.0
                 q: 0.0
-              trap: [1.0]
+              potential: {type: harmonic, omega: [1.0]}
         """
         cfg = load_config_from_string(yaml)
         p = cfg.steps[1].params

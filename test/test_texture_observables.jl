@@ -204,7 +204,7 @@ using LinearAlgebra
                   dt: 0.01
                   n_steps: 10
                   tol: 1e-4
-                  trap: [1.0]
+                  potential: {type: harmonic, omega: [1.0]}
             """
             config = load_config_from_string(yaml)
             p = config.steps[1].params
@@ -229,7 +229,7 @@ using LinearAlgebra
                   dt: 0.01
                   n_steps: 10
                   tol: 1e-4
-                  trap: [1.0]
+                  potential: {type: harmonic, omega: [1.0]}
             """
             config = load_config_from_string(yaml)
             p = config.steps[1].params

@@ -17,7 +17,7 @@
               zeeman:
                 p: 0.0
                 q: 0.1
-              trap: [1.0]
+              potential: {type: harmonic, omega: [1.0]}
         """
         cfg = load_config_from_string(yaml)
         @test cfg isa PipelineConfig
@@ -50,7 +50,7 @@
               zeeman:
                 p: 0.0
                 q: 0.1
-              trap: [1.0]
+              potential: {type: harmonic, omega: [1.0]}
           - dynamics:
               duration: 0.1
               dt: 0.01
@@ -62,7 +62,7 @@
                 q:
                   from: 0.1
                   to: -0.5
-              trap: [1.0]
+              potential: {type: harmonic, omega: [1.0]}
         """
         cfg = load_config_from_string(yaml)
         @test cfg isa PipelineConfig
@@ -89,7 +89,7 @@
               dt: 0.005
               n_steps: 100
               tol: 1.0e-8
-              trap: [1.0]
+              potential: {type: harmonic, omega: [1.0]}
         """
         cfg = load_config_from_string(yaml)
         @test cfg isa PipelineConfig
@@ -110,7 +110,7 @@
               dt: 0.01
               n_steps: 100
               tol: 1e-6
-              trap: [1.0]
+              potential: {type: harmonic, omega: [1.0]}
         scan:
           zip:
             pipeline.0.interactions.c1: [-5.0, -2.0, 0.0, 2.0, 5.0]
@@ -140,7 +140,7 @@
               dt: 0.005
               n_steps: 100
               tol: 1.0e-8
-              trap: [1.0]
+              potential: {type: harmonic, omega: [1.0]}
         """
         cfg = load_config_from_string(yaml)
         @test cfg isa PipelineConfig
@@ -194,7 +194,7 @@
               zeeman:
                 p: 0.0
                 q: 0.1
-              trap: [1.0]
+              potential: {type: harmonic, omega: [1.0]}
         """
         cfg = load_config_from_string(yaml)
         result = run_config(cfg; verbose=false)
@@ -222,7 +222,7 @@
               zeeman:
                 p: 0.0
                 q: 0.1
-              trap: [1.0]
+              potential: {type: harmonic, omega: [1.0]}
           - dynamics:
               duration: 0.05
               dt: 0.001
@@ -230,7 +230,7 @@
               zeeman:
                 p: 0.0
                 q: 0.1
-              trap: [1.0]
+              potential: {type: harmonic, omega: [1.0]}
         """
         cfg = load_config_from_string(yaml)
         result = run_config(cfg; verbose=false)
@@ -256,7 +256,7 @@
               zeeman:
                 p: 0.0
                 q: 0.1
-              trap: [1.0]
+              potential: {type: harmonic, omega: [1.0]}
           - dynamics:
               duration: 0.05
               dt: 0.001
@@ -266,7 +266,7 @@
               zeeman:
                 p: 0.0
                 q: 0.1
-              trap: [1.0]
+              potential: {type: harmonic, omega: [1.0]}
         """
         cfg = load_config_from_string(yaml)
         result = run_config(cfg; verbose=false)
@@ -287,7 +287,7 @@
               dt: 0.01
               n_steps: 100
               tol: 1e-6
-              trap: [1.0]
+              potential: {type: harmonic, omega: [1.0]}
         scan:
           zip:
             pipeline.0.interactions.c1: [-5.0, 0.0, 5.0]
@@ -322,7 +322,7 @@
               dt: 0.01
               n_steps: 100
               tol: 1e-6
-              trap: [1.0, 1.0]
+              potential: {type: harmonic, omega: [1.0, 1.0]}
         scan:
           type: constrained_jz
           target_values: [0.0, 1.0]

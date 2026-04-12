@@ -134,22 +134,15 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev; verbos
     zeeman_p = z isa Dict ? Float64(get(z, "p", 0.0)) : 0.0
     zeeman_q = z isa Dict ? Float64(get(z, "q", 0.0)) : 0.0
 
-    # Trap / potential
-    trap = get(p, "trap", nothing)
-    potential = if trap !== nothing
-        omega = trap isa Vector ? NTuple{ndim,Float64}(Float64.(trap)) :
-                                  NTuple{ndim,Float64}(ntuple(_ -> 1.0, ndim))
-        HarmonicTrap(omega)
+    # Potential (single or composite list)
+    pot_d = get(p, "potential", Dict("type" => "harmonic", "omega" => ones(ndim)))
+    potential = if pot_d isa Vector
+        components = [PotentialConfig(Symbol(get(c, "type", "harmonic")),
+            Dict{String,Any}(string(k) => v for (k, v) in c if k != "type")) for c in pot_d]
+        _build_potential(PotentialConfig(:composite, Dict{String,Any}("components" => components)), ndim)
     else
-        pot_d = get(p, "potential", Dict("type" => "harmonic", "omega" => ones(ndim)))
-        if pot_d isa Vector
-            components = [PotentialConfig(Symbol(get(c, "type", "harmonic")),
-                Dict{String,Any}(string(k) => v for (k, v) in c if k != "type")) for c in pot_d]
-            _build_potential(PotentialConfig(:composite, Dict{String,Any}("components" => components)), ndim)
-        else
-            _build_potential(PotentialConfig(Symbol(get(pot_d, "type", "harmonic")),
-                Dict{String,Any}(string(k) => v for (k, v) in pot_d if k != "type")), ndim)
-        end
+        _build_potential(PotentialConfig(Symbol(get(pot_d, "type", "harmonic")),
+            Dict{String,Any}(string(k) => v for (k, v) in pot_d if k != "type")), ndim)
     end
 
     # ITP params

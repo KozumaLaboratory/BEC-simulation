@@ -15,7 +15,7 @@ pipeline:
       zeeman:
         p: 0.0
         q: 0.0
-      trap: [0.5, 0.5]           # Weaker trap to make the BEC larger
+      potential: {type: harmonic, omega: [0.5, 0.5]}           # Weaker trap to make the BEC larger
       dt: 0.001
       n_steps: 1500              # Increase steps for larger grid
       tol: 1.0e-6

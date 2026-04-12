@@ -75,7 +75,7 @@ using FFTW
               zeeman:
                 p: 0.0
                 q: 0.0
-              trap: [1.0]
+              potential: {type: harmonic, omega: [1.0]}
         scan:
           zip:
             pipeline.0.zeeman.p: [0.0, 0.5, 1.0]
@@ -103,7 +103,7 @@ using FFTW
               dt: 0.01
               n_steps: 100
               tol: 1e-6
-              trap: [1.0]
+              potential: {type: harmonic, omega: [1.0]}
         scan:
           zip:
             pipeline.0.interactions.c1: [-5.0, -1.0, 0.0]
@@ -135,7 +135,7 @@ using FFTW
               dt: 0.01
               n_steps: 100
               tol: 1e-6
-              trap: [1.0, 1.0]
+              potential: {type: harmonic, omega: [1.0, 1.0]}
         scan:
           type: constrained_jz
           target_values: [0.0, 1.0, 2.0]
