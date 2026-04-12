@@ -316,6 +316,22 @@ function _run_analyzer(name::Symbol, psi, grid, F, params)
     elseif name == :phase_classify
         sm = spin_matrices(F)
         classify_phase_detailed(psi, F, grid, sm)
+    elseif name == :stability
+        # Stability analysis needs a workspace — build a minimal one
+        ndim = length(grid.config.n_points)
+        atom = resolve_atom(:Eu151)  # TODO: pass atom through
+        sp = SimParams(; dt = 0.0001, n_steps = 1, save_every = 1)
+        ws = make_workspace(;
+            grid, atom,
+            interactions = InteractionParams(0.0, 0.0),
+            potential = HarmonicTrap(ntuple(_ -> 1.0, ndim)),
+            sim_params = sp,
+            psi_init = psi,
+        )
+        perturbation = Float64(get(params, "perturbation", 1e-4))
+        n_steps_stab = Int(get(params, "n_steps", 1000))
+        sample_every = Int(get(params, "sample_every", 10))
+        analyze_stability(ws; perturbation, n_steps = n_steps_stab, sample_every)
     else
         @warn "Unknown analyzer: $name"
         nothing

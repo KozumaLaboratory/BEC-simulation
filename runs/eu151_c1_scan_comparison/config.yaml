@@ -13,7 +13,7 @@ pipeline:
       atom: Eu151
       grid:
         n: [64, 64, 64]
-        box: [12.0, 12.0, 12.0]
+        box: [20.0, 20.0, 20.0]
       interactions:
         N_atoms: 50000
         omega_ref: 691.15
