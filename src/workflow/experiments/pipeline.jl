@@ -88,8 +88,8 @@ Execute a pipeline sequentially. Each step receives the current psi
 and produces a new one. Analysis steps don't modify psi but accumulate
 results.
 """
-function run_pipeline(config::PipelineConfig; verbose::Bool = true)
-    psi = nothing
+function run_pipeline(config::PipelineConfig; verbose::Bool = true, psi_init = nothing)
+    psi = psi_init
     grid = nothing
     atom = nothing
     results = Dict{Symbol,Any}()

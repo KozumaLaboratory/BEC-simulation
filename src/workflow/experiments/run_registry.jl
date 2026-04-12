@@ -107,11 +107,12 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
             started_at = _now_iso()
             t_start = time()
 
-            # Continuation: inject previous psi
+            # Continuation: inject previous psi as initial condition
             prev = scan.continuation ? get(chain_state, run_name, nothing) : nothing
+            psi_prev = prev !== nothing ? prev.psi : nothing
 
             config = parse_pipeline(patched)
-            result = run_pipeline(config; verbose = false)
+            result = run_pipeline(config; verbose = false, psi_init = psi_prev)
 
             finished_at = _now_iso()
             duration = time() - t_start
