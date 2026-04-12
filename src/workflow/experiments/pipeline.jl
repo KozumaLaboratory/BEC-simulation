@@ -207,7 +207,9 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom; verbose=true)
 
     # Zeeman (supports ramp)
     z = get(p, "zeeman", Dict())
-    zeeman = _build_phase_zeeman_from_dict(z, 0.0, duration)
+    # _build_phase_zeeman expects {ground_state: {zeeman: ...}} structure
+    zeeman_wrapper = Dict{String,Any}("ground_state" => Dict{String,Any}("zeeman" => get(p, "zeeman", Dict())))
+    zeeman = _build_phase_zeeman(zeeman_wrapper, 0.0, duration)
 
     # Potential
     trap = get(p, "trap", nothing)
@@ -368,22 +370,4 @@ function _parse_gs_ddi(ddi_d, inter, atom)
     (enabled, c_dd, secular, q2d, lz)
 end
 
-function _build_phase_zeeman_from_dict(z::Dict, t_offset::Float64, duration::Float64)
-    p_spec = get(z, "p", 0.0)
-    q_spec = get(z, "q", 0.0)
-    p_ramp = _zeeman_ramp(p_spec)
-    q_ramp = _zeeman_ramp(q_spec)
-
-    if p_ramp isa ConstantValue && q_ramp isa ConstantValue
-        ZeemanParams(p_ramp.value, q_ramp.value)
-    else
-        TimeDependentZeeman(t -> begin
-            t_local = t - t_offset
-            t_frac = duration > 0 ? t_local / duration : 0.0
-            ZeemanParams(interpolate_value(p_ramp, t_frac), interpolate_value(q_ramp, t_frac))
-        end)
-    end
-end
-
-_build_phase_zeeman_from_dict(z, t_offset, duration) =
-    ZeemanParams(0.0, 0.0)
+    # _build_phase_zeeman is in experiment_runner.jl (shared with config_runner)
