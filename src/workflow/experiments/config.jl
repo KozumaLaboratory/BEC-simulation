@@ -28,11 +28,13 @@ end
 
 function load_config(path::String)
     data = YAML.load_file(path)
+    haskey(data, "pipeline") && return parse_pipeline(data)
     _parse_config(data)
 end
 
 function load_config_from_string(yaml_str::String)
     data = YAML.load(yaml_str)
+    data isa Dict && haskey(data, "pipeline") && return parse_pipeline(data)
     _parse_config(data)
 end
 

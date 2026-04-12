@@ -89,9 +89,9 @@ include("workflow/experiments/config_override.jl")  # OverrideMap + scan expansi
 include("workflow/experiments/experiment.jl")  # Defines PhaseConfig, GroundStateConfig, etc.
 include("workflow/experiments/experiment_runner.jl")
 include("workflow/experiments/config.jl")  # Uses types from experiment.jl
+include("workflow/experiments/pipeline.jl")  # Must come before config_runner (PipelineConfig)
 include("workflow/experiments/config_runner.jl")
 include("workflow/experiments/run_registry.jl")
-include("workflow/experiments/pipeline.jl")
 
 # ========================================
 # ANALYSIS: Observables & diagnostics

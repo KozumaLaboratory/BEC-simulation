@@ -11,6 +11,9 @@ function run_config(config::UnifiedConfig; verbose::Bool = true)
     _run_config(config, config.spec; verbose)
 end
 
+run_config(config::PipelineConfig; verbose::Bool = true) =
+    run_pipeline(config; verbose)
+
 # --- Ground state only ---
 
 function _run_config(config::UnifiedConfig, ::GroundStateExperiment; verbose::Bool = true)

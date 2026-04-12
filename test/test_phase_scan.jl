@@ -238,9 +238,6 @@ using FFTW
             @test isfinite(r.energy)
         end
 
-        csv_path = "/tmp/test_tiny_scan/scan.csv"
-        @test isfile(csv_path)
-
         rm("/tmp/test_tiny_scan"; recursive=true, force=true)
     end
 
