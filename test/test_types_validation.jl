@@ -72,11 +72,6 @@ using SpinorBEC
         @test ic.method == :strang
     end
 
-    @testset "ObservablesConfig validation" begin
-        @test_throws ArgumentError ObservablesConfig(Symbol[], Symbol[], Symbol[], 0.0)
-        @test_throws ArgumentError ObservablesConfig(Symbol[], Symbol[], Symbol[], 1.5)
-    end
-
     @testset "HarmonicTrap construction" begin
         t1d = HarmonicTrap(1.0)
         @test t1d.omega == (1.0,)

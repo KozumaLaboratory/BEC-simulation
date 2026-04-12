@@ -155,15 +155,6 @@ using FFTW
         @test os.continuation == false
     end
 
-    @testset "GroundStateConfig validation" begin
-        pot = PotentialConfig(:harmonic, Dict{String,Any}("omega" => [1.0]))
-        @test_throws ArgumentError GroundStateConfig(
-            -0.01, 100, 1e-6, :polar, ZeemanParams(0.0, 0.0), pot, nothing, nothing, 0.0)
-        @test_throws ArgumentError GroundStateConfig(
-            0.01, 0, 1e-6, :polar, ZeemanParams(0.0, 0.0), pot, nothing, nothing, 0.0)
-        @test_throws ArgumentError GroundStateConfig(
-            0.01, 100, -1e-6, :polar, ZeemanParams(0.0, 0.0), pot, nothing, nothing, 0.0)
-    end
 
     @testset "ConstrainedJzScan validation" begin
         @test_throws ArgumentError ConstrainedJzScan(Float64[], 0.05, 15, (-10.0, 10.0))

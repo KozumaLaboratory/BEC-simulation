@@ -150,32 +150,6 @@
         @test p["ddi"]["c_dd"] == 7647.0
     end
 
-    @testset "ObservablesConfig validation" begin
-        @test_throws ArgumentError ObservablesConfig(Symbol[], Symbol[], Symbol[], 0.0)
-        @test_throws ArgumentError ObservablesConfig(Symbol[], Symbol[], Symbol[], -0.1)
-        @test_throws ArgumentError ObservablesConfig(Symbol[], Symbol[], Symbol[], 1.5)
-        oc = ObservablesConfig()
-        @test oc.spatial_sampling == 1.0
-    end
-
-    @testset "PerturbationConfig validation" begin
-        @test_throws ArgumentError PerturbationConfig(-0.1, nothing)   # < 0
-        @test_throws ArgumentError PerturbationConfig(1.5, 42)          # > 1
-        pc = PerturbationConfig(0.1, 42)
-        @test pc.temperature_ratio == 0.1
-        @test pc.seed == 42
-    end
-
-    @testset "OutputConfig defaults" begin
-        oc = OutputConfig()
-        @test oc.dir == "results"
-        @test oc.csv == true
-        @test oc.save_psi == false
-        @test oc.checkpoint_enabled == false
-        @test oc.checkpoint_interval == 1000
-        @test oc.seed === nothing
-    end
-
     @testset "run_config - ground_state" begin
         yaml = """
         pipeline:

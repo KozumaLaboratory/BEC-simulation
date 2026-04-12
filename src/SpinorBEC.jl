@@ -88,9 +88,7 @@ include("workflow/experiments/adaptive_advice.jl")
 include("workflow/experiments/config_override.jl")  # OverrideMap + scan expansion
 include("workflow/experiments/experiment.jl")  # Defines PhaseConfig, GroundStateConfig, etc.
 include("workflow/experiments/experiment_runner.jl")
-include("workflow/experiments/config.jl")  # Uses types from experiment.jl
-include("workflow/experiments/pipeline.jl")  # Must come before config_runner (PipelineConfig)
-include("workflow/experiments/config_runner.jl")
+include("workflow/experiments/pipeline.jl")
 include("workflow/experiments/run_registry.jl")
 
 # ========================================
@@ -267,19 +265,13 @@ export SimulationCallbacks, LiveMonitor
 # I/O
 export save_state, load_state
 
-# Pipeline (primary API)
+# Pipeline API
 export parse_pipeline, run_pipeline, PipelineConfig
+export load_config, load_config_from_string, run_config
 export run_yaml, run_status, list_runs, compute_run_dir
 export apply_override!, apply_overrides, expand_scan_points, parse_override_map
-export OverrideScan
-
-# Backward compat (old experiment: format — tests only)
-export load_config, load_config_from_string, run_config
-export UnifiedConfig, GroundStateExperiment, DynamicsExperiment, ScanExperiment
-export PotentialConfig, PhaseConfig, GroundStateConfig, DDIConfig, SystemConfig
-export ScanStabilityConfig, ConstrainedJzScan, AbstractScanSpec, AbstractExperimentSpec
-export PerturbationConfig, OutputConfig, ObservablesConfig
-export ConstantValue, LinearRamp, RampOrConstant, interpolate_value
+export OverrideScan, ConstrainedJzScan, ScanStabilityConfig
+export PotentialConfig, ConstantValue, LinearRamp, interpolate_value
 
 # Units
 export Units

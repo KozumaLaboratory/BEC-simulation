@@ -314,29 +314,6 @@
         @test sum(abs2, psi[:, 3]) > 0
     end
 
-    @testset "GroundStateConfig enable_ddi default" begin
-        yaml = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid:
-                n: 64
-                box: 20.0
-              interactions:
-                c0: 1.0
-                c1: 0.0
-              dt: 0.01
-              n_steps: 100
-              tol: 1.0e-8
-              zeeman:
-                p: 0.0
-                q: 0.0
-              potential: {type: harmonic, omega: [1.0]}
-        """
-        cfg = load_config_from_string(yaml)
-        p = cfg.steps[1].params
-        @test !haskey(p, "enable_ddi")
-    end
 
     @testset "2D loss step" begin
         config = GridConfig((32, 32), (10.0, 10.0))

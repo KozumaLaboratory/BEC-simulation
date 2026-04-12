@@ -464,27 +464,6 @@ end
 
 IntegratorConfig() = IntegratorConfig(:strang, nothing)
 
-struct ObservablesConfig
-    always::Vector{Symbol}
-    on_save::Vector{Symbol}
-    final_only::Vector{Symbol}
-    spatial_sampling::Float64
-
-    function ObservablesConfig(
-        always::Vector{Symbol},
-        on_save::Vector{Symbol},
-        final_only::Vector{Symbol},
-        spatial_sampling::Float64,
-    )
-        0.0 < spatial_sampling <= 1.0 || throw(
-            ArgumentError("spatial_sampling must be in (0, 1], got $spatial_sampling"),
-        )
-        new(always, on_save, final_only, spatial_sampling)
-    end
-end
-
-ObservablesConfig() = ObservablesConfig([:norm, :magnetization], [:energy], Symbol[], 1.0)
-
 struct TOFParams
     t_tof::Float64
     gradient::Float64
@@ -675,30 +654,3 @@ struct Workspace{N,A,P,IP,SM<:SpinMatrices,ZEE,DDI,DDIB,RAM,LOSS,DDIP,BK,TC,CC,K
     lhy::LHY
 end
 
-# --- Unified Config (base types) ---
-
-abstract type AbstractExperimentSpec end
-
-struct GroundStateExperiment <: AbstractExperimentSpec end
-
-struct PerturbationConfig
-    temperature_ratio::Float64   # T/T_c, Bose-Einstein distributed thermal noise
-    seed::Union{Nothing,Int}
-
-    function PerturbationConfig(temperature_ratio::Float64, seed::Union{Nothing,Int})
-        0 < temperature_ratio < 1 ||
-            throw(ArgumentError("temperature_ratio must be in (0, 1), got $temperature_ratio"))
-        new(temperature_ratio, seed)
-    end
-end
-
-struct OutputConfig
-    dir::String
-    csv::Bool
-    save_psi::Bool
-    checkpoint_enabled::Bool
-    checkpoint_interval::Int
-    seed::Union{Nothing,Int}
-end
-
-OutputConfig() = OutputConfig("results", true, false, false, 1000, nothing)
