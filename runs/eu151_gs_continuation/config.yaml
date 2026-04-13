@@ -1,7 +1,8 @@
-# Eu151 ground state: adaptive c_dd ramp (0 → 7647)
+# Eu151 ground state: discrete c_dd continuation (0 → 7647)
 #
-# DDI strength is advanced only when ITP has converged (dE < threshold).
-# This naturally adapts: fast ramp when DDI is weak, slow when strong.
+# Ramp DDI strength in 20 steps, using each converged state as
+# initial condition for the next. Finer steps than before (8 → 20)
+# with fewer ITP iterations per step (warm start from previous).
 
 pipeline:
   - ground_state:
@@ -15,16 +16,16 @@ pipeline:
         c1_ratio: -0.01
       ddi:
         enabled: true
-        c_dd:
-          from: 0
-          to: 7647
-          adaptive: true
-          step: 200          # advance by 200 per convergence event (~38 steps total)
-          threshold: 0.01    # dE threshold to advance
+        c_dd: 0.0
       zeeman: {p: 0.39, q: 0.0}
       potential: {type: harmonic, omega: [1.0, 1.0, 1.1818]}
       dt: 0.0005
-      n_steps: 500000
-      tol: 1.0e-8
+      n_steps: 20000
+      tol: 1.0e-6
       initial_state: antiferromagnetic
       backend: cuda
+
+scan:
+  zip:
+    pipeline.0.ddi.c_dd: {from: 0, to: 7647, n: 20}
+  continuation: true
