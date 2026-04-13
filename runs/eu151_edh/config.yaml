@@ -43,6 +43,7 @@
 pipeline:
   # Fully polarized ground state at high field
   - ground_state:
+      cache: runs/shared/eu151_gs_p100_ferromagnetic_64.jld2
       atom: Eu151
       grid: {n: [64, 64, 64], box: [20.0, 20.0, 20.0]}
       interactions:

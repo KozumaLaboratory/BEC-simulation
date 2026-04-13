@@ -79,6 +79,21 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
     p = step.params
     atom = resolve_atom(Symbol(p["atom"]))
     grid, ndim = _setup_grid_from_params(p)
+
+    # Cache: skip GS computation if cache file exists
+    cache_path = get(p, "cache", nothing)
+    if cache_path !== nothing && isfile(cache_path)
+        verbose && println("  Loading cached GS from $cache_path")
+        d = JLD2.load(cache_path)
+        psi_out = d["psi"]
+        energy = get(d, "energy", NaN)
+        converged = get(d, "converged", true)
+        step_result = Dict{Symbol,Any}(
+            :ground_state_energy => energy,
+            :ground_state_converged => converged,
+        )
+        return (psi_out, grid, atom, nothing, step_result)
+    end
     interactions = _parse_gs_interactions(get(p, "interactions", Dict()), atom)
     enable_ddi, c_dd_val, secular, q2d, lz = _parse_gs_ddi(get(p, "ddi", Dict()), get(p, "interactions", Dict()), atom)
     potential = _parse_and_build_potential(
@@ -163,6 +178,25 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
 
     psi_out = copy(gs.workspace.state.psi)
     verbose && _print_gs_summary(psi_out, grid, atom, gs)
+
+    # Save to cache if specified
+    if cache_path !== nothing
+        mkpath(dirname(cache_path))
+        psi_host = _to_host(psi_out)
+        tmp = cache_path * ".tmp"
+        try
+            jldopen(tmp, "w") do f
+                f["psi"] = psi_host
+                f["energy"] = gs.energy
+                f["converged"] = gs.converged
+            end
+            mv(tmp, cache_path; force = true)
+            verbose && println("  Cached GS to $cache_path")
+        catch err
+            isfile(tmp) && rm(tmp; force = true)
+            @warn "Failed to save GS cache: $err"
+        end
+    end
 
     step_result = Dict{Symbol,Any}(
         :ground_state_energy => gs.energy,
