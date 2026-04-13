@@ -624,7 +624,11 @@ function renderDensity(data) {
     const totalMax = Math.max(...data.total_density);
     const entries = [{label: 'Total', data: data.total_density}];
     for (let mi = 0; mi < D; mi++) {
-        entries.push({label: `m=${mVals[mi]}`, data: data.densities[mi]});
+        const maxVal = Math.max(...data.densities[mi]);
+        // Show if peak density is at least 0.1% of total peak
+        if (maxVal > totalMax * 1e-3) {
+            entries.push({label: `m=${mVals[mi]}`, data: data.densities[mi]});
+        }
     }
 
     // Grid layout: up to 4 columns
