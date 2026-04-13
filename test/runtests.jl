@@ -63,4 +63,6 @@ using SpinorBEC
     include("test_lhy_2d.jl")
     include("test_bogoliubov_enhanced.jl")
     include("test_spinor_lhy.jl")
+    include("test_pipeline.jl")
+    include("test_pause_resume.jl")
 end

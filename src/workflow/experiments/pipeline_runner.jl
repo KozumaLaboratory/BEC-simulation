@@ -1,38 +1,4 @@
-# --- Pipeline-based experiment config ---
-#
-# An experiment is an ordered list of steps. Each step transforms state
-# (typically psi). Steps are typed by their single YAML key:
-#
-#   pipeline:
-#     - ground_state: {atom: Eu151, ...}
-#     - dynamics: {duration: 3.0, ...}
-#     - analyze: [{tomography: {...}}, {faraday: {...}}]
-#
-# scan: is orthogonal — overrides paths like `pipeline.1.zeeman.p`.
-
-# --- Step types ---
-
-struct GroundStateStep
-    params::Dict{String,Any}    # raw YAML dict for this step
-end
-
-struct DynamicsStep
-    params::Dict{String,Any}
-end
-
-struct AnalyzeStep
-    analyzers::Vector{Pair{Symbol,Dict{String,Any}}}
-end
-
-const PipelineStep = Union{GroundStateStep, DynamicsStep, AnalyzeStep}
-
-struct PipelineConfig
-    steps::Vector{PipelineStep}
-    scan::Union{Nothing,AbstractScanSpec}
-    raw_data::Dict                   # full YAML dict for override re-parse
-end
-
-# --- Parser ---
+# --- Pipeline parser & runner ---
 
 function parse_pipeline(data::Dict)
     pipe_data = data["pipeline"]
@@ -81,10 +47,8 @@ function _parse_step(d::Dict)
     end
 end
 
-# --- Runner ---
-
 """
-    run_pipeline(config::PipelineConfig; verbose=true) → NamedTuple
+    run_pipeline(config::PipelineConfig; verbose=true) -> NamedTuple
 
 Execute a pipeline sequentially. Each step receives the current psi
 and produces a new one. Analysis steps don't modify psi but accumulate
@@ -94,7 +58,7 @@ function run_pipeline(config::PipelineConfig; verbose::Bool = true, psi_init = n
     psi = psi_init
     grid = nothing
     atom = nothing
-    workspace = nothing   # last workspace (carries interactions/ddi/potential)
+    workspace = nothing
     results = Dict{Symbol,Any}()
 
     for (i, step) in enumerate(config.steps)
@@ -130,13 +94,21 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
     temp_ratio = _get_optional_float(p, "temperature_ratio")
 
     psi_init = psi_prev
+    if psi_init !== nothing
+        D = 2 * atom.F + 1
+        expected = (grid.config.n_points..., D)
+        if size(psi_init) != expected
+            throw(ArgumentError(
+                "psi_init size $(size(psi_init)) does not match grid+atom: expected $expected. " *
+                "Grid or atom changed between continuation points? Delete stale cached results and re-run."))
+        end
+    end
     if psi_init === nothing && temp_ratio !== nothing
         psi_base = init_psi(grid, SpinSystem(atom.F); state = initial_state)
         psi_init = add_thermal_noise(psi_base, atom.F;
             T_over_Tc = temp_ratio, seed = Int(get(p, "noise_seed", 42)))
     end
 
-    # Build on_step callback for any ramping parameters (c_dd, etc.)
     ramp_callbacks = Function[]
     ddi_d_raw = get(p, "ddi", Dict())
     if ddi_d_raw isa Dict && get(ddi_d_raw, "c_dd", nothing) isa Dict
@@ -144,7 +116,7 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
         push!(ramp_callbacks, (ws, step, ns) -> begin
             ws.ddi !== nothing && (ws.ddi.C_dd = c_dd_interp(step / ns))
         end)
-        c_dd_val = c_dd_interp(0.0)  # initial value for workspace creation
+        c_dd_val = c_dd_interp(0.0)
     end
 
     on_step = isempty(ramp_callbacks) ? nothing :
@@ -180,14 +152,12 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
     dt = Float64(p["dt"])
     save_every = Int(get(p, "save_every", max(1, round(Int, duration / dt / 20))))
 
-    # Inherit from previous workspace (GS step) as defaults
     prev_interactions = ws_prev !== nothing ? ws_prev.interactions : InteractionParams(0.0, 0.0)
     prev_potential = ws_prev !== nothing ? ws_prev.potential : HarmonicTrap(ntuple(_ -> 1.0, ndim))
     prev_ddi = ws_prev !== nothing ? ws_prev.ddi : nothing
     prev_c_dd = prev_ddi !== nothing ? prev_ddi.C_dd : NaN
     prev_enable_ddi = prev_ddi !== nothing
 
-    # DDI: explicit in dynamics step overrides inherited
     ddi_raw = get(p, "ddi", nothing)
     enable_ddi = if ddi_raw === nothing
         prev_enable_ddi
@@ -204,15 +174,12 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
         prev_c_dd
     end
 
-    # Zeeman (supports ramp)
     zeeman_wrapper = Dict{String,Any}("ground_state" => Dict{String,Any}("zeeman" => get(p, "zeeman", Dict())))
     zeeman = _build_phase_zeeman(zeeman_wrapper, 0.0, duration)
 
-    # Potential: explicit overrides inherited
     pot_d = get(p, "potential", nothing)
     potential = pot_d !== nothing ? _parse_and_build_potential(pot_d, ndim) : prev_potential
 
-    # Noise
     temp_ratio = let v = get(p, "temperature_ratio", nothing)
         v === nothing ? nothing : Float64(v)
     end
@@ -220,7 +187,6 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
     n_steps = round(Int, duration / dt)
     sp = SimParams(; dt, n_steps, save_every)
 
-    # Interactions: explicit overrides inherited
     inter = get(p, "interactions", nothing)
     interactions = inter !== nothing ? _parse_gs_interactions(inter, atom) : prev_interactions
 
@@ -251,7 +217,6 @@ end
 
 function _run_step(step::AnalyzeStep, psi, grid, atom, ws_prev; verbose=true)
     psi !== nothing || throw(ArgumentError("analyze step requires psi from preceding steps"))
-    F = atom.F
     results = Dict{Symbol,Any}()
 
     for (name, params) in step.analyzers
@@ -263,73 +228,3 @@ function _run_step(step::AnalyzeStep, psi, grid, atom, ws_prev; verbose=true)
 
     (psi, grid, atom, ws_prev, results)
 end
-
-# --- Analyzer dispatch ---
-
-function _run_analyzer(name::Symbol, psi, grid, atom, params)
-    F = atom.F
-    if name == :tomography
-        spin_tomography(psi, grid, F;
-            rotation_axis = Symbol(get(params, "axis", "y")),
-            n_angles = Int(get(params, "n_angles", 19)),
-            theta_min = Float64(get(params, "theta_min", 0.0)),
-            theta_max = Float64(get(params, "theta_max", Float64(π))),
-            reference_m = let v = get(params, "reference_m", nothing); v === nothing ? nothing : Int(v) end,
-            tof_params = let td = get(params, "tof", Dict())
-                TOFParams(Float64(get(td, "t_tof", 11.0)),
-                         Float64(get(td, "gradient", 0.0)),
-                         Int(get(td, "imaging_axis", 3)))
-            end,
-        )
-    elseif name == :faraday
-        faraday_image(psi, grid, F;
-            params = FaradayParams(;
-                probe_axis = Int(get(params, "probe_axis", get(params, "axis", 3))),
-                detuning = Float64(get(params, "detuning", -64.0)),
-                polarization = Symbol(get(params, "polarization", "linear_x")),
-            ),
-        )
-    elseif name == :energy_decomposition
-        # Need workspace — use last one from results
-        # For now, compute from psi directly
-        sm = spin_matrices(F)
-        ndim = length(grid.config.n_points)
-        classify_phase_detailed(psi, F, grid, sm)
-    elseif name == :phase_classify
-        sm = spin_matrices(F)
-        classify_phase_detailed(psi, F, grid, sm)
-    elseif name == :stability
-        ndim = length(grid.config.n_points)
-        sp = SimParams(; dt = 0.0001, n_steps = 1, save_every = 1)
-        ws = make_workspace(;
-            grid, atom,
-            interactions = InteractionParams(0.0, 0.0),
-            potential = HarmonicTrap(ntuple(_ -> 1.0, ndim)),
-            sim_params = sp,
-            psi_init = psi,
-        )
-        perturbation = Float64(get(params, "perturbation", 1e-4))
-        n_steps_stab = Int(get(params, "n_steps", 1000))
-        sample_every = Int(get(params, "sample_every", 10))
-        analyze_stability(ws; perturbation, n_steps = n_steps_stab, sample_every)
-    else
-        throw(ArgumentError("Unknown analyzer: $name. Supported: tomography, faraday, energy_decomposition, phase_classify, stability"))
-    end
-end
-
-# --- Public API ---
-
-"""Load a YAML file and return a PipelineConfig."""
-function load_config(path::String)
-    data = YAML.load_file(path)
-    parse_pipeline(data)
-end
-
-"""Load a YAML string and return a PipelineConfig."""
-function load_config_from_string(yaml_str::String)
-    data = YAML.load(yaml_str)
-    parse_pipeline(data)
-end
-
-"""Run a pipeline config (alias for run_pipeline)."""
-run_config(config::PipelineConfig; verbose::Bool = true) = run_pipeline(config; verbose)

@@ -90,7 +90,16 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
     has_comparison = !isempty(scan.comparison_runs)
     chain_state = Dict{String,Any}()  # run_name → (psi, mz_actual)
 
+    pause_file = joinpath(run_dir, ".pause")
+
     for (i, point_override) in enumerate(scan.points)
+        # Check for pause signal
+        if isfile(pause_file)
+            verbose && println("  Paused: detected $pause_file ($(i-1)/$(length(scan.points)) points completed)")
+            verbose && println("  Remove .pause file and re-run to continue.")
+            return
+        end
+
         runs = has_comparison ? scan.comparison_runs : [("", Dict{String,Any}())]
         for (run_name, cmp_override) in runs
             psi_file = joinpath(run_dir, _point_filename(i, run_name))
@@ -119,22 +128,9 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
             prev = scan.continuation ? get(chain_state, run_name, nothing) : nothing
             psi_prev = prev !== nothing ? prev.psi : nothing
 
-            # Auto-rotate: if target_magnetization changed, rotate psi so the
-            # constraint can redistribute populations from the previous state.
             if psi_prev !== nothing && scan.auto_rotate_on_mz
-                gs_params = let pipe = get(patched, "pipeline", [])
-                    isempty(pipe) ? Dict() : first(values(pipe[1]))
-                end
-                target_mz = get(gs_params, "target_magnetization", nothing)
-                if target_mz !== nothing && prev !== nothing && !isnan(prev.mz_actual)
-                    F_atom = gs_params isa Dict ? resolve_atom(Symbol(get(gs_params, "atom", "Eu151"))).F : 6
-                    α_target = acos(clamp(-Float64(target_mz) / F_atom, -1.0, 1.0))
-                    α_prev = acos(clamp(-prev.mz_actual / F_atom, -1.0, 1.0))
-                    Δα = α_target - α_prev
-                    if abs(Δα) > 1e-12
-                        psi_prev = rotate_quantization_axis(psi_prev, F_atom, 0.0, Δα)
-                    end
-                end
+                prev_mz = prev !== nothing ? prev.mz_actual : NaN
+                psi_prev = auto_rotate_psi(psi_prev, patched, prev_mz)
             end
 
             config = parse_pipeline(patched)

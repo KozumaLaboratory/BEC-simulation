@@ -74,6 +74,7 @@ include("workflow/initialization/thermal_noise.jl")
 # 8. I/O
 include("workflow/io/io.jl")
 include("workflow/io/unitful_support.jl")
+include("workflow/io/dashboard.jl")
 
 # 9. Monitoring system (needed by solvers)
 include("workflow/monitoring/ascii_plot.jl")
@@ -86,8 +87,15 @@ include("workflow/monitoring/live_monitor.jl")
 # 10. Experiments (defines config types needed by phases)
 include("workflow/experiments/adaptive_advice.jl")
 include("workflow/experiments/config_override.jl")  # OverrideMap + scan expansion
-include("workflow/experiments/helpers.jl")  # Shared: PotentialConfig, _build_potential, _build_phase_zeeman, scan parsers
-include("workflow/experiments/pipeline.jl")
+include("workflow/experiments/helpers_types.jl")
+include("workflow/experiments/helpers_utils.jl")
+include("workflow/experiments/helpers_parsers.jl")
+include("workflow/experiments/helpers_builders.jl")
+include("workflow/experiments/pipeline_types.jl")
+include("workflow/experiments/pipeline_analyzers.jl")
+include("workflow/experiments/pipeline_runner.jl")
+include("workflow/experiments/pipeline_api.jl")
+include("workflow/experiments/pipeline_continuation.jl")
 include("workflow/experiments/run_registry.jl")
 
 # ========================================
@@ -253,6 +261,7 @@ export instability_angular_map
 # Simulation
 export find_ground_state, find_ground_state_multistart, scan_continuation,
     scan_continuation_bidirectional
+export resume_ground_state, refine_ground_state, load_itp_checkpoint, ITPCheckpoint
 export scan_phase_diagram_2d
 export find_phase_boundary
 export run_simulation!, run_simulation_checkpointed!
@@ -262,7 +271,7 @@ export run_simulation_adaptive!, run_simulation_yoshida!, make_workspace, init_p
 export SimulationCallbacks, LiveMonitor
 
 # I/O
-export save_state, load_state
+export save_state, load_state, generate_dashboard_data, export_dashboard
 
 # Pipeline API
 export parse_pipeline, run_pipeline, PipelineConfig
