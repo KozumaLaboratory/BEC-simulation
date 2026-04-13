@@ -20,7 +20,6 @@ pipeline:
       zeeman: {p: 0.0, q: 0.0}
       potential: {type: harmonic, omega: [1.0, 1.0]}
       dt: 0.001
-      n_steps: 5000
       tol: 1.0e-8
       initial_state: ferromagnetic
       backend: cuda

@@ -26,7 +26,6 @@ experiment:
 
   ground_state:
     dt: 0.001
-    n_steps: 5000
     tol: 1.0e-8
     initial_state: ferromagnetic
     zeeman:

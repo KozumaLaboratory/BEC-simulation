@@ -22,7 +22,6 @@ pipeline:
       zeeman: {p: 0.39, q: 0.0}   # B = 2.6 nT dimensionless
       potential: {type: harmonic, omega: [1.0, 1.0, 1.1818]}    # 130/110
       dt: 0.001
-      n_steps: 3000
       tol: 1.0e-7
       initial_state: antiferromagnetic   # m=-F polarized
       backend: cuda
