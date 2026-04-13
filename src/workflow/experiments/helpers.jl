@@ -325,3 +325,30 @@ function _print_gs_summary(psi, grid, atom, gs)
     mz = sum((F - (c-1)) * pops[c] for c in 1:D)
     println("  E=$(round(gs.energy; sigdigits=6)) conv=$(gs.converged) Mz=$(round(mz; digits=2)) [$pop_str]")
 end
+
+"""
+Parse zeeman from pipeline params. Supports:
+  - {p: 0.5, q: 0.0}           → constant ZeemanParams
+  - {p: {from: 100, to: 0}}    → TimeDependentZeeman ramp over `duration`
+"""
+function _parse_zeeman(z, duration::Float64)
+    z isa Dict || return ZeemanParams(0.0, 0.0)
+    p_spec = get(z, "p", 0.0)
+    q_spec = get(z, "q", 0.0)
+
+    p_is_ramp = p_spec isa Dict
+    q_is_ramp = q_spec isa Dict
+
+    if !p_is_ramp && !q_is_ramp
+        return ZeemanParams(_zeeman_scalar(p_spec), _zeeman_scalar(q_spec))
+    end
+
+    # At least one is a ramp → TimeDependentZeeman
+    p_ramp = _parse_ramp_or_constant(p_spec)
+    q_ramp = _parse_ramp_or_constant(q_spec)
+
+    TimeDependentZeeman(t -> begin
+        t_frac = duration > 0 ? clamp(t / duration, 0.0, 1.0) : 0.0
+        ZeemanParams(interpolate_value(p_ramp, t_frac), interpolate_value(q_ramp, t_frac))
+    end)
+end

@@ -116,14 +116,15 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
     grid, ndim = _setup_grid_from_params(p)
     interactions = _parse_gs_interactions(get(p, "interactions", Dict()), atom)
     enable_ddi, c_dd_val, secular, q2d, lz = _parse_gs_ddi(get(p, "ddi", Dict()), get(p, "interactions", Dict()), atom)
-    zeeman = _parse_constant_zeeman(get(p, "zeeman", Dict()))
     potential = _parse_and_build_potential(
         get(p, "potential", Dict("type" => "harmonic", "omega" => ones(ndim))), ndim)
     backend = _resolve_backend(Symbol(get(p, "backend", "cpu")))
 
     dt = Float64(get(p, "dt", 0.001))
-    n_steps = Int(get(p, "n_steps", 5000))
     tol = Float64(get(p, "tol", 1e-8))
+    n_steps = Int(get(p, "n_steps", 100000))
+    duration = dt * n_steps
+    zeeman = _parse_zeeman(get(p, "zeeman", Dict()), duration)
     initial_state = Symbol(get(p, "initial_state", "polar"))
     target_mz = _get_optional_float(p, "target_magnetization")
     temp_ratio = _get_optional_float(p, "temperature_ratio")

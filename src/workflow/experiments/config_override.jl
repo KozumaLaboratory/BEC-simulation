@@ -115,10 +115,47 @@ function expand_scan_points(scan_dict::Dict)
     end
 end
 
+"""
+    _expand_values(spec) → Vector
+
+Expand a scan axis value specification into a concrete list of values.
+
+Supported forms:
+  [1.0, 2.0, 3.0]                        # explicit list
+  {from: 0, to: 1, n: 11}                # linspace
+  {from: 100, to: 0.1, n: 7, scale: log} # logspace
+  {from: 0, to: 10, step: 0.5}           # range with step size
+"""
+function _expand_values(spec)
+    spec isa AbstractVector && return collect(spec)
+    spec isa Dict || throw(ArgumentError("Scan values must be a list or {from, to, ...} dict"))
+
+    from = Float64(spec["from"])
+    to = Float64(spec["to"])
+
+    if haskey(spec, "step")
+        step = Float64(spec["step"])
+        return collect(from:step:to)
+    end
+
+    n = Int(get(spec, "n", 11))
+    n >= 2 || throw(ArgumentError("scan n must be >= 2"))
+    scale = Symbol(get(spec, "scale", "linear"))
+
+    if scale == :linear
+        return collect(range(from, to; length = n))
+    elseif scale == :log
+        from > 0 && to > 0 || throw(ArgumentError("log scale requires positive from/to"))
+        return [exp(v) for v in range(log(from), log(to); length = n)]
+    else
+        throw(ArgumentError("Unknown scale: $scale. Supported: linear, log"))
+    end
+end
+
 function _expand_zip(d::Dict)
     isempty(d) && return [OverrideMap()]
     paths = collect(keys(d))
-    cols = [collect(d[p]) for p in paths]
+    cols = [_expand_values(d[p]) for p in paths]
     lens = length.(cols)
     all(==(lens[1]), lens) || throw(ArgumentError(
         "scan.zip: all axes must have the same length, got $lens for paths $paths",
@@ -130,7 +167,7 @@ end
 function _expand_product(d::Dict)
     isempty(d) && return [OverrideMap()]
     paths = collect(keys(d))
-    cols = [collect(d[p]) for p in paths]
+    cols = [_expand_values(d[p]) for p in paths]
     points = OverrideMap[]
     _product_recurse!(points, paths, cols, 1, OverrideMap())
     points
