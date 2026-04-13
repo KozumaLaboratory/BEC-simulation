@@ -9,6 +9,7 @@
 
 pipeline:
   - ground_state:
+      cache: runs/shared/eu151_128x2_box16_c1r-0.01_ddi7647_q2d_lz0.9206_fm.jld2
       atom: Eu151
       grid: {n: [128, 128], box: [16.0, 16.0]}
       interactions:

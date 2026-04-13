@@ -8,6 +8,7 @@
 
 pipeline:
   - ground_state:
+      cache: runs/shared/eu151_64x3_box12_c1r0.0_ddi7647_lhy1135_fl.jld2
       atom: Eu151
       grid:
         n: [64, 64, 64]

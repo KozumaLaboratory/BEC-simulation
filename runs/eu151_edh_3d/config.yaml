@@ -12,6 +12,7 @@
 
 pipeline:
   - ground_state:
+      cache: runs/shared/eu151_64x3_box20_c1r-0.01_noddi_p0.39_afm.jld2
       atom: Eu151
       grid: {n: [64, 64, 64], box: [20.0, 20.0, 20.0]}
       interactions:
