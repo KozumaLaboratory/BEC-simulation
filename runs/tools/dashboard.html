@@ -77,6 +77,16 @@
     </label>
 </div>
 
+<div id="loading-bar" style="display:none; margin-bottom:1rem;">
+    <div style="display:flex; align-items:center; gap:0.8rem;">
+        <span id="loading-text" style="color:#8b949e; font-size:0.85rem;">Loading...</span>
+        <div style="flex:1; height:6px; background:#21262d; border-radius:3px; overflow:hidden;">
+            <div id="loading-fill" style="height:100%; background:#00d9ff; border-radius:3px; width:0%; transition:width 0.3s;"></div>
+        </div>
+        <span id="loading-pct" style="color:#00d9ff; font-size:0.85rem; min-width:3em; text-align:right;">0%</span>
+    </div>
+</div>
+
 <div id="warning-box" class="warning" style="display:none"></div>
 
 <div class="stats-row" id="stats-row"></div>
@@ -122,20 +132,47 @@ const COLORS = ['#00d9ff','#a277ff','#ffd580','#ff6b9d','#50fa7b','#ff8fab','#80
 
 let DATA = null;
 
+// --- Loading bar ---
+const loadingBar = document.getElementById('loading-bar');
+const loadingFill = document.getElementById('loading-fill');
+const loadingPct = document.getElementById('loading-pct');
+const loadingText = document.getElementById('loading-text');
+
+function showLoading(label) {
+    loadingText.textContent = label;
+    loadingFill.style.width = '0%';
+    loadingPct.textContent = '0%';
+    loadingBar.style.display = '';
+}
+function setLoading(pct, label) {
+    const p = Math.round(Math.min(100, Math.max(0, pct)));
+    loadingFill.style.width = p + '%';
+    loadingPct.textContent = p + '%';
+    if (label) loadingText.textContent = label;
+}
+function hideLoading() {
+    loadingBar.style.display = 'none';
+}
+
 // --- Data loading (server mode) ---
 const runDirSel = document.getElementById('run-dir-select');
 
 function loadRunList() {
+    showLoading('Loading run list...');
+    setLoading(10);
     fetch('/api/runs').then(r => r.json()).then(runs => {
+        setLoading(50, 'Loading run list...');
         runDirSel.innerHTML = '';
         for (const name of runs) {
             const opt = document.createElement('option');
             opt.value = name; opt.textContent = name;
             runDirSel.appendChild(opt);
         }
+        setLoading(100);
         if (runs.length > 0) loadRun(runs[0]);
+        else hideLoading();
     }).catch(() => {
-        // Fallback: not in server mode, try embedded or file
+        hideLoading();
         runDirSel.style.display = 'none';
         if (typeof EMBEDDED_DATA !== 'undefined') {
             DATA = EMBEDDED_DATA;
@@ -145,10 +182,18 @@ function loadRunList() {
 }
 
 function loadRun(name) {
+    showLoading(`Loading ${name}...`);
+    setLoading(20, `Loading ${name}...`);
     fetch(`/api/data/${name}`).then(r => r.json()).then(d => {
+        setLoading(80, 'Rendering...');
         DATA = d;
         render();
-    }).catch(e => console.error('Failed to load run:', e));
+        setLoading(100);
+        setTimeout(hideLoading, 400);
+    }).catch(e => {
+        hideLoading();
+        console.error('Failed to load run:', e);
+    });
 }
 
 runDirSel.addEventListener('change', () => loadRun(runDirSel.value));
@@ -430,11 +475,21 @@ function loadDensity() {
     const run = runDirSel.value;
     const axis = axisSel.value;
     if (!file || !run) return;
-    densityStatus.textContent = 'Loading...';
+    showLoading('Loading density...');
+    setLoading(30, `Loading density: ${file}`);
+    densityStatus.textContent = '';
     fetch(`/api/density/${encodeURIComponent(run)}/${encodeURIComponent(file)}?axis=${axis}`)
         .then(r => r.json())
-        .then(renderDensity)
-        .catch(e => { densityStatus.textContent = 'Error: ' + e.message; });
+        .then(d => {
+            setLoading(70, 'Rendering density...');
+            renderDensity(d);
+            setLoading(100);
+            setTimeout(hideLoading, 400);
+        })
+        .catch(e => {
+            hideLoading();
+            densityStatus.textContent = 'Error: ' + e.message;
+        });
 }
 
 function renderDensity(data) {
