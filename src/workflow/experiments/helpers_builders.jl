@@ -79,6 +79,14 @@ end
 """
 Build an interpolation function from a ramp spec.
 Scalar -> constant. Dict {from, to, scale?} -> scaled interpolation.
+
+Scale controls the t-mapping g(t): result = from + (to - from) * g(t)
+- linear:      g(t) = t                          (uniform)
+- log:         g(t) = log(1 + (e-1)*t)           (dense at start)
+- sqrt:        g(t) = sqrt(t)                     (dense at start)
+- cosine:      g(t) = (1 - cos(πt)) / 2          (S-curve: dense at both ends)
+- exponential: g(t) = 1 - exp(-k*t) / (1-exp(-k)) (dense at start, k=5)
+- reverse_sqrt: g(t) = t^2                        (dense at end)
 """
 function _make_interpolator(spec)
     spec isa Dict || return _ -> Float64(spec)
@@ -90,24 +98,21 @@ function _make_interpolator(spec)
     if scale == :linear
         return t -> from + (to - from) * t
     elseif scale == :log
-        from > 0 && to > 0 || throw(ArgumentError("log ramp requires positive from/to"))
-        log_from = log(from)
-        log_to = log(to)
-        return t -> exp(log_from + (log_to - log_from) * t)
+        # g(t) = log(1 + (e-1)*t), maps [0,1] → [0,1], dense near t=0
+        em1 = exp(1.0) - 1.0
+        return t -> from + (to - from) * log(1.0 + em1 * t)
     elseif scale == :sqrt
-        s_from = sign(from) * sqrt(abs(from))
-        s_to = sign(to) * sqrt(abs(to))
-        return t -> begin
-            s = s_from + (s_to - s_from) * t
-            sign(s) * s^2
-        end
+        return t -> from + (to - from) * sqrt(t)
     elseif scale == :cosine
         return t -> from + (to - from) * (1 - cos(π * t)) / 2
     elseif scale == :exponential
-        from > 0 || throw(ArgumentError("exponential ramp requires positive from"))
-        rate = -log(max(to / from, 1e-10))
-        return t -> from * exp(-rate * t)
+        # Dense near t=0, k controls steepness
+        k = 5.0
+        norm = 1.0 / (1.0 - exp(-k))
+        return t -> from + (to - from) * (1.0 - exp(-k * t)) * norm
+    elseif scale == :reverse_sqrt
+        return t -> from + (to - from) * t^2
     else
-        throw(ArgumentError("Unknown ramp scale: $scale. Supported: linear, log, sqrt, cosine, exponential"))
+        throw(ArgumentError("Unknown ramp scale: $scale. Supported: linear, log, sqrt, cosine, exponential, reverse_sqrt"))
     end
 end
