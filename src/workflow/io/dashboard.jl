@@ -311,7 +311,7 @@ end
 Compute 3D density for each m-component. Returns downsampled if grid > max_n.
 Top `max_components` by population are included, plus total.
 """
-function _compute_3d_densities(jld2_path::String; max_n::Int = 40, max_components::Int = 5)
+function _compute_3d_densities(jld2_path::String; max_n::Int = 40, max_components::Int = 0)
     d = JLD2.load(jld2_path)
     psi = d["psi"]
     n_comp = size(psi, ndims(psi))
@@ -330,9 +330,10 @@ function _compute_3d_densities(jld2_path::String; max_n::Int = 40, max_component
     # Total density
     total_dens = sum(all_densities)
 
-    # Pick top components by population
+    # Pick top components by population (0 = all)
     sorted_idx = sortperm(pops; rev=true)
-    top_idx = sorted_idx[1:min(max_components, n_comp)]
+    n_keep = max_components > 0 ? min(max_components, n_comp) : n_comp
+    top_idx = sorted_idx[1:n_keep]
 
     # Downsample if needed
     step = max(1, cld(maximum(n_pts), max_n))
