@@ -36,6 +36,8 @@ end
 
 function parse_pipeline(data::Dict)
     pipe_data = data["pipeline"]
+    (pipe_data isa AbstractVector && !isempty(pipe_data)) ||
+        throw(ArgumentError("pipeline: must be a non-empty list of steps"))
     steps = PipelineStep[_parse_step(s) for s in pipe_data]
 
     scan = if haskey(data, "scan")
@@ -376,8 +378,10 @@ end
 # --- Helpers ---
 
 function _normalize_grid(n_raw, box_raw)
-    n_pts = n_raw isa Vector ? Int.(n_raw) : n_raw isa Integer ? [n_raw, n_raw, n_raw] : Int.([n_raw])
-    box_size = box_raw isa Vector ? Float64.(box_raw) : Float64.([box_raw for _ in n_pts])
+    n_pts = n_raw isa Vector ? Int.(n_raw) : Int[Int(n_raw)]
+    box_size = box_raw isa Vector ? Float64.(box_raw) : Float64[Float64(box_raw)]
+    length(n_pts) == length(box_size) ||
+        throw(ArgumentError("grid n and box must have the same length"))
     (n_pts, box_size)
 end
 

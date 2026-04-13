@@ -38,7 +38,10 @@ function apply_override!(d::Dict, path::AbstractString, value)
         end
         # Navigate: handle Dict keys, list indices, and single-key unwrap
         if cursor isa AbstractVector
-            idx = parse(Int, key) + 1  # 0-based → 1-based
+            idx = tryparse(Int, key)
+            idx === nothing && throw(ArgumentError("Override path segment '$key' is not a valid list index"))
+            idx += 1  # 0-based → 1-based
+            1 <= idx <= length(cursor) || throw(ArgumentError("Override list index $key out of bounds (length=$(length(cursor)))"))
             elem = cursor[idx]
             # Auto-unwrap single-key dicts (pipeline steps like {ground_state: {...}})
             if elem isa Dict && length(elem) == 1
@@ -53,6 +56,8 @@ function apply_override!(d::Dict, path::AbstractString, value)
                 cursor[key] = next
             end
             cursor = next
+        else
+            throw(ArgumentError("Override path cannot traverse $(typeof(cursor)) at segment '$key'"))
         end
     end
     d
