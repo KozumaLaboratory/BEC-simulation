@@ -119,6 +119,24 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
             prev = scan.continuation ? get(chain_state, run_name, nothing) : nothing
             psi_prev = prev !== nothing ? prev.psi : nothing
 
+            # Auto-rotate: if target_magnetization changed, rotate psi so the
+            # constraint can redistribute populations from the previous state.
+            if psi_prev !== nothing && scan.auto_rotate_on_mz
+                gs_params = let pipe = get(patched, "pipeline", [])
+                    isempty(pipe) ? Dict() : first(values(pipe[1]))
+                end
+                target_mz = get(gs_params, "target_magnetization", nothing)
+                if target_mz !== nothing && prev !== nothing && !isnan(prev.mz_actual)
+                    F_atom = gs_params isa Dict ? resolve_atom(Symbol(get(gs_params, "atom", "Eu151"))).F : 6
+                    α_target = acos(clamp(-Float64(target_mz) / F_atom, -1.0, 1.0))
+                    α_prev = acos(clamp(-prev.mz_actual / F_atom, -1.0, 1.0))
+                    Δα = α_target - α_prev
+                    if abs(Δα) > 1e-12
+                        psi_prev = rotate_quantization_axis(psi_prev, F_atom, 0.0, Δα)
+                    end
+                end
+            end
+
             config = parse_pipeline(patched)
             result = run_pipeline(config; verbose = false, psi_init = psi_prev)
 
