@@ -113,11 +113,39 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
     ramp_callbacks = Function[]
     ddi_d_raw = get(p, "ddi", Dict())
     if ddi_d_raw isa Dict && get(ddi_d_raw, "c_dd", nothing) isa Dict
-        c_dd_interp = _make_interpolator(ddi_d_raw["c_dd"])
-        push!(ramp_callbacks, (ws, step, ns) -> begin
-            ws.ddi !== nothing && (ws.ddi.C_dd = c_dd_interp(step / ns))
-        end)
-        c_dd_val = c_dd_interp(0.0)
+        c_dd_spec = ddi_d_raw["c_dd"]
+        if get(c_dd_spec, "adaptive", false)
+            # Adaptive ramp: advance c_dd only when dE is small
+            c_dd_target = Float64(c_dd_spec["to"])
+            c_dd_from = Float64(get(c_dd_spec, "from", 0.0))
+            c_dd_step = Float64(get(c_dd_spec, "step", (c_dd_target - c_dd_from) / 100))
+            dE_threshold = Float64(get(c_dd_spec, "threshold", 0.01))
+            save_every_local = max(1, Int(get(p, "n_steps", 100000)) ÷ 10)
+            c_dd_current = Ref(c_dd_from)
+            E_prev_ramp = Ref(NaN)
+            push!(ramp_callbacks, (ws, step, ns) -> begin
+                ws.ddi === nothing && return
+                if step % save_every_local == 0
+                    E_now = total_energy(ws)
+                    dE = isnan(E_prev_ramp[]) ? Inf : abs(E_now - E_prev_ramp[])
+                    E_prev_ramp[] = E_now
+                    if dE < dE_threshold && c_dd_current[] < c_dd_target
+                        c_dd_current[] = min(c_dd_current[] + c_dd_step, c_dd_target)
+                        ws.ddi.C_dd = c_dd_current[]
+                        println("    c_dd → $(round(c_dd_current[]; digits=1)) (dE=$(round(dE; sigdigits=3)))")
+                        flush(stdout)
+                        E_prev_ramp[] = NaN  # reset after jump
+                    end
+                end
+            end)
+            c_dd_val = c_dd_from
+        else
+            c_dd_interp = _make_interpolator(c_dd_spec)
+            push!(ramp_callbacks, (ws, step, ns) -> begin
+                ws.ddi !== nothing && (ws.ddi.C_dd = c_dd_interp(step / ns))
+            end)
+            c_dd_val = c_dd_interp(0.0)
+        end
     end
 
     on_step = isempty(ramp_callbacks) ? nothing :

@@ -1,8 +1,7 @@
-# Eu151 ground state: continuous c_dd ramp (0 → 7647)
+# Eu151 ground state: adaptive c_dd ramp (0 → 7647)
 #
-# DDI strength is ramped continuously during ITP via on_step callback.
-# This avoids discrete jumps and gives smoother convergence.
-# c_dd is a material constant — ramp is purely numerical technique.
+# DDI strength is advanced only when ITP has converged (dE < threshold).
+# This naturally adapts: fast ramp when DDI is weak, slow when strong.
 
 pipeline:
   - ground_state:
@@ -16,11 +15,16 @@ pipeline:
         c1_ratio: -0.01
       ddi:
         enabled: true
-        c_dd: {from: 0, to: 7647, scale: reverse_sqrt}
+        c_dd:
+          from: 0
+          to: 7647
+          adaptive: true
+          step: 200          # advance by 200 per convergence event (~38 steps total)
+          threshold: 0.01    # dE threshold to advance
       zeeman: {p: 0.39, q: 0.0}
       potential: {type: harmonic, omega: [1.0, 1.0, 1.1818]}
       dt: 0.0005
-      n_steps: 200000
+      n_steps: 500000
       tol: 1.0e-8
       initial_state: antiferromagnetic
       backend: cuda
