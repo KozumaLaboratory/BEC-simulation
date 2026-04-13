@@ -280,10 +280,58 @@ function _run_itp_loop!(
 
     interrupted = false
     gpu = _is_gpu(ws.state.psi)
+    dt = ws.sim_params.dt
+    n_comp_ws = n_comp
+    bk = ws.batched_kinetic
+    omega = ws.sim_params.rotating_frame_omega
+    cc = ws.coriolis_cache
+    it = true  # imaginary time
+
+    # ITP leapfrog: merge outer V substeps (diag+SM+nematic+tensor+raman)
+    # between adjacent steps. DDI stays at dt/2 (ITP real exponentials
+    # would overflow if doubled).
+    #
+    # Standard split_step V(dt/2):
+    #   outer_fwd(dt/4) → DDI(dt/2) → outer_bwd(dt/4)
+    #
+    # Leapfrog merges boundary outer_bwd(dt/4) + outer_fwd(dt/4) = outer(dt/2).
+    #
+    # Open: outer_fwd(dt/4) DDI(dt/2) outer_bwd(dt/4)
+    _outer_potential_fwd!(ws, dt / 4, n_comp_ws, N_dim, it)
+    _ddi_step!(ws, dt / 2, N_dim, it)
+    _outer_potential_bwd!(ws, dt / 4, n_comp_ws, N_dim, it)
+
     try
         for step = (start_step + 1):n_steps
             on_step !== nothing && on_step(ws, step, n_steps)
-            split_step!(ws)
+
+            # Kinetic step K(dt)
+            _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, it, cc)
+            apply_kinetic_step_batched!(ws.state.psi, bk)
+            _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, it, cc)
+
+            is_check = step % sp.save_every == 0
+            is_last = step == n_steps
+            need_split = is_check || is_last
+
+            if need_split
+                # Close: outer_fwd(dt/4) DDI(dt/2) outer_bwd(dt/4)
+                _outer_potential_fwd!(ws, dt / 4, n_comp_ws, N_dim, it)
+                _ddi_step!(ws, dt / 2, N_dim, it)
+                _outer_potential_bwd!(ws, dt / 4, n_comp_ws, N_dim, it)
+            else
+                # Merged boundary: outer(dt/2) then DDI(dt/2) then outer(dt/2)
+                # bwd(dt/4)+fwd(dt/4) = single pass at dt/2
+                _outer_potential_fwd!(ws, dt / 2, n_comp_ws, N_dim, it)
+                _ddi_step!(ws, dt / 2, N_dim, it)
+                _outer_potential_bwd!(ws, dt / 2, n_comp_ws, N_dim, it)
+            end
+
+            ws.state.step += 1
+            if ws.sim_params.normalize_every > 0 && ws.state.step % ws.sim_params.normalize_every == 0
+                _normalize_psi!(ws.state.psi, ws.grid, n_comp_ws, N_dim)
+            end
+
             # NaN check: only first 10 steps (forces GPU sync)
             if step <= (start_step + 10)
                 if any(isnan, ws.state.psi)
@@ -337,6 +385,12 @@ function _run_itp_loop!(
                 copyto!(psi_prev, ws.state.psi)
             end
 
+            # Reopen leapfrog after split point
+            if need_split && !converged && step < n_steps
+                _outer_potential_fwd!(ws, dt / 4, n_comp_ws, N_dim, it)
+                _ddi_step!(ws, dt / 2, N_dim, it)
+                _outer_potential_bwd!(ws, dt / 4, n_comp_ws, N_dim, it)
+            end
         end
     catch e
         if e isa InterruptException

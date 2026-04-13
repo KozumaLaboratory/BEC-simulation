@@ -375,6 +375,130 @@ function _half_potential_step!(
     )
 end
 
+# --- ITP leapfrog helpers ---
+# Split V(dt/2) into outer (diag+SM+nematic+tensor+raman) and inner (DDI).
+# Outer part can be merged between adjacent steps; DDI stays at dt/2.
+
+"""
+Outer part of half-potential step: everything except DDI.
+Forward direction: diag → SM → nematic → tensor → raman
+"""
+function _outer_potential_fwd!(ws::Workspace{N}, dt_outer, n_comp, ndim, imaginary_time) where {N}
+    gpu = _is_gpu(ws.state.psi)
+    zee = zeeman_at(ws.zeeman, ws.state.t)
+    zeeman_diag = zeeman_diagonal(zee, ws.spin_matrices)
+
+    _diagonal_step_svec!(
+        Val(N), ws.state.psi, ws.potential_values, zeeman_diag,
+        ws.interactions.c0,
+        ws.lhy !== nothing ? ws.lhy : ws.interactions.c_lhy,
+        dt_outer, ws.density_buf, imaginary_time,
+    )
+
+    if abs(ws.interactions.c1) > 1e-30
+        apply_spin_mixing_step!(ws.state.psi, ws.spin_matrices, ws.interactions.c1, dt_outer, ndim; imaginary_time)
+    end
+
+    c2 = get_cn(ws.interactions, 2)
+    if abs(c2) > 1e-30
+        if gpu
+            _run_on_host!(ws.state.psi) do p
+                apply_nematic_step!(p, ws.interactions, ws.spin_matrices.system.F, dt_outer, ndim; imaginary_time)
+            end
+        else
+            apply_nematic_step!(ws.state.psi, ws.interactions, ws.spin_matrices.system.F, dt_outer, ndim; imaginary_time)
+        end
+    end
+
+    if ws.tensor_cache !== nothing
+        if gpu
+            _run_on_host!(ws.state.psi) do p
+                apply_tensor_interaction_step!(p, ws.tensor_cache, ws.spin_matrices, dt_outer, ndim; imaginary_time)
+            end
+        else
+            apply_tensor_interaction_step!(ws.state.psi, ws.tensor_cache, ws.spin_matrices, dt_outer, ndim; imaginary_time)
+        end
+    end
+
+    if ws.raman !== nothing
+        if gpu
+            _run_on_host!(ws.state.psi) do p
+                apply_raman_step!(p, ws.spin_matrices, ws.raman, ws.grid, dt_outer; imaginary_time)
+            end
+        else
+            apply_raman_step!(ws.state.psi, ws.spin_matrices, ws.raman, ws.grid, dt_outer; imaginary_time)
+        end
+    end
+end
+
+"""
+Outer part of half-potential step, backward direction: raman → tensor → nematic → SM → diag
+"""
+function _outer_potential_bwd!(ws::Workspace{N}, dt_outer, n_comp, ndim, imaginary_time) where {N}
+    gpu = _is_gpu(ws.state.psi)
+
+    if ws.raman !== nothing
+        if gpu
+            _run_on_host!(ws.state.psi) do p
+                apply_raman_step!(p, ws.spin_matrices, ws.raman, ws.grid, dt_outer; imaginary_time)
+            end
+        else
+            apply_raman_step!(ws.state.psi, ws.spin_matrices, ws.raman, ws.grid, dt_outer; imaginary_time)
+        end
+    end
+
+    if ws.tensor_cache !== nothing
+        if gpu
+            _run_on_host!(ws.state.psi) do p
+                apply_tensor_interaction_step!(p, ws.tensor_cache, ws.spin_matrices, dt_outer, ndim; imaginary_time)
+            end
+        else
+            apply_tensor_interaction_step!(ws.state.psi, ws.tensor_cache, ws.spin_matrices, dt_outer, ndim; imaginary_time)
+        end
+    end
+
+    c2 = get_cn(ws.interactions, 2)
+    if abs(c2) > 1e-30
+        if gpu
+            _run_on_host!(ws.state.psi) do p
+                apply_nematic_step!(p, ws.interactions, ws.spin_matrices.system.F, dt_outer, ndim; imaginary_time)
+            end
+        else
+            apply_nematic_step!(ws.state.psi, ws.interactions, ws.spin_matrices.system.F, dt_outer, ndim; imaginary_time)
+        end
+    end
+
+    if abs(ws.interactions.c1) > 1e-30
+        apply_spin_mixing_step!(ws.state.psi, ws.spin_matrices, ws.interactions.c1, dt_outer, ndim; imaginary_time)
+    end
+
+    zee = zeeman_at(ws.zeeman, ws.state.t)
+    zeeman_diag = zeeman_diagonal(zee, ws.spin_matrices)
+    _diagonal_step_svec!(
+        Val(N), ws.state.psi, ws.potential_values, zeeman_diag,
+        ws.interactions.c0,
+        ws.lhy !== nothing ? ws.lhy : ws.interactions.c_lhy,
+        dt_outer, ws.density_buf, imaginary_time,
+    )
+end
+
+"""
+DDI-only step (inner part of half-potential).
+"""
+function _ddi_step!(ws::Workspace{N}, dt_ddi, ndim, imaginary_time) where {N}
+    ws.ddi === nothing && return nothing
+    gpu = _is_gpu(ws.state.psi)
+    if gpu
+        _apply_ddi_step_gpu!(ws, dt_ddi, ndim, imaginary_time)
+    else
+        if ws.ddi_padded !== nothing
+            apply_ddi_step!(ws.state.psi, ws.spin_matrices, ws.ddi, ws.ddi_bufs, dt_ddi, ndim, ws.ddi_padded; imaginary_time)
+        else
+            apply_ddi_step!(ws.state.psi, ws.spin_matrices, ws.ddi, ws.ddi_bufs, dt_ddi, ndim; imaginary_time)
+        end
+    end
+end
+
 function _normalize_psi!(psi, grid, n_components, ndim)
     dV = cell_volume(grid)
     norm_sq = 0.0
