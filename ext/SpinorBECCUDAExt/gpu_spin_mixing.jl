@@ -1,11 +1,59 @@
-# GPU-native spin_mixing: eliminates GPU↔CPU round-trip
+# GPU-native spin_mixing with pre-allocated buffers
 #
-# Strategy: use broadcast-based approach instead of custom kernel.
-# For each grid point, compute spin vector F, then apply Euler rotation
-# R_z(α) R_y(β) exp(-iθFz) R_y(-β) R_z(-α) using precomputed Fy eigenvectors.
-#
-# Implemented as a sequence of batched matrix operations (CUBLAS gemm)
-# to avoid kernel compilation issues with large D.
+# Euler decomposition: R_z(α) R_y(β) exp(-iθFz) R_y(-β) R_z(-α)
+# Uses CUBLAS gemm for V†·ψ and V·ψ, fused broadcasts for diagonal phases.
+
+# Per-workspace cache to avoid allocation in hot loop
+mutable struct GPUSMCache{D}
+    V::CuArray{ComplexF64,2}     # D×D Fy eigenvectors
+    Vt::CuArray{ComplexF64,2}    # D×D Fy eigenvectors adjoint
+    λ::Vector{Float64}            # D Fy eigenvalues (host)
+    m_vals::Vector{Float64}       # D m-values (host)
+    fp_coeffs::Vector{Float64}    # D F+ coefficients (host)
+    F::Float64
+    # Work buffers (allocated once, reused)
+    tmp::CuArray{ComplexF64,2}   # (N, D)
+    fz::CuArray{Float64,1}       # (N,)
+    fx::CuArray{Float64,1}       # (N,)
+    fy::CuArray{Float64,1}       # (N,)
+    β::CuArray{Float64,1}        # (N,)
+    α::CuArray{Float64,1}        # (N,)
+    θ::CuArray{Float64,1}        # (N,)
+    phase_buf::CuArray{ComplexF64,1}  # (N,)
+end
+
+const _GPU_SM_CACHE = Dict{UInt64,Any}()
+
+function _get_gpu_sm_cache(psi::CuArray{ComplexF64}, sm::SpinorBEC.SpinMatrices{D}, ndim::Int) where {D}
+    N = prod(ntuple(d -> size(psi, d), ndim))
+    key = hash((objectid(sm), N, D))
+    cache = get(_GPU_SM_CACHE, key, nothing)
+    cache !== nothing && return cache::GPUSMCache{D}
+
+    F = Float64(sm.system.F)
+    Ff1 = F * (F + 1)
+    m_vals = Float64[F - (c - 1) for c in 1:D]
+    fp_coeffs = Float64[c == 1 ? 0.0 : sqrt(Ff1 - (F - c + 1) * (F - c + 2)) for c in 1:D]
+
+    cache = GPUSMCache{D}(
+        CuArray(ComplexF64.(Matrix(sm.Fy_eigvecs))),
+        CuArray(ComplexF64.(Matrix(sm.Fy_eigvecs_adj))),
+        Float64.(sm.Fy_eigvals),
+        m_vals,
+        fp_coeffs,
+        F,
+        CUDA.zeros(ComplexF64, N, D),
+        CUDA.zeros(Float64, N),
+        CUDA.zeros(Float64, N),
+        CUDA.zeros(Float64, N),
+        CUDA.zeros(Float64, N),
+        CUDA.zeros(Float64, N),
+        CUDA.zeros(Float64, N),
+        CUDA.zeros(ComplexF64, N),
+    )
+    _GPU_SM_CACHE[key] = cache
+    cache
+end
 
 function SpinorBEC.apply_spin_mixing_step!(
     psi::CuArray{ComplexF64},
@@ -18,91 +66,83 @@ function SpinorBEC.apply_spin_mixing_step!(
     abs(c1) < 1e-30 && return nothing
     n_pts = ntuple(d -> size(psi, d), ndim)
     N = prod(n_pts)
-    F = sm.system.F
+    cache = _get_gpu_sm_cache(psi, sm, ndim)
+    F = cache.F
 
-    # Reshape psi to (N, D) for batched operations
     psi_2d = reshape(psi, N, D)
+    tmp = cache.tmp
+    fz = cache.fz
+    fx = cache.fx
+    fy = cache.fy
+    β = cache.β
+    α = cache.α
+    θ = cache.θ
+    pb = cache.phase_buf
 
-    # Step 1: Compute Fz per grid point (broadcast)
-    m_vals_d = CUDA.CuArray(Float64[F - (c - 1) for c in 1:D])
-    # Fz[i] = Σ_c m_c |ψ_{i,c}|²
-    fz = dropdims(sum(abs2.(psi_2d) .* reshape(m_vals_d, 1, D); dims=2); dims=2)
+    # --- Compute spin vector (fused broadcasts, no temp alloc) ---
+    fz .= 0.0
+    for c in 1:D
+        m = cache.m_vals[c]
+        # fz[i] += m * |psi[i,c]|²  (fused into one kernel per component)
+        fz .+= m .* abs2.(view(psi_2d, :, c))
+    end
 
-    # Step 2: Compute F+ per grid point
-    Ff1 = Float64(F * (F + 1))
-    fp_d = CUDA.CuArray(Float64[c == 1 ? 0.0 : sqrt(Ff1 - (F - c + 1) * (F - c + 2)) for c in 1:D])
-    # F+[i] = Σ_{c=2}^D fp_c conj(ψ_{i,c-1}) ψ_{i,c}
-    fp_host = Float64[c == 1 ? 0.0 : sqrt(Ff1 - (F - c + 1) * (F - c + 2)) for c in 1:D]
-    fplus = CUDA.zeros(ComplexF64, N)
+    fx .= 0.0
+    fy .= 0.0
     for c in 2:D
-        fplus .+= fp_host[c] .* conj.(view(psi_2d, :, c-1)) .* view(psi_2d, :, c)
+        fp = cache.fp_coeffs[c]
+        # pb = conj(psi[:,c-1]) * psi[:,c]
+        pb .= conj.(view(psi_2d, :, c-1)) .* view(psi_2d, :, c)
+        fx .+= fp .* real.(pb)
+        fy .+= fp .* imag.(pb)
     end
-    fx = real.(fplus)
-    fy = imag.(fplus)
 
-    # Step 3: Compute angles
-    f_perp = sqrt.(fx.^2 .+ fy.^2)
-    f_mag = sqrt.(fx.^2 .+ fy.^2 .+ fz.^2)
+    # --- Angles (fused) ---
+    # f_mag, β, α, θ in minimal broadcasts
+    # θ stores f_mag temporarily
+    θ .= sqrt.(fx.^2 .+ fy.^2 .+ fz.^2)  # f_mag
+    β .= acos.(clamp.(fz ./ max.(θ, 1e-30), -1.0, 1.0))
+    α .= atan.(fy, fx)
+    θ .*= c1 * dt_frac  # θ = c1 * f_mag * dt
 
-    # Avoid division by zero
-    safe_mag = max.(f_mag, 1e-30)
-    safe_perp = max.(f_perp, 1e-30)
-
-    β = acos.(clamp.(fz ./ safe_mag, -1.0, 1.0))
-    α = atan.(fy, fx)
-    θ = c1 .* f_mag .* dt_frac
-
-    # Zero out rotation for zero spin
-    mask = f_mag .> 1e-30
-
-    # Step 4: Apply R_z(-α) — diagonal per component
+    # --- R_z(-α) ---
     for c in 1:D
-        m = Float64(F - (c - 1))
-        phase = cis.(-m .* α)
-        view(psi_2d, :, c) .*= phase
+        m = cache.m_vals[c]
+        view(psi_2d, :, c) .*= cis.(-m .* α)
     end
 
-    # Step 5: R_y(-β) = V diag(exp(iβλ)) V†
-    V_d = CUDA.CuArray(ComplexF64.(Matrix(sm.Fy_eigvecs)))     # D×D
-    Vt_d = CUDA.CuArray(ComplexF64.(Matrix(sm.Fy_eigvecs_adj))) # D×D
-    λ_host = Float64.(sm.Fy_eigvals)
-
-    # V† · ψ  (batched: (N,D) × (D,D)^T → (N,D))
-    tmp = psi_2d * transpose(Vt_d)  # (N, D)
-
-    # Multiply by exp(iβλ_j) per component (β is spatial angle, always cis)
+    # --- R_y(-β): V · diag(exp(iβλ)) · V† · ψ ---
+    # tmp = ψ · Vt^T  (CUBLAS gemm, no alloc — write into pre-allocated tmp)
+    CUDA.CUBLAS.gemm!('N', 'T', ComplexF64(1), psi_2d, cache.Vt, ComplexF64(0), tmp)
     for j in 1:D
-        λj = λ_host[j]
-        view(tmp, :, j) .*= cis.(β .* λj) .* mask .+ (1.0 .- mask)
+        λj = cache.λ[j]
+        view(tmp, :, j) .*= cis.(β .* λj)
     end
+    # psi_2d = tmp · V^T
+    CUDA.CUBLAS.gemm!('N', 'T', ComplexF64(1), tmp, cache.V, ComplexF64(0), psi_2d)
 
-    # V · tmp → psi_2d
-    psi_2d .= tmp * transpose(V_d)
-
-    # Step 6: exp(-iθFz) — diagonal
-    # ITP: shift by exp(-F·θ) so largest factor = 1 (prevents overflow, removed by normalization)
+    # --- exp(-iθFz) ---
     for c in 1:D
-        m = Float64(F - (c - 1))
+        m = cache.m_vals[c]
         if imaginary_time
-            view(psi_2d, :, c) .*= exp.(θ .* (m .- F)) .* mask .+ (1.0 .- mask)
+            view(psi_2d, :, c) .*= exp.(θ .* (m - F))
         else
-            view(psi_2d, :, c) .*= cis.(-θ .* m) .* mask .+ (1.0 .- mask)
+            view(psi_2d, :, c) .*= cis.(-θ .* m)
         end
     end
 
-    # Step 7: R_y(β) = V diag(exp(-iβλ)) V†
-    tmp .= psi_2d * transpose(Vt_d)
+    # --- R_y(β): V · diag(exp(-iβλ)) · V† · ψ ---
+    CUDA.CUBLAS.gemm!('N', 'T', ComplexF64(1), psi_2d, cache.Vt, ComplexF64(0), tmp)
     for j in 1:D
-        λj = λ_host[j]
-        view(tmp, :, j) .*= cis.(-β .* λj) .* mask .+ (1.0 .- mask)
+        λj = cache.λ[j]
+        view(tmp, :, j) .*= cis.(-β .* λj)
     end
-    psi_2d .= tmp * transpose(V_d)
+    CUDA.CUBLAS.gemm!('N', 'T', ComplexF64(1), tmp, cache.V, ComplexF64(0), psi_2d)
 
-    # Step 8: R_z(α) — diagonal
+    # --- R_z(α) ---
     for c in 1:D
-        m = Float64(F - (c - 1))
-        phase = cis.(m .* α)
-        view(psi_2d, :, c) .*= phase
+        m = cache.m_vals[c]
+        view(psi_2d, :, c) .*= cis.(m .* α)
     end
 
     nothing

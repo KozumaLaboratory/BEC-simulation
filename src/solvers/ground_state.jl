@@ -336,6 +336,7 @@ function _run_itp_loop!(
                 E_prev = E
                 copyto!(psi_prev, ws.state.psi)
             end
+
         end
     catch e
         if e isa InterruptException
