@@ -221,3 +221,57 @@ function seed_noise(
     _add_noise!(psi, amplitude, n_components, ndim, grid)
     psi
 end
+
+# --- Pipeline step helpers (from pipeline.jl) ---
+
+function _normalize_grid(n_raw, box_raw)
+    n_pts = n_raw isa Vector ? Int.(n_raw) : Int[Int(n_raw)]
+    box_size = box_raw isa Vector ? Float64.(box_raw) : Float64[Float64(box_raw)]
+    length(n_pts) == length(box_size) ||
+        throw(ArgumentError("grid n and box must have the same length"))
+    (n_pts, box_size)
+end
+
+function _parse_gs_interactions(inter::Dict, atom)
+    F = atom.F
+    c_extra = Float64[]
+    if haskey(inter, "c_total")
+        c_total = Float64(inter["c_total"])
+        c1_ratio = Float64(get(inter, "c1_ratio", 0.0))
+        c_lhy = Float64(get(inter, "c_lhy", 0.0))
+        ip = interaction_params_from_constraint(; c_total, c1_ratio, F, c_extra)
+        InteractionParams(ip.c0, ip.c1, c_lhy, ip.c_extra)
+    elseif haskey(inter, "N_atoms") && haskey(inter, "omega_ref")
+        N_atoms = Int(inter["N_atoms"])
+        omega_ref = Float64(inter["omega_ref"])
+        c_total = compute_c_total(atom; N_atoms, omega_ref)
+        c1_ratio = Float64(get(inter, "c1_ratio", 0.0))
+        c_lhy = Float64(get(inter, "c_lhy", 0.0))
+        ip = interaction_params_from_constraint(; c_total, c1_ratio, F, c_extra)
+        InteractionParams(ip.c0, ip.c1, c_lhy, ip.c_extra)
+    else
+        c0 = Float64(get(inter, "c0", 0.0))
+        c1 = Float64(get(inter, "c1", 0.0))
+        c_lhy = Float64(get(inter, "c_lhy", 0.0))
+        InteractionParams(c0, c1, c_lhy, c_extra)
+    end
+end
+
+function _parse_gs_ddi(ddi_d, inter, atom)
+    if isempty(ddi_d) || ddi_d === nothing
+        return (false, NaN, false, false, 0.0)
+    end
+    ddi_d = ddi_d isa Dict ? ddi_d : Dict{String,Any}("enabled" => ddi_d)
+    enabled = Bool(get(ddi_d, "enabled", false))
+    c_dd = if haskey(ddi_d, "c_dd")
+        Float64(ddi_d["c_dd"])
+    elseif haskey(inter, "N_atoms") && haskey(inter, "omega_ref")
+        compute_c_dd_dimless(atom; N_atoms = Int(inter["N_atoms"]), omega_ref = Float64(inter["omega_ref"]))
+    else
+        NaN
+    end
+    secular = Bool(get(ddi_d, "secular", false))
+    q2d = Bool(get(ddi_d, "quasi_2d", false))
+    lz = Float64(get(ddi_d, "l_z", 0.0))
+    (enabled, c_dd, secular, q2d, lz)
+end
