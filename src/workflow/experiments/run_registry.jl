@@ -56,11 +56,19 @@ function run_yaml(yaml_path::String; base_dir::String = "runs", verbose::Bool = 
     haskey(data, "pipeline") || throw(ArgumentError(
         "YAML must have a 'pipeline:' key. Got keys: $(collect(keys(data)))"))
 
-    run_dir = compute_run_dir(yaml_path; base_dir)
+    # If the YAML is already runs/foo/config.yaml, use runs/foo/ as the run dir
+    # (user manages directory names). Otherwise compute a hash-based dir.
+    run_dir = if basename(yaml_path) == "config.yaml" && isdir(dirname(yaml_path))
+        dirname(yaml_path)
+    else
+        compute_run_dir(yaml_path; base_dir)
+    end
     mkpath(run_dir)
 
     config_snapshot = joinpath(run_dir, "config.yaml")
-    isfile(config_snapshot) || cp(yaml_path, config_snapshot)
+    if abspath(yaml_path) != abspath(config_snapshot)
+        isfile(config_snapshot) || cp(yaml_path, config_snapshot)
+    end
 
     env = _env_metadata()
 
