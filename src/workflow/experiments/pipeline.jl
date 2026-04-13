@@ -112,100 +112,40 @@ end
 
 function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_prev; verbose=true)
     p = step.params
-    atom_name = Symbol(p["atom"])
-    atom = resolve_atom(atom_name)
-    F = atom.F
+    atom = resolve_atom(Symbol(p["atom"]))
+    grid, ndim = _setup_grid_from_params(p)
+    interactions = _parse_gs_interactions(get(p, "interactions", Dict()), atom)
+    enable_ddi, c_dd_val, secular, q2d, lz = _parse_gs_ddi(get(p, "ddi", Dict()), get(p, "interactions", Dict()), atom)
+    zeeman = _parse_constant_zeeman(get(p, "zeeman", Dict()))
+    potential = _parse_and_build_potential(
+        get(p, "potential", Dict("type" => "harmonic", "omega" => ones(ndim))), ndim)
+    backend = _resolve_backend(Symbol(get(p, "backend", "cpu")))
 
-    # Grid
-    g = p["grid"]
-    n_raw = g isa Dict ? get(g, "n", get(g, "n_points", 32)) : g
-    box_raw = g isa Dict ? get(g, "box", get(g, "box_size", 12.0)) : 12.0
-    n_pts, box_size = _normalize_grid(n_raw, box_raw)
-    ndim = length(n_pts)
-    grid = make_grid(GridConfig(NTuple{ndim,Int}(n_pts), NTuple{ndim,Float64}(box_size)))
-
-    # Interactions
-    inter = get(p, "interactions", Dict())
-    interactions = _parse_gs_interactions(inter, atom)
-
-    # DDI
-    ddi_d = get(p, "ddi", Dict())
-    enable_ddi, c_dd_val, secular, q2d, lz = _parse_gs_ddi(ddi_d, inter, atom)
-
-    # Zeeman
-    z = get(p, "zeeman", Dict())
-    zeeman_p = z isa Dict ? Float64(get(z, "p", 0.0)) : 0.0
-    zeeman_q = z isa Dict ? Float64(get(z, "q", 0.0)) : 0.0
-
-    # Potential (single or composite list)
-    pot_d = get(p, "potential", Dict("type" => "harmonic", "omega" => ones(ndim)))
-    potential = if pot_d isa Vector
-        components = [PotentialConfig(Symbol(get(c, "type", "harmonic")),
-            Dict{String,Any}(string(k) => v for (k, v) in c if k != "type")) for c in pot_d]
-        _build_potential(PotentialConfig(:composite, Dict{String,Any}("components" => components)), ndim)
-    else
-        _build_potential(PotentialConfig(Symbol(get(pot_d, "type", "harmonic")),
-            Dict{String,Any}(string(k) => v for (k, v) in pot_d if k != "type")), ndim)
-    end
-
-    # ITP params
     dt = Float64(get(p, "dt", 0.001))
     n_steps = Int(get(p, "n_steps", 5000))
     tol = Float64(get(p, "tol", 1e-8))
     initial_state = Symbol(get(p, "initial_state", "polar"))
-    target_mz = let v = get(p, "target_magnetization", nothing)
-        v === nothing ? nothing : Float64(v)
-    end
-    backend_name = Symbol(get(p, "backend", "cpu"))
-    backend = _resolve_backend(backend_name)
+    target_mz = _get_optional_float(p, "target_magnetization")
+    temp_ratio = _get_optional_float(p, "temperature_ratio")
 
-    # Temperature noise
-    temp_ratio = let v = get(p, "temperature_ratio", nothing)
-        v === nothing ? nothing : Float64(v)
-    end
-
-    psi_init = psi_prev  # continuation from previous step
+    psi_init = psi_prev
     if psi_init === nothing && temp_ratio !== nothing
-        sys = SpinSystem(F)
-        psi_base = init_psi(grid, sys; state = initial_state)
-        psi_init = add_thermal_noise(psi_base, F; T_over_Tc = temp_ratio, seed = Int(get(p, "noise_seed", 42)))
+        psi_base = init_psi(grid, SpinSystem(atom.F); state = initial_state)
+        psi_init = add_thermal_noise(psi_base, atom.F;
+            T_over_Tc = temp_ratio, seed = Int(get(p, "noise_seed", 42)))
     end
 
     gs = find_ground_state(;
-        grid, atom, interactions,
-        zeeman = ZeemanParams(zeeman_p, zeeman_q),
-        potential,
-        dt, n_steps, tol,
-        initial_state,
-        psi_init,
+        grid, atom, interactions, zeeman, potential,
+        dt, n_steps, tol, initial_state, psi_init,
         enable_ddi, c_dd = c_dd_val,
-        secular_ddi = secular,
-        quasi_2d_ddi = q2d, l_z_ddi = lz,
-        target_magnetization = target_mz,
-        backend,
+        secular_ddi = secular, quasi_2d_ddi = q2d, l_z_ddi = lz,
+        target_magnetization = target_mz, backend,
     )
 
     psi_out = copy(gs.workspace.state.psi)
+    verbose && _print_gs_summary(psi_out, grid, atom, gs)
 
-    if verbose
-        D = 2F + 1
-        dV = cell_volume(grid)
-        n_pts = grid.config.n_points
-        ndim_v = length(n_pts)
-        pops = Float64[]
-        for c in 1:D
-            idx = _component_slice(ndim_v, n_pts, c)
-            push!(pops, sum(abs2, view(psi_out, idx...)) * dV)
-        end
-        total = sum(pops)
-        pops ./= total
-        # Show top 3 populations
-        sorted_idx = sortperm(pops; rev=true)
-        top = [(F - (i-1), pops[i]) for i in sorted_idx[1:min(3, D)]]
-        pop_str = join(["m=$(m): $(round(p*100; digits=1))%" for (m, p) in top], ", ")
-        mz = sum((F - (c-1)) * pops[c] for c in 1:D)
-        println("  E=$(round(gs.energy; sigdigits=6)) conv=$(gs.converged) Mz=$(round(mz; digits=2)) [$pop_str]")
-    end
     step_result = Dict{Symbol,Any}(
         :ground_state_energy => gs.energy,
         :ground_state_converged => gs.converged,
@@ -255,18 +195,7 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
 
     # Potential: explicit overrides inherited
     pot_d = get(p, "potential", nothing)
-    potential = if pot_d !== nothing
-        if pot_d isa Vector
-            components = [PotentialConfig(Symbol(get(c, "type", "harmonic")),
-                Dict{String,Any}(string(k) => v for (k, v) in c if k != "type")) for c in pot_d]
-            _build_potential(PotentialConfig(:composite, Dict{String,Any}("components" => components)), ndim)
-        else
-            _build_potential(PotentialConfig(Symbol(get(pot_d, "type", "harmonic")),
-                Dict{String,Any}(string(k) => v for (k, v) in pot_d if k != "type")), ndim)
-        end
-    else
-        prev_potential
-    end
+    potential = pot_d !== nothing ? _parse_and_build_potential(pot_d, ndim) : prev_potential
 
     # Noise
     temp_ratio = let v = get(p, "temperature_ratio", nothing)
@@ -312,7 +241,7 @@ function _run_step(step::AnalyzeStep, psi, grid, atom, ws_prev; verbose=true)
 
     for (name, params) in step.analyzers
         verbose && print("  $name... ")
-        result = _run_analyzer(name, psi, grid, F, params)
+        result = _run_analyzer(name, psi, grid, atom, params)
         results[name] = result
         verbose && println("done")
     end
@@ -322,7 +251,8 @@ end
 
 # --- Analyzer dispatch ---
 
-function _run_analyzer(name::Symbol, psi, grid, F, params)
+function _run_analyzer(name::Symbol, psi, grid, atom, params)
+    F = atom.F
     if name == :tomography
         spin_tomography(psi, grid, F;
             rotation_axis = Symbol(get(params, "axis", "y")),
@@ -354,9 +284,7 @@ function _run_analyzer(name::Symbol, psi, grid, F, params)
         sm = spin_matrices(F)
         classify_phase_detailed(psi, F, grid, sm)
     elseif name == :stability
-        # Stability analysis needs a workspace — build a minimal one
         ndim = length(grid.config.n_points)
-        atom = resolve_atom(:Eu151)  # TODO: pass atom through
         sp = SimParams(; dt = 0.0001, n_steps = 1, save_every = 1)
         ws = make_workspace(;
             grid, atom,
@@ -370,8 +298,7 @@ function _run_analyzer(name::Symbol, psi, grid, F, params)
         sample_every = Int(get(params, "sample_every", 10))
         analyze_stability(ws; perturbation, n_steps = n_steps_stab, sample_every)
     else
-        @warn "Unknown analyzer: $name"
-        nothing
+        throw(ArgumentError("Unknown analyzer: $name. Supported: tomography, faraday, energy_decomposition, phase_classify, stability"))
     end
 end
 

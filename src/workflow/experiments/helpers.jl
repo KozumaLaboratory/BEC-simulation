@@ -171,8 +171,8 @@ function _build_phase_zeeman(phase_raw::Dict, t_offset::Float64, duration::Float
     p_spec = get(z, "p", 0.0)
     q_spec = get(z, "q", 0.0)
 
-    p_ramp = _zeeman_ramp(p_spec)
-    q_ramp = _zeeman_ramp(q_spec)
+    p_ramp = _parse_ramp_or_constant(p_spec)
+    q_ramp = _parse_ramp_or_constant(q_spec)
 
     if p_ramp isa ConstantValue && q_ramp isa ConstantValue
         ZeemanParams(p_ramp.value, q_ramp.value)
@@ -188,10 +188,10 @@ function _build_phase_zeeman(phase_raw::Dict, t_offset::Float64, duration::Float
     end
 end
 
-_zeeman_ramp(v::Dict) = haskey(v, "to") ?
+_parse_ramp_or_constant(v::Dict) = haskey(v, "to") ?
     LinearRamp(Float64(v["from"]), Float64(v["to"])) :
     ConstantValue(Float64(v["from"]))
-_zeeman_ramp(v) = ConstantValue(Float64(v))
+_parse_ramp_or_constant(v) = ConstantValue(Float64(v))
 
 function _add_noise!(psi, amplitude, n_components, ndim, grid)
     n_pts = ntuple(d -> size(psi, d), ndim)
@@ -274,4 +274,63 @@ function _parse_gs_ddi(ddi_d, inter, atom)
     q2d = Bool(get(ddi_d, "quasi_2d", false))
     lz = Float64(get(ddi_d, "l_z", 0.0))
     (enabled, c_dd, secular, q2d, lz)
+end
+
+# --- Shared utilities ---
+
+"""Convert all keys in a dict to String."""
+_to_string_keys(d::Dict) = Dict{String,Any}(string(k) => v for (k, v) in d)
+
+"""Get an optional Float64 from a dict, returning nothing if key is absent."""
+_get_optional_float(d::Dict, key::String) =
+    let v = get(d, key, nothing); v === nothing ? nothing : Float64(v) end
+
+"""Get an optional Int from a dict, returning nothing if key is absent."""
+_get_optional_int(d::Dict, key::String) =
+    let v = get(d, key, nothing); v === nothing ? nothing : Int(v) end
+
+"""Parse a potential spec (dict or list of dicts) and build the potential."""
+function _parse_and_build_potential(pot_d, ndim::Int)
+    if pot_d isa Vector
+        components = [PotentialConfig(Symbol(get(c, "type", "harmonic")),
+            _to_string_keys(Dict(k => v for (k, v) in c if k != "type"))) for c in pot_d]
+        _build_potential(PotentialConfig(:composite, Dict{String,Any}("components" => components)), ndim)
+    else
+        _build_potential(PotentialConfig(Symbol(get(pot_d, "type", "harmonic")),
+            _to_string_keys(Dict(k => v for (k, v) in pot_d if k != "type"))), ndim)
+    end
+end
+
+"""Parse grid config from pipeline step params."""
+function _setup_grid_from_params(p::Dict)
+    g = p["grid"]
+    n_raw = g isa Dict ? get(g, "n", get(g, "n_points", 32)) : g
+    box_raw = g isa Dict ? get(g, "box", get(g, "box_size", 12.0)) : 12.0
+    n_pts, box_size = _normalize_grid(n_raw, box_raw)
+    ndim = length(n_pts)
+    grid = make_grid(GridConfig(NTuple{ndim,Int}(n_pts), NTuple{ndim,Float64}(box_size)))
+    (grid, ndim)
+end
+
+"""Parse constant zeeman params from a dict {p: ..., q: ...}."""
+function _parse_constant_zeeman(z)
+    z isa Dict || return ZeemanParams(0.0, 0.0)
+    ZeemanParams(_zeeman_scalar(get(z, "p", 0.0)), _zeeman_scalar(get(z, "q", 0.0)))
+end
+
+"""Print ground state summary with populations."""
+function _print_gs_summary(psi, grid, atom, gs)
+    F = atom.F
+    D = 2F + 1
+    dV = cell_volume(grid)
+    n_pts = grid.config.n_points
+    ndim = length(n_pts)
+    pops = [sum(abs2, view(psi, _component_slice(ndim, n_pts, c)...)) * dV for c in 1:D]
+    total = sum(pops)
+    pops ./= total
+    sorted_idx = sortperm(pops; rev=true)
+    top = [(F - (i-1), pops[i]) for i in sorted_idx[1:min(3, D)]]
+    pop_str = join(["m=$(m): $(round(p*100; digits=1))%" for (m, p) in top], ", ")
+    mz = sum((F - (c-1)) * pops[c] for c in 1:D)
+    println("  E=$(round(gs.energy; sigdigits=6)) conv=$(gs.converged) Mz=$(round(mz; digits=2)) [$pop_str]")
 end
