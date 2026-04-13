@@ -1,45 +1,33 @@
-# Eu151 ground state with DDI via c_dd continuation
+# Eu151 ground state with DDI via discrete c_dd continuation
 #
-# Ramps c_dd from 0 → 7647 in 6 steps, using each converged state as the
-# initial condition for the next step. Tracks the energy decomposition
-# and runs a final stability check.
-#
-# Differs from eu151_continuation_viz.yaml only in step count (6 vs 3).
+# c_dd is a material constant (not experimentally tunable), so discrete
+# continuation is the natural numerical technique: step c_dd from 0 to
+# full value, using each converged state as initial condition for the next.
 
 pipeline:
   - ground_state:
       atom: Eu151
       grid:
-        n: [32, 32, 32]
-        box: [12.0, 12.0, 12.0]
+        n: [64, 64, 64]
+        box: [20.0, 20.0, 20.0]
       interactions:
         N_atoms: 50000
         omega_ref: 691.15
         c1_ratio: -0.01
       ddi:
-        enabled: false           # overridden per point
-      zeeman:
-        p: 0.39
-        q: 0.0
+        enabled: true
+        c_dd: 0.0            # overridden by scan
+      zeeman: {p: 0.39, q: 0.0}
       potential: {type: harmonic, omega: [1.0, 1.0, 1.1818]}
-      dt: 0.001
+      dt: 0.0005
       tol: 1.0e-8
       initial_state: antiferromagnetic
       backend: cuda
 
   - analyze:
-      - stability:
-          perturbation: 1.0e-4
-          n_steps: 1000
-          sample_every: 10
+      - stability: {perturbation: 1.0e-4, n_steps: 1000, sample_every: 10}
 
 scan:
   zip:
-    pipeline.0.ddi.c_dd:    [0.0,   1000.0, 2000.0, 4000.0, 6000.0, 7647.0]
-    pipeline.0.ddi.enabled: [false, true,   true,   true,   true,   true]
-    pipeline.0.dt:          [0.001, 0.0005, 0.0005, 0.0005, 0.0005, 0.0005]
+    pipeline.0.ddi.c_dd: {from: 0, to: 7647, n: 8}
   continuation: true
-
-observables:
-  always: [norm, magnetization]
-  on_save: [energy, energy_decomposition]
