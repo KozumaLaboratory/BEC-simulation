@@ -1,6 +1,6 @@
 # Eu151 quasi-2D ground state
 #
-# Quasi-2D geometry: tight z-confinement (l_z = sqrt(ω_⊥/ω_z) ≈ 0.847)
+# Quasi-2D geometry: tight z-confinement (l_z = sqrt(ω_⊥/ω_z) ≈ 0.9196)
 # with 2D DDI kernel. Polar (m=0) initial state.
 
 pipeline:
@@ -16,10 +16,12 @@ pipeline:
       ddi:
         enabled: true
         quasi_2d: true
-        l_z: 0.847
+        c_dd: 7647.0
+        l_z: 0.9196  # sqrt(110/130)
       zeeman: {p: 0.0, q: 0.0}
       potential: {type: harmonic, omega: [1.0, 1.0]}
-      dt: 0.001
+      dt: 0.0005
+      n_steps: 100000
       tol: 1.0e-7
       initial_state: polar
       backend: cuda

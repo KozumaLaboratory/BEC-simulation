@@ -52,8 +52,10 @@ pipeline:
       zeeman: {p: 100.0, q: 0.0}
       potential: {type: harmonic, omega: [1.0, 1.0, 1.182]}
       dt: 0.005
+      n_steps: 100000
       tol: 1.0e-10
       initial_state: ferromagnetic
+      backend: cuda
 
   # ---- Phase 1: Quench to weak field ----
   # Paper: quench to B = 2.6 nT (p ≈ 0.39)
@@ -79,8 +81,3 @@ pipeline:
       temperature_ratio: 0.1   # T/T_c
       noise_seed: 42
       zeeman: {p: 0.39, q: 0.0}
-
-observables:
-  always: [norm, magnetization]
-  on_save: [energy, populations]
-  spatial_sampling: 0.1

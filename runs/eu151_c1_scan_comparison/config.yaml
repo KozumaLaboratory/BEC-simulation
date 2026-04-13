@@ -21,11 +21,13 @@ pipeline:
         c_lhy: 1135.0
       ddi:
         enabled: true
+        c_dd: 7647.0
       zeeman:
         p: 0.0
         q: 0.0
       potential: {type: harmonic, omega: [1.0, 1.0, 1.1818]}
       dt: 0.0001
+      n_steps: 100000
       tol: 1.0e-7
       initial_state: ferromagnetic_min   # overridden by comparison runs
       backend: cuda
@@ -46,7 +48,3 @@ scan:
         pipeline.0.init_state_params:
           init_theta: 1.5707963267948966   # π/2
           init_vortex_charge: 1
-
-observables:
-  always: [norm, magnetization]
-  on_save: [energy]

@@ -26,20 +26,23 @@ pipeline:
         n: [64, 64]
         box: [12.0, 12.0]
       interactions:
-        c_total: 4689.0
+        N_atoms: 50000
+        omega_ref: 691.15
         c1_ratio: 0.0
       ddi:
         enabled: true
         c_dd: 7647.0
         quasi_2d: true
-        l_z: 0.847  # a_ho_z / a_ho_perp = 1/sqrt(130/110)
+        l_z: 0.9196  # sqrt(110/130)
       zeeman:
         p: 0.39
         q: 0.0
       potential: {type: harmonic, omega: [1.0, 1.0]}
       dt: 0.005
+      n_steps: 100000
       tol: 1.0e-8
       initial_state: polar
+      backend: cuda
 
 scan:
   zip:
@@ -48,8 +51,3 @@ scan:
         0.00099214, 0.0039686, 0.006945, 0.0099214, 0.012898,
         0.015874, 0.018851, 0.021827, 0.024804, 0.02778]
   continuation: true
-
-observables:
-  always: [norm, magnetization]
-  on_save: [energy]
-  final_only: [phase_classification, structure_factor]

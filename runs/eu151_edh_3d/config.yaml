@@ -13,7 +13,7 @@
 pipeline:
   - ground_state:
       atom: Eu151
-      grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+      grid: {n: [64, 64, 64], box: [20.0, 20.0, 20.0]}
       interactions:
         N_atoms: 50000
         omega_ref: 691.15
@@ -22,17 +22,14 @@ pipeline:
       zeeman: {p: 0.39, q: 0.0}   # B = 2.6 nT dimensionless
       potential: {type: harmonic, omega: [1.0, 1.0, 1.1818]}    # 130/110
       dt: 0.001
+      n_steps: 100000
       tol: 1.0e-7
       initial_state: antiferromagnetic   # m=-F polarized
       backend: cuda
 
   - dynamics:
-      duration: 3.0               # ω⁻¹ ≈ 4.3 ms
-      dt: 0.0002
+      duration: 27.6              # ω⁻¹ ≈ 40 ms
+      dt: 0.0001
       save_every: 750
       ddi: true                   # DDI on for dynamics
       zeeman: {p: 0.39, q: 0.0}
-
-observables:
-  always: [norm, magnetization]
-  on_save: [energy, populations]

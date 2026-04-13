@@ -29,7 +29,3 @@ pipeline:
       zeeman: {p: 0.0, q: 0.0}
       temperature_ratio: 0.1     # T/T_c (η≈1.58%)
       noise_seed: 42
-
-observables:
-  always: [norm, magnetization]
-  on_save: [energy, populations]
