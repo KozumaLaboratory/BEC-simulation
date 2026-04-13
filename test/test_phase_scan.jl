@@ -163,9 +163,4 @@ using FFTW
         @test_throws ArgumentError ConstrainedJzScan([0.0], 0.05, 15, (10.0, -10.0))
     end
 
-    @testset "ScanStabilityConfig validation" begin
-        @test_throws ArgumentError ScanStabilityConfig(true, -1.0, 300, 10)
-        s = ScanStabilityConfig()
-        @test s.enabled == false
-    end
 end

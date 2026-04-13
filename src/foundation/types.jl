@@ -596,27 +596,6 @@ struct ConstrainedJzScan <: AbstractScanSpec
     end
 end
 
-struct ScanStabilityConfig
-    enabled::Bool
-    perturbation::Float64
-    n_steps::Int
-    sample_every::Int
-
-    function ScanStabilityConfig(
-        enabled::Bool,
-        perturbation::Float64,
-        n_steps::Int,
-        sample_every::Int,
-    )
-        perturbation > 0 || throw(ArgumentError("perturbation must be positive"))
-        n_steps > 0 || throw(ArgumentError("n_steps must be positive"))
-        sample_every > 0 || throw(ArgumentError("sample_every must be positive"))
-        new(enabled, perturbation, n_steps, sample_every)
-    end
-end
-
-ScanStabilityConfig() = ScanStabilityConfig(false, 1e-4, 300, 10)
-
 # --- Simulation Result ---
 
 struct SimulationResult

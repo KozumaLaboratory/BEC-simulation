@@ -86,8 +86,7 @@ include("workflow/monitoring/live_monitor.jl")
 # 10. Experiments (defines config types needed by phases)
 include("workflow/experiments/adaptive_advice.jl")
 include("workflow/experiments/config_override.jl")  # OverrideMap + scan expansion
-include("workflow/experiments/experiment.jl")  # Defines PhaseConfig, GroundStateConfig, etc.
-include("workflow/experiments/experiment_runner.jl")
+include("workflow/experiments/helpers.jl")  # Shared: PotentialConfig, _build_potential, _build_phase_zeeman, scan parsers
 include("workflow/experiments/pipeline.jl")
 include("workflow/experiments/run_registry.jl")
 
@@ -270,7 +269,7 @@ export parse_pipeline, run_pipeline, PipelineConfig
 export load_config, load_config_from_string, run_config
 export run_yaml, run_status, list_runs, compute_run_dir
 export apply_override!, apply_overrides, expand_scan_points, parse_override_map
-export OverrideScan, ConstrainedJzScan, ScanStabilityConfig
+export OverrideScan, ConstrainedJzScan
 export PotentialConfig, ConstantValue, LinearRamp, interpolate_value
 
 # Units
