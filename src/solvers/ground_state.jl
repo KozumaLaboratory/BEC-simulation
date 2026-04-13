@@ -118,6 +118,7 @@ function find_ground_state(;
     quasi_2d::Bool = false,
     l_z::Float64 = 0.0,
     backend::AbstractBackend = CPUBackend(),
+    on_step::Union{Nothing,Function} = nothing,  # (ws, step, n_steps) → update ws params
 )
     psi0 = if psi_init === nothing
         sys = SpinSystem(atom.F)
@@ -244,6 +245,7 @@ function find_ground_state(;
     t_start = time()
 
     for step = 1:n_steps
+        on_step !== nothing && on_step(ws, step, n_steps)
         split_step!(ws)
         if any(isnan, ws.state.psi)
             throw(

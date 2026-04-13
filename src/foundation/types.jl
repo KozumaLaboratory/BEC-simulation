@@ -326,7 +326,7 @@ end
 
 # --- DDI ---
 
-struct DDIParams{N,AQ<:AbstractArray{Float64,N}}
+mutable struct DDIParams{N,AQ<:AbstractArray{Float64,N}}
     C_dd::Float64
     Q_xx::AQ
     Q_xy::AQ

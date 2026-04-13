@@ -136,12 +136,26 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
             T_over_Tc = temp_ratio, seed = Int(get(p, "noise_seed", 42)))
     end
 
+    # Build on_step callback for any ramping parameters (c_dd, etc.)
+    ramp_callbacks = Function[]
+    ddi_d_raw = get(p, "ddi", Dict())
+    if ddi_d_raw isa Dict && get(ddi_d_raw, "c_dd", nothing) isa Dict
+        c_dd_interp = _make_interpolator(ddi_d_raw["c_dd"])
+        push!(ramp_callbacks, (ws, step, ns) -> begin
+            ws.ddi !== nothing && (ws.ddi.C_dd = c_dd_interp(step / ns))
+        end)
+        c_dd_val = c_dd_interp(0.0)  # initial value for workspace creation
+    end
+
+    on_step = isempty(ramp_callbacks) ? nothing :
+        (ws, step, ns) -> for cb in ramp_callbacks; cb(ws, step, ns); end
+
     gs = find_ground_state(;
         grid, atom, interactions, zeeman, potential,
         dt, n_steps, tol, initial_state, psi_init,
         enable_ddi, c_dd = c_dd_val,
         secular_ddi = secular, quasi_2d_ddi = q2d, l_z_ddi = lz,
-        target_magnetization = target_mz, backend,
+        target_magnetization = target_mz, backend, on_step,
     )
 
     psi_out = copy(gs.workspace.state.psi)

@@ -254,8 +254,12 @@ function _parse_gs_ddi(ddi_d, inter, atom)
     end
     ddi_d = ddi_d isa Dict ? ddi_d : Dict{String,Any}("enabled" => ddi_d)
     enabled = Bool(get(ddi_d, "enabled", false))
-    c_dd = if haskey(ddi_d, "c_dd")
-        Float64(ddi_d["c_dd"])
+    c_dd_raw = get(ddi_d, "c_dd", nothing)
+    c_dd = if c_dd_raw isa Dict
+        # Ramp — pipeline will handle via on_step callback; return initial value
+        Float64(get(c_dd_raw, "from", 0.0))
+    elseif c_dd_raw !== nothing
+        Float64(c_dd_raw)
     elseif haskey(inter, "N_atoms") && haskey(inter, "omega_ref")
         compute_c_dd_dimless(atom; N_atoms = Int(inter["N_atoms"]), omega_ref = Float64(inter["omega_ref"]))
     else
