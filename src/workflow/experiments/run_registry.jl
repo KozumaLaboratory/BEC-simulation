@@ -134,7 +134,8 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
             end
 
             config = parse_pipeline(patched)
-            result = run_pipeline(config; verbose = false, psi_init = psi_prev)
+            ckpt_dir = joinpath(run_dir, ".checkpoints", basename(psi_file))
+            result = run_pipeline(config; verbose = false, psi_init = psi_prev, checkpoint_dir = ckpt_dir)
 
             finished_at = _now_iso()
             duration = time() - t_start
@@ -172,6 +173,9 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
                 rethrow(err)
             end
 
+            # Clean up checkpoint (point completed successfully)
+            isdir(ckpt_dir) && rm(ckpt_dir; recursive = true, force = true)
+
             if scan.continuation
                 chain_state[run_name] = (psi = psi_host, mz_actual = mz_actual)
             end
@@ -193,7 +197,8 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
     t_start = time()
 
     config = parse_pipeline(data)
-    result = run_pipeline(config; verbose)
+    ckpt_dir = joinpath(run_dir, ".checkpoints", basename(psi_file))
+    result = run_pipeline(config; verbose, checkpoint_dir = ckpt_dir)
 
     finished_at = _now_iso()
     duration = time() - t_start
@@ -223,6 +228,7 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
         rethrow(err)
     end
 
+    isdir(ckpt_dir) && rm(ckpt_dir; recursive = true, force = true)
     verbose && @printf("    E=%.4f conv=%s\n", energy, converged)
 end
 

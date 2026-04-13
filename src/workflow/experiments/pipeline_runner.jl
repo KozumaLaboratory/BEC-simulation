@@ -54,7 +54,8 @@ Execute a pipeline sequentially. Each step receives the current psi
 and produces a new one. Analysis steps don't modify psi but accumulate
 results.
 """
-function run_pipeline(config::PipelineConfig; verbose::Bool = true, psi_init = nothing)
+function run_pipeline(config::PipelineConfig; verbose::Bool = true, psi_init = nothing,
+                      checkpoint_dir::Union{Nothing,String} = nothing)
     psi = psi_init
     grid = nothing
     atom = nothing
@@ -63,7 +64,7 @@ function run_pipeline(config::PipelineConfig; verbose::Bool = true, psi_init = n
 
     for (i, step) in enumerate(config.steps)
         verbose && println("Step $i/$(length(config.steps)): $(nameof(typeof(step)))")
-        psi, grid, atom, workspace, step_result = _run_step(step, psi, grid, atom, workspace; verbose)
+        psi, grid, atom, workspace, step_result = _run_step(step, psi, grid, atom, workspace; verbose, checkpoint_dir)
         if step_result !== nothing
             merge!(results, step_result)
         end
@@ -74,7 +75,7 @@ end
 
 # --- Step dispatch ---
 
-function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_prev; verbose=true)
+function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_prev; verbose=true, checkpoint_dir=nothing)
     p = step.params
     atom = resolve_atom(Symbol(p["atom"]))
     grid, ndim = _setup_grid_from_params(p)
@@ -128,6 +129,8 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
         enable_ddi, c_dd = c_dd_val,
         secular_ddi = secular, quasi_2d_ddi = q2d, l_z_ddi = lz,
         target_magnetization = target_mz, backend, on_step,
+        checkpoint_dir = checkpoint_dir,
+        checkpoint_every = checkpoint_dir !== nothing ? max(1, n_steps ÷ 10) : 0,
     )
 
     psi_out = copy(gs.workspace.state.psi)
@@ -141,7 +144,7 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
     (psi_out, grid, atom, gs.workspace, step_result)
 end
 
-function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=true)
+function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=true, checkpoint_dir=nothing)
     psi_prev !== nothing || throw(ArgumentError("dynamics step requires a preceding ground_state step"))
     grid !== nothing || throw(ArgumentError("dynamics step requires grid from preceding step"))
     p = step.params
@@ -215,7 +218,7 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
     (psi_out, grid, atom, ws, step_result)
 end
 
-function _run_step(step::AnalyzeStep, psi, grid, atom, ws_prev; verbose=true)
+function _run_step(step::AnalyzeStep, psi, grid, atom, ws_prev; verbose=true, checkpoint_dir=nothing)
     psi !== nothing || throw(ArgumentError("analyze step requires psi from preceding steps"))
     results = Dict{Symbol,Any}()
 
