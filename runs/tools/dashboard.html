@@ -68,6 +68,13 @@
     <label>Run:
         <select id="run-select"><option value="">All</option></select>
     </label>
+    <label>Integration:
+        <select id="axis-select">
+            <option value="3">xy (sum z)</option>
+            <option value="2">xz (sum y)</option>
+            <option value="1">yz (sum x)</option>
+        </select>
+    </label>
 </div>
 
 <div id="warning-box" class="warning" style="display:none"></div>
@@ -84,6 +91,17 @@
 <div class="panel" style="margin-bottom:1.2rem"><div id="pop-heatmap" class="plot-tall"></div></div>
 
 <div class="panel" style="margin-bottom:1.2rem"><div id="timing-plot" class="plot"></div></div>
+
+<div class="panel" style="margin-bottom:1.2rem">
+    <div style="display:flex; align-items:center; gap:1rem; margin-bottom:0.8rem;">
+        <span style="color:#00d9ff; font-weight:bold;">Column Density</span>
+        <label style="color:#8b949e; font-size:0.85rem;">Point:
+            <select id="density-point-select" style="background:#131920;color:#e6edf3;border:1px solid #21262d;border-radius:4px;padding:0.3rem 0.5rem;font-family:inherit;font-size:0.85rem;"></select>
+        </label>
+        <span id="density-status" style="color:#8b949e; font-size:0.8rem;"></span>
+    </div>
+    <div id="density-grid" style="display:grid; gap:0.5rem;"></div>
+</div>
 
 <div class="panel" style="margin-bottom:1.2rem">
     <div class="table-wrap">
@@ -350,6 +368,9 @@ function render() {
         tr.innerHTML = rowHTML;
         tbody.appendChild(tr);
     }
+
+    // Density point selector
+    populateDensityPoints(filtered);
 }
 
 function formatTime(s) {
@@ -379,6 +400,107 @@ function generateMColors(D) {
         }
     }
     return colors;
+}
+
+// --- Density visualization ---
+const densityPointSel = document.getElementById('density-point-select');
+const densityGrid = document.getElementById('density-grid');
+const densityStatus = document.getElementById('density-status');
+const axisSel = document.getElementById('axis-select');
+
+densityPointSel.addEventListener('change', loadDensity);
+axisSel.addEventListener('change', loadDensity);
+
+function populateDensityPoints(filtered) {
+    const prev = densityPointSel.value;
+    densityPointSel.innerHTML = '';
+    for (const p of filtered) {
+        const opt = document.createElement('option');
+        opt.value = p.file;
+        const label = p.run_name ? `#${p.index} (${p.run_name})` : `#${p.index}`;
+        opt.textContent = `${label} E=${p.energy !== null ? p.energy.toFixed(2) : '?'}`;
+        densityPointSel.appendChild(opt);
+    }
+    if (prev) densityPointSel.value = prev;
+    if (densityPointSel.value) loadDensity();
+}
+
+function loadDensity() {
+    const file = densityPointSel.value;
+    const run = runDirSel.value;
+    const axis = axisSel.value;
+    if (!file || !run) return;
+    densityStatus.textContent = 'Loading...';
+    fetch(`/api/density/${encodeURIComponent(run)}/${encodeURIComponent(file)}?axis=${axis}`)
+        .then(r => r.json())
+        .then(renderDensity)
+        .catch(e => { densityStatus.textContent = 'Error: ' + e.message; });
+}
+
+function renderDensity(data) {
+    if (data.error) { densityStatus.textContent = data.error; return; }
+    densityStatus.textContent = '';
+
+    const mVals = data.m_values;
+    const D = mVals.length;
+    const shape = data.shape;
+    const labels = data.axis_labels || ['x', 'y'];
+
+    // Show total + all components with significant population
+    const totalMax = Math.max(...data.total_density);
+    const entries = [{label: 'Total', data: data.total_density}];
+    for (let mi = 0; mi < D; mi++) {
+        const maxVal = Math.max(...data.densities[mi]);
+        if (maxVal > totalMax * 1e-6) {
+            entries.push({label: `m=${mVals[mi]}`, data: data.densities[mi]});
+        }
+    }
+
+    // Grid layout: up to 4 columns
+    const ncols = Math.min(entries.length, 4);
+    densityGrid.style.gridTemplateColumns = `repeat(${ncols}, 1fr)`;
+    densityGrid.innerHTML = '';
+
+    for (const entry of entries) {
+        const div = document.createElement('div');
+        const plotId = 'density-' + entry.label.replace(/[^a-zA-Z0-9]/g, '_');
+        div.innerHTML = `<div id="${plotId}" style="width:100%;height:300px;"></div>`;
+        densityGrid.appendChild(div);
+
+        if (data.ndim >= 2) {
+            // 2D heatmap
+            const nx = shape[0], ny = shape[1];
+            const z = [];
+            for (let j = 0; j < ny; j++) {
+                const row = [];
+                for (let i = 0; i < nx; i++) {
+                    row.push(entry.data[j * nx + i]);
+                }
+                z.push(row);
+            }
+            Plotly.newPlot(plotId, [{
+                z, type: 'heatmap',
+                colorscale: 'Viridis',
+                colorbar: { len: 0.6, thickness: 10, tickfont: { size: 9, color: '#8b949e' } },
+            }], {
+                ...LAYOUT,
+                title: { text: entry.label, font: { color: '#00d9ff', size: 13 } },
+                xaxis: { ...LAYOUT.xaxis, title: labels[0] || '', scaleanchor: 'y' },
+                yaxis: { ...LAYOUT.yaxis, title: labels[1] || '' },
+                margin: { t: 35, r: 10, b: 35, l: 35 },
+            }, CFG);
+        } else {
+            // 1D line
+            Plotly.newPlot(plotId, [{
+                y: entry.data, type: 'scatter', mode: 'lines',
+                line: { color: '#00d9ff', width: 2 },
+            }], {
+                ...LAYOUT,
+                title: { text: entry.label, font: { color: '#00d9ff', size: 13 } },
+                margin: { t: 35, r: 10, b: 35, l: 40 },
+            }, CFG);
+        }
+    }
 }
 </script>
 </body>

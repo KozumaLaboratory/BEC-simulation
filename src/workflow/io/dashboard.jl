@@ -232,6 +232,35 @@ function _route_dashboard(path, html_content, data_cache, base_dir)
             end
         end
         (200, "application/json", json)
+    elseif startswith(path, "/api/density/")
+        # /api/density/run_name/point_001.jld2?axis=3
+        rest = _uri_decode(path[14:end])
+        slash_idx = findfirst('/', rest)
+        if slash_idx === nothing
+            return (400, "text/plain", "Expected /api/density/:run/:file")
+        end
+        name = rest[1:slash_idx-1]
+        file = rest[slash_idx+1:end]
+        # Parse query string for axis
+        axis = 3  # default: integrate along z
+        qidx = findfirst('?', file)
+        if qidx !== nothing
+            query = file[qidx+1:end]
+            file = file[1:qidx-1]
+            m = match(r"axis=(\d+)", query)
+            m !== nothing && (axis = parse(Int, m.captures[1]))
+        end
+        fpath = joinpath(base_dir, name, file)
+        if !isfile(fpath)
+            return (404, "text/plain", "File not found: $name/$file")
+        end
+        json = try
+            _json_string(_compute_column_densities(fpath, axis))
+        catch e
+            "{\"error\":\"$(replace(string(e), "\"" => "'"))\"}"
+        end
+        (200, "application/json", json)
+
     elseif path == "/api/refresh"
         empty!(data_cache)
         (200, "text/plain", "Cache cleared")
@@ -255,4 +284,60 @@ end
 
 function _uri_decode(s::AbstractString)
     replace(s, r"%([0-9A-Fa-f]{2})" => m -> Char(parse(UInt8, m[2:3]; base=16)))
+end
+
+"""
+Compute column densities (integrated along `axis`) for each m-component.
+Returns Dict with m_values, densities (list of 2D arrays), grid info.
+"""
+function _compute_column_densities(jld2_path::String, axis::Int = 3)
+    d = JLD2.load(jld2_path)
+    psi = d["psi"]
+    n_comp = size(psi, ndims(psi))
+    ndim = ndims(psi) - 1
+    F = div(n_comp - 1, 2)
+    m_values = [F - (c - 1) for c in 1:n_comp]
+    n_pts = ntuple(i -> size(psi, i), ndim)
+
+    if ndim == 1
+        # 1D: just return |psi_m|² directly
+        densities = [Float64[abs2(psi[i, c]) for i in 1:n_pts[1]] for c in 1:n_comp]
+        return Dict{String,Any}(
+            "m_values" => m_values,
+            "densities" => densities,
+            "ndim" => 1,
+            "shape" => [n_pts[1]],
+            "axis" => 0,
+        )
+    end
+
+    axis = clamp(axis, 1, ndim)
+    # Remaining axes after integration
+    remaining = [i for i in 1:ndim if i != axis]
+    out_shape = ntuple(i -> n_pts[remaining[i]], length(remaining))
+
+    densities = Vector{Vector{Float64}}()
+    for c in 1:n_comp
+        idx = _component_slice(ndim, n_pts, c)
+        comp = abs2.(view(psi, idx...))
+        # Sum along the integration axis
+        col = dropdims(sum(comp; dims=axis); dims=axis)
+        push!(densities, vec(col))
+    end
+
+    # Total density
+    total = zeros(Float64, prod(out_shape))
+    for dens in densities
+        total .+= dens
+    end
+
+    Dict{String,Any}(
+        "m_values" => m_values,
+        "densities" => densities,
+        "total_density" => total,
+        "ndim" => ndim,
+        "shape" => collect(out_shape),
+        "axis" => axis,
+        "axis_labels" => [["x","y","z"][i] for i in remaining],
+    )
 end
