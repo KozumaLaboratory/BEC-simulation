@@ -279,19 +279,23 @@ function _run_itp_loop!(
     end
 
     interrupted = false
+    gpu = _is_gpu(ws.state.psi)
     try
         for step = (start_step + 1):n_steps
             on_step !== nothing && on_step(ws, step, n_steps)
             split_step!(ws)
-            if any(isnan, ws.state.psi)
-                throw(
-                    ArgumentError(
-                        "NaN detected in ITP at step $step. " *
-                        "Likely DDI or interaction overflow. Reduce dt.",
-                    ),
-                )
+            # NaN check: only first 10 steps (forces GPU sync)
+            if step <= (start_step + 10)
+                if any(isnan, ws.state.psi)
+                    throw(
+                        ArgumentError(
+                            "NaN detected in ITP at step $step. " *
+                            "Likely DDI or interaction overflow. Reduce dt.",
+                        ),
+                    )
+                end
+                _check_itp_overflow(ws, step)
             end
-            step <= (start_step + 10) && _check_itp_overflow(ws, step)
             if use_constrained
                 _normalize_psi_constrained!(
                     ws.state.psi,

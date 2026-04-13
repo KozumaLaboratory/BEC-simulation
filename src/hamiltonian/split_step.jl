@@ -275,13 +275,7 @@ function _half_potential_step!(
     )
 
     if abs(ws.interactions.c1) > 1e-30
-        @timeit_debug TIMER "spin_mixing" if gpu
-            _run_on_host!(ws.state.psi) do p
-                apply_spin_mixing_step!(p, ws.spin_matrices, ws.interactions.c1, dt_half / 2, ndim; imaginary_time)
-            end
-        else
-            apply_spin_mixing_step!(ws.state.psi, ws.spin_matrices, ws.interactions.c1, dt_half / 2, ndim; imaginary_time)
-        end
+        @timeit_debug TIMER "spin_mixing" apply_spin_mixing_step!(ws.state.psi, ws.spin_matrices, ws.interactions.c1, dt_half / 2, ndim; imaginary_time)
     end
 
     c2 = get_cn(ws.interactions, 2)
@@ -358,13 +352,7 @@ function _half_potential_step!(
     end
 
     if abs(ws.interactions.c1) > 1e-30
-        @timeit_debug TIMER "spin_mixing" if gpu
-            _run_on_host!(ws.state.psi) do p
-                apply_spin_mixing_step!(p, ws.spin_matrices, ws.interactions.c1, dt_half / 2, ndim; imaginary_time)
-            end
-        else
-            apply_spin_mixing_step!(ws.state.psi, ws.spin_matrices, ws.interactions.c1, dt_half / 2, ndim; imaginary_time)
-        end
+        @timeit_debug TIMER "spin_mixing" apply_spin_mixing_step!(ws.state.psi, ws.spin_matrices, ws.interactions.c1, dt_half / 2, ndim; imaginary_time)
     end
 
     zeeman_diag_bwd = if !isnan(t_start) && ws.zeeman isa TimeDependentZeeman
