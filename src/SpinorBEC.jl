@@ -12,6 +12,7 @@ using Printf
 using Dates
 using SHA
 using SpecialFunctions: erfcx
+using Sockets
 
 const TIMER = TimerOutput()
 
@@ -271,7 +272,7 @@ export run_simulation_adaptive!, run_simulation_yoshida!, make_workspace, init_p
 export SimulationCallbacks, LiveMonitor
 
 # I/O
-export save_state, load_state, generate_dashboard_data, export_dashboard
+export save_state, load_state, generate_dashboard_data, export_dashboard, serve_dashboard
 
 # Pipeline API
 export parse_pipeline, run_pipeline, PipelineConfig

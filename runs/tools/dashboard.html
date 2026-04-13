@@ -59,8 +59,8 @@
 <div class="subtitle" id="subtitle"></div>
 
 <div class="controls">
-    <label>Load data:
-        <input type="file" id="file-input" accept=".json">
+    <label>Run dir:
+        <select id="run-dir-select"></select>
     </label>
     <label>X-axis:
         <select id="x-axis-select"></select>
@@ -104,22 +104,40 @@ const COLORS = ['#00d9ff','#a277ff','#ffd580','#ff6b9d','#50fa7b','#ff8fab','#80
 
 let DATA = null;
 
-// --- Data loading ---
-document.getElementById('file-input').addEventListener('change', e => {
-    const reader = new FileReader();
-    reader.onload = ev => { DATA = JSON.parse(ev.target.result); render(); };
-    reader.readAsText(e.target.files[0]);
-});
+// --- Data loading (server mode) ---
+const runDirSel = document.getElementById('run-dir-select');
 
-// Auto-load dashboard_data.json from same directory
-fetch('dashboard_data.json').then(r => r.ok ? r.json() : Promise.reject())
-    .then(d => { DATA = d; render(); }).catch(() => {});
-// Also try parent (when opened from runs/tools/)
-fetch('../dashboard_data.json').then(r => r.ok ? r.json() : Promise.reject())
-    .then(d => { if (!DATA) { DATA = d; render(); } }).catch(() => {});
+function loadRunList() {
+    fetch('/api/runs').then(r => r.json()).then(runs => {
+        runDirSel.innerHTML = '';
+        for (const name of runs) {
+            const opt = document.createElement('option');
+            opt.value = name; opt.textContent = name;
+            runDirSel.appendChild(opt);
+        }
+        if (runs.length > 0) loadRun(runs[0]);
+    }).catch(() => {
+        // Fallback: not in server mode, try embedded or file
+        runDirSel.style.display = 'none';
+        if (typeof EMBEDDED_DATA !== 'undefined') {
+            DATA = EMBEDDED_DATA;
+            render();
+        }
+    });
+}
 
+function loadRun(name) {
+    fetch(`/api/data/${name}`).then(r => r.json()).then(d => {
+        DATA = d;
+        render();
+    }).catch(e => console.error('Failed to load run:', e));
+}
+
+runDirSel.addEventListener('change', () => loadRun(runDirSel.value));
 document.getElementById('x-axis-select').addEventListener('change', render);
 document.getElementById('run-select').addEventListener('change', render);
+
+loadRunList();
 
 function render() {
     if (!DATA) return;

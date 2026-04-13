@@ -141,3 +141,118 @@ end
 _write_json(io::IO, n::Real) = isnan(n) ? print(io, "null") : isinf(n) ? print(io, "null") : print(io, n)
 _write_json(io::IO, b::Bool) = print(io, b ? "true" : "false")
 _write_json(io::IO, ::Nothing) = print(io, "null")
+
+function _json_string(data)
+    buf = IOBuffer()
+    _write_json(buf, data)
+    String(take!(buf))
+end
+
+# --- Dashboard server (stdlib Sockets only, no HTTP.jl needed) ---
+
+const _DASHBOARD_HTML_PATH = joinpath(@__DIR__, "..", "..", "..", "runs", "tools", "dashboard.html")
+
+"""
+    serve_dashboard(port=8080; base_dir="runs")
+
+Start a local HTTP server for the dashboard.
+Browse to http://localhost:\$port to view results.
+
+API:
+- `GET /`               → dashboard HTML
+- `GET /api/runs`       → list of run directories
+- `GET /api/data/:name` → dashboard data JSON for a run
+- `GET /api/refresh`    → clear cache
+"""
+function serve_dashboard(port::Int = 8080; base_dir::String = "runs")
+    html_path = _DASHBOARD_HTML_PATH
+    isfile(html_path) || throw(ArgumentError("Dashboard HTML not found: $html_path"))
+    html_content = read(html_path, String)
+    data_cache = Dict{String,String}()
+
+    server = Sockets.listen(Sockets.InetAddr(ip"0.0.0.0", port))
+    println("Dashboard server running at http://localhost:$port")
+    println("  Serving runs from: $(abspath(base_dir))")
+    println("  Press Ctrl+C to stop")
+    flush(stdout)
+
+    try
+        while true
+            sock = Sockets.accept(server)
+            @async _handle_dashboard_connection(sock, html_content, data_cache, base_dir)
+        end
+    catch e
+        e isa InterruptException || rethrow(e)
+        println("\nDashboard server stopped.")
+    finally
+        close(server)
+    end
+end
+
+function _handle_dashboard_connection(sock, html_content, data_cache, base_dir)
+    try
+        request_line = readline(sock)
+        isempty(request_line) && return close(sock)
+        # Read remaining headers (discard)
+        while true
+            line = readline(sock)
+            (isempty(line) || line == "\r") && break
+        end
+
+        parts = split(request_line)
+        length(parts) >= 2 || return close(sock)
+        path = String(parts[2])
+
+        status, content_type, body = _route_dashboard(path, html_content, data_cache, base_dir)
+        _send_http_response(sock, status, content_type, body)
+    catch e
+        e isa EOFError || @warn "Dashboard connection error: $e"
+    finally
+        close(sock)
+    end
+end
+
+function _route_dashboard(path, html_content, data_cache, base_dir)
+    if path == "/" || path == ""
+        (200, "text/html; charset=utf-8", html_content)
+    elseif path == "/api/runs"
+        runs = list_runs(base_dir)
+        (200, "application/json", "[" * join(["\"$r\"" for r in runs], ",") * "]")
+    elseif startswith(path, "/api/data/")
+        name = _uri_decode(path[11:end])
+        run_dir = joinpath(base_dir, name)
+        if !isdir(run_dir)
+            return (404, "text/plain", "Run not found: $name")
+        end
+        json = get!(data_cache, name) do
+            try
+                _json_string(generate_dashboard_data(run_dir))
+            catch e
+                "{\"error\":\"$(replace(string(e), "\"" => "'"))\"}"
+            end
+        end
+        (200, "application/json", json)
+    elseif path == "/api/refresh"
+        empty!(data_cache)
+        (200, "text/plain", "Cache cleared")
+    else
+        (404, "text/plain", "Not found")
+    end
+end
+
+function _send_http_response(sock, status, content_type, body)
+    reason = status == 200 ? "OK" : status == 404 ? "Not Found" : "Error"
+    body_bytes = Vector{UInt8}(body)
+    write(sock,
+        "HTTP/1.1 $status $reason\r\n" *
+        "Content-Type: $content_type\r\n" *
+        "Content-Length: $(length(body_bytes))\r\n" *
+        "Access-Control-Allow-Origin: *\r\n" *
+        "Connection: close\r\n" *
+        "\r\n")
+    write(sock, body_bytes)
+end
+
+function _uri_decode(s::AbstractString)
+    replace(s, r"%([0-9A-Fa-f]{2})" => m -> Char(parse(UInt8, m[2:3]; base=16)))
+end
