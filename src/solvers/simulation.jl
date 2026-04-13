@@ -166,36 +166,43 @@ function _run_simulation_standard!(
     live_monitor::Union{Nothing,LiveMonitor},
 ) where {N}
     t_start = time()
-    for step = 1:sp.n_steps
-        split_step!(ws)
+    try
+        for step = 1:sp.n_steps
+            split_step!(ws)
 
-        # on_step callback (called every step)
-        if callbacks.on_step !== nothing
-            callbacks.on_step(ws, step, times, energies)
-        end
-
-        # Update live monitor (throttled internally)
-        if live_monitor !== nothing
-            update!(live_monitor, ws, step)
-        end
-
-        # Snapshot and logging
-        if step % sp.save_every == 0
-            _record_snapshot!(times, energies, norms, mags, snapshots, ws, sys)
-
-            elapsed = time() - t_start
-            frac = step / sp.n_steps
-            eta = frac > 0 ? elapsed / frac * (1 - frac) : NaN
-            println(
-                "  step $(step)/$(sp.n_steps) | t=$(round(ws.state.t; sigdigits=6)) " *
-                "E=$(round(energies[end]; sigdigits=8)) | $(round(elapsed; digits=1))s elapsed, ETA $(round(eta; digits=0))s",
-            )
-            flush(stdout)
-
-            # on_snapshot callback
-            if callbacks.on_snapshot !== nothing
-                callbacks.on_snapshot(ws, step, snapshots[end])
+            if callbacks.on_step !== nothing
+                callbacks.on_step(ws, step, times, energies)
             end
+
+            if live_monitor !== nothing
+                update!(live_monitor, ws, step)
+            end
+
+            if step % sp.save_every == 0
+                _record_snapshot!(times, energies, norms, mags, snapshots, ws, sys)
+
+                elapsed = time() - t_start
+                frac = step / sp.n_steps
+                eta = frac > 0 ? elapsed / frac * (1 - frac) : NaN
+                println(
+                    "  step $(step)/$(sp.n_steps) | t=$(round(ws.state.t; sigdigits=6)) " *
+                    "E=$(round(energies[end]; sigdigits=8)) | $(round(elapsed; digits=1))s elapsed, ETA $(round(eta; digits=0))s",
+                )
+                flush(stdout)
+
+                if callbacks.on_snapshot !== nothing
+                    callbacks.on_snapshot(ws, step, snapshots[end])
+                end
+            end
+        end
+    catch e
+        if e isa InterruptException
+            _record_snapshot!(times, energies, norms, mags, snapshots, ws, sys)
+            println("\n  Simulation interrupted at step $(ws.state.step)/$(sp.n_steps), t=$(round(ws.state.t; sigdigits=6))")
+            println("  Final snapshot saved. Use run_simulation_checkpointed! with resume=true to continue.")
+            flush(stdout)
+        else
+            rethrow(e)
         end
     end
 end
@@ -227,59 +234,63 @@ function _run_simulation_leapfrog!(
     omega = sp.rotating_frame_omega
     cc = ws.coriolis_cache
 
-    # Leapfrog: initial half potential step
-    # First half-step covers [t, t+dt/2], midpoint at t+dt/4
     _half_potential_step!(ws, dt / 2, n_comp, N, false; t_eval = ws.state.t + dt / 4, t_start = ws.state.t)
 
-    for step = 1:sp.n_steps
-        _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, false, cc)
-        apply_kinetic_step_batched!(ws.state.psi, bk)
-        _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, false, cc)
+    try
+        for step = 1:sp.n_steps
+            _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, false, cc)
+            apply_kinetic_step_batched!(ws.state.psi, bk)
+            _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, false, cc)
 
-        is_save = (step % sp.save_every == 0)
-        is_last = (step == sp.n_steps)
-        need_split = is_save || is_last
+            is_save = (step % sp.save_every == 0)
+            is_last = (step == sp.n_steps)
+            need_split = is_save || is_last
 
-        t_now = ws.state.t
+            t_now = ws.state.t
 
-        if need_split
-            # Close current step: covers [t_now+dt/2, t_now+dt], midpoint at t_now+3dt/4
-            _half_potential_step!(ws, dt / 2, n_comp, N, false; t_eval = t_now + 3dt / 4, t_start = t_now + dt / 2)
-        else
-            # Merged: close [t_now+dt/2, t_now+dt] + open [t_now+dt, t_now+3dt/2]
-            # = full step [t_now+dt/2, t_now+3dt/2], midpoint at t_now+dt
-            _half_potential_step!(ws, dt, n_comp, N, false; t_eval = t_now + dt, t_start = t_now + dt / 2)
-        end
+            if need_split
+                _half_potential_step!(ws, dt / 2, n_comp, N, false; t_eval = t_now + 3dt / 4, t_start = t_now + dt / 2)
+            else
+                _half_potential_step!(ws, dt, n_comp, N, false; t_eval = t_now + dt, t_start = t_now + dt / 2)
+            end
 
-        if ws.loss !== nothing
-            apply_loss_step!(ws.state.psi, ws.loss, sys.F, dt, n_comp, N, ws.density_buf)
-        end
+            if ws.loss !== nothing
+                apply_loss_step!(ws.state.psi, ws.loss, sys.F, dt, n_comp, N, ws.density_buf)
+            end
 
-        ws.state.t += dt
-        ws.state.step += 1
+            ws.state.t += dt
+            ws.state.step += 1
 
-        # on_step callback (called every step)
-        if callbacks.on_step !== nothing
-            callbacks.on_step(ws, step, times, energies)
-        end
+            if callbacks.on_step !== nothing
+                callbacks.on_step(ws, step, times, energies)
+            end
 
-        # Update live monitor (throttled internally)
-        if live_monitor !== nothing
-            update!(live_monitor, ws, step)
-        end
+            if live_monitor !== nothing
+                update!(live_monitor, ws, step)
+            end
 
-        if is_save
-            _record_snapshot!(times, energies, norms, mags, snapshots, ws, sys)
+            if is_save
+                _record_snapshot!(times, energies, norms, mags, snapshots, ws, sys)
 
-            # on_snapshot callback
-            if callbacks.on_snapshot !== nothing
-                callbacks.on_snapshot(ws, step, snapshots[end])
+                if callbacks.on_snapshot !== nothing
+                    callbacks.on_snapshot(ws, step, snapshots[end])
+                end
+            end
+
+            if need_split && !is_last
+                _half_potential_step!(ws, dt / 2, n_comp, N, false; t_eval = ws.state.t + dt / 4, t_start = ws.state.t)
             end
         end
-
-        # Open next step if we split: covers [t_now+dt, t_now+3dt/2], midpoint at t_now+dt+dt/4
-        if need_split && !is_last
+    catch e
+        if e isa InterruptException
+            # Close the open half-step so psi is in a valid Strang-split state
             _half_potential_step!(ws, dt / 2, n_comp, N, false; t_eval = ws.state.t + dt / 4, t_start = ws.state.t)
+            _record_snapshot!(times, energies, norms, mags, snapshots, ws, sys)
+            println("\n  Simulation interrupted at step $(ws.state.step)/$(sp.n_steps), t=$(round(ws.state.t; sigdigits=6))")
+            println("  Final snapshot saved. Use run_simulation_checkpointed! with resume=true to continue.")
+            flush(stdout)
+        else
+            rethrow(e)
         end
     end
 end

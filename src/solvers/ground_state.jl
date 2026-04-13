@@ -119,6 +119,11 @@ function find_ground_state(;
     l_z::Float64 = 0.0,
     backend::AbstractBackend = CPUBackend(),
     on_step::Union{Nothing,Function} = nothing,  # (ws, step, n_steps) → update ws params
+    checkpoint_dir::Union{Nothing,String} = nothing,
+    checkpoint_every::Int = 0,
+    _start_step::Int = 0,        # internal: for resume
+    _checkpoint_dir::Union{Nothing,String} = nothing,  # internal alias
+    _checkpoint_every::Int = 0,   # internal alias
 )
     psi0 = if psi_init === nothing
         sys = SpinSystem(atom.F)
@@ -237,61 +242,111 @@ function find_ground_state(;
         )
     end
 
+    ckpt_dir = checkpoint_dir !== nothing ? checkpoint_dir : _checkpoint_dir
+    ckpt_every = checkpoint_every > 0 ? checkpoint_every : _checkpoint_every
+
+    _run_itp_loop!(ws, n_steps, tol, on_step, target_magnetization;
+        start_step = _start_step,
+        checkpoint_dir = ckpt_dir,
+        checkpoint_every = ckpt_every,
+    )
+end
+
+# --- Core ITP loop (interrupt-safe, checkpoint-capable) ---
+
+function _run_itp_loop!(
+    ws, n_steps, tol, on_step, target_magnetization;
+    start_step::Int = 0,
+    checkpoint_dir::Union{Nothing,String} = nothing,
+    checkpoint_every::Int = 0,
+)
+    sp = ws.sim_params
+    n_comp = ws.spin_matrices.system.n_components
+    F = ws.atom.F
+    N_dim = length(ws.grid.config.n_points)
+    use_constrained = target_magnetization !== nothing
+
     E_prev = total_energy(ws)
     converged = false
     psi_prev = copy(ws.state.psi)
     final_dE = NaN
     final_dpsi = NaN
+    last_step = start_step
     t_start = time()
 
-    for step = 1:n_steps
-        on_step !== nothing && on_step(ws, step, n_steps)
-        split_step!(ws)
-        if any(isnan, ws.state.psi)
-            throw(
-                ArgumentError(
-                    "NaN detected in ITP at step $step. " *
-                    "Likely DDI or interaction overflow. Reduce dt.",
-                ),
-            )
-        end
-        step <= 10 && _check_itp_overflow(ws, step)
-        if use_constrained
-            _normalize_psi_constrained!(
-                ws.state.psi,
-                ws.grid,
-                n_comp,
-                N_dim,
-                target_magnetization,
-                atom.F,
-            )
-        end
-        if step % sp.save_every == 0
-            E = total_energy(ws)
-            dE = abs(E - E_prev)
-            psi_max = maximum(abs, ws.state.psi)
-            dpsi = psi_max > 0 ? maximum(abs, ws.state.psi .- psi_prev) / psi_max : 0.0
-            final_dE = dE
-            final_dpsi = dpsi
+    if checkpoint_dir !== nothing
+        mkpath(checkpoint_dir)
+    end
 
-            elapsed = time() - t_start
-            frac = step / n_steps
-            eta = frac > 0 ? elapsed / frac * (1 - frac) : NaN
-            println(
-                "  ITP $(step)/$(n_steps) | E=$(round(E; sigdigits=8)) dE=$(round(dE; sigdigits=3)) " *
-                "dpsi=$(round(dpsi; sigdigits=3)) | $(round(elapsed; digits=1))s elapsed, ETA $(round(eta; digits=0))s",
-            )
-            flush(stdout)
-
-            # Convergence by dE only — dpsi can stay large with persistent
-            # mass currents (DDI-driven vortex flow, FL texture, etc.)
-            if dE < tol
-                converged = true
-                break
+    interrupted = false
+    try
+        for step = (start_step + 1):n_steps
+            on_step !== nothing && on_step(ws, step, n_steps)
+            split_step!(ws)
+            if any(isnan, ws.state.psi)
+                throw(
+                    ArgumentError(
+                        "NaN detected in ITP at step $step. " *
+                        "Likely DDI or interaction overflow. Reduce dt.",
+                    ),
+                )
             end
-            E_prev = E
-            copyto!(psi_prev, ws.state.psi)
+            step <= (start_step + 10) && _check_itp_overflow(ws, step)
+            if use_constrained
+                _normalize_psi_constrained!(
+                    ws.state.psi,
+                    ws.grid,
+                    n_comp,
+                    N_dim,
+                    target_magnetization,
+                    F,
+                )
+            end
+            last_step = step
+
+            if checkpoint_dir !== nothing && checkpoint_every > 0 && step % checkpoint_every == 0
+                _save_itp_checkpoint(checkpoint_dir, ws, step, n_steps, E_prev, final_dE, final_dpsi, converged, tol)
+            end
+
+            if step % sp.save_every == 0
+                E = total_energy(ws)
+                dE = abs(E - E_prev)
+                psi_max = maximum(abs, ws.state.psi)
+                dpsi = psi_max > 0 ? maximum(abs, ws.state.psi .- psi_prev) / psi_max : 0.0
+                final_dE = dE
+                final_dpsi = dpsi
+
+                elapsed = time() - t_start
+                frac = step / n_steps
+                eta = frac > 0 ? elapsed / frac * (1 - frac) : NaN
+                println(
+                    "  ITP $(step)/$(n_steps) | E=$(round(E; sigdigits=8)) dE=$(round(dE; sigdigits=3)) " *
+                    "dpsi=$(round(dpsi; sigdigits=3)) | $(round(elapsed; digits=1))s elapsed, ETA $(round(eta; digits=0))s",
+                )
+                flush(stdout)
+
+                if dE < tol
+                    converged = true
+                    break
+                end
+                E_prev = E
+                copyto!(psi_prev, ws.state.psi)
+            end
         end
+    catch e
+        if e isa InterruptException
+            interrupted = true
+            println("\n  ITP interrupted at step $last_step/$n_steps")
+            flush(stdout)
+        else
+            rethrow(e)
+        end
+    end
+
+    if interrupted && checkpoint_dir !== nothing
+        _save_itp_checkpoint(checkpoint_dir, ws, last_step, n_steps, total_energy(ws), final_dE, final_dpsi, converged, tol)
+        println("  Checkpoint saved to $checkpoint_dir/itp_checkpoint.jld2")
+        flush(stdout)
     end
 
     (
@@ -300,6 +355,137 @@ function find_ground_state(;
         energy = total_energy(ws),
         dE = final_dE,
         dpsi = final_dpsi,
+        interrupted = interrupted,
+        last_step = last_step,
+    )
+end
+
+function _save_itp_checkpoint(dir, ws, step, n_steps, energy, dE, dpsi, converged, tol)
+    psi_host = _to_host(ws.state.psi)
+    fname = joinpath(dir, "itp_checkpoint.jld2")
+    tmp = fname * ".tmp"
+    try
+        jldopen(tmp, "w") do f
+            f["psi"] = psi_host
+            f["step"] = step
+            f["n_steps"] = n_steps
+            f["energy"] = energy
+            f["dE"] = isnan(dE) ? Inf : dE
+            f["dpsi"] = isnan(dpsi) ? Inf : dpsi
+            f["converged"] = converged
+            f["dt"] = ws.sim_params.dt
+            f["tol"] = tol
+            f["atom_name"] = ws.atom.name
+            f["grid_n_points"] = ws.grid.config.n_points
+            f["grid_box_size"] = ws.grid.config.box_size
+            f["c0"] = ws.interactions.c0
+            f["c1"] = ws.interactions.c1
+        end
+        mv(tmp, fname; force = true)
+    catch err
+        isfile(tmp) && rm(tmp; force = true)
+        @warn "Failed to save ITP checkpoint: $err"
+    end
+end
+
+"""
+    load_itp_checkpoint(path) -> ITPCheckpoint
+
+Load an ITP checkpoint from a JLD2 file (or directory containing itp_checkpoint.jld2).
+"""
+function load_itp_checkpoint(path::String)
+    fname = isdir(path) ? joinpath(path, "itp_checkpoint.jld2") : path
+    isfile(fname) || throw(ArgumentError("Checkpoint not found: $fname"))
+    d = JLD2.load(fname)
+    ITPCheckpoint(
+        d["psi"],
+        d["step"],
+        d["n_steps"],
+        d["energy"],
+        get(d, "dE", NaN),
+        get(d, "dpsi", NaN),
+        get(d, "converged", false),
+        d["dt"],
+        get(d, "tol", 1e-10),
+    )
+end
+
+"""
+    resume_ground_state(checkpoint; grid, atom, interactions, kwargs...) -> NamedTuple
+
+Resume ITP from a checkpoint. The checkpoint can be:
+- An `ITPCheckpoint` (from `load_itp_checkpoint`)
+- A file path or directory containing `itp_checkpoint.jld2`
+
+Requires the same `grid`, `atom`, `interactions` (and other workspace params)
+as the original run. `n_steps`, `tol`, `dt` default to the checkpoint values.
+"""
+function resume_ground_state(checkpoint::ITPCheckpoint;
+    n_steps::Int = checkpoint.n_steps,
+    tol::Float64 = checkpoint.tol,
+    dt::Float64 = checkpoint.dt,
+    checkpoint_dir::Union{Nothing,String} = nothing,
+    checkpoint_every::Int = 0,
+    kwargs...,
+)
+    checkpoint.converged && @warn "Checkpoint already converged (dE=$(checkpoint.dE)). Use refine_ground_state to continue with tighter tol."
+
+    remaining = n_steps - checkpoint.step
+    remaining <= 0 && return (
+        workspace = nothing,
+        converged = checkpoint.converged,
+        energy = checkpoint.energy,
+        dE = checkpoint.dE,
+        dpsi = checkpoint.dpsi,
+        interrupted = false,
+        last_step = checkpoint.step,
+    )
+
+    find_ground_state(;
+        psi_init = copy(checkpoint.psi),
+        dt, n_steps, tol,
+        _start_step = checkpoint.step,
+        _checkpoint_dir = checkpoint_dir,
+        _checkpoint_every = checkpoint_every,
+        kwargs...,
+    )
+end
+
+function resume_ground_state(path::String; kwargs...)
+    resume_ground_state(load_itp_checkpoint(path); kwargs...)
+end
+
+"""
+    refine_ground_state(result; tol, dt, n_steps, kwargs...) -> NamedTuple
+
+Take an existing ground state result and continue ITP with tighter parameters.
+The `result` should be a NamedTuple from `find_ground_state` (must have `.workspace`).
+
+Typical usage: converged at tol=1e-8, refine to tol=1e-10.
+"""
+function refine_ground_state(result::NamedTuple;
+    tol::Float64 = result.workspace.sim_params.imaginary_time ? 1e-12 : 1e-10,
+    dt::Float64 = result.workspace.sim_params.dt,
+    n_steps::Int = result.workspace.sim_params.n_steps,
+    checkpoint_dir::Union{Nothing,String} = nothing,
+    checkpoint_every::Int = 0,
+    on_step::Union{Nothing,Function} = nothing,
+    target_magnetization::Union{Nothing,Float64} = nothing,
+)
+    ws = result.workspace
+    println("  Refining: E=$(round(result.energy; sigdigits=8)), dE=$(result.dE), tol_new=$tol, dt=$dt")
+    flush(stdout)
+
+    ws_new = if dt != ws.sim_params.dt
+        _rebuild_workspace_with_dt(ws, dt)
+    else
+        ws
+    end
+
+    _run_itp_loop!(ws_new, n_steps, tol, on_step, target_magnetization;
+        start_step = 0,
+        checkpoint_dir,
+        checkpoint_every,
     )
 end
 

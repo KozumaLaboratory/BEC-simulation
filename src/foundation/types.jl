@@ -596,6 +596,20 @@ struct ConstrainedJzScan <: AbstractScanSpec
     end
 end
 
+# --- ITP Checkpoint (for pause/resume/refine) ---
+
+struct ITPCheckpoint
+    psi::Array{ComplexF64}
+    step::Int
+    n_steps::Int
+    energy::Float64
+    dE::Float64
+    dpsi::Float64
+    converged::Bool
+    dt::Float64
+    tol::Float64
+end
+
 # --- Simulation Result ---
 
 struct SimulationResult
