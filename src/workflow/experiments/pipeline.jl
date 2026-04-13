@@ -92,11 +92,12 @@ function run_pipeline(config::PipelineConfig; verbose::Bool = true, psi_init = n
     psi = psi_init
     grid = nothing
     atom = nothing
+    workspace = nothing   # last workspace (carries interactions/ddi/potential)
     results = Dict{Symbol,Any}()
 
     for (i, step) in enumerate(config.steps)
         verbose && println("Step $i/$(length(config.steps)): $(nameof(typeof(step)))")
-        psi, grid, atom, step_result = _run_step(step, psi, grid, atom; verbose)
+        psi, grid, atom, workspace, step_result = _run_step(step, psi, grid, atom, workspace; verbose)
         if step_result !== nothing
             merge!(results, step_result)
         end
@@ -107,7 +108,7 @@ end
 
 # --- Step dispatch ---
 
-function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev; verbose=true)
+function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_prev; verbose=true)
     p = step.params
     atom_name = Symbol(p["atom"])
     atom = resolve_atom(atom_name)
@@ -208,10 +209,10 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev; verbos
         :ground_state_converged => gs.converged,
         :workspace => gs.workspace,
     )
-    (psi_out, grid, atom, step_result)
+    (psi_out, grid, atom, gs.workspace, step_result)
 end
 
-function _run_step(step::DynamicsStep, psi_prev, grid, atom; verbose=true)
+function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=true)
     psi_prev !== nothing || throw(ArgumentError("dynamics step requires a preceding ground_state step"))
     grid !== nothing || throw(ArgumentError("dynamics step requires grid from preceding step"))
     p = step.params
@@ -222,25 +223,47 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom; verbose=true)
     dt = Float64(p["dt"])
     save_every = Int(get(p, "save_every", max(1, round(Int, duration / dt / 20))))
 
-    # DDI
+    # Inherit from previous workspace (GS step) as defaults
+    prev_interactions = ws_prev !== nothing ? ws_prev.interactions : InteractionParams(0.0, 0.0)
+    prev_potential = ws_prev !== nothing ? ws_prev.potential : HarmonicTrap(ntuple(_ -> 1.0, ndim))
+    prev_ddi = ws_prev !== nothing ? ws_prev.ddi : nothing
+    prev_c_dd = prev_ddi !== nothing ? prev_ddi.C_dd : NaN
+    prev_enable_ddi = prev_ddi !== nothing
+
+    # DDI: explicit in dynamics step overrides inherited
     ddi_raw = get(p, "ddi", nothing)
-    enable_ddi = ddi_raw isa Bool ? ddi_raw : (ddi_raw isa Dict ? Bool(get(ddi_raw, "enabled", false)) : false)
-    c_dd_val = ddi_raw isa Dict ? Float64(get(ddi_raw, "c_dd", NaN)) : NaN
+    enable_ddi = if ddi_raw === nothing
+        prev_enable_ddi
+    elseif ddi_raw isa Bool
+        ddi_raw
+    elseif ddi_raw isa Dict
+        Bool(get(ddi_raw, "enabled", prev_enable_ddi))
+    else
+        prev_enable_ddi
+    end
+    c_dd_val = if ddi_raw isa Dict && haskey(ddi_raw, "c_dd")
+        Float64(ddi_raw["c_dd"])
+    else
+        prev_c_dd
+    end
 
     # Zeeman (supports ramp)
-    z = get(p, "zeeman", Dict())
-    # _build_phase_zeeman expects {ground_state: {zeeman: ...}} structure
     zeeman_wrapper = Dict{String,Any}("ground_state" => Dict{String,Any}("zeeman" => get(p, "zeeman", Dict())))
     zeeman = _build_phase_zeeman(zeeman_wrapper, 0.0, duration)
 
-    # Potential
-    trap = get(p, "trap", nothing)
-    potential = if trap !== nothing
-        omega = trap isa Vector ? NTuple{ndim,Float64}(Float64.(trap)) :
-                                  NTuple{ndim,Float64}(ntuple(_ -> 1.0, ndim))
-        HarmonicTrap(omega)
+    # Potential: explicit overrides inherited
+    pot_d = get(p, "potential", nothing)
+    potential = if pot_d !== nothing
+        if pot_d isa Vector
+            components = [PotentialConfig(Symbol(get(c, "type", "harmonic")),
+                Dict{String,Any}(string(k) => v for (k, v) in c if k != "type")) for c in pot_d]
+            _build_potential(PotentialConfig(:composite, Dict{String,Any}("components" => components)), ndim)
+        else
+            _build_potential(PotentialConfig(Symbol(get(pot_d, "type", "harmonic")),
+                Dict{String,Any}(string(k) => v for (k, v) in pot_d if k != "type")), ndim)
+        end
     else
-        HarmonicTrap(ntuple(_ -> 1.0, ndim))
+        prev_potential
     end
 
     # Noise
@@ -251,15 +274,9 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom; verbose=true)
     n_steps = round(Int, duration / dt)
     sp = SimParams(; dt, n_steps, save_every)
 
-    # Read interactions from the workspace left by GS step (if available)
-    # For simplicity, rebuild from params if provided
+    # Interactions: explicit overrides inherited
     inter = get(p, "interactions", nothing)
-    interactions = if inter !== nothing
-        _parse_gs_interactions(inter, atom)
-    else
-        # Fall through to workspace interactions (via caller)
-        InteractionParams(0.0, 0.0)
-    end
+    interactions = inter !== nothing ? _parse_gs_interactions(inter, atom) : prev_interactions
 
     ws = make_workspace(;
         grid, atom, interactions,
@@ -283,10 +300,10 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom; verbose=true)
         :dynamics_result => result,
         :dynamics_workspace => ws,
     )
-    (psi_out, grid, atom, step_result)
+    (psi_out, grid, atom, ws, step_result)
 end
 
-function _run_step(step::AnalyzeStep, psi, grid, atom; verbose=true)
+function _run_step(step::AnalyzeStep, psi, grid, atom, ws_prev; verbose=true)
     psi !== nothing || throw(ArgumentError("analyze step requires psi from preceding steps"))
     F = atom.F
     results = Dict{Symbol,Any}()
@@ -298,7 +315,7 @@ function _run_step(step::AnalyzeStep, psi, grid, atom; verbose=true)
         verbose && println("done")
     end
 
-    (psi, grid, atom, results)
+    (psi, grid, atom, ws_prev, results)
 end
 
 # --- Analyzer dispatch ---
