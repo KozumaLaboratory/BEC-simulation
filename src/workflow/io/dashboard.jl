@@ -117,7 +117,27 @@ function _write_json(io::IO, v::AbstractVector)
     print(io, "]")
 end
 
-_write_json(io::IO, s::AbstractString) = print(io, "\"", replace(replace(s, "\\" => "\\\\"), "\"" => "\\\""), "\"")
+function _write_json(io::IO, s::AbstractString)
+    print(io, '"')
+    for ch in s
+        if ch == '"'
+            print(io, "\\\"")
+        elseif ch == '\\'
+            print(io, "\\\\")
+        elseif ch == '\n'
+            print(io, "\\n")
+        elseif ch == '\r'
+            print(io, "\\r")
+        elseif ch == '\t'
+            print(io, "\\t")
+        elseif codepoint(ch) < 0x20
+            @printf(io, "\\u%04x", codepoint(ch))
+        else
+            print(io, ch)
+        end
+    end
+    print(io, '"')
+end
 _write_json(io::IO, n::Real) = isnan(n) ? print(io, "null") : isinf(n) ? print(io, "null") : print(io, n)
 _write_json(io::IO, b::Bool) = print(io, b ? "true" : "false")
 _write_json(io::IO, ::Nothing) = print(io, "null")
