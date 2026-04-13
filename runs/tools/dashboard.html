@@ -108,6 +108,12 @@
         <label style="color:#8b949e; font-size:0.85rem;">Point:
             <select id="density-point-select" style="background:#131920;color:#e6edf3;border:1px solid #21262d;border-radius:4px;padding:0.3rem 0.5rem;font-family:inherit;font-size:0.85rem;"></select>
         </label>
+        <label style="color:#8b949e; font-size:0.85rem;">Color:
+            <select id="colorscale-mode" style="background:#131920;color:#e6edf3;border:1px solid #21262d;border-radius:4px;padding:0.3rem 0.5rem;font-family:inherit;font-size:0.85rem;">
+                <option value="shared">Shared scale</option>
+                <option value="individual">Individual scale</option>
+            </select>
+        </label>
         <span id="density-status" style="color:#8b949e; font-size:0.8rem;"></span>
     </div>
     <div id="density-grid" style="display:grid; gap:0.5rem;"></div>
@@ -611,27 +617,31 @@ function loadDensity() {
     });
 }
 
+let lastColData = null;
+const colorModeSel = document.getElementById('colorscale-mode');
+colorModeSel.addEventListener('change', () => { if (lastColData) renderDensity(lastColData); });
+
 function renderDensity(data) {
     if (data.error) { densityStatus.textContent = data.error; return; }
     densityStatus.textContent = '';
+    lastColData = data;
 
     const mVals = data.m_values;
     const D = mVals.length;
     const shape = data.shape;
     const labels = data.axis_labels || ['x', 'y'];
+    const ranges = data.axis_ranges || [[0, shape[0]-1], [0, shape[1]-1]];
+    const shared = colorModeSel.value === 'shared';
 
-    // Show total + all components with significant population
     const totalMax = Math.max(...data.total_density);
     const entries = [{label: 'Total', data: data.total_density}];
     for (let mi = 0; mi < D; mi++) {
         const maxVal = Math.max(...data.densities[mi]);
-        // Show if peak density is at least 0.1% of total peak
         if (maxVal > totalMax * 1e-3) {
             entries.push({label: `m=${mVals[mi]}`, data: data.densities[mi]});
         }
     }
 
-    // Grid layout: up to 4 columns
     const ncols = Math.min(entries.length, 4);
     densityGrid.style.gridTemplateColumns = `repeat(${ncols}, 1fr)`;
     densityGrid.innerHTML = '';
@@ -643,8 +653,9 @@ function renderDensity(data) {
         densityGrid.appendChild(div);
 
         if (data.ndim >= 2) {
-            // 2D heatmap
             const nx = shape[0], ny = shape[1];
+            const x0 = ranges[0][0], x1 = ranges[0][1];
+            const y0 = ranges[1][0], y1 = ranges[1][1];
             const z = [];
             for (let j = 0; j < ny; j++) {
                 const row = [];
@@ -653,15 +664,19 @@ function renderDensity(data) {
                 }
                 z.push(row);
             }
+            const entryMax = Math.max(...entry.data);
             Plotly.newPlot(plotId, [{
                 z, type: 'heatmap',
+                x0: x0, dx: (x1 - x0) / (nx - 1),
+                y0: y0, dy: (y1 - y0) / (ny - 1),
+                zmin: 0, zmax: shared ? totalMax : entryMax,
                 colorscale: 'Viridis',
                 colorbar: { len: 0.6, thickness: 10, tickfont: { size: 9, color: '#8b949e' } },
             }], {
                 ...LAYOUT,
                 title: { text: entry.label, font: { color: '#00d9ff', size: 13 } },
-                xaxis: { ...LAYOUT.xaxis, title: labels[0] || '', scaleanchor: 'y' },
-                yaxis: { ...LAYOUT.yaxis, title: labels[1] || '' },
+                xaxis: { ...LAYOUT.xaxis, title: `${labels[0] || ''} [a_ho]`, scaleanchor: 'y' },
+                yaxis: { ...LAYOUT.yaxis, title: `${labels[1] || ''} [a_ho]` },
                 margin: { t: 35, r: 10, b: 35, l: 35 },
             }, CFG);
         } else {

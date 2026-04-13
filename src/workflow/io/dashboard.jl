@@ -363,6 +363,28 @@ function _compute_3d_densities(jld2_path::String; max_n::Int = 40, max_component
 end
 
 """
+Read box_size from the config.yaml in the same directory as the JLD2 file.
+Returns nothing if not found.
+"""
+function _read_box_size(jld2_path::String)
+    config_path = joinpath(dirname(jld2_path), "config.yaml")
+    isfile(config_path) || return nothing
+    try
+        data = YAML.load_file(config_path)
+        pipe = get(data, "pipeline", [])
+        isempty(pipe) && return nothing
+        gs = first(values(pipe[1]))
+        g = get(gs, "grid", nothing)
+        g === nothing && return nothing
+        box_raw = g isa Dict ? get(g, "box", get(g, "box_size", nothing)) : nothing
+        box_raw === nothing && return nothing
+        box_raw isa Vector ? Float64.(box_raw) : Float64[Float64(box_raw)]
+    catch
+        nothing
+    end
+end
+
+"""
 Compute column densities (integrated along `axis`) for each m-component.
 Returns Dict with m_values, densities (list of 2D arrays), grid info.
 """
@@ -374,21 +396,23 @@ function _compute_column_densities(jld2_path::String, axis::Int = 3)
     F = div(n_comp - 1, 2)
     m_values = [F - (c - 1) for c in 1:n_comp]
     n_pts = ntuple(i -> size(psi, i), ndim)
+    box = _read_box_size(jld2_path)
 
     if ndim == 1
-        # 1D: just return |psi_m|² directly
         densities = [Float64[abs2(psi[i, c]) for i in 1:n_pts[1]] for c in 1:n_comp]
+        x_range = box !== nothing ? [-box[1]/2, box[1]/2] : [0, n_pts[1]-1]
         return Dict{String,Any}(
             "m_values" => m_values,
             "densities" => densities,
             "ndim" => 1,
             "shape" => [n_pts[1]],
             "axis" => 0,
+            "box" => box,
+            "x_range" => x_range,
         )
     end
 
     axis = clamp(axis, 1, ndim)
-    # Remaining axes after integration
     remaining = [i for i in 1:ndim if i != axis]
     out_shape = ntuple(i -> n_pts[remaining[i]], length(remaining))
 
@@ -396,15 +420,21 @@ function _compute_column_densities(jld2_path::String, axis::Int = 3)
     for c in 1:n_comp
         idx = _component_slice(ndim, n_pts, c)
         comp = abs2.(view(psi, idx...))
-        # Sum along the integration axis
         col = dropdims(sum(comp; dims=axis); dims=axis)
         push!(densities, vec(col))
     end
 
-    # Total density
     total = zeros(Float64, prod(out_shape))
     for dens in densities
         total .+= dens
+    end
+
+    axis_names = ["x","y","z"]
+    ax_labels = [axis_names[i] for i in remaining]
+    ax_ranges = if box !== nothing && length(box) >= ndim
+        [[-box[i]/2, box[i]/2] for i in remaining]
+    else
+        [[0, n_pts[i]-1] for i in remaining]
     end
 
     Dict{String,Any}(
@@ -414,6 +444,8 @@ function _compute_column_densities(jld2_path::String, axis::Int = 3)
         "ndim" => ndim,
         "shape" => collect(out_shape),
         "axis" => axis,
-        "axis_labels" => [["x","y","z"][i] for i in remaining],
+        "axis_labels" => ax_labels,
+        "axis_ranges" => ax_ranges,
+        "box" => box,
     )
 end
