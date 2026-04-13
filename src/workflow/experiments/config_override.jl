@@ -147,8 +147,28 @@ function _expand_values(spec)
     elseif scale == :log
         from > 0 && to > 0 || throw(ArgumentError("log scale requires positive from/to"))
         return [exp(v) for v in range(log(from), log(to); length = n)]
+    elseif scale == :sqrt
+        # √ scale: denser near 0, sparser at large values
+        s_from = sign(from) * sqrt(abs(from))
+        s_to = sign(to) * sqrt(abs(to))
+        return [sign(v) * v^2 for v in range(s_from, s_to; length = n)]
+    elseif scale == :geom
+        # Geometric: same as log but allows from=0 by shifting
+        from >= 0 && to > 0 || throw(ArgumentError("geom scale requires non-negative from/to"))
+        if from == 0
+            return [0.0; [exp(v) for v in range(log(to / n), log(to); length = n - 1)]]
+        end
+        return [exp(v) for v in range(log(from), log(to); length = n)]
+    elseif scale == :cosine
+        # Cosine spacing: denser at endpoints (Chebyshev nodes)
+        return [(from + to) / 2 + (to - from) / 2 * cos(π * (n - k) / (n - 1)) for k in 1:n]
+    elseif scale == :reverse_log
+        # Denser near `to` (log-reversed)
+        to > 0 || throw(ArgumentError("reverse_log requires to > 0"))
+        reversed = [exp(v) for v in range(log(to), log(max(from, to/1000)); length = n)]
+        return reverse(reversed)
     else
-        throw(ArgumentError("Unknown scale: $scale. Supported: linear, log"))
+        throw(ArgumentError("Unknown scale: $scale. Supported: linear, log, sqrt, geom, cosine, reverse_log"))
     end
 end
 

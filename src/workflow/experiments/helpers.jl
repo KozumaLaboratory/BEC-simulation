@@ -328,8 +328,9 @@ end
 
 """
 Parse zeeman from pipeline params. Supports:
-  - {p: 0.5, q: 0.0}           → constant ZeemanParams
-  - {p: {from: 100, to: 0}}    → TimeDependentZeeman ramp over `duration`
+  - {p: 0.5, q: 0.0}                     → constant ZeemanParams
+  - {p: {from: 100, to: 0}}              → linear ramp
+  - {p: {from: 100, to: 0.1, scale: log}} → log ramp (denser near small values)
 """
 function _parse_zeeman(z, duration::Float64)
     z isa Dict || return ZeemanParams(0.0, 0.0)
@@ -343,12 +344,49 @@ function _parse_zeeman(z, duration::Float64)
         return ZeemanParams(_zeeman_scalar(p_spec), _zeeman_scalar(q_spec))
     end
 
-    # At least one is a ramp → TimeDependentZeeman
-    p_ramp = _parse_ramp_or_constant(p_spec)
-    q_ramp = _parse_ramp_or_constant(q_spec)
+    p_interp = _make_interpolator(p_spec)
+    q_interp = _make_interpolator(q_spec)
 
     TimeDependentZeeman(t -> begin
         t_frac = duration > 0 ? clamp(t / duration, 0.0, 1.0) : 0.0
-        ZeemanParams(interpolate_value(p_ramp, t_frac), interpolate_value(q_ramp, t_frac))
+        ZeemanParams(p_interp(t_frac), q_interp(t_frac))
     end)
+end
+
+"""
+Build an interpolation function from a ramp spec.
+Scalar → constant. Dict {from, to, scale?} → scaled interpolation.
+"""
+function _make_interpolator(spec)
+    spec isa Dict || return _ -> Float64(spec)
+
+    from = Float64(spec["from"])
+    to = Float64(get(spec, "to", from))
+    scale = Symbol(get(spec, "scale", "linear"))
+
+    if scale == :linear
+        return t -> from + (to - from) * t
+    elseif scale == :log
+        from > 0 && to > 0 || throw(ArgumentError("log ramp requires positive from/to"))
+        log_from = log(from)
+        log_to = log(to)
+        return t -> exp(log_from + (log_to - log_from) * t)
+    elseif scale == :sqrt
+        s_from = sign(from) * sqrt(abs(from))
+        s_to = sign(to) * sqrt(abs(to))
+        return t -> begin
+            s = s_from + (s_to - s_from) * t
+            sign(s) * s^2
+        end
+    elseif scale == :cosine
+        # Smooth start/end (S-curve)
+        return t -> from + (to - from) * (1 - cos(π * t)) / 2
+    elseif scale == :exponential
+        # Fast initial decay, slow tail
+        from > 0 || throw(ArgumentError("exponential ramp requires positive from"))
+        rate = -log(max(to / from, 1e-10))
+        return t -> from * exp(-rate * t)
+    else
+        throw(ArgumentError("Unknown ramp scale: $scale. Supported: linear, log, sqrt, cosine, exponential"))
+    end
 end
