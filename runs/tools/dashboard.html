@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpinorBEC Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0e14;
+            color: #e6edf3;
+            padding: 1.5rem;
+        }
+        h1 { color: #00d9ff; text-align: center; font-size: 1.8rem; margin-bottom: 0.3rem; }
+        .subtitle { text-align: center; color: #8b949e; margin-bottom: 1rem; font-size: 0.85rem; }
+        .controls {
+            display: flex; gap: 1rem; align-items: center; justify-content: center;
+            margin-bottom: 1.5rem; flex-wrap: wrap;
+        }
+        .controls label { color: #8b949e; font-size: 0.85rem; }
+        .controls select, .controls input[type=file] {
+            background: #131920; color: #e6edf3; border: 1px solid #21262d;
+            border-radius: 4px; padding: 0.4rem 0.6rem; font-family: inherit; font-size: 0.85rem;
+        }
+        .warning {
+            background: #3d1f00; border: 1px solid #ff6b35; color: #ffaa6b;
+            padding: 0.7rem 1rem; border-radius: 6px; margin-bottom: 1rem; text-align: center;
+        }
+        .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.8rem; margin-bottom: 1.2rem; }
+        .stat-box {
+            background: #131920; border: 1px solid #21262d; border-left: 3px solid #00d9ff;
+            border-radius: 6px; padding: 0.8rem;
+        }
+        .stat-label { color: #8b949e; font-size: 0.75rem; }
+        .stat-value { color: #00d9ff; font-size: 1.2rem; font-weight: bold; margin-top: 0.2rem; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; margin-bottom: 1.2rem; }
+        .panel {
+            background: #131920; border: 1px solid #21262d; border-radius: 8px; padding: 0.8rem;
+        }
+        .panel-full { composes: panel; margin-bottom: 1.2rem; }
+        .plot { width: 100%; height: 380px; }
+        .plot-tall { width: 100%; height: 480px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        th, td { padding: 0.35rem 0.5rem; text-align: right; border-bottom: 1px solid #21262d; }
+        th { color: #00d9ff; font-weight: bold; position: sticky; top: 0; background: #131920; }
+        td:first-child, th:first-child { text-align: left; }
+        tr:hover td { background: #1a2330; }
+        .conv-true { color: #50fa7b; }
+        .conv-false { color: #ff6b9d; }
+        .table-wrap { max-height: 400px; overflow-y: auto; }
+        @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+<h1 id="title">SpinorBEC Dashboard</h1>
+<div class="subtitle" id="subtitle"></div>
+
+<div class="controls">
+    <label>Load data:
+        <input type="file" id="file-input" accept=".json">
+    </label>
+    <label>X-axis:
+        <select id="x-axis-select"></select>
+    </label>
+    <label>Run:
+        <select id="run-select"><option value="">All</option></select>
+    </label>
+</div>
+
+<div id="warning-box" class="warning" style="display:none"></div>
+
+<div class="stats-row" id="stats-row"></div>
+
+<div class="grid-2">
+    <div class="panel"><div id="energy-plot" class="plot"></div></div>
+    <div class="panel"><div id="mz-plot" class="plot"></div></div>
+</div>
+
+<div class="panel" style="margin-bottom:1.2rem"><div id="pop-plot" class="plot-tall"></div></div>
+
+<div class="panel" style="margin-bottom:1.2rem"><div id="pop-heatmap" class="plot-tall"></div></div>
+
+<div class="panel" style="margin-bottom:1.2rem"><div id="timing-plot" class="plot"></div></div>
+
+<div class="panel" style="margin-bottom:1.2rem">
+    <div class="table-wrap">
+        <table id="data-table"><thead><tr id="table-header"></tr></thead><tbody></tbody></table>
+    </div>
+</div>
+
+<script>
+const LAYOUT = {
+    paper_bgcolor: '#131920', plot_bgcolor: '#0a0e14',
+    font: { family: 'Courier New', color: '#e6edf3', size: 12 },
+    margin: { t: 40, r: 20, b: 50, l: 65 },
+    xaxis: { gridcolor: '#21262d', zerolinecolor: '#3d4550' },
+    yaxis: { gridcolor: '#21262d', zerolinecolor: '#3d4550' },
+};
+const CFG = { responsive: true, displayModeBar: false };
+const COLORS = ['#00d9ff','#a277ff','#ffd580','#ff6b9d','#50fa7b','#ff8fab','#80e0ff','#c0ff60','#ff60c0','#60ffc0','#ffc060','#c060ff','#60c0ff'];
+
+let DATA = null;
+
+// --- Data loading ---
+document.getElementById('file-input').addEventListener('change', e => {
+    const reader = new FileReader();
+    reader.onload = ev => { DATA = JSON.parse(ev.target.result); render(); };
+    reader.readAsText(e.target.files[0]);
+});
+
+// Auto-load dashboard_data.json from same directory
+fetch('dashboard_data.json').then(r => r.ok ? r.json() : Promise.reject())
+    .then(d => { DATA = d; render(); }).catch(() => {});
+// Also try parent (when opened from runs/tools/)
+fetch('../dashboard_data.json').then(r => r.ok ? r.json() : Promise.reject())
+    .then(d => { if (!DATA) { DATA = d; render(); } }).catch(() => {});
+
+document.getElementById('x-axis-select').addEventListener('change', render);
+document.getElementById('run-select').addEventListener('change', render);
+
+function render() {
+    if (!DATA) return;
+    const pts = DATA.points;
+    const F = DATA.F;
+    const runNames = DATA.run_names || [];
+    const scanKeys = DATA.scan_keys || [];
+
+    // Title
+    document.getElementById('title').textContent = DATA.run || 'SpinorBEC Dashboard';
+    document.getElementById('subtitle').textContent =
+        `F=${F} | ${pts.length} points` +
+        (runNames.length > 0 ? ` | runs: ${runNames.join(', ')}` : '') +
+        (scanKeys.length > 0 ? ` | scan: ${scanKeys.join(', ')}` : '');
+
+    // Populate controls
+    const xSel = document.getElementById('x-axis-select');
+    const prevX = xSel.value;
+    xSel.innerHTML = '<option value="index">Point index</option>';
+    for (const k of scanKeys) {
+        const opt = document.createElement('option');
+        opt.value = k; opt.textContent = k.replace('pipeline.0.', '');
+        xSel.appendChild(opt);
+    }
+    if (prevX) xSel.value = prevX;
+
+    const rSel = document.getElementById('run-select');
+    const prevR = rSel.value;
+    rSel.innerHTML = '<option value="">All</option>';
+    for (const rn of runNames) {
+        const opt = document.createElement('option');
+        opt.value = rn; opt.textContent = rn;
+        rSel.appendChild(opt);
+    }
+    if (prevR) rSel.value = prevR;
+
+    // Filter
+    const runFilter = rSel.value;
+    const filtered = runFilter ? pts.filter(p => p.run_name === runFilter) : pts;
+
+    // X values
+    const xKey = xSel.value;
+    const xVals = filtered.map(p =>
+        xKey === 'index' ? p.index : (p.override && p.override[xKey] !== undefined ? p.override[xKey] : p.index)
+    );
+    const xLabel = xKey === 'index' ? 'Point index' : xKey.replace('pipeline.0.', '');
+
+    // Stats
+    const nConv = filtered.filter(p => p.converged).length;
+    const energies = filtered.map(p => p.energy).filter(e => e !== null);
+    const eMin = energies.length > 0 ? Math.min(...energies).toFixed(2) : '-';
+    const eMax = energies.length > 0 ? Math.max(...energies).toFixed(2) : '-';
+    const totalTime = filtered.reduce((s, p) => s + (p.duration_seconds || 0), 0);
+
+    const statsRow = document.getElementById('stats-row');
+    statsRow.innerHTML = '';
+    const stats = [
+        ['Points', `${filtered.length}`],
+        ['Converged', `${nConv}/${filtered.length}`],
+        ['Energy range', `${eMin} .. ${eMax}`],
+        ['Total time', formatTime(totalTime)],
+    ];
+    for (const [label, value] of stats) {
+        const box = document.createElement('div');
+        box.className = 'stat-box';
+        box.innerHTML = `<div class="stat-label">${label}</div><div class="stat-value">${value}</div>`;
+        statsRow.appendChild(box);
+    }
+
+    // Warning
+    const warnBox = document.getElementById('warning-box');
+    if (nConv < filtered.length) {
+        warnBox.textContent = `${filtered.length - nConv}/${filtered.length} points did NOT converge.`;
+        warnBox.style.display = '';
+    } else {
+        warnBox.style.display = 'none';
+    }
+
+    // --- Plots ---
+    // If multiple run_names and no filter, plot each as a separate trace
+    const groups = runFilter || runNames.length === 0
+        ? { '': filtered }
+        : Object.fromEntries(runNames.map(rn => [rn, pts.filter(p => p.run_name === rn)]));
+
+    // Energy
+    const eTraces = Object.entries(groups).map(([rn, grp], ci) => {
+        const xs = grp.map(p => xKey === 'index' ? p.index : (p.override?.[xKey] ?? p.index));
+        return {
+            x: xs, y: grp.map(p => p.energy),
+            type: 'scatter', mode: 'lines+markers',
+            marker: { color: COLORS[ci % COLORS.length], size: 7 },
+            line: { color: COLORS[ci % COLORS.length], width: 2 },
+            name: rn || 'Energy',
+        };
+    });
+    Plotly.newPlot('energy-plot', eTraces, {
+        ...LAYOUT,
+        title: { text: 'Total Energy', font: { color: '#00d9ff', size: 14 } },
+        xaxis: { ...LAYOUT.xaxis, title: xLabel },
+        yaxis: { ...LAYOUT.yaxis, title: 'E [hw]' },
+        showlegend: Object.keys(groups).length > 1,
+        legend: { font: { size: 10 } },
+    }, CFG);
+
+    // Mz
+    const mzTraces = Object.entries(groups).map(([rn, grp], ci) => {
+        const xs = grp.map(p => xKey === 'index' ? p.index : (p.override?.[xKey] ?? p.index));
+        return {
+            x: xs, y: grp.map(p => p.mz_actual),
+            type: 'scatter', mode: 'lines+markers',
+            marker: { color: COLORS[(ci + 1) % COLORS.length], size: 7 },
+            line: { color: COLORS[(ci + 1) % COLORS.length], width: 2 },
+            name: rn || 'Mz',
+        };
+    });
+    Plotly.newPlot('mz-plot', mzTraces, {
+        ...LAYOUT,
+        title: { text: 'Magnetization', font: { color: '#00d9ff', size: 14 } },
+        xaxis: { ...LAYOUT.xaxis, title: xLabel },
+        yaxis: { ...LAYOUT.yaxis, title: 'Mz' },
+        showlegend: Object.keys(groups).length > 1,
+    }, CFG);
+
+    // Population stacked bar (use filtered only)
+    if (filtered.length > 0) {
+        const mVals = filtered[0].m_values;
+        const D = mVals.length;
+        const popColors = generateMColors(D);
+        const popTraces = mVals.map((m, mi) => ({
+            x: xVals, y: filtered.map(p => p.populations[mi]),
+            type: 'bar', name: `m=${m}`,
+            marker: { color: popColors[mi] },
+        }));
+        Plotly.newPlot('pop-plot', popTraces, {
+            ...LAYOUT, barmode: 'stack',
+            title: { text: 'Component Populations', font: { color: '#00d9ff', size: 14 } },
+            xaxis: { ...LAYOUT.xaxis, title: xLabel },
+            yaxis: { ...LAYOUT.yaxis, title: 'Fraction', range: [0, 1.05] },
+            legend: { orientation: 'h', y: -0.15, font: { size: 9 } },
+        }, CFG);
+
+        // Heatmap
+        const popMatrix = mVals.map((_, mi) =>
+            filtered.map(p => Math.log10(Math.max(p.populations[mi], 1e-300)))
+        );
+        const zMin = Math.max(-150, Math.min(...popMatrix.flat().filter(v => isFinite(v))));
+        Plotly.newPlot('pop-heatmap', [{
+            z: popMatrix,
+            x: xVals.map(v => `${v}`),
+            y: mVals.map(m => `m=${m}`),
+            type: 'heatmap',
+            colorscale: [[0,'#0a0e14'],[0.3,'#1a1a5e'],[0.5,'#4a0080'],[0.7,'#a277ff'],[0.85,'#00d9ff'],[1,'#50fa7b']],
+            zmin: zMin, zmax: 0,
+            colorbar: { title: 'log10(P)', titlefont: { color: '#8b949e' } },
+        }], {
+            ...LAYOUT,
+            title: { text: 'Population Heatmap (log scale)', font: { color: '#00d9ff', size: 14 } },
+            yaxis: { ...LAYOUT.yaxis, autorange: 'reversed' },
+        }, CFG);
+    }
+
+    // Timing
+    const timingTraces = Object.entries(groups).map(([rn, grp], ci) => {
+        const xs = grp.map(p => xKey === 'index' ? p.index : (p.override?.[xKey] ?? p.index));
+        return {
+            x: xs, y: grp.map(p => p.duration_seconds || 0),
+            type: 'bar', name: rn || 'Time',
+            marker: { color: COLORS[(ci + 2) % COLORS.length] },
+        };
+    });
+    Plotly.newPlot('timing-plot', timingTraces, {
+        ...LAYOUT,
+        title: { text: 'Computation Time per Point', font: { color: '#00d9ff', size: 14 } },
+        xaxis: { ...LAYOUT.xaxis, title: xLabel },
+        yaxis: { ...LAYOUT.yaxis, title: 'Seconds' },
+        barmode: 'group',
+        showlegend: Object.keys(groups).length > 1,
+    }, CFG);
+
+    // Data table
+    const mVals0 = filtered.length > 0 ? filtered[0].m_values : [];
+    const thead = document.getElementById('table-header');
+    let headerHTML = '<th>#</th>';
+    if (runNames.length > 0) headerHTML += '<th>Run</th>';
+    for (const k of scanKeys) headerHTML += `<th>${k.replace('pipeline.0.', '')}</th>`;
+    headerHTML += '<th>Energy</th><th>Conv</th><th>Mz</th><th>Time</th><th>Top-3</th>';
+    thead.innerHTML = headerHTML;
+
+    const tbody = document.querySelector('#data-table tbody');
+    tbody.innerHTML = '';
+    for (const p of filtered) {
+        const sorted = p.populations.map((pop, mi) => ({ m: mVals0[mi], pop }))
+            .sort((a, b) => b.pop - a.pop).slice(0, 3);
+        const topStr = sorted.map(s => `m=${s.m}: ${(s.pop * 100).toFixed(1)}%`).join(', ');
+        const convClass = p.converged ? 'conv-true' : 'conv-false';
+
+        let rowHTML = `<td>${p.index}</td>`;
+        if (runNames.length > 0) rowHTML += `<td>${p.run_name}</td>`;
+        for (const k of scanKeys) {
+            const v = p.override?.[k];
+            rowHTML += `<td>${v !== undefined ? (typeof v === 'number' ? v.toPrecision(4) : v) : '-'}</td>`;
+        }
+        rowHTML += `<td>${p.energy !== null ? p.energy.toFixed(3) : '-'}</td>`;
+        rowHTML += `<td class="${convClass}">${p.converged}</td>`;
+        rowHTML += `<td>${p.mz_actual !== null ? p.mz_actual.toFixed(3) : '-'}</td>`;
+        rowHTML += `<td>${formatTime(p.duration_seconds || 0)}</td>`;
+        rowHTML += `<td style="text-align:left">${topStr}</td>`;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = rowHTML;
+        tbody.appendChild(tr);
+    }
+}
+
+function formatTime(s) {
+    if (!s || s <= 0) return '-';
+    if (s < 60) return `${s.toFixed(1)}s`;
+    if (s < 3600) return `${Math.floor(s/60)}m ${Math.round(s%60)}s`;
+    return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`;
+}
+
+function generateMColors(D) {
+    if (D <= 3) return ['#ff6b9d', '#ffffff', '#50fa7b'];
+    const colors = [];
+    for (let i = 0; i < D; i++) {
+        const t = D > 1 ? i / (D - 1) : 0.5;
+        if (t < 0.5) {
+            const u = t * 2;
+            const r = Math.round(255 * (1 - u) + 100 * u);
+            const g = Math.round(107 * (1 - u) + 200 * u);
+            const b = Math.round(157 * (1 - u) + 255 * u);
+            colors.push(`rgb(${r},${g},${b})`);
+        } else {
+            const u = (t - 0.5) * 2;
+            const r = Math.round(100 * (1 - u) + 80 * u);
+            const g = Math.round(200 * (1 - u) + 250 * u);
+            const b = Math.round(255 * (1 - u) + 123 * u);
+            colors.push(`rgb(${r},${g},${b})`);
+        }
+    }
+    return colors;
+}
+</script>
+</body>
+</html>
