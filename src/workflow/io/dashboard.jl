@@ -261,6 +261,27 @@ function _route_dashboard(path, html_content, data_cache, base_dir)
         end
         (200, "application/json", json)
 
+    elseif startswith(path, "/api/density3d/")
+        rest = _uri_decode(path[16:end])
+        slash_idx = findfirst('/', rest)
+        if slash_idx === nothing
+            return (400, "text/plain", "Expected /api/density3d/:run/:file")
+        end
+        name = rest[1:slash_idx-1]
+        file = rest[slash_idx+1:end]
+        qidx = findfirst('?', file)
+        qidx !== nothing && (file = file[1:qidx-1])
+        fpath = joinpath(base_dir, name, file)
+        if !isfile(fpath)
+            return (404, "text/plain", "File not found: $name/$file")
+        end
+        json = try
+            _json_string(_compute_3d_densities(fpath))
+        catch e
+            "{\"error\":\"$(replace(string(e), "\"" => "'"))\"}"
+        end
+        (200, "application/json", json)
+
     elseif path == "/api/refresh"
         empty!(data_cache)
         (200, "text/plain", "Cache cleared")
@@ -284,6 +305,60 @@ end
 
 function _uri_decode(s::AbstractString)
     replace(s, r"%([0-9A-Fa-f]{2})" => m -> Char(parse(UInt8, m[2:3]; base=16)))
+end
+
+"""
+Compute 3D density for each m-component. Returns downsampled if grid > max_n.
+Top `max_components` by population are included, plus total.
+"""
+function _compute_3d_densities(jld2_path::String; max_n::Int = 40, max_components::Int = 5)
+    d = JLD2.load(jld2_path)
+    psi = d["psi"]
+    n_comp = size(psi, ndims(psi))
+    ndim = ndims(psi) - 1
+    F = div(n_comp - 1, 2)
+    m_values = [F - (c - 1) for c in 1:n_comp]
+    n_pts = ntuple(i -> size(psi, i), ndim)
+
+    ndim == 3 || throw(ArgumentError("3D density requires 3D data, got $(ndim)D"))
+
+    # Compute all densities to find top components
+    all_densities = [abs2.(view(psi, _component_slice(ndim, n_pts, c)...)) for c in 1:n_comp]
+    pops = [sum(dens) for dens in all_densities]
+    total_pop = sum(pops)
+
+    # Total density
+    total_dens = sum(all_densities)
+
+    # Pick top components by population
+    sorted_idx = sortperm(pops; rev=true)
+    top_idx = sorted_idx[1:min(max_components, n_comp)]
+
+    # Downsample if needed
+    step = max(1, cld(maximum(n_pts), max_n))
+    r1 = 1:step:n_pts[1]
+    r2 = 1:step:n_pts[2]
+    r3 = 1:step:n_pts[3]
+    out_shape = (length(r1), length(r2), length(r3))
+
+    components = Dict{String,Any}[]
+    for ci in top_idx
+        dens = all_densities[ci][r1, r2, r3]
+        push!(components, Dict{String,Any}(
+            "m" => m_values[ci],
+            "population" => pops[ci] / max(total_pop, 1e-300),
+            "density" => vec(dens),
+        ))
+    end
+
+    Dict{String,Any}(
+        "m_values" => [c["m"] for c in components],
+        "total_density" => vec(total_dens[r1, r2, r3]),
+        "components" => components,
+        "shape" => collect(out_shape),
+        "original_shape" => collect(n_pts),
+        "step" => step,
+    )
 end
 
 """

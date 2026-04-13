@@ -114,6 +114,20 @@
 </div>
 
 <div class="panel" style="margin-bottom:1.2rem">
+    <div style="display:flex; align-items:center; gap:1rem; margin-bottom:0.8rem;">
+        <span style="color:#00d9ff; font-weight:bold;">3D Density (isosurface)</span>
+        <button id="load-3d-btn" style="background:#1a2330;color:#00d9ff;border:1px solid #21262d;border-radius:4px;padding:0.3rem 0.8rem;cursor:pointer;font-family:inherit;">Load 3D</button>
+        <label style="color:#8b949e;font-size:0.85rem;">Component:
+            <select id="density3d-comp-select" style="background:#131920;color:#e6edf3;border:1px solid #21262d;border-radius:4px;padding:0.3rem 0.5rem;font-family:inherit;font-size:0.85rem;">
+                <option value="total">Total</option>
+            </select>
+        </label>
+        <span id="density3d-status" style="color:#8b949e; font-size:0.8rem;"></span>
+    </div>
+    <div id="density3d-plot" style="width:100%; height:550px;"></div>
+</div>
+
+<div class="panel" style="margin-bottom:1.2rem">
     <div class="table-wrap">
         <table id="data-table"><thead><tr id="table-header"></tr></thead><tbody></tbody></table>
     </div>
@@ -445,6 +459,105 @@ function generateMColors(D) {
         }
     }
     return colors;
+}
+
+// --- 3D Density visualization ---
+let density3dData = null;
+const load3dBtn = document.getElementById('load-3d-btn');
+const density3dCompSel = document.getElementById('density3d-comp-select');
+const density3dStatus = document.getElementById('density3d-status');
+
+load3dBtn.addEventListener('click', load3dDensity);
+density3dCompSel.addEventListener('change', render3dDensity);
+
+function load3dDensity() {
+    const file = densityPointSel.value;
+    const run = runDirSel.value;
+    if (!file || !run) return;
+    showLoading('Loading 3D density...');
+    setLoading(20, `Loading 3D density: ${file}`);
+    density3dStatus.textContent = '';
+    fetch(`/api/density3d/${encodeURIComponent(run)}/${encodeURIComponent(file)}`)
+        .then(r => r.json())
+        .then(d => {
+            setLoading(70, 'Rendering 3D...');
+            density3dData = d;
+            // Populate component selector
+            density3dCompSel.innerHTML = '<option value="total">Total</option>';
+            if (d.components) {
+                for (const c of d.components) {
+                    const opt = document.createElement('option');
+                    opt.value = `m${c.m}`;
+                    opt.textContent = `m=${c.m} (${(c.population * 100).toFixed(1)}%)`;
+                    density3dCompSel.appendChild(opt);
+                }
+            }
+            render3dDensity();
+            setLoading(100);
+            setTimeout(hideLoading, 400);
+        })
+        .catch(e => {
+            hideLoading();
+            density3dStatus.textContent = 'Error: ' + e.message;
+        });
+}
+
+function render3dDensity() {
+    if (!density3dData) return;
+    const d = density3dData;
+    if (d.error) { density3dStatus.textContent = d.error; return; }
+    const shape = d.shape;
+    const nx = shape[0], ny = shape[1], nz = shape[2];
+
+    const sel = density3dCompSel.value;
+    let values;
+    if (sel === 'total') {
+        values = d.total_density;
+    } else {
+        const m = parseInt(sel.slice(1));
+        const comp = d.components.find(c => c.m === m);
+        values = comp ? comp.density : d.total_density;
+    }
+
+    // Build coordinate arrays
+    const x = [], y = [], z = [], v = [];
+    for (let iz = 0; iz < nz; iz++) {
+        for (let iy = 0; iy < ny; iy++) {
+            for (let ix = 0; ix < nx; ix++) {
+                x.push(ix);
+                y.push(iy);
+                z.push(iz);
+                v.push(values[iz * ny * nx + iy * nx + ix]);
+            }
+        }
+    }
+
+    const vMax = Math.max(...v);
+    const isomin = vMax * 0.05;
+    const isomax = vMax * 0.8;
+
+    Plotly.newPlot('density3d-plot', [{
+        type: 'isosurface',
+        x, y, z,
+        value: v,
+        isomin,
+        isomax,
+        surface: { count: 4 },
+        caps: { x: { show: false }, y: { show: false }, z: { show: false } },
+        opacity: 0.6,
+        colorscale: 'Viridis',
+        colorbar: { len: 0.6, thickness: 15, tickfont: { size: 10, color: '#8b949e' } },
+    }], {
+        ...LAYOUT,
+        title: { text: `3D Density: ${sel} (${nx}×${ny}×${nz})`, font: { color: '#00d9ff', size: 14 } },
+        margin: { t: 40, r: 10, b: 10, l: 10 },
+        scene: {
+            xaxis: { title: 'x', gridcolor: '#21262d', color: '#8b949e' },
+            yaxis: { title: 'y', gridcolor: '#21262d', color: '#8b949e' },
+            zaxis: { title: 'z', gridcolor: '#21262d', color: '#8b949e' },
+            bgcolor: '#0a0e14',
+        },
+    }, CFG);
 }
 
 // --- Density visualization ---
