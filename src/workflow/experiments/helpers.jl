@@ -37,15 +37,6 @@ end
 
 _zeeman_scalar(v) = v isa Dict ? Float64(v["from"]) : Float64(v)
 
-function _parse_ramp_or_constant(v)::RampOrConstant
-    if v isa Dict
-        if haskey(v, "to")
-            return LinearRamp(Float64(v["from"]), Float64(v["to"]))
-        end
-        return ConstantValue(Float64(v["from"]))
-    end
-    ConstantValue(Float64(v))
-end
 
 function _parse_potential_config(d::Dict)
     t = Symbol(get(d, "type", "none"))
