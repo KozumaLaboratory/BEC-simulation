@@ -433,9 +433,9 @@ struct AdaptiveDtParams
         dt_min > 0 || throw(ArgumentError("dt_min must be positive"))
         dt_max >= dt_min || throw(ArgumentError("dt_max must be >= dt_min"))
         tol > 0 || throw(ArgumentError("tol must be positive"))
-        error_mode in (:step_change, :richardson) || throw(
+        error_mode in (:step_change, :richardson, :embedded) || throw(
             ArgumentError(
-                "error_mode must be :step_change or :richardson, got :$error_mode",
+                "error_mode must be :step_change, :richardson, or :embedded, got :$error_mode",
             ),
         )
         new(dt_init, dt_min, dt_max, tol, error_mode)

@@ -137,7 +137,10 @@ function _adaptive_step_change_loop!(
         end
         fsal_deferred = false
 
+        omega = ws.sim_params.rotating_frame_omega
+        _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt_step / 2, false, ws.coriolis_cache)
         apply_kinetic_step_batched!(ws.state.psi, bk)
+        _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt_step / 2, false, ws.coriolis_cache)
 
         rel_change = 0.0
         if may_reject
@@ -217,8 +220,11 @@ function _adaptive_step_change_loop!(
 end
 
 @inline function _full_strang_step!(ws::Workspace{N}, dt_step, n_comp, bk; t_base::Float64 = ws.state.t) where {N}
+    omega = ws.sim_params.rotating_frame_omega
     _half_potential_step!(ws, dt_step / 2, n_comp, N, false; t_eval = t_base + dt_step / 4, t_start = t_base)
+    _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt_step / 2, false, ws.coriolis_cache)
     apply_kinetic_step_batched!(ws.state.psi, bk)
+    _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt_step / 2, false, ws.coriolis_cache)
     _half_potential_step!(ws, dt_step / 2, n_comp, N, false; t_eval = t_base + 3dt_step / 4, t_start = t_base + dt_step / 2)
     nothing
 end
