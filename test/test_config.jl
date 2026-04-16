@@ -136,7 +136,7 @@
                 c1_ratio: 0.02778
               ddi:
                 enabled: true
-                c_dd: 7647.0
+                c_dd: 211.0
               dt: 0.005
               n_steps: 100
               tol: 1.0e-8
@@ -147,7 +147,7 @@
         p = cfg.steps[1].params
         @test p["atom"] == "Eu151"
         @test p["interactions"]["c_total"] == 4689.0
-        @test p["ddi"]["c_dd"] == 7647.0
+        @test p["ddi"]["c_dd"] == 211.0
     end
 
     @testset "run_config - ground_state" begin
