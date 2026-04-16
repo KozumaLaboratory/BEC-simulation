@@ -36,7 +36,7 @@
 #   B = 2.6 nT → p ≈ 0.39
 #   c0    ≈ 4689
 #   c1/c0 = 1/36 (Buchachenko AFM estimate; set c1_ratio: 0.0 for DDI-only)
-#   c_dd  ≈ 7647
+#   c_dd auto-derived from N_atoms+omega_ref
 #   ε_dd  ≈ 0.544
 # ================================================================
 
@@ -49,7 +49,7 @@ pipeline:
       interactions:
         c_total: 4689.0
         c1_ratio: 0.02778  # 1/36, Buchachenko AFM estimate
-      ddi: {enabled: true, c_dd: 7647.0}
+      ddi: {enabled: true}
       zeeman: {p: 100.0, q: 0.0}
       potential: {type: harmonic, omega: [1.0, 1.0, 1.182]}
       dt: 0.005

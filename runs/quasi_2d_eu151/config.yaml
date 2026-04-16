@@ -14,7 +14,7 @@ pipeline:
       interactions:
         c_total: 4689.0
         c1_ratio: -0.01
-      ddi: {enabled: false, c_dd: 7647.0, quasi_2d: true, l_z: 0.9206}
+      ddi: {enabled: false, quasi_2d: true, l_z: 0.9206}
       zeeman: {p: 0.0, q: 0.0}
       potential: {type: harmonic, omega: [1.0, 1.0]}
       dt: 0.001

@@ -1,4 +1,4 @@
-# Eu151 ground state: discrete c_dd continuation (0 → 7647)
+# Eu151 ground state: discrete c_dd continuation (0 → auto)
 #
 # Ramp DDI strength in 20 steps, using each converged state as
 # initial condition for the next. Finer steps than before (8 → 20)
@@ -27,5 +27,5 @@ pipeline:
 
 scan:
   zip:
-    pipeline.0.ddi.c_dd: {from: 0, to: 7647, n: 20}
+    pipeline.0.ddi.c_dd: {from: 0, to: 212, n: 20}
   continuation: true
