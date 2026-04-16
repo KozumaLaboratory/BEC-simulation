@@ -25,6 +25,9 @@ pipeline:
       initial_state: antiferromagnetic
       backend: cuda
 
+  - analyze:
+      - phase_classify: {}
+
 scan:
   zip:
     pipeline.0.ddi.c_dd: {from: 0, to: 212, n: 20}

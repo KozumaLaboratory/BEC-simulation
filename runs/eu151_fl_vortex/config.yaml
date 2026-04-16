@@ -29,3 +29,6 @@ pipeline:
       tol: 1.0e-7
       initial_state: fl_vortex
       backend: cuda
+
+  - analyze:
+      - phase_classify: {}

@@ -31,3 +31,6 @@ pipeline:
       zeeman: {p: 0.0, q: 0.0}
       temperature_ratio: 0.1      # T/T_c
       noise_seed: 42
+
+  - analyze:
+      - phase_classify: {}

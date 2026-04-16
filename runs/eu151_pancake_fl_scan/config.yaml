@@ -51,6 +51,9 @@ pipeline:
       initial_state: ferromagnetic_min
       backend: cuda
 
+  - analyze:
+      - phase_classify: {}
+
 scan:
   product:
     pipeline.0.interactions.c1_ratio: [-0.02, -0.01, 0.0]

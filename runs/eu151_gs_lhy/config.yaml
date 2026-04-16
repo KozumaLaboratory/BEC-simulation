@@ -27,3 +27,6 @@ pipeline:
       tol: 1.0e-8
       initial_state: polar        # m=0, allows spontaneous magnetization
       backend: cuda
+
+  - analyze:
+      - phase_classify: {}

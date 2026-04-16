@@ -43,6 +43,9 @@ pipeline:
       initial_state: polar
       backend: cuda
 
+  - analyze:
+      - phase_classify: {}
+
 scan:
   zip:
     pipeline.0.interactions.c1_ratio:

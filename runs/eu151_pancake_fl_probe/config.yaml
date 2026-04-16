@@ -56,6 +56,9 @@ pipeline:
       tol: 1.0e-7
       backend: cuda
 
+  - analyze:
+      - phase_classify: {}
+
 scan:
   zip:
     pipeline.1.potential:
