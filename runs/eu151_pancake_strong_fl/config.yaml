@@ -1,0 +1,56 @@
+# ================================================================
+# Eu151 strong pancake FL scan (ω_z/ω_⊥ = 30)
+# ================================================================
+#
+# Stronger pancake than eu151_pancake_fl_scan.
+# At ω_z=30, the condensate is highly oblate and the kinetic cost
+# of in-plane spin texture is minimal. This is the most favorable
+# geometry for FL ground state.
+#
+# Grid: quasi-2D limit — 128×128×8, box_z ≈ 1.0 (only ~5 z-points
+# within the condensate, but sufficient for nearly 2D states).
+#
+# Also tests c1_ratio = +0.01 (weak antiferromagnetic) where
+# the FL phase may be additionally stabilized.
+# ================================================================
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid:
+        n: [128, 128, 8]
+        box: [16.0, 16.0, 1.0]
+      interactions:
+        N_atoms: 50000
+        omega_ref: 691.15
+        c1_ratio: 0.0
+        c_lhy: 1135.0
+      ddi:
+        enabled: true
+      zeeman:
+        p: 0.0
+        q: 0.0
+      potential: {type: harmonic, omega: [1.0, 1.0, 30.0]}
+      dt: 0.0001
+      n_steps: 100000
+      tol: 1.0e-7
+      initial_state: ferromagnetic_min
+      backend: cuda
+
+scan:
+  product:
+    pipeline.0.interactions.c1_ratio: [-0.02, -0.01, 0.0, 0.01]
+    pipeline.0.init_state_params.init_theta: [0.8, 1.0, 1.2, 1.5707963]
+
+  comparison_runs:
+    - name: uniform_polarized
+      override:
+        pipeline.0.initial_state: ferromagnetic_min
+        pipeline.0.target_magnetization: -6.0
+
+    - name: fl_vortex
+      override:
+        pipeline.0.initial_state: spin_coherent
+        pipeline.0.target_magnetization: 0.0
+        pipeline.0.init_state_params:
+          init_vortex_charge: 1
