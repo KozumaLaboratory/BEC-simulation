@@ -1,6 +1,9 @@
 # --- Analyzer dispatch ---
 
 function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing)
+    # Analyzers perform reductions over psi and are not GPU-safe in general.
+    # Move to host once here; no-op on CPU.
+    psi = _to_host(psi)
     F = atom.F
     if name == :tomography
         spin_tomography(psi, grid, F;
