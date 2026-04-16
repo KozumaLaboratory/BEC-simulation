@@ -6,11 +6,13 @@
         @test f_lin(0.5) == 50.0
         @test f_lin(1.0) == 0.0
 
-        # Log scale
+        # Log scale — g(t) = log(1 + (e-1)*t) time-warp (dense at start),
+        # not a geometric interpolator. At t=0.5: g ≈ log(1.859) ≈ 0.6200,
+        # so value ≈ from + (to-from)*g(0.5) = 100 - 99*0.6200 ≈ 38.62.
         f_log = SpinorBEC._make_interpolator(Dict("from" => 100.0, "to" => 1.0, "scale" => "log"))
         @test f_log(0.0) ≈ 100.0
         @test f_log(1.0) ≈ 1.0
-        @test f_log(0.5) ≈ 10.0  # geometric midpoint
+        @test f_log(0.5) ≈ 100.0 + (1.0 - 100.0) * log(1.0 + (ℯ - 1.0) * 0.5)
 
         # Sqrt scale
         f_sqrt = SpinorBEC._make_interpolator(Dict("from" => 100.0, "to" => 0.0, "scale" => "sqrt"))
