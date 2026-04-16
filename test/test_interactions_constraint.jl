@@ -30,8 +30,9 @@
     @testset "compute_c_dd_dimless" begin
         omega = 2π * 110.0
         c_dd = compute_c_dd_dimless(Eu151; N_atoms=50_000, omega_ref=omega)
-        @test c_dd > 7000
-        @test c_dd < 8000
+        # c_dd = μ₀(mu_mag/F)² × N/(ℏω a_ho³) ≈ 211 for Eu151
+        @test c_dd > 180
+        @test c_dd < 250
     end
 
     @testset "linear_zeeman_p" begin
@@ -70,7 +71,7 @@
                 c1_ratio: 0.02778
               ddi:
                 enabled: true
-                c_dd: 7647.0
+                c_dd: 211.0
               dt: 0.01
               n_steps: 10
               tol: 1e-4
@@ -80,7 +81,7 @@
         p = config.steps[1].params
         @test p["interactions"]["c_total"] == 4689.0
         @test p["interactions"]["c1_ratio"] == 0.02778
-        @test p["ddi"]["c_dd"] == 7647.0
+        @test p["ddi"]["c_dd"] == 211.0
     end
 
     @testset "YAML c_total with c1_ratio=0" begin

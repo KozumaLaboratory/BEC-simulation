@@ -88,19 +88,31 @@ function compute_c0(
 end
 
 """
-DDI coupling constant: c_dd = μ₀ μ².
-Returns c_dd in SI (J·m³). Zero for non-dipolar atoms.
+DDI coupling for spinor Hamiltonian: c_dd = μ₀ (g_F μ_B)².
 
-Used with k-space kernel Q_αβ(k) = k̂_αk̂_β − δ_αβ/3, which is the Fourier
-transform of (δ_αβ − 3r̂_αr̂_β)/(4πr³) — the 1/(4π) is absorbed into Q.
+The spinor DDI Hamiltonian is E = (c_dd/2) ∫ F_α Q_αβ F_β, where F_α are
+spin-F operators with eigenvalues -F..+F. Since mu_mag = g_F F μ_B already
+contains F, we must use mu_mag/F to avoid double-counting:
+  c_dd = μ₀ (mu_mag/F)²  (for F > 0)
+
+For scalar BEC (F=0), c_dd = μ₀ μ² directly (no spin operators).
 """
 function compute_c_dd(atom::AtomSpecies)
     atom.mu_mag == 0.0 && return 0.0
-    Units.MU_0 * atom.mu_mag^2
+    F = atom.F
+    if F == 0
+        return Units.MU_0 * atom.mu_mag^2
+    end
+    mu_gF = atom.mu_mag / F  # = g_F × μ_B
+    Units.MU_0 * mu_gF^2
 end
 
 """
-Dipolar length: a_dd = μ₀ μ² m / (12π ℏ²).
+Dipolar length: a_dd = μ₀ μ² m / (12π ℏ²), using full magnetic moment μ = g_F F μ_B.
+
+Note: a_dd uses the full moment (not divided by F) because ε_dd = a_dd/a_s is
+defined for the physical DDI strength, independent of the Hamiltonian convention.
+The F² from the spin operators is accounted for separately in ε_dd calculations.
 """
 function compute_a_dd(atom::AtomSpecies)
     atom.mu_mag == 0.0 && return 0.0

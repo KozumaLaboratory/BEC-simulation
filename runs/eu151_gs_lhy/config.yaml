@@ -18,7 +18,6 @@ pipeline:
         c_lhy: 1135.0            # computed from (128/3√π)√(a_s³/a_ho³)·N·Q₅(ε_dd)
       ddi:
         enabled: true
-        c_dd: 7647.0
       zeeman:
         p: 0.0
         q: 0.0

@@ -16,7 +16,6 @@ pipeline:
         c1_ratio: 0.02778
       ddi:
         enabled: true
-        c_dd: 7647.0
       zeeman:
         p: {from: 100, to: 0, scale: log}
         q: 0.0

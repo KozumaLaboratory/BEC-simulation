@@ -21,7 +21,6 @@ pipeline:
         c_lhy: 1135.0
       ddi:
         enabled: true
-        c_dd: 7647.0
       zeeman:
         p: 0.0
         q: 0.0

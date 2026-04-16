@@ -31,7 +31,6 @@ pipeline:
         c1_ratio: 0.0
       ddi:
         enabled: true
-        c_dd: 7647.0
         quasi_2d: true
         l_z: 0.9196  # sqrt(110/130)
       zeeman:
