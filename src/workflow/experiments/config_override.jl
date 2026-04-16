@@ -81,38 +81,23 @@ end
 """
     expand_scan_points(scan_dict::Dict) → Vector{OverrideMap}
 
-Expand a scan spec into a list of override maps, one per scan point.
-
-Supported forms (mutually exclusive):
-
-  zip:
-    system.ddi.c_dd:    [0.0, 4000.0, 7647.0]
-    ground_state.zeeman.p: [100.0, 10.0, 1.0]
-
-  product:
-    system.interactions.c1_ratio: [-0.02, -0.01, 0.0]
-    ground_state.target_magnetization: [-6.0, -3.0, 0.0]
-
-`zip` produces N points (all axes must agree on length). `product` produces
-∏ Nᵢ points (Cartesian product, lexicographic over the path order).
-
-If neither key is present, returns a single empty override (= base config
-unchanged), so a YAML can declare a scan with only `comparison_runs:` and
-sweep nothing.
+Expand a scan spec into override maps. Supports zip, product, or both combined
+(Cartesian product of zip × product). When both are present, each zip point is
+crossed with all product points.
 """
 function expand_scan_points(scan_dict::Dict)
     has_zip = haskey(scan_dict, "zip")
     has_product = haskey(scan_dict, "product")
-    has_zip && has_product &&
-        throw(ArgumentError("scan: zip and product are mutually exclusive"))
 
-    if has_zip
-        return _expand_zip(scan_dict["zip"])
-    elseif has_product
-        return _expand_product(scan_dict["product"])
-    else
+    zip_points = has_zip ? _expand_zip(scan_dict["zip"]) : [OverrideMap()]
+    prod_points = has_product ? _expand_product(scan_dict["product"]) : [OverrideMap()]
+
+    if !has_zip && !has_product
         return [OverrideMap()]
     end
+
+    # Cartesian product of zip × product
+    [merge(z, p) for z in zip_points for p in prod_points]
 end
 
 """

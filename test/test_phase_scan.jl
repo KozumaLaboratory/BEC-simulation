@@ -50,11 +50,14 @@ using FFTW
         @test length(combos) == 6
     end
 
-    @testset "expand_scan_points: zip and product mutually exclusive" begin
-        @test_throws ArgumentError SpinorBEC.expand_scan_points(Dict{String,Any}(
-            "zip" => Dict{String,Any}("a" => [1]),
-            "product" => Dict{String,Any}("b" => [1]),
+    @testset "expand_scan_points: zip × product combination" begin
+        pts = SpinorBEC.expand_scan_points(Dict{String,Any}(
+            "zip" => Dict{String,Any}("a" => [1, 2, 3]),
+            "product" => Dict{String,Any}("b" => [10, 20]),
         ))
+        @test length(pts) == 6  # 3 zip × 2 product
+        combos = Set([(p["a"], p["b"]) for p in pts])
+        @test length(combos) == 6
     end
 
     @testset "YAML parsing - override scan with zip" begin

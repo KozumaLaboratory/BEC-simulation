@@ -91,6 +91,75 @@ function _parse_constrained_jz_scan(d::Dict)
     ConstrainedJzScan(target_values, tolerance, max_iter, omega_range)
 end
 
+"""
+Resolve derived parameters from N_atoms + omega_ref.
+
+Auto-derives c_lhy (Lima-Pelster Q5) and logs all derived values.
+Explicit values in the YAML override auto-derived ones.
+"""
+function _resolve_derived_params!(p::Dict, atom; verbose::Bool = true)
+    inter = get(p, "interactions", Dict())
+    inter isa Dict || return
+    N_raw = get(inter, "N_atoms", nothing)
+    ω_raw = get(inter, "omega_ref", nothing)
+    (N_raw === nothing || ω_raw === nothing) && return
+
+    N_atoms = Int(N_raw)
+    omega_ref = Float64(ω_raw)
+    a_ho = sqrt(Units.HBAR / (atom.mass * omega_ref))
+
+    # c_total (always derived — basis for c0/c1)
+    c_total = compute_c_total(atom; N_atoms, omega_ref)
+
+    # c_dd: derive if not explicitly specified
+    ddi_d = get(p, "ddi", nothing)
+    if ddi_d === true
+        p["ddi"] = Dict{String,Any}("enabled" => true)
+        ddi_d = p["ddi"]
+    end
+    c_dd_val = NaN
+    if ddi_d isa Dict
+        if !haskey(ddi_d, "c_dd") || ddi_d["c_dd"] === nothing
+            c_dd_val = compute_c_dd_dimless(atom; N_atoms, omega_ref)
+            ddi_d["c_dd"] = c_dd_val
+        else
+            c_dd_raw = ddi_d["c_dd"]
+            c_dd_val = c_dd_raw isa Dict ? Float64(get(c_dd_raw, "from", 0.0)) : Float64(c_dd_raw)
+        end
+    end
+
+    # ε_dd
+    eps_dd = atom.a_s > 0 ? compute_a_dd(atom) / atom.a_s : 0.0
+
+    # c_lhy: derive if not explicitly specified and DDI is active
+    if !haskey(inter, "c_lhy") && !isnan(c_dd_val) && c_dd_val > 0
+        a_s_dl = atom.a_s / a_ho
+        c_lhy_scalar = (128.0 / (3.0 * sqrt(π))) * sqrt(abs(a_s_dl)^3) * N_atoms
+        inter["c_lhy"] = c_lhy_scalar * lima_pelster_Q5(eps_dd)
+    end
+
+    # l_z: derive from trap ratio if quasi_2d and not specified
+    pot = get(p, "potential", nothing)
+    if pot isa Dict && get(pot, "type", "") == "harmonic" && ddi_d isa Dict
+        ω_vec = _to_float_vec(pot["omega"])
+        if Bool(get(ddi_d, "quasi_2d", false)) && !haskey(ddi_d, "l_z") && length(ω_vec) >= 2
+            ω_perp = sqrt(ω_vec[1] * ω_vec[2])
+            ω_z = length(ω_vec) >= 3 ? ω_vec[3] : ω_vec[end]
+            ddi_d["l_z"] = sqrt(ω_perp / ω_z)
+        end
+    end
+
+    if verbose
+        c_lhy_val = Float64(get(inter, "c_lhy", 0.0))
+        l_z_val = ddi_d isa Dict ? Float64(get(ddi_d, "l_z", 0.0)) : 0.0
+        println("  Derived: c_total=$(round(c_total; digits=1))" *
+                " c_dd=$(isnan(c_dd_val) ? "N/A" : string(round(c_dd_val; digits=1)))" *
+                " c_lhy=$(round(c_lhy_val; digits=1))" *
+                " ε_dd=$(round(eps_dd; digits=4))" *
+                (l_z_val > 0 ? " l_z=$(round(l_z_val; digits=4))" : ""))
+    end
+end
+
 function _parse_gs_interactions(inter::Dict, atom)
     F = atom.F
     c_extra = Float64[]
