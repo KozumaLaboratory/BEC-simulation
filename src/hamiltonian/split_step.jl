@@ -280,23 +280,11 @@ function _half_potential_step!(
 
     c2 = get_cn(ws.interactions, 2)
     if abs(c2) > 1e-30
-        @timeit_debug TIMER "nematic" if gpu
-            _run_on_host!(ws.state.psi) do p
-                apply_nematic_step!(p, ws.interactions, ws.spin_matrices.system.F, dt_half / 2, ndim; imaginary_time)
-            end
-        else
-            apply_nematic_step!(ws.state.psi, ws.interactions, ws.spin_matrices.system.F, dt_half / 2, ndim; imaginary_time)
-        end
+        @timeit_debug TIMER "nematic" apply_nematic_step!(ws.state.psi, ws.interactions, ws.spin_matrices.system.F, dt_half / 2, ndim; imaginary_time)
     end
 
     if ws.tensor_cache !== nothing
-        @timeit_debug TIMER "tensor" if gpu
-            _run_on_host!(ws.state.psi) do p
-                apply_tensor_interaction_step!(p, ws.tensor_cache, ws.spin_matrices, dt_half / 2, ndim; imaginary_time)
-            end
-        else
-            apply_tensor_interaction_step!(ws.state.psi, ws.tensor_cache, ws.spin_matrices, dt_half / 2, ndim; imaginary_time)
-        end
+        @timeit_debug TIMER "tensor" apply_tensor_interaction_step!(ws.state.psi, ws.tensor_cache, ws.spin_matrices, dt_half / 2, ndim; imaginary_time)
     end
 
     if ws.raman !== nothing
@@ -332,23 +320,11 @@ function _half_potential_step!(
     end
 
     if ws.tensor_cache !== nothing
-        @timeit_debug TIMER "tensor" if gpu
-            _run_on_host!(ws.state.psi) do p
-                apply_tensor_interaction_step!(p, ws.tensor_cache, ws.spin_matrices, dt_half / 2, ndim; imaginary_time)
-            end
-        else
-            apply_tensor_interaction_step!(ws.state.psi, ws.tensor_cache, ws.spin_matrices, dt_half / 2, ndim; imaginary_time)
-        end
+        @timeit_debug TIMER "tensor" apply_tensor_interaction_step!(ws.state.psi, ws.tensor_cache, ws.spin_matrices, dt_half / 2, ndim; imaginary_time)
     end
 
     if abs(c2) > 1e-30
-        @timeit_debug TIMER "nematic" if gpu
-            _run_on_host!(ws.state.psi) do p
-                apply_nematic_step!(p, ws.interactions, ws.spin_matrices.system.F, dt_half / 2, ndim; imaginary_time)
-            end
-        else
-            apply_nematic_step!(ws.state.psi, ws.interactions, ws.spin_matrices.system.F, dt_half / 2, ndim; imaginary_time)
-        end
+        @timeit_debug TIMER "nematic" apply_nematic_step!(ws.state.psi, ws.interactions, ws.spin_matrices.system.F, dt_half / 2, ndim; imaginary_time)
     end
 
     if abs(ws.interactions.c1) > 1e-30
@@ -401,23 +377,11 @@ function _outer_potential_fwd!(ws::Workspace{N}, dt_outer, n_comp, ndim, imagina
 
     c2 = get_cn(ws.interactions, 2)
     if abs(c2) > 1e-30
-        if gpu
-            _run_on_host!(ws.state.psi) do p
-                apply_nematic_step!(p, ws.interactions, ws.spin_matrices.system.F, dt_outer, ndim; imaginary_time)
-            end
-        else
-            apply_nematic_step!(ws.state.psi, ws.interactions, ws.spin_matrices.system.F, dt_outer, ndim; imaginary_time)
-        end
+        apply_nematic_step!(ws.state.psi, ws.interactions, ws.spin_matrices.system.F, dt_outer, ndim; imaginary_time)
     end
 
     if ws.tensor_cache !== nothing
-        if gpu
-            _run_on_host!(ws.state.psi) do p
-                apply_tensor_interaction_step!(p, ws.tensor_cache, ws.spin_matrices, dt_outer, ndim; imaginary_time)
-            end
-        else
-            apply_tensor_interaction_step!(ws.state.psi, ws.tensor_cache, ws.spin_matrices, dt_outer, ndim; imaginary_time)
-        end
+        apply_tensor_interaction_step!(ws.state.psi, ws.tensor_cache, ws.spin_matrices, dt_outer, ndim; imaginary_time)
     end
 
     if ws.raman !== nothing
@@ -448,24 +412,12 @@ function _outer_potential_bwd!(ws::Workspace{N}, dt_outer, n_comp, ndim, imagina
     end
 
     if ws.tensor_cache !== nothing
-        if gpu
-            _run_on_host!(ws.state.psi) do p
-                apply_tensor_interaction_step!(p, ws.tensor_cache, ws.spin_matrices, dt_outer, ndim; imaginary_time)
-            end
-        else
-            apply_tensor_interaction_step!(ws.state.psi, ws.tensor_cache, ws.spin_matrices, dt_outer, ndim; imaginary_time)
-        end
+        apply_tensor_interaction_step!(ws.state.psi, ws.tensor_cache, ws.spin_matrices, dt_outer, ndim; imaginary_time)
     end
 
     c2 = get_cn(ws.interactions, 2)
     if abs(c2) > 1e-30
-        if gpu
-            _run_on_host!(ws.state.psi) do p
-                apply_nematic_step!(p, ws.interactions, ws.spin_matrices.system.F, dt_outer, ndim; imaginary_time)
-            end
-        else
-            apply_nematic_step!(ws.state.psi, ws.interactions, ws.spin_matrices.system.F, dt_outer, ndim; imaginary_time)
-        end
+        apply_nematic_step!(ws.state.psi, ws.interactions, ws.spin_matrices.system.F, dt_outer, ndim; imaginary_time)
     end
 
     if abs(ws.interactions.c1) > 1e-30

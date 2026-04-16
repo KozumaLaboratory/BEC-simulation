@@ -6,6 +6,16 @@ Decompose total energy into individual contributions.
 Returns `(kinetic, trap, zeeman, density, spin, ddi, lhy, tensor, raman, total)`.
 """
 function energy_decomposition(ws::Workspace{N}) where {N}
+    # GPU path: dispatch to extension via _energy_decomposition_impl
+    if _is_gpu(ws.state.psi)
+        return _energy_decomposition_gpu(ws)
+    end
+    _energy_decomposition_cpu(ws)
+end
+
+function _energy_decomposition_gpu end
+
+function _energy_decomposition_cpu(ws::Workspace{N}) where {N}
     psi = _to_host(ws.state.psi)
     grid = ws.grid
     n_comp = ws.spin_matrices.system.n_components
