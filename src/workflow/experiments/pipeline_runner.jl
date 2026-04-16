@@ -99,21 +99,6 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
         throw(ArgumentError("ground_state step requires 'grid' (no previous step to inherit from)"))
     end
 
-    # --- Cache: skip if file exists ---
-    cache_path = get(p, "cache", nothing)
-    if cache_path !== nothing && isfile(cache_path)
-        verbose && println("  Loading cached GS from $cache_path")
-        d = JLD2.load(cache_path)
-        psi_out = d["psi"]
-        energy = get(d, "energy", NaN)
-        converged = get(d, "converged", true)
-        step_result = Dict{Symbol,Any}(
-            :ground_state_energy => energy,
-            :ground_state_converged => converged,
-        )
-        return (psi_out, grid, atom, nothing, step_result)
-    end
-
     # --- Physical params: inherit from ws_prev if absent ---
     interactions = if haskey(p, "interactions")
         _parse_gs_interactions(p["interactions"], atom)
@@ -157,6 +142,31 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
         ws_prev.zeeman
     else
         _parse_zeeman(Dict(), duration)
+    end
+
+    # --- Cache: skip ITP/LBFGS if file exists, but build a workspace so
+    #     downstream analyzers (e.g. bogoliubov) can inspect the system ---
+    cache_path = get(p, "cache", nothing)
+    if cache_path !== nothing && isfile(cache_path)
+        verbose && println("  Loading cached GS from $cache_path")
+        d = JLD2.load(cache_path)
+        psi_out = d["psi"]
+        energy = get(d, "energy", NaN)
+        converged = get(d, "converged", true)
+        ws_cached = make_workspace(;
+            grid, atom, interactions, zeeman, potential,
+            sim_params = SimParams(; dt, n_steps = 1, save_every = 1),
+            psi_init = psi_out,
+            enable_ddi, c_dd = c_dd_val,
+            secular_ddi = secular, quasi_2d_ddi = q2d, l_z_ddi = lz,
+            backend,
+        )
+        step_result = Dict{Symbol,Any}(
+            :ground_state_energy => energy,
+            :ground_state_converged => converged,
+            :workspace => ws_cached,
+        )
+        return (psi_out, grid, atom, ws_cached, step_result)
     end
     initial_state = Symbol(get(p, "initial_state", "polar"))
     target_mz = _get_optional_float(p, "target_magnetization")
@@ -368,7 +378,7 @@ function _run_step(step::AnalyzeStep, psi, grid, atom, ws_prev; verbose=true, ch
 
     for (name, params) in step.analyzers
         verbose && print("  $name... ")
-        result = _run_analyzer(name, psi, grid, atom, params)
+        result = _run_analyzer(name, psi, grid, atom, params; ws_prev = ws_prev)
         results[name] = result
         verbose && println("done")
     end

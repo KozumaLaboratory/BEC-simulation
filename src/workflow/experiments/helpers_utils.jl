@@ -84,6 +84,52 @@ function _save_units_metadata!(f, data::Dict)
     N_raw !== nothing && (f["units/N_atoms"] = Int(N_raw))
 end
 
+"""
+Persist pipeline analyzer outputs under `analyze/<name>/<field>` so phase
+diagrams can be reconstructed from disk without re-running simulations.
+
+Silently skips unknown analyzer keys (e.g. pipeline-internal entries
+`:ground_state_energy`, `:dynamics_result`, `:dynamics_workspace`). Only
+fields that JLD2 can persist losslessly are written; Dict/NamedTuple/
+Number/String/Symbol/Vector-of-these are supported.
+"""
+function _save_analyzer_results!(f, result)
+    analyzer_names = (:tomography, :faraday, :energy_decomposition, :phase_classify,
+                      :stability, :bogoliubov)
+    for name in analyzer_names
+        haskey(result, name) || continue
+        val = result[name]
+        _write_jld2_value!(f, "analyze/$(name)", val)
+    end
+end
+
+function _write_jld2_value!(f, prefix::String, v::NamedTuple)
+    for (k, x) in pairs(v)
+        _write_jld2_value!(f, "$(prefix)/$(k)", x)
+    end
+end
+
+function _write_jld2_value!(f, prefix::String, v::Dict)
+    for (k, x) in v
+        _write_jld2_value!(f, "$(prefix)/$(k)", x)
+    end
+end
+
+function _write_jld2_value!(f, key::String, v::Union{Number,String,Bool,Symbol})
+    f[key] = v isa Symbol ? String(v) : v
+end
+
+function _write_jld2_value!(f, key::String, v::Tuple)
+    f[key] = collect(v)
+end
+
+function _write_jld2_value!(f, key::String, v::AbstractArray)
+    eltype_ok = eltype(v) <: Union{Number,String,Bool}
+    eltype_ok && (f[key] = Array(v))
+end
+
+_write_jld2_value!(::Any, ::String, ::Any) = nothing  # silently skip unsupported
+
 """Print ground state summary with populations."""
 function _print_gs_summary(psi, grid, atom, gs)
     F = atom.F

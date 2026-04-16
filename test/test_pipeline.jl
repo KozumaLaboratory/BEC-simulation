@@ -1,3 +1,5 @@
+using JLD2
+
 @testset "Pipeline" begin
     @testset "continuous ramp interpolators" begin
         # Linear
@@ -127,6 +129,95 @@
         @test haskey(result, :phase_classify)
         @test haskey(result.phase_classify, :spin_order)
         @test haskey(result.phase_classify, :phase)
+    end
+
+    @testset "bogoliubov analyzer" begin
+        yaml_str = """
+        pipeline:
+          - ground_state:
+              atom: Rb87
+              grid: {n: [16, 16], box: [8.0, 8.0]}
+              interactions: {c0: 10.0, c1: -0.5}
+              dt: 0.01
+              n_steps: 50
+              tol: 1e-4
+              initial_state: ferromagnetic
+              zeeman: {p: 0.0, q: 0.1}
+              potential: {type: harmonic, omega: [1.0, 1.0]}
+          - analyze:
+              - bogoliubov: {k_max: 5.0, n_k: 40, directions: auto}
+        """
+        config = load_config_from_string(yaml_str)
+        result = run_config(config; verbose=false)
+
+        @test haskey(result, :bogoliubov)
+        r = result.bogoliubov
+        @test haskey(r, :max_growth)
+        @test haskey(r, :unstable)
+        @test haskey(r, :k_peak)
+        @test haskey(r, :pattern)
+        @test r.max_growth >= 0.0
+        @test r.unstable isa Bool
+    end
+
+    @testset "analyzer result persistence" begin
+        mktempdir() do tmp
+            cfg_path = joinpath(tmp, "config.yaml")
+            write(cfg_path, """
+            pipeline:
+              - ground_state:
+                  atom: Rb87
+                  grid: {n: [16], box: [8.0]}
+                  interactions: {c0: 10.0, c1: -0.5}
+                  dt: 0.01
+                  n_steps: 30
+                  tol: 1e-4
+                  initial_state: ferromagnetic
+                  zeeman: {p: 0.0, q: 0.1}
+                  potential: {type: harmonic, omega: [1.0]}
+              - analyze:
+                  - phase_classify: {}
+            """)
+            run_dir = SpinorBEC.run_yaml(cfg_path; base_dir = tmp, verbose = false)
+            d = only(filter(p -> endswith(p, ".jld2"),
+                            joinpath.(run_dir, readdir(run_dir))))
+            loaded = JLD2.load(d)
+            @test haskey(loaded, "analyze/phase_classify/spin_order")
+            @test haskey(loaded, "analyze/phase_classify/phase")
+            @test loaded["analyze/phase_classify/phase"] isa AbstractString
+        end
+    end
+
+    @testset "cache hit feeds workspace to analyzers" begin
+        mktempdir() do tmp
+            cache_file = joinpath(tmp, "gs.jld2")
+            yaml_str = """
+            pipeline:
+              - ground_state:
+                  atom: Rb87
+                  grid: {n: [16, 16], box: [8.0, 8.0]}
+                  interactions: {c0: 10.0, c1: -0.5}
+                  dt: 0.01
+                  n_steps: 50
+                  tol: 1e-4
+                  initial_state: ferromagnetic
+                  zeeman: {p: 0.0, q: 0.1}
+                  potential: {type: harmonic, omega: [1.0, 1.0]}
+                  cache: $cache_file
+              - analyze:
+                  - bogoliubov: {k_max: 5.0, n_k: 40, directions: auto}
+            """
+            cfg = load_config_from_string(yaml_str)
+            r1 = run_config(cfg; verbose = false)
+            @test isfile(cache_file)
+            @test haskey(r1, :bogoliubov)
+
+            # Second run: cache is hit; analyzer must still receive ws_prev
+            cfg2 = load_config_from_string(yaml_str)
+            r2 = run_config(cfg2; verbose = false)
+            @test haskey(r2, :bogoliubov)
+            @test r2.bogoliubov.max_growth ≈ r1.bogoliubov.max_growth atol=1e-8
+        end
     end
 
     @testset "auto_rotate_psi" begin

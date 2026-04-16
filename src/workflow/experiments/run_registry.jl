@@ -170,6 +170,7 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
                         f["env/$k"] = v
                     end
                     _save_units_metadata!(f, patched)
+                    _save_analyzer_results!(f, result)
                 end
                 mv(tmp_file, psi_file; force = true)
             catch err
@@ -226,6 +227,7 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
                 f["env/$k"] = v
             end
             _save_units_metadata!(f, data)
+            _save_analyzer_results!(f, result)
         end
         mv(tmp_file, psi_file; force = false)
     catch err
