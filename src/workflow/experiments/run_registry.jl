@@ -56,6 +56,9 @@ function run_yaml(yaml_path::String; base_dir::String = "runs", verbose::Bool = 
     haskey(data, "pipeline") || throw(ArgumentError(
         "YAML must have a 'pipeline:' key. Got keys: $(collect(keys(data)))"))
 
+    # Schema validation: catch typos and invalid values before starting
+    validate_pipeline!(data)
+
     # If the YAML is already runs/foo/config.yaml, use runs/foo/ as the run dir
     # (user manages directory names). Otherwise compute a hash-based dir.
     run_dir = if basename(yaml_path) == "config.yaml" && isdir(dirname(yaml_path))
@@ -166,8 +169,9 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
                     for (k, v) in env
                         f["env/$k"] = v
                     end
+                    _save_units_metadata!(f, patched)
                 end
-                mv(tmp_file, psi_file; force = false)
+                mv(tmp_file, psi_file; force = true)
             catch err
                 isfile(tmp_file) && rm(tmp_file; force = true)
                 rethrow(err)
@@ -221,6 +225,7 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
             for (k, v) in env
                 f["env/$k"] = v
             end
+            _save_units_metadata!(f, data)
         end
         mv(tmp_file, psi_file; force = false)
     catch err

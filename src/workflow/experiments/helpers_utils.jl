@@ -50,6 +50,40 @@ function seed_noise(
     psi
 end
 
+"""Save unit metadata to a JLD2 file for reproducibility."""
+function _save_units_metadata!(f, data::Dict)
+    gs = nothing
+    pipeline = get(data, "pipeline", [])
+    for step in pipeline
+        step isa Dict || continue
+        if haskey(step, "ground_state")
+            gs = step["ground_state"]
+            break
+        end
+    end
+    gs === nothing && return
+
+    inter = get(gs, "interactions", Dict())
+    omega_ref_raw = get(inter, "omega_ref", nothing)
+    omega_ref_raw === nothing && return
+    omega_ref = Float64(omega_ref_raw)
+
+    atom_name = get(gs, "atom", nothing)
+    atom_name === nothing && return
+    atom = resolve_atom(Symbol(atom_name))
+
+    a_ho = sqrt(Units.HBAR / (atom.mass * omega_ref))
+    f["units/system"] = "dimensionless"
+    f["units/omega_ref_hz"] = omega_ref / (2π)
+    f["units/omega_ref_rad_s"] = omega_ref
+    f["units/a_ho_m"] = a_ho
+    f["units/time_unit_s"] = 1.0 / omega_ref
+    f["units/energy_unit_J"] = Units.HBAR * omega_ref
+    f["units/atom"] = String(atom_name)
+    N_raw = get(inter, "N_atoms", nothing)
+    N_raw !== nothing && (f["units/N_atoms"] = Int(N_raw))
+end
+
 """Print ground state summary with populations."""
 function _print_gs_summary(psi, grid, atom, gs)
     F = atom.F

@@ -76,6 +76,7 @@ include("workflow/initialization/thermal_noise.jl")
 include("workflow/io/io.jl")
 include("workflow/io/unitful_support.jl")
 include("workflow/io/dashboard.jl")
+include("workflow/io/scan_summary.jl")
 
 # 9. Monitoring system (needed by solvers)
 include("workflow/monitoring/ascii_plot.jl")
@@ -88,6 +89,7 @@ include("workflow/monitoring/live_monitor.jl")
 # 10. Experiments (defines config types needed by phases)
 include("workflow/experiments/adaptive_advice.jl")
 include("workflow/experiments/config_override.jl")  # OverrideMap + scan expansion
+include("workflow/experiments/schema.jl")           # YAML validation
 include("workflow/experiments/helpers_types.jl")
 include("workflow/experiments/helpers_utils.jl")
 include("workflow/experiments/helpers_parsers.jl")
@@ -281,6 +283,8 @@ export run_yaml, run_status, list_runs, compute_run_dir
 export apply_override!, apply_overrides, expand_scan_points, parse_override_map
 export OverrideScan, ConstrainedJzScan
 export PotentialConfig, ConstantValue, LinearRamp, interpolate_value
+export validate_pipeline!, validate_config!
+export scan_summary, scan_energy_comparison, print_scan_summary
 
 # Units
 export Units
