@@ -484,7 +484,7 @@ function _apply_ddi_rotation!(
     for i = 1:D
         lam_i = Float64(-F + (i - 1))
         wi = view(W, :, i)
-        @. wi = wi * cis(-lam_i * beta)
+        @. wi = wi * cis(lam_i * beta)
     end
     _gpu_matmul_V!(P, W, V_T, Val(D))
 
@@ -512,7 +512,7 @@ function _apply_ddi_rotation!(
     for i = 1:D
         lam_i = Float64(-F + (i - 1))
         wi = view(W, :, i)
-        @. wi = wi * cis(lam_i * beta)
+        @. wi = wi * cis(-lam_i * beta)
     end
     _gpu_matmul_V!(P, W, V_T, Val(D))
 
