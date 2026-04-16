@@ -206,7 +206,7 @@ function find_ground_state(;
         n_steps,
         imaginary_time = true,
         normalize_every = norm_every,
-        save_every = max(1, n_steps ÷ 10),
+        save_every = max(1, n_steps ÷ 100),
         rotating_frame_omega,
     )
     ws = make_workspace(;
@@ -364,7 +364,14 @@ function _run_itp_loop!(
                 E = total_energy(ws)
                 dE = abs(E - E_prev)
                 psi_max = maximum(abs, ws.state.psi)
-                dpsi = psi_max > 0 ? maximum(abs, ws.state.psi .- psi_prev) / psi_max : 0.0
+                dpsi = if psi_max > 0
+                    # Fuse subtraction + abs into map-reduce (avoids temp array alloc)
+                    psi_prev .= ws.state.psi .- psi_prev  # reuse psi_prev as diff buffer
+                    maximum(abs, psi_prev) / psi_max
+                else
+                    0.0
+                end
+                copyto!(psi_prev, ws.state.psi)
                 final_dE = dE
                 final_dpsi = dpsi
 
@@ -382,7 +389,6 @@ function _run_itp_loop!(
                     break
                 end
                 E_prev = E
-                copyto!(psi_prev, ws.state.psi)
             end
 
             # Reopen leapfrog after split point

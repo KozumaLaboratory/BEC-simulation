@@ -133,6 +133,7 @@ include("solvers/ground_state.jl")
 include("solvers/simulation.jl")
 include("solvers/adaptive.jl")
 include("solvers/embedded_adaptive.jl")
+include("solvers/lbfgs_ground_state.jl")
 include("solvers/continuation.jl")
 
 # Types
@@ -270,6 +271,7 @@ export scan_phase_diagram_2d
 export find_phase_boundary
 export run_simulation!, run_simulation_checkpointed!
 export run_simulation_adaptive!, run_simulation_yoshida!, run_simulation_embedded!
+export find_ground_state_lbfgs
 export make_workspace, init_psi
 
 # Monitoring & Callbacks

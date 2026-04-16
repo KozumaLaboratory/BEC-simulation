@@ -77,10 +77,29 @@ end
 
 function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_prev; verbose=true, checkpoint_dir=nothing)
     p = step.params
-    atom = resolve_atom(Symbol(p["atom"]))
-    grid, ndim = _setup_grid_from_params(p)
+    method = Symbol(get(p, "method", "itp"))
 
-    # Cache: skip GS computation if cache file exists
+    # --- atom: inherit from previous step if absent ---
+    atom = if haskey(p, "atom")
+        a = resolve_atom(Symbol(p["atom"]))
+        _resolve_derived_params!(p, a; verbose)
+        a
+    elseif atom_prev !== nothing
+        atom_prev
+    else
+        throw(ArgumentError("ground_state step requires 'atom' (no previous step to inherit from)"))
+    end
+
+    # --- grid: inherit from previous step if absent ---
+    grid, ndim = if haskey(p, "grid")
+        _setup_grid_from_params(p)
+    elseif grid_prev !== nothing
+        (grid_prev, length(grid_prev.config.n_points))
+    else
+        throw(ArgumentError("ground_state step requires 'grid' (no previous step to inherit from)"))
+    end
+
+    # --- Cache: skip if file exists ---
     cache_path = get(p, "cache", nothing)
     if cache_path !== nothing && isfile(cache_path)
         verbose && println("  Loading cached GS from $cache_path")
@@ -94,19 +113,57 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
         )
         return (psi_out, grid, atom, nothing, step_result)
     end
-    interactions = _parse_gs_interactions(get(p, "interactions", Dict()), atom)
-    enable_ddi, c_dd_val, secular, q2d, lz = _parse_gs_ddi(get(p, "ddi", Dict()), get(p, "interactions", Dict()), atom)
-    potential = _parse_and_build_potential(
-        get(p, "potential", Dict("type" => "harmonic", "omega" => ones(ndim))), ndim)
-    backend = _resolve_backend(Symbol(get(p, "backend", "cpu")))
 
-    dt = Float64(get(p, "dt", 0.001))
+    # --- Physical params: inherit from ws_prev if absent ---
+    interactions = if haskey(p, "interactions")
+        _parse_gs_interactions(p["interactions"], atom)
+    elseif ws_prev !== nothing
+        ws_prev.interactions
+    else
+        _parse_gs_interactions(Dict{String,Any}(), atom)
+    end
+
+    enable_ddi, c_dd_val, secular, q2d, lz = if haskey(p, "ddi") || haskey(p, "interactions")
+        _parse_gs_ddi(get(p, "ddi", Dict()), get(p, "interactions", Dict()), atom)
+    elseif ws_prev !== nothing && ws_prev.ddi !== nothing
+        (true, ws_prev.ddi.C_dd, false, false, 0.0)
+    else
+        (false, NaN, false, false, 0.0)
+    end
+
+    potential = if haskey(p, "potential")
+        _parse_and_build_potential(p["potential"], ndim)
+    elseif ws_prev !== nothing
+        ws_prev.potential
+    else
+        _parse_and_build_potential(Dict("type" => "harmonic", "omega" => ones(ndim)), ndim)
+    end
+
+    backend = if haskey(p, "backend")
+        _resolve_backend(Symbol(p["backend"]))
+    elseif ws_prev !== nothing
+        ws_prev.backend
+    else
+        CPUBackend()
+    end
+
     tol = Float64(get(p, "tol", 1e-8))
-    n_steps = Int(get(p, "n_steps", 100000))
+    n_steps = Int(get(p, "n_steps", method === :lbfgs ? 500 : 100000))
+    dt = Float64(get(p, "dt", 0.001))
     duration = dt * n_steps
-    zeeman = _parse_zeeman(get(p, "zeeman", Dict()), duration)
+    zeeman = if haskey(p, "zeeman")
+        _parse_zeeman(p["zeeman"], duration)
+    elseif ws_prev !== nothing
+        ws_prev.zeeman
+    else
+        _parse_zeeman(Dict(), duration)
+    end
     initial_state = Symbol(get(p, "initial_state", "polar"))
     target_mz = _get_optional_float(p, "target_magnetization")
+    if target_mz === nothing && psi_prev !== nothing && method === :lbfgs
+        # Preserve the Mz constraint from the seed state
+        target_mz = magnetization(_to_host(psi_prev), grid, SpinSystem(atom.F))
+    end
     temp_ratio = _get_optional_float(p, "temperature_ratio")
 
     psi_init = psi_prev
@@ -135,7 +192,7 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
             c_dd_from = Float64(get(c_dd_spec, "from", 0.0))
             c_dd_step = Float64(get(c_dd_spec, "step", (c_dd_target - c_dd_from) / 100))
             dE_threshold = Float64(get(c_dd_spec, "threshold", 0.01))
-            save_every_local = max(1, Int(get(p, "n_steps", 100000)) ÷ 10)
+            save_every_local = max(1, Int(get(p, "n_steps", 100000)) ÷ 100)
             c_dd_current = Ref(c_dd_from)
             E_prev_ramp = Ref(NaN)
             push!(ramp_callbacks, (ws, step, ns) -> begin
@@ -166,15 +223,40 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
     on_step = isempty(ramp_callbacks) ? nothing :
         (ws, step, ns) -> for cb in ramp_callbacks; cb(ws, step, ns); end
 
-    gs = find_ground_state(;
-        grid, atom, interactions, zeeman, potential,
-        dt, n_steps, tol, initial_state, psi_init,
-        enable_ddi, c_dd = c_dd_val,
-        secular_ddi = secular, quasi_2d_ddi = q2d, l_z_ddi = lz,
-        target_magnetization = target_mz, backend, on_step,
-        checkpoint_dir = checkpoint_dir,
-        checkpoint_every = checkpoint_dir !== nothing ? max(1, n_steps ÷ 10) : 0,
-    )
+    gs = if method === :itp
+        find_ground_state(;
+            grid, atom, interactions, zeeman, potential,
+            dt, n_steps, tol, initial_state, psi_init,
+            enable_ddi, c_dd = c_dd_val,
+            secular_ddi = secular, quasi_2d_ddi = q2d, l_z_ddi = lz,
+            target_magnetization = target_mz, backend, on_step,
+            checkpoint_dir = checkpoint_dir,
+            checkpoint_every = checkpoint_dir !== nothing ? max(1, n_steps ÷ 10) : 0,
+        )
+    elseif method === :lbfgs
+        m_lbfgs = Int(get(p, "m_lbfgs", 10))
+        # Reuse existing workspace when available to preserve DDI flags (secular/q2d/l_z)
+        if ws_prev !== nothing && !haskey(p, "interactions") && !haskey(p, "ddi") &&
+           !haskey(p, "potential") && !haskey(p, "zeeman")
+            find_ground_state_lbfgs(;
+                ws_init = ws_prev, psi_init,
+                n_steps, tol, m_lbfgs,
+                target_magnetization = target_mz,
+                verbose,
+            )
+        else
+            find_ground_state_lbfgs(;
+                grid, atom, interactions, zeeman, potential,
+                n_steps, tol, m_lbfgs, initial_state, psi_init,
+                enable_ddi, c_dd = c_dd_val,
+                secular_ddi = secular, quasi_2d_ddi = q2d, l_z_ddi = lz,
+                target_magnetization = target_mz, backend,
+                verbose,
+            )
+        end
+    else
+        throw(ArgumentError("Unknown ground_state method: $method. Supported: itp, lbfgs"))
+    end
 
     psi_out = copy(gs.workspace.state.psi)
     verbose && _print_gs_summary(psi_out, grid, atom, gs)

@@ -320,19 +320,7 @@ function compute_ddi_potential!(ddi::DDIParams{N}, bufs::DDIBuffers) where {N}
     mul!(bufs.Fy_rk, rp.forward, bufs.Fy_r)
     mul!(bufs.Fz_rk, rp.forward, bufs.Fz_r)
 
-    C = ddi.C_dd
-    rk_shape = rp.rk_shape
-    @inbounds for I in CartesianIndices(rk_shape)
-        fk_x = bufs.Fx_rk[I]
-        fk_y = bufs.Fy_rk[I]
-        fk_z = bufs.Fz_rk[I]
-        bufs.Phi_x_rk[I] =
-            C * (ddi.Q_xx[I] * fk_x + ddi.Q_xy[I] * fk_y + ddi.Q_xz[I] * fk_z)
-        bufs.Phi_y_rk[I] =
-            C * (ddi.Q_xy[I] * fk_x + ddi.Q_yy[I] * fk_y + ddi.Q_yz[I] * fk_z)
-        bufs.Phi_z_rk[I] =
-            C * (ddi.Q_xz[I] * fk_x + ddi.Q_yz[I] * fk_y + ddi.Q_zz[I] * fk_z)
-    end
+    _ddi_k_contraction!(bufs, ddi, ddi.C_dd)
 
     mul!(bufs.Phi_x, rp.inverse, bufs.Phi_x_rk)
     mul!(bufs.Phi_y, rp.inverse, bufs.Phi_y_rk)

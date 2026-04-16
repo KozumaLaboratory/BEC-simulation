@@ -6,6 +6,7 @@
 
 pipeline:
   - ground_state:
+      method: itp
       atom: Eu151
       grid:
         n: [64, 64, 64]
@@ -22,11 +23,18 @@ pipeline:
         p: 0.0
         q: 0.0
       potential: {type: harmonic, omega: [1.0, 1.0, 1.1818]}   # 130/110
-      dt: 0.0001
+      dt: 0.001
       tol: 1.0e-7
       initial_state: ferromagnetic_min
       target_magnetization: -6.0
       backend: cuda
+
+  - ground_state:
+      method: lbfgs              # polish ITP seed with L-BFGS
+      n_steps: 500
+      tol: 1.0e-8
+      # atom/grid/interactions/ddi/potential/zeeman/target_magnetization
+      # all inherited from the previous step
 
 scan:
   zip:
