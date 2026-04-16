@@ -1,0 +1,51 @@
+# ================================================================
+# Eu151 convergence study: grid × dt × tol at a fixed (c1, q, Mz)
+# ================================================================
+#
+# Goal:
+#   Establish that the phase maps are not grid-limited at 32^3.
+#   Runs the same physical point (c1_ratio=0, q=0, Mz=0) across
+#   {32, 48, 64, 96} grids, two dt values, two tol values. Phase
+#   label should be stable; energy should approach a limit.
+#
+# Read back via scan_summary; plot E vs N_grid on log-log.
+# Pick the smallest grid where |E(N) - E(N*)| / |E(N*)| < 1e-3.
+# ================================================================
+
+pipeline:
+  - ground_state:
+      method: itp
+      atom: Eu151
+      grid: {n: [32, 32, 32], box: [20.0, 20.0, 20.0]}
+      interactions:
+        N_atoms: 50000
+        omega_ref: 691.15
+        c1_ratio: 0.0
+        c_lhy: 1135.0
+      ddi: {enabled: true}
+      zeeman: {p: 0.0, q: 0.0}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.1818]}
+      dt: 0.002
+      n_steps: 50000
+      tol: 1.0e-7
+      initial_state: ferromagnetic_min
+      target_magnetization: 0.0
+      backend: cuda
+
+  - ground_state:
+      method: lbfgs
+      n_steps: 800
+      tol: 1.0e-9
+
+  - analyze:
+      - phase_classify: {}
+
+scan:
+  product:
+    pipeline.0.grid.n:
+      [[32, 32, 32], [48, 48, 48], [64, 64, 64], [96, 96, 96]]
+    pipeline.0.dt:
+      [0.002, 0.0005]
+    pipeline.0.tol:
+      [1.0e-7, 1.0e-8]
+  continuation: false

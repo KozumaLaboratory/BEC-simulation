@@ -1,0 +1,47 @@
+# ================================================================
+# Eu151 2D phase map:  c1_ratio  ×  quadratic Zeeman q
+# ================================================================
+#
+# Goal:
+#   Sketch the (c1/c0, q) phase diagram under full 3D DDI.
+#   c1_ratio < 0 favours ferromagnetic; q>0 favours polar (m=0);
+#   DDI frustrates these → expect FM, polar, FL vortex, mixed.
+#
+# Grid choice (32^3) is a deliberate trade-off for density of points.
+# Convergence-grade points (64^3) should be re-run for any phase
+# boundary that the coarse map exposes. See runs/eu151_convergence.
+#
+# Per-point output includes classify_phase_detailed + bogoliubov:
+#   analyze/phase_classify/{phase,spin_order,biaxiality,Q6,
+#                          star_entropy,point_group,...}
+#   analyze/bogoliubov/{max_growth,unstable,k_peak,pattern,...}
+# ================================================================
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [32, 32, 32], box: [16.0, 16.0, 16.0]}
+      interactions:
+        N_atoms: 50000
+        omega_ref: 691.15
+        c1_ratio: 0.0
+      ddi: {enabled: true}
+      zeeman: {p: 0.0, q: 0.0}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.1818]}  # 130/110
+      dt: 0.002
+      n_steps: 40000
+      tol: 1.0e-7
+      initial_state: polar
+      backend: cuda
+
+  - analyze:
+      - phase_classify: {}
+      - bogoliubov: {k_max: 8.0, n_k: 80, directions: auto}
+
+scan:
+  product:
+    pipeline.0.interactions.c1_ratio:
+      [-0.020, -0.010, -0.005, -0.002, 0.0, 0.002, 0.005, 0.010, 0.020]
+    pipeline.0.zeeman.q:
+      [-0.2, -0.05, 0.0, 0.05, 0.2, 0.5]
+  continuation: false

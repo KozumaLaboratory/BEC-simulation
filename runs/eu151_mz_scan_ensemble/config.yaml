@@ -1,0 +1,56 @@
+# ================================================================
+# Eu151 Mz scan — initial-state ensemble
+# ================================================================
+#
+# Extends eu151_mz_scan by running three initial-state seeds at
+# every Mz point via comparison_runs. At each Mz, the lowest-E
+# seed is the candidate ground state; disagreement between seeds
+# signals multiple competing minima.
+#
+# Analyzer outputs persist to analyze/phase_classify/* for direct
+# phase-diagram reconstruction via scan_summary.
+# ================================================================
+
+pipeline:
+  - ground_state:
+      method: itp
+      atom: Eu151
+      grid: {n: [64, 64, 64], box: [20.0, 20.0, 20.0]}
+      interactions:
+        N_atoms: 50000
+        omega_ref: 691.15
+        c1_ratio: 0.0
+        c_lhy: 1135.0
+      ddi: {enabled: true}
+      zeeman: {p: 0.0, q: 0.0}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.1818]}
+      dt: 0.001
+      tol: 1.0e-7
+      initial_state: ferromagnetic_min     # overridden per comparison_run
+      target_magnetization: -6.0
+      backend: cuda
+
+  - ground_state:
+      method: lbfgs
+      n_steps: 500
+      tol: 1.0e-8
+
+  - analyze:
+      - phase_classify: {}
+
+scan:
+  zip:
+    pipeline.0.target_magnetization:
+      [-6.0, -4.0, -3.0, -2.0, -1.0, -0.5, 0.0]
+  comparison_runs:
+    - name: fm_min
+      override:
+        pipeline.0.initial_state: ferromagnetic_min
+    - name: polar
+      override:
+        pipeline.0.initial_state: polar
+    - name: fl_vortex
+      override:
+        pipeline.0.initial_state: fl_vortex
+  continuation: true
+  auto_rotate_on_mz: true
