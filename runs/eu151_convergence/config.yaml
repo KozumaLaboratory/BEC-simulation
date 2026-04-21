@@ -30,7 +30,7 @@ pipeline:
       tol: 1.0e-7
       initial_state: ferromagnetic_min
       target_magnetization: 0.0
-      backend: cuda
+      backend: cpu
 
   - ground_state:
       method: lbfgs

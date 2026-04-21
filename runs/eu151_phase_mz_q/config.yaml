@@ -35,6 +35,7 @@ pipeline:
       method: lbfgs
       n_steps: 500
       tol: 1.0e-8
+      backend: cpu
 
   - analyze:
       - phase_classify: {}

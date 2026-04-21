@@ -24,61 +24,52 @@
 #   energy  = ℏ ω_ref
 #   time    = 1/ω_ref ≈ 1.447 ms
 #
-# === Conversion formulae ===
-#   p = g_F × μ_B × B / (ℏ ω_ref)
-#   t_dimless = t_SI × ω_ref
-#   c0 = 4π × (a_s / a_ho) × N  (3D)
-#   c_dd = N × μ₀μ² / (ℏ ω_ref × a_ho³)  (3D)
-#
 # === Reference values (ω_ref = 2π × 110 Hz) ===
 #   a_ho  ≈ 0.780 μm
 #   1 ms  ≈ 0.691 ω⁻¹
 #   B = 2.6 nT → p ≈ 0.39
-#   c0    ≈ 4689
-#   c1/c0 = 1/36 (Buchachenko AFM estimate; set c1_ratio: 0.0 for DDI-only)
+#   c0    ≈ 4689 (DDI-only: c1=0)
 #   c_dd auto-derived from N_atoms+omega_ref
 #   ε_dd  ≈ 0.544
 # ================================================================
 
 pipeline:
   # Fully polarized ground state at high field
+  # c1_ratio: 0.0 — DDI-only (a_F unknown for Eu151)
   - ground_state:
-      cache: runs/shared/eu151_gs_p100_ferromagnetic_64.jld2
+      cache: runs/shared/eu151_gs_p100_fmmin_c1r0_64.jld2
       atom: Eu151
       grid: {n: [64, 64, 64], box: [20.0, 20.0, 20.0]}
       interactions:
-        c_total: 4689.0
-        c1_ratio: 0.02778  # 1/36, Buchachenko AFM estimate
+        N_atoms: 50000
+        omega_ref: 691.15        # 2π × 110 Hz
+        c1_ratio: 0.0            # DDI-only (paper: a_F unknown)
       ddi: {enabled: true}
       zeeman: {p: 100.0, q: 0.0}
       potential: {type: harmonic, omega: [1.0, 1.0, 1.182]}
       dt: 0.005
       n_steps: 100000
       tol: 1.0e-10
-      initial_state: ferromagnetic
+      initial_state: ferromagnetic_min
       backend: cuda
 
   # ---- Phase 1: Quench to weak field ----
-  # Paper: quench to B = 2.6 nT (p ≈ 0.39)
-  # Duration ~0.2 ms ≈ 0.14 ω⁻¹
+  # Paper: "momentarily adjusted" — instantaneous on EdH timescale (~22 ms)
+  # 0.14 ω⁻¹ ≈ 0.2 ms ≪ EdH timescale
   - dynamics:
       duration: 0.14
-      dt: 0.001
-      save_every: 10
+      dt: 0.0005
+      save_every: 280            # save only final state
       zeeman: {p: {from: 100.0, to: 0.39}, q: 0.0}
 
   # ---- Phase 2: Spin relaxation at weak field ----
-  # thermal noise seeds DDI instability
+  # Symmetry-breaking seed (1e-6) on Δm=±1 component only
+  # Paper: "negligible thermal component" — no bulk thermal noise
   # 40 ms ≈ 27.6 ω⁻¹
   - dynamics:
       duration: 27.6
-      dt: 0.002
-      save_every: 50
-      integrator:
-        method: adaptive
-        tol: 1.0e-4
-        dt_min: 1.0e-4
-        dt_max: 0.01
-      temperature_ratio: 0.1   # T/T_c
+      dt: 0.0001
+      save_every: 5000           # ~55 snapshots, 0.72 ms resolution
+      seed_amplitude: 1.0e-6     # tiny symmetry-breaking seed
       noise_seed: 42
       zeeman: {p: 0.39, q: 0.0}
