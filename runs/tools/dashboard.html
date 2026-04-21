@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SpinorBEC Dashboard</title>
+    <meta http-equiv="Cache-Control" content="no-store" />
     <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -68,13 +69,6 @@
     <label>Run:
         <select id="run-select"><option value="">All</option></select>
     </label>
-    <label>Integration:
-        <select id="axis-select">
-            <option value="3">xy (sum z)</option>
-            <option value="2">xz (sum y)</option>
-            <option value="1">yz (sum x)</option>
-        </select>
-    </label>
 </div>
 
 <div id="loading-bar" style="display:none; margin-bottom:1rem;">
@@ -105,6 +99,13 @@
 <div class="panel" style="margin-bottom:1.2rem">
     <div style="display:flex; align-items:center; gap:1rem; margin-bottom:0.8rem;">
         <span style="color:#00d9ff; font-weight:bold;">Column Density</span>
+        <label style="color:#8b949e; font-size:0.85rem;">Axis:
+            <select id="axis-select" style="background:#131920;color:#e6edf3;border:1px solid #21262d;border-radius:4px;padding:0.3rem 0.5rem;font-family:inherit;font-size:0.85rem;">
+                <option value="3">xy (sum z)</option>
+                <option value="2">xz (sum y)</option>
+                <option value="1">yz (sum x)</option>
+            </select>
+        </label>
         <label style="color:#8b949e; font-size:0.85rem;">Point:
             <select id="density-point-select" style="background:#131920;color:#e6edf3;border:1px solid #21262d;border-radius:4px;padding:0.3rem 0.5rem;font-family:inherit;font-size:0.85rem;"></select>
         </label>
@@ -115,6 +116,14 @@
             </select>
         </label>
         <span id="density-status" style="color:#8b949e; font-size:0.8rem;"></span>
+    </div>
+    <div style="display:flex; align-items:center; gap:0.8rem; margin-bottom:0.5rem;">
+        <label style="color:#8b949e; font-size:0.85rem;">Quantization axis tilt:
+            <input type="range" id="qaxis-angle" min="0" max="180" value="0" step="1"
+                style="width:200px; vertical-align:middle;">
+            <span id="qaxis-label" style="color:#a277ff; font-size:0.85rem; font-weight:bold;">0°</span>
+        </label>
+        <span id="qaxis-status" style="color:#8b949e; font-size:0.75rem;"></span>
     </div>
     <div id="density-grid" style="display:grid; gap:0.5rem;"></div>
 </div>
@@ -132,6 +141,13 @@
             </select>
         </label>
         <span id="density3d-status" style="color:#8b949e; font-size:0.8rem;"></span>
+    </div>
+    <div style="display:flex; align-items:center; gap:0.8rem; margin-bottom:0.5rem;">
+        <label style="color:#8b949e; font-size:0.85rem;">Quantization axis tilt:
+            <input type="range" id="qaxis-angle-3d" min="0" max="180" value="0" step="1"
+                style="width:200px; vertical-align:middle;">
+            <span id="qaxis-label-3d" style="color:#a277ff; font-size:0.85rem; font-weight:bold;">0°</span>
+        </label>
     </div>
     <div id="density3d-plot" style="width:100%; height:550px;"></div>
 </div>
@@ -154,6 +170,7 @@ const CFG = { responsive: true, displayModeBar: false };
 const COLORS = ['#00d9ff','#a277ff','#ffd580','#ff6b9d','#50fa7b','#ff8fab','#80e0ff','#c0ff60','#ff60c0','#60ffc0','#ffc060','#c060ff','#60c0ff'];
 
 let DATA = null;
+function arrayMax(arr) { let m = -Infinity; for (let i = 0; i < arr.length; i++) { if (arr[i] > m) m = arr[i]; } return m; }
 
 // --- Loading bar ---
 const loadingBar = document.getElementById('loading-bar');
@@ -227,6 +244,7 @@ loadRunList();
 
 function render() {
     if (!DATA) return;
+    if (DATA.error) { console.warn('Data error:', DATA.error); return; }
     const pts = DATA.points;
     const F = DATA.F;
     const runNames = DATA.run_names || [];
@@ -471,13 +489,13 @@ function generateMColors(D) {
 }
 
 // --- 3D Density visualization ---
-let density3dData = null;
+let density3dMeta = null; // {nx,ny,nz,n_comp,F,pops}
 const prevPointBtn = document.getElementById('prev-point-btn');
 const nextPointBtn = document.getElementById('next-point-btn');
 const density3dCompSel = document.getElementById('density3d-comp-select');
 const density3dStatus = document.getElementById('density3d-status');
 
-density3dCompSel.addEventListener('change', render3dDensity);
+density3dCompSel.addEventListener('change', load3dComponent);
 
 prevPointBtn.addEventListener('click', () => {
     const sel = densityPointSel;
@@ -494,67 +512,77 @@ nextPointBtn.addEventListener('click', () => {
     }
 });
 
-function render3dDensity() {
-    if (!density3dData) return;
-    const d = density3dData;
-    if (d.error) { density3dStatus.textContent = d.error; return; }
-    const shape = d.shape;
-    const nx = shape[0], ny = shape[1], nz = shape[2];
-
+function load3dComponent() {
+    const file = densityPointSel.value;
+    const run = runDirSel.value;
+    if (!file || !run) return;
     const sel = density3dCompSel.value;
-    let values;
-    if (sel === 'total') {
-        values = d.total_density;
-    } else {
-        const m = parseInt(sel.slice(1));
-        const comp = d.components.find(c => c.m === m);
-        values = comp ? comp.density : d.total_density;
-    }
+    const comp = sel === 'total' ? 0 : parseInt(sel);
+    density3dStatus.textContent = 'Loading...';
+    fetch(`/api/density3d_bin/${encodeURIComponent(run)}/${encodeURIComponent(file)}?comp=${comp}`)
+        .then(r => r.arrayBuffer())
+        .then(buf => {
+            const meta = parse3dBinary(buf);
+            density3dMeta = meta;
+            render3dFromFloat32(meta.density, meta.nx, meta.ny, meta.nz, sel);
+            density3dStatus.textContent = '';
+        })
+        .catch(e => { density3dStatus.textContent = 'Error: ' + e.message; });
+}
 
-    // Build coordinate arrays
-    const x = [], y = [], z = [], v = [];
+function parse3dBinary(buf) {
+    const header = new Int32Array(buf, 0, 6);
+    const nx = header[0], ny = header[1], nz = header[2];
+    const n_comp = header[3], F = header[4], component = header[5];
+    const pops = new Float32Array(buf, 24, n_comp);
+    const dataOffset = 24 + n_comp * 4;
+    const density = new Float32Array(buf, dataOffset, nx * ny * nz);
+    return { nx, ny, nz, n_comp, F, component, pops: Array.from(pops), density };
+}
+
+function render3dFromFloat32(values, nx, ny, nz, label) {
+    const N = nx * ny * nz;
+    const x = new Array(N), y = new Array(N), z = new Array(N), v = new Array(N);
+    let idx = 0, vMax = 0;
     for (let iz = 0; iz < nz; iz++) {
         for (let iy = 0; iy < ny; iy++) {
             for (let ix = 0; ix < nx; ix++) {
-                x.push(ix);
-                y.push(iy);
-                z.push(iz);
-                v.push(values[iz * ny * nx + iy * nx + ix]);
+                x[idx] = ix; y[idx] = iy; z[idx] = iz;
+                v[idx] = values[idx];
+                if (v[idx] > vMax) vMax = v[idx];
+                idx++;
             }
         }
     }
-
-    const vMax = Math.max(...v);
     const isomin = vMax * 0.05;
     const isomax = vMax * 0.8;
-
-    // Point info for title
-    const ptFile = densityPointSel.value || '';
     const ptOpt = densityPointSel.options[densityPointSel.selectedIndex];
-    const ptLabel = ptOpt ? ptOpt.textContent : ptFile;
+    const ptLabel = ptOpt ? ptOpt.textContent : '';
 
     Plotly.newPlot('density3d-plot', [{
         type: 'isosurface',
-        x, y, z,
-        value: v,
-        isomin,
-        isomax,
-        surface: { count: 4 },
+        x, y, z, value: v,
+        isomin, isomax,
+        surface: { count: 6, fill: 0.7 },
         caps: { x: { show: false }, y: { show: false }, z: { show: false } },
-        opacity: 0.6,
-        colorscale: 'Viridis',
+        opacity: 0.5,
+        colorscale: [[0,'#440154'],[0.2,'#482878'],[0.4,'#3e4989'],[0.5,'#31688e'],[0.6,'#26828e'],[0.7,'#1f9e89'],[0.8,'#6ece58'],[0.9,'#b5de2b'],[1,'#fde725']],
         colorbar: { len: 0.6, thickness: 15, tickfont: { size: 10, color: '#8b949e' } },
+        lighting: { ambient: 0.6, diffuse: 0.5, specular: 0.3, roughness: 0.5, fresnel: 0.2 },
+        lightposition: { x: 1000, y: 1000, z: 500 },
+        flatshading: false,
     }], {
-        ...LAYOUT,
-        title: { text: `3D: ${sel} | ${ptLabel}`, font: { color: '#00d9ff', size: 14 } },
+        paper_bgcolor: '#131920', font: { color: '#e6edf3' },
+        title: { text: `3D: ${label} | ${ptLabel}`, font: { color: '#00d9ff', size: 14 } },
         margin: { t: 40, r: 10, b: 10, l: 10 },
         scene: {
-            xaxis: { title: 'x', gridcolor: '#21262d', color: '#8b949e' },
-            yaxis: { title: 'y', gridcolor: '#21262d', color: '#8b949e' },
-            zaxis: { title: 'z', gridcolor: '#21262d', color: '#8b949e' },
+            xaxis: { title: 'x', gridcolor: '#21262d', color: '#8b949e', showbackground: false },
+            yaxis: { title: 'y', gridcolor: '#21262d', color: '#8b949e', showbackground: false },
+            zaxis: { title: 'z', gridcolor: '#21262d', color: '#8b949e', showbackground: false },
             bgcolor: '#0a0e14',
+            aspectmode: 'data',
         },
-    }, CFG);
+    }, { responsive: true, displayModeBar: false });
 }
 
 // --- Density visualization ---
@@ -589,32 +617,42 @@ function loadDensity() {
     setLoading(15, `Loading column density: ${file}`);
     densityStatus.textContent = '';
 
-    const p1 = fetch(`/api/density/${encodeURIComponent(run)}/${encodeURIComponent(file)}?axis=${axis}`)
-        .then(r => r.json());
-    const p2 = fetch(`/api/density3d/${encodeURIComponent(run)}/${encodeURIComponent(file)}`)
-        .then(r => r.json());
+    // Load column density first (fast, ~1MB JSON)
+    fetch(`/api/density/${encodeURIComponent(run)}/${encodeURIComponent(file)}?axis=${axis}`)
+        .then(r => r.json())
+        .then(colData => {
+            setLoading(60, 'Rendering column density...');
+            renderDensity(colData);
+            setLoading(100);
+            setTimeout(hideLoading, 300);
 
-    Promise.all([p1, p2]).then(([colData, vol3d]) => {
-        setLoading(60, 'Rendering column density...');
-        renderDensity(colData);
-        setLoading(80, 'Rendering 3D...');
-        density3dData = vol3d;
-        density3dCompSel.innerHTML = '<option value="total">Total</option>';
-        if (vol3d.components) {
-            for (const c of vol3d.components) {
-                const opt = document.createElement('option');
-                opt.value = `m${c.m}`;
-                opt.textContent = `m=${c.m} (${(c.population * 100).toFixed(1)}%)`;
-                density3dCompSel.appendChild(opt);
+            // Load coherence matrix for quantization axis rotation
+            loadCoherenceMatrix(run, file, axis);
+        })
+        .catch(e => { hideLoading(); densityStatus.textContent = 'Error: ' + e.message; });
+
+    // Load 3D binary
+    density3dStatus.textContent = 'Loading 3D...';
+    fetch(`/api/density3d_bin/${encodeURIComponent(run)}/${encodeURIComponent(file)}?comp=0`)
+        .then(r => r.arrayBuffer())
+        .then(buf => {
+            const meta = parse3dBinary(buf);
+            density3dMeta = meta;
+            // Populate component selector
+            density3dCompSel.innerHTML = '<option value="total">Total</option>';
+            const F = meta.F;
+            for (let c = 0; c < meta.n_comp; c++) {
+                const m = F - c;
+                if (meta.pops[c] > 1e-6) {
+                    const opt = document.createElement('option');
+                    opt.value = String(c + 1);  // 1-based component index
+                    opt.textContent = `m=${m} (${(meta.pops[c] * 100).toFixed(1)}%)`;
+                    density3dCompSel.appendChild(opt);
+                }
             }
-        }
-        render3dDensity();
-        setLoading(100);
-        setTimeout(hideLoading, 400);
-    }).catch(e => {
-        hideLoading();
-        densityStatus.textContent = 'Error: ' + e.message;
-    });
+            render3dFromFloat32(meta.density, meta.nx, meta.ny, meta.nz, 'total');
+        })
+        .catch(e => { density3dStatus.textContent = 'Error: ' + e.message; });
 }
 
 let lastColData = null;
@@ -625,6 +663,8 @@ function renderDensity(data) {
     if (data.error) { densityStatus.textContent = data.error; return; }
     densityStatus.textContent = '';
     lastColData = data;
+    const axisNames = {3: 'xy plane (sum z)', 2: 'xz plane (sum y)', 1: 'yz plane (sum x)'};
+    document.getElementById('density-axis-label').textContent = axisNames[axisSel.value] || '';
 
     const mVals = data.m_values;
     const D = mVals.length;
@@ -633,11 +673,11 @@ function renderDensity(data) {
     const ranges = data.axis_ranges || [[0, shape[0]-1], [0, shape[1]-1]];
     const shared = colorModeSel.value === 'shared';
 
-    const totalMax = Math.max(...data.total_density);
+    const totalMax = arrayMax(data.total_density);
     const entries = [{label: 'Total', data: data.total_density}];
     for (let mi = 0; mi < D; mi++) {
-        const maxVal = Math.max(...data.densities[mi]);
-        if (maxVal > totalMax * 1e-3) {
+        const maxVal = arrayMax(data.densities[mi]);
+        if (maxVal > totalMax * 1e-8) {
             entries.push({label: `m=${mVals[mi]}`, data: data.densities[mi]});
         }
     }
@@ -664,7 +704,7 @@ function renderDensity(data) {
                 }
                 z.push(row);
             }
-            const entryMax = Math.max(...entry.data);
+            const entryMax = arrayMax(entry.data);
             Plotly.newPlot(plotId, [{
                 z, type: 'heatmap',
                 x0: x0, dx: (x1 - x0) / (nx - 1),
@@ -691,6 +731,224 @@ function renderDensity(data) {
             }, CFG);
         }
     }
+}
+
+// --- Quantization axis rotation via coherence matrix ---
+let coherenceData = null; // {n1, n2, n_comp, F, C_upper: Float32Array[]}
+const qaxisSlider = document.getElementById('qaxis-angle');
+const qaxisLabel = document.getElementById('qaxis-label');
+const qaxisStatus = document.getElementById('qaxis-status');
+
+const qaxisSlider3d = document.getElementById('qaxis-angle-3d');
+const qaxisLabel3d = document.getElementById('qaxis-label-3d');
+let qaxisDebounceTimer = null;
+
+function syncSliders(source, deg) {
+    qaxisSlider.value = deg; qaxisLabel.textContent = deg + '°';
+    qaxisSlider3d.value = deg; qaxisLabel3d.textContent = deg + '°';
+    // Column density: immediate (client-side)
+    if (coherenceData && deg > 0) {
+        applyRotation(deg);
+    } else if (coherenceData && deg === 0 && lastColData) {
+        renderDensity(lastColData);
+    }
+    // 3D density: debounced server call
+    clearTimeout(qaxisDebounceTimer);
+    qaxisDebounceTimer = setTimeout(() => loadRotated3d(deg), 150);
+}
+qaxisSlider.addEventListener('input', () => syncSliders('col', parseInt(qaxisSlider.value)));
+qaxisSlider3d.addEventListener('input', () => syncSliders('3d', parseInt(qaxisSlider3d.value)));
+
+function loadRotated3d(deg) {
+    const file = densityPointSel.value;
+    const run = runDirSel.value;
+    if (!file || !run) return;
+    const sel = density3dCompSel.value;
+    const comp = sel === 'total' ? 0 : parseInt(sel);
+    if (deg === 0) {
+        density3dStatus.textContent = 'Loading...';
+        fetch(`/api/density3d_bin/${encodeURIComponent(run)}/${encodeURIComponent(file)}?comp=${comp}`)
+            .then(r => r.arrayBuffer()).then(buf => {
+                const meta = parse3dBinary(buf);
+                render3dFromFloat32(meta.density, meta.nx, meta.ny, meta.nz, sel);
+                density3dStatus.textContent = '';
+            });
+        return;
+    }
+    density3dStatus.textContent = `Rotating ${deg}°...`;
+    fetch(`/api/density3d_rotated/${encodeURIComponent(run)}/${encodeURIComponent(file)}?angle=${deg}&comp=${comp}`)
+        .then(r => r.arrayBuffer()).then(buf => {
+            const meta = parse3dBinary(buf);
+            render3dFromFloat32(meta.density, meta.nx, meta.ny, meta.nz, `${sel} @${deg}°`);
+            density3dStatus.textContent = '';
+        }).catch(e => { density3dStatus.textContent = 'Error: ' + e.message; });
+}
+
+function loadCoherenceMatrix(run, file, axis) {
+    qaxisStatus.textContent = 'Loading coherence...';
+    fetch(`/api/coherence/${encodeURIComponent(run)}/${encodeURIComponent(file)}?axis=${axis}`)
+        .then(r => r.arrayBuffer())
+        .then(buf => {
+            const hdr = new Int32Array(buf, 0, 5);
+            const n1 = hdr[0], n2 = hdr[1], n_comp = hdr[2], F = hdr[3], ax = hdr[4];
+            const n_pixels = n1 * n2;
+            const n_pairs = n_comp * (n_comp + 1) / 2;
+            // Parse upper triangle blocks: each is n_pixels * 2 Float32 (re, im)
+            const C_upper = [];
+            let offset = 20; // 5 * Int32
+            for (let p = 0; p < n_pairs; p++) {
+                const block = new Float32Array(buf, offset, n_pixels * 2);
+                C_upper.push(block);
+                offset += n_pixels * 2 * 4;
+            }
+            coherenceData = { n1, n2, n_comp, F, C_upper };
+            const sizeMB = (buf.byteLength / 1024 / 1024).toFixed(1);
+            qaxisStatus.textContent = `Ready (${sizeMB}MB)`;
+        })
+        .catch(e => { qaxisStatus.textContent = 'Error: ' + e.message; });
+}
+
+// Wigner small-d matrix for spin F, rotation angle beta around y-axis
+function wignerD(F, beta) {
+    const D = 2 * F + 1;
+    // Compute exp(-i*beta*Fy) using Fy matrix
+    // First build Fy for spin-F
+    const Fy_re = new Float64Array(D * D);
+    const Fy_im = new Float64Array(D * D);
+    for (let r = 0; r < D; r++) {
+        const m = F - r;
+        // F+ has element at (r, r+1): sqrt(F(F+1)-m(m-1))/2 -> (F_+ - F_-)/2i
+        if (r + 1 < D) {
+            const mp = m - 1;
+            const val = Math.sqrt(F * (F + 1) - m * mp) / 2;
+            Fy_im[r * D + (r + 1)] = -val;  // -i * val / i = -val for Fy = (F+ - F-)/(2i)
+            Fy_im[(r + 1) * D + r] = val;
+        }
+    }
+    // d = exp(-i * beta * Fy) = cos(beta*Fy) - i*sin(beta*Fy)
+    // Use eigendecomposition: Fy is real antisymmetric in Im part
+    // Simpler: use matrix exponentiation via repeated squaring on small matrix
+    return matrixExpIm(Fy_im, -beta, D);
+}
+
+// Compute exp(i*t*A) where A is purely imaginary (A_im is the imaginary part)
+// Returns {re: Float64Array, im: Float64Array} of D×D matrix
+function matrixExpIm(A_im, t, D) {
+    // M = i*t*A_im → M is real: M_re[r,c] = -t * A_im[r,c]
+    const M = new Float64Array(D * D);
+    for (let i = 0; i < D * D; i++) M[i] = -t * A_im[i];
+    // exp(M) where M is real, using Padé approximation (scale and square)
+    // Scale
+    let norm = 0;
+    for (let i = 0; i < D * D; i++) norm = Math.max(norm, Math.abs(M[i]));
+    let s = 0;
+    while (norm > 0.5) { norm /= 2; s++; }
+    const Ms = new Float64Array(D * D);
+    const scale = 1 / (1 << s);
+    for (let i = 0; i < D * D; i++) Ms[i] = M[i] * scale;
+    // Padé(6,6)
+    const b = [1, 1/2, 1/10, 1/120, 1/1680, 1/30240, 1/720720];
+    let M2 = matMul(Ms, Ms, D);
+    let M4 = matMul(M2, M2, D);
+    let M6 = matMul(M2, M4, D);
+    // U = M*(b1*I + b3*M2 + b5*M4) ... simplified: use Taylor for small matrices
+    // Actually for D=13, just use Taylor series to high order
+    // exp(Ms) = I + Ms + Ms²/2! + Ms³/3! + ...
+    const result = new Float64Array(D * D);
+    for (let i = 0; i < D; i++) result[i * D + i] = 1; // I
+    const term = new Float64Array(D * D);
+    for (let i = 0; i < D * D; i++) term[i] = result[i]; // current term = I
+    for (let k = 1; k <= 20; k++) {
+        const next = matMul(term, Ms, D);
+        for (let i = 0; i < D * D; i++) {
+            next[i] /= k;
+            result[i] += next[i];
+        }
+        for (let i = 0; i < D * D; i++) term[i] = next[i];
+    }
+    // Square back
+    for (let i = 0; i < s; i++) {
+        const sq = matMul(result, result, D);
+        for (let j = 0; j < D * D; j++) result[j] = sq[j];
+    }
+    return result; // real matrix (d-matrix is real for rotation around y)
+}
+
+function matMul(A, B, D) {
+    const C = new Float64Array(D * D);
+    for (let i = 0; i < D; i++)
+        for (let j = 0; j < D; j++) {
+            let s = 0;
+            for (let k = 0; k < D; k++) s += A[i * D + k] * B[k * D + j];
+            C[i * D + j] = s;
+        }
+    return C;
+}
+
+function applyRotation(deg) {
+    if (!coherenceData || !lastColData) return;
+    const t0 = performance.now();
+    const beta = deg * Math.PI / 180;
+    const { n1, n2, n_comp, F, C_upper } = coherenceData;
+    const D = n_comp;
+    const R = wignerD(F, beta);
+    const n_pixels = n1 * n2;
+
+    // Compute rotated densities: rho'_{m'}(px) = Σ_{m,n} R[m',m]*R[m',n] * C_{mn}(px)
+    // C is Hermitian: C_{nm} = conj(C_{mn})
+    const mVals = [];
+    const densities = [];
+    const totalDens = new Float64Array(n_pixels);
+
+    for (let mp = 0; mp < D; mp++) {
+        mVals.push(F - mp);
+        const dens = new Float64Array(n_pixels);
+        for (let m = 0; m < D; m++) {
+            const Rmp_m = R[mp * D + m];
+            if (Math.abs(Rmp_m) < 1e-15) continue;
+            for (let n = m; n < D; n++) {
+                const Rmp_n = R[mp * D + n];
+                if (Math.abs(Rmp_n) < 1e-15) continue;
+                // Get C_{mn} block
+                const pairIdx = m * D - m * (m - 1) / 2 + (n - m);
+                const block = C_upper[pairIdx];
+                const coeff = Rmp_m * Rmp_n;
+                if (m === n) {
+                    // Diagonal: C_{mm} is real
+                    for (let px = 0; px < n_pixels; px++) {
+                        dens[px] += coeff * block[px * 2]; // real part only
+                    }
+                } else {
+                    // Off-diagonal: 2*Re(R_m*R_n * C_{mn})
+                    // C_{mn} = re + i*im, C_{nm} = re - i*im
+                    // contribution = R_m*R_n*(re+i*im) + R_m*R_n*(re-i*im) -- wait no
+                    // Full: Σ_n R[m',m]*R[m',n]*C_{mn} for all m,n
+                    // For m<n: R_m*R_n*C_{mn} + R_n*R_m*C_{nm} = R_m*R_n*(C + C*) = 2*R_m*R_n*Re(C)
+                    // Wait, that's only if R is real (which it is for d-matrix)
+                    // And C_{nm} = conj(C_{mn}), so:
+                    // R_m'_m * R_m'_n * C_mn + R_m'_n * R_m'_m * conj(C_mn)
+                    // = R_m * R_n * (C + C*) = 2 * R_m * R_n * Re(C)
+                    const coeff2 = 2 * coeff;
+                    for (let px = 0; px < n_pixels; px++) {
+                        dens[px] += coeff2 * block[px * 2]; // 2 * R_m * R_n * Re(C_mn)
+                    }
+                }
+            }
+        }
+        densities.push(Array.from(dens));
+        for (let px = 0; px < n_pixels; px++) totalDens[px] += dens[px];
+    }
+
+    // Build rotated data in same format as lastColData
+    const rotData = {
+        ...lastColData,
+        m_values: mVals,
+        densities: densities,
+        total_density: Array.from(totalDens),
+    };
+    renderDensity(rotData);
+    const ms = (performance.now() - t0).toFixed(0);
+    qaxisStatus.textContent = `${ms}ms`;
 }
 </script>
 </body>

@@ -169,6 +169,7 @@ function serve_dashboard(port::Int = 8080; base_dir::String = "runs")
     isfile(html_path) || throw(ArgumentError("Dashboard HTML not found: $html_path"))
     html_content = read(html_path, String)
     data_cache = Dict{String,String}()
+    psi_cache = Dict{String,Any}()  # path → (psi, n_comp, n_pts, F, pops)
 
     server = Sockets.listen(Sockets.InetAddr(ip"0.0.0.0", port))
     println("Dashboard server running at http://localhost:$port")
@@ -179,7 +180,7 @@ function serve_dashboard(port::Int = 8080; base_dir::String = "runs")
     try
         while true
             sock = Sockets.accept(server)
-            @async _handle_dashboard_connection(sock, html_content, data_cache, base_dir)
+            @async _handle_dashboard_connection(sock, html_content, data_cache, psi_cache, base_dir)
         end
     catch e
         e isa InterruptException || rethrow(e)
@@ -189,7 +190,7 @@ function serve_dashboard(port::Int = 8080; base_dir::String = "runs")
     end
 end
 
-function _handle_dashboard_connection(sock, html_content, data_cache, base_dir)
+function _handle_dashboard_connection(sock, html_content, data_cache, psi_cache, base_dir)
     try
         request_line = readline(sock)
         isempty(request_line) && return close(sock)
@@ -203,7 +204,7 @@ function _handle_dashboard_connection(sock, html_content, data_cache, base_dir)
         length(parts) >= 2 || return close(sock)
         path = String(parts[2])
 
-        status, content_type, body = _route_dashboard(path, html_content, data_cache, base_dir)
+        status, content_type, body = _route_dashboard(path, html_content, data_cache, psi_cache, base_dir)
         _send_http_response(sock, status, content_type, body)
     catch e
         e isa EOFError || @warn "Dashboard connection error: $e"
@@ -212,7 +213,7 @@ function _handle_dashboard_connection(sock, html_content, data_cache, base_dir)
     end
 end
 
-function _route_dashboard(path, html_content, data_cache, base_dir)
+function _route_dashboard(path, html_content, data_cache, psi_cache, base_dir)
     if path == "/" || path == ""
         (200, "text/html; charset=utf-8", html_content)
     elseif path == "/api/runs"
@@ -255,7 +256,8 @@ function _route_dashboard(path, html_content, data_cache, base_dir)
             return (404, "text/plain", "File not found: $name/$file")
         end
         json = try
-            _json_string(_compute_column_densities(fpath, axis))
+            cached = _load_psi_cached(fpath, psi_cache)
+            _json_string(_compute_column_densities_from_cache(cached..., axis, fpath))
         catch e
             "{\"error\":\"$(replace(string(e), "\"" => "'"))\"}"
         end
@@ -282,8 +284,93 @@ function _route_dashboard(path, html_content, data_cache, base_dir)
         end
         (200, "application/json", json)
 
+    elseif startswith(path, "/api/density3d_bin/")
+        rest = _uri_decode(path[19:end])
+        slash_idx = findfirst('/', rest)
+        if slash_idx === nothing
+            return (400, "text/plain", "Expected /api/density3d_bin/:run/:file")
+        end
+        name = rest[1:slash_idx-1]
+        file = rest[slash_idx+1:end]
+        qidx = findfirst('?', file)
+        comp_idx = 0  # 0 = total
+        if qidx !== nothing
+            query = file[qidx+1:end]
+            file = file[1:qidx-1]
+            m = match(r"comp=(-?\d+)", query)
+            m !== nothing && (comp_idx = parse(Int, m.captures[1]))
+        end
+        fpath = joinpath(base_dir, name, file)
+        if !isfile(fpath)
+            return (404, "text/plain", "File not found: $name/$file")
+        end
+        bin = try
+            _compute_3d_density_binary(_load_psi_cached(fpath, psi_cache)...; component=comp_idx)
+        catch e
+            return (500, "text/plain", "Error: $(e)")
+        end
+        (200, "application/octet-stream", bin)
+
+    elseif startswith(path, "/api/coherence/")
+        rest = _uri_decode(path[16:end])
+        slash_idx = findfirst('/', rest)
+        if slash_idx === nothing
+            return (400, "text/plain", "Expected /api/coherence/:run/:file?axis=N")
+        end
+        name = rest[1:slash_idx-1]
+        file = rest[slash_idx+1:end]
+        axis = 3
+        qidx = findfirst('?', file)
+        if qidx !== nothing
+            query = file[qidx+1:end]
+            file = file[1:qidx-1]
+            m = match(r"axis=(\d+)", query)
+            m !== nothing && (axis = parse(Int, m.captures[1]))
+        end
+        fpath = joinpath(base_dir, name, file)
+        if !isfile(fpath)
+            return (404, "text/plain", "File not found: $name/$file")
+        end
+        bin = try
+            _compute_coherence_matrix_binary(_load_psi_cached(fpath, psi_cache)..., axis)
+        catch e
+            return (500, "text/plain", "Error: $(e)")
+        end
+        (200, "application/octet-stream", bin)
+
+    elseif startswith(path, "/api/density3d_rotated/")
+        rest = _uri_decode(path[23:end])
+        slash_idx = findfirst('/', rest)
+        if slash_idx === nothing
+            return (400, "text/plain", "Expected /api/density3d_rotated/:run/:file?angle=DEG&comp=N")
+        end
+        name = rest[1:slash_idx-1]
+        file = rest[slash_idx+1:end]
+        angle_deg = 0.0; comp_idx = 0
+        qidx = findfirst('?', file)
+        if qidx !== nothing
+            query = file[qidx+1:end]
+            file = file[1:qidx-1]
+            m = match(r"angle=([0-9.e+-]+)", query)
+            m !== nothing && (angle_deg = parse(Float64, m.captures[1]))
+            m2 = match(r"comp=(-?\d+)", query)
+            m2 !== nothing && (comp_idx = parse(Int, m2.captures[1]))
+        end
+        fpath = joinpath(base_dir, name, file)
+        if !isfile(fpath)
+            return (404, "text/plain", "File not found: $name/$file")
+        end
+        bin = try
+            _compute_rotated_3d_density_binary(
+                _load_psi_cached(fpath, psi_cache)...; angle_deg, component=comp_idx)
+        catch e
+            return (500, "text/plain", "Error: $(e)")
+        end
+        (200, "application/octet-stream", bin)
+
     elseif path == "/api/refresh"
         empty!(data_cache)
+        empty!(psi_cache)
         (200, "text/plain", "Cache cleared")
     else
         (404, "text/plain", "Not found")
@@ -292,12 +379,13 @@ end
 
 function _send_http_response(sock, status, content_type, body)
     reason = status == 200 ? "OK" : status == 404 ? "Not Found" : "Error"
-    body_bytes = Vector{UInt8}(body)
+    body_bytes = body isa Vector{UInt8} ? body : Vector{UInt8}(body)
     write(sock,
         "HTTP/1.1 $status $reason\r\n" *
         "Content-Type: $content_type\r\n" *
         "Content-Length: $(length(body_bytes))\r\n" *
         "Access-Control-Allow-Origin: *\r\n" *
+        "Cache-Control: no-store\r\n" *
         "Connection: close\r\n" *
         "\r\n")
     write(sock, body_bytes)
@@ -308,10 +396,51 @@ function _uri_decode(s::AbstractString)
 end
 
 """
-Compute 3D density for each m-component. Returns downsampled if grid > max_n.
+    _trilinear_upsample(data::Array{Float64,3}, target_n::Int) -> Array{Float64,3}
+
+Upsample a 3D array to `target_n` points per axis using trilinear interpolation.
+"""
+function _trilinear_upsample(data::Array{Float64,3}, target_n::Int)
+    nx, ny, nz = size(data)
+    out = Array{Float64,3}(undef, target_n, target_n, target_n)
+    @inbounds for iz in 1:target_n
+        fz = 1.0 + (iz - 1) * (nz - 1) / (target_n - 1)
+        z0 = clamp(floor(Int, fz), 1, nz - 1)
+        z1 = z0 + 1
+        wz = fz - z0
+        for iy in 1:target_n
+            fy = 1.0 + (iy - 1) * (ny - 1) / (target_n - 1)
+            y0 = clamp(floor(Int, fy), 1, ny - 1)
+            y1 = y0 + 1
+            wy = fy - y0
+            for ix in 1:target_n
+                fx = 1.0 + (ix - 1) * (nx - 1) / (target_n - 1)
+                x0 = clamp(floor(Int, fx), 1, nx - 1)
+                x1 = x0 + 1
+                wx = fx - x0
+                c000 = data[x0, y0, z0]; c100 = data[x1, y0, z0]
+                c010 = data[x0, y1, z0]; c110 = data[x1, y1, z0]
+                c001 = data[x0, y0, z1]; c101 = data[x1, y0, z1]
+                c011 = data[x0, y1, z1]; c111 = data[x1, y1, z1]
+                c00 = c000 * (1 - wx) + c100 * wx
+                c01 = c001 * (1 - wx) + c101 * wx
+                c10 = c010 * (1 - wx) + c110 * wx
+                c11 = c011 * (1 - wx) + c111 * wx
+                c0 = c00 * (1 - wy) + c10 * wy
+                c1 = c01 * (1 - wy) + c11 * wy
+                out[ix, iy, iz] = c0 * (1 - wz) + c1 * wz
+            end
+        end
+    end
+    out
+end
+
+"""
+Compute 3D density for each m-component.
+Uses trilinear interpolation to produce smooth output at `target_n` resolution.
 Top `max_components` by population are included, plus total.
 """
-function _compute_3d_densities(jld2_path::String; max_n::Int = 40, max_components::Int = 0)
+function _compute_3d_densities(jld2_path::String; target_n::Int = 0, max_components::Int = 0)
     d = JLD2.load(jld2_path)
     psi = d["psi"]
     n_comp = size(psi, ndims(psi))
@@ -322,29 +451,25 @@ function _compute_3d_densities(jld2_path::String; max_n::Int = 40, max_component
 
     ndim == 3 || throw(ArgumentError("3D density requires 3D data, got $(ndim)D"))
 
-    # Compute all densities to find top components
-    all_densities = [abs2.(view(psi, _component_slice(ndim, n_pts, c)...)) for c in 1:n_comp]
+    all_densities = [Float64.(abs2.(view(psi, _component_slice(ndim, n_pts, c)...))) for c in 1:n_comp]
     pops = [sum(dens) for dens in all_densities]
     total_pop = sum(pops)
 
-    # Total density
     total_dens = sum(all_densities)
 
-    # Pick top components by population (0 = all)
     sorted_idx = sortperm(pops; rev=true)
     n_keep = max_components > 0 ? min(max_components, n_comp) : n_comp
     top_idx = sorted_idx[1:n_keep]
 
-    # Downsample if needed
-    step = max(1, cld(maximum(n_pts), max_n))
-    r1 = 1:step:n_pts[1]
-    r2 = 1:step:n_pts[2]
-    r3 = 1:step:n_pts[3]
-    out_shape = (length(r1), length(r2), length(r3))
+    # Interpolate only if explicitly requested (target_n > 0)
+    out_n = target_n > 0 ? min(target_n, maximum(n_pts) * 2) : 0
+    need_interp = out_n > 0 && (out_n != n_pts[1] || out_n != n_pts[2] || out_n != n_pts[3])
+
+    total_out = need_interp ? _trilinear_upsample(total_dens, out_n) : total_dens
 
     components = Dict{String,Any}[]
     for ci in top_idx
-        dens = all_densities[ci][r1, r2, r3]
+        dens = need_interp ? _trilinear_upsample(all_densities[ci], out_n) : all_densities[ci]
         push!(components, Dict{String,Any}(
             "m" => m_values[ci],
             "population" => pops[ci] / max(total_pop, 1e-300),
@@ -352,13 +477,15 @@ function _compute_3d_densities(jld2_path::String; max_n::Int = 40, max_component
         ))
     end
 
+    out_shape = need_interp ? (out_n, out_n, out_n) : n_pts
+
     Dict{String,Any}(
         "m_values" => [c["m"] for c in components],
-        "total_density" => vec(total_dens[r1, r2, r3]),
+        "total_density" => vec(total_out),
         "components" => components,
         "shape" => collect(out_shape),
         "original_shape" => collect(n_pts),
-        "step" => step,
+        "interpolated" => need_interp,
     )
 end
 
@@ -448,4 +575,178 @@ function _compute_column_densities(jld2_path::String, axis::Int = 3)
         "axis_ranges" => ax_ranges,
         "box" => box,
     )
+end
+
+"""Column densities from pre-loaded (cached) psi."""
+function _compute_column_densities_from_cache(psi, n_comp, ndim, n_pts, F, axis::Int, jld2_path::String)
+    m_values = [F - (c - 1) for c in 1:n_comp]
+    box = _read_box_size(jld2_path)
+
+    if ndim == 1
+        densities = [Float64[abs2(psi[i, c]) for i in 1:n_pts[1]] for c in 1:n_comp]
+        x_range = box !== nothing ? [-box[1]/2, box[1]/2] : [0, n_pts[1]-1]
+        return Dict{String,Any}(
+            "m_values" => m_values, "densities" => densities,
+            "ndim" => 1, "shape" => [n_pts[1]], "axis" => 0,
+            "box" => box, "x_range" => x_range,
+        )
+    end
+
+    axis = clamp(axis, 1, ndim)
+    remaining = [i for i in 1:ndim if i != axis]
+    out_shape = ntuple(i -> n_pts[remaining[i]], length(remaining))
+
+    densities = Vector{Vector{Float64}}()
+    for c in 1:n_comp
+        idx = _component_slice(ndim, n_pts, c)
+        comp = abs2.(view(psi, idx...))
+        col = dropdims(sum(comp; dims=axis); dims=axis)
+        push!(densities, vec(col))
+    end
+
+    total = zeros(Float64, prod(out_shape))
+    for dens in densities
+        total .+= dens
+    end
+
+    axis_names = ["x","y","z"]
+    ax_labels = [axis_names[i] for i in remaining]
+    ax_ranges = if box !== nothing && length(box) >= ndim
+        [[-box[i]/2, box[i]/2] for i in remaining]
+    else
+        [[0, n_pts[i]-1] for i in remaining]
+    end
+
+    Dict{String,Any}(
+        "m_values" => m_values, "densities" => densities,
+        "total_density" => total, "ndim" => ndim,
+        "shape" => collect(out_shape), "axis" => axis,
+        "axis_labels" => ax_labels, "axis_ranges" => ax_ranges, "box" => box,
+    )
+end
+
+# --- Binary APIs for performance ---
+
+"""Load psi from JLD2 with caching. Returns (psi, n_comp, ndim, n_pts, F)."""
+function _load_psi_cached(jld2_path::String, cache::Dict{String,Any})
+    get!(cache, jld2_path) do
+        d = JLD2.load(jld2_path)
+        psi = d["psi"]
+        n_comp = size(psi, ndims(psi))
+        ndim = ndims(psi) - 1
+        F = div(n_comp - 1, 2)
+        n_pts = ntuple(i -> size(psi, i), ndim)
+        (psi, n_comp, ndim, n_pts, F)
+    end
+end
+
+"""
+Compute a single 3D density component as binary Float32.
+"""
+function _compute_3d_density_binary(psi, n_comp, ndim, n_pts, F; component::Int = 0)
+    ndim == 3 || throw(ArgumentError("3D density requires 3D data"))
+    _pack_3d_binary(psi, n_comp, ndim, n_pts, F, component)
+end
+
+"""
+Compute rotated 3D density: rotate quantization axis by angle_deg around y, then extract component.
+Optimized: only computes the single requested component (not full matrix multiply).
+Total density (component=0) is rotation-invariant, so skip rotation entirely.
+"""
+function _compute_rotated_3d_density_binary(psi, n_comp, ndim, n_pts, F; angle_deg::Float64 = 0.0, component::Int = 0)
+    ndim == 3 || throw(ArgumentError("3D density requires 3D data"))
+    if abs(angle_deg) < 0.01 || component == 0
+        return _pack_3d_binary(psi, n_comp, ndim, n_pts, F, component)
+    end
+    beta = angle_deg * π / 180
+    Fy = spin_matrices(F).Fy
+    R = exp(-im * beta * Matrix{ComplexF64}(Fy))
+
+    c = clamp(component, 1, n_comp)
+    N = prod(n_pts)
+    # ψ'_c(r) = Σ_m R[c,m] * ψ_m(r) — only one row of R needed
+    R_row = R[c, :]
+    psi_flat = reshape(psi, N, n_comp)
+    psi_c_rot = psi_flat * conj.(R_row)  # (N,D) * (D,) → (N,) complex
+    dens = Float32.(abs2.(psi_c_rot))
+
+    # Compute rotated populations (cheap: just norms of R * population_vector)
+    pops_orig = Float32[Float32(sum(abs2, view(psi, _component_slice(ndim, n_pts, m)...))) for m in 1:n_comp]
+    total_pop = sum(pops_orig)
+    pops_orig ./= max(total_pop, 1f-30)
+
+    buf = IOBuffer(; sizehint = 24 + n_comp * 4 + N * 4)
+    write(buf, Int32(n_pts[1]), Int32(n_pts[2]), Int32(n_pts[3]))
+    write(buf, Int32(n_comp), Int32(F), Int32(component))
+    write(buf, pops_orig)
+    write(buf, dens)
+    take!(buf)
+end
+
+function _pack_3d_binary(psi, n_comp, ndim, n_pts, F, component)
+    N = prod(n_pts)
+    # Use 3D array matching psi_c shape (eachindex returns CartesianIndices for SubArray)
+    dens = zeros(Float32, n_pts...)
+    if component == 0
+        for c in 1:n_comp
+            psi_c = view(psi, _component_slice(ndim, n_pts, c)...)
+            @inbounds for i in eachindex(psi_c)
+                dens[i] += Float32(abs2(psi_c[i]))
+            end
+        end
+    else
+        c = clamp(component, 1, n_comp)
+        psi_c = view(psi, _component_slice(ndim, n_pts, c)...)
+        @inbounds for i in eachindex(psi_c)
+            dens[i] = Float32(abs2(psi_c[i]))
+        end
+    end
+
+    pops = zeros(Float32, n_comp)
+    for c in 1:n_comp
+        s = 0.0
+        for v in view(psi, _component_slice(ndim, n_pts, c)...)
+            s += abs2(v)
+        end
+        pops[c] = Float32(s)
+    end
+    total_pop = sum(pops)
+    pops ./= max(total_pop, 1f-30)
+
+    buf = IOBuffer(; sizehint = 24 + n_comp * 4 + N * 4)
+    write(buf, Int32(n_pts[1]), Int32(n_pts[2]), Int32(n_pts[3]))
+    write(buf, Int32(n_comp), Int32(F), Int32(component))
+    write(buf, pops)
+    write(buf, vec(dens))  # flatten to column-major 1D
+    take!(buf)
+end
+
+"""
+Compute coherence matrix C_{mn}(x,y) = Σ_z ψ_m*(x,y,z) ψ_n(x,y,z) for quantization axis rotation.
+"""
+function _compute_coherence_matrix_binary(psi, n_comp, ndim, n_pts, F, axis::Int = 3)
+    ndim == 3 || throw(ArgumentError("Coherence matrix requires 3D data"))
+    axis = clamp(axis, 1, 3)
+
+    remaining = [i for i in 1:3 if i != axis]
+    n1, n2 = n_pts[remaining[1]], n_pts[remaining[2]]
+
+    buf = IOBuffer()
+    # Header
+    write(buf, Int32(n1), Int32(n2), Int32(n_comp), Int32(F), Int32(axis))
+
+    # Compute and write upper triangle
+    for m in 1:n_comp
+        psi_m = view(psi, _component_slice(ndim, n_pts, m)...)
+        for n in m:n_comp
+            psi_n = view(psi, _component_slice(ndim, n_pts, n)...)
+            # C_{mn}(x,y) = Σ_axis conj(ψ_m) * ψ_n
+            c_mn = dropdims(sum(conj.(psi_m) .* psi_n; dims=axis); dims=axis)
+            for val in vec(c_mn)
+                write(buf, Float32(real(val)), Float32(imag(val)))
+            end
+        end
+    end
+
+    take!(buf)
 end
