@@ -101,6 +101,41 @@ function _save_analyzer_results!(f, result)
         val = result[name]
         _write_jld2_value!(f, "analyze/$(name)", val)
     end
+    _save_dynamics_timeseries!(f, result)
+end
+
+"""
+Save dynamics time series (times, energies, magnetizations, component populations)
+from `dynamics_result` so Mz(t) and E(t) can be analysed from disk.
+
+Per-component populations are computed from psi_snapshots (13 floats per snapshot).
+Full psi snapshots are NOT saved to avoid multi-GB files.
+"""
+function _save_dynamics_timeseries!(f, result)
+    haskey(result, :dynamics_result) || return
+    dr = result[:dynamics_result]
+    hasproperty(dr, :times) || return
+    f["dynamics/times"] = collect(Float64, dr.times)
+    f["dynamics/energies"] = collect(Float64, dr.energies)
+    f["dynamics/norms"] = collect(Float64, dr.norms)
+    f["dynamics/magnetizations"] = collect(Float64, dr.magnetizations)
+
+    if hasproperty(dr, :psi_snapshots) && !isempty(dr.psi_snapshots)
+        psi1 = dr.psi_snapshots[1]
+        D = size(psi1)[end]
+        ndim = ndims(psi1) - 1
+        n_pts = ntuple(d -> size(psi1, d), ndim)
+        n_snaps = length(dr.psi_snapshots)
+        pops = zeros(Float64, n_snaps, D)
+        for (s, psi) in enumerate(dr.psi_snapshots)
+            total = sum(abs2, psi)
+            for c in 1:D
+                idx = ntuple(d -> d <= ndim ? (1:n_pts[d]) : c, ndim + 1)
+                pops[s, c] = sum(abs2, view(psi, idx...)) / max(total, 1e-30)
+            end
+        end
+        f["dynamics/component_populations"] = pops
+    end
 end
 
 function _write_jld2_value!(f, prefix::String, v::NamedTuple)

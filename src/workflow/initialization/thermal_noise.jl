@@ -65,8 +65,12 @@ function add_thermal_noise!(
 
     rng = Random.MersenneTwister(seed)
 
+    original_norm = sqrt(sum(abs2, psi))
+
     psi_max = maximum(abs, psi)
     noise_scale = eta * psi_max
+
+    noise = zeros(ComplexF64, size(psi))
 
     if transverse_only
         dominant_c = 1
@@ -80,28 +84,29 @@ function add_thermal_noise!(
             end
         end
 
-        # Decay weight by spin-flip distance from dominant component:
-        # w_c = exp(-|Δm|/2), mimicking Bose-Einstein suppression of
-        # higher-order spin-flip excitations.
         for c = 1:D
             c == dominant_c && continue
             delta_m = abs(c - dominant_c)
             weight = exp(-delta_m / 2)
             idx = _component_slice(ndim, n_pts, c)
-            v = view(psi, idx...)
+            v = view(noise, idx...)
             @inbounds for I in eachindex(v)
-                v[I] += weight * noise_scale * (randn(rng) + 1im * randn(rng)) / sqrt(2)
+                v[I] = weight * noise_scale * (randn(rng) + 1im * randn(rng)) / sqrt(2)
             end
         end
     else
-        @inbounds for I in eachindex(psi)
-            psi[I] += noise_scale * (randn(rng) + 1im * randn(rng)) / sqrt(2)
+        @inbounds for I in eachindex(noise)
+            noise[I] = noise_scale * (randn(rng) + 1im * randn(rng)) / sqrt(2)
         end
     end
 
+    noise_buf = similar(psi)
+    copyto!(noise_buf, noise)
+    psi .+= noise_buf
+
     total_norm = sqrt(sum(abs2, psi))
-    if total_norm > 0
-        psi ./= total_norm
+    if total_norm > 0 && original_norm > 0
+        psi .*= (original_norm / total_norm)
     end
     psi
 end
@@ -115,4 +120,62 @@ function add_thermal_noise(psi::AbstractArray{ComplexF64}, F::Int; kwargs...)
     psi_copy = copy(psi)
     add_thermal_noise!(psi_copy, F; kwargs...)
     psi_copy
+end
+
+"""
+    add_symmetry_breaking_seed!(psi, F; amplitude, seed) → psi
+
+Add a tiny perturbation to the nearest transverse spin component (Δm=±1)
+to seed dynamical instabilities (e.g. EdH effect).
+
+Only the m=F-1 (or m=-F+1 for AFM) component receives noise.
+Amplitude is relative to max|ψ|.  After seeding, the wavefunction is
+renormalized to preserve total density.
+
+Typical usage: `amplitude = 1e-6` for symmetry breaking without
+injecting macroscopic energy.
+"""
+function add_symmetry_breaking_seed!(
+    psi::AbstractArray{ComplexF64},
+    F::Int;
+    amplitude::Float64 = 1e-6,
+    seed::Int = 42,
+)
+    D = 2F + 1
+    ndim = ndims(psi) - 1
+    n_pts = ntuple(d -> size(psi, d), ndim)
+
+    rng = Random.MersenneTwister(seed)
+    original_norm = sqrt(sum(abs2, psi))
+    psi_max = maximum(abs, psi)
+    noise_scale = amplitude * psi_max
+
+    dominant_c = 1
+    dominant_norm = 0.0
+    for c = 1:D
+        idx = _component_slice(ndim, n_pts, c)
+        n_c = sum(abs2, view(psi, idx...))
+        if n_c > dominant_norm
+            dominant_norm = n_c
+            dominant_c = c
+        end
+    end
+
+    target_c = dominant_c < D ? dominant_c + 1 : dominant_c - 1
+
+    noise = zeros(ComplexF64, n_pts...)
+    @inbounds for I in eachindex(noise)
+        noise[I] = noise_scale * (randn(rng) + 1im * randn(rng)) / sqrt(2)
+    end
+
+    idx = _component_slice(ndim, n_pts, target_c)
+    noise_buf = similar(psi, ComplexF64, n_pts...)
+    copyto!(noise_buf, noise)
+    view(psi, idx...) .+= noise_buf
+
+    total_norm = sqrt(sum(abs2, psi))
+    if total_norm > 0 && original_norm > 0
+        psi .*= (original_norm / total_norm)
+    end
+    psi
 end

@@ -189,6 +189,7 @@ function _run_simulation_standard!(
                     "E=$(round(energies[end]; sigdigits=8)) | $(round(elapsed; digits=1))s elapsed, ETA $(round(eta; digits=0))s",
                 )
                 flush(stdout)
+                ccall(:fflush, Cint, (Ptr{Cvoid},), C_NULL)
 
                 if callbacks.on_snapshot !== nothing
                     callbacks.on_snapshot(ws, step, snapshots[end])

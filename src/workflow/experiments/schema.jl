@@ -79,6 +79,7 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     "interactions"       => FieldSpec(type=Dict),
     "potential"          => FieldSpec(type=Union{Dict, Vector}),
     "temperature_ratio"  => FieldSpec(type=Number, range=(0.0, 1.0)),
+    "seed_amplitude"     => FieldSpec(type=Number, range=(0.0, 1.0)),
     "noise_seed"         => FieldSpec(type=Number),
     "integrator"         => FieldSpec(type=String,
         enum=["strang", "yoshida", "adaptive", "richardson"]),

@@ -63,7 +63,10 @@ function run_pipeline(config::PipelineConfig; verbose::Bool = true, psi_init = n
     results = Dict{Symbol,Any}()
 
     for (i, step) in enumerate(config.steps)
-        verbose && println("Step $i/$(length(config.steps)): $(nameof(typeof(step)))")
+        if verbose
+            println("Step $i/$(length(config.steps)): $(nameof(typeof(step)))")
+            flush(stdout); ccall(:fflush, Cint, (Ptr{Cvoid},), C_NULL)
+        end
         psi, grid, atom, workspace, step_result = _run_step(step, psi, grid, atom, workspace; verbose, checkpoint_dir)
         if step_result !== nothing
             merge!(results, step_result)
@@ -148,7 +151,10 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
     #     downstream analyzers (e.g. bogoliubov) can inspect the system ---
     cache_path = get(p, "cache", nothing)
     if cache_path !== nothing && isfile(cache_path)
-        verbose && println("  Loading cached GS from $cache_path")
+        if verbose
+            println("  Loading cached GS from $cache_path")
+            flush(stdout); ccall(:fflush, Cint, (Ptr{Cvoid},), C_NULL)
+        end
         d = JLD2.load(cache_path)
         psi_out = d["psi"]
         energy = get(d, "energy", NaN)
@@ -185,6 +191,10 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
                 "psi_init size $(size(psi_init)) does not match grid+atom: expected $expected. " *
                 "Grid or atom changed between continuation points? Delete stale cached results and re-run."))
         end
+    end
+    # Convert psi_init to target backend (e.g. GPU psi → CPU for LBFGS polish)
+    if psi_init !== nothing && backend isa CPUBackend
+        psi_init = _to_host(psi_init)
     end
     if psi_init === nothing && temp_ratio !== nothing
         psi_base = init_psi(grid, SpinSystem(atom.F); state = initial_state)
@@ -245,8 +255,10 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
         )
     elseif method === :lbfgs
         m_lbfgs = Int(get(p, "m_lbfgs", 10))
-        # Reuse existing workspace when available to preserve DDI flags (secular/q2d/l_z)
-        if ws_prev !== nothing && !haskey(p, "interactions") && !haskey(p, "ddi") &&
+        # Reuse existing workspace when available to preserve DDI flags (secular/q2d/l_z).
+        # Skip reuse when backend is explicitly overridden (e.g. GPU ITP → CPU LBFGS).
+        if ws_prev !== nothing && !haskey(p, "backend") &&
+           !haskey(p, "interactions") && !haskey(p, "ddi") &&
            !haskey(p, "potential") && !haskey(p, "zeeman")
             find_ground_state_lbfgs(;
                 ws_init = ws_prev, psi_init,
@@ -347,12 +359,15 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
     inter = get(p, "interactions", nothing)
     interactions = inter !== nothing ? _parse_gs_interactions(inter, atom) : prev_interactions
 
+    backend = ws_prev !== nothing ? ws_prev.backend : CPUBackend()
+
     ws = make_workspace(;
         grid, atom, interactions,
         zeeman, potential,
         sim_params = sp,
         psi_init = psi_prev,
         enable_ddi, c_dd = c_dd_val,
+        backend,
     )
 
     if temp_ratio !== nothing
@@ -360,9 +375,19 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
         ws.state.psi .= psi_noisy
     end
 
+    seed_amp = let v = get(p, "seed_amplitude", nothing)
+        v === nothing ? nothing : Float64(v)
+    end
+    if seed_amp !== nothing
+        add_symmetry_breaking_seed!(ws.state.psi, F; amplitude = seed_amp, seed = Int(get(p, "noise_seed", 42)))
+    end
+
     result = run_simulation!(ws)
 
-    verbose && println("  $(n_steps) steps, E_final=$(round(result.energies[end]; sigdigits=6))")
+    if verbose
+        println("  $(n_steps) steps, E_final=$(round(result.energies[end]; sigdigits=6))")
+        flush(stdout); ccall(:fflush, Cint, (Ptr{Cvoid},), C_NULL)
+    end
 
     psi_out = copy(ws.state.psi)
     step_result = Dict{Symbol,Any}(

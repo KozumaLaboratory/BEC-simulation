@@ -201,7 +201,8 @@ export LaserBeamPotential, crossed_laser_trap
 
 # Thomas-Fermi
 export thomas_fermi_density, init_psi_thomas_fermi
-export add_thermal_noise!, add_thermal_noise, thermal_noise_amplitude, bec_critical_temperature
+export add_thermal_noise!, add_thermal_noise, thermal_noise_amplitude, bec_critical_temperature,
+       add_symmetry_breaking_seed!
 export simulate_tof, spin_tomography, tomography_sinogram
 export FaradayParams, faraday_image, faraday_differential, detect_vortices_faraday
 
