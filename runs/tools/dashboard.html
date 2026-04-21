@@ -664,7 +664,6 @@ function renderDensity(data) {
     densityStatus.textContent = '';
     lastColData = data;
     const axisNames = {3: 'xy plane (sum z)', 2: 'xz plane (sum y)', 1: 'yz plane (sum x)'};
-    document.getElementById('density-axis-label').textContent = axisNames[axisSel.value] || '';
 
     const mVals = data.m_values;
     const D = mVals.length;
