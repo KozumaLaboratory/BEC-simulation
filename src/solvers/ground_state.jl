@@ -197,6 +197,7 @@ function find_ground_state(;
             quasi_2d,
             l_z,
             backend,
+            light_shift,
         )
     end
 
@@ -584,6 +585,7 @@ function _find_ground_state_adaptive(;
     quasi_2d::Bool = false,
     l_z::Float64 = 0.0,
     backend::AbstractBackend = CPUBackend(),
+    light_shift = nothing,
 )
     current_dt = dt
     check_every = max(1, n_steps ÷ 100)
