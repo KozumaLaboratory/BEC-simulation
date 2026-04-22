@@ -73,6 +73,7 @@ include("workflow/initialization/atoms.jl")
 include("workflow/initialization/thomas_fermi.jl")
 include("workflow/initialization/initialization.jl")
 include("workflow/initialization/thermal_noise.jl")
+include("workflow/initialization/vacuum_noise.jl")
 
 # 8. I/O
 include("workflow/io/io.jl")
@@ -109,6 +110,7 @@ include("workflow/experiments/run_registry.jl")
 
 # 11. Analysis (needed by solvers)
 include("analysis/observables.jl")
+include("analysis/ensemble.jl")
 include("analysis/energy.jl")
 include("analysis/currents.jl")
 include("analysis/vorticity.jl")
@@ -137,12 +139,14 @@ include("solvers/adaptive.jl")
 include("solvers/embedded_adaptive.jl")
 include("solvers/lbfgs_ground_state.jl")
 include("solvers/continuation.jl")
+include("solvers/twa.jl")
 
 # Types
 export GridConfig, Grid, SpinSystem, SpinMatrices
 export AtomSpecies, InteractionParams, ZeemanParams, LossParams, AbsorbingBoundary, LightShift, TensorInteractionCache
 export SimParams,
     SimState, FFTPlans, RFFTPlans, Workspace, AdaptiveDtParams, IntegratorConfig
+export TWAConfig, EnsembleResult
 export TOFParams, BdGResult, InstabilityMap, HysteresisResult, RotonParams, SupersolidPrediction
 export HarmonicTrap, NoPotential, GravityPotential, CompositePotential
 export AbstractBackend, CPUBackend, CUDABackend
@@ -250,6 +254,7 @@ export spin_density_vector, total_norm, total_energy, energy_decomposition
 export structure_factor, modulation_contrast
 export probability_current, orbital_angular_momentum
 export superfluid_velocity, total_angular_momentum, spin_texture_charge
+export wigner_correct_density, ensemble_correlation, ensemble_stderr
 export superfluid_vorticity, berry_curvature, singlet_pair_amplitude
 export pair_amplitude, pair_amplitude_spectrum
 export majorana_stars, icosahedral_order_parameter, detect_point_group
@@ -281,6 +286,7 @@ export find_phase_boundary
 export run_simulation!, run_simulation_checkpointed!
 export run_simulation_adaptive!, run_simulation_yoshida!, run_simulation_embedded!
 export find_ground_state_lbfgs
+export run_twa, add_vacuum_noise
 export make_workspace, init_psi
 
 # Monitoring & Callbacks

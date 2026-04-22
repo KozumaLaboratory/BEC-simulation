@@ -67,4 +67,5 @@ using SpinorBEC
     include("test_pipeline.jl")
     include("test_pause_resume.jl")
     include("test_absorbing_boundary.jl")
+    include("test_twa.jl")
 end

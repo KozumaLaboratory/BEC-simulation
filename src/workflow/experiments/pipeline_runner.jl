@@ -404,6 +404,28 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
         add_symmetry_breaking_seed!(ws.state.psi, F; amplitude = seed_amp, seed = Int(get(p, "noise_seed", 42)))
     end
 
+    twa_raw = get(p, "twa", nothing)
+    if twa_raw !== nothing
+        twa_config = _parse_twa_config(twa_raw)
+        store_traj = Bool(get(twa_raw, "store_trajectories", false))
+        ensemble = run_twa(;
+            psi_gs = psi_prev, grid, atom, interactions, zeeman, potential,
+            sim_params = sp, twa_config, enable_ddi, c_dd = c_dd_val, backend,
+            store_trajectories = store_traj, verbose,
+        )
+
+        verbose && @printf("  TWA ensemble: %d trajectories, %d snapshots\n",
+                           ensemble.n_trajectories, length(ensemble.times))
+
+        # Use mean density to reconstruct a representative psi_out for downstream
+        psi_out = copy(psi_prev)
+        step_result = Dict{Symbol,Any}(
+            :ensemble_result => ensemble,
+            :dynamics_workspace => ws,
+        )
+        return (psi_out, grid, atom, ws, step_result)
+    end
+
     result = run_simulation!(ws)
 
     if verbose
@@ -417,6 +439,16 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
         :dynamics_workspace => ws,
     )
     (psi_out, grid, atom, ws, step_result)
+end
+
+function _parse_twa_config(d::Dict)
+    n_traj = Int(d["n_trajectories"])
+    seed_base = Int(get(d, "seed_base", 42))
+    cutoff_raw = get(d, "cutoff_energy", nothing)
+    cutoff = cutoff_raw === nothing ? nothing : Float64(cutoff_raw)
+    obs_raw = get(d, "observables", ["density", "magnetization"])
+    observables = Symbol[Symbol(s) for s in obs_raw]
+    TWAConfig(n_traj, seed_base, cutoff, observables)
 end
 
 function _parse_light_shift(raw, F::Int, V_trap, backend::AbstractBackend)

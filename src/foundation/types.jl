@@ -640,6 +640,33 @@ struct SimulationResult
     psi_snapshots::Vector{Array{ComplexF64}}
 end
 
+# --- TWA (Truncated Wigner Approximation) ---
+
+struct TWAConfig
+    n_trajectories::Int
+    seed_base::Int
+    cutoff_energy::Union{Nothing,Float64}
+    observables::Vector{Symbol}
+
+    function TWAConfig(
+        n_trajectories::Int,
+        seed_base::Int = 42,
+        cutoff_energy::Union{Nothing,Float64} = nothing,
+        observables::Vector{Symbol} = [:density, :magnetization],
+    )
+        n_trajectories > 0 || throw(ArgumentError("n_trajectories must be positive"))
+        new(n_trajectories, seed_base, cutoff_energy, observables)
+    end
+end
+
+struct EnsembleResult
+    times::Vector{Float64}
+    mean::Dict{Symbol,Vector{<:AbstractArray}}
+    var::Dict{Symbol,Vector{<:AbstractArray}}
+    n_trajectories::Int
+    trajectory_results::Union{Nothing,Vector{SimulationResult}}
+end
+
 # --- Workspace ---
 
 struct Workspace{N,A,P,IP,SM<:SpinMatrices,ZEE,DDI,DDIB,RAM,LOSS,DDIP,BK,TC,CC,KPA<:AbstractArray,VPA<:AbstractArray,DBA<:AbstractArray,BACK<:AbstractBackend,LHY,ABM,LS}
