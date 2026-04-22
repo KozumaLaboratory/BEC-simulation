@@ -10,5 +10,6 @@ include("gpu_normalize.jl")
 include("gpu_nematic.jl")
 include("gpu_tensor.jl")
 include("gpu_energy.jl")
+include("gpu_raman.jl")
 
 end # module

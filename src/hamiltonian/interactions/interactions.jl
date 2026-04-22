@@ -323,13 +323,11 @@ function _gauss_legendre(n::Int, a::Float64, b::Float64)
         end
         nodes[i] = mid - half * z
         nodes[n+1-i] = mid + half * z
-        w = 2.0 * half / ((1.0 - z^2) * (n * (z * 1.0 - 0.0))^2)
-        pp_final = 0.0
-        p1 = 1.0;
-        p2 = 0.0
+        # Recompute P_n and P_n' at the converged z (pp from the Newton loop
+        # was evaluated at z+dz, before the final update).
+        p1 = 1.0; p2 = 0.0
         for j = 1:n
-            p3 = p2;
-            p2 = p1
+            p3 = p2; p2 = p1
             p1 = ((2j - 1) * z * p2 - (j - 1) * p3) / j
         end
         pp_final = n * (z * p1 - p2) / (z^2 - 1.0)

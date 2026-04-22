@@ -107,7 +107,7 @@ function SpinorBEC.apply_tensor_interaction_step!(
         h_bufs = [Matrix{ComplexF64}(undef, D, D) for _ = 1:nthr]
         tmp_bufs = [Vector{ComplexF64}(undef, D) for _ = 1:nthr]
 
-        Threads.@threads for I in CartesianIndices(n_pts_tuple)
+        Threads.@threads :static for I in CartesianIndices(n_pts_tuple)
             tid = Threads.threadid()
             @inbounds SpinorBEC._tensor_step_point!(
                 psi_host, I, cache, hf_entries, dt, imaginary_time,

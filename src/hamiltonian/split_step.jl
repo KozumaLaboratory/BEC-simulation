@@ -311,13 +311,7 @@ function _half_potential_step!(
     end
 
     if ws.raman !== nothing
-        @timeit_debug TIMER "raman" if gpu
-            _run_on_host!(ws.state.psi) do p
-                apply_raman_step!(p, ws.spin_matrices, ws.raman, ws.grid, dt_half / 2; imaginary_time)
-            end
-        else
-            apply_raman_step!(ws.state.psi, ws.spin_matrices, ws.raman, ws.grid, dt_half / 2; imaginary_time)
-        end
+        @timeit_debug TIMER "raman" apply_raman_step!(ws.state.psi, ws.spin_matrices, ws.raman, ws.grid, dt_half / 2; imaginary_time)
     end
 
     if ws.ddi !== nothing
@@ -333,13 +327,7 @@ function _half_potential_step!(
     end
 
     if ws.raman !== nothing
-        @timeit_debug TIMER "raman" if gpu
-            _run_on_host!(ws.state.psi) do p
-                apply_raman_step!(p, ws.spin_matrices, ws.raman, ws.grid, dt_half / 2; imaginary_time)
-            end
-        else
-            apply_raman_step!(ws.state.psi, ws.spin_matrices, ws.raman, ws.grid, dt_half / 2; imaginary_time)
-        end
+        @timeit_debug TIMER "raman" apply_raman_step!(ws.state.psi, ws.spin_matrices, ws.raman, ws.grid, dt_half / 2; imaginary_time)
     end
 
     if ws.tensor_cache !== nothing
@@ -401,13 +389,7 @@ function _outer_potential_fwd!(ws::Workspace{N}, dt_outer, n_comp, ndim, imagina
     end
 
     if ws.raman !== nothing
-        if gpu
-            _run_on_host!(ws.state.psi) do p
-                apply_raman_step!(p, ws.spin_matrices, ws.raman, ws.grid, dt_outer; imaginary_time)
-            end
-        else
-            apply_raman_step!(ws.state.psi, ws.spin_matrices, ws.raman, ws.grid, dt_outer; imaginary_time)
-        end
+        apply_raman_step!(ws.state.psi, ws.spin_matrices, ws.raman, ws.grid, dt_outer; imaginary_time)
     end
 end
 
@@ -418,13 +400,7 @@ function _outer_potential_bwd!(ws::Workspace{N}, dt_outer, n_comp, ndim, imagina
     gpu = _is_gpu(ws.state.psi)
 
     if ws.raman !== nothing
-        if gpu
-            _run_on_host!(ws.state.psi) do p
-                apply_raman_step!(p, ws.spin_matrices, ws.raman, ws.grid, dt_outer; imaginary_time)
-            end
-        else
-            apply_raman_step!(ws.state.psi, ws.spin_matrices, ws.raman, ws.grid, dt_outer; imaginary_time)
-        end
+        apply_raman_step!(ws.state.psi, ws.spin_matrices, ws.raman, ws.grid, dt_outer; imaginary_time)
     end
 
     if ws.tensor_cache !== nothing

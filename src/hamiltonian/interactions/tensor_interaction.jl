@@ -148,7 +148,7 @@ function apply_tensor_interaction_step!(
     h_bufs = [Matrix{ComplexF64}(undef, D, D) for _ = 1:nthr]
     tmp_bufs = [Vector{ComplexF64}(undef, D) for _ = 1:nthr]
 
-    Threads.@threads for I in CartesianIndices(n_pts)
+    Threads.@threads :static for I in CartesianIndices(n_pts)
         tid = Threads.threadid()
         @inbounds _tensor_step_point!(
             psi,
@@ -278,17 +278,17 @@ function _tensor_interaction_energy(psi, cache::TensorInteractionCache, ndim, n_
     D = cache.D
 
     pair_entries = _precompute_pair_entries(cache)
+    n_A = sum(2S + 1 for S in cache.active_channels)
+    spinor = Vector{ComplexF64}(undef, D)
+    A_SM = Vector{ComplexF64}(undef, n_A)
 
     E = 0.0
     for I in CartesianIndices(n_pts)
-        spinor = Vector{ComplexF64}(undef, D)
         @inbounds for c = 1:D
             spinor[c] = psi[I, c]
         end
 
-        n_A = sum(2S + 1 for S in cache.active_channels)
-        A_SM = zeros(ComplexF64, n_A)
-
+        fill!(A_SM, zero(ComplexF64))
         for entry in pair_entries
             @inbounds A_SM[entry.a_idx] += entry.cg * spinor[entry.c1] * spinor[entry.c2]
         end

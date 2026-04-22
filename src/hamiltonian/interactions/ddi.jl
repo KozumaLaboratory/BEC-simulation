@@ -37,6 +37,9 @@ function _build_q_tensor!(
         inv_k2 = 1.0 / k2
 
         if secular
+            # TODO: This secular approximation assumes polarization along z.
+            # For transverse polarization (B in-plane), the Larmor-averaged
+            # kernel differs — see Kawaguchi-Ueda Eq. (458)-(459).
             qzz = kv_z * kv_z * inv_k2 - 1.0 / 3.0
             Q_zz[I] = qzz
             Q_xx[I] = -qzz / 2.0
@@ -417,6 +420,46 @@ function _gpu_matmul_V!(P, W, V_T, ::Val{D}) where {D}
     end
 end
 
+struct _DDIRotationCache
+    W::AbstractArray{ComplexF64,2}
+    conj_V::AbstractArray{ComplexF64,2}
+    V_T::AbstractArray{ComplexF64,2}
+    phi_mag::AbstractArray{Float64,1}
+    alpha::AbstractArray{Float64,1}
+    beta::AbstractArray{Float64,1}
+    theta::AbstractArray{Float64,1}
+end
+
+const _DDI_ROTATION_CACHE = Dict{UInt64,_DDIRotationCache}()
+
+function _get_ddi_rotation_cache(psi::AbstractArray{ComplexF64}, sm::SpinMatrices{D}, ndim::Int) where {D}
+    n_pts = ntuple(d -> size(psi, d), ndim)
+    N_spatial = prod(n_pts)
+    key = hash((objectid(sm), N_spatial, D, typeof(psi).name))
+    cache = get(_DDI_ROTATION_CACHE, key, nothing)
+    cache !== nothing && return cache
+
+    P = reshape(psi, N_spatial, D)
+    W = similar(P)
+    conj_V_cpu = conj(Matrix(sm.Fy_eigvecs))
+    V_T_cpu = Matrix(transpose(sm.Fy_eigvecs))
+    if D > 7
+        conj_V = similar(P, ComplexF64, D, D)
+        V_T = similar(P, ComplexF64, D, D)
+        copyto!(conj_V, conj_V_cpu)
+        copyto!(V_T, V_T_cpu)
+    else
+        conj_V = conj_V_cpu
+        V_T = V_T_cpu
+    end
+    phi_template = similar(psi, Float64, N_spatial)
+    c = _DDIRotationCache(W, conj_V, V_T,
+        similar(phi_template), similar(phi_template),
+        similar(phi_template), similar(phi_template))
+    _DDI_ROTATION_CACHE[key] = c
+    c
+end
+
 function _apply_ddi_rotation!(
     psi::AbstractArray{ComplexF64},
     phi_x::AbstractArray{Float64},
@@ -431,30 +474,22 @@ function _apply_ddi_rotation!(
     N_spatial = prod(n_pts)
     F = sm.system.F
 
+    rc = _get_ddi_rotation_cache(psi, sm, ndim)
     P = reshape(psi, N_spatial, D)
-    W = reshape(similar(psi), N_spatial, D)
+    W = rc.W
 
-    conj_V_cpu = conj(Matrix(sm.Fy_eigvecs))
-    V_T_cpu = Matrix(transpose(sm.Fy_eigvecs))
-    if D > 7
-        conj_V = similar(P, ComplexF64, D, D)
-        V_T = similar(P, ComplexF64, D, D)
-        copyto!(conj_V, conj_V_cpu)
-        copyto!(V_T, V_T_cpu)
-    else
-        conj_V = conj_V_cpu
-        V_T = V_T_cpu
-    end
+    conj_V = rc.conj_V
+    V_T = rc.V_T
 
     spatial_idx = ntuple(d -> 1:n_pts[d], ndim)
     phi_x_v = reshape(view(phi_x, spatial_idx...), N_spatial)
     phi_y_v = reshape(view(phi_y, spatial_idx...), N_spatial)
     phi_z_v = reshape(view(phi_z, spatial_idx...), N_spatial)
 
-    phi_mag = similar(phi_x_v)
-    alpha = similar(phi_x_v)
-    beta = similar(phi_x_v)
-    theta = similar(phi_x_v)
+    phi_mag = rc.phi_mag
+    alpha = rc.alpha
+    beta = rc.beta
+    theta = rc.theta
     @. phi_mag = sqrt(phi_x_v^2 + phi_y_v^2 + phi_z_v^2)
     @. alpha = atan(phi_y_v, phi_x_v)
     @. beta = acos(clamp(phi_z_v / max(phi_mag, 1e-30), -1.0, 1.0))

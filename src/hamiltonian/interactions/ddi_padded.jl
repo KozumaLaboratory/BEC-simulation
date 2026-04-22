@@ -164,6 +164,10 @@ function apply_ddi_step!(
         n_pts,
     )
 
+    # Phi_*_pad are 2n-sized (padded) arrays, but _apply_ddi_rotation! iterates
+    # over CartesianIndices(n_pts) — the original n-sized grid — so only the
+    # first n_pts elements of each padded array are read.  This is the implicit
+    # crop from padded convolution back to the physical domain.
     @timeit_debug TIMER "ddi_rotation" _apply_ddi_rotation!(
         psi, ddi_padded.Phi_x_pad, ddi_padded.Phi_y_pad, ddi_padded.Phi_z_pad,
         sm, dt_frac, ndim;
