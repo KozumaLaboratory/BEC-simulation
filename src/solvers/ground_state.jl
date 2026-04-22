@@ -124,6 +124,7 @@ function find_ground_state(;
     _start_step::Int = 0,        # internal: for resume
     _checkpoint_dir::Union{Nothing,String} = nothing,  # internal alias
     _checkpoint_every::Int = 0,   # internal alias
+    light_shift::Union{Nothing,LightShift} = nothing,
 )
     psi0 = if psi_init === nothing
         sys = SpinSystem(atom.F)
@@ -226,6 +227,7 @@ function find_ground_state(;
         quasi_2d,
         l_z,
         backend,
+        light_shift,
     )
 
     n_comp = ws.spin_matrices.system.n_components
@@ -612,6 +614,7 @@ function _find_ground_state_adaptive(;
         quasi_2d,
         l_z,
         backend,
+        light_shift,
     )
     psi_backup = similar(ws.state.psi)
     E_prev = total_energy(ws)
@@ -853,6 +856,8 @@ function _rebuild_workspace_with_dt(ws::Workspace{N}, new_dt::Float64) where {N}
         ws.coriolis_cache,
         ws.backend,
         ws.lhy,
+        ws.absorbing_mask,
+        ws.light_shift,
     )
 end
 

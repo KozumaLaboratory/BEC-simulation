@@ -54,6 +54,8 @@ function estimate_splitting_error(ws::Workspace{N}) where {N}
         ws.coriolis_cache,
         ws.backend,
         ws.lhy,
+        ws.absorbing_mask,
+        ws.light_shift,
     )
 
     split_step!(ws_half)

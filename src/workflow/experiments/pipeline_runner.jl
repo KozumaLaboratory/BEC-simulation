@@ -243,6 +243,10 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
     on_step = isempty(ramp_callbacks) ? nothing :
         (ws, step, ns) -> for cb in ramp_callbacks; cb(ws, step, ns); end
 
+    V_trap_for_ls = evaluate_potential(potential, grid)
+    ls_raw = get(p, "light_shift", nothing)
+    gs_light_shift = _parse_light_shift(ls_raw, atom.F, V_trap_for_ls, backend)
+
     gs = if method === :itp
         find_ground_state(;
             grid, atom, interactions, zeeman, potential,
@@ -252,6 +256,7 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
             target_magnetization = target_mz, backend, on_step,
             checkpoint_dir = checkpoint_dir,
             checkpoint_every = checkpoint_dir !== nothing ? max(1, n_steps ÷ 10) : 0,
+            light_shift = gs_light_shift,
         )
     elseif method === :lbfgs
         m_lbfgs = Int(get(p, "m_lbfgs", 10))
@@ -274,6 +279,7 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
                 secular_ddi = secular, quasi_2d_ddi = q2d, l_z_ddi = lz,
                 target_magnetization = target_mz, backend,
                 verbose,
+                light_shift = gs_light_shift,
             )
         end
     else
@@ -361,6 +367,20 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
 
     backend = ws_prev !== nothing ? ws_prev.backend : CPUBackend()
 
+    ab_raw = get(p, "absorbing_boundary", nothing)
+    absorbing_boundary = if ab_raw isa Dict
+        AbsorbingBoundary(;
+            strength = Float64(ab_raw["strength"]),
+            width = Float64(ab_raw["width"]),
+            power = Int(get(ab_raw, "power", 2)),
+        )
+    else
+        nothing
+    end
+
+    ls_raw = get(p, "light_shift", nothing)
+    light_shift = _parse_light_shift(ls_raw, F, nothing, backend)
+
     ws = make_workspace(;
         grid, atom, interactions,
         zeeman, potential,
@@ -368,6 +388,8 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
         psi_init = psi_prev,
         enable_ddi, c_dd = c_dd_val,
         backend,
+        absorbing_boundary,
+        light_shift,
     )
 
     if temp_ratio !== nothing
@@ -395,6 +417,27 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
         :dynamics_workspace => ws,
     )
     (psi_out, grid, atom, ws, step_result)
+end
+
+function _parse_light_shift(raw, F::Int, V_trap, backend::AbstractBackend)
+    raw === nothing && return nothing
+    raw isa Dict || return nothing
+    if haskey(raw, "eta_tensor")
+        eta_t = Float64(raw["eta_tensor"])
+        eta_v = Float64(get(raw, "eta_vector", 0.0))
+        pol_raw = get(raw, "polarization", [0, 0, 1])
+        pol = NTuple{3,Float64}(Tuple(Float64.(pol_raw)))
+        V_trap === nothing && throw(ArgumentError("light_shift.eta_tensor requires a trap potential (V_trap)"))
+        return make_light_shift_from_trap(V_trap, F, eta_t; eta_vector = eta_v, polarization = pol, backend)
+    end
+    alpha_t = Float64(get(raw, "alpha_tensor", 0.0))
+    alpha_v = Float64(get(raw, "alpha_vector", 0.0))
+    pol_raw = get(raw, "polarization", [0, 0, 1])
+    pol = NTuple{3,Float64}(Tuple(Float64.(pol_raw)))
+    if haskey(raw, "profile")
+        throw(ArgumentError("light_shift.profile from YAML not yet supported; use eta_tensor with trap or pass LightShift from Julia"))
+    end
+    nothing
 end
 
 function _run_step(step::AnalyzeStep, psi, grid, atom, ws_prev; verbose=true, checkpoint_dir=nothing)

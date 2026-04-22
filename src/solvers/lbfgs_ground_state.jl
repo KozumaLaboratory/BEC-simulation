@@ -110,6 +110,28 @@ function energy_gradient!(
         end
     end
 
+    # --- Light shift: M × I(r) × ψ ---
+    if ws.light_shift !== nothing
+        ls = ws.light_shift
+        profile = _to_host(ls.profile)
+        if ls.is_diagonal
+            for c = 1:D
+                idx = _component_slice(N, n_pts, c)
+                view(grad, idx...) .+= ls.eigvals[c] .* profile .* view(psi, idx...)
+            end
+        else
+            M_full = ls.U * Diagonal(ls.eigvals) * ls.U'
+            for c = 1:D
+                idx_c = _component_slice(N, n_pts, c)
+                for c2 = 1:D
+                    abs(M_full[c, c2]) < 1e-30 && continue
+                    idx_c2 = _component_slice(N, n_pts, c2)
+                    view(grad, idx_c...) .+= M_full[c, c2] .* profile .* view(psi, idx_c2...)
+                end
+            end
+        end
+    end
+
     # --- DDI: (Φ⃗·f⃗) ψ ---
     if ws.ddi !== nothing
         sm = ws.spin_matrices
@@ -218,6 +240,7 @@ function find_ground_state_lbfgs(;
     backend::AbstractBackend = CPUBackend(),
     m_lbfgs::Int = 10,
     verbose::Bool = true,
+    light_shift::Union{Nothing,LightShift} = nothing,
 )
     if ws_init !== nothing
         ws = ws_init
@@ -245,6 +268,7 @@ function find_ground_state_lbfgs(;
             grid, atom, interactions, zeeman, potential,
             sim_params = sp, psi_init,
             enable_ddi, c_dd, secular_ddi, quasi_2d_ddi, l_z_ddi, backend,
+            light_shift,
         )
     end
 

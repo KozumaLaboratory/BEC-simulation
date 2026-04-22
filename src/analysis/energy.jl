@@ -3,7 +3,7 @@
 
 Decompose total energy into individual contributions.
 
-Returns `(kinetic, trap, zeeman, density, spin, ddi, lhy, tensor, raman, total)`.
+Returns `(kinetic, trap, zeeman, density, spin, ddi, lhy, tensor, raman, light_shift, total)`.
 """
 function energy_decomposition(ws::Workspace{N}) where {N}
     # GPU path: dispatch to extension via _energy_decomposition_impl
@@ -69,7 +69,13 @@ function _energy_decomposition_cpu(ws::Workspace{N}) where {N}
         0.0
     end
 
-    E_total = E_kin + E_trap + E_zee + E_c0 + E_c1 + E_ddi + E_lhy + E_tensor + E_raman
+    E_light_shift = if ws.light_shift !== nothing
+        _light_shift_energy(psi, ws.light_shift, n_comp, N, n_pts, dV)
+    else
+        0.0
+    end
+
+    E_total = E_kin + E_trap + E_zee + E_c0 + E_c1 + E_ddi + E_lhy + E_tensor + E_raman + E_light_shift
     (
         kinetic = E_kin,
         trap = E_trap,
@@ -80,6 +86,7 @@ function _energy_decomposition_cpu(ws::Workspace{N}) where {N}
         lhy = E_lhy,
         tensor = E_tensor,
         raman = E_raman,
+        light_shift = E_light_shift,
         total = E_total,
     )
 end

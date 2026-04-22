@@ -220,6 +220,15 @@ function split_step!(ws::Workspace{N}) where {N}
         )
     end
 
+    if !it && ws.absorbing_mask !== nothing
+        @timeit_debug TIMER "absorbing" apply_absorbing_boundary!(
+            ws.state.psi,
+            ws.absorbing_mask,
+            n_comp,
+            N,
+        )
+    end
+
     ws.state.t += it ? 0.0 : dt
     ws.state.step += 1
 
@@ -230,6 +239,26 @@ function split_step!(ws::Workspace{N}) where {N}
     end
 
     nothing
+end
+
+function _dispatch_diagonal_step!(ws::Workspace{N}, ::Val{N}, zeeman_diag::SVector{D,Float64}, dt_frac, imaginary_time) where {N,D}
+    if ws.light_shift !== nothing && ws.light_shift.is_diagonal
+        ls_amp = SVector{D,Float64}(ntuple(c -> ws.light_shift.eigvals[c], Val(D)))
+        _diagonal_step_with_ls!(
+            Val(N), ws.state.psi, ws.potential_values, zeeman_diag,
+            ws.interactions.c0,
+            ws.lhy !== nothing ? ws.lhy : ws.interactions.c_lhy,
+            dt_frac, ws.density_buf, imaginary_time,
+            ls_amp, ws.light_shift.profile,
+        )
+    else
+        _diagonal_step_svec!(
+            Val(N), ws.state.psi, ws.potential_values, zeeman_diag,
+            ws.interactions.c0,
+            ws.lhy !== nothing ? ws.lhy : ws.interactions.c_lhy,
+            dt_frac, ws.density_buf, imaginary_time,
+        )
+    end
 end
 
 """
@@ -262,17 +291,11 @@ function _half_potential_step!(
     end
     gpu = _is_gpu(ws.state.psi)
 
-    @timeit_debug TIMER "diagonal" _diagonal_step_svec!(
-        Val(N),
-        ws.state.psi,
-        ws.potential_values,
-        zeeman_diag_fwd,
-        ws.interactions.c0,
-        ws.lhy !== nothing ? ws.lhy : ws.interactions.c_lhy,
-        dt_half / 2,
-        ws.density_buf,
-        imaginary_time,
-    )
+    @timeit_debug TIMER "diagonal" _dispatch_diagonal_step!(ws, Val(N), zeeman_diag_fwd, dt_half / 2, imaginary_time)
+
+    if ws.light_shift !== nothing && !ws.light_shift.is_diagonal
+        @timeit_debug TIMER "light_shift" apply_light_shift_step!(ws.state.psi, ws.light_shift, dt_half / 2, ndim; imaginary_time)
+    end
 
     if abs(ws.interactions.c1) > 1e-30
         @timeit_debug TIMER "spin_mixing" apply_spin_mixing_step!(ws.state.psi, ws.spin_matrices, ws.interactions.c1, dt_half / 2, ndim; imaginary_time)
@@ -338,17 +361,11 @@ function _half_potential_step!(
         zeeman_diag_fwd
     end
 
-    @timeit_debug TIMER "diagonal" _diagonal_step_svec!(
-        Val(N),
-        ws.state.psi,
-        ws.potential_values,
-        zeeman_diag_bwd,
-        ws.interactions.c0,
-        ws.lhy !== nothing ? ws.lhy : ws.interactions.c_lhy,
-        dt_half / 2,
-        ws.density_buf,
-        imaginary_time,
-    )
+    if ws.light_shift !== nothing && !ws.light_shift.is_diagonal
+        @timeit_debug TIMER "light_shift" apply_light_shift_step!(ws.state.psi, ws.light_shift, dt_half / 2, ndim; imaginary_time)
+    end
+
+    @timeit_debug TIMER "diagonal" _dispatch_diagonal_step!(ws, Val(N), zeeman_diag_bwd, dt_half / 2, imaginary_time)
 end
 
 # --- ITP leapfrog helpers ---
@@ -364,12 +381,11 @@ function _outer_potential_fwd!(ws::Workspace{N}, dt_outer, n_comp, ndim, imagina
     zee = zeeman_at(ws.zeeman, ws.state.t)
     zeeman_diag = zeeman_diagonal(zee, ws.spin_matrices)
 
-    _diagonal_step_svec!(
-        Val(N), ws.state.psi, ws.potential_values, zeeman_diag,
-        ws.interactions.c0,
-        ws.lhy !== nothing ? ws.lhy : ws.interactions.c_lhy,
-        dt_outer, ws.density_buf, imaginary_time,
-    )
+    _dispatch_diagonal_step!(ws, Val(N), zeeman_diag, dt_outer, imaginary_time)
+
+    if ws.light_shift !== nothing && !ws.light_shift.is_diagonal
+        apply_light_shift_step!(ws.state.psi, ws.light_shift, dt_outer, ndim; imaginary_time)
+    end
 
     if abs(ws.interactions.c1) > 1e-30
         apply_spin_mixing_step!(ws.state.psi, ws.spin_matrices, ws.interactions.c1, dt_outer, ndim; imaginary_time)
@@ -424,14 +440,13 @@ function _outer_potential_bwd!(ws::Workspace{N}, dt_outer, n_comp, ndim, imagina
         apply_spin_mixing_step!(ws.state.psi, ws.spin_matrices, ws.interactions.c1, dt_outer, ndim; imaginary_time)
     end
 
+    if ws.light_shift !== nothing && !ws.light_shift.is_diagonal
+        apply_light_shift_step!(ws.state.psi, ws.light_shift, dt_outer, ndim; imaginary_time)
+    end
+
     zee = zeeman_at(ws.zeeman, ws.state.t)
     zeeman_diag = zeeman_diagonal(zee, ws.spin_matrices)
-    _diagonal_step_svec!(
-        Val(N), ws.state.psi, ws.potential_values, zeeman_diag,
-        ws.interactions.c0,
-        ws.lhy !== nothing ? ws.lhy : ws.interactions.c_lhy,
-        dt_outer, ws.density_buf, imaginary_time,
-    )
+    _dispatch_diagonal_step!(ws, Val(N), zeeman_diag, dt_outer, imaginary_time)
 end
 
 """

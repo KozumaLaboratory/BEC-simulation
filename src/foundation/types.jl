@@ -361,6 +361,26 @@ end
 
 LossParams(gamma_dr::Float64) = LossParams(gamma_dr, 0.0)
 
+# --- Absorbing Boundary ---
+
+struct AbsorbingBoundary
+    strength::Float64
+    width::Float64
+    power::Int
+end
+
+AbsorbingBoundary(; strength::Float64, width::Float64, power::Int = 2) =
+    AbsorbingBoundary(strength, width, power)
+
+# --- Light Shift (tensor + vector AC Stark) ---
+
+struct LightShift{A<:AbstractArray}
+    profile::A               # spatial intensity I(r), shape n_pts
+    eigvals::Vector{Float64} # eigenvalues of spin matrix M (length D)
+    U::Matrix{ComplexF64}    # eigenvector matrix D×D
+    is_diagonal::Bool        # true → fold into diagonal step, no rotation needed
+end
+
 # --- DDI Padded Context ---
 
 struct DDIPaddedContext{N,RP,IRP,AR<:AbstractArray,AC<:AbstractArray}
@@ -622,7 +642,7 @@ end
 
 # --- Workspace ---
 
-struct Workspace{N,A,P,IP,SM<:SpinMatrices,ZEE,DDI,DDIB,RAM,LOSS,DDIP,BK,TC,CC,KPA<:AbstractArray,VPA<:AbstractArray,DBA<:AbstractArray,BACK<:AbstractBackend,LHY}
+struct Workspace{N,A,P,IP,SM<:SpinMatrices,ZEE,DDI,DDIB,RAM,LOSS,DDIP,BK,TC,CC,KPA<:AbstractArray,VPA<:AbstractArray,DBA<:AbstractArray,BACK<:AbstractBackend,LHY,ABM,LS}
     state::SimState{N,A}
     fft_plans::FFTPlans{P,IP}
     kinetic_phase::KPA
@@ -645,5 +665,7 @@ struct Workspace{N,A,P,IP,SM<:SpinMatrices,ZEE,DDI,DDIB,RAM,LOSS,DDIP,BK,TC,CC,K
     coriolis_cache::CC
     backend::BACK
     lhy::LHY
+    absorbing_mask::ABM
+    light_shift::LS
 end
 

@@ -223,6 +223,100 @@ function _diagonal_step_svec!(
     nothing
 end
 
+function _diagonal_step_with_ls!(
+    ::Val{N},
+    psi::Array,
+    V_trap,
+    zeeman_diag::SVector{D,Float64},
+    c0,
+    c_lhy,
+    dt_frac,
+    density_buf,
+    imaginary_time,
+    ls_amp::SVector{D,Float64},
+    ls_profile,
+) where {N,D}
+    n_pts = ntuple(d -> size(psi, d), Val(N))
+
+    @inbounds for I in CartesianIndices(n_pts)
+        s = 0.0
+        for c = 1:D
+            s += abs2(psi[I, c])
+        end
+        density_buf[I] = s
+    end
+
+    if imaginary_time
+        zee_shift = minimum(zeeman_diag)
+        @inbounds for I in CartesianIndices(n_pts)
+            n = density_buf[I]
+            V_int = c0 * n + _lhy_V(n, c_lhy)
+            exp_base = exp(-(V_trap[I] + V_int) * dt_frac)
+            intensity = ls_profile[I]
+            for c = 1:D
+                psi[I, c] *= exp_base * exp(-((zeeman_diag[c] - zee_shift) + ls_amp[c] * intensity) * dt_frac)
+            end
+        end
+    else
+        @inbounds for I in CartesianIndices(n_pts)
+            n = density_buf[I]
+            V_int = c0 * n + _lhy_V(n, c_lhy)
+            cis_base = cis(-(V_trap[I] + V_int) * dt_frac)
+            intensity = ls_profile[I]
+            for c = 1:D
+                psi[I, c] *= cis_base * cis(-(zeeman_diag[c] + ls_amp[c] * intensity) * dt_frac)
+            end
+        end
+    end
+    nothing
+end
+
+function _diagonal_step_with_ls!(
+    ::Val{N},
+    psi::AbstractArray,
+    V_trap,
+    zeeman_diag::SVector{D,Float64},
+    c0,
+    c_lhy,
+    dt_frac,
+    density_buf,
+    imaginary_time,
+    ls_amp::SVector{D,Float64},
+    ls_profile,
+) where {N,D}
+    n_pts = ntuple(d -> size(psi, d), Val(N))
+    idx1 = _component_slice(N, n_pts, 1)
+    density_buf .= abs2.(view(psi, idx1...))
+    for c = 2:D
+        idx = _component_slice(N, n_pts, c)
+        density_buf .+= abs2.(view(psi, idx...))
+    end
+    _has_lhy = c_lhy isa AbstractLHY || (c_lhy isa Float64 && c_lhy != 0.0)
+    for c = 1:D
+        idx = _component_slice(N, n_pts, c)
+        psi_c = view(psi, idx...)
+        zee_c = zeeman_diag[c]
+        ls_c = ls_amp[c]
+        if imaginary_time
+            zee_shift = minimum(zeeman_diag)
+            if !_has_lhy
+                @. psi_c *= exp(-(V_trap + (zee_c - zee_shift) + ls_c * ls_profile + c0 * density_buf) * dt_frac)
+            else
+                c_lhy_val = c_lhy isa Float64 ? c_lhy : (c_lhy isa ScalarLHY ? c_lhy.c_lhy : 0.0)
+                @. psi_c *= exp(-(V_trap + (zee_c - zee_shift) + ls_c * ls_profile + c0 * density_buf + c_lhy_val * density_buf * sqrt(density_buf)) * dt_frac)
+            end
+        else
+            if !_has_lhy
+                @. psi_c *= cis(-(V_trap + zee_c + ls_c * ls_profile + c0 * density_buf) * dt_frac)
+            else
+                c_lhy_val = c_lhy isa Float64 ? c_lhy : (c_lhy isa ScalarLHY ? c_lhy.c_lhy : 0.0)
+                @. psi_c *= cis(-(V_trap + zee_c + ls_c * ls_profile + c0 * density_buf + c_lhy_val * density_buf * sqrt(density_buf)) * dt_frac)
+            end
+        end
+    end
+    nothing
+end
+
 function _make_batched_kinetic_cache(
     psi, kinetic_phase, ndim, backend::AbstractBackend = CPUBackend(); flags = FFTW.MEASURE,
 )

@@ -378,6 +378,8 @@ function run_simulation_checkpointed!(
         ws.coriolis_cache,
         ws.backend,
         ws.lhy,
+        ws.absorbing_mask,
+        ws.light_shift,
     )
 
     result = run_simulation!(ws_remain; callbacks = checkpoint_callbacks)

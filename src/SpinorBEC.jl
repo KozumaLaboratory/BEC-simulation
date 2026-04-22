@@ -45,6 +45,7 @@ include("hamiltonian/interactions/ddi.jl")
 include("hamiltonian/interactions/ddi_padded.jl")
 include("hamiltonian/interactions/lhy.jl")
 include("hamiltonian/interactions/losses.jl")
+include("hamiltonian/interactions/absorbing_boundary.jl")
 
 # 4. Potentials
 include("hamiltonian/potentials/potentials.jl")
@@ -53,6 +54,7 @@ include("hamiltonian/potentials/raman.jl")
 include("hamiltonian/potentials/optics.jl")  # Must be before laser_potential (defines OpticalBeam)
 include("hamiltonian/potentials/laser_potential.jl")
 include("hamiltonian/potentials/optical_trap.jl")
+include("hamiltonian/potentials/light_shift.jl")
 
 # 5. Propagators
 include("hamiltonian/propagators.jl")
@@ -138,7 +140,7 @@ include("solvers/continuation.jl")
 
 # Types
 export GridConfig, Grid, SpinSystem, SpinMatrices
-export AtomSpecies, InteractionParams, ZeemanParams, LossParams, TensorInteractionCache
+export AtomSpecies, InteractionParams, ZeemanParams, LossParams, AbsorbingBoundary, LightShift, TensorInteractionCache
 export SimParams,
     SimState, FFTPlans, RFFTPlans, Workspace, AdaptiveDtParams, IntegratorConfig
 export TOFParams, BdGResult, InstabilityMap, HysteresisResult, RotonParams, SupersolidPrediction
@@ -196,6 +198,9 @@ export radius_of_curvature, divergence_angle, peak_intensity, beam_intensity
 export abcd_free_space, abcd_thin_lens, abcd_curved_mirror, abcd_flat_mirror
 export mode_overlap, fiber_coupling
 
+# Light shift
+export make_light_shift, make_light_shift_from_trap, apply_light_shift_step!
+
 # Laser beam potential
 export LaserBeamPotential, crossed_laser_trap
 
@@ -229,6 +234,9 @@ export wigner_3j,
 
 # Losses
 export apply_loss_step!
+
+# Absorbing boundary
+export AbsorbingBoundary, compute_absorbing_mask, apply_absorbing_boundary!
 
 # Raman coupling
 export RamanCoupling, apply_raman_step!

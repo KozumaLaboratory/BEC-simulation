@@ -187,6 +187,8 @@ function make_workspace(;
     l_z::Float64 = 0.0,
     backend::AbstractBackend = CPUBackend(),
     spinor_lhy::Union{Nothing,Symbol} = nothing,
+    absorbing_boundary::Union{Nothing,AbsorbingBoundary} = nothing,
+    light_shift::Union{Nothing,LightShift} = nothing,
 ) where {N}
     if quasi_2d
         N == 2 || throw(ArgumentError("quasi_2d requires 2D grid, got $(N)D"))
@@ -365,6 +367,12 @@ function make_workspace(;
         nothing
     end
 
+    abs_mask = if absorbing_boundary !== nothing
+        compute_absorbing_mask(grid, absorbing_boundary, sim_params.dt, backend)
+    else
+        nothing
+    end
+
     Workspace(
         state,
         plans,
@@ -388,6 +396,8 @@ function make_workspace(;
         coriolis_cache,
         backend,
         lhy,
+        abs_mask,
+        light_shift,
     )
 end
 
