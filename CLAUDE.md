@@ -111,3 +111,49 @@ F=6, g_J=1.9934, g_F≈1.163, μ≈6.977μ_B, a_s≈110a₀. 7 unknown scatterin
 - Workspace has 18+ type params — never write explicit type params.
 - D=13 (Eu): SMatrix heap-allocates. Use Matrix/MVector in hot loops.
 - `Val(N)` from type parameter, not `Val(ndim::Int)`.
+
+## Type stability boundaries
+
+`Workspace` has 23+ type params and `run_pipeline` dispatches abstractly on
+`PipelineStep`. Any type widening in a `_run_step` branch (e.g. assigning
+`zeeman = dict[:zeeman]` from `Dict{Symbol,Any}`) propagates to `make_workspace`'s
+type parameter combinations, causing inference to explode — symptom is a **30 min
+JIT hang with no stack trace**, not a runtime error. Prevent with two rules:
+
+1. **`Dict{Symbol,Any}` → concrete struct: isolate in a helper function with
+   `::ConcreteType` assertions.** The function boundary keeps `Any`-typed
+   locals out of `_run_step`, and the type assertion tells the compiler the
+   return-tuple elements are concrete. Never let `Any` flow into
+   `make_workspace` kwargs directly. (`@noinline` is NOT required — verified;
+   the function boundary plus type assertion is what defuses inference.)
+
+   ```julia
+   # NG — zeeman becomes ::Any, pollutes make_workspace inference
+   zeeman = ps_compiled[:zeeman]
+   ws = make_workspace(; zeeman, ...)
+
+   # OK — helper boundary + ::ConcreteType narrow
+   function _apply_pulse_sequence(ps_raw, ..., zeeman, ...)
+       ps_raw isa Vector || return (zeeman, ...)
+       compiled = compile_pulse_sequence(...)
+       zee_out = haskey(compiled, :zeeman) ?
+           compiled[:zeeman]::TimeDependentZeeman : zeeman
+       (zee_out, ...)
+   end
+   ```
+
+2. **Never store closures (`FunctionWaveform(t -> ...)`, anonymous functions)
+   in struct fields that flow into Workspace.** Each closure site has a unique
+   type, multiplying specialization work. Pre-evaluate to `PiecewiseLinearWaveform`
+   or `InterpolatedWaveform` (concrete types) before storing.
+
+**Debug procedure** when JIT hangs:
+- Direct-call the offending `_run_step(::ConcreteStep, ...)` — if fast, suspect
+  abstract-dispatch propagation from `run_pipeline`.
+- Check recent additions for `Dict{Symbol,Any}` extractions or closure creation
+  in paths that reach `make_workspace`.
+- `Cthulhu.descend(run_pipeline, (typeof(config),))` for deep inspection.
+
+**User-supplied callbacks** (live_monitor `extract_observables`, simulation
+`SimulationCallbacks.on_step`) accept `::Function` — these are OK in cold paths
+but callbacks invoked in hot loops should parameterize: `struct Cb{F1,F2} ...`.
