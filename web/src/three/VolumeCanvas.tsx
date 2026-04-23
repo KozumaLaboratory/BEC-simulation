@@ -5,6 +5,7 @@ import * as THREE_WEBGPU from 'three/webgpu'
 import { useMemo } from 'react'
 import { DensityVolume, type VolumeParams } from './DensityVolume'
 import { VectorField, type VectorFieldParams } from './VectorField'
+import { ParticleField, type ParticleParams } from './ParticleField'
 import type { DensityTexture } from './useDensityTexture'
 import type { PhaseTexture } from './usePhaseTexture'
 import type { VectorField3D } from '@/api'
@@ -17,12 +18,16 @@ interface Props {
     field: VectorField3D
     params: VectorFieldParams
   }
+  particles?: {
+    field: VectorField3D
+    params: ParticleParams
+  }
 }
 
 const webgpuSupported =
   typeof navigator !== 'undefined' && 'gpu' in navigator
 
-export function VolumeCanvas({ density, phase, params, vector }: Props) {
+export function VolumeCanvas({ density, phase, params, vector, particles }: Props) {
   if (!webgpuSupported) {
     return (
       <div className="h-full flex items-center justify-center text-sm text-destructive text-center px-6">
@@ -53,6 +58,14 @@ export function VolumeCanvas({ density, phase, params, vector }: Props) {
           density={density.meta}
           densityMax={density.maxValue}
           params={vector.params}
+        />
+      )}
+      {particles && (
+        <ParticleField
+          field={particles.field}
+          density={density.meta}
+          densityMax={density.maxValue}
+          params={particles.params}
         />
       )}
       <BoundingBox />

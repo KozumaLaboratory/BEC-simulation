@@ -18,6 +18,7 @@ import { useVectorField } from '@/three/useVectorField'
 import { VolumeCanvas } from '@/three/VolumeCanvas'
 import type { VolumeParams, ColorMode } from '@/three/DensityVolume'
 import type { VectorFieldParams } from '@/three/VectorField'
+import type { ParticleParams } from '@/three/ParticleField'
 
 interface Props {
   run: string | null
@@ -73,6 +74,25 @@ export function View3D({ run, data }: Props) {
     colorHigh: '#f0f921',
   })
 
+  const particleControls = useControls('Particles', {
+    show: false,
+    field: {
+      value: 'velocity' as VectorFieldKind,
+      options: {
+        'Mass current j (質量流)': 'current' as VectorFieldKind,
+        'Superfluid velocity v=j/n': 'velocity' as VectorFieldKind,
+      },
+      label: 'Advect on',
+    },
+    stride: { value: 4, min: 1, max: 8, step: 1 },
+    count: { value: 4000, min: 500, max: 20000, step: 500 },
+    speed: { value: 0.08, min: 0.005, max: 0.5, step: 0.005 },
+    lifespan: { value: 3.5, min: 0.5, max: 15, step: 0.1 },
+    pointSize: { value: 0.012, min: 0.002, max: 0.05, step: 0.001 },
+    densityThreshold: { value: 0.05, min: 0, max: 0.5, step: 0.01 },
+    color: '#ffffff',
+  })
+
   const params = useMemo<VolumeParams>(
     () => ({
       isoMin: controls.isoMin,
@@ -118,6 +138,26 @@ export function View3D({ run, data }: Props) {
     vectorControls.field,
     Math.round(vectorControls.stride),
     vectorControls.show,
+  )
+
+  const { data: particleFieldData, error: particleError } = useVectorField(
+    run,
+    currentPoint?.file ?? null,
+    particleControls.field,
+    Math.round(particleControls.stride),
+    particleControls.show,
+  )
+
+  const pParams = useMemo<ParticleParams>(
+    () => ({
+      count: Math.round(particleControls.count),
+      speed: particleControls.speed,
+      lifespan: particleControls.lifespan,
+      pointSize: particleControls.pointSize,
+      color: particleControls.color,
+      densityThreshold: particleControls.densityThreshold,
+    }),
+    [particleControls],
   )
 
   const componentOptions = useMemo(() => {
@@ -216,6 +256,11 @@ export function View3D({ run, data }: Props) {
                   ? { field: vectorData, params: vParams }
                   : undefined
               }
+              particles={
+                particleControls.show && particleFieldData
+                  ? { field: particleFieldData, params: pParams }
+                  : undefined
+              }
             />
           ) : (
             <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
@@ -227,6 +272,12 @@ export function View3D({ run, data }: Props) {
         {vectorError && (
           <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             Vector field: {vectorError}
+          </div>
+        )}
+
+        {particleError && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            Particles: {particleError}
           </div>
         )}
 
