@@ -1,7 +1,20 @@
+import type * as React from 'react'
 import Plotly from 'plotly.js-dist-min'
-import createPlotlyComponent from 'react-plotly.js/factory'
+import * as plotlyFactoryModule from 'react-plotly.js/factory'
 import type { Layout, Config } from 'plotly.js-dist-min'
 
+// react-plotly.js/factory is a CJS module whose default export is the
+// factory function. Vite's ESM interop sometimes delivers it as
+// `{ default: fn }` instead of the function itself, so unwrap both shapes.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const factoryAny = plotlyFactoryModule as any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const createPlotlyComponent: (plotly: any) => React.ComponentType<any> =
+  typeof factoryAny === 'function'
+    ? factoryAny
+    : typeof factoryAny.default === 'function'
+      ? factoryAny.default
+      : factoryAny.default?.default
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const Plot = createPlotlyComponent(Plotly as any)
 

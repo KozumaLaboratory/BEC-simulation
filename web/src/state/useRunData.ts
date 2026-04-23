@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, type DashboardData, type PointMeta } from '@/api'
 
 export interface RunDataState {
@@ -24,6 +24,14 @@ export function useRunData(): RunDataState {
   const [xKey, setXKey] = useState<string>('index')
   const [runFilter, setRunFilter] = useState<string>('')
   const [refreshToken, setRefreshToken] = useState(0)
+  // Track whether the user has manually overridden the initial-run pick, so
+  // we stop auto-advancing past empty runs once they've chosen something.
+  const userPickedRef = useRef(false)
+
+  const setSelectedRunUser = useCallback((name: string) => {
+    userPickedRef.current = true
+    setSelectedRun(name)
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -59,6 +67,22 @@ export function useRunData(): RunDataState {
       .getRunData(selectedRun)
       .then((d) => {
         if (cancelled) return
+        // Julia returns { error: "..." } when a run has no points or fails
+        // to parse; surface that as a hook-level error instead of a broken data shape.
+        const errField = (d as unknown as { error?: string }).error
+        if (typeof errField === 'string') {
+          setData(null)
+          setError(errField)
+          // Auto-advance past empty/failing runs on initial load only.
+          // Once the user has picked something manually, respect their choice
+          // even if it errors.
+          if (!userPickedRef.current && runs.length > 0) {
+            const idx = runs.indexOf(selectedRun)
+            const next = runs[idx + 1]
+            if (next) setSelectedRun(next)
+          }
+          return
+        }
         setData(d)
         setError(null)
       })
@@ -71,7 +95,7 @@ export function useRunData(): RunDataState {
     return () => {
       cancelled = true
     }
-  }, [selectedRun, refreshToken])
+  }, [selectedRun, refreshToken, runs])
 
   const refresh = useCallback(() => {
     api.refresh().finally(() => setRefreshToken((n) => n + 1))
@@ -85,7 +109,7 @@ export function useRunData(): RunDataState {
     error,
     xKey,
     runFilter,
-    setSelectedRun,
+    setSelectedRun: setSelectedRunUser,
     setXKey,
     setRunFilter,
     refresh,

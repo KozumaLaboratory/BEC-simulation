@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useRunData } from '@/state/useRunData'
@@ -8,7 +9,17 @@ import {
   PopulationsChart,
   PopulationsHeatmap,
 } from '@/components/charts/PopulationsChart'
-import { View3D } from '@/components/View3D'
+import { DataTable } from '@/components/DataTable'
+
+// Lazy chunks — three/webgpu + R3F + drei is ~1.7MB; splitting keeps the
+// initial payload light. SliceGrid stays eager since it shares Plotly with
+// Overview anyway.
+const View3D = lazy(() =>
+  import('@/components/View3D').then((m) => ({ default: m.View3D })),
+)
+const SliceGrid = lazy(() =>
+  import('@/components/SliceGrid').then((m) => ({ default: m.SliceGrid })),
+)
 
 export default function App() {
   const state = useRunData()
@@ -23,8 +34,10 @@ export default function App() {
         {data && (
           <p className="text-xs text-muted-foreground mt-1">
             F={data.F} · {data.n_points} points
-            {data.run_names.length > 0 && ` · runs: ${data.run_names.join(', ')}`}
-            {data.scan_keys.length > 0 && ` · scan: ${data.scan_keys.join(', ')}`}
+            {(data.run_names?.length ?? 0) > 0 &&
+              ` · runs: ${data.run_names.join(', ')}`}
+            {(data.scan_keys?.length ?? 0) > 0 &&
+              ` · scan: ${data.scan_keys.join(', ')}`}
           </p>
         )}
       </header>
@@ -46,7 +59,9 @@ export default function App() {
       <Tabs defaultValue="overview" className="w-full">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="slice">Slice</TabsTrigger>
           <TabsTrigger value="view3d">3D View</TabsTrigger>
+          <TabsTrigger value="data">Data</TabsTrigger>
           <TabsTrigger value="config">Config</TabsTrigger>
         </TabsList>
 
@@ -105,8 +120,20 @@ export default function App() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="slice">
+          <Suspense fallback={<TabFallback />}>
+            <SliceGrid run={selectedRun} data={data} />
+          </Suspense>
+        </TabsContent>
+
         <TabsContent value="view3d">
-          <View3D run={selectedRun} data={data} />
+          <Suspense fallback={<TabFallback />}>
+            <View3D run={selectedRun} data={data} />
+          </Suspense>
+        </TabsContent>
+
+        <TabsContent value="data">
+          <DataTable data={data} runFilter={runFilter} />
         </TabsContent>
 
         <TabsContent value="config">
@@ -123,5 +150,15 @@ export default function App() {
         </TabsContent>
       </Tabs>
     </div>
+  )
+}
+
+function TabFallback() {
+  return (
+    <Card>
+      <CardContent className="h-[400px] flex items-center justify-center text-muted-foreground text-sm">
+        Loading…
+      </CardContent>
+    </Card>
   )
 }

@@ -48,6 +48,18 @@ export interface VectorField3D {
 
 export type VectorFieldKind = 'current' | 'magnetization'
 
+export interface ColumnDensity {
+  ndim: number
+  axis: number
+  shape: number[] // 2D: [nx, ny]
+  box: number[]
+  axis_labels: string[] // remaining axes, e.g. ["x", "y"]
+  axis_ranges: number[][] // [[x_min,x_max], [y_min,y_max]]
+  m_values: number[]
+  total_density: number[] // flat length shape[0]*shape[1]
+  densities: number[][] // per-component flat arrays
+}
+
 async function json<T>(url: string): Promise<T> {
   const r = await fetch(url)
   if (!r.ok) throw new Error(`${r.status} ${r.statusText} @ ${url}`)
@@ -101,6 +113,12 @@ export const api = {
       s = header[3]
     const data = new Float32Array(buf, 28, nx * ny * nz * 4)
     return { nx, ny, nz, stride: s, data }
+  },
+
+  getColumnDensity(run: string, file: string, axis: 1 | 2 | 3): Promise<ColumnDensity> {
+    return json(
+      `/api/density/${encodeURIComponent(run)}/${encodeURIComponent(file)}?axis=${axis}`,
+    )
   },
 
   refresh(): Promise<void> {
