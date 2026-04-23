@@ -28,6 +28,7 @@
     "@eslint/js": "^10.0.1",
     "@tailwindcss/vite": "4",
     "@types/node": "^24.12.2",
+    "@types/plotly.js": "^3.0.10",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@types/react-plotly.js": "^2.6.4",
