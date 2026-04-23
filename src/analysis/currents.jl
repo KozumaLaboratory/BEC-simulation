@@ -121,3 +121,139 @@ function total_angular_momentum(
     Sz = magnetization(psi, grid, sys)
     Lz + Sz
 end
+
+# 2D bilinear interpolation of a vector field at a single point.
+# Periodic wrap consistent with FFT-based grid.
+@inline function _interp_velocity(
+    v::NTuple{2,Array{Float64,2}},
+    grid::Grid{2},
+    p::NTuple{2,Float64},
+)
+    nx, ny = grid.config.n_points
+    tx = (p[1] - grid.x[1][1]) / grid.dx[1]
+    ty = (p[2] - grid.x[2][1]) / grid.dx[2]
+    ix = floor(Int, tx)
+    iy = floor(Int, ty)
+    fx = tx - ix
+    fy = ty - iy
+    ix0 = mod(ix, nx) + 1
+    ix1 = mod(ix + 1, nx) + 1
+    iy0 = mod(iy, ny) + 1
+    iy1 = mod(iy + 1, ny) + 1
+    w00 = (1 - fx) * (1 - fy)
+    w10 = fx * (1 - fy)
+    w01 = (1 - fx) * fy
+    w11 = fx * fy
+    @inbounds begin
+        vx =
+            w00 * v[1][ix0, iy0] +
+            w10 * v[1][ix1, iy0] +
+            w01 * v[1][ix0, iy1] +
+            w11 * v[1][ix1, iy1]
+        vy =
+            w00 * v[2][ix0, iy0] +
+            w10 * v[2][ix1, iy0] +
+            w01 * v[2][ix0, iy1] +
+            w11 * v[2][ix1, iy1]
+    end
+    (vx, vy)
+end
+
+# 3D trilinear interpolation.
+@inline function _interp_velocity(
+    v::NTuple{3,Array{Float64,3}},
+    grid::Grid{3},
+    p::NTuple{3,Float64},
+)
+    nx, ny, nz = grid.config.n_points
+    tx = (p[1] - grid.x[1][1]) / grid.dx[1]
+    ty = (p[2] - grid.x[2][1]) / grid.dx[2]
+    tz = (p[3] - grid.x[3][1]) / grid.dx[3]
+    ix = floor(Int, tx)
+    iy = floor(Int, ty)
+    iz = floor(Int, tz)
+    fx = tx - ix
+    fy = ty - iy
+    fz = tz - iz
+    ix0 = mod(ix, nx) + 1
+    ix1 = mod(ix + 1, nx) + 1
+    iy0 = mod(iy, ny) + 1
+    iy1 = mod(iy + 1, ny) + 1
+    iz0 = mod(iz, nz) + 1
+    iz1 = mod(iz + 1, nz) + 1
+    w000 = (1 - fx) * (1 - fy) * (1 - fz)
+    w100 = fx * (1 - fy) * (1 - fz)
+    w010 = (1 - fx) * fy * (1 - fz)
+    w110 = fx * fy * (1 - fz)
+    w001 = (1 - fx) * (1 - fy) * fz
+    w101 = fx * (1 - fy) * fz
+    w011 = (1 - fx) * fy * fz
+    w111 = fx * fy * fz
+    @inbounds begin
+        vx =
+            w000 * v[1][ix0, iy0, iz0] +
+            w100 * v[1][ix1, iy0, iz0] +
+            w010 * v[1][ix0, iy1, iz0] +
+            w110 * v[1][ix1, iy1, iz0] +
+            w001 * v[1][ix0, iy0, iz1] +
+            w101 * v[1][ix1, iy0, iz1] +
+            w011 * v[1][ix0, iy1, iz1] +
+            w111 * v[1][ix1, iy1, iz1]
+        vy =
+            w000 * v[2][ix0, iy0, iz0] +
+            w100 * v[2][ix1, iy0, iz0] +
+            w010 * v[2][ix0, iy1, iz0] +
+            w110 * v[2][ix1, iy1, iz0] +
+            w001 * v[2][ix0, iy0, iz1] +
+            w101 * v[2][ix1, iy0, iz1] +
+            w011 * v[2][ix0, iy1, iz1] +
+            w111 * v[2][ix1, iy1, iz1]
+        vz =
+            w000 * v[3][ix0, iy0, iz0] +
+            w100 * v[3][ix1, iy0, iz0] +
+            w010 * v[3][ix0, iy1, iz0] +
+            w110 * v[3][ix1, iy1, iz0] +
+            w001 * v[3][ix0, iy0, iz1] +
+            w101 * v[3][ix1, iy0, iz1] +
+            w011 * v[3][ix0, iy1, iz1] +
+            w111 * v[3][ix1, iy1, iz1]
+    end
+    (vx, vy, vz)
+end
+
+"""
+    circulation(v, grid, loop) -> Float64
+
+Line integral Γ = ∮ v · dl around a closed polyline. The last vertex connects
+back to the first. Uses midpoint-rule integration with linear interpolation
+of `v` at each segment midpoint; coordinates outside the grid wrap
+periodically (consistent with FFT-based derivatives).
+
+In units where ℏ=m=1, a quantum vortex enclosed by the loop gives
+`Γ = 2π · w` where w ∈ ℤ is the winding number. The loop orientation
+determines the sign.
+
+Supported dimensions: N ∈ {2, 3}.
+"""
+function circulation(
+    v::NTuple{N,Array{Float64,N}},
+    grid::Grid{N},
+    loop::AbstractVector{<:NTuple{N,<:Real}},
+) where {N}
+    N == 2 || N == 3 || throw(ArgumentError("circulation requires N ∈ {2,3}"))
+    np = length(loop)
+    np >= 3 || throw(ArgumentError("loop must have at least 3 vertices"))
+
+    Γ = 0.0
+    @inbounds for i = 1:np
+        j = (i == np) ? 1 : i + 1
+        p1 = ntuple(d -> Float64(loop[i][d]), N)
+        p2 = ntuple(d -> Float64(loop[j][d]), N)
+        mid = ntuple(d -> 0.5 * (p1[d] + p2[d]), N)
+        vmid = _interp_velocity(v, grid, mid)
+        for d = 1:N
+            Γ += vmid[d] * (p2[d] - p1[d])
+        end
+    end
+    Γ
+end

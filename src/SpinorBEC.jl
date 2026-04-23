@@ -271,6 +271,7 @@ export spin_density_vector, total_norm, total_energy, energy_decomposition
 export structure_factor, modulation_contrast
 export probability_current, orbital_angular_momentum
 export superfluid_velocity, total_angular_momentum, spin_texture_charge
+export circulation
 export wigner_correct_density, ensemble_correlation, ensemble_stderr
 export superfluid_vorticity, berry_curvature, singlet_pair_amplitude
 export pair_amplitude, pair_amplitude_spectrum
