@@ -19,6 +19,60 @@ function _build_potential(pc::PotentialConfig, ndim::Int)
         beam_dicts = pc.params["beams"]
         beams = [_build_beam(bd) for bd in beam_dicts]
         CrossedDipoleTrap{ndim}(beams, pol)
+    elseif pc.type == :ring
+        radius = Float64(get(pc.params, "radius", 5.0))
+        strength = Float64(get(pc.params, "strength", 50.0))
+        width = Float64(get(pc.params, "width", 1.0))
+        RingPotential{ndim}(radius, strength, width)
+    elseif pc.type == :box
+        sz = _to_float_vec(pc.params["size"])
+        length(sz) == ndim || throw(ArgumentError("box size length must match grid dimensions ($ndim)"))
+        wall_strength = Float64(get(pc.params, "wall_strength", 1000.0))
+        wall_width = Float64(get(pc.params, "wall_width", 0.5))
+        BoxPotential{ndim}(NTuple{ndim,Float64}(sz), wall_strength, wall_width)
+    elseif pc.type == :lattice || pc.type == :optical_lattice
+        depth = NTuple{ndim,Float64}(_to_float_vec(pc.params["depth"]))
+        period = NTuple{ndim,Float64}(_to_float_vec(pc.params["period"]))
+        phase = NTuple{ndim,Float64}(_to_float_vec(get(pc.params, "phase", zeros(ndim))))
+        OpticalLatticePotential{ndim}(depth, period, phase)
+    elseif pc.type == :double_well
+        separation = Float64(get(pc.params, "separation", 4.0))
+        barrier = Float64(get(pc.params, "barrier", 10.0))
+        omega = NTuple{ndim,Float64}(_to_float_vec(get(pc.params, "omega", ones(ndim))))
+        axis = Int(get(pc.params, "axis", 1))
+        DoubleWellPotential{ndim}(separation, barrier, omega, axis)
+    elseif pc.type == :quartic
+        omega = NTuple{ndim,Float64}(_to_float_vec(pc.params["omega"]))
+        lambda = NTuple{ndim,Float64}(_to_float_vec(pc.params["lambda"]))
+        QuarticPotential{ndim}(omega, lambda)
+    elseif pc.type == :laguerre_gauss || pc.type == :lg_beam
+        power = Float64(get(pc.params, "power", 1.0))
+        waist = Float64(get(pc.params, "waist", 10.0))
+        l_mode = Int(get(pc.params, "l_mode", 1))
+        p_mode = Int(get(pc.params, "p_mode", 0))
+        pol = Float64(get(pc.params, "polarizability", 1.0))
+        LaguerreGaussBeam{ndim}(power, waist, l_mode, p_mode, pol)
+    elseif pc.type == :plug || pc.type == :plug_beam
+        strength = Float64(get(pc.params, "strength", 50.0))
+        waist = Float64(get(pc.params, "waist", 2.0))
+        PlugBeam{ndim}(strength, waist)
+    elseif pc.type == :shaken_lattice
+        depth = NTuple{ndim,Float64}(_to_float_vec(pc.params["depth"]))
+        period = NTuple{ndim,Float64}(_to_float_vec(pc.params["period"]))
+        shake_specs = get(pc.params, "shake", nothing)
+        duration = Float64(get(pc.params, "duration", 1.0))
+        shake_wf = if shake_specs !== nothing
+            wfs = _to_float_vec(shake_specs)
+            NTuple{ndim,Waveform}(ntuple(d -> ConstantWaveform(d <= length(wfs) ? wfs[d] : 0.0), ndim))
+        else
+            NTuple{ndim,Waveform}(ntuple(_ -> ConstantWaveform(0.0), ndim))
+        end
+        ShakenLatticePotential{ndim}(depth, period, shake_wf)
+    elseif pc.type == :magnetic_gradient
+        gradient = Float64(pc.params["gradient"])
+        axis = Int(get(pc.params, "axis", ndim))
+        g_F = Float64(get(pc.params, "g_F", 1.0))
+        MagneticGradient{ndim}(gradient, axis, g_F)
     elseif pc.type == :composite
         components = [_build_potential(c, ndim) for c in pc.params["components"]]
         CompositePotential{ndim}(components)
@@ -37,6 +91,46 @@ function _build_beam(d::Dict)
 end
 
 """
+    _make_waveform(spec, duration) -> Waveform
+
+Convert a YAML scalar or {from, to, scale?} dict into a Waveform.
+"""
+function _make_waveform(spec, duration::Float64)
+    spec isa Dict || return ConstantWaveform(Float64(spec))
+    if haskey(spec, "sinusoidal")
+        s = spec["sinusoidal"]
+        return SinusoidalWaveform(;
+            center = Float64(get(s, "center", 0.0)),
+            amplitude = Float64(get(s, "amplitude", 1.0)),
+            frequency = Float64(get(s, "frequency", 1.0)),
+            phase = Float64(get(s, "phase", 0.0)),
+        )
+    elseif haskey(spec, "gaussian_pulse")
+        g = spec["gaussian_pulse"]
+        return GaussianPulseWaveform(;
+            center = Float64(get(g, "center", 0.0)),
+            amplitude = Float64(get(g, "amplitude", 1.0)),
+            t_center = Float64(get(g, "t_center", duration / 2)),
+            sigma = Float64(get(g, "sigma", 0.01)),
+        )
+    elseif haskey(spec, "piecewise")
+        p = spec["piecewise"]
+        times = Float64.(p["times"])
+        values = Float64.(p["values"])
+        return PiecewiseLinearWaveform(times, values)
+    elseif haskey(spec, "interpolated")
+        p = spec["interpolated"]
+        times = Float64.(p["times"])
+        values = Float64.(p["values"])
+        return InterpolatedWaveform(times, values)
+    end
+    from = Float64(spec["from"])
+    to = Float64(get(spec, "to", from))
+    scale = Symbol(get(spec, "scale", "linear"))
+    RampWaveform(from, to, duration, scale)
+end
+
+"""
     _build_phase_zeeman(phase_raw, t_offset, duration) -> ZeemanParams or TimeDependentZeeman
 
 Build the per-phase Zeeman object from override-applied raw YAML dict.
@@ -47,21 +141,50 @@ function _build_phase_zeeman(phase_raw::Dict, t_offset::Float64, duration::Float
     p_spec = get(z, "p", 0.0)
     q_spec = get(z, "q", 0.0)
 
-    p_ramp = _parse_ramp_or_constant(p_spec)
-    q_ramp = _parse_ramp_or_constant(q_spec)
+    p_is_ramp = p_spec isa Dict
+    q_is_ramp = q_spec isa Dict
+    bx_spec = get(z, "bx", nothing)
+    by_spec = get(z, "by", nothing)
+    has_transverse = bx_spec !== nothing || by_spec !== nothing
 
-    if p_ramp isa ConstantValue && q_ramp isa ConstantValue
-        ZeemanParams(p_ramp.value, q_ramp.value)
-    else
-        TimeDependentZeeman(t -> begin
-            t_local = t - t_offset
-            t_frac = duration > 0 ? t_local / duration : 0.0
-            ZeemanParams(
-                interpolate_value(p_ramp, t_frac),
-                interpolate_value(q_ramp, t_frac),
-            )
-        end)
+    if !p_is_ramp && !q_is_ramp && !has_transverse
+        return ZeemanParams(Float64(p_spec), Float64(q_spec))
     end
+
+    p_wf = _make_waveform(p_spec, duration)
+    q_wf = _make_waveform(q_spec, duration)
+
+    if t_offset != 0.0
+        p_wf = FunctionWaveform(t -> evaluate(p_wf, t - t_offset))
+        q_wf = FunctionWaveform(t -> evaluate(q_wf, t - t_offset))
+    end
+
+    bx_wf = bx_spec !== nothing ? _make_waveform(bx_spec, duration) : nothing
+    by_wf = by_spec !== nothing ? _make_waveform(by_spec, duration) : nothing
+    TimeDependentZeeman(p_wf, q_wf, bx_wf, by_wf)
+end
+
+"""
+    _build_raman(p, duration) -> RamanCoupling | TimeDependentRaman | nothing
+
+Build a Raman coupling from a dynamics step dict.
+"""
+function _build_raman(p::Dict, duration::Float64)
+    haskey(p, "raman") || return nothing
+    r = p["raman"]
+    k_eff = Tuple(Float64.(r["k_eff"]))
+    omega_spec = r["Omega_R"]
+    delta_spec = get(r, "delta", 0.0)
+    omega_is_ramp = omega_spec isa Dict
+    delta_is_ramp = delta_spec isa Dict
+    if !omega_is_ramp && !delta_is_ramp
+        return RamanCoupling(Float64(omega_spec), Float64(delta_spec), k_eff)
+    end
+    TimeDependentRaman(
+        _make_waveform(omega_spec, duration),
+        _make_waveform(delta_spec, duration),
+        k_eff,
+    )
 end
 
 """Parse a potential spec (dict or list of dicts) and build the potential."""

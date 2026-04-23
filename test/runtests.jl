@@ -1,71 +1,128 @@
 using Test
 using SpinorBEC
 
-@testset "SpinorBEC" begin
-    include("test_atoms.jl")
-    include("test_grid.jl")
-    include("test_spin_matrices.jl")
-    include("test_propagators.jl")
-    include("test_spin_mixing.jl")
-    include("test_split_step.jl")
-    include("test_observables.jl")
-    include("test_simulation.jl")
-    include("test_3d.jl")
-    include("test_ddi.jl")
-    include("test_potentials.jl")
-    include("test_experiment.jl")
-    include("test_physics_level0.jl")
-    include("test_physics_level1.jl")
-    include("test_physics_level2.jl")
-    include("test_physics_level3.jl")
-    include("test_optics.jl")
-    include("test_thomas_fermi.jl")
-    include("test_laser_potential.jl")
-    include("test_raman.jl")
-    include("test_adaptive_dt.jl")
-    include("test_unitful.jl")
-    include("test_angular_momentum.jl")
-    include("test_texture_observables.jl")
-    include("test_vorticity_berry.jl")
-    include("test_majorana.jl")
-    include("test_diagnostics.jl")
-    include("test_losses.jl")
-    include("test_lhy.jl")
-    include("test_nematic.jl")
-    include("test_batched_kinetic.jl")
-    include("test_ddi_padded.jl")
-    include("test_clebsch_gordan.jl")
-    include("test_general_f.jl")
-    include("test_tensor_interaction.jl")
-    include("test_interactions_constraint.jl")
-    include("test_io.jl")
-    include("test_analytic_ground_states.jl")
-    include("test_nematic_tensor.jl")
-    include("test_spherical_harmonics.jl")
-    include("test_spectral.jl")
-    include("test_checkpoint.jl")
-    include("test_continuation.jl")
-    include("test_phase_boundary.jl")
-    include("test_tof.jl")
-    include("test_bogoliubov.jl")
-    include("test_analytical_validation.jl")
-    include("test_phase_scan.jl")
-    include("test_config.jl")
-    include("test_energy.jl")
-    include("test_initialization.jl")
-    include("test_spinor_utils.jl")
-    include("test_types_validation.jl")
-    include("test_currents.jl")
-    include("test_quasi_2d.jl")
-    include("test_quasi_2d_api.jl")
-    include("test_zeeman_midpoint.jl")
-    include("test_ground_state.jl")
-    include("test_lbfgs.jl")
-    include("test_lhy_2d.jl")
-    include("test_bogoliubov_enhanced.jl")
-    include("test_spinor_lhy.jl")
-    include("test_pipeline.jl")
-    include("test_pause_resume.jl")
-    include("test_absorbing_boundary.jl")
-    include("test_twa.jl")
+# ── Test tier system ──────────────────────────────────────────────
+# SPINORBEC_TEST_TIER controls which tests run:
+#   fast     ~30s   lightweight unit tests only (no ITP/RTP)
+#   ci       ~3min  fast + core integration (split_step, simulation, ground_state)
+#   full     ~6min  everything (default)
+#   physics  validation-only subset (analytic + physics levels)
+#
+# Usage:
+#   SPINORBEC_TEST_TIER=fast julia --project=. -e 'using Pkg; Pkg.test()'
+#   SPINORBEC_TEST_TIER=ci   julia --project=. -e 'using Pkg; Pkg.test()'
+
+const TEST_TIER = lowercase(get(ENV, "SPINORBEC_TEST_TIER", "full"))
+
+# ── Fast tier: pure unit tests, no find_ground_state / run_simulation ──
+const FAST_TESTS = [
+    "test_atoms.jl",
+    "test_grid.jl",
+    "test_spin_matrices.jl",
+    "test_propagators.jl",
+    "test_spin_mixing.jl",
+    "test_observables.jl",
+    "test_ddi.jl",
+    "test_potentials.jl",
+    "test_physics_level0.jl",
+    "test_physics_level1.jl",
+    "test_optics.jl",
+    "test_thomas_fermi.jl",
+    "test_laser_potential.jl",
+    "test_raman.jl",
+    "test_unitful.jl",
+    "test_texture_observables.jl",
+    "test_vorticity_berry.jl",
+    "test_majorana.jl",
+    "test_diagnostics.jl",
+    "test_lhy.jl",
+    "test_nematic.jl",
+    "test_batched_kinetic.jl",
+    "test_ddi_padded.jl",
+    "test_clebsch_gordan.jl",
+    "test_general_f.jl",
+    "test_interactions_constraint.jl",
+    "test_io.jl",
+    "test_nematic_tensor.jl",
+    "test_spherical_harmonics.jl",
+    "test_spectral.jl",
+    "test_tof.jl",
+    "test_bogoliubov.jl",
+    "test_phase_scan.jl",
+    "test_initialization.jl",
+    "test_spinor_utils.jl",
+    "test_types_validation.jl",
+    "test_currents.jl",
+    "test_lhy_2d.jl",
+    "test_bogoliubov_enhanced.jl",
+    "test_spinor_lhy.jl",
+    "test_absorbing_boundary.jl",
+    "test_waveform.jl",
+    "test_raman_timedep.jl",
+    "test_vtk_export.jl",
+    "test_infrastructure.jl",
+]
+
+# ── CI tier: fast + core integration tests that run ITP/RTP ──
+const CI_EXTRA = [
+    "test_split_step.jl",
+    "test_simulation.jl",
+    "test_ground_state.jl",
+    "test_checkpoint.jl",
+    "test_energy.jl",
+    "test_losses.jl",
+    "test_config.jl",
+    "test_experiment.jl",
+    "test_zeeman_midpoint.jl",
+]
+
+# ── Full tier: everything (ci + remaining heavy tests) ──
+const FULL_EXTRA = [
+    "test_3d.jl",
+    "test_adaptive_dt.jl",
+    "test_analytic_ground_states.jl",
+    "test_analytical_validation.jl",
+    "test_angular_momentum.jl",
+    "test_continuation.jl",
+    "test_phase_boundary.jl",
+    "test_physics_level2.jl",
+    "test_physics_level3.jl",
+    "test_quasi_2d.jl",
+    "test_quasi_2d_api.jl",
+    "test_tensor_interaction.jl",
+    "test_lbfgs.jl",
+    "test_pipeline.jl",
+    "test_pause_resume.jl",
+    "test_twa.jl",
+]
+
+# ── Physics tier: analytic validation + physics level tests ──
+const PHYSICS_TESTS = [
+    "test_physics_level0.jl",
+    "test_physics_level1.jl",
+    "test_physics_level2.jl",
+    "test_physics_level3.jl",
+    "test_analytic_ground_states.jl",
+    "test_analytical_validation.jl",
+]
+
+function select_tests(tier::String)
+    if tier == "fast"
+        return FAST_TESTS
+    elseif tier == "ci"
+        return vcat(FAST_TESTS, CI_EXTRA)
+    elseif tier == "full"
+        return vcat(FAST_TESTS, CI_EXTRA, FULL_EXTRA)
+    elseif tier == "physics"
+        return PHYSICS_TESTS
+    else
+        @warn "Unknown SPINORBEC_TEST_TIER=$tier, falling back to full"
+        return vcat(FAST_TESTS, CI_EXTRA, FULL_EXTRA)
+    end
+end
+
+@testset "SpinorBEC (tier=$TEST_TIER)" begin
+    for f in select_tests(TEST_TIER)
+        include(f)
+    end
 end

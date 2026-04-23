@@ -149,6 +149,17 @@
             <span id="qaxis-label-3d" style="color:#a277ff; font-size:0.85rem; font-weight:bold;">0°</span>
         </label>
     </div>
+    <div style="display:flex; align-items:center; gap:0.8rem; margin-bottom:0.5rem;">
+        <label style="color:#8b949e; font-size:0.85rem;">
+            <input type="checkbox" id="show-vector-cb"> Show vectors
+        </label>
+        <select id="vector-field-sel" style="background:#131920;color:#e6edf3;border:1px solid #21262d;border-radius:4px;padding:0.3rem 0.5rem;font-family:inherit;font-size:0.85rem;">
+            <option value="current">Mass current</option>
+            <option value="spin_density">Spin density</option>
+            <option value="velocity">Velocity</option>
+        </select>
+        <span id="vector3d-status" style="color:#8b949e; font-size:0.8rem;"></span>
+    </div>
     <div id="density3d-plot" style="width:100%; height:550px;"></div>
 </div>
 
@@ -583,6 +594,125 @@ function render3dFromFloat32(values, nx, ny, nz, label) {
             aspectmode: 'data',
         },
     }, { responsive: true, displayModeBar: false });
+
+    if (document.getElementById('show-vector-cb').checked) {
+        loadAndShowVectors();
+    }
+}
+
+// --- Vector field overlay ---
+const showVectorCb = document.getElementById('show-vector-cb');
+const vectorFieldSel = document.getElementById('vector-field-sel');
+const vector3dStatus = document.getElementById('vector3d-status');
+
+showVectorCb.addEventListener('change', () => {
+    if (showVectorCb.checked) loadAndShowVectors();
+    else removeConeTrace();
+});
+vectorFieldSel.addEventListener('change', () => {
+    if (showVectorCb.checked) loadAndShowVectors();
+});
+
+function parseVector3dBinary(buf) {
+    const header = new Int32Array(buf, 0, 7);
+    const nx = header[0], ny = header[1], nz = header[2], stride = header[3];
+    const N = nx * ny * nz;
+    const data = new Float32Array(buf, 28, N * 4);
+    const vx = new Array(N), vy = new Array(N), vz = new Array(N), mag = new Array(N);
+    for (let i = 0; i < N; i++) {
+        vx[i] = data[i * 4];
+        vy[i] = data[i * 4 + 1];
+        vz[i] = data[i * 4 + 2];
+        mag[i] = data[i * 4 + 3];
+    }
+    return { nx, ny, nz, stride, vx, vy, vz, mag };
+}
+
+function loadAndShowVectors() {
+    const file = densityPointSel.value;
+    const run = runDirSel.value;
+    if (!file || !run) return;
+    const field = vectorFieldSel.value;
+    vector3dStatus.textContent = 'Loading vectors...';
+    fetch(`/api/vector3d_bin/${encodeURIComponent(run)}/${encodeURIComponent(file)}?field=${field}&stride=2`)
+        .then(r => r.arrayBuffer())
+        .then(buf => {
+            const v = parseVector3dBinary(buf);
+            addConeTrace(v);
+            vector3dStatus.textContent = '';
+        })
+        .catch(e => { vector3dStatus.textContent = 'Error: ' + e.message; });
+}
+
+function addConeTrace(v) {
+    const plotDiv = document.getElementById('density3d-plot');
+    if (!plotDiv || !plotDiv.data) return;
+
+    // Remove existing cone trace if any
+    while (plotDiv.data.length > 1) {
+        Plotly.deleteTraces('density3d-plot', 1);
+    }
+
+    // Density-threshold filter: only show where density > 5% of max
+    const densityData = density3dMeta ? density3dMeta.density : null;
+    let densMax = 0;
+    if (densityData) {
+        for (let i = 0; i < densityData.length; i++) {
+            if (densityData[i] > densMax) densMax = densityData[i];
+        }
+    }
+    const densThresh = densMax * 0.05;
+    const fullNx = density3dMeta ? density3dMeta.nx : v.nx * v.stride;
+    const fullNy = density3dMeta ? density3dMeta.ny : v.ny * v.stride;
+    const stride = v.stride;
+
+    const cx = [], cy = [], cz = [], cu = [], cv = [], cw = [];
+    let idx = 0;
+    for (let iz = 0; iz < v.nz; iz++) {
+        for (let iy = 0; iy < v.ny; iy++) {
+            for (let ix = 0; ix < v.nx; ix++) {
+                if (v.mag[idx] > 1e-20) {
+                    const gx = ix * stride, gy = iy * stride, gz = iz * stride;
+                    // Check density at this grid point
+                    if (densityData && densThresh > 0) {
+                        const di = gx + gy * fullNx + gz * fullNx * fullNy;
+                        if (di < densityData.length && densityData[di] < densThresh) {
+                            idx++; continue;
+                        }
+                    }
+                    cx.push(gx); cy.push(gy); cz.push(gz);
+                    cu.push(v.vx[idx]); cv.push(v.vy[idx]); cw.push(v.vz[idx]);
+                }
+                idx++;
+            }
+        }
+    }
+
+    if (cx.length === 0) {
+        vector3dStatus.textContent = 'No vectors above threshold';
+        return;
+    }
+
+    const gridSpacing = stride;
+    Plotly.addTraces('density3d-plot', {
+        type: 'cone',
+        x: cx, y: cy, z: cz,
+        u: cu, v: cv, w: cw,
+        sizemode: 'absolute',
+        sizeref: gridSpacing * 0.8,
+        anchor: 'tail',
+        colorscale: [[0,'#0d0887'],[0.5,'#d8576b'],[1,'#f0f921']],
+        opacity: 0.85,
+        showscale: false,
+        lighting: { ambient: 0.7, diffuse: 0.5, specular: 0.2 },
+    });
+}
+
+function removeConeTrace() {
+    const plotDiv = document.getElementById('density3d-plot');
+    if (plotDiv && plotDiv.data && plotDiv.data.length > 1) {
+        Plotly.deleteTraces('density3d-plot', 1);
+    }
 }
 
 // --- Density visualization ---

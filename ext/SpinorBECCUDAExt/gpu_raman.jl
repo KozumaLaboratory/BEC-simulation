@@ -26,7 +26,7 @@ function _get_gpu_raman_cache(
     ndim::Int,
 ) where {D,N}
     N_spatial = prod(ntuple(d -> size(psi, d), ndim))
-    key = hash((objectid(sm), objectid(raman), N_spatial, D))
+    key = hash((objectid(sm), raman.k_eff, N_spatial, D))
     cache = get(_GPU_RAMAN_CACHE, key, nothing)
     cache !== nothing && return cache::GPURamanCache{D}
 

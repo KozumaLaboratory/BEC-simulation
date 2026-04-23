@@ -56,7 +56,12 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
     "initial_state"        => FieldSpec(type=String, default="polar",
         enum=["polar", "ferromagnetic", "ferromagnetic_min",
               "uniform", "antiferromagnetic", "random",
-              "spin_coherent", "fl_vortex", "spin_helix"]),
+              "spin_coherent", "fl_vortex", "spin_helix",
+              "cyclic", "biaxial_nematic", "polar_core_vortex",
+              "soliton_bright", "soliton_dark", "skyrmion",
+              "gaussian_wavepacket", "domain_wall", "two_packet",
+              "chiral_spin_vortex", "magnetic_domain",
+              "vortex_lattice", "skyrmion_lattice"]),
     "backend"              => FieldSpec(type=String, default="cpu", enum=["cpu", "cuda", "gpu"]),
     "target_magnetization" => FieldSpec(type=Number),
     "temperature_ratio"    => FieldSpec(type=Number, range=(0.0, 1.0)),
@@ -68,6 +73,8 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
     "rotating_frame_omega" => FieldSpec(type=Number),
     "adaptive_dt"          => FieldSpec(type=Bool),
     "dt_max"               => FieldSpec(type=Number),
+    "light_shift"          => FieldSpec(type=Dict),
+    "raman"                => FieldSpec(type=Dict),
 )
 
 const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
@@ -84,6 +91,12 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     "integrator"         => FieldSpec(type=String,
         enum=["strang", "yoshida", "adaptive", "richardson"]),
     "backend"            => FieldSpec(type=String, enum=["cpu", "cuda", "gpu"]),
+    "raman"              => FieldSpec(type=Dict),
+    "absorbing_boundary" => FieldSpec(type=Dict),
+    "light_shift"        => FieldSpec(type=Dict),
+    "twa"                => FieldSpec(type=Dict),
+    "magnetic_gradient"  => FieldSpec(type=Dict),
+    "pulse_sequence"     => FieldSpec(type=Vector),
 )
 
 const STEP_SCHEMAS = Dict{String, Dict{String, FieldSpec}}(

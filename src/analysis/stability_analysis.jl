@@ -31,31 +31,10 @@ function estimate_splitting_error(ws::Workspace{N}) where {N}
         ws.sim_params.normalize_every,
         ws.sim_params.save_every,
     )
-    ws_half = Workspace(
-        ws.state,
-        ws.fft_plans,
-        kinetic_phase_half,
-        ws.potential_values,
-        ws.density_buf,
-        ws.spin_matrices,
-        ws.grid,
-        ws.atom,
-        ws.interactions,
-        ws.zeeman,
-        ws.potential,
-        sp_half,
-        ws.ddi,
-        ws.ddi_bufs,
-        ws.raman,
-        ws.loss,
-        ws.ddi_padded,
-        bk_half,
-        ws.tensor_cache,
-        ws.coriolis_cache,
-        ws.backend,
-        ws.lhy,
-        ws.absorbing_mask,
-        ws.light_shift,
+    ws_half = _rebuild_workspace(ws;
+        kinetic_phase=kinetic_phase_half,
+        sim_params=sp_half,
+        batched_kinetic=bk_half,
     )
 
     split_step!(ws_half)

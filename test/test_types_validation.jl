@@ -41,10 +41,11 @@ using SpinorBEC
         @test z.q == 0.0
     end
 
-    @testset "TimeDependentZeeman stores concrete function type" begin
+    @testset "TimeDependentZeeman with Waveform fields" begin
         z = TimeDependentZeeman(t -> ZeemanParams(t, 0.0))
-        @test z.B_func(1.0) == ZeemanParams(1.0, 0.0)
-        @test typeof(z).parameters[1] <: Function
+        @test zeeman_at(z, 1.0) == ZeemanParams(1.0, 0.0)
+        @test z.p_wf isa FunctionWaveform
+        @test z.q_wf isa FunctionWaveform
     end
 
     @testset "InteractionParams" begin

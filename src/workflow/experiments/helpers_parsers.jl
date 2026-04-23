@@ -178,8 +178,10 @@ function _parse_gs_interactions(inter::Dict, atom)
         ip = interaction_params_from_constraint(; c_total, c1_ratio, F, c_extra)
         InteractionParams(ip.c0, ip.c1, c_lhy, ip.c_extra)
     else
-        c0 = Float64(get(inter, "c0", 0.0))
-        c1 = Float64(get(inter, "c1", 0.0))
+        c0_raw = get(inter, "c0", 0.0)
+        c1_raw = get(inter, "c1", 0.0)
+        c0 = c0_raw isa Dict ? Float64(get(c0_raw, "from", 0.0)) : Float64(c0_raw)
+        c1 = c1_raw isa Dict ? Float64(get(c1_raw, "from", 0.0)) : Float64(c1_raw)
         c_lhy = Float64(get(inter, "c_lhy", 0.0))
         InteractionParams(c0, c1, c_lhy, c_extra)
     end
@@ -231,13 +233,10 @@ function _parse_zeeman(z, duration::Float64)
         return ZeemanParams(_zeeman_scalar(p_spec), _zeeman_scalar(q_spec))
     end
 
-    p_interp = _make_interpolator(p_spec)
-    q_interp = _make_interpolator(q_spec)
-
-    TimeDependentZeeman(t -> begin
-        t_frac = duration > 0 ? clamp(t / duration, 0.0, 1.0) : 0.0
-        ZeemanParams(p_interp(t_frac), q_interp(t_frac))
-    end)
+    TimeDependentZeeman(
+        _make_waveform(p_spec, duration),
+        _make_waveform(q_spec, duration),
+    )
 end
 
 """Parse grid config from pipeline step params."""

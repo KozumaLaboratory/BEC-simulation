@@ -48,9 +48,294 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing)
         analyze_stability(ws; perturbation, n_steps = n_steps_stab, sample_every)
     elseif name == :bogoliubov
         _run_bogoliubov_analyzer(psi, grid, atom, params, ws_prev)
+    elseif name == :multipole_order
+        F = atom.F
+        ndim = length(grid.config.n_points)
+        ranks = let v = get(params, "ranks", nothing)
+            v === nothing ? collect(0:2:2F) : Int.(v)
+        end
+        spectrum = multipole_spectrum(psi, F, grid)
+        selected = Dict{Int,Float64}(k => get(spectrum, k, 0.0) for k in ranks)
+        (multipole_spectrum = selected, ranks = ranks)
+    elseif name == :winding_map
+        F = atom.F
+        ndim = length(grid.config.n_points)
+        n_pts = grid.config.n_points
+        plans = make_fft_plans(n_pts; flags = FFTW.ESTIMATE)
+        Lz_total = orbital_angular_momentum(psi, grid, plans)
+        Mz = magnetization(psi, grid, SpinSystem(F))
+        j = probability_current(psi, grid, plans)
+        j_mag = sqrt.(sum(ji .^ 2 for ji in j))
+        (Lz = Lz_total, Mz = Mz, Jz = Lz_total + Mz, max_current = maximum(j_mag))
+    elseif name == :absorption_image
+        F = atom.F
+        ndim = length(grid.config.n_points)
+        axis = Int(get(params, "axis", ndim))
+        psf_sigma = Float64(get(params, "psf_sigma", 0.0))
+        n = total_density(psi, ndim)
+        col = dropdims(sum(n; dims = axis); dims = axis) .* cell_volume(grid)^(1.0 / ndim)
+        if psf_sigma > 0 && ndim >= 2
+            # Simple Gaussian blur via FFT convolution
+            remaining = [i for i in 1:ndim if i != axis]
+            sz = size(col)
+            col_c = Array{ComplexF64}(undef, sz)
+            col_c .= col
+            p_fwd = plan_fft!(col_c)
+            p_inv = plan_ifft!(col_c)
+            p_fwd * col_c
+            for I in CartesianIndices(sz)
+                ksq = sum(j -> (2π * I[j] / sz[j])^2, 1:length(sz))
+                col_c[I] *= exp(-0.5 * psf_sigma^2 * ksq)
+            end
+            p_inv * col_c
+            col = real.(col_c)
+        end
+        add_noise = Bool(get(params, "shot_noise", false))
+        if add_noise
+            rng = Random.MersenneTwister(Int(get(params, "seed", 42)))
+            col .= max.(0.0, col .+ sqrt.(max.(0.0, col)) .* randn(rng, size(col)...))
+        end
+        (column_density = col, axis = axis)
+    elseif name == :sg_tof
+        F = atom.F
+        sys = SpinSystem(F)
+        gradient = Float64(get(params, "gradient", 0.1))
+        t_tof = Float64(get(params, "t_tof", 10.0))
+        imaging_axis = Int(get(params, "imaging_axis", length(grid.config.n_points)))
+        tof_params = TOFParams(t_tof, gradient, imaging_axis)
+        result = simulate_tof(psi, grid, sys, tof_params)
+        populations = Dict{Int,Float64}()
+        for (m, dens) in result
+            populations[m] = sum(dens)
+        end
+        (tof_images = result, populations = populations)
+    elseif name == :domain_analysis
+        F = atom.F
+        ndim = length(grid.config.n_points)
+        sm = spin_matrices(F)
+        fx, fy, fz = spin_density_vector(psi, sm, ndim)
+        n = total_density(psi, ndim)
+        n_max = maximum(n)
+        threshold = Float64(get(params, "threshold", 0.05)) * n_max
+        # Count domain structure: regions where fz changes sign
+        n_pts = grid.config.n_points
+        domain_count = 0
+        prev_sign = 0
+        for I in CartesianIndices(n_pts)
+            n[I] > threshold || continue
+            s = sign(fz[I])
+            if s != 0 && s != prev_sign && prev_sign != 0
+                domain_count += 1
+            end
+            if s != 0
+                prev_sign = s
+            end
+        end
+        f_mag_avg = sum(sqrt.(fx .^ 2 .+ fy .^ 2 .+ fz .^ 2) .* n) / sum(n)
+        (domain_walls = domain_count, mean_spin_magnitude = f_mag_avg)
+    elseif name == :skyrmion_density
+        F = atom.F
+        ndim = length(grid.config.n_points)
+        n_pts = grid.config.n_points
+        sm = spin_matrices(F)
+        plans = make_fft_plans(n_pts; flags = FFTW.ESTIMATE)
+        if ndim == 2
+            Q = spin_texture_charge(psi, grid, plans, sm)
+            omega = berry_curvature(psi, grid, plans, sm)
+            (charge = Q, berry_curvature = omega)
+        elseif ndim == 3
+            omega_x, omega_y, omega_z = berry_curvature(psi, grid, plans, sm)
+            dV = cell_volume(grid)
+            Q_xy = sum(omega_z) * dV / (4π)
+            (charge_xy = Q_xy, berry_curvature = (omega_x, omega_y, omega_z))
+        else
+            (charge = 0.0,)
+        end
+    elseif name == :phase_contrast_image
+        F = atom.F
+        ndim = length(grid.config.n_points)
+        axis = Int(get(params, "axis", ndim))
+        detuning = Float64(get(params, "detuning", -64.0))
+        sm = spin_matrices(F)
+        fx, fy, fz = spin_density_vector(psi, sm, ndim)
+        n = total_density(psi, ndim)
+        # Phase contrast ∝ column-integrated (n ± fz) depending on probe polarization
+        n_plus = n .+ fz
+        n_minus = n .- fz
+        col_plus = dropdims(sum(n_plus; dims=axis); dims=axis) .* cell_volume(grid)^(1.0 / ndim)
+        col_minus = dropdims(sum(n_minus; dims=axis); dims=axis) .* cell_volume(grid)^(1.0 / ndim)
+        phase_signal = col_plus .- col_minus
+        (phase_signal = phase_signal, column_density_plus = col_plus, column_density_minus = col_minus, axis = axis)
+    elseif name == :momentum_distribution
+        F = atom.F
+        ndim = length(grid.config.n_points)
+        n_pts = grid.config.n_points
+        plans = make_fft_plans(n_pts; flags = FFTW.ESTIMATE)
+        D = 2F + 1
+        nk = zeros(Float64, n_pts)
+        for c in 1:D
+            idx = _component_slice(ndim, n_pts, c)
+            psi_c = copy(view(psi, idx...))
+            psi_k = similar(psi_c, ComplexF64)
+            psi_k .= psi_c
+            plans.forward * psi_k
+            nk .+= abs2.(psi_k)
+        end
+        # Normalize
+        dV = cell_volume(grid)
+        nk .*= dV^2
+        (momentum_density = nk,)
+    elseif name == :vortex_detect
+        F = atom.F
+        ndim = length(grid.config.n_points)
+        n_pts = grid.config.n_points
+        ndim >= 2 || throw(ArgumentError("vortex_detect requires N >= 2"))
+        component = Int(get(params, "component", 1))
+        threshold = Float64(get(params, "threshold", 0.1))
+        idx = _component_slice(ndim, n_pts, component)
+        psi_c = view(psi, idx...)
+        n_c = abs2.(psi_c)
+        n_max = maximum(n_c)
+        # Phase winding detection via discrete curl of phase gradient
+        phase_field = angle.(psi_c)
+        vortex_count = 0
+        for i in 2:(n_pts[1]-1), j in 2:(n_pts[2]-1)
+            n_c[i, j] < threshold * n_max && continue
+            # Plaquette phase winding
+            dp = _phase_diff(phase_field[i+1, j], phase_field[i, j]) +
+                 _phase_diff(phase_field[i+1, j+1], phase_field[i+1, j]) +
+                 _phase_diff(phase_field[i, j+1], phase_field[i+1, j+1]) +
+                 _phase_diff(phase_field[i, j], phase_field[i, j+1])
+            if abs(dp) > π
+                vortex_count += 1
+            end
+        end
+        (vortex_count = vortex_count, component = component)
+    elseif name == :correlation_length
+        F = atom.F
+        ndim = length(grid.config.n_points)
+        direction = Int(get(params, "direction", 1))
+        sm = spin_matrices(F)
+        fx, fy, fz = spin_density_vector(psi, sm, ndim)
+        n = total_density(psi, ndim)
+        n_max = maximum(n)
+        threshold = 0.05 * n_max
+        # Extract 1D spin correlation along specified direction through center
+        center = ntuple(d -> (grid.config.n_points[d] + 1) ÷ 2, ndim)
+        n_along = grid.config.n_points[direction]
+        fz_line = zeros(Float64, n_along)
+        for i in 1:n_along
+            idx = ntuple(d -> d == direction ? i : center[d], ndim)
+            fz_line[i] = n[idx...] > threshold ? fz[idx...] / max(n[idx...], 1e-30) : 0.0
+        end
+        # Autocorrelation
+        dx = grid.config.box_size[direction] / n_along
+        corr = zeros(Float64, n_along ÷ 2)
+        fz_mean = sum(fz_line) / n_along
+        fz_var = sum((fz_line .- fz_mean) .^ 2) / n_along
+        if fz_var > 1e-30
+            for lag in 0:(n_along ÷ 2 - 1)
+                c = 0.0
+                for i in 1:(n_along - lag)
+                    c += (fz_line[i] - fz_mean) * (fz_line[i + lag] - fz_mean)
+                end
+                corr[lag + 1] = c / ((n_along - lag) * fz_var)
+            end
+        end
+        # Find 1/e decay length
+        xi = 0.0
+        for i in 2:length(corr)
+            if corr[i] < exp(-1.0)
+                xi = (i - 1) * dx
+                break
+            end
+        end
+        xi == 0.0 && (xi = length(corr) * dx)
+        (correlation_length = xi, correlation = corr, direction = direction)
+    elseif name == :defect_density
+        F = atom.F
+        ndim = length(grid.config.n_points)
+        sm = spin_matrices(F)
+        fx, fy, fz = spin_density_vector(psi, sm, ndim)
+        n = total_density(psi, ndim)
+        n_max = maximum(n)
+        threshold = Float64(get(params, "threshold", 0.1)) * n_max
+        defect_type = Symbol(get(params, "defect_type", "domain_wall"))
+        n_pts = grid.config.n_points
+        defect_count = 0
+        if defect_type == :domain_wall
+            prev_sign = 0
+            for I in CartesianIndices(n_pts)
+                n[I] > threshold || continue
+                s = sign(fz[I])
+                if s != 0 && s != prev_sign && prev_sign != 0
+                    defect_count += 1
+                end
+                s != 0 && (prev_sign = s)
+            end
+        elseif defect_type == :vortex && ndim >= 2
+            phase_field = angle.(view(psi, _component_slice(ndim, n_pts, 1)...))
+            for i in 2:(n_pts[1]-1), j in 2:(n_pts[2]-1)
+                n[i, j] < threshold && continue
+                dp = _phase_diff(phase_field[i+1, j], phase_field[i, j]) +
+                     _phase_diff(phase_field[i+1, j+1], phase_field[i+1, j]) +
+                     _phase_diff(phase_field[i, j+1], phase_field[i+1, j+1]) +
+                     _phase_diff(phase_field[i, j], phase_field[i, j+1])
+                abs(dp) > π && (defect_count += 1)
+            end
+        end
+        volume = prod(grid.config.box_size)
+        (defect_count = defect_count, defect_density = defect_count / volume, defect_type = defect_type)
+    elseif name == :kibble_zurek_stats
+        # Requires ensemble data from TWA or repeated runs — reports summary stats
+        # For single-psi fallback: count defects and report
+        F = atom.F
+        ndim = length(grid.config.n_points)
+        sm = spin_matrices(F)
+        fx, fy, fz = spin_density_vector(psi, sm, ndim)
+        n = total_density(psi, ndim)
+        n_max = maximum(n)
+        threshold = Float64(get(params, "threshold", 0.1)) * n_max
+        # Count domain walls
+        prev_sign = 0
+        defect_count = 0
+        for I in CartesianIndices(grid.config.n_points)
+            n[I] > threshold || continue
+            s = sign(fz[I])
+            if s != 0 && s != prev_sign && prev_sign != 0
+                defect_count += 1
+            end
+            s != 0 && (prev_sign = s)
+        end
+        volume = prod(grid.config.box_size)
+        (defect_count = defect_count, defect_density = defect_count / volume, n_samples = 1)
+    elseif name == :bragg_spectroscopy
+        F = atom.F
+        ndim = length(grid.config.n_points)
+        n_pts = grid.config.n_points
+        plans = make_fft_plans(n_pts; flags = FFTW.ESTIMATE)
+        D = 2F + 1
+        # Static structure factor S(k) from density fluctuations
+        n_total = total_density(psi, ndim)
+        n_mean = sum(n_total) * cell_volume(grid)
+        delta_n = n_total .- (n_mean / prod(grid.config.box_size))
+        delta_nk = similar(delta_n, ComplexF64)
+        delta_nk .= delta_n
+        plans.forward * delta_nk
+        Sk = abs2.(delta_nk) .* cell_volume(grid)^2
+        (structure_factor = Sk,)
     else
-        throw(ArgumentError("Unknown analyzer: $name. Supported: tomography, faraday, energy_decomposition, phase_classify, stability, bogoliubov"))
+        _known = "tomography, faraday, energy_decomposition, phase_classify, stability, bogoliubov, " *
+                 "multipole_order, winding_map, absorption_image, sg_tof, domain_analysis, skyrmion_density, " *
+                 "phase_contrast_image, momentum_distribution, vortex_detect, correlation_length, " *
+                 "defect_density, kibble_zurek_stats, bragg_spectroscopy"
+        throw(ArgumentError("Unknown analyzer: $name. Supported: $_known"))
     end
+end
+
+function _phase_diff(a::Float64, b::Float64)
+    d = a - b
+    d > π ? d - 2π : d < -π ? d + 2π : d
 end
 
 """

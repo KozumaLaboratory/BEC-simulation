@@ -20,6 +20,7 @@ SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
 YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [weakdeps]
@@ -43,6 +44,7 @@ SpecialFunctions = "2.7.2"
 StaticArrays = "1"
 TimerOutputs = "0.5.29"
 Unitful = "1"
+WriteVTK = "1.21.2"
 YAML = "0.4"
 julia = "1.10"
 

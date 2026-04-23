@@ -13,6 +13,7 @@ using Dates
 using SHA
 using SpecialFunctions: erfcx
 using Sockets
+using WriteVTK
 
 const TIMER = TimerOutput()
 
@@ -21,6 +22,7 @@ const TIMER = TimerOutput()
 # ========================================
 
 # 1. Type definitions (must be first)
+include("foundation/waveform.jl")
 include("foundation/types.jl")
 
 # 2. Mathematical foundation
@@ -79,6 +81,7 @@ include("workflow/initialization/vacuum_noise.jl")
 include("workflow/io/io.jl")
 include("workflow/io/unitful_support.jl")
 include("workflow/io/dashboard.jl")
+include("workflow/io/vtk_export.jl")
 include("workflow/io/scan_summary.jl")
 
 # 9. Monitoring system (needed by solvers)
@@ -100,6 +103,7 @@ include("workflow/experiments/helpers_builders.jl")
 include("workflow/experiments/pipeline_types.jl")
 include("workflow/experiments/pipeline_analyzers.jl")
 include("workflow/experiments/pipeline_runner.jl")
+include("workflow/experiments/pulse_sequence.jl")
 include("workflow/experiments/pipeline_api.jl")
 include("workflow/experiments/pipeline_continuation.jl")
 include("workflow/experiments/run_registry.jl")
@@ -146,9 +150,13 @@ export GridConfig, Grid, SpinSystem, SpinMatrices
 export AtomSpecies, InteractionParams, ZeemanParams, LossParams, AbsorbingBoundary, LightShift, TensorInteractionCache
 export SimParams,
     SimState, FFTPlans, RFFTPlans, Workspace, AdaptiveDtParams, IntegratorConfig
-export TWAConfig, EnsembleResult
+export SimulationResult, TWAConfig, EnsembleResult
 export TOFParams, BdGResult, InstabilityMap, HysteresisResult, RotonParams, SupersolidPrediction
 export HarmonicTrap, NoPotential, GravityPotential, CompositePotential
+export RingPotential, BoxPotential, OpticalLatticePotential, DoubleWellPotential, QuarticPotential
+export LaguerreGaussBeam, PlugBeam, ShakenLatticePotential
+export MagneticGradient, TimeDependentMagneticGradient
+export TimeDependentTrap, TimeDependentInteractions, interactions_at
 export AbstractBackend, CPUBackend, CUDABackend
 export AbstractLHY, ScalarLHY, Quasi2DLHY, SpinorLHYTable
 
@@ -242,8 +250,16 @@ export apply_loss_step!
 # Absorbing boundary
 export AbsorbingBoundary, compute_absorbing_mask, apply_absorbing_boundary!
 
+# Waveform
+export AbstractWaveform, Waveform
+export ConstantWaveform, RampWaveform, PiecewiseLinearWaveform, FunctionWaveform
+export SinusoidalWaveform, GaussianPulseWaveform, InterpolatedWaveform, CompositeWaveform
+export StepWaveform
+export evaluate, load_waveform_csv
+
 # Raman coupling
-export RamanCoupling, apply_raman_step!
+export RamanCoupling, TimeDependentRaman, apply_raman_step!, raman_at
+export apply_uniform_spin_rotation!
 
 # Split-step
 export split_step!, prepare_kinetic_phase
@@ -294,6 +310,7 @@ export SimulationCallbacks, LiveMonitor
 
 # I/O
 export save_state, load_state, generate_dashboard_data, export_dashboard, serve_dashboard
+export export_vtk, export_vtk_series
 
 # Pipeline API
 export parse_pipeline, run_pipeline, PipelineConfig

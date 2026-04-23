@@ -835,31 +835,10 @@ function _rebuild_workspace_with_dt(ws::Workspace{N}, new_dt::Float64) where {N}
     )
     batched_kinetic = _make_batched_kinetic_cache(ws.state.psi, kinetic_phase, N, ws.backend)
 
-    Workspace(
-        ws.state,
-        ws.fft_plans,
-        kinetic_phase,
-        ws.potential_values,
-        ws.density_buf,
-        ws.spin_matrices,
-        ws.grid,
-        ws.atom,
-        ws.interactions,
-        ws.zeeman,
-        ws.potential,
-        sp,
-        ws.ddi,
-        ws.ddi_bufs,
-        ws.raman,
-        ws.loss,
-        ws.ddi_padded,
-        batched_kinetic,
-        ws.tensor_cache,
-        ws.coriolis_cache,
-        ws.backend,
-        ws.lhy,
-        ws.absorbing_mask,
-        ws.light_shift,
+    _rebuild_workspace(ws;
+        sim_params=sp,
+        kinetic_phase=kinetic_phase,
+        batched_kinetic=batched_kinetic,
     )
 end
 

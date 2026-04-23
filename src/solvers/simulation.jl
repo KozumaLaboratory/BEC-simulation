@@ -24,17 +24,18 @@ callbacks = SimulationCallbacks(
 result = run_simulation!(ws, callbacks=callbacks)
 ```
 """
-struct SimulationCallbacks
-    on_step::Union{Nothing,Function}
-    on_snapshot::Union{Nothing,Function}
-    on_complete::Union{Nothing,Function}
+struct SimulationCallbacks{F1,F2,F3}
+    on_step::F1
+    on_snapshot::F2
+    on_complete::F3
 end
 
 SimulationCallbacks(;
     on_step = nothing,
     on_snapshot = nothing,
     on_complete = nothing,
-) = SimulationCallbacks(on_step, on_snapshot, on_complete)
+) = SimulationCallbacks{typeof(on_step),typeof(on_snapshot),typeof(on_complete)}(
+    on_step, on_snapshot, on_complete)
 
 # Backward compatibility: convert simple function to callbacks
 _normalize_callbacks(::Nothing) = SimulationCallbacks()
@@ -355,32 +356,7 @@ function run_simulation_checkpointed!(
         sp_orig.save_every,
     )
 
-    ws_remain = Workspace(
-        ws.state,
-        ws.fft_plans,
-        ws.kinetic_phase,
-        ws.potential_values,
-        ws.density_buf,
-        ws.spin_matrices,
-        ws.grid,
-        ws.atom,
-        ws.interactions,
-        ws.zeeman,
-        ws.potential,
-        sp_remain,
-        ws.ddi,
-        ws.ddi_bufs,
-        ws.raman,
-        ws.loss,
-        ws.ddi_padded,
-        ws.batched_kinetic,
-        ws.tensor_cache,
-        ws.coriolis_cache,
-        ws.backend,
-        ws.lhy,
-        ws.absorbing_mask,
-        ws.light_shift,
-    )
+    ws_remain = _rebuild_workspace(ws; sim_params=sp_remain)
 
     result = run_simulation!(ws_remain; callbacks = checkpoint_callbacks)
 

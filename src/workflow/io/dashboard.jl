@@ -368,9 +368,44 @@ function _route_dashboard(path, html_content, data_cache, psi_cache, base_dir)
         end
         (200, "application/octet-stream", bin)
 
+    elseif startswith(path, "/api/vector3d_bin/")
+        rest = _uri_decode(path[18:end])
+        slash_idx = findfirst('/', rest)
+        if slash_idx === nothing
+            return (400, "text/plain", "Expected /api/vector3d_bin/:run/:file?field=current&stride=2")
+        end
+        name = rest[1:slash_idx-1]
+        file = rest[slash_idx+1:end]
+        vec_field = :current
+        vec_stride = 2
+        qidx = findfirst('?', file)
+        if qidx !== nothing
+            query = file[qidx+1:end]
+            file = file[1:qidx-1]
+            m = match(r"field=(\w+)", query)
+            m !== nothing && (vec_field = Symbol(m.captures[1]))
+            m2 = match(r"stride=(\d+)", query)
+            m2 !== nothing && (vec_stride = parse(Int, m2.captures[1]))
+        end
+        fpath = joinpath(base_dir, name, file)
+        if !isfile(fpath)
+            return (404, "text/plain", "File not found: $name/$file")
+        end
+        bin = try
+            psi, n_comp, ndim, n_pts, F = _load_psi_cached(fpath, psi_cache)
+            ndim == 3 || throw(ArgumentError("vector3d requires 3D data"))
+            box_size = _load_box_size(fpath)
+            _compute_vector3d_binary(psi, n_comp, ndim, n_pts, F, box_size;
+                field = vec_field, stride = vec_stride)
+        catch e
+            return (500, "text/plain", "Error: $(e)")
+        end
+        (200, "application/octet-stream", bin)
+
     elseif path == "/api/refresh"
         empty!(data_cache)
         empty!(psi_cache)
+        empty!(_vector3d_plans_cache)
         (200, "text/plain", "Cache cleared")
     else
         (404, "text/plain", "Not found")
@@ -746,6 +781,60 @@ function _compute_coherence_matrix_binary(psi, n_comp, ndim, n_pts, F, axis::Int
                 write(buf, Float32(real(val)), Float32(imag(val)))
             end
         end
+    end
+
+    take!(buf)
+end
+
+# --- Vector field (current / spin_density / velocity) binary API ---
+
+const _vector3d_plans_cache = Dict{NTuple{3,Int},Tuple{FFTPlans,Grid{3}}}()
+
+function _load_box_size(jld2_path::String)
+    d = JLD2.load(jld2_path, "grid_box_size")
+    NTuple{3,Float64}(d)
+end
+
+function _get_plans_and_grid(n_pts::NTuple{3,Int}, box_size::NTuple{3,Float64})
+    get!(_vector3d_plans_cache, n_pts) do
+        grid = make_grid(GridConfig(n_pts, box_size))
+        plans = make_fft_plans(n_pts; flags = FFTW.ESTIMATE)
+        (plans, grid)
+    end
+end
+
+function _compute_vector3d_binary(psi, n_comp, ndim, n_pts, F, box_size;
+    field::Symbol = :current, stride::Int = 2)
+
+    stride = max(1, stride)
+    sub_idx = ntuple(d -> 1:stride:n_pts[d], 3)
+    n_sub = ntuple(d -> length(sub_idx[d]), 3)
+
+    if field === :spin_density
+        sm = spin_matrices(F)
+        vx, vy, vz = spin_density_vector(psi, sm, 3)
+    else
+        plans, grid = _get_plans_and_grid(n_pts, box_size)
+        if field === :current
+            vx, vy, vz = probability_current(psi, grid, plans)
+        elseif field === :velocity
+            vx, vy, vz = superfluid_velocity(psi, grid, plans)
+        else
+            throw(ArgumentError("Unknown vector field: $field"))
+        end
+    end
+
+    N_sub = prod(n_sub)
+    buf = IOBuffer(; sizehint = 28 + 4 * 4 * N_sub)
+    write(buf, Int32(n_sub[1]), Int32(n_sub[2]), Int32(n_sub[3]))
+    write(buf, Int32(stride), Int32(0), Int32(0), Int32(0))
+
+    for iz in sub_idx[3], iy in sub_idx[2], ix in sub_idx[1]
+        ux = Float32(vx[ix, iy, iz])
+        uy = Float32(vy[ix, iy, iz])
+        uz = Float32(vz[ix, iy, iz])
+        mag = sqrt(ux^2 + uy^2 + uz^2)
+        write(buf, ux, uy, uz, mag)
     end
 
     take!(buf)

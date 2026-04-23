@@ -119,6 +119,197 @@ function init_psi(
                 psi[I, c] = rotated[c]
             end
         end
+    elseif state == :cyclic
+        # Cyclic state: equal amplitude, phases 0, 2π/3, 4π/3
+        # For F=1: ψ = (1, 0, 1)/√2 (up to normalization)
+        # General F: distribute among m = F, 0, -F with cyclic phases
+        c_top = 1
+        c_mid = (D + 1) ÷ 2
+        c_bot = D
+        inv_sqrt3 = 1.0 / sqrt(3.0)
+        for I in CartesianIndices(n_pts)
+            psi[I, c_top] = gauss[I] * inv_sqrt3
+            psi[I, c_mid] = gauss[I] * inv_sqrt3 * cis(2π / 3)
+            psi[I, c_bot] = gauss[I] * inv_sqrt3 * cis(4π / 3)
+        end
+    elseif state == :biaxial_nematic
+        # Biaxial nematic: (|+2⟩ + |−2⟩)/√2 for F≥2, (|+1⟩ + |−1⟩)/√2 for F=1
+        delta = min(2, F)
+        c_p = F - delta + 1
+        c_m = F + delta + 1
+        inv_sqrt2 = 1.0 / sqrt(2.0)
+        for I in CartesianIndices(n_pts)
+            psi[I, c_p] = gauss[I] * inv_sqrt2
+            psi[I, c_m] = gauss[I] * inv_sqrt2
+        end
+    elseif state == :polar_core_vortex
+        # Polar-core vortex (PCV): core is polar (m=0), outer is vortex in m=±F
+        N >= 2 || throw(ArgumentError(":polar_core_vortex requires N >= 2"))
+        c_mid = (D + 1) ÷ 2
+        r_core = min(grid.config.box_size...) / 8
+        charge = init_vortex_charge_i == 0 ? 1 : init_vortex_charge_i
+        for I in CartesianIndices(n_pts)
+            x = grid.x[1][I[1]]
+            y = grid.x[2][I[2]]
+            r = sqrt(x^2 + y^2)
+            phi = atan(y, x)
+            f_core = exp(-r^2 / (2 * r_core^2))
+            f_outer = sqrt(max(0.0, 1.0 - f_core^2))
+            psi[I, c_mid] = gauss[I] * f_core
+            psi[I, 1] = gauss[I] * f_outer * cis(charge * phi) / sqrt(2.0)
+            psi[I, D] = gauss[I] * f_outer * cis(-charge * phi) / sqrt(2.0)
+        end
+    elseif state == :soliton_bright
+        # Bright soliton in 1D: sech profile
+        c_mid = (D + 1) ÷ 2
+        w = grid.config.box_size[1] / 10
+        for I in CartesianIndices(n_pts)
+            x = grid.x[1][I[1]]
+            psi[I, c_mid] = complex(1.0 / cosh(x / w))
+        end
+    elseif state == :soliton_dark
+        # Dark soliton in 1D: tanh profile
+        c_mid = (D + 1) ÷ 2
+        w = grid.config.box_size[1] / 20
+        for I in CartesianIndices(n_pts)
+            x = grid.x[1][I[1]]
+            psi[I, c_mid] = gauss[I] * tanh(x / w)
+        end
+    elseif state == :skyrmion
+        # Baby skyrmion texture in 2D
+        N >= 2 || throw(ArgumentError(":skyrmion requires N >= 2"))
+        D >= 3 || throw(ArgumentError(":skyrmion requires F >= 1"))
+        sm = spin_matrices(F)
+        R = min(grid.config.box_size...) / 4
+        for I in CartesianIndices(n_pts)
+            x = grid.x[1][I[1]]
+            y = grid.x[2][I[2]]
+            r = sqrt(x^2 + y^2)
+            phi = atan(y, x)
+            theta = π * (1.0 - r / R)
+            theta = clamp(theta, 0.0, π)
+            U_y = exp(-1im * theta * Matrix(sm.Fy))
+            c_base = U_y[:, 1]
+            for c in 1:D
+                m = F - (c - 1)
+                psi[I, c] = gauss[I] * c_base[c] * cis(-m * phi)
+            end
+        end
+    elseif state == :gaussian_wavepacket
+        # Gaussian wavepacket with momentum kick along dim 1
+        c_mid = (D + 1) ÷ 2
+        k0 = init_theta_f  # reuse init_theta as momentum
+        for I in CartesianIndices(n_pts)
+            x = grid.x[1][I[1]]
+            psi[I, c_mid] = gauss[I] * cis(k0 * x)
+        end
+    elseif state == :domain_wall
+        # Domain wall: m=+F for x<0, m=-F for x>0, smooth transition
+        w = grid.config.box_size[1] / 20
+        for I in CartesianIndices(n_pts)
+            x = grid.x[1][I[1]]
+            f_left = 0.5 * (1.0 - tanh(x / w))
+            f_right = 0.5 * (1.0 + tanh(x / w))
+            psi[I, 1] = gauss[I] * sqrt(f_left)
+            psi[I, D] = gauss[I] * sqrt(f_right)
+        end
+    elseif state == :two_packet
+        # Two counter-propagating wavepackets for collision studies
+        c_mid = (D + 1) ÷ 2
+        sep = grid.config.box_size[1] / 4
+        w = grid.config.box_size[1] / 12
+        k0 = init_theta_f == 0.0 ? 2π / grid.config.box_size[1] * 3 : init_theta_f
+        for I in CartesianIndices(n_pts)
+            x = grid.x[1][I[1]]
+            g1 = exp(-(x + sep)^2 / (2 * w^2))
+            g2 = exp(-(x - sep)^2 / (2 * w^2))
+            psi[I, c_mid] = (g1 * cis(k0 * x) + g2 * cis(-k0 * x))
+        end
+    elseif state == :chiral_spin_vortex
+        # Chiral spin vortex: spin texture winds chirally in the xy-plane
+        # Core: m=0 (polar), outer: spin rotates with winding + helicity
+        N >= 2 || throw(ArgumentError(":chiral_spin_vortex requires N >= 2"))
+        sm = spin_matrices(F)
+        R = min(grid.config.box_size...) / 4
+        charge = init_vortex_charge_i == 0 ? 1 : init_vortex_charge_i
+        for I in CartesianIndices(n_pts)
+            x = grid.x[1][I[1]]
+            y = grid.x[2][I[2]]
+            r = sqrt(x^2 + y^2)
+            phi = atan(y, x)
+            theta = (π / 2) * min(r / R, 1.0)
+            chi = charge * phi + init_phi_f
+            U_y = exp(-1im * theta * Matrix(sm.Fy))
+            c_base = U_y[:, 1]
+            for c in 1:D
+                m = F - (c - 1)
+                psi[I, c] = gauss[I] * c_base[c] * cis(-m * chi)
+            end
+        end
+    elseif state == :magnetic_domain
+        # 2D magnetic domain pattern: stripe (default), square, or hexagonal
+        # init_vortex_charge selects pattern: 0/1=stripe, 2=square, 3=hexagonal
+        k0 = init_theta_f == 0.0 ? 2π / (grid.config.box_size[1] / 4) : init_theta_f
+        pattern = init_vortex_charge_i
+        for I in CartesianIndices(n_pts)
+            x = grid.x[1][I[1]]
+            mod_val = if pattern <= 1
+                sin(k0 * x)
+            elseif pattern == 2 && N >= 2
+                y = grid.x[2][I[2]]
+                sin(k0 * x) * sin(k0 * y)
+            elseif pattern == 3 && N >= 2
+                y = grid.x[2][I[2]]
+                cos(k0 * x) + cos(k0 * (-0.5 * x + sqrt(3) / 2 * y)) +
+                    cos(k0 * (-0.5 * x - sqrt(3) / 2 * y))
+            else
+                sin(k0 * x)
+            end
+            f_up = 0.5 * (1.0 + tanh(5.0 * mod_val))
+            f_dn = 1.0 - f_up
+            psi[I, 1] = gauss[I] * sqrt(f_up)
+            psi[I, D] = gauss[I] * sqrt(f_dn)
+        end
+    elseif state == :vortex_lattice
+        # Vortex lattice: array of phase vortices in m=+F component
+        N >= 2 || throw(ArgumentError(":vortex_lattice requires N >= 2"))
+        n_v = init_vortex_charge_i == 0 ? 4 : abs(init_vortex_charge_i)
+        spacing = grid.config.box_size[1] / (n_v + 1)
+        for I in CartesianIndices(n_pts)
+            x = grid.x[1][I[1]]
+            y = grid.x[2][I[2]]
+            phase_acc = 0.0
+            for ix in 1:n_v, iy in 1:n_v
+                xv = -grid.config.box_size[1] / 2 + ix * spacing
+                yv = -grid.config.box_size[2] / 2 + iy * spacing
+                phase_acc += atan(y - yv, x - xv)
+            end
+            psi[I, 1] = gauss[I] * cis(phase_acc)
+        end
+    elseif state == :skyrmion_lattice
+        # Skyrmion lattice: periodic array of skyrmions via triple-Q ansatz
+        N >= 2 || throw(ArgumentError(":skyrmion_lattice requires N >= 2"))
+        D >= 3 || throw(ArgumentError(":skyrmion_lattice requires F >= 1"))
+        sm = spin_matrices(F)
+        q0 = init_theta_f == 0.0 ? 2π / (grid.config.box_size[1] / 3) : init_theta_f
+        q_vecs = [(q0, 0.0), (q0 * (-0.5), q0 * sqrt(3) / 2), (q0 * (-0.5), q0 * (-sqrt(3) / 2))]
+        for I in CartesianIndices(n_pts)
+            x = grid.x[1][I[1]]
+            y = grid.x[2][I[2]]
+            mx = sum(cos(qx * x + qy * y) for (qx, qy) in q_vecs)
+            my = sum(sin(qx * x + qy * y) for (qx, qy) in q_vecs)
+            mz = 1.5
+            m_norm = sqrt(mx^2 + my^2 + mz^2)
+            mx /= m_norm; my /= m_norm; mz /= m_norm
+            theta = acos(clamp(mz, -1.0, 1.0))
+            phi = atan(my, mx)
+            U_y = exp(-1im * theta * Matrix(sm.Fy))
+            c_base = U_y[:, 1]
+            for c in 1:D
+                m = F - (c - 1)
+                psi[I, c] = gauss[I] * c_base[c] * cis(-m * phi)
+            end
+        end
     else
         throw(ArgumentError("Unknown initial state: $state"))
     end
@@ -177,7 +368,7 @@ function make_workspace(;
     enable_ddi::Bool = false,
     c_dd::Float64 = NaN,
     secular_ddi::Bool = false,
-    raman::Union{Nothing,RamanCoupling{N}} = nothing,
+    raman::Union{Nothing,RamanCoupling{N},TimeDependentRaman{N}} = nothing,
     loss::Union{Nothing,LossParams} = nothing,
     fft_flags = FFTW.MEASURE,
     ddi_padding::Bool = false,
@@ -189,6 +380,8 @@ function make_workspace(;
     spinor_lhy::Union{Nothing,Symbol} = nothing,
     absorbing_boundary::Union{Nothing,AbsorbingBoundary} = nothing,
     light_shift::Union{Nothing,LightShift} = nothing,
+    time_dep_interactions::Union{Nothing,TimeDependentInteractions} = nothing,
+    magnetic_gradient::Union{Nothing,MagneticGradient,TimeDependentMagneticGradient} = nothing,
 ) where {N}
     if quasi_2d
         N == 2 || throw(ArgumentError("quasi_2d requires 2D grid, got $(N)D"))
@@ -398,13 +591,30 @@ function make_workspace(;
         lhy,
         abs_mask,
         light_shift,
+        time_dep_interactions,
+        magnetic_gradient,
     )
+end
+
+"""
+    _rebuild_workspace(ws; field=value, ...)
+
+Create a new Workspace by copying all fields from `ws`, overriding specified fields.
+Avoids fragile positional constructor calls when Workspace gains new fields.
+"""
+function _rebuild_workspace(ws::Workspace; kwargs...)
+    names = fieldnames(Workspace)
+    override = Dict{Symbol,Any}(kwargs)
+    args = [haskey(override, n) ? override[n] : getfield(ws, n) for n in names]
+    Workspace(args...)
 end
 
 _shift_zeeman_for_rotating_frame(z::ZeemanParams, omega::Float64) =
     ZeemanParams(z.p - omega, z.q)
 _shift_zeeman_for_rotating_frame(z::TimeDependentZeeman, omega::Float64) =
-    TimeDependentZeeman(t -> begin
-        zp = z.B_func(t)
-        ZeemanParams(zp.p - omega, zp.q)
-    end)
+    TimeDependentZeeman(
+        FunctionWaveform(t -> evaluate(z.p_wf, t) - omega),
+        z.q_wf,
+        z.bx_wf,
+        z.by_wf,
+    )

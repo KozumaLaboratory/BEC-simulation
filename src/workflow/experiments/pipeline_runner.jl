@@ -175,6 +175,12 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
         return (psi_out, grid, atom, ws_cached, step_result)
     end
     initial_state = Symbol(get(p, "initial_state", "polar"))
+    init_state_params = Dict{Symbol,Float64}()
+    if haskey(p, "init_state_params")
+        for (k, v) in p["init_state_params"]
+            init_state_params[Symbol(k)] = Float64(v)
+        end
+    end
     target_mz = _get_optional_float(p, "target_magnetization")
     if target_mz === nothing && psi_prev !== nothing && method === :lbfgs
         # Preserve the Mz constraint from the seed state
@@ -197,7 +203,7 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
         psi_init = _to_host(psi_init)
     end
     if psi_init === nothing && temp_ratio !== nothing
-        psi_base = init_psi(grid, SpinSystem(atom.F); state = initial_state)
+        psi_base = init_psi(grid, SpinSystem(atom.F); state = initial_state, pairs(init_state_params)...)
         psi_init = add_thermal_noise(psi_base, atom.F;
             T_over_Tc = temp_ratio, seed = Int(get(p, "noise_seed", 42)))
     end
@@ -250,7 +256,7 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
     gs = if method === :itp
         find_ground_state(;
             grid, atom, interactions, zeeman, potential,
-            dt, n_steps, tol, initial_state, psi_init,
+            dt, n_steps, tol, initial_state, init_state_params, psi_init,
             enable_ddi, c_dd = c_dd_val,
             secular_ddi = secular, quasi_2d_ddi = q2d, l_z_ddi = lz,
             target_magnetization = target_mz, backend, on_step,
@@ -274,7 +280,7 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
         else
             find_ground_state_lbfgs(;
                 grid, atom, interactions, zeeman, potential,
-                n_steps, tol, m_lbfgs, initial_state, psi_init,
+                n_steps, tol, m_lbfgs, initial_state, init_state_params, psi_init,
                 enable_ddi, c_dd = c_dd_val,
                 secular_ddi = secular, quasi_2d_ddi = q2d, l_z_ddi = lz,
                 target_magnetization = target_mz, backend,
@@ -381,6 +387,47 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
     ls_raw = get(p, "light_shift", nothing)
     light_shift = _parse_light_shift(ls_raw, F, nothing, backend)
 
+    raman = _build_raman(p, duration)
+
+    time_dep_interactions = let inter_raw = get(p, "interactions", nothing)
+        if inter_raw isa Dict
+            c0_spec = get(inter_raw, "c0", nothing)
+            c1_spec = get(inter_raw, "c1", nothing)
+            if (c0_spec isa Dict) || (c1_spec isa Dict)
+                c0_wf = _make_waveform(c0_spec !== nothing ? c0_spec : interactions.c0, duration)
+                c1_wf = _make_waveform(c1_spec !== nothing ? c1_spec : interactions.c1, duration)
+                TimeDependentInteractions(c0_wf, c1_wf)
+            else
+                nothing
+            end
+        else
+            nothing
+        end
+    end
+
+    magnetic_gradient = let mg_raw = get(p, "magnetic_gradient", nothing)
+        if mg_raw isa Dict
+            grad_spec = mg_raw["gradient"]
+            axis = Int(get(mg_raw, "axis", ndim))
+            g_F = Float64(get(mg_raw, "g_F", 1.0))
+            if grad_spec isa Dict
+                wf = _make_waveform(grad_spec, duration)
+                TimeDependentMagneticGradient{ndim}(wf, axis, g_F)
+            else
+                MagneticGradient{ndim}(Float64(grad_spec), axis, g_F)
+            end
+        else
+            nothing
+        end
+    end
+
+    # Pulse sequence: compile into TimeDep* overrides (type-narrowed to avoid
+    # inference blow-up when `run_pipeline` dispatches abstractly on PipelineStep)
+    zeeman, raman, time_dep_interactions = _apply_pulse_sequence(
+        get(p, "pulse_sequence", nothing), duration, interactions,
+        zeeman, raman, time_dep_interactions,
+    )
+
     ws = make_workspace(;
         grid, atom, interactions,
         zeeman, potential,
@@ -390,6 +437,9 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
         backend,
         absorbing_boundary,
         light_shift,
+        raman,
+        time_dep_interactions,
+        magnetic_gradient,
     )
 
     if temp_ratio !== nothing

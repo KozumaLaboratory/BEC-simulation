@@ -18,4 +18,5 @@ function zeeman_diagonal(z::ZeemanParams, sm::SpinMatrices{D}) where {D}
 end
 
 zeeman_at(z::ZeemanParams, ::Float64) = z
-zeeman_at(z::TimeDependentZeeman, t::Float64) = z.B_func(t)
+zeeman_at(z::TimeDependentZeeman, t::Float64) =
+    ZeemanParams(evaluate(z.p_wf, t), evaluate(z.q_wf, t))

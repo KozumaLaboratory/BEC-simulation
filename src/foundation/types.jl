@@ -204,9 +204,21 @@ end
 
 ZeemanParams() = ZeemanParams(0.0, 0.0)
 
-struct TimeDependentZeeman{T<:Function}
-    B_func::T  # t -> ZeemanParams
+struct TimeDependentZeeman
+    p_wf::Waveform
+    q_wf::Waveform
+    bx_wf::Union{Nothing,Waveform}
+    by_wf::Union{Nothing,Waveform}
 end
+
+TimeDependentZeeman(p_wf::Waveform, q_wf::Waveform) =
+    TimeDependentZeeman(p_wf, q_wf, nothing, nothing)
+
+TimeDependentZeeman(f::Function) = TimeDependentZeeman(
+    FunctionWaveform(t -> f(t).p),
+    FunctionWaveform(t -> f(t).q),
+    nothing, nothing,
+)
 
 # --- Raman Coupling ---
 
@@ -214,6 +226,12 @@ struct RamanCoupling{N}
     Omega_R::Float64          # Rabi frequency
     delta::Float64            # two-photon detuning
     k_eff::NTuple{N,Float64}  # effective wave vector (difference of two beams)
+end
+
+struct TimeDependentRaman{N}
+    omega_wf::Waveform
+    delta_wf::Waveform
+    k_eff::NTuple{N,Float64}
 end
 
 # --- Potential ---
@@ -246,6 +264,49 @@ struct CompositePotential{N} <: AbstractPotential
     components::Vector{AbstractPotential}
 end
 
+struct RingPotential{N} <: AbstractPotential
+    radius::Float64
+    strength::Float64
+    width::Float64
+end
+
+RingPotential(; radius=5.0, strength=50.0, width=1.0, ndim::Int=2) =
+    RingPotential{ndim}(radius, strength, width)
+
+struct BoxPotential{N} <: AbstractPotential
+    size::NTuple{N,Float64}
+    wall_strength::Float64
+    wall_width::Float64
+end
+
+BoxPotential(size::NTuple{N,Float64}; wall_strength=1000.0, wall_width=0.5) where {N} =
+    BoxPotential{N}(size, wall_strength, wall_width)
+
+struct OpticalLatticePotential{N} <: AbstractPotential
+    depth::NTuple{N,Float64}
+    period::NTuple{N,Float64}
+    phase::NTuple{N,Float64}
+end
+
+OpticalLatticePotential(depth::NTuple{N,Float64}, period::NTuple{N,Float64};
+    phase::NTuple{N,Float64}=ntuple(_ -> 0.0, N)) where {N} =
+    OpticalLatticePotential{N}(depth, period, phase)
+
+struct DoubleWellPotential{N} <: AbstractPotential
+    separation::Float64
+    barrier::Float64
+    omega::NTuple{N,Float64}
+    axis::Int
+end
+
+DoubleWellPotential(; separation=4.0, barrier=10.0, omega=(1.0,), axis=1) =
+    DoubleWellPotential{length(omega)}(separation, barrier, omega, axis)
+
+struct QuarticPotential{N} <: AbstractPotential
+    omega::NTuple{N,Float64}
+    lambda::NTuple{N,Float64}
+end
+
 # --- LHY Abstraction ---
 
 abstract type AbstractLHY end
@@ -264,6 +325,81 @@ struct SpinorLHYTable <: AbstractLHY
     mode::Symbol
     densities::Vector{Float64}
     potential_values::Vector{Float64}
+end
+
+struct MagneticGradient{N} <: AbstractPotential
+    gradient::Float64
+    axis::Int
+    g_F::Float64
+
+    function MagneticGradient{N}(gradient::Float64, axis::Int, g_F::Float64) where {N}
+        1 <= axis <= N || throw(ArgumentError("axis must be between 1 and $N"))
+        new{N}(gradient, axis, g_F)
+    end
+end
+
+MagneticGradient(; gradient=0.1, axis=3, g_F=1.0, ndim::Int=3) =
+    MagneticGradient{ndim}(gradient, axis, g_F)
+
+struct TimeDependentMagneticGradient{N}
+    gradient_wf::Waveform
+    axis::Int
+    g_F::Float64
+
+    function TimeDependentMagneticGradient{N}(gradient_wf::Waveform, axis::Int, g_F::Float64) where {N}
+        1 <= axis <= N || throw(ArgumentError("axis must be between 1 and $N"))
+        new{N}(gradient_wf, axis, g_F)
+    end
+end
+
+TimeDependentMagneticGradient(; gradient_wf::Waveform, axis::Int=3, g_F::Float64=1.0, ndim::Int=3) =
+    TimeDependentMagneticGradient{ndim}(gradient_wf, axis, g_F)
+
+struct LaguerreGaussBeam{N} <: AbstractPotential
+    power::Float64
+    waist::Float64
+    l_mode::Int
+    p_mode::Int
+    polarizability::Float64
+end
+
+LaguerreGaussBeam(; power=1.0, waist=10.0, l_mode=1, p_mode=0, polarizability=1.0, ndim::Int=2) =
+    LaguerreGaussBeam{ndim}(power, waist, l_mode, p_mode, polarizability)
+
+struct PlugBeam{N} <: AbstractPotential
+    strength::Float64
+    waist::Float64
+end
+
+PlugBeam(; strength=50.0, waist=2.0, ndim::Int=2) = PlugBeam{ndim}(strength, waist)
+
+struct ShakenLatticePotential{N} <: AbstractPotential
+    depth::NTuple{N,Float64}
+    period::NTuple{N,Float64}
+    shake_wf::NTuple{N,Waveform}
+end
+
+# --- Time-dependent extensions ---
+
+struct TimeDependentTrap{N} <: AbstractPotential
+    base::AbstractPotential
+    omega_wf::NTuple{N,Waveform}
+end
+
+struct TimeDependentInteractions
+    c0_wf::Waveform
+    c1_wf::Waveform
+end
+
+TimeDependentInteractions(; c0=0.0, c1=0.0) =
+    TimeDependentInteractions(ConstantWaveform(Float64(c0)), ConstantWaveform(Float64(c1)))
+
+function interactions_at(ip::InteractionParams, ::Float64)
+    ip
+end
+
+function interactions_at(td::TimeDependentInteractions, t::Float64)
+    InteractionParams(evaluate(td.c0_wf, t), evaluate(td.c1_wf, t))
 end
 
 # --- Simulation Parameters ---
@@ -669,7 +805,7 @@ end
 
 # --- Workspace ---
 
-struct Workspace{N,A,P,IP,SM<:SpinMatrices,ZEE,DDI,DDIB,RAM,LOSS,DDIP,BK,TC,CC,KPA<:AbstractArray,VPA<:AbstractArray,DBA<:AbstractArray,BACK<:AbstractBackend,LHY,ABM,LS}
+struct Workspace{N,A,P,IP,SM<:SpinMatrices,ZEE,DDI,DDIB,RAM,LOSS,DDIP,BK,TC,CC,KPA<:AbstractArray,VPA<:AbstractArray,DBA<:AbstractArray,BACK<:AbstractBackend,LHY,ABM,LS,TDI,MG}
     state::SimState{N,A}
     fft_plans::FFTPlans{P,IP}
     kinetic_phase::KPA
@@ -694,5 +830,7 @@ struct Workspace{N,A,P,IP,SM<:SpinMatrices,ZEE,DDI,DDIB,RAM,LOSS,DDIP,BK,TC,CC,K
     lhy::LHY
     absorbing_mask::ABM
     light_shift::LS
+    time_dep_interactions::TDI
+    magnetic_gradient::MG
 end
 
