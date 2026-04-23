@@ -1,0 +1,165 @@
+import { useState, useMemo } from 'react'
+import { useControls } from 'leva'
+import * as THREE from 'three'
+import { Card, CardContent } from '@/components/ui/card'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Button } from '@/components/ui/button'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import type { DashboardData } from '@/api'
+import { useDensityTexture } from '@/three/useDensityTexture'
+import { VolumeCanvas } from '@/three/VolumeCanvas'
+import type { VolumeParams } from '@/three/DensityVolume'
+
+interface Props {
+  run: string | null
+  data: DashboardData | null
+}
+
+export function View3D({ run, data }: Props) {
+  const points = data?.points ?? []
+  const [pointIdx, setPointIdx] = useState(0)
+  const [comp, setComp] = useState<number>(0) // 0 = total, 1..n = m-component
+
+  const currentPoint = points[Math.min(pointIdx, points.length - 1)] ?? null
+
+  const controls = useControls('Volume', {
+    isoMin: { value: 0.05, min: 0, max: 1, step: 0.01 },
+    isoMax: { value: 0.8, min: 0, max: 1, step: 0.01 },
+    stepCount: { value: 128, min: 16, max: 512, step: 8 },
+    opacity: { value: 0.6, min: 0, max: 1.5, step: 0.02 },
+    colorLow: '#3d2d7a',
+    colorHigh: '#fde725',
+  })
+
+  const params = useMemo<VolumeParams>(
+    () => ({
+      isoMin: controls.isoMin,
+      isoMax: controls.isoMax,
+      stepCount: Math.round(controls.stepCount),
+      opacity: controls.opacity,
+      colorA: new THREE.Color(controls.colorLow),
+      colorB: new THREE.Color(controls.colorHigh),
+    }),
+    [controls],
+  )
+
+  const { data: density, loading, error } = useDensityTexture(
+    run,
+    currentPoint?.file ?? null,
+    comp,
+  )
+
+  const componentOptions = useMemo(() => {
+    const opts = [{ value: '0', label: 'Total' }]
+    if (currentPoint?.m_values) {
+      currentPoint.m_values.forEach((m, i) => {
+        opts.push({ value: String(i + 1), label: `m=${m}` })
+      })
+    }
+    return opts
+  }, [currentPoint])
+
+  if (!run) {
+    return <Placeholder text="Select a run." />
+  }
+  if (points.length === 0) {
+    return <Placeholder text="No points in run." />
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-3 space-y-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex gap-1">
+            <Button
+              variant="outline"
+              size="icon-sm"
+              onClick={() => setPointIdx((i) => Math.max(0, i - 1))}
+              disabled={pointIdx <= 0}
+            >
+              <ChevronLeft />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              onClick={() => setPointIdx((i) => Math.min(points.length - 1, i + 1))}
+              disabled={pointIdx >= points.length - 1}
+            >
+              <ChevronRight />
+            </Button>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground">Point</span>
+            <Select
+              value={String(pointIdx)}
+              onValueChange={(v) => setPointIdx(Number(v))}
+            >
+              <SelectTrigger className="min-w-[220px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {points.map((p, i) => (
+                  <SelectItem key={i} value={String(i)}>
+                    #{i + 1} — {p.file} (Mz={p.mz_actual?.toFixed?.(2) ?? '—'})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground">Component</span>
+            <Select value={String(comp)} onValueChange={(v) => setComp(Number(v))}>
+              <SelectTrigger className="min-w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {componentOptions.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="ml-auto text-xs text-muted-foreground">
+            {loading && 'Loading density…'}
+            {density && !loading &&
+              `${density.meta.nx}×${density.meta.ny}×${density.meta.nz} · max=${density.maxValue.toExponential(2)}`}
+          </div>
+        </div>
+
+        {error && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            {error}
+          </div>
+        )}
+
+        <div className="h-[600px] rounded-md overflow-hidden bg-[#0a0e14] border border-border">
+          {density ? (
+            <VolumeCanvas density={density} params={params} />
+          ) : (
+            <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+              {loading ? 'Loading…' : 'No data.'}
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function Placeholder({ text }: { text: string }) {
+  return (
+    <Card>
+      <CardContent className="h-[600px] flex items-center justify-center text-muted-foreground">
+        {text}
+      </CardContent>
+    </Card>
+  )
+}

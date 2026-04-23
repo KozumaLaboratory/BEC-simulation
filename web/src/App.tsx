@@ -8,6 +8,7 @@ import {
   PopulationsChart,
   PopulationsHeatmap,
 } from '@/components/charts/PopulationsChart'
+import { View3D } from '@/components/View3D'
 
 export default function App() {
   const state = useRunData()
@@ -105,14 +106,7 @@ export default function App() {
         </TabsContent>
 
         <TabsContent value="view3d">
-          <Card>
-            <CardHeader>
-              <CardTitle>3D density (WebGPU)</CardTitle>
-            </CardHeader>
-            <CardContent className="h-[600px] flex items-center justify-center text-muted-foreground">
-              {selectedRun ? 'WebGPU canvas coming next commit.' : 'Select a run.'}
-            </CardContent>
-          </Card>
+          <View3D run={selectedRun} data={data} />
         </TabsContent>
 
         <TabsContent value="config">
