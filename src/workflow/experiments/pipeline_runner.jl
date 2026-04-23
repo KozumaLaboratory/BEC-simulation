@@ -140,7 +140,7 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
     dt = Float64(get(p, "dt", 0.001))
     duration = dt * n_steps
     zeeman = if haskey(p, "zeeman")
-        _parse_zeeman(p["zeeman"], duration)
+        _build_zeeman_dispatched(p["zeeman"], duration, atom, p)
     elseif ws_prev !== nothing
         ws_prev.zeeman
     else
@@ -356,7 +356,7 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
     end
 
     zeeman_wrapper = Dict{String,Any}("ground_state" => Dict{String,Any}("zeeman" => get(p, "zeeman", Dict())))
-    zeeman = _build_phase_zeeman(zeeman_wrapper, 0.0, duration)
+    zeeman = _build_phase_zeeman(zeeman_wrapper, 0.0, duration; atom, p_step = p)
 
     pot_d = get(p, "potential", nothing)
     potential = pot_d !== nothing ? _parse_and_build_potential(pot_d, ndim) : prev_potential

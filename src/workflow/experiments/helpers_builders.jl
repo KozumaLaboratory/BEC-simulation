@@ -135,12 +135,23 @@ end
 
 Build the per-phase Zeeman object from override-applied raw YAML dict.
 """
-function _build_phase_zeeman(phase_raw::Dict, t_offset::Float64, duration::Float64)
+function _build_phase_zeeman(phase_raw::Dict, t_offset::Float64, duration::Float64;
+                              atom = nothing, p_step::Dict = Dict{String,Any}())
     gs = get(phase_raw, "ground_state", Dict())
     z = get(gs, "zeeman", Dict())
+    z isa Dict || return ZeemanParams(0.0, 0.0)
+
+    # Level 1/2 dispatch if the zeeman dict uses Gauss-valued keys.
+    # Requires atom for g_F and an omega_ref from p_step.
+    level = _detect_zeeman_level(z)
+    if level >= 1
+        atom === nothing && throw(ArgumentError(
+            "zeeman Level $level requires atom; caller must pass atom kwarg"))
+        return _build_zeeman_dispatched(z, duration, atom, p_step)
+    end
+
     p_spec = get(z, "p", 0.0)
     q_spec = get(z, "q", 0.0)
-
     p_is_ramp = p_spec isa Dict
     q_is_ramp = q_spec isa Dict
     bx_spec = get(z, "bx", nothing)
@@ -155,13 +166,22 @@ function _build_phase_zeeman(phase_raw::Dict, t_offset::Float64, duration::Float
     q_wf = _make_waveform(q_spec, duration)
 
     if t_offset != 0.0
-        p_wf = FunctionWaveform(t -> evaluate(p_wf, t - t_offset))
-        q_wf = FunctionWaveform(t -> evaluate(q_wf, t - t_offset))
+        # Pre-sample shifted waveforms to avoid closure type leakage
+        # (see CLAUDE.md > Type stability boundaries).
+        p_wf = _shift_waveform(p_wf, t_offset, duration)
+        q_wf = _shift_waveform(q_wf, t_offset, duration)
     end
 
     bx_wf = bx_spec !== nothing ? _make_waveform(bx_spec, duration) : nothing
     by_wf = by_spec !== nothing ? _make_waveform(by_spec, duration) : nothing
     TimeDependentZeeman(p_wf, q_wf, bx_wf, by_wf)
+end
+
+"""Apply a time shift to a waveform by sampling into a PiecewiseLinearWaveform."""
+function _shift_waveform(wf::Waveform, t_offset::Float64, duration::Float64; n_samples::Int = 1024)
+    times = collect(range(0.0, duration; length = n_samples))
+    values = Float64[evaluate(wf, t - t_offset) for t in times]
+    PiecewiseLinearWaveform(times, values)
 end
 
 """
