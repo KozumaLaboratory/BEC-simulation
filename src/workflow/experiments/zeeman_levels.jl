@@ -8,7 +8,8 @@
 # keep everything concretely-typed; see CLAUDE.md > Type stability boundaries.
 
 const _GAUSS_TO_TESLA = 1.0e-4
-const _ZEEMAN_SAMPLE_N = 1024
+const _ZEEMAN_SAMPLE_N = 1024  # default — increase for stir experiments via
+                               # zeeman.n_samples YAML override
 
 """
     _detect_zeeman_level(z::Dict) -> Int  (0, 1, or 2)
@@ -100,7 +101,8 @@ points over [0, duration] and applying the Gauss→dimless factor. Accepts:
 Never returns a closure — keeps everything concretely typed (see CLAUDE.md:
 Type stability boundaries).
 """
-function _convert_B_waveform(B_spec, duration::Float64, g_F::Float64, omega_ref::Float64)
+function _convert_B_waveform(B_spec, duration::Float64, g_F::Float64, omega_ref::Float64;
+                              n_samples::Int = _ZEEMAN_SAMPLE_N)
     factor = g_F * Units.BOHR_MAGNETON * _GAUSS_TO_TESLA / (Units.HBAR * omega_ref)
     if B_spec isa AbstractString
         # "0.819 G" → parse Quantity → to Tesla → dimensionless p
@@ -110,9 +112,25 @@ function _convert_B_waveform(B_spec, duration::Float64, g_F::Float64, omega_ref:
         return ConstantWaveform(factor * Float64(B_spec))
     end
     B_wf = B_spec isa Waveform ? B_spec : _make_waveform(B_spec, duration)
-    times = collect(range(0.0, duration; length = _ZEEMAN_SAMPLE_N))
+    times = collect(range(0.0, duration; length = n_samples))
     values = Float64[factor * evaluate(B_wf, t) for t in times]
     PiecewiseLinearWaveform(times, values)
+end
+
+"""Estimate appropriate sample count for a Bz/Bx/By spec. For sinusoidal and
+chirped spec, return ≥ 20 samples per highest-frequency cycle. Returns the
+default floor otherwise."""
+function _suggest_sample_count(spec, duration::Float64)
+    spec isa Dict || return _ZEEMAN_SAMPLE_N
+    if haskey(spec, "sinusoidal")
+        f = Float64(get(spec["sinusoidal"], "frequency", 1.0))
+        f > 0 || return _ZEEMAN_SAMPLE_N
+        return max(_ZEEMAN_SAMPLE_N, ceil(Int, 20 * f * duration))
+    elseif haskey(spec, "chirped_sinusoidal")
+        f_end = Float64(get(spec["chirped_sinusoidal"], "freq_end", 1.0))
+        return max(_ZEEMAN_SAMPLE_N, ceil(Int, 20 * f_end * duration))
+    end
+    _ZEEMAN_SAMPLE_N
 end
 
 """Level 1: Bx, By, Bz → TimeDependentZeeman (always, even for scalar)."""
@@ -122,10 +140,15 @@ function _build_zeeman_level1(z::Dict, duration::Float64, atom, omega_ref::Float
     Bz = get(z, "Bz", 0.0)
     g_F = atom.g_F
     # p: longitudinal (Bz). q: 2nd-order Zeeman is user-override only.
-    p_wf = _convert_B_waveform(Bz, duration, g_F, omega_ref)
+    # Pick sample counts: enough to resolve the fastest oscillation in each axis.
+    n_override = Int(get(z, "n_samples", 0))
+    n_bx = n_override > 0 ? n_override : _suggest_sample_count(Bx, duration)
+    n_by = n_override > 0 ? n_override : _suggest_sample_count(By, duration)
+    n_bz = n_override > 0 ? n_override : _suggest_sample_count(Bz, duration)
+    p_wf = _convert_B_waveform(Bz, duration, g_F, omega_ref; n_samples = n_bz)
     q_wf = _make_waveform(get(z, "q", 0.0), duration)
-    bx_wf = _convert_B_waveform(Bx, duration, g_F, omega_ref)
-    by_wf = _convert_B_waveform(By, duration, g_F, omega_ref)
+    bx_wf = _convert_B_waveform(Bx, duration, g_F, omega_ref; n_samples = n_bx)
+    by_wf = _convert_B_waveform(By, duration, g_F, omega_ref; n_samples = n_by)
     TimeDependentZeeman(p_wf, q_wf, bx_wf, by_wf)
 end
 

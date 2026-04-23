@@ -45,6 +45,34 @@ end
 SinusoidalWaveform(; center=0.0, amplitude=1.0, frequency=1.0, phase=0.0) =
     SinusoidalWaveform(center, amplitude, frequency, phase)
 
+"""
+    ChirpedSinusoidalWaveform
+
+Sinusoidal oscillation with a **linearly varying instantaneous frequency**:
+f(t) = freq_start + (freq_end - freq_start) · t / duration.
+
+The evaluated signal is
+  value(t) = center + amplitude · sin(φ(t) + phase)
+where φ(t) = 2π · ∫₀ᵗ f(τ) dτ = 2π · (freq_start · t + (freq_end − freq_start) · t² / (2 · duration)).
+
+Use case: magnetostir spin-up phases where the stirring frequency ramps
+from 0 to its steady-state value over some time. Preserves phase continuity
+at the ramp boundaries (no discontinuous freq jumps).
+"""
+struct ChirpedSinusoidalWaveform <: Waveform
+    center::Float64
+    amplitude::Float64
+    freq_start::Float64
+    freq_end::Float64
+    duration::Float64
+    phase::Float64
+end
+
+ChirpedSinusoidalWaveform(; center=0.0, amplitude=1.0,
+                          freq_start=0.0, freq_end=1.0,
+                          duration=1.0, phase=0.0) =
+    ChirpedSinusoidalWaveform(center, amplitude, freq_start, freq_end, duration, phase)
+
 struct GaussianPulseWaveform <: Waveform
     center::Float64
     amplitude::Float64
@@ -102,6 +130,19 @@ evaluate(w::FunctionWaveform, t::Float64) = w.f(t)
 
 evaluate(w::SinusoidalWaveform, t::Float64) =
     w.center + w.amplitude * sin(2π * w.frequency * t + w.phase)
+
+function evaluate(w::ChirpedSinusoidalWaveform, t::Float64)
+    # Clamp t to [0, duration] so evaluations past the ramp use f_end freely:
+    # after t >= duration, effective f is f_end and phase continues linearly.
+    if t <= w.duration
+        φ = 2π * (w.freq_start * t + 0.5 * (w.freq_end - w.freq_start) * t^2 / w.duration)
+    else
+        # Integrate the ramp fully, then continue with f_end.
+        φ_ramp = 2π * (w.freq_start * w.duration + 0.5 * (w.freq_end - w.freq_start) * w.duration)
+        φ = φ_ramp + 2π * w.freq_end * (t - w.duration)
+    end
+    w.center + w.amplitude * sin(φ + w.phase)
+end
 
 evaluate(w::GaussianPulseWaveform, t::Float64) =
     w.center + w.amplitude * exp(-0.5 * ((t - w.t_center) / w.sigma)^2)

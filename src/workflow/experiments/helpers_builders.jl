@@ -105,6 +105,16 @@ function _make_waveform(spec, duration::Float64)
             frequency = Float64(get(s, "frequency", 1.0)),
             phase = Float64(get(s, "phase", 0.0)),
         )
+    elseif haskey(spec, "chirped_sinusoidal")
+        c = spec["chirped_sinusoidal"]
+        return ChirpedSinusoidalWaveform(;
+            center = Float64(get(c, "center", 0.0)),
+            amplitude = Float64(get(c, "amplitude", 1.0)),
+            freq_start = Float64(get(c, "freq_start", 0.0)),
+            freq_end = Float64(get(c, "freq_end", get(c, "freq_start", 0.0))),
+            duration = Float64(get(c, "duration", duration)),
+            phase = Float64(get(c, "phase", 0.0)),
+        )
     elseif haskey(spec, "gaussian_pulse")
         g = spec["gaussian_pulse"]
         return GaussianPulseWaveform(;

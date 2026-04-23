@@ -254,7 +254,7 @@ export AbsorbingBoundary, compute_absorbing_mask, apply_absorbing_boundary!
 # Waveform
 export AbstractWaveform, Waveform
 export ConstantWaveform, RampWaveform, PiecewiseLinearWaveform, FunctionWaveform
-export SinusoidalWaveform, GaussianPulseWaveform, InterpolatedWaveform, CompositeWaveform
+export SinusoidalWaveform, ChirpedSinusoidalWaveform, GaussianPulseWaveform, InterpolatedWaveform, CompositeWaveform
 export StepWaveform
 export evaluate, load_waveform_csv
 
