@@ -39,11 +39,18 @@ export function VolumeCanvas({ density, phase, params, vector, particles }: Prop
   return (
     <Canvas
       camera={{ position: [1.1, 1.1, 1.4], fov: 50, near: 0.05, far: 20 }}
+      dpr={1}
       gl={async (glProps) => {
+        // depth: false — we render a single transparent cube with
+        // depthWrite: false, so we don't need a depth attachment at all.
+        // Dropping it also avoids a known R3F + WebGPURenderer resize bug
+        // where the depth texture keeps its initial 300×150 size and every
+        // frame validation-fails.
         const renderer = new THREE_WEBGPU.WebGPURenderer({
           canvas: glProps.canvas as HTMLCanvasElement,
           antialias: true,
           alpha: true,
+          depth: false,
         })
         await renderer.init()
         return renderer
