@@ -374,6 +374,34 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         end
         (200, "application/octet-stream", bin)
 
+    elseif startswith(path, "/api/phase3d_bin/")
+        # /api/phase3d_bin/:run/:file?comp=N (N >= 1)
+        rest = _uri_decode(path[18:end])
+        slash_idx = findfirst('/', rest)
+        if slash_idx === nothing
+            return (400, "text/plain", "Expected /api/phase3d_bin/:run/:file?comp=N")
+        end
+        name = rest[1:slash_idx-1]
+        file = rest[slash_idx+1:end]
+        qidx = findfirst('?', file)
+        comp_idx = 1
+        if qidx !== nothing
+            query = file[qidx+1:end]
+            file = file[1:qidx-1]
+            m = match(r"comp=(-?\d+)", query)
+            m !== nothing && (comp_idx = parse(Int, m.captures[1]))
+        end
+        fpath = joinpath(base_dir, name, file)
+        if !isfile(fpath)
+            return (404, "text/plain", "File not found: $name/$file")
+        end
+        bin = try
+            _compute_3d_phase_binary(_load_psi_cached(fpath, psi_cache)...; component=comp_idx)
+        catch e
+            return (500, "text/plain", "Error: $(e)")
+        end
+        (200, "application/octet-stream", bin)
+
     elseif startswith(path, "/api/coherence/")
         rest = _uri_decode(path[16:end])
         slash_idx = findfirst('/', rest)
@@ -818,6 +846,35 @@ Compute a single 3D density component as binary Float32.
 function _compute_3d_density_binary(psi, n_comp, ndim, n_pts, F; component::Int = 0)
     ndim == 3 || throw(ArgumentError("3D density requires 3D data"))
     _pack_3d_binary(psi, n_comp, ndim, n_pts, F, component)
+end
+
+"""
+3D per-component phase arg(ψ_m) as Float32 volume. Matches density3d_bin's
+header layout so the frontend can reuse the same parser. Requires a
+specific component (`component >= 1`); the total spinor has no scalar phase.
+"""
+function _compute_3d_phase_binary(psi, n_comp, ndim, n_pts, F; component::Int = 0)
+    ndim == 3 || throw(ArgumentError("3D phase requires 3D data"))
+    component >= 1 || throw(ArgumentError("phase3d requires component >= 1 (per-m only)"))
+    c = clamp(component, 1, n_comp)
+
+    psi_c = view(psi, _component_slice(ndim, n_pts, c)...)
+    phase = zeros(Float32, n_pts...)
+    @inbounds for i in eachindex(psi_c)
+        phase[i] = Float32(angle(psi_c[i]))
+    end
+
+    pops = Float32[Float32(sum(abs2, view(psi, _component_slice(ndim, n_pts, m)...))) for m in 1:n_comp]
+    total_pop = sum(pops)
+    pops ./= max(total_pop, 1f-30)
+
+    N = prod(n_pts)
+    buf = IOBuffer(; sizehint = 24 + n_comp * 4 + N * 4)
+    write(buf, Int32(n_pts[1]), Int32(n_pts[2]), Int32(n_pts[3]))
+    write(buf, Int32(n_comp), Int32(F), Int32(c))
+    write(buf, pops)
+    write(buf, phase)
+    take!(buf)
 end
 
 """

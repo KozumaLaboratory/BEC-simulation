@@ -6,10 +6,12 @@ import { useMemo } from 'react'
 import { DensityVolume, type VolumeParams } from './DensityVolume'
 import { VectorField, type VectorFieldParams } from './VectorField'
 import type { DensityTexture } from './useDensityTexture'
+import type { PhaseTexture } from './usePhaseTexture'
 import type { VectorField3D } from '@/api'
 
 interface Props {
   density: DensityTexture
+  phase?: PhaseTexture
   params: VolumeParams
   vector?: {
     field: VectorField3D
@@ -20,7 +22,7 @@ interface Props {
 const webgpuSupported =
   typeof navigator !== 'undefined' && 'gpu' in navigator
 
-export function VolumeCanvas({ density, params, vector }: Props) {
+export function VolumeCanvas({ density, phase, params, vector }: Props) {
   if (!webgpuSupported) {
     return (
       <div className="h-full flex items-center justify-center text-sm text-destructive text-center px-6">
@@ -44,7 +46,7 @@ export function VolumeCanvas({ density, params, vector }: Props) {
     >
       <color attach="background" args={['#0a0e14']} />
       <ambientLight intensity={0.4} />
-      <DensityVolume density={density} params={params} />
+      <DensityVolume density={density} phase={phase} params={params} />
       {vector && (
         <VectorField
           field={vector.field}

@@ -37,6 +37,17 @@ export interface Density3D {
   density: Float32Array
 }
 
+export interface Phase3D {
+  nx: number
+  ny: number
+  nz: number
+  n_comp: number
+  F: number
+  component: number
+  populations: Float32Array
+  phase: Float32Array // radians, [-π, π]
+}
+
 export interface VectorField3D {
   nx: number
   ny: number
@@ -141,6 +152,25 @@ export const api = {
     return json(
       `/api/density/${encodeURIComponent(run)}/${encodeURIComponent(file)}?axis=${axis}`,
     )
+  },
+
+  async getPhase3d(run: string, file: string, component: number): Promise<Phase3D> {
+    if (component < 1) {
+      throw new Error('phase3d requires component >= 1 (per-m only)')
+    }
+    const buf = await bin(
+      `/api/phase3d_bin/${encodeURIComponent(run)}/${encodeURIComponent(file)}?comp=${component}`,
+    )
+    const header = new Int32Array(buf, 0, 6)
+    const nx = header[0],
+      ny = header[1],
+      nz = header[2]
+    const n_comp = header[3],
+      F = header[4],
+      comp = header[5]
+    const populations = new Float32Array(buf, 24, n_comp)
+    const phase = new Float32Array(buf, 24 + n_comp * 4, nx * ny * nz)
+    return { nx, ny, nz, n_comp, F, component: comp, populations, phase }
   },
 
   getPhaseSlice(

@@ -13,9 +13,10 @@ import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { DashboardData, VectorFieldKind } from '@/api'
 import { useDensityTexture } from '@/three/useDensityTexture'
+import { usePhaseTexture } from '@/three/usePhaseTexture'
 import { useVectorField } from '@/three/useVectorField'
 import { VolumeCanvas } from '@/three/VolumeCanvas'
-import type { VolumeParams } from '@/three/DensityVolume'
+import type { VolumeParams, ColorMode } from '@/three/DensityVolume'
 import type { VectorFieldParams } from '@/three/VectorField'
 
 interface Props {
@@ -35,8 +36,17 @@ export function View3D({ run, data }: Props) {
     isoMax: { value: 0.8, min: 0, max: 1, step: 0.01 },
     stepCount: { value: 128, min: 16, max: 512, step: 8 },
     opacity: { value: 0.6, min: 0, max: 1.5, step: 0.02 },
+    colorMode: {
+      value: 'density' as ColorMode,
+      options: {
+        'Density (iso color ramp)': 'density' as ColorMode,
+        'Phase arg(ψ_m) hue (needs m≥1)': 'phase' as ColorMode,
+      },
+      label: 'Color by',
+    },
     colorLow: '#3d2d7a',
     colorHigh: '#fde725',
+    phaseSaturation: { value: 1.0, min: 0, max: 1, step: 0.02 },
     tiltDeg: {
       value: 0,
       min: 0,
@@ -71,6 +81,8 @@ export function View3D({ run, data }: Props) {
       opacity: controls.opacity,
       colorA: new THREE.Color(controls.colorLow),
       colorB: new THREE.Color(controls.colorHigh),
+      colorMode: controls.colorMode,
+      phaseSaturation: controls.phaseSaturation,
     }),
     [controls],
   )
@@ -90,6 +102,14 @@ export function View3D({ run, data }: Props) {
     currentPoint?.file ?? null,
     comp,
     controls.tiltDeg,
+  )
+
+  const phaseEnabled = controls.colorMode === 'phase' && comp >= 1
+  const { data: phase, error: phaseError } = usePhaseTexture(
+    run,
+    currentPoint?.file ?? null,
+    comp,
+    phaseEnabled,
   )
 
   const { data: vectorData, error: vectorError } = useVectorField(
@@ -189,6 +209,7 @@ export function View3D({ run, data }: Props) {
           {density ? (
             <VolumeCanvas
               density={density}
+              phase={phase ?? undefined}
               params={params}
               vector={
                 vectorControls.show && vectorData
@@ -206,6 +227,19 @@ export function View3D({ run, data }: Props) {
         {vectorError && (
           <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             Vector field: {vectorError}
+          </div>
+        )}
+
+        {phaseError && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            Phase: {phaseError}
+          </div>
+        )}
+
+        {controls.colorMode === 'phase' && comp === 0 && (
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
+            Phase mode needs a specific m-component (not Total). Switch the
+            Component selector above.
           </div>
         )}
       </CardContent>

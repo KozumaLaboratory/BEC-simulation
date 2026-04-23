@@ -18,9 +18,13 @@ import {
   mix,
   smoothstep,
   clamp,
+  abs as tslAbs,
   Break,
 } from 'three/tsl'
 import type { DensityTexture } from './useDensityTexture'
+import type { PhaseTexture } from './usePhaseTexture'
+
+export type ColorMode = 'density' | 'phase'
 
 export interface VolumeParams {
   isoMin: number // fraction of max density [0,1]
@@ -29,16 +33,25 @@ export interface VolumeParams {
   opacity: number
   colorA: THREE.Color
   colorB: THREE.Color
+  colorMode: ColorMode
+  phaseSaturation: number // 0..1, only used when colorMode === 'phase'
 }
 
 interface Props {
   density: DensityTexture
+  phase?: PhaseTexture
   params: VolumeParams
 }
 
-export function DensityVolume({ density, params }: Props) {
+const PI = Math.PI
+const TWO_PI = 2 * Math.PI
+
+export function DensityVolume({ density, phase, params }: Props) {
   const tex = density.texture
+  const phaseTex = phase?.texture
   const maxValue = density.maxValue
+  const effectiveMode: ColorMode =
+    params.colorMode === 'phase' && phaseTex ? 'phase' : 'density'
 
   const uniforms = useMemo(
     () => ({
@@ -47,6 +60,7 @@ export function DensityVolume({ density, params }: Props) {
       opacity: uniform(params.opacity),
       colorA: uniform(new THREE.Color(params.colorA)),
       colorB: uniform(new THREE.Color(params.colorB)),
+      saturation: uniform(params.phaseSaturation),
     }),
     // Uniforms created once per mount; values live-updated below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -59,13 +73,26 @@ export function DensityVolume({ density, params }: Props) {
     uniforms.opacity.value = params.opacity
     uniforms.colorA.value.set(params.colorA)
     uniforms.colorB.value.set(params.colorB)
+    uniforms.saturation.value = params.phaseSaturation
   }, [params, maxValue, uniforms])
 
   const material = useMemo(() => {
     const mat = new THREE_WEBGPU.NodeMaterial()
     mat.transparent = true
-    mat.side = THREE.BackSide // inside-out raymarch from back faces
+    mat.side = THREE.BackSide
     mat.depthWrite = false
+
+    // Phase → RGB via a standard HSV(H, 1, 1)→RGB expansion.
+    // Input phase is in [-π, π]; we normalize to [0, 1] hue.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const phaseToRgb = (ph: any) => {
+      const h = ph.add(float(PI)).div(float(TWO_PI))
+      const hx6 = h.mul(6.0)
+      const r = clamp(tslAbs(hx6.sub(3.0)).sub(1.0), float(0.0), float(1.0))
+      const g = clamp(float(2.0).sub(tslAbs(hx6.sub(2.0))), float(0.0), float(1.0))
+      const b = clamp(float(2.0).sub(tslAbs(hx6.sub(4.0))), float(0.0), float(1.0))
+      return vec3(r, g, b)
+    }
 
     const raymarch = Fn(() => {
       // Map world-space [-0.5, 0.5] → local [0, 1].
@@ -96,7 +123,19 @@ export function DensityVolume({ density, params }: Props) {
           const p = clamp(camLocal.add(rayDir.mul(t)), vec3(0.0), vec3(1.0))
           const d = texture3D(tex, p).r
           const norm = smoothstep(uniforms.isoMin, uniforms.isoMax, d)
-          const col = mix(uniforms.colorA, uniforms.colorB, norm)
+
+          let col
+          if (effectiveMode === 'phase' && phaseTex) {
+            const ph = texture3D(phaseTex, p).r
+            const hsv = phaseToRgb(ph)
+            // Blend hue with a neutral greyscale by saturation. s=1 → pure
+            // hue, s=0 → density-based greyscale. Keeps both modes legible.
+            const grey = vec3(norm)
+            col = mix(grey, hsv, uniforms.saturation)
+          } else {
+            col = mix(uniforms.colorA, uniforms.colorB, norm)
+          }
+
           const stepAlpha = clamp(
             norm.mul(uniforms.opacity),
             float(0.0),
@@ -117,7 +156,7 @@ export function DensityVolume({ density, params }: Props) {
 
     mat.colorNode = raymarch()
     return mat
-  }, [tex, uniforms, params.stepCount])
+  }, [tex, phaseTex, uniforms, params.stepCount, effectiveMode])
 
   const meshRef = useRef<THREE.Mesh>(null!)
   return (
