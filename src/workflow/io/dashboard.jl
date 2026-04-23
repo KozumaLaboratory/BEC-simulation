@@ -294,6 +294,38 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         end
         (200, "application/json", json)
 
+    elseif startswith(path, "/api/phase/")
+        # /api/phase/:run/:file?axis=N&slice=K
+        rest = _uri_decode(path[12:end])
+        slash_idx = findfirst('/', rest)
+        if slash_idx === nothing
+            return (400, "text/plain", "Expected /api/phase/:run/:file?axis=N&slice=K")
+        end
+        name = rest[1:slash_idx-1]
+        file = rest[slash_idx+1:end]
+        axis = 3
+        slice_idx = nothing
+        qidx = findfirst('?', file)
+        if qidx !== nothing
+            query = file[qidx+1:end]
+            file = file[1:qidx-1]
+            m = match(r"axis=(\d+)", query)
+            m !== nothing && (axis = parse(Int, m.captures[1]))
+            ms = match(r"slice=(\d+)", query)
+            ms !== nothing && (slice_idx = parse(Int, ms.captures[1]))
+        end
+        fpath = joinpath(base_dir, name, file)
+        if !isfile(fpath)
+            return (404, "text/plain", "File not found: $name/$file")
+        end
+        json = try
+            cached = _load_psi_cached(fpath, psi_cache)
+            _json_string(_compute_phase_slice_from_cache(cached..., axis, slice_idx, fpath))
+        catch e
+            "{\"error\":\"$(replace(string(e), "\"" => "'"))\"}"
+        end
+        (200, "application/json", json)
+
     elseif startswith(path, "/api/density3d/")
         rest = _uri_decode(path[16:end])
         slash_idx = findfirst('/', rest)
@@ -712,6 +744,56 @@ function _compute_column_densities_from_cache(psi, n_comp, ndim, n_pts, F, axis:
         "total_density" => total, "ndim" => ndim,
         "shape" => collect(out_shape), "axis" => axis,
         "axis_labels" => ax_labels, "axis_ranges" => ax_ranges, "box" => box,
+    )
+end
+
+"""
+Per-component phase arg(ψ_m) at a single plane (index `slice_idx` along `axis`).
+3D only. Also returns per-component |ψ_m|² at the same plane so the frontend
+can mask phase at low density where the angle is ill-defined.
+"""
+function _compute_phase_slice_from_cache(
+    psi, n_comp, ndim, n_pts, F,
+    axis::Int, slice_idx::Union{Nothing,Int},
+    jld2_path::String,
+)
+    ndim == 3 || throw(ArgumentError("Phase slice requires 3D data, got $(ndim)D"))
+    m_values = [F - (c - 1) for c in 1:n_comp]
+    axis = clamp(axis, 1, ndim)
+    k = slice_idx === nothing ? max(1, n_pts[axis] ÷ 2) : clamp(slice_idx, 1, n_pts[axis])
+
+    remaining = [i for i in 1:ndim if i != axis]
+    out_shape = ntuple(i -> n_pts[remaining[i]], length(remaining))
+    box = _read_box_size(jld2_path)
+
+    phases = Vector{Vector{Float64}}()
+    densities = Vector{Vector{Float64}}()
+    for c in 1:n_comp
+        comp_view = view(psi, _component_slice(ndim, n_pts, c)...)
+        slice = selectdim(comp_view, axis, k)  # 2D complex
+        push!(phases, vec(angle.(slice)))
+        push!(densities, vec(abs2.(slice)))
+    end
+
+    axis_names = ["x","y","z"]
+    ax_labels = [axis_names[i] for i in remaining]
+    ax_ranges = if box !== nothing && length(box) >= ndim
+        [[-box[i]/2, box[i]/2] for i in remaining]
+    else
+        [[0, n_pts[i]-1] for i in remaining]
+    end
+
+    Dict{String,Any}(
+        "m_values" => m_values,
+        "phases" => phases,
+        "densities" => densities,
+        "ndim" => ndim,
+        "axis" => axis,
+        "slice_index" => k,
+        "shape" => collect(out_shape),
+        "axis_labels" => ax_labels,
+        "axis_ranges" => ax_ranges,
+        "box" => box,
     )
 end
 

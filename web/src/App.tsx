@@ -21,6 +21,9 @@ const View3D = lazy(() =>
 const SliceGrid = lazy(() =>
   import('@/components/SliceGrid').then((m) => ({ default: m.SliceGrid })),
 )
+const PhaseGrid = lazy(() =>
+  import('@/components/PhaseGrid').then((m) => ({ default: m.PhaseGrid })),
+)
 
 export default function App() {
   const state = useRunData()
@@ -62,6 +65,7 @@ export default function App() {
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="slice">Slice</TabsTrigger>
+          <TabsTrigger value="phase">Phase</TabsTrigger>
           <TabsTrigger value="view3d">3D View</TabsTrigger>
           <TabsTrigger value="data">Data</TabsTrigger>
           <TabsTrigger value="config">Config</TabsTrigger>
@@ -125,6 +129,12 @@ export default function App() {
         <TabsContent value="slice">
           <Suspense fallback={<TabFallback />}>
             <SliceGrid run={selectedRun} data={data} />
+          </Suspense>
+        </TabsContent>
+
+        <TabsContent value="phase">
+          <Suspense fallback={<TabFallback />}>
+            <PhaseGrid run={selectedRun} data={data} />
           </Suspense>
         </TabsContent>
 

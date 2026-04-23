@@ -46,7 +46,20 @@ export interface VectorField3D {
   data: Float32Array
 }
 
-export type VectorFieldKind = 'current' | 'magnetization'
+export type VectorFieldKind = 'current' | 'spin_density' | 'velocity'
+
+export interface PhaseSlice {
+  ndim: number
+  axis: number
+  slice_index: number
+  shape: number[]
+  box: number[]
+  axis_labels: string[]
+  axis_ranges: number[][]
+  m_values: number[]
+  phases: number[][] // per-component flat arrays, values in [-π, π]
+  densities: number[][] // per-component |ψ|² at the same slice, for low-density masking
+}
 
 export interface ColumnDensity {
   ndim: number
@@ -127,6 +140,18 @@ export const api = {
   getColumnDensity(run: string, file: string, axis: 1 | 2 | 3): Promise<ColumnDensity> {
     return json(
       `/api/density/${encodeURIComponent(run)}/${encodeURIComponent(file)}?axis=${axis}`,
+    )
+  },
+
+  getPhaseSlice(
+    run: string,
+    file: string,
+    axis: 1 | 2 | 3,
+    sliceIndex?: number,
+  ): Promise<PhaseSlice> {
+    const sliceArg = sliceIndex !== undefined ? `&slice=${sliceIndex}` : ''
+    return json(
+      `/api/phase/${encodeURIComponent(run)}/${encodeURIComponent(file)}?axis=${axis}${sliceArg}`,
     )
   },
 

@@ -47,12 +47,13 @@ export function View3D({ run, data }: Props) {
   })
 
   const vectorControls = useControls('Vectors', {
-    show: false,
+    show: true,
     field: {
       value: 'current' as VectorFieldKind,
       options: {
-        'Mass current': 'current' as VectorFieldKind,
-        Magnetization: 'magnetization' as VectorFieldKind,
+        'Mass current j (質量流)': 'current' as VectorFieldKind,
+        'Spin density ⟨F⟩ (磁化)': 'spin_density' as VectorFieldKind,
+        'Superfluid velocity v=j/n': 'velocity' as VectorFieldKind,
       },
     },
     stride: { value: 8, min: 2, max: 16, step: 1 },
