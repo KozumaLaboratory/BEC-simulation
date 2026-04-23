@@ -35,6 +35,21 @@ export function ParticleField({ field, density, densityMax, params }: Props) {
   const { count, trailLength } = params
   const vertsPerTrail = Math.max(2, trailLength)
 
+  // Peak |v| over the whole field. Velocities are divided by this so the
+  // user-facing `speed` control is "box fraction per second" regardless of
+  // the absolute magnitude of j or v_s (which can vary by 10+ orders of
+  // magnitude between ground states and dynamics snapshots).
+  const invPeakMag = useMemo(() => {
+    const d = field.data
+    const n = field.nx * field.ny * field.nz
+    let peak = 0
+    for (let i = 0; i < n; i++) {
+      const m = d[i * 4 + 3]
+      if (m > peak) peak = m
+    }
+    return peak > 0 ? 1 / peak : 0
+  }, [field])
+
   const positions = useMemo(
     () => new Float32Array(count * vertsPerTrail * 3),
     [count, vertsPerTrail],
@@ -129,31 +144,37 @@ export function ParticleField({ field, density, densityMax, params }: Props) {
         positions[dst + 2] = positions[src + 2]
       }
 
-      // Advance head (t=0) by RK2.
+      // Advance head (t=0) by RK2 in normalized velocity units (peak |v| = 1).
       const hx = positions[trailBase]
       const hy = positions[trailBase + 1]
       const hz = positions[trailBase + 2]
       const v1 = sampleVector(fData, fNx, fNy, fNz, hx, hy, hz)
-      const mx = hx + v1[0] * speed * dt * 0.5
-      const my = hy + v1[1] * speed * dt * 0.5
-      const mz = hz + v1[2] * speed * dt * 0.5
+      const stepHalf = speed * dt * 0.5 * invPeakMag
+      const mx = hx + v1[0] * stepHalf
+      const my = hy + v1[1] * stepHalf
+      const mz = hz + v1[2] * stepHalf
       const v2 = sampleVector(fData, fNx, fNy, fNz, mx, my, mz)
-      const nx = hx + v2[0] * speed * dt
-      const ny = hy + v2[1] * speed * dt
-      const nz = hz + v2[2] * speed * dt
+      const step = speed * dt * invPeakMag
+      const nx = hx + v2[0] * step
+      const ny = hy + v2[1] * step
+      const nz = hz + v2[2] * step
       positions[trailBase] = nx
       positions[trailBase + 1] = ny
       positions[trailBase + 2] = nz
       ages[i] += dt
 
-      // Respawn conditions (same as point version): collapse trail to new seed.
-      const vmag = v2[3]
+      // Respawn conditions. `vmag * invPeakMag` is in [0, 1]; 1e-4 means the
+      // local flow is 10000× weaker than the strongest point — respawning
+      // there avoids wasting particles in stagnant regions. If the whole
+      // field is essentially zero (invPeakMag = 0) we'd never advect, so we
+      // still let the lifespan path retire particles.
+      const vNorm = v2[3] * invPeakMag
       if (
         ages[i] > life ||
         nx < -0.5 || nx > 0.5 ||
         ny < -0.5 || ny > 0.5 ||
         nz < -0.5 || nz > 0.5 ||
-        vmag < 1e-20 ||
+        vNorm < 1e-4 ||
         sampleDensity(dens, dNx, dNy, dNz, nx, ny, nz) < minDensKeep
       ) {
         seedCollapse(positions, ages, i, vertsPerTrail, density, densityMax, params.densityThreshold)

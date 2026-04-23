@@ -87,7 +87,13 @@ export function View3D({ run, data }: Props) {
     stride: { value: 4, min: 1, max: 8, step: 1 },
     count: { value: 3000, min: 300, max: 20000, step: 100 },
     trailLength: { value: 18, min: 2, max: 60, step: 1 },
-    speed: { value: 0.08, min: 0.005, max: 0.5, step: 0.005 },
+    speed: {
+      value: 0.3,
+      min: 0.01,
+      max: 2.0,
+      step: 0.01,
+      label: 'speed (box/sec at peak |v|)',
+    },
     lifespan: { value: 4.0, min: 0.5, max: 15, step: 0.1 },
     densityThreshold: { value: 0.05, min: 0, max: 0.5, step: 0.01 },
     color: '#ffffff',
@@ -165,6 +171,25 @@ export function View3D({ run, data }: Props) {
     Math.round(particleControls.stride),
     particleControls.show,
   )
+
+  // Peak magnitude of whichever field is currently driving advection (or
+  // showing arrows). Tells the user at a glance whether there's real flow
+  // or whether they're staring at numerical noise from a stationary GS.
+  const peakMag = useMemo(() => {
+    const src = particleControls.show
+      ? particleFieldData
+      : vectorControls.show
+      ? vectorData
+      : null
+    if (!src) return null
+    let m = 0
+    const n = src.nx * src.ny * src.nz
+    for (let i = 0; i < n; i++) {
+      const v = src.data[i * 4 + 3]
+      if (v > m) m = v
+    }
+    return m
+  }, [particleControls.show, vectorControls.show, particleFieldData, vectorData])
 
   const pParams = useMemo<ParticleParams>(
     () => ({
@@ -250,10 +275,22 @@ export function View3D({ run, data }: Props) {
               </SelectContent>
             </Select>
           </div>
-          <div className="ml-auto text-xs text-muted-foreground">
+          <div className="ml-auto text-xs text-muted-foreground text-right">
             {loading && 'Loading density…'}
-            {density && !loading &&
-              `${density.meta.nx}×${density.meta.ny}×${density.meta.nz} · max=${density.maxValue.toExponential(2)}`}
+            {density && !loading && (
+              <>
+                <div>
+                  {density.meta.nx}×{density.meta.ny}×{density.meta.nz} ·
+                  n<sub>max</sub>={density.maxValue.toExponential(2)}
+                </div>
+                {peakMag !== null && (
+                  <div className={peakMag < 1e-10 ? 'text-amber-500' : ''}>
+                    |v|<sub>peak</sub>={peakMag.toExponential(2)}
+                    {peakMag < 1e-10 && ' (≈ 0, stationary state)'}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
 
