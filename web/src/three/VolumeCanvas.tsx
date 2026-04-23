@@ -1,8 +1,8 @@
-import { Canvas } from '@react-three/fiber'
+import { Canvas, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 import * as THREE_WEBGPU from 'three/webgpu'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { DensityVolume, type VolumeParams } from './DensityVolume'
 import { VectorField, type VectorFieldParams } from './VectorField'
 import { ParticleField, type ParticleParams } from './ParticleField'
@@ -49,6 +49,7 @@ export function VolumeCanvas({ density, phase, params, vector, particles }: Prop
         return renderer
       }}
     >
+      <ResizeFix />
       <color attach="background" args={['#0a0e14']} />
       <ambientLight intensity={0.4} />
       <DensityVolume density={density} phase={phase} params={params} />
@@ -81,4 +82,18 @@ function BoundingBox() {
       <lineBasicMaterial color="#21262d" />
     </lineSegments>
   )
+}
+
+// R3F's async gl factory returns the WebGPURenderer *after* init(), but by
+// then the renderer's internal depth buffer has already been created at the
+// canvas's default 300×150 size. R3F's own resize path doesn't re-allocate
+// it. Force a setSize call after mount and on every size change; WebGPURenderer
+// rebuilds the depth attachment as part of setSize.
+function ResizeFix() {
+  const { gl, size } = useThree()
+  useEffect(() => {
+    const g = gl as unknown as { setSize: (w: number, h: number, updateStyle?: boolean) => void }
+    g.setSize(size.width, size.height, false)
+  }, [gl, size.width, size.height])
+  return null
 }
