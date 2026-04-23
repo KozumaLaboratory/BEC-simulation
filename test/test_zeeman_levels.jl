@@ -84,6 +84,47 @@
         @test abs(evaluate(tdz.by_wf, 0.5)) < unit_p * 1e-6
     end
 
+    @testset "Unitful string: Level 1 Bz" begin
+        atom = Dy164
+        omega_ref = 2π * 50.0
+        # String with explicit Gauss — note: "G" alone is gravitational constant
+        # in Unitful's namespace, use "Gauss" or SI prefix (mT, μT, T).
+        z = Dict{String,Any}("Bz" => "0.819 Gauss")
+        p_step = Dict{String,Any}("interactions" => Dict("omega_ref" => omega_ref))
+        tdz = SpinorBEC._build_zeeman_dispatched(z, 1.0, atom, p_step)
+        expected = SpinorBEC.Units.bfield_to_p(0.819, atom.g_F, omega_ref)
+        @test evaluate(tdz.p_wf, 0.0) ≈ expected rtol=1e-10
+
+        # μT prefix should give the same result: 0.819 Gauss = 81.9 μT
+        z2 = Dict{String,Any}("Bz" => "81.9 μT")
+        tdz2 = SpinorBEC._build_zeeman_dispatched(z2, 1.0, atom, p_step)
+        @test evaluate(tdz2.p_wf, 0.0) ≈ expected rtol=1e-6
+
+        # Bogus unit (not magnetic field) rejected
+        z_bad = Dict{String,Any}("Bz" => "1.0 m")
+        @test_throws ArgumentError SpinorBEC._build_zeeman_dispatched(z_bad, 1.0, atom, p_step)
+
+        # Bogus string rejected by regex before reaching uparse
+        z_evil = Dict{String,Any}("Bz" => "1.0 rm(\"/\")")
+        @test_throws ArgumentError SpinorBEC._build_zeeman_dispatched(z_evil, 1.0, atom, p_step)
+    end
+
+    @testset "Unitful string: Level 2 B_mag" begin
+        atom = Dy164
+        omega_ref = 2π * 50.0
+        z = Dict{String,Any}(
+            "B_mag" => "0.819 Gauss",
+            "theta_deg" => 90.0,
+            "phi_deg" => 0.0,
+        )
+        p_step = Dict{String,Any}("interactions" => Dict("omega_ref" => omega_ref))
+        tdz = SpinorBEC._build_zeeman_dispatched(z, 1.0, atom, p_step)
+        expected = SpinorBEC.Units.bfield_to_p(0.819, atom.g_F, omega_ref)
+        # At theta=90, B is pure x → bx = full p, p (z) ≈ 0
+        @test evaluate(tdz.bx_wf, 0.5) ≈ expected rtol=1e-6
+        @test abs(evaluate(tdz.p_wf, 0.5)) < expected * 1e-6
+    end
+
     @testset "omega_ref resolution priority" begin
         atom = Dy164
         # Explicit in zeeman takes priority (50 Hz linear → 2π·50)

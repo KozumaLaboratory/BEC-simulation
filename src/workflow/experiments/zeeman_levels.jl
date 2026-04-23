@@ -87,14 +87,26 @@ end
 """
     _convert_B_waveform(B_spec, duration, g_F, omega_ref) -> Waveform
 
-Convert a Gauss-valued spec (scalar/ramp/sinusoidal/...) into a dimensionless
-Waveform by sampling N points over [0, duration] and applying the Gauss→dimless
-factor. Always returns a `PiecewiseLinearWaveform` (or `ConstantWaveform` if
-input is a plain Number) — never a closure.
+Convert a Gauss-valued spec into a dimensionless Waveform by sampling N
+points over [0, duration] and applying the Gauss→dimless factor. Accepts:
+
+- `Number` (Gauss): returns ConstantWaveform.
+- `AbstractString` ("0.819 G", "81.9 mT"): Unitful parsed, returns
+  ConstantWaveform.
+- `Dict` (ramp/sinusoidal/...): samples the waveform, applies factor,
+  returns PiecewiseLinearWaveform.
+- `Waveform`: samples it directly.
+
+Never returns a closure — keeps everything concretely typed (see CLAUDE.md:
+Type stability boundaries).
 """
 function _convert_B_waveform(B_spec, duration::Float64, g_F::Float64, omega_ref::Float64)
     factor = g_F * Units.BOHR_MAGNETON * _GAUSS_TO_TESLA / (Units.HBAR * omega_ref)
-    if B_spec isa Number
+    if B_spec isa AbstractString
+        # "0.819 G" → parse Quantity → to Tesla → dimensionless p
+        q = Units.safe_parse_quantity(B_spec)
+        return ConstantWaveform(Units.bfield_to_p(q, g_F, omega_ref))
+    elseif B_spec isa Number
         return ConstantWaveform(factor * Float64(B_spec))
     end
     B_wf = B_spec isa Waveform ? B_spec : _make_waveform(B_spec, duration)
@@ -126,9 +138,18 @@ function _build_zeeman_level2(z::Dict, duration::Float64, atom, omega_ref::Float
     factor = g_F * Units.BOHR_MAGNETON * _GAUSS_TO_TESLA / (Units.HBAR * omega_ref)
 
     # Sample all three at the same time grid, project, convert.
+    # B_mag_spec may be a unit-carrying string ("0.819 G"); pre-resolve to Gauss.
+    B_mag_gauss_spec = if B_mag_spec isa AbstractString
+        q = Units.safe_parse_quantity(B_mag_spec)
+        # convert to Gauss so the `factor` (Gauss→dimless) applies directly
+        Float64(ustrip(u"Gauss", q))
+    else
+        B_mag_spec
+    end
+
     times = collect(range(0.0, duration; length = _ZEEMAN_SAMPLE_N))
-    Bmag_wf = B_mag_spec isa Number ? ConstantWaveform(Float64(B_mag_spec)) :
-        (B_mag_spec isa Waveform ? B_mag_spec : _make_waveform(B_mag_spec, duration))
+    Bmag_wf = B_mag_gauss_spec isa Number ? ConstantWaveform(Float64(B_mag_gauss_spec)) :
+        (B_mag_gauss_spec isa Waveform ? B_mag_gauss_spec : _make_waveform(B_mag_gauss_spec, duration))
     theta_wf = theta_spec isa Number ? ConstantWaveform(Float64(theta_spec)) :
         (theta_spec isa Waveform ? theta_spec : _make_waveform(theta_spec, duration))
     phi_wf = phi_spec isa Number ? ConstantWaveform(Float64(phi_spec)) :
