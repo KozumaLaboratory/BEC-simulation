@@ -69,7 +69,7 @@ export function View3D({ run, data }: Props) {
     },
     stride: { value: 8, min: 2, max: 16, step: 1 },
     arrowScale: { value: 0.9, min: 0.1, max: 4, step: 0.05 },
-    densityThreshold: { value: 0.05, min: 0, max: 0.5, step: 0.01 },
+    densityThreshold: { value: 0.005, min: 0, max: 0.5, step: 0.005 },
     colorLow: '#0d0887',
     colorHigh: '#f0f921',
   })
@@ -95,7 +95,7 @@ export function View3D({ run, data }: Props) {
       label: 'speed (box/sec at peak |v|)',
     },
     lifespan: { value: 20.0, min: 0.5, max: 60, step: 0.5 },
-    densityThreshold: { value: 0.05, min: 0, max: 0.5, step: 0.01 },
+    densityThreshold: { value: 0.005, min: 0, max: 0.5, step: 0.005 },
     color: '#ffffff',
   })
 

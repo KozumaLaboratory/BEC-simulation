@@ -123,12 +123,6 @@ export function ParticleField({ field, density, densityMax, params }: Props) {
       fNy = field.ny,
       fNz = field.nz,
       fData = field.data
-    const dNx = density.nx,
-      dNy = density.ny,
-      dNz = density.nz
-    const dens = density.density
-    const densThresh = densityMax * params.densityThreshold
-    const minDensKeep = densThresh * 0.3
     const speed = params.speed
     const life = params.lifespan
 
@@ -144,38 +138,44 @@ export function ParticleField({ field, density, densityMax, params }: Props) {
         positions[dst + 2] = positions[src + 2]
       }
 
-      // Advance head (t=0) by RK2 in normalized velocity units (peak |v| = 1).
+      // Advance head (t=0) by RK2. We integrate along the unit-direction
+      // v̂ = v/|v| rather than v itself, so every particle draws a curve of
+      // the same arc-length per frame regardless of where it is in the
+      // field — this is the only way a slow-moving region produces a
+      // trail of comparable length to the core. Magnitude information is
+      // recovered by coloring the head by |v|.
       const hx = positions[trailBase]
       const hy = positions[trailBase + 1]
       const hz = positions[trailBase + 2]
       const v1 = sampleVector(fData, fNx, fNy, fNz, hx, hy, hz)
-      const stepHalf = speed * dt * 0.5 * invPeakMag
-      const mx = hx + v1[0] * stepHalf
-      const my = hy + v1[1] * stepHalf
-      const mz = hz + v1[2] * stepHalf
+      const m1 = v1[3] > 1e-30 ? 1 / v1[3] : 0
+      const stepHalf = speed * dt * 0.5
+      const mx = hx + v1[0] * m1 * stepHalf
+      const my = hy + v1[1] * m1 * stepHalf
+      const mz = hz + v1[2] * m1 * stepHalf
       const v2 = sampleVector(fData, fNx, fNy, fNz, mx, my, mz)
-      const step = speed * dt * invPeakMag
-      const nx = hx + v2[0] * step
-      const ny = hy + v2[1] * step
-      const nz = hz + v2[2] * step
+      const m2 = v2[3] > 1e-30 ? 1 / v2[3] : 0
+      const step = speed * dt
+      const nx = hx + v2[0] * m2 * step
+      const ny = hy + v2[1] * m2 * step
+      const nz = hz + v2[2] * m2 * step
       positions[trailBase] = nx
       positions[trailBase + 1] = ny
       positions[trailBase + 2] = nz
       ages[i] += dt
 
-      // Respawn conditions. `vmag * invPeakMag` is in [0, 1]; 1e-4 means the
-      // local flow is 10000× weaker than the strongest point — respawning
-      // there avoids wasting particles in stagnant regions. If the whole
-      // field is essentially zero (invPeakMag = 0) we'd never advect, so we
-      // still let the lifespan path retire particles.
+      // Respawn conditions. We used to also kill particles in low-density
+      // regions, but that makes vortex cores (|ψ|² → 0) invisible —
+      // streamlines got truncated right where the interesting circulation
+      // lives. Keep only lifespan, out-of-bounds, and "flow is essentially
+      // zero here" (vNorm < 1e-4 relative to field peak).
       const vNorm = v2[3] * invPeakMag
       if (
         ages[i] > life ||
         nx < -0.5 || nx > 0.5 ||
         ny < -0.5 || ny > 0.5 ||
         nz < -0.5 || nz > 0.5 ||
-        vNorm < 1e-4 ||
-        sampleDensity(dens, dNx, dNy, dNz, nx, ny, nz) < minDensKeep
+        vNorm < 1e-4
       ) {
         seedCollapse(positions, ages, i, vertsPerTrail, density, densityMax, params.densityThreshold)
       }
