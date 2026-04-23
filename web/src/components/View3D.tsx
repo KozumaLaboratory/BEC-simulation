@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useControls } from 'leva'
 import * as THREE from 'three'
 import { Card, CardContent } from '@/components/ui/card'
@@ -77,7 +77,7 @@ export function View3D({ run, data }: Props) {
   const particleControls = useControls('Particles', {
     show: false,
     field: {
-      value: 'velocity' as VectorFieldKind,
+      value: 'current' as VectorFieldKind,
       options: {
         'Mass current j (質量流)': 'current' as VectorFieldKind,
         'Superfluid velocity v=j/n': 'velocity' as VectorFieldKind,
@@ -85,10 +85,10 @@ export function View3D({ run, data }: Props) {
       label: 'Advect on',
     },
     stride: { value: 4, min: 1, max: 8, step: 1 },
-    count: { value: 4000, min: 500, max: 20000, step: 500 },
+    count: { value: 3000, min: 300, max: 20000, step: 100 },
+    trailLength: { value: 18, min: 2, max: 60, step: 1 },
     speed: { value: 0.08, min: 0.005, max: 0.5, step: 0.005 },
-    lifespan: { value: 3.5, min: 0.5, max: 15, step: 0.1 },
-    pointSize: { value: 0.012, min: 0.002, max: 0.05, step: 0.001 },
+    lifespan: { value: 4.0, min: 0.5, max: 15, step: 0.1 },
     densityThreshold: { value: 0.05, min: 0, max: 0.5, step: 0.01 },
     color: '#ffffff',
   })
@@ -124,6 +124,24 @@ export function View3D({ run, data }: Props) {
     controls.tiltDeg,
   )
 
+  // When the user flips to phase color mode while Component is still "Total"
+  // (comp=0), auto-advance to the spinor component with the largest
+  // population so they see something immediately. Don't touch their choice
+  // otherwise.
+  useEffect(() => {
+    if (controls.colorMode !== 'phase' || comp !== 0 || !currentPoint?.populations) return
+    const pops = currentPoint.populations
+    let bestIdx = 0
+    let bestPop = -1
+    for (let i = 0; i < pops.length; i++) {
+      if (pops[i] > bestPop) {
+        bestPop = pops[i]
+        bestIdx = i
+      }
+    }
+    setComp(bestIdx + 1) // populations is 0-indexed per m; selector is 1-indexed (0=Total)
+  }, [controls.colorMode, comp, currentPoint])
+
   const phaseEnabled = controls.colorMode === 'phase' && comp >= 1
   const { data: phase, error: phaseError } = usePhaseTexture(
     run,
@@ -151,9 +169,9 @@ export function View3D({ run, data }: Props) {
   const pParams = useMemo<ParticleParams>(
     () => ({
       count: Math.round(particleControls.count),
+      trailLength: Math.round(particleControls.trailLength),
       speed: particleControls.speed,
       lifespan: particleControls.lifespan,
-      pointSize: particleControls.pointSize,
       color: particleControls.color,
       densityThreshold: particleControls.densityThreshold,
     }),

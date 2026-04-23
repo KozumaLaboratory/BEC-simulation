@@ -5,9 +5,9 @@ import type { VectorField3D, Density3D } from '@/api'
 
 export interface ParticleParams {
   count: number
+  trailLength: number // number of trail samples per particle
   speed: number // world-space units per second
   lifespan: number // seconds
-  pointSize: number
   color: string
   densityThreshold: number // fraction of max density for seeding
 }
@@ -19,149 +19,225 @@ interface Props {
   params: ParticleParams
 }
 
-// Resample v_mass into world-space [-0.5, 0.5]^3 and advect N particles
-// with RK2 on the CPU. For Eu-151 64³ grids and N ≤ 10k this is comfortably
-// 60 fps on a modern laptop; once we need >50k or 128³+ fields we can move
-// this into a TSL compute kernel sharing the same Data3DTexture.
+// Advects N particles along the chosen velocity field and renders each
+// particle as a short polyline trail (last L positions). Trails make
+// rotational flow read instantly where individual points can't.
+//
+// Storage layout: positions[i * L * 3 + t * 3 + k]
+//   i ∈ [0, count), t ∈ [0, trailLength), k ∈ {x,y,z}
+//   t = 0 is the newest head position, t = L-1 is the oldest.
+// Each frame we shift t back by one (memmove-style) and write the new
+// head. Index buffer wires (t, t+1) pairs into LineSegments — built
+// once, never rebuilt per frame.
 export function ParticleField({ field, density, densityMax, params }: Props) {
-  const pointsRef = useRef<THREE.Points>(null!)
+  const lineRef = useRef<THREE.LineSegments>(null!)
 
-  const { positions, ages } = useMemo(() => {
-    const n = params.count
-    return {
-      positions: new Float32Array(n * 3),
-      ages: new Float32Array(n),
+  const { count, trailLength } = params
+  const vertsPerTrail = Math.max(2, trailLength)
+
+  const positions = useMemo(
+    () => new Float32Array(count * vertsPerTrail * 3),
+    [count, vertsPerTrail],
+  )
+  const colors = useMemo(
+    () => new Float32Array(count * vertsPerTrail * 4),
+    [count, vertsPerTrail],
+  )
+  const ages = useMemo(() => new Float32Array(count), [count])
+
+  const indices = useMemo(() => {
+    const arr = new Uint32Array(count * (vertsPerTrail - 1) * 2)
+    let k = 0
+    for (let p = 0; p < count; p++) {
+      const base = p * vertsPerTrail
+      for (let t = 0; t < vertsPerTrail - 1; t++) {
+        arr[k++] = base + t
+        arr[k++] = base + t + 1
+      }
     }
-  }, [params.count])
+    return arr
+  }, [count, vertsPerTrail])
 
-  // Seed positions in high-density regions once per field/density change.
+  // Pre-bake per-trail-position alpha ramp (head bright, tail faint).
+  // Colors are constant per vertex-in-trail, so bake once.
   useEffect(() => {
-    for (let i = 0; i < params.count; i++) {
-      seed(positions, ages, i, density, densityMax, params.densityThreshold)
+    const c = new THREE.Color(params.color)
+    for (let i = 0; i < count; i++) {
+      for (let t = 0; t < vertsPerTrail; t++) {
+        const a = 1 - t / (vertsPerTrail - 1)
+        const idx = (i * vertsPerTrail + t) * 4
+        colors[idx] = c.r
+        colors[idx + 1] = c.g
+        colors[idx + 2] = c.b
+        colors[idx + 3] = a * a // sharper fade
+      }
     }
-    if (pointsRef.current) {
-      const attr = pointsRef.current.geometry.attributes.position as THREE.BufferAttribute
+    const lines = lineRef.current
+    if (lines) {
+      const attr = lines.geometry.attributes.color as THREE.BufferAttribute
       attr.needsUpdate = true
     }
-  }, [density, densityMax, params.count, params.densityThreshold, positions, ages])
+  }, [params.color, count, vertsPerTrail, colors])
+
+  useEffect(() => {
+    // Seed: collapse every particle's trail to a single density-weighted point.
+    for (let i = 0; i < count; i++) {
+      seedCollapse(positions, ages, i, vertsPerTrail, density, densityMax, params.densityThreshold)
+    }
+    const lines = lineRef.current
+    if (lines) {
+      const attr = lines.geometry.attributes.position as THREE.BufferAttribute
+      attr.needsUpdate = true
+    }
+  }, [
+    positions,
+    ages,
+    count,
+    vertsPerTrail,
+    density,
+    densityMax,
+    params.densityThreshold,
+  ])
 
   useFrame((_, deltaRaw) => {
-    const dt = Math.min(deltaRaw, 1 / 30) // clamp for long frames
-    const mesh = pointsRef.current
-    if (!mesh) return
+    const dt = Math.min(deltaRaw, 1 / 30)
+    const lines = lineRef.current
+    if (!lines) return
+
     const fNx = field.nx,
       fNy = field.ny,
       fNz = field.nz,
-      stride = field.stride,
       fData = field.data
-    const n = params.count
-    const speed = params.speed
-    const life = params.lifespan
-    const dens = density.density
     const dNx = density.nx,
       dNy = density.ny,
       dNz = density.nz
+    const dens = density.density
     const densThresh = densityMax * params.densityThreshold
+    const minDensKeep = densThresh * 0.3
+    const speed = params.speed
+    const life = params.lifespan
 
-    for (let i = 0; i < n; i++) {
-      // RK2: sample v at current pos, at half step, advance full step.
-      const px = positions[i * 3]
-      const py = positions[i * 3 + 1]
-      const pz = positions[i * 3 + 2]
+    for (let i = 0; i < count; i++) {
+      const trailBase = i * vertsPerTrail * 3
 
-      const v1 = sampleVector(fData, fNx, fNy, fNz, stride, px, py, pz)
-      const mx = px + v1[0] * speed * dt * 0.5
-      const my = py + v1[1] * speed * dt * 0.5
-      const mz = pz + v1[2] * speed * dt * 0.5
-      const v2 = sampleVector(fData, fNx, fNy, fNz, stride, mx, my, mz)
+      // Shift tail back: trail[t] ← trail[t-1] for t = L-1 .. 1
+      for (let t = vertsPerTrail - 1; t > 0; t--) {
+        const dst = trailBase + t * 3
+        const src = trailBase + (t - 1) * 3
+        positions[dst] = positions[src]
+        positions[dst + 1] = positions[src + 1]
+        positions[dst + 2] = positions[src + 2]
+      }
 
-      positions[i * 3] = px + v2[0] * speed * dt
-      positions[i * 3 + 1] = py + v2[1] * speed * dt
-      positions[i * 3 + 2] = pz + v2[2] * speed * dt
+      // Advance head (t=0) by RK2.
+      const hx = positions[trailBase]
+      const hy = positions[trailBase + 1]
+      const hz = positions[trailBase + 2]
+      const v1 = sampleVector(fData, fNx, fNy, fNz, hx, hy, hz)
+      const mx = hx + v1[0] * speed * dt * 0.5
+      const my = hy + v1[1] * speed * dt * 0.5
+      const mz = hz + v1[2] * speed * dt * 0.5
+      const v2 = sampleVector(fData, fNx, fNy, fNz, mx, my, mz)
+      const nx = hx + v2[0] * speed * dt
+      const ny = hy + v2[1] * speed * dt
+      const nz = hz + v2[2] * speed * dt
+      positions[trailBase] = nx
+      positions[trailBase + 1] = ny
+      positions[trailBase + 2] = nz
       ages[i] += dt
 
-      // Respawn conditions: out of the unit cube, exceeded lifespan, or
-      // drifted into a vacuum region where v is meaningless.
+      // Respawn conditions (same as point version): collapse trail to new seed.
       const vmag = v2[3]
-      const ax = positions[i * 3],
-        ay = positions[i * 3 + 1],
-        az = positions[i * 3 + 2]
       if (
         ages[i] > life ||
-        ax < -0.5 || ax > 0.5 ||
-        ay < -0.5 || ay > 0.5 ||
-        az < -0.5 || az > 0.5 ||
+        nx < -0.5 || nx > 0.5 ||
+        ny < -0.5 || ny > 0.5 ||
+        nz < -0.5 || nz > 0.5 ||
         vmag < 1e-20 ||
-        sampleDensity(dens, dNx, dNy, dNz, ax, ay, az) < densThresh * 0.3
+        sampleDensity(dens, dNx, dNy, dNz, nx, ny, nz) < minDensKeep
       ) {
-        seed(positions, ages, i, density, densityMax, params.densityThreshold)
+        seedCollapse(positions, ages, i, vertsPerTrail, density, densityMax, params.densityThreshold)
       }
     }
 
-    const attr = mesh.geometry.attributes.position as THREE.BufferAttribute
+    const attr = lines.geometry.attributes.position as THREE.BufferAttribute
     attr.needsUpdate = true
   })
 
   const material = useMemo(
     () =>
-      new THREE.PointsMaterial({
-        size: params.pointSize,
-        color: params.color,
+      new THREE.LineBasicMaterial({
+        vertexColors: true,
         transparent: true,
-        opacity: 0.9,
         depthWrite: false,
         blending: THREE.AdditiveBlending,
-        sizeAttenuation: true,
       }),
-    [params.pointSize, params.color],
+    [],
   )
 
   return (
-    <points ref={pointsRef} material={material} frustumCulled={false}>
+    <lineSegments ref={lineRef} material={material} frustumCulled={false}>
       <bufferGeometry>
         <bufferAttribute
           attach="attributes-position"
           args={[positions, 3]}
           usage={THREE.DynamicDrawUsage}
         />
+        <bufferAttribute
+          attach="attributes-color"
+          args={[colors, 4]}
+          usage={THREE.StaticDrawUsage}
+        />
+        <bufferAttribute attach="index" args={[indices, 1]} />
       </bufferGeometry>
-    </points>
+    </lineSegments>
   )
 }
 
-// Seed one particle in a density-weighted random location within the cube.
-// Simple rejection sampling against the density threshold — fine for the
-// one-shot initial fill and the per-frame respawn rate (~few %).
-function seed(
+// Seed one particle in a density-weighted random location, collapsing its
+// entire trail to the new head position so the line renders as a point
+// until it accumulates movement.
+function seedCollapse(
   positions: Float32Array,
   ages: Float32Array,
   i: number,
+  trailLength: number,
   density: Density3D,
   densityMax: number,
   thresholdFrac: number,
 ) {
   const thresh = densityMax * thresholdFrac
+  let x = 0,
+    y = 0,
+    z = 0,
+    found = false
   for (let attempt = 0; attempt < 20; attempt++) {
-    const x = Math.random() - 0.5
-    const y = Math.random() - 0.5
-    const z = Math.random() - 0.5
-    const d = sampleDensity(density.density, density.nx, density.ny, density.nz, x, y, z)
+    const cx = Math.random() - 0.5
+    const cy = Math.random() - 0.5
+    const cz = Math.random() - 0.5
+    const d = sampleDensity(density.density, density.nx, density.ny, density.nz, cx, cy, cz)
     if (d > thresh) {
-      positions[i * 3] = x
-      positions[i * 3 + 1] = y
-      positions[i * 3 + 2] = z
-      ages[i] = Math.random() * 1.0 // stagger ages to avoid synchronized dying
-      return
+      x = cx
+      y = cy
+      z = cz
+      found = true
+      break
     }
   }
-  // Fallback: put it somewhere near the centre.
-  positions[i * 3] = (Math.random() - 0.5) * 0.3
-  positions[i * 3 + 1] = (Math.random() - 0.5) * 0.3
-  positions[i * 3 + 2] = (Math.random() - 0.5) * 0.3
-  ages[i] = 0
+  if (!found) {
+    x = (Math.random() - 0.5) * 0.3
+    y = (Math.random() - 0.5) * 0.3
+    z = (Math.random() - 0.5) * 0.3
+  }
+  const base = i * trailLength * 3
+  for (let t = 0; t < trailLength; t++) {
+    positions[base + t * 3] = x
+    positions[base + t * 3 + 1] = y
+    positions[base + t * 3 + 2] = z
+  }
+  ages[i] = Math.random() * 0.8
 }
 
-// Trilinear interpolation of a 3D scalar field on the unit cube [-0.5, 0.5]^3.
 function sampleDensity(
   data: Float32Array,
   nx: number,
@@ -184,31 +260,20 @@ function sampleDensity(
     fz = w - iz
   const s = nx * ny
   const i000 = ix + iy * nx + iz * s
-  const i100 = i000 + 1
-  const i010 = i000 + nx
-  const i110 = i010 + 1
-  const i001 = i000 + s
-  const i101 = i001 + 1
-  const i011 = i010 + s
-  const i111 = i011 + 1
-  const c00 = data[i000] * (1 - fx) + data[i100] * fx
-  const c10 = data[i010] * (1 - fx) + data[i110] * fx
-  const c01 = data[i001] * (1 - fx) + data[i101] * fx
-  const c11 = data[i011] * (1 - fx) + data[i111] * fx
+  const c00 = data[i000] * (1 - fx) + data[i000 + 1] * fx
+  const c10 = data[i000 + nx] * (1 - fx) + data[i000 + nx + 1] * fx
+  const c01 = data[i000 + s] * (1 - fx) + data[i000 + s + 1] * fx
+  const c11 = data[i000 + nx + s] * (1 - fx) + data[i000 + nx + s + 1] * fx
   const c0 = c00 * (1 - fy) + c10 * fy
   const c1 = c01 * (1 - fy) + c11 * fy
   return c0 * (1 - fz) + c1 * fz
 }
 
-// Trilinear interpolation of the RGBA velocity field; returns [vx, vy, vz, mag].
-// Data layout: interleaved 4-channel per strided cell, ordered (ix, iy, iz).
-// Particle coords are in [-0.5, 0.5]; map to the strided subgrid.
 function sampleVector(
   data: Float32Array,
   nx: number,
   ny: number,
   nz: number,
-  _stride: number,
   x: number,
   y: number,
   z: number,
