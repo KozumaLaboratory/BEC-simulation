@@ -1,6 +1,9 @@
+using JSON
+
 # --- Analyzer dispatch ---
 
-function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing)
+function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
+                        pipeline_results::Dict{Symbol,Any} = Dict{Symbol,Any}())
     # Analyzers perform reductions over psi and are not GPU-safe in general.
     # Move to host once here; no-op on CPU.
     psi = _to_host(psi)
@@ -324,11 +327,76 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing)
         plans.forward * delta_nk
         Sk = abs2.(delta_nk) .* cell_volume(grid)^2
         (structure_factor = Sk,)
+    elseif name == :column_density_movie
+        # Column-integrated total density for every snapshot from the preceding
+        # dynamics step, written as PNG frames. Requires prior dynamics step
+        # with save_every > 0 (produces psi_snapshots).
+        dynres = get(pipeline_results, :dynamics_result, nothing)
+        dynres === nothing && throw(ArgumentError(
+            "column_density_movie requires a preceding dynamics step with save_every > 0"))
+        ndim = length(grid.config.n_points)
+        ndim == 3 || throw(ArgumentError(
+            "column_density_movie currently supports 3D only (got $(ndim)D)"))
+        axis = Int(get(params, "axis", 3))
+        output_dir = String(get(params, "output_dir", "frames"))
+        mkpath(output_dir)
+        colorscale = String(get(params, "colorscale", "Viridis"))
+        width = Int(get(params, "width", 600))
+        height = Int(get(params, "height", 500))
+        title_fmt = get(params, "title_fmt", nothing)
+
+        snaps = dynres.psi_snapshots
+        times = dynres.times
+        frames = String[]
+        for (i, psi_s) in enumerate(snaps)
+            n_total = total_density(psi_s, ndim)
+            col = dropdims(sum(n_total; dims = axis); dims = axis)
+            title = title_fmt === nothing ?
+                "t = $(round(times[i], digits=3))" : string(title_fmt)
+            png_path = joinpath(output_dir, "col_$(lpad(i, 4, '0')).png")
+            save_column_density_png(grid, col, axis, png_path;
+                title = title, colorscale = colorscale, width = width, height = height)
+            push!(frames, png_path)
+        end
+        (output_dir = output_dir, n_frames = length(frames),
+         frame_paths = frames, axis = axis)
+
+    elseif name == :summary_json
+        # Dump the accumulated pipeline_results plus QC metadata to a JSON file.
+        output_path = String(get(params, "path", "summary.json"))
+        extras = get(params, "extras", Dict{String,Any}())
+        summary = Dict{String,Any}()
+        for (k, v) in pipeline_results
+            # Skip objects that aren't JSON-serializable (workspaces, arrays).
+            if v isa Number || v isa AbstractString || v isa Bool || v === nothing
+                summary[String(k)] = v
+            end
+        end
+        if haskey(pipeline_results, :dynamics_result)
+            dr = pipeline_results[:dynamics_result]
+            summary["n_snapshots"] = length(dr.psi_snapshots)
+            summary["t_initial"] = dr.times[1]
+            summary["t_final"] = dr.times[end]
+            if !isempty(dr.energies)
+                summary["energy_initial"] = Float64(dr.energies[1])
+                summary["energy_final"] = Float64(dr.energies[end])
+                summary["norm_drift"] = Float64(abs(dr.norms[end] - dr.norms[1]))
+            end
+        end
+        for (k, v) in extras
+            summary[String(k)] = v
+        end
+        mkpath(dirname(output_path) == "" ? "." : dirname(output_path))
+        open(output_path, "w") do io
+            JSON.print(io, summary, 2)
+        end
+        (path = output_path, n_fields = length(summary))
+
     else
         _known = "tomography, faraday, energy_decomposition, phase_classify, stability, bogoliubov, " *
                  "multipole_order, winding_map, absorption_image, sg_tof, domain_analysis, skyrmion_density, " *
                  "phase_contrast_image, momentum_distribution, vortex_detect, correlation_length, " *
-                 "defect_density, kibble_zurek_stats, bragg_spectroscopy"
+                 "defect_density, kibble_zurek_stats, bragg_spectroscopy, column_density_movie, summary_json"
         throw(ArgumentError("Unknown analyzer: $name. Supported: $_known"))
     end
 end

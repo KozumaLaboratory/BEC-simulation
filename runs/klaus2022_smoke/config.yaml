@@ -1,0 +1,44 @@
+# Klaus 2022-style infrastructure smoke test (A1a) — pure YAML
+# ==============================================================
+# Verifies Phase 0/1/1.5 pipeline runs Dy164 3D with time-dep Level 2 zeeman
+# and emits column density PNGs + summary JSON. Not a full Klaus 2022
+# reproduction (no magnetostir spin-up, tiny B field, short duration).
+
+pipeline:
+  - ground_state:
+      atom: Dy164
+      grid:
+        n: [32, 32, 16]
+        box: [16.0, 16.0, 6.0]
+      interactions:
+        c0: 300.0
+        c1: 0.0
+        omega_ref: 314.159
+      trap: [1.0, 1.0, 2.6]
+      zeeman:
+        Bz: "1.0e-4 Gauss"
+      initial_state: ferromagnetic_min
+      dt: 0.005
+      n_steps: 2000
+      tol: 1.0e-6
+
+  - dynamics:
+      duration: 6.28
+      dt: 0.01
+      save_every: 32
+      interactions: {omega_ref: 314.159}
+      zeeman:
+        B_mag: "1.0e-4 Gauss"
+        theta_deg: {from: 0.0, to: 35.0}
+        phi_deg: 0.0
+
+  - analyze:
+      - column_density_movie:
+          axis: 3
+          output_dir: runs/klaus2022_smoke/frames
+          colorscale: Viridis
+      - summary_json:
+          path: runs/klaus2022_smoke/summary.json
+          extras:
+            test_kind: smoke
+            expected_norm_drift_max: 1.0e-3

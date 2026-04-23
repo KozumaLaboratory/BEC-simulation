@@ -346,7 +346,8 @@ end
 function plot_density end
 function plot_spinor end
 function plot_spin_texture end
+function save_column_density_png end
 function animate_dynamics end
-export plot_density, plot_spinor, plot_spin_texture, animate_dynamics
+export plot_density, plot_spinor, plot_spin_texture, animate_dynamics, save_column_density_png
 
 end # module

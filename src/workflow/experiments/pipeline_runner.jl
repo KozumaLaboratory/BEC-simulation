@@ -67,7 +67,12 @@ function run_pipeline(config::PipelineConfig; verbose::Bool = true, psi_init = n
             println("Step $i/$(length(config.steps)): $(nameof(typeof(step)))")
             flush(stdout); ccall(:fflush, Cint, (Ptr{Cvoid},), C_NULL)
         end
-        psi, grid, atom, workspace, step_result = _run_step(step, psi, grid, atom, workspace; verbose, checkpoint_dir)
+        psi, grid, atom, workspace, step_result = if step isa AnalyzeStep
+            _run_step(step, psi, grid, atom, workspace;
+                      verbose, checkpoint_dir, pipeline_results = results)
+        else
+            _run_step(step, psi, grid, atom, workspace; verbose, checkpoint_dir)
+        end
         if step_result !== nothing
             merge!(results, step_result)
         end
@@ -522,13 +527,15 @@ function _parse_light_shift(raw, F::Int, V_trap, backend::AbstractBackend)
     nothing
 end
 
-function _run_step(step::AnalyzeStep, psi, grid, atom, ws_prev; verbose=true, checkpoint_dir=nothing)
+function _run_step(step::AnalyzeStep, psi, grid, atom, ws_prev; verbose=true, checkpoint_dir=nothing,
+                    pipeline_results::Dict{Symbol,Any} = Dict{Symbol,Any}())
     psi !== nothing || throw(ArgumentError("analyze step requires psi from preceding steps"))
     results = Dict{Symbol,Any}()
 
     for (name, params) in step.analyzers
         verbose && print("  $name... ")
-        result = _run_analyzer(name, psi, grid, atom, params; ws_prev = ws_prev)
+        result = _run_analyzer(name, psi, grid, atom, params;
+                                ws_prev = ws_prev, pipeline_results = pipeline_results)
         results[name] = result
         verbose && println("done")
     end

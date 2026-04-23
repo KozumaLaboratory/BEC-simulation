@@ -120,6 +120,46 @@ function SpinorBEC.plot_spinor(
     p
 end
 
+"""
+    save_column_density_png(grid, col, axis, path; kwargs...)
+
+Save a 2D column density array as a PNG heatmap. Used by
+`column_density_movie` analyzer to dump per-snapshot frames. `axis` is the
+integrated axis (1, 2, or 3) — informs axis labels for the remaining plane.
+"""
+function SpinorBEC.save_column_density_png(
+    grid::SpinorBEC.Grid{3},
+    col::AbstractMatrix{<:Real},
+    axis::Int,
+    path::AbstractString;
+    title::AbstractString = "",
+    colorscale::AbstractString = "Viridis",
+    width::Integer = 600,
+    height::Integer = 500,
+)
+    axes_remaining = Tuple(i for i in 1:3 if i != axis)
+    _name = i -> i == 1 ? "x" : i == 2 ? "y" : "z"
+    x_axis = grid.x[axes_remaining[1]]
+    y_axis = grid.x[axes_remaining[2]]
+    xlabel = "$(_name(axes_remaining[1])) [a_ho]"
+    ylabel = "$(_name(axes_remaining[2])) [a_ho]"
+    trace = heatmap(
+        x = x_axis, y = y_axis,
+        z = collect(col'),
+        colorscale = colorscale,
+        colorbar = attr(title = "∫n d$(_name(axis))"),
+    )
+    layout = Layout(
+        title = title,
+        xaxis_title = xlabel, yaxis_title = ylabel,
+        yaxis_scaleanchor = "x",
+        width = width, height = height,
+    )
+    p = plot(trace, layout)
+    savefig(p, String(path))
+    path
+end
+
 function SpinorBEC.plot_spin_texture(
     grid::SpinorBEC.Grid{1},
     psi::AbstractArray{ComplexF64},
