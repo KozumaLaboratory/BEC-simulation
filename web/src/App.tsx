@@ -10,6 +10,7 @@ import {
   PopulationsHeatmap,
 } from '@/components/charts/PopulationsChart'
 import { DataTable } from '@/components/DataTable'
+import { LoadingBar } from '@/components/LoadingBar'
 
 // Lazy chunks — three/webgpu + R3F + drei is ~1.7MB; splitting keeps the
 // initial payload light. SliceGrid stays eager since it shares Plotly with
@@ -27,6 +28,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen p-6 max-w-[1400px] mx-auto">
+      <LoadingBar active={loading} />
       <header className="mb-4">
         <h1 className="text-2xl font-semibold text-primary">
           {data?.run ?? 'SpinorBEC dashboard'}

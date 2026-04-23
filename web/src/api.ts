@@ -81,10 +81,19 @@ export const api = {
     return json(`/api/data/${encodeURIComponent(name)}`)
   },
 
-  async getDensity3d(run: string, file: string, component = 0): Promise<Density3D> {
-    const buf = await bin(
-      `/api/density3d_bin/${encodeURIComponent(run)}/${encodeURIComponent(file)}?comp=${component}`,
-    )
+  async getDensity3d(
+    run: string,
+    file: string,
+    component = 0,
+    angleDeg = 0,
+  ): Promise<Density3D> {
+    // Rotation only matters for per-component requests; the total density
+    // (component=0) is invariant under quantization-axis rotation.
+    const useRotated = component > 0 && Math.abs(angleDeg) > 0.01
+    const url = useRotated
+      ? `/api/density3d_rotated/${encodeURIComponent(run)}/${encodeURIComponent(file)}?angle=${angleDeg}&comp=${component}`
+      : `/api/density3d_bin/${encodeURIComponent(run)}/${encodeURIComponent(file)}?comp=${component}`
+    const buf = await bin(url)
     const header = new Int32Array(buf, 0, 6)
     const nx = header[0],
       ny = header[1],

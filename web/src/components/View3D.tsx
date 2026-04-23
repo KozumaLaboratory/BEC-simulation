@@ -37,6 +37,13 @@ export function View3D({ run, data }: Props) {
     opacity: { value: 0.6, min: 0, max: 1.5, step: 0.02 },
     colorLow: '#3d2d7a',
     colorHigh: '#fde725',
+    tiltDeg: {
+      value: 0,
+      min: 0,
+      max: 180,
+      step: 1,
+      label: 'q-axis tilt (deg)',
+    },
   })
 
   const vectorControls = useControls('Vectors', {
@@ -81,6 +88,7 @@ export function View3D({ run, data }: Props) {
     run,
     currentPoint?.file ?? null,
     comp,
+    controls.tiltDeg,
   )
 
   const { data: vectorData, error: vectorError } = useVectorField(

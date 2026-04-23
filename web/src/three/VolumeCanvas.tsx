@@ -31,7 +31,7 @@ export function VolumeCanvas({ density, params, vector }: Props) {
   }
   return (
     <Canvas
-      camera={{ position: [2, 2, 2.5], fov: 40, near: 0.1, far: 50 }}
+      camera={{ position: [1.1, 1.1, 1.4], fov: 50, near: 0.05, far: 20 }}
       gl={async (glProps) => {
         const renderer = new THREE_WEBGPU.WebGPURenderer({
           canvas: glProps.canvas as HTMLCanvasElement,

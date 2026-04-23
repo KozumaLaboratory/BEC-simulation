@@ -8,7 +8,12 @@ export interface DensityTexture {
   maxValue: number
 }
 
-export function useDensityTexture(run: string | null, file: string | null, component: number) {
+export function useDensityTexture(
+  run: string | null,
+  file: string | null,
+  component: number,
+  angleDeg: number = 0,
+) {
   const [state, setState] = useState<{
     data: DensityTexture | null
     loading: boolean
@@ -23,7 +28,7 @@ export function useDensityTexture(run: string | null, file: string | null, compo
     let cancelled = false
     setState((s) => ({ ...s, loading: true, error: null }))
     api
-      .getDensity3d(run, file, component)
+      .getDensity3d(run, file, component, angleDeg)
       .then((d) => {
         if (cancelled) return
         const tex = new THREE.Data3DTexture(d.density, d.nx, d.ny, d.nz)
@@ -52,7 +57,7 @@ export function useDensityTexture(run: string | null, file: string | null, compo
     return () => {
       cancelled = true
     }
-  }, [run, file, component])
+  }, [run, file, component, angleDeg])
 
   return state
 }
