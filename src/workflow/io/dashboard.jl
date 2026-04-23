@@ -985,8 +985,24 @@ end
 const _vector3d_plans_cache = Dict{NTuple{3,Int},Tuple{FFTPlans,Grid{3}}}()
 
 function _load_box_size(jld2_path::String)
-    d = JLD2.load(jld2_path, "grid_box_size")
-    NTuple{3,Float64}(d)
+    # Preferred: pull "grid_box_size" from the JLD2 file itself (newer runs
+    # embed it). Older runs — e.g. eu151_edh/point_001.jld2 — don't. FileIO
+    # may re-wrap JLD2's KeyError as CapturedException, so swallow any
+    # lookup failure and fall back to the sibling config.yaml.
+    try
+        d = JLD2.load(jld2_path, "grid_box_size")
+        return NTuple{3,Float64}(d)
+    catch
+        # fall through
+    end
+    box = _read_box_size(jld2_path)
+    if box === nothing || length(box) < 3
+        throw(ArgumentError(
+            "Cannot resolve box_size for $(jld2_path): missing `grid_box_size` " *
+            "in the JLD2 file and no usable grid.box in config.yaml.",
+        ))
+    end
+    NTuple{3,Float64}((Float64(box[1]), Float64(box[2]), Float64(box[3])))
 end
 
 function _get_plans_and_grid(n_pts::NTuple{3,Int}, box_size::NTuple{3,Float64})
