@@ -150,37 +150,58 @@ end
 
 # --- Dashboard server (stdlib Sockets only, no HTTP.jl needed) ---
 
-const _DASHBOARD_HTML_PATH = joinpath(@__DIR__, "..", "..", "..", "runs", "tools", "dashboard.html")
+const _REPO_ROOT = normpath(joinpath(@__DIR__, "..", "..", ".."))
+const _WEB_DIST_DIR = joinpath(_REPO_ROOT, "web", "dist")
+const _WEB_DIST_INDEX = joinpath(_WEB_DIST_DIR, "index.html")
+const _LEGACY_DASHBOARD_HTML = joinpath(_REPO_ROOT, "runs", "tools", "dashboard.html")
 
 """
     serve_dashboard(port=8080; base_dir="runs")
 
-Start a local HTTP server for the dashboard.
+Start a local HTTP server for the React + WebGPU dashboard.
 Browse to http://localhost:\$port to view results.
 
+Requires `web/dist/` (run `cd web && bun run build`). The legacy
+Plotly dashboard remains reachable at `/legacy` as long as
+`runs/tools/dashboard.html` exists.
+
 API:
-- `GET /`               → dashboard HTML
+- `GET /`               → React dashboard (web/dist/index.html)
+- `GET /assets/*`       → hashed static assets from web/dist/assets/
+- `GET /favicon.svg`    → favicon from web/dist/
+- `GET /legacy`         → legacy Plotly dashboard (if present)
 - `GET /api/runs`       → list of run directories
 - `GET /api/data/:name` → dashboard data JSON for a run
 - `GET /api/refresh`    → clear cache
+
+See src/workflow/io/dashboard.jl for the full /api surface that the
+React app consumes.
 """
 function serve_dashboard(port::Int = 8080; base_dir::String = "runs")
-    html_path = _DASHBOARD_HTML_PATH
-    isfile(html_path) || throw(ArgumentError("Dashboard HTML not found: $html_path"))
-    html_content = read(html_path, String)
+    if !isfile(_WEB_DIST_INDEX)
+        throw(ArgumentError(
+            "React dashboard not built. Run: cd web && bun install && bun run build"
+        ))
+    end
+    html_content = read(_WEB_DIST_INDEX, String)
+    legacy_html = isfile(_LEGACY_DASHBOARD_HTML) ? read(_LEGACY_DASHBOARD_HTML, String) : ""
     data_cache = Dict{String,String}()
     psi_cache = Dict{String,Any}()  # path → (psi, n_comp, n_pts, F, pops)
 
     server = Sockets.listen(Sockets.InetAddr(ip"0.0.0.0", port))
     println("Dashboard server running at http://localhost:$port")
     println("  Serving runs from: $(abspath(base_dir))")
+    println("  React app:         $(_WEB_DIST_INDEX)")
+    isempty(legacy_html) || println("  Legacy dashboard:  /legacy")
     println("  Press Ctrl+C to stop")
     flush(stdout)
 
     try
         while true
             sock = Sockets.accept(server)
-            @async _handle_dashboard_connection(sock, html_content, data_cache, psi_cache, base_dir)
+            @async _handle_dashboard_connection(
+                sock, html_content, legacy_html, data_cache, psi_cache, base_dir,
+            )
         end
     catch e
         e isa InterruptException || rethrow(e)
@@ -190,7 +211,7 @@ function serve_dashboard(port::Int = 8080; base_dir::String = "runs")
     end
 end
 
-function _handle_dashboard_connection(sock, html_content, data_cache, psi_cache, base_dir)
+function _handle_dashboard_connection(sock, html_content, legacy_html, data_cache, psi_cache, base_dir)
     try
         request_line = readline(sock)
         isempty(request_line) && return close(sock)
@@ -204,7 +225,9 @@ function _handle_dashboard_connection(sock, html_content, data_cache, psi_cache,
         length(parts) >= 2 || return close(sock)
         path = String(parts[2])
 
-        status, content_type, body = _route_dashboard(path, html_content, data_cache, psi_cache, base_dir)
+        status, content_type, body = _route_dashboard(
+            path, html_content, legacy_html, data_cache, psi_cache, base_dir,
+        )
         _send_http_response(sock, status, content_type, body)
     catch e
         e isa EOFError || @warn "Dashboard connection error: $e"
@@ -213,9 +236,17 @@ function _handle_dashboard_connection(sock, html_content, data_cache, psi_cache,
     end
 end
 
-function _route_dashboard(path, html_content, data_cache, psi_cache, base_dir)
+function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache, base_dir)
     if path == "/" || path == ""
         (200, "text/html; charset=utf-8", html_content)
+    elseif path == "/legacy"
+        if isempty(legacy_html)
+            (404, "text/plain", "Legacy dashboard not present")
+        else
+            (200, "text/html; charset=utf-8", legacy_html)
+        end
+    elseif startswith(path, "/assets/") || path == "/favicon.svg"
+        _serve_static_asset(path)
     elseif path == "/api/runs"
         runs = list_runs(base_dir)
         (200, "application/json", "[" * join(["\"$r\"" for r in runs], ",") * "]")
@@ -428,6 +459,30 @@ end
 
 function _uri_decode(s::AbstractString)
     replace(s, r"%([0-9A-Fa-f]{2})" => m -> Char(parse(UInt8, m[2:3]; base=16)))
+end
+
+function _static_content_type(path::AbstractString)
+    endswith(path, ".js")  && return "application/javascript; charset=utf-8"
+    endswith(path, ".css") && return "text/css; charset=utf-8"
+    endswith(path, ".svg") && return "image/svg+xml"
+    endswith(path, ".png") && return "image/png"
+    endswith(path, ".ico") && return "image/x-icon"
+    endswith(path, ".json") && return "application/json"
+    endswith(path, ".map") && return "application/json"
+    endswith(path, ".woff2") && return "font/woff2"
+    endswith(path, ".woff") && return "font/woff"
+    "application/octet-stream"
+end
+
+function _serve_static_asset(path::AbstractString)
+    # Sanitize: strip leading "/", reject traversal.
+    rel = lstrip(_uri_decode(path), '/')
+    occursin("..", rel) && return (400, "text/plain", "Bad path")
+    full = normpath(joinpath(_WEB_DIST_DIR, rel))
+    startswith(full, _WEB_DIST_DIR) || return (400, "text/plain", "Bad path")
+    isfile(full) || return (404, "text/plain", "Not found: $path")
+    body = read(full)
+    (200, _static_content_type(full), body)
 end
 
 """

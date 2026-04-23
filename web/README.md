@@ -1,73 +1,55 @@
-# React + TypeScript + Vite
+# SpinorBEC dashboard (React + WebGPU)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Frontend for the Julia `serve_dashboard` backend. Replaces the previous
+Plotly.js dashboard (`runs/tools/dashboard.html`) with:
 
-Currently, two official plugins are available:
+- shadcn/ui + Tailwind v4 shell
+- react-plotly.js for 2D charts (energy / Mz / populations / timing)
+- React Three Fiber + Three.js WebGPURenderer + TSL for 3D volume raymarch
+- leva for live shader / render parameters
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Toolchain
 
-## React Compiler
+Pinned via `web/mise.toml`:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Node 24
+- bun 1.3
 
-## Expanding the ESLint configuration
+## Develop
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+# From web/:
+bun install
+bun run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Vite dev server runs on <http://localhost:5173> and proxies `/api/*` to
+the Julia dashboard server. Start the backend separately:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+julia --project=. -e 'using SpinorBEC; serve_dashboard(8080)'
 ```
+
+Override the proxy target with `VITE_API_TARGET=http://other-host:8080`.
+
+## Production build
+
+```bash
+bun run build
+```
+
+Output goes to `web/dist/`. `serve_dashboard` in Julia serves this
+directory — it refuses to start if `web/dist/index.html` is missing.
+The legacy Plotly dashboard remains reachable at `/legacy` as long as
+`runs/tools/dashboard.html` is on disk.
+
+## Browser support
+
+Requires WebGPU for the 3D view:
+
+- Chrome / Edge 113+
+- Safari 17.4+ (macOS 14.4 / iOS 17.4) — enable "WebGPU" in Feature Flags
+- Firefox Nightly with `dom.webgpu.enabled`
+
+The 2D charts and data tabs work everywhere; the 3D tab shows an inline
+fallback message when `navigator.gpu` is absent.
