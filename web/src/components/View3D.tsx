@@ -11,10 +11,12 @@ import {
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import type { DashboardData } from '@/api'
+import type { DashboardData, VectorFieldKind } from '@/api'
 import { useDensityTexture } from '@/three/useDensityTexture'
+import { useVectorField } from '@/three/useVectorField'
 import { VolumeCanvas } from '@/three/VolumeCanvas'
 import type { VolumeParams } from '@/three/DensityVolume'
+import type { VectorFieldParams } from '@/three/VectorField'
 
 interface Props {
   run: string | null
@@ -37,6 +39,22 @@ export function View3D({ run, data }: Props) {
     colorHigh: '#fde725',
   })
 
+  const vectorControls = useControls('Vectors', {
+    show: false,
+    field: {
+      value: 'current' as VectorFieldKind,
+      options: {
+        'Mass current': 'current' as VectorFieldKind,
+        Magnetization: 'magnetization' as VectorFieldKind,
+      },
+    },
+    stride: { value: 8, min: 2, max: 16, step: 1 },
+    arrowScale: { value: 0.9, min: 0.1, max: 4, step: 0.05 },
+    densityThreshold: { value: 0.05, min: 0, max: 0.5, step: 0.01 },
+    colorLow: '#0d0887',
+    colorHigh: '#f0f921',
+  })
+
   const params = useMemo<VolumeParams>(
     () => ({
       isoMin: controls.isoMin,
@@ -49,10 +67,28 @@ export function View3D({ run, data }: Props) {
     [controls],
   )
 
+  const vParams = useMemo<VectorFieldParams>(
+    () => ({
+      arrowScale: vectorControls.arrowScale,
+      densityThreshold: vectorControls.densityThreshold,
+      colorLow: vectorControls.colorLow,
+      colorHigh: vectorControls.colorHigh,
+    }),
+    [vectorControls],
+  )
+
   const { data: density, loading, error } = useDensityTexture(
     run,
     currentPoint?.file ?? null,
     comp,
+  )
+
+  const { data: vectorData, error: vectorError } = useVectorField(
+    run,
+    currentPoint?.file ?? null,
+    vectorControls.field,
+    Math.round(vectorControls.stride),
+    vectorControls.show,
   )
 
   const componentOptions = useMemo(() => {
@@ -142,13 +178,27 @@ export function View3D({ run, data }: Props) {
 
         <div className="h-[600px] rounded-md overflow-hidden bg-[#0a0e14] border border-border">
           {density ? (
-            <VolumeCanvas density={density} params={params} />
+            <VolumeCanvas
+              density={density}
+              params={params}
+              vector={
+                vectorControls.show && vectorData
+                  ? { field: vectorData, params: vParams }
+                  : undefined
+              }
+            />
           ) : (
             <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
               {loading ? 'Loading…' : 'No data.'}
             </div>
           )}
         </div>
+
+        {vectorError && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            Vector field: {vectorError}
+          </div>
+        )}
       </CardContent>
     </Card>
   )

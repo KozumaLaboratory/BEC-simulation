@@ -4,17 +4,23 @@ import * as THREE from 'three'
 import * as THREE_WEBGPU from 'three/webgpu'
 import { useMemo } from 'react'
 import { DensityVolume, type VolumeParams } from './DensityVolume'
+import { VectorField, type VectorFieldParams } from './VectorField'
 import type { DensityTexture } from './useDensityTexture'
+import type { VectorField3D } from '@/api'
 
 interface Props {
   density: DensityTexture
   params: VolumeParams
+  vector?: {
+    field: VectorField3D
+    params: VectorFieldParams
+  }
 }
 
 const webgpuSupported =
   typeof navigator !== 'undefined' && 'gpu' in navigator
 
-export function VolumeCanvas({ density, params }: Props) {
+export function VolumeCanvas({ density, params, vector }: Props) {
   if (!webgpuSupported) {
     return (
       <div className="h-full flex items-center justify-center text-sm text-destructive text-center px-6">
@@ -39,6 +45,14 @@ export function VolumeCanvas({ density, params }: Props) {
       <color attach="background" args={['#0a0e14']} />
       <ambientLight intensity={0.4} />
       <DensityVolume density={density} params={params} />
+      {vector && (
+        <VectorField
+          field={vector.field}
+          density={density.meta}
+          densityMax={density.maxValue}
+          params={vector.params}
+        />
+      )}
       <BoundingBox />
       <OrbitControls enableDamping dampingFactor={0.08} />
     </Canvas>
