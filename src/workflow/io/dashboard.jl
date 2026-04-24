@@ -356,30 +356,33 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         name = rest[1:slash_idx-1]
         file = rest[slash_idx+1:end]
         qidx = findfirst('?', file)
-        comp_idx = 0  # 0 = total
+        comp_idx = 0
+        snap_idx = nothing
         if qidx !== nothing
             query = file[qidx+1:end]
             file = file[1:qidx-1]
             m = match(r"comp=(-?\d+)", query)
             m !== nothing && (comp_idx = parse(Int, m.captures[1]))
+            ms = match(r"snap=(\d+)", query)
+            ms !== nothing && (snap_idx = parse(Int, ms.captures[1]))
         end
         fpath = joinpath(base_dir, name, file)
         if !isfile(fpath)
             return (404, "text/plain", "File not found: $name/$file")
         end
         bin = try
-            _compute_3d_density_binary(_load_psi_cached(fpath, psi_cache)...; component=comp_idx)
+            _compute_3d_density_binary(_load_psi_cached(fpath, psi_cache, snap_idx)...; component=comp_idx)
         catch e
             return (500, "text/plain", "Error: $(e)")
         end
         (200, "application/octet-stream", bin)
 
-    elseif startswith(path, "/api/vorticity3d_bin/")
-        # /api/vorticity3d_bin/:run/:file  (no query params; scalar field)
-        rest = _uri_decode(path[22:end])
+    elseif startswith(path, "/api/snapshots/")
+        # /api/snapshots/:run/:file → metadata for the time-scrubber UI.
+        rest = _uri_decode(path[16:end])
         slash_idx = findfirst('/', rest)
         if slash_idx === nothing
-            return (400, "text/plain", "Expected /api/vorticity3d_bin/:run/:file")
+            return (400, "text/plain", "Expected /api/snapshots/:run/:file")
         end
         name = rest[1:slash_idx-1]
         file = rest[slash_idx+1:end]
@@ -389,8 +392,35 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         if !isfile(fpath)
             return (404, "text/plain", "File not found: $name/$file")
         end
+        meta = _snapshots_metadata(fpath)
+        if meta === nothing
+            return (200, "application/json", "{\"n_snapshots\":0,\"times\":[]}")
+        end
+        (200, "application/json", _json_string(meta))
+
+    elseif startswith(path, "/api/vorticity3d_bin/")
+        # /api/vorticity3d_bin/:run/:file?snap=K
+        rest = _uri_decode(path[22:end])
+        slash_idx = findfirst('/', rest)
+        if slash_idx === nothing
+            return (400, "text/plain", "Expected /api/vorticity3d_bin/:run/:file?snap=K")
+        end
+        name = rest[1:slash_idx-1]
+        file = rest[slash_idx+1:end]
+        qidx = findfirst('?', file)
+        snap_idx = nothing
+        if qidx !== nothing
+            query = file[qidx+1:end]
+            file = file[1:qidx-1]
+            ms = match(r"snap=(\d+)", query)
+            ms !== nothing && (snap_idx = parse(Int, ms.captures[1]))
+        end
+        fpath = joinpath(base_dir, name, file)
+        if !isfile(fpath)
+            return (404, "text/plain", "File not found: $name/$file")
+        end
         bin = try
-            psi, n_comp, ndim, n_pts, F = _load_psi_cached(fpath, psi_cache)
+            psi, n_comp, ndim, n_pts, F = _load_psi_cached(fpath, psi_cache, snap_idx)
             ndim == 3 || throw(ArgumentError("vorticity3d requires 3D data"))
             box_size = _load_box_size(fpath)
             _compute_3d_vorticity_binary(psi, n_comp, ndim, n_pts, F, box_size)
@@ -400,28 +430,31 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         (200, "application/octet-stream", bin)
 
     elseif startswith(path, "/api/phase3d_bin/")
-        # /api/phase3d_bin/:run/:file?comp=N (N >= 1)
+        # /api/phase3d_bin/:run/:file?comp=N&snap=K (N >= 1)
         rest = _uri_decode(path[18:end])
         slash_idx = findfirst('/', rest)
         if slash_idx === nothing
-            return (400, "text/plain", "Expected /api/phase3d_bin/:run/:file?comp=N")
+            return (400, "text/plain", "Expected /api/phase3d_bin/:run/:file?comp=N&snap=K")
         end
         name = rest[1:slash_idx-1]
         file = rest[slash_idx+1:end]
         qidx = findfirst('?', file)
         comp_idx = 1
+        snap_idx = nothing
         if qidx !== nothing
             query = file[qidx+1:end]
             file = file[1:qidx-1]
             m = match(r"comp=(-?\d+)", query)
             m !== nothing && (comp_idx = parse(Int, m.captures[1]))
+            ms = match(r"snap=(\d+)", query)
+            ms !== nothing && (snap_idx = parse(Int, ms.captures[1]))
         end
         fpath = joinpath(base_dir, name, file)
         if !isfile(fpath)
             return (404, "text/plain", "File not found: $name/$file")
         end
         bin = try
-            _compute_3d_phase_binary(_load_psi_cached(fpath, psi_cache)...; component=comp_idx)
+            _compute_3d_phase_binary(_load_psi_cached(fpath, psi_cache, snap_idx)...; component=comp_idx)
         catch e
             return (500, "text/plain", "Error: $(e)")
         end
@@ -488,12 +521,13 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         rest = _uri_decode(path[18:end])
         slash_idx = findfirst('/', rest)
         if slash_idx === nothing
-            return (400, "text/plain", "Expected /api/vector3d_bin/:run/:file?field=current&stride=2")
+            return (400, "text/plain", "Expected /api/vector3d_bin/:run/:file?field=current&stride=2&snap=K")
         end
         name = rest[1:slash_idx-1]
         file = rest[slash_idx+1:end]
         vec_field = :current
         vec_stride = 2
+        snap_idx = nothing
         qidx = findfirst('?', file)
         if qidx !== nothing
             query = file[qidx+1:end]
@@ -502,13 +536,15 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
             m !== nothing && (vec_field = Symbol(m.captures[1]))
             m2 = match(r"stride=(\d+)", query)
             m2 !== nothing && (vec_stride = parse(Int, m2.captures[1]))
+            ms = match(r"snap=(\d+)", query)
+            ms !== nothing && (snap_idx = parse(Int, ms.captures[1]))
         end
         fpath = joinpath(base_dir, name, file)
         if !isfile(fpath)
             return (404, "text/plain", "File not found: $name/$file")
         end
         bin = try
-            psi, n_comp, ndim, n_pts, F = _load_psi_cached(fpath, psi_cache)
+            psi, n_comp, ndim, n_pts, F = _load_psi_cached(fpath, psi_cache, snap_idx)
             ndim == 3 || throw(ArgumentError("vector3d requires 3D data"))
             box_size = _load_box_size(fpath)
             _compute_vector3d_binary(psi, n_comp, ndim, n_pts, F, box_size;
@@ -852,16 +888,58 @@ end
 
 # --- Binary APIs for performance ---
 
-"""Load psi from JLD2 with caching. Returns (psi, n_comp, ndim, n_pts, F)."""
-function _load_psi_cached(jld2_path::String, cache::Dict{String,Any})
-    get!(cache, jld2_path) do
-        d = JLD2.load(jld2_path)
-        psi = d["psi"]
+"""Load psi from JLD2 with caching. Returns (psi, n_comp, ndim, n_pts, F).
+
+When `snap_idx === nothing` (default) the final `psi` field is returned.
+When `snap_idx` is a positive integer, loads the requested time-slice
+from `dynamics/psi_snapshots` (saved by runs with
+`save_psi_snapshots: true`); the 5D array is up-cast to ComplexF64 so
+downstream code (FFT, probability_current, etc.) runs at its native
+precision."""
+function _load_psi_cached(
+    jld2_path::String,
+    cache::Dict{String,Any},
+    snap_idx::Union{Nothing,Int} = nothing,
+)
+    key = snap_idx === nothing ? jld2_path : "$(jld2_path)#snap=$(snap_idx)"
+    get!(cache, key) do
+        if snap_idx === nothing
+            d = JLD2.load(jld2_path)
+            psi = d["psi"]
+        else
+            snaps = JLD2.load(jld2_path, "dynamics/psi_snapshots")
+            n_snaps = size(snaps, ndims(snaps))
+            k = clamp(snap_idx, 1, n_snaps)
+            idx = ntuple(d -> d == ndims(snaps) ? k : Colon(), ndims(snaps))
+            psi = ComplexF64.(view(snaps, idx...))
+        end
         n_comp = size(psi, ndims(psi))
         ndim = ndims(psi) - 1
         F = div(n_comp - 1, 2)
         n_pts = ntuple(i -> size(psi, i), ndim)
         (psi, n_comp, ndim, n_pts, F)
+    end
+end
+
+"""Return metadata about the saved snapshot time series, or nothing if
+the file has no `dynamics/psi_snapshots` key."""
+function _snapshots_metadata(jld2_path::String)
+    try
+        jldopen(jld2_path, "r") do f
+            if !haskey(f, "dynamics/psi_snapshots")
+                return nothing
+            end
+            snaps = f["dynamics/psi_snapshots"]
+            n_snaps = size(snaps, ndims(snaps))
+            times = haskey(f, "dynamics/times") ? Float64.(f["dynamics/times"]) : Float64[]
+            Dict{String,Any}(
+                "n_snapshots" => n_snaps,
+                "times" => times,
+                "shape" => collect(size(snaps)[1:end-1]),
+            )
+        end
+    catch
+        nothing
     end
 end
 
