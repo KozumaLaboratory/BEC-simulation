@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, type DashboardData, type PointMeta } from '@/api'
+import { useDashboardURL } from './useDashboardURL'
 
 export interface RunDataState {
   runs: string[]
@@ -16,8 +17,9 @@ export interface RunDataState {
 }
 
 export function useRunData(): RunDataState {
+  const [urlState, setUrlState] = useDashboardURL()
+  const selectedRun = urlState.run
   const [runs, setRuns] = useState<string[]>([])
-  const [selectedRun, setSelectedRun] = useState<string | null>(null)
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -28,10 +30,13 @@ export function useRunData(): RunDataState {
   // we stop auto-advancing past empty runs once they've chosen something.
   const userPickedRef = useRef(false)
 
-  const setSelectedRunUser = useCallback((name: string) => {
-    userPickedRef.current = true
-    setSelectedRun(name)
-  }, [])
+  const setSelectedRun = useCallback(
+    (name: string) => {
+      userPickedRef.current = true
+      setUrlState({ run: name, point: 0, snap: null })
+    },
+    [setUrlState],
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -41,7 +46,9 @@ export function useRunData(): RunDataState {
       .then((list) => {
         if (cancelled) return
         setRuns(list)
-        if (list.length > 0 && !selectedRun) setSelectedRun(list[0])
+        if (list.length > 0 && !selectedRun) {
+          setUrlState({ run: list[0] })
+        }
         setError(null)
       })
       .catch((e: Error) => {
@@ -79,7 +86,7 @@ export function useRunData(): RunDataState {
           if (!userPickedRef.current && runs.length > 0) {
             const idx = runs.indexOf(selectedRun)
             const next = runs[idx + 1]
-            if (next) setSelectedRun(next)
+            if (next) setUrlState({ run: next })
           }
           return
         }
@@ -109,7 +116,7 @@ export function useRunData(): RunDataState {
     error,
     xKey,
     runFilter,
-    setSelectedRun: setSelectedRunUser,
+    setSelectedRun,
     setXKey,
     setRunFilter,
     refresh,

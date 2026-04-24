@@ -14,15 +14,22 @@
     "@react-three/fiber": "^9.6.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
     "leva": "^0.10.1",
     "lucide-react": "^1.9.0",
+    "nuqs": "^2.8.9",
     "plotly.js-dist-min": "^3.5.0",
     "radix-ui": "^1.4.3",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
+    "react-error-boundary": "^6.1.1",
+    "react-hotkeys-hook": "^5.2.4",
     "react-plotly.js": "^2.6.0",
+    "shiki": "^4.0.2",
     "tailwind-merge": "^3.5.0",
-    "three": "^0.184.0"
+    "three": "^0.184.0",
+    "yaml": "^2.8.3",
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

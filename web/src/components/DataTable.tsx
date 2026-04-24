@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { DashboardData, PointMeta } from '@/api'
+import { api, type DashboardData, type PointMeta, type DynamicsSeries } from '@/api'
 import { filterPoints } from '@/state/useRunData'
+import { Sparkline } from '@/components/Sparkline'
 
 interface Props {
   data: DashboardData | null
@@ -21,6 +22,7 @@ export function DataTable({ data, runFilter }: Props) {
   const pts = useMemo(() => filterPoints(data, runFilter), [data, runFilter])
   const mValues = useMemo(() => pts[0]?.m_values ?? [], [pts])
   const scanKeys = data?.scan_keys ?? []
+  const series = useDynamicsSeriesMap(data?.run ?? null, pts)
 
   const allNumericKeys = useMemo(
     () => ['energy', 'mz_actual', 'duration_seconds', ...scanKeys],
@@ -150,6 +152,8 @@ export function DataTable({ data, runFilter }: Props) {
                   Mz
                 </Th>
                 <th className="px-2 py-2 text-right">conv</th>
+                <th className="px-2 py-2 text-center min-w-[90px]">Mz(t)</th>
+                <th className="px-2 py-2 text-center min-w-[90px]">E(t)</th>
                 <th className="px-2 py-2 text-center min-w-[130px]">populations (m=+F..−F)</th>
                 <Th
                   k="duration_seconds"
@@ -169,6 +173,8 @@ export function DataTable({ data, runFilter }: Props) {
                 ))}
                 <StatCell s={stats['energy']} />
                 <StatCell s={stats['mz_actual']} />
+                <td />
+                <td />
                 <td />
                 <td />
                 <StatCell s={stats['duration_seconds']} digits={1} />
@@ -192,6 +198,12 @@ export function DataTable({ data, runFilter }: Props) {
                       {p.converged ? '✓' : '✗'}
                     </span>
                   </td>
+                  <td className="px-2 py-1.5 text-center">
+                    <Sparkline ys={series[p.file]?.magnetizations ?? []} color="#a277ff" />
+                  </td>
+                  <td className="px-2 py-1.5 text-center">
+                    <Sparkline ys={series[p.file]?.energies ?? []} color="#00d9ff" />
+                  </td>
                   <td className="px-2 py-1.5">
                     <PopulationBar populations={p.populations ?? []} />
                   </td>
@@ -206,6 +218,37 @@ export function DataTable({ data, runFilter }: Props) {
       </CardContent>
     </Card>
   )
+}
+
+// Fetch dynamics/* time series for every row in the table. Hits the new
+// /api/dynamics_series endpoint in parallel; returns a file → series map.
+// Results are cached by (run, file) and survive panel re-renders.
+function useDynamicsSeriesMap(run: string | null, pts: PointMeta[]) {
+  const [map, setMap] = useState<Record<string, DynamicsSeries>>({})
+
+  useEffect(() => {
+    if (!run || pts.length === 0) {
+      setMap({})
+      return
+    }
+    let cancelled = false
+    Promise.all(
+      pts.map((p) =>
+        api
+          .getDynamicsSeries(run, p.file)
+          .then((s): [string, DynamicsSeries] => [p.file, s])
+          .catch((): [string, DynamicsSeries] => [p.file, { has_dynamics: false }]),
+      ),
+    ).then((entries) => {
+      if (cancelled) return
+      setMap(Object.fromEntries(entries))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [run, pts])
+
+  return map
 }
 
 function StatCell({ s, digits = 3 }: { s?: Record<Stat, number>; digits?: number }) {

@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useMemo, useEffect } from 'react'
+import { useDashboardURL } from '@/state/useDashboardURL'
 import { useControls } from 'leva'
 import * as THREE from 'three'
 import { Card, CardContent } from '@/components/ui/card'
@@ -12,6 +13,10 @@ import {
 import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { DashboardData, VectorFieldKind } from '@/api'
+import { useRef } from 'react'
+import type CameraControlsImpl from 'camera-controls'
+import { CAMERA_PRESETS } from '@/three/CameraRig'
+import { CameraPresetBar } from '@/components/CameraPresetBar'
 import { useDensityTexture } from '@/three/useDensityTexture'
 import { usePhaseTexture } from '@/three/usePhaseTexture'
 import { useVorticityTexture } from '@/three/useVorticityTexture'
@@ -31,21 +36,27 @@ interface Props {
 
 export function View3D({ run, data }: Props) {
   const points = data?.points ?? []
-  const [pointIdx, setPointIdx] = useState(0)
-  const [comp, setComp] = useState<number>(0) // 0 = total, 1..n = m-component
+  const [url, setUrl] = useDashboardURL()
+  const pointIdx = Math.min(Math.max(url.point, 0), Math.max(0, points.length - 1))
+  const setPointIdx = (updater: number | ((n: number) => number)) => {
+    const next = typeof updater === 'function' ? updater(pointIdx) : updater
+    setUrl({ point: next, snap: null })
+  }
+  const comp = Math.max(0, url.comp)
+  const setComp = (n: number) => setUrl({ comp: n })
 
   const currentPoint = points[Math.min(pointIdx, points.length - 1)] ?? null
 
   // Snapshot scrubbing. snap === undefined means "render the final state"
   // (the pre-time-scrubber behaviour, used for non-snapshot runs).
   const { data: snapMeta } = useSnapshots(run, currentPoint?.file ?? null)
-  const [snapIdx, setSnapIdx] = useState<number>(1)
+  const snapIdx = url.snap ?? 1
+  const setSnapIdx = (n: number) => setUrl({ snap: n })
   useEffect(() => {
-    // Reset to the first frame when switching points or entering a run with snapshots.
-    if (snapMeta && snapMeta.n_snapshots > 0) {
-      setSnapIdx((prev) => Math.min(Math.max(prev, 1), snapMeta.n_snapshots))
+    if (snapMeta && snapMeta.n_snapshots > 0 && url.snap === null) {
+      setUrl({ snap: 1 })
     }
-  }, [snapMeta, pointIdx])
+  }, [snapMeta, url.snap, setUrl])
   const snap =
     snapMeta && snapMeta.n_snapshots > 0 ? snapIdx : undefined
 
@@ -213,6 +224,7 @@ export function View3D({ run, data }: Props) {
   }, [controls.colorMode, comp, currentPoint])
 
   const phaseEnabled = controls.colorMode === 'phase' && comp >= 1
+  const cameraRef = useRef<CameraControlsImpl | null>(null)
   const { data: phase, error: phaseError } = usePhaseTexture(
     run,
     currentPoint?.file ?? null,
@@ -380,9 +392,17 @@ export function View3D({ run, data }: Props) {
           </div>
         )}
 
-        <div className="h-[600px] rounded-md overflow-hidden bg-[#0a0e14] border border-border">
+        <div className="relative h-[600px] rounded-md overflow-hidden bg-[#0a0e14] border border-border">
+          <CameraPresetBar
+            controlsRef={cameraRef}
+            onReset={() => {
+              const p = CAMERA_PRESETS.iso
+              cameraRef.current?.setLookAt(p[0], p[1], p[2], 0, 0, 0, true)
+            }}
+          />
           {volumeTex ? (
             <VolumeCanvas
+              ref={cameraRef}
               density={volumeTex}
               phase={controls.source === 'density' ? phase ?? undefined : undefined}
               params={params}

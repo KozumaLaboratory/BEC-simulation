@@ -65,6 +65,16 @@ export interface SnapshotsMeta {
   shape?: number[]
 }
 
+export interface DynamicsSeries {
+  has_dynamics: boolean
+  times?: number[]
+  energies?: number[]
+  magnetizations?: number[]
+  norms?: number[]
+  pop_top?: number[]
+  pop_mid?: number[]
+}
+
 export interface VortexLine {
   m: string // "+5", "-3", "0"
   charge: number // ±1, ±2, ...
@@ -132,6 +142,12 @@ export const api = {
     const snapArg = snap !== undefined ? `&snap=${snap}` : ''
     return json(
       `/api/vortex_lines/${encodeURIComponent(run)}/${encodeURIComponent(file)}?mask=${mask}${snapArg}`,
+    )
+  },
+
+  getDynamicsSeries(run: string, file: string): Promise<DynamicsSeries> {
+    return json(
+      `/api/dynamics_series/${encodeURIComponent(run)}/${encodeURIComponent(file)}`,
     )
   },
 

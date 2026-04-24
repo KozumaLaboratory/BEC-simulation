@@ -42,11 +42,25 @@ export const BASE_LAYOUT: Partial<Layout> = {
   xaxis: { gridcolor: '#21262d', zerolinecolor: '#3d4550' },
   yaxis: { gridcolor: '#21262d', zerolinecolor: '#3d4550' },
   legend: { bgcolor: 'rgba(0,0,0,0)' },
+  // Preserve zoom / pan when the underlying data updates (e.g. on point
+  // selection changes). Any static string works — what matters is that it
+  // doesn't change across renders for the same chart.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  uirevision: 'keep' as any,
+  hovermode: 'x unified',
+  dragmode: 'zoom',
 }
 
 export const BASE_CONFIG: Partial<Config> = {
   responsive: true,
-  displayModeBar: false,
+  displayModeBar: 'hover',
+  modeBarButtonsToRemove: [
+    'lasso2d',
+    'select2d',
+    'toggleSpikelines',
+    'autoScale2d',
+  ],
+  displaylogo: false,
 }
 
 export { Plot }
