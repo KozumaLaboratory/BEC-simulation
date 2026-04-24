@@ -65,6 +65,18 @@ export interface SnapshotsMeta {
   shape?: number[]
 }
 
+export interface VortexLine {
+  m: string // "+5", "-3", "0"
+  charge: number // ±1, ±2, ...
+  points: number[][] // [[x, y, z], ...] in physical (Julia) coords
+}
+
+export interface VortexLinesResponse {
+  lines: VortexLine[]
+  box: number[]
+  n_lines: number
+}
+
 export interface PhaseSlice {
   ndim: number
   axis: number
@@ -109,6 +121,18 @@ export const api = {
 
   getRunData(name: string): Promise<DashboardData> {
     return json(`/api/data/${encodeURIComponent(name)}`)
+  },
+
+  getVortexLines(
+    run: string,
+    file: string,
+    snap?: number,
+    mask = 0.01,
+  ): Promise<VortexLinesResponse> {
+    const snapArg = snap !== undefined ? `&snap=${snap}` : ''
+    return json(
+      `/api/vortex_lines/${encodeURIComponent(run)}/${encodeURIComponent(file)}?mask=${mask}${snapArg}`,
+    )
   },
 
   getSnapshots(run: string, file: string): Promise<SnapshotsMeta> {

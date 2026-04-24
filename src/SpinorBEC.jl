@@ -119,6 +119,7 @@ include("analysis/ensemble.jl")
 include("analysis/energy.jl")
 include("analysis/currents.jl")
 include("analysis/vorticity.jl")
+include("analysis/vortex_extraction.jl")
 include("analysis/diagnostics.jl")
 include("analysis/majorana.jl")
 include("analysis/tof.jl")
@@ -272,6 +273,7 @@ export structure_factor, modulation_contrast
 export probability_current, orbital_angular_momentum
 export superfluid_velocity, total_angular_momentum, spin_texture_charge
 export circulation
+export extract_vortex_lines_per_m
 export wigner_correct_density, ensemble_correlation, ensemble_stderr
 export superfluid_vorticity, berry_curvature, singlet_pair_amplitude
 export pair_amplitude, pair_amplitude_spectrum

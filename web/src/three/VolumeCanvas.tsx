@@ -6,9 +6,10 @@ import { useMemo } from 'react'
 import { DensityVolume, type VolumeParams } from './DensityVolume'
 import { VectorField, type VectorFieldParams } from './VectorField'
 import { ParticleField, type ParticleParams } from './ParticleField'
+import { VortexTubes } from './VortexTubes'
 import type { DensityTexture } from './useDensityTexture'
 import type { PhaseTexture } from './usePhaseTexture'
-import type { VectorField3D } from '@/api'
+import type { VectorField3D, VortexLinesResponse } from '@/api'
 
 interface Props {
   density: DensityTexture
@@ -22,12 +23,24 @@ interface Props {
     field: VectorField3D
     params: ParticleParams
   }
+  vortexLines?: {
+    data: VortexLinesResponse
+    thickness: number
+    colorByCharge?: boolean
+  }
 }
 
 const webgpuSupported =
   typeof navigator !== 'undefined' && 'gpu' in navigator
 
-export function VolumeCanvas({ density, phase, params, vector, particles }: Props) {
+export function VolumeCanvas({
+  density,
+  phase,
+  params,
+  vector,
+  particles,
+  vortexLines,
+}: Props) {
   if (!webgpuSupported) {
     return (
       <div className="h-full flex items-center justify-center text-sm text-destructive text-center px-6">
@@ -73,6 +86,13 @@ export function VolumeCanvas({ density, phase, params, vector, particles }: Prop
           density={density.meta}
           densityMax={density.maxValue}
           params={particles.params}
+        />
+      )}
+      {vortexLines && (
+        <VortexTubes
+          data={vortexLines.data}
+          thickness={vortexLines.thickness}
+          colorByCharge={vortexLines.colorByCharge}
         />
       )}
       <BoundingBox />

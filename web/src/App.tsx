@@ -61,7 +61,7 @@ export default function App() {
       <Tabs defaultValue="overview" className="w-full">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="slice">2D</TabsTrigger>
+          <TabsTrigger value="slice">2D View</TabsTrigger>
           <TabsTrigger value="view3d">3D View</TabsTrigger>
           <TabsTrigger value="data">Data</TabsTrigger>
           <TabsTrigger value="config">Config</TabsTrigger>

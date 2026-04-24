@@ -398,6 +398,57 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         end
         (200, "application/json", _json_string(meta))
 
+    elseif startswith(path, "/api/vortex_lines/")
+        # /api/vortex_lines/:run/:file?snap=K&mask=FRAC  → per-m polylines
+        rest = _uri_decode(path[19:end])
+        slash_idx = findfirst('/', rest)
+        if slash_idx === nothing
+            return (400, "text/plain", "Expected /api/vortex_lines/:run/:file?snap=K&mask=FRAC")
+        end
+        name = rest[1:slash_idx-1]
+        file = rest[slash_idx+1:end]
+        snap_idx = nothing
+        mask_frac = 0.0
+        qidx = findfirst('?', file)
+        if qidx !== nothing
+            query = file[qidx+1:end]
+            file = file[1:qidx-1]
+            ms = match(r"snap=(\d+)", query)
+            ms !== nothing && (snap_idx = parse(Int, ms.captures[1]))
+            mm = match(r"mask=([0-9.]+)", query)
+            mm !== nothing && (mask_frac = parse(Float64, mm.captures[1]))
+        end
+        fpath = joinpath(base_dir, name, file)
+        if !isfile(fpath)
+            return (404, "text/plain", "File not found: $name/$file")
+        end
+        json = try
+            psi, n_comp, ndim, n_pts, F = _load_psi_cached(fpath, psi_cache, snap_idx)
+            ndim == 3 || throw(ArgumentError("vortex_lines requires 3D data"))
+            box_size = _load_box_size(fpath)
+            g = make_grid(GridConfig(n_pts, box_size))
+            lines = extract_vortex_lines_per_m(psi, g; min_density_frac = mask_frac)
+            # Flatten into a frontend-friendly list [{m, charge, points}, ...]
+            out_lines = Dict{String,Any}[]
+            for (m_label, polylines) in lines
+                for ln in polylines
+                    push!(out_lines, Dict{String,Any}(
+                        "m" => m_label,
+                        "charge" => ln.charge,
+                        "points" => [[p[1], p[2], p[3]] for p in ln.points],
+                    ))
+                end
+            end
+            _json_string(Dict{String,Any}(
+                "lines" => out_lines,
+                "box" => collect(Float64.(box_size)),
+                "n_lines" => length(out_lines),
+            ))
+        catch e
+            "{\"error\":\"$(replace(string(e), "\"" => "'"))\"}"
+        end
+        (200, "application/json", json)
+
     elseif startswith(path, "/api/vorticity3d_bin/")
         # /api/vorticity3d_bin/:run/:file?snap=K
         rest = _uri_decode(path[22:end])

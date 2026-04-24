@@ -16,6 +16,7 @@ import { useDensityTexture } from '@/three/useDensityTexture'
 import { usePhaseTexture } from '@/three/usePhaseTexture'
 import { useVorticityTexture } from '@/three/useVorticityTexture'
 import { useVectorField } from '@/three/useVectorField'
+import { useVortexLines } from '@/three/useVortexLines'
 import { useSnapshots } from '@/state/useSnapshots'
 import { TimeScrubber } from '@/components/TimeScrubber'
 import { VolumeCanvas } from '@/three/VolumeCanvas'
@@ -96,6 +97,13 @@ export function View3D({ run, data }: Props) {
     densityThreshold: { value: 0.005, min: 0, max: 0.5, step: 0.005 },
     colorLow: '#0d0887',
     colorHigh: '#f0f921',
+  })
+
+  const vortexControls = useControls('Vortex lines', {
+    show: true,
+    mask: { value: 0.01, min: 0, max: 0.5, step: 0.005, label: 'density mask' },
+    thickness: { value: 0.008, min: 0.001, max: 0.05, step: 0.001 },
+    colorByCharge: { value: false, label: 'color by charge (vs m)' },
   })
 
   const particleControls = useControls('Particles', {
@@ -200,6 +208,14 @@ export function View3D({ run, data }: Props) {
     Math.round(vectorControls.stride),
     vectorControls.show,
     snap,
+  )
+
+  const { data: vortexData, error: vortexError } = useVortexLines(
+    run,
+    currentPoint?.file ?? null,
+    vortexControls.show,
+    snap,
+    vortexControls.mask,
   )
 
   const { data: particleFieldData, error: particleError } = useVectorField(
@@ -357,6 +373,15 @@ export function View3D({ run, data }: Props) {
                   ? { field: particleFieldData, params: pParams }
                   : undefined
               }
+              vortexLines={
+                vortexControls.show && vortexData
+                  ? {
+                      data: vortexData,
+                      thickness: vortexControls.thickness,
+                      colorByCharge: vortexControls.colorByCharge,
+                    }
+                  : undefined
+              }
             />
           ) : (
             <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
@@ -374,6 +399,23 @@ export function View3D({ run, data }: Props) {
         {particleError && (
           <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             Particles: {particleError}
+          </div>
+        )}
+
+        {vortexError && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            Vortex lines: {vortexError}
+          </div>
+        )}
+
+        {vortexData && vortexControls.show && (
+          <div className="text-xs text-muted-foreground">
+            Vortex lines: {vortexData.n_lines} polyline{vortexData.n_lines === 1 ? '' : 's'}
+            {vortexData.lines.length > 0 && (
+              <span className="ml-2">
+                ({Array.from(new Set(vortexData.lines.map((l) => l.m))).sort().join(', ')})
+              </span>
+            )}
           </div>
         )}
 
