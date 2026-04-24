@@ -138,6 +138,7 @@ invalidate_split_step_graph!(::Workspace) = nothing
 include("workflow/experiments/pipeline_api.jl")
 include("workflow/experiments/pipeline_continuation.jl")
 include("workflow/experiments/run_registry.jl")
+include("workflow/experiments/calibration.jl")
 
 # ========================================
 # ANALYSIS: Observables & diagnostics
@@ -365,6 +366,9 @@ export apply_photon_scattering!, photon_scattering_callback
 export split_step_captured!, invalidate_split_step_graph!
 export load_config, load_config_from_string, run_config
 export run_yaml, run_status, list_runs, compute_run_dir
+export CalibrationSet, CoilCalibration, FORTCalibration, RabiCalibration
+export DEFAULT_CALIBRATION, load_calibration, apply_calibration!, run_yaml_calibrated
+export coil_mv_to_gauss, fort_mw_to_trap_hz, rabi_mw_to_rad_s
 export apply_override!, apply_overrides, expand_scan_points, parse_override_map
 export OverrideScan, ConstrainedJzScan
 export PotentialConfig, ConstantValue, LinearRamp, interpolate_value
