@@ -143,11 +143,34 @@ function _save_dynamics_timeseries!(f, result)
         f["dynamics/component_populations"] = pops
 
         if get(result, :save_psi_snapshots, false)
-            stacked = Array{ComplexF32}(undef, n_pts..., D, n_snaps)
+            # Streamed write: downcast and serialise snapshots one at a time
+            # rather than allocating the full (n_pts..., D, n_snaps) 5D array
+            # up front. For a 64³×13×154 scan point that would be ~1 GB of
+            # working memory on top of whatever the simulation was already
+            # holding, and the tmp-file copy step then doubled that on disk.
+            # Writing per-snapshot into group members keeps peak memory at
+            # one snapshot (~7 MB ComplexF32) and still round-trips through
+            # `load(path, "dynamics/psi_snapshots")` thanks to the light
+            # reconstruction path in dashboard.jl (_load_psi_cached checks
+            # for both layouts).
+            #
+            # Note: JLD2 doesn't ship a transparent chunk-compressed array
+            # type like HDF5. `CodecZlib`/`CodecZstd` integration is opt-in
+            # and varies across JLD2 minor versions, so we stay out of that
+            # business and just avoid the doubled-memory copy.
+            # Streamed: one JLD2 key per frame, reusing a single
+            # ComplexF32 buffer. Peak = one snapshot (~7 MB for 64³×13)
+            # vs the 1 GB 5D-array approach.
+            f["dynamics/psi_snapshots_streamed/n_snapshots"] = n_snaps
+            f["dynamics/psi_snapshots_streamed/spatial_shape"] = collect(n_pts)
+            f["dynamics/psi_snapshots_streamed/n_components"] = D
+            buf = Array{ComplexF32}(undef, n_pts..., D)
             for (s, psi) in enumerate(dr.psi_snapshots)
-                stacked[ntuple(_ -> Colon(), ndim + 1)..., s] = ComplexF32.(psi)
+                buf .= ComplexF32.(psi)
+                key = "dynamics/psi_snapshots_streamed/frame_" *
+                      lpad(string(s), 5, '0')
+                f[key] = buf
             end
-            f["dynamics/psi_snapshots"] = stacked
         end
     end
 end

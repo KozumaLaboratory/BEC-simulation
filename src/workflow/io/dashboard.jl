@@ -377,6 +377,42 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         end
         (200, "application/octet-stream", bin)
 
+    elseif startswith(path, "/api/dynamics_series/")
+        # /api/dynamics_series/:run/:file → scalar time series for sparkline rendering
+        rest = _uri_decode(path[22:end])
+        slash_idx = findfirst('/', rest)
+        if slash_idx === nothing
+            return (400, "text/plain", "Expected /api/dynamics_series/:run/:file")
+        end
+        name = rest[1:slash_idx-1]
+        file = rest[slash_idx+1:end]
+        qidx = findfirst('?', file)
+        qidx !== nothing && (file = file[1:qidx-1])
+        fpath = joinpath(base_dir, name, file)
+        if !isfile(fpath)
+            return (404, "text/plain", "File not found: $name/$file")
+        end
+        json = try
+            d = JLD2.load(fpath)
+            out = Dict{String,Any}("has_dynamics" => haskey(d, "dynamics/times"))
+            for k in ("dynamics/times", "dynamics/energies", "dynamics/magnetizations", "dynamics/norms")
+                haskey(d, k) || continue
+                out[split(k, "/")[2]] = Float64.(d[k])
+            end
+            if haskey(d, "dynamics/component_populations")
+                # Just return the dominant m's series so sparklines stay compact.
+                pops = d["dynamics/component_populations"]
+                n_snaps = size(pops, 1)
+                n_comp = size(pops, 2)
+                out["pop_top"] = [Float64(pops[t, 1]) for t in 1:n_snaps]  # m=+F
+                out["pop_mid"] = [Float64(pops[t, (n_comp + 1) ÷ 2]) for t in 1:n_snaps]  # m=0
+            end
+            _json_string(out)
+        catch e
+            "{\"error\":\"$(replace(string(e), "\"" => "'"))\"}"
+        end
+        (200, "application/json", json)
+
     elseif startswith(path, "/api/snapshots/")
         # /api/snapshots/:run/:file → metadata for the time-scrubber UI.
         rest = _uri_decode(path[16:end])
@@ -958,11 +994,37 @@ function _load_psi_cached(
             d = JLD2.load(jld2_path)
             psi = d["psi"]
         else
-            snaps = JLD2.load(jld2_path, "dynamics/psi_snapshots")
-            n_snaps = size(snaps, ndims(snaps))
-            k = clamp(snap_idx, 1, n_snaps)
-            idx = ntuple(d -> d == ndims(snaps) ? k : Colon(), ndims(snaps))
-            psi = ComplexF64.(view(snaps, idx...))
+            # Two on-disk layouts are supported:
+            #   (1) streamed — one key per frame, keys
+            #       "dynamics/psi_snapshots_streamed/frame_00001" … 00154.
+            #       Written by the current simulator; peak memory on the
+            #       write side is one snapshot.
+            #   (2) legacy — a single 5D array "dynamics/psi_snapshots"
+            #       with the snapshot index on the trailing axis.
+            # Only read the requested frame in either case; never stack.
+            psi = jldopen(jld2_path, "r") do f
+                if haskey(f, "dynamics/psi_snapshots_streamed/n_snapshots")
+                    n = Int(f["dynamics/psi_snapshots_streamed/n_snapshots"])
+                    k = clamp(snap_idx, 1, n)
+                    key = "dynamics/psi_snapshots_streamed/frame_" *
+                          lpad(string(k), 5, '0')
+                    ComplexF64.(f[key])
+                elseif haskey(f, "dynamics/psi_snapshots")
+                    snaps = f["dynamics/psi_snapshots"]
+                    n = size(snaps, ndims(snaps))
+                    k = clamp(snap_idx, 1, n)
+                    idx = ntuple(
+                        d -> d == ndims(snaps) ? k : Colon(),
+                        ndims(snaps),
+                    )
+                    ComplexF64.(view(snaps, idx...))
+                else
+                    throw(ArgumentError(
+                        "No psi snapshots in $(jld2_path). Re-run with " *
+                        "`save_psi_snapshots: true`.",
+                    ))
+                end
+            end
         end
         n_comp = size(psi, ndims(psi))
         ndim = ndims(psi) - 1
@@ -977,17 +1039,27 @@ the file has no `dynamics/psi_snapshots` key."""
 function _snapshots_metadata(jld2_path::String)
     try
         jldopen(jld2_path, "r") do f
-            if !haskey(f, "dynamics/psi_snapshots")
-                return nothing
+            times = haskey(f, "dynamics/times") ?
+                Float64.(f["dynamics/times"]) : Float64[]
+            if haskey(f, "dynamics/psi_snapshots_streamed/n_snapshots")
+                n = Int(f["dynamics/psi_snapshots_streamed/n_snapshots"])
+                shape = Int.(f["dynamics/psi_snapshots_streamed/spatial_shape"])
+                D = Int(f["dynamics/psi_snapshots_streamed/n_components"])
+                return Dict{String,Any}(
+                    "n_snapshots" => n,
+                    "times" => times,
+                    "shape" => vcat(shape, D),
+                )
+            elseif haskey(f, "dynamics/psi_snapshots")
+                snaps = f["dynamics/psi_snapshots"]
+                n_snaps = size(snaps, ndims(snaps))
+                return Dict{String,Any}(
+                    "n_snapshots" => n_snaps,
+                    "times" => times,
+                    "shape" => collect(size(snaps)[1:end-1]),
+                )
             end
-            snaps = f["dynamics/psi_snapshots"]
-            n_snaps = size(snaps, ndims(snaps))
-            times = haskey(f, "dynamics/times") ? Float64.(f["dynamics/times"]) : Float64[]
-            Dict{String,Any}(
-                "n_snapshots" => n_snaps,
-                "times" => times,
-                "shape" => collect(size(snaps)[1:end-1]),
-            )
+            nothing
         end
     catch
         nothing
