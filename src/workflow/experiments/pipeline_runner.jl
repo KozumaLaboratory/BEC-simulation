@@ -481,7 +481,13 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
         return (psi_out, grid, atom, ws, step_result)
     end
 
-    result = run_simulation!(ws)
+    save_psi_snap = Bool(get(p, "save_psi_snapshots", false))
+    save_compress = Bool(get(p, "save_snapshot_compression", false))
+
+    result, snap_tmp_path, snap_count =
+        _run_dynamics_with_optional_streaming!(
+            ws, save_psi_snap, save_compress,
+        )
 
     if verbose
         println("  $(n_steps) steps, E_final=$(round(result.energies[end]; sigdigits=6))")
@@ -492,11 +498,71 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
     step_result = Dict{Symbol,Any}(
         :dynamics_result => result,
         :dynamics_workspace => ws,
-        :save_psi_snapshots => Bool(get(p, "save_psi_snapshots", false)),
-        :save_snapshot_compression =>
-            Bool(get(p, "save_snapshot_compression", false)),
+        :save_psi_snapshots => save_psi_snap,
+        :save_snapshot_compression => save_compress,
+        :snapshot_tmp_path => snap_tmp_path,
+        :snapshot_count => snap_count,
     )
     (psi_out, grid, atom, ws, step_result)
+end
+
+"""
+    _run_dynamics_with_optional_streaming!(ws, save_psi, compress)
+        -> (result, tmp_path_or_nothing, snapshot_count)
+
+When `save_psi` is false, run the simulation the normal way. When true,
+open a scratch JLD2 file for snapshot streaming before the sim, install
+an on_snapshot callback that downcasts to ComplexF32 and writes one
+frame per key, then close the file. Peak host RAM while dynamics runs
+is now one snapshot (~26 MB at 64³×13) instead of the full accumulated
+vector (~8 GB at 154 snapshots).
+"""
+function _run_dynamics_with_optional_streaming!(
+    ws, save_psi::Bool, compress::Bool,
+)
+    if !save_psi
+        return (run_simulation!(ws), nothing, 0)
+    end
+
+    snap_tmp = _dynamics_scratch_path()
+    jld_kwargs = compress ? (; compress = ZlibCompressor()) : (;)
+    snap_file = jldopen(snap_tmp, "w"; jld_kwargs...)
+
+    n_pts = ntuple(d -> size(ws.state.psi, d), ndims(ws.state.psi) - 1)
+    D = size(ws.state.psi, ndims(ws.state.psi))
+    snap_file["spatial_shape"] = collect(n_pts)
+    snap_file["n_components"] = D
+
+    buf = Array{ComplexF32}(undef, n_pts..., D)
+    frame_count = Ref(0)
+
+    on_snap = function (_ws, _step, psi_snap)
+        frame_count[] += 1
+        buf .= ComplexF32.(psi_snap)
+        snap_file["frame_" * lpad(string(frame_count[]), 5, '0')] = buf
+        return
+    end
+
+    result = try
+        run_simulation!(
+            ws;
+            callbacks = SimulationCallbacks(on_snapshot = on_snap),
+            stream_snapshots = true,
+        )
+    finally
+        snap_file["n_snapshots"] = frame_count[]
+        close(snap_file)
+    end
+
+    return (result, snap_tmp, frame_count[])
+end
+
+function _dynamics_scratch_path()
+    scratch = get(ENV, "SPINORBEC_SCRATCH_DIR", "")
+    base = string(hash((time_ns(), getpid())); base = 16)
+    dir = isempty(scratch) ? tempdir() : scratch
+    isdir(dir) || mkpath(dir)
+    joinpath(dir, "spinorbec_snaps_" * base * ".jld2")
 end
 
 function _parse_twa_config(d::Dict)

@@ -42,12 +42,25 @@ _normalize_callbacks(::Nothing) = SimulationCallbacks()
 _normalize_callbacks(f::Function) = SimulationCallbacks(on_snapshot = f)
 _normalize_callbacks(c::SimulationCallbacks) = c
 
-function _record_snapshot!(times, energies, norms, mags, snapshots, ws, sys)
+function _record_snapshot!(
+    times,
+    energies,
+    norms,
+    mags,
+    snapshots,
+    ws,
+    sys;
+    keep_psi::Bool = true,
+)
     push!(times, ws.state.t)
     push!(energies, total_energy(ws))
     push!(norms, total_norm(ws.state.psi, ws.grid))
     push!(mags, magnetization(ws.state.psi, ws.grid, sys))
-    push!(snapshots, Array(ws.state.psi))
+    # When a caller is streaming snapshots to disk in an on_snapshot
+    # callback we skip the in-memory copy. 154 × 52 MB on a 64³×13
+    # grid is 8 GB of host RAM that we can trivially avoid — the live
+    # `ws.state.psi` is already available to the callback.
+    keep_psi && push!(snapshots, Array(ws.state.psi))
 end
 
 function _check_energy_drift(energies, norms, E_now, nrm_now, t)
@@ -97,6 +110,7 @@ function run_simulation!(
     callback::Union{Nothing,Function} = nothing,
     callbacks::Union{Nothing,SimulationCallbacks} = nothing,
     live_monitor::Union{Nothing,LiveMonitor} = nothing,
+    stream_snapshots::Bool = false,
 ) where {N}
     sp = ws.sim_params
     sys = ws.spin_matrices.system
@@ -114,7 +128,10 @@ function run_simulation!(
     norms = Float64[]
     mags = Float64[]
     snapshots = Array{ComplexF64}[]
-    _record_snapshot!(times, energies, norms, mags, snapshots, ws, sys)
+    _record_snapshot!(
+        times, energies, norms, mags, snapshots, ws, sys;
+        keep_psi = !stream_snapshots,
+    )
 
     if it
         _run_simulation_standard!(
@@ -127,7 +144,8 @@ function run_simulation!(
             mags,
             snapshots,
             cbs,
-            live_monitor,
+            live_monitor;
+            stream_snapshots,
         )
     else
         _run_simulation_leapfrog!(
@@ -140,7 +158,8 @@ function run_simulation!(
             mags,
             snapshots,
             cbs,
-            live_monitor,
+            live_monitor;
+            stream_snapshots,
         )
     end
 
@@ -164,7 +183,8 @@ function _run_simulation_standard!(
     mags,
     snapshots,
     callbacks::SimulationCallbacks,
-    live_monitor::Union{Nothing,LiveMonitor},
+    live_monitor::Union{Nothing,LiveMonitor};
+    stream_snapshots::Bool = false,
 ) where {N}
     t_start = time()
     try
@@ -180,7 +200,10 @@ function _run_simulation_standard!(
             end
 
             if step % sp.save_every == 0
-                _record_snapshot!(times, energies, norms, mags, snapshots, ws, sys)
+                _record_snapshot!(
+                    times, energies, norms, mags, snapshots, ws, sys;
+                    keep_psi = !stream_snapshots,
+                )
 
                 elapsed = time() - t_start
                 frac = step / sp.n_steps
@@ -193,13 +216,17 @@ function _run_simulation_standard!(
                 ccall(:fflush, Cint, (Ptr{Cvoid},), C_NULL)
 
                 if callbacks.on_snapshot !== nothing
-                    callbacks.on_snapshot(ws, step, snapshots[end])
+                    psi_snap = stream_snapshots ? Array(ws.state.psi) : snapshots[end]
+                    callbacks.on_snapshot(ws, step, psi_snap)
                 end
             end
         end
     catch e
         if e isa InterruptException
-            _record_snapshot!(times, energies, norms, mags, snapshots, ws, sys)
+            _record_snapshot!(
+                times, energies, norms, mags, snapshots, ws, sys;
+                keep_psi = !stream_snapshots,
+            )
             println("\n  Simulation interrupted at step $(ws.state.step)/$(sp.n_steps), t=$(round(ws.state.t; sigdigits=6))")
             println("  Final snapshot saved. Use run_simulation_checkpointed! with resume=true to continue.")
             flush(stdout)
@@ -228,7 +255,8 @@ function _run_simulation_leapfrog!(
     mags,
     snapshots,
     callbacks::SimulationCallbacks,
-    live_monitor::Union{Nothing,LiveMonitor},
+    live_monitor::Union{Nothing,LiveMonitor};
+    stream_snapshots::Bool = false,
 ) where {N}
     dt = sp.dt
     n_comp = sys.n_components
@@ -272,10 +300,14 @@ function _run_simulation_leapfrog!(
             end
 
             if is_save
-                _record_snapshot!(times, energies, norms, mags, snapshots, ws, sys)
+                _record_snapshot!(
+                    times, energies, norms, mags, snapshots, ws, sys;
+                    keep_psi = !stream_snapshots,
+                )
 
                 if callbacks.on_snapshot !== nothing
-                    callbacks.on_snapshot(ws, step, snapshots[end])
+                    psi_snap = stream_snapshots ? Array(ws.state.psi) : snapshots[end]
+                    callbacks.on_snapshot(ws, step, psi_snap)
                 end
             end
 
@@ -287,7 +319,10 @@ function _run_simulation_leapfrog!(
         if e isa InterruptException
             # Close the open half-step so psi is in a valid Strang-split state
             _half_potential_step!(ws, dt / 2, n_comp, N, false; t_eval = ws.state.t + dt / 4, t_start = ws.state.t)
-            _record_snapshot!(times, energies, norms, mags, snapshots, ws, sys)
+            _record_snapshot!(
+                times, energies, norms, mags, snapshots, ws, sys;
+                keep_psi = !stream_snapshots,
+            )
             println("\n  Simulation interrupted at step $(ws.state.step)/$(sp.n_steps), t=$(round(ws.state.t; sigdigits=6))")
             println("  Final snapshot saved. Use run_simulation_checkpointed! with resume=true to continue.")
             flush(stdout)

@@ -126,7 +126,49 @@ function _save_dynamics_timeseries!(f, result)
     f["dynamics/norms"] = collect(Float64, dr.norms)
     f["dynamics/magnetizations"] = collect(Float64, dr.magnetizations)
 
-    if hasproperty(dr, :psi_snapshots) && !isempty(dr.psi_snapshots)
+    # Snapshots arrive via two paths now:
+    #   (A) Streamed: the dynamics step wrote ComplexF32 frames to a
+    #       scratch JLD2 file on the fly (keeps peak host RAM at one
+    #       frame), and :snapshot_tmp_path + :snapshot_count are set.
+    #       We copy those frames into the main file and delete the
+    #       scratch. Component populations are derived from the F32
+    #       buffers as we stream them — one pass, no double-load.
+    #   (B) Legacy in-memory: `dr.psi_snapshots` is populated and we
+    #       do the old write-at-end (still streamed into the final
+    #       file, but the source vector holds all 154×ComplexF64 in
+    #       host RAM).
+    tmp_path = get(result, :snapshot_tmp_path, nothing)
+    save_psi = get(result, :save_psi_snapshots, false)
+
+    if save_psi && tmp_path !== nothing && isfile(tmp_path)
+        jldopen(tmp_path, "r") do src
+            n_snaps = Int(src["n_snapshots"])
+            n_pts_v = Int.(src["spatial_shape"])
+            D = Int(src["n_components"])
+            ndim = length(n_pts_v)
+
+            pops = zeros(Float64, n_snaps, D)
+            f["dynamics/psi_snapshots_streamed/n_snapshots"] = n_snaps
+            f["dynamics/psi_snapshots_streamed/spatial_shape"] = n_pts_v
+            f["dynamics/psi_snapshots_streamed/n_components"] = D
+
+            for s in 1:n_snaps
+                skey = "frame_" * lpad(string(s), 5, '0')
+                frame = src[skey]::Array{ComplexF32}
+                f["dynamics/psi_snapshots_streamed/" * skey] = frame
+                total = sum(abs2, frame)
+                for c in 1:D
+                    idx = ntuple(d -> d <= ndim ? (1:n_pts_v[d]) : c, ndim + 1)
+                    pops[s, c] = sum(abs2, view(frame, idx...)) / max(total, 1e-30)
+                end
+            end
+            f["dynamics/component_populations"] = pops
+        end
+        rm(tmp_path; force = true)
+    elseif hasproperty(dr, :psi_snapshots) && !isempty(dr.psi_snapshots)
+        # Legacy in-memory path. `pops` is computed first from F64
+        # buffers, then each frame is copied to disk as F32 one at a
+        # time — no intermediate 5D array.
         psi1 = dr.psi_snapshots[1]
         D = size(psi1)[end]
         ndim = ndims(psi1) - 1
@@ -142,17 +184,7 @@ function _save_dynamics_timeseries!(f, result)
         end
         f["dynamics/component_populations"] = pops
 
-        if get(result, :save_psi_snapshots, false)
-            # Streamed write: one JLD2 key per frame, reusing a single
-            # ComplexF32 buffer. Peak memory = one snapshot (~7 MB for
-            # 64³×13, ~440 MB for 256³×13) vs the old 5D-array approach
-            # which allocated the full (n_pts..., D, n_snaps) stack
-            # up front (~1 GB / ~68 GB respectively).
-            #
-            # Compression is applied at the jldopen level upstream
-            # (run_registry passes `compress=true` via the ZlibCompressor
-            # when the run is configured for it); each frame write
-            # inherits that setting.
+        if save_psi
             f["dynamics/psi_snapshots_streamed/n_snapshots"] = n_snaps
             f["dynamics/psi_snapshots_streamed/spatial_shape"] = collect(n_pts)
             f["dynamics/psi_snapshots_streamed/n_components"] = D
