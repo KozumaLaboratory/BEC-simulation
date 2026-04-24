@@ -18,11 +18,8 @@ import { LoadingBar } from '@/components/LoadingBar'
 const View3D = lazy(() =>
   import('@/components/View3D').then((m) => ({ default: m.View3D })),
 )
-const SliceGrid = lazy(() =>
-  import('@/components/SliceGrid').then((m) => ({ default: m.SliceGrid })),
-)
-const PhaseGrid = lazy(() =>
-  import('@/components/PhaseGrid').then((m) => ({ default: m.PhaseGrid })),
+const SlicePanel = lazy(() =>
+  import('@/components/SlicePanel').then((m) => ({ default: m.SlicePanel })),
 )
 
 export default function App() {
@@ -64,8 +61,7 @@ export default function App() {
       <Tabs defaultValue="overview" className="w-full">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="slice">Slice</TabsTrigger>
-          <TabsTrigger value="phase">Phase</TabsTrigger>
+          <TabsTrigger value="slice">2D</TabsTrigger>
           <TabsTrigger value="view3d">3D View</TabsTrigger>
           <TabsTrigger value="data">Data</TabsTrigger>
           <TabsTrigger value="config">Config</TabsTrigger>
@@ -128,13 +124,7 @@ export default function App() {
 
         <TabsContent value="slice">
           <Suspense fallback={<TabFallback />}>
-            <SliceGrid run={selectedRun} data={data} />
-          </Suspense>
-        </TabsContent>
-
-        <TabsContent value="phase">
-          <Suspense fallback={<TabFallback />}>
-            <PhaseGrid run={selectedRun} data={data} />
+            <SlicePanel run={selectedRun} data={data} />
           </Suspense>
         </TabsContent>
 
