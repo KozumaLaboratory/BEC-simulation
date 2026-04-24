@@ -111,6 +111,7 @@ include("workflow/experiments/sta_counter_diabatic.jl")
 include("workflow/experiments/feshbach_ramp.jl")
 include("solvers/projected_gp.jl")
 include("solvers/photon_heating.jl")
+include("solvers/sgpe.jl")
 
 # CUDA-graph-accelerated split_step (extended by SpinorBECCUDAExt).
 # Default implementation = plain split_step! so CPU workspaces work unchanged.
@@ -363,6 +364,7 @@ export sta_counter_diabatic_q_quench, build_sta_zeeman
 export feshbach_ramp, feshbach_c0_wf
 export apply_projected_gp!, projected_gp_callback
 export apply_photon_scattering!, photon_scattering_callback
+export apply_sgpe_step!, sgpe_callback
 export split_step_captured!, invalidate_split_step_graph!
 export load_config, load_config_from_string, run_config
 export run_yaml, run_status, list_runs, compute_run_dir

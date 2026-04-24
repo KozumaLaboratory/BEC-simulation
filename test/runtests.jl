@@ -76,6 +76,7 @@ const CI_EXTRA = [
     "test_experiment.jl",
     "test_zeeman_midpoint.jl",
     "test_calibration.jl",
+    "test_phase4.jl",
 ]
 
 # ── Full tier: everything (ci + remaining heavy tests) ──
