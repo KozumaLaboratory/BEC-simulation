@@ -109,7 +109,13 @@ Save dynamics time series (times, energies, magnetizations, component population
 from `dynamics_result` so Mz(t) and E(t) can be analysed from disk.
 
 Per-component populations are computed from psi_snapshots (13 floats per snapshot).
-Full psi snapshots are NOT saved to avoid multi-GB files.
+
+Full psi snapshots are persisted only when the run was invoked with
+`save_psi_snapshots: true` (the caller stashes this as
+`result[:save_psi_snapshots]`). When saved they are downcast to ComplexF32
+and packed into one 5D array `dynamics/psi_snapshots` of shape
+`(n_pts..., n_comp, n_snaps)` — halves the disk footprint vs ComplexF64
+and keeps numerical precision fine for visualisation.
 """
 function _save_dynamics_timeseries!(f, result)
     haskey(result, :dynamics_result) || return
@@ -135,6 +141,14 @@ function _save_dynamics_timeseries!(f, result)
             end
         end
         f["dynamics/component_populations"] = pops
+
+        if get(result, :save_psi_snapshots, false)
+            stacked = Array{ComplexF32}(undef, n_pts..., D, n_snaps)
+            for (s, psi) in enumerate(dr.psi_snapshots)
+                stacked[ntuple(_ -> Colon(), ndim + 1)..., s] = ComplexF32.(psi)
+            end
+            f["dynamics/psi_snapshots"] = stacked
+        end
     end
 end
 

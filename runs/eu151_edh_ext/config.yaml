@@ -1,0 +1,77 @@
+# ================================================================
+# Eu151 EdH — extended evolution, dense snapshots, seed scan
+# ================================================================
+#
+# Context (see runs/eu151_edh/config.yaml for the original):
+#   The 40 ms reference run ended with Mz oscillating around +4.9
+#   (not fully depolarised) and a single z-axis vortex line rather
+#   than an 8-corner texture. To resolve whether that's an
+#   insufficient-time issue or an insufficient-seed issue, this run
+#   (a) extends the relaxation phase to ~115 ms and (b) scans the
+#   symmetry-breaking seed amplitude.
+#
+# Snapshot plan (user asked for ~30 fps × 5 s playback):
+#   Phase 2+3 merged into one long dynamics step of 107.6 ω⁻¹
+#   (~155 ms) at dt = 1e-4 → 1.076 M steps.
+#   save_every = 7000 → ~154 snapshots. At 30 fps that's 5.1 s of
+#   playback for the whole relaxation.
+#   save_psi_snapshots: true writes them to disk as ComplexF32 (8
+#   bytes/element) → 64³ × 13 × 8 B = 6.8 MB/snap × 154 ≈ 1.05 GB
+#   per run. × 2 scan points = ~2 GB. Fits on a laptop SSD; won't
+#   bottleneck the dynamics (write is one-shot at end).
+#
+# Cost estimate:
+#   GS: cached (free).
+#   Quench (0.14 ω⁻¹ @ dt=5e-4): ~280 steps, seconds on GPU.
+#   Relaxation (107.6 ω⁻¹ @ dt=1e-4): 1.076 M steps. Reference
+#   40 ms run = 27.6 ω⁻¹ = 276k steps; scale that linearly ≈ 4×
+#   the original → a few hours on GPU × 2 scan points = overnight.
+#
+# If you only want the "longer time alone" test, leave the default
+# seed (1e-6) and comment out the `scan:` block to save one run.
+# ================================================================
+
+pipeline:
+  - ground_state:
+      cache: runs/shared/eu151_gs_p100_fmmin_c1r0_64.jld2
+      atom: Eu151
+      grid: {n: [64, 64, 64], box: [20.0, 20.0, 20.0]}
+      interactions:
+        N_atoms: 50000
+        omega_ref: 691.15
+        c1_ratio: 0.0
+      ddi: {enabled: true}
+      zeeman: {p: 100.0, q: 0.0}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.182]}
+      dt: 0.005
+      n_steps: 100000
+      tol: 1.0e-10
+      initial_state: ferromagnetic_min
+      backend: cuda
+
+  # Instantaneous quench to weak field (unchanged from reference).
+  - dynamics:
+      duration: 0.14
+      dt: 0.0005
+      save_every: 280
+      zeeman: {p: {from: 100.0, to: 0.39}, q: 0.0}
+
+  # Extended relaxation — 115 ms instead of the reference 40 ms.
+  # Snapshots saved densely so the time-scrubber can play the whole
+  # evolution at 30 fps without gaps.
+  - dynamics:
+      duration: 107.6
+      dt: 0.0001
+      save_every: 7000
+      save_psi_snapshots: true
+      seed_amplitude: 1.0e-6
+      noise_seed: 42
+      zeeman: {p: 0.39, q: 0.0}
+
+scan:
+  product:
+    # Two seed amplitudes at the start of the long relaxation phase.
+    # 1e-6 is the reference (matches original run); 1e-4 gives
+    # azimuthal / octahedral modes a head-start and should reveal
+    # whether the 8-corner texture needs a larger kick to form.
+    pipeline.2.seed_amplitude: [1.0e-6, 1.0e-4]
