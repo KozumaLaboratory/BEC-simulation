@@ -197,9 +197,25 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
             end
 
             verbose && @printf("    E=%.4f conv=%s (%.1fs)\n", energy, converged, duration)
+
+            # Free the workspace's GPU buffers before the next scan point.
+            # Without this, ~96 ComplexF64 64³ workspaces can accumulate on
+            # a 16 GB device before CUDA's allocator reclaims (each
+            # workspace pins ~150 MB across psi/fft_buf/k²/ddi_kernel/...).
+            result = nothing
+            GC.gc()
+            _maybe_cuda_reclaim()
         end
     end
 end
+
+"""
+Callback the CUDA extension sets at `__init__` to release cached GPU
+memory between scan points. Default is a no-op so the CPU-only build
+doesn't pay any cost.
+"""
+const _cuda_reclaim_callback = Ref{Function}(() -> nothing)
+_maybe_cuda_reclaim() = _cuda_reclaim_callback[]()
 
 """
     _scratch_tmp_path(final_path)

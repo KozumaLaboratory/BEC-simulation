@@ -199,18 +199,27 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
         psi_c = view(psi, idx...)
         n_c = abs2.(psi_c)
         n_max = maximum(n_c)
-        # Phase winding detection via discrete curl of phase gradient
         phase_field = angle.(psi_c)
+        thresh = threshold * n_max
         vortex_count = 0
-        for i in 2:(n_pts[1]-1), j in 2:(n_pts[2]-1)
-            n_c[i, j] < threshold * n_max && continue
-            # Plaquette phase winding
-            dp = _phase_diff(phase_field[i+1, j], phase_field[i, j]) +
-                 _phase_diff(phase_field[i+1, j+1], phase_field[i+1, j]) +
-                 _phase_diff(phase_field[i, j+1], phase_field[i+1, j+1]) +
-                 _phase_diff(phase_field[i, j], phase_field[i, j+1])
-            if abs(dp) > π
-                vortex_count += 1
+        if ndim == 2
+            @inbounds for j in 2:(n_pts[2]-1), i in 2:(n_pts[1]-1)
+                n_c[i, j] < thresh && continue
+                dp = _phase_diff(phase_field[i+1, j], phase_field[i, j]) +
+                     _phase_diff(phase_field[i+1, j+1], phase_field[i+1, j]) +
+                     _phase_diff(phase_field[i, j+1], phase_field[i+1, j+1]) +
+                     _phase_diff(phase_field[i, j], phase_field[i, j+1])
+                abs(dp) > π && (vortex_count += 1)
+            end
+        else
+            # 3D: sum vortex plaquettes across every z-slice
+            @inbounds for k in 1:n_pts[3], j in 2:(n_pts[2]-1), i in 2:(n_pts[1]-1)
+                n_c[i, j, k] < thresh && continue
+                dp = _phase_diff(phase_field[i+1, j, k], phase_field[i, j, k]) +
+                     _phase_diff(phase_field[i+1, j+1, k], phase_field[i+1, j, k]) +
+                     _phase_diff(phase_field[i, j+1, k], phase_field[i+1, j+1, k]) +
+                     _phase_diff(phase_field[i, j, k], phase_field[i, j+1, k])
+                abs(dp) > π && (vortex_count += 1)
             end
         end
         (vortex_count = vortex_count, component = component)

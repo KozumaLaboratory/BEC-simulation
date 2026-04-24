@@ -15,10 +15,12 @@ using Printf
 end
 
 const RUNS = [
-    "klaus2022_full",        # Klaus 2022 Dy164 vortex-stripe reproduction
-    "eu151_sgpe_thermal",    # SGPE finite-T ensemble (validates Phase 4.3)
-    "eu151_kibble_zurek",    # KZ quench scaling (defect_density × τ_Q)
-    "eu151_phase_pq_hires",  # (p, q) phase diagram — runs only if prior finish early
+    "klaus2022_full",        # Klaus 2022 Dy164 vortex-stripe (re-run with fixed
+                             # vortex_detect 3D + smaller save_every)
+    "eu151_droplet",         # Eu151 self-bound droplet — exercises droplet_profile
+                             # analyzer end-to-end on Phase 4.1 config
+    "eu151_phase_pq_hires",  # (p, q) phase map resume — 95/144 cached, 49 to go;
+                             # benefits from CUDA.reclaim() between scan points
 ]
 
 println("=" ^ 72)

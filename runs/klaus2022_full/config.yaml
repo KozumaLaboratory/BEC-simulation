@@ -76,9 +76,8 @@ pipeline:
   - dynamics:
       duration: 314                      # 1 s
       dt: 0.002
-      save_every: 500
-      save_psi_snapshots: true
-      save_snapshot_precision: "f32"
+      save_every: 5000                   # 31 snapshots over 1 s — keeps RAM at ~1 GB
+                                         # so column_density_movie can read them in-memory
       interactions: {omega_ref: 314.159}
       zeeman:
         level: 1
