@@ -1,0 +1,38 @@
+# Self-bound Eu151 DDI + LHY droplet (Phase 4.1 / Scenario #4).
+#
+# Trap OFF. The cloud is stabilized purely by the balance between attractive
+# mean-field (DDI with c₁<0 small correction, polarized along z) and
+# repulsive scalar LHY. Starting from a compact Gaussian in a large box; at
+# the end ITP should have condensed into a finite-radius self-bound drop
+# rather than spreading to fill the box.
+#
+# Notes:
+#   - box: 30 a_ho^3 to give plenty of vacuum around the drop
+#   - c_lhy must be tuned to match the cloud; 1135 is the Li & Saito value
+#     for N=50000 at q=0, polar. For other regimes regenerate.
+#   - initial_state: a narrow Gaussian seeded by default at grid centre.
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid:
+        n: [64, 64, 64]
+        box: [30.0, 30.0, 30.0]
+      interactions:
+        N_atoms: 50000
+        omega_ref: 691.15
+        c1_ratio: 0.0
+        c_lhy: 1135.0
+      ddi:
+        enabled: true
+      zeeman: {p: 0.0, q: 0.0}
+      potential: {type: none}              # no external confinement
+      dt: 0.0005
+      n_steps: 60000
+      tol: 1.0e-8
+      initial_state: polar
+      backend: cpu
+
+  - analyze:
+      - droplet_profile: {}
+      - phase_classify: {}

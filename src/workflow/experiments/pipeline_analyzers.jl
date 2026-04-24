@@ -327,6 +327,72 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
         plans.forward * delta_nk
         Sk = abs2.(delta_nk) .* cell_volume(grid)^2
         (structure_factor = Sk,)
+    elseif name == :droplet_profile
+        ndim = length(grid.config.n_points)
+        n = total_density(psi, ndim)
+        dV = cell_volume(grid)
+        n_peak = maximum(n)
+        N_atoms = sum(n) * dV
+        # FWHM along each axis through the density peak
+        peak_idx = Tuple(argmax(n))
+        fwhm = zeros(Float64, ndim)
+        sigma = zeros(Float64, ndim)
+        for d in 1:ndim
+            line = _line_through_peak(n, peak_idx, d)
+            fwhm[d] = _fwhm_1d(line, grid.dx[d])
+            sigma[d] = _rms_width_1d(line, grid.dx[d], grid.x[d])
+        end
+        # Surface sharpness ≈ max |∇n| / n_peak (axis-aligned max)
+        max_grad = 0.0
+        for d in 1:ndim
+            dxd = grid.dx[d]
+            # forward difference max
+            gmax = _max_forward_grad(n, d, dxd)
+            max_grad = max(max_grad, gmax)
+        end
+        sharpness = n_peak > 0 ? max_grad / n_peak : 0.0
+        (n_peak = n_peak, N_atoms = N_atoms,
+         fwhm = fwhm, sigma = sigma,
+         surface_sharpness = sharpness,
+         peak_index = collect(peak_idx))
+
+    elseif name == :non_abelian_homotopy
+        ndim = length(grid.config.n_points)
+        ndim >= 2 || throw(ArgumentError("non_abelian_homotopy requires N >= 2"))
+        loop_pts_raw = get(params, "loop_pts", nothing)
+        loop_pts_raw === nothing && throw(ArgumentError(
+            "non_abelian_homotopy requires loop_pts: [[i,j], ...]"))
+        loop_pts = NTuple{2,Int}[(Int(p[1]), Int(p[2])) for p in loop_pts_raw]
+        component = let v = get(params, "component", nothing)
+            v === nothing ? nothing : Int(v)
+        end
+        holonomy = non_abelian_holonomy(psi, grid, loop_pts; component = component)
+        winding = round(Int, angle(holonomy) / (2π))
+        (holonomy = holonomy, phase = angle(holonomy),
+         winding = winding, loop_length = length(loop_pts))
+
+    elseif name == :monopole_charge
+        ndim = length(grid.config.n_points)
+        ndim == 3 || throw(ArgumentError("monopole_charge requires 3D grid"))
+        smooth = Bool(get(params, "smooth", false))
+        q_field = monopole_charge_3d(psi, grid; smooth = smooth)
+        total_charge = total_monopole_charge(q_field, grid)
+        (monopole_charge_density = q_field,
+         total_charge = total_charge,
+         max_abs_density = maximum(abs, q_field))
+
+    elseif name == :winding_field
+        ndim = length(grid.config.n_points)
+        ndim >= 2 || throw(ArgumentError("winding_field requires N >= 2"))
+        component = let v = get(params, "component", nothing)
+            v === nothing ? nothing : Int(v)
+        end
+        threshold = Float64(get(params, "threshold", 1e-6))
+        w = winding_number_field(psi, grid; component = component, threshold = threshold)
+        (winding_field = w,
+         total_winding = sum(w),
+         max_abs_winding = maximum(abs, w))
+
     elseif name == :column_density_movie
         # Column-integrated total density for every snapshot from the preceding
         # dynamics step, written as PNG frames. Requires prior dynamics step
@@ -396,7 +462,8 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
         _known = "tomography, faraday, energy_decomposition, phase_classify, stability, bogoliubov, " *
                  "multipole_order, winding_map, absorption_image, sg_tof, domain_analysis, skyrmion_density, " *
                  "phase_contrast_image, momentum_distribution, vortex_detect, correlation_length, " *
-                 "defect_density, kibble_zurek_stats, bragg_spectroscopy, column_density_movie, summary_json"
+                 "defect_density, kibble_zurek_stats, bragg_spectroscopy, non_abelian_homotopy, " *
+                 "monopole_charge, winding_field, droplet_profile, column_density_movie, summary_json"
         throw(ArgumentError("Unknown analyzer: $name. Supported: $_known"))
     end
 end
@@ -404,6 +471,69 @@ end
 function _phase_diff(a::Float64, b::Float64)
     d = a - b
     d > π ? d - 2π : d < -π ? d + 2π : d
+end
+
+# --- droplet_profile helpers ---
+
+"""Extract the 1D density line through `peak_idx` along dimension `d`."""
+function _line_through_peak(n::AbstractArray, peak_idx::NTuple{D,Int}, d::Int) where {D}
+    nd = size(n, d)
+    line = Vector{Float64}(undef, nd)
+    @inbounds for i in 1:nd
+        idx = ntuple(k -> k == d ? i : peak_idx[k], D)
+        line[i] = n[idx...]
+    end
+    line
+end
+
+"""
+Full width at half maximum of a 1D profile with grid spacing `dx`.
+Returns 0 if the profile never reaches half of its peak (degenerate).
+Uses linear interpolation between adjacent grid points at the crossings.
+"""
+function _fwhm_1d(line::AbstractVector{Float64}, dx::Float64)
+    pk = maximum(line)
+    pk > 0 || return 0.0
+    half = 0.5 * pk
+    # Find first and last indices where line >= half
+    i_lo = findfirst(x -> x >= half, line)
+    i_hi = findlast(x -> x >= half, line)
+    (i_lo === nothing || i_hi === nothing || i_hi <= i_lo) && return 0.0
+    # Linear interpolation for sub-cell precision
+    lo_frac = if i_lo > 1
+        prev = line[i_lo - 1]; curr = line[i_lo]
+        curr > prev ? (half - prev) / (curr - prev) : 0.0
+    else
+        0.0
+    end
+    hi_frac = if i_hi < length(line)
+        curr = line[i_hi]; nxt = line[i_hi + 1]
+        curr > nxt ? (curr - half) / (curr - nxt) : 1.0
+    else
+        1.0
+    end
+    (i_hi + hi_frac - (i_lo - (1.0 - lo_frac))) * dx
+end
+
+"""Density-weighted RMS width of a 1D profile along a coordinate axis."""
+function _rms_width_1d(line::AbstractVector{Float64}, dx::Float64, x::AbstractVector)
+    tot = sum(line) * dx
+    tot > 0 || return 0.0
+    x̄ = sum(line .* x) * dx / tot
+    var = sum(line .* (x .- x̄).^2) * dx / tot
+    sqrt(max(var, 0.0))
+end
+
+"""Max absolute forward-difference derivative of density along axis `d`."""
+function _max_forward_grad(n::AbstractArray{<:Real,D}, d::Int, dx::Float64) where {D}
+    sz = size(n)
+    gmax = 0.0
+    @inbounds for I in CartesianIndices(ntuple(k -> k == d ? sz[k] - 1 : sz[k], D))
+        Ip1 = CartesianIndex(ntuple(k -> k == d ? I[k] + 1 : I[k], D))
+        g = abs(n[Ip1] - n[I]) / dx
+        g > gmax && (gmax = g)
+    end
+    gmax
 end
 
 """

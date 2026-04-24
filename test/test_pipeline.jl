@@ -160,6 +160,89 @@ using JLD2
         @test r.unstable isa Bool
     end
 
+    @testset "droplet_profile on synthetic Gaussian" begin
+        # Synthetic 3D isotropic Gaussian: n(r) = n0 * exp(-r^2/(2σ^2))
+        # FWHM (analytic) = 2 σ √(2 ln 2); RMS width = σ.
+        cfg = GridConfig((32, 32, 32), (8.0, 8.0, 8.0))
+        grid = make_grid(cfg)
+        σ = 0.9
+        psi = zeros(ComplexF64, 32, 32, 32, 3)
+        @inbounds for k in 1:32, j in 1:32, i in 1:32
+            x = grid.x[1][i]; y = grid.x[2][j]; z = grid.x[3][k]
+            r2 = x^2 + y^2 + z^2
+            psi[i, j, k, 1] = sqrt(exp(-r2 / (2σ^2)))
+        end
+        # Normalize so the analyzer reads a sane N_atoms
+        dV = SpinorBEC.cell_volume(grid)
+        tot = sum(abs2, psi) * dV
+        psi ./= sqrt(tot)
+
+        r = SpinorBEC._run_analyzer(:droplet_profile, psi, grid,
+            AtomSpecies("Rb87", 1.44e-25, 1, 0.0, 0.0, 0.0), Dict{String,Any}())
+        @test r.N_atoms ≈ 1.0 atol=1e-10
+        @test r.n_peak > 0
+        fwhm_analytic = 2 * σ * sqrt(2 * log(2))
+        for d in 1:3
+            @test abs(r.fwhm[d] - fwhm_analytic) < 0.25  # coarse grid
+            @test abs(r.sigma[d] - σ) < 0.15
+        end
+        @test r.surface_sharpness >= 0
+    end
+
+    @testset "topology analyzers (winding_field, monopole_charge, non_abelian_homotopy)" begin
+        yaml_str_2d = """
+        pipeline:
+          - ground_state:
+              atom: Rb87
+              grid: {n: [16, 16], box: [8.0, 8.0]}
+              interactions: {c0: 10.0, c1: -0.5}
+              dt: 0.01
+              n_steps: 40
+              tol: 1e-4
+              initial_state: ferromagnetic
+              zeeman: {p: 0.0, q: 0.1}
+              potential: {type: harmonic, omega: [1.0, 1.0]}
+          - analyze:
+              - winding_field: {component: 1, threshold: 1.0e-6}
+              - non_abelian_homotopy:
+                  loop_pts: [[6, 8], [10, 8], [10, 10], [6, 10], [6, 8]]
+                  component: 1
+        """
+        result_2d = run_config(load_config_from_string(yaml_str_2d); verbose=false)
+        @test haskey(result_2d, :winding_field)
+        @test haskey(result_2d.winding_field, :winding_field)
+        @test haskey(result_2d.winding_field, :total_winding)
+        @test result_2d.winding_field.winding_field isa AbstractMatrix{Int}
+        @test haskey(result_2d, :non_abelian_homotopy)
+        @test haskey(result_2d.non_abelian_homotopy, :holonomy)
+        @test result_2d.non_abelian_homotopy.holonomy isa Complex
+        # Uniform-phase ferromagnet: holonomy around any loop ≈ 1
+        @test abs(result_2d.non_abelian_homotopy.holonomy) ≈ 1.0 atol=1e-8
+
+        yaml_str_3d = """
+        pipeline:
+          - ground_state:
+              atom: Rb87
+              grid: {n: [10, 10, 10], box: [6.0, 6.0, 6.0]}
+              interactions: {c0: 10.0, c1: -0.5}
+              dt: 0.01
+              n_steps: 30
+              tol: 1e-4
+              initial_state: ferromagnetic
+              zeeman: {p: 0.0, q: 0.1}
+              potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+          - analyze:
+              - monopole_charge: {smooth: false}
+        """
+        result_3d = run_config(load_config_from_string(yaml_str_3d); verbose=false)
+        @test haskey(result_3d, :monopole_charge)
+        @test haskey(result_3d.monopole_charge, :total_charge)
+        @test haskey(result_3d.monopole_charge, :monopole_charge_density)
+        @test result_3d.monopole_charge.monopole_charge_density isa AbstractArray{Float64,3}
+        # Uniform polarised GS has no topological charge
+        @test abs(result_3d.monopole_charge.total_charge) < 1e-4
+    end
+
     @testset "analyzer result persistence" begin
         mktempdir() do tmp
             cfg_path = joinpath(tmp, "config.yaml")
