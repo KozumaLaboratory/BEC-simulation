@@ -78,9 +78,11 @@ function estimate_run_budget(yaml_path::AbstractString; io::IO = stdout)
     snap_ram_accumulated = save_psi ? snap_bytes_per * total_snapshots : 0
 
     vram_est = psi_f64_bytes * 8          # ψ + ~5× buffers + ~2× DDI pad
-    host_ram_est = psi_f64_bytes +        # final psi copy
-                   psi_f64_bytes * total_snapshots  # raw dr.psi_snapshots
-    host_ram_est += snap_ram_streamed     # streaming ComplexF32 buf
+    # Host RAM during dynamics: with callback-streamed snapshots the
+    # previous 1×psi_F64×n_snaps accumulation collapses to a single
+    # ComplexF32 buffer (~26 MB at 64³×13). The +1×F64 below covers the
+    # live psi copy on the host after the sim completes.
+    host_ram_est = psi_f64_bytes + snap_ram_streamed
 
     compression_ratio = save_compressed ? 2.5 : 1.0
     disk_per_run = psi_f64_bytes +        # final psi
