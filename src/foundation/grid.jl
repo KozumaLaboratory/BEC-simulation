@@ -45,8 +45,9 @@ function make_fft_plans(
     spatial_shape::NTuple{N,Int},
     backend::AbstractBackend = CPUBackend();
     flags = FFTW.MEASURE,
-) where {N}
-    buf = _zeros(backend, ComplexF64, spatial_shape...)
+    dtype::Type{T} = Float64,
+) where {N,T<:AbstractFloat}
+    buf = _zeros(backend, Complex{T}, spatial_shape...)
     kw = _fft_kwargs(backend, flags)
     fwd = plan_fft!(buf; kw...)
     inv = plan_ifft!(buf; kw...)
@@ -59,10 +60,11 @@ function make_rfft_plans(
     spatial_shape::NTuple{N,Int},
     backend::AbstractBackend = CPUBackend();
     flags = FFTW.MEASURE,
-) where {N}
+    dtype::Type{T} = Float64,
+) where {N,T<:AbstractFloat}
     rk_shape = rfft_output_shape(spatial_shape)
-    real_buf = _zeros(backend, Float64, spatial_shape...)
-    complex_buf = _zeros(backend, ComplexF64, rk_shape...)
+    real_buf = _zeros(backend, T, spatial_shape...)
+    complex_buf = _zeros(backend, Complex{T}, rk_shape...)
     kw = _fft_kwargs(backend, flags)
     fwd = plan_rfft(real_buf; kw...)
     inv = plan_irfft(complex_buf, spatial_shape[1]; kw...)
