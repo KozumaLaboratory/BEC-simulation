@@ -38,7 +38,7 @@ export function VolumeCanvas({ density, phase, params, vector, particles }: Prop
   }
   return (
     <Canvas
-      camera={{ position: [1.1, 1.1, 1.4], fov: 50, near: 0.05, far: 20 }}
+      camera={{ position: [0.55, 0.55, 0.7], fov: 55, near: 0.01, far: 20 }}
       dpr={1}
       gl={async (glProps) => {
         // depth: false — we render a single transparent cube with

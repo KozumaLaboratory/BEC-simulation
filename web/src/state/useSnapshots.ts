@@ -1,32 +1,27 @@
 import { useEffect, useState } from 'react'
-import { api, type VectorField3D, type VectorFieldKind } from '@/api'
+import { api, type SnapshotsMeta } from '@/api'
 
-export function useVectorField(
-  run: string | null,
-  file: string | null,
-  field: VectorFieldKind,
-  stride: number,
-  enabled: boolean,
-  snap?: number,
-) {
+// Probe /api/snapshots for a given run/point. Returns n_snapshots=0 for
+// runs that weren't generated with save_psi_snapshots:true, which the UI
+// uses to decide whether to show the time-scrubber at all.
+export function useSnapshots(run: string | null, file: string | null) {
   const [state, setState] = useState<{
-    data: VectorField3D | null
+    data: SnapshotsMeta | null
     loading: boolean
     error: string | null
   }>({ data: null, loading: false, error: null })
 
   useEffect(() => {
-    if (!enabled || !run || !file) {
+    if (!run || !file) {
       setState({ data: null, loading: false, error: null })
       return
     }
     let cancelled = false
     setState((s) => ({ ...s, loading: true, error: null }))
     api
-      .getVector3d(run, file, field, stride, snap)
+      .getSnapshots(run, file)
       .then((d) => {
-        if (cancelled) return
-        setState({ data: d, loading: false, error: null })
+        if (!cancelled) setState({ data: d, loading: false, error: null })
       })
       .catch((e: Error) => {
         if (!cancelled) setState({ data: null, loading: false, error: e.message })
@@ -34,7 +29,7 @@ export function useVectorField(
     return () => {
       cancelled = true
     }
-  }, [run, file, field, stride, enabled, snap])
+  }, [run, file])
 
   return state
 }

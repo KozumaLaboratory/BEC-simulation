@@ -16,6 +16,8 @@ import { useDensityTexture } from '@/three/useDensityTexture'
 import { usePhaseTexture } from '@/three/usePhaseTexture'
 import { useVorticityTexture } from '@/three/useVorticityTexture'
 import { useVectorField } from '@/three/useVectorField'
+import { useSnapshots } from '@/state/useSnapshots'
+import { TimeScrubber } from '@/components/TimeScrubber'
 import { VolumeCanvas } from '@/three/VolumeCanvas'
 import type { VolumeParams, ColorMode } from '@/three/DensityVolume'
 import type { VectorFieldParams } from '@/three/VectorField'
@@ -32,6 +34,19 @@ export function View3D({ run, data }: Props) {
   const [comp, setComp] = useState<number>(0) // 0 = total, 1..n = m-component
 
   const currentPoint = points[Math.min(pointIdx, points.length - 1)] ?? null
+
+  // Snapshot scrubbing. snap === undefined means "render the final state"
+  // (the pre-time-scrubber behaviour, used for non-snapshot runs).
+  const { data: snapMeta } = useSnapshots(run, currentPoint?.file ?? null)
+  const [snapIdx, setSnapIdx] = useState<number>(1)
+  useEffect(() => {
+    // Reset to the first frame when switching points or entering a run with snapshots.
+    if (snapMeta && snapMeta.n_snapshots > 0) {
+      setSnapIdx((prev) => Math.min(Math.max(prev, 1), snapMeta.n_snapshots))
+    }
+  }, [snapMeta, pointIdx])
+  const snap =
+    snapMeta && snapMeta.n_snapshots > 0 ? snapIdx : undefined
 
   const controls = useControls('Volume', {
     source: {
@@ -137,12 +152,14 @@ export function View3D({ run, data }: Props) {
     currentPoint?.file ?? null,
     comp,
     controls.tiltDeg,
+    snap,
   )
 
   const { data: vorticity, loading: vortLoading, error: vortError } = useVorticityTexture(
     run,
     currentPoint?.file ?? null,
     controls.source === 'vorticity',
+    snap,
   )
 
   const volumeTex = controls.source === 'vorticity' ? vorticity : density
@@ -173,6 +190,7 @@ export function View3D({ run, data }: Props) {
     currentPoint?.file ?? null,
     comp,
     phaseEnabled,
+    snap,
   )
 
   const { data: vectorData, error: vectorError } = useVectorField(
@@ -181,6 +199,7 @@ export function View3D({ run, data }: Props) {
     vectorControls.field,
     Math.round(vectorControls.stride),
     vectorControls.show,
+    snap,
   )
 
   const { data: particleFieldData, error: particleError } = useVectorField(
@@ -189,6 +208,7 @@ export function View3D({ run, data }: Props) {
     particleControls.field,
     Math.round(particleControls.stride),
     particleControls.show,
+    snap,
   )
 
   // Peak magnitude of whichever field is currently driving advection (or
@@ -369,6 +389,8 @@ export function View3D({ run, data }: Props) {
             Component selector above.
           </div>
         )}
+
+        <TimeScrubber meta={snapMeta} snapIdx={snapIdx} onChange={setSnapIdx} fps={30} />
       </CardContent>
     </Card>
   )

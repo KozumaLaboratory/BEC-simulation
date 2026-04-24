@@ -6,7 +6,12 @@ import type { DensityTexture } from './useDensityTexture'
 // Returns a scalar 3D texture of |∇×v_s| packaged in the same shape as
 // useDensityTexture's output, so the volume-raymarch pipeline can render
 // vorticity with no other changes — just swap which texture is bound.
-export function useVorticityTexture(run: string | null, file: string | null, enabled: boolean) {
+export function useVorticityTexture(
+  run: string | null,
+  file: string | null,
+  enabled: boolean,
+  snap?: number,
+) {
   const [state, setState] = useState<{
     data: DensityTexture | null
     loading: boolean
@@ -21,7 +26,7 @@ export function useVorticityTexture(run: string | null, file: string | null, ena
     let cancelled = false
     setState((s) => ({ ...s, loading: true, error: null }))
     api
-      .getVorticity3d(run, file)
+      .getVorticity3d(run, file, snap)
       .then((d: Density3D) => {
         if (cancelled) return
         const tex = new THREE.Data3DTexture(d.density, d.nx, d.ny, d.nz)
@@ -50,7 +55,7 @@ export function useVorticityTexture(run: string | null, file: string | null, ena
     return () => {
       cancelled = true
     }
-  }, [run, file, enabled])
+  }, [run, file, enabled, snap])
 
   return state
 }

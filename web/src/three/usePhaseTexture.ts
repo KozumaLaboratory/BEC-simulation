@@ -12,6 +12,7 @@ export function usePhaseTexture(
   file: string | null,
   component: number,
   enabled: boolean,
+  snap?: number,
 ) {
   const [state, setState] = useState<{
     data: PhaseTexture | null
@@ -28,7 +29,7 @@ export function usePhaseTexture(
     let cancelled = false
     setState((s) => ({ ...s, loading: true, error: null }))
     api
-      .getPhase3d(run, file, component)
+      .getPhase3d(run, file, component, snap)
       .then((p) => {
         if (cancelled) return
         const tex = new THREE.Data3DTexture(p.phase, p.nx, p.ny, p.nz)
@@ -49,7 +50,7 @@ export function usePhaseTexture(
     return () => {
       cancelled = true
     }
-  }, [run, file, component, enabled])
+  }, [run, file, component, enabled, snap])
 
   return state
 }

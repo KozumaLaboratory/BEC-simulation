@@ -59,6 +59,12 @@ export interface VectorField3D {
 
 export type VectorFieldKind = 'current' | 'spin_density' | 'velocity'
 
+export interface SnapshotsMeta {
+  n_snapshots: number
+  times: number[]
+  shape?: number[]
+}
+
 export interface PhaseSlice {
   ndim: number
   axis: number
@@ -105,11 +111,18 @@ export const api = {
     return json(`/api/data/${encodeURIComponent(name)}`)
   },
 
-  async getVorticity3d(run: string, file: string): Promise<Density3D> {
+  getSnapshots(run: string, file: string): Promise<SnapshotsMeta> {
+    return json(
+      `/api/snapshots/${encodeURIComponent(run)}/${encodeURIComponent(file)}`,
+    )
+  },
+
+  async getVorticity3d(run: string, file: string, snap?: number): Promise<Density3D> {
     // Returns scalar |∇×v_s| in the same binary layout as density3d_bin,
     // so the consumer path can be reused without a separate type.
+    const snapArg = snap !== undefined ? `?snap=${snap}` : ''
     const buf = await bin(
-      `/api/vorticity3d_bin/${encodeURIComponent(run)}/${encodeURIComponent(file)}`,
+      `/api/vorticity3d_bin/${encodeURIComponent(run)}/${encodeURIComponent(file)}${snapArg}`,
     )
     const header = new Int32Array(buf, 0, 6)
     const nx = header[0],
@@ -128,13 +141,15 @@ export const api = {
     file: string,
     component = 0,
     angleDeg = 0,
+    snap?: number,
   ): Promise<Density3D> {
     // Rotation only matters for per-component requests; the total density
     // (component=0) is invariant under quantization-axis rotation.
     const useRotated = component > 0 && Math.abs(angleDeg) > 0.01
+    const snapArg = snap !== undefined ? `&snap=${snap}` : ''
     const url = useRotated
-      ? `/api/density3d_rotated/${encodeURIComponent(run)}/${encodeURIComponent(file)}?angle=${angleDeg}&comp=${component}`
-      : `/api/density3d_bin/${encodeURIComponent(run)}/${encodeURIComponent(file)}?comp=${component}`
+      ? `/api/density3d_rotated/${encodeURIComponent(run)}/${encodeURIComponent(file)}?angle=${angleDeg}&comp=${component}${snapArg}`
+      : `/api/density3d_bin/${encodeURIComponent(run)}/${encodeURIComponent(file)}?comp=${component}${snapArg}`
     const buf = await bin(url)
     const header = new Int32Array(buf, 0, 6)
     const nx = header[0],
@@ -153,9 +168,11 @@ export const api = {
     file: string,
     field: VectorFieldKind = 'current',
     stride = 2,
+    snap?: number,
   ): Promise<VectorField3D> {
+    const snapArg = snap !== undefined ? `&snap=${snap}` : ''
     const buf = await bin(
-      `/api/vector3d_bin/${encodeURIComponent(run)}/${encodeURIComponent(file)}?field=${field}&stride=${stride}`,
+      `/api/vector3d_bin/${encodeURIComponent(run)}/${encodeURIComponent(file)}?field=${field}&stride=${stride}${snapArg}`,
     )
     const header = new Int32Array(buf, 0, 7)
     const nx = header[0],
@@ -172,12 +189,18 @@ export const api = {
     )
   },
 
-  async getPhase3d(run: string, file: string, component: number): Promise<Phase3D> {
+  async getPhase3d(
+    run: string,
+    file: string,
+    component: number,
+    snap?: number,
+  ): Promise<Phase3D> {
     if (component < 1) {
       throw new Error('phase3d requires component >= 1 (per-m only)')
     }
+    const snapArg = snap !== undefined ? `&snap=${snap}` : ''
     const buf = await bin(
-      `/api/phase3d_bin/${encodeURIComponent(run)}/${encodeURIComponent(file)}?comp=${component}`,
+      `/api/phase3d_bin/${encodeURIComponent(run)}/${encodeURIComponent(file)}?comp=${component}${snapArg}`,
     )
     const header = new Int32Array(buf, 0, 6)
     const nx = header[0],

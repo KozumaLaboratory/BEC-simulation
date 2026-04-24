@@ -13,6 +13,7 @@ export function useDensityTexture(
   file: string | null,
   component: number,
   angleDeg: number = 0,
+  snap?: number,
 ) {
   const [state, setState] = useState<{
     data: DensityTexture | null
@@ -28,7 +29,7 @@ export function useDensityTexture(
     let cancelled = false
     setState((s) => ({ ...s, loading: true, error: null }))
     api
-      .getDensity3d(run, file, component, angleDeg)
+      .getDensity3d(run, file, component, angleDeg, snap)
       .then((d) => {
         if (cancelled) return
         const tex = new THREE.Data3DTexture(d.density, d.nx, d.ny, d.nz)
@@ -57,7 +58,7 @@ export function useDensityTexture(
     return () => {
       cancelled = true
     }
-  }, [run, file, component, angleDeg])
+  }, [run, file, component, angleDeg, snap])
 
   return state
 }
