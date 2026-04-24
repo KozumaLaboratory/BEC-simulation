@@ -5,6 +5,7 @@ authors = ["anko"]
 
 [deps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+CodecZlib = "944b1d66-785c-5afd-91f1-9de20f533193"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
 HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
@@ -33,6 +34,7 @@ SpinorBECPlotlyExt = "PlotlyJS"
 
 [compat]
 CUDA = "5, 6"
+CodecZlib = "0.7.8"
 FFTW = "1"
 HTTP = "1"
 JLD2 = "0.4, 0.5"

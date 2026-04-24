@@ -493,6 +493,8 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
         :dynamics_result => result,
         :dynamics_workspace => ws,
         :save_psi_snapshots => Bool(get(p, "save_psi_snapshots", false)),
+        :save_snapshot_compression =>
+            Bool(get(p, "save_snapshot_compression", false)),
     )
     (psi_out, grid, atom, ws, step_result)
 end

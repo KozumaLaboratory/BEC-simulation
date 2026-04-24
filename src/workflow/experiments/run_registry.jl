@@ -154,8 +154,9 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
                         magnetization(psi_host, grid, sys) : NaN
 
             tmp_file = _scratch_tmp_path(psi_file)
+            jld_kwargs = _snapshot_compression_kwargs(result)
             try
-                jldopen(tmp_file, "w") do f
+                jldopen(tmp_file, "w"; jld_kwargs...) do f
                     f["psi"] = psi_host
                     f["scan_index"] = i
                     f["run_name"] = run_name
@@ -223,6 +224,24 @@ function _move_scratch_to_final(tmp_path::String, final_path::String)
     mv(tmp_path, final_path; force = true)
 end
 
+"""
+    _snapshot_compression_kwargs(result) -> NamedTuple
+
+When the pipeline result flags `:save_snapshot_compression` as true, emit
+`(; compress = ZlibCompressor())` kwargs so the JLD2 file compresses
+every dataset transparently. zlib was picked over zstd because JLD2's
+codec integration is stable across 0.4/0.5 and the `CodecZlib` pkg is
+a tiny dep. Compression ratio on spinor snapshots is typically 1.8–3×
+depending on how much the density concentrates in the cloud core.
+Leaves the kwargs empty (no compression) when the flag is absent.
+"""
+function _snapshot_compression_kwargs(result)
+    if get(result, :save_snapshot_compression, false)
+        return (; compress = ZlibCompressor())
+    end
+    return (;)
+end
+
 function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=true)
     psi_file = joinpath(run_dir, _point_filename(index, run_name))
 
@@ -246,8 +265,9 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
     converged = get(result, :ground_state_converged, true)
 
     tmp_file = _scratch_tmp_path(psi_file)
+    jld_kwargs = _snapshot_compression_kwargs(result)
     try
-        jldopen(tmp_file, "w") do f
+        jldopen(tmp_file, "w"; jld_kwargs...) do f
             f["psi"] = psi_host
             f["scan_index"] = index
             f["run_name"] = run_name

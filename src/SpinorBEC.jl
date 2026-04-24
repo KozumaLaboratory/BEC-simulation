@@ -4,6 +4,7 @@ using LinearAlgebra
 using StaticArrays
 using FFTW
 using JLD2
+using CodecZlib: ZlibCompressor
 using YAML
 using Unitful
 using TimerOutputs
@@ -82,6 +83,7 @@ include("workflow/io/io.jl")
 include("workflow/io/unitful_support.jl")
 include("workflow/io/dashboard.jl")
 include("workflow/io/vtk_export.jl")
+include("workflow/io/budget.jl")
 include("workflow/io/scan_summary.jl")
 
 # 9. Monitoring system (needed by solvers)
@@ -314,6 +316,7 @@ export SimulationCallbacks, LiveMonitor
 
 # I/O
 export save_state, load_state, generate_dashboard_data, export_dashboard, serve_dashboard
+export estimate_run_budget
 export export_vtk, export_vtk_series
 
 # Pipeline API
