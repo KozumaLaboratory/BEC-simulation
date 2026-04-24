@@ -1,0 +1,25 @@
+# P3.1 — Realistic absorption imaging post-processing
+#
+# The pipeline itself just produces a clean column density; the noise model
+# is applied in Julia code after `run_config`:
+#
+#   result = run_config(load_config("…/params.yaml"))
+#   col = column_density(result.final_ws.state.psi, 3, 1, 3)
+#   img = synthesise_absorption_image(col, result.final_ws.grid;
+#       sigma_pixels=1.5, photons_per_unit=200.0, OD_sat=2.0,
+#       read_noise_sigma=3.0, seed=1)
+
+pipeline:
+  - ground_state:
+      atom: Dy164
+      grid: {n: 32, box: 10.0}
+      interactions: {c0: 80.0, c1: 0.0, omega_ref: 314.159}
+      trap: [1.0, 1.0, 1.0]
+      zeeman: {Bz: 1.0e-4}
+      initial_state: polar
+      dt: 0.01
+      n_steps: 50
+      tol: 1.0e-3
+
+  - analyze:
+      - column_density: {axis: 3, component: 0}

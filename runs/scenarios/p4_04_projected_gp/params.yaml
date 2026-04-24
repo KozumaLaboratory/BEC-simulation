@@ -1,0 +1,24 @@
+# P4.4 — Projected Gross-Pitaevskii (momentum cutoff)
+#
+# Pipeline produces a standard dynamics run; the `apply_projected_gp!` filter
+# is applied from Julia either after each split-step (via on_step callback)
+# or once post-evolution. Pure-YAML triggering of the callback is Phase 5.
+
+pipeline:
+  - ground_state:
+      atom: Dy164
+      grid: {n: 32, box: 10.0}
+      interactions: {c0: 50.0, c1: 0.0, omega_ref: 314.159}
+      trap: [1.0, 1.0, 1.0]
+      zeeman: {Bz: 1.0e-4}
+      dt: 0.01
+      n_steps: 100
+      tol: 1.0e-3
+
+  - dynamics:
+      duration: 0.5
+      dt: 0.005
+      interactions: {omega_ref: 314.159}
+
+  - analyze:
+      - magnetization: {}

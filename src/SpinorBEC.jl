@@ -109,6 +109,8 @@ include("workflow/experiments/pipeline_runner.jl")
 include("workflow/experiments/pulse_sequence.jl")
 include("workflow/experiments/sta_counter_diabatic.jl")
 include("workflow/experiments/feshbach_ramp.jl")
+include("solvers/projected_gp.jl")
+include("solvers/photon_heating.jl")
 include("workflow/experiments/pipeline_api.jl")
 include("workflow/experiments/pipeline_continuation.jl")
 include("workflow/experiments/run_registry.jl")
@@ -129,6 +131,9 @@ include("analysis/majorana.jl")
 include("analysis/tof.jl")
 include("analysis/tomography.jl")
 include("analysis/faraday.jl")
+include("analysis/imaging.jl")
+include("analysis/topology.jl")
+include("analysis/time_resolved.jl")
 include("analysis/stability_analysis.jl")
 include("analysis/spin_rotation.jl")
 
@@ -227,6 +232,11 @@ export thomas_fermi_density, init_psi_thomas_fermi
 export add_thermal_noise!, add_thermal_noise, thermal_noise_amplitude, bec_critical_temperature,
        add_symmetry_breaking_seed!
 export simulate_tof, simulate_tof_with_gradient, sg_separation_peaks
+export gaussian_psf_convolve, apply_shot_noise, apply_saturation
+export synthesise_absorption_image, faraday_polarization_components
+export faraday_snr, momentum_distribution
+export winding_number_field, monopole_charge_3d, total_monopole_charge
+export non_abelian_holonomy, time_resolved_tomography
 export spin_tomography, tomography_sinogram
 export FaradayParams, faraday_image, faraday_differential, detect_vortices_faraday
 
@@ -326,6 +336,8 @@ export export_vtk, export_vtk_series
 export parse_pipeline, run_pipeline, PipelineConfig
 export sta_counter_diabatic_q_quench, build_sta_zeeman
 export feshbach_ramp, feshbach_c0_wf
+export apply_projected_gp!, projected_gp_callback
+export apply_photon_scattering!, photon_scattering_callback
 export load_config, load_config_from_string, run_config
 export run_yaml, run_status, list_runs, compute_run_dir
 export apply_override!, apply_overrides, expand_scan_points, parse_override_map

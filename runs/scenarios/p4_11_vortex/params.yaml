@@ -1,0 +1,26 @@
+# P4.11 — Topological vortex: winding number + monopole observables
+#
+# Start from a polar-core vortex state and compute the topological observables
+# via `winding_number_field` and `monopole_charge_3d`. Those functions operate
+# on the final wavefunction (post-pipeline) — call them from Julia after
+# `run_config`.
+#
+#   res = run_config(load_config("…/params.yaml"))
+#   w = winding_number_field(res.final_ws.state.psi, res.final_ws.grid)
+#   q = monopole_charge_3d(res.final_ws.state.psi, res.final_ws.grid)
+
+pipeline:
+  - ground_state:
+      atom: Dy164
+      grid: {n: 32, box: 10.0}
+      interactions: {c0: 60.0, c1: -0.2, omega_ref: 314.159}
+      trap: [1.0, 1.0, 1.0]
+      zeeman: {Bz: 1.0e-4}
+      initial_state: polar_core_vortex
+      init_state_params: {init_vortex_charge: 1}
+      dt: 0.005
+      n_steps: 100
+      tol: 1.0e-4
+
+  - analyze:
+      - magnetization: {}
