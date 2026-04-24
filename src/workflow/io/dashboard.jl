@@ -883,13 +883,28 @@ dominated by a radial-inflow component.
 function _compute_3d_vorticity_binary(psi, n_comp, ndim, n_pts, F, box_size)
     ndim == 3 || throw(ArgumentError("3D vorticity requires 3D data"))
     plans, grid = _get_plans_and_grid(n_pts, box_size)
-    ωx, ωy, ωz = superfluid_vorticity(psi, grid, plans; density_cutoff = 1e-12)
+    # v = j/n explodes where n → 0 (trap vacuum), and ∇×v inherits those
+    # spurious peaks. Scale the density cutoff to the actual cloud: 1% of
+    # peak |ψ|² masks out everything outside the Thomas-Fermi radius without
+    # touching the physical vortex-core structure (where n is small but the
+    # j ≈ nv compensates the denominator).
+    total_n = sum(m -> Float64.(abs2.(view(psi, _component_slice(ndim, n_pts, m)...))), 1:n_comp)
+    n_peak = maximum(total_n)
+    cutoff = max(1e-8, 1e-2 * n_peak)
+    ωx, ωy, ωz = superfluid_vorticity(psi, grid, plans; density_cutoff = cutoff)
 
     N = prod(n_pts)
+    # Also zero the output outside the cloud to be defensive; the cutoff
+    # above zeroes v, but numerical ∇ can still pick up edge gradients.
     mag = Vector{Float32}(undef, N)
+    total_flat = vec(total_n)
     @inbounds for i = 1:N
-        a = ωx[i]; b = ωy[i]; c = ωz[i]
-        mag[i] = Float32(sqrt(a*a + b*b + c*c))
+        if total_flat[i] < cutoff
+            mag[i] = 0.0f0
+        else
+            a = ωx[i]; b = ωy[i]; c = ωz[i]
+            mag[i] = Float32(sqrt(a*a + b*b + c*c))
+        end
     end
 
     pops = Float32[Float32(sum(abs2, view(psi, _component_slice(ndim, n_pts, m)...))) for m in 1:n_comp]
