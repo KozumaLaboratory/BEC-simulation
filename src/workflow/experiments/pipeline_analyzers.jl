@@ -278,13 +278,25 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
             end
         elseif defect_type == :vortex && ndim >= 2
             phase_field = angle.(view(psi, _component_slice(ndim, n_pts, 1)...))
-            for i in 2:(n_pts[1]-1), j in 2:(n_pts[2]-1)
-                n[i, j] < threshold && continue
-                dp = _phase_diff(phase_field[i+1, j], phase_field[i, j]) +
-                     _phase_diff(phase_field[i+1, j+1], phase_field[i+1, j]) +
-                     _phase_diff(phase_field[i, j+1], phase_field[i+1, j+1]) +
-                     _phase_diff(phase_field[i, j], phase_field[i, j+1])
-                abs(dp) > π && (defect_count += 1)
+            if ndim == 2
+                for j in 2:(n_pts[2]-1), i in 2:(n_pts[1]-1)
+                    n[i, j] < threshold && continue
+                    dp = _phase_diff(phase_field[i+1, j], phase_field[i, j]) +
+                         _phase_diff(phase_field[i+1, j+1], phase_field[i+1, j]) +
+                         _phase_diff(phase_field[i, j+1], phase_field[i+1, j+1]) +
+                         _phase_diff(phase_field[i, j], phase_field[i, j+1])
+                    abs(dp) > π && (defect_count += 1)
+                end
+            else
+                # 3D: sum vortex detections across all (x,y) plaquettes at every z
+                for k in 1:n_pts[3], j in 2:(n_pts[2]-1), i in 2:(n_pts[1]-1)
+                    n[i, j, k] < threshold && continue
+                    dp = _phase_diff(phase_field[i+1, j, k], phase_field[i, j, k]) +
+                         _phase_diff(phase_field[i+1, j+1, k], phase_field[i+1, j, k]) +
+                         _phase_diff(phase_field[i, j+1, k], phase_field[i+1, j+1, k]) +
+                         _phase_diff(phase_field[i, j, k], phase_field[i, j+1, k])
+                    abs(dp) > π && (defect_count += 1)
+                end
             end
         end
         volume = prod(grid.config.box_size)
