@@ -146,8 +146,8 @@ export function View3D({ run, data }: Props) {
       label: 'shell radius (box units)',
     },
     azimuthalOnly: {
-      value: true,
-      label: 'orbit only (project v_s)',
+      value: false,
+      label: 'orbit only (drops radial/axial — cheat toggle)',
     },
   })
 
