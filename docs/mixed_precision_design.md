@@ -42,9 +42,15 @@ parameterised — every buffer is allocated as `ComplexF64` through
 
 ## Suggested rollout
 
-Phase 1 (low risk):
-  - Parameterise `Grid{N,T}` and `FFTPlans{T}` without changing
-    existing callers (keep F64 default).
+Phase 1 (low risk) — **started**:
+  - `Grid{N,T<:AbstractFloat}` parameterised; `make_grid` takes an
+    optional `dtype::Type{<:AbstractFloat} = Float64` kwarg that
+    threads through x, dx, k, dk, k_squared. Backward compat via
+    the fact that `Grid{N}` is still a valid where-unbound spelling
+    that accepts any T, so existing method signatures keep
+    working; the 17/17 test_grid suite passes without edits. ✓
+  - Next in this phase: FFTPlans{P,IP,T} with a matching dtype
+    kwarg on `make_fft_plans` and `make_rfft_plans`.
   - Dual-dtype tests: run a 32³ smoke test in F32 vs F64 and verify
     observables agree to ~1e-5 relative.
 

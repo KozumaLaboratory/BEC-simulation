@@ -1,31 +1,38 @@
-function make_grid(config::GridConfig{N}) where {N}
+function make_grid(
+    config::GridConfig{N};
+    dtype::Type{T} = Float64,
+) where {N,T<:AbstractFloat}
     x = ntuple(N) do d
         n = config.n_points[d]
-        L = config.box_size[d]
+        L = T(config.box_size[d])
         dx = L / n
-        collect(range(-L / 2 + dx / 2, L / 2 - dx / 2, length = n))
+        collect(T, range(-L / 2 + dx / 2, L / 2 - dx / 2, length = n))
     end
 
-    dx = ntuple(d -> config.box_size[d] / config.n_points[d], N)
+    dx = ntuple(d -> T(config.box_size[d] / config.n_points[d]), N)
 
     k = ntuple(N) do d
         n = config.n_points[d]
-        L = config.box_size[d]
-        dk = 2π / L
-        collect(fftfreq(n, n * dk))
+        L = T(config.box_size[d])
+        dk = T(2π) / L
+        collect(T, fftfreq(n, n * dk))
     end
 
-    dk = ntuple(d -> 2π / config.box_size[d], N)
+    dk = ntuple(d -> T(2π / config.box_size[d]), N)
 
-    k_squared = _compute_k_squared(k, config.n_points)
+    k_squared = _compute_k_squared(k, config.n_points, T)
 
-    Grid{N}(config, x, dx, k, dk, k_squared)
+    Grid{N,T}(config, x, dx, k, dk, k_squared)
 end
 
-function _compute_k_squared(k::NTuple{N,Vector{Float64}}, n_points::NTuple{N,Int}) where {N}
-    ksq = zeros(Float64, n_points)
+function _compute_k_squared(
+    k::NTuple{N,Vector{T}},
+    n_points::NTuple{N,Int},
+    ::Type{T} = T,
+) where {N,T<:AbstractFloat}
+    ksq = zeros(T, n_points)
     @inbounds for I in CartesianIndices(n_points)
-        s = 0.0
+        s = zero(T)
         for d = 1:N
             s += k[d][I[d]]^2
         end

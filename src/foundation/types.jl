@@ -28,14 +28,20 @@ spatial_dims(::GridConfig{N}) where {N} = N
 
 # --- Spatial Grid ---
 
-struct Grid{N}
+struct Grid{N,T<:AbstractFloat}
     config::GridConfig{N}
-    x::NTuple{N,Vector{Float64}}
-    dx::NTuple{N,Float64}
-    k::NTuple{N,Vector{Float64}}
-    dk::NTuple{N,Float64}
-    k_squared::Array{Float64,N}
+    x::NTuple{N,Vector{T}}
+    dx::NTuple{N,T}
+    k::NTuple{N,Vector{T}}
+    dk::NTuple{N,T}
+    k_squared::Array{T,N}
 end
+
+# Partial-application alias for the common Float64 case. Most call sites
+# write `Grid{N}` or `grid::Grid{N}` — with this alias those continue to
+# resolve to the concrete `Grid{N,Float64}`, so the precision-parameter
+# rollout is backward compatible.
+const GridF64{N} = Grid{N,Float64}
 
 # --- Spin System ---
 
