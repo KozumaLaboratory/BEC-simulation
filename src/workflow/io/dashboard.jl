@@ -374,6 +374,31 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         end
         (200, "application/octet-stream", bin)
 
+    elseif startswith(path, "/api/vorticity3d_bin/")
+        # /api/vorticity3d_bin/:run/:file  (no query params; scalar field)
+        rest = _uri_decode(path[22:end])
+        slash_idx = findfirst('/', rest)
+        if slash_idx === nothing
+            return (400, "text/plain", "Expected /api/vorticity3d_bin/:run/:file")
+        end
+        name = rest[1:slash_idx-1]
+        file = rest[slash_idx+1:end]
+        qidx = findfirst('?', file)
+        qidx !== nothing && (file = file[1:qidx-1])
+        fpath = joinpath(base_dir, name, file)
+        if !isfile(fpath)
+            return (404, "text/plain", "File not found: $name/$file")
+        end
+        bin = try
+            psi, n_comp, ndim, n_pts, F = _load_psi_cached(fpath, psi_cache)
+            ndim == 3 || throw(ArgumentError("vorticity3d requires 3D data"))
+            box_size = _load_box_size(fpath)
+            _compute_3d_vorticity_binary(psi, n_comp, ndim, n_pts, F, box_size)
+        catch e
+            return (500, "text/plain", "Error: $(e)")
+        end
+        (200, "application/octet-stream", bin)
+
     elseif startswith(path, "/api/phase3d_bin/")
         # /api/phase3d_bin/:run/:file?comp=N (N >= 1)
         rest = _uri_decode(path[18:end])
@@ -846,6 +871,37 @@ Compute a single 3D density component as binary Float32.
 function _compute_3d_density_binary(psi, n_comp, ndim, n_pts, F; component::Int = 0)
     ndim == 3 || throw(ArgumentError("3D density requires 3D data"))
     _pack_3d_binary(psi, n_comp, ndim, n_pts, F, component)
+end
+
+"""
+3D vorticity magnitude |∇×v_s| as Float32 volume. Matches density3d_bin's
+header layout so the frontend can reuse the same parser. Breathing/radial
+modes have ∇×v = 0, so peaks in this field isolate the rotational part of
+the flow — vortex cores show up cleanly even when the mass current is
+dominated by a radial-inflow component.
+"""
+function _compute_3d_vorticity_binary(psi, n_comp, ndim, n_pts, F, box_size)
+    ndim == 3 || throw(ArgumentError("3D vorticity requires 3D data"))
+    plans, grid = _get_plans_and_grid(n_pts, box_size)
+    ωx, ωy, ωz = superfluid_vorticity(psi, grid, plans; density_cutoff = 1e-12)
+
+    N = prod(n_pts)
+    mag = Vector{Float32}(undef, N)
+    @inbounds for i = 1:N
+        a = ωx[i]; b = ωy[i]; c = ωz[i]
+        mag[i] = Float32(sqrt(a*a + b*b + c*c))
+    end
+
+    pops = Float32[Float32(sum(abs2, view(psi, _component_slice(ndim, n_pts, m)...))) for m in 1:n_comp]
+    total_pop = sum(pops)
+    pops ./= max(total_pop, 1f-30)
+
+    buf = IOBuffer(; sizehint = 24 + n_comp * 4 + N * 4)
+    write(buf, Int32(n_pts[1]), Int32(n_pts[2]), Int32(n_pts[3]))
+    write(buf, Int32(n_comp), Int32(F), Int32(0))
+    write(buf, pops)
+    write(buf, mag)
+    take!(buf)
 end
 
 """

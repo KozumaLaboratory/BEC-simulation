@@ -14,6 +14,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { DashboardData, VectorFieldKind } from '@/api'
 import { useDensityTexture } from '@/three/useDensityTexture'
 import { usePhaseTexture } from '@/three/usePhaseTexture'
+import { useVorticityTexture } from '@/three/useVorticityTexture'
 import { useVectorField } from '@/three/useVectorField'
 import { VolumeCanvas } from '@/three/VolumeCanvas'
 import type { VolumeParams, ColorMode } from '@/three/DensityVolume'
@@ -33,6 +34,14 @@ export function View3D({ run, data }: Props) {
   const currentPoint = points[Math.min(pointIdx, points.length - 1)] ?? null
 
   const controls = useControls('Volume', {
+    source: {
+      value: 'density' as 'density' | 'vorticity',
+      options: {
+        'Density |ψ|²': 'density' as const,
+        'Vorticity |∇×v_s| (渦度)': 'vorticity' as const,
+      },
+      label: 'Volume source',
+    },
     isoMin: { value: 0.05, min: 0, max: 1, step: 0.01 },
     isoMax: { value: 0.8, min: 0, max: 1, step: 0.01 },
     stepCount: { value: 128, min: 16, max: 512, step: 8 },
@@ -129,6 +138,16 @@ export function View3D({ run, data }: Props) {
     comp,
     controls.tiltDeg,
   )
+
+  const { data: vorticity, loading: vortLoading, error: vortError } = useVorticityTexture(
+    run,
+    currentPoint?.file ?? null,
+    controls.source === 'vorticity',
+  )
+
+  const volumeTex = controls.source === 'vorticity' ? vorticity : density
+  const volumeLoading = controls.source === 'vorticity' ? vortLoading : loading
+  const volumeError = controls.source === 'vorticity' ? vortError : error
 
   // When the user flips to phase color mode while Component is still "Total"
   // (comp=0), auto-advance to the spinor component with the largest
@@ -276,12 +295,14 @@ export function View3D({ run, data }: Props) {
             </Select>
           </div>
           <div className="ml-auto text-xs text-muted-foreground text-right">
-            {loading && 'Loading density…'}
-            {density && !loading && (
+            {volumeLoading &&
+              (controls.source === 'vorticity' ? 'Loading vorticity…' : 'Loading density…')}
+            {volumeTex && !volumeLoading && (
               <>
                 <div>
-                  {density.meta.nx}×{density.meta.ny}×{density.meta.nz} ·
-                  n<sub>max</sub>={density.maxValue.toExponential(2)}
+                  {volumeTex.meta.nx}×{volumeTex.meta.ny}×{volumeTex.meta.nz} ·{' '}
+                  {controls.source === 'vorticity' ? '|ω|' : 'n'}
+                  <sub>max</sub>={volumeTex.maxValue.toExponential(2)}
                 </div>
                 {peakMag !== null && (
                   <div className={peakMag < 1e-10 ? 'text-amber-500' : ''}>
@@ -294,17 +315,17 @@ export function View3D({ run, data }: Props) {
           </div>
         </div>
 
-        {error && (
+        {volumeError && (
           <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-            {error}
+            {volumeError}
           </div>
         )}
 
         <div className="h-[600px] rounded-md overflow-hidden bg-[#0a0e14] border border-border">
-          {density ? (
+          {volumeTex ? (
             <VolumeCanvas
-              density={density}
-              phase={phase ?? undefined}
+              density={volumeTex}
+              phase={controls.source === 'density' ? phase ?? undefined : undefined}
               params={params}
               vector={
                 vectorControls.show && vectorData
@@ -319,7 +340,7 @@ export function View3D({ run, data }: Props) {
             />
           ) : (
             <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-              {loading ? 'Loading…' : 'No data.'}
+              {volumeLoading ? 'Loading…' : 'No data.'}
             </div>
           )}
         </div>

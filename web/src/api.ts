@@ -105,6 +105,24 @@ export const api = {
     return json(`/api/data/${encodeURIComponent(name)}`)
   },
 
+  async getVorticity3d(run: string, file: string): Promise<Density3D> {
+    // Returns scalar |∇×v_s| in the same binary layout as density3d_bin,
+    // so the consumer path can be reused without a separate type.
+    const buf = await bin(
+      `/api/vorticity3d_bin/${encodeURIComponent(run)}/${encodeURIComponent(file)}`,
+    )
+    const header = new Int32Array(buf, 0, 6)
+    const nx = header[0],
+      ny = header[1],
+      nz = header[2]
+    const n_comp = header[3],
+      F = header[4],
+      comp = header[5]
+    const populations = new Float32Array(buf, 24, n_comp)
+    const density = new Float32Array(buf, 24 + n_comp * 4, nx * ny * nz)
+    return { nx, ny, nz, n_comp, F, component: comp, populations, density }
+  },
+
   async getDensity3d(
     run: string,
     file: string,
