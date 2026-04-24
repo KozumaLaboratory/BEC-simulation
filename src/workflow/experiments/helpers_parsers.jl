@@ -117,6 +117,32 @@ _parse_ramp_or_constant(v::Dict) = haskey(v, "to") ?
     ConstantValue(Float64(v["from"]))
 _parse_ramp_or_constant(v) = ConstantValue(Float64(v))
 
+"""
+    _parse_loss_params(node) -> Union{Nothing,LossParams}
+
+Parse a YAML `loss:` block into `LossParams`. Supported forms:
+
+    loss: false | 0 | null        # no loss
+    loss: {gamma_dr: 0.02, L3: 0.001}
+    loss: {gamma_dr: 0.02, K3_per_m: [0.01, 0.02, 0.05, ...]}  # spin-dep 3-body
+"""
+function _parse_loss_params(node)
+    node === nothing && return nothing
+    node isa Bool && (node || return nothing; return nothing)
+    if node isa Real
+        v = Float64(node)
+        v == 0 && return nothing
+        return LossParams(v)
+    end
+    node isa Dict || throw(ArgumentError("loss must be a mapping or scalar, got $(typeof(node))"))
+    gamma_dr = Float64(get(node, "gamma_dr", 0.0))
+    L3 = Float64(get(node, "L3", 0.0))
+    L3_per_m = let v = get(node, "K3_per_m", get(node, "L3_per_m", nothing))
+        v === nothing ? Float64[] : Float64.(v)
+    end
+    LossParams(; gamma_dr, L3, L3_per_m)
+end
+
 # --- Scan parsing helpers ---
 
 function _parse_override_scan(d::Dict)

@@ -35,7 +35,15 @@ function apply_loss_step!(
     ndim::Int,
     density_buf::AbstractArray{<:AbstractFloat},
 )
-    loss.gamma_dr < 1e-30 && loss.L3 < 1e-30 && return nothing
+    L3_scalar_max = isempty(loss.L3_per_m) ? loss.L3 :
+        maximum(abs, loss.L3_per_m)
+    loss.gamma_dr < 1e-30 && L3_scalar_max < 1e-30 && return nothing
+
+    if !isempty(loss.L3_per_m) && length(loss.L3_per_m) != n_components
+        throw(ArgumentError(
+            "LossParams.L3_per_m length $(length(loss.L3_per_m)) " *
+            "≠ n_components $(n_components)"))
+    end
 
     n_pts = ntuple(d -> size(psi, d), ndim)
     _total_density!(density_buf, psi, n_components, ndim, n_pts)
@@ -43,7 +51,8 @@ function apply_loss_step!(
     gamma_rates = _dipolar_relaxation_rates(F, loss.gamma_dr)
 
     for c = 1:n_components
-        rate = gamma_rates[c] + loss.L3
+        L3_c = isempty(loss.L3_per_m) ? loss.L3 : loss.L3_per_m[c]
+        rate = gamma_rates[c] + L3_c
         rate < 1e-30 && continue
 
         idx = _component_slice(ndim, n_pts, c)

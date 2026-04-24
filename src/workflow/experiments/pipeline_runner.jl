@@ -392,6 +392,8 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
     ls_raw = get(p, "light_shift", nothing)
     light_shift = _parse_light_shift(ls_raw, F, nothing, backend)
 
+    loss = _parse_loss_params(get(p, "loss", nothing))
+
     raman = _build_raman(p, duration)
 
     time_dep_interactions = let inter_raw = get(p, "interactions", nothing)
@@ -442,6 +444,7 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
         backend,
         absorbing_boundary,
         light_shift,
+        loss,
         raman,
         time_dep_interactions,
         magnetic_gradient,

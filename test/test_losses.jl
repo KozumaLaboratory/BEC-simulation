@@ -3,9 +3,60 @@
         lp = LossParams(1e-3, 1e-5)
         @test lp.gamma_dr == 1e-3
         @test lp.L3 == 1e-5
+        @test isempty(lp.L3_per_m)
 
         lp2 = LossParams(1e-3)
         @test lp2.L3 == 0.0
+        @test isempty(lp2.L3_per_m)
+
+        # Kwarg with spin-dependent K₃
+        lp3 = LossParams(; gamma_dr=0.0, L3_per_m=[1.0, 2.0, 4.0])
+        @test lp3.L3_per_m == [1.0, 2.0, 4.0]
+        @test lp3.L3 == 0.0
+    end
+
+    @testset "L3_per_m: spin-dependent three-body loss (spin-1)" begin
+        config = GridConfig(32, 20.0)
+        grid = make_grid(config)
+        sys = SpinSystem(1)
+        psi = init_psi(grid, sys; state=:uniform)
+        # c=1 loses slowest, c=3 loses fastest
+        loss = LossParams(; gamma_dr=0.0, L3_per_m=[0.01, 0.1, 0.5])
+        dt = 0.005
+        for _ in 1:20
+            apply_loss_step!(psi, loss, 1, dt, sys.n_components, 1)
+        end
+        pop = [sum(abs2, psi[:, c]) for c in 1:3]
+        @test pop[1] > pop[2] > pop[3]   # monotonic
+    end
+
+    @testset "L3_per_m length-mismatch raises" begin
+        config = GridConfig(8, 4.0)
+        grid = make_grid(config)
+        sys = SpinSystem(1)
+        psi = init_psi(grid, sys; state=:uniform)
+        # Wrong length (4 != 3 components)
+        loss = LossParams(; gamma_dr=0.0, L3_per_m=[0.1, 0.1, 0.1, 0.1])
+        @test_throws ArgumentError apply_loss_step!(psi, loss, 1, 0.01,
+            sys.n_components, 1)
+    end
+
+    @testset "L3_per_m overrides scalar L3" begin
+        config = GridConfig(16, 8.0)
+        grid = make_grid(config)
+        sys = SpinSystem(1)
+        psi_a = init_psi(grid, sys; state=:uniform)
+        psi_b = copy(psi_a)
+        # loss_a: only per-m, scalar L3 should be ignored
+        loss_a = LossParams(; gamma_dr=0.0, L3=999.0, L3_per_m=[0.1, 0.1, 0.1])
+        # loss_b: scalar L3 matching per-m values
+        loss_b = LossParams(; gamma_dr=0.0, L3=0.1)
+        dt = 0.01
+        for _ in 1:10
+            apply_loss_step!(psi_a, loss_a, 1, dt, sys.n_components, 1)
+            apply_loss_step!(psi_b, loss_b, 1, dt, sys.n_components, 1)
+        end
+        @test psi_a ≈ psi_b rtol=1e-12
     end
 
     @testset "No loss: LossParams(0,0) preserves norm" begin

@@ -496,12 +496,35 @@ end
 
 # --- Loss Parameters ---
 
+"""
+Loss parameters for dipolar-relaxation (two-body) and three-body channels.
+
+Fields:
+- `gamma_dr` — base dipolar-relaxation rate. Internally re-weighted per m via
+  Clebsch–Gordan factors inside `apply_loss_step!` so only Δm=−1,−2 transitions
+  drive loss and the average rate across all m equals `gamma_dr`.
+- `L3`        — m-independent three-body rate. Ignored when `L3_per_m` is
+  non-empty.
+- `L3_per_m`  — optional per-component three-body rates, length 2F+1
+  ordered as the spinor (c=1 → m=+F, c=2F+1 → m=−F). When non-empty,
+  overrides `L3`. Used for spin-dependent K₃ channels (Scenarios #36/#37).
+"""
 struct LossParams
     gamma_dr::Float64
     L3::Float64
+    L3_per_m::Vector{Float64}
 end
 
-LossParams(gamma_dr::Float64) = LossParams(gamma_dr, 0.0)
+LossParams(gamma_dr::Float64) = LossParams(gamma_dr, 0.0, Float64[])
+LossParams(gamma_dr::Float64, L3::Float64) = LossParams(gamma_dr, L3, Float64[])
+
+function LossParams(;
+    gamma_dr::Real = 0.0,
+    L3::Real = 0.0,
+    L3_per_m::AbstractVector{<:Real} = Float64[],
+)
+    LossParams(Float64(gamma_dr), Float64(L3), collect(Float64, L3_per_m))
+end
 
 # --- Absorbing Boundary ---
 
