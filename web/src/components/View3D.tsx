@@ -118,10 +118,10 @@ export function View3D({ run, data }: Props) {
       label: 'Advect on',
     },
     stride: { value: 4, min: 1, max: 8, step: 1 },
-    count: { value: 200, min: 10, max: 5000, step: 20 },
-    trailLength: { value: 80, min: 2, max: 600, step: 4 },
+    count: { value: 120, min: 10, max: 5000, step: 20 },
+    trailLength: { value: 300, min: 2, max: 1000, step: 10 },
     speed: {
-      value: 0.25,
+      value: 0.18,
       min: 0.01,
       max: 2.0,
       step: 0.005,

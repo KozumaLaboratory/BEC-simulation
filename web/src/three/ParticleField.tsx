@@ -124,17 +124,20 @@ export function ParticleField({
   }, [count, vertsPerTrail])
 
   // Pre-bake per-trail-position alpha ramp (head bright, tail faint).
-  // Colors are constant per vertex-in-trail, so bake once.
+  // Colors are constant per vertex-in-trail, so bake once. Fade curve is
+  // `1-t` (linear) rather than the former α² so the whole spiral tail stays
+  // visible instead of blending into the background after ~25 % of the
+  // trail length.
   useEffect(() => {
     const c = new THREE.Color(params.color)
     for (let i = 0; i < count; i++) {
       for (let t = 0; t < vertsPerTrail; t++) {
         const a = 1 - t / (vertsPerTrail - 1)
         const idx = (i * vertsPerTrail + t) * 4
-        colors[idx] = c.r
-        colors[idx + 1] = c.g
-        colors[idx + 2] = c.b
-        colors[idx + 3] = a * a // sharper fade
+        colors[idx] = c.r * (0.4 + 0.6 * a) // head brighter than tail for extra contrast
+        colors[idx + 1] = c.g * (0.4 + 0.6 * a)
+        colors[idx + 2] = c.b * (0.4 + 0.6 * a)
+        colors[idx + 3] = a
       }
     }
     const lines = lineRef.current
