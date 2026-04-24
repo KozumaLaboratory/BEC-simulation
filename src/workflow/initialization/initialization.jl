@@ -1,5 +1,5 @@
 function init_psi(
-    grid::Grid{N},
+    grid::Grid{N,T},
     sys::SpinSystem;
     state::Symbol = :polar,
     seed::Int = 42,
@@ -7,12 +7,14 @@ function init_psi(
     init_theta::Real = 0.0,
     init_phi::Real = 0.0,
     init_vortex_charge::Real = 0,
-) where {N}
+    dtype::Union{Nothing,Type{<:AbstractFloat}} = nothing,
+) where {N,T<:AbstractFloat}
+    U = dtype === nothing ? T : dtype
     init_theta_f = Float64(init_theta)
     init_phi_f = Float64(init_phi)
     init_vortex_charge_i = Int(init_vortex_charge)
     n_pts = grid.config.n_points
-    psi = zeros(ComplexF64, n_pts..., sys.n_components)
+    psi = zeros(Complex{U}, n_pts..., sys.n_components)
     F = sys.F
     D = sys.n_components
 
@@ -337,7 +339,7 @@ function _set_component!(psi, vals, ndim, n_pts, c)
     view(psi, idx...) .= vals
 end
 
-function _extract_spinor(psi::AbstractArray{ComplexF64})
+function _extract_spinor(psi::AbstractArray{<:Complex})
     D = size(psi, ndims(psi))
     n_pts = ntuple(d -> size(psi, d), ndims(psi) - 1)
     peak_idx = argmax(sum(abs2, psi; dims=ndims(psi)))
@@ -358,13 +360,13 @@ function _default_spinor(F::Int)
 end
 
 function make_workspace(;
-    grid::Grid{N},
+    grid::Grid{N,T},
     atom::AtomSpecies,
     interactions::InteractionParams,
     zeeman::Union{ZeemanParams,TimeDependentZeeman} = ZeemanParams(),
     potential::AbstractPotential = NoPotential(),
     sim_params::SimParams,
-    psi_init::Union{Nothing,AbstractArray{ComplexF64}} = nothing,
+    psi_init::Union{Nothing,AbstractArray{<:Complex}} = nothing,
     enable_ddi::Bool = false,
     c_dd::Float64 = NaN,
     secular_ddi::Bool = false,
@@ -382,7 +384,12 @@ function make_workspace(;
     light_shift::Union{Nothing,LightShift} = nothing,
     time_dep_interactions::Union{Nothing,TimeDependentInteractions} = nothing,
     magnetic_gradient::Union{Nothing,MagneticGradient,TimeDependentMagneticGradient} = nothing,
-) where {N}
+    dtype::Union{Nothing,Type{<:AbstractFloat}} = nothing,
+) where {N,T<:AbstractFloat}
+    U = dtype === nothing ? T : dtype
+    U === T || throw(ArgumentError(
+        "dtype=$U disagrees with grid eltype=$T. Build the grid with `make_grid(cfg; dtype=$U)` first.",
+    ))
     if quasi_2d
         N == 2 || throw(ArgumentError("quasi_2d requires 2D grid, got $(N)D"))
         l_z > 0 || throw(ArgumentError("quasi_2d requires l_z > 0"))
@@ -399,31 +406,33 @@ function make_workspace(;
     sm = spin_matrices(atom.F)
 
     psi = if psi_init === nothing
-        init_psi(grid, sys)
+        init_psi(grid, sys; dtype=U)
     else
-        copy(psi_init)
+        eltype(psi_init) === Complex{U} ? copy(psi_init) : Complex{U}.(psi_init)
     end
     psi = _to_device(backend, psi)
 
-    fft_buf = _zeros(backend, ComplexF64, grid.config.n_points...)
+    fft_buf = _zeros(backend, Complex{U}, grid.config.n_points...)
     state = SimState{N,typeof(psi),typeof(fft_buf)}(psi, fft_buf, 0.0, 0)
 
-    plans = make_fft_plans(grid.config.n_points, backend; flags = fft_flags)
+    plans = make_fft_plans(grid.config.n_points, backend; flags = fft_flags, dtype = U)
     kinetic_phase = _to_device(
         backend,
         prepare_kinetic_phase(
             grid,
             sim_params.dt;
             imaginary_time = sim_params.imaginary_time,
+            dtype = U,
         ),
     )
     V = evaluate_potential(potential, grid)
 
     omega = sim_params.rotating_frame_omega
     if abs(omega) > 1e-15 && N >= 2
+        omega_sq_half = U(0.5 * omega^2)
         @inbounds for I in CartesianIndices(grid.config.n_points)
             r_perp_sq = grid.x[1][I[1]]^2 + grid.x[2][I[2]]^2
-            V[I] += 0.5 * omega^2 * r_perp_sq
+            V[I] += omega_sq_half * r_perp_sq
         end
     end
     V = _to_device(backend, V)
@@ -453,6 +462,7 @@ function make_workspace(;
             secular = secular_ddi,
             quasi_2d = quasi_2d_ddi,
             l_z = l_z_ddi,
+            dtype = U,
         )
     else
         nothing
@@ -465,12 +475,12 @@ function make_workspace(;
     end
 
     ddi_bufs = if ddi !== nothing
-        make_ddi_buffers(grid.config.n_points, backend; flags = fft_flags)
+        make_ddi_buffers(grid.config.n_points, backend; flags = fft_flags, dtype = U)
     else
         nothing
     end
 
-    density_buf = _zeros(backend, Float64, grid.config.n_points...)
+    density_buf = _zeros(backend, U, grid.config.n_points...)
 
     ddi_pad = if ddi_padding && ddi !== nothing
         c_dd_val = isnan(c_dd) ? compute_c_dd(atom) : ddi.C_dd
@@ -483,6 +493,7 @@ function make_workspace(;
             quasi_2d = quasi_2d_ddi,
             l_z = l_z_ddi,
             backend,
+            dtype = U,
         )
     else
         nothing
@@ -561,7 +572,7 @@ function make_workspace(;
     end
 
     abs_mask = if absorbing_boundary !== nothing
-        compute_absorbing_mask(grid, absorbing_boundary, sim_params.dt, backend)
+        compute_absorbing_mask(grid, absorbing_boundary, sim_params.dt, backend; dtype = U)
     else
         nothing
     end

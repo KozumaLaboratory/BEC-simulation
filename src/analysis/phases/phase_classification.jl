@@ -6,7 +6,7 @@ Compute order parameters and classify the spinor phase.
 Returns `(spin_order, nematic_order, channel_weights, phase, magnetization_density)`.
 """
 function classify_phase(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     F::Int,
     grid::Grid{N},
     sm::SpinMatrices,
@@ -146,7 +146,7 @@ Returns `(spin_order, nematic_order, biaxiality, Q6, star_entropy,
           channel_weights, magnetization_density, phase)`.
 """
 function classify_phase_detailed(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     F::Int,
     grid::Grid{N},
     sm::SpinMatrices;

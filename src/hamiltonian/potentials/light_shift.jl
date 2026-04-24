@@ -58,7 +58,7 @@ function make_light_shift(;
     polarization = (0, 0, 1),
     alpha_vector::Float64 = 0.0,
     alpha_tensor::Float64 = 0.0,
-    profile::AbstractArray{Float64},
+    profile::AbstractArray{<:AbstractFloat},
     backend::AbstractBackend = CPUBackend(),
 )
     sm = spin_matrices(F)
@@ -87,7 +87,7 @@ end
 Convenience: use trap potential as intensity profile with η = α₂/α₀ effective ratio.
 """
 function make_light_shift_from_trap(
-    V_trap::AbstractArray{Float64},
+    V_trap::AbstractArray{<:AbstractFloat},
     F::Int,
     eta_tensor::Float64;
     eta_vector::Float64 = 0.0,
@@ -110,7 +110,7 @@ Off-diagonal light-shift substep: U†→phase(λ·I(r)·dt)→U per grid point.
 Only called when `!ls.is_diagonal`.
 """
 function apply_light_shift_step!(
-    psi::Array{ComplexF64},
+    psi::Array{<:Complex},
     ls::LightShift,
     dt_frac::Float64,
     ndim::Int;
@@ -157,7 +157,7 @@ function apply_light_shift_step!(
 end
 
 function apply_light_shift_step!(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     ls::LightShift,
     dt_frac::Float64,
     ndim::Int;

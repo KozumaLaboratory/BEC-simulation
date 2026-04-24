@@ -32,7 +32,7 @@ where V = c₂ (-1)^{F-m}/√D × A₀₀ (same for both signs of m since (-1)^{
 Real-time conserves norm for each (m, -m) pair.
 """
 function apply_nematic_step!(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     interactions::InteractionParams,
     F::Int,
     dt::Float64,

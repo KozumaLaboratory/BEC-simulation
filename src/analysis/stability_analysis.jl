@@ -188,7 +188,7 @@ function _estimate_growth_rate(time_series::Vector{Float64}, dt_sample::Float64)
     num / den
 end
 
-function _find_peak_k(sk::AbstractArray{Float64}, grid::Grid{N}) where {N}
+function _find_peak_k(sk::AbstractArray{<:AbstractFloat}, grid::Grid{N}) where {N}
     n_pts = size(sk)
     k_sq = grid.k_squared
 

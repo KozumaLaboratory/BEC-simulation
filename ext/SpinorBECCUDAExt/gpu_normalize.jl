@@ -8,7 +8,7 @@
 Compute per-component norms ∫|ψ_c|² dV for all components in one pass.
 Returns a host Vector{Float64} of length D.
 """
-function _gpu_component_norms(psi::CuArray{ComplexF64}, dV::Float64, ndim::Int, D::Int)
+function _gpu_component_norms(psi::CuArray{<:Complex}, dV::Float64, ndim::Int, D::Int)
     N = prod(ntuple(d -> size(psi, d), ndim))
     psi_2d = reshape(psi, N, D)
     # Compute sum(abs2, col) for each component as a single GPU operation
@@ -22,7 +22,7 @@ end
 """
 GPU-native normalize: compute total norm in one GPU reduction.
 """
-function SpinorBEC._normalize_psi!(psi::CuArray{ComplexF64}, grid, n_components, ndim)
+function SpinorBEC._normalize_psi!(psi::CuArray{<:Complex}, grid, n_components, ndim)
     dV = SpinorBEC.cell_volume(grid)
     norm_sq = sum(abs2, psi) * dV  # single GPU reduction + scalar transfer
     psi ./= sqrt(norm_sq)
@@ -37,7 +37,7 @@ Instead of D separate sum(abs2, view(psi,...,c)) calls per Newton iteration
 and transfer the D-element vector once.
 """
 function SpinorBEC._normalize_psi_constrained!(
-    psi::CuArray{ComplexF64}, grid, n_components, ndim, target_Mz, F,
+    psi::CuArray{<:Complex}, grid, n_components, ndim, target_Mz, F,
 )
     dV = SpinorBEC.cell_volume(grid)
     D = n_components

@@ -11,7 +11,7 @@ Imaginary time: rotation by imaginary angle with real exponential shear factors
 (stable for small Ωτ, renormalized each ITP step).
 """
 function _apply_coriolis_step!(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     grid::Grid{N},
     omega::Float64,
     dt::Float64,
@@ -74,7 +74,7 @@ function _apply_coriolis_step!(
 end
 
 function _apply_1d_shear_batch!(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     coord_vals::Vector{Float64},
     k_vals::Vector{Float64},
     fft_dim::Int,
@@ -96,7 +96,7 @@ function _apply_1d_shear_batch!(
 end
 
 function _apply_1d_shear_batch!(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     coord_vals::Vector{Float64},
     k_vals::Vector{Float64},
     fft_dim::Int,

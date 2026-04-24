@@ -11,7 +11,7 @@ extract observables. Mean and variance are computed via Welford's online algorit
 Uses `pmap` when `nprocs() > 1`, otherwise `map`.
 """
 function run_twa(;
-    psi_gs::AbstractArray{ComplexF64},
+    psi_gs::AbstractArray{<:Complex},
     grid::Grid{N},
     atom::AtomSpecies,
     interactions::InteractionParams,
@@ -137,7 +137,7 @@ function _extract_trajectory_observables(
 end
 
 function _compute_observable(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     grid::Grid{N},
     sm::SpinMatrices,
     sys::SpinSystem,

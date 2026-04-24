@@ -62,7 +62,7 @@ Returns a NamedTuple with:
 - `vortex_signal`: regions where |φ| < threshold (potential vortex cores)
 """
 function faraday_image(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     grid::Grid{N},
     F::Int;
     params::FaradayParams = FaradayParams(),
@@ -125,8 +125,8 @@ of a uniform background.
 Returns same fields as `faraday_image` plus `differential` (φ - φ_ref).
 """
 function faraday_differential(
-    psi::AbstractArray{ComplexF64},
-    psi_ref::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
+    psi_ref::AbstractArray{<:Complex},
     grid::Grid{N},
     F::Int;
     params::FaradayParams = FaradayParams(),
@@ -153,7 +153,7 @@ Detect potential vortex positions from zero-crossings of the Faraday signal.
 Returns a list of (x_index, y_index) positions where vortex cores are likely.
 """
 function detect_vortices_faraday(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     grid::Grid{N},
     F::Int;
     params::FaradayParams = FaradayParams(),

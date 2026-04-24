@@ -4,7 +4,7 @@ Build zero-padded DDI context for reduced aliasing.
 Doubles grid size in each dimension. Builds Q tensor and rFFT plans on padded grid.
 """
 function make_ddi_padded(
-    grid::Grid{N},
+    grid::Grid{N,T},
     atom::AtomSpecies;
     c_dd::Float64 = compute_c_dd(atom),
     fft_flags = FFTW.MEASURE,
@@ -12,30 +12,31 @@ function make_ddi_padded(
     quasi_2d::Bool = false,
     l_z::Float64 = 0.0,
     backend::AbstractBackend = CPUBackend(),
-) where {N}
+    dtype::Union{Nothing,Type{<:AbstractFloat}} = nothing,
+) where {N,T<:AbstractFloat}
+    U = dtype === nothing ? T : dtype
     n_pts = grid.config.n_points
     padded_shape = ntuple(d -> 2 * n_pts[d], N)
     rk_shape = rfft_output_shape(padded_shape)
 
     dx = grid.dx
-    kx_r =
-        collect(rfftfreq(padded_shape[1], padded_shape[1] * 2π / (padded_shape[1] * dx[1])))
+    kx_r = collect(U, rfftfreq(padded_shape[1], padded_shape[1] * 2π / (padded_shape[1] * dx[1])))
     k_full = ntuple(N) do d
         n = padded_shape[d]
         dk = 2π / (n * dx[d])
-        collect(fftfreq(n, n * dk))
+        collect(U, fftfreq(n, n * dk))
     end
-    ky = N >= 2 ? k_full[2] : Float64[]
-    kz = N >= 3 ? k_full[3] : Float64[]
+    ky = N >= 2 ? k_full[2] : U[]
+    kz = N >= 3 ? k_full[3] : U[]
 
-    Q_xx = zeros(Float64, rk_shape)
-    Q_xy = zeros(Float64, rk_shape)
-    Q_xz = zeros(Float64, rk_shape)
-    Q_yy = zeros(Float64, rk_shape)
-    Q_yz = zeros(Float64, rk_shape)
-    Q_zz = zeros(Float64, rk_shape)
+    Q_xx = zeros(U, rk_shape)
+    Q_xy = zeros(U, rk_shape)
+    Q_xz = zeros(U, rk_shape)
+    Q_yy = zeros(U, rk_shape)
+    Q_yz = zeros(U, rk_shape)
+    Q_zz = zeros(U, rk_shape)
 
-    k_sq_rk = zeros(Float64, rk_shape)
+    k_sq_rk = zeros(U, rk_shape)
     @inbounds for I in CartesianIndices(rk_shape)
         k2 = kx_r[I[1]]^2
         if N >= 2
@@ -61,7 +62,7 @@ function make_ddi_padded(
             ky,
             k_sq_rk,
             rk_shape,
-            l_z,
+            U(l_z),
         )
     else
         _build_q_tensor!(
@@ -80,7 +81,7 @@ function make_ddi_padded(
         )
     end
 
-    rplans = make_rfft_plans(padded_shape, backend; flags = fft_flags)
+    rplans = make_rfft_plans(padded_shape, backend; flags = fft_flags, dtype = U)
 
     DDIPaddedContext(
         padded_shape,
@@ -91,18 +92,18 @@ function make_ddi_padded(
         _to_device(backend, Q_yy),
         _to_device(backend, Q_yz),
         _to_device(backend, Q_zz),
-        _zeros(backend, Float64, padded_shape...),
-        _zeros(backend, Float64, padded_shape...),
-        _zeros(backend, Float64, padded_shape...),
-        _zeros(backend, ComplexF64, rk_shape...),
-        _zeros(backend, ComplexF64, rk_shape...),
-        _zeros(backend, ComplexF64, rk_shape...),
-        _zeros(backend, ComplexF64, rk_shape...),
-        _zeros(backend, ComplexF64, rk_shape...),
-        _zeros(backend, ComplexF64, rk_shape...),
-        _zeros(backend, Float64, padded_shape...),
-        _zeros(backend, Float64, padded_shape...),
-        _zeros(backend, Float64, padded_shape...),
+        _zeros(backend, U, padded_shape...),
+        _zeros(backend, U, padded_shape...),
+        _zeros(backend, U, padded_shape...),
+        _zeros(backend, Complex{U}, rk_shape...),
+        _zeros(backend, Complex{U}, rk_shape...),
+        _zeros(backend, Complex{U}, rk_shape...),
+        _zeros(backend, Complex{U}, rk_shape...),
+        _zeros(backend, Complex{U}, rk_shape...),
+        _zeros(backend, Complex{U}, rk_shape...),
+        _zeros(backend, U, padded_shape...),
+        _zeros(backend, U, padded_shape...),
+        _zeros(backend, U, padded_shape...),
     )
 end
 
@@ -143,7 +144,7 @@ end
 Apply DDI step using zero-padded rFFT convolution when DDIPaddedContext is available.
 """
 function apply_ddi_step!(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     sm::SpinMatrices{D},
     ddi::DDIParams{N},
     bufs::DDIBuffers,

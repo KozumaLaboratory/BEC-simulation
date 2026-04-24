@@ -1,16 +1,16 @@
-function total_density(psi::AbstractArray{ComplexF64}, ndim::Int)
+function total_density(psi::AbstractArray{<:Complex}, ndim::Int)
     n_comp = size(psi, ndim + 1)
     n_pts = ntuple(d -> size(psi, d), ndim)
     _total_density(psi, n_comp, ndim, n_pts)
 end
 
-function component_density(psi::AbstractArray{ComplexF64}, ndim::Int, c::Int)
+function component_density(psi::AbstractArray{<:Complex}, ndim::Int, c::Int)
     n_pts = ntuple(d -> size(psi, d), ndim)
     idx = _component_slice(ndim, n_pts, c)
     abs2.(view(psi, idx...))
 end
 
-function total_norm(psi::AbstractArray{ComplexF64}, grid::Grid{N}) where {N}
+function total_norm(psi::AbstractArray{<:Complex}, grid::Grid{N}) where {N}
     dV = cell_volume(grid)
     n = total_density(psi, N)
     sum(n) * dV
@@ -20,7 +20,7 @@ end
 Magnetization ⟨Fz⟩ = Σ_m m |ψ_m|² integrated over space.
 """
 function magnetization(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     grid::Grid{N},
     sys::SpinSystem,
 ) where {N}
@@ -39,7 +39,7 @@ Local spin density vector (Fx, Fy, Fz) at each spatial point.
 Returns a tuple of 3 arrays.
 """
 function spin_density_vector(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     sm::SpinMatrices{D},
     ndim::Int,
 ) where {D}
@@ -131,7 +131,7 @@ Singlet pair amplitude A₀₀(r) = Σ_m (-1)^{F-m} ψ_m(r) ψ_{-m}(r) / √(2F+
 Returns Array{ComplexF64,N} over spatial points. Non-zero only for integer F.
 For F=1: A₀₀ = (ψ₊₁ψ₋₁ - ψ₀ψ₀ + ψ₋₁ψ₊₁) / √3 = (2ψ₊₁ψ₋₁ - ψ₀²) / √3.
 """
-function singlet_pair_amplitude(psi::AbstractArray{ComplexF64}, F::Int, ndim::Int)
+function singlet_pair_amplitude(psi::AbstractArray{<:Complex}, F::Int, ndim::Int)
     D = 2F + 1
     n_pts = ntuple(d -> size(psi, d), ndim)
     A = zeros(ComplexF64, n_pts)
@@ -156,7 +156,7 @@ end
 Pair amplitude A_{SM}(r) = Σ_{m1} CG(F,m1;F,M-m1|S,M) ψ_{m1}(r) ψ_{M-m1}(r).
 """
 function pair_amplitude(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     F::Int,
     S::Int,
     M::Int,
@@ -197,7 +197,7 @@ The rank-2 nematic tensor is N_{ab} = ⟨(F_a F_b + F_b F_a)/2⟩/n - F(F+1)/3 �
 Returns three N-dim arrays (lambda1, lambda2, lambda3) sorted lambda1 >= lambda2 >= lambda3.
 """
 function nematic_tensor_eigenvalues(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     sm::SpinMatrices{D},
     ndim::Int;
     density_cutoff::Float64 = 1e-10,
@@ -277,7 +277,7 @@ where Q_{kq} = Σ_m CG(F,m;k,q|F,m+q) ψ*_{m+q} ψ_m.
 Returns Dict mapping rank k to spatial array of O_k values.
 """
 function multipole_order_parameters(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     F::Int,
     ndim::Int;
     density_cutoff::Float64 = 1e-10,
@@ -326,7 +326,7 @@ Density-weighted average of each multipole order parameter.
 Returns Dict mapping rank k to ⟨O_k⟩ = ∫ O_k(r) n²(r) dV / ∫ n²(r) dV.
 """
 function multipole_spectrum(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     F::Int,
     grid::Grid{N};
     density_cutoff::Float64 = 1e-10,
@@ -347,7 +347,7 @@ end
 Static structure factor S(k) = |δn(k)|² / N_grid from density fluctuations.
 Useful for detecting supersolid/modulated phases.
 """
-function structure_factor(psi::AbstractArray{ComplexF64}, grid::Grid{N}) where {N}
+function structure_factor(psi::AbstractArray{<:Complex}, grid::Grid{N}) where {N}
     n = total_density(psi, N)
     n_mean = sum(n) / prod(size(n))
     delta_n = n .- n_mean
@@ -361,7 +361,7 @@ end
 Density modulation contrast (n_max - n_min) / (n_max + n_min).
 Returns 0 for uniform density, approaches 1 for strong modulation.
 """
-function modulation_contrast(psi::AbstractArray{ComplexF64}, ndim::Int)
+function modulation_contrast(psi::AbstractArray{<:Complex}, ndim::Int)
     n = total_density(psi, ndim)
     n_max = maximum(n)
     n_min = minimum(n)
@@ -378,7 +378,7 @@ Returns `(amplitudes, channel_weights)` where:
 - `channel_weights::Dict{Int, Float64}`: S => Σ_M ∫|A_{SM}|² dV
 """
 function pair_amplitude_spectrum(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     F::Int,
     grid::Grid{N},
 ) where {N}

@@ -22,10 +22,10 @@ The gradient includes kinetic, trap, contact, LHY, spin, and DDI terms.
 which only works on CPU). L-BFGS on GPU should pass a device-resident copy.
 """
 function energy_gradient!(
-    grad::AbstractArray{ComplexF64},
-    psi::AbstractArray{ComplexF64},
+    grad::AbstractArray{<:Complex},
+    psi::AbstractArray{<:Complex},
     ws::Workspace{N};
-    k_squared_dev::AbstractArray{Float64} = ws.grid.k_squared,
+    k_squared_dev::AbstractArray{<:AbstractFloat} = ws.grid.k_squared,
 ) where {N}
     grid = ws.grid
     n_comp = ws.spin_matrices.system.n_components
@@ -174,8 +174,8 @@ Project gradient onto constraint tangent space:
   2. Remove Mz-changing component (magnetization conservation)
 """
 function _project_constraints!(
-    grad::AbstractArray{ComplexF64},
-    psi::AbstractArray{ComplexF64},
+    grad::AbstractArray{<:Complex},
+    psi::AbstractArray{<:Complex},
     grid::Grid{N},
     target_Mz::Union{Nothing,Float64},
     F::Int,
@@ -391,7 +391,7 @@ end
 
 """Two-loop L-BFGS direction."""
 function _lbfgs_direction(
-    grad::AbstractArray{ComplexF64},
+    grad::AbstractArray{<:Complex},
     s_hist::Vector, y_hist::Vector, rho_hist::Vector{Float64},
 )
     q = copy(grad)

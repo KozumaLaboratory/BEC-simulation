@@ -18,36 +18,32 @@ function _build_q_tensor!(
     n_pts::NTuple{N,Int};
     secular::Bool = false,
 ) where {N}
+    T = eltype(Q_xx)
+    third = T(1) / T(3)
+    half = T(1) / T(2)
     @inbounds for I in CartesianIndices(n_pts)
         k2 = k_squared[I]
-        if k2 == 0.0
-            Q_xx[I] = 0.0;
-            Q_yy[I] = 0.0;
-            Q_zz[I] = 0.0
-            Q_xy[I] = 0.0;
-            Q_xz[I] = 0.0;
-            Q_yz[I] = 0.0
+        if iszero(k2)
+            Q_xx[I] = zero(T); Q_yy[I] = zero(T); Q_zz[I] = zero(T)
+            Q_xy[I] = zero(T); Q_xz[I] = zero(T); Q_yz[I] = zero(T)
             continue
         end
 
         kv_x = kx[I[1]]
-        kv_y = N >= 2 ? ky[I[2]] : 0.0
-        kv_z = N >= 3 ? kz[I[3]] : 0.0
+        kv_y = N >= 2 ? ky[I[2]] : zero(T)
+        kv_z = N >= 3 ? kz[I[3]] : zero(T)
 
-        inv_k2 = 1.0 / k2
+        inv_k2 = one(T) / k2
 
         if secular
-            # TODO: This secular approximation assumes polarization along z.
-            # For transverse polarization (B in-plane), the Larmor-averaged
-            # kernel differs — see Kawaguchi-Ueda Eq. (458)-(459).
-            qzz = kv_z * kv_z * inv_k2 - 1.0 / 3.0
+            qzz = kv_z * kv_z * inv_k2 - third
             Q_zz[I] = qzz
-            Q_xx[I] = -qzz / 2.0
-            Q_yy[I] = -qzz / 2.0
+            Q_xx[I] = -qzz * half
+            Q_yy[I] = -qzz * half
         else
-            Q_xx[I] = kv_x * kv_x * inv_k2 - 1.0 / 3.0
-            Q_yy[I] = kv_y * kv_y * inv_k2 - 1.0 / 3.0
-            Q_zz[I] = kv_z * kv_z * inv_k2 - 1.0 / 3.0
+            Q_xx[I] = kv_x * kv_x * inv_k2 - third
+            Q_yy[I] = kv_y * kv_y * inv_k2 - third
+            Q_zz[I] = kv_z * kv_z * inv_k2 - third
             Q_xy[I] = kv_x * kv_y * inv_k2
             Q_xz[I] = kv_x * kv_z * inv_k2
             Q_yz[I] = kv_y * kv_z * inv_k2
@@ -67,11 +63,14 @@ where u = k⊥ · l_z.
 
 Limits: h(0) = 2/3 (repulsive), h(∞) → -1/3 (attractive).
 """
-function _quasi_2d_kernel(k_perp::Float64, l_z::Float64)
+function _quasi_2d_kernel(k_perp::T, l_z::T) where {T<:AbstractFloat}
     u = k_perp * l_z
-    u < 1e-15 && return 2.0 / 3.0
-    2.0 / 3.0 - u * sqrt(π / 2.0) * erfcx(u / sqrt(2.0))
+    two_thirds = T(2) / T(3)
+    u < T(1e-15) && return two_thirds
+    two_thirds - u * sqrt(T(π) / T(2)) * erfcx(u / sqrt(T(2)))
 end
+_quasi_2d_kernel(k_perp::AbstractFloat, l_z::AbstractFloat) =
+    _quasi_2d_kernel(promote(k_perp, l_z)...)
 
 """
 Build Q tensor for quasi-2D DDI (secular approximation) on a 2D grid.
@@ -89,53 +88,61 @@ function _build_q_tensor_quasi2d!(
     ky,
     k_squared,
     n_pts::NTuple{2,Int},
-    l_z::Float64,
+    l_z,
 )
+    T = eltype(Q_xx)
+    l_z_t = T(l_z)
+    half = T(1) / T(2)
     @inbounds for I in CartesianIndices(n_pts)
         k2 = k_squared[I]
         k_perp = sqrt(k2)
-        qzz = _quasi_2d_kernel(k_perp, l_z)
+        qzz = _quasi_2d_kernel(k_perp, l_z_t)
         Q_zz[I] = qzz
-        Q_xx[I] = -qzz / 2.0
-        Q_yy[I] = -qzz / 2.0
-        Q_xy[I] = 0.0
-        Q_xz[I] = 0.0
-        Q_yz[I] = 0.0
+        Q_xx[I] = -qzz * half
+        Q_yy[I] = -qzz * half
+        Q_xy[I] = zero(T)
+        Q_xz[I] = zero(T)
+        Q_yz[I] = zero(T)
     end
     nothing
 end
 
 function make_ddi_params(
-    grid::Grid{N},
+    grid::Grid{N,T},
     atom::AtomSpecies;
     c_dd::Float64 = compute_c_dd(atom),
     secular::Bool = false,
     quasi_2d::Bool = false,
     l_z::Float64 = 0.0,
-) where {N}
+    dtype::Union{Nothing,Type{<:AbstractFloat}} = nothing,
+) where {N,T<:AbstractFloat}
+    U = dtype === nothing ? T : dtype
     if quasi_2d
         N == 2 || throw(ArgumentError("quasi_2d DDI requires a 2D grid (N=2), got N=$N"))
         l_z > 0.0 || throw(ArgumentError("quasi_2d DDI requires l_z > 0, got l_z=$l_z"))
-        return _make_ddi_params_quasi2d(grid, c_dd, l_z)
+        return _make_ddi_params_quasi2d(grid, c_dd, l_z; dtype=U)
     end
-    _make_ddi_params_full(grid, atom; c_dd, secular)
+    _make_ddi_params_full(grid, atom; c_dd, secular, dtype=U)
 end
 
-function _make_ddi_params_quasi2d(grid::Grid{2}, c_dd::Float64, l_z::Float64)
+function _make_ddi_params_quasi2d(
+    grid::Grid{2}, c_dd::Float64, l_z::Float64;
+    dtype::Type{U} = Float64,
+) where {U<:AbstractFloat}
     n_pts = grid.config.n_points
     rk_shape = rfft_output_shape(n_pts)
 
-    Q_xx = zeros(Float64, rk_shape)
-    Q_xy = zeros(Float64, rk_shape)
-    Q_xz = zeros(Float64, rk_shape)
-    Q_yy = zeros(Float64, rk_shape)
-    Q_yz = zeros(Float64, rk_shape)
-    Q_zz = zeros(Float64, rk_shape)
+    Q_xx = zeros(U, rk_shape)
+    Q_xy = zeros(U, rk_shape)
+    Q_xz = zeros(U, rk_shape)
+    Q_yy = zeros(U, rk_shape)
+    Q_yz = zeros(U, rk_shape)
+    Q_zz = zeros(U, rk_shape)
 
-    kx_r = collect(rfftfreq(n_pts[1], n_pts[1] * grid.dk[1]))
-    ky = grid.k[2]
+    kx_r = collect(U, rfftfreq(n_pts[1], n_pts[1] * grid.dk[1]))
+    ky = U.(grid.k[2])
 
-    k_sq_rk = zeros(Float64, rk_shape)
+    k_sq_rk = zeros(U, rk_shape)
     @inbounds for I in CartesianIndices(rk_shape)
         k_sq_rk[I] = kx_r[I[1]]^2 + ky[I[2]]^2
     end
@@ -151,18 +158,20 @@ function _make_ddi_params_quasi2d(grid::Grid{2}, c_dd::Float64, l_z::Float64)
         ky,
         k_sq_rk,
         rk_shape,
-        l_z,
+        U(l_z),
     )
 
     DDIParams(c_dd, Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz)
 end
 
 function _make_ddi_params_full(
-    grid::Grid{N},
+    grid::Grid{N,T},
     atom::AtomSpecies;
     c_dd::Float64 = compute_c_dd(atom),
     secular::Bool = false,
-) where {N}
+    dtype::Union{Nothing,Type{<:AbstractFloat}} = nothing,
+) where {N,T<:AbstractFloat}
+    U = dtype === nothing ? T : dtype
     if secular
         @warn "DDI secular approximation: ensure ω_Larmor ≫ c_dd × peak_density" maxlog=1
     end
@@ -170,18 +179,18 @@ function _make_ddi_params_full(
     n_pts = grid.config.n_points
     rk_shape = rfft_output_shape(n_pts)
 
-    Q_xx = zeros(Float64, rk_shape)
-    Q_xy = zeros(Float64, rk_shape)
-    Q_xz = zeros(Float64, rk_shape)
-    Q_yy = zeros(Float64, rk_shape)
-    Q_yz = zeros(Float64, rk_shape)
-    Q_zz = zeros(Float64, rk_shape)
+    Q_xx = zeros(U, rk_shape)
+    Q_xy = zeros(U, rk_shape)
+    Q_xz = zeros(U, rk_shape)
+    Q_yy = zeros(U, rk_shape)
+    Q_yz = zeros(U, rk_shape)
+    Q_zz = zeros(U, rk_shape)
 
-    kx_r = collect(rfftfreq(n_pts[1], n_pts[1] * grid.dk[1]))
-    ky = N >= 2 ? grid.k[2] : Float64[]
-    kz = N >= 3 ? grid.k[3] : Float64[]
+    kx_r = collect(U, rfftfreq(n_pts[1], n_pts[1] * grid.dk[1]))
+    ky = N >= 2 ? U.(grid.k[2]) : U[]
+    kz = N >= 3 ? U.(grid.k[3]) : U[]
 
-    k_sq_rk = zeros(Float64, rk_shape)
+    k_sq_rk = zeros(U, rk_shape)
     @inbounds for I in CartesianIndices(rk_shape)
         k2 = kx_r[I[1]]^2
         if N >= 2
@@ -230,24 +239,26 @@ function _ddi_params_to_device(ddi::DDIParams, backend::AbstractBackend)
 end
 
 function make_ddi_buffers(
-    n_pts::NTuple{N,Int}, backend::AbstractBackend = CPUBackend(); flags = FFTW.MEASURE,
-) where {N}
+    n_pts::NTuple{N,Int}, backend::AbstractBackend = CPUBackend();
+    flags = FFTW.MEASURE,
+    dtype::Type{U} = Float64,
+) where {N,U<:AbstractFloat}
     rk_shape = rfft_output_shape(n_pts)
-    rplans = make_rfft_plans(n_pts, backend; flags = flags)
+    rplans = make_rfft_plans(n_pts, backend; flags = flags, dtype = U)
     DDIBuffers(
         rplans,
-        _zeros(backend, Float64, n_pts...),       # Fx_r
-        _zeros(backend, Float64, n_pts...),       # Fy_r
-        _zeros(backend, Float64, n_pts...),       # Fz_r
-        _zeros(backend, ComplexF64, rk_shape...), # Fx_rk
-        _zeros(backend, ComplexF64, rk_shape...), # Fy_rk
-        _zeros(backend, ComplexF64, rk_shape...), # Fz_rk
-        _zeros(backend, ComplexF64, rk_shape...), # Phi_x_rk
-        _zeros(backend, ComplexF64, rk_shape...), # Phi_y_rk
-        _zeros(backend, ComplexF64, rk_shape...), # Phi_z_rk
-        _zeros(backend, Float64, n_pts...),       # Phi_x
-        _zeros(backend, Float64, n_pts...),       # Phi_y
-        _zeros(backend, Float64, n_pts...),       # Phi_z
+        _zeros(backend, U, n_pts...),             # Fx_r
+        _zeros(backend, U, n_pts...),             # Fy_r
+        _zeros(backend, U, n_pts...),             # Fz_r
+        _zeros(backend, Complex{U}, rk_shape...), # Fx_rk
+        _zeros(backend, Complex{U}, rk_shape...), # Fy_rk
+        _zeros(backend, Complex{U}, rk_shape...), # Fz_rk
+        _zeros(backend, Complex{U}, rk_shape...), # Phi_x_rk
+        _zeros(backend, Complex{U}, rk_shape...), # Phi_y_rk
+        _zeros(backend, Complex{U}, rk_shape...), # Phi_z_rk
+        _zeros(backend, U, n_pts...),             # Phi_x
+        _zeros(backend, U, n_pts...),             # Phi_y
+        _zeros(backend, U, n_pts...),             # Phi_z
     )
 end
 
@@ -286,21 +297,23 @@ function _ddi_k_contraction_core!(
     Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz,
     C, rk_shape, is_cpu::Bool,
 )
+    # Match scalar to Q eltype so F32 arrays stay F32 through the broadcast.
+    Ct = convert(eltype(Q_xx), C)
     if is_cpu
         Threads.@threads for I in CartesianIndices(rk_shape)
             @inbounds begin
                 fk_x = Fx_rk[I]
                 fk_y = Fy_rk[I]
                 fk_z = Fz_rk[I]
-                Phi_x_rk[I] = C * (Q_xx[I] * fk_x + Q_xy[I] * fk_y + Q_xz[I] * fk_z)
-                Phi_y_rk[I] = C * (Q_xy[I] * fk_x + Q_yy[I] * fk_y + Q_yz[I] * fk_z)
-                Phi_z_rk[I] = C * (Q_xz[I] * fk_x + Q_yz[I] * fk_y + Q_zz[I] * fk_z)
+                Phi_x_rk[I] = Ct * (Q_xx[I] * fk_x + Q_xy[I] * fk_y + Q_xz[I] * fk_z)
+                Phi_y_rk[I] = Ct * (Q_xy[I] * fk_x + Q_yy[I] * fk_y + Q_yz[I] * fk_z)
+                Phi_z_rk[I] = Ct * (Q_xz[I] * fk_x + Q_yz[I] * fk_y + Q_zz[I] * fk_z)
             end
         end
     else
-        @. Phi_x_rk = C * (Q_xx * Fx_rk + Q_xy * Fy_rk + Q_xz * Fz_rk)
-        @. Phi_y_rk = C * (Q_xy * Fx_rk + Q_yy * Fy_rk + Q_yz * Fz_rk)
-        @. Phi_z_rk = C * (Q_xz * Fx_rk + Q_yz * Fy_rk + Q_zz * Fz_rk)
+        @. Phi_x_rk = Ct * (Q_xx * Fx_rk + Q_xy * Fy_rk + Q_xz * Fz_rk)
+        @. Phi_y_rk = Ct * (Q_xy * Fx_rk + Q_yy * Fy_rk + Q_yz * Fz_rk)
+        @. Phi_z_rk = Ct * (Q_xz * Fx_rk + Q_yz * Fy_rk + Q_zz * Fz_rk)
     end
 end
 
@@ -338,10 +351,10 @@ Apply Euler spin rotation from DDI dipolar field to the wavefunction.
 Operates on CPU arrays only (uses scalar indexing via _get_spinor/_set_spinor!).
 """
 function _apply_ddi_rotation!(
-    psi::Array{ComplexF64},
-    phi_x::Array{Float64},
-    phi_y::Array{Float64},
-    phi_z::Array{Float64},
+    psi::Array{<:Complex},
+    phi_x::Array{<:AbstractFloat},
+    phi_y::Array{<:AbstractFloat},
+    phi_z::Array{<:AbstractFloat},
     sm::SpinMatrices{D},
     dt_frac::Float64,
     ndim::Int;
@@ -385,7 +398,9 @@ Reshapes psi from (spatial..., D) to (N_spatial, D) for efficient BLAS.
 Replaces 4×D² broadcast calls with 4 CUBLAS gemm calls.
 """
 function _gpu_matmul_Vdag!(W, P, conj_V, ::Val{D}) where {D}
-    if D > 7
+    # GPU: always use mul! (single cuBLAS call >> many broadcast launches).
+    # CPU small-D: manual unroll avoids BLAS overhead on tiny matrices.
+    if D > 7 || !(W isa Array)
         mul!(W, P, conj_V)
     else
         for i = 1:D
@@ -403,7 +418,7 @@ function _gpu_matmul_Vdag!(W, P, conj_V, ::Val{D}) where {D}
 end
 
 function _gpu_matmul_V!(P, W, V_T, ::Val{D}) where {D}
-    if D > 7
+    if D > 7 || !(P isa Array)
         mul!(P, W, V_T)
     else
         for i = 1:D
@@ -421,50 +436,80 @@ function _gpu_matmul_V!(P, W, V_T, ::Val{D}) where {D}
 end
 
 struct _DDIRotationCache
-    W::AbstractArray{ComplexF64,2}
-    conj_V::AbstractArray{ComplexF64,2}
-    V_T::AbstractArray{ComplexF64,2}
-    phi_mag::AbstractArray{Float64,1}
-    alpha::AbstractArray{Float64,1}
-    beta::AbstractArray{Float64,1}
-    theta::AbstractArray{Float64,1}
+    W::AbstractArray{<:Complex,2}
+    conj_V::AbstractArray{<:Complex,2}
+    V_T::AbstractArray{<:Complex,2}
+    phi_mag::AbstractArray{<:AbstractFloat,1}
+    alpha::AbstractArray{<:AbstractFloat,1}
+    beta::AbstractArray{<:AbstractFloat,1}
+    theta::AbstractArray{<:AbstractFloat,1}
+    # (1,D) row vectors for fused broadcasts — present on GPU only.
+    # CPU path uses scalar loop anyway so these stay nothing.
+    m_row::Any           # AbstractArray{<:AbstractFloat,2} or nothing
+    λ_row::Any           # AbstractArray{<:AbstractFloat,2} or nothing
+    m_shift_row::Any     # AbstractArray{<:AbstractFloat,2} or nothing
 end
 
 const _DDI_ROTATION_CACHE = Dict{UInt64,_DDIRotationCache}()
 
-function _get_ddi_rotation_cache(psi::AbstractArray{ComplexF64}, sm::SpinMatrices{D}, ndim::Int) where {D}
+function _get_ddi_rotation_cache(psi::AbstractArray{<:Complex}, sm::SpinMatrices{D}, ndim::Int) where {D}
     n_pts = ntuple(d -> size(psi, d), ndim)
     N_spatial = prod(n_pts)
-    key = hash((objectid(sm), N_spatial, D, typeof(psi).name))
+    CT = eltype(psi)
+    RT = real(CT)
+    key = hash((objectid(sm), N_spatial, D, typeof(psi).name, CT))
     cache = get(_DDI_ROTATION_CACHE, key, nothing)
     cache !== nothing && return cache
 
     P = reshape(psi, N_spatial, D)
     W = similar(P)
-    conj_V_cpu = conj(Matrix(sm.Fy_eigvecs))
-    V_T_cpu = Matrix(transpose(sm.Fy_eigvecs))
-    if D > 7
-        conj_V = similar(P, ComplexF64, D, D)
-        V_T = similar(P, ComplexF64, D, D)
-        copyto!(conj_V, conj_V_cpu)
-        copyto!(V_T, V_T_cpu)
+    # Always materialise V/V† on the same device as psi so mul!(W, P, V)
+    # stays pure-GPU for CuArrays (avoids cuBLAS fallback to scalar loops).
+    conj_V_cpu = Matrix{CT}(conj(sm.Fy_eigvecs))
+    V_T_cpu = Matrix{CT}(transpose(sm.Fy_eigvecs))
+    conj_V = similar(P, CT, D, D)
+    V_T = similar(P, CT, D, D)
+    copyto!(conj_V, conj_V_cpu)
+    copyto!(V_T, V_T_cpu)
+
+    phi_template = similar(psi, RT, N_spatial)
+    F = sm.system.F
+    on_gpu = !(psi isa Array)
+    m_row, λ_row, m_shift_row = if on_gpu
+        # Build plain `Vector{RT}` (not SVector) — CUDA.jl's copyto! into a
+        # device array needs an IndexLinear host source it knows how to memcpy.
+        m_host = Vector{RT}(undef, D)
+        λ_host_vec = Vector{RT}(undef, D)
+        m_shift_host = Vector{RT}(undef, D)
+        @inbounds for c in 1:D
+            m_host[c]       = RT(F - (c - 1))
+            λ_host_vec[c]   = RT(sm.Fy_eigvals[c])
+            m_shift_host[c] = m_host[c] + RT(F)
+        end
+        mr_dev = similar(P, RT, 1, D)
+        λr_dev = similar(P, RT, 1, D)
+        ms_dev = similar(P, RT, 1, D)
+        copyto!(vec(mr_dev), m_host)
+        copyto!(vec(λr_dev), λ_host_vec)
+        copyto!(vec(ms_dev), m_shift_host)
+        (mr_dev, λr_dev, ms_dev)
     else
-        conj_V = conj_V_cpu
-        V_T = V_T_cpu
+        (nothing, nothing, nothing)
     end
-    phi_template = similar(psi, Float64, N_spatial)
+
     c = _DDIRotationCache(W, conj_V, V_T,
         similar(phi_template), similar(phi_template),
-        similar(phi_template), similar(phi_template))
+        similar(phi_template), similar(phi_template),
+        m_row, λ_row, m_shift_row)
     _DDI_ROTATION_CACHE[key] = c
     c
 end
 
 function _apply_ddi_rotation!(
-    psi::AbstractArray{ComplexF64},
-    phi_x::AbstractArray{Float64},
-    phi_y::AbstractArray{Float64},
-    phi_z::AbstractArray{Float64},
+    psi::AbstractArray{<:Complex},
+    phi_x::AbstractArray{<:AbstractFloat},
+    phi_y::AbstractArray{<:AbstractFloat},
+    phi_z::AbstractArray{<:AbstractFloat},
     sm::SpinMatrices{D},
     dt_frac::Float64,
     ndim::Int;
@@ -490,60 +535,95 @@ function _apply_ddi_rotation!(
     alpha = rc.alpha
     beta = rc.beta
     theta = rc.theta
+    RT = eltype(phi_mag)
+    guard = floatmin(RT)
+    dt_t = RT(dt_frac)
+    F_t = RT(F)
     @. phi_mag = sqrt(phi_x_v^2 + phi_y_v^2 + phi_z_v^2)
     @. alpha = atan(phi_y_v, phi_x_v)
-    @. beta = acos(clamp(phi_z_v / max(phi_mag, 1e-30), -1.0, 1.0))
-    @. theta = phi_mag * dt_frac
+    @. beta = acos(clamp(phi_z_v / max(phi_mag, guard), -one(RT), one(RT)))
+    @. theta = phi_mag * dt_t
 
-    # Step 1: Rz(-α)
-    for c = 1:D
-        m_c = Float64(F - (c - 1))
-        pc = view(P, :, c)
-        @. pc = pc * cis(m_c * alpha)
-    end
+    # GPU path: fuse D per-column broadcasts into one (N,D)×(1,D)*(N,1) broadcast.
+    if rc.m_row !== nothing
+        α_col = reshape(alpha, N_spatial, 1)
+        β_col = reshape(beta, N_spatial, 1)
+        θ_col = reshape(theta, N_spatial, 1)
+        m_row = rc.m_row
+        λ_row = rc.λ_row
+        m_shift_row = rc.m_shift_row
 
-    # Step 2: Ry(-β) = V · diag(exp(+iβλ)) · V†
-    _gpu_matmul_Vdag!(W, P, conj_V, Val(D))
-    for i = 1:D
-        lam_i = Float64(-F + (i - 1))
-        wi = view(W, :, i)
-        @. wi = wi * cis(lam_i * beta)
-    end
-    _gpu_matmul_V!(P, W, V_T, Val(D))
+        # Step 1: Rz(-α) — psi[i,c] *= cis(+m[c] * α[i])
+        P .*= cis.(m_row .* α_col)
 
-    # Step 3: Dz(θ).
-    # ITP applies a constant -F shift so the largest factor is exp(0)=1
-    # (m=-F gets factor 1, m=+F gets exp(-2F·θ)). Without this shift the
-    # m=-F component gets exp(+F·θ) and explodes (constant shift is removed
-    # by the subsequent normalization step).
-    if imaginary_time
-        for c = 1:D
-            m_c = Float64(F - (c - 1))
-            pc = view(P, :, c)
-            @. pc = pc * exp(-(m_c + F) * theta)
+        # Step 2: Ry(-β) = V · diag(exp(+iβλ)) · V†
+        mul!(W, P, conj_V)
+        W .*= cis.(β_col .* λ_row)
+        mul!(P, W, V_T)
+
+        # Step 3: Dz(θ)
+        if imaginary_time
+            # psi[i,c] *= exp(-(m[c]+F) * θ[i])  — shifted so max factor is 1
+            P .*= exp.(.-m_shift_row .* θ_col)
+        else
+            P .*= cis.(.-m_row .* θ_col)
         end
+
+        # Step 4: Ry(β) = V · diag(exp(-iβλ)) · V†
+        mul!(W, P, conj_V)
+        W .*= cis.(.-β_col .* λ_row)
+        mul!(P, W, V_T)
+
+        # Step 5: Rz(α) — psi[i,c] *= cis(-m[c] * α[i])
+        P .*= cis.(.-m_row .* α_col)
     else
+        # CPU path: column-wise loop avoids large temporary (1,D) broadcast tables.
+        # Step 1: Rz(-α)
         for c = 1:D
-            m_c = Float64(F - (c - 1))
+            m_c = RT(F - (c - 1))
             pc = view(P, :, c)
-            @. pc = pc * cis(-m_c * theta)
+            @. pc = pc * cis(m_c * alpha)
         end
-    end
 
-    # Step 4: Ry(β) = V · diag(exp(-iβλ)) · V†
-    _gpu_matmul_Vdag!(W, P, conj_V, Val(D))
-    for i = 1:D
-        lam_i = Float64(-F + (i - 1))
-        wi = view(W, :, i)
-        @. wi = wi * cis(-lam_i * beta)
-    end
-    _gpu_matmul_V!(P, W, V_T, Val(D))
+        # Step 2: Ry(-β) = V · diag(exp(+iβλ)) · V†
+        _gpu_matmul_Vdag!(W, P, conj_V, Val(D))
+        for i = 1:D
+            lam_i = RT(-F + (i - 1))
+            wi = view(W, :, i)
+            @. wi = wi * cis(lam_i * beta)
+        end
+        _gpu_matmul_V!(P, W, V_T, Val(D))
 
-    # Step 5: Rz(α)
-    for c = 1:D
-        m_c = Float64(F - (c - 1))
-        pc = view(P, :, c)
-        @. pc = pc * cis(-m_c * alpha)
+        # Step 3: Dz(θ)
+        if imaginary_time
+            for c = 1:D
+                m_c = RT(F - (c - 1))
+                pc = view(P, :, c)
+                @. pc = pc * exp(-(m_c + F_t) * theta)
+            end
+        else
+            for c = 1:D
+                m_c = RT(F - (c - 1))
+                pc = view(P, :, c)
+                @. pc = pc * cis(-m_c * theta)
+            end
+        end
+
+        # Step 4: Ry(β)
+        _gpu_matmul_Vdag!(W, P, conj_V, Val(D))
+        for i = 1:D
+            lam_i = RT(-F + (i - 1))
+            wi = view(W, :, i)
+            @. wi = wi * cis(-lam_i * beta)
+        end
+        _gpu_matmul_V!(P, W, V_T, Val(D))
+
+        # Step 5: Rz(α)
+        for c = 1:D
+            m_c = RT(F - (c - 1))
+            pc = view(P, :, c)
+            @. pc = pc * cis(-m_c * alpha)
+        end
     end
 
     nothing
@@ -553,7 +633,7 @@ end
 Full DDI sub-step: compute spin density, rfft convolve, apply Euler spin rotation.
 """
 function apply_ddi_step!(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     sm::SpinMatrices{D},
     ddi::DDIParams{N},
     bufs::DDIBuffers,

@@ -43,7 +43,7 @@ applies TOF+SG at each angle, and returns the resulting image stack.
   to the reference component (if `reference_m` given)
 """
 function spin_tomography(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     grid::Grid{N},
     F::Int;
     rotation_axis::Symbol = :y,

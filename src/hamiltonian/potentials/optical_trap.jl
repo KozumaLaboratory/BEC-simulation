@@ -13,8 +13,8 @@ end
 
 CrossedDipoleTrap(beams, pol; dims::Int = 3) = CrossedDipoleTrap{dims}(beams, pol)
 
-function evaluate_potential(trap::CrossedDipoleTrap{N}, grid::Grid{N}) where {N}
-    V = zeros(Float64, grid.config.n_points)
+function evaluate_potential(trap::CrossedDipoleTrap{N}, grid::Grid{N,T}) where {N,T}
+    V = zeros(T, grid.config.n_points)
     for beam in trap.beams
         _add_beam_potential!(V, beam, grid, trap.polarizability)
     end
@@ -22,17 +22,18 @@ function evaluate_potential(trap::CrossedDipoleTrap{N}, grid::Grid{N}) where {N}
 end
 
 function _add_beam_potential!(
-    V::Array{Float64,N},
+    V::AbstractArray{T,N},
     beam::GaussianBeam,
-    grid::Grid{N},
+    grid::Grid{N,T},
     alpha::Float64,
-) where {N}
-    w0 = beam.waist
-    P = beam.power
-    I0 = 2 * P / (π * w0^2)
+) where {N,T<:AbstractFloat}
+    w0 = T(beam.waist)
+    P = T(beam.power)
+    I0 = T(2) * P / (T(π) * w0^2)
 
-    d = beam.direction
-    pos = beam.position
+    d = ntuple(i -> T(beam.direction[i]), 3)
+    pos = ntuple(i -> T(beam.position[i]), 3)
+    alpha_t = T(alpha)
 
     @inbounds for I in CartesianIndices(size(V))
         coords = ntuple(N) do dim
@@ -42,8 +43,8 @@ function _add_beam_potential!(
         axial = sum(ntuple(dim -> coords[dim] * d[dim], N))
         r_perp_sq = sum(ntuple(dim -> coords[dim]^2, N)) - axial^2
 
-        intensity = I0 * exp(-2 * r_perp_sq / w0^2)
-        V[I] += -alpha * intensity
+        intensity = I0 * exp(-T(2) * r_perp_sq / w0^2)
+        V[I] += -alpha_t * intensity
     end
     nothing
 end

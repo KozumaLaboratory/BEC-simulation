@@ -1,5 +1,5 @@
 function apply_spin_mixing_step!(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     sm::SpinMatrices{D},
     c1::Float64,
     dt_frac::Float64,

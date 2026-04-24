@@ -164,7 +164,7 @@ end
 # --- Probe A: Component populations ---
 
 function component_populations(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     grid::Grid{N},
     sys::SpinSystem,
 ) where {N}

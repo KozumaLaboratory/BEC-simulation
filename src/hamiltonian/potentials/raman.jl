@@ -7,7 +7,7 @@ H_R(r) = (Ω_R/2) * (e^{ik_eff·r} F_+ + e^{-ik_eff·r} F_-) + δ * Fz
 Applied via Euler angle decomposition (O(D²), allocation-free for any D).
 """
 function apply_raman_step!(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     sm::SpinMatrices{D},
     raman::RamanCoupling{N},
     grid::Grid{N},
@@ -61,7 +61,7 @@ Apply a spatially uniform spin rotation exp(-i dt (phi_x Fx + phi_y Fy + phi_z F
 Used for transverse Zeeman fields (Bx, By).
 """
 function apply_uniform_spin_rotation!(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     sm::SpinMatrices{D},
     phi_x::Float64,
     phi_y::Float64,

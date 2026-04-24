@@ -14,7 +14,7 @@ m = -F is stable (no downward transitions exist).
 Applied as: ψ_m → ψ_m × exp(-rate_m × n(r) × dt / 2)
 """
 function apply_loss_step!(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     loss::LossParams,
     F::Int,
     dt::Float64,
@@ -27,13 +27,13 @@ function apply_loss_step!(
 end
 
 function apply_loss_step!(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     loss::LossParams,
     F::Int,
     dt::Float64,
     n_components::Int,
     ndim::Int,
-    density_buf::AbstractArray{Float64},
+    density_buf::AbstractArray{<:AbstractFloat},
 )
     loss.gamma_dr < 1e-30 && loss.L3 < 1e-30 && return nothing
 

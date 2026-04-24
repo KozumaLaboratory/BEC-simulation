@@ -7,7 +7,7 @@ Available fields: `:density`, `:current`, `:spin_density`, `:velocity`,
 `:vorticity`, `:component_densities`.
 """
 function export_vtk(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     grid::Grid{3};
     output::String = "bec",
     fields::Vector{Symbol} = [:density, :current, :spin_density, :velocity],

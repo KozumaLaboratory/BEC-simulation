@@ -11,7 +11,7 @@ Returns `Dict(m => density_2d)` for each m component.
 For 1D grids, returns `Dict(m => density_1d)` (no column integration needed).
 """
 function simulate_tof(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     grid::Grid{N},
     sys::SpinSystem,
     params::TOFParams;

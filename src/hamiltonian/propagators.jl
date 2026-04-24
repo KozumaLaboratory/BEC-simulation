@@ -1,18 +1,22 @@
 function prepare_kinetic_phase(
-    grid::Grid{N},
+    grid::Grid{N,T},
     dt::Float64;
     imaginary_time::Bool = false,
-) where {N}
+    dtype::Union{Nothing,Type{<:AbstractFloat}} = nothing,
+) where {N,T<:AbstractFloat}
+    U = dtype === nothing ? T : dtype
+    half = U(0.5)
+    dt_u = U(dt)
     if imaginary_time
-        ComplexF64.(@. exp(-0.5 * grid.k_squared * dt))
+        Complex{U}.(@. exp(-half * grid.k_squared * dt_u))
     else
-        @. cis(-0.5 * grid.k_squared * dt)
+        Complex{U}.(@. cis(-half * grid.k_squared * dt_u))
     end
 end
 
 function apply_kinetic_step!(
-    psi::AbstractArray{ComplexF64},
-    fft_buf::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
+    fft_buf::AbstractArray{<:Complex},
     kinetic_phase::AbstractArray{<:Number},
     plans::FFTPlans,
     n_components::Int,
@@ -34,14 +38,14 @@ function apply_kinetic_step!(
 end
 
 function apply_diagonal_potential_step!(
-    psi::AbstractArray{ComplexF64},
-    V_trap::AbstractArray{Float64},
+    psi::AbstractArray{<:Complex},
+    V_trap::AbstractArray{<:AbstractFloat},
     zeeman_diag,
     c0::Float64,
     dt_frac::Float64,
     n_components::Int,
     ndim::Int,
-    density_buf::AbstractArray{Float64};
+    density_buf::AbstractArray{<:AbstractFloat};
     imaginary_time::Bool = false,
     c_lhy::Float64 = 0.0,
 )
@@ -85,14 +89,14 @@ function apply_diagonal_potential_step!(
 end
 
 function apply_diagonal_potential_step!(
-    psi::AbstractArray{ComplexF64},
-    V_trap::AbstractArray{Float64},
+    psi::AbstractArray{<:Complex},
+    V_trap::AbstractArray{<:AbstractFloat},
     zeeman_diag::SVector{D,Float64},
     c0::Float64,
     dt_frac::Float64,
     n_components::Int,
     ndim::Int,
-    density_buf::AbstractArray{Float64};
+    density_buf::AbstractArray{<:AbstractFloat};
     imaginary_time::Bool = false,
     c_lhy::Float64 = 0.0,
 ) where {D}
@@ -120,16 +124,16 @@ end
     ys[i] + t * (ys[i+1] - ys[i])
 end
 
-@inline _lhy_V(::Float64, ::Nothing) = 0.0
-@inline _lhy_V(n::Float64, l::ScalarLHY) = l.c_lhy * n * sqrt(n)
-@inline function _lhy_V(n::Float64, l::Quasi2DLHY)
-    n < 1e-30 && return 0.0
+@inline _lhy_V(::AbstractFloat, ::Nothing) = 0.0
+@inline _lhy_V(n::AbstractFloat, l::ScalarLHY) = l.c_lhy * n * sqrt(n)
+@inline function _lhy_V(n::AbstractFloat, l::Quasi2DLHY)
+    n < 1e-30 && return zero(n)
     l.c_lhy_2d * n * (2.0 * (log(n * l.a_2d_sq) + l.log_const) + 1.0)
 end
-@inline function _lhy_V(n::Float64, l::SpinorLHYTable)
-    _interpolate_1d(l.densities, l.potential_values, n)
+@inline function _lhy_V(n::AbstractFloat, l::SpinorLHYTable)
+    _interpolate_1d(l.densities, l.potential_values, Float64(n))
 end
-@inline _lhy_V(n::Float64, c_lhy::Float64) = c_lhy * n * sqrt(n)
+@inline _lhy_V(n::AbstractFloat, c_lhy::AbstractFloat) = c_lhy * n * sqrt(n)
 
 function _diagonal_step_svec!(
     ::Val{N},
@@ -198,25 +202,29 @@ function _diagonal_step_svec!(
         idx = _component_slice(N, n_pts, c)
         density_buf .+= abs2.(view(psi, idx...))
     end
+    # Match scalar eltype to array eltype so F32 arrays stay F32 in @.
+    RT = eltype(V_trap)
+    dt_t = RT(dt_frac)
+    c0_t = RT(c0)
     _has_lhy = c_lhy isa AbstractLHY || (c_lhy isa Float64 && c_lhy != 0.0)
+    c_lhy_val_t = RT(c_lhy isa Float64 ? c_lhy : (c_lhy isa ScalarLHY ? c_lhy.c_lhy : 0.0))
+    zee_shift = RT(minimum(zeeman_diag))
     for c = 1:D
         idx = _component_slice(N, n_pts, c)
         psi_c = view(psi, idx...)
-        zee_c = zeeman_diag[c]
+        zee_c = RT(zeeman_diag[c])
         if imaginary_time
-            zee_shift = minimum(zeeman_diag)
+            zee_rel = zee_c - zee_shift
             if !_has_lhy
-                @. psi_c *= exp(-(V_trap + (zee_c - zee_shift) + c0 * density_buf) * dt_frac)
+                @. psi_c *= exp(-(V_trap + zee_rel + c0_t * density_buf) * dt_t)
             else
-                c_lhy_val = c_lhy isa Float64 ? c_lhy : (c_lhy isa ScalarLHY ? c_lhy.c_lhy : 0.0)
-                @. psi_c *= exp(-(V_trap + (zee_c - zee_shift) + c0 * density_buf + c_lhy_val * density_buf * sqrt(density_buf)) * dt_frac)
+                @. psi_c *= exp(-(V_trap + zee_rel + c0_t * density_buf + c_lhy_val_t * density_buf * sqrt(density_buf)) * dt_t)
             end
         else
             if !_has_lhy
-                @. psi_c *= cis(-(V_trap + zee_c + c0 * density_buf) * dt_frac)
+                @. psi_c *= cis(-(V_trap + zee_c + c0_t * density_buf) * dt_t)
             else
-                c_lhy_val = c_lhy isa Float64 ? c_lhy : (c_lhy isa ScalarLHY ? c_lhy.c_lhy : 0.0)
-                @. psi_c *= cis(-(V_trap + zee_c + c0 * density_buf + c_lhy_val * density_buf * sqrt(density_buf)) * dt_frac)
+                @. psi_c *= cis(-(V_trap + zee_c + c0_t * density_buf + c_lhy_val_t * density_buf * sqrt(density_buf)) * dt_t)
             end
         end
     end
@@ -291,26 +299,29 @@ function _diagonal_step_with_ls!(
         idx = _component_slice(N, n_pts, c)
         density_buf .+= abs2.(view(psi, idx...))
     end
+    RT = eltype(V_trap)
+    dt_t = RT(dt_frac)
+    c0_t = RT(c0)
     _has_lhy = c_lhy isa AbstractLHY || (c_lhy isa Float64 && c_lhy != 0.0)
+    c_lhy_val_t = RT(c_lhy isa Float64 ? c_lhy : (c_lhy isa ScalarLHY ? c_lhy.c_lhy : 0.0))
+    zee_shift = RT(minimum(zeeman_diag))
     for c = 1:D
         idx = _component_slice(N, n_pts, c)
         psi_c = view(psi, idx...)
-        zee_c = zeeman_diag[c]
-        ls_c = ls_amp[c]
+        zee_c = RT(zeeman_diag[c])
+        ls_c = RT(ls_amp[c])
         if imaginary_time
-            zee_shift = minimum(zeeman_diag)
+            zee_rel = zee_c - zee_shift
             if !_has_lhy
-                @. psi_c *= exp(-(V_trap + (zee_c - zee_shift) + ls_c * ls_profile + c0 * density_buf) * dt_frac)
+                @. psi_c *= exp(-(V_trap + zee_rel + ls_c * ls_profile + c0_t * density_buf) * dt_t)
             else
-                c_lhy_val = c_lhy isa Float64 ? c_lhy : (c_lhy isa ScalarLHY ? c_lhy.c_lhy : 0.0)
-                @. psi_c *= exp(-(V_trap + (zee_c - zee_shift) + ls_c * ls_profile + c0 * density_buf + c_lhy_val * density_buf * sqrt(density_buf)) * dt_frac)
+                @. psi_c *= exp(-(V_trap + zee_rel + ls_c * ls_profile + c0_t * density_buf + c_lhy_val_t * density_buf * sqrt(density_buf)) * dt_t)
             end
         else
             if !_has_lhy
-                @. psi_c *= cis(-(V_trap + zee_c + ls_c * ls_profile + c0 * density_buf) * dt_frac)
+                @. psi_c *= cis(-(V_trap + zee_c + ls_c * ls_profile + c0_t * density_buf) * dt_t)
             else
-                c_lhy_val = c_lhy isa Float64 ? c_lhy : (c_lhy isa ScalarLHY ? c_lhy.c_lhy : 0.0)
-                @. psi_c *= cis(-(V_trap + zee_c + ls_c * ls_profile + c0 * density_buf + c_lhy_val * density_buf * sqrt(density_buf)) * dt_frac)
+                @. psi_c *= cis(-(V_trap + zee_c + ls_c * ls_profile + c0_t * density_buf + c_lhy_val_t * density_buf * sqrt(density_buf)) * dt_t)
             end
         end
     end
@@ -350,20 +361,23 @@ function _update_batched_kinetic_phase!(cache::BatchedKineticCache, k_squared, d
     kp = cache.kinetic_phase_bc
     ndim = ndims(kp) - 1
     n_pts = ntuple(d -> size(kp, d), ndim)
+    RT = eltype(k_squared)
+    half = RT(0.5)
+    dt_t = RT(dt)
     if kp isa Array
         @inbounds for I in CartesianIndices(n_pts)
-            kp[I, 1] = cis(-0.5 * k_squared[I] * dt)
+            kp[I, 1] = cis(-half * k_squared[I] * dt_t)
         end
     else
         kp_view = selectdim(kp, ndim + 1, 1)
-        kp_view .= cis.(-0.5 .* k_squared .* dt)
+        kp_view .= cis.(-half .* k_squared .* dt_t)
     end
     nothing
 end
 
 function _total_density!(
-    buf::AbstractArray{Float64},
-    psi::AbstractArray{ComplexF64},
+    buf::AbstractArray{<:AbstractFloat},
+    psi::AbstractArray{<:Complex},
     n_components::Int,
     ndim::Int,
     n_pts,
@@ -378,7 +392,7 @@ function _total_density!(
     buf
 end
 
-function _total_density(psi::AbstractArray{ComplexF64}, n_components::Int, ndim::Int, n_pts)
+function _total_density(psi::AbstractArray{<:Complex}, n_components::Int, ndim::Int, n_pts)
     idx1 = _component_slice(ndim, n_pts, 1)
     n = abs2.(view(psi, idx1...))
     for c = 2:n_components

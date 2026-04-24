@@ -286,7 +286,7 @@ At each point: spinor → Majorana stars → sphere points → Steinhardt Q₆.
 Returns `Array{Float64,N}` (0 everywhere for F < 6).
 """
 function icosahedral_order_parameter(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     grid::Grid{N},
     sm::SpinMatrices{D};
     density_cutoff::Float64 = 1e-10,

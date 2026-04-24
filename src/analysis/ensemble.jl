@@ -5,8 +5,8 @@ Connected correlation ⟨AB⟩ - ⟨A⟩⟨B⟩ from two sets of per-trajectory 
 Each input is a Vector of Array (one per trajectory, same shape).
 """
 function ensemble_correlation(
-    results_a::Vector{<:AbstractArray{Float64}},
-    results_b::Vector{<:AbstractArray{Float64}},
+    results_a::Vector{<:AbstractArray{<:AbstractFloat}},
+    results_b::Vector{<:AbstractArray{<:AbstractFloat}},
 )
     n = length(results_a)
     n == length(results_b) || throw(DimensionMismatch("trajectory count mismatch"))
@@ -31,7 +31,7 @@ pre-summed density over components.
 For total density: correction = D/(2V) per k-mode.
 """
 function wigner_correct_density(
-    mean_density_k::AbstractArray{Float64},
+    mean_density_k::AbstractArray{<:AbstractFloat},
     grid::Grid{N};
     n_components::Int = 1,
 ) where {N}
@@ -45,7 +45,7 @@ end
 
 Standard error of the ensemble mean: √(var / n_traj).
 """
-function ensemble_stderr(var::AbstractArray{Float64}, n_traj::Int)
+function ensemble_stderr(var::AbstractArray{<:AbstractFloat}, n_traj::Int)
     n_traj > 0 || throw(ArgumentError("n_traj must be positive"))
     sqrt.(var ./ n_traj)
 end

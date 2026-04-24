@@ -31,23 +31,26 @@ function LaserBeamPotential(
     LaserBeamPotential{N}(beam, polarizability, position, direction)
 end
 
-function evaluate_potential(lp::LaserBeamPotential{N}, grid::Grid{N}) where {N}
-    V = zeros(Float64, grid.config.n_points)
-    w0 = waist_radius(lp.beam)
-    z_R = rayleigh_length(lp.beam)
-    I0 = 2 * lp.beam.power / (π * w0^2)
+function evaluate_potential(lp::LaserBeamPotential{N}, grid::Grid{N,T}) where {N,T<:AbstractFloat}
+    V = zeros(T, grid.config.n_points)
+    w0 = T(waist_radius(lp.beam))
+    z_R = T(rayleigh_length(lp.beam))
+    I0 = T(2) * T(lp.beam.power) / (T(π) * w0^2)
+    alpha_t = T(lp.polarizability)
+    pos = ntuple(i -> T(lp.position[i]), N)
+    dir = ntuple(i -> T(lp.direction[i]), N)
 
     @inbounds for I in CartesianIndices(size(V))
         coords = ntuple(N) do dim
-            grid.x[dim][I[dim]] - lp.position[dim]
+            grid.x[dim][I[dim]] - pos[dim]
         end
 
-        axial = sum(ntuple(dim -> coords[dim] * lp.direction[dim], N))
+        axial = sum(ntuple(dim -> coords[dim] * dir[dim], N))
         r_perp_sq = sum(ntuple(dim -> coords[dim]^2, N)) - axial^2
 
-        wz_sq = w0^2 * (1 + (axial / z_R)^2)
-        intensity = I0 * (w0^2 / wz_sq) * exp(-2 * r_perp_sq / wz_sq)
-        V[I] = -lp.polarizability * intensity
+        wz_sq = w0^2 * (one(T) + (axial / z_R)^2)
+        intensity = I0 * (w0^2 / wz_sq) * exp(-T(2) * r_perp_sq / wz_sq)
+        V[I] = -alpha_t * intensity
     end
     V
 end

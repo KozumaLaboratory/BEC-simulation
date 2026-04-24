@@ -444,9 +444,9 @@ end
 
 # --- Simulation State (mutable) ---
 
-mutable struct SimState{N,A<:AbstractArray,B<:AbstractArray{ComplexF64,N}}
-    psi::A              # wavefunction: spatial dims... × n_components
-    fft_buf::B          # spatial-only buffer for FFT (same device as psi)
+mutable struct SimState{N,A<:AbstractArray,B<:AbstractArray}
+    psi::A              # wavefunction: spatial dims... × n_components (eltype Complex{T})
+    fft_buf::B          # spatial-only buffer for FFT (same device + eltype as psi)
     t::Float64
     step::Int
 end
@@ -468,7 +468,7 @@ end
 
 # --- DDI ---
 
-mutable struct DDIParams{N,AQ<:AbstractArray{Float64,N}}
+mutable struct DDIParams{N,AQ<:AbstractArray{<:AbstractFloat,N}}
     C_dd::Float64
     Q_xx::AQ
     Q_xy::AQ

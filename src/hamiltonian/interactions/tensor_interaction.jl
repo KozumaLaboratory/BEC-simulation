@@ -131,7 +131,7 @@ Per grid point, build the Hermitian mean-field matrix:
 where M = m+μ = m'+ν. Then evolve ψ → exp(-i h dt) ψ.
 """
 function apply_tensor_interaction_step!(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     cache::TensorInteractionCache,
     sm::SpinMatrices,
     dt::Float64,

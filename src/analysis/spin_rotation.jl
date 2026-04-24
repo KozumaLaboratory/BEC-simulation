@@ -28,7 +28,7 @@ For observation along a tilted axis (e.g. -16° around y):
 Returns a new array (does not mutate).
 """
 function rotate_quantization_axis(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     F::Int,
     theta_x::Float64,
     theta_y::Float64,
@@ -98,10 +98,10 @@ This reproduces the EdH phase calculation from the old MATLAB code.
 Returns a new array.
 """
 function apply_edh_rotation(
-    psi::AbstractArray{ComplexF64},
-    Bx::AbstractArray{Float64},
-    By::AbstractArray{Float64},
-    Bz::AbstractArray{Float64},
+    psi::AbstractArray{<:Complex},
+    Bx::AbstractArray{<:AbstractFloat},
+    By::AbstractArray{<:AbstractFloat},
+    Bz::AbstractArray{<:AbstractFloat},
     t_hold::Float64,
     F::Int,
     sm::SpinMatrices{D},
@@ -139,10 +139,10 @@ At each point, rotates the fully-polarized m=+F state to point along B(r).
 Returns a new array.
 """
 function apply_fl_alignment(
-    psi::AbstractArray{ComplexF64},
-    Bx::AbstractArray{Float64},
-    By::AbstractArray{Float64},
-    Bz::AbstractArray{Float64},
+    psi::AbstractArray{<:Complex},
+    Bx::AbstractArray{<:AbstractFloat},
+    By::AbstractArray{<:AbstractFloat},
+    Bz::AbstractArray{<:AbstractFloat},
     F::Int,
     sm::SpinMatrices{D},
 ) where {D}
@@ -205,7 +205,7 @@ Column-integrated density of a single spinor component along the given axis.
 For 3D psi, returns a 2D array. For 2D psi, returns a 1D array.
 """
 function column_density(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     ndim::Int,
     component::Int,
     axis::Int,

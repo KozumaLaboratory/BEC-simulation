@@ -52,7 +52,7 @@ truncated Wigner with Bogoliubov modes, we add Gaussian noise on the
 spin transverse modes only. Sufficient to break Z-axis rotational symmetry.
 """
 function add_thermal_noise!(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     F::Int;
     T_over_Tc::Float64 = 0.1,
     transverse_only::Bool = true,
@@ -116,7 +116,7 @@ end
 
 Non-mutating version of `add_thermal_noise!`.
 """
-function add_thermal_noise(psi::AbstractArray{ComplexF64}, F::Int; kwargs...)
+function add_thermal_noise(psi::AbstractArray{<:Complex}, F::Int; kwargs...)
     psi_copy = copy(psi)
     add_thermal_noise!(psi_copy, F; kwargs...)
     psi_copy
@@ -136,7 +136,7 @@ Typical usage: `amplitude = 1e-6` for symmetry breaking without
 injecting macroscopic energy.
 """
 function add_symmetry_breaking_seed!(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     F::Int;
     amplitude::Float64 = 1e-6,
     seed::Int = 42,

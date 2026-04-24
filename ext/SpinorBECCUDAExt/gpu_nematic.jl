@@ -4,59 +4,61 @@
 # step directly on GPU using broadcast operations.
 # Uses cached buffers to avoid per-call GPU memory allocations.
 
-mutable struct GPUNematicCache
-    A00::CuArray{ComplexF64,1}
-    V_buf::CuArray{ComplexF64,1}
-    absV::CuArray{Float64,1}
-    ch::CuArray{Float64,1}
-    sh::CuArray{Float64,1}
-    phase::CuArray{ComplexF64,1}
-    psi_tmp1::CuArray{ComplexF64,1}
-    psi_tmp2::CuArray{ComplexF64,1}
+mutable struct GPUNematicCache{T<:AbstractFloat}
+    A00::CuArray{Complex{T},1}
+    V_buf::CuArray{Complex{T},1}
+    absV::CuArray{T,1}
+    ch::CuArray{T,1}
+    sh::CuArray{T,1}
+    phase::CuArray{Complex{T},1}
+    psi_tmp1::CuArray{Complex{T},1}
+    psi_tmp2::CuArray{Complex{T},1}
 end
 
-const _GPU_NEMATIC_CACHE = Dict{UInt64,GPUNematicCache}()
+const _GPU_NEMATIC_CACHE = Dict{UInt64,Any}()
 
-function _get_gpu_nematic_cache(N::Int)
-    key = hash(N)
+function _get_gpu_nematic_cache(N::Int, ::Type{T}) where {T<:AbstractFloat}
+    key = hash((N, T))
     cache = get(_GPU_NEMATIC_CACHE, key, nothing)
-    cache !== nothing && return cache::GPUNematicCache
+    cache !== nothing && return cache::GPUNematicCache{T}
 
-    cache = GPUNematicCache(
-        CUDA.zeros(ComplexF64, N),
-        CUDA.zeros(ComplexF64, N),
-        CUDA.zeros(Float64, N),
-        CUDA.zeros(Float64, N),
-        CUDA.zeros(Float64, N),
-        CUDA.zeros(ComplexF64, N),
-        CUDA.zeros(ComplexF64, N),
-        CUDA.zeros(ComplexF64, N),
+    cache = GPUNematicCache{T}(
+        CUDA.zeros(Complex{T}, N),
+        CUDA.zeros(Complex{T}, N),
+        CUDA.zeros(T, N),
+        CUDA.zeros(T, N),
+        CUDA.zeros(T, N),
+        CUDA.zeros(Complex{T}, N),
+        CUDA.zeros(Complex{T}, N),
+        CUDA.zeros(Complex{T}, N),
     )
     _GPU_NEMATIC_CACHE[key] = cache
     cache
 end
 
 function SpinorBEC.apply_nematic_step!(
-    psi::CuArray{ComplexF64},
+    psi::CuArray{Complex{T}},
     interactions::SpinorBEC.InteractionParams,
     F::Int,
     dt::Float64,
     ndim::Int;
     imaginary_time::Bool = false,
-)
+) where {T<:AbstractFloat}
     c2 = SpinorBEC.get_cn(interactions, 2)
     abs(c2) < 1e-30 && return nothing
 
     D = 2F + 1
     n_pts = ntuple(d -> size(psi, d), ndim)
     N = prod(n_pts)
-    inv_sqrt_D = 1.0 / sqrt(Float64(D))
+    inv_sqrt_D = one(T) / sqrt(T(D))
     mid = (D + 1) ÷ 2
+    c2_t = T(c2)
+    dt_t = T(dt)
 
-    signs = Float64[iseven(F - (F - (c - 1))) ? 1.0 : -1.0 for c in 1:D]
+    signs = T[iseven(F - (F - (c - 1))) ? one(T) : -one(T) for c in 1:D]
 
     psi_2d = reshape(psi, N, D)
-    cache = _get_gpu_nematic_cache(N)
+    cache = _get_gpu_nematic_cache(N, T)
     A00 = cache.A00
     V_buf = cache.V_buf
     absV = cache.absV
@@ -76,7 +78,7 @@ function SpinorBEC.apply_nematic_step!(
     A00 .*= inv_sqrt_D
 
     # V_base = c2 * A00 * inv_sqrt_D (stored in A00 to reuse buffer)
-    A00 .*= c2 * inv_sqrt_D  # A00 is now V_base
+    A00 .*= c2_t * inv_sqrt_D  # A00 is now V_base
 
     # Apply Bogoliubov rotation to each (m, -m) pair
     for c in 1:mid
@@ -87,14 +89,14 @@ function SpinorBEC.apply_nematic_step!(
         absV .= abs.(V_buf)
 
         if imaginary_time
-            ch .= cosh.(absV .* dt)
-            sh .= sinh.(absV .* dt)
+            ch .= cosh.(absV .* dt_t)
+            sh .= sinh.(absV .* dt_t)
         else
-            ch .= cos.(absV .* dt)
-            sh .= sin.(absV .* dt)
+            ch .= cos.(absV .* dt_t)
+            sh .= sin.(absV .* dt_t)
         end
 
-        phase .= V_buf ./ max.(absV, 1e-30)
+        phase .= V_buf ./ max.(absV, floatmin(T))
 
         if c == c_pair
             psi_tmp1 .= view(psi_2d, :, c)

@@ -3,7 +3,7 @@ Probability current density j(r) = Σ_c Im(ψ_c* ∇ψ_c).
 Returns NTuple{N, Array{Float64,N}} of current components.
 """
 function probability_current(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     grid::Grid{N},
     plans::FFTPlans,
 ) where {N}
@@ -40,7 +40,7 @@ Orbital angular momentum ⟨Lz⟩ = ∫ Σ_c ψ_c* (-i)(x ∂_y - y ∂_x) ψ_c 
 Returns 0.0 for 1D grids.
 """
 function orbital_angular_momentum(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     grid::Grid{N},
     plans::FFTPlans,
 ) where {N}
@@ -86,7 +86,7 @@ Returns `NTuple{N, Array{Float64,N}}`.
 Points with density below `density_cutoff` are set to zero.
 """
 function superfluid_velocity(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     grid::Grid{N},
     plans::FFTPlans;
     density_cutoff::Float64 = 1e-10,
@@ -112,7 +112,7 @@ Total angular momentum J_z = L_z + S_z.
 L_z = `orbital_angular_momentum`, S_z = `magnetization`.
 """
 function total_angular_momentum(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     grid::Grid{N},
     plans::FFTPlans,
     sys::SpinSystem,

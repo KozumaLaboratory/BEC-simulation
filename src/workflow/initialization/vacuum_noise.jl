@@ -16,7 +16,7 @@ Does NOT renormalize — TWA noise must preserve mode occupations exactly.
 - `cutoff_energy`: if set, skip modes with ε_k = k²/2 > cutoff_energy
 """
 function add_vacuum_noise(
-    psi::AbstractArray{ComplexF64},
+    psi::AbstractArray{<:Complex},
     grid::Grid{N},
     F::Int;
     seed::Int = 42,
