@@ -145,6 +145,10 @@ export function View3D({ run, data }: Props) {
       step: 0.005,
       label: 'shell radius (box units)',
     },
+    azimuthalOnly: {
+      value: true,
+      label: 'orbit only (project v_s)',
+    },
   })
 
   const params = useMemo<VolumeParams>(
@@ -272,6 +276,7 @@ export function View3D({ run, data }: Props) {
       densityThreshold: particleControls.densityThreshold,
       seedMode: particleControls.seedMode,
       vortexShellRadius: particleControls.vortexShellRadius,
+      azimuthalOnly: particleControls.azimuthalOnly,
     }),
     [particleControls],
   )

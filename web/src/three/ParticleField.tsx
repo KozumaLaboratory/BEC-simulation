@@ -13,7 +13,11 @@ export interface ParticleParams {
   color: string
   densityThreshold: number // fraction of max density for seeding
   seedMode: SeedMode
-  vortexShellRadius: number // render-space units; only used when seedMode='vortex_shell'
+  vortexShellRadius: number
+  // When true, project v_s onto the azimuthal direction around the nearest
+  // vortex-line axis before advecting. The "real physics, radial part
+  // removed" path — produces clean orbital motion.
+  azimuthalOnly: boolean
 }
 
 interface Props {
@@ -60,6 +64,41 @@ export function ParticleField({
     }
     return peak > 0 ? 1 / peak : 0
   }, [field])
+
+  // Precompute one sample per vortex-line point: centre in render space and
+  // local tangent direction. Needed only when azimuthalOnly is engaged, but
+  // the computation is cheap enough (a couple of hundred samples at most)
+  // that we keep it always ready.
+  const vortexSamples = useMemo(() => {
+    if (!vortexLines || vortexLines.lines.length === 0) return null
+    const [Lx, Ly, Lz] = vortexLines.box
+    const out: Array<{
+      cx: number; cy: number; cz: number
+      tx: number; ty: number; tz: number
+    }> = []
+    for (const line of vortexLines.lines) {
+      const n = line.points.length
+      for (let i = 0; i < n; i++) {
+        const p = line.points[i]
+        const prev = line.points[Math.max(0, i - 1)]
+        const next = line.points[Math.min(n - 1, i + 1)]
+        let tx = (next[0] - prev[0]) / Lx
+        let ty = (next[1] - prev[1]) / Ly
+        let tz = (next[2] - prev[2]) / Lz
+        const tn = Math.hypot(tx, ty, tz)
+        if (tn < 1e-8) {
+          tx = 0; ty = 0; tz = 1
+        } else {
+          tx /= tn; ty /= tn; tz /= tn
+        }
+        out.push({
+          cx: p[0] / Lx, cy: p[1] / Ly, cz: p[2] / Lz,
+          tx, ty, tz,
+        })
+      }
+    }
+    return out
+  }, [vortexLines])
 
   const positions = useMemo(
     () => new Float32Array(count * vertsPerTrail * 3),
@@ -171,18 +210,41 @@ export function ParticleField({
       const hx = positions[trailBase]
       const hy = positions[trailBase + 1]
       const hz = positions[trailBase + 2]
-      const v1 = sampleVector(fData, fNx, fNy, fNz, hx, hy, hz)
-      const m1 = v1[3] > 1e-30 ? 1 / v1[3] : 0
-      const stepHalf = speed * dt * 0.5
-      const mx = hx + v1[0] * m1 * stepHalf
-      const my = hy + v1[1] * m1 * stepHalf
-      const mz = hz + v1[2] * m1 * stepHalf
-      const v2 = sampleVector(fData, fNx, fNy, fNz, mx, my, mz)
-      const m2 = v2[3] > 1e-30 ? 1 / v2[3] : 0
-      const step = speed * dt
-      const nx = hx + v2[0] * m2 * step
-      const ny = hy + v2[1] * m2 * step
-      const nz = hz + v2[2] * m2 * step
+
+      let stepX: number, stepY: number, stepZ: number, vmagAtHead: number
+
+      if (params.azimuthalOnly && vortexSamples && vortexSamples.length > 0) {
+        // Project the local v_s onto the azimuthal direction around the
+        // nearest vortex-line axis. Radial and axial parts are discarded,
+        // so the particle orbits the core on a closed curve rather than
+        // spiralling in/out with the breathing component.
+        const dir = azimuthalDirection(hx, hy, hz, vortexSamples)
+        const v = sampleVector(fData, fNx, fNy, fNz, hx, hy, hz)
+        const vAzi = v[0] * dir[0] + v[1] * dir[1] + v[2] * dir[2]
+        const signedSpeed = speed * dt * Math.sign(vAzi || 1)
+        stepX = dir[0] * signedSpeed
+        stepY = dir[1] * signedSpeed
+        stepZ = dir[2] * signedSpeed
+        vmagAtHead = v[3]
+      } else {
+        const v1 = sampleVector(fData, fNx, fNy, fNz, hx, hy, hz)
+        const m1 = v1[3] > 1e-30 ? 1 / v1[3] : 0
+        const stepHalf = speed * dt * 0.5
+        const mx = hx + v1[0] * m1 * stepHalf
+        const my = hy + v1[1] * m1 * stepHalf
+        const mz = hz + v1[2] * m1 * stepHalf
+        const v2 = sampleVector(fData, fNx, fNy, fNz, mx, my, mz)
+        const m2 = v2[3] > 1e-30 ? 1 / v2[3] : 0
+        const step_ = speed * dt
+        stepX = v2[0] * m2 * step_
+        stepY = v2[1] * m2 * step_
+        stepZ = v2[2] * m2 * step_
+        vmagAtHead = v2[3]
+      }
+
+      const nx = hx + stepX
+      const ny = hy + stepY
+      const nz = hz + stepZ
       positions[trailBase] = nx
       positions[trailBase + 1] = ny
       positions[trailBase + 2] = nz
@@ -193,7 +255,7 @@ export function ParticleField({
       // streamlines got truncated right where the interesting circulation
       // lives. Keep only lifespan, out-of-bounds, and "flow is essentially
       // zero here" (vNorm < 1e-4 relative to field peak).
-      const vNorm = v2[3] * invPeakMag
+      const vNorm = vmagAtHead * invPeakMag
       if (
         ages[i] > life ||
         nx < -0.5 || nx > 0.5 ||
@@ -337,6 +399,47 @@ function seedOnVortexShell(
     positions[base + t * 3 + 2] = z
   }
   ages[i] = Math.random() * 0.8
+}
+
+// Given a particle position and the pre-computed vortex-line samples,
+// find the nearest sample and return the unit azimuthal direction at that
+// sample for this particle's position. "Azimuthal" = tangent × r̂ where r̂
+// is the unit radial offset from the line axis, projected to the plane
+// perpendicular to the tangent.
+function azimuthalDirection(
+  px: number, py: number, pz: number,
+  samples: Array<{ cx: number; cy: number; cz: number; tx: number; ty: number; tz: number }>,
+): [number, number, number] {
+  let bestD = Infinity
+  let bestIdx = 0
+  for (let i = 0; i < samples.length; i++) {
+    const s = samples[i]
+    const d = (px - s.cx) ** 2 + (py - s.cy) ** 2 + (pz - s.cz) ** 2
+    if (d < bestD) {
+      bestD = d
+      bestIdx = i
+    }
+  }
+  const s = samples[bestIdx]
+  const dx = px - s.cx, dy = py - s.cy, dz = pz - s.cz
+  // Remove axial component: r_perp = d − (d·t) t
+  const dDotT = dx * s.tx + dy * s.ty + dz * s.tz
+  const rx = dx - dDotT * s.tx
+  const ry = dy - dDotT * s.ty
+  const rz = dz - dDotT * s.tz
+  const rn = Math.hypot(rx, ry, rz)
+  if (rn < 1e-9) {
+    // Sitting on the axis — pick an arbitrary perpendicular.
+    if (Math.abs(s.tz) < 0.9) return [-s.ty, s.tx, 0]
+    return [0, -s.tz, s.ty]
+  }
+  const rxh = rx / rn, ryh = ry / rn, rzh = rz / rn
+  // azi = t × r̂
+  const ax = s.ty * rzh - s.tz * ryh
+  const ay = s.tz * rxh - s.tx * rzh
+  const az = s.tx * ryh - s.ty * rxh
+  const an = Math.hypot(ax, ay, az) || 1
+  return [ax / an, ay / an, az / an]
 }
 
 // Seed one particle in a density-weighted random location, collapsing its
