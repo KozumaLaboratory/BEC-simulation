@@ -102,9 +102,10 @@ export function View3D({ run, data }: Props) {
   const vortexControls = useControls('Vortex lines', {
     show: true,
     mask: { value: 0.01, min: 0, max: 0.5, step: 0.005, label: 'density mask' },
-    thickness: { value: 0.008, min: 0.001, max: 0.05, step: 0.001 },
+    thickness: { value: 0.012, min: 0.001, max: 0.1, step: 0.001 },
     colorByCharge: { value: false, label: 'color by charge (vs m)' },
   })
+
 
   const particleControls = useControls('Particles', {
     show: false,
@@ -117,18 +118,33 @@ export function View3D({ run, data }: Props) {
       label: 'Advect on',
     },
     stride: { value: 4, min: 1, max: 8, step: 1 },
-    count: { value: 150, min: 10, max: 20000, step: 10 },
-    trailLength: { value: 420, min: 2, max: 1200, step: 4 },
+    count: { value: 200, min: 10, max: 5000, step: 20 },
+    trailLength: { value: 80, min: 2, max: 600, step: 4 },
     speed: {
-      value: 0.12,
+      value: 0.25,
       min: 0.01,
       max: 2.0,
       step: 0.005,
       label: 'speed (box/sec at peak |v|)',
     },
-    lifespan: { value: 20.0, min: 0.5, max: 60, step: 0.5 },
+    lifespan: { value: 12.0, min: 0.5, max: 60, step: 0.5 },
     densityThreshold: { value: 0.005, min: 0, max: 0.5, step: 0.005 },
-    color: '#ffffff',
+    color: '#ffe0a0',
+    seedMode: {
+      value: 'vortex_shell' as 'density' | 'vortex_shell',
+      options: {
+        'Density-weighted (whole cloud)': 'density' as const,
+        'Vortex-line shell (orbit cores)': 'vortex_shell' as const,
+      },
+      label: 'seed location',
+    },
+    vortexShellRadius: {
+      value: 0.1,
+      min: 0.005,
+      max: 0.3,
+      step: 0.005,
+      label: 'shell radius (box units)',
+    },
   })
 
   const params = useMemo<VolumeParams>(
@@ -254,6 +270,8 @@ export function View3D({ run, data }: Props) {
       lifespan: particleControls.lifespan,
       color: particleControls.color,
       densityThreshold: particleControls.densityThreshold,
+      seedMode: particleControls.seedMode,
+      vortexShellRadius: particleControls.vortexShellRadius,
     }),
     [particleControls],
   )
@@ -370,7 +388,11 @@ export function View3D({ run, data }: Props) {
               }
               particles={
                 particleControls.show && particleFieldData
-                  ? { field: particleFieldData, params: pParams }
+                  ? {
+                      field: particleFieldData,
+                      params: pParams,
+                      vortexLines: vortexData ?? undefined,
+                    }
                   : undefined
               }
               vortexLines={

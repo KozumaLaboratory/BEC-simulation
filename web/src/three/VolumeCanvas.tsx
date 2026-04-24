@@ -22,6 +22,7 @@ interface Props {
   particles?: {
     field: VectorField3D
     params: ParticleParams
+    vortexLines?: VortexLinesResponse
   }
   vortexLines?: {
     data: VortexLinesResponse
@@ -86,6 +87,7 @@ export function VolumeCanvas({
           density={density.meta}
           densityMax={density.maxValue}
           params={particles.params}
+          vortexLines={particles.vortexLines}
         />
       )}
       {vortexLines && (

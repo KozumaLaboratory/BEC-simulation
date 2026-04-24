@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import type { VectorField3D, Density3D } from '@/api'
+import type { VectorField3D, Density3D, VortexLinesResponse } from '@/api'
+
+export type SeedMode = 'density' | 'vortex_shell'
 
 export interface ParticleParams {
   count: number
@@ -10,6 +12,8 @@ export interface ParticleParams {
   lifespan: number // seconds
   color: string
   densityThreshold: number // fraction of max density for seeding
+  seedMode: SeedMode
+  vortexShellRadius: number // render-space units; only used when seedMode='vortex_shell'
 }
 
 interface Props {
@@ -17,6 +21,7 @@ interface Props {
   density: Density3D
   densityMax: number
   params: ParticleParams
+  vortexLines?: VortexLinesResponse // required when seedMode='vortex_shell'
 }
 
 // Advects N particles along the chosen velocity field and renders each
@@ -29,7 +34,13 @@ interface Props {
 // Each frame we shift t back by one (memmove-style) and write the new
 // head. Index buffer wires (t, t+1) pairs into LineSegments — built
 // once, never rebuilt per frame.
-export function ParticleField({ field, density, densityMax, params }: Props) {
+export function ParticleField({
+  field,
+  density,
+  densityMax,
+  params,
+  vortexLines,
+}: Props) {
   const lineRef = useRef<THREE.LineSegments>(null!)
 
   const { count, trailLength } = params
@@ -95,9 +106,19 @@ export function ParticleField({ field, density, densityMax, params }: Props) {
   }, [params.color, count, vertsPerTrail, colors])
 
   useEffect(() => {
-    // Seed: collapse every particle's trail to a single density-weighted point.
     for (let i = 0; i < count; i++) {
-      seedCollapse(positions, ages, i, vertsPerTrail, density, densityMax, params.densityThreshold)
+      seedByMode(
+        positions,
+        ages,
+        i,
+        vertsPerTrail,
+        density,
+        densityMax,
+        params.densityThreshold,
+        params.seedMode,
+        vortexLines,
+        params.vortexShellRadius,
+      )
     }
     const lines = lineRef.current
     if (lines) {
@@ -112,6 +133,9 @@ export function ParticleField({ field, density, densityMax, params }: Props) {
     density,
     densityMax,
     params.densityThreshold,
+    params.seedMode,
+    vortexLines,
+    params.vortexShellRadius,
   ])
 
   useFrame((_, deltaRaw) => {
@@ -177,7 +201,18 @@ export function ParticleField({ field, density, densityMax, params }: Props) {
         nz < -0.5 || nz > 0.5 ||
         vNorm < 1e-4
       ) {
-        seedCollapse(positions, ages, i, vertsPerTrail, density, densityMax, params.densityThreshold)
+        seedByMode(
+          positions,
+          ages,
+          i,
+          vertsPerTrail,
+          density,
+          densityMax,
+          params.densityThreshold,
+          params.seedMode,
+          vortexLines,
+          params.vortexShellRadius,
+        )
       }
     }
 
@@ -213,6 +248,95 @@ export function ParticleField({ field, density, densityMax, params }: Props) {
       </bufferGeometry>
     </lineSegments>
   )
+}
+
+// Dispatch to the appropriate seeder. Both paths collapse the entire
+// trail to the new head position so a new line starts as a point and
+// grows once the actual v_s field has carried the particle somewhere.
+function seedByMode(
+  positions: Float32Array,
+  ages: Float32Array,
+  i: number,
+  trailLength: number,
+  density: Density3D,
+  densityMax: number,
+  thresholdFrac: number,
+  mode: SeedMode,
+  vortexLines: VortexLinesResponse | undefined,
+  shellRadius: number,
+) {
+  if (mode === 'vortex_shell' && vortexLines && vortexLines.lines.length > 0) {
+    seedOnVortexShell(positions, ages, i, trailLength, vortexLines, shellRadius)
+    return
+  }
+  seedCollapse(positions, ages, i, trailLength, density, densityMax, thresholdFrac)
+}
+
+// Seed one particle in a thin cylindrical shell perpendicular to a random
+// vortex-line segment. Because the shell sits where v_s(r) is actually
+// strongest and nearly purely azimuthal, the subsequent RK2 advection on
+// the REAL velocity field produces particles that visibly orbit the core —
+// no synthetic / procedural motion involved.
+function seedOnVortexShell(
+  positions: Float32Array,
+  ages: Float32Array,
+  i: number,
+  trailLength: number,
+  vortexLines: VortexLinesResponse,
+  shellRadius: number,
+) {
+  const [Lx, Ly, Lz] = vortexLines.box
+  const nLines = vortexLines.lines.length
+  const line = vortexLines.lines[Math.floor(Math.random() * nLines)]
+  const nPts = line.points.length
+  const pi = Math.floor(Math.random() * nPts)
+  const p = line.points[pi]
+  // Local tangent from neighbouring point (if available).
+  const pNext = line.points[Math.min(nPts - 1, pi + 1)]
+  const pPrev = line.points[Math.max(0, pi - 1)]
+  const tx = (pNext[0] - pPrev[0]) / Lx
+  const ty = (pNext[1] - pPrev[1]) / Ly
+  const tz = (pNext[2] - pPrev[2]) / Lz
+  let tlen = Math.hypot(tx, ty, tz)
+  if (tlen < 1e-6) {
+    // Degenerate (shouldn't happen for real lines with >=2 points). Fall
+    // back to z-axis.
+    tlen = 1
+  }
+  const txn = tx / tlen,
+    tyn = ty / tlen,
+    tzn = tz / tlen
+  // Pick e1 perpendicular to tangent.
+  const helperZ = Math.abs(tzn) < 0.9
+  const hx = helperZ ? 0 : 1
+  const hy = 0
+  const hz = helperZ ? 1 : 0
+  const e1x = tyn * hz - tzn * hy
+  const e1y = tzn * hx - txn * hz
+  const e1z = txn * hy - tyn * hx
+  const e1n = Math.hypot(e1x, e1y, e1z) || 1
+  const e1xN = e1x / e1n,
+    e1yN = e1y / e1n,
+    e1zN = e1z / e1n
+  const e2x = tyn * e1zN - tzn * e1yN
+  const e2y = tzn * e1xN - txn * e1zN
+  const e2z = txn * e1yN - tyn * e1xN
+  const theta = Math.random() * Math.PI * 2
+  // Slight jitter around the shell radius so the particles don't clump onto
+  // one ring.
+  const r = shellRadius * (0.8 + Math.random() * 0.4)
+  const cx = Math.cos(theta)
+  const sn = Math.sin(theta)
+  const x = p[0] / Lx + r * (cx * e1xN + sn * e2x)
+  const y = p[1] / Ly + r * (cx * e1yN + sn * e2y)
+  const z = p[2] / Lz + r * (cx * e1zN + sn * e2z)
+  const base = i * trailLength * 3
+  for (let t = 0; t < trailLength; t++) {
+    positions[base + t * 3] = x
+    positions[base + t * 3 + 1] = y
+    positions[base + t * 3 + 2] = z
+  }
+  ages[i] = Math.random() * 0.8
 }
 
 // Seed one particle in a density-weighted random location, collapsing its
