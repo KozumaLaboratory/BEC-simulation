@@ -241,7 +241,23 @@ function find_ground_state_lbfgs(;
     m_lbfgs::Int = 10,
     verbose::Bool = true,
     light_shift::Union{Nothing,LightShift} = nothing,
+    dtype::Union{Nothing,Type{<:AbstractFloat}} = nothing,
 )
+    # F32 gradient norm floors around unit roundoff (~1e-7 scaled by grid dV).
+    # Relax the default convergence test so F32 runs don't burn all n_steps.
+    T_effective = if ws_init !== nothing
+        eltype(ws_init.grid.x[1])
+    elseif dtype !== nothing
+        dtype
+    elseif grid !== nothing
+        eltype(grid.x[1])
+    else
+        Float64
+    end
+    if T_effective === Float32 && tol < 1.0e-5
+        @warn "Relaxing LBFGS tol $tol → 1e-5 for Float32 (grad_norm floors near 1e-6)." maxlog=1
+        tol = 1.0e-5
+    end
     if ws_init !== nothing
         ws = ws_init
         grid = ws.grid
@@ -260,6 +276,7 @@ function find_ground_state_lbfgs(;
             for (k, v) in init_state_params
                 init_kwargs[k] = v
             end
+            dtype !== nothing && (init_kwargs[:dtype] = dtype)
             psi_init = init_psi(grid, sys; init_kwargs...)
         end
         sp = SimParams(; dt=0.001, n_steps, imaginary_time=true,
@@ -268,7 +285,7 @@ function find_ground_state_lbfgs(;
             grid, atom, interactions, zeeman, potential,
             sim_params = sp, psi_init,
             enable_ddi, c_dd, secular_ddi, quasi_2d_ddi, l_z_ddi, backend,
-            light_shift,
+            light_shift, dtype,
         )
     end
 

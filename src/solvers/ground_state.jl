@@ -135,6 +135,15 @@ function find_ground_state(;
         copy(psi_init)
     end
 
+    # F32 unit roundoff is ~1.2e-7, so requesting tol=1e-10 will never converge.
+    # Cap at 1e-6 and warn, so users get a sensible default when they flip dtype
+    # without rethinking tolerances.
+    T_effective = dtype === nothing ? eltype(grid.x[1]) : dtype
+    if T_effective === Float32 && tol < 1.0e-6
+        @warn "Relaxing ITP tol $tol → 1e-6 for Float32 (unit roundoff ~1.2e-7)." maxlog=1
+        tol = 1.0e-6
+    end
+
     if target_Jz !== nothing
         N_dim = length(grid.config.n_points)
         N_dim >= 2 || throw(

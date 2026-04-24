@@ -298,13 +298,36 @@ function _parse_zeeman(z, duration::Float64)
     )
 end
 
-"""Parse grid config from pipeline step params."""
+"""Parse grid config from pipeline step params.
+
+Accepts `dtype: "float32"` or `dtype: "float64"` on the pipeline step to
+request mixed-precision simulation. Default is `Float64`. The resolved
+eltype also propagates through `make_workspace(; dtype=…)` so the entire
+hot path runs in the requested precision.
+"""
 function _setup_grid_from_params(p::Dict)
     g = p["grid"]
     n_raw = g isa Dict ? get(g, "n", get(g, "n_points", 32)) : g
     box_raw = g isa Dict ? get(g, "box", get(g, "box_size", 12.0)) : 12.0
     n_pts, box_size = _normalize_grid(n_raw, box_raw)
     ndim = length(n_pts)
-    grid = make_grid(GridConfig(NTuple{ndim,Int}(n_pts), NTuple{ndim,Float64}(box_size)))
+    T = _parse_dtype(get(p, "dtype", "float64"))
+    grid = make_grid(
+        GridConfig(NTuple{ndim,Int}(n_pts), NTuple{ndim,Float64}(box_size));
+        dtype = T,
+    )
     (grid, ndim)
+end
+
+"""Parse a YAML `dtype:` string/symbol into a concrete AbstractFloat type."""
+function _parse_dtype(spec)
+    s = spec isa Symbol ? String(spec) : String(spec)
+    s_lower = lowercase(s)
+    if s_lower in ("float32", "f32", "single")
+        Float32
+    elseif s_lower in ("float64", "f64", "double")
+        Float64
+    else
+        throw(ArgumentError("Unknown dtype '$s' — use 'float32' or 'float64'."))
+    end
 end

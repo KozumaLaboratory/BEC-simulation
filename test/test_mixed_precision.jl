@@ -83,6 +83,41 @@ using LinearAlgebra
         @test abs(n1 - n0) / n0 < 1e-4
     end
 
+    # YAML `dtype:` knob + ITP tol auto-relax
+    @testset "YAML dtype + ITP F32 tol auto-relax" begin
+        p_f32 = Dict{String,Any}(
+            "grid" => Dict("n" => [16, 16, 16], "box" => [6.0, 6.0, 6.0]),
+            "dtype" => "float32",
+        )
+        grid32, ndim = SpinorBEC._setup_grid_from_params(p_f32)
+        @test ndim == 3
+        @test eltype(grid32.x[1]) === Float32
+
+        p_f64 = Dict{String,Any}(
+            "grid" => Dict("n" => [16, 16, 16], "box" => [6.0, 6.0, 6.0]),
+        )
+        grid64, _ = SpinorBEC._setup_grid_from_params(p_f64)
+        @test eltype(grid64.x[1]) === Float64
+
+        @test_throws ArgumentError SpinorBEC._setup_grid_from_params(
+            Dict{String,Any}(
+                "grid" => Dict("n" => [8,8,8], "box" => [4.0,4.0,4.0]),
+                "dtype" => "half",
+            ),
+        )
+
+        # ITP F32 with tol<1e-6 should log a warning and clamp.
+        atom = AtomSpecies("Na23", 3.8e-26, 1, 52.0*5.29e-11, 54.3*5.29e-11, 0.0)
+        ip = InteractionParams(50.0, -0.2)
+        grid = make_grid(GridConfig((16,16,16), (6.0,6.0,6.0)); dtype=Float32)
+        r = find_ground_state(;
+            grid, atom, interactions = ip, potential = HarmonicTrap(1.0,1.0,1.0),
+            dt = 0.005, n_steps = 20, tol = 1e-10,
+            dtype = Float32,
+        )
+        @test eltype(r.workspace.state.psi) === ComplexF32
+    end
+
     # DDI path at F32 (harder — has Q tensor and rFFT)
     @testset "F32 DDI workspace & step" begin
         cfg = GridConfig((16, 16, 16), (6.0, 6.0, 6.0))
