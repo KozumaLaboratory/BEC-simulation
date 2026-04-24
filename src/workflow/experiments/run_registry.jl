@@ -153,7 +153,7 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
             mz_actual = haskey(result, :ground_state_energy) ?
                         magnetization(psi_host, grid, sys) : NaN
 
-            tmp_file = psi_file * ".tmp"
+            tmp_file = _scratch_tmp_path(psi_file)
             try
                 jldopen(tmp_file, "w") do f
                     f["psi"] = psi_host
@@ -172,7 +172,7 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
                     _save_units_metadata!(f, patched)
                     _save_analyzer_results!(f, result)
                 end
-                mv(tmp_file, psi_file; force = true)
+                _move_scratch_to_final(tmp_file, psi_file)
             catch err
                 isfile(tmp_file) && rm(tmp_file; force = true)
                 rethrow(err)
@@ -188,6 +188,39 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
             verbose && @printf("    E=%.4f conv=%s (%.1fs)\n", energy, converged, duration)
         end
     end
+end
+
+"""
+    _scratch_tmp_path(final_path)
+
+Return a filesystem path suitable for the JLD2 `.tmp` write. When the env
+var `SPINORBEC_SCRATCH_DIR` is set (typically node-local fast storage on
+HPC — TSUBAME's T4_TMPDIR, SLURM's TMPDIR, or `/tmp`), write there and
+copy to the final shared-filesystem path at the end. On Lustre-style
+shared storage the per-dataset JLD2 writes can otherwise saturate the
+metadata server.
+"""
+function _scratch_tmp_path(final_path::String)
+    scratch = get(ENV, "SPINORBEC_SCRATCH_DIR", "")
+    if isempty(scratch)
+        return final_path * ".tmp"
+    end
+    isdir(scratch) || mkpath(scratch)
+    joinpath(scratch, string(hash(final_path); base = 16) * ".jld2.tmp")
+end
+
+"""
+    _move_scratch_to_final(tmp_path, final_path)
+
+Atomically move the scratch file into place. If the scratch dir is on a
+different filesystem (typical on HPC: local SSD vs shared home) `mv`
+falls back to copy+delete automatically. Creates the destination
+directory if it doesn't exist.
+"""
+function _move_scratch_to_final(tmp_path::String, final_path::String)
+    final_dir = dirname(final_path)
+    isdir(final_dir) || mkpath(final_dir)
+    mv(tmp_path, final_path; force = true)
 end
 
 function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=true)
@@ -212,7 +245,7 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
     energy = get(result, :ground_state_energy, NaN)
     converged = get(result, :ground_state_converged, true)
 
-    tmp_file = psi_file * ".tmp"
+    tmp_file = _scratch_tmp_path(psi_file)
     try
         jldopen(tmp_file, "w") do f
             f["psi"] = psi_host
@@ -229,7 +262,7 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
             _save_units_metadata!(f, data)
             _save_analyzer_results!(f, result)
         end
-        mv(tmp_file, psi_file; force = false)
+        _move_scratch_to_final(tmp_file, psi_file)
     catch err
         isfile(tmp_file) && rm(tmp_file; force = true)
         rethrow(err)
