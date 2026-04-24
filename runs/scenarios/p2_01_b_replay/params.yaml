@@ -1,0 +1,27 @@
+# P2.1 — arbitrary B(t) waveform replay from CSV
+#
+# Demonstrates feeding a lab-measured magnetic field trace directly into the
+# simulator via Phase 0's `load_waveform_csv` + the `csv:` YAML hook. The
+# resolver looks up `beam_z.csv` relative to this YAML's directory.
+
+pipeline:
+  - ground_state:
+      atom: Dy164
+      grid: {n: 16, box: 8.0}
+      interactions: {c0: 50.0, c1: -0.2, omega_ref: 314.159}
+      trap: [1.0, 1.0, 1.0]
+      zeeman: {Bz: 1.0e-4}
+      dt: 0.01
+      n_steps: 10
+      tol: 1.0e-3
+
+  - dynamics:
+      duration: 1.0
+      dt: 0.02
+      interactions: {omega_ref: 314.159}
+      zeeman:
+        Bz:
+          csv:
+            path: beam_z.csv
+            scale: 1.0e-4   # raw CSV values are "Gauss × 1e-4" arb units
+            header: true

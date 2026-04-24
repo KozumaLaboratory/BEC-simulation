@@ -1,0 +1,33 @@
+# P2.11 — Breathing-mode trap modulation
+#
+# Sinusoidal modulation of the harmonic trap frequency along z. Resonant
+# drive at 2ω_z excites the breathing (monopole) mode. Post-process by
+# fitting ⟨z²⟩(t) to extract the breathing amplitude.
+
+pipeline:
+  - ground_state:
+      atom: Dy164
+      grid: {n: 16, box: 8.0}
+      interactions: {c0: 50.0, c1: 0.0, omega_ref: 314.159}
+      trap: [1.0, 1.0, 1.0]
+      zeeman: {Bz: 1.0e-4}
+      initial_state: polar
+      dt: 0.01
+      n_steps: 10
+      tol: 1.0e-3
+
+  - dynamics:
+      duration: 1.0
+      dt: 0.002
+      interactions: {omega_ref: 314.159}
+      # YAML-native TimeDependentTrap isn't yet exposed — construct from code:
+      #
+      #   base = HarmonicTrap((1.0, 1.0, 1.0))
+      #   wfs  = (ConstantWaveform(1.0), ConstantWaveform(1.0),
+      #           SinusoidalWaveform(center=1.0, amplitude=0.1, frequency=2.0))
+      #   trap = TimeDependentTrap{3}(base, wfs)
+      #
+      # For the YAML smoke test, we run the static trap as a no-op baseline.
+
+  - analyze:
+      - magnetization: {}

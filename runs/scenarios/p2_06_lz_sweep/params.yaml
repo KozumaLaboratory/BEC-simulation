@@ -1,0 +1,32 @@
+# P2.6 — Landau-Zener quadratic Zeeman sweep
+#
+# Sweep q(t) through zero at constant speed α. P_LZ = exp(-2π Ω² / α)
+# predicts the diabatic-crossing probability. Use a small Raman coupling Ω to
+# set the avoided-crossing gap.
+
+pipeline:
+  - ground_state:
+      atom: Dy164
+      grid: {n: 16, box: 8.0}
+      interactions: {c0: 30.0, c1: 0.2, omega_ref: 314.159}
+      trap: [1.0, 1.0, 1.0]
+      zeeman: {p: 0.0, q: 2.0}
+      initial_state: polar
+      dt: 0.01
+      n_steps: 10
+      tol: 1.0e-3
+
+  - dynamics:
+      duration: 1.0
+      dt: 0.002
+      interactions: {omega_ref: 314.159}
+      zeeman:
+        p: 0.0
+        q: {from: 2.0, to: -2.0, scale: linear}
+      raman:
+        Omega: 0.5
+        delta: 0.0
+        k_eff: [0.0, 0.0, 0.0]
+
+  - analyze:
+      - component_populations: {}

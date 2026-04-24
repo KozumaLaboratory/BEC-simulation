@@ -75,14 +75,24 @@ function run_yaml(yaml_path::String; base_dir::String = "runs", verbose::Bool = 
 
     env = _env_metadata()
 
-    # Expand scan points (if any)
-    scan_dict = get(data, "scan", nothing)
-    if scan_dict !== nothing
-        scan = _parse_override_scan(scan_dict)
-        _run_yaml_scan(data, scan, run_dir, env; verbose)
-    else
-        # Single-shot pipeline: one point
-        _run_yaml_single(data, run_dir, env, 1, ""; verbose)
+    # Make relative paths inside the YAML (e.g. `csv: beams.csv`) resolve
+    # against the YAML's own directory, not the caller's cwd.
+    prev_yaml_dir = get(ENV, "SPINORBEC_YAML_DIR", nothing)
+    ENV["SPINORBEC_YAML_DIR"] = dirname(abspath(yaml_path))
+
+    try
+        # Expand scan points (if any)
+        scan_dict = get(data, "scan", nothing)
+        if scan_dict !== nothing
+            scan = _parse_override_scan(scan_dict)
+            _run_yaml_scan(data, scan, run_dir, env; verbose)
+        else
+            # Single-shot pipeline: one point
+            _run_yaml_single(data, run_dir, env, 1, ""; verbose)
+        end
+    finally
+        prev_yaml_dir === nothing ? delete!(ENV, "SPINORBEC_YAML_DIR") :
+                                    (ENV["SPINORBEC_YAML_DIR"] = prev_yaml_dir)
     end
 
     verbose && println("Done: $run_dir")

@@ -1,0 +1,40 @@
+# P2.8 — Stern-Gerlach + real-time TOF
+#
+# Run a quick ITP to get a ground state, apply a short "quench" that mixes
+# components, then image with `simulate_tof_with_gradient`. The analyzer
+# below is a placeholder that dumps per-component column density JSON; the
+# real API is `simulate_tof_with_gradient(ws; gradient, t_tof, imaging_axis)`
+# called from Julia after `run_config`.
+#
+# Pipeline-level TOF analyzers are not yet wired; the recommended flow is
+# to `run_config` the dynamics phase and then call the analyzer directly:
+#
+#     result = run_config(load_config("runs/scenarios/p2_08_sg_tof/params.yaml"))
+#     dens = simulate_tof_with_gradient(result.dynamics_result.final_ws;
+#                                       gradient = 1.0, t_tof = 0.5,
+#                                       imaging_axis = 3, gradient_axis = 1)
+
+pipeline:
+  - ground_state:
+      atom: Dy164
+      grid: {n: 32, box: 10.0}
+      interactions: {c0: 80.0, c1: 0.2, omega_ref: 314.159}
+      trap: [1.0, 1.0, 1.0]
+      zeeman: {Bz: 1.0e-4}
+      initial_state: polar
+      dt: 0.01
+      n_steps: 50
+      tol: 1.0e-3
+
+  - dynamics:
+      duration: 0.1
+      dt: 0.002
+      interactions: {omega_ref: 314.159}
+      # Short Raman pulse to populate m ≠ 0 (so SG has something to separate)
+      pulse_sequence:
+        - {t: 0.00, duration: 0.05, apply: raman,
+           Omega: 4.0, delta: 0.0, k_eff: [0.0, 0.0, 0.0]}
+
+  - analyze:
+      - magnetization: {}
+      - component_populations: {}

@@ -1,9 +1,21 @@
 # --- Public pipeline API ---
 
-"""Load a YAML file and return a PipelineConfig."""
+"""Load a YAML file and return a PipelineConfig.
+
+Sets `ENV["SPINORBEC_YAML_DIR"]` to the YAML's directory while parsing so
+that relative paths inside the config (e.g. `csv: beams.csv`) resolve
+against the YAML's location rather than the caller's pwd.
+"""
 function load_config(path::String)
     data = YAML.load_file(path)
-    parse_pipeline(data)
+    prev = get(ENV, "SPINORBEC_YAML_DIR", nothing)
+    ENV["SPINORBEC_YAML_DIR"] = dirname(abspath(path))
+    try
+        parse_pipeline(data)
+    finally
+        prev === nothing ? delete!(ENV, "SPINORBEC_YAML_DIR") :
+                           (ENV["SPINORBEC_YAML_DIR"] = prev)
+    end
 end
 
 """Load a YAML string and return a PipelineConfig."""

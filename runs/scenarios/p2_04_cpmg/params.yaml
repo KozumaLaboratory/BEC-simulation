@@ -1,0 +1,35 @@
+# P2.4 — CPMG dynamical decoupling: π/2 – (τ – π – τ)^N – π/2
+#
+# Standard noise-suppression sequence. Uses N=2 echoes here for brevity; scale
+# up n_steps / duration for realistic lab sequences.
+
+pipeline:
+  - ground_state:
+      atom: Dy164
+      grid: {n: 16, box: 8.0}
+      interactions: {c0: 30.0, c1: -0.1, omega_ref: 314.159}
+      trap: [1.0, 1.0, 1.0]
+      zeeman: {Bz: 1.0e-4}
+      initial_state: ferromagnetic_min
+      dt: 0.01
+      n_steps: 10
+      tol: 1.0e-3
+
+  - dynamics:
+      duration: 1.0
+      dt: 0.002
+      interactions: {omega_ref: 314.159}
+      zeeman: {q: 0.2}
+      pulse_sequence:
+        # π/2 along x
+        - {t: 0.00, duration: 0.05, apply: raman, Omega: 3.1416, delta: 0.0, k_eff: [0.0, 0.0, 0.0]}
+        # first τ ends, π pulse along y (delta > 0 rotates axis)
+        - {t: 0.25, duration: 0.10, apply: raman, Omega: 3.1416, delta: 1.5708, k_eff: [0.0, 0.0, 0.0]}
+        # second τ ends, second π pulse
+        - {t: 0.65, duration: 0.10, apply: raman, Omega: 3.1416, delta: 1.5708, k_eff: [0.0, 0.0, 0.0]}
+        # final π/2
+        - {t: 0.95, duration: 0.05, apply: raman, Omega: 3.1416, delta: 0.0, k_eff: [0.0, 0.0, 0.0]}
+
+  - analyze:
+      - component_populations: {}
+      - magnetization: {}

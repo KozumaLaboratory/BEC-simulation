@@ -1,0 +1,28 @@
+# P2.5 — Adiabatic Rapid Passage via chirped detuning
+#
+# Linear Raman detuning sweep from below to above resonance. Final state
+# should end up fully flipped to the far-detuned adiabatic branch.
+
+pipeline:
+  - ground_state:
+      atom: Dy164
+      grid: {n: 16, box: 8.0}
+      interactions: {c0: 30.0, c1: -0.1, omega_ref: 314.159}
+      trap: [1.0, 1.0, 1.0]
+      zeeman: {Bz: 1.0e-4}
+      initial_state: ferromagnetic_min
+      dt: 0.01
+      n_steps: 10
+      tol: 1.0e-3
+
+  - dynamics:
+      duration: 1.0
+      dt: 0.002
+      interactions: {omega_ref: 314.159}
+      raman:
+        Omega: 2.0
+        delta: {from: -5.0, to: 5.0, scale: linear}
+        k_eff: [0.0, 0.0, 0.0]
+
+  - analyze:
+      - component_populations: {}

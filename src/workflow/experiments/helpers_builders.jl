@@ -133,6 +133,41 @@ function _make_waveform(spec, duration::Float64)
         times = Float64.(p["times"])
         values = Float64.(p["values"])
         return InterpolatedWaveform(times, values)
+    elseif haskey(spec, "csv")
+        # `csv:` may be a bare filename ("beams.csv") or a dict with optional
+        # time/value column indices, scale, offset, delimiter, header flag.
+        c = spec["csv"]
+        path, opts = if c isa AbstractString
+            (String(c), Dict{String,Any}())
+        elseif c isa Dict
+            (String(c["path"]), c)
+        else
+            throw(ArgumentError("`csv` must be a filename or a {path, ...} dict"))
+        end
+        # Resolve relative paths against the YAML file's directory when known
+        # (ENV set by run_yaml / load_config). Otherwise treat as CWD.
+        resolved = isabspath(path) ? path :
+            joinpath(get(ENV, "SPINORBEC_YAML_DIR", pwd()), path)
+        isfile(resolved) || throw(ArgumentError(
+            "csv waveform path not found: $resolved"))
+        w = load_waveform_csv(
+            resolved;
+            time_col  = Int(get(opts, "time_col",  1)),
+            value_col = Int(get(opts, "value_col", 2)),
+            header    = Bool(get(opts, "header",  true)),
+            delimiter = first(String(get(opts, "delimiter", ","))),
+        )
+        scale  = Float64(get(opts, "scale",  1.0))
+        offset = Float64(get(opts, "offset", 0.0))
+        if scale != 1.0 || offset != 0.0
+            n = length(w.times)
+            scaled = Vector{Float64}(undef, n)
+            @inbounds for i in 1:n
+                scaled[i] = scale * w.values[i] + offset
+            end
+            return InterpolatedWaveform(w.times, scaled)
+        end
+        return w
     end
     from = Float64(spec["from"])
     to = Float64(get(spec, "to", from))
