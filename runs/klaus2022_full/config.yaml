@@ -1,0 +1,110 @@
+# =================================================================
+# Klaus 2022 reproduction (Dy164 magnetostirring → vortex stripes)
+# =================================================================
+#
+# Phys setup from Klaus et al., Nature 601, 205 (2022):
+#   - Dy164 BEC, N=60000, a_s = 90 a_0
+#   - Pancake trap (ω_ρ = 2π·50 Hz, ω_z = 2π·130 Hz) → aspect ≈ 2.6
+#   - Strong z bias Bz = 0.819 G, transverse rotation B_⊥ = 0.574 G at 226 Hz
+#   - 20 ms tilt ramp → 50 ms spin-up → 1 s magnetostir
+#
+# Pipeline units:  ω_ref = 314.159 rad/s ≡ 2π·50 Hz. Dimless time unit ≈ 3.18 ms.
+# Frequency in sinusoidal/chirped waveforms = f_phys [Hz] / ω_ref_Hz, so
+# 226 Hz → 226/50 = 4.52 in the frequency field.
+#
+# Grid: 64×64×32 — resolves vortex cores (healing length ≈ 0.3 a_ho) and stripe
+# features. VRAM ≈ 2 GB, dynamics ~25 min on RTX 5070 Ti.
+
+pipeline:
+  # --- Ground state (Dy164 z-polarized) ------------------------------
+  - ground_state:
+      atom: Dy164
+      grid:
+        n: [64, 64, 32]
+        box: [20.0, 20.0, 8.0]
+      interactions:
+        # Dy164 default a_s = 92 a_0 (~Klaus value 90). c_total / c_dd derived.
+        omega_ref: 314.159
+        N_atoms: 60000
+      ddi: {enabled: true}
+      trap: [1.0, 1.0, 2.6]
+      zeeman:
+        level: 1
+        Bz: "1.0 Gauss"                 # weak bias before stirring starts
+      dt: 0.001                         # Dy164 ε_dd > 1 needs small dt (NaN at 0.005)
+      n_steps: 30000                    # same total time, smaller dt
+      tol: 1.0e-7
+      initial_state: ferromagnetic_min
+      backend: cuda
+
+  # --- 20 ms tilt: θ 0 → 35° (Level 2: B_mag + θ + φ) ---------------
+  - dynamics:
+      duration: 6.28                     # 20 ms in units of ω_ref⁻¹
+      dt: 0.002                          # Dy164 ε_dd > 1 → tight dt
+      save_every: 100
+      interactions: {omega_ref: 314.159}
+      zeeman:
+        level: 2
+        B_mag: "1.0 Gauss"
+        theta_deg: {from: 0.0, to: 35.0}
+        phi_deg: 0.0
+
+  # --- 50 ms spin-up: stir freq 0 → 226 Hz (chirp) ------------------
+  - dynamics:
+      duration: 15.7                     # 50 ms
+      dt: 0.002
+      save_every: 250
+      interactions: {omega_ref: 314.159}
+      zeeman:
+        level: 1
+        Bz: "0.819 Gauss"
+        Bx:
+          chirped_sinusoidal:
+            amplitude: 0.574             # in Gauss (converted by zeeman_levels)
+            freq_start: 0.0
+            freq_end: 4.52
+            duration: 15.7
+        By:
+          chirped_sinusoidal:
+            amplitude: 0.574
+            freq_start: 0.0
+            freq_end: 4.52
+            duration: 15.7
+            phase: -1.5708               # π/2 lag → circular polarization
+
+  # --- 1 s magnetostir at 226 Hz ------------------------------------
+  - dynamics:
+      duration: 314                      # 1 s
+      dt: 0.002
+      save_every: 500
+      save_psi_snapshots: true
+      save_snapshot_precision: "f32"
+      interactions: {omega_ref: 314.159}
+      zeeman:
+        level: 1
+        Bz: "0.819 Gauss"
+        Bx:
+          sinusoidal:
+            amplitude: 0.574
+            frequency: 4.52
+        By:
+          sinusoidal:
+            amplitude: 0.574
+            frequency: 4.52
+            phase: -1.5708
+
+  # --- Post-processing ---------------------------------------------
+  - analyze:
+      - column_density_movie:
+          axis: 3
+          output_dir: runs/klaus2022_full/frames
+          colorscale: Viridis
+          width: 700
+          height: 600
+      - vortex_detect: {component: 1, threshold: 0.1}
+      - winding_field: {component: 1, threshold: 1.0e-6}
+      - summary_json:
+          path: runs/klaus2022_full/summary.json
+          extras:
+            test_kind: klaus2022_full
+            target: vortex_stripe_formation
