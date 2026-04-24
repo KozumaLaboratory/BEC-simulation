@@ -83,6 +83,7 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     "save_every"         => FieldSpec(type=Number, range=(1.0, 1e8)),
     "save_psi_snapshots" => FieldSpec(type=Bool),
     "save_snapshot_compression" => FieldSpec(type=Bool),
+    "save_snapshot_precision"   => FieldSpec(type=String, enum=["f32", "f64"]),
     "ddi"                => FieldSpec(type=Union{Dict, Bool}),
     "zeeman"             => FieldSpec(type=Dict),
     "interactions"       => FieldSpec(type=Dict),

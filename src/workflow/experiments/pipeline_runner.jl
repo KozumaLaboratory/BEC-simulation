@@ -483,10 +483,18 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
 
     save_psi_snap = Bool(get(p, "save_psi_snapshots", false))
     save_compress = Bool(get(p, "save_snapshot_compression", false))
+    snap_precision_str = String(get(p, "save_snapshot_precision", "f32"))
+    snap_precision_cf =
+        snap_precision_str == "f64" ? ComplexF64 :
+        snap_precision_str == "f32" ? ComplexF32 :
+        throw(ArgumentError(
+            "save_snapshot_precision must be \"f32\" or \"f64\", got " *
+            snap_precision_str,
+        ))
 
     result, snap_tmp_path, snap_count =
         _run_dynamics_with_optional_streaming!(
-            ws, save_psi_snap, save_compress,
+            ws, save_psi_snap, save_compress, snap_precision_cf,
         )
 
     if verbose
@@ -519,6 +527,7 @@ vector (~8 GB at 154 snapshots).
 """
 function _run_dynamics_with_optional_streaming!(
     ws, save_psi::Bool, compress::Bool,
+    snap_type::Type{<:Complex} = ComplexF32,
 )
     if !save_psi
         return (run_simulation!(ws), nothing, 0)
@@ -532,13 +541,14 @@ function _run_dynamics_with_optional_streaming!(
     D = size(ws.state.psi, ndims(ws.state.psi))
     snap_file["spatial_shape"] = collect(n_pts)
     snap_file["n_components"] = D
+    snap_file["snap_eltype"] = string(snap_type)
 
-    buf = Array{ComplexF32}(undef, n_pts..., D)
+    buf = Array{snap_type}(undef, n_pts..., D)
     frame_count = Ref(0)
 
     on_snap = function (_ws, _step, psi_snap)
         frame_count[] += 1
-        buf .= ComplexF32.(psi_snap)
+        buf .= snap_type.(psi_snap)
         snap_file["frame_" * lpad(string(frame_count[]), 5, '0')] = buf
         return
     end
