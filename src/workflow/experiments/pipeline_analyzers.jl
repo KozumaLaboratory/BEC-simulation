@@ -416,8 +416,17 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
 
     elseif name == :column_density_movie
         # Column-integrated total density for every snapshot from the preceding
-        # dynamics step, written as PNG frames. Requires prior dynamics step
-        # with save_every > 0 (produces psi_snapshots).
+        # dynamics step, written as PNG frames. Two snapshot sources supported:
+        #
+        #   1. Streamed scratch JLD2 (preferred for long runs):
+        #      `save_psi_snapshots: true` makes the dynamics step write each
+        #      ψ frame to a temp JLD2 and the path is exposed via
+        #      `pipeline_results[:snapshot_tmp_path]`. We open it read-only,
+        #      load one frame at a time, write the PNG, and discard — peak
+        #      host RAM stays at ~one snapshot regardless of frame count.
+        #
+        #   2. Legacy in-memory `dynres.psi_snapshots` (RAM-bound):
+        #      used when streaming was off. Cap frame count by host RAM.
         dynres = get(pipeline_results, :dynamics_result, nothing)
         dynres === nothing && throw(ArgumentError(
             "column_density_movie requires a preceding dynamics step with save_every > 0"))
@@ -432,18 +441,42 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
         height = Int(get(params, "height", 500))
         title_fmt = get(params, "title_fmt", nothing)
 
-        snaps = dynres.psi_snapshots
+        snap_tmp = get(pipeline_results, :snapshot_tmp_path, nothing)
+        save_psi = get(pipeline_results, :save_psi_snapshots, false)
         times = dynres.times
         frames = String[]
-        for (i, psi_s) in enumerate(snaps)
-            n_total = total_density(psi_s, ndim)
-            col = dropdims(sum(n_total; dims = axis); dims = axis)
-            title = title_fmt === nothing ?
-                "t = $(round(times[i], digits=3))" : string(title_fmt)
-            png_path = joinpath(output_dir, "col_$(lpad(i, 4, '0')).png")
-            save_column_density_png(grid, col, axis, png_path;
-                title = title, colorscale = colorscale, width = width, height = height)
-            push!(frames, png_path)
+        if save_psi && snap_tmp !== nothing && isfile(snap_tmp)
+            jldopen(snap_tmp, "r") do src
+                n_snaps = Int(src["n_snapshots"])
+                # Sanity: times array length should match n_snaps
+                t_max = min(length(times), n_snaps)
+                for i in 1:t_max
+                    skey = "frame_" * lpad(string(i), 5, '0')
+                    frame = src[skey]                # Array{ComplexF32, ndim+1}
+                    n_total = total_density(frame, ndim)
+                    col = dropdims(sum(n_total; dims = axis); dims = axis)
+                    title = title_fmt === nothing ?
+                        "t = $(round(times[i], digits=3))" : string(title_fmt)
+                    png_path = joinpath(output_dir, "col_$(lpad(i, 4, '0')).png")
+                    save_column_density_png(grid, col, axis, png_path;
+                        title = title, colorscale = colorscale,
+                        width = width, height = height)
+                    push!(frames, png_path)
+                end
+            end
+        else
+            snaps = dynres.psi_snapshots
+            for (i, psi_s) in enumerate(snaps)
+                n_total = total_density(psi_s, ndim)
+                col = dropdims(sum(n_total; dims = axis); dims = axis)
+                title = title_fmt === nothing ?
+                    "t = $(round(times[i], digits=3))" : string(title_fmt)
+                png_path = joinpath(output_dir, "col_$(lpad(i, 4, '0')).png")
+                save_column_density_png(grid, col, axis, png_path;
+                    title = title, colorscale = colorscale,
+                    width = width, height = height)
+                push!(frames, png_path)
+            end
         end
         (output_dir = output_dir, n_frames = length(frames),
          frame_paths = frames, axis = axis)

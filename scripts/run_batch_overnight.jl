@@ -5,6 +5,7 @@
 
 import CUDA
 using SpinorBEC
+using PlotlyJS    # triggers SpinorBECPlotlyExt → save_column_density_png method
 using Dates
 using Printf
 
@@ -15,12 +16,11 @@ using Printf
 end
 
 const RUNS = [
-    "klaus2022_full",        # Klaus 2022 Dy164 vortex-stripe (re-run with fixed
-                             # vortex_detect 3D + smaller save_every)
-    "eu151_droplet",         # Eu151 self-bound droplet — exercises droplet_profile
-                             # analyzer end-to-end on Phase 4.1 config
-    "eu151_phase_pq_hires",  # (p, q) phase map resume — 95/144 cached, 49 to go;
-                             # benefits from CUDA.reclaim() between scan points
+    "klaus2022_full",        # Klaus 2022 Dy164 vortex-stripe (re-run with fixes)
+    "eu151_droplet",         # Eu151 self-bound droplet (droplet_profile analyzer)
+    "klaus2022_freq_scan",   # 3 stir frequencies → vortex-lattice vs stripe map
+    "eu151_kz_slow",         # KZ slow-quench tail (τ_Q ∈ {200, 500, 1000} × 3 seed)
+    "eu151_phase_pq_hires",  # (p, q) phase map resume — 49/144 to go
 ]
 
 println("=" ^ 72)
