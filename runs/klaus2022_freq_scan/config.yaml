@@ -84,9 +84,7 @@ pipeline:
           output_dir: runs/klaus2022_freq_scan/frames
           colorscale: Viridis
       - vortex_detect: {component: 1, threshold: 0.1}
-      # winding_field omitted: the running batch loaded the pre-fix
-      # winding_number_field which has a 3D z-axis indexing bug
-      # (fixed in topology.jl but only for next batch start).
+      - winding_field: {component: 1, threshold: 1.0e-6}
       - summary_json:
           path: runs/klaus2022_freq_scan/summary.json
           extras: {test_kind: klaus_freq_scan}
