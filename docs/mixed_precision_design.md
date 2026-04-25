@@ -61,9 +61,31 @@ Phase 2:
   - Convert split-step and DDI kernels to be `T`-generic. Run
     regression suite.
 
-Phase 3:
+Phase 3 (in progress):
+  - **Done**: dtype kwarg accepted by find_ground_state /
+    find_ground_state_lbfgs; SimState.psi eltype follows dtype; ITP/LBFGS
+    tol auto-relax for Float32 (commit 738a3e4); SimState.psi_scratch
+    field added so apply_uniform_spin_rotation! can reuse a buffer
+    instead of allocating per call.
+  - **Next**: parameterise `Workspace{...,T}` so the T eltype propagates
+    visibly through dispatch (currently inferred from psi). Concrete
+    todo list:
+      - SimState{N,A,B,T<:AbstractFloat}: add T param, store as
+        T = real(eltype(psi))
+      - Workspace{...,T} via the same eltype binding
+      - Update make_workspace to thread T explicitly
+      - Bind kinetic_phase / potential_values / density_buf to T
+        (these are already Array{T}, just lacks the type param)
+      - Add a YAML knob `dtype: float32` at pipeline level so users
+        don't need to thread it manually
+  - **Smoke regression guard**: `test/test_mixed_precision_phase3.jl`
+    runs an F32 vs F64 ITP and checks energies agree to ~1e-3 relative.
+
+Phase 4:
   - Analyzer audit: which ones can run at T, which must promote.
   - Tighten ITP convergence semantics at F32 (warn + cap tolerance).
+  - GPU benchmarking on 256³ F32 vs 128³ F64 to quantify the win
+    (expected: ~2× throughput, ~½ VRAM).
 
 Phase 4:
   - GPU benchmarking on 256³ F32 vs 128³ F64 to quantify the win
