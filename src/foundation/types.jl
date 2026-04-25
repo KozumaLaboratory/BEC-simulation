@@ -444,7 +444,7 @@ end
 
 # --- Simulation State (mutable) ---
 
-mutable struct SimState{N,A<:AbstractArray,B<:AbstractArray}
+mutable struct SimState{N,A<:AbstractArray,B<:AbstractArray,T<:AbstractFloat}
     psi::A              # wavefunction: spatial dims... × n_components (eltype Complex{T})
     fft_buf::B          # spatial-only buffer for FFT (same device + eltype as psi)
     psi_scratch::A      # full-size scratch (same shape as psi); avoids per-call
@@ -454,6 +454,11 @@ mutable struct SimState{N,A<:AbstractArray,B<:AbstractArray}
     t::Float64
     step::Int
 end
+
+# Convenience: T is always real(eltype(psi)). Use this so callers don't
+# need to specify T manually.
+SimState{N,A,B}(psi::A, fft_buf::B, psi_scratch::A, t, step) where {N,A,B} =
+    SimState{N,A,B,real(eltype(A))}(psi, fft_buf, psi_scratch, t, step)
 
 # --- FFT Plans ---
 
