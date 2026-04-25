@@ -1,4 +1,5 @@
 using JLD2
+using Dates: Date
 
 @testset "Pipeline" begin
     @testset "continuous ramp interpolators" begin
@@ -241,6 +242,96 @@ using JLD2
         @test result_3d.monopole_charge.monopole_charge_density isa AbstractArray{Float64,3}
         # Uniform polarised GS has no topological charge
         @test abs(result_3d.monopole_charge.total_charge) < 1e-4
+    end
+
+    @testset "synthetic_dim analyzer" begin
+        atom = AtomSpecies("Rb87", 1.44e-25, 1, 0.0, 0.0, 0.0)
+        cfg = GridConfig((12, 12), (6.0, 6.0))
+        grid = make_grid(cfg)
+        # Equal-population state across 3 components
+        psi = zeros(ComplexF64, 12, 12, 3)
+        for c in 1:3
+            psi[:, :, c] .= 1.0 / sqrt(3 * length(psi[:, :, 1]))
+        end
+        r = SpinorBEC._run_analyzer(:synthetic_dim, psi, grid, atom, Dict{String,Any}())
+        @test length(r.pop_per_m) == 3
+        @test sum(r.pop_per_m) ≈ 1.0 atol=1e-8
+        @test r.m_mean ≈ 0.0 atol=1e-10        # symmetric across m=±1
+        @test r.edge_density ≈ 2/3 atol=1e-8   # m=±1 components
+        @test r.bulk_density ≈ 1/3 atol=1e-8   # m=0 component
+    end
+
+    @testset "SGPE YAML knob smoke" begin
+        yaml_str = """
+        pipeline:
+          - ground_state:
+              atom: Rb87
+              grid: {n: [10, 10], box: [5.0, 5.0]}
+              interactions: {c0: 5.0, c1: 0.0}
+              zeeman: {p: 0.0, q: 0.1}
+              potential: {type: harmonic, omega: [1.0, 1.0]}
+              dt: 0.01
+              n_steps: 30
+              tol: 1.0e-4
+              initial_state: ferromagnetic
+          - dynamics:
+              duration: 0.2
+              dt: 0.005
+              save_every: 100
+              sgpe: {gamma: 0.05, T: 0.05, mu: 0.0, every: 1, seed: 11}
+        """
+        result = run_config(load_config_from_string(yaml_str); verbose=false)
+        @test haskey(result, :dynamics_result)
+        @test length(result.dynamics_result.energies) >= 2
+        # SGPE noise injection means the norm grows from 1 — check it's finite
+        @test isfinite(result.dynamics_result.norms[end])
+    end
+
+    @testset "Projected GP YAML knob smoke" begin
+        yaml_str = """
+        pipeline:
+          - ground_state:
+              atom: Rb87
+              grid: {n: [12, 12], box: [6.0, 6.0]}
+              interactions: {c0: 5.0, c1: 0.0}
+              zeeman: {p: 0.0, q: 0.1}
+              potential: {type: harmonic, omega: [1.0, 1.0]}
+              dt: 0.01
+              n_steps: 30
+              tol: 1.0e-4
+              initial_state: ferromagnetic
+          - dynamics:
+              duration: 0.2
+              dt: 0.005
+              save_every: 100
+              projected_gp: {k_cut: 4.0, every: 1}
+        """
+        # Should run without error; high-k modes get truncated each step
+        result = run_config(load_config_from_string(yaml_str); verbose=false)
+        @test haskey(result, :dynamics_result)
+    end
+
+    @testset "calibration_history interpolation" begin
+        cs1 = CalibrationSet(
+            epoch = "w1", date = "2026-04-01",
+            coil_strong = CoilCalibration(0.40, 0.05, (-Inf, Inf)),
+            fort = FORTCalibration((400.0, 400.0, 600.0), (0.0, 0.0, 0.0)),
+        )
+        cs2 = CalibrationSet(
+            epoch = "w2", date = "2026-04-15",
+            coil_strong = CoilCalibration(0.50, 0.05, (-Inf, Inf)),
+            fort = FORTCalibration((500.0, 500.0, 700.0), (0.0, 0.0, 0.0)),
+        )
+        hist = CalibrationHistory([Date("2026-04-01"), Date("2026-04-15")], [cs1, cs2])
+        # Midpoint (April 8) → coil ≈ 0.45, fort_x ≈ 450
+        mid = interpolate_calibration(hist, Date("2026-04-08"))
+        @test 0.44 < mid.coil_strong.gauss_per_mv < 0.46
+        @test 440 < mid.fort.sqrt_coeffs_hz[1] < 460
+        # Outside window → clamps to nearest
+        before = interpolate_calibration(hist, Date("2026-03-01"))
+        @test before.coil_strong.gauss_per_mv ≈ 0.40
+        after = interpolate_calibration(hist, Date("2026-05-01"))
+        @test after.coil_strong.gauss_per_mv ≈ 0.50
     end
 
     @testset "vortex_detect returns positions" begin
