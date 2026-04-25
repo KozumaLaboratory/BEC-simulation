@@ -205,9 +205,43 @@ export function View3D({ run, data }: Props) {
     snap,
   )
 
-  const volumeTex = controls.source === 'vorticity' ? vorticity : density
+  const rawVolumeTex = controls.source === 'vorticity' ? vorticity : density
   const volumeLoading = controls.source === 'vorticity' ? vortLoading : loading
   const volumeError = controls.source === 'vorticity' ? vortError : error
+
+  // --- Stable normalisation -------------------------------------------------
+  //
+  // Per-frame max changes through dynamics (spin redistribution, breathing,
+  // etc.) so DensityVolume normalising on it makes the visible cloud appear
+  // to grow/shrink. Two strategies, in priority order:
+  //
+  //   1. **Global max from server** (snapMeta.density_max_total): physically
+  //      correct for total density — every frame renders against the same
+  //      absolute scale, computed once by the dashboard from all snapshots.
+  //      Only valid when comp=0 (spin-summed) and source=density.
+  //   2. **Sticky max** fallback: track running max across visited frames
+  //      for per-component or vorticity views where the server can't
+  //      precompute a single scale.
+  const stickyMaxRef = useRef<{ key: string; value: number }>({
+    key: '',
+    value: 0,
+  })
+  const stickyKey = `${run ?? ''}|${currentPoint?.file ?? ''}|${controls.source}|${comp}`
+  if (stickyMaxRef.current.key !== stickyKey) {
+    stickyMaxRef.current = { key: stickyKey, value: 0 }
+  }
+  if (rawVolumeTex && rawVolumeTex.maxValue > stickyMaxRef.current.value) {
+    stickyMaxRef.current.value = rawVolumeTex.maxValue
+  }
+  const useGlobalMax =
+    controls.source === 'density' && comp === 0 && snapMeta?.density_max_total
+  const stableMax = useGlobalMax
+    ? snapMeta!.density_max_total!
+    : stickyMaxRef.current.value
+  const volumeTex =
+    rawVolumeTex && stableMax > 0
+      ? { ...rawVolumeTex, maxValue: stableMax }
+      : rawVolumeTex
 
   // When the user flips to phase color mode while Component is still "Total"
   // (comp=0), auto-advance to the spinor component with the largest

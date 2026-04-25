@@ -730,8 +730,16 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         empty!(psi_cache)
         empty!(_vector3d_plans_cache)
         (200, "text/plain", "Cache cleared")
+    elseif startswith(path, "/api/")
+        # Unknown API route — actual 404
+        (404, "text/plain", "Not found: $path")
     else
-        (404, "text/plain", "Not found")
+        # SPA client-side routing fallback. The React app uses
+        # react-router (or equivalent) so URLs like /runs/foo /view/3d
+        # /viz/density-slice are valid in-app routes that don't exist
+        # on the server. Serve index.html and let the JS router pick
+        # them up. Same trick as nginx `try_files $uri /index.html`.
+        (200, "text/html; charset=utf-8", html_content)
     end
 end
 
@@ -1149,10 +1157,16 @@ function _snapshots_metadata(jld2_path::String)
                 # checkpoints, so times has length n+1. Slice the leading
                 # t=0 off so times[k] aligns with frame_NNNNN where N=k.
                 times_aligned = length(times) == n + 1 ? times[2:end] : times
+                # Global peak total-density estimate across all snapshots,
+                # so the 3D viewer can normalise on a fixed absolute scale.
+                # Sub-sampled to 16 frames to stay under HTTP timeout
+                # (full sweep = 157 × ~50 ms = 8 s for Klaus).
+                d_max = _global_density_max_total_sampled(f, n; n_samples = 16)
                 return Dict{String,Any}(
                     "n_snapshots" => n,
                     "times" => times_aligned,
                     "shape" => vcat(shape, D),
+                    "density_max_total" => d_max,
                 )
             elseif haskey(f, "dynamics/psi_snapshots")
                 snaps = f["dynamics/psi_snapshots"]
@@ -1169,6 +1183,39 @@ function _snapshots_metadata(jld2_path::String)
     catch
         nothing
     end
+end
+
+"""Sub-sample n_samples evenly-spaced snapshots and return the max
+spin-summed total density across them. Full sweep through all 157
+Klaus frames takes ~8 s; sub-sampled to 16 frames it's ~0.8 s,
+within HTTP timeout budget. Always includes the first + last frame.
+
+Returned value is the physically correct normalisation reference
+for the 3D viewer (same density renders the same color frame-to-frame).
+"""
+function _global_density_max_total_sampled(f, n_snapshots::Int; n_samples::Int = 16)
+    n_snapshots == 0 && return 1.0
+    # Sample indices: evenly spaced + include endpoints
+    idxs = if n_snapshots <= n_samples
+        collect(1:n_snapshots)
+    else
+        unique([1; round.(Int, range(1, n_snapshots; length = n_samples)); n_snapshots])
+    end
+    g_max = 0.0
+    for k in idxs
+        key = "dynamics/psi_snapshots_streamed/frame_" * lpad(string(k), 5, '0')
+        haskey(f, key) || continue
+        frame = f[key]
+        ndim = ndims(frame) - 1
+        D = size(frame, ndim + 1)
+        # Spin-summed density per grid cell. Avoid CartesianIndices
+        # for speed: sum over component axis with abs2.(view(...)).
+        n_total = sum(c -> abs2.(view(frame, ntuple(d -> d <= ndim ? Colon() : c, ndim + 1)...)),
+                       1:D)
+        local_max = Float64(maximum(n_total))
+        local_max > g_max && (g_max = local_max)
+    end
+    g_max
 end
 
 """

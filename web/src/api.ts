@@ -63,6 +63,10 @@ export interface SnapshotsMeta {
   n_snapshots: number
   times: number[]
   shape?: number[]
+  /** Global peak total density across all snapshots (spin-summed).
+   * Used by the 3D viewer for absolute-scale normalisation so the
+   * volume render stays the same physical size frame-to-frame. */
+  density_max_total?: number
 }
 
 export interface DynamicsSeries {
