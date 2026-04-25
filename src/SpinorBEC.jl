@@ -145,6 +145,7 @@ include("workflow/experiments/pipeline_continuation.jl")
 include("workflow/experiments/run_registry.jl")
 include("workflow/experiments/calibration.jl")
 include("workflow/experiments/faraday_fit.jl")
+include("workflow/experiments/bayesian_opt.jl")
 
 # ========================================
 # ANALYSIS: Observables & diagnostics
@@ -375,6 +376,7 @@ export load_config, load_config_from_string, run_config
 export run_yaml, run_status, list_runs, compute_run_dir
 export print_run_summary, compare_runs, generate_html_report
 export load_target_faraday, fit_faraday_param
+export bayesian_optimize, gp_predict, expected_improvement
 export CalibrationSet, CoilCalibration, FORTCalibration, RabiCalibration
 export DEFAULT_CALIBRATION, load_calibration, apply_calibration!, run_yaml_calibrated
 export coil_mv_to_gauss, fort_mw_to_trap_hz, rabi_mw_to_rad_s
@@ -382,7 +384,8 @@ export CalibrationHistory, load_calibration_history, load_calibration_csv,
        interpolate_calibration
 export BinaryCouplings, BinaryState, find_binary_ground_state,
        is_immiscible, droplet_regime_petrov,
-       binary_overlap, binary_separation_radius
+       binary_overlap, binary_separation_radius,
+       SpinorBinaryCouplings, SpinorBinaryState, find_spinor_binary_ground_state
 export init_psi_polar, init_psi_ferromagnetic, init_psi_ferromagnetic_min,
        init_psi_uniform, init_psi_antiferromagnetic, init_psi_random,
        init_psi_spin_coherent, init_psi_fl_vortex, init_psi_spin_helix,
