@@ -872,3 +872,11 @@ struct Workspace{N,A,P,IP,SM<:SpinMatrices,ZEE,DDI,DDIB,RAM,LOSS,DDIP,BK,TC,CC,K
     magnetic_gradient::MG
 end
 
+"""
+Real eltype carried by a Workspace's ψ. For mixed-precision audits:
+`workspace_T(ws)` returns `Float32` for an F32 build, `Float64` for the
+default. Equivalent to `real(eltype(ws.state.psi))` but documented +
+exported so callers don't reach into internals.
+"""
+@inline workspace_T(ws::Workspace{N,A}) where {N,A} = real(eltype(A))
+

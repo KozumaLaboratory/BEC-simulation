@@ -379,7 +379,8 @@ export coil_mv_to_gauss, fort_mw_to_trap_hz, rabi_mw_to_rad_s
 export CalibrationHistory, load_calibration_history, load_calibration_csv,
        interpolate_calibration
 export BinaryCouplings, BinaryState, find_binary_ground_state,
-       is_immiscible, droplet_regime_petrov
+       is_immiscible, droplet_regime_petrov,
+       binary_overlap, binary_separation_radius
 export init_psi_polar, init_psi_ferromagnetic, init_psi_ferromagnetic_min,
        init_psi_uniform, init_psi_antiferromagnetic, init_psi_random,
        init_psi_spin_coherent, init_psi_fl_vortex, init_psi_spin_helix,

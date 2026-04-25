@@ -148,3 +148,45 @@ function _binary_energy(psi_A, psi_B, V_A, V_B, K, plans, c::BinaryCouplings, dV
                   c.g_AB * sum(n_A .* n_B)) * dV
     E_kin + E_pot + E_int
 end
+
+# --- Binary system observables -----------------------------------------
+
+"""
+    binary_overlap(state) -> Float64
+
+Spatial overlap integral ∫ √(n_A·n_B) dV. 0 = perfectly demixed,
+1 = identical density profiles. Quick immiscibility metric for the
+ground state of a binary system.
+
+Requires the BinaryState carry the spatial grid implicitly; for
+the scaffold case we accept the grid as a 2nd argument.
+"""
+function binary_overlap(state::BinaryState, grid)
+    n_A = abs2.(state.psi_A)
+    n_B = abs2.(state.psi_B)
+    sum(sqrt.(n_A .* n_B)) * cell_volume(grid)
+end
+
+"""
+    binary_separation_radius(state, grid) -> Float64
+
+L²-distance between the COM of species A and species B (in a_ho units).
+Robust scalar measure of phase separation.
+"""
+function binary_separation_radius(state::BinaryState, grid::Grid{N}) where {N}
+    n_A = abs2.(state.psi_A)
+    n_B = abs2.(state.psi_B)
+    dV = cell_volume(grid)
+    n_A_tot = sum(n_A) * dV
+    n_B_tot = sum(n_B) * dV
+    com_A = ntuple(d -> sum(n_A .* _coord_axis_array(grid, d, N)) * dV / n_A_tot, N)
+    com_B = ntuple(d -> sum(n_B .* _coord_axis_array(grid, d, N)) * dV / n_B_tot, N)
+    sqrt(sum((com_A[d] - com_B[d])^2 for d in 1:N))
+end
+
+# Helper: broadcast the grid coordinate along axis d to the full N-D shape
+function _coord_axis_array(grid::Grid{N}, d::Int, ::Int) where {N}
+    coords = grid.x[d]
+    shape = ntuple(i -> i == d ? length(coords) : 1, N)
+    reshape(coords, shape)
+end

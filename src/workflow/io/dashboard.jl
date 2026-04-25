@@ -290,6 +290,18 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         end
     elseif startswith(path, "/assets/") || path == "/favicon.svg"
         _serve_static_asset(path)
+    elseif startswith(path, "/runs/") && occursin("/lab_images/", path)
+        # Static-serve lab images posted via /api/lab/image/<run> POST.
+        # Path looks like /runs/<run_name>/lab_images/shot_NNNNN.png.
+        # Resolve relative to base_dir, refuse path-traversal (..).
+        rel = _uri_decode(path[7:end])    # strip leading "/runs/"
+        occursin("..", rel) && return (400, "text/plain", "bad path")
+        full = joinpath(base_dir, rel)
+        if isfile(full) && (endswith(full, ".png") || endswith(full, ".fits"))
+            ct = endswith(full, ".png") ? "image/png" : "application/octet-stream"
+            return (200, ct, read(full))
+        end
+        return (404, "text/plain", "lab image not found: $rel")
     elseif path == "/api/runs"
         runs = list_runs(base_dir)
         (200, "application/json", "[" * join(["\"$r\"" for r in runs], ",") * "]")
