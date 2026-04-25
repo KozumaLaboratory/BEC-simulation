@@ -257,6 +257,9 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
     V_trap_for_ls = evaluate_potential(potential, grid)
     ls_raw = get(p, "light_shift", nothing)
     gs_light_shift = _parse_light_shift(ls_raw, atom.F, V_trap_for_ls, backend)
+    spinor_lhy_mode = let v = get(p, "spinor_lhy", nothing)
+        v === nothing ? nothing : Symbol(String(v))
+    end
 
     gs = if method === :itp
         find_ground_state(;
@@ -268,6 +271,7 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
             checkpoint_dir = checkpoint_dir,
             checkpoint_every = checkpoint_dir !== nothing ? max(1, n_steps ÷ 10) : 0,
             light_shift = gs_light_shift,
+            spinor_lhy = spinor_lhy_mode,
         )
     elseif method === :lbfgs
         m_lbfgs = Int(get(p, "m_lbfgs", 10))
@@ -495,9 +499,12 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
             snap_precision_str,
         ))
 
+    sgpe_cb = _build_sgpe_callback(get(p, "sgpe", nothing), Float64(sp.dt))
+
     result, snap_tmp_path, snap_count =
         _run_dynamics_with_optional_streaming!(
-            ws, save_psi_snap, save_compress, snap_precision_cf,
+            ws, save_psi_snap, save_compress, snap_precision_cf;
+            extra_on_step = sgpe_cb,
         )
 
     if verbose
@@ -530,10 +537,13 @@ vector (~8 GB at 154 snapshots).
 """
 function _run_dynamics_with_optional_streaming!(
     ws, save_psi::Bool, compress::Bool,
-    snap_type::Type{<:Complex} = ComplexF32,
+    snap_type::Type{<:Complex} = ComplexF32;
+    extra_on_step::Union{Nothing,Function} = nothing,
 )
     if !save_psi
-        return (run_simulation!(ws), nothing, 0)
+        cb = extra_on_step === nothing ? nothing :
+             SimulationCallbacks(on_step = extra_on_step)
+        return (run_simulation!(ws; callbacks = cb), nothing, 0)
     end
 
     snap_tmp = _dynamics_scratch_path()
@@ -559,7 +569,10 @@ function _run_dynamics_with_optional_streaming!(
     result = try
         run_simulation!(
             ws;
-            callbacks = SimulationCallbacks(on_snapshot = on_snap),
+            callbacks = SimulationCallbacks(
+                on_snapshot = on_snap,
+                on_step = extra_on_step,
+            ),
             stream_snapshots = true,
         )
     finally
@@ -568,6 +581,35 @@ function _run_dynamics_with_optional_streaming!(
     end
 
     return (result, snap_tmp, frame_count[])
+end
+
+"""
+    _build_sgpe_callback(node, dt) -> Union{Nothing,Function}
+
+Parse a `dynamics.sgpe:` block into an SGPE on-step callback. Accepts:
+
+    sgpe: false | null            # disabled (returns nothing)
+    sgpe: {gamma: 0.05, T: 0.1, mu: 0.0, k_cut: 6.0, every: 1, seed: 42}
+
+`gamma` and `T` are required when sgpe is a Dict. `mu` defaults to 0,
+`k_cut` to Inf (no projection), `every` to 1, `seed` to nothing (random).
+"""
+function _build_sgpe_callback(node, dt::Float64)
+    node === nothing && return nothing
+    node isa Bool && (node || return nothing)
+    node isa Dict || throw(ArgumentError(
+        "dynamics.sgpe must be a mapping or `false`, got $(typeof(node))"))
+    haskey(node, "gamma") || throw(ArgumentError("dynamics.sgpe requires `gamma`"))
+    haskey(node, "T") || throw(ArgumentError("dynamics.sgpe requires `T`"))
+    γ = Float64(node["gamma"])
+    T = Float64(node["T"])
+    μ = Float64(get(node, "mu", 0.0))
+    k_cut = Float64(get(node, "k_cut", Inf))
+    every = Int(get(node, "every", 1))
+    seed = let v = get(node, "seed", nothing)
+        v === nothing ? nothing : Int(v)
+    end
+    sgpe_callback(γ, T, dt; μ = μ, k_cut = k_cut, seed = seed, every = every)
 end
 
 function _dynamics_scratch_path()

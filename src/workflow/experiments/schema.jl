@@ -65,6 +65,8 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
     "backend"              => FieldSpec(type=String, default="cpu", enum=["cpu", "cuda", "gpu"]),
     "target_magnetization" => FieldSpec(type=Number),
     "temperature_ratio"    => FieldSpec(type=Number, range=(0.0, 1.0)),
+    "spinor_lhy"           => FieldSpec(type=String,
+        enum=["two_channel", "table", "scalar"]),
     "init_state_params"    => FieldSpec(type=Dict),
     "cache"                => FieldSpec(type=String),
     "quasi_2d"             => FieldSpec(type=Bool),
@@ -100,6 +102,8 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     "twa"                => FieldSpec(type=Dict),
     "magnetic_gradient"  => FieldSpec(type=Dict),
     "pulse_sequence"     => FieldSpec(type=Vector),
+    "sgpe"               => FieldSpec(type=Union{Dict, Bool}),
+    "loss"               => FieldSpec(type=Union{Dict, Bool, Number}),
 )
 
 const STEP_SCHEMAS = Dict{String, Dict{String, FieldSpec}}(

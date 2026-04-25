@@ -134,7 +134,11 @@ function sgpe_callback(
     seed::Union{Nothing,Int} = nothing,
     every::Int = 1,
 )
-    function (ws, step, _)
+    # SimulationCallbacks.on_step signature is `(ws, step, times, energies)`
+    # — accept the trailing two as varargs so this also works as a manually
+    # invoked `(ws, step, n_steps)` callback (older convention used by some
+    # callers in the codebase).
+    function (ws, step, args...)
         step % every == 0 || return nothing
         apply_sgpe_step!(ws, γ, T, dt;
             μ = μ, k_cut = k_cut,

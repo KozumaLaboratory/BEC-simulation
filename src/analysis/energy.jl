@@ -141,7 +141,10 @@ when spin degrees of freedom are dynamically active.
 """
 function _lhy_energy(psi, c_lhy, n_comp, ndim, n_pts, dV)
     if n_comp > 1
-        @warn "LHY energy uses scalar (fully-polarized) approximation for a spinor condensate (n_comp=$n_comp). Spin-dependent LHY corrections are not included." maxlog=1
+        @warn """LHY energy uses scalar (fully-polarized) approximation for a \
+spinor condensate (n_comp=$n_comp). Spin-dependent LHY corrections are not \
+included. To use the two-channel spinor LHY table, add `spinor_lhy: two_channel` \
+to the YAML ground_state step or pass `spinor_lhy=:two_channel` to make_workspace.""" maxlog=1
     end
     n = total_density(psi, ndim)
     E = 0.0
