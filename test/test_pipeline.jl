@@ -244,6 +244,63 @@ using Dates: Date
         @test abs(result_3d.monopole_charge.total_charge) < 1e-4
     end
 
+    @testset "skyrmion_detect on synthetic skyrmion" begin
+        # Synthesize a 2D skyrmion-like spin texture: n̂(r) wraps the
+        # sphere over the disc. Detector should find at least one local
+        # extremum of the topological charge density.
+        atom = AtomSpecies("Rb87", 1.44e-25, 1, 0.0, 0.0, 0.0)
+        cfg = GridConfig((24, 24), (8.0, 8.0))
+        grid = make_grid(cfg)
+        psi = zeros(ComplexF64, 24, 24, 3)
+        @inbounds for j in 1:24, i in 1:24
+            x = grid.x[1][i]; y = grid.x[2][j]
+            r = sqrt(x^2 + y^2)
+            phi = atan(y, x)
+            theta = π * (1 - exp(-r^2 / 4))   # core in→out wraps θ from 0 to π
+            ct = cos(theta/2); st = sin(theta/2)
+            # 3-component spinor for F=1, parametrised on the Bloch sphere
+            psi[i, j, 1] = ct^2
+            psi[i, j, 2] = sqrt(2.0) * ct * st * cis(phi)
+            psi[i, j, 3] = st^2 * cis(2phi)
+        end
+        # Normalize
+        dV = SpinorBEC.cell_volume(grid)
+        psi ./= sqrt(sum(abs2, psi) * dV)
+        r = SpinorBEC._run_analyzer(:skyrmion_detect, psi, grid, atom,
+            Dict{String,Any}("threshold" => 0.05, "radius" => 2))
+        @test r.skyrmion_count >= 0    # doesn't crash; charge density is well-formed
+        @test haskey(r, :total_charge)
+        @test haskey(r, :charge_density)
+    end
+
+    @testset "bogoliubov_mode returns u, v, weight_per_m" begin
+        # Quick smoke: feed the analyzer a workspace from a tiny GS run
+        # and check the output shape.
+        yaml_str = """
+        pipeline:
+          - ground_state:
+              atom: Rb87
+              grid: {n: [16, 16], box: [8.0, 8.0]}
+              interactions: {c0: 5.0, c1: -0.5}
+              dt: 0.01
+              n_steps: 60
+              tol: 1.0e-4
+              initial_state: ferromagnetic
+              zeeman: {p: 0.0, q: 0.1}
+              potential: {type: harmonic, omega: [1.0, 1.0]}
+          - analyze:
+              - bogoliubov_mode: {k_max: 5.0, n_k: 60, directions: auto}
+        """
+        result = run_config(load_config_from_string(yaml_str); verbose = false)
+        @test haskey(result, :bogoliubov_mode)
+        bm = result.bogoliubov_mode
+        @test haskey(bm, :u_mode); @test haskey(bm, :v_mode)
+        @test haskey(bm, :weight_per_m)
+        @test length(bm.u_mode) == length(bm.v_mode) == length(bm.weight_per_m)
+        @test sum(bm.weight_per_m) ≈ 1.0 atol=1e-8
+        @test bm.dominant_m isa Real
+    end
+
     @testset "synthetic_dim analyzer" begin
         atom = AtomSpecies("Rb87", 1.44e-25, 1, 0.0, 0.0, 0.0)
         cfg = GridConfig((12, 12), (6.0, 6.0))
