@@ -1038,12 +1038,27 @@ from `dynamics/psi_snapshots` (saved by runs with
 `save_psi_snapshots: true`); the 5D array is up-cast to ComplexF64 so
 downstream code (FFT, probability_current, etc.) runs at its native
 precision."""
+# Maximum number of (file, snap_idx) entries kept in the dashboard's
+# psi cache. Each entry holds one full ψ snapshot — for Eu151 64×64×32×13
+# that's ~13.6 MB ComplexF64 in memory, so 32 entries cap RAM at ~440 MB.
+# Older entries are evicted FIFO when the cap is exceeded; the time
+# scrubber re-fetches them from disk (fast — JLD2 mmap).
+const PSI_CACHE_MAX_ENTRIES = 32
+
 function _load_psi_cached(
     jld2_path::String,
     cache::Dict{String,Any},
     snap_idx::Union{Nothing,Int} = nothing,
 )
     key = snap_idx === nothing ? jld2_path : "$(jld2_path)#snap=$(snap_idx)"
+    if haskey(cache, key)
+        return cache[key]
+    end
+    # Evict oldest when at cap (Dicts iterate in insertion order in Julia,
+    # so popfirst!-style first-key removal gives us FIFO eviction).
+    while length(cache) >= PSI_CACHE_MAX_ENTRIES
+        delete!(cache, first(keys(cache)))
+    end
     get!(cache, key) do
         if snap_idx === nothing
             d = JLD2.load(jld2_path)
