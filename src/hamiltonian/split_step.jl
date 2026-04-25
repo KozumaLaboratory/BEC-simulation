@@ -550,13 +550,34 @@ const _COMP_OMELYAN_PEFRL = let
     (a = (xi, chi, a3, chi, xi), b = (b1, lam, lam, b1))
 end
 
+# Yoshida 6th-order (Yoshida 1990, "solution A"). 7-stage symplectic
+# with 8 V-steps and 7 K-steps after merging adjacent same-operator
+# substeps. Lower error constant than Blanes-Moan S6 for some problems
+# (notably when the perturbation spectrum has wide bandwidth) but more
+# stages → ~15% slower per dt. Pick this when you need sub-1e-10 norm
+# drift over very long evolution; Blanes-Moan S6 is the default 6th.
+const _COMP_YOSHIDA_S6 = let
+    # Yoshida (1990) Phys. Lett. A 150, 262. Solution A:
+    w1 = -1.17767998417887
+    w2 =  0.235573213359357
+    w3 =  0.784513610477560
+    w0 =  1.0 - 2.0 * (w1 + w2 + w3)
+    # symmetric triple-jump in s2 ∘ s2 ∘ s2 form:
+    bs = (w3, w2, w1, w0, w1, w2, w3)
+    as_pairs = (w3 / 2, (w2 + w3) / 2, (w1 + w2) / 2, (w0 + w1) / 2,
+                (w1 + w0) / 2, (w2 + w1) / 2, (w3 + w2) / 2, w3 / 2)
+    (a = as_pairs, b = bs)
+end
+
 function _resolve_composition(sym::Symbol)
     sym === :yoshida && return _COMP_YOSHIDA
+    sym === :yoshida_s6 && return _COMP_YOSHIDA_S6
     sym === :suzuki && return _COMP_SUZUKI
     sym === :blanes_moan_s6 && return _COMP_BLANES_MOAN_S6
     sym === :omelyan_pefrl && return _COMP_OMELYAN_PEFRL
     throw(ArgumentError(
-        "Unknown composition: $sym. Use :yoshida, :suzuki, :blanes_moan_s6, or :omelyan_pefrl",
+        "Unknown composition: $sym. Use :yoshida, :yoshida_s6, :suzuki, " *
+        ":blanes_moan_s6, or :omelyan_pefrl",
     ))
 end
 

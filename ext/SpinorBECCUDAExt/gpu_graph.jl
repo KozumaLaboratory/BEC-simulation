@@ -20,12 +20,22 @@
 #
 # Path to enabling this:
 #   a. Pre-allocate every scratch buffer inside Workspace (add fields).
+#      Progress: psi_scratch landed in SimState (commit 8e7b607) — used
+#      by apply_uniform_spin_rotation!. Remaining allocators to audit:
+#        - cuFFT plan scratch (CUFFT.cufftSetWorkArea on the pre-allocated
+#          workspace area)
+#        - Spin-mixing temp matrices in gpu_spin_mixing.jl
+#        - Implicit broadcasts in DDI / nematic / tensor steps
 #   b. Rewrite the broadcasts to `@.` pure in-place (no intermediate).
 #   c. Configure cuFFT / cuBLAS to use the pre-allocated workspace.
 #
+# Smoke test for "is the hot path allocation-free?":
+#
+#     ws = make_workspace(...; backend = CUDABackend())
+#     CUDA.@allocated SpinorBEC.split_step!(ws, 0.005)
+#     # Target: 0 (or very small) once the audit is done.
+#
 # Until then, `split_step_captured!` falls back to `split_step!` on GPU.
-# This keeps the API stable so the future allocation-free rewrite doesn't
-# break callers, and clearly signals the intent.
 
 """
     split_step_captured!(ws::Workspace{N,<:CuArray}) → Nothing

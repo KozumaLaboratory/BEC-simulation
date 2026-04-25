@@ -95,7 +95,7 @@ Number/String/Symbol/Vector-of-these are supported.
 """
 function _save_analyzer_results!(f, result)
     analyzer_names = (:tomography, :faraday, :energy_decomposition, :phase_classify,
-                      :stability, :bogoliubov, :bogoliubov_mode,
+                      :stability, :bogoliubov, :bogoliubov_mode, :bogoliubov_dispersion,
                       :non_abelian_homotopy, :monopole_charge, :winding_field,
                       :droplet_profile, :synthetic_dim, :skyrmion_detect)
     for name in analyzer_names

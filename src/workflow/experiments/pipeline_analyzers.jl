@@ -384,6 +384,46 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
          surface_sharpness = sharpness,
          peak_index = collect(peak_idx))
 
+    elseif name == :bogoliubov_dispersion
+        # Full ω(k) for every BdG band, returned as a (n_k, 2D) matrix.
+        # Useful to plot the full dispersion (not just max growth)
+        # — roton dips, gapped vs gapless modes, branch crossings.
+        ws_prev === nothing && throw(ArgumentError(
+            "bogoliubov_dispersion requires a preceding ground_state step"))
+        F = atom.F
+        D = 2F + 1
+        ndim = length(grid.config.n_points)
+        psi_host = _to_host(psi)
+        n_total = total_density(psi_host, ndim)
+        peak_idx = argmax(n_total)
+        spinor = ComplexF64[psi_host[peak_idx, c] for c in 1:D]
+        n0 = sum(abs2, spinor)
+        n0 > 1e-30 && (spinor ./= sqrt(n0))
+        interactions = ws_prev.interactions
+        c_dd_val = ws_prev.ddi === nothing ? 0.0 : ws_prev.ddi.C_dd
+        zeeman = ws_prev.zeeman isa ZeemanParams ? ws_prev.zeeman : ZeemanParams(0.0, 0.0)
+        k_max = Float64(get(params, "k_max", 10.0))
+        n_k = Int(get(params, "n_k", 200))
+        k_dir_raw = get(params, "k_direction", [0.0, 0.0, 1.0])
+        k_direction = NTuple{3,Float64}(Tuple(Float64.(k_dir_raw)))
+        result = bogoliubov_spectrum(;
+            spinor = spinor, n0 = n0, F = F,
+            interactions = interactions, zeeman = zeeman, c_dd = c_dd_val,
+            k_max = k_max, n_k = n_k, k_direction = k_direction,
+        )
+        # Sort each k column by Re(ω) for plottable bands
+        omega_sorted = similar(result.omega)
+        for ik in 1:n_k
+            col = result.omega[:, ik]
+            perm = sortperm(real.(col))
+            omega_sorted[:, ik] .= col[perm]
+        end
+        (k_values = result.k_values,
+         omega_real = real.(omega_sorted),
+         omega_imag = imag.(omega_sorted),
+         max_growth = result.max_growth,
+         direction = collect(k_direction))
+
     elseif name == :bogoliubov_mode
         # Like :bogoliubov but additionally returns the eigenvector (u, v)
         # of the most unstable BdG mode plus its per-spinor-component
@@ -755,7 +795,8 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
                  "phase_contrast_image, momentum_distribution, vortex_detect, correlation_length, " *
                  "defect_density, kibble_zurek_stats, bragg_spectroscopy, non_abelian_homotopy, " *
                  "monopole_charge, winding_field, droplet_profile, synthetic_dim, " *
-                 "skyrmion_detect, bogoliubov_mode, column_density_movie, summary_json"
+                 "skyrmion_detect, bogoliubov_mode, bogoliubov_dispersion, " *
+                 "column_density_movie, summary_json"
         throw(ArgumentError("Unknown analyzer: $name. Supported: $_known"))
     end
 end
