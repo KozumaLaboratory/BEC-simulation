@@ -103,6 +103,8 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     "magnetic_gradient"  => FieldSpec(type=Dict),
     "pulse_sequence"     => FieldSpec(type=Vector),
     "sgpe"               => FieldSpec(type=Union{Dict, Bool}),
+    "projected_gp"       => FieldSpec(type=Union{Dict, Bool}),
+    "photon_scattering"  => FieldSpec(type=Union{Dict, Bool}),
     "loss"               => FieldSpec(type=Union{Dict, Bool, Number}),
 )
 

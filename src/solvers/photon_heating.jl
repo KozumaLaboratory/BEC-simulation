@@ -55,7 +55,9 @@ end
 """
 function photon_scattering_callback(Γ_sc::Real, dt::Real;
                                      seed::Union{Nothing,Int} = nothing)
-    function (ws, step, _)
+    # Accept SimulationCallbacks 4-arg `(ws, step, times, energies)` as well
+    # as the older 3-arg `(ws, step, n_steps)` direct-callable convention.
+    function (ws, step, args...)
         apply_photon_scattering!(ws, Γ_sc, dt;
                                  seed = seed === nothing ? nothing : seed + step)
         nothing

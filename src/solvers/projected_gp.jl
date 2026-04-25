@@ -69,7 +69,9 @@ Construct an `on_step` callback for `run_simulation!` that projects every
 `every` steps. Returns `(ws, step, n_steps) -> Nothing`.
 """
 function projected_gp_callback(k_cut::Real; smooth::Bool = false, every::Int = 1)
-    function (ws, step, _)
+    # Accept SimulationCallbacks 4-arg `(ws, step, times, energies)` as well
+    # as the older 3-arg `(ws, step, n_steps)` direct-callable convention.
+    function (ws, step, args...)
         step % every == 0 && apply_projected_gp!(ws, k_cut; smooth)
         nothing
     end

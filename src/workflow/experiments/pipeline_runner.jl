@@ -74,6 +74,21 @@ function run_pipeline(config::PipelineConfig; verbose::Bool = true, psi_init = n
             _run_step(step, psi, grid, atom, workspace; verbose, checkpoint_dir)
         end
         if step_result !== nothing
+            if step isa DynamicsStep
+                # Maintain a history of every dynamics step so analyzers
+                # (e.g. column_density_movie with multi_step=true) can
+                # walk all phases of a multi-stage pipeline like Klaus
+                # 2022 (tilt → spin-up → magnetostir).
+                history = get(results, :dynamics_history,
+                              NamedTuple[])
+                push!(history, (
+                    dynamics_result = get(step_result, :dynamics_result, nothing),
+                    snapshot_tmp_path = get(step_result, :snapshot_tmp_path, nothing),
+                    save_psi_snapshots = get(step_result, :save_psi_snapshots, false),
+                    snapshot_count = get(step_result, :snapshot_count, 0),
+                ))
+                results[:dynamics_history] = history
+            end
             merge!(results, step_result)
         end
     end
@@ -396,7 +411,12 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
     ls_raw = get(p, "light_shift", nothing)
     light_shift = _parse_light_shift(ls_raw, F, nothing, backend)
 
-    loss = _parse_loss_params(get(p, "loss", nothing))
+    # Loss parser may need (atom, N_atoms, omega_ref) when SI-unit K_3 is used
+    inter_raw = get(p, "interactions", Dict{String,Any}())
+    n_atoms_for_loss = get(inter_raw, "N_atoms", nothing)
+    omega_ref_for_loss = get(inter_raw, "omega_ref", nothing)
+    loss = _parse_loss_params(get(p, "loss", nothing);
+        atom = atom, N_atoms = n_atoms_for_loss, omega_ref = omega_ref_for_loss)
 
     raman = _build_raman(p, duration)
 
@@ -499,12 +519,15 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
             snap_precision_str,
         ))
 
-    sgpe_cb = _build_sgpe_callback(get(p, "sgpe", nothing), Float64(sp.dt))
+    cb_sgpe   = _build_sgpe_callback(   get(p, "sgpe", nothing),              Float64(sp.dt))
+    cb_pgp    = _build_pgp_callback(    get(p, "projected_gp", nothing))
+    cb_photon = _build_photon_callback( get(p, "photon_scattering", nothing),  Float64(sp.dt))
+    extra_cb  = _compose_callbacks(cb_sgpe, cb_pgp, cb_photon)
 
     result, snap_tmp_path, snap_count =
         _run_dynamics_with_optional_streaming!(
             ws, save_psi_snap, save_compress, snap_precision_cf;
-            extra_on_step = sgpe_cb,
+            extra_on_step = extra_cb,
         )
 
     if verbose
@@ -581,6 +604,65 @@ function _run_dynamics_with_optional_streaming!(
     end
 
     return (result, snap_tmp, frame_count[])
+end
+
+"""
+    _build_pgp_callback(node) -> Union{Nothing,Function}
+
+Parse a `dynamics.projected_gp:` block into a Projected-GP on-step
+callback. Accepts:
+
+    projected_gp: false | null
+    projected_gp: {k_cut: 6.0, smooth: false, every: 1}
+"""
+function _build_pgp_callback(node)
+    node === nothing && return nothing
+    node isa Bool && (node || return nothing)
+    node isa Dict || throw(ArgumentError(
+        "dynamics.projected_gp must be a Dict or `false`, got $(typeof(node))"))
+    haskey(node, "k_cut") || throw(ArgumentError("dynamics.projected_gp requires `k_cut`"))
+    k_cut = Float64(node["k_cut"])
+    smooth = Bool(get(node, "smooth", false))
+    every = Int(get(node, "every", 1))
+    projected_gp_callback(k_cut; smooth = smooth, every = every)
+end
+
+"""
+    _build_photon_callback(node, dt) -> Union{Nothing,Function}
+
+Parse a `dynamics.photon_scattering:` block into a phase-diffusion
+on-step callback. Accepts:
+
+    photon_scattering: false | null
+    photon_scattering: {Gamma_sc: 0.01, seed: 42}
+"""
+function _build_photon_callback(node, dt::Float64)
+    node === nothing && return nothing
+    node isa Bool && (node || return nothing)
+    node isa Dict || throw(ArgumentError(
+        "dynamics.photon_scattering must be a Dict or `false`, got $(typeof(node))"))
+    Γ_sc_key = haskey(node, "Gamma_sc") ? "Gamma_sc" :
+               haskey(node, "gamma_sc") ? "gamma_sc" :
+               throw(ArgumentError("dynamics.photon_scattering requires `Gamma_sc`"))
+    Γ_sc = Float64(node[Γ_sc_key])
+    seed = let v = get(node, "seed", nothing)
+        v === nothing ? nothing : Int(v)
+    end
+    photon_scattering_callback(Γ_sc, dt; seed = seed)
+end
+
+"""Compose multiple optional on_step callbacks into a single one. Each
+nothing entry is silently skipped."""
+function _compose_callbacks(cbs...)
+    real_cbs = filter(cb -> cb !== nothing, collect(cbs))
+    isempty(real_cbs) && return nothing
+    length(real_cbs) == 1 && return real_cbs[1]
+    function (ws, step, args...)
+        for cb in real_cbs
+            cb(ws, step, args...)
+        end
+        nothing
+    end
 end
 
 """
