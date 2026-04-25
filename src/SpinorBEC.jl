@@ -144,6 +144,7 @@ include("workflow/experiments/pipeline_api.jl")
 include("workflow/experiments/pipeline_continuation.jl")
 include("workflow/experiments/run_registry.jl")
 include("workflow/experiments/calibration.jl")
+include("workflow/experiments/faraday_fit.jl")
 
 # ========================================
 # ANALYSIS: Observables & diagnostics
@@ -373,6 +374,7 @@ export split_step_captured!, invalidate_split_step_graph!
 export load_config, load_config_from_string, run_config
 export run_yaml, run_status, list_runs, compute_run_dir
 export print_run_summary, compare_runs, generate_html_report
+export load_target_faraday, fit_faraday_param
 export CalibrationSet, CoilCalibration, FORTCalibration, RabiCalibration
 export DEFAULT_CALIBRATION, load_calibration, apply_calibration!, run_yaml_calibrated
 export coil_mv_to_gauss, fort_mw_to_trap_hz, rabi_mw_to_rad_s

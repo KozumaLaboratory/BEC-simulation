@@ -506,33 +506,52 @@ end
 # --- Loss Parameters ---
 
 """
-Loss parameters for dipolar-relaxation (two-body) and three-body channels.
+Loss parameters for dipolar relaxation, two-body, three-body, and
+energy-selective evaporation channels.
 
 Fields:
-- `gamma_dr` — base dipolar-relaxation rate. Internally re-weighted per m via
-  Clebsch–Gordan factors inside `apply_loss_step!` so only Δm=−1,−2 transitions
-  drive loss and the average rate across all m equals `gamma_dr`.
-- `L3`        — m-independent three-body rate. Ignored when `L3_per_m` is
-  non-empty.
-- `L3_per_m`  — optional per-component three-body rates, length 2F+1
-  ordered as the spinor (c=1 → m=+F, c=2F+1 → m=−F). When non-empty,
-  overrides `L3`. Used for spin-dependent K₃ channels (Scenarios #36/#37).
+- `gamma_dr` — base dipolar-relaxation rate. Internally re-weighted per m
+  via Clebsch–Gordan factors so only Δm=−1,−2 transitions drive loss and
+  the average rate across m equals `gamma_dr`.
+- `L3` / `L3_per_m` — **legacy 2-body-shaped** rate that uses
+  `exp(-rate · n_total · dt / 2)`. Convenient when calibrated against the
+  same shape; physically a 2-body loss with a 3-body label.
+- `K3_cubic` / `K3_per_m_cubic` — **physically correct 3-body** rate
+  applied as `exp(-K_3 · n_total² · dt / 2)`, i.e. dn/dt = −K_3 n² n_m.
+  Use this for true 3-body recombination loss (Eu151/Dy164 in dense
+  regimes). Per-m vector overrides scalar.
+- `evap_energy_cutoff` / `evap_rate` — energy-selective evaporation
+  (Phase 4 #40): atoms in regions where the local potential energy
+  exceeds `evap_energy_cutoff` are removed at rate `evap_rate`. Models
+  RF-knife evaporative cooling. Both must be non-zero to activate.
 """
 struct LossParams
     gamma_dr::Float64
     L3::Float64
     L3_per_m::Vector{Float64}
+    K3_cubic::Float64
+    K3_per_m_cubic::Vector{Float64}
+    evap_energy_cutoff::Float64
+    evap_rate::Float64
 end
 
-LossParams(gamma_dr::Float64) = LossParams(gamma_dr, 0.0, Float64[])
-LossParams(gamma_dr::Float64, L3::Float64) = LossParams(gamma_dr, L3, Float64[])
+LossParams(gamma_dr::Float64) =
+    LossParams(gamma_dr, 0.0, Float64[], 0.0, Float64[], 0.0, 0.0)
+LossParams(gamma_dr::Float64, L3::Float64) =
+    LossParams(gamma_dr, L3, Float64[], 0.0, Float64[], 0.0, 0.0)
 
 function LossParams(;
     gamma_dr::Real = 0.0,
     L3::Real = 0.0,
     L3_per_m::AbstractVector{<:Real} = Float64[],
+    K3_cubic::Real = 0.0,
+    K3_per_m_cubic::AbstractVector{<:Real} = Float64[],
+    evap_energy_cutoff::Real = 0.0,
+    evap_rate::Real = 0.0,
 )
-    LossParams(Float64(gamma_dr), Float64(L3), collect(Float64, L3_per_m))
+    LossParams(Float64(gamma_dr), Float64(L3), collect(Float64, L3_per_m),
+               Float64(K3_cubic), collect(Float64, K3_per_m_cubic),
+               Float64(evap_energy_cutoff), Float64(evap_rate))
 end
 
 # --- Absorbing Boundary ---

@@ -171,7 +171,18 @@ function _parse_loss_params(
         L3_per_m = [Units.k3_si(Units.safe_parse_quantity(String(s))) * factor
                     for s in si_vals]
     end
-    LossParams(; gamma_dr, L3, L3_per_m)
+
+    # True 3-body cubic loss (physically correct: dn/dt = -K_3 n² n_m)
+    K3_cubic = Float64(get(node, "K3_cubic", 0.0))
+    K3_per_m_cubic = let v = get(node, "K3_per_m_cubic", nothing)
+        v === nothing ? Float64[] : Float64.(v)
+    end
+    # Energy-selective evaporation (Phase 4 #40)
+    evap_energy_cutoff = Float64(get(node, "evap_energy_cutoff", 0.0))
+    evap_rate = Float64(get(node, "evap_rate", 0.0))
+
+    LossParams(; gamma_dr, L3, L3_per_m, K3_cubic, K3_per_m_cubic,
+                 evap_energy_cutoff, evap_rate)
 end
 
 # --- Scan parsing helpers ---
