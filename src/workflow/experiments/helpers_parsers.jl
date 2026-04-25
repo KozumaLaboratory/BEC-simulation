@@ -118,15 +118,30 @@ _parse_ramp_or_constant(v::Dict) = haskey(v, "to") ?
 _parse_ramp_or_constant(v) = ConstantValue(Float64(v))
 
 """
-    _parse_loss_params(node) -> Union{Nothing,LossParams}
+    _parse_loss_params(node; atom=nothing, N_atoms=nothing, omega_ref=nothing) -> Union{Nothing,LossParams}
 
 Parse a YAML `loss:` block into `LossParams`. Supported forms:
 
     loss: false | 0 | null        # no loss
     loss: {gamma_dr: 0.02, L3: 0.001}
-    loss: {gamma_dr: 0.02, K3_per_m: [0.01, 0.02, 0.05, ...]}  # spin-dep 3-body
+    loss: {gamma_dr: 0.02, K3_per_m: [0.01, 0.02, 0.05, ...]}  # dimless
+
+SI-unit input (lab-friendly, requires atom + N_atoms + omega_ref to derive
+the dimensionless conversion factor):
+
+    loss:
+      gamma_dr: 0.02
+      K3_per_m_si: ["1.5e-30 m^6/s", "3.0e-30 m^6/s", ...]
+
+For the SI form the dimensionless rate is K3_dimless = K3_SI · n0² / ω_ref
+with n0 = N_atoms / a_ho³ and a_ho = √(ℏ / (m·ω_ref)).
 """
-function _parse_loss_params(node)
+function _parse_loss_params(
+    node;
+    atom::Union{Nothing,AtomSpecies} = nothing,
+    N_atoms::Union{Nothing,Real} = nothing,
+    omega_ref::Union{Nothing,Real} = nothing,
+)
     node === nothing && return nothing
     node isa Bool && (node || return nothing; return nothing)
     if node isa Real
@@ -139,6 +154,22 @@ function _parse_loss_params(node)
     L3 = Float64(get(node, "L3", 0.0))
     L3_per_m = let v = get(node, "K3_per_m", get(node, "L3_per_m", nothing))
         v === nothing ? Float64[] : Float64.(v)
+    end
+    # SI-unit per-m K3 — convert to dimless using atom/N/ω_ref
+    if haskey(node, "K3_per_m_si")
+        atom === nothing && throw(ArgumentError(
+            "K3_per_m_si requires atom information (passed via dynamics step parsing)"))
+        N_atoms === nothing && throw(ArgumentError(
+            "K3_per_m_si requires interactions.N_atoms"))
+        omega_ref === nothing && throw(ArgumentError(
+            "K3_per_m_si requires interactions.omega_ref"))
+        a_ho = sqrt(Units.HBAR / (atom.mass * Float64(omega_ref)))
+        n0 = Float64(N_atoms) / a_ho^3
+        # K_3 [m^6/s] · n^2 [1/m^6]^2 = [1/s]; divide by ω_ref to dimless
+        factor = n0^2 / Float64(omega_ref)
+        si_vals = node["K3_per_m_si"]
+        L3_per_m = [Units.k3_si(Units.safe_parse_quantity(String(s))) * factor
+                    for s in si_vals]
     end
     LossParams(; gamma_dr, L3, L3_per_m)
 end

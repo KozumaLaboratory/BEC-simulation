@@ -114,6 +114,18 @@ function length_to_dimless(L::Quantity, a_ho::Real)
 end
 length_to_dimless(L::Real, ::Real) = Float64(L)
 
+"""
+    k3_si(q) -> Float64 (m^6/s)
+
+Strip a Unitful 3-body-loss-coefficient quantity to plain Float64 in
+m^6/s. Errors loudly if the dimension doesn't match.
+"""
+function k3_si(q::Quantity)
+    dimension(q) == dimension(1.0u"m^6/s") ||
+        throw(ArgumentError("k3_si expects [length]^6/[time]; got $(unit(q))"))
+    Float64(ustrip(u"m^6/s", q))
+end
+
 struct DimensionlessScales
     length_scale::Float64   # meters per dimensionless unit
     time_scale::Float64     # seconds per dimensionless unit
