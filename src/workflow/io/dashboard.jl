@@ -215,25 +215,68 @@ function _handle_dashboard_connection(sock, html_content, legacy_html, data_cach
     try
         request_line = readline(sock)
         isempty(request_line) && return close(sock)
-        # Read remaining headers (discard)
+        parts = split(request_line)
+        length(parts) >= 2 || return close(sock)
+        method = String(parts[1])
+        path   = String(parts[2])
+
+        # Parse headers — keep Content-Length so POST bodies are readable
+        content_length = 0
         while true
             line = readline(sock)
             (isempty(line) || line == "\r") && break
+            if startswith(lowercase(line), "content-length:")
+                content_length = parse(Int, strip(split(line, ':'; limit = 2)[2]))
+            end
         end
 
-        parts = split(request_line)
-        length(parts) >= 2 || return close(sock)
-        path = String(parts[2])
-
-        status, content_type, body = _route_dashboard(
-            path, html_content, legacy_html, data_cache, psi_cache, base_dir,
-        )
-        _send_http_response(sock, status, content_type, body)
+        if method == "POST"
+            body_bytes = content_length > 0 ? read(sock, content_length) : UInt8[]
+            status, content_type, body = _route_dashboard_post(
+                path, body_bytes, base_dir,
+            )
+            _send_http_response(sock, status, content_type, body)
+        else
+            status, content_type, body = _route_dashboard(
+                path, html_content, legacy_html, data_cache, psi_cache, base_dir,
+            )
+            _send_http_response(sock, status, content_type, body)
+        end
     catch e
         e isa EOFError || @warn "Dashboard connection error: $e"
     finally
         close(sock)
     end
+end
+
+"""
+    _route_dashboard_post(path, body_bytes, base_dir) -> (status, content_type, body)
+
+POST endpoints. Currently supports:
+
+  POST /api/lab/image/<run_name>     body = raw PNG bytes
+    → writes runs/<run_name>/lab_images/shot_NNNNN.png
+       with NNNNN auto-incremented per run.
+
+Lab acquisition scripts can ship images straight off the camera with
+`curl --data-binary @shot.png http://host:port/api/lab/image/today`.
+"""
+function _route_dashboard_post(path, body_bytes, base_dir)
+    if startswith(path, "/api/lab/image/")
+        run_name = _uri_decode(path[length("/api/lab/image/")+1:end])
+        run_dir = joinpath(base_dir, run_name)
+        isdir(run_dir) || return (404, "text/plain", "Run not found: $run_name")
+        img_dir = joinpath(run_dir, "lab_images")
+        mkpath(img_dir)
+        # Auto-increment shot index based on existing files
+        existing = filter(f -> startswith(f, "shot_"), readdir(img_dir))
+        n = length(existing) + 1
+        out_path = joinpath(img_dir, "shot_$(lpad(n, 5, '0')).png")
+        write(out_path, body_bytes)
+        body_json = "{\"path\":\"$out_path\",\"size\":$(length(body_bytes)),\"shot_id\":$n}"
+        return (200, "application/json", body_json)
+    end
+    (404, "text/plain", "POST endpoint not found: $path")
 end
 
 function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache, base_dir)
