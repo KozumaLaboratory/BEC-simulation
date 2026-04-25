@@ -413,7 +413,11 @@ function make_workspace(;
     psi = _to_device(backend, psi)
 
     fft_buf = _zeros(backend, Complex{U}, grid.config.n_points...)
-    state = SimState{N,typeof(psi),typeof(fft_buf)}(psi, fft_buf, 0.0, 0)
+    # Scratch buffer with same shape + device + eltype as psi — used by
+    # apply_uniform_spin_rotation! and any other whole-ψ broadcast op that
+    # would otherwise allocate similar(psi) per call.
+    psi_scratch = similar(psi)
+    state = SimState{N,typeof(psi),typeof(fft_buf)}(psi, fft_buf, psi_scratch, 0.0, 0)
 
     plans = make_fft_plans(grid.config.n_points, backend; flags = fft_flags, dtype = U)
     kinetic_phase = _to_device(

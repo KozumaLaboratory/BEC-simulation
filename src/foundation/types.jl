@@ -447,6 +447,10 @@ end
 mutable struct SimState{N,A<:AbstractArray,B<:AbstractArray}
     psi::A              # wavefunction: spatial dims... × n_components (eltype Complex{T})
     fft_buf::B          # spatial-only buffer for FFT (same device + eltype as psi)
+    psi_scratch::A      # full-size scratch (same shape as psi); avoids per-call
+                        # similar(psi) in apply_uniform_spin_rotation! and other
+                        # whole-ψ broadcast ops on the spin axis. Reusable across
+                        # any operator that does ψ_new = R · ψ in place.
     t::Float64
     step::Int
 end

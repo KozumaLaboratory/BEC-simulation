@@ -293,7 +293,8 @@ function _apply_transverse_zeeman_step!(ws::Workspace, t::Float64, dt_frac::Floa
     bx = bx_wf !== nothing ? evaluate(bx_wf, t) : 0.0
     by = by_wf !== nothing ? evaluate(by_wf, t) : 0.0
     @timeit_debug TIMER "transverse_zeeman" apply_uniform_spin_rotation!(
-        ws.state.psi, ws.spin_matrices, bx, by, 0.0, dt_frac, ndim; imaginary_time,
+        ws.state.psi, ws.spin_matrices, bx, by, 0.0, dt_frac, ndim;
+        imaginary_time, scratch = ws.state.psi_scratch,
     )
     nothing
 end

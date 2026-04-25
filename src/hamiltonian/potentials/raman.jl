@@ -69,6 +69,7 @@ function apply_uniform_spin_rotation!(
     dt_frac::Float64,
     ndim::Int;
     imaginary_time::Bool = false,
+    scratch::Union{Nothing,AbstractArray} = nothing,
 ) where {D}
     abs(phi_x) + abs(phi_y) + abs(phi_z) < 1e-30 && return nothing
 
@@ -76,8 +77,13 @@ function apply_uniform_spin_rotation!(
     # every grid point. Build R once (D² scalar ops on host), then apply it
     # to the spin axis of psi via broadcast-only slab multiplications. This
     # is GPU-safe: no scalar indexing into the (possibly CuArray) psi.
+    #
+    # `scratch` (typically `ws.state.psi_scratch`) avoids allocating a fresh
+    # full-size buffer per call. For Klaus-style runs with ~10⁶ rotation
+    # calls this matters — without scratch the CUDA pool eats GC pressure
+    # equivalent to ~70 TB total allocations on a 64×64×32 Dy164 grid.
     R = _compute_uniform_rotation_matrix(sm, phi_x, phi_y, phi_z, dt_frac, imaginary_time)
-    _apply_rotation_to_spin_axis!(psi, R, ndim)
+    _apply_rotation_to_spin_axis!(psi, R, ndim; scratch = scratch)
     nothing
 end
 
@@ -110,13 +116,17 @@ end
 """Apply a spatially uniform D×D rotation R to the spin axis of psi
 (which has shape `(n_pts..., D)`). Works on CPU and GPU arrays because
 every op is either a broadcast on spatial slabs or an SMatrix scalar ×
-array operation — no scalar indexing into psi."""
+array operation — no scalar indexing into psi.
+
+`scratch`, if supplied, is reused as the accumulator (must be same shape
++ device + eltype as psi). Otherwise we allocate one per call.
+"""
 function _apply_rotation_to_spin_axis!(
-    psi::AbstractArray{<:Complex}, R::SMatrix{D,D,ComplexF64}, ndim::Int,
+    psi::AbstractArray{<:Complex}, R::SMatrix{D,D,ComplexF64}, ndim::Int;
+    scratch::Union{Nothing,AbstractArray} = nothing,
 ) where {D}
     T = eltype(psi)
-    # Output accumulator: same type, device, shape as psi
-    buf = similar(psi)
+    buf = scratch === nothing ? similar(psi) : scratch::typeof(psi)
     fill!(buf, zero(T))
     @inbounds for j = 1:D
         psi_j = selectdim(psi, ndim + 1, j)
