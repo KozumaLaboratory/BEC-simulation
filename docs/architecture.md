@@ -314,3 +314,46 @@ State serialization uses JLD2 format, saving the wavefunction array, time, step 
 | YAML | Experiment configuration parsing |
 | PlotlyJS | Visualization (weak extension) |
 | Makie | Visualization (weak extension) |
+
+## Module dependency diagram
+
+```mermaid
+graph TD
+    foundation["foundation/<br/>types · grid · spin_matrices · waveform · binary_state"]
+    hamiltonian["hamiltonian/<br/>split_step · yoshida · interactions · potentials"]
+    solvers["solvers/<br/>ground_state · simulation · sgpe · projected_gp · twa"]
+    init["workflow/initialization/<br/>atoms · make_workspace · state_zoo"]
+    experiments["workflow/experiments/<br/>pipeline_runner · pipeline_analyzers · run_registry · calibration · pulse_sequence"]
+    io["workflow/io/<br/>units · dashboard · run_summary · html_report · vtk_export"]
+    analysis["analysis/<br/>observables · topology · tomography · faraday · imaging · phases/"]
+
+    foundation --> hamiltonian
+    foundation --> init
+    foundation --> analysis
+    foundation --> io
+    hamiltonian --> solvers
+    init --> solvers
+    solvers --> experiments
+    analysis --> experiments
+    io --> experiments
+```
+
+## Reading order for new contributors
+
+1. `src/foundation/types.jl` — every struct in the codebase.
+2. `src/foundation/grid.jl` + `spin_matrices.jl` — math primitives.
+3. `src/hamiltonian/split_step.jl` — the inner loop.
+4. `src/solvers/ground_state.jl` — ITP loop.
+5. `src/workflow/experiments/pipeline_runner.jl` — YAML → run dispatch.
+6. `src/workflow/experiments/run_registry.jl` — `run_yaml` + scan loop.
+7. `CLAUDE.md` "Type stability boundaries" — recurring pitfall.
+
+## Key design choices (don't reverse without careful thought)
+
+- **Workspace is one big struct with 23+ type parameters.** Adding new
+  fields is fine; adding a new abstract type position is dangerous.
+- **All structs in `types.jl`** so include order is monotonic.
+- **Calibration is a YAML preprocessor**, not a Workspace field.
+- **Snapshots stream by default at ComplexF32**.
+- **`run_yaml` is resumable** by file existence check.
+- **DDI uses `c_dd = μ₀μ²` (no 4π)** — see CLAUDE.md "Conventions".

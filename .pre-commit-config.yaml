@@ -1,0 +1,37 @@
+# Pre-commit hooks for SpinorBEC.
+#
+# Install:
+#   pip install pre-commit
+#   pre-commit install
+#
+# Run on all files (one-off):
+#   pre-commit run --all-files
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        exclude: "^runs/.*\\.yaml$"   # YAML configs may be invalid mid-edit
+      - id: check-added-large-files
+        args: ["--maxkb=2048"]         # block accidental .jld2 / PNG dumps
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.0
+    hooks:
+      - id: gitleaks
+
+  # JuliaFormatter — run as a local hook because there's no published
+  # pre-commit repo for it. Activate by uncommenting once you have
+  # JuliaFormatter installed in your default julia env.
+  # - repo: local
+  #   hooks:
+  #     - id: julia-format
+  #       name: JuliaFormatter
+  #       entry: julia -e 'using JuliaFormatter; format(ARGS)'
+  #       language: system
+  #       files: '\.jl$'

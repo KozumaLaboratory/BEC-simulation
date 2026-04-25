@@ -1,0 +1,27 @@
+{
+    "name": "SpinorBEC",
+    "build": { "dockerfile": "../Dockerfile" },
+    "features": {
+        "ghcr.io/devcontainers/features/git:1": {},
+        "ghcr.io/devcontainers/features/github-cli:1": {}
+    },
+    "postCreateCommand": "julia --project=. -e 'using Pkg; Pkg.instantiate()'",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "julialang.language-julia",
+                "github.vscode-github-actions",
+                "ms-azuretools.vscode-docker",
+                "DavidAnson.vscode-markdownlint"
+            ],
+            "settings": {
+                "julia.environmentPath": "/workspaces/BEC-simulation",
+                "julia.executablePath": "/usr/local/julia/bin/julia"
+            }
+        }
+    },
+    "remoteUser": "vscode",
+    "mounts": [
+        "source=${localEnv:HOME}/.julia,target=/home/vscode/.julia,type=bind,consistency=cached"
+    ]
+}
