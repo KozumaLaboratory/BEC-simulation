@@ -1,0 +1,28 @@
+# Sample: Eu151 droplet with PROPER SGPE finite-T dynamics.
+# Validates the new dynamics.sgpe YAML knob (NOT the temperature_ratio
+# seed-noise path that runs/eu151_sgpe_thermal uses).
+# γ=0.05 damping + T=0.05 dimensionless temperature.
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [48, 48, 48], box: [16.0, 16.0, 16.0]}
+      interactions: {N_atoms: 50000, omega_ref: 691.15, c1_ratio: 0.0, c_lhy: 1135.0}
+      ddi: {enabled: true}
+      zeeman: {p: 0.0, q: 0.0}
+      potential: {type: none}                # self-bound, no trap
+      dt: 0.0005
+      n_steps: 50000
+      tol: 1.0e-8
+      initial_state: polar
+      backend: cuda
+  - dynamics:
+      duration: 8.0
+      dt: 0.005
+      save_every: 100
+      sgpe: {gamma: 0.05, T: 0.05, mu: 0.0, every: 1, seed: 42}
+      zeeman: {p: 0.0, q: 0.0}
+  - analyze:
+      - droplet_profile: {}
+      - phase_classify: {}
+      - synthetic_dim: {}
+      - summary_json: {path: runs/samples/eu151_droplet_sgpe_proper/summary.json}

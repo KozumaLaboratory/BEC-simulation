@@ -87,6 +87,49 @@ scan:                                   # orthogonal to pipeline
 
 **Noise**: both GS (`temperature_ratio`) and phase noise (`dynamics.temperature_ratio`) use Bose-Einstein thermal noise with `T/T_c ∈ (0, 1)`, driving `add_thermal_noise(psi, F; T_over_Tc, seed)`.
 
+**Per-step dynamics knobs** (compose freely in a `dynamics:` block):
+
+```yaml
+dynamics:
+  duration: 10.0
+  dt: 0.005
+  sgpe:              {gamma: 0.05, T: 0.1, mu: 0.0, k_cut: 6.0, every: 1, seed: 42}
+  projected_gp:      {k_cut: 4.0, smooth: false, every: 1}
+  photon_scattering: {Gamma_sc: 0.01, seed: 42}
+  loss:              {gamma_dr: 0.02, K3_per_m_si: ["1.5e-30 m^6/s", ...]}
+  pulse_sequence:    [...]
+  save_psi_snapshots: true
+  save_snapshot_precision: "f32"
+```
+
+`sgpe`/`projected_gp`/`photon_scattering`/`loss` blocks each return an
+`on_step` callback; `pipeline_runner._compose_callbacks` chains them so
+multiple can run together without conflict.
+
+**Calibration** (lab-unit YAML preprocess — auto-applied by `run_yaml`):
+
+```yaml
+calibration:
+  coil_strong: {gauss_per_mv: 0.4, gauss_offset: 0.05}
+  fort:        {sqrt_coeffs_hz: [450, 450, 600]}
+# OR week-to-week interpolation:
+calibration_history:
+  - {date: "2026-04-01", coil_strong: {...}, fort: {...}}
+  - {date: "2026-04-15", coil_strong: {...}, fort: {...}}
+target_date: "2026-04-08"   # optional, defaults to today
+```
+
+Lab-unit fields then expand: `zeeman: {p_mv: 2.5, coil_mode: strong}` →
+`zeeman: {p: "X Gauss"}`; `trap: {fort_power_mw: [...]}` → `trap.omega: ["f Hz", ...]`.
+
+**State zoo**: 22 named builders in `init_psi_<name>` shape (see
+`src/workflow/initialization/state_zoo.jl`). All wrap the same
+`init_psi(state=:..., init_state_params=...)` dispatch — same physics,
+named API.
+
+**Spinor LHY**: scalar approximation by default. To use the Lima-Pelster
+two-channel table, set `ground_state.spinor_lhy: two_channel`.
+
 **Continuation API** (direct-Julia, for benches/tests): `make_params(val) → NamedTuple` overrides any `find_ground_state` kwargs per sweep point. Legacy `make_interactions(val) → InteractionParams` also supported.
 
 **GPU**: `import CUDA` before `using SpinorBEC` to load CUDA extension. Pass `backend=CUDABackend()`. WSL2 needs `LD_LIBRARY_PATH=/usr/lib/wsl/lib`.
