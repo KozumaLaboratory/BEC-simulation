@@ -86,6 +86,7 @@ include("workflow/io/unitful_support.jl")
 include("workflow/io/dashboard.jl")
 include("workflow/io/vtk_export.jl")
 include("workflow/io/run_summary.jl")
+include("workflow/io/html_report.jl")
 include("workflow/io/budget.jl")
 include("workflow/io/scan_summary.jl")
 
@@ -371,7 +372,7 @@ export apply_sgpe_step!, sgpe_callback
 export split_step_captured!, invalidate_split_step_graph!
 export load_config, load_config_from_string, run_config
 export run_yaml, run_status, list_runs, compute_run_dir
-export print_run_summary, compare_runs
+export print_run_summary, compare_runs, generate_html_report
 export CalibrationSet, CoilCalibration, FORTCalibration, RabiCalibration
 export DEFAULT_CALIBRATION, load_calibration, apply_calibration!, run_yaml_calibrated
 export coil_mv_to_gauss, fort_mw_to_trap_hz, rabi_mw_to_rad_s
