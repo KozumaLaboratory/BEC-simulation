@@ -513,30 +513,45 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         if !isfile(fpath)
             return (404, "text/plain", "File not found: $name/$file")
         end
-        json = try
-            psi, n_comp, ndim, n_pts, F = _load_psi_cached(fpath, psi_cache, snap_idx)
-            ndim == 3 || throw(ArgumentError("vortex_lines requires 3D data"))
-            box_size = _load_box_size(fpath)
-            g = make_grid(GridConfig(n_pts, box_size))
-            lines = extract_vortex_lines_per_m(psi, g; min_density_frac = mask_frac)
-            # Flatten into a frontend-friendly list [{m, charge, points}, ...]
-            out_lines = Dict{String,Any}[]
-            for (m_label, polylines) in lines
-                for ln in polylines
-                    push!(out_lines, Dict{String,Any}(
-                        "m" => m_label,
-                        "charge" => ln.charge,
-                        "points" => [[p[1], p[2], p[3]] for p in ln.points],
-                    ))
-                end
+        # Cache key: (file, snap, mask). Identical scrub-replay returns
+        # instantly from cache instead of re-running the per-plaquette
+        # phase-winding scan + greedy z-stitch (sub-second per call but
+        # the scrubber fires many in rapid succession).
+        cache_key = "vortex_lines:$(fpath)#snap=$(snap_idx)#mask=$(mask_frac)"
+        json = if haskey(psi_cache, cache_key)
+            psi_cache[cache_key]
+        else
+            # Reuse the same FIFO cap as ψ snapshots to keep RAM bounded.
+            while length(psi_cache) >= PSI_CACHE_MAX_ENTRIES
+                delete!(psi_cache, first(keys(psi_cache)))
             end
-            _json_string(Dict{String,Any}(
-                "lines" => out_lines,
-                "box" => collect(Float64.(box_size)),
-                "n_lines" => length(out_lines),
-            ))
-        catch e
-            "{\"error\":\"$(replace(string(e), "\"" => "'"))\"}"
+            json_str = try
+                psi, n_comp, ndim, n_pts, F = _load_psi_cached(fpath, psi_cache, snap_idx)
+                ndim == 3 || throw(ArgumentError("vortex_lines requires 3D data"))
+                box_size = _load_box_size(fpath)
+                g = make_grid(GridConfig(n_pts, box_size))
+                lines = extract_vortex_lines_per_m(psi, g; min_density_frac = mask_frac)
+                # Flatten into a frontend-friendly list [{m, charge, points}, ...]
+                out_lines = Dict{String,Any}[]
+                for (m_label, polylines) in lines
+                    for ln in polylines
+                        push!(out_lines, Dict{String,Any}(
+                            "m" => m_label,
+                            "charge" => ln.charge,
+                            "points" => [[p[1], p[2], p[3]] for p in ln.points],
+                        ))
+                    end
+                end
+                _json_string(Dict{String,Any}(
+                    "lines" => out_lines,
+                    "box" => collect(Float64.(box_size)),
+                    "n_lines" => length(out_lines),
+                ))
+            catch e
+                "{\"error\":\"$(replace(string(e), "\"" => "'"))\"}"
+            end
+            psi_cache[cache_key] = json_str
+            json_str
         end
         (200, "application/json", json)
 

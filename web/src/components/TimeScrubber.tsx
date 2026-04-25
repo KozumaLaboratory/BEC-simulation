@@ -12,21 +12,34 @@ interface Props {
 
 // Minimal time scrubber. Slider spans [1, n_snapshots] (1-indexed to match
 // Julia conventions); play advances at ~fps frames/sec and wraps at the end.
-export function TimeScrubber({ meta, snapIdx, onChange, fps = 30 }: Props) {
+export function TimeScrubber({ meta, snapIdx, onChange, fps = 10 }: Props) {
   const [playing, setPlaying] = useState(false)
   const timerRef = useRef<number | null>(null)
   const n = meta?.n_snapshots ?? 0
 
+  // Latest snapIdx via ref so the play interval reads the current value
+  // WITHOUT being re-created on every tick. The previous code put snapIdx
+  // in the effect deps, which meant the interval was destroyed +
+  // recreated each frame — visibly stuttering and racing the dashboard's
+  // /api/density3d_bin requests.
+  const snapIdxRef = useRef(snapIdx)
+  useEffect(() => {
+    snapIdxRef.current = snapIdx
+  }, [snapIdx])
+
   useEffect(() => {
     if (!playing || n === 0) return
-    const interval = Math.max(1000 / fps, 16) // cap at ~60 fps max in practice
+    // Default 10 fps — at 30 fps each tick fires another density3d_bin
+    // GET (~30 ms decode + JLD2 read), so requests pile up faster than
+    // they complete and the viewer freezes. 10 fps gives the backend
+    // breathing room.
+    const interval = Math.max(1000 / fps, 33)
     const id = window.setInterval(() => {
-      onChange(((snapIdx - 1 + 1) % n) + 1)
+      onChange((snapIdxRef.current % n) + 1)
     }, interval)
     timerRef.current = id
     return () => window.clearInterval(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playing, n, fps, snapIdx])
+  }, [playing, n, fps, onChange])
 
   if (!meta || meta.n_snapshots === 0) return null
 
