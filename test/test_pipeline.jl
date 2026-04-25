@@ -243,6 +243,65 @@ using JLD2
         @test abs(result_3d.monopole_charge.total_charge) < 1e-4
     end
 
+    @testset "vortex_detect returns positions" begin
+        # 2D vortex synthesised at the centre of a (32,32) grid
+        cfg = GridConfig((32, 32), (8.0, 8.0))
+        grid = make_grid(cfg)
+        psi = zeros(ComplexF64, 32, 32, 3)
+        @inbounds for j in 1:32, i in 1:32
+            x = grid.x[1][i]; y = grid.x[2][j]
+            r = sqrt(x^2 + y^2)
+            psi[i, j, 1] = 0.5 * r * cis(atan(y, x)) * exp(-r^2 / 4)
+        end
+        atom = AtomSpecies("Rb87", 1.44e-25, 1, 0.0, 0.0, 0.0)
+        r = SpinorBEC._run_analyzer(:vortex_detect, psi, grid, atom,
+            Dict{String,Any}("component" => 1, "threshold" => 0.05))
+        @test r.vortex_count >= 1
+        @test haskey(r, :positions)
+        @test r.positions isa AbstractVector
+        @test !isempty(r.positions)
+        # Each entry: (i, j, winding) for 2D
+        @test length(r.positions[1]) == 3
+        @test r.positions[1][3] == 1   # singly-charged
+    end
+
+    @testset "column_density_movie streamed snapshot path" begin
+        # Mini dynamics smoke that exercises save_psi_snapshots: true →
+        # streamed scratch JLD2 → column_density_movie reads it back and
+        # produces PNG frames. Must not require save_psi_snapshots: false.
+        mktempdir() do tmp
+            frame_dir = joinpath(tmp, "frames")
+            cfg_path = joinpath(tmp, "config.yaml")
+            write(cfg_path, """
+            pipeline:
+              - ground_state:
+                  atom: Rb87
+                  grid: {n: [12, 12, 6], box: [6.0, 6.0, 4.0]}
+                  interactions: {c0: 5.0, c1: 0.0}
+                  zeeman: {p: 0.0, q: 0.0}
+                  potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+                  dt: 0.01
+                  n_steps: 30
+                  tol: 1.0e-4
+                  initial_state: ferromagnetic
+              - dynamics:
+                  duration: 0.2
+                  dt: 0.01
+                  save_every: 5
+                  save_psi_snapshots: true
+                  save_snapshot_precision: "f32"
+              - analyze:
+                  - column_density_movie:
+                      axis: 3
+                      output_dir: $frame_dir
+                      colorscale: Viridis
+            """)
+            run_yaml(cfg_path; base_dir = tmp, verbose = false)
+            png_files = filter(p -> endswith(p, ".png"), readdir(frame_dir))
+            @test length(png_files) >= 3   # 0.2/dt(0.01)/save_every(5) = 4 frames
+        end
+    end
+
     @testset "analyzer result persistence" begin
         mktempdir() do tmp
             cfg_path = joinpath(tmp, "config.yaml")

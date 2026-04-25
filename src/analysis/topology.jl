@@ -190,39 +190,43 @@ end
 """
     non_abelian_holonomy(psi, grid, loop_pts; component=nothing) -> ComplexF64
 
-Wilson-loop-style holonomy around a user-specified closed path in 2D.
-`loop_pts` is a vector of `(i, j)` grid-index pairs traversed in order; the
-loop must close (first == last). For a scalar / dominant-component phase
-field this returns `exp(i·∮∇ϕ·dl) = exp(i·2π·winding)`, so it's a convenient
-smoke test of integer winding along an arbitrary loop — but it also captures
-non-trivial U(1) × U(1) × … rotations when used over the full spinor.
+Wilson-loop-style holonomy around a user-specified closed path. `loop_pts`
+is a `Vector{NTuple{N,Int}}` of grid-index points traversed in order
+(matching the spatial dimensionality of `grid`), and the loop must close
+(first == last). For a scalar / dominant-component phase field this
+returns `exp(i·∮∇ϕ·dl) = exp(i·2π·winding)`, so it's a convenient smoke
+test of integer winding along an arbitrary 2D or 3D loop — but it also
+captures non-trivial U(1) × U(1) × … rotations when used over the full
+spinor.
 
 For full non-Abelian structure, extend this with the Bloch-basis transformation
 at each grid point — left as a Phase 4.11+ follow-up.
 """
 function non_abelian_holonomy(
     psi::AbstractArray{<:Complex}, grid::Grid{N},
-    loop_pts::Vector{NTuple{2,Int}};
+    loop_pts::AbstractVector{<:NTuple};
     component::Union{Nothing,Int} = nothing,
 ) where {N}
     N >= 2 || throw(ArgumentError("non_abelian_holonomy requires N ≥ 2"))
     length(loop_pts) >= 2 || throw(ArgumentError("loop_pts needs ≥ 2 entries"))
+    isempty(loop_pts) || length(loop_pts[1]) == N ||
+        throw(ArgumentError(
+            "loop_pts entry length $(length(loop_pts[1])) ≠ grid N=$N"))
     loop_pts[1] == loop_pts[end] || @warn "non_abelian_holonomy: loop is not closed"
 
     c = component === nothing ? argmax_component_density(psi, N) :
                                 clamp(Int(component), 1, size(psi, N+1))
     phase_acc = 0.0
     for k in 2:length(loop_pts)
-        i0, j0 = loop_pts[k-1]
-        i1, j1 = loop_pts[k]
-        ψ0 = N == 2 ? psi[i0, j0, c] : psi[i0, j0, 1, c]
-        ψ1 = N == 2 ? psi[i1, j1, c] : psi[i1, j1, 1, c]
+        ψ0 = psi[loop_pts[k-1]..., c]
+        ψ1 = psi[loop_pts[k]...,   c]
         # Parallel transport: exp(iϕ_1)·exp(-iϕ_0) factor
         abs(ψ0) < 1e-12 && continue
         phase_acc += _wrap(atan(imag(ψ1), real(ψ1)) - atan(imag(ψ0), real(ψ0)))
     end
     cis(phase_acc)
 end
+
 
 # --- Helpers ---
 

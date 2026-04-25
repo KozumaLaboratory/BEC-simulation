@@ -97,7 +97,7 @@ function _save_analyzer_results!(f, result)
     analyzer_names = (:tomography, :faraday, :energy_decomposition, :phase_classify,
                       :stability, :bogoliubov,
                       :non_abelian_homotopy, :monopole_charge, :winding_field,
-                      :droplet_profile)
+                      :droplet_profile, :synthetic_dim)
     for name in analyzer_names
         haskey(result, name) || continue
         val = result[name]

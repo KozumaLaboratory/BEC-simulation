@@ -202,6 +202,8 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
         phase_field = angle.(psi_c)
         thresh = threshold * n_max
         vortex_count = 0
+        # Per-vortex records: (i, j[, k], winding) for downstream maps / plots
+        positions = Tuple[]
         if ndim == 2
             @inbounds for j in 2:(n_pts[2]-1), i in 2:(n_pts[1]-1)
                 n_c[i, j] < thresh && continue
@@ -209,20 +211,25 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
                      _phase_diff(phase_field[i+1, j+1], phase_field[i+1, j]) +
                      _phase_diff(phase_field[i, j+1], phase_field[i+1, j+1]) +
                      _phase_diff(phase_field[i, j], phase_field[i, j+1])
-                abs(dp) > π && (vortex_count += 1)
+                if abs(dp) > π
+                    vortex_count += 1
+                    push!(positions, (i, j, round(Int, dp / (2π))))
+                end
             end
         else
-            # 3D: sum vortex plaquettes across every z-slice
             @inbounds for k in 1:n_pts[3], j in 2:(n_pts[2]-1), i in 2:(n_pts[1]-1)
                 n_c[i, j, k] < thresh && continue
                 dp = _phase_diff(phase_field[i+1, j, k], phase_field[i, j, k]) +
                      _phase_diff(phase_field[i+1, j+1, k], phase_field[i+1, j, k]) +
                      _phase_diff(phase_field[i, j+1, k], phase_field[i+1, j+1, k]) +
                      _phase_diff(phase_field[i, j, k], phase_field[i, j+1, k])
-                abs(dp) > π && (vortex_count += 1)
+                if abs(dp) > π
+                    vortex_count += 1
+                    push!(positions, (i, j, k, round(Int, dp / (2π))))
+                end
             end
         end
-        (vortex_count = vortex_count, component = component)
+        (vortex_count = vortex_count, positions = positions, component = component)
     elseif name == :correlation_length
         F = atom.F
         ndim = length(grid.config.n_points)
@@ -377,13 +384,67 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
          surface_sharpness = sharpness,
          peak_index = collect(peak_idx))
 
+    elseif name == :synthetic_dim
+        # Treat the spinor m-axis as a synthetic site index. Outputs:
+        #   pop_per_m       — N_atoms[c] integrated over real space (length D)
+        #   edge_density    — sum of |ψ|² at m = ±F (real-space integrated)
+        #   bulk_density    — sum of |ψ|² over interior m (|m| < F)
+        #   coherence_q1    — |Σ_m e^{−iq·m} ⟨ψ_m⟩|² for q = 2π/D (1st Brillouin)
+        #
+        # Intended for ladder / synthetic-dim observables when the m manifold
+        # is being driven (Raman / RF) so populations move between m sites.
+        F = atom.F
+        ndim = length(grid.config.n_points)
+        D = 2F + 1
+        dV = cell_volume(grid)
+        pop_per_m = zeros(Float64, D)
+        coh_re = zeros(Float64, D)
+        coh_im = zeros(Float64, D)
+        n_pts = grid.config.n_points
+        for c in 1:D
+            idx = _component_slice(ndim, n_pts, c)
+            psi_c = view(psi, idx...)
+            pop_per_m[c] = real(sum(abs2, psi_c)) * dV
+            # First-Brillouin coherence: integrate ψ_m over space, then
+            # combine with phase exp(−i q m) for q = 2π/D.
+            mean_psi = sum(psi_c) * dV / (length(psi_c) * dV)  # spatial mean ψ
+            coh_re[c] = real(mean_psi)
+            coh_im[c] = imag(mean_psi)
+        end
+        m_vals = Float64[F - (c - 1) for c in 1:D]
+        q1 = 2π / D
+        coh_q1_re = sum(coh_re[c] * cos(q1 * m_vals[c]) -
+                        coh_im[c] * sin(-q1 * m_vals[c]) for c in 1:D)
+        coh_q1_im = sum(coh_re[c] * sin(-q1 * m_vals[c]) +
+                        coh_im[c] * cos(q1 * m_vals[c])  for c in 1:D)
+        coherence_q1 = coh_q1_re^2 + coh_q1_im^2
+        edge_density = pop_per_m[1] + pop_per_m[D]
+        bulk_density = sum(pop_per_m) - edge_density
+        # First moment along m (synthetic position)
+        total = sum(pop_per_m)
+        m_mean = total > 0 ? sum(pop_per_m[c] * m_vals[c] for c in 1:D) / total : 0.0
+        m_var = total > 0 ?
+            sum(pop_per_m[c] * (m_vals[c] - m_mean)^2 for c in 1:D) / total : 0.0
+        (pop_per_m = pop_per_m,
+         m_values = m_vals,
+         m_mean = m_mean,
+         m_variance = m_var,
+         edge_density = edge_density,
+         bulk_density = bulk_density,
+         coherence_q1 = coherence_q1)
+
     elseif name == :non_abelian_homotopy
         ndim = length(grid.config.n_points)
         ndim >= 2 || throw(ArgumentError("non_abelian_homotopy requires N >= 2"))
         loop_pts_raw = get(params, "loop_pts", nothing)
         loop_pts_raw === nothing && throw(ArgumentError(
-            "non_abelian_homotopy requires loop_pts: [[i,j], ...]"))
-        loop_pts = NTuple{2,Int}[(Int(p[1]), Int(p[2])) for p in loop_pts_raw]
+            "non_abelian_homotopy requires loop_pts: [[i,j(,k)], ...]"))
+        # Match loop dim to grid N (2D or 3D path)
+        loop_pts = if ndim == 2
+            NTuple{2,Int}[(Int(p[1]), Int(p[2])) for p in loop_pts_raw]
+        else
+            NTuple{3,Int}[(Int(p[1]), Int(p[2]), Int(p[3])) for p in loop_pts_raw]
+        end
         component = let v = get(params, "component", nothing)
             v === nothing ? nothing : Int(v)
         end
@@ -517,7 +578,8 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
                  "multipole_order, winding_map, absorption_image, sg_tof, domain_analysis, skyrmion_density, " *
                  "phase_contrast_image, momentum_distribution, vortex_detect, correlation_length, " *
                  "defect_density, kibble_zurek_stats, bragg_spectroscopy, non_abelian_homotopy, " *
-                 "monopole_charge, winding_field, droplet_profile, column_density_movie, summary_json"
+                 "monopole_charge, winding_field, droplet_profile, synthetic_dim, " *
+                 "column_density_movie, summary_json"
         throw(ArgumentError("Unknown analyzer: $name. Supported: $_known"))
     end
 end
