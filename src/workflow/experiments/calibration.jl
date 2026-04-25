@@ -254,6 +254,68 @@ struct CalibrationHistory
     end
 end
 
+"""
+    load_calibration_csv(path) -> CalibrationHistory
+
+Load a drift table from CSV (Excel-friendly). Expected columns (header
+row required):
+
+    date, coil_strong_gauss_per_mv, coil_strong_gauss_offset,
+    coil_weak_gauss_per_mv, coil_weak_gauss_offset,
+    fort_x_hz, fort_y_hz, fort_z_hz,
+    microwave_rad_per_s_per_mw
+
+Missing columns default to 0. Date format: YYYY-MM-DD.
+Comma- or tab-separated; auto-detected.
+"""
+function load_calibration_csv(path::AbstractString)
+    text = read(String(path), String)
+    lines = filter(!isempty, strip.(split(text, '\n')))
+    isempty(lines) && throw(ArgumentError("calibration CSV $path is empty"))
+    sep = occursin('\t', lines[1]) ? '\t' : ','
+    header = String.(strip.(split(lines[1], sep)))
+    col(name) = let i = findfirst(==(name), header); i === nothing ? nothing : i; end
+
+    dates = Date[]
+    entries = CalibrationSet[]
+    @inbounds for line in lines[2:end]
+        startswith(line, "#") && continue
+        cells = String.(strip.(split(line, sep)))
+        length(cells) == length(header) || continue
+        i_date = col("date")
+        i_date === nothing && throw(ArgumentError("CSV needs a `date` column"))
+        push!(dates, Date(cells[i_date]))
+        getf(name, default=0.0) = let i = col(name)
+            i === nothing || isempty(cells[i]) ? default : parse(Float64, cells[i])
+        end
+        cs_strong = CoilCalibration(
+            getf("coil_strong_gauss_per_mv"),
+            getf("coil_strong_gauss_offset"),
+            (-Inf, Inf),
+        )
+        cs_weak = CoilCalibration(
+            getf("coil_weak_gauss_per_mv"),
+            getf("coil_weak_gauss_offset"),
+            (-Inf, Inf),
+        )
+        fort = FORTCalibration(
+            (getf("fort_x_hz"), getf("fort_y_hz"), getf("fort_z_hz")),
+            (0.0, 0.0, 0.0),
+        )
+        mw = RabiCalibration(getf("microwave_rad_per_s_per_mw"))
+        push!(entries, CalibrationSet(
+            epoch = "csv_row",
+            date = cells[i_date],
+            coil_strong = cs_strong,
+            coil_weak = cs_weak,
+            fort = fort,
+            microwave = mw,
+        ))
+    end
+    perm = sortperm(dates)
+    CalibrationHistory(dates[perm], entries[perm])
+end
+
 function load_calibration_history(path::AbstractString)
     raw = YAML.load_file(String(path))
     root = haskey(raw, "calibration_history") ? raw["calibration_history"] : raw
