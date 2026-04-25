@@ -1,0 +1,39 @@
+# Singularity image for SpinorBEC on TSUBAME (and any cluster with
+# CUDA 12 host libs).
+#
+# Build (need root or fakeroot):
+#   singularity build --fakeroot spinorbec.sif containers/spinorbec.def
+#
+# Use:
+#   singularity exec --nv spinorbec.sif julia --project=. ...
+#
+# `--nv` forwards the host CUDA driver. Compatible with TSUBAME 4
+# H100 / TSUBAME 3 A100 nodes that expose nvidia-smi via the host.
+
+Bootstrap: docker
+From: julia:1.11-bookworm
+
+%post
+    apt-get update && apt-get install -y --no-install-recommends \
+        git ca-certificates curl ffmpeg less vim \
+        libgomp1 libstdc++6 \
+        && rm -rf /var/lib/apt/lists/*
+    # Pre-warm a depot inside the image so the first run on a node
+    # doesn't pay the precompile cost. The actual project Manifest is
+    # bind-mounted at use time, so we just install common deps that
+    # SpinorBEC pulls in.
+    julia -e 'using Pkg
+              Pkg.add(["CUDA", "FFTW", "JLD2", "PlotlyJS", "JuliaFormatter",
+                       "BenchmarkTools", "StaticArrays", "Unitful", "YAML"])
+              Pkg.precompile()'
+
+%environment
+    export JULIA_DEPOT_PATH=/opt/julia-depot
+    export LD_LIBRARY_PATH=/usr/local/cuda/lib64:${LD_LIBRARY_PATH:-}
+
+%runscript
+    exec julia "$@"
+
+%labels
+    Maintainer anko
+    Description SpinorBEC dev container with CUDA 12 + Julia 1.11

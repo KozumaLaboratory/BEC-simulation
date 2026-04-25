@@ -42,6 +42,9 @@ const DDI_SCHEMA = Dict{String, FieldSpec}(
 )
 
 const GS_SCHEMA = Dict{String, FieldSpec}(
+    "kind"                 => FieldSpec(type=String, enum=["spinor", "binary"]),
+    "species_A"            => FieldSpec(type=Dict),    # binary path
+    "species_B"            => FieldSpec(type=Dict),    # binary path
     "method"               => FieldSpec(type=String, default="itp", enum=["itp", "lbfgs"]),
     "atom"                 => FieldSpec(type=String),
     "grid"                 => FieldSpec(type=Dict, schema=GRID_SCHEMA),

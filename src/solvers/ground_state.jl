@@ -126,6 +126,7 @@ function find_ground_state(;
     _checkpoint_every::Int = 0,   # internal alias
     light_shift::Union{Nothing,LightShift} = nothing,
     dtype::Union{Nothing,Type{<:AbstractFloat}} = nothing,
+    spinor_lhy::Union{Nothing,Symbol} = nothing,
 )
     psi0 = if psi_init === nothing
         sys = SpinSystem(atom.F)
@@ -240,6 +241,7 @@ function find_ground_state(;
         backend,
         light_shift,
         dtype = dtype,
+        spinor_lhy,
     )
 
     n_comp = ws.spin_matrices.system.n_components

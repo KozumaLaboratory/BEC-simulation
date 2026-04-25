@@ -72,33 +72,34 @@ Budget check before you launch:
 (`estimate_run_budget` — TODO helper to prints VRAM / host RAM / disk
 estimates given the config.)
 
-## SLURM job template (H100 single node)
+## SLURM job templates
+
+Drop-in templates in `scripts/slurm/`:
+
+- `eu151_h100_single.sbatch` — single H100 (80 GB), 12 h, --requeue.
+  Use for a single config:
+  `sbatch scripts/slurm/eu151_h100_single.sbatch runs/eu151_edh_ext/config.yaml`
+- `scan_array.sbatch` — SLURM array job, one task per scan point (set
+  via `SPINORBEC_SCAN_ONLY_INDEX` env var; wired into `_run_yaml_scan`).
+  4× faster on phase-diagram scans because points run in parallel.
+
+Both templates `source scripts/tsubame_setup.sh` which bootstraps:
+
+- `module load cuda + julia`
+- `JULIA_DEPOT_PATH` on `$T4_TMPDIR/.julia` (avoids Lustre metadata storms)
+- `SPINORBEC_SCRATCH_DIR=$T4_TMPDIR/spinorbec_snaps`
+- `JULIA_NUM_THREADS = $SLURM_CPUS_PER_TASK`
+- WSL2 fallback so the same script works on dev machines
+
+## Pre-submission helper
 
 ```bash
-#!/bin/bash
-#SBATCH --job-name=eu151_edh
-#SBATCH --partition=gpu-h100
-#SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=64G
-#SBATCH --time=12:00:00
-#SBATCH --output=logs/%x-%j.out
-
-module load cuda/12.4
-module load julia/1.12
-
-export SPINORBEC_SCRATCH_DIR=$TMPDIR
-export JULIA_NUM_THREADS=4
-export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
-
-cd $SLURM_SUBMIT_DIR
-
-julia --project=. -e '
-  using CUDA, SpinorBEC
-  @info "CUDA" dev=CUDA.name(CUDA.device()) mem_gb=CUDA.totalmem(CUDA.device())/2^30
-  run_yaml("runs/eu151_edh_ext/config.yaml")
-'
+julia --project=. scripts/slurm_helpers.jl sbatch-suggest runs/foo/config.yaml
 ```
+
+Prints suggested `--time`, `--mem`, `--gres`, `--array=N` flags derived
+from the config's grid size + scan point count. Copy into your sbatch
+script before submitting.
 
 ## Walltime vs. evolution
 

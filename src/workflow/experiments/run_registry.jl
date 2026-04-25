@@ -149,7 +149,18 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
 
     pause_file = joinpath(run_dir, ".pause")
 
+    # SLURM array-job hook: if SPINORBEC_SCAN_ONLY_INDEX is set (e.g. by
+    # scripts/slurm/scan_array.sbatch), compute only that single point and
+    # exit. Indices are 1-based and clamped silently.
+    only_idx = let v = get(ENV, "SPINORBEC_SCAN_ONLY_INDEX", nothing)
+        v === nothing ? nothing : parse(Int, v)
+    end
+
     for (i, point_override) in enumerate(scan.points)
+        # SLURM array-job mode: skip everything except the assigned index
+        if only_idx !== nothing && i != only_idx
+            continue
+        end
         # Check for pause signal
         if isfile(pause_file)
             verbose && println("  Paused: detected $pause_file ($(i-1)/$(length(scan.points)) points completed)")

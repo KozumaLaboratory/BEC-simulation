@@ -100,6 +100,14 @@ end
 
 function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_prev; verbose=true, checkpoint_dir=nothing)
     p = step.params
+
+    # Binary (two-component) GP path — Phase 4.7 / Scenario #51 scaffold.
+    # Activated by `kind: binary` in the YAML; falls through to the standard
+    # spinor path otherwise. Currently supports F=0 + F=0 only.
+    if get(p, "kind", nothing) == "binary"
+        return _run_binary_ground_state_step(p; verbose = verbose)
+    end
+
     method = Symbol(get(p, "method", "itp"))
 
     # --- atom: inherit from previous step if absent ---
@@ -663,6 +671,63 @@ function _compose_callbacks(cbs...)
         end
         nothing
     end
+end
+
+"""
+Binary (two-component) ground-state YAML entry point. Returns a result
+shape compatible with the standard spinor `_run_step` path so analyzers
+that only need ψ can still consume it.
+
+Currently F=0 + F=0 via `find_binary_ground_state`. Spinor binary,
+DDI, and YAML-side analyzer integration are next-session work — see
+`docs/two_component_gp_design.md`.
+"""
+function _run_binary_ground_state_step(p::AbstractDict; verbose::Bool = true)
+    grid_node = p["grid"]
+    n = Int.(grid_node["n"])
+    box = Float64.(grid_node["box"])
+    grid = make_grid(GridConfig(Tuple(n), Tuple(box)))
+
+    inter = p["interactions"]
+    couplings = BinaryCouplings(
+        g_AA = Float64(inter["g_AA"]),
+        g_BB = Float64(inter["g_BB"]),
+        g_AB = Float64(inter["g_AB"]),
+        omega_coupling = Float64(get(inter, "omega_coupling", 0.0)),
+        delta_coupling = Float64(get(inter, "delta_coupling", 0.0)),
+    )
+
+    pot_node = get(p, "potential", Dict())
+    potential = if pot_node isa AbstractDict && get(pot_node, "type", "") == "harmonic"
+        ω_vec = Float64.(pot_node["omega"])
+        length(ω_vec) == length(n) ||
+            throw(ArgumentError("potential.omega length must match grid ndim"))
+        HarmonicTrap(Tuple(ω_vec))
+    else
+        NoPotential()
+    end
+
+    state = find_binary_ground_state(
+        grid;
+        couplings = couplings,
+        potential_A = potential,
+        potential_B = potential,
+        dt = Float64(get(p, "dt", 0.005)),
+        n_steps = Int(get(p, "n_steps", 1000)),
+        tol = Float64(get(p, "tol", 1e-6)),
+        verbose = verbose,
+    )
+
+    # Stash ψ_A as the "psi" downstream so phase_classify etc. don't break;
+    # ψ_B is in the binary-specific result. Atom / interactions are
+    # placeholders — binary path doesn't carry a single AtomSpecies.
+    placeholder_atom = AtomSpecies("Binary", 1.66e-25, 0, 0.0, 0.0, 0.0)
+    psi_4d = reshape(state.psi_A, (size(state.psi_A)..., 1))
+    step_result = Dict{Symbol,Any}(
+        :binary_state => state,
+        :binary_couplings => couplings,
+    )
+    return (psi_4d, grid, placeholder_atom, nothing, step_result)
 end
 
 """
