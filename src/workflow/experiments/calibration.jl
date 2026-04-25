@@ -19,6 +19,7 @@
 #   run_yaml_calibrated("experiment.yaml"; calibration_path="lab_calib_2026_04.yaml")
 
 using YAML: YAML
+using Dates: Date
 
 # --- Calibration struct (one per hardware epoch) ---
 
@@ -233,6 +234,98 @@ function _calibrate_raman_node!(node::Dict, calib::CalibrationSet)
 end
 
 # --- One-shot wrapper ---
+
+# --- Time-interpolated calibration history (Phase 5.5 / Scenario #68) ---
+
+"""
+A series of dated `CalibrationSet` snapshots used to capture week-to-week
+hardware drift. `dates` and `entries` are parallel vectors of equal length;
+`dates` must be strictly increasing.
+"""
+struct CalibrationHistory
+    dates::Vector{Date}
+    entries::Vector{CalibrationSet}
+    function CalibrationHistory(dates::Vector{Date}, entries::Vector{CalibrationSet})
+        length(dates) == length(entries) ||
+            throw(ArgumentError("dates and entries must have the same length"))
+        length(dates) >= 1 || throw(ArgumentError("calibration history is empty"))
+        issorted(dates) || throw(ArgumentError("calibration dates must be sorted ascending"))
+        new(dates, entries)
+    end
+end
+
+function load_calibration_history(path::AbstractString)
+    raw = YAML.load_file(String(path))
+    root = haskey(raw, "calibration_history") ? raw["calibration_history"] : raw
+    root isa AbstractVector ||
+        throw(ArgumentError("calibration_history must be a list of dated entries"))
+    dates = Date[]
+    entries = CalibrationSet[]
+    for entry in root
+        entry isa Dict || throw(ArgumentError("calibration_history entry must be a Dict"))
+        haskey(entry, "date") || throw(ArgumentError("calibration_history entry needs `date`"))
+        push!(dates, Date(String(entry["date"])))
+        push!(entries, _calibration_from_dict(entry))
+    end
+    perm = sortperm(dates)
+    CalibrationHistory(dates[perm], entries[perm])
+end
+
+"""
+    interpolate_calibration(history, target_date) -> CalibrationSet
+
+Linearly interpolate per-field between the two history entries that bracket
+`target_date`. Outside the range we clamp to the nearest endpoint (no
+extrapolation — drift outside the measured window is unsafe).
+"""
+function interpolate_calibration(hist::CalibrationHistory, target::Date)
+    n = length(hist.dates)
+    if target <= hist.dates[1]
+        return _stamped(hist.entries[1], target)
+    elseif target >= hist.dates[end]
+        return _stamped(hist.entries[end], target)
+    end
+    # Find the bracket [i, i+1]
+    i = searchsortedlast(hist.dates, target)
+    d_lo = hist.dates[i]; d_hi = hist.dates[i + 1]
+    a = (Float64((target - d_lo).value)) / Float64((d_hi - d_lo).value)
+    lo = hist.entries[i]; hi = hist.entries[i + 1]
+    interp = CalibrationSet(
+        epoch = "interp[$(d_lo)..$(d_hi) @ $(target)]",
+        date  = string(target),
+        coil_strong = _interp_coil(lo.coil_strong, hi.coil_strong, a),
+        coil_weak   = _interp_coil(lo.coil_weak,   hi.coil_weak,   a),
+        fort        = _interp_fort(lo.fort,        hi.fort,        a),
+        microwave   = RabiCalibration(
+            (1 - a) * lo.microwave.rad_per_s_per_mw + a * hi.microwave.rad_per_s_per_mw),
+    )
+    interp
+end
+
+function _stamped(cs::CalibrationSet, target::Date)
+    CalibrationSet(
+        epoch = "$(cs.epoch) (clamped to $(target))",
+        date  = string(target),
+        coil_strong = cs.coil_strong, coil_weak = cs.coil_weak,
+        fort = cs.fort, microwave = cs.microwave,
+    )
+end
+
+function _interp_coil(a_c::CoilCalibration, b_c::CoilCalibration, a::Float64)
+    CoilCalibration(
+        (1 - a) * a_c.gauss_per_mv + a * b_c.gauss_per_mv,
+        (1 - a) * a_c.gauss_offset + a * b_c.gauss_offset,
+        (max(a_c.valid_range_mv[1], b_c.valid_range_mv[1]),
+         min(a_c.valid_range_mv[2], b_c.valid_range_mv[2])),
+    )
+end
+
+function _interp_fort(a_f::FORTCalibration, b_f::FORTCalibration, a::Float64)
+    FORTCalibration(
+        ntuple(i -> (1 - a) * a_f.sqrt_coeffs_hz[i] + a * b_f.sqrt_coeffs_hz[i], 3),
+        ntuple(i -> (1 - a) * a_f.offsets_hz[i] + a * b_f.offsets_hz[i], 3),
+    )
+end
 
 """
     run_yaml_calibrated(path; calibration_path=nothing, base_dir=pwd(), kwargs...)

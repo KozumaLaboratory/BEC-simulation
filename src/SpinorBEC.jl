@@ -75,6 +75,7 @@ include("workflow/io/units.jl")
 include("workflow/initialization/atoms.jl")
 include("workflow/initialization/thomas_fermi.jl")
 include("workflow/initialization/initialization.jl")
+include("workflow/initialization/state_zoo.jl")
 include("workflow/initialization/thermal_noise.jl")
 include("workflow/initialization/vacuum_noise.jl")
 
@@ -371,6 +372,15 @@ export run_yaml, run_status, list_runs, compute_run_dir
 export CalibrationSet, CoilCalibration, FORTCalibration, RabiCalibration
 export DEFAULT_CALIBRATION, load_calibration, apply_calibration!, run_yaml_calibrated
 export coil_mv_to_gauss, fort_mw_to_trap_hz, rabi_mw_to_rad_s
+export CalibrationHistory, load_calibration_history, interpolate_calibration
+export init_psi_polar, init_psi_ferromagnetic, init_psi_ferromagnetic_min,
+       init_psi_uniform, init_psi_antiferromagnetic, init_psi_random,
+       init_psi_spin_coherent, init_psi_fl_vortex, init_psi_spin_helix,
+       init_psi_cyclic, init_psi_biaxial_nematic, init_psi_polar_core_vortex,
+       init_psi_bright_soliton, init_psi_dark_soliton, init_psi_skyrmion,
+       init_psi_wavepacket, init_psi_domain_wall, init_psi_two_packets,
+       init_psi_chiral_spin_vortex, init_psi_magnetic_domain,
+       init_psi_vortex_lattice, init_psi_skyrmion_lattice
 export apply_override!, apply_overrides, expand_scan_points, parse_override_map
 export OverrideScan, ConstrainedJzScan
 export PotentialConfig, ConstantValue, LinearRamp, interpolate_value

@@ -56,6 +56,38 @@ function run_yaml(yaml_path::String; base_dir::String = "runs", verbose::Bool = 
     haskey(data, "pipeline") || throw(ArgumentError(
         "YAML must have a 'pipeline:' key. Got keys: $(collect(keys(data)))"))
 
+    # Auto-apply lab-unit calibration. Three forms recognised:
+    #
+    #   1. `calibration:`         single CalibrationSet
+    #   2. `calibration_history:` + optional `target_date:` — interpolate
+    #      between dated snapshots so weekly drift is captured automatically
+    #      (Phase 5.5 / Scenario #68). Without target_date, defaults to
+    #      today's date.
+    #
+    # All calibration-related top-level keys are popped before schema
+    # validation so they don't trigger "unknown key" warnings.
+    if haskey(data, "calibration") && data["calibration"] isa Dict
+        calib = _calibration_from_dict(pop!(data, "calibration"))
+        verbose && println("  applying calibration epoch=$(calib.epoch) date=$(calib.date)")
+        apply_calibration!(data, calib)
+    elseif haskey(data, "calibration_history")
+        hist_raw = pop!(data, "calibration_history")
+        target = haskey(data, "target_date") ?
+            Dates.Date(String(pop!(data, "target_date"))) : Dates.today()
+        # Reuse the loader logic by stuffing into the expected wrapper
+        tmp = Dict{String,Any}("calibration_history" => hist_raw)
+        tmp_path = tempname() * ".yaml"
+        YAML.write_file(tmp_path, tmp)
+        try
+            hist = load_calibration_history(tmp_path)
+            calib = interpolate_calibration(hist, target)
+            verbose && println("  applying interpolated calibration → $(calib.epoch)")
+            apply_calibration!(data, calib)
+        finally
+            rm(tmp_path; force = true)
+        end
+    end
+
     # Schema validation: catch typos and invalid values before starting
     validate_pipeline!(data)
 
