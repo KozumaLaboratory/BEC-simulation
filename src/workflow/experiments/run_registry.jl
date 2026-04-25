@@ -51,7 +51,8 @@ The YAML must have a `pipeline:` key. If a `scan:` key is present,
 each scan point × comparison run is executed independently via
 `run_pipeline` with the corresponding overrides applied to the raw dict.
 """
-function run_yaml(yaml_path::String; base_dir::String = "runs", verbose::Bool = true)
+function run_yaml(yaml_path::String; base_dir::String = "runs", verbose::Bool = true,
+                   dry_run::Bool = false)
     data = YAML.load_file(yaml_path)
     haskey(data, "pipeline") || throw(ArgumentError(
         "YAML must have a 'pipeline:' key. Got keys: $(collect(keys(data)))"))
@@ -90,6 +91,17 @@ function run_yaml(yaml_path::String; base_dir::String = "runs", verbose::Bool = 
 
     # Schema validation: catch typos and invalid values before starting
     validate_pipeline!(data)
+
+    # Dry-run: print the calibration-applied + validated YAML and exit
+    # without touching the GPU / building any workspace. Useful for
+    # checking that lab-unit YAML expanded as expected before committing
+    # to a long compute.
+    if dry_run
+        println("# === run_yaml dry-run output (post calibration + validation) ===")
+        println("# original: $yaml_path")
+        YAML.write(stdout, data)
+        return ""
+    end
 
     # If the YAML is already runs/foo/config.yaml, use runs/foo/ as the run dir
     # (user manages directory names). Otherwise compute a hash-based dir.

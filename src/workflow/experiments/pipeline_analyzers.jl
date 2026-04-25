@@ -384,6 +384,151 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
          surface_sharpness = sharpness,
          peak_index = collect(peak_idx))
 
+    elseif name == :bogoliubov_mode
+        # Like :bogoliubov but additionally returns the eigenvector (u, v)
+        # of the most unstable BdG mode plus its per-spinor-component
+        # weight |u_m|² + |v_m|². Useful to see WHICH spinor channel
+        # carries the instability and at what spatial wavelength.
+        ws_prev === nothing && throw(ArgumentError(
+            "bogoliubov_mode requires a preceding ground_state step"))
+        F = atom.F
+        D = 2F + 1
+        ndim = length(grid.config.n_points)
+
+        psi_host = _to_host(psi)
+        n_total = total_density(psi_host, ndim)
+        peak_idx = argmax(n_total)
+        spinor = ComplexF64[psi_host[peak_idx, c] for c in 1:D]
+        n0 = sum(abs2, spinor)
+        n0 > 1e-30 && (spinor ./= sqrt(n0))
+
+        interactions = ws_prev.interactions
+        c_dd_val = ws_prev.ddi === nothing ? 0.0 : ws_prev.ddi.C_dd
+        zeeman = ws_prev.zeeman isa ZeemanParams ? ws_prev.zeeman : ZeemanParams(0.0, 0.0)
+
+        # First locate the peak-growth k via the existing scan
+        imap = bogoliubov_instability_scan(;
+            spinor = spinor, n0 = n0, F = F,
+            interactions = interactions, zeeman = zeeman, c_dd = c_dd_val,
+            k_max = Float64(get(params, "k_max", 10.0)),
+            n_k = Int(get(params, "n_k", 200)),
+        )
+        k_peak = imap.most_unstable_k
+        # Build BdG matrix at k_peak, k̂ = best_direction; diagonalize
+        h_mf, M_anom, zee, _ = SpinorBEC._bdg_contact_matrices(spinor, F, interactions, zeeman)
+        if abs(c_dd_val) > 1e-30
+            sm_for_ddi = spin_matrices(F)
+            k_hat = collect(imap.most_unstable_direction)
+            kn = sqrt(sum(abs2, k_hat)); kn > 0 && (k_hat ./= kn)
+            Q_ab = SpinorBEC._q_tensor_direction(k_hat)
+            h_ddi, M_ddi = SpinorBEC._bdg_ddi_matrices(spinor, F, D, sm_for_ddi, c_dd_val, Q_ab)
+            h_mf = h_mf .+ h_ddi
+            M_anom = M_anom .+ M_ddi
+        end
+        mu = real(sum(c -> (zee[c] + n0 * h_mf[c, c]) * abs2(spinor[c]), 1:D))
+        ek = k_peak^2 / 2
+        L = 2n0 .* h_mf
+        for i in 1:D; L[i, i] += ek - mu + zee[i]; end
+        M_sc = n0 .* M_anom
+        H_bdg = zeros(ComplexF64, 2D, 2D)
+        H_bdg[1:D, 1:D]              .= L
+        H_bdg[1:D, (D+1):2D]         .= M_sc
+        H_bdg[(D+1):2D, 1:D]         .= .-conj.(M_sc)
+        H_bdg[(D+1):2D, (D+1):2D]    .= .-conj.(L)
+        evals, evecs = eigen(H_bdg)
+        # Pick the mode with the largest imaginary part (instability)
+        igrow = argmax(imag.(evals))
+        ω_mode = evals[igrow]
+        uv = evecs[:, igrow]
+        u = uv[1:D]; v = uv[(D+1):2D]
+        weight_per_m = abs2.(u) .+ abs2.(v)
+        weight_per_m ./= max(sum(weight_per_m), 1e-30)
+        wavelength = k_peak > 1e-12 ? 2π / k_peak : Inf
+        (k_peak = k_peak, omega = ω_mode,
+         growth_rate = imag(ω_mode),
+         u_mode = u, v_mode = v,
+         weight_per_m = weight_per_m,
+         dominant_m = F - (argmax(weight_per_m) - 1),
+         wavelength = wavelength,
+         direction = collect(imap.most_unstable_direction))
+
+    elseif name == :skyrmion_detect
+        # Locate skyrmion centres in 2D (or per z-slice in 3D) by finding
+        # local maxima of the topological charge density q(r) = (1/4π)
+        # n̂ · (∂_x n̂ × ∂_y n̂). Each maximum above `threshold` returns
+        # (i, j[, k], local_charge_integral) — useful for tracking
+        # individual skyrmions across snapshots.
+        F = atom.F
+        ndim = length(grid.config.n_points)
+        ndim >= 2 || throw(ArgumentError("skyrmion_detect requires N >= 2"))
+        n_pts = grid.config.n_points
+        sm = spin_matrices(F)
+        plans = make_fft_plans(n_pts; flags = FFTW.ESTIMATE)
+        threshold = Float64(get(params, "threshold", 0.05))
+        radius = Int(get(params, "radius", 2))   # local-max search radius
+
+        positions = Tuple[]
+        if ndim == 2
+            omega = berry_curvature(psi, grid, plans, sm)
+            q_max = maximum(abs, omega)
+            cutoff = threshold * q_max
+            @inbounds for j in (1+radius):(n_pts[2]-radius), i in (1+radius):(n_pts[1]-radius)
+                v = omega[i, j]
+                abs(v) < cutoff && continue
+                # Local max (or min) check
+                is_extremum = true
+                for dj in -radius:radius, di in -radius:radius
+                    di == 0 && dj == 0 && continue
+                    if abs(omega[i+di, j+dj]) > abs(v)
+                        is_extremum = false
+                        break
+                    end
+                end
+                is_extremum || continue
+                # Approximate per-skyrmion charge: sum over a ±radius patch
+                local_q = 0.0
+                for dj in -radius:radius, di in -radius:radius
+                    local_q += omega[i+di, j+dj]
+                end
+                push!(positions, (i, j, local_q * cell_volume(grid)))
+            end
+            total_Q = sum(omega) * cell_volume(grid) / (4π)
+            (skyrmion_count = length(positions),
+             positions = positions,
+             total_charge = total_Q,
+             charge_density = omega)
+        else
+            # 3D: detect per z-slice
+            omega_x, omega_y, omega_z = berry_curvature(psi, grid, plans, sm)
+            q_max = maximum(abs, omega_z)
+            cutoff = threshold * q_max
+            @inbounds for k in 1:n_pts[3]
+                slab = view(omega_z, :, :, k)
+                for j in (1+radius):(n_pts[2]-radius), i in (1+radius):(n_pts[1]-radius)
+                    v = slab[i, j]
+                    abs(v) < cutoff && continue
+                    is_extremum = true
+                    for dj in -radius:radius, di in -radius:radius
+                        di == 0 && dj == 0 && continue
+                        if abs(slab[i+di, j+dj]) > abs(v)
+                            is_extremum = false
+                            break
+                        end
+                    end
+                    is_extremum || continue
+                    local_q = 0.0
+                    for dj in -radius:radius, di in -radius:radius
+                        local_q += slab[i+di, j+dj]
+                    end
+                    push!(positions, (i, j, k, local_q * cell_volume(grid)))
+                end
+            end
+            total_Q_xy = sum(omega_z) * cell_volume(grid) / (4π)
+            (skyrmion_count = length(positions),
+             positions = positions,
+             total_charge_xy = total_Q_xy)
+        end
+
     elseif name == :synthetic_dim
         # Treat the spinor m-axis as a synthetic site index. Outputs:
         #   pop_per_m       — N_atoms[c] integrated over real space (length D)
@@ -610,7 +755,7 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
                  "phase_contrast_image, momentum_distribution, vortex_detect, correlation_length, " *
                  "defect_density, kibble_zurek_stats, bragg_spectroscopy, non_abelian_homotopy, " *
                  "monopole_charge, winding_field, droplet_profile, synthetic_dim, " *
-                 "column_density_movie, summary_json"
+                 "skyrmion_detect, bogoliubov_mode, column_density_movie, summary_json"
         throw(ArgumentError("Unknown analyzer: $name. Supported: $_known"))
     end
 end

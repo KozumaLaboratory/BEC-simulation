@@ -311,6 +311,111 @@ using Dates: Date
         @test haskey(result, :dynamics_result)
     end
 
+    @testset "column_density_movie multi-step concat" begin
+        mktempdir() do tmp
+            frame_dir = joinpath(tmp, "frames")
+            cfg_path = joinpath(tmp, "config.yaml")
+            write(cfg_path, """
+            pipeline:
+              - ground_state:
+                  atom: Rb87
+                  grid: {n: [10, 10, 6], box: [5.0, 5.0, 4.0]}
+                  interactions: {c0: 5.0, c1: 0.0}
+                  zeeman: {p: 0.0, q: 0.0}
+                  potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+                  dt: 0.01
+                  n_steps: 20
+                  tol: 1.0e-3
+                  initial_state: ferromagnetic
+              - dynamics:
+                  duration: 0.1
+                  dt: 0.01
+                  save_every: 5
+                  save_psi_snapshots: true
+              - dynamics:
+                  duration: 0.1
+                  dt: 0.01
+                  save_every: 5
+                  save_psi_snapshots: true
+              - analyze:
+                  - column_density_movie:
+                      axis: 3
+                      output_dir: $frame_dir
+                      multi_step: true
+            """)
+            run_yaml(cfg_path; base_dir = tmp, verbose = false)
+            png_files = filter(p -> endswith(p, ".png"), readdir(frame_dir))
+            # Each dynamics step has 0.1/0.01/5 = 2 frames, so multi_step
+            # concat should give 4 frames total.
+            @test length(png_files) >= 3
+        end
+    end
+
+    @testset "loss SI-unit K3_per_m parsing" begin
+        # Smoke: SI-unit K3 should parse, downstream applied as dimless rate
+        atom = AtomSpecies("Rb87", 1.44e-25, 1, 0.0, 0.0, 0.0)
+        node = Dict{String,Any}(
+            "gamma_dr" => 0.0,
+            "K3_per_m_si" => ["1.5e-30 m^6/s", "1.5e-30 m^6/s", "1.5e-30 m^6/s"],
+        )
+        # N_atoms=10000, omega_ref=2π·100 → finite dimless K3
+        loss = SpinorBEC._parse_loss_params(node;
+            atom = atom, N_atoms = 10000, omega_ref = 2π * 100.0)
+        @test loss isa LossParams
+        @test length(loss.L3_per_m) == 3
+        @test all(isfinite, loss.L3_per_m)
+        @test all(loss.L3_per_m .>= 0.0)
+    end
+
+    @testset "CSV calibration loader" begin
+        mktempdir() do tmp
+            csv_path = joinpath(tmp, "drift.csv")
+            write(csv_path, """
+            date,coil_strong_gauss_per_mv,coil_strong_gauss_offset,fort_x_hz,fort_y_hz,fort_z_hz,microwave_rad_per_s_per_mw
+            2026-04-01,0.40,0.05,400.0,400.0,600.0,1.20e6
+            2026-04-15,0.42,0.04,395.0,395.0,590.0,1.18e6
+            """)
+            hist = load_calibration_csv(csv_path)
+            @test hist isa CalibrationHistory
+            @test length(hist.dates) == 2
+            @test hist.entries[1].coil_strong.gauss_per_mv ≈ 0.40
+            @test hist.entries[2].fort.sqrt_coeffs_hz[1] ≈ 395.0
+            # Interpolate at midpoint
+            mid = interpolate_calibration(hist, Date("2026-04-08"))
+            @test 0.40 < mid.coil_strong.gauss_per_mv < 0.42
+        end
+    end
+
+    @testset "run_yaml dry-run prints calibration-applied YAML" begin
+        mktempdir() do tmp
+            cfg_path = joinpath(tmp, "config.yaml")
+            write(cfg_path, """
+            calibration:
+              coil_strong: {gauss_per_mv: 0.4, gauss_offset: 0.05}
+            pipeline:
+              - ground_state:
+                  atom: Rb87
+                  grid: {n: [8, 8], box: [4.0, 4.0]}
+                  interactions: {c0: 5.0, c1: 0.0}
+                  zeeman: {p_mv: 2.5, coil_mode: strong, q: 0.1}
+                  potential: {type: harmonic, omega: [1.0, 1.0]}
+                  dt: 0.01
+                  n_steps: 5
+                  tol: 1.0e-3
+                  initial_state: ferromagnetic
+            """)
+            # dry_run should print expanded YAML and return "" — must NOT touch GPU
+            buf = IOBuffer()
+            redirect_stdout(buf) do
+                run_yaml(cfg_path; base_dir = tmp, verbose = false, dry_run = true)
+            end
+            out = String(take!(buf))
+            @test occursin("dry-run", out)
+            @test occursin("Gauss", out)        # p_mv → "X Gauss" in expanded form
+            @test !occursin("p_mv", out)        # lab key stripped
+        end
+    end
+
     @testset "calibration_history interpolation" begin
         cs1 = CalibrationSet(
             epoch = "w1", date = "2026-04-01",
