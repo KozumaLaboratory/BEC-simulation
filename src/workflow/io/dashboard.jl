@@ -1144,17 +1144,23 @@ function _snapshots_metadata(jld2_path::String)
                 n = Int(f["dynamics/psi_snapshots_streamed/n_snapshots"])
                 shape = Int.(f["dynamics/psi_snapshots_streamed/spatial_shape"])
                 D = Int(f["dynamics/psi_snapshots_streamed/n_components"])
+                # `times` includes t=0 (the GS state) PLUS one entry per
+                # save_every checkpoint. Streamed frames only cover the
+                # checkpoints, so times has length n+1. Slice the leading
+                # t=0 off so times[k] aligns with frame_NNNNN where N=k.
+                times_aligned = length(times) == n + 1 ? times[2:end] : times
                 return Dict{String,Any}(
                     "n_snapshots" => n,
-                    "times" => times,
+                    "times" => times_aligned,
                     "shape" => vcat(shape, D),
                 )
             elseif haskey(f, "dynamics/psi_snapshots")
                 snaps = f["dynamics/psi_snapshots"]
                 n_snaps = size(snaps, ndims(snaps))
+                times_aligned = length(times) == n_snaps + 1 ? times[2:end] : times
                 return Dict{String,Any}(
                     "n_snapshots" => n_snaps,
-                    "times" => times,
+                    "times" => times_aligned,
                     "shape" => collect(size(snaps)[1:end-1]),
                 )
             end
