@@ -30,9 +30,10 @@ using Random
             sm = SpinSystem(6)
             mz0 = magnetization(ws.state.psi, ws.grid, sm)
 
-            # Many split-steps — accumulated drift should still be small
+            # Many split-steps — accumulated drift should still be small.
+            # split_step!(ws) reads dt from ws.sim_params, no kwarg.
             for _ in 1:50
-                SpinorBEC.split_step!(ws, 0.005)
+                SpinorBEC.split_step!(ws)
             end
             n_after = sum(abs2, ws.state.psi) * SpinorBEC.cell_volume(grid)
             mz_after = magnetization(ws.state.psi, ws.grid, sm)
@@ -81,7 +82,7 @@ using Random
         sm = SpinSystem(1)
         mz0 = magnetization(ws.state.psi, ws.grid, sm)
         for _ in 1:30
-            SpinorBEC.split_step!(ws, 0.01)
+            SpinorBEC.split_step!(ws)
         end
         @test abs(magnetization(ws.state.psi, ws.grid, sm) - mz0) < 1e-10
     end

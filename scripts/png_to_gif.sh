@@ -22,13 +22,23 @@ command -v ffmpeg >/dev/null 2>&1 || { echo "error: ffmpeg not on PATH"; exit 1;
 PALETTE="$(mktemp --suffix=.png)"
 trap 'rm -f "$PALETTE"' EXIT
 
+# Detect padding width: column_density_movie uses 4-digit (single-step)
+# or 5-digit (multi_step=true) naming.
+if compgen -G "$FRAMES_DIR/col_?????.png" > /dev/null; then
+    PAT="col_%05d.png"
+elif compgen -G "$FRAMES_DIR/col_????.png" > /dev/null; then
+    PAT="col_%04d.png"
+else
+    echo "error: no col_NNNN.png frames found in $FRAMES_DIR"; exit 1
+fi
+
 # Pass 1: build a global palette from the whole sequence.
-ffmpeg -y -framerate "$FPS" -i "$FRAMES_DIR/col_%05d.png" \
+ffmpeg -y -framerate "$FPS" -i "$FRAMES_DIR/$PAT" \
     -vf "fps=$FPS,scale=$WIDTH:-1:flags=lanczos,palettegen=stats_mode=full" \
     "$PALETTE" 2>/dev/null
 
 # Pass 2: encode the GIF using the palette + Sierra dithering.
-ffmpeg -y -framerate "$FPS" -i "$FRAMES_DIR/col_%05d.png" -i "$PALETTE" \
+ffmpeg -y -framerate "$FPS" -i "$FRAMES_DIR/$PAT" -i "$PALETTE" \
     -filter_complex "fps=$FPS,scale=$WIDTH:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=sierra2_4a" \
     "$OUTPUT" 2>/dev/null
 

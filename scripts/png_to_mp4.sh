@@ -15,8 +15,16 @@ FPS="${3:-30}"
 [[ -d "$FRAMES_DIR" ]] || { echo "error: $FRAMES_DIR is not a directory"; exit 1; }
 command -v ffmpeg >/dev/null 2>&1 || { echo "error: ffmpeg not on PATH"; exit 1; }
 
-# column_density_movie writes col_NNNNN.png (5-digit zero pad)
-ffmpeg -y -framerate "$FPS" -i "$FRAMES_DIR/col_%05d.png" \
+# Detect padding width (single-step: 4-digit, multi_step: 5-digit).
+if compgen -G "$FRAMES_DIR/col_?????.png" > /dev/null; then
+    PAT="col_%05d.png"
+elif compgen -G "$FRAMES_DIR/col_????.png" > /dev/null; then
+    PAT="col_%04d.png"
+else
+    echo "error: no col_NNNN.png frames found in $FRAMES_DIR"; exit 1
+fi
+
+ffmpeg -y -framerate "$FPS" -i "$FRAMES_DIR/$PAT" \
     -c:v libx264 -pix_fmt yuv420p -crf 18 -preset fast \
     -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" \
     "$OUTPUT"
