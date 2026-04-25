@@ -425,10 +425,24 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         if !isfile(fpath)
             return (404, "text/plain", "File not found: $name/$file")
         end
-        bin = try
-            _compute_3d_density_binary(_load_psi_cached(fpath, psi_cache, snap_idx)...; component=comp_idx)
-        catch e
-            return (500, "text/plain", "Error: $(e)")
+        # Cache density3d_bin output by (file, snap, component). The
+        # packed Float32 volume is much smaller than the underlying ψ
+        # (524 KB for 64x64x32 vs 13.6 MB), so this is a RAM win + the
+        # time-scrubber playback hits cache after the first full pass.
+        cache_key = "density3d_bin:$(fpath)#snap=$(snap_idx)#comp=$(comp_idx)"
+        bin = if haskey(psi_cache, cache_key)
+            psi_cache[cache_key]
+        else
+            while length(psi_cache) >= PSI_CACHE_MAX_ENTRIES
+                delete!(psi_cache, first(keys(psi_cache)))
+            end
+            v = try
+                _compute_3d_density_binary(_load_psi_cached(fpath, psi_cache, snap_idx)...; component=comp_idx)
+            catch e
+                return (500, "text/plain", "Error: $(e)")
+            end
+            psi_cache[cache_key] = v
+            v
         end
         (200, "application/octet-stream", bin)
 

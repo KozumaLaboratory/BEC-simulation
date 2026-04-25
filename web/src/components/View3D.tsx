@@ -111,7 +111,11 @@ export function View3D({ run, data }: Props) {
   })
 
   const vortexControls = useControls('Vortex lines', {
-    show: true,
+    // Off by default — extract_vortex_lines_per_m runs on every snap
+    // change (cached server-side after the first hit, but still adds
+    // ~100-300 ms latency per fresh frame). Toggle on after the time
+    // scrubber feels responsive.
+    show: false,
     mask: { value: 0.01, min: 0, max: 0.5, step: 0.005, label: 'density mask' },
     thickness: { value: 0.012, min: 0.001, max: 0.1, step: 0.001 },
     colorByCharge: { value: false, label: 'color by charge (vs m)' },
@@ -479,7 +483,13 @@ export function View3D({ run, data }: Props) {
           </div>
         )}
 
-        <TimeScrubber meta={snapMeta} snapIdx={snapIdx} onChange={setSnapIdx} fps={30} />
+        <TimeScrubber
+          meta={snapMeta}
+          snapIdx={snapIdx}
+          onChange={setSnapIdx}
+          fps={10}
+          loading={loading}
+        />
       </CardContent>
     </Card>
   )
