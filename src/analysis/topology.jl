@@ -35,13 +35,17 @@ function winding_number_field(
     # Pick the phase source: a single component or the one with peak density.
     c = component === nothing ? argmax_component_density(psi, N) :
                                 clamp(Int(component), 1, D)
-    field_shape = ntuple(d -> n_pts[d] - 1, Val(N))
-    winding = zeros(Int, field_shape)
 
-    # Extract the (x, y) plane at each value of the other axes.
+    # Output shape:
+    # - 2D: one plaquette winding per (i, j) interior cell → (nx-1, ny-1)
+    # - 3D: same per-z-slice → (nx-1, ny-1, nz). Only the in-plane axes
+    #   shrink; we keep one entry per z so the slab indices line up with
+    #   `1:n_pts[3]` in the loop below.
     if N == 2
+        winding = zeros(Int, n_pts[1] - 1, n_pts[2] - 1)
         _fill_winding_2d!(winding, psi, c, Float64(threshold))
     elseif N == 3
+        winding = zeros(Int, n_pts[1] - 1, n_pts[2] - 1, n_pts[3])
         for k in 1:n_pts[3]
             sub = view(winding, :, :, k)
             psi_xy = view(psi, :, :, k, c)
