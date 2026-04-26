@@ -2,7 +2,7 @@ module SpinorBECCUDAExt
 
 using SpinorBEC
 import CUDA
-using CUDA: CuArray
+using CUDA: CuArray, CuGraph, CuGraphExec, @captured
 
 include("backend.jl")
 include("gpu_spin_mixing.jl")
