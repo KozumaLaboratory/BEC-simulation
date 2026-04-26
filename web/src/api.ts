@@ -163,6 +163,69 @@ export const api = {
     )
   },
 
+  /** Lab image ring buffer for the live monitor (#67). Returns an
+   * array of recently-uploaded shots for the run, most recent first.
+   * Each entry has `url` ready to drop into <img src=…>. */
+  listLabImages(
+    run: string,
+    limit = 32,
+  ): Promise<Array<{ name: string; url: string; mtime_ms: number; size: number }>> {
+    return json(
+      `/api/lab/list/${encodeURIComponent(run)}?limit=${limit}`,
+    )
+  },
+
+  /** 3D density atlas: one binary blob containing every snap's full
+   * 3D density volume for one component. Layout matches the backend's
+   * "D3AT" packer (see /api/density3d_atlas). Returns the per-snap
+   * slabs already broken into Float32Array views — feed each one into
+   * a `THREE.Data3DTexture(slab, nx, ny, nz)` to scrub by texture
+   * swap instead of fetch + upload. */
+  async getDensity3dAtlas(
+    run: string,
+    file: string,
+    component = 0,
+  ): Promise<{
+    nx: number
+    ny: number
+    nz: number
+    n_snaps: number
+    n_comp: number
+    F: number
+    component: number
+    snaps: Float32Array[]
+  }> {
+    const buf = await bin(
+      `/api/density3d_atlas/${encodeURIComponent(run)}/${encodeURIComponent(file)}?comp=${component}`,
+    )
+    // "D3AT" magic (4) + 6 Int32 header (24) = 28 byte header
+    const magic = new Uint8Array(buf, 0, 4)
+    if (
+      magic[0] !== 0x44 ||
+      magic[1] !== 0x33 ||
+      magic[2] !== 0x41 ||
+      magic[3] !== 0x54
+    ) {
+      throw new Error('density3d_atlas: bad magic')
+    }
+    const hdr = new Int32Array(buf, 4, 6)
+    const n_snaps = hdr[0]
+    const nx = hdr[1]
+    const ny = hdr[2]
+    const nz = hdr[3]
+    const n_comp = hdr[4]
+    const comp = hdr[5]
+    const slabFloats = nx * ny * nz
+    const slabBytes = slabFloats * 4
+    const snaps: Float32Array[] = []
+    let off = 28
+    for (let s = 0; s < n_snaps; s++) {
+      snaps.push(new Float32Array(buf, off, slabFloats).slice())
+      off += slabBytes
+    }
+    return { nx, ny, nz, n_snaps, n_comp, F: 0, component: comp, snaps }
+  },
+
   /** Synthetic-dimension dispersion image (k_real × k_synth). Wraps
    * the backend's /api/synthetic_dispersion endpoint, which packs the
    * spectrum into the same Float32-binary layout as a column density

@@ -363,6 +363,35 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
             return (200, ct, read(full))
         end
         return (404, "text/plain", "lab image not found: $rel")
+    elseif startswith(path, "/api/lab/list/")
+        # /api/lab/list/<run_name>?limit=N → JSON array of recent lab
+        # images uploaded via POST /api/lab/image/<run>. Most recent
+        # first, capped to `limit` (default 32 — matches the React
+        # LabImageOverlay's ring buffer expectation).
+        run_name = _uri_decode(path[(length("/api/lab/list/") + 1):end])
+        qidx = findfirst('?', run_name)
+        limit = 32
+        if qidx !== nothing
+            query = run_name[(qidx + 1):end]
+            run_name = run_name[1:(qidx - 1)]
+            m = match(r"limit=(\d+)", query)
+            m !== nothing && (limit = parse(Int, m.captures[1]))
+        end
+        img_dir = joinpath(base_dir, run_name, "lab_images")
+        if !isdir(img_dir)
+            return (200, "application/json", "[]")
+        end
+        files = sort(filter(f -> startswith(f, "shot_") && endswith(f, ".png"),
+                             readdir(img_dir)); rev = true)
+        files = files[1:min(limit, length(files))]
+        items = map(files) do f
+            full = joinpath(img_dir, f)
+            mt = round(Int, mtime(full) * 1000)
+            sz = filesize(full)
+            "{\"name\":\"$f\",\"url\":\"/runs/$(run_name)/lab_images/$(f)\",\"mtime_ms\":$mt,\"size\":$sz}"
+        end
+        (200, "application/json", "[" * join(items, ",") * "]")
+
     elseif path == "/api/runs"
         runs = list_runs(base_dir)
         (200, "application/json", "[" * join(["\"$r\"" for r in runs], ",") * "]")
