@@ -8,8 +8,10 @@
 
 # Per-workspace cache. Parameterised on T (Float32 / Float64).
 mutable struct GPUSMCache{D, T <: AbstractFloat}
-    V::CuArray{Complex{T}, 2}          # D×D Fy eigenvectors
-    Vt::CuArray{Complex{T}, 2}         # D×D Fy eigenvectors adjoint
+    V::CuArray{Complex{T}, 2}          # D×D Fy eigenvectors V
+    Vt::CuArray{Complex{T}, 2}         # D×D V_adj = (V^T)* (legacy gemm path)
+    conj_V::CuArray{Complex{T}, 2}     # D×D V* (for shared apply_euler_5stage_fused!)
+    V_T::CuArray{Complex{T}, 2}        # D×D V^T (for shared helper)
     λ::CuArray{T, 2}                    # (1,D) Fy eigenvalues (for Ry fusion)
     m_vals::CuArray{T, 2}               # (1,D) m-values (for Rz fusion)
     m_shift::CuArray{T, 2}              # (1,D) m_vals - F (ITP Dz shift)
@@ -40,9 +42,12 @@ function _get_gpu_sm_cache(
     λ_host = T.(sm.Fy_eigvals)
     m_shift_host = T[m_vals[c] - F for c in 1:D]
 
+    V_host = Matrix{Complex{T}}(sm.Fy_eigvecs)
     cache = GPUSMCache{D, T}(
-        CuArray(Matrix{Complex{T}}(sm.Fy_eigvecs)),
+        CuArray(V_host),
         CuArray(Matrix{Complex{T}}(sm.Fy_eigvecs_adj)),
+        CuArray(conj.(V_host)),
+        CuArray(transpose(V_host) |> Matrix),
         CuArray(reshape(λ_host, 1, D)),
         CuArray(reshape(m_vals, 1, D)),
         CuArray(reshape(m_shift_host, 1, D)),
@@ -117,38 +122,18 @@ function SpinorBEC.apply_spin_mixing_step!(
     α_view .= atan.(fy, fx)
     f_mag_view .*= c1_t * dt_t       # θ = c1 * f_mag * dt
 
-    # --- Step 1: R_z(-α) → psi_2d[i,c] *= cis(+m[c] * α[i]) ---
-    # Matches CPU spinor_utils.jl `_apply_euler_spin_rotation` (line 121-129):
-    # the initial phase is `cis(F·α)` and the per-component recurrence
-    # multiplies by `cis(-α)`, giving `cis(m_c · α)` per column. ddi.jl
-    # line 592 uses the same `cis(+m_c · alpha)` convention. The earlier
-    # GPU code shipped `cis(-m_c · α)` here (and likewise at Step 5 below),
-    # which is α → -α — that flipped the sign of the F_y component of the
-    # spin-mixing field and gave wrong dynamics for any state with
-    # ⟨F_y⟩ ≠ 0 on GPU. Fixed 2026-04-26 after audit.
-    psi_2d .*= cis.(m_gpu .* α)
-
-    # --- Step 2: R_y(-β) = V · diag(exp(+iβλ)) · V† · ψ ---
-    CUDA.CUBLAS.gemm!('N', 'T', Complex{T}(1), psi_2d, cache.Vt, Complex{T}(0), tmp)
-    tmp .*= cis.(β .* λ_gpu)  # fused (N,D) × (N,1)*(1,D)
-    CUDA.CUBLAS.gemm!('N', 'T', Complex{T}(1), tmp, cache.V, Complex{T}(0), psi_2d)
-
-    # --- Step 3: exp(-iθF_z) (diagonal in spin) ---
-    if imaginary_time
-        # Shift by -F so largest factor is exp(0)=1 (m=-F gets factor 1)
-        psi_2d .*= exp.(θ .* m_shift_gpu)
-    else
-        psi_2d .*= cis.(.-θ .* m_gpu)
-    end
-
-    # --- Step 4: R_y(β) = V · diag(exp(-iβλ)) · V† · ψ ---
-    CUDA.CUBLAS.gemm!('N', 'T', Complex{T}(1), psi_2d, cache.Vt, Complex{T}(0), tmp)
-    tmp .*= cis.(.-β .* λ_gpu)
-    CUDA.CUBLAS.gemm!('N', 'T', Complex{T}(1), tmp, cache.V, Complex{T}(0), psi_2d)
-
-    # --- Step 5: R_z(α) → psi_2d[i,c] *= cis(-m[c] * α[i]) ---
-    # See Step 1 note. ddi.jl line 632 uses the same `cis(-m_c · alpha)`.
-    psi_2d .*= cis.(.-m_gpu .* α)
+    # Fused (N,1)·(1,D) Euler 5-stage rotation, single source of truth
+    # in `foundation/spinor_utils.jl::apply_euler_5stage_fused!`. The
+    # 2026-04-26 GPU audit pinned down the convention (Step 1 = cis(+m·α),
+    # Step 5 = cis(-m·α)) — keep all paths through the helper so a
+    # mismatch can never re-emerge silently. `mul!` on `CuArray` here
+    # dispatches to cuBLAS through CUDA.jl's overload (verified against
+    # the prior `CUDA.CUBLAS.gemm!` direct calls — same kernel).
+    SpinorBEC.apply_euler_5stage_fused!(
+        psi_2d, tmp, α, β, θ,
+        m_gpu, m_shift_gpu, λ_gpu, cache.V_T, cache.conj_V;
+        imaginary_time=imaginary_time,
+    )
 
     nothing
 end

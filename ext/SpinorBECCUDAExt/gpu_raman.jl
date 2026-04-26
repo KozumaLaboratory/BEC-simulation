@@ -6,6 +6,8 @@
 mutable struct GPURamanCache{D, T <: AbstractFloat}
     V::CuArray{Complex{T}, 2}
     Vt::CuArray{Complex{T}, 2}
+    conj_V::CuArray{Complex{T}, 2}    # D×D V* (for shared apply_euler_5stage_fused!)
+    V_T::CuArray{Complex{T}, 2}       # D×D V^T (for shared helper)
     λ::CuArray{T, 2}                  # (1, D) — fused with (N, 1) for D-wide broadcast
     m_vals::CuArray{T, 2}             # (1, D)
     m_shift::CuArray{T, 2}            # (1, D)  m_vals - F
@@ -43,9 +45,12 @@ function _get_gpu_raman_cache(
         kr_host[lin] = sum(ntuple(d -> T(raman.k_eff[d]) * T(grid.x[d][I[d]]), Val(N)))
     end
 
+    V_host = Matrix{Complex{T}}(sm.Fy_eigvecs)
     cache = GPURamanCache{D, T}(
-        CuArray(Matrix{Complex{T}}(sm.Fy_eigvecs)),
+        CuArray(V_host),
         CuArray(Matrix{Complex{T}}(sm.Fy_eigvecs_adj)),
+        CuArray(conj.(V_host)),
+        CuArray(transpose(V_host) |> Matrix),
         CuArray(reshape(λ_host, 1, D)),
         CuArray(reshape(m_vals, 1, D)),
         CuArray(reshape(m_shift, 1, D)),
@@ -95,53 +100,14 @@ function SpinorBEC.apply_raman_step!(
     α .= atan.(.-Omega_R .* sin.(kr), Omega_R .* cos.(kr))
     θ .= phi_mag_val * dt_t
 
-    # Fused 5-stage Euler rotation matching gpu_spin_mixing.jl convention
-    # (single-launch broadcasts replacing per-column loops).
-    _gpu_euler_5stage_rotate!(
-        psi_2d, tmp, α, β, θ, cache.m_vals, cache.m_shift, cache.λ,
-        cache.V, cache.Vt, imaginary_time,
+    # Single source of truth for the Euler 5-stage rotation lives in
+    # `foundation/spinor_utils.jl::apply_euler_5stage_fused!`. Same call
+    # site as gpu_spin_mixing and DDI.
+    SpinorBEC.apply_euler_5stage_fused!(
+        psi_2d, tmp, α, β, θ,
+        cache.m_vals, cache.m_shift, cache.λ, cache.V_T, cache.conj_V;
+        imaginary_time=imaginary_time,
     )
 
-    nothing
-end
-
-"""
-    _gpu_euler_5stage_rotate!(psi_2d, tmp, α, β, θ, m_gpu, m_shift_gpu, λ_gpu, V, Vt, imaginary_time)
-
-Apply `R_z(α) R_y(β) D_z(θ) R_y(-β) R_z(-α)` per spatial point on the
-GPU. `α`, `β`, `θ` are `(N, 1)` per-point fields; `m_gpu`, `m_shift_gpu`,
-`λ_gpu` are `(1, D)` row vectors so the per-component phases fuse with
-the per-point fields in a single broadcast each. Shared by `gpu_raman`
-and (informally — same code shape) `gpu_spin_mixing`. Centralises the
-sign convention that the 2026-04-26 audit pinned down (Step 1 = `cis(+m·α)`,
-Step 5 = `cis(-m·α)` matching CPU spinor_utils).
-"""
-@inline function _gpu_euler_5stage_rotate!(
-    psi_2d, tmp, α, β, θ,
-    m_gpu, m_shift_gpu, λ_gpu, V, Vt, imaginary_time::Bool,
-)
-    T = real(eltype(psi_2d))
-    # Step 1: R_z(-α) → cis(+m·α) per (point, component)
-    psi_2d .*= cis.(m_gpu .* α)
-
-    # Step 2: R_y(-β) = V · diag(cis(+βλ)) · V†
-    CUDA.CUBLAS.gemm!('N', 'T', Complex{T}(1), psi_2d, Vt, Complex{T}(0), tmp)
-    tmp .*= cis.(β .* λ_gpu)
-    CUDA.CUBLAS.gemm!('N', 'T', Complex{T}(1), tmp, V, Complex{T}(0), psi_2d)
-
-    # Step 3: D_z(θ) — RTP cis(-θm), ITP exp(-θ(m+F)) shifted by -F so m=-F → 1
-    if imaginary_time
-        psi_2d .*= exp.(θ .* m_shift_gpu)
-    else
-        psi_2d .*= cis.(.-θ .* m_gpu)
-    end
-
-    # Step 4: R_y(β) = V · diag(cis(-βλ)) · V†
-    CUDA.CUBLAS.gemm!('N', 'T', Complex{T}(1), psi_2d, Vt, Complex{T}(0), tmp)
-    tmp .*= cis.(.-β .* λ_gpu)
-    CUDA.CUBLAS.gemm!('N', 'T', Complex{T}(1), tmp, V, Complex{T}(0), psi_2d)
-
-    # Step 5: R_z(α) → cis(-m·α)
-    psi_2d .*= cis.(.-m_gpu .* α)
     nothing
 end

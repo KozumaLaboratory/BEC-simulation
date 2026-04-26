@@ -553,36 +553,20 @@ function _apply_ddi_rotation!(
 
     # GPU path: fuse D per-column broadcasts into one (N,D)×(1,D)*(N,1) broadcast.
     if rc.m_row !== nothing
-        α_col = reshape(alpha, N_spatial, 1)
-        β_col = reshape(beta, N_spatial, 1)
-        θ_col = reshape(theta, N_spatial, 1)
-        m_row = rc.m_row
-        λ_row = rc.λ_row
-        m_shift_row = rc.m_shift_row
-
-        # Step 1: Rz(-α) — psi[i,c] *= cis(+m[c] * α[i])
-        P .*= cis.(m_row .* α_col)
-
-        # Step 2: Ry(-β) = V · diag(exp(+iβλ)) · V†
-        mul!(W, P, conj_V)
-        W .*= cis.(β_col .* λ_row)
-        mul!(P, W, V_T)
-
-        # Step 3: Dz(θ)
-        if imaginary_time
-            # psi[i,c] *= exp(-(m[c]+F) * θ[i])  — shifted so max factor is 1
-            P .*= exp.(.-m_shift_row .* θ_col)
-        else
-            P .*= cis.(.-m_row .* θ_col)
-        end
-
-        # Step 4: Ry(β) = V · diag(exp(-iβλ)) · V†
-        mul!(W, P, conj_V)
-        W .*= cis.(.-β_col .* λ_row)
-        mul!(P, W, V_T)
-
-        # Step 5: Rz(α) — psi[i,c] *= cis(-m[c] * α[i])
-        P .*= cis.(.-m_row .* α_col)
+        # Fused (N,1)·(1,D) Euler 5-stage rotation, shared with
+        # `gpu_spin_mixing.jl` and `gpu_raman.jl` via
+        # `apply_euler_5stage_fused!` (foundation/spinor_utils.jl). The
+        # earlier inline copy here was bit-identical but invited the same
+        # silent sign-convention drift the 2026-04-26 GPU audit caught.
+        apply_euler_5stage_fused!(
+            P, W,
+            reshape(alpha, N_spatial, 1),
+            reshape(beta, N_spatial, 1),
+            reshape(theta, N_spatial, 1),
+            rc.m_row, rc.m_shift_row, rc.λ_row,
+            V_T, conj_V;
+            imaginary_time=imaginary_time,
+        )
     else
         # CPU path: column-wise loop avoids large temporary (1,D) broadcast tables.
         # Step 1: Rz(-α)
