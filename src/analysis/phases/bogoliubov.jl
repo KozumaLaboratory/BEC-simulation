@@ -67,7 +67,15 @@ function _bdg_contact_matrices(spinor, F, interactions, zeeman)
 end
 
 function _bdg_k_scan(h_mf, M_anom, zee, n0, D, spinor, k_max, n_k)
-    mu = real(sum(c -> (zee[c] + n0 * h_mf[c, c]) * abs2(spinor[c]), 1:D))
+    # μ = ⟨ψ|(Z + n0 h_mf)|ψ⟩. The earlier `sum(c -> ...|ψ_c|²)` form
+    # kept only the diagonal of h_mf, which is correct for a single-m
+    # state but drops O(1) off-diagonal terms whenever the spinor is
+    # not aligned with a |m⟩ basis vector (FL, cyclic, biaxial nematic,
+    # any uniformly-rotated polarized state). The diagonal-only μ
+    # systematically biases the roton gap and the long-wavelength sound
+    # speed reported by `bogoliubov_dispersion`. Fixed 2026-04-26.
+    H_mu = Diagonal(zee) .+ n0 .* h_mf
+    mu = real(dot(spinor, H_mu * spinor))
 
     k_values = collect(range(0, k_max; length=n_k))
     omega = zeros(ComplexF64, 2D, n_k)

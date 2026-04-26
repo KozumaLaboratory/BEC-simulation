@@ -94,7 +94,11 @@ function _compute_lhy_at_density(
         sm = nothing
     end
 
-    mu = real(sum(c -> (zee[c] + n0 * h_mf[c, c]) * abs2(spinor[c]), 1:D))
+    # μ = ⟨ψ|(Z + n0 h_mf)|ψ⟩ — the diagonal-only `sum(...|ψ_c|²)` form
+    # was correct only for single-m states. Mirrors the matching fix in
+    # phases/bogoliubov.jl (2026-04-26).
+    H_mu_lhy = Diagonal(zee) .+ n0 .* h_mf
+    mu = real(dot(spinor, H_mu_lhy * spinor))
 
     k_values = collect(range(1e-6, k_max; length=n_k))
     dk = k_values[2] - k_values[1]
@@ -129,12 +133,23 @@ function _compute_lhy_at_density(
             H_bdg[(D + 1):2D, 1:D] .= .-conj.(M_sc)
             H_bdg[(D + 1):2D, (D + 1):2D] .= .-conj.(L)
 
-            evals = eigvals(H_bdg)
+            # mu_b is the per-branch large-k asymptote subtracted to make
+            # the LHY k-integrand convergent. For each ω-branch we find
+            # the dominant spinor component c* of the BdG eigenvector and
+            # use the matching diagonal entry — was hard-coded to c=1
+            # (m=+F), which only holds for a fully polarized GS along +z.
+            evals_full = eigen(H_bdg)
+            evals = evals_full.values
+            evecs = evals_full.vectors
             zpe = 0.0
-            for ev in evals
+            for (eb, ev) in enumerate(evals)
                 omega = real(ev)
                 omega > 1e-10 || continue
-                mu_b = ek + n0 * real(h_total[1, 1]) - mu + zee[1]
+                # particle-branch lives in the upper D rows; pick the
+                # dominant component there to label the asymptote
+                u_part = view(evecs, 1:D, eb)
+                c_star = argmax(abs2.(u_part))
+                mu_b = ek + n0 * real(h_total[c_star, c_star]) - mu + zee[c_star]
                 correction = omega - ek - mu_b + mu_b^2 / (2.0 * max(ek, 1e-30))
                 zpe += 0.5 * correction
             end

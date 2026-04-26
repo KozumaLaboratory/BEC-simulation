@@ -1,3 +1,5 @@
+using LinearAlgebra: normalize
+
 @testset "Bogoliubov-de Gennes" begin
     @testset "Scalar BEC phonon dispersion (F=1, polar)" begin
         F = 1
