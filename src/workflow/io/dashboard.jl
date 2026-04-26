@@ -16,7 +16,7 @@ function generate_dashboard_data(run_dir::String; F::Union{Nothing, Int}=nothing
 
     jld2_files = sort(
         filter(f -> startswith(f, "point_") && endswith(f, ".jld2"),
-            readdir(run_dir))
+            readdir(run_dir)),
     )
     isempty(jld2_files) && throw(ArgumentError("No point_*.jld2 files in $run_dir"))
 
@@ -145,13 +145,14 @@ function _write_json(io::IO, s::AbstractString)
     end
     print(io, '"')
 end
-_write_json(io::IO, n::Real) = if isnan(n)
-    print(io, "null")
-elseif isinf(n)
-    print(io, "null")
-else
-    print(io, n)
-end
+_write_json(io::IO, n::Real) =
+    if isnan(n)
+        print(io, "null")
+    elseif isinf(n)
+        print(io, "null")
+    else
+        print(io, n)
+    end
 _write_json(io::IO, b::Bool) = print(io, b ? "true" : "false")
 _write_json(io::IO, ::Nothing) = print(io, "null")
 
@@ -195,7 +196,7 @@ function serve_dashboard(port::Int=8080; base_dir::String="runs")
         throw(
             ArgumentError(
                 "React dashboard not built. Run: cd web && bun install && bun run build"
-            )
+            ),
         )
     end
     html_content = read(_WEB_DIST_INDEX, String)

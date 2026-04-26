@@ -34,7 +34,7 @@ using FFTW
         @test_throws ArgumentError SpinorBEC.expand_scan_points(
             Dict{String, Any}(
                 "zip" => Dict{String, Any}("a.b" => [1, 2], "c.d" => [1, 2, 3])
-            )
+            ),
         )
     end
 

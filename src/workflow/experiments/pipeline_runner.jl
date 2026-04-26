@@ -285,7 +285,7 @@ function _run_step(
                             c_dd_current[] = min(c_dd_current[] + c_dd_step, c_dd_target)
                             ws.ddi.C_dd = c_dd_current[]
                             println(
-                                "    c_dd → $(round(c_dd_current[]; digits=1)) (dE=$(round(dE; sigdigits=3)))",
+                                "    c_dd → $(round(c_dd_current[]; digits=1)) (dE=$(round(dE; sigdigits=3)))"
                             )
                             flush(stdout)
                             E_prev_ramp[] = NaN  # reset after jump
@@ -570,11 +570,11 @@ function _run_step(
             ComplexF32
         else
             throw(
-            ArgumentError(
-                "save_snapshot_precision must be \"f32\" or \"f64\", got " *
-                snap_precision_str,
-            ),
-        )
+                ArgumentError(
+                    "save_snapshot_precision must be \"f32\" or \"f64\", got " *
+                    snap_precision_str,
+                ),
+            )
         end
 
     cb_sgpe = _build_sgpe_callback(get(p, "sgpe", nothing), Float64(sp.dt))
@@ -873,7 +873,7 @@ function _parse_light_shift(raw, F::Int, V_trap, backend::AbstractBackend)
     if haskey(raw, "profile")
         throw(
             ArgumentError(
-                "light_shift.profile from YAML not yet supported; use eta_tensor with trap or pass LightShift from Julia",
+                "light_shift.profile from YAML not yet supported; use eta_tensor with trap or pass LightShift from Julia"
             ),
         )
     end

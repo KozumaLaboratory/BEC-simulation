@@ -482,7 +482,8 @@ using PrecompileTools
             # Don't break package precompile if the workload trips.
         finally
             try
-                ; rm(tmpdir; recursive=true, force=true);
+                ;
+                rm(tmpdir; recursive=true, force=true);
             catch
                 ;
             end

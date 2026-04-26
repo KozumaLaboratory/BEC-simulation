@@ -179,11 +179,13 @@ function _build_zeeman_level2(z::Dict, duration::Float64, atom, omega_ref::Float
     Bmag_wf = if B_mag_gauss_spec isa Number
         ConstantWaveform(Float64(B_mag_gauss_spec))
     else
-        (if B_mag_gauss_spec isa Waveform
-            B_mag_gauss_spec
-        else
-            _make_waveform(B_mag_gauss_spec, duration)
-        end)
+        (
+            if B_mag_gauss_spec isa Waveform
+                B_mag_gauss_spec
+            else
+                _make_waveform(B_mag_gauss_spec, duration)
+            end
+        )
     end
     theta_wf = if theta_spec isa Number
         ConstantWaveform(Float64(theta_spec))

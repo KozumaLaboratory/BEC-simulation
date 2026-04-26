@@ -26,12 +26,14 @@ function _env_metadata()
     git_hash = try
         readchomp(`git rev-parse --short HEAD`)
     catch
-        ; "unknown"
+        ;
+        "unknown"
     end
     git_dirty = try
         !isempty(readchomp(`git status --porcelain`))
     catch
-        ; false
+        ;
+        false
     end
     Dict{String, Any}(
         "git_hash" => git_hash,
@@ -178,7 +180,7 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
         # Check for pause signal
         if isfile(pause_file)
             verbose && println(
-                "  Paused: detected $pause_file ($(i-1)/$(length(scan.points)) points completed)",
+                "  Paused: detected $pause_file ($(i-1)/$(length(scan.points)) points completed)"
             )
             verbose && println("  Remove .pause file and re-run to continue.")
             return nothing

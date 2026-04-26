@@ -228,10 +228,10 @@ function _run_simulation_standard!(
                 keep_psi=(!stream_snapshots),
             )
             println(
-                "\n  Simulation interrupted at step $(ws.state.step)/$(sp.n_steps), t=$(round(ws.state.t; sigdigits=6))",
+                "\n  Simulation interrupted at step $(ws.state.step)/$(sp.n_steps), t=$(round(ws.state.t; sigdigits=6))"
             )
             println(
-                "  Final snapshot saved. Use run_simulation_checkpointed! with resume=true to continue.",
+                "  Final snapshot saved. Use run_simulation_checkpointed! with resume=true to continue."
             )
             flush(stdout)
         else
@@ -338,10 +338,10 @@ function _run_simulation_leapfrog!(
                 keep_psi=(!stream_snapshots),
             )
             println(
-                "\n  Simulation interrupted at step $(ws.state.step)/$(sp.n_steps), t=$(round(ws.state.t; sigdigits=6))",
+                "\n  Simulation interrupted at step $(ws.state.step)/$(sp.n_steps), t=$(round(ws.state.t; sigdigits=6))"
             )
             println(
-                "  Final snapshot saved. Use run_simulation_checkpointed! with resume=true to continue.",
+                "  Final snapshot saved. Use run_simulation_checkpointed! with resume=true to continue."
             )
             flush(stdout)
         else

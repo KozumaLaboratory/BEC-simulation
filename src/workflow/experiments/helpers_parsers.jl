@@ -116,11 +116,12 @@ function _parse_potential_config(v::Vector)
     PotentialConfig(:composite, Dict{String, Any}("components" => components))
 end
 
-_parse_ramp_or_constant(v::Dict) = if haskey(v, "to")
-    LinearRamp(Float64(v["from"]), Float64(v["to"]))
-else
-    ConstantValue(Float64(v["from"]))
-end
+_parse_ramp_or_constant(v::Dict) =
+    if haskey(v, "to")
+        LinearRamp(Float64(v["from"]), Float64(v["to"]))
+    else
+        ConstantValue(Float64(v["from"]))
+    end
 _parse_ramp_or_constant(v) = ConstantValue(Float64(v))
 
 """

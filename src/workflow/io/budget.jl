@@ -89,15 +89,16 @@ function estimate_run_budget(yaml_path::AbstractString; io::IO=stdout)
                    snap_disk_per_run      # snapshots
     disk_total = (disk_per_run / compression_ratio) * scan_points
 
-    _fmt(b) = if b < 1024
-        @sprintf("%d B", b)
-    elseif b < 1 << 20
-        @sprintf("%.1f KB", b / 1024)
-    elseif b < 1 << 30
-        @sprintf("%.1f MB", b / 2^20)
-    else
-        @sprintf("%.2f GB", b / 2^30)
-    end
+    _fmt(b) =
+        if b < 1024
+            @sprintf("%d B", b)
+        elseif b < 1 << 20
+            @sprintf("%.1f KB", b / 1024)
+        elseif b < 1 << 30
+            @sprintf("%.1f MB", b / 2^20)
+        else
+            @sprintf("%.2f GB", b / 2^30)
+        end
 
     println(io, "── Run budget estimate: $(basename(yaml_path)) ──")
     println(io, "  grid:         $(n_pts)   box: $(box_raw)")

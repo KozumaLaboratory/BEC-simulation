@@ -311,7 +311,7 @@ function _make_interpolator(spec)
     else
         throw(
             ArgumentError(
-                "Unknown ramp scale: $scale. Supported: linear, log, sqrt, cosine, exponential, reverse_sqrt",
+                "Unknown ramp scale: $scale. Supported: linear, log, sqrt, cosine, exponential, reverse_sqrt"
             ),
         )
     end

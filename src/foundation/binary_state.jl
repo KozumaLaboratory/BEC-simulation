@@ -97,11 +97,11 @@ function find_binary_ground_state(
         # Potential half-step (interspecies seen as Hartree)
         @. psi_A *= exp(
             -(V_A + couplings.g_AA * abs2(psi_A) +
-              couplings.g_AB * abs2(psi_B)) * dt / 2
+              couplings.g_AB * abs2(psi_B)) * dt / 2,
         )
         @. psi_B *= exp(
             -(V_B + couplings.g_BB * abs2(psi_B) +
-              couplings.g_AB * abs2(psi_A)) * dt / 2
+              couplings.g_AB * abs2(psi_A)) * dt / 2,
         )
         # Kinetic full step (each species independently)
         for psi in (psi_A, psi_B)
@@ -123,11 +123,11 @@ function find_binary_ground_state(
         # Potential half-step
         @. psi_A *= exp(
             -(V_A + couplings.g_AA * abs2(psi_A) +
-              couplings.g_AB * abs2(psi_B)) * dt / 2
+              couplings.g_AB * abs2(psi_B)) * dt / 2,
         )
         @. psi_B *= exp(
             -(V_B + couplings.g_BB * abs2(psi_B) +
-              couplings.g_AB * abs2(psi_A)) * dt / 2
+              couplings.g_AB * abs2(psi_A)) * dt / 2,
         )
         # Renormalise each species
         psi_A ./= sqrt(sum(abs2, psi_A) * dV)

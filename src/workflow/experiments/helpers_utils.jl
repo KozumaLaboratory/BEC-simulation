@@ -243,6 +243,6 @@ function _print_gs_summary(psi, grid, atom, gs)
     pop_str = join(["m=$(m): $(round(p*100; digits=1))%" for (m, p) in top], ", ")
     mz = sum((F - (c-1)) * pops[c] for c in 1:D)
     println(
-        "  E=$(round(gs.energy; sigdigits=6)) conv=$(gs.converged) Mz=$(round(mz; digits=2)) [$pop_str]",
+        "  E=$(round(gs.energy; sigdigits=6)) conv=$(gs.converged) Mz=$(round(mz; digits=2)) [$pop_str]"
     )
 end

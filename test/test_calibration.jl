@@ -88,7 +88,7 @@ using YAML
         cfg_r = Dict{String, Any}(
             "raman" => Dict{String, Any}(
                 "power_mw" => 2.0, "detuning" => 0.5
-            )
+            ),
         )
         apply_calibration!(cfg_r, calib)
         @test haskey(cfg_r["raman"], "Omega")
@@ -144,7 +144,7 @@ using YAML
         cfg = Dict{String, Any}(
             "zeeman" => Dict{String, Any}(
                 "p_mv" => 1.0, "coil_mode" => "bogus"
-            )
+            ),
         )
         @test_throws ArgumentError apply_calibration!(cfg, DEFAULT_CALIBRATION)
     end
@@ -156,7 +156,7 @@ using YAML
         cfg = Dict{String, Any}(
             "zeeman" => Dict{String, Any}(
                 "p_mv" => 50.0, "coil_mode" => "strong"
-            )
+            ),
         )
         # Warns but doesn't throw
         @test_logs (:warn, r"outside validated range") apply_calibration!(cfg, calib)

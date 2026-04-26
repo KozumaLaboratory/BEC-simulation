@@ -43,7 +43,7 @@ function apply_override!(d::Dict, path::AbstractString, value)
                 throw(ArgumentError("Override path segment '$key' is not a valid list index"))
             idx += 1  # 0-based → 1-based
             1 <= idx <= length(cursor) || throw(
-                ArgumentError("Override list index $key out of bounds (length=$(length(cursor)))"),
+                ArgumentError("Override list index $key out of bounds (length=$(length(cursor)))")
             )
             elem = cursor[idx]
             # Auto-unwrap single-key dicts (pipeline steps like {ground_state: {...}})

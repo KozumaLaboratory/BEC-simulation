@@ -191,6 +191,6 @@ function binary_total_energy(sim::BinarySimulation)
     dV = cell_volume(sim.grid)
     real(
         _binary_energy(sim.psi_A, sim.psi_B, sim.V_A, sim.V_B,
-            sim.K, sim.plans, sim.couplings, dV)
+            sim.K, sim.plans, sim.couplings, dV),
     )
 end
