@@ -1,5 +1,4 @@
-import { useState, useMemo } from 'react'
-import type { Data, Layout } from 'plotly.js-dist-min'
+import { useEffect, useState, useMemo } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   Select,
@@ -12,8 +11,12 @@ import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { DashboardData } from '@/api'
 import { useColumnDensity } from '@/state/useColumnDensity'
+import { useColumnDensityAtlas } from '@/state/useColumnDensityAtlas'
 import { useColumnPhase } from '@/state/useColumnPhase'
-import { BASE_CONFIG, BASE_LAYOUT, Plot } from '@/components/charts/Plot'
+import { useSnapshots } from '@/state/useSnapshots'
+import { useDashboardURL } from '@/state/useDashboardURL'
+import { TimeScrubber } from '@/components/TimeScrubber'
+import { HeatmapGrid, type HeatmapPanelSpec } from '@/components/HeatmapGrid'
 
 interface Props {
   run: string | null
@@ -22,6 +25,7 @@ interface Props {
 
 type Axis = 1 | 2 | 3
 type Mode = 'density' | 'phase'
+type PanelMode = 'total' | 'total_selected' | 'all'
 
 const AXIS_LABEL: Record<Axis, string> = {
   3: 'xy plane (z integrate/slice)',
@@ -29,21 +33,18 @@ const AXIS_LABEL: Record<Axis, string> = {
   1: 'yz plane (x integrate/slice)',
 }
 
-// Cyclic HSL colormap for phase ∈ [-π, π].
-const PHASE_COLORSCALE: Array<[number, string]> = (() => {
-  const stops: Array<[number, string]> = []
-  const N = 12
-  for (let i = 0; i <= N; i++) {
-    const t = i / N
-    stops.push([t, `hsl(${t * 360}, 80%, 55%)`])
+function maxF32(a: Float32Array): number {
+  let m = 0
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] > m) m = a[i]
   }
-  return stops
-})()
+  return m
+}
 
-// Unified per-m 2D grid — one component switches between column-integrated
-// density (viridis, |ψ_m|²) and phase-at-a-plane (cyclic hue, arg(ψ_m)).
-// Previously these lived in two tabs (SliceGrid, PhaseGrid) with 90 % of
-// the same scaffolding around them; keeping them in sync was annoying.
+// Unified per-m 2D grid — switches between column density and phase slice.
+// Hot path is time-scrubber playback: keep a single (Total + selected m)
+// pair on screen by default so each snap only repaints two heatmaps; the
+// "All" mode is opt-in for inspecting every spinor component side by side.
 export function SlicePanel({ run, data }: Props) {
   const points = data?.points ?? []
   const [pointIdx, setPointIdx] = useState(0)
@@ -51,16 +52,47 @@ export function SlicePanel({ run, data }: Props) {
   const [mode, setMode] = useState<Mode>('density')
   const [scaleMode, setScaleMode] = useState<'shared' | 'individual'>('shared')
   const [densityMaskFrac, setDensityMaskFrac] = useState<number>(0.01)
+  const [panelMode, setPanelMode] = useState<PanelMode>('total_selected')
+  const [selectedM, setSelectedM] = useState<number>(0)
 
   const currentPoint = points[Math.min(pointIdx, points.length - 1)] ?? null
+
+  // Time-scrubber state. snap lives on the URL (shared with View3D and the
+  // global ←/→ hotkeys); for non-snapshot runs snap stays undefined and the
+  // backend serves the final state, matching pre-scrubber behaviour.
+  const [url, setUrl] = useDashboardURL()
+  const { data: snapMeta } = useSnapshots(run, currentPoint?.file ?? null)
+  const snapIdx = url.snap ?? 1
+  const setSnapIdx = (n: number) => setUrl({ snap: n })
+  useEffect(() => {
+    if (snapMeta && snapMeta.n_snapshots > 0 && url.snap === null) {
+      setUrl({ snap: 1 })
+    }
+  }, [snapMeta, url.snap, setUrl])
+  const snap = snapMeta && snapMeta.n_snapshots > 0 ? snapIdx : undefined
+
+  // Density atlas: when the run has snapshots, bulk-fetch every snap up
+  // front so the scrubber becomes a pure GPU uniform write — no HTTP, no
+  // decode, no React re-render. The single-snap useColumnDensity stays as
+  // a fallback for snapshot-less runs (and phase mode below).
+  const useAtlas =
+    mode === 'density' && (snapMeta?.n_snapshots ?? 0) > 0
+  const atlas = useColumnDensityAtlas(
+    useAtlas ? run : null,
+    useAtlas ? currentPoint?.file ?? null : null,
+    axis,
+    useAtlas ? snapMeta!.n_snapshots : 0,
+  )
+
   const {
     data: colDens,
     loading: densLoading,
     error: densError,
   } = useColumnDensity(
-    mode === 'density' ? run : null,
-    mode === 'density' ? currentPoint?.file ?? null : null,
+    mode === 'density' && !useAtlas ? run : null,
+    mode === 'density' && !useAtlas ? currentPoint?.file ?? null : null,
     axis,
+    snap,
   )
   const {
     data: phaseData,
@@ -70,71 +102,168 @@ export function SlicePanel({ run, data }: Props) {
     mode === 'phase' ? run : null,
     mode === 'phase' ? currentPoint?.file ?? null : null,
     axis,
+    undefined,
+    snap,
   )
 
-  const loading = mode === 'density' ? densLoading : phaseLoading
+  const loading = mode === 'density'
+    ? useAtlas
+      ? !atlas.ready
+      : densLoading
+    : phaseLoading
   const error = mode === 'density' ? densError : phaseError
 
-  const { panels, xs, ys, axisLabels } = useMemo(() => {
-    if (mode === 'density' && colDens) {
-      const [nx, ny] = colDens.shape
-      const [xRange, yRange] = colDens.axis_ranges
-      const xsArr = linspace(xRange[0], xRange[1], nx)
-      const ysArr = linspace(yRange[0], yRange[1], ny)
-      const perMax = colDens.densities.map((d) => d.reduce((m, v) => (v > m ? v : m), 0))
-      const globalMax = Math.max(...perMax, 0)
+  // Heatmap2D doesn't need explicit x/y coordinate arrays — it renders a
+  // textured plane that fills its container — so we only need the axis
+  // labels for the corner annotations.
+  const axisLabels =
+    mode === 'density'
+      ? useAtlas && atlas.ready
+        ? atlas.axisLabels
+        : colDens?.axis_labels ?? ['x', 'y']
+      : mode === 'phase' && phaseData
+        ? phaseData.axis_labels
+        : ['x', 'y']
+
+  type PanelData = {
+    title: string
+    z: Float32Array
+    nx: number
+    ny: number
+    /** When > 1, `z` is an atlas of this many frames stacked; the
+     * HeatmapGrid shader picks the active slab via `atlasFrame`. */
+    atlasFrames?: number
+    atlasFrame?: number
+    zmin: number
+    zmax: number
+    colormap: 'viridis' | 'phase'
+    /** Density mask for phase panels — Heatmap2D shader discards cells
+     * where mask.data < threshold. */
+    mask?: { data: Float32Array; threshold: number }
+  }
+
+  const allPanels = useMemo<PanelData[]>(() => {
+    // Atlas mode: every snap pre-loaded; per-frame change is a single
+    // GPU uniform write. Allocations (max scan, panels array) happen
+    // ONCE per (run, file, axis), not per scrub frame.
+    if (mode === 'density' && useAtlas && atlas.ready && atlas.totalAtlas) {
+      const { nx, ny, m_values, totalAtlas, componentAtlases, total } = atlas
+      // Compute per-component maxima from the entire atlas — the
+      // colourbar otherwise jumps as the user scrubs into a frame with
+      // a hotter peak.
+      const perMax = componentAtlases.map(maxF32)
+      const totalMax = maxF32(totalAtlas)
       const sharedMax =
-        scaleMode === 'shared' ? Math.max(globalMax, colDens.total_density.reduce((m, v) => (v > m ? v : m), 0)) : null
-      const out: Array<{ title: string; z: (number | null)[][]; zmin: number; zmax: number }> = []
+        scaleMode === 'shared'
+          ? Math.max(totalMax, perMax.reduce((a, b) => (a > b ? a : b), 0))
+          : null
+      const frame = Math.max(0, snapIdx - 1)
+      const out: PanelData[] = []
       out.push({
         title: 'Total',
-        z: reshape(colDens.total_density, nx, ny),
+        z: totalAtlas,
+        nx,
+        ny,
+        atlasFrames: total,
+        atlasFrame: frame,
         zmin: 0,
-        zmax: sharedMax ?? colDens.total_density.reduce((m, v) => (v > m ? v : m), 0),
+        zmax: sharedMax ?? totalMax,
+        colormap: 'viridis',
+      })
+      m_values.forEach((m, i) => {
+        out.push({
+          title: `m=${m}`,
+          z: componentAtlases[i],
+          nx,
+          ny,
+          atlasFrames: total,
+          atlasFrame: frame,
+          zmin: 0,
+          zmax: sharedMax ?? perMax[i],
+          colormap: 'viridis',
+        })
+      })
+      return out
+    }
+    // Single-frame mode (no snapshots, or phase) — per-scrub HTTP fetch
+    // path retained for backward compatibility.
+    if (mode === 'density' && colDens) {
+      const [nx, ny] = colDens.shape
+      const perMax = colDens.densities.map(maxF32)
+      const totalMax = maxF32(colDens.total_density)
+      const sharedMax =
+        scaleMode === 'shared'
+          ? Math.max(totalMax, perMax.reduce((a, b) => (a > b ? a : b), 0))
+          : null
+      const out: PanelData[] = []
+      out.push({
+        title: 'Total',
+        z: colDens.total_density,
+        nx,
+        ny,
+        zmin: 0,
+        zmax: sharedMax ?? totalMax,
+        colormap: 'viridis',
       })
       colDens.m_values.forEach((m, i) => {
         out.push({
           title: `m=${m}`,
-          z: reshape(colDens.densities[i], nx, ny),
+          z: colDens.densities[i],
+          nx,
+          ny,
           zmin: 0,
           zmax: sharedMax ?? perMax[i],
+          colormap: 'viridis',
         })
       })
-      return { panels: out, xs: xsArr, ys: ysArr, axisLabels: colDens.axis_labels }
+      return out
     }
     if (mode === 'phase' && phaseData) {
       const [nx, ny] = phaseData.shape
-      const [xRange, yRange] = phaseData.axis_ranges
-      const xsArr = linspace(xRange[0], xRange[1], nx)
-      const ysArr = linspace(yRange[0], yRange[1], ny)
       const globalMaxN = Math.max(
-        ...phaseData.densities.map((d) => d.reduce((m, v) => (v > m ? v : m), 0)),
+        ...phaseData.densities.map(maxF32),
         1e-300,
       )
-      const mask = densityMaskFrac * globalMaxN
-      const out = phaseData.m_values.map((m, i) => {
-        const ph = phaseData.phases[i]
-        const dens = phaseData.densities[i]
-        const z: (number | null)[][] = new Array(ny)
-        for (let iy = 0; iy < ny; iy++) {
-          const row: (number | null)[] = new Array(nx)
-          for (let ix = 0; ix < nx; ix++) {
-            const k = ix + iy * nx
-            row[ix] = dens[k] < mask ? null : ph[k]
-          }
-          z[iy] = row
-        }
-        return { title: `m=${m}`, z, zmin: -Math.PI, zmax: Math.PI }
-      })
-      return { panels: out, xs: xsArr, ys: ysArr, axisLabels: phaseData.axis_labels }
+      const threshold = densityMaskFrac * globalMaxN
+      return phaseData.m_values.map((m, i) => ({
+        title: `m=${m}`,
+        z: phaseData.phases[i],
+        nx,
+        ny,
+        zmin: -Math.PI,
+        zmax: Math.PI,
+        colormap: 'phase' as const,
+        mask: { data: phaseData.densities[i], threshold },
+      }))
     }
-    return { panels: [], xs: [] as number[], ys: [] as number[], axisLabels: ['x', 'y'] }
-  }, [mode, colDens, phaseData, scaleMode, densityMaskFrac])
+    return []
+  }, [mode, colDens, phaseData, scaleMode, densityMaskFrac, useAtlas, atlas, snapIdx])
+
+  // Filter to the requested panel count. The filtering is cheap and lives
+  // in its own useMemo so changing panelMode doesn't recompute reshape().
+  const panels = useMemo<PanelData[]>(() => {
+    if (panelMode === 'all') return allPanels
+    if (panelMode === 'total' || mode === 'phase') {
+      // phase has no Total; just show the first m when in 'total' mode
+      return allPanels.slice(0, 1)
+    }
+    // total_selected: Total + selected m (density only)
+    const total = allPanels[0]
+    if (!total) return []
+    const idx = Math.min(Math.max(0, selectedM), Math.max(0, allPanels.length - 2))
+    const sel = allPanels[idx + 1]
+    return sel ? [total, sel] : [total]
+  }, [allPanels, panelMode, selectedM, mode])
 
   const sizeInfo =
     mode === 'density'
       ? colDens && `${colDens.shape[0]}×${colDens.shape[1]}`
       : phaseData && `slice #${phaseData.slice_index} / ${phaseData.shape.join('×')}`
+
+  const m_values =
+    mode === 'density'
+      ? colDens?.m_values ?? []
+      : phaseData?.m_values ?? []
 
   return (
     <Card>
@@ -179,6 +308,26 @@ export function SlicePanel({ run, data }: Props) {
             }))}
             width="min-w-[200px]"
           />
+          <LabelledSelect
+            label="Panels"
+            value={panelMode}
+            onChange={(v) => setPanelMode(v as PanelMode)}
+            options={[
+              { value: 'total', label: 'Total only' },
+              { value: 'total_selected', label: 'Total + selected m' },
+              { value: 'all', label: 'All components' },
+            ]}
+            width="min-w-[200px]"
+          />
+          {panelMode === 'total_selected' && m_values.length > 0 && (
+            <LabelledSelect
+              label="m"
+              value={String(selectedM)}
+              onChange={(v) => setSelectedM(Number(v))}
+              options={m_values.map((m, i) => ({ value: String(i), label: `m=${m}` }))}
+              width="min-w-[120px]"
+            />
+          )}
           {mode === 'density' && (
             <LabelledSelect
               label="Color scale"
@@ -218,70 +367,52 @@ export function SlicePanel({ run, data }: Props) {
           </div>
         )}
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          {panels.map((p) => (
-            <Panel
-              key={p.title}
-              mode={mode}
-              title={p.title}
-              z={p.z}
-              xs={xs}
-              ys={ys}
-              zmin={p.zmin}
-              zmax={p.zmax}
-              axisLabels={axisLabels}
+        {snapMeta && snapMeta.n_snapshots > 0 && (
+          <TimeScrubber
+            meta={snapMeta}
+            snapIdx={snapIdx}
+            onChange={setSnapIdx}
+            loading={loading}
+          />
+        )}
+
+        {(() => {
+          // Total (spin-summed) is conceptually different from per-m
+          // panels: it's the physical mass density, the m's are its
+          // breakdown. Render Total full-width on top so it doesn't get
+          // visually lumped into the per-m grid (which previously made it
+          // look like Total had "moved" when switching panel modes).
+          const totalIsFirst =
+            panels.length > 0 && panels[0].title === 'Total'
+          const specs: HeatmapPanelSpec[] = panels.map((p) => ({
+            id: p.title,
+            title: p.title,
+            atlasFrames: p.atlasFrames,
+            atlasFrame: p.atlasFrame,
+            data: p.z,
+            nx: p.nx,
+            ny: p.ny,
+            zmin: p.zmin,
+            zmax: p.zmax,
+            colormap: p.colormap,
+            mask: p.mask,
+          }))
+          const mCount = specs.length - (totalIsFirst ? 1 : 0)
+          const cols: 1 | 2 | 4 = mCount <= 1 ? 1 : mCount <= 2 ? 2 : 4
+          const rowHeight = mCount > 4 ? 180 : 220
+          return (
+            <HeatmapGrid
+              panels={specs}
+              cols={cols}
+              rowHeight={rowHeight}
+              firstFull={totalIsFirst}
+              totalHeight={280}
+              axisLabels={[axisLabels[0] ?? 'x', axisLabels[1] ?? 'y']}
             />
-          ))}
-        </div>
+          )
+        })()}
       </CardContent>
     </Card>
-  )
-}
-
-interface PanelProps {
-  mode: Mode
-  title: string
-  z: (number | null)[][] | number[][]
-  xs: number[]
-  ys: number[]
-  zmin: number
-  zmax: number
-  axisLabels: string[]
-}
-
-function Panel({ mode, title, z, xs, ys, zmin, zmax, axisLabels }: PanelProps) {
-  const traces: Data[] = [
-    {
-      type: 'heatmap',
-      z: z as number[][],
-      x: xs,
-      y: ys,
-      colorscale: mode === 'phase' ? PHASE_COLORSCALE : 'Viridis',
-      zmin,
-      zmax: zmax > 0 ? zmax : 1,
-      showscale: false,
-      hoverongaps: false,
-    } as Data,
-  ]
-  const layout: Partial<Layout> = {
-    ...BASE_LAYOUT,
-    title: { text: title, font: { size: 11, color: '#00d9ff' } },
-    margin: { t: 24, r: 6, b: 28, l: 32 },
-    xaxis: {
-      ...BASE_LAYOUT.xaxis,
-      title: { text: axisLabels[0] ?? 'x', font: { size: 10 } },
-      scaleanchor: 'y',
-      constrain: 'domain',
-    },
-    yaxis: {
-      ...BASE_LAYOUT.yaxis,
-      title: { text: axisLabels[1] ?? 'y', font: { size: 10 } },
-    },
-    height: 220,
-    paper_bgcolor: mode === 'phase' ? '#0a0e14' : 'rgba(0,0,0,0)',
-  }
-  return (
-    <Plot data={traces} layout={layout} config={BASE_CONFIG} style={{ width: '100%', height: 220 }} />
   )
 }
 
@@ -313,22 +444,3 @@ function LabelledSelect({ label, value, onChange, options, width }: LabelledSele
   )
 }
 
-function linspace(a: number, b: number, n: number): number[] {
-  if (n <= 1) return [a]
-  const step = (b - a) / (n - 1)
-  const out = new Array<number>(n)
-  for (let i = 0; i < n; i++) out[i] = a + step * i
-  return out
-}
-
-function reshape(flat: number[], nx: number, ny: number): number[][] {
-  const out: number[][] = new Array(ny)
-  for (let iy = 0; iy < ny; iy++) {
-    const row = new Array<number>(nx)
-    for (let ix = 0; ix < nx; ix++) {
-      row[ix] = flat[ix + iy * nx]
-    }
-    out[iy] = row
-  }
-  return out
-}

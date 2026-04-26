@@ -23,6 +23,7 @@ import { useVorticityTexture } from '@/three/useVorticityTexture'
 import { useVectorField } from '@/three/useVectorField'
 import { useVortexLines } from '@/three/useVortexLines'
 import { useSnapshots } from '@/state/useSnapshots'
+import { useDensityMax } from '@/state/useDensityMax'
 import { TimeScrubber } from '@/components/TimeScrubber'
 import { VolumeCanvas } from '@/three/VolumeCanvas'
 import type { VolumeParams, ColorMode } from '@/three/DensityVolume'
@@ -50,6 +51,10 @@ export function View3D({ run, data }: Props) {
   // Snapshot scrubbing. snap === undefined means "render the final state"
   // (the pre-time-scrubber behaviour, used for non-snapshot runs).
   const { data: snapMeta } = useSnapshots(run, currentPoint?.file ?? null)
+  // density_max moved to its own lazy endpoint so /api/snapshots stays
+  // instant; the value lands a few hundred ms later and the volume
+  // renderer falls back to its sticky-max in the meantime.
+  const densityMax = useDensityMax(run, currentPoint?.file ?? null)
   const snapIdx = url.snap ?? 1
   const setSnapIdx = (n: number) => setUrl({ snap: n })
   useEffect(() => {
@@ -233,10 +238,14 @@ export function View3D({ run, data }: Props) {
   if (rawVolumeTex && rawVolumeTex.maxValue > stickyMaxRef.current.value) {
     stickyMaxRef.current.value = rawVolumeTex.maxValue
   }
+  // Prefer the lazy /api/density_max value once it arrives; the legacy
+  // snapMeta.density_max_total field is kept for backward compat with
+  // older dashboards that still emit it inline.
+  const globalMax = densityMax ?? snapMeta?.density_max_total
   const useGlobalMax =
-    controls.source === 'density' && comp === 0 && snapMeta?.density_max_total
+    controls.source === 'density' && comp === 0 && typeof globalMax === 'number'
   const stableMax = useGlobalMax
-    ? snapMeta!.density_max_total!
+    ? (globalMax as number)
     : stickyMaxRef.current.value
   const volumeTex =
     rawVolumeTex && stableMax > 0
