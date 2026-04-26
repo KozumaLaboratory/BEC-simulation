@@ -97,6 +97,9 @@ const FULL_EXTRA = [
     "test_pipeline.jl",
     "test_pause_resume.jl",
     "test_twa.jl",
+    "test_binary_simulation.jl",
+    "test_synthetic_dimension.jl",
+    "test_calibration_drift.jl",
 ]
 
 # ── Physics tier: analytic validation + physics level tests ──
