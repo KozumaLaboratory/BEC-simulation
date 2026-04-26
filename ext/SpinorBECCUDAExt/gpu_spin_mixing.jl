@@ -7,38 +7,40 @@
 # was 71% of GPU F32 Eu151 128³ split_step total).
 
 # Per-workspace cache. Parameterised on T (Float32 / Float64).
-mutable struct GPUSMCache{D,T<:AbstractFloat}
-    V::CuArray{Complex{T},2}          # D×D Fy eigenvectors
-    Vt::CuArray{Complex{T},2}         # D×D Fy eigenvectors adjoint
-    λ::CuArray{T,2}                    # (1,D) Fy eigenvalues (for Ry fusion)
-    m_vals::CuArray{T,2}               # (1,D) m-values (for Rz fusion)
-    m_shift::CuArray{T,2}              # (1,D) m_vals - F (ITP Dz shift)
+mutable struct GPUSMCache{D, T <: AbstractFloat}
+    V::CuArray{Complex{T}, 2}          # D×D Fy eigenvectors
+    Vt::CuArray{Complex{T}, 2}         # D×D Fy eigenvectors adjoint
+    λ::CuArray{T, 2}                    # (1,D) Fy eigenvalues (for Ry fusion)
+    m_vals::CuArray{T, 2}               # (1,D) m-values (for Rz fusion)
+    m_shift::CuArray{T, 2}              # (1,D) m_vals - F (ITP Dz shift)
     F::T
     # Work buffers
-    tmp::CuArray{Complex{T},2}        # (N, D)
-    fz::CuArray{T,1}                   # (N,)
-    fx::CuArray{T,1}                   # (N,)
-    fy::CuArray{T,1}                   # (N,)
-    β::CuArray{T,2}                    # (N, 1)  shape for fused broadcast
-    α::CuArray{T,2}                    # (N, 1)
-    θ::CuArray{T,2}                    # (N, 1)
-    phase_buf::CuArray{Complex{T},1}  # (N,)
+    tmp::CuArray{Complex{T}, 2}        # (N, D)
+    fz::CuArray{T, 1}                   # (N,)
+    fx::CuArray{T, 1}                   # (N,)
+    fy::CuArray{T, 1}                   # (N,)
+    β::CuArray{T, 2}                    # (N, 1)  shape for fused broadcast
+    α::CuArray{T, 2}                    # (N, 1)
+    θ::CuArray{T, 2}                    # (N, 1)
+    phase_buf::CuArray{Complex{T}, 1}  # (N,)
 end
 
-const _GPU_SM_CACHE = Dict{UInt64,Any}()
+const _GPU_SM_CACHE = Dict{UInt64, Any}()
 
-function _get_gpu_sm_cache(psi::CuArray{Complex{T}}, sm::SpinorBEC.SpinMatrices{D}, ndim::Int) where {D,T<:AbstractFloat}
+function _get_gpu_sm_cache(
+    psi::CuArray{Complex{T}}, sm::SpinorBEC.SpinMatrices{D}, ndim::Int
+) where {D, T <: AbstractFloat}
     N = prod(ntuple(d -> size(psi, d), ndim))
     key = hash((objectid(sm), N, D, T))
     cache = get(_GPU_SM_CACHE, key, nothing)
-    cache !== nothing && return cache::GPUSMCache{D,T}
+    cache !== nothing && return cache::GPUSMCache{D, T}
 
     F = T(sm.system.F)
     m_vals = T[F - T(c - 1) for c in 1:D]
     λ_host = T.(sm.Fy_eigvals)
     m_shift_host = T[m_vals[c] - F for c in 1:D]
 
-    cache = GPUSMCache{D,T}(
+    cache = GPUSMCache{D, T}(
         CuArray(Matrix{Complex{T}}(sm.Fy_eigvecs)),
         CuArray(Matrix{Complex{T}}(sm.Fy_eigvecs_adj)),
         CuArray(reshape(λ_host, 1, D)),
@@ -64,8 +66,8 @@ function SpinorBEC.apply_spin_mixing_step!(
     c1::Float64,
     dt_frac::Float64,
     ndim::Int;
-    imaginary_time::Bool = false,
-) where {D,T<:AbstractFloat}
+    imaginary_time::Bool=false,
+) where {D, T <: AbstractFloat}
     abs(c1) < 1e-30 && return nothing
     n_pts = ntuple(d -> size(psi, d), ndim)
     N = prod(n_pts)
@@ -108,7 +110,7 @@ function SpinorBEC.apply_spin_mixing_step!(
     # --- Angles (reshape to (N,1) for later fusion with (1,D) diag ---
     # θ stores f_mag temporarily, then scaled
     f_mag_view = reshape(θ, N)
-    f_mag_view .= sqrt.(fx.^2 .+ fy.^2 .+ fz.^2)
+    f_mag_view .= sqrt.(fx .^ 2 .+ fy .^ 2 .+ fz .^ 2)
     β_view = reshape(β, N)
     β_view .= acos.(clamp.(fz ./ max.(f_mag_view, floatmin(T)), -one(T), one(T)))
     α_view = reshape(α, N)

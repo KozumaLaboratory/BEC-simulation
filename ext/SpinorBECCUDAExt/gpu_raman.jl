@@ -3,20 +3,20 @@
 # Uses the same Euler spin rotation as gpu_spin_mixing.jl, but with
 # position-dependent field: phi_x = Ω cos(k·r), phi_y = -Ω sin(k·r), phi_z = δ.
 
-mutable struct GPURamanCache{D,T<:AbstractFloat}
-    V::CuArray{Complex{T},2}
-    Vt::CuArray{Complex{T},2}
+mutable struct GPURamanCache{D, T <: AbstractFloat}
+    V::CuArray{Complex{T}, 2}
+    Vt::CuArray{Complex{T}, 2}
     λ::Vector{T}
     m_vals::Vector{T}
     F::T
-    tmp::CuArray{Complex{T},2}
-    β::CuArray{T,1}
-    α::CuArray{T,1}
-    θ::CuArray{T,1}
-    kr::CuArray{T,1}                # k_eff · r per spatial point
+    tmp::CuArray{Complex{T}, 2}
+    β::CuArray{T, 1}
+    α::CuArray{T, 1}
+    θ::CuArray{T, 1}
+    kr::CuArray{T, 1}                # k_eff · r per spatial point
 end
 
-const _GPU_RAMAN_CACHE = Dict{UInt64,Any}()
+const _GPU_RAMAN_CACHE = Dict{UInt64, Any}()
 
 function _get_gpu_raman_cache(
     psi::CuArray{Complex{T}},
@@ -24,11 +24,11 @@ function _get_gpu_raman_cache(
     raman::SpinorBEC.RamanCoupling{N},
     grid::SpinorBEC.Grid{N},
     ndim::Int,
-) where {D,N,T<:AbstractFloat}
+) where {D, N, T <: AbstractFloat}
     N_spatial = prod(ntuple(d -> size(psi, d), ndim))
     key = hash((objectid(sm), raman.k_eff, N_spatial, D, T))
     cache = get(_GPU_RAMAN_CACHE, key, nothing)
-    cache !== nothing && return cache::GPURamanCache{D,T}
+    cache !== nothing && return cache::GPURamanCache{D, T}
 
     F = T(sm.system.F)
     m_vals = T[F - T(c - 1) for c in 1:D]
@@ -40,7 +40,7 @@ function _get_gpu_raman_cache(
         kr_host[lin] = sum(ntuple(d -> T(raman.k_eff[d]) * T(grid.x[d][I[d]]), Val(N)))
     end
 
-    cache = GPURamanCache{D,T}(
+    cache = GPURamanCache{D, T}(
         CuArray(Matrix{Complex{T}}(sm.Fy_eigvecs)),
         CuArray(Matrix{Complex{T}}(sm.Fy_eigvecs_adj)),
         T.(sm.Fy_eigvals),
@@ -62,8 +62,8 @@ function SpinorBEC.apply_raman_step!(
     raman::SpinorBEC.RamanCoupling{N},
     grid::SpinorBEC.Grid{N},
     dt_frac::Float64;
-    imaginary_time::Bool = false,
-) where {D,N,T<:AbstractFloat}
+    imaginary_time::Bool=false,
+) where {D, N, T <: AbstractFloat}
     ndim = N
     n_pts = ntuple(d -> size(psi, d), ndim)
     N_spatial = prod(n_pts)

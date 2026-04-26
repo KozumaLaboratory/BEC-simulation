@@ -23,7 +23,7 @@ function _get_energy_cache(ws::SpinorBEC.Workspace{N}) where {N}
 
     grid = ws.grid
     fft_buf = zeros(ComplexF64, grid.config.n_points)
-    plans = SpinorBEC.make_fft_plans(grid.config.n_points; flags = SpinorBEC.FFTW.ESTIMATE)
+    plans = SpinorBEC.make_fft_plans(grid.config.n_points; flags=SpinorBEC.FFTW.ESTIMATE)
 
     ddi_host = nothing
     ddi_bufs = nothing
@@ -70,9 +70,10 @@ function _cached_ddi_energy(
 
     E = 0.0
     @inbounds for I in CartesianIndices(n_pts)
-        E += bufs.Phi_x[I] * bufs.Fx_r[I] +
-             bufs.Phi_y[I] * bufs.Fy_r[I] +
-             bufs.Phi_z[I] * bufs.Fz_r[I]
+        E +=
+            bufs.Phi_x[I] * bufs.Fx_r[I] +
+            bufs.Phi_y[I] * bufs.Fy_r[I] +
+            bufs.Phi_z[I] * bufs.Fz_r[I]
     end
     0.5 * E * dV
 end
@@ -97,10 +98,18 @@ function SpinorBEC._energy_decomposition_gpu(ws::SpinorBEC.Workspace{N}) where {
     zee = SpinorBEC.zeeman_at(ws.zeeman, ws.state.t)
     E_zee = SpinorBEC._zeeman_energy(psi, zee, ws.spin_matrices.system, n_comp, N, n_pts, dV)
 
-    E_c0 = abs(ws.interactions.c0) > 1e-30 ?
-        SpinorBEC._density_interaction_energy(psi, ws.interactions.c0, n_comp, N, n_pts, dV) : 0.0
-    E_c1 = abs(ws.interactions.c1) > 1e-30 ?
-        SpinorBEC._spin_interaction_energy(psi, ws.spin_matrices, ws.interactions.c1, n_comp, N, n_pts, dV) : 0.0
+    E_c0 = if abs(ws.interactions.c0) > 1e-30
+        SpinorBEC._density_interaction_energy(psi, ws.interactions.c0, n_comp, N, n_pts, dV)
+    else
+        0.0
+    end
+    E_c1 = if abs(ws.interactions.c1) > 1e-30
+        SpinorBEC._spin_interaction_energy(
+            psi, ws.spin_matrices, ws.interactions.c1, n_comp, N, n_pts, dV
+        )
+    else
+        0.0
+    end
 
     E_ddi = if ws.ddi !== nothing
         if SpinorBEC._is_gpu(ws.ddi_bufs.Fx_r) && ecache.ddi_host !== nothing
@@ -108,12 +117,12 @@ function SpinorBEC._energy_decomposition_gpu(ws::SpinorBEC.Workspace{N}) where {
         elseif SpinorBEC._is_gpu(ws.ddi_bufs.Fx_r)
             SpinorBEC._ddi_energy_from_gpu(
                 psi, ws.spin_matrices, ws.ddi, ws.ddi_bufs, n_comp, N, n_pts, dV;
-                ddi_padded = ws.ddi_padded,
+                ddi_padded=ws.ddi_padded,
             )
         else
             SpinorBEC._ddi_energy(
                 psi, ws.spin_matrices, ws.ddi, ws.ddi_bufs, n_comp, N, n_pts, dV;
-                ddi_padded = ws.ddi_padded,
+                ddi_padded=ws.ddi_padded,
             )
         end
     else
@@ -131,8 +140,10 @@ function SpinorBEC._energy_decomposition_gpu(ws::SpinorBEC.Workspace{N}) where {
     E_tensor = begin
         e = 0.0
         c2 = SpinorBEC.get_cn(ws.interactions, 2)
-        abs(c2) > 1e-30 && (e += SpinorBEC._nematic_energy(psi, ws.spin_matrices.system.F, c2, N, n_pts, dV))
-        ws.tensor_cache !== nothing && (e += SpinorBEC._tensor_interaction_energy(psi, ws.tensor_cache, N, n_pts, dV))
+        abs(c2) > 1e-30 &&
+            (e += SpinorBEC._nematic_energy(psi, ws.spin_matrices.system.F, c2, N, n_pts, dV))
+        ws.tensor_cache !== nothing &&
+            (e += SpinorBEC._tensor_interaction_energy(psi, ws.tensor_cache, N, n_pts, dV))
         e
     end
 
@@ -144,15 +155,15 @@ function SpinorBEC._energy_decomposition_gpu(ws::SpinorBEC.Workspace{N}) where {
 
     E_total = E_kin + E_trap + E_zee + E_c0 + E_c1 + E_ddi + E_lhy + E_tensor + E_raman
     (
-        kinetic = E_kin,
-        trap = E_trap,
-        zeeman = E_zee,
-        density = E_c0,
-        spin = E_c1,
-        ddi = E_ddi,
-        lhy = E_lhy,
-        tensor = E_tensor,
-        raman = E_raman,
-        total = E_total,
+        kinetic=E_kin,
+        trap=E_trap,
+        zeeman=E_zee,
+        density=E_c0,
+        spin=E_c1,
+        ddi=E_ddi,
+        lhy=E_lhy,
+        tensor=E_tensor,
+        raman=E_raman,
+        total=E_total,
     )
 end

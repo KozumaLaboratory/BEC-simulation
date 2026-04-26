@@ -4,20 +4,20 @@
 # step directly on GPU using broadcast operations.
 # Uses cached buffers to avoid per-call GPU memory allocations.
 
-mutable struct GPUNematicCache{T<:AbstractFloat}
-    A00::CuArray{Complex{T},1}
-    V_buf::CuArray{Complex{T},1}
-    absV::CuArray{T,1}
-    ch::CuArray{T,1}
-    sh::CuArray{T,1}
-    phase::CuArray{Complex{T},1}
-    psi_tmp1::CuArray{Complex{T},1}
-    psi_tmp2::CuArray{Complex{T},1}
+mutable struct GPUNematicCache{T <: AbstractFloat}
+    A00::CuArray{Complex{T}, 1}
+    V_buf::CuArray{Complex{T}, 1}
+    absV::CuArray{T, 1}
+    ch::CuArray{T, 1}
+    sh::CuArray{T, 1}
+    phase::CuArray{Complex{T}, 1}
+    psi_tmp1::CuArray{Complex{T}, 1}
+    psi_tmp2::CuArray{Complex{T}, 1}
 end
 
-const _GPU_NEMATIC_CACHE = Dict{UInt64,Any}()
+const _GPU_NEMATIC_CACHE = Dict{UInt64, Any}()
 
-function _get_gpu_nematic_cache(N::Int, ::Type{T}) where {T<:AbstractFloat}
+function _get_gpu_nematic_cache(N::Int, ::Type{T}) where {T <: AbstractFloat}
     key = hash((N, T))
     cache = get(_GPU_NEMATIC_CACHE, key, nothing)
     cache !== nothing && return cache::GPUNematicCache{T}
@@ -42,8 +42,8 @@ function SpinorBEC.apply_nematic_step!(
     F::Int,
     dt::Float64,
     ndim::Int;
-    imaginary_time::Bool = false,
-) where {T<:AbstractFloat}
+    imaginary_time::Bool=false,
+) where {T <: AbstractFloat}
     c2 = SpinorBEC.get_cn(interactions, 2)
     abs(c2) < 1e-30 && return nothing
 

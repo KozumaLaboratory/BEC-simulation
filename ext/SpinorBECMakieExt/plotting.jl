@@ -15,7 +15,7 @@ function SpinorBEC.plot_density(
     ndim = 1
     nc = size(psi, ndim + 1)
 
-    fig = Figure(size=(800, 500))
+    fig = Figure(; size=(800, 500))
     ax = Axis(fig[1, 1]; xlabel="x", ylabel="n(x)", title)
 
     n_total = SpinorBEC.total_density(psi, ndim)
@@ -25,7 +25,15 @@ function SpinorBEC.plot_density(
         for c in 1:nc
             nc_density = SpinorBEC.component_density(psi, ndim, c)
             color = COMPONENT_COLORS[mod1(c, length(COMPONENT_COLORS))]
-            lines!(ax, x, nc_density; color, linewidth=1.5, linestyle=:dash, label="m=$(nc ÷ 2 + 1 - c)")
+            lines!(
+                ax,
+                x,
+                nc_density;
+                color,
+                linewidth=1.5,
+                linestyle=:dash,
+                label="m=$(nc ÷ 2 + 1 - c)",
+            )
         end
     end
 
@@ -46,7 +54,7 @@ function SpinorBEC.plot_density(
     n_total = SpinorBEC.total_density(psi, ndim)
 
     if components
-        fig = Figure(size=(300 * (nc + 1), 400))
+        fig = Figure(; size=(300 * (nc + 1), 400))
         ax = Axis(fig[1, 1]; xlabel="x", ylabel="y", title="Total", aspect=DataAspect())
         heatmap!(ax, x, y, n_total)
         for c in 1:nc
@@ -56,7 +64,7 @@ function SpinorBEC.plot_density(
             heatmap!(ax_c, x, y, nc_density)
         end
     else
-        fig = Figure(size=(600, 500))
+        fig = Figure(; size=(600, 500))
         ax = Axis(fig[1, 1]; xlabel="x", ylabel="y", title, aspect=DataAspect())
         hm = heatmap!(ax, x, y, n_total)
         Colorbar(fig[1, 2], hm)
@@ -73,7 +81,7 @@ function SpinorBEC.plot_spinor(
     x = grid.x[1]
     nc = size(psi, 2)
 
-    fig = Figure(size=(800, 600))
+    fig = Figure(; size=(800, 600))
 
     ax_amp = Axis(fig[1, 1]; xlabel="x", ylabel="|ψ|", title="$title - Amplitude")
     ax_phase = Axis(fig[2, 1]; xlabel="x", ylabel="arg(ψ)")
@@ -104,7 +112,7 @@ function SpinorBEC.plot_spin_texture(
     fy_norm = [ni > threshold ? fi / ni : 0.0 for (fi, ni) in zip(fy, n)]
     fz_norm = [ni > threshold ? fi / ni : 0.0 for (fi, ni) in zip(fz, n)]
 
-    fig = Figure(size=(800, 500))
+    fig = Figure(; size=(800, 500))
     ax = Axis(fig[1, 1]; xlabel="x", ylabel="⟨F_α⟩/n", title)
 
     lines!(ax, x, fx_norm; color=:red, linewidth=1.5, label="Fx/n")
@@ -128,7 +136,7 @@ function SpinorBEC.plot_spin_texture(
 
     fz_norm = @. ifelse(n > threshold, fz / n, 0.0)
 
-    fig = Figure(size=(600, 500))
+    fig = Figure(; size=(600, 500))
     ax = Axis(fig[1, 1]; xlabel="x", ylabel="y", title="$title: Fz/n", aspect=DataAspect())
     hm = heatmap!(ax, x, y, fz_norm; colorrange=(-1, 1), colormap=:RdBu)
     Colorbar(fig[1, 2], hm)

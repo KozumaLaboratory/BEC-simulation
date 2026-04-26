@@ -3,7 +3,7 @@ function SpinorBEC.animate_dynamics(
     result::SpinorBEC.SimulationResult;
     title::String="Dynamics",
     fps::Int=30,
-    filename::Union{Nothing,String}=nothing,
+    filename::Union{Nothing, String}=nothing,
 )
     x = grid.x[1]
     snapshots = result.psi_snapshots
@@ -13,7 +13,7 @@ function SpinorBEC.animate_dynamics(
 
     n_max = maximum(maximum(SpinorBEC.total_density(s, 1)) for s in snapshots)
 
-    fig = Figure(size=(800, 500))
+    fig = Figure(; size=(800, 500))
     ax = Axis(fig[1, 1]; xlabel="x", ylabel="n(x)", title,
         limits=(nothing, (0, n_max * 1.1)))
 
@@ -60,7 +60,7 @@ function SpinorBEC.animate_dynamics(
     result::SpinorBEC.SimulationResult;
     title::String="Dynamics",
     fps::Int=30,
-    filename::Union{Nothing,String}=nothing,
+    filename::Union{Nothing, String}=nothing,
 )
     x, y = grid.x
     snapshots = result.psi_snapshots
@@ -69,7 +69,7 @@ function SpinorBEC.animate_dynamics(
 
     n_max = maximum(maximum(SpinorBEC.total_density(s, 2)) for s in snapshots)
 
-    fig = Figure(size=(600, 550))
+    fig = Figure(; size=(600, 550))
     ax = Axis(fig[1, 1]; xlabel="x", ylabel="y", title, aspect=DataAspect())
     time_label = Label(fig[0, 1], "t = $(round(times[1], digits=4))")
 

@@ -45,13 +45,13 @@ disabled pending allocation-free refactor (see gpu_graph.jl source for
 details). CPU path already falls back at the main-module stub.
 """
 function SpinorBEC.split_step_captured!(
-    ws::SpinorBEC.Workspace{N,A},
-) where {N,A<:CuArray}
+    ws::SpinorBEC.Workspace{N, A}
+) where {N, A <: CuArray}
     SpinorBEC.split_step!(ws)
 end
 
 function SpinorBEC.invalidate_split_step_graph!(
-    ::SpinorBEC.Workspace{N,A},
-) where {N,A<:CuArray}
+    ::SpinorBEC.Workspace{N, A}
+) where {N, A <: CuArray}
     nothing
 end

@@ -99,6 +99,31 @@ using LinearAlgebra
         end
     end
 
+    @testset "tensor — random complex spinors, F=2..6" begin
+        # Tensor interaction step now runs the full path entirely on GPU
+        # via CUSOLVER batched eigen + CUBLAS gemm. Compare against the
+        # CPU per-point eigen reference.
+        rng = Random.MersenneTwister(0xDA2A)
+        for F in 2:6, trial in 1:3
+            sm = SpinorBEC.spin_matrices(F)
+            psi_cpu = _randspinor(rng, F, (8,))
+            psi_gpu = CuArray(ComplexF32.(copy(psi_cpu)))
+            # Random g_S over even channels — picks ψ off the diagonal
+            g_dict = Dict{Int, Float64}(
+                S => randn(rng) for S in 0:2:(2F)
+            )
+            cache = SpinorBEC._make_tensor_cache_from_channels(F, g_dict)
+            dt = 0.0011
+            SpinorBEC.apply_tensor_interaction_step!(psi_cpu, cache, sm, dt, 1)
+            SpinorBEC.apply_tensor_interaction_step!(psi_gpu, cache, sm, dt, 1)
+            diff = maximum(abs, ComplexF64.(Array(psi_gpu)) .- psi_cpu)
+            # F32 GPU vs F64 CPU — relax tolerance to 1e-5 for the tensor
+            # path because the eigendecomposition error compounds with
+            # the F32→F64 reference comparison.
+            @test diff < 1e-5
+        end
+    end
+
     @testset "norm preservation under random GPU step" begin
         # Bonus invariant — independent of CPU reference: every step we
         # apply must be unitary. Norm-drift over a random-spinor + random

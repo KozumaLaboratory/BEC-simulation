@@ -37,7 +37,7 @@ Instead of D separate sum(abs2, view(psi,...,c)) calls per Newton iteration
 and transfer the D-element vector once.
 """
 function SpinorBEC._normalize_psi_constrained!(
-    psi::CuArray{<:Complex}, grid, n_components, ndim, target_Mz, F,
+    psi::CuArray{<:Complex}, grid, n_components, ndim, target_Mz, F
 )
     dV = SpinorBEC.cell_volume(grid)
     D = n_components
@@ -56,20 +56,20 @@ function SpinorBEC._normalize_psi_constrained!(
     lambda = 0.0
     m_vals = Float64[F - (c - 1) for c in 1:D]
 
-    for _iter = 1:20
+    for _iter in 1:20
         norms = similar(base_norms)
-        for c = 1:D
+        for c in 1:D
             w = exp(lambda * m_vals[c])
             norms[c] = base_norms[c] * w^2
         end
         total = sum(norms)
         total < 1e-30 && break
 
-        Mz = sum(m_vals[c] * norms[c] for c = 1:D) / total
+        Mz = sum(m_vals[c] * norms[c] for c in 1:D) / total
         abs(Mz - target_Mz) < 1e-12 && break
 
         dMz = 0.0
-        for c = 1:D
+        for c in 1:D
             dMz += 2 * m_vals[c] * (m_vals[c] - Mz) * norms[c] / total
         end
         abs(dMz) < 1e-30 && break
@@ -79,7 +79,7 @@ function SpinorBEC._normalize_psi_constrained!(
     end
 
     # Apply weights on GPU (one kernel per component, no sync needed until done)
-    for c = 1:D
+    for c in 1:D
         w = exp(lambda * m_vals[c])
         view(psi_2d, :, c) .*= w
     end
