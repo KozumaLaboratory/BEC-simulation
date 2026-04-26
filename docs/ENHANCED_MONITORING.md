@@ -1,5 +1,23 @@
 # Enhanced Monitoring System
 
+> **Status (2026-04-26):** historical document. The features described
+> below still exist, but the paths have moved:
+>
+> | doc claim                       | current location                                   |
+> |---------------------------------|----------------------------------------------------|
+> | `src/progress.jl`               | `src/workflow/monitoring/progress.jl`              |
+> | `src/ascii_plot.jl`             | `src/workflow/monitoring/ascii_plot.jl`            |
+> | `src/logging.jl`                | `src/workflow/monitoring/logging.jl`               |
+> | `src/resource_monitor.jl`       | `src/workflow/monitoring/resource_monitor.jl`      |
+> | `src/notifications.jl`          | `src/workflow/monitoring/notifications.jl`         |
+> | `src/adaptive_advice.jl`        | `src/workflow/experiments/adaptive_advice.jl`      |
+>
+> The "Future" section's "ブラウザダッシュボード" is now the live
+> dashboard at `serve_dashboard(8765)` (see `architecture.md` §
+> Dashboard). The `dynamics.live_monitor` YAML knob plus
+> `/api/live/*` endpoints replace the imagined WebSocket server. For
+> the API listing, see `docs/dynamics.md`.
+
 包括的な進捗監視・ログ・診断システム
 
 ## 実装済み機能

@@ -1,3 +1,11 @@
+> **Status (2026-04-26):** snapshot from early planning (~Apr 14). The
+> Level 0/1/2/3 verification pyramid described here was largely
+> implemented (test suite is now ~8600 tests; `test_propagators/`,
+> `test_conservation/`, `test_ground_state/`, `test_dynamics/` all
+> exist). DDI k=0 handling has been correct for a long while
+> (`Q(k=0) = 0` by construction). Kept as the historical rationale
+> for the test layout. For current TODOs see `PLAN.md` (root).
+
 了解です。それなら設計の優先順位が根本的に変わります。BEC物理の正しさを最優先にするとき、最も重要な洞察は一つです。
 
 **テストを書かないと何が壊れているかわからない。コードを書く前にテストを書く。**

@@ -53,11 +53,43 @@ pipeline:
     photon_scattering: {Gamma_sc: 0.01, seed: 42}
     loss:              {gamma_dr: 0.02, K3_per_m_si: ["1.5e-30 m^6/s"] × D}
     pulse_sequence:    [...]
+    live_monitor:      {every: 50}            # writes <run>/_live_status.json
 ```
 
-The four `on_step` callbacks (sgpe / projected_gp / photon_scattering /
-pulse_sequence) compose freely; `_compose_callbacks` chains them per
-dynamics step.
+All `on_step` callbacks (sgpe / projected_gp / photon_scattering /
+pulse_sequence / live_monitor) compose freely; `_compose_callbacks`
+chains them per dynamics step.
+
+## Live monitoring (dashboard hook)
+
+```yaml
+- dynamics:
+    duration: 30.0
+    dt: 0.005
+    save_every: 100
+    live_monitor: {every: 50}      # or simply `live_monitor: true`
+```
+
+Each `every`-th step the runner atomically writes
+`<run_dir>/_live_status.json` (step, t, energy, norm, populations).
+The dashboard polls `/api/live/list` to surface the run and
+`/api/live/<run>` to stream the JSON; in the React UI the
+`LiveStatusPanel` in the App header renders it. Disable with
+`live_monitor: false` (or omit).
+
+## Symmetry-breaking seed (EdH)
+
+```yaml
+- dynamics:
+    seed_amplitude: 1.0e-4
+    seed_k_cut: 0.6              # k-space lowpass — concentrates noise
+                                  # in long-wavelength unstable modes
+```
+
+`seed_k_cut` is optional. Without it the seed is unfiltered white
+noise; with it, FFT components above `|k| = seed_k_cut` are zeroed
+before injecting into the dominant transverse component. For Eu151 EdH
+a typical choice is `seed_k_cut ≈ 1/ξ_h`. Used in `runs/eu151_edh/`.
 
 ## 1D scan over a YAML path
 
@@ -110,8 +142,14 @@ pipeline:
           multi_step: true                   # walk every dynamics step
 ```
 
-Frame numbers carry across phases. Each PNG title is tagged
-`phase N  t = X`.
+Output (PlotlyJS removed 2026-04-26):
+
+- `<output_dir>/columns.jld2` — one Float32 2D array per frame keyed
+  `frame_NNNNN` (global frame counter across all phases).
+- `<output_dir>/manifest.json` — `n_frames`, `n_phases`, `axis`,
+  `frame_keys`, `times` (with each phase's t offset added),
+  `phase_indices`, `archive` (basename of the JLD2). The dashboard /
+  external notebooks render PNGs on demand from this archive.
 
 ## Calibration: lab-unit YAML
 
@@ -181,9 +219,9 @@ point's GS+dynamics is independent; one failure doesn't poison neighbours.
 ## Dry-run preview
 
 ```julia
-run_yaml("path/to/config.yaml"; dry_run = true)
+yaml_str = run_yaml("path/to/config.yaml"; dry_run = true)
 ```
 
-Prints the post-calibration / post-validation YAML to stdout and returns
-without touching the GPU. Useful to verify lab-unit expansion before
-committing to a long compute.
+Prints the post-calibration / post-validation YAML to stdout **and
+returns it as a String** without touching the GPU. Useful to capture
+the expanded YAML for diff'ing or to assert in tests.

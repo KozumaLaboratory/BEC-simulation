@@ -1,3 +1,11 @@
+> **Status (2026-04-26):** snapshot from early planning (~Apr 14). Many
+> items below are now implemented — see `CLAUDE.md`,
+> `docs/session_handoff_2026-04-25.md`, and `PLAN.md` (root) for the
+> current state. Kept here as historical context for the architectural
+> choices (units strategy, GaussianBeam q-parameter, DDI k=0 handling,
+> AtomOptics.jl split). Do not treat the "stage" ordering as a current
+> roadmap.
+
 ## システムの二層構造
 
 このソフトウェアが本質的に**二つの物理レイヤー**を持っていることが最初の重要な認識です。この二層構造が全ての設計判断の出発点です。重要なのは**光学系層とBEC層はほぼ独立して開発できる**が、接続部分（`LaserBeamPotential`, `RamanCoupling`）だけインターフェースを最初に合意する必要があるということです。

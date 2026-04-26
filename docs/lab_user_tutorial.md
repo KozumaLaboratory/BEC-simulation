@@ -124,7 +124,7 @@ session leader, survives shell close.
 
 ```bash
 tail -f logs/today.log
-ls runs/today/frames/        # PNGs accumulate during analyze step
+ls runs/today/frames/        # columns.jld2 + manifest.json after analyze step
 ```
 
 If you opened the dashboard (`serve_dashboard(8765)`), the run shows up
@@ -135,8 +135,10 @@ under the active runs list and the 3D viewer streams snapshots.
 After the run finishes, `runs/today/` contains:
 
 - `<run_name>.jld2` — full ψ + analyzer outputs per scan point
-- `frames/` — column density PNGs
+- `frames/columns.jld2` — Float32 column densities, key `frame_NNNNN`
+- `frames/manifest.json` — frame metadata (`n_frames`, `times`, `axis`, …)
 - `summary.json` — text summary of energies, norms, defect counts
+- `_live_status.json` — present if `dynamics.live_monitor` was set
 - `dynamics/` (inside .jld2) — streamed snapshot frames + populations
 - `analyze/<analyzer>/<field>` (inside .jld2) — every analyzer's outputs
 
@@ -166,7 +168,7 @@ n_peak = d["analyze/droplet_profile/n_peak"]
 |---|---|---|
 | `Scalar indexing is disallowed` on dynamics | Zeeman with non-zero Bx/By on GPU on a pre-fix install | upgrade to ≥ commit 59a52a1 (`apply_uniform_spin_rotation!` matmul path) |
 | ITP `NaN at step 1` | dt too large for ε_dd > 1 (Dy164, Eu151 strong DDI) | drop dt to 0.002 |
-| `column_density_movie ... done` writes 0 frames | `save_psi_snapshots: true` + pre-fix analyzer | upgrade to ≥ 3685fd7 (streamed-snapshot reader) |
+| `column_density_movie ... done` writes 0 frames | `save_psi_snapshots: true` + pre-fix analyzer | upgrade to ≥ 3685fd7 (streamed-snapshot reader); since 2026-04-26 the analyzer writes `columns.jld2` + `manifest.json` (no PNGs) |
 | Long scan OOMs at point ~100 | scan-loop GPU memory leak | upgrade to ≥ 7769d84 (CUDA.reclaim hook) |
 | `unknown key 'a_s'` warning | scattering length parsing | use `c_total:` or `c1_ratio:` directly |
 | `unknown key 'trap'` warning | shorthand notation | harmless, equivalent to `potential: {type: harmonic, omega: [...]}` |

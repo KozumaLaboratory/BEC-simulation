@@ -1,8 +1,39 @@
 # Session Handoff — 2026-04-25 @ commit `3414228`
 
-Follow-up to `docs/session_handoff_2026-04-24.md`. This session closed out
-the Phase 4/5 primitives backlog and launched a long-running phase-diagram
-scan that should complete overnight.
+This session closed out the Phase 4/5 primitives backlog and launched a
+long-running phase-diagram scan that should complete overnight. The
+predecessor handoff (`session_handoff_2026-04-24.md`) was deleted on
+2026-04-26 once superseded; the MP refactor / dashboard UX state it
+described is now baked into CLAUDE.md.
+
+## Since 2026-04-25 (delta)
+
+- **PlotlyJS removed entirely.** All Plotly-based plot helpers
+  (`save_column_density_png`, …) deleted. `plot_density` / `plot_spinor`
+  / `plot_spin_texture` / `animate_dynamics` are now Makie-only stubs.
+  `column_density_movie` analyzer now writes
+  `<output_dir>/columns.jld2` (Float32, key `frame_NNNNN`) +
+  `<output_dir>/manifest.json` instead of PNG frames.
+- **`live_monitor` + `seed_k_cut` wired.** New YAML knob
+  `dynamics.live_monitor: {every: N}` writes
+  `<run>/_live_status.json` for the dashboard's `/api/live/list` and
+  `/api/live/<run>` endpoints (frontend: `useLiveRuns` / `useLiveStatus`
+  hooks + `LiveStatusPanel` in App header). New optional
+  `dynamics.seed_k_cut` adds k-space lowpass to the symmetry-breaking
+  seed (used in `runs/eu151_edh/`); plumbed via new `k_cut`/`grid`
+  kwargs on `add_symmetry_breaking_seed!`.
+- **Frontend WebGPU completed.** R3F `HeatmapGrid` (WebGPU raymarch),
+  binary atlas-mode protocol, `LineChartSVG` replacing all Plotly
+  charts, `LabImageOverlay` for the lab-image side of `/api/lab/*`.
+- **`dry_run` returns the YAML string.** No more
+  `redirect_stdout(IOBuffer())` in `run_yaml`; the function returns
+  the post-calibration YAML as a `String`.
+- **CI fixes** for synthetic_dim / SGPE / vortex / dry-run tests.
+
+The rest of this doc reflects the 2026-04-25 state; cross-check with
+`CLAUDE.md` "Active handoff" before relying on PIDs / paths.
+
+---
 
 ## Detached long-running processes
 
@@ -82,7 +113,7 @@ Phase 4/5 primitives inventory:
 
 ## Remaining plan items (next session)
 
-See the plan doc in chat history or `PLAN.md`.
+See `PLAN.md` at the repo root for the live list.
 
 - **#51 Two-component immiscible GP** (~500 lines, explicitly deferred)
 - **#53 Synthetic dimension** observables (~200 lines)

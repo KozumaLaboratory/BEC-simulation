@@ -1,91 +1,98 @@
-これは非常に実践的な問いかけです。論文の内容を整理した上で、散乱長が未知という条件での診断戦略を体系的に設計します。5つの独立した実験プローブを、論文から抽出した理論的根拠と紐付けて設計します。まず診断の全体フローを示します。各プローブの物理的根拠を詳しく見ていきます。
+# `dynamics:` block reference
 
----
+Every key accepted under a YAML `dynamics:` step. Multiple knobs that
+return `on_step` callbacks compose freely (`_compose_callbacks` chains
+them). For `ground_state:` knobs see `pipeline_cookbook.md`; for
+hardware/dashboard plumbing see `architecture.md`.
 
-## Step 0：強磁性（c₁ < 0）の確認が大前提
+## Required
 
-Flower phaseは強磁性相（c₁ < 0）を母体にします。Euの場合 $^8S_{7/2}$ から c₁ < 0 が期待されますが、これを実験で確認する必要があります。
+| key       | type       | meaning                                          |
+|-----------|------------|--------------------------------------------------|
+| `duration`| Float      | total simulated time (in `ω_ref⁻¹`)              |
+| `dt`      | Float      | time step (Strang split-step)                    |
 
-スピン混合振動の周期（論文式181, 182）：
+## Output cadence
 
-$$T = \frac{2\hbar}{|\tilde{c}_1|} K\!\left(\frac{q}{|\tilde{c}_1|}\right)$$
+| key                          | type     | default | meaning                                   |
+|------------------------------|----------|---------|-------------------------------------------|
+| `save_every`                 | Int      | 1       | record observables / snapshots every N steps |
+| `save_psi_snapshots`         | Bool     | false   | stream ψ to scratch JLD2 (`frame_NNNNN`)    |
+| `save_snapshot_precision`    | "f32"\|"f64" | "f32" | downcast precision for streamed snapshots  |
+| `save_snapshot_compression`  | Bool     | false   | zlib-compress streamed snapshots            |
 
-磁場 B を変えて $q = (g\mu_B B)^2/\Delta E_{hf}$ を走査し、周期の磁場依存性から $\tilde{c}_1$ の符号と大きさを決めます（Cr実験と同様の手順、Table 4参照）。**このステップは以降の全ての診断の前提です。**
+Snapshots land at `dynamics/psi_snapshots_streamed/frame_NNNNN`. Set
+`SPINORBEC_SCRATCH_DIR` to redirect the scratch `.tmp`.
 
----
+## Hamiltonian overrides (per phase)
 
-## Step 1：Flower phaseへ入る条件の評価
+Each of these falls back to the previous step's value if omitted:
 
-論文式427と論文図19(a)より、相境界は2つの無次元比で決まります：
+- `interactions:` — `c0` / `c1` / `c1_ratio` / `N_atoms` / `omega_ref` /
+  per-channel `c_extra` / `c_lhy`. Time-dependent `c0` / `c1` produce
+  `TimeDependentInteractions`.
+- `zeeman:` — Level 0 (`p`/`q`/`bx`/`by`), Level 1 (`Bx`/`By`/`Bz` in
+  Gauss strings), Level 2 (`B_mag`/`theta_deg`/`phi_deg`). Mixing levels
+  in one block raises `ArgumentError`. Ramps via `{from: …, to: …}` are
+  expanded to a `TimeDependentZeeman`.
+- `ddi:` — `enabled`, `c_dd` (with optional `{from, to}` ramp),
+  `secular`, `quasi_2d`, `l_z`.
+- `potential:` — single dict or list (composite). Same syntax as the
+  ground-state block.
+- `raman:` — Rabi pulses (rectangular / Gaussian envelopes).
+- `magnetic_gradient:` — Stern-Gerlach-style ∇B along an axis.
 
-$$\frac{R_{\rm TF}}{\xi_{\rm sp}} = R_{\rm TF} \cdot \frac{\sqrt{2M|c_1|n}}{\hbar}, \quad \frac{R_{\rm TF}}{\xi_{\rm dd}} = R_{\rm TF} \cdot \frac{\sqrt{2Mc_{\rm dd}n}}{\hbar}$$
+## Stochastic + open-system callbacks
 
-Euの $c_{\rm dd} = \mu_0(g\mu_B)^2/(4\pi)$ は磁気モーメント7µ_B から既知なので $\xi_{\rm dd}$ はすぐ計算できます。$\xi_{\rm sp}$ だけ c₁ 依存で未知ですが、Step 0で c₁ を決めれば両方わかります。Rbの相図（図19a）の「Rb line」と同様に Eu の動作点がプロットでき、FL領域内かどうかが判断できます。
+These return `on_step` closures and compose freely:
 
----
+| knob                | fields                                  | semantics                                            |
+|---------------------|------------------------------------------|------------------------------------------------------|
+| `sgpe:`             | `gamma`, `T`, `mu`, `k_cut`, `every`, `seed` | stochastic projected GPE (finite-T relaxation)        |
+| `projected_gp:`     | `k_cut`, `smooth`, `every`               | hard truncated-projected GP                          |
+| `photon_scattering:`| `Gamma_sc`, `seed`                       | spontaneous-emission heating (Lindblad jumps)         |
+| `loss:`             | `gamma_dr` and/or `K3_per_m_si: ["1.5e-30 m^6/s", …] × D` | one-body + spin-dependent three-body loss             |
+| `pulse_sequence:`   | list of pulse spec dicts                 | composes Zeeman / Raman / interactions for the phase  |
+| `live_monitor:`     | `true` \| `{every: N}`                   | atomically writes `<run>/_live_status.json` every N steps for `/api/live/*` |
 
-## Probe A：Stern-Gerlach + TOF — 最初の証拠
+`K3_per_m_si` accepts Unitful strings; if exactly one entry is given it
+is broadcast across all `D = 2F+1` components.
 
-これが最もシンプルで第一に試すべき実験です。
+## Initial-condition perturbations
 
-FL phaseでは $J_z = 1$（論文式432-435）で全スピン成分が共存します。F = -f で始めたBECがFL状態に緩和すると：
+Applied **once** at the start of the dynamics phase, after ψ is copied
+from the previous step:
 
-$$L_z = \int d\mathbf{r} \sum_m (J_z - m)|\psi_m(\mathbf{r})|^2 > 0$$
+| key                  | type   | meaning                                                  |
+|----------------------|--------|----------------------------------------------------------|
+| `temperature_ratio`  | Float  | `T/T_c ∈ (0,1)` Bose-Einstein thermal noise              |
+| `noise_seed`         | Int    | RNG seed for `temperature_ratio` and `seed_amplitude`    |
+| `seed_amplitude`     | Float  | symmetry-breaking seed on the dominant ±1 component      |
+| `seed_k_cut`         | Float  | optional k-space lowpass on the seed (`grid` auto-fed)   |
 
-Stern-Gerlach展開後に各 $m$ 成分を空間分離して検出すると：
-- 強磁性完全偏極：$m = -6$ のみ → $L_z = 0$
-- FL phase：$m = -5, -4, \ldots$ 成分が有意に出現 → $L_z > 0$
-- TOF展開の非球面変形（角運動量 ≠ 0 のシグネチャ）
+`seed_k_cut` zeroes FFT modes above `|k| = seed_k_cut`, concentrating
+noise in long-wavelength unstable bands (e.g. EdH spin-wave manifold
+below `1/ξ_h`). Without it the seed is unfiltered white noise. Used in
+`runs/eu151_edh/config.yaml`.
 
-特にf=6の場合、論文図20に相当する $L_z/N\hbar$ vs $(\omega^{1/5}N^{2/5})$ プロットを測定することで、論文と定量的比較ができます。
+## Worked example — multi-knob composition
 
----
+```yaml
+- dynamics:
+    duration: 30.0
+    dt: 0.005
+    save_every: 100
+    save_psi_snapshots: true
+    save_snapshot_precision: "f32"
+    interactions: {omega_ref: 691.15}
+    zeeman: {p: {from: 1.0, to: 0.39}, q: 0.0}
+    sgpe:              {gamma: 0.05, T: 0.1, every: 1, seed: 42}
+    photon_scattering: {Gamma_sc: 0.01, seed: 42}
+    loss:              {gamma_dr: 0.02}
+    seed_amplitude:    1.0e-4
+    seed_k_cut:        0.6
+    live_monitor:      {every: 50}
+```
 
-## Probe B：in-situ位相コントラストイメージング — FL vs CSV の決定的識別
-
-Sadlerら（Ref.[81,82]）がRbで使った手法の応用です。局所磁化の方向に感度のある位相コントラスト光でin-situのスピンテクスチャを直接観察します。
-
-| FL（Flower） | CSV（Chiral Spin Vortex） |
-|---|---|
-| x-y断面：渦状、左右対称 | x-y断面：キラリティあり（左巻 or 右巻）|
-| x-z断面：上下半球対称 | x-z断面：上下に非対称なパターン |
-
-論文図19(b-d)がテンプレートです。観測されたパターンがこのどれに対応するかを比較することでフラワー相を同定できます。
-
----
-
-## Probe C：ヘテロダイン検出 — あんこさんの実験の直接接続
-
-これが最も重要で、実験室で既に進行中の実験と最も関係するプローブです。
-
-Mermin-Ho関係（論文式529）のf=6版：
-
-$$\nabla \times \mathbf{v}^{(\rm mass)} = -\frac{\hbar \cdot 6}{M} \sum_{\nu_1\nu_2\nu_3} \hat{s}_{\nu_1}(\nabla \hat{s}_{\nu_2} \times \nabla \hat{s}_{\nu_3})$$
-
-Flower phaseでは $\nabla \cdot \mathbf{F} = 0$ のflux-closure構造から生じる循環電流が、静止トラップ内でも存在します（論文6.3.2節）。この質量流がヘテロダイン信号に位相変化として現れる訳ですが、**Rb（f=1）に比べてf=6倍の振幅で現れる**のがEuの優位性です。
-
-**検出プロトコル**：
-1. B → 0 へゆっくり落とす（FL構造が形成される時間スケール $\sim \xi_{\rm dd}/c_s$ を待つ）
-2. ヘテロダインで位相 $\varphi(\mathbf{r})$ の空間分布を測定
-3. $\nabla\varphi$ から $\mathbf{v}^{(\rm mass)}$ を再構成
-4. 渦度 $\nabla \times \mathbf{v}^{(\rm mass)} \neq 0$ が確認されれば、スピンテクスチャの証拠
-
----
-
-## Step 2：スケーリング検証でFL相図上の軌跡を追う
-
-FL→CSV→PCV の相転移は $R_{\rm TF}/\xi_{\rm sp}$, $R_{\rm TF}/\xi_{\rm dd}$ を変えることでたどれます（論文図19a）。
-
-| 制御変数 | 変化 | 相図上の移動 |
-|---|---|---|
-| 原子数 N を増やす | $R_{\rm TF} \propto N^{1/5}$ | 右方向（ξ_sp固定でR_TF/ξ_sp増） |
-| トラップ周波数 ω を下げる | $R_{\rm TF} \propto \omega^{-1}$ | 右方向 |
-| 磁場 B を上げる | DDIが時間平均化（式437） | 縦軸変動 |
-
-Probe A で観測される $L_z$ がN・ωと共に図20のように増加すれば、FL→CSV相転移の軌跡を追っていることになります。これ自体が散乱長が不明でも相境界を経験的に決める方法です。
-
----
-
-## Steps 3a/3b：スケーリングから散乱長を逆算
-
-Step 2で FL→CSV 相境界の $(\omega^{1/5}N^{2/5})$ 値が決まれば、論文図19(a)との対応から $R_{\rm TF}/\xi_{\rm sp}$ の相境界値が読め、$\xi_{\rm sp}$ → $|c_1|$ → $|a_{2f-2} - a_{2f}|$ へと逆算できます。さらにMott絶縁体中の振動（論文4.3節、Ref.[75,31]）まで実現できれば個々の散乱長 $a_F$ を精度よく決定できます。これは「Flower phase に入っていることを確認する」と「散乱長を決める」という二つの問いに同時に答える戦略です。
+The runner builds `cb_sgpe`, `cb_pgp`, `cb_photon`, `cb_live` and pipes
+them through `_compose_callbacks` into a single `on_step`.

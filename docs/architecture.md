@@ -10,24 +10,48 @@ The spatial dimensionality `N` is handled generically via Julia's parametric typ
 
 ```
 src/
-  SpinorBEC.jl       # Module definition, includes, exports
-  types.jl           # All struct definitions (must be included first)
-  units.jl           # Physical constants and unit conversion
-  grid.jl            # Spatial/momentum grid construction
-  atoms.jl           # Predefined atom species (Rb87, Na23, Eu151)
-  interactions.jl    # Contact interaction parameters (c0, c1, C_dd)
-  potentials.jl      # External potential evaluation
-  optical_trap.jl    # Gaussian beam and crossed dipole trap
-  zeeman.jl          # Zeeman energy shifts
-  spin_matrices.jl   # Spin-F matrix construction via StaticArrays
-  propagators.jl     # Kinetic and diagonal potential propagators
-  spin_mixing.jl     # Spin-dependent interaction propagator
-  ddi.jl             # Dipole-dipole interaction via k-space convolution
-  split_step.jl      # Strang splitting orchestration
-  observables.jl     # Energy, density, magnetization, spin density
-  simulation.jl      # Workspace, ground state finder, time evolution
-  io.jl              # JLD2 save/load
-  experiment.jl      # YAML-driven experiment configuration and runner
+  SpinorBEC.jl                              # Module entry, includes, exports
+  foundation/
+    types.jl                                # All struct definitions (included first)
+    backend.jl                              # AbstractBackend / CPU / CUDA dispatch
+    grid.jl                                 # Grid{N,T<:AbstractFloat}
+    spin_matrices.jl                        # SpinSystem + spin-F operators
+    clebsch_gordan.jl                       # CG / 3j / Wigner D
+    waveform.jl                             # AbstractWaveform{T} + 10 subtypes
+    binary_state.jl                         # Two-component scaffold
+    fft_utils.jl, spinor_utils.jl, …
+  hamiltonian/
+    split_step.jl                           # Strang splitting orchestrator
+    yoshida.jl                              # 4th-order option
+    propagators.jl                          # Kinetic + diagonal potential
+    interactions/                           # c0/c1, nematic, tensor, DDI, raman, LHY, …
+    potentials/                             # Harmonic, gravity, optical, gauge, …
+  solvers/
+    ground_state.jl                         # ITP
+    lbfgs_ground_state.jl                   # LBFGS polish
+    simulation.jl                           # Real-time evolution
+    sgpe.jl, projected_gp.jl                # Stochastic + truncated solvers
+    photon_heating.jl                       # Spontaneous emission heating
+    twa.jl                                  # Truncated Wigner ensemble
+    binary_simulation.jl                    # Two-component RTP (scaffold)
+    continuation.jl, adaptive.jl, embedded_adaptive.jl
+  workflow/
+    initialization/                         # atoms, make_workspace, state_zoo, thermal_noise
+    experiments/                            # pipeline_runner, pipeline_analyzers,
+                                            # run_registry (run_yaml), schema, calibration,
+                                            # pulse_sequence, sta_counter_diabatic,
+                                            # bayesian_opt, faraday_fit, feshbach_ramp,
+                                            # adaptive_advice, zeeman_levels, …
+    io/                                     # dashboard.jl (HTTP + atlas + live + lab),
+                                            # html_report, run_summary, scan_summary,
+                                            # vtk_export, units, budget
+    monitoring/                             # progress / live_monitor primitives
+  analysis/
+    observables.jl, energy.jl, currents.jl, vorticity.jl, vortex_extraction.jl,
+    topology.jl, tomography.jl, faraday.jl, imaging.jl, tof.jl,
+    stability_analysis.jl, synthetic_dimension.jl, time_resolved.jl,
+    diagnostics.jl, ensemble.jl, majorana.jl, spin_rotation.jl,
+    phases/                                 # phase_classify primitives
 ```
 
 ## Core Data Flow
@@ -185,123 +209,83 @@ Constructs the `Workspace` struct, which bundles all simulation state and parame
 
 ### `find_ground_state`
 
-Uses imaginary time propagation with per-step renormalization. Convergence is checked every `save_every` steps by comparing successive total energies against a tolerance `tol`. Returns a named tuple `(workspace, converged, energy)`.
+Uses imaginary time propagation with per-step renormalization.
+Convergence is `dpsi_norm < tol` (sole criterion). Returns a named
+tuple `(workspace, converged, energy, dE, last_step)`. LBFGS polish is
+provided by `find_ground_state_lbfgs` with the same return shape and
+`grad_norm < tol` as the convergence check.
 
 ### `run_simulation!`
 
 Runs real-time evolution for `n_steps` steps, recording observables (time, energy, norm, magnetization) and wavefunction snapshots at intervals specified by `save_every`. Supports an optional callback function. Returns a `SimulationResult`.
 
-## Experiment System (`experiment.jl`)
+## Experiment System (`workflow/experiments/`)
 
-The experiment system provides a YAML-driven interface for defining multi-phase simulation protocols.
+The experiment system is YAML-driven. Top-level entry points live in
+`run_registry.jl`; per-step dispatch lives in `pipeline_runner.jl`.
 
-### Configuration Hierarchy
+### Pipeline shape
 
 ```
-ExperimentConfig
-  +-- SystemConfig (atom, grid, interactions, DDI)
-  +-- GroundStateConfig (imaginary time parameters, potential, Zeeman)
-  +-- PhaseConfig[] (sequence of real-time evolution phases)
+pipeline:
+  - ground_state: …       # ITP / LBFGS
+  - dynamics: …           # real-time, optionally repeated
+  - analyze:              # one or many analyzers
+      - phase_classify: {}
+      - column_density_movie: {axis: 3, output_dir: …}
 ```
 
-Each `PhaseConfig` specifies duration, time step, Zeeman parameters (constant or linear ramp), and an optional potential override. If a phase omits the potential, it inherits from the previous phase or ground state.
+Every parameter variation is a **dotted config-path override** (e.g.
+`pipeline.0.zeeman.p`) — see `CLAUDE.md` "YAML schema" for the full
+reference. The runner applies each scan point's overrides to the raw
+YAML dict, re-parses the experiment, and rebuilds a fresh workspace.
 
-### YAML Format
+Per-step dynamics knobs (compose freely in a `dynamics:` block) include
+`sgpe`, `projected_gp`, `photon_scattering`, `loss`, `pulse_sequence`,
+`live_monitor`, `seed_amplitude` + `seed_k_cut`. Each callback-style
+knob returns an `on_step` closure; `_compose_callbacks` chains them.
+See `docs/dynamics.md`.
 
-```yaml
-experiment:
-  name: "example"
-  system:
-    atom: Rb87              # Rb87 | Na23 | Eu151
-    grid:
-      n_points: [64, 64]
-      box_size: [20.0, 20.0]
-    interactions:
-      c0: 10.0
-      c1: -0.5
-    ddi:                     # optional
-      enabled: true
-      c_dd: 1.5e-5
-  ground_state:              # optional
-    dt: 0.005
-    n_steps: 1000
-    tol: 1.0e-8
-    initial_state: polar     # polar | ferromagnetic | uniform
-    zeeman: { p: 0.0, q: 0.1 }
-    potential:
-      type: harmonic
-      omega: [1.0, 1.0]
-  sequence:
-    - name: quench
-      duration: 1.0
-      dt: 0.01
-      save_every: 10
-      zeeman:
-        p: { from: 0.0, to: 0.5 }   # linear ramp
-        q: 0.0                        # constant
-      potential:                       # optional override
-        type: harmonic
-        omega: [1.0, 1.0]
-```
+### Entry points
 
-### Potential Specification in YAML
+- `run_yaml("path/to/config.yaml")` — resumable, directory-per-config,
+  one `point_NNN.jld2` per scan point. Auto-applies `calibration:` /
+  `calibration_history:` if present at YAML root. Dry-run preview via
+  `dry_run = true` returns the post-calibration YAML as a string.
+- `load_config("path") |> run_config` — in-memory run, no resume.
+- `scan_continuation(; …)` / `scan_phase_diagram_2d(; …)` — direct-Julia
+  parameter sweeps (used in tests + benches).
 
-Single potential (Dict form):
+### Dashboard (`workflow/io/dashboard.jl`)
 
-```yaml
-potential:
-  type: harmonic
-  omega: [1.0, 1.0]
-```
+`serve_dashboard(port)` launches an HTTP server backed by `HTTP.jl` that
+serves the Vite-built React UI from `web/dist/` plus the following JSON /
+binary endpoints:
 
-```yaml
-potential:
-  type: gravity
-  g: 9.81          # default: 9.81
-  axis: 2          # default: last axis
-```
+| endpoint                        | purpose                                       |
+|---------------------------------|-----------------------------------------------|
+| `/api/runs`                     | list of run directories                        |
+| `/api/data/<run>`               | dashboard JSON (energies, populations, …)     |
+| `/api/density_atlas?…`          | binary atlas for the WebGPU `HeatmapGrid`      |
+| `/api/snapshot/<run>/frame_N`   | per-frame ψ for the 3D raymarch                |
+| `/api/live/list`                | runs with a fresh `_live_status.json`         |
+| `/api/live/<run>`               | latest live status (step / t / energy / pops)  |
+| `/api/lab/list?run=…`           | lab images uploaded for `<run>`                |
+| `/api/lab/image` (POST)         | upload a `.png` lab image into a run dir       |
 
-```yaml
-potential:
-  type: crossed_dipole
-  polarizability: 1.5e-37
-  beams:
-    - wavelength: 1064.0e-9
-      power: 10.0
-      waist: 50.0e-6
-      position: [0, 0, 0]
-      direction: [1, 0, 0]
-```
+Atlases are mtime-validated and cached under
+`runs/_dashboard_cache/atlas__<run>__<file>__axis<N>__bsz<true|false>.bin`.
+Optional bitshuffle + zstd-3 compression via `?bsz=1` (see
+`docs/dashboard_perf_notes.md`).
 
-Composite potential (List form, automatically summed):
+## I/O (`workflow/io/`)
 
-```yaml
-potential:
-  - type: harmonic
-    omega: [1.0, 1.0, 1.0]
-  - type: gravity
-    g: 9.81
-    axis: 3
-```
-
-### Execution Flow
-
-`run_experiment(config)`:
-
-1. Resolve atom species from registry.
-2. Build grid from config.
-3. If `ground_state` is specified, run `find_ground_state` with imaginary time propagation.
-4. For each phase in `sequence`:
-   - Build potential (or inherit from previous phase).
-   - Build Zeeman (static or time-dependent ramp).
-   - Create workspace with the ground state wavefunction (or previous phase output) as initial condition.
-   - Run real-time simulation.
-   - Chain the output wavefunction to the next phase.
-5. Return `ExperimentResult` with all phase results.
-
-## I/O (`io.jl`)
-
-State serialization uses JLD2 format, saving the wavefunction array, time, step count, and grid parameters. This enables checkpoint/restart workflows.
+State serialization uses JLD2. Snapshots are streamed under
+`dynamics/psi_snapshots_streamed/frame_NNNNN` (ComplexF32 default,
+ComplexF64 with `save_snapshot_precision: "f64"`); legacy 5D arrays are
+still readable. Set `SPINORBEC_SCRATCH_DIR` to redirect the streamed
+`.tmp` to node-local FS (HPC / TSUBAME-friendly). `estimate_run_budget`
+prints VRAM / host RAM / disk projections from a YAML.
 
 ## Dependencies
 
@@ -310,9 +294,22 @@ State serialization uses JLD2 format, saving the wavefunction array, time, step 
 | FFTW | Fast Fourier transforms (in-place, planned) |
 | StaticArrays | Stack-allocated spin matrices and spinors |
 | LinearAlgebra | Eigendecomposition for matrix exponentials |
-| JLD2 | Binary state serialization |
+| JLD2 | Binary state serialization (snapshot frames, scan points) |
 | YAML | Experiment configuration parsing |
-| Makie | Visualization (weak extension) |
+| JSON | Manifests, dashboard responses, `_live_status.json` |
+| HTTP / Sockets | `serve_dashboard` HTTP server |
+| CodecZlib / CodecZstd | Optional snapshot + atlas compression |
+| Unitful | Lab-unit YAML parsing (`"X Gauss"`, `"f Hz"`) |
+| WriteVTK | VTK export (3D paraview workflow) |
+| CUDA | GPU backend (weak extension `SpinorBECCUDAExt`) |
+| Makie | 2D/3D visualization (weak extension `SpinorBECMakieExt`) |
+
+PlotlyJS was removed (2026-04-26). All Makie plot helpers
+(`plot_density`, `plot_spinor`, `plot_spin_texture`, `animate_dynamics`)
+are exported as `function … end` stubs and only resolve when
+`using GLMakie` (or another Makie backend) is loaded. The dashboard
+frontend renders 2D heatmaps via WebGPU (`HeatmapGrid`) and time series
+via SVG (`LineChartSVG`); no server-side plotting library is required.
 
 ## Module dependency diagram
 

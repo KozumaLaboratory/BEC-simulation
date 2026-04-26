@@ -98,3 +98,42 @@ Analyzers that gained extra fields (vortex_detect now returns
 `positions`, monopole_charge gains `max_abs_density`, etc.) are
 backward-compatible — they only added named-tuple fields. Old code that
 does `result.vortex_count` still works.
+
+## PlotlyJS removed (2026-04-26)
+
+PlotlyJS is no longer a dependency. Two user-visible consequences:
+
+1. `column_density_movie` no longer writes PNG frames. Output is now:
+   - `<output_dir>/columns.jld2` — Float32 2D array per frame, key
+     `frame_NNNNN`.
+   - `<output_dir>/manifest.json` — `n_frames`, `n_phases`, `axis`,
+     `frame_keys`, `times`, `phase_indices`, `archive`.
+
+   Migration: any post-processing script that walked `frames/*.png`
+   should switch to reading `frames/columns.jld2` directly:
+
+   ```julia
+   using JLD2, JSON
+   manifest = JSON.parsefile("frames/manifest.json")
+   jldopen(joinpath("frames", manifest["archive"]), "r") do f
+       for k in manifest["frame_keys"]
+           col = f[k]   # Float32 2D array
+           # render however you like (Makie, Plots, matplotlib via PythonCall, …)
+       end
+   end
+   ```
+
+   The dashboard renders frames client-side from the JLD2 archive.
+
+2. `plot_density` / `plot_spinor` / `plot_spin_texture` /
+   `animate_dynamics` are now Makie-only. Load a Makie backend
+   (`using GLMakie` or `using CairoMakie`) before calling them. The
+   Plotly variants and `save_column_density_png` no longer exist.
+
+## `dry_run` returns the YAML string (2026-04-26)
+
+Old form silently called `redirect_stdout(IOBuffer())` and returned
+nothing useful. New form: `run_yaml(path; dry_run=true)` prints the
+post-calibration / post-validation YAML to stdout **and returns the
+same content as a `String`**. Tests that previously captured stdout
+with `redirect_stdout` should switch to inspecting the return value.

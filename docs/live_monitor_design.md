@@ -1,6 +1,27 @@
 # Live monitoring — design note
 
-Status: **scaffold / deferred** (Phase 5.4, Scenario #67).
+Status: **partially implemented** (2026-04-26). The two halves of the
+"live monitor" idea were split and implemented separately:
+
+- **Lab-image side (items 1-3 below): IMPLEMENTED.** `/api/lab/image`
+  POST + `/api/lab/list` GET in `dashboard.jl` accept and serve
+  `runs/<run>/lab_images/shot_*.png`; the React `LabImageOverlay`
+  component renders them in the 3D view. Auth (item 4) is still
+  deferred — server is LAN-only.
+- **Simulation-observable streaming: IMPLEMENTED separately** via the
+  YAML knob `dynamics.live_monitor: {every: N}` →
+  `<run>/_live_status.json`. Two new dashboard endpoints
+  `/api/live/list` and `/api/live/<run>` return the freshest status
+  JSON. Frontend hooks `useLiveRuns` / `useLiveStatus` and component
+  `LiveStatusPanel` render it in the App header. See
+  `pipeline_runner.jl:_build_live_callback` for the writer side.
+
+The original design note (kept below for context) imagined a single
+push socket; in practice splitting "lab pushes images" from "sim
+publishes status JSON" was simpler — both share the dashboard's static
+file route and an atomic-rename writer.
+
+---
 
 The lab-side live-monitor socket adds a push endpoint to the existing
 dashboard so a pickup script on the experiment PC can ship absorption
