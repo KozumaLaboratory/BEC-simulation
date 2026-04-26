@@ -402,12 +402,57 @@ end
 """
     run_status(run_dir) → NamedTuple
 
-Report the progress of a run directory by counting per-point .jld2 files.
+Report the progress of a run directory:
+
+  - `completed`: number of `point_*.jld2` files written
+  - `expected`:  number of points the YAML scan block plans (Int) or
+                 `nothing` for a single-point (no scan) run / unknown
+  - `latest_mtime_s`: epoch-seconds mtime of newest point file (NaN if none)
+  - `eta_s`:    naive linear ETA based on the gap between the first and
+                last completed points (NaN if <2 points)
 """
 function run_status(run_dir::String)
-    isdir(run_dir) || return (exists=false, total=0, completed=0)
-    files = filter(f -> startswith(f, "point_") && endswith(f, ".jld2"), readdir(run_dir))
-    (exists=true, total=length(files), completed=length(files))
+    isdir(run_dir) ||
+        return (exists=false, completed=0, expected=nothing,
+            latest_mtime_s=NaN, eta_s=NaN)
+    files = filter(f -> startswith(f, "point_") && endswith(f, ".jld2"),
+        readdir(run_dir))
+    completed = length(files)
+    expected = _expected_scan_points(joinpath(run_dir, "config.yaml"))
+    latest_mtime_s = NaN
+    eta_s = NaN
+    if !isempty(files)
+        mtimes = [mtime(joinpath(run_dir, f)) for f in files]
+        latest_mtime_s = maximum(mtimes)
+        if completed >= 2 && expected isa Int && expected > completed
+            elapsed = latest_mtime_s - minimum(mtimes)
+            per_point = elapsed / max(completed - 1, 1)
+            eta_s = per_point * (expected - completed)
+        end
+    end
+    (exists=true, completed=completed, expected=expected,
+        latest_mtime_s=latest_mtime_s, eta_s=eta_s)
+end
+
+function _expected_scan_points(cfg_path::String)
+    isfile(cfg_path) || return nothing
+    data = try
+        YAML.load_file(cfg_path)
+    catch
+        return nothing
+    end
+    scan = get(data, "scan", nothing)
+    scan isa Dict || return nothing
+    pts = try
+        expand_scan_points(scan)
+    catch
+        return nothing
+    end
+    n_pts = length(pts)
+    n_pts == 0 && return nothing
+    comparison = get(scan, "comparison_runs", nothing)
+    n_recipes = (comparison isa Vector && !isempty(comparison)) ? length(comparison) : 1
+    n_pts * n_recipes
 end
 
 function list_runs(base_dir::String="runs")

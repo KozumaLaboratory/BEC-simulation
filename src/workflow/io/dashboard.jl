@@ -422,6 +422,27 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         body = read(status_path, String)
         (200, "application/json", body)
 
+    elseif startswith(path, "/api/scan_status/")
+        # /api/scan_status/<run_name> → JSON with {completed, expected,
+        # latest_mtime_s, eta_s} so the dashboard can show "12/144 done · ETA 9h"
+        # for an in-progress overnight scan. expected may be null when the
+        # config has no scan block.
+        run_name = _uri_decode(path[(length("/api/scan_status/") + 1):end])
+        status = run_status(joinpath(base_dir, run_name))
+        if !status.exists
+            return (404, "application/json", "{\"error\":\"unknown run $run_name\"}")
+        end
+        expected_str = status.expected === nothing ? "null" : string(status.expected)
+        latest_str =
+            isnan(status.latest_mtime_s) ? "null" :
+            string(round(status.latest_mtime_s; digits=3))
+        eta_str = isnan(status.eta_s) ? "null" :
+                  string(round(status.eta_s; digits=1))
+        body =
+            "{\"completed\":$(status.completed),\"expected\":$expected_str," *
+            "\"latest_mtime_s\":$latest_str,\"eta_s\":$eta_str}"
+        (200, "application/json", body)
+
     elseif path == "/api/runs"
         runs = list_runs(base_dir)
         (200, "application/json", "[" * join(["\"$r\"" for r in runs], ",") * "]")

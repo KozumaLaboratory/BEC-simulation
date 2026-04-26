@@ -52,6 +52,51 @@ export function useLiveRuns(intervalMs = 3000) {
   return { runs, error }
 }
 
+export interface ScanStatus {
+  completed: number
+  expected: number | null
+  latest_mtime_s: number | null
+  eta_s: number | null
+}
+
+/**
+ * Polls /api/scan_status/<run> for "N points done out of M, ETA T" data.
+ * Lower frequency than useLiveStatus (default 10 s) — point files land
+ * minutes apart on a real scan; spamming the listing every second is wasteful.
+ */
+export function useScanStatus(run: string | null, intervalMs = 10_000) {
+  const [status, setStatus] = useState<ScanStatus | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const stopRef = useRef(false)
+
+  useEffect(() => {
+    stopRef.current = false
+    setStatus(null)
+    setError(null)
+    if (!run) return
+    const tick = async () => {
+      if (document.hidden) return
+      try {
+        const s = await api.scanStatus(run)
+        if (!stopRef.current) {
+          setStatus(s)
+          setError(null)
+        }
+      } catch (e) {
+        if (!stopRef.current) setError((e as Error).message)
+      }
+    }
+    void tick()
+    const id = window.setInterval(tick, intervalMs)
+    return () => {
+      stopRef.current = true
+      window.clearInterval(id)
+    }
+  }, [run, intervalMs])
+
+  return { status, error }
+}
+
 /**
  * Polls /api/live/<run> for the per-step status snapshot. Returns the
  * latest status plus a ring buffer of the last `historyLen` snapshots

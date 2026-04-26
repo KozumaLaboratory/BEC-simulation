@@ -71,7 +71,7 @@ export default function App() {
       <TopControls state={state} />
 
       <div className="mb-3">
-        <LiveStatusPanel run={selectedRun} />
+        <LiveStatusPanel run={selectedRun} onSelect={state.setSelectedRun} />
       </div>
 
       {error && (

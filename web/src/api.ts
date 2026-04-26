@@ -195,6 +195,20 @@ export const api = {
     return json('/api/live/list')
   },
 
+  /** Per-run scan progress: how many `point_NNN.jld2` files have landed
+   * vs. the total number of points the YAML scan block plans, plus a
+   * naive linear ETA based on the spread between the first and last
+   * completed point's mtimes. `expected` is null for a single-point
+   * (no scan block) run. */
+  scanStatus(run: string): Promise<{
+    completed: number
+    expected: number | null
+    latest_mtime_s: number | null
+    eta_s: number | null
+  }> {
+    return json(`/api/scan_status/${encodeURIComponent(run)}`)
+  },
+
   /** 3D density atlas: one binary blob containing every snap's full
    * 3D density volume for one component. Layout matches the backend's
    * "D3AT" packer (see /api/density3d_atlas). Returns the per-snap
