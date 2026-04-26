@@ -730,6 +730,19 @@ function _run_binary_ground_state_step(p::AbstractDict; verbose::Bool = true)
     return (psi_4d, grid, placeholder_atom, nothing, step_result)
 end
 
+# Binary RTP integration into the YAML pipeline is intentionally NOT
+# wired here: the abstract dispatch on `_run_step(::PipelineStep, …)`
+# triggered the multi-minute JIT inference cascade documented as the
+# "Type stability boundaries" pitfall in CLAUDE.md when the binary path
+# was added. The standalone solver works (see test/test_binary_simulation.jl)
+# and can be invoked directly from a script:
+#   sim = make_binary_simulation(grid; couplings, ...)
+#   run_binary_simulation!(sim; duration, dt)
+# Re-attempting the YAML wiring needs either a dedicated
+# `BinaryDynamicsStep` concrete step type or @noinline helpers around
+# every Dict{Symbol,Any} read, AND verification that `run_pipeline`
+# inference still terminates in seconds.
+
 """
     _build_sgpe_callback(node, dt) -> Union{Nothing,Function}
 
