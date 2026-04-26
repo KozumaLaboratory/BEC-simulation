@@ -103,9 +103,10 @@ function SpinorBEC.apply_raman_step!(
     # Single source of truth for the Euler 5-stage rotation lives in
     # `foundation/spinor_utils.jl::apply_euler_5stage_fused!`. Same call
     # site as gpu_spin_mixing and DDI.
-    SpinorBEC.apply_euler_5stage_fused!(
-        psi_2d, tmp, α, β, θ,
-        cache.m_vals, cache.m_shift, cache.λ, cache.V_T, cache.conj_V;
+    # Single-launch fused 5-stage rotation kernel (gpu_euler_kernel.jl).
+    apply_euler_5stage_fused_kernel!(
+        psi_2d, α, β, θ,
+        cache.m_vals, cache.m_shift, cache.λ, cache.V, cache.conj_V;
         imaginary_time=imaginary_time,
     )
 
