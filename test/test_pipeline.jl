@@ -1,4 +1,5 @@
 using JLD2
+using JSON
 using Dates: Date
 
 @testset "Pipeline" begin
@@ -312,17 +313,20 @@ using Dates: Date
         atom = AtomSpecies("Rb87", 1.44e-25, 1, 0.0, 0.0, 0.0)
         cfg = GridConfig((12, 12), (6.0, 6.0))
         grid = make_grid(cfg)
-        # Equal-population state across 3 components
+        # Equal-population state across 3 components, normalised so
+        # ∫|ψ|² dV = 1 (the convention :synthetic_dim assumes for
+        # pop_per_m / edge_density / bulk_density).
+        dV = cell_volume(grid)
         psi = zeros(ComplexF64, 12, 12, 3)
         for c in 1:3
-            psi[:, :, c] .= 1.0 / sqrt(3 * length(psi[:, :, 1]))
+            psi[:, :, c] .= 1.0 / sqrt(3 * length(psi[:, :, 1]) * dV)
         end
         r = SpinorBEC._run_analyzer(:synthetic_dim, psi, grid, atom, Dict{String, Any}())
         @test length(r.pop_per_m) == 3
         @test sum(r.pop_per_m) ≈ 1.0 atol=1e-8
         @test r.m_mean ≈ 0.0 atol=1e-10        # symmetric across m=±1
-        @test r.edge_density ≈ 2/3 atol=1e-8   # m=±1 components
-        @test r.bulk_density ≈ 1/3 atol=1e-8   # m=0 component
+        @test r.edge_density ≈ 2 / 3 atol=1e-8   # m=±1 components
+        @test r.bulk_density ≈ 1 / 3 atol=1e-8   # m=0 component
     end
 
     @testset "SGPE YAML knob smoke" begin
@@ -341,7 +345,7 @@ using Dates: Date
           - dynamics:
               duration: 0.2
               dt: 0.005
-              save_every: 100
+              save_every: 10
               sgpe: {gamma: 0.05, T: 0.05, mu: 0.0, every: 1, seed: 11}
         """
         result = run_config(load_config_from_string(yaml_str); verbose=false)
@@ -411,10 +415,15 @@ pipeline:
 """,
             )
             run_yaml(cfg_path; base_dir=tmp, verbose=false)
-            png_files = filter(p -> endswith(p, ".png"), readdir(frame_dir))
+            archive = joinpath(frame_dir, "columns.jld2")
+            manifest = joinpath(frame_dir, "manifest.json")
+            @test isfile(archive)
+            @test isfile(manifest)
+            mj = JSON.parsefile(manifest)
             # Each dynamics step has 0.1/0.01/5 = 2 frames, so multi_step
             # concat should give 4 frames total.
-            @test length(png_files) >= 3
+            @test mj["n_frames"] >= 3
+            @test mj["n_phases"] == 2
         end
     end
 
@@ -477,12 +486,8 @@ pipeline:
       initial_state: ferromagnetic
 """,
             )
-            # dry_run should print expanded YAML and return "" — must NOT touch GPU
-            buf = IOBuffer()
-            redirect_stdout(buf) do
-                run_yaml(cfg_path; base_dir=tmp, verbose=false, dry_run=true)
-            end
-            out = String(take!(buf))
+            # dry_run returns the expanded YAML string — must NOT touch GPU
+            out = run_yaml(cfg_path; base_dir=tmp, verbose=false, dry_run=true)
             @test occursin("dry-run", out)
             @test occursin("Gauss", out)        # p_mv → "X Gauss" in expanded form
             @test !occursin("p_mv", out)        # lab key stripped
@@ -524,8 +529,12 @@ pipeline:
             psi[i, j, 1] = 0.5 * r * cis(atan(y, x)) * exp(-r^2 / 4)
         end
         atom = AtomSpecies("Rb87", 1.44e-25, 1, 0.0, 0.0, 0.0)
+        # threshold is "minimum |ψ|² fraction of n_max for the corner gate".
+        # The central plaquette enclosing the singularity has density ~4% of
+        # peak (the core is dark), so the gate must be loose enough to admit
+        # it; otherwise the only winding-positive plaquette gets skipped.
         r = SpinorBEC._run_analyzer(:vortex_detect, psi, grid, atom,
-            Dict{String, Any}("component" => 1, "threshold" => 0.05))
+            Dict{String, Any}("component" => 1, "threshold" => 0.001))
         @test r.vortex_count >= 1
         @test haskey(r, :positions)
         @test r.positions isa AbstractVector
@@ -538,7 +547,7 @@ pipeline:
     @testset "column_density_movie streamed snapshot path" begin
         # Mini dynamics smoke that exercises save_psi_snapshots: true →
         # streamed scratch JLD2 → column_density_movie reads it back and
-        # produces PNG frames. Must not require save_psi_snapshots: false.
+        # writes per-frame column densities to columns.jld2 + manifest.json.
         mktempdir() do tmp
             frame_dir = joinpath(tmp, "frames")
             cfg_path = joinpath(tmp, "config.yaml")
@@ -566,12 +575,15 @@ pipeline:
       - column_density_movie:
           axis: 3
           output_dir: $frame_dir
-          colorscale: Viridis
 """,
             )
             run_yaml(cfg_path; base_dir=tmp, verbose=false)
-            png_files = filter(p -> endswith(p, ".png"), readdir(frame_dir))
-            @test length(png_files) >= 3   # 0.2/dt(0.01)/save_every(5) = 4 frames
+            archive = joinpath(frame_dir, "columns.jld2")
+            manifest = joinpath(frame_dir, "manifest.json")
+            @test isfile(archive)
+            @test isfile(manifest)
+            mj = JSON.parsefile(manifest)
+            @test mj["n_frames"] >= 3
         end
     end
 

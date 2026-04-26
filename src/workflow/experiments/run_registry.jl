@@ -110,10 +110,13 @@ function run_yaml(yaml_path::String; base_dir::String="runs", verbose::Bool=true
     # checking that lab-unit YAML expanded as expected before committing
     # to a long compute.
     if dry_run
-        println("# === run_yaml dry-run output (post calibration + validation) ===")
-        println("# original: $yaml_path")
-        YAML.write(stdout, data)
-        return ""
+        buf = IOBuffer()
+        println(buf, "# === run_yaml dry-run output (post calibration + validation) ===")
+        println(buf, "# original: $yaml_path")
+        YAML.write(buf, data)
+        out = String(take!(buf))
+        print(out)
+        return out
     end
 
     # If the YAML is already runs/foo/config.yaml, use runs/foo/ as the run dir
