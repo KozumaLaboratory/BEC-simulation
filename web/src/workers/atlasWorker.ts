@@ -5,6 +5,13 @@
 // blob so we avoid 157× HTTP round-trips. Falls back to per-snap
 // /api/density_bin parallel fetches only if the bulk endpoint isn't
 // available (older dashboards).
+//
+// Optionally requests the bsz=1 variant when the connection looks
+// slow (env var or future Network Information API). The response
+// carries a "BSZ1" magic header → bitshuffle + zstd-decompress
+// before handing off to decodeAtlas.
+
+import { decompress as fzstdDecompress } from 'fzstd'
 
 interface AtlasReq {
   type: 'fetch'
@@ -36,16 +43,64 @@ self.addEventListener('message', (event: MessageEvent<Req>) => {
   }
 })
 
+/** Byte-shuffle inverse: undo the per-byte interleave applied
+ * server-side. For 4-byte Float32 elements the encoded layout is:
+ *   [byte0_of_e1, byte0_of_e2, …, byte1_of_e1, byte1_of_e2, …, …]
+ * Reorders into the natural element-major layout. */
+function unbitshuffle(shuffled: Uint8Array, esize: number): Uint8Array {
+  const n = shuffled.length
+  if (n % esize !== 0) {
+    throw new Error(`bitshuffle: length ${n} not divisible by esize ${esize}`)
+  }
+  const n_elem = n / esize
+  const out = new Uint8Array(n)
+  for (let b = 0; b < esize; b++) {
+    for (let i = 0; i < n_elem; i++) {
+      out[i * esize + b] = shuffled[b * n_elem + i]
+    }
+  }
+  return out
+}
+
+/** Decode a BSZ1-wrapped binary back to its raw bytes. Returns the
+ * input unchanged if the magic doesn't match (lets the same worker
+ * accept both raw and bsz responses). */
+function maybeDecodeBsz(buf: ArrayBuffer): ArrayBuffer {
+  if (buf.byteLength < 12) return buf
+  const magic = new Uint8Array(buf, 0, 4)
+  if (magic[0] !== 0x42 || magic[1] !== 0x53 || magic[2] !== 0x5a || magic[3] !== 0x31) {
+    return buf // not "BSZ1"
+  }
+  const hdr = new Int32Array(buf, 4, 2)
+  const origSize = hdr[0]
+  const esize = hdr[1]
+  const compressed = new Uint8Array(buf, 12)
+  const shuffled = fzstdDecompress(compressed)
+  const raw = unbitshuffle(shuffled, esize)
+  if (raw.byteLength !== origSize) {
+    throw new Error(`bsz: decoded size ${raw.byteLength} != header ${origSize}`)
+  }
+  return raw.buffer as ArrayBuffer
+}
+
 async function runFetch(req: AtlasReq) {
   const { reqId, run, file, axis, totalSnaps } = req
-  // Attempt the bulk endpoint first; if it isn't there we fall back.
+  // Auto-opt-in to bsz when the build flag says so. The fzstd decode
+  // adds ~20-50 ms on Klaus 46 MB; over LAN the 21 % bandwidth
+  // saving wins. Override at runtime by setting `?bsz=1` on the fetch
+  // URL or stripping it.
+  const bszArg = (self as unknown as { __SPINORBEC_PREFER_BSZ?: boolean })
+    .__SPINORBEC_PREFER_BSZ
+    ? '&bsz=1'
+    : ''
   try {
     const res = await fetch(
-      `/api/density_atlas/${encodeURIComponent(run)}/${encodeURIComponent(file)}?axis=${axis}`,
+      `/api/density_atlas/${encodeURIComponent(run)}/${encodeURIComponent(file)}?axis=${axis}${bszArg}`,
     )
     if (activeReqId !== reqId) return
     if (res.ok) {
-      const buf = await res.arrayBuffer()
+      const rawBuf = await res.arrayBuffer()
+      const buf = maybeDecodeBsz(rawBuf)
       const decoded = decodeAtlas(buf)
       if (decoded === null) {
         self.postMessage({ type: 'error', reqId, message: 'atlas decode failed' })

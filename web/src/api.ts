@@ -163,6 +163,30 @@ export const api = {
     )
   },
 
+  /** Synthetic-dimension dispersion image (k_real × k_synth). Wraps
+   * the backend's /api/synthetic_dispersion endpoint, which packs the
+   * spectrum into the same Float32-binary layout as a column density
+   * with n_comp=0 (the spectrum lives in the `total_density` slot).
+   * Returns nx = number of points along the chosen real axis,
+   * ny = D = 2F+1 (synthetic axis length). */
+  async getSyntheticDispersion(
+    run: string,
+    file: string,
+    axis: 1 | 2 | 3,
+    snap?: number,
+  ): Promise<{ nx: number; ny: number; spectrum: Float32Array }> {
+    const snapArg = snap !== undefined ? `&snap=${snap}` : ''
+    const buf = await bin(
+      `/api/synthetic_dispersion/${encodeURIComponent(run)}/${encodeURIComponent(file)}?axis=${axis}${snapArg}`,
+    )
+    const header = new Int32Array(buf, 0, 6)
+    const nx = header[2]
+    const ny = header[3]
+    // Skip header (24) + axis_ranges (16) — n_comp=0 so no m_values.
+    const spectrum = new Float32Array(buf, 40, nx * ny).slice()
+    return { nx, ny, spectrum }
+  },
+
   /** Lazy companion to getSnapshots: the global peak total density
    * across all snapshots. Used by the 3D viewer for absolute-scale
    * normalisation. Computing it server-side walks 16 sampled frames,

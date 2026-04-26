@@ -814,6 +814,75 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         end
         (200, "application/octet-stream", bin)
 
+    elseif startswith(path, "/api/synthetic_dispersion/")
+        # /api/synthetic_dispersion/:run/:file?axis=N&snap=K → packed
+        # Float32 (k_real × k_synth) dispersion image. Drives the new
+        # SlicePanel "dispersion" mode — same protocol shape as
+        # density_bin so the same DataTexture upload path can render it.
+        rest = _uri_decode(path[27:end])
+        slash_idx = findfirst('/', rest)
+        if slash_idx === nothing
+            return (400, "text/plain", "Expected /api/synthetic_dispersion/:run/:file")
+        end
+        name = rest[1:(slash_idx - 1)]
+        file = rest[(slash_idx + 1):end]
+        axis = 1
+        snap_idx = nothing
+        qidx = findfirst('?', file)
+        if qidx !== nothing
+            query = file[(qidx + 1):end]
+            file = file[1:(qidx - 1)]
+            m = match(r"axis=(\d+)", query)
+            m !== nothing && (axis = parse(Int, m.captures[1]))
+            ms = match(r"snap=(\d+)", query)
+            ms !== nothing && (snap_idx = parse(Int, ms.captures[1]))
+        end
+        fpath = joinpath(base_dir, name, file)
+        if !isfile(fpath)
+            return (404, "text/plain", "File not found: $name/$file")
+        end
+        cache_key = "synth_disp:$(fpath)#snap=$(snap_idx)#axis=$(axis)"
+        bin = if haskey(psi_cache, cache_key)
+            psi_cache[cache_key]
+        else
+            while length(psi_cache) >= PSI_CACHE_MAX_ENTRIES
+                _evict_one!(psi_cache)
+            end
+            v = try
+                tup = _load_psi_cached(fpath, psi_cache, snap_idx)
+                psi = tup[1]
+                # Re-derive a Grid from the JLD2 box_size so the
+                # synthetic_dim_dispersion call (which queries
+                # grid.config.box_size) has what it needs.
+                box = _load_box_size(fpath)
+                ndim = ndims(psi) - 1
+                n_pts = ntuple(i -> size(psi, i), ndim)
+                box_n = ntuple(i -> Float64(box[i]), ndim)
+                grid = make_grid(GridConfig(n_pts, box_n))
+                d = synthetic_dim_dispersion(psi, grid; axis = axis)
+                spectrum_f32 = Float32.(d.spectrum)
+                n_axis = size(spectrum_f32, 1)
+                D = size(spectrum_f32, 2)
+                buf = IOBuffer(; sizehint = 40 + n_axis * D * 4)
+                # density_bin header reused: ndim=2, axis=axis,
+                # nx=n_axis, ny=D, n_comp=0 (no per-component split,
+                # the whole image lives in the total slot), F=0.
+                write(buf, Int32(2), Int32(axis), Int32(n_axis), Int32(D), Int32(0), Int32(0))
+                # axis_ranges in radians-of-k (label-only on the client)
+                write(buf, Float32[-π, π, -π, π])
+                # m_values empty (n_comp=0) so the frontend parser skips
+                # straight to total_density.
+                # total_density slot carries the spectrum.
+                write(buf, vec(spectrum_f32))
+                take!(buf)
+            catch e
+                return (500, "text/plain", "Error: $(e)")
+            end
+            psi_cache[cache_key] = v
+            v
+        end
+        (200, "application/octet-stream", bin)
+
     elseif startswith(path, "/api/density_max/")
         # /api/density_max/:run/:file → {"density_max_total": float}
         # Lazy version of the field that used to live in /api/snapshots.
@@ -2055,7 +2124,7 @@ const PSI_CACHE_MAX_ENTRIES = 200
 const _DERIVED_CACHE_PREFIXES = (
     "density_bin:", "phase_bin:", "density3d_bin:", "phase3d_bin:",
     "vorticity3d_bin:", "vector3d_bin:", "vortex_lines:", "density_max:",
-    "density_atlas:",
+    "density_atlas:", "synth_disp:",
 )
 
 function _is_derived_cache_key(k::AbstractString)
