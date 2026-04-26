@@ -267,7 +267,7 @@ export make_light_shift, make_light_shift_from_trap, apply_light_shift_step!
 export LaserBeamPotential, crossed_laser_trap
 
 # Thomas-Fermi
-export thomas_fermi_density, init_psi_thomas_fermi
+export thomas_fermi_density, init_psi_thomas_fermi, init_psi_thomas_fermi_textured
 export add_thermal_noise!, add_thermal_noise, thermal_noise_amplitude, bec_critical_temperature,
     add_symmetry_breaking_seed!
 export simulate_tof, simulate_tof_with_gradient, sg_separation_peaks

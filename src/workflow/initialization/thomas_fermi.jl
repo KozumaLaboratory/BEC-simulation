@@ -83,3 +83,71 @@ function init_psi_thomas_fermi(
 
     psi
 end
+
+"""
+    init_psi_thomas_fermi_textured(grid, sys, potential, c0, texture_psi;
+                                   N_target=1.0) → psi
+
+Pair a Thomas-Fermi *density* envelope with an arbitrary *spin texture*
+provided as `texture_psi[x..., c]`. The texture is normalised per-point
+(divided by its local total density), then multiplied by `sqrt(n_TF(r))`
+so the final ψ has
+
+    |ψ(r)|² = n_TF(r),     ψ_c(r) / sqrt(n_TF(r)) = texture_psi_c(r) / |texture(r)|
+
+The total density is set by Thomas-Fermi (i.e. self-consistent against
+the trap + `c0`), while the *spin texture* (FL vortex, cyclic, biaxial
+nematic, …) is whatever the caller supplies. Closes the gap flagged in
+the code review (Round 4 #2): polarized GS gave a biased initial
+density when ITP'ing into a non-trivial spin texture, so the FL/PCV
+energy curves used for the B-1 boundary scan inherited a systematic
+bias from the seed. Feed this textured TF state in as `psi_init` and
+ITP relaxes from a starting point that is already self-consistent on
+the density side.
+
+Points where the texture is exactly zero (vortex cores in the dominant
+component, etc.) are left at zero density, which is correct for those
+states.
+"""
+function init_psi_thomas_fermi_textured(
+    grid::Grid{N},
+    sys::SpinSystem,
+    potential::AbstractPotential,
+    c0::Float64,
+    texture_psi::AbstractArray{<:Complex};
+    N_target::Float64=1.0,
+) where {N}
+    n_pts = grid.config.n_points
+    D = sys.n_components
+    expected = (n_pts..., D)
+    size(texture_psi) == expected || throw(
+        ArgumentError(
+            "texture_psi shape $(size(texture_psi)) must match (n_pts..., D) = $expected"),
+    )
+
+    V = evaluate_potential(potential, grid)
+    dV = cell_volume(grid)
+    n_TF = thomas_fermi_density(V, c0, dV; N_target).density
+
+    psi = zeros(ComplexF64, expected)
+    @inbounds for I in CartesianIndices(n_pts)
+        # Local norm of the supplied texture
+        local_n = 0.0
+        for c in 1:D
+            local_n += abs2(texture_psi[I, c])
+        end
+        local_n > 1e-30 || continue
+        # |ψ(r)|² = n_TF(r), with the per-component ratio set by the
+        # supplied texture
+        scale = sqrt(n_TF[I] / local_n)
+        for c in 1:D
+            psi[I, c] = scale * texture_psi[I, c]
+        end
+    end
+
+    # Renormalise to the requested N (TF normalisation can drift slightly
+    # under the unit cell discretisation).
+    norm = sqrt(sum(abs2, psi) * dV)
+    norm > 0 && (psi ./= norm; psi .*= sqrt(N_target))
+    psi
+end

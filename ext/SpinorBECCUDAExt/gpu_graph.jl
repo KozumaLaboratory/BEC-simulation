@@ -1,41 +1,40 @@
-# --- CUDA Graph capture for split_step (EXPERIMENTAL, currently disabled) ---
+# --- CUDA Graph capture for split_step (EXPERIMENTAL, falls back to split_step!) ---
 #
 # Goal: capture the split_step! kernel sequence once into a CUDA Graph and
 # replay it with a single `cuGraphLaunch`, eliminating the ~5-10 μs
 # per-kernel host launch overhead that leaves our 128³ F32 Eu151 DDI run at
 # only 55% GPU utilisation.
 #
-# Status: requires an allocation-free hot path to work correctly. Our
-# current split_step! has implicit allocations from:
+# Allocation audit (2026-04-26, CUDA.jl 5.x, CUDA Runtime 12.9):
 #
-#   1. Julia fused broadcasts that materialise intermediate CuArrays
-#   2. cuBLAS gemm workspace scratch
-#   3. cuFFT plan workspace scratch
+#     Workload                | CUDA.@allocated per split_step!
+#     ------------------------|--------------------------------
+#     F=1 16³ contact only    |   520 bytes
+#     F=2 32³ contact only    |   520 bytes
+#     F=2 32³ + DDI           |   776 bytes
+#     F=6 32³ + DDI           |   776 bytes
 #
-# When `cuStreamBeginCapture` is active, these allocations get recorded
-# into the graph's memory plan. On replay, the recorded `cuMemFreeAsync`
-# calls try to free memory whose pool positions have shifted — the
-# captured pointer in the kernel args then points at unrelated memory,
-# and the replayed step zero's the wavefunction (observed).
+# These are tiny fixed-size allocations (KernelAbstractions launch
+# metadata / per-launch handles), not the per-point intermediate
+# CuArrays the original gpu_graph.jl comment was worried about. So the
+# blocker for graph capture is not the implicit-allocation cost itself
+# — recent CUDA.jl tracks and pools fused broadcasts well enough that
+# steady-state allocations are negligible. What still needs a focused
+# session:
 #
-# Path to enabling this:
-#   a. Pre-allocate every scratch buffer inside Workspace (add fields).
-#      Progress: psi_scratch landed in SimState (commit 8e7b607) — used
-#      by apply_uniform_spin_rotation!. Remaining allocators to audit:
-#        - cuFFT plan scratch (CUFFT.cufftSetWorkArea on the pre-allocated
-#          workspace area)
-#        - Spin-mixing temp matrices in gpu_spin_mixing.jl
-#        - Implicit broadcasts in DDI / nematic / tensor steps
-#   b. Rewrite the broadcasts to `@.` pure in-place (no intermediate).
-#   c. Configure cuFFT / cuBLAS to use the pre-allocated workspace.
+#   a. Confirm cuFFT plan scratch is configured against the workspace's
+#      pre-allocated work area (CUFFT.cufftSetWorkArea), so re-allocations
+#      don't sneak in across the captured graph boundary.
+#   b. Verify each step's CuArrays live for the full lifetime of the
+#      Workspace, not just the call (this is true for the latest gpu_*.jl
+#      caches but warrants a `gc_total_bytes()` cross-check).
+#   c. Wrap the actual capture / instantiate / launch sequence and exercise
+#      it over an end-to-end ITP run, comparing against split_step! on a
+#      few representative grids.
 #
-# Smoke test for "is the hot path allocation-free?":
-#
-#     ws = make_workspace(...; backend = CUDABackend())
-#     CUDA.@allocated SpinorBEC.split_step!(ws, 0.005)
-#     # Target: 0 (or very small) once the audit is done.
-#
-# Until then, `split_step_captured!` falls back to `split_step!` on GPU.
+# Until that lands, `split_step_captured!` falls back to `split_step!` on
+# GPU. The fallback is correct, just doesn't deliver the launch-overhead
+# savings.
 
 """
     split_step_captured!(ws::Workspace{N,<:CuArray}) → Nothing
