@@ -18,7 +18,19 @@ function generate_dashboard_data(run_dir::String; F::Union{Nothing, Int}=nothing
         filter(f -> startswith(f, "point_") && endswith(f, ".jld2"),
             readdir(run_dir)),
     )
-    isempty(jld2_files) && throw(ArgumentError("No point_*.jld2 files in $run_dir"))
+    if isempty(jld2_files)
+        # Run dir exists with config.yaml but no completed points yet —
+        # typical state for a batch in progress. Return the config so the
+        # Config tab works, plus an `in_progress` flag the frontend can
+        # show instead of an error.
+        return Dict{String, Any}(
+            "points" => Dict{String, Any}[],
+            "scan_keys" => String[],
+            "config_yaml" => config_raw,
+            "in_progress" => true,
+            "run_names" => String[],
+        )
+    end
 
     points = Dict{String, Any}[]
     run_names = Set{String}()
@@ -452,7 +464,16 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         if !isdir(run_dir)
             return (404, "text/plain", "Run not found: $name")
         end
-        json = get!(data_cache, name) do
+        # Cache only completed runs. In-progress runs (no point_*.jld2 yet,
+        # or whose point file count differs from a prior cache hit) bypass
+        # the cache so the dashboard reflects new files as the batch lands
+        # them. Without this guard the first request during a run cached
+        # the empty in-progress response and the dashboard never updated
+        # even after `point_001.jld2` appeared on disk.
+        live_count = count(f -> startswith(f, "point_") && endswith(f, ".jld2"),
+            readdir(run_dir))
+        cache_key = "$name#$live_count"
+        json = get!(data_cache, cache_key) do
             try
                 _json_string(generate_dashboard_data(run_dir))
             catch e

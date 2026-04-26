@@ -438,10 +438,20 @@ function make_workspace(;
 
     omega = sim_params.rotating_frame_omega
     if abs(omega) > 1e-15 && N >= 2
+        # Rotating-frame Hamiltonian: H_rot = H_lab − Ω L_z. Completing
+        # the square in (p − mΩ×r) gives the centrifugal term
+        # −(1/2)Ω²r_⊥² **subtracted** from the trap (so the effective
+        # transverse confinement is ω_eff² = ω_⊥² − Ω², deconfining at
+        # the centrifugal limit Ω → ω_⊥). The previous `V[I] +=` form
+        # had the wrong sign and over-confined any rotating-frame ITP /
+        # RTP, biasing FL / cyclic / vortex-lattice scans where Ω
+        # approaches a non-trivial fraction of ω_⊥. Fixed 2026-04-27
+        # after code review caught it. (Klaus 2022 lab-frame magnetostir
+        # runs with rotating_frame_omega = 0 are unaffected.)
         omega_sq_half = U(0.5 * omega^2)
         @inbounds for I in CartesianIndices(grid.config.n_points)
             r_perp_sq = grid.x[1][I[1]]^2 + grid.x[2][I[2]]^2
-            V[I] += omega_sq_half * r_perp_sq
+            V[I] -= omega_sq_half * r_perp_sq
         end
     end
     V = _to_device(backend, V)
