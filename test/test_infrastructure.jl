@@ -5,7 +5,7 @@
 # concrete-step refactor described in pipeline_runner.jl. Until that
 # lands, skip the affected blocks unless the user explicitly opts in.
 const _SKIP_HEAVY_YAML_INFRA =
-    VERSION >= v"1.11" && get(ENV, "SPINORBEC_RUN_HEAVY_YAML", "false") != "true"
+    get(ENV, "SPINORBEC_RUN_HEAVY_YAML", "false") != "true"
 
 @testset "Infrastructure extensions" begin
     @testset "Waveform extensions" begin

@@ -2,7 +2,7 @@
 # documented in CLAUDE.md ("Type stability boundaries") on Julia 1.11+.
 # Skip them by default — set SPINORBEC_RUN_HEAVY_YAML=true to opt in.
 const _SKIP_HEAVY_YAML_ZEEMAN =
-    VERSION >= v"1.11" && get(ENV, "SPINORBEC_RUN_HEAVY_YAML", "false") != "true"
+    get(ENV, "SPINORBEC_RUN_HEAVY_YAML", "false") != "true"
 
 @testset "Phase 1.5: Zeeman level dispatch" begin
     @testset "Level detection" begin
