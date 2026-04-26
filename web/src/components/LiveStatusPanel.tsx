@@ -1,4 +1,5 @@
 import { useLiveRuns, useLiveStatus } from '@/state/useLiveRuns'
+import { Sparkline } from '@/components/Sparkline'
 
 interface Props {
   /** Currently-selected run name; if it's actively writing live status,
@@ -18,7 +19,7 @@ interface Props {
  */
 export function LiveStatusPanel({ run, className = '' }: Props) {
   const { runs, error: listErr } = useLiveRuns()
-  const { status, error: statusErr } = useLiveStatus(run)
+  const { status, history, error: statusErr } = useLiveStatus(run)
 
   if (listErr) {
     return (
@@ -60,14 +61,29 @@ export function LiveStatusPanel({ run, className = '' }: Props) {
       </div>
 
       {status && run && (
-        <div className="border-t border-gray-200 pt-1">
+        <div className="border-t border-gray-200 pt-1 space-y-0.5">
           <div className="font-semibold text-gray-700">{run}</div>
           <div className="font-mono text-gray-600">
             step {status.step} · t = {status.t.toFixed(3)} · E ={' '}
             {status.energy.toFixed(4)}
           </div>
-          <div className="font-mono text-gray-600">
-            ‖ψ‖² = {status.norm.toFixed(5)}
+          <div className="font-mono text-gray-600 flex items-center gap-2">
+            <span>E(t)</span>
+            <Sparkline
+              ys={history.map((h) => h.energy)}
+              w={120}
+              h={18}
+              color="#2563eb"
+            />
+          </div>
+          <div className="font-mono text-gray-600 flex items-center gap-2">
+            <span>‖ψ‖² = {status.norm.toFixed(5)}</span>
+            <Sparkline
+              ys={history.map((h) => h.norm)}
+              w={120}
+              h={18}
+              color="#059669"
+            />
           </div>
           <div className="font-mono text-gray-600 break-all">
             pops: [
@@ -76,6 +92,12 @@ export function LiveStatusPanel({ run, className = '' }: Props) {
               .join(', ')}
             ]
           </div>
+          {history.length > 1 && (
+            <div className="text-gray-400">
+              {history.length} samples · spans{' '}
+              {(history[history.length - 1].t - history[0].t).toFixed(3)} time-units
+            </div>
+          )}
         </div>
       )}
 
