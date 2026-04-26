@@ -1,9 +1,13 @@
 """
     apply_nematic_step!(psi, interactions, F, dt, ndim; imaginary_time=false)
 
-Apply the singlet-pair (nematic) interaction step: exp(-i c₂ |A₀₀|² dt).
+Apply the **S=0 spin-singlet pair channel** step: exp(-i c₂ |A₀₀|² dt).
 
-This handles the S=0 pair channel only (KU Eq. (48), first spin-singlet term).
+> Despite the legacy name `nematic`, this is *not* the rank-2 spin
+> nematic tensor ⟨N^(2)_αβ⟩ — see `analysis/observables.jl` for that.
+> It is specifically the c₂|A₀₀|² spin-singlet pair channel from
+> KU Eq. (48). The function-level rename to `apply_singlet_pair_step!`
+> is deferred so existing call sites (split_step.jl) keep working.
 
 Kawaguchi-Ueda convention correspondence for contact interactions:
 - F=1: c₀n² + c₁|F|²  →  diagonal + spin_mixing           (2 channels, exact)

@@ -382,6 +382,7 @@ function _run_step(
             checkpoint_every=checkpoint_dir !== nothing ? max(1, n_steps ÷ 10) : 0,
             light_shift=gs_light_shift,
             spinor_lhy=spinor_lhy_mode,
+            verbose=verbose,
         )
     elseif method === :lbfgs
         m_lbfgs = Int(get(p, "m_lbfgs", 10))

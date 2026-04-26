@@ -127,7 +127,16 @@ function find_ground_state(;
     dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
     spinor_lhy::Union{Nothing, Symbol}=nothing,
     method::Symbol=:strang,
+    verbose::Bool=true,
 )
+    method === :strang || throw(
+        ArgumentError(
+            "find_ground_state currently supports method=:strang only " *
+            "(got :$method). The :sc4 path was disabled pending verified " *
+            "complex-coefficient symmetric-conjugate weights — see " *
+            "src/solvers/embedded_adaptive.jl for the design note."),
+    )
+
     psi0 = if psi_init === nothing
         sys = SpinSystem(atom.F)
         init_kwargs = pairs(init_state_params)
@@ -209,6 +218,7 @@ function find_ground_state(;
             l_z,
             backend,
             light_shift,
+            verbose,
         )
     end
 
@@ -265,6 +275,7 @@ function find_ground_state(;
         start_step=_start_step,
         checkpoint_dir=ckpt_dir,
         checkpoint_every=ckpt_every,
+        verbose=verbose,
     )
 end
 
@@ -275,6 +286,7 @@ function _run_itp_loop!(
     start_step::Int=0,
     checkpoint_dir::Union{Nothing, String}=nothing,
     checkpoint_every::Int=0,
+    verbose::Bool=true,
 )
     sp = ws.sim_params
     n_comp = ws.spin_matrices.system.n_components
@@ -394,14 +406,16 @@ function _run_itp_loop!(
                 final_dE = dE
                 final_dpsi = dpsi
 
-                elapsed = time() - t_start
-                frac = step / n_steps
-                eta = frac > 0 ? elapsed / frac * (1 - frac) : NaN
-                println(
-                    "  ITP $(step)/$(n_steps) | E=$(round(E; sigdigits=8)) dE=$(round(dE; sigdigits=3)) " *
-                    "dpsi=$(round(dpsi; sigdigits=3)) | $(round(elapsed; digits=1))s elapsed, ETA $(round(eta; digits=0))s",
-                )
-                flush(stdout)
+                if verbose
+                    elapsed = time() - t_start
+                    frac = step / n_steps
+                    eta = frac > 0 ? elapsed / frac * (1 - frac) : NaN
+                    println(
+                        "  ITP $(step)/$(n_steps) | E=$(round(E; sigdigits=8)) dE=$(round(dE; sigdigits=3)) " *
+                        "dpsi=$(round(dpsi; sigdigits=3)) | $(round(elapsed; digits=1))s elapsed, ETA $(round(eta; digits=0))s",
+                    )
+                    flush(stdout)
+                end
 
                 if dE < tol
                     converged = true
@@ -420,8 +434,10 @@ function _run_itp_loop!(
     catch e
         if e isa InterruptException
             interrupted = true
-            println("\n  ITP interrupted at step $last_step/$n_steps")
-            flush(stdout)
+            if verbose
+                println("\n  ITP interrupted at step $last_step/$n_steps")
+                flush(stdout)
+            end
         else
             rethrow(e)
         end
@@ -439,8 +455,10 @@ function _run_itp_loop!(
             converged,
             tol,
         )
-        println("  Checkpoint saved to $checkpoint_dir/itp_checkpoint.jld2")
-        flush(stdout)
+        if verbose
+            println("  Checkpoint saved to $checkpoint_dir/itp_checkpoint.jld2")
+            flush(stdout)
+        end
     end
 
     (
@@ -615,6 +633,7 @@ function _find_ground_state_adaptive(;
     l_z::Float64=0.0,
     backend::AbstractBackend=CPUBackend(),
     light_shift=nothing,
+    verbose::Bool=true,
 )
     current_dt = dt
     check_every = max(1, n_steps ÷ 100)
@@ -656,20 +675,11 @@ function _find_ground_state_adaptive(;
     final_dpsi = NaN
     t_start = time()
 
-    method in (:strang, :sc4) || throw(ArgumentError(
-        "find_ground_state method must be :strang or :sc4 (got $method)"))
-    n_comp_step = ws.spin_matrices.system.n_components
-    N_dim_step = length(grid.config.n_points)
-
     while total_steps < n_steps
         copyto!(psi_backup, ws.state.psi)
 
         for i in 1:check_every
-            if method === :sc4
-                _sc4_itp_step!(ws, current_dt, n_comp_step, N_dim_step)
-            else
-                split_step!(ws)
-            end
+            split_step!(ws)
             if i == 1 && total_steps == 0
                 _check_itp_overflow(ws, 1)
             end
@@ -686,10 +696,12 @@ function _find_ground_state_adaptive(;
             copyto!(ws.state.psi, psi_backup)
             current_dt = max(current_dt * 0.5, 1e-8)
             ws = _rebuild_workspace_with_dt(ws, current_dt)
-            println(
-                "  ITP adaptive: rejected at step $(total_steps)/$(n_steps), dt → $(current_dt)"
-            )
-            flush(stdout)
+            if verbose
+                println(
+                    "  ITP adaptive: rejected at step $(total_steps)/$(n_steps), dt → $(current_dt)"
+                )
+                flush(stdout)
+            end
         else
             dE = abs(E - E_prev)
             psi_max = maximum(abs, ws.state.psi)
@@ -697,15 +709,17 @@ function _find_ground_state_adaptive(;
             final_dE = dE
             final_dpsi = dpsi
 
-            elapsed = time() - t_start
-            frac = total_steps / n_steps
-            eta = frac > 0 ? elapsed / frac * (1 - frac) : NaN
-            println(
-                "  ITP $(total_steps)/$(n_steps) | E=$(round(E; sigdigits=8)) dE=$(round(dE; sigdigits=3)) " *
-                "dpsi=$(round(dpsi; sigdigits=3)) dt=$(round(current_dt; sigdigits=3)) | " *
-                "$(round(elapsed; digits=1))s elapsed, ETA $(round(eta; digits=0))s",
-            )
-            flush(stdout)
+            if verbose
+                elapsed = time() - t_start
+                frac = total_steps / n_steps
+                eta = frac > 0 ? elapsed / frac * (1 - frac) : NaN
+                println(
+                    "  ITP $(total_steps)/$(n_steps) | E=$(round(E; sigdigits=8)) dE=$(round(dE; sigdigits=3)) " *
+                    "dpsi=$(round(dpsi; sigdigits=3)) dt=$(round(current_dt; sigdigits=3)) | " *
+                    "$(round(elapsed; digits=1))s elapsed, ETA $(round(eta; digits=0))s",
+                )
+                flush(stdout)
+            end
 
             # Convergence by dE only — dpsi can stay large with persistent
             # mass currents (DDI-driven vortex flow, FL texture, etc.)

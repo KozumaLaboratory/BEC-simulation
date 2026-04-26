@@ -205,54 +205,30 @@ function _pi_controller(
 end
 
 # =====================================================================
-# Symmetric-conjugate ITP step (SC4s4)
+# Note on 4th-order ITP — the Sheng-Suzuki barrier
 # =====================================================================
-
-# SC4s4 coefficients: (3 + i√15)/12 etc.
-# All a_j real & positive → stable for ITP.
-const _SC4_COEFFS = let
-    s15 = sqrt(15.0)
-    # ABA form: V(a₁) K(b₁) V(a₂) K(b₂) V(a₃) K(b₃) V(a₄) K(b₄) V(a₅)
-    # a₁ = Re(b₁) = 1/8, a₂ = Re(a₂) = 1/4, a₃ = 1/2, a₄ = 1/4, a₅ = 1/8
-    # b₁ = Re(a₂) = 1/4, b₂ = Re(b₂) = 3/8, b₃ = 3/8, b₄ = 1/4
-    a = (0.125, 0.25, 0.25, 0.25, 0.125)
-    b = (0.25, 0.375, 0.375, 0.25)
-    b_im = (s15/24.0, s15/24.0, -s15/24.0, -s15/24.0)
-    (a=a, b=b, b_im=b_im)
-end
-
-"""
-    _sc4_itp_step!(ws, dt, n_comp, N_dim) → err
-
-SC4s4 ITP step. Uses real parts of SC4 coefficients (all positive).
-Error estimate: norm-change ratio × imaginary coefficient magnitude.
-"""
-function _sc4_itp_step!(ws::Workspace{N}, dt::Float64, n_comp::Int, N_dim::Int) where {N}
-    c = _SC4_COEFFS
-    bk = ws.batched_kinetic
-    omega = ws.sim_params.rotating_frame_omega
-    it = true
-
-    norm_before = sum(abs2, ws.state.psi)
-
-    # ABA step with SC4 real coefficients
-    _half_potential_step!(ws, c.a[1] * dt, n_comp, N_dim, it)
-    for i in 1:4
-        _apply_coriolis_step!(ws.state.psi, ws.grid, omega, c.b[i] * dt / 2, it, ws.coriolis_cache)
-        _update_batched_kinetic_phase!(bk, ws.grid.k_squared, c.b[i] * dt)
-        apply_kinetic_step_batched!(ws.state.psi, bk)
-        _apply_coriolis_step!(ws.state.psi, ws.grid, omega, c.b[i] * dt / 2, it, ws.coriolis_cache)
-        _half_potential_step!(ws, c.a[i + 1] * dt, n_comp, N_dim, it)
-    end
-
-    norm_after = sum(abs2, ws.state.psi)
-    b_im_scale = maximum(abs, c.b_im)
-    abs(1.0 - norm_after / max(norm_before, 1e-300)) * b_im_scale
-end
-
-# =====================================================================
-# Main adaptive RTP loop
-# =====================================================================
+#
+# An earlier `_sc4_itp_step!` shipped a "SC4s4 symmetric-conjugate ITP"
+# step with `b = (1/4, 3/8, 3/8, 1/4)`. Code review caught the bug:
+# `sum(b) = 5/4`, breaking even 1st-order consistency.
+#
+# Fixing that table is non-trivial. Sheng-Suzuki's no-go theorem rules
+# out real-valued 4th-or-higher-order splittings with all-positive
+# coefficients, so every fast 4th+ scheme in this file's composition
+# table (Yoshida, Suzuki, Blanes-Moan S6, PEFRL) carries a negative
+# weight somewhere. In ITP that negative middle step expands modes
+# instead of contracting them — overflow on stiff problems.
+#
+# The way out is *complex*-coefficient symmetric-conjugate methods
+# (Castella-Chartier-Descombes-Vilmart 2009, Blanes-Casas-Murua 2024).
+# Implementing one correctly requires verified palindromic complex
+# weights with `Re(sum(b)) = 1` and matching imaginary cancellations,
+# plus extending `_half_potential_step!` / kinetic kernels to accept
+# complex dt. That's a research-grade addition, not a patch.
+#
+# Until then `find_ground_state` exposes only `:strang` as the ITP
+# stepper. For tighter convergence, the LBFGS polish path
+# (`find_ground_state_lbfgs`) is the supported route.
 
 """
     run_simulation_embedded!(ws; t_end, save_interval, adaptive, composition, callback)
