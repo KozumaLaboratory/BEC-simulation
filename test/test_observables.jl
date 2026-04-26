@@ -109,12 +109,13 @@ using FFTW
         trap = HarmonicTrap(1.0)
         sp = SimParams(; dt=0.01, n_steps=10, imaginary_time=false, save_every=10)
         ws = make_workspace(; grid, atom=Rb87, interactions, potential=trap,
-                            sim_params=sp, fft_flags=FFTW.ESTIMATE)
+            sim_params=sp, fft_flags=FFTW.ESTIMATE)
 
         @testset "total matches sum of components" begin
             ed = energy_decomposition(ws)
-            component_sum = ed.kinetic + ed.trap + ed.zeeman + ed.density +
-                           ed.spin + ed.ddi + ed.lhy + ed.tensor + ed.raman
+            component_sum =
+                ed.kinetic + ed.trap + ed.zeeman + ed.density +
+                ed.spin + ed.ddi + ed.lhy + ed.tensor + ed.raman
             @test ed.total ≈ component_sum atol = 1e-14
         end
 
@@ -226,7 +227,7 @@ using FFTW
         cg_dict = precompute_cg_table(F)
         cg_arr = precompute_cg_array(F)
 
-        for S in 0:2:2F, M in -S:S, m1 in -F:F
+        for S in 0:2:2F, M in (-S):S, m1 in (-F):F
             m2 = M - m1
             abs(m2) > F && continue
             expected = get(cg_dict, (S, M, m1, m2), 0.0)

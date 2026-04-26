@@ -29,7 +29,9 @@ using Dates: Date
         @test f_cos(0.5) ≈ 0.5 atol=1e-15  # symmetric midpoint
 
         # Exponential scale
-        f_exp = SpinorBEC._make_interpolator(Dict("from" => 100.0, "to" => 1.0, "scale" => "exponential"))
+        f_exp = SpinorBEC._make_interpolator(
+            Dict("from" => 100.0, "to" => 1.0, "scale" => "exponential")
+        )
         @test f_exp(0.0) ≈ 100.0
         @test f_exp(1.0) ≈ 1.0 atol=1e-10
 
@@ -169,7 +171,9 @@ using Dates: Date
         σ = 0.9
         psi = zeros(ComplexF64, 32, 32, 32, 3)
         @inbounds for k in 1:32, j in 1:32, i in 1:32
-            x = grid.x[1][i]; y = grid.x[2][j]; z = grid.x[3][k]
+            x = grid.x[1][i];
+            y = grid.x[2][j];
+            z = grid.x[3][k]
             r2 = x^2 + y^2 + z^2
             psi[i, j, k, 1] = sqrt(exp(-r2 / (2σ^2)))
         end
@@ -179,7 +183,7 @@ using Dates: Date
         psi ./= sqrt(tot)
 
         r = SpinorBEC._run_analyzer(:droplet_profile, psi, grid,
-            AtomSpecies("Rb87", 1.44e-25, 1, 0.0, 0.0, 0.0), Dict{String,Any}())
+            AtomSpecies("Rb87", 1.44e-25, 1, 0.0, 0.0, 0.0), Dict{String, Any}())
         @test r.N_atoms ≈ 1.0 atol=1e-10
         @test r.n_peak > 0
         fwhm_analytic = 2 * σ * sqrt(2 * log(2))
@@ -239,7 +243,7 @@ using Dates: Date
         @test haskey(result_3d, :monopole_charge)
         @test haskey(result_3d.monopole_charge, :total_charge)
         @test haskey(result_3d.monopole_charge, :monopole_charge_density)
-        @test result_3d.monopole_charge.monopole_charge_density isa AbstractArray{Float64,3}
+        @test result_3d.monopole_charge.monopole_charge_density isa AbstractArray{Float64, 3}
         # Uniform polarised GS has no topological charge
         @test abs(result_3d.monopole_charge.total_charge) < 1e-4
     end
@@ -253,11 +257,13 @@ using Dates: Date
         grid = make_grid(cfg)
         psi = zeros(ComplexF64, 24, 24, 3)
         @inbounds for j in 1:24, i in 1:24
-            x = grid.x[1][i]; y = grid.x[2][j]
+            x = grid.x[1][i];
+            y = grid.x[2][j]
             r = sqrt(x^2 + y^2)
             phi = atan(y, x)
             theta = π * (1 - exp(-r^2 / 4))   # core in→out wraps θ from 0 to π
-            ct = cos(theta/2); st = sin(theta/2)
+            ct = cos(theta/2);
+            st = sin(theta/2)
             # 3-component spinor for F=1, parametrised on the Bloch sphere
             psi[i, j, 1] = ct^2
             psi[i, j, 2] = sqrt(2.0) * ct * st * cis(phi)
@@ -267,7 +273,7 @@ using Dates: Date
         dV = SpinorBEC.cell_volume(grid)
         psi ./= sqrt(sum(abs2, psi) * dV)
         r = SpinorBEC._run_analyzer(:skyrmion_detect, psi, grid, atom,
-            Dict{String,Any}("threshold" => 0.05, "radius" => 2))
+            Dict{String, Any}("threshold" => 0.05, "radius" => 2))
         @test r.skyrmion_count >= 0    # doesn't crash; charge density is well-formed
         @test haskey(r, :total_charge)
         @test haskey(r, :charge_density)
@@ -291,10 +297,11 @@ using Dates: Date
           - analyze:
               - bogoliubov_mode: {k_max: 5.0, n_k: 60, directions: auto}
         """
-        result = run_config(load_config_from_string(yaml_str); verbose = false)
+        result = run_config(load_config_from_string(yaml_str); verbose=false)
         @test haskey(result, :bogoliubov_mode)
         bm = result.bogoliubov_mode
-        @test haskey(bm, :u_mode); @test haskey(bm, :v_mode)
+        @test haskey(bm, :u_mode);
+        @test haskey(bm, :v_mode)
         @test haskey(bm, :weight_per_m)
         @test length(bm.u_mode) == length(bm.v_mode) == length(bm.weight_per_m)
         @test sum(bm.weight_per_m) ≈ 1.0 atol=1e-8
@@ -310,7 +317,7 @@ using Dates: Date
         for c in 1:3
             psi[:, :, c] .= 1.0 / sqrt(3 * length(psi[:, :, 1]))
         end
-        r = SpinorBEC._run_analyzer(:synthetic_dim, psi, grid, atom, Dict{String,Any}())
+        r = SpinorBEC._run_analyzer(:synthetic_dim, psi, grid, atom, Dict{String, Any}())
         @test length(r.pop_per_m) == 3
         @test sum(r.pop_per_m) ≈ 1.0 atol=1e-8
         @test r.m_mean ≈ 0.0 atol=1e-10        # symmetric across m=±1
@@ -372,35 +379,38 @@ using Dates: Date
         mktempdir() do tmp
             frame_dir = joinpath(tmp, "frames")
             cfg_path = joinpath(tmp, "config.yaml")
-            write(cfg_path, """
-            pipeline:
-              - ground_state:
-                  atom: Rb87
-                  grid: {n: [10, 10, 6], box: [5.0, 5.0, 4.0]}
-                  interactions: {c0: 5.0, c1: 0.0}
-                  zeeman: {p: 0.0, q: 0.0}
-                  potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-                  dt: 0.01
-                  n_steps: 20
-                  tol: 1.0e-3
-                  initial_state: ferromagnetic
-              - dynamics:
-                  duration: 0.1
-                  dt: 0.01
-                  save_every: 5
-                  save_psi_snapshots: true
-              - dynamics:
-                  duration: 0.1
-                  dt: 0.01
-                  save_every: 5
-                  save_psi_snapshots: true
-              - analyze:
-                  - column_density_movie:
-                      axis: 3
-                      output_dir: $frame_dir
-                      multi_step: true
-            """)
-            run_yaml(cfg_path; base_dir = tmp, verbose = false)
+            write(
+                cfg_path,
+                """
+pipeline:
+  - ground_state:
+      atom: Rb87
+      grid: {n: [10, 10, 6], box: [5.0, 5.0, 4.0]}
+      interactions: {c0: 5.0, c1: 0.0}
+      zeeman: {p: 0.0, q: 0.0}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      dt: 0.01
+      n_steps: 20
+      tol: 1.0e-3
+      initial_state: ferromagnetic
+  - dynamics:
+      duration: 0.1
+      dt: 0.01
+      save_every: 5
+      save_psi_snapshots: true
+  - dynamics:
+      duration: 0.1
+      dt: 0.01
+      save_every: 5
+      save_psi_snapshots: true
+  - analyze:
+      - column_density_movie:
+          axis: 3
+          output_dir: $frame_dir
+          multi_step: true
+""",
+            )
+            run_yaml(cfg_path; base_dir=tmp, verbose=false)
             png_files = filter(p -> endswith(p, ".png"), readdir(frame_dir))
             # Each dynamics step has 0.1/0.01/5 = 2 frames, so multi_step
             # concat should give 4 frames total.
@@ -411,13 +421,13 @@ using Dates: Date
     @testset "loss SI-unit K3_per_m parsing" begin
         # Smoke: SI-unit K3 should parse, downstream applied as dimless rate
         atom = AtomSpecies("Rb87", 1.44e-25, 1, 0.0, 0.0, 0.0)
-        node = Dict{String,Any}(
+        node = Dict{String, Any}(
             "gamma_dr" => 0.0,
             "K3_per_m_si" => ["1.5e-30 m^6/s", "1.5e-30 m^6/s", "1.5e-30 m^6/s"],
         )
         # N_atoms=10000, omega_ref=2π·100 → finite dimless K3
         loss = SpinorBEC._parse_loss_params(node;
-            atom = atom, N_atoms = 10000, omega_ref = 2π * 100.0)
+            atom=atom, N_atoms=10000, omega_ref=2π * 100.0)
         @test loss isa LossParams
         @test length(loss.L3_per_m) == 3
         @test all(isfinite, loss.L3_per_m)
@@ -427,11 +437,14 @@ using Dates: Date
     @testset "CSV calibration loader" begin
         mktempdir() do tmp
             csv_path = joinpath(tmp, "drift.csv")
-            write(csv_path, """
-            date,coil_strong_gauss_per_mv,coil_strong_gauss_offset,fort_x_hz,fort_y_hz,fort_z_hz,microwave_rad_per_s_per_mw
-            2026-04-01,0.40,0.05,400.0,400.0,600.0,1.20e6
-            2026-04-15,0.42,0.04,395.0,395.0,590.0,1.18e6
-            """)
+            write(
+                csv_path,
+                """
+date,coil_strong_gauss_per_mv,coil_strong_gauss_offset,fort_x_hz,fort_y_hz,fort_z_hz,microwave_rad_per_s_per_mw
+2026-04-01,0.40,0.05,400.0,400.0,600.0,1.20e6
+2026-04-15,0.42,0.04,395.0,395.0,590.0,1.18e6
+""",
+            )
             hist = load_calibration_csv(csv_path)
             @test hist isa CalibrationHistory
             @test length(hist.dates) == 2
@@ -446,25 +459,28 @@ using Dates: Date
     @testset "run_yaml dry-run prints calibration-applied YAML" begin
         mktempdir() do tmp
             cfg_path = joinpath(tmp, "config.yaml")
-            write(cfg_path, """
-            calibration:
-              coil_strong: {gauss_per_mv: 0.4, gauss_offset: 0.05}
-            pipeline:
-              - ground_state:
-                  atom: Rb87
-                  grid: {n: [8, 8], box: [4.0, 4.0]}
-                  interactions: {c0: 5.0, c1: 0.0}
-                  zeeman: {p_mv: 2.5, coil_mode: strong, q: 0.1}
-                  potential: {type: harmonic, omega: [1.0, 1.0]}
-                  dt: 0.01
-                  n_steps: 5
-                  tol: 1.0e-3
-                  initial_state: ferromagnetic
-            """)
+            write(
+                cfg_path,
+                """
+calibration:
+  coil_strong: {gauss_per_mv: 0.4, gauss_offset: 0.05}
+pipeline:
+  - ground_state:
+      atom: Rb87
+      grid: {n: [8, 8], box: [4.0, 4.0]}
+      interactions: {c0: 5.0, c1: 0.0}
+      zeeman: {p_mv: 2.5, coil_mode: strong, q: 0.1}
+      potential: {type: harmonic, omega: [1.0, 1.0]}
+      dt: 0.01
+      n_steps: 5
+      tol: 1.0e-3
+      initial_state: ferromagnetic
+""",
+            )
             # dry_run should print expanded YAML and return "" — must NOT touch GPU
             buf = IOBuffer()
             redirect_stdout(buf) do
-                run_yaml(cfg_path; base_dir = tmp, verbose = false, dry_run = true)
+                run_yaml(cfg_path; base_dir=tmp, verbose=false, dry_run=true)
             end
             out = String(take!(buf))
             @test occursin("dry-run", out)
@@ -475,14 +491,14 @@ using Dates: Date
 
     @testset "calibration_history interpolation" begin
         cs1 = CalibrationSet(
-            epoch = "w1", date = "2026-04-01",
-            coil_strong = CoilCalibration(0.40, 0.05, (-Inf, Inf)),
-            fort = FORTCalibration((400.0, 400.0, 600.0), (0.0, 0.0, 0.0)),
+            epoch="w1", date="2026-04-01",
+            coil_strong=CoilCalibration(0.40, 0.05, (-Inf, Inf)),
+            fort=FORTCalibration((400.0, 400.0, 600.0), (0.0, 0.0, 0.0)),
         )
         cs2 = CalibrationSet(
-            epoch = "w2", date = "2026-04-15",
-            coil_strong = CoilCalibration(0.50, 0.05, (-Inf, Inf)),
-            fort = FORTCalibration((500.0, 500.0, 700.0), (0.0, 0.0, 0.0)),
+            epoch="w2", date="2026-04-15",
+            coil_strong=CoilCalibration(0.50, 0.05, (-Inf, Inf)),
+            fort=FORTCalibration((500.0, 500.0, 700.0), (0.0, 0.0, 0.0)),
         )
         hist = CalibrationHistory([Date("2026-04-01"), Date("2026-04-15")], [cs1, cs2])
         # Midpoint (April 8) → coil ≈ 0.45, fort_x ≈ 450
@@ -502,13 +518,14 @@ using Dates: Date
         grid = make_grid(cfg)
         psi = zeros(ComplexF64, 32, 32, 3)
         @inbounds for j in 1:32, i in 1:32
-            x = grid.x[1][i]; y = grid.x[2][j]
+            x = grid.x[1][i];
+            y = grid.x[2][j]
             r = sqrt(x^2 + y^2)
             psi[i, j, 1] = 0.5 * r * cis(atan(y, x)) * exp(-r^2 / 4)
         end
         atom = AtomSpecies("Rb87", 1.44e-25, 1, 0.0, 0.0, 0.0)
         r = SpinorBEC._run_analyzer(:vortex_detect, psi, grid, atom,
-            Dict{String,Any}("component" => 1, "threshold" => 0.05))
+            Dict{String, Any}("component" => 1, "threshold" => 0.05))
         @test r.vortex_count >= 1
         @test haskey(r, :positions)
         @test r.positions isa AbstractVector
@@ -525,31 +542,34 @@ using Dates: Date
         mktempdir() do tmp
             frame_dir = joinpath(tmp, "frames")
             cfg_path = joinpath(tmp, "config.yaml")
-            write(cfg_path, """
-            pipeline:
-              - ground_state:
-                  atom: Rb87
-                  grid: {n: [12, 12, 6], box: [6.0, 6.0, 4.0]}
-                  interactions: {c0: 5.0, c1: 0.0}
-                  zeeman: {p: 0.0, q: 0.0}
-                  potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-                  dt: 0.01
-                  n_steps: 30
-                  tol: 1.0e-4
-                  initial_state: ferromagnetic
-              - dynamics:
-                  duration: 0.2
-                  dt: 0.01
-                  save_every: 5
-                  save_psi_snapshots: true
-                  save_snapshot_precision: "f32"
-              - analyze:
-                  - column_density_movie:
-                      axis: 3
-                      output_dir: $frame_dir
-                      colorscale: Viridis
-            """)
-            run_yaml(cfg_path; base_dir = tmp, verbose = false)
+            write(
+                cfg_path,
+                """
+pipeline:
+  - ground_state:
+      atom: Rb87
+      grid: {n: [12, 12, 6], box: [6.0, 6.0, 4.0]}
+      interactions: {c0: 5.0, c1: 0.0}
+      zeeman: {p: 0.0, q: 0.0}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      dt: 0.01
+      n_steps: 30
+      tol: 1.0e-4
+      initial_state: ferromagnetic
+  - dynamics:
+      duration: 0.2
+      dt: 0.01
+      save_every: 5
+      save_psi_snapshots: true
+      save_snapshot_precision: "f32"
+  - analyze:
+      - column_density_movie:
+          axis: 3
+          output_dir: $frame_dir
+          colorscale: Viridis
+""",
+            )
+            run_yaml(cfg_path; base_dir=tmp, verbose=false)
             png_files = filter(p -> endswith(p, ".png"), readdir(frame_dir))
             @test length(png_files) >= 3   # 0.2/dt(0.01)/save_every(5) = 4 frames
         end
@@ -558,24 +578,27 @@ using Dates: Date
     @testset "analyzer result persistence" begin
         mktempdir() do tmp
             cfg_path = joinpath(tmp, "config.yaml")
-            write(cfg_path, """
-            pipeline:
-              - ground_state:
-                  atom: Rb87
-                  grid: {n: [16], box: [8.0]}
-                  interactions: {c0: 10.0, c1: -0.5}
-                  dt: 0.01
-                  n_steps: 30
-                  tol: 1e-4
-                  initial_state: ferromagnetic
-                  zeeman: {p: 0.0, q: 0.1}
-                  potential: {type: harmonic, omega: [1.0]}
-              - analyze:
-                  - phase_classify: {}
-            """)
-            run_dir = SpinorBEC.run_yaml(cfg_path; base_dir = tmp, verbose = false)
+            write(
+                cfg_path,
+                """
+pipeline:
+  - ground_state:
+      atom: Rb87
+      grid: {n: [16], box: [8.0]}
+      interactions: {c0: 10.0, c1: -0.5}
+      dt: 0.01
+      n_steps: 30
+      tol: 1e-4
+      initial_state: ferromagnetic
+      zeeman: {p: 0.0, q: 0.1}
+      potential: {type: harmonic, omega: [1.0]}
+  - analyze:
+      - phase_classify: {}
+""",
+            )
+            run_dir = SpinorBEC.run_yaml(cfg_path; base_dir=tmp, verbose=false)
             d = only(filter(p -> endswith(p, ".jld2"),
-                            joinpath.(run_dir, readdir(run_dir))))
+                joinpath.(run_dir, readdir(run_dir))))
             loaded = JLD2.load(d)
             @test haskey(loaded, "analyze/phase_classify/spin_order")
             @test haskey(loaded, "analyze/phase_classify/phase")
@@ -603,13 +626,13 @@ using Dates: Date
                   - bogoliubov: {k_max: 5.0, n_k: 40, directions: auto}
             """
             cfg = load_config_from_string(yaml_str)
-            r1 = run_config(cfg; verbose = false)
+            r1 = run_config(cfg; verbose=false)
             @test isfile(cache_file)
             @test haskey(r1, :bogoliubov)
 
             # Second run: cache is hit; analyzer must still receive ws_prev
             cfg2 = load_config_from_string(yaml_str)
-            r2 = run_config(cfg2; verbose = false)
+            r2 = run_config(cfg2; verbose=false)
             @test haskey(r2, :bogoliubov)
             @test r2.bogoliubov.max_growth ≈ r1.bogoliubov.max_growth atol=1e-8
         end
@@ -623,7 +646,10 @@ using Dates: Date
 
         # No rotation when prev_mz is NaN
         psi_out = SpinorBEC.auto_rotate_psi(psi,
-            Dict("pipeline" => [Dict("ground_state" => Dict("atom" => "Rb87", "target_magnetization" => 0.0))]),
+            Dict(
+                "pipeline" =>
+                    [Dict("ground_state" => Dict("atom" => "Rb87", "target_magnetization" => 0.0))],
+            ),
             NaN)
         @test psi_out === psi  # identity, not a copy
 
@@ -635,7 +661,10 @@ using Dates: Date
 
         # Rotation when Mz changes
         psi_rot = SpinorBEC.auto_rotate_psi(psi,
-            Dict("pipeline" => [Dict("ground_state" => Dict("atom" => "Rb87", "target_magnetization" => 0.0))]),
+            Dict(
+                "pipeline" =>
+                    [Dict("ground_state" => Dict("atom" => "Rb87", "target_magnetization" => 0.0))],
+            ),
             -1.0)
         @test psi_rot !== psi  # different array
         @test size(psi_rot) == size(psi)

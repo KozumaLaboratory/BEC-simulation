@@ -2,31 +2,33 @@ using JSON
 
 # --- Analyzer dispatch ---
 
-function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
-                        pipeline_results::Dict{Symbol,Any} = Dict{Symbol,Any}())
+function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev=nothing,
+    pipeline_results::Dict{Symbol, Any}=Dict{Symbol, Any}())
     # Analyzers perform reductions over psi and are not GPU-safe in general.
     # Move to host once here; no-op on CPU.
     psi = _to_host(psi)
     F = atom.F
     if name == :tomography
         spin_tomography(psi, grid, F;
-            rotation_axis = Symbol(get(params, "axis", "y")),
-            n_angles = Int(get(params, "n_angles", 19)),
-            theta_min = Float64(get(params, "theta_min", 0.0)),
-            theta_max = Float64(get(params, "theta_max", Float64(π))),
-            reference_m = let v = get(params, "reference_m", nothing); v === nothing ? nothing : Int(v) end,
-            tof_params = let td = get(params, "tof", Dict())
+            rotation_axis=Symbol(get(params, "axis", "y")),
+            n_angles=Int(get(params, "n_angles", 19)),
+            theta_min=Float64(get(params, "theta_min", 0.0)),
+            theta_max=Float64(get(params, "theta_max", Float64(π))),
+            reference_m=let v = get(params, "reference_m", nothing);
+                v === nothing ? nothing : Int(v)
+            end,
+            tof_params=let td = get(params, "tof", Dict())
                 TOFParams(Float64(get(td, "t_tof", 11.0)),
-                         Float64(get(td, "gradient", 0.0)),
-                         Int(get(td, "imaging_axis", 3)))
+                    Float64(get(td, "gradient", 0.0)),
+                    Int(get(td, "imaging_axis", 3)))
             end,
         )
     elseif name == :faraday
         faraday_image(psi, grid, F;
-            params = FaradayParams(;
-                probe_axis = Int(get(params, "probe_axis", get(params, "axis", 3))),
-                detuning = Float64(get(params, "detuning", -64.0)),
-                polarization = Symbol(get(params, "polarization", "linear_x")),
+            params=FaradayParams(;
+                probe_axis=Int(get(params, "probe_axis", get(params, "axis", 3))),
+                detuning=Float64(get(params, "detuning", -64.0)),
+                polarization=Symbol(get(params, "polarization", "linear_x")),
             ),
         )
     elseif name == :energy_decomposition
@@ -37,18 +39,18 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
         classify_phase_detailed(psi, F, grid, sm)
     elseif name == :stability
         ndim = length(grid.config.n_points)
-        sp = SimParams(; dt = 0.0001, n_steps = 1, save_every = 1)
+        sp = SimParams(; dt=0.0001, n_steps=1, save_every=1)
         ws = make_workspace(;
             grid, atom,
-            interactions = InteractionParams(0.0, 0.0),
-            potential = HarmonicTrap(ntuple(_ -> 1.0, ndim)),
-            sim_params = sp,
-            psi_init = psi,
+            interactions=InteractionParams(0.0, 0.0),
+            potential=HarmonicTrap(ntuple(_ -> 1.0, ndim)),
+            sim_params=sp,
+            psi_init=psi,
         )
         perturbation = Float64(get(params, "perturbation", 1e-4))
         n_steps_stab = Int(get(params, "n_steps", 1000))
         sample_every = Int(get(params, "sample_every", 10))
-        analyze_stability(ws; perturbation, n_steps = n_steps_stab, sample_every)
+        analyze_stability(ws; perturbation, n_steps=n_steps_stab, sample_every)
     elseif name == :bogoliubov
         _run_bogoliubov_analyzer(psi, grid, atom, params, ws_prev)
     elseif name == :multipole_order
@@ -58,25 +60,25 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
             v === nothing ? collect(0:2:2F) : Int.(v)
         end
         spectrum = multipole_spectrum(psi, F, grid)
-        selected = Dict{Int,Float64}(k => get(spectrum, k, 0.0) for k in ranks)
-        (multipole_spectrum = selected, ranks = ranks)
+        selected = Dict{Int, Float64}(k => get(spectrum, k, 0.0) for k in ranks)
+        (multipole_spectrum=selected, ranks=ranks)
     elseif name == :winding_map
         F = atom.F
         ndim = length(grid.config.n_points)
         n_pts = grid.config.n_points
-        plans = make_fft_plans(n_pts; flags = FFTW.ESTIMATE)
+        plans = make_fft_plans(n_pts; flags=FFTW.ESTIMATE)
         Lz_total = orbital_angular_momentum(psi, grid, plans)
         Mz = magnetization(psi, grid, SpinSystem(F))
         j = probability_current(psi, grid, plans)
         j_mag = sqrt.(sum(ji .^ 2 for ji in j))
-        (Lz = Lz_total, Mz = Mz, Jz = Lz_total + Mz, max_current = maximum(j_mag))
+        (Lz=Lz_total, Mz=Mz, Jz=Lz_total + Mz, max_current=maximum(j_mag))
     elseif name == :absorption_image
         F = atom.F
         ndim = length(grid.config.n_points)
         axis = Int(get(params, "axis", ndim))
         psf_sigma = Float64(get(params, "psf_sigma", 0.0))
         n = total_density(psi, ndim)
-        col = dropdims(sum(n; dims = axis); dims = axis) .* cell_volume(grid)^(1.0 / ndim)
+        col = dropdims(sum(n; dims=axis); dims=axis) .* cell_volume(grid)^(1.0 / ndim)
         if psf_sigma > 0 && ndim >= 2
             # Simple Gaussian blur via FFT convolution
             remaining = [i for i in 1:ndim if i != axis]
@@ -98,7 +100,7 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
             rng = Random.MersenneTwister(Int(get(params, "seed", 42)))
             col .= max.(0.0, col .+ sqrt.(max.(0.0, col)) .* randn(rng, size(col)...))
         end
-        (column_density = col, axis = axis)
+        (column_density=col, axis=axis)
     elseif name == :sg_tof
         F = atom.F
         sys = SpinSystem(F)
@@ -107,11 +109,11 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
         imaging_axis = Int(get(params, "imaging_axis", length(grid.config.n_points)))
         tof_params = TOFParams(t_tof, gradient, imaging_axis)
         result = simulate_tof(psi, grid, sys, tof_params)
-        populations = Dict{Int,Float64}()
+        populations = Dict{Int, Float64}()
         for (m, dens) in result
             populations[m] = sum(dens)
         end
-        (tof_images = result, populations = populations)
+        (tof_images=result, populations=populations)
     elseif name == :domain_analysis
         F = atom.F
         ndim = length(grid.config.n_points)
@@ -135,24 +137,24 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
             end
         end
         f_mag_avg = sum(sqrt.(fx .^ 2 .+ fy .^ 2 .+ fz .^ 2) .* n) / sum(n)
-        (domain_walls = domain_count, mean_spin_magnitude = f_mag_avg)
+        (domain_walls=domain_count, mean_spin_magnitude=f_mag_avg)
     elseif name == :skyrmion_density
         F = atom.F
         ndim = length(grid.config.n_points)
         n_pts = grid.config.n_points
         sm = spin_matrices(F)
-        plans = make_fft_plans(n_pts; flags = FFTW.ESTIMATE)
+        plans = make_fft_plans(n_pts; flags=FFTW.ESTIMATE)
         if ndim == 2
             Q = spin_texture_charge(psi, grid, plans, sm)
             omega = berry_curvature(psi, grid, plans, sm)
-            (charge = Q, berry_curvature = omega)
+            (charge=Q, berry_curvature=omega)
         elseif ndim == 3
             omega_x, omega_y, omega_z = berry_curvature(psi, grid, plans, sm)
             dV = cell_volume(grid)
             Q_xy = sum(omega_z) * dV / (4π)
-            (charge_xy = Q_xy, berry_curvature = (omega_x, omega_y, omega_z))
+            (charge_xy=Q_xy, berry_curvature=(omega_x, omega_y, omega_z))
         else
-            (charge = 0.0,)
+            (charge=0.0,)
         end
     elseif name == :phase_contrast_image
         F = atom.F
@@ -168,12 +170,17 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
         col_plus = dropdims(sum(n_plus; dims=axis); dims=axis) .* cell_volume(grid)^(1.0 / ndim)
         col_minus = dropdims(sum(n_minus; dims=axis); dims=axis) .* cell_volume(grid)^(1.0 / ndim)
         phase_signal = col_plus .- col_minus
-        (phase_signal = phase_signal, column_density_plus = col_plus, column_density_minus = col_minus, axis = axis)
+        (
+            phase_signal=phase_signal,
+            column_density_plus=col_plus,
+            column_density_minus=col_minus,
+            axis=axis,
+        )
     elseif name == :momentum_distribution
         F = atom.F
         ndim = length(grid.config.n_points)
         n_pts = grid.config.n_points
-        plans = make_fft_plans(n_pts; flags = FFTW.ESTIMATE)
+        plans = make_fft_plans(n_pts; flags=FFTW.ESTIMATE)
         D = 2F + 1
         nk = zeros(Float64, n_pts)
         for c in 1:D
@@ -187,7 +194,7 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
         # Normalize
         dV = cell_volume(grid)
         nk .*= dV^2
-        (momentum_density = nk,)
+        (momentum_density=nk,)
     elseif name == :vortex_detect
         F = atom.F
         ndim = length(grid.config.n_points)
@@ -205,31 +212,33 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
         # Per-vortex records: (i, j[, k], winding) for downstream maps / plots
         positions = Tuple[]
         if ndim == 2
-            @inbounds for j in 2:(n_pts[2]-1), i in 2:(n_pts[1]-1)
+            @inbounds for j in 2:(n_pts[2] - 1), i in 2:(n_pts[1] - 1)
                 n_c[i, j] < thresh && continue
-                dp = _phase_diff(phase_field[i+1, j], phase_field[i, j]) +
-                     _phase_diff(phase_field[i+1, j+1], phase_field[i+1, j]) +
-                     _phase_diff(phase_field[i, j+1], phase_field[i+1, j+1]) +
-                     _phase_diff(phase_field[i, j], phase_field[i, j+1])
+                dp =
+                    _phase_diff(phase_field[i + 1, j], phase_field[i, j]) +
+                    _phase_diff(phase_field[i + 1, j + 1], phase_field[i + 1, j]) +
+                    _phase_diff(phase_field[i, j + 1], phase_field[i + 1, j + 1]) +
+                    _phase_diff(phase_field[i, j], phase_field[i, j + 1])
                 if abs(dp) > π
                     vortex_count += 1
                     push!(positions, (i, j, round(Int, dp / (2π))))
                 end
             end
         else
-            @inbounds for k in 1:n_pts[3], j in 2:(n_pts[2]-1), i in 2:(n_pts[1]-1)
+            @inbounds for k in 1:n_pts[3], j in 2:(n_pts[2] - 1), i in 2:(n_pts[1] - 1)
                 n_c[i, j, k] < thresh && continue
-                dp = _phase_diff(phase_field[i+1, j, k], phase_field[i, j, k]) +
-                     _phase_diff(phase_field[i+1, j+1, k], phase_field[i+1, j, k]) +
-                     _phase_diff(phase_field[i, j+1, k], phase_field[i+1, j+1, k]) +
-                     _phase_diff(phase_field[i, j, k], phase_field[i, j+1, k])
+                dp =
+                    _phase_diff(phase_field[i + 1, j, k], phase_field[i, j, k]) +
+                    _phase_diff(phase_field[i + 1, j + 1, k], phase_field[i + 1, j, k]) +
+                    _phase_diff(phase_field[i, j + 1, k], phase_field[i + 1, j + 1, k]) +
+                    _phase_diff(phase_field[i, j, k], phase_field[i, j + 1, k])
                 if abs(dp) > π
                     vortex_count += 1
                     push!(positions, (i, j, k, round(Int, dp / (2π))))
                 end
             end
         end
-        (vortex_count = vortex_count, positions = positions, component = component)
+        (vortex_count=vortex_count, positions=positions, component=component)
     elseif name == :correlation_length
         F = atom.F
         ndim = length(grid.config.n_points)
@@ -270,7 +279,7 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
             end
         end
         xi == 0.0 && (xi = length(corr) * dx)
-        (correlation_length = xi, correlation = corr, direction = direction)
+        (correlation_length=xi, correlation=corr, direction=direction)
     elseif name == :defect_density
         F = atom.F
         ndim = length(grid.config.n_points)
@@ -295,28 +304,30 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
         elseif defect_type == :vortex && ndim >= 2
             phase_field = angle.(view(psi, _component_slice(ndim, n_pts, 1)...))
             if ndim == 2
-                for j in 2:(n_pts[2]-1), i in 2:(n_pts[1]-1)
+                for j in 2:(n_pts[2] - 1), i in 2:(n_pts[1] - 1)
                     n[i, j] < threshold && continue
-                    dp = _phase_diff(phase_field[i+1, j], phase_field[i, j]) +
-                         _phase_diff(phase_field[i+1, j+1], phase_field[i+1, j]) +
-                         _phase_diff(phase_field[i, j+1], phase_field[i+1, j+1]) +
-                         _phase_diff(phase_field[i, j], phase_field[i, j+1])
+                    dp =
+                        _phase_diff(phase_field[i + 1, j], phase_field[i, j]) +
+                        _phase_diff(phase_field[i + 1, j + 1], phase_field[i + 1, j]) +
+                        _phase_diff(phase_field[i, j + 1], phase_field[i + 1, j + 1]) +
+                        _phase_diff(phase_field[i, j], phase_field[i, j + 1])
                     abs(dp) > π && (defect_count += 1)
                 end
             else
                 # 3D: sum vortex detections across all (x,y) plaquettes at every z
-                for k in 1:n_pts[3], j in 2:(n_pts[2]-1), i in 2:(n_pts[1]-1)
+                for k in 1:n_pts[3], j in 2:(n_pts[2] - 1), i in 2:(n_pts[1] - 1)
                     n[i, j, k] < threshold && continue
-                    dp = _phase_diff(phase_field[i+1, j, k], phase_field[i, j, k]) +
-                         _phase_diff(phase_field[i+1, j+1, k], phase_field[i+1, j, k]) +
-                         _phase_diff(phase_field[i, j+1, k], phase_field[i+1, j+1, k]) +
-                         _phase_diff(phase_field[i, j, k], phase_field[i, j+1, k])
+                    dp =
+                        _phase_diff(phase_field[i + 1, j, k], phase_field[i, j, k]) +
+                        _phase_diff(phase_field[i + 1, j + 1, k], phase_field[i + 1, j, k]) +
+                        _phase_diff(phase_field[i, j + 1, k], phase_field[i + 1, j + 1, k]) +
+                        _phase_diff(phase_field[i, j, k], phase_field[i, j + 1, k])
                     abs(dp) > π && (defect_count += 1)
                 end
             end
         end
         volume = prod(grid.config.box_size)
-        (defect_count = defect_count, defect_density = defect_count / volume, defect_type = defect_type)
+        (defect_count=defect_count, defect_density=defect_count / volume, defect_type=defect_type)
     elseif name == :kibble_zurek_stats
         # Requires ensemble data from TWA or repeated runs — reports summary stats
         # For single-psi fallback: count defects and report
@@ -339,12 +350,12 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
             s != 0 && (prev_sign = s)
         end
         volume = prod(grid.config.box_size)
-        (defect_count = defect_count, defect_density = defect_count / volume, n_samples = 1)
+        (defect_count=defect_count, defect_density=defect_count / volume, n_samples=1)
     elseif name == :bragg_spectroscopy
         F = atom.F
         ndim = length(grid.config.n_points)
         n_pts = grid.config.n_points
-        plans = make_fft_plans(n_pts; flags = FFTW.ESTIMATE)
+        plans = make_fft_plans(n_pts; flags=FFTW.ESTIMATE)
         D = 2F + 1
         # Static structure factor S(k) from density fluctuations
         n_total = total_density(psi, ndim)
@@ -354,7 +365,7 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
         delta_nk .= delta_n
         plans.forward * delta_nk
         Sk = abs2.(delta_nk) .* cell_volume(grid)^2
-        (structure_factor = Sk,)
+        (structure_factor=Sk,)
     elseif name == :droplet_profile
         ndim = length(grid.config.n_points)
         n = total_density(psi, ndim)
@@ -379,10 +390,10 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
             max_grad = max(max_grad, gmax)
         end
         sharpness = n_peak > 0 ? max_grad / n_peak : 0.0
-        (n_peak = n_peak, N_atoms = N_atoms,
-         fwhm = fwhm, sigma = sigma,
-         surface_sharpness = sharpness,
-         peak_index = collect(peak_idx))
+        (n_peak=n_peak, N_atoms=N_atoms,
+            fwhm=fwhm, sigma=sigma,
+            surface_sharpness=sharpness,
+            peak_index=collect(peak_idx))
 
     elseif name == :bogoliubov_dispersion
         # Full ω(k) for every BdG band, returned as a (n_k, 2D) matrix.
@@ -405,11 +416,11 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
         k_max = Float64(get(params, "k_max", 10.0))
         n_k = Int(get(params, "n_k", 200))
         k_dir_raw = get(params, "k_direction", [0.0, 0.0, 1.0])
-        k_direction = NTuple{3,Float64}(Tuple(Float64.(k_dir_raw)))
+        k_direction = NTuple{3, Float64}(Tuple(Float64.(k_dir_raw)))
         result = bogoliubov_spectrum(;
-            spinor = spinor, n0 = n0, F = F,
-            interactions = interactions, zeeman = zeeman, c_dd = c_dd_val,
-            k_max = k_max, n_k = n_k, k_direction = k_direction,
+            spinor=spinor, n0=n0, F=F,
+            interactions=interactions, zeeman=zeeman, c_dd=c_dd_val,
+            k_max=k_max, n_k=n_k, k_direction=k_direction,
         )
         # Sort each k column by Re(ω) for plottable bands
         omega_sorted = similar(result.omega)
@@ -418,11 +429,11 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
             perm = sortperm(real.(col))
             omega_sorted[:, ik] .= col[perm]
         end
-        (k_values = result.k_values,
-         omega_real = real.(omega_sorted),
-         omega_imag = imag.(omega_sorted),
-         max_growth = result.max_growth,
-         direction = collect(k_direction))
+        (k_values=result.k_values,
+            omega_real=real.(omega_sorted),
+            omega_imag=imag.(omega_sorted),
+            max_growth=result.max_growth,
+            direction=collect(k_direction))
 
     elseif name == :bogoliubov_mode
         # Like :bogoliubov but additionally returns the eigenvector (u, v)
@@ -448,10 +459,10 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
 
         # First locate the peak-growth k via the existing scan
         imap = bogoliubov_instability_scan(;
-            spinor = spinor, n0 = n0, F = F,
-            interactions = interactions, zeeman = zeeman, c_dd = c_dd_val,
-            k_max = Float64(get(params, "k_max", 10.0)),
-            n_k = Int(get(params, "n_k", 200)),
+            spinor=spinor, n0=n0, F=F,
+            interactions=interactions, zeeman=zeeman, c_dd=c_dd_val,
+            k_max=Float64(get(params, "k_max", 10.0)),
+            n_k=Int(get(params, "n_k", 200)),
         )
         k_peak = imap.most_unstable_k
         # Build BdG matrix at k_peak, k̂ = best_direction; diagonalize
@@ -459,7 +470,8 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
         if abs(c_dd_val) > 1e-30
             sm_for_ddi = spin_matrices(F)
             k_hat = collect(imap.most_unstable_direction)
-            kn = sqrt(sum(abs2, k_hat)); kn > 0 && (k_hat ./= kn)
+            kn = sqrt(sum(abs2, k_hat));
+            kn > 0 && (k_hat ./= kn)
             Q_ab = SpinorBEC._q_tensor_direction(k_hat)
             h_ddi, M_ddi = SpinorBEC._bdg_ddi_matrices(spinor, F, D, sm_for_ddi, c_dd_val, Q_ab)
             h_mf = h_mf .+ h_ddi
@@ -468,29 +480,33 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
         mu = real(sum(c -> (zee[c] + n0 * h_mf[c, c]) * abs2(spinor[c]), 1:D))
         ek = k_peak^2 / 2
         L = 2n0 .* h_mf
-        for i in 1:D; L[i, i] += ek - mu + zee[i]; end
+        for i in 1:D
+            ;
+            L[i, i] += ek - mu + zee[i];
+        end
         M_sc = n0 .* M_anom
         H_bdg = zeros(ComplexF64, 2D, 2D)
-        H_bdg[1:D, 1:D]              .= L
-        H_bdg[1:D, (D+1):2D]         .= M_sc
-        H_bdg[(D+1):2D, 1:D]         .= .-conj.(M_sc)
-        H_bdg[(D+1):2D, (D+1):2D]    .= .-conj.(L)
+        H_bdg[1:D, 1:D] .= L
+        H_bdg[1:D, (D + 1):2D] .= M_sc
+        H_bdg[(D + 1):2D, 1:D] .= .-conj.(M_sc)
+        H_bdg[(D + 1):2D, (D + 1):2D] .= .-conj.(L)
         evals, evecs = eigen(H_bdg)
         # Pick the mode with the largest imaginary part (instability)
         igrow = argmax(imag.(evals))
         ω_mode = evals[igrow]
         uv = evecs[:, igrow]
-        u = uv[1:D]; v = uv[(D+1):2D]
+        u = uv[1:D];
+        v = uv[(D + 1):2D]
         weight_per_m = abs2.(u) .+ abs2.(v)
         weight_per_m ./= max(sum(weight_per_m), 1e-30)
         wavelength = k_peak > 1e-12 ? 2π / k_peak : Inf
-        (k_peak = k_peak, omega = ω_mode,
-         growth_rate = imag(ω_mode),
-         u_mode = u, v_mode = v,
-         weight_per_m = weight_per_m,
-         dominant_m = F - (argmax(weight_per_m) - 1),
-         wavelength = wavelength,
-         direction = collect(imap.most_unstable_direction))
+        (k_peak=k_peak, omega=ω_mode,
+            growth_rate=imag(ω_mode),
+            u_mode=u, v_mode=v,
+            weight_per_m=weight_per_m,
+            dominant_m=F - (argmax(weight_per_m) - 1),
+            wavelength=wavelength,
+            direction=collect(imap.most_unstable_direction))
 
     elseif name == :skyrmion_detect
         # Locate skyrmion centres in 2D (or per z-slice in 3D) by finding
@@ -503,7 +519,7 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
         ndim >= 2 || throw(ArgumentError("skyrmion_detect requires N >= 2"))
         n_pts = grid.config.n_points
         sm = spin_matrices(F)
-        plans = make_fft_plans(n_pts; flags = FFTW.ESTIMATE)
+        plans = make_fft_plans(n_pts; flags=FFTW.ESTIMATE)
         threshold = Float64(get(params, "threshold", 0.05))
         radius = Int(get(params, "radius", 2))   # local-max search radius
 
@@ -512,14 +528,16 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
             omega = berry_curvature(psi, grid, plans, sm)
             q_max = maximum(abs, omega)
             cutoff = threshold * q_max
-            @inbounds for j in (1+radius):(n_pts[2]-radius), i in (1+radius):(n_pts[1]-radius)
+            @inbounds for j in (1 + radius):(n_pts[2] - radius),
+                i in (1 + radius):(n_pts[1] - radius)
+
                 v = omega[i, j]
                 abs(v) < cutoff && continue
                 # Local max (or min) check
                 is_extremum = true
-                for dj in -radius:radius, di in -radius:radius
+                for dj in (-radius):radius, di in (-radius):radius
                     di == 0 && dj == 0 && continue
-                    if abs(omega[i+di, j+dj]) > abs(v)
+                    if abs(omega[i + di, j + dj]) > abs(v)
                         is_extremum = false
                         break
                     end
@@ -527,46 +545,46 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
                 is_extremum || continue
                 # Approximate per-skyrmion charge: sum over a ±radius patch
                 local_q = 0.0
-                for dj in -radius:radius, di in -radius:radius
-                    local_q += omega[i+di, j+dj]
+                for dj in (-radius):radius, di in (-radius):radius
+                    local_q += omega[i + di, j + dj]
                 end
                 push!(positions, (i, j, local_q * cell_volume(grid)))
             end
             total_Q = sum(omega) * cell_volume(grid) / (4π)
-            (skyrmion_count = length(positions),
-             positions = positions,
-             total_charge = total_Q,
-             charge_density = omega)
+            (skyrmion_count=length(positions),
+                positions=positions,
+                total_charge=total_Q,
+                charge_density=omega)
         else
             # 3D: detect per z-slice
             omega_x, omega_y, omega_z = berry_curvature(psi, grid, plans, sm)
             q_max = maximum(abs, omega_z)
             cutoff = threshold * q_max
             @inbounds for k in 1:n_pts[3]
-                slab = view(omega_z, :, :, k)
-                for j in (1+radius):(n_pts[2]-radius), i in (1+radius):(n_pts[1]-radius)
+                slab = view(omega_z,:,:,k)
+                for j in (1 + radius):(n_pts[2] - radius), i in (1 + radius):(n_pts[1] - radius)
                     v = slab[i, j]
                     abs(v) < cutoff && continue
                     is_extremum = true
-                    for dj in -radius:radius, di in -radius:radius
+                    for dj in (-radius):radius, di in (-radius):radius
                         di == 0 && dj == 0 && continue
-                        if abs(slab[i+di, j+dj]) > abs(v)
+                        if abs(slab[i + di, j + dj]) > abs(v)
                             is_extremum = false
                             break
                         end
                     end
                     is_extremum || continue
                     local_q = 0.0
-                    for dj in -radius:radius, di in -radius:radius
-                        local_q += slab[i+di, j+dj]
+                    for dj in (-radius):radius, di in (-radius):radius
+                        local_q += slab[i + di, j + dj]
                     end
                     push!(positions, (i, j, k, local_q * cell_volume(grid)))
                 end
             end
             total_Q_xy = sum(omega_z) * cell_volume(grid) / (4π)
-            (skyrmion_count = length(positions),
-             positions = positions,
-             total_charge_xy = total_Q_xy)
+            (skyrmion_count=length(positions),
+                positions=positions,
+                total_charge_xy=total_Q_xy)
         end
 
     elseif name == :synthetic_dim
@@ -598,10 +616,14 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
         end
         m_vals = Float64[F - (c - 1) for c in 1:D]
         q1 = 2π / D
-        coh_q1_re = sum(coh_re[c] * cos(q1 * m_vals[c]) -
-                        coh_im[c] * sin(-q1 * m_vals[c]) for c in 1:D)
-        coh_q1_im = sum(coh_re[c] * sin(-q1 * m_vals[c]) +
-                        coh_im[c] * cos(q1 * m_vals[c])  for c in 1:D)
+        coh_q1_re = sum(
+            coh_re[c] * cos(q1 * m_vals[c]) -
+            coh_im[c] * sin(-q1 * m_vals[c]) for c in 1:D
+        )
+        coh_q1_im = sum(
+            coh_re[c] * sin(-q1 * m_vals[c]) +
+            coh_im[c] * cos(q1 * m_vals[c]) for c in 1:D
+        )
         coherence_q1 = coh_q1_re^2 + coh_q1_im^2
         edge_density = pop_per_m[1] + pop_per_m[D]
         bulk_density = sum(pop_per_m) - edge_density
@@ -609,7 +631,7 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
         total = sum(pop_per_m)
         m_mean = total > 0 ? sum(pop_per_m[c] * m_vals[c] for c in 1:D) / total : 0.0
         m_var = total > 0 ?
-            sum(pop_per_m[c] * (m_vals[c] - m_mean)^2 for c in 1:D) / total : 0.0
+                sum(pop_per_m[c] * (m_vals[c] - m_mean)^2 for c in 1:D) / total : 0.0
         # Synthetic-ladder bond currents J_m (length D-1) — proxy for
         # population flow under Raman / RF driving; see
         # src/analysis/synthetic_dimension.jl for the convention.
@@ -623,24 +645,24 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
             v === nothing ? nothing : Int(v)
         end
         dispersion_block = if spectrum_axis !== nothing
-            d = synthetic_dim_dispersion(psi, grid; axis = spectrum_axis)
-            (spectrum = collect(d.spectrum),
-             k_real = d.k_real,
-             k_synth = d.k_synth,
-             axis = spectrum_axis)
+            d = synthetic_dim_dispersion(psi, grid; axis=spectrum_axis)
+            (spectrum=collect(d.spectrum),
+                k_real=d.k_real,
+                k_synth=d.k_synth,
+                axis=spectrum_axis)
         else
             nothing
         end
-        (pop_per_m = pop_per_m,
-         m_values = m_vals,
-         m_mean = m_mean,
-         m_variance = m_var,
-         edge_density = edge_density,
-         bulk_density = bulk_density,
-         coherence_q1 = coherence_q1,
-         synthetic_currents = currents,
-         localization_length = ipr_xi,
-         dispersion = dispersion_block)
+        (pop_per_m=pop_per_m,
+            m_values=m_vals,
+            m_mean=m_mean,
+            m_variance=m_var,
+            edge_density=edge_density,
+            bulk_density=bulk_density,
+            coherence_q1=coherence_q1,
+            synthetic_currents=currents,
+            localization_length=ipr_xi,
+            dispersion=dispersion_block)
 
     elseif name == :non_abelian_homotopy
         ndim = length(grid.config.n_points)
@@ -650,27 +672,27 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
             "non_abelian_homotopy requires loop_pts: [[i,j(,k)], ...]"))
         # Match loop dim to grid N (2D or 3D path)
         loop_pts = if ndim == 2
-            NTuple{2,Int}[(Int(p[1]), Int(p[2])) for p in loop_pts_raw]
+            NTuple{2, Int}[(Int(p[1]), Int(p[2])) for p in loop_pts_raw]
         else
-            NTuple{3,Int}[(Int(p[1]), Int(p[2]), Int(p[3])) for p in loop_pts_raw]
+            NTuple{3, Int}[(Int(p[1]), Int(p[2]), Int(p[3])) for p in loop_pts_raw]
         end
         component = let v = get(params, "component", nothing)
             v === nothing ? nothing : Int(v)
         end
-        holonomy = non_abelian_holonomy(psi, grid, loop_pts; component = component)
+        holonomy = non_abelian_holonomy(psi, grid, loop_pts; component=component)
         winding = round(Int, angle(holonomy) / (2π))
-        (holonomy = holonomy, phase = angle(holonomy),
-         winding = winding, loop_length = length(loop_pts))
+        (holonomy=holonomy, phase=angle(holonomy),
+            winding=winding, loop_length=length(loop_pts))
 
     elseif name == :monopole_charge
         ndim = length(grid.config.n_points)
         ndim == 3 || throw(ArgumentError("monopole_charge requires 3D grid"))
         smooth = Bool(get(params, "smooth", false))
-        q_field = monopole_charge_3d(psi, grid; smooth = smooth)
+        q_field = monopole_charge_3d(psi, grid; smooth=smooth)
         total_charge = total_monopole_charge(q_field, grid)
-        (monopole_charge_density = q_field,
-         total_charge = total_charge,
-         max_abs_density = maximum(abs, q_field))
+        (monopole_charge_density=q_field,
+            total_charge=total_charge,
+            max_abs_density=maximum(abs, q_field))
 
     elseif name == :winding_field
         ndim = length(grid.config.n_points)
@@ -679,10 +701,10 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
             v === nothing ? nothing : Int(v)
         end
         threshold = Float64(get(params, "threshold", 1e-6))
-        w = winding_number_field(psi, grid; component = component, threshold = threshold)
-        (winding_field = w,
-         total_winding = sum(w),
-         max_abs_winding = maximum(abs, w))
+        w = winding_number_field(psi, grid; component=component, threshold=threshold)
+        (winding_field=w,
+            total_winding=sum(w),
+            max_abs_winding=maximum(abs, w))
 
     elseif name == :column_density_movie
         # Two snapshot sources supported:
@@ -712,18 +734,23 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
 
         history = get(pipeline_results, :dynamics_history, nothing)
         if multi_step
-            history === nothing && throw(ArgumentError(
-                "column_density_movie multi_step=true requires preceding dynamics steps"))
+            history === nothing && throw(
+                ArgumentError(
+                    "column_density_movie multi_step=true requires preceding dynamics steps"),
+            )
             sources = collect(history)
         else
             dynres = get(pipeline_results, :dynamics_result, nothing)
-            dynres === nothing && throw(ArgumentError(
-                "column_density_movie requires a preceding dynamics step with save_every > 0"))
+            dynres === nothing && throw(
+                ArgumentError(
+                    "column_density_movie requires a preceding dynamics step with save_every > 0"
+                ),
+            )
             sources = [(
-                dynamics_result = dynres,
-                snapshot_tmp_path = get(pipeline_results, :snapshot_tmp_path, nothing),
-                save_psi_snapshots = get(pipeline_results, :save_psi_snapshots, false),
-                snapshot_count = get(pipeline_results, :snapshot_count, 0),
+                dynamics_result=dynres,
+                snapshot_tmp_path=get(pipeline_results, :snapshot_tmp_path, nothing),
+                save_psi_snapshots=get(pipeline_results, :save_psi_snapshots, false),
+                snapshot_count=get(pipeline_results, :snapshot_count, 0),
             )]
         end
 
@@ -745,15 +772,17 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
                         skey = "frame_" * lpad(string(i), 5, '0')
                         frame = jh[skey]
                         n_total = total_density(frame, ndim)
-                        col = dropdims(sum(n_total; dims = axis); dims = axis)
+                        col = dropdims(sum(n_total; dims=axis); dims=axis)
                         t_label = times[i] + t_offset
-                        title = title_fmt === nothing ?
-                            "phase $(phase_idx)  t = $(round(t_label, digits=3))" :
+                        title = if title_fmt === nothing
+                            "phase $(phase_idx)  t = $(round(t_label, digits=3))"
+                        else
                             string(title_fmt)
+                        end
                         png_path = joinpath(output_dir, "col_$(lpad(global_idx, 5, '0')).png")
                         save_column_density_png(grid, col, axis, png_path;
-                            title = title, colorscale = colorscale,
-                            width = width, height = height)
+                            title=title, colorscale=colorscale,
+                            width=width, height=height)
                         push!(frames, png_path)
                     end
                 end
@@ -761,15 +790,17 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
                 for (i, psi_s) in enumerate(dr.psi_snapshots)
                     global_idx += 1
                     n_total = total_density(psi_s, ndim)
-                    col = dropdims(sum(n_total; dims = axis); dims = axis)
+                    col = dropdims(sum(n_total; dims=axis); dims=axis)
                     t_label = times[i] + t_offset
-                    title = title_fmt === nothing ?
-                        "phase $(phase_idx)  t = $(round(t_label, digits=3))" :
+                    title = if title_fmt === nothing
+                        "phase $(phase_idx)  t = $(round(t_label, digits=3))"
+                    else
                         string(title_fmt)
+                    end
                     png_path = joinpath(output_dir, "col_$(lpad(global_idx, 5, '0')).png")
                     save_column_density_png(grid, col, axis, png_path;
-                        title = title, colorscale = colorscale,
-                        width = width, height = height)
+                        title=title, colorscale=colorscale,
+                        width=width, height=height)
                     push!(frames, png_path)
                 end
             end
@@ -778,15 +809,15 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
             # simulation time).
             t_offset += isempty(times) ? 0.0 : times[end] - times[1]
         end
-        (output_dir = output_dir, n_frames = length(frames),
-         frame_paths = frames, axis = axis,
-         n_phases = multi_step ? length(sources) : 1)
+        (output_dir=output_dir, n_frames=length(frames),
+            frame_paths=frames, axis=axis,
+            n_phases=multi_step ? length(sources) : 1)
 
     elseif name == :summary_json
         # Dump the accumulated pipeline_results plus QC metadata to a JSON file.
         output_path = String(get(params, "path", "summary.json"))
-        extras = get(params, "extras", Dict{String,Any}())
-        summary = Dict{String,Any}()
+        extras = get(params, "extras", Dict{String, Any}())
+        summary = Dict{String, Any}()
         for (k, v) in pipeline_results
             # Skip objects that aren't JSON-serializable (workspaces, arrays).
             if v isa Number || v isa AbstractString || v isa Bool || v === nothing
@@ -811,29 +842,36 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
         open(output_path, "w") do io
             JSON.print(io, summary, 2)
         end
-        (path = output_path, n_fields = length(summary))
+        (path=output_path, n_fields=length(summary))
 
     else
-        _known = "tomography, faraday, energy_decomposition, phase_classify, stability, bogoliubov, " *
-                 "multipole_order, winding_map, absorption_image, sg_tof, domain_analysis, skyrmion_density, " *
-                 "phase_contrast_image, momentum_distribution, vortex_detect, correlation_length, " *
-                 "defect_density, kibble_zurek_stats, bragg_spectroscopy, non_abelian_homotopy, " *
-                 "monopole_charge, winding_field, droplet_profile, synthetic_dim, " *
-                 "skyrmion_detect, bogoliubov_mode, bogoliubov_dispersion, " *
-                 "column_density_movie, summary_json"
+        _known =
+            "tomography, faraday, energy_decomposition, phase_classify, stability, bogoliubov, " *
+            "multipole_order, winding_map, absorption_image, sg_tof, domain_analysis, skyrmion_density, " *
+            "phase_contrast_image, momentum_distribution, vortex_detect, correlation_length, " *
+            "defect_density, kibble_zurek_stats, bragg_spectroscopy, non_abelian_homotopy, " *
+            "monopole_charge, winding_field, droplet_profile, synthetic_dim, " *
+            "skyrmion_detect, bogoliubov_mode, bogoliubov_dispersion, " *
+            "column_density_movie, summary_json"
         throw(ArgumentError("Unknown analyzer: $name. Supported: $_known"))
     end
 end
 
 function _phase_diff(a::Float64, b::Float64)
     d = a - b
-    d > π ? d - 2π : d < -π ? d + 2π : d
+    if d > π
+        d - 2π
+    elseif d < -π
+        d + 2π
+    else
+        d
+    end
 end
 
 # --- droplet_profile helpers ---
 
 """Extract the 1D density line through `peak_idx` along dimension `d`."""
-function _line_through_peak(n::AbstractArray, peak_idx::NTuple{D,Int}, d::Int) where {D}
+function _line_through_peak(n::AbstractArray, peak_idx::NTuple{D, Int}, d::Int) where {D}
     nd = size(n, d)
     line = Vector{Float64}(undef, nd)
     @inbounds for i in 1:nd
@@ -858,13 +896,15 @@ function _fwhm_1d(line::AbstractVector{Float64}, dx::Float64)
     (i_lo === nothing || i_hi === nothing || i_hi <= i_lo) && return 0.0
     # Linear interpolation for sub-cell precision
     lo_frac = if i_lo > 1
-        prev = line[i_lo - 1]; curr = line[i_lo]
+        prev = line[i_lo - 1];
+        curr = line[i_lo]
         curr > prev ? (half - prev) / (curr - prev) : 0.0
     else
         0.0
     end
     hi_frac = if i_hi < length(line)
-        curr = line[i_hi]; nxt = line[i_hi + 1]
+        curr = line[i_hi];
+        nxt = line[i_hi + 1]
         curr > nxt ? (curr - half) / (curr - nxt) : 1.0
     else
         1.0
@@ -877,12 +917,12 @@ function _rms_width_1d(line::AbstractVector{Float64}, dx::Float64, x::AbstractVe
     tot = sum(line) * dx
     tot > 0 || return 0.0
     x̄ = sum(line .* x) * dx / tot
-    var = sum(line .* (x .- x̄).^2) * dx / tot
+    var = sum(line .* (x .- x̄) .^ 2) * dx / tot
     sqrt(max(var, 0.0))
 end
 
 """Max absolute forward-difference derivative of density along axis `d`."""
-function _max_forward_grad(n::AbstractArray{<:Real,D}, d::Int, dx::Float64) where {D}
+function _max_forward_grad(n::AbstractArray{<:Real, D}, d::Int, dx::Float64) where {D}
     sz = size(n)
     gmax = 0.0
     @inbounds for I in CartesianIndices(ntuple(k -> k == d ? sz[k] - 1 : sz[k], D))
@@ -902,7 +942,11 @@ Returns a NamedTuple with `max_growth`, `unstable`, `k_peak`, `wavelength`,
 """
 function _run_bogoliubov_analyzer(psi, grid, atom, params, ws_prev)
     ws_prev === nothing &&
-        throw(ArgumentError("bogoliubov analyzer requires a preceding ground_state step (ws_prev is nothing)"))
+        throw(
+            ArgumentError(
+                "bogoliubov analyzer requires a preceding ground_state step (ws_prev is nothing)"
+            ),
+        )
 
     F = atom.F
     D = 2F + 1
@@ -933,21 +977,21 @@ function _run_bogoliubov_analyzer(psi, grid, atom, params, ws_prev)
     directions_arg = dir_mode in (:auto, :dense, :planar) ? dir_mode : :auto
 
     imap = bogoliubov_instability_scan(;
-        spinor, n0, F, interactions, zeeman, c_dd = c_dd_val,
+        spinor, n0, F, interactions, zeeman, c_dd=c_dd_val,
         k_max, n_k,
-        directions = directions_arg,
-        n_directions = n_dirs,
+        directions=directions_arg,
+        n_directions=n_dirs,
     )
     pred = predict_supersolid_params(imap)
 
     (
-        n0 = n0,
-        max_growth = imap.max_growth_rate,
-        unstable = imap.unstable,
-        k_peak = imap.most_unstable_k,
-        wavelength = imap.predicted_wavelength,
-        best_direction = imap.most_unstable_direction,
-        pattern = pred.pattern_type,
-        anisotropy = pred.angular_anisotropy,
+        n0=n0,
+        max_growth=imap.max_growth_rate,
+        unstable=imap.unstable,
+        k_peak=imap.most_unstable_k,
+        wavelength=imap.predicted_wavelength,
+        best_direction=imap.most_unstable_direction,
+        pattern=pred.pattern_type,
+        anisotropy=pred.angular_anisotropy,
     )
 end

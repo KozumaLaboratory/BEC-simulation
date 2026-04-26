@@ -4,14 +4,14 @@ using Printf
 
 # Terminal colors
 const COLORS = (
-    reset = "\033[0m",
-    red = "\033[31m",
-    green = "\033[32m",
-    yellow = "\033[33m",
-    blue = "\033[34m",
-    magenta = "\033[35m",
-    cyan = "\033[36m",
-    bold = "\033[1m",
+    reset="\033[0m",
+    red="\033[31m",
+    green="\033[32m",
+    yellow="\033[33m",
+    blue="\033[34m",
+    magenta="\033[35m",
+    cyan="\033[36m",
+    bold="\033[1m",
 )
 
 const USE_COLOR = get(ENV, "TERM", "") != "dumb" && isinteractive()
@@ -37,7 +37,7 @@ end
 
 function trend(h::ObservableHistory)
     length(h.values) < 2 && return "→"
-    recent = h.values[max(1, end-4):end]
+    recent = h.values[max(1, end - 4):end]
     if length(recent) < 2
         return "→"
     end
@@ -67,12 +67,12 @@ mutable struct ProgressReporter
     steps_times::Vector{Float64}  # Time for recent steps
 
     # Anomaly detection
-    last_energy::Union{Nothing,Float64}
+    last_energy::Union{Nothing, Float64}
     energy_drift_threshold::Float64
     norm_violation_threshold::Float64
 
     # Phase comparison
-    avg_step_time::Union{Nothing,Float64}
+    avg_step_time::Union{Nothing, Float64}
 end
 
 function ProgressReporter(
@@ -155,7 +155,7 @@ function detect_anomalies(pr::ProgressReporter, E::Float64, norm::Float64)
         drift = abs(E - pr.last_energy) / max(abs(pr.last_energy), 1e-10)
         if drift > pr.energy_drift_threshold
             msg = @sprintf("Energy drift %.1f%% over last %d steps",
-                          drift * 100, pr.print_every)
+                drift * 100, pr.print_every)
             push!(warnings, colorize("⚠️  $msg", COLORS.yellow))
         end
     end
@@ -182,7 +182,7 @@ function get_populations(ws::Workspace)
     D = 2F + 1
     dV = cell_volume(ws.grid)
 
-    pops = Dict{Int,Float64}()
+    pops = Dict{Int, Float64}()
     for c in 1:D
         m = F - (c - 1)
         p = sum(component_density(ws.state.psi, length(ws.grid.config.n_points), c)) * dV
@@ -199,7 +199,7 @@ end
 
 function print_progress(pr::ProgressReporter, ws::Workspace, step::Int)
     if !should_print(pr, step)
-        return
+        return nothing
     end
 
     t_now = time()
@@ -247,14 +247,15 @@ function print_progress(pr::ProgressReporter, ws::Workspace, step::Int)
 
         # Key populations
         p_main = haskey(pops, -F) ? pops[-F] : 0.0
-        p_next = haskey(pops, -F+1) ? pops[-F+1] : 0.0
+        p_next = haskey(pops, -F+1) ? pops[-F + 1] : 0.0
 
-        line = @sprintf("\r%s %3d%% | t=%.2f/%.2f | E=%s%s | P(%d)=%.2f%s P(%d)=%.2f%s | %.1fst/s | ETA:%s",
-                       bar, pct, t_sim, t_sim + (pr.total_steps - step) * ws.sim_params.dt,
-                       format_number(E, 2), trend(pr.energy_hist),
-                       -F, p_main, trend(ObservableHistory()),
-                       -F+1, p_next, trend(ObservableHistory()),
-                       step_rate, format_time(eta))
+        line = @sprintf(
+            "\r%s %3d%% | t=%.2f/%.2f | E=%s%s | P(%d)=%.2f%s P(%d)=%.2f%s | %.1fst/s | ETA:%s",
+            bar, pct, t_sim, t_sim + (pr.total_steps - step) * ws.sim_params.dt,
+            format_number(E, 2), trend(pr.energy_hist),
+            -F, p_main, trend(ObservableHistory()),
+            -F+1, p_next, trend(ObservableHistory()),
+            step_rate, format_time(eta))
 
         print(line)
         flush(stdout)
@@ -286,7 +287,7 @@ function print_progress(pr::ProgressReporter, ws::Workspace, step::Int)
             obs_parts = push!(obs_parts, "P(m=$(-F))=$p_str")
         end
         if haskey(pops, -F+1)
-            p_str = format_number(pops[-F+1], 3)
+            p_str = format_number(pops[-F + 1], 3)
             obs_parts = push!(obs_parts, "P(m=$(-F+1))=$p_str")
         end
 
@@ -340,11 +341,15 @@ function print_phase_summary(
 
     dE = E_final - E_initial
     dE_str = dE >= 0 ? "+$(format_number(abs(dE), 6))" : "-$(format_number(abs(dE), 6))"
-    dE_colored = dE >= 0 ?
-        colorize(dE_str, abs(dE) > 0.01 ? COLORS.yellow : COLORS.green) :
+    dE_colored = if dE >= 0
+        colorize(dE_str, abs(dE) > 0.01 ? COLORS.yellow : COLORS.green)
+    else
         colorize(dE_str, COLORS.green)
+    end
 
-    println("  Energy: $(format_number(E_initial, 4)) → $(format_number(E_final, 4)) (ΔE = $dE_colored)")
+    println(
+        "  Energy: $(format_number(E_initial, 4)) → $(format_number(E_final, 4)) (ΔE = $dE_colored)"
+    )
     println("  Performance: $(format_number(step_rate, 1)) steps/s")
     println(colorize("─"^80, COLORS.bold))
 end
@@ -366,20 +371,26 @@ function print_simulation_summary(
     for (i, (name, t, rate)) in enumerate(zip(phase_names, phase_times, phase_rates))
         pct = 100 * t / total_time
         comparison = ""
-        if i > 1 && phase_rates[i-1] > 0
-            speedup = rate / phase_rates[i-1]
+        if i > 1 && phase_rates[i - 1] > 0
+            speedup = rate / phase_rates[i - 1]
             if speedup > 1.05
-                comparison = colorize(@sprintf(" (%.0f%% faster)", (speedup - 1) * 100), COLORS.green)
+                comparison = colorize(
+                    @sprintf(" (%.0f%% faster)", (speedup - 1) * 100), COLORS.green
+                )
             elseif speedup < 0.95
-                comparison = colorize(@sprintf(" (%.0f%% slower)", (1 - speedup) * 100), COLORS.yellow)
+                comparison = colorize(
+                    @sprintf(" (%.0f%% slower)", (1 - speedup) * 100), COLORS.yellow
+                )
             end
         end
 
         bar_width = round(Int, pct / 100 * 40)
         bar = "▓"^bar_width * "░"^(40 - bar_width)
 
-        println(@sprintf("    %d. %-20s %s %.1f%% (%s, %.1f st/s)%s",
-                        i, name, bar, pct, format_time(t), rate, comparison))
+        println(
+            @sprintf("    %d. %-20s %s %.1f%% (%s, %.1f st/s)%s",
+                i, name, bar, pct, format_time(t), rate, comparison)
+        )
     end
 
     println(colorize("═"^80, COLORS.bold))

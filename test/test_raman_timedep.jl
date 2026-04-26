@@ -33,11 +33,11 @@ using SpinorBEC
             (1.0,),
         )
         ws = make_workspace(;
-            grid, atom, interactions = ip,
-            zeeman = ZeemanParams(0.0, -0.01),
-            potential = HarmonicTrap(1.0),
-            sim_params = SimParams(dt = 0.001, n_steps = 50, save_every = 50),
-            psi_init = init_psi(grid, SpinorBEC.SpinSystem(atom.F)),
+            grid, atom, interactions=ip,
+            zeeman=ZeemanParams(0.0, -0.01),
+            potential=HarmonicTrap(1.0),
+            sim_params=SimParams(dt=0.001, n_steps=50, save_every=50),
+            psi_init=init_psi(grid, SpinorBEC.SpinSystem(atom.F)),
             raman,
         )
 

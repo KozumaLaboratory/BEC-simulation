@@ -2,7 +2,6 @@ using Test
 using SpinorBEC
 
 @testset "Adaptive dt" begin
-
     @testset "adaptive converges to same ground state" begin
         grid = make_grid(GridConfig(64, 15.0))
         atom = Rb87
@@ -78,7 +77,8 @@ using SpinorBEC
         sp_fixed = SimParams(; dt=0.001, n_steps=500, save_every=500)
         ws_fixed = make_workspace(; grid, atom, interactions, potential, sim_params=sp_fixed)
         res_fixed = run_simulation!(ws_fixed)
-        @test abs(res_fixed.energies[end] - out.result.energies[end]) / abs(res_fixed.energies[end]) < 0.01
+        @test abs(res_fixed.energies[end] - out.result.energies[end]) /
+              abs(res_fixed.energies[end]) < 0.01
     end
 
     @testset "error estimators" begin
@@ -114,7 +114,9 @@ using SpinorBEC
 
         sp = SimParams(; dt=0.001, n_steps=1)
         ws = make_workspace(; grid, atom, interactions, potential, sim_params=sp)
-        adaptive = AdaptiveDtParams(dt_init=0.001, dt_min=1e-5, dt_max=0.01, tol=1e-3, error_mode=:richardson)
+        adaptive = AdaptiveDtParams(
+            dt_init=0.001, dt_min=1e-5, dt_max=0.01, tol=1e-3, error_mode=:richardson
+        )
         out = run_simulation_adaptive!(ws; adaptive, t_end=0.5, save_interval=0.1)
 
         @test out.n_accepted > 0
@@ -129,7 +131,8 @@ using SpinorBEC
         sp_fixed = SimParams(; dt=0.001, n_steps=500, save_every=500)
         ws_fixed = make_workspace(; grid, atom, interactions, potential, sim_params=sp_fixed)
         res_fixed = run_simulation!(ws_fixed)
-        @test abs(res_fixed.energies[end] - out.result.energies[end]) / abs(res_fixed.energies[end]) < 0.01
+        @test abs(res_fixed.energies[end] - out.result.energies[end]) /
+              abs(res_fixed.energies[end]) < 0.01
     end
 
     @testset "YAML adaptive_dt parsing" begin
@@ -358,5 +361,4 @@ using SpinorBEC
         result = run_config(config; verbose=false)
         @test result.dynamics_result !== nothing
     end
-
 end

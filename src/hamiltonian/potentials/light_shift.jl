@@ -55,11 +55,11 @@ Build a LightShift from explicit parameters.
 """
 function make_light_shift(;
     F::Int,
-    polarization = (0, 0, 1),
-    alpha_vector::Float64 = 0.0,
-    alpha_tensor::Float64 = 0.0,
+    polarization=(0, 0, 1),
+    alpha_vector::Float64=0.0,
+    alpha_tensor::Float64=0.0,
     profile::AbstractArray{<:AbstractFloat},
-    backend::AbstractBackend = CPUBackend(),
+    backend::AbstractBackend=CPUBackend(),
 )
     sm = spin_matrices(F)
     M = _build_light_shift_operator(F, sm, polarization, alpha_vector, alpha_tensor)
@@ -90,15 +90,15 @@ function make_light_shift_from_trap(
     V_trap::AbstractArray{<:AbstractFloat},
     F::Int,
     eta_tensor::Float64;
-    eta_vector::Float64 = 0.0,
-    polarization = (0, 0, 1),
-    backend::AbstractBackend = CPUBackend(),
+    eta_vector::Float64=0.0,
+    polarization=(0, 0, 1),
+    backend::AbstractBackend=CPUBackend(),
 )
     profile = abs.(V_trap)
     make_light_shift(;
         F, polarization,
-        alpha_vector = eta_vector,
-        alpha_tensor = eta_tensor,
+        alpha_vector=eta_vector,
+        alpha_tensor=eta_tensor,
         profile, backend,
     )
 end
@@ -114,7 +114,7 @@ function apply_light_shift_step!(
     ls::LightShift,
     dt_frac::Float64,
     ndim::Int;
-    imaginary_time::Bool = false,
+    imaginary_time::Bool=false,
 )
     D = length(ls.eigvals)
     n_pts = ntuple(d -> size(psi, d), ndim)
@@ -126,8 +126,8 @@ function apply_light_shift_step!(
     Threads.@threads for lin in 1:prod(n_pts)
         I = CartesianIndices(n_pts)[lin]
         intensity = profile[I]
-        v = MVector{D,ComplexF64}(undef)
-        spinor = MVector{D,ComplexF64}(undef)
+        v = MVector{D, ComplexF64}(undef)
+        spinor = MVector{D, ComplexF64}(undef)
         for c in 1:D
             spinor[c] = psi[I, c]
         end
@@ -161,7 +161,7 @@ function apply_light_shift_step!(
     ls::LightShift,
     dt_frac::Float64,
     ndim::Int;
-    imaginary_time::Bool = false,
+    imaginary_time::Bool=false,
 )
     _run_on_host!(psi) do p
         apply_light_shift_step!(p, ls, dt_frac, ndim; imaginary_time)

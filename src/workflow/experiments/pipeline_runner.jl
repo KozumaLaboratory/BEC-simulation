@@ -28,22 +28,28 @@ function _parse_step(d::Dict)
     val = d[keys_list[1]]
 
     if key == :ground_state
-        GroundStateStep(Dict{String,Any}(string(k) => v for (k, v) in val))
+        GroundStateStep(Dict{String, Any}(string(k) => v for (k, v) in val))
     elseif key == :dynamics
-        DynamicsStep(Dict{String,Any}(string(k) => v for (k, v) in val))
+        DynamicsStep(Dict{String, Any}(string(k) => v for (k, v) in val))
     elseif key == :analyze
-        analyzers = Pair{Symbol,Dict{String,Any}}[]
+        analyzers = Pair{Symbol, Dict{String, Any}}[]
         for entry in val
             if entry isa Dict
                 for (ak, av) in entry
-                    params = av isa Dict ? Dict{String,Any}(string(k) => v for (k, v) in av) : Dict{String,Any}()
+                    params = if av isa Dict
+                        Dict{String, Any}(string(k) => v for (k, v) in av)
+                    else
+                        Dict{String, Any}()
+                    end
                     push!(analyzers, Symbol(ak) => params)
                 end
             end
         end
         AnalyzeStep(analyzers)
     else
-        throw(ArgumentError("Unknown pipeline step: $key. Supported: ground_state, dynamics, analyze"))
+        throw(
+            ArgumentError("Unknown pipeline step: $key. Supported: ground_state, dynamics, analyze")
+        )
     end
 end
 
@@ -54,22 +60,23 @@ Execute a pipeline sequentially. Each step receives the current psi
 and produces a new one. Analysis steps don't modify psi but accumulate
 results.
 """
-function run_pipeline(config::PipelineConfig; verbose::Bool = true, psi_init = nothing,
-                      checkpoint_dir::Union{Nothing,String} = nothing)
+function run_pipeline(config::PipelineConfig; verbose::Bool=true, psi_init=nothing,
+    checkpoint_dir::Union{Nothing, String}=nothing)
     psi = psi_init
     grid = nothing
     atom = nothing
     workspace = nothing
-    results = Dict{Symbol,Any}()
+    results = Dict{Symbol, Any}()
 
     for (i, step) in enumerate(config.steps)
         if verbose
             println("Step $i/$(length(config.steps)): $(nameof(typeof(step)))")
-            flush(stdout); ccall(:fflush, Cint, (Ptr{Cvoid},), C_NULL)
+            flush(stdout);
+            ccall(:fflush, Cint, (Ptr{Cvoid},), C_NULL)
         end
         psi, grid, atom, workspace, step_result = if step isa AnalyzeStep
             _run_step(step, psi, grid, atom, workspace;
-                      verbose, checkpoint_dir, pipeline_results = results)
+                verbose, checkpoint_dir, pipeline_results=results)
         else
             _run_step(step, psi, grid, atom, workspace; verbose, checkpoint_dir)
         end
@@ -80,32 +87,43 @@ function run_pipeline(config::PipelineConfig; verbose::Bool = true, psi_init = n
                 # walk all phases of a multi-stage pipeline like Klaus
                 # 2022 (tilt → spin-up → magnetostir).
                 history = get(results, :dynamics_history,
-                              NamedTuple[])
-                push!(history, (
-                    dynamics_result = get(step_result, :dynamics_result, nothing),
-                    snapshot_tmp_path = get(step_result, :snapshot_tmp_path, nothing),
-                    save_psi_snapshots = get(step_result, :save_psi_snapshots, false),
-                    snapshot_count = get(step_result, :snapshot_count, 0),
-                ))
+                    NamedTuple[])
+                push!(
+                    history,
+                    (
+                        dynamics_result=get(step_result, :dynamics_result, nothing),
+                        snapshot_tmp_path=get(step_result, :snapshot_tmp_path, nothing),
+                        save_psi_snapshots=get(step_result, :save_psi_snapshots, false),
+                        snapshot_count=get(step_result, :snapshot_count, 0),
+                    ),
+                )
                 results[:dynamics_history] = history
             end
             merge!(results, step_result)
         end
     end
 
-    (psi = psi, grid = grid, atom = atom, results...)
+    (psi=psi, grid=grid, atom=atom, results...)
 end
 
 # --- Step dispatch ---
 
-function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_prev; verbose=true, checkpoint_dir=nothing)
+function _run_step(
+    step::GroundStateStep,
+    psi_prev,
+    grid_prev,
+    atom_prev,
+    ws_prev;
+    verbose=true,
+    checkpoint_dir=nothing,
+)
     p = step.params
 
     # Binary (two-component) GP path — Phase 4.7 / Scenario #51 scaffold.
     # Activated by `kind: binary` in the YAML; falls through to the standard
     # spinor path otherwise. Currently supports F=0 + F=0 only.
     if get(p, "kind", nothing) == "binary"
-        return _run_binary_ground_state_step(p; verbose = verbose)
+        return _run_binary_ground_state_step(p; verbose=verbose)
     end
 
     method = Symbol(get(p, "method", "itp"))
@@ -136,7 +154,7 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
     elseif ws_prev !== nothing
         ws_prev.interactions
     else
-        _parse_gs_interactions(Dict{String,Any}(), atom)
+        _parse_gs_interactions(Dict{String, Any}(), atom)
     end
 
     enable_ddi, c_dd_val, secular, q2d, lz = if haskey(p, "ddi") || haskey(p, "interactions")
@@ -181,7 +199,8 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
     if cache_path !== nothing && isfile(cache_path)
         if verbose
             println("  Loading cached GS from $cache_path")
-            flush(stdout); ccall(:fflush, Cint, (Ptr{Cvoid},), C_NULL)
+            flush(stdout);
+            ccall(:fflush, Cint, (Ptr{Cvoid},), C_NULL)
         end
         d = JLD2.load(cache_path)
         psi_out = d["psi"]
@@ -189,13 +208,13 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
         converged = get(d, "converged", true)
         ws_cached = make_workspace(;
             grid, atom, interactions, zeeman, potential,
-            sim_params = SimParams(; dt, n_steps = 1, save_every = 1),
-            psi_init = psi_out,
-            enable_ddi, c_dd = c_dd_val,
-            secular_ddi = secular, quasi_2d_ddi = q2d, l_z_ddi = lz,
+            sim_params=SimParams(; dt, n_steps=1, save_every=1),
+            psi_init=psi_out,
+            enable_ddi, c_dd=c_dd_val,
+            secular_ddi=secular, quasi_2d_ddi=q2d, l_z_ddi=lz,
             backend,
         )
-        step_result = Dict{Symbol,Any}(
+        step_result = Dict{Symbol, Any}(
             :ground_state_energy => energy,
             :ground_state_converged => converged,
             :workspace => ws_cached,
@@ -203,7 +222,7 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
         return (psi_out, grid, atom, ws_cached, step_result)
     end
     initial_state = Symbol(get(p, "initial_state", "polar"))
-    init_state_params = Dict{Symbol,Float64}()
+    init_state_params = Dict{Symbol, Float64}()
     if haskey(p, "init_state_params")
         for (k, v) in p["init_state_params"]
             init_state_params[Symbol(k)] = Float64(v)
@@ -221,9 +240,12 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
         D = 2 * atom.F + 1
         expected = (grid.config.n_points..., D)
         if size(psi_init) != expected
-            throw(ArgumentError(
-                "psi_init size $(size(psi_init)) does not match grid+atom: expected $expected. " *
-                "Grid or atom changed between continuation points? Delete stale cached results and re-run."))
+            throw(
+                ArgumentError(
+                    "psi_init size $(size(psi_init)) does not match grid+atom: expected $expected. " *
+                    "Grid or atom changed between continuation points? Delete stale cached results and re-run.",
+                ),
+            )
         end
     end
     # Convert psi_init to target backend (e.g. GPU psi → CPU for LBFGS polish)
@@ -231,9 +253,11 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
         psi_init = _to_host(psi_init)
     end
     if psi_init === nothing && temp_ratio !== nothing
-        psi_base = init_psi(grid, SpinSystem(atom.F); state = initial_state, pairs(init_state_params)...)
+        psi_base = init_psi(
+            grid, SpinSystem(atom.F); state=initial_state, pairs(init_state_params)...
+        )
         psi_init = add_thermal_noise(psi_base, atom.F;
-            T_over_Tc = temp_ratio, seed = Int(get(p, "noise_seed", 42)))
+            T_over_Tc=temp_ratio, seed=Int(get(p, "noise_seed", 42)))
     end
 
     ramp_callbacks = Function[]
@@ -249,33 +273,44 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
             save_every_local = max(1, Int(get(p, "n_steps", 100000)) ÷ 100)
             c_dd_current = Ref(c_dd_from)
             E_prev_ramp = Ref(NaN)
-            push!(ramp_callbacks, (ws, step, ns) -> begin
-                ws.ddi === nothing && return
-                if step % save_every_local == 0
-                    E_now = total_energy(ws)
-                    dE = isnan(E_prev_ramp[]) ? Inf : abs(E_now - E_prev_ramp[])
-                    E_prev_ramp[] = E_now
-                    if dE < dE_threshold && c_dd_current[] < c_dd_target
-                        c_dd_current[] = min(c_dd_current[] + c_dd_step, c_dd_target)
-                        ws.ddi.C_dd = c_dd_current[]
-                        println("    c_dd → $(round(c_dd_current[]; digits=1)) (dE=$(round(dE; sigdigits=3)))")
-                        flush(stdout)
-                        E_prev_ramp[] = NaN  # reset after jump
+            push!(
+                ramp_callbacks,
+                (ws, step, ns) -> begin
+                    ws.ddi === nothing && return nothing
+                    if step % save_every_local == 0
+                        E_now = total_energy(ws)
+                        dE = isnan(E_prev_ramp[]) ? Inf : abs(E_now - E_prev_ramp[])
+                        E_prev_ramp[] = E_now
+                        if dE < dE_threshold && c_dd_current[] < c_dd_target
+                            c_dd_current[] = min(c_dd_current[] + c_dd_step, c_dd_target)
+                            ws.ddi.C_dd = c_dd_current[]
+                            println(
+                                "    c_dd → $(round(c_dd_current[]; digits=1)) (dE=$(round(dE; sigdigits=3)))",
+                            )
+                            flush(stdout)
+                            E_prev_ramp[] = NaN  # reset after jump
+                        end
                     end
-                end
-            end)
+                end,
+            )
             c_dd_val = c_dd_from
         else
             c_dd_interp = _make_interpolator(c_dd_spec)
-            push!(ramp_callbacks, (ws, step, ns) -> begin
-                ws.ddi !== nothing && (ws.ddi.C_dd = c_dd_interp(step / ns))
-            end)
+            push!(
+                ramp_callbacks,
+                (ws, step, ns) -> begin
+                    ws.ddi !== nothing && (ws.ddi.C_dd = c_dd_interp(step / ns))
+                end,
+            )
             c_dd_val = c_dd_interp(0.0)
         end
     end
 
     on_step = isempty(ramp_callbacks) ? nothing :
-        (ws, step, ns) -> for cb in ramp_callbacks; cb(ws, step, ns); end
+              (ws, step, ns) -> for cb in ramp_callbacks
+        ;
+        cb(ws, step, ns);
+    end
 
     V_trap_for_ls = evaluate_potential(potential, grid)
     ls_raw = get(p, "light_shift", nothing)
@@ -288,36 +323,36 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
         find_ground_state(;
             grid, atom, interactions, zeeman, potential,
             dt, n_steps, tol, initial_state, init_state_params, psi_init,
-            enable_ddi, c_dd = c_dd_val,
-            secular_ddi = secular, quasi_2d_ddi = q2d, l_z_ddi = lz,
-            target_magnetization = target_mz, backend, on_step,
-            checkpoint_dir = checkpoint_dir,
-            checkpoint_every = checkpoint_dir !== nothing ? max(1, n_steps ÷ 10) : 0,
-            light_shift = gs_light_shift,
-            spinor_lhy = spinor_lhy_mode,
+            enable_ddi, c_dd=c_dd_val,
+            secular_ddi=secular, quasi_2d_ddi=q2d, l_z_ddi=lz,
+            target_magnetization=target_mz, backend, on_step,
+            checkpoint_dir=checkpoint_dir,
+            checkpoint_every=checkpoint_dir !== nothing ? max(1, n_steps ÷ 10) : 0,
+            light_shift=gs_light_shift,
+            spinor_lhy=spinor_lhy_mode,
         )
     elseif method === :lbfgs
         m_lbfgs = Int(get(p, "m_lbfgs", 10))
         # Reuse existing workspace when available to preserve DDI flags (secular/q2d/l_z).
         # Skip reuse when backend is explicitly overridden (e.g. GPU ITP → CPU LBFGS).
         if ws_prev !== nothing && !haskey(p, "backend") &&
-           !haskey(p, "interactions") && !haskey(p, "ddi") &&
-           !haskey(p, "potential") && !haskey(p, "zeeman")
+            !haskey(p, "interactions") && !haskey(p, "ddi") &&
+            !haskey(p, "potential") && !haskey(p, "zeeman")
             find_ground_state_lbfgs(;
-                ws_init = ws_prev, psi_init,
+                ws_init=ws_prev, psi_init,
                 n_steps, tol, m_lbfgs,
-                target_magnetization = target_mz,
+                target_magnetization=target_mz,
                 verbose,
             )
         else
             find_ground_state_lbfgs(;
                 grid, atom, interactions, zeeman, potential,
                 n_steps, tol, m_lbfgs, initial_state, init_state_params, psi_init,
-                enable_ddi, c_dd = c_dd_val,
-                secular_ddi = secular, quasi_2d_ddi = q2d, l_z_ddi = lz,
-                target_magnetization = target_mz, backend,
+                enable_ddi, c_dd=c_dd_val,
+                secular_ddi=secular, quasi_2d_ddi=q2d, l_z_ddi=lz,
+                target_magnetization=target_mz, backend,
                 verbose,
-                light_shift = gs_light_shift,
+                light_shift=gs_light_shift,
             )
         end
     else
@@ -338,15 +373,15 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
                 f["energy"] = gs.energy
                 f["converged"] = gs.converged
             end
-            mv(tmp, cache_path; force = true)
+            mv(tmp, cache_path; force=true)
             verbose && println("  Cached GS to $cache_path")
         catch err
-            isfile(tmp) && rm(tmp; force = true)
+            isfile(tmp) && rm(tmp; force=true)
             @warn "Failed to save GS cache: $err"
         end
     end
 
-    step_result = Dict{Symbol,Any}(
+    step_result = Dict{Symbol, Any}(
         :ground_state_energy => gs.energy,
         :ground_state_converged => gs.converged,
         :workspace => gs.workspace,
@@ -354,8 +389,11 @@ function _run_step(step::GroundStateStep, psi_prev, grid_prev, atom_prev, ws_pre
     (psi_out, grid, atom, gs.workspace, step_result)
 end
 
-function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=true, checkpoint_dir=nothing)
-    psi_prev !== nothing || throw(ArgumentError("dynamics step requires a preceding ground_state step"))
+function _run_step(
+    step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=true, checkpoint_dir=nothing
+)
+    psi_prev !== nothing ||
+        throw(ArgumentError("dynamics step requires a preceding ground_state step"))
     grid !== nothing || throw(ArgumentError("dynamics step requires grid from preceding step"))
     p = step.params
     ndim = length(grid.config.n_points)
@@ -387,8 +425,10 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
         prev_c_dd
     end
 
-    zeeman_wrapper = Dict{String,Any}("ground_state" => Dict{String,Any}("zeeman" => get(p, "zeeman", Dict())))
-    zeeman = _build_phase_zeeman(zeeman_wrapper, 0.0, duration; atom, p_step = p)
+    zeeman_wrapper = Dict{String, Any}(
+        "ground_state" => Dict{String, Any}("zeeman" => get(p, "zeeman", Dict()))
+    )
+    zeeman = _build_phase_zeeman(zeeman_wrapper, 0.0, duration; atom, p_step=p)
 
     pot_d = get(p, "potential", nothing)
     potential = pot_d !== nothing ? _parse_and_build_potential(pot_d, ndim) : prev_potential
@@ -408,9 +448,9 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
     ab_raw = get(p, "absorbing_boundary", nothing)
     absorbing_boundary = if ab_raw isa Dict
         AbsorbingBoundary(;
-            strength = Float64(ab_raw["strength"]),
-            width = Float64(ab_raw["width"]),
-            power = Int(get(ab_raw, "power", 2)),
+            strength=Float64(ab_raw["strength"]),
+            width=Float64(ab_raw["width"]),
+            power=Int(get(ab_raw, "power", 2)),
         )
     else
         nothing
@@ -420,11 +460,11 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
     light_shift = _parse_light_shift(ls_raw, F, nothing, backend)
 
     # Loss parser may need (atom, N_atoms, omega_ref) when SI-unit K_3 is used
-    inter_raw = get(p, "interactions", Dict{String,Any}())
+    inter_raw = get(p, "interactions", Dict{String, Any}())
     n_atoms_for_loss = get(inter_raw, "N_atoms", nothing)
     omega_ref_for_loss = get(inter_raw, "omega_ref", nothing)
     loss = _parse_loss_params(get(p, "loss", nothing);
-        atom = atom, N_atoms = n_atoms_for_loss, omega_ref = omega_ref_for_loss)
+        atom=atom, N_atoms=n_atoms_for_loss, omega_ref=omega_ref_for_loss)
 
     raman = _build_raman(p, duration)
 
@@ -470,9 +510,9 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
     ws = make_workspace(;
         grid, atom, interactions,
         zeeman, potential,
-        sim_params = sp,
-        psi_init = psi_prev,
-        enable_ddi, c_dd = c_dd_val,
+        sim_params=sp,
+        psi_init=psi_prev,
+        enable_ddi, c_dd=c_dd_val,
         backend,
         absorbing_boundary,
         light_shift,
@@ -483,7 +523,9 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
     )
 
     if temp_ratio !== nothing
-        psi_noisy = add_thermal_noise(ws.state.psi, F; T_over_Tc = temp_ratio, seed = Int(get(p, "noise_seed", 42)))
+        psi_noisy = add_thermal_noise(
+            ws.state.psi, F; T_over_Tc=temp_ratio, seed=Int(get(p, "noise_seed", 42))
+        )
         ws.state.psi .= psi_noisy
     end
 
@@ -491,7 +533,9 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
         v === nothing ? nothing : Float64(v)
     end
     if seed_amp !== nothing
-        add_symmetry_breaking_seed!(ws.state.psi, F; amplitude = seed_amp, seed = Int(get(p, "noise_seed", 42)))
+        add_symmetry_breaking_seed!(
+            ws.state.psi, F; amplitude=seed_amp, seed=Int(get(p, "noise_seed", 42))
+        )
     end
 
     twa_raw = get(p, "twa", nothing)
@@ -499,17 +543,17 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
         twa_config = _parse_twa_config(twa_raw)
         store_traj = Bool(get(twa_raw, "store_trajectories", false))
         ensemble = run_twa(;
-            psi_gs = psi_prev, grid, atom, interactions, zeeman, potential,
-            sim_params = sp, twa_config, enable_ddi, c_dd = c_dd_val, backend,
-            store_trajectories = store_traj, verbose,
+            psi_gs=psi_prev, grid, atom, interactions, zeeman, potential,
+            sim_params=sp, twa_config, enable_ddi, c_dd=c_dd_val, backend,
+            store_trajectories=store_traj, verbose,
         )
 
         verbose && @printf("  TWA ensemble: %d trajectories, %d snapshots\n",
-                           ensemble.n_trajectories, length(ensemble.times))
+            ensemble.n_trajectories, length(ensemble.times))
 
         # Use mean density to reconstruct a representative psi_out for downstream
         psi_out = copy(psi_prev)
-        step_result = Dict{Symbol,Any}(
+        step_result = Dict{Symbol, Any}(
             :ensemble_result => ensemble,
             :dynamics_workspace => ws,
         )
@@ -520,31 +564,37 @@ function _run_step(step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=tr
     save_compress = Bool(get(p, "save_snapshot_compression", false))
     snap_precision_str = String(get(p, "save_snapshot_precision", "f32"))
     snap_precision_cf =
-        snap_precision_str == "f64" ? ComplexF64 :
-        snap_precision_str == "f32" ? ComplexF32 :
-        throw(ArgumentError(
-            "save_snapshot_precision must be \"f32\" or \"f64\", got " *
-            snap_precision_str,
-        ))
-
-    cb_sgpe   = _build_sgpe_callback(   get(p, "sgpe", nothing),              Float64(sp.dt))
-    cb_pgp    = _build_pgp_callback(    get(p, "projected_gp", nothing))
-    cb_photon = _build_photon_callback( get(p, "photon_scattering", nothing),  Float64(sp.dt))
-    extra_cb  = _compose_callbacks(cb_sgpe, cb_pgp, cb_photon)
-
-    result, snap_tmp_path, snap_count =
-        _run_dynamics_with_optional_streaming!(
-            ws, save_psi_snap, save_compress, snap_precision_cf;
-            extra_on_step = extra_cb,
+        if snap_precision_str == "f64"
+            ComplexF64
+        elseif snap_precision_str == "f32"
+            ComplexF32
+        else
+            throw(
+            ArgumentError(
+                "save_snapshot_precision must be \"f32\" or \"f64\", got " *
+                snap_precision_str,
+            ),
         )
+        end
+
+    cb_sgpe = _build_sgpe_callback(get(p, "sgpe", nothing), Float64(sp.dt))
+    cb_pgp = _build_pgp_callback(get(p, "projected_gp", nothing))
+    cb_photon = _build_photon_callback(get(p, "photon_scattering", nothing), Float64(sp.dt))
+    extra_cb = _compose_callbacks(cb_sgpe, cb_pgp, cb_photon)
+
+    result, snap_tmp_path, snap_count = _run_dynamics_with_optional_streaming!(
+        ws, save_psi_snap, save_compress, snap_precision_cf;
+        extra_on_step=extra_cb,
+    )
 
     if verbose
         println("  $(n_steps) steps, E_final=$(round(result.energies[end]; sigdigits=6))")
-        flush(stdout); ccall(:fflush, Cint, (Ptr{Cvoid},), C_NULL)
+        flush(stdout);
+        ccall(:fflush, Cint, (Ptr{Cvoid},), C_NULL)
     end
 
     psi_out = copy(ws.state.psi)
-    step_result = Dict{Symbol,Any}(
+    step_result = Dict{Symbol, Any}(
         :dynamics_result => result,
         :dynamics_workspace => ws,
         :save_psi_snapshots => save_psi_snap,
@@ -568,17 +618,17 @@ vector (~8 GB at 154 snapshots).
 """
 function _run_dynamics_with_optional_streaming!(
     ws, save_psi::Bool, compress::Bool,
-    snap_type::Type{<:Complex} = ComplexF32;
-    extra_on_step::Union{Nothing,Function} = nothing,
+    snap_type::Type{<:Complex}=ComplexF32;
+    extra_on_step::Union{Nothing, Function}=nothing,
 )
     if !save_psi
         cb = extra_on_step === nothing ? nothing :
-             SimulationCallbacks(on_step = extra_on_step)
-        return (run_simulation!(ws; callbacks = cb), nothing, 0)
+             SimulationCallbacks(; on_step=extra_on_step)
+        return (run_simulation!(ws; callbacks=cb), nothing, 0)
     end
 
     snap_tmp = _dynamics_scratch_path()
-    jld_kwargs = compress ? (; compress = ZlibCompressor()) : (;)
+    jld_kwargs = compress ? (; compress=ZlibCompressor()) : (;)
     snap_file = jldopen(snap_tmp, "w"; jld_kwargs...)
 
     n_pts = ntuple(d -> size(ws.state.psi, d), ndims(ws.state.psi) - 1)
@@ -594,17 +644,17 @@ function _run_dynamics_with_optional_streaming!(
         frame_count[] += 1
         buf .= snap_type.(psi_snap)
         snap_file["frame_" * lpad(string(frame_count[]), 5, '0')] = buf
-        return
+        return nothing
     end
 
     result = try
         run_simulation!(
             ws;
-            callbacks = SimulationCallbacks(
-                on_snapshot = on_snap,
-                on_step = extra_on_step,
+            callbacks=SimulationCallbacks(;
+                on_snapshot=on_snap,
+                on_step=extra_on_step,
             ),
-            stream_snapshots = true,
+            stream_snapshots=true,
         )
     finally
         snap_file["n_snapshots"] = frame_count[]
@@ -632,7 +682,7 @@ function _build_pgp_callback(node)
     k_cut = Float64(node["k_cut"])
     smooth = Bool(get(node, "smooth", false))
     every = Int(get(node, "every", 1))
-    projected_gp_callback(k_cut; smooth = smooth, every = every)
+    projected_gp_callback(k_cut; smooth=smooth, every=every)
 end
 
 """
@@ -647,16 +697,22 @@ on-step callback. Accepts:
 function _build_photon_callback(node, dt::Float64)
     node === nothing && return nothing
     node isa Bool && (node || return nothing)
-    node isa Dict || throw(ArgumentError(
-        "dynamics.photon_scattering must be a Dict or `false`, got $(typeof(node))"))
-    Γ_sc_key = haskey(node, "Gamma_sc") ? "Gamma_sc" :
-               haskey(node, "gamma_sc") ? "gamma_sc" :
-               throw(ArgumentError("dynamics.photon_scattering requires `Gamma_sc`"))
+    node isa Dict || throw(
+        ArgumentError(
+            "dynamics.photon_scattering must be a Dict or `false`, got $(typeof(node))"),
+    )
+    Γ_sc_key = if haskey(node, "Gamma_sc")
+        "Gamma_sc"
+    elseif haskey(node, "gamma_sc")
+        "gamma_sc"
+    else
+        throw(ArgumentError("dynamics.photon_scattering requires `Gamma_sc`"))
+    end
     Γ_sc = Float64(node[Γ_sc_key])
     seed = let v = get(node, "seed", nothing)
         v === nothing ? nothing : Int(v)
     end
-    photon_scattering_callback(Γ_sc, dt; seed = seed)
+    photon_scattering_callback(Γ_sc, dt; seed=seed)
 end
 
 """Compose multiple optional on_step callbacks into a single one. Each
@@ -682,19 +738,19 @@ Currently F=0 + F=0 via `find_binary_ground_state`. Spinor binary,
 DDI, and YAML-side analyzer integration are next-session work — see
 `docs/two_component_gp_design.md`.
 """
-function _run_binary_ground_state_step(p::AbstractDict; verbose::Bool = true)
+function _run_binary_ground_state_step(p::AbstractDict; verbose::Bool=true)
     grid_node = p["grid"]
     n = Int.(grid_node["n"])
     box = Float64.(grid_node["box"])
     grid = make_grid(GridConfig(Tuple(n), Tuple(box)))
 
     inter = p["interactions"]
-    couplings = BinaryCouplings(
-        g_AA = Float64(inter["g_AA"]),
-        g_BB = Float64(inter["g_BB"]),
-        g_AB = Float64(inter["g_AB"]),
-        omega_coupling = Float64(get(inter, "omega_coupling", 0.0)),
-        delta_coupling = Float64(get(inter, "delta_coupling", 0.0)),
+    couplings = BinaryCouplings(;
+        g_AA=Float64(inter["g_AA"]),
+        g_BB=Float64(inter["g_BB"]),
+        g_AB=Float64(inter["g_AB"]),
+        omega_coupling=Float64(get(inter, "omega_coupling", 0.0)),
+        delta_coupling=Float64(get(inter, "delta_coupling", 0.0)),
     )
 
     pot_node = get(p, "potential", Dict())
@@ -709,13 +765,13 @@ function _run_binary_ground_state_step(p::AbstractDict; verbose::Bool = true)
 
     state = find_binary_ground_state(
         grid;
-        couplings = couplings,
-        potential_A = potential,
-        potential_B = potential,
-        dt = Float64(get(p, "dt", 0.005)),
-        n_steps = Int(get(p, "n_steps", 1000)),
-        tol = Float64(get(p, "tol", 1e-6)),
-        verbose = verbose,
+        couplings=couplings,
+        potential_A=potential,
+        potential_B=potential,
+        dt=Float64(get(p, "dt", 0.005)),
+        n_steps=Int(get(p, "n_steps", 1000)),
+        tol=Float64(get(p, "tol", 1e-6)),
+        verbose=verbose,
     )
 
     # Stash ψ_A as the "psi" downstream so phase_classify etc. don't break;
@@ -723,7 +779,7 @@ function _run_binary_ground_state_step(p::AbstractDict; verbose::Bool = true)
     # placeholders — binary path doesn't carry a single AtomSpecies.
     placeholder_atom = AtomSpecies("Binary", 1.66e-25, 0, 0.0, 0.0, 0.0)
     psi_4d = reshape(state.psi_A, (size(state.psi_A)..., 1))
-    step_result = Dict{Symbol,Any}(
+    step_result = Dict{Symbol, Any}(
         :binary_state => state,
         :binary_couplings => couplings,
     )
@@ -775,12 +831,12 @@ function _build_sgpe_callback(node, dt::Float64)
     seed = let v = get(node, "seed", nothing)
         v === nothing ? nothing : Int(v)
     end
-    sgpe_callback(γ, T, dt; μ = μ, k_cut = k_cut, seed = seed, every = every)
+    sgpe_callback(γ, T, dt; μ=μ, k_cut=k_cut, seed=seed, every=every)
 end
 
 function _dynamics_scratch_path()
     scratch = get(ENV, "SPINORBEC_SCRATCH_DIR", "")
-    base = string(hash((time_ns(), getpid())); base = 16)
+    base = string(hash((time_ns(), getpid())); base=16)
     dir = isempty(scratch) ? tempdir() : scratch
     isdir(dir) || mkpath(dir)
     joinpath(dir, "spinorbec_snaps_" * base * ".jld2")
@@ -803,29 +859,37 @@ function _parse_light_shift(raw, F::Int, V_trap, backend::AbstractBackend)
         eta_t = Float64(raw["eta_tensor"])
         eta_v = Float64(get(raw, "eta_vector", 0.0))
         pol_raw = get(raw, "polarization", [0, 0, 1])
-        pol = NTuple{3,Float64}(Tuple(Float64.(pol_raw)))
-        V_trap === nothing && throw(ArgumentError("light_shift.eta_tensor requires a trap potential (V_trap)"))
-        return make_light_shift_from_trap(V_trap, F, eta_t; eta_vector = eta_v, polarization = pol, backend)
+        pol = NTuple{3, Float64}(Tuple(Float64.(pol_raw)))
+        V_trap === nothing &&
+            throw(ArgumentError("light_shift.eta_tensor requires a trap potential (V_trap)"))
+        return make_light_shift_from_trap(
+            V_trap, F, eta_t; eta_vector=eta_v, polarization=pol, backend
+        )
     end
     alpha_t = Float64(get(raw, "alpha_tensor", 0.0))
     alpha_v = Float64(get(raw, "alpha_vector", 0.0))
     pol_raw = get(raw, "polarization", [0, 0, 1])
-    pol = NTuple{3,Float64}(Tuple(Float64.(pol_raw)))
+    pol = NTuple{3, Float64}(Tuple(Float64.(pol_raw)))
     if haskey(raw, "profile")
-        throw(ArgumentError("light_shift.profile from YAML not yet supported; use eta_tensor with trap or pass LightShift from Julia"))
+        throw(
+            ArgumentError(
+                "light_shift.profile from YAML not yet supported; use eta_tensor with trap or pass LightShift from Julia",
+            ),
+        )
     end
     nothing
 end
 
-function _run_step(step::AnalyzeStep, psi, grid, atom, ws_prev; verbose=true, checkpoint_dir=nothing,
-                    pipeline_results::Dict{Symbol,Any} = Dict{Symbol,Any}())
+function _run_step(step::AnalyzeStep, psi, grid, atom, ws_prev; verbose=true,
+    checkpoint_dir=nothing,
+    pipeline_results::Dict{Symbol, Any}=Dict{Symbol, Any}())
     psi !== nothing || throw(ArgumentError("analyze step requires psi from preceding steps"))
-    results = Dict{Symbol,Any}()
+    results = Dict{Symbol, Any}()
 
     for (name, params) in step.analyzers
         verbose && print("  $name... ")
         result = _run_analyzer(name, psi, grid, atom, params;
-                                ws_prev = ws_prev, pipeline_results = pipeline_results)
+            ws_prev=ws_prev, pipeline_results=pipeline_results)
         results[name] = result
         verbose && println("done")
     end

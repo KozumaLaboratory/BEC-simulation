@@ -23,7 +23,7 @@ as an `on_step` callback during `run_simulation!` / dynamics.
 """
 function apply_photon_scattering!(
     ws::Workspace{N}, Γ_sc::Real, dt::Real;
-    seed::Union{Nothing,Int} = nothing,
+    seed::Union{Nothing, Int}=nothing,
 ) where {N}
     σ = sqrt(Float64(Γ_sc) * Float64(dt))
     σ <= 0 && return nothing
@@ -38,9 +38,9 @@ function apply_photon_scattering!(
     # grids, a GPU-native generator (CUDA.rand!) would be faster but
     # requires the CUDA extension.
     phase_host = randn(rng, Float64, n_pts) .* σ
-    phase_dev  = _to_device(ws.backend, phase_host)
+    phase_dev = _to_device(ws.backend, phase_host)
 
-    for c = 1:D
+    for c in 1:D
         idx = _component_slice(N, n_pts, c)
         psi_c = view(psi, idx...)
         @. psi_c = psi_c * cis(phase_dev)
@@ -54,12 +54,12 @@ end
 `on_step` callback that applies phase-diffusion noise after every step.
 """
 function photon_scattering_callback(Γ_sc::Real, dt::Real;
-                                     seed::Union{Nothing,Int} = nothing)
+    seed::Union{Nothing, Int}=nothing)
     # Accept SimulationCallbacks 4-arg `(ws, step, times, energies)` as well
     # as the older 3-arg `(ws, step, n_steps)` direct-callable convention.
     function (ws, step, args...)
         apply_photon_scattering!(ws, Γ_sc, dt;
-                                 seed = seed === nothing ? nothing : seed + step)
+            seed=seed === nothing ? nothing : seed + step)
         nothing
     end
 end

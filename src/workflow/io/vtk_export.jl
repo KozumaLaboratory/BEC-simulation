@@ -9,20 +9,21 @@ Available fields: `:density`, `:current`, `:spin_density`, `:velocity`,
 function export_vtk(
     psi::AbstractArray{<:Complex},
     grid::Grid{3};
-    output::String = "bec",
-    fields::Vector{Symbol} = [:density, :current, :spin_density, :velocity],
-    atom::Union{Nothing,AtomSpecies} = nothing,
+    output::String="bec",
+    fields::Vector{Symbol}=[:density, :current, :spin_density, :velocity],
+    atom::Union{Nothing, AtomSpecies}=nothing,
 )
     n_pts = ntuple(d -> size(psi, d), 3)
     n_comp = size(psi, 4)
     F = atom !== nothing ? atom.F : div(n_comp - 1, 2)
 
-    x_ranges = ntuple(d -> range(grid.x[d][1], grid.x[d][end]; length = n_pts[d]), 3)
+    x_ranges = ntuple(d -> range(grid.x[d][1], grid.x[d][end]; length=n_pts[d]), 3)
 
     plans = nothing
     sm = nothing
 
-    _ensure_plans() = plans === nothing ? (plans = make_fft_plans(n_pts; flags = FFTW.ESTIMATE)) : plans
+    _ensure_plans() =
+        plans === nothing ? (plans = make_fft_plans(n_pts; flags=FFTW.ESTIMATE)) : plans
     _ensure_sm() = sm === nothing ? (sm = spin_matrices(F)) : sm
 
     paths = WriteVTK.vtk_grid(output, x_ranges...) do vtk
@@ -64,10 +65,10 @@ Export time series from SimulationResult as `.pvd` collection + per-frame `.vti`
 function export_vtk_series(
     result::SimulationResult,
     grid::Grid{3};
-    output_dir::String = "vtk_output",
-    fields::Vector{Symbol} = [:density, :current, :spin_density],
-    atom::Union{Nothing,AtomSpecies} = nothing,
-    stride::Int = 1,
+    output_dir::String="vtk_output",
+    fields::Vector{Symbol}=[:density, :current, :spin_density],
+    atom::Union{Nothing, AtomSpecies}=nothing,
+    stride::Int=1,
 )
     mkpath(output_dir)
 
@@ -82,13 +83,13 @@ function export_vtk_series(
     needs_sm = :spin_density in fields
 
     if needs_plans
-        plans = make_fft_plans(n_pts; flags = FFTW.ESTIMATE)
+        plans = make_fft_plans(n_pts; flags=FFTW.ESTIMATE)
     end
     if needs_sm
         sm = spin_matrices(F)
     end
 
-    x_ranges = ntuple(d -> range(grid.x[d][1], grid.x[d][end]; length = n_pts[d]), 3)
+    x_ranges = ntuple(d -> range(grid.x[d][1], grid.x[d][end]; length=n_pts[d]), 3)
 
     pvd = WriteVTK.paraview_collection(joinpath(output_dir, "series"))
     try
@@ -131,5 +132,5 @@ function export_vtk_series(
 end
 
 function export_vtk(ws::Workspace; kwargs...)
-    export_vtk(Array(ws.state.psi), ws.grid; atom = ws.atom, kwargs...)
+    export_vtk(Array(ws.state.psi), ws.grid; atom=ws.atom, kwargs...)
 end

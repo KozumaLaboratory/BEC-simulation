@@ -24,22 +24,22 @@ callbacks = SimulationCallbacks(
 result = run_simulation!(ws, callbacks=callbacks)
 ```
 """
-struct SimulationCallbacks{F1,F2,F3}
+struct SimulationCallbacks{F1, F2, F3}
     on_step::F1
     on_snapshot::F2
     on_complete::F3
 end
 
 SimulationCallbacks(;
-    on_step = nothing,
-    on_snapshot = nothing,
-    on_complete = nothing,
-) = SimulationCallbacks{typeof(on_step),typeof(on_snapshot),typeof(on_complete)}(
+on_step=nothing,
+on_snapshot=nothing,
+on_complete=nothing
+) = SimulationCallbacks{typeof(on_step), typeof(on_snapshot), typeof(on_complete)}(
     on_step, on_snapshot, on_complete)
 
 # Backward compatibility: convert simple function to callbacks
 _normalize_callbacks(::Nothing) = SimulationCallbacks()
-_normalize_callbacks(f::Function) = SimulationCallbacks(on_snapshot = f)
+_normalize_callbacks(f::Function) = SimulationCallbacks(on_snapshot=f)
 _normalize_callbacks(c::SimulationCallbacks) = c
 
 function _record_snapshot!(
@@ -50,7 +50,7 @@ function _record_snapshot!(
     snapshots,
     ws,
     sys;
-    keep_psi::Bool = true,
+    keep_psi::Bool=true,
 )
     push!(times, ws.state.t)
     push!(energies, total_energy(ws))
@@ -107,10 +107,10 @@ result = run_simulation!(ws, callbacks=callbacks)
 """
 function run_simulation!(
     ws::Workspace{N};
-    callback::Union{Nothing,Function} = nothing,
-    callbacks::Union{Nothing,SimulationCallbacks} = nothing,
-    live_monitor::Union{Nothing,LiveMonitor} = nothing,
-    stream_snapshots::Bool = false,
+    callback::Union{Nothing, Function}=nothing,
+    callbacks::Union{Nothing, SimulationCallbacks}=nothing,
+    live_monitor::Union{Nothing, LiveMonitor}=nothing,
+    stream_snapshots::Bool=false,
 ) where {N}
     sp = ws.sim_params
     sys = ws.spin_matrices.system
@@ -130,7 +130,7 @@ function run_simulation!(
     snapshots = Array{ComplexF64}[]
     _record_snapshot!(
         times, energies, norms, mags, snapshots, ws, sys;
-        keep_psi = !stream_snapshots,
+        keep_psi=(!stream_snapshots),
     )
 
     if it
@@ -183,12 +183,12 @@ function _run_simulation_standard!(
     mags,
     snapshots,
     callbacks::SimulationCallbacks,
-    live_monitor::Union{Nothing,LiveMonitor};
-    stream_snapshots::Bool = false,
+    live_monitor::Union{Nothing, LiveMonitor};
+    stream_snapshots::Bool=false,
 ) where {N}
     t_start = time()
     try
-        for step = 1:sp.n_steps
+        for step in 1:sp.n_steps
             split_step!(ws)
 
             if callbacks.on_step !== nothing
@@ -202,7 +202,7 @@ function _run_simulation_standard!(
             if step % sp.save_every == 0
                 _record_snapshot!(
                     times, energies, norms, mags, snapshots, ws, sys;
-                    keep_psi = !stream_snapshots,
+                    keep_psi=(!stream_snapshots),
                 )
 
                 elapsed = time() - t_start
@@ -225,10 +225,14 @@ function _run_simulation_standard!(
         if e isa InterruptException
             _record_snapshot!(
                 times, energies, norms, mags, snapshots, ws, sys;
-                keep_psi = !stream_snapshots,
+                keep_psi=(!stream_snapshots),
             )
-            println("\n  Simulation interrupted at step $(ws.state.step)/$(sp.n_steps), t=$(round(ws.state.t; sigdigits=6))")
-            println("  Final snapshot saved. Use run_simulation_checkpointed! with resume=true to continue.")
+            println(
+                "\n  Simulation interrupted at step $(ws.state.step)/$(sp.n_steps), t=$(round(ws.state.t; sigdigits=6))",
+            )
+            println(
+                "  Final snapshot saved. Use run_simulation_checkpointed! with resume=true to continue.",
+            )
             flush(stdout)
         else
             rethrow(e)
@@ -255,8 +259,8 @@ function _run_simulation_leapfrog!(
     mags,
     snapshots,
     callbacks::SimulationCallbacks,
-    live_monitor::Union{Nothing,LiveMonitor};
-    stream_snapshots::Bool = false,
+    live_monitor::Union{Nothing, LiveMonitor};
+    stream_snapshots::Bool=false,
 ) where {N}
     dt = sp.dt
     n_comp = sys.n_components
@@ -264,10 +268,12 @@ function _run_simulation_leapfrog!(
     omega = sp.rotating_frame_omega
     cc = ws.coriolis_cache
 
-    _half_potential_step!(ws, dt / 2, n_comp, N, false; t_eval = ws.state.t + dt / 4, t_start = ws.state.t)
+    _half_potential_step!(
+        ws, dt / 2, n_comp, N, false; t_eval=(ws.state.t + dt / 4), t_start=ws.state.t
+    )
 
     try
-        for step = 1:sp.n_steps
+        for step in 1:sp.n_steps
             _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, false, cc)
             apply_kinetic_step_batched!(ws.state.psi, bk)
             _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, false, cc)
@@ -279,9 +285,13 @@ function _run_simulation_leapfrog!(
             t_now = ws.state.t
 
             if need_split
-                _half_potential_step!(ws, dt / 2, n_comp, N, false; t_eval = t_now + 3dt / 4, t_start = t_now + dt / 2)
+                _half_potential_step!(
+                    ws, dt / 2, n_comp, N, false; t_eval=t_now + 3dt / 4, t_start=t_now + dt / 2
+                )
             else
-                _half_potential_step!(ws, dt, n_comp, N, false; t_eval = t_now + dt, t_start = t_now + dt / 2)
+                _half_potential_step!(
+                    ws, dt, n_comp, N, false; t_eval=t_now + dt, t_start=t_now + dt / 2
+                )
             end
 
             if ws.loss !== nothing
@@ -302,7 +312,7 @@ function _run_simulation_leapfrog!(
             if is_save
                 _record_snapshot!(
                     times, energies, norms, mags, snapshots, ws, sys;
-                    keep_psi = !stream_snapshots,
+                    keep_psi=(!stream_snapshots),
                 )
 
                 if callbacks.on_snapshot !== nothing
@@ -312,19 +322,27 @@ function _run_simulation_leapfrog!(
             end
 
             if need_split && !is_last
-                _half_potential_step!(ws, dt / 2, n_comp, N, false; t_eval = ws.state.t + dt / 4, t_start = ws.state.t)
+                _half_potential_step!(
+                    ws, dt / 2, n_comp, N, false; t_eval=(ws.state.t + dt / 4), t_start=ws.state.t
+                )
             end
         end
     catch e
         if e isa InterruptException
             # Close the open half-step so psi is in a valid Strang-split state
-            _half_potential_step!(ws, dt / 2, n_comp, N, false; t_eval = ws.state.t + dt / 4, t_start = ws.state.t)
+            _half_potential_step!(
+                ws, dt / 2, n_comp, N, false; t_eval=(ws.state.t + dt / 4), t_start=ws.state.t
+            )
             _record_snapshot!(
                 times, energies, norms, mags, snapshots, ws, sys;
-                keep_psi = !stream_snapshots,
+                keep_psi=(!stream_snapshots),
             )
-            println("\n  Simulation interrupted at step $(ws.state.step)/$(sp.n_steps), t=$(round(ws.state.t; sigdigits=6))")
-            println("  Final snapshot saved. Use run_simulation_checkpointed! with resume=true to continue.")
+            println(
+                "\n  Simulation interrupted at step $(ws.state.step)/$(sp.n_steps), t=$(round(ws.state.t; sigdigits=6))",
+            )
+            println(
+                "  Final snapshot saved. Use run_simulation_checkpointed! with resume=true to continue.",
+            )
             flush(stdout)
         else
             rethrow(e)
@@ -334,18 +352,18 @@ end
 
 function run_simulation_checkpointed!(
     ws::Workspace{N};
-    checkpoint_dir::String = "checkpoints",
-    checkpoint_every::Int = 1000,
-    callback::Union{Nothing,Function} = nothing,
-    callbacks::Union{Nothing,SimulationCallbacks} = nothing,
-    resume::Bool = false,
+    checkpoint_dir::String="checkpoints",
+    checkpoint_every::Int=1000,
+    callback::Union{Nothing, Function}=nothing,
+    callbacks::Union{Nothing, SimulationCallbacks}=nothing,
+    resume::Bool=false,
 ) where {N}
     mkpath(checkpoint_dir)
 
     if resume
         existing = filter(
             f -> startswith(basename(f), "step_") && endswith(f, ".jld2"),
-            readdir(checkpoint_dir, join = true),
+            readdir(checkpoint_dir; join=true),
         )
         if !isempty(existing)
             sort!(existing)
@@ -362,8 +380,8 @@ function run_simulation_checkpointed!(
     remaining <= 0 && return run_simulation!(ws; callback, callbacks)
 
     # Create checkpoint callback compatible with new signature
-    checkpoint_callbacks = SimulationCallbacks(
-        on_snapshot = function (ws_cb, step, snapshot)
+    checkpoint_callbacks = SimulationCallbacks(;
+        on_snapshot=function (ws_cb, step, snapshot)
             global_step = start_step + step
             if global_step % checkpoint_every == 0
                 fname = joinpath(checkpoint_dir, "step_$(lpad(global_step, 8, '0')).jld2")
@@ -378,8 +396,8 @@ function run_simulation_checkpointed!(
                 callbacks.on_snapshot(ws_cb, step, snapshot)
             end
         end,
-        on_step = callbacks !== nothing ? callbacks.on_step : nothing,
-        on_complete = callbacks !== nothing ? callbacks.on_complete : nothing,
+        on_step=callbacks !== nothing ? callbacks.on_step : nothing,
+        on_complete=callbacks !== nothing ? callbacks.on_complete : nothing,
     )
 
     sp_orig = ws.sim_params
@@ -393,7 +411,7 @@ function run_simulation_checkpointed!(
 
     ws_remain = _rebuild_workspace(ws; sim_params=sp_remain)
 
-    result = run_simulation!(ws_remain; callbacks = checkpoint_callbacks)
+    result = run_simulation!(ws_remain; callbacks=checkpoint_callbacks)
 
     ws.state.t = ws_remain.state.t
     ws.state.step = start_step + remaining

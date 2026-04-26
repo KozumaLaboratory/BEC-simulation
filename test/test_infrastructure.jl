@@ -176,30 +176,44 @@
     end
 
     @testset "YAML potential builder" begin
-        pc = SpinorBEC.PotentialConfig(:ring, Dict{String,Any}("radius" => 5.0, "strength" => 50.0, "width" => 1.0))
+        pc = SpinorBEC.PotentialConfig(
+            :ring, Dict{String, Any}("radius" => 5.0, "strength" => 50.0, "width" => 1.0)
+        )
         pot = SpinorBEC._build_potential(pc, 2)
         @test pot isa RingPotential{2}
 
-        pc2 = SpinorBEC.PotentialConfig(:box, Dict{String,Any}("size" => [10.0, 10.0]))
+        pc2 = SpinorBEC.PotentialConfig(:box, Dict{String, Any}("size" => [10.0, 10.0]))
         pot2 = SpinorBEC._build_potential(pc2, 2)
         @test pot2 isa BoxPotential{2}
 
-        pc3 = SpinorBEC.PotentialConfig(:double_well, Dict{String,Any}("separation" => 4.0, "barrier" => 10.0))
+        pc3 = SpinorBEC.PotentialConfig(
+            :double_well, Dict{String, Any}("separation" => 4.0, "barrier" => 10.0)
+        )
         pot3 = SpinorBEC._build_potential(pc3, 1)
         @test pot3 isa DoubleWellPotential{1}
     end
 
     @testset "YAML waveform builder" begin
-        wf = SpinorBEC._make_waveform(Dict("sinusoidal" => Dict("center" => 1.0, "amplitude" => 2.0, "frequency" => 10.0)), 1.0)
+        wf = SpinorBEC._make_waveform(
+            Dict("sinusoidal" => Dict("center" => 1.0, "amplitude" => 2.0, "frequency" => 10.0)),
+            1.0,
+        )
         @test wf isa SinusoidalWaveform
 
-        wf2 = SpinorBEC._make_waveform(Dict("gaussian_pulse" => Dict("amplitude" => 5.0, "sigma" => 0.01)), 1.0)
+        wf2 = SpinorBEC._make_waveform(
+            Dict("gaussian_pulse" => Dict("amplitude" => 5.0, "sigma" => 0.01)), 1.0
+        )
         @test wf2 isa GaussianPulseWaveform
 
-        wf3 = SpinorBEC._make_waveform(Dict("piecewise" => Dict("times" => [0.0, 1.0], "values" => [0.0, 1.0])), 1.0)
+        wf3 = SpinorBEC._make_waveform(
+            Dict("piecewise" => Dict("times" => [0.0, 1.0], "values" => [0.0, 1.0])), 1.0
+        )
         @test wf3 isa PiecewiseLinearWaveform
 
-        wf4 = SpinorBEC._make_waveform(Dict("interpolated" => Dict("times" => [0.0, 0.5, 1.0], "values" => [0.0, 1.0, 0.0])), 1.0)
+        wf4 = SpinorBEC._make_waveform(
+            Dict("interpolated" => Dict("times" => [0.0, 0.5, 1.0], "values" => [0.0, 1.0, 0.0])),
+            1.0,
+        )
         @test wf4 isa InterpolatedWaveform
     end
 
@@ -294,7 +308,7 @@
             "gaussian_wavepacket", "domain_wall", "two_packet",
         ]
         for s in all_states
-            d = Dict{String,Any}(
+            d = Dict{String, Any}(
                 "atom" => "Rb87", "grid" => Dict("n" => 32, "box" => 10.0),
                 "dt" => 0.005, "n_steps" => 100, "tol" => 1e-6,
                 "initial_state" => s,
@@ -304,7 +318,7 @@
     end
 
     @testset "YAML integration: schema validates dynamics new fields" begin
-        d = Dict{String,Any}(
+        d = Dict{String, Any}(
             "duration" => 1.0, "dt" => 0.001,
             "raman" => Dict("k_eff" => [1.0], "Omega_R" => 1.0),
             "absorbing_boundary" => Dict("strength" => 1.0, "width" => 2.0),
@@ -317,26 +331,28 @@
 
     @testset "YAML integration: MagneticGradient potential builder" begin
         pc = SpinorBEC.PotentialConfig(:magnetic_gradient,
-            Dict{String,Any}("gradient" => 0.5, "axis" => 1, "g_F" => 1.0))
+            Dict{String, Any}("gradient" => 0.5, "axis" => 1, "g_F" => 1.0))
         pot = SpinorBEC._build_potential(pc, 3)
         @test pot isa MagneticGradient{3}
         @test pot.gradient == 0.5
         @test pot.axis == 1
 
         pc2 = SpinorBEC.PotentialConfig(:magnetic_gradient,
-            Dict{String,Any}("gradient" => 1.0))
+            Dict{String, Any}("gradient" => 1.0))
         pot2 = SpinorBEC._build_potential(pc2, 2)
         @test pot2 isa MagneticGradient{2}
         @test pot2.axis == 2  # defaults to ndim
     end
 
     @testset "YAML integration: transverse Zeeman Bx/By" begin
-        phase_raw = Dict{String,Any}(
-            "ground_state" => Dict{String,Any}(
-                "zeeman" => Dict{String,Any}(
+        phase_raw = Dict{String, Any}(
+            "ground_state" => Dict{String, Any}(
+                "zeeman" => Dict{String, Any}(
                     "p" => 100.0, "q" => 0.5,
-                    "bx" => Dict{String,Any}("sinusoidal" => Dict{String,Any}(
-                        "amplitude" => 1.0, "frequency" => 10.0)),
+                    "bx" => Dict{String, Any}(
+                        "sinusoidal" => Dict{String, Any}(
+                            "amplitude" => 1.0, "frequency" => 10.0),
+                    ),
                     "by" => 0.5,
                 ),
             ),
@@ -348,9 +364,9 @@
     end
 
     @testset "YAML integration: transverse Zeeman static fallback" begin
-        phase_raw = Dict{String,Any}(
-            "ground_state" => Dict{String,Any}(
-                "zeeman" => Dict{String,Any}("p" => 10.0, "q" => 0.5),
+        phase_raw = Dict{String, Any}(
+            "ground_state" => Dict{String, Any}(
+                "zeeman" => Dict{String, Any}("p" => 10.0, "q" => 0.5)
             ),
         )
         zee = SpinorBEC._build_phase_zeeman(phase_raw, 0.0, 1.0)
@@ -492,7 +508,7 @@ pipeline:
             "vortex_lattice", "skyrmion_lattice",
         ]
         for s in all_states
-            d = Dict{String,Any}(
+            d = Dict{String, Any}(
                 "atom" => "Rb87", "grid" => Dict("n" => 32, "box" => 10.0),
                 "dt" => 0.005, "n_steps" => 100, "tol" => 1e-6,
                 "initial_state" => s,
@@ -521,17 +537,17 @@ pipeline:
 
     @testset "P1.2: YAML builders for new potentials" begin
         pc = SpinorBEC.PotentialConfig(:lg_beam,
-            Dict{String,Any}("power" => 1.0, "waist" => 5.0, "l_mode" => 1))
+            Dict{String, Any}("power" => 1.0, "waist" => 5.0, "l_mode" => 1))
         pot = SpinorBEC._build_potential(pc, 2)
         @test pot isa LaguerreGaussBeam{2}
 
         pc2 = SpinorBEC.PotentialConfig(:plug,
-            Dict{String,Any}("strength" => 50.0, "waist" => 2.0))
+            Dict{String, Any}("strength" => 50.0, "waist" => 2.0))
         pot2 = SpinorBEC._build_potential(pc2, 2)
         @test pot2 isa PlugBeam{2}
 
         pc3 = SpinorBEC.PotentialConfig(:shaken_lattice,
-            Dict{String,Any}("depth" => [5.0, 5.0], "period" => [4.0, 4.0]))
+            Dict{String, Any}("depth" => [5.0, 5.0], "period" => [4.0, 4.0]))
         pot3 = SpinorBEC._build_potential(pc3, 2)
         @test pot3 isa ShakenLatticePotential{2}
     end
@@ -541,38 +557,40 @@ pipeline:
         sys1 = SpinSystem(1)
         psi = init_psi(grid2d, sys1; state=:skyrmion)
 
-        r = SpinorBEC._run_analyzer(:phase_contrast_image, psi, grid2d, Rb87, Dict{String,Any}())
+        r = SpinorBEC._run_analyzer(:phase_contrast_image, psi, grid2d, Rb87, Dict{String, Any}())
         @test haskey(r, :phase_signal)
         @test size(r.phase_signal) == (32,)
 
-        r = SpinorBEC._run_analyzer(:momentum_distribution, psi, grid2d, Rb87, Dict{String,Any}())
+        r = SpinorBEC._run_analyzer(:momentum_distribution, psi, grid2d, Rb87, Dict{String, Any}())
         @test haskey(r, :momentum_density)
         @test size(r.momentum_density) == (32, 32)
 
-        r = SpinorBEC._run_analyzer(:vortex_detect, psi, grid2d, Rb87, Dict{String,Any}("component" => 1))
+        r = SpinorBEC._run_analyzer(
+            :vortex_detect, psi, grid2d, Rb87, Dict{String, Any}("component" => 1)
+        )
         @test haskey(r, :vortex_count)
         @test r.vortex_count isa Int
 
-        r = SpinorBEC._run_analyzer(:correlation_length, psi, grid2d, Rb87, Dict{String,Any}())
+        r = SpinorBEC._run_analyzer(:correlation_length, psi, grid2d, Rb87, Dict{String, Any}())
         @test haskey(r, :correlation_length)
         @test r.correlation_length >= 0.0
 
-        r = SpinorBEC._run_analyzer(:defect_density, psi, grid2d, Rb87, Dict{String,Any}())
+        r = SpinorBEC._run_analyzer(:defect_density, psi, grid2d, Rb87, Dict{String, Any}())
         @test haskey(r, :defect_density)
 
-        r = SpinorBEC._run_analyzer(:bragg_spectroscopy, psi, grid2d, Rb87, Dict{String,Any}())
+        r = SpinorBEC._run_analyzer(:bragg_spectroscopy, psi, grid2d, Rb87, Dict{String, Any}())
         @test haskey(r, :structure_factor)
         @test size(r.structure_factor) == (32, 32)
 
-        r = SpinorBEC._run_analyzer(:kibble_zurek_stats, psi, grid2d, Rb87, Dict{String,Any}())
+        r = SpinorBEC._run_analyzer(:kibble_zurek_stats, psi, grid2d, Rb87, Dict{String, Any}())
         @test haskey(r, :defect_count)
     end
 
     @testset "P1.4: Pulse sequence parse + compile" begin
         raw = [
-            Dict{String,Any}("t" => 0.0, "apply" => "zeeman", "duration" => 0.5,
-                "p" => Dict{String,Any}("from" => 0.0, "to" => 100.0)),
-            Dict{String,Any}("t" => 0.5, "apply" => "zeeman", "duration" => 0.5,
+            Dict{String, Any}("t" => 0.0, "apply" => "zeeman", "duration" => 0.5,
+                "p" => Dict{String, Any}("from" => 0.0, "to" => 100.0)),
+            Dict{String, Any}("t" => 0.5, "apply" => "zeeman", "duration" => 0.5,
                 "p" => 100.0),
         ]
         events = SpinorBEC.parse_pulse_sequence(raw, 1.0)
@@ -610,7 +628,7 @@ pipeline:
     end
 
     @testset "P1: Schema validates dynamics pulse_sequence" begin
-        d = Dict{String,Any}(
+        d = Dict{String, Any}(
             "duration" => 1.0, "dt" => 0.001,
             "pulse_sequence" => [Dict("t" => 0.0, "apply" => "zeeman")],
         )

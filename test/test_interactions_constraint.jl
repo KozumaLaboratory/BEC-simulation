@@ -1,5 +1,4 @@
 @testset "Constraint-based interactions" begin
-
     @testset "interaction_params_from_constraint basic" begin
         ip = interaction_params_from_constraint(; c_total=4689.0, c1_ratio=0.0, F=6)
         @test ip.c0 ≈ 4689.0
@@ -156,9 +155,9 @@
                 E_pair = 0.0
                 for S in 0:2:2F
                     gS = g[S]
-                    for M in -S:S
+                    for M in (-S):S
                         A = zero(ComplexF64)
-                        for m1 in -F:F
+                        for m1 in (-F):F
                             m2 = M - m1
                             abs(m2) > F && continue
                             cg_val = get(cg_table, (S, M, m1, m2), 0.0)
@@ -189,7 +188,7 @@
 
     @testset "interaction_params_from_constraint with c_extra" begin
         ip = interaction_params_from_constraint(; c_total=4689.0, c1_ratio=1.0/36, F=6,
-                                                  c_extra=[0.0, 0.0, 50.0])
+            c_extra=[0.0, 0.0, 50.0])
         @test ip.c0 + 36 * ip.c1 ≈ 4689.0 rtol=1e-12
         @test length(ip.c_extra) == 3
         @test ip.c_extra[3] ≈ 50.0

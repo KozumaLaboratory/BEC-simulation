@@ -173,7 +173,9 @@
         interactions = InteractionParams(100.0, 0.0)
         sp = SimParams(dt=0.001, n_steps=1, imaginary_time=false, normalize_every=0, save_every=1)
 
-        ws = make_workspace(; grid, atom, interactions, sim_params=sp, enable_ddi=true, c_dd=1.0, secular_ddi=true)
+        ws = make_workspace(;
+            grid, atom, interactions, sim_params=sp, enable_ddi=true, c_dd=1.0, secular_ddi=true
+        )
         @test ws.ddi !== nothing
         @test maximum(abs, ws.ddi.Q_xy) == 0.0
     end
@@ -186,7 +188,9 @@
         trap = HarmonicTrap(1.0, 1.0, 1.0)
         sp = SimParams(dt=0.001, n_steps=10, imaginary_time=false, normalize_every=0, save_every=10)
 
-        ws = make_workspace(; grid, atom, interactions, potential=trap, sim_params=sp, enable_ddi=true, c_dd=1.0)
+        ws = make_workspace(;
+            grid, atom, interactions, potential=trap, sim_params=sp, enable_ddi=true, c_dd=1.0
+        )
 
         @test ws.ddi !== nothing
         @test ws.ddi_bufs !== nothing
@@ -229,13 +233,17 @@
         @testset "quasi_2d on 1D grid → ArgumentError" begin
             config = GridConfig(16, 10.0)
             grid = make_grid(config)
-            @test_throws ArgumentError make_ddi_params(grid, Eu151; c_dd=1.0, quasi_2d=true, l_z=1.0)
+            @test_throws ArgumentError make_ddi_params(
+                grid, Eu151; c_dd=1.0, quasi_2d=true, l_z=1.0
+            )
         end
 
         @testset "quasi_2d with l_z=0 → ArgumentError" begin
             config = GridConfig((16, 16), (10.0, 10.0))
             grid = make_grid(config)
-            @test_throws ArgumentError make_ddi_params(grid, Eu151; c_dd=1.0, quasi_2d=true, l_z=0.0)
+            @test_throws ArgumentError make_ddi_params(
+                grid, Eu151; c_dd=1.0, quasi_2d=true, l_z=0.0
+            )
         end
 
         @testset "quasi-2D Q_zz at k=0 is 2/3" begin
@@ -251,6 +259,8 @@
         grid = make_grid(config)
         interactions = InteractionParams(1.0, 0.0)
         sp = SimParams(dt=0.001, n_steps=1, imaginary_time=false, normalize_every=0, save_every=1)
-        @test_throws ArgumentError make_workspace(; grid, atom=Eu151, interactions, sim_params=sp, enable_ddi=true)
+        @test_throws ArgumentError make_workspace(;
+            grid, atom=Eu151, interactions, sim_params=sp, enable_ddi=true
+        )
     end
 end

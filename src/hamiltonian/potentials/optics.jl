@@ -16,7 +16,7 @@ function OpticalBeam(;
     wavelength::Float64,
     power::Float64,
     waist::Float64,
-    M2::Float64 = 1.0,
+    M2::Float64=1.0,
 )
     z_R = π * waist^2 / (M2 * wavelength)
     OpticalBeam(im * z_R, wavelength, power, M2)
@@ -61,12 +61,12 @@ end
 # --- ABCD Matrix Propagation ---
 
 """Propagate beam through an ABCD matrix [A B; C D]."""
-function propagate(beam::OpticalBeam, M::SMatrix{2,2,Float64})
+function propagate(beam::OpticalBeam, M::SMatrix{2, 2, Float64})
     q_new = (M[1, 1] * beam.q + M[1, 2]) / (M[2, 1] * beam.q + M[2, 2])
     OpticalBeam(q_new, beam.wavelength, beam.power, beam.M2)
 end
 
-function propagate(beam::OpticalBeam, Ms::AbstractVector{<:SMatrix{2,2,Float64}})
+function propagate(beam::OpticalBeam, Ms::AbstractVector{<:SMatrix{2, 2, Float64}})
     b = beam
     for M in Ms
         b = propagate(b, M)
@@ -74,13 +74,13 @@ function propagate(beam::OpticalBeam, Ms::AbstractVector{<:SMatrix{2,2,Float64}}
     b
 end
 
-abcd_free_space(d::Float64) = SMatrix{2,2,Float64}(1.0, 0.0, d, 1.0)
+abcd_free_space(d::Float64) = SMatrix{2, 2, Float64}(1.0, 0.0, d, 1.0)
 
-abcd_thin_lens(f::Float64) = SMatrix{2,2,Float64}(1.0, -1.0 / f, 0.0, 1.0)
+abcd_thin_lens(f::Float64) = SMatrix{2, 2, Float64}(1.0, -1.0 / f, 0.0, 1.0)
 
-abcd_curved_mirror(R::Float64) = SMatrix{2,2,Float64}(1.0, -2.0 / R, 0.0, 1.0)
+abcd_curved_mirror(R::Float64) = SMatrix{2, 2, Float64}(1.0, -2.0 / R, 0.0, 1.0)
 
-abcd_flat_mirror() = SMatrix{2,2,Float64}(1.0, 0.0, 0.0, 1.0)
+abcd_flat_mirror() = SMatrix{2, 2, Float64}(1.0, 0.0, 0.0, 1.0)
 
 # --- Mode Overlap (Fiber Coupling) ---
 
@@ -91,7 +91,7 @@ Coupling efficiency between two Gaussian beams (mode overlap).
 For two Gaussian beams with waists w₁, w₂ and lateral offset Δr:
 η = (2w₁w₂/(w₁²+w₂²))² × exp(-2Δr²/(w₁²+w₂²))
 """
-function mode_overlap(beam1::OpticalBeam, beam2::OpticalBeam; lateral_offset::Float64 = 0.0)
+function mode_overlap(beam1::OpticalBeam, beam2::OpticalBeam; lateral_offset::Float64=0.0)
     w1 = waist_radius(beam1)
     w2 = waist_radius(beam2)
     w_sum_sq = w1^2 + w2^2
@@ -105,10 +105,9 @@ Coupling efficiency into a single-mode fiber with given mode field diameter.
 function fiber_coupling(
     beam::OpticalBeam,
     fiber_mfd::Float64;
-    lateral_offset::Float64 = 0.0,
+    lateral_offset::Float64=0.0,
 )
     w_fiber = fiber_mfd / 2
-    fiber_beam =
-        OpticalBeam(; wavelength = beam.wavelength, power = 1.0, waist = w_fiber, M2 = 1.0)
+    fiber_beam = OpticalBeam(; wavelength=beam.wavelength, power=1.0, waist=w_fiber, M2=1.0)
     mode_overlap(beam, fiber_beam; lateral_offset)
 end

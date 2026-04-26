@@ -19,8 +19,7 @@ function _spin_mixing_period_core(ac1::Float64, q::Float64)
     2.0 / ac1 * _elliptic_k(ratio)
 end
 
-spin_mixing_period(c1_tilde::Float64, q::Float64) =
-    _spin_mixing_period_core(abs(c1_tilde), q)
+spin_mixing_period(c1_tilde::Float64, q::Float64) = _spin_mixing_period_core(abs(c1_tilde), q)
 
 spin_mixing_period_si(c1_tilde_si::Float64, q_si::Float64) =
     Units.HBAR * _spin_mixing_period_core(abs(c1_tilde_si), q_si)
@@ -39,7 +38,7 @@ Throws if `Delta_E_hf` is zero (unknown).
 function compute_quadratic_zeeman(atom::AtomSpecies, B::Float64)
     atom.Delta_E_hf > 0 || throw(
         ArgumentError(
-            "Delta_E_hf unknown for $(atom.name); set it or use quadratic_zeeman_from_field directly",
+            "Delta_E_hf unknown for $(atom.name); set it or use quadratic_zeeman_from_field directly"
         ),
     )
     quadratic_zeeman_from_field(atom.g_F, B, atom.Delta_E_hf)
@@ -112,11 +111,11 @@ function phase_diagram_point(;
     xi_sp = healing_length_spin(mass, c1_density, n)
     xi_dd = healing_length_ddi(mass, C_dd, n)
     (
-        R_TF_over_xi_sp = R_TF / xi_sp,
-        R_TF_over_xi_dd = R_TF / xi_dd,
-        xi_sp = xi_sp,
-        xi_dd = xi_dd,
-        R_TF = R_TF,
+        R_TF_over_xi_sp=R_TF / xi_sp,
+        R_TF_over_xi_dd=R_TF / xi_dd,
+        xi_sp=xi_sp,
+        xi_dd=xi_dd,
+        R_TF=R_TF,
     )
 end
 
@@ -141,12 +140,12 @@ Usage:
     run_simulation!(ws; callback=cb)
     # mon.t, mon.E, mon.N, mon.Sz now contain time series
 """
-function make_conservation_monitor(ws::Workspace{N}; track_Jz::Bool = false) where {N}
+function make_conservation_monitor(ws::Workspace{N}; track_Jz::Bool=false) where {N}
     sys = ws.spin_matrices.system
     grid = ws.grid
     plans = ws.fft_plans
 
-    data = (t = Float64[], E = Float64[], N = Float64[], Sz = Float64[], Jz = Float64[])
+    data = (t=Float64[], E=Float64[], N=Float64[], Sz=Float64[], Jz=Float64[])
 
     function callback(ws_cb, step)
         push!(data.t, ws_cb.state.t)
@@ -171,7 +170,7 @@ function component_populations(
     dV = cell_volume(grid)
     n_pts = ntuple(d -> size(psi, d), N)
     pops = Vector{Float64}(undef, sys.n_components)
-    for c = 1:sys.n_components
+    for c in 1:sys.n_components
         idx = _component_slice(N, n_pts, c)
         pops[c] = sum(abs2, view(psi, idx...)) * dV
     end
@@ -179,7 +178,7 @@ function component_populations(
     if total > 0
         pops ./= total
     end
-    (populations = pops, m_values = copy(sys.m_values))
+    (populations=pops, m_values=copy(sys.m_values))
 end
 
 """
@@ -191,8 +190,8 @@ Returns `(frequencies, power)` using rfft. Applies windowing to reduce spectral 
 function power_spectrum(
     times::Vector{Float64},
     signal::Vector{Float64};
-    window::Symbol = :hanning,
-    pad_factor::Int = 1,
+    window::Symbol=:hanning,
+    pad_factor::Int=1,
 )
     N_sig = length(times)
     length(signal) == N_sig ||
@@ -203,9 +202,9 @@ function power_spectrum(
     dt = times[2] - times[1]
     dt > 0 || throw(ArgumentError("times must be increasing"))
 
-    max_dt_var = maximum(abs(times[i+1] - times[i] - dt) for i = 1:(N_sig-1))
+    max_dt_var = maximum(abs(times[i + 1] - times[i] - dt) for i in 1:(N_sig - 1))
     max_dt_var / dt < 1e-6 || throw(
-        ArgumentError("times must be uniformly spaced (max variation = $(max_dt_var))"),
+        ArgumentError("times must be uniformly spaced (max variation = $(max_dt_var))")
     )
 
     w = if window === :hanning
@@ -230,13 +229,13 @@ function power_spectrum(
 
     freqs = FFTW.rfftfreq(n_pad, 1.0 / dt)
 
-    (frequencies = collect(freqs), power = collect(power))
+    (frequencies=collect(freqs), power=collect(power))
 end
 
 function _hanning_window(N::Int)
-    [0.5 * (1 - cos(2π * i / (N - 1))) for i = 0:(N-1)]
+    [0.5 * (1 - cos(2π * i / (N - 1))) for i in 0:(N - 1)]
 end
 
 function _hamming_window(N::Int)
-    [0.54 - 0.46 * cos(2π * i / (N - 1)) for i = 0:(N-1)]
+    [0.54 - 0.46 * cos(2π * i / (N - 1)) for i in 0:(N - 1)]
 end

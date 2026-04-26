@@ -42,7 +42,7 @@ function safe_parse_quantity(s::AbstractString)
     # "0.819 G" → "0.819*G", "50 rad/s" → "50*rad/s".
     s_clean = replace(strip(s), r"(?<=[\d\.)])\s+(?=[a-zA-Zπμ])" => "*")
     try
-        return Unitful.uparse(s_clean; unit_context = Unitful)
+        return Unitful.uparse(s_clean; unit_context=Unitful)
     catch e
         throw(ArgumentError("failed to parse unit string '$s': $e"))
     end
@@ -63,8 +63,9 @@ function bfield_to_p(B::Quantity, g_F::Real, omega_ref::Real)
     B_T = ustrip(u"T", B)
     g_F * BOHR_MAGNETON * B_T / (HBAR * omega_ref)
 end
-bfield_to_p(B::Real, g_F::Real, omega_ref::Real) =
-    bfield_to_p(Float64(B) * u"Gauss", g_F, omega_ref)
+bfield_to_p(B::Real, g_F::Real, omega_ref::Real) = bfield_to_p(
+    Float64(B) * u"Gauss", g_F, omega_ref
+)
 
 """
     freq_to_angular(f) -> Float64 (rad/s)

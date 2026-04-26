@@ -11,7 +11,7 @@ using Random
 using SpecialFunctions: erf
 
 # Matérn-5/2 kernel — smoother than RBF, suits physics objectives.
-function _matern52(x, y; ℓ::Float64 = 1.0, σ²::Float64 = 1.0)
+function _matern52(x, y; ℓ::Float64=1.0, σ²::Float64=1.0)
     r = sqrt(sum(((x .- y) ./ ℓ) .^ 2))
     σ² * (1 + sqrt(5) * r + 5/3 * r^2) * exp(-sqrt(5) * r)
 end
@@ -26,16 +26,16 @@ function gp_predict(
     X_train::AbstractMatrix{<:Real},
     y_train::AbstractVector{<:Real},
     X_test::AbstractMatrix{<:Real};
-    ℓ::Float64 = 1.0,
-    σ²::Float64 = 1.0,
-    σ_noise::Float64 = 1e-3,
+    ℓ::Float64=1.0,
+    σ²::Float64=1.0,
+    σ_noise::Float64=1e-3,
 )
     n, d = size(X_train)
     m = size(X_test, 1)
     K11 = [_matern52(X_train[i, :], X_train[j, :]; ℓ, σ²) for i in 1:n, j in 1:n]
     K11 .+= σ_noise^2 .* IDENT(n)
-    K12 = [_matern52(X_train[i, :], X_test[j, :]; ℓ, σ²)  for i in 1:n, j in 1:m]
-    K22 = [_matern52(X_test[i, :], X_test[j, :]; ℓ, σ²)   for i in 1:m, j in 1:m]
+    K12 = [_matern52(X_train[i, :], X_test[j, :]; ℓ, σ²) for i in 1:n, j in 1:m]
+    K22 = [_matern52(X_test[i, :], X_test[j, :]; ℓ, σ²) for i in 1:m, j in 1:m]
     L = cholesky(Symmetric(K11)).L
     α = L' \ (L \ y_train)
     μ = K12' * α
@@ -50,7 +50,7 @@ end
 
 EI acquisition function. Higher value = better candidate.
 """
-function expected_improvement(μ, σ², y_best; minimise::Bool = true)
+function expected_improvement(μ, σ², y_best; minimise::Bool=true)
     σ = sqrt.(σ²)
     Δ = minimise ? (y_best .- μ) : (μ .- y_best)
     z = Δ ./ max.(σ, 1e-12)
@@ -77,14 +77,14 @@ significant compute savings vs a grid sweep.
 """
 function bayesian_optimize(
     eval_fn::Function,
-    bounds::Vector{Tuple{Float64,Float64}};
-    n_init::Int = 5,
-    n_iter::Int = 25,
-    minimise::Bool = true,
-    ℓ::Union{Nothing,Float64} = nothing,
-    n_grid::Int = 100,
-    seed::Int = 42,
-    verbose::Bool = true,
+    bounds::Vector{Tuple{Float64, Float64}};
+    n_init::Int=5,
+    n_iter::Int=25,
+    minimise::Bool=true,
+    ℓ::Union{Nothing, Float64}=nothing,
+    n_grid::Int=100,
+    seed::Int=42,
+    verbose::Bool=true,
 )
     d = length(bounds)
     rng = MersenneTwister(seed)
@@ -100,28 +100,30 @@ function bayesian_optimize(
 
     # Default length scale: 30% of box width
     ℓ_use = ℓ === nothing ?
-        mean(bounds[j][2] - bounds[j][1] for j in 1:d) * 0.3 : ℓ
+            mean(bounds[j][2] - bounds[j][1] for j in 1:d) * 0.3 : ℓ
 
     # Pre-build candidate mesh
-    axis_grids = [collect(range(b[1], b[2]; length = n_grid)) for b in bounds]
+    axis_grids = [collect(range(b[1], b[2]; length=n_grid)) for b in bounds]
 
     for it in 1:n_iter
         y_best = minimise ? minimum(y) : maximum(y)
         # Evaluate EI on a grid
         candidates = _box_grid(axis_grids)
-        μ, σ² = gp_predict(X, y, candidates; ℓ = ℓ_use)
-        ei = expected_improvement(μ, σ², y_best; minimise = minimise)
+        μ, σ² = gp_predict(X, y, candidates; ℓ=ℓ_use)
+        ei = expected_improvement(μ, σ², y_best; minimise=minimise)
         i_best = argmax(ei)
         p_next = candidates[i_best, :]
         y_next = Float64(eval_fn(p_next))
         X = vcat(X, p_next')
         push!(y, y_next)
-        verbose && println("iter $it: p=$(round.(p_next; digits=3)) y=$(round(y_next; digits=4)) " *
-                           "best=$(round(minimise ? minimum(y) : maximum(y); digits=4))")
+        verbose && println(
+            "iter $it: p=$(round.(p_next; digits=3)) y=$(round(y_next; digits=4)) " *
+            "best=$(round(minimise ? minimum(y) : maximum(y); digits=4))",
+        )
     end
 
     i_opt = minimise ? argmin(y) : argmax(y)
-    return (best_p = X[i_opt, :], best_y = y[i_opt], X_history = X, y_history = y)
+    return (best_p=X[i_opt, :], best_y=y[i_opt], X_history=X, y_history=y)
 end
 
 # Build a regular d-dim mesh from per-axis 1D grids; rows are points.

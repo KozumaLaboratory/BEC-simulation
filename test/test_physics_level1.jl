@@ -2,7 +2,6 @@ using Test
 using SpinorBEC
 
 @testset "Level 1: Conservation Laws" begin
-
     @testset "norm conservation (machine precision)" begin
         gc = GridConfig((128,), (20.0,))
         grid = make_grid(gc)
@@ -81,5 +80,4 @@ using SpinorBEC
 
         @test abs(M1 - M0) < 1e-10
     end
-
 end

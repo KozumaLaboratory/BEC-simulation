@@ -25,15 +25,15 @@ result = run_simulation!(ws, live_monitor=monitor)
 ```
 """
 mutable struct LiveMonitor
-    output_file::Union{Nothing,String}
+    output_file::Union{Nothing, String}
     update_interval::Int
     last_update_step::Int
     extract_observables::Function
 
     function LiveMonitor(;
-        output_file::Union{Nothing,String} = nothing,
-        update_interval::Int = 10,
-        extract_observables::Function = default_observable_extractor,
+        output_file::Union{Nothing, String}=nothing,
+        update_interval::Int=10,
+        extract_observables::Function=default_observable_extractor,
     )
         new(output_file, update_interval, 0, extract_observables)
     end
@@ -44,7 +44,7 @@ Default observable extractor for LiveMonitor.
 Returns basic observables: populations, energy, norm.
 """
 function default_observable_extractor(ws::Workspace)
-    Dict{String,Any}(
+    Dict{String, Any}(
         "energy" => total_energy(ws),
         "norm" => total_norm(ws.state.psi, ws.grid),
         "populations" => compute_populations(ws),
@@ -60,7 +60,7 @@ Writes data to JSON file if configured.
 function update!(monitor::LiveMonitor, ws::Workspace{N}, step::Int) where {N}
     # Throttle updates
     if step - monitor.last_update_step < monitor.update_interval
-        return
+        return nothing
     end
     monitor.last_update_step = step
 
@@ -68,7 +68,7 @@ function update!(monitor::LiveMonitor, ws::Workspace{N}, step::Int) where {N}
     observables = monitor.extract_observables(ws)
 
     # Build data structure
-    data = Dict{String,Any}(
+    data = Dict{String, Any}(
         "step" => step,
         "time" => ws.state.t,
         "observables" => observables,

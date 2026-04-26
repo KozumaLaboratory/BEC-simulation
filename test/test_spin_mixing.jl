@@ -49,9 +49,9 @@ using LinearAlgebra
         F = 2
         D = 2F + 1
         sm = spin_matrices(F)
-        m_vals = SVector{D,Float64}(ntuple(c -> F - (c - 1), Val(D)))
+        m_vals = SVector{D, Float64}(ntuple(c -> F - (c - 1), Val(D)))
 
-        spinor = SVector{D,ComplexF64}(ntuple(c -> complex(Float64(c), Float64(c) * 0.5), Val(D)))
+        spinor = SVector{D, ComplexF64}(ntuple(c -> complex(Float64(c), Float64(c) * 0.5), Val(D)))
         spinor_norm = spinor / sqrt(sum(abs2, spinor))
 
         result = SpinorBEC._apply_euler_spin_rotation(

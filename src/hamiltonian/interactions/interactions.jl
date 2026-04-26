@@ -12,9 +12,9 @@ constructs InteractionParams directly from the physical constraint c₀+F²c₁ 
 """
 function compute_interaction_params(
     atom::AtomSpecies;
-    N_atoms::Int = 1,
-    dims::Int = 1,
-    length_scale::Float64 = 1.0,
+    N_atoms::Int=1,
+    dims::Int=1,
+    length_scale::Float64=1.0,
 )
     if atom.F == 1
         a0, a2, m = atom.a0, atom.a2, atom.mass
@@ -58,9 +58,9 @@ are stored in `TensorInteractionCache`, not in `InteractionParams`.
 """
 function compute_interaction_params_general_f(
     atom::AtomSpecies;
-    N_atoms::Int = 1,
-    dims::Int = 1,
-    length_scale::Float64 = 1.0,
+    N_atoms::Int=1,
+    dims::Int=1,
+    length_scale::Float64=1.0,
 )
     InteractionParams(0.0, 0.0)
 end
@@ -71,9 +71,9 @@ c0 = 4πℏ² a_s / m (no spin channels, just s-wave scattering length a0).
 """
 function compute_c0(
     atom::AtomSpecies;
-    N_atoms::Int = 1,
-    dims::Int = 1,
-    length_scale::Float64 = 1.0,
+    N_atoms::Int=1,
+    dims::Int=1,
+    length_scale::Float64=1.0,
 )
     hbar = Units.HBAR
     c0_3d = 4π * hbar^2 * atom.a_s / atom.mass
@@ -121,15 +121,15 @@ end
 
 function compute_interaction_params_dimless(
     atom::AtomSpecies;
-    N_atoms::Int = 1,
-    dims::Int = 1,
-    omega::Float64 = 1.0,
+    N_atoms::Int=1,
+    dims::Int=1,
+    omega::Float64=1.0,
 )
     hbar = Units.HBAR
     m = atom.mass
     a_ho = sqrt(hbar / (m * omega))
 
-    params_si = compute_interaction_params(atom; N_atoms, dims, length_scale = a_ho)
+    params_si = compute_interaction_params(atom; N_atoms, dims, length_scale=a_ho)
 
     energy_scale = hbar * omega
     InteractionParams(params_si.c0 / energy_scale, params_si.c1 / energy_scale)
@@ -151,7 +151,7 @@ unknown (e.g. Eu151). To specify independent g_S, provide higher-rank couplings
 via `c_extra` or use `_make_tensor_cache_from_channels` directly.
 """
 function _c0c1_to_gS(F::Int, c0::Float64, c1::Float64)
-    Dict{Int,Float64}(S => c0 + c1 * (S * (S + 1) - 2 * F * (F + 1)) / 2 for S = 0:2:2F)
+    Dict{Int, Float64}(S => c0 + c1 * (S * (S + 1) - 2 * F * (F + 1)) / 2 for S in 0:2:2F)
 end
 
 """
@@ -171,16 +171,16 @@ function _c_extra_to_delta_gS(F::Int, c_extra::Vector{Float64})
         k = idx + 1
         if abs(val) > 1e-30 && isodd(k)
             @warn "c_extra[$idx] (c$k) is odd-rank and will be ignored. " *
-                  "If this is a Kawaguchi-Ueda pair-channel coupling (e.g. c₃ → S=2 channel), " *
-                  "use _make_tensor_cache_from_channels(F, Dict(S => g_S, ...)) instead." maxlog=1
+                "If this is a Kawaguchi-Ueda pair-channel coupling (e.g. c₃ → S=2 channel), " *
+                "use _make_tensor_cache_from_channels(F, Dict(S => g_S, ...)) instead." maxlog=1
         end
     end
-    c_dict = Dict{Int,Float64}()
+    c_dict = Dict{Int, Float64}()
     for (idx, val) in enumerate(c_extra)
         k = idx + 1
         abs(val) > 1e-30 && iseven(k) && k <= 2F && (c_dict[k] = val)
     end
-    isempty(c_dict) && return Dict{Int,Float64}()
+    isempty(c_dict) && return Dict{Int, Float64}()
     _cn_to_gS(F, c_dict)
 end
 
@@ -212,9 +212,9 @@ Note: r = -1/F² is singular (c₀ → ∞). For F=6, avoid r ≤ -1/36.
 """
 function interaction_params_from_constraint(;
     c_total::Float64,
-    c1_ratio::Float64 = 0.0,
+    c1_ratio::Float64=0.0,
     F::Int,
-    c_extra::Vector{Float64} = Float64[],
+    c_extra::Vector{Float64}=Float64[],
 )
     c0 = c_total / (1.0 + F^2 * c1_ratio)
     c1 = c1_ratio * c0
@@ -261,10 +261,10 @@ function compute_eu151_interactions(;
     N_atoms::Int,
     omega_ref::Float64,
     c1_ratio::Float64,
-    c_extra::Vector{Float64} = Float64[],
+    c_extra::Vector{Float64}=Float64[],
 )
     c_total = compute_c_total(Eu151; N_atoms, omega_ref)
-    interaction_params_from_constraint(; c_total, c1_ratio, F = 6, c_extra)
+    interaction_params_from_constraint(; c_total, c1_ratio, F=6, c_extra)
 end
 
 """
@@ -306,12 +306,12 @@ function _gauss_legendre(n::Int, a::Float64, b::Float64)
     mid = (a + b) / 2
     half = (b - a) / 2
 
-    for i = 1:m
+    for i in 1:m
         z = cos(π * (i - 0.25) / (n + 0.5))
-        for _ = 1:100
+        for _ in 1:100
             p1 = 1.0
             p2 = 0.0
-            for j = 1:n
+            for j in 1:n
                 p3 = p2
                 p2 = p1
                 p1 = ((2j - 1) * z * p2 - (j - 1) * p3) / j
@@ -322,18 +322,20 @@ function _gauss_legendre(n::Int, a::Float64, b::Float64)
             abs(dz) < 1e-15 && break
         end
         nodes[i] = mid - half * z
-        nodes[n+1-i] = mid + half * z
+        nodes[n + 1 - i] = mid + half * z
         # Recompute P_n and P_n' at the converged z (pp from the Newton loop
         # was evaluated at z+dz, before the final update).
-        p1 = 1.0; p2 = 0.0
-        for j = 1:n
-            p3 = p2; p2 = p1
+        p1 = 1.0;
+        p2 = 0.0
+        for j in 1:n
+            p3 = p2;
+            p2 = p1
             p1 = ((2j - 1) * z * p2 - (j - 1) * p3) / j
         end
         pp_final = n * (z * p1 - p2) / (z^2 - 1.0)
         w = 2.0 * half / ((1.0 - z^2) * pp_final^2)
         weights[i] = w
-        weights[n+1-i] = w
+        weights[n + 1 - i] = w
     end
     (nodes, weights)
 end

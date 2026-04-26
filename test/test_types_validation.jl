@@ -97,8 +97,8 @@ using SpinorBEC
     end
 
     @testset "OverrideScan validation" begin
-        @test_throws ArgumentError OverrideScan(Dict{String,Any}[])
-        os = OverrideScan([Dict{String,Any}("a.b" => 1)])
+        @test_throws ArgumentError OverrideScan(Dict{String, Any}[])
+        os = OverrideScan([Dict{String, Any}("a.b" => 1)])
         @test length(os.points) == 1
     end
 

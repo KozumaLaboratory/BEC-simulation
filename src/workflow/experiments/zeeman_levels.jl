@@ -9,7 +9,7 @@
 
 const _GAUSS_TO_TESLA = 1.0e-4
 const _ZEEMAN_SAMPLE_N = 1024  # default — increase for stir experiments via
-                               # zeeman.n_samples YAML override
+# zeeman.n_samples YAML override
 
 """
     _detect_zeeman_level(z::Dict) -> Int  (0, 1, or 2)
@@ -24,8 +24,10 @@ function _detect_zeeman_level(z::Dict)
     explicit = get(z, "level", nothing)
 
     levels_present = count(identity, (has_l0, has_l1, has_l2))
-    levels_present > 1 && throw(ArgumentError(
-        "zeeman: cannot mix Level 0 (p/q/bx/by), Level 1 (Bx/By/Bz), and Level 2 (B_mag)"))
+    levels_present > 1 && throw(
+        ArgumentError(
+            "zeeman: cannot mix Level 0 (p/q/bx/by), Level 1 (Bx/By/Bz), and Level 2 (B_mag)"),
+    )
 
     if explicit !== nothing
         lvl = Int(explicit)
@@ -60,8 +62,11 @@ function _resolve_omega_ref(z::Dict, p_step::Dict)
     if haskey(p_step, "omega_ref")
         return Float64(p_step["omega_ref"])
     end
-    throw(ArgumentError(
-        "zeeman Level 1/2 requires omega_ref; set zeeman.omega_ref_hz (Hz) or interactions.omega_ref (rad/s)"))
+    throw(
+        ArgumentError(
+            "zeeman Level 1/2 requires omega_ref; set zeeman.omega_ref_hz (Hz) or interactions.omega_ref (rad/s)"
+        ),
+    )
 end
 
 """
@@ -102,7 +107,7 @@ Never returns a closure — keeps everything concretely typed (see CLAUDE.md:
 Type stability boundaries).
 """
 function _convert_B_waveform(B_spec, duration::Float64, g_F::Float64, omega_ref::Float64;
-                              n_samples::Int = _ZEEMAN_SAMPLE_N)
+    n_samples::Int=_ZEEMAN_SAMPLE_N)
     factor = g_F * Units.BOHR_MAGNETON * _GAUSS_TO_TESLA / (Units.HBAR * omega_ref)
     if B_spec isa AbstractString
         # "0.819 G" → parse Quantity → to Tesla → dimensionless p
@@ -112,7 +117,7 @@ function _convert_B_waveform(B_spec, duration::Float64, g_F::Float64, omega_ref:
         return ConstantWaveform(factor * Float64(B_spec))
     end
     B_wf = B_spec isa Waveform ? B_spec : _make_waveform(B_spec, duration)
-    times = collect(range(0.0, duration; length = n_samples))
+    times = collect(range(0.0, duration; length=n_samples))
     values = Float64[factor * evaluate(B_wf, t) for t in times]
     PiecewiseLinearWaveform(times, values)
 end
@@ -145,10 +150,10 @@ function _build_zeeman_level1(z::Dict, duration::Float64, atom, omega_ref::Float
     n_bx = n_override > 0 ? n_override : _suggest_sample_count(Bx, duration)
     n_by = n_override > 0 ? n_override : _suggest_sample_count(By, duration)
     n_bz = n_override > 0 ? n_override : _suggest_sample_count(Bz, duration)
-    p_wf = _convert_B_waveform(Bz, duration, g_F, omega_ref; n_samples = n_bz)
+    p_wf = _convert_B_waveform(Bz, duration, g_F, omega_ref; n_samples=n_bz)
     q_wf = _make_waveform(get(z, "q", 0.0), duration)
-    bx_wf = _convert_B_waveform(Bx, duration, g_F, omega_ref; n_samples = n_bx)
-    by_wf = _convert_B_waveform(By, duration, g_F, omega_ref; n_samples = n_by)
+    bx_wf = _convert_B_waveform(Bx, duration, g_F, omega_ref; n_samples=n_bx)
+    by_wf = _convert_B_waveform(By, duration, g_F, omega_ref; n_samples=n_by)
     TimeDependentZeeman(p_wf, q_wf, bx_wf, by_wf)
 end
 
@@ -170,13 +175,26 @@ function _build_zeeman_level2(z::Dict, duration::Float64, atom, omega_ref::Float
         B_mag_spec
     end
 
-    times = collect(range(0.0, duration; length = _ZEEMAN_SAMPLE_N))
-    Bmag_wf = B_mag_gauss_spec isa Number ? ConstantWaveform(Float64(B_mag_gauss_spec)) :
-        (B_mag_gauss_spec isa Waveform ? B_mag_gauss_spec : _make_waveform(B_mag_gauss_spec, duration))
-    theta_wf = theta_spec isa Number ? ConstantWaveform(Float64(theta_spec)) :
+    times = collect(range(0.0, duration; length=_ZEEMAN_SAMPLE_N))
+    Bmag_wf = if B_mag_gauss_spec isa Number
+        ConstantWaveform(Float64(B_mag_gauss_spec))
+    else
+        (if B_mag_gauss_spec isa Waveform
+            B_mag_gauss_spec
+        else
+            _make_waveform(B_mag_gauss_spec, duration)
+        end)
+    end
+    theta_wf = if theta_spec isa Number
+        ConstantWaveform(Float64(theta_spec))
+    else
         (theta_spec isa Waveform ? theta_spec : _make_waveform(theta_spec, duration))
-    phi_wf = phi_spec isa Number ? ConstantWaveform(Float64(phi_spec)) :
+    end
+    phi_wf = if phi_spec isa Number
+        ConstantWaveform(Float64(phi_spec))
+    else
         (phi_spec isa Waveform ? phi_spec : _make_waveform(phi_spec, duration))
+    end
 
     bx_vals = Vector{Float64}(undef, _ZEEMAN_SAMPLE_N)
     by_vals = Vector{Float64}(undef, _ZEEMAN_SAMPLE_N)
@@ -211,6 +229,9 @@ function _build_zeeman_dispatched(z::Dict, duration::Float64, atom, p_step::Dict
         return _parse_zeeman(z, duration)
     end
     omega_ref = _resolve_omega_ref(z, p_step)
-    level == 1 ? _build_zeeman_level1(z, duration, atom, omega_ref) :
-                 _build_zeeman_level2(z, duration, atom, omega_ref)
+    if level == 1
+        _build_zeeman_level1(z, duration, atom, omega_ref)
+    else
+        _build_zeeman_level2(z, duration, atom, omega_ref)
+    end
 end

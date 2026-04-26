@@ -60,7 +60,7 @@ Useful for extracting spin-orbit-coupling-style dispersion images:
 peaks in `spectrum` trace out the lower / upper bands of the synthetic
 dimension's Hamiltonian.
 """
-function synthetic_dim_dispersion(psi::AbstractArray{Complex{T}}, grid; axis::Int = 1) where {T}
+function synthetic_dim_dispersion(psi::AbstractArray{Complex{T}}, grid; axis::Int=1) where {T}
     ndim = ndims(psi) - 1
     1 <= axis <= ndim || throw(ArgumentError("axis $axis out of range 1:$ndim"))
     D = size(psi, ndim + 1)
@@ -77,8 +77,8 @@ function synthetic_dim_dispersion(psi::AbstractArray{Complex{T}}, grid; axis::In
     n_pts = ntuple(d -> size(psi, d), ndim)
     plane = abs2.(psi_k)
     if !isempty(other)
-        plane = sum(plane; dims = Tuple(other))
-        plane = dropdims(plane; dims = Tuple(other))
+        plane = sum(plane; dims=Tuple(other))
+        plane = dropdims(plane; dims=Tuple(other))
     end
     # `plane` has shape (n_axis, D); FFT along m axis.
     plane_complex = Complex{Float64}.(plane)
@@ -92,7 +92,7 @@ function synthetic_dim_dispersion(psi::AbstractArray{Complex{T}}, grid; axis::In
     k_real = fftfreq(n_axis, 2π / dx)
     # Synthetic axis: a unit lattice spacing on the integer m site index.
     k_synth = fftfreq(D, 2π)
-    (spectrum = spectrum, k_real = collect(k_real), k_synth = collect(k_synth))
+    (spectrum=spectrum, k_real=collect(k_real), k_synth=collect(k_synth))
 end
 
 """

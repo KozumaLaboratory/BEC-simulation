@@ -8,17 +8,19 @@ Returns a Dict that can be serialized to JSON.
 
 If `F` is not provided, it is inferred from the psi array shape.
 """
-function generate_dashboard_data(run_dir::String; F::Union{Nothing,Int} = nothing)
+function generate_dashboard_data(run_dir::String; F::Union{Nothing, Int}=nothing)
     isdir(run_dir) || throw(ArgumentError("Not a directory: $run_dir"))
 
     config_path = joinpath(run_dir, "config.yaml")
     config_raw = isfile(config_path) ? read(config_path, String) : ""
 
-    jld2_files = sort(filter(f -> startswith(f, "point_") && endswith(f, ".jld2"),
-                             readdir(run_dir)))
+    jld2_files = sort(
+        filter(f -> startswith(f, "point_") && endswith(f, ".jld2"),
+            readdir(run_dir))
+    )
     isempty(jld2_files) && throw(ArgumentError("No point_*.jld2 files in $run_dir"))
 
-    points = Dict{String,Any}[]
+    points = Dict{String, Any}[]
     run_names = Set{String}()
 
     for fname in jld2_files
@@ -35,8 +37,8 @@ function generate_dashboard_data(run_dir::String; F::Union{Nothing,Int} = nothin
         total = sum(pops)
         pops_norm = total > 0 ? pops ./ total : pops
 
-        override = get(d, "override", Dict{String,Any}())
-        scan_params = Dict{String,Any}()
+        override = get(d, "override", Dict{String, Any}())
+        scan_params = Dict{String, Any}()
         for (k, v) in override
             v isa AbstractArray || (scan_params[k] = v)
         end
@@ -44,20 +46,23 @@ function generate_dashboard_data(run_dir::String; F::Union{Nothing,Int} = nothin
         rn = get(d, "run_name", "")
         !isempty(rn) && push!(run_names, rn)
 
-        push!(points, Dict{String,Any}(
-            "file" => fname,
-            "index" => get(d, "scan_index", 0),
-            "run_name" => rn,
-            "energy" => get(d, "energy", NaN),
-            "converged" => get(d, "converged", false),
-            "mz_actual" => get(d, "mz_actual", NaN),
-            "populations" => pops_norm,
-            "m_values" => m_values,
-            "override" => scan_params,
-            "duration_seconds" => get(d, "duration_seconds", NaN),
-            "started_at" => get(d, "started_at", ""),
-            "finished_at" => get(d, "finished_at", ""),
-        ))
+        push!(
+            points,
+            Dict{String, Any}(
+                "file" => fname,
+                "index" => get(d, "scan_index", 0),
+                "run_name" => rn,
+                "energy" => get(d, "energy", NaN),
+                "converged" => get(d, "converged", false),
+                "mz_actual" => get(d, "mz_actual", NaN),
+                "populations" => pops_norm,
+                "m_values" => m_values,
+                "override" => scan_params,
+                "duration_seconds" => get(d, "duration_seconds", NaN),
+                "started_at" => get(d, "started_at", ""),
+                "finished_at" => get(d, "finished_at", ""),
+            ),
+        )
     end
 
     scan_keys = String[]
@@ -67,7 +72,7 @@ function generate_dashboard_data(run_dir::String; F::Union{Nothing,Int} = nothin
 
     F_out = !isempty(points) ? div(length(first(points)["m_values"]) - 1, 2) : 0
 
-    Dict{String,Any}(
+    Dict{String, Any}(
         "run" => basename(run_dir),
         "config_yaml" => config_raw,
         "F" => F_out,
@@ -84,7 +89,9 @@ end
 Generate dashboard_data.json for a run directory. If `output` is nothing,
 writes to `run_dir/dashboard_data.json`.
 """
-function export_dashboard(run_dir::String; output::Union{Nothing,String} = nothing, F::Union{Nothing,Int} = nothing)
+function export_dashboard(
+    run_dir::String; output::Union{Nothing, String}=nothing, F::Union{Nothing, Int}=nothing
+)
     data = generate_dashboard_data(run_dir; F)
     out_path = output !== nothing ? output : joinpath(run_dir, "dashboard_data.json")
 
@@ -138,7 +145,13 @@ function _write_json(io::IO, s::AbstractString)
     end
     print(io, '"')
 end
-_write_json(io::IO, n::Real) = isnan(n) ? print(io, "null") : isinf(n) ? print(io, "null") : print(io, n)
+_write_json(io::IO, n::Real) = if isnan(n)
+    print(io, "null")
+elseif isinf(n)
+    print(io, "null")
+else
+    print(io, n)
+end
 _write_json(io::IO, b::Bool) = print(io, b ? "true" : "false")
 _write_json(io::IO, ::Nothing) = print(io, "null")
 
@@ -177,16 +190,18 @@ API:
 See src/workflow/io/dashboard.jl for the full /api surface that the
 React app consumes.
 """
-function serve_dashboard(port::Int = 8080; base_dir::String = "runs")
+function serve_dashboard(port::Int=8080; base_dir::String="runs")
     if !isfile(_WEB_DIST_INDEX)
-        throw(ArgumentError(
-            "React dashboard not built. Run: cd web && bun install && bun run build"
-        ))
+        throw(
+            ArgumentError(
+                "React dashboard not built. Run: cd web && bun install && bun run build"
+            )
+        )
     end
     html_content = read(_WEB_DIST_INDEX, String)
     legacy_html = isfile(_LEGACY_DASHBOARD_HTML) ? read(_LEGACY_DASHBOARD_HTML, String) : ""
-    data_cache = Dict{String,String}()
-    psi_cache = Dict{String,Any}()  # path → (psi, n_comp, n_pts, F, pops)
+    data_cache = Dict{String, String}()
+    psi_cache = Dict{String, Any}()  # path → (psi, n_comp, n_pts, F, pops)
 
     server = Sockets.listen(Sockets.InetAddr(ip"0.0.0.0", port))
     println("Dashboard server running at http://localhost:$port")
@@ -200,7 +215,7 @@ function serve_dashboard(port::Int = 8080; base_dir::String = "runs")
         while true
             sock = Sockets.accept(server)
             @async _handle_dashboard_connection(
-                sock, html_content, legacy_html, data_cache, psi_cache, base_dir,
+                sock, html_content, legacy_html, data_cache, psi_cache, base_dir
             )
         end
     catch e
@@ -211,7 +226,9 @@ function serve_dashboard(port::Int = 8080; base_dir::String = "runs")
     end
 end
 
-function _handle_dashboard_connection(sock, html_content, legacy_html, data_cache, psi_cache, base_dir)
+function _handle_dashboard_connection(
+    sock, html_content, legacy_html, data_cache, psi_cache, base_dir
+)
     try
         # Keep-alive loop: a single TCP connection serves successive
         # requests. Browsers cap to ~6 connections per origin, and the
@@ -227,7 +244,7 @@ function _handle_dashboard_connection(sock, html_content, legacy_html, data_cach
             parts = split(request_line)
             length(parts) >= 2 || break
             method = String(parts[1])
-            path   = String(parts[2])
+            path = String(parts[2])
             http_ver = length(parts) >= 3 ? String(parts[3]) : "HTTP/1.0"
 
             # HTTP/1.0 defaults to close; HTTP/1.1 defaults to keep-alive.
@@ -241,9 +258,9 @@ function _handle_dashboard_connection(sock, html_content, legacy_html, data_cach
                 (isempty(line) || line == "\r") && break
                 lc = lowercase(line)
                 if startswith(lc, "content-length:")
-                    content_length = parse(Int, strip(split(line, ':'; limit = 2)[2]))
+                    content_length = parse(Int, strip(split(line, ':'; limit=2)[2]))
                 elseif startswith(lc, "connection:")
-                    val = strip(lowercase(split(line, ':'; limit = 2)[2]))
+                    val = strip(lowercase(split(line, ':'; limit=2)[2]))
                     if occursin("close", val)
                         client_close = true
                     elseif occursin("keep-alive", val)
@@ -252,11 +269,12 @@ function _handle_dashboard_connection(sock, html_content, legacy_html, data_cach
                         ws_upgrade = true
                     end
                 elseif startswith(lc, "upgrade:")
-                    occursin("websocket", lowercase(split(line, ':'; limit = 2)[2])) && (ws_upgrade = true)
+                    occursin("websocket", lowercase(split(line, ':'; limit=2)[2])) &&
+                        (ws_upgrade = true)
                 elseif startswith(lc, "sec-websocket-key:")
-                    ws_key = String(strip(split(line, ':'; limit = 2)[2]))
+                    ws_key = String(strip(split(line, ':'; limit=2)[2]))
                 elseif startswith(lc, "accept-encoding:")
-                    val = lowercase(split(line, ':'; limit = 2)[2])
+                    val = lowercase(split(line, ':'; limit=2)[2])
                     accept_gzip = occursin("gzip", val)
                 end
             end
@@ -272,12 +290,12 @@ function _handle_dashboard_connection(sock, html_content, legacy_html, data_cach
             if method == "POST"
                 body_bytes = content_length > 0 ? read(sock, content_length) : UInt8[]
                 status, content_type, body = _route_dashboard_post(
-                    path, body_bytes, base_dir,
+                    path, body_bytes, base_dir
                 )
                 _send_http_response(sock, status, content_type, body; keep_alive, accept_gzip)
             else
                 status, content_type, body = _route_dashboard(
-                    path, html_content, legacy_html, data_cache, psi_cache, base_dir,
+                    path, html_content, legacy_html, data_cache, psi_cache, base_dir
                 )
                 _send_http_response(sock, status, content_type, body; keep_alive, accept_gzip)
             end
@@ -305,7 +323,7 @@ Lab acquisition scripts can ship images straight off the camera with
 """
 function _route_dashboard_post(path, body_bytes, base_dir)
     if startswith(path, "/api/lab/image/")
-        run_name = _uri_decode(path[length("/api/lab/image/")+1:end])
+        run_name = _uri_decode(path[(length("/api/lab/image/") + 1):end])
         run_dir = joinpath(base_dir, run_name)
         isdir(run_dir) || return (404, "text/plain", "Run not found: $run_name")
         img_dir = joinpath(run_dir, "lab_images")
@@ -368,14 +386,14 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         if slash_idx === nothing
             return (400, "text/plain", "Expected /api/density/:run/:file")
         end
-        name = rest[1:slash_idx-1]
-        file = rest[slash_idx+1:end]
+        name = rest[1:(slash_idx - 1)]
+        file = rest[(slash_idx + 1):end]
         axis = 3  # default: integrate along z
         snap_idx = nothing
         qidx = findfirst('?', file)
         if qidx !== nothing
-            query = file[qidx+1:end]
-            file = file[1:qidx-1]
+            query = file[(qidx + 1):end]
+            file = file[1:(qidx - 1)]
             m = match(r"axis=(\d+)", query)
             m !== nothing && (axis = parse(Int, m.captures[1]))
             ms = match(r"snap=(\d+)", query)
@@ -400,15 +418,15 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         if slash_idx === nothing
             return (400, "text/plain", "Expected /api/phase/:run/:file?axis=N&slice=K")
         end
-        name = rest[1:slash_idx-1]
-        file = rest[slash_idx+1:end]
+        name = rest[1:(slash_idx - 1)]
+        file = rest[(slash_idx + 1):end]
         axis = 3
         slice_idx = nothing
         snap_idx = nothing
         qidx = findfirst('?', file)
         if qidx !== nothing
-            query = file[qidx+1:end]
-            file = file[1:qidx-1]
+            query = file[(qidx + 1):end]
+            file = file[1:(qidx - 1)]
             m = match(r"axis=(\d+)", query)
             m !== nothing && (axis = parse(Int, m.captures[1]))
             ms = match(r"slice=(\d+)", query)
@@ -437,14 +455,14 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         if slash_idx === nothing
             return (400, "text/plain", "Expected /api/density_bin/:run/:file")
         end
-        name = rest[1:slash_idx-1]
-        file = rest[slash_idx+1:end]
+        name = rest[1:(slash_idx - 1)]
+        file = rest[(slash_idx + 1):end]
         axis = 3
         snap_idx = nothing
         qidx = findfirst('?', file)
         if qidx !== nothing
-            query = file[qidx+1:end]
-            file = file[1:qidx-1]
+            query = file[(qidx + 1):end]
+            file = file[1:(qidx - 1)]
             m = match(r"axis=(\d+)", query)
             m !== nothing && (axis = parse(Int, m.captures[1]))
             ms = match(r"snap=(\d+)", query)
@@ -463,7 +481,7 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
             end
             v = try
                 _compute_column_density_binary(
-                    _load_psi_cached(fpath, psi_cache, snap_idx)..., axis, fpath,
+                    _load_psi_cached(fpath, psi_cache, snap_idx)..., axis, fpath
                 )
             catch e
                 return (500, "text/plain", "Error: $(e)")
@@ -482,15 +500,15 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         if slash_idx === nothing
             return (400, "text/plain", "Expected /api/phase_bin/:run/:file")
         end
-        name = rest[1:slash_idx-1]
-        file = rest[slash_idx+1:end]
+        name = rest[1:(slash_idx - 1)]
+        file = rest[(slash_idx + 1):end]
         axis = 3
         slice_idx = nothing
         snap_idx = nothing
         qidx = findfirst('?', file)
         if qidx !== nothing
-            query = file[qidx+1:end]
-            file = file[1:qidx-1]
+            query = file[(qidx + 1):end]
+            file = file[1:(qidx - 1)]
             m = match(r"axis=(\d+)", query)
             m !== nothing && (axis = parse(Int, m.captures[1]))
             ms = match(r"slice=(\d+)", query)
@@ -528,10 +546,10 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         if slash_idx === nothing
             return (400, "text/plain", "Expected /api/density3d/:run/:file")
         end
-        name = rest[1:slash_idx-1]
-        file = rest[slash_idx+1:end]
+        name = rest[1:(slash_idx - 1)]
+        file = rest[(slash_idx + 1):end]
         qidx = findfirst('?', file)
-        qidx !== nothing && (file = file[1:qidx-1])
+        qidx !== nothing && (file = file[1:(qidx - 1)])
         fpath = joinpath(base_dir, name, file)
         if !isfile(fpath)
             return (404, "text/plain", "File not found: $name/$file")
@@ -549,15 +567,15 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         if slash_idx === nothing
             return (400, "text/plain", "Expected /api/density3d_bin/:run/:file")
         end
-        name = rest[1:slash_idx-1]
-        file = rest[slash_idx+1:end]
+        name = rest[1:(slash_idx - 1)]
+        file = rest[(slash_idx + 1):end]
         qidx = findfirst('?', file)
         comp_idx = 0
         snap_idx = nothing
         bsz = false
         if qidx !== nothing
-            query = file[qidx+1:end]
-            file = file[1:qidx-1]
+            query = file[(qidx + 1):end]
+            file = file[1:(qidx - 1)]
             m = match(r"comp=(-?\d+)", query)
             m !== nothing && (comp_idx = parse(Int, m.captures[1]))
             ms = match(r"snap=(\d+)", query)
@@ -581,7 +599,9 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
                 _evict_one!(psi_cache)
             end
             v = try
-                raw = _compute_3d_density_binary(_load_psi_cached(fpath, psi_cache, snap_idx)...; component=comp_idx)
+                raw = _compute_3d_density_binary(
+                    _load_psi_cached(fpath, psi_cache, snap_idx)...; component=comp_idx
+                )
                 _maybe_bitshuffle_zstd(raw, bsz)
             catch e
                 return (500, "text/plain", "Error: $(e)")
@@ -598,18 +618,23 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         if slash_idx === nothing
             return (400, "text/plain", "Expected /api/dynamics_series/:run/:file")
         end
-        name = rest[1:slash_idx-1]
-        file = rest[slash_idx+1:end]
+        name = rest[1:(slash_idx - 1)]
+        file = rest[(slash_idx + 1):end]
         qidx = findfirst('?', file)
-        qidx !== nothing && (file = file[1:qidx-1])
+        qidx !== nothing && (file = file[1:(qidx - 1)])
         fpath = joinpath(base_dir, name, file)
         if !isfile(fpath)
             return (404, "text/plain", "File not found: $name/$file")
         end
         json = try
             d = JLD2.load(fpath)
-            out = Dict{String,Any}("has_dynamics" => haskey(d, "dynamics/times"))
-            for k in ("dynamics/times", "dynamics/energies", "dynamics/magnetizations", "dynamics/norms")
+            out = Dict{String, Any}("has_dynamics" => haskey(d, "dynamics/times"))
+            for k in (
+                "dynamics/times",
+                "dynamics/energies",
+                "dynamics/magnetizations",
+                "dynamics/norms",
+            )
                 haskey(d, k) || continue
                 out[split(k, "/")[2]] = Float64.(d[k])
             end
@@ -634,10 +659,10 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         if slash_idx === nothing
             return (400, "text/plain", "Expected /api/snapshots/:run/:file")
         end
-        name = rest[1:slash_idx-1]
-        file = rest[slash_idx+1:end]
+        name = rest[1:(slash_idx - 1)]
+        file = rest[(slash_idx + 1):end]
         qidx = findfirst('?', file)
-        qidx !== nothing && (file = file[1:qidx-1])
+        qidx !== nothing && (file = file[1:(qidx - 1)])
         fpath = joinpath(base_dir, name, file)
         if !isfile(fpath)
             return (404, "text/plain", "File not found: $name/$file")
@@ -679,14 +704,14 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         if slash_idx === nothing
             return (400, "text/plain", "Expected /api/density3d_atlas/:run/:file")
         end
-        name = rest[1:slash_idx-1]
-        file = rest[slash_idx+1:end]
+        name = rest[1:(slash_idx - 1)]
+        file = rest[(slash_idx + 1):end]
         comp_idx = 0
         bsz = false
         qidx = findfirst('?', file)
         if qidx !== nothing
-            query = file[qidx+1:end]
-            file = file[1:qidx-1]
+            query = file[(qidx + 1):end]
+            file = file[1:(qidx - 1)]
             m = match(r"comp=(-?\d+)", query)
             m !== nothing && (comp_idx = parse(Int, m.captures[1]))
             occursin("bsz=1", query) && (bsz = true)
@@ -736,14 +761,14 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         if slash_idx === nothing
             return (400, "text/plain", "Expected /api/density_atlas/:run/:file")
         end
-        name = rest[1:slash_idx-1]
-        file = rest[slash_idx+1:end]
+        name = rest[1:(slash_idx - 1)]
+        file = rest[(slash_idx + 1):end]
         axis = 3
         bsz = false
         qidx = findfirst('?', file)
         if qidx !== nothing
-            query = file[qidx+1:end]
-            file = file[1:qidx-1]
+            query = file[(qidx + 1):end]
+            file = file[1:(qidx - 1)]
             m = match(r"axis=(\d+)", query)
             m !== nothing && (axis = parse(Int, m.captures[1]))
             occursin("bsz=1", query) && (bsz = true)
@@ -799,10 +824,10 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         if slash_idx === nothing
             return (400, "text/plain", "Expected /api/density_max/:run/:file")
         end
-        name = rest[1:slash_idx-1]
-        file = rest[slash_idx+1:end]
+        name = rest[1:(slash_idx - 1)]
+        file = rest[(slash_idx + 1):end]
         qidx = findfirst('?', file)
-        qidx !== nothing && (file = file[1:qidx-1])
+        qidx !== nothing && (file = file[1:(qidx - 1)])
         fpath = joinpath(base_dir, name, file)
         if !isfile(fpath)
             return (404, "text/plain", "File not found: $name/$file")
@@ -818,7 +843,7 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
                     else
                         0
                     end
-                    n == 0 ? 1.0 : _global_density_max_total_sampled(f, n; n_samples = 16)
+                    n == 0 ? 1.0 : _global_density_max_total_sampled(f, n; n_samples=16)
                 end
             catch
                 1.0
@@ -838,14 +863,14 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         if slash_idx === nothing
             return (400, "text/plain", "Expected /api/vortex_lines/:run/:file?snap=K&mask=FRAC")
         end
-        name = rest[1:slash_idx-1]
-        file = rest[slash_idx+1:end]
+        name = rest[1:(slash_idx - 1)]
+        file = rest[(slash_idx + 1):end]
         snap_idx = nothing
         mask_frac = 0.0
         qidx = findfirst('?', file)
         if qidx !== nothing
-            query = file[qidx+1:end]
-            file = file[1:qidx-1]
+            query = file[(qidx + 1):end]
+            file = file[1:(qidx - 1)]
             ms = match(r"snap=(\d+)", query)
             ms !== nothing && (snap_idx = parse(Int, ms.captures[1]))
             mm = match(r"mask=([0-9.]+)", query)
@@ -872,23 +897,28 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
                 ndim == 3 || throw(ArgumentError("vortex_lines requires 3D data"))
                 box_size = _load_box_size(fpath)
                 g = make_grid(GridConfig(n_pts, box_size))
-                lines = extract_vortex_lines_per_m(psi, g; min_density_frac = mask_frac)
+                lines = extract_vortex_lines_per_m(psi, g; min_density_frac=mask_frac)
                 # Flatten into a frontend-friendly list [{m, charge, points}, ...]
-                out_lines = Dict{String,Any}[]
+                out_lines = Dict{String, Any}[]
                 for (m_label, polylines) in lines
                     for ln in polylines
-                        push!(out_lines, Dict{String,Any}(
-                            "m" => m_label,
-                            "charge" => ln.charge,
-                            "points" => [[p[1], p[2], p[3]] for p in ln.points],
-                        ))
+                        push!(
+                            out_lines,
+                            Dict{String, Any}(
+                                "m" => m_label,
+                                "charge" => ln.charge,
+                                "points" => [[p[1], p[2], p[3]] for p in ln.points],
+                            ),
+                        )
                     end
                 end
-                _json_string(Dict{String,Any}(
-                    "lines" => out_lines,
-                    "box" => collect(Float64.(box_size)),
-                    "n_lines" => length(out_lines),
-                ))
+                _json_string(
+                    Dict{String, Any}(
+                        "lines" => out_lines,
+                        "box" => collect(Float64.(box_size)),
+                        "n_lines" => length(out_lines),
+                    ),
+                )
             catch e
                 "{\"error\":\"$(replace(string(e), "\"" => "'"))\"}"
             end
@@ -904,13 +934,13 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         if slash_idx === nothing
             return (400, "text/plain", "Expected /api/vorticity3d_bin/:run/:file?snap=K")
         end
-        name = rest[1:slash_idx-1]
-        file = rest[slash_idx+1:end]
+        name = rest[1:(slash_idx - 1)]
+        file = rest[(slash_idx + 1):end]
         qidx = findfirst('?', file)
         snap_idx = nothing
         if qidx !== nothing
-            query = file[qidx+1:end]
-            file = file[1:qidx-1]
+            query = file[(qidx + 1):end]
+            file = file[1:(qidx - 1)]
             ms = match(r"snap=(\d+)", query)
             ms !== nothing && (snap_idx = parse(Int, ms.captures[1]))
         end
@@ -935,14 +965,14 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         if slash_idx === nothing
             return (400, "text/plain", "Expected /api/phase3d_bin/:run/:file?comp=N&snap=K")
         end
-        name = rest[1:slash_idx-1]
-        file = rest[slash_idx+1:end]
+        name = rest[1:(slash_idx - 1)]
+        file = rest[(slash_idx + 1):end]
         qidx = findfirst('?', file)
         comp_idx = 1
         snap_idx = nothing
         if qidx !== nothing
-            query = file[qidx+1:end]
-            file = file[1:qidx-1]
+            query = file[(qidx + 1):end]
+            file = file[1:(qidx - 1)]
             m = match(r"comp=(-?\d+)", query)
             m !== nothing && (comp_idx = parse(Int, m.captures[1]))
             ms = match(r"snap=(\d+)", query)
@@ -953,7 +983,9 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
             return (404, "text/plain", "File not found: $name/$file")
         end
         bin = try
-            _compute_3d_phase_binary(_load_psi_cached(fpath, psi_cache, snap_idx)...; component=comp_idx)
+            _compute_3d_phase_binary(
+                _load_psi_cached(fpath, psi_cache, snap_idx)...; component=comp_idx
+            )
         catch e
             return (500, "text/plain", "Error: $(e)")
         end
@@ -965,13 +997,13 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         if slash_idx === nothing
             return (400, "text/plain", "Expected /api/coherence/:run/:file?axis=N")
         end
-        name = rest[1:slash_idx-1]
-        file = rest[slash_idx+1:end]
+        name = rest[1:(slash_idx - 1)]
+        file = rest[(slash_idx + 1):end]
         axis = 3
         qidx = findfirst('?', file)
         if qidx !== nothing
-            query = file[qidx+1:end]
-            file = file[1:qidx-1]
+            query = file[(qidx + 1):end]
+            file = file[1:(qidx - 1)]
             m = match(r"axis=(\d+)", query)
             m !== nothing && (axis = parse(Int, m.captures[1]))
         end
@@ -990,15 +1022,18 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         rest = _uri_decode(path[23:end])
         slash_idx = findfirst('/', rest)
         if slash_idx === nothing
-            return (400, "text/plain", "Expected /api/density3d_rotated/:run/:file?angle=DEG&comp=N")
+            return (
+                400, "text/plain", "Expected /api/density3d_rotated/:run/:file?angle=DEG&comp=N"
+            )
         end
-        name = rest[1:slash_idx-1]
-        file = rest[slash_idx+1:end]
-        angle_deg = 0.0; comp_idx = 0
+        name = rest[1:(slash_idx - 1)]
+        file = rest[(slash_idx + 1):end]
+        angle_deg = 0.0;
+        comp_idx = 0
         qidx = findfirst('?', file)
         if qidx !== nothing
-            query = file[qidx+1:end]
-            file = file[1:qidx-1]
+            query = file[(qidx + 1):end]
+            file = file[1:(qidx - 1)]
             m = match(r"angle=([0-9.e+-]+)", query)
             m !== nothing && (angle_deg = parse(Float64, m.captures[1]))
             m2 = match(r"comp=(-?\d+)", query)
@@ -1020,17 +1055,21 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         rest = _uri_decode(path[18:end])
         slash_idx = findfirst('/', rest)
         if slash_idx === nothing
-            return (400, "text/plain", "Expected /api/vector3d_bin/:run/:file?field=current&stride=2&snap=K")
+            return (
+                400,
+                "text/plain",
+                "Expected /api/vector3d_bin/:run/:file?field=current&stride=2&snap=K",
+            )
         end
-        name = rest[1:slash_idx-1]
-        file = rest[slash_idx+1:end]
+        name = rest[1:(slash_idx - 1)]
+        file = rest[(slash_idx + 1):end]
         vec_field = :current
         vec_stride = 2
         snap_idx = nothing
         qidx = findfirst('?', file)
         if qidx !== nothing
-            query = file[qidx+1:end]
-            file = file[1:qidx-1]
+            query = file[(qidx + 1):end]
+            file = file[1:(qidx - 1)]
             m = match(r"field=(\w+)", query)
             m !== nothing && (vec_field = Symbol(m.captures[1]))
             m2 = match(r"stride=(\d+)", query)
@@ -1047,7 +1086,7 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
             ndim == 3 || throw(ArgumentError("vector3d requires 3D data"))
             box_size = _load_box_size(fpath)
             _compute_vector3d_binary(psi, n_comp, ndim, n_pts, F, box_size;
-                field = vec_field, stride = vec_stride)
+                field=vec_field, stride=vec_stride)
         catch e
             return (500, "text/plain", "Error: $(e)")
         end
@@ -1107,10 +1146,10 @@ so the client can reverse it. Layout:
     zstd_compressed_bitshuffled_bytes (the rest)
 
 Returns the packed Vector{UInt8}."""
-function _pack_bitshuffle_zstd(payload_bytes::Vector{UInt8}; esize::Int = 4, level::Int = 3)
+function _pack_bitshuffle_zstd(payload_bytes::Vector{UInt8}; esize::Int=4, level::Int=3)
     shuffled = _bitshuffle(payload_bytes, esize)
-    compressed = transcode(ZstdCompressor(level = level), shuffled)
-    out = IOBuffer(; sizehint = 12 + length(compressed))
+    compressed = transcode(ZstdCompressor(; level=level), shuffled)
+    out = IOBuffer(; sizehint=12 + length(compressed))
     write(out, b"BSZ1")
     write(out, Int32(length(payload_bytes)))
     write(out, Int32(esize))
@@ -1123,7 +1162,7 @@ Skips re-encoding (pass-through) when `bsz=false` so HTTP clients without
 the codec stay on the raw path."""
 function _maybe_bitshuffle_zstd(payload::Vector{UInt8}, bsz::Bool)
     bsz || return payload
-    _pack_bitshuffle_zstd(payload; esize = 4, level = 3)
+    _pack_bitshuffle_zstd(payload; esize=4, level=3)
 end
 
 # --- Minimal WebSocket implementation (RFC 6455 subset) ---
@@ -1218,13 +1257,13 @@ function _ws_parse_request(payload::Vector{UInt8})
     try
         return JSON.parse(s)
     catch
-        return Dict{String,Any}()
+        return Dict{String, Any}()
     end
 end
 
 # Build the same density_bin / phase_bin payload an HTTP request would
 # return. Returns Vector{UInt8} or nothing on error.
-function _ws_build_payload(req::Dict, psi_cache::Dict{String,Any}, base_dir::String)
+function _ws_build_payload(req::Dict, psi_cache::Dict{String, Any}, base_dir::String)
     kind = String(get(req, "kind", "density"))
     run = String(get(req, "run", ""))
     file = String(get(req, "file", ""))
@@ -1239,7 +1278,7 @@ function _ws_build_payload(req::Dict, psi_cache::Dict{String,Any}, base_dir::Str
                 _evict_one!(psi_cache)
             end
             v = _compute_column_density_binary(
-                _load_psi_cached(fpath, psi_cache, snap)..., axis, fpath,
+                _load_psi_cached(fpath, psi_cache, snap)..., axis, fpath
             )
             psi_cache[cache_key] = v
             v
@@ -1268,26 +1307,38 @@ phase_bin binary blobs out. The `req_id` field is echoed in the first 8
 bytes of each binary response so the client can match replies to their
 issuing request even out-of-order."""
 function _websocket_serve(sock, path::AbstractString, ws_key::AbstractString,
-                          psi_cache::Dict{String,Any}, base_dir::String)
+    psi_cache::Dict{String, Any}, base_dir::String)
     try
         # Disable Nagle so each frame goes out immediately. WebSocket
         # frames are intentionally small + interactive — the OS coalescing
         # them costs ~40 ms per frame for no benefit.
-        try Sockets.nagle(sock, false); catch; end
+        try
+            Sockets.nagle(sock, false);
+        catch
+            ;
+        end
         _ws_handshake(sock, ws_key)
     catch
-        return
+        return nothing
     end
     if path != "/ws/scrub"
-        try _ws_send_close(sock); catch; end
-        return
+        try
+            _ws_send_close(sock);
+        catch
+            ;
+        end
+        return nothing
     end
     try
         while true
             opcode, payload = _ws_read_frame(sock)
             if opcode == 0x08  # close
-                try _ws_send_close(sock); catch; end
-                return
+                try
+                    _ws_send_close(sock);
+                catch
+                    ;
+                end
+                return nothing
             elseif opcode == 0x09  # ping
                 _ws_send_pong(sock, payload)
                 continue
@@ -1307,7 +1358,10 @@ function _websocket_serve(sock, path::AbstractString, ws_key::AbstractString,
                     out[2] = UInt8((req_id >> 8) & 0xFF)
                     out[3] = UInt8((req_id >> 16) & 0xFF)
                     out[4] = UInt8((req_id >> 24) & 0xFF)
-                    out[5] = 0; out[6] = 0; out[7] = 0; out[8] = 0
+                    out[5] = 0;
+                    out[6] = 0;
+                    out[7] = 0;
+                    out[8] = 0
                     @inbounds copyto!(out, 9, bin, 1, length(bin))
                     _ws_send_binary(sock, out)
                 end
@@ -1318,8 +1372,16 @@ function _websocket_serve(sock, path::AbstractString, ws_key::AbstractString,
     end
 end
 
-function _send_http_response(sock, status, content_type, body; keep_alive::Bool = false, accept_gzip::Bool = false)
-    reason = status == 200 ? "OK" : status == 404 ? "Not Found" : "Error"
+function _send_http_response(
+    sock, status, content_type, body; keep_alive::Bool=false, accept_gzip::Bool=false
+)
+    reason = if status == 200
+        "OK"
+    elseif status == 404
+        "Not Found"
+    else
+        "Error"
+    end
     body_bytes = body isa Vector{UInt8} ? body : Vector{UInt8}(body)
     # Gzip large bodies when the client asked for it. Float32 binaries
     # only compress ~10-15% (fundamentally noisy bit patterns), but on a
@@ -1329,7 +1391,7 @@ function _send_http_response(sock, status, content_type, body; keep_alive::Bool 
     encoding_hdr = ""
     if accept_gzip && length(body_bytes) >= _GZIP_THRESHOLD_BYTES
         try
-            compressed = transcode(GzipCompressor(level = 1), body_bytes)
+            compressed = transcode(GzipCompressor(; level=1), body_bytes)
             if length(compressed) < length(body_bytes)
                 body_bytes = compressed
                 encoding_hdr = "Content-Encoding: gzip\r\n"
@@ -1338,9 +1400,11 @@ function _send_http_response(sock, status, content_type, body; keep_alive::Bool 
             # If gzip blows up for any reason, just send uncompressed.
         end
     end
-    conn_hdr = keep_alive ?
-        "Connection: keep-alive\r\nKeep-Alive: timeout=30\r\n" :
+    conn_hdr = if keep_alive
+        "Connection: keep-alive\r\nKeep-Alive: timeout=30\r\n"
+    else
         "Connection: close\r\n"
+    end
     write(sock,
         "HTTP/1.1 $status $reason\r\n" *
         "Content-Type: $content_type\r\n" *
@@ -1358,7 +1422,7 @@ function _uri_decode(s::AbstractString)
 end
 
 function _static_content_type(path::AbstractString)
-    endswith(path, ".js")  && return "application/javascript; charset=utf-8"
+    endswith(path, ".js") && return "application/javascript; charset=utf-8"
     endswith(path, ".css") && return "text/css; charset=utf-8"
     endswith(path, ".svg") && return "image/svg+xml"
     endswith(path, ".png") && return "image/png"
@@ -1386,9 +1450,9 @@ end
 
 Upsample a 3D array to `target_n` points per axis using trilinear interpolation.
 """
-function _trilinear_upsample(data::Array{Float64,3}, target_n::Int)
+function _trilinear_upsample(data::Array{Float64, 3}, target_n::Int)
     nx, ny, nz = size(data)
-    out = Array{Float64,3}(undef, target_n, target_n, target_n)
+    out = Array{Float64, 3}(undef, target_n, target_n, target_n)
     @inbounds for iz in 1:target_n
         fz = 1.0 + (iz - 1) * (nz - 1) / (target_n - 1)
         z0 = clamp(floor(Int, fz), 1, nz - 1)
@@ -1404,10 +1468,14 @@ function _trilinear_upsample(data::Array{Float64,3}, target_n::Int)
                 x0 = clamp(floor(Int, fx), 1, nx - 1)
                 x1 = x0 + 1
                 wx = fx - x0
-                c000 = data[x0, y0, z0]; c100 = data[x1, y0, z0]
-                c010 = data[x0, y1, z0]; c110 = data[x1, y1, z0]
-                c001 = data[x0, y0, z1]; c101 = data[x1, y0, z1]
-                c011 = data[x0, y1, z1]; c111 = data[x1, y1, z1]
+                c000 = data[x0, y0, z0];
+                c100 = data[x1, y0, z0]
+                c010 = data[x0, y1, z0];
+                c110 = data[x1, y1, z0]
+                c001 = data[x0, y0, z1];
+                c101 = data[x1, y0, z1]
+                c011 = data[x0, y1, z1];
+                c111 = data[x1, y1, z1]
                 c00 = c000 * (1 - wx) + c100 * wx
                 c01 = c001 * (1 - wx) + c101 * wx
                 c10 = c010 * (1 - wx) + c110 * wx
@@ -1426,7 +1494,7 @@ Compute 3D density for each m-component.
 Uses trilinear interpolation to produce smooth output at `target_n` resolution.
 Top `max_components` by population are included, plus total.
 """
-function _compute_3d_densities(jld2_path::String; target_n::Int = 0, max_components::Int = 0)
+function _compute_3d_densities(jld2_path::String; target_n::Int=0, max_components::Int=0)
     d = JLD2.load(jld2_path)
     psi = d["psi"]
     n_comp = size(psi, ndims(psi))
@@ -1437,7 +1505,9 @@ function _compute_3d_densities(jld2_path::String; target_n::Int = 0, max_compone
 
     ndim == 3 || throw(ArgumentError("3D density requires 3D data, got $(ndim)D"))
 
-    all_densities = [Float64.(abs2.(view(psi, _component_slice(ndim, n_pts, c)...))) for c in 1:n_comp]
+    all_densities = [
+        Float64.(abs2.(view(psi, _component_slice(ndim, n_pts, c)...))) for c in 1:n_comp
+    ]
     pops = [sum(dens) for dens in all_densities]
     total_pop = sum(pops)
 
@@ -1453,19 +1523,22 @@ function _compute_3d_densities(jld2_path::String; target_n::Int = 0, max_compone
 
     total_out = need_interp ? _trilinear_upsample(total_dens, out_n) : total_dens
 
-    components = Dict{String,Any}[]
+    components = Dict{String, Any}[]
     for ci in top_idx
         dens = need_interp ? _trilinear_upsample(all_densities[ci], out_n) : all_densities[ci]
-        push!(components, Dict{String,Any}(
-            "m" => m_values[ci],
-            "population" => pops[ci] / max(total_pop, 1e-300),
-            "density" => vec(dens),
-        ))
+        push!(
+            components,
+            Dict{String, Any}(
+                "m" => m_values[ci],
+                "population" => pops[ci] / max(total_pop, 1e-300),
+                "density" => vec(dens),
+            ),
+        )
     end
 
     out_shape = need_interp ? (out_n, out_n, out_n) : n_pts
 
-    Dict{String,Any}(
+    Dict{String, Any}(
         "m_values" => [c["m"] for c in components],
         "total_density" => vec(total_out),
         "components" => components,
@@ -1501,7 +1574,7 @@ end
 Compute column densities (integrated along `axis`) for each m-component.
 Returns Dict with m_values, densities (list of 2D arrays), grid info.
 """
-function _compute_column_densities(jld2_path::String, axis::Int = 3)
+function _compute_column_densities(jld2_path::String, axis::Int=3)
     d = JLD2.load(jld2_path)
     psi = d["psi"]
     n_comp = size(psi, ndims(psi))
@@ -1514,7 +1587,7 @@ function _compute_column_densities(jld2_path::String, axis::Int = 3)
     if ndim == 1
         densities = [Float64[abs2(psi[i, c]) for i in 1:n_pts[1]] for c in 1:n_comp]
         x_range = box !== nothing ? [-box[1]/2, box[1]/2] : [0, n_pts[1]-1]
-        return Dict{String,Any}(
+        return Dict{String, Any}(
             "m_values" => m_values,
             "densities" => densities,
             "ndim" => 1,
@@ -1542,7 +1615,7 @@ function _compute_column_densities(jld2_path::String, axis::Int = 3)
         total .+= dens
     end
 
-    axis_names = ["x","y","z"]
+    axis_names = ["x", "y", "z"]
     ax_labels = [axis_names[i] for i in remaining]
     ax_ranges = if box !== nothing && length(box) >= ndim
         [[-box[i]/2, box[i]/2] for i in remaining]
@@ -1550,7 +1623,7 @@ function _compute_column_densities(jld2_path::String, axis::Int = 3)
         [[0, n_pts[i]-1] for i in remaining]
     end
 
-    Dict{String,Any}(
+    Dict{String, Any}(
         "m_values" => m_values,
         "densities" => densities,
         "total_density" => total,
@@ -1564,14 +1637,16 @@ function _compute_column_densities(jld2_path::String, axis::Int = 3)
 end
 
 """Column densities from pre-loaded (cached) psi."""
-function _compute_column_densities_from_cache(psi, n_comp, ndim, n_pts, F, axis::Int, jld2_path::String)
+function _compute_column_densities_from_cache(
+    psi, n_comp, ndim, n_pts, F, axis::Int, jld2_path::String
+)
     m_values = [F - (c - 1) for c in 1:n_comp]
     box = _read_box_size(jld2_path)
 
     if ndim == 1
         densities = [Float64[abs2(psi[i, c]) for i in 1:n_pts[1]] for c in 1:n_comp]
         x_range = box !== nothing ? [-box[1]/2, box[1]/2] : [0, n_pts[1]-1]
-        return Dict{String,Any}(
+        return Dict{String, Any}(
             "m_values" => m_values, "densities" => densities,
             "ndim" => 1, "shape" => [n_pts[1]], "axis" => 0,
             "box" => box, "x_range" => x_range,
@@ -1595,7 +1670,7 @@ function _compute_column_densities_from_cache(psi, n_comp, ndim, n_pts, F, axis:
         total .+= dens
     end
 
-    axis_names = ["x","y","z"]
+    axis_names = ["x", "y", "z"]
     ax_labels = [axis_names[i] for i in remaining]
     ax_ranges = if box !== nothing && length(box) >= ndim
         [[-box[i]/2, box[i]/2] for i in remaining]
@@ -1603,7 +1678,7 @@ function _compute_column_densities_from_cache(psi, n_comp, ndim, n_pts, F, axis:
         [[0, n_pts[i]-1] for i in remaining]
     end
 
-    Dict{String,Any}(
+    Dict{String, Any}(
         "m_values" => m_values, "densities" => densities,
         "total_density" => total, "ndim" => ndim,
         "shape" => collect(out_shape), "axis" => axis,
@@ -1618,7 +1693,7 @@ can mask phase at low density where the angle is ill-defined.
 """
 function _compute_phase_slice_from_cache(
     psi, n_comp, ndim, n_pts, F,
-    axis::Int, slice_idx::Union{Nothing,Int},
+    axis::Int, slice_idx::Union{Nothing, Int},
     jld2_path::String,
 )
     ndim == 3 || throw(ArgumentError("Phase slice requires 3D data, got $(ndim)D"))
@@ -1639,7 +1714,7 @@ function _compute_phase_slice_from_cache(
         push!(densities, vec(abs2.(slice)))
     end
 
-    axis_names = ["x","y","z"]
+    axis_names = ["x", "y", "z"]
     ax_labels = [axis_names[i] for i in remaining]
     ax_ranges = if box !== nothing && length(box) >= ndim
         [[-box[i]/2, box[i]/2] for i in remaining]
@@ -1647,7 +1722,7 @@ function _compute_phase_slice_from_cache(
         [[0, n_pts[i]-1] for i in remaining]
     end
 
-    Dict{String,Any}(
+    Dict{String, Any}(
         "m_values" => m_values,
         "phases" => phases,
         "densities" => densities,
@@ -1675,7 +1750,7 @@ Total size for 64×64 × 13 components: 24 + 16 + 52 + 16384 + 213 KB ≈ 230 KB
 vs ~1.6 MB for the equivalent JSON.
 """
 function _compute_column_density_binary(
-    psi, n_comp, ndim, n_pts, F, axis::Int, jld2_path::String,
+    psi, n_comp, ndim, n_pts, F, axis::Int, jld2_path::String
 )
     ndim >= 2 || throw(ArgumentError("Column density binary requires 2D or 3D data"))
     axis = clamp(axis, 1, ndim)
@@ -1702,17 +1777,17 @@ function _compute_column_density_binary(
     end
 
     ax_ranges = if box !== nothing && length(box) >= ndim
-        Float32[-box[remaining[1]]/2, box[remaining[1]]/2,
-                length(remaining) >= 2 ? -box[remaining[2]]/2 : 0f0,
-                length(remaining) >= 2 ?  box[remaining[2]]/2 : 0f0]
+        Float32[-box[remaining[1]] / 2, box[remaining[1]] / 2,
+            length(remaining) >= 2 ? -box[remaining[2]]/2 : 0.0f0,
+            length(remaining) >= 2 ? box[remaining[2]]/2 : 0.0f0]
     else
-        Float32[0, nx-1, 0, ny-1]
+        Float32[0, nx - 1, 0, ny - 1]
     end
     m_values = Int32[F - (c - 1) for c in 1:n_comp]
 
-    buf = IOBuffer(; sizehint = 24 + 16 + n_comp*4 + plane_n*4 + n_comp*plane_n*4)
+    buf = IOBuffer(; sizehint=24 + 16 + n_comp*4 + plane_n*4 + n_comp*plane_n*4)
     write(buf, Int32(ndim), Int32(axis), Int32(nx), Int32(ny),
-               Int32(n_comp), Int32(F))
+        Int32(n_comp), Int32(F))
     write(buf, ax_ranges)
     write(buf, m_values)
     write(buf, total)
@@ -1742,7 +1817,7 @@ computes the missing frames in passing and back-fills the cache so a
 subsequent per-frame request still hits.
 """
 function _compute_column_density_atlas_binary(
-    fpath::String, axis::Int, n_snaps::Int, psi_cache::Dict{String,Any},
+    fpath::String, axis::Int, n_snaps::Int, psi_cache::Dict{String, Any}
 )
     n_snaps > 0 || throw(ArgumentError("n_snaps must be positive"))
     # Load snap=1 to learn the shape; subsequent snaps reuse the same
@@ -1761,11 +1836,11 @@ function _compute_column_density_atlas_binary(
     plane_n = nx * ny
     plane_bytes = plane_n * 4
     ax_ranges = if box !== nothing && length(box) >= ndim
-        Float32[-box[remaining[1]]/2, box[remaining[1]]/2,
-                length(remaining) >= 2 ? -box[remaining[2]]/2 : 0f0,
-                length(remaining) >= 2 ?  box[remaining[2]]/2 : 0f0]
+        Float32[-box[remaining[1]] / 2, box[remaining[1]] / 2,
+            length(remaining) >= 2 ? -box[remaining[2]]/2 : 0.0f0,
+            length(remaining) >= 2 ? box[remaining[2]]/2 : 0.0f0]
     else
-        Float32[0, nx-1, 0, ny-1]
+        Float32[0, nx - 1, 0, ny - 1]
     end
     m_values = Int32[F - (c - 1) for c in 1:n_comp]
 
@@ -1776,7 +1851,10 @@ function _compute_column_density_atlas_binary(
     out = Vector{UInt8}(undef, total_size)
 
     # Write header.
-    out[1] = UInt8('D'); out[2] = UInt8('A'); out[3] = UInt8('T'); out[4] = UInt8('L')
+    out[1] = UInt8('D');
+    out[2] = UInt8('A');
+    out[3] = UInt8('T');
+    out[4] = UInt8('L')
     hdr_int = reinterpret(Int32, view(out, 5:32))
     hdr_int[1] = Int32(n_snaps)
     hdr_int[2] = Int32(ndim)
@@ -1809,7 +1887,7 @@ function _compute_column_density_atlas_binary(
                 _evict_one!(psi_cache)
             end
             v = _compute_column_density_binary(
-                _load_psi_cached(fpath, psi_cache, snap)..., axis_clamped, fpath,
+                _load_psi_cached(fpath, psi_cache, snap)..., axis_clamped, fpath
             )
             psi_cache[cache_key] = v
             v
@@ -1820,8 +1898,9 @@ function _compute_column_density_atlas_binary(
         copyto!(out, dst_total_off, per_frame, src_total_off, plane_bytes)
         for c in 1:n_comp
             src_off = frame_header_bytes + plane_bytes + (c - 1) * plane_bytes + 1
-            dst_off = total_atlas_off + panel_atlas_bytes +
-                      (c - 1) * panel_atlas_bytes + (snap - 1) * plane_bytes
+            dst_off =
+                total_atlas_off + panel_atlas_bytes +
+                (c - 1) * panel_atlas_bytes + (snap - 1) * plane_bytes
             copyto!(out, dst_off, per_frame, src_off, plane_bytes)
         end
     end
@@ -1842,13 +1921,15 @@ into the atlas region; missing frames are computed in passing and
 cached.
 """
 function _compute_density3d_atlas_binary(
-    fpath::String, component::Int, n_snaps::Int, psi_cache::Dict{String,Any},
+    fpath::String, component::Int, n_snaps::Int, psi_cache::Dict{String, Any}
 )
     n_snaps > 0 || throw(ArgumentError("n_snaps must be positive"))
     first_tup = _load_psi_cached(fpath, psi_cache, 1)
     psi1, n_comp, ndim, n_pts, F = first_tup
     ndim == 3 || throw(ArgumentError("density3d atlas requires 3D data"))
-    nx = n_pts[1]; ny = n_pts[2]; nz = n_pts[3]
+    nx = n_pts[1];
+    ny = n_pts[2];
+    nz = n_pts[3]
     voxel_n = nx * ny * nz
     voxel_bytes = voxel_n * 4
 
@@ -1856,7 +1937,10 @@ function _compute_density3d_atlas_binary(
     total_size = header_size + n_snaps * voxel_bytes
     out = Vector{UInt8}(undef, total_size)
 
-    out[1] = UInt8('D'); out[2] = UInt8('3'); out[3] = UInt8('A'); out[4] = UInt8('T')
+    out[1] = UInt8('D');
+    out[2] = UInt8('3');
+    out[3] = UInt8('A');
+    out[4] = UInt8('T')
     hdr_int = reinterpret(Int32, view(out, 5:28))
     hdr_int[1] = Int32(n_snaps)
     hdr_int[2] = Int32(nx)
@@ -1877,7 +1961,7 @@ function _compute_density3d_atlas_binary(
                 _evict_one!(psi_cache)
             end
             v = _compute_3d_density_binary(
-                _load_psi_cached(fpath, psi_cache, snap)...; component = component,
+                _load_psi_cached(fpath, psi_cache, snap)...; component=component
             )
             psi_cache[cache_key] = v
             v
@@ -1900,7 +1984,7 @@ Phase slice packed as Float32. Layout:
 """
 function _compute_phase_slice_binary(
     psi, n_comp, ndim, n_pts, F,
-    axis::Int, slice_idx::Union{Nothing,Int},
+    axis::Int, slice_idx::Union{Nothing, Int},
     jld2_path::String,
 )
     ndim == 3 || throw(ArgumentError("Phase slice binary requires 3D data, got $(ndim)D"))
@@ -1928,16 +2012,16 @@ function _compute_phase_slice_binary(
     end
 
     ax_ranges = if box !== nothing && length(box) >= ndim
-        Float32[-box[remaining[1]]/2, box[remaining[1]]/2,
-                -box[remaining[2]]/2,  box[remaining[2]]/2]
+        Float32[-box[remaining[1]] / 2, box[remaining[1]] / 2,
+            -box[remaining[2]] / 2, box[remaining[2]] / 2]
     else
-        Float32[0, nx-1, 0, ny-1]
+        Float32[0, nx - 1, 0, ny - 1]
     end
     m_values = Int32[F - (c - 1) for c in 1:n_comp]
 
-    buf = IOBuffer(; sizehint = 28 + 16 + n_comp*4 + 2*n_comp*plane_n*4)
+    buf = IOBuffer(; sizehint=28 + 16 + n_comp*4 + 2*n_comp*plane_n*4)
     write(buf, Int32(ndim), Int32(axis), Int32(k), Int32(nx), Int32(ny),
-               Int32(n_comp), Int32(F))
+        Int32(n_comp), Int32(F))
     write(buf, ax_ranges)
     write(buf, m_values)
     write(buf, phases)
@@ -1986,7 +2070,7 @@ function _evict_one!(cache::Dict)
     for k in keys(cache)
         if !_is_derived_cache_key(k)
             delete!(cache, k)
-            return
+            return nothing
         end
     end
     # All entries are derived blobs — fall back to FIFO (insertion order).
@@ -2009,7 +2093,7 @@ const _PREPACK_INFLIGHT = Set{String}()
 # Capacity is bounded so we don't exhaust file descriptors when many runs
 # get visited; LRU-ish eviction (FIFO via insertion order) closes the
 # oldest open handle when the cap is hit.
-const _OPEN_JLD_HANDLES = Dict{String,Tuple{JLD2.JLDFile,ReentrantLock}}()
+const _OPEN_JLD_HANDLES = Dict{String, Tuple{JLD2.JLDFile, ReentrantLock}}()
 const _OPEN_JLD_LOCK = ReentrantLock()
 const _OPEN_JLD_MAX = 32
 
@@ -2080,7 +2164,9 @@ end
 
 """Write atlas blob to disk-cache. Best-effort — failures (full disk,
 permission denied, etc.) are logged but don't propagate."""
-function _save_atlas_to_disk(base_dir::String, fpath::String, axis::Int, bsz::Bool, blob::Vector{UInt8})
+function _save_atlas_to_disk(
+    base_dir::String, fpath::String, axis::Int, bsz::Bool, blob::Vector{UInt8}
+)
     cache_path = _atlas_disk_path(base_dir, fpath, axis, bsz)
     try
         mkpath(dirname(cache_path))
@@ -2090,7 +2176,7 @@ function _save_atlas_to_disk(base_dir::String, fpath::String, axis::Int, bsz::Bo
         open(tmp, "w") do io
             write(io, blob)
         end
-        mv(tmp, cache_path; force = true)
+        mv(tmp, cache_path; force=true)
     catch e
         @warn "Failed to persist atlas cache: $(e)"
     end
@@ -2109,7 +2195,7 @@ hit (sub-ms). The cache cap is 200 entries — enough for the 157-frame
 Klaus run + room for a few ψ snapshots without eviction churn.
 """
 function _warm_density_bin_all(
-    fpath::String, n_snapshots::Int, axis::Int, psi_cache::Dict{String,Any},
+    fpath::String, n_snapshots::Int, axis::Int, psi_cache::Dict{String, Any},
     base_dir::String,
 )
     inflight_key = "warm_density_bin:$(fpath)#axis=$(axis)"
@@ -2169,8 +2255,8 @@ end
 
 function _load_psi_cached(
     jld2_path::String,
-    cache::Dict{String,Any},
-    snap_idx::Union{Nothing,Int} = nothing,
+    cache::Dict{String, Any},
+    snap_idx::Union{Nothing, Int}=nothing,
 )
     key = snap_idx === nothing ? jld2_path : "$(jld2_path)#snap=$(snap_idx)"
     if haskey(cache, key)
@@ -2218,10 +2304,12 @@ function _load_psi_cached(
                     )
                     Array(view(snaps, idx...))
                 else
-                    throw(ArgumentError(
-                        "No psi snapshots in $(jld2_path). Re-run with " *
-                        "`save_psi_snapshots: true`.",
-                    ))
+                    throw(
+                        ArgumentError(
+                            "No psi snapshots in $(jld2_path). Re-run with " *
+                            "`save_psi_snapshots: true`.",
+                        ),
+                    )
                 end
             end
         end
@@ -2246,7 +2334,7 @@ function _snapshots_metadata(jld2_path::String)
         # acceptable in exchange for not starving the hot path.
         jldopen(jld2_path, "r") do f
             times = haskey(f, "dynamics/times") ?
-                Float64.(f["dynamics/times"]) : Float64[]
+                    Float64.(f["dynamics/times"]) : Float64[]
             if haskey(f, "dynamics/psi_snapshots_streamed/n_snapshots")
                 n = Int(f["dynamics/psi_snapshots_streamed/n_snapshots"])
                 shape = Int.(f["dynamics/psi_snapshots_streamed/spatial_shape"])
@@ -2259,7 +2347,7 @@ function _snapshots_metadata(jld2_path::String)
                 # density_max_total moved to its own /api/density_max
                 # endpoint — the 16-frame walk took ~0.8 s and blocked the
                 # snapshots response. Lazy fetch keeps run-open instant.
-                return Dict{String,Any}(
+                return Dict{String, Any}(
                     "n_snapshots" => n,
                     "times" => times_aligned,
                     "shape" => vcat(shape, D),
@@ -2268,10 +2356,10 @@ function _snapshots_metadata(jld2_path::String)
                 snaps = f["dynamics/psi_snapshots"]
                 n_snaps = size(snaps, ndims(snaps))
                 times_aligned = length(times) == n_snaps + 1 ? times[2:end] : times
-                return Dict{String,Any}(
+                return Dict{String, Any}(
                     "n_snapshots" => n_snaps,
                     "times" => times_aligned,
-                    "shape" => collect(size(snaps)[1:end-1]),
+                    "shape" => collect(size(snaps)[1:(end - 1)]),
                 )
             end
             nothing
@@ -2289,13 +2377,13 @@ within HTTP timeout budget. Always includes the first + last frame.
 Returned value is the physically correct normalisation reference
 for the 3D viewer (same density renders the same color frame-to-frame).
 """
-function _global_density_max_total_sampled(f, n_snapshots::Int; n_samples::Int = 16)
+function _global_density_max_total_sampled(f, n_snapshots::Int; n_samples::Int=16)
     n_snapshots == 0 && return 1.0
     # Sample indices: evenly spaced + include endpoints
     idxs = if n_snapshots <= n_samples
         collect(1:n_snapshots)
     else
-        unique([1; round.(Int, range(1, n_snapshots; length = n_samples)); n_snapshots])
+        unique([1; round.(Int, range(1, n_snapshots; length=n_samples)); n_snapshots])
     end
     g_max = 0.0
     for k in idxs
@@ -2307,7 +2395,7 @@ function _global_density_max_total_sampled(f, n_snapshots::Int; n_samples::Int =
         # Spin-summed density per grid cell. Avoid CartesianIndices
         # for speed: sum over component axis with abs2.(view(...)).
         n_total = sum(c -> abs2.(view(frame, ntuple(d -> d <= ndim ? Colon() : c, ndim + 1)...)),
-                       1:D)
+            1:D)
         local_max = Float64(maximum(n_total))
         local_max > g_max && (g_max = local_max)
     end
@@ -2317,7 +2405,7 @@ end
 """
 Compute a single 3D density component as binary Float32.
 """
-function _compute_3d_density_binary(psi, n_comp, ndim, n_pts, F; component::Int = 0)
+function _compute_3d_density_binary(psi, n_comp, ndim, n_pts, F; component::Int=0)
     ndim == 3 || throw(ArgumentError("3D density requires 3D data"))
     _pack_3d_binary(psi, n_comp, ndim, n_pts, F, component)
 end
@@ -2340,27 +2428,31 @@ function _compute_3d_vorticity_binary(psi, n_comp, ndim, n_pts, F, box_size)
     total_n = sum(m -> Float64.(abs2.(view(psi, _component_slice(ndim, n_pts, m)...))), 1:n_comp)
     n_peak = maximum(total_n)
     cutoff = max(1e-8, 1e-2 * n_peak)
-    ωx, ωy, ωz = superfluid_vorticity(psi, grid, plans; density_cutoff = cutoff)
+    ωx, ωy, ωz = superfluid_vorticity(psi, grid, plans; density_cutoff=cutoff)
 
     N = prod(n_pts)
     # Also zero the output outside the cloud to be defensive; the cutoff
     # above zeroes v, but numerical ∇ can still pick up edge gradients.
     mag = Vector{Float32}(undef, N)
     total_flat = vec(total_n)
-    @inbounds for i = 1:N
+    @inbounds for i in 1:N
         if total_flat[i] < cutoff
             mag[i] = 0.0f0
         else
-            a = ωx[i]; b = ωy[i]; c = ωz[i]
+            a = ωx[i];
+            b = ωy[i];
+            c = ωz[i]
             mag[i] = Float32(sqrt(a*a + b*b + c*c))
         end
     end
 
-    pops = Float32[Float32(sum(abs2, view(psi, _component_slice(ndim, n_pts, m)...))) for m in 1:n_comp]
+    pops = Float32[
+        Float32(sum(abs2, view(psi, _component_slice(ndim, n_pts, m)...))) for m in 1:n_comp
+    ]
     total_pop = sum(pops)
-    pops ./= max(total_pop, 1f-30)
+    pops ./= max(total_pop, 1.0f-30)
 
-    buf = IOBuffer(; sizehint = 24 + n_comp * 4 + N * 4)
+    buf = IOBuffer(; sizehint=24 + n_comp * 4 + N * 4)
     write(buf, Int32(n_pts[1]), Int32(n_pts[2]), Int32(n_pts[3]))
     write(buf, Int32(n_comp), Int32(F), Int32(0))
     write(buf, pops)
@@ -2373,7 +2465,7 @@ end
 header layout so the frontend can reuse the same parser. Requires a
 specific component (`component >= 1`); the total spinor has no scalar phase.
 """
-function _compute_3d_phase_binary(psi, n_comp, ndim, n_pts, F; component::Int = 0)
+function _compute_3d_phase_binary(psi, n_comp, ndim, n_pts, F; component::Int=0)
     ndim == 3 || throw(ArgumentError("3D phase requires 3D data"))
     component >= 1 || throw(ArgumentError("phase3d requires component >= 1 (per-m only)"))
     c = clamp(component, 1, n_comp)
@@ -2384,12 +2476,14 @@ function _compute_3d_phase_binary(psi, n_comp, ndim, n_pts, F; component::Int = 
         phase[i] = Float32(angle(psi_c[i]))
     end
 
-    pops = Float32[Float32(sum(abs2, view(psi, _component_slice(ndim, n_pts, m)...))) for m in 1:n_comp]
+    pops = Float32[
+        Float32(sum(abs2, view(psi, _component_slice(ndim, n_pts, m)...))) for m in 1:n_comp
+    ]
     total_pop = sum(pops)
-    pops ./= max(total_pop, 1f-30)
+    pops ./= max(total_pop, 1.0f-30)
 
     N = prod(n_pts)
-    buf = IOBuffer(; sizehint = 24 + n_comp * 4 + N * 4)
+    buf = IOBuffer(; sizehint=24 + n_comp * 4 + N * 4)
     write(buf, Int32(n_pts[1]), Int32(n_pts[2]), Int32(n_pts[3]))
     write(buf, Int32(n_comp), Int32(F), Int32(c))
     write(buf, pops)
@@ -2402,7 +2496,9 @@ Compute rotated 3D density: rotate quantization axis by angle_deg around y, then
 Optimized: only computes the single requested component (not full matrix multiply).
 Total density (component=0) is rotation-invariant, so skip rotation entirely.
 """
-function _compute_rotated_3d_density_binary(psi, n_comp, ndim, n_pts, F; angle_deg::Float64 = 0.0, component::Int = 0)
+function _compute_rotated_3d_density_binary(
+    psi, n_comp, ndim, n_pts, F; angle_deg::Float64=0.0, component::Int=0
+)
     ndim == 3 || throw(ArgumentError("3D density requires 3D data"))
     if abs(angle_deg) < 0.01 || component == 0
         return _pack_3d_binary(psi, n_comp, ndim, n_pts, F, component)
@@ -2422,11 +2518,13 @@ function _compute_rotated_3d_density_binary(psi, n_comp, ndim, n_pts, F; angle_d
     dens = Float32.(abs2.(psi_c_rot))
 
     # Compute rotated populations (cheap: just norms of R * population_vector)
-    pops_orig = Float32[Float32(sum(abs2, view(psi, _component_slice(ndim, n_pts, m)...))) for m in 1:n_comp]
+    pops_orig = Float32[
+        Float32(sum(abs2, view(psi, _component_slice(ndim, n_pts, m)...))) for m in 1:n_comp
+    ]
     total_pop = sum(pops_orig)
-    pops_orig ./= max(total_pop, 1f-30)
+    pops_orig ./= max(total_pop, 1.0f-30)
 
-    buf = IOBuffer(; sizehint = 24 + n_comp * 4 + N * 4)
+    buf = IOBuffer(; sizehint=24 + n_comp * 4 + N * 4)
     write(buf, Int32(n_pts[1]), Int32(n_pts[2]), Int32(n_pts[3]))
     write(buf, Int32(n_comp), Int32(F), Int32(component))
     write(buf, pops_orig)
@@ -2462,9 +2560,9 @@ function _pack_3d_binary(psi, n_comp, ndim, n_pts, F, component)
         pops[c] = Float32(s)
     end
     total_pop = sum(pops)
-    pops ./= max(total_pop, 1f-30)
+    pops ./= max(total_pop, 1.0f-30)
 
-    buf = IOBuffer(; sizehint = 24 + n_comp * 4 + N * 4)
+    buf = IOBuffer(; sizehint=24 + n_comp * 4 + N * 4)
     write(buf, Int32(n_pts[1]), Int32(n_pts[2]), Int32(n_pts[3]))
     write(buf, Int32(n_comp), Int32(F), Int32(component))
     write(buf, pops)
@@ -2475,7 +2573,7 @@ end
 """
 Compute coherence matrix C_{mn}(x,y) = Σ_z ψ_m*(x,y,z) ψ_n(x,y,z) for quantization axis rotation.
 """
-function _compute_coherence_matrix_binary(psi, n_comp, ndim, n_pts, F, axis::Int = 3)
+function _compute_coherence_matrix_binary(psi, n_comp, ndim, n_pts, F, axis::Int=3)
     ndim == 3 || throw(ArgumentError("Coherence matrix requires 3D data"))
     axis = clamp(axis, 1, 3)
 
@@ -2504,7 +2602,7 @@ end
 
 # --- Vector field (current / spin_density / velocity) binary API ---
 
-const _vector3d_plans_cache = Dict{NTuple{3,Int},Tuple{FFTPlans,Grid{3}}}()
+const _vector3d_plans_cache = Dict{NTuple{3, Int}, Tuple{FFTPlans, Grid{3}}}()
 
 function _load_box_size(jld2_path::String)
     # Preferred: pull "grid_box_size" from the JLD2 file itself (newer runs
@@ -2515,31 +2613,32 @@ function _load_box_size(jld2_path::String)
         d = _with_jld_handle(jld2_path) do f
             haskey(f, "grid_box_size") ? f["grid_box_size"] : nothing
         end
-        d === nothing || return NTuple{3,Float64}(d)
+        d === nothing || return NTuple{3, Float64}(d)
     catch
         # fall through
     end
     box = _read_box_size(jld2_path)
     if box === nothing || length(box) < 3
-        throw(ArgumentError(
-            "Cannot resolve box_size for $(jld2_path): missing `grid_box_size` " *
-            "in the JLD2 file and no usable grid.box in config.yaml.",
-        ))
+        throw(
+            ArgumentError(
+                "Cannot resolve box_size for $(jld2_path): missing `grid_box_size` " *
+                "in the JLD2 file and no usable grid.box in config.yaml.",
+            ),
+        )
     end
-    NTuple{3,Float64}((Float64(box[1]), Float64(box[2]), Float64(box[3])))
+    NTuple{3, Float64}((Float64(box[1]), Float64(box[2]), Float64(box[3])))
 end
 
-function _get_plans_and_grid(n_pts::NTuple{3,Int}, box_size::NTuple{3,Float64})
+function _get_plans_and_grid(n_pts::NTuple{3, Int}, box_size::NTuple{3, Float64})
     get!(_vector3d_plans_cache, n_pts) do
         grid = make_grid(GridConfig(n_pts, box_size))
-        plans = make_fft_plans(n_pts; flags = FFTW.ESTIMATE)
+        plans = make_fft_plans(n_pts; flags=FFTW.ESTIMATE)
         (plans, grid)
     end
 end
 
 function _compute_vector3d_binary(psi, n_comp, ndim, n_pts, F, box_size;
-    field::Symbol = :current, stride::Int = 2)
-
+    field::Symbol=:current, stride::Int=2)
     stride = max(1, stride)
     sub_idx = ntuple(d -> 1:stride:n_pts[d], 3)
     n_sub = ntuple(d -> length(sub_idx[d]), 3)
@@ -2559,7 +2658,7 @@ function _compute_vector3d_binary(psi, n_comp, ndim, n_pts, F, box_size;
     end
 
     N_sub = prod(n_sub)
-    buf = IOBuffer(; sizehint = 28 + 4 * 4 * N_sub)
+    buf = IOBuffer(; sizehint=28 + 4 * 4 * N_sub)
     write(buf, Int32(n_sub[1]), Int32(n_sub[2]), Int32(n_sub[3]))
     write(buf, Int32(stride), Int32(0), Int32(0), Int32(0))
 

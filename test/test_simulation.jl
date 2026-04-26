@@ -160,7 +160,7 @@ using FFTW
         sp = SimParams(; dt=0.01, n_steps=50, imaginary_time=false, save_every=10)
 
         ws = make_workspace(;
-            grid, atom=Rb87, interactions, sim_params=sp,
+            grid, atom=Rb87, interactions, sim_params=sp
         )
 
         result = run_simulation!(ws)
@@ -219,9 +219,9 @@ using FFTW
         omega = 0.3
 
         sp = SimParams(; dt=0.01, n_steps=10, imaginary_time=true,
-                        rotating_frame_omega=omega)
+            rotating_frame_omega=omega)
         ws = make_workspace(; grid, atom=Rb87, interactions, sim_params=sp,
-                            fft_flags=FFTW.ESTIMATE)
+            fft_flags=FFTW.ESTIMATE)
 
         center_idx = CartesianIndex(8, 8)
         corner_idx = CartesianIndex(1, 1)
@@ -238,8 +238,8 @@ using FFTW
         trap = HarmonicTrap(1.0, 1.0)
 
         r = find_ground_state(; grid, atom=Rb87, interactions, potential=trap,
-                                dt=0.005, n_steps=200,
-                                rotating_frame_omega=0.3, fft_flags=FFTW.ESTIMATE)
+            dt=0.005, n_steps=200,
+            rotating_frame_omega=0.3, fft_flags=FFTW.ESTIMATE)
         @test isfinite(r.energy)
         @test !any(isnan, r.workspace.state.psi)
     end

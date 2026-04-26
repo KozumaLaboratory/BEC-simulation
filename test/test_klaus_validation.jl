@@ -40,7 +40,7 @@ using SpinorBEC
           - vortex_detect: {component: 1, threshold: 0.1}
     """
     cfg = load_config_from_string(yaml_str)
-    result = run_config(cfg; verbose = false)
+    result = run_config(cfg; verbose=false)
     @test haskey(result, :vortex_detect)
     @test result.vortex_detect.vortex_count >= 0
     # Norm conservation through a 0.5 ω_ref^-1 stir should be < 1% drift

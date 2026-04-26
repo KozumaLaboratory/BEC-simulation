@@ -12,8 +12,7 @@ function _check_itp_overflow(ws, step::Int)
     end
     ws.ddi === nothing && return nothing
     bufs = ws.ddi_bufs
-    phi_max =
-        max(maximum(abs, bufs.Phi_x), maximum(abs, bufs.Phi_y), maximum(abs, bufs.Phi_z))
+    phi_max = max(maximum(abs, bufs.Phi_x), maximum(abs, bufs.Phi_y), maximum(abs, bufs.Phi_z))
     dt = ws.sim_params.dt
     exponent = phi_max * dt / 2
     if exponent > _ITP_EXPONENT_LIMIT
@@ -50,8 +49,8 @@ function _validate_itp_interactions(
     interactions::InteractionParams,
     F,
     dt;
-    psi = nothing,
-    c_dd::Float64 = 0.0,
+    psi=nothing,
+    c_dd::Float64=0.0,
 )
     n_peak = if psi !== nothing
         ndim = ndims(psi) - 1
@@ -93,45 +92,45 @@ function find_ground_state(;
     grid,
     atom,
     interactions,
-    zeeman = ZeemanParams(),
-    potential = NoPotential(),
-    dt = 0.001,
-    n_steps = 10000,
-    tol = 1e-10,
-    initial_state = :polar,
-    init_state_params::Dict{Symbol,Float64} = Dict{Symbol,Float64}(),
-    psi_init = nothing,
-    enable_ddi::Bool = false,
-    c_dd::Float64 = NaN,
-    secular_ddi::Bool = false,
-    adaptive_dt::Bool = false,
-    dt_max::Float64 = 10.0 * dt,
-    fft_flags = FFTW.MEASURE,
-    target_magnetization::Union{Nothing,Float64} = nothing,
-    rotating_frame_omega::Float64 = 0.0,
-    target_Jz::Union{Nothing,Float64} = nothing,
-    Jz_tol::Float64 = 0.01,
-    Jz_max_iter::Int = 20,
-    Jz_omega_range::Tuple{Float64,Float64} = (-5.0, 5.0),
-    quasi_2d_ddi::Bool = false,
-    l_z_ddi::Float64 = 0.0,
-    quasi_2d::Bool = false,
-    l_z::Float64 = 0.0,
-    backend::AbstractBackend = CPUBackend(),
-    on_step::Union{Nothing,Function} = nothing,  # (ws, step, n_steps) → update ws params
-    checkpoint_dir::Union{Nothing,String} = nothing,
-    checkpoint_every::Int = 0,
-    _start_step::Int = 0,        # internal: for resume
-    _checkpoint_dir::Union{Nothing,String} = nothing,  # internal alias
-    _checkpoint_every::Int = 0,   # internal alias
-    light_shift::Union{Nothing,LightShift} = nothing,
-    dtype::Union{Nothing,Type{<:AbstractFloat}} = nothing,
-    spinor_lhy::Union{Nothing,Symbol} = nothing,
+    zeeman=ZeemanParams(),
+    potential=NoPotential(),
+    dt=0.001,
+    n_steps=10000,
+    tol=1e-10,
+    initial_state=:polar,
+    init_state_params::Dict{Symbol, Float64}=Dict{Symbol, Float64}(),
+    psi_init=nothing,
+    enable_ddi::Bool=false,
+    c_dd::Float64=NaN,
+    secular_ddi::Bool=false,
+    adaptive_dt::Bool=false,
+    dt_max::Float64=10.0 * dt,
+    fft_flags=FFTW.MEASURE,
+    target_magnetization::Union{Nothing, Float64}=nothing,
+    rotating_frame_omega::Float64=0.0,
+    target_Jz::Union{Nothing, Float64}=nothing,
+    Jz_tol::Float64=0.01,
+    Jz_max_iter::Int=20,
+    Jz_omega_range::Tuple{Float64, Float64}=(-5.0, 5.0),
+    quasi_2d_ddi::Bool=false,
+    l_z_ddi::Float64=0.0,
+    quasi_2d::Bool=false,
+    l_z::Float64=0.0,
+    backend::AbstractBackend=CPUBackend(),
+    on_step::Union{Nothing, Function}=nothing,  # (ws, step, n_steps) → update ws params
+    checkpoint_dir::Union{Nothing, String}=nothing,
+    checkpoint_every::Int=0,
+    _start_step::Int=0,        # internal: for resume
+    _checkpoint_dir::Union{Nothing, String}=nothing,  # internal alias
+    _checkpoint_every::Int=0,   # internal alias
+    light_shift::Union{Nothing, LightShift}=nothing,
+    dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
+    spinor_lhy::Union{Nothing, Symbol}=nothing,
 )
     psi0 = if psi_init === nothing
         sys = SpinSystem(atom.F)
         init_kwargs = pairs(init_state_params)
-        init_psi(grid, sys; state = initial_state, dtype = dtype, init_kwargs...)
+        init_psi(grid, sys; state=initial_state, dtype=dtype, init_kwargs...)
     else
         copy(psi_init)
     end
@@ -149,7 +148,7 @@ function find_ground_state(;
         N_dim = length(grid.config.n_points)
         N_dim >= 2 || throw(
             ArgumentError(
-                "target_Jz requires N ≥ 2 (need orbital angular momentum). Got N=$N_dim.",
+                "target_Jz requires N ≥ 2 (need orbital angular momentum). Got N=$N_dim."
             ),
         )
         return _find_ground_state_Jz(;
@@ -162,7 +161,7 @@ function find_ground_state(;
             n_steps,
             tol,
             initial_state,
-            psi_init = psi0,
+            psi_init=psi0,
             enable_ddi,
             c_dd,
             secular_ddi,
@@ -184,7 +183,7 @@ function find_ground_state(;
 
     _validate_itp_zeeman(zeeman, atom.F, dt)
     effective_c_dd = (enable_ddi && !isnan(c_dd)) ? c_dd : 0.0
-    _validate_itp_interactions(interactions, atom.F, dt; psi = psi0, c_dd = effective_c_dd)
+    _validate_itp_interactions(interactions, atom.F, dt; psi=psi0, c_dd=effective_c_dd)
 
     if adaptive_dt
         return _find_ground_state_adaptive(;
@@ -217,9 +216,9 @@ function find_ground_state(;
     sp = SimParams(;
         dt,
         n_steps,
-        imaginary_time = true,
-        normalize_every = norm_every,
-        save_every = max(1, n_steps ÷ 100),
+        imaginary_time=true,
+        normalize_every=norm_every,
+        save_every=max(1, n_steps ÷ 100),
         rotating_frame_omega,
     )
     ws = make_workspace(;
@@ -228,8 +227,8 @@ function find_ground_state(;
         interactions,
         zeeman,
         potential,
-        sim_params = sp,
-        psi_init = psi0,
+        sim_params=sp,
+        psi_init=psi0,
         enable_ddi,
         c_dd,
         secular_ddi,
@@ -240,7 +239,7 @@ function find_ground_state(;
         l_z,
         backend,
         light_shift,
-        dtype = dtype,
+        dtype=dtype,
         spinor_lhy,
     )
 
@@ -262,9 +261,9 @@ function find_ground_state(;
     ckpt_every = checkpoint_every > 0 ? checkpoint_every : _checkpoint_every
 
     _run_itp_loop!(ws, n_steps, tol, on_step, target_magnetization;
-        start_step = _start_step,
-        checkpoint_dir = ckpt_dir,
-        checkpoint_every = ckpt_every,
+        start_step=_start_step,
+        checkpoint_dir=ckpt_dir,
+        checkpoint_every=ckpt_every,
     )
 end
 
@@ -272,9 +271,9 @@ end
 
 function _run_itp_loop!(
     ws, n_steps, tol, on_step, target_magnetization;
-    start_step::Int = 0,
-    checkpoint_dir::Union{Nothing,String} = nothing,
-    checkpoint_every::Int = 0,
+    start_step::Int=0,
+    checkpoint_dir::Union{Nothing, String}=nothing,
+    checkpoint_every::Int=0,
 )
     sp = ws.sim_params
     n_comp = ws.spin_matrices.system.n_components
@@ -318,7 +317,7 @@ function _run_itp_loop!(
     _outer_potential_bwd!(ws, dt / 4, n_comp_ws, N_dim, it)
 
     try
-        for step = (start_step + 1):n_steps
+        for step in (start_step + 1):n_steps
             on_step !== nothing && on_step(ws, step, n_steps)
 
             # Kinetic step K(dt)
@@ -344,7 +343,8 @@ function _run_itp_loop!(
             end
 
             ws.state.step += 1
-            if ws.sim_params.normalize_every > 0 && ws.state.step % ws.sim_params.normalize_every == 0
+            if ws.sim_params.normalize_every > 0 &&
+                ws.state.step % ws.sim_params.normalize_every == 0
                 _normalize_psi!(ws.state.psi, ws.grid, n_comp_ws, N_dim)
             end
 
@@ -373,7 +373,9 @@ function _run_itp_loop!(
             last_step = step
 
             if checkpoint_dir !== nothing && checkpoint_every > 0 && step % checkpoint_every == 0
-                _save_itp_checkpoint(checkpoint_dir, ws, step, n_steps, E_prev, final_dE, final_dpsi, converged, tol)
+                _save_itp_checkpoint(
+                    checkpoint_dir, ws, step, n_steps, E_prev, final_dE, final_dpsi, converged, tol
+                )
             end
 
             if step % sp.save_every == 0
@@ -425,19 +427,29 @@ function _run_itp_loop!(
     end
 
     if interrupted && checkpoint_dir !== nothing
-        _save_itp_checkpoint(checkpoint_dir, ws, last_step, n_steps, total_energy(ws), final_dE, final_dpsi, converged, tol)
+        _save_itp_checkpoint(
+            checkpoint_dir,
+            ws,
+            last_step,
+            n_steps,
+            total_energy(ws),
+            final_dE,
+            final_dpsi,
+            converged,
+            tol,
+        )
         println("  Checkpoint saved to $checkpoint_dir/itp_checkpoint.jld2")
         flush(stdout)
     end
 
     (
-        workspace = ws,
-        converged = converged,
-        energy = total_energy(ws),
-        dE = final_dE,
-        dpsi = final_dpsi,
-        interrupted = interrupted,
-        last_step = last_step,
+        workspace=ws,
+        converged=converged,
+        energy=total_energy(ws),
+        dE=final_dE,
+        dpsi=final_dpsi,
+        interrupted=interrupted,
+        last_step=last_step,
     )
 end
 
@@ -462,9 +474,9 @@ function _save_itp_checkpoint(dir, ws, step, n_steps, energy, dE, dpsi, converge
             f["c0"] = ws.interactions.c0
             f["c1"] = ws.interactions.c1
         end
-        mv(tmp, fname; force = true)
+        mv(tmp, fname; force=true)
     catch err
-        isfile(tmp) && rm(tmp; force = true)
+        isfile(tmp) && rm(tmp; force=true)
         @warn "Failed to save ITP checkpoint: $err"
     end
 end
@@ -502,32 +514,33 @@ Requires the same `grid`, `atom`, `interactions` (and other workspace params)
 as the original run. `n_steps`, `tol`, `dt` default to the checkpoint values.
 """
 function resume_ground_state(checkpoint::ITPCheckpoint;
-    n_steps::Int = checkpoint.n_steps,
-    tol::Float64 = checkpoint.tol,
-    dt::Float64 = checkpoint.dt,
-    checkpoint_dir::Union{Nothing,String} = nothing,
-    checkpoint_every::Int = 0,
+    n_steps::Int=checkpoint.n_steps,
+    tol::Float64=checkpoint.tol,
+    dt::Float64=checkpoint.dt,
+    checkpoint_dir::Union{Nothing, String}=nothing,
+    checkpoint_every::Int=0,
     kwargs...,
 )
-    checkpoint.converged && @warn "Checkpoint already converged (dE=$(checkpoint.dE)). Use refine_ground_state to continue with tighter tol."
+    checkpoint.converged &&
+        @warn "Checkpoint already converged (dE=$(checkpoint.dE)). Use refine_ground_state to continue with tighter tol."
 
     remaining = n_steps - checkpoint.step
     remaining <= 0 && return (
-        workspace = nothing,
-        converged = checkpoint.converged,
-        energy = checkpoint.energy,
-        dE = checkpoint.dE,
-        dpsi = checkpoint.dpsi,
-        interrupted = false,
-        last_step = checkpoint.step,
+        workspace=nothing,
+        converged=checkpoint.converged,
+        energy=checkpoint.energy,
+        dE=checkpoint.dE,
+        dpsi=checkpoint.dpsi,
+        interrupted=false,
+        last_step=checkpoint.step,
     )
 
     find_ground_state(;
-        psi_init = copy(checkpoint.psi),
+        psi_init=copy(checkpoint.psi),
         dt, n_steps, tol,
-        _start_step = checkpoint.step,
-        _checkpoint_dir = checkpoint_dir,
-        _checkpoint_every = checkpoint_every,
+        _start_step=checkpoint.step,
+        _checkpoint_dir=checkpoint_dir,
+        _checkpoint_every=checkpoint_every,
         kwargs...,
     )
 end
@@ -545,16 +558,18 @@ The `result` should be a NamedTuple from `find_ground_state` (must have `.worksp
 Typical usage: converged at tol=1e-8, refine to tol=1e-10.
 """
 function refine_ground_state(result::NamedTuple;
-    tol::Float64 = result.workspace.sim_params.imaginary_time ? 1e-12 : 1e-10,
-    dt::Float64 = result.workspace.sim_params.dt,
-    n_steps::Int = result.workspace.sim_params.n_steps,
-    checkpoint_dir::Union{Nothing,String} = nothing,
-    checkpoint_every::Int = 0,
-    on_step::Union{Nothing,Function} = nothing,
-    target_magnetization::Union{Nothing,Float64} = nothing,
+    tol::Float64=result.workspace.sim_params.imaginary_time ? 1e-12 : 1e-10,
+    dt::Float64=result.workspace.sim_params.dt,
+    n_steps::Int=result.workspace.sim_params.n_steps,
+    checkpoint_dir::Union{Nothing, String}=nothing,
+    checkpoint_every::Int=0,
+    on_step::Union{Nothing, Function}=nothing,
+    target_magnetization::Union{Nothing, Float64}=nothing,
 )
     ws = result.workspace
-    println("  Refining: E=$(round(result.energy; sigdigits=8)), dE=$(result.dE), tol_new=$tol, dt=$dt")
+    println(
+        "  Refining: E=$(round(result.energy; sigdigits=8)), dE=$(result.dE), tol_new=$tol, dt=$dt"
+    )
     flush(stdout)
 
     ws_new = if dt != ws.sim_params.dt
@@ -564,7 +579,7 @@ function refine_ground_state(result::NamedTuple;
     end
 
     _run_itp_loop!(ws_new, n_steps, tol, on_step, target_magnetization;
-        start_step = 0,
+        start_step=0,
         checkpoint_dir,
         checkpoint_every,
     )
@@ -589,27 +604,27 @@ function _find_ground_state_adaptive(;
     psi0,
     enable_ddi,
     c_dd,
-    secular_ddi = false,
+    secular_ddi=false,
     dt_max,
-    fft_flags = FFTW.MEASURE,
-    rotating_frame_omega::Float64 = 0.0,
-    quasi_2d_ddi::Bool = false,
-    l_z_ddi::Float64 = 0.0,
-    quasi_2d::Bool = false,
-    l_z::Float64 = 0.0,
-    backend::AbstractBackend = CPUBackend(),
-    light_shift = nothing,
+    fft_flags=FFTW.MEASURE,
+    rotating_frame_omega::Float64=0.0,
+    quasi_2d_ddi::Bool=false,
+    l_z_ddi::Float64=0.0,
+    quasi_2d::Bool=false,
+    l_z::Float64=0.0,
+    backend::AbstractBackend=CPUBackend(),
+    light_shift=nothing,
 )
     current_dt = dt
     check_every = max(1, n_steps ÷ 100)
     psi_current = copy(psi0)
 
     sp = SimParams(;
-        dt = current_dt,
-        n_steps = check_every,
-        imaginary_time = true,
-        normalize_every = 1,
-        save_every = check_every,
+        dt=current_dt,
+        n_steps=check_every,
+        imaginary_time=true,
+        normalize_every=1,
+        save_every=check_every,
         rotating_frame_omega,
     )
     ws = make_workspace(;
@@ -618,8 +633,8 @@ function _find_ground_state_adaptive(;
         interactions,
         zeeman,
         potential,
-        sim_params = sp,
-        psi_init = psi_current,
+        sim_params=sp,
+        psi_init=psi_current,
         enable_ddi,
         c_dd,
         secular_ddi,
@@ -643,7 +658,7 @@ function _find_ground_state_adaptive(;
     while total_steps < n_steps
         copyto!(psi_backup, ws.state.psi)
 
-        for i = 1:check_every
+        for i in 1:check_every
             split_step!(ws)
             if i == 1 && total_steps == 0
                 _check_itp_overflow(ws, 1)
@@ -662,7 +677,7 @@ function _find_ground_state_adaptive(;
             current_dt = max(current_dt * 0.5, 1e-8)
             ws = _rebuild_workspace_with_dt(ws, current_dt)
             println(
-                "  ITP adaptive: rejected at step $(total_steps)/$(n_steps), dt → $(current_dt)",
+                "  ITP adaptive: rejected at step $(total_steps)/$(n_steps), dt → $(current_dt)"
             )
             flush(stdout)
         else
@@ -698,11 +713,11 @@ function _find_ground_state_adaptive(;
     end
 
     (
-        workspace = ws,
-        converged = converged,
-        energy = total_energy(ws),
-        dE = final_dE,
-        dpsi = final_dpsi,
+        workspace=ws,
+        converged=converged,
+        energy=total_energy(ws),
+        dE=final_dE,
+        dpsi=final_dpsi,
     )
 end
 
@@ -716,9 +731,9 @@ forwarded to `find_ground_state`.
 Returns `(workspace, converged, energy, initial_state, all_results)`.
 """
 function find_ground_state_multistart(;
-    initial_states::Vector{Symbol} = [:polar, :ferromagnetic, :uniform, :antiferromagnetic],
-    n_random::Int = 3,
-    seed::Int = 42,
+    initial_states::Vector{Symbol}=[:polar, :ferromagnetic, :uniform, :antiferromagnetic],
+    n_random::Int=3,
+    seed::Int=42,
     grid,
     atom,
     interactions,
@@ -728,26 +743,26 @@ function find_ground_state_multistart(;
 
     for state in initial_states
         if state == :random
-            for i = 1:n_random
+            for i in 1:n_random
                 sys = SpinSystem(atom.F)
-                psi0 = init_psi(grid, sys; state = :random, seed = seed + i)
+                psi0 = init_psi(grid, sys; state=:random, seed=seed + i)
                 r = find_ground_state(;
                     grid,
                     atom,
                     interactions,
-                    psi_init = psi0,
+                    psi_init=psi0,
                     kwargs...,
                 )
                 push!(
                     results,
                     (
-                        initial_state = :random,
-                        idx = i,
-                        workspace = r.workspace,
-                        converged = r.converged,
-                        energy = r.energy,
-                        dE = r.dE,
-                        dpsi = r.dpsi,
+                        initial_state=:random,
+                        idx=i,
+                        workspace=r.workspace,
+                        converged=r.converged,
+                        energy=r.energy,
+                        dE=r.dE,
+                        dpsi=r.dpsi,
                     ),
                 )
             end
@@ -756,19 +771,19 @@ function find_ground_state_multistart(;
                 grid,
                 atom,
                 interactions,
-                initial_state = state,
+                initial_state=state,
                 kwargs...,
             )
             push!(
                 results,
                 (
-                    initial_state = state,
-                    idx = 0,
-                    workspace = r.workspace,
-                    converged = r.converged,
-                    energy = r.energy,
-                    dE = r.dE,
-                    dpsi = r.dpsi,
+                    initial_state=state,
+                    idx=0,
+                    workspace=r.workspace,
+                    converged=r.converged,
+                    energy=r.energy,
+                    dE=r.dE,
+                    dpsi=r.dpsi,
                 ),
             )
         end
@@ -776,11 +791,11 @@ function find_ground_state_multistart(;
 
     best = argmin(r -> r.energy, results)
     (
-        workspace = best.workspace,
-        converged = best.converged,
-        energy = best.energy,
-        initial_state = best.initial_state,
-        all_results = results,
+        workspace=best.workspace,
+        converged=best.converged,
+        energy=best.energy,
+        initial_state=best.initial_state,
+        all_results=results,
     )
 end
 
@@ -797,9 +812,9 @@ function _normalize_psi_constrained!(psi, grid, n_components, ndim, target_Mz, F
     _normalize_psi!(psi, grid, n_components, ndim)
 
     lambda = 0.0
-    for _iter = 1:20
+    for _iter in 1:20
         norms = Vector{Float64}(undef, n_components)
-        for c = 1:n_components
+        for c in 1:n_components
             m = F - (c - 1)
             idx = _component_slice(ndim, n_pts, c)
             w = exp(lambda * m)
@@ -808,11 +823,11 @@ function _normalize_psi_constrained!(psi, grid, n_components, ndim, target_Mz, F
         total = sum(norms)
         total < 1e-30 && break
 
-        Mz = sum((F - (c - 1)) * norms[c] for c = 1:n_components) / total
+        Mz = sum((F - (c - 1)) * norms[c] for c in 1:n_components) / total
         abs(Mz - target_Mz) < 1e-12 && break
 
         dMz = 0.0
-        for c = 1:n_components
+        for c in 1:n_components
             m = F - (c - 1)
             dMz += 2 * m * (m - Mz) * norms[c] / total
         end
@@ -822,7 +837,7 @@ function _normalize_psi_constrained!(psi, grid, n_components, ndim, target_Mz, F
         lambda = clamp(lambda, -10.0, 10.0)
     end
 
-    for c = 1:n_components
+    for c in 1:n_components
         m = F - (c - 1)
         w = exp(lambda * m)
         idx = _component_slice(ndim, n_pts, c)
@@ -844,7 +859,7 @@ function _rebuild_workspace_with_dt(ws::Workspace{N}, new_dt::Float64) where {N}
     )
     kinetic_phase = _to_device(
         ws.backend,
-        prepare_kinetic_phase(ws.grid, new_dt; imaginary_time = true),
+        prepare_kinetic_phase(ws.grid, new_dt; imaginary_time=true),
     )
     batched_kinetic = _make_batched_kinetic_cache(ws.state.psi, kinetic_phase, N, ws.backend)
 
@@ -885,11 +900,11 @@ function _find_ground_state_Jz(;
     Jz_tol,
     Jz_max_iter,
     Jz_omega_range,
-    quasi_2d_ddi::Bool = false,
-    l_z_ddi::Float64 = 0.0,
-    quasi_2d::Bool = false,
-    l_z::Float64 = 0.0,
-    backend::AbstractBackend = CPUBackend(),
+    quasi_2d_ddi::Bool=false,
+    l_z_ddi::Float64=0.0,
+    quasi_2d::Bool=false,
+    l_z::Float64=0.0,
+    backend::AbstractBackend=CPUBackend(),
 )
     omega_lo, omega_hi = Jz_omega_range
     prev_psi = psi_init
@@ -898,7 +913,7 @@ function _find_ground_state_Jz(;
     best_Jz = NaN
     best_omega = 0.0
 
-    for iter = 1:Jz_max_iter
+    for iter in 1:Jz_max_iter
         omega_trial = (omega_lo + omega_hi) / 2.0
         r = find_ground_state(;
             grid,
@@ -910,7 +925,7 @@ function _find_ground_state_Jz(;
             n_steps,
             tol,
             initial_state,
-            psi_init = copy(prev_psi),
+            psi_init=copy(prev_psi),
             enable_ddi,
             c_dd,
             secular_ddi,
@@ -918,7 +933,7 @@ function _find_ground_state_Jz(;
             dt_max,
             fft_flags,
             target_magnetization,
-            rotating_frame_omega = omega_trial,
+            rotating_frame_omega=omega_trial,
             quasi_2d_ddi,
             l_z_ddi,
             quasi_2d,
@@ -939,13 +954,13 @@ function _find_ground_state_Jz(;
 
         if abs(Jz - target_Jz) < Jz_tol
             return (
-                workspace = r.workspace,
-                converged = r.converged,
-                energy = r.energy,
-                dE = r.dE,
-                dpsi = r.dpsi,
-                Jz = Jz,
-                omega = omega_trial,
+                workspace=r.workspace,
+                converged=r.converged,
+                energy=r.energy,
+                dE=r.dE,
+                dpsi=r.dpsi,
+                Jz=Jz,
+                omega=omega_trial,
             )
         end
 
@@ -959,12 +974,12 @@ function _find_ground_state_Jz(;
     end
 
     (
-        workspace = best_result.workspace,
-        converged = false,
-        energy = best_result.energy,
-        dE = best_result.dE,
-        dpsi = best_result.dpsi,
-        Jz = best_Jz,
-        omega = best_omega,
+        workspace=best_result.workspace,
+        converged=false,
+        energy=best_result.energy,
+        dE=best_result.dE,
+        dpsi=best_result.dpsi,
+        Jz=best_Jz,
+        omega=best_omega,
     )
 end

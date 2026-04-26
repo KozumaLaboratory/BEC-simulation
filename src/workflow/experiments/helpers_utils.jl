@@ -25,9 +25,9 @@ function _add_noise!(psi, amplitude, n_components, ndim, grid)
     n_pts = ntuple(d -> size(psi, d), ndim)
     dV = cell_volume(grid)
     dominant = argmax([
-        sum(abs2, view(psi, _component_slice(ndim, n_pts, c)...)) for c = 1:n_components
+        sum(abs2, view(psi, _component_slice(ndim, n_pts, c)...)) for c in 1:n_components
     ])
-    for c = 1:n_components
+    for c in 1:n_components
         c == dominant && continue
         idx = _component_slice(ndim, n_pts, c)
         view(psi, idx...) .+= amplitude .* randn(ComplexF64, n_pts)
@@ -41,8 +41,8 @@ function seed_noise(
     n_components::Int,
     ndim::Int,
     grid::Grid;
-    amplitude::Float64 = 0.001,
-    seed::Int = 42,
+    amplitude::Float64=0.001,
+    seed::Int=42,
 )
     psi = copy(psi_gs)
     Random.seed!(seed)
@@ -61,15 +61,15 @@ function _save_units_metadata!(f, data::Dict)
             break
         end
     end
-    gs === nothing && return
+    gs === nothing && return nothing
 
     inter = get(gs, "interactions", Dict())
     omega_ref_raw = get(inter, "omega_ref", nothing)
-    omega_ref_raw === nothing && return
+    omega_ref_raw === nothing && return nothing
     omega_ref = Float64(omega_ref_raw)
 
     atom_name = get(gs, "atom", nothing)
-    atom_name === nothing && return
+    atom_name === nothing && return nothing
     atom = resolve_atom(Symbol(atom_name))
 
     a_ho = sqrt(Units.HBAR / (atom.mass * omega_ref))
@@ -95,9 +95,9 @@ Number/String/Symbol/Vector-of-these are supported.
 """
 function _save_analyzer_results!(f, result)
     analyzer_names = (:tomography, :faraday, :energy_decomposition, :phase_classify,
-                      :stability, :bogoliubov, :bogoliubov_mode, :bogoliubov_dispersion,
-                      :non_abelian_homotopy, :monopole_charge, :winding_field,
-                      :droplet_profile, :synthetic_dim, :skyrmion_detect)
+        :stability, :bogoliubov, :bogoliubov_mode, :bogoliubov_dispersion,
+        :non_abelian_homotopy, :monopole_charge, :winding_field,
+        :droplet_profile, :synthetic_dim, :skyrmion_detect)
     for name in analyzer_names
         haskey(result, name) || continue
         val = result[name]
@@ -120,9 +120,9 @@ and packed into one 5D array `dynamics/psi_snapshots` of shape
 and keeps numerical precision fine for visualisation.
 """
 function _save_dynamics_timeseries!(f, result)
-    haskey(result, :dynamics_result) || return
+    haskey(result, :dynamics_result) || return nothing
     dr = result[:dynamics_result]
-    hasproperty(dr, :times) || return
+    hasproperty(dr, :times) || return nothing
     f["dynamics/times"] = collect(Float64, dr.times)
     f["dynamics/energies"] = collect(Float64, dr.energies)
     f["dynamics/norms"] = collect(Float64, dr.norms)
@@ -166,7 +166,7 @@ function _save_dynamics_timeseries!(f, result)
             end
             f["dynamics/component_populations"] = pops
         end
-        rm(tmp_path; force = true)
+        rm(tmp_path; force=true)
     elseif hasproperty(dr, :psi_snapshots) && !isempty(dr.psi_snapshots)
         # Legacy in-memory path. `pops` is computed first from F64
         # buffers, then each frame is copied to disk as F32 one at a
@@ -213,7 +213,7 @@ function _write_jld2_value!(f, prefix::String, v::Dict)
     end
 end
 
-function _write_jld2_value!(f, key::String, v::Union{Number,String,Bool,Symbol})
+function _write_jld2_value!(f, key::String, v::Union{Number, String, Bool, Symbol})
     f[key] = v isa Symbol ? String(v) : v
 end
 
@@ -222,7 +222,7 @@ function _write_jld2_value!(f, key::String, v::Tuple)
 end
 
 function _write_jld2_value!(f, key::String, v::AbstractArray)
-    eltype_ok = eltype(v) <: Union{Number,String,Bool}
+    eltype_ok = eltype(v) <: Union{Number, String, Bool}
     eltype_ok && (f[key] = Array(v))
 end
 
@@ -242,5 +242,7 @@ function _print_gs_summary(psi, grid, atom, gs)
     top = [(F - (i-1), pops[i]) for i in sorted_idx[1:min(3, D)]]
     pop_str = join(["m=$(m): $(round(p*100; digits=1))%" for (m, p) in top], ", ")
     mz = sum((F - (c-1)) * pops[c] for c in 1:D)
-    println("  E=$(round(gs.energy; sigdigits=6)) conv=$(gs.converged) Mz=$(round(mz; digits=2)) [$pop_str]")
+    println(
+        "  E=$(round(gs.energy; sigdigits=6)) conv=$(gs.converged) Mz=$(round(mz; digits=2)) [$pop_str]",
+    )
 end

@@ -3,7 +3,6 @@ using SpinorBEC
 using LinearAlgebra
 
 @testset "Majorana Representation" begin
-
     @testset "majorana_stars" begin
         @testset "F=1 ferromagnetic: all stars at south pole (Inf)" begin
             spinor = ComplexF64[1.0, 0.0, 0.0]
@@ -172,5 +171,4 @@ using LinearAlgebra
             end
         end
     end
-
 end

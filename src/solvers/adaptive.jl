@@ -51,16 +51,24 @@ end
 
 @inline function _flush_fsal!(ws::Workspace{N}, fsal_dt, n_comp, ndim) where {N}
     # Closing half: covers [t - fsal_dt/2, t], midpoint at t - fsal_dt/4
-    _half_potential_step!(ws, fsal_dt / 2, n_comp, ndim, false; t_eval = ws.state.t - fsal_dt / 4, t_start = ws.state.t - fsal_dt / 2)
+    _half_potential_step!(
+        ws,
+        fsal_dt / 2,
+        n_comp,
+        ndim,
+        false;
+        t_eval=(ws.state.t - fsal_dt / 4),
+        t_start=(ws.state.t - fsal_dt / 2),
+    )
     nothing
 end
 
 function run_simulation_adaptive!(
     ws::Workspace{N};
-    adaptive::AdaptiveDtParams = AdaptiveDtParams(),
+    adaptive::AdaptiveDtParams=AdaptiveDtParams(),
     t_end::Float64,
     save_interval::Float64,
-    callback::Union{Nothing,Function} = nothing,
+    callback::Union{Nothing, Function}=nothing,
 ) where {N}
     if adaptive.error_mode === :richardson
         return _adaptive_richardson_loop!(ws; adaptive, t_end, save_interval, callback)
@@ -73,7 +81,7 @@ function _adaptive_step_change_loop!(
     adaptive::AdaptiveDtParams,
     t_end::Float64,
     save_interval::Float64,
-    callback::Union{Nothing,Function} = nothing,
+    callback::Union{Nothing, Function}=nothing,
 ) where {N}
     n_comp = ws.spin_matrices.system.n_components
     sys = ws.spin_matrices.system
@@ -125,15 +133,29 @@ function _adaptive_step_change_loop!(
         if fsal_deferred && abs(fsal_dt - dt_step) < 1e-14
             # Merged: close prev [t-dt_step/2, t] + open new [t, t+dt_step/2]
             # = full [t-dt_step/2, t+dt_step/2], midpoint at t
-            _half_potential_step!(ws, dt_step, n_comp, N, false; t_eval = t_now, t_start = t_now - dt_step / 2)
+            _half_potential_step!(
+                ws, dt_step, n_comp, N, false; t_eval=t_now, t_start=t_now - dt_step / 2
+            )
         elseif fsal_deferred
             # Close prev: [t-fsal_dt/2, t], midpoint at t - fsal_dt/4
-            _half_potential_step!(ws, fsal_dt / 2, n_comp, N, false; t_eval = t_now - fsal_dt / 4, t_start = t_now - fsal_dt / 2)
+            _half_potential_step!(
+                ws,
+                fsal_dt / 2,
+                n_comp,
+                N,
+                false;
+                t_eval=t_now - fsal_dt / 4,
+                t_start=t_now - fsal_dt / 2,
+            )
             # Open new: [t, t+dt_step/2], midpoint at t + dt_step/4
-            _half_potential_step!(ws, dt_step / 2, n_comp, N, false; t_eval = t_now + dt_step / 4, t_start = t_now)
+            _half_potential_step!(
+                ws, dt_step / 2, n_comp, N, false; t_eval=t_now + dt_step / 4, t_start=t_now
+            )
         else
             # Fresh open: [t, t+dt_step/2], midpoint at t + dt_step/4
-            _half_potential_step!(ws, dt_step / 2, n_comp, N, false; t_eval = t_now + dt_step / 4, t_start = t_now)
+            _half_potential_step!(
+                ws, dt_step / 2, n_comp, N, false; t_eval=t_now + dt_step / 4, t_start=t_now
+            )
         end
         fsal_deferred = false
 
@@ -212,20 +234,32 @@ function _adaptive_step_change_loop!(
     end
 
     (
-        result = SimulationResult(times, energies, norms, mags, snapshots),
-        n_accepted = n_accepted,
-        n_rejected = n_rejected,
-        final_dt = dt,
+        result=SimulationResult(times, energies, norms, mags, snapshots),
+        n_accepted=n_accepted,
+        n_rejected=n_rejected,
+        final_dt=dt,
     )
 end
 
-@inline function _full_strang_step!(ws::Workspace{N}, dt_step, n_comp, bk; t_base::Float64 = ws.state.t) where {N}
+@inline function _full_strang_step!(
+    ws::Workspace{N}, dt_step, n_comp, bk; t_base::Float64=ws.state.t
+) where {N}
     omega = ws.sim_params.rotating_frame_omega
-    _half_potential_step!(ws, dt_step / 2, n_comp, N, false; t_eval = t_base + dt_step / 4, t_start = t_base)
+    _half_potential_step!(
+        ws, dt_step / 2, n_comp, N, false; t_eval=t_base + dt_step / 4, t_start=t_base
+    )
     _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt_step / 2, false, ws.coriolis_cache)
     apply_kinetic_step_batched!(ws.state.psi, bk)
     _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt_step / 2, false, ws.coriolis_cache)
-    _half_potential_step!(ws, dt_step / 2, n_comp, N, false; t_eval = t_base + 3dt_step / 4, t_start = t_base + dt_step / 2)
+    _half_potential_step!(
+        ws,
+        dt_step / 2,
+        n_comp,
+        N,
+        false;
+        t_eval=t_base + 3dt_step / 4,
+        t_start=t_base + dt_step / 2,
+    )
     nothing
 end
 
@@ -234,7 +268,7 @@ function _adaptive_richardson_loop!(
     adaptive::AdaptiveDtParams,
     t_end::Float64,
     save_interval::Float64,
-    callback::Union{Nothing,Function} = nothing,
+    callback::Union{Nothing, Function}=nothing,
 ) where {N}
     n_comp = ws.spin_matrices.system.n_components
     sys = ws.spin_matrices.system
@@ -329,9 +363,9 @@ function _adaptive_richardson_loop!(
     end
 
     (
-        result = SimulationResult(times, energies, norms, mags, snapshots),
-        n_accepted = n_accepted,
-        n_rejected = n_rejected,
-        final_dt = dt,
+        result=SimulationResult(times, energies, norms, mags, snapshots),
+        n_accepted=n_accepted,
+        n_rejected=n_rejected,
+        final_dt=dt,
     )
 end

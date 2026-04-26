@@ -4,7 +4,7 @@ function apply_spin_mixing_step!(
     c1::Float64,
     dt_frac::Float64,
     ndim::Int;
-    imaginary_time::Bool = false,
+    imaginary_time::Bool=false,
 ) where {D}
     abs(c1) < 1e-30 && return nothing
     n_pts = ntuple(d -> size(psi, d), ndim)
@@ -34,10 +34,9 @@ Uses Matrix (not SMatrix) for V_Fy to avoid heap allocation at large D.
 function _spin_mixing_loop!(psi, sm, c1, dt_frac, ::Val{D}, n_pts, imaginary_time) where {D}
     F = sm.system.F
     Ff1 = Float64(F * (F + 1))
-    m_vals = SVector{D,Float64}(ntuple(c -> F - (c - 1), Val(D)))
+    m_vals = SVector{D, Float64}(ntuple(c -> F - (c - 1), Val(D)))
     m_vals_t = ntuple(c -> Float64(F - (c - 1)), Val(D))
-    fp_coeffs =
-        ntuple(c -> c == 1 ? 0.0 : sqrt(Ff1 - m_vals_t[c] * (m_vals_t[c] + 1.0)), Val(D))
+    fp_coeffs = ntuple(c -> c == 1 ? 0.0 : sqrt(Ff1 - m_vals_t[c] * (m_vals_t[c] + 1.0)), Val(D))
 
     V_Fy = sm.Fy_eigvecs
     Vt_Fy = sm.Fy_eigvecs_adj
@@ -48,13 +47,13 @@ function _spin_mixing_loop!(psi, sm, c1, dt_frac, ::Val{D}, n_pts, imaginary_tim
             spinor = _get_spinor(psi, I, Val(D))
 
             fz_val = 0.0
-            for c = 1:D
+            for c in 1:D
                 fz_val += m_vals_t[c] * abs2(spinor[c])
             end
             fxy_re = 0.0
             fxy_im = 0.0
-            for c = 2:D
-                prod = conj(spinor[c-1]) * spinor[c]
+            for c in 2:D
+                prod = conj(spinor[c - 1]) * spinor[c]
                 fxy_re += fp_coeffs[c] * real(prod)
                 fxy_im += fp_coeffs[c] * imag(prod)
             end
@@ -82,7 +81,7 @@ end
 Spin-1 Rodrigues' formula: exp(-iθ(n̂·F)) = I - i sin(θ)(n̂·F) + (cos(θ)-1)(n̂·F)²
 """
 function _apply_rodrigues_rotation(
-    spinor::SVector{3,ComplexF64},
+    spinor::SVector{3, ComplexF64},
     sm::SpinMatrices{3},
     c1::Float64,
     dt_frac::Float64,
@@ -103,9 +102,9 @@ function _apply_rodrigues_rotation(
     θ = c1 * f_mag * dt_frac
 
     if imaginary_time
-        U = SMatrix{3,3,ComplexF64}(I) - sinh(θ) * nF + (cosh(θ) - 1) * nF2
+        U = SMatrix{3, 3, ComplexF64}(I) - sinh(θ) * nF + (cosh(θ) - 1) * nF2
     else
-        U = SMatrix{3,3,ComplexF64}(I) - 1im * sin(θ) * nF + (cos(θ) - 1) * nF2
+        U = SMatrix{3, 3, ComplexF64}(I) - 1im * sin(θ) * nF + (cos(θ) - 1) * nF2
     end
     U * spinor
 end

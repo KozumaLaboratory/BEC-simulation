@@ -12,12 +12,12 @@ function apply_raman_step!(
     raman::RamanCoupling{N},
     grid::Grid{N},
     dt_frac::Float64;
-    imaginary_time::Bool = false,
-) where {D,N}
+    imaginary_time::Bool=false,
+) where {D, N}
     n_pts = ntuple(d -> size(psi, d), Val(N))
 
     F = sm.system.F
-    m_vals = SVector{D,Float64}(ntuple(c -> F - (c - 1), Val(D)))
+    m_vals = SVector{D, Float64}(ntuple(c -> F - (c - 1), Val(D)))
     V_Fy = sm.Fy_eigvecs
     Vt_Fy = sm.Fy_eigvecs_adj
     λ_Fy = sm.Fy_eigvals
@@ -50,8 +50,9 @@ function apply_raman_step!(
 end
 
 raman_at(r::RamanCoupling, ::Float64) = r
-raman_at(r::TimeDependentRaman{N}, t::Float64) where {N} =
-    RamanCoupling{N}(evaluate(r.omega_wf, t), evaluate(r.delta_wf, t), r.k_eff)
+raman_at(r::TimeDependentRaman{N}, t::Float64) where {N} = RamanCoupling{N}(
+    evaluate(r.omega_wf, t), evaluate(r.delta_wf, t), r.k_eff
+)
 raman_at(::Nothing, ::Float64) = nothing
 
 """
@@ -68,8 +69,8 @@ function apply_uniform_spin_rotation!(
     phi_z::Float64,
     dt_frac::Float64,
     ndim::Int;
-    imaginary_time::Bool = false,
-    scratch::Union{Nothing,AbstractArray} = nothing,
+    imaginary_time::Bool=false,
+    scratch::Union{Nothing, AbstractArray}=nothing,
 ) where {D}
     abs(phi_x) + abs(phi_y) + abs(phi_z) < 1e-30 && return nothing
 
@@ -83,7 +84,7 @@ function apply_uniform_spin_rotation!(
     # calls this matters — without scratch the CUDA pool eats GC pressure
     # equivalent to ~70 TB total allocations on a 64×64×32 Dy164 grid.
     R = _compute_uniform_rotation_matrix(sm, phi_x, phi_y, phi_z, dt_frac, imaginary_time)
-    _apply_rotation_to_spin_axis!(psi, R, ndim; scratch = scratch)
+    _apply_rotation_to_spin_axis!(psi, R, ndim; scratch=scratch)
     nothing
 end
 
@@ -96,21 +97,21 @@ scalar path."""
     dt::Float64, imaginary_time::Bool,
 ) where {D}
     F = sm.system.F
-    m_vals = SVector{D,Float64}(ntuple(c -> F - (c - 1), Val(D)))
+    m_vals = SVector{D, Float64}(ntuple(c -> F - (c - 1), Val(D)))
     V_Fy = sm.Fy_eigvecs
     Vt_Fy = sm.Fy_eigvecs_adj
     λ_Fy = sm.Fy_eigvals
     cols = ntuple(Val(D)) do j
-        ej = SVector{D,ComplexF64}(ntuple(c -> ComplexF64(c == j ? 1 : 0), Val(D)))
+        ej = SVector{D, ComplexF64}(ntuple(c -> ComplexF64(c == j ? 1 : 0), Val(D)))
         _apply_euler_spin_rotation(ej, phi_x, phi_y, phi_z, dt, F, m_vals,
-                                   V_Fy, Vt_Fy, λ_Fy, sm, imaginary_time)
+            V_Fy, Vt_Fy, λ_Fy, sm, imaginary_time)
     end
     # Assemble as SMatrix column-major
-    mat = MMatrix{D,D,ComplexF64}(undef)
-    @inbounds for j = 1:D, i = 1:D
+    mat = MMatrix{D, D, ComplexF64}(undef)
+    @inbounds for j in 1:D, i in 1:D
         mat[i, j] = cols[j][i]
     end
-    SMatrix{D,D,ComplexF64}(mat)
+    SMatrix{D, D, ComplexF64}(mat)
 end
 
 """Apply a spatially uniform D×D rotation R to the spin axis of psi
@@ -122,15 +123,15 @@ array operation — no scalar indexing into psi.
 + device + eltype as psi). Otherwise we allocate one per call.
 """
 function _apply_rotation_to_spin_axis!(
-    psi::AbstractArray{<:Complex}, R::SMatrix{D,D,ComplexF64}, ndim::Int;
-    scratch::Union{Nothing,AbstractArray} = nothing,
+    psi::AbstractArray{<:Complex}, R::SMatrix{D, D, ComplexF64}, ndim::Int;
+    scratch::Union{Nothing, AbstractArray}=nothing,
 ) where {D}
     T = eltype(psi)
     buf = scratch === nothing ? similar(psi) : scratch::typeof(psi)
     fill!(buf, zero(T))
-    @inbounds for j = 1:D
+    @inbounds for j in 1:D
         psi_j = selectdim(psi, ndim + 1, j)
-        for i = 1:D
+        for i in 1:D
             Rij = T(R[i, j])
             Rij == zero(T) && continue
             buf_i = selectdim(buf, ndim + 1, i)

@@ -2,7 +2,6 @@ using Test
 using SpinorBEC
 
 @testset "Thomas-Fermi" begin
-
     @testset "1D harmonic trap: analytical TF profile" begin
         grid = make_grid(GridConfig(256, 20.0))
         V = evaluate_potential(HarmonicTrap(1.0), grid)
@@ -93,5 +92,4 @@ using SpinorBEC
         @test maximum(r1.density) > maximum(r2.density)
         @test r2.mu > r1.mu
     end
-
 end

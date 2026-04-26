@@ -1,7 +1,7 @@
 @testset "Spinor-dependent LHY" begin
     @testset "two_channel: basic construction" begin
         table = compute_spinor_lhy_two_channel(;
-            F=1, c0=10.0, c1=-0.5, n_max=10.0, n_points=50,
+            F=1, c0=10.0, c1=-0.5, n_max=10.0, n_points=50
         )
         @test table isa SpinorLHYTable
         @test table.mode === :two_channel
@@ -13,16 +13,16 @@
 
     @testset "two_channel: monotonically increasing potential" begin
         table = compute_spinor_lhy_two_channel(;
-            F=1, c0=10.0, c1=-0.5, n_max=10.0, n_points=100,
+            F=1, c0=10.0, c1=-0.5, n_max=10.0, n_points=100
         )
         for i in 3:length(table.potential_values)
-            @test table.potential_values[i] >= table.potential_values[i-1] - 1e-10
+            @test table.potential_values[i] >= table.potential_values[i - 1] - 1e-10
         end
     end
 
     @testset "two_channel: c1=0 consistent with scalar" begin
         table = compute_spinor_lhy_two_channel(;
-            F=1, c0=10.0, c1=0.0, n_max=10.0, n_points=100,
+            F=1, c0=10.0, c1=0.0, n_max=10.0, n_points=100
         )
         prefactor = 8.0 / (15.0 * π^2)
         n_test = 5.0
@@ -34,7 +34,7 @@
 
     @testset "_lhy_V near-zero for n≈0" begin
         table = compute_spinor_lhy_two_channel(;
-            F=1, c0=10.0, c1=-0.5, n_max=5.0, n_points=50,
+            F=1, c0=10.0, c1=-0.5, n_max=5.0, n_points=50
         )
         V0 = SpinorBEC._lhy_V(0.0, table)
         V_mid = SpinorBEC._lhy_V(2.5, table)
@@ -43,13 +43,13 @@
 
     @testset "interpolation smoothness" begin
         table = compute_spinor_lhy_two_channel(;
-            F=1, c0=10.0, c1=-0.5, n_max=10.0, n_points=200,
+            F=1, c0=10.0, c1=-0.5, n_max=10.0, n_points=200
         )
         ns = range(0.1, 9.9; length=20)
         Vs = [SpinorBEC._lhy_V(n, table) for n in ns]
         for i in 2:length(Vs)
-            jump = abs(Vs[i] - Vs[i-1])
-            scale = max(abs(Vs[i]), abs(Vs[i-1]), 1e-10)
+            jump = abs(Vs[i] - Vs[i - 1])
+            scale = max(abs(Vs[i]), abs(Vs[i - 1]), 1e-10)
             @test jump / scale < 1.0
         end
     end
@@ -70,7 +70,7 @@
         x = collect(0.0:0.1:1.0)
         y = x .^ 2
         dy = SpinorBEC._numerical_derivative(x, y)
-        for i in 2:(length(x)-1)
+        for i in 2:(length(x) - 1)
             @test abs(dy[i] - 2*x[i]) < 0.05
         end
     end

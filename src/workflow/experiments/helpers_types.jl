@@ -9,7 +9,7 @@ struct LinearRamp
     to::Float64
 end
 
-const RampOrConstant = Union{ConstantValue,LinearRamp}
+const RampOrConstant = Union{ConstantValue, LinearRamp}
 
 interpolate_value(v::ConstantValue, ::Float64) = v.value
 interpolate_value(v::LinearRamp, t_frac::Float64) =
@@ -17,5 +17,5 @@ interpolate_value(v::LinearRamp, t_frac::Float64) =
 
 struct PotentialConfig
     type::Symbol
-    params::Dict{String,Any}
+    params::Dict{String, Any}
 end

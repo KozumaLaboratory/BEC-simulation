@@ -23,8 +23,8 @@ Uses two 1D FFT-based convolutions (separable kernel) for O(N·log N)
 scaling.
 """
 function gaussian_psf_convolve(
-    img::AbstractMatrix{T}, sigma_pixels::Real,
-) where {T<:Real}
+    img::AbstractMatrix{T}, sigma_pixels::Real
+) where {T <: Real}
     sigma = Float64(sigma_pixels)
     if sigma <= 0
         return Matrix{Float64}(img)
@@ -32,15 +32,15 @@ function gaussian_psf_convolve(
     nx, ny = size(img)
     # Truncate the kernel at 4σ — negligible contribution beyond.
     half = max(1, ceil(Int, 4 * sigma))
-    xs = -half:half
-    k = exp.(-xs.^2 ./ (2 * sigma^2))
+    xs = (-half):half
+    k = exp.(-xs .^ 2 ./ (2 * sigma^2))
     k ./= sum(k)
     # Convolve rows
     out1 = zeros(Float64, nx, ny)
     @inbounds for j in 1:ny
         for i in 1:nx
             s = 0.0
-            for di in -half:half
+            for di in (-half):half
                 ii = clamp(i + di, 1, nx)
                 s += Float64(img[ii, j]) * k[di + half + 1]
             end
@@ -52,7 +52,7 @@ function gaussian_psf_convolve(
     @inbounds for j in 1:ny
         for i in 1:nx
             s = 0.0
-            for dj in -half:half
+            for dj in (-half):half
                 jj = clamp(j + dj, 1, ny)
                 s += out1[i, jj] * k[dj + half + 1]
             end
@@ -71,8 +71,8 @@ Poisson mean.
 """
 function apply_shot_noise(
     image::AbstractMatrix{T}, photons_per_unit::Real;
-    seed::Union{Nothing,Int} = nothing,
-) where {T<:Real}
+    seed::Union{Nothing, Int}=nothing,
+) where {T <: Real}
     rng = seed === nothing ? Random.default_rng() : Random.MersenneTwister(seed)
     s = Float64(photons_per_unit)
     s > 0 || throw(ArgumentError("photons_per_unit must be positive"))
@@ -84,7 +84,8 @@ function apply_shot_noise(
             out[i] = λ + sqrt(λ) * randn(rng)
         else
             L = exp(-λ)
-            k = 0; p = 1.0
+            k = 0;
+            p = 1.0
             while p > L
                 k += 1
                 p *= rand(rng)
@@ -102,7 +103,7 @@ Model the absorption-imaging saturation curve: invert
 `OD = -log(T)` where `T = 1 - (counts_sat/counts_probe)`. For input
 column density `n` → OD, clip OD ≤ `OD_sat` (typical dichroic camera limit).
 """
-function apply_saturation(image::AbstractMatrix{T}, OD_sat::Real = 2.0) where {T<:Real}
+function apply_saturation(image::AbstractMatrix{T}, OD_sat::Real=2.0) where {T <: Real}
     od_cap = Float64(OD_sat)
     out = similar(image, Float64)
     @inbounds for i in eachindex(image)
@@ -123,19 +124,22 @@ Each stage is opt-in (pass `0.0` or `Inf` to skip).
 """
 function synthesise_absorption_image(
     column_density::AbstractMatrix, grid::Grid{N};
-    sigma_pixels::Real = 0.0,
-    photons_per_unit::Real = 0.0,
-    OD_sat::Real = Inf,
-    read_noise_sigma::Real = 0.0,
-    seed::Union{Nothing,Int} = nothing,
+    sigma_pixels::Real=0.0,
+    photons_per_unit::Real=0.0,
+    OD_sat::Real=Inf,
+    read_noise_sigma::Real=0.0,
+    seed::Union{Nothing, Int}=nothing,
 ) where {N}
-    img = sigma_pixels > 0 ? gaussian_psf_convolve(column_density, sigma_pixels) :
-                              Matrix{Float64}(column_density)
+    img = if sigma_pixels > 0
+        gaussian_psf_convolve(column_density, sigma_pixels)
+    else
+        Matrix{Float64}(column_density)
+    end
     isfinite(OD_sat) && (img = apply_saturation(img, OD_sat))
     photons_per_unit > 0 && (img = apply_shot_noise(img, photons_per_unit; seed))
     if read_noise_sigma > 0
         rng = seed === nothing ? Random.default_rng() :
-                                 Random.MersenneTwister(seed + 1)
+              Random.MersenneTwister(seed + 1)
         σ = Float64(read_noise_sigma)
         @inbounds for i in eachindex(img)
             img[i] += σ * randn(rng)
@@ -160,26 +164,26 @@ Convention follows Kawaguchi-Ueda §13.2:
     linear_x, linear_y: real and imaginary parts of the raw M_F signal
 """
 function faraday_polarization_components(
-    psi, grid::Grid{N}, F::Int; params::FaradayParams = FaradayParams(),
+    psi, grid::Grid{N}, F::Int; params::FaradayParams=FaradayParams()
 ) where {N}
-    img_x  = faraday_image(psi, grid, F;
-                           params = FaradayParams(params.probe_axis,
-                                                  params.detuning, :linear_x,
-                                                  params.include_vector_shift))
-    img_y  = faraday_image(psi, grid, F;
-                           params = FaradayParams(params.probe_axis,
-                                                  params.detuning, :linear_y,
-                                                  params.include_vector_shift))
-    img_c  = faraday_image(psi, grid, F;
-                           params = FaradayParams(params.probe_axis,
-                                                  params.detuning, :circular,
-                                                  params.include_vector_shift))
+    img_x = faraday_image(psi, grid, F;
+        params=FaradayParams(params.probe_axis,
+            params.detuning, :linear_x,
+            params.include_vector_shift))
+    img_y = faraday_image(psi, grid, F;
+        params=FaradayParams(params.probe_axis,
+            params.detuning, :linear_y,
+            params.include_vector_shift))
+    img_c = faraday_image(psi, grid, F;
+        params=FaradayParams(params.probe_axis,
+            params.detuning, :circular,
+            params.include_vector_shift))
     (
-        sigma_plus  = 0.5 .* (img_c.rotation_angle .+ img_x.rotation_angle),
-        sigma_minus = 0.5 .* (img_c.rotation_angle .- img_x.rotation_angle),
-        linear_x    = img_x.rotation_angle,
-        linear_y    = img_y.rotation_angle,
-        column_density = img_x.column_density,
+        sigma_plus=0.5 .* (img_c.rotation_angle .+ img_x.rotation_angle),
+        sigma_minus=0.5 .* (img_c.rotation_angle .- img_x.rotation_angle),
+        linear_x=img_x.rotation_angle,
+        linear_y=img_y.rotation_angle,
+        column_density=img_x.column_density,
     )
 end
 
@@ -196,8 +200,8 @@ limit). Returns per-pixel matrices of signal, noise, SNR.
 function faraday_snr(
     psi, grid::Grid{N}, F::Int;
     N_photons_per_pixel::Real,
-    params::FaradayParams = FaradayParams(),
-    seed::Union{Nothing,Int} = nothing,
+    params::FaradayParams=FaradayParams(),
+    seed::Union{Nothing, Int}=nothing,
 ) where {N}
     img = faraday_image(psi, grid, F; params)
     signal = img.rotation_angle
@@ -205,7 +209,7 @@ function faraday_snr(
     # Shot-noise floor per pixel for a balanced polarimeter.
     noise = fill(1.0 / (2 * sqrt(Nph)), size(signal))
     snr = @. abs(signal) / noise
-    (signal = signal, noise = noise, snr = snr, column_density = img.column_density)
+    (signal=signal, noise=noise, snr=snr, column_density=img.column_density)
 end
 
 # --- P3.6: Long-TOF momentum distribution ---
@@ -221,8 +225,8 @@ For intermediate TOF use `simulate_tof_with_gradient` instead.
 """
 function momentum_distribution(
     psi::AbstractArray{<:Complex}, grid::Grid{N};
-    t_tof::Real = 10.0,
-    axis::Int = N,
+    t_tof::Real=10.0,
+    axis::Int=N,
 ) where {N}
     n_pts = grid.config.n_points
     D = size(psi, N + 1)
@@ -232,7 +236,7 @@ function momentum_distribution(
 
     plans = make_fft_plans(n_pts)
     n_k_total = zeros(Float64, n_pts)
-    for c = 1:D
+    for c in 1:D
         idx = _component_slice(N, n_pts, c)
         psi_c = copy(Array(view(psi, idx...)))
         psi_k = plans.forward * psi_c
@@ -242,10 +246,10 @@ function momentum_distribution(
 
     # Column integrate and return the momentum coordinates along remaining axes
     if N == 1
-        return (k_coords = (grid.k[1],), n_k = n_k_total)
+        return (k_coords=(grid.k[1],), n_k=n_k_total)
     end
-    col = dropdims(sum(n_k_total; dims = axis); dims = axis)
+    col = dropdims(sum(n_k_total; dims=axis); dims=axis)
     remaining_axes = Int[d for d in 1:N if d != axis]
     k_coords = ntuple(i -> grid.k[remaining_axes[i]], Val(N-1))
-    (k_coords = k_coords, n_k = col)
+    (k_coords=k_coords, n_k=col)
 end

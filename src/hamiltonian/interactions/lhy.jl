@@ -11,9 +11,9 @@ function compute_spinor_lhy_two_channel(;
     F::Int,
     c0::Float64,
     c1::Float64,
-    c_dd::Float64 = 0.0,
-    n_max::Float64 = 100.0,
-    n_points::Int = 200,
+    c_dd::Float64=0.0,
+    n_max::Float64=100.0,
+    n_points::Int=200,
 )
     n_points >= 3 || throw(ArgumentError("n_points must be >= 3"))
     n_max > 0 || throw(ArgumentError("n_max must be positive"))
@@ -21,7 +21,7 @@ function compute_spinor_lhy_two_channel(;
     eps_dd = abs(c0) > 1e-30 ? c_dd / c0 : 0.0
     Q5 = lima_pelster_Q5(eps_dd)
 
-    densities = collect(range(0.0, n_max; length = n_points))
+    densities = collect(range(0.0, n_max; length=n_points))
 
     prefactor = 8.0 / (15.0 * Float64(π)^2)
     energy = zeros(Float64, n_points)
@@ -49,19 +49,19 @@ function compute_spinor_lhy_table(;
     spinor::Vector{ComplexF64},
     F::Int,
     interactions::InteractionParams,
-    zeeman::ZeemanParams = ZeemanParams(),
-    c_dd::Float64 = 0.0,
-    n_max::Float64 = 100.0,
-    n_points::Int = 100,
-    k_max::Float64 = 20.0,
-    n_k::Int = 200,
+    zeeman::ZeemanParams=ZeemanParams(),
+    c_dd::Float64=0.0,
+    n_max::Float64=100.0,
+    n_points::Int=100,
+    k_max::Float64=20.0,
+    n_k::Int=200,
 )
     n_points >= 3 || throw(ArgumentError("n_points must be >= 3"))
     D = 2F + 1
     length(spinor) == D ||
         throw(DimensionMismatch("spinor length $(length(spinor)) != 2F+1 = $D"))
 
-    densities = collect(range(0.0, n_max; length = n_points))
+    densities = collect(range(0.0, n_max; length=n_points))
     energy = zeros(Float64, n_points)
 
     for (i, n0) in enumerate(densities)
@@ -78,7 +78,7 @@ Compute BdG zero-point energy at a single density:
 ε_LHY(n) = (1/2) × (1/2π²) ∫ dk k² Σ_b [ω_b(k) - ε_k - μ_b + μ²_b/(2ε_k)]
 """
 function _compute_lhy_at_density(
-    spinor, n0, F, interactions, zeeman, c_dd, k_max, n_k,
+    spinor, n0, F, interactions, zeeman, c_dd, k_max, n_k
 )
     D = 2F + 1
     h_mf, M_anom, zee, _ = _bdg_contact_matrices(spinor, F, interactions, zeeman)
@@ -96,7 +96,7 @@ function _compute_lhy_at_density(
 
     mu = real(sum(c -> (zee[c] + n0 * h_mf[c, c]) * abs2(spinor[c]), 1:D))
 
-    k_values = collect(range(1e-6, k_max; length = n_k))
+    k_values = collect(range(1e-6, k_max; length=n_k))
     dk = k_values[2] - k_values[1]
 
     E_total = 0.0
@@ -118,16 +118,16 @@ function _compute_lhy_at_density(
             ek = k^2 / 2
 
             L = 2n0 .* h_total
-            for i = 1:D
+            for i in 1:D
                 L[i, i] += ek - mu + zee[i]
             end
             M_sc = n0 .* M_total
 
             H_bdg = zeros(ComplexF64, 2D, 2D)
             H_bdg[1:D, 1:D] .= L
-            H_bdg[1:D, (D+1):2D] .= M_sc
-            H_bdg[(D+1):2D, 1:D] .= .-conj.(M_sc)
-            H_bdg[(D+1):2D, (D+1):2D] .= .-conj.(L)
+            H_bdg[1:D, (D + 1):2D] .= M_sc
+            H_bdg[(D + 1):2D, 1:D] .= .-conj.(M_sc)
+            H_bdg[(D + 1):2D, (D + 1):2D] .= .-conj.(L)
 
             evals = eigvals(H_bdg)
             zpe = 0.0
@@ -152,9 +152,9 @@ function _numerical_derivative(x::Vector{Float64}, y::Vector{Float64})
     n < 2 && return dy
 
     dy[1] = (y[2] - y[1]) / (x[2] - x[1])
-    dy[n] = (y[n] - y[n-1]) / (x[n] - x[n-1])
-    for i in 2:(n-1)
-        dy[i] = (y[i+1] - y[i-1]) / (x[i+1] - x[i-1])
+    dy[n] = (y[n] - y[n - 1]) / (x[n] - x[n - 1])
+    for i in 2:(n - 1)
+        dy[i] = (y[i + 1] - y[i - 1]) / (x[i + 1] - x[i - 1])
     end
     dy
 end

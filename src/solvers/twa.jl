@@ -15,15 +15,15 @@ function run_twa(;
     grid::Grid{N},
     atom::AtomSpecies,
     interactions::InteractionParams,
-    zeeman::Union{ZeemanParams,TimeDependentZeeman} = ZeemanParams(),
-    potential::AbstractPotential = NoPotential(),
+    zeeman::Union{ZeemanParams, TimeDependentZeeman}=ZeemanParams(),
+    potential::AbstractPotential=NoPotential(),
     sim_params::SimParams,
     twa_config::TWAConfig,
-    enable_ddi::Bool = false,
-    c_dd::Float64 = NaN,
-    backend::AbstractBackend = CPUBackend(),
-    store_trajectories::Bool = false,
-    verbose::Bool = true,
+    enable_ddi::Bool=false,
+    c_dd::Float64=NaN,
+    backend::AbstractBackend=CPUBackend(),
+    store_trajectories::Bool=false,
+    verbose::Bool=true,
     kwargs...,
 ) where {N}
     n_traj = twa_config.n_trajectories
@@ -41,12 +41,12 @@ function run_twa(;
         t_start = time()
 
         psi_noisy = add_vacuum_noise(psi_gs, grid, F;
-            seed = twa_config.seed_base + i,
-            cutoff_energy = twa_config.cutoff_energy)
+            seed=(twa_config.seed_base + i),
+            cutoff_energy=twa_config.cutoff_energy)
 
         ws = make_workspace(;
             grid, atom, interactions, zeeman, potential, sim_params,
-            psi_init = psi_noisy, enable_ddi, c_dd, backend, kwargs...)
+            psi_init=psi_noisy, enable_ddi, c_dd, backend, kwargs...)
 
         result = run_simulation!(ws)
 
@@ -58,8 +58,8 @@ function run_twa(;
 
         if ref_times === nothing
             ref_times = result.times
-            mean_obs = Dict{Symbol,Vector{Array{Float64}}}()
-            M2_obs = Dict{Symbol,Vector{Array{Float64}}}()
+            mean_obs = Dict{Symbol, Vector{Array{Float64}}}()
+            M2_obs = Dict{Symbol, Vector{Array{Float64}}}()
             for sym in keys(traj_obs)
                 mean_obs[sym] = [copy(arr) for arr in traj_obs[sym]]
                 M2_obs[sym] = [zeros(size(arr)) for arr in traj_obs[sym]]
@@ -68,7 +68,7 @@ function run_twa(;
             for sym in keys(traj_obs)
                 for t_idx in eachindex(traj_obs[sym])
                     _welford_update!(mean_obs[sym][t_idx], M2_obs[sym][t_idx],
-                                     traj_obs[sym][t_idx], i)
+                        traj_obs[sym][t_idx], i)
                 end
             end
         end
@@ -82,7 +82,7 @@ function run_twa(;
     end
 
     # Finalize variance
-    var_obs = Dict{Symbol,Vector{Array{Float64}}}()
+    var_obs = Dict{Symbol, Vector{Array{Float64}}}()
     for sym in keys(M2_obs)
         var_obs[sym] = if n_traj > 1
             [m2 ./ (n_traj - 1) for m2 in M2_obs[sym]]
@@ -99,7 +99,7 @@ Welford online update: incorporate sample x_new (the i-th sample, 1-indexed).
 Updates mean and M2 (sum of squared deviations) in place.
 """
 function _welford_update!(mean::Array{Float64}, M2::Array{Float64},
-                          x_new::Array{Float64}, i::Int)
+    x_new::Array{Float64}, i::Int)
     @inbounds for I in eachindex(mean)
         delta = x_new[I] - mean[I]
         mean[I] += delta / i
@@ -122,7 +122,7 @@ function _extract_trajectory_observables(
     sm = spin_matrices(F)
     sys = sm.system
 
-    out = Dict{Symbol,Vector{Array{Float64}}}()
+    out = Dict{Symbol, Vector{Array{Float64}}}()
     for sym in obs_list
         out[sym] = Array{Float64}[]
     end

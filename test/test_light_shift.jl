@@ -8,7 +8,7 @@ using SpinorBEC
         D = 2F + 1
         grid = make_grid(GridConfig((32,), (10.0,)))
         profile = ones(Float64, 32)
-        ls = make_light_shift(; F, polarization=(0,0,1), alpha_tensor=1.0, profile)
+        ls = make_light_shift(; F, polarization=(0, 0, 1), alpha_tensor=1.0, profile)
         @test ls.is_diagonal
         # For ε∥ẑ, (ε̂·F̂)² = Fz², tensor = (3Fz² - F(F+1))/(F(2F-1))
         # F=1: eigenvalues should be (3m² - 2)/(1·1) for m = 1, 0, -1
@@ -21,7 +21,7 @@ using SpinorBEC
         D = 2F + 1
         grid = make_grid(GridConfig((32,), (10.0,)))
         profile = ones(Float64, 32)
-        ls = make_light_shift(; F, polarization=(1,0,1), alpha_tensor=1.0, profile)
+        ls = make_light_shift(; F, polarization=(1, 0, 1), alpha_tensor=1.0, profile)
         @test !ls.is_diagonal
         @test length(ls.eigvals) == D
         # Eigenvectors should be unitary
@@ -34,7 +34,9 @@ using SpinorBEC
         grid = make_grid(GridConfig((32,), (10.0,)))
         profile = ones(Float64, 32)
         # σ+ polarization: (1, i, 0)/√2
-        ls = make_light_shift(; F, polarization=(1, im, 0), alpha_vector=1.0, alpha_tensor=0.0, profile)
+        ls = make_light_shift(;
+            F, polarization=(1, im, 0), alpha_vector=1.0, alpha_tensor=0.0, profile
+        )
         @test ls.is_diagonal
         # (iε̂*×ε̂) for σ+ = (0,0,1), so M_v = α_v/F × Fz
         # Diagonal: eigvals ordered by component (m=1,0,-1), ∝ m
@@ -49,7 +51,7 @@ using SpinorBEC
         dV = SpinorBEC.cell_volume(grid)
         norm_before = sum(abs2, psi) * dV
         profile = ones(Float64, 32)
-        ls = make_light_shift(; F, polarization=(1,0,1), alpha_tensor=1.0, profile)
+        ls = make_light_shift(; F, polarization=(1, 0, 1), alpha_tensor=1.0, profile)
         @test !ls.is_diagonal
         for _ in 1:100
             apply_light_shift_step!(psi, ls, 0.01, 1; imaginary_time=false)
@@ -66,12 +68,15 @@ using SpinorBEC
         sp = SimParams(; dt=0.001, n_steps=10, imaginary_time=true)
         V_trap = evaluate_potential(HarmonicTrap(1.0), grid)
         ls = make_light_shift_from_trap(V_trap, F, 0.05)
-        ws = make_workspace(; grid, atom, interactions, sim_params=sp, potential=HarmonicTrap(1.0), light_shift=ls)
+        ws = make_workspace(;
+            grid, atom, interactions, sim_params=sp, potential=HarmonicTrap(1.0), light_shift=ls
+        )
         ed = energy_decomposition(ws)
         @test haskey(pairs(ed), :light_shift)
         @test ed.light_shift != 0.0
-        @test ed.total ≈ ed.kinetic + ed.trap + ed.zeeman + ed.density + ed.spin +
-                          ed.ddi + ed.lhy + ed.tensor + ed.raman + ed.light_shift
+        @test ed.total ≈
+            ed.kinetic + ed.trap + ed.zeeman + ed.density + ed.spin +
+              ed.ddi + ed.lhy + ed.tensor + ed.raman + ed.light_shift
     end
 
     @testset "ITP with tensor LS redistributes populations" begin
@@ -82,7 +87,7 @@ using SpinorBEC
         interactions = InteractionParams(1.0, 0.0)
         profile = evaluate_potential(HarmonicTrap(1.0), grid)
         # Strong tensor LS: favors m=0 (negative eigenvalue for ε∥ẑ)
-        ls = make_light_shift(; F, polarization=(0,0,1), alpha_tensor=5.0, profile=abs.(profile))
+        ls = make_light_shift(; F, polarization=(0, 0, 1), alpha_tensor=5.0, profile=abs.(profile))
         ws = make_workspace(;
             grid, atom, interactions,
             sim_params=SimParams(; dt=0.005, n_steps=500, imaginary_time=true),
@@ -107,7 +112,9 @@ using SpinorBEC
         sp = SimParams(; dt=0.001, n_steps=10)
         psi0 = init_psi(grid, SpinSystem(F); state=:uniform)
         ws1 = make_workspace(; grid, atom, interactions, sim_params=sp, psi_init=copy(psi0))
-        ws2 = make_workspace(; grid, atom, interactions, sim_params=sp, psi_init=copy(psi0), light_shift=nothing)
+        ws2 = make_workspace(;
+            grid, atom, interactions, sim_params=sp, psi_init=copy(psi0), light_shift=nothing
+        )
         for _ in 1:10
             split_step!(ws1)
             split_step!(ws2)
@@ -127,7 +134,7 @@ using SpinorBEC
         F = 6
         D = 2F + 1
         profile = ones(Float64, 16)
-        ls = make_light_shift(; F, polarization=(0,0,1), alpha_tensor=1.0, profile)
+        ls = make_light_shift(; F, polarization=(0, 0, 1), alpha_tensor=1.0, profile)
         @test ls.is_diagonal
         @test length(ls.eigvals) == D
         # m-dependent eigenvalues: (3m² - F(F+1)) / (F(2F-1))

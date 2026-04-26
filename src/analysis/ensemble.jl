@@ -33,7 +33,7 @@ For total density: correction = D/(2V) per k-mode.
 function wigner_correct_density(
     mean_density_k::AbstractArray{<:AbstractFloat},
     grid::Grid{N};
-    n_components::Int = 1,
+    n_components::Int=1,
 ) where {N}
     V = prod(grid.config.box_size)
     correction = n_components / (2.0 * V)

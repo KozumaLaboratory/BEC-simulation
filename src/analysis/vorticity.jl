@@ -8,7 +8,7 @@ function superfluid_vorticity(
     psi::AbstractArray{<:Complex},
     grid::Grid{N},
     plans::FFTPlans;
-    density_cutoff::Float64 = 1e-10,
+    density_cutoff::Float64=1e-10,
 ) where {N}
     N >= 2 || return 0.0
     v = superfluid_velocity(psi, grid, plans; density_cutoff)
@@ -52,7 +52,7 @@ function berry_curvature(
     grid::Grid{N},
     plans::FFTPlans,
     sm::SpinMatrices;
-    density_cutoff::Float64 = 1e-10,
+    density_cutoff::Float64=1e-10,
 ) where {N}
     n_pts = ntuple(d -> size(psi, d), N)
     N >= 2 || return zeros(Float64, n_pts)
@@ -97,7 +97,7 @@ function spin_texture_charge(
     grid::Grid{N},
     plans::FFTPlans,
     sm::SpinMatrices;
-    density_cutoff::Float64 = 1e-10,
+    density_cutoff::Float64=1e-10,
 ) where {N}
     N == 2 || return 0.0
     omega = berry_curvature(psi, grid, plans, sm; density_cutoff)

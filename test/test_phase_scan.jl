@@ -2,7 +2,7 @@ using FFTW
 
 @testset "Phase Scan" begin
     @testset "Override primitive: apply_override!" begin
-        d = Dict{String,Any}("a" => Dict{String,Any}("b" => 1))
+        d = Dict{String, Any}("a" => Dict{String, Any}("b" => 1))
         SpinorBEC.apply_override!(d, "a.b", 42)
         @test d["a"]["b"] == 42
 
@@ -11,15 +11,15 @@ using FFTW
         @test d["a"]["c"]["d"] == "x"
 
         # Multi-key apply_overrides
-        out = SpinorBEC.apply_overrides(d, Dict{String,Any}("a.b" => 7, "z" => true))
+        out = SpinorBEC.apply_overrides(d, Dict{String, Any}("a.b" => 7, "z" => true))
         @test out["a"]["b"] == 7
         @test out["z"] == true
         @test d["a"]["b"] == 42  # base unchanged
     end
 
     @testset "expand_scan_points: zip" begin
-        scan = Dict{String,Any}(
-            "zip" => Dict{String,Any}(
+        scan = Dict{String, Any}(
+            "zip" => Dict{String, Any}(
                 "system.ddi.c_dd" => [0.0, 1000.0, 4000.0],
                 "ground_state.zeeman.p" => [100.0, 10.0, 1.0],
             ),
@@ -31,14 +31,16 @@ using FFTW
         @test pts[3]["system.ddi.c_dd"] == 4000.0
 
         # Length mismatch errors
-        @test_throws ArgumentError SpinorBEC.expand_scan_points(Dict{String,Any}(
-            "zip" => Dict{String,Any}("a.b" => [1, 2], "c.d" => [1, 2, 3]),
-        ))
+        @test_throws ArgumentError SpinorBEC.expand_scan_points(
+            Dict{String, Any}(
+                "zip" => Dict{String, Any}("a.b" => [1, 2], "c.d" => [1, 2, 3])
+            )
+        )
     end
 
     @testset "expand_scan_points: product" begin
-        scan = Dict{String,Any}(
-            "product" => Dict{String,Any}(
+        scan = Dict{String, Any}(
+            "product" => Dict{String, Any}(
                 "system.interactions.c1_ratio" => [-0.01, 0.0],
                 "ground_state.target_magnetization" => [-6.0, -3.0, 0.0],
             ),
@@ -46,15 +48,19 @@ using FFTW
         pts = SpinorBEC.expand_scan_points(scan)
         @test length(pts) == 6
         # Each combination present exactly once
-        combos = Set([(p["system.interactions.c1_ratio"], p["ground_state.target_magnetization"]) for p in pts])
+        combos = Set([
+            (p["system.interactions.c1_ratio"], p["ground_state.target_magnetization"]) for p in pts
+        ])
         @test length(combos) == 6
     end
 
     @testset "expand_scan_points: zip × product combination" begin
-        pts = SpinorBEC.expand_scan_points(Dict{String,Any}(
-            "zip" => Dict{String,Any}("a" => [1, 2, 3]),
-            "product" => Dict{String,Any}("b" => [10, 20]),
-        ))
+        pts = SpinorBEC.expand_scan_points(
+            Dict{String, Any}(
+                "zip" => Dict{String, Any}("a" => [1, 2, 3]),
+                "product" => Dict{String, Any}("b" => [10, 20]),
+            ),
+        )
         @test length(pts) == 6  # 3 zip × 2 product
         combos = Set([(p["a"], p["b"]) for p in pts])
         @test length(combos) == 6
@@ -152,12 +158,11 @@ using FFTW
     end
 
     @testset "OverrideScan validation" begin
-        @test_throws ArgumentError OverrideScan(Dict{String,Any}[])
-        os = OverrideScan([Dict{String,Any}("a.b" => 1)])
+        @test_throws ArgumentError OverrideScan(Dict{String, Any}[])
+        os = OverrideScan([Dict{String, Any}("a.b" => 1)])
         @test length(os.points) == 1
         @test os.continuation == false
     end
-
 
     @testset "ConstrainedJzScan validation" begin
         @test_throws ArgumentError ConstrainedJzScan(Float64[], 0.05, 15, (-10.0, 10.0))
@@ -165,5 +170,4 @@ using FFTW
         @test_throws ArgumentError ConstrainedJzScan([0.0], 0.05, 0, (-10.0, 10.0))
         @test_throws ArgumentError ConstrainedJzScan([0.0], 0.05, 15, (10.0, -10.0))
     end
-
 end

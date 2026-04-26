@@ -13,7 +13,7 @@
 # Scans are then literally a list of OverrideMaps generated from a higher-
 # level scan spec (zip / product over a few paths).
 
-const OverrideMap = Dict{String,Any}
+const OverrideMap = Dict{String, Any}
 
 """
     apply_override!(d::Dict, path::String, value)
@@ -39,9 +39,12 @@ function apply_override!(d::Dict, path::AbstractString, value)
         # Navigate: handle Dict keys, list indices, and single-key unwrap
         if cursor isa AbstractVector
             idx = tryparse(Int, key)
-            idx === nothing && throw(ArgumentError("Override path segment '$key' is not a valid list index"))
+            idx === nothing &&
+                throw(ArgumentError("Override path segment '$key' is not a valid list index"))
             idx += 1  # 0-based → 1-based
-            1 <= idx <= length(cursor) || throw(ArgumentError("Override list index $key out of bounds (length=$(length(cursor)))"))
+            1 <= idx <= length(cursor) || throw(
+                ArgumentError("Override list index $key out of bounds (length=$(length(cursor)))"),
+            )
             elem = cursor[idx]
             # Auto-unwrap single-key dicts (pipeline steps like {ground_state: {...}})
             if elem isa Dict && length(elem) == 1
@@ -52,12 +55,14 @@ function apply_override!(d::Dict, path::AbstractString, value)
         elseif cursor isa Dict
             next = get(cursor, key, nothing)
             if next === nothing
-                next = Dict{String,Any}()
+                next = Dict{String, Any}()
                 cursor[key] = next
             end
             cursor = next
         else
-            throw(ArgumentError("Override path cannot traverse $(typeof(cursor)) at segment '$key'"))
+            throw(
+                ArgumentError("Override path cannot traverse $(typeof(cursor)) at segment '$key'")
+            )
         end
     end
     d
@@ -128,32 +133,36 @@ function _expand_values(spec)
     scale = Symbol(get(spec, "scale", "linear"))
 
     if scale == :linear
-        return collect(range(from, to; length = n))
+        return collect(range(from, to; length=n))
     elseif scale == :log
         from > 0 && to > 0 || throw(ArgumentError("log scale requires positive from/to"))
-        return [exp(v) for v in range(log(from), log(to); length = n)]
+        return [exp(v) for v in range(log(from), log(to); length=n)]
     elseif scale == :sqrt
         # √ scale: denser near 0, sparser at large values
         s_from = sign(from) * sqrt(abs(from))
         s_to = sign(to) * sqrt(abs(to))
-        return [sign(v) * v^2 for v in range(s_from, s_to; length = n)]
+        return [sign(v) * v^2 for v in range(s_from, s_to; length=n)]
     elseif scale == :geom
         # Geometric: same as log but allows from=0 by shifting
         from >= 0 && to > 0 || throw(ArgumentError("geom scale requires non-negative from/to"))
         if from == 0
-            return [0.0; [exp(v) for v in range(log(to / n), log(to); length = n - 1)]]
+            return [0.0; [exp(v) for v in range(log(to / n), log(to); length=n - 1)]]
         end
-        return [exp(v) for v in range(log(from), log(to); length = n)]
+        return [exp(v) for v in range(log(from), log(to); length=n)]
     elseif scale == :cosine
         # Cosine spacing: denser at endpoints (Chebyshev nodes)
         return [(from + to) / 2 + (to - from) / 2 * cos(π * (n - k) / (n - 1)) for k in 1:n]
     elseif scale == :reverse_log
         # Denser near `to` (log-reversed)
         to > 0 || throw(ArgumentError("reverse_log requires to > 0"))
-        reversed = [exp(v) for v in range(log(to), log(max(from, to/1000)); length = n)]
+        reversed = [exp(v) for v in range(log(to), log(max(from, to/1000)); length=n)]
         return reverse(reversed)
     else
-        throw(ArgumentError("Unknown scale: $scale. Supported: linear, log, sqrt, geom, cosine, reverse_log"))
+        throw(
+            ArgumentError(
+                "Unknown scale: $scale. Supported: linear, log, sqrt, geom, cosine, reverse_log"
+            ),
+        )
     end
 end
 
@@ -162,9 +171,11 @@ function _expand_zip(d::Dict)
     paths = collect(keys(d))
     cols = [_expand_values(d[p]) for p in paths]
     lens = length.(cols)
-    all(==(lens[1]), lens) || throw(ArgumentError(
-        "scan.zip: all axes must have the same length, got $lens for paths $paths",
-    ))
+    all(==(lens[1]), lens) || throw(
+        ArgumentError(
+            "scan.zip: all axes must have the same length, got $lens for paths $paths"
+        ),
+    )
     n = lens[1]
     [OverrideMap(paths[i] => cols[i][k] for i in eachindex(paths)) for k in 1:n]
 end
@@ -181,7 +192,7 @@ end
 function _product_recurse!(out, paths, cols, depth, acc)
     if depth > length(paths)
         push!(out, copy(acc))
-        return
+        return nothing
     end
     for v in cols[depth]
         acc[paths[depth]] = v

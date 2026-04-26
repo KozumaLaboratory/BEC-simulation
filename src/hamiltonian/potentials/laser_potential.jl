@@ -7,14 +7,14 @@ V(r) = -α × I(r) where I accounts for w(z) = w₀√(1 + (z/z_R)²).
 struct LaserBeamPotential{N} <: AbstractPotential
     beam::OpticalBeam
     polarizability::Float64
-    position::NTuple{N,Float64}
-    direction::NTuple{N,Float64}
+    position::NTuple{N, Float64}
+    direction::NTuple{N, Float64}
 
     function LaserBeamPotential{N}(
         beam::OpticalBeam,
         polarizability::Float64,
-        position::NTuple{N,Float64},
-        direction::NTuple{N,Float64},
+        position::NTuple{N, Float64},
+        direction::NTuple{N, Float64},
     ) where {N}
         d_norm = sqrt(sum(d^2 for d in direction))
         dir_normalized = ntuple(i -> direction[i] / d_norm, N)
@@ -25,13 +25,15 @@ end
 function LaserBeamPotential(
     beam::OpticalBeam,
     polarizability::Float64,
-    position::NTuple{N,Float64},
-    direction::NTuple{N,Float64},
+    position::NTuple{N, Float64},
+    direction::NTuple{N, Float64},
 ) where {N}
     LaserBeamPotential{N}(beam, polarizability, position, direction)
 end
 
-function evaluate_potential(lp::LaserBeamPotential{N}, grid::Grid{N,T}) where {N,T<:AbstractFloat}
+function evaluate_potential(
+    lp::LaserBeamPotential{N}, grid::Grid{N, T}
+) where {N, T <: AbstractFloat}
     V = zeros(T, grid.config.n_points)
     w0 = T(waist_radius(lp.beam))
     z_R = T(rayleigh_length(lp.beam))

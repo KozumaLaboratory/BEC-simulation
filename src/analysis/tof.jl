@@ -15,7 +15,7 @@ function simulate_tof(
     grid::Grid{N},
     sys::SpinSystem,
     params::TOFParams;
-    fft_plans::Union{Nothing,FFTPlans} = nothing,
+    fft_plans::Union{Nothing, FFTPlans}=nothing,
 ) where {N}
     D = sys.n_components
     n_pts = grid.config.n_points
@@ -25,9 +25,9 @@ function simulate_tof(
     # so final position grid ∝ k-grid × t_tof
     k_dx = ntuple(d -> grid.dk[d] * params.t_tof, Val(N))
 
-    result = Dict{Int,Array{Float64}}()
+    result = Dict{Int, Array{Float64}}()
 
-    for c = 1:D
+    for c in 1:D
         m = sys.m_values[c]
         idx = _component_slice(N, n_pts, c)
         psi_c = copy(view(psi, idx...))
@@ -62,7 +62,7 @@ function simulate_tof(
 
             # Column integrate along imaging_axis
             ax = min(params.imaging_axis, N)
-            integrated = dropdims(sum(mom_density; dims = ax); dims = ax)
+            integrated = dropdims(sum(mom_density; dims=ax); dims=ax)
             result[m] = integrated
         end
     end
@@ -71,11 +71,11 @@ function simulate_tof(
 end
 
 function _circshift_axis(
-    arr::AbstractArray{T,N},
+    arr::AbstractArray{T, N},
     shift::Int,
     axis::Int,
     ::Val{N},
-) where {T,N}
+) where {T, N}
     shifts = ntuple(d -> d == axis ? shift : 0, Val(N))
     circshift(arr, shifts)
 end
@@ -126,11 +126,11 @@ function simulate_tof_with_gradient(
     ws_source::Workspace{N};
     gradient::Float64,
     t_tof::Float64,
-    imaging_axis::Int = N,
-    gradient_axis::Int = N,
-    n_steps::Int = 200,
-    keep_trap::Bool = false,
-    drop_interactions::Bool = true,
+    imaging_axis::Int=N,
+    gradient_axis::Int=N,
+    n_steps::Int=200,
+    keep_trap::Bool=false,
+    drop_interactions::Bool=true,
 ) where {N}
     t_tof >= 0 || throw(ArgumentError("t_tof must be non-negative"))
     n_steps > 0 || throw(ArgumentError("n_steps must be positive"))
@@ -144,13 +144,13 @@ function simulate_tof_with_gradient(
     D = ws_source.spin_matrices.system.n_components
 
     ip_tof = drop_interactions ? InteractionParams(0.0, 0.0) :
-                                  ws_source.interactions
+             ws_source.interactions
     potential_tof = keep_trap ? ws_source.potential : NoPotential()
 
     dt_tof = t_tof / n_steps
-    sp_tof = SimParams(; dt = dt_tof, n_steps, imaginary_time = false,
-                        normalize_every = 0,
-                        save_every = max(1, n_steps ÷ 4))
+    sp_tof = SimParams(; dt=dt_tof, n_steps, imaginary_time=false,
+        normalize_every=0,
+        save_every=max(1, n_steps ÷ 4))
 
     # Use existing MagneticGradient — the hot-path split_step already
     # integrates V_mg(r, m) = m · g_F · gradient · r[axis] per component.
@@ -159,24 +159,24 @@ function simulate_tof_with_gradient(
     ws_tof = make_workspace(;
         grid,
         atom,
-        interactions = ip_tof,
-        zeeman = ZeemanParams(),          # no Zeeman during TOF
-        potential = potential_tof,
-        sim_params = sp_tof,
-        psi_init = ws_source.state.psi,
-        backend = ws_source.backend,
-        magnetic_gradient = mg,
+        interactions=ip_tof,
+        zeeman=ZeemanParams(),          # no Zeeman during TOF
+        potential=potential_tof,
+        sim_params=sp_tof,
+        psi_init=ws_source.state.psi,
+        backend=ws_source.backend,
+        magnetic_gradient=mg,
     )
 
-    for _ = 1:n_steps
+    for _ in 1:n_steps
         split_step!(ws_tof)
     end
 
     # Extract per-component column density
     psi = ws_tof.state.psi
     n_pts = grid.config.n_points
-    result = Dict{Int,Array{Float64}}()
-    for c = 1:D
+    result = Dict{Int, Array{Float64}}()
+    for c in 1:D
         m = ws_source.spin_matrices.system.m_values[c]
         idx = _component_slice(N, n_pts, c)
         slice_arr = view(psi, idx...)
@@ -185,7 +185,7 @@ function simulate_tof_with_gradient(
             result[m] = density_c
         else
             ax = imaging_axis
-            integrated = dropdims(sum(density_c; dims = ax); dims = ax)
+            integrated = dropdims(sum(density_c; dims=ax); dims=ax)
             result[m] = integrated
         end
     end
@@ -203,11 +203,11 @@ center_y))` (or `(center_x,)` for 2D result collapsed from 3D along the
 last axis).
 """
 function sg_separation_peaks(
-    result::Dict{<:Integer,<:AbstractArray},
+    result::Dict{<:Integer, <:AbstractArray},
     grid::Grid{N},
-    imaging_axis::Int = N,
+    imaging_axis::Int=N,
 ) where {N}
-    out = Dict{Int,NTuple{N-1,Float64}}()
+    out = Dict{Int, NTuple{N-1, Float64}}()
     # Remaining axes after dropping imaging_axis
     remaining = Int[d for d in 1:N if d != imaging_axis]
     for (m, dens) in result

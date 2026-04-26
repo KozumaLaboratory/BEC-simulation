@@ -20,11 +20,11 @@ function classify_phase(
     n_sum = sum(n_total) * dV
     n_sq_sum = sum(n_total .^ 2) * dV
     n_sum < 1e-30 && return (
-        spin_order = 0.0,
-        nematic_order = 0.0,
-        channel_weights = Dict{Int,Float64}(),
-        phase = :vacuum,
-        magnetization_density = 0.0,
+        spin_order=0.0,
+        nematic_order=0.0,
+        channel_weights=Dict{Int, Float64}(),
+        phase=:vacuum,
+        magnetization_density=0.0,
     )
 
     fx, fy, fz = spin_density_vector(psi, sm, N)
@@ -33,7 +33,7 @@ function classify_phase(
 
     spec = pair_amplitude_spectrum(psi, F, grid)
     total_weight = sum(values(spec.channel_weights))
-    cw_norm = Dict{Int,Float64}()
+    cw_norm = Dict{Int, Float64}()
     for (S, w) in spec.channel_weights
         cw_norm[S] = total_weight > 0 ? w / total_weight : 0.0
     end
@@ -45,11 +45,11 @@ function classify_phase(
     phase = _label_phase(spin_order, nematic_order, cw_norm, F)
 
     (
-        spin_order = spin_order,
-        nematic_order = nematic_order,
-        channel_weights = cw_norm,
-        phase = phase,
-        magnetization_density = Mz,
+        spin_order=spin_order,
+        nematic_order=nematic_order,
+        channel_weights=cw_norm,
+        phase=phase,
+        magnetization_density=Mz,
     )
 end
 
@@ -68,7 +68,7 @@ function _majorana_star_entropy(spinor::AbstractVector{ComplexF64}, F::Int)
     n_stars == 0 && return 0.0
 
     n_bins = max(6, n_stars)
-    cos_edges = range(-1.0, 1.0, length = n_bins + 1)
+    cos_edges = range(-1.0, 1.0; length=n_bins + 1)
     counts = zeros(Float64, n_bins)
     for p in points
         cos_theta = clamp(p[3], -1.0, 1.0)
@@ -90,8 +90,8 @@ function _mean_majorana_entropy(
     ndim::Int,
     n_total,
     dV;
-    density_cutoff::Float64 = 1e-10,
-    sampling::Float64 = 1.0,
+    density_cutoff::Float64=1e-10,
+    sampling::Float64=1.0,
 )
     D = 2F + 1
     n_pts = ntuple(d -> size(psi, d), ndim)
@@ -111,7 +111,7 @@ function _mean_majorana_entropy(
         ni > density_cutoff || continue
         spinor = Vector{ComplexF64}(undef, D)
         norm_sq = 0.0
-        for c = 1:D
+        for c in 1:D
             spinor[c] = psi[I, c]
             norm_sq += abs2(psi[I, c])
         end
@@ -150,7 +150,7 @@ function classify_phase_detailed(
     F::Int,
     grid::Grid{N},
     sm::SpinMatrices;
-    sampling::Float64 = 1.0,
+    sampling::Float64=1.0,
 ) where {N}
     D = 2F + 1
     dV = cell_volume(grid)
@@ -161,15 +161,15 @@ function classify_phase_detailed(
     n_sq_sum = sum(n_total .^ 2) * dV
     if n_sum < 1e-30
         return (
-            spin_order = 0.0,
-            nematic_order = 0.0,
-            biaxiality = 0.0,
-            Q6 = 0.0,
-            star_entropy = 0.0,
-            channel_weights = Dict{Int,Float64}(),
-            magnetization_density = 0.0,
-            phase = :vacuum,
-            point_group = :trivial,
+            spin_order=0.0,
+            nematic_order=0.0,
+            biaxiality=0.0,
+            Q6=0.0,
+            star_entropy=0.0,
+            channel_weights=Dict{Int, Float64}(),
+            magnetization_density=0.0,
+            phase=:vacuum,
+            point_group=:trivial,
         )
     end
 
@@ -179,7 +179,7 @@ function classify_phase_detailed(
 
     spec = pair_amplitude_spectrum(psi, F, grid)
     total_weight = sum(values(spec.channel_weights))
-    cw_norm = Dict{Int,Float64}()
+    cw_norm = Dict{Int, Float64}()
     for (S, w) in spec.channel_weights
         cw_norm[S] = total_weight > 0 ? w / total_weight : 0.0
     end
@@ -203,14 +203,14 @@ function classify_phase_detailed(
     pg = _peak_point_group(psi, F, N, n_total, dV)
 
     (
-        spin_order = spin_order,
-        nematic_order = nematic_order,
-        biaxiality = mean_biax,
-        Q6 = mean_Q6,
-        star_entropy = star_entropy,
-        channel_weights = cw_norm,
-        magnetization_density = Mz,
-        phase = phase,
-        point_group = pg,
+        spin_order=spin_order,
+        nematic_order=nematic_order,
+        biaxiality=mean_biax,
+        Q6=mean_Q6,
+        star_entropy=star_entropy,
+        channel_weights=cw_norm,
+        magnetization_density=Mz,
+        phase=phase,
+        point_group=pg,
     )
 end

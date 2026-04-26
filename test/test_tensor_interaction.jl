@@ -1,5 +1,4 @@
 @testset "Tensor interaction" begin
-
     @testset "make_tensor_interaction_cache returns nothing for c2-only" begin
         ip = InteractionParams(100.0, 10.0, 0.0, [5.0])
         cache = make_tensor_interaction_cache(1, ip)
@@ -41,7 +40,7 @@
                 for m1 in -1:1
                     m2 = M - m1
                     abs(m2) > 1 && continue
-                    a += clebsch_gordan(1, m1, 1, m2, 0, M) * sp[1-m1+1] * sp[1-m2+1]
+                    a += clebsch_gordan(1, m1, 1, m2, 0, M) * sp[1 - m1 + 1] * sp[1 - m2 + 1]
                 end
                 a0_sq += abs2(a)
             end
@@ -52,7 +51,7 @@
                 for m1 in -1:1
                     m2 = M - m1
                     abs(m2) > 1 && continue
-                    a += clebsch_gordan(1, m1, 1, m2, 2, M) * sp[1-m1+1] * sp[1-m2+1]
+                    a += clebsch_gordan(1, m1, 1, m2, 2, M) * sp[1 - m1 + 1] * sp[1 - m2 + 1]
                 end
                 a2_sq += abs2(a)
             end
@@ -141,7 +140,9 @@
         grid = make_grid(GridConfig((16,), (10.0,)))
 
         interactions = InteractionParams(0.0, 0.0, 0.0, [5.0, 0.0, 3.0])
-        atom = AtomSpecies("test-f2", 1e-25, 2, 0.0, 0.0, 0.0, Dict(0 => 1e-9, 2 => 2e-9, 4 => 1.5e-9))
+        atom = AtomSpecies(
+            "test-f2", 1e-25, 2, 0.0, 0.0, 0.0, Dict(0 => 1e-9, 2 => 2e-9, 4 => 1.5e-9)
+        )
         sp = SimParams(; dt=0.001, n_steps=10)
 
         ws = make_workspace(;
@@ -213,7 +214,7 @@
         @test cache.g_values[findfirst(==(0), cache.active_channels)] ≈ 100.0
         @test cache.g_values[findfirst(==(4), cache.active_channels)] ≈ 25.0
 
-        empty_dict = Dict{Int,Float64}(0 => 0.0, 2 => 0.0)
+        empty_dict = Dict{Int, Float64}(0 => 0.0, 2 => 0.0)
         @test SpinorBEC._make_tensor_cache_from_channels(2, empty_dict) === nothing
     end
 
@@ -330,8 +331,11 @@
         sm = spin_matrices(F)
         E_c1 = SpinorBEC._spin_interaction_energy(psi, sm, c1, D, 1, n_pts, dV)
         cache_residual = SpinorBEC._make_tensor_cache_from_channels(F, g_delta)
-        E_residual = cache_residual !== nothing ?
-            SpinorBEC._tensor_interaction_energy(psi, cache_residual, 1, n_pts, dV) : 0.0
+        E_residual = if cache_residual !== nothing
+            SpinorBEC._tensor_interaction_energy(psi, cache_residual, 1, n_pts, dV)
+        else
+            0.0
+        end
 
         @test E_total ≈ E_c0 + E_c1 + E_residual rtol = 1e-10
     end
@@ -423,7 +427,7 @@
         cache = make_tensor_interaction_cache(F, ip)
         entries = SpinorBEC._precompute_hf_entries(cache)
         for i in 2:length(entries)
-            prev = (entries[i-1].c_m, entries[i-1].c_mp)
+            prev = (entries[i - 1].c_m, entries[i - 1].c_mp)
             cur = (entries[i].c_m, entries[i].c_mp)
             @test prev <= cur
         end

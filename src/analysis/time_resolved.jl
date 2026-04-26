@@ -30,12 +30,12 @@ Forwarded to `spin_tomography`:
 """
 function time_resolved_tomography(
     sim_result::SimulationResult, grid::Grid{N}, F::Int;
-    rotation_axis::Symbol = :y,
-    theta_min::Real = 0.0,
-    theta_max::Real = π,
-    n_angles::Int = 19,
-    tof_params::TOFParams = TOFParams(; t_tof = 5.0),
-    reference_m::Union{Nothing,Int} = -F,
+    rotation_axis::Symbol=:y,
+    theta_min::Real=0.0,
+    theta_max::Real=π,
+    n_angles::Int=19,
+    tof_params::TOFParams=TOFParams(; t_tof=5.0),
+    reference_m::Union{Nothing, Int}=(-F),
 ) where {N}
     snapshots = sim_result.psi_snapshots
     n_times = length(snapshots)
@@ -43,8 +43,8 @@ function time_resolved_tomography(
         "sim_result contains no psi snapshots — set save_every to store them"))
 
     D = 2F + 1
-    angles = collect(range(theta_min, theta_max; length = n_angles))
-    images = Dict{Int,Vector{Matrix{Float64}}}()
+    angles = collect(range(theta_min, theta_max; length=n_angles))
+    images = Dict{Int, Vector{Matrix{Float64}}}()
     # Call the first snapshot to size the output
     first_res = spin_tomography(snapshots[1], grid, F;
         rotation_axis, theta_min, theta_max, n_angles, tof_params, reference_m)
@@ -69,6 +69,6 @@ function time_resolved_tomography(
         pop[t_idx, :, :] .= res.populations
     end
 
-    (times = copy(sim_result.times), angles = angles, images = images,
-     populations = pop)
+    (times=copy(sim_result.times), angles=angles, images=images,
+        populations=pop)
 end

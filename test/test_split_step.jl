@@ -12,7 +12,7 @@ using SpinorBEC
         sp = SimParams(; dt=0.001, n_steps=100, imaginary_time=false, save_every=100)
 
         ws = make_workspace(;
-            grid, atom=Rb87, interactions, sim_params=sp, psi_init=psi0,
+            grid, atom=Rb87, interactions, sim_params=sp, psi_init=psi0
         )
 
         E0 = total_energy(ws)
@@ -34,7 +34,7 @@ using SpinorBEC
         sp = SimParams(; dt=0.001, n_steps=200, imaginary_time=false, save_every=200)
 
         ws = make_workspace(;
-            grid, atom=Rb87, interactions, sim_params=sp, psi_init=psi0,
+            grid, atom=Rb87, interactions, sim_params=sp, psi_init=psi0
         )
 
         N0 = total_norm(ws.state.psi, grid)
@@ -61,7 +61,7 @@ using SpinorBEC
             sp = SimParams(; dt, n_steps, imaginary_time=false, save_every=n_steps)
             psi0 = init_psi(grid, sys; state=:polar)
             ws = make_workspace(;
-                grid, atom=Rb87, interactions, sim_params=sp, psi_init=psi0,
+                grid, atom=Rb87, interactions, sim_params=sp, psi_init=psi0
             )
             E0 = total_energy(ws)
             for _ in 1:n_steps
@@ -136,7 +136,10 @@ using SpinorBEC
             psi0 = init_psi(grid, sys; state=:polar)
             ws = make_workspace(; grid, atom=Rb87, interactions, sim_params=sp, psi_init=psi0)
             E0_s = total_energy(ws)
-            for _ in 1:n_steps; split_step!(ws); end
+            for _ in 1:n_steps
+                ;
+                split_step!(ws);
+            end
             push!(strang_errors, abs(total_energy(ws) - E0_s))
 
             # Yoshida
@@ -197,7 +200,7 @@ using SpinorBEC
         sp = SimParams(; dt=0.01, n_steps=1)
         psi0 = init_psi(grid, sys; state=:ferromagnetic)
         ws = make_workspace(; grid, atom=Rb87, interactions, sim_params=sp, psi_init=psi0,
-                            zeeman=ZeemanParams(0.1, 0.0))
+            zeeman=ZeemanParams(0.1, 0.0))
 
         adaptive = AdaptiveDtParams(; dt_init=0.005, dt_min=1e-4, dt_max=0.05, tol=0.01)
         result = run_simulation_yoshida!(ws; adaptive, t_end=0.5, save_interval=0.1)
@@ -248,11 +251,11 @@ using SpinorBEC
         sp = SimParams(; dt=0.01, n_steps=1)
         psi0 = init_psi(grid, sys; state=:ferromagnetic)
         ws = make_workspace(; grid, atom=Rb87, interactions, sim_params=sp, psi_init=psi0,
-                            zeeman=ZeemanParams(0.1, 0.0))
+            zeeman=ZeemanParams(0.1, 0.0))
 
         adaptive = AdaptiveDtParams(; dt_init=0.005, dt_min=1e-4, dt_max=0.05, tol=0.01)
         result = run_simulation_yoshida!(ws; adaptive, t_end=0.5, save_interval=0.1,
-                                         composition=:suzuki)
+            composition=:suzuki)
 
         @test result.n_accepted > 0
         @test length(result.result.times) >= 2
@@ -314,7 +317,8 @@ using SpinorBEC
         @test errors[1] / errors[2] > 3.5
     end
 
-    @testset "Coefficient sums ($method)" for method in (:yoshida, :suzuki, :blanes_moan_s6, :omelyan_pefrl)
+    @testset "Coefficient sums ($method)" for method in
+                                              (:yoshida, :suzuki, :blanes_moan_s6, :omelyan_pefrl)
         comp = SpinorBEC._resolve_composition(method)
         @test sum(comp.a) ≈ 1.0 atol=1e-15
         @test sum(comp.b) ≈ 1.0 atol=1e-15
@@ -337,11 +341,11 @@ using SpinorBEC
         sp = SimParams(; dt=0.01, n_steps=1)
         psi0 = init_psi(grid, sys; state=:ferromagnetic)
         ws = make_workspace(; grid, atom=Rb87, interactions, sim_params=sp, psi_init=psi0,
-                            zeeman=ZeemanParams(0.1, 0.0))
+            zeeman=ZeemanParams(0.1, 0.0))
 
         adaptive = AdaptiveDtParams(; dt_init=0.005, dt_min=1e-4, dt_max=0.05, tol=0.01)
         result = run_simulation_yoshida!(ws; adaptive, t_end=0.5, save_interval=0.1,
-                                         composition=method)
+            composition=method)
 
         @test result.n_accepted > 0
         @test length(result.result.times) >= 2
@@ -358,12 +362,12 @@ using SpinorBEC
         sp = SimParams(; dt=0.01, n_steps=1)
         psi0 = init_psi(grid, sys; state=:ferromagnetic)
         ws = make_workspace(; grid, atom=Rb87, interactions, sim_params=sp, psi_init=psi0,
-                            zeeman=ZeemanParams(0.1, 0.0))
+            zeeman=ZeemanParams(0.1, 0.0))
 
         adaptive = AdaptiveDtParams(; dt_init=0.005, dt_min=1e-4, dt_max=0.05, tol=0.01)
         custom = SpinorBEC._COMP_YOSHIDA
         result = run_simulation_yoshida!(ws; adaptive, t_end=0.5, save_interval=0.1,
-                                         composition=custom)
+            composition=custom)
 
         @test result.n_accepted > 0
         @test length(result.result.times) >= 2

@@ -2,7 +2,6 @@ using Test
 using SpinorBEC
 
 @testset "Level 2: Thomas-Fermi Ground State" begin
-
     @testset "1D Thomas-Fermi density profile" begin
         # ℏ = m = ω = 1, large c₀ → Thomas-Fermi regime
         # n_TF(x) = max(0, (μ - x²/2) / c₀)
@@ -85,5 +84,4 @@ using SpinorBEC
         )
         @test abs(numerical_R - R_TF) / R_TF < 0.15
     end
-
 end

@@ -8,7 +8,7 @@ using SpinorBEC
         interactions = InteractionParams(1.0, 0.1)
         sp = SimParams(; dt=0.001, n_steps=1)
         ws = make_workspace(; grid, atom, interactions, sim_params=sp,
-                            potential=HarmonicTrap(1.0))
+            potential=HarmonicTrap(1.0))
 
         E = energy_decomposition(ws)
         @test haskey(E, :kinetic)
@@ -22,8 +22,9 @@ using SpinorBEC
         @test haskey(E, :raman)
         @test haskey(E, :total)
 
-        @test E.total ≈ E.kinetic + E.trap + E.zeeman + E.density +
-                         E.spin + E.ddi + E.lhy + E.tensor + E.raman
+        @test E.total ≈
+            E.kinetic + E.trap + E.zeeman + E.density +
+              E.spin + E.ddi + E.lhy + E.tensor + E.raman
     end
 
     @testset "total_energy matches decomposition sum" begin
@@ -32,7 +33,7 @@ using SpinorBEC
         interactions = InteractionParams(1.0, 0.1)
         sp = SimParams(; dt=0.001, n_steps=1)
         ws = make_workspace(; grid, atom, interactions, sim_params=sp,
-                            potential=HarmonicTrap(1.0))
+            potential=HarmonicTrap(1.0))
 
         @test total_energy(ws) ≈ energy_decomposition(ws).total
     end
@@ -54,7 +55,7 @@ using SpinorBEC
         interactions = InteractionParams(0.0, 0.0)
         sp = SimParams(; dt=0.001, n_steps=1)
         ws = make_workspace(; grid, atom, interactions, sim_params=sp,
-                            potential=HarmonicTrap(1.0))
+            potential=HarmonicTrap(1.0))
 
         E = energy_decomposition(ws)
         @test E.trap > 0.0
@@ -66,9 +67,9 @@ using SpinorBEC
         sp = SimParams(; dt=0.001, n_steps=1)
 
         ws_pos = make_workspace(; grid, atom, interactions=InteractionParams(10.0, 0.0),
-                                 sim_params=sp)
+            sim_params=sp)
         ws_neg = make_workspace(; grid, atom, interactions=InteractionParams(-10.0, 0.0),
-                                 sim_params=sp)
+            sim_params=sp)
 
         E_pos = energy_decomposition(ws_pos).density
         E_neg = energy_decomposition(ws_neg).density
@@ -98,7 +99,7 @@ using SpinorBEC
         rc = RamanCoupling{1}(2.0, 0.5, (1.0,))
         psi = init_psi(grid, SpinSystem(1); state=:uniform)
         ws = make_workspace(; grid, atom, interactions, sim_params=sp, raman=rc,
-                             psi_init=psi)
+            psi_init=psi)
 
         E = energy_decomposition(ws)
         @test abs(E.raman) > 1e-10
@@ -112,7 +113,7 @@ using SpinorBEC
 
         psi_ferro = init_psi(grid, SpinSystem(1); state=:ferromagnetic)
         ws = make_workspace(; grid, atom, interactions, sim_params=sp,
-                            zeeman=ZeemanParams(1.0, 0.0), psi_init=psi_ferro)
+            zeeman=ZeemanParams(1.0, 0.0), psi_init=psi_ferro)
 
         E = energy_decomposition(ws)
         @test abs(E.zeeman) > 0.0
@@ -125,12 +126,12 @@ using SpinorBEC
         sp = SimParams(; dt=0.001, n_steps=100, imaginary_time=false, save_every=100)
 
         r = find_ground_state(; grid, atom, interactions,
-                               potential=HarmonicTrap(1.0), dt=0.005, n_steps=2000)
+            potential=HarmonicTrap(1.0), dt=0.005, n_steps=2000)
 
         sp_rt = SimParams(; dt=0.001, n_steps=200, imaginary_time=false, save_every=200)
         ws = make_workspace(; grid, atom, interactions, sim_params=sp_rt,
-                            potential=HarmonicTrap(1.0),
-                            psi_init=copy(r.workspace.state.psi))
+            potential=HarmonicTrap(1.0),
+            psi_init=copy(r.workspace.state.psi))
 
         E0 = total_energy(ws)
         for _ in 1:200

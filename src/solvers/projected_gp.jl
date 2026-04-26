@@ -20,7 +20,7 @@ cosine-tapered cutoff over [k_cut, 1.1·k_cut] for smoother artefacts.
 """
 function apply_projected_gp!(
     ws::Workspace{N}, k_cut::Real;
-    smooth::Bool = false,
+    smooth::Bool=false,
 ) where {N}
     psi = ws.state.psi
     D = ws.spin_matrices.system.n_components
@@ -37,7 +37,7 @@ function apply_projected_gp!(
         k_taper_sq = (1.1 * k_cut)^2
     end
 
-    for c = 1:D
+    for c in 1:D
         idx = _component_slice(N, n_pts, c)
         psi_c = view(psi, idx...)
         fft_buf .= psi_c
@@ -50,7 +50,7 @@ function apply_projected_gp!(
                 k_squared <= k_cut_sq_t, one(T),
                 ifelse(k_squared >= k_taper_sq_t, zero(T),
                     T(0.5) * (one(T) + cos(T(π) * (k_squared - k_cut_sq_t) /
-                                                   (k_taper_sq_t - k_cut_sq_t)))),
+                                  (k_taper_sq_t - k_cut_sq_t)))),
             )
         else
             k_cut_sq_t = T(k_cut_sq)
@@ -68,7 +68,7 @@ end
 Construct an `on_step` callback for `run_simulation!` that projects every
 `every` steps. Returns `(ws, step, n_steps) -> Nothing`.
 """
-function projected_gp_callback(k_cut::Real; smooth::Bool = false, every::Int = 1)
+function projected_gp_callback(k_cut::Real; smooth::Bool=false, every::Int=1)
     # Accept SimulationCallbacks 4-arg `(ws, step, times, energies)` as well
     # as the older 3-arg `(ws, step, n_steps)` direct-callable convention.
     function (ws, step, args...)

@@ -73,7 +73,7 @@ using SpinorBEC
     @testset "Scale functions monotonic" begin
         for scale in (:linear, :log, :sqrt, :cosine, :exponential, :reverse_sqrt)
             w = RampWaveform(0.0, 1.0, 1.0, scale)
-            ts = range(0.0, 1.0; length = 50)
+            ts = range(0.0, 1.0; length=50)
             vals = [evaluate(w, t) for t in ts]
             @test issorted(vals)
         end
@@ -95,20 +95,22 @@ using SpinorBEC
         @test evaluate(w, 1.0) ≈ 0.0 atol=1e-10
 
         # Zero-crossing density should increase across the interval (chirp up).
-        ts = collect(range(0.0, 1.0; length = 5001))
+        ts = collect(range(0.0, 1.0; length=5001))
         vals = [evaluate(w, t) for t in ts]
         half = length(ts) ÷ 2
-        count_zero_crossings(vs) = sum((vs[i-1] * vs[i]) < 0 for i in 2:length(vs))
+        count_zero_crossings(vs) = sum((vs[i - 1] * vs[i]) < 0 for i in 2:length(vs))
         xings_first = count_zero_crossings(vals[1:half])
-        xings_second = count_zero_crossings(vals[half+1:end])
+        xings_second = count_zero_crossings(vals[(half + 1):end])
         @test xings_second > xings_first
     end
 
     @testset "ChirpedSinusoidalWaveform: YAML builder" begin
-        spec = Dict{String,Any}("chirped_sinusoidal" => Dict{String,Any}(
-            "amplitude" => 2.0, "freq_start" => 0.0, "freq_end" => 10.0,
-            "duration" => 0.5,
-        ))
+        spec = Dict{String, Any}(
+            "chirped_sinusoidal" => Dict{String, Any}(
+                "amplitude" => 2.0, "freq_start" => 0.0, "freq_end" => 10.0,
+                "duration" => 0.5,
+            ),
+        )
         w = SpinorBEC._make_waveform(spec, 1.0)
         @test w isa ChirpedSinusoidalWaveform
         @test w.amplitude == 2.0

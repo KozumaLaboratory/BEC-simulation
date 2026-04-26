@@ -22,7 +22,7 @@ using SpinorBEC
     )
 
     # Run 10 steps each; captured path should match plain step-for-step
-    for _ = 1:10
+    for _ in 1:10
         SpinorBEC.split_step!(ws_a)
         SpinorBEC.split_step_captured!(ws_b)
     end

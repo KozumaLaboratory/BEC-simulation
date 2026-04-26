@@ -50,20 +50,20 @@ function sta_counter_diabatic_q_quench(;
     q_start::Real,
     q_end::Real,
     duration::Real,
-    omega_ref::Real = 1.0,
-    n_samples::Int  = 2048,
-    p_base::Real    = 0.0,
-    q0_reference::Union{Nothing,Real} = nothing,
+    omega_ref::Real=1.0,
+    n_samples::Int=2048,
+    p_base::Real=0.0,
+    q0_reference::Union{Nothing, Real}=nothing,
 )
     duration > 0 || throw(ArgumentError("duration must be positive"))
     n_samples >= 4 || throw(ArgumentError("n_samples must be ≥ 4"))
 
     q0 = q0_reference === nothing ? max(abs(q_start - q_end) / 4, 1e-12) :
-                                    Float64(q0_reference)
+         Float64(q0_reference)
     T = Float64(duration)
-    times = collect(range(0.0, T; length = n_samples))
-    q_vals  = Vector{Float64}(undef, n_samples)
-    p_vals  = Vector{Float64}(undef, n_samples)
+    times = collect(range(0.0, T; length=n_samples))
+    q_vals = Vector{Float64}(undef, n_samples)
+    p_vals = Vector{Float64}(undef, n_samples)
     by_vals = Vector{Float64}(undef, n_samples)
 
     qs = Float64(q_start)
@@ -74,24 +74,24 @@ function sta_counter_diabatic_q_quench(;
     # Cubic Hermite ramp with zero derivative at both ends → dq/dt = 0 at
     # t=0 and t=T (the STA CD field vanishes at the boundaries).
     @inbounds for i in 1:n_samples
-        s     = times[i] / T
-        h     = 3s^2 - 2s^3              # smooth-step
-        dhdt  = (6s - 6s^2) / T          # ds/dt = 1/T
-        q     = qs + (qe - qs) * h
-        dqdt  = (qe - qs) * dhdt
-        θ     = atan(q0, q)              # arctan(q0 / q) with full range
+        s = times[i] / T
+        h = 3s^2 - 2s^3              # smooth-step
+        dhdt = (6s - 6s^2) / T          # ds/dt = 1/T
+        q = qs + (qe - qs) * h
+        dqdt = (qe - qs) * dhdt
+        θ = atan(q0, q)              # arctan(q0 / q) with full range
         # dθ/dt from d/dt arctan2(q0, q) = -q0/(q0² + q²) · dq/dt
-        dθdt  = -q0 * dqdt / (q0^2 + q^2)
+        dθdt = -q0 * dqdt / (q0^2 + q^2)
 
-        q_vals[i]  = q
-        p_vals[i]  = p0
+        q_vals[i] = q
+        p_vals[i] = p0
         # CD transverse field: b_y(t) = -1/(2 ω_ref) · dθ/dt
         by_vals[i] = -0.5 * dθdt / ωr
     end
 
     (PiecewiseLinearWaveform(times, p_vals),
-     PiecewiseLinearWaveform(times, q_vals),
-     PiecewiseLinearWaveform(times, by_vals))
+        PiecewiseLinearWaveform(times, q_vals),
+        PiecewiseLinearWaveform(times, by_vals))
 end
 
 """
@@ -104,16 +104,16 @@ function build_sta_zeeman(;
     q_start::Real,
     q_end::Real,
     duration::Real,
-    omega_ref::Real = 1.0,
-    n_samples::Int  = 2048,
-    p_base::Real    = 0.0,
-    q0_reference::Union{Nothing,Real} = nothing,
+    omega_ref::Real=1.0,
+    n_samples::Int=2048,
+    p_base::Real=0.0,
+    q0_reference::Union{Nothing, Real}=nothing,
 )
     p_wf, q_wf, by_wf = sta_counter_diabatic_q_quench(;
-        q_start, q_end, duration, omega_ref, n_samples, p_base, q0_reference,
+        q_start, q_end, duration, omega_ref, n_samples, p_base, q0_reference
     )
     bx_wf = PiecewiseLinearWaveform(
-        [0.0, Float64(duration)], [0.0, 0.0],
+        [0.0, Float64(duration)], [0.0, 0.0]
     )
     TimeDependentZeeman(p_wf, q_wf, bx_wf, by_wf)
 end

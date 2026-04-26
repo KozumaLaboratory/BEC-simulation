@@ -3,7 +3,6 @@ using SpinorBEC
 using LinearAlgebra
 
 @testset "Raman Coupling" begin
-
     @testset "RamanCoupling construction" begin
         rc = RamanCoupling{1}(1.0, 0.5, (2π / 0.8e-6,))
         @test rc.Omega_R == 1.0
@@ -127,15 +126,14 @@ using LinearAlgebra
 
         psi_uniform = init_psi(grid, sys; state=:uniform)
         ws = make_workspace(; grid, atom, interactions, sim_params=sp, raman=rc,
-                             psi_init=psi_uniform)
+            psi_init=psi_uniform)
         E = total_energy(ws)
         @test isfinite(E)
 
         ws_no = make_workspace(; grid, atom, interactions, sim_params=sp,
-                                psi_init=copy(psi_uniform))
+            psi_init=copy(psi_uniform))
         E_no = total_energy(ws_no)
         @test isfinite(E_no)
         @test E != E_no
     end
-
 end

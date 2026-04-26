@@ -87,7 +87,7 @@ using FFTW
 
         σ = 1.5
         psi = zeros(ComplexF64, nx, ny, 3)
-        @inbounds for j = 1:ny, i = 1:nx
+        @inbounds for j in 1:ny, i in 1:nx
             x = grid.x[1][i]
             y = grid.x[2][j]
             r = sqrt(x^2 + y^2)
@@ -101,7 +101,7 @@ using FFTW
         # Circular loop of radius R around origin (well inside envelope).
         R = 1.0
         n_seg = 64
-        loop = [(R * cos(2π * k / n_seg), R * sin(2π * k / n_seg)) for k = 0:n_seg-1]
+        loop = [(R * cos(2π * k / n_seg), R * sin(2π * k / n_seg)) for k in 0:(n_seg - 1)]
         Γ = circulation(v, grid, loop)
         @test Γ ≈ 2π rtol = 1e-2
 
@@ -114,7 +114,7 @@ using FFTW
         cx, cy = 3.5, 0.0
         loop_off = [
             (cx + 0.3 * cos(2π * k / n_seg), cy + 0.3 * sin(2π * k / n_seg)) for
-            k = 0:n_seg-1
+            k in 0:(n_seg - 1)
         ]
         Γ_off = circulation(v, grid, loop_off)
         @test abs(Γ_off) < 0.1
@@ -130,7 +130,7 @@ using FFTW
 
         σ = 1.5
         psi = zeros(ComplexF64, nx, ny, nz, 3)
-        @inbounds for k = 1:nz, j = 1:ny, i = 1:nx
+        @inbounds for k in 1:nz, j in 1:ny, i in 1:nx
             x = grid.x[1][i]
             y = grid.x[2][j]
             r_xy = sqrt(x^2 + y^2)
@@ -146,7 +146,7 @@ using FFTW
         # Loop in z=0 plane (nearest grid z-slice).
         z0 = grid.x[3][nz ÷ 2 + 1]
         loop = [
-            (R * cos(2π * k / n_seg), R * sin(2π * k / n_seg), z0) for k = 0:n_seg-1
+            (R * cos(2π * k / n_seg), R * sin(2π * k / n_seg), z0) for k in 0:(n_seg - 1)
         ]
         Γ = circulation(v, grid, loop)
         @test Γ ≈ 2π rtol = 5e-2

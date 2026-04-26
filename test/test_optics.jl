@@ -4,7 +4,6 @@ using LinearAlgebra
 using StaticArrays
 
 @testset "Optics" begin
-
     @testset "OpticalBeam construction and properties" begin
         λ = 460e-9
         w0 = 50e-6
@@ -105,5 +104,4 @@ using StaticArrays
         η = fiber_coupling(beam, mfd)
         @test 0 < η <= 1.0
     end
-
 end

@@ -4,7 +4,6 @@ using Unitful
 using Unitful: @u_str
 
 @testset "Unitful Integration" begin
-
     @testset "OpticalBeam with units" begin
         beam = OpticalBeam(460u"nm", 3.5u"mW", 50u"μm")
 
@@ -66,5 +65,4 @@ using Unitful: @u_str
     @testset "unit mismatch throws" begin
         @test_throws Unitful.DimensionError OpticalBeam(460u"nm", 3.5u"mW", 50u"kg")
     end
-
 end

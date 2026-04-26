@@ -14,8 +14,8 @@ using SpinorBEC
     spinor = ComplexF64[c == 1 ? 1.0 : 0.0 for c in 1:D]
     interactions = InteractionParams(50.0, 0.0)   # c0=50, c1=0
     table = compute_spinor_lhy_two_channel(;
-        F = F, c0 = interactions.c0, c1 = interactions.c1,
-        c_dd = 0.0, n_max = 1.0, n_points = 64,
+        F=F, c0=interactions.c0, c1=interactions.c1,
+        c_dd=0.0, n_max=1.0, n_points=64,
     )
     @test table isa SpinorLHYTable
     @test length(table.densities) == 64
@@ -26,5 +26,5 @@ using SpinorBEC
     # Sanity: monotonically increasing in n (LHY ∝ n^{3/2})
     sorted_idx = sortperm(table.densities)
     pots_sorted = table.potential_values[sorted_idx]
-    @test issorted(pots_sorted; lt = (a, b) -> a <= b + 1e-10)
+    @test issorted(pots_sorted; lt=(a, b) -> a <= b + 1e-10)
 end

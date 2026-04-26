@@ -27,7 +27,9 @@ end
     csv = joinpath(tdir, "field.csv")
     write(csv, "t,B\n0.0,0.0\n1.0,1.0\n")
     yaml_path = joinpath(tdir, "cfg.yaml")
-    write(yaml_path, """
+    write(
+        yaml_path,
+        """
 pipeline:
   - ground_state:
       atom: Dy164
@@ -45,14 +47,15 @@ pipeline:
       zeeman:
         Bz:
           csv: {path: field.csv, scale: 1.0e-4}
-""")
+""",
+    )
     cfg = load_config(yaml_path)
     @test cfg isa PipelineConfig
 end
 
 @testset "STA counter-diabatic q-quench builder" begin
     p_wf, q_wf, by_wf = sta_counter_diabatic_q_quench(;
-        q_start = 1.0, q_end = -1.0, duration = 0.5, n_samples = 64,
+        q_start=1.0, q_end=-1.0, duration=0.5, n_samples=64
     )
     # q endpoints match
     @test evaluate(q_wf, 0.0) ≈ 1.0 atol=1e-12
@@ -66,8 +69,8 @@ end
 
 @testset "Feshbach ramp builder" begin
     c0, as_wf, B_wf = feshbach_ramp(;
-        a_bg = 100.0, Delta = 10.0, B0 = 50.0,
-        B_start = 70.0, B_end = 80.0, duration = 1.0, n_samples = 64,
+        a_bg=100.0, Delta=10.0, B0=50.0,
+        B_start=70.0, B_end=80.0, duration=1.0, n_samples=64,
     )
     # Endpoints
     @test evaluate(B_wf, 0.0) ≈ 70.0 atol=1e-12
@@ -86,16 +89,16 @@ end
     grid = make_grid(cfg)
     atom = Dy164
     ip = InteractionParams(20.0, 0.0)
-    sp = SimParams(; dt = 0.005, n_steps = 1, imaginary_time = false)
+    sp = SimParams(; dt=0.005, n_steps=1, imaginary_time=false)
     ws = make_workspace(;
-        grid, atom, interactions = ip, sim_params = sp,
-        potential = HarmonicTrap(1.0, 1.0, 1.0),
-        zeeman = ZeemanParams(0.01, 0.0),
+        grid, atom, interactions=ip, sim_params=sp,
+        potential=HarmonicTrap(1.0, 1.0, 1.0),
+        zeeman=ZeemanParams(0.01, 0.0),
     )
 
     result = simulate_tof_with_gradient(ws;
-        gradient = 0.5, t_tof = 0.1, imaging_axis = 3, gradient_axis = 1,
-        n_steps = 20,
+        gradient=0.5, t_tof=0.1, imaging_axis=3, gradient_axis=1,
+        n_steps=20,
     )
     @test result isa Dict
     @test !isempty(result)

@@ -54,7 +54,7 @@
         """
 
         config = load_config_from_string(yaml_str)
-        result = run_config(config; verbose = false)
+        result = run_config(config; verbose=false)
         @test result.ground_state_energy isa Float64
         @test result.ground_state_converged isa Bool
     end

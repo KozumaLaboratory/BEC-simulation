@@ -54,9 +54,9 @@ spin transverse modes only. Sufficient to break Z-axis rotational symmetry.
 function add_thermal_noise!(
     psi::AbstractArray{<:Complex},
     F::Int;
-    T_over_Tc::Float64 = 0.1,
-    transverse_only::Bool = true,
-    seed::Int = 42,
+    T_over_Tc::Float64=0.1,
+    transverse_only::Bool=true,
+    seed::Int=42,
 )
     D = 2F + 1
     ndim = ndims(psi) - 1
@@ -75,7 +75,7 @@ function add_thermal_noise!(
     if transverse_only
         dominant_c = 1
         dominant_norm = 0.0
-        for c = 1:D
+        for c in 1:D
             idx = _component_slice(ndim, n_pts, c)
             n_c = sum(abs2, view(psi, idx...))
             if n_c > dominant_norm
@@ -84,7 +84,7 @@ function add_thermal_noise!(
             end
         end
 
-        for c = 1:D
+        for c in 1:D
             c == dominant_c && continue
             delta_m = abs(c - dominant_c)
             weight = exp(-delta_m / 2)
@@ -138,8 +138,8 @@ injecting macroscopic energy.
 function add_symmetry_breaking_seed!(
     psi::AbstractArray{<:Complex},
     F::Int;
-    amplitude::Float64 = 1e-6,
-    seed::Int = 42,
+    amplitude::Float64=1e-6,
+    seed::Int=42,
 )
     D = 2F + 1
     ndim = ndims(psi) - 1
@@ -152,7 +152,7 @@ function add_symmetry_breaking_seed!(
 
     dominant_c = 1
     dominant_norm = 0.0
-    for c = 1:D
+    for c in 1:D
         idx = _component_slice(ndim, n_pts, c)
         n_c = sum(abs2, view(psi, idx...))
         if n_c > dominant_norm

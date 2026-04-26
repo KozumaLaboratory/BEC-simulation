@@ -3,7 +3,6 @@ using SpinorBEC
 using LinearAlgebra
 
 @testset "Vorticity & Berry Curvature" begin
-
     @testset "superfluid_vorticity" begin
         @testset "1D returns 0.0" begin
             grid = make_grid(GridConfig(64, 10.0))
@@ -154,5 +153,4 @@ using LinearAlgebra
         center = N ÷ 2
         @test abs(omega_vort[center, center]) > 1.0
     end
-
 end

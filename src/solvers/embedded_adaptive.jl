@@ -32,7 +32,7 @@ Requires two buffers: psi0 (initial state) and psi1 (after first Strang substep)
 function _yoshida_embedded_step!(
     ws::Workspace{N}, dt::Float64, n_comp::Int,
     psi0::AbstractArray, psi1::AbstractArray;
-    t_base::Float64 = ws.state.t,
+    t_base::Float64=ws.state.t,
 ) where {N}
     w1 = _YOSHIDA_W1
     w0 = _YOSHIDA_W0
@@ -44,13 +44,13 @@ function _yoshida_embedded_step!(
 
     # --- Strang 1: S2(w1·dt) ---
     _half_potential_step!(ws, w1 * dt / 2, n_comp, N, false;
-        t_eval = t_base + w1 * dt / 4, t_start = t_base)
+        t_eval=t_base + w1 * dt / 4, t_start=t_base)
     _apply_coriolis_step!(ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache)
     _update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, w1 * dt)
     apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
     _apply_coriolis_step!(ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache)
     _half_potential_step!(ws, wm * dt, n_comp, N, false;
-        t_eval = t_base + w1 * dt / 2 + wm * dt / 2, t_start = t_base + w1 * dt / 2)
+        t_eval=t_base + w1 * dt / 2 + wm * dt / 2, t_start=t_base + w1 * dt / 2)
 
     # Save ψ₁
     copyto!(psi1, ws.state.psi)
@@ -62,7 +62,7 @@ function _yoshida_embedded_step!(
     _apply_coriolis_step!(ws.state.psi, ws.grid, omega, w0 * dt / 2, false, ws.coriolis_cache)
     t_v3 = t_base + w1 * dt / 2 + wm * dt
     _half_potential_step!(ws, wm * dt, n_comp, N, false;
-        t_eval = t_v3 + wm * dt / 2, t_start = t_v3)
+        t_eval=t_v3 + wm * dt / 2, t_start=t_v3)
 
     # ψ₂ is now in ws.state.psi — save temporarily by computing (ψ₁ - ψ₂)
     # psi1 = ψ₁ - ψ₂  (reuse buffer)
@@ -74,7 +74,7 @@ function _yoshida_embedded_step!(
     apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
     _apply_coriolis_step!(ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache)
     _half_potential_step!(ws, w1 * dt / 2, n_comp, N, false;
-        t_eval = t_base + dt - w1 * dt / 4, t_start = t_base + dt - w1 * dt / 2)
+        t_eval=t_base + dt - w1 * dt / 4, t_start=t_base + dt - w1 * dt / 2)
 
     # ψ₃ is now in ws.state.psi
     # Error = c(ψ₃ - ψ₀) - (ψ₁ - ψ₂)
@@ -129,7 +129,7 @@ to store intermediate wavefunctions ψ₀..ψ₆.
 function _bm_s6_embedded_step!(
     ws::Workspace{N}, dt::Float64, n_comp::Int,
     stages::Vector{<:AbstractArray};
-    t_base::Float64 = ws.state.t,
+    t_base::Float64=ws.state.t,
 ) where {N}
     comp = _COMP_BLANES_MOAN_S6
     a = comp.a  # 7 V-step weights
@@ -142,7 +142,7 @@ function _bm_s6_embedded_step!(
 
     t_cur = 0.0
     _half_potential_step!(ws, a[1] * dt, n_comp, N, false;
-        t_eval = t_base + a[1] * dt / 2, t_start = t_base)
+        t_eval=t_base + a[1] * dt / 2, t_start=t_base)
     t_cur += a[1] * dt
 
     for i in 1:6
@@ -152,7 +152,7 @@ function _bm_s6_embedded_step!(
         _apply_coriolis_step!(ws.state.psi, ws.grid, omega, b[i] * dt / 2, false, ws.coriolis_cache)
 
         _half_potential_step!(ws, a[i + 1] * dt, n_comp, N, false;
-            t_eval = t_base + t_cur + a[i + 1] * dt / 2, t_start = t_base + t_cur)
+            t_eval=t_base + t_cur + a[i + 1] * dt / 2, t_start=t_base + t_cur)
         t_cur += a[i + 1] * dt
 
         # Save ψᵢ (after i-th kinetic step + following V-step)
@@ -183,7 +183,7 @@ end
 function _pi_controller(
     err::Float64, tol::Float64, dt::Float64,
     dt_min::Float64, dt_max::Float64, order::Int;
-    prev_err::Float64 = NaN,
+    prev_err::Float64=NaN,
 )
     safety = 0.8
     fac_min = 0.2
@@ -218,7 +218,7 @@ const _SC4_COEFFS = let
     a = (0.125, 0.25, 0.25, 0.25, 0.125)
     b = (0.25, 0.375, 0.375, 0.25)
     b_im = (s15/24.0, s15/24.0, -s15/24.0, -s15/24.0)
-    (a = a, b = b, b_im = b_im)
+    (a=a, b=b, b_im=b_im)
 end
 
 """
@@ -265,11 +265,11 @@ terms cancel exactly, leaving a pure O(h^{p-1}) local error estimate.
 """
 function run_simulation_embedded!(
     ws::Workspace{N};
-    adaptive::AdaptiveDtParams = AdaptiveDtParams(error_mode=:embedded),
+    adaptive::AdaptiveDtParams=AdaptiveDtParams(error_mode=:embedded),
     t_end::Float64,
     save_interval::Float64,
-    composition::Symbol = :blanes_moan_s6,
-    callback::Union{Nothing,Function} = nothing,
+    composition::Symbol=:blanes_moan_s6,
+    callback::Union{Nothing, Function}=nothing,
 ) where {N}
     n_comp = ws.spin_matrices.system.n_components
     sys = ws.spin_matrices.system
@@ -314,9 +314,9 @@ function run_simulation_embedded!(
         copyto!(psi_backup, ws.state.psi)
 
         err = if use_s6
-            _bm_s6_embedded_step!(ws, dt_step, n_comp, stages; t_base = ws.state.t)
+            _bm_s6_embedded_step!(ws, dt_step, n_comp, stages; t_base=ws.state.t)
         else
-            _yoshida_embedded_step!(ws, dt_step, n_comp, buf0, buf1; t_base = ws.state.t)
+            _yoshida_embedded_step!(ws, dt_step, n_comp, buf0, buf1; t_base=ws.state.t)
         end
 
         if may_reject && err > adaptive.tol
@@ -343,8 +343,8 @@ function run_simulation_embedded!(
     end
 
     (
-        times = times, energies = energies, norms = norms, magnetizations = mags,
-        snapshots = snapshots, n_accepted = n_accepted, n_rejected = n_rejected,
-        final_dt = dt,
+        times=times, energies=energies, norms=norms, magnetizations=mags,
+        snapshots=snapshots, n_accepted=n_accepted, n_rejected=n_rejected,
+        final_dt=dt,
     )
 end

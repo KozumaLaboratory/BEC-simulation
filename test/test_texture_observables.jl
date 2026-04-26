@@ -3,7 +3,6 @@ using SpinorBEC
 using LinearAlgebra
 
 @testset "Texture Observables & Extended Interactions" begin
-
     @testset "InteractionParams backward compatibility" begin
         @testset "2-arg constructor" begin
             ip = InteractionParams(1.0, 2.0)
@@ -239,5 +238,4 @@ using LinearAlgebra
             @test p["interactions"]["c3"] == 1.5
         end
     end
-
 end

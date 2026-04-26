@@ -1,17 +1,19 @@
 @testset "Phase 1.5: Zeeman level dispatch" begin
     @testset "Level detection" begin
-        @test SpinorBEC._detect_zeeman_level(Dict{String,Any}()) == 0
-        @test SpinorBEC._detect_zeeman_level(Dict{String,Any}("p" => 0.5)) == 0
-        @test SpinorBEC._detect_zeeman_level(Dict{String,Any}("Bz" => 1.0)) == 1
-        @test SpinorBEC._detect_zeeman_level(Dict{String,Any}("Bx" => 0.1, "By" => 0.2)) == 1
-        @test SpinorBEC._detect_zeeman_level(Dict{String,Any}("B_mag" => 1.0, "theta_deg" => 30)) == 2
-        @test SpinorBEC._detect_zeeman_level(Dict{String,Any}("level" => 2, "B_mag" => 1.0)) == 2
+        @test SpinorBEC._detect_zeeman_level(Dict{String, Any}()) == 0
+        @test SpinorBEC._detect_zeeman_level(Dict{String, Any}("p" => 0.5)) == 0
+        @test SpinorBEC._detect_zeeman_level(Dict{String, Any}("Bz" => 1.0)) == 1
+        @test SpinorBEC._detect_zeeman_level(Dict{String, Any}("Bx" => 0.1, "By" => 0.2)) == 1
+        @test SpinorBEC._detect_zeeman_level(
+            Dict{String, Any}("B_mag" => 1.0, "theta_deg" => 30)
+        ) == 2
+        @test SpinorBEC._detect_zeeman_level(Dict{String, Any}("level" => 2, "B_mag" => 1.0)) == 2
 
         # Mixing levels rejected
         @test_throws ArgumentError SpinorBEC._detect_zeeman_level(
-            Dict{String,Any}("p" => 1.0, "Bz" => 1.0))
+            Dict{String, Any}("p" => 1.0, "Bz" => 1.0))
         @test_throws ArgumentError SpinorBEC._detect_zeeman_level(
-            Dict{String,Any}("Bz" => 1.0, "B_mag" => 1.0))
+            Dict{String, Any}("Bz" => 1.0, "B_mag" => 1.0))
     end
 
     @testset "Gauss → dimensionless scalar" begin
@@ -32,8 +34,8 @@
     @testset "Level 1: Bz scalar → TimeDependentZeeman" begin
         atom = Dy164
         omega_ref = 2π * 50.0
-        z = Dict{String,Any}("Bz" => 1.0)
-        p_step = Dict{String,Any}("interactions" => Dict("omega_ref" => omega_ref))
+        z = Dict{String, Any}("Bz" => 1.0)
+        p_step = Dict{String, Any}("interactions" => Dict("omega_ref" => omega_ref))
         tdz = SpinorBEC._build_zeeman_dispatched(z, 1.0, atom, p_step)
         @test tdz isa TimeDependentZeeman
         # Constant Bz → ConstantWaveform p
@@ -46,8 +48,8 @@
     @testset "Level 1: Bx linear ramp" begin
         atom = Dy164
         omega_ref = 2π * 50.0
-        z = Dict{String,Any}("Bx" => Dict("from" => 0.0, "to" => 0.574))
-        p_step = Dict{String,Any}("interactions" => Dict("omega_ref" => omega_ref))
+        z = Dict{String, Any}("Bx" => Dict("from" => 0.0, "to" => 0.574))
+        p_step = Dict{String, Any}("interactions" => Dict("omega_ref" => omega_ref))
         tdz = SpinorBEC._build_zeeman_dispatched(z, 0.020, atom, p_step)
         @test tdz.bx_wf isa PiecewiseLinearWaveform
         # Endpoints
@@ -65,12 +67,12 @@
         atom = Dy164
         omega_ref = 2π * 50.0
         # B_mag=1 G fixed, theta 0 → 90 deg: B rotates from z-axis to x-axis
-        z = Dict{String,Any}(
+        z = Dict{String, Any}(
             "B_mag" => 1.0,
             "theta_deg" => Dict("from" => 0.0, "to" => 90.0),
             "phi_deg" => 0.0,
         )
-        p_step = Dict{String,Any}("interactions" => Dict("omega_ref" => omega_ref))
+        p_step = Dict{String, Any}("interactions" => Dict("omega_ref" => omega_ref))
         tdz = SpinorBEC._build_zeeman_dispatched(z, 1.0, atom, p_step)
         unit_p = SpinorBEC._gauss_to_dimless(1.0, atom.g_F, omega_ref)
 
@@ -89,35 +91,35 @@
         omega_ref = 2π * 50.0
         # String with explicit Gauss — note: "G" alone is gravitational constant
         # in Unitful's namespace, use "Gauss" or SI prefix (mT, μT, T).
-        z = Dict{String,Any}("Bz" => "0.819 Gauss")
-        p_step = Dict{String,Any}("interactions" => Dict("omega_ref" => omega_ref))
+        z = Dict{String, Any}("Bz" => "0.819 Gauss")
+        p_step = Dict{String, Any}("interactions" => Dict("omega_ref" => omega_ref))
         tdz = SpinorBEC._build_zeeman_dispatched(z, 1.0, atom, p_step)
         expected = SpinorBEC.Units.bfield_to_p(0.819, atom.g_F, omega_ref)
         @test evaluate(tdz.p_wf, 0.0) ≈ expected rtol=1e-10
 
         # μT prefix should give the same result: 0.819 Gauss = 81.9 μT
-        z2 = Dict{String,Any}("Bz" => "81.9 μT")
+        z2 = Dict{String, Any}("Bz" => "81.9 μT")
         tdz2 = SpinorBEC._build_zeeman_dispatched(z2, 1.0, atom, p_step)
         @test evaluate(tdz2.p_wf, 0.0) ≈ expected rtol=1e-6
 
         # Bogus unit (not magnetic field) rejected
-        z_bad = Dict{String,Any}("Bz" => "1.0 m")
+        z_bad = Dict{String, Any}("Bz" => "1.0 m")
         @test_throws ArgumentError SpinorBEC._build_zeeman_dispatched(z_bad, 1.0, atom, p_step)
 
         # Bogus string rejected by regex before reaching uparse
-        z_evil = Dict{String,Any}("Bz" => "1.0 rm(\"/\")")
+        z_evil = Dict{String, Any}("Bz" => "1.0 rm(\"/\")")
         @test_throws ArgumentError SpinorBEC._build_zeeman_dispatched(z_evil, 1.0, atom, p_step)
     end
 
     @testset "Unitful string: Level 2 B_mag" begin
         atom = Dy164
         omega_ref = 2π * 50.0
-        z = Dict{String,Any}(
+        z = Dict{String, Any}(
             "B_mag" => "0.819 Gauss",
             "theta_deg" => 90.0,
             "phi_deg" => 0.0,
         )
-        p_step = Dict{String,Any}("interactions" => Dict("omega_ref" => omega_ref))
+        p_step = Dict{String, Any}("interactions" => Dict("omega_ref" => omega_ref))
         tdz = SpinorBEC._build_zeeman_dispatched(z, 1.0, atom, p_step)
         expected = SpinorBEC.Units.bfield_to_p(0.819, atom.g_F, omega_ref)
         # At theta=90, B is pure x → bx = full p, p (z) ≈ 0
@@ -128,21 +130,21 @@
     @testset "omega_ref resolution priority" begin
         atom = Dy164
         # Explicit in zeeman takes priority (50 Hz linear → 2π·50)
-        z = Dict{String,Any}("Bz" => 1.0, "omega_ref_hz" => 50.0)
-        p_step = Dict{String,Any}("interactions" => Dict("omega_ref" => 2π * 100.0))
+        z = Dict{String, Any}("Bz" => 1.0, "omega_ref_hz" => 50.0)
+        p_step = Dict{String, Any}("interactions" => Dict("omega_ref" => 2π * 100.0))
         tdz = SpinorBEC._build_zeeman_dispatched(z, 1.0, atom, p_step)
         expected = SpinorBEC._gauss_to_dimless(1.0, atom.g_F, 2π * 50.0)
         @test evaluate(tdz.p_wf, 0.0) ≈ expected rtol=1e-6
 
         # Falls back to interactions.omega_ref
-        z2 = Dict{String,Any}("Bz" => 1.0)
+        z2 = Dict{String, Any}("Bz" => 1.0)
         tdz2 = SpinorBEC._build_zeeman_dispatched(z2, 1.0, atom, p_step)
         expected2 = SpinorBEC._gauss_to_dimless(1.0, atom.g_F, 2π * 100.0)
         @test evaluate(tdz2.p_wf, 0.0) ≈ expected2 rtol=1e-6
 
         # Missing omega_ref raises
         @test_throws ArgumentError SpinorBEC._resolve_omega_ref(
-            Dict{String,Any}(), Dict{String,Any}())
+            Dict{String, Any}(), Dict{String, Any}())
     end
 
     @testset "YAML round-trip: Level 1 in ground_state" begin

@@ -14,7 +14,7 @@
 Map a YAML file to its run directory. Identical YAML content → identical
 directory, enabling transparent resume.
 """
-function compute_run_dir(yaml_path::String; base_dir::String = "runs")
+function compute_run_dir(yaml_path::String; base_dir::String="runs")
     isfile(yaml_path) || throw(ArgumentError("YAML file not found: $yaml_path"))
     content = read(yaml_path, String)
     hash8 = bytes2hex(sha256(content))[1:8]
@@ -23,9 +23,17 @@ function compute_run_dir(yaml_path::String; base_dir::String = "runs")
 end
 
 function _env_metadata()
-    git_hash = try readchomp(`git rev-parse --short HEAD`) catch; "unknown" end
-    git_dirty = try !isempty(readchomp(`git status --porcelain`)) catch; false end
-    Dict{String,Any}(
+    git_hash = try
+        readchomp(`git rev-parse --short HEAD`)
+    catch
+        ; "unknown"
+    end
+    git_dirty = try
+        !isempty(readchomp(`git status --porcelain`))
+    catch
+        ; false
+    end
+    Dict{String, Any}(
         "git_hash" => git_hash,
         "git_dirty" => git_dirty,
         "julia_version" => string(VERSION),
@@ -37,7 +45,7 @@ end
 
 _now_iso() = Dates.format(now(), "yyyy-mm-ddTHH:MM:SS")
 
-function _point_filename(i::Int, run_name::String = "")
+function _point_filename(i::Int, run_name::String="")
     base = "point_$(lpad(i, 3, '0'))"
     isempty(run_name) ? "$(base).jld2" : "$(base)_$(run_name).jld2"
 end
@@ -51,8 +59,8 @@ The YAML must have a `pipeline:` key. If a `scan:` key is present,
 each scan point × comparison run is executed independently via
 `run_pipeline` with the corresponding overrides applied to the raw dict.
 """
-function run_yaml(yaml_path::String; base_dir::String = "runs", verbose::Bool = true,
-                   dry_run::Bool = false)
+function run_yaml(yaml_path::String; base_dir::String="runs", verbose::Bool=true,
+    dry_run::Bool=false)
     data = YAML.load_file(yaml_path)
     haskey(data, "pipeline") || throw(ArgumentError(
         "YAML must have a 'pipeline:' key. Got keys: $(collect(keys(data)))"))
@@ -73,10 +81,13 @@ function run_yaml(yaml_path::String; base_dir::String = "runs", verbose::Bool = 
         apply_calibration!(data, calib)
     elseif haskey(data, "calibration_history")
         hist_raw = pop!(data, "calibration_history")
-        target = haskey(data, "target_date") ?
-            Dates.Date(String(pop!(data, "target_date"))) : Dates.today()
+        target = if haskey(data, "target_date")
+            Dates.Date(String(pop!(data, "target_date")))
+        else
+            Dates.today()
+        end
         # Reuse the loader logic by stuffing into the expected wrapper
-        tmp = Dict{String,Any}("calibration_history" => hist_raw)
+        tmp = Dict{String, Any}("calibration_history" => hist_raw)
         tmp_path = tempname() * ".yaml"
         YAML.write_file(tmp_path, tmp)
         try
@@ -85,7 +96,7 @@ function run_yaml(yaml_path::String; base_dir::String = "runs", verbose::Bool = 
             verbose && println("  applying interpolated calibration → $(calib.epoch)")
             apply_calibration!(data, calib)
         finally
-            rm(tmp_path; force = true)
+            rm(tmp_path; force=true)
         end
     end
 
@@ -135,8 +146,11 @@ function run_yaml(yaml_path::String; base_dir::String = "runs", verbose::Bool = 
             _run_yaml_single(data, run_dir, env, 1, ""; verbose)
         end
     finally
-        prev_yaml_dir === nothing ? delete!(ENV, "SPINORBEC_YAML_DIR") :
-                                    (ENV["SPINORBEC_YAML_DIR"] = prev_yaml_dir)
+        if prev_yaml_dir === nothing
+            delete!(ENV, "SPINORBEC_YAML_DIR")
+        else
+            (ENV["SPINORBEC_YAML_DIR"] = prev_yaml_dir)
+        end
     end
 
     verbose && println("Done: $run_dir")
@@ -145,7 +159,7 @@ end
 
 function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=true)
     has_comparison = !isempty(scan.comparison_runs)
-    chain_state = Dict{String,Any}()  # run_name → (psi, mz_actual)
+    chain_state = Dict{String, Any}()  # run_name → (psi, mz_actual)
 
     pause_file = joinpath(run_dir, ".pause")
 
@@ -163,12 +177,14 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
         end
         # Check for pause signal
         if isfile(pause_file)
-            verbose && println("  Paused: detected $pause_file ($(i-1)/$(length(scan.points)) points completed)")
+            verbose && println(
+                "  Paused: detected $pause_file ($(i-1)/$(length(scan.points)) points completed)",
+            )
             verbose && println("  Remove .pause file and re-run to continue.")
-            return
+            return nothing
         end
 
-        runs = has_comparison ? scan.comparison_runs : [("", Dict{String,Any}())]
+        runs = has_comparison ? scan.comparison_runs : [("", Dict{String, Any}())]
         for (run_name, cmp_override) in runs
             psi_file = joinpath(run_dir, _point_filename(i, run_name))
 
@@ -176,7 +192,7 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
                 verbose && println("  ✓ $(basename(psi_file)) (cached)")
                 if scan.continuation
                     d = JLD2.load(psi_file)
-                    chain_state[run_name] = (psi = d["psi"], mz_actual = get(d, "mz_actual", NaN))
+                    chain_state[run_name] = (psi=d["psi"], mz_actual=get(d, "mz_actual", NaN))
                 end
                 continue
             end
@@ -203,7 +219,7 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
 
             config = parse_pipeline(patched)
             ckpt_dir = joinpath(run_dir, ".checkpoints", basename(psi_file))
-            result = run_pipeline(config; verbose = false, psi_init = psi_prev, checkpoint_dir = ckpt_dir)
+            result = run_pipeline(config; verbose=false, psi_init=psi_prev, checkpoint_dir=ckpt_dir)
 
             finished_at = _now_iso()
             duration = time() - t_start
@@ -215,8 +231,9 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
             # Mz measurement
             grid = result.grid
             sys = SpinSystem(result.atom.F)
-            mz_actual = haskey(result, :ground_state_energy) ?
-                        magnetization(psi_host, grid, sys) : NaN
+            mz_actual =
+                haskey(result, :ground_state_energy) ?
+                magnetization(psi_host, grid, sys) : NaN
 
             tmp_file = _scratch_tmp_path(psi_file)
             jld_kwargs = _snapshot_compression_kwargs(result)
@@ -240,15 +257,15 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
                 end
                 _move_scratch_to_final(tmp_file, psi_file)
             catch err
-                isfile(tmp_file) && rm(tmp_file; force = true)
+                isfile(tmp_file) && rm(tmp_file; force=true)
                 rethrow(err)
             end
 
             # Clean up checkpoint (point completed successfully)
-            isdir(ckpt_dir) && rm(ckpt_dir; recursive = true, force = true)
+            isdir(ckpt_dir) && rm(ckpt_dir; recursive=true, force=true)
 
             if scan.continuation
-                chain_state[run_name] = (psi = psi_host, mz_actual = mz_actual)
+                chain_state[run_name] = (psi=psi_host, mz_actual=mz_actual)
             end
 
             verbose && @printf("    E=%.4f conv=%s (%.1fs)\n", energy, converged, duration)
@@ -288,7 +305,7 @@ function _scratch_tmp_path(final_path::String)
         return final_path * ".tmp"
     end
     isdir(scratch) || mkpath(scratch)
-    joinpath(scratch, string(hash(final_path); base = 16) * ".jld2.tmp")
+    joinpath(scratch, string(hash(final_path); base=16) * ".jld2.tmp")
 end
 
 """
@@ -302,7 +319,7 @@ directory if it doesn't exist.
 function _move_scratch_to_final(tmp_path::String, final_path::String)
     final_dir = dirname(final_path)
     isdir(final_dir) || mkpath(final_dir)
-    mv(tmp_path, final_path; force = true)
+    mv(tmp_path, final_path; force=true)
 end
 
 """
@@ -318,7 +335,7 @@ Leaves the kwargs empty (no compression) when the flag is absent.
 """
 function _snapshot_compression_kwargs(result)
     if get(result, :save_snapshot_compression, false)
-        return (; compress = ZlibCompressor())
+        return (; compress=ZlibCompressor())
     end
     return (;)
 end
@@ -328,7 +345,7 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
 
     if isfile(psi_file)
         verbose && println("  ✓ $(basename(psi_file)) (cached)")
-        return
+        return nothing
     end
 
     started_at = _now_iso()
@@ -336,7 +353,7 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
 
     config = parse_pipeline(data)
     ckpt_dir = joinpath(run_dir, ".checkpoints", basename(psi_file))
-    result = run_pipeline(config; verbose, checkpoint_dir = ckpt_dir)
+    result = run_pipeline(config; verbose, checkpoint_dir=ckpt_dir)
 
     finished_at = _now_iso()
     duration = time() - t_start
@@ -365,11 +382,11 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
         end
         _move_scratch_to_final(tmp_file, psi_file)
     catch err
-        isfile(tmp_file) && rm(tmp_file; force = true)
+        isfile(tmp_file) && rm(tmp_file; force=true)
         rethrow(err)
     end
 
-    isdir(ckpt_dir) && rm(ckpt_dir; recursive = true, force = true)
+    isdir(ckpt_dir) && rm(ckpt_dir; recursive=true, force=true)
     verbose && @printf("    E=%.4f conv=%s\n", energy, converged)
 end
 
@@ -379,14 +396,14 @@ end
 Report the progress of a run directory by counting per-point .jld2 files.
 """
 function run_status(run_dir::String)
-    isdir(run_dir) || return (exists = false, total = 0, completed = 0)
+    isdir(run_dir) || return (exists=false, total=0, completed=0)
     files = filter(f -> startswith(f, "point_") && endswith(f, ".jld2"), readdir(run_dir))
-    (exists = true, total = length(files), completed = length(files))
+    (exists=true, total=length(files), completed=length(files))
 end
 
-function list_runs(base_dir::String = "runs")
+function list_runs(base_dir::String="runs")
     isdir(base_dir) || return String[]
     dirs = filter(d -> isdir(joinpath(base_dir, d)) && isfile(joinpath(base_dir, d, "config.yaml")),
-                  readdir(base_dir))
+        readdir(base_dir))
     sort(dirs)
 end

@@ -21,7 +21,7 @@ and the bookkeeping (t, step). Build via `make_binary_simulation`,
 advance via `binary_split_step!`, and drive a full run via
 `run_binary_simulation!`.
 """
-mutable struct BinarySimulation{N,A1<:AbstractArray,A2<:AbstractArray,P,V}
+mutable struct BinarySimulation{N, A1 <: AbstractArray, A2 <: AbstractArray, P, V}
     psi_A::A1
     psi_B::A2
     V_A::V
@@ -46,13 +46,13 @@ omitted they default to a normalised uniform field.
 function make_binary_simulation(
     grid::Grid{N};
     couplings::BinaryCouplings,
-    potential_A::AbstractPotential = NoPotential(),
-    potential_B::AbstractPotential = NoPotential(),
-    psi_A_init::Union{Nothing,AbstractArray} = nothing,
-    psi_B_init::Union{Nothing,AbstractArray} = nothing,
+    potential_A::AbstractPotential=NoPotential(),
+    potential_B::AbstractPotential=NoPotential(),
+    psi_A_init::Union{Nothing, AbstractArray}=nothing,
+    psi_B_init::Union{Nothing, AbstractArray}=nothing,
 ) where {N}
     n_pts = grid.config.n_points
-    plans = make_fft_plans(n_pts; flags = FFTW.ESTIMATE)
+    plans = make_fft_plans(n_pts; flags=FFTW.ESTIMATE)
     K = grid.k_squared
     V_A = evaluate_potential(potential_A, grid)
     V_B = evaluate_potential(potential_B, grid)
@@ -71,8 +71,8 @@ function make_binary_simulation(
     else
         ComplexF64.(psi_B_init)
     end
-    BinarySimulation{N,typeof(psi_A),typeof(psi_B),typeof(plans),typeof(K)}(
-        psi_A, psi_B, V_A, V_B, K, plans, couplings, grid, 0.0, 0,
+    BinarySimulation{N, typeof(psi_A), typeof(psi_B), typeof(plans), typeof(K)}(
+        psi_A, psi_B, V_A, V_B, K, plans, couplings, grid, 0.0, 0
     )
 end
 
@@ -99,9 +99,9 @@ function binary_split_step!(sim::BinarySimulation, dt::Real)
 
     # V/2 (pre): mean-field nonlinear + external + half detuning shift
     @. psi_A *= exp(-1im * (V_A + c.g_AA * abs2(psi_A) +
-                             c.g_AB * abs2(psi_B) + Δ / 2) * half)
+                            c.g_AB * abs2(psi_B) + Δ / 2) * half)
     @. psi_B *= exp(-1im * (V_B + c.g_BB * abs2(psi_B) +
-                             c.g_AB * abs2(psi_A) - Δ / 2) * half)
+                            c.g_AB * abs2(psi_A) - Δ / 2) * half)
 
     # K (full): kinetic in k-space. K = k² so exp(-i k²/2 · dt) is the
     # Schrödinger kinetic propagator; the dt/2 factor below already
@@ -118,7 +118,8 @@ function binary_split_step!(sim::BinarySimulation, dt::Real)
         cosθ = cos(c.omega_coupling * dt / 2)
         sinθ = sin(c.omega_coupling * dt / 2)
         @inbounds for i in eachindex(psi_A)
-            a = psi_A[i]; b = psi_B[i]
+            a = psi_A[i];
+            b = psi_B[i]
             psi_A[i] = cosθ * a - 1im * sinθ * b
             psi_B[i] = cosθ * b - 1im * sinθ * a
         end
@@ -126,9 +127,9 @@ function binary_split_step!(sim::BinarySimulation, dt::Real)
 
     # V/2 (post)
     @. psi_A *= exp(-1im * (V_A + c.g_AA * abs2(psi_A) +
-                             c.g_AB * abs2(psi_B) + Δ / 2) * half)
+                            c.g_AB * abs2(psi_B) + Δ / 2) * half)
     @. psi_B *= exp(-1im * (V_B + c.g_BB * abs2(psi_B) +
-                             c.g_AB * abs2(psi_A) - Δ / 2) * half)
+                            c.g_AB * abs2(psi_A) - Δ / 2) * half)
 
     sim.t += dt
     sim.step += 1
@@ -148,8 +149,8 @@ function run_binary_simulation!(
     sim::BinarySimulation;
     duration::Real,
     dt::Real,
-    save_every::Int = 0,
-    on_save::Union{Nothing,Function} = nothing,
+    save_every::Int=0,
+    on_save::Union{Nothing, Function}=nothing,
 )
     duration > 0 || throw(ArgumentError("duration must be positive"))
     dt > 0 || throw(ArgumentError("dt must be positive"))
@@ -188,6 +189,8 @@ Rabi coupling.
 """
 function binary_total_energy(sim::BinarySimulation)
     dV = cell_volume(sim.grid)
-    real(_binary_energy(sim.psi_A, sim.psi_B, sim.V_A, sim.V_B,
-                         sim.K, sim.plans, sim.couplings, dV))
+    real(
+        _binary_energy(sim.psi_A, sim.psi_B, sim.V_A, sim.V_B,
+            sim.K, sim.plans, sim.couplings, dV)
+    )
 end

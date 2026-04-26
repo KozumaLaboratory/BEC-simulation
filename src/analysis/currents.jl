@@ -14,14 +14,14 @@ function probability_current(
     psi_k = zeros(ComplexF64, n_pts)
     dpsi = zeros(ComplexF64, n_pts)
 
-    for c = 1:n_comp
+    for c in 1:n_comp
         idx = _component_slice(N, n_pts, c)
         psi_c = view(psi, idx...)
 
         psi_k .= psi_c
         plans.forward * psi_k
 
-        for d = 1:N
+        for d in 1:N
             @inbounds for I in CartesianIndices(n_pts)
                 dpsi[I] = im * grid.k[d][I[d]] * psi_k[I]
             end
@@ -56,7 +56,7 @@ function orbital_angular_momentum(
 
     Lz = 0.0
 
-    for c = 1:n_comp
+    for c in 1:n_comp
         idx = _component_slice(N, n_pts, c)
         psi_c = view(psi, idx...)
 
@@ -89,7 +89,7 @@ function superfluid_velocity(
     psi::AbstractArray{<:Complex},
     grid::Grid{N},
     plans::FFTPlans;
-    density_cutoff::Float64 = 1e-10,
+    density_cutoff::Float64=1e-10,
 ) where {N}
     j = probability_current(psi, grid, plans)
     n = total_density(psi, N)
@@ -99,7 +99,7 @@ function superfluid_velocity(
     @inbounds for I in CartesianIndices(n_pts)
         if n[I] > density_cutoff
             inv_n = 1.0 / n[I]
-            for d = 1:N
+            for d in 1:N
                 v[d][I] = j[d][I] * inv_n
             end
         end
@@ -125,9 +125,9 @@ end
 # 2D bilinear interpolation of a vector field at a single point.
 # Periodic wrap consistent with FFT-based grid.
 @inline function _interp_velocity(
-    v::NTuple{2,Array{Float64,2}},
+    v::NTuple{2, Array{Float64, 2}},
     grid::Grid{2},
-    p::NTuple{2,Float64},
+    p::NTuple{2, Float64},
 )
     nx, ny = grid.config.n_points
     tx = (p[1] - grid.x[1][1]) / grid.dx[1]
@@ -161,9 +161,9 @@ end
 
 # 3D trilinear interpolation.
 @inline function _interp_velocity(
-    v::NTuple{3,Array{Float64,3}},
+    v::NTuple{3, Array{Float64, 3}},
     grid::Grid{3},
-    p::NTuple{3,Float64},
+    p::NTuple{3, Float64},
 )
     nx, ny, nz = grid.config.n_points
     tx = (p[1] - grid.x[1][1]) / grid.dx[1]
@@ -236,22 +236,22 @@ determines the sign.
 Supported dimensions: N ∈ {2, 3}.
 """
 function circulation(
-    v::NTuple{N,Array{Float64,N}},
+    v::NTuple{N, Array{Float64, N}},
     grid::Grid{N},
-    loop::AbstractVector{<:NTuple{N,<:Real}},
+    loop::AbstractVector{<:NTuple{N, <:Real}},
 ) where {N}
     N == 2 || N == 3 || throw(ArgumentError("circulation requires N ∈ {2,3}"))
     np = length(loop)
     np >= 3 || throw(ArgumentError("loop must have at least 3 vertices"))
 
     Γ = 0.0
-    @inbounds for i = 1:np
+    @inbounds for i in 1:np
         j = (i == np) ? 1 : i + 1
         p1 = ntuple(d -> Float64(loop[i][d]), N)
         p2 = ntuple(d -> Float64(loop[j][d]), N)
         mid = ntuple(d -> 0.5 * (p1[d] + p2[d]), N)
         vmid = _interp_velocity(v, grid, mid)
-        for d = 1:N
+        for d in 1:N
             Γ += vmid[d] * (p2[d] - p1[d])
         end
     end

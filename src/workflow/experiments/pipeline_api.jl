@@ -14,7 +14,7 @@ function load_config(path::String)
         parse_pipeline(data)
     finally
         prev === nothing ? delete!(ENV, "SPINORBEC_YAML_DIR") :
-                           (ENV["SPINORBEC_YAML_DIR"] = prev)
+        (ENV["SPINORBEC_YAML_DIR"] = prev)
     end
 end
 
@@ -25,4 +25,4 @@ function load_config_from_string(yaml_str::String)
 end
 
 """Run a pipeline config (alias for run_pipeline)."""
-run_config(config::PipelineConfig; verbose::Bool = true) = run_pipeline(config; verbose)
+run_config(config::PipelineConfig; verbose::Bool=true) = run_pipeline(config; verbose)

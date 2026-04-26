@@ -9,111 +9,112 @@ struct FieldSpec
     required::Bool
     type::Type
     default::Any
-    range::Union{Nothing, Tuple{Float64,Float64}}
+    range::Union{Nothing, Tuple{Float64, Float64}}
     enum::Union{Nothing, Vector{String}}
     schema::Union{Nothing, Dict{String, FieldSpec}}  # for nested dicts
 end
 
-FieldSpec(; required=false, type=Any, default=nothing, range=nothing, enum=nothing, schema=nothing) =
-    FieldSpec(required, type, default, range, enum, schema)
+FieldSpec(; required=false, type=Any, default=nothing, range=nothing, enum=nothing, schema=nothing) = FieldSpec(
+    required, type, default, range, enum, schema
+)
 
 const GRID_SCHEMA = Dict{String, FieldSpec}(
-    "n"   => FieldSpec(required=true, type=Union{Vector, Int}),
-    "box" => FieldSpec(required=true, type=Union{Vector, Float64}),
+    "n" => FieldSpec(; required=true, type=Union{Vector, Int}),
+    "box" => FieldSpec(; required=true, type=Union{Vector, Float64}),
 )
 
 const INTERACTIONS_SCHEMA = Dict{String, FieldSpec}(
-    "N_atoms"    => FieldSpec(type=Number),
-    "omega_ref"  => FieldSpec(type=Number, range=(0.0, 1e10)),
-    "c_total"    => FieldSpec(type=Number),
-    "c0"         => FieldSpec(type=Number),
-    "c1"         => FieldSpec(type=Number),
-    "c1_ratio"   => FieldSpec(type=Number, range=(-1.0, 1.0)),
-    "c_lhy"      => FieldSpec(type=Number),
-    "c_extra"    => FieldSpec(type=Vector),
+    "N_atoms" => FieldSpec(; type=Number),
+    "omega_ref" => FieldSpec(; type=Number, range=(0.0, 1e10)),
+    "c_total" => FieldSpec(; type=Number),
+    "c0" => FieldSpec(; type=Number),
+    "c1" => FieldSpec(; type=Number),
+    "c1_ratio" => FieldSpec(; type=Number, range=(-1.0, 1.0)),
+    "c_lhy" => FieldSpec(; type=Number),
+    "c_extra" => FieldSpec(; type=Vector),
 )
 
 const DDI_SCHEMA = Dict{String, FieldSpec}(
-    "enabled"   => FieldSpec(type=Bool, default=false),
-    "c_dd"      => FieldSpec(type=Union{Number, Dict}),
-    "secular"   => FieldSpec(type=Bool, default=false),
-    "quasi_2d"  => FieldSpec(type=Bool, default=false),
-    "l_z"       => FieldSpec(type=Number, range=(0.0, 100.0)),
+    "enabled" => FieldSpec(; type=Bool, default=false),
+    "c_dd" => FieldSpec(; type=Union{Number, Dict}),
+    "secular" => FieldSpec(; type=Bool, default=false),
+    "quasi_2d" => FieldSpec(; type=Bool, default=false),
+    "l_z" => FieldSpec(; type=Number, range=(0.0, 100.0)),
 )
 
 const GS_SCHEMA = Dict{String, FieldSpec}(
-    "kind"                 => FieldSpec(type=String, enum=["spinor", "binary"]),
-    "species_A"            => FieldSpec(type=Dict),    # binary path
-    "species_B"            => FieldSpec(type=Dict),    # binary path
-    "method"               => FieldSpec(type=String, default="itp", enum=["itp", "lbfgs"]),
-    "atom"                 => FieldSpec(type=String),
-    "grid"                 => FieldSpec(type=Dict, schema=GRID_SCHEMA),
-    "interactions"         => FieldSpec(type=Dict, schema=INTERACTIONS_SCHEMA),
-    "ddi"                  => FieldSpec(type=Union{Dict, Bool}),
-    "zeeman"               => FieldSpec(type=Dict),
-    "potential"            => FieldSpec(type=Union{Dict, Vector}),
-    "dt"                   => FieldSpec(type=Number, default=0.001, range=(1e-8, 1.0)),
-    "n_steps"              => FieldSpec(type=Number, default=100000, range=(1.0, 1e9)),
-    "tol"                  => FieldSpec(type=Number, default=1e-8, range=(1e-16, 1.0)),
-    "m_lbfgs"              => FieldSpec(type=Number, default=10, range=(1.0, 100.0)),
-    "initial_state"        => FieldSpec(type=String, default="polar",
+    "kind" => FieldSpec(; type=String, enum=["spinor", "binary"]),
+    "species_A" => FieldSpec(; type=Dict),    # binary path
+    "species_B" => FieldSpec(; type=Dict),    # binary path
+    "method" => FieldSpec(; type=String, default="itp", enum=["itp", "lbfgs"]),
+    "atom" => FieldSpec(; type=String),
+    "grid" => FieldSpec(; type=Dict, schema=GRID_SCHEMA),
+    "interactions" => FieldSpec(; type=Dict, schema=INTERACTIONS_SCHEMA),
+    "ddi" => FieldSpec(; type=Union{Dict, Bool}),
+    "zeeman" => FieldSpec(; type=Dict),
+    "potential" => FieldSpec(; type=Union{Dict, Vector}),
+    "dt" => FieldSpec(; type=Number, default=0.001, range=(1e-8, 1.0)),
+    "n_steps" => FieldSpec(; type=Number, default=100000, range=(1.0, 1e9)),
+    "tol" => FieldSpec(; type=Number, default=1e-8, range=(1e-16, 1.0)),
+    "m_lbfgs" => FieldSpec(; type=Number, default=10, range=(1.0, 100.0)),
+    "initial_state" => FieldSpec(; type=String, default="polar",
         enum=["polar", "ferromagnetic", "ferromagnetic_min",
-              "uniform", "antiferromagnetic", "random",
-              "spin_coherent", "fl_vortex", "spin_helix",
-              "cyclic", "biaxial_nematic", "polar_core_vortex",
-              "soliton_bright", "soliton_dark", "skyrmion",
-              "gaussian_wavepacket", "domain_wall", "two_packet",
-              "chiral_spin_vortex", "magnetic_domain",
-              "vortex_lattice", "skyrmion_lattice"]),
-    "backend"              => FieldSpec(type=String, default="cpu", enum=["cpu", "cuda", "gpu"]),
-    "target_magnetization" => FieldSpec(type=Number),
-    "temperature_ratio"    => FieldSpec(type=Number, range=(0.0, 1.0)),
-    "spinor_lhy"           => FieldSpec(type=String,
+            "uniform", "antiferromagnetic", "random",
+            "spin_coherent", "fl_vortex", "spin_helix",
+            "cyclic", "biaxial_nematic", "polar_core_vortex",
+            "soliton_bright", "soliton_dark", "skyrmion",
+            "gaussian_wavepacket", "domain_wall", "two_packet",
+            "chiral_spin_vortex", "magnetic_domain",
+            "vortex_lattice", "skyrmion_lattice"]),
+    "backend" => FieldSpec(; type=String, default="cpu", enum=["cpu", "cuda", "gpu"]),
+    "target_magnetization" => FieldSpec(; type=Number),
+    "temperature_ratio" => FieldSpec(; type=Number, range=(0.0, 1.0)),
+    "spinor_lhy" => FieldSpec(; type=String,
         enum=["two_channel", "table", "scalar"]),
-    "init_state_params"    => FieldSpec(type=Dict),
-    "cache"                => FieldSpec(type=String),
-    "quasi_2d"             => FieldSpec(type=Bool),
-    "l_z"                  => FieldSpec(type=Number, range=(0.0, 100.0)),
-    "noise_seed"           => FieldSpec(type=Number),
-    "rotating_frame_omega" => FieldSpec(type=Number),
-    "adaptive_dt"          => FieldSpec(type=Bool),
-    "dt_max"               => FieldSpec(type=Number),
-    "light_shift"          => FieldSpec(type=Dict),
-    "raman"                => FieldSpec(type=Dict),
+    "init_state_params" => FieldSpec(; type=Dict),
+    "cache" => FieldSpec(; type=String),
+    "quasi_2d" => FieldSpec(; type=Bool),
+    "l_z" => FieldSpec(; type=Number, range=(0.0, 100.0)),
+    "noise_seed" => FieldSpec(; type=Number),
+    "rotating_frame_omega" => FieldSpec(; type=Number),
+    "adaptive_dt" => FieldSpec(; type=Bool),
+    "dt_max" => FieldSpec(; type=Number),
+    "light_shift" => FieldSpec(; type=Dict),
+    "raman" => FieldSpec(; type=Dict),
 )
 
 const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
-    "duration"           => FieldSpec(required=true, type=Number, range=(0.0, 1e6)),
-    "dt"                 => FieldSpec(required=true, type=Number, range=(1e-8, 1.0)),
-    "save_every"         => FieldSpec(type=Number, range=(1.0, 1e8)),
-    "save_psi_snapshots" => FieldSpec(type=Bool),
-    "save_snapshot_compression" => FieldSpec(type=Bool),
-    "save_snapshot_precision"   => FieldSpec(type=String, enum=["f32", "f64"]),
-    "ddi"                => FieldSpec(type=Union{Dict, Bool}),
-    "zeeman"             => FieldSpec(type=Dict),
-    "interactions"       => FieldSpec(type=Dict),
-    "potential"          => FieldSpec(type=Union{Dict, Vector}),
-    "temperature_ratio"  => FieldSpec(type=Number, range=(0.0, 1.0)),
-    "seed_amplitude"     => FieldSpec(type=Number, range=(0.0, 1.0)),
-    "noise_seed"         => FieldSpec(type=Number),
-    "integrator"         => FieldSpec(type=String,
+    "duration" => FieldSpec(; required=true, type=Number, range=(0.0, 1e6)),
+    "dt" => FieldSpec(; required=true, type=Number, range=(1e-8, 1.0)),
+    "save_every" => FieldSpec(; type=Number, range=(1.0, 1e8)),
+    "save_psi_snapshots" => FieldSpec(; type=Bool),
+    "save_snapshot_compression" => FieldSpec(; type=Bool),
+    "save_snapshot_precision" => FieldSpec(; type=String, enum=["f32", "f64"]),
+    "ddi" => FieldSpec(; type=Union{Dict, Bool}),
+    "zeeman" => FieldSpec(; type=Dict),
+    "interactions" => FieldSpec(; type=Dict),
+    "potential" => FieldSpec(; type=Union{Dict, Vector}),
+    "temperature_ratio" => FieldSpec(; type=Number, range=(0.0, 1.0)),
+    "seed_amplitude" => FieldSpec(; type=Number, range=(0.0, 1.0)),
+    "noise_seed" => FieldSpec(; type=Number),
+    "integrator" => FieldSpec(; type=String,
         enum=["strang", "yoshida", "adaptive", "richardson"]),
-    "backend"            => FieldSpec(type=String, enum=["cpu", "cuda", "gpu"]),
-    "raman"              => FieldSpec(type=Dict),
-    "absorbing_boundary" => FieldSpec(type=Dict),
-    "light_shift"        => FieldSpec(type=Dict),
-    "twa"                => FieldSpec(type=Dict),
-    "magnetic_gradient"  => FieldSpec(type=Dict),
-    "pulse_sequence"     => FieldSpec(type=Vector),
-    "sgpe"               => FieldSpec(type=Union{Dict, Bool}),
-    "projected_gp"       => FieldSpec(type=Union{Dict, Bool}),
-    "photon_scattering"  => FieldSpec(type=Union{Dict, Bool}),
-    "loss"               => FieldSpec(type=Union{Dict, Bool, Number}),
+    "backend" => FieldSpec(; type=String, enum=["cpu", "cuda", "gpu"]),
+    "raman" => FieldSpec(; type=Dict),
+    "absorbing_boundary" => FieldSpec(; type=Dict),
+    "light_shift" => FieldSpec(; type=Dict),
+    "twa" => FieldSpec(; type=Dict),
+    "magnetic_gradient" => FieldSpec(; type=Dict),
+    "pulse_sequence" => FieldSpec(; type=Vector),
+    "sgpe" => FieldSpec(; type=Union{Dict, Bool}),
+    "projected_gp" => FieldSpec(; type=Union{Dict, Bool}),
+    "photon_scattering" => FieldSpec(; type=Union{Dict, Bool}),
+    "loss" => FieldSpec(; type=Union{Dict, Bool, Number}),
 )
 
 const STEP_SCHEMAS = Dict{String, Dict{String, FieldSpec}}(
     "ground_state" => GS_SCHEMA,
-    "dynamics"     => DYNAMICS_SCHEMA,
+    "dynamics" => DYNAMICS_SCHEMA,
 )
 
 """
@@ -125,7 +126,7 @@ Validate a YAML config dict against a schema.
 - Wrong type or out-of-range → error
 - Invalid enum value → error
 """
-function validate_config!(params::Dict, schema::Dict, path::String = ""; strict::Bool = false)
+function validate_config!(params::Dict, schema::Dict, path::String=""; strict::Bool=false)
     errors = String[]
     known = Set(keys(schema))
 
@@ -157,10 +158,11 @@ function validate_config!(params::Dict, schema::Dict, path::String = ""; strict:
         # Type check
         if spec.type !== Any && !(v isa spec.type)
             # Allow Number → Bool promotion, Int → Float64, etc.
-            ok = (spec.type <: Number && v isa Number) ||
-                 (spec.type === String && v isa AbstractString) ||
-                 (spec.type === Bool && v isa Bool) ||
-                 (spec.type isa Union && any(T -> v isa T, Base.uniontypes(spec.type)))
+            ok =
+                (spec.type <: Number && v isa Number) ||
+                (spec.type === String && v isa AbstractString) ||
+                (spec.type === Bool && v isa Bool) ||
+                (spec.type isa Union && any(T -> v isa T, Base.uniontypes(spec.type)))
             if !ok
                 push!(errors, "'$full_key' expected $(spec.type), got $(typeof(v))")
             end

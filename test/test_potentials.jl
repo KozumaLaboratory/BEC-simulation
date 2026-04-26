@@ -38,7 +38,7 @@
     end
 
     @testset "build_potential - gravity" begin
-        pc = PotentialConfig(:gravity, Dict{String,Any}("g" => 9.81, "axis" => 1))
+        pc = PotentialConfig(:gravity, Dict{String, Any}("g" => 9.81, "axis" => 1))
         pot = SpinorBEC._build_potential(pc, 1)
         @test pot isa GravityPotential{1}
         @test pot.g == 9.81
@@ -46,7 +46,7 @@
     end
 
     @testset "build_potential - gravity defaults" begin
-        pc = PotentialConfig(:gravity, Dict{String,Any}())
+        pc = PotentialConfig(:gravity, Dict{String, Any}())
         pot = SpinorBEC._build_potential(pc, 2)
         @test pot isa GravityPotential{2}
         @test pot.g == 9.81
@@ -55,12 +55,14 @@
 
     @testset "build_potential - crossed_dipole" begin
         beams = [
-            Dict{String,Any}(
+            Dict{String, Any}(
                 "wavelength" => 1064e-9, "power" => 10.0, "waist" => 50e-6,
-                "position" => [0, 0, 0], "direction" => [1, 0, 0]
+                "position" => [0, 0, 0], "direction" => [1, 0, 0],
             ),
         ]
-        pc = PotentialConfig(:crossed_dipole, Dict{String,Any}("polarizability" => 1.5e-37, "beams" => beams))
+        pc = PotentialConfig(
+            :crossed_dipole, Dict{String, Any}("polarizability" => 1.5e-37, "beams" => beams)
+        )
         pot = SpinorBEC._build_potential(pc, 3)
         @test pot isa CrossedDipoleTrap{3}
         @test pot.polarizability == 1.5e-37
@@ -68,9 +70,9 @@
     end
 
     @testset "build_potential - composite" begin
-        c1 = PotentialConfig(:harmonic, Dict{String,Any}("omega" => [1.0]))
-        c2 = PotentialConfig(:gravity, Dict{String,Any}("g" => 5.0, "axis" => 1))
-        pc = PotentialConfig(:composite, Dict{String,Any}("components" => [c1, c2]))
+        c1 = PotentialConfig(:harmonic, Dict{String, Any}("omega" => [1.0]))
+        c2 = PotentialConfig(:gravity, Dict{String, Any}("g" => 5.0, "axis" => 1))
+        pc = PotentialConfig(:composite, Dict{String, Any}("components" => [c1, c2]))
         pot = SpinorBEC._build_potential(pc, 1)
         @test pot isa CompositePotential{1}
         @test length(pot.components) == 2

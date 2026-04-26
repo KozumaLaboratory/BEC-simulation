@@ -3,7 +3,6 @@ using SpinorBEC
 using LinearAlgebra
 
 @testset "Angular Momentum & Current" begin
-
     @testset "probability_current: stationary state has zero current" begin
         grid = make_grid(GridConfig((32, 32), (10.0, 10.0)))
         sys = SpinSystem(1)
@@ -273,5 +272,4 @@ using LinearAlgebra
         @test length(j) == 1
         @test maximum(abs, j[1]) < 1e-12
     end
-
 end

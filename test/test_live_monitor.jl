@@ -23,7 +23,7 @@ using SpinorBEC
                 webdir = joinpath(@__DIR__, "..", "web", "dist")
                 indexhtml = joinpath(webdir, "index.html")
                 isfile(indexhtml) || (mkpath(webdir); write(indexhtml, "<html></html>"))
-                serve_dashboard(port; base_dir = tmp)
+                serve_dashboard(port; base_dir=tmp)
             catch e
                 e isa Base.IOError || rethrow(e)
             end

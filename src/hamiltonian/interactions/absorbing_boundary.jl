@@ -1,7 +1,7 @@
 function compute_absorbing_mask(
-    grid::Grid{N,T}, ab::AbsorbingBoundary, dt::Float64, backend;
-    dtype::Union{Nothing,Type{<:AbstractFloat}} = nothing,
-) where {N,T<:AbstractFloat}
+    grid::Grid{N, T}, ab::AbsorbingBoundary, dt::Float64, backend;
+    dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
+) where {N, T <: AbstractFloat}
     U = dtype === nothing ? T : dtype
     mask = ones(U, grid.config.n_points)
     w = U(ab.width)
@@ -27,7 +27,9 @@ function compute_absorbing_mask(
     _to_device(backend, mask)
 end
 
-function apply_absorbing_boundary!(psi::AbstractArray{<:Complex}, mask, n_components::Int, ndim::Int)
+function apply_absorbing_boundary!(
+    psi::AbstractArray{<:Complex}, mask, n_components::Int, ndim::Int
+)
     n_pts = ntuple(d -> size(psi, d), ndim)
     @inbounds for c in 1:n_components
         idx = _component_slice(ndim, n_pts, c)

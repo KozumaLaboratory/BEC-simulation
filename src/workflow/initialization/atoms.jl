@@ -12,7 +12,7 @@ const Li7 = AtomSpecies(
     -7.2 * Units.BOHR_RADIUS,
     0.0,
     -0.5;
-    Delta_E_hf = 803.504086e6 * 2π * Units.HBAR,
+    Delta_E_hf=803.504086e6 * 2π * Units.HBAR,
 )
 
 # ²³Na: F=1 ground state (²S₁/₂, I=3/2)
@@ -27,7 +27,7 @@ const Na23 = AtomSpecies(
     52.98 * Units.BOHR_RADIUS,
     0.0,
     -0.5;
-    Delta_E_hf = 1.771626128e9 * 2π * Units.HBAR,
+    Delta_E_hf=1.771626128e9 * 2π * Units.HBAR,
 )
 
 # ³⁹K: F=1 ground state (²S₁/₂, I=3/2)
@@ -42,7 +42,7 @@ const K39 = AtomSpecies(
     -13.5 * Units.BOHR_RADIUS,
     0.0,
     -0.5;
-    Delta_E_hf = 461.7197e6 * 2π * Units.HBAR,
+    Delta_E_hf=461.7197e6 * 2π * Units.HBAR,
 )
 
 # ⁴¹K: F=1 ground state (²S₁/₂, I=3/2)
@@ -57,7 +57,7 @@ const K41 = AtomSpecies(
     63.5 * Units.BOHR_RADIUS,
     0.0,
     -0.5;
-    Delta_E_hf = 254.0138e6 * 2π * Units.HBAR,
+    Delta_E_hf=254.0138e6 * 2π * Units.HBAR,
 )
 
 # ⁸⁵Rb: F=2 ground state (²S₁/₂, I=5/2)
@@ -73,7 +73,7 @@ const Rb85 = AtomSpecies(
     0.0,
     0.0,
     -1.0 / 3.0;
-    Delta_E_hf = 3.0357324390e9 * 2π * Units.HBAR,
+    Delta_E_hf=3.0357324390e9 * 2π * Units.HBAR,
 )
 
 # ⁸⁷Rb: F=1 ground state (²S₁/₂, I=3/2)
@@ -88,7 +88,7 @@ const Rb87 = AtomSpecies(
     100.4 * Units.BOHR_RADIUS,
     0.0,
     -0.5;
-    Delta_E_hf = 6.834682610904e9 * 2π * Units.HBAR,
+    Delta_E_hf=6.834682610904e9 * 2π * Units.HBAR,
 )
 
 # ¹³³Cs: F=3 ground state (²S₁/₂, I=7/2)
@@ -104,7 +104,7 @@ const Cs133 = AtomSpecies(
     0.0,
     0.0,
     -0.25;
-    Delta_E_hf = 9.192631770e9 * 2π * Units.HBAR,
+    Delta_E_hf=9.192631770e9 * 2π * Units.HBAR,
 )
 
 # --- Magnetic Lanthanides ---
@@ -122,7 +122,7 @@ const Cr52 = AtomSpecies(
     0.0,
     2.0 * 3.0 * Units.MU_BOHR,
     2.0,
-    Dict{Int,Float64}(
+    Dict{Int, Float64}(
         2 => 112.0 * Units.BOHR_RADIUS,
         4 => 58.0 * Units.BOHR_RADIUS,
         6 => -7.0 * Units.BOHR_RADIUS,
@@ -205,8 +205,7 @@ const Eu151 = AtomSpecies(
 
 # ⁴⁰Ca: ground state (¹S₀, I=0)
 #   a_s ≈ 443 a₀ (Kraft et al. PRA 2009)
-const Ca40 =
-    AtomSpecies("40Ca", 39.962590850 * Units.AMU, 0, 443.0 * Units.BOHR_RADIUS, 0.0)
+const Ca40 = AtomSpecies("40Ca", 39.962590850 * Units.AMU, 0, 443.0 * Units.BOHR_RADIUS, 0.0)
 
 # ⁸⁴Sr: ground state (¹S₀, I=0)
 #   a_s ≈ 123 a₀ (Martinez de Escobar et al. PRA 2008)
@@ -226,13 +225,11 @@ const Yb170 = AtomSpecies("170Yb", 169.934761 * Units.AMU, 0, 64.0 * Units.BOHR_
 
 # ¹⁷⁴Yb: ground state (¹S₀, I=0)
 #   a_s ≈ 105 a₀ (Kitagawa et al. PRA 2008)
-const Yb174 =
-    AtomSpecies("174Yb", 173.938862 * Units.AMU, 0, 105.0 * Units.BOHR_RADIUS, 0.0)
+const Yb174 = AtomSpecies("174Yb", 173.938862 * Units.AMU, 0, 105.0 * Units.BOHR_RADIUS, 0.0)
 
 # ¹⁷⁶Yb: ground state (¹S₀, I=0)
 #   a_s ≈ -24 a₀ (Kitagawa et al. PRA 2008)
-const Yb176 =
-    AtomSpecies("176Yb", 175.942572 * Units.AMU, 0, -24.0 * Units.BOHR_RADIUS, 0.0)
+const Yb176 = AtomSpecies("176Yb", 175.942572 * Units.AMU, 0, -24.0 * Units.BOHR_RADIUS, 0.0)
 
 # --- Metastable Helium ---
 
@@ -254,7 +251,7 @@ const He4star = AtomSpecies(
 
 # --- Atom Registry ---
 
-const ATOM_REGISTRY = Dict{Symbol,AtomSpecies}(
+const ATOM_REGISTRY = Dict{Symbol, AtomSpecies}(
     :Li7 => Li7,
     :Na23 => Na23,
     :K39 => K39,

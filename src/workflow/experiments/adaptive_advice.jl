@@ -7,42 +7,50 @@ struct SimulationAdvice
     auto_fixable::Bool
 end
 
-function analyze_simulation_health(ws::Workspace, energy_history::Vector{Float64}, norm_history::Vector{Float64})
+function analyze_simulation_health(
+    ws::Workspace, energy_history::Vector{Float64}, norm_history::Vector{Float64}
+)
     advice = SimulationAdvice[]
 
     # Check energy drift
     if length(energy_history) >= 10
-        recent = energy_history[end-9:end]
+        recent = energy_history[(end - 9):end]
         energy_trend = (recent[end] - recent[1]) / length(recent)
         energy_volatility = std(diff(recent))
 
         if energy_volatility > 0.1 * abs(mean(recent))
-            push!(advice, SimulationAdvice(
-                "High energy volatility detected",
-                :warning,
-                [
-                    "Reduce dt by factor of 2 (current: $(ws.sim_params.dt))",
-                    "Enable adaptive integrator",
-                    "Check if DDI padding is enabled (reduces aliasing)",
-                    "Verify LHY correction is appropriate for current density"
-                ],
-                true  # Can auto-fix by reducing dt
-            ))
+            push!(
+                advice,
+                SimulationAdvice(
+                    "High energy volatility detected",
+                    :warning,
+                    [
+                        "Reduce dt by factor of 2 (current: $(ws.sim_params.dt))",
+                        "Enable adaptive integrator",
+                        "Check if DDI padding is enabled (reduces aliasing)",
+                        "Verify LHY correction is appropriate for current density",
+                    ],
+                    true,  # Can auto-fix by reducing dt
+                ),
+            )
         end
 
         if abs(energy_trend) > 0.01 * abs(mean(recent))
             direction = energy_trend > 0 ? "increasing" : "decreasing"
-            push!(advice, SimulationAdvice(
-                "Energy $direction rapidly",
-                :warning,
-                [
-                    "System may be unstable",
-                    "Check if dt is too large",
-                    "Verify initial state is near ground state",
-                    "Consider using imaginary time propagation first"
-                ],
-                false
-            ))
+            push!(
+                advice,
+                SimulationAdvice(
+                    "Energy $direction rapidly",
+                    :warning,
+                    [
+                        "System may be unstable",
+                        "Check if dt is too large",
+                        "Verify initial state is near ground state",
+                        "Consider using imaginary time propagation first",
+                    ],
+                    false,
+                ),
+            )
         end
     end
 
@@ -50,17 +58,20 @@ function analyze_simulation_health(ws::Workspace, energy_history::Vector{Float64
     if length(norm_history) >= 2
         norm_drift = abs(norm_history[end] - 1.0)
         if norm_drift > 0.01
-            push!(advice, SimulationAdvice(
-                "Norm conservation violated (norm = $(round(norm_history[end], digits=5)))",
-                :critical,
-                [
-                    "Reduce dt immediately (current: $(ws.sim_params.dt))",
-                    "Check for numerical instabilities",
-                    "Verify FFT precision settings",
-                    "May need to restart with smaller dt"
-                ],
-                true
-            ))
+            push!(
+                advice,
+                SimulationAdvice(
+                    "Norm conservation violated (norm = $(round(norm_history[end], digits=5)))",
+                    :critical,
+                    [
+                        "Reduce dt immediately (current: $(ws.sim_params.dt))",
+                        "Check for numerical instabilities",
+                        "Verify FFT precision settings",
+                        "May need to restart with smaller dt",
+                    ],
+                    true,
+                ),
+            )
         end
     end
 
@@ -68,17 +79,20 @@ function analyze_simulation_health(ws::Workspace, energy_history::Vector{Float64
     try
         n = total_density(ws.state.psi, length(ws.grid.config.n_points))
         if any(n .< -1e-10)
-            push!(advice, SimulationAdvice(
-                "Negative density detected",
-                :critical,
-                [
-                    "Simulation is numerically unstable",
-                    "STOP and reduce dt by factor of 4",
-                    "Check if interactions are too strong",
-                    "May need adaptive step size control"
-                ],
-                false
-            ))
+            push!(
+                advice,
+                SimulationAdvice(
+                    "Negative density detected",
+                    :critical,
+                    [
+                        "Simulation is numerically unstable",
+                        "STOP and reduce dt by factor of 4",
+                        "Check if interactions are too strong",
+                        "May need adaptive step size control",
+                    ],
+                    false,
+                ),
+            )
         end
     catch
     end
@@ -87,17 +101,20 @@ function analyze_simulation_health(ws::Workspace, energy_history::Vector{Float64
     if isdefined(ws, :resource_monitor) && !isempty(ws.resource_monitor.cpu_usage)
         cpu = ws.resource_monitor.cpu_usage[end]
         if cpu < 20.0
-            push!(advice, SimulationAdvice(
-                "Low CPU utilization ($(round(Int, cpu))%)",
-                :info,
-                [
-                    "Simulation may be I/O bound",
-                    "Reduce save_every to save less frequently",
-                    "Check if disk is slow",
-                    "Consider using GPU backend for better performance"
-                ],
-                false
-            ))
+            push!(
+                advice,
+                SimulationAdvice(
+                    "Low CPU utilization ($(round(Int, cpu))%)",
+                    :info,
+                    [
+                        "Simulation may be I/O bound",
+                        "Reduce save_every to save less frequently",
+                        "Check if disk is slow",
+                        "Consider using GPU backend for better performance",
+                    ],
+                    false,
+                ),
+            )
         end
     end
 
@@ -105,16 +122,19 @@ function analyze_simulation_health(ws::Workspace, energy_history::Vector{Float64
     if ws.ddi !== nothing && ws.ddi_padded === nothing
         grid_size = prod(ws.grid.config.n_points)
         if grid_size >= 32^3
-            push!(advice, SimulationAdvice(
-                "DDI enabled without padding on large grid",
-                :info,
-                [
-                    "Enable DDI padding to reduce aliasing errors",
-                    "Add ddi_padding=true to make_workspace",
-                    "Increases memory ~8x but improves accuracy"
-                ],
-                false
-            ))
+            push!(
+                advice,
+                SimulationAdvice(
+                    "DDI enabled without padding on large grid",
+                    :info,
+                    [
+                        "Enable DDI padding to reduce aliasing errors",
+                        "Add ddi_padding=true to make_workspace",
+                        "Increases memory ~8x but improves accuracy",
+                    ],
+                    false,
+                ),
+            )
         end
     end
 
@@ -122,7 +142,7 @@ function analyze_simulation_health(ws::Workspace, energy_history::Vector{Float64
 end
 
 function print_advice(advice::Vector{SimulationAdvice})
-    isempty(advice) && return
+    isempty(advice) && return nothing
 
     println()
     println(colorize("═"^80, COLORS.bold))
@@ -131,20 +151,29 @@ function print_advice(advice::Vector{SimulationAdvice})
 
     for (i, adv) in enumerate(advice)
         # Color code by severity
-        icon_color = adv.severity == :critical ? COLORS.red :
-                     adv.severity == :warning ? COLORS.yellow :
-                     COLORS.blue
+        icon_color = if adv.severity == :critical
+            COLORS.red
+        elseif adv.severity == :warning
+            COLORS.yellow
+        else
+            COLORS.blue
+        end
 
-        icon = adv.severity == :critical ? "❗" :
-               adv.severity == :warning ? "⚠️ " :
-               "ℹ️ "
+        icon = if adv.severity == :critical
+            "❗"
+        elseif adv.severity == :warning
+            "⚠️ "
+        else
+            "ℹ️ "
+        end
 
         println()
         println(colorize("$icon Problem: $(adv.problem)", icon_color * COLORS.bold))
         println(colorize("Suggestions:", COLORS.cyan))
 
         for (j, suggestion) in enumerate(adv.suggestions)
-            prefix = j == 1 && adv.auto_fixable ? colorize("   → [Auto-fixable]", COLORS.green) : "   →"
+            prefix =
+                j == 1 && adv.auto_fixable ? colorize("   → [Auto-fixable]", COLORS.green) : "   →"
             println("$prefix $suggestion")
         end
     end

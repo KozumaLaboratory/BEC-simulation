@@ -365,7 +365,6 @@
         @test sum(abs2, psi[:, 3]) > 0
     end
 
-
     @testset "2D loss step" begin
         config = GridConfig((32, 32), (10.0, 10.0))
         grid = make_grid(config)

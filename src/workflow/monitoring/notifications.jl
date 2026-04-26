@@ -5,15 +5,17 @@ using JSON
 
 struct NotificationConfig
     enabled::Bool
-    slack_webhook::Union{Nothing,String}
-    email::Union{Nothing,String}
+    slack_webhook::Union{Nothing, String}
+    email::Union{Nothing, String}
     desktop::Bool
 end
 
 NotificationConfig() = NotificationConfig(false, nothing, nothing, false)
 
-function send_notification(config::NotificationConfig, title::String, message::String; status::Symbol=:info)
-    !config.enabled && return
+function send_notification(
+    config::NotificationConfig, title::String, message::String; status::Symbol=:info
+)
+    !config.enabled && return nothing
 
     # Desktop notification
     if config.desktop
@@ -35,9 +37,15 @@ function send_desktop_notification(title::String, message::String, status::Symbo
     try
         if Sys.islinux()
             # Use notify-send on Linux
-            icon = status == :success ? "dialog-information" :
-                   status == :error ? "dialog-error" :
-                   status == :warning ? "dialog-warning" : "dialog-information"
+            icon = if status == :success
+                "dialog-information"
+            elseif status == :error
+                "dialog-error"
+            elseif status == :warning
+                "dialog-warning"
+            else
+                "dialog-information"
+            end
 
             run(`notify-send -u normal -i $icon $title $message`)
 
@@ -77,12 +85,20 @@ function send_desktop_notification(title::String, message::String, status::Symbo
     end
 end
 
-function send_slack_notification(webhook_url::String, title::String, message::String, status::Symbol)
+function send_slack_notification(
+    webhook_url::String, title::String, message::String, status::Symbol
+)
     try
         # Slack message color
-        color = status == :success ? "good" :
-                status == :error ? "danger" :
-                status == :warning ? "warning" : "#439FE0"
+        color = if status == :success
+            "good"
+        elseif status == :error
+            "danger"
+        elseif status == :warning
+            "warning"
+        else
+            "#439FE0"
+        end
 
         # Construct payload
         payload = Dict(
@@ -92,16 +108,16 @@ function send_slack_notification(webhook_url::String, title::String, message::St
                     "title" => title,
                     "text" => message,
                     "footer" => "SpinorBEC.jl",
-                    "ts" => round(Int, time())
-                )
-            ]
+                    "ts" => round(Int, time()),
+                ),
+            ],
         )
 
         # Send POST request
         response = HTTP.post(
             webhook_url,
             ["Content-Type" => "application/json"],
-            JSON.json(payload)
+            JSON.json(payload),
         )
 
         if response.status != 200
@@ -112,10 +128,13 @@ function send_slack_notification(webhook_url::String, title::String, message::St
     end
 end
 
-function notify_simulation_complete(config::NotificationConfig, phase_names::Vector{String}, total_time::Float64)
+function notify_simulation_complete(
+    config::NotificationConfig, phase_names::Vector{String}, total_time::Float64
+)
     title = "✓ Simulation Complete"
-    message = "Completed $(length(phase_names)) phases in $(format_time(total_time))\n" *
-              "Phases: " * join(phase_names, ", ")
+    message =
+        "Completed $(length(phase_names)) phases in $(format_time(total_time))\n" *
+        "Phases: " * join(phase_names, ", ")
 
     send_notification(config, title, message; status=:success)
 end

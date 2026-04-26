@@ -12,7 +12,7 @@ using Test
     if !cuda_available
         @info "CUDA not available, skipping GPU tests"
         @test true  # placeholder
-        return
+        return nothing
     end
 
     @testset "CUDABackend type" begin

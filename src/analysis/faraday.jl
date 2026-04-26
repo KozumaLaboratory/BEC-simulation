@@ -38,10 +38,10 @@ struct FaradayParams
     include_vector_shift::Bool
 
     function FaradayParams(;
-        probe_axis::Int = 3,
-        detuning::Float64 = -320.0 / 5.0,   # -320 MHz / Γ≈5MHz for Eu
-        polarization::Symbol = :linear_x,
-        include_vector_shift::Bool = false,
+        probe_axis::Int=3,
+        detuning::Float64=-320.0 / 5.0,   # -320 MHz / Γ≈5MHz for Eu
+        polarization::Symbol=:linear_x,
+        include_vector_shift::Bool=false,
     )
         1 <= probe_axis <= 3 || throw(ArgumentError("probe_axis must be 1, 2, or 3"))
         abs(detuning) > 1 || throw(ArgumentError("detuning must be >> Γ for dispersive regime"))
@@ -65,7 +65,7 @@ function faraday_image(
     psi::AbstractArray{<:Complex},
     grid::Grid{N},
     F::Int;
-    params::FaradayParams = FaradayParams(),
+    params::FaradayParams=FaradayParams(),
 ) where {N}
     N >= 2 || throw(ArgumentError("Faraday imaging requires at least 2D"))
     sm = spin_matrices(F)
@@ -106,12 +106,12 @@ function faraday_image(
     vortex_signal = (abs.(rotation_angle) .< 0.1 * max_phi) .& (col_n .> density_threshold)
 
     (
-        rotation_angle = rotation_angle,
-        column_Fz = col_Fz,
-        column_density = col_n,
-        contrast = contrast,
-        vortex_signal = vortex_signal,
-        params = params,
+        rotation_angle=rotation_angle,
+        column_Fz=col_Fz,
+        column_density=col_n,
+        contrast=contrast,
+        vortex_signal=vortex_signal,
+        params=params,
     )
 end
 
@@ -129,20 +129,20 @@ function faraday_differential(
     psi_ref::AbstractArray{<:Complex},
     grid::Grid{N},
     F::Int;
-    params::FaradayParams = FaradayParams(),
+    params::FaradayParams=FaradayParams(),
 ) where {N}
     img = faraday_image(psi, grid, F; params)
     ref = faraday_image(psi_ref, grid, F; params)
     differential = img.rotation_angle .- ref.rotation_angle
 
     (
-        rotation_angle = img.rotation_angle,
-        column_Fz = img.column_Fz,
-        column_density = img.column_density,
-        contrast = img.contrast,
-        vortex_signal = img.vortex_signal,
-        differential = differential,
-        params = params,
+        rotation_angle=img.rotation_angle,
+        column_Fz=img.column_Fz,
+        column_density=img.column_density,
+        contrast=img.contrast,
+        vortex_signal=img.vortex_signal,
+        differential=differential,
+        params=params,
     )
 end
 
@@ -156,24 +156,24 @@ function detect_vortices_faraday(
     psi::AbstractArray{<:Complex},
     grid::Grid{N},
     F::Int;
-    params::FaradayParams = FaradayParams(),
-    threshold::Float64 = 0.1,
+    params::FaradayParams=FaradayParams(),
+    threshold::Float64=0.1,
 ) where {N}
     img = faraday_image(psi, grid, F; params)
     max_phi = maximum(abs, img.rotation_angle)
-    max_phi < 1e-15 && return Tuple{Int,Int}[]
+    max_phi < 1e-15 && return Tuple{Int, Int}[]
 
     density_threshold = 0.01 * maximum(img.column_density)
-    vortex_positions = Tuple{Int,Int}[]
+    vortex_positions = Tuple{Int, Int}[]
 
     phi = img.rotation_angle
     nx, ny = size(phi)
-    for j in 2:ny-1, i in 2:nx-1
+    for j in 2:(ny - 1), i in 2:(nx - 1)
         img.column_density[i, j] < density_threshold && continue
         abs(phi[i, j]) > threshold * max_phi && continue
 
         # Check if surrounded by opposite signs (zero-crossing)
-        neighbors = (phi[i-1, j], phi[i+1, j], phi[i, j-1], phi[i, j+1])
+        neighbors = (phi[i - 1, j], phi[i + 1, j], phi[i, j - 1], phi[i, j + 1])
         has_pos = any(>(0), neighbors)
         has_neg = any(<(0), neighbors)
         if has_pos && has_neg

@@ -10,11 +10,11 @@ Cost: ~4 Strang steps per accepted step; benefits from larger dt at same accurac
 """
 function run_simulation_yoshida!(
     ws::Workspace{N};
-    adaptive::AdaptiveDtParams = AdaptiveDtParams(),
+    adaptive::AdaptiveDtParams=AdaptiveDtParams(),
     t_end::Float64,
     save_interval::Float64,
-    callback::Union{Nothing,Function} = nothing,
-    composition::Union{Symbol,NamedTuple{(:a,:b)}} = :yoshida,
+    callback::Union{Nothing, Function}=nothing,
+    composition::Union{Symbol, NamedTuple{(:a, :b)}}=:yoshida,
 ) where {N}
     n_comp = ws.spin_matrices.system.n_components
     sys = ws.spin_matrices.system
@@ -106,9 +106,9 @@ function run_simulation_yoshida!(
     end
 
     (
-        result = SimulationResult(times, energies, norms, mags, snapshots),
-        n_accepted = n_accepted,
-        n_rejected = n_rejected,
-        final_dt = dt,
+        result=SimulationResult(times, energies, norms, mags, snapshots),
+        n_accepted=n_accepted,
+        n_rejected=n_rejected,
+        final_dt=dt,
     )
 end

@@ -9,10 +9,10 @@ using LinearAlgebra
         trap = HarmonicTrap(1.0)
 
         result = find_ground_state_lbfgs(;
-            grid, atom = Rb87, interactions, potential = trap,
-            n_steps = 200, tol = 1e-7,
-            initial_state = :ferromagnetic,
-            verbose = false,
+            grid, atom=Rb87, interactions, potential=trap,
+            n_steps=200, tol=1e-7,
+            initial_state=:ferromagnetic,
+            verbose=false,
         )
 
         @test isfinite(result.energy)
@@ -27,16 +27,16 @@ using LinearAlgebra
         trap = HarmonicTrap(1.0)
 
         r_itp = find_ground_state(;
-            grid, atom = Rb87, interactions, potential = trap,
-            dt = 0.005, n_steps = 200, initial_state = :ferromagnetic,
+            grid, atom=Rb87, interactions, potential=trap,
+            dt=0.005, n_steps=200, initial_state=:ferromagnetic,
         )
         E_itp = r_itp.energy
         psi_itp = copy(r_itp.workspace.state.psi)
 
         r_lbfgs = find_ground_state_lbfgs(;
-            ws_init = r_itp.workspace, psi_init = psi_itp,
-            n_steps = 100, tol = 1e-9,
-            verbose = false,
+            ws_init=r_itp.workspace, psi_init=psi_itp,
+            n_steps=100, tol=1e-9,
+            verbose=false,
         )
 
         @test isfinite(r_lbfgs.energy)
@@ -53,11 +53,11 @@ using LinearAlgebra
         target_Mz = 0.5
 
         result = find_ground_state_lbfgs(;
-            grid, atom = Rb87, interactions, potential = trap,
-            n_steps = 200, tol = 1e-7,
-            initial_state = :uniform,
-            target_magnetization = target_Mz,
-            verbose = false,
+            grid, atom=Rb87, interactions, potential=trap,
+            n_steps=200, tol=1e-7,
+            initial_state=:uniform,
+            target_magnetization=target_Mz,
+            verbose=false,
         )
 
         ws = result.workspace
@@ -72,10 +72,10 @@ using LinearAlgebra
         trap = HarmonicTrap(1.0)
 
         result = find_ground_state_lbfgs(;
-            grid, atom = Na23, interactions, potential = trap,
-            n_steps = 100, tol = 1e-10,
-            initial_state = :polar,
-            verbose = false,
+            grid, atom=Na23, interactions, potential=trap,
+            n_steps=100, tol=1e-10,
+            initial_state=:polar,
+            verbose=false,
         )
 
         # A smooth-running L-BFGS on this simple problem should reach dE ≲ 1e-6

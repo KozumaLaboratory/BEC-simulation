@@ -11,7 +11,7 @@ function plot_ascii(data::Vector{Float64}; width::Int=60, height::Int=8, title::
     # Downsample if needed
     n = length(data)
     if n > width
-        indices = round.(Int, range(1, n, length=width))
+        indices = round.(Int, range(1, n; length=width))
         data_plot = data[indices]
     else
         data_plot = data
@@ -42,9 +42,9 @@ function plot_ascii(data::Vector{Float64}; width::Int=60, height::Int=8, title::
     !isempty(title) && push!(lines, title)
 
     # Y-axis labels
-    y_labels = range(max_val, min_val, length=height)
+    y_labels = range(max_val, min_val; length=height)
 
-    for row in (height-1):-1:0
+    for row in (height - 1):-1:0
         line_chars = Char[]
 
         # Y-axis label
@@ -60,7 +60,7 @@ function plot_ascii(data::Vector{Float64}; width::Int=60, height::Int=8, title::
             else
                 # Check if line passes through
                 if col > 1
-                    prev_val = normalized[col-1]
+                    prev_val = normalized[col - 1]
                     if (prev_val <= row <= val) || (val <= row <= prev_val)
                         push!(line_chars, '│')
                     else
@@ -93,7 +93,7 @@ function plot_sparkline(data::Vector{Float64}; width::Int=40)
     # Downsample
     n = length(data)
     if n > width
-        indices = round.(Int, range(1, n, length=width))
+        indices = round.(Int, range(1, n; length=width))
         data_plot = data[indices]
     else
         data_plot = data

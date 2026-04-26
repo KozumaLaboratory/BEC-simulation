@@ -3,20 +3,20 @@ Thomas-Fermi density profile: n_TF(r) = max(0, (μ - V(r)) / g).
 Chemical potential μ is found via bisection so that ∫n_TF dV = N_target.
 """
 function thomas_fermi_density(
-    V::Array{Float64,N},
+    V::Array{Float64, N},
     g::Float64,
     dV::Float64;
-    N_target::Float64 = 1.0,
+    N_target::Float64=1.0,
 ) where {N}
     μ = _find_chemical_potential(V, g, dV, N_target)
     n = similar(V)
     @inbounds for I in eachindex(V)
         n[I] = max(0.0, (μ - V[I]) / g)
     end
-    (density = n, mu = μ)
+    (density=n, mu=μ)
 end
 
-function _find_chemical_potential(V, g, dV, N_target; max_iter = 200, tol = 1e-12)
+function _find_chemical_potential(V, g, dV, N_target; max_iter=200, tol=1e-12)
     V_min = minimum(V)
     V_max = maximum(V)
 
@@ -27,7 +27,7 @@ function _find_chemical_potential(V, g, dV, N_target; max_iter = 200, tol = 1e-1
         μ_hi *= 2.0
     end
 
-    for _ = 1:max_iter
+    for _ in 1:max_iter
         μ_mid = (μ_lo + μ_hi) / 2
         N_mid = _tf_norm(V, g, dV, μ_mid)
         if abs(N_mid - N_target) / N_target < tol
@@ -61,7 +61,7 @@ function init_psi_thomas_fermi(
     sys::SpinSystem,
     potential::AbstractPotential,
     c0::Float64;
-    N_target::Float64 = 1.0,
+    N_target::Float64=1.0,
 ) where {N}
     V = evaluate_potential(potential, grid)
     dV = cell_volume(grid)

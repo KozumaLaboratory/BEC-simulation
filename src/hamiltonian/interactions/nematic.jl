@@ -37,7 +37,7 @@ function apply_nematic_step!(
     F::Int,
     dt::Float64,
     ndim::Int;
-    imaginary_time::Bool = false,
+    imaginary_time::Bool=false,
 )
     c2 = get_cn(interactions, 2)
     abs(c2) < 1e-30 && return nothing
@@ -62,7 +62,7 @@ function _nematic_loop!(psi, ::Val{D}, n_pts, c2, dt, imaginary_time) where {D}
     Threads.@threads for I in CartesianIndices(n_pts)
         @inbounds begin
             A00 = zero(ComplexF64)
-            for c = 1:D
+            for c in 1:D
                 c_pair = D - c + 1
                 A00 += signs[c] * psi[I, c] * psi[I, c_pair]
             end
@@ -71,7 +71,7 @@ function _nematic_loop!(psi, ::Val{D}, n_pts, c2, dt, imaginary_time) where {D}
             V_base = c2 * A00 * inv_sqrt_D
 
             if imaginary_time
-                for c = 1:mid
+                for c in 1:mid
                     c_pair = D - c + 1
                     V = V_base * signs[c]
                     absV = abs(V)
@@ -92,7 +92,7 @@ function _nematic_loop!(psi, ::Val{D}, n_pts, c2, dt, imaginary_time) where {D}
                     end
                 end
             else
-                for c = 1:mid
+                for c in 1:mid
                     c_pair = D - c + 1
                     V = V_base * signs[c]
                     absV = abs(V)

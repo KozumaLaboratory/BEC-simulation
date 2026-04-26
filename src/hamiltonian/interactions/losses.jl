@@ -37,22 +37,26 @@ function apply_loss_step!(
 )
     L3_scalar_max = isempty(loss.L3_per_m) ? loss.L3 : maximum(abs, loss.L3_per_m)
     K3_scalar_max = isempty(loss.K3_per_m_cubic) ? loss.K3_cubic :
-        maximum(abs, loss.K3_per_m_cubic)
+                    maximum(abs, loss.K3_per_m_cubic)
     has_evap = loss.evap_rate > 1e-30 && loss.evap_energy_cutoff > 0
     if loss.gamma_dr < 1e-30 && L3_scalar_max < 1e-30 &&
-       K3_scalar_max < 1e-30 && !has_evap
+        K3_scalar_max < 1e-30 && !has_evap
         return nothing
     end
 
     if !isempty(loss.L3_per_m) && length(loss.L3_per_m) != n_components
-        throw(ArgumentError(
-            "LossParams.L3_per_m length $(length(loss.L3_per_m)) " *
-            "≠ n_components $(n_components)"))
+        throw(
+            ArgumentError(
+                "LossParams.L3_per_m length $(length(loss.L3_per_m)) " *
+                "≠ n_components $(n_components)"),
+        )
     end
     if !isempty(loss.K3_per_m_cubic) && length(loss.K3_per_m_cubic) != n_components
-        throw(ArgumentError(
-            "LossParams.K3_per_m_cubic length $(length(loss.K3_per_m_cubic)) " *
-            "≠ n_components $(n_components)"))
+        throw(
+            ArgumentError(
+                "LossParams.K3_per_m_cubic length $(length(loss.K3_per_m_cubic)) " *
+                "≠ n_components $(n_components)"),
+        )
     end
 
     n_pts = ntuple(d -> size(psi, d), ndim)
@@ -60,7 +64,7 @@ function apply_loss_step!(
 
     gamma_rates = _dipolar_relaxation_rates(F, loss.gamma_dr)
 
-    for c = 1:n_components
+    for c in 1:n_components
         L3_c = isempty(loss.L3_per_m) ? loss.L3 : loss.L3_per_m[c]
         K3_c = isempty(loss.K3_per_m_cubic) ? loss.K3_cubic : loss.K3_per_m_cubic[c]
         gamma_lin_rate = gamma_rates[c] + L3_c     # 2-body / linear-in-n channel
@@ -85,14 +89,13 @@ function apply_loss_step!(
     if has_evap
         cut = loss.evap_energy_cutoff
         rate = loss.evap_rate
-        for c = 1:n_components
+        for c in 1:n_components
             idx = _component_slice(ndim, n_pts, c)
             psi_view = view(psi, idx...)
             # element-wise: |ψ_c|² · n_tot > cut → multiply by exp(-rate·dt/2)
-            @. psi_view *=
-                ifelse(abs2(psi_view) * density_buf > cut,
-                       exp(-rate * dt / 2),
-                       one(eltype(psi_view)))
+            @. psi_view *= ifelse(abs2(psi_view) * density_buf > cut,
+                exp(-rate * dt / 2),
+                one(eltype(psi_view)))
         end
     end
     nothing
@@ -115,7 +118,7 @@ function _dipolar_relaxation_rates(F::Int, gamma_dr::Float64)
     raw = Vector{Float64}(undef, D)
 
     raw_sum = 0.0
-    for c = 1:D
+    for c in 1:D
         m = F - (c - 1)
         s = 0.0
         for q in (-1, -2)
@@ -131,5 +134,5 @@ function _dipolar_relaxation_rates(F::Int, gamma_dr::Float64)
     raw_sum < 1e-30 && return zeros(Float64, D)
 
     Z = raw_sum / D
-    [gamma_dr * raw[c] / Z for c = 1:D]
+    [gamma_dr * raw[c] / Z for c in 1:D]
 end

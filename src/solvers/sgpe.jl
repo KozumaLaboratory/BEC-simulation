@@ -41,11 +41,14 @@ occupation n(k) = T / (ε(k) - μ) for modes below ε ≪ k_B T.
 """
 function apply_sgpe_step!(
     ws::Workspace{N}, γ::Real, T::Real, dt::Real;
-    μ::Real = 0.0, mu::Real = μ,            # both spellings
-    k_cut::Real = Inf,
-    seed::Union{Nothing,Int} = nothing,
+    μ::Real=0.0, mu::Real=μ,            # both spellings
+    k_cut::Real=Inf,
+    seed::Union{Nothing, Int}=nothing,
 ) where {N}
-    γ_f = Float64(γ); T_f = Float64(T); dt_f = Float64(dt); μ_f = Float64(mu)
+    γ_f = Float64(γ);
+    T_f = Float64(T);
+    dt_f = Float64(dt);
+    μ_f = Float64(mu)
     γ_f <= 0 && T_f <= 0 && return nothing
 
     # 1. Coherent γ-damping on kinetic modes.
@@ -55,7 +58,7 @@ function apply_sgpe_step!(
     isfinite(k_cut) && apply_projected_gp!(ws, Float64(k_cut))
 
     # 3. Thermal Gaussian noise in position space.
-    γ_f > 0 && T_f > 0 && _sgpe_add_noise!(ws, γ_f, T_f, dt_f; seed = seed)
+    γ_f > 0 && T_f > 0 && _sgpe_add_noise!(ws, γ_f, T_f, dt_f; seed=seed)
 
     nothing
 end
@@ -75,9 +78,11 @@ function _sgpe_damp_kinetic!(ws::Workspace{N}, γ::Float64, μ::Float64, dt::Flo
     T = real(eltype(psi))
     k_squared = ws.grid.k_squared
     half_T = T(0.5)
-    γT = T(γ); μT = T(μ); dtT = T(dt)
+    γT = T(γ);
+    μT = T(μ);
+    dtT = T(dt)
 
-    for c = 1:D
+    for c in 1:D
         idx = _component_slice(N, n_pts, c)
         psi_c = view(psi, idx...)
         fft_buf .= psi_c
@@ -98,7 +103,7 @@ is dimensionally consistent (∫|noise|² dV ≈ 2γT·dt per component).
 """
 function _sgpe_add_noise!(
     ws::Workspace{N}, γ::Float64, T::Float64, dt::Float64;
-    seed::Union{Nothing,Int} = nothing,
+    seed::Union{Nothing, Int}=nothing,
 ) where {N}
     psi = ws.state.psi
     D = ws.spin_matrices.system.n_components
@@ -108,7 +113,7 @@ function _sgpe_add_noise!(
     σ <= 0 && return nothing
 
     rng = seed === nothing ? Random.default_rng() : Random.MersenneTwister(seed)
-    for c = 1:D
+    for c in 1:D
         idx = _component_slice(N, n_pts, c)
         psi_c = view(psi, idx...)
         # Independent real + imaginary parts, each 𝒩(0, σ²/2) so that the
@@ -116,7 +121,7 @@ function _sgpe_add_noise!(
         re_host = randn(rng, Float64, n_pts) .* (σ / sqrt(2.0))
         im_host = randn(rng, Float64, n_pts) .* (σ / sqrt(2.0))
         noise_host = complex.(re_host, im_host)
-        noise_dev  = _to_device(ws.backend, noise_host)
+        noise_dev = _to_device(ws.backend, noise_host)
         psi_c .+= noise_dev
     end
     nothing
@@ -130,9 +135,9 @@ and auto-increments the RNG seed so step-to-step draws are independent.
 """
 function sgpe_callback(
     γ::Real, T::Real, dt::Real;
-    μ::Real = 0.0, k_cut::Real = Inf,
-    seed::Union{Nothing,Int} = nothing,
-    every::Int = 1,
+    μ::Real=0.0, k_cut::Real=Inf,
+    seed::Union{Nothing, Int}=nothing,
+    every::Int=1,
 )
     # SimulationCallbacks.on_step signature is `(ws, step, times, energies)`
     # — accept the trailing two as varargs so this also works as a manually
@@ -141,8 +146,8 @@ function sgpe_callback(
     function (ws, step, args...)
         step % every == 0 || return nothing
         apply_sgpe_step!(ws, γ, T, dt;
-            μ = μ, k_cut = k_cut,
-            seed = seed === nothing ? nothing : seed + step)
+            μ=μ, k_cut=k_cut,
+            seed=seed === nothing ? nothing : seed + step)
         nothing
     end
 end

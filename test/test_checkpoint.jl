@@ -31,14 +31,14 @@
         # Run first 50 steps with checkpoint
         sp1 = SimParams(; dt=dt, n_steps=50, save_every=50)
         ws1 = make_workspace(; grid, atom, interactions, sim_params=sp1,
-                             psi_init=copy(psi0))
+            psi_init=copy(psi0))
         run_simulation_checkpointed!(ws1;
             checkpoint_dir=dir, checkpoint_every=50)
 
         # Resume for remaining 50 steps
         sp2 = SimParams(; dt=dt, n_steps=100, save_every=50)
         ws2 = make_workspace(; grid, atom, interactions, sim_params=sp2,
-                             psi_init=copy(psi0))
+            psi_init=copy(psi0))
         # Manually set state to match checkpoint
         data = load_state(joinpath(dir, readdir(dir)[end]))
         copyto!(ws2.state.psi, data.psi)
@@ -47,7 +47,7 @@
 
         sp_remain = SimParams(; dt=dt, n_steps=50, save_every=50)
         ws2_remain = make_workspace(; grid, atom, interactions, sim_params=sp_remain,
-                                    psi_init=copy(ws2.state.psi))
+            psi_init=copy(ws2.state.psi))
         ws2_remain.state.t = ws2.state.t
         run_simulation!(ws2_remain)
 

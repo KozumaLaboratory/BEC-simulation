@@ -20,11 +20,11 @@ function bogoliubov_spectrum(;
     n0::Float64,
     F::Int,
     interactions::InteractionParams,
-    zeeman::ZeemanParams = ZeemanParams(),
-    c_dd::Float64 = 0.0,
-    k_max::Float64 = 10.0,
-    n_k::Int = 200,
-    k_direction::NTuple{3,Float64} = (0.0, 0.0, 1.0),
+    zeeman::ZeemanParams=ZeemanParams(),
+    c_dd::Float64=0.0,
+    k_max::Float64=10.0,
+    n_k::Int=200,
+    k_direction::NTuple{3, Float64}=(0.0, 0.0, 1.0),
 )
     D = 2F + 1
     length(spinor) == D ||
@@ -69,7 +69,7 @@ end
 function _bdg_k_scan(h_mf, M_anom, zee, n0, D, spinor, k_max, n_k)
     mu = real(sum(c -> (zee[c] + n0 * h_mf[c, c]) * abs2(spinor[c]), 1:D))
 
-    k_values = collect(range(0, k_max; length = n_k))
+    k_values = collect(range(0, k_max; length=n_k))
     omega = zeros(ComplexF64, 2D, n_k)
     max_growth = 0.0
 
@@ -77,7 +77,7 @@ function _bdg_k_scan(h_mf, M_anom, zee, n0, D, spinor, k_max, n_k)
         ek = k^2 / 2
 
         L = 2n0 .* h_mf
-        for i = 1:D
+        for i in 1:D
             L[i, i] += ek - mu + zee[i]
         end
 
@@ -85,9 +85,9 @@ function _bdg_k_scan(h_mf, M_anom, zee, n0, D, spinor, k_max, n_k)
 
         H_bdg = zeros(ComplexF64, 2D, 2D)
         H_bdg[1:D, 1:D] .= L
-        H_bdg[1:D, (D+1):2D] .= M_sc
-        H_bdg[(D+1):2D, 1:D] .= .-conj.(M_sc)
-        H_bdg[(D+1):2D, (D+1):2D] .= .-conj.(L)
+        H_bdg[1:D, (D + 1):2D] .= M_sc
+        H_bdg[(D + 1):2D, 1:D] .= .-conj.(M_sc)
+        H_bdg[(D + 1):2D, (D + 1):2D] .= .-conj.(L)
 
         evals = eigvals(H_bdg)
         omega[:, ik] .= evals
@@ -133,8 +133,8 @@ only the upper hemisphere.
 function fibonacci_sphere_directions(n::Int)
     n >= 1 || throw(ArgumentError("n must be >= 1, got $n"))
     golden_ratio = (1.0 + sqrt(5.0)) / 2.0
-    dirs = NTuple{3,Float64}[]
-    for i in 0:(2n-1)
+    dirs = NTuple{3, Float64}[]
+    for i in 0:(2n - 1)
         theta = acos(1.0 - (2.0 * i + 1.0) / (2n))
         phi = 2.0 * Float64(π) * i / golden_ratio
         x = sin(theta) * cos(phi)
@@ -164,12 +164,12 @@ function bogoliubov_instability_scan(;
     n0::Float64,
     F::Int,
     interactions::InteractionParams,
-    zeeman::ZeemanParams = ZeemanParams(),
-    c_dd::Float64 = 0.0,
-    k_max::Float64 = 10.0,
-    n_k::Int = 200,
-    directions::Union{Symbol,Vector{NTuple{3,Float64}}} = :auto,
-    n_directions::Int = 100,
+    zeeman::ZeemanParams=ZeemanParams(),
+    c_dd::Float64=0.0,
+    k_max::Float64=10.0,
+    n_k::Int=200,
+    directions::Union{Symbol, Vector{NTuple{3, Float64}}}=:auto,
+    n_directions::Int=100,
 )
     D = 2F + 1
     length(spinor) == D ||
@@ -192,7 +192,7 @@ function bogoliubov_instability_scan(;
     sm = has_ddi ? spin_matrices(F) : nothing
 
     growth_rates = zeros(Float64, n_k, n_dir)
-    k_values = collect(range(0, k_max; length = n_k))
+    k_values = collect(range(0, k_max; length=n_k))
 
     global_max = 0.0
     best_k = 0.0
@@ -214,9 +214,9 @@ function bogoliubov_instability_scan(;
 
         _, omega, _ = _bdg_k_scan(h_mf, M_anom, zee, n0, D, spinor, k_max, n_k)
 
-        for ik = 1:n_k
+        for ik in 1:n_k
             max_g = 0.0
-            for ie = 1:2D
+            for ie in 1:2D
                 g = imag(omega[ie, ik])
                 g > max_g && (max_g = g)
             end
@@ -234,7 +234,7 @@ function bogoliubov_instability_scan(;
     k_lo = Inf
     k_hi = -Inf
     if unstable
-        for id = 1:n_dir, ik = 1:n_k
+        for id in 1:n_dir, ik in 1:n_k
             if growth_rates[ik, id] > 1e-10
                 k = k_values[ik]
                 k < k_lo && (k_lo = k)
@@ -272,7 +272,7 @@ Suggest grid parameters that resolve the instability found in `imap`.
 Returns `(; n_points::NTuple{N,Int}, box_size::NTuple{N,Float64})` or
 `nothing` if the system is stable.
 """
-function suggest_grid_params(imap::InstabilityMap; ndim::Int = 2, margin::Float64 = 2.0)
+function suggest_grid_params(imap::InstabilityMap; ndim::Int=2, margin::Float64=2.0)
     imap.unstable || return nothing
 
     k_lo, k_hi = imap.k_unstable_range
@@ -290,15 +290,15 @@ end
 
 function _bdg_normal_matrix(spinor, F, D, g_dict, cg_table)
     h = zeros(ComplexF64, D, D)
-    for S = 0:2:2F
+    for S in 0:2:2F
         gS = get(g_dict, S, 0.0)
         abs(gS) < 1e-30 && continue
-        for m = (-F):F
+        for m in (-F):F
             cm = F - m + 1
-            for mp = (-F):F
+            for mp in (-F):F
                 cmp = F - mp + 1
                 val = zero(ComplexF64)
-                for mu = (-F):F
+                for mu in (-F):F
                     M = m + mu
                     abs(M) > S && continue
                     nu = M - mp
@@ -306,7 +306,7 @@ function _bdg_normal_matrix(spinor, F, D, g_dict, cg_table)
                     cg1 = get(cg_table, (S, M, m, mu), 0.0)
                     cg2 = get(cg_table, (S, M, mp, nu), 0.0)
                     abs(cg1 * cg2) < 1e-30 && continue
-                    val += cg1 * cg2 * conj(spinor[F-mu+1]) * spinor[F-nu+1]
+                    val += cg1 * cg2 * conj(spinor[F - mu + 1]) * spinor[F - nu + 1]
                 end
                 h[cm, cmp] += gS * val
             end
@@ -317,26 +317,26 @@ end
 
 function _bdg_anomalous_matrix(spinor, F, D, g_dict, cg_table)
     M_mat = zeros(ComplexF64, D, D)
-    for S = 0:2:2F
+    for S in 0:2:2F
         gS = get(g_dict, S, 0.0)
         abs(gS) < 1e-30 && continue
-        for M_val = (-S):S
+        for M_val in (-S):S
             A_SM = zero(ComplexF64)
-            for mu = (-F):F
+            for mu in (-F):F
                 nu = M_val - mu
                 abs(nu) > F && continue
                 cg = get(cg_table, (S, M_val, mu, nu), 0.0)
                 abs(cg) < 1e-30 && continue
-                A_SM += cg * spinor[F-mu+1] * spinor[F-nu+1]
+                A_SM += cg * spinor[F - mu + 1] * spinor[F - nu + 1]
             end
             abs(A_SM) < 1e-30 && continue
 
-            for m = (-F):F
+            for m in (-F):F
                 mp = M_val - m
                 abs(mp) > F && continue
                 cg = get(cg_table, (S, M_val, m, mp), 0.0)
                 abs(cg) < 1e-30 && continue
-                M_mat[F-m+1, F-mp+1] += gS * cg * A_SM
+                M_mat[F - m + 1, F - mp + 1] += gS * cg * A_SM
             end
         end
     end
@@ -345,8 +345,8 @@ end
 
 function _q_tensor_direction(k_hat::Vector{Float64})
     Q = zeros(Float64, 3, 3)
-    for a = 1:3
-        for b = 1:3
+    for a in 1:3
+        for b in 1:3
             Q[a, b] = k_hat[a] * k_hat[b] - (a == b ? 1.0 / 3.0 : 0.0)
         end
     end
@@ -363,20 +363,20 @@ function _bdg_ddi_matrices(spinor, F, D, sm, c_dd, Q_ab)
 
     # Normal: h^DDI_{mm'} = c_dd Σ_{ab} Q_{ab} <F_b> (F_a)_{mm'}
     h = zeros(ComplexF64, D, D)
-    for a = 1:3
-        for b = 1:3
+    for a in 1:3
+        for b in 1:3
             h .+= c_dd * Q_ab[a, b] * f_exp[b] .* F_mats[a]
         end
     end
 
     # Anomalous DDI: outer product of F_a·ζ vectors
     # M^DDI_{m,m'} = c_dd Σ_{ab} Q_{ab} (F_a·ζ)_m (F_b·ζ)_{m'}
-    fa_zeta = [F_mats[a] * spinor for a = 1:3]
+    fa_zeta = [F_mats[a] * spinor for a in 1:3]
     M_mat = zeros(ComplexF64, D, D)
-    for a = 1:3, b = 1:3
+    for a in 1:3, b in 1:3
         coeff = c_dd * Q_ab[a, b]
         abs(coeff) < 1e-30 && continue
-        for i = 1:D, j = 1:D
+        for i in 1:D, j in 1:D
             M_mat[i, j] += coeff * fa_zeta[a][i] * fa_zeta[b][j]
         end
     end
@@ -411,8 +411,8 @@ function detect_roton(bdg::BdGResult)
     best_omega = Inf
     found = false
 
-    for ik in (k_skip+1):(n_k-1)
-        if phonon_branch[ik] < phonon_branch[ik-1] && phonon_branch[ik] < phonon_branch[ik+1]
+    for ik in (k_skip + 1):(n_k - 1)
+        if phonon_branch[ik] < phonon_branch[ik - 1] && phonon_branch[ik] < phonon_branch[ik + 1]
             if phonon_branch[ik] < best_omega
                 best_omega = phonon_branch[ik]
                 best_k = bdg.k_values[ik]
@@ -437,8 +437,8 @@ Generate `n` evenly-spaced directions in the xy-plane (upper semicircle).
 """
 function _planar_directions(n::Int)
     n >= 1 || throw(ArgumentError("n must be >= 1"))
-    dirs = NTuple{3,Float64}[]
-    for i in 0:(n-1)
+    dirs = NTuple{3, Float64}[]
+    for i in 0:(n - 1)
         theta = Float64(π) * i / n
         push!(dirs, (cos(theta), sin(theta), 0.0))
     end
@@ -484,12 +484,12 @@ function instability_angular_map(;
     n0::Float64,
     F::Int,
     interactions::InteractionParams,
-    zeeman::ZeemanParams = ZeemanParams(),
-    c_dd::Float64 = 0.0,
-    k_max::Float64 = 10.0,
-    n_k::Int = 200,
-    n_theta::Int = 18,
-    n_phi::Int = 36,
+    zeeman::ZeemanParams=ZeemanParams(),
+    c_dd::Float64=0.0,
+    k_max::Float64=10.0,
+    n_k::Int=200,
+    n_theta::Int=18,
+    n_phi::Int=36,
 )
     D = 2F + 1
     length(spinor) == D ||
@@ -499,8 +499,8 @@ function instability_angular_map(;
     has_ddi = abs(c_dd) > 1e-30
     sm = has_ddi ? spin_matrices(F) : nothing
 
-    theta_vals = collect(range(0.0, Float64(π) / 2; length = n_theta))
-    phi_vals = collect(range(0.0, 2.0 * Float64(π); length = n_phi + 1)[1:n_phi])
+    theta_vals = collect(range(0.0, Float64(π) / 2; length=n_theta))
+    phi_vals = collect(range(0.0, 2.0 * Float64(π); length=n_phi + 1)[1:n_phi])
     growth_map = zeros(Float64, n_theta, n_phi)
 
     for it in 1:n_theta
@@ -527,5 +527,5 @@ function instability_angular_map(;
         end
     end
 
-    (theta = theta_vals, phi = phi_vals, growth_map = growth_map)
+    (theta=theta_vals, phi=phi_vals, growth_map=growth_map)
 end

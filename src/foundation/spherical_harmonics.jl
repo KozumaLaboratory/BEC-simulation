@@ -34,7 +34,7 @@ function _associated_legendre(l::Int, m::Int, ct::Float64, st::Float64)
     pmm = 1.0
     if m > 0
         fact = 1.0
-        for i = 1:m
+        for i in 1:m
             pmm *= -fact * st
             fact += 2.0
         end
@@ -46,7 +46,7 @@ function _associated_legendre(l::Int, m::Int, ct::Float64, st::Float64)
     (m + 1) == l && return pmm1
 
     plm = 0.0
-    for ll = (m+2):l
+    for ll in (m + 2):l
         plm = ((2ll - 1) * ct * pmm1 - (ll + m - 1) * pmm) / (ll - m)
         pmm = pmm1
         pmm1 = plm
@@ -63,21 +63,21 @@ Returns theta ∈ [0,π], phi ∈ [0,2π), and rho matrix (n_theta × n_phi).
 function spinor_angular_density(
     spinor::AbstractVector{<:Number},
     F::Int;
-    n_theta::Int = 64,
-    n_phi::Int = 128,
+    n_theta::Int=64,
+    n_phi::Int=128,
 )
     D = 2F + 1
     length(spinor) == D ||
         throw(DimensionMismatch("spinor length $(length(spinor)) != 2F+1 = $D"))
 
-    theta = range(0, π, length = n_theta)
-    phi = range(0, 2π * (1 - 1 / n_phi), length = n_phi)
+    theta = range(0, π; length=n_theta)
+    phi = range(0, 2π * (1 - 1 / n_phi); length=n_phi)
     rho = zeros(Float64, n_theta, n_phi)
 
     for (it, th) in enumerate(theta)
         for (ip, ph) in enumerate(phi)
             val = zero(ComplexF64)
-            for c = 1:D
+            for c in 1:D
                 m = F - (c - 1)
                 val += spherical_harmonic(F, m, th, ph) * spinor[c]
             end
@@ -85,5 +85,5 @@ function spinor_angular_density(
         end
     end
 
-    (theta = collect(theta), phi = collect(phi), rho = rho)
+    (theta=collect(theta), phi=collect(phi), rho=rho)
 end

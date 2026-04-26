@@ -45,9 +45,9 @@ function feshbach_ramp(;
     B_start::Real,
     B_end::Real,
     duration::Real,
-    ramp_shape::Symbol = :linear,
-    n_samples::Int = 2048,
-    c_scale::Real = 1.0,
+    ramp_shape::Symbol=:linear,
+    n_samples::Int=2048,
+    c_scale::Real=1.0,
 )
     duration > 0 || throw(ArgumentError("duration must be positive"))
     n_samples >= 2 || throw(ArgumentError("n_samples must be ≥ 2"))
@@ -55,16 +55,16 @@ function feshbach_ramp(;
         ArgumentError("ramp_shape must be :linear, :cubic_hermite, or :exponential"))
 
     T = Float64(duration)
-    times = collect(range(0.0, T; length = n_samples))
-    B_vals  = Vector{Float64}(undef, n_samples)
+    times = collect(range(0.0, T; length=n_samples))
+    B_vals = Vector{Float64}(undef, n_samples)
     as_vals = Vector{Float64}(undef, n_samples)
     c0_vals = Vector{Float64}(undef, n_samples)
 
     B0f = Float64(B0)
-    Bs  = Float64(B_start)
-    Be  = Float64(B_end)
-    ΔB  = Be - Bs
-    Δ   = Float64(Delta)
+    Bs = Float64(B_start)
+    Be = Float64(B_end)
+    ΔB = Be - Bs
+    Δ = Float64(Delta)
     abg = Float64(a_bg)
     scale = Float64(c_scale)
 
@@ -83,14 +83,14 @@ function feshbach_ramp(;
         denom = B - B0f
         a_s = abs(denom) < 1e-12 ? sign(denom) * 1.0e12 * abg :
               abg * (1.0 - Δ / denom)
-        B_vals[i]  = B
+        B_vals[i] = B
         as_vals[i] = a_s
         c0_vals[i] = scale * a_s
     end
 
     (PiecewiseLinearWaveform(times, c0_vals),
-     PiecewiseLinearWaveform(times, as_vals),
-     PiecewiseLinearWaveform(times, B_vals))
+        PiecewiseLinearWaveform(times, as_vals),
+        PiecewiseLinearWaveform(times, B_vals))
 end
 
 """

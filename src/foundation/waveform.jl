@@ -1,6 +1,6 @@
 # --- Waveform: typed time-dependent parameter abstraction ---
 
-abstract type AbstractWaveform{T<:Number} end
+abstract type AbstractWaveform{T <: Number} end
 
 """Type alias for real-valued waveforms (the common case)."""
 const Waveform = AbstractWaveform{Float64}
@@ -42,8 +42,9 @@ struct SinusoidalWaveform <: Waveform
     phase::Float64
 end
 
-SinusoidalWaveform(; center=0.0, amplitude=1.0, frequency=1.0, phase=0.0) =
-    SinusoidalWaveform(center, amplitude, frequency, phase)
+SinusoidalWaveform(; center=0.0, amplitude=1.0, frequency=1.0, phase=0.0) = SinusoidalWaveform(
+    center, amplitude, frequency, phase
+)
 
 """
     ChirpedSinusoidalWaveform
@@ -69,9 +70,10 @@ struct ChirpedSinusoidalWaveform <: Waveform
 end
 
 ChirpedSinusoidalWaveform(; center=0.0, amplitude=1.0,
-                          freq_start=0.0, freq_end=1.0,
-                          duration=1.0, phase=0.0) =
-    ChirpedSinusoidalWaveform(center, amplitude, freq_start, freq_end, duration, phase)
+freq_start=0.0, freq_end=1.0,
+duration=1.0, phase=0.0) = ChirpedSinusoidalWaveform(
+    center, amplitude, freq_start, freq_end, duration, phase
+)
 
 struct GaussianPulseWaveform <: Waveform
     center::Float64
@@ -80,8 +82,9 @@ struct GaussianPulseWaveform <: Waveform
     sigma::Float64
 end
 
-GaussianPulseWaveform(; center=0.0, amplitude=1.0, t_center=0.0, sigma=0.01) =
-    GaussianPulseWaveform(center, amplitude, t_center, sigma)
+GaussianPulseWaveform(; center=0.0, amplitude=1.0, t_center=0.0, sigma=0.01) = GaussianPulseWaveform(
+    center, amplitude, t_center, sigma
+)
 
 struct InterpolatedWaveform <: Waveform
     times::Vector{Float64}
@@ -103,8 +106,9 @@ struct CompositeWaveform <: Waveform
     operation::Symbol
 end
 
-CompositeWaveform(waveforms::Vector{<:Waveform}; operation::Symbol=:add) =
-    CompositeWaveform(convert(Vector{Waveform}, waveforms), operation)
+CompositeWaveform(waveforms::Vector{<:Waveform}; operation::Symbol=:add) = CompositeWaveform(
+    convert(Vector{Waveform}, waveforms), operation
+)
 
 evaluate(w::ConstantWaveform, ::Float64) = w.value
 
@@ -120,8 +124,8 @@ function evaluate(w::PiecewiseLinearWaveform, t::Float64)
     t >= w.times[end] && return w.values[end]
     i = searchsortedlast(w.times, t)
     i >= length(w.times) && return w.values[end]
-    t0, t1 = w.times[i], w.times[i+1]
-    v0, v1 = w.values[i], w.values[i+1]
+    t0, t1 = w.times[i], w.times[i + 1]
+    v0, v1 = w.values[i], w.values[i + 1]
     frac = (t - t0) / (t1 - t0)
     v0 + (v1 - v0) * frac
 end
@@ -152,18 +156,20 @@ function evaluate(w::InterpolatedWaveform, t::Float64)
     t >= w.times[end] && return w.values[end]
     i = searchsortedlast(w.times, t)
     i >= length(w.times) && return w.values[end]
-    t0, t1 = w.times[i], w.times[i+1]
-    v0, v1 = w.values[i], w.values[i+1]
+    t0, t1 = w.times[i], w.times[i + 1]
+    v0, v1 = w.values[i], w.values[i + 1]
     h = t1 - t0
     frac = (t - t0) / h
     if length(w.times) >= 4
         # Cubic Hermite spline (Catmull-Rom)
         i0 = max(1, i - 1)
         i3 = min(length(w.times), i + 2)
-        m0 = (w.values[i+1] - w.values[i0]) / (w.times[i+1] - w.times[i0])
+        m0 = (w.values[i + 1] - w.values[i0]) / (w.times[i + 1] - w.times[i0])
         m1 = (w.values[i3] - w.values[i]) / (w.times[i3] - w.times[i])
-        m0 *= h; m1 *= h
-        t2 = frac * frac; t3 = t2 * frac
+        m0 *= h;
+        m1 *= h
+        t2 = frac * frac;
+        t3 = t2 * frac
         return (2t3 - 3t2 + 1) * v0 + (t3 - 2t2 + frac) * m0 +
                (-2t3 + 3t2) * v1 + (t3 - t2) * m1
     end
@@ -194,7 +200,7 @@ evaluate(w::StepWaveform, t::Float64) = t < w.t_step ? w.value_before : w.value_
 Load a waveform from a CSV file. Returns an InterpolatedWaveform.
 """
 function load_waveform_csv(path::String; time_col::Int=1, value_col::Int=2,
-                           header::Bool=true, delimiter::Char=',')
+    header::Bool=true, delimiter::Char=',')
     lines = readlines(path)
     header && !isempty(lines) && popfirst!(lines)
     times = Float64[]

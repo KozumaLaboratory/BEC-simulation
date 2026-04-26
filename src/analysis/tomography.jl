@@ -46,18 +46,18 @@ function spin_tomography(
     psi::AbstractArray{<:Complex},
     grid::Grid{N},
     F::Int;
-    rotation_axis::Symbol = :y,
-    theta_min::Float64 = 0.0,
-    theta_max::Float64 = Float64(π),
-    n_angles::Int = 19,
-    tof_params::TOFParams = TOFParams(11.0, 0.0, 3),  # 16ms TOF, no SG, axis 3
-    reference_m::Union{Nothing,Int} = nothing,
+    rotation_axis::Symbol=:y,
+    theta_min::Float64=0.0,
+    theta_max::Float64=Float64(π),
+    n_angles::Int=19,
+    tof_params::TOFParams=TOFParams(11.0, 0.0, 3),  # 16ms TOF, no SG, axis 3
+    reference_m::Union{Nothing, Int}=nothing,
 ) where {N}
     D = 2F + 1
     sys = SpinSystem(F)
-    angles = collect(range(theta_min, theta_max; length = n_angles))
+    angles = collect(range(theta_min, theta_max; length=n_angles))
 
-    images = Dict{Int,Vector{Array{Float64}}}(m => Array{Float64}[] for m in sys.m_values)
+    images = Dict{Int, Vector{Array{Float64}}}(m => Array{Float64}[] for m in sys.m_values)
     populations = zeros(Float64, n_angles, D)
 
     for (i, theta) in enumerate(angles)
@@ -100,13 +100,13 @@ function spin_tomography(
     end
 
     (
-        angles = angles,
-        images = images,
-        populations = populations,
-        differential = differential,
-        F = F,
-        rotation_axis = rotation_axis,
-        tof_params = tof_params,
+        angles=angles,
+        images=images,
+        populations=populations,
+        differential=differential,
+        F=F,
+        rotation_axis=rotation_axis,
+        tof_params=tof_params,
     )
 end
 
@@ -135,7 +135,7 @@ function _compute_differential(images, populations, m_values, ref_idx)
 
     ref_img_0 = ref_images[1]  # reference at θ=0
 
-    diff = Dict{Int,Vector{Array{Float64}}}()
+    diff = Dict{Int, Vector{Array{Float64}}}()
     for (c, m) in enumerate(m_values)
         diff[m] = Array{Float64}[]
         for i in eachindex(images[m])

@@ -21,7 +21,7 @@ function estimate_splitting_error(ws::Workspace{N}) where {N}
     kinetic_phase_half = prepare_kinetic_phase(
         ws.grid,
         dt_half;
-        imaginary_time = ws.sim_params.imaginary_time,
+        imaginary_time=ws.sim_params.imaginary_time,
     )
     bk_half = _make_batched_kinetic_cache(ws.state.psi, kinetic_phase_half, N)
     sp_half = SimParams(
@@ -58,12 +58,12 @@ Restores the workspace state after validation.
 """
 function validate_conservation(
     ws::Workspace{N};
-    n_steps::Int = 100,
-    tol_norm::Float64 = 1e-12,
-    tol_energy::Float64 = 1e-3,
-    tol_magnetization::Float64 = 1e-6,
-    track_Jz::Bool = false,
-    tol_Jz::Float64 = 1e-3,
+    n_steps::Int=100,
+    tol_norm::Float64=1e-12,
+    tol_energy::Float64=1e-3,
+    tol_magnetization::Float64=1e-6,
+    track_Jz::Bool=false,
+    tol_Jz::Float64=1e-3,
 ) where {N}
     psi_save = copy(ws.state.psi)
     t_save, step_save = ws.state.t, ws.state.step
@@ -78,7 +78,7 @@ function validate_conservation(
     Jz0 =
         (track_Jz && N >= 2) ? total_angular_momentum(ws.state.psi, grid, plans, sys) : NaN
 
-    for _ = 1:n_steps
+    for _ in 1:n_steps
         split_step!(ws)
     end
 
@@ -104,11 +104,11 @@ function validate_conservation(
     end
 
     (
-        passed = passed,
-        norm_drift = norm_drift,
-        energy_drift = energy_drift,
-        magnetization_drift = mag_drift,
-        Jz_drift = Jz_drift,
+        passed=passed,
+        norm_drift=norm_drift,
+        energy_drift=energy_drift,
+        magnetization_drift=mag_drift,
+        Jz_drift=Jz_drift,
     )
 end
 
@@ -130,10 +130,10 @@ Returns `(growth_rate, unstable, k_peak, time_series, sk_series)` where:
 """
 function analyze_stability(
     ws::Workspace{N};
-    perturbation::Float64 = 1e-4,
-    n_steps::Int = 500,
-    sample_every::Int = 10,
-    seed::Int = 42,
+    perturbation::Float64=1e-4,
+    n_steps::Int=500,
+    sample_every::Int=10,
+    seed::Int=42,
 ) where {N}
     psi_save = copy(ws.state.psi)
     t_save = ws.state.t
@@ -149,7 +149,7 @@ function analyze_stability(
     sk_series = Array{Float64}[]
     dt = ws.sim_params.dt
 
-    for step = 1:n_steps
+    for step in 1:n_steps
         split_step!(ws)
         if step % sample_every == 0
             delta = maximum(abs, ws.state.psi .- psi_save)
@@ -166,11 +166,11 @@ function analyze_stability(
     ws.state.step = step_save
 
     (
-        growth_rate = growth_rate,
-        unstable = growth_rate > 0.01,
-        k_peak = k_peak,
-        time_series = time_series,
-        sk_series = sk_series,
+        growth_rate=growth_rate,
+        unstable=growth_rate > 0.01,
+        k_peak=k_peak,
+        time_series=time_series,
+        sk_series=sk_series,
     )
 end
 
@@ -178,12 +178,12 @@ function _estimate_growth_rate(time_series::Vector{Float64}, dt_sample::Float64)
     n = length(time_series)
     n < 2 && return 0.0
     log_vals = [v > 0 ? log(v) : -50.0 for v in time_series]
-    t_vals = [(i - 1) * dt_sample for i = 1:n]
+    t_vals = [(i - 1) * dt_sample for i in 1:n]
 
     t_mean = sum(t_vals) / n
     y_mean = sum(log_vals) / n
-    num = sum((t_vals[i] - t_mean) * (log_vals[i] - y_mean) for i = 1:n)
-    den = sum((t_vals[i] - t_mean)^2 for i = 1:n)
+    num = sum((t_vals[i] - t_mean) * (log_vals[i] - y_mean) for i in 1:n)
+    den = sum((t_vals[i] - t_mean)^2 for i in 1:n)
     den < 1e-30 && return 0.0
     num / den
 end

@@ -9,7 +9,7 @@ function _build_potential(pc::PotentialConfig, ndim::Int)
         omega = _to_float_vec(omega_raw)
         length(omega) == ndim ||
             throw(ArgumentError("omega length must match grid dimensions ($ndim)"))
-        HarmonicTrap(NTuple{ndim,Float64}(omega))
+        HarmonicTrap(NTuple{ndim, Float64}(omega))
     elseif pc.type == :gravity
         g = Float64(get(pc.params, "g", 9.81))
         axis = Int(get(pc.params, "axis", ndim))
@@ -26,24 +26,25 @@ function _build_potential(pc::PotentialConfig, ndim::Int)
         RingPotential{ndim}(radius, strength, width)
     elseif pc.type == :box
         sz = _to_float_vec(pc.params["size"])
-        length(sz) == ndim || throw(ArgumentError("box size length must match grid dimensions ($ndim)"))
+        length(sz) == ndim ||
+            throw(ArgumentError("box size length must match grid dimensions ($ndim)"))
         wall_strength = Float64(get(pc.params, "wall_strength", 1000.0))
         wall_width = Float64(get(pc.params, "wall_width", 0.5))
-        BoxPotential{ndim}(NTuple{ndim,Float64}(sz), wall_strength, wall_width)
+        BoxPotential{ndim}(NTuple{ndim, Float64}(sz), wall_strength, wall_width)
     elseif pc.type == :lattice || pc.type == :optical_lattice
-        depth = NTuple{ndim,Float64}(_to_float_vec(pc.params["depth"]))
-        period = NTuple{ndim,Float64}(_to_float_vec(pc.params["period"]))
-        phase = NTuple{ndim,Float64}(_to_float_vec(get(pc.params, "phase", zeros(ndim))))
+        depth = NTuple{ndim, Float64}(_to_float_vec(pc.params["depth"]))
+        period = NTuple{ndim, Float64}(_to_float_vec(pc.params["period"]))
+        phase = NTuple{ndim, Float64}(_to_float_vec(get(pc.params, "phase", zeros(ndim))))
         OpticalLatticePotential{ndim}(depth, period, phase)
     elseif pc.type == :double_well
         separation = Float64(get(pc.params, "separation", 4.0))
         barrier = Float64(get(pc.params, "barrier", 10.0))
-        omega = NTuple{ndim,Float64}(_to_float_vec(get(pc.params, "omega", ones(ndim))))
+        omega = NTuple{ndim, Float64}(_to_float_vec(get(pc.params, "omega", ones(ndim))))
         axis = Int(get(pc.params, "axis", 1))
         DoubleWellPotential{ndim}(separation, barrier, omega, axis)
     elseif pc.type == :quartic
-        omega = NTuple{ndim,Float64}(_to_float_vec(pc.params["omega"]))
-        lambda = NTuple{ndim,Float64}(_to_float_vec(pc.params["lambda"]))
+        omega = NTuple{ndim, Float64}(_to_float_vec(pc.params["omega"]))
+        lambda = NTuple{ndim, Float64}(_to_float_vec(pc.params["lambda"]))
         QuarticPotential{ndim}(omega, lambda)
     elseif pc.type == :laguerre_gauss || pc.type == :lg_beam
         power = Float64(get(pc.params, "power", 1.0))
@@ -57,15 +58,17 @@ function _build_potential(pc::PotentialConfig, ndim::Int)
         waist = Float64(get(pc.params, "waist", 2.0))
         PlugBeam{ndim}(strength, waist)
     elseif pc.type == :shaken_lattice
-        depth = NTuple{ndim,Float64}(_to_float_vec(pc.params["depth"]))
-        period = NTuple{ndim,Float64}(_to_float_vec(pc.params["period"]))
+        depth = NTuple{ndim, Float64}(_to_float_vec(pc.params["depth"]))
+        period = NTuple{ndim, Float64}(_to_float_vec(pc.params["period"]))
         shake_specs = get(pc.params, "shake", nothing)
         duration = Float64(get(pc.params, "duration", 1.0))
         shake_wf = if shake_specs !== nothing
             wfs = _to_float_vec(shake_specs)
-            NTuple{ndim,Waveform}(ntuple(d -> ConstantWaveform(d <= length(wfs) ? wfs[d] : 0.0), ndim))
+            NTuple{ndim, Waveform}(
+                ntuple(d -> ConstantWaveform(d <= length(wfs) ? wfs[d] : 0.0), ndim)
+            )
         else
-            NTuple{ndim,Waveform}(ntuple(_ -> ConstantWaveform(0.0), ndim))
+            NTuple{ndim, Waveform}(ntuple(_ -> ConstantWaveform(0.0), ndim))
         end
         ShakenLatticePotential{ndim}(depth, period, shake_wf)
     elseif pc.type == :magnetic_gradient
@@ -85,8 +88,8 @@ function _build_beam(d::Dict)
     wavelength = Float64(d["wavelength"])
     power = Float64(d["power"])
     waist = Float64(d["waist"])
-    position = NTuple{3,Float64}(_to_float_vec(d["position"]))
-    direction = NTuple{3,Float64}(_to_float_vec(d["direction"]))
+    position = NTuple{3, Float64}(_to_float_vec(d["position"]))
+    direction = NTuple{3, Float64}(_to_float_vec(d["direction"]))
     GaussianBeam(wavelength, power, waist, position, direction)
 end
 
@@ -100,28 +103,28 @@ function _make_waveform(spec, duration::Float64)
     if haskey(spec, "sinusoidal")
         s = spec["sinusoidal"]
         return SinusoidalWaveform(;
-            center = Float64(get(s, "center", 0.0)),
-            amplitude = Float64(get(s, "amplitude", 1.0)),
-            frequency = Float64(get(s, "frequency", 1.0)),
-            phase = Float64(get(s, "phase", 0.0)),
+            center=Float64(get(s, "center", 0.0)),
+            amplitude=Float64(get(s, "amplitude", 1.0)),
+            frequency=Float64(get(s, "frequency", 1.0)),
+            phase=Float64(get(s, "phase", 0.0)),
         )
     elseif haskey(spec, "chirped_sinusoidal")
         c = spec["chirped_sinusoidal"]
         return ChirpedSinusoidalWaveform(;
-            center = Float64(get(c, "center", 0.0)),
-            amplitude = Float64(get(c, "amplitude", 1.0)),
-            freq_start = Float64(get(c, "freq_start", 0.0)),
-            freq_end = Float64(get(c, "freq_end", get(c, "freq_start", 0.0))),
-            duration = Float64(get(c, "duration", duration)),
-            phase = Float64(get(c, "phase", 0.0)),
+            center=Float64(get(c, "center", 0.0)),
+            amplitude=Float64(get(c, "amplitude", 1.0)),
+            freq_start=Float64(get(c, "freq_start", 0.0)),
+            freq_end=Float64(get(c, "freq_end", get(c, "freq_start", 0.0))),
+            duration=Float64(get(c, "duration", duration)),
+            phase=Float64(get(c, "phase", 0.0)),
         )
     elseif haskey(spec, "gaussian_pulse")
         g = spec["gaussian_pulse"]
         return GaussianPulseWaveform(;
-            center = Float64(get(g, "center", 0.0)),
-            amplitude = Float64(get(g, "amplitude", 1.0)),
-            t_center = Float64(get(g, "t_center", duration / 2)),
-            sigma = Float64(get(g, "sigma", 0.01)),
+            center=Float64(get(g, "center", 0.0)),
+            amplitude=Float64(get(g, "amplitude", 1.0)),
+            t_center=Float64(get(g, "t_center", duration / 2)),
+            sigma=Float64(get(g, "sigma", 0.01)),
         )
     elseif haskey(spec, "piecewise")
         p = spec["piecewise"]
@@ -138,7 +141,7 @@ function _make_waveform(spec, duration::Float64)
         # time/value column indices, scale, offset, delimiter, header flag.
         c = spec["csv"]
         path, opts = if c isa AbstractString
-            (String(c), Dict{String,Any}())
+            (String(c), Dict{String, Any}())
         elseif c isa Dict
             (String(c["path"]), c)
         else
@@ -147,17 +150,17 @@ function _make_waveform(spec, duration::Float64)
         # Resolve relative paths against the YAML file's directory when known
         # (ENV set by run_yaml / load_config). Otherwise treat as CWD.
         resolved = isabspath(path) ? path :
-            joinpath(get(ENV, "SPINORBEC_YAML_DIR", pwd()), path)
+                   joinpath(get(ENV, "SPINORBEC_YAML_DIR", pwd()), path)
         isfile(resolved) || throw(ArgumentError(
             "csv waveform path not found: $resolved"))
         w = load_waveform_csv(
             resolved;
-            time_col  = Int(get(opts, "time_col",  1)),
-            value_col = Int(get(opts, "value_col", 2)),
-            header    = Bool(get(opts, "header",  true)),
-            delimiter = first(String(get(opts, "delimiter", ","))),
+            time_col=Int(get(opts, "time_col", 1)),
+            value_col=Int(get(opts, "value_col", 2)),
+            header=Bool(get(opts, "header", true)),
+            delimiter=first(String(get(opts, "delimiter", ","))),
         )
-        scale  = Float64(get(opts, "scale",  1.0))
+        scale = Float64(get(opts, "scale", 1.0))
         offset = Float64(get(opts, "offset", 0.0))
         if scale != 1.0 || offset != 0.0
             n = length(w.times)
@@ -181,7 +184,7 @@ end
 Build the per-phase Zeeman object from override-applied raw YAML dict.
 """
 function _build_phase_zeeman(phase_raw::Dict, t_offset::Float64, duration::Float64;
-                              atom = nothing, p_step::Dict = Dict{String,Any}())
+    atom=nothing, p_step::Dict=Dict{String, Any}())
     gs = get(phase_raw, "ground_state", Dict())
     z = get(gs, "zeeman", Dict())
     z isa Dict || return ZeemanParams(0.0, 0.0)
@@ -223,8 +226,8 @@ function _build_phase_zeeman(phase_raw::Dict, t_offset::Float64, duration::Float
 end
 
 """Apply a time shift to a waveform by sampling into a PiecewiseLinearWaveform."""
-function _shift_waveform(wf::Waveform, t_offset::Float64, duration::Float64; n_samples::Int = 1024)
-    times = collect(range(0.0, duration; length = n_samples))
+function _shift_waveform(wf::Waveform, t_offset::Float64, duration::Float64; n_samples::Int=1024)
+    times = collect(range(0.0, duration; length=n_samples))
     values = Float64[evaluate(wf, t - t_offset) for t in times]
     PiecewiseLinearWaveform(times, values)
 end
@@ -255,12 +258,17 @@ end
 """Parse a potential spec (dict or list of dicts) and build the potential."""
 function _parse_and_build_potential(pot_d, ndim::Int)
     if pot_d isa Vector
-        components = [PotentialConfig(Symbol(get(c, "type", "harmonic")),
-            _to_string_keys(Dict(k => v for (k, v) in c if k != "type"))) for c in pot_d]
-        _build_potential(PotentialConfig(:composite, Dict{String,Any}("components" => components)), ndim)
+        components = [
+            PotentialConfig(Symbol(get(c, "type", "harmonic")),
+                _to_string_keys(Dict(k => v for (k, v) in c if k != "type"))) for c in pot_d
+        ]
+        _build_potential(
+            PotentialConfig(:composite, Dict{String, Any}("components" => components)), ndim
+        )
     else
-        _build_potential(PotentialConfig(Symbol(get(pot_d, "type", "harmonic")),
-            _to_string_keys(Dict(k => v for (k, v) in pot_d if k != "type"))), ndim)
+        _build_potential(
+            PotentialConfig(Symbol(get(pot_d, "type", "harmonic")),
+                _to_string_keys(Dict(k => v for (k, v) in pot_d if k != "type"))), ndim)
     end
 end
 
@@ -301,6 +309,10 @@ function _make_interpolator(spec)
     elseif scale == :reverse_sqrt
         return t -> from + (to - from) * t^2
     else
-        throw(ArgumentError("Unknown ramp scale: $scale. Supported: linear, log, sqrt, cosine, exponential, reverse_sqrt"))
+        throw(
+            ArgumentError(
+                "Unknown ramp scale: $scale. Supported: linear, log, sqrt, cosine, exponential, reverse_sqrt",
+            ),
+        )
     end
 end

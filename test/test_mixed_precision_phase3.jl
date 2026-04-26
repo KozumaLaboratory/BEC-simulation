@@ -12,36 +12,36 @@ using SpinorBEC
 
     # F64 reference
     grid_f64 = make_grid(cfg)
-    sp = SimParams(; dt = 0.01, n_steps = 200)
+    sp = SimParams(; dt=0.01, n_steps=200)
     ws_f64 = make_workspace(;
-        grid = grid_f64, atom = Rb87,
-        interactions = InteractionParams(5.0, 0.0),
-        zeeman = ZeemanParams(0.0, 0.1),
-        potential = HarmonicTrap(1.0, 1.0),
-        sim_params = sp,
+        grid=grid_f64, atom=Rb87,
+        interactions=InteractionParams(5.0, 0.0),
+        zeeman=ZeemanParams(0.0, 0.1),
+        potential=HarmonicTrap(1.0, 1.0),
+        sim_params=sp,
     )
     gs_f64 = find_ground_state(;
-        grid = grid_f64, atom = Rb87,
-        interactions = InteractionParams(5.0, 0.0),
-        zeeman = ZeemanParams(0.0, 0.1),
-        potential = HarmonicTrap(1.0, 1.0),
-        dt = 0.01, n_steps = 200, tol = 1e-7,
-        initial_state = :ferromagnetic,
+        grid=grid_f64, atom=Rb87,
+        interactions=InteractionParams(5.0, 0.0),
+        zeeman=ZeemanParams(0.0, 0.1),
+        potential=HarmonicTrap(1.0, 1.0),
+        dt=0.01, n_steps=200, tol=1e-7,
+        initial_state=:ferromagnetic,
     )
 
     # F32 path (Grid + plans only — Workspace-wide T parametrisation pending)
-    grid_f32 = make_grid(cfg; dtype = Float32)
+    grid_f32 = make_grid(cfg; dtype=Float32)
     @test eltype(grid_f32.x[1]) == Float32
 
     # Run F32 ITP via dtype kwarg
     gs_f32 = find_ground_state(;
-        grid = grid_f32, atom = Rb87,
-        interactions = InteractionParams(5.0, 0.0),
-        zeeman = ZeemanParams(0.0, 0.1),
-        potential = HarmonicTrap(1.0f0, 1.0f0),
-        dt = 0.01, n_steps = 200, tol = 1e-5,
-        initial_state = :ferromagnetic,
-        dtype = Float32,
+        grid=grid_f32, atom=Rb87,
+        interactions=InteractionParams(5.0, 0.0),
+        zeeman=ZeemanParams(0.0, 0.1),
+        potential=HarmonicTrap(1.0f0, 1.0f0),
+        dt=0.01, n_steps=200, tol=1e-5,
+        initial_state=:ferromagnetic,
+        dtype=Float32,
     )
 
     # ψ eltype should follow dtype

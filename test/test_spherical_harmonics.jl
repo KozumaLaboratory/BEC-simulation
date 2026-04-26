@@ -35,7 +35,7 @@
     @testset "Addition theorem: Σ_m |Y_{lm}|² = (2l+1)/(4π)" begin
         for l in 0:6
             theta = 0.8
-            total = sum(abs2(spherical_harmonic(l, m, theta, 0.0)) for m in -l:l)
+            total = sum(abs2(spherical_harmonic(l, m, theta, 0.0)) for m in (-l):l)
             @test total ≈ (2l + 1) / (4π) atol=1e-10
         end
     end
@@ -48,7 +48,7 @@
         dth = theta[2] - theta[1]
         dph = phi[2] - phi[1]
 
-        for l1 in 0:2, m1 in -l1:l1, l2 in 0:2, m2 in -l2:l2
+        for l1 in 0:2, m1 in (-l1):l1, l2 in 0:2, m2 in (-l2):l2
             integral = 0.0 + 0.0im
             for th in theta
                 for ph in phi

@@ -26,15 +26,15 @@ using Dates: Date
 struct CoilCalibration
     gauss_per_mv::Float64
     gauss_offset::Float64           # residual field at 0 mV [G]
-    valid_range_mv::NTuple{2,Float64}
+    valid_range_mv::NTuple{2, Float64}
 end
 
 CoilCalibration() = CoilCalibration(0.0, 0.0, (-Inf, Inf))
 
 struct FORTCalibration
     # ω_axis(Hz) = sqrt_coeffs[axis] * sqrt(P_mW) + offsets[axis]
-    sqrt_coeffs_hz::NTuple{3,Float64}
-    offsets_hz::NTuple{3,Float64}
+    sqrt_coeffs_hz::NTuple{3, Float64}
+    offsets_hz::NTuple{3, Float64}
 end
 
 FORTCalibration() = FORTCalibration((0.0, 0.0, 0.0), (0.0, 0.0, 0.0))
@@ -59,13 +59,13 @@ Placeholder calibration. Values are illustrative — replace with site-measured
 constants before using for real experiments. Prefer `load_calibration("...")`
 from a YAML file checked in per epoch.
 """
-const DEFAULT_CALIBRATION = CalibrationSet(
-    epoch = "placeholder",
-    date = "2026-04-24",
-    coil_strong = CoilCalibration(0.4, 0.05, (-1000.0, 1000.0)),
-    coil_weak = CoilCalibration(0.04, 0.002, (-100.0, 100.0)),
-    fort = FORTCalibration((450.0, 450.0, 600.0), (0.0, 0.0, 0.0)),
-    microwave = RabiCalibration(1.2e6),
+const DEFAULT_CALIBRATION = CalibrationSet(;
+    epoch="placeholder",
+    date="2026-04-24",
+    coil_strong=CoilCalibration(0.4, 0.05, (-1000.0, 1000.0)),
+    coil_weak=CoilCalibration(0.04, 0.002, (-100.0, 100.0)),
+    fort=FORTCalibration((450.0, 450.0, 600.0), (0.0, 0.0, 0.0)),
+    microwave=RabiCalibration(1.2e6),
 )
 
 # --- Conversions ---
@@ -95,9 +95,9 @@ function load_calibration(path::AbstractString)
 end
 
 function _calibration_from_dict(d::Dict)
-    kwargs = Dict{Symbol,Any}()
+    kwargs = Dict{Symbol, Any}()
     haskey(d, "epoch") && (kwargs[:epoch] = String(d["epoch"]))
-    haskey(d, "date")  && (kwargs[:date]  = String(d["date"]))
+    haskey(d, "date") && (kwargs[:date] = String(d["date"]))
     if haskey(d, "coil_strong")
         kwargs[:coil_strong] = _parse_coil(d["coil_strong"])
     end
@@ -134,7 +134,7 @@ function _parse_fort(d::Dict)
     o = Tuple(Float64(x) for x in get(d, "offsets_hz", [0.0, 0.0, 0.0]))
     length(c) == 3 || throw(ArgumentError("fort.sqrt_coeffs_hz must have length 3"))
     length(o) == 3 || throw(ArgumentError("fort.offsets_hz must have length 3"))
-    FORTCalibration(NTuple{3,Float64}(c), NTuple{3,Float64}(o))
+    FORTCalibration(NTuple{3, Float64}(c), NTuple{3, Float64}(o))
 end
 
 # --- Apply to raw YAML config dict ---
@@ -164,7 +164,7 @@ Recognized conventions:
 
 Returns the (mutated) `config`.
 """
-function apply_calibration!(config::Dict, calib::CalibrationSet = DEFAULT_CALIBRATION)
+function apply_calibration!(config::Dict, calib::CalibrationSet=DEFAULT_CALIBRATION)
     _calibrate_recurse!(config, calib)
     config
 end
@@ -188,7 +188,7 @@ end
 function _pick_coil(node::Dict, calib::CalibrationSet)
     mode = Symbol(get(node, "coil_mode", "strong"))
     mode === :strong && return calib.coil_strong
-    mode === :weak   && return calib.coil_weak
+    mode === :weak && return calib.coil_weak
     throw(ArgumentError("calibration: unknown coil_mode=$(mode) (expected :strong or :weak)"))
 end
 
@@ -206,11 +206,12 @@ function _calibrate_zeeman_node!(node::Dict, calib::CalibrationSet)
         delete!(node, "q_mv")
     end
     # coil_mode was only meaningful alongside the lab-unit fields; drop it.
-    (haskey(node, "coil_mode") && !haskey(node, "p") && !haskey(node, "q")) && delete!(node, "coil_mode")
+    (haskey(node, "coil_mode") && !haskey(node, "p") && !haskey(node, "q")) &&
+        delete!(node, "coil_mode")
 end
 
 function _calibrate_trap_node!(node::Dict, calib::CalibrationSet)
-    haskey(node, "fort_power_mw") || return
+    haskey(node, "fort_power_mw") || return nothing
     pw = node["fort_power_mw"]
     if pw isa AbstractVector
         freqs_hz = [fort_mw_to_trap_hz(Float64(pw[i]), i, calib.fort)
@@ -224,10 +225,11 @@ function _calibrate_trap_node!(node::Dict, calib::CalibrationSet)
 end
 
 function _calibrate_raman_node!(node::Dict, calib::CalibrationSet)
-    haskey(node, "power_mw") || return
-    is_raman = haskey(node, "detuning") || haskey(node, "delta") ||
-               get(node, "_kind", "") == "raman"
-    is_raman || return
+    haskey(node, "power_mw") || return nothing
+    is_raman =
+        haskey(node, "detuning") || haskey(node, "delta") ||
+        get(node, "_kind", "") == "raman"
+    is_raman || return nothing
     mw = Float64(node["power_mw"])
     node["Omega"] = "$(rabi_mw_to_rad_s(mw, calib.microwave)) rad/s"
     delete!(node, "power_mw")
@@ -274,7 +276,10 @@ function load_calibration_csv(path::AbstractString)
     isempty(lines) && throw(ArgumentError("calibration CSV $path is empty"))
     sep = occursin('\t', lines[1]) ? '\t' : ','
     header = String.(strip.(split(lines[1], sep)))
-    col(name) = let i = findfirst(==(name), header); i === nothing ? nothing : i; end
+    col(name) =
+        let i = findfirst(==(name), header);
+            i === nothing ? nothing : i;
+        end
 
     dates = Date[]
     entries = CalibrationSet[]
@@ -285,9 +290,10 @@ function load_calibration_csv(path::AbstractString)
         i_date = col("date")
         i_date === nothing && throw(ArgumentError("CSV needs a `date` column"))
         push!(dates, Date(cells[i_date]))
-        getf(name, default=0.0) = let i = col(name)
-            i === nothing || isempty(cells[i]) ? default : parse(Float64, cells[i])
-        end
+        getf(name, default=0.0) =
+            let i = col(name)
+                i === nothing || isempty(cells[i]) ? default : parse(Float64, cells[i])
+            end
         cs_strong = CoilCalibration(
             getf("coil_strong_gauss_per_mv"),
             getf("coil_strong_gauss_offset"),
@@ -303,14 +309,17 @@ function load_calibration_csv(path::AbstractString)
             (0.0, 0.0, 0.0),
         )
         mw = RabiCalibration(getf("microwave_rad_per_s_per_mw"))
-        push!(entries, CalibrationSet(
-            epoch = "csv_row",
-            date = cells[i_date],
-            coil_strong = cs_strong,
-            coil_weak = cs_weak,
-            fort = fort,
-            microwave = mw,
-        ))
+        push!(
+            entries,
+            CalibrationSet(
+                epoch="csv_row",
+                date=cells[i_date],
+                coil_strong=cs_strong,
+                coil_weak=cs_weak,
+                fort=fort,
+                microwave=mw,
+            ),
+        )
     end
     perm = sortperm(dates)
     CalibrationHistory(dates[perm], entries[perm])
@@ -349,27 +358,29 @@ function interpolate_calibration(hist::CalibrationHistory, target::Date)
     end
     # Find the bracket [i, i+1]
     i = searchsortedlast(hist.dates, target)
-    d_lo = hist.dates[i]; d_hi = hist.dates[i + 1]
+    d_lo = hist.dates[i];
+    d_hi = hist.dates[i + 1]
     a = (Float64((target - d_lo).value)) / Float64((d_hi - d_lo).value)
-    lo = hist.entries[i]; hi = hist.entries[i + 1]
-    interp = CalibrationSet(
-        epoch = "interp[$(d_lo)..$(d_hi) @ $(target)]",
-        date  = string(target),
-        coil_strong = _interp_coil(lo.coil_strong, hi.coil_strong, a),
-        coil_weak   = _interp_coil(lo.coil_weak,   hi.coil_weak,   a),
-        fort        = _interp_fort(lo.fort,        hi.fort,        a),
-        microwave   = RabiCalibration(
+    lo = hist.entries[i];
+    hi = hist.entries[i + 1]
+    interp = CalibrationSet(;
+        epoch="interp[$(d_lo)..$(d_hi) @ $(target)]",
+        date=string(target),
+        coil_strong=_interp_coil(lo.coil_strong, hi.coil_strong, a),
+        coil_weak=_interp_coil(lo.coil_weak, hi.coil_weak, a),
+        fort=_interp_fort(lo.fort, hi.fort, a),
+        microwave=RabiCalibration(
             (1 - a) * lo.microwave.rad_per_s_per_mw + a * hi.microwave.rad_per_s_per_mw),
     )
     interp
 end
 
 function _stamped(cs::CalibrationSet, target::Date)
-    CalibrationSet(
-        epoch = "$(cs.epoch) (clamped to $(target))",
-        date  = string(target),
-        coil_strong = cs.coil_strong, coil_weak = cs.coil_weak,
-        fort = cs.fort, microwave = cs.microwave,
+    CalibrationSet(;
+        epoch="$(cs.epoch) (clamped to $(target))",
+        date=string(target),
+        coil_strong=cs.coil_strong, coil_weak=cs.coil_weak,
+        fort=cs.fort, microwave=cs.microwave,
     )
 end
 
@@ -378,7 +389,7 @@ function _interp_coil(a_c::CoilCalibration, b_c::CoilCalibration, a::Float64)
         (1 - a) * a_c.gauss_per_mv + a * b_c.gauss_per_mv,
         (1 - a) * a_c.gauss_offset + a * b_c.gauss_offset,
         (max(a_c.valid_range_mv[1], b_c.valid_range_mv[1]),
-         min(a_c.valid_range_mv[2], b_c.valid_range_mv[2])),
+            min(a_c.valid_range_mv[2], b_c.valid_range_mv[2])),
     )
 end
 
@@ -400,9 +411,9 @@ Calibration source precedence:
 3. `DEFAULT_CALIBRATION` (placeholder — warns).
 """
 function run_yaml_calibrated(path::AbstractString;
-                              calibration_path::Union{Nothing,AbstractString} = nothing,
-                              base_dir::AbstractString = pwd(),
-                              kwargs...)
+    calibration_path::Union{Nothing, AbstractString}=nothing,
+    base_dir::AbstractString=pwd(),
+    kwargs...)
     raw = YAML.load_file(String(path))
     calib = if calibration_path !== nothing
         load_calibration(String(calibration_path))
@@ -416,8 +427,8 @@ function run_yaml_calibrated(path::AbstractString;
     tmpfile = tempname() * ".yaml"
     YAML.write_file(tmpfile, raw)
     try
-        run_yaml(tmpfile; base_dir = base_dir, kwargs...)
+        run_yaml(tmpfile; base_dir=base_dir, kwargs...)
     finally
-        rm(tmpfile; force = true)
+        rm(tmpfile; force=true)
     end
 end

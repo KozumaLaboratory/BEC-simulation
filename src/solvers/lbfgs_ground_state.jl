@@ -25,7 +25,7 @@ function energy_gradient!(
     grad::AbstractArray{<:Complex},
     psi::AbstractArray{<:Complex},
     ws::Workspace{N};
-    k_squared_dev::AbstractArray{<:AbstractFloat} = ws.grid.k_squared,
+    k_squared_dev::AbstractArray{<:AbstractFloat}=ws.grid.k_squared,
 ) where {N}
     grid = ws.grid
     n_comp = ws.spin_matrices.system.n_components
@@ -41,7 +41,7 @@ function energy_gradient!(
 
     # --- Kinetic: (-∇²/2) ψ via FFT ---
     fft_buf = similar(psi, ComplexF64, n_pts)
-    for c = 1:D
+    for c in 1:D
         idx = _component_slice(N, n_pts, c)
         fft_buf .= view(psi, idx...)
         ws.fft_plans.forward * fft_buf
@@ -51,7 +51,7 @@ function energy_gradient!(
     end
 
     # --- Trap potential: V_trap ψ ---
-    for c = 1:D
+    for c in 1:D
         idx = _component_slice(N, n_pts, c)
         view(grad, idx...) .+= ws.potential_values .* view(psi, idx...)
     end
@@ -59,7 +59,7 @@ function energy_gradient!(
     # --- Zeeman ---
     zee = zeeman_at(ws.zeeman, ws.state.t)
     zee_vals = zeeman_energies(zee, ws.spin_matrices.system)
-    for c = 1:D
+    for c in 1:D
         idx = _component_slice(N, n_pts, c)
         view(grad, idx...) .+= zee_vals[c] .* view(psi, idx...)
     end
@@ -68,7 +68,7 @@ function energy_gradient!(
     n_density = total_density(psi, N)
     c0 = ws.interactions.c0
     if abs(c0) > 1e-30
-        for c = 1:D
+        for c in 1:D
             idx = _component_slice(N, n_pts, c)
             view(grad, idx...) .+= c0 .* n_density .* view(psi, idx...)
         end
@@ -78,7 +78,7 @@ function energy_gradient!(
     c_lhy_val = ws.interactions.c_lhy
     if c_lhy_val != 0.0
         v_lhy = c_lhy_val .* n_density .* sqrt.(max.(n_density, 0.0))
-        for c = 1:D
+        for c in 1:D
             idx = _component_slice(N, n_pts, c)
             view(grad, idx...) .+= v_lhy .* view(psi, idx...)
         end
@@ -94,13 +94,13 @@ function energy_gradient!(
         fz = similar(psi, Float64, n_pts)
         _compute_spin_density!(fx, fy, fz, psi, sm, Val(D), N, n_pts)
         # Fz part (diagonal)
-        for c = 1:D
+        for c in 1:D
             idx = _component_slice(N, n_pts, c)
             m = Float64(F - (c - 1))
             view(grad, idx...) .+= c1 .* m .* fz .* view(psi, idx...)
         end
         # F+/F- parts (tridiagonal)
-        for c = 2:D
+        for c in 2:D
             idx_c = _component_slice(N, n_pts, c)
             idx_cm1 = _component_slice(N, n_pts, c - 1)
             fp = sqrt(Float64(F * (F + 1) - (F - c + 1) * (F - c + 2)))
@@ -115,15 +115,15 @@ function energy_gradient!(
         ls = ws.light_shift
         profile = _to_host(ls.profile)
         if ls.is_diagonal
-            for c = 1:D
+            for c in 1:D
                 idx = _component_slice(N, n_pts, c)
                 view(grad, idx...) .+= ls.eigvals[c] .* profile .* view(psi, idx...)
             end
         else
             M_full = ls.U * Diagonal(ls.eigvals) * ls.U'
-            for c = 1:D
+            for c in 1:D
                 idx_c = _component_slice(N, n_pts, c)
-                for c2 = 1:D
+                for c2 in 1:D
                     abs(M_full[c, c2]) < 1e-30 && continue
                     idx_c2 = _component_slice(N, n_pts, c2)
                     view(grad, idx_c...) .+= M_full[c, c2] .* profile .* view(psi, idx_c2...)
@@ -145,13 +145,13 @@ function energy_gradient!(
         phi_z = bufs.Phi_z
 
         # Fz part
-        for c = 1:D
+        for c in 1:D
             idx = _component_slice(N, n_pts, c)
             m = Float64(F - (c - 1))
             view(grad, idx...) .+= m .* phi_z .* view(psi, idx...)
         end
         # F+/F- parts
-        for c = 2:D
+        for c in 2:D
             idx_c = _component_slice(N, n_pts, c)
             idx_cm1 = _component_slice(N, n_pts, c - 1)
             fp = sqrt(Float64(F * (F + 1) - (F - c + 1) * (F - c + 2)))
@@ -177,7 +177,7 @@ function _project_constraints!(
     grad::AbstractArray{<:Complex},
     psi::AbstractArray{<:Complex},
     grid::Grid{N},
-    target_Mz::Union{Nothing,Float64},
+    target_Mz::Union{Nothing, Float64},
     F::Int,
 ) where {N}
     dV = cell_volume(grid)
@@ -193,7 +193,7 @@ function _project_constraints!(
     if target_Mz !== nothing
         mz_grad = 0.0
         mz_norm = 0.0
-        for c = 1:D
+        for c in 1:D
             m = Float64(F - (c - 1))
             idx = _component_slice(N, n_pts, c)
             gc = view(grad, idx...)
@@ -203,7 +203,7 @@ function _project_constraints!(
         end
         if mz_norm > 1e-30
             λ = mz_grad / mz_norm
-            for c = 1:D
+            for c in 1:D
                 m = Float64(F - (c - 1))
                 idx = _component_slice(N, n_pts, c)
                 view(grad, idx...) .-= λ * m .* view(psi, idx...)
@@ -220,28 +220,28 @@ Find ground state by direct energy minimization using L-BFGS on the
 constraint manifold {‖ψ‖²=1}.
 """
 function find_ground_state_lbfgs(;
-    grid::Union{Nothing,Grid} = nothing,
-    atom::Union{Nothing,AtomSpecies} = nothing,
-    interactions::InteractionParams = InteractionParams(0.0, 0.0),
-    zeeman::Union{ZeemanParams,TimeDependentZeeman} = ZeemanParams(0.0, 0.0),
-    potential::AbstractPotential = NoPotential(),
-    n_steps::Int = 1000,
-    tol::Float64 = 1e-8,
-    initial_state::Symbol = :polar,
-    init_state_params::Dict{Symbol,Float64} = Dict{Symbol,Float64}(),
-    psi_init::Union{Nothing,AbstractArray} = nothing,
-    ws_init::Union{Nothing,Workspace} = nothing,
-    enable_ddi::Bool = false,
-    c_dd::Float64 = NaN,
-    secular_ddi::Bool = false,
-    quasi_2d_ddi::Bool = false,
-    l_z_ddi::Float64 = 0.0,
-    target_magnetization::Union{Nothing,Float64} = nothing,
-    backend::AbstractBackend = CPUBackend(),
-    m_lbfgs::Int = 10,
-    verbose::Bool = true,
-    light_shift::Union{Nothing,LightShift} = nothing,
-    dtype::Union{Nothing,Type{<:AbstractFloat}} = nothing,
+    grid::Union{Nothing, Grid}=nothing,
+    atom::Union{Nothing, AtomSpecies}=nothing,
+    interactions::InteractionParams=InteractionParams(0.0, 0.0),
+    zeeman::Union{ZeemanParams, TimeDependentZeeman}=ZeemanParams(0.0, 0.0),
+    potential::AbstractPotential=NoPotential(),
+    n_steps::Int=1000,
+    tol::Float64=1e-8,
+    initial_state::Symbol=:polar,
+    init_state_params::Dict{Symbol, Float64}=Dict{Symbol, Float64}(),
+    psi_init::Union{Nothing, AbstractArray}=nothing,
+    ws_init::Union{Nothing, Workspace}=nothing,
+    enable_ddi::Bool=false,
+    c_dd::Float64=NaN,
+    secular_ddi::Bool=false,
+    quasi_2d_ddi::Bool=false,
+    l_z_ddi::Float64=0.0,
+    target_magnetization::Union{Nothing, Float64}=nothing,
+    backend::AbstractBackend=CPUBackend(),
+    m_lbfgs::Int=10,
+    verbose::Bool=true,
+    light_shift::Union{Nothing, LightShift}=nothing,
+    dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
 )
     # F32 gradient norm floors around unit roundoff (~1e-7 scaled by grid dV).
     # Relax the default convergence test so F32 runs don't burn all n_steps.
@@ -269,10 +269,14 @@ function find_ground_state_lbfgs(;
         end
     else
         (grid === nothing || atom === nothing) &&
-            throw(ArgumentError("find_ground_state_lbfgs requires either ws_init, or both grid and atom"))
+            throw(
+                ArgumentError(
+                    "find_ground_state_lbfgs requires either ws_init, or both grid and atom"
+                ),
+            )
         sys = SpinSystem(atom.F)
         if psi_init === nothing
-            init_kwargs = Dict{Symbol,Any}(:state => initial_state)
+            init_kwargs = Dict{Symbol, Any}(:state => initial_state)
             for (k, v) in init_state_params
                 init_kwargs[k] = v
             end
@@ -280,10 +284,10 @@ function find_ground_state_lbfgs(;
             psi_init = init_psi(grid, sys; init_kwargs...)
         end
         sp = SimParams(; dt=0.001, n_steps, imaginary_time=true,
-                       save_every=max(1, n_steps ÷ 100))
+            save_every=max(1, n_steps ÷ 100))
         ws = make_workspace(;
             grid, atom, interactions, zeeman, potential,
-            sim_params = sp, psi_init,
+            sim_params=sp, psi_init,
             enable_ddi, c_dd, secular_ddi, quasi_2d_ddi, l_z_ddi, backend,
             light_shift, dtype,
         )
@@ -311,7 +315,7 @@ function find_ground_state_lbfgs(;
     last_step = 0
     t_start = time()
 
-    for step = 1:n_steps
+    for step in 1:n_steps
         # Gradient at current psi
         E = energy_gradient!(grad, psi, ws; k_squared_dev)
         _project_constraints!(grad, psi, grid, target_magnetization, F)
@@ -351,11 +355,15 @@ function find_ground_state_lbfgs(;
         end
 
         # Line search: pure energy decrease (no slope condition — safe on manifold)
-        α, E_trial = _line_search_energy_decrease(psi, direction, E, ws, grid, dV, target_magnetization, F)
+        α, E_trial = _line_search_energy_decrease(
+            psi, direction, E, ws, grid, dV, target_magnetization, F
+        )
 
         # Line search failed — reset L-BFGS and try steepest descent next
         if α == 0.0
-            empty!(s_hist); empty!(y_hist); empty!(rho_hist)
+            empty!(s_hist);
+            empty!(y_hist);
+            empty!(rho_hist)
             E_prev = E
             last_step = step
             continue
@@ -369,7 +377,9 @@ function find_ground_state_lbfgs(;
         norm_sq = sum(abs2, psi) * dV
         psi ./= sqrt(norm_sq)
         if target_magnetization !== nothing
-            _normalize_psi_constrained!(psi, grid, D, length(grid.config.n_points), target_magnetization, F)
+            _normalize_psi_constrained!(
+                psi, grid, D, length(grid.config.n_points), target_magnetization, F
+            )
         end
 
         # Gradient at new psi
@@ -384,10 +394,14 @@ function find_ground_state_lbfgs(;
             push!(y_hist, copy(y_k))
             push!(rho_hist, 1.0 / ys)
             if length(s_hist) > m_lbfgs
-                popfirst!(s_hist); popfirst!(y_hist); popfirst!(rho_hist)
+                popfirst!(s_hist);
+                popfirst!(y_hist);
+                popfirst!(rho_hist)
             end
         else
-            empty!(s_hist); empty!(y_hist); empty!(rho_hist)
+            empty!(s_hist);
+            empty!(y_hist);
+            empty!(rho_hist)
         end
 
         E_prev = E_trial
@@ -398,11 +412,11 @@ function find_ground_state_lbfgs(;
     E_final = total_energy(ws)
 
     (
-        workspace = ws,
-        converged = converged,
-        energy = E_final,
-        dE = abs(E_final - E_prev),
-        last_step = last_step,
+        workspace=ws,
+        converged=converged,
+        energy=E_final,
+        dE=abs(E_final - E_prev),
+        last_step=last_step,
     )
 end
 
@@ -415,7 +429,7 @@ function _lbfgs_direction(
     m = length(rho_hist)
     alphas = zeros(m)
 
-    for i = m:-1:1
+    for i in m:-1:1
         alphas[i] = rho_hist[i] * real(sum(conj.(s_hist[i]) .* q))
         q .-= alphas[i] .* y_hist[i]
     end
@@ -427,7 +441,7 @@ function _lbfgs_direction(
         q .*= γ
     end
 
-    for i = 1:m
+    for i in 1:m
         β = rho_hist[i] * real(sum(conj.(y_hist[i]) .* q))
         q .+= (alphas[i] - β) .* s_hist[i]
     end
@@ -443,14 +457,14 @@ Armijo unreliable on the sphere.
 """
 function _line_search_energy_decrease(
     psi, direction, E0, ws, grid, dV, target_Mz, F;
-    α_init::Float64 = 0.01, shrink::Float64 = 0.5, max_iter::Int = 30,
+    α_init::Float64=0.01, shrink::Float64=0.5, max_iter::Int=30,
 )
     D = 2F + 1
     N_dim = length(grid.config.n_points)
     psi_trial = similar(psi)
 
     α = α_init
-    for _ = 1:max_iter
+    for _ in 1:max_iter
         psi_trial .= psi .+ α .* direction
         # Retraction: normalize back to manifold
         norm_sq = sum(abs2, psi_trial) * dV

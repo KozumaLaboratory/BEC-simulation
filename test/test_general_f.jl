@@ -1,5 +1,4 @@
 @testset "General-F interactions" begin
-
     @testset "AtomSpecies backward compatibility" begin
         a = AtomSpecies("test", 1.0, 1, 0.1, 0.2)
         @test a.mu_mag == 0.0
@@ -85,7 +84,7 @@
     end
 
     @testset "Empty scattering_lengths returns nothing" begin
-        cache = make_tensor_interaction_cache(2, Dict{Int,Float64}(); dims=3)
+        cache = make_tensor_interaction_cache(2, Dict{Int, Float64}(); dims=3)
         @test cache === nothing
     end
 end

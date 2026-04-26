@@ -3,7 +3,6 @@ using SpinorBEC
 using LinearAlgebra
 
 @testset "Level 0: Propagator Unit Tests" begin
-
     @testset "kinetic propagator: free Gaussian spreading" begin
         # ℏ = m = 1 (dimensionless units)
         # ψ(x,0) ∝ exp(-x²/(2σ₀²)), density variance ⟨x²⟩ = σ₀²/2
@@ -140,5 +139,4 @@ using LinearAlgebra
         n_m0 = component_density(psi, 1, 2)
         @test maximum(n_m0) < 1e-28
     end
-
 end

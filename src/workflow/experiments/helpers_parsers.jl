@@ -67,15 +67,19 @@ _to_float_vec(v::Vector) = Float64[Float64(x) for x in v]
 _to_float_vec(v) = Float64[Float64(v)]
 
 """Convert all keys in a dict to String."""
-_to_string_keys(d::Dict) = Dict{String,Any}(string(k) => v for (k, v) in d)
+_to_string_keys(d::Dict) = Dict{String, Any}(string(k) => v for (k, v) in d)
 
 """Get an optional Float64 from a dict, returning nothing if key is absent."""
 _get_optional_float(d::Dict, key::String) =
-    let v = get(d, key, nothing); v === nothing ? nothing : Float64(v) end
+    let v = get(d, key, nothing);
+        v === nothing ? nothing : Float64(v)
+    end
 
 """Get an optional Int from a dict, returning nothing if key is absent."""
 _get_optional_int(d::Dict, key::String) =
-    let v = get(d, key, nothing); v === nothing ? nothing : Int(v) end
+    let v = get(d, key, nothing);
+        v === nothing ? nothing : Int(v)
+    end
 
 """
 Parse c_extra (c2, c3, c4, ...) from a YAML interactions dict. Handles sparse keys
@@ -91,15 +95,15 @@ function _parse_c_extra(inter::Dict, ::Int)
     end
     max_n < 2 && return Float64[]
     c_extra = zeros(Float64, max_n - 1)
-    for n = 2:max_n
-        haskey(inter, "c$n") && (c_extra[n-1] = Float64(inter["c$n"]))
+    for n in 2:max_n
+        haskey(inter, "c$n") && (c_extra[n - 1] = Float64(inter["c$n"]))
     end
     c_extra
 end
 
 function _parse_potential_config(d::Dict)
     t = Symbol(get(d, "type", "none"))
-    params = Dict{String,Any}()
+    params = Dict{String, Any}()
     for (k, v) in d
         k == "type" && continue
         params[k] = v
@@ -109,12 +113,14 @@ end
 
 function _parse_potential_config(v::Vector)
     components = [_parse_potential_config(d) for d in v]
-    PotentialConfig(:composite, Dict{String,Any}("components" => components))
+    PotentialConfig(:composite, Dict{String, Any}("components" => components))
 end
 
-_parse_ramp_or_constant(v::Dict) = haskey(v, "to") ?
-    LinearRamp(Float64(v["from"]), Float64(v["to"])) :
+_parse_ramp_or_constant(v::Dict) = if haskey(v, "to")
+    LinearRamp(Float64(v["from"]), Float64(v["to"]))
+else
     ConstantValue(Float64(v["from"]))
+end
 _parse_ramp_or_constant(v) = ConstantValue(Float64(v))
 
 """
@@ -138,9 +144,9 @@ with n0 = N_atoms / a_ho³ and a_ho = √(ℏ / (m·ω_ref)).
 """
 function _parse_loss_params(
     node;
-    atom::Union{Nothing,AtomSpecies} = nothing,
-    N_atoms::Union{Nothing,Real} = nothing,
-    omega_ref::Union{Nothing,Real} = nothing,
+    atom::Union{Nothing, AtomSpecies}=nothing,
+    N_atoms::Union{Nothing, Real}=nothing,
+    omega_ref::Union{Nothing, Real}=nothing,
 )
     node === nothing && return nothing
     node isa Bool && (node || return nothing; return nothing)
@@ -157,8 +163,10 @@ function _parse_loss_params(
     end
     # SI-unit per-m K3 — convert to dimless using atom/N/ω_ref
     if haskey(node, "K3_per_m_si")
-        atom === nothing && throw(ArgumentError(
-            "K3_per_m_si requires atom information (passed via dynamics step parsing)"))
+        atom === nothing && throw(
+            ArgumentError(
+                "K3_per_m_si requires atom information (passed via dynamics step parsing)"),
+        )
         N_atoms === nothing && throw(ArgumentError(
             "K3_per_m_si requires interactions.N_atoms"))
         omega_ref === nothing && throw(ArgumentError(
@@ -182,7 +190,7 @@ function _parse_loss_params(
     evap_rate = Float64(get(node, "evap_rate", 0.0))
 
     LossParams(; gamma_dr, L3, L3_per_m, K3_cubic, K3_per_m_cubic,
-                 evap_energy_cutoff, evap_rate)
+        evap_energy_cutoff, evap_rate)
 end
 
 # --- Scan parsing helpers ---
@@ -191,12 +199,12 @@ function _parse_override_scan(d::Dict)
     points = expand_scan_points(d)
 
     comparison_runs = if haskey(d, "comparison_runs")
-        Tuple{String,Dict{String,Any}}[
+        Tuple{String, Dict{String, Any}}[
             (String(r["name"]), parse_override_map(get(r, "override", Dict())))
             for r in d["comparison_runs"]
         ]
     else
-        Tuple{String,Dict{String,Any}}[]
+        Tuple{String, Dict{String, Any}}[]
     end
 
     continuation = Bool(get(d, "continuation", false))
@@ -224,12 +232,12 @@ Resolve derived parameters from N_atoms + omega_ref.
 Auto-derives c_lhy (Lima-Pelster Q5) and logs all derived values.
 Explicit values in the YAML override auto-derived ones.
 """
-function _resolve_derived_params!(p::Dict, atom; verbose::Bool = true)
+function _resolve_derived_params!(p::Dict, atom; verbose::Bool=true)
     inter = get(p, "interactions", Dict())
-    inter isa Dict || return
+    inter isa Dict || return nothing
     N_raw = get(inter, "N_atoms", nothing)
     ω_raw = get(inter, "omega_ref", nothing)
-    (N_raw === nothing || ω_raw === nothing) && return
+    (N_raw === nothing || ω_raw === nothing) && return nothing
 
     N_atoms = Int(N_raw)
     omega_ref = Float64(ω_raw)
@@ -241,7 +249,7 @@ function _resolve_derived_params!(p::Dict, atom; verbose::Bool = true)
     # c_dd: derive if not explicitly specified
     ddi_d = get(p, "ddi", nothing)
     if ddi_d === true
-        p["ddi"] = Dict{String,Any}("enabled" => true)
+        p["ddi"] = Dict{String, Any}("enabled" => true)
         ddi_d = p["ddi"]
     end
     c_dd_val = NaN
@@ -279,11 +287,13 @@ function _resolve_derived_params!(p::Dict, atom; verbose::Bool = true)
     if verbose
         c_lhy_val = Float64(get(inter, "c_lhy", 0.0))
         l_z_val = ddi_d isa Dict ? Float64(get(ddi_d, "l_z", 0.0)) : 0.0
-        println("  Derived: c_total=$(round(c_total; digits=1))" *
-                " c_dd=$(isnan(c_dd_val) ? "N/A" : string(round(c_dd_val; digits=1)))" *
-                " c_lhy=$(round(c_lhy_val; digits=1))" *
-                " ε_dd=$(round(eps_dd; digits=4))" *
-                (l_z_val > 0 ? " l_z=$(round(l_z_val; digits=4))" : ""))
+        println(
+            "  Derived: c_total=$(round(c_total; digits=1))" *
+            " c_dd=$(isnan(c_dd_val) ? "N/A" : string(round(c_dd_val; digits=1)))" *
+            " c_lhy=$(round(c_lhy_val; digits=1))" *
+            " ε_dd=$(round(eps_dd; digits=4))" *
+            (l_z_val > 0 ? " l_z=$(round(l_z_val; digits=4))" : ""),
+        )
     end
 end
 
@@ -318,7 +328,7 @@ function _parse_gs_ddi(ddi_d, inter, atom)
     if isempty(ddi_d) || ddi_d === nothing
         return (false, NaN, false, false, 0.0)
     end
-    ddi_d = ddi_d isa Dict ? ddi_d : Dict{String,Any}("enabled" => ddi_d)
+    ddi_d = ddi_d isa Dict ? ddi_d : Dict{String, Any}("enabled" => ddi_d)
     enabled = Bool(get(ddi_d, "enabled", false))
     c_dd_raw = get(ddi_d, "c_dd", nothing)
     c_dd = if c_dd_raw isa Dict
@@ -326,7 +336,7 @@ function _parse_gs_ddi(ddi_d, inter, atom)
     elseif c_dd_raw !== nothing
         Float64(c_dd_raw)
     elseif haskey(inter, "N_atoms") && haskey(inter, "omega_ref")
-        compute_c_dd_dimless(atom; N_atoms = Int(inter["N_atoms"]), omega_ref = Float64(inter["omega_ref"]))
+        compute_c_dd_dimless(atom; N_atoms=Int(inter["N_atoms"]), omega_ref=Float64(inter["omega_ref"]))
     else
         NaN
     end
@@ -381,8 +391,8 @@ function _setup_grid_from_params(p::Dict)
     ndim = length(n_pts)
     T = _parse_dtype(get(p, "dtype", "float64"))
     grid = make_grid(
-        GridConfig(NTuple{ndim,Int}(n_pts), NTuple{ndim,Float64}(box_size));
-        dtype = T,
+        GridConfig(NTuple{ndim, Int}(n_pts), NTuple{ndim, Float64}(box_size));
+        dtype=T,
     )
     (grid, ndim)
 end

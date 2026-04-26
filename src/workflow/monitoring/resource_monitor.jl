@@ -21,7 +21,7 @@ function ResourceMonitor(; enabled::Bool=true)
         gpu_available,
         Float64[],
         Float64[],
-        time()
+        time(),
     )
 end
 
@@ -116,10 +116,10 @@ function get_gpu_usage()
             mem_pct = (mem_used / mem_total) * 100
 
             return (
-                usage = 0.0,  # Would need nvidia-smi parsing
-                memory_used = mem_used,
-                memory_total = mem_total,
-                memory_pct = mem_pct
+                usage=0.0,  # Would need nvidia-smi parsing
+                memory_used=mem_used,
+                memory_total=mem_total,
+                memory_pct=mem_pct,
             )
         catch
         end
@@ -129,12 +129,12 @@ function get_gpu_usage()
 end
 
 function update!(monitor::ResourceMonitor)
-    !monitor.enabled && return
+    !monitor.enabled && return nothing
 
     # Throttle updates (at most once per second)
     t_now = time()
     if t_now - monitor.last_check < 1.0
-        return
+        return nothing
     end
     monitor.last_check = t_now
 

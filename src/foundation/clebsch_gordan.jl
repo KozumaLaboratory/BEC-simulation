@@ -5,7 +5,7 @@ function _log_factorial(n::Int)
     n < 0 && return -Inf
     n <= 1 && return 0.0
     s = 0.0
-    for i = 2:n
+    for i in 2:n
         s += log(i)
     end
     s
@@ -51,7 +51,7 @@ function wigner_3j(j1::Int, j2::Int, j3::Int, m1::Int, m2::Int, m3::Int)
     t_min > t_max && return 0.0
 
     s = 0.0
-    for t = t_min:t_max
+    for t in t_min:t_max
         log_den = (
             _log_factorial(t) +
             _log_factorial(j1 + j2 - j3 - t) +
@@ -100,7 +100,7 @@ function wigner_6j(j1::Int, j2::Int, j3::Int, j4::Int, j5::Int, j6::Int)
     t_min > t_max && return 0.0
 
     s = 0.0
-    for t = t_min:t_max
+    for t in t_min:t_max
         log_num = _log_factorial(t + 1)
         log_den = (
             _log_factorial(t - j1 - j2 - j3) +
@@ -142,12 +142,12 @@ end
 Transform rank-k tensor couplings c_k to channel couplings g_S via Wigner 6j:
   g_S = Σ_k (2k+1) {F F k; F F S} c_k
 """
-function _cn_to_gS(F::Int, c_dict::Dict{Int,Float64})
+function _cn_to_gS(F::Int, c_dict::Dict{Int, Float64})
     W, even_vals = _build_6j_matrix(F)
     n = length(even_vals)
-    c_vec = [get(c_dict, even_vals[j], 0.0) for j = 1:n]
+    c_vec = [get(c_dict, even_vals[j], 0.0) for j in 1:n]
     g_vec = W * c_vec
-    Dict{Int,Float64}(even_vals[i] => g_vec[i] for i = 1:n)
+    Dict{Int, Float64}(even_vals[i] => g_vec[i] for i in 1:n)
 end
 
 """
@@ -156,12 +156,12 @@ end
 Inverse transform: channel couplings g_S to rank-k tensor couplings c_k.
 Uses the matrix inverse of the even-rank 6j transform.
 """
-function _gS_to_cn(F::Int, g_dict::Dict{Int,Float64})
+function _gS_to_cn(F::Int, g_dict::Dict{Int, Float64})
     W, even_vals = _build_6j_matrix(F)
     n = length(even_vals)
-    g_vec = [get(g_dict, even_vals[i], 0.0) for i = 1:n]
+    g_vec = [get(g_dict, even_vals[i], 0.0) for i in 1:n]
     c_vec = W \ g_vec
-    Dict{Int,Float64}(even_vals[j] => c_vec[j] for j = 1:n)
+    Dict{Int, Float64}(even_vals[j] => c_vec[j] for j in 1:n)
 end
 
 """
@@ -174,10 +174,10 @@ Only even l channels are populated (bosonic symmetry: odd l channels vanish
 for identical bosons in the interaction Hamiltonian).
 """
 function precompute_cg_table(F::Int)
-    table = Dict{NTuple{4,Int},Float64}()
-    for l = 0:2:2F
-        for M = (-l):l
-            for m1 = (-F):F
+    table = Dict{NTuple{4, Int}, Float64}()
+    for l in 0:2:2F
+        for M in (-l):l
+            for m1 in (-F):F
                 m2 = M - m1
                 abs(m2) > F && continue
                 val = clebsch_gordan(F, m1, F, m2, l, M)
@@ -196,7 +196,7 @@ Dense 3D array for O(1) CG coefficient lookups.
 Indexed as `data[S÷2+1, M+2F+1, m1+F+1]` for CG(F,m1;F,M-m1|S,M).
 """
 struct CGArrayTable
-    data::Array{Float64,3}
+    data::Array{Float64, 3}
     F::Int
 end
 
@@ -218,13 +218,13 @@ function precompute_cg_array(F::Int)
     n_M = 4F + 1
     n_m1 = 2F + 1
     data = zeros(Float64, n_S, n_M, n_m1)
-    for S = 0:2:2F
-        for M = (-S):S
-            for m1 = (-F):F
+    for S in 0:2:2F
+        for M in (-S):S
+            for m1 in (-F):F
                 m2 = M - m1
                 abs(m2) > F && continue
                 val = clebsch_gordan(F, m1, F, m2, S, M)
-                data[S÷2+1, M+2F+1, m1+F+1] = val
+                data[S ÷ 2 + 1, M + 2F + 1, m1 + F + 1] = val
             end
         end
     end

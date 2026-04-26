@@ -4,7 +4,7 @@
 Convert sweep callback return value to a NamedTuple of find_ground_state kwargs.
 Accepts InteractionParams (legacy) or NamedTuple (new API).
 """
-_normalize_sweep_result(ip::InteractionParams) = (interactions = ip,)
+_normalize_sweep_result(ip::InteractionParams) = (interactions=ip,)
 _normalize_sweep_result(nt::NamedTuple) = nt
 
 """
@@ -27,14 +27,14 @@ All other kwargs are forwarded to `find_ground_state` as fixed defaults.
 """
 function scan_continuation(;
     param_values::AbstractVector{Float64},
-    make_params::Union{Function,Nothing} = nothing,
-    make_interactions::Union{Function,Nothing} = nothing,
+    make_params::Union{Function, Nothing}=nothing,
+    make_interactions::Union{Function, Nothing}=nothing,
     grid,
     atom,
-    initial_state::Symbol = :polar,
-    energy_jump_threshold::Float64 = 0.1,
-    n_steps_continuation::Int = 500,
-    n_steps_fresh::Int = 5000,
+    initial_state::Symbol=:polar,
+    energy_jump_threshold::Float64=0.1,
+    n_steps_continuation::Int=500,
+    n_steps_fresh::Int=5000,
     kwargs...,
 )
     sweep_fn = _resolve_sweep_fn(make_params, make_interactions)
@@ -47,7 +47,7 @@ function scan_continuation(;
 
     for (i, val) in enumerate(param_values)
         overrides = _normalize_sweep_result(sweep_fn(val))
-        base = Dict{Symbol,Any}(kwargs)
+        base = Dict{Symbol, Any}(kwargs)
         for (k, v) in pairs(overrides)
             base[k] = v
         end
@@ -59,8 +59,8 @@ function scan_continuation(;
             find_ground_state(;
                 grid,
                 atom,
-                psi_init = copy(prev_psi),
-                n_steps = n_steps_continuation,
+                psi_init=copy(prev_psi),
+                n_steps=n_steps_continuation,
                 base...,
             )
         else
@@ -68,18 +68,18 @@ function scan_continuation(;
                 grid,
                 atom,
                 initial_state,
-                n_steps = n_steps_fresh,
+                n_steps=n_steps_fresh,
                 base...,
             )
         end
 
         if !isnan(prev_energy) &&
-           abs(r.energy - prev_energy) / max(abs(prev_energy), 1e-30) >
+            abs(r.energy - prev_energy) / max(abs(prev_energy), 1e-30) >
            energy_jump_threshold
             r = find_ground_state_multistart(;
                 grid,
                 atom,
-                n_steps = n_steps_fresh,
+                n_steps=n_steps_fresh,
                 base...,
             )
         end
@@ -92,12 +92,12 @@ function scan_continuation(;
         push!(
             results,
             (
-                param = val,
-                energy = r.energy,
-                converged = r.converged,
-                phase = phase_info.phase,
-                phase_info = detailed,
-                psi = copy(psi_host),
+                param=val,
+                energy=r.energy,
+                converged=r.converged,
+                phase=phase_info.phase,
+                phase_info=detailed,
+                psi=copy(psi_host),
             ),
         )
 
@@ -126,7 +126,7 @@ function _detect_hysteresis(
     n = length(param_values)
     in_hysteresis = false
     lo = 0.0
-    intervals = Tuple{Float64,Float64}[]
+    intervals = Tuple{Float64, Float64}[]
 
     for i in 1:n
         mismatch = forward[i].phase != backward[i].phase
@@ -155,25 +155,25 @@ See `scan_continuation` for the `make_params` / `make_interactions` interface.
 """
 function scan_continuation_bidirectional(;
     param_values::AbstractVector{Float64},
-    make_params::Union{Function,Nothing} = nothing,
-    make_interactions::Union{Function,Nothing} = nothing,
+    make_params::Union{Function, Nothing}=nothing,
+    make_interactions::Union{Function, Nothing}=nothing,
     grid,
     atom,
-    initial_state_forward::Symbol = :polar,
-    initial_state_backward::Symbol = :polar,
-    energy_jump_threshold::Float64 = 0.1,
-    n_steps_continuation::Int = 500,
-    n_steps_fresh::Int = 5000,
+    initial_state_forward::Symbol=:polar,
+    initial_state_backward::Symbol=:polar,
+    energy_jump_threshold::Float64=0.1,
+    n_steps_continuation::Int=500,
+    n_steps_fresh::Int=5000,
     kwargs...,
 )
     sweep_fn = _resolve_sweep_fn(make_params, make_interactions)
 
     forward = scan_continuation(;
         param_values,
-        make_params = sweep_fn,
+        make_params=sweep_fn,
         grid,
         atom,
-        initial_state = initial_state_forward,
+        initial_state=initial_state_forward,
         energy_jump_threshold,
         n_steps_continuation,
         n_steps_fresh,
@@ -181,11 +181,11 @@ function scan_continuation_bidirectional(;
     )
 
     backward_raw = scan_continuation(;
-        param_values = reverse(param_values),
-        make_params = sweep_fn,
+        param_values=reverse(param_values),
+        make_params=sweep_fn,
         grid,
         atom,
-        initial_state = initial_state_backward,
+        initial_state=initial_state_backward,
         energy_jump_threshold,
         n_steps_continuation,
         n_steps_fresh,
@@ -220,14 +220,14 @@ See `scan_continuation` for the `make_params` / `make_interactions` interface.
 function scan_phase_diagram_2d(;
     param1_values::AbstractVector{Float64},
     param2_values::AbstractVector{Float64},
-    make_params::Union{Function,Nothing} = nothing,
-    make_interactions::Union{Function,Nothing} = nothing,
+    make_params::Union{Function, Nothing}=nothing,
+    make_interactions::Union{Function, Nothing}=nothing,
     grid,
     atom,
-    initial_state::Symbol = :polar,
-    n_steps_continuation::Int = 500,
-    n_steps_fresh::Int = 5000,
-    energy_jump_threshold::Float64 = 0.1,
+    initial_state::Symbol=:polar,
+    n_steps_continuation::Int=500,
+    n_steps_fresh::Int=5000,
+    energy_jump_threshold::Float64=0.1,
     kwargs...,
 )
     sweep_fn = _resolve_sweep_fn(make_params, make_interactions)
@@ -245,7 +245,7 @@ function scan_phase_diagram_2d(;
 
         for (i, v1) in enumerate(param1_values)
             overrides = _normalize_sweep_result(sweep_fn(v1, v2))
-            base = Dict{Symbol,Any}(kwargs)
+            base = Dict{Symbol, Any}(kwargs)
             for (k, v) in pairs(overrides)
                 base[k] = v
             end
@@ -257,8 +257,8 @@ function scan_phase_diagram_2d(;
                 find_ground_state(;
                     grid,
                     atom,
-                    psi_init = copy(prev_psi),
-                    n_steps = n_steps_continuation,
+                    psi_init=copy(prev_psi),
+                    n_steps=n_steps_continuation,
                     base...,
                 )
             else
@@ -266,18 +266,18 @@ function scan_phase_diagram_2d(;
                     grid,
                     atom,
                     initial_state,
-                    n_steps = n_steps_fresh,
+                    n_steps=n_steps_fresh,
                     base...,
                 )
             end
 
             if !isnan(prev_energy) &&
-               abs(r.energy - prev_energy) / max(abs(prev_energy), 1e-30) >
+                abs(r.energy - prev_energy) / max(abs(prev_energy), 1e-30) >
                energy_jump_threshold
                 r = find_ground_state_multistart(;
                     grid,
                     atom,
-                    n_steps = n_steps_fresh,
+                    n_steps=n_steps_fresh,
                     base...,
                 )
             end
@@ -287,13 +287,13 @@ function scan_phase_diagram_2d(;
             detailed = classify_phase_detailed(psi_host, atom.F, grid, sm)
 
             results[i, j] = (
-                param1 = v1,
-                param2 = v2,
-                energy = r.energy,
-                converged = r.converged,
-                phase = detailed.phase,
-                phase_info = detailed,
-                psi = copy(psi_host),
+                param1=v1,
+                param2=v2,
+                energy=r.energy,
+                converged=r.converged,
+                phase=detailed.phase,
+                phase_info=detailed,
+                psi=copy(psi_host),
             )
 
             prev_psi = copy(ws.state.psi)

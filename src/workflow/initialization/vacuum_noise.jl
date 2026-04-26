@@ -19,8 +19,8 @@ function add_vacuum_noise(
     psi::AbstractArray{<:Complex},
     grid::Grid{N},
     F::Int;
-    seed::Int = 42,
-    cutoff_energy::Union{Nothing,Float64} = nothing,
+    seed::Int=42,
+    cutoff_energy::Union{Nothing, Float64}=nothing,
 ) where {N}
     D = 2F + 1
     n_pts = ntuple(d -> size(psi, d), N)

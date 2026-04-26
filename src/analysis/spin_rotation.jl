@@ -32,7 +32,7 @@ function rotate_quantization_axis(
     F::Int,
     theta_x::Float64,
     theta_y::Float64,
-    theta_z::Float64 = 0.0,
+    theta_z::Float64=0.0,
 )
     ndim = ndims(psi) - 1
     D = 2F + 1
@@ -41,9 +41,9 @@ function rotate_quantization_axis(
 
     psi_rot = similar(psi)
     @inbounds for I in CartesianIndices(n_pts)
-        for c = 1:D
+        for c in 1:D
             s = zero(ComplexF64)
-            for c2 = 1:D
+            for c2 in 1:D
                 s += U[c, c2] * psi[I, c2]
             end
             psi_rot[I, c] = s
@@ -80,9 +80,9 @@ function dipolar_field(ws)
     compute_ddi_potential!(ddi, ddi_bufs)
 
     (
-        Bx = copy(Array(ddi_bufs.Phi_x)),
-        By = copy(Array(ddi_bufs.Phi_y)),
-        Bz = copy(Array(ddi_bufs.Phi_z)),
+        Bx=copy(Array(ddi_bufs.Phi_x)),
+        By=copy(Array(ddi_bufs.Phi_y)),
+        Bz=copy(Array(ddi_bufs.Phi_z)),
     )
 end
 
@@ -108,12 +108,12 @@ function apply_edh_rotation(
 ) where {D}
     ndim = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), ndim)
-    m_vals = SVector{D,Float64}(ntuple(c -> Float64(F - (c - 1)), Val(D)))
+    m_vals = SVector{D, Float64}(ntuple(c -> Float64(F - (c - 1)), Val(D)))
 
     psi_edh = similar(psi)
 
     @inbounds for I in CartesianIndices(n_pts)
-        spinor = SVector{D,ComplexF64}(ntuple(c -> psi[I, c], Val(D)))
+        spinor = SVector{D, ComplexF64}(ntuple(c -> psi[I, c], Val(D)))
         rotated = _apply_euler_spin_rotation(
             spinor,
             Bx[I], By[I], Bz[I],
@@ -122,7 +122,7 @@ function apply_edh_rotation(
             sm.Fy_eigvecs, sm.Fy_eigvecs_adj, sm.Fy_eigvals,
             sm, false,
         )
-        for c = 1:D
+        for c in 1:D
             psi_edh[I, c] = rotated[c]
         end
     end
@@ -154,7 +154,7 @@ function apply_fl_alignment(
     @inbounds for I in CartesianIndices(n_pts)
         B_mag = sqrt(Bx[I]^2 + By[I]^2 + Bz[I]^2)
         if B_mag < 1e-30
-            for c = 1:D
+            for c in 1:D
                 psi_fl[I, c] = psi[I, c]
             end
             continue
@@ -166,13 +166,13 @@ function apply_fl_alignment(
         n = total_density(psi, ndim)
         amplitude = sqrt(abs(n[I]))
 
-        for c = 1:D
+        for c in 1:D
             psi_fl[I, c] = zero(ComplexF64)
         end
         psi_fl[I, 1] = complex(amplitude)
 
-        spinor = SVector{D,ComplexF64}(ntuple(c -> psi_fl[I, c], Val(D)))
-        m_vals = SVector{D,Float64}(ntuple(c -> Float64(F - (c - 1)), Val(D)))
+        spinor = SVector{D, ComplexF64}(ntuple(c -> psi_fl[I, c], Val(D)))
+        m_vals = SVector{D, Float64}(ntuple(c -> Float64(F - (c - 1)), Val(D)))
         rotated = _apply_euler_spin_rotation(
             spinor,
             0.0, sin(beta), cos(beta),
@@ -191,7 +191,7 @@ function apply_fl_alignment(
             sm, false,
         )
 
-        for c = 1:D
+        for c in 1:D
             psi_fl[I, c] = rotated[c]
         end
     end

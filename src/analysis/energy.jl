@@ -23,25 +23,36 @@ function _energy_decomposition_cpu(ws::Workspace{N}) where {N}
     n_pts = ntuple(d -> size(psi, d), Val(N))
 
     fft_buf = _is_gpu(ws.state.psi) ? zeros(ComplexF64, grid.config.n_points) : ws.state.fft_buf
-    plans = _is_gpu(ws.state.psi) ? make_fft_plans(grid.config.n_points; flags = FFTW.ESTIMATE) : ws.fft_plans
+    plans = if _is_gpu(ws.state.psi)
+        make_fft_plans(grid.config.n_points; flags=FFTW.ESTIMATE)
+    else
+        ws.fft_plans
+    end
     V_trap = _to_host(ws.potential_values)
     E_kin = _kinetic_energy(psi, grid, plans, fft_buf, n_comp, N, n_pts, dV)
     E_trap = _trap_energy(psi, V_trap, n_comp, N, n_pts, dV)
     zee = zeeman_at(ws.zeeman, ws.state.t)
     E_zee = _zeeman_energy(psi, zee, ws.spin_matrices.system, n_comp, N, n_pts, dV)
 
-    E_c0 = abs(ws.interactions.c0) > 1e-30 ?
-        _density_interaction_energy(psi, ws.interactions.c0, n_comp, N, n_pts, dV) : 0.0
-    E_c1 = abs(ws.interactions.c1) > 1e-30 ?
-        _spin_interaction_energy(psi, ws.spin_matrices, ws.interactions.c1, n_comp, N, n_pts, dV) : 0.0
+    E_c0 = if abs(ws.interactions.c0) > 1e-30
+        _density_interaction_energy(psi, ws.interactions.c0, n_comp, N, n_pts, dV)
+    else
+        0.0
+    end
+    E_c1 = if abs(ws.interactions.c1) > 1e-30
+        _spin_interaction_energy(psi, ws.spin_matrices, ws.interactions.c1, n_comp, N, n_pts, dV)
+    else
+        0.0
+    end
 
     E_ddi = if ws.ddi !== nothing
         if _is_gpu(ws.ddi_bufs.Fx_r)
-            _ddi_energy_from_gpu(psi, ws.spin_matrices, ws.ddi, ws.ddi_bufs, n_comp, N, n_pts, dV;
-                ddi_padded = ws.ddi_padded)
+            _ddi_energy_from_gpu(psi, ws.spin_matrices, ws.ddi, ws.ddi_bufs, n_comp, N, n_pts,
+                dV;
+                ddi_padded=ws.ddi_padded)
         else
             _ddi_energy(psi, ws.spin_matrices, ws.ddi, ws.ddi_bufs, n_comp, N, n_pts, dV;
-                ddi_padded = ws.ddi_padded)
+                ddi_padded=ws.ddi_padded)
         end
     else
         0.0
@@ -58,8 +69,10 @@ function _energy_decomposition_cpu(ws::Workspace{N}) where {N}
     E_tensor = begin
         e = 0.0
         c2 = get_cn(ws.interactions, 2)
-        abs(c2) > 1e-30 && (e += _nematic_energy(psi, ws.spin_matrices.system.F, c2, N, n_pts, dV))
-        ws.tensor_cache !== nothing && (e += _tensor_interaction_energy(psi, ws.tensor_cache, N, n_pts, dV))
+        abs(c2) > 1e-30 &&
+            (e += _nematic_energy(psi, ws.spin_matrices.system.F, c2, N, n_pts, dV))
+        ws.tensor_cache !== nothing &&
+            (e += _tensor_interaction_energy(psi, ws.tensor_cache, N, n_pts, dV))
         e
     end
 
@@ -75,19 +88,20 @@ function _energy_decomposition_cpu(ws::Workspace{N}) where {N}
         0.0
     end
 
-    E_total = E_kin + E_trap + E_zee + E_c0 + E_c1 + E_ddi + E_lhy + E_tensor + E_raman + E_light_shift
+    E_total =
+        E_kin + E_trap + E_zee + E_c0 + E_c1 + E_ddi + E_lhy + E_tensor + E_raman + E_light_shift
     (
-        kinetic = E_kin,
-        trap = E_trap,
-        zeeman = E_zee,
-        density = E_c0,
-        spin = E_c1,
-        ddi = E_ddi,
-        lhy = E_lhy,
-        tensor = E_tensor,
-        raman = E_raman,
-        light_shift = E_light_shift,
-        total = E_total,
+        kinetic=E_kin,
+        trap=E_trap,
+        zeeman=E_zee,
+        density=E_c0,
+        spin=E_c1,
+        ddi=E_ddi,
+        lhy=E_lhy,
+        tensor=E_tensor,
+        raman=E_raman,
+        light_shift=E_light_shift,
+        total=E_total,
     )
 end
 
@@ -97,7 +111,7 @@ end
 
 function _kinetic_energy(psi, grid, plans, fft_buf, n_comp, ndim, n_pts, dV)
     E = 0.0
-    for c = 1:n_comp
+    for c in 1:n_comp
         idx = _component_slice(ndim, n_pts, c)
         fft_buf .= view(psi, idx...)
         plans.forward * fft_buf
@@ -108,7 +122,7 @@ end
 
 function _trap_energy(psi, V_trap, n_comp, ndim, n_pts, dV)
     E = 0.0
-    for c = 1:n_comp
+    for c in 1:n_comp
         idx = _component_slice(ndim, n_pts, c)
         E += sum(V_trap .* abs2.(view(psi, idx...))) * dV
     end
@@ -118,7 +132,7 @@ end
 function _zeeman_energy(psi, zeeman, sys, n_comp, ndim, n_pts, dV)
     zee = zeeman_energies(zeeman, sys)
     E = 0.0
-    for c = 1:n_comp
+    for c in 1:n_comp
         idx = _component_slice(ndim, n_pts, c)
         E += zee[c] * sum(abs2, view(psi, idx...)) * dV
     end
@@ -200,7 +214,7 @@ function _ddi_energy(
     ndim,
     n_pts,
     dV;
-    ddi_padded = nothing,
+    ddi_padded=nothing,
 ) where {D}
     if ddi_padded !== nothing
         _compute_and_convolve_ddi_padded!(psi, sm, ddi, ddi_padded, Val(D), ndim, n_pts)
@@ -243,7 +257,7 @@ function _ddi_energy_from_gpu(
     ndim,
     n_pts,
     dV;
-    ddi_padded = nothing,
+    ddi_padded=nothing,
 ) where {D}
     Fx_r = zeros(Float64, n_pts)
     Fy_r = zeros(Float64, n_pts)
@@ -251,7 +265,8 @@ function _ddi_energy_from_gpu(
     _compute_spin_density!(Fx_r, Fy_r, Fz_r, psi_host, sm, Val(D), ndim, n_pts)
 
     ddi_host = DDIParams(ddi_gpu.C_dd, _to_host(ddi_gpu.Q_xx), _to_host(ddi_gpu.Q_xy),
-        _to_host(ddi_gpu.Q_xz), _to_host(ddi_gpu.Q_yy), _to_host(ddi_gpu.Q_yz), _to_host(ddi_gpu.Q_zz))
+        _to_host(ddi_gpu.Q_xz), _to_host(ddi_gpu.Q_yy), _to_host(ddi_gpu.Q_yz),
+        _to_host(ddi_gpu.Q_zz))
     rfft_plans = make_rfft_plans(n_pts)
     Fx_rk = rfft_plans.forward * Fx_r
     Fy_rk = similar(Fx_rk)
@@ -269,9 +284,10 @@ function _ddi_energy_from_gpu(
 
     E = 0.0
     @inbounds for I in CartesianIndices(n_pts)
-        E += bufs_host.Phi_x[I] * bufs_host.Fx_r[I] +
-             bufs_host.Phi_y[I] * bufs_host.Fy_r[I] +
-             bufs_host.Phi_z[I] * bufs_host.Fz_r[I]
+        E +=
+            bufs_host.Phi_x[I] * bufs_host.Fx_r[I] +
+            bufs_host.Phi_y[I] * bufs_host.Fy_r[I] +
+            bufs_host.Phi_z[I] * bufs_host.Fz_r[I]
     end
     0.5 * E * dV
 end
@@ -284,12 +300,11 @@ function _raman_energy(
     ndim,
     n_pts,
     dV,
-) where {D,N}
+) where {D, N}
     F = sm.system.F
     Ff1 = Float64(F * (F + 1))
     m_vals = ntuple(c -> Float64(F - (c - 1)), Val(D))
-    fp_coeffs =
-        ntuple(c -> c == 1 ? 0.0 : sqrt(Ff1 - m_vals[c] * (m_vals[c] + 1.0)), Val(D))
+    fp_coeffs = ntuple(c -> c == 1 ? 0.0 : sqrt(Ff1 - m_vals[c] * (m_vals[c] + 1.0)), Val(D))
 
     E = 0.0
     @inbounds for I in CartesianIndices(n_pts)
@@ -297,13 +312,13 @@ function _raman_energy(
         phase = exp(1im * kr)
 
         fz_val = 0.0
-        for c = 1:D
+        for c in 1:D
             fz_val += m_vals[c] * abs2(psi[I, c])
         end
 
         fp_val = zero(ComplexF64)
-        for c = 2:D
-            fp_val += fp_coeffs[c] * conj(psi[I, c-1]) * psi[I, c]
+        for c in 2:D
+            fp_val += fp_coeffs[c] * conj(psi[I, c - 1]) * psi[I, c]
         end
 
         E += (raman.delta * fz_val + raman.Omega_R * real(phase * fp_val)) * dV

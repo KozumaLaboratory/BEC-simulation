@@ -195,7 +195,8 @@ include("solvers/binary_simulation.jl")
 
 # Types
 export GridConfig, Grid, SpinSystem, SpinMatrices
-export AtomSpecies, InteractionParams, ZeemanParams, LossParams, AbsorbingBoundary, LightShift, TensorInteractionCache
+export AtomSpecies, InteractionParams, ZeemanParams, LossParams, AbsorbingBoundary, LightShift,
+    TensorInteractionCache
 export SimParams,
     SimState, FFTPlans, RFFTPlans, Workspace, AdaptiveDtParams, IntegratorConfig
 export SimulationResult, TWAConfig, EnsembleResult
@@ -267,7 +268,7 @@ export LaserBeamPotential, crossed_laser_trap
 # Thomas-Fermi
 export thomas_fermi_density, init_psi_thomas_fermi
 export add_thermal_noise!, add_thermal_noise, thermal_noise_amplitude, bec_critical_temperature,
-       add_symmetry_breaking_seed!
+    add_symmetry_breaking_seed!
 export simulate_tof, simulate_tof_with_gradient, sg_separation_peaks
 export gaussian_psf_convolve, apply_shot_noise, apply_saturation
 export synthesise_absorption_image, faraday_polarization_components
@@ -308,7 +309,8 @@ export AbsorbingBoundary, compute_absorbing_mask, apply_absorbing_boundary!
 # Waveform
 export AbstractWaveform, Waveform
 export ConstantWaveform, RampWaveform, PiecewiseLinearWaveform, FunctionWaveform
-export SinusoidalWaveform, ChirpedSinusoidalWaveform, GaussianPulseWaveform, InterpolatedWaveform, CompositeWaveform
+export SinusoidalWaveform,
+    ChirpedSinusoidalWaveform, GaussianPulseWaveform, InterpolatedWaveform, CompositeWaveform
 export StepWaveform
 export evaluate, load_waveform_csv
 
@@ -351,7 +353,8 @@ export fibonacci_sphere_directions, detect_roton, predict_supersolid_params
 export instability_angular_map
 
 # Simulation
-export find_ground_state, find_ground_state_multistart, scan_continuation,
+export find_ground_state,
+    find_ground_state_multistart, scan_continuation,
     scan_continuation_bidirectional
 export resume_ground_state, refine_ground_state, load_itp_checkpoint, ITPCheckpoint
 export scan_phase_diagram_2d
@@ -387,21 +390,21 @@ export CalibrationSet, CoilCalibration, FORTCalibration, RabiCalibration
 export DEFAULT_CALIBRATION, load_calibration, apply_calibration!, run_yaml_calibrated
 export coil_mv_to_gauss, fort_mw_to_trap_hz, rabi_mw_to_rad_s
 export CalibrationHistory, load_calibration_history, load_calibration_csv,
-       interpolate_calibration
+    interpolate_calibration
 export BinaryCouplings, BinaryState, find_binary_ground_state,
-       is_immiscible, droplet_regime_petrov,
-       binary_overlap, binary_separation_radius,
-       SpinorBinaryCouplings, SpinorBinaryState, find_spinor_binary_ground_state,
-       BinarySimulation, make_binary_simulation, binary_split_step!,
-       run_binary_simulation!, binary_norms, binary_total_energy
+    is_immiscible, droplet_regime_petrov,
+    binary_overlap, binary_separation_radius,
+    SpinorBinaryCouplings, SpinorBinaryState, find_spinor_binary_ground_state,
+    BinarySimulation, make_binary_simulation, binary_split_step!,
+    run_binary_simulation!, binary_norms, binary_total_energy
 export init_psi_polar, init_psi_ferromagnetic, init_psi_ferromagnetic_min,
-       init_psi_uniform, init_psi_antiferromagnetic, init_psi_random,
-       init_psi_spin_coherent, init_psi_fl_vortex, init_psi_spin_helix,
-       init_psi_cyclic, init_psi_biaxial_nematic, init_psi_polar_core_vortex,
-       init_psi_bright_soliton, init_psi_dark_soliton, init_psi_skyrmion,
-       init_psi_wavepacket, init_psi_domain_wall, init_psi_two_packets,
-       init_psi_chiral_spin_vortex, init_psi_magnetic_domain,
-       init_psi_vortex_lattice, init_psi_skyrmion_lattice
+    init_psi_uniform, init_psi_antiferromagnetic, init_psi_random,
+    init_psi_spin_coherent, init_psi_fl_vortex, init_psi_spin_helix,
+    init_psi_cyclic, init_psi_biaxial_nematic, init_psi_polar_core_vortex,
+    init_psi_bright_soliton, init_psi_dark_soliton, init_psi_skyrmion,
+    init_psi_wavepacket, init_psi_domain_wall, init_psi_two_packets,
+    init_psi_chiral_spin_vortex, init_psi_magnetic_domain,
+    init_psi_vortex_lattice, init_psi_skyrmion_lattice
 export apply_override!, apply_overrides, expand_scan_points, parse_override_map
 export OverrideScan, ConstrainedJzScan
 export PotentialConfig, ConstantValue, LinearRamp, interpolate_value
@@ -460,7 +463,7 @@ using PrecompileTools
                 f["dynamics/times"] = [0.0, 0.1]
                 f["grid_box_size"] = (1.0, 1.0, 1.0)
             end
-            cache = Dict{String,Any}()
+            cache = Dict{String, Any}()
             tup = _load_psi_cached(path, cache, 1)
             _compute_column_density_binary(tup..., 3, path)
             _compute_phase_slice_binary(tup..., 3, nothing, path)
@@ -478,7 +481,11 @@ using PrecompileTools
         catch
             # Don't break package precompile if the workload trips.
         finally
-            try; rm(tmpdir; recursive = true, force = true); catch; end
+            try
+                ; rm(tmpdir; recursive=true, force=true);
+            catch
+                ;
+            end
         end
     end
 end

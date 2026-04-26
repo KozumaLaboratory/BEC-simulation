@@ -8,8 +8,8 @@ using SpinorBEC
         trap = HarmonicTrap(1.0)
 
         result = find_ground_state(;
-            grid, atom = Rb87, interactions, potential = trap,
-            dt = 0.005, n_steps = 200, initial_state = :ferromagnetic,
+            grid, atom=Rb87, interactions, potential=trap,
+            dt=0.005, n_steps=200, initial_state=:ferromagnetic,
         )
 
         @test result.energy < 0 || result.energy < 100
@@ -26,12 +26,12 @@ using SpinorBEC
         trap = HarmonicTrap(1.0)
 
         r_polar = find_ground_state(;
-            grid, atom = Na23, interactions, potential = trap,
-            dt = 0.005, n_steps = 200, initial_state = :polar,
+            grid, atom=Na23, interactions, potential=trap,
+            dt=0.005, n_steps=200, initial_state=:polar,
         )
         r_ferro = find_ground_state(;
-            grid, atom = Na23, interactions, potential = trap,
-            dt = 0.005, n_steps = 200, initial_state = :ferromagnetic,
+            grid, atom=Na23, interactions, potential=trap,
+            dt=0.005, n_steps=200, initial_state=:ferromagnetic,
         )
 
         @test abs(r_polar.energy - r_ferro.energy) / max(abs(r_polar.energy), 1e-10) < 0.3
@@ -44,9 +44,9 @@ using SpinorBEC
 
         target_Mz = 0.5
         result = find_ground_state(;
-            grid, atom = Rb87, interactions, potential = trap,
-            dt = 0.005, n_steps = 500, initial_state = :uniform,
-            target_magnetization = target_Mz,
+            grid, atom=Rb87, interactions, potential=trap,
+            dt=0.005, n_steps=500, initial_state=:uniform,
+            target_magnetization=target_Mz,
         )
 
         ws = result.workspace
@@ -61,10 +61,10 @@ using SpinorBEC
         trap = HarmonicTrap(1.0)
 
         result = find_ground_state_multistart(;
-            grid, atom = Na23, interactions, potential = trap,
-            dt = 0.005, n_steps = 50,
-            initial_states = [:polar, :ferromagnetic],
-            n_random = 0,
+            grid, atom=Na23, interactions, potential=trap,
+            dt=0.005, n_steps=50,
+            initial_states=[:polar, :ferromagnetic],
+            n_random=0,
         )
 
         @test haskey(result, :energy)
@@ -78,13 +78,13 @@ using SpinorBEC
 
     @testset "ITP overflow: extreme Zeeman" begin
         @test_throws ArgumentError SpinorBEC._validate_itp_zeeman(
-            ZeemanParams(1e6, 0.0), 1, 0.01,
+            ZeemanParams(1e6, 0.0), 1, 0.01
         )
     end
 
     @testset "ITP overflow: extreme interactions" begin
         @test_throws ArgumentError SpinorBEC._validate_itp_interactions(
-            InteractionParams(1e8, 0.0), 1, 0.01,
+            InteractionParams(1e8, 0.0), 1, 0.01
         )
     end
 end

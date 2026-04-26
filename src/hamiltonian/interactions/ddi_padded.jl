@@ -4,16 +4,16 @@ Build zero-padded DDI context for reduced aliasing.
 Doubles grid size in each dimension. Builds Q tensor and rFFT plans on padded grid.
 """
 function make_ddi_padded(
-    grid::Grid{N,T},
+    grid::Grid{N, T},
     atom::AtomSpecies;
-    c_dd::Float64 = compute_c_dd(atom),
-    fft_flags = FFTW.MEASURE,
-    secular::Bool = false,
-    quasi_2d::Bool = false,
-    l_z::Float64 = 0.0,
-    backend::AbstractBackend = CPUBackend(),
-    dtype::Union{Nothing,Type{<:AbstractFloat}} = nothing,
-) where {N,T<:AbstractFloat}
+    c_dd::Float64=compute_c_dd(atom),
+    fft_flags=FFTW.MEASURE,
+    secular::Bool=false,
+    quasi_2d::Bool=false,
+    l_z::Float64=0.0,
+    backend::AbstractBackend=CPUBackend(),
+    dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
+) where {N, T <: AbstractFloat}
     U = dtype === nothing ? T : dtype
     n_pts = grid.config.n_points
     padded_shape = ntuple(d -> 2 * n_pts[d], N)
@@ -81,7 +81,7 @@ function make_ddi_padded(
         )
     end
 
-    rplans = make_rfft_plans(padded_shape, backend; flags = fft_flags, dtype = U)
+    rplans = make_rfft_plans(padded_shape, backend; flags=fft_flags, dtype=U)
 
     DDIPaddedContext(
         padded_shape,
@@ -119,7 +119,7 @@ function _compute_and_convolve_ddi_padded!(
     ::Val{D},
     ndim,
     n_pts,
-) where {D,N}
+) where {D, N}
     ctx.Fx_pad .= 0
     ctx.Fy_pad .= 0
     ctx.Fz_pad .= 0
@@ -151,8 +151,8 @@ function apply_ddi_step!(
     dt_frac::Float64,
     ndim::Int,
     ddi_padded::DDIPaddedContext{N};
-    imaginary_time::Bool = false,
-) where {D,N}
+    imaginary_time::Bool=false,
+) where {D, N}
     n_pts = ntuple(d -> size(psi, d), Val(N))
 
     @timeit_debug TIMER "ddi_convolve_padded" _compute_and_convolve_ddi_padded!(

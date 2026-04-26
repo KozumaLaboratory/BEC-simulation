@@ -2,7 +2,6 @@ using SpinorBEC: _elliptic_k
 using FFTW
 
 @testset "Diagnostics" begin
-
     @testset "Elliptic integral K(m)" begin
         @test _elliptic_k(0.0) ≈ π / 2 atol = 1e-14
         @test _elliptic_k(0.5) ≈ 1.8540746773013719 atol = 1e-10
@@ -211,12 +210,12 @@ using FFTW
 
         sp1 = SimParams(; dt=0.01, n_steps=10, imaginary_time=false, save_every=10)
         ws1 = make_workspace(; grid, atom=Rb87, interactions, potential=trap,
-                              sim_params=sp1, fft_flags=FFTW.ESTIMATE)
+            sim_params=sp1, fft_flags=FFTW.ESTIMATE)
         err1 = estimate_splitting_error(ws1)
 
         sp2 = SimParams(; dt=0.005, n_steps=10, imaginary_time=false, save_every=10)
         ws2 = make_workspace(; grid, atom=Rb87, interactions, potential=trap,
-                              sim_params=sp2, fft_flags=FFTW.ESTIMATE)
+            sim_params=sp2, fft_flags=FFTW.ESTIMATE)
         err2 = estimate_splitting_error(ws2)
 
         @test err1 > 0
@@ -232,7 +231,7 @@ using FFTW
         @testset "passes for reasonable dt" begin
             sp = SimParams(; dt=0.001, n_steps=100, imaginary_time=false, save_every=100)
             ws = make_workspace(; grid, atom=Rb87, interactions, potential=trap,
-                                sim_params=sp, fft_flags=FFTW.ESTIMATE)
+                sim_params=sp, fft_flags=FFTW.ESTIMATE)
             result = validate_conservation(ws; n_steps=50)
             @test result.passed
             @test result.norm_drift < 1e-12
@@ -241,7 +240,7 @@ using FFTW
         @testset "restores state" begin
             sp = SimParams(; dt=0.001, n_steps=100, imaginary_time=false, save_every=100)
             ws = make_workspace(; grid, atom=Rb87, interactions, potential=trap,
-                                sim_params=sp, fft_flags=FFTW.ESTIMATE)
+                sim_params=sp, fft_flags=FFTW.ESTIMATE)
             psi_before = copy(ws.state.psi)
             validate_conservation(ws; n_steps=20)
             @test ws.state.psi ≈ psi_before
@@ -255,7 +254,7 @@ using FFTW
             trap = HarmonicTrap(1.0)
             sp = SimParams(; dt=0.001, n_steps=200, imaginary_time=false, save_every=200)
             ws = make_workspace(; grid, atom=Rb87, interactions, potential=trap,
-                                sim_params=sp, fft_flags=FFTW.ESTIMATE)
+                sim_params=sp, fft_flags=FFTW.ESTIMATE)
             result = analyze_stability(ws; n_steps=100, sample_every=10)
             @test isfinite(result.growth_rate)
             @test length(result.time_series) == 10
@@ -269,7 +268,7 @@ using FFTW
             trap = HarmonicTrap(1.0)
             sp = SimParams(; dt=0.001, n_steps=200, imaginary_time=false, save_every=200)
             ws = make_workspace(; grid, atom=Rb87, interactions, potential=trap,
-                                sim_params=sp, fft_flags=FFTW.ESTIMATE)
+                sim_params=sp, fft_flags=FFTW.ESTIMATE)
             psi_before = copy(ws.state.psi)
             t_before = ws.state.t
             analyze_stability(ws; n_steps=50, sample_every=10)
@@ -282,8 +281,8 @@ using FFTW
             interactions = InteractionParams(10.0, 0.0)
             sp = SimParams(; dt=0.001, n_steps=200, imaginary_time=false, save_every=200)
             ws = make_workspace(; grid, atom=Rb87, interactions,
-                                potential=HarmonicTrap(1.0),
-                                sim_params=sp, fft_flags=FFTW.ESTIMATE)
+                potential=HarmonicTrap(1.0),
+                sim_params=sp, fft_flags=FFTW.ESTIMATE)
             result = analyze_stability(ws; n_steps=30, sample_every=10)
             for sk in result.sk_series
                 @test size(sk) == grid.config.n_points

@@ -18,8 +18,11 @@ so the fit is scale-invariant in absolute brightness.
 function load_target_faraday(path::AbstractString)
     target = if endswith(path, ".jld2")
         jldopen(path, "r") do f
-            haskey(f, "faraday") ? f["faraday"] :
+            if haskey(f, "faraday")
+                f["faraday"]
+            else
                 throw(ArgumentError("$path missing top-level `faraday` key"))
+            end
         end
     else
         readdlm_simple(path)
@@ -39,7 +42,10 @@ function readdlm_simple(path::AbstractString)
     end
     isempty(rows) && return zeros(Float64, 0, 0)
     M = zeros(Float64, length(rows), length(rows[1]))
-    for (i, r) in enumerate(rows); M[i, :] .= r; end
+    for (i, r) in enumerate(rows)
+        ;
+        M[i, :] .= r;
+    end
     M
 end
 
@@ -64,9 +70,9 @@ This is a real numerical fit:
 function fit_faraday_param(
     eval_fn::Function,
     target::AbstractMatrix{Float64};
-    bounds::Tuple{Float64,Float64},
-    max_iter::Int = 30,
-    atol::Real = 1e-4,
+    bounds::Tuple{Float64, Float64},
+    max_iter::Int=30,
+    atol::Real=1e-4,
 )
     target_norm = let n = sqrt(sum(abs2, target))
         n > 0 ? target ./ n : copy(target)
@@ -84,18 +90,21 @@ function fit_faraday_param(
     φ = (sqrt(5.0) - 1) / 2          # golden ratio
     c = b - φ * (b - a)
     d = a + φ * (b - a)
-    fc = loss(c); fd = loss(d)
+    fc = loss(c);
+    fd = loss(d)
     history = [(c, fc), (d, fd)]
     iter = 0
     while abs(b - a) > atol && iter < max_iter
         iter += 1
         if fc < fd
             b, d, fd = d, c, fc
-            c = b - φ * (b - a); fc = loss(c)
+            c = b - φ * (b - a);
+            fc = loss(c)
             push!(history, (c, fc))
         else
             a, c, fc = c, d, fd
-            d = a + φ * (b - a); fd = loss(d)
+            d = a + φ * (b - a);
+            fd = loss(d)
             push!(history, (d, fd))
         end
     end
@@ -116,6 +125,6 @@ function fit_faraday_param(
             end
         end
     end
-    return (best_p = best_p, best_loss = best_loss, history = history,
-            n_evaluations = length(history))
+    return (best_p=best_p, best_loss=best_loss, history=history,
+        n_evaluations=length(history))
 end

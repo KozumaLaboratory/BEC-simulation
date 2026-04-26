@@ -1,14 +1,14 @@
 function init_psi(
-    grid::Grid{N,T},
+    grid::Grid{N, T},
     sys::SpinSystem;
-    state::Symbol = :polar,
-    seed::Int = 42,
-    helix_k::NTuple{N,Float64} = ntuple(_ -> 0.0, N),
-    init_theta::Real = 0.0,
-    init_phi::Real = 0.0,
-    init_vortex_charge::Real = 0,
-    dtype::Union{Nothing,Type{<:AbstractFloat}} = nothing,
-) where {N,T<:AbstractFloat}
+    state::Symbol=:polar,
+    seed::Int=42,
+    helix_k::NTuple{N, Float64}=ntuple(_ -> 0.0, N),
+    init_theta::Real=0.0,
+    init_phi::Real=0.0,
+    init_vortex_charge::Real=0,
+    dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
+) where {N, T <: AbstractFloat}
     U = dtype === nothing ? T : dtype
     init_theta_f = Float64(init_theta)
     init_phi_f = Float64(init_phi)
@@ -29,11 +29,11 @@ function init_psi(
     elseif state == :ferromagnetic_min
         _set_component!(psi, gauss, N, n_pts, D)  # m = -F
     elseif state == :uniform
-        for c = 1:D
+        for c in 1:D
             _set_component!(psi, gauss / sqrt(D), N, n_pts, c)
         end
     elseif state == :antiferromagnetic
-        for c = 1:D
+        for c in 1:D
             m = F - (c - 1)
             sign = iseven(F - m) ? 1.0 : -1.0
             _set_component!(psi, sign * gauss / sqrt(D), N, n_pts, c)
@@ -42,7 +42,7 @@ function init_psi(
         rng = Random.MersenneTwister(seed)
         psi .= randn(rng, ComplexF64, size(psi))
         @inbounds for I in CartesianIndices(n_pts)
-            for c = 1:D
+            for c in 1:D
                 psi[I, c] *= gauss[I]
             end
         end
@@ -65,7 +65,7 @@ function init_psi(
         if vortex_charge_use != 0
             N >= 2 || throw(
                 ArgumentError(
-                    ":spin_coherent with init_vortex_charge≠0 requires N >= 2",
+                    ":spin_coherent with init_vortex_charge≠0 requires N >= 2"
                 ),
             )
         end
@@ -77,12 +77,12 @@ function init_psi(
         if vortex_charge_use == 0
             # Uniform spin direction: precompute Rz(init_phi) c_base.
             spinor_uniform = Vector{ComplexF64}(undef, D)
-            for c = 1:D
+            for c in 1:D
                 m = F - (c - 1)
                 spinor_uniform[c] = c_base[c] * cis(-m * init_phi_f)
             end
             @inbounds for I in CartesianIndices(n_pts)
-                for c = 1:D
+                for c in 1:D
                     psi[I, c] = gauss[I] * spinor_uniform[c]
                 end
             end
@@ -91,7 +91,7 @@ function init_psi(
                 x = grid.x[1][I[1]]
                 y = grid.x[2][I[2]]
                 phi_local = init_phi_f + vortex_charge_use * atan(y, x)
-                for c = 1:D
+                for c in 1:D
                     m = F - (c - 1)
                     psi[I, c] = gauss[I] * c_base[c] * cis(-m * phi_local)
                 end
@@ -103,7 +103,7 @@ function init_psi(
             theta = sum(ntuple(d -> helix_k[d] * grid.x[d][I[d]], Val(N)))
             ct = cos(theta)
             st = sin(theta)
-            for c = 1:D
+            for c in 1:D
                 m = F - (c - 1)
                 if c == 1
                     psi[I, c] = gauss[I] * complex(ct, st)^F
@@ -112,12 +112,12 @@ function init_psi(
                 end
             end
             spinor = Vector{ComplexF64}(undef, D)
-            for c = 1:D
+            for c in 1:D
                 spinor[c] = psi[I, c]
             end
             rot = exp(-1im * theta * Matrix(sm.Fy))
-            rotated = rot * [c == 1 ? complex(gauss[I]) : zero(ComplexF64) for c = 1:D]
-            for c = 1:D
+            rotated = rot * [c == 1 ? complex(gauss[I]) : zero(ComplexF64) for c in 1:D]
+            for c in 1:D
                 psi[I, c] = rotated[c]
             end
         end
@@ -263,7 +263,7 @@ function init_psi(
             elseif pattern == 3 && N >= 2
                 y = grid.x[2][I[2]]
                 cos(k0 * x) + cos(k0 * (-0.5 * x + sqrt(3) / 2 * y)) +
-                    cos(k0 * (-0.5 * x - sqrt(3) / 2 * y))
+                cos(k0 * (-0.5 * x - sqrt(3) / 2 * y))
             else
                 sin(k0 * x)
             end
@@ -302,7 +302,9 @@ function init_psi(
             my = sum(sin(qx * x + qy * y) for (qx, qy) in q_vecs)
             mz = 1.5
             m_norm = sqrt(mx^2 + my^2 + mz^2)
-            mx /= m_norm; my /= m_norm; mz /= m_norm
+            mx /= m_norm;
+            my /= m_norm;
+            mz /= m_norm
             theta = acos(clamp(mz, -1.0, 1.0))
             phi = atan(my, mx)
             U_y = exp(-1im * theta * Matrix(sm.Fy))
@@ -322,11 +324,11 @@ function init_psi(
     psi
 end
 
-function _gaussian(grid::Grid{N}, sigma::NTuple{N,Float64}) where {N}
+function _gaussian(grid::Grid{N}, sigma::NTuple{N, Float64}) where {N}
     g = zeros(Float64, grid.config.n_points)
     @inbounds for I in CartesianIndices(grid.config.n_points)
         s = 0.0
-        for d = 1:N
+        for d in 1:N
             s += grid.x[d][I[d]]^2 / (2 * sigma[d]^2)
         end
         g[I] = exp(-s)
@@ -360,42 +362,45 @@ function _default_spinor(F::Int)
 end
 
 function make_workspace(;
-    grid::Grid{N,T},
+    grid::Grid{N, T},
     atom::AtomSpecies,
     interactions::InteractionParams,
-    zeeman::Union{ZeemanParams,TimeDependentZeeman} = ZeemanParams(),
-    potential::AbstractPotential = NoPotential(),
+    zeeman::Union{ZeemanParams, TimeDependentZeeman}=ZeemanParams(),
+    potential::AbstractPotential=NoPotential(),
     sim_params::SimParams,
-    psi_init::Union{Nothing,AbstractArray{<:Complex}} = nothing,
-    enable_ddi::Bool = false,
-    c_dd::Float64 = NaN,
-    secular_ddi::Bool = false,
-    raman::Union{Nothing,RamanCoupling{N},TimeDependentRaman{N}} = nothing,
-    loss::Union{Nothing,LossParams} = nothing,
-    fft_flags = FFTW.MEASURE,
-    ddi_padding::Bool = false,
-    quasi_2d_ddi::Bool = false,
-    l_z_ddi::Float64 = 0.0,
-    quasi_2d::Bool = false,
-    l_z::Float64 = 0.0,
-    backend::AbstractBackend = CPUBackend(),
-    spinor_lhy::Union{Nothing,Symbol} = nothing,
-    absorbing_boundary::Union{Nothing,AbsorbingBoundary} = nothing,
-    light_shift::Union{Nothing,LightShift} = nothing,
-    time_dep_interactions::Union{Nothing,TimeDependentInteractions} = nothing,
-    magnetic_gradient::Union{Nothing,MagneticGradient,TimeDependentMagneticGradient} = nothing,
-    dtype::Union{Nothing,Type{<:AbstractFloat}} = nothing,
-) where {N,T<:AbstractFloat}
+    psi_init::Union{Nothing, AbstractArray{<:Complex}}=nothing,
+    enable_ddi::Bool=false,
+    c_dd::Float64=NaN,
+    secular_ddi::Bool=false,
+    raman::Union{Nothing, RamanCoupling{N}, TimeDependentRaman{N}}=nothing,
+    loss::Union{Nothing, LossParams}=nothing,
+    fft_flags=FFTW.MEASURE,
+    ddi_padding::Bool=false,
+    quasi_2d_ddi::Bool=false,
+    l_z_ddi::Float64=0.0,
+    quasi_2d::Bool=false,
+    l_z::Float64=0.0,
+    backend::AbstractBackend=CPUBackend(),
+    spinor_lhy::Union{Nothing, Symbol}=nothing,
+    absorbing_boundary::Union{Nothing, AbsorbingBoundary}=nothing,
+    light_shift::Union{Nothing, LightShift}=nothing,
+    time_dep_interactions::Union{Nothing, TimeDependentInteractions}=nothing,
+    magnetic_gradient::Union{Nothing, MagneticGradient, TimeDependentMagneticGradient}=nothing,
+    dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
+) where {N, T <: AbstractFloat}
     U = dtype === nothing ? T : dtype
-    U === T || throw(ArgumentError(
-        "dtype=$U disagrees with grid eltype=$T. Build the grid with `make_grid(cfg; dtype=$U)` first.",
-    ))
+    U === T || throw(
+        ArgumentError(
+            "dtype=$U disagrees with grid eltype=$T. Build the grid with `make_grid(cfg; dtype=$U)` first."
+        ),
+    )
     if quasi_2d
         N == 2 || throw(ArgumentError("quasi_2d requires 2D grid, got $(N)D"))
         l_z > 0 || throw(ArgumentError("quasi_2d requires l_z > 0"))
     end
 
-    effective_interactions = quasi_2d ? scale_interactions_quasi_2d(interactions, l_z) : interactions
+    effective_interactions =
+        quasi_2d ? scale_interactions_quasi_2d(interactions, l_z) : interactions
 
     if quasi_2d && enable_ddi
         quasi_2d_ddi = true
@@ -417,16 +422,16 @@ function make_workspace(;
     # apply_uniform_spin_rotation! and any other whole-ψ broadcast op that
     # would otherwise allocate similar(psi) per call.
     psi_scratch = similar(psi)
-    state = SimState{N,typeof(psi),typeof(fft_buf)}(psi, fft_buf, psi_scratch, 0.0, 0)
+    state = SimState{N, typeof(psi), typeof(fft_buf)}(psi, fft_buf, psi_scratch, 0.0, 0)
 
-    plans = make_fft_plans(grid.config.n_points, backend; flags = fft_flags, dtype = U)
+    plans = make_fft_plans(grid.config.n_points, backend; flags=fft_flags, dtype=U)
     kinetic_phase = _to_device(
         backend,
         prepare_kinetic_phase(
             grid,
             sim_params.dt;
-            imaginary_time = sim_params.imaginary_time,
-            dtype = U,
+            imaginary_time=sim_params.imaginary_time,
+            dtype=U,
         ),
     )
     V = evaluate_potential(potential, grid)
@@ -462,11 +467,11 @@ function make_workspace(;
         make_ddi_params(
             grid,
             atom;
-            c_dd = c_dd_val,
-            secular = secular_ddi,
-            quasi_2d = quasi_2d_ddi,
-            l_z = l_z_ddi,
-            dtype = U,
+            c_dd=c_dd_val,
+            secular=secular_ddi,
+            quasi_2d=quasi_2d_ddi,
+            l_z=l_z_ddi,
+            dtype=U,
         )
     else
         nothing
@@ -479,7 +484,7 @@ function make_workspace(;
     end
 
     ddi_bufs = if ddi !== nothing
-        make_ddi_buffers(grid.config.n_points, backend; flags = fft_flags, dtype = U)
+        make_ddi_buffers(grid.config.n_points, backend; flags=fft_flags, dtype=U)
     else
         nothing
     end
@@ -491,19 +496,19 @@ function make_workspace(;
         make_ddi_padded(
             grid,
             atom;
-            c_dd = c_dd_val,
+            c_dd=c_dd_val,
             fft_flags,
-            secular = secular_ddi,
-            quasi_2d = quasi_2d_ddi,
-            l_z = l_z_ddi,
+            secular=secular_ddi,
+            quasi_2d=quasi_2d_ddi,
+            l_z=l_z_ddi,
             backend,
-            dtype = U,
+            dtype=U,
         )
     else
         nothing
     end
 
-    batched_kinetic = _make_batched_kinetic_cache(psi, kinetic_phase, N, backend; flags = fft_flags)
+    batched_kinetic = _make_batched_kinetic_cache(psi, kinetic_phase, N, backend; flags=fft_flags)
 
     F = atom.F
     # Tensor interaction path activation:
@@ -531,10 +536,17 @@ function make_workspace(;
     tensor_cache, ws_interactions = if has_higher_c_extra
         g_delta = _c_extra_to_delta_gS(F, effective_interactions.c_extra)
         tc = _make_tensor_cache_from_channels(F, g_delta)
-        tc, InteractionParams(effective_interactions.c0, effective_interactions.c1, effective_interactions.c_lhy, Float64[])
+        tc,
+        InteractionParams(
+            effective_interactions.c0,
+            effective_interactions.c1,
+            effective_interactions.c_lhy,
+            Float64[],
+        )
     else
         tc = make_tensor_interaction_cache(F, effective_interactions)
-        if tc !== nothing && (abs(effective_interactions.c0) > 1e-30 || abs(effective_interactions.c1) > 1e-30)
+        if tc !== nothing &&
+            (abs(effective_interactions.c0) > 1e-30 || abs(effective_interactions.c1) > 1e-30)
             throw(
                 ArgumentError(
                     "tensor_cache active with non-zero c0=$(effective_interactions.c0), c1=$(effective_interactions.c1). " *
@@ -547,20 +559,28 @@ function make_workspace(;
     end
 
     coriolis_cache = if sim_params.rotating_frame_omega != 0.0 && N >= 2
-        _make_coriolis_cache(psi, backend; flags = fft_flags)
+        _make_coriolis_cache(psi, backend; flags=fft_flags)
     else
         nothing
     end
 
     lhy = if spinor_lhy === :two_channel
-        n_max_est = psi_init !== nothing ? maximum(sum(abs2, psi_init; dims=ndims(psi_init))) * 3.0 : 100.0
+        n_max_est = if psi_init !== nothing
+            maximum(sum(abs2, psi_init; dims=ndims(psi_init))) * 3.0
+        else
+            100.0
+        end
         compute_spinor_lhy_two_channel(;
             F=atom.F, c0=ws_interactions.c0, c1=ws_interactions.c1,
             c_dd=enable_ddi && !isnan(c_dd) ? c_dd : 0.0,
             n_max=n_max_est,
         )
     elseif spinor_lhy === :full_bdg
-        n_max_est = psi_init !== nothing ? maximum(sum(abs2, psi_init; dims=ndims(psi_init))) * 3.0 : 100.0
+        n_max_est = if psi_init !== nothing
+            maximum(sum(abs2, psi_init; dims=ndims(psi_init))) * 3.0
+        else
+            100.0
+        end
         spinor_init = psi_init !== nothing ? _extract_spinor(psi_init) : _default_spinor(atom.F)
         compute_spinor_lhy_table(;
             spinor=spinor_init, F=atom.F, interactions=ws_interactions,
@@ -576,7 +596,7 @@ function make_workspace(;
     end
 
     abs_mask = if absorbing_boundary !== nothing
-        compute_absorbing_mask(grid, absorbing_boundary, sim_params.dt, backend; dtype = U)
+        compute_absorbing_mask(grid, absorbing_boundary, sim_params.dt, backend; dtype=U)
     else
         nothing
     end
@@ -619,17 +639,15 @@ Avoids fragile positional constructor calls when Workspace gains new fields.
 """
 function _rebuild_workspace(ws::Workspace; kwargs...)
     names = fieldnames(Workspace)
-    override = Dict{Symbol,Any}(kwargs)
+    override = Dict{Symbol, Any}(kwargs)
     args = [haskey(override, n) ? override[n] : getfield(ws, n) for n in names]
     Workspace(args...)
 end
 
-_shift_zeeman_for_rotating_frame(z::ZeemanParams, omega::Float64) =
-    ZeemanParams(z.p - omega, z.q)
-_shift_zeeman_for_rotating_frame(z::TimeDependentZeeman, omega::Float64) =
-    TimeDependentZeeman(
-        FunctionWaveform(t -> evaluate(z.p_wf, t) - omega),
-        z.q_wf,
-        z.bx_wf,
-        z.by_wf,
-    )
+_shift_zeeman_for_rotating_frame(z::ZeemanParams, omega::Float64) = ZeemanParams(z.p - omega, z.q)
+_shift_zeeman_for_rotating_frame(z::TimeDependentZeeman, omega::Float64) = TimeDependentZeeman(
+    FunctionWaveform(t -> evaluate(z.p_wf, t) - omega),
+    z.q_wf,
+    z.bx_wf,
+    z.by_wf,
+)

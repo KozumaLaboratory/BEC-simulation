@@ -2,7 +2,6 @@ using Test
 using SpinorBEC
 
 @testset "LaserBeamPotential" begin
-
     @testset "1D: peak at beam center" begin
         beam = OpticalBeam(; wavelength=1064e-9, power=1.0, waist=50e-6)
         α = 1e-36
@@ -84,5 +83,4 @@ using SpinorBEC
         @test lp.direction[1] ≈ 0.6
         @test lp.direction[2] ≈ 0.8
     end
-
 end

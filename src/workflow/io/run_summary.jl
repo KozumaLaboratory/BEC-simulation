@@ -12,13 +12,13 @@ point_NNN.jld2 (or the single root .jld2 for non-scan runs) and reports
 energies, magnetisations, defect counts, frame counts, etc. — enough to
 tell at a glance whether the run finished cleanly.
 """
-function print_run_summary(run_dir::AbstractString; io::IO = stdout)
+function print_run_summary(run_dir::AbstractString; io::IO=stdout)
     isdir(run_dir) || throw(ArgumentError("run_dir not found: $run_dir"))
     println(io, "=" ^ 60)
     println(io, "Run summary: $run_dir")
     println(io, "=" ^ 60)
     files = sort(filter(f -> endswith(f, ".jld2"),
-                        readdir(joinpath(run_dir))))
+        readdir(joinpath(run_dir))))
     isempty(files) && (println(io, "(no .jld2 files yet)"); return nothing)
 
     for fname in files
@@ -40,9 +40,12 @@ function print_run_summary(run_dir::AbstractString; io::IO = stdout)
                 # Dynamics traces
                 if haskey(f, "dynamics/energies")
                     e = f["dynamics/energies"]
-                    println(io, "  dynamics      = $(length(e)) snapshots, " *
-                                "E[1]=$(round(e[1]; digits=4)), " *
-                                "E[end]=$(round(e[end]; digits=4))")
+                    println(
+                        io,
+                        "  dynamics      = $(length(e)) snapshots, " *
+                        "E[1]=$(round(e[1]; digits=4)), " *
+                        "E[end]=$(round(e[end]; digits=4))",
+                    )
                 end
                 # Streamed snapshot count
                 if haskey(f, "dynamics/psi_snapshots_streamed/n_snapshots")
@@ -84,7 +87,7 @@ Useful for regression: re-run the same scan and compare against a
 known-good baseline.
 """
 function compare_runs(dir1::AbstractString, dir2::AbstractString;
-                      tol::Real = 1e-6, io::IO = stdout)
+    tol::Real=1e-6, io::IO=stdout)
     isdir(dir1) && isdir(dir2) ||
         throw(ArgumentError("both dirs must exist: $dir1, $dir2"))
     f1 = Set(filter(f -> endswith(f, ".jld2"), readdir(dir1)))

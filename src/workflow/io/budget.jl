@@ -15,7 +15,7 @@ Covers:
 Not a tight upper bound — CUDA fragmentation, analyzer passes, and
 per-snapshot temporaries can add 10–20 %, so plan for headroom.
 """
-function estimate_run_budget(yaml_path::AbstractString; io::IO = stdout)
+function estimate_run_budget(yaml_path::AbstractString; io::IO=stdout)
     data = YAML.load_file(String(yaml_path))
     pipeline = get(data, "pipeline", Any[])
     isempty(pipeline) &&
@@ -29,7 +29,7 @@ function estimate_run_budget(yaml_path::AbstractString; io::IO = stdout)
     grid_raw === nothing &&
         throw(ArgumentError("ground_state step has no `grid` entry"))
     n_pts_raw = grid_raw["n"]
-    n_pts = NTuple{length(n_pts_raw),Int}(Int.(n_pts_raw))
+    n_pts = NTuple{length(n_pts_raw), Int}(Int.(n_pts_raw))
     box_raw = get(grid_raw, "box", get(grid_raw, "box_size", nothing))
 
     atom_name = get(gs, "atom", "Eu151")
@@ -67,7 +67,7 @@ function estimate_run_budget(yaml_path::AbstractString; io::IO = stdout)
         prod_dict = get(scan, "product", Dict())
         zip_dict = get(scan, "zip", Dict())
         prod_n = isempty(prod_dict) ? 1 :
-            prod(length(v) for v in values(prod_dict))
+                 prod(length(v) for v in values(prod_dict))
         zip_n = isempty(zip_dict) ? 1 : length(first(values(zip_dict)))
         scan_points = max(prod_n, 1) * (isempty(zip_dict) ? 1 : zip_n)
     end
@@ -89,10 +89,15 @@ function estimate_run_budget(yaml_path::AbstractString; io::IO = stdout)
                    snap_disk_per_run      # snapshots
     disk_total = (disk_per_run / compression_ratio) * scan_points
 
-    _fmt(b) = b < 1024       ? @sprintf("%d B", b) :
-              b < 1 << 20    ? @sprintf("%.1f KB", b / 1024) :
-              b < 1 << 30    ? @sprintf("%.1f MB", b / 2^20) :
-                               @sprintf("%.2f GB", b / 2^30)
+    _fmt(b) = if b < 1024
+        @sprintf("%d B", b)
+    elseif b < 1 << 20
+        @sprintf("%.1f KB", b / 1024)
+    elseif b < 1 << 30
+        @sprintf("%.1f MB", b / 2^20)
+    else
+        @sprintf("%.2f GB", b / 2^30)
+    end
 
     println(io, "── Run budget estimate: $(basename(yaml_path)) ──")
     println(io, "  grid:         $(n_pts)   box: $(box_raw)")
@@ -106,8 +111,11 @@ function estimate_run_budget(yaml_path::AbstractString; io::IO = stdout)
         print(io, "  snapshot I/O: ")
         println(io, "$(_fmt(snap_bytes_per))/frame  → streamed ~$(_fmt(snap_ram_streamed)) peak")
     end
-    println(io, "  disk / run:   $(_fmt(disk_per_run / compression_ratio))   " *
-                 "(compression: $(save_compressed ? "zlib ~2.5×" : "none"))")
+    println(
+        io,
+        "  disk / run:   $(_fmt(disk_per_run / compression_ratio))   " *
+        "(compression: $(save_compressed ? "zlib ~2.5×" : "none"))",
+    )
     println(io, "  disk total:   $(_fmt(disk_total))   (× $(scan_points) scan points)")
     if vram_est > 16 * 2^30
         println(io, "  ⚠ VRAM > 16 GB — needs H100 or mixed-precision rewrite")
@@ -123,8 +131,8 @@ function estimate_run_budget(yaml_path::AbstractString; io::IO = stdout)
         scan_points,
         total_steps,
         total_snapshots,
-        psi_bytes_f64 = psi_f64_bytes,
-        psi_bytes_f32 = psi_f32_bytes,
+        psi_bytes_f64=psi_f64_bytes,
+        psi_bytes_f32=psi_f32_bytes,
         vram_est,
         host_ram_est,
         snap_bytes_per,

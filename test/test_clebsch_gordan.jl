@@ -1,5 +1,4 @@
 @testset "Clebsch-Gordan / Wigner coefficients" begin
-
     @testset "Wigner 3j known values" begin
         # (1,1,0; 0,0,0) = -1/√3 (standard Condon-Shortley convention)
         @test wigner_3j(1, 1, 0, 0, 0, 0) ≈ -1 / sqrt(3) atol = 1e-12
@@ -40,9 +39,9 @@
     @testset "CG orthogonality (fixed l,M)" begin
         for F in [1, 2, 3]
             for l in 0:2F
-                for M in -l:l
+                for M in (-l):l
                     s = 0.0
-                    for m1 in -F:F
+                    for m1 in (-F):F
                         m2 = M - m1
                         abs(m2) > F && continue
                         s += clebsch_gordan(F, m1, F, m2, l, M)^2
@@ -55,7 +54,7 @@
 
     @testset "CG completeness (fixed m1,m2)" begin
         for F in [1, 2]
-            for m1 in -F:F, m2 in -F:F
+            for m1 in (-F):F, m2 in (-F):F
                 M = m1 + m2
                 s = 0.0
                 for l in 0:2F
@@ -92,7 +91,9 @@
 
         psi = [0.5+0.1im, 0.3-0.2im, 0.4+0.3im]
         sm = spin_matrices(1)
-        Fx_m = Matrix(sm.Fx); Fy_m = Matrix(sm.Fy); Fz_m = Matrix(sm.Fz)
+        Fx_m = Matrix(sm.Fx);
+        Fy_m = Matrix(sm.Fy);
+        Fz_m = Matrix(sm.Fz)
 
         n = sum(abs2, psi)
         fx = real(psi' * Fx_m * psi)
@@ -103,12 +104,12 @@
         # Pair amplitude calculation
         V_pair = 0.0
         for (S, gS) in [(0, a0), (2, a2)]
-            for M in -S:S
+            for M in (-S):S
                 a = 0.0 + 0.0im
                 for m1 in -1:1
                     m2 = M - m1
                     abs(m2) > 1 && continue
-                    a += clebsch_gordan(1, m1, 1, m2, S, M) * psi[1-m1+1] * psi[1-m2+1]
+                    a += clebsch_gordan(1, m1, 1, m2, S, M) * psi[1 - m1 + 1] * psi[1 - m2 + 1]
                 end
                 V_pair += gS * abs2(a)
             end
@@ -119,7 +120,7 @@
 
     @testset "c_k ↔ g_S roundtrip" begin
         for F in [1, 2, 3, 6]
-            c_dict = Dict{Int,Float64}(k => randn() for k in 0:2:2F)
+            c_dict = Dict{Int, Float64}(k => randn() for k in 0:2:2F)
             g_dict = SpinorBEC._cn_to_gS(F, c_dict)
             c_round = SpinorBEC._gS_to_cn(F, g_dict)
             for k in 0:2:2F

@@ -44,7 +44,7 @@
             for i in 1:3
                 # Each eigenvalue should have a partner with opposite sign
                 @test abs(evals[i] + evals[end - i + 1]) < 0.1 ||
-                      abs(real(evals[i])) < 0.1
+                    abs(real(evals[i])) < 0.1
             end
         end
     end

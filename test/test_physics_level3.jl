@@ -3,7 +3,6 @@ using SpinorBEC
 using LinearAlgebra
 
 @testset "Level 3: Spin Dynamics" begin
-
     @testset "Larmor precession: full system with intermediate checkpoints" begin
         # Equatorial spin coherent state |Fx=+1⟩ = (1/2, 1/√2, 1/2)
         # Under linear Zeeman p: ⟨Fx⟩(t) = cos(pt), ⟨Fy⟩(t) = -sin(pt)
@@ -27,7 +26,12 @@ using LinearAlgebra
         checkpoints = [π / 4, π / 2, π, 3π / 2, 2π]
         checkpoint_steps = [round(Int, t / dt) for t in checkpoints]
 
-        sp = SimParams(; dt, n_steps=checkpoint_steps[end], imaginary_time=false, save_every=checkpoint_steps[end])
+        sp = SimParams(;
+            dt,
+            n_steps=checkpoint_steps[end],
+            imaginary_time=false,
+            save_every=checkpoint_steps[end],
+        )
         ws = make_workspace(;
             grid, atom,
             interactions=InteractionParams(0.0, 0.0),
@@ -214,5 +218,4 @@ using LinearAlgebra
             end
         end
     end
-
 end

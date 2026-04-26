@@ -2,7 +2,6 @@ using Test
 using SpinorBEC
 
 @testset "P4 analyzers and noise models" begin
-
     @testset "P4.4 Projected GP: high-k modes zeroed" begin
         cfg = GridConfig((16, 16), (6.0, 6.0))
         grid = make_grid(cfg)
@@ -10,15 +9,15 @@ using SpinorBEC
         sp = SimParams(; dt=0.005, n_steps=1)
         ws = make_workspace(;
             grid, atom,
-            interactions = InteractionParams(10.0, 0.0),
-            sim_params = sp,
-            potential = HarmonicTrap(1.0, 1.0),
-            zeeman = ZeemanParams(),
+            interactions=InteractionParams(10.0, 0.0),
+            sim_params=sp,
+            potential=HarmonicTrap(1.0, 1.0),
+            zeeman=ZeemanParams(),
         )
         # Deposit a high-k perturbation on m=0 component
         psi = ws.state.psi
         @inbounds for j in 1:size(psi, 2), i in 1:size(psi, 1)
-            psi[i, j, 2] += 0.01 * cis(2π * (i-1) * (size(psi,1)/2) / size(psi,1))
+            psi[i, j, 2] += 0.01 * cis(2π * (i-1) * (size(psi, 1)/2) / size(psi, 1))
         end
         n_before = sum(abs2, psi)
 
@@ -38,9 +37,9 @@ using SpinorBEC
         sp = SimParams(; dt=0.01, n_steps=1)
         ws = make_workspace(;
             grid, atom,
-            interactions = InteractionParams(10.0, 0.0),
-            sim_params = sp, potential = HarmonicTrap(1.0, 1.0, 1.0),
-            zeeman = ZeemanParams(),
+            interactions=InteractionParams(10.0, 0.0),
+            sim_params=sp, potential=HarmonicTrap(1.0, 1.0, 1.0),
+            zeeman=ZeemanParams(),
         )
         psi_before = copy(ws.state.psi)
         n_before = sum(abs2, psi_before)
@@ -58,7 +57,8 @@ using SpinorBEC
         # Synthesize a single-charge vortex: ψ(x,y) = f(r) · exp(iθ)
         psi = zeros(ComplexF64, 32, 32, 3)
         @inbounds for j in 1:32, i in 1:32
-            x = grid.x[1][i]; y = grid.x[2][j]
+            x = grid.x[1][i];
+            y = grid.x[2][j]
             r = sqrt(x^2 + y^2)
             phase = atan(y, x)
             psi[i, j, 1] = 0.5 * r * cis(phase) * exp(-r^2 / 4)
@@ -98,10 +98,10 @@ using SpinorBEC
         sp = SimParams(; dt=0.01, n_steps=1)
         ws = make_workspace(;
             grid, atom,
-            interactions = InteractionParams(5.0, 0.0),
-            sim_params = sp,
-            potential = HarmonicTrap(1.0, 1.0),
-            zeeman = ZeemanParams(),
+            interactions=InteractionParams(5.0, 0.0),
+            sim_params=sp,
+            potential=HarmonicTrap(1.0, 1.0),
+            zeeman=ZeemanParams(),
         )
         psi_before = copy(ws.state.psi)
         apply_sgpe_step!(ws, 0.0, 0.0, 0.01)
@@ -115,10 +115,10 @@ using SpinorBEC
         sp = SimParams(; dt=0.01, n_steps=1)
         ws = make_workspace(;
             grid, atom,
-            interactions = InteractionParams(5.0, 0.0),
-            sim_params = sp,
-            potential = HarmonicTrap(1.0, 1.0),
-            zeeman = ZeemanParams(),
+            interactions=InteractionParams(5.0, 0.0),
+            sim_params=sp,
+            potential=HarmonicTrap(1.0, 1.0),
+            zeeman=ZeemanParams(),
         )
         # Seed m=0 with a high-k standing wave plus a low-k bulk
         psi = ws.state.psi
@@ -140,10 +140,10 @@ using SpinorBEC
         sp = SimParams(; dt=0.01, n_steps=1)
         ws = make_workspace(;
             grid, atom,
-            interactions = InteractionParams(5.0, 0.0),
-            sim_params = sp,
-            potential = HarmonicTrap(1.0, 1.0),
-            zeeman = ZeemanParams(),
+            interactions=InteractionParams(5.0, 0.0),
+            sim_params=sp,
+            potential=HarmonicTrap(1.0, 1.0),
+            zeeman=ZeemanParams(),
         )
         ws.state.psi .= 0
         # With zero damping but nonzero T there's no formal FD relation, but
@@ -161,10 +161,10 @@ using SpinorBEC
         sp = SimParams(; dt=0.01, n_steps=1)
         ws = make_workspace(;
             grid, atom,
-            interactions = InteractionParams(5.0, 0.0),
-            sim_params = sp,
-            potential = HarmonicTrap(1.0, 1.0),
-            zeeman = ZeemanParams(),
+            interactions=InteractionParams(5.0, 0.0),
+            sim_params=sp,
+            potential=HarmonicTrap(1.0, 1.0),
+            zeeman=ZeemanParams(),
         )
         ws.state.psi .= 1.0
         cb = sgpe_callback(0.05, 0.1, 0.01; seed=42)
