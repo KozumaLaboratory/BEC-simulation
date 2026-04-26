@@ -87,7 +87,13 @@ function SpinorBEC.apply_raman_step!(
     end
 
     β .= acos(clamp(delta / phi_mag_val, -one(T), one(T)))
-    α .= .-kr
+    # α = atan2(phi_y, phi_x) where phi_x = Ω cos(kr), phi_y = -Ω sin(kr).
+    # For Ω > 0 this collapses to α = -kr. For Ω < 0, the (phi_x, phi_y)
+    # quadrant flips, giving α = π - kr (mod 2π) — the previous
+    # `α .= -kr` shipped the Ω > 0 branch only and silently rotated
+    # negative-Ω drives the wrong way. Match the CPU's atan2 exactly so
+    # the sign of Ω propagates into the rotation.
+    α .= atan.(.-Omega_R .* sin.(kr), Omega_R .* cos.(kr))
     θ .= phi_mag_val * dt_t
 
     for c in 1:D

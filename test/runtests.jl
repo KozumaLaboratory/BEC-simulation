@@ -101,6 +101,7 @@ const FULL_EXTRA = [
     "test_synthetic_dimension.jl",
     "test_calibration_drift.jl",
     "test_dynamics_knobs.jl",
+    "test_cuda_equivalence.jl",
 ]
 
 # ── Physics tier: analytic validation + physics level tests ──
