@@ -115,19 +115,23 @@ function SpinorBEC.apply_spin_mixing_step!(
     α_view .= atan.(fy, fx)
     f_mag_view .*= c1_t * dt_t       # θ = c1 * f_mag * dt
 
-    # --- R_z(-α): single fused (N,D) broadcast replacing D column updates ---
-    # psi_2d[i,c] *= cis(-m[c] * α[i])
-    # NOTE: minus sign matches CPU Rz(-α): @. pc *= cis(m_c * α)? No, CPU is:
-    #   for c: m_c = F-(c-1); pc *= cis(m_c * alpha) → that's Rz(+α) if using the sign convention
-    # Original GPU code did cis.(-m .* α), keep same convention.
-    psi_2d .*= cis.(.-m_gpu .* α)
+    # --- Step 1: R_z(-α) → psi_2d[i,c] *= cis(+m[c] * α[i]) ---
+    # Matches CPU spinor_utils.jl `_apply_euler_spin_rotation` (line 121-129):
+    # the initial phase is `cis(F·α)` and the per-component recurrence
+    # multiplies by `cis(-α)`, giving `cis(m_c · α)` per column. ddi.jl
+    # line 592 uses the same `cis(+m_c · alpha)` convention. The earlier
+    # GPU code shipped `cis(-m_c · α)` here (and likewise at Step 5 below),
+    # which is α → -α — that flipped the sign of the F_y component of the
+    # spin-mixing field and gave wrong dynamics for any state with
+    # ⟨F_y⟩ ≠ 0 on GPU. Fixed 2026-04-26 after audit.
+    psi_2d .*= cis.(m_gpu .* α)
 
-    # --- R_y(-β): V · diag(exp(+iβλ)) · V† · ψ ---
+    # --- Step 2: R_y(-β) = V · diag(exp(+iβλ)) · V† · ψ ---
     CUDA.CUBLAS.gemm!('N', 'T', Complex{T}(1), psi_2d, cache.Vt, Complex{T}(0), tmp)
     tmp .*= cis.(β .* λ_gpu)  # fused (N,D) × (N,1)*(1,D)
     CUDA.CUBLAS.gemm!('N', 'T', Complex{T}(1), tmp, cache.V, Complex{T}(0), psi_2d)
 
-    # --- exp(-iθFz) (diagonal in spin) ---
+    # --- Step 3: exp(-iθF_z) (diagonal in spin) ---
     if imaginary_time
         # Shift by -F so largest factor is exp(0)=1 (m=-F gets factor 1)
         psi_2d .*= exp.(θ .* m_shift_gpu)
@@ -135,13 +139,14 @@ function SpinorBEC.apply_spin_mixing_step!(
         psi_2d .*= cis.(.-θ .* m_gpu)
     end
 
-    # --- R_y(β): V · diag(exp(-iβλ)) · V† · ψ ---
+    # --- Step 4: R_y(β) = V · diag(exp(-iβλ)) · V† · ψ ---
     CUDA.CUBLAS.gemm!('N', 'T', Complex{T}(1), psi_2d, cache.Vt, Complex{T}(0), tmp)
     tmp .*= cis.(.-β .* λ_gpu)
     CUDA.CUBLAS.gemm!('N', 'T', Complex{T}(1), tmp, cache.V, Complex{T}(0), psi_2d)
 
-    # --- R_z(α) ---
-    psi_2d .*= cis.(m_gpu .* α)
+    # --- Step 5: R_z(α) → psi_2d[i,c] *= cis(-m[c] * α[i]) ---
+    # See Step 1 note. ddi.jl line 632 uses the same `cis(-m_c · alpha)`.
+    psi_2d .*= cis.(.-m_gpu .* α)
 
     nothing
 end
