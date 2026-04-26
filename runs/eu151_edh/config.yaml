@@ -71,5 +71,8 @@ pipeline:
       dt: 0.0001
       save_every: 5000           # ~55 snapshots, 0.72 ms resolution
       seed_amplitude: 1.0e-6     # tiny symmetry-breaking seed
+      seed_k_cut: 2.5            # ~ 1/ξ_h: keeps long-wavelength EdH modes,
+                                 # suppresses short-wavelength UV grass that
+                                 # DDI would otherwise amplify into noise
       noise_seed: 42
       zeeman: {p: 0.39, q: 0.0}

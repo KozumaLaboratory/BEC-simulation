@@ -175,6 +175,26 @@ export const api = {
     )
   },
 
+  /** Live status snapshot for an in-progress run. Returns the latest
+   * step / energy / Mz / populations the simulator wrote to its
+   * `_live_status.json`. 404 when the run isn't actively writing. */
+  liveStatus(run: string): Promise<{
+    step: number
+    t: number
+    energy: number
+    norm: number
+    populations: number[]
+    updated_ms: number
+  }> {
+    return json(`/api/live/${encodeURIComponent(run)}`)
+  },
+
+  /** Returns runs whose live status was touched in the last 5 minutes —
+   * the dashboard's "what's running right now" panel polls this. */
+  listLiveRuns(): Promise<Array<{ run: string; mtime_ms: number; age_s: number }>> {
+    return json('/api/live/list')
+  },
+
   /** 3D density atlas: one binary blob containing every snap's full
    * 3D density volume for one component. Layout matches the backend's
    * "D3AT" packer (see /api/density3d_atlas). Returns the per-snap

@@ -392,6 +392,36 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         end
         (200, "application/json", "[" * join(items, ",") * "]")
 
+    elseif path == "/api/live/list"
+        # Scan base_dir/* for runs whose _live_status.json was touched in
+        # the last 5 minutes — those are presumed actively running. Return
+        # a JSON array of {run, mtime_ms, age_s}.
+        cutoff_s = 300.0
+        active = String[]
+        if isdir(base_dir)
+            now_s = time()
+            for entry in readdir(base_dir)
+                full = joinpath(base_dir, entry, "_live_status.json")
+                isfile(full) || continue
+                age = now_s - mtime(full)
+                age <= cutoff_s || continue
+                mt = round(Int, mtime(full) * 1000)
+                push!(active,
+                    "{\"run\":\"$entry\",\"mtime_ms\":$mt,\"age_s\":$(round(age; digits=1))}")
+            end
+        end
+        (200, "application/json", "[" * join(active, ",") * "]")
+
+    elseif startswith(path, "/api/live/")
+        # /api/live/<run_name> → contents of base_dir/<run>/_live_status.json
+        run_name = _uri_decode(path[(length("/api/live/") + 1):end])
+        status_path = joinpath(base_dir, run_name, "_live_status.json")
+        if !isfile(status_path)
+            return (404, "application/json", "{\"error\":\"no live status for $run_name\"}")
+        end
+        body = read(status_path, String)
+        (200, "application/json", body)
+
     elseif path == "/api/runs"
         runs = list_runs(base_dir)
         (200, "application/json", "[" * join(["\"$r\"" for r in runs], ",") * "]")

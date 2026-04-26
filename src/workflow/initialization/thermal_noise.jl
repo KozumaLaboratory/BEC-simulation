@@ -123,7 +123,7 @@ function add_thermal_noise(psi::AbstractArray{<:Complex}, F::Int; kwargs...)
 end
 
 """
-    add_symmetry_breaking_seed!(psi, F; amplitude, seed) → psi
+    add_symmetry_breaking_seed!(psi, F; amplitude, seed, k_cut, grid) → psi
 
 Add a tiny perturbation to the nearest transverse spin component (Δm=±1)
 to seed dynamical instabilities (e.g. EdH effect).
@@ -132,14 +132,24 @@ Only the m=F-1 (or m=-F+1 for AFM) component receives noise.
 Amplitude is relative to max|ψ|.  After seeding, the wavefunction is
 renormalized to preserve total density.
 
+Optional **k-space lowpass**: pass `k_cut > 0` together with `grid` to
+suppress white-noise spectral content above |k| = k_cut. This concentrates
+the seed in the long-wavelength modes that physically drive instabilities
+(e.g. the EdH spin-wave manifold below the healing-length wavenumber)
+instead of exciting all bands uniformly. With `k_cut === nothing` (default)
+the noise is unfiltered white.
+
 Typical usage: `amplitude = 1e-6` for symmetry breaking without
-injecting macroscopic energy.
+injecting macroscopic energy. For EdH, also set `k_cut ≈ 1/ξ_h` with
+`ξ_h = 1/sqrt(8π n a_s)` the healing length.
 """
 function add_symmetry_breaking_seed!(
     psi::AbstractArray{<:Complex},
     F::Int;
     amplitude::Float64=1e-6,
     seed::Int=42,
+    k_cut::Union{Nothing, Float64}=nothing,
+    grid=nothing,
 )
     D = 2F + 1
     ndim = ndims(psi) - 1
@@ -166,6 +176,31 @@ function add_symmetry_breaking_seed!(
     noise = zeros(ComplexF64, n_pts...)
     @inbounds for I in eachindex(noise)
         noise[I] = noise_scale * (randn(rng) + 1im * randn(rng)) / sqrt(2)
+    end
+
+    if k_cut !== nothing
+        grid === nothing && throw(ArgumentError(
+            "add_symmetry_breaking_seed!: k_cut requires `grid` to map FFT bins"))
+        k_cut > 0 || throw(ArgumentError(
+            "add_symmetry_breaking_seed!: k_cut must be positive (got $k_cut)"))
+        nhat = fft(noise)
+        kvecs = grid.k
+        kc2 = k_cut^2
+        @inbounds for I in CartesianIndices(nhat)
+            k2 = 0.0
+            for d in 1:ndim
+                k2 += kvecs[d][I.I[d]]^2
+            end
+            if k2 > kc2
+                nhat[I] = 0
+            end
+        end
+        noise = ifft(nhat)
+        # Restore the per-pixel target amplitude after spectral truncation
+        new_max = maximum(abs, noise)
+        if new_max > 0
+            noise .*= noise_scale / new_max
+        end
     end
 
     idx = _component_slice(ndim, n_pts, target_c)

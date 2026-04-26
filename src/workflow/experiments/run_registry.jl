@@ -224,7 +224,9 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
 
             config = parse_pipeline(patched)
             ckpt_dir = joinpath(run_dir, ".checkpoints", basename(psi_file))
-            result = run_pipeline(config; verbose=false, psi_init=psi_prev, checkpoint_dir=ckpt_dir)
+            live_path = joinpath(run_dir, "_live_status.json")
+            result = run_pipeline(config; verbose=false, psi_init=psi_prev,
+                checkpoint_dir=ckpt_dir, live_status_path=live_path)
 
             finished_at = _now_iso()
             duration = time() - t_start
@@ -358,7 +360,9 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
 
     config = parse_pipeline(data)
     ckpt_dir = joinpath(run_dir, ".checkpoints", basename(psi_file))
-    result = run_pipeline(config; verbose, checkpoint_dir=ckpt_dir)
+    live_path = joinpath(run_dir, "_live_status.json")
+    result = run_pipeline(config; verbose, checkpoint_dir=ckpt_dir,
+        live_status_path=live_path)
 
     finished_at = _now_iso()
     duration = time() - t_start

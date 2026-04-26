@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { useRunData } from '@/state/useRunData'
 import { useDashboardURL } from '@/state/useDashboardURL'
 import { TopControls } from '@/components/TopControls'
+import { LiveStatusPanel } from '@/components/LiveStatusPanel'
 import { Stats } from '@/components/Stats'
 import { MetricLineChart } from '@/components/charts/MetricLineChart'
 import {
@@ -68,6 +69,10 @@ export default function App() {
       </header>
 
       <TopControls state={state} />
+
+      <div className="mb-3">
+        <LiveStatusPanel run={selectedRun} />
+      </div>
 
       {error && (
         <div className="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-2 text-sm text-destructive">

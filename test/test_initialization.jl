@@ -1,5 +1,6 @@
 using Test
 using SpinorBEC
+using FFTW: fft
 
 @testset "Initialization" begin
     @testset "init_psi states are normalized" begin
@@ -107,5 +108,33 @@ using SpinorBEC
         @test size(psi) == (32, 32, 3)
         norm = sum(abs2, psi) * dV
         @test norm ≈ 1.0 atol = 1e-12
+    end
+
+    @testset "add_symmetry_breaking_seed! lowpass" begin
+        grid = make_grid(GridConfig((32, 32), (8.0, 8.0)))
+        sys = SpinSystem(1)
+        dV = cell_volume(grid)
+        # Ferromagnetic: dominant is m=+1 (index 1), so seed target = index 2.
+        psi0 = init_psi(grid, sys; state=:ferromagnetic)
+        norm0 = sum(abs2, psi0) * dV
+        psi = copy(psi0)
+        SpinorBEC.add_symmetry_breaking_seed!(psi, 1;
+            amplitude=1e-3, seed=7, k_cut=1.0, grid=grid)
+        # Renormalised back to original total density
+        @test sum(abs2, psi) * dV ≈ norm0 atol=1e-10
+        delta = psi[:, :, 2] .- psi0[:, :, 2]
+        nhat = fft(delta)
+        kvecs = grid.k
+        kc2 = 1.0
+        p_above = 0.0
+        p_below = 0.0
+        for I in CartesianIndices(nhat)
+            k2 = kvecs[1][I.I[1]]^2 + kvecs[2][I.I[2]]^2
+            (k2 > kc2 ? (p_above += abs2(nhat[I])) : (p_below += abs2(nhat[I])))
+        end
+        # Cutoff power above k_cut should be machine-epsilon dust vs.
+        # the retained low-k band
+        @test p_below > 0
+        @test p_above < 1e-20 * p_below
     end
 end

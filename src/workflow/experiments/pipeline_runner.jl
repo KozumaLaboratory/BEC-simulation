@@ -73,12 +73,16 @@ and produces a new one. Analysis steps don't modify psi but accumulate
 results.
 """
 function run_pipeline(config::PipelineConfig; verbose::Bool=true, psi_init=nothing,
-    checkpoint_dir::Union{Nothing, String}=nothing)
+    checkpoint_dir::Union{Nothing, String}=nothing,
+    live_status_path::Union{Nothing, String}=nothing)
     psi = psi_init
     grid = nothing
     atom = nothing
     workspace = nothing
     results = Dict{Symbol, Any}()
+    if live_status_path !== nothing
+        results[:_live_status_path] = live_status_path
+    end
 
     for (i, step) in enumerate(config.steps)
         if verbose
@@ -96,7 +100,7 @@ function run_pipeline(config::PipelineConfig; verbose::Bool=true, psi_init=nothi
         # surrounding inference world stays narrow.
         psi, grid, atom, workspace = _step_dispatch!(
             results, step, psi, grid, atom, workspace,
-            verbose, checkpoint_dir,
+            verbose, checkpoint_dir, live_status_path,
         )
     end
 
@@ -119,6 +123,7 @@ end
     @nospecialize(workspace),
     verbose::Bool,
     checkpoint_dir,
+    live_status_path::Union{Nothing, String},
 )
     # Each branch hands back a 5-tuple from _run_step. We narrow to
     # `Tuple` immediately so the loop-local types stay maximally generic.
@@ -128,6 +133,9 @@ end
     elseif step isa BinaryDynamicsStep
         _run_step(step, psi, grid, atom, workspace;
             verbose, checkpoint_dir, pipeline_results=results)
+    elseif step isa DynamicsStep
+        _run_step(step, psi, grid, atom, workspace;
+            verbose, checkpoint_dir, live_status_path)
     else
         _run_step(step, psi, grid, atom, workspace; verbose, checkpoint_dir)
     end
@@ -434,7 +442,9 @@ function _run_step(
 end
 
 function _run_step(
-    step::DynamicsStep, psi_prev, grid, atom, ws_prev; verbose=true, checkpoint_dir=nothing
+    step::DynamicsStep, psi_prev, grid, atom, ws_prev;
+    verbose=true, checkpoint_dir=nothing,
+    live_status_path::Union{Nothing, String}=nothing,
 )
     psi_prev !== nothing ||
         throw(ArgumentError("dynamics step requires a preceding ground_state step"))
@@ -577,8 +587,15 @@ function _run_step(
         v === nothing ? nothing : Float64(v)
     end
     if seed_amp !== nothing
+        seed_k_cut = let v = get(p, "seed_k_cut", nothing)
+            v === nothing ? nothing : Float64(v)
+        end
         add_symmetry_breaking_seed!(
-            ws.state.psi, F; amplitude=seed_amp, seed=Int(get(p, "noise_seed", 42))
+            ws.state.psi, F;
+            amplitude=seed_amp,
+            seed=Int(get(p, "noise_seed", 42)),
+            k_cut=seed_k_cut,
+            grid=seed_k_cut === nothing ? nothing : grid,
         )
     end
 
@@ -624,7 +641,8 @@ function _run_step(
     cb_sgpe = _build_sgpe_callback(get(p, "sgpe", nothing), Float64(sp.dt))
     cb_pgp = _build_pgp_callback(get(p, "projected_gp", nothing))
     cb_photon = _build_photon_callback(get(p, "photon_scattering", nothing), Float64(sp.dt))
-    extra_cb = _compose_callbacks(cb_sgpe, cb_pgp, cb_photon)
+    cb_live = _build_live_callback(get(p, "live_monitor", nothing), live_status_path)
+    extra_cb = _compose_callbacks(cb_sgpe, cb_pgp, cb_photon, cb_live)
 
     result, snap_tmp_path, snap_count = _run_dynamics_with_optional_streaming!(
         ws, save_psi_snap, save_compress, snap_precision_cf;
@@ -757,6 +775,63 @@ function _build_photon_callback(node, dt::Float64)
         v === nothing ? nothing : Int(v)
     end
     photon_scattering_callback(Γ_sc, dt; seed=seed)
+end
+
+"""
+    _build_live_callback(node, status_path) -> Union{Nothing,Function}
+
+Build an on_step callback that periodically writes a JSON status snapshot
+to `status_path` for the dashboard's `/api/live/*` endpoints. Accepts:
+
+    live_monitor: false | null   → off
+    live_monitor: true           → defaults (every=50)
+    live_monitor: {every: 100}   → custom cadence
+
+If `status_path === nothing` we silently skip even when YAML asks for it
+(useful for ad-hoc `run_config` calls that have no run dir).
+"""
+function _build_live_callback(node, status_path::Union{Nothing, String})
+    node === nothing && return nothing
+    if node isa Bool
+        node || return nothing
+        every = 50
+    else
+        node isa Dict || throw(ArgumentError(
+            "dynamics.live_monitor must be Bool or Dict, got $(typeof(node))"))
+        every = Int(get(node, "every", 50))
+    end
+    status_path === nothing && return nothing
+    every >= 1 || throw(ArgumentError("live_monitor.every must be >= 1"))
+    status_dir = dirname(status_path)
+    isempty(status_dir) || mkpath(status_dir)
+    function (ws, step, times, energies)
+        step % every == 0 || return nothing
+        psi = ws.state.psi
+        D = size(psi, ndims(psi))
+        ndim = ndims(psi) - 1
+        n_total = sum(abs2, psi)
+        pops = Float64[]
+        for c in 1:D
+            push!(pops, Float64(sum(abs2, selectdim(psi, ndim + 1, c))) / n_total)
+        end
+        e_now = isempty(energies) ? NaN : Float64(energies[end])
+        t_now = isempty(times) ? Float64(ws.state.t) : Float64(times[end])
+        data = Dict{String, Any}(
+            "step" => step,
+            "t" => t_now,
+            "energy" => e_now,
+            "norm" => Float64(n_total) * Float64(cell_volume(ws.grid)),
+            "populations" => pops,
+            "updated_ms" => round(Int, time() * 1000),
+        )
+        # Atomic write: tmp file + rename so HTTP readers never see partial JSON
+        tmp_path = status_path * ".tmp"
+        open(tmp_path, "w") do f
+            JSON.print(f, data)
+        end
+        mv(tmp_path, status_path; force=true)
+        nothing
+    end
 end
 
 """Compose multiple optional on_step callbacks into a single one. Each
