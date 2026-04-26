@@ -382,7 +382,7 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
             return (200, "application/json", "[]")
         end
         files = sort(filter(f -> startswith(f, "shot_") && endswith(f, ".png"),
-                             readdir(img_dir)); rev = true)
+                readdir(img_dir)); rev=true)
         files = files[1:min(limit, length(files))]
         items = map(files) do f
             full = joinpath(img_dir, f)
@@ -888,11 +888,11 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
                 n_pts = ntuple(i -> size(psi, i), ndim)
                 box_n = ntuple(i -> Float64(box[i]), ndim)
                 grid = make_grid(GridConfig(n_pts, box_n))
-                d = synthetic_dim_dispersion(psi, grid; axis = axis)
+                d = synthetic_dim_dispersion(psi, grid; axis=axis)
                 spectrum_f32 = Float32.(d.spectrum)
                 n_axis = size(spectrum_f32, 1)
                 D = size(spectrum_f32, 2)
-                buf = IOBuffer(; sizehint = 40 + n_axis * D * 4)
+                buf = IOBuffer(; sizehint=40 + n_axis * D * 4)
                 # density_bin header reused: ndim=2, axis=axis,
                 # nx=n_axis, ny=D, n_comp=0 (no per-component split,
                 # the whole image lives in the total slot), F=0.

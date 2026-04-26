@@ -480,6 +480,13 @@ using PrecompileTools
             write(iob, Int32(1), Int32(1), Int32(4), Int32(4), Int32(3), Int32(1))
             write(iob, Float32[0, 1, 0, 1])
             take!(iob)
+            # NOTE: Pre-compiling the binary-GP YAML pipeline path was
+            # tried here and made package precompile take 10+ minutes —
+            # the same JIT cascade that hits the runtime call simply
+            # moves to build time. Standalone solver path still works
+            # via test/test_binary_simulation.jl; YAML wiring remains a
+            # known slow-first-call limitation tracked in the test
+            # guards (_SKIP_HEAVY_YAML_INFRA / _SKIP_HEAVY_YAML_ZEEMAN).
         catch
             # Don't break package precompile if the workload trips.
         finally

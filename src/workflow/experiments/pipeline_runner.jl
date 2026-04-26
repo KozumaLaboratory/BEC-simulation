@@ -28,9 +28,21 @@ function _parse_step(d::Dict)
     val = d[keys_list[1]]
 
     if key == :ground_state
-        GroundStateStep(Dict{String, Any}(string(k) => v for (k, v) in val))
+        params = Dict{String, Any}(string(k) => v for (k, v) in val)
+        kind = get(params, "kind", nothing)
+        if kind == "binary" || kind == :binary
+            BinaryGroundStateStep(params)
+        else
+            GroundStateStep(params)
+        end
     elseif key == :dynamics
-        DynamicsStep(Dict{String, Any}(string(k) => v for (k, v) in val))
+        params = Dict{String, Any}(string(k) => v for (k, v) in val)
+        kind = get(params, "kind", nothing)
+        if kind == "binary" || kind == :binary
+            BinaryDynamicsStep(params)
+        else
+            DynamicsStep(params)
+        end
     elseif key == :analyze
         analyzers = Pair{Symbol, Dict{String, Any}}[]
         for entry in val
@@ -74,36 +86,69 @@ function run_pipeline(config::PipelineConfig; verbose::Bool=true, psi_init=nothi
             flush(stdout);
             ccall(:fflush, Cint, (Ptr{Cvoid},), C_NULL)
         end
-        psi, grid, atom, workspace, step_result = if step isa AnalyzeStep
-            _run_step(step, psi, grid, atom, workspace;
-                verbose, checkpoint_dir, pipeline_results=results)
-        else
-            _run_step(step, psi, grid, atom, workspace; verbose, checkpoint_dir)
-        end
-        if step_result !== nothing
-            if step isa DynamicsStep
-                # Maintain a history of every dynamics step so analyzers
-                # (e.g. column_density_movie with multi_step=true) can
-                # walk all phases of a multi-stage pipeline like Klaus
-                # 2022 (tilt → spin-up → magnetostir).
-                history = get(results, :dynamics_history,
-                    NamedTuple[])
-                push!(
-                    history,
-                    (
-                        dynamics_result=get(step_result, :dynamics_result, nothing),
-                        snapshot_tmp_path=get(step_result, :snapshot_tmp_path, nothing),
-                        save_psi_snapshots=get(step_result, :save_psi_snapshots, false),
-                        snapshot_count=get(step_result, :snapshot_count, 0),
-                    ),
-                )
-                results[:dynamics_history] = history
-            end
-            merge!(results, step_result)
-        end
+        # Push the per-iteration dispatch + tuple destructuring into a
+        # @nospecialize-tagged helper. Without that, Julia specialises
+        # this loop body across every PipelineStep concrete type AND
+        # every _run_step return-tuple shape, which compounds into a
+        # multi-minute JIT cascade once the binary GP path is in the
+        # union (CLAUDE.md "Type stability boundaries"). The helper
+        # treats step as Any, so dispatch happens at runtime and the
+        # surrounding inference world stays narrow.
+        psi, grid, atom, workspace = _step_dispatch!(
+            results, step, psi, grid, atom, workspace,
+            verbose, checkpoint_dir,
+        )
     end
 
     (psi=psi, grid=grid, atom=atom, results...)
+end
+
+# Inference barrier for the per-step dispatch — see run_pipeline for
+# rationale. `@nospecialize` on `step` is the load-bearing annotation:
+# without it, Julia generates a fresh specialisation of this function
+# (and the rest of the loop body) for each PipelineStep concrete type
+# the YAML mentions, and the binary GP path's return-tuple type hits a
+# combinatorial explosion that takes 10+ minutes of inference work to
+# settle. With it, dispatch on step happens once at runtime per step.
+@noinline function _step_dispatch!(
+    results::Dict{Symbol, Any},
+    @nospecialize(step),
+    @nospecialize(psi),
+    @nospecialize(grid),
+    @nospecialize(atom),
+    @nospecialize(workspace),
+    verbose::Bool,
+    checkpoint_dir,
+)
+    # Each branch hands back a 5-tuple from _run_step. We narrow to
+    # `Tuple` immediately so the loop-local types stay maximally generic.
+    out = if step isa AnalyzeStep
+        _run_step(step, psi, grid, atom, workspace;
+            verbose, checkpoint_dir, pipeline_results=results)
+    elseif step isa BinaryDynamicsStep
+        _run_step(step, psi, grid, atom, workspace;
+            verbose, checkpoint_dir, pipeline_results=results)
+    else
+        _run_step(step, psi, grid, atom, workspace; verbose, checkpoint_dir)
+    end
+    psi_out, grid_out, atom_out, workspace_out, step_result = out
+    if step_result !== nothing
+        if step isa DynamicsStep || step isa BinaryDynamicsStep
+            history = get(results, :dynamics_history, NamedTuple[])
+            push!(
+                history,
+                (
+                    dynamics_result=get(step_result, :dynamics_result, nothing),
+                    snapshot_tmp_path=get(step_result, :snapshot_tmp_path, nothing),
+                    save_psi_snapshots=get(step_result, :save_psi_snapshots, false),
+                    snapshot_count=get(step_result, :snapshot_count, 0),
+                ),
+            )
+            results[:dynamics_history] = history
+        end
+        merge!(results, step_result)
+    end
+    return (psi_out, grid_out, atom_out, workspace_out)
 end
 
 # --- Step dispatch ---
@@ -119,12 +164,11 @@ function _run_step(
 )
     p = step.params
 
-    # Binary (two-component) GP path — Phase 4.7 / Scenario #51 scaffold.
-    # Activated by `kind: binary` in the YAML; falls through to the standard
-    # spinor path otherwise. Currently supports F=0 + F=0 only.
-    if get(p, "kind", nothing) == "binary"
-        return _run_binary_ground_state_step(p; verbose=verbose)
-    end
+    # Binary (two-component) GP runs through the dedicated
+    # _run_step(::BinaryGroundStateStep, ...) method (gated by the
+    # parser on `kind: binary`) so this method's inference world stays
+    # narrow — see pipeline_types.jl. Falling back here would
+    # re-introduce the JIT cascade.
 
     method = Symbol(get(p, "method", "itp"))
 
@@ -786,24 +830,128 @@ function _run_binary_ground_state_step(p::AbstractDict; verbose::Bool=true)
     return (psi_4d, grid, placeholder_atom, nothing, step_result)
 end
 
-# Binary GP YAML wiring is currently broken: even just the ground-state
-# binary path through run_pipeline triggers a multi-minute JIT inference
-# cascade (verified 2026-04-26 — both BinaryDynamicsStep concrete-type
-# split and pipeline_results kwarg approaches hung at 90+ s, then died
-# to SIGTERM). Same root cause as the "Type stability boundaries" pitfall
-# in CLAUDE.md but the fix is non-trivial because the BinaryState's
-# parametric type leaks into the surrounding tuple destructuring inside
-# run_pipeline's loop. Fixing it likely requires either:
-#   (a) erasing BinaryState's type params before stashing in step_result,
-#   (b) splitting BinaryGroundStateStep + BinaryDynamicsStep concrete
-#       step types AND pinning their _run_step return tuple to a single
-#       concrete signature (probably via a non-parametric BinaryHandle
-#       wrapper that hides BinaryState{N,A1,A2}),
-#   (c) using a Function-Barrier @noinline at every Dict{Symbol,Any}
-#       extraction point — already partially attempted, didn't help.
-# The standalone solver path (call make_binary_simulation +
-# run_binary_simulation! from a script) works and is exercised by
-# test/test_binary_simulation.jl.
+# Concrete-type dispatch for binary GP. Both methods are tagged
+# @noinline so the abstract reads from the YAML Dict{String,Any} stay
+# inside this file's compilation unit and don't widen the inference
+# world of the regular spinor steps.
+
+@noinline function _run_step(
+    step::BinaryGroundStateStep,
+    psi_prev,
+    grid_prev,
+    atom_prev,
+    ws_prev;
+    verbose=true,
+    checkpoint_dir=nothing,
+)
+    return _run_binary_ground_state_step(step.params; verbose=verbose)
+end
+
+@noinline function _run_step(
+    step::BinaryDynamicsStep,
+    psi_prev,
+    grid,
+    atom,
+    ws_prev;
+    verbose=true,
+    checkpoint_dir=nothing,
+    pipeline_results::Union{Nothing, Dict}=nothing,
+)
+    grid !== nothing || throw(ArgumentError(
+        "binary dynamics step requires grid from preceding ground_state step"))
+    pipeline_results !== nothing || throw(ArgumentError(
+        "binary dynamics step requires preceding ground_state results"))
+    return _run_binary_dynamics_inner(step.params, grid, pipeline_results;
+        verbose=verbose)
+end
+
+@noinline function _run_binary_dynamics_inner(
+    p::Dict{String, Any},
+    grid,
+    pipeline_results::Dict;
+    verbose::Bool=true,
+)
+    haskey(pipeline_results, :binary_state) || throw(
+        ArgumentError(
+            "binary dynamics requires a preceding `ground_state` step with `kind: binary`"),
+    )
+    state = pipeline_results[:binary_state]::BinaryState
+    base_couplings = pipeline_results[:binary_couplings]::BinaryCouplings
+
+    duration = Float64(p["duration"])
+    dt = Float64(p["dt"])
+    save_every = Int(get(p, "save_every", max(1, round(Int, duration / dt / 20))))
+
+    couplings = if haskey(p, "couplings")
+        c_node = p["couplings"]::Dict
+        BinaryCouplings(;
+            g_AA=Float64(get(c_node, "g_AA", base_couplings.g_AA)),
+            g_BB=Float64(get(c_node, "g_BB", base_couplings.g_BB)),
+            g_AB=Float64(get(c_node, "g_AB", base_couplings.g_AB)),
+            omega_coupling=Float64(get(c_node, "omega_coupling",
+                    base_couplings.omega_coupling)),
+            delta_coupling=Float64(get(c_node, "delta_coupling",
+                    base_couplings.delta_coupling)),
+        )
+    else
+        base_couplings
+    end
+
+    pot_node = get(p, "potential", nothing)
+    potential::AbstractPotential =
+        if pot_node isa AbstractDict &&
+            get(pot_node, "type", "") == "harmonic"
+            ω_vec = Float64.(pot_node["omega"])
+            HarmonicTrap(Tuple(ω_vec))
+        else
+            NoPotential()
+        end
+
+    sim = make_binary_simulation(grid;
+        couplings=couplings,
+        potential_A=potential,
+        potential_B=potential,
+        psi_A_init=state.psi_A,
+        psi_B_init=state.psi_B)
+
+    save_psi = Bool(get(p, "save_psi_snapshots", false))
+    times = Float64[]
+    psi_A_snaps = Vector{Array{ComplexF64, ndims(sim.psi_A)}}()
+    psi_B_snaps = Vector{Array{ComplexF64, ndims(sim.psi_B)}}()
+    on_save = save_psi ? function _on(s)
+        push!(times, s.t)
+        push!(psi_A_snaps, copy(s.psi_A))
+        push!(psi_B_snaps, copy(s.psi_B))
+        return nothing
+    end : nothing
+    verbose && println("  binary RTP: duration=$duration dt=$dt save_every=$save_every")
+    run_binary_simulation!(sim; duration, dt, save_every, on_save)
+
+    state.psi_A = sim.psi_A
+    state.psi_B = sim.psi_B
+    state.t = sim.t
+    state.step = sim.step
+
+    placeholder_atom = AtomSpecies("Binary", 1.66e-25, 0, 0.0, 0.0, 0.0)
+    psi_4d = reshape(state.psi_A, (size(state.psi_A)..., 1))
+    bdyn = Dict{Symbol, Any}(
+        :duration => duration, :dt => dt,
+        :final_t => sim.t, :final_step => sim.step,
+        :norms => binary_norms(sim),
+        :total_energy => binary_total_energy(sim),
+    )
+    if save_psi
+        bdyn[:times] = times
+        bdyn[:psi_A_snapshots] = psi_A_snaps
+        bdyn[:psi_B_snapshots] = psi_B_snaps
+    end
+    step_result = Dict{Symbol, Any}(
+        :binary_state => state,
+        :binary_couplings => couplings,
+        :binary_dynamics => bdyn,
+    )
+    return (psi_4d, grid, placeholder_atom, nothing, step_result)
+end
 
 """
     _build_sgpe_callback(node, dt) -> Union{Nothing,Function}
