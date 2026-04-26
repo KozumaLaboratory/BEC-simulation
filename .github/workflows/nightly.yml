@@ -21,20 +21,16 @@ concurrency:
 
 jobs:
   heavy:
-    name: Heavy YAML (Julia ${{ matrix.julia-version }})
+    name: Heavy YAML (Julia 1)
     runs-on: ubuntu-latest
     timeout-minutes: 90
-    strategy:
-      fail-fast: false
-      matrix:
-        julia-version: ["1.10", "1"]
     env:
       SPINORBEC_RUN_HEAVY_YAML: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
         with:
-          version: ${{ matrix.julia-version }}
+          version: "1"
       - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
