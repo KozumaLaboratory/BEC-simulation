@@ -4,7 +4,8 @@ using LinearAlgebra
 using StaticArrays
 using FFTW
 using JLD2
-using CodecZlib: ZlibCompressor
+using CodecZlib: ZlibCompressor, GzipCompressor, transcode
+using CodecZstd: ZstdCompressor
 using YAML
 using Unitful
 using TimerOutputs
@@ -12,6 +13,8 @@ using Random
 using Printf
 using Dates
 using SHA
+using Base64: base64encode
+import JSON
 using SpecialFunctions: erfcx
 using Sockets
 using WriteVTK
@@ -187,6 +190,7 @@ include("solvers/embedded_adaptive.jl")
 include("solvers/lbfgs_ground_state.jl")
 include("solvers/continuation.jl")
 include("solvers/twa.jl")
+include("solvers/binary_simulation.jl")
 
 # Types
 export GridConfig, Grid, SpinSystem, SpinMatrices
@@ -385,7 +389,9 @@ export CalibrationHistory, load_calibration_history, load_calibration_csv,
 export BinaryCouplings, BinaryState, find_binary_ground_state,
        is_immiscible, droplet_regime_petrov,
        binary_overlap, binary_separation_radius,
-       SpinorBinaryCouplings, SpinorBinaryState, find_spinor_binary_ground_state
+       SpinorBinaryCouplings, SpinorBinaryState, find_spinor_binary_ground_state,
+       BinarySimulation, make_binary_simulation, binary_split_step!,
+       run_binary_simulation!, binary_norms, binary_total_energy
 export init_psi_polar, init_psi_ferromagnetic, init_psi_ferromagnetic_min,
        init_psi_uniform, init_psi_antiferromagnetic, init_psi_random,
        init_psi_spin_coherent, init_psi_fl_vortex, init_psi_spin_helix,
@@ -426,5 +432,53 @@ function plot_spin_texture end
 function save_column_density_png end
 function animate_dynamics end
 export plot_density, plot_spinor, plot_spin_texture, animate_dynamics, save_column_density_png
+
+# ---------------------------------------------------------------------------
+# Precompile workload — exercises the dashboard's hot read/write paths so
+# the first /api/density_bin scrub doesn't pay the ~9 s JIT tax. We don't
+# try to precompile the simulator (multi-minute build); only the routes a
+# freshly-opened browser session walks through.
+# ---------------------------------------------------------------------------
+using PrecompileTools
+
+@setup_workload begin
+    @compile_workload begin
+        # Tiny synthetic snapshot file mirroring the
+        # `dynamics/psi_snapshots_streamed/frame_NNNNN` layout.
+        tmpdir = mktempdir()
+        path = joinpath(tmpdir, "precompile_smoke.jld2")
+        try
+            psi_frame = zeros(ComplexF32, 4, 4, 4, 3)  # F=1 spinor on a 4³ grid
+            psi_frame[2, 2, 2, 2] = 1.0f0 + 0.0f0im
+            JLD2.jldopen(path, "w") do f
+                f["dynamics/psi_snapshots_streamed/n_snapshots"] = 1
+                f["dynamics/psi_snapshots_streamed/spatial_shape"] = [4, 4, 4]
+                f["dynamics/psi_snapshots_streamed/n_components"] = 3
+                f["dynamics/psi_snapshots_streamed/frame_00001"] = psi_frame
+                f["dynamics/times"] = [0.0, 0.1]
+                f["grid_box_size"] = (1.0, 1.0, 1.0)
+            end
+            cache = Dict{String,Any}()
+            tup = _load_psi_cached(path, cache, 1)
+            _compute_column_density_binary(tup..., 3, path)
+            _compute_phase_slice_binary(tup..., 3, nothing, path)
+            # _snapshots_metadata internally invokes
+            # _global_density_max_total_sampled, so this single call
+            # specialises both the metadata reader and the global-max walk.
+            _snapshots_metadata(path)
+            # Exercise the binary HTTP-response path too; the IOBuffer
+            # take! → write(::TCPSocket, ::Vector{UInt8}) chain has its
+            # own specialisations.
+            iob = IOBuffer()
+            write(iob, Int32(1), Int32(1), Int32(4), Int32(4), Int32(3), Int32(1))
+            write(iob, Float32[0, 1, 0, 1])
+            take!(iob)
+        catch
+            # Don't break package precompile if the workload trips.
+        finally
+            try; rm(tmpdir; recursive = true, force = true); catch; end
+        end
+    end
+end
 
 end # module

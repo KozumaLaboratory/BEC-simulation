@@ -3,6 +3,16 @@
 # Simulation binary data (large, reproducible from config)
 *.jld2
 
+# Dashboard atlas cache (server-rebuildable from per-snap binaries)
+runs/_dashboard_cache/
+
+# Per-run generated artefacts (movie frames, summaries, dashboard JSON)
+runs/**/frames/
+runs/**/summary.json
+runs/**/dashboard_data.json
+runs/**/movie.gif
+runs/**/movie.mp4
+
 # Generated dashboards (reproducible from data)
 *.html
 
