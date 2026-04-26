@@ -730,18 +730,24 @@ function _run_binary_ground_state_step(p::AbstractDict; verbose::Bool = true)
     return (psi_4d, grid, placeholder_atom, nothing, step_result)
 end
 
-# Binary RTP integration into the YAML pipeline is intentionally NOT
-# wired here: the abstract dispatch on `_run_step(::PipelineStep, …)`
-# triggered the multi-minute JIT inference cascade documented as the
-# "Type stability boundaries" pitfall in CLAUDE.md when the binary path
-# was added. The standalone solver works (see test/test_binary_simulation.jl)
-# and can be invoked directly from a script:
-#   sim = make_binary_simulation(grid; couplings, ...)
-#   run_binary_simulation!(sim; duration, dt)
-# Re-attempting the YAML wiring needs either a dedicated
-# `BinaryDynamicsStep` concrete step type or @noinline helpers around
-# every Dict{Symbol,Any} read, AND verification that `run_pipeline`
-# inference still terminates in seconds.
+# Binary GP YAML wiring is currently broken: even just the ground-state
+# binary path through run_pipeline triggers a multi-minute JIT inference
+# cascade (verified 2026-04-26 — both BinaryDynamicsStep concrete-type
+# split and pipeline_results kwarg approaches hung at 90+ s, then died
+# to SIGTERM). Same root cause as the "Type stability boundaries" pitfall
+# in CLAUDE.md but the fix is non-trivial because the BinaryState's
+# parametric type leaks into the surrounding tuple destructuring inside
+# run_pipeline's loop. Fixing it likely requires either:
+#   (a) erasing BinaryState's type params before stashing in step_result,
+#   (b) splitting BinaryGroundStateStep + BinaryDynamicsStep concrete
+#       step types AND pinning their _run_step return tuple to a single
+#       concrete signature (probably via a non-parametric BinaryHandle
+#       wrapper that hides BinaryState{N,A1,A2}),
+#   (c) using a Function-Barrier @noinline at every Dict{Symbol,Any}
+#       extraction point — already partially attempted, didn't help.
+# The standalone solver path (call make_binary_simulation +
+# run_binary_simulation! from a script) works and is exercised by
+# test/test_binary_simulation.jl.
 
 """
     _build_sgpe_callback(node, dt) -> Union{Nothing,Function}
