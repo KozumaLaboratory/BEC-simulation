@@ -694,6 +694,29 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev=nothing,
             total_charge=total_charge,
             max_abs_density=maximum(abs, q_field))
 
+    elseif name == :majorana_order
+        # Per-point Steinhardt Q₆ icosahedral order parameter from the
+        # Majorana stars decomposition (only meaningful for F >= 6).
+        # Returns the spatially-averaged Q₆ weighted by density and a
+        # field of point-group symbols at sampled points.
+        F = atom.F
+        F >= 6 || throw(ArgumentError(
+            "majorana_order requires F >= 6 (got $F)"))
+        sm = spin_matrices(F)
+        sampling = Float64(get(params, "sampling", 1.0))
+        density_cutoff = Float64(get(params, "density_cutoff", 1e-6))
+        q6_field = icosahedral_order_parameter(psi, grid, sm;
+            density_cutoff, sampling)
+        ndim = length(grid.config.n_points)
+        n = total_density(psi, ndim)
+        n_total = sum(n) * cell_volume(grid)
+        q6_avg = n_total > 0 ?
+                 sum(@. q6_field * n) * cell_volume(grid) / n_total : 0.0
+        (q6_avg=q6_avg,
+            q6_max=maximum(q6_field),
+            q6_field=q6_field,
+            sampling=sampling)
+
     elseif name == :winding_field
         ndim = length(grid.config.n_points)
         ndim >= 2 || throw(ArgumentError("winding_field requires N >= 2"))

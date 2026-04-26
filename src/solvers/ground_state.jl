@@ -126,6 +126,7 @@ function find_ground_state(;
     light_shift::Union{Nothing, LightShift}=nothing,
     dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
     spinor_lhy::Union{Nothing, Symbol}=nothing,
+    method::Symbol=:strang,
 )
     psi0 = if psi_init === nothing
         sys = SpinSystem(atom.F)
@@ -655,11 +656,20 @@ function _find_ground_state_adaptive(;
     final_dpsi = NaN
     t_start = time()
 
+    method in (:strang, :sc4) || throw(ArgumentError(
+        "find_ground_state method must be :strang or :sc4 (got $method)"))
+    n_comp_step = ws.spin_matrices.system.n_components
+    N_dim_step = length(grid.config.n_points)
+
     while total_steps < n_steps
         copyto!(psi_backup, ws.state.psi)
 
         for i in 1:check_every
-            split_step!(ws)
+            if method === :sc4
+                _sc4_itp_step!(ws, current_dt, n_comp_step, N_dim_step)
+            else
+                split_step!(ws)
+            end
             if i == 1 && total_steps == 0
                 _check_itp_overflow(ws, 1)
             end
