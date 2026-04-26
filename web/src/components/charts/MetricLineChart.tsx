@@ -1,9 +1,8 @@
 import { useMemo } from 'react'
-import type { Data, Layout } from 'plotly.js-dist-min'
-import { BASE_CONFIG, BASE_LAYOUT, CHART_COLORS, Plot } from './Plot'
-import type { PointMeta } from '@/api'
+import { LineChartSVG, type LineChartTrace } from './LineChartSVG'
+import { CHART_COLORS } from './chartColors'
+import type { PointMeta, DashboardData } from '@/api'
 import { getX, useGroupedPoints } from '@/state/useRunData'
-import type { DashboardData } from '@/api'
 
 interface Props {
   data: DashboardData | null
@@ -27,38 +26,28 @@ export function MetricLineChart({
   height = 320,
 }: Props) {
   const groups = useGroupedPoints(data, runFilter)
-  const traces = useMemo<Data[]>(() => {
+
+  const traces = useMemo<LineChartTrace[]>(() => {
     return Object.entries(groups).map(([rn, grp], i) => ({
+      name: rn || yLabel,
+      color: CHART_COLORS[i % CHART_COLORS.length],
       x: grp.map((p) => getX(p, xKey)),
       y: grp.map((p) => {
         const v = yAccessor(p)
         return v !== null && Number.isFinite(v) ? v : null
       }),
-      type: 'scatter',
-      mode: 'lines+markers',
-      marker: { color: CHART_COLORS[i % CHART_COLORS.length], size: 6 },
-      line: { color: CHART_COLORS[i % CHART_COLORS.length], width: 2 },
-      name: rn || yLabel,
     }))
   }, [groups, xKey, yLabel, yAccessor])
 
-  const layout = useMemo<Partial<Layout>>(
-    () => ({
-      ...BASE_LAYOUT,
-      title: title ? { text: title, font: { size: 13, color: '#00d9ff' } } : undefined,
-      xaxis: { ...BASE_LAYOUT.xaxis, title: { text: xAxisLabel(xKey) } },
-      yaxis: {
-        ...BASE_LAYOUT.yaxis,
-        title: { text: yLabel },
-        range: yRange,
-      },
-      height,
-    }),
-    [title, xKey, yLabel, yRange, height],
-  )
-
   return (
-    <Plot data={traces} layout={layout} config={BASE_CONFIG} style={{ width: '100%', height }} />
+    <LineChartSVG
+      traces={traces}
+      title={title}
+      xLabel={xAxisLabel(xKey)}
+      yLabel={yLabel}
+      yRange={yRange}
+      height={height}
+    />
   )
 }
 
