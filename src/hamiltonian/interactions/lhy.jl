@@ -78,16 +78,24 @@ Compute BdG zero-point energy at a single density:
 ε_LHY(n) = (1/2) × (1/2π²) ∫ dk k² Σ_b [ω_b(k) - ε_k - μ_b + μ²_b/(2ε_k)]
 """
 function _compute_lhy_at_density(
-    spinor, n0, F, interactions, zeeman, c_dd, k_max, n_k
+    spinor, n0, F, interactions, zeeman, c_dd, k_max, n_k;
+    n_dir::Int=32,
 )
     D = 2F + 1
     h_mf, M_anom, zee, _ = _bdg_contact_matrices(spinor, F, interactions, zeeman)
 
     if abs(c_dd) > 1e-30
+        # The LHY zero-point integral inherits the DDI's k̂-anisotropy via
+        # `_q_tensor_direction(k̂)` — the spherical average of the per-mode
+        # ω_b(k) is anisotropic, so direction sampling matters. The earlier
+        # 6-axis octahedron is exact only for `ℓ ≤ 3`; the DDI Q-tensor
+        # mixes `ℓ = 0, 2` and BdG correction adds `ℓ ≤ 4`. Switch to a
+        # quasi-uniform Fibonacci-spiral grid (default 32 = 64 antipodal
+        # samples) so the integration error stops dominating the absolute
+        # LHY shift. Caller can tune `n_dir` for tight budget.
         sm = spin_matrices(F)
-        n_dir = 6
-        dirs = [(1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0),
-            (-1.0, 0.0, 0.0), (0.0, -1.0, 0.0), (0.0, 0.0, -1.0)]
+        dirs = fibonacci_sphere_directions(n_dir)
+        n_dir = length(dirs)
     else
         n_dir = 1
         dirs = [(0.0, 0.0, 1.0)]

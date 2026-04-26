@@ -358,7 +358,7 @@ export find_ground_state,
     find_ground_state_multistart, scan_continuation,
     scan_continuation_bidirectional
 export resume_ground_state, refine_ground_state, load_itp_checkpoint, ITPCheckpoint
-export scan_phase_diagram_2d
+export scan_phase_diagram_2d, scan_phase_boundary
 export find_phase_boundary
 export run_simulation!, run_simulation_checkpointed!
 export run_simulation_adaptive!, run_simulation_yoshida!, run_simulation_embedded!
