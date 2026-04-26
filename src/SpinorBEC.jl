@@ -168,6 +168,7 @@ include("analysis/tomography.jl")
 include("analysis/faraday.jl")
 include("analysis/imaging.jl")
 include("analysis/topology.jl")
+include("analysis/synthetic_dimension.jl")
 include("analysis/time_resolved.jl")
 include("analysis/stability_analysis.jl")
 include("analysis/spin_rotation.jl")
@@ -272,6 +273,7 @@ export gaussian_psf_convolve, apply_shot_noise, apply_saturation
 export synthesise_absorption_image, faraday_polarization_components
 export faraday_snr, momentum_distribution
 export winding_number_field, monopole_charge_3d, total_monopole_charge
+export synthetic_axis_current, synthetic_dim_dispersion, synthetic_localization_length
 export non_abelian_holonomy, time_resolved_tomography
 export spin_tomography, tomography_sinogram
 export FaradayParams, faraday_image, faraday_differential, detect_vortices_faraday

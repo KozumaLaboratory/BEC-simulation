@@ -610,13 +610,37 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev = nothing,
         m_mean = total > 0 ? sum(pop_per_m[c] * m_vals[c] for c in 1:D) / total : 0.0
         m_var = total > 0 ?
             sum(pop_per_m[c] * (m_vals[c] - m_mean)^2 for c in 1:D) / total : 0.0
+        # Synthetic-ladder bond currents J_m (length D-1) — proxy for
+        # population flow under Raman / RF driving; see
+        # src/analysis/synthetic_dimension.jl for the convention.
+        currents = synthetic_axis_current(psi, grid)
+        # Inverse participation ratio on the m ladder: 1 = fully
+        # localised on a single Zeeman sublevel, D = uniformly spread.
+        ipr_xi = synthetic_localization_length(psi, grid)
+        # Optional 2D dispersion (k_real × k_synth) when an axis is
+        # supplied — tomography-style band structure for SOC studies.
+        spectrum_axis = let v = get(params, "dispersion_axis", nothing)
+            v === nothing ? nothing : Int(v)
+        end
+        dispersion_block = if spectrum_axis !== nothing
+            d = synthetic_dim_dispersion(psi, grid; axis = spectrum_axis)
+            (spectrum = collect(d.spectrum),
+             k_real = d.k_real,
+             k_synth = d.k_synth,
+             axis = spectrum_axis)
+        else
+            nothing
+        end
         (pop_per_m = pop_per_m,
          m_values = m_vals,
          m_mean = m_mean,
          m_variance = m_var,
          edge_density = edge_density,
          bulk_density = bulk_density,
-         coherence_q1 = coherence_q1)
+         coherence_q1 = coherence_q1,
+         synthetic_currents = currents,
+         localization_length = ipr_xi,
+         dispersion = dispersion_block)
 
     elseif name == :non_abelian_homotopy
         ndim = length(grid.config.n_points)
