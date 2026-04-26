@@ -200,3 +200,16 @@ JIT hang with no stack trace**, not a runtime error. Prevent with two rules:
 **User-supplied callbacks** (live_monitor `extract_observables`, simulation
 `SimulationCallbacks.on_step`) accept `::Function` — these are OK in cold paths
 but callbacks invoked in hot loops should parameterize: `struct Cb{F1,F2} ...`.
+
+**Current cascade cost** (measured 2026-04-26, Julia 1.12.6, fresh JIT,
+no cache): a single `run_yaml` for a trivial `pipeline:` with one
+`ground_state:` step (Rb87, 32-pt 1D grid, 50 ITP steps) takes >4 min
+to first output, dominated by `make_workspace` + `find_ground_state`
+specialization for the freshly-emitted `Workspace{...23 type params...}`.
+This is the reason `test_infrastructure.jl` / `test_zeeman_levels.jl`
+gate 8 YAML integration tests behind `_SKIP_HEAVY_YAML_INFRA` /
+`_SKIP_HEAVY_YAML_ZEEMAN` (default off; opt-in via
+`SPINORBEC_RUN_HEAVY_YAML=true`). The nightly workflow
+(`.github/workflows/nightly.yml`) flips that env var on cron so the
+guarded blocks still get regression coverage without paying the cost
+on every push.

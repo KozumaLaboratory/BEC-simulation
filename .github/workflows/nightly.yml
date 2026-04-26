@@ -1,0 +1,40 @@
+name: Nightly heavy YAML
+
+# Runs the full test suite with `SPINORBEC_RUN_HEAVY_YAML=true`, which
+# enables the YAML pipeline integration tests guarded by
+# `_SKIP_HEAVY_YAML_INFRA` / `_SKIP_HEAVY_YAML_ZEEMAN`. Each guarded
+# block individually drives `run_pipeline` through a multi-minute JIT
+# cascade (see CLAUDE.md > "Type stability boundaries"); the nightly
+# job picks up the resulting cost so the regular per-push CI stays
+# under ~10 min.
+
+on:
+  schedule:
+    # 02:00 UTC every day = 11:00 JST. Skips weekends to save runner
+    # minutes — failures on Mon-Fri are usually enough to catch drift.
+    - cron: "0 2 * * 1-5"
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-heavy
+  cancel-in-progress: false
+
+jobs:
+  heavy:
+    name: Heavy YAML (Julia ${{ matrix.julia-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        julia-version: ["1.10", "1"]
+    env:
+      SPINORBEC_RUN_HEAVY_YAML: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: ${{ matrix.julia-version }}
+      - uses: julia-actions/cache@v2
+      - uses: julia-actions/julia-buildpkg@v1
+      - uses: julia-actions/julia-runtest@v1
