@@ -5,7 +5,6 @@
 
 import CUDA
 using SpinorBEC
-using PlotlyJS    # triggers SpinorBECPlotlyExt → save_column_density_png method
 using Dates
 using Printf
 

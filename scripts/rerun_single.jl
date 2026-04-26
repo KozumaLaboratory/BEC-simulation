@@ -10,7 +10,6 @@
 
 import CUDA
 using SpinorBEC
-using PlotlyJS
 using Dates
 
 length(ARGS) == 1 || error("usage: julia --project=. scripts/rerun_single.jl <run_name>")

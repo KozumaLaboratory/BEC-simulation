@@ -432,13 +432,12 @@ function reset_tracing!()
     TimerOutputs.reset_timer!(TIMER)
 end
 
-# Visualization (defined in extension, exported here for discoverability)
+# Visualization (defined in Makie extension, exported here for discoverability)
 function plot_density end
 function plot_spinor end
 function plot_spin_texture end
-function save_column_density_png end
 function animate_dynamics end
-export plot_density, plot_spinor, plot_spin_texture, animate_dynamics, save_column_density_png
+export plot_density, plot_spinor, plot_spin_texture, animate_dynamics
 
 # ---------------------------------------------------------------------------
 # Precompile workload — exercises the dashboard's hot read/write paths so

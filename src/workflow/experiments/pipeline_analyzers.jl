@@ -707,29 +707,22 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev=nothing,
             max_abs_winding=maximum(abs, w))
 
     elseif name == :column_density_movie
-        # Two snapshot sources supported:
+        # Streams per-snapshot column densities into a single JLD2 archive
+        # (`columns.jld2` with one Float32 2D array per frame, key
+        # `frame_NNNNN`) and writes a JSON manifest with frame times + axis
+        # metadata. The dashboard / external notebooks render frames; we no
+        # longer ship PNGs (PlotlyJS dependency removed).
         #
-        #   1. Streamed scratch JLD2 (preferred for long runs):
-        #      `save_psi_snapshots: true` makes the dynamics step write each
-        #      ψ frame to a temp JLD2 (path exposed via
-        #      `pipeline_results[:snapshot_tmp_path]`). Read one frame at a
-        #      time → PNG → discard — peak host RAM stays at ~one snapshot.
-        #
-        #   2. Legacy in-memory `dynres.psi_snapshots` (RAM-bound).
-        #
-        # Set `multi_step: true` to walk EVERY preceding dynamics step (Klaus
-        # 2022: tilt → spin-up → magnetostir = 3 phases concatenated). Frame
-        # numbers are continuous across phases.
+        # Two snapshot sources supported, same as before:
+        #   1. Streamed scratch JLD2 (preferred for long runs).
+        #   2. Legacy in-memory `dynres.psi_snapshots`.
+        # `multi_step: true` walks every preceding dynamics phase.
         ndim = length(grid.config.n_points)
         ndim == 3 || throw(ArgumentError(
             "column_density_movie currently supports 3D only (got $(ndim)D)"))
         axis = Int(get(params, "axis", 3))
         output_dir = String(get(params, "output_dir", "frames"))
         mkpath(output_dir)
-        colorscale = String(get(params, "colorscale", "Viridis"))
-        width = Int(get(params, "width", 600))
-        height = Int(get(params, "height", 500))
-        title_fmt = get(params, "title_fmt", nothing)
         multi_step = Bool(get(params, "multi_step", false))
 
         history = get(pipeline_results, :dynamics_history, nothing)
@@ -754,64 +747,69 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev=nothing,
             )]
         end
 
-        frames = String[]
+        archive_path = joinpath(output_dir, "columns.jld2")
+        manifest_path = joinpath(output_dir, "manifest.json")
+        frame_keys = String[]
+        frame_times = Float64[]
+        frame_phases = Int[]
         global_idx = 0
         t_offset = 0.0
-        for (phase_idx, src) in enumerate(sources)
-            dr = src.dynamics_result
-            dr === nothing && continue
-            tmp = src.snapshot_tmp_path
-            saved = src.save_psi_snapshots
-            times = dr.times
-            if saved && tmp !== nothing && isfile(tmp)
-                jldopen(tmp, "r") do jh
-                    n_snaps = Int(jh["n_snapshots"])
-                    t_max = min(length(times), n_snaps)
-                    for i in 1:t_max
-                        global_idx += 1
-                        skey = "frame_" * lpad(string(i), 5, '0')
-                        frame = jh[skey]
-                        n_total = total_density(frame, ndim)
-                        col = dropdims(sum(n_total; dims=axis); dims=axis)
-                        t_label = times[i] + t_offset
-                        title = if title_fmt === nothing
-                            "phase $(phase_idx)  t = $(round(t_label, digits=3))"
-                        else
-                            string(title_fmt)
+        jldopen(archive_path, "w") do out
+            for (phase_idx, src) in enumerate(sources)
+                dr = src.dynamics_result
+                dr === nothing && continue
+                tmp = src.snapshot_tmp_path
+                saved = src.save_psi_snapshots
+                times = dr.times
+                if saved && tmp !== nothing && isfile(tmp)
+                    jldopen(tmp, "r") do jh
+                        n_snaps = Int(jh["n_snapshots"])
+                        t_max = min(length(times), n_snaps)
+                        for i in 1:t_max
+                            global_idx += 1
+                            skey = "frame_" * lpad(string(i), 5, '0')
+                            frame = jh[skey]
+                            n_total = total_density(frame, ndim)
+                            col = dropdims(sum(n_total; dims=axis); dims=axis)
+                            okey = "frame_" * lpad(string(global_idx), 5, '0')
+                            out[okey] = Float32.(col)
+                            push!(frame_keys, okey)
+                            push!(frame_times, times[i] + t_offset)
+                            push!(frame_phases, phase_idx)
                         end
-                        png_path = joinpath(output_dir, "col_$(lpad(global_idx, 5, '0')).png")
-                        save_column_density_png(grid, col, axis, png_path;
-                            title=title, colorscale=colorscale,
-                            width=width, height=height)
-                        push!(frames, png_path)
+                    end
+                elseif hasproperty(dr, :psi_snapshots)
+                    for (i, psi_s) in enumerate(dr.psi_snapshots)
+                        global_idx += 1
+                        n_total = total_density(psi_s, ndim)
+                        col = dropdims(sum(n_total; dims=axis); dims=axis)
+                        okey = "frame_" * lpad(string(global_idx), 5, '0')
+                        out[okey] = Float32.(col)
+                        push!(frame_keys, okey)
+                        push!(frame_times, times[i] + t_offset)
+                        push!(frame_phases, phase_idx)
                     end
                 end
-            elseif hasproperty(dr, :psi_snapshots)
-                for (i, psi_s) in enumerate(dr.psi_snapshots)
-                    global_idx += 1
-                    n_total = total_density(psi_s, ndim)
-                    col = dropdims(sum(n_total; dims=axis); dims=axis)
-                    t_label = times[i] + t_offset
-                    title = if title_fmt === nothing
-                        "phase $(phase_idx)  t = $(round(t_label, digits=3))"
-                    else
-                        string(title_fmt)
-                    end
-                    png_path = joinpath(output_dir, "col_$(lpad(global_idx, 5, '0')).png")
-                    save_column_density_png(grid, col, axis, png_path;
-                        title=title, colorscale=colorscale,
-                        width=width, height=height)
-                    push!(frames, png_path)
-                end
+                t_offset += isempty(times) ? 0.0 : times[end] - times[1]
             end
-            # Roll the time offset so the next phase's frames carry continuous
-            # t labels (matches the way dynamics phases are stitched in real
-            # simulation time).
-            t_offset += isempty(times) ? 0.0 : times[end] - times[1]
+            out["n_frames"] = global_idx
+            out["axis"] = axis
         end
-        (output_dir=output_dir, n_frames=length(frames),
-            frame_paths=frames, axis=axis,
-            n_phases=multi_step ? length(sources) : 1)
+        manifest = Dict{String, Any}(
+            "n_frames" => global_idx,
+            "axis" => axis,
+            "n_phases" => multi_step ? length(sources) : 1,
+            "frame_keys" => frame_keys,
+            "times" => frame_times,
+            "phase_indices" => frame_phases,
+            "archive" => basename(archive_path),
+        )
+        open(manifest_path, "w") do io
+            JSON.print(io, manifest)
+        end
+        (output_dir=output_dir, n_frames=global_idx,
+            archive_path=archive_path, manifest_path=manifest_path,
+            axis=axis, n_phases=multi_step ? length(sources) : 1)
 
     elseif name == :summary_json
         # Dump the accumulated pipeline_results plus QC metadata to a JSON file.

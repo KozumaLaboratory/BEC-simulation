@@ -80,7 +80,6 @@ correctly:
 ```julia
 import CUDA
 using SpinorBEC
-using PlotlyJS
 
 run_yaml("runs/today/config.yaml"; dry_run = true)
 ```
@@ -112,7 +111,7 @@ Detached (overnight, survives Claude session close):
 setsid nohup bash -c '
   LD_LIBRARY_PATH=/usr/lib/wsl/lib \\
   julia --project=. -e "
-    import CUDA; using SpinorBEC; using PlotlyJS;
+    import CUDA; using SpinorBEC;
     run_yaml(\"runs/today/config.yaml\"; verbose=true)
   "' > logs/today.log 2>&1 < /dev/null &
 disown
@@ -167,7 +166,7 @@ n_peak = d["analyze/droplet_profile/n_peak"]
 |---|---|---|
 | `Scalar indexing is disallowed` on dynamics | Zeeman with non-zero Bx/By on GPU on a pre-fix install | upgrade to ≥ commit 59a52a1 (`apply_uniform_spin_rotation!` matmul path) |
 | ITP `NaN at step 1` | dt too large for ε_dd > 1 (Dy164, Eu151 strong DDI) | drop dt to 0.002 |
-| `column_density_movie ... done` writes 0 PNGs | `save_psi_snapshots: true` + pre-fix analyzer | upgrade to ≥ 3685fd7 (streamed-snapshot reader) |
+| `column_density_movie ... done` writes 0 frames | `save_psi_snapshots: true` + pre-fix analyzer | upgrade to ≥ 3685fd7 (streamed-snapshot reader) |
 | Long scan OOMs at point ~100 | scan-loop GPU memory leak | upgrade to ≥ 7769d84 (CUDA.reclaim hook) |
 | `unknown key 'a_s'` warning | scattering length parsing | use `c_total:` or `c1_ratio:` directly |
 | `unknown key 'trap'` warning | shorthand notation | harmless, equivalent to `potential: {type: harmonic, omega: [...]}` |

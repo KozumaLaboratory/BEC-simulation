@@ -312,7 +312,6 @@ State serialization uses JLD2 format, saving the wavefunction array, time, step 
 | LinearAlgebra | Eigendecomposition for matrix exponentials |
 | JLD2 | Binary state serialization |
 | YAML | Experiment configuration parsing |
-| PlotlyJS | Visualization (weak extension) |
 | Makie | Visualization (weak extension) |
 
 ## Module dependency diagram
