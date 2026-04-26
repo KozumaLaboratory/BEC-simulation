@@ -10,9 +10,11 @@ Spin- $F$ Bose-Einstein condensate simulator solving the spinor Gross-Pitaevskii
 # Install
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
 
-# Run a YAML config → JLD2 output → interactive HTML dashboard
-julia --project=. examples/run.jl examples/li7_quench.yaml
-julia --project=. examples/visualize_dashboard.jl examples/output/li7_quench.jld2
+# Run a YAML config (writes runs/<config>/point_NNN.jld2 and resumes if rerun)
+julia --project=. -e 'using SpinorBEC; run_yaml("runs/li7_quench/config.yaml")'
+
+# Live dashboard (React + WebGPU, served from web/dist/) — open the URL it prints
+julia --project=. -e 'using SpinorBEC; serve_dashboard(8765; base_dir="runs")'
 
 # Tests
 julia --project=. -e 'using Pkg; Pkg.test()'
@@ -72,4 +74,8 @@ Dimensionless units: $\hbar = m = \omega_{\mathrm{ref}} = 1$ . Physical quantiti
 | `cr52_tensor.yaml` | Tensor interactions: channel-resolved $c_4, c_6$ + DDI | 2D $32^2$ |
 | `dy164_droplet.yaml` | DDI + LHY quantum droplet, $F{=}8$ (17 components) | 2D $32^2$ |
 
-Pipeline: `run.jl` (YAML → JLD2) → `visualize_dashboard.jl` (JLD2 → HTML dashboard with 3D isosurface, populations, conservation).
+Pipeline: `run_yaml("runs/<config>/config.yaml")` (YAML → resumable
+`runs/<config>/point_NNN.jld2`) → `serve_dashboard(port; base_dir="runs")`
+(React + WebGPU UI in `web/dist/` — 3D volume raymarch, per-component
+column densities, energy/Mz/populations time series, live status panel
+for in-progress runs via the `dynamics.live_monitor` knob).
