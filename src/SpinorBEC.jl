@@ -345,7 +345,9 @@ export compute_quadratic_zeeman, compute_quadratic_zeeman_dimless
 export healing_length_contact, healing_length_spin, healing_length_ddi
 export thomas_fermi_radius, thomas_fermi_radius_harmonic
 export phase_diagram_point, component_populations, make_conservation_monitor
-export classify_phase, classify_phase_detailed
+export classify_phase,
+    classify_phase_detailed,
+    classify_phase_distance, PhaseReference, DEFAULT_PHASE_REFERENCES
 export estimate_splitting_error, validate_conservation
 export power_spectrum
 export analyze_stability

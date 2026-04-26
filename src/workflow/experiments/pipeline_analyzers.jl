@@ -37,6 +37,22 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev=nothing,
     elseif name == :phase_classify
         sm = spin_matrices(F)
         classify_phase_detailed(psi, F, grid, sm)
+    elseif name == :phase_classify_distance
+        # Reference-distance classifier — primarily useful for F >= 6 where
+        # the threshold-cascade `_label_phase` saturates. Returns the
+        # detailed feature vector plus the distance ranking.
+        sm = spin_matrices(F)
+        details = classify_phase_detailed(psi, F, grid, sm)
+        threshold = Float64(get(params, "threshold", 0.4))
+        ranking = classify_phase_distance(details, F; threshold=threshold)
+        merge(
+            details,
+            (
+                phase_distance=ranking.phase,
+                distance=ranking.distance,
+                ranking=ranking.scores,
+            ),
+        )
     elseif name == :stability
         ndim = length(grid.config.n_points)
         sp = SimParams(; dt=0.0001, n_steps=1, save_every=1)

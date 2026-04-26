@@ -138,6 +138,129 @@ function _label_phase(spin_order, nematic_order, channel_weights, F)
 end
 
 """
+    PhaseReference
+
+Reference feature vector for one canonical spinor phase, used by
+`classify_phase_distance` to assign a label by minimum Euclidean
+distance instead of the threshold cascade in `_label_phase`. Each
+field carries a target value in `[0, 1]` (or `nothing` to skip the
+component when computing distance — useful when a feature isn't
+characterised for a phase, e.g. Q₆ is meaningless for F < 6).
+"""
+struct PhaseReference
+    name::Symbol
+    F::Int                         # spin manifold this reference applies to
+    spin_order::Union{Nothing, Float64}
+    nematic_order::Union{Nothing, Float64}
+    biaxiality::Union{Nothing, Float64}
+    Q6::Union{Nothing, Float64}
+    dom_channel_S::Union{Nothing, Int}
+    dom_channel_weight::Union{Nothing, Float64}
+end
+
+PhaseReference(name, F; spin_order=nothing, nematic_order=nothing,
+biaxiality=nothing, Q6=nothing, dom_channel_S=nothing,
+dom_channel_weight=nothing) = PhaseReference(name, F, spin_order,
+    nematic_order, biaxiality, Q6, dom_channel_S, dom_channel_weight)
+
+"""
+    DEFAULT_PHASE_REFERENCES
+
+Hand-curated reference table covering the canonical KU phases for
+F=1, 2, and 6. Entries are conservative (only the most diagnostic
+features per phase are populated), and `classify_phase_distance`
+falls back to `:unknown` when no reference is within the user-supplied
+distance threshold. New phase candidates can be appended at any time
+via the `references` kwarg without editing this constant.
+"""
+const DEFAULT_PHASE_REFERENCES = PhaseReference[
+    # F = 1
+    PhaseReference(:ferromagnetic, 1; spin_order=1.0, nematic_order=0.0),
+    PhaseReference(:polar, 1; spin_order=0.0, nematic_order=1.0),
+    # F = 2
+    PhaseReference(:ferromagnetic, 2; spin_order=1.0, nematic_order=0.0),
+    PhaseReference(:uniaxial_nematic, 2; spin_order=0.0, nematic_order=1.0,
+        biaxiality=0.0),
+    PhaseReference(:biaxial_nematic, 2; spin_order=0.0, nematic_order=0.5,
+        biaxiality=1.0),
+    PhaseReference(:cyclic, 2; spin_order=0.0, nematic_order=0.0,
+        dom_channel_S=4, dom_channel_weight=1.0),
+    # F = 6 (Eu151) — KU §7.5 candidate phases. Q6 is the icosahedral
+    # Steinhardt order (0 for axial / cyclic, ~1 for the icosahedral
+    # state). Reference values are best-guess analytic limits;
+    # appending data-driven references is encouraged.
+    PhaseReference(:ferromagnetic, 6; spin_order=1.0, nematic_order=0.0,
+        Q6=0.0),
+    PhaseReference(:polar, 6; spin_order=0.0, nematic_order=1.0,
+        biaxiality=0.0, Q6=0.0),
+    PhaseReference(:cyclic, 6; spin_order=0.0, nematic_order=0.0,
+        dom_channel_S=12, dom_channel_weight=1.0),
+    PhaseReference(:biaxial_nematic, 6; spin_order=0.0, biaxiality=1.0,
+        Q6=0.0),
+    PhaseReference(:icosahedral, 6; spin_order=0.0, nematic_order=0.0,
+        Q6=1.0),
+]
+
+"""
+    classify_phase_distance(features::NamedTuple, F::Int;
+                            references=DEFAULT_PHASE_REFERENCES,
+                            threshold=0.4) → NamedTuple
+
+Multi-feature reference-distance phase classifier. `features` is a
+`NamedTuple` produced by `classify_phase_detailed` (or any subset
+containing the fields listed in `PhaseReference`). For each reference
+matching the supplied `F`, compute the Euclidean distance over every
+feature that is non-`nothing` in the reference, then return the
+nearest match — or `:unknown` when the minimum exceeds `threshold`,
+which is the hint that a new / unmodelled phase has been reached.
+
+Returns `(phase, distance, scores::Vector{NamedTuple})` where each
+`score` is `(name, distance, n_features_compared)` so callers can
+plot the relative distances and tune `threshold` from data.
+"""
+function classify_phase_distance(features::NamedTuple, F::Int;
+    references::Vector{PhaseReference}=DEFAULT_PHASE_REFERENCES,
+    threshold::Float64=0.4)
+    scores = NamedTuple[]
+    for ref in references
+        ref.F == F || continue
+        d_sq = 0.0
+        n_used = 0
+        if ref.spin_order !== nothing && haskey(features, :spin_order)
+            d_sq += (features.spin_order - ref.spin_order)^2
+            n_used += 1
+        end
+        if ref.nematic_order !== nothing && haskey(features, :nematic_order)
+            d_sq += (features.nematic_order - ref.nematic_order)^2
+            n_used += 1
+        end
+        if ref.biaxiality !== nothing && haskey(features, :biaxiality)
+            d_sq += (features.biaxiality - ref.biaxiality)^2
+            n_used += 1
+        end
+        if ref.Q6 !== nothing && haskey(features, :Q6)
+            d_sq += (features.Q6 - ref.Q6)^2
+            n_used += 1
+        end
+        if ref.dom_channel_S !== nothing && ref.dom_channel_weight !== nothing &&
+            haskey(features, :channel_weights)
+            cw = features.channel_weights
+            obs_w = get(cw, ref.dom_channel_S, 0.0)
+            d_sq += (obs_w - ref.dom_channel_weight)^2
+            n_used += 1
+        end
+        n_used > 0 || continue
+        d = sqrt(d_sq / n_used)
+        push!(scores, (name=ref.name, distance=d, n_features_compared=n_used))
+    end
+    isempty(scores) && return (phase=:unknown, distance=Inf, scores=scores)
+    sort!(scores; by=s -> s.distance)
+    best = scores[1]
+    phase = best.distance <= threshold ? best.name : :unknown
+    (phase=phase, distance=best.distance, scores=scores)
+end
+
+"""
     classify_phase_detailed(psi, F, grid, sm) → NamedTuple
 
 Extended phase classification with continuous order parameters.
