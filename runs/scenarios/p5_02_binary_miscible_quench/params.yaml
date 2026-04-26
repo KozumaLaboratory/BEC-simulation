@@ -1,0 +1,41 @@
+# P5.2 — Two-component (binary) GP miscible→immiscible quench
+#
+# Phase 4/5 #51 scaffold. F=0+F=0 scalar GP for two distinguishable
+# species A, B (e.g. Rb87 |F=1⟩ × |F=2⟩, or Cr-Sr immiscibility study).
+#
+# Currently the binary path is callable via the standalone solver
+# (test/test_binary_simulation.jl) but not yet wired through run_yaml
+# because of the JIT inference cascade documented in
+# pipeline_runner.jl. This YAML serves as the *target* shape for the
+# follow-on integration; running it via run_yaml today will just
+# produce a placeholder result (kind: binary in ground_state silently
+# falls through to scalar path on Julia 1.11+ until D fix lands).
+#
+# Use directly with:
+#   import SpinorBEC: make_binary_simulation, find_binary_ground_state, run_binary_simulation!, BinaryCouplings
+#   gs = find_binary_ground_state(grid; couplings, ...)
+#   sim = make_binary_simulation(grid; couplings, psi_A_init=gs.psi_A, psi_B_init=gs.psi_B)
+#   run_binary_simulation!(sim; duration=1.0, dt=0.005)
+
+pipeline:
+  - ground_state:
+      kind: binary
+      grid: {n: [48, 48], box: [10.0, 10.0]}
+      interactions:
+        g_AA: 1.0
+        g_BB: 1.0
+        g_AB: 0.5            # miscible (g_AB^2 < g_AA·g_BB)
+      potential: {type: harmonic, omega: [1.0, 1.0]}
+      dt: 0.005
+      n_steps: 1500
+      tol: 1.0e-9
+
+  - dynamics:
+      kind: binary
+      duration: 2.0
+      dt: 0.005
+      save_every: 20
+      couplings:
+        g_AA: 1.0
+        g_BB: 1.0
+        g_AB: 1.5            # quench to immiscible (g_AB^2 > g_AA·g_BB)

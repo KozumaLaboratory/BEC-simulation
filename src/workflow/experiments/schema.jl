@@ -110,12 +110,29 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     "projected_gp" => FieldSpec(; type=Union{Dict, Bool}),
     "photon_scattering" => FieldSpec(; type=Union{Dict, Bool}),
     "loss" => FieldSpec(; type=Union{Dict, Bool, Number}),
+    # Two-component / binary GP path (Phase 4/5 #51 scaffold).
+    "kind" => FieldSpec(; type=String, enum=["binary"]),
+    "couplings" => FieldSpec(; type=Dict),
 )
 
 const STEP_SCHEMAS = Dict{String, Dict{String, FieldSpec}}(
     "ground_state" => GS_SCHEMA,
     "dynamics" => DYNAMICS_SCHEMA,
 )
+
+# Top-level YAML keys recognised by the runner. Anything else triggers
+# a typo warning so users catch e.g. `pipline:` vs `pipeline:` early.
+const TOP_LEVEL_KEYS = Set([
+    "pipeline",
+    "scan",
+    "calibration",
+    "calibration_history",
+    "target_date",
+    "metadata",          # free-form provenance, ignored at runtime
+    "name",              # human-readable label for the scenario
+    "notes",             # free-form notes
+    "version",           # YAML schema version stamp
+])
 
 """
     validate_config!(params::Dict, schema::Dict, path::String; strict::Bool=false)
@@ -198,6 +215,14 @@ end
 Validate a full pipeline YAML dict. Checks each step against its schema.
 """
 function validate_pipeline!(data::Dict)
+    # Top-level typo guard: warn on unknown root-level keys so a misspelt
+    # `pipline:` doesn't silently fall back to an empty pipeline.
+    for k in keys(data)
+        sk = String(k)
+        sk in TOP_LEVEL_KEYS && continue
+        @warn "Unknown top-level YAML key '$sk' — typo? Recognised keys: $(sort(collect(TOP_LEVEL_KEYS)))"
+    end
+
     pipeline = get(data, "pipeline", nothing)
     pipeline === nothing && throw(ArgumentError("YAML must have a 'pipeline:' key"))
     pipeline isa Vector || throw(ArgumentError("'pipeline' must be a list of steps"))
@@ -212,6 +237,8 @@ function validate_pipeline!(data::Dict)
 
         if haskey(STEP_SCHEMAS, step_type) && step_params isa Dict
             validate_config!(step_params, STEP_SCHEMAS[step_type], "pipeline.$i.$step_type")
+        elseif !(step_type in ("ground_state", "dynamics", "analyze"))
+            @warn "Unknown pipeline step kind '$step_type' (line $i) — typo? Recognised: ground_state, dynamics, analyze"
         end
     end
 end

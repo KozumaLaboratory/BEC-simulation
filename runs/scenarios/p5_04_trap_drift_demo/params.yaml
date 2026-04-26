@@ -1,0 +1,43 @@
+# P5.4 — Lab calibration drift over a multi-day run
+#
+# Demonstrates the Phase 4/5 #68 trap-drift API. The `calibration_history`
+# block is auto-applied by `run_yaml`: it picks the calibration sample
+# closest to (or interpolated to) `target_date` and substitutes the
+# resulting trap frequencies into the `ground_state.trap` field.
+#
+# For *real* drift modelling during a long dynamics phase, build the
+# TimeDependentTrap directly via:
+#
+#   import SpinorBEC: apply_trap_drift, load_calibration_csv
+#   hist  = load_calibration_csv("calibrations/q1_2026.csv")
+#   trap  = apply_trap_drift(HarmonicTrap((1.0,1.0,1.0)), hist, (1,2,3);
+#                             start_date = Date("2026-04-15"),
+#                             sim_seconds_per_unit = 1/(2π·100),
+#                             sim_duration = 1000.0,
+#                             fort_mw_per_axis = 12.5,
+#                             omega_ref_hz = 100.0)
+#
+# That returns a TimeDependentTrap whose ω(t) tracks the drift, ready
+# to drop into make_workspace(; potential = trap, ...).
+
+calibration_history:
+  - {date: "2026-04-01", coil_strong: {gauss_per_mv: 0.402, gauss_offset: 0.05},
+                          fort: {sqrt_coeffs_hz: [450, 450, 600]}}
+  - {date: "2026-04-08", coil_strong: {gauss_per_mv: 0.401, gauss_offset: 0.05},
+                          fort: {sqrt_coeffs_hz: [445, 445, 595]}}
+  - {date: "2026-04-15", coil_strong: {gauss_per_mv: 0.400, gauss_offset: 0.05},
+                          fort: {sqrt_coeffs_hz: [440, 440, 590]}}
+
+target_date: "2026-04-08"
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+      interactions: {c_total: 4689, c1_ratio: 0.028}
+      ddi: {c_dd: 7647, enabled: true}
+      zeeman: {p_mv: 2.5, coil_mode: strong}
+      trap: {fort_power_mw: [12.5, 12.5, 18.0]}
+      dt: 0.005
+      n_steps: 1000
+      tol: 1.0e-6

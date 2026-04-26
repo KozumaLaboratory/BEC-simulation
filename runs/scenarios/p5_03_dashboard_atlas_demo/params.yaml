@@ -1,0 +1,36 @@
+# P5.3 — Dashboard atlas-mode demo
+#
+# Long-ish dynamics with many snapshots so the React 2D scrubber's
+# atlas mode (one HTTP request → 46 MB Float32 atlas → GPU upload
+# once → uniform-write per scrub frame) has something to chew on.
+#
+# Tuned for Eu151 with all the shiny on: DDI on, time-dep Zeeman ramp,
+# 200 saved snapshots so the time scrubber slider has fine resolution.
+# Backend pre-pack will warm every snap × axis ∈ {1,2,3} and persist
+# the atlas to runs/_dashboard_cache/ so the next dashboard restart
+# is instant on this run.
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [48, 48, 32], box: [16.0, 16.0, 12.0]}
+      interactions:
+        c_total: 4689
+        c1_ratio: 0.028
+      ddi: {c_dd: 7647, enabled: true}
+      zeeman: {p: 100.0, q: 0.0}
+      trap: [1.0, 1.0, 1.182]
+      dt: 0.005
+      n_steps: 4000
+      tol: 1.0e-7
+      backend: cpu
+
+  - dynamics:
+      duration: 60.0
+      dt: 0.01
+      save_every: 30          # 200 snapshots
+      save_psi_snapshots: true
+      ddi: true
+      zeeman:
+        p: {from: 100.0, to: 0.5}
+        q: 0.0
