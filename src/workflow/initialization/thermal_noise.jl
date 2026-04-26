@@ -179,8 +179,10 @@ function add_symmetry_breaking_seed!(
     end
 
     if k_cut !== nothing
-        grid === nothing && throw(ArgumentError(
-            "add_symmetry_breaking_seed!: k_cut requires `grid` to map FFT bins"))
+        grid === nothing && throw(
+            ArgumentError(
+                "add_symmetry_breaking_seed!: k_cut requires `grid` to map FFT bins"),
+        )
         k_cut > 0 || throw(ArgumentError(
             "add_symmetry_breaking_seed!: k_cut must be positive (got $k_cut)"))
         nhat = fft(noise)
