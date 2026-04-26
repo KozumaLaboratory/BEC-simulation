@@ -4,7 +4,9 @@ Frontend for the Julia `serve_dashboard` backend. Replaces the previous
 Plotly.js dashboard (`runs/tools/dashboard.html`) with:
 
 - shadcn/ui + Tailwind v4 shell
-- react-plotly.js for 2D charts (energy / Mz / populations / timing)
+- inline SVG line charts (`LineChartSVG`) for 2D series (energy / Mz /
+  populations / timing) — Plotly.js was dropped 2026-04-26 to cut the
+  ~4 MB bundle hit
 - React Three Fiber + Three.js WebGPURenderer + TSL for 3D volume raymarch
 - leva for live shader / render parameters
 

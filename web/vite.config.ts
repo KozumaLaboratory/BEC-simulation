@@ -30,7 +30,6 @@ export default defineConfig({
           if (id.includes('three')) return 'three'
           if (id.includes('@react-three')) return 'r3f'
           if (id.includes('shiki') || id.includes('react-syntax-highlighter')) return 'syntax'
-          if (id.includes('plotly')) return 'plotly-legacy'
           // Group the Radix UI primitives together — they're a fair chunk
           // of weight (~80 KB minified) and only the components mounted
           // for the current tab actually pull from them at runtime.
