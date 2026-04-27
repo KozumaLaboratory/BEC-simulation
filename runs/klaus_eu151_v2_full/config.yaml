@@ -1,0 +1,44 @@
+# =================================================================
+# Eu151 mechanism map — corner: Berry connection + DDI both ON.
+# Klaus 4-step protocol (proven in klaus_eu151_spin_excitation).
+# 200 ms steady stir (= 2× spin_excitation, longer accumulation).
+# =================================================================
+
+pipeline:
+  - ground_state:
+      kind: rotating_basis
+      backend: cuda
+      atom: Eu151
+      N_atoms: 60000
+      omega_ref: 314.159
+      grid: {n: [24, 24, 12], box: [20.0, 20.0, 10.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 2.6]}
+      interactions: {c1: 0.0}                    # c0/c_dd auto-derived
+      zeeman: {p: 26700.0, q: 0.0}
+      B_hat: {theta: 0.0, phi: 0.0}
+      gauge_fix: false
+      n_steps: 250
+      dt: 0.005
+      init_m_idx: 1
+      init_sigma: 1.5
+
+  - dynamics:
+      kind: rotating_basis
+      duration: 6.28                             # 20 ms tilt ramp
+      epsilon: 1.0e-3
+      save_every: 30
+      B_hat: {theta_ramp: {from: 0.0, to: 0.611, duration: 6.28}, phi_omega: 0.0}
+
+  - dynamics:
+      kind: rotating_basis
+      duration: 15.7                             # 50 ms freq chirp
+      epsilon: 1.0e-3
+      save_every: 30
+      B_hat: {theta_const: 0.611, phi_chirp: {from: 0.0, to: 4.524, duration: 15.7}}
+
+  - dynamics:
+      kind: rotating_basis
+      duration: 62.83                            # 200 ms steady stir
+      epsilon: 1.0e-3
+      save_every: 50
+      B_hat: {theta_const: 0.611, phi_omega: 4.524}
