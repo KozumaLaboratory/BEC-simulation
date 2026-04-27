@@ -14,7 +14,7 @@ pipeline:
         c_extra: [0.0, 0.0, 5.0, 0.0, 3.0, 0.0, 1.0]
         # index:           c_2   c_3   c_4   c_5   c_6   c_7   c_8
         omega_ref: 314.159
-      trap: [1.0, 1.0, 1.0]
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
       zeeman: {Bz: 1.0e-4}
       initial_state: ferromagnetic_min
       dt: 0.01

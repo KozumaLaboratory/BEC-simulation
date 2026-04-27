@@ -35,6 +35,22 @@ struct FunctionWaveform <: Waveform
     f::Function
 end
 
+"""
+    SinusoidalWaveform(; center, amplitude, frequency, phase)
+
+`value(t) = center + amplitude · sin(2π · frequency · t + phase)`.
+
+**Frequency convention** — `t` here is the dimensionless simulation time
+(unit = `1 / ω_ref` where `ω_ref` is in **rad/s**). Because the formula
+multiplies by `2π`, the YAML/Julia `frequency` field is
+
+    frequency = f_phys[Hz] / ω_ref[rad/s] = f_phys / (2π · f_ref[Hz])
+
+NOT `f_phys / f_ref`. With the typical `ω_ref = 2π · 50 rad/s ≈ 314.159`,
+a 226 Hz drive needs `frequency ≈ 0.72`, not `4.52`. The `4.52` form
+gives a 2π× rotation and a quasi-DC field as far as the BEC is concerned
+(caught 2026-04-27 in the Klaus 2022 magnetostir reproduction).
+"""
 struct SinusoidalWaveform <: Waveform
     center::Float64
     amplitude::Float64
@@ -59,6 +75,12 @@ where φ(t) = 2π · ∫₀ᵗ f(τ) dτ = 2π · (freq_start · t + (freq_end �
 Use case: magnetostir spin-up phases where the stirring frequency ramps
 from 0 to its steady-state value over some time. Preserves phase continuity
 at the ramp boundaries (no discontinuous freq jumps).
+
+**Frequency convention** — same as [`SinusoidalWaveform`](@ref): both
+`freq_start` and `freq_end` are in units of `1 / (dimensionless time)`,
+which means `f_phys[Hz] / ω_ref[rad/s] = f_phys / (2π · f_ref)`. For
+`ω_ref = 2π · 50 rad/s`, a chirp ending at 226 Hz needs
+`freq_end ≈ 0.72`, not `4.52`.
 """
 struct ChirpedSinusoidalWaveform <: Waveform
     center::Float64

@@ -90,6 +90,7 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     "save_psi_snapshots" => FieldSpec(; type=Bool),
     "save_snapshot_compression" => FieldSpec(; type=Bool),
     "save_snapshot_precision" => FieldSpec(; type=String, enum=["f32", "f64"]),
+    "spin_rotating_frame_omega" => FieldSpec(; type=Number),
     "ddi" => FieldSpec(; type=Union{Dict, Bool}),
     "zeeman" => FieldSpec(; type=Dict),
     "interactions" => FieldSpec(; type=Dict),
@@ -216,13 +217,21 @@ end
 
 Validate a full pipeline YAML dict. Checks each step against its schema.
 """
-function validate_pipeline!(data::Dict)
-    # Top-level typo guard: warn on unknown root-level keys so a misspelt
-    # `pipline:` doesn't silently fall back to an empty pipeline.
+function validate_pipeline!(data::Dict; strict::Bool=false)
+    # Top-level typo guard. In strict mode (production runner default)
+    # unknown keys become errors — silent drops here have caused entire
+    # physics regressions (2026-04-27 `trap:` incident: pancake YAML ran
+    # in isotropic trap because `trap:` was not recognized and the
+    # @warn was easy to miss in the noise).
+    unknown_top = String[]
     for k in keys(data)
         sk = String(k)
         sk in TOP_LEVEL_KEYS && continue
-        @warn "Unknown top-level YAML key '$sk' — typo? Recognised keys: $(sort(collect(TOP_LEVEL_KEYS)))"
+        push!(unknown_top, sk)
+    end
+    if !isempty(unknown_top)
+        msg = "Unknown top-level YAML key(s) $unknown_top — typo? Recognised: $(sort(collect(TOP_LEVEL_KEYS)))"
+        strict ? throw(ArgumentError(msg)) : @warn msg
     end
 
     pipeline = get(data, "pipeline", nothing)
@@ -238,9 +247,11 @@ function validate_pipeline!(data::Dict)
         step_params = step[step_keys[1]]
 
         if haskey(STEP_SCHEMAS, step_type) && step_params isa Dict
-            validate_config!(step_params, STEP_SCHEMAS[step_type], "pipeline.$i.$step_type")
+            validate_config!(step_params, STEP_SCHEMAS[step_type],
+                "pipeline.$i.$step_type"; strict)
         elseif !(step_type in ("ground_state", "dynamics", "analyze"))
-            @warn "Unknown pipeline step kind '$step_type' (line $i) — typo? Recognised: ground_state, dynamics, analyze"
+            msg = "Unknown pipeline step kind '$step_type' (line $i) — typo? Recognised: ground_state, dynamics, analyze"
+            strict ? throw(ArgumentError(msg)) : @warn msg
         end
     end
 end

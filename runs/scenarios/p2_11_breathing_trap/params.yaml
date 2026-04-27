@@ -9,7 +9,7 @@ pipeline:
       atom: Dy164
       grid: {n: 16, box: 8.0}
       interactions: {c0: 50.0, c1: 0.0, omega_ref: 314.159}
-      trap: [1.0, 1.0, 1.0]
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
       zeeman: {Bz: 1.0e-4}
       initial_state: polar
       dt: 0.01

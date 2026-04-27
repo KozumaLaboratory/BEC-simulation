@@ -102,8 +102,11 @@ function run_yaml(yaml_path::String; base_dir::String="runs", verbose::Bool=true
         end
     end
 
-    # Schema validation: catch typos and invalid values before starting
-    validate_pipeline!(data)
+    # Schema validation: catch typos and invalid values before starting.
+    # strict=true fails the run on unknown keys; this is the production
+    # default so silent-drop bugs (2026-04-27 `trap:` incident) cannot
+    # repeat.
+    validate_pipeline!(data; strict=true)
 
     # Dry-run: print the calibration-applied + validated YAML and exit
     # without touching the GPU / building any workspace. Useful for

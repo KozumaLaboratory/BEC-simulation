@@ -9,8 +9,11 @@
 #   - 20 ms tilt ramp → 50 ms spin-up → 1 s magnetostir
 #
 # Pipeline units:  ω_ref = 314.159 rad/s ≡ 2π·50 Hz. Dimless time unit ≈ 3.18 ms.
-# Frequency in sinusoidal/chirped waveforms = f_phys [Hz] / ω_ref_Hz, so
-# 226 Hz → 226/50 = 4.52 in the frequency field.
+# Frequency in sinusoidal/chirped waveforms uses sin(2π·f·t_dimless) under
+# the hood, so f_yaml = f_phys [Hz] / ω_ref [rad/s] = f_phys / (2π·f_ref).
+# 226 Hz → 226/(2π·50) ≈ 0.72  (NOT 226/50 = 4.52 — that mistake gave a
+# 2π× field rotation, manifesting as cloud breathing/elongation without
+# any orbital response. Caught 2026-04-27.)
 #
 # Grid: 64×64×32 — resolves vortex cores (healing length ≈ 0.3 a_ho) and stripe
 # features. VRAM ≈ 2 GB, dynamics ~25 min on RTX 5070 Ti.
@@ -27,7 +30,7 @@ pipeline:
         omega_ref: 314.159
         N_atoms: 60000
       ddi: {enabled: true}
-      trap: [1.0, 1.0, 2.6]
+      potential: {type: harmonic, omega: [1.0, 1.0, 2.6]}
       zeeman:
         level: 1
         Bz: "1.0 Gauss"                 # weak bias before stirring starts
@@ -42,6 +45,8 @@ pipeline:
       duration: 6.28                     # 20 ms in units of ω_ref⁻¹
       dt: 0.002                          # Dy164 ε_dd > 1 → tight dt
       save_every: 100
+      save_psi_snapshots: true           # frame 0 = GS final state
+      save_snapshot_precision: "f32"
       interactions: {omega_ref: 314.159}
       zeeman:
         level: 2
@@ -54,6 +59,8 @@ pipeline:
       duration: 15.7                     # 50 ms
       dt: 0.002
       save_every: 250
+      save_psi_snapshots: true
+      save_snapshot_precision: "f32"
       interactions: {omega_ref: 314.159}
       zeeman:
         level: 1
@@ -62,13 +69,13 @@ pipeline:
           chirped_sinusoidal:
             amplitude: 0.574             # in Gauss (converted by zeeman_levels)
             freq_start: 0.0
-            freq_end: 4.52
+            freq_end: 0.72                # = 226 Hz / ω_ref(rad/s) = 226 / (2π·50)
             duration: 15.7
         By:
           chirped_sinusoidal:
             amplitude: 0.574
             freq_start: 0.0
-            freq_end: 4.52
+            freq_end: 0.72                # = 226 Hz / ω_ref(rad/s) = 226 / (2π·50)
             duration: 15.7
             phase: -1.5708               # π/2 lag → circular polarization
 
@@ -88,11 +95,11 @@ pipeline:
         Bx:
           sinusoidal:
             amplitude: 0.574
-            frequency: 4.52
+            frequency: 0.72             # = 226 Hz / ω_ref(rad/s) = 226 / (2π·50)
         By:
           sinusoidal:
             amplitude: 0.574
-            frequency: 4.52
+            frequency: 0.72             # = 226 Hz / ω_ref(rad/s) = 226 / (2π·50)
             phase: -1.5708
 
   # --- Post-processing ---------------------------------------------
@@ -103,6 +110,10 @@ pipeline:
           colorscale: Viridis
           width: 700
           height: 600
+          multi_step: true               # walk Step 2 (tilt) + Step 3 (chirp)
+                                         # + Step 4 (stir) — animation begins
+                                         # at GS final state
+
       - vortex_detect: {component: 1, threshold: 0.1}
       - winding_field: {component: 1, threshold: 1.0e-6}
       - summary_json:
