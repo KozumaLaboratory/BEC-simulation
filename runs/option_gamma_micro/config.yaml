@@ -1,0 +1,23 @@
+# Tiny smoke: 8×8×8, F=1 (D=3 spinor), 30 ITP steps, 5 dynamics steps.
+# Purpose: exercise full pipeline path with minimal JIT cost.
+pipeline:
+  - ground_state:
+      kind: rotating_basis
+      F: 1
+      grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      interactions: {c0: 10.0, c1: 0.0, c_dd: 0.0, gamma_lhy: 0.0}
+      zeeman: {p: 1.0, q: 0.0}
+      B_hat: {theta: 0.0, phi: 0.0}
+      gauge_fix: false
+      n_steps: 30
+      dt: 0.01
+      init_m_idx: 1
+      init_sigma: 0.5
+
+  - dynamics:
+      kind: rotating_basis
+      duration: 0.05
+      epsilon: 1.0e-3
+      save_every: 1
+      B_hat: {theta_const: 0.3, phi_omega: 1.0}

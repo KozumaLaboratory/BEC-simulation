@@ -1,0 +1,80 @@
+# =================================================================
+# Klaus magnetostir on Eu151 — proper Klaus protocol (修論 core run)
+# =================================================================
+#
+# 修論 main: spinor extension of Klaus 2022 to Eu151. Same B-field protocol
+# as Klaus paper, but on F=6 spinor instead of Dy F=8 spin-frozen.
+#
+# Protocol:
+#   1. GS at vertical bias only
+#   2. 20 ms tilt ramp 0° → 35°  (theta_ramp)
+#   3. 50 ms freq chirp 0 → 226 Hz  (phi_chirp)
+#   4. 100 ms steady magnetostir  (smoke; full thesis = 500ms-1s)
+#
+# Auto-derived for Eu151:
+#   c0 = 3792, c_dd = 170.7 (spinor), F = 6 (D = 13)
+#   ε_dd_phys = ε_dd_eff = 0.5402 ✓
+#   p_dimless ≈ 26700 at vertical B_z = 0.819 G
+#
+# This is the **adiabatic-protocol** Klaus run; pair with `klaus_eu151_weak_field`
+# for non-adiabatic regime (Berry connection driver).
+
+pipeline:
+  - ground_state:
+      kind: rotating_basis
+      backend: cuda                          # GPU
+      atom: Eu151
+      N_atoms: 60000
+      omega_ref: 314.159
+      grid:
+        n: [24, 24, 12]
+        box: [20.0, 20.0, 10.0]
+      potential:
+        type: harmonic
+        omega: [1.0, 1.0, 2.6]
+      interactions:
+        c1: 0.0
+      zeeman:
+        p: 100.0                              # Larmor at B=3mG (Berry regime)
+        q: 0.0
+      B_hat:
+        theta: 0.0                              # vertical bias only during ITP
+        phi: 0.0
+      gauge_fix: false
+      n_steps: 250
+      dt: 0.005
+      init_m_idx: 1
+      init_sigma: 1.5
+
+  - dynamics:
+      kind: rotating_basis
+      duration: 6.28                            # 20 ms tilt ramp
+      epsilon: 1.0e-3                           # Y6 auto-dt = 0.1·(ε/T)^(1/6)
+      save_every: 30
+      B_hat:
+        theta_ramp:
+          from: 0.0
+          to: 0.611
+          duration: 6.28
+        phi_omega: 0.0
+
+  - dynamics:
+      kind: rotating_basis
+      duration: 15.7                            # 50 ms freq chirp
+      epsilon: 1.0e-3                           # Y6 auto-dt = 0.1·(ε/T)^(1/6)
+      save_every: 30
+      B_hat:
+        theta_const: 0.611
+        phi_chirp:
+          from: 0.0
+          to: 4.524
+          duration: 15.7
+
+  - dynamics:
+      kind: rotating_basis
+      duration: 31.4                            # 100 ms steady stir
+      epsilon: 1.0e-3                           # Y6 auto-dt = 0.1·(ε/T)^(1/6)
+      save_every: 50
+      B_hat:
+        theta_const: 0.611
+        phi_omega: 4.524

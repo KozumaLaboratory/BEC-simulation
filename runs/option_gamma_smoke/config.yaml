@@ -1,0 +1,39 @@
+# Option γ rotating-basis spinor GP smoke test (Klaus-style 100ms stir).
+# Demonstrates YAML pipeline integration: kind: rotating_basis on both
+# ground_state and dynamics steps.
+
+pipeline:
+  - ground_state:
+      kind: rotating_basis
+      atom: Eu151                          # F=6
+      grid:
+        n: [12, 12, 12]
+        box: [10.0, 10.0, 10.0]
+      potential:
+        type: harmonic
+        omega: [1.0, 1.0, 1.0]
+      interactions:
+        c0: 60.0
+        c1: 0.0
+        c_dd: 1.5                          # ε_dd_eff = 0.3
+        gamma_lhy: 0.0
+      zeeman:
+        p: 1000.0                          # adiabatic but tractable
+        q: 0.0
+      B_hat:
+        theta: 0.0                         # static B̂ = ẑ during ITP
+        phi: 0.0
+      gauge_fix: false
+      n_steps: 150
+      dt: 0.005
+      init_m_idx: 1                        # m=+F (lowest under -p F_z, p>0)
+      init_sigma: 1.0
+
+  - dynamics:
+      kind: rotating_basis
+      duration: 1.0                        # ~3 ms physical
+      epsilon: 1.0e-3                           # Y6 auto-dt = 0.1·(ε/T)^(1/6)
+      save_every: 10
+      B_hat:
+        theta_const: 0.611                 # 35° tilt
+        phi_omega:  4.524                  # 226 Hz / (2π·50) · 2π = ω_rotation in dimless
