@@ -46,8 +46,8 @@ function make_scalar_ws(
     g_contact::Real,
     c_dd::Real,
     F::Real,
-    gamma_lhy::Real = 0.0,
-    dt::Real = 0.0,
+    gamma_lhy::Real=0.0,
+    dt::Real=0.0,
 ) where {N, T <: AbstractFloat}
     n_pts = grid.config.n_points
     psi = zeros(Complex{T}, n_pts...)
@@ -130,7 +130,8 @@ end
 """Compute ρ = |ψ|² in place into ws.rho."""
 function _update_density!(ws::ScalarSimWS{T, N}) where {T, N}
     @inbounds for I in eachindex(ws.psi)
-        re = real(ws.psi[I]); im = imag(ws.psi[I])
+        re = real(ws.psi[I]);
+        im = imag(ws.psi[I])
         ws.rho[I] = re * re + im * im
     end
     nothing
@@ -139,7 +140,7 @@ end
 """Diagonal step: ψ ← exp(-i (V_trap + g·ρ + V_dd + γ_LHY·ρ^{3/2}) · dt) ψ
 (real time) or exp(-(...)·dt) ψ (imaginary time)."""
 function apply_diagonal_step_scalar!(
-    ws::ScalarSimWS{T, N}, dt::T; imaginary_time::Bool = false
+    ws::ScalarSimWS{T, N}, dt::T; imaginary_time::Bool=false
 ) where {T, N}
     g = ws.g_contact
     γ = ws.gamma_lhy
@@ -168,7 +169,7 @@ end
 """Kinetic step: ψ ← F⁻¹{exp(-i k²/2 · dt) F{ψ}} (real time) or
 F⁻¹{exp(-k²/2·dt) F{ψ}} (imaginary time)."""
 function apply_kinetic_step_scalar!(
-    ws::ScalarSimWS{T, N}, dt::T; imaginary_time::Bool = false
+    ws::ScalarSimWS{T, N}, dt::T; imaginary_time::Bool=false
 ) where {T, N}
     ws.fft_fwd * ws.psi
     if imaginary_time
@@ -209,7 +210,7 @@ of the local potential — no separate symmetrization (it's diagonal in r).
 """
 function split_step_scalar!(
     ws::ScalarSimWS{T, N}, dt::T, t::T, B_hat_func::Function;
-    imaginary_time::Bool = false,
+    imaginary_time::Bool=false,
 ) where {T, N}
     half = dt / 2
     apply_kinetic_step_scalar!(ws, half; imaginary_time)
@@ -224,7 +225,7 @@ function split_step_scalar!(
 end
 
 """Renormalize ψ to total norm = `target_norm`."""
-function normalize_scalar!(ws::ScalarSimWS{T, N}; target_norm::T = one(T)) where {T, N}
+function normalize_scalar!(ws::ScalarSimWS{T, N}; target_norm::T=one(T)) where {T, N}
     n = scalar_norm(ws)
     n > zero(T) || return nothing
     s = sqrt(target_norm / n)
@@ -239,13 +240,13 @@ each step. Returns final estimated chemical potential μ ≈ -ln(N(t)/N(t-dt))/d
 (after a renormalization step the norm has dropped by exp(-2μ·dt))."""
 function find_ground_state_scalar!(
     ws::ScalarSimWS{T, N}, n_steps::Int, dt::T; B_hat::SVector{3, T},
-    target_norm::T = one(T),
-    on_step::Union{Nothing, Function} = nothing,
+    target_norm::T=one(T),
+    on_step::Union{Nothing, Function}=nothing,
 ) where {T, N}
     B_func = (_t::T) -> B_hat
     μ_last = zero(T)
     for step in 1:n_steps
-        split_step_scalar!(ws, dt, zero(T), B_func; imaginary_time = true)
+        split_step_scalar!(ws, dt, zero(T), B_func; imaginary_time=true)
         n_before_renorm = scalar_norm(ws)
         # Norm decay in imag-time corresponds to drop ratio exp(-2μ·dt)·N0
         # We renormalize after, but capture μ from the decay.
@@ -268,9 +269,9 @@ Returns the final time `t0 + n_steps·dt`. Use `observe!` callbacks
 (via the optional `on_step` kwarg) to record observables.
 """
 function evolve_scalar!(
-    ws::ScalarSimWS{T, N}, n_steps::Int, dt::T; t0::T = zero(T),
+    ws::ScalarSimWS{T, N}, n_steps::Int, dt::T; t0::T=zero(T),
     B_hat_func::Function,
-    on_step::Union{Nothing, Function} = nothing,
+    on_step::Union{Nothing, Function}=nothing,
 ) where {T, N}
     t = t0
     for step in 1:n_steps
@@ -287,7 +288,8 @@ end
 function scalar_norm(ws::ScalarSimWS{T, N}) where {T, N}
     s = zero(T)
     @inbounds for I in eachindex(ws.psi)
-        re = real(ws.psi[I]); im = imag(ws.psi[I])
+        re = real(ws.psi[I]);
+        im = imag(ws.psi[I])
         s += re * re + im * im
     end
     s * prod(ws.grid.dx)
@@ -300,7 +302,8 @@ function scalar_com(ws::ScalarSimWS{T, N}) where {T, N}
     inv_n = norm > 0 ? one(T) / norm : zero(T)
     com = zeros(T, N)
     @inbounds for I in CartesianIndices(ws.psi)
-        re = real(ws.psi[I]); im = imag(ws.psi[I])
+        re = real(ws.psi[I]);
+        im = imag(ws.psi[I])
         ρ = re * re + im * im
         for d in 1:N
             com[d] += ρ * ws.grid.x[d][I[d]]
@@ -315,9 +318,11 @@ function scalar_aspect_ratio(ws::ScalarSimWS{T, 3}) where {T}
     n = scalar_norm(ws)
     n > 0 || return zero(T)
     com = scalar_com(ws)
-    σ_xy = zero(T); σ_z = zero(T)
+    σ_xy = zero(T);
+    σ_z = zero(T)
     @inbounds for I in CartesianIndices(ws.psi)
-        re = real(ws.psi[I]); im = imag(ws.psi[I])
+        re = real(ws.psi[I]);
+        im = imag(ws.psi[I])
         ρ = re * re + im * im
         x = ws.grid.x[1][I[1]] - com[1]
         y = ws.grid.x[2][I[2]] - com[2]
@@ -325,7 +330,8 @@ function scalar_aspect_ratio(ws::ScalarSimWS{T, 3}) where {T}
         σ_xy += ρ * (x * x + y * y) / 2
         σ_z += ρ * z * z
     end
-    σ_xy *= dV / n; σ_z *= dV / n
+    σ_xy *= dV / n;
+    σ_z *= dV / n
     σ_xy > 0 ? sqrt(σ_z / σ_xy) : zero(T)
 end
 
@@ -350,7 +356,9 @@ function scalar_energies(ws::ScalarSimWS{T, N}, B_hat::SVector{3, T}) where {T, 
 
     _update_density!(ws)
     compute_tilted_dipole_potential!(ws, B_hat)
-    E_trap = zero(T); E_contact = zero(T); E_dd = zero(T)
+    E_trap = zero(T);
+    E_contact = zero(T);
+    E_dd = zero(T)
     g = ws.g_contact
     @inbounds for I in eachindex(ws.psi)
         ρ = ws.rho[I]
@@ -358,7 +366,9 @@ function scalar_energies(ws::ScalarSimWS{T, N}, B_hat::SVector{3, T}) where {T, 
         E_contact += ρ * ρ * g / 2
         E_dd += ρ * ws.V_dd[I] / 2
     end
-    E_trap *= dV; E_contact *= dV; E_dd *= dV
+    E_trap *= dV;
+    E_contact *= dV;
+    E_dd *= dV
     (E_kin, E_trap, E_contact, E_dd, E_kin + E_trap + E_contact + E_dd)
 end
 
@@ -367,7 +377,8 @@ end
 function scalar_Lz(ws::ScalarSimWS{T, 3}) where {T}
     # ∂_y ψ via FFT
     n_pts = ws.grid.config.n_points
-    kx = ws.grid.k[1]; ky = ws.grid.k[2]
+    kx = ws.grid.k[1];
+    ky = ws.grid.k[2]
     @inbounds for I in eachindex(ws.psi)
         ws.psi_k[I] = ws.psi[I]
     end
@@ -387,7 +398,8 @@ function scalar_Lz(ws::ScalarSimWS{T, 3}) where {T}
 
     Lz = zero(Complex{T})
     @inbounds for I in CartesianIndices(n_pts)
-        x = ws.grid.x[1][I[1]]; y = ws.grid.x[2][I[2]]
+        x = ws.grid.x[1][I[1]];
+        y = ws.grid.x[2][I[2]]
         # ψ* (x ∂_y - y ∂_x) ψ
         Lz += conj(ws.psi[I]) * (x * dpsi_dy[I] - y * dpsi_dx[I])
     end

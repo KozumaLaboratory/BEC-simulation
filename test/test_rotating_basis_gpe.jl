@@ -11,21 +11,25 @@ using StaticArrays: SVector
 
     V_trap = zeros(Float64, 16, 16, 16)
     @inbounds for I in CartesianIndices(V_trap)
-        x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+        x = grid.x[1][I[1]];
+        y = grid.x[2][I[2]];
+        z = grid.x[3][I[3]]
         V_trap[I] = 0.5 * (x*x + y*y + z*z)
     end
 
     @testset "norm preservation under basis-only transforms" begin
         ws = SpinorBEC.make_rotating_basis_ws(
             grid, F_test, V_trap;
-            p = 0.0, q = 0.0, c0 = 0.0, c1 = 0.0, c_dd = 0.0,
-            theta_func = (_t) -> 0.0, phi_func = (_t) -> 0.0,
+            p=0.0, q=0.0, c0=0.0, c1=0.0, c_dd=0.0,
+            theta_func=(_t) -> 0.0, phi_func=(_t) -> 0.0,
         )
         # Initialize ψ̃ in the m=-F (lowest) component as a Gaussian
         D = 2F_test + 1
         σ = 1.0
         @inbounds for I in CartesianIndices(grid.config.n_points)
-            x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+            x = grid.x[1][I[1]];
+            y = grid.x[2][I[2]];
+            z = grid.x[3][I[3]]
             ws.psi_tilde[I, D] = exp(-(x*x + y*y + z*z) / (2σ*σ))
         end
         SpinorBEC.normalize_rotating!(ws)
@@ -42,14 +46,16 @@ using StaticArrays: SVector
     @testset "RTP norm conservation, static B̂ = ẑ, no DDI" begin
         ws = SpinorBEC.make_rotating_basis_ws(
             grid, F_test, V_trap;
-            p = 0.5, q = 0.1, c0 = 50.0, c1 = 0.0, c_dd = 0.0,
-            theta_func = (_t) -> 0.0, phi_func = (_t) -> 0.0,
-            theta_dot_func = (_t) -> 0.0, phi_dot_func = (_t) -> 0.0,
+            p=0.5, q=0.1, c0=50.0, c1=0.0, c_dd=0.0,
+            theta_func=(_t) -> 0.0, phi_func=(_t) -> 0.0,
+            theta_dot_func=(_t) -> 0.0, phi_dot_func=(_t) -> 0.0,
         )
         D = 2F_test + 1
         σ = 1.0
         @inbounds for I in CartesianIndices(grid.config.n_points)
-            x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+            x = grid.x[1][I[1]];
+            y = grid.x[2][I[2]];
+            z = grid.x[3][I[3]]
             ws.psi_tilde[I, D] = exp(-(x*x + y*y + z*z) / (2σ*σ))
         end
         SpinorBEC.normalize_rotating!(ws)
@@ -65,14 +71,16 @@ using StaticArrays: SVector
     @testset "ITP convergence: scalar limit (F=1, c0 only)" begin
         ws = SpinorBEC.make_rotating_basis_ws(
             grid, F_test, V_trap;
-            p = 0.0, q = 0.0, c0 = 100.0, c1 = 0.0, c_dd = 0.0,
-            theta_func = (_t) -> 0.0, phi_func = (_t) -> 0.0,
+            p=0.0, q=0.0, c0=100.0, c1=0.0, c_dd=0.0,
+            theta_func=(_t) -> 0.0, phi_func=(_t) -> 0.0,
         )
         D = 2F_test + 1
         # TF ansatz in m=-F component
         μ_TF = (15 * 100.0 / (8π))^(2/5)
         @inbounds for I in CartesianIndices(grid.config.n_points)
-            x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+            x = grid.x[1][I[1]];
+            y = grid.x[2][I[2]];
+            z = grid.x[3][I[3]]
             V_local = 0.5 * (x*x + y*y + z*z)
             ρ = max(0.0, (μ_TF - V_local) / 100.0)
             ws.psi_tilde[I, D] = sqrt(ρ)
@@ -101,13 +109,15 @@ using StaticArrays: SVector
 
         ws_tilde = SpinorBEC.make_rotating_basis_ws(
             grid, F_test, V_trap;
-            p = 0.5, q = 0.0, c0 = 50.0, c1 = 0.0, c_dd = 0.0,
-            theta_func = (_t) -> theta, phi_func = (_t) -> phi,
+            p=0.5, q=0.0, c0=50.0, c1=0.0, c_dd=0.0,
+            theta_func=(_t) -> theta, phi_func=(_t) -> phi,
         )
         D = 2F_test + 1
         σ = 1.0
         @inbounds for I in CartesianIndices(grid.config.n_points)
-            x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+            x = grid.x[1][I[1]];
+            y = grid.x[2][I[2]];
+            z = grid.x[3][I[3]]
             ws_tilde.psi_tilde[I, D] = exp(-(x*x + y*y + z*z) / (2σ*σ))
         end
         SpinorBEC.normalize_rotating!(ws_tilde)
@@ -133,7 +143,9 @@ using StaticArrays: SVector
             theta_func=(_t)->0.0, phi_func=(_t)->0.0)
         σ_l = 1.0
         @inbounds for I in CartesianIndices(grid.config.n_points)
-            x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+            x = grid.x[1][I[1]];
+            y = grid.x[2][I[2]];
+            z = grid.x[3][I[3]]
             ws_no.psi_tilde[I, 1] = exp(-(x*x + y*y + z*z) / (2σ_l*σ_l))
         end
         SpinorBEC.normalize_rotating!(ws_no)
@@ -144,7 +156,9 @@ using StaticArrays: SVector
             gamma_lhy=100.0,                              # nontrivial LHY
             theta_func=(_t)->0.0, phi_func=(_t)->0.0)
         @inbounds for I in CartesianIndices(grid.config.n_points)
-            x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+            x = grid.x[1][I[1]];
+            y = grid.x[2][I[2]];
+            z = grid.x[3][I[3]]
             ws_lhy.psi_tilde[I, 1] = exp(-(x*x + y*y + z*z) / (2σ_l*σ_l))
         end
         SpinorBEC.normalize_rotating!(ws_lhy)
@@ -162,7 +176,9 @@ using StaticArrays: SVector
             theta_func=(_t)->0.0, phi_func=(_t)->0.0)
         σ_l = 1.0
         @inbounds for I in CartesianIndices(grid.config.n_points)
-            x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+            x = grid.x[1][I[1]];
+            y = grid.x[2][I[2]];
+            z = grid.x[3][I[3]]
             ws.psi_tilde[I, 1] = exp(-(x*x + y*y + z*z) / (2σ_l*σ_l))
         end
         SpinorBEC.normalize_rotating!(ws)
@@ -171,7 +187,9 @@ using StaticArrays: SVector
         # Vortex
         fill!(ws.psi_tilde, 0.0)
         @inbounds for I in CartesianIndices(grid.config.n_points)
-            x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+            x = grid.x[1][I[1]];
+            y = grid.x[2][I[2]];
+            z = grid.x[3][I[3]]
             r2 = x*x + y*y + z*z
             ws.psi_tilde[I, 1] = (x + im*y) * exp(-r2 / (2σ_l*σ_l))
         end
@@ -183,15 +201,17 @@ using StaticArrays: SVector
         F6 = 6
         ws6 = SpinorBEC.make_rotating_basis_ws(
             grid, F6, V_trap;
-            p = 1.0, q = 0.001, c0 = 100.0, c1 = 0.0, c_dd = 0.0,
-            theta_func = (_t) -> 0.0, phi_func = (_t) -> 0.0,
+            p=1.0, q=0.001, c0=100.0, c1=0.0, c_dd=0.0,
+            theta_func=(_t) -> 0.0, phi_func=(_t) -> 0.0,
         )
         D6 = 2F6 + 1
         @test size(ws6.psi_tilde, 4) == D6
         # Initialize in m=-F=−6 (last index)
         σ = 1.0
         @inbounds for I in CartesianIndices(grid.config.n_points)
-            x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+            x = grid.x[1][I[1]];
+            y = grid.x[2][I[2]];
+            z = grid.x[3][I[3]]
             ws6.psi_tilde[I, D6] = exp(-(x*x + y*y + z*z) / (2σ*σ))
         end
         SpinorBEC.normalize_rotating!(ws6)
@@ -209,7 +229,9 @@ end
 
     V_trap = zeros(Float64, 16, 16, 16)
     @inbounds for I in CartesianIndices(V_trap)
-        x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+        x = grid.x[1][I[1]];
+        y = grid.x[2][I[2]];
+        z = grid.x[3][I[3]]
         V_trap[I] = 0.5 * (x*x + y*y + z*z)
     end
 
@@ -218,16 +240,18 @@ end
         F_test = 2
         ws = SpinorBEC.make_rotating_basis_ws(
             grid, F_test, V_trap;
-            p = 0.5, q = 0.0, c0 = 10.0, c1 = 0.0, c_dd = 0.0,
-            theta_func = (_t) -> π/4,           # constant tilt
-            phi_func = (t) -> ω * t,            # uniform rotation
-            theta_dot_func = (_t) -> 0.0,
-            phi_dot_func = (_t) -> ω,
+            p=0.5, q=0.0, c0=10.0, c1=0.0, c_dd=0.0,
+            theta_func=(_t) -> π/4,           # constant tilt
+            phi_func=(t) -> ω * t,            # uniform rotation
+            theta_dot_func=(_t) -> 0.0,
+            phi_dot_func=(_t) -> ω,
         )
         D = 2F_test + 1
         σ = 1.0
         @inbounds for I in CartesianIndices(grid.config.n_points)
-            x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+            x = grid.x[1][I[1]];
+            y = grid.x[2][I[2]];
+            z = grid.x[3][I[3]]
             ws.psi_tilde[I, D] = exp(-(x*x + y*y + z*z) / (2σ*σ))
         end
         SpinorBEC.normalize_rotating!(ws)

@@ -23,7 +23,7 @@ Output: derived quantities tagged for direct plotting:
 Extract N_m(t) for all m components (rows = m index 1..D, cols = time).
 Population is per-m norm × N_atoms (or normalized fraction).
 """
-function population_dynamics(dyn::Dict; normalize::Bool = true)
+function population_dynamics(dyn::Dict; normalize::Bool=true)
     pm_hist = dyn[:per_m_history]::Vector
     times = dyn[:times]::Vector{Float64}
     D = length(pm_hist[1])
@@ -41,7 +41,7 @@ function population_dynamics(dyn::Dict; normalize::Bool = true)
             end
         end
     end
-    (times = times, N_m = N_m, F = (D - 1) ÷ 2)
+    (times=times, N_m=N_m, F=(D - 1) ÷ 2)
 end
 
 # --- X2'/X5: EdH conservation check ------------------------------------
@@ -57,8 +57,8 @@ function edh_conservation(dyn::Dict)
     Lz = dyn[:Lz]::Vector{Float64}
     Jz = Fz .+ Lz
     drift = Jz .- Jz[1]
-    (times = times, Fz = Fz, Lz = Lz, Jz = Jz, Jz_drift = drift,
-     conservation_max_rel = maximum(abs.(drift)) / max(abs(Jz[1]), 1.0))
+    (times=times, Fz=Fz, Lz=Lz, Jz=Jz, Jz_drift=drift,
+        conservation_max_rel=maximum(abs.(drift)) / max(abs(Jz[1]), 1.0))
 end
 
 # --- X3: Spin texture ⟨F_α⟩(x,y) ---------------------------------------
@@ -74,7 +74,7 @@ to get lab-frame spin, apply Û_B(t) rotation to F operators or to ψ̃ post-hoc
 This function returns the TILDE-basis spin density — by construction, m=+F
 fully polarized state has ⟨F_z⟩_tilde = +F·ρ across the cloud.
 """
-function spin_texture_xy(dyn::Dict; frame_idxs::AbstractVector{Int} = Int[])
+function spin_texture_xy(dyn::Dict; frame_idxs::AbstractVector{Int}=Int[])
     haskey(dyn, :psi_snapshots) || error(
         "spin_texture_xy requires :psi_snapshots in dynamics result. " *
         "Re-run with `save_psi_snapshots: true` (default).")
@@ -84,7 +84,7 @@ function spin_texture_xy(dyn::Dict; frame_idxs::AbstractVector{Int} = Int[])
     if isempty(frame_idxs)
         # Default: 5 evenly spaced frames
         n = length(snaps)
-        frame_idxs = Int.(round.(range(1, n, length=min(5, n))))
+        frame_idxs = Int.(round.(range(1, n; length=min(5, n))))
     end
 
     sample = snaps[1]
@@ -127,7 +127,9 @@ function spin_texture_xy(dyn::Dict; frame_idxs::AbstractVector{Int} = Int[])
     @inbounds for (k, idx) in enumerate(frame_idxs)
         ψ = snaps[idx]
         for ix in 1:Nx, iy in 1:Ny
-            fx_acc = 0.0; fy_acc = 0.0; fz_acc = 0.0
+            fx_acc = 0.0;
+            fy_acc = 0.0;
+            fz_acc = 0.0
             for iz in 1:Nz
                 # ⟨F_α⟩ at (ix,iy,iz) = Σ_m,m' conj(ψ_m) F_α[m,m'] ψ_m'
                 for j in 1:D, i in 1:D
@@ -151,8 +153,8 @@ function spin_texture_xy(dyn::Dict; frame_idxs::AbstractVector{Int} = Int[])
         end
     end
 
-    (frame_times = times[frame_idxs], frame_idxs = frame_idxs,
-     Fx = Fx_xy, Fy = Fy_xy, Fz = Fz_xy, F = F_val)
+    (frame_times=times[frame_idxs], frame_idxs=frame_idxs,
+        Fx=Fx_xy, Fy=Fy_xy, Fz=Fz_xy, F=F_val)
 end
 
 # --- X4: Per-m column density + vortex detection -----------------------
@@ -161,7 +163,7 @@ end
 Column-projected density per m component: |ψ̃_m(x,y)|² = ∫ |ψ̃_m(x,y,z)|² dz.
 Returns Array{Float64, 3} indexed [x, y, m] for the requested frame.
 """
-function per_m_column_density(dyn::Dict; frame_idx::Int = -1)
+function per_m_column_density(dyn::Dict; frame_idx::Int=-1)
     haskey(dyn, :psi_snapshots) || error("requires :psi_snapshots")
     snaps = dyn[:psi_snapshots]::Vector
     f = frame_idx < 0 ? length(snaps) : frame_idx
@@ -190,19 +192,20 @@ Returns Vector of (ix, iy) tuples for detected cores. `density_threshold`
 is a fraction of peak density below which a local-min counts as a core.
 """
 function detect_density_minima(rho::AbstractMatrix{Float64};
-                                density_threshold::Float64 = 0.3)
+    density_threshold::Float64=0.3)
     Nx, Ny = size(rho)
     ρ_max = maximum(rho)
     cores = NTuple{2, Int}[]
-    @inbounds for ix in 2:Nx-1, iy in 2:Ny-1
+    @inbounds for ix in 2:(Nx - 1), iy in 2:(Ny - 1)
         ρ = rho[ix, iy]
         ρ < density_threshold * ρ_max || continue
         # Local minimum check (8-neighbor)
         is_min = true
         for di in -1:1, dj in -1:1
             (di == 0 && dj == 0) && continue
-            if rho[ix+di, iy+dj] < ρ
-                is_min = false; break
+            if rho[ix + di, iy + dj] < ρ
+                is_min = false;
+                break
             end
         end
         is_min && push!(cores, (ix, iy))
@@ -211,16 +214,16 @@ function detect_density_minima(rho::AbstractMatrix{Float64};
 end
 
 """Detect vortex cores in each m component for a given frame."""
-function detect_per_m_vortices(dyn::Dict; frame_idx::Int = -1,
-                                density_threshold::Float64 = 0.2)
+function detect_per_m_vortices(dyn::Dict; frame_idx::Int=-1,
+    density_threshold::Float64=0.2)
     cd = per_m_column_density(dyn; frame_idx)
     Nx, Ny, D = size(cd)
     cores_per_m = Vector{Vector{NTuple{2, Int}}}(undef, D)
     @inbounds for m_idx in 1:D
         cores_per_m[m_idx] = detect_density_minima(@view cd[:, :, m_idx];
-                                                    density_threshold)
+            density_threshold)
     end
-    (cores = cores_per_m, column_density = cd)
+    (cores=cores_per_m, column_density=cd)
 end
 
 # --- X6: Berry connection time profile ---------------------------------
@@ -238,11 +241,11 @@ Returns time series of (a_x, a_y, a_z) per the gauge-fix convention used:
   - gauge_fix=true: a_x = -φ̇·sinθ, a_y = θ̇, a_z = 0  (F_z piece absorbed)
 """
 function berry_connection_trajectory(times::AbstractVector;
-                                      theta_func::Function,
-                                      phi_func::Function,
-                                      theta_dot_func::Function,
-                                      phi_dot_func::Function,
-                                      gauge_fix::Bool = false)
+    theta_func::Function,
+    phi_func::Function,
+    theta_dot_func::Function,
+    phi_dot_func::Function,
+    gauge_fix::Bool=false)
     a_x = zeros(Float64, length(times))
     a_y = zeros(Float64, length(times))
     a_z = zeros(Float64, length(times))
@@ -255,19 +258,19 @@ function berry_connection_trajectory(times::AbstractVector;
         a_z[i] = gauge_fix ? 0.0 : φ̇ * cos(θ)
     end
     a_mag = @. sqrt(a_x^2 + a_y^2 + a_z^2)
-    (times = collect(times), a_x = a_x, a_y = a_y, a_z = a_z, a_mag = a_mag)
+    (times=collect(times), a_x=a_x, a_y=a_y, a_z=a_z, a_mag=a_mag)
 end
 
 """Convenience: extract Â trajectory from a dynamics result (uses
 saved theta_const, phi_omega)."""
-function berry_connection_trajectory(dyn::Dict; gauge_fix::Bool = false)
+function berry_connection_trajectory(dyn::Dict; gauge_fix::Bool=false)
     times = dyn[:times]::Vector{Float64}
     θ_const = dyn[:theta_const]::Float64
     φ_omega = dyn[:phi_omega]::Float64
     berry_connection_trajectory(times;
-        theta_func = (t)->θ_const,
-        phi_func = (t)->φ_omega * t,
-        theta_dot_func = (t)->0.0,
-        phi_dot_func = (t)->φ_omega,
-        gauge_fix = gauge_fix)
+        theta_func=(t)->θ_const,
+        phi_func=(t)->φ_omega * t,
+        theta_dot_func=(t)->0.0,
+        phi_dot_func=(t)->φ_omega,
+        gauge_fix=gauge_fix)
 end

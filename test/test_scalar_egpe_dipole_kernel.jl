@@ -9,24 +9,26 @@ using StaticArrays: SVector
     V_trap = zeros(Float64, 32, 32, 32)
     ws = SpinorBEC.make_scalar_ws(
         grid, V_trap;
-        g_contact = 1.0, c_dd = 100.0, F = 1.0, gamma_lhy = 0.0, dt = 0.0,
+        g_contact=1.0, c_dd=100.0, F=1.0, gamma_lhy=0.0, dt=0.0,
     )
 
     # Spherically symmetric Gaussian density
     σ = 1.5
     @inbounds for I in CartesianIndices(ws.psi)
-        x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+        x = grid.x[1][I[1]];
+        y = grid.x[2][I[2]];
+        z = grid.x[3][I[3]]
         ws.psi[I] = exp(-(x*x + y*y + z*z) / (2σ*σ))
     end
     SpinorBEC.normalize_scalar!(ws)
     SpinorBEC._update_density!(ws)
 
     # B̂ = ẑ → V_dd should be axisymmetric around z, with extremum on z-axis
-    SpinorBEC.compute_tilted_dipole_potential!(ws, SVector{3,Float64}(0.0, 0.0, 1.0))
+    SpinorBEC.compute_tilted_dipole_potential!(ws, SVector{3, Float64}(0.0, 0.0, 1.0))
     Vdd_z = copy(ws.V_dd)
 
     # B̂ = x̂ → V_dd should be axisymmetric around x (90° rotation of above)
-    SpinorBEC.compute_tilted_dipole_potential!(ws, SVector{3,Float64}(1.0, 0.0, 0.0))
+    SpinorBEC.compute_tilted_dipole_potential!(ws, SVector{3, Float64}(1.0, 0.0, 0.0))
     Vdd_x = copy(ws.V_dd)
 
     # Reference index near origin (grid is offset, no exact origin cell)
@@ -56,7 +58,7 @@ using StaticArrays: SVector
     # B̂=(1,1,1)/√3 (diagonal) — V_dd extends along (1,1,1) direction
     invsqrt3 = 1.0 / sqrt(3)
     SpinorBEC.compute_tilted_dipole_potential!(
-        ws, SVector{3,Float64}(invsqrt3, invsqrt3, invsqrt3)
+        ws, SVector{3, Float64}(invsqrt3, invsqrt3, invsqrt3)
     )
     Vdd_diag = ws.V_dd
     edge_diag = Vdd_diag[cx + 4, cy + 4, cz + 4]   # along (1,1,1)

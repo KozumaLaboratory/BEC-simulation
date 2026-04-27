@@ -33,7 +33,7 @@ function _parse_step(d::Dict)
         if kind == "binary" || kind == :binary
             BinaryGroundStateStep(params)
         elseif kind == "rotating_basis" || kind == :rotating_basis ||
-               kind == "option_gamma" || kind == :option_gamma
+            kind == "option_gamma" || kind == :option_gamma
             RotatingBasisGroundStateStep(params)
         else
             GroundStateStep(params)
@@ -44,7 +44,7 @@ function _parse_step(d::Dict)
         if kind == "binary" || kind == :binary
             BinaryDynamicsStep(params)
         elseif kind == "rotating_basis" || kind == :rotating_basis ||
-               kind == "option_gamma" || kind == :option_gamma
+            kind == "option_gamma" || kind == :option_gamma
             RotatingBasisDynamicsStep(params)
         else
             DynamicsStep(params)
@@ -1030,7 +1030,7 @@ function (c::_LinearChirpPhi)(t::Float64)
     else
         # After ramp ends, phase continues at constant ω_end
         c.omega_start * c.duration + (c.omega_end - c.omega_start) * c.duration / 2 +
-            c.omega_end * (t - c.duration)
+        c.omega_end * (t - c.duration)
     end
 end
 
@@ -1048,7 +1048,7 @@ function (c::_LinearChirpPhiDot)(t::Float64)
 end
 
 @noinline function _run_rotating_basis_ground_state_step(
-    p::Dict{String, Any}; verbose::Bool=true,
+    p::Dict{String, Any}; verbose::Bool=true
 )
     grid_node = p["grid"]::Dict
     n = Int.(grid_node["n"])
@@ -1056,8 +1056,10 @@ end
     grid = make_grid(GridConfig(Tuple(n), Tuple(box)))
 
     pot_node = p["potential"]::Dict
-    get(pot_node, "type", "harmonic") == "harmonic" || throw(ArgumentError(
-        "rotating_basis ground_state currently supports only `potential.type: harmonic`"))
+    get(pot_node, "type", "harmonic") == "harmonic" || throw(
+        ArgumentError(
+            "rotating_basis ground_state currently supports only `potential.type: harmonic`"),
+    )
     ω_vec = Float64.(pot_node["omega"])::Vector{Float64}
     length(ω_vec) == length(n) ||
         throw(ArgumentError("potential.omega length must match grid ndim"))
@@ -1081,12 +1083,24 @@ end
     # via spin operators in the Hamiltonian).
     atom_obj = if haskey(p, "atom")
         atom_name = string(p["atom"])::String
-        if atom_name == "Eu151"; SpinorBEC.Eu151
-        elseif atom_name == "Dy164"; SpinorBEC.Dy164
-        elseif atom_name == "Dy162"; SpinorBEC.Dy162
-        elseif atom_name == "Cr52"; SpinorBEC.Cr52
-        elseif atom_name == "Rb87"; SpinorBEC.Rb87
-        else; nothing
+        if atom_name == "Eu151"
+            ;
+            SpinorBEC.Eu151
+        elseif atom_name == "Dy164"
+            ;
+            SpinorBEC.Dy164
+        elseif atom_name == "Dy162"
+            ;
+            SpinorBEC.Dy162
+        elseif atom_name == "Cr52"
+            ;
+            SpinorBEC.Cr52
+        elseif atom_name == "Rb87"
+            ;
+            SpinorBEC.Rb87
+        else
+            ;
+            nothing
         end
     else
         nothing
@@ -1101,7 +1115,10 @@ end
 
     inter = p["interactions"]::Dict
     auto_path = atom_obj !== nothing && haskey(p, "N_atoms") && haskey(p, "omega_ref")
-    c0_auto = 0.0; c_dd_auto = 0.0; γ_auto = 0.0; ε_dd_phys = NaN
+    c0_auto = 0.0;
+    c_dd_auto = 0.0;
+    γ_auto = 0.0;
+    ε_dd_phys = NaN
     if auto_path
         N_atoms = Int(p["N_atoms"])::Int
         ω_ref = Float64(p["omega_ref"])
@@ -1111,7 +1128,7 @@ end
         ε_dd_phys = compute_a_dd(atom_obj) / atom_obj.a_s
         # Lima-Pelster γ_LHY (only nonzero if ε_dd worth stabilising)
         γ_auto = ε_dd_phys > 0.5 ?
-            compute_gamma_lhy(atom_obj.a_s / a_ho, ε_dd_phys, N_atoms) : 0.0
+                 compute_gamma_lhy(atom_obj.a_s / a_ho, ε_dd_phys, N_atoms) : 0.0
     end
 
     c0 = haskey(inter, "c0") ? Float64(inter["c0"]) : c0_auto
@@ -1123,13 +1140,22 @@ end
         # Show physical ε_dd alongside the dimensionless effective ε_dd_eff
         # (= c_dd·F²/(3·c0)) so user can verify convention immediately.
         ε_dd_eff = c0 > 0 ? c_dd * F_atom^2 / (3 * c0) : NaN
-        printstyled("  rotating_basis physics: atom=$(atom_obj.name), N=$(p["N_atoms"]), ω_ref=$(p["omega_ref"]) rad/s\n"; color=:cyan)
+        printstyled(
+            "  rotating_basis physics: atom=$(atom_obj.name), N=$(p["N_atoms"]), ω_ref=$(p["omega_ref"]) rad/s\n";
+            color=:cyan,
+        )
         @printf "    c0=%.3e c_dd=%.3e γ_LHY=%.3e\n" c0 c_dd γ
         @printf "    ε_dd_phys = a_dd/a_s = %.4f, ε_dd_eff (solver) = %.4f  ← MUST match\n" ε_dd_phys ε_dd_eff
     end
     if !auto_path && verbose
-        printstyled("  ⚠️  rotating_basis: manual c0/c_dd path (no `atom`+`N_atoms`+`omega_ref`).\n"; color=:yellow)
-        printstyled("       Convention reminder: c_dd uses spinor `μ₀(μ/F)²` (F² returns via spin ops).\n"; color=:yellow)
+        printstyled(
+            "  ⚠️  rotating_basis: manual c0/c_dd path (no `atom`+`N_atoms`+`omega_ref`).\n";
+            color=:yellow,
+        )
+        printstyled(
+            "       Convention reminder: c_dd uses spinor `μ₀(μ/F)²` (F² returns via spin ops).\n";
+            color=:yellow,
+        )
     end
 
     zee = p["zeeman"]::Dict
@@ -1174,11 +1200,11 @@ end
     normalize_rotating!(ws)
 
     n_steps = Int(get(p, "n_steps", 200))
-    dt_itp  = Float64(get(p, "dt", 0.005))
+    dt_itp = Float64(get(p, "dt", 0.005))
 
     if verbose
         println("  rotating_basis GS: F=", F_atom, " D=", D,
-                " p=", p_z, " ε_dd_eff=", round(c_dd * F_atom^2 / (3 * c0); digits=3))
+            " p=", p_z, " ε_dd_eff=", round(c_dd * F_atom^2 / (3 * c0); digits=3))
     end
 
     μ_final = find_ground_state_rotating!(ws, n_steps, dt_itp)
@@ -1218,10 +1244,18 @@ DDI / fast-rotation regimes).
 Returns: dt = 0.1 · (ε / duration)^(1/p)
 """
 function _dt_from_epsilon(epsilon::Float64, duration::Float64, integrator::String)
-    p = if integrator == "strang"; 2
-    elseif integrator == "yoshida4" || integrator == "cfet4"; 4
-    elseif integrator == "yoshida6"; 6
-    else; 2  # fallback
+    p = if integrator == "strang"
+        ;
+        2
+    elseif integrator == "yoshida4" || integrator == "cfet4"
+        ;
+        4
+    elseif integrator == "yoshida6"
+        ;
+        6
+    else
+        ;
+        2  # fallback
     end
     safety = 0.1
     safety * (epsilon / duration)^(1.0 / p)
@@ -1231,8 +1265,11 @@ end
     p::Dict{String, Any}, grid, pipeline_results::Dict;
     verbose::Bool=true,
 )
-    haskey(pipeline_results, :rotating_basis_ws) || throw(ArgumentError(
-        "rotating_basis dynamics requires preceding ground_state with kind: rotating_basis"))
+    haskey(pipeline_results, :rotating_basis_ws) || throw(
+        ArgumentError(
+            "rotating_basis dynamics requires preceding ground_state with kind: rotating_basis"
+        ),
+    )
     ws_prev = pipeline_results[:rotating_basis_ws]::RotatingBasisWS
 
     duration = Float64(p["duration"])
@@ -1250,7 +1287,7 @@ end
     else
         0.005   # legacy default
     end
-    n_steps  = Int(round(duration / dt_rtp))
+    n_steps = Int(round(duration / dt_rtp))
     save_every = Int(get(p, "save_every", max(1, n_steps ÷ 100)))
 
     B_hat_node = get(p, "B_hat", Dict{String, Any}())::Dict
@@ -1261,7 +1298,8 @@ end
     # (most-relevant for the steady-state portion of the step).
     theta_func, theta_dot_func, θ_repr = if haskey(B_hat_node, "theta_ramp")
         rn = B_hat_node["theta_ramp"]::Dict
-        θ0 = Float64(rn["from"]); θ1 = Float64(rn["to"])
+        θ0 = Float64(rn["from"]);
+        θ1 = Float64(rn["to"])
         T_ramp = Float64(rn["duration"])
         rate = (θ1 - θ0) / T_ramp
         (_LinearRamp(θ0, θ1, T_ramp), _LinearRampDot(rate, T_ramp), θ1)
@@ -1273,7 +1311,8 @@ end
 
     phi_func, phi_dot_func, φ_omega_repr = if haskey(B_hat_node, "phi_chirp")
         cn = B_hat_node["phi_chirp"]::Dict
-        ω0 = Float64(cn["from"]); ω1 = Float64(cn["to"])
+        ω0 = Float64(cn["from"]);
+        ω1 = Float64(cn["to"])
         T_chirp = Float64(cn["duration"])
         (_LinearChirpPhi(ω0, ω1, T_chirp), _LinearChirpPhiDot(ω0, ω1, T_chirp), ω1)
     else
@@ -1296,12 +1335,13 @@ end
     )
     copyto!(ws.psi_tilde, ws_prev.psi_tilde)
 
-    times_arr  = Float64[]
-    norms_arr  = Float64[]
-    Lz_arr     = Float64[]
-    per_m_arr  = Vector{Vector{Float64}}()
-    Fz_arr     = Float64[]                   # ⟨F_z⟩(t) for EdH conservation
-    Fx_arr     = Float64[]; Fy_arr = Float64[]
+    times_arr = Float64[]
+    norms_arr = Float64[]
+    Lz_arr = Float64[]
+    per_m_arr = Vector{Vector{Float64}}()
+    Fz_arr = Float64[]                   # ⟨F_z⟩(t) for EdH conservation
+    Fx_arr = Float64[];
+    Fy_arr = Float64[]
     # ψ̃ snapshots: optional, controlled by save_psi_snapshots flag.
     # Enables per-m density (Fig 4), spin texture (Fig 3) — heavy memory but
     # only every save_every step, so 200ms × dt=0.005 / save_every=50 = 80 frames.
@@ -1309,13 +1349,14 @@ end
     psi_snapshots = Vector{Array{ComplexF64, 4}}()
 
     if verbose
-        dt_source = haskey(p, "dt") ? "explicit" :
-                    (haskey(p, "epsilon") ? "ε=$(p["epsilon"])" : "default")
+        dt_source =
+            haskey(p, "dt") ? "explicit" :
+            (haskey(p, "epsilon") ? "ε=$(p["epsilon"])" : "default")
         println("  rotating_basis dynamics: ", n_steps, " steps × dt=", round(dt_rtp; sigdigits=3),
-                " ($dt_source, integrator=", integrator_name,
-                ", θ_repr=", round(θ_repr; digits=3),
-                ", φ_omega_repr=", round(φ_omega_repr; digits=3),
-                ", save_psi=", save_psi, ")")
+            " ($dt_source, integrator=", integrator_name,
+            ", θ_repr=", round(θ_repr; digits=3),
+            ", φ_omega_repr=", round(φ_omega_repr; digits=3),
+            ", save_psi=", save_psi, ")")
     end
 
     # Integrator dispatch
@@ -1328,12 +1369,15 @@ end
     elseif integrator_name == "cfet4"
         evolve_rotating_cfet4_real!   # experimental, not order-4 in current form
     else
-        throw(ArgumentError(
-            "Unknown integrator '$integrator_name'. Use: strang, yoshida4, yoshida6, cfet4"))
+        throw(
+            ArgumentError(
+                "Unknown integrator '$integrator_name'. Use: strang, yoshida4, yoshida6, cfet4"
+            ),
+        )
     end
 
     evolve_fn(ws, n_steps, dt_rtp; t0=0.0,
-        on_step = (step, t, w) -> begin
+        on_step=(step, t, w) -> begin
             if step == 1 || step % save_every == 0
                 push!(times_arr, t)
                 push!(norms_arr, rotating_norm(w))
@@ -1353,7 +1397,8 @@ end
                 # placeholder zeros — implemented in next analyzer iteration if
                 # needed for spin texture animation. Total magnetization
                 # in lab frame can be derived via Û_B(t) rotation in post.)
-                push!(Fx_arr, 0.0); push!(Fy_arr, 0.0)
+                push!(Fx_arr, 0.0);
+                push!(Fy_arr, 0.0)
                 if save_psi
                     snap = Array{ComplexF64, 4}(undef, size(w.psi_tilde)...)
                     copyto!(snap, w.psi_tilde)
@@ -1404,8 +1449,10 @@ end
     verbose=true, checkpoint_dir=nothing,
     pipeline_results::Union{Nothing, Dict}=nothing,
 )
-    grid !== nothing || throw(ArgumentError(
-        "rotating_basis dynamics step requires grid from preceding ground_state step"))
+    grid !== nothing || throw(
+        ArgumentError(
+            "rotating_basis dynamics step requires grid from preceding ground_state step"),
+    )
     pipeline_results !== nothing || throw(ArgumentError(
         "rotating_basis dynamics step requires preceding ground_state results"))
     return _run_rotating_basis_dynamics_inner(step.params, grid, pipeline_results;

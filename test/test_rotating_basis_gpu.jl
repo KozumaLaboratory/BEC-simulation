@@ -22,7 +22,9 @@ CUDA.functional() || error("CUDA not functional — cannot run GPU tests")
     grid = SpinorBEC.make_grid(config)
     V_trap = zeros(Float64, 8, 8, 4)
     @inbounds for I in CartesianIndices(V_trap)
-        x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+        x = grid.x[1][I[1]];
+        y = grid.x[2][I[2]];
+        z = grid.x[3][I[3]]
         V_trap[I] = 0.5 * (x^2 + y^2 + 2.6^2 * z^2)
     end
 
@@ -36,7 +38,9 @@ CUDA.functional() || error("CUDA not functional — cannot run GPU tests")
         # Initialize Gaussian on host, copy to device
         psi_host = zeros(ComplexF64, 8, 8, 4, 3)
         @inbounds for I in CartesianIndices((8, 8, 4))
-            x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+            x = grid.x[1][I[1]];
+            y = grid.x[2][I[2]];
+            z = grid.x[3][I[3]]
             psi_host[I, 1] = exp(-(x^2 + y^2 + z^2) / 2)
         end
         copyto!(ws.psi_tilde, psi_host)

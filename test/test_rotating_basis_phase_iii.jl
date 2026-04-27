@@ -12,11 +12,14 @@ using StaticArrays: SVector
     grid = SpinorBEC.make_grid(config)
     V_trap = zeros(Float64, 10, 10, 10)
     @inbounds for I in CartesianIndices(V_trap)
-        x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+        x = grid.x[1][I[1]];
+        y = grid.x[2][I[2]];
+        z = grid.x[3][I[3]]
         V_trap[I] = 0.5 * (x*x + y*y + z*z)
     end
 
-    F_t = 2; D_t = 2F_t + 1
+    F_t = 2;
+    D_t = 2F_t + 1
     g_t = 60.0
     c_t = 0.05 * 3 * g_t / F_t^2
     tilt = π/6
@@ -36,7 +39,9 @@ using StaticArrays: SVector
             gauge_fix=false)
 
         @inbounds for I in CartesianIndices(grid.config.n_points)
-            x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+            x = grid.x[1][I[1]];
+            y = grid.x[2][I[2]];
+            z = grid.x[3][I[3]]
             ws_g.psi_tilde[I, 1] = exp(-(x*x + y*y + z*z) / (2σ*σ))
         end
         SpinorBEC.normalize_rotating!(ws_g)
@@ -59,10 +64,13 @@ using StaticArrays: SVector
         # Convert γ → lab via Û_B(T_final)
         T_final = n_steps * dt
         psi_g_lab = copy(ws_g.psi_tilde)
-        SpinorBEC._apply_UB!(psi_g_lab, ws_g.spin_matrices, theta_f(T_final), phi_f(T_final), 3; inverse=false)
+        SpinorBEC._apply_UB!(
+            psi_g_lab, ws_g.spin_matrices, theta_f(T_final), phi_f(T_final), 3; inverse=false
+        )
 
         coh = abs(sum(@. conj(ws_l.psi_tilde) * psi_g_lab) * prod(grid.dx))
-        rho_g = zeros(Float64, 10, 10, 10); rho_l = zeros(Float64, 10, 10, 10)
+        rho_g = zeros(Float64, 10, 10, 10);
+        rho_l = zeros(Float64, 10, 10, 10)
         @inbounds for m_idx in 1:D_t, I in CartesianIndices(rho_g)
             rho_g[I] += abs2(psi_g_lab[I, m_idx])
             rho_l[I] += abs2(ws_l.psi_tilde[I, m_idx])

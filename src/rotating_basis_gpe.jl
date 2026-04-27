@@ -43,7 +43,7 @@ function lima_pelster_Q5(ε_dd::Real; n_points::Int=64)
         end
     end
     s = integrand(u[1]) + integrand(u[end])
-    @inbounds for i in 2:length(u)-1
+    @inbounds for i in 2:(length(u) - 1)
         s += (isodd(i) ? 4.0 : 2.0) * integrand(u[i])
     end
     s * h / 3
@@ -69,7 +69,7 @@ is ~36% of contact — substantial as expected for the Klaus regime.
 function compute_gamma_lhy(a_s_over_a_ho::Real, ε_dd::Real, N_atoms::Real)
     Q5 = lima_pelster_Q5(ε_dd)
     (128.0 * sqrt(π) / 3.0) * Float64(a_s_over_a_ho)^2.5 *
-        Float64(N_atoms)^1.5 * Q5
+    Float64(N_atoms)^1.5 * Q5
 end
 
 """
@@ -98,10 +98,10 @@ Scope (skeleton):
 # --- Workspace ---
 
 struct RotatingBasisWS{T <: AbstractFloat, N, D,
-                       AC <: AbstractArray, AC1 <: AbstractArray,
-                       AR <: AbstractArray, ARK <: AbstractArray,
-                       FP, IP, DB <: DDIBuffers,
-                       BACK <: AbstractBackend}
+    AC <: AbstractArray, AC1 <: AbstractArray,
+    AR <: AbstractArray, ARK <: AbstractArray,
+    FP, IP, DB <: DDIBuffers,
+    BACK <: AbstractBackend}
     # State (rotating basis): ψ̃[r..., m] — concrete eltype Complex{T}
     psi_tilde::AC
     # Scratch: ψ in lab basis (only populated during DDI step)
@@ -154,26 +154,26 @@ function make_rotating_basis_ws(
     F::Int,
     V_trap::AbstractArray{T, N};
     p::Real, q::Real,
-    c0::Real, c1::Real = 0.0,
-    c_dd::Real = 0.0,
-    gamma_lhy::Real = 0.0,
-    theta_func::Function = (_t) -> 0.0,
-    phi_func::Function = (_t) -> 0.0,
-    theta_dot_func::Function = (_t) -> 0.0,
-    phi_dot_func::Function = (_t) -> 0.0,
-    gauge_fix::Bool = true,
-    backend::AbstractBackend = CPUBackend(),
+    c0::Real, c1::Real=0.0,
+    c_dd::Real=0.0,
+    gamma_lhy::Real=0.0,
+    theta_func::Function=(_t) -> 0.0,
+    phi_func::Function=(_t) -> 0.0,
+    theta_dot_func::Function=(_t) -> 0.0,
+    phi_dot_func::Function=(_t) -> 0.0,
+    gauge_fix::Bool=true,
+    backend::AbstractBackend=CPUBackend(),
 ) where {N, T <: AbstractFloat}
     D = 2F + 1
     n_pts = grid.config.n_points
 
     # Allocate state + scratch on the requested device. _zeros dispatches
     # CPU → Array, CUDA → CuArray (loaded by SpinorBECCUDAExt extension).
-    psi_tilde        = _zeros(backend, Complex{T}, n_pts..., D)
-    psi_lab_buf      = _zeros(backend, Complex{T}, n_pts..., D)
+    psi_tilde = _zeros(backend, Complex{T}, n_pts..., D)
+    psi_lab_buf = _zeros(backend, Complex{T}, n_pts..., D)
     rotation_scratch = _zeros(backend, Complex{T}, n_pts..., D)
-    spatial_buf      = _zeros(backend, Complex{T}, n_pts...)
-    rho_buf          = _zeros(backend, T, n_pts...)
+    spatial_buf = _zeros(backend, Complex{T}, n_pts...)
+    rho_buf = _zeros(backend, T, n_pts...)
 
     sm = spin_matrices(F)
 
@@ -183,8 +183,12 @@ function make_rotating_basis_ws(
 
     # Build DDI machinery (Q tensor on CPU, then ship to device).
     rk_shape = rfft_output_shape(n_pts)
-    Q_xx = zeros(T, rk_shape); Q_xy = zeros(T, rk_shape); Q_xz = zeros(T, rk_shape)
-    Q_yy = zeros(T, rk_shape); Q_yz = zeros(T, rk_shape); Q_zz = zeros(T, rk_shape)
+    Q_xx = zeros(T, rk_shape);
+    Q_xy = zeros(T, rk_shape);
+    Q_xz = zeros(T, rk_shape)
+    Q_yy = zeros(T, rk_shape);
+    Q_yz = zeros(T, rk_shape);
+    Q_zz = zeros(T, rk_shape)
     kx_r = collect(T, rfftfreq(n_pts[1], n_pts[1] * grid.dk[1]))
     ky = N >= 2 ? T.(grid.k[2]) : T[]
     kz = N >= 3 ? T.(grid.k[3]) : T[]
@@ -230,7 +234,7 @@ Direction "tilde→lab": apply exp(-iθ F_y) first, then exp(-iφ F_z).
 """
 function _apply_UB!(
     psi::AbstractArray{<:Complex}, sm::SpinMatrices{D}, theta::T, phi::T, ndim::Int;
-    inverse::Bool = false, scratch = nothing,
+    inverse::Bool=false, scratch=nothing,
 ) where {T, D}
     if !inverse
         # ψ_lab = exp(-iφ F_z) exp(-iθ F_y) ψ̃
@@ -249,7 +253,7 @@ end
 """Kinetic step: per-component FFT. GPU-safe via broadcasts. k_squared is
 lazily lifted to the device on first call and cached."""
 function apply_kinetic_step_rotating!(
-    ws::RotatingBasisWS{T, N, D}, dt::T; imaginary_time::Bool = false,
+    ws::RotatingBasisWS{T, N, D}, dt::T; imaginary_time::Bool=false
 ) where {T, N, D}
     k2_dev = _kinetic_kspace_buffer(ws)
     @inbounds for m_idx in 1:D
@@ -280,7 +284,7 @@ end
 """Spatial-diagonal step: apply exp(-i (V_trap + c0 n + γ_LHY n^(3/2)) dt)
 per spinor component. GPU-safe via broadcasts on slabs."""
 function apply_spatial_diagonal_step!(
-    ws::RotatingBasisWS{T, N, D}, dt::T; imaginary_time::Bool = false,
+    ws::RotatingBasisWS{T, N, D}, dt::T; imaginary_time::Bool=false
 ) where {T, N, D}
     # Compute total density rho = Σ_m |ψ̃_m|² via broadcasts on slabs.
     fill!(ws.rho_buf, zero(T))
@@ -328,7 +332,7 @@ renormalization).
 """
 function apply_local_spin_step!(
     ws::RotatingBasisWS{T, N, D}, dt::T, t::T;
-    imaginary_time::Bool = false,
+    imaginary_time::Bool=false,
 ) where {T, N, D}
     sm = ws.spin_matrices
 
@@ -356,7 +360,8 @@ function apply_local_spin_step!(
         a_x = -phi_dot * sin(theta)
         a_y = theta_dot
         a_z = ws.gauge_fix ? 0.0 : phi_dot * cos(theta)
-        Fx = sm.Fx; Fy = sm.Fy
+        Fx = sm.Fx;
+        Fy = sm.Fy
         @inbounds for j in 1:D, i in 1:D
             Hz[i, j] -= a_x * Fx[i, j] + a_y * Fy[i, j] + a_z * Fz[i, j]
         end
@@ -384,14 +389,14 @@ function apply_local_spin_step!(
 
     # Apply U_loc to every grid point of ψ̃ via the existing
     # spatially-uniform spin-axis rotation helper.
-    _apply_rotation_to_spin_axis!(ws.psi_tilde, U_loc, N; scratch = ws.rotation_scratch)
+    _apply_rotation_to_spin_axis!(ws.psi_tilde, U_loc, N; scratch=ws.rotation_scratch)
     nothing
 end
 
 """DDI step in rotating basis: rotate ψ̃→ψ_lab, apply existing DDI, rotate back."""
 function apply_ddi_step_rotating!(
     ws::RotatingBasisWS{T, N, D}, dt::T, t::T;
-    imaginary_time::Bool = false,
+    imaginary_time::Bool=false,
 ) where {T, N, D}
     abs(ws.ddi_params.C_dd) > 1e-30 || return nothing
     theta = T(ws.theta_func(Float64(t)))
@@ -400,7 +405,7 @@ function apply_ddi_step_rotating!(
     # ψ̃ → ψ_lab
     copyto!(ws.psi_lab_buf, ws.psi_tilde)
     _apply_UB!(ws.psi_lab_buf, ws.spin_matrices, theta, phi, N;
-        inverse = false, scratch = ws.rotation_scratch)
+        inverse=false, scratch=ws.rotation_scratch)
 
     # Apply DDI on ψ_lab using existing infrastructure
     apply_ddi_step!(
@@ -410,7 +415,7 @@ function apply_ddi_step_rotating!(
 
     # ψ_lab → ψ̃
     _apply_UB!(ws.psi_lab_buf, ws.spin_matrices, theta, phi, N;
-        inverse = true, scratch = ws.rotation_scratch)
+        inverse=true, scratch=ws.rotation_scratch)
     copyto!(ws.psi_tilde, ws.psi_lab_buf)
     nothing
 end
@@ -425,7 +430,7 @@ Equivalently (applied as exp(-i (φ_x F_x + φ_y F_y + φ_z F_z) dt)):
 """
 function apply_gauge_step!(
     ws::RotatingBasisWS{T, N, D}, dt::T, t::T;
-    imaginary_time::Bool = false,
+    imaginary_time::Bool=false,
 ) where {T, N, D}
     theta = ws.theta_func(Float64(t))
     theta_dot = ws.theta_dot_func(Float64(t))
@@ -441,7 +446,7 @@ function apply_gauge_step!(
         ws.psi_tilde, ws.spin_matrices,
         Float64(phi_x), Float64(phi_y), Float64(phi_z),
         Float64(dt), N;
-        imaginary_time, scratch = ws.rotation_scratch,
+        imaginary_time, scratch=ws.rotation_scratch,
     )
     nothing
 end
@@ -455,7 +460,7 @@ vs lab-frame on identical infrastructure.
 """
 function apply_lab_spin_step!(
     ws::RotatingBasisWS{T, N, D}, dt::T, t::T;
-    imaginary_time::Bool = false,
+    imaginary_time::Bool=false,
 ) where {T, N, D}
     sm = ws.spin_matrices
     theta = ws.theta_func(Float64(t))
@@ -463,7 +468,9 @@ function apply_lab_spin_step!(
     bx = sin(theta) * cos(phi)
     by = sin(theta) * sin(phi)
     bz = cos(theta)
-    Fx = sm.Fx; Fy = sm.Fy; Fz = sm.Fz
+    Fx = sm.Fx;
+    Fy = sm.Fy;
+    Fz = sm.Fz
 
     Hb = MMatrix{D, D, ComplexF64}(undef)
     @inbounds for j in 1:D, i in 1:D
@@ -493,7 +500,7 @@ function apply_lab_spin_step!(
         SMatrix{D, D, ComplexF64}(Vmat * Diagonal([cis(-λ[i] * dt) for i in 1:D]) * Vmat')
     end
 
-    _apply_rotation_to_spin_axis!(ws.psi_tilde, U_loc, N; scratch = ws.rotation_scratch)
+    _apply_rotation_to_spin_axis!(ws.psi_tilde, U_loc, N; scratch=ws.rotation_scratch)
     nothing
 end
 
@@ -504,7 +511,7 @@ to build H_lab from B̂(t)). DDI is applied directly without Û_B wrap.
 """
 function split_step_lab!(
     ws::RotatingBasisWS{T, N, D}, dt::T, t::T;
-    imaginary_time::Bool = false,
+    imaginary_time::Bool=false,
 ) where {T, N, D}
     half = dt / 2
     t_mid = t + half
@@ -516,7 +523,7 @@ function split_step_lab!(
     # DDI directly in lab basis (no Û_B wrap)
     if abs(ws.ddi_params.C_dd) > 1e-30
         apply_ddi_step!(ws.psi_tilde, ws.spin_matrices, ws.ddi_params,
-                       ws.ddi_bufs, dt, N; imaginary_time)
+            ws.ddi_bufs, dt, N; imaginary_time)
     end
 
     apply_lab_spin_step!(ws, half, t_mid; imaginary_time)
@@ -528,8 +535,8 @@ end
 """Lab-basis RTP driver."""
 function evolve_lab!(
     ws::RotatingBasisWS{T, N, D}, n_steps::Int, dt::T;
-    t0::T = zero(T),
-    on_step::Union{Nothing, Function} = nothing,
+    t0::T=zero(T),
+    on_step::Union{Nothing, Function}=nothing,
 ) where {T, N, D}
     t = t0
     for step in 1:n_steps
@@ -553,7 +560,7 @@ when c1 = 0 (skipped); when present it's applied symmetrically.
 """
 function split_step_rotating!(
     ws::RotatingBasisWS{T, N, D}, dt::T, t::T;
-    imaginary_time::Bool = false,
+    imaginary_time::Bool=false,
 ) where {T, N, D}
     half = dt / 2
     t_mid = t + half
@@ -596,7 +603,7 @@ function rotating_norm(ws::RotatingBasisWS{T, N, D}) where {T, N, D}
 end
 
 function normalize_rotating!(
-    ws::RotatingBasisWS{T, N, D}; target_norm::T = one(T)
+    ws::RotatingBasisWS{T, N, D}; target_norm::T=one(T)
 ) where {T, N, D}
     n = rotating_norm(ws)
     n > zero(T) || return nothing
@@ -609,12 +616,12 @@ end
 the lab-frame ground state expressed in the rotating basis."""
 function find_ground_state_rotating!(
     ws::RotatingBasisWS{T, N, D}, n_steps::Int, dt::T;
-    target_norm::T = one(T),
-    on_step::Union{Nothing, Function} = nothing,
+    target_norm::T=one(T),
+    on_step::Union{Nothing, Function}=nothing,
 ) where {T, N, D}
     μ_last = zero(T)
     for step in 1:n_steps
-        split_step_rotating!(ws, dt, zero(T); imaginary_time = true)
+        split_step_rotating!(ws, dt, zero(T); imaginary_time=true)
         n_before = rotating_norm(ws)
         if n_before > zero(T) && target_norm > zero(T)
             μ_last = -log(n_before / target_norm) / (2 * dt)
@@ -649,7 +656,7 @@ instability ("Sheng-Suzuki barrier"), so this routine is RTP-only.
 """
 function yoshida4_step_rotating!(
     ws::RotatingBasisWS{T, N, D}, dt::T, t::T;
-    imaginary_time::Bool = false,
+    imaginary_time::Bool=false,
 ) where {T, N, D}
     imaginary_time &&
         error("yoshida4_step_rotating! is RTP-only (negative sub-step blows up in ITP).")
@@ -658,9 +665,9 @@ function yoshida4_step_rotating!(
     w₀ = T(1) - T(2) * w₁
 
     # Sequence: U(w₁) U(w₀) U(w₁), each with midpoint H sampling
-    split_step_rotating!(ws, w₁ * dt, t; imaginary_time = false)           # H @ t + (w₁/2)·dt
-    split_step_rotating!(ws, w₀ * dt, t + w₁ * dt; imaginary_time = false) # H @ t + (w₁ + w₀/2)·dt
-    split_step_rotating!(ws, w₁ * dt, t + (w₁ + w₀) * dt; imaginary_time = false)
+    split_step_rotating!(ws, w₁ * dt, t; imaginary_time=false)           # H @ t + (w₁/2)·dt
+    split_step_rotating!(ws, w₀ * dt, t + w₁ * dt; imaginary_time=false) # H @ t + (w₁ + w₀/2)·dt
+    split_step_rotating!(ws, w₁ * dt, t + (w₁ + w₀) * dt; imaginary_time=false)
     nothing
 end
 
@@ -683,8 +690,8 @@ at comparable accuracy.
 """
 function evolve_rotating_yoshida4!(
     ws::RotatingBasisWS{T, N, D}, n_steps::Int, dt::T;
-    t0::T = zero(T),
-    on_step::Union{Nothing, Function} = nothing,
+    t0::T=zero(T),
+    on_step::Union{Nothing, Function}=nothing,
 ) where {T, N, D}
     t = t0
     for step in 1:n_steps
@@ -718,17 +725,17 @@ periods matters (Klaus 1 sec stir, B-1 long evolution). RTP only.
 """
 function yoshida6_step_rotating!(
     ws::RotatingBasisWS{T, N, D}, dt::T, t::T;
-    imaginary_time::Bool = false,
+    imaginary_time::Bool=false,
 ) where {T, N, D}
     imaginary_time && error("yoshida6_step_rotating! is RTP-only.")
     w₁ = T(-1.17767998417887)
-    w₂ = T( 0.235573213359357)
-    w₃ = T( 0.784513610477560)
+    w₂ = T(0.235573213359357)
+    w₃ = T(0.784513610477560)
     w₀ = one(T) - T(2) * (w₁ + w₂ + w₃)
     weights = (w₃, w₂, w₁, w₀, w₁, w₂, w₃)
     t_local = t
     for w in weights
-        split_step_rotating!(ws, w * dt, t_local + w * dt / 2; imaginary_time = false)
+        split_step_rotating!(ws, w * dt, t_local + w * dt / 2; imaginary_time=false)
         t_local += w * dt
     end
     nothing
@@ -737,8 +744,8 @@ end
 """RTP driver: Yoshida6."""
 function evolve_rotating_yoshida6!(
     ws::RotatingBasisWS{T, N, D}, n_steps::Int, dt::T;
-    t0::T = zero(T),
-    on_step::Union{Nothing, Function} = nothing,
+    t0::T=zero(T),
+    on_step::Union{Nothing, Function}=nothing,
 ) where {T, N, D}
     t = t0
     for step in 1:n_steps
@@ -777,7 +784,7 @@ RTP only.
 """
 function cfet4_real_step_rotating!(
     ws::RotatingBasisWS{T, N, D}, dt::T, t::T;
-    imaginary_time::Bool = false,
+    imaginary_time::Bool=false,
 ) where {T, N, D}
     imaginary_time && error("cfet4_real_step_rotating! is RTP-only.")
 
@@ -789,21 +796,21 @@ function cfet4_real_step_rotating!(
     β = T(0.25) - sqrt3_12
 
     # Stage 1: α at τ₁
-    split_step_rotating!(ws, α * dt, t + τ₁_offset * dt; imaginary_time = false)
+    split_step_rotating!(ws, α * dt, t + τ₁_offset * dt; imaginary_time=false)
     # Stage 2: β at τ₂
-    split_step_rotating!(ws, β * dt, t + τ₂_offset * dt; imaginary_time = false)
+    split_step_rotating!(ws, β * dt, t + τ₂_offset * dt; imaginary_time=false)
     # Stage 3: β at τ₁
-    split_step_rotating!(ws, β * dt, t + τ₁_offset * dt; imaginary_time = false)
+    split_step_rotating!(ws, β * dt, t + τ₁_offset * dt; imaginary_time=false)
     # Stage 4: α at τ₂
-    split_step_rotating!(ws, α * dt, t + τ₂_offset * dt; imaginary_time = false)
+    split_step_rotating!(ws, α * dt, t + τ₂_offset * dt; imaginary_time=false)
     nothing
 end
 
 """RTP driver: real CFET4 (Alvermann-Fehske)."""
 function evolve_rotating_cfet4_real!(
     ws::RotatingBasisWS{T, N, D}, n_steps::Int, dt::T;
-    t0::T = zero(T),
-    on_step::Union{Nothing, Function} = nothing,
+    t0::T=zero(T),
+    on_step::Union{Nothing, Function}=nothing,
 ) where {T, N, D}
     t = t0
     for step in 1:n_steps
@@ -817,8 +824,8 @@ end
 """RTP driver in rotating basis."""
 function evolve_rotating!(
     ws::RotatingBasisWS{T, N, D}, n_steps::Int, dt::T;
-    t0::T = zero(T),
-    on_step::Union{Nothing, Function} = nothing,
+    t0::T=zero(T),
+    on_step::Union{Nothing, Function}=nothing,
 ) where {T, N, D}
     t = t0
     for step in 1:n_steps
@@ -862,13 +869,13 @@ function rotating_Lz(ws::RotatingBasisWS{T, 3, D}) where {T, D}
     # repeated calls don't copy.
     kx_dev = _coord_buffer(ws, :kx, ws.grid.k[1])
     ky_dev = _coord_buffer(ws, :ky, ws.grid.k[2])
-    x_dev  = _coord_buffer(ws, :x,  ws.grid.x[1])
-    y_dev  = _coord_buffer(ws, :y,  ws.grid.x[2])
+    x_dev = _coord_buffer(ws, :x, ws.grid.x[1])
+    y_dev = _coord_buffer(ws, :y, ws.grid.x[2])
     # Reshape for broadcast: (Nx,) → (Nx,1,1); (Ny,) → (1,Ny,1)
     kx_b = reshape(kx_dev, Nx, 1, 1)
     ky_b = reshape(ky_dev, 1, Ny, 1)
-    x_b  = reshape(x_dev,  Nx, 1, 1)
-    y_b  = reshape(y_dev,  1, Ny, 1)
+    x_b = reshape(x_dev, Nx, 1, 1)
+    y_b = reshape(y_dev, 1, Ny, 1)
 
     Lz = zero(Complex{T})
     dpsi_dy = _zeros(ws.backend, Complex{T}, n_pts...)

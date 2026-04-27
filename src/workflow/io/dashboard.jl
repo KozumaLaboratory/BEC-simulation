@@ -1019,19 +1019,21 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
                         nframes == 0 && return 1.0
                         # Sample up to 16 frames; for legacy 5D the array IS in
                         # memory, so just compute peak per frame quickly.
-                        sample_idxs = nframes ≤ 16 ?
-                            (1:nframes) :
+                        sample_idxs = if nframes ≤ 16
+                            (1:nframes)
+                        else
                             Int.(round.(range(1, nframes; length=16)))
+                        end
                         gmax = 0.0
                         spatial_dims = ndims(snaps) - 2  # (Nx,Ny,Nz, D, n)
                         for k in sample_idxs
                             idx = ntuple(d -> d == ndims(snaps) ? k : Colon(),
-                                          ndims(snaps))
+                                ndims(snaps))
                             ψk = view(snaps, idx...)
                             # |ψ|² summed across components (last axis of slice)
                             local_max = 0.0
                             for I in CartesianIndices(ntuple(d -> size(ψk, d),
-                                                              spatial_dims))
+                                spatial_dims))
                                 rho = 0.0
                                 for c in 1:size(ψk, ndims(ψk))
                                     rho += abs2(ψk[I, c])

@@ -16,7 +16,9 @@ using StaticArrays: SVector
     grid = SpinorBEC.make_grid(config)
     V_trap = zeros(Float64, 8, 8, 8)
     @inbounds for I in CartesianIndices(V_trap)
-        x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+        x = grid.x[1][I[1]];
+        y = grid.x[2][I[2]];
+        z = grid.x[3][I[3]]
         V_trap[I] = 0.5 * (x*x + y*y + z*z)
     end
 
@@ -32,7 +34,9 @@ using StaticArrays: SVector
             theta_dot_func=(t)->0.0, phi_dot_func=(t)->omega_rot,
             gauge_fix=false)
         @inbounds for I in CartesianIndices(grid.config.n_points)
-            x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+            x = grid.x[1][I[1]];
+            y = grid.x[2][I[2]];
+            z = grid.x[3][I[3]]
             ws.psi_tilde[I, 1] = exp(-(x*x + y*y + z*z) / (2σ*σ))
         end
         SpinorBEC.normalize_rotating!(ws)
@@ -52,15 +56,15 @@ using StaticArrays: SVector
     # Coarse dt for all schemes
     dt_coarse = 0.01
 
-    psi_strang  = final_psi(SpinorBEC.evolve_rotating!,           dt_coarse)
-    psi_y4      = final_psi(SpinorBEC.evolve_rotating_yoshida4!,  dt_coarse)
-    psi_y6      = final_psi(SpinorBEC.evolve_rotating_yoshida6!,  dt_coarse)
-    psi_cfet4   = final_psi(SpinorBEC.evolve_rotating_cfet4_real!, dt_coarse)
+    psi_strang = final_psi(SpinorBEC.evolve_rotating!, dt_coarse)
+    psi_y4 = final_psi(SpinorBEC.evolve_rotating_yoshida4!, dt_coarse)
+    psi_y6 = final_psi(SpinorBEC.evolve_rotating_yoshida6!, dt_coarse)
+    psi_cfet4 = final_psi(SpinorBEC.evolve_rotating_cfet4_real!, dt_coarse)
 
     err_strang = sqrt(sum(abs2, psi_strang - psi_ref))
-    err_y4     = sqrt(sum(abs2, psi_y4     - psi_ref))
-    err_y6     = sqrt(sum(abs2, psi_y6     - psi_ref))
-    err_cfet4  = sqrt(sum(abs2, psi_cfet4  - psi_ref))
+    err_y4 = sqrt(sum(abs2, psi_y4 - psi_ref))
+    err_y6 = sqrt(sum(abs2, psi_y6 - psi_ref))
+    err_cfet4 = sqrt(sum(abs2, psi_cfet4 - psi_ref))
 
     @info "Errors at dt=$dt_coarse vs reference at dt=0.0001" err_strang err_y4 err_y6 err_cfet4
 
@@ -79,9 +83,9 @@ using StaticArrays: SVector
         driver(ws, n, dt)
         SpinorBEC.rotating_norm(ws)
     end
-    @test norm_check(SpinorBEC.evolve_rotating_yoshida4!,    0.005) ≈ 1.0 atol=1e-7
-    @test norm_check(SpinorBEC.evolve_rotating_yoshida6!,    0.005) ≈ 1.0 atol=1e-7
-    @test norm_check(SpinorBEC.evolve_rotating_cfet4_real!,  0.005) ≈ 1.0 atol=1e-7
+    @test norm_check(SpinorBEC.evolve_rotating_yoshida4!, 0.005) ≈ 1.0 atol=1e-7
+    @test norm_check(SpinorBEC.evolve_rotating_yoshida6!, 0.005) ≈ 1.0 atol=1e-7
+    @test norm_check(SpinorBEC.evolve_rotating_cfet4_real!, 0.005) ≈ 1.0 atol=1e-7
 end
 
 @testset "ITP guards: higher-order RTP-only" begin
@@ -91,6 +95,10 @@ end
     ws = SpinorBEC.make_rotating_basis_ws(grid, 1, V_trap;
         p=1.0, q=0.0, c0=1.0, c1=0.0, c_dd=0.0,
         theta_func=(t)->0.0, phi_func=(t)->0.0)
-    @test_throws ErrorException SpinorBEC.yoshida6_step_rotating!(ws, 0.01, 0.0; imaginary_time=true)
-    @test_throws ErrorException SpinorBEC.cfet4_real_step_rotating!(ws, 0.01, 0.0; imaginary_time=true)
+    @test_throws ErrorException SpinorBEC.yoshida6_step_rotating!(
+        ws, 0.01, 0.0; imaginary_time=true
+    )
+    @test_throws ErrorException SpinorBEC.cfet4_real_step_rotating!(
+        ws, 0.01, 0.0; imaginary_time=true
+    )
 end

@@ -21,7 +21,9 @@ using SpinorBEC
         amp_main = sqrt(1 - leak)
         amp_leak = sqrt(leak)
         for ix in 1:Nx, iy in 1:Ny, iz in 1:Nz
-            x = ix - Nx/2 - 0.5; y = iy - Ny/2 - 0.5; z = iz - Nz/2 - 0.5
+            x = ix - Nx/2 - 0.5;
+            y = iy - Ny/2 - 0.5;
+            z = iz - Nz/2 - 0.5
             g = exp(-(x*x + y*y + z*z) / (2σ*σ))
             ψ[ix, iy, iz, 1] = amp_main * g
             ψ[ix, iy, iz, 2] = amp_leak * g
@@ -117,11 +119,11 @@ using SpinorBEC
         # Constant tilt + linear stir (Klaus-style)
         times_x6 = collect(0.0:0.1:1.0)
         res = SpinorBEC.berry_connection_trajectory(times_x6;
-            theta_func = (t)->0.611,
-            phi_func = (t)->4.524*t,
-            theta_dot_func = (t)->0.0,
-            phi_dot_func = (t)->4.524,
-            gauge_fix = false)
+            theta_func=(t)->0.611,
+            phi_func=(t)->4.524*t,
+            theta_dot_func=(t)->0.0,
+            phi_dot_func=(t)->4.524,
+            gauge_fix=false)
         @test length(res.a_x) == length(times_x6)
         # Steady stir → constant Â magnitude
         @test all(abs.(res.a_mag .- res.a_mag[1]) .< 1e-10)
@@ -134,11 +136,11 @@ using SpinorBEC
 
         # gauge_fix=true: a_z absorbed into χ
         res_gf = SpinorBEC.berry_connection_trajectory(times_x6;
-            theta_func = (t)->0.611,
-            phi_func = (t)->4.524*t,
-            theta_dot_func = (t)->0.0,
-            phi_dot_func = (t)->4.524,
-            gauge_fix = true)
+            theta_func=(t)->0.611,
+            phi_func=(t)->4.524*t,
+            theta_dot_func=(t)->0.0,
+            phi_dot_func=(t)->4.524,
+            gauge_fix=true)
         @test res_gf.a_z[1] ≈ 0.0 atol=1e-10
         @test res_gf.a_x[1] ≈ -4.524 * sin(0.611) atol=1e-10
 

@@ -17,7 +17,9 @@ using StaticArrays: SVector
     grid = SpinorBEC.make_grid(config)
     V_trap = zeros(Float64, 8, 8, 8)
     @inbounds for I in CartesianIndices(V_trap)
-        x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+        x = grid.x[1][I[1]];
+        y = grid.x[2][I[2]];
+        z = grid.x[3][I[3]]
         V_trap[I] = 0.5 * (x*x + y*y + z*z)
     end
 
@@ -34,7 +36,9 @@ using StaticArrays: SVector
             theta_dot_func=(t)->0.0, phi_dot_func=(t)->omega_rot,
             gauge_fix=false)
         @inbounds for I in CartesianIndices(grid.config.n_points)
-            x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+            x = grid.x[1][I[1]];
+            y = grid.x[2][I[2]];
+            z = grid.x[3][I[3]]
             ws.psi_tilde[I, 1] = exp(-(x*x + y*y + z*z) / (2σ*σ))
         end
         SpinorBEC.normalize_rotating!(ws)
@@ -67,7 +71,9 @@ using StaticArrays: SVector
     err_st = sqrt(sum(abs2, psi_st .- psi_ref))
     err_cfet = sqrt(sum(abs2, psi_cfet .- psi_ref))
 
-    @info "CFET4 vs Strang at dt=0.01" err_strang=err_st err_cfet4=err_cfet improvement_ratio=(err_st/err_cfet)
+    @info "CFET4 vs Strang at dt=0.01" err_strang=err_st err_cfet4=err_cfet improvement_ratio=(
+        err_st/err_cfet
+    )
 
     @test err_st < 1.0   # Strang at coarse dt is reasonable
     @test err_cfet < 1.0
@@ -84,7 +90,9 @@ end
     grid = SpinorBEC.make_grid(config)
     V_trap = zeros(Float64, 8, 8, 8)
     @inbounds for I in CartesianIndices(V_trap)
-        x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+        x = grid.x[1][I[1]];
+        y = grid.x[2][I[2]];
+        z = grid.x[3][I[3]]
         V_trap[I] = 0.5 * (x*x + y*y + z*z)
     end
     ws = SpinorBEC.make_rotating_basis_ws(grid, 1, V_trap;
@@ -94,7 +102,9 @@ end
         gauge_fix=false)
     σ = 1.0
     @inbounds for I in CartesianIndices(grid.config.n_points)
-        x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+        x = grid.x[1][I[1]];
+        y = grid.x[2][I[2]];
+        z = grid.x[3][I[3]]
         ws.psi_tilde[I, 1] = exp(-(x*x + y*y + z*z) / (2σ*σ))
     end
     SpinorBEC.normalize_rotating!(ws)

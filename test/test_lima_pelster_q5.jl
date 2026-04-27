@@ -11,7 +11,7 @@ using SpinorBEC
     # Q5 monotonically increasing on (0, ∞)
     Q5s = [SpinorBEC.lima_pelster_Q5(ε) for ε in 0.0:0.2:2.0]
     for i in 2:length(Q5s)
-        @test Q5s[i] > Q5s[i-1]
+        @test Q5s[i] > Q5s[i - 1]
     end
 
     # Q5(2) finite (Re part of complex integrand)
