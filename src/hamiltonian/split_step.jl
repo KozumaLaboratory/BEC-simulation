@@ -305,8 +305,17 @@ function _apply_transverse_zeeman_step!(
     bx_wf = ws.zeeman.bx_wf
     by_wf = ws.zeeman.by_wf
     (bx_wf === nothing && by_wf === nothing) && return nothing
-    bx = bx_wf !== nothing ? evaluate(bx_wf, t) : 0.0
-    by = by_wf !== nothing ? evaluate(by_wf, t) : 0.0
+    bx_lab = bx_wf !== nothing ? evaluate(bx_wf, t) : 0.0
+    by_lab = by_wf !== nothing ? evaluate(by_wf, t) : 0.0
+    # Optional spin rotating frame: rotate (Bx, By) into the RF coords;
+    # when ω_R = ω_drive the transverse field becomes static in RF.
+    omega_R = ws.sim_params.spin_rotating_frame_omega
+    bx, by = if abs(omega_R) > 1e-30
+        c = cos(omega_R * t); s = sin(omega_R * t)
+        (bx_lab * c + by_lab * s, -bx_lab * s + by_lab * c)
+    else
+        (bx_lab, by_lab)
+    end
     @timeit_debug TIMER "transverse_zeeman" apply_uniform_spin_rotation!(
         ws.state.psi, ws.spin_matrices, bx, by, 0.0, dt_frac, ndim;
         imaginary_time, scratch=ws.state.psi_scratch,
@@ -346,10 +355,10 @@ function _half_potential_step!(
 
     zeeman_diag_fwd = if !isnan(t_start) && ws.zeeman isa TimeDependentZeeman
         zee_fwd = zeeman_at(ws.zeeman, t_start + dt_half / 4)
-        zeeman_diagonal(zee_fwd, ws.spin_matrices)
+        zeeman_diagonal(zee_fwd, ws.spin_matrices, ws.sim_params.spin_rotating_frame_omega)
     else
         zee = zeeman_at(ws.zeeman, t_eval)
-        zeeman_diagonal(zee, ws.spin_matrices)
+        zeeman_diagonal(zee, ws.spin_matrices, ws.sim_params.spin_rotating_frame_omega)
     end
     gpu = _is_gpu(ws.state.psi)
 
@@ -451,7 +460,7 @@ function _half_potential_step!(
 
     zeeman_diag_bwd = if !isnan(t_start) && ws.zeeman isa TimeDependentZeeman
         zee_bwd = zeeman_at(ws.zeeman, t_start + 3 * dt_half / 4)
-        zeeman_diagonal(zee_bwd, ws.spin_matrices)
+        zeeman_diagonal(zee_bwd, ws.spin_matrices, ws.sim_params.spin_rotating_frame_omega)
     else
         zeeman_diag_fwd
     end
@@ -480,7 +489,7 @@ Forward direction: diag → SM → nematic → tensor → raman
 function _outer_potential_fwd!(ws::Workspace{N}, dt_outer, n_comp, ndim, imaginary_time) where {N}
     gpu = _is_gpu(ws.state.psi)
     zee = zeeman_at(ws.zeeman, ws.state.t)
-    zeeman_diag = zeeman_diagonal(zee, ws.spin_matrices)
+    zeeman_diag = zeeman_diagonal(zee, ws.spin_matrices, ws.sim_params.spin_rotating_frame_omega)
 
     _dispatch_diagonal_step!(ws, Val(N), zeeman_diag, dt_outer, imaginary_time)
 
@@ -552,7 +561,7 @@ function _outer_potential_bwd!(ws::Workspace{N}, dt_outer, n_comp, ndim, imagina
     end
 
     zee = zeeman_at(ws.zeeman, ws.state.t)
-    zeeman_diag = zeeman_diagonal(zee, ws.spin_matrices)
+    zeeman_diag = zeeman_diagonal(zee, ws.spin_matrices, ws.sim_params.spin_rotating_frame_omega)
     _dispatch_diagonal_step!(ws, Val(N), zeeman_diag, dt_outer, imaginary_time)
 end
 

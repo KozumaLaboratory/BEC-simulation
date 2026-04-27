@@ -438,11 +438,23 @@ struct SimParams
     normalize_every::Int
     save_every::Int
     rotating_frame_omega::Float64
+    # Spin rotating-frame rotation rate (around z, dimensionless ω_ref units).
+    # When ≠ 0, the simulator evolves ψ_rot = exp(+i ω_R F_z t) ψ_lab under
+    # H_rot = U H_lab U† + ω_R F_z. The fast linear Zeeman -p F_z is cancelled
+    # by choosing ω_R = p; transverse Bx,By rotate into the RF coords,
+    # becoming static if their drive frequency matches ω_R.
+    # Caveats: requires secular DDI (Q_zz only) for correctness; transverse
+    # F_x,F_y observables in the lab frame need post-hoc U† transformation.
+    spin_rotating_frame_omega::Float64
 end
 
 SimParams(dt, n_steps, imaginary_time, normalize_every, save_every) = SimParams(
-    dt, n_steps, imaginary_time, normalize_every, save_every, 0.0
+    dt, n_steps, imaginary_time, normalize_every, save_every, 0.0, 0.0
 )
+
+SimParams(dt, n_steps, imaginary_time, normalize_every, save_every, rotating_frame_omega) =
+    SimParams(dt, n_steps, imaginary_time, normalize_every, save_every,
+        rotating_frame_omega, 0.0)
 
 function SimParams(;
     dt::Float64,
@@ -451,6 +463,7 @@ function SimParams(;
     normalize_every::Int=imaginary_time ? 1 : 0,
     save_every::Int=max(1, n_steps ÷ 100),
     rotating_frame_omega::Float64=0.0,
+    spin_rotating_frame_omega::Float64=0.0,
 )
     dt > 0 || throw(ArgumentError("dt must be positive"))
     n_steps > 0 || throw(ArgumentError("n_steps must be positive"))
@@ -461,6 +474,7 @@ function SimParams(;
         normalize_every,
         save_every,
         rotating_frame_omega,
+        spin_rotating_frame_omega,
     )
 end
 

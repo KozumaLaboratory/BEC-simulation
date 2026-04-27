@@ -493,7 +493,9 @@ function _run_step(
     end
 
     n_steps = round(Int, duration / dt)
-    sp = SimParams(; dt, n_steps, save_every)
+    spin_rf_omega = Float64(get(p, "spin_rotating_frame_omega", 0.0))
+    sp = SimParams(; dt, n_steps, save_every,
+        spin_rotating_frame_omega=spin_rf_omega)
 
     inter = get(p, "interactions", nothing)
     interactions = inter !== nothing ? _parse_gs_interactions(inter, atom) : prev_interactions
