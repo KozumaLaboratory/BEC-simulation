@@ -74,26 +74,8 @@ using StaticArrays
         @test norm(result) ≈ norm(spinor) rtol = 1e-12
     end
 
-    @testset "_apply_euler_spin_rotation matches _exp_i_hermitian (F=1)" begin
-        sm = spin_matrices(1)
-        F = 1
-        D = 3
-        m_vals = SVector{D, Float64}(ntuple(c -> F - (c - 1), Val(D)))
-
-        phi_x, phi_y, phi_z = 0.5, -0.3, 0.7
-        dt = 0.1
-        H = SMatrix{3, 3, ComplexF64}(phi_x * sm.Fx + phi_y * sm.Fy + phi_z * sm.Fz)
-
-        spinor = SVector{D, ComplexF64}(normalize(randn(ComplexF64, D)))
-        U = SpinorBEC._exp_i_hermitian(H, dt, false)
-        expected = U * spinor
-
-        result = SpinorBEC._apply_euler_spin_rotation(
-            spinor, phi_x, phi_y, phi_z,
-            dt, F, m_vals, sm.Fy_eigvecs, sm.Fy_eigvecs_adj, sm.Fy_eigvals, sm, false)
-
-        @test result ≈ expected atol = 1e-12
-    end
+    # F=1..6 randomized Euler-vs-exp(-i dt H) coverage lives in
+    # test/test_property_based.jl.
 
     @testset "_apply_euler_spin_rotation zero field returns spinor" begin
         sm = spin_matrices(1)

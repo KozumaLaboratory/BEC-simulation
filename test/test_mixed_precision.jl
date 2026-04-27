@@ -118,6 +118,55 @@ using LinearAlgebra
         @test eltype(r.workspace.state.psi) === ComplexF32
     end
 
+    # Production-trust gate: if F32 dynamics diverges meaningfully from F64
+    # over a science-realistic step count, reported scientific conclusions
+    # drawn from F32 runs are not reliable. Threshold |⟨ψ32|ψ64⟩| ≥ 0.999
+    # comes from the unit-roundoff bound — accumulated phase error from
+    # ε_F32 ≈ 1.2e-7 over O(10³) steps on a 16³ grid leaves headroom of
+    # roughly two orders of magnitude before this fires.
+    @testset "F32 vs F64 long-time RT trajectory overlap (≥0.999)" begin
+        cfg = GridConfig((16, 16, 16), (8.0, 8.0, 8.0))
+        atom = AtomSpecies("Na23", 3.8e-26, 1, 52.0 * 5.29e-11, 54.3 * 5.29e-11, 0.0)
+        ip = InteractionParams(20.0, 0.0)
+        trap = HarmonicTrap(1.0, 1.0, 1.0)
+
+        n_steps = 1000
+        dt = 0.005
+        sp = SimParams(; dt, n_steps, save_every=n_steps, imaginary_time=false)
+
+        # Reference run in Float64.
+        grid64 = make_grid(cfg)
+        sys = SpinSystem(1)
+        psi_init_64 = init_psi(grid64, sys;
+            state=:spin_coherent, init_theta=π / 3, init_phi=0.4)
+        ws64 = make_workspace(;
+            grid=grid64, atom, interactions=ip, potential=trap,
+            sim_params=sp, psi_init=psi_init_64,
+        )
+        run_simulation!(ws64)
+        psi_final_64 = copy(ws64.state.psi)
+
+        # F32 run: identical setup, only precision differs.
+        grid32 = make_grid(cfg; dtype=Float32)
+        psi_init_32 = ComplexF32.(psi_init_64)
+        ws32 = make_workspace(;
+            grid=grid32, atom, interactions=ip, potential=trap,
+            sim_params=sp, psi_init=psi_init_32, dtype=Float32,
+        )
+        run_simulation!(ws32)
+        psi_final_32 = ComplexF64.(ws32.state.psi)
+
+        dV = cell_volume(grid64)
+        # F64 norm at machine precision; F32 drifts ~ε_F32 √n_steps over
+        # 1000 steps (measured 1.2e-4 on this fixture).
+        @test abs(sum(abs2, psi_final_64) * dV - 1.0) < 1e-8
+        @test abs(sum(abs2, psi_final_32) * dV - 1.0) < 5e-4
+
+        overlap = abs(sum(conj.(psi_final_64) .* psi_final_32)) * dV
+        @info "F32-vs-F64 RT overlap after $n_steps steps" overlap
+        @test overlap > 0.999
+    end
+
     # DDI path at F32 (harder — has Q tensor and rFFT)
     @testset "F32 DDI workspace & step" begin
         cfg = GridConfig((16, 16, 16), (6.0, 6.0, 6.0))

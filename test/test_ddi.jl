@@ -5,10 +5,6 @@
         atom = Eu151
         ddi = make_ddi_params(grid, atom)
 
-        @test ddi.Q_xy ≈ ddi.Q_xy
-        @test ddi.Q_xz ≈ ddi.Q_xz
-        @test ddi.Q_yz ≈ ddi.Q_yz
-
         trace = ddi.Q_xx .+ ddi.Q_yy .+ ddi.Q_zz
         for I in CartesianIndices(size(trace))
             if grid.k_squared[I] > 0.0

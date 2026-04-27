@@ -51,6 +51,7 @@ const FAST_TESTS = [
     "test_phase_scan.jl",
     "test_initialization.jl",
     "test_spinor_utils.jl",
+    "test_property_based.jl",
     "test_types_validation.jl",
     "test_currents.jl",
     "test_lhy_2d.jl",
@@ -77,6 +78,7 @@ const CI_EXTRA = [
     "test_zeeman_midpoint.jl",
     "test_calibration.jl",
     "test_phase4.jl",
+    "test_physics_invariants.jl",
 ]
 
 # ── Full tier: everything (ci + remaining heavy tests) ──
