@@ -1009,12 +1009,41 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         else
             v = try
                 jldopen(fpath, "r") do f
-                    n = if haskey(f, "dynamics/psi_snapshots_streamed/n_snapshots")
-                        Int(f["dynamics/psi_snapshots_streamed/n_snapshots"])
+                    if haskey(f, "dynamics/psi_snapshots_streamed/n_snapshots")
+                        n = Int(f["dynamics/psi_snapshots_streamed/n_snapshots"])
+                        n == 0 ? 1.0 : _global_density_max_total_sampled(f, n; n_samples=16)
+                    elseif haskey(f, "dynamics/psi_snapshots")
+                        # Legacy 5D layout — sample frames directly
+                        snaps = f["dynamics/psi_snapshots"]
+                        nframes = size(snaps, ndims(snaps))
+                        nframes == 0 && return 1.0
+                        # Sample up to 16 frames; for legacy 5D the array IS in
+                        # memory, so just compute peak per frame quickly.
+                        sample_idxs = nframes ≤ 16 ?
+                            (1:nframes) :
+                            Int.(round.(range(1, nframes; length=16)))
+                        gmax = 0.0
+                        spatial_dims = ndims(snaps) - 2  # (Nx,Ny,Nz, D, n)
+                        for k in sample_idxs
+                            idx = ntuple(d -> d == ndims(snaps) ? k : Colon(),
+                                          ndims(snaps))
+                            ψk = view(snaps, idx...)
+                            # |ψ|² summed across components (last axis of slice)
+                            local_max = 0.0
+                            for I in CartesianIndices(ntuple(d -> size(ψk, d),
+                                                              spatial_dims))
+                                rho = 0.0
+                                for c in 1:size(ψk, ndims(ψk))
+                                    rho += abs2(ψk[I, c])
+                                end
+                                rho > local_max && (local_max = rho)
+                            end
+                            local_max > gmax && (gmax = local_max)
+                        end
+                        gmax > 0 ? gmax : 1.0
                     else
-                        0
+                        1.0
                     end
-                    n == 0 ? 1.0 : _global_density_max_total_sampled(f, n; n_samples=16)
                 end
             catch
                 1.0

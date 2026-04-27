@@ -43,9 +43,15 @@ const DDI_SCHEMA = Dict{String, FieldSpec}(
 )
 
 const GS_SCHEMA = Dict{String, FieldSpec}(
-    "kind" => FieldSpec(; type=String, enum=["spinor", "binary"]),
+    "kind" => FieldSpec(; type=String, enum=["spinor", "binary", "rotating_basis", "option_gamma"]),
     "species_A" => FieldSpec(; type=Dict),    # binary path
     "species_B" => FieldSpec(; type=Dict),    # binary path
+    "B_hat" => FieldSpec(; type=Dict),        # rotating_basis path
+    "F" => FieldSpec(; type=Integer, range=(0, 12)),   # rotating_basis F override
+    "gauge_fix" => FieldSpec(; type=Bool, default=true),  # rotating_basis
+    "init_m_idx" => FieldSpec(; type=Integer, range=(1, 25)),
+    "init_sigma" => FieldSpec(; type=Number, range=(0.0, 100.0)),
+    "backend" => FieldSpec(; type=String, enum=["cpu", "cuda", "gpu"]),
     "method" => FieldSpec(; type=String, default="itp", enum=["itp", "lbfgs"]),
     "atom" => FieldSpec(; type=String),
     "grid" => FieldSpec(; type=Dict, schema=GRID_SCHEMA),
@@ -114,8 +120,13 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     "photon_scattering" => FieldSpec(; type=Union{Dict, Bool}),
     "loss" => FieldSpec(; type=Union{Dict, Bool, Number}),
     # Two-component / binary GP path (Phase 4/5 #51 scaffold).
-    "kind" => FieldSpec(; type=String, enum=["binary"]),
+    "kind" => FieldSpec(; type=String, enum=["binary", "rotating_basis", "option_gamma"]),
     "couplings" => FieldSpec(; type=Dict),
+    # Option γ rotating-basis dynamics
+    "B_hat" => FieldSpec(; type=Dict),
+    "integrator" => FieldSpec(; type=String,
+        enum=["strang", "yoshida4", "yoshida6", "cfet4"]),
+    "epsilon" => FieldSpec(; type=Number, range=(1e-15, 1.0)),
 )
 
 const STEP_SCHEMAS = Dict{String, Dict{String, FieldSpec}}(

@@ -115,29 +115,40 @@ scalar path."""
 end
 
 """Apply a spatially uniform D×D rotation R to the spin axis of psi
-(which has shape `(n_pts..., D)`). Works on CPU and GPU arrays because
-every op is either a broadcast on spatial slabs or an SMatrix scalar ×
-array operation — no scalar indexing into psi.
+(shape `(n_pts..., D)`). Reformulated as a single dense matrix product
+`buf_2d = psi_2d · Rᵀ` where psi_2d/buf_2d are `(N_spatial, D)` views;
+on GPU this is one CUBLAS gemm instead of D² per-slab broadcasts
+(D=17 Klaus → ~289× kernel-launch reduction). On CPU it dispatches to
+BLAS gemm.
 
-`scratch`, if supplied, is reused as the accumulator (must be same shape
-+ device + eltype as psi). Otherwise we allocate one per call.
+`scratch`, if supplied, is reused as the gemm output buffer (must be
+same shape + device + eltype as psi). The D×D `Rᵀ` is materialized once
+per call into a tiny device buffer (D² complexes ≈ few KB).
 """
 function _apply_rotation_to_spin_axis!(
-    psi::AbstractArray{<:Complex}, R::SMatrix{D, D, ComplexF64}, ndim::Int;
+    psi::AbstractArray{<:Complex, M}, R::SMatrix{D, D, ComplexF64}, ndim::Int;
     scratch::Union{Nothing, AbstractArray}=nothing,
-) where {D}
+) where {D, M}
     T = eltype(psi)
     buf = scratch === nothing ? similar(psi) : scratch::typeof(psi)
-    fill!(buf, zero(T))
-    @inbounds for j in 1:D
-        psi_j = selectdim(psi, ndim + 1, j)
-        for i in 1:D
-            Rij = T(R[i, j])
-            Rij == zero(T) && continue
-            buf_i = selectdim(buf, ndim + 1, i)
-            buf_i .+= Rij .* psi_j
-        end
+
+    n_spatial = 1
+    @inbounds for i in 1:ndim
+        n_spatial *= size(psi, i)
     end
+    psi_2d = reshape(psi, n_spatial, D)
+    buf_2d = reshape(buf, n_spatial, D)
+
+    # buf[k,i] = Σⱼ R[i,j]·psi[k,j] = Σⱼ psi[k,j]·(Rᵀ)[j,i] → buf = psi · Rᵀ.
+    # Build Rᵀ on host (D² scalar ops), then copyto! to a small device buffer.
+    R_T_host = Matrix{T}(undef, D, D)
+    @inbounds for j in 1:D, i in 1:D
+        R_T_host[j, i] = T(R[i, j])
+    end
+    R_T = similar(psi, T, D, D)
+    copyto!(R_T, R_T_host)
+
+    mul!(buf_2d, psi_2d, R_T)
     copyto!(psi, buf)
     nothing
 end

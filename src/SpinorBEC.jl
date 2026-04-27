@@ -119,6 +119,9 @@ include("workflow/experiments/feshbach_ramp.jl")
 include("solvers/projected_gp.jl")
 include("solvers/photon_heating.jl")
 include("solvers/sgpe.jl")
+include("scalar_egpe.jl")
+include("rotating_basis_gpe.jl")
+include("rotating_basis_analyzers.jl")
 
 # CUDA-graph-accelerated split_step (extended by SpinorBECCUDAExt).
 # Default implementation = plain split_step! so CPU workspaces work unchanged.

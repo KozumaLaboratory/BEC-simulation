@@ -26,9 +26,21 @@ struct BinaryDynamicsStep
     params::Dict{String, Any}
 end
 
+# Option γ rotating-basis spinor GP steps. Same isolation pattern as binary GP:
+# concrete types so the spinor `_run_step(::GroundStateStep)` / `(::DynamicsStep)`
+# inference world is not widened by a third RotatingBasisWS-typed return tuple.
+struct RotatingBasisGroundStateStep
+    params::Dict{String, Any}
+end
+
+struct RotatingBasisDynamicsStep
+    params::Dict{String, Any}
+end
+
 const PipelineStep = Union{
     GroundStateStep, DynamicsStep, AnalyzeStep,
     BinaryGroundStateStep, BinaryDynamicsStep,
+    RotatingBasisGroundStateStep, RotatingBasisDynamicsStep,
 }
 
 struct PipelineConfig
