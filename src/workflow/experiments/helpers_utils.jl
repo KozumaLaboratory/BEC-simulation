@@ -123,6 +123,20 @@ function _save_dynamics_timeseries!(f, result)
     haskey(result, :dynamics_result) || return nothing
     dr = result[:dynamics_result]
     hasproperty(dr, :times) || return nothing
+
+    # If the pipeline ran multiple dynamics steps, walk
+    # `result[:dynamics_history]` to concatenate every step's time series
+    # into one continuous timeline starting at GS (t=0). Without this
+    # only the LAST step's snapshots / times survive on disk — the
+    # dashboard then shows the steady-state stir alone instead of the
+    # full GS → tilt → chirp → stir animation. Caught 2026-04-27 on
+    # Klaus 2022.
+    history = get(result, :dynamics_history, nothing)
+    if history !== nothing && length(history) > 1 &&
+            all(h -> hasproperty(h.dynamics_result, :times), history)
+        return _save_dynamics_timeseries_multi!(f, history, result)
+    end
+
     f["dynamics/times"] = collect(Float64, dr.times)
     f["dynamics/energies"] = collect(Float64, dr.energies)
     f["dynamics/norms"] = collect(Float64, dr.norms)
@@ -199,6 +213,106 @@ function _save_dynamics_timeseries!(f, result)
             end
         end
     end
+end
+
+"""
+Multi-step variant of `_save_dynamics_timeseries!`. Concatenates every
+dynamics step's time series + ψ snapshots into one continuous record:
+
+  - `dynamics/times`     — Step1.times ∪ Step2.times[2:end] ∪ … with
+                           cumulative time offset, so frame_NNNNN aligns
+                           with `times[NNNNN+1]` (GS at times[1]=0).
+  - `dynamics/energies`, `dynamics/norms`, `dynamics/magnetizations`
+                         — same concatenation as times.
+  - `dynamics/psi_snapshots_streamed/frame_NNNNN`
+                         — globally indexed across all steps that opted
+                           in via `save_psi_snapshots: true`. Steps that
+                           opted out skip frame contribution but their
+                           times/energies still join the timeline.
+  - `dynamics/component_populations` — (n_global_frames × D) populations.
+"""
+function _save_dynamics_timeseries_multi!(f, history, result)
+    # --- Concatenate time-series across all dynamics steps -----------
+    n_steps = length(history)
+    n_pts_v_ref = nothing
+    D_ref = nothing
+
+    times = Float64[]
+    energies = Float64[]
+    norms = Float64[]
+    mags = Float64[]
+    t_offset = 0.0
+    for (i, h) in enumerate(history)
+        dr = h.dynamics_result
+        local_times = collect(Float64, dr.times)
+        local_E = collect(Float64, dr.energies)
+        local_N = collect(Float64, dr.norms)
+        local_M = collect(Float64, dr.magnetizations)
+        # Skip the leading t=0 of every step except the first to avoid
+        # duplicating the boundary point shared with the previous step.
+        start = i == 1 ? 1 : 2
+        append!(times, local_times[start:end] .+ t_offset)
+        append!(energies, local_E[start:end])
+        append!(norms, local_N[start:end])
+        append!(mags, local_M[start:end])
+        t_offset += local_times[end]
+    end
+    f["dynamics/times"] = times
+    f["dynamics/energies"] = energies
+    f["dynamics/norms"] = norms
+    f["dynamics/magnetizations"] = mags
+
+    # --- Walk per-step scratch JLD2s and copy frames into one group ---
+    n_global = 0
+    pops_rows = Vector{Vector{Float64}}()
+    for h in history
+        h.save_psi_snapshots || continue
+        tmp_path = h.snapshot_tmp_path
+        (tmp_path === nothing || !isfile(tmp_path)) && continue
+        jldopen(tmp_path, "r") do src
+            n_local = Int(src["n_snapshots"])
+            n_pts_v = Int.(src["spatial_shape"])
+            D = Int(src["n_components"])
+            if n_pts_v_ref === nothing
+                n_pts_v_ref = n_pts_v
+                D_ref = D
+                f["dynamics/psi_snapshots_streamed/spatial_shape"] = n_pts_v
+                f["dynamics/psi_snapshots_streamed/n_components"] = D
+            else
+                (n_pts_v == n_pts_v_ref && D == D_ref) ||
+                    error("snapshot shape changed across steps: " *
+                          "$(n_pts_v_ref)/$(D_ref) → $(n_pts_v)/$D")
+            end
+            ndim = length(n_pts_v)
+            for s in 1:n_local
+                n_global += 1
+                src_key = "frame_" * lpad(string(s), 5, '0')
+                dst_key = "dynamics/psi_snapshots_streamed/frame_" *
+                          lpad(string(n_global), 5, '0')
+                frame = src[src_key]::Array{ComplexF32}
+                f[dst_key] = frame
+                total = sum(abs2, frame)
+                row = Vector{Float64}(undef, D)
+                for c in 1:D
+                    idx = ntuple(d -> d <= ndim ? (1:n_pts_v[d]) : c, ndim + 1)
+                    row[c] = sum(abs2, view(frame, idx...)) / max(total, 1e-30)
+                end
+                push!(pops_rows, row)
+            end
+        end
+        rm(tmp_path; force=true)
+    end
+
+    if n_global > 0
+        f["dynamics/psi_snapshots_streamed/n_snapshots"] = n_global
+        D = D_ref::Int
+        pops = Matrix{Float64}(undef, n_global, D)
+        for (i, row) in enumerate(pops_rows)
+            pops[i, :] .= row
+        end
+        f["dynamics/component_populations"] = pops
+    end
+    return nothing
 end
 
 function _write_jld2_value!(f, prefix::String, v::NamedTuple)
