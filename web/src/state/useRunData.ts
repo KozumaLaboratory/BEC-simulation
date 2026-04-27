@@ -80,14 +80,12 @@ export function useRunData(): RunDataState {
         if (typeof errField === 'string') {
           setData(null)
           setError(errField)
-          // Auto-advance past empty/failing runs on initial load only.
-          // Once the user has picked something manually, respect their choice
-          // even if it errors.
-          if (!userPickedRef.current && runs.length > 0) {
-            const idx = runs.indexOf(selectedRun)
-            const next = runs[idx + 1]
-            if (next) setUrlState({ run: next })
-          }
+          // Auto-advance past empty/failing runs disabled (2026-04-26):
+          // a batch in flight has empty runs by design (no point_*.jld2
+          // until the run completes), and URL-driven navigation /
+          // browser back/forward bypassed the userPickedRef guard, so
+          // the dashboard kept yanking the user to the next non-empty
+          // run. Show the error in place instead.
           return
         }
         setData(d)

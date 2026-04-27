@@ -1,0 +1,119 @@
+# =================================================================
+# Eu151 Klaus-style magnetostir frequency scan
+# =================================================================
+#
+# Direct port of runs/klaus2022_freq_scan: identical trap geometry
+# (pancake aspect 2.6), identical Bz / B⊥ amplitudes (0.819 / 0.574 G),
+# identical 20 ms tilt → 50 ms chirp → 1 s steady stir, but the atom is
+# Eu151 (F=6, μ ≈ 6.977 μ_B) instead of Dy164 (F=8, μ ≈ 9.93 μ_B).
+#
+# Why scan freq for Eu specifically:
+#   - ε_dd(Eu151) ≈ 0.544 vs ε_dd(Dy164) ≈ 1.42. Below ε_dd = 1 the
+#     condensate is stable to Rosensweig modulation, so we expect a
+#     plain vortex lattice rather than the Klaus stripes — but the
+#     stir frequency that maximises L_z transfer is set by the F=6
+#     Larmor / collective-mode hierarchy and need not match 226 Hz.
+#   - Bracket the Klaus operating point (150 / 226 / 300 Hz) and look
+#     at vortex_count + winding texture as a function of stir freq.
+#     If vortex count peaks well off 226 Hz, that locates Eu's own
+#     "magnetostir sweet spot" in this geometry.
+#
+# Frequency convention (same as Klaus YAMLs, 2026-04-27 fix):
+#   freq_param = f_phys[Hz] / ω_ref[rad/s] = f_phys / (2π·50).
+#   150 Hz → 0.4775,  226 Hz → 0.7194,  300 Hz → 0.9549.
+#
+# Budget: ~50 min/point on RTX 5070 Ti × 3 points ≈ 2.5 h.
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [64, 64, 32], box: [20.0, 20.0, 8.0]}
+      interactions: {omega_ref: 314.159, N_atoms: 50000}
+      ddi: {enabled: true}
+      potential: {type: harmonic, omega: [1.0, 1.0, 2.6]}
+      zeeman: {level: 1, Bz: "1.0 Gauss"}
+      dt: 0.002                          # Eu ε_dd < 1, dt looser than Klaus
+      n_steps: 15000
+      tol: 1.0e-7
+      initial_state: ferromagnetic_min
+      backend: cuda
+
+  # --- 20 ms tilt: θ 0 → 35° (level 2: B_mag + θ + φ) ---------------
+  - dynamics:
+      duration: 6.28
+      dt: 0.002
+      save_every: 100
+      save_psi_snapshots: true           # frame 0 = GS final state
+      save_snapshot_precision: "f32"
+      interactions: {omega_ref: 314.159}
+      zeeman:
+        level: 2
+        B_mag: "1.0 Gauss"
+        theta_deg: {from: 0.0, to: 35.0}
+        phi_deg: 0.0
+
+  # --- 50 ms spin-up: stir freq 0 → 226 Hz (chirp) ------------------
+  - dynamics:
+      duration: 15.7
+      dt: 0.002
+      save_every: 250
+      save_psi_snapshots: true
+      save_snapshot_precision: "f32"
+      interactions: {omega_ref: 314.159}
+      zeeman:
+        level: 1
+        Bz: "0.819 Gauss"
+        Bx:
+          chirped_sinusoidal:
+            amplitude: 0.574
+            freq_start: 0.0
+            freq_end: 0.7194     # OVERRIDDEN per scan point
+            duration: 15.7
+        By:
+          chirped_sinusoidal:
+            amplitude: 0.574
+            freq_start: 0.0
+            freq_end: 0.7194     # OVERRIDDEN per scan point
+            duration: 15.7
+            phase: -1.5708
+
+  # --- 1 s steady magnetostir --------------------------------------
+  - dynamics:
+      duration: 314
+      dt: 0.002
+      save_every: 1000
+      save_psi_snapshots: true
+      save_snapshot_precision: "f32"
+      interactions: {omega_ref: 314.159}
+      zeeman:
+        level: 1
+        Bz: "0.819 Gauss"
+        Bx:
+          sinusoidal:
+            amplitude: 0.574
+            frequency: 0.7194    # OVERRIDDEN per scan point
+        By:
+          sinusoidal:
+            amplitude: 0.574
+            frequency: 0.7194    # OVERRIDDEN per scan point
+            phase: -1.5708
+
+  - analyze:
+      - column_density_movie:
+          axis: 3
+          output_dir: runs/eu151_klaus_freq_scan/frames
+          colorscale: Viridis
+          multi_step: true               # animation from GS through tilt+chirp+stir
+      - vortex_detect: {component: 1, threshold: 0.1}
+      - winding_field: {component: 1, threshold: 1.0e-6}
+      - summary_json:
+          path: runs/eu151_klaus_freq_scan/summary.json
+          extras: {test_kind: eu151_klaus_freq_scan}
+
+scan:
+  product:
+    pipeline.3.zeeman.Bx.sinusoidal.frequency: [0.4775, 0.7194, 0.9549]   # 150 / 226 / 300 Hz
+    pipeline.3.zeeman.By.sinusoidal.frequency: [0.4775, 0.7194, 0.9549]
+    pipeline.2.zeeman.Bx.chirped_sinusoidal.freq_end: [0.4775, 0.7194, 0.9549]
+    pipeline.2.zeeman.By.chirped_sinusoidal.freq_end: [0.4775, 0.7194, 0.9549]
+  continuation: false

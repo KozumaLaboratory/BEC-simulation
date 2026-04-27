@@ -1,0 +1,44 @@
+# Klaus 2022 dt-resolution smoke test
+# ─────────────────────────────────────
+# Same GS + Step 2 (20 ms tilt) as klaus2022_full, but dt reduced 5× from
+# 0.002 → 0.0004. Hypothesis: with dt 5× smaller (closer to Larmor period
+# 0.57 μs / dt_phys 1.27 μs), the spin will adiabatically follow the tilted
+# B field and Mz will stay ≈ 8 (instead of crashing to 6.27 in 0.6 ms).
+#
+# If Mz stays ~8 → confirms dt under-resolution as root cause.
+# If Mz still drops → the bug is elsewhere (rotating-frame Zeeman needed).
+#
+# Cost: GS ~6 min + Step 2 (15700 steps × ~5 ms) ≈ 9 min total on GPU.
+
+pipeline:
+  - ground_state:
+      atom: Dy164
+      grid: {n: [64, 64, 32], box: [20.0, 20.0, 8.0]}
+      interactions: {omega_ref: 314.159, N_atoms: 60000}
+      ddi: {enabled: true}
+      potential: {type: harmonic, omega: [1.0, 1.0, 2.6]}
+      zeeman: {level: 1, Bz: "1.0 Gauss"}
+      dt: 0.001
+      n_steps: 30000
+      tol: 1.0e-7
+      initial_state: ferromagnetic_min
+      backend: cuda
+
+  # Step 2 tilt — dt 5× smaller than klaus2022_full
+  - dynamics:
+      duration: 6.28
+      dt: 0.0004                         # 5× smaller, was 0.002
+      save_every: 100                    # 157 frames over 6.28 dim time
+      save_psi_snapshots: true
+      save_snapshot_precision: "f32"
+      interactions: {omega_ref: 314.159}
+      zeeman:
+        level: 2
+        B_mag: "1.0 Gauss"
+        theta_deg: {from: 0.0, to: 35.0}
+        phi_deg: 0.0
+
+  - analyze:
+      - summary_json:
+          path: runs/klaus_dt_test/summary.json
+          extras: {test_kind: dt_resolution_smoke}
