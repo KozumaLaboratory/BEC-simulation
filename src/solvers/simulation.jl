@@ -407,6 +407,8 @@ function run_simulation_checkpointed!(
         sp_orig.imaginary_time,
         sp_orig.normalize_every,
         sp_orig.save_every,
+        sp_orig.rotating_frame_omega,
+        sp_orig.spin_rotating_frame_omega,
     )
 
     ws_remain = _rebuild_workspace(ws; sim_params=sp_remain)

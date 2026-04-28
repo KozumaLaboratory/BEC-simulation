@@ -380,6 +380,7 @@ function _run_step(
         v === nothing ? nothing : Symbol(String(v))
     end
 
+    gs_rf_omega = Float64(get(p, "rotating_frame_omega", 0.0))
     gs = if method === :itp
         find_ground_state(;
             grid, atom, interactions, zeeman, potential,
@@ -391,6 +392,7 @@ function _run_step(
             checkpoint_every=checkpoint_dir !== nothing ? max(1, n_steps ÷ 10) : 0,
             light_shift=gs_light_shift,
             spinor_lhy=spinor_lhy_mode,
+            rotating_frame_omega=gs_rf_omega,
             verbose=verbose,
         )
     elseif method === :lbfgs
@@ -502,8 +504,10 @@ function _run_step(
     end
 
     n_steps = round(Int, duration / dt)
+    rf_omega = Float64(get(p, "rotating_frame_omega", 0.0))
     spin_rf_omega = Float64(get(p, "spin_rotating_frame_omega", 0.0))
     sp = SimParams(; dt, n_steps, save_every,
+        rotating_frame_omega=rf_omega,
         spin_rotating_frame_omega=spin_rf_omega)
 
     inter = get(p, "interactions", nothing)

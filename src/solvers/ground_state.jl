@@ -880,6 +880,7 @@ function _rebuild_workspace_with_dt(ws::Workspace{N}, new_dt::Float64) where {N}
         ws.sim_params.normalize_every,
         ws.sim_params.save_every,
         ws.sim_params.rotating_frame_omega,
+        ws.sim_params.spin_rotating_frame_omega,
     )
     kinetic_phase = _to_device(
         ws.backend,

@@ -88,8 +88,19 @@ function _energy_decomposition_cpu(ws::Workspace{N}) where {N}
         0.0
     end
 
+    # H_rot = H_lab - Ω L_z. The -Ω ⟨L_z⟩ piece is what makes ITP converge to
+    # vortex / FL ground states under finite rotating_frame_omega; without it,
+    # `dE` tracks H_lab while the propagator drives toward H_rot's minimum.
+    Ω = ws.sim_params.rotating_frame_omega
+    E_coriolis = if abs(Ω) > 1e-15 && N >= 2
+        -Ω * orbital_angular_momentum(psi, grid, plans)
+    else
+        0.0
+    end
+
     E_total =
-        E_kin + E_trap + E_zee + E_c0 + E_c1 + E_ddi + E_lhy + E_tensor + E_raman + E_light_shift
+        E_kin + E_trap + E_zee + E_c0 + E_c1 + E_ddi + E_lhy + E_tensor + E_raman +
+        E_light_shift + E_coriolis
     (
         kinetic=E_kin,
         trap=E_trap,
@@ -101,6 +112,7 @@ function _energy_decomposition_cpu(ws::Workspace{N}) where {N}
         tensor=E_tensor,
         raman=E_raman,
         light_shift=E_light_shift,
+        coriolis=E_coriolis,
         total=E_total,
     )
 end

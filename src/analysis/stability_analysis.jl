@@ -30,6 +30,8 @@ function estimate_splitting_error(ws::Workspace{N}) where {N}
         ws.sim_params.imaginary_time,
         ws.sim_params.normalize_every,
         ws.sim_params.save_every,
+        ws.sim_params.rotating_frame_omega,
+        ws.sim_params.spin_rotating_frame_omega,
     )
     ws_half = _rebuild_workspace(ws;
         kinetic_phase=kinetic_phase_half,
