@@ -1306,6 +1306,28 @@ end
         0.005   # legacy default
     end
     n_steps = Int(round(duration / dt_rtp))
+
+    # Larmor / Â regime guard: the Y6 ε-formula coefficient (0.1) assumes
+    # commutator scales of O(1). For Klaus regime where p × F or
+    # |Â| × |H_DDI| scale 10³–10⁵, ε=1e-3 is empirically too coarse and
+    # produces non-physical depolarisation (audit 2026-04-28: p_3000
+    # ε=1e-3 → 0.997→0.106 thermal scrambling; ε=1e-6 → 0.997→0.999
+    # frozen). Warn when the per-step Larmor phase advance exceeds π —
+    # the regime where the spin step's exp(-i p F_z dt) wraps inside one
+    # solver step and Y6 commutator-error coefficients break the ε scaling.
+    # This is a *predictive* check, not enforcing; user can pass an
+    # explicit `dt:` to override.
+    p_zeeman_abs = abs(ws_prev.p)
+    F_atom_int = ws_prev.spin_matrices.system.F
+    larmor_phase = p_zeeman_abs * F_atom_int * dt_rtp
+    if verbose && larmor_phase > π && !haskey(p, "dt")
+        @warn "rotating_basis: Larmor phase advance per step (p·F·dt = " *
+            "$(round(larmor_phase; sigdigits=4))) > π. Y6 ε-formula " *
+            "may underestimate dt for Klaus-regime p·F·dt ≫ 1; see " *
+            "audit 2026-04-28 (p_3000 ε=1e-3 false convergence). " *
+            "Consider tightening to ε ≤ 1e-6, or supplying an explicit " *
+            "dt < $(round(π / (p_zeeman_abs * F_atom_int); sigdigits=3))."
+    end
     save_every = Int(get(p, "save_every", max(1, n_steps ÷ 100)))
 
     B_hat_node = get(p, "B_hat", Dict{String, Any}())::Dict
@@ -1437,6 +1459,15 @@ end
         :per_m_history => per_m_arr,
         :theta_const => θ_repr,
         :phi_omega => φ_omega_repr,
+        # Integrator metadata for postmortem analysis: lets a future audit
+        # check whether a run was in the Larmor-stiff regime
+        # (`p · F · dt > π`) without re-loading the YAML config.
+        :dt_used => dt_rtp,
+        :integrator => integrator_name,
+        :epsilon_target => Float64(get(p, "epsilon", NaN)),
+        :p_zeeman => ws_prev.p,
+        :F_atom => F_atom_int,
+        :larmor_phase_per_step => abs(ws_prev.p) * F_atom_int * dt_rtp,
     )
     if !isempty(psi_snapshots)
         dyn_dict[:psi_snapshots] = psi_snapshots
