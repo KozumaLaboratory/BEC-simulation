@@ -18,9 +18,9 @@ pipeline:
           - 20.0
           - 10.0
         n:
-          - 64
-          - 64
-          - 32
+          - 24
+          - 24
+          - 12
       zeeman:
         q: 0.0
         p: 26700.0
@@ -53,13 +53,13 @@ pipeline:
         theta_const: 0.611
         phi_chirp:
           duration: 15.7
-          to: 4.524
+          to: 1.0
           from: 0.0
   - dynamics:
-      duration: 62.83
+      duration: 157.0
       kind: "rotating_basis"
       save_every: 50
       epsilon: 1.0e-6
       B_hat:
         theta_const: 0.611
-        phi_omega: 4.524
+        phi_omega: 1.0

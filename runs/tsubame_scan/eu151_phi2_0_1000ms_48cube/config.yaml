@@ -1,7 +1,7 @@
 pipeline:
   - ground_state:
       dt: 0.005
-      atom: "Dy164"
+      atom: "Eu151"
       potential:
         omega:
           - 1.0
@@ -18,12 +18,12 @@ pipeline:
           - 20.0
           - 10.0
         n:
-          - 64
-          - 64
-          - 32
+          - 48
+          - 48
+          - 24
       zeeman:
         q: 0.0
-        p: 28428.0
+        p: 26700.0
       kind: "rotating_basis"
       init_m_idx: 1
       B_hat:
@@ -53,13 +53,13 @@ pipeline:
         theta_const: 0.611
         phi_chirp:
           duration: 15.7
-          to: 4.524
+          to: 2.0
           from: 0.0
   - dynamics:
-      duration: 62.83
+      duration: 314.0
       kind: "rotating_basis"
       save_every: 50
       epsilon: 1.0e-6
       B_hat:
         theta_const: 0.611
-        phi_omega: 4.524
+        phi_omega: 2.0

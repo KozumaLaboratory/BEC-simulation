@@ -31,7 +31,6 @@ pipeline:
         phi: 0.0
       interactions:
         c1: 0.0
-        c_dd: 0.0
       init_sigma: 1.5
       n_steps: 250
   - dynamics:
@@ -54,13 +53,13 @@ pipeline:
         theta_const: 0.611
         phi_chirp:
           duration: 15.7
-          to: 4.524
+          to: 18.0
           from: 0.0
   - dynamics:
-      duration: 157.0
+      duration: 314.0
       kind: "rotating_basis"
       save_every: 50
       epsilon: 1.0e-6
       B_hat:
         theta_const: 0.611
-        phi_omega: 4.524
+        phi_omega: 18.0
