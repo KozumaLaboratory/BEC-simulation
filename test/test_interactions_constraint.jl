@@ -240,4 +240,36 @@
         @test p["interactions"]["c0"] == 10.0
         @test p["interactions"]["c1"] == -0.5
     end
+
+    @testset "even_c_extra helper" begin
+        # F=6: returned vector is length 2F-1 = 11; odd slots zero,
+        # c_extra[k-1] = c_k for k = 2, 4, 6, 8, 10, 12.
+        v = even_c_extra(6, c2=1.0, c4=2.0, c6=3.0, c8=4.0, c10=5.0, c12=6.0)
+        @test length(v) == 11
+        @test v[1] == 1.0    # c2
+        @test v[2] == 0.0    # c3 (odd → 0)
+        @test v[3] == 2.0    # c4
+        @test v[5] == 3.0    # c6
+        @test v[7] == 4.0    # c8
+        @test v[9] == 5.0    # c10
+        @test v[11] == 6.0   # c12
+
+        # F=2: returned vector is length 3; only c2 slot used.
+        v2 = even_c_extra(2, c2=0.5)
+        @test length(v2) == 3
+        @test v2[1] == 0.5
+        @test v2[2] == 0.0
+        @test v2[3] == 0.0
+
+        # Default zeros — easy way to construct an empty extras vector.
+        v_empty = even_c_extra(6)
+        @test all(iszero, v_empty)
+
+        # Reject c_k for k > 2F (would otherwise silently drop).
+        @test_throws ArgumentError even_c_extra(2, c6=1.0)   # c6 > 2·2 = 4
+        @test_throws ArgumentError even_c_extra(1, c4=1.0)   # c4 > 2·1 = 2
+        # Boundary cases: c at exactly 2F is OK.
+        @test even_c_extra(6, c12=1.0)[end] == 1.0
+        @test even_c_extra(2, c4=1.0)[3] == 1.0
+    end
 end

@@ -88,14 +88,22 @@ function compute_c0(
 end
 
 """
-DDI coupling for spinor Hamiltonian: c_dd = μ₀ (g_F μ_B)².
+DDI coupling for spinor Hamiltonian: `c_dd = μ₀ (g_F μ_B)²` (per-unit-spin).
 
-The spinor DDI Hamiltonian is E = (c_dd/2) ∫ F_α Q_αβ F_β, where F_α are
-spin-F operators with eigenvalues -F..+F. Since mu_mag = g_F F μ_B already
-contains F, we must use mu_mag/F to avoid double-counting:
-  c_dd = μ₀ (mu_mag/F)²  (for F > 0)
+# DO NOT MULTIPLY BY F²  ← this docstring exists because Bug-3 was an F²/36×
+# regression caused by exactly that confusion. The Hamiltonian convention is
 
-For scalar BEC (F=0), c_dd = μ₀ μ² directly (no spin operators).
+    H_dd = (c_dd / 2) ∫ d³r d³r' Σ_{αβ} F̂_α(r) Q_{αβ}(r-r') F̂_β(r')
+
+with `F̂_α` the *operators* whose eigenvalues are `m ∈ -F..+F`. Therefore
+`c_dd` carries `(g_F μ_B)²`, NOT `(g_F F μ_B)²` — the F² that maps eigenvalues
+to physical magnetic moments is supplied by the operators inside the integral.
+
+`atom.mu_mag` stores the *full* magnetic moment `g_F · F · μ_B` (saturation
+moment), so we divide by F here to recover `g_F μ_B`. For ε_dd computations
+use `compute_a_dd`, which does the opposite — see its docstring.
+
+Scalar (F=0) BEC: `c_dd = μ₀ μ²` directly (no spin operators in H_dd).
 """
 function compute_c_dd(atom::AtomSpecies)
     atom.mu_mag == 0.0 && return 0.0
@@ -103,7 +111,7 @@ function compute_c_dd(atom::AtomSpecies)
     if F == 0
         return Units.MU_0 * atom.mu_mag^2
     end
-    mu_gF = atom.mu_mag / F  # = g_F × μ_B
+    mu_gF = atom.mu_mag / F  # = g_F × μ_B  (DO NOT MULTIPLY BY F)
     Units.MU_0 * mu_gF^2
 end
 
@@ -182,6 +190,35 @@ function _c_extra_to_delta_gS(F::Int, c_extra::Vector{Float64})
     end
     isempty(c_dict) && return Dict{Int, Float64}()
     _cn_to_gS(F, c_dict)
+end
+
+"""
+    even_c_extra(F::Int; c2=0.0, c4=0.0, c6=0.0, c8=0.0, c10=0.0, c12=0.0) -> Vector{Float64}
+
+Build a `c_extra` vector with odd-rank slots auto-zeroed for spin-F. Use this
+instead of constructing the vector by hand — only even-rank tensor couplings
+(k = 2, 4, ..., 2F) are physical; odd-rank slots must be zero.
+
+For F=6 (Eu151), the returned vector has 11 entries
+`[c₂, 0, c₄, 0, c₆, 0, c₈, 0, c₁₀, 0, c₁₂]`. Without this helper, supplying
+`c_extra = [c2, c4, c6]` (length 3) silently misinterprets `c4 → c3` and
+`c6 → c4`.
+"""
+function even_c_extra(F::Int;
+    c2::Float64=0.0, c4::Float64=0.0, c6::Float64=0.0,
+    c8::Float64=0.0, c10::Float64=0.0, c12::Float64=0.0)
+    vals = Dict{Int, Float64}(2 => c2, 4 => c4, 6 => c6, 8 => c8, 10 => c10, 12 => c12)
+    out = zeros(Float64, 2F - 1)  # c_extra[idx] = c_{idx+1}, idx ∈ 1:2F-1
+    for k in 2:2:2F
+        haskey(vals, k) && (out[k - 1] = vals[k])
+    end
+    # Refuse passing nonzero c_k for k > 2F (would be silently dropped).
+    for (k, v) in vals
+        if k > 2F && abs(v) > 1e-30
+            throw(ArgumentError("even_c_extra: c$k supplied but F=$F only supports up to c$(2F)"))
+        end
+    end
+    out
 end
 
 """

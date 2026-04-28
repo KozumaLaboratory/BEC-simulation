@@ -237,6 +237,7 @@ export compute_interaction_params,
     compute_interaction_params_general_f, compute_c0, compute_c_dd, compute_a_dd
 export interaction_params_from_constraint,
     compute_c_total, compute_c_dd_dimless, linear_zeeman_p
+export even_c_extra
 export compute_eu151_interactions
 export lima_pelster_Q5, compute_c_lhy_with_ddi
 export compute_lhy_2d_params
@@ -295,7 +296,7 @@ export BatchedKineticCache
 export apply_spin_mixing_step!
 
 # Nematic
-export apply_nematic_step!
+export apply_singlet_pair_step!, apply_nematic_step!  # nematic = legacy alias
 
 # Tensor interaction (general-F)
 export apply_tensor_interaction_step!, make_tensor_interaction_cache

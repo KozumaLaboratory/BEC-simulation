@@ -164,13 +164,32 @@ For spinor condensates (n_comp > 1), the true LHY correction depends on the
 Bogoliubov spectrum of the full spin-F system and can differ qualitatively
 (e.g., spinor droplets in 39K, spin-dependent depletion). Use with caution
 when spin degrees of freedom are dynamically active.
+
+For F ≥ 3 (e.g. Eu151 F=6) the spinor LHY problem is **research-open**:
+- The two-channel `SpinorLHYTable` we ship covers (S=0, S=2) only — sufficient
+  for F ≤ 2 (Na23 F=1/2, Rb87 F=1, Cr52 F=3 limit), insufficient for F=6.
+- No closed-form Lima-Pelster–style elliptic integral is known for general F.
+- Petrov–Astrakharchik droplet stabilisation (PRL 117 100401) was derived for
+  scalar condensates; extension to F=6 with full DDI is unsolved.
+- Lima-Pelster Q5(ε_dd) for **scalar with DDI** is implemented separately
+  (`compute_c_lhy_with_ddi`) and is the right call for fully-polarized states
+  in a strong B field — but it does not capture spin-dependent depletion.
+
+For F=6 production runs, one of the following is the appropriate choice:
+1. `spinor_lhy: two_channel` for c0/c1 path with weak DDI (qualitative).
+2. `spinor_lhy: scalar_with_ddi` (planned) for fully-polarized + strong DDI.
+3. Disable LHY entirely (set `gamma_lhy: 0`) and rely on TF — most reliable
+   when ε_dd ≲ 1 and the cloud is far from droplet onset.
+
+Until item 2 lands, the scalar warning is the honest signal.
 """
 function _lhy_energy(psi, c_lhy, n_comp, ndim, n_pts, dV)
     if n_comp > 1
         @warn """LHY energy uses scalar (fully-polarized) approximation for a \
 spinor condensate (n_comp=$n_comp). Spin-dependent LHY corrections are not \
 included. To use the two-channel spinor LHY table, add `spinor_lhy: two_channel` \
-to the YAML ground_state step or pass `spinor_lhy=:two_channel` to make_workspace.""" maxlog=1
+to the YAML ground_state step or pass `spinor_lhy=:two_channel` to make_workspace. \
+For F ≥ 3 the two-channel table is also incomplete — see _lhy_energy docstring.""" maxlog=1
     end
     n = total_density(psi, ndim)
     E = 0.0

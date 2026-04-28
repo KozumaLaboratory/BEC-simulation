@@ -474,6 +474,40 @@ function make_workspace(;
             )
         end
         c_dd_val = isnan(c_dd) ? compute_c_dd(atom) : c_dd
+
+        # Spin rotating-frame correctness guard: the rotating-basis frame is
+        # built around z, so off-diagonal DDI components rotate at ω_R and
+        # average to zero only in the secular limit. With a non-zero
+        # spin_rotating_frame_omega and full (non-secular) DDI, the chosen
+        # propagator silently violates rotating-frame consistency.
+        if abs(sim_params.spin_rotating_frame_omega) > 1e-15 && !secular_ddi
+            throw(
+                ArgumentError(
+                    "spin_rotating_frame_omega = $(sim_params.spin_rotating_frame_omega) ≠ 0 " *
+                    "with non-secular DDI: the rotating frame relies on Larmor-averaging " *
+                    "off-diagonal DDI components. Pass `secular_ddi=true` to make_workspace, " *
+                    "or set spin_rotating_frame_omega=0 to use the lab-frame full DDI.",
+                ),
+            )
+        end
+
+        # Larmor regime advisory: when ω_L (= p_zeeman, dimensionless) ≫
+        # c_dd × n_peak, the Larmor cycle averages off-diagonal DDI to zero,
+        # and the secular kernel is the appropriate choice. Most Eu151
+        # experiments live deep in this regime (ω_L ~ kHz, c_dd × n ~ Hz).
+        # Only @info, not error: the user may intentionally want the full
+        # kernel to study transverse Larmor-coherent dynamics.
+        if !secular_ddi && abs(zeeman.p) > 1e-15 && c_dd_val > 1e-30
+            n_peak_est =
+                sum(abs2, _to_host(psi)) / cell_volume(grid) /
+                max(1, prod(grid.config.n_points))  # rough mean → upper bound on n_peak
+            larmor_ratio = abs(zeeman.p) / max(c_dd_val * n_peak_est, 1e-30)
+            if larmor_ratio > 100.0
+                @info "DDI Larmor regime: ω_L / (c_dd · ⟨n⟩) ≈ $(round(larmor_ratio; sigdigits=3)). " *
+                    "Consider `secular_ddi=true` (faster + more physical for ω_L ≫ c_dd·n)."
+            end
+        end
+
         make_ddi_params(
             grid,
             atom;

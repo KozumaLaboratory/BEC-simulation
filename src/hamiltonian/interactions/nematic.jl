@@ -1,13 +1,14 @@
 """
-    apply_nematic_step!(psi, interactions, F, dt, ndim; imaginary_time=false)
+    apply_singlet_pair_step!(psi, interactions, F, dt, ndim; imaginary_time=false)
 
 Apply the **S=0 spin-singlet pair channel** step: exp(-i c₂ |A₀₀|² dt).
 
-> Despite the legacy name `nematic`, this is *not* the rank-2 spin
-> nematic tensor ⟨N^(2)_αβ⟩ — see `analysis/observables.jl` for that.
-> It is specifically the c₂|A₀₀|² spin-singlet pair channel from
-> KU Eq. (48). The function-level rename to `apply_singlet_pair_step!`
-> is deferred so existing call sites (split_step.jl) keep working.
+> Canonical name: `apply_singlet_pair_step!`. The legacy alias
+> `apply_nematic_step!` is preserved for backwards compatibility but
+> refers to the *same* function — it is the c₂|A₀₀|² spin-singlet pair
+> Hamiltonian (KU Eq. 48), NOT the rank-2 spin nematic tensor
+> ⟨N^(2)_αβ⟩ (which lives in `analysis/observables.jl` as
+> `nematic_tensor_eigenvalues`).
 
 Kawaguchi-Ueda convention correspondence for contact interactions:
 - F=1: c₀n² + c₁|F|²  →  diagonal + spin_mixing           (2 channels, exact)
@@ -35,7 +36,7 @@ where V = c₂ (-1)^{F-m}/√D × A₀₀ (same for both signs of m since (-1)^{
 
 Real-time conserves norm for each (m, -m) pair.
 """
-function apply_nematic_step!(
+function apply_singlet_pair_step!(
     psi::AbstractArray{<:Complex},
     interactions::InteractionParams,
     F::Int,
@@ -121,3 +122,13 @@ function _nematic_loop!(psi, ::Val{D}, n_pts, c2, dt, imaginary_time) where {D}
     end
     nothing
 end
+
+"""
+    apply_nematic_step!(args...; kwargs...)
+
+Legacy alias for [`apply_singlet_pair_step!`](@ref). Same function — the
+"nematic" label is historical (KU Eq. 48 for F=2 was popularised under that
+name) and conflicts with the rank-2 spin nematic tensor observable.
+Prefer `apply_singlet_pair_step!` in new code.
+"""
+const apply_nematic_step! = apply_singlet_pair_step!

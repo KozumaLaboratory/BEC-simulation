@@ -148,6 +148,41 @@ two-channel table, set `ground_state.spinor_lhy: two_channel`.
 
 F=6, g_J=1.9934, g_F≈1.163, μ≈6.977μ_B, a_s≈110a₀. 7 unknown scattering channels (S=0,2,...,12). Constraint: c₀+36c₁=4π(a_s/a_ho)N.
 
+## Known limitations / open issues (NOT bugs — design boundaries)
+
+These are documented quirks; do not "fix" without explicit user discussion.
+
+- **F ≥ 3 spinor LHY is research-open.** `SpinorLHYTable` covers (S=0, S=2)
+  only; for Eu151 F=6 it is incomplete. `_lhy_energy` emits a one-shot
+  `@warn` per process when `n_comp > 1`. For fully-polarized + strong DDI
+  use `compute_c_lhy_with_ddi` (Lima-Pelster scalar-with-DDI) instead. See
+  `_lhy_energy` docstring for the full menu.
+- **`apply_nematic_step!` is the S=0 singlet-pair Hamiltonian, NOT the
+  rank-2 nematic tensor observable.** Naming is legacy. Observable side
+  is `nematic_tensor_eigenvalues` (different function). Do not conflate.
+- **`secular_ddi=true` is the user's decision**, not auto. `make_workspace`
+  emits an `@info` advisory when `ω_L / (c_dd · ⟨n⟩) > 100` — Eu experiments
+  almost always live in this regime.
+- **`spin_rotating_frame_omega ≠ 0` requires `secular_ddi=true`.** Now
+  enforced via `ArgumentError` in `make_workspace`. Reason: full DDI's
+  off-diagonal components rotate at ω_R and only Larmor-average to zero in
+  the secular limit.
+- **`even_c_extra(F; c2, c4, c6, …)` is the canonical way to construct
+  `c_extra`.** Hand-written `[c2, c4, c6]` (length 3) silently misindexes
+  for F ≥ 3 because c_extra[idx] = c_{idx+1} (so odd slots must be 0).
+- **`Workspace` 23+ type params can JIT-hang for 30 min**. See "Type
+  stability boundaries" below — the operative discipline (helper-fn
+  boundary + `::ConcreteType` narrow + no closures in struct fields) is
+  load-bearing. A "small refactor" here can cost an evening.
+- **`_get_spinor(psi, I, Val(13))` allocates ~352 bytes / call at D=13.**
+  Measured in microbench (16k voxels × 1k iter → 5.5 GB). Inside real
+  hot loops (`_spin_mixing_loop!`, `apply_raman_step!`) the compiler may
+  elide some via SROA, but the call site still costs allocation when
+  `c1 ≠ 0` and Eu151 F=6. Future work: an `_apply_euler_spin_rotation!`
+  variant that operates in-place on `psi` slabs without round-tripping
+  through `SVector{13, ComplexF64}`. Not relevant to rotating-basis
+  (Option γ) path — that one uses gemm-form rotation instead.
+
 ## Constraints
 
 - All structs in `types.jl` (included first). New structs go there.
