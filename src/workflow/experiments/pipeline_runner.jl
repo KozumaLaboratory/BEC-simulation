@@ -145,8 +145,22 @@ end
     elseif step isa DynamicsStep
         _run_step(step, psi, grid, atom, workspace;
             verbose, checkpoint_dir, live_status_path)
-    else
+    elseif step isa GroundStateStep ||
+        step isa BinaryGroundStateStep ||
+        step isa RotatingBasisGroundStateStep
         _run_step(step, psi, grid, atom, workspace; verbose, checkpoint_dir)
+    else
+        # Defensive: a new PipelineStep subtype must be added explicitly above
+        # so the kwargs passed to its _run_step match its method signature.
+        # Julia would otherwise raise MethodError, but the message would not
+        # mention this dispatch site — easier to debug if we point here.
+        throw(
+            ArgumentError(
+                "Unknown PipelineStep subtype $(typeof(step)) in _step_dispatch!. " *
+                "Add an explicit branch in _step_dispatch! (pipeline_runner.jl:123) " *
+                "and a matching _run_step(::$(typeof(step)), ...) method.",
+            ),
+        )
     end
     psi_out, grid_out, atom_out, workspace_out, step_result = out
     if step_result !== nothing

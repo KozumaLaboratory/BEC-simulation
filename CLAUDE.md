@@ -174,6 +174,21 @@ These are documented quirks; do not "fix" without explicit user discussion.
   stability boundaries" below — the operative discipline (helper-fn
   boundary + `::ConcreteType` narrow + no closures in struct fields) is
   load-bearing. A "small refactor" here can cost an evening.
+- **Bogoliubov k=0 Goldstone mode is gapped — μ convention issue.**
+  `_bdg_k_scan` (analysis/phases/bogoliubov.jl:77-78) computes
+  `μ = ⟨ψ|(Z + n₀·h_mf)|ψ⟩` where `h_mf` includes the k̂-direction-dependent
+  DDI piece. Confirmed via `test_bogoliubov_goldstone.jl` (`@test_broken`)
+  that this leaves a finite gap at k=0 even in the symmetry-breaking
+  regime where a Goldstone mode is required: F=1 contact-only gives
+  gap ≈ 0.4, F=6 with c_dd × F² × n₀ scaling gives gap ≈ 1440. Affects
+  the absolute roton-gap and sound-speed values reported by
+  `bogoliubov_dispersion`. Phase-boundary detection via
+  `bogoliubov_instability_scan` is **less affected** — that uses the
+  growth rate (`Im ω`) at finite k, not the k=0 gap. Fix requires
+  re-deriving the proper μ for the spinor BdG framework — likely μ
+  should be the contact-only piece (gauge mode at k=0), with the DDI
+  k̂-dependent piece appearing only inside the L block. See test for
+  pinned regression and TODO context.
 - **`split_step_captured!` on GPU silently falls back to `split_step!`.**
   CUDA Graph capture is implemented in `ext/SpinorBECCUDAExt/gpu_graph.jl`
   but currently disabled — replay drift from per-call broadcast allocations

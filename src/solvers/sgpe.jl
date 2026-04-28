@@ -37,7 +37,30 @@ position space. Conservative in the γ→0 limit (no-op).
 
 Fluctuation–dissipation consistency: for a Bose gas in thermal equilibrium at
 (μ, T) the damping and noise amplitudes combine to target the classical-field
-occupation n(k) = T / (ε(k) - μ) for modes below ε ≪ k_B T.
+occupation n(k) = T / (ε(k) - μ) for modes below ε ≪ k_B T. Pinned by
+`test_sgpe_fdr.jl` (Rayleigh-Jeans slope check).
+
+# Limitations: "simple-growth" form
+
+This is the Bradley-Gardiner *simple-growth* SGPE: only the coherent kinetic
+phase is damped. Interaction terms (c₀, c₁, DDI, LHY, …) are NOT included in
+the damping kernel — i.e. the Hartree-Fock μ-shift from interactions does not
+back-react on γ. Consequences:
+
+- Early-time relaxation (e.g. Kibble-Zurek defect dynamics) is faithful: the
+  fast modes rapidly reach the Rayleigh-Jeans distribution.
+- Long-time asymptotic equilibrium is biased for strongly-interacting cases:
+  the Hartree-Fock-corrected μ_eff ≠ μ in the damping target.
+- For Eu (DDI ε_dd ~ 0.5, c₀ × n_peak ~ O(10²) ≫ T) the bias is significant.
+  Treat asymptotic SGPE temperatures as a *control parameter*, not the true
+  thermodynamic temperature.
+
+For full-Hamiltonian damping (Stoof-form SGPE) the kernel needs the local
+GP residual, not just ε(k); not implemented.
+
+Per-component noise is independent across spinor components. For F=6 dipolar
+regimes where spin-coherent thermal correlations matter, this *under*-couples
+the spin modes to the bath. Document if running long-T simulations.
 """
 function apply_sgpe_step!(
     ws::Workspace{N}, γ::Real, T::Real, dt::Real;

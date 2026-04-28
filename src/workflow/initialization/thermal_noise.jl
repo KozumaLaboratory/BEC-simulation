@@ -26,12 +26,21 @@ function thermal_noise_amplitude(T_over_Tc::Float64)
 end
 
 """
-    add_thermal_noise!(psi, F; T_over_Tc, transverse_only, seed) → psi
+    add_thermal_seed!(psi, F; T_over_Tc, transverse_only, seed) → psi
 
-Add Gaussian random noise to the wavefunction to seed thermal fluctuations.
+Heuristic symmetry-breaking kick: add small Gaussian noise to the wavefunction
+to seed spin-rotational symmetry breaking before / during ITP.
 
-This breaks the spin-rotational symmetry of a polarized state, allowing
-ITP to find non-trivial spin textures via spontaneous symmetry breaking.
+> **This is a heuristic seed, NOT a true classical-field thermal initialisation.**
+> The amplitude `η = √((T/T_c)³ / 4)` is dimensional-scaling shorthand without
+> a derivation, and the per-component weight `exp(-|c - c_dom|/2)` is
+> hand-tuned for ferromagnetic / polar GS scenarios. For a true thermal
+> Wigner sample (Bogoliubov-weighted occupations on each k-mode), use the
+> SGPE callback (`apply_sgpe_step!`) followed by a measurement window —
+> see `test_sgpe_fdr.jl` for the FDR contract.
+
+The legacy alias `add_thermal_noise!` is preserved so existing callers
+keep working; new code should use `add_thermal_seed!`.
 
 # Arguments
 - `psi`: spinor wavefunction (modified in place)
@@ -41,17 +50,14 @@ ITP to find non-trivial spin textures via spontaneous symmetry breaking.
   (preserves the dominant component, only seeds spin-flip excitations)
 - `seed`: RNG seed
 
-The noise amplitude is set so that |δψ|/|ψ| ≈ ((T/T_c)³/4)^{1/2}.
-For T/T_c = 0.1 → η ≈ 1.6%; for T/T_c = 0.2 → η ≈ 4.5%.
-
 After adding noise, the wavefunction is renormalized to preserve total density.
 
-# Physical interpretation
-This is a minimal classical-field-method initialization: instead of full
-truncated Wigner with Bogoliubov modes, we add Gaussian noise on the
-spin transverse modes only. Sufficient to break Z-axis rotational symmetry.
+# When to reach for this
+Useful as a 1-line "kick the GS off the high-symmetry axis" before ITP
+finds the FL / cyclic / nematic phase. For quench dynamics (Kibble-Zurek)
+or thermal-state preparation, prefer SGPE.
 """
-function add_thermal_noise!(
+function add_thermal_seed!(
     psi::AbstractArray{<:Complex},
     F::Int;
     T_over_Tc::Float64=0.1,
@@ -112,15 +118,22 @@ function add_thermal_noise!(
 end
 
 """
-    add_thermal_noise(psi, F; kwargs...) → psi_noisy
+    add_thermal_seed(psi, F; kwargs...) → psi_noisy
 
-Non-mutating version of `add_thermal_noise!`.
+Non-mutating version of [`add_thermal_seed!`](@ref). The legacy alias
+`add_thermal_noise` is preserved for backwards compatibility.
 """
-function add_thermal_noise(psi::AbstractArray{<:Complex}, F::Int; kwargs...)
+function add_thermal_seed(psi::AbstractArray{<:Complex}, F::Int; kwargs...)
     psi_copy = copy(psi)
-    add_thermal_noise!(psi_copy, F; kwargs...)
+    add_thermal_seed!(psi_copy, F; kwargs...)
     psi_copy
 end
+
+# Legacy aliases — see add_thermal_seed!/add_thermal_seed docstrings for
+# why the rename happened (the previous name implied a true thermal Wigner
+# initialisation, which this function is not).
+const add_thermal_noise! = add_thermal_seed!
+const add_thermal_noise = add_thermal_seed
 
 """
     add_symmetry_breaking_seed!(psi, F; amplitude, seed, k_cut, grid) → psi
