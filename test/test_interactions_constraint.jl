@@ -217,6 +217,15 @@
         @test p["interactions"]["c_total"] == 4689.0
         @test p["interactions"]["c4"] == 50.0
         @test p["interactions"]["c6"] == -20.0
+
+        # Regression test: c_extra MUST reach InteractionParams via the
+        # actual parsing pipeline. Pre-Apr 2026 _parse_gs_interactions
+        # hardcoded c_extra=Float64[] and silently dropped these keys.
+        ip = SpinorBEC._parse_gs_interactions(p["interactions"], Eu151)
+        @test length(ip.c_extra) >= 5     # entries up to c6 (idx 5 = c6)
+        @test ip.c_extra[3] == 50.0       # c4
+        @test ip.c_extra[5] == -20.0      # c6
+        @test ip.c_extra[1] == 0.0        # c2 unset → zero
     end
 
     @testset "YAML explicit c0/c1 still works" begin

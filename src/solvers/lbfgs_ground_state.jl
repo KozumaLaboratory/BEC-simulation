@@ -218,6 +218,23 @@ end
 
 Find ground state by direct energy minimization using L-BFGS on the
 constraint manifold {‖ψ‖²=1}.
+
+# Hamiltonian coverage
+
+The gradient implementation (`energy_gradient!`) covers:
+kinetic, trap, Zeeman, c0 (density), c_lhy, c1 (spin), light_shift, DDI.
+
+It does **NOT** cover:
+- c2 (the S=0 singlet-pair channel — `apply_singlet_pair_step!`)
+- `c_extra` higher-rank tensor couplings (c4, c6, …)
+- `tensor_cache` (per-channel g_S table)
+
+The energy evaluation at end of step is correct (uses
+`energy_decomposition`), but the gradient direction is biased when any
+of those channels is active. The optimizer will converge to a wrong
+minimum. A runtime `@warn` fires in this case; for those Hamiltonians
+use the ITP path (`find_ground_state`) instead, or only LBFGS-polish a
+state already ITP-converged with the full Hamiltonian.
 """
 function find_ground_state_lbfgs(;
     grid::Union{Nothing, Grid}=nothing,
@@ -296,6 +313,26 @@ function find_ground_state_lbfgs(;
     F = atom.F
     D = 2F + 1
     dV = cell_volume(grid)
+
+    # Gradient-coverage guard: energy_gradient! covers kinetic + trap +
+    # Zeeman + c0 + c_lhy + c1 + light_shift + DDI. It does NOT cover
+    # the c2 singlet-pair channel (apply_singlet_pair_step!) nor the
+    # tensor_cache c_extra (c4, c6, …) terms. Energy *evaluation* is
+    # correct (energy_decomposition.total at line ~95), but the gradient
+    # direction is missing those contributions, so LBFGS would converge
+    # to a wrong minimum. Warn the user to fall back to ITP.
+    c2_val = abs(get_cn(ws.interactions, 2))
+    has_c_extra = !isempty(ws.interactions.c_extra) &&
+                  any(>(1e-30) ∘ abs, ws.interactions.c_extra)
+    has_tensor = ws.tensor_cache !== nothing
+    if c2_val > 1e-30 || has_c_extra || has_tensor
+        @warn "find_ground_state_lbfgs: gradient does NOT include c2 singlet-pair " *
+            "or c_extra/tensor_cache contributions. The optimizer will converge " *
+            "to a biased minimum. Use find_ground_state (ITP) for these channels, " *
+            "or only LBFGS-polish a state that has already been ITP-converged with " *
+            "the full Hamiltonian. " *
+            "(c2=$(round(c2_val; sigdigits=3)), c_extra=$has_c_extra, tensor=$has_tensor)"
+    end
 
     # Device-resident k² for energy_gradient! (matches ws.state.psi's backend)
     k_squared_dev = _to_device(ws.backend, grid.k_squared)

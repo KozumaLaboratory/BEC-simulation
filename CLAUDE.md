@@ -174,6 +174,15 @@ These are documented quirks; do not "fix" without explicit user discussion.
   stability boundaries" below — the operative discipline (helper-fn
   boundary + `::ConcreteType` narrow + no closures in struct fields) is
   load-bearing. A "small refactor" here can cost an evening.
+- **`split_step_captured!` on GPU silently falls back to `split_step!`.**
+  CUDA Graph capture is implemented in `ext/SpinorBECCUDAExt/gpu_graph.jl`
+  but currently disabled — replay drift from per-call broadcast allocations
+  (e.g. `cis.(m_gpu .* α)` recreates CuArrays each frame, invalidating
+  captured kernel arg pointers). Bench shows captured 4× slower than plain
+  on the current code path. The bench helper
+  `gpu_graph.jl::bench_split_step_capture` exists to validate any future
+  re-enable. Until then `split_step_captured!(::Workspace{N, <:CuArray})`
+  is a transparent alias for `split_step!`.
 - **`_get_spinor(psi, I, Val(13))` allocates ~352 bytes / call at D=13.**
   Measured in microbench (16k voxels × 1k iter → 5.5 GB). Inside real
   hot loops (`_spin_mixing_loop!`, `apply_raman_step!`) the compiler may

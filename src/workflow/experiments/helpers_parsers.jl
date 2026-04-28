@@ -300,7 +300,11 @@ end
 
 function _parse_gs_interactions(inter::Dict, atom)
     F = atom.F
-    c_extra = Float64[]
+    # Higher-rank tensor couplings c_k (k = 2, 3, …) declared via YAML keys
+    # `c2: …`, `c4: …`, etc. Pre-Apr 2026 this was hardcoded `Float64[]`,
+    # silently dropping any c_extra YAML inputs. Regression test:
+    # test_interactions_constraint.jl "YAML c_total with c_extra".
+    c_extra = _parse_c_extra(inter, F)
     if haskey(inter, "c_total")
         c_total = Float64(inter["c_total"])
         c1_ratio = Float64(get(inter, "c1_ratio", 0.0))

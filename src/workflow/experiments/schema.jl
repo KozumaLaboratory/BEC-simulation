@@ -261,8 +261,55 @@ function validate_pipeline!(data::Dict; strict::Bool=false)
         if haskey(STEP_SCHEMAS, step_type) && step_params isa Dict
             validate_config!(step_params, STEP_SCHEMAS[step_type],
                 "pipeline.$i.$step_type"; strict)
+            # Cross-field F-dependent validation.
+            if step_type == "ground_state"
+                _validate_ground_state_physics!(step_params, "pipeline.$i.ground_state"; strict)
+            end
         elseif !(step_type in ("ground_state", "dynamics", "analyze"))
             msg = "Unknown pipeline step kind '$step_type' (line $i) — typo? Recognised: ground_state, dynamics, analyze"
+            strict ? throw(ArgumentError(msg)) : @warn msg
+        end
+    end
+end
+
+"""
+    _validate_ground_state_physics!(step_params, path; strict)
+
+F-dependent cross-field validation that the static schema cannot express:
+
+- `c1_ratio > -1/F²` (singularity in `interaction_params_from_constraint`:
+  `c0 = c_total / (1 + F²·c1_ratio)`, so values at or below `-1/F²` give
+  `c0 ≤ 0` — non-physical density attraction).
+
+The schema's `c1_ratio` range `(-1.0, 1.0)` is generous on purpose so
+F=1 (singularity at -1) and F=6 (singularity at -1/36) share one declaration.
+This function tightens it once `F` is known.
+"""
+function _validate_ground_state_physics!(step_params::Dict, path::String; strict::Bool=false)
+    # Resolve F: prefer `atom:` lookup, fall back to F=1 if neither given.
+    atom_str = get(step_params, "atom", nothing)
+    F = if atom_str !== nothing
+        a = resolve_atom(Symbol(String(atom_str)))
+        a !== nothing ? a.F : 1
+    else
+        1
+    end
+
+    inter = get(step_params, "interactions", nothing)
+    if inter isa Dict && haskey(inter, "c1_ratio")
+        cr_raw = inter["c1_ratio"]
+        cr = if cr_raw isa Number
+            Float64(cr_raw)
+        else
+            (cr_raw isa Dict && haskey(cr_raw, "from") ? Float64(cr_raw["from"]) : 0.0)
+        end
+        bound = -1.0 / F^2
+        if cr <= bound + 1e-10
+            msg =
+                "$path.interactions.c1_ratio = $cr is at or below the singularity " *
+                "-1/F² = $(round(bound; sigdigits=4)) for F=$F. " *
+                "interaction_params_from_constraint gives c0 → ∞ or c0 ≤ 0 (non-physical). " *
+                "Use c1_ratio > $(round(bound; sigdigits=4))."
             strict ? throw(ArgumentError(msg)) : @warn msg
         end
     end
