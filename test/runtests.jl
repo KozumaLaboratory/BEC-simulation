@@ -104,6 +104,24 @@ const FULL_EXTRA = [
     "test_calibration_drift.jl",
     "test_dynamics_knobs.jl",
     "test_cuda_equivalence.jl",
+    # Option γ rotating-basis tests (added 2026-04-27..29).
+    "test_rotating_basis_gpe.jl",                  # CPU Phase I + II
+    "test_rotating_basis_analyzers.jl",
+    "test_rotating_basis_phase_ii.jl",
+    "test_rotating_basis_phase_iii.jl",            # lab-frame agreement
+    "test_rotating_basis_pipeline_parsing.jl",
+    "test_rotating_basis_f32.jl",                  # F32 mixed-precision pin
+    # Higher-order integrator tests
+    "test_higher_order_integrators.jl",
+    "test_cfet4_order.jl",
+    # Lima-Pelster Q5 + scalar eGPE
+    "test_lima_pelster_q5.jl",
+    "test_scalar_egpe_dipole_kernel.jl",
+    "test_scalar_egpe_smoke.jl",
+    # Round-1..3 regression pins
+    "test_rotating_frame_regression.jl",           # Bug-1: SimParams + Coriolis
+    "test_bogoliubov_goldstone.jl",                # μ convention (broken-pinned)
+    "test_sgpe_fdr.jl",                            # SGPE Rayleigh-Jeans
 ]
 
 # ── Physics tier: analytic validation + physics level tests ──
