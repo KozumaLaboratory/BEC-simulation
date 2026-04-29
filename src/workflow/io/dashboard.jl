@@ -199,6 +199,9 @@ API:
 - `GET /api/runs`       → list of run directories
 - `GET /api/data/:name` → dashboard data JSON for a run
 - `GET /api/refresh`    → clear cache
+- `GET /api/physics_summary/:run/:file` → integrator metadata,
+  Larmor regime classification, Lz/Fz/m-top extremes summary
+  (lightweight — no snapshot loading required)
 
 See src/workflow/io/dashboard.jl for the full /api surface that the
 React app consumes.
@@ -748,6 +751,114 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
                 out["pop_top"] = [Float64(pops[t, 1]) for t in 1:n_snaps]  # m=+F
                 out["pop_mid"] = [Float64(pops[t, (n_comp + 1) ÷ 2]) for t in 1:n_snaps]  # m=0
             end
+            _json_string(out)
+        catch e
+            "{\"error\":\"$(replace(string(e), "\"" => "'"))\"}"
+        end
+        (200, "application/json", json)
+
+    elseif startswith(path, "/api/physics_summary/")
+        # /api/physics_summary/:run/:file → integrator metadata + Larmor regime
+        # classification + Lz/Fz/m=+F summary. Designed so a frontend physics
+        # panel can render gauge widgets (Larmor ratio, ε vs threshold,
+        # Lz min/max) without re-loading the multi-GB result.jld2 each time.
+        rest = _uri_decode(path[22:end])
+        slash_idx = findfirst('/', rest)
+        if slash_idx === nothing
+            return (400, "text/plain", "Expected /api/physics_summary/:run/:file")
+        end
+        name = rest[1:(slash_idx - 1)]
+        file = rest[(slash_idx + 1):end]
+        qidx = findfirst('?', file)
+        qidx !== nothing && (file = file[1:(qidx - 1)])
+        fpath = joinpath(base_dir, name, file)
+        if !isfile(fpath)
+            return (404, "text/plain", "File not found: $name/$file")
+        end
+        json = try
+            d = JLD2.load(fpath)
+            out = Dict{String, Any}()
+
+            # Integrator metadata block (written by `save_rotating_basis_result!`).
+            for (k, label) in (
+                ("dynamics/integrator_meta/dt_used", "dt_used"),
+                ("dynamics/integrator_meta/integrator", "integrator"),
+                ("dynamics/integrator_meta/epsilon_target", "epsilon_target"),
+                ("dynamics/integrator_meta/p_zeeman", "p_zeeman"),
+                ("dynamics/integrator_meta/F_atom", "F_atom"),
+                ("dynamics/integrator_meta/larmor_phase_per_step", "larmor_phase_per_step"),
+                ("dynamics/integrator_meta/theta_const", "theta_const"),
+                ("dynamics/integrator_meta/phi_omega", "phi_omega"),
+            )
+                haskey(d, k) && (out[label] = d[k])
+            end
+
+            # Larmor regime classification — same threshold as the Larmor
+            # guard warning in pipeline_runner. Audit 2026-04-28 showed
+            # ε=1e-3 fails for `p·F·dt > 300`; ε=1e-6 brings it down to
+            # ~90 for the Klaus-equivalent runs. Frontend can colour-code
+            # the gauge from this field.
+            larmor = get(out, "larmor_phase_per_step", NaN)
+            out["larmor_regime"] = if !isfinite(larmor) || larmor == 0
+                "unknown"
+            elseif larmor < 1
+                "safe"
+            elseif larmor < 100
+                "marginal"
+            elseif larmor < 300
+                "stiff"
+            else
+                "danger"
+            end
+
+            # Lz / Fz extremes summary. Try the canonical
+            # `dynamics/<X>` keys first; fall back to top-level `<X>`
+            # for the legacy launch_*.jl Vector output (pre-2026-04-29).
+            for sym in ("Lz", "Fz", "Fx", "Fy")
+                v = if haskey(d, "dynamics/$sym")
+                    Float64.(d["dynamics/$sym"])
+                elseif haskey(d, sym)
+                    Float64.(d[sym])
+                else
+                    nothing
+                end
+                v === nothing || isempty(v) && continue
+                if v !== nothing && !isempty(v)
+                    out[sym * "_min"] = minimum(v)
+                    out[sym * "_max"] = maximum(v)
+                    out[sym * "_init"] = v[1]
+                    out[sym * "_final"] = v[end]
+                end
+            end
+
+            # m=+F population at start vs end (canonical thesis observable).
+            pm = if haskey(d, "dynamics/per_m_history")
+                d["dynamics/per_m_history"]
+            elseif haskey(d, "per_m_history")
+                d["per_m_history"]
+            else
+                nothing
+            end
+            if pm !== nothing
+                T = size(pm, 2)
+                col1 = sum(view(pm, :, 1))
+                colT = sum(view(pm, :, T))
+                out["m_top_init"] = pm[1, 1] / max(col1, 1e-30)
+                out["m_top_final"] = pm[1, T] / max(colT, 1e-30)
+            end
+
+            # Norm conservation diagnostic.
+            nv = if haskey(d, "dynamics/norms")
+                Float64.(d["dynamics/norms"])
+            elseif haskey(d, "norms")
+                Float64.(d["norms"])
+            else
+                nothing
+            end
+            if nv !== nothing && !isempty(nv)
+                out["norm_max_dev"] = maximum(abs.(nv .- 1.0))
+            end
+
             _json_string(out)
         catch e
             "{\"error\":\"$(replace(string(e), "\"" => "'"))\"}"
