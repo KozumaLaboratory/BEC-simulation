@@ -84,4 +84,9 @@ using SpinorBEC
     @test typeof(μ) === Float32 || typeof(μ) === Float64
     n_final = SpinorBEC.rotating_norm(ws)
     @test n_final ≈ 1.0 atol = 1e-5
+
+    # Lab-basis split step (Phase III reference path) — same boundary
+    # fix needed for `apply_ddi_step!` Float64 dt. Verify it runs.
+    SpinorBEC.split_step_lab!(ws, 0.005f0, 0.0f0)
+    @test isfinite(SpinorBEC.rotating_norm(ws))
 end
