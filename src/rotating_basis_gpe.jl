@@ -114,6 +114,14 @@ struct RotatingBasisWS{T <: AbstractFloat, N, D,
     spatial_buf::AC1
     # Per-point density buffer used by spatial_diagonal_step (reused, GPU-safe)
     rho_buf::AR
+    # Phase scratch for kinetic and diagonal-step broadcasts. Pre-allocated so
+    # `cis.(-dt·k²/2)` and `exp/cis(-(V+c0·n+γ·n^{3/2})·dt)` reuse the same
+    # device buffer instead of producing a new CuArray temporary each call —
+    # required for any future CUDA Graph capture, and a meaningful alloc
+    # reduction independently (~14 calls per Yoshida6 step × thousands of
+    # steps × 4-8 MB per scratch at 24³).
+    kspace_phase_buf::AC1
+    xspace_phase_buf::AC1
 
     grid::Grid{N, T}
     spin_matrices::SpinMatrices{D}
@@ -174,6 +182,8 @@ function make_rotating_basis_ws(
     rotation_scratch = _zeros(backend, Complex{T}, n_pts..., D)
     spatial_buf = _zeros(backend, Complex{T}, n_pts...)
     rho_buf = _zeros(backend, T, n_pts...)
+    kspace_phase_buf = _zeros(backend, Complex{T}, n_pts...)
+    xspace_phase_buf = _zeros(backend, Complex{T}, n_pts...)
 
     sm = spin_matrices(F)
 
@@ -212,6 +222,7 @@ function make_rotating_basis_ws(
         typeof(psi_tilde), typeof(spatial_buf), typeof(rho_buf), typeof(V_trap_dev),
         typeof(fft_fwd), typeof(fft_inv), typeof(ddi_bufs), typeof(backend)}(
         psi_tilde, psi_lab_buf, rotation_scratch, spatial_buf, rho_buf,
+        kspace_phase_buf, xspace_phase_buf,
         grid, sm,
         fft_fwd, fft_inv,
         ddi_params, ddi_bufs,
@@ -251,19 +262,22 @@ end
 # --- Substep operators ---
 
 """Kinetic step: per-component FFT. GPU-safe via broadcasts. k_squared is
-lazily lifted to the device on first call and cached."""
+lazily lifted to the device on first call and cached. The phase factor
+`cis(-dt·k²/2)` is computed once into `ws.kspace_phase_buf` and reused
+across all D spinor components — turns D×N broadcast temps into one."""
 function apply_kinetic_step_rotating!(
     ws::RotatingBasisWS{T, N, D}, dt::T; imaginary_time::Bool=false
 ) where {T, N, D}
     k2_dev = _kinetic_kspace_buffer(ws)
+    if imaginary_time
+        @. ws.kspace_phase_buf = exp(-T(dt) * k2_dev / 2)
+    else
+        @. ws.kspace_phase_buf = cis(-T(dt) * k2_dev / 2)
+    end
     @inbounds for m_idx in 1:D
         copyto!(ws.spatial_buf, selectdim(ws.psi_tilde, N + 1, m_idx))
         ws.fft_fwd * ws.spatial_buf
-        if imaginary_time
-            @. ws.spatial_buf *= exp(-T(dt) * k2_dev / 2)
-        else
-            @. ws.spatial_buf *= cis(-T(dt) * k2_dev / 2)
-        end
+        @. ws.spatial_buf *= ws.kspace_phase_buf
         ws.fft_inv * ws.spatial_buf
         copyto!(selectdim(ws.psi_tilde, N + 1, m_idx), ws.spatial_buf)
     end
@@ -282,7 +296,10 @@ function _kinetic_kspace_buffer(ws::RotatingBasisWS{T, N}) where {T, N}
 end
 
 """Spatial-diagonal step: apply exp(-i (V_trap + c0 n + γ_LHY n^(3/2)) dt)
-per spinor component. GPU-safe via broadcasts on slabs."""
+per spinor component. GPU-safe via broadcasts on slabs. Phase factor is
+computed once into `ws.xspace_phase_buf` and reused across all D spinor
+slabs — turns D inner-loop temporaries into one (alloc-stable for any
+future CUDA Graph capture)."""
 function apply_spatial_diagonal_step!(
     ws::RotatingBasisWS{T, N, D}, dt::T; imaginary_time::Bool=false
 ) where {T, N, D}
@@ -297,21 +314,23 @@ function apply_spatial_diagonal_step!(
     c0 = ws.c0
     V = ws.V_trap
     ρ = ws.rho_buf
+    Φ = ws.xspace_phase_buf
+    if imaginary_time
+        if γ == zero(T)
+            @. Φ = exp(-(V + c0 * ρ) * dt)
+        else
+            @. Φ = exp(-(V + c0 * ρ + γ * ρ * sqrt(ρ)) * dt)
+        end
+    else
+        if γ == zero(T)
+            @. Φ = cis(-(V + c0 * ρ) * dt)
+        else
+            @. Φ = cis(-(V + c0 * ρ + γ * ρ * sqrt(ρ)) * dt)
+        end
+    end
     @inbounds for m_idx in 1:D
         slab = selectdim(ws.psi_tilde, N + 1, m_idx)
-        if imaginary_time
-            if γ == zero(T)
-                @. slab *= exp(-(V + c0 * ρ) * dt)
-            else
-                @. slab *= exp(-(V + c0 * ρ + γ * ρ * sqrt(ρ)) * dt)
-            end
-        else
-            if γ == zero(T)
-                @. slab *= cis(-(V + c0 * ρ) * dt)
-            else
-                @. slab *= cis(-(V + c0 * ρ + γ * ρ * sqrt(ρ)) * dt)
-            end
-        end
+        @. slab *= Φ
     end
     nothing
 end

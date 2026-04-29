@@ -123,8 +123,26 @@ BLAS gemm.
 
 `scratch`, if supplied, is reused as the gemm output buffer (must be
 same shape + device + eltype as psi). The D×D `Rᵀ` is materialized once
-per call into a tiny device buffer (D² complexes ≈ few KB).
+per call into a tiny device buffer (D² complexes ≈ few KB) and that
+buffer is cached per-`scratch`-objectid so subsequent calls re-use the
+same allocation — required for any future CUDA Graph capture, since
+a per-call `similar()` would invalidate the captured argument pointer.
 """
+
+# Per-scratch-buffer cache for the small D×D R^T device matrix. Keyed by
+# `objectid(scratch)` so callers passing distinct workspace scratches
+# get distinct cached buffers. Falls back to per-call alloc when scratch
+# is nothing.
+const _ROTATION_RT_CACHE = Dict{UInt, AbstractArray}()
+
+function _get_rt_buffer(scratch::AbstractArray, ::Type{T}, D::Int) where {T}
+    key = objectid(scratch)
+    haskey(_ROTATION_RT_CACHE, key) && return _ROTATION_RT_CACHE[key]
+    buf = similar(scratch, T, D, D)
+    _ROTATION_RT_CACHE[key] = buf
+    buf
+end
+
 function _apply_rotation_to_spin_axis!(
     psi::AbstractArray{<:Complex, M}, R::SMatrix{D, D, ComplexF64}, ndim::Int;
     scratch::Union{Nothing, AbstractArray}=nothing,
@@ -140,12 +158,16 @@ function _apply_rotation_to_spin_axis!(
     buf_2d = reshape(buf, n_spatial, D)
 
     # buf[k,i] = Σⱼ R[i,j]·psi[k,j] = Σⱼ psi[k,j]·(Rᵀ)[j,i] → buf = psi · Rᵀ.
-    # Build Rᵀ on host (D² scalar ops), then copyto! to a small device buffer.
+    # Build Rᵀ on host (D² scalar ops), then copyto! into a cached device
+    # buffer (per-scratch objectid) to keep the GPU pointer stable across
+    # calls. The h2d copy of D² complexes is trivial (~5 KB at D=17).
     R_T_host = Matrix{T}(undef, D, D)
     @inbounds for j in 1:D, i in 1:D
         R_T_host[j, i] = T(R[i, j])
     end
-    R_T = similar(psi, T, D, D)
+    R_T = scratch === nothing ?
+          (rt=similar(psi, T, D, D); rt) :
+          _get_rt_buffer(scratch, T, D)
     copyto!(R_T, R_T_host)
 
     mul!(buf_2d, psi_2d, R_T)
