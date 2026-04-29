@@ -9,10 +9,32 @@ cd /gs/bs/$USER/SpinorBEC.jl
 module load cuda/12.6.0 julia/1.12.6
 
 julia --project=. -e 'using Pkg; Pkg.instantiate()'         # one-shot
-julia --project=. scripts/tsubame/generate_hires_scan.jl    # populates runs/tsubame_scan/
 
-qsub scripts/tsubame/run_scan_array.sbatch                  # submits 11-task job array
+# Pre-flight (interactive node, 30 min):
+qrsh -l gpu_h=1,h_rt=00:30:00
+bash scripts/tsubame/preflight.sh                           # CUDA + Julia + smoke
+julia --project=. scripts/tsubame/build_sysimage.jl         # optional, saves JIT cost
+exit
+
+# Generate configs + submit:
+julia --project=. scripts/tsubame/generate_hires_scan.jl    # populates runs/tsubame_scan/
+qsub scripts/tsubame/run_scan_array.sbatch                  # submits N-task job array
 ```
+
+## Optimisations baked in
+
+- **Sysimage support**: If `spinor_sysimage.so` is present at the project
+  root, the SBATCH script picks it up and each task skips the ~30-60 sec
+  SpinorBEC JIT cost. Build once via
+  `julia --project=. scripts/tsubame/build_sysimage.jl` (~10-15 min).
+- **JLD2 zstd compression** (default ON): snapshot bulk reduced 30-50%
+  on disk + faster `rsync` back to local. Disable with
+  `compress=false` kwarg if benchmarking raw I/O.
+- **Node-local NVMe scratch**: `SPINORBEC_SCRATCH_DIR=$T3TMPDIR/<JOB>_<TASK>`
+  routes JLD2 `.tmp` atomic-write staging away from shared FS hotspots.
+- **Multi-phase canonical save**: `save_rotating_basis_result!` (called
+  automatically by `run_pipeline`) writes the full GS → tilt → chirp →
+  stir trajectory; no separate repack step.
 
 ## Scan contents
 

@@ -45,10 +45,20 @@ mkdir -p "$SPINORBEC_SCRATCH_DIR"
 # --- CUDA paths (verify on TSUBAME — may need adjustment) ---
 export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 
+# --- Sysimage support (optional) ---
+# If `spinor_sysimage.so` exists at the project root (built once via
+# `scripts/tsubame/build_sysimage.jl`), each task skips the SpinorBEC
+# JIT cost (~30-60 sec/job → ~5 min saved across an 8-job array).
+SYSIMAGE_FLAG=""
+if [ -f "$PROJECT_ROOT/spinor_sysimage.so" ]; then
+    SYSIMAGE_FLAG="--sysimage=$PROJECT_ROOT/spinor_sysimage.so"
+    echo "[$(date)] using sysimage: $SYSIMAGE_FLAG"
+fi
+
 # --- Run via the same launcher we use locally ---
 # Note: scripts/launch_thesis_run.jl hardcodes runs/thesis_batch/<name>/.
 # For tsubame_scan we use a similar wrapper:
-julia --project=. -e "
+julia --project=. $SYSIMAGE_FLAG -e "
 using CUDA, SpinorBEC, JLD2
 config = SpinorBEC.load_config(\"runs/tsubame_scan/${RUN_NAME}/config.yaml\")
 @time result = SpinorBEC.run_config(config; verbose=true)

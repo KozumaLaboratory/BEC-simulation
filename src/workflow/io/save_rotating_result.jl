@@ -103,6 +103,7 @@ via the legacy fallback, but new code should write canonical here.
 function save_rotating_basis_result!(
     run_dir::String, result::AbstractDict;
     snapshot_precision::Symbol=:f32,
+    compress::Bool=true,
 )
     haskey(result, :rotating_basis_dynamics) || throw(
         ArgumentError(
@@ -132,7 +133,13 @@ function save_rotating_basis_result!(
     # Convert snapshot precision once up front.
     snap_eltype = snapshot_precision === :f64 ? ComplexF64 : ComplexF32
 
-    JLD2.jldopen(out_path, "w") do f
+    # Snapshot data is the bulk of the file (~tens of MB / frame at 48³ D=13).
+    # Default to ZstdCompressor at the JLD2 default level — typical 30-50%
+    # reduction on smooth-density data, ~5% CPU overhead per frame. Set
+    # `compress=false` to opt out (e.g. when bypassing for performance bench).
+    compressor = compress ? ZstdCompressor() : nothing
+
+    JLD2.jldopen(out_path, "w"; compress=compressor) do f
         # GS (or first snapshot) for the dashboard's volume renderer entry point.
         if n_snaps >= 1
             f["psi"] = Array{ComplexF64}(snaps[1])
