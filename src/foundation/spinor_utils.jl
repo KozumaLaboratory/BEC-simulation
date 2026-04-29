@@ -236,19 +236,53 @@ on the rotation block.
     m_row, m_shift_row, λ_row,
     V_T, conj_V;
     imaginary_time::Bool=false,
+    cis_PD=nothing,
 )
-    P .*= cis.(m_row .* α_col)               # Step 1: R_z(-α)
-    mul!(W, P, conj_V)                        # Step 2: R_y(-β) start
-    W .*= cis.(β_col .* λ_row)
-    mul!(P, W, V_T)
-    if imaginary_time
-        P .*= exp.(.-m_shift_row .* θ_col)    # Step 3: D_z(θ) ITP shifted
+    # `cis_PD` (size of P, Complex) is a pre-allocated scratch for the
+    # phase factor `cis(...)` so the broadcasts stay in-place — required
+    # for any future CUDA Graph capture, since per-call `cis.(...)`
+    # would allocate a fresh CuArray each invocation and invalidate the
+    # captured argument pointer. When nothing is supplied (legacy CPU
+    # fallback / one-shot calls) we let Julia allocate, matching prior
+    # behaviour.
+    if cis_PD === nothing
+        P .*= cis.(m_row .* α_col)
+        mul!(W, P, conj_V)
+        W .*= cis.(β_col .* λ_row)
+        mul!(P, W, V_T)
+        if imaginary_time
+            P .*= exp.(.-m_shift_row .* θ_col)
+        else
+            P .*= cis.(.-m_row .* θ_col)
+        end
+        mul!(W, P, conj_V)
+        W .*= cis.(.-β_col .* λ_row)
+        mul!(P, W, V_T)
+        P .*= cis.(.-m_row .* α_col)
     else
-        P .*= cis.(.-m_row .* θ_col)          # Step 3: D_z(θ) RTP
+        # Step 1: R_z(-α) via in-place cis scratch
+        @. cis_PD = cis(m_row * α_col)
+        @. P *= cis_PD
+        # Step 2: R_y(-β) via Vt
+        mul!(W, P, conj_V)
+        @. cis_PD = cis(β_col * λ_row)         # reuse same scratch on W (same shape)
+        @. W *= cis_PD
+        mul!(P, W, V_T)
+        # Step 3: D_z(θ)
+        if imaginary_time
+            @. cis_PD = exp(-m_shift_row * θ_col)
+        else
+            @. cis_PD = cis(-m_row * θ_col)
+        end
+        @. P *= cis_PD
+        # Step 4: R_y(β)
+        mul!(W, P, conj_V)
+        @. cis_PD = cis(-β_col * λ_row)
+        @. W *= cis_PD
+        mul!(P, W, V_T)
+        # Step 5: R_z(α)
+        @. cis_PD = cis(-m_row * α_col)
+        @. P *= cis_PD
     end
-    mul!(W, P, conj_V)                        # Step 4: R_y(β)
-    W .*= cis.(.-β_col .* λ_row)
-    mul!(P, W, V_T)
-    P .*= cis.(.-m_row .* α_col)              # Step 5: R_z(α)
     nothing
 end

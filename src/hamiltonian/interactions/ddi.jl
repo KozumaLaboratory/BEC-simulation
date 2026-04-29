@@ -453,6 +453,13 @@ struct _DDIRotationCache
     m_row::Any           # AbstractArray{<:AbstractFloat,2} or nothing
     λ_row::Any           # AbstractArray{<:AbstractFloat,2} or nothing
     m_shift_row::Any     # AbstractArray{<:AbstractFloat,2} or nothing
+    # (N×D) Complex scratch for the per-step fused-Euler `cis(...)`
+    # broadcasts. Lets `apply_euler_5stage_fused!` write the phase
+    # factor in-place instead of allocating a fresh CuArray temporary
+    # each `P .*= cis.(...)` line — required for any future CUDA Graph
+    # capture, and an alloc reduction independently. Sized to match P.
+    # Always allocated (CPU and GPU); CPU path's scalar loop ignores it.
+    cis_PD::Any          # AbstractArray{<:Complex,2}
 end
 
 const _DDI_ROTATION_CACHE = Dict{UInt64, _DDIRotationCache}()
@@ -504,10 +511,11 @@ function _get_ddi_rotation_cache(
         (nothing, nothing, nothing)
     end
 
+    cis_PD = similar(P)   # (N_spatial, D) Complex scratch
     c = _DDIRotationCache(W, conj_V, V_T,
         similar(phi_template), similar(phi_template),
         similar(phi_template), similar(phi_template),
-        m_row, λ_row, m_shift_row)
+        m_row, λ_row, m_shift_row, cis_PD)
     _DDI_ROTATION_CACHE[key] = c
     c
 end
@@ -566,6 +574,7 @@ function _apply_ddi_rotation!(
             rc.m_row, rc.m_shift_row, rc.λ_row,
             V_T, conj_V;
             imaginary_time=imaginary_time,
+            cis_PD=rc.cis_PD,
         )
     else
         # CPU path: column-wise loop avoids large temporary (1,D) broadcast tables.
