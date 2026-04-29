@@ -1112,14 +1112,22 @@ end
     length(ω_vec) == length(n) ||
         throw(ArgumentError("potential.omega length must match grid ndim"))
 
-    V_trap = zeros(Float64, Tuple(n)...)
+    # Float precision for the rotating_basis workspace. Default Float64;
+    # `dtype: f32` (YAML) → Float32 throughout (psi, V_trap, k², FFT plans,
+    # DDI buffers). H100 Tensor Cores benefit ~2× on F32 FFT throughput;
+    # combined with the alloc-stable refactor (commit a03d264 + adf51ef)
+    # this gets close to memory-bandwidth limit.
+    dtype_str = String(get(p, "dtype", "f64"))::String
+    T_float = dtype_str == "f32" ? Float32 : Float64
+
+    V_trap = zeros(T_float, Tuple(n)...)
     @inbounds for I in CartesianIndices(V_trap)
-        V_local = 0.0
+        V_local = T_float(0)
         for d in 1:length(n)
-            x_d = grid.x[d][I[d]]
-            V_local += ω_vec[d]^2 * x_d^2
+            x_d = T_float(grid.x[d][I[d]])
+            V_local += T_float(ω_vec[d])^2 * x_d^2
         end
-        V_trap[I] = 0.5 * V_local
+        V_trap[I] = T_float(0.5) * V_local
     end
 
     # --- Physical-parameter path (recommended) ------------------------------

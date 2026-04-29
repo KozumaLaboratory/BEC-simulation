@@ -44,6 +44,7 @@ const DDI_SCHEMA = Dict{String, FieldSpec}(
 
 const GS_SCHEMA = Dict{String, FieldSpec}(
     "kind" => FieldSpec(; type=String, enum=["spinor", "binary", "rotating_basis", "option_gamma"]),
+    "dtype" => FieldSpec(; type=String, default="f64", enum=["f32", "f64"]),
     "species_A" => FieldSpec(; type=Dict),    # binary path
     "species_B" => FieldSpec(; type=Dict),    # binary path
     "B_hat" => FieldSpec(; type=Dict),        # rotating_basis path
