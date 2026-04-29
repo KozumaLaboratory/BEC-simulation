@@ -87,6 +87,16 @@ scan:                                   # orthogonal to pipeline
 
 **Noise**: both GS (`temperature_ratio`) and phase noise (`dynamics.temperature_ratio`) use Bose-Einstein thermal noise with `T/T_c ∈ (0, 1)`, driving `add_thermal_noise(psi, F; T_over_Tc, seed)`.
 
+**Mixed precision (rotating_basis only)**: set `dtype: f32` in the
+`ground_state` block. Plumbs Float32 through Grid, V_trap, workspace,
+FFT plans, DDI buffers. Eu thesis runs work; first-time JIT for the
+F32 specialisation ~10 min then cached. Caveats: `apply_uniform_spin_rotation!`
++ `apply_ddi_step!` + `apply_spin_mixing_step!` keep their scalar Float64
+locks (rotation builder + DDI dt + c1·dt) — these are scalar-only
+boundaries, the per-voxel array work stays F32. `DDIParams.C_dd` stays
+Float64 by struct definition (mixed: scalar F64, array F32). For the
+full picture see `test/test_rotating_basis_f32.jl`. F64 is the default.
+
 **Per-step dynamics knobs** (compose freely in a `dynamics:` block):
 
 ```yaml
