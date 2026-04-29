@@ -33,12 +33,21 @@ const SlicePanel = lazy(() =>
 const ConfigViewer = lazy(() =>
   import('@/components/ConfigViewer').then((m) => ({ default: m.ConfigViewer })),
 )
+const ScanGroupView = lazy(() => import('@/components/ScanGroupView'))
 
 export default function App() {
   const state = useRunData()
   const [url, setUrl] = useDashboardURL()
   const { data, selectedRun, loading, error, xKey, runFilter, runs } = state
   const [helpOpen, setHelpOpen] = useState(false)
+
+  if (url.scan) {
+    return (
+      <Suspense fallback={<div className="p-10 text-sm text-muted-foreground">Loading scan group…</div>}>
+        <ScanGroupView scanName={url.scan} />
+      </Suspense>
+    )
+  }
 
   return (
     <div className="min-h-screen p-6 max-w-[1400px] mx-auto">

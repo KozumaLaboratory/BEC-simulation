@@ -19,6 +19,7 @@ export function useDashboardURL() {
       tab: parseAsStringLiteral(TABS).withDefault('overview'),
       comp: parseAsInteger.withDefault(0),
       snap: parseAsInteger,
+      scan: parseAsString,
     },
     { history: 'replace', shallow: true },
   )

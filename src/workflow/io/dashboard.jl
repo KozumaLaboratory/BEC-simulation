@@ -757,6 +757,129 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         end
         (200, "application/json", json)
 
+    elseif startswith(path, "/api/scan_group/")
+        # /api/scan_group/<scan_dir_name> → aggregated cross-run summary
+        # for all points declared in `runs/<scan_dir>/scan.yaml`. Backed
+        # by the per-run `/api/physics_summary` data, but loaded once
+        # per scan rather than per point.
+        rest = _uri_decode(path[17:end])
+        qidx = findfirst('?', rest)
+        qidx !== nothing && (rest = rest[1:(qidx - 1)])
+        scan_dir = joinpath(base_dir, rest)
+        if !isdir(scan_dir)
+            return (404, "text/plain", "scan_dir not found: $rest")
+        end
+        scan_yaml_path = joinpath(scan_dir, "scan.yaml")
+        if !isfile(scan_yaml_path)
+            return (
+                404, "text/plain",
+                "scan.yaml not found in $rest — run scripts/scan_retrofit.jl first",
+            )
+        end
+        json = try
+            scan = YAML.load_file(scan_yaml_path)
+            param = scan["parameter"]
+            values = param["values"]
+            display_factor = Float64(get(param, "display_factor", 1.0))
+
+            point_pattern = get(scan, "point_dir_pattern",
+                "$(scan["name"])_p\${idx}")
+
+            # Resolve point dir per value (mirror scan_expand naming).
+            function _point_name(value, idx)
+                s = point_pattern
+                s = replace(s, "\${idx}" => string(idx))
+                val_str = replace(string(value), "." => "_")
+                s = replace(s, "\${value}" => val_str)
+                s
+            end
+
+            runs_data = []
+            for (idx, value) in enumerate(values)
+                pt_name = _point_name(value, idx)
+                pt_dir = joinpath(scan_dir, pt_name)
+                # Look for canonical result.jld2 first, then legacy result_legacy.jld2.
+                jld_path = isfile(joinpath(pt_dir, "result.jld2")) ?
+                           joinpath(pt_dir, "result.jld2") :
+                           joinpath(pt_dir, "result_legacy.jld2")
+                run_summary = Dict{String, Any}(
+                    "value" => value,
+                    "value_display" => value * display_factor,
+                    "point_dir" => pt_name,
+                    "completed" => isfile(jld_path),
+                )
+                if isfile(jld_path)
+                    try
+                        d = JLD2.load(jld_path)
+                        # Same fields as /api/physics_summary, abbreviated.
+                        for sym in ("Lz", "Fz")
+                            v = if haskey(d, "dynamics/$sym")
+                                Float64.(d["dynamics/$sym"])
+                            elseif haskey(d, sym)
+                                Float64.(d[sym])
+                            else
+                                Float64[]
+                            end
+                            if !isempty(v)
+                                run_summary[sym * "_min"] = minimum(v)
+                                run_summary[sym * "_max"] = maximum(v)
+                                run_summary[sym * "_init"] = v[1]
+                                run_summary[sym * "_final"] = v[end]
+                            end
+                        end
+                        pm = if haskey(d, "dynamics/per_m_history")
+                            d["dynamics/per_m_history"]
+                        elseif haskey(d, "per_m_history")
+                            d["per_m_history"]
+                        else
+                            nothing
+                        end
+                        if pm !== nothing
+                            T = size(pm, 2)
+                            col1 = sum(view(pm, :, 1))
+                            colT = sum(view(pm, :, T))
+                            run_summary["m_top_init"] = pm[1, 1] / max(col1, 1e-30)
+                            run_summary["m_top_final"] = pm[1, T] / max(colT, 1e-30)
+                        end
+                        nv = if haskey(d, "dynamics/norms")
+                            Float64.(d["dynamics/norms"])
+                        elseif haskey(d, "norms")
+                            Float64.(d["norms"])
+                        else
+                            Float64[]
+                        end
+                        if !isempty(nv)
+                            run_summary["norm_max_dev"] = maximum(abs.(nv .- 1.0))
+                        end
+                        if haskey(d, "dynamics/integrator_meta/larmor_phase_per_step")
+                            run_summary["larmor_phase_per_step"] =
+                                d["dynamics/integrator_meta/larmor_phase_per_step"]
+                        end
+                    catch e
+                        run_summary["error"] = string(e)
+                    end
+                end
+                push!(runs_data, run_summary)
+            end
+
+            out = Dict{String, Any}(
+                "name" => scan["name"],
+                "description" => get(scan, "description", ""),
+                "parameter" => Dict{String, Any}(
+                    "key" => param["key"],
+                    "values" => values,
+                    "unit" => get(param, "unit", ""),
+                    "display_unit" => get(param, "display_unit", ""),
+                    "display_factor" => display_factor,
+                ),
+                "runs" => runs_data,
+            )
+            _json_string(out)
+        catch e
+            "{\"error\":\"$(replace(string(e), "\"" => "'"))\"}"
+        end
+        (200, "application/json", json)
+
     elseif startswith(path, "/api/physics_summary/")
         # /api/physics_summary/:run/:file → integrator metadata + Larmor regime
         # classification + Lz/Fz/m=+F summary. Designed so a frontend physics

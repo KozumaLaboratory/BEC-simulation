@@ -1,0 +1,16 @@
+name: "berry_crossover_scan"
+parameter:
+  key: "p"
+  values:
+    - 1000.0
+    - 100.0
+    - 10.0
+    - 3000.0
+    - 300.0
+    - 30.0
+  yaml_path: "pipeline.0.ground_state.zeeman.p"
+template: "eu151_p1000_0_500ms/config.yaml"
+extra_overrides: {}
+point_dir_pattern: "eu151_p${value}_500ms"
+description: "Retrofit by scan_retrofit.jl on 2026-04-29"
+override_path: "pipeline.0.ground_state.zeeman.p"
