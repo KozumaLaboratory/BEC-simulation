@@ -147,8 +147,14 @@ EOF
     return 0
   fi
 
-  # Did claude produce any tree changes?
-  if [ -z "$(git status --porcelain)" ]; then
+  # Snapshot exactly which paths claude touched, before the bench
+  # harness rewrites bench/results.json. We will commit only these
+  # paths plus the wrapper-controlled bookkeeping files (perf_targets,
+  # baseline) — never `git add -A`, which previously swept untracked
+  # archive/, runs/, and figs/ into auto-perf commits.
+  local claude_changes
+  claude_changes="$(git status --porcelain | awk '{print $2}')"
+  if [ -z "$claude_changes" ]; then
     echo "[ralph_perf] no edits applied; treating as bail"
     mark_target "$target_kernel" "skipped(no-edit)"
     return 0
@@ -202,7 +208,16 @@ EOF
   echo "[ralph_perf] $verdict"
   case "$verdict" in
     ACCEPT*)
-      git add -A
+      # Stage exactly the files claude edited + the wrapper bookkeeping
+      # (perf_targets gets the # done line, baseline.json ratchets fwd).
+      # Skip bench/results.json — gitignored, regenerated each iter.
+      mark_target "$target_kernel" "done"
+      cp "$LATEST" "$BASELINE"
+      for f in $claude_changes; do
+        [ "$f" = "bench/results.json" ] && continue
+        git add -- "$f"
+      done
+      git add -- bench/perf_targets.txt bench/baseline.json
       git commit -m "perf($target_kernel): auto-perf-ralph
 
 $target_hint
@@ -210,11 +225,16 @@ $target_hint
 Bench: $target_bench (auto-accept by ralph_perf.sh)
 
 Assisted-by: Claude (model: claude-opus-4-7) [perf-ralph]"
-      mark_target "$target_kernel" "done"
-      cp "$LATEST" "$BASELINE"   # ratchet baseline forward
       ;;
     REJECT*)
-      git checkout -- .
+      # Revert tracked changes (claude edits). Untracked new files
+      # claude may have created are left in place for human review;
+      # they are NOT swept into the next iteration's commit because
+      # ACCEPT only stages files in $claude_changes captured before
+      # the bench harness ran.
+      for f in $claude_changes; do
+        git checkout -- "$f" 2>/dev/null || rm -f "$f"
+      done
       mark_target "$target_kernel" "skipped(${verdict#REJECT })"
       ;;
   esac

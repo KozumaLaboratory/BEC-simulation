@@ -50,6 +50,33 @@ let
     end
 end
 
+# 4. spin_mixing inner loop on Eu151 (D=13). Hot kernel called each
+# split-step substep when c1 ≠ 0. Documented `_get_spinor` 352 B/call
+# alloc lives here — measuring it directly tightens the alloc loop.
+let
+    sm = spin_matrices(6)            # F=6 → D=13
+    psi = randn(ComplexF64, 16, 16, 8, 13) ./ 100
+    c1 = 0.028
+    dt = 0.005
+    n_pts = (16, 16, 8)
+    SUITE["kernel/spin_mixing_eu151_16x16x8"] = @benchmarkable begin
+        SpinorBEC._spin_mixing_loop!($psi, $sm, $c1, $dt,
+            Val(13), $n_pts, false)
+    end
+end
+
+# 5. apply_uniform_spin_rotation! on Eu151 (D=13). GPU-safe matmul
+# rebuilds R::Matrix per call from (phi_x, phi_y, phi_z) — host scalar
+# work + broadcast, used heavily by rotating-basis Klaus runs.
+let
+    sm = spin_matrices(6)
+    psi = randn(ComplexF64, 16, 16, 8, 13) ./ 100
+    SUITE["kernel/uniform_spin_rotation_eu151_16x16x8"] = @benchmarkable begin
+        SpinorBEC.apply_uniform_spin_rotation!($psi, $sm,
+            0.1, 0.05, 0.0, 0.005, 3)
+    end
+end
+
 # Tune + run
 println("Tuning…"); tune!(SUITE)
 println("Running…"); results = run(SUITE; verbose = false, samples = 10, evals = 1)
