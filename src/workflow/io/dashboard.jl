@@ -1043,6 +1043,34 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
                             local_max > gmax && (gmax = local_max)
                         end
                         gmax > 0 ? gmax : 1.0
+                    elseif haskey(f, "psi_snapshots")
+                        # Top-level Vector{Array{Complex,4}} layout (saved by
+                        # legacy launch_*.jl direct jldsave). Each element is
+                        # an N+1-D array (spatial..., D); sample up to 16.
+                        snaps = f["psi_snapshots"]
+                        nframes = length(snaps)
+                        nframes == 0 && return 1.0
+                        sample_idxs = if nframes ≤ 16
+                            (1:nframes)
+                        else
+                            Int.(round.(range(1, nframes; length=16)))
+                        end
+                        gmax = 0.0
+                        for k in sample_idxs
+                            ψk = snaps[k]
+                            local_max = 0.0
+                            spatial_dims = ndims(ψk) - 1
+                            for I in CartesianIndices(ntuple(d -> size(ψk, d),
+                                spatial_dims))
+                                rho = 0.0
+                                for c in 1:size(ψk, ndims(ψk))
+                                    rho += abs2(ψk[I, c])
+                                end
+                                rho > local_max && (local_max = rho)
+                            end
+                            local_max > gmax && (gmax = local_max)
+                        end
+                        gmax > 0 ? gmax : 1.0
                     else
                         1.0
                     end
@@ -2505,6 +2533,14 @@ function _load_psi_cached(
                         ndims(snaps),
                     )
                     Array(view(snaps, idx...))
+                elseif haskey(f, "psi_snapshots")
+                    # Top-level Vector{Array{Complex,N+1}} layout (legacy
+                    # launch_thesis_run.jl / launch_phi_omega_run.jl prior
+                    # to 2026-04-28 unification — kept for back-compat).
+                    snaps = f["psi_snapshots"]
+                    n = length(snaps)
+                    k = clamp(snap_idx, 1, n)
+                    snaps[k]
                 else
                     throw(
                         ArgumentError(

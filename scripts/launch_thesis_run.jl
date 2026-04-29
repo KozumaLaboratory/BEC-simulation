@@ -1,12 +1,12 @@
-# Per-run launcher for the thesis batch. Mirrors /tmp/launch_klaus_run.jl but
-# resolves config under runs/thesis_batch/<name>/config.yaml.
+# Per-run launcher for the thesis batch. Writes the canonical
+# dashboard-compatible JLD2 layout via `save_rotating_basis_result!` so
+# results show up in `serve_dashboard` without a separate repack step.
 using CUDA
 using SpinorBEC
-using JLD2
 
 run_name = ARGS[1]
 config_path = "runs/thesis_batch/$run_name/config.yaml"
-out_path = "runs/thesis_batch/$run_name/result_legacy.jld2"
+run_dir = "runs/thesis_batch/$run_name"
 
 config = SpinorBEC.load_config(config_path)
 @time result = SpinorBEC.run_config(config; verbose=true)
@@ -35,18 +35,10 @@ println(
     "]",
 )
 println("  m=+F: ", round(pm_init[1]; digits=6), " -> ", round(pm_final[1]; digits=6))
-
-snapshots = get(dyn, :psi_snapshots, [])
-JLD2.jldsave(
-    out_path;
-    times=dyn[:times],
-    norms=dyn[:norms],
-    Lz=dyn[:Lz],
-    Fz=dyn[:Fz],
-    per_m_history=hcat(dyn[:per_m_history]...),
-    psi_snapshots=Vector{Array{ComplexF64, 4}}([Array(s) for s in snapshots]),
-    theta_const=get(dyn, :theta_const, nothing),
-    phi_omega=get(dyn, :phi_omega, nothing),
-    n_phases=n_phases,
+println(
+    "  Larmor phase per step: ",
+    round(get(dyn, :larmor_phase_per_step, NaN); sigdigits=4),
 )
-println("Saved -> $out_path")
+
+out_path = save_rotating_basis_result!(run_dir, result)
+println("Saved (dashboard-canonical) -> $out_path")

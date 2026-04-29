@@ -86,6 +86,7 @@ include("workflow/initialization/vacuum_noise.jl")
 # 8. I/O
 include("workflow/io/io.jl")
 include("workflow/io/unitful_support.jl")
+include("workflow/io/save_rotating_result.jl")
 include("workflow/io/dashboard.jl")
 include("workflow/io/vtk_export.jl")
 include("workflow/io/run_summary.jl")
@@ -379,6 +380,7 @@ export SimulationCallbacks, LiveMonitor
 
 # I/O
 export save_state, load_state, generate_dashboard_data, export_dashboard, serve_dashboard
+export save_rotating_basis_result!
 export estimate_run_budget
 export export_vtk, export_vtk_series
 
