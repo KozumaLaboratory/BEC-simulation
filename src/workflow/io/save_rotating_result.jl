@@ -101,10 +101,13 @@ Dict produced by `run_config`. The legacy
 via the legacy fallback, but new code should write canonical here.
 """
 function save_rotating_basis_result!(
-    run_dir::String, result::AbstractDict;
+    run_dir::String, result;
     snapshot_precision::Symbol=:f32,
     compress::Bool=true,
 )
+    # Accepts either AbstractDict (e.g. `run_pipeline`'s internal results
+    # dict) or NamedTuple (`run_config(...)` return value). Both expose
+    # `haskey` and `getindex`, so we don't constrain the type.
     haskey(result, :rotating_basis_dynamics) || throw(
         ArgumentError(
             "save_rotating_basis_result!: result has no :rotating_basis_dynamics key " *
@@ -115,7 +118,9 @@ function save_rotating_basis_result!(
     # `:rotating_basis_history` is populated by `_step_dispatch!` for every
     # `RotatingBasisDynamicsStep`. Falls back to the single phase in
     # `:rotating_basis_dynamics` for older code paths or one-phase pipelines.
-    history = get(result, :rotating_basis_history, [result[:rotating_basis_dynamics]])
+    history = haskey(result, :rotating_basis_history) ?
+              result[:rotating_basis_history] :
+              [result[:rotating_basis_dynamics]]
     isempty(history) && throw(
         ArgumentError(
             "save_rotating_basis_result!: no rotating_basis dynamics phases in result"),
