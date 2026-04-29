@@ -8,6 +8,7 @@
 using BenchmarkTools
 using SpinorBEC
 using JSON
+using Printf
 
 const SUITE = BenchmarkGroup()
 
@@ -23,7 +24,7 @@ let
         sim_params = sp,
     )
     SUITE["split_step/eu151_16cubed"] =
-        @benchmarkable SpinorBEC.split_step!($ws, 0.005)
+        @benchmarkable SpinorBEC.split_step!($ws)
 end
 
 # 2. find_ground_state on a tiny grid
@@ -55,7 +56,7 @@ println("Running…"); results = run(SUITE; verbose = false, samples = 10, evals
 
 # Save median time / allocations
 out = Dict{String,Any}()
-for (name, t) in leaves(results)
+for (name, t) in BenchmarkTools.leaves(results)
     m = median(t)
     out[join(name, "/")] = Dict(
         "time_ns" => time(m),

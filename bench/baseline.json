@@ -1,0 +1,17 @@
+{
+  "find_ground_state/rb87_16sq": {
+    "allocs": 11727,
+    "time_ns": 1.6619165e6,
+    "memory_bytes": 1432160
+  },
+  "analyze/tomography_16x16x8": {
+    "allocs": 5539944,
+    "time_ns": 6.9352194e7,
+    "memory_bytes": 182980224
+  },
+  "split_step/eu151_16cubed": {
+    "allocs": 221,
+    "time_ns": 1.7504145e6,
+    "memory_bytes": 140304
+  }
+}

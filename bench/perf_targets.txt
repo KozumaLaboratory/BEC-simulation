@@ -1,0 +1,21 @@
+# Perf Ralph hot-kernel queue
+# Format: <kernel_name>  <bench_key>  <hint>
+# bench_key MUST match a key in bench/bench_regression.jl (or extend that
+# file before adding a target).
+# Topmost unmarked entry is picked next. Mark progress with `# done <date>`
+# or `# skipped <reason> <date>` lines appended below.
+#
+# === Currently runnable (bench_regression.jl keys) ===
+
+_run_analyzer/tomography  analyze/tomography_16x16x8  5.5M allocs, 69 ms — biggest single allocator. Try @views on psi slabs, hoist Wigner-d cache outside loop.
+split_step!  split_step/eu151_16cubed  1.75 ms / 221 alloc on Eu151 16³. Already low-alloc; try fusing diag+spin_mixing kernels or pre-computing exp(iα) tables.
+find_ground_state  find_ground_state/rb87_16sq  1.66 ms / 11.7K allocs on Rb87 16² × 50 ITP steps. Allocs likely come from per-step normalisation; try in-place renorm.
+
+# === Wishlist (require bench_regression.jl extension) ===
+# Add a corresponding @benchmarkable to bench_regression.jl, re-baseline,
+# then move the target above the separator.
+#
+# apply_ddi_step!         bench/ddi_eu151_24cubed   GPU broadcast → CUBLAS gemm for spin part
+# _get_spinor             bench/get_spinor_d13      CLAUDE.md: 352 B/call alloc, D=13 known issue
+# _spin_mixing_loop!      bench/spin_mixing_d13     SMatrix vs MMatrix tradeoff at D=13
+# rotating_norm           bench/rotating_norm       reduction with abs2; check fusion
