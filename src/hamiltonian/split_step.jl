@@ -595,12 +595,7 @@ end
 
 function _normalize_psi!(psi, grid, n_components, ndim)
     dV = cell_volume(grid)
-    norm_sq = 0.0
-    n_pts = ntuple(d -> size(psi, d), ndim)
-    for c in 1:n_components
-        idx = _component_slice(ndim, n_pts, c)
-        norm_sq += sum(abs2, view(psi, idx...)) * dV
-    end
+    norm_sq = sum(abs2, psi) * dV
     psi ./= sqrt(norm_sq)
     nothing
 end
