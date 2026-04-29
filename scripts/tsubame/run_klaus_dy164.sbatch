@@ -52,5 +52,6 @@ println(\"dt_used: \", get(dyn, :dt_used, NaN))
 println(\"epsilon_target: \", get(dyn, :epsilon_target, NaN))
 "
 
-# --- Snapshot / dashboard repack — optional, run separately:
-# julia --project=. scripts/dashboard_repack_rotating_basis.jl runs/${RUN_NAME}
+# --- Dashboard format is auto-saved by run_pipeline (since 2026-04-29); no
+# --- separate repack step required. The result.jld2 + point_001.jld2 symlink
+# --- lands on disk automatically when checkpoint_dir is set.
