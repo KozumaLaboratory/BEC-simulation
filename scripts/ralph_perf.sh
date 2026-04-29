@@ -54,8 +54,16 @@ next_target() {
 mark_target() {
   local target="$1"; local marker="$2"
   local stamp="$(date -u +%Y-%m-%d)"
-  # Append marker as a comment line so future runs see it as already-handled.
-  echo "# $marker $stamp: $target" >> "$QUEUE"
+  # Comment out the first matching uncommented line so future iterations
+  # skip it. Append-only would leave the original target line active.
+  awk -v target="$target" -v marker="$marker" -v stamp="$stamp" '
+    !done && $1 == target {
+      print "# " marker " " stamp ": " $0
+      done = 1
+      next
+    }
+    { print }
+  ' "$QUEUE" > "$QUEUE.tmp" && mv "$QUEUE.tmp" "$QUEUE"
 }
 
 iterate() {
@@ -156,37 +164,39 @@ EOF
 
   # Compare bench/results.json (latest) against bench/baseline.json.
   # Accept iff target_bench improved ≥5% AND no other bench regressed >5%.
+  # Wrapped in a function — Julia's soft scope eats `target_improved`
+  # assignments inside top-level for-loops, returning false always.
   local verdict
   verdict="$($JULIA --project=. -e "
     using JSON
-    base = JSON.parsefile(\"$BASELINE\")
-    new  = JSON.parsefile(\"$LATEST\")
-    target = \"$target_bench\"
-    target_improved = false
-    any_regressed = false
-    regressions = String[]
-    for (k, v) in new
-        haskey(base, k) || continue
-        old_t = base[k][\"time_ns\"]
-        new_t = v[\"time_ns\"]
-        ratio = new_t / old_t
-        if k == target && ratio < 0.95
-            target_improved = true
+    function evaluate(base_path, new_path, target)
+        base = JSON.parsefile(base_path)
+        new  = JSON.parsefile(new_path)
+        target_improved = false
+        any_regressed = false
+        regressions = String[]
+        for (k, v) in new
+            haskey(base, k) || continue
+            old_t = base[k][\"time_ns\"]
+            new_t = v[\"time_ns\"]
+            ratio = new_t / old_t
+            if k == target && ratio < 0.95
+                target_improved = true
+            end
+            if ratio > 1.05
+                any_regressed = true
+                push!(regressions, string(k, \" +\", round((ratio-1)*100; digits=1), \"%\"))
+            end
         end
-        if ratio > 1.05
-            any_regressed = true
-            push!(regressions, \"\$k +\$(round((ratio-1)*100; digits=1))%\")
-        end
-    end
-    if target_improved && !any_regressed
-        println(\"ACCEPT\")
-    else
-        if !target_improved
-            println(\"REJECT no-target-improve\")
+        if target_improved && !any_regressed
+            return \"ACCEPT\"
+        elseif !target_improved
+            return \"REJECT no-target-improve\"
         else
-            println(\"REJECT regressions: \" * join(regressions, \", \"))
+            return \"REJECT regressions: \" * join(regressions, \", \")
         end
     end
+    println(evaluate(\"$BASELINE\", \"$LATEST\", \"$target_bench\"))
   ")"
 
   echo "[ralph_perf] $verdict"
