@@ -210,7 +210,13 @@ function make_rotating_basis_ws(
         k_sq_rk[I] = k2
     end
     _build_q_tensor!(Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz, kx_r, ky, kz, k_sq_rk, rk_shape)
-    ddi_params_cpu = DDIParams(T(c_dd), Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz)
+    # DDIParams.C_dd is a Float64 scalar by struct definition (across both F32
+    # and F64 workspaces); the Q_αβ field arrays carry the precision. Q_αβ × C_dd
+    # broadcasts will promote intermediates to Float64 but final result is the
+    # same precision as the larger array — for F32 Q this is a small ~5%
+    # extra fp64 work on the ddi convolution multiplier; not enough to worry
+    # about until we move to a fully T-parametric DDIParams.
+    ddi_params_cpu = DDIParams(Float64(c_dd), Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz)
     ddi_params = _ddi_params_to_device(ddi_params_cpu, backend)
     ddi_bufs = make_ddi_buffers(n_pts, backend; dtype=T)
 
@@ -247,14 +253,20 @@ function _apply_UB!(
     psi::AbstractArray{<:Complex}, sm::SpinMatrices{D}, theta::T, phi::T, ndim::Int;
     inverse::Bool=false, scratch=nothing,
 ) where {T, D}
+    # apply_uniform_spin_rotation! takes Float64 angles for performance
+    # (avoids F32 specialization of its inner D×D rotation matrix builder).
+    # The conversion here is per-call scalar work — no array involvement —
+    # so F32 workspaces stay F32 in the per-voxel matmul.
+    θ = Float64(theta)
+    φ = Float64(phi)
     if !inverse
         # ψ_lab = exp(-iφ F_z) exp(-iθ F_y) ψ̃
-        apply_uniform_spin_rotation!(psi, sm, 0.0, theta, 0.0, 1.0, ndim; scratch)
-        apply_uniform_spin_rotation!(psi, sm, 0.0, 0.0, phi, 1.0, ndim; scratch)
+        apply_uniform_spin_rotation!(psi, sm, 0.0, θ, 0.0, 1.0, ndim; scratch)
+        apply_uniform_spin_rotation!(psi, sm, 0.0, 0.0, φ, 1.0, ndim; scratch)
     else
         # ψ̃ = exp(+iθ F_y) exp(+iφ F_z) ψ_lab — same calls with negated angles in reverse order
-        apply_uniform_spin_rotation!(psi, sm, 0.0, 0.0, -phi, 1.0, ndim; scratch)
-        apply_uniform_spin_rotation!(psi, sm, 0.0, -theta, 0.0, 1.0, ndim; scratch)
+        apply_uniform_spin_rotation!(psi, sm, 0.0, 0.0, -φ, 1.0, ndim; scratch)
+        apply_uniform_spin_rotation!(psi, sm, 0.0, -θ, 0.0, 1.0, ndim; scratch)
     end
     nothing
 end
@@ -426,10 +438,12 @@ function apply_ddi_step_rotating!(
     _apply_UB!(ws.psi_lab_buf, ws.spin_matrices, theta, phi, N;
         inverse=false, scratch=ws.rotation_scratch)
 
-    # Apply DDI on ψ_lab using existing infrastructure
+    # Apply DDI on ψ_lab using existing infrastructure. apply_ddi_step!
+    # locks dt to Float64 (built around the legacy spinor solver path);
+    # convert at the boundary so F32 workspaces interop.
     apply_ddi_step!(
         ws.psi_lab_buf, ws.spin_matrices, ws.ddi_params,
-        ws.ddi_bufs, dt, N; imaginary_time,
+        ws.ddi_bufs, Float64(dt), N; imaginary_time,
     )
 
     # ψ_lab → ψ̃

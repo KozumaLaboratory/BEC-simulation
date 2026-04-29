@@ -1101,7 +1101,14 @@ end
     grid_node = p["grid"]::Dict
     n = Int.(grid_node["n"])
     box = Float64.(grid_node["box"])
-    grid = make_grid(GridConfig(Tuple(n), Tuple(box)))
+
+    # Float precision: see V_trap allocation below for context. Grid must
+    # match V_trap precision so make_rotating_basis_ws's `T` parameter is
+    # consistent across all inputs.
+    dtype_str = String(get(p, "dtype", "f64"))::String
+    T_float = dtype_str == "f32" ? Float32 : Float64
+
+    grid = make_grid(GridConfig(Tuple(n), Tuple(box)); dtype=T_float)
 
     pot_node = p["potential"]::Dict
     get(pot_node, "type", "harmonic") == "harmonic" || throw(
@@ -1112,14 +1119,8 @@ end
     length(ω_vec) == length(n) ||
         throw(ArgumentError("potential.omega length must match grid ndim"))
 
-    # Float precision for the rotating_basis workspace. Default Float64;
-    # `dtype: f32` (YAML) → Float32 throughout (psi, V_trap, k², FFT plans,
-    # DDI buffers). H100 Tensor Cores benefit ~2× on F32 FFT throughput;
-    # combined with the alloc-stable refactor (commit a03d264 + adf51ef)
-    # this gets close to memory-bandwidth limit.
-    dtype_str = String(get(p, "dtype", "f64"))::String
-    T_float = dtype_str == "f32" ? Float32 : Float64
-
+    # T_float was resolved earlier (must match grid precision). Allocate
+    # V_trap at the same precision.
     V_trap = zeros(T_float, Tuple(n)...)
     @inbounds for I in CartesianIndices(V_trap)
         V_local = T_float(0)
@@ -1263,7 +1264,7 @@ end
             " p=", p_z, " ε_dd_eff=", round(c_dd * F_atom^2 / (3 * c0); digits=3))
     end
 
-    μ_final = find_ground_state_rotating!(ws, n_steps, dt_itp)
+    μ_final = find_ground_state_rotating!(ws, n_steps, T_float(dt_itp))
 
     placeholder_atom = AtomSpecies("RotatingBasis", 1.66e-25, F_atom, 0.0, 0.0, 0.0)
     # IMPORTANT: keep RotatingBasisWS OUT of the return tuple. The 23-type-param
@@ -1280,7 +1281,11 @@ end
         :rotating_basis_mu => μ_final,
         :rotating_basis_per_m => rotating_per_m_norms(ws),
     )
-    psi_concrete = ws.psi_tilde::AbstractArray{ComplexF64, 4}
+    # Type assertion: pin to a concrete 4D Complex array (either F32 or F64
+    # eltype). Earlier this hard-asserted ComplexF64 to keep downstream
+    # inference narrow, but that broke the F32 path. The Complex Union
+    # still constrains inference enough to avoid abstract dispatch.
+    psi_concrete = ws.psi_tilde::AbstractArray{<:Complex, 4}
     return (psi_concrete, grid, placeholder_atom, nothing, step_result)
 end
 
@@ -1517,8 +1522,8 @@ end
         :rotating_basis_dynamics => dyn_dict,
     )
     # See note in _run_rotating_basis_ground_state_step: ws stashed in Dict only,
-    # psi_tilde concrete-typed.
-    psi_concrete = ws.psi_tilde::AbstractArray{ComplexF64, 4}
+    # psi_tilde concrete-typed (Complex eltype, supports both F32 and F64).
+    psi_concrete = ws.psi_tilde::AbstractArray{<:Complex, 4}
     return (psi_concrete, grid, placeholder_atom, nothing, step_result)
 end
 
