@@ -1,0 +1,65 @@
+pipeline:
+  - ground_state:
+      dt: 0.005
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 2.6
+        type: "harmonic"
+      backend: "cuda"
+      gauge_fix: false
+      omega_ref: 314.159
+      N_atoms: 60000
+      grid:
+        box:
+          - 20.0
+          - 20.0
+          - 10.0
+        n:
+          - 24
+          - 24
+          - 12
+      zeeman:
+        q: 0.0
+        p: 300.0
+      kind: "rotating_basis"
+      init_m_idx: 1
+      B_hat:
+        theta: 0.0
+        phi: 0.0
+      interactions:
+        c1: 0.0
+      init_sigma: 1.5
+      n_steps: 250
+  - dynamics:
+      duration: 6.28
+      kind: "rotating_basis"
+      save_every: 30
+      epsilon: 1.0e-6
+      B_hat:
+        theta_ramp:
+          duration: 6.28
+          to: 0.611
+          from: 0.0
+        phi_omega: 0.0
+  - dynamics:
+      duration: 15.7
+      kind: "rotating_basis"
+      save_every: 30
+      epsilon: 1.0e-6
+      B_hat:
+        theta_const: 0.611
+        phi_chirp:
+          duration: 15.7
+          to: 4.524
+          from: 0.0
+  - dynamics:
+      duration: 157.0
+      kind: "rotating_basis"
+      save_every: 50
+      epsilon: 1.0e-6
+      B_hat:
+        theta_const: 0.611
+        phi_omega: 4.524

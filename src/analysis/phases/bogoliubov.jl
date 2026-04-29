@@ -202,11 +202,22 @@ function bogoliubov_instability_scan(;
     growth_rates = zeros(Float64, n_k, n_dir)
     k_values = collect(range(0, k_max; length=n_k))
 
-    global_max = 0.0
-    best_k = 0.0
-    best_dir = dirs[1]
+    # Per-direction BdG diagonalisation is embarrassingly parallel: each
+    # direction builds its own h_ddi/M_ddi (when DDI is on) and runs an
+    # independent _bdg_k_scan that allocates its own (omega, k_values)
+    # buffers. Across n_dir × n_k = O(20000) eigvals(26×26) calls for
+    # F=6 dense scans this is the bottleneck (round-3 review item 2.4).
+    # Use `:static` so threadid() ∈ 1:nthreads() (default :dynamic can
+    # produce threadid() up to maxthreadid() in 1.10+, breaking per-thread
+    # buffer arrays sized by nthreads()).
+    n_thr = Threads.maxthreadid()
+    per_thr_max = zeros(Float64, n_thr)
+    per_thr_k = zeros(Float64, n_thr)
+    per_thr_dir = [dirs[1] for _ in 1:n_thr]
 
-    for (id, dir) in enumerate(dirs)
+    Threads.@threads :static for id in 1:n_dir
+        tid = Threads.threadid()
+        dir = dirs[id]
         if has_ddi
             k_hat = collect(dir)
             k_norm = norm(k_hat)
@@ -229,11 +240,23 @@ function bogoliubov_instability_scan(;
                 g > max_g && (max_g = g)
             end
             growth_rates[ik, id] = max_g
-            if max_g > global_max
-                global_max = max_g
-                best_k = k_values[ik]
-                best_dir = dir
+            if max_g > per_thr_max[tid]
+                per_thr_max[tid] = max_g
+                per_thr_k[tid] = k_values[ik]
+                per_thr_dir[tid] = dir
             end
+        end
+    end
+
+    # Reduce per-thread maxima into the global best.
+    global_max = 0.0
+    best_k = 0.0
+    best_dir = dirs[1]
+    @inbounds for t in 1:n_thr
+        if per_thr_max[t] > global_max
+            global_max = per_thr_max[t]
+            best_k = per_thr_k[t]
+            best_dir = per_thr_dir[t]
         end
     end
 
