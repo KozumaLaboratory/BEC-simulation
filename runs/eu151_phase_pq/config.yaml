@@ -1,0 +1,51 @@
+# ================================================================
+# Eu151 2D phase map:  linear Zeeman (p)  ×  quadratic Zeeman (q)
+# ================================================================
+#
+# Physical parameters:
+#   N=50000, omega_ref=691.15 Hz → c_total≈4687, c_dd≈211
+#   c1_ratio=0.028 (Buchachenko et al. antiferromagnetic estimate)
+#   c0≈2334, c1≈65.4
+#   Trap: (1, 1, 1.1818) → pancake along z
+#
+# Axes:
+#   p = linear Zeeman = g_F μ_B B / (ℏω). p=100 ↔ B≈7 mG.
+#   q = quadratic Zeeman. q>0 favors m=0 (nematic), q<0 favors |m|=F.
+#   Transition scale: q_c ~ c1 × n_peak ~ 0.3 (rough).
+#
+# Grid: 32³, box=16 (each side ±8 a_ho)
+# Solver: ITP 10000 steps (dt=0.005) → LBFGS 300 steps
+# ================================================================
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      method: itp
+      grid: {n: [32, 32, 32], box: [16.0, 16.0, 16.0]}
+      interactions:
+        N_atoms: 50000
+        omega_ref: 691.15
+        c1_ratio: 0.028
+      ddi: {enabled: true}
+      zeeman: {p: 0.0, q: 0.0}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.1818]}
+      dt: 0.005
+      n_steps: 10000
+      tol: 1.0e-7
+      initial_state: polar
+
+  - ground_state:
+      method: lbfgs
+      n_steps: 300
+      tol: 1.0e-8
+
+  - analyze:
+      - phase_classify: {}
+
+scan:
+  product:
+    pipeline.0.zeeman.p:
+      [0.0, 0.5, 2.0, 10.0, 100.0]
+    pipeline.0.zeeman.q:
+      [-2.0, -0.5, 0.0, 0.5, 2.0]
+  continuation: false

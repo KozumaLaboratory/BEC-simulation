@@ -8,7 +8,7 @@
 # === Currently runnable (bench_regression.jl keys) ===
 
 _run_analyzer/tomography  analyze/tomography_16x16x8  5.5M allocs, 69 ms — biggest single allocator. Try @views on psi slabs, hoist Wigner-d cache outside loop.
-split_step!  split_step/eu151_16cubed  1.75 ms / 221 alloc on Eu151 16³. Already low-alloc; try fusing diag+spin_mixing kernels or pre-computing exp(iα) tables.
+# skipped(no-target-improve) 2026-04-29: split_step!  split_step/eu151_16cubed  1.75 ms / 221 alloc on Eu151 16³. Already low-alloc; try fusing diag+spin_mixing kernels or pre-computing exp(iα) tables.
 find_ground_state  find_ground_state/rb87_16sq  1.66 ms / 11.7K allocs on Rb87 16² × 50 ITP steps. Allocs likely come from per-step normalisation; try in-place renorm.
 
 # === Wishlist (require bench_regression.jl extension) ===

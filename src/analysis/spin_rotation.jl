@@ -34,21 +34,14 @@ function rotate_quantization_axis(
     theta_y::Float64,
     theta_z::Float64=0.0,
 )
-    ndim = ndims(psi) - 1
     D = 2F + 1
-    n_pts = ntuple(d -> size(psi, d), ndim)
     U = spin_rotation_matrix(F, theta_x, theta_y, theta_z)
+    M = div(length(psi), D)
 
     psi_rot = similar(psi)
-    @inbounds for I in CartesianIndices(n_pts)
-        for c in 1:D
-            s = zero(ComplexF64)
-            for c2 in 1:D
-                s += U[c, c2] * psi[I, c2]
-            end
-            psi_rot[I, c] = s
-        end
-    end
+    psi_flat = reshape(psi, M, D)
+    psi_rot_flat = reshape(psi_rot, M, D)
+    mul!(psi_rot_flat, psi_flat, transpose(U))
     psi_rot
 end
 
