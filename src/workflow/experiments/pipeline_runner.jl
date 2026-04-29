@@ -110,6 +110,25 @@ function run_pipeline(config::PipelineConfig; verbose::Bool=true, psi_init=nothi
         )
     end
 
+    # Auto-save rotating_basis pipelines into the dashboard-canonical layout
+    # whenever the caller supplied a `checkpoint_dir`. This eliminates the
+    # need for downstream launchers to call `save_rotating_basis_result!`
+    # by hand and unifies the on-disk format with the dashboard reader.
+    # Lab-frame `:dynamics_history` already saves itself via the workflow
+    # runner; this hook only fires for the rotating_basis path.
+    if checkpoint_dir !== nothing && haskey(results, :rotating_basis_history)
+        try
+            save_rotating_basis_result!(checkpoint_dir, results)
+            verbose && println(
+                "  auto-saved canonical rotating_basis result -> ",
+                joinpath(checkpoint_dir, "result.jld2"),
+            )
+        catch err
+            @warn "rotating_basis auto-save failed; downstream launcher should " *
+                "call save_rotating_basis_result! manually" exception = (err, catch_backtrace())
+        end
+    end
+
     (psi=psi, grid=grid, atom=atom, results...)
 end
 
@@ -176,6 +195,17 @@ end
                 ),
             )
             results[:dynamics_history] = history
+        elseif step isa RotatingBasisDynamicsStep
+            # Each phase's dyn dict goes into a list so save_rotating_basis_result!
+            # can concatenate the full GS → ramp → chirp → stir timeseries.
+            # Without this the last `merge!` would overwrite earlier phases'
+            # `:rotating_basis_dynamics` entry and on-disk results would only
+            # cover the final phase.
+            rb_history = get(results, :rotating_basis_history, Dict[])
+            if haskey(step_result, :rotating_basis_dynamics)
+                push!(rb_history, step_result[:rotating_basis_dynamics])
+            end
+            results[:rotating_basis_history] = rb_history
         end
         merge!(results, step_result)
     end
