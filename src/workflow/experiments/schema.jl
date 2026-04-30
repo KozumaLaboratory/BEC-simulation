@@ -35,7 +35,7 @@ const INTERACTIONS_SCHEMA = Dict{String, FieldSpec}(
 )
 
 const DDI_SCHEMA = Dict{String, FieldSpec}(
-    "enabled" => FieldSpec(; type=Bool, default=false),
+    "enabled" => FieldSpec(; type=Bool, default=true),     # was false, flipped 2026-04-30
     "c_dd" => FieldSpec(; type=Union{Number, Dict}),
     "secular" => FieldSpec(; type=Bool, default=false),
     "quasi_2d" => FieldSpec(; type=Bool, default=false),

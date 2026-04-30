@@ -62,10 +62,28 @@ function apply_B_block_normalize!(data::Dict)
         step isa AbstractDict || continue
         for (_, inner) in step
             inner isa AbstractDict || continue
+            _reject_legacy_blocks!(inner)
             _split_B_block!(inner)
         end
     end
     return data
+end
+
+"""Reject user-written `zeeman:` and `B_hat:` blocks. They are removed
+from the user-facing schema; the unified `B:` block is the only form.
+(Internal post-normalize keys with the same names still exist and are
+consumed by pipeline_runner — the validator runs after normalize so
+those don't trigger this check.)"""
+function _reject_legacy_blocks!(step::AbstractDict)
+    for legacy in ("zeeman", "B_hat")
+        if haskey(step, legacy)
+            throw(ArgumentError(
+                "step has legacy `$legacy:` block — removed 2026-04-30. " *
+                "Use the unified `B:` block: magnitude (Bz/B_mag/p) + " *
+                "direction (theta/phi) + q (auto from |B|² unless " *
+                "explicit) all live there."))
+        end
+    end
 end
 
 function _split_B_block!(step::AbstractDict)
