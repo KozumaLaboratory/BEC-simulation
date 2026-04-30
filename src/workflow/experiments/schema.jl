@@ -42,6 +42,16 @@ const DDI_SCHEMA = Dict{String, FieldSpec}(
     "l_z" => FieldSpec(; type=Number, range=(0.0, 100.0)),
 )
 
+# `kind` selects the solver path:
+#   spinor          (default)  — full F=2F+1 spinor GP, Larmor sub-cycled
+#                              Use for static B / weak-field experiments.
+#   binary                     — two-component miscible/immiscible GP
+#                              (species_A, species_B blocks required).
+#   rotating_basis             — Option γ: B̂(t) rotating-direction frame
+#                              that absorbs Larmor analytically. Use for
+#                              Klaus-style protocols where B direction
+#                              evolves and p·F·dt would otherwise blow up.
+#   option_gamma               — alias for rotating_basis (legacy name).
 const GS_SCHEMA = Dict{String, FieldSpec}(
     "kind" => FieldSpec(; type=String, enum=["spinor", "binary", "rotating_basis", "option_gamma"]),
     "dtype" => FieldSpec(; type=String, default="f64", enum=["f32", "f64"]),
