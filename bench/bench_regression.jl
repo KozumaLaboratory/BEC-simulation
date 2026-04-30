@@ -141,6 +141,66 @@ let
     end
 end
 
+# 9. apply_local_spin_step! on Eu151 16³ rotating basis (CPU). Per call:
+# builds D×D Zeeman_diag + gauge-connection Hamiltonian, eigendecomposes,
+# applies U_loc to every voxel via _apply_rotation_to_spin_axis!. Hot in
+# every Yoshida sub-step of Klaus / Berry / phi_omega runs. Profile shows
+# 2K+ allocs from `Hermitian(Matrix(...))` round-trip + `eigen()` arrays
+# + `Diagonal([...])` comprehension + `Vmat * D_diag * Vmat'` BLAS chain.
+let
+    grid = make_grid(GridConfig((16, 16, 16), (8.0, 8.0, 8.0)))
+    V_trap = zeros(Float64, 16, 16, 16)
+    @inbounds for I in CartesianIndices(V_trap)
+        x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+        V_trap[I] = 0.5 * (x*x + y*y + z*z)
+    end
+    # Klaus-like config: nonzero phi_dot exercises the gauge-connection
+    # branch (production hot path). theta tilt nonzero so sin(theta) ≠ 0.
+    ws_rb = SpinorBEC.make_rotating_basis_ws(
+        grid, 6, V_trap;
+        p = 100.0, q = 0.0, c0 = 50.0, c1 = 0.0, c_dd = 0.0,
+        theta_func = (_t) -> 0.3, phi_func = (_t) -> 0.0,
+        theta_dot_func = (_t) -> 0.05, phi_dot_func = (_t) -> 0.5,
+        gauge_fix = false,
+    )
+    @inbounds for I in CartesianIndices(grid.config.n_points)
+        x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+        ws_rb.psi_tilde[I, 1] = exp(-(x*x + y*y + z*z) / 2)
+    end
+    SpinorBEC.normalize_rotating!(ws_rb)
+    SUITE["kernel/local_spin_step_eu151_16cubed"] = @benchmarkable begin
+        SpinorBEC.apply_local_spin_step!($ws_rb, 0.005, 0.0)
+    end
+end
+
+# 10. apply_kinetic_step_rotating! on Eu151 16³ rotating basis (CPU).
+# Per-component FFT loop: D=13 iterations of (selectdim+copyto → fwd FFT
+# on spatial_buf → broadcast `*= kspace_phase_buf` → inv FFT → copyto).
+# Lab-basis batched equivalent does the same work via single batched FFT
+# plan over (n_pts..., D) — candidate for the same treatment.
+let
+    grid = make_grid(GridConfig((16, 16, 16), (8.0, 8.0, 8.0)))
+    V_trap = zeros(Float64, 16, 16, 16)
+    @inbounds for I in CartesianIndices(V_trap)
+        x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+        V_trap[I] = 0.5 * (x*x + y*y + z*z)
+    end
+    ws_rb = SpinorBEC.make_rotating_basis_ws(
+        grid, 6, V_trap;
+        p = 100.0, q = 0.0, c0 = 50.0, c1 = 0.0, c_dd = 0.0,
+        theta_func = (_t) -> 0.0, phi_func = (_t) -> 0.0,
+        theta_dot_func = (_t) -> 0.0, phi_dot_func = (_t) -> 0.0,
+    )
+    @inbounds for I in CartesianIndices(grid.config.n_points)
+        x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+        ws_rb.psi_tilde[I, 1] = exp(-(x*x + y*y + z*z) / 2)
+    end
+    SpinorBEC.normalize_rotating!(ws_rb)
+    SUITE["kernel/kinetic_step_rotating_eu151_16cubed"] = @benchmarkable begin
+        SpinorBEC.apply_kinetic_step_rotating!($ws_rb, 0.005)
+    end
+end
+
 # Tune + run. Use minimum (not median) for noise immunity — system jitter
 # only adds time, never subtracts, so minimum is a tighter floor on true
 # performance. samples=100 + 10s budget gives us several hundred datapoints
