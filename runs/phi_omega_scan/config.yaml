@@ -1,0 +1,56 @@
+# phi_omega scan — single-file form. Klaus magnetostir on Eu151 with
+# stir frequency varied 1.0 → 18.0 dimless (= 50 → 900 Hz at ω_ref =
+# 2π·50 Hz). The phase-2 spinup endpoint slaves to the steady value via
+# the zip scan with two coupled axes.
+
+units: {B: Gauss, t: ms}
+accuracy: 1.0e-6
+defaults: {kind: rotating_basis, backend: gpu}
+
+mixins:
+  eu151_klaus_phys:
+    atom: Eu151
+    N_atoms: 60000
+    omega_ref: 314.159
+    grid: {n: [24, 24, 12], box: [20.0, 20.0, 10.0]}
+    potential: {type: harmonic, omega: ["50 Hz", "50 Hz", "130 Hz"]}
+    init_m_idx: 1
+    init_sigma: 1.5
+    gauge_fix: false
+    dt: 0.005
+    n_steps: 250
+    tol: 1.0e-7
+
+pipeline:
+  - ground_state:
+      use: [eu151_klaus_phys]
+      B: {Bz: "0.819 Gauss"}        # p, q auto from atom + B
+      interactions: {c1: 0.0}        # orbital-only
+
+  # tilt: 0 → 35° over 20 ms
+  - dynamics:
+      duration: "20 ms"
+      B:
+        theta: {from: 0.0, to: 0.611, duration: "20 ms"}
+        phi: {rate: 0.0}
+
+  # spinup: 0 → stir freq over 50 ms
+  - dynamics:
+      duration: "50 ms"
+      B:
+        theta: 0.611
+        phi: {rate: {from: 0.0, to: 4.524, duration: "50 ms"}}
+
+  # steady stir 500 ms — scan target
+  - dynamics:
+      duration: "500 ms"
+      B:
+        theta: 0.611
+        phi: {rate: 4.524}
+
+# 8-point scan over stir frequency. The chirp endpoint slaves so the
+# spinup ramps to the steady value (zip — both axes vary together).
+scan:
+  zip:
+    pipeline.3.dynamics.B.phi.rate: [1.0, 2.0, 3.0, 4.524, 6.0, 8.0, 12.0, 18.0]
+    pipeline.2.dynamics.B.phi.rate.to: [1.0, 2.0, 3.0, 4.524, 6.0, 8.0, 12.0, 18.0]

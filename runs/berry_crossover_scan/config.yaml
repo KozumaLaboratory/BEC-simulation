@@ -1,0 +1,49 @@
+# berry_crossover scan — single-file form. Eu151 spinor-orbital crossover
+# scan over B-field strength (dimless p). p = 10 → 3000: spinor-active
+# (p=10) → Klaus-frozen (p≥100).
+
+units: {B: Gauss, t: ms}
+accuracy: 1.0e-6
+defaults: {kind: rotating_basis, backend: gpu}
+
+mixins:
+  eu151_klaus_phys:
+    atom: Eu151
+    N_atoms: 60000
+    omega_ref: 314.159
+    grid: {n: [24, 24, 12], box: [20.0, 20.0, 10.0]}
+    potential: {type: harmonic, omega: ["50 Hz", "50 Hz", "130 Hz"]}
+    init_m_idx: 1
+    init_sigma: 1.5
+    gauge_fix: false
+    dt: 0.005
+    n_steps: 250
+    tol: 1.0e-7
+
+pipeline:
+  - ground_state:
+      use: [eu151_klaus_phys]
+      B: {p: 1000.0}                # ← scan parameter (dimless)
+      interactions: {c1: 0.0}
+
+  - dynamics:
+      duration: "20 ms"
+      B:
+        theta: {from: 0.0, to: 0.611, duration: "20 ms"}
+        phi: {rate: 0.0}
+
+  - dynamics:
+      duration: "50 ms"
+      B:
+        theta: 0.611
+        phi: {rate: {from: 0.0, to: 4.524, duration: "50 ms"}}
+
+  - dynamics:
+      duration: "500 ms"
+      B:
+        theta: 0.611
+        phi: {rate: 4.524}
+
+scan:
+  zip:
+    pipeline.0.ground_state.B.p: [10.0, 30.0, 100.0, 300.0, 1000.0, 3000.0]
