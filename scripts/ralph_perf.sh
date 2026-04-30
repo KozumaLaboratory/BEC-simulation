@@ -31,15 +31,21 @@ die() { echo "ralph_perf: $*" >&2; exit 1; }
 [ -f "$BASELINE" ]    || die "missing baseline $BASELINE — run bench/bench_regression.jl and copy results.json to baseline.json first"
 command -v claude >/dev/null 2>&1 || die "claude CLI not on PATH"
 
+DISCOVERY_PROMPT="bench/RALPH_DISCOVERY_PROMPT.md"
+
 LOOP=false
 DRY=false
+MAX_DISCOVERY=10  # sanity bound: total discovery rounds per process
 for arg in "$@"; do
   case "$arg" in
-    --loop)    LOOP=true ;;
-    --dry-run) DRY=true ;;
-    *)         die "unknown flag: $arg" ;;
+    --loop)             LOOP=true ;;
+    --dry-run)          DRY=true ;;
+    --max-discovery=*)  MAX_DISCOVERY="${arg#--max-discovery=}" ;;
+    *)                  die "unknown flag: $arg" ;;
   esac
 done
+
+discovery_count=0
 
 # Pick first unmarked target
 next_target() {
@@ -82,12 +88,105 @@ _narrow_revert() {
   done
 }
 
+# Invoke claude as a discovery agent — profile the codebase, identify
+# the next bottleneck, append new bench keys + queue entries, re-run
+# baseline. Returns 0 if at least one new target was added; 1 on BAIL
+# or any verification failure.
+_discover_targets() {
+  if $DRY; then
+    echo "[ralph_perf] --dry-run, skipping discovery"
+    return 1
+  fi
+  if [ "$discovery_count" -ge "$MAX_DISCOVERY" ]; then
+    echo "[ralph_perf] discovery budget exhausted ($MAX_DISCOVERY rounds)"
+    return 1
+  fi
+  discovery_count=$((discovery_count + 1))
+
+  local pre_state
+  pre_state="$(git status --porcelain | awk '{print $2}' | sort -u)"
+
+  local prompt
+  prompt=$(cat <<EOF
+You are running discovery round $discovery_count for the perf-Ralph
+loop. Read $DISCOVERY_PROMPT in full and follow it strictly.
+
+The main loop's queue (bench/perf_targets.txt) is empty. Identify
+the next bottleneck, append a new @benchmarkable + queue entry,
+re-run bench/bench_regression.jl to update bench/baseline.json,
+and stop. Output your final line as either:
+  DISCOVERY_DONE: added N targets (...)
+  BAIL: <reason>
+
+Do NOT commit. The wrapper will commit after verifying the diff
+scope.
+EOF
+)
+
+  local log="logs/ralph_perf_discovery_$(date +%s).log"
+  echo "[ralph_perf] invoking discovery agent → $log"
+  if ! claude -p --dangerously-skip-permissions "$prompt" > "$log" 2>&1; then
+    echo "[ralph_perf] discovery agent exited non-zero"
+    _narrow_revert "$pre_state"
+    return 1
+  fi
+
+  # Did claude bail?
+  if grep -q "^BAIL:" "$log"; then
+    local reason
+    reason="$(grep "^BAIL:" "$log" | head -1 | sed 's/^BAIL: //')"
+    echo "[ralph_perf] discovery BAIL: $reason"
+    _narrow_revert "$pre_state"
+    return 1
+  fi
+
+  # Verify edit scope: only bench/* should be modified.
+  local newly_dirty
+  newly_dirty="$(comm -23 \
+    <(git status --porcelain | awk '{print $2}' | sort -u) \
+    <(echo "$pre_state"))"
+  local out_of_scope=false
+  for f in $newly_dirty; do
+    case "$f" in
+      bench/bench_regression.jl|bench/baseline.json|bench/perf_targets.txt|bench/results.json) ;;
+      *) echo "[ralph_perf] discovery touched out-of-scope: $f"; out_of_scope=true ;;
+    esac
+  done
+  if $out_of_scope; then
+    _narrow_revert "$pre_state"
+    return 1
+  fi
+
+  # Did discovery actually add a new active queue entry?
+  if [ -z "$(next_target)" ]; then
+    echo "[ralph_perf] discovery produced no new active queue entry"
+    _narrow_revert "$pre_state"
+    return 1
+  fi
+
+  # Commit the discovery changes so the next iteration starts clean.
+  git add -- bench/bench_regression.jl bench/baseline.json bench/perf_targets.txt
+  git commit -m "chore(perf-ralph): discovery round $discovery_count — new targets
+
+$(grep -E "^DISCOVERY_DONE:|^BAIL:" "$log" | head -1)
+
+Assisted-by: Claude (model: claude-opus-4-7) [perf-ralph-discovery]" \
+    --no-edit 2>&1 | tail -3
+  return 0
+}
+
 iterate() {
   local target_line target_kernel target_bench target_hint
   target_line="$(next_target || true)"
   if [ -z "$target_line" ]; then
-    echo "[ralph_perf] queue empty — nothing to do."
-    return 1
+    echo "[ralph_perf] queue empty — invoking discovery agent"
+    if _discover_targets; then
+      target_line="$(next_target || true)"
+    fi
+    if [ -z "$target_line" ]; then
+      echo "[ralph_perf] no targets after discovery — exiting loop."
+      return 1
+    fi
   fi
 
   # Parse: first whitespace-delimited token is the kernel, second is the bench key, rest is hint.
