@@ -398,25 +398,28 @@ function apply_local_spin_step!(
         end
     end
 
-    # Build U = exp(-i H_spin · dt)  (RTP)  or  exp(-H_spin·dt + shift) (ITP)
+    # Build U = exp(-iH·dt) (RTP) / exp(-H·dt + shift) (ITP) via eigendecomp.
+    # Fuse U[i,j] = Σ_k V[i,k]·phase[k]·conj(V[j,k]) directly into MMatrix to
+    # drop the Diagonal-Vector + 2 intermediate matmul heap allocations.
     H_static = SMatrix{D, D, ComplexF64}(Hz)
-    U_loc = if imaginary_time
-        # Hermitian (since H_spin is built from Hermitian operators).
-        Hh = Hermitian(Matrix(H_static))
-        eigs = eigen(Hh)
-        λ = eigs.values
+    eigs = eigen(Hermitian(Matrix(H_static)))
+    λ = eigs.values
+    Vmat = eigs.vectors
+    phases = if imaginary_time
         λ_min = minimum(λ)
-        D_diag = Diagonal([exp(-(λ[i] - λ_min) * dt) for i in 1:D])
-        Vmat = eigs.vectors
-        SMatrix{D, D, ComplexF64}(Vmat * D_diag * Vmat')
+        ntuple(k -> ComplexF64(exp(-(λ[k] - λ_min) * dt)), Val(D))
     else
-        Hh = Hermitian(Matrix(H_static))
-        eigs = eigen(Hh)
-        λ = eigs.values
-        D_diag = Diagonal([cis(-λ[i] * dt) for i in 1:D])
-        Vmat = eigs.vectors
-        SMatrix{D, D, ComplexF64}(Vmat * D_diag * Vmat')
+        ntuple(k -> cis(-λ[k] * dt), Val(D))
     end
+    U_buf = MMatrix{D, D, ComplexF64}(undef)
+    @inbounds for j in 1:D, i in 1:D
+        s = zero(ComplexF64)
+        for k in 1:D
+            s += Vmat[i, k] * phases[k] * conj(Vmat[j, k])
+        end
+        U_buf[i, j] = s
+    end
+    U_loc = SMatrix{D, D, ComplexF64}(U_buf)
 
     # Apply U_loc to every grid point of ψ̃ via the existing
     # spatially-uniform spin-axis rotation helper.
