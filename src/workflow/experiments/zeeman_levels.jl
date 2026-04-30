@@ -180,14 +180,12 @@ function _build_zeeman_level1(z::Dict, duration::Float64, atom, omega_ref::Float
     By = get(z, "By", 0.0)
     Bz = get(z, "Bz", 0.0)
     g_F = atom.g_F
-    # p: longitudinal (Bz). q: 2nd-order Zeeman is user-override only.
-    # Pick sample counts: enough to resolve the fastest oscillation in each axis.
     n_override = Int(get(z, "n_samples", 0))
     n_bx = n_override > 0 ? n_override : _suggest_sample_count(Bx, duration; omega_ref=omega_ref)
     n_by = n_override > 0 ? n_override : _suggest_sample_count(By, duration; omega_ref=omega_ref)
     n_bz = n_override > 0 ? n_override : _suggest_sample_count(Bz, duration; omega_ref=omega_ref)
     p_wf = _convert_B_waveform(Bz, duration, g_F, omega_ref; n_samples=n_bz)
-    q_wf = _make_waveform(get(z, "q", 0.0), duration; omega_ref=omega_ref)
+    q_wf = _resolve_q_waveform(z, p_wf, atom, omega_ref, duration)
     bx_wf = _convert_B_waveform(Bx, duration, g_F, omega_ref; n_samples=n_bx)
     by_wf = _convert_B_waveform(By, duration, g_F, omega_ref; n_samples=n_by)
     TimeDependentZeeman(p_wf, q_wf, bx_wf, by_wf)
@@ -250,8 +248,49 @@ function _build_zeeman_level2(z::Dict, duration::Float64, atom, omega_ref::Float
     p_wf = PiecewiseLinearWaveform(times, bz_vals)
     bx_wf = PiecewiseLinearWaveform(times, bx_vals)
     by_wf = PiecewiseLinearWaveform(times, by_vals)
-    q_wf = _make_waveform(get(z, "q", 0.0), duration; omega_ref=omega_ref)
+    q_wf = _resolve_q_waveform(z, p_wf, atom, omega_ref, duration)
     TimeDependentZeeman(p_wf, q_wf, bx_wf, by_wf)
+end
+
+"""
+    _resolve_q_waveform(z, p_wf, atom, omega_ref, duration) -> Waveform
+
+Resolve the quadratic Zeeman waveform `q_wf`. Priority:
+
+1. User wrote `q: <value>` in the zeeman block → that wins (override).
+2. Atom has full hyperfine data (Delta_E_hf > 0, g_J > 0, q_geometry > 0)
+   → auto-derive q from p via Breit-Rabi (`compute_quadratic_zeeman`).
+3. Atom is bosonic / no hyperfine (Delta_E_hf = 0) → q = 0 (correct
+   physics for I=0 isotopes; quadratic Zeeman ~ B²/ΔE_fs is negligible).
+4. Atom has hyperfine but missing q-derivation data → ArgumentError.
+   User must either explicitly set `q:` or fill in the atom's
+   `q_geometry`/`g_J` constants.
+
+The auto-derived q tracks the time-dependent p (B) — it's a function of
+B², so a B that ramps yields a quadratically-ramping q.
+"""
+function _resolve_q_waveform(z::Dict, p_wf, atom, omega_ref::Float64, duration::Float64)
+    if haskey(z, "q")
+        return _make_waveform(z["q"], duration; omega_ref=omega_ref)
+    end
+    # Auto-derive: bosonic / no hyperfine → q = 0 silently.
+    atom.Delta_E_hf > 0 || return ConstantWaveform(0.0)
+    # Hyperfine present but q-geometry missing → error (incomplete atom data).
+    (atom.g_J > 0 && atom.q_geometry > 0) || throw(ArgumentError(
+        "atom $(atom.name): magnetic field set but quadratic-Zeeman " *
+        "geometry data is incomplete (g_J=$(atom.g_J), " *
+        "q_geometry=$(atom.q_geometry)). Set `q:` explicitly in the " *
+        "zeeman block, or fill in `g_J` and `q_geometry` for this atom " *
+        "in src/workflow/initialization/atoms.jl."))
+    # Hyperfine + geometry present → derive q(t) from p(t)².
+    n = _ZEEMAN_SAMPLE_N
+    times = collect(range(0.0, duration; length=n))
+    q_vals = Vector{Float64}(undef, n)
+    @inbounds for (i, t) in enumerate(times)
+        p_t = evaluate(p_wf, t)
+        q_vals[i] = compute_quadratic_zeeman(atom; p_dimless=p_t, omega_ref=omega_ref)
+    end
+    PiecewiseLinearWaveform(times, q_vals)
 end
 
 """

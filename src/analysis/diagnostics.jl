@@ -24,33 +24,38 @@ spin_mixing_period(c1_tilde::Float64, q::Float64) = _spin_mixing_period_core(abs
 spin_mixing_period_si(c1_tilde_si::Float64, q_si::Float64) =
     Units.HBAR * _spin_mixing_period_core(abs(c1_tilde_si), q_si)
 
-function quadratic_zeeman_from_field(g_F::Float64, B::Float64, Delta_E_hf::Float64)
-    Delta_E_hf > 0 || throw(ArgumentError("Delta_E_hf must be positive"))
-    (g_F * Units.MU_BOHR * B)^2 / Delta_E_hf
+"""
+    quadratic_zeeman_si(atom, B_tesla) → Float64 (J)
+
+Rigorous quadratic Zeeman shift coefficient `q` in SI (joules) from
+2nd-order perturbation theory:
+
+    q = (g_J μ_B B)² · q_geometry / |ΔE_hf|
+
+Uses the per-atom `g_J` and `q_geometry` (closed-form 6j × Clebsch²)
+rather than the naive `(g_F μ_B B)² / ΔE_hf` form, which is incorrect
+by a factor (g_J/g_F)² · q_geometry — for Eu-151 F=6 this is ~0.71×
+(35/144 / (g_F/g_J)² ≈ 0.243 · 2.94 = 0.715), so the naive form
+overestimates q by ~40%.
+
+Throws if any of `Delta_E_hf`, `g_J`, `q_geometry` is missing on the
+atom. Bosonic isotopes (I=0, Delta_E_hf=0) return 0.
+"""
+function quadratic_zeeman_si(atom::AtomSpecies, B_tesla::Float64)
+    atom.Delta_E_hf > 0 || return 0.0
+    (atom.g_J > 0 && atom.q_geometry > 0) || throw(ArgumentError(
+        "atom $(atom.name): missing g_J or q_geometry; cannot compute q. " *
+        "Fill in src/workflow/initialization/atoms.jl."))
+    (atom.g_J * Units.MU_BOHR * B_tesla)^2 * atom.q_geometry / atom.Delta_E_hf
 end
 
 """
-    compute_quadratic_zeeman(atom, B) → Float64
+    quadratic_zeeman_dimless_si(atom, B_tesla, omega_ref) → Float64
 
-Quadratic Zeeman q = (g_F μ_B B)² / ΔE_hf in SI units (J).
-Throws if `Delta_E_hf` is zero (unknown).
+Dimensionless q (= q_SI / (ℏ ω_ref)) for a given physical B in Tesla.
 """
-function compute_quadratic_zeeman(atom::AtomSpecies, B::Float64)
-    atom.Delta_E_hf > 0 || throw(
-        ArgumentError(
-            "Delta_E_hf unknown for $(atom.name); set it or use quadratic_zeeman_from_field directly"
-        ),
-    )
-    quadratic_zeeman_from_field(atom.g_F, B, atom.Delta_E_hf)
-end
-
-"""
-    compute_quadratic_zeeman_dimless(atom, B, omega_ref) → Float64
-
-Dimensionless q = (g_F μ_B B)² / (ΔE_hf · ℏω).
-"""
-function compute_quadratic_zeeman_dimless(atom::AtomSpecies, B::Float64, omega_ref::Float64)
-    compute_quadratic_zeeman(atom, B) / (Units.HBAR * omega_ref)
+function quadratic_zeeman_dimless_si(atom::AtomSpecies, B_tesla::Float64, omega_ref::Float64)
+    quadratic_zeeman_si(atom, B_tesla) / (Units.HBAR * omega_ref)
 end
 
 # --- Step 1: Healing lengths (SI) ---

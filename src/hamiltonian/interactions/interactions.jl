@@ -279,6 +279,35 @@ function compute_c_dd_dimless(atom::AtomSpecies; N_atoms::Int, omega_ref::Float6
 end
 
 """
+    compute_quadratic_zeeman(atom; p_dimless, omega_ref) -> q_dimless
+
+Second-order Zeeman shift coefficient `q` (dimensionless, in ℏω_ref units)
+from rigorous Breit-Rabi for the F=I+J ground manifold. Uses the closed-form
+geometry factor stored on each AtomSpecies.
+
+Formula (closed-form 2nd-order PT, F coupled to F-1 via J_z):
+
+    q_phys = (g_J μ_B B)² · q_geometry / |Δ_hf|
+
+In dimensionless internal units (B → p via p = g_F μ_B B / ℏω_ref):
+
+    q_dimless = q_phys / (ℏω_ref)
+              = p² · ω_ref · ℏ · (g_J/g_F)² · q_geometry / Δ_hf
+
+For Eu151 F=6: q_geometry = 35/144, exact (m⁴ correction zero at 2nd order).
+
+Returns 0.0 if the atom lacks `Delta_E_hf` or `q_geometry` (not derivable);
+caller is responsible for either setting `q` explicitly or refusing to
+proceed.
+"""
+function compute_quadratic_zeeman(atom::AtomSpecies; p_dimless::Real, omega_ref::Real)
+    atom.Delta_E_hf > 0 && atom.g_J > 0 && atom.q_geometry > 0 || return 0.0
+    Δ_rad_s = atom.Delta_E_hf / Units.HBAR
+    Float64(p_dimless)^2 * omega_ref * (atom.g_J / atom.g_F)^2 *
+        atom.q_geometry / Δ_rad_s
+end
+
+"""
     compute_eu151_interactions(; N_atoms, omega_ref, c1_ratio, c_extra)
 
 Dimensionless interaction params for ¹⁵¹Eu (F=6) with mandatory c₁/c₀ ratio.

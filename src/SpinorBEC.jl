@@ -351,8 +351,9 @@ export multipole_order_parameters, multipole_spectrum
 export get_cn
 
 # Diagnostics
-export spin_mixing_period, spin_mixing_period_si, quadratic_zeeman_from_field
-export compute_quadratic_zeeman, compute_quadratic_zeeman_dimless
+export spin_mixing_period, spin_mixing_period_si
+export compute_quadratic_zeeman                  # dimless from p_dimless (interactions.jl)
+export quadratic_zeeman_si, quadratic_zeeman_dimless_si  # from B in Tesla (diagnostics.jl)
 export healing_length_contact, healing_length_spin, healing_length_ddi
 export thomas_fermi_radius, thomas_fermi_radius_harmonic
 export phase_diagram_point, component_populations, make_conservation_monitor

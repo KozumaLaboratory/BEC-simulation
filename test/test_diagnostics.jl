@@ -42,46 +42,31 @@ using FFTW
         @test_throws ArgumentError spin_mixing_period_si(0.0, 1e-31)
     end
 
-    @testset "Quadratic Zeeman from field" begin
-        g_F = 0.5
-        B = 1e-4  # 0.1 mT
-        Delta_E_hf = 6.835e9 * 6.626e-34  # Rb87 hf splitting
-        q = quadratic_zeeman_from_field(g_F, B, Delta_E_hf)
-        expected = (g_F * SpinorBEC.Units.MU_BOHR * B)^2 / Delta_E_hf
-        @test q ≈ expected
-        @test q > 0.0
-        @test_throws ArgumentError quadratic_zeeman_from_field(0.5, 1e-4, -1.0)
-    end
+    @testset "Quadratic Zeeman (rigorous, g_J + q_geometry)" begin
+        # Rb87: hyperfine known but q_geometry not provided in atom data,
+        # so quadratic_zeeman_si throws.
+        @test_throws ArgumentError quadratic_zeeman_si(Rb87, 1e-4)
 
-    @testset "Quadratic Zeeman auto-calculation" begin
-        @testset "Rb87 at B=1mT" begin
-            q = compute_quadratic_zeeman(Rb87, 1e-3)
-            @test q > 0
-            q_manual = quadratic_zeeman_from_field(Rb87.g_F, 1e-3, Rb87.Delta_E_hf)
-            @test q ≈ q_manual
-        end
+        # Eu151: full data (g_J=1.9934, q_geometry=35/144, Δ_hf=121 MHz).
+        # At B=1 G = 1e-4 T, expect q/h ≈ 15.6 kHz (per rigorous derivation).
+        q_eu = quadratic_zeeman_si(Eu151, 1e-4)
+        q_hz = q_eu / (2π * SpinorBEC.Units.HBAR)
+        @test 15.0e3 < q_hz < 16.5e3   # 15.636 kHz/G² ± rounding
 
-        @testset "Na23 at B=0.1mT" begin
-            q = compute_quadratic_zeeman(Na23, 1e-4)
-            @test q > 0
-        end
+        # Dy164 (I=0, no hyperfine) → 0 by physics.
+        @test quadratic_zeeman_si(Dy164, 1e-4) == 0.0
 
-        @testset "Eu151 throws (unknown hf)" begin
-            @test_throws ArgumentError compute_quadratic_zeeman(Eu151, 1e-4)
-        end
+        # Dimensionless conversion roundtrips.
+        ω = 2π * 50.0
+        q_dl = quadratic_zeeman_dimless_si(Eu151, 1e-4, ω)
+        @test q_dl ≈ q_eu / (SpinorBEC.Units.HBAR * ω)
 
-        @testset "dimensionless version" begin
-            omega = 2π * 100.0
-            q_dimless = compute_quadratic_zeeman_dimless(Rb87, 1e-3, omega)
-            q_si = compute_quadratic_zeeman(Rb87, 1e-3)
-            @test q_dimless ≈ q_si / (SpinorBEC.Units.HBAR * omega)
-        end
-
-        @testset "Delta_E_hf stored correctly" begin
-            @test Rb87.Delta_E_hf > 0
-            @test Na23.Delta_E_hf > 0
-            @test Eu151.Delta_E_hf ≈ 0.0
-        end
+        # AtomSpecies hyperfine data presence.
+        @test Rb87.Delta_E_hf > 0
+        @test Na23.Delta_E_hf > 0
+        @test Eu151.Delta_E_hf > 0    # was 0 before 2026-04-30; now 121 MHz
+        @test Eu151.q_geometry > 0
+        @test Eu151.g_J > 0
     end
 
     @testset "Healing lengths" begin
