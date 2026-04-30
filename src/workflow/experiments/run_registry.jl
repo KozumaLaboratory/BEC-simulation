@@ -102,8 +102,12 @@ function run_yaml(yaml_path::String; base_dir::String="runs", verbose::Bool=true
         end
     end
 
-    # Apply opt-in `units:` block AFTER calibration (calibration may emit
-    # Quantity strings; `units:` rewrite only touches bare Reals).
+    # Expand templates + mixins (named protocols, reusable parameter sets).
+    apply_templates_and_mixins!(data)
+
+    # Apply opt-in `units:` block AFTER calibration + templates (template
+    # output may already be in Quantity strings; `units:` rewrite only
+    # touches bare Reals).
     apply_units_block!(data)
 
     # Schema validation: catch typos and invalid values before starting.

@@ -8,6 +8,7 @@ against the YAML's location rather than the caller's pwd.
 """
 function load_config(path::String)
     data = YAML.load_file(path)
+    apply_templates_and_mixins!(data)
     apply_units_block!(data)
     prev = get(ENV, "SPINORBEC_YAML_DIR", nothing)
     ENV["SPINORBEC_YAML_DIR"] = dirname(abspath(path))
@@ -22,6 +23,7 @@ end
 """Load a YAML string and return a PipelineConfig."""
 function load_config_from_string(yaml_str::String)
     data = YAML.load(yaml_str)
+    apply_templates_and_mixins!(data)
     apply_units_block!(data)
     parse_pipeline(data)
 end
