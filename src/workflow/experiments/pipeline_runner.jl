@@ -1276,7 +1276,26 @@ end
 
     D = 2F_atom + 1
     init_m_idx = Int(get(p, "init_m_idx", p_z > 0 ? 1 : D))::Int
-    σ_init = Float64(get(p, "init_sigma", 1.0))
+    # Auto-derive init_sigma from Thomas-Fermi radius if user omits.
+    # Geomean of per-axis R_TF gives the natural scale for an isotropic
+    # Gaussian seed approximating the eventual TF profile:
+    #   μ_TF/(ℏω) = 0.5 (15·N·a_s/a_ho)^(2/5)         (isotropic harmonic)
+    #   R_TF[d]   = sqrt(2 μ_TF / ω_d²)                (per axis, dimless)
+    #   σ_init    = (∏_d R_TF[d])^(1/N_dim)
+    σ_init = if haskey(p, "init_sigma")
+        Float64(p["init_sigma"])
+    elseif atom_obj !== nothing && haskey(p, "N_atoms")
+        ω_ref = Float64(get(p, "omega_ref", 314.159))
+        a_ho = sqrt(Units.HBAR / (atom_obj.mass * ω_ref))
+        N = Float64(p["N_atoms"])
+        μ = 0.5 * (15.0 * N * atom_obj.a_s / a_ho)^(2.0 / 5.0)
+        ω_axes = ntuple(i -> Float64(V_trap.omega[i]), length(V_trap.omega))
+        R_TF = ntuple(i -> sqrt(2.0 * μ / ω_axes[i]^2), length(ω_axes))
+        prod_R = prod(R_TF)
+        prod_R^(1.0 / length(R_TF))
+    else
+        1.0  # legacy fallback
+    end
     # Build Gaussian on host (CPU) then copyto! to device — avoids GPU scalar
     # indexing on every cell. For 32×32×16 grid this is ~50 KB host alloc.
     psi_init_host = zeros(ComplexF64, grid.config.n_points..., D)
