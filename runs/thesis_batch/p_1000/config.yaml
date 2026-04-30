@@ -39,27 +39,30 @@ pipeline:
       save_every: 200
       epsilon: 0.001
       B_hat:
-        theta_ramp:
+        theta:
           duration: 6.28
           to: 0.611
           from: 0.0
-        phi_omega: 0.0
+        phi:
+          rate: 0.0
   - dynamics:
       duration: 15.7
       kind: "rotating_basis"
       save_every: 200
       epsilon: 0.001
       B_hat:
-        theta_const: 0.611
-        phi_chirp:
-          duration: 15.7
-          to: 4.524
-          from: 0.0
+        theta: 0.611
+        phi:
+          rate:
+            duration: 15.7
+            to: 4.524
+            from: 0.0
   - dynamics:
       duration: 157.0
       kind: "rotating_basis"
       save_every: 200
       epsilon: 0.001
       B_hat:
-        theta_const: 0.611
-        phi_omega: 4.524
+        theta: 0.611
+        phi:
+          rate: 4.524

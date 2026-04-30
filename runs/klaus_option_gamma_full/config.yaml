@@ -1,84 +1,68 @@
-# =================================================================
-# Klaus 2022 (Dy164) — proper protocol: vertical bias → tilt ramp → chirp → stir
-# =================================================================
-#
-# Klaus 2022 paper protocol:
-#   1. GS at vertical bias B = (0, 0, B_z)
-#   2. 20 ms tilt ramp: θ 0° → 35° (= atan(B_⊥/B_z))
-#   3. 50 ms freq chirp: stir 0 → 226 Hz
-#   4. 1 sec steady magnetostir at 226 Hz
-#
-# Total |B| during stir = √(B_z² + B_⊥²) = √(0.819² + 0.574²) ≈ 1.000 G,
-# NOT 0.819 G — this matters for Larmor: p uses |B|.
-#
-# Auto-derived for Dy164 + N=60000 + ω_ref=314.159:
-#   c0 = 3306, c_dd = 219.8 (spinor convention), F = 8 (D = 17 components)
-#   ε_dd_phys = ε_dd_eff = 1.4184 ✓
-#   γ_LHY = 5994 (Lima-Pelster auto-on for ε_dd > 0.5)
-#   p_dimless = g_F·μ_B·|B|/(ℏω) at |B|=1.000 G ≈ 34717
-#
-# Smoke total: 20+50+100 = 170 ms (full 20+50+1000 = 1070 ms = production GPU run).
-
 pipeline:
   - ground_state:
-      kind: rotating_basis
-      backend: cuda                          # GPU
-      atom: Dy164
-      N_atoms: 60000
-      omega_ref: 314.159
-      grid:
-        n: [32, 32, 16]
-        box: [20.0, 20.0, 10.0]
+      dt: 0.005
+      atom: "Dy164"
       potential:
-        type: harmonic
-        omega: [1.0, 1.0, 2.6]
+        omega:
+          - 1.0
+          - 1.0
+          - 2.6
+        type: "harmonic"
+      backend: "cuda"
+      gauge_fix: false
+      omega_ref: 314.159
+      N_atoms: 60000
+      grid:
+        box:
+          - 20.0
+          - 20.0
+          - 10.0
+        n:
+          - 32
+          - 32
+          - 16
+      zeeman:
+        q: 0.0
+        p: 28428.0
+      kind: "rotating_basis"
+      init_m_idx: 1
+      B_hat:
+        theta: 0.0
+        phi: 0.0
       interactions:
         c1: 0.0
-        # c0/c_dd/γ_LHY auto-derived from atom + N + ω_ref
-      zeeman:
-        p: 28428.0                              # Larmor at vertical bias B_z = 0.819 G
-        q: 0.0
-      B_hat:
-        theta: 0.0                              # vertical bias only during ITP
-        phi: 0.0
-      gauge_fix: false
-      n_steps: 300
-      dt: 0.005
-      init_m_idx: 1
       init_sigma: 1.0
-
-  # --- Step 2: 20 ms tilt ramp 0° → 35° (= 0.611 rad) ---
+      n_steps: 300
   - dynamics:
-      kind: rotating_basis
-      duration: 6.28                            # 20 ms = 20·ω_ref/(2π)·... = 6.28 dimless
-      epsilon: 1.0e-3                           # Y6 auto-dt = 0.1·(ε/T)^(1/6)
+      duration: 6.28
+      kind: "rotating_basis"
       save_every: 30
+      epsilon: 0.001
       B_hat:
-        theta_ramp:
-          from: 0.0
-          to: 0.611                             # 35° = atan(B_⊥/B_z) = atan(0.574/0.819)
+        theta:
           duration: 6.28
-        phi_omega: 0.0                          # no stir yet
-
-  # --- Step 3: 50 ms chirp, stir freq 0 → 226 Hz ---
-  - dynamics:
-      kind: rotating_basis
-      duration: 15.7                            # 50 ms
-      epsilon: 1.0e-3                           # Y6 auto-dt = 0.1·(ε/T)^(1/6)
-      save_every: 30
-      B_hat:
-        theta_const: 0.611                      # tilt fixed at 35°
-        phi_chirp:
+          to: 0.611
           from: 0.0
-          to: 4.524                             # 226 Hz / (2π·50) · 2π = 4.524
-          duration: 15.7
-
-  # --- Step 4: 100 ms steady stir at 226 Hz (smoke; full Klaus = 1 sec) ---
+        phi:
+          rate: 0.0
   - dynamics:
-      kind: rotating_basis
-      duration: 31.4                            # 100 ms steady stir (smoke)
-      epsilon: 1.0e-3                           # Y6 auto-dt = 0.1·(ε/T)^(1/6)
-      save_every: 50
+      duration: 15.7
+      kind: "rotating_basis"
+      save_every: 30
+      epsilon: 0.001
       B_hat:
-        theta_const: 0.611
-        phi_omega: 4.524                        # steady 226 Hz
+        theta: 0.611
+        phi:
+          rate:
+            duration: 15.7
+            to: 4.524
+            from: 0.0
+  - dynamics:
+      duration: 31.4
+      kind: "rotating_basis"
+      save_every: 50
+      epsilon: 0.001
+      B_hat:
+        theta: 0.611
+        phi:
+          rate: 4.524

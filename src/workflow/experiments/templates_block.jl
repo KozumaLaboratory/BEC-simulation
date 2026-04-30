@@ -50,7 +50,10 @@
 const _TEMPLATES = Dict{String, Function}()
 
 function __init_templates__()
-    register_template!("klaus_magnetostir", _klaus_magnetostir_template)
+    # No built-in templates — use `mixins:` + explicit pipeline for
+    # human-readable configs. The template hook is preserved for any
+    # third-party extension that wants to register a named protocol.
+    nothing
 end
 
 """

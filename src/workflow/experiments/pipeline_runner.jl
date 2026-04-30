@@ -1363,6 +1363,66 @@ function _resolve_save_every(p::Dict, duration::Float64, dt::Real;
 end
 
 """
+Parse `B_hat.theta` (canonical form):
+  scalar → const θ
+  {from, to, duration} → linear ramp
+Returns (theta_func, theta_dot_func, θ_repr).
+"""
+function _parse_b_hat_theta(b_hat::Dict)
+    if !haskey(b_hat, "theta")
+        return (_ConstAngle(0.0), _ZERO_FUNC, 0.0)
+    end
+    v = b_hat["theta"]
+    if v isa AbstractDict
+        haskey(v, "from") && haskey(v, "to") && haskey(v, "duration") ||
+            throw(ArgumentError(
+                "B_hat.theta dict form requires `from`, `to`, `duration`; " *
+                "got keys $(collect(keys(v)))"))
+        θ0 = Float64(v["from"])
+        θ1 = Float64(v["to"])
+        T_ramp = Float64(v["duration"])
+        rate = (θ1 - θ0) / T_ramp
+        return (_LinearRamp(θ0, θ1, T_ramp), _LinearRampDot(rate, T_ramp), θ1)
+    end
+    θc = Float64(v)
+    (_ConstAngle(θc), _ZERO_FUNC, θc)
+end
+
+"""
+Parse `B_hat.phi` (canonical form, rotation-rate semantics):
+  {rate: scalar}                    → const dφ/dt
+  {rate: {from, to, duration}}      → ramp dφ/dt (chirp)
+Returns (phi_func, phi_dot_func, φ_omega_repr).
+
+Hz-aware: `_ω` resolves Hz quantity strings to dimensionless ω/ω_ref.
+"""
+function _parse_b_hat_phi(b_hat::Dict, _ω)
+    if !haskey(b_hat, "phi")
+        return (_LinearPhi(0.0), _ConstAngle(0.0), 0.0)
+    end
+    v = b_hat["phi"]
+    v isa AbstractDict || throw(ArgumentError(
+        "B_hat.phi: expected `{rate: <waveform>}`, got scalar $v. " *
+        "Use `phi: {rate: <V>}` for rotation at rate V (formerly `phi_omega`)."))
+    haskey(v, "rate") || throw(ArgumentError(
+        "B_hat.phi: expected `{rate: <waveform>}`, got keys $(collect(keys(v)))"))
+    rate = v["rate"]
+    if rate isa AbstractDict
+        haskey(rate, "from") && haskey(rate, "to") && haskey(rate, "duration") ||
+            throw(ArgumentError(
+                "B_hat.phi.rate dict form requires `from`, `to`, `duration`; " *
+                "got keys $(collect(keys(rate)))"))
+        ω0 = _ω(rate["from"])
+        ω1 = _ω(rate["to"])
+        T_chirp = Float64(rate["duration"])
+        return (_LinearChirpPhi(ω0, ω1, T_chirp),
+                _LinearChirpPhiDot(ω0, ω1, T_chirp), ω1)
+    end
+    ω = _ω(rate)
+    (_LinearPhi(ω), _ConstAngle(ω), ω)
+end
+
+"""
 Derive dt from accumulated-error target ε via global error scaling
 ε ≈ C · T · dt^p where p is integrator order, C ~ O(1).
 
@@ -1465,37 +1525,24 @@ end
     # representatives (θ_repr, φ_omega_repr) for downstream Berry-connection
     # diagnostic + dyn_dict storage; for ramp/chirp we use the END value
     # (most-relevant for the steady-state portion of the step).
-    theta_func, theta_dot_func, θ_repr = if haskey(B_hat_node, "theta_ramp")
-        rn = B_hat_node["theta_ramp"]::Dict
-        θ0 = Float64(rn["from"]);
-        θ1 = Float64(rn["to"])
-        T_ramp = Float64(rn["duration"])
-        rate = (θ1 - θ0) / T_ramp
-        (_LinearRamp(θ0, θ1, T_ramp), _LinearRampDot(rate, T_ramp), θ1)
-    else
-        θc = Float64(get(B_hat_node, "theta_const",
-            Float64(get(B_hat_node, "theta", 0.0))))
-        (_ConstAngle(θc), _ZERO_FUNC, θc)
-    end
-
-    # Hz-aware parsing of phi_omega / phi_chirp endpoints: a string like
-    # "226 Hz" gets converted to dimensionless ω/ω_ref via the omega_ref
-    # stashed by _run_rotating_basis_ground_state_step. Real values
-    # pass through unchanged (existing dimensionless convention).
+    # Canonical B_hat schema:
+    #
+    #   B_hat:
+    #     theta: <scalar>                            const θ
+    #     theta: {from, to, duration}                linear ramp θ
+    #     phi:   {rate: <scalar>}                    const dφ/dt
+    #     phi:   {rate: {from, to, duration}}        ramp dφ/dt (chirp)
+    #
+    # The `phi: {rate: ...}` form makes the integrator-relevant quantity
+    # (dφ/dt) explicit without naming an axis "phi_dot" — phi is just an
+    # angle, and `rate:` is the motion type that says "linearly increasing
+    # at this rate".
     ω_ref_dimless = get(pipeline_results, :rotating_basis_omega_ref, NaN)::Float64
     _ω(node) = isnan(ω_ref_dimless) ? Float64(node) :
                _parse_dimless_freq(node, ω_ref_dimless)
 
-    phi_func, phi_dot_func, φ_omega_repr = if haskey(B_hat_node, "phi_chirp")
-        cn = B_hat_node["phi_chirp"]::Dict
-        ω0 = _ω(cn["from"]);
-        ω1 = _ω(cn["to"])
-        T_chirp = Float64(cn["duration"])
-        (_LinearChirpPhi(ω0, ω1, T_chirp), _LinearChirpPhiDot(ω0, ω1, T_chirp), ω1)
-    else
-        ω = _ω(get(B_hat_node, "phi_omega", 0.0))
-        (_LinearPhi(ω), _ConstAngle(ω), ω)
-    end
+    theta_func, theta_dot_func, θ_repr = _parse_b_hat_theta(B_hat_node)
+    phi_func, phi_dot_func, φ_omega_repr = _parse_b_hat_phi(B_hat_node, _ω)
 
     # Build a NEW workspace re-using the same physics couplings + state, but
     # with the time-dep B̂(t) hooked up.

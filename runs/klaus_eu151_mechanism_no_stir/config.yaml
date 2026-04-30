@@ -1,72 +1,45 @@
-# =================================================================
-# Klaus magnetostir on Eu151 (修論 core run, mechanism = Berry connection + DDI)
-# =================================================================
-#
-# Goal: Observe **spinor extension of Klaus 2022** in Eu151:
-#   - Population transfer m=+6 → m=+5,+4,... driven by Berry connection Â(t)
-#   - Per-m vortex pattern divergence (CANNOT happen in scalar Dy)
-#   - Spin texture ⟨F⟩(r,t) emergence from initially polarized state
-#   - Total angular momentum conservation ⟨F_z⟩ + ⟨L_z⟩ = const (EdH)
-#
-# This is the "Eu spinor analogue of Klaus 2022" — the modeling target
-# of the master's thesis.
-#
-# Physical parameters:
-#   - Eu151, F=6, a_s ≈ 110 a_B, μ ≈ 7 μ_B (close to standard Eu values)
-#   - N = 60000 atoms (matches Klaus convention for direct comparison)
-#   - Pancake trap: ω_⊥/ω_z = 1/2.6 (Klaus-style; lab values overridable)
-#   - ω_ref = 2π·50 Hz → 1 dimless time = 3.18 ms, a_ho ≈ 1.16 μm
-#   - Magnetostir: Ω = 226 Hz (= 0.72 dimless), tilt 35°, |B_⊥|/|B_z| = 0.7
-#     ⇒ Berry connection |Â/ℏ| ≈ 4.5 (rotation rate scale)
-#   - Larmor p_dimless ≈ 26700 → adiabatic for spin (eigen-exact step OK at trap dt)
-#
-# Derived:
-#   - c0_dimless = 4π·(a_s/a_ho)·N ≈ 3786
-#   - c_dd_dimless = μ_0·μ²·N/(ℏ·ω_ref·a_ho³) ≈ 6.14
-#   - ε_dd_eff = c_dd·F²/(3·c0) = 6.14·36/(3·3786) ≈ 0.02 (well below collapse,
-#     LHY optional). Note: Eu's ε_dd is 70× smaller than Dy164's 1.42 — this
-#     is precisely WHY the spinor degree of freedom dominates the dynamics
-#     in Eu (Dy is scalar-like, Eu is genuinely spinor).
-#
-# Initial state: m=+F (lowest under -p F_z for p > 0). Static B̂ = ẑ during ITP,
-# then ramp to tilted rotating B̂(t) at start of dynamics.
-#
-# Smoke: 200 ms (= 62.8 dimless) at 16×16×8 grid for first signature.
-# Production: 500 ms - 1 s on 32×32×16 grid (next step, optional GPU).
-
 pipeline:
   - ground_state:
-      kind: rotating_basis
-      backend: cuda                          # GPU
-      atom: Eu151                              # F=6
-      grid:
-        n: [16, 16, 8]
-        box: [10.0, 10.0, 5.0]
-      potential:
-        type: harmonic
-        omega: [1.0, 1.0, 2.6]                 # pancake, Klaus aspect ratio
-      interactions:
-        c0: 3786.0                              # 4π·a_s/a_ho·N
-        c1: 0.0                                 # scalar regime first; c1≠0 in scan
-        c_dd: 6.14                              # ε_dd_eff ≈ 0.02
-        gamma_lhy: 0.0                          # ε_dd<1, LHY optional
-      zeeman:
-        p: 26700.0                              # full physical Larmor (Phase III stable)
-        q: 0.0
-      B_hat:
-        theta: 0.0                              # static B̂ = ẑ during ITP
-        phi: 0.0
-      gauge_fix: false
-      n_steps: 250
       dt: 0.005
-      init_m_idx: 1                             # m=+F (GS for p > 0)
-      init_sigma: 1.5
-
-  - dynamics:
-      kind: rotating_basis
-      duration: 62.83                           # 200 ms in dimless (3.18 ms × 62.83 ≈ 200 ms)
-      epsilon: 1.0e-3                           # Y6 auto-dt = 0.1·(ε/T)^(1/6)
-      save_every: 50                            # ~250 snapshots / 200 ms = 0.8 ms cadence
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 2.6
+        type: "harmonic"
+      backend: "cuda"
+      gauge_fix: false
+      grid:
+        box:
+          - 10.0
+          - 10.0
+          - 5.0
+        n:
+          - 16
+          - 16
+          - 8
+      zeeman:
+        q: 0.0
+        p: 26700.0
+      kind: "rotating_basis"
+      init_m_idx: 1
       B_hat:
-        theta_const: 0.611                      # 35° tilt (instant ramp at t=0)
-        phi_omega:  0.0                         # STIR OFF — mechanism comparison
+        theta: 0.0
+        phi: 0.0
+      interactions:
+        c1: 0.0
+        gamma_lhy: 0.0
+        c_dd: 6.14
+        c0: 3786.0
+      init_sigma: 1.5
+      n_steps: 250
+  - dynamics:
+      duration: 62.83
+      kind: "rotating_basis"
+      save_every: 50
+      epsilon: 0.001
+      B_hat:
+        theta: 0.611
+        phi:
+          rate: 0.0

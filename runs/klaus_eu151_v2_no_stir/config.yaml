@@ -1,38 +1,56 @@
-# =================================================================
-# Eu151 mechanism map — corner: DDI ON, NO stir.
-# Only the 20 ms tilt ramp (no chirp, no steady stir).
-# After ramp, hold static at theta=0.611, phi=0 for 200 ms.
-# Tests: does DDI alone drive any dynamics in tilted field?
-# =================================================================
-
 pipeline:
   - ground_state:
-      kind: rotating_basis
-      backend: cuda
-      atom: Eu151
-      N_atoms: 60000
-      omega_ref: 314.159
-      grid: {n: [24, 24, 12], box: [20.0, 20.0, 10.0]}
-      potential: {type: harmonic, omega: [1.0, 1.0, 2.6]}
-      interactions: {c1: 0.0}
-      zeeman: {p: 26700.0, q: 0.0}
-      B_hat: {theta: 0.0, phi: 0.0}
-      gauge_fix: false
-      n_steps: 250
       dt: 0.005
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 2.6
+        type: "harmonic"
+      backend: "cuda"
+      gauge_fix: false
+      omega_ref: 314.159
+      N_atoms: 60000
+      grid:
+        box:
+          - 20.0
+          - 20.0
+          - 10.0
+        n:
+          - 24
+          - 24
+          - 12
+      zeeman:
+        q: 0.0
+        p: 26700.0
+      kind: "rotating_basis"
       init_m_idx: 1
+      B_hat:
+        theta: 0.0
+        phi: 0.0
+      interactions:
+        c1: 0.0
       init_sigma: 1.5
-
+      n_steps: 250
   - dynamics:
-      kind: rotating_basis
-      duration: 6.28                             # 20 ms tilt ramp
-      epsilon: 1.0e-3
+      duration: 6.28
+      kind: "rotating_basis"
       save_every: 30
-      B_hat: {theta_ramp: {from: 0.0, to: 0.611, duration: 6.28}, phi_omega: 0.0}
-
+      epsilon: 0.001
+      B_hat:
+        theta:
+          duration: 6.28
+          to: 0.611
+          from: 0.0
+        phi:
+          rate: 0.0
   - dynamics:
-      kind: rotating_basis
-      duration: 62.83                            # 200 ms STATIC tilt (no stir)
-      epsilon: 1.0e-3
+      duration: 62.83
+      kind: "rotating_basis"
       save_every: 50
-      B_hat: {theta_const: 0.611, phi_omega: 0.0}
+      epsilon: 0.001
+      B_hat:
+        theta: 0.611
+        phi:
+          rate: 0.0

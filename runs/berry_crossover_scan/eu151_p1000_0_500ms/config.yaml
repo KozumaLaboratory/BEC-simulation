@@ -1,27 +1,69 @@
 units:
+  B: "Gauss"
   t: "ms"
-template: "klaus_magnetostir"
-parameters:
-  theta_tilt_deg: 35
-  stir_duration: "500 ms"
-  grid_n:
-    - 24
-    - 24
-    - 12
-  atom: "Eu151"
-  stir_freq: 4.524
-  backend: "cuda"
-  c1_ratio: 0.0
-  ramp_duration: "20 ms"
-  B_static_p: 1000.0
-  chirp_duration: "50 ms"
-  N_atoms: 60000
-  trap_freq:
-    - "50 Hz"
-    - "50 Hz"
-    - "130 Hz"
-  grid_box:
-    - 20.0
-    - 20.0
-    - 10.0
+mixins:
+  eu151_klaus_phys:
+    dt: 0.005
+    atom: "Eu151"
+    potential:
+      omega:
+        - "50 Hz"
+        - "50 Hz"
+        - "130 Hz"
+      type: "harmonic"
+    gauge_fix: false
+    omega_ref: 314.159
+    tol: 1.0e-7
+    N_atoms: 60000
+    grid:
+      box:
+        - 20.0
+        - 20.0
+        - 10.0
+      n:
+        - 24
+        - 24
+        - 12
+    init_m_idx: 1
+    init_sigma: 1.5
+    n_steps: 250
 accuracy: 1.0e-6
+pipeline:
+  - ground_state:
+      use:
+        - "eu151_klaus_phys"
+      B_hat:
+        theta: 0.0
+        phi: 0.0
+      interactions:
+        c1: 0.0
+      zeeman:
+        q: 0.0
+        p: 1000.0
+  - dynamics:
+      duration: "20 ms"
+      B_hat:
+        theta:
+          duration: "20 ms"
+          to: 0.611
+          from: 0.0
+        phi:
+          rate: 0.0
+  - dynamics:
+      duration: "50 ms"
+      B_hat:
+        theta: 0.611
+        phi:
+          rate:
+            duration: "50 ms"
+            to: 4.524
+            from: 0.0
+  - dynamics:
+      duration: "500 ms"
+      B_hat:
+        theta: 0.611
+        phi:
+          rate: 4.524
+defaults:
+  kind: "rotating_basis"
+  backend: "cuda"

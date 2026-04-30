@@ -1,31 +1,69 @@
-# Showcase: Klaus 2022 magnetostir on Eu151 written in new-schema lab units.
-#
-# Compare with runs/phi_omega_scan/eu151_phi4_524_500ms/config.yaml
-# (66 lines of dimensionless YAML) to see the compression ratio.
-#
-# Stages applied at parse time:
-#
-#   1. template:    `klaus_magnetostir` expands to the canonical 4-phase
-#                   pipeline (GS → tilt ramp → phi chirp → steady stir).
-#   2. units:       Bare Reals interpreted as the declared unit (Hz, Gauss,
-#                   ms). No declaration → legacy dimless interpretation.
-#   3. accuracy:    Seeds `epsilon:` on every rotating_basis step.
-#   4. auto_grid:   Derives grid n + box from Thomas-Fermi radius.
-
-units: {B: Gauss, ω: Hz, t: ms}
+units:
+  B: "Gauss"
+  t: "ms"
+mixins:
+  eu151_klaus_phys:
+    dt: 0.005
+    atom: "Eu151"
+    potential:
+      omega:
+        - "50 Hz"
+        - "50 Hz"
+        - "130 Hz"
+      type: "harmonic"
+    gauge_fix: false
+    omega_ref: 314.159
+    tol: 1.0e-7
+    N_atoms: 60000
+    grid:
+      box:
+        - 20.0
+        - 20.0
+        - 10.0
+      n:
+        - 24
+        - 24
+        - 12
+    init_m_idx: 1
+    init_sigma: 1.5
+    n_steps: 250
 accuracy: 1.0e-6
-auto_grid: true
-
-template: klaus_magnetostir
-parameters:
-  atom: Eu151
-  N_atoms: 60000
-  trap_freq: ["50 Hz", "50 Hz", "130 Hz"]
-  B_static: "1 Gauss"
-  theta_tilt_deg: 35
-  stir_freq: "226.2 Hz"
-  ramp_duration: "10 ms"
-  chirp_duration: "25 ms"
-  stir_duration: "500 ms"
-  c1_ratio: 0.028
-  backend: cuda
+pipeline:
+  - ground_state:
+      use:
+        - "eu151_klaus_phys"
+      B_hat:
+        theta: 0.0
+        phi: 0.0
+      interactions:
+        c1: 0.0
+      zeeman:
+        q: 0.0
+        Bz: "0.819 Gauss"
+  - dynamics:
+      duration: "20 ms"
+      B_hat:
+        theta:
+          duration: "20 ms"
+          to: 0.611
+          from: 0.0
+        phi:
+          rate: 0.0
+  - dynamics:
+      duration: "50 ms"
+      B_hat:
+        theta: 0.611
+        phi:
+          rate:
+            duration: "50 ms"
+            to: 4.524
+            from: 0.0
+  - dynamics:
+      duration: "500 ms"
+      B_hat:
+        theta: 0.611
+        phi:
+          rate: 4.524
+defaults:
+  kind: "rotating_basis"
+  backend: "cuda"

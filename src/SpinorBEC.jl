@@ -108,7 +108,6 @@ include("workflow/experiments/config_override.jl")  # OverrideMap + scan expansi
 include("workflow/experiments/schema.jl")           # YAML validation
 include("workflow/experiments/units_block.jl")      # opt-in `units:` rewrite
 include("workflow/experiments/templates_block.jl")  # template + mixin expansion
-include("workflow/experiments/templates/klaus_magnetostir.jl")
 include("workflow/experiments/auto_defaults.jl")    # accuracy: + auto_grid:
 include("workflow/experiments/helpers_types.jl")
 include("workflow/experiments/helpers_utils.jl")
