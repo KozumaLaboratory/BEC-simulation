@@ -36,6 +36,8 @@ function run_twa(;
     mean_obs = nothing
     M2_obs = nothing
     ref_times = nothing
+    final_psi = nothing
+    last_traj_result = nothing
 
     for i in 1:n_traj
         t_start = time()
@@ -52,6 +54,15 @@ function run_twa(;
 
         if store_trajectories
             all_traj_results[i] = result
+        end
+
+        # Capture the last trajectory's final ψ + full SimulationResult — the
+        # pipeline auto-save uses these to stream Phase-2 frames into the
+        # canonical result.jld2 layout. Without this the snapshots that
+        # run_simulation! already accumulated would be discarded.
+        if i == n_traj
+            final_psi = copy(ws.state.psi)
+            last_traj_result = result
         end
 
         traj_obs = _extract_trajectory_observables(result, grid, atom, obs_list)
@@ -91,7 +102,9 @@ function run_twa(;
         end
     end
 
-    EnsembleResult(ref_times, mean_obs, var_obs, n_traj, all_traj_results)
+    EnsembleResult(
+        ref_times, mean_obs, var_obs, n_traj, all_traj_results, final_psi, last_traj_result,
+    )
 end
 
 """

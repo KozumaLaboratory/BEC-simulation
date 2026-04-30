@@ -300,10 +300,21 @@ function _run_step(
         _parse_gs_interactions(Dict{String, Any}(), atom)
     end
 
-    enable_ddi, c_dd_val, secular, q2d, lz = if haskey(p, "ddi") || haskey(p, "interactions")
-        _parse_gs_ddi(get(p, "ddi", Dict()), get(p, "interactions", Dict()), atom)
+    enable_ddi, c_dd_val, secular, q2d, lz = if haskey(p, "ddi")
+        # Explicit `ddi:` block — re-parse, deriving c_dd from interactions
+        # if `c_dd` field is omitted.
+        _parse_gs_ddi(p["ddi"], get(p, "interactions", Dict()), atom)
     elseif ws_prev !== nothing && ws_prev.ddi !== nothing
+        # Inherit DDI from the previous workspace. The dynamics step typically
+        # only seeds `omega_ref` (for B↦p conversion); `N_atoms` lives on the
+        # GS step's `interactions:` block, so re-deriving c_dd here would
+        # silently disable DDI. Inherit instead.
         (true, ws_prev.ddi.C_dd, false, false, 0.0)
+    elseif haskey(p, "interactions")
+        # No prior workspace and no explicit `ddi:` — try to derive from the
+        # interactions block alone (works only when N_atoms+omega_ref both
+        # present, e.g. on a fresh ground_state step).
+        _parse_gs_ddi(Dict{String, Any}(), p["interactions"], atom)
     else
         (false, NaN, false, false, 0.0)
     end
@@ -712,11 +723,22 @@ function _run_step(
         verbose && @printf("  TWA ensemble: %d trajectories, %d snapshots\n",
             ensemble.n_trajectories, length(ensemble.times))
 
-        # Use mean density to reconstruct a representative psi_out for downstream
-        psi_out = copy(psi_prev)
+        # Hand the final-trajectory ψ + its SimulationResult to downstream
+        # steps. The `:dynamics_result` slot lets the canonical auto-save
+        # (`_concat_dynamics_phases`) stream the Phase-2 snapshots that
+        # `run_simulation!` already accumulated; without it those frames
+        # are lost and the saved result.jld2 only carries Phase 0/1.
+        psi_out = ensemble.final_psi !== nothing ? copy(ensemble.final_psi) :
+                  copy(psi_prev)
         step_result = Dict{Symbol, Any}(
             :ensemble_result => ensemble,
             :dynamics_workspace => ws,
+            :dynamics_result => ensemble.last_trajectory,
+            :save_psi_snapshots => ensemble.last_trajectory !== nothing &&
+                                   !isempty(ensemble.last_trajectory.psi_snapshots),
+            :snapshot_tmp_path => nothing,
+            :snapshot_count => ensemble.last_trajectory === nothing ? 0 :
+                               length(ensemble.last_trajectory.psi_snapshots),
         )
         return (psi_out, grid, atom, ws, step_result)
     end

@@ -497,11 +497,18 @@ function make_workspace(;
         # experiments live deep in this regime (ω_L ~ kHz, c_dd × n ~ Hz).
         # Only @info, not error: the user may intentionally want the full
         # kernel to study transverse Larmor-coherent dynamics.
-        if !secular_ddi && abs(zeeman.p) > 1e-15 && c_dd_val > 1e-30
+        # ZeemanParams holds `p` directly; TimeDependentZeeman exposes a
+        # waveform `p_wf`. Sample at t=0 for the regime check.
+        p_now = if zeeman isa TimeDependentZeeman
+            zeeman.p_wf === nothing ? 0.0 : evaluate(zeeman.p_wf, 0.0)
+        else
+            zeeman.p
+        end
+        if !secular_ddi && abs(p_now) > 1e-15 && c_dd_val > 1e-30
             n_peak_est =
                 sum(abs2, _to_host(psi)) / cell_volume(grid) /
                 max(1, prod(grid.config.n_points))  # rough mean → upper bound on n_peak
-            larmor_ratio = abs(zeeman.p) / max(c_dd_val * n_peak_est, 1e-30)
+            larmor_ratio = abs(p_now) / max(c_dd_val * n_peak_est, 1e-30)
             if larmor_ratio > 100.0
                 @info "DDI Larmor regime: ω_L / (c_dd · ⟨n⟩) ≈ $(round(larmor_ratio; sigdigits=3)). " *
                     "Consider `secular_ddi=true` (faster + more physical for ω_L ≫ c_dd·n)."

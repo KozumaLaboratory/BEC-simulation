@@ -353,11 +353,14 @@ function _parse_gs_interactions(inter::Dict, atom)
 end
 
 function _parse_gs_ddi(ddi_d, inter, atom)
-    if isempty(ddi_d) || ddi_d === nothing
+    # DDI default is `enabled: true` (schema flipped 2026-04-30) — when the
+    # YAML omits the `ddi:` block entirely we still want it on, since dipolar
+    # atoms (Eu, Dy, Cr, …) are the whole point of the codebase. Users can
+    # opt out with `ddi: false` or `ddi: {enabled: false}`.
+    if ddi_d === nothing || ddi_d === false || (ddi_d isa Dict && get(ddi_d, "enabled", true) === false)
         return (false, NaN, false, false, 0.0)
     end
-    ddi_d = ddi_d isa Dict ? ddi_d : Dict{String, Any}("enabled" => ddi_d)
-    enabled = Bool(get(ddi_d, "enabled", false))
+    ddi_d = ddi_d isa Dict ? ddi_d : Dict{String, Any}()
     c_dd_raw = get(ddi_d, "c_dd", nothing)
     c_dd = if c_dd_raw isa Dict
         Float64(get(c_dd_raw, "from", 0.0))
@@ -368,6 +371,8 @@ function _parse_gs_ddi(ddi_d, inter, atom)
     else
         NaN
     end
+    # No N_atoms/omega_ref ⇒ can't derive c_dd ⇒ DDI silently off.
+    enabled = !isnan(c_dd) && c_dd != 0.0
     secular = Bool(get(ddi_d, "secular", false))
     q2d = Bool(get(ddi_d, "quasi_2d", false))
     lz = Float64(get(ddi_d, "l_z", 0.0))
