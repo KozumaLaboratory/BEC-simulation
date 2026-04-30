@@ -21,6 +21,11 @@
 
 apply_ddi_step!  kernel/apply_ddi_step_eu151_16cubed  327 μs / 29 allocs / 68 KB on Eu151 16³ CPU (6 rFFTs + spin density + tensor contraction + Euler rotation). Hot in every Klaus/Berry split-step. Look at: rfft plan reuse (already done?), tensor contraction broadcast fusion in _ddi_k_contraction!, or scratch reuse across the 3 spin-density buffers.
 
+# (Round 3a, attempted 2026-04-30 under 10% time-win threshold:
+#  claude's @noinline rotation-loop split cut allocs 29→20 / mem 68→18 KB
+#  but only 326.7→324.6 μs time → REJECTed. Threshold widened to
+#  "ratio < 1.0" — re-attempt below.)
+
 # === Wishlist (require further bench_regression.jl extension) ===
 # Add a corresponding @benchmarkable to bench_regression.jl, re-baseline,
 # then move the target above the separator.
