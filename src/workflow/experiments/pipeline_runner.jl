@@ -1431,13 +1431,31 @@ end
     p_zeeman_abs = abs(ws_prev.p)
     F_atom_int = ws_prev.spin_matrices.system.F
     larmor_phase = p_zeeman_abs * F_atom_int * dt_rtp
-    if verbose && larmor_phase > π && !haskey(p, "dt")
-        @warn "rotating_basis: Larmor phase advance per step (p·F·dt = " *
-            "$(round(larmor_phase; sigdigits=4))) > π. Y6 ε-formula " *
-            "may underestimate dt for Klaus-regime p·F·dt ≫ 1; see " *
-            "audit 2026-04-28 (p_3000 ε=1e-3 false convergence). " *
-            "Consider tightening to ε ≤ 1e-6, or supplying an explicit " *
-            "dt < $(round(π / (p_zeeman_abs * F_atom_int); sigdigits=3))."
+    if larmor_phase > π && !haskey(p, "dt")
+        # Hard error in the audit-confirmed danger regime (ε ≥ 1e-3,
+        # phase ≥ π) — the 2026-04-28 audit showed p=3000 ε=1e-3
+        # produced fake-physics m=+F drift 0.997 → 0.106. The user
+        # MUST either tighten ε or pass explicit dt.
+        ε_used = haskey(p, "epsilon") ? Float64(p["epsilon"]) : NaN
+        if !isnan(ε_used) && ε_used >= 1e-3
+            throw(ArgumentError(
+                "rotating_basis: Larmor phase per step p·F·dt = " *
+                "$(round(larmor_phase; sigdigits=4)) > π combined with " *
+                "ε = $(round(ε_used; sigdigits=2)) ≥ 1e-3. This regime " *
+                "produced fake-physics in the 2026-04-28 audit (m=+F " *
+                "drift 0.997 → 0.106 was numerical, not physical). " *
+                "Tighten to ε ≤ 1e-6, or supply explicit " *
+                "dt < $(round(π / (p_zeeman_abs * F_atom_int); sigdigits=3))."))
+        elseif verbose
+            # Warn in the marginal regime (ε < 1e-3 but phase > π still
+            # near the edge — Y6 may still under-resolve commutator
+            # corrections).
+            @warn "rotating_basis: Larmor phase advance per step (p·F·dt = " *
+                "$(round(larmor_phase; sigdigits=4))) > π with ε = " *
+                "$(isnan(ε_used) ? "?" : round(ε_used; sigdigits=2)). " *
+                "Y6 ε-formula may underestimate dt; consider ε ≤ 1e-6 " *
+                "or explicit dt < $(round(π / (p_zeeman_abs * F_atom_int); sigdigits=3))."
+        end
     end
     save_every = _resolve_save_every(p, duration, dt_rtp; n_steps=n_steps)
 

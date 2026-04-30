@@ -1,0 +1,31 @@
+# Showcase: Klaus 2022 magnetostir on Eu151 written in new-schema lab units.
+#
+# Compare with runs/phi_omega_scan/eu151_phi4_524_500ms/config.yaml
+# (66 lines of dimensionless YAML) to see the compression ratio.
+#
+# Stages applied at parse time:
+#
+#   1. template:    `klaus_magnetostir` expands to the canonical 4-phase
+#                   pipeline (GS → tilt ramp → phi chirp → steady stir).
+#   2. units:       Bare Reals interpreted as the declared unit (Hz, Gauss,
+#                   ms). No declaration → legacy dimless interpretation.
+#   3. accuracy:    Seeds `epsilon:` on every rotating_basis step.
+#   4. auto_grid:   Derives grid n + box from Thomas-Fermi radius.
+
+units: {B: Gauss, ω: Hz, t: ms}
+accuracy: 1.0e-6
+auto_grid: true
+
+template: klaus_magnetostir
+parameters:
+  atom: Eu151
+  N_atoms: 60000
+  trap_freq: ["50 Hz", "50 Hz", "130 Hz"]
+  B_static: "1 Gauss"
+  theta_tilt_deg: 35
+  stir_freq: "226.2 Hz"
+  ramp_duration: "10 ms"
+  chirp_duration: "25 ms"
+  stir_duration: "500 ms"
+  c1_ratio: 0.028
+  backend: cuda
