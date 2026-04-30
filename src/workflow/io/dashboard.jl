@@ -2030,10 +2030,28 @@ function _compute_3d_densities(jld2_path::String; target_n::Int=0, max_component
 end
 
 """
-Read box_size from the config.yaml in the same directory as the JLD2 file.
-Returns nothing if not found.
+Resolve box_size for `jld2_path`. First tries the embedded
+`grid_box_size` dataset (written by `_run_yaml_single`), then falls
+back to parsing the sibling config.yaml's `pipeline[0].<step>.grid.box`.
+Returns nothing if neither path produces a usable vector.
+
+The JLD2-first lookup matters for configs that move `grid:` into a
+`mixins:` block: the YAML fallback reads the raw YAML, so it never
+sees the expanded grid.
 """
 function _read_box_size(jld2_path::String)
+    # Embedded dataset (preferred)
+    try
+        d = _with_jld_handle(jld2_path) do f
+            haskey(f, "grid_box_size") ? f["grid_box_size"] : nothing
+        end
+        if d !== nothing
+            return d isa Vector ? Float64.(d) : Float64[Float64(d)]
+        end
+    catch
+        # fall through
+    end
+    # Sibling config.yaml fallback
     config_path = joinpath(dirname(jld2_path), "config.yaml")
     isfile(config_path) || return nothing
     try
