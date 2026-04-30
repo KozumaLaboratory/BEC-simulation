@@ -149,7 +149,8 @@ function _convert_B_waveform(B_spec, duration::Float64, g_F::Float64, omega_ref:
     elseif B_spec isa Number
         return ConstantWaveform(factor * Float64(B_spec))
     end
-    B_wf = B_spec isa Waveform ? B_spec : _make_waveform(B_spec, duration)
+    B_wf = B_spec isa Waveform ? B_spec :
+           _make_waveform(B_spec, duration; omega_ref=omega_ref)
     times = collect(range(0.0, duration; length=n_samples))
     values = Float64[factor * evaluate(B_wf, t) for t in times]
     PiecewiseLinearWaveform(times, values)
@@ -158,14 +159,16 @@ end
 """Estimate appropriate sample count for a Bz/Bx/By spec. For sinusoidal and
 chirped spec, return ≥ 20 samples per highest-frequency cycle. Returns the
 default floor otherwise."""
-function _suggest_sample_count(spec, duration::Float64)
+function _suggest_sample_count(spec, duration::Float64; omega_ref::Float64=NaN)
     spec isa Dict || return _ZEEMAN_SAMPLE_N
+    _f(node) = isnan(omega_ref) ? Float64(node) :
+               _parse_dimless_freq(node, 2π * omega_ref)
     if haskey(spec, "sinusoidal")
-        f = Float64(get(spec["sinusoidal"], "frequency", 1.0))
+        f = _f(get(spec["sinusoidal"], "frequency", 1.0))
         f > 0 || return _ZEEMAN_SAMPLE_N
         return max(_ZEEMAN_SAMPLE_N, ceil(Int, 20 * f * duration))
     elseif haskey(spec, "chirped_sinusoidal")
-        f_end = Float64(get(spec["chirped_sinusoidal"], "freq_end", 1.0))
+        f_end = _f(get(spec["chirped_sinusoidal"], "freq_end", 1.0))
         return max(_ZEEMAN_SAMPLE_N, ceil(Int, 20 * f_end * duration))
     end
     _ZEEMAN_SAMPLE_N
@@ -180,11 +183,11 @@ function _build_zeeman_level1(z::Dict, duration::Float64, atom, omega_ref::Float
     # p: longitudinal (Bz). q: 2nd-order Zeeman is user-override only.
     # Pick sample counts: enough to resolve the fastest oscillation in each axis.
     n_override = Int(get(z, "n_samples", 0))
-    n_bx = n_override > 0 ? n_override : _suggest_sample_count(Bx, duration)
-    n_by = n_override > 0 ? n_override : _suggest_sample_count(By, duration)
-    n_bz = n_override > 0 ? n_override : _suggest_sample_count(Bz, duration)
+    n_bx = n_override > 0 ? n_override : _suggest_sample_count(Bx, duration; omega_ref=omega_ref)
+    n_by = n_override > 0 ? n_override : _suggest_sample_count(By, duration; omega_ref=omega_ref)
+    n_bz = n_override > 0 ? n_override : _suggest_sample_count(Bz, duration; omega_ref=omega_ref)
     p_wf = _convert_B_waveform(Bz, duration, g_F, omega_ref; n_samples=n_bz)
-    q_wf = _make_waveform(get(z, "q", 0.0), duration)
+    q_wf = _make_waveform(get(z, "q", 0.0), duration; omega_ref=omega_ref)
     bx_wf = _convert_B_waveform(Bx, duration, g_F, omega_ref; n_samples=n_bx)
     by_wf = _convert_B_waveform(By, duration, g_F, omega_ref; n_samples=n_by)
     TimeDependentZeeman(p_wf, q_wf, bx_wf, by_wf)
@@ -216,19 +219,19 @@ function _build_zeeman_level2(z::Dict, duration::Float64, atom, omega_ref::Float
             if B_mag_gauss_spec isa Waveform
                 B_mag_gauss_spec
             else
-                _make_waveform(B_mag_gauss_spec, duration)
+                _make_waveform(B_mag_gauss_spec, duration; omega_ref=omega_ref)
             end
         )
     end
     theta_wf = if theta_spec isa Number
         ConstantWaveform(Float64(theta_spec))
     else
-        (theta_spec isa Waveform ? theta_spec : _make_waveform(theta_spec, duration))
+        (theta_spec isa Waveform ? theta_spec : _make_waveform(theta_spec, duration; omega_ref=omega_ref))
     end
     phi_wf = if phi_spec isa Number
         ConstantWaveform(Float64(phi_spec))
     else
-        (phi_spec isa Waveform ? phi_spec : _make_waveform(phi_spec, duration))
+        (phi_spec isa Waveform ? phi_spec : _make_waveform(phi_spec, duration; omega_ref=omega_ref))
     end
 
     bx_vals = Vector{Float64}(undef, _ZEEMAN_SAMPLE_N)
@@ -247,7 +250,7 @@ function _build_zeeman_level2(z::Dict, duration::Float64, atom, omega_ref::Float
     p_wf = PiecewiseLinearWaveform(times, bz_vals)
     bx_wf = PiecewiseLinearWaveform(times, bx_vals)
     by_wf = PiecewiseLinearWaveform(times, by_vals)
-    q_wf = _make_waveform(get(z, "q", 0.0), duration)
+    q_wf = _make_waveform(get(z, "q", 0.0), duration; omega_ref=omega_ref)
     TimeDependentZeeman(p_wf, q_wf, bx_wf, by_wf)
 end
 

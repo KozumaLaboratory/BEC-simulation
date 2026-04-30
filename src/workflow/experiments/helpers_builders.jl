@@ -94,18 +94,40 @@ function _build_beam(d::Dict)
 end
 
 """
-    _make_waveform(spec, duration) -> Waveform
+    _make_waveform(spec, duration; omega_ref=NaN) -> Waveform
 
-Convert a YAML scalar or {from, to, scale?} dict into a Waveform.
+Convert a YAML scalar or `{sinusoidal: {...}}` / `{chirped_sinusoidal: {...}}` /
+`{gaussian_pulse: {...}}` / `{piecewise: {...}}` / `{interpolated: {...}}` /
+`{csv: ...}` dict into a Waveform.
+
+When `omega_ref` is finite (rad/s), accepts unit-bearing strings for time and
+frequency fields:
+
+  - `frequency: "226 Hz"` → dimensionless waveform freq = ω_phys / (2π·ω_ref)
+  - `freq_start: "100 Hz"`, `freq_end: "1 kHz"`           (same convention)
+  - `duration: "10 ms"`, `t_center: "5 ms"`, `sigma: "1 ms"`  (× ω_ref)
+
+`duration::Float64` (positional) is the dimensionless step duration used as
+default for chirp/pulse durations and as a fallback unit base for absolute
+time fields. When `omega_ref` is NaN (legacy / unrecognized callers), all
+fields fall back to plain `Float64(get(...))`.
 """
-function _make_waveform(spec, duration::Float64)
+function _make_waveform(spec, duration::Float64; omega_ref::Float64=NaN)
+    # Helpers route Real → Float64 (legacy) and String → unit-aware parse
+    # Frequency: dimensionless waveform-freq = ω_phys / (2π·ω_ref).
+    # We re-use _parse_dimless_freq with scale = 2π·ω_ref to get this.
+    _f(node) = isnan(omega_ref) ? Float64(node) :
+               _parse_dimless_freq(node, 2π * omega_ref)
+    _t(node) = isnan(omega_ref) ? Float64(node) :
+               _parse_dimless_time(node, omega_ref)
+
     spec isa Dict || return ConstantWaveform(Float64(spec))
     if haskey(spec, "sinusoidal")
         s = spec["sinusoidal"]
         return SinusoidalWaveform(;
             center=Float64(get(s, "center", 0.0)),
             amplitude=Float64(get(s, "amplitude", 1.0)),
-            frequency=Float64(get(s, "frequency", 1.0)),
+            frequency=_f(get(s, "frequency", 1.0)),
             phase=Float64(get(s, "phase", 0.0)),
         )
     elseif haskey(spec, "chirped_sinusoidal")
@@ -113,9 +135,9 @@ function _make_waveform(spec, duration::Float64)
         return ChirpedSinusoidalWaveform(;
             center=Float64(get(c, "center", 0.0)),
             amplitude=Float64(get(c, "amplitude", 1.0)),
-            freq_start=Float64(get(c, "freq_start", 0.0)),
-            freq_end=Float64(get(c, "freq_end", get(c, "freq_start", 0.0))),
-            duration=Float64(get(c, "duration", duration)),
+            freq_start=_f(get(c, "freq_start", 0.0)),
+            freq_end=_f(get(c, "freq_end", get(c, "freq_start", 0.0))),
+            duration=_t(get(c, "duration", duration)),
             phase=Float64(get(c, "phase", 0.0)),
         )
     elseif haskey(spec, "gaussian_pulse")
@@ -123,8 +145,8 @@ function _make_waveform(spec, duration::Float64)
         return GaussianPulseWaveform(;
             center=Float64(get(g, "center", 0.0)),
             amplitude=Float64(get(g, "amplitude", 1.0)),
-            t_center=Float64(get(g, "t_center", duration / 2)),
-            sigma=Float64(get(g, "sigma", 0.01)),
+            t_center=_t(get(g, "t_center", duration / 2)),
+            sigma=_t(get(g, "sigma", 0.01)),
         )
     elseif haskey(spec, "piecewise")
         p = spec["piecewise"]

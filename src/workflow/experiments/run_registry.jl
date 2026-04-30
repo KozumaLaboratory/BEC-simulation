@@ -102,6 +102,10 @@ function run_yaml(yaml_path::String; base_dir::String="runs", verbose::Bool=true
         end
     end
 
+    # Apply opt-in `units:` block AFTER calibration (calibration may emit
+    # Quantity strings; `units:` rewrite only touches bare Reals).
+    apply_units_block!(data)
+
     # Schema validation: catch typos and invalid values before starting.
     # strict=true fails the run on unknown keys; this is the production
     # default so silent-drop bugs (2026-04-27 `trap:` incident) cannot

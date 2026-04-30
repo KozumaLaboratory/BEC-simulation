@@ -106,6 +106,7 @@ include("workflow/monitoring/live_monitor.jl")
 include("workflow/experiments/adaptive_advice.jl")
 include("workflow/experiments/config_override.jl")  # OverrideMap + scan expansion
 include("workflow/experiments/schema.jl")           # YAML validation
+include("workflow/experiments/units_block.jl")      # opt-in `units:` rewrite
 include("workflow/experiments/helpers_types.jl")
 include("workflow/experiments/helpers_utils.jl")
 include("workflow/experiments/helpers_parsers.jl")
