@@ -290,6 +290,9 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
                     f["energy"] = energy
                     f["converged"] = converged
                     f["mz_actual"] = mz_actual
+                    # Embed grid geometry — see single-run path for rationale.
+                    f["grid_box_size"] = collect(Float64, grid.config.box_size)
+                    f["grid_n_points"] = collect(Int, grid.config.n_points)
                     for (k, v) in env
                         f["env/$k"] = v
                     end
@@ -417,6 +420,16 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
             f["duration_seconds"] = duration
             f["energy"] = energy
             f["converged"] = converged
+            # Embed grid geometry so dashboard endpoints (vector3d_bin,
+            # vorticity3d_bin, …) can reconstruct the spatial mesh without
+            # re-parsing config.yaml — the YAML fallback misses
+            # mixin-expanded configs because `_read_box_size` reads the raw
+            # YAML, not the expanded pipeline dict.
+            grid_obj = get(result, :grid, nothing)
+            if grid_obj !== nothing
+                f["grid_box_size"] = collect(Float64, grid_obj.config.box_size)
+                f["grid_n_points"] = collect(Int, grid_obj.config.n_points)
+            end
             for (k, v) in env
                 f["env/$k"] = v
             end
