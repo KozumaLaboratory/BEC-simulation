@@ -97,6 +97,50 @@ let
     end
 end
 
+# 7. _diagonal_step_svec! on Eu151 16³ (CPU). Diagonal V(dt) step:
+# computes density across D=13 components, then for each c applies
+# psi[I,c] *= cis(-(V_trap[I] + zee_c + c0*n) * dt). Profile shows
+# ~28% of split_step time. Hot path for every potential half-step.
+let
+    grid = make_grid(GridConfig((16, 16, 16), (8.0, 8.0, 8.0)))
+    sp = SimParams(; dt = 0.005, n_steps = 1)
+    ws = make_workspace(;
+        grid, atom = Eu151,
+        interactions = InteractionParams(50.0, 1.0),
+        zeeman = ZeemanParams(0.5, 0.1),
+        potential = HarmonicTrap(1.0, 1.0, 1.0),
+        sim_params = sp,
+    )
+    zee = SpinorBEC.zeeman_at(ws.zeeman, 0.0)
+    zeeman_diag = SpinorBEC.zeeman_diagonal(zee, ws.spin_matrices, 0.0)
+    SUITE["kernel/diagonal_step_eu151_16cubed"] = @benchmarkable begin
+        SpinorBEC._dispatch_diagonal_step!(
+            $ws, Val(3), $zeeman_diag, 0.005 / 4, false, $(ws.interactions),
+        )
+    end
+end
+
+# 8. apply_kinetic_step_batched! on Eu151 16³ (CPU). Three operations:
+# forward FFT, broadcast `psi .*= kinetic_phase_bc`, inverse FFT.
+# Profile shows ~13% of split_step time. FFTs are FFTW-bound but the
+# central broadcast over (16³ × 13) elements has SIMD/threading headroom.
+let
+    grid = make_grid(GridConfig((16, 16, 16), (8.0, 8.0, 8.0)))
+    sp = SimParams(; dt = 0.005, n_steps = 1)
+    ws = make_workspace(;
+        grid, atom = Eu151,
+        interactions = InteractionParams(50.0, 1.0),
+        zeeman = ZeemanParams(0.5, 0.1),
+        potential = HarmonicTrap(1.0, 1.0, 1.0),
+        sim_params = sp,
+    )
+    SUITE["kernel/kinetic_step_eu151_16cubed"] = @benchmarkable begin
+        SpinorBEC.apply_kinetic_step_batched!(
+            $(ws.state.psi), $(ws.batched_kinetic),
+        )
+    end
+end
+
 # Tune + run. Use minimum (not median) for noise immunity — system jitter
 # only adds time, never subtracts, so minimum is a tighter floor on true
 # performance. samples=100 + 10s budget gives us several hundred datapoints

@@ -26,6 +26,11 @@
 #  but only 326.7→324.6 μs time → REJECTed. Threshold widened to
 #  "ratio < 1.0" — re-attempt below.)
 
+# === Round 4 targets (added 2026-04-30, discovery) ===
+
+_diagonal_step_svec!  kernel/diagonal_step_eu151_16cubed  ~28% of split_step time on Eu151 16³ (largest non-baselined hot kernel). Per-c broadcast `cis(-(V_trap + zee_c + c0*n) * dt)` recomputes V_trap+c0*n each of D=13 iters. Try: hoist `base_phase = (V_trap + c0*n) * dt` once, then `cis(-base_phase) * cis(-zee_c*dt)` per c. Or @simd the inner c-loop in the fused-cartesian branch (production path, line 138). Watch F32 path (line 186) doesn't regress.
+apply_kinetic_step_batched!  kernel/kinetic_step_eu151_16cubed  ~13% of split_step time. forward FFT + `psi .*= kinetic_phase_bc` + inverse FFT. FFTs are FFTW-bound; the broadcast over (16³×13)=53k elements is a candidate for explicit @inbounds @simd loop or Threads.@threads on the trailing-c slab dimension.
+
 # === Wishlist (require further bench_regression.jl extension) ===
 # Add a corresponding @benchmarkable to bench_regression.jl, re-baseline,
 # then move the target above the separator.
