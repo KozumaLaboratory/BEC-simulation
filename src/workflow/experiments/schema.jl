@@ -84,8 +84,6 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
     "l_z" => FieldSpec(; type=Number, range=(0.0, 100.0)),
     "noise_seed" => FieldSpec(; type=Number),
     "rotating_frame_omega" => FieldSpec(; type=Number),
-    "adaptive_dt" => FieldSpec(; type=Bool),
-    "dt_max" => FieldSpec(; type=Number),
     "light_shift" => FieldSpec(; type=Dict),
     "raman" => FieldSpec(; type=Dict),
 )
@@ -93,11 +91,9 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
 const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     "duration" => FieldSpec(; required=true, type=Number, range=(0.0, 1e6)),
     "dt" => FieldSpec(; required=true, type=Number, range=(1e-8, 1.0)),
-    "save_every" => FieldSpec(; type=Number, range=(1.0, 1e8)),
-    "n_snapshots" => FieldSpec(; type=Number, range=(1.0, 1e6)),
-    "save_psi_snapshots" => FieldSpec(; type=Bool),
-    "save_snapshot_compression" => FieldSpec(; type=Bool),
-    "save_snapshot_precision" => FieldSpec(; type=String, enum=["f32", "f64"]),
+    # Unified `save:` block. Sub-keys: every (steps) | n_snapshots (frames)
+    # | psi (Bool) | compression (Bool) | precision ("f32"|"f64").
+    "save" => FieldSpec(; type=Dict),
     "rotating_frame_omega" => FieldSpec(; type=Number),
     "spin_rotating_frame_omega" => FieldSpec(; type=Number),
     "ddi" => FieldSpec(; type=Union{Dict, Bool}),

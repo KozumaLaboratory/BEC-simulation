@@ -8,7 +8,7 @@ pipeline:
           - 1.0
           - 1.1818
         type: "harmonic"
-      backend: gpu
+      backend: "gpu"
       B:
         q: 0.1
         p: 0.5
@@ -35,7 +35,6 @@ pipeline:
       B:
         q: 0.1
         p: 0.5
-      save_every: 50
       dt: 0.005
       interactions:
         c1: 70.0
@@ -43,6 +42,8 @@ pipeline:
         c0:
           to: 3000.0
           from: 1500.0
+      save:
+        every: 50
   - analyze:
       - phase_classify: {}
       - droplet_profile: {}

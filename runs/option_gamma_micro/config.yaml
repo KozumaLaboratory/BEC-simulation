@@ -30,14 +30,15 @@ pipeline:
         gamma_lhy: 0.0
         c_dd: 0.0
         c0: 10.0
-      F: 1
       init_sigma: 0.5
+      F: 1
   - dynamics:
       duration: 0.05
       kind: "rotating_basis"
-      save_every: 1
       B:
         theta: 0.3
         phi:
           rate: 1.0
       epsilon: 0.001
+      save:
+        every: 1

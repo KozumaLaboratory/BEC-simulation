@@ -7,7 +7,7 @@ pipeline:
           - 1.0
           - 1.0
         type: "harmonic"
-      backend: gpu
+      backend: "gpu"
       B:
         q: 0.0
         p: 100.0
@@ -35,14 +35,15 @@ pipeline:
       B:
         q: 0.0
         p: 100.0
-      save_every: 500
       seed_k_cut: 2.0
       noise_seed: 7
       live_monitor:
         every: 200
       dt: 0.001
+      save:
+        psi: true
+        every: 500
       seed_amplitude: 1.0e-5
-      save_psi_snapshots: true
   - analyze:
       - rosensweig_pattern:
           n_radial_bins: 32

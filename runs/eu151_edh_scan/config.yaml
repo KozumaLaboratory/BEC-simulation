@@ -24,7 +24,7 @@ pipeline:
           - 1.0
           - 1.182
         type: "harmonic"
-      backend: gpu
+      backend: "gpu"
       B:
         q: 0.0
         p: 100.0
@@ -52,6 +52,7 @@ pipeline:
       B:
         q: 0.0
         p: 0.024
-      save_every: 100
       ddi: true
       dt: 0.0005
+      save:
+        every: 100

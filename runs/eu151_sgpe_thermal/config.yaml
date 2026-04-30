@@ -28,7 +28,7 @@ pipeline:
           - 1.0
           - 1.1818
         type: "harmonic"
-      backend: gpu
+      backend: "gpu"
       B:
         q: 0.1
         p: 1.0
@@ -55,9 +55,10 @@ pipeline:
       B:
         q: 0.1
         p: 1.0
-      save_every: 200
       temperature_ratio: 0.1
       dt: 0.005
+      save:
+        every: 200
   - analyze:
       - phase_classify: {}
       - defect_density:

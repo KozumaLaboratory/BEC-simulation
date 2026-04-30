@@ -715,9 +715,11 @@ function _run_step(
         return (psi_out, grid, atom, ws, step_result)
     end
 
-    save_psi_snap = Bool(get(p, "save_psi_snapshots", false))
-    save_compress = Bool(get(p, "save_snapshot_compression", false))
-    snap_precision_str = String(get(p, "save_snapshot_precision", "f32"))
+    # Unified `save:` block reads — see schema.jl SAVE_SCHEMA.
+    save_block = get(p, "save", Dict{Any, Any}())::AbstractDict
+    save_psi_snap = Bool(get(save_block, "psi", false))
+    save_compress = Bool(get(save_block, "compression", false))
+    snap_precision_str = String(get(save_block, "precision", "f32"))
     snap_precision_cf =
         if snap_precision_str == "f64"
             ComplexF64
@@ -726,7 +728,7 @@ function _run_step(
         else
             throw(
                 ArgumentError(
-                    "save_snapshot_precision must be \"f32\" or \"f64\", got " *
+                    "save.precision must be \"f32\" or \"f64\", got " *
                     snap_precision_str,
                 ),
             )
@@ -1356,23 +1358,24 @@ end
 """
     _resolve_save_every(p::Dict, duration, dt; n_steps=nothing) -> Int
 
-Resolve `save_every` (frame stride in integrator steps). Priority:
+Resolve frame stride from `save:` block. Priority:
 
-  1. `save_every: 30`     — explicit step count (legacy, exact)
-  2. `n_snapshots: 100`   — N frames over the step, dt-invariant (preferred)
-  3. default              — ~20-100 frames depending on context
+  1. `save.every: 30`        — explicit step count (exact)
+  2. `save.n_snapshots: 100` — N frames over the step, dt-invariant
+  3. default                  — ~20-100 frames depending on context
 
 `n_snapshots` is dt-invariant: changing `dt`/`epsilon` keeps the number
 of saved frames unchanged, only their granularity changes.
 """
 function _resolve_save_every(p::Dict, duration::Float64, dt::Real;
     n_steps::Union{Nothing, Int}=nothing)
-    if haskey(p, "save_every")
-        return Int(p["save_every"])
+    save_block = get(p, "save", Dict{Any, Any}())::AbstractDict
+    if haskey(save_block, "every")
+        return Int(save_block["every"])
     end
-    if haskey(p, "n_snapshots")
-        ns = Int(p["n_snapshots"])
-        ns >= 1 || throw(ArgumentError("n_snapshots must be >= 1, got $ns"))
+    if haskey(save_block, "n_snapshots")
+        ns = Int(save_block["n_snapshots"])
+        ns >= 1 || throw(ArgumentError("save.n_snapshots must be >= 1, got $ns"))
         total = n_steps !== nothing ? n_steps :
                 max(1, round(Int, duration / float(dt)))
         return max(1, total ÷ ns)

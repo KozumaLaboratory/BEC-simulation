@@ -8,7 +8,7 @@ pipeline:
           - 1.0
           - 2.6
         type: "harmonic"
-      backend: gpu
+      backend: "gpu"
       B:
         theta: 0.0
         phi: 0.0
@@ -36,7 +36,6 @@ pipeline:
   - dynamics:
       duration: 6.28
       kind: "rotating_basis"
-      save_every: 200
       B:
         theta:
           duration: 6.28
@@ -45,10 +44,11 @@ pipeline:
         phi:
           rate: 0.0
       epsilon: 0.001
+      save:
+        every: 200
   - dynamics:
       duration: 15.7
       kind: "rotating_basis"
-      save_every: 200
       B:
         theta: 0.611
         phi:
@@ -57,12 +57,15 @@ pipeline:
             to: 4.524
             from: 0.0
       epsilon: 0.001
+      save:
+        every: 200
   - dynamics:
       duration: 157.0
       kind: "rotating_basis"
-      save_every: 200
       B:
         theta: 0.611
         phi:
           rate: 4.524
       epsilon: 0.001
+      save:
+        every: 200

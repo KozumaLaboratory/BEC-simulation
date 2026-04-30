@@ -4,7 +4,7 @@ pipeline:
       atom: "Eu151"
       potential:
         type: "none"
-      backend: gpu
+      backend: "gpu"
       B:
         q: 0.0
         p: 0.0
@@ -32,8 +32,9 @@ pipeline:
       B:
         q: 0.0
         p: 0.0
-      save_every: 100
       dt: 0.005
+      save:
+        every: 100
       sgpe:
         every: 1
         T: 0.05

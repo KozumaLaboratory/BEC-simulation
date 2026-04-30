@@ -8,7 +8,7 @@ pipeline:
           - 1.0
           - 2.6
         type: "harmonic"
-      backend: gpu
+      backend: "gpu"
       B:
         Bz: "1.0 Gauss"
       initial_state: "ferromagnetic_min"
@@ -36,12 +36,13 @@ pipeline:
         theta_deg:
           to: 35.0
           from: 0.0
-      save_every: 100
       dt: 0.0004
       interactions:
         omega_ref: 314.159
-      save_psi_snapshots: true
-      save_snapshot_precision: "f32"
+      save:
+        psi: true
+        every: 100
+        precision: "f32"
   - analyze:
       - summary_json:
           extras:

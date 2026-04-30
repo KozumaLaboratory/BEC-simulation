@@ -35,9 +35,10 @@ pipeline:
   - dynamics:
       duration: 1.0
       kind: "rotating_basis"
-      save_every: 10
       B:
         theta: 0.611
         phi:
           rate: 4.524
       epsilon: 0.001
+      save:
+        every: 10
