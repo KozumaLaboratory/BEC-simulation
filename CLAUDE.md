@@ -132,6 +132,13 @@ target_date: "2026-04-08"   # optional, defaults to today
 Lab-unit fields then expand: `zeeman: {p_mv: 2.5, coil_mode: strong}` →
 `zeeman: {p: "X Gauss"}`; `trap: {fort_power_mw: [...]}` → `trap.omega: ["f Hz", ...]`.
 
+**`phi_omega` Hz form** (rotating_basis B̂ rotation, dynamics block):
+`phi_omega: 4.524` (dimensionless ω/ω_ref) and `phi_omega: "226.2 Hz"` are
+equivalent. The Hz form converts via `(2π·f) / ω_ref` using the `omega_ref`
+declared in the parent `ground_state.interactions`. `phi_chirp.{from,to}`
+accept the same forms. Eliminates the documented Klaus 2022 magnetostir
+2π footgun (MEMORY.md `gotcha_waveform_frequency_convention.md`).
+
 **State zoo**: 22 named builders in `init_psi_<name>` shape (see
 `src/workflow/initialization/state_zoo.jl`). All wrap the same
 `init_psi(state=:..., init_state_params=...)` dispatch — same physics,

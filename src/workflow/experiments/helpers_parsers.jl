@@ -61,6 +61,29 @@ function _parse_dimless_time(node, omega_ref::Real)
     throw(ArgumentError("time: expected Real (dimensionless) or quantity string"))
 end
 
+"""
+    _parse_dimless_freq(node, omega_ref) -> Float64
+
+Accept Real (already-dimensionless ω/ω_ref) or string ("226 Hz", "1.42 kHz",
+"314 rad/s"). Returns the dimensionless ratio used internally.
+
+Eliminates the documented Klaus 2022 magnetostir footgun where
+`phi_omega: 4.524` was sometimes computed as `f/f_ref` instead of
+`(2π·f)/ω_ref` — the 2π factor.
+"""
+function _parse_dimless_freq(node, omega_ref::Real)
+    omega_ref > 0 ||
+        throw(ArgumentError("omega_ref must be positive, got $omega_ref"))
+    if node isa AbstractString
+        ω_si = Units.freq_to_angular(Units.safe_parse_quantity(node))
+        return ω_si / omega_ref
+    elseif node isa Real
+        return Float64(node)
+    end
+    throw(ArgumentError(
+        "frequency: expected Real (dimensionless) or quantity string"))
+end
+
 _to_int_vec(v::Vector) = Int[Int(x) for x in v]
 _to_int_vec(v) = Int[Int(v)]
 _to_float_vec(v::Vector) = Float64[Float64(x) for x in v]

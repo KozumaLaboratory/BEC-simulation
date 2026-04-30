@@ -1280,6 +1280,10 @@ end
         :rotating_basis_F => F_atom,
         :rotating_basis_mu => μ_final,
         :rotating_basis_per_m => rotating_per_m_norms(ws),
+        # Stash omega_ref so downstream rotating_basis dynamics steps
+        # can convert physical-unit fields ("226 Hz") to dimensionless
+        # ratios via _parse_dimless_freq. NaN if manual c0/c_dd path.
+        :rotating_basis_omega_ref => auto_path ? Float64(p["omega_ref"]) : NaN,
     )
     # Type assertion: pin to a concrete 4D Complex array (either F32 or F64
     # eltype). Earlier this hard-asserted ComplexF64 to keep downstream
@@ -1392,14 +1396,22 @@ end
         (_ConstAngle(θc), _ZERO_FUNC, θc)
     end
 
+    # Hz-aware parsing of phi_omega / phi_chirp endpoints: a string like
+    # "226 Hz" gets converted to dimensionless ω/ω_ref via the omega_ref
+    # stashed by _run_rotating_basis_ground_state_step. Real values
+    # pass through unchanged (existing dimensionless convention).
+    ω_ref_dimless = get(pipeline_results, :rotating_basis_omega_ref, NaN)::Float64
+    _ω(node) = isnan(ω_ref_dimless) ? Float64(node) :
+               _parse_dimless_freq(node, ω_ref_dimless)
+
     phi_func, phi_dot_func, φ_omega_repr = if haskey(B_hat_node, "phi_chirp")
         cn = B_hat_node["phi_chirp"]::Dict
-        ω0 = Float64(cn["from"]);
-        ω1 = Float64(cn["to"])
+        ω0 = _ω(cn["from"]);
+        ω1 = _ω(cn["to"])
         T_chirp = Float64(cn["duration"])
         (_LinearChirpPhi(ω0, ω1, T_chirp), _LinearChirpPhiDot(ω0, ω1, T_chirp), ω1)
     else
-        ω = Float64(get(B_hat_node, "phi_omega", 0.0))
+        ω = _ω(get(B_hat_node, "phi_omega", 0.0))
         (_LinearPhi(ω), _ConstAngle(ω), ω)
     end
 
