@@ -4,6 +4,19 @@ function parse_pipeline(data::Dict)
     pipe_data = data["pipeline"]
     (pipe_data isa AbstractVector && !isempty(pipe_data)) ||
         throw(ArgumentError("pipeline: must be a non-empty list of steps"))
+
+    # `defaults:` (top-level, optional): a flat dict whose keys seed every
+    # pipeline step's inner block. Step-level entries override defaults.
+    # E.g. `defaults: {kind: rotating_basis, save_every: 30, epsilon: 1e-6}`
+    # applies to ground_state + every dynamics block. Useful for DRY across
+    # multi-phase Klaus / Berry configs.
+    defaults = haskey(data, "defaults") ? data["defaults"] : nothing
+    if defaults !== nothing
+        defaults isa AbstractDict || throw(ArgumentError(
+            "defaults: must be a mapping, got $(typeof(defaults))"))
+        pipe_data = [_apply_step_defaults(s, defaults) for s in pipe_data]
+    end
+
     steps = PipelineStep[_parse_step(s) for s in pipe_data]
 
     scan = if haskey(data, "scan")
@@ -18,6 +31,27 @@ function parse_pipeline(data::Dict)
     end
 
     PipelineConfig(steps, scan, data)
+end
+
+"""
+Seed an unkeyed step entry's inner block with `defaults`. Step-level keys
+override defaults. Returns a new Dict (immutable input).
+"""
+function _apply_step_defaults(step::Dict, defaults::AbstractDict)
+    keys_list = collect(keys(step))
+    length(keys_list) == 1 || return step  # malformed; let _parse_step error
+    key = keys_list[1]
+    inner = step[key]
+    inner isa AbstractDict || return step  # e.g. analyze: <list> doesn't get defaults
+
+    seeded = Dict{Any, Any}()
+    for (k, v) in defaults
+        seeded[k] = v
+    end
+    for (k, v) in inner
+        seeded[k] = v   # step-level wins
+    end
+    Dict{Any, Any}(key => seeded)
 end
 
 function _parse_step(d::Dict)

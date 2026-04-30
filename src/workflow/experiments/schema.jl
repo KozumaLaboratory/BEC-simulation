@@ -145,6 +145,9 @@ const TOP_LEVEL_KEYS = Set([
     "calibration",
     "calibration_history",
     "target_date",
+    "units",             # opt-in lab-unit interpretation of bare Reals
+    "defaults",          # per-step seeded fallbacks (DRY across pipeline)
+    "mixins",            # named parameter sets pulled into the config
     "metadata",          # free-form provenance, ignored at runtime
     "name",              # human-readable label for the scenario
     "notes",             # free-form notes
