@@ -1577,6 +1577,19 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         empty!(data_cache)
         empty!(psi_cache)
         empty!(_vector3d_plans_cache)
+        # Persistent JLD2 handles (`_OPEN_JLD_HANDLES`) survive content
+        # rewrites: when a run regenerates point_NNN.jld2 the mmap'd handle
+        # keeps serving the prior content. Close + drop them so the next
+        # request reopens against the fresh file.
+        lock(_OPEN_JLD_LOCK) do
+            for (_, (h, _)) in _OPEN_JLD_HANDLES
+                try
+                    close(h)
+                catch
+                end
+            end
+            empty!(_OPEN_JLD_HANDLES)
+        end
         (200, "text/plain", "Cache cleared")
     elseif startswith(path, "/api/")
         # Unknown API route — actual 404
