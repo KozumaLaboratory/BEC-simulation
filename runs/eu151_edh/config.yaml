@@ -1,54 +1,52 @@
+# ─────────────────────────────────────────────────────────────────────
+#  Eu151 Einstein-de Haas (EdH) protocol.
+#
+#  Quench the Zeeman strength from p=100 (ferromagnetic-min seed) down to
+#  p=0.39 over 0.14 ω_ref⁻¹, then evolve at low p for 27.6 ω_ref⁻¹.
+#  Spinor-orbital coupling via DDI converts atomic spin angular momentum
+#  into mechanical orbital angular momentum (Lz spin-up → Lz orbital).
+#
+#  Reference: Matsui 2025 EdH proposal for Eu151.
+# ─────────────────────────────────────────────────────────────────────
+
+defaults: {kind: spinor, backend: gpu}
+
+mixins:
+  eu151_edh_phys:
+    atom:        Eu151
+    N_atoms:     50000
+    omega_ref:   691.15                                     # = 2π · 110 Hz
+    grid:        {n: [64, 64, 64], box: [20, 20, 20]}
+    potential:   {type: harmonic, omega: [1.0, 1.0, 1.182]}
+    interactions: {c1_ratio: 0.0}                           # orbital-only
+
 pipeline:
+  # Phase 0: ferromagnetic-min ground state at strong p=100 (cached on disk
+  # to skip the ~50 minute ITP recompute).
   - ground_state:
-      dt: 0.005
-      atom: "Eu151"
-      potential:
-        omega:
-          - 1.0
-          - 1.0
-          - 1.182
-        type: "harmonic"
-      backend: "gpu"
-      B:
-        q: 0.0
-        p: 100.0
-      initial_state: "ferromagnetic_min"
-      tol: 1.0e-10
-      ddi:
-        enabled: true
-      cache: "runs/shared/eu151_gs_p100_fmmin_c1r0_64.jld2"
-      grid:
-        box:
-          - 20.0
-          - 20.0
-          - 20.0
-        n:
-          - 64
-          - 64
-          - 64
-      interactions:
-        omega_ref: 691.15
-        c1_ratio: 0.0
-        N_atoms: 50000
-      n_steps: 100000
+      use:           [eu151_edh_phys]
+      B:             {p: 100.0}
+      initial_state: ferromagnetic_min
+      cache:         "runs/shared/eu151_gs_p100_fmmin_c1r0_64.jld2"
+      n_steps:       100000
+      tol:           1.0e-10
+      dt:            0.005
+
+  # Phase 1: Zeeman quench p: 100 → 0.39 over 0.14 (≈ 32 μs)
   - dynamics:
       duration: 0.14
-      B:
-        q: 0.0
-        p:
-          to: 0.39
-          from: 100.0
-      dt: 0.0005
-      save:
-        every: 280
+      dt:       0.0005
+      B:        {p: {from: 100.0, to: 0.39, duration: 0.14}}
+      save:     {every: 280}
+
+  # Phase 2: weak-field hold at p=0.39 for 27.6 (≈ 6.4 ms) with seeded noise
+  # to break symmetry and let EdH instability grow.
   - dynamics:
       duration: 27.6
-      B:
-        q: 0.0
-        p: 0.39
-      seed_k_cut: 2.5
-      noise_seed: 42
-      dt: 0.0001
-      save:
-        every: 5000
-      seed_amplitude: 1.0e-6
+      dt:       0.0001
+      B:        {p: 0.39}
+      noise:
+        seed: 42
+        initial:
+          coherent: {amplitude: 1.0e-6, k_cut: 2.5}
+      save:     {every: 5000}

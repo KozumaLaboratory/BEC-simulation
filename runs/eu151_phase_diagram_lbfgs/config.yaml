@@ -1,0 +1,56 @@
+# ─────────────────────────────────────────────────────────────────────
+#  Eu151 ground-state phase diagram via LBFGS polish + 2D scan.
+#
+#  Find the GS at each (c1_ratio, q_factor) point with high-precision
+#  L-BFGS, then classify the phase (FM / AFM / polar / cyclic / nematic).
+#
+#  Cost: 11 × 11 = 121 points × (ITP warmup + LBFGS polish) ≈ 30 s/point
+#  on GPU = ~1 hour total. Use `comparison_runs` to seed each point with
+#  both stretched (m=+F) and polar (m=0) initial states; the lower-energy
+#  result wins as the GS.
+# ─────────────────────────────────────────────────────────────────────
+
+units:    {B: Gauss}
+defaults: {kind: spinor, backend: gpu}                     # plain spinor (no rotating_basis)
+
+mixins:
+  eu151_phys:
+    atom:        Eu151
+    N_atoms:     60000
+    omega_ref:   314.159
+    grid:        {n: [32, 32, 24], box: [12, 12, 8]}
+    potential:   {type: harmonic, omega: ["50 Hz", "50 Hz", "130 Hz"]}
+
+pipeline:
+  - ground_state:
+      use:           [eu151_phys]
+      B:             {Bz: "0.1 Gauss"}                     # weak bias for symmetry break
+      interactions:  {c1_ratio: 0.0}                       # ← scanned
+      method:        lbfgs                                  # second-order, ITP warm-start
+      m_lbfgs:       10                                     # history length
+      n_steps:       500
+      tol:           1.0e-9                                 # tighter than ITP default
+
+  - analyze:
+      - phase_classify: {}                                  # FM / AFM / polar / cyclic / nematic
+      - bogoliubov:    {k_max: 8.0, n_k: 32}                # excitation gap
+      - summary_json:  {path: summary.json}
+
+# 2D Cartesian product over (c1_ratio, q_override).
+# At each point, both stretched and polar initial seeds are run; the
+# minimum-energy result is the true GS.
+scan:
+  product:
+    pipeline.0.ground_state.interactions.c1_ratio:
+      from: -0.05
+      to:    0.05
+      n:     11
+    pipeline.0.ground_state.B.q:
+      from: -50.0
+      to:    50.0
+      n:     11
+  comparison_runs:
+    - name: stretched
+      override: {pipeline.0.ground_state.init_m_idx: 1}
+    - name: polar
+      override: {pipeline.0.ground_state.init_m_idx: 7}

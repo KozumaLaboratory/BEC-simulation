@@ -1,70 +1,48 @@
+# ─────────────────────────────────────────────────────────────────────
+#  Klaus 2022 magnetostir — Dy164 reference run with ε=1e-6 hardening.
+#  Verified Klaus reproduction: m=+F: 0.9995 → 0.9999 (frozen spinor),
+#  Lz [-0.52, +0.43] (orbital response). Thesis canonical Dy data.
+# ─────────────────────────────────────────────────────────────────────
+
+accuracy: 1.0e-6
+defaults: {kind: rotating_basis, backend: gpu}
+
+mixins:
+  dy164_klaus_phys:
+    atom:        Dy164
+    N_atoms:     60000
+    omega_ref:   314.159
+    grid:        {n: [24, 24, 12], box: [20, 20, 10]}
+    potential:   {type: harmonic, omega: [1.0, 1.0, 2.6]}
+    init_m_idx:  1
+    n_steps:     250
+    tol:         1.0e-7
+    dt:          0.005
+    gauge_fix:   false
+
 pipeline:
   - ground_state:
-      dt: 0.005
-      atom: "Dy164"
-      potential:
-        omega:
-          - 1.0
-          - 1.0
-          - 2.6
-        type: "harmonic"
-      backend: "gpu"
-      B:
-        theta: 0.0
-        phi: 0.0
-        q: 0.0
-        p: 28428.0
-      gauge_fix: false
-      omega_ref: 314.159
-      N_atoms: 60000
-      grid:
-        box:
-          - 20.0
-          - 20.0
-          - 10.0
-        n:
-          - 24
-          - 24
-          - 12
-      kind: "rotating_basis"
-      init_m_idx: 1
-      interactions:
-        c1: 0.0
-      init_sigma: 1.5
-      n_steps: 250
-  - dynamics:
+      use:          [dy164_klaus_phys]
+      B:            {p: 28428.0}                            # Dy164 Klaus value
+      interactions: {c1: 0.0}
+
+  - dynamics:                                                # tilt: 0 → 35°
       duration: 6.28
-      kind: "rotating_basis"
       B:
-        theta:
-          duration: 6.28
-          to: 0.611
-          from: 0.0
-        phi:
-          rate: 0.0
-      epsilon: 1.0e-6
-      save:
-        every: 200
-  - dynamics:
+        theta: {from: 0.0, to: 0.611, duration: 6.28}
+        phi:   {rate: 0.0}
+      save: {every: 200}
+
+  - dynamics:                                                # spinup
       duration: 15.7
-      kind: "rotating_basis"
       B:
         theta: 0.611
-        phi:
-          rate:
-            duration: 15.7
-            to: 4.524
-            from: 0.0
-      epsilon: 1.0e-6
-      save:
-        every: 200
-  - dynamics:
+        phi:   {rate: {from: 0.0, to: 4.524, duration: 15.7}}
+      save: {every: 200}
+
+  - dynamics:                                                # steady stir
       duration: 157.0
-      kind: "rotating_basis"
       B:
         theta: 0.611
-        phi:
-          rate: 4.524
-      epsilon: 1.0e-6
-      save:
-        every: 200
+        phi:   {rate: 4.524}
+      save: {every: 200}

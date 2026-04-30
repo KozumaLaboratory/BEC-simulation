@@ -1,0 +1,49 @@
+# ─────────────────────────────────────────────────────────────────────
+#  Lab-unit calibration showcase. The user writes control-deck values
+#  (mV on the coil, mW on the FORT laser) and a calibration_history
+#  table; `apply_calibration!` interpolates between dated snapshots to
+#  the `target_date` and rewrites the YAML into physical units before
+#  the schema parser sees it.
+#
+#  Effect at target_date 2026-04-08 (interpolated from 04-01 + 04-15):
+#     B.p_mv: 2.5 + coil_mode: strong → B.p ≈ 1.04 Gauss
+#     potential.fort_power_mw: [50, 50, 100] → omega ≈ [3134 Hz, 3134, 5980]
+# ─────────────────────────────────────────────────────────────────────
+
+target_date: "2026-04-08"
+
+calibration_history:
+  - date: "2026-04-01"
+    coil_strong: {gauss_per_mv: 0.40, gauss_offset: 0.05}
+    coil_weak:   {gauss_per_mv: 0.04, gauss_offset: 0.002}
+    fort:        {sqrt_coeffs_hz: [450, 450, 600]}
+    microwave:   {rad_per_s_per_mw: 1.2e6}
+  - date: "2026-04-15"
+    coil_strong: {gauss_per_mv: 0.42, gauss_offset: 0.04}
+    coil_weak:   {gauss_per_mv: 0.038, gauss_offset: 0.003}
+    fort:        {sqrt_coeffs_hz: [443, 443, 596]}
+    microwave:   {rad_per_s_per_mw: 1.18e6}
+
+defaults: {backend: gpu}
+
+pipeline:
+  - ground_state:
+      atom:          Eu151
+      N_atoms:       30000
+      omega_ref:     691.15                              # = 2π · 110 Hz
+      grid:          {n: [32, 32, 24], box: [12, 12, 8]}
+      potential:
+        type:           harmonic
+        fort_power_mw:  [50, 50, 100]                    # → ω auto via fort cal
+      B:
+        p_mv:           2.5                              # → p auto via coil cal
+        coil_mode:      strong
+      interactions:  {c1_ratio: 0.028}
+      initial_state: polar
+      tol:           1.0e-7
+      n_steps:       4000
+      dt:            0.005
+
+  - analyze:
+      - phase_classify: {}
+      - summary_json:   {path: summary.json}

@@ -1,70 +1,47 @@
+# ─────────────────────────────────────────────────────────────────────
+#  Klaus 2022 magnetostir — Eu151 reference run, full DDI + 500 ms stir.
+#  Thesis baseline for the spinor-active regime.
+# ─────────────────────────────────────────────────────────────────────
+
+accuracy: 1.0e-3
+defaults: {kind: rotating_basis, backend: gpu}
+
+mixins:
+  eu151_klaus_phys:
+    atom:        Eu151
+    N_atoms:     60000
+    omega_ref:   314.159
+    grid:        {n: [24, 24, 12], box: [20, 20, 10]}
+    potential:   {type: harmonic, omega: [1.0, 1.0, 2.6]}
+    init_m_idx:  1
+    n_steps:     250
+    tol:         1.0e-7
+    dt:          0.005
+    gauge_fix:   false
+
 pipeline:
   - ground_state:
-      dt: 0.005
-      atom: "Eu151"
-      potential:
-        omega:
-          - 1.0
-          - 1.0
-          - 2.6
-        type: "harmonic"
-      backend: "gpu"
+      use:          [eu151_klaus_phys]
+      B:            {p: 26700.0}
+      interactions: {c1: 0.0}
+
+  - dynamics:                                                # tilt: 0 → 35°
+      duration: 6.28                                         # ≈ 20 ms
       B:
-        theta: 0.0
-        phi: 0.0
-        q: 0.0
-        p: 26700.0
-      gauge_fix: false
-      omega_ref: 314.159
-      N_atoms: 60000
-      grid:
-        box:
-          - 20.0
-          - 20.0
-          - 10.0
-        n:
-          - 24
-          - 24
-          - 12
-      kind: "rotating_basis"
-      init_m_idx: 1
-      interactions:
-        c1: 0.0
-      init_sigma: 1.5
-      n_steps: 250
-  - dynamics:
-      duration: 6.28
-      kind: "rotating_basis"
-      B:
-        theta:
-          duration: 6.28
-          to: 0.611
-          from: 0.0
-        phi:
-          rate: 0.0
-      epsilon: 0.001
-      save:
-        every: 200
-  - dynamics:
-      duration: 15.7
-      kind: "rotating_basis"
+        theta: {from: 0.0, to: 0.611, duration: 6.28}
+        phi:   {rate: 0.0}
+      save: {every: 200}
+
+  - dynamics:                                                # spinup: 0 → 226 Hz
+      duration: 15.7                                         # ≈ 50 ms
       B:
         theta: 0.611
-        phi:
-          rate:
-            duration: 15.7
-            to: 4.524
-            from: 0.0
-      epsilon: 0.001
-      save:
-        every: 200
-  - dynamics:
-      duration: 157.0
-      kind: "rotating_basis"
+        phi:   {rate: {from: 0.0, to: 4.524, duration: 15.7}}
+      save: {every: 200}
+
+  - dynamics:                                                # steady stir
+      duration: 157.0                                        # ≈ 500 ms
       B:
         theta: 0.611
-        phi:
-          rate: 4.524
-      epsilon: 0.001
-      save:
-        every: 200
+        phi:   {rate: 4.524}
+      save: {every: 200}
