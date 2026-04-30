@@ -47,12 +47,12 @@ function _spin_mixing_loop!(psi, sm, c1, dt_frac, ::Val{D}, n_pts, imaginary_tim
             spinor = _get_spinor(psi, I, Val(D))
 
             fz_val = 0.0
-            for c in 1:D
+            @simd for c in 1:D
                 fz_val += m_vals_t[c] * abs2(spinor[c])
             end
             fxy_re = 0.0
             fxy_im = 0.0
-            for c in 2:D
+            @simd for c in 2:D
                 prod = conj(spinor[c - 1]) * spinor[c]
                 fxy_re += fp_coeffs[c] * real(prod)
                 fxy_im += fp_coeffs[c] * imag(prod)

@@ -14,7 +14,7 @@
 # === Round 2 targets (added 2026-04-30) ===
 
 # skipped(stale-bench: was no-scratch fallback, replaced with with-scratch version) 2026-04-30: apply_uniform_spin_rotation!_no_scratch
-_spin_mixing_loop!  kernel/spin_mixing_eu151_16x16x8  ~1400 μs / 7 allocs — at D=13 has SIMD / reuse headroom. Try @inbounds + manual unroll over m, or hoist loop-invariants out of CartesianIndices loop.
+# done 2026-04-30: _spin_mixing_loop!  kernel/spin_mixing_eu151_16x16x8  ~1400 μs / 7 allocs — at D=13 has SIMD / reuse headroom. Try @inbounds + manual unroll over m, or hoist loop-invariants out of CartesianIndices loop.
 apply_uniform_spin_rotation!  kernel/uniform_spin_rotation_eu151_16x16x8  ~70-150 μs / 5 allocs / 3 KB (with-scratch, production path). Sub-100μs is at noise floor; only attempt if change can be verified independently on a 10× larger grid. Look at 13×13 R-matrix rebuild and Fy eigendecomp products — could be cached across same-(phi,dt) calls.
 
 # === Wishlist (require further bench_regression.jl extension) ===

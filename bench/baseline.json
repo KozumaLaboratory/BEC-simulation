@@ -1,27 +1,27 @@
 {
   "kernel/spin_mixing_eu151_16x16x8": {
     "allocs": 7,
-    "time_ns": 1.387001e6,
+    "time_ns": 901155.0,
     "memory_bytes": 17344
   },
   "find_ground_state/rb87_16sq": {
     "allocs": 9777,
-    "time_ns": 1.225503e6,
+    "time_ns": 1.236889e6,
     "memory_bytes": 1363360
   },
   "analyze/tomography_16x16x8": {
     "allocs": 2164,
-    "time_ns": 1.12684e6,
+    "time_ns": 1.136159e6,
     "memory_bytes": 5771328
   },
   "kernel/uniform_spin_rotation_eu151_16x16x8": {
     "allocs": 5,
-    "time_ns": 153734.0,
+    "time_ns": 63985.0,
     "memory_bytes": 2936
   },
   "split_step/eu151_16cubed": {
     "allocs": 221,
-    "time_ns": 1.654735e6,
+    "time_ns": 1.813399e6,
     "memory_bytes": 140304
   }
 }
