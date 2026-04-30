@@ -77,8 +77,10 @@ After every edit:
      for GPU benches (only if the kernel runs on GPU)
 3. Compare to baseline (`bench/baseline.json`):
    - **Accept** the change only if: (a) all smoke tests pass, AND
-     (b) at least one targeted bench shows ≥5% improvement, AND
-     (c) no other bench regresses by >5%.
+     (b) at least one targeted bench shows ≥10% improvement, AND
+     (c) no other bench regresses by >10%.
+   - The 10% threshold is above the WSL2 noise floor (BenchmarkTools
+     `minimum()` has ~5% jitter; sub-100μs benches up to ~30%).
    - Otherwise: `git checkout -- <files>` and try a different pattern.
 
 ## Commit format

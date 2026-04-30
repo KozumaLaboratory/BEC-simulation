@@ -67,24 +67,34 @@ end
 
 # 5. apply_uniform_spin_rotation! on Eu151 (D=13). GPU-safe matmul
 # rebuilds R::Matrix per call from (phi_x, phi_y, phi_z) — host scalar
-# work + broadcast, used heavily by rotating-basis Klaus runs.
+# work + broadcast, used heavily by rotating-basis Klaus runs. Bench
+# the production path (scratch threaded through) — without scratch the
+# function falls back to similar(psi) per call (~432 KB) which is the
+# fallback path, not what production callers exercise. Optimising the
+# fallback was misleading Ralph into changes that broke split_step
+# (collateral +15%).
 let
     sm = spin_matrices(6)
     psi = randn(ComplexF64, 16, 16, 8, 13) ./ 100
+    scratch = similar(psi)
     SUITE["kernel/uniform_spin_rotation_eu151_16x16x8"] = @benchmarkable begin
         SpinorBEC.apply_uniform_spin_rotation!($psi, $sm,
-            0.1, 0.05, 0.0, 0.005, 3)
+            0.1, 0.05, 0.0, 0.005, 3; scratch = $scratch)
     end
 end
 
-# Tune + run
+# Tune + run. Use minimum (not median) for noise immunity — system jitter
+# only adds time, never subtracts, so minimum is a tighter floor on true
+# performance. samples=100 + 10s budget gives us several hundred datapoints
+# per benchmark; minimum() over those is stable to ~1% on this machine.
 println("Tuning…"); tune!(SUITE)
-println("Running…"); results = run(SUITE; verbose = false, samples = 10, evals = 1)
+println("Running…")
+results = run(SUITE; verbose = false, samples = 100, seconds = 10.0)
 
-# Save median time / allocations
+# Save minimum time / allocations
 out = Dict{String,Any}()
 for (name, t) in BenchmarkTools.leaves(results)
-    m = median(t)
+    m = minimum(t)
     out[join(name, "/")] = Dict(
         "time_ns" => time(m),
         "memory_bytes" => memory(m),
@@ -100,7 +110,7 @@ end
 println("\nWrote $out_path")
 
 # Pretty print
-println("\nName                                   median(μs)    allocs   memory")
+println("\nName                                   min(μs)       allocs   memory")
 println("-" ^ 75)
 for (k, v) in sort(collect(out); by = first)
     @printf("%-40s  %10.1f  %8d  %8d\n",

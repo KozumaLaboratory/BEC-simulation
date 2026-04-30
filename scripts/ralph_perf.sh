@@ -169,9 +169,10 @@ EOF
   fi
 
   # Compare bench/results.json (latest) against bench/baseline.json.
-  # Accept iff target_bench improved ≥5% AND no other bench regressed >5%.
-  # Wrapped in a function — Julia's soft scope eats `target_improved`
-  # assignments inside top-level for-loops, returning false always.
+  # Accept iff target_bench improved ≥10% AND no other bench regressed >10%.
+  # Threshold widened from 5% to 10% because BenchmarkTools minimum() on
+  # this WSL2 machine still has ~5% jitter (more for sub-100μs benches).
+  # 10% is above the noise floor for benches in the 500μs-3ms range.
   local verdict
   verdict="$($JULIA --project=. -e "
     using JSON
@@ -186,10 +187,10 @@ EOF
             old_t = base[k][\"time_ns\"]
             new_t = v[\"time_ns\"]
             ratio = new_t / old_t
-            if k == target && ratio < 0.95
+            if k == target && ratio < 0.90
                 target_improved = true
             end
-            if ratio > 1.05
+            if ratio > 1.10
                 any_regressed = true
                 push!(regressions, string(k, \" +\", round((ratio-1)*100; digits=1), \"%\"))
             end
