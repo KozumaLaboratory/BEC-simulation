@@ -32,7 +32,6 @@ pipeline:
       ddi: {enabled: true}
       potential: {type: harmonic, omega: [1.0, 1.0, 2.6]}
       zeeman:
-        level: 1
         Bz: "1.0 Gauss"                 # weak bias before stirring starts
       dt: 0.001                         # Dy164 ε_dd > 1 needs small dt (NaN at 0.005)
       n_steps: 30000                    # same total time, smaller dt
@@ -49,7 +48,6 @@ pipeline:
       save_snapshot_precision: "f32"
       interactions: {omega_ref: 314.159}
       zeeman:
-        level: 2
         B_mag: "1.0 Gauss"
         theta_deg: {from: 0.0, to: 35.0}
         phi_deg: 0.0
@@ -63,7 +61,6 @@ pipeline:
       save_snapshot_precision: "f32"
       interactions: {omega_ref: 314.159}
       zeeman:
-        level: 1
         Bz: "0.819 Gauss"
         Bx:
           chirped_sinusoidal:
@@ -90,7 +87,6 @@ pipeline:
                                          # the scratch JLD2 directly.
       interactions: {omega_ref: 314.159}
       zeeman:
-        level: 1
         Bz: "0.819 Gauss"
         Bx:
           sinusoidal:

@@ -14,24 +14,57 @@ const _ZEEMAN_SAMPLE_N = 1024  # default — increase for stir experiments via
 """
     _detect_zeeman_level(z::Dict) -> Int  (0, 1, or 2)
 
-Infer the level from keys present. Explicit `level:` key wins if set.
-Raises ArgumentError on mixed levels.
+The Zeeman Hamiltonian has two mathematically independent contributions:
+
+  H_Zeeman = -(g_F μ_B B · F) + q F_z²
+             ↑ vector (chooses coord system)   ↑ scalar (orthogonal)
+
+The "level" refers ONLY to the vector term's coordinate system:
+  Level 0 — dimensionless Cartesian:  p, bx, by  (with bz≡p)
+  Level 1 — Gauss-Cartesian:          Bx, By, Bz
+  Level 2 — Gauss-spherical:          B_mag, theta_deg, phi_deg
+
+`q` (quadratic Zeeman) is a scalar coupling that is allowed alongside
+any vector-coord system. It does NOT participate in level detection.
+
+Mixing keys across vector coord systems (e.g. `p:` and `B_mag:`) raises
+ArgumentError. Writing both an explicit `level:` AND vector-coord keys
+also raises (duplicate spec — pick one). The lone case where explicit
+`level:` is meaningful is an empty zeeman block being pre-declared for
+later override.
 """
 function _detect_zeeman_level(z::Dict)
-    has_l0 = any(haskey(z, k) for k in ("p", "q", "bx", "by"))
+    # Vector-coord keys per level. q is NOT here — it's coord-orthogonal.
+    has_l0 = any(haskey(z, k) for k in ("p", "bx", "by"))
     has_l1 = any(haskey(z, k) for k in ("Bx", "By", "Bz"))
-    has_l2 = haskey(z, "B_mag")
+    has_l2 = any(haskey(z, k) for k in ("B_mag", "theta_deg", "phi_deg"))
     explicit = get(z, "level", nothing)
 
-    levels_present = count(identity, (has_l0, has_l1, has_l2))
-    levels_present > 1 && throw(
+    coord_systems = count(identity, (has_l0, has_l1, has_l2))
+    coord_systems > 1 && throw(
         ArgumentError(
-            "zeeman: cannot mix Level 0 (p/q/bx/by), Level 1 (Bx/By/Bz), and Level 2 (B_mag)"),
+            "zeeman: cannot mix vector coord systems — " *
+            "Level 0 dimensionless Cartesian (p/bx/by), " *
+            "Level 1 Gauss Cartesian (Bx/By/Bz), " *
+            "Level 2 Gauss spherical (B_mag/theta_deg/phi_deg). " *
+            "Pick one. (`q` quadratic Zeeman is independent and can " *
+            "be combined with any of these.)",
+        ),
     )
 
     if explicit !== nothing
         lvl = Int(explicit)
         (lvl in (0, 1, 2)) || throw(ArgumentError("zeeman.level must be 0, 1, or 2; got $lvl"))
+        # Reject duplicate specs: either explicit `level:` OR vector-coord
+        # keys, not both. Auto-detect from keys is preferred.
+        coord_systems > 0 && throw(
+            ArgumentError(
+                "zeeman: explicit `level: $lvl` conflicts with vector-coord " *
+                "keys already present in the block. Drop the `level:` line — " *
+                "the keys imply the level (Bx/By/Bz → 1, " *
+                "B_mag/theta_deg/phi_deg → 2, p/bx/by → 0).",
+            ),
+        )
         return lvl
     end
 

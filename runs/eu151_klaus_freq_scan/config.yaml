@@ -31,7 +31,7 @@ pipeline:
       interactions: {omega_ref: 314.159, N_atoms: 50000}
       ddi: {enabled: true}
       potential: {type: harmonic, omega: [1.0, 1.0, 2.6]}
-      zeeman: {level: 1, Bz: "1.0 Gauss"}
+      zeeman: {Bz: "1.0 Gauss"}
       dt: 0.002                          # Eu ε_dd < 1, dt looser than Klaus
       n_steps: 15000
       tol: 1.0e-7
@@ -47,7 +47,6 @@ pipeline:
       save_snapshot_precision: "f32"
       interactions: {omega_ref: 314.159}
       zeeman:
-        level: 2
         B_mag: "1.0 Gauss"
         theta_deg: {from: 0.0, to: 35.0}
         phi_deg: 0.0
@@ -61,7 +60,6 @@ pipeline:
       save_snapshot_precision: "f32"
       interactions: {omega_ref: 314.159}
       zeeman:
-        level: 1
         Bz: "0.819 Gauss"
         Bx:
           chirped_sinusoidal:
@@ -86,7 +84,6 @@ pipeline:
       save_snapshot_precision: "f32"
       interactions: {omega_ref: 314.159}
       zeeman:
-        level: 1
         Bz: "0.819 Gauss"
         Bx:
           sinusoidal:
