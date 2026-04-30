@@ -2,80 +2,91 @@
 
 [![CI](https://github.com/anko9801/BEC-simulation/actions/workflows/ci.yml/badge.svg)](https://github.com/anko9801/BEC-simulation/actions/workflows/ci.yml)
 
-Spin- $F$ Bose-Einstein condensate simulator solving the spinor Gross-Pitaevskii equation in 1D/2D/3D via split-step Fourier method. Arbitrary spin $F$ , N-dimensional, 21 built-in atom species ( $F{=}0$ to $8$ ).
+A general-purpose solver for the spinor Gross–Pitaevskii equation: arbitrary
+spin $F$, 1D/2D/3D, contact + dipolar + LHY + Raman/Zeeman, on CPU or CUDA,
+driven entirely from YAML.
 
-## Quick Start
+## What it does well
+
+- **Arbitrary $F$.** The whole stack (spin matrices, Clebsch–Gordan, tensor
+  interactions, observables) works for any $F$, not just $F=1$ or $F=2$.
+  Tested through $F=8$ (¹⁶⁴Dy, 17 components) and routinely run for ¹⁵¹Eu
+  ($F=6$).
+- **Dipolar interactions are first-class.** $k$-space convolution in 6 FFTs,
+  zero-padded or quasi-2D (erfcx kernel), with the spin-orbital coupling
+  needed for Einstein–de Haas dynamics.
+- **A rotating-basis solver for fast magnetostir.** When the magnetic-field
+  direction $\hat B(t)$ varies on a timescale comparable to the Larmor
+  precession, the standard spinor split-step blows up unless $\Delta t$ is
+  pushed to absurd values. The `kind: rotating_basis` path co-rotates with
+  $\hat B(t)$ and absorbs the Larmor phase analytically, so Klaus-2022-style
+  protocols just work.
+- **YAML in, results out.** A run is one YAML file: `pipeline:` (ground
+  state → dynamics → analysis), `scan:` for sweeps, optional
+  `calibration_history:` so lab-deck values (mV, mW) are written verbatim
+  and parsed into physical units. Re-running a YAML resumes from the last
+  completed point.
+- **GPU is not an afterthought.** Both kinetic and DDI paths are CUDA-native
+  (CUFFT, in-place broadcasts), with a mixed-precision F32 path for large
+  grids.
+- **A live dashboard.** `serve_dashboard` exposes runs in a React + WebGPU
+  UI: 3D volume raymarch, per-component column densities, scan heatmaps,
+  and a status panel for in-progress runs.
+
+## Usage
 
 ```bash
-# Install
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
 
-# Run a YAML config (writes runs/<config>/point_NNN.jld2 and resumes if rerun)
-julia --project=. -e 'using SpinorBEC; run_yaml("runs/li7_quench/config.yaml")'
+# Run
+julia --project=. -e 'using CUDA, SpinorBEC; run_yaml("runs/eu151_edh/config.yaml")'
 
-# Live dashboard (React + WebGPU, served from web/dist/) — open the URL it prints
+# Browse
 julia --project=. -e 'using SpinorBEC; serve_dashboard(8765; base_dir="runs")'
-
-# Tests
-julia --project=. -e 'using Pkg; Pkg.test()'
 ```
 
-```julia
-using SpinorBEC
+WSL2 GPU users: prepend `LD_LIBRARY_PATH=/usr/lib/wsl/lib`.
 
-grid = make_grid(GridConfig((128,), (20.0,)))
-ip = InteractionParams(10.0, -0.5)   # c0, c1
-trap = HarmonicTrap((1.0,))
+## Physics
 
-# Ground state via imaginary-time propagation
-gs = find_ground_state(; grid, atom=Rb87, interactions=ip, potential=trap,
-    dt=0.005, n_steps=5000, tol=1e-10, initial_state=:polar)
+$$H = \sum_m \int \psi_m^\ast \left[ -\tfrac{\nabla^2}{2} + V - p\,m + q\,m^2 + c_0 n + c_1 \langle\mathbf{F}\rangle \cdot \mathbf{F} + H_{\mathrm{ddi}} + c_{\mathrm{LHY}} n^{5/2} + H_{\mathrm{Raman}} \right] \psi_m \, d\mathbf{r}$$
 
-# Real-time dynamics
-ws = make_workspace(; grid, atom=Rb87, interactions=ip, potential=trap,
-    zeeman=ZeemanParams(0.0, 0.1), sim_params=SimParams(dt=0.001, n_steps=5000),
-    psi_init=gs.workspace.state.psi)
-run_simulation!(ws)
+Internal units are dimensionless ($\hbar = m = \omega_{\mathrm{ref}} = 1$);
+the `Units` module handles physical conversion. Higher-rank tensor
+interactions ($S = 4, 6, \ldots$) are built from Clebsch–Gordan coefficients,
+and LHY uses the Lima–Pelster correction.
+
+The solver dispatches on `kind:`:
+
+- `spinor` — standard spinor GP. Static fields, weak-field phase transitions.
+- `rotating_basis` — Larmor-following frame, for fast magnetostir and any
+  protocol where $\hat B$ rotates faster than $1/\omega_{\mathrm{ref}}$.
+- `binary` — two-component GP.
+
+Ground states use imaginary-time propagation or LBFGS; dynamics use
+Strang/Yoshida integrators, with Truncated Wigner sampling, SGPE,
+photon scattering, and three-body loss available as composable per-step
+callbacks.
+
+## Repository layout
+
+```
+src/    Solvers, Hamiltonian terms, workflow, analysis
+runs/   YAML configs (Klaus magnetostir, Einstein–de Haas, phase diagrams, …)
+docs/   Design notes and reference papers
+test/   ~8600 tests, tiered (fast / ci / full)
+web/    React + WebGPU dashboard
+ext/    CUDA and Makie extensions
+bench/  Benchmarks
 ```
 
-## Physical Model
+`CLAUDE.md` is the full YAML schema reference and internal conventions;
+`docs/` has the design of each major subsystem.
 
-$$H = \sum_m \int \psi_m^{*} \left[ -\frac{\nabla^2}{2} + V - pm + qm^2 + c_0 n + c_1 \langle\mathbf{F}\rangle \cdot \mathbf{F} + H_{\mathrm{ddi}} + c_{\mathrm{LHY}} n^{5/2} + H_{\mathrm{Raman}} \right] \psi_m \, d\mathbf{r}$$
+## Tests
 
-Dimensionless units: $\hbar = m = \omega_{\mathrm{ref}} = 1$ . Physical quantities via `Units` module.
+```bash
+SPINORBEC_TEST_TIER=fast julia --project=. -e 'using Pkg; Pkg.test()'
+```
 
-| Term | Implementation |
-|------|----------------|
-| $c_0 n + c_1 \langle\mathbf{F}\rangle\cdot\mathbf{F}$ | Spin-independent + spin-dependent contact. $c_0, c_1$ from $a_0, a_2$ . Constraint mode $c_0 + F^2 c_1 = c_{\mathrm{total}}$ for unknown channels. |
-| General- $F$ tensor | CG-based mean-field for all channels $S{=}0,2,\ldots,2F$ . Higher-rank $c_k$ ( $k{=}4,6,\ldots$ ) via 6j transform. Replaces $c_0/c_1$ /nematic when active. |
-| DDI | $k$-space $Q_{\alpha\beta} = \hat{k}_\alpha\hat{k}_\beta - \delta/3$ convolution (6 FFTs). Zero-padded or quasi-2D (erfcx kernel). |
-| LHY | Beyond-mean-field $\propto n^{5/2}$ with Lima-Pelster $Q_5(\varepsilon_{\mathrm{dd}})$ correction. |
-| Raman / Losses | Two-photon coupling. $m$-dependent dipolar relaxation ( $m{=}{-}F$ stable). |
-
-## Numerical Methods
-
-**Split-step (Strang)**: `diag(dt/4) → SM(dt/4) → tensor(dt/4) → Raman(dt/4) → DDI(dt/2) → [mirror]` + full kinetic FFT. Substeps auto-skip when coupling $\approx 0$ . Leapfrog fusion merges adjacent half-steps in time loops.
-
-**Spin mixing**: Rodrigues ( $D{=}3$ ), Euler angle decomposition with $F_y$ eigencache + cis recurrence ( $D{>}3$ ). **DDI**: Euler rotation for spin projection; quasi-2D via erfcx $z$-integrated kernel. **Tensor**: Per-point Hermitian $h_{mm'}$ → eigendecomposition → $e^{-ih\,dt}$ . **Kinetic**: Batched FFT for all $D$ components.
-
-**Higher order**: Yoshida 4th-order ( $S_4 = S_2 \circ S_2 \circ S_2$ , 1.94x cost), embedded error estimator, PI controller adaptive $\Delta t$ . 2-5x speedup over adaptive Strang.
-
-**Ground state**: ITP with energy + wavefunction convergence. Multistart (multiple initial states), constrained $\langle F_z \rangle$ (Lagrange), parameter continuation, phase boundary bisection.
-
-**Large- $D$** ( $D{=}13$ , Eu151): `MVector`/`Matrix` instead of `SMatrix`, $O(D)$ raising/lowering. 167 GiB → 43 MiB alloc, 5.7x speedup on $32^3$ .
-
-## Examples
-
-| Config | Physics | Grid |
-|--------|---------|------|
-| `eu151_edh.yaml` | Einstein-de Haas: DDI spin relaxation, $J_z$ conservation (Matsui 2026) | 3D $64^3$ |
-| `eu151_phase_scan.yaml` | Phase diagram: quasi-2D DDI, $c_1/c_0$ sweep | 2D $64^2$ |
-| `li7_quench.yaml` | Polar→ferro quench: strong $c_1$ spin mixing | 3D $32^3$ |
-| `cr52_tensor.yaml` | Tensor interactions: channel-resolved $c_4, c_6$ + DDI | 2D $32^2$ |
-| `dy164_droplet.yaml` | DDI + LHY quantum droplet, $F{=}8$ (17 components) | 2D $32^2$ |
-
-Pipeline: `run_yaml("runs/<config>/config.yaml")` (YAML → resumable
-`runs/<config>/point_NNN.jld2`) → `serve_dashboard(port; base_dir="runs")`
-(React + WebGPU UI in `web/dist/` — 3D volume raymarch, per-component
-column densities, energy/Mz/populations time series, live status panel
-for in-progress runs via the `dynamics.live_monitor` knob).
+Tiers are `fast`, `ci`, `full`. CI runs all of them.
