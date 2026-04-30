@@ -262,6 +262,14 @@ Level-aware builder. Level 0 returns the existing `ZeemanParams` /
 using atom.g_F and a resolved omega_ref.
 """
 function _build_zeeman_dispatched(z::Dict, duration::Float64, atom, p_step::Dict)
+    # Multi-source: `sources: [...]` lists multiple B-vector contributions,
+    # each independently in L0/L1/L2. Sum at sample-grid level. `q` is
+    # global (coord-orthogonal scalar) and lives at the top of the zeeman
+    # block, NOT inside individual sources.
+    if haskey(z, "sources")
+        return _build_zeeman_multi_source(z, duration, atom, p_step)
+    end
+
     level = _detect_zeeman_level(z)
     if level == 0
         return _parse_zeeman(z, duration)
@@ -272,4 +280,75 @@ function _build_zeeman_dispatched(z::Dict, duration::Float64, atom, p_step::Dict
     else
         _build_zeeman_level2(z, duration, atom, omega_ref)
     end
+end
+
+"""
+Build a TimeDependentZeeman from a list of vector-source contributions
+that sum additively. Each source is independently L0/L1/L2 (auto-detect).
+The global scalar `q` (quadratic Zeeman) lives at the parent level, NOT
+per-source.
+"""
+function _build_zeeman_multi_source(z::Dict, duration::Float64, atom, p_step::Dict)
+    sources = z["sources"]
+    sources isa AbstractVector ||
+        throw(ArgumentError("zeeman.sources: must be a list, got $(typeof(sources))"))
+
+    omega_ref = _resolve_omega_ref(z, p_step)
+
+    # Build each source as a standalone TimeDependentZeeman (any level).
+    # We fork the source dict to avoid leaking `q:` (which we'll add once
+    # at the end) into each sub-builder.
+    sub_zeemans = TimeDependentZeeman[]
+    for (i, src) in enumerate(sources)
+        src isa AbstractDict || throw(ArgumentError(
+            "zeeman.sources[$i]: must be a mapping, got $(typeof(src))"))
+        # Each source carries its own coord-system keys. q is forced to 0
+        # in sub-builders; the parent's q is added separately below.
+        src_dict = Dict{Any, Any}(src)
+        src_dict["q"] = 0.0
+        sub_z = if haskey(src_dict, "Bx") || haskey(src_dict, "By") || haskey(src_dict, "Bz")
+            _build_zeeman_level1(src_dict, duration, atom, omega_ref)
+        elseif haskey(src_dict, "B_mag") || haskey(src_dict, "theta_deg") ||
+               haskey(src_dict, "phi_deg")
+            _build_zeeman_level2(src_dict, duration, atom, omega_ref)
+        else
+            # Treat as Level 0 vector source (p/bx/by). Wrap via _parse_zeeman.
+            zee = _parse_zeeman(src_dict, duration)
+            zee isa TimeDependentZeeman ? zee : _zeeman_to_time_dependent(zee, duration)
+        end
+        push!(sub_zeemans, sub_z)
+    end
+
+    # Sum each axis on a common time grid.
+    n = _ZEEMAN_SAMPLE_N
+    times = collect(range(0.0, duration; length=n))
+    total_p = zeros(Float64, n)
+    total_bx = zeros(Float64, n)
+    total_by = zeros(Float64, n)
+    for sub in sub_zeemans
+        for (i, t) in enumerate(times)
+            total_p[i]  += evaluate(sub.p_wf,  t)
+            total_bx[i] += sub.bx_wf === nothing ? 0.0 : evaluate(sub.bx_wf, t)
+            total_by[i] += sub.by_wf === nothing ? 0.0 : evaluate(sub.by_wf, t)
+        end
+    end
+
+    # Global q from the parent block.
+    q_wf = _make_waveform(get(z, "q", 0.0), duration; omega_ref=omega_ref)
+
+    p_wf = PiecewiseLinearWaveform(times, total_p)
+    bx_wf = all(x -> x == 0.0, total_bx) ?
+            nothing : PiecewiseLinearWaveform(times, total_bx)
+    by_wf = all(x -> x == 0.0, total_by) ?
+            nothing : PiecewiseLinearWaveform(times, total_by)
+    TimeDependentZeeman(p_wf, q_wf, bx_wf, by_wf)
+end
+
+"""Wrap a static `ZeemanParams` into a `TimeDependentZeeman` for uniform
+handling in multi-source summation."""
+function _zeeman_to_time_dependent(z::ZeemanParams, duration::Float64)
+    times = [0.0, duration]
+    p_wf = PiecewiseLinearWaveform(times, [z.p, z.p])
+    q_wf = PiecewiseLinearWaveform(times, [z.q, z.q])
+    TimeDependentZeeman(p_wf, q_wf, nothing, nothing)
 end
