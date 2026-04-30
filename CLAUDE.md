@@ -139,6 +139,38 @@ declared in the parent `ground_state.interactions`. `phi_chirp.{from,to}`
 accept the same forms. Eliminates the documented Klaus 2022 magnetostir
 2π footgun (MEMORY.md `gotcha_waveform_frequency_convention.md`).
 
+**YAML schema overhaul (2026-04-30, 8 phases)**: 5 opt-in pre-parse
+stages applied between calibration and schema validation:
+
+```yaml
+units: {B: Gauss, ω: Hz, t: ms}      # bare Reals → quantity strings
+accuracy: 1.0e-6                     # → epsilon: on rotating_basis steps
+auto_grid: true                      # → grid: from TF radius
+
+template: klaus_magnetostir          # → 4-phase pipeline
+parameters: {atom: Eu151, B_static: "1 Gauss", ...}
+
+defaults: {kind: rotating_basis}     # seeds every step's missing fields
+mixins: {eu151_phys: {atom: Eu151, ...}}  # named param sets, use: [...] to import
+
+scan:
+  zip:
+    parameters.stir_freq:
+      from: "50 Hz"  ; to: "900 Hz"  ; n: 8  ; scale: log
+```
+
+zeeman additive composition: `sources: [{B_mag: "1G", theta_deg: 35},
+{Bx: ...}]` for L2 base + L1 perturbation. ε hardening: `epsilon ≥ 1e-3
++ p·F·dt > π` is now a hard error (not warn).
+
+Showcase: `runs/samples/eu151_klaus_lab_units/config.yaml` (25 lines)
+reproduces the 4-phase Klaus protocol that legacy YAML wrote in 65
+lines (62% reduction). Both `runs/phi_omega_scan/` and
+`runs/berry_crossover_scan/` migrated 2026-04-30. Migration to existing
+configs is OPT-IN: legacy bare-Real YAMLs continue to parse unchanged
+(no behavior change without `units:` / `template:` / `accuracy:` etc.).
+Memory: [yaml_lab_units_design](yaml_lab_units_design.md).
+
 **State zoo**: 22 named builders in `init_psi_<name>` shape (see
 `src/workflow/initialization/state_zoo.jl`). All wrap the same
 `init_psi(state=:..., init_state_params=...)` dispatch — same physics,
