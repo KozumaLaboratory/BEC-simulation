@@ -120,8 +120,18 @@ function _expand_values(spec)
     spec isa AbstractVector && return collect(spec)
     spec isa Dict || throw(ArgumentError("Scan values must be a list or {from, to, ...} dict"))
 
-    from = Float64(spec["from"])
-    to = Float64(spec["to"])
+    # Unit-aware from/to: if either endpoint is a Quantity string ("50 Hz",
+    # "1 mG", "100 ms"), parse it to a Quantity and emit the intermediate
+    # values in the SAME unit as Quantity strings. The downstream per-field
+    # parser handles the unit interpretation.
+    raw_from = spec["from"]
+    raw_to = spec["to"]
+    if raw_from isa AbstractString || raw_to isa AbstractString
+        return _expand_values_unit_aware(spec, raw_from, raw_to)
+    end
+
+    from = Float64(raw_from)
+    to = Float64(raw_to)
 
     if haskey(spec, "step")
         step = Float64(spec["step"])
@@ -164,6 +174,55 @@ function _expand_values(spec)
             ),
         )
     end
+end
+
+"""
+Unit-aware scan expansion. Both endpoints may be Quantity strings
+("50 Hz", "1 mG"); intermediate values are emitted in the FROM-side
+unit so downstream per-field parsers see consistent unit strings.
+
+Supports `scale: linear` (default) and `scale: log`. Other scales fall
+back to numeric expansion in the unit-stripped value.
+"""
+function _expand_values_unit_aware(spec::Dict, raw_from, raw_to)
+    n = Int(get(spec, "n", 11))
+    n >= 2 || throw(ArgumentError("scan n must be >= 2"))
+    scale = Symbol(get(spec, "scale", "linear"))
+
+    q_from = raw_from isa AbstractString ?
+             Units.safe_parse_quantity(raw_from) : raw_from
+    q_to = raw_to isa AbstractString ?
+           Units.safe_parse_quantity(raw_to) : raw_to
+
+    # Pick a target unit from the FROM side (or TO if FROM is a plain number).
+    unit_str, from_val, to_val = if q_from isa Unitful.Quantity
+        u = string(Unitful.unit(q_from))
+        f = Float64(Unitful.ustrip(q_from))
+        # Convert to the same unit
+        t = q_to isa Unitful.Quantity ?
+            Float64(Unitful.ustrip(Unitful.uconvert(Unitful.unit(q_from), q_to))) :
+            Float64(q_to)
+        (u, f, t)
+    else
+        u = string(Unitful.unit(q_to))
+        t = Float64(Unitful.ustrip(q_to))
+        f = Float64(q_from)
+        (u, f, t)
+    end
+
+    raw_values = if scale == :linear
+        collect(range(from_val, to_val; length=n))
+    elseif scale == :log
+        from_val > 0 && to_val > 0 ||
+            throw(ArgumentError("log scale requires positive from/to"))
+        [exp(v) for v in range(log(from_val), log(to_val); length=n)]
+    else
+        throw(ArgumentError(
+            "scan scale=$scale not supported with unit-bearing from/to. " *
+            "Use linear or log; or strip units and use a numeric scan."))
+    end
+    # Emit as "value unit" strings so the downstream parser handles them.
+    [string(v, " ", unit_str) for v in raw_values]
 end
 
 function _expand_zip(d::Dict)
