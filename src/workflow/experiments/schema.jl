@@ -94,8 +94,7 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     # Unified `save:` block. Sub-keys: every (steps) | n_snapshots (frames)
     # | psi (Bool) | compression (Bool) | precision ("f32"|"f64").
     "save" => FieldSpec(; type=Dict),
-    "rotating_frame_omega" => FieldSpec(; type=Number),
-    "spin_rotating_frame_omega" => FieldSpec(; type=Number),
+    "rotating_frame_omega" => FieldSpec(; type=Number),    # spatial (rotating bucket)
     "ddi" => FieldSpec(; type=Union{Dict, Bool}),
     "zeeman" => FieldSpec(; type=Dict),
     "interactions" => FieldSpec(; type=Dict),

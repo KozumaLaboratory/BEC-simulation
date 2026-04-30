@@ -118,6 +118,10 @@ function run_yaml(yaml_path::String; base_dir::String="runs", verbose::Bool=true
     # runner. Validates Cartesian/spherical mutual exclusion.
     apply_B_block_normalize!(data)
 
+    # Unified `noise:` block → temperature_ratio / twa / sgpe / etc.
+    # Validates `initial.thermal` ⊕ `twa` mutex.
+    apply_noise_block_normalize!(data)
+
     # Schema validation: catch typos and invalid values before starting.
     # strict=true fails the run on unknown keys; this is the production
     # default so silent-drop bugs (2026-04-27 `trap:` incident) cannot

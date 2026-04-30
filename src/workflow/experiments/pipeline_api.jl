@@ -12,6 +12,7 @@ function load_config(path::String)
     apply_units_block!(data)
     apply_auto_defaults!(data)
     apply_B_block_normalize!(data)
+    apply_noise_block_normalize!(data)
     prev = get(ENV, "SPINORBEC_YAML_DIR", nothing)
     ENV["SPINORBEC_YAML_DIR"] = dirname(abspath(path))
     try
@@ -29,6 +30,7 @@ function load_config_from_string(yaml_str::String)
     apply_units_block!(data)
     apply_auto_defaults!(data)
     apply_B_block_normalize!(data)
+    apply_noise_block_normalize!(data)
     parse_pipeline(data)
 end
 

@@ -583,7 +583,9 @@ function _run_step(
 
     n_steps = round(Int, duration / dt)
     rf_omega = Float64(get(p, "rotating_frame_omega", 0.0))
-    spin_rf_omega = Float64(get(p, "spin_rotating_frame_omega", 0.0))
+    # spin_rotating_frame_omega removed 2026-04-30 — subsumed by `kind:
+    # rotating_basis` (Option γ removes Larmor analytically).
+    spin_rf_omega = 0.0
     sp = SimParams(; dt, n_steps, save_every,
         rotating_frame_omega=rf_omega,
         spin_rotating_frame_omega=spin_rf_omega)
