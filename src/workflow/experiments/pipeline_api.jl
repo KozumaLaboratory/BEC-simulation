@@ -10,6 +10,7 @@ function load_config(path::String)
     data = YAML.load_file(path)
     apply_templates_and_mixins!(data)
     apply_units_block!(data)
+    apply_auto_defaults!(data)
     prev = get(ENV, "SPINORBEC_YAML_DIR", nothing)
     ENV["SPINORBEC_YAML_DIR"] = dirname(abspath(path))
     try
@@ -25,6 +26,7 @@ function load_config_from_string(yaml_str::String)
     data = YAML.load(yaml_str)
     apply_templates_and_mixins!(data)
     apply_units_block!(data)
+    apply_auto_defaults!(data)
     parse_pipeline(data)
 end
 

@@ -110,6 +110,10 @@ function run_yaml(yaml_path::String; base_dir::String="runs", verbose::Bool=true
     # touches bare Reals).
     apply_units_block!(data)
 
+    # Top-level `accuracy:` and `auto_grid:` shortcuts → physics-first
+    # defaults seeded into pipeline steps where missing.
+    apply_auto_defaults!(data)
+
     # Schema validation: catch typos and invalid values before starting.
     # strict=true fails the run on unknown keys; this is the production
     # default so silent-drop bugs (2026-04-27 `trap:` incident) cannot

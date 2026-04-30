@@ -148,6 +148,8 @@ const TOP_LEVEL_KEYS = Set([
     "units",             # opt-in lab-unit interpretation of bare Reals
     "defaults",          # per-step seeded fallbacks (DRY across pipeline)
     "mixins",            # named parameter sets pulled into the config
+    "accuracy",          # ε accuracy budget — seeds rotating_basis epsilon
+    "auto_grid",         # bool — enable TF-radius grid auto-derivation
     "metadata",          # free-form provenance, ignored at runtime
     "name",              # human-readable label for the scenario
     "notes",             # free-form notes
