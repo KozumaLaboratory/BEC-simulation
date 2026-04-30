@@ -1,41 +1,67 @@
-# Sample: lab-unit YAML with auto-applied calibration.
-# Top-level `calibration_history:` + `target_date:` interpolates between
-# weekly snapshots, then rewrites zeeman.p_mv / trap.fort_power_mw into
-# Unitful strings the schema parser understands.
-
+target_date: "2026-04-08"
 calibration_history:
-  - date: "2026-04-01"
-    coil_strong: {gauss_per_mv: 0.40, gauss_offset: 0.05}
-    coil_weak:   {gauss_per_mv: 0.04, gauss_offset: 0.002}
-    fort:        {sqrt_coeffs_hz: [450.0, 450.0, 600.0]}
-    microwave:   {rad_per_s_per_mw: 1.2e6}
-  - date: "2026-04-15"
-    coil_strong: {gauss_per_mv: 0.42, gauss_offset: 0.04}     # week-2 drift
-    coil_weak:   {gauss_per_mv: 0.038, gauss_offset: 0.003}
-    fort:        {sqrt_coeffs_hz: [443.0, 443.0, 596.0]}
-    microwave:   {rad_per_s_per_mw: 1.18e6}
-
-target_date: "2026-04-08"   # ← interpolated between week-1 and week-2
-
+  - fort:
+      sqrt_coeffs_hz:
+        - 450.0
+        - 450.0
+        - 600.0
+    coil_strong:
+      gauss_per_mv: 0.4
+      gauss_offset: 0.05
+    date: "2026-04-01"
+    coil_weak:
+      gauss_per_mv: 0.04
+      gauss_offset: 0.002
+    microwave:
+      rad_per_s_per_mw: 1.2e6
+  - fort:
+      sqrt_coeffs_hz:
+        - 443.0
+        - 443.0
+        - 596.0
+    coil_strong:
+      gauss_per_mv: 0.42
+      gauss_offset: 0.04
+    date: "2026-04-15"
+    coil_weak:
+      gauss_per_mv: 0.038
+      gauss_offset: 0.003
+    microwave:
+      rad_per_s_per_mw: 1.18e6
 pipeline:
   - ground_state:
-      atom: Eu151
-      grid: {n: [32, 32, 24], box: [12.0, 12.0, 8.0]}
-      interactions: {N_atoms: 30000, omega_ref: 691.15, c1_ratio: 0.028}
-      ddi: {enabled: true}
-      zeeman:
-        p_mv: 2.5            # → strong coil → ~1.05 G → bfield_to_p
-        coil_mode: strong
-        q: 0.1
-      potential:
-        type: harmonic
-        fort_power_mw: [50.0, 50.0, 100.0]   # → omega: ["X Hz", ...]
       dt: 0.005
-      n_steps: 4000
+      atom: "Eu151"
+      potential:
+        fort_power_mw:
+          - 50.0
+          - 50.0
+          - 100.0
+        type: "harmonic"
+      backend: "cuda"
+      B:
+        p_mv: 2.5
+        coil_mode: "strong"
+        q: 0.1
+      initial_state: "polar"
       tol: 1.0e-7
-      initial_state: polar
-      backend: cuda
-
+      ddi:
+        enabled: true
+      grid:
+        box:
+          - 12.0
+          - 12.0
+          - 8.0
+        n:
+          - 32
+          - 32
+          - 24
+      interactions:
+        omega_ref: 691.15
+        c1_ratio: 0.028
+        N_atoms: 30000
+      n_steps: 4000
   - analyze:
       - phase_classify: {}
-      - summary_json: {path: runs/samples/eu151_lab_calibrated/summary.json}
+      - summary_json:
+          path: "runs/samples/eu151_lab_calibrated/summary.json"

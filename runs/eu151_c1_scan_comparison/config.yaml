@@ -1,52 +1,62 @@
-# Eu151 c1_ratio scan with FL vortex vs uniform polarized comparison
-#
-# At each c1_ratio value, runs TWO ground-state calculations:
-#   - uniform_polarized: ferromagnetic_min state with target_Mz = -6
-#   - fl_vortex:         spin-coherent state with θ=π/2, vortex charge 1
-# and outputs both energies side-by-side for direct comparison.
-#
-# The transition c1_ratio where E_FL < E_uniform marks the boundary of the
-# magnetic vortex phase in the Eu151 phase diagram.
-
+scan:
+  comparison_runs:
+    - name: "uniform_polarized"
+      override:
+        pipeline.0.initial_state: "ferromagnetic_min"
+        pipeline.0.target_magnetization: -6.0
+    - name: "fl_vortex"
+      override:
+        pipeline.0.initial_state: "spin_coherent"
+        pipeline.0.init_state_params:
+          init_theta: 1.5707963267948966
+          init_vortex_charge: 1
+        pipeline.0.target_magnetization: 0.0
+  zip:
+    pipeline.0.interactions.c1_ratio:
+      - -0.02
+      - -0.018
+      - -0.016
+      - -0.014
+      - -0.012
+      - -0.01
+      - -0.008
+      - -0.006
+      - -0.004
+      - -0.002
+      - 0.0
+  continuation: true
 pipeline:
   - ground_state:
-      atom: Eu151
-      grid:
-        n: [64, 64, 64]
-        box: [20.0, 20.0, 20.0]
-      interactions:
-        N_atoms: 50000
-        omega_ref: 691.15
-        c1_ratio: 0.0           # overridden by scan
-        c_lhy: 1135.0
+      dt: 0.0001
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 1.1818
+        type: "harmonic"
+      backend: "cuda"
+      B:
+        q: 0.0
+        p: 0.0
+      initial_state: "ferromagnetic_min"
+      tol: 1.0e-7
       ddi:
         enabled: true
-      zeeman:
-        p: 0.0
-        q: 0.0
-      potential: {type: harmonic, omega: [1.0, 1.0, 1.1818]}
-      dt: 0.0001
+      grid:
+        box:
+          - 20.0
+          - 20.0
+          - 20.0
+        n:
+          - 64
+          - 64
+          - 64
+      interactions:
+        c_lhy: 1135.0
+        omega_ref: 691.15
+        c1_ratio: 0.0
+        N_atoms: 50000
       n_steps: 100000
-      tol: 1.0e-7
-      initial_state: ferromagnetic_min   # overridden by comparison runs
-      backend: cuda
-
   - analyze:
       - phase_classify: {}
-
-scan:
-  zip:
-    pipeline.0.interactions.c1_ratio: [-0.020, -0.018, -0.016, -0.014, -0.012, -0.010, -0.008, -0.006, -0.004, -0.002, 0.000]
-  continuation: true
-  comparison_runs:
-    - name: uniform_polarized
-      override:
-        pipeline.0.initial_state: ferromagnetic_min
-        pipeline.0.target_magnetization: -6.0
-    - name: fl_vortex
-      override:
-        pipeline.0.initial_state: spin_coherent
-        pipeline.0.target_magnetization: 0.0
-        pipeline.0.init_state_params:
-          init_theta: 1.5707963267948966   # π/2
-          init_vortex_charge: 1

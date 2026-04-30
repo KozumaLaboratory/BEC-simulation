@@ -1,34 +1,42 @@
-# Eu151 ground state: discrete c_dd continuation (0 → auto)
-#
-# Ramp DDI strength in 20 steps, using each converged state as
-# initial condition for the next. Finer steps than before (8 → 20)
-# with fewer ITP iterations per step (warm start from previous).
-
-pipeline:
-  - ground_state:
-      atom: Eu151
-      grid:
-        n: [64, 64, 64]
-        box: [20.0, 20.0, 20.0]
-      interactions:
-        N_atoms: 50000
-        omega_ref: 691.15
-        c1_ratio: -0.01
-      ddi:
-        enabled: true
-        c_dd: 0.0
-      zeeman: {p: 0.39, q: 0.0}
-      potential: {type: harmonic, omega: [1.0, 1.0, 1.1818]}
-      dt: 0.0005
-      n_steps: 20000
-      tol: 1.0e-6
-      initial_state: antiferromagnetic
-      backend: cuda
-
-  - analyze:
-      - phase_classify: {}
-
 scan:
   zip:
-    pipeline.0.ddi.c_dd: {from: 0, to: 212, n: 20}
+    pipeline.0.ddi.c_dd:
+      to: 212
+      from: 0
+      n: 20
   continuation: true
+pipeline:
+  - ground_state:
+      dt: 0.0005
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 1.1818
+        type: "harmonic"
+      backend: "cuda"
+      B:
+        q: 0.0
+        p: 0.39
+      initial_state: "antiferromagnetic"
+      tol: 1.0e-6
+      ddi:
+        c_dd: 0.0
+        enabled: true
+      grid:
+        box:
+          - 20.0
+          - 20.0
+          - 20.0
+        n:
+          - 64
+          - 64
+          - 64
+      interactions:
+        omega_ref: 691.15
+        c1_ratio: -0.01
+        N_atoms: 50000
+      n_steps: 20000
+  - analyze:
+      - phase_classify: {}

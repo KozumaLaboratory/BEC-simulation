@@ -1,32 +1,36 @@
-# Eu151 ground state with LHY correction (Li & Saito method).
-#
-# Starts from m=0 polar (zero field) with scalar LHY correction enabled.
-# Uses c1_ratio=0 (Li & Saito: spin-dependent interaction neglected).
-# DDI + LHY balance stabilizes the ground state against collapse.
-
 pipeline:
   - ground_state:
-      cache: runs/shared/eu151_64x3_box20_c1r0.0_ddi7647_lhy1135_polar.jld2
-      atom: Eu151
-      grid:
-        n: [64, 64, 64]
-        box: [20.0, 20.0, 20.0]
-      interactions:
-        N_atoms: 50000
-        omega_ref: 691.15
-        c1_ratio: 0.0
-        c_lhy: 1135.0            # computed from (128/3√π)√(a_s³/a_ho³)·N·Q₅(ε_dd)
+      dt: 0.0005
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 1.1818
+        type: "harmonic"
+      backend: "cuda"
+      B:
+        q: 0.0
+        p: 0.0
+      initial_state: "polar"
+      tol: 1.0e-8
       ddi:
         enabled: true
-      zeeman:
-        p: 0.0
-        q: 0.0
-      potential: {type: harmonic, omega: [1.0, 1.0, 1.1818]}
-      dt: 0.0005
+      cache: "runs/shared/eu151_64x3_box20_c1r0.0_ddi7647_lhy1135_polar.jld2"
+      grid:
+        box:
+          - 20.0
+          - 20.0
+          - 20.0
+        n:
+          - 64
+          - 64
+          - 64
+      interactions:
+        c_lhy: 1135.0
+        omega_ref: 691.15
+        c1_ratio: 0.0
+        N_atoms: 50000
       n_steps: 100000
-      tol: 1.0e-8
-      initial_state: polar        # m=0, allows spontaneous magnetization
-      backend: cuda
-
   - analyze:
       - phase_classify: {}

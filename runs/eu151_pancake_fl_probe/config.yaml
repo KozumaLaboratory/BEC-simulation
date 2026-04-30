@@ -1,93 +1,144 @@
-# ================================================================
-# Eu151 pancake FL probe: 2-stage approach
-# ================================================================
-#
-# Stage 1: GS without DDI (ITP converges perfectly)
-# Stage 2: GS with DDI via c_dd ramp 0→full (uses stage 1 as init)
-#
-# The 2-stage pipeline ensures DDI is ramped *after* a good
-# starting state, avoiding the DDI ITP instability.
-# ================================================================
-
-pipeline:
-  # Stage 1: converge without DDI
-  - ground_state:
-      atom: Eu151
-      grid:
-        n: [64, 64, 16]
-        box: [16.0, 16.0, 3.0]
-      interactions:
-        N_atoms: 50000
-        omega_ref: 691.15
-        c1_ratio: 0.0
-        c_lhy: 1135.0
-      ddi:
-        enabled: false
-      zeeman:
-        p: 0.0
-        q: 0.0
-      potential: {type: harmonic, omega: [1.0, 1.0, 10.0]}
-      dt: 0.0001
-      n_steps: 100000
-      tol: 1.0e-7
-      initial_state: ferromagnetic_min
-      backend: cuda
-
-  # Stage 2: ramp c_dd from 0 to full
-  - ground_state:
-      atom: Eu151
-      grid:
-        n: [64, 64, 16]
-        box: [16.0, 16.0, 3.0]
-      interactions:
-        N_atoms: 50000
-        omega_ref: 691.15
-        c1_ratio: 0.0
-        c_lhy: 1135.0
-      ddi:
-        enabled: true
-        c_dd: {from: 0.0, to: 212.0, adaptive: true, step: 500.0, threshold: 0.1}
-      zeeman:
-        p: 0.0
-        q: 0.0
-      potential: {type: harmonic, omega: [1.0, 1.0, 10.0]}
-      dt: 0.0001
-      n_steps: 500000
-      tol: 1.0e-7
-      backend: cuda
-
-  - analyze:
-      - phase_classify: {}
-
 scan:
-  zip:
-    pipeline.1.potential:
-      - {type: harmonic, omega: [1.0, 1.0, 10.0]}
-      - {type: harmonic, omega: [1.0, 1.0, 20.0]}
-      - {type: harmonic, omega: [1.0, 1.0, 30.0]}
-    pipeline.1.grid.box:
-      - [16.0, 16.0, 3.0]
-      - [16.0, 16.0, 1.5]
-      - [16.0, 16.0, 1.0]
-    pipeline.0.potential:
-      - {type: harmonic, omega: [1.0, 1.0, 10.0]}
-      - {type: harmonic, omega: [1.0, 1.0, 20.0]}
-      - {type: harmonic, omega: [1.0, 1.0, 30.0]}
-    pipeline.0.grid.box:
-      - [16.0, 16.0, 3.0]
-      - [16.0, 16.0, 1.5]
-      - [16.0, 16.0, 1.0]
-
   comparison_runs:
-    - name: uniform_polarized
+    - name: "uniform_polarized"
       override:
-        pipeline.0.initial_state: ferromagnetic_min
+        pipeline.0.initial_state: "ferromagnetic_min"
         pipeline.0.target_magnetization: -6.0
-
-    - name: fl_vortex
+    - name: "fl_vortex"
       override:
-        pipeline.0.initial_state: spin_coherent
-        pipeline.0.target_magnetization: 0.0
+        pipeline.0.initial_state: "spin_coherent"
         pipeline.0.init_state_params:
           init_theta: 1.5707963267948966
           init_vortex_charge: 1
+        pipeline.0.target_magnetization: 0.0
+  zip:
+    pipeline.1.potential:
+      - omega:
+          - 1.0
+          - 1.0
+          - 10.0
+        type: "harmonic"
+      - omega:
+          - 1.0
+          - 1.0
+          - 20.0
+        type: "harmonic"
+      - omega:
+          - 1.0
+          - 1.0
+          - 30.0
+        type: "harmonic"
+    pipeline.0.potential:
+      - omega:
+          - 1.0
+          - 1.0
+          - 10.0
+        type: "harmonic"
+      - omega:
+          - 1.0
+          - 1.0
+          - 20.0
+        type: "harmonic"
+      - omega:
+          - 1.0
+          - 1.0
+          - 30.0
+        type: "harmonic"
+    pipeline.0.grid.box:
+      -
+        - 16.0
+        - 16.0
+        - 3.0
+      -
+        - 16.0
+        - 16.0
+        - 1.5
+      -
+        - 16.0
+        - 16.0
+        - 1.0
+    pipeline.1.grid.box:
+      -
+        - 16.0
+        - 16.0
+        - 3.0
+      -
+        - 16.0
+        - 16.0
+        - 1.5
+      -
+        - 16.0
+        - 16.0
+        - 1.0
+pipeline:
+  - ground_state:
+      dt: 0.0001
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 10.0
+        type: "harmonic"
+      backend: "cuda"
+      B:
+        q: 0.0
+        p: 0.0
+      initial_state: "ferromagnetic_min"
+      tol: 1.0e-7
+      ddi:
+        enabled: false
+      grid:
+        box:
+          - 16.0
+          - 16.0
+          - 3.0
+        n:
+          - 64
+          - 64
+          - 16
+      interactions:
+        c_lhy: 1135.0
+        omega_ref: 691.15
+        c1_ratio: 0.0
+        N_atoms: 50000
+      n_steps: 100000
+  - ground_state:
+      dt: 0.0001
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 10.0
+        type: "harmonic"
+      backend: "cuda"
+      B:
+        q: 0.0
+        p: 0.0
+      tol: 1.0e-7
+      ddi:
+        c_dd:
+          step: 500.0
+          adaptive: true
+          threshold: 0.1
+          to: 212.0
+          from: 0.0
+        enabled: true
+      grid:
+        box:
+          - 16.0
+          - 16.0
+          - 3.0
+        n:
+          - 64
+          - 64
+          - 16
+      interactions:
+        c_lhy: 1135.0
+        omega_ref: 691.15
+        c1_ratio: 0.0
+        N_atoms: 50000
+      n_steps: 500000
+  - analyze:
+      - phase_classify: {}

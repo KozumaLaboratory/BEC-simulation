@@ -1,31 +1,43 @@
-# Smoke test for the save_psi_snapshots pipeline plumbing.
-# Runs in a minute or two on GPU. Verifies only that
-# `dynamics/psi_snapshots` is written with the expected shape; don't
-# read any physics off this run.
-
 pipeline:
   - ground_state:
-      cache: runs/shared/eu151_gs_p100_fmmin_c1r0_64.jld2
-      atom: Eu151
-      grid: {n: [64, 64, 64], box: [20.0, 20.0, 20.0]}
+      dt: 0.005
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 1.182
+        type: "harmonic"
+      backend: "cuda"
+      B:
+        q: 0.0
+        p: 100.0
+      initial_state: "ferromagnetic_min"
+      tol: 1.0e-10
+      ddi:
+        enabled: true
+      cache: "runs/shared/eu151_gs_p100_fmmin_c1r0_64.jld2"
+      grid:
+        box:
+          - 20.0
+          - 20.0
+          - 20.0
+        n:
+          - 64
+          - 64
+          - 64
       interactions:
-        N_atoms: 50000
         omega_ref: 691.15
         c1_ratio: 0.0
-      ddi: {enabled: true}
-      zeeman: {p: 100.0, q: 0.0}
-      potential: {type: harmonic, omega: [1.0, 1.0, 1.182]}
-      dt: 0.005
+        N_atoms: 50000
       n_steps: 100000
-      tol: 1.0e-10
-      initial_state: ferromagnetic_min
-      backend: cuda
-
   - dynamics:
       duration: 0.1
+      B:
+        q: 0.0
+        p: 0.39
+      save_every: 20
+      noise_seed: 42
       dt: 0.001
-      save_every: 20           # 5 snapshots
       save_psi_snapshots: true
       seed_amplitude: 1.0e-6
-      noise_seed: 42
-      zeeman: {p: 0.39, q: 0.0}

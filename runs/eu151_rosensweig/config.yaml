@@ -1,64 +1,52 @@
-# ================================================================
-# Eu151 Rosensweig pattern (Phase 6 / P6.5)
-# ================================================================
-#
-# Quasi-2D dipolar BEC with the magnetic-field axis tilted into the
-# trap plane. With ε_dd > 1 the homogeneous condensate is unstable to
-# a hexagonal "finger" pattern at a wavelength set by the dipolar
-# healing length λ_R ~ √(ξ ξ_dd).
-#
-# References:
-#   - Cooper, Phys. Rev. A 92, 053633 (2015): single-component dBEC
-#     hex pattern from a roton-mode softening
-#   - Kadau et al., Nature 530, 194 (2016): observation in Dy164
-#
-# This config drives Eu151 (μ ≈ 7 μ_B, F=6) into the same regime by
-# (i) freezing the spinor with a strong p, (ii) confining tightly along
-# z (quasi-2D), and (iii) tuning c_total so c_dd / c_total > 1.
-#
-# Output: the `rosensweig_pattern` analyzer reports
-#   peak_k          — dominant in-plane wavenumber
-#   lambda_peak     — pattern wavelength (a_ho units)
-#   pattern_strength — peak_power / DC_power (dimensionless)
-#   n_petals        — angular fold count (6 for hex, 0 for stripe)
-# ================================================================
-
 pipeline:
   - ground_state:
-      atom: Eu151
-      grid: {n: [64, 64], box: [16.0, 16.0]}
-      interactions:
-        N_atoms: 50000
-        omega_ref: 691.15        # 2π × 110 Hz
-        c_total: 4500            # tune below the c_dd ≈ 7647 → ε_dd > 1
-        c1_ratio: 0.0
-      ddi:
-        enabled: true
-        quasi_2d: true           # 2D BEC with z-integrated kernel
-        l_z: 0.4                 # tight z-confinement (a_ho units)
-      zeeman: {p: 100.0, q: 0.0}
-      potential: {type: harmonic, omega: [1.0, 1.0]}
       dt: 0.005
-      n_steps: 30000
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+        type: "harmonic"
+      backend: "cuda"
+      B:
+        q: 0.0
+        p: 100.0
+      initial_state: "ferromagnetic_min"
       tol: 1.0e-9
-      initial_state: ferromagnetic_min
-      backend: cuda
-
-  # Slow ramp into the unstable regime so the pattern grows from
-  # zero-point fluctuations + a tiny seed (band-limited so DDI
-  # doesn't amplify UV grass into structureless noise).
+      ddi:
+        quasi_2d: true
+        l_z: 0.4
+        enabled: true
+      grid:
+        box:
+          - 16.0
+          - 16.0
+        n:
+          - 64
+          - 64
+      interactions:
+        omega_ref: 691.15
+        c1_ratio: 0.0
+        N_atoms: 50000
+        c_total: 4500
+      n_steps: 30000
   - dynamics:
       duration: 5.0
-      dt: 0.001
+      B:
+        q: 0.0
+        p: 100.0
       save_every: 500
-      seed_amplitude: 1.0e-5
-      seed_k_cut: 2.0            # ~ pattern band
+      seed_k_cut: 2.0
       noise_seed: 7
-      live_monitor: {every: 200}
-      zeeman: {p: 100.0, q: 0.0}
+      live_monitor:
+        every: 200
+      dt: 0.001
+      seed_amplitude: 1.0e-5
       save_psi_snapshots: true
-
   - analyze:
-      - rosensweig_pattern: {n_radial_bins: 32, n_angular: 64}
+      - rosensweig_pattern:
+          n_radial_bins: 32
+          n_angular: 64
       - phase_classify: {}
-      - summary_json: {path: summary.json}
+      - summary_json:
+          path: "summary.json"

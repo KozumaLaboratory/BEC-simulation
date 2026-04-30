@@ -1,23 +1,36 @@
-# Sample: Rb87 spin-orbit coupling via Raman with k_eff != 0.
-# Demonstrates RamanCoupling momentum transfer (synthetic spin-orbit).
-# Reference: Lin et al., Nature 471, 83 (2011).
 pipeline:
   - ground_state:
-      atom: Rb87
-      grid: {n: [64, 64], box: [12.0, 12.0]}
-      interactions: {c0: 100.0, c1: -2.0}
-      zeeman: {p: 0.0, q: 0.0}
-      potential: {type: harmonic, omega: [1.0, 1.0]}
-      dt: 0.005
-      n_steps: 5000
-      tol: 1.0e-7
-      initial_state: polar
       raman:
-        Omega: 4.0                       # Rabi frequency (rad/ω_ref)
-        delta: 0.0                       # detuning
-        k_eff: [2.0, 0.0]                # SOC momentum kick (units of 1/a_ho)
-
+        Omega: 4.0
+        k_eff:
+          - 2.0
+          - 0.0
+        delta: 0.0
+      dt: 0.005
+      atom: "Rb87"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+        type: "harmonic"
+      B:
+        q: 0.0
+        p: 0.0
+      initial_state: "polar"
+      tol: 1.0e-7
+      grid:
+        box:
+          - 12.0
+          - 12.0
+        n:
+          - 64
+          - 64
+      interactions:
+        c1: -2.0
+        c0: 100.0
+      n_steps: 5000
   - analyze:
       - phase_classify: {}
       - momentum_distribution: {}
-      - summary_json: {path: runs/samples/rb87_soc_band/summary.json}
+      - summary_json:
+          path: "runs/samples/rb87_soc_band/summary.json"

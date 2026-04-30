@@ -1,54 +1,60 @@
-# ================================================================
-# Eu151 EdH: c1_ratio scan
-# ================================================================
-#
-# Goal: Find the boundary between DDI-dominated EdH dynamics
-# and spin-exchange-dominated decoherence.
-#
-# c1_ratio = c1/c0. For Eu151, a_F is unknown (paper uses c1=0).
-# Buchachenko AFM estimate: c1/c0 ≈ 1/36 ≈ 0.028 (causes decoherence).
-# Scan: 0 → 0.02 to find where EdH breaks down.
-#
-# Key diagnostic: Mz oscillation (EdH pendulum) vs monotonic decay.
-# ε_dd ≈ 0.54, so DDI dominates when |c1/c0| ≪ ε_dd.
-#
-# Duration: 20 ms ≈ 13.8 ω⁻¹ (half of full 40ms, enough to see EdH)
-# ================================================================
-
-pipeline:
-  - ground_state:
-      cache: runs/shared/eu151_gs_p100_fm_c1r0_64.jld2
-      atom: Eu151
-      grid: {n: [64, 64, 64], box: [20.0, 20.0, 20.0]}
-      interactions:
-        N_atoms: 50000
-        omega_ref: 691.15
-        c1_ratio: 0.0
-      ddi: {enabled: true}
-      zeeman: {p: 100.0, q: 0.0}
-      potential: {type: harmonic, omega: [1.0, 1.0, 1.182]}
-      dt: 0.005
-      n_steps: 100000
-      tol: 1.0e-10
-      initial_state: ferromagnetic
-      backend: cuda
-
-  # Phase 1: Quench
-  - dynamics:
-      duration: 0.14
-      dt: 0.0005
-      save_every: 280
-      zeeman: {p: {from: 100.0, to: 0.39}, q: 0.0}
-
-  # Phase 2: Spin relaxation (20 ms)
-  - dynamics:
-      duration: 13.8
-      dt: 0.0001
-      save_every: 2760
-      seed_amplitude: 1.0e-6
-      noise_seed: 42
-      zeeman: {p: 0.39, q: 0.0}
-
 scan:
   zip:
-    pipeline.0.interactions.c1_ratio: [0.0, 0.001, 0.003, 0.005, 0.01, 0.02]
+    pipeline.0.interactions.c1_ratio:
+      - 0.0
+      - 0.001
+      - 0.003
+      - 0.005
+      - 0.01
+      - 0.02
+pipeline:
+  - ground_state:
+      dt: 0.005
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 1.182
+        type: "harmonic"
+      backend: "cuda"
+      B:
+        q: 0.0
+        p: 100.0
+      initial_state: "ferromagnetic"
+      tol: 1.0e-10
+      ddi:
+        enabled: true
+      cache: "runs/shared/eu151_gs_p100_fm_c1r0_64.jld2"
+      grid:
+        box:
+          - 20.0
+          - 20.0
+          - 20.0
+        n:
+          - 64
+          - 64
+          - 64
+      interactions:
+        omega_ref: 691.15
+        c1_ratio: 0.0
+        N_atoms: 50000
+      n_steps: 100000
+  - dynamics:
+      duration: 0.14
+      B:
+        q: 0.0
+        p:
+          to: 0.39
+          from: 100.0
+      save_every: 280
+      dt: 0.0005
+  - dynamics:
+      duration: 13.8
+      B:
+        q: 0.0
+        p: 0.39
+      save_every: 2760
+      noise_seed: 42
+      dt: 0.0001
+      seed_amplitude: 1.0e-6

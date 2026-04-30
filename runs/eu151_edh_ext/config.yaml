@@ -1,63 +1,57 @@
-# ================================================================
-# Eu151 EdH — extended evolution, dense snapshots, seed scan
-# ================================================================
-#
-# Zeeman sign flipped vs the reference eu151_edh run so that the
-# ground state lives at m = -F (= -6) — matches the user convention
-# that smaller m is the lower-energy state. Physics is identical
-# modulo a reflection in m; Mz runs -6 → 0 instead of +6 → 0.
-#
-# Runs on a fresh GS cache (eu151_gs_pneg100) — the p=+100 cache
-# would give m=+6 and be nonsense for p<0.
-#
-# Snapshot plan (user asked for ~30 fps × 5 s playback):
-#   Relaxation merged into one 107.6 ω⁻¹ step (~155 ms) at dt=1e-4
-#   → 1.076 M steps. save_every = 7000 → ~154 snapshots at
-#     30 fps playback = 5.1 s of visible evolution.
-#   save_psi_snapshots: true writes them as ComplexF32
-#   (64³ × 13 × 8 B = 6.8 MB/snap × 154 ≈ 1.05 GB per run).
-#
-# Cost:
-#   GS: one-time fresh ITP (~10–30 min on GPU for p=-100).
-#   Quench + relaxation (1.076 M steps at dt=1e-4): a few hours
-#   per scan point × 2 = overnight.
-# ================================================================
-
-pipeline:
-  - ground_state:
-      cache: runs/shared/eu151_gs_pneg100_fmmin_c1r0_64.jld2
-      atom: Eu151
-      grid: {n: [64, 64, 64], box: [20.0, 20.0, 20.0]}
-      interactions:
-        N_atoms: 50000
-        omega_ref: 691.15
-        c1_ratio: 0.0
-      ddi: {enabled: true}
-      zeeman: {p: -100.0, q: 0.0}
-      potential: {type: harmonic, omega: [1.0, 1.0, 1.182]}
-      dt: 0.005
-      n_steps: 100000
-      tol: 1.0e-10
-      initial_state: ferromagnetic_min
-      backend: cuda
-
-  # Instantaneous quench to weak field (same direction, weaker).
-  - dynamics:
-      duration: 0.14
-      dt: 0.0005
-      save_every: 280
-      zeeman: {p: {from: -100.0, to: -0.39}, q: 0.0}
-
-  # Extended relaxation with dense snapshots.
-  - dynamics:
-      duration: 107.6
-      dt: 0.0001
-      save_every: 7000
-      save_psi_snapshots: true
-      seed_amplitude: 1.0e-6
-      noise_seed: 42
-      zeeman: {p: -0.39, q: 0.0}
-
 scan:
   product:
-    pipeline.2.seed_amplitude: [1.0e-6, 1.0e-4]
+    pipeline.2.seed_amplitude:
+      - 1.0e-6
+      - 0.0001
+pipeline:
+  - ground_state:
+      dt: 0.005
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 1.182
+        type: "harmonic"
+      backend: "cuda"
+      B:
+        q: 0.0
+        p: -100.0
+      initial_state: "ferromagnetic_min"
+      tol: 1.0e-10
+      ddi:
+        enabled: true
+      cache: "runs/shared/eu151_gs_pneg100_fmmin_c1r0_64.jld2"
+      grid:
+        box:
+          - 20.0
+          - 20.0
+          - 20.0
+        n:
+          - 64
+          - 64
+          - 64
+      interactions:
+        omega_ref: 691.15
+        c1_ratio: 0.0
+        N_atoms: 50000
+      n_steps: 100000
+  - dynamics:
+      duration: 0.14
+      B:
+        q: 0.0
+        p:
+          to: -0.39
+          from: -100.0
+      save_every: 280
+      dt: 0.0005
+  - dynamics:
+      duration: 107.6
+      B:
+        q: 0.0
+        p: -0.39
+      save_every: 7000
+      noise_seed: 42
+      dt: 0.0001
+      save_psi_snapshots: true
+      seed_amplitude: 1.0e-6

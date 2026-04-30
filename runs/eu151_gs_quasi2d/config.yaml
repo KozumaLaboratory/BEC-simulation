@@ -1,30 +1,34 @@
-# Eu151 quasi-2D ground state
-#
-# Quasi-2D geometry: tight z-confinement (l_z = sqrt(ω_⊥/ω_z) ≈ 0.9196)
-# with 2D DDI kernel. Polar (m=0) initial state.
-
 pipeline:
   - ground_state:
-      cache: runs/shared/eu151_96x2_box24_c1r0.0_ddi7647_q2d_lz0.9196_polar.jld2
-      atom: Eu151
+      dt: 0.0005
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+        type: "harmonic"
+      backend: "cuda"
+      B:
+        q: 0.0
+        p: 0.0
+      initial_state: "polar"
+      tol: 1.0e-7
+      ddi:
+        quasi_2d: true
+        l_z: 0.9196
+        enabled: true
+      cache: "runs/shared/eu151_96x2_box24_c1r0.0_ddi7647_q2d_lz0.9196_polar.jld2"
       grid:
-        n: [96, 96]
-        box: [24.0, 24.0]
+        box:
+          - 24.0
+          - 24.0
+        n:
+          - 96
+          - 96
       interactions:
-        N_atoms: 50000
         omega_ref: 691.15
         c1_ratio: 0.0
-      ddi:
-        enabled: true
-        quasi_2d: true
-        l_z: 0.9196  # sqrt(110/130)
-      zeeman: {p: 0.0, q: 0.0}
-      potential: {type: harmonic, omega: [1.0, 1.0]}
-      dt: 0.0005
+        N_atoms: 50000
       n_steps: 100000
-      tol: 1.0e-7
-      initial_state: polar
-      backend: cuda
-
   - analyze:
       - phase_classify: {}

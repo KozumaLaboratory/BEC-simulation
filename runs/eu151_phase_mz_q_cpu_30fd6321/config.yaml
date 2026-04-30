@@ -1,51 +1,62 @@
-# ================================================================
-# Eu151 2D phase map:  target_magnetization Mz  ×  quadratic Zeeman q
-# ================================================================
-#
-# Goal:
-#   Map flux-closure (FL) / polar / mixed phases in the constrained-Mz
-#   sector. Building on eu151_mz_scan (1D in Mz at q=0) by adding the
-#   q axis: negative q favours ferromagnetic along ẑ (m=±F), positive
-#   q favours polar (m=0). DDI with Mz constraint creates FL-vortex
-#   states whose prevalence depends on q.
-#
-# Uses ITP→LBFGS two-step (same recipe as eu151_mz_scan).
-# ================================================================
-
+scan:
+  auto_rotate_on_mz: true
+  product:
+    pipeline.0.zeeman.q:
+      - -0.2
+      - -0.05
+      - 0.0
+      - 0.05
+      - 0.2
+    pipeline.0.target_magnetization:
+      - -6.0
+      - -4.0
+      - -2.0
+      - -1.0
+      - -0.5
+      - 0.0
+  continuation: true
 pipeline:
   - ground_state:
-      method: itp
-      atom: Eu151
-      grid: {n: [64, 64, 64], box: [20.0, 20.0, 20.0]}
+      method: "itp"
+      dt: 0.001
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 1.1818
+        type: "harmonic"
+      backend: "cpu"
+      B:
+        q: 0.0
+        p: 0.0
+      initial_state: "ferromagnetic_min"
+      tol: 1.0e-7
+      ddi:
+        enabled: true
+      target_magnetization: -6.0
+      grid:
+        box:
+          - 20.0
+          - 20.0
+          - 20.0
+        n:
+          - 64
+          - 64
+          - 64
       interactions:
-        N_atoms: 50000
+        c_lhy: 1135.0
         omega_ref: 691.15
         c1_ratio: 0.0
-        c_lhy: 1135.0
-      ddi: {enabled: true}
-      zeeman: {p: 0.0, q: 0.0}
-      potential: {type: harmonic, omega: [1.0, 1.0, 1.1818]}
-      dt: 0.001
-      tol: 1.0e-7
-      initial_state: ferromagnetic_min
-      target_magnetization: -6.0
-      backend: cpu
-
+        N_atoms: 50000
   - ground_state:
-      method: lbfgs
-      n_steps: 500
       tol: 1.0e-8
-      backend: cpu
-
+      backend: "cpu"
+      method: "lbfgs"
+      n_steps: 500
   - analyze:
       - phase_classify: {}
-      - bogoliubov: {k_max: 8.0, n_k: 80, directions: auto}
-
-scan:
-  product:
-    pipeline.0.target_magnetization:
-      [-6.0, -4.0, -2.0, -1.0, -0.5, 0.0]
-    pipeline.0.zeeman.q:
-      [-0.2, -0.05, 0.0, 0.05, 0.2]
-  continuation: true
-  auto_rotate_on_mz: true
+      - bogoliubov:
+          k_max: 8.0
+          n_k: 80
+          directions: "auto"

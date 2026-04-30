@@ -1,40 +1,44 @@
-# C-1: Synthetic spin tomography on EdH ground state
-#
-# Computes the ground state (A-1 equivalent) then runs spin tomography:
-# rotates the spinor by angles 0°→180° around y-axis, applies TOF + SG
-# separation, and records the column-integrated density for each m_F.
-#
-# This directly simulates what the experiment does:
-#   Δρ(r; θ) = |⟨m| e^{-iθF_y} |ψ⟩|² after TOF + SG
-#
-# The sinogram (angle × position) reveals the spin texture structure.
-
 pipeline:
   - ground_state:
-      cache: runs/shared/eu151_gs_p100_ferromagnetic_64.jld2
-      atom: Eu151
-      grid: {n: [64, 64, 64], box: [20.0, 20.0, 20.0]}
+      dt: 0.0005
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 1.182
+        type: "harmonic"
+      backend: "cuda"
+      B:
+        q: 0.0
+        p: 0.39
+      initial_state: "antiferromagnetic"
+      tol: 1.0e-8
+      ddi:
+        enabled: true
+      cache: "runs/shared/eu151_gs_p100_ferromagnetic_64.jld2"
+      grid:
+        box:
+          - 20.0
+          - 20.0
+          - 20.0
+        n:
+          - 64
+          - 64
+          - 64
       interactions:
-        N_atoms: 50000
         omega_ref: 691.15
         c1_ratio: 0.02778
-      ddi: {enabled: true}
-      zeeman: {p: 0.39, q: 0.0}
-      potential: {type: harmonic, omega: [1.0, 1.0, 1.182]}
-      dt: 0.0005
+        N_atoms: 50000
       n_steps: 100000
-      tol: 1.0e-8
-      initial_state: antiferromagnetic
-      backend: cuda
-
   - analyze:
       - tomography:
-          rotation_axis: y
-          theta_min: 0.0
           theta_max: 3.14159
-          n_angles: 19            # 0°, 10°, 20°, ..., 180°
-          reference_m: -6
           tof:
-            t_tof: 11.0          # 16 ms in ω⁻¹ units
-            gradient: 0.5        # SG gradient strength
+            t_tof: 11.0
             imaging_axis: 3
+            gradient: 0.5
+          rotation_axis: "y"
+          reference_m: -6
+          theta_min: 0.0
+          n_angles: 19

@@ -1,119 +1,105 @@
-# =================================================================
-# Klaus 2022 reproduction (Dy164 magnetostirring → vortex stripes)
-# =================================================================
-#
-# Phys setup from Klaus et al., Nature 601, 205 (2022):
-#   - Dy164 BEC, N=60000, a_s = 90 a_0
-#   - Pancake trap (ω_ρ = 2π·50 Hz, ω_z = 2π·130 Hz) → aspect ≈ 2.6
-#   - Strong z bias Bz = 0.819 G, transverse rotation B_⊥ = 0.574 G at 226 Hz
-#   - 20 ms tilt ramp → 50 ms spin-up → 1 s magnetostir
-#
-# Pipeline units:  ω_ref = 314.159 rad/s ≡ 2π·50 Hz. Dimless time unit ≈ 3.18 ms.
-# Frequency in sinusoidal/chirped waveforms uses sin(2π·f·t_dimless) under
-# the hood, so f_yaml = f_phys [Hz] / ω_ref [rad/s] = f_phys / (2π·f_ref).
-# 226 Hz → 226/(2π·50) ≈ 0.72  (NOT 226/50 = 4.52 — that mistake gave a
-# 2π× field rotation, manifesting as cloud breathing/elongation without
-# any orbital response. Caught 2026-04-27.)
-#
-# Grid: 64×64×32 — resolves vortex cores (healing length ≈ 0.3 a_ho) and stripe
-# features. VRAM ≈ 2 GB, dynamics ~25 min on RTX 5070 Ti.
-
 pipeline:
-  # --- Ground state (Dy164 z-polarized) ------------------------------
   - ground_state:
-      atom: Dy164
+      dt: 0.001
+      atom: "Dy164"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 2.6
+        type: "harmonic"
+      backend: "cuda"
+      B:
+        Bz: "1.0 Gauss"
+      initial_state: "ferromagnetic_min"
+      tol: 1.0e-7
+      ddi:
+        enabled: true
       grid:
-        n: [64, 64, 32]
-        box: [20.0, 20.0, 8.0]
+        box:
+          - 20.0
+          - 20.0
+          - 8.0
+        n:
+          - 64
+          - 64
+          - 32
       interactions:
-        # Dy164 default a_s = 92 a_0 (~Klaus value 90). c_total / c_dd derived.
         omega_ref: 314.159
         N_atoms: 60000
-      ddi: {enabled: true}
-      potential: {type: harmonic, omega: [1.0, 1.0, 2.6]}
-      zeeman:
-        Bz: "1.0 Gauss"                 # weak bias before stirring starts
-      dt: 0.001                         # Dy164 ε_dd > 1 needs small dt (NaN at 0.005)
-      n_steps: 30000                    # same total time, smaller dt
-      tol: 1.0e-7
-      initial_state: ferromagnetic_min
-      backend: cuda
-
-  # --- 20 ms tilt: θ 0 → 35° (Level 2: B_mag + θ + φ) ---------------
+      n_steps: 30000
   - dynamics:
-      duration: 6.28                     # 20 ms in units of ω_ref⁻¹
-      dt: 0.002                          # Dy164 ε_dd > 1 → tight dt
-      save_every: 100
-      save_psi_snapshots: true           # frame 0 = GS final state
-      save_snapshot_precision: "f32"
-      interactions: {omega_ref: 314.159}
-      zeeman:
-        B_mag: "1.0 Gauss"
-        theta_deg: {from: 0.0, to: 35.0}
+      duration: 6.28
+      B:
         phi_deg: 0.0
-
-  # --- 50 ms spin-up: stir freq 0 → 226 Hz (chirp) ------------------
-  - dynamics:
-      duration: 15.7                     # 50 ms
+        magnitude: "1.0 Gauss"
+        theta_deg:
+          to: 35.0
+          from: 0.0
+      save_every: 100
       dt: 0.002
-      save_every: 250
+      interactions:
+        omega_ref: 314.159
       save_psi_snapshots: true
       save_snapshot_precision: "f32"
-      interactions: {omega_ref: 314.159}
-      zeeman:
-        Bz: "0.819 Gauss"
-        Bx:
-          chirped_sinusoidal:
-            amplitude: 0.574             # in Gauss (converted by zeeman_levels)
-            freq_start: 0.0
-            freq_end: 0.72                # = 226 Hz / ω_ref(rad/s) = 226 / (2π·50)
-            duration: 15.7
-        By:
-          chirped_sinusoidal:
-            amplitude: 0.574
-            freq_start: 0.0
-            freq_end: 0.72                # = 226 Hz / ω_ref(rad/s) = 226 / (2π·50)
-            duration: 15.7
-            phase: -1.5708               # π/2 lag → circular polarization
-
-  # --- 1 s magnetostir at 226 Hz ------------------------------------
   - dynamics:
-      duration: 314                      # 1 s
-      dt: 0.002
-      save_every: 1000                   # 157 snapshots over 1 s (~6 ms cadence)
-      save_psi_snapshots: true           # stream snapshots → host RAM stays at
-      save_snapshot_precision: "f32"     # ~30 MB regardless of frame count;
-                                         # column_density_movie now reads from
-                                         # the scratch JLD2 directly.
-      interactions: {omega_ref: 314.159}
-      zeeman:
-        Bz: "0.819 Gauss"
-        Bx:
-          sinusoidal:
+      duration: 15.7
+      B:
+        By:
+          chirped_sinusoidal:
+            duration: 15.7
+            freq_end: 0.72
+            freq_start: 0.0
+            phase: -1.5708
             amplitude: 0.574
-            frequency: 0.72             # = 226 Hz / ω_ref(rad/s) = 226 / (2π·50)
+        Bx:
+          chirped_sinusoidal:
+            duration: 15.7
+            freq_end: 0.72
+            freq_start: 0.0
+            amplitude: 0.574
+        Bz: "0.819 Gauss"
+      save_every: 250
+      dt: 0.002
+      interactions:
+        omega_ref: 314.159
+      save_psi_snapshots: true
+      save_snapshot_precision: "f32"
+  - dynamics:
+      duration: 314
+      B:
         By:
           sinusoidal:
-            amplitude: 0.574
-            frequency: 0.72             # = 226 Hz / ω_ref(rad/s) = 226 / (2π·50)
             phase: -1.5708
-
-  # --- Post-processing ---------------------------------------------
+            frequency: 0.72
+            amplitude: 0.574
+        Bx:
+          sinusoidal:
+            frequency: 0.72
+            amplitude: 0.574
+        Bz: "0.819 Gauss"
+      save_every: 1000
+      dt: 0.002
+      interactions:
+        omega_ref: 314.159
+      save_psi_snapshots: true
+      save_snapshot_precision: "f32"
   - analyze:
       - column_density_movie:
-          axis: 3
-          output_dir: runs/klaus2022_full/frames
-          colorscale: Viridis
-          width: 700
+          colorscale: "Viridis"
           height: 600
-          multi_step: true               # walk Step 2 (tilt) + Step 3 (chirp)
-                                         # + Step 4 (stir) — animation begins
-                                         # at GS final state
-
-      - vortex_detect: {component: 1, threshold: 0.1}
-      - winding_field: {component: 1, threshold: 1.0e-6}
+          axis: 3
+          multi_step: true
+          output_dir: "runs/klaus2022_full/frames"
+          width: 700
+      - vortex_detect:
+          threshold: 0.1
+          component: 1
+      - winding_field:
+          threshold: 1.0e-6
+          component: 1
       - summary_json:
-          path: runs/klaus2022_full/summary.json
           extras:
-            test_kind: klaus2022_full
-            target: vortex_stripe_formation
+            test_kind: "klaus2022_full"
+            target: "vortex_stripe_formation"
+          path: "runs/klaus2022_full/summary.json"

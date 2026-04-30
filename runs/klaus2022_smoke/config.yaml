@@ -1,44 +1,50 @@
-# Klaus 2022-style infrastructure smoke test (A1a) — pure YAML
-# ==============================================================
-# Verifies Phase 0/1/1.5 pipeline runs Dy164 3D with time-dep Level 2 zeeman
-# and emits column density PNGs + summary JSON. Not a full Klaus 2022
-# reproduction (no magnetostir spin-up, tiny B field, short duration).
-
 pipeline:
   - ground_state:
-      atom: Dy164
-      grid:
-        n: [32, 32, 16]
-        box: [16.0, 16.0, 6.0]
-      interactions:
-        c0: 300.0
-        c1: 0.0
-        omega_ref: 314.159
-      potential: {type: harmonic, omega: [1.0, 1.0, 2.6]}
-      zeeman:
-        Bz: "1.0e-4 Gauss"
-      initial_state: ferromagnetic_min
       dt: 0.005
       n_steps: 2000
       tol: 1.0e-6
-
+      B:
+        Bz: "1.0e-4 Gauss"
+      grid:
+        box:
+          - 16.0
+          - 16.0
+          - 6.0
+        n:
+          - 32
+          - 32
+          - 16
+      atom: "Dy164"
+      interactions:
+        c1: 0.0
+        omega_ref: 314.159
+        c0: 300.0
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 2.6
+        type: "harmonic"
+      initial_state: "ferromagnetic_min"
   - dynamics:
       duration: 6.28
-      dt: 0.01
-      save_every: 32
-      interactions: {omega_ref: 314.159}
-      zeeman:
-        B_mag: "1.0e-4 Gauss"
-        theta_deg: {from: 0.0, to: 35.0}
+      B:
         phi_deg: 0.0
-
+        magnitude: "1.0e-4 Gauss"
+        theta_deg:
+          to: 35.0
+          from: 0.0
+      save_every: 32
+      dt: 0.01
+      interactions:
+        omega_ref: 314.159
   - analyze:
       - column_density_movie:
+          colorscale: "Viridis"
           axis: 3
-          output_dir: runs/klaus2022_smoke/frames
-          colorscale: Viridis
+          output_dir: "runs/klaus2022_smoke/frames"
       - summary_json:
-          path: runs/klaus2022_smoke/summary.json
           extras:
-            test_kind: smoke
-            expected_norm_drift_max: 1.0e-3
+            test_kind: "smoke"
+            expected_norm_drift_max: 0.001
+          path: "runs/klaus2022_smoke/summary.json"

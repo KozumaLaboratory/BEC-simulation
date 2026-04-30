@@ -1,66 +1,82 @@
-# =================================================================
-# Eu151 Kibble-Zurek quench through ferromagnetic transition
-# =================================================================
-#
-# Linear quench of quadratic Zeeman q from q_i (nematic-favoring) through q_c
-# into q_f (ferromagnetic). Slower τ_Q → fewer defects (KZ scaling
-# n_defect ∝ τ_Q^(-ν)). Ensemble over τ_Q × seeds produces a scaling curve.
-#
-# Pipeline:
-#   1. ITP at q = q_i (polar/nematic GS)
-#   2. Linear q ramp in time T_ramp
-#   3. 5 ω⁻¹ hold at final q (defects freeze)
-#   4. Analyze: defect_density + kibble_zurek_stats + phase_classify
-
+scan:
+  comparison_runs:
+    - name: "seed_a"
+      override:
+        pipeline.1.noise_seed: 1001
+    - name: "seed_b"
+      override:
+        pipeline.1.noise_seed: 2002
+    - name: "seed_c"
+      override:
+        pipeline.1.noise_seed: 3003
+  product:
+    pipeline.1.duration:
+      - 5.0
+      - 10.0
+      - 20.0
+      - 50.0
+      - 100.0
+  continuation: false
 pipeline:
   - ground_state:
-      atom: Eu151
-      grid: {n: [48, 48, 32], box: [14.0, 14.0, 10.0]}
+      dt: 0.005
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 1.1818
+        type: "harmonic"
+      backend: "cuda"
+      B:
+        q: 1.5
+        p: 0.5
+      initial_state: "polar"
+      tol: 1.0e-7
+      ddi:
+        enabled: true
+      grid:
+        box:
+          - 14.0
+          - 14.0
+          - 10.0
+        n:
+          - 48
+          - 48
+          - 32
       interactions:
-        N_atoms: 30000
         omega_ref: 691.15
         c1_ratio: 0.028
-      ddi: {enabled: true}
-      zeeman: {p: 0.5, q: 1.5}              # starts above q_c (nematic-favored)
-      potential: {type: harmonic, omega: [1.0, 1.0, 1.1818]}
-      dt: 0.005
+        N_atoms: 30000
       n_steps: 6000
-      tol: 1.0e-7
-      initial_state: polar
-      backend: cuda
-
   - dynamics:
-      duration: 20.0                         # T_ramp (quench duration)
-      dt: 0.01
-      save_every: 100
-      temperature_ratio: 0.05                # seed thermal noise
-      zeeman:
+      duration: 20.0
+      B:
+        q:
+          to: -0.5
+          from: 1.5
         p: 0.5
-        q: {from: 1.5, to: -0.5}             # through q_c ≈ 0.3
-
-  - dynamics:
-      duration: 5.0                          # hold at final q
-      dt: 0.01
       save_every: 100
-      zeeman: {p: 0.5, q: -0.5}
-
+      temperature_ratio: 0.05
+      dt: 0.01
+  - dynamics:
+      duration: 5.0
+      B:
+        q: -0.5
+        p: 0.5
+      save_every: 100
+      dt: 0.01
   - analyze:
       - phase_classify: {}
-      - defect_density: {defect_type: domain_wall, threshold: 0.05}
-      - defect_density: {defect_type: vortex, threshold: 0.1}
-      - kibble_zurek_stats: {threshold: 0.1}
+      - defect_density:
+          defect_type: "domain_wall"
+          threshold: 0.05
+      - defect_density:
+          defect_type: "vortex"
+          threshold: 0.1
+      - kibble_zurek_stats:
+          threshold: 0.1
       - summary_json:
-          path: runs/eu151_kibble_zurek/summary.json
-          extras: {test_kind: kibble_zurek_scan}
-
-scan:
-  product:
-    pipeline.1.duration: [5.0, 10.0, 20.0, 50.0, 100.0]
-  comparison_runs:
-    - name: seed_a
-      override: {pipeline.1.noise_seed: 1001}
-    - name: seed_b
-      override: {pipeline.1.noise_seed: 2002}
-    - name: seed_c
-      override: {pipeline.1.noise_seed: 3003}
-  continuation: false
+          extras:
+            test_kind: "kibble_zurek_scan"
+          path: "runs/eu151_kibble_zurek/summary.json"

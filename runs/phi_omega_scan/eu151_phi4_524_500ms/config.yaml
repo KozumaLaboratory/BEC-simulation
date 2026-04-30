@@ -30,19 +30,18 @@ mixins:
 accuracy: 1.0e-6
 pipeline:
   - ground_state:
-      use:
-        - "eu151_klaus_phys"
-      B_hat:
+      B:
         theta: 0.0
         phi: 0.0
-      interactions:
-        c1: 0.0
-      zeeman:
         q: 0.0
         Bz: "0.819 Gauss"
+      use:
+        - "eu151_klaus_phys"
+      interactions:
+        c1: 0.0
   - dynamics:
       duration: "20 ms"
-      B_hat:
+      B:
         theta:
           duration: "20 ms"
           to: 0.611
@@ -51,7 +50,7 @@ pipeline:
           rate: 0.0
   - dynamics:
       duration: "50 ms"
-      B_hat:
+      B:
         theta: 0.611
         phi:
           rate:
@@ -60,7 +59,7 @@ pipeline:
             from: 0.0
   - dynamics:
       duration: "500 ms"
-      B_hat:
+      B:
         theta: 0.611
         phi:
           rate: 4.524

@@ -1,32 +1,58 @@
-# Sample: q quench through ferromagnetic transition (Eu151).
-# Demonstrates dynamics with q ramp + defect_density + kibble_zurek_stats.
-# Single point — for the τ_Q scan see runs/eu151_kibble_zurek/.
 pipeline:
   - ground_state:
-      atom: Eu151
-      grid: {n: [32, 32, 24], box: [12.0, 12.0, 8.0]}
-      interactions: {N_atoms: 30000, omega_ref: 691.15, c1_ratio: 0.028}
-      ddi: {enabled: true}
-      zeeman: {p: 0.5, q: 1.5}              # nematic-favored start
-      potential: {type: harmonic, omega: [1.0, 1.0, 1.1818]}
       dt: 0.005
-      n_steps: 4000
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 1.1818
+        type: "harmonic"
+      backend: "cuda"
+      B:
+        q: 1.5
+        p: 0.5
+      initial_state: "polar"
       tol: 1.0e-7
-      initial_state: polar
-      backend: cuda
+      ddi:
+        enabled: true
+      grid:
+        box:
+          - 12.0
+          - 12.0
+          - 8.0
+        n:
+          - 32
+          - 32
+          - 24
+      interactions:
+        omega_ref: 691.15
+        c1_ratio: 0.028
+        N_atoms: 30000
+      n_steps: 4000
   - dynamics:
-      duration: 30.0                          # τ_Q
-      dt: 0.01
+      duration: 30.0
+      B:
+        q:
+          to: -0.5
+          from: 1.5
+        p: 0.5
       save_every: 100
-      temperature_ratio: 0.05                 # seed thermal noise
-      zeeman: {p: 0.5, q: {from: 1.5, to: -0.5}}
+      temperature_ratio: 0.05
+      dt: 0.01
   - dynamics:
       duration: 5.0
-      dt: 0.01
+      B:
+        q: -0.5
+        p: 0.5
       save_every: 100
-      zeeman: {p: 0.5, q: -0.5}
+      dt: 0.01
   - analyze:
       - phase_classify: {}
-      - defect_density: {defect_type: vortex, threshold: 0.1}
-      - kibble_zurek_stats: {threshold: 0.1}
-      - summary_json: {path: runs/samples/eu151_quench_q/summary.json}
+      - defect_density:
+          defect_type: "vortex"
+          threshold: 0.1
+      - kibble_zurek_stats:
+          threshold: 0.1
+      - summary_json:
+          path: "runs/samples/eu151_quench_q/summary.json"

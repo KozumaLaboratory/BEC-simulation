@@ -1,36 +1,41 @@
-# Eu151 3D Einstein-de Haas effect (Matsui et al. Science 2026)
-#
-# Strategy: find ground state WITHOUT DDI (DDI causes ITP divergence for
-# F=6 at c_dd×F²/3 ≫ c0), then turn DDI ON for the dynamics phase. The
-# phase override on the dynamics phase flips `system.ddi.enabled` without
-# requiring a separate config.
-#
-# Physical conditions:
-#   3D trap: ω = (110, 110, 130) Hz, N = 5×10⁴
-#   Initial: m=-6 polarized
-#   B = 2.6 nT → p ≈ 0.39 (spin relaxation regime)
-
 pipeline:
   - ground_state:
-      cache: runs/shared/eu151_64x3_box20_c1r-0.01_noddi_p0.39_afm.jld2
-      atom: Eu151
-      grid: {n: [64, 64, 64], box: [20.0, 20.0, 20.0]}
+      dt: 0.001
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 1.1818
+        type: "harmonic"
+      backend: "cuda"
+      B:
+        q: 0.0
+        p: 0.39
+      initial_state: "antiferromagnetic"
+      tol: 1.0e-7
+      ddi:
+        enabled: false
+      cache: "runs/shared/eu151_64x3_box20_c1r-0.01_noddi_p0.39_afm.jld2"
+      grid:
+        box:
+          - 20.0
+          - 20.0
+          - 20.0
+        n:
+          - 64
+          - 64
+          - 64
       interactions:
-        N_atoms: 50000
         omega_ref: 691.15
         c1_ratio: -0.01
-      ddi: {enabled: false}        # GS without DDI
-      zeeman: {p: 0.39, q: 0.0}   # B = 2.6 nT dimensionless
-      potential: {type: harmonic, omega: [1.0, 1.0, 1.1818]}    # 130/110
-      dt: 0.001
+        N_atoms: 50000
       n_steps: 100000
-      tol: 1.0e-7
-      initial_state: antiferromagnetic   # m=-F polarized
-      backend: cuda
-
   - dynamics:
-      duration: 27.6              # ω⁻¹ ≈ 40 ms
-      dt: 0.0001
+      duration: 27.6
+      B:
+        q: 0.0
+        p: 0.39
       save_every: 750
-      ddi: true                   # DDI on for dynamics
-      zeeman: {p: 0.39, q: 0.0}
+      ddi: true
+      dt: 0.0001

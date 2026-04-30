@@ -114,6 +114,10 @@ function run_yaml(yaml_path::String; base_dir::String="runs", verbose::Bool=true
     # defaults seeded into pipeline steps where missing.
     apply_auto_defaults!(data)
 
+    # Unified `B:` block → split into legacy zeeman: + B_hat: for the
+    # runner. Validates Cartesian/spherical mutual exclusion.
+    apply_B_block_normalize!(data)
+
     # Schema validation: catch typos and invalid values before starting.
     # strict=true fails the run on unknown keys; this is the production
     # default so silent-drop bugs (2026-04-27 `trap:` incident) cannot

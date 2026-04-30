@@ -1,104 +1,121 @@
-# =================================================================
-# Klaus 2022 stir-frequency scan: vortex lattice → stripe regime map
-# =================================================================
-#
-# Same Dy164 magnetostir setup as runs/klaus2022_full but scans the rotation
-# frequency (Bx/By sinusoidal `frequency` and chirp `freq_end`) over four
-# values bracketing the published 226 Hz operating point. Each run produces
-# its own column_density frames + vortex_detect count, so the post-run
-# comparison shows how the steady-state texture changes with stirring rate.
-#
-# Frequency in waveform units = f_phys[Hz] / ω_ref[rad/s].
-# Here ω_ref = 314.159 rad/s ≡ 2π·50 Hz, so freq_param = f_phys / (2π·50).
-# 226 Hz → 0.72, 150 Hz → 0.4775, 300 Hz → 0.9549.
-# (The earlier "/ 50" form was a 2π× error — caught 2026-04-27 alongside
-# the matching klaus2022_full fix; gave a 1420 Hz field that the BEC
-# saw as a time-averaged DC bias, with no orbital response.)
-
-pipeline:
-  - ground_state:
-      atom: Dy164
-      grid: {n: [64, 64, 32], box: [20.0, 20.0, 8.0]}
-      interactions: {omega_ref: 314.159, N_atoms: 60000}
-      ddi: {enabled: true}
-      potential: {type: harmonic, omega: [1.0, 1.0, 2.6]}
-      zeeman: {Bz: "1.0 Gauss"}
-      dt: 0.001
-      n_steps: 30000
-      tol: 1.0e-7
-      initial_state: ferromagnetic_min
-      backend: cuda
-
-  - dynamics:
-      duration: 6.28
-      dt: 0.002
-      save_every: 100
-      save_psi_snapshots: true           # frame 0 = GS final state
-      save_snapshot_precision: "f32"
-      interactions: {omega_ref: 314.159}
-      zeeman:
-        B_mag: "1.0 Gauss"
-        theta_deg: {from: 0.0, to: 35.0}
-        phi_deg: 0.0
-
-  - dynamics:
-      duration: 15.7
-      dt: 0.002
-      save_every: 250
-      save_psi_snapshots: true
-      save_snapshot_precision: "f32"
-      interactions: {omega_ref: 314.159}
-      zeeman:
-        Bz: "0.819 Gauss"
-        Bx:
-          chirped_sinusoidal:
-            amplitude: 0.574
-            freq_start: 0.0
-            freq_end: 0.7194     # = 226 Hz / (2π·50); OVERRIDDEN per scan point
-            duration: 15.7
-        By:
-          chirped_sinusoidal:
-            amplitude: 0.574
-            freq_start: 0.0
-            freq_end: 0.7194     # = 226 Hz / (2π·50); OVERRIDDEN per scan point
-            duration: 15.7
-            phase: -1.5708
-
-  - dynamics:
-      duration: 314
-      dt: 0.002
-      save_every: 1000                   # 157 frames per scan point, streamed
-      save_psi_snapshots: true
-      save_snapshot_precision: "f32"
-      interactions: {omega_ref: 314.159}
-      zeeman:
-        Bz: "0.819 Gauss"
-        Bx:
-          sinusoidal:
-            amplitude: 0.574
-            frequency: 0.7194    # = 226 Hz / (2π·50); OVERRIDDEN per scan point
-        By:
-          sinusoidal:
-            amplitude: 0.574
-            frequency: 0.7194    # = 226 Hz / (2π·50); OVERRIDDEN per scan point
-            phase: -1.5708
-
-  - analyze:
-      - column_density_movie:
-          axis: 3
-          output_dir: runs/klaus2022_freq_scan/frames
-          colorscale: Viridis
-          multi_step: true               # animation from GS through tilt+chirp+stir
-      - vortex_detect: {component: 1, threshold: 0.1}
-      - winding_field: {component: 1, threshold: 1.0e-6}
-      - summary_json:
-          path: runs/klaus2022_freq_scan/summary.json
-          extras: {test_kind: klaus_freq_scan}
-
 scan:
   product:
-    pipeline.3.zeeman.Bx.sinusoidal.frequency: [0.4775, 0.7194, 0.9549]   # 150 / 226 / 300 Hz
-    pipeline.3.zeeman.By.sinusoidal.frequency: [0.4775, 0.7194, 0.9549]
-    pipeline.2.zeeman.Bx.chirped_sinusoidal.freq_end: [0.4775, 0.7194, 0.9549]
-    pipeline.2.zeeman.By.chirped_sinusoidal.freq_end: [0.4775, 0.7194, 0.9549]
+    pipeline.2.zeeman.By.chirped_sinusoidal.freq_end:
+      - 0.4775
+      - 0.7194
+      - 0.9549
+    pipeline.3.zeeman.By.sinusoidal.frequency:
+      - 0.4775
+      - 0.7194
+      - 0.9549
+    pipeline.3.zeeman.Bx.sinusoidal.frequency:
+      - 0.4775
+      - 0.7194
+      - 0.9549
+    pipeline.2.zeeman.Bx.chirped_sinusoidal.freq_end:
+      - 0.4775
+      - 0.7194
+      - 0.9549
   continuation: false
+pipeline:
+  - ground_state:
+      dt: 0.001
+      atom: "Dy164"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 2.6
+        type: "harmonic"
+      backend: "cuda"
+      B:
+        Bz: "1.0 Gauss"
+      initial_state: "ferromagnetic_min"
+      tol: 1.0e-7
+      ddi:
+        enabled: true
+      grid:
+        box:
+          - 20.0
+          - 20.0
+          - 8.0
+        n:
+          - 64
+          - 64
+          - 32
+      interactions:
+        omega_ref: 314.159
+        N_atoms: 60000
+      n_steps: 30000
+  - dynamics:
+      duration: 6.28
+      B:
+        phi_deg: 0.0
+        magnitude: "1.0 Gauss"
+        theta_deg:
+          to: 35.0
+          from: 0.0
+      save_every: 100
+      dt: 0.002
+      interactions:
+        omega_ref: 314.159
+      save_psi_snapshots: true
+      save_snapshot_precision: "f32"
+  - dynamics:
+      duration: 15.7
+      B:
+        By:
+          chirped_sinusoidal:
+            duration: 15.7
+            freq_end: 0.7194
+            freq_start: 0.0
+            phase: -1.5708
+            amplitude: 0.574
+        Bx:
+          chirped_sinusoidal:
+            duration: 15.7
+            freq_end: 0.7194
+            freq_start: 0.0
+            amplitude: 0.574
+        Bz: "0.819 Gauss"
+      save_every: 250
+      dt: 0.002
+      interactions:
+        omega_ref: 314.159
+      save_psi_snapshots: true
+      save_snapshot_precision: "f32"
+  - dynamics:
+      duration: 314
+      B:
+        By:
+          sinusoidal:
+            phase: -1.5708
+            frequency: 0.7194
+            amplitude: 0.574
+        Bx:
+          sinusoidal:
+            frequency: 0.7194
+            amplitude: 0.574
+        Bz: "0.819 Gauss"
+      save_every: 1000
+      dt: 0.002
+      interactions:
+        omega_ref: 314.159
+      save_psi_snapshots: true
+      save_snapshot_precision: "f32"
+  - analyze:
+      - column_density_movie:
+          colorscale: "Viridis"
+          axis: 3
+          multi_step: true
+          output_dir: "runs/klaus2022_freq_scan/frames"
+      - vortex_detect:
+          threshold: 0.1
+          component: 1
+      - winding_field:
+          threshold: 1.0e-6
+          component: 1
+      - summary_json:
+          extras:
+            test_kind: "klaus_freq_scan"
+          path: "runs/klaus2022_freq_scan/summary.json"

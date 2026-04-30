@@ -1,58 +1,70 @@
-# =================================================================
-# Eu151 finite-T SGPE ensemble — validates Phase 4.3 SGPE at scale
-# =================================================================
-#
-# Pipeline:
-#   1. ITP ground state at T=0 (polar, pancake trap)
-#   2. SGPE-damped real-time dynamics at prescribed (γ, T) for 10 ω⁻¹
-#      (≈ 15 ms — long enough to see thermal equilibration onset)
-#   3. Analyze: phase_classify + droplet_profile + defect_density
-#
-# Scan: 3 temperatures × 4 seeds = 12 SGPE trajectories per base run.
-# `comparison_runs` varies the seed and damping parameter.
-
+scan:
+  comparison_runs:
+    - name: "seed_a"
+      override:
+        pipeline.1.noise_seed: 101
+    - name: "seed_b"
+      override:
+        pipeline.1.noise_seed: 202
+    - name: "seed_c"
+      override:
+        pipeline.1.noise_seed: 303
+    - name: "seed_d"
+      override:
+        pipeline.1.noise_seed: 404
+  product:
+    pipeline.1.temperature_ratio:
+      - 0.05
+      - 0.1
+      - 0.2
+  continuation: false
 pipeline:
   - ground_state:
-      atom: Eu151
-      grid: {n: [48, 48, 48], box: [16.0, 16.0, 16.0]}
+      dt: 0.005
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 1.1818
+        type: "harmonic"
+      backend: "cuda"
+      B:
+        q: 0.1
+        p: 1.0
+      initial_state: "polar"
+      tol: 1.0e-7
+      ddi:
+        enabled: true
+      grid:
+        box:
+          - 16.0
+          - 16.0
+          - 16.0
+        n:
+          - 48
+          - 48
+          - 48
       interactions:
-        N_atoms: 30000
         omega_ref: 691.15
         c1_ratio: 0.028
-      ddi: {enabled: true}
-      zeeman: {p: 1.0, q: 0.1}
-      potential: {type: harmonic, omega: [1.0, 1.0, 1.1818]}
-      dt: 0.005
+        N_atoms: 30000
       n_steps: 8000
-      tol: 1.0e-7
-      initial_state: polar
-      backend: cuda
-
   - dynamics:
       duration: 10.0
-      dt: 0.005
+      B:
+        q: 0.1
+        p: 1.0
       save_every: 200
-      temperature_ratio: 0.1              # T/T_c seed noise at dynamics start
-      zeeman: {p: 1.0, q: 0.1}
-
+      temperature_ratio: 0.1
+      dt: 0.005
   - analyze:
       - phase_classify: {}
-      - defect_density: {defect_type: domain_wall, threshold: 0.05}
+      - defect_density:
+          defect_type: "domain_wall"
+          threshold: 0.05
       - droplet_profile: {}
       - summary_json:
-          path: runs/eu151_sgpe_thermal/summary.json
-          extras: {test_kind: sgpe_thermal_ensemble}
-
-scan:
-  product:
-    pipeline.1.temperature_ratio: [0.05, 0.10, 0.20]
-  comparison_runs:
-    - name: seed_a
-      override: {pipeline.1.noise_seed: 101}
-    - name: seed_b
-      override: {pipeline.1.noise_seed: 202}
-    - name: seed_c
-      override: {pipeline.1.noise_seed: 303}
-    - name: seed_d
-      override: {pipeline.1.noise_seed: 404}
-  continuation: false
+          extras:
+            test_kind: "sgpe_thermal_ensemble"
+          path: "runs/eu151_sgpe_thermal/summary.json"

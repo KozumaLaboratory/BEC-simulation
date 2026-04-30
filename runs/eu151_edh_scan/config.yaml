@@ -1,42 +1,57 @@
-# B-2: EdH holding-time × target-field systematic scan
-#
-# Fix the preparation sequence (3G → 10mG ramp), then scan:
-#   - target magnetic field B_target: 50–300 μG (= p ≈ 0.008–0.049 dimless)
-#   - holding time at B_target: 1–25 ms (= 0.69–17.3 ω⁻¹)
-#
-# Product scan gives a 2D map showing where EdH signal is strongest.
-# Each point: GS at strong field → hold at B_target → record populations.
-#
-# ⚠️ Run AFTER Bug-1 (Coriolis) is confirmed fixed.
-
-pipeline:
-  - ground_state:
-      cache: runs/shared/eu151_gs_p100_ferromagnetic_64.jld2
-      atom: Eu151
-      grid: {n: [64, 64, 64], box: [20.0, 20.0, 20.0]}
-      interactions:
-        N_atoms: 50000
-        omega_ref: 691.15
-        c1_ratio: 0.02778     # 1/36 Buchachenko
-      ddi: {enabled: true}
-      zeeman: {p: 100.0, q: 0.0}  # strong field polarizes m=+F
-      potential: {type: harmonic, omega: [1.0, 1.0, 1.182]}
-      dt: 0.005
-      n_steps: 100000
-      tol: 1.0e-8
-      initial_state: ferromagnetic
-      backend: cuda
-
-  - dynamics:
-      duration: 6.91          # overridden by scan
-      dt: 0.0005
-      save_every: 100
-      ddi: true
-      zeeman: {p: 0.024, q: 0.0}  # overridden by scan
-
 scan:
   product:
-    # target field: 50, 100, 150, 200, 250, 300 μG → p values
-    pipeline.1.zeeman.p: [0.008, 0.016, 0.024, 0.033, 0.041, 0.049]
-    # holding time: 1, 5, 10, 15, 20, 25 ms → ω⁻¹ units
-    pipeline.1.duration: [0.69, 3.46, 6.91, 10.37, 13.82, 17.28]
+    pipeline.1.duration:
+      - 0.69
+      - 3.46
+      - 6.91
+      - 10.37
+      - 13.82
+      - 17.28
+    pipeline.1.zeeman.p:
+      - 0.008
+      - 0.016
+      - 0.024
+      - 0.033
+      - 0.041
+      - 0.049
+pipeline:
+  - ground_state:
+      dt: 0.005
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 1.182
+        type: "harmonic"
+      backend: "cuda"
+      B:
+        q: 0.0
+        p: 100.0
+      initial_state: "ferromagnetic"
+      tol: 1.0e-8
+      ddi:
+        enabled: true
+      cache: "runs/shared/eu151_gs_p100_ferromagnetic_64.jld2"
+      grid:
+        box:
+          - 20.0
+          - 20.0
+          - 20.0
+        n:
+          - 64
+          - 64
+          - 64
+      interactions:
+        omega_ref: 691.15
+        c1_ratio: 0.02778
+        N_atoms: 50000
+      n_steps: 100000
+  - dynamics:
+      duration: 6.91
+      B:
+        q: 0.0
+        p: 0.024
+      save_every: 100
+      ddi: true
+      dt: 0.0005

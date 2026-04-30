@@ -9,6 +9,11 @@ pipeline:
           - 2.6
         type: "harmonic"
       backend: "cuda"
+      B:
+        theta: 0.0
+        phi: 0.0
+        q: 0.0
+        p: 26700.0
       gauge_fix: false
       grid:
         box:
@@ -19,14 +24,8 @@ pipeline:
           - 16
           - 16
           - 8
-      zeeman:
-        q: 0.0
-        p: 26700.0
       kind: "rotating_basis"
       init_m_idx: 1
-      B_hat:
-        theta: 0.0
-        phi: 0.0
       interactions:
         c1: 0.0
         gamma_lhy: 0.0
@@ -38,8 +37,8 @@ pipeline:
       duration: 62.83
       kind: "rotating_basis"
       save_every: 50
-      epsilon: 0.001
-      B_hat:
+      B:
         theta: 0.611
         phi:
           rate: 0.0
+      epsilon: 0.001

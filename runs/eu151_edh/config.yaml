@@ -1,78 +1,52 @@
-# ================================================================
-# Eu151 Einstein-de Haas effect (3D)
-# ================================================================
-#
-# Reference:
-#   Matsui et al., Science 391, 384-388 (2026)
-#   arXiv:2504.17357
-#
-# Physics:
-#   Spin-polarized F=6 BEC (m=+6) at weak magnetic field (B = 2.6 nT)
-#   undergoes spin relaxation driven by DDI. Conservation of
-#   J_z = L_z + S_z transfers spin → orbital angular momentum.
-#
-# Experimental conditions:
-#   Trap: (ωx, ωy, ωz)/(2π) = (110, 110, 130) Hz — nearly spherical
-#   N = 5×10⁴ atoms
-#   c₁ = 0 (a_F unknown for Eu151; DDI is sole spin-dependent interaction)
-#   B = 2.6 nT (NOT zero)
-#   g_F = 7/6, μ = 7 μ_B
-#   Observation up to 40 ms
-#
-# Units: dimensionless (ℏ = m = ω_ref = 1), ω_ref = 2π × 110 Hz
-#   length  = a_ho = √(ℏ/(m ω_ref)) ≈ 0.780 μm
-#   energy  = ℏ ω_ref
-#   time    = 1/ω_ref ≈ 1.447 ms
-#
-# === Reference values (ω_ref = 2π × 110 Hz) ===
-#   a_ho  ≈ 0.780 μm
-#   1 ms  ≈ 0.691 ω⁻¹
-#   B = 2.6 nT → p ≈ 0.39
-#   c0    ≈ 4689 (DDI-only: c1=0)
-#   c_dd auto-derived from N_atoms+omega_ref
-#   ε_dd  ≈ 0.544
-# ================================================================
-
 pipeline:
-  # Fully polarized ground state at high field
-  # c1_ratio: 0.0 — DDI-only (a_F unknown for Eu151)
   - ground_state:
-      cache: runs/shared/eu151_gs_p100_fmmin_c1r0_64.jld2
-      atom: Eu151
-      grid: {n: [64, 64, 64], box: [20.0, 20.0, 20.0]}
-      interactions:
-        N_atoms: 50000
-        omega_ref: 691.15        # 2π × 110 Hz
-        c1_ratio: 0.0            # DDI-only (paper: a_F unknown)
-      ddi: {enabled: true}
-      zeeman: {p: 100.0, q: 0.0}
-      potential: {type: harmonic, omega: [1.0, 1.0, 1.182]}
       dt: 0.005
-      n_steps: 100000
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 1.182
+        type: "harmonic"
+      backend: "cuda"
+      B:
+        q: 0.0
+        p: 100.0
+      initial_state: "ferromagnetic_min"
       tol: 1.0e-10
-      initial_state: ferromagnetic_min
-      backend: cuda
-
-  # ---- Phase 1: Quench to weak field ----
-  # Paper: "momentarily adjusted" — instantaneous on EdH timescale (~22 ms)
-  # 0.14 ω⁻¹ ≈ 0.2 ms ≪ EdH timescale
+      ddi:
+        enabled: true
+      cache: "runs/shared/eu151_gs_p100_fmmin_c1r0_64.jld2"
+      grid:
+        box:
+          - 20.0
+          - 20.0
+          - 20.0
+        n:
+          - 64
+          - 64
+          - 64
+      interactions:
+        omega_ref: 691.15
+        c1_ratio: 0.0
+        N_atoms: 50000
+      n_steps: 100000
   - dynamics:
       duration: 0.14
+      B:
+        q: 0.0
+        p:
+          to: 0.39
+          from: 100.0
+      save_every: 280
       dt: 0.0005
-      save_every: 280            # save only final state
-      zeeman: {p: {from: 100.0, to: 0.39}, q: 0.0}
-
-  # ---- Phase 2: Spin relaxation at weak field ----
-  # Symmetry-breaking seed (1e-6) on Δm=±1 component only
-  # Paper: "negligible thermal component" — no bulk thermal noise
-  # 40 ms ≈ 27.6 ω⁻¹
   - dynamics:
       duration: 27.6
-      dt: 0.0001
-      save_every: 5000           # ~55 snapshots, 0.72 ms resolution
-      seed_amplitude: 1.0e-6     # tiny symmetry-breaking seed
-      seed_k_cut: 2.5            # ~ 1/ξ_h: keeps long-wavelength EdH modes,
-                                 # suppresses short-wavelength UV grass that
-                                 # DDI would otherwise amplify into noise
+      B:
+        q: 0.0
+        p: 0.39
+      save_every: 5000
+      seed_k_cut: 2.5
       noise_seed: 42
-      zeeman: {p: 0.39, q: 0.0}
+      dt: 0.0001
+      seed_amplitude: 1.0e-6
