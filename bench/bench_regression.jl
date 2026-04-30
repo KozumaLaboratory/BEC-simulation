@@ -173,6 +173,40 @@ let
     end
 end
 
+# 11. apply_ddi_step_rotating! on Eu151 16³ rotating basis (CPU). Wraps
+# lab-basis apply_ddi_step! with B̂-rotation round-trip:
+#   ψ̃ → copy → _apply_UB!(forward) → apply_ddi_step! → _apply_UB!(inverse) → copy back
+# Profile shows ~2.1 ms minimum / 47 allocs / 73 KiB — ~61% of full
+# split_step_rotating! time on Eu151 16³ × D=13. Baseline `apply_ddi_step!`
+# itself is 327 μs; the wrapper adds ~1.77 ms of pure rotation + copy
+# overhead (4 apply_uniform_spin_rotation! calls + 2 copyto!). theta=0.3
+# so the SU(D) rotation builders take the production matmul path.
+let
+    grid = make_grid(GridConfig((16, 16, 16), (8.0, 8.0, 8.0)))
+    V_trap = zeros(Float64, 16, 16, 16)
+    @inbounds for I in CartesianIndices(V_trap)
+        x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+        V_trap[I] = 0.5 * (x*x + y*y + z*z)
+    end
+    # Klaus-like setup: nonzero c_dd so apply_ddi_step! runs (not skipped),
+    # nonzero theta so rotations exercise the SU(D) matmul (not identity).
+    ws_rb = SpinorBEC.make_rotating_basis_ws(
+        grid, 6, V_trap;
+        p = 100.0, q = 0.0, c0 = 50.0, c1 = 0.0, c_dd = 100.0,
+        theta_func = (_t) -> 0.3, phi_func = (_t) -> 0.0,
+        theta_dot_func = (_t) -> 0.05, phi_dot_func = (_t) -> 0.5,
+        gauge_fix = false,
+    )
+    @inbounds for I in CartesianIndices(grid.config.n_points)
+        x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+        ws_rb.psi_tilde[I, 1] = exp(-(x*x + y*y + z*z) / 2)
+    end
+    SpinorBEC.normalize_rotating!(ws_rb)
+    SUITE["kernel/apply_ddi_step_rotating_eu151_16cubed"] = @benchmarkable begin
+        SpinorBEC.apply_ddi_step_rotating!($ws_rb, 0.005, 0.0)
+    end
+end
+
 # 10. apply_kinetic_step_rotating! on Eu151 16³ rotating basis (CPU).
 # Per-component FFT loop: D=13 iterations of (selectdim+copyto → fwd FFT
 # on spatial_buf → broadcast `*= kspace_phase_buf` → inv FFT → copyto).
