@@ -144,21 +144,25 @@ function run_pipeline(config::PipelineConfig; verbose::Bool=true, psi_init=nothi
         )
     end
 
-    # Auto-save rotating_basis pipelines into the dashboard-canonical layout
-    # whenever the caller supplied a `checkpoint_dir`. This eliminates the
-    # need for downstream launchers to call `save_rotating_basis_result!`
-    # by hand and unifies the on-disk format with the dashboard reader.
-    # Lab-frame `:dynamics_history` already saves itself via the workflow
-    # runner; this hook only fires for the rotating_basis path.
-    if checkpoint_dir !== nothing && haskey(results, :rotating_basis_history)
+    # Auto-save dynamics pipelines into the dashboard-canonical layout
+    # whenever the caller supplied a `checkpoint_dir`. Fires for both
+    # `kind: rotating_basis` (`:rotating_basis_history`) and `kind: spinor`
+    # (`:dynamics_history`) so downstream launchers don't need to call
+    # `save_rotating_basis_result!` by hand.
+    has_dyn = haskey(results, :rotating_basis_history) ||
+              haskey(results, :dynamics_history)
+    if checkpoint_dir !== nothing && has_dyn
+        # The auto-save target is the run directory (parent of the checkpoint
+        # subdirectory) so `result.jld2` lives next to `point_001.jld2`.
+        run_dir = dirname(dirname(checkpoint_dir))
         try
-            save_rotating_basis_result!(checkpoint_dir, results)
+            save_rotating_basis_result!(run_dir, results)
             verbose && println(
-                "  auto-saved canonical rotating_basis result -> ",
-                joinpath(checkpoint_dir, "result.jld2"),
+                "  auto-saved canonical dynamics result -> ",
+                joinpath(run_dir, "result.jld2"),
             )
         catch err
-            @warn "rotating_basis auto-save failed; downstream launcher should " *
+            @warn "dynamics auto-save failed; downstream launcher should " *
                 "call save_rotating_basis_result! manually" exception = (err, catch_backtrace())
         end
     end

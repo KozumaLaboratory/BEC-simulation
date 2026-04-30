@@ -49,7 +49,11 @@ function add_vacuum_noise(
 
         psi_k .+= noise_k
         psi_c .= plans.inverse * psi_k
-        view(psi_out, idx...) .= psi_c
+        # `psi_c` is a host Array (line 36 forced it via `Array(view(...))`); use
+        # copyto! so the assignment back into `psi_out` works whether `psi_out`
+        # is a CPU Array or a CuArray (broadcast `.=` would fail on GPU because
+        # an inline host Array isn't isbits in a CUDA kernel).
+        copyto!(view(psi_out, idx...), psi_c)
     end
 
     psi_out

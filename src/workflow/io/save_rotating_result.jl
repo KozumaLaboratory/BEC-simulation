@@ -64,6 +64,66 @@ function _concat_rotating_phases(history::AbstractVector)
 end
 
 """
+Concatenate consecutive lab-frame (`kind: spinor`) dynamics phases into
+the same dyn dict shape used by `_concat_rotating_phases`, so a single
+JLD2 writer can serve both code paths.
+
+The spinor pipeline stores each phase as a NamedTuple with:
+  - `dynamics_result :: SimulationResult`  (times, norms, magnetizations, …)
+  - `snapshot_tmp_path :: Union{Nothing, String}`  scratch JLD2 with
+        per-frame `frame_NNNNN` datasets (see
+        `_run_dynamics_with_optional_streaming!`)
+  - `snapshot_count :: Int`
+
+We pull `:Lz`, `:Fx`, `:Fy` from a per-step trace if present, and otherwise
+emit only the fields the spinor SimulationResult guarantees (times,
+norms, Fz). The dashboard's reader is tolerant of missing Lz/Fx/Fy and
+can recompute them from the saved snapshots on demand.
+"""
+function _concat_dynamics_phases(history::AbstractVector)
+    isempty(history) && return Dict{Symbol, Any}()
+
+    out = Dict{Symbol, Any}()
+    out[:times] = Float64[]
+    out[:norms] = Float64[]
+    out[:Fz] = Float64[]
+    out[:psi_snapshots] = Any[]
+
+    t_offset = 0.0
+    for (pi, phase) in enumerate(history)
+        dr = phase.dynamics_result
+        dr === nothing && continue
+        phase_times = collect(Float64, dr.times)
+        keep = pi == 1 ? eachindex(phase_times) : 2:length(phase_times)
+        for k in keep
+            push!(out[:times], phase_times[k] + t_offset)
+            push!(out[:norms], dr.norms[k])
+            push!(out[:Fz], dr.magnetizations[k])
+        end
+        t_offset += isempty(phase_times) ? 0.0 : phase_times[end]
+
+        # Pull snapshots from the scratch JLD2 if the phase streamed them
+        # to disk; otherwise fall back to the in-memory Vector held by
+        # `dr.psi_snapshots`. The boundary-skip rule (`keep`) only applies
+        # to time-aligned scalar traces — snapshots are emitted on a
+        # `save_every` cadence and don't share endpoints between phases.
+        if phase.snapshot_tmp_path !== nothing && isfile(phase.snapshot_tmp_path)
+            JLD2.jldopen(phase.snapshot_tmp_path, "r") do f
+                n = phase.snapshot_count
+                for s in 1:n
+                    key = "frame_" * lpad(string(s), 5, '0')
+                    haskey(f, key) || continue
+                    push!(out[:psi_snapshots], f[key])
+                end
+            end
+        elseif !isempty(dr.psi_snapshots)
+            append!(out[:psi_snapshots], dr.psi_snapshots)
+        end
+    end
+    out
+end
+
+"""
 Canonical save layout for `kind: rotating_basis` (Option γ) dynamics
 results.
 
@@ -108,24 +168,41 @@ function save_rotating_basis_result!(
     # Accepts either AbstractDict (e.g. `run_pipeline`'s internal results
     # dict) or NamedTuple (`run_config(...)` return value). Both expose
     # `haskey` and `getindex`, so we don't constrain the type.
-    haskey(result, :rotating_basis_dynamics) || throw(
-        ArgumentError(
-            "save_rotating_basis_result!: result has no :rotating_basis_dynamics key " *
-            "(was the pipeline using `kind: rotating_basis`?)"),
-    )
-
-    # Concatenate every dynamics phase (GS → tilt ramp → chirp → steady stir).
-    # `:rotating_basis_history` is populated by `_step_dispatch!` for every
-    # `RotatingBasisDynamicsStep`. Falls back to the single phase in
-    # `:rotating_basis_dynamics` for older code paths or one-phase pipelines.
-    history = haskey(result, :rotating_basis_history) ?
-              result[:rotating_basis_history] :
-              [result[:rotating_basis_dynamics]]
-    isempty(history) && throw(
-        ArgumentError(
-            "save_rotating_basis_result!: no rotating_basis dynamics phases in result"),
-    )
-    dyn = _concat_rotating_phases(history)
+    #
+    # Two pipeline paths produce dashboard-saveable dynamics results:
+    #
+    #   - `kind: rotating_basis` populates `:rotating_basis_history`
+    #     (Vector{Dict}) — see RotatingBasisDynamicsStep dispatch.
+    #   - `kind: spinor`         populates `:dynamics_history`
+    #     (Vector{NamedTuple{(:dynamics_result, :snapshot_tmp_path, ...)}}) —
+    #     see DynamicsStep dispatch.
+    #
+    # We dispatch here instead of in the caller so any auto-save hook
+    # (pipeline_runner.jl) can call this function unconditionally.
+    if haskey(result, :rotating_basis_history) ||
+       haskey(result, :rotating_basis_dynamics)
+        history = haskey(result, :rotating_basis_history) ?
+                  result[:rotating_basis_history] :
+                  [result[:rotating_basis_dynamics]]
+        isempty(history) && throw(
+            ArgumentError(
+                "save_rotating_basis_result!: no rotating_basis dynamics phases in result"),
+        )
+        dyn = _concat_rotating_phases(history)
+    elseif haskey(result, :dynamics_history)
+        history = result[:dynamics_history]
+        isempty(history) && throw(
+            ArgumentError(
+                "save_rotating_basis_result!: no spinor dynamics phases in result"),
+        )
+        dyn = _concat_dynamics_phases(history)
+    else
+        throw(
+            ArgumentError(
+                "save_rotating_basis_result!: result has neither :rotating_basis_dynamics " *
+                "nor :dynamics_history (was the pipeline a ground-state-only run?)"),
+        )
+    end
 
     isdir(run_dir) || mkpath(run_dir)
     out_path = joinpath(run_dir, "result.jld2")
@@ -152,8 +229,11 @@ function save_rotating_basis_result!(
 
         f["dynamics/times"] = collect(Float64, dyn[:times])
         f["dynamics/norms"] = collect(Float64, dyn[:norms])
-        f["dynamics/Lz"] = collect(Float64, dyn[:Lz])
-        f["dynamics/Fz"] = collect(Float64, dyn[:Fz])
+        # Lz / Fx / Fy are populated by the rotating_basis path but absent in
+        # the lab-frame spinor path (only times/norms/Fz are guaranteed by
+        # SimulationResult). Guard each write so spinor dynamics still saves.
+        haskey(dyn, :Lz) && (f["dynamics/Lz"] = collect(Float64, dyn[:Lz]))
+        haskey(dyn, :Fz) && (f["dynamics/Fz"] = collect(Float64, dyn[:Fz]))
         haskey(dyn, :Fx) && (f["dynamics/Fx"] = collect(Float64, dyn[:Fx]))
         haskey(dyn, :Fy) && (f["dynamics/Fy"] = collect(Float64, dyn[:Fy]))
         if !isempty(pm_mat)
