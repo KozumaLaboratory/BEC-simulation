@@ -1,0 +1,44 @@
+pipeline:
+  - ground_state:
+      dt: 0.005
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 1.0
+        type: "harmonic"
+      B:
+        theta: 0.0
+        phi: 0.0
+        q: 0.0
+        p: 1000.0
+      gauge_fix: false
+      grid:
+        box:
+          - 10.0
+          - 10.0
+          - 10.0
+        n:
+          - 12
+          - 12
+          - 12
+      kind: "rotating_basis"
+      init_m_idx: 1
+      interactions:
+        c1: 0.0
+        gamma_lhy: 0.0
+        c_dd: 1.5
+        c0: 60.0
+      init_sigma: 1.0
+      n_steps: 150
+  - dynamics:
+      duration: 1.0
+      kind: "rotating_basis"
+      B:
+        theta: 0.611
+        phi:
+          rate: 4.524
+      epsilon: 0.001
+      save:
+        every: 10

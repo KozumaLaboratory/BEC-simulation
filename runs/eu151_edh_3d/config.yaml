@@ -1,0 +1,42 @@
+pipeline:
+  - ground_state:
+      dt: 0.001
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 1.1818
+        type: "harmonic"
+      backend: "gpu"
+      B:
+        q: 0.0
+        p: 0.39
+      initial_state: "antiferromagnetic"
+      tol: 1.0e-7
+      ddi:
+        enabled: false
+      cache: "runs/shared/eu151_64x3_box20_c1r-0.01_noddi_p0.39_afm.jld2"
+      grid:
+        box:
+          - 20.0
+          - 20.0
+          - 20.0
+        n:
+          - 64
+          - 64
+          - 64
+      interactions:
+        omega_ref: 691.15
+        c1_ratio: -0.01
+        N_atoms: 50000
+      n_steps: 100000
+  - dynamics:
+      duration: 27.6
+      B:
+        q: 0.0
+        p: 0.39
+      ddi: true
+      dt: 0.0001
+      save:
+        every: 750

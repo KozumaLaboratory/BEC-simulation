@@ -1,0 +1,84 @@
+scan:
+  comparison_runs:
+    - name: "seed_a"
+      override:
+        pipeline.1.noise_seed: 1001
+    - name: "seed_b"
+      override:
+        pipeline.1.noise_seed: 2002
+    - name: "seed_c"
+      override:
+        pipeline.1.noise_seed: 3003
+  product:
+    pipeline.1.duration:
+      - 5.0
+      - 10.0
+      - 20.0
+      - 50.0
+      - 100.0
+  continuation: false
+pipeline:
+  - ground_state:
+      dt: 0.005
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 1.1818
+        type: "harmonic"
+      backend: "gpu"
+      B:
+        q: 1.5
+        p: 0.5
+      initial_state: "polar"
+      tol: 1.0e-7
+      ddi:
+        enabled: true
+      grid:
+        box:
+          - 14.0
+          - 14.0
+          - 10.0
+        n:
+          - 48
+          - 48
+          - 32
+      interactions:
+        omega_ref: 691.15
+        c1_ratio: 0.028
+        N_atoms: 30000
+      n_steps: 6000
+  - dynamics:
+      duration: 20.0
+      B:
+        q:
+          to: -0.5
+          from: 1.5
+        p: 0.5
+      temperature_ratio: 0.05
+      dt: 0.01
+      save:
+        every: 100
+  - dynamics:
+      duration: 5.0
+      B:
+        q: -0.5
+        p: 0.5
+      dt: 0.01
+      save:
+        every: 100
+  - analyze:
+      - phase_classify: {}
+      - defect_density:
+          defect_type: "domain_wall"
+          threshold: 0.05
+      - defect_density:
+          defect_type: "vortex"
+          threshold: 0.1
+      - kibble_zurek_stats:
+          threshold: 0.1
+      - summary_json:
+          extras:
+            test_kind: "kibble_zurek_scan"
+          path: "runs/eu151_kibble_zurek/summary.json"

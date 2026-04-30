@@ -1,0 +1,43 @@
+pipeline:
+  - ground_state:
+      dt: 0.001
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+        type: "harmonic"
+      backend: "gpu"
+      B:
+        q: 0.0
+        p: 0.0
+      initial_state: "ferromagnetic"
+      tol: 1.0e-8
+      ddi:
+        quasi_2d: true
+        l_z: 0.9206
+        enabled: false
+      cache: "runs/shared/eu151_128x2_box16_c1r-0.01_noddi_fm.jld2"
+      grid:
+        box:
+          - 16.0
+          - 16.0
+        n:
+          - 128
+          - 128
+      quasi_2d: true
+      l_z: 0.9206
+      interactions:
+        c1_ratio: -0.01
+        c_total: 4689.0
+  - dynamics:
+      duration: 5.0
+      B:
+        q: 0.0
+        p: 0.0
+      ddi: true
+      noise_seed: 42
+      temperature_ratio: 0.1
+      dt: 0.0001
+      save:
+        every: 2500

@@ -1,0 +1,46 @@
+pipeline:
+  - ground_state:
+      dt: 0.001
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 1.1818
+        type: "harmonic"
+      backend: "gpu"
+      B:
+        q: 0.0
+        p: 0.0
+      initial_state: "polar"
+      tol: 1.0e-8
+      ddi:
+        enabled: false
+      target_magnetization: 0.0
+      grid:
+        box:
+          - 20.0
+          - 20.0
+          - 20.0
+        n:
+          - 64
+          - 64
+          - 64
+      interactions:
+        omega_ref: 691.15
+        c1_ratio: 0.0
+        N_atoms: 50000
+      n_steps: 100000
+  - dynamics:
+      duration: 5.0
+      B:
+        q: 0.0
+        p: 0.0
+      ddi: true
+      noise_seed: 42
+      temperature_ratio: 0.1
+      dt: 5.0e-5
+      save:
+        every: 500
+  - analyze:
+      - phase_classify: {}

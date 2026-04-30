@@ -1,0 +1,58 @@
+scan:
+  product:
+    pipeline.0.zeeman.q:
+      - -0.2
+      - -0.05
+      - 0.0
+      - 0.05
+      - 0.2
+      - 0.5
+    pipeline.0.interactions.c1_ratio:
+      - -0.02
+      - -0.01
+      - -0.005
+      - -0.002
+      - 0.0
+      - 0.002
+      - 0.005
+      - 0.01
+      - 0.02
+  continuation: false
+pipeline:
+  - ground_state:
+      dt: 0.002
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 1.1818
+        type: "harmonic"
+      backend: gpu
+      B:
+        q: 0.0
+        p: 0.0
+      initial_state: "polar"
+      tol: 1.0e-7
+      ddi:
+        enabled: true
+      grid:
+        box:
+          - 16.0
+          - 16.0
+          - 16.0
+        n:
+          - 32
+          - 32
+          - 32
+      interactions:
+        omega_ref: 691.15
+        c1_ratio: 0.0
+        N_atoms: 50000
+      n_steps: 40000
+  - analyze:
+      - phase_classify: {}
+      - bogoliubov:
+          k_max: 8.0
+          n_k: 80
+          directions: "auto"

@@ -1,0 +1,32 @@
+pipeline:
+  - ground_state:
+      dt: 0.0005
+      atom: "Eu151"
+      potential:
+        type: "none"
+      backend: "cpu"
+      B:
+        q: 0.0
+        p: 0.0
+      initial_state: "polar"
+      tol: 1.0e-8
+      ddi:
+        enabled: true
+      grid:
+        box:
+          - 30.0
+          - 30.0
+          - 30.0
+        n:
+          - 64
+          - 64
+          - 64
+      interactions:
+        c_lhy: 1135.0
+        omega_ref: 691.15
+        c1_ratio: 0.0
+        N_atoms: 50000
+      n_steps: 60000
+  - analyze:
+      - droplet_profile: {}
+      - phase_classify: {}

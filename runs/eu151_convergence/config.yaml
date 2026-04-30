@@ -1,0 +1,67 @@
+scan:
+  product:
+    pipeline.0.tol:
+      - 1.0e-7
+      - 1.0e-8
+    pipeline.0.dt:
+      - 0.002
+      - 0.0005
+    pipeline.0.grid.n:
+      -
+        - 32
+        - 32
+        - 32
+      -
+        - 48
+        - 48
+        - 48
+      -
+        - 64
+        - 64
+        - 64
+      -
+        - 96
+        - 96
+        - 96
+  continuation: false
+pipeline:
+  - ground_state:
+      method: "itp"
+      dt: 0.002
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 1.1818
+        type: "harmonic"
+      backend: "cpu"
+      B:
+        q: 0.0
+        p: 0.0
+      initial_state: "ferromagnetic_min"
+      tol: 1.0e-7
+      ddi:
+        enabled: true
+      target_magnetization: 0.0
+      grid:
+        box:
+          - 20.0
+          - 20.0
+          - 20.0
+        n:
+          - 32
+          - 32
+          - 32
+      interactions:
+        c_lhy: 1135.0
+        omega_ref: 691.15
+        c1_ratio: 0.0
+        N_atoms: 50000
+      n_steps: 50000
+  - ground_state:
+      tol: 1.0e-9
+      method: "lbfgs"
+      n_steps: 800
+  - analyze:
+      - phase_classify: {}

@@ -1,0 +1,50 @@
+pipeline:
+  - ground_state:
+      dt: 0.001
+      atom: "Dy164"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 2.6
+        type: "harmonic"
+      backend: "gpu"
+      B:
+        Bz: "1.0 Gauss"
+      initial_state: "ferromagnetic_min"
+      tol: 1.0e-7
+      ddi:
+        enabled: true
+      grid:
+        box:
+          - 20.0
+          - 20.0
+          - 8.0
+        n:
+          - 64
+          - 64
+          - 32
+      interactions:
+        omega_ref: 314.159
+        N_atoms: 60000
+      n_steps: 30000
+  - dynamics:
+      duration: 6.28
+      B:
+        phi_deg: 0.0
+        magnitude: "1.0 Gauss"
+        theta_deg:
+          to: 35.0
+          from: 0.0
+      dt: 0.0004
+      interactions:
+        omega_ref: 314.159
+      save:
+        psi: true
+        every: 100
+        precision: "f32"
+  - analyze:
+      - summary_json:
+          extras:
+            test_kind: "dt_resolution_smoke"
+          path: "runs/klaus_dt_test/summary.json"

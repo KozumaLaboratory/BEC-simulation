@@ -1,0 +1,44 @@
+pipeline:
+  - ground_state:
+      dt: 0.0005
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 1.182
+        type: "harmonic"
+      backend: gpu
+      B:
+        q: 0.0
+        p: 0.39
+      initial_state: "antiferromagnetic"
+      tol: 1.0e-8
+      ddi:
+        enabled: true
+      cache: "runs/shared/eu151_gs_p100_ferromagnetic_64.jld2"
+      grid:
+        box:
+          - 20.0
+          - 20.0
+          - 20.0
+        n:
+          - 64
+          - 64
+          - 64
+      interactions:
+        omega_ref: 691.15
+        c1_ratio: 0.02778
+        N_atoms: 50000
+      n_steps: 100000
+  - analyze:
+      - tomography:
+          theta_max: 3.14159
+          tof:
+            t_tof: 11.0
+            imaging_axis: 3
+            gradient: 0.5
+          rotation_axis: "y"
+          reference_m: -6
+          theta_min: 0.0
+          n_angles: 19

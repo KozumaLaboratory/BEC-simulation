@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eu151 Mz Scan Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0e14;
+            color: #e6edf3;
+            padding: 1.5rem;
+        }
+        h1 {
+            color: #00d9ff;
+            text-align: center;
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+        }
+        .subtitle {
+            text-align: center;
+            color: #8b949e;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+        }
+        .warning {
+            background: #3d1f00;
+            border: 1px solid #ff6b35;
+            color: #ffaa6b;
+            padding: 0.8rem 1rem;
+            border-radius: 6px;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .stat-box {
+            background: #131920;
+            border: 1px solid #21262d;
+            border-left: 3px solid #00d9ff;
+            border-radius: 6px;
+            padding: 1rem;
+        }
+        .stat-label { color: #8b949e; font-size: 0.8rem; }
+        .stat-value { color: #00d9ff; font-size: 1.4rem; font-weight: bold; margin-top: 0.3rem; }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .panel {
+            background: #131920;
+            border: 1px solid #21262d;
+            border-radius: 8px;
+            padding: 1rem;
+        }
+        .panel-full {
+            background: #131920;
+            border: 1px solid #21262d;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .plot { width: 100%; height: 400px; }
+        .plot-tall { width: 100%; height: 500px; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        th, td {
+            padding: 0.4rem 0.6rem;
+            text-align: right;
+            border-bottom: 1px solid #21262d;
+        }
+        th { color: #00d9ff; font-weight: bold; }
+        td:first-child, th:first-child { text-align: left; }
+        tr:hover td { background: #1a2330; }
+        .conv-true { color: #50fa7b; }
+        .conv-false { color: #ff6b9d; }
+    </style>
+</head>
+<body>
+
+<h1>Eu151 Mz Scan Dashboard</h1>
+<div class="subtitle">Target Mz: -6.0 &rarr; 0.0 | 64&sup3; grid | DDI enabled | c1_ratio=0.0</div>
+
+<div id="warning-box" class="warning"></div>
+
+<div class="stats-row">
+    <div class="stat-box">
+        <div class="stat-label">Scan Points</div>
+        <div class="stat-value" id="stat-points">-</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-label">Converged</div>
+        <div class="stat-value" id="stat-converged">-</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-label">Energy Range</div>
+        <div class="stat-value" id="stat-energy">-</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-label">Mz Range</div>
+        <div class="stat-value" id="stat-mz">-</div>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="panel"><div id="energy-plot" class="plot"></div></div>
+    <div class="panel"><div id="mz-plot" class="plot"></div></div>
+</div>
+
+<div class="panel-full"><div id="pop-plot" class="plot-tall"></div></div>
+
+<div class="panel-full"><div id="pop-heatmap" class="plot-tall"></div></div>
+
+<div class="panel-full">
+    <table id="data-table">
+        <thead>
+            <tr>
+                <th>#</th><th>Target Mz</th><th>Actual Mz</th><th>Energy</th>
+                <th>Conv</th><th>Top-3 m</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<script>
+const plotLayout = {
+    paper_bgcolor: '#131920',
+    plot_bgcolor: '#0a0e14',
+    font: { family: 'Courier New', color: '#e6edf3', size: 12 },
+    margin: { t: 40, r: 20, b: 50, l: 60 },
+    xaxis: { gridcolor: '#21262d', zerolinecolor: '#3d4550' },
+    yaxis: { gridcolor: '#21262d', zerolinecolor: '#3d4550' },
+};
+
+const plotConfig = { responsive: true, displayModeBar: false };
+
+fetch('dashboard_data.json')
+    .then(r => r.json())
+    .then(render)
+    .catch(err => {
+        document.getElementById('warning-box').textContent =
+            'Failed to load dashboard_data.json: ' + err.message;
+    });
+
+function render(data) {
+    const pts = data.points;
+    const F = data.F;
+    const nPts = pts.length;
+    const nConv = pts.filter(p => p.converged).length;
+
+    // Stats
+    document.getElementById('stat-points').textContent = nPts;
+    document.getElementById('stat-converged').textContent = `${nConv}/${nPts}`;
+
+    const energies = pts.map(p => p.energy);
+    const eMin = Math.min(...energies).toFixed(1);
+    const eMax = Math.max(...energies).toFixed(1);
+    document.getElementById('stat-energy').textContent = `${eMin} .. ${eMax}`;
+
+    const mzActual = pts.map(p => p.mz_actual);
+    const mzMin = Math.min(...mzActual).toFixed(2);
+    const mzMax = Math.max(...mzActual).toFixed(2);
+    document.getElementById('stat-mz').textContent = `${mzMin} .. ${mzMax}`;
+
+    // Warning
+    if (nConv < nPts) {
+        document.getElementById('warning-box').textContent =
+            `${nPts - nConv}/${nPts} points did NOT converge. Results may be unreliable.`;
+    } else {
+        document.getElementById('warning-box').style.display = 'none';
+    }
+
+    // Target Mz values
+    const targetMz = pts.map((_, i) => -6.0 + i * 0.5);
+
+    // Energy vs Mz
+    Plotly.newPlot('energy-plot', [{
+        x: targetMz,
+        y: energies,
+        type: 'scatter',
+        mode: 'lines+markers',
+        marker: {
+            color: pts.map(p => p.converged ? '#00d9ff' : '#ff6b9d'),
+            size: 8,
+        },
+        line: { color: '#00d9ff', width: 2 },
+        name: 'Energy',
+    }], {
+        ...plotLayout,
+        title: { text: 'Total Energy vs Target Mz', font: { color: '#00d9ff' } },
+        xaxis: { ...plotLayout.xaxis, title: 'Target Mz' },
+        yaxis: { ...plotLayout.yaxis, title: 'E [ℏω]' },
+    }, plotConfig);
+
+    // Actual Mz vs Target Mz
+    Plotly.newPlot('mz-plot', [
+        {
+            x: targetMz,
+            y: mzActual,
+            type: 'scatter',
+            mode: 'lines+markers',
+            marker: { color: '#a277ff', size: 8 },
+            line: { color: '#a277ff', width: 2 },
+            name: 'Actual Mz',
+        },
+        {
+            x: [-6, 0],
+            y: [-6, 0],
+            type: 'scatter',
+            mode: 'lines',
+            line: { color: '#3d4550', dash: 'dash', width: 1 },
+            name: 'Mz = target',
+            showlegend: false,
+        },
+    ], {
+        ...plotLayout,
+        title: { text: 'Actual vs Target Mz', font: { color: '#00d9ff' } },
+        xaxis: { ...plotLayout.xaxis, title: 'Target Mz' },
+        yaxis: { ...plotLayout.yaxis, title: 'Actual Mz' },
+    }, plotConfig);
+
+    // Population bar chart (stacked)
+    const mValues = pts[0].m_values;
+    const colors = [
+        '#ff6b9d', '#ff8fab', '#ffa8c5', '#ffcce0',
+        '#e0e0ff', '#c0c0ff', '#a0a0ff',
+        '#ffffff',
+        '#a0ffa0', '#80e080', '#60c060',
+        '#40a040', '#208020',
+    ];
+
+    const popTraces = mValues.map((m, mi) => ({
+        x: targetMz,
+        y: pts.map(p => p.populations[mi]),
+        type: 'bar',
+        name: `m=${m}`,
+        marker: { color: colors[mi] || '#888' },
+    }));
+
+    Plotly.newPlot('pop-plot', popTraces, {
+        ...plotLayout,
+        barmode: 'stack',
+        title: { text: 'Spin Component Populations', font: { color: '#00d9ff' } },
+        xaxis: { ...plotLayout.xaxis, title: 'Target Mz' },
+        yaxis: { ...plotLayout.yaxis, title: 'Population fraction', range: [0, 1.05] },
+        legend: { orientation: 'h', y: -0.15, font: { size: 10 } },
+    }, plotConfig);
+
+    // Population heatmap
+    const popMatrix = mValues.map((_, mi) =>
+        pts.map(p => Math.log10(Math.max(p.populations[mi], 1e-150)))
+    );
+
+    Plotly.newPlot('pop-heatmap', [{
+        z: popMatrix,
+        x: targetMz.map(v => `Mz=${v}`),
+        y: mValues.map(m => `m=${m}`),
+        type: 'heatmap',
+        colorscale: [
+            [0, '#0a0e14'], [0.3, '#1a1a5e'], [0.5, '#4a0080'],
+            [0.7, '#a277ff'], [0.85, '#00d9ff'], [1, '#50fa7b'],
+        ],
+        zmin: -150, zmax: 0,
+        colorbar: { title: 'log₁₀(P)', titlefont: { color: '#8b949e' } },
+    }], {
+        ...plotLayout,
+        title: { text: 'Population Heatmap (log scale)', font: { color: '#00d9ff' } },
+        yaxis: { ...plotLayout.yaxis, autorange: 'reversed' },
+    }, plotConfig);
+
+    // Data table
+    const tbody = document.querySelector('#data-table tbody');
+    pts.forEach((p, i) => {
+        const sorted = p.populations.map((pop, mi) => ({ m: mValues[mi], pop }))
+            .sort((a, b) => b.pop - a.pop)
+            .slice(0, 3);
+        const topStr = sorted.map(s => `m=${s.m}: ${(s.pop * 100).toFixed(1)}%`).join(', ');
+        const convClass = p.converged ? 'conv-true' : 'conv-false';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${p.index}</td>
+            <td>${targetMz[i].toFixed(1)}</td>
+            <td>${p.mz_actual.toFixed(4)}</td>
+            <td>${p.energy.toFixed(2)}</td>
+            <td class="${convClass}">${p.converged}</td>
+            <td style="text-align:left">${topStr}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+</script>
+</body>
+</html>
