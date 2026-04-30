@@ -1,16 +1,15 @@
 name: phi_omega_scan
 description: |
-  Klaus magnetostir frequency optimisation on Eu151 (24×24×12, 500ms stir, ε=1e-6).
-  phi_chirp.to slaves to phi_omega so the chirp ramps up to the steady value.
+  Klaus magnetostir frequency scan on Eu151 (24×24×12, 500 ms stir, ε=1e-6).
+  Migrated 2026-04-30 to use template: klaus_magnetostir + parameters override.
+  Values are dimless ω/ω_ref; display_factor=50 → Hz for plots.
 parameter:
-  key: phi_omega
+  key: stir_freq
   values: [1.0, 2.0, 3.0, 4.524, 6.0, 8.0, 12.0, 18.0]
   unit: "(2π·50 Hz)"
   display_unit: "Hz"
   display_factor: 50.0
-  yaml_path: pipeline.3.dynamics.B_hat.phi_omega
+  yaml_path: parameters.stir_freq
 template: eu151_phi4_524_500ms/config.yaml
-override_path: pipeline.3.dynamics.B_hat.phi_omega
-extra_overrides:
-  pipeline.2.dynamics.B_hat.phi_chirp.to: ${value}
+override_path: parameters.stir_freq
 point_dir_pattern: eu151_phi${value}_500ms

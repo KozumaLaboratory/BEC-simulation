@@ -91,8 +91,13 @@ end
 function _format_point_name(pattern::String, value, idx)
     s = pattern
     s = replace(s, "\${idx}" => string(idx))
-    # Stringify value with underscores so e.g. 4.524 → "4_524" works as a dir name.
+    # Stringify value cleanly for use in directory names:
+    #   4.524        → "4_524"
+    #   "226 Hz"     → "226Hz"
+    #   "0.307 mG"   → "0_307mG"
     val_str = replace(string(value), "." => "_")
+    val_str = replace(val_str, " " => "")
+    val_str = replace(val_str, r"[^A-Za-z0-9_]" => "")
     s = replace(s, "\${value}" => val_str)
     s
 end

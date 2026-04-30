@@ -1,16 +1,16 @@
-name: "berry_crossover_scan"
+name: berry_crossover_scan
+description: |
+  Eu151 spinor-orbital crossover scan over B-field strength (dimless p).
+  Migrated 2026-04-30 to template: klaus_magnetostir + parameters override.
+  p = 10 → 3000: spinor-active (p=10) → Klaus-frozen (p≥100). See
+  figs/berry_crossover.{pdf,png} for the thesis-grade summary.
 parameter:
-  key: "p"
-  values:
-    - 1000.0
-    - 100.0
-    - 10.0
-    - 3000.0
-    - 300.0
-    - 30.0
-  yaml_path: "pipeline.0.ground_state.zeeman.p"
-template: "eu151_p1000_0_500ms/config.yaml"
-extra_overrides: {}
-point_dir_pattern: "eu151_p${value}_500ms"
-description: "Retrofit by scan_retrofit.jl on 2026-04-29"
-override_path: "pipeline.0.ground_state.zeeman.p"
+  key: B_static_p
+  values: [10.0, 30.0, 100.0, 300.0, 1000.0, 3000.0]
+  unit: "dimless"
+  display_unit: "p (= g_F μ_B B / ℏω_ref)"
+  display_factor: 1.0
+  yaml_path: parameters.B_static_p
+template: eu151_p1000_0_500ms/config.yaml
+override_path: parameters.B_static_p
+point_dir_pattern: eu151_p${value}_500ms

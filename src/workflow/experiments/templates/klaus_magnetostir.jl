@@ -66,6 +66,15 @@ function _klaus_magnetostir_template(params::Dict)
         "backend" => p["backend"],
     )
 
+    # Zeeman block: prefer dimless `B_static_p` if user supplied (for
+    # numerical scans over p without re-computing Gauss equivalents).
+    # Otherwise use Level 1 `Bz: <Gauss>` from `B_static`.
+    zeeman_block = if haskey(params, "B_static_p")
+        Dict("p" => Float64(params["B_static_p"]), "q" => 0.0)
+    else
+        Dict("Bz" => p["B_static"], "q" => 0.0)
+    end
+
     # Common physics constants for ground_state
     gs_block = Dict{Any, Any}(
         "atom"          => p["atom"],
@@ -75,7 +84,7 @@ function _klaus_magnetostir_template(params::Dict)
         "interactions"  => Dict("c1_ratio" => p["c1_ratio"]),
         "grid"          => Dict("n" => p["grid_n"], "box" => p["grid_box"]),
         "potential"     => Dict("type" => "harmonic", "omega" => p["trap_freq"]),
-        "zeeman"        => Dict("Bz" => p["B_static"], "q" => 0.0),
+        "zeeman"        => zeeman_block,
         "gauge_fix"     => p["gauge_fix"],
         "init_m_idx"    => 1,
         "init_sigma"    => p["init_sigma"],
