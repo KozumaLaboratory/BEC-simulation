@@ -1,0 +1,65 @@
+# ─────────────────────────────────────────────────────────────────────
+#  Klaus 2022 magnetostir — atom comparison (Eu151 vs Dy164).
+#
+#  Same protocol (35° tilt → 226 Hz stir × 500 ms), different atoms +
+#  Klaus-regime p value. Two comparison runs at every scan point;
+#  here scan: is empty so we get exactly two runs.
+#
+#  Verified Dy164: m=+F 0.9995 → 0.9999 (frozen spinor),
+#  Lz [-0.52, +0.43] (orbital response). Klaus paper reproduction.
+# ─────────────────────────────────────────────────────────────────────
+
+accuracy: 1.0e-6
+defaults: {kind: rotating_basis, backend: gpu}
+
+mixins:
+  klaus_phys:
+    N_atoms:    60000
+    omega_ref:  314.159
+    grid:       {n: [24, 24, 12], box: [20, 20, 10]}
+    potential:  {type: harmonic, omega: [1.0, 1.0, 2.6]}
+    init_m_idx: 1
+    n_steps:    250
+    tol:        1.0e-7
+    dt:         0.005
+    gauge_fix:  false
+
+pipeline:
+  - ground_state:
+      use:          [klaus_phys]
+      atom:         Eu151                                   # ← overridden by comparison_runs
+      B:            {p: 26700.0}                            # ← overridden per atom
+      interactions: {c1: 0.0}
+
+  - dynamics:                                                # tilt: 0 → 35° over 20 ms
+      duration: 6.28
+      B:
+        theta: {from: 0.0, to: 0.611, duration: 6.28}
+        phi:   {rate: 0.0}
+      save: {every: 200}
+
+  - dynamics:                                                # spinup: 0 → 226 Hz over 50 ms
+      duration: 15.7
+      B:
+        theta: 0.611
+        phi:   {rate: {from: 0.0, to: 4.524, duration: 15.7}}
+      save: {every: 200}
+
+  - dynamics:                                                # steady stir 500 ms
+      duration: 157.0
+      B:
+        theta: 0.611
+        phi:   {rate: 4.524}
+      save: {every: 200}
+
+# Atom + Klaus-regime p comparison (Eu151 g_F vs Dy164 g_J differs).
+scan:
+  comparison_runs:
+    - name: eu151
+      override:
+        pipeline.0.ground_state.atom:  Eu151
+        pipeline.0.ground_state.B.p:   26700.0
+    - name: dy164
+      override:
+        pipeline.0.ground_state.atom:  Dy164
+        pipeline.0.ground_state.B.p:   28428.0
