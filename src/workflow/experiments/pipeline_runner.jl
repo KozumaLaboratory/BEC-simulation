@@ -511,7 +511,7 @@ function _run_step(
 
     duration = Float64(p["duration"])
     dt = Float64(p["dt"])
-    save_every = Int(get(p, "save_every", max(1, round(Int, duration / dt / 20))))
+    save_every = _resolve_save_every(p, duration, dt)
 
     prev_interactions = ws_prev !== nothing ? ws_prev.interactions : InteractionParams(0.0, 0.0)
     prev_potential = ws_prev !== nothing ? ws_prev.potential : HarmonicTrap(ntuple(_ -> 1.0, ndim))
@@ -1299,6 +1299,36 @@ function _default_rotating_integrator(duration::Float64)::String
 end
 
 """
+    _resolve_save_every(p::Dict, duration, dt; n_steps=nothing) -> Int
+
+Resolve `save_every` (frame stride in integrator steps). Priority:
+
+  1. `save_every: 30`     — explicit step count (legacy, exact)
+  2. `n_snapshots: 100`   — N frames over the step, dt-invariant (preferred)
+  3. default              — ~20-100 frames depending on context
+
+`n_snapshots` is dt-invariant: changing `dt`/`epsilon` keeps the number
+of saved frames unchanged, only their granularity changes.
+"""
+function _resolve_save_every(p::Dict, duration::Float64, dt::Real;
+    n_steps::Union{Nothing, Int}=nothing)
+    if haskey(p, "save_every")
+        return Int(p["save_every"])
+    end
+    if haskey(p, "n_snapshots")
+        ns = Int(p["n_snapshots"])
+        ns >= 1 || throw(ArgumentError("n_snapshots must be >= 1, got $ns"))
+        total = n_steps !== nothing ? n_steps :
+                max(1, round(Int, duration / float(dt)))
+        return max(1, total ÷ ns)
+    end
+    total = n_steps !== nothing ? n_steps :
+            max(1, round(Int, duration / float(dt)))
+    # 100 frames default for rotating_basis (n_steps known), 20 otherwise.
+    return max(1, total ÷ (n_steps === nothing ? 20 : 100))
+end
+
+"""
 Derive dt from accumulated-error target ε via global error scaling
 ε ≈ C · T · dt^p where p is integrator order, C ~ O(1).
 
@@ -1375,7 +1405,7 @@ end
             "Consider tightening to ε ≤ 1e-6, or supplying an explicit " *
             "dt < $(round(π / (p_zeeman_abs * F_atom_int); sigdigits=3))."
     end
-    save_every = Int(get(p, "save_every", max(1, n_steps ÷ 100)))
+    save_every = _resolve_save_every(p, duration, dt_rtp; n_steps=n_steps)
 
     B_hat_node = get(p, "B_hat", Dict{String, Any}())::Dict
 

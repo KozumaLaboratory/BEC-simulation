@@ -112,14 +112,25 @@ function run_yaml(yaml_path::String; base_dir::String="runs", verbose::Bool=true
     # repeat.
     validate_pipeline!(data; strict=true)
 
-    # Dry-run: print the calibration-applied + validated YAML and exit
-    # without touching the GPU / building any workspace. Useful for
-    # checking that lab-unit YAML expanded as expected before committing
-    # to a long compute.
+    # Dry-run: print the calibration-applied + units-applied + validated
+    # YAML and exit without touching the GPU / building any workspace.
+    # Useful for checking that lab-unit YAML expanded as expected before
+    # committing to a long compute.
     if dry_run
         buf = IOBuffer()
-        println(buf, "# === run_yaml dry-run output (post calibration + validation) ===")
+        println(buf, "# === run_yaml dry-run (post calibration + units + validation) ===")
         println(buf, "# original: $yaml_path")
+        println(buf, "#")
+        println(buf, "# Stages applied:")
+        println(buf, "#   1. calibration:  lab-control values → physical units")
+        println(buf, "#   2. units:        bare Reals → unit-bearing strings")
+        println(buf, "#   3. schema:       unknown-key + range + enum validation")
+        println(buf, "#")
+        println(buf, "# Numerics defaults (dt, save_every, n_steps) are still expressed")
+        println(buf, "# in their YAML form here; final resolved values are logged when")
+        println(buf, "# the actual run starts. To inspect resolved values without running,")
+        println(buf, "# use a 1-step ground_state with verbose=true.")
+        println(buf, "#")
         YAML.write(buf, data)
         out = String(take!(buf))
         print(out)

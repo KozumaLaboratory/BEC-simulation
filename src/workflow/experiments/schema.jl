@@ -94,6 +94,7 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     "duration" => FieldSpec(; required=true, type=Number, range=(0.0, 1e6)),
     "dt" => FieldSpec(; required=true, type=Number, range=(1e-8, 1.0)),
     "save_every" => FieldSpec(; type=Number, range=(1.0, 1e8)),
+    "n_snapshots" => FieldSpec(; type=Number, range=(1.0, 1e6)),
     "save_psi_snapshots" => FieldSpec(; type=Bool),
     "save_snapshot_compression" => FieldSpec(; type=Bool),
     "save_snapshot_precision" => FieldSpec(; type=String, enum=["f32", "f64"]),
@@ -163,10 +164,18 @@ function validate_config!(params::Dict, schema::Dict, path::String=""; strict::B
     errors = String[]
     known = Set(keys(schema))
 
-    # Check for unknown keys (likely typos)
+    # Check for unknown keys (likely typos). Suggest the closest match
+    # via Levenshtein distance — catches "phi" → "phi_omega", etc.
     for k in keys(params)
         if !(k in known)
-            msg = "Unknown key '$(isempty(path) ? k : "$path.$k")' — possible typo? Known keys: $(sort(collect(known)))"
+            full_key = isempty(path) ? string(k) : "$path.$k"
+            suggestion = _suggest_key(string(k), known)
+            base = "Unknown key '$full_key'"
+            msg = if suggestion !== nothing
+                "$base — did you mean '$suggestion'? Known keys: $(sort(collect(known)))"
+            else
+                "$base — possible typo? Known keys: $(sort(collect(known)))"
+            end
             if strict
                 push!(errors, msg)
             else
@@ -314,4 +323,39 @@ function _validate_ground_state_physics!(step_params::Dict, path::String; strict
             strict ? throw(ArgumentError(msg)) : @warn msg
         end
     end
+end
+
+# Levenshtein distance for typo suggestions. Returns the closest key in
+# `known` if its distance to `k` is ≤ max(2, |k|/3) — close enough to
+# almost certainly be a typo. nothing otherwise.
+function _suggest_key(k::String, known::Set)
+    isempty(known) && return nothing
+    threshold = max(2, length(k) ÷ 3)
+    best, best_d = nothing, threshold + 1
+    for cand in known
+        c = string(cand)
+        d = _levenshtein(k, c)
+        if d < best_d
+            best, best_d = c, d
+        end
+    end
+    best_d <= threshold ? best : nothing
+end
+
+function _levenshtein(a::AbstractString, b::AbstractString)
+    m, n = length(a), length(b)
+    m == 0 && return n
+    n == 0 && return m
+    av, bv = collect(a), collect(b)
+    prev = collect(0:n)
+    curr = zeros(Int, n + 1)
+    for i in 1:m
+        curr[1] = i
+        for j in 1:n
+            cost = av[i] == bv[j] ? 0 : 1
+            curr[j+1] = min(curr[j] + 1, prev[j+1] + 1, prev[j] + cost)
+        end
+        prev, curr = curr, prev
+    end
+    prev[n+1]
 end
