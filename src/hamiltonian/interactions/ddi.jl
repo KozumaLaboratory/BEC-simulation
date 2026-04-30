@@ -554,10 +554,21 @@ function _apply_ddi_rotation!(
     guard = floatmin(RT)
     dt_t = RT(dt_frac)
     F_t = RT(F)
-    @. phi_mag = sqrt(phi_x_v^2 + phi_y_v^2 + phi_z_v^2)
-    @. alpha = atan(phi_y_v, phi_x_v)
-    @. beta = acos(clamp(phi_z_v / max(phi_mag, guard), -one(RT), one(RT)))
-    @. theta = phi_mag * dt_t
+    if phi_x isa Array
+        @inbounds @simd for i in 1:N_spatial
+            px = phi_x[i]; py = phi_y[i]; pz = phi_z[i]
+            pm = sqrt(px * px + py * py + pz * pz)
+            phi_mag[i] = pm
+            alpha[i] = atan(py, px)
+            beta[i] = acos(clamp(pz / max(pm, guard), -one(RT), one(RT)))
+            theta[i] = pm * dt_t
+        end
+    else
+        @. phi_mag = sqrt(phi_x_v^2 + phi_y_v^2 + phi_z_v^2)
+        @. alpha = atan(phi_y_v, phi_x_v)
+        @. beta = acos(clamp(phi_z_v / max(phi_mag, guard), -one(RT), one(RT)))
+        @. theta = phi_mag * dt_t
+    end
 
     # GPU path: fuse D per-column broadcasts into one (N,D)×(1,D)*(N,1) broadcast.
     if rc.m_row !== nothing
