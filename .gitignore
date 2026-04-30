@@ -50,3 +50,9 @@ JuliaLocalPreferences.toml
 # Perf-Ralph transient bench output (baseline.json is pinned, results.json
 # is regenerated per loop iteration).
 bench/results.json
+
+# Perf-Ralph per-iteration logs (claude transcripts + bench output).
+# Wrapper retains them on disk for human review; not for the index.
+logs/ralph_perf_*.log
+logs/ralph_perf_*.log.bench
+logs/ralph_perf_master*.log

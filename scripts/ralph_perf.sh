@@ -66,6 +66,22 @@ mark_target() {
   ' "$QUEUE" > "$QUEUE.tmp" && mv "$QUEUE.tmp" "$QUEUE"
 }
 
+# Revert only files that became dirty AFTER pre_state was captured.
+# Preserves any concurrent human edits whose paths were already dirty
+# before the iteration began. $1 is the newline-delimited pre-state path
+# list (output of `git status --porcelain | awk '{print $2}' | sort -u`).
+_narrow_revert() {
+  local pre_state="$1"
+  local now_state
+  now_state="$(git status --porcelain | awk '{print $2}' | sort -u)"
+  # comm -23 = lines in now_state but not in pre_state (newly-dirty files)
+  local newly_dirty
+  newly_dirty="$(comm -23 <(echo "$now_state") <(echo "$pre_state"))"
+  for f in $newly_dirty; do
+    git checkout -- "$f" 2>/dev/null || rm -f "$f"
+  done
+}
+
 iterate() {
   local target_line target_kernel target_bench target_hint
   target_line="$(next_target || true)"
@@ -131,10 +147,16 @@ EOF
   # goes wrong.
   local claude_log="logs/ralph_perf_$(date +%s)_${target_kernel//[^a-zA-Z0-9]/_}.log"
   mkdir -p logs
+  # Capture the pre-claude clean state so we can later distinguish
+  # claude's edits from any concurrent human edits and not nuke the
+  # latter on revert.
+  local pre_state
+  pre_state="$(git status --porcelain | awk '{print $2}' | sort -u)"
+
   echo "[ralph_perf] invoking claude → $claude_log"
   if ! claude -p --dangerously-skip-permissions "$prompt" > "$claude_log" 2>&1; then
     echo "[ralph_perf] claude exited non-zero, reverting"
-    git checkout -- . && mark_target "$target_kernel" "skipped(claude-error)"
+    _narrow_revert "$pre_state" && mark_target "$target_kernel" "skipped(claude-error)"
     return 0
   fi
 
@@ -143,7 +165,7 @@ EOF
     local reason
     reason="$(grep "^BAIL:" "$claude_log" | head -1 | sed 's/^BAIL: //')"
     echo "[ralph_perf] BAIL: $reason"
-    git checkout -- . && mark_target "$target_kernel" "skipped($reason)"
+    _narrow_revert "$pre_state" && mark_target "$target_kernel" "skipped($reason)"
     return 0
   fi
 
@@ -207,6 +229,13 @@ EOF
   ")"
 
   echo "[ralph_perf] $verdict"
+  # Strip pre-existing dirty paths from claude_changes so concurrent
+  # human edits aren't included on either ACCEPT or REJECT.
+  local touched_by_claude
+  touched_by_claude="$(comm -23 \
+    <(echo "$claude_changes" | tr ' ' '\n' | sort -u) \
+    <(echo "$pre_state"))"
+
   case "$verdict" in
     ACCEPT*)
       # Stage exactly the files claude edited + the wrapper bookkeeping
@@ -214,7 +243,7 @@ EOF
       # Skip bench/results.json — gitignored, regenerated each iter.
       mark_target "$target_kernel" "done"
       cp "$LATEST" "$BASELINE"
-      for f in $claude_changes; do
+      for f in $touched_by_claude; do
         [ "$f" = "bench/results.json" ] && continue
         git add -- "$f"
       done
@@ -228,12 +257,8 @@ Bench: $target_bench (auto-accept by ralph_perf.sh)
 Assisted-by: Claude (model: claude-opus-4-7) [perf-ralph]"
       ;;
     REJECT*)
-      # Revert tracked changes (claude edits). Untracked new files
-      # claude may have created are left in place for human review;
-      # they are NOT swept into the next iteration's commit because
-      # ACCEPT only stages files in $claude_changes captured before
-      # the bench harness ran.
-      for f in $claude_changes; do
+      # Revert only what claude touched, NOT human edits in flight.
+      for f in $touched_by_claude; do
         git checkout -- "$f" 2>/dev/null || rm -f "$f"
       done
       mark_target "$target_kernel" "skipped(${verdict#REJECT })"

@@ -48,7 +48,7 @@ function bayesian_optimize_yaml(
         # Apply to fresh copy of base_dict
         modified = apply_overrides(base_dict, overrides)
         # Run pipeline in-memory (no caching to disk for BO speed)
-        config = parse_pipeline_config(modified)
+        config = parse_pipeline(modified)
         if verbose
             println("  [eval $(eval_count[])] params: ",
                     join(["$(p_)=$(round(v_; digits=4))" for (p_, v_) in zip(override_paths, p)], ", "))
@@ -91,7 +91,7 @@ Convenience: extract `1 - N_{m=+F}` from a rotating_basis dynamics result,
 i.e. the total population that left the initial m=+F state. Higher score
 = more spin transfer, so use with `minimise=false`.
 """
-function bo_objective_max_m_transfer(result::NamedTuple)
+function bo_objective_max_m_transfer(result)
     haskey(result, :rotating_basis_dynamics) || throw(ArgumentError(
         "result has no :rotating_basis_dynamics; pipeline must end with rotating_basis dynamics"))
     dyn = result[:rotating_basis_dynamics]::Dict
@@ -104,7 +104,7 @@ end
 
 Maximise final |⟨L_z⟩| in the rotating_basis dynamics result.
 """
-function bo_objective_max_lz(result::NamedTuple)
+function bo_objective_max_lz(result)
     haskey(result, :rotating_basis_dynamics) || throw(ArgumentError(
         "result has no :rotating_basis_dynamics"))
     dyn = result[:rotating_basis_dynamics]::Dict
@@ -117,7 +117,7 @@ end
 Minimise final ground-state μ from a rotating_basis_ground_state step.
 Useful for ε_dd/c1 calibration runs where one wants the lowest-energy GS.
 """
-function bo_objective_min_energy(result::NamedTuple)
+function bo_objective_min_energy(result)
     haskey(result, :rotating_basis_mu) || throw(ArgumentError(
         "result has no :rotating_basis_mu (need a ground_state step)"))
     Float64(result[:rotating_basis_mu])

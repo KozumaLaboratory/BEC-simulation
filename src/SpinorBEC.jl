@@ -154,6 +154,7 @@ include("workflow/experiments/calibration.jl")
 include("workflow/io/calibration_drift.jl")
 include("workflow/experiments/faraday_fit.jl")
 include("workflow/experiments/bayesian_opt.jl")
+include("workflow/experiments/bayesian_opt_yaml.jl")
 
 # ========================================
 # ANALYSIS: Observables & diagnostics
@@ -397,6 +398,8 @@ export run_yaml, run_status, list_runs, compute_run_dir
 export print_run_summary, compare_runs, generate_html_report
 export load_target_faraday, fit_faraday_param
 export bayesian_optimize, gp_predict, expected_improvement
+export bayesian_optimize_yaml,
+    bo_objective_max_m_transfer, bo_objective_max_lz, bo_objective_min_energy
 export CalibrationSet, CoilCalibration, FORTCalibration, RabiCalibration
 export DEFAULT_CALIBRATION, load_calibration, apply_calibration!, run_yaml_calibrated
 export coil_mv_to_gauss, fort_mw_to_trap_hz, rabi_mw_to_rad_s

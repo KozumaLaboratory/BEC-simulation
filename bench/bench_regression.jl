@@ -65,6 +65,20 @@ let
     end
 end
 
+# 6. apply_ddi_step! on Eu151 16³ (CPU). 6 rFFTs + spin-density + tensor
+# contraction in k-space + Euler spin rotation. Single largest cost in
+# Klaus / Berry rotating-basis runs (called every split-step).
+let
+    grid = make_grid(GridConfig((16, 16, 16), (8.0, 8.0, 8.0)))
+    sm = spin_matrices(6)
+    ddi = SpinorBEC.make_ddi_params(grid, Eu151)
+    bufs = SpinorBEC.make_ddi_buffers(grid.config.n_points)
+    psi = randn(ComplexF64, 16, 16, 16, 13) ./ 100
+    SUITE["kernel/apply_ddi_step_eu151_16cubed"] = @benchmarkable begin
+        SpinorBEC.apply_ddi_step!($psi, $sm, $ddi, $bufs, 0.005, 3)
+    end
+end
+
 # 5. apply_uniform_spin_rotation! on Eu151 (D=13). GPU-safe matmul
 # rebuilds R::Matrix per call from (phi_x, phi_y, phi_z) — host scalar
 # work + broadcast, used heavily by rotating-basis Klaus runs. Bench

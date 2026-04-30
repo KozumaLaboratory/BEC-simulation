@@ -15,12 +15,15 @@
 
 # skipped(stale-bench: was no-scratch fallback, replaced with with-scratch version) 2026-04-30: apply_uniform_spin_rotation!_no_scratch
 # done 2026-04-30: _spin_mixing_loop!  kernel/spin_mixing_eu151_16x16x8  ~1400 μs / 7 allocs — at D=13 has SIMD / reuse headroom. Try @inbounds + manual unroll over m, or hoist loop-invariants out of CartesianIndices loop.
-apply_uniform_spin_rotation!  kernel/uniform_spin_rotation_eu151_16x16x8  ~70-150 μs / 5 allocs / 3 KB (with-scratch, production path). Sub-100μs is at noise floor; only attempt if change can be verified independently on a 10× larger grid. Look at 13×13 R-matrix rebuild and Fy eigendecomp products — could be cached across same-(phi,dt) calls.
+# skipped(kernel at 64μs noise-floor; identifiable wins (skip R_T_host alloc, direct R construction) are <2μs / <5%, and any cache-across-calls speedup would only show on the bench (constant args) while contributing zero in production where bx/by vary per substep — would be a misleading commit.) 2026-04-30: apply_uniform_spin_rotation!  kernel/uniform_spin_rotation_eu151_16x16x8  ~70-150 μs / 5 allocs / 3 KB (with-scratch, production path). Sub-100μs is at noise floor; only attempt if change can be verified independently on a 10× larger grid. Look at 13×13 R-matrix rebuild and Fy eigendecomp products — could be cached across same-(phi,dt) calls.
+
+# === Round 3 targets (added 2026-04-30) ===
+
+apply_ddi_step!  kernel/apply_ddi_step_eu151_16cubed  327 μs / 29 allocs / 68 KB on Eu151 16³ CPU (6 rFFTs + spin density + tensor contraction + Euler rotation). Hot in every Klaus/Berry split-step. Look at: rfft plan reuse (already done?), tensor contraction broadcast fusion in _ddi_k_contraction!, or scratch reuse across the 3 spin-density buffers.
 
 # === Wishlist (require further bench_regression.jl extension) ===
 # Add a corresponding @benchmarkable to bench_regression.jl, re-baseline,
 # then move the target above the separator.
 #
-# apply_ddi_step!         bench/ddi_eu151_24cubed   GPU broadcast → CUBLAS gemm for spin part
 # _get_spinor             bench/get_spinor_d13      CLAUDE.md: 352 B/call alloc, D=13 known issue
 # rotating_norm           bench/rotating_norm       reduction with abs2; check fusion
