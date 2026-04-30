@@ -1305,6 +1305,23 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
                             local_max > gmax && (gmax = local_max)
                         end
                         gmax > 0 ? gmax : 1.0
+                    elseif haskey(f, "psi")
+                        # Static-psi file (e.g. ground-state-only run, or a
+                        # `_run_yaml_single` point_NNN.jld2 that only stores
+                        # the final ψ). Compute the spin-summed peak density
+                        # directly so the volume renderer can normalise.
+                        psi = f["psi"]
+                        spatial_dims = ndims(psi) - 1
+                        D = size(psi, ndims(psi))
+                        gmax = 0.0
+                        for I in CartesianIndices(ntuple(d -> size(psi, d), spatial_dims))
+                            rho = 0.0
+                            for c in 1:D
+                                rho += abs2(psi[I, c])
+                            end
+                            rho > gmax && (gmax = rho)
+                        end
+                        gmax > 0 ? gmax : 1.0
                     else
                         1.0
                     end
