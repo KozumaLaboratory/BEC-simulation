@@ -65,4 +65,4 @@ pipeline:
           rate: 6.0
 defaults:
   kind: "rotating_basis"
-  backend: "cuda"
+  backend: gpu

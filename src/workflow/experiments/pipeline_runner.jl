@@ -735,7 +735,9 @@ function _run_step(
     cb_sgpe = _build_sgpe_callback(get(p, "sgpe", nothing), Float64(sp.dt))
     cb_pgp = _build_pgp_callback(get(p, "projected_gp", nothing))
     cb_photon = _build_photon_callback(get(p, "photon_scattering", nothing), Float64(sp.dt))
-    cb_live = _build_live_callback(get(p, "live_monitor", nothing), live_status_path)
+    # live_monitor defaults ON (every=50). Disable explicitly with
+    # `live_monitor: false` for batch / TSUBAME / no-dashboard runs.
+    cb_live = _build_live_callback(get(p, "live_monitor", true), live_status_path)
     extra_cb = _compose_callbacks(cb_sgpe, cb_pgp, cb_photon, cb_live)
 
     result, snap_tmp_path, snap_count = _run_dynamics_with_optional_streaming!(
@@ -1258,9 +1260,9 @@ end
     φ_init = Float64(get(B_hat, "phi", 0.0))
     gauge_fix_flag = Bool(get(p, "gauge_fix", true))
 
-    # Device backend: "cpu" (default) or "cuda"
+    # Device backend: "cpu" (default) or "gpu"
     backend_name = String(get(p, "backend", "cpu"))::String
-    backend_obj = if backend_name == "cuda" || backend_name == "gpu"
+    backend_obj = if backend_name == "gpu"
         CUDABackend()
     else
         CPUBackend()

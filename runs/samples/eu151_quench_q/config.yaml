@@ -8,7 +8,7 @@ pipeline:
           - 1.0
           - 1.1818
         type: "harmonic"
-      backend: "cuda"
+      backend: gpu
       B:
         q: 1.5
         p: 0.5

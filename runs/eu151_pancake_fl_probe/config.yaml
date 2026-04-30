@@ -80,7 +80,7 @@ pipeline:
           - 1.0
           - 10.0
         type: "harmonic"
-      backend: "cuda"
+      backend: gpu
       B:
         q: 0.0
         p: 0.0
@@ -112,7 +112,7 @@ pipeline:
           - 1.0
           - 10.0
         type: "harmonic"
-      backend: "cuda"
+      backend: gpu
       B:
         q: 0.0
         p: 0.0

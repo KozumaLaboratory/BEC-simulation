@@ -38,7 +38,7 @@ pipeline:
           - 50.0
           - 100.0
         type: "harmonic"
-      backend: "cuda"
+      backend: gpu
       B:
         p_mv: 2.5
         coil_mode: "strong"
