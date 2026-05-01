@@ -56,3 +56,4 @@ bench/results.json
 logs/ralph_perf_*.log
 logs/ralph_perf_*.log.bench
 logs/ralph_perf_master*.log
+runs/**/_live_status.json
