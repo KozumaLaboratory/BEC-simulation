@@ -270,13 +270,12 @@ function _resolve_derived_params!(p::Dict, atom; verbose::Bool=true)
     # c_total (always derived — basis for c0/c1)
     c_total = compute_c_total(atom; N_atoms, omega_ref)
 
-    # c_dd: derive if not explicitly specified.
-    # Schema default `ddi.enabled: true` means an absent `ddi:` block still
-    # enables DDI when the atom has a dipole moment — keep this consistent
-    # with `_parse_gs_ddi` so LHY auto-derivation triggers off the same
-    # signal (atom + N_atoms + ω_ref ⇒ DDI is on).
+    # c_dd: derive if not explicitly specified. `apply_schema_defaults!` has
+    # already injected `ddi: {}` for ground_state steps (the only context
+    # this helper sees), so `ddi_d isa Dict` is the common path; we still
+    # tolerate `ddi: true` (alias for empty dict) and `ddi: false` (opt-out).
     ddi_d = get(p, "ddi", nothing)
-    if ddi_d === true || ddi_d === nothing
+    if ddi_d === true
         p["ddi"] = Dict{String, Any}()
         ddi_d = p["ddi"]
     end
@@ -356,15 +355,22 @@ function _parse_gs_interactions(inter::Dict, atom)
     end
 end
 
+"""
+    _parse_gs_ddi(ddi_d, inter, atom) -> (enabled, c_dd, secular, quasi_2d, l_z)
+
+Parse the `ddi:` block of a step. Assumes `apply_schema_defaults!` has
+already run, so for a ground_state step `ddi_d` is at least `Dict{}`;
+dynamics steps either inherit DDI from `ws_prev` (handled in the caller)
+or pass an explicit user value here. Opt-outs: `ddi: false` or
+`ddi: {enabled: false}` ⇒ disabled. Without N_atoms+ω_ref c_dd can't
+be derived, so DDI ends up off too.
+"""
 function _parse_gs_ddi(ddi_d, inter, atom)
-    # DDI default is `enabled: true` (schema flipped 2026-04-30) — when the
-    # YAML omits the `ddi:` block entirely we still want it on, since dipolar
-    # atoms (Eu, Dy, Cr, …) are the whole point of the codebase. Users can
-    # opt out with `ddi: false` or `ddi: {enabled: false}`.
-    if ddi_d === nothing || ddi_d === false || (ddi_d isa Dict && get(ddi_d, "enabled", true) === false)
+    if ddi_d === false || (ddi_d isa Dict && get(ddi_d, "enabled", true) === false)
         return (false, NaN, false, false, 0.0)
     end
-    ddi_d = ddi_d isa Dict ? ddi_d : Dict{String, Any}()
+    ddi_d isa Dict || (ddi_d = Dict{String, Any}())
+
     c_dd_raw = get(ddi_d, "c_dd", nothing)
     c_dd = if c_dd_raw isa Dict
         Float64(get(c_dd_raw, "from", 0.0))
@@ -375,7 +381,7 @@ function _parse_gs_ddi(ddi_d, inter, atom)
     else
         NaN
     end
-    # No N_atoms/omega_ref ⇒ can't derive c_dd ⇒ DDI silently off.
+
     enabled = !isnan(c_dd) && c_dd != 0.0
     secular = Bool(get(ddi_d, "secular", false))
     q2d = Bool(get(ddi_d, "quasi_2d", false))

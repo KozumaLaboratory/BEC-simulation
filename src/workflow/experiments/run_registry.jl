@@ -105,6 +105,12 @@ function run_yaml(yaml_path::String; base_dir::String="runs", verbose::Bool=true
     # Expand templates + mixins (named protocols, reusable parameter sets).
     apply_templates_and_mixins!(data)
 
+    # Auto-inject schema-level block defaults (e.g. `ground_state.ddi: {}`
+    # so the parser auto-derives c_dd from atom + N_atoms + ω_ref). Must
+    # run after templates/mixins so the steps it walks are fully expanded;
+    # before unit/B/noise normalisation so those see consistent shape.
+    apply_schema_defaults!(data)
+
     # Apply opt-in `units:` block AFTER calibration + templates (template
     # output may already be in Quantity strings; `units:` rewrite only
     # touches bare Reals).
