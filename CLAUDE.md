@@ -223,21 +223,20 @@ These are documented quirks; do not "fix" without explicit user discussion.
   stability boundaries" below — the operative discipline (helper-fn
   boundary + `::ConcreteType` narrow + no closures in struct fields) is
   load-bearing. A "small refactor" here can cost an evening.
-- **Bogoliubov k=0 Goldstone mode is gapped — μ convention issue.**
-  `_bdg_k_scan` (analysis/phases/bogoliubov.jl:77-78) computes
-  `μ = ⟨ψ|(Z + n₀·h_mf)|ψ⟩` where `h_mf` includes the k̂-direction-dependent
-  DDI piece. Confirmed via `test_bogoliubov_goldstone.jl` (`@test_broken`)
-  that this leaves a finite gap at k=0 even in the symmetry-breaking
-  regime where a Goldstone mode is required: F=1 contact-only gives
-  gap ≈ 0.4, F=6 with c_dd × F² × n₀ scaling gives gap ≈ 1440. Affects
-  the absolute roton-gap and sound-speed values reported by
-  `bogoliubov_dispersion`. Phase-boundary detection via
-  `bogoliubov_instability_scan` is **less affected** — that uses the
-  growth rate (`Im ω`) at finite k, not the k=0 gap. Fix requires
-  re-deriving the proper μ for the spinor BdG framework — likely μ
-  should be the contact-only piece (gauge mode at k=0), with the DDI
-  k̂-dependent piece appearing only inside the L block. See test for
-  pinned regression and TODO context.
+- **Bogoliubov k=0 Goldstone mode — diagnosis was wrong, code is right.**
+  Earlier note here claimed `_bdg_k_scan` had a μ convention bug
+  producing a residual k=0 gap (F=1: gap ≈ 0.4, F=6 DDI: gap ≈ 1440).
+  Re-audit on 2026-05-02 found the actual cause was a TEST INDEXING
+  bug: `test_bogoliubov_goldstone.jl` sliced the BdG omega matrix as
+  `omega[1, :]` (row 1 across all k columns), but `_bdg_k_scan` writes
+  eigenvalues into `omega[:, ik]` in LAPACK-arbitrary order returned
+  by `eigen(L)`. Picking the row-1 eigenvalue at every k is meaningless;
+  the F=6 case happened to land on the largest eigenvalue
+  (≈ ±c_dd·Q_zz·F·m·n₀). Correct slice is `omega[:, 1]` — all
+  eigenvalues at the smallest k. With that, F=1 gives 2 zeros at k=0
+  (gauge + 1 spin Goldstone), F=6 DDI gives 4 zeros (gauge + 3 spin
+  Goldstones for SU(2) → U(1)). μ convention is correct. Test now
+  asserts `gap < 1e-6` directly (no `@test_broken`).
 - **`split_step_captured!` on GPU silently falls back to `split_step!`.**
   CUDA Graph capture is implemented in `ext/SpinorBECCUDAExt/gpu_graph.jl`
   but currently disabled — replay drift from per-call broadcast allocations

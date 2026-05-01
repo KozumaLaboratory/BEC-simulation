@@ -56,7 +56,7 @@ Compute the Faraday rotation image of the spinor BEC.
 
 Returns a NamedTuple with:
 - `rotation_angle`: 2D array of Faraday rotation φ(x,y) [rad]
-- `column_Fz`: 2D array of column-integrated ⟨F_z⟩ × n
+- `column_Fz`: 2D array of column-integrated local spin density ∫⟨F_z⟩·n dz
 - `column_density`: 2D total column density ∫n dz
 - `contrast`: normalized Faraday contrast φ/max(|φ|)
 - `vortex_signal`: regions where |φ| < threshold (potential vortex cores)
@@ -73,19 +73,23 @@ function faraday_image(
     ax = params.probe_axis
     ax <= N || throw(ArgumentError("probe_axis=$ax exceeds grid dimension $N"))
 
-    # Compute spin density F_z weighted by number density
+    # Local spin density f_α(r) = ⟨ψ|F_α|ψ⟩ = ⟨F_α⟩_local · n(r) — i.e. the
+    # density-WEIGHTED expectation already. The Faraday formula
+    # φ ∝ ∫⟨F_z⟩·n dz that the docstring quotes equals ∫f_z dz directly;
+    # multiplying by `n_total` again would give ∫⟨F_z⟩·n² dz (off by one
+    # factor of n, fixed 2026-05-02).
     Fz = spin_density_vector(psi, sm, ndim)
     n_total = total_density(psi, ndim)
 
     # Column-integrated quantities along probe axis
     dz = grid.dx[ax]
     if N == 3
-        col_Fz = dropdims(sum(Fz[ax] .* n_total; dims=ax); dims=ax) .* dz
+        col_Fz = dropdims(sum(Fz[ax]; dims=ax); dims=ax) .* dz
         col_n = dropdims(sum(n_total; dims=ax); dims=ax) .* dz
     elseif N == 2
-        # 2D: no integration needed, treat as already column-integrated
-        col_Fz = Fz[ax] .* n_total
-        col_n = n_total
+        # 2D: no integration along probe axis (treat as already column-integrated).
+        col_Fz = copy(Fz[ax])
+        col_n = copy(n_total)
     else
         throw(ArgumentError("unsupported dimension"))
     end
