@@ -1,0 +1,32 @@
+# R39 — BdG spectrum along R35 B-1 boundary
+#
+# Post-process the R35 boundary trace by computing the Bogoliubov
+# spectrum at each accepted point. Yields the thesis figure
+# "roton softening across the B-1 boundary".
+#
+# Reuses the same R35 baseline GS config; bogoliubov_along_boundary_curve
+# warm-starts from each previous boundary point and computes the BdG
+# spectrum at the converged ψ.
+
+defaults:
+  kind:    spinor
+  backend: gpu
+
+mixins:
+  eu151_thesis_24:
+    atom: Eu151
+    N_atoms: 30000
+    omega_ref: 691.15
+    grid: {n: [24, 24, 24], box: [16, 16, 16]}
+    potential: {type: harmonic, omega: [1.0, 1.0, 1.182]}
+    interactions: {c1_ratio: 0.0}
+    ddi: {c_dd_ratio: 1.0, enabled: true}
+    method: lbfgs
+    m_lbfgs: 10
+    n_steps: 500
+    tol: 1.0e-7
+
+pipeline:
+  - ground_state:
+      use: [eu151_thesis_24]
+      B: {Bz: "1.0 Gauss"}

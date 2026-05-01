@@ -1,0 +1,63 @@
+# R33 MFBO Eu phase scan — Phase 2 measurement
+#
+# Target: validate the 2.4-3.1× synthetic MFBO speedup on real Eu
+# physics. Two-tier MFBO over (c_1_ratio, c_dd_ratio) at fixed
+# (B_field, trap, atom = Eu151) — minimise total energy as the
+# objective.
+#
+# Run pair (set externally via `multi_fidelity_optimize_yaml`):
+#   eval_low  : grid 16³, n_steps 500   (~ 1-2 min/eval)
+#   eval_high : grid 32³, n_steps 4000  (~ 30 min/eval)
+#   cost_ratio (expected): 30-60
+#
+# This config is the BASELINE that the MFBO wrapper modifies via
+# `low_overrides` and `high_overrides`. The wrapper script
+# (TSUBAME job) will issue
+#
+#   res = multi_fidelity_optimize_yaml(
+#       "runs/measurement_R3x_eu/r33_mfbo_eu_phase/config.yaml",
+#       ["pipeline.0.ground_state.interactions.c1_ratio",
+#        "pipeline.0.ground_state.ddi.c_dd_ratio"],
+#       [(-0.05, 0.05), (0.5, 1.5)];
+#       objective_fn = bo_objective_min_energy,
+#       low_overrides  = Dict(
+#           "pipeline.0.ground_state.grid.n"  => [16, 16, 16],
+#           "pipeline.0.ground_state.n_steps" => 500,
+#       ),
+#       high_overrides = Dict(),    # use config-default high tier
+#       cost_ratio = 30.0,
+#       n_init_low = 12, n_init_high = 3,
+#       n_iter = 25, budget_high = 8,
+#       minimise = true,
+#       save_history_to = "runs/measurement_R3x_eu/r33_mfbo_eu_phase/history.jld2",
+#   )
+
+defaults:
+  kind:    spinor
+  backend: gpu
+
+mixins:
+  eu151_thesis:
+    atom: Eu151
+    N_atoms: 30000
+    omega_ref: 691.15        # 2π · 110 Hz
+    grid: {n: [32, 32, 32], box: [20, 20, 20]}
+    potential: {type: harmonic, omega: [1.0, 1.0, 1.182]}
+    interactions: {c1_ratio: 0.0}     # ← scanned
+    ddi: {c_dd_ratio: 1.0, enabled: true}    # ← scanned
+    initial_state: m_plus_F
+    method: lbfgs
+    m_lbfgs: 10
+    n_steps: 4000
+    tol: 1.0e-9
+
+pipeline:
+  - ground_state:
+      use: [eu151_thesis]
+      B: {Bz: "1.0 Gauss"}             # weak bias for symmetry break
+      sobolev_alpha: 0.0               # opt-in via override if needed
+
+  - analyze:
+      - phase_classify: {}
+      - bogoliubov:    {k_max: 8.0, n_k: 32}
+      - summary_json:  {path: summary.json}

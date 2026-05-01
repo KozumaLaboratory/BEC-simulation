@@ -1,0 +1,39 @@
+# R35 — B-1 boundary trace (FL vs uniform polarization)
+#
+# Eu thesis B-1 experiment: trace the phase boundary in (c₁_ratio, c_dd_ratio)
+# where FL (flux-closure) and uniform polarization energies cross.
+# trace_phase_boundary takes a F(θ) = E_FL - E_uniform closure built
+# via make_phase_diff_eval, then walks the curve via predictor +
+# Newton corrector with warm-start ψ.
+#
+# Eu sets the boundary near c₁ = 0 (the canonical polar↔FM line) but
+# c_dd shifts it. R35 traces that 1-D curve.
+#
+# This config is the BASELINE for the GS at each candidate point. The
+# trace driver builds two such GS evaluations (one with phase_A_init,
+# one with phase_B_init) per call to F.
+
+defaults:
+  kind:    spinor
+  backend: gpu
+
+mixins:
+  eu151_thesis_24:                   # 24³ for the B-1 trace; production
+    atom: Eu151                      # is 32³+ but 24³ keeps this within
+    N_atoms: 30000                   # one wall day
+    omega_ref: 691.15
+    grid: {n: [24, 24, 24], box: [16, 16, 16]}
+    potential: {type: harmonic, omega: [1.0, 1.0, 1.182]}
+    interactions: {c1_ratio: 0.0}    # ← trace candidate
+    ddi: {c_dd_ratio: 1.0, enabled: true}    # ← trace candidate
+    method: lbfgs
+    m_lbfgs: 10
+    n_steps: 500                     # warm-started; shouldn't need 4000
+    tol: 1.0e-7
+
+pipeline:
+  - ground_state:
+      use: [eu151_thesis_24]
+      B: {Bz: "1.0 Gauss"}
+
+# No analyzers — trace driver consumes the GS energy directly.

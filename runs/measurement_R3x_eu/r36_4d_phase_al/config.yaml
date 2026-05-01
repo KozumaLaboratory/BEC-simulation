@@ -1,0 +1,37 @@
+# R36 — 4-D Eu phase active learning
+#
+# Active-learning scan over (c₁_ratio, c_dd_ratio, p_zeeman, q_zeeman)
+# with phase_classify_distance entropy as acquisition. Replaces 4-D
+# grid scan (50⁴ = 6 × 10⁶ runs, infeasible) with 200-500 AL samples
+# concentrated on the boundary surface.
+#
+# Pre-flight (synthetic 2-D): 66.7 % boundary concentration vs 40 %
+# random (commit e3030ac).
+
+defaults:
+  kind:    spinor
+  backend: gpu
+
+mixins:
+  eu151_thesis_24:
+    atom: Eu151
+    N_atoms: 30000
+    omega_ref: 691.15
+    grid: {n: [24, 24, 24], box: [16, 16, 16]}
+    potential: {type: harmonic, omega: [1.0, 1.0, 1.182]}
+    interactions: {c1_ratio: 0.0}    # ← AL parameter
+    ddi: {c_dd_ratio: 1.0, enabled: true}    # ← AL parameter
+    method: lbfgs
+    m_lbfgs: 10
+    n_steps: 500
+    tol: 1.0e-7
+
+pipeline:
+  - ground_state:
+      use: [eu151_thesis_24]
+      B: {p: 0.0, q: 0.0}    # ← AL parameters
+      initial_state: m_plus_F
+
+  - analyze:
+      - phase_classify_distance: {threshold: 0.4}
+      - summary_json: {path: summary.json}

@@ -1,0 +1,38 @@
+# R37 — F=6 triple-point hunting (Eu thesis-grade)
+#
+# Run R36 AL → detect_triple_points → trace 3 boundary curves from
+# each candidate. Goal: find 3+ phase coexistence points in the F=6
+# Eu phase diagram. Literature has F=1,2,3 triple points (FL/CSV/PCV)
+# but no F=6 mapping — this is the publication candidate.
+#
+# Same physics as R36 (24³, Eu thesis) but the analyze step records
+# `phase_classify_distance` so detect_triple_points can read the
+# scores list.
+
+defaults:
+  kind:    spinor
+  backend: gpu
+
+mixins:
+  eu151_thesis_24:
+    atom: Eu151
+    N_atoms: 30000
+    omega_ref: 691.15
+    grid: {n: [24, 24, 24], box: [16, 16, 16]}
+    potential: {type: harmonic, omega: [1.0, 1.0, 1.182]}
+    interactions: {c1_ratio: 0.0}
+    ddi: {c_dd_ratio: 1.0, enabled: true}
+    method: lbfgs
+    m_lbfgs: 10
+    n_steps: 500
+    tol: 1.0e-7
+
+pipeline:
+  - ground_state:
+      use: [eu151_thesis_24]
+      B: {p: 0.0, q: 0.0}
+      initial_state: m_plus_F
+
+  - analyze:
+      - phase_classify_distance: {threshold: 0.4}
+      - summary_json: {path: summary.json}
