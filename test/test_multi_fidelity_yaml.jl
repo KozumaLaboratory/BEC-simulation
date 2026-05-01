@@ -9,10 +9,12 @@
 #
 # Each MFBO call runs the full YAML pipeline several times. CLAUDE.md
 # documents that a single `run_yaml` for a trivial config takes >4 min
-# to first output (Workspace specialisation). Skip by default — set
-# SPINORBEC_RUN_HEAVY_YAML=true to opt in (mirrors the gating pattern
-# used by test_infrastructure.jl + test_zeeman_levels.jl). Nightly CI
-# flips the env var on cron so the integration still gets covered.
+# to first output, dominated by `make_workspace` + `find_ground_state`
+# specialisation for the freshly-emitted `Workspace{…23 type params…}`.
+# Skip by default — set SPINORBEC_RUN_HEAVY_YAML=true to opt in (mirrors
+# the gating pattern used by test_infrastructure.jl +
+# test_zeeman_levels.jl). Nightly CI flips the env var on cron so the
+# integration still gets covered.
 
 using SpinorBEC
 using Test
