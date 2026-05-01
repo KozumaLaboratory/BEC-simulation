@@ -1574,22 +1574,7 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         (200, "application/octet-stream", bin)
 
     elseif path == "/api/refresh"
-        empty!(data_cache)
-        empty!(psi_cache)
-        empty!(_vector3d_plans_cache)
-        # Persistent JLD2 handles (`_OPEN_JLD_HANDLES`) survive content
-        # rewrites: when a run regenerates point_NNN.jld2 the mmap'd handle
-        # keeps serving the prior content. Close + drop them so the next
-        # request reopens against the fresh file.
-        lock(_OPEN_JLD_LOCK) do
-            for (_, (h, _)) in _OPEN_JLD_HANDLES
-                try
-                    close(h)
-                catch
-                end
-            end
-            empty!(_OPEN_JLD_HANDLES)
-        end
+        clear_all_caches!(data_cache, psi_cache)
         (200, "text/plain", "Cache cleared")
     elseif startswith(path, "/api/")
         # Unknown API route — actual 404
@@ -2608,6 +2593,65 @@ const _PREPACK_INFLIGHT = Set{String}()
 const _OPEN_JLD_HANDLES = Dict{String, Tuple{JLD2.JLDFile, ReentrantLock}}()
 const _OPEN_JLD_LOCK = ReentrantLock()
 const _OPEN_JLD_MAX = 32
+
+# --- Cache topology -----------------------------------------------------
+#
+# The dashboard maintains six parallel caches. Each addresses a distinct
+# bottleneck and they share no keys, but they all need to be cleared
+# together when a run regenerates its on-disk files (otherwise the user
+# sees stale data even after `/api/refresh`).
+#
+#   data_cache             run-level JSON responses (per /api/data/<run>)
+#   psi_cache              ψ + derived binary blobs keyed by fpath[#snap=K]
+#   _OPEN_JLD_HANDLES      persistent JLD2 read handles (mmap'd)
+#   _vector3d_plans_cache  FFT plans per (nx, ny, nz)
+#   _PREPACK_INFLIGHT      in-flight prepack-warmer task IDs
+#   _DASHBOARD_CACHE_DIRNAME  on-disk atlas blobs (per run dir)
+#
+# Two helpers below are the canonical entry points for invalidation:
+# `clear_all_caches!` (used by /api/refresh) and `invalidate_path!`
+# (used when a single run regenerates).
+
+"""Drop every cache layer at once. Used by /api/refresh."""
+function clear_all_caches!(data_cache::Dict, psi_cache::Dict)
+    empty!(data_cache)
+    empty!(psi_cache)
+    empty!(_vector3d_plans_cache)
+    empty!(_PREPACK_INFLIGHT)
+    lock(_OPEN_JLD_LOCK) do
+        for (_, (h, _)) in _OPEN_JLD_HANDLES
+            try
+                close(h)
+            catch
+            end
+        end
+        empty!(_OPEN_JLD_HANDLES)
+    end
+    return nothing
+end
+
+"""Drop every cache entry that references `fpath` so the next request
+reads it fresh. Other runs' caches are preserved."""
+function invalidate_path!(data_cache::Dict, psi_cache::Dict, fpath::String)
+    for k in collect(keys(data_cache))
+        occursin(k, fpath) && delete!(data_cache, k)
+    end
+    for k in collect(keys(psi_cache))
+        occursin(fpath, k) && delete!(psi_cache, k)
+    end
+    lock(_OPEN_JLD_LOCK) do
+        if haskey(_OPEN_JLD_HANDLES, fpath)
+            (h, _) = _OPEN_JLD_HANDLES[fpath]
+            try
+                close(h)
+            catch
+            end
+            delete!(_OPEN_JLD_HANDLES, fpath)
+        end
+    end
+    # Plans cache + prepack-inflight aren't path-keyed; leave alone.
+    return nothing
+end
 
 function _get_or_open_jld_handle(fpath::String)
     lock(_OPEN_JLD_LOCK) do
