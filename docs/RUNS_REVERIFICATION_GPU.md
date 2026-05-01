@@ -49,7 +49,35 @@ Two configs need re-running on the post-fix integrator (per
 | Run | Config | Local re-run? | TSUBAME re-run needed |
 |---|---|---|---|
 | `runs/eu151_edh/` | 64³, n_steps=100 000, save_every=1000 | **No** — over budget on local GPU; 5-10 h on RTX 5070 Ti | **YES** |
-| `runs/eu151_lab_calibrated/` | 32³, n_steps=4 000, save_every=40 | **Attempted, schema warning during temp-YAML truncation** | **YES** — easier than eu151_edh |
+| `runs/eu151_lab_calibrated/` | 32³, n_steps=4 000, save_every=40 | **Blocked by an unrelated config bug** | **YES** after the bug below is fixed |
+
+### Side-finding: eu151_lab_calibrated has a **separate** schema/calibration ordering bug
+
+While attempting the local re-run, two issues surfaced that are
+**independent of Bug-4** and predate it:
+
+1. **Schema lockdown drift**: the original config had `N_atoms` and
+   `omega_ref` at the `ground_state.*` level rather than under
+   `ground_state.interactions.*`. The post-2026-04-30 schema rejects
+   them at that level (`Unknown key 'pipeline.1.ground_state.omega_ref'`).
+   This commit (R41) moved them under `interactions:` to comply.
+
+2. **calibration → units pipeline ordering**: after the schema fix,
+   the run still fails with `MethodError: no method matching Float64(::String)`
+   in `_resolve_derived_params!` line 222 (`_to_float_vec(pot["omega"])`).
+   The calibration step transforms `fort_power_mw: [50, 50, 100]` into
+   `omega: ["3157 Hz", "3157 Hz", "5980 Hz"]` (string entries with
+   unit suffixes), but the subsequent `_to_float_vec` in
+   `parsing_blocks.jl` doesn't strip those unit suffixes. Either
+   `apply_units_block!` needs to run **after** calibration (so strings
+   like `"3157 Hz"` get parsed to `3157.0`), or `_to_float_vec` needs
+   to handle quantity strings inline.
+
+   Until that's addressed, this config can't be re-run end-to-end.
+   Workaround: pre-resolve the calibration manually and write the
+   numeric `omega:` directly into the YAML, then run.
+
+   **Action**: file as a separate bug, address before TSUBAME burst.
 
 Local re-run via temp-YAML pipeline truncation tripped on schema
 validation for the calibration mixin. On TSUBAME the original

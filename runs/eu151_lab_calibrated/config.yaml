@@ -36,8 +36,6 @@ defaults: {backend: gpu}
 pipeline:
   - ground_state:
       atom:          Eu151
-      N_atoms:       30000
-      omega_ref:     691.15                              # = 2π · 110 Hz
       grid:          {n: [32, 32, 24], box: [12, 12, 8]}
       potential:
         type:           harmonic
@@ -45,7 +43,10 @@ pipeline:
       B:
         p_mv:           2.5                              # → p auto via coil cal
         coil_mode:      strong
-      interactions:  {c1_ratio: 0.028}
+      interactions:
+        c1_ratio:    0.028
+        N_atoms:     30000
+        omega_ref:   691.15                              # = 2π · 110 Hz
       initial_state: polar
       tol:           1.0e-7
       n_steps:       4000
