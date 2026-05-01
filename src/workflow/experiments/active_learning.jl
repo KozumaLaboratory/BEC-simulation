@@ -130,3 +130,130 @@ function active_learn_phase_scan(
     bayesian_optimize(obj_fn, bounds;
         n_init, n_iter, minimise=false, ℓ, n_grid, seed, verbose)
 end
+
+"""
+    active_learn_phase_scan_yaml(yaml_path, override_paths, bounds;
+                                 phase_classifier_extractor=default_phase_classifier_extractor,
+                                 n_init=5, n_iter=50, temperature=0.1,
+                                 ℓ=nothing, n_grid=20, seed=42,
+                                 verbose=true,
+                                 save_history_to=nothing)
+        → BO-result tuple
+
+YAML wrapper for [`active_learn_phase_scan`](@ref). Like
+`bayesian_optimize_yaml` and `multi_fidelity_optimize_yaml`, takes a
+base YAML config + override paths and runs the full pipeline at each
+candidate point. The pipeline must produce a phase classification (via
+an `analyze:` step running `phase_classify_distance`); this wrapper
+extracts the per-phase distance scores and feeds them into the AL
+entropy proxy.
+
+`phase_classifier_extractor(result) → Vector{NamedTuple}` controls
+how the per-phase scores are pulled out of the pipeline result. The
+default reads `result[:phase_classify_distance].ranking` (the field
+name produced by `:phase_classify_distance` analyzer); pass a custom
+function if your pipeline stashes them elsewhere.
+
+Use case
+========
+Eu F=6 phase mapping in `(c₁/c₀, c_dd/c₀, p, q)`. The YAML config
+defines the full pipeline (ground state → analyze with
+`phase_classify_distance`); this wrapper manages the BO loop with
+heavy gate compatibility.
+
+See `active_learn_phase_scan` for the in-memory API.
+"""
+function active_learn_phase_scan_yaml(
+    yaml_path::AbstractString,
+    override_paths::Vector{<:AbstractString},
+    bounds::Vector{Tuple{Float64, Float64}};
+    phase_classifier_extractor::Function=default_phase_classifier_extractor,
+    n_init::Int=5,
+    n_iter::Int=50,
+    temperature::Float64=0.1,
+    ℓ::Union{Nothing, Float64}=nothing,
+    n_grid::Int=20,
+    seed::Int=42,
+    verbose::Bool=true,
+    save_history_to::Union{Nothing, AbstractString}=nothing,
+)
+    length(override_paths) == length(bounds) || throw(ArgumentError(
+        "override_paths and bounds must have same length"))
+
+    base_dict = YAML.load_file(yaml_path; dicttype=Dict{String, Any})
+
+    eval_count = Ref(0)
+    function eval_fn(p::AbstractVector{<:Real})
+        eval_count[] += 1
+        cand = OverrideMap()
+        for (path, val) in zip(override_paths, p)
+            cand[path] = val
+        end
+        modified = apply_overrides(base_dict, cand)
+        config = parse_pipeline(modified)
+        if verbose
+            println("  [eval $(eval_count[])] params: ",
+                join(["$(p_)=$(round(v_; digits=4))" for (p_, v_) in zip(override_paths, p)], ", "))
+        end
+        result = run_pipeline(config; verbose=false)
+        scores = phase_classifier_extractor(result)
+        (scores=scores,)
+    end
+
+    res = active_learn_phase_scan(eval_fn, bounds;
+        n_init, n_iter, temperature, ℓ, n_grid, seed, verbose)
+
+    if save_history_to !== nothing
+        JLD2.jldsave(save_history_to;
+            best_p=res.best_p,
+            best_y=res.best_y,
+            X_history=res.X_history,
+            y_history=res.y_history,
+            override_paths=collect(override_paths),
+            bounds=bounds,
+            yaml_path=yaml_path,
+            n_init=n_init,
+            n_iter=n_iter,
+            temperature=temperature,
+        )
+        verbose && println("AL history saved to: $save_history_to")
+    end
+
+    res
+end
+
+"""
+    default_phase_classifier_extractor(result) → Vector{NamedTuple}
+
+Default extractor used by `active_learn_phase_scan_yaml`. Reads
+`result[:phase_classify_distance].ranking` (the typical output shape
+when the pipeline ends with an `analyze: [phase_classify_distance: …]`
+step).
+
+If your pipeline produces the scores under a different key, pass a
+custom extractor: `(result) -> result[:my_classifier].ranking` or
+similar.
+"""
+function default_phase_classifier_extractor(result)
+    if haskey(result, :phase_classify_distance)
+        cls = result[:phase_classify_distance]
+        if hasproperty(cls, :ranking)
+            return cls.ranking
+        elseif cls isa Dict && haskey(cls, :ranking)
+            return cls[:ranking]
+        elseif cls isa Dict && haskey(cls, "ranking")
+            return cls["ranking"]
+        end
+    end
+    if haskey(result, :phase_classify)
+        cls = result[:phase_classify]
+        if hasproperty(cls, :ranking)
+            return cls.ranking
+        end
+    end
+    throw(ArgumentError(
+        "default_phase_classifier_extractor: result has no :phase_classify_distance " *
+        "or :phase_classify field with a `ranking` member. Got fields $(propertynames(result)). " *
+        "Pass a custom phase_classifier_extractor.",
+    ))
+end

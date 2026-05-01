@@ -480,7 +480,8 @@ export bayesian_optimize, gp_predict, expected_improvement
 export multi_fidelity_optimize_2tier, MultiFidelityBOResult
 export bayesian_optimize_yaml, multi_fidelity_optimize_yaml,
     bo_objective_max_m_transfer, bo_objective_max_lz, bo_objective_min_energy
-export active_learn_phase_scan, phase_entropy_uncertainty
+export active_learn_phase_scan, active_learn_phase_scan_yaml,
+    phase_entropy_uncertainty, default_phase_classifier_extractor
 export CalibrationSet, CoilCalibration, FORTCalibration, RabiCalibration
 export DEFAULT_CALIBRATION, load_calibration, apply_calibration!, run_yaml_calibrated
 export coil_mv_to_gauss, fort_mw_to_trap_hz, rabi_mw_to_rad_s
