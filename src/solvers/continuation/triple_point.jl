@@ -223,3 +223,151 @@ function trace_triple_point_curves(
     end
     out
 end
+
+# --- R37 → R39 bridge: Bogoliubov spectra along a boundary curve ---
+#
+# Given a BoundaryTrace (output of `trace_phase_boundary`), compute the
+# Bogoliubov spectrum at every accepted boundary point. Used to map
+# the roton-maxon dispersion as it evolves along a phase-coexistence
+# curve — required for thesis-paper plots like "roton softening across
+# the Eu B-1 boundary" or "BdG spectrum at the polar/cyclic/FM triple
+# point".
+#
+# Each boundary point gets a fresh L-BFGS GS computation, warm-started
+# from the previous point's ψ. After convergence, the spinor at the
+# peak-density voxel is fed to `bogoliubov_spectrum`. Cold-warm-warm-…
+# pattern matches what `make_phase_diff_eval` already does, so the
+# wall-clock per BdG sample is ~ 1 GS solve (5-30 s) + ~ 0.1 s for
+# `bogoliubov_spectrum` itself.
+
+"""
+    BoundaryBdGSample
+
+One Bogoliubov spectrum sample along a phase-boundary curve.
+
+Fields
+======
+- `θ::Vector{Float64}`         — boundary parameter point
+- `bdg::BdGResult`             — spectrum (k_values, omega, max_growth, …)
+- `n0::Float64`                — peak density at the GS used for the spectrum
+- `last_step::Int`             — L-BFGS iterations to convergence at this θ
+- `converged::Bool`            — L-BFGS convergence flag
+"""
+struct BoundaryBdGSample
+    θ::Vector{Float64}
+    bdg::BdGResult
+    n0::Float64
+    last_step::Int
+    converged::Bool
+end
+
+"""
+    bogoliubov_along_boundary_curve(points, parameter_setter, grid, atom;
+        phase_init=:m_plus_F,
+        k_max=10.0, n_k=200, k_direction=(0.0, 0.0, 1.0),
+        n_steps=500, tol=1e-7, sobolev_alpha=0.0, verbose=true)
+        → Vector{BoundaryBdGSample}
+
+For each row of `points` (a `BoundaryTrace.points` matrix or any
+`(n × d)` matrix of parameter points), compute the Bogoliubov spectrum
+at the L-BFGS-converged ground state. Warm-starts each GS from the
+previous point's ψ.
+
+`parameter_setter(θ)::NamedTuple` returns the kwargs forwarded to
+`find_ground_state_lbfgs` at each θ — same shape as
+`make_phase_diff_eval`'s `parameter_setter`. Must include at least
+`:interactions`. Optional `:c_dd`, `:zeeman`, `:enable_ddi` propagate
+to `bogoliubov_spectrum`.
+
+Spinor extraction
+=================
+The peak-density voxel of the converged ψ defines the local
+homogeneous-spinor approximation that `bogoliubov_spectrum` then
+linearises around. This is the same convention used by the
+`bogoliubov` analyzer in `analyzers/stability.jl`.
+
+Use case
+========
+Eu B-1 boundary curve: trace via `trace_phase_boundary`, then call
+this to plot ω(k) at every boundary point. Roton softening shows up
+as a `min(Re ω)` minimum that dips toward zero as θ approaches the
+modulation-instability pre-cursor.
+
+Cost
+====
+~ 1 GS solve per boundary point (L-BFGS warm-started) + ~ 0.1 s for
+the BdG eigendecomposition. For a 50-point curve at 24³ Eu F=6, this
+is roughly 50 × 30 s = 25 min wall time.
+"""
+function bogoliubov_along_boundary_curve(
+    points::AbstractMatrix{<:Real},
+    parameter_setter::Function,
+    grid::Grid{N}, atom::AtomSpecies;
+    phase_init::Symbol=:m_plus_F,
+    k_max::Float64=10.0,
+    n_k::Int=200,
+    k_direction::NTuple{3, Float64}=(0.0, 0.0, 1.0),
+    n_steps::Int=500,
+    tol::Float64=1.0e-7,
+    sobolev_alpha::Float64=0.0,
+    verbose::Bool=true,
+) where {N}
+    F = atom.F
+    D = 2F + 1
+    samples = BoundaryBdGSample[]
+    psi_warm = nothing
+
+    for i in 1:size(points, 1)
+        θ = collect(Float64, points[i, :])
+        kwargs = parameter_setter(θ)
+
+        haskey(kwargs, :interactions) ||
+            throw(ArgumentError(
+                "parameter_setter must return a NamedTuple containing :interactions"
+            ))
+
+        init_kwargs = psi_warm === nothing ?
+                      (initial_state=phase_init,) :
+                      (psi_init=psi_warm,)
+
+        r = find_ground_state_lbfgs(;
+            grid, atom,
+            kwargs...,
+            init_kwargs...,
+            n_steps, tol, sobolev_alpha,
+            verbose=false,
+        )
+        psi_warm = copy(r.workspace.state.psi)
+
+        # Extract spinor at peak density (host-side)
+        psi_host = _to_host(psi_warm)
+        ndim = ndims(psi_host) - 1
+        n_total = total_density(psi_host, ndim)
+        peak_idx = argmax(n_total)
+        spinor = ComplexF64[psi_host[peak_idx, c] for c in 1:D]
+        n0_local = sum(abs2, spinor)
+        n0_local > 1.0e-30 && (spinor ./= sqrt(n0_local))
+
+        ip = kwargs.interactions
+        c_dd_val = haskey(kwargs, :c_dd) ? Float64(kwargs.c_dd) : 0.0
+        zee = haskey(kwargs, :zeeman) ? kwargs.zeeman : ZeemanParams()
+        # bogoliubov_spectrum needs ZeemanParams (not TimeDependentZeeman)
+        if !(zee isa ZeemanParams)
+            zee = ZeemanParams()
+        end
+
+        bdg = bogoliubov_spectrum(;
+            spinor, n0=n0_local, F,
+            interactions=ip, zeeman=zee, c_dd=c_dd_val,
+            k_max, n_k, k_direction,
+        )
+
+        push!(samples,
+            BoundaryBdGSample(θ, bdg, n0_local, r.last_step, r.converged))
+
+        verbose && println("  $i/$(size(points, 1)): θ=$(round.(θ; digits=3)), " *
+                           "max_growth=$(round(bdg.max_growth_rate; sigdigits=3)), " *
+                           "L-BFGS iter=$(r.last_step)")
+    end
+    samples
+end

@@ -447,6 +447,7 @@ export resume_ground_state, refine_ground_state, load_itp_checkpoint, ITPCheckpo
 export scan_phase_diagram_2d, scan_phase_boundary
 export trace_phase_boundary, tangent_at, BoundaryTrace, make_phase_diff_eval
 export detect_triple_points, trace_triple_point_curves, TriplePointCandidate, pair_F_factory
+export bogoliubov_along_boundary_curve, BoundaryBdGSample
 export find_phase_boundary
 export run_simulation!, run_simulation_checkpointed!
 export run_simulation_adaptive!, run_simulation_yoshida!, run_simulation_embedded!
