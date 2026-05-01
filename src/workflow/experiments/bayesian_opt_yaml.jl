@@ -85,6 +85,133 @@ function bayesian_optimize_yaml(
 end
 
 """
+    multi_fidelity_optimize_yaml(yaml_path, override_paths, bounds;
+                                 objective_fn,
+                                 low_overrides::OverrideMap,
+                                 high_overrides::OverrideMap=OverrideMap(),
+                                 cost_ratio=10.0, n_init_low=10, n_init_high=3,
+                                 n_iter=20, budget_high=8, minimise=false, …)
+        → MultiFidelityBOResult
+
+Two-tier MFBO wired through the YAML pipeline. Like
+`bayesian_optimize_yaml` but with a CHEAP surrogate fidelity (e.g.
+coarse 12³ grid, fewer ITP steps) used most of the time, anchored to
+the production-grade fidelity by a discrepancy GP.
+
+`low_overrides` / `high_overrides` are `OverrideMap`s applied on top of
+the candidate-point overrides at each evaluation. Typical usage for
+SpinorBEC phase scans:
+
+```julia
+res = multi_fidelity_optimize_yaml(
+    "runs/eu151_phase_diagram_lbfgs/config.yaml",
+    ["pipeline.0.ground_state.B.p", "pipeline.0.ground_state.interactions.c1_ratio"],
+    [(10.0, 1000.0), (-0.1, 0.1)];
+    objective_fn = bo_objective_min_energy,
+    low_overrides = Dict{String,Any}(
+        "pipeline.0.ground_state.grid.n"  => [12, 12, 6],
+        "pipeline.0.ground_state.n_steps" => 300,
+    ),
+    high_overrides = Dict{String,Any}(),   # use config-default high tier
+    cost_ratio  = 30.0,
+    n_init_low  = 12, n_init_high = 3,
+    n_iter      = 25, budget_high = 8,
+    minimise    = true,
+)
+```
+
+The cheap-tier override list typically tightens grid resolution and
+ITP step count. `cost_ratio` should reflect the actual wall-time
+ratio (calibrate by running each tier once on a representative point).
+
+See `multi_fidelity_optimize_2tier` for the underlying acquisition
+strategy (cost-aware EI on a discrepancy GP).
+"""
+function multi_fidelity_optimize_yaml(
+    yaml_path::AbstractString,
+    override_paths::Vector{<:AbstractString},
+    bounds::Vector{Tuple{Float64, Float64}};
+    objective_fn::Function,
+    low_overrides::OverrideMap,
+    high_overrides::OverrideMap=OverrideMap(),
+    cost_ratio::Float64=10.0,
+    n_init_low::Int=10,
+    n_init_high::Int=3,
+    n_iter::Int=20,
+    budget_high::Int=8,
+    minimise::Bool=false,
+    ℓ::Union{Nothing, Float64}=nothing,
+    n_grid::Int=20,
+    seed::Int=42,
+    verbose::Bool=true,
+    save_history_to::Union{Nothing, AbstractString}=nothing,
+)
+    length(override_paths) == length(bounds) || throw(ArgumentError(
+        "override_paths and bounds must have same length"))
+
+    base_dict = YAML.load_file(yaml_path; dicttype=Dict{String, Any})
+
+    function _make_eval(fidelity_overrides::OverrideMap, label::String)
+        eval_count = Ref(0)
+        return function (p::AbstractVector{Float64})
+            eval_count[] += 1
+            cand = OverrideMap()
+            for (path, val) in zip(override_paths, p)
+                cand[path] = val
+            end
+            modified = apply_overrides(base_dict, cand, fidelity_overrides)
+            config = parse_pipeline(modified)
+            if verbose
+                println("  [$label eval $(eval_count[])] params: ",
+                    join(["$(p_)=$(round(v_; digits=4))" for (p_, v_) in zip(override_paths, p)], ", "))
+            end
+            result = run_pipeline(config; verbose=false)
+            score = Float64(objective_fn(result))
+            if verbose
+                println("  [$label eval $(eval_count[])] objective: $(round(score; digits=6))")
+            end
+            score
+        end
+    end
+
+    eval_low = _make_eval(low_overrides, "low")
+    eval_high = _make_eval(high_overrides, "high")
+
+    res = multi_fidelity_optimize_2tier(
+        eval_low, eval_high, bounds;
+        cost_ratio, n_init_low, n_init_high,
+        n_iter, budget_high, minimise,
+        ℓ, n_grid, seed, verbose,
+    )
+
+    if save_history_to !== nothing
+        JLD2.jldsave(save_history_to;
+            best_p=res.best_p,
+            best_y=res.best_y,
+            X_high=res.X_high,
+            y_high=res.y_high,
+            X_low=res.X_low,
+            y_low=res.y_low,
+            n_evals_high=res.n_evals_high,
+            n_evals_low=res.n_evals_low,
+            total_cost=res.total_cost,
+            override_paths=collect(override_paths),
+            bounds=bounds,
+            yaml_path=yaml_path,
+            cost_ratio=cost_ratio,
+            n_init_low=n_init_low,
+            n_init_high=n_init_high,
+            n_iter=n_iter,
+            budget_high=budget_high,
+            minimise=minimise,
+        )
+        verbose && println("MFBO history saved to: $save_history_to")
+    end
+
+    res
+end
+
+"""
     bo_objective_max_m_transfer(result; m_target=2)
 
 Convenience: extract `1 - N_{m=+F}` from a rotating_basis dynamics result,

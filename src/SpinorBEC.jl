@@ -473,7 +473,7 @@ export print_run_summary, compare_runs, generate_html_report
 export load_target_faraday, fit_faraday_param
 export bayesian_optimize, gp_predict, expected_improvement
 export multi_fidelity_optimize_2tier, MultiFidelityBOResult
-export bayesian_optimize_yaml,
+export bayesian_optimize_yaml, multi_fidelity_optimize_yaml,
     bo_objective_max_m_transfer, bo_objective_max_lz, bo_objective_min_energy
 export CalibrationSet, CoilCalibration, FORTCalibration, RabiCalibration
 export DEFAULT_CALIBRATION, load_calibration, apply_calibration!, run_yaml_calibrated
