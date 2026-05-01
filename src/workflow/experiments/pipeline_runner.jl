@@ -252,6 +252,74 @@ end
 
 # --- Step dispatch ---
 
+"""
+Resolve the atom for a GS step: parse from p["atom"] when present (and
+populate derived params), else inherit from atom_prev. Throws when neither
+is available. @noinline boundary plus the `::AtomSpecies` return assertion
+in the caller keeps the `Dict{String,Any}` typed parsing local — preserving
+the inference fence pattern that prevents a Workspace JIT cascade
+(see CLAUDE.md "Type stability boundaries").
+"""
+@noinline function _resolve_gs_atom(p::Dict{String, Any}, atom_prev; verbose::Bool=true)
+    if haskey(p, "atom")
+        a = resolve_atom(Symbol(p["atom"]))
+        _resolve_derived_params!(p, a; verbose)
+        return a
+    elseif atom_prev !== nothing
+        return atom_prev
+    else
+        throw(ArgumentError("ground_state step requires 'atom' (no previous step to inherit from)"))
+    end
+end
+
+@noinline function _resolve_gs_grid(p::Dict{String, Any}, grid_prev)
+    if haskey(p, "grid")
+        return _setup_grid_from_params(p)
+    elseif grid_prev !== nothing
+        return (grid_prev, length(grid_prev.config.n_points))
+    else
+        throw(ArgumentError("ground_state step requires 'grid' (no previous step to inherit from)"))
+    end
+end
+
+@noinline function _resolve_gs_interactions(p::Dict{String, Any}, ws_prev, atom)
+    if haskey(p, "interactions")
+        return _parse_gs_interactions(p["interactions"], atom)
+    elseif ws_prev !== nothing
+        return ws_prev.interactions
+    else
+        return _parse_gs_interactions(Dict{String, Any}(), atom)
+    end
+end
+
+"""
+DDI resolution with inheritance: explicit `ddi:` re-parses; otherwise
+inherit from `ws_prev.ddi`; final fallback derives from `interactions:`
+alone (works only on a fresh GS step where N_atoms+omega_ref are both
+present).
+"""
+@noinline function _resolve_gs_ddi_inheritance(p::Dict{String, Any}, ws_prev, atom)
+    if haskey(p, "ddi")
+        return _parse_gs_ddi(p["ddi"], get(p, "interactions", Dict()), atom)
+    elseif ws_prev !== nothing && ws_prev.ddi !== nothing
+        return (true, ws_prev.ddi.C_dd, false, false, 0.0)
+    elseif haskey(p, "interactions")
+        return _parse_gs_ddi(Dict{String, Any}(), p["interactions"], atom)
+    else
+        return (false, NaN, false, false, 0.0)
+    end
+end
+
+@noinline function _resolve_gs_potential(p::Dict{String, Any}, ws_prev, ndim::Int)
+    if haskey(p, "potential")
+        return _parse_and_build_potential(p["potential"], ndim)
+    elseif ws_prev !== nothing
+        return ws_prev.potential
+    else
+        return _parse_and_build_potential(Dict("type" => "harmonic", "omega" => ones(ndim)), ndim)
+    end
+end
+
 function _run_step(
     step::GroundStateStep,
     psi_prev,
@@ -271,61 +339,11 @@ function _run_step(
 
     method = Symbol(get(p, "method", "itp"))
 
-    # --- atom: inherit from previous step if absent ---
-    atom = if haskey(p, "atom")
-        a = resolve_atom(Symbol(p["atom"]))
-        _resolve_derived_params!(p, a; verbose)
-        a
-    elseif atom_prev !== nothing
-        atom_prev
-    else
-        throw(ArgumentError("ground_state step requires 'atom' (no previous step to inherit from)"))
-    end
-
-    # --- grid: inherit from previous step if absent ---
-    grid, ndim = if haskey(p, "grid")
-        _setup_grid_from_params(p)
-    elseif grid_prev !== nothing
-        (grid_prev, length(grid_prev.config.n_points))
-    else
-        throw(ArgumentError("ground_state step requires 'grid' (no previous step to inherit from)"))
-    end
-
-    # --- Physical params: inherit from ws_prev if absent ---
-    interactions = if haskey(p, "interactions")
-        _parse_gs_interactions(p["interactions"], atom)
-    elseif ws_prev !== nothing
-        ws_prev.interactions
-    else
-        _parse_gs_interactions(Dict{String, Any}(), atom)
-    end
-
-    enable_ddi, c_dd_val, secular, q2d, lz = if haskey(p, "ddi")
-        # Explicit `ddi:` block — re-parse, deriving c_dd from interactions
-        # if `c_dd` field is omitted.
-        _parse_gs_ddi(p["ddi"], get(p, "interactions", Dict()), atom)
-    elseif ws_prev !== nothing && ws_prev.ddi !== nothing
-        # Inherit DDI from the previous workspace. The dynamics step typically
-        # only seeds `omega_ref` (for B↦p conversion); `N_atoms` lives on the
-        # GS step's `interactions:` block, so re-deriving c_dd here would
-        # silently disable DDI. Inherit instead.
-        (true, ws_prev.ddi.C_dd, false, false, 0.0)
-    elseif haskey(p, "interactions")
-        # No prior workspace and no explicit `ddi:` — try to derive from the
-        # interactions block alone (works only when N_atoms+omega_ref both
-        # present, e.g. on a fresh ground_state step).
-        _parse_gs_ddi(Dict{String, Any}(), p["interactions"], atom)
-    else
-        (false, NaN, false, false, 0.0)
-    end
-
-    potential = if haskey(p, "potential")
-        _parse_and_build_potential(p["potential"], ndim)
-    elseif ws_prev !== nothing
-        ws_prev.potential
-    else
-        _parse_and_build_potential(Dict("type" => "harmonic", "omega" => ones(ndim)), ndim)
-    end
+    atom = _resolve_gs_atom(p, atom_prev; verbose)::AtomSpecies
+    grid, ndim = _resolve_gs_grid(p, grid_prev)
+    interactions = _resolve_gs_interactions(p, ws_prev, atom)::InteractionParams
+    enable_ddi, c_dd_val, secular, q2d, lz = _resolve_gs_ddi_inheritance(p, ws_prev, atom)
+    potential = _resolve_gs_potential(p, ws_prev, ndim)
 
     backend = if haskey(p, "backend")
         _resolve_backend(Symbol(p["backend"]))
