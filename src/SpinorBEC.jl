@@ -116,13 +116,18 @@ include("workflow/experiments/auto_defaults.jl")    # accuracy: + auto_grid:
 include("workflow/experiments/B_block.jl")          # B: → zeeman + B_hat split
 include("workflow/experiments/noise_block.jl")      # noise: → temperature/twa/sgpe split
 include("workflow/experiments/schema_defaults.jl")  # auto-inject ddi:{} etc.
-include("workflow/experiments/helpers_types.jl")
-include("workflow/experiments/helpers_utils.jl")
-include("workflow/experiments/helpers_parsers.jl")
-include("workflow/experiments/helpers_builders.jl")
+include("workflow/experiments/helpers_types.jl")            # ConstantValue, LinearRamp, PotentialConfig
+include("workflow/experiments/runtime_misc.jl")             # scale_interactions_quasi_2d, grid normalise, noise seed
+include("workflow/experiments/runtime_io.jl")               # JLD2 result-file writers
+include("workflow/experiments/parsing_units.jl")            # Unit-aware numeric (B-field, freq, time)
+include("workflow/experiments/parsing_blocks.jl")           # Per-block YAML parsers (zeeman/ddi/inter/loss/potential/scan)
+include("workflow/experiments/builders_potential.jl")       # _build_potential / _build_beam / _parse_and_build_potential
+include("workflow/experiments/builders_phase.jl")           # waveforms + zeeman + raman builders
 include("workflow/experiments/zeeman_levels.jl")
 include("workflow/experiments/pipeline_types.jl")
 include("workflow/experiments/pipeline_analyzers.jl")
+include("workflow/experiments/pipeline_dispatch.jl")    # save_every / b_hat / dt-from-eps / twa / light_shift parsers
+include("workflow/experiments/pipeline_callbacks.jl")    # sgpe / projected_gp / photon_scattering / live_monitor callback builders
 include("workflow/experiments/pipeline_runner.jl")
 include("workflow/experiments/pulse_sequence.jl")
 include("workflow/experiments/sta_counter_diabatic.jl")
