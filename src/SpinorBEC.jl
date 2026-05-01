@@ -211,6 +211,7 @@ include("workflow/experiments/faraday_fit.jl")
 include("workflow/experiments/bayesian_opt.jl")
 include("workflow/experiments/bayesian_opt_mf.jl")    # 2-tier multi-fidelity BO
 include("workflow/experiments/bayesian_opt_yaml.jl")
+include("workflow/experiments/active_learning.jl")    # entropy-uncertainty AL for phase scan
 
 # ========================================
 # ANALYSIS: Observables & diagnostics
@@ -477,6 +478,7 @@ export bayesian_optimize, gp_predict, expected_improvement
 export multi_fidelity_optimize_2tier, MultiFidelityBOResult
 export bayesian_optimize_yaml, multi_fidelity_optimize_yaml,
     bo_objective_max_m_transfer, bo_objective_max_lz, bo_objective_min_energy
+export active_learn_phase_scan, phase_entropy_uncertainty
 export CalibrationSet, CoilCalibration, FORTCalibration, RabiCalibration
 export DEFAULT_CALIBRATION, load_calibration, apply_calibration!, run_yaml_calibrated
 export coil_mv_to_gauss, fort_mw_to_trap_hz, rabi_mw_to_rad_s
