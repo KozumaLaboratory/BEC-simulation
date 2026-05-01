@@ -952,20 +952,18 @@ struct EnsembleResult
     var::Dict{Symbol, Vector{<:AbstractArray}}
     n_trajectories::Int
     trajectory_results::Union{Nothing, Vector{SimulationResult}}
-    # Final ψ from the last trajectory. Lets downstream pipeline steps and
-    # the dashboard show a representative post-evolution wavefunction without
-    # storing every trajectory. `nothing` when the caller did not capture it.
-    final_psi::Union{Nothing, AbstractArray}
-    # The last trajectory's full SimulationResult (with psi_snapshots).
-    # Always retained so the dashboard auto-save can stream the dynamics
-    # frames even when the user didn't request store_trajectories. Distinct
-    # from `trajectory_results` (which holds *every* trajectory and is opt-in).
+    # Last trajectory's full SimulationResult (with psi_snapshots). Always
+    # retained so the dashboard auto-save can stream dynamics frames even
+    # when the user didn't request `store_trajectories=true`. Use
+    # `last_trajectory.psi_snapshots[end]` for the post-evolution ψ when the
+    # caller needs a representative state (the snapshot at the last step
+    # IS `ws.state.psi` whenever `save_every` divides `n_steps`, which is
+    # the typical case). Distinct from `trajectory_results` which holds
+    # *every* trajectory and is opt-in.
     last_trajectory::Union{Nothing, SimulationResult}
 end
 EnsembleResult(times, mean, var, n_trajectories, trajectory_results) =
-    EnsembleResult(times, mean, var, n_trajectories, trajectory_results, nothing, nothing)
-EnsembleResult(times, mean, var, n_trajectories, trajectory_results, final_psi) =
-    EnsembleResult(times, mean, var, n_trajectories, trajectory_results, final_psi, nothing)
+    EnsembleResult(times, mean, var, n_trajectories, trajectory_results, nothing)
 
 # --- Workspace ---
 

@@ -723,22 +723,25 @@ function _run_step(
         verbose && @printf("  TWA ensemble: %d trajectories, %d snapshots\n",
             ensemble.n_trajectories, length(ensemble.times))
 
-        # Hand the final-trajectory ψ + its SimulationResult to downstream
-        # steps. The `:dynamics_result` slot lets the canonical auto-save
-        # (`_concat_dynamics_phases`) stream the Phase-2 snapshots that
-        # `run_simulation!` already accumulated; without it those frames
-        # are lost and the saved result.jld2 only carries Phase 0/1.
-        psi_out = ensemble.final_psi !== nothing ? copy(ensemble.final_psi) :
-                  copy(psi_prev)
+        # Hand the last-trajectory SimulationResult to downstream steps so
+        # the canonical auto-save (`_concat_dynamics_phases`) streams the
+        # Phase-2 snapshots that `run_simulation!` already accumulated.
+        # Pull the post-evolution ψ from `psi_snapshots[end]` — that's the
+        # last frame run_simulation! recorded; for the typical case where
+        # save_every divides n_steps it equals `ws.state.psi` exactly.
+        traj = ensemble.last_trajectory
+        psi_out = if traj !== nothing && !isempty(traj.psi_snapshots)
+            copy(traj.psi_snapshots[end])
+        else
+            copy(psi_prev)
+        end
         step_result = Dict{Symbol, Any}(
             :ensemble_result => ensemble,
             :dynamics_workspace => ws,
-            :dynamics_result => ensemble.last_trajectory,
-            :save_psi_snapshots => ensemble.last_trajectory !== nothing &&
-                                   !isempty(ensemble.last_trajectory.psi_snapshots),
+            :dynamics_result => traj,
+            :save_psi_snapshots => traj !== nothing && !isempty(traj.psi_snapshots),
             :snapshot_tmp_path => nothing,
-            :snapshot_count => ensemble.last_trajectory === nothing ? 0 :
-                               length(ensemble.last_trajectory.psi_snapshots),
+            :snapshot_count => traj === nothing ? 0 : length(traj.psi_snapshots),
         )
         return (psi_out, grid, atom, ws, step_result)
     end

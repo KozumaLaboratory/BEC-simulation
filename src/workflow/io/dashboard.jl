@@ -2068,6 +2068,83 @@ function _read_box_size(jld2_path::String)
 end
 
 """
+    RunMetadata(box_size, n_points, atom_name, omega_ref, n_atoms)
+
+Run-level geometry + physics constants extracted once and reused across
+endpoint handlers. Resolved by `load_run_metadata(jld2_path)` which tries
+the embedded JLD2 datasets first and falls back to the sibling
+config.yaml. All fields except `box_size` may be `nothing` when the
+source file doesn't carry the data (older runs / GS-only files).
+"""
+struct RunMetadata
+    box_size::NTuple{3, Float64}
+    n_points::Union{Nothing, NTuple{3, Int}}
+    atom_name::Union{Nothing, String}
+    omega_ref::Union{Nothing, Float64}
+    n_atoms::Union{Nothing, Int}
+end
+
+function load_run_metadata(jld2_path::String)
+    box_vec = _read_box_size(jld2_path)
+    if box_vec === nothing || length(box_vec) < 3
+        throw(
+            ArgumentError(
+                "Cannot resolve box_size for $(jld2_path): missing " *
+                "`grid_box_size` in the JLD2 file and no usable grid.box " *
+                "in config.yaml.",
+            ),
+        )
+    end
+    box = NTuple{3, Float64}((Float64(box_vec[1]), Float64(box_vec[2]), Float64(box_vec[3])))
+
+    n_points = try
+        n_vec = _with_jld_handle(jld2_path) do f
+            haskey(f, "grid_n_points") ? f["grid_n_points"] : nothing
+        end
+        n_vec === nothing ? nothing :
+        NTuple{3, Int}((Int(n_vec[1]), Int(n_vec[2]), Int(n_vec[3])))
+    catch
+        nothing
+    end
+
+    atom_name, omega_ref, n_atoms = _read_run_physics(jld2_path)
+    RunMetadata(box, n_points, atom_name, omega_ref, n_atoms)
+end
+
+"""Tuple `(atom_name, omega_ref, n_atoms)` from JLD2 first then YAML."""
+function _read_run_physics(jld2_path::String)
+    # JLD2 may carry these inside `units/` group or `env/`
+    try
+        out = _with_jld_handle(jld2_path) do f
+            atom = haskey(f, "units/atom") ? String(f["units/atom"]) : nothing
+            omega = haskey(f, "units/omega_ref_rad_s") ?
+                    Float64(f["units/omega_ref_rad_s"]) : nothing
+            n = haskey(f, "units/N_atoms") ? Int(f["units/N_atoms"]) : nothing
+            (atom, omega, n)
+        end
+        return out
+    catch
+        # fall through
+    end
+    # YAML fallback
+    config_path = joinpath(dirname(jld2_path), "config.yaml")
+    isfile(config_path) || return (nothing, nothing, nothing)
+    try
+        data = YAML.load_file(config_path)
+        pipe = get(data, "pipeline", [])
+        isempty(pipe) && return (nothing, nothing, nothing)
+        gs = first(values(pipe[1]))
+        atom = haskey(gs, "atom") ? String(gs["atom"]) : nothing
+        inter = get(gs, "interactions", Dict())
+        omega = inter isa Dict && haskey(inter, "omega_ref") ? Float64(inter["omega_ref"]) : nothing
+        n = inter isa Dict && haskey(inter, "N_atoms") ? Int(inter["N_atoms"]) : nothing
+        (atom, omega, n)
+    catch
+        (nothing, nothing, nothing)
+    end
+end
+
+"""
 Compute column densities (integrated along `axis`) for each m-component.
 Returns Dict with m_values, densities (list of 2D arrays), grid info.
 """
@@ -3200,30 +3277,9 @@ end
 
 const _vector3d_plans_cache = Dict{NTuple{3, Int}, Tuple{FFTPlans, Grid{3}}}()
 
-function _load_box_size(jld2_path::String)
-    # Preferred: pull "grid_box_size" from the JLD2 file itself (newer runs
-    # embed it). Older runs — e.g. eu151_edh/point_001.jld2 — don't. FileIO
-    # may re-wrap JLD2's KeyError as CapturedException, so swallow any
-    # lookup failure and fall back to the sibling config.yaml.
-    try
-        d = _with_jld_handle(jld2_path) do f
-            haskey(f, "grid_box_size") ? f["grid_box_size"] : nothing
-        end
-        d === nothing || return NTuple{3, Float64}(d)
-    catch
-        # fall through
-    end
-    box = _read_box_size(jld2_path)
-    if box === nothing || length(box) < 3
-        throw(
-            ArgumentError(
-                "Cannot resolve box_size for $(jld2_path): missing `grid_box_size` " *
-                "in the JLD2 file and no usable grid.box in config.yaml.",
-            ),
-        )
-    end
-    NTuple{3, Float64}((Float64(box[1]), Float64(box[2]), Float64(box[3])))
-end
+"""Compatibility shim: returns just the `box_size` tuple. Prefer
+`load_run_metadata(jld2_path).box_size` in new code."""
+_load_box_size(jld2_path::String) = load_run_metadata(jld2_path).box_size
 
 function _get_plans_and_grid(n_pts::NTuple{3, Int}, box_size::NTuple{3, Float64})
     get!(_vector3d_plans_cache, n_pts) do

@@ -36,7 +36,6 @@ function run_twa(;
     mean_obs = nothing
     M2_obs = nothing
     ref_times = nothing
-    final_psi = nothing
     last_traj_result = nothing
 
     for i in 1:n_traj
@@ -56,14 +55,12 @@ function run_twa(;
             all_traj_results[i] = result
         end
 
-        # Capture the last trajectory's final ψ + full SimulationResult — the
-        # pipeline auto-save uses these to stream Phase-2 frames into the
-        # canonical result.jld2 layout. Without this the snapshots that
-        # run_simulation! already accumulated would be discarded.
-        if i == n_traj
-            final_psi = copy(ws.state.psi)
-            last_traj_result = result
-        end
+        # Capture the last trajectory's full SimulationResult — pipeline
+        # auto-save uses it to stream the Phase-2 frames that
+        # `run_simulation!` already accumulated into the canonical
+        # result.jld2 layout. The post-evolution ψ is recovered downstream
+        # via `last_trajectory.psi_snapshots[end]`.
+        i == n_traj && (last_traj_result = result)
 
         traj_obs = _extract_trajectory_observables(result, grid, atom, obs_list)
 
@@ -102,9 +99,7 @@ function run_twa(;
         end
     end
 
-    EnsembleResult(
-        ref_times, mean_obs, var_obs, n_traj, all_traj_results, final_psi, last_traj_result,
-    )
+    EnsembleResult(ref_times, mean_obs, var_obs, n_traj, all_traj_results, last_traj_result)
 end
 
 """

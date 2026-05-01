@@ -389,6 +389,7 @@ export SimulationCallbacks, LiveMonitor
 
 # I/O
 export save_state, load_state, generate_dashboard_data, export_dashboard, serve_dashboard
+export RunMetadata, load_run_metadata
 export save_rotating_basis_result!
 export estimate_run_budget
 export export_vtk, export_vtk_series
