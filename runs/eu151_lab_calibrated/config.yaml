@@ -6,8 +6,15 @@
 #  the schema parser sees it.
 #
 #  Effect at target_date 2026-04-08 (interpolated from 04-01 + 04-15):
-#     B.p_mv: 2.5 + coil_mode: strong → B.p ≈ 1.04 Gauss
-#     potential.fort_power_mw: [50, 50, 100] → omega ≈ [3134 Hz, 3134, 5980]
+#     t = 7d / 14d = 0.5
+#     coil_strong: gauss_per_mv 0.41, gauss_offset 0.045  (linear avg)
+#     fort:        sqrt_coeffs_hz [446.5, 446.5, 598.0]   (linear avg)
+#     B.p_mv: 2.5 + coil_mode: strong → B.p = 0.41 · 2.5 + 0.045 = 1.07 Gauss
+#     fort_power_mw: [50, 50, 100] → omega = sqrt_coeff · sqrt(power_mw)
+#                                          = [3157, 3157, 5980] Hz
+#  (Earlier comment quoted 1.04 G / 3134 Hz — that's not the interpolation;
+#   3134 Hz is the 04-15 endpoint alone (sqrt_coeff=443·√50), and 1.04 G
+#   doesn't match either endpoint or the midpoint. Updated 2026-05-02.)
 # ─────────────────────────────────────────────────────────────────────
 
 target_date: "2026-04-08"

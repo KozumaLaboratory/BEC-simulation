@@ -1,6 +1,14 @@
 # berry_crossover scan — single-file form. Eu151 spinor-orbital crossover
 # scan over B-field strength (dimless p). p = 10 → 3000: spinor-active
 # (p=10) → Klaus-frozen (p≥100).
+#
+# `units:` block below is for *future* lab-unit fields (B in Gauss,
+# durations in ms — the schema applies these to quantity-string entries
+# like `omega: ["50 Hz", ...]` and `duration: "20 ms"`). The bare-Real
+# `B: {p: 1000.0}` here is the dimensionless Zeeman energy
+# `p = ω_L / ω_ref`, not Gauss; the unit declaration is therefore
+# unused for `B.p` in this file. Both forms coexist by design — see
+# CLAUDE.md "YAML schema overhaul".
 
 units: {B: Gauss, t: ms}
 accuracy: 1.0e-6
