@@ -259,6 +259,7 @@ function find_ground_state_lbfgs(;
     verbose::Bool=true,
     light_shift::Union{Nothing, LightShift}=nothing,
     dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
+    sobolev_alpha::Float64=0.0,
 )
     # F32 gradient norm floors around unit roundoff (~1e-7 scaled by grid dV).
     # Relax the default convergence test so F32 runs don't burn all n_steps.
@@ -353,10 +354,20 @@ function find_ground_state_lbfgs(;
     t_start = time()
 
     for step in 1:n_steps
-        # Gradient at current psi
+        # Gradient at current psi (Riemannian, used unchanged for the
+        # convergence test — `grad_norm` is the *physical* residual).
         E = energy_gradient!(grad, psi, ws; k_squared_dev)
         _project_constraints!(grad, psi, grid, target_magnetization, F)
         grad_norm = sqrt(sum(abs2, grad) * dV)
+
+        # Sobolev preconditioner: high-k attenuation acts as a mass-matrix
+        # preconditioner for L-BFGS. α = 0 leaves the gradient untouched.
+        # Re-project after preconditioning to restore tangency on the
+        # (norm + Mz) constraint manifold.
+        if sobolev_alpha > 0
+            _sobolev_precondition!(grad, ws, k_squared_dev, sobolev_alpha)
+            _project_constraints!(grad, psi, grid, target_magnetization, F)
+        end
 
         dE = abs(E - E_prev)
 
@@ -422,6 +433,10 @@ function find_ground_state_lbfgs(;
         # Gradient at new psi
         E_new = energy_gradient!(grad_new, psi, ws; k_squared_dev)
         _project_constraints!(grad_new, psi, grid, target_magnetization, F)
+        if sobolev_alpha > 0
+            _sobolev_precondition!(grad_new, ws, k_squared_dev, sobolev_alpha)
+            _project_constraints!(grad_new, psi, grid, target_magnetization, F)
+        end
 
         # L-BFGS history update
         y_k = grad_new .- grad
@@ -455,6 +470,44 @@ function find_ground_state_lbfgs(;
         dE=abs(E_final - E_prev),
         last_step=last_step,
     )
+end
+
+"""
+    _sobolev_precondition!(grad, ws, k_squared_dev, alpha) → grad
+
+In-place Sobolev preconditioner: `grad ← (1 + α·(-∇²))^(-1) · grad`,
+applied per spinor component via the existing per-component FFT plans
+in `ws.fft_plans` and the device-resident `k_squared_dev`. In k-space
+this is pointwise division by `(1 + α·k²)` — the high-`k` (rapid
+oscillation) modes of the gradient get attenuated, which acts as a
+mass-matrix preconditioner for L-BFGS.
+
+`α = 0` is a no-op (preserves backward compatibility with the
+unpreconditioned solver). Useful range: α = 0.01 – 1.0 in dimensionless
+ω_ref units; for Eu 64³ box=20 the highest k² ≈ 25, so α ≈ 0.04 dampens
+the k_max mode by ~half. Bao et al. 2025-12 ("Projected Sobolev Natural
+Gradient Descent", arXiv:2512.11339) is the natural-gradient analogue
+applied as a preconditioner here.
+"""
+function _sobolev_precondition!(
+    grad::AbstractArray{<:Complex},
+    ws::Workspace{N},
+    k_squared_dev::AbstractArray{<:AbstractFloat},
+    alpha::Float64,
+) where {N}
+    alpha > 0 || return grad
+    n_pts = ntuple(d -> size(grad, d), Val(N))
+    n_comp = ws.spin_matrices.system.n_components
+    fft_buf = ws.state.fft_buf
+    @inbounds for c in 1:n_comp
+        idx = _component_slice(N, n_pts, c)
+        fft_buf .= view(grad, idx...)
+        ws.fft_plans.forward * fft_buf
+        fft_buf ./= (1 .+ alpha .* k_squared_dev)
+        ws.fft_plans.inverse * fft_buf
+        view(grad, idx...) .= fft_buf
+    end
+    grad
 end
 
 """Two-loop L-BFGS direction."""
