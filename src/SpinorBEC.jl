@@ -52,7 +52,10 @@ include("hamiltonian/interactions/interactions.jl")
 include("hamiltonian/interactions/spin_mixing.jl")
 include("hamiltonian/interactions/nematic.jl")
 include("hamiltonian/interactions/tensor_interaction.jl")
-include("hamiltonian/interactions/ddi.jl")
+include("hamiltonian/interactions/ddi/qtensor.jl")     # k-space + quasi-2D Q-tensor builders
+include("hamiltonian/interactions/ddi/convolution.jl") # DDIParams + buffers + 6-FFT convolution
+include("hamiltonian/interactions/ddi/rotation.jl")    # Euler 5-stage spinor rotation
+include("hamiltonian/interactions/ddi.jl")             # apply_ddi_step! entry point
 include("hamiltonian/interactions/ddi_padded.jl")
 include("hamiltonian/interactions/lhy.jl")
 include("hamiltonian/interactions/losses.jl")
@@ -83,6 +86,8 @@ include("workflow/io/units.jl")
 
 # 7. Initialization
 include("workflow/initialization/atoms.jl")
+include("workflow/initialization/state_dispatch.jl")    # init_psi + small helpers
+include("workflow/initialization/make_workspace.jl")    # make_workspace + _rebuild_workspace
 include("workflow/initialization/thomas_fermi.jl")
 include("workflow/initialization/initialization.jl")
 include("workflow/initialization/state_zoo.jl")
