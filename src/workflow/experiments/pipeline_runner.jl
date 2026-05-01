@@ -320,6 +320,52 @@ end
     end
 end
 
+# --- DynamicsStep field-resolution helpers ---
+#
+# Same `@noinline + ::ConcreteType` pattern as the GS helpers above:
+# isolate Dict{String,Any} parsing locals from the abstract-dispatch
+# inference world that runs `_run_step` (CLAUDE.md "Type stability
+# boundaries").
+
+@noinline function _resolve_dyn_absorbing_boundary(p::Dict{String, Any})
+    ab_raw = get(p, "absorbing_boundary", nothing)
+    ab_raw isa Dict || return nothing
+    return AbsorbingBoundary(;
+        strength=Float64(ab_raw["strength"]),
+        width=Float64(ab_raw["width"]),
+        power=Int(get(ab_raw, "power", 2)),
+    )
+end
+
+@noinline function _resolve_dyn_time_dep_interactions(
+    p::Dict{String, Any}, interactions::InteractionParams, duration::Float64
+)
+    inter_raw = get(p, "interactions", nothing)
+    inter_raw isa Dict || return nothing
+    c0_spec = get(inter_raw, "c0", nothing)
+    c1_spec = get(inter_raw, "c1", nothing)
+    (c0_spec isa Dict) || (c1_spec isa Dict) || return nothing
+    c0_wf = _make_waveform(c0_spec !== nothing ? c0_spec : interactions.c0, duration)
+    c1_wf = _make_waveform(c1_spec !== nothing ? c1_spec : interactions.c1, duration)
+    return TimeDependentInteractions(c0_wf, c1_wf)
+end
+
+@noinline function _resolve_dyn_magnetic_gradient(
+    p::Dict{String, Any}, ndim::Int, duration::Float64
+)
+    mg_raw = get(p, "magnetic_gradient", nothing)
+    mg_raw isa Dict || return nothing
+    grad_spec = mg_raw["gradient"]
+    axis = Int(get(mg_raw, "axis", ndim))
+    g_F = Float64(get(mg_raw, "g_F", 1.0))
+    if grad_spec isa Dict
+        wf = _make_waveform(grad_spec, duration)
+        return TimeDependentMagneticGradient{ndim}(wf, axis, g_F)
+    else
+        return MagneticGradient{ndim}(Float64(grad_spec), axis, g_F)
+    end
+end
+
 function _run_step(
     step::GroundStateStep,
     psi_prev,
@@ -628,16 +674,7 @@ function _run_step(
 
     backend = ws_prev !== nothing ? ws_prev.backend : CPUBackend()
 
-    ab_raw = get(p, "absorbing_boundary", nothing)
-    absorbing_boundary = if ab_raw isa Dict
-        AbsorbingBoundary(;
-            strength=Float64(ab_raw["strength"]),
-            width=Float64(ab_raw["width"]),
-            power=Int(get(ab_raw, "power", 2)),
-        )
-    else
-        nothing
-    end
+    absorbing_boundary = _resolve_dyn_absorbing_boundary(p)
 
     ls_raw = get(p, "light_shift", nothing)
     light_shift = _parse_light_shift(ls_raw, F, nothing, backend)
@@ -651,37 +688,8 @@ function _run_step(
 
     raman = _build_raman(p, duration)
 
-    time_dep_interactions = let inter_raw = get(p, "interactions", nothing)
-        if inter_raw isa Dict
-            c0_spec = get(inter_raw, "c0", nothing)
-            c1_spec = get(inter_raw, "c1", nothing)
-            if (c0_spec isa Dict) || (c1_spec isa Dict)
-                c0_wf = _make_waveform(c0_spec !== nothing ? c0_spec : interactions.c0, duration)
-                c1_wf = _make_waveform(c1_spec !== nothing ? c1_spec : interactions.c1, duration)
-                TimeDependentInteractions(c0_wf, c1_wf)
-            else
-                nothing
-            end
-        else
-            nothing
-        end
-    end
-
-    magnetic_gradient = let mg_raw = get(p, "magnetic_gradient", nothing)
-        if mg_raw isa Dict
-            grad_spec = mg_raw["gradient"]
-            axis = Int(get(mg_raw, "axis", ndim))
-            g_F = Float64(get(mg_raw, "g_F", 1.0))
-            if grad_spec isa Dict
-                wf = _make_waveform(grad_spec, duration)
-                TimeDependentMagneticGradient{ndim}(wf, axis, g_F)
-            else
-                MagneticGradient{ndim}(Float64(grad_spec), axis, g_F)
-            end
-        else
-            nothing
-        end
-    end
+    time_dep_interactions = _resolve_dyn_time_dep_interactions(p, interactions, duration)
+    magnetic_gradient = _resolve_dyn_magnetic_gradient(p, ndim, duration)
 
     # Pulse sequence: compile into TimeDep* overrides (type-narrowed to avoid
     # inference blow-up when `run_pipeline` dispatches abstractly on PipelineStep)

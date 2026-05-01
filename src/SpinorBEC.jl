@@ -234,7 +234,10 @@ include("solvers/simulation.jl")
 include("solvers/adaptive.jl")
 include("solvers/embedded_adaptive.jl")
 include("solvers/lbfgs_ground_state.jl")
-include("solvers/continuation.jl")
+include("solvers/continuation.jl")                  # stub (the actual code lives in 3 sub-files)
+include("solvers/continuation/scan_1d.jl")           # scan_continuation + bidirectional
+include("solvers/continuation/scan_2d.jl")           # scan_phase_diagram_2d
+include("solvers/continuation/boundary.jl")          # scan_phase_boundary bisection
 include("solvers/twa.jl")
 include("solvers/binary_simulation.jl")
 

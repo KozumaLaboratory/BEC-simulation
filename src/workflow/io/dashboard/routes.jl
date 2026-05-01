@@ -436,3 +436,371 @@ function _route_density_max(path::String, base_dir::String, psi_cache::Dict{Stri
     (200, "application/json", "{\"density_max_total\":$(d_max)}")
 end
 
+
+# --- Round 5 (R11-cont) extracted handlers ---
+function _route_density3d_atlas(path::String, base_dir::String, psi_cache::Dict{String, Any})
+    # /api/density3d_atlas/:run/:file?comp=N → all-snaps 3D density
+    # atlas for one component. Same panel-major idea as the 2D atlas
+    # but for the 3D viewer: 1 fetch instead of one per scrub frame.
+    # Layout (panel-major over snap, single component):
+    #   "D3AT" magic (4)
+    #   Int32 header (6): n_snaps, nx, ny, nz, n_comp_total, component
+    #   Float32 atlas  (n_snaps * nx * ny * nz)
+    rest = _uri_decode(path[22:end])
+    slash_idx = findfirst('/', rest)
+    if slash_idx === nothing
+        return (400, "text/plain", "Expected /api/density3d_atlas/:run/:file")
+    end
+    name = rest[1:(slash_idx - 1)]
+    file = rest[(slash_idx + 1):end]
+    comp_idx = 0
+    bsz = false
+    qidx = findfirst('?', file)
+    if qidx !== nothing
+        query = file[(qidx + 1):end]
+        file = file[1:(qidx - 1)]
+        m = match(r"comp=(-?\d+)", query)
+        m !== nothing && (comp_idx = parse(Int, m.captures[1]))
+        occursin("bsz=1", query) && (bsz = true)
+    end
+    fpath = joinpath(base_dir, name, file)
+    if !isfile(fpath)
+        return (404, "text/plain", "File not found: $name/$file")
+    end
+    cache_key = "density3d_atlas:$(fpath)#comp=$(comp_idx)#bsz=$(bsz)"
+    bin = if haskey(psi_cache, cache_key)
+        psi_cache[cache_key]
+    else
+        disk_blob = _try_load_atlas_from_disk(base_dir, fpath, 1000 + comp_idx, bsz)
+        if disk_blob !== nothing
+            while length(psi_cache) >= PSI_CACHE_MAX_ENTRIES
+                _evict_one!(psi_cache)
+            end
+            psi_cache[cache_key] = disk_blob
+            disk_blob
+        else
+            while length(psi_cache) >= PSI_CACHE_MAX_ENTRIES
+                _evict_one!(psi_cache)
+            end
+            v = try
+                meta = _snapshots_metadata(fpath)
+                n_snaps = meta === nothing ? 0 : Int(get(meta, "n_snapshots", 0))
+                n_snaps == 0 && return (404, "text/plain", "No snapshots")
+                raw = _compute_density3d_atlas_binary(fpath, comp_idx, n_snaps, psi_cache)
+                _maybe_bitshuffle_zstd(raw, bsz)
+            catch e
+                return (500, "text/plain", "Error: $(e)")
+            end
+            psi_cache[cache_key] = v
+            _save_atlas_to_disk(base_dir, fpath, 1000 + comp_idx, bsz, v)
+            v
+        end
+    end
+    (200, "application/octet-stream", bin)
+end
+
+function _route_density_atlas(path::String, base_dir::String, psi_cache::Dict{String, Any})
+    # /api/density_atlas/:run/:file?axis=N → all-snaps atlas in one
+    # binary blob (panel-major: total then n_comp components, each
+    # n_snaps × nx × ny). Replaces ~157 separate /api/density_bin
+    # round-trips with a single fetch.
+    rest = _uri_decode(path[20:end])
+    slash_idx = findfirst('/', rest)
+    if slash_idx === nothing
+        return (400, "text/plain", "Expected /api/density_atlas/:run/:file")
+    end
+    name = rest[1:(slash_idx - 1)]
+    file = rest[(slash_idx + 1):end]
+    axis = 3
+    bsz = false
+    qidx = findfirst('?', file)
+    if qidx !== nothing
+        query = file[(qidx + 1):end]
+        file = file[1:(qidx - 1)]
+        m = match(r"axis=(\d+)", query)
+        m !== nothing && (axis = parse(Int, m.captures[1]))
+        occursin("bsz=1", query) && (bsz = true)
+    end
+    fpath = joinpath(base_dir, name, file)
+    if !isfile(fpath)
+        return (404, "text/plain", "File not found: $name/$file")
+    end
+    cache_key = "density_atlas:$(fpath)#axis=$(axis)#bsz=$(bsz)"
+    bin = if haskey(psi_cache, cache_key)
+        psi_cache[cache_key]
+    else
+        # Disk-cache fallback: a previous dashboard run may have
+        # already written this atlas to runs/_dashboard_cache/.
+        disk_blob = _try_load_atlas_from_disk(base_dir, fpath, axis, bsz)
+        if disk_blob !== nothing
+            while length(psi_cache) >= PSI_CACHE_MAX_ENTRIES
+                _evict_one!(psi_cache)
+            end
+            psi_cache[cache_key] = disk_blob
+            disk_blob
+        else
+            while length(psi_cache) >= PSI_CACHE_MAX_ENTRIES
+                _evict_one!(psi_cache)
+            end
+            v = try
+                meta = _snapshots_metadata(fpath)
+                n_snaps = meta === nothing ? 0 : Int(get(meta, "n_snapshots", 0))
+                if n_snaps == 0
+                    return (404, "text/plain", "No snapshots in $name/$file")
+                end
+                raw = _compute_column_density_atlas_binary(fpath, axis, n_snaps, psi_cache)
+                _maybe_bitshuffle_zstd(raw, bsz)
+            catch e
+                return (500, "text/plain", "Error: $(e)")
+            end
+            psi_cache[cache_key] = v
+            # Also write through to disk so the next session is instant.
+            _save_atlas_to_disk(base_dir, fpath, axis, bsz, v)
+            v
+        end
+    end
+    (200, "application/octet-stream", bin)
+end
+
+function _route_vortex_lines(path::String, base_dir::String, psi_cache::Dict{String, Any})
+    # /api/vortex_lines/:run/:file?snap=K&mask=FRAC  → per-m polylines
+    rest = _uri_decode(path[19:end])
+    slash_idx = findfirst('/', rest)
+    if slash_idx === nothing
+        return (400, "text/plain", "Expected /api/vortex_lines/:run/:file?snap=K&mask=FRAC")
+    end
+    name = rest[1:(slash_idx - 1)]
+    file = rest[(slash_idx + 1):end]
+    snap_idx = nothing
+    mask_frac = 0.0
+    qidx = findfirst('?', file)
+    if qidx !== nothing
+        query = file[(qidx + 1):end]
+        file = file[1:(qidx - 1)]
+        ms = match(r"snap=(\d+)", query)
+        ms !== nothing && (snap_idx = parse(Int, ms.captures[1]))
+        mm = match(r"mask=([0-9.]+)", query)
+        mm !== nothing && (mask_frac = parse(Float64, mm.captures[1]))
+    end
+    fpath = joinpath(base_dir, name, file)
+    if !isfile(fpath)
+        return (404, "text/plain", "File not found: $name/$file")
+    end
+    # Cache key: (file, snap, mask). Identical scrub-replay returns
+    # instantly from cache instead of re-running the per-plaquette
+    # phase-winding scan + greedy z-stitch (sub-second per call but
+    # the scrubber fires many in rapid succession).
+    cache_key = "vortex_lines:$(fpath)#snap=$(snap_idx)#mask=$(mask_frac)"
+    json = if haskey(psi_cache, cache_key)
+        psi_cache[cache_key]
+    else
+        # Reuse the same FIFO cap as ψ snapshots to keep RAM bounded.
+        while length(psi_cache) >= PSI_CACHE_MAX_ENTRIES
+            _evict_one!(psi_cache)
+        end
+        json_str = try
+            psi, n_comp, ndim, n_pts, F = _load_psi_cached(fpath, psi_cache, snap_idx)
+            ndim == 3 || throw(ArgumentError("vortex_lines requires 3D data"))
+            box_size = _load_box_size(fpath)
+            g = make_grid(GridConfig(n_pts, box_size))
+            lines = extract_vortex_lines_per_m(psi, g; min_density_frac=mask_frac)
+            # Flatten into a frontend-friendly list [{m, charge, points}, ...]
+            out_lines = Dict{String, Any}[]
+            for (m_label, polylines) in lines
+                for ln in polylines
+                    push!(
+                        out_lines,
+                        Dict{String, Any}(
+                            "m" => m_label,
+                            "charge" => ln.charge,
+                            "points" => [[p[1], p[2], p[3]] for p in ln.points],
+                        ),
+                    )
+                end
+            end
+            _json_string(
+                Dict{String, Any}(
+                    "lines" => out_lines,
+                    "box" => collect(Float64.(box_size)),
+                    "n_lines" => length(out_lines),
+                ),
+            )
+        catch e
+            "{\"error\":\"$(replace(string(e), "\"" => "'"))\"}"
+        end
+        psi_cache[cache_key] = json_str
+        json_str
+    end
+    (200, "application/json", json)
+end
+
+function _route_vorticity3d_bin(path::String, base_dir::String, psi_cache::Dict{String, Any})
+    # /api/vorticity3d_bin/:run/:file?snap=K
+    rest = _uri_decode(path[22:end])
+    slash_idx = findfirst('/', rest)
+    if slash_idx === nothing
+        return (400, "text/plain", "Expected /api/vorticity3d_bin/:run/:file?snap=K")
+    end
+    name = rest[1:(slash_idx - 1)]
+    file = rest[(slash_idx + 1):end]
+    qidx = findfirst('?', file)
+    snap_idx = nothing
+    if qidx !== nothing
+        query = file[(qidx + 1):end]
+        file = file[1:(qidx - 1)]
+        ms = match(r"snap=(\d+)", query)
+        ms !== nothing && (snap_idx = parse(Int, ms.captures[1]))
+    end
+    fpath = joinpath(base_dir, name, file)
+    if !isfile(fpath)
+        return (404, "text/plain", "File not found: $name/$file")
+    end
+    bin = try
+        psi, n_comp, ndim, n_pts, F = _load_psi_cached(fpath, psi_cache, snap_idx)
+        ndim == 3 || throw(ArgumentError("vorticity3d requires 3D data"))
+        box_size = _load_box_size(fpath)
+        _compute_3d_vorticity_binary(psi, n_comp, ndim, n_pts, F, box_size)
+    catch e
+        return (500, "text/plain", "Error: $(e)")
+    end
+    (200, "application/octet-stream", bin)
+end
+
+function _route_phase3d_bin(path::String, base_dir::String, psi_cache::Dict{String, Any})
+    # /api/phase3d_bin/:run/:file?comp=N&snap=K (N >= 1)
+    rest = _uri_decode(path[18:end])
+    slash_idx = findfirst('/', rest)
+    if slash_idx === nothing
+        return (400, "text/plain", "Expected /api/phase3d_bin/:run/:file?comp=N&snap=K")
+    end
+    name = rest[1:(slash_idx - 1)]
+    file = rest[(slash_idx + 1):end]
+    qidx = findfirst('?', file)
+    comp_idx = 1
+    snap_idx = nothing
+    if qidx !== nothing
+        query = file[(qidx + 1):end]
+        file = file[1:(qidx - 1)]
+        m = match(r"comp=(-?\d+)", query)
+        m !== nothing && (comp_idx = parse(Int, m.captures[1]))
+        ms = match(r"snap=(\d+)", query)
+        ms !== nothing && (snap_idx = parse(Int, ms.captures[1]))
+    end
+    fpath = joinpath(base_dir, name, file)
+    if !isfile(fpath)
+        return (404, "text/plain", "File not found: $name/$file")
+    end
+    bin = try
+        _compute_3d_phase_binary(
+            _load_psi_cached(fpath, psi_cache, snap_idx)...; component=comp_idx
+        )
+    catch e
+        return (500, "text/plain", "Error: $(e)")
+    end
+    (200, "application/octet-stream", bin)
+end
+
+function _route_coherence(path::String, base_dir::String, psi_cache::Dict{String, Any})
+    rest = _uri_decode(path[16:end])
+    slash_idx = findfirst('/', rest)
+    if slash_idx === nothing
+        return (400, "text/plain", "Expected /api/coherence/:run/:file?axis=N")
+    end
+    name = rest[1:(slash_idx - 1)]
+    file = rest[(slash_idx + 1):end]
+    axis = 3
+    qidx = findfirst('?', file)
+    if qidx !== nothing
+        query = file[(qidx + 1):end]
+        file = file[1:(qidx - 1)]
+        m = match(r"axis=(\d+)", query)
+        m !== nothing && (axis = parse(Int, m.captures[1]))
+    end
+    fpath = joinpath(base_dir, name, file)
+    if !isfile(fpath)
+        return (404, "text/plain", "File not found: $name/$file")
+    end
+    bin = try
+        _compute_coherence_matrix_binary(_load_psi_cached(fpath, psi_cache)..., axis)
+    catch e
+        return (500, "text/plain", "Error: $(e)")
+    end
+    (200, "application/octet-stream", bin)
+end
+
+function _route_density3d_rotated(path::String, base_dir::String, psi_cache::Dict{String, Any})
+    rest = _uri_decode(path[23:end])
+    slash_idx = findfirst('/', rest)
+    if slash_idx === nothing
+        return (
+            400, "text/plain", "Expected /api/density3d_rotated/:run/:file?angle=DEG&comp=N"
+        )
+    end
+    name = rest[1:(slash_idx - 1)]
+    file = rest[(slash_idx + 1):end]
+    angle_deg = 0.0;
+    comp_idx = 0
+    qidx = findfirst('?', file)
+    if qidx !== nothing
+        query = file[(qidx + 1):end]
+        file = file[1:(qidx - 1)]
+        m = match(r"angle=([0-9.e+-]+)", query)
+        m !== nothing && (angle_deg = parse(Float64, m.captures[1]))
+        m2 = match(r"comp=(-?\d+)", query)
+        m2 !== nothing && (comp_idx = parse(Int, m2.captures[1]))
+    end
+    fpath = joinpath(base_dir, name, file)
+    if !isfile(fpath)
+        return (404, "text/plain", "File not found: $name/$file")
+    end
+    bin = try
+        _compute_rotated_3d_density_binary(
+            _load_psi_cached(fpath, psi_cache)...; angle_deg, component=comp_idx)
+    catch e
+        return (500, "text/plain", "Error: $(e)")
+    end
+    (200, "application/octet-stream", bin)
+end
+
+function _route_vector3d_bin(path::String, base_dir::String, psi_cache::Dict{String, Any})
+    rest = _uri_decode(path[18:end])
+    slash_idx = findfirst('/', rest)
+    if slash_idx === nothing
+        return (
+            400,
+            "text/plain",
+            "Expected /api/vector3d_bin/:run/:file?field=current&stride=2&snap=K",
+        )
+    end
+    name = rest[1:(slash_idx - 1)]
+    file = rest[(slash_idx + 1):end]
+    vec_field = :current
+    vec_stride = 2
+    snap_idx = nothing
+    qidx = findfirst('?', file)
+    if qidx !== nothing
+        query = file[(qidx + 1):end]
+        file = file[1:(qidx - 1)]
+        m = match(r"field=(\w+)", query)
+        m !== nothing && (vec_field = Symbol(m.captures[1]))
+        m2 = match(r"stride=(\d+)", query)
+        m2 !== nothing && (vec_stride = parse(Int, m2.captures[1]))
+        ms = match(r"snap=(\d+)", query)
+        ms !== nothing && (snap_idx = parse(Int, ms.captures[1]))
+    end
+    fpath = joinpath(base_dir, name, file)
+    if !isfile(fpath)
+        return (404, "text/plain", "File not found: $name/$file")
+    end
+    bin = try
+        psi, n_comp, ndim, n_pts, F = _load_psi_cached(fpath, psi_cache, snap_idx)
+        ndim == 3 || throw(ArgumentError("vector3d requires 3D data"))
+        box_size = _load_box_size(fpath)
+        _compute_vector3d_binary(psi, n_comp, ndim, n_pts, F, box_size;
+            field=vec_field, stride=vec_stride)
+    catch e
+        return (500, "text/plain", "Error: $(e)")
+    end
+    (200, "application/octet-stream", bin)
+end
+
