@@ -89,7 +89,9 @@ include("workflow/initialization/vacuum_noise.jl")
 include("workflow/io/io.jl")
 include("workflow/io/unitful_support.jl")
 include("workflow/io/save_rotating_result.jl")
-include("workflow/io/dashboard.jl")
+include("workflow/io/dashboard.jl")              # router + cache + JSON helpers
+include("workflow/io/dashboard/compute.jl")       # column/3d density + phase + atlas kernels
+include("workflow/io/dashboard/pack3d.jl")        # 3D density/vortex/phase/vector binary packers
 include("workflow/io/vtk_export.jl")
 include("workflow/io/run_summary.jl")
 include("workflow/io/html_report.jl")
