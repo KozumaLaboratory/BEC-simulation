@@ -280,19 +280,29 @@ function _run_simulation_leapfrog!(
 
             is_save = (step % sp.save_every == 0)
             is_last = (step == sp.n_steps)
-            need_split = is_save || is_last
 
             t_now = ws.state.t
 
-            if need_split
-                _half_potential_step!(
-                    ws, dt / 2, n_comp, N, false; t_eval=t_now + 3dt / 4, t_start=t_now + dt / 2
-                )
-            else
-                _half_potential_step!(
-                    ws, dt, n_comp, N, false; t_eval=t_now + dt, t_start=t_now + dt / 2
-                )
-            end
+            # Close: V(dt/2). The previous merged branch
+            # (`_half_potential_step!(ws, dt, …)` on non-checkpoint steps)
+            # was *rate-correct* — _half_potential_step! scales DDI with
+            # its parameter, so the merge applied DDI for dt total per
+            # step. But it collapsed the two V(dt/2) blocks (end of step
+            # n + start of step n+1) into a single DDI(dt) call instead
+            # of two DDI(dt/2) substeps with φ_{x,y,z} re-evaluated
+            # between them. Empirically this made the converged ψ
+            # depend on `save_every` for stiff DDI (~30 % rel-Δψ between
+            # save_every=1 and save_every=100 at Eu c_dd, c_dd-scaling
+            # super-linear-then-saturating → substep accuracy, not a
+            # rate bug).
+            #
+            # Bug-4 RTP analogue (2026-05-02). Same shape as the ITP
+            # fix in itp_loop.jl: drop the merge, always do close +
+            # reopen so DDI is substepped. Cost: 2× _half_potential_step!
+            # calls per step instead of 1 in the previously-merged path.
+            _half_potential_step!(
+                ws, dt / 2, n_comp, N, false; t_eval=t_now + 3dt / 4, t_start=t_now + dt / 2
+            )
 
             if ws.loss !== nothing
                 apply_loss_step!(ws.state.psi, ws.loss, sys.F, dt, n_comp, N, ws.density_buf)
@@ -321,7 +331,9 @@ function _run_simulation_leapfrog!(
                 end
             end
 
-            if need_split && !is_last
+            # Reopen V(dt/2) for the next K-step. Skipped on the final
+            # step since there's no further K to chain into.
+            if !is_last
                 _half_potential_step!(
                     ws, dt / 2, n_comp, N, false; t_eval=(ws.state.t + dt / 4), t_start=ws.state.t
                 )
