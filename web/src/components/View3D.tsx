@@ -74,8 +74,15 @@ export function View3D({ run, data }: Props) {
       },
       label: 'Volume source',
     },
-    isoMin: { value: 0.05, min: 0, max: 1, step: 0.01 },
-    isoMax: { value: 0.8, min: 0, max: 1, step: 0.01 },
+    // Default isoMin is small (0.5% of peak) so frames whose peak density
+    // is well below the run-global maximum — e.g. the t=0 GS in a run that
+    // later sharpens via dipolar self-focusing — still render visibly.
+    // The full bulk of a TF cloud sits between ~5% and ~50% of its
+    // own peak; with global normalisation a 30× peak ratio across the
+    // run would otherwise hide every "early" frame at the legacy 5%
+    // default. User can still raise it to highlight just the dense core.
+    isoMin: { value: 0.005, min: 0, max: 1, step: 0.005 },
+    isoMax: { value: 0.5, min: 0, max: 1, step: 0.01 },
     stepCount: { value: 128, min: 16, max: 512, step: 8 },
     opacity: { value: 0.6, min: 0, max: 1.5, step: 0.02 },
     colorMode: {
