@@ -27,7 +27,12 @@ const TIMER = TimerOutput()
 
 # 1. Type definitions (must be first)
 include("foundation/waveform.jl")
-include("foundation/types.jl")
+# `potentials.jl` defines AbstractPotential; main types.jl references it
+# in field declarations (Workspace.potential, etc), so must load first.
+include("foundation/types/potentials.jl")        # 12 trap / beam / lattice / gradient potential structs
+include("foundation/types.jl")                   # core: Grid, Spin, Atom, Interactions, Zeeman, SimParams, Workspace, …
+include("foundation/types/results.jl")           # TOFParams, BdGResult, InstabilityMap, RotonParams, etc
+include("foundation/types/scan.jl")              # OverrideScan, ConstrainedJzScan, ITPCheckpoint
 
 # 2. Mathematical foundation
 include("foundation/grid.jl")
@@ -92,6 +97,7 @@ include("workflow/io/save_rotating_result.jl")
 include("workflow/io/dashboard/encoding.jl")      # bitshuffle + zstd
 include("workflow/io/dashboard/cache.jl")         # PSI_CACHE, JLD handle pool, atlas disk cache
 include("workflow/io/dashboard/snapshots.jl")     # _load_psi_cached + sibling result.jld2 redirect
+include("workflow/io/dashboard/routes.jl")        # extracted long-branch handlers (scan_group / physics_summary / density_max / synth_disp)
 include("workflow/io/dashboard.jl")               # router + serve_dashboard + JSON helpers
 include("workflow/io/dashboard/websocket.jl")     # WS handshake + frames + serve
 include("workflow/io/dashboard/compute.jl")       # column/3d density + phase + atlas kernels
@@ -129,6 +135,7 @@ include("workflow/experiments/builders_potential.jl")       # _build_potential /
 include("workflow/experiments/builders_phase.jl")           # waveforms + zeeman + raman builders
 include("workflow/experiments/zeeman_levels.jl")
 include("workflow/experiments/pipeline_types.jl")
+include("workflow/experiments/analyzers_large.jl")     # extracted bodies for the 5 longest analyzers
 include("workflow/experiments/pipeline_analyzers.jl")
 include("workflow/experiments/pipeline_dispatch.jl")    # save_every / b_hat / dt-from-eps / twa / light_shift parsers
 include("workflow/experiments/pipeline_callbacks.jl")    # sgpe / projected_gp / photon_scattering / live_monitor callback builders
