@@ -1,0 +1,247 @@
+# --- Option γ (rotating-basis) workspace + LHY helpers + lab↔tilde transforms ---
+#
+# Lima-Pelster Q5 + γ_LHY estimation, the RotatingBasisWS struct, the
+# `make_rotating_basis_ws` factory, and the U_B / U_B† basis-change helpers.
+# Extracted from rotating_basis_gpe.jl 2026-05-01.
+
+"""
+Lima-Pelster correction Q_5(ε_dd) for the dipolar BEC LHY coefficient.
+
+For ε_dd ≤ 1: Q_5 is real and positive. For ε_dd > 1, the elliptic integrand
+has imaginary excursions (roton instability of the homogeneous gas); the
+Wachter convention uses Re[Q_5] which captures the dominant stabilizing
+contribution. Reference: Lima & Pelster, PRA 84, 041604(R) (2011).
+
+Closed-form result (real part for general ε_dd):
+
+    Q_5(ε_dd) = ∫₀¹ du · Re[ (1 - ε_dd + 3 ε_dd u²)^(5/2) ]
+
+For ε_dd ≤ 1 the integrand is real throughout. For ε_dd > 1 the integrand
+becomes imaginary on u ∈ (0, √((ε_dd-1)/(3ε_dd))) and we drop that piece
+when taking Re[]. Implementation uses adaptive Gauss-Legendre quadrature.
+"""
+function lima_pelster_Q5(ε_dd::Real; n_points::Int=64)
+    ε = Float64(ε_dd)
+    # 64-point Gauss-Legendre on [0, 1]
+    function gl_points(n)
+        # Use textbook recurrence or just sample uniformly with high density
+        # for skeleton — composite Simpson on n_points is sufficient for our
+        # ±0.1% accuracy needs across ε_dd ∈ [0, 2].
+        u = collect(range(0.0, 1.0; length=n_points + 1))
+        u
+    end
+    u = gl_points(n_points)
+    # Composite Simpson: requires odd # samples
+    n = length(u) - 1
+    if isodd(n)
+        push!(u, u[end])  # pad to even — won't matter for accuracy
+        n += 1
+    end
+    h = (u[end] - u[1]) / n
+    function integrand(u_val)
+        z = 1.0 - ε + 3.0 * ε * u_val^2
+        if z >= 0.0
+            return z^2.5
+        else
+            # Re[(complex)^2.5] for negative real argument: real part = 0 of (i√|z|)⁵ = 0
+            # Strictly: (-|z|)^(5/2) = i⁵ |z|^(5/2) = i |z|^(5/2). Re = 0.
+            return 0.0
+        end
+    end
+    s = integrand(u[1]) + integrand(u[end])
+    @inbounds for i in 2:(length(u) - 1)
+        s += (isodd(i) ? 4.0 : 2.0) * integrand(u[i])
+    end
+    s * h / 3
+end
+
+"""
+Dimensionless LHY coefficient γ_LHY for a polarized dipolar BEC.
+
+In the eGPE convention `i∂_t ψ̃ = (... + γ_LHY |ψ̃|³) ψ̃` with ψ̃ normalized
+to 1, lengths in a_ho, energy in ℏω_ref:
+
+    γ_LHY = (128 √π / 3) · (a_s/a_ho)^(5/2) · N^(3/2) · Q5(ε_dd)
+
+Derivation: μ_LHY (SI) = (32/3) g √(a_s³/π) n^(3/2) Q5. Substitute
+n = N |ψ̃|² / a_ho³ and divide by ℏω_ref using g/(ℏω_ref) = 4π a_s a_ho²:
+
+    μ_LHY/(ℏω_ref) = γ_LHY |ψ̃|³ , γ_LHY = (128 √π / 3) (a_s/a_ho)^(5/2) N^(3/2) Q5
+
+Validation reference: Klaus 2022 Dy164 (a_s/a_ho ≈ 4.4e-3, N=60000, ε_dd=1.42)
+gives γ_LHY ≈ 6080, ratio to c0=3306 ≈ 1.8. LHY contribution at ψ̃²_peak~0.04
+is ~36% of contact — substantial as expected for the Klaus regime.
+"""
+function compute_gamma_lhy(a_s_over_a_ho::Real, ε_dd::Real, N_atoms::Real)
+    Q5 = lima_pelster_Q5(ε_dd)
+    (128.0 * sqrt(π) / 3.0) * Float64(a_s_over_a_ho)^2.5 *
+    Float64(N_atoms)^1.5 * Q5
+end
+
+"""
+Option γ: Instantaneous local-frame spinor GPE.
+
+The spin quantization axis follows ̂B(t) instantaneously via
+|ψ⟩ = Û_B(t)|ψ̃⟩ with Û_B(t) = exp(-iφ(t)F_z) exp(-iθ(t)F_y).
+
+Result: Zeeman becomes static -p F_z + q F_z² in the tilde basis;
+the gauge connection Â(t) = ℏ(θ̇ F_y + φ̇(cosθ F_z - sinθ F_x))
+appears at rotation-rate scale (kHz vs Larmor MHz). Spin excitations
+are preserved (FL phase, EdH spin texture). DDI Q-tensor is rotated
+in spin indices via R(t) ∈ SO(3); spatial FFT path is unchanged.
+
+See `docs/option_gamma_rotating_basis.md` for the full derivation.
+
+Scope (skeleton):
+- 3D harmonic trap, contact (c0), spin-mixing (c1, optional), DDI
+- Static B̂ (Phase I) and time-dependent B̂ (Phase II/III) supported
+- ITP for static B̂ (find_ground_state_rotating!)
+- RTP for time-dep B̂ (evolve_rotating!)
+- No LHY / loss / SGPE / projected GP yet
+- CPU only
+"""
+
+# --- Workspace ---
+
+struct RotatingBasisWS{T <: AbstractFloat, N, D,
+    AC <: AbstractArray, AC1 <: AbstractArray,
+    AR <: AbstractArray, ARK <: AbstractArray,
+    FP, IP, DB <: DDIBuffers,
+    BACK <: AbstractBackend}
+    # State (rotating basis): ψ̃[r..., m] — concrete eltype Complex{T}
+    psi_tilde::AC
+    # Scratch: ψ in lab basis (only populated during DDI step)
+    psi_lab_buf::AC
+    # Reusable scratch buffer for `_apply_rotation_to_spin_axis!` (avoids
+    # per-call `similar(psi)` alloc — 14 such calls per Yoshida6 macro step
+    # × 100ms run = several GB churn without this).
+    rotation_scratch::AC
+    # Spatial scratch for in-place FFT in kinetic step
+    spatial_buf::AC1
+    # Per-point density buffer used by spatial_diagonal_step (reused, GPU-safe)
+    rho_buf::AR
+    # Phase scratch for kinetic and diagonal-step broadcasts. Pre-allocated so
+    # `cis.(-dt·k²/2)` and `exp/cis(-(V+c0·n+γ·n^{3/2})·dt)` reuse the same
+    # device buffer instead of producing a new CuArray temporary each call —
+    # required for any future CUDA Graph capture, and a meaningful alloc
+    # reduction independently (~14 calls per Yoshida6 step × thousands of
+    # steps × 4-8 MB per scratch at 24³).
+    kspace_phase_buf::AC1
+    xspace_phase_buf::AC1
+
+    grid::Grid{N, T}
+    spin_matrices::SpinMatrices{D}
+
+    # FFT plans (in-place on spatial_buf)
+    fft_fwd::FP
+    fft_inv::IP
+
+    # DDI machinery (reused from spinor infrastructure)
+    ddi_params::DDIParams{N}
+    ddi_bufs::DB
+
+    # Static potential (real-valued spatial array)
+    V_trap::ARK
+    p::T               # linear Zeeman magnitude
+    q::T               # quadratic Zeeman
+
+    # Couplings
+    c0::T              # contact (4π a_s N / a_ho or equivalent)
+    c1::T              # spin-mixing (set 0 to skip)
+    gamma_lhy::T       # scalar LHY: V += γ_LHY · ρ^(3/2). Stabilizes ε_dd > 1.
+
+    # B̂(t) angles + their derivatives. Each maps t → Float64.
+    theta_func::Function
+    phi_func::Function
+    theta_dot_func::Function
+    phi_dot_func::Function
+
+    # Gauge: if true, apply χ̇ = -φ̇ cosθ to remove F_z component of Â.
+    gauge_fix::Bool
+
+    # Backend (CPU or CUDA) — kept on the workspace so callers can dispatch.
+    backend::BACK
+end
+
+function make_rotating_basis_ws(
+    grid::Grid{N, T},
+    F::Int,
+    V_trap::AbstractArray{T, N};
+    p::Real, q::Real,
+    c0::Real, c1::Real=0.0,
+    c_dd::Real=0.0,
+    gamma_lhy::Real=0.0,
+    theta_func::Function=(_t) -> 0.0,
+    phi_func::Function=(_t) -> 0.0,
+    theta_dot_func::Function=(_t) -> 0.0,
+    phi_dot_func::Function=(_t) -> 0.0,
+    gauge_fix::Bool=true,
+    backend::AbstractBackend=CPUBackend(),
+) where {N, T <: AbstractFloat}
+    D = 2F + 1
+    n_pts = grid.config.n_points
+
+    # Allocate state + scratch on the requested device. _zeros dispatches
+    # CPU → Array, CUDA → CuArray (loaded by SpinorBECCUDAExt extension).
+    psi_tilde = _zeros(backend, Complex{T}, n_pts..., D)
+    psi_lab_buf = _zeros(backend, Complex{T}, n_pts..., D)
+    rotation_scratch = _zeros(backend, Complex{T}, n_pts..., D)
+    spatial_buf = _zeros(backend, Complex{T}, n_pts...)
+    rho_buf = _zeros(backend, T, n_pts...)
+    kspace_phase_buf = _zeros(backend, Complex{T}, n_pts...)
+    xspace_phase_buf = _zeros(backend, Complex{T}, n_pts...)
+
+    sm = spin_matrices(F)
+
+    fft_fwd, fft_inv = let plans = make_fft_plans(n_pts, backend; dtype=T)
+        plans.forward, plans.inverse
+    end
+
+    # Build DDI machinery (Q tensor on CPU, then ship to device).
+    rk_shape = rfft_output_shape(n_pts)
+    Q_xx = zeros(T, rk_shape);
+    Q_xy = zeros(T, rk_shape);
+    Q_xz = zeros(T, rk_shape)
+    Q_yy = zeros(T, rk_shape);
+    Q_yz = zeros(T, rk_shape);
+    Q_zz = zeros(T, rk_shape)
+    kx_r = collect(T, rfftfreq(n_pts[1], n_pts[1] * grid.dk[1]))
+    ky = N >= 2 ? T.(grid.k[2]) : T[]
+    kz = N >= 3 ? T.(grid.k[3]) : T[]
+    k_sq_rk = zeros(T, rk_shape)
+    @inbounds for I in CartesianIndices(rk_shape)
+        k2 = kx_r[I[1]]^2
+        N >= 2 && (k2 += ky[I[2]]^2)
+        N >= 3 && (k2 += kz[I[3]]^2)
+        k_sq_rk[I] = k2
+    end
+    _build_q_tensor!(Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz, kx_r, ky, kz, k_sq_rk, rk_shape)
+    # DDIParams.C_dd is a Float64 scalar by struct definition (across both F32
+    # and F64 workspaces); the Q_αβ field arrays carry the precision. Q_αβ × C_dd
+    # broadcasts will promote intermediates to Float64 but final result is the
+    # same precision as the larger array — for F32 Q this is a small ~5%
+    # extra fp64 work on the ddi convolution multiplier; not enough to worry
+    # about until we move to a fully T-parametric DDIParams.
+    ddi_params_cpu = DDIParams(Float64(c_dd), Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz)
+    ddi_params = _ddi_params_to_device(ddi_params_cpu, backend)
+    ddi_bufs = make_ddi_buffers(n_pts, backend; dtype=T)
+
+    # V_trap also goes on device (per-point scalar phase needs it on same device as ψ̃)
+    V_trap_dev = _zeros(backend, T, n_pts...)
+    copyto!(V_trap_dev, V_trap)
+
+    RotatingBasisWS{T, N, D,
+        typeof(psi_tilde), typeof(spatial_buf), typeof(rho_buf), typeof(V_trap_dev),
+        typeof(fft_fwd), typeof(fft_inv), typeof(ddi_bufs), typeof(backend)}(
+        psi_tilde, psi_lab_buf, rotation_scratch, spatial_buf, rho_buf,
+        kspace_phase_buf, xspace_phase_buf,
+        grid, sm,
+        fft_fwd, fft_inv,
+        ddi_params, ddi_bufs,
+        V_trap_dev, T(p), T(q), T(c0), T(c1), T(gamma_lhy),
+        theta_func, phi_func, theta_dot_func, phi_dot_func,
+        gauge_fix, backend,
+    )
+end
+
+# --- Lab ↔ tilde basis transforms ---

@@ -65,7 +65,9 @@ include("hamiltonian/potentials/light_shift.jl")
 # 5. Propagators
 include("hamiltonian/propagators.jl")
 include("hamiltonian/yoshida.jl")
-include("hamiltonian/split_step.jl")
+include("hamiltonian/split_step_kernels.jl")    # _apply_coriolis_step!, _apply_1d_shear_batch!, _apply_ddi_step_gpu!
+include("hamiltonian/split_step.jl")            # split_step! + half-potential dispatcher
+include("hamiltonian/split_step_composers.jl")  # Yoshida/Suzuki/Blanes-Moan/Omelyan + core composers
 
 # ========================================
 # WORKFLOW: Initialization, I/O, monitoring, experiments
@@ -127,7 +129,10 @@ include("solvers/projected_gp.jl")
 include("solvers/photon_heating.jl")
 include("solvers/sgpe.jl")
 include("scalar_egpe.jl")
-include("rotating_basis_gpe.jl")
+include("rotating_basis/workspace.jl")
+include("rotating_basis/propagators.jl")
+include("rotating_basis/integrators.jl")
+include("rotating_basis/analysis.jl")
 include("rotating_basis_analyzers.jl")
 
 # CUDA-graph-accelerated split_step (extended by SpinorBECCUDAExt).
@@ -196,7 +201,11 @@ include("analysis/phases/bogoliubov.jl")
 # ========================================
 
 # 13. Solvers (depend on observables and monitoring)
-include("solvers/ground_state.jl")
+include("solvers/ground_state.jl")               # validators + public find_ground_state
+include("solvers/ground_state/itp_loop.jl")       # _run_itp_loop! core
+include("solvers/ground_state/checkpoint.jl")     # save/load/resume/refine
+include("solvers/ground_state/adaptive.jl")       # _find_ground_state_adaptive
+include("solvers/ground_state/advanced.jl")       # multistart + Jz-constrained
 include("solvers/simulation.jl")
 include("solvers/adaptive.jl")
 include("solvers/embedded_adaptive.jl")
