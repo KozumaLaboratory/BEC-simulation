@@ -217,7 +217,8 @@ include("analysis/spin_rotation.jl")
 include("analysis/phases/phase_classification.jl")
 include("analysis/phases/phase_boundary.jl")
 include("analysis/phases/phase_scan.jl")
-include("analysis/phases/bogoliubov.jl")
+include("analysis/phases/bogoliubov.jl")            # spectrum + matrices + roton detect + angular map
+include("analysis/phases/bogoliubov/scan.jl")        # instability scan + direction grid + supersolid prediction
 
 # ========================================
 # SOLVERS: Ground state & time evolution
