@@ -270,14 +270,18 @@ function _resolve_derived_params!(p::Dict, atom; verbose::Bool=true)
     # c_total (always derived — basis for c0/c1)
     c_total = compute_c_total(atom; N_atoms, omega_ref)
 
-    # c_dd: derive if not explicitly specified
+    # c_dd: derive if not explicitly specified.
+    # Schema default `ddi.enabled: true` means an absent `ddi:` block still
+    # enables DDI when the atom has a dipole moment — keep this consistent
+    # with `_parse_gs_ddi` so LHY auto-derivation triggers off the same
+    # signal (atom + N_atoms + ω_ref ⇒ DDI is on).
     ddi_d = get(p, "ddi", nothing)
-    if ddi_d === true
-        p["ddi"] = Dict{String, Any}("enabled" => true)
+    if ddi_d === true || ddi_d === nothing
+        p["ddi"] = Dict{String, Any}()
         ddi_d = p["ddi"]
     end
     c_dd_val = NaN
-    if ddi_d isa Dict
+    if ddi_d isa Dict && get(ddi_d, "enabled", true) !== false
         if !haskey(ddi_d, "c_dd") || ddi_d["c_dd"] === nothing
             c_dd_val = compute_c_dd_dimless(atom; N_atoms, omega_ref)
             ddi_d["c_dd"] = c_dd_val

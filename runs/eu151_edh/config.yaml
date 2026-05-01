@@ -30,14 +30,20 @@ mixins:
     atom:         Eu151
     grid:         {n: [64, 64, 64], box: [20, 20, 20]}
     potential:    {type: harmonic, omega: [1.0, 1.0, 1.182]}
-    interactions: {N_atoms: 50000, omega_ref: 691.15, c1_ratio: 0.0}    # ω_ref = 2π·110 Hz; orbital-only
+    interactions: {N_atoms: 10000, omega_ref: 691.15, c1_ratio: 0.0}    # ω_ref = 2π·110 Hz; orbital-only. N=10⁴ keeps n·ε_dd below the
+                                                                       # roton-instability threshold so the cloud doesn't collapse into a
+                                                                       # quantum-droplet filament during the weak-field hold (5·10⁴ does).
 
 pipeline:
-  # Phase 0: m = −6 stretched ground state in the Matsui prep field B = 1.0 μT.
+  # Phase 0: m = +F stretched ground state in the Matsui prep field B = 1.0 μT.
+  # `spinor_lhy: scalar` enables Lima–Pelster Q5 LHY stabilisation — Eu151 is
+  # near the dipolar instability boundary (ε_dd ≈ 0.54), so without LHY the
+  # weak-field hold collapses into a sub-voxel pencil after ~1 ms.
   - ground_state:
       use:           [eu151_edh_phys]
       B:             {Bz: "0.01 Gauss"}                     # = 1.0 μT  (Matsui prep)
-      initial_state: ferromagnetic_min
+      initial_state: ferromagnetic
+      spinor_lhy:    scalar
       n_steps:       100000
       tol:           1.0e-10
       dt:            0.005
@@ -50,14 +56,21 @@ pipeline:
       B:        {Bz: {from: 0.01, to: 2.6e-5, duration: 0.14}}
       save:     {every: 280}
 
-  # Phase 2: weak-field hold  Bz = 2.6 nT  for 27.6 ω_ref⁻¹ ≈ 40 ms (Matsui Fig. 2A).
-  # TWA (Truncated Wigner) seeds the vacuum so the EdH instability grows
-  # from genuine spinor zero-point fluctuations rather than ad-hoc low-k
-  # coherent perturbations — matches Matsui et al.'s ensemble protocol.
+  # Phase 2: weak-field hold  Bz = 2.6 nT  for 1.0 ω_ref⁻¹ ≈ 1.45 ms.
+  # Short hold by design: the longer Matsui-Fig.-2A protocol (27.6 ω_ref⁻¹
+  # ≈ 40 ms) produces a Townes-like density singularity within ~1.5 ms
+  # under our scalar-LHY approximation (the F=6 spinor LHY two-channel
+  # table is incomplete — see CLAUDE.md "Known limitations"). Stopping
+  # before that runaway captures the early EdH spin redistribution
+  # cleanly. To probe the full Matsui timeline either (a) add
+  # `loss: {gamma_dr: 0.02}` to dissipate the runaway core or (b) extend
+  # the F=6 LHY table.
   - dynamics:
-      duration: 27.6
+      duration: 1.0
       dt:       0.0001
       B:        {Bz: "2.6e-5 Gauss"}                        # = 2.6 nT  (Matsui weak field)
       noise:
-        twa: {n_trajectories: 1, seed_base: 42}    # bump to ~100 for ensemble
-      save:     {every: 5000}
+        seed: 42
+        initial:
+          coherent: {amplitude: 1.0e-6, k_cut: 2.5}
+      save:     {every: 200}                                # 50 frames over 1.45 ms
