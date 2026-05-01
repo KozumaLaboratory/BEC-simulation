@@ -209,6 +209,7 @@ include("workflow/experiments/calibration.jl")
 include("workflow/io/calibration_drift.jl")
 include("workflow/experiments/faraday_fit.jl")
 include("workflow/experiments/bayesian_opt.jl")
+include("workflow/experiments/bayesian_opt_mf.jl")    # 2-tier multi-fidelity BO
 include("workflow/experiments/bayesian_opt_yaml.jl")
 
 # ========================================
@@ -471,6 +472,7 @@ export run_yaml, run_status, list_runs, compute_run_dir
 export print_run_summary, compare_runs, generate_html_report
 export load_target_faraday, fit_faraday_param
 export bayesian_optimize, gp_predict, expected_improvement
+export multi_fidelity_optimize_2tier, MultiFidelityBOResult
 export bayesian_optimize_yaml,
     bo_objective_max_m_transfer, bo_objective_max_lz, bo_objective_min_energy
 export CalibrationSet, CoilCalibration, FORTCalibration, RabiCalibration
