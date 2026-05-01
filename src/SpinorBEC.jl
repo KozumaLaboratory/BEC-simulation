@@ -216,6 +216,7 @@ include("workflow/experiments/bayesian_opt_yaml.jl")
 # ========================================
 
 # 11. Analysis (needed by solvers)
+include("analysis/compare.jl")          # generic observed-vs-simulated metric stack
 include("analysis/observables.jl")
 include("analysis/ensemble.jl")
 include("analysis/energy.jl")
@@ -393,6 +394,12 @@ export apply_uniform_spin_rotation!
 
 # Split-step
 export split_step!, prepare_kinetic_phase
+
+# Generic observed-vs-simulated comparison
+export compare, normalize_field
+
+# Higher-rank multipole observables (F ≥ 3 phases)
+export multipole_q_spectrum
 
 # Observables
 export total_density, component_density, magnetization

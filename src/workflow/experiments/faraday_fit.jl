@@ -50,14 +50,20 @@ function readdlm_simple(path::AbstractString)
 end
 
 """
-    fit_faraday_param(eval_fn, target; bounds, max_iter=30, atol=1e-4)
+    fit_faraday_param(eval_fn, target; bounds, max_iter=30, atol=1e-4,
+                      metric=:l2, normalize=:unit, mask=nothing)
 
 Golden-section search over a 1D parameter interval `bounds = (lo, hi)`,
 followed by 3-point parabolic refinement near the optimum.
 
 `eval_fn(p)` must return a Faraday image (Matrix) for parameter `p`.
-Loss = ||target - simulated|| (each renormalised to unit Euclidean
-norm). Returns `(best_p, best_loss, history)`.
+The loss is computed via the unified `compare(target, simulated; …)` —
+see `src/analysis/compare.jl` for the full metric / normalisation
+catalogue. Default is L² with unit-norm normalisation, matching the
+historical Faraday fit. Pass `metric=:cosine` for shape-only fits,
+`mask` to restrict to the cloud support, etc.
+
+Returns `(best_p, best_loss, history)`.
 
 This is a real numerical fit:
 - Convergence is rigorous golden-section bracketing.
@@ -73,17 +79,11 @@ function fit_faraday_param(
     bounds::Tuple{Float64, Float64},
     max_iter::Int=30,
     atol::Real=1e-4,
+    metric::Symbol=:l2,
+    normalize::Symbol=:unit,
+    mask::Union{Nothing, AbstractArray}=nothing,
 )
-    target_norm = let n = sqrt(sum(abs2, target))
-        n > 0 ? target ./ n : copy(target)
-    end
-    function loss(p)
-        sim = eval_fn(p)
-        s_norm = let n = sqrt(sum(abs2, sim))
-            n > 0 ? sim ./ n : sim
-        end
-        sum((target_norm .- s_norm) .^ 2)
-    end
+    loss(p) = compare(target, eval_fn(p); metric, normalize, mask)
 
     a, b = bounds
     a < b || throw(ArgumentError("bounds must satisfy lo < hi"))
