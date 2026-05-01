@@ -89,7 +89,11 @@ include("workflow/initialization/vacuum_noise.jl")
 include("workflow/io/io.jl")
 include("workflow/io/unitful_support.jl")
 include("workflow/io/save_rotating_result.jl")
-include("workflow/io/dashboard.jl")              # router + cache + JSON helpers
+include("workflow/io/dashboard/encoding.jl")      # bitshuffle + zstd
+include("workflow/io/dashboard/cache.jl")         # PSI_CACHE, JLD handle pool, atlas disk cache
+include("workflow/io/dashboard/snapshots.jl")     # _load_psi_cached + sibling result.jld2 redirect
+include("workflow/io/dashboard.jl")               # router + serve_dashboard + JSON helpers
+include("workflow/io/dashboard/websocket.jl")     # WS handshake + frames + serve
 include("workflow/io/dashboard/compute.jl")       # column/3d density + phase + atlas kernels
 include("workflow/io/dashboard/pack3d.jl")        # 3D density/vortex/phase/vector binary packers
 include("workflow/io/vtk_export.jl")
