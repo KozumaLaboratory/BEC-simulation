@@ -239,3 +239,101 @@ function _newton_corrector(
     # Failed to converge in newton_max_iter
     θ, newton_max_iter, false
 end
+
+# --- SpinorBEC adapter --------------------------------------------------
+#
+# `trace_phase_boundary` only needs a scalar `F(θ)`. The line below
+# turns the SpinorBEC L-BFGS solver into one such `F` whose value is
+# the energy difference between two competing phases. The closure
+# carries warm-start state for both branches so consecutive `θ`s
+# (the continuation pattern) skip full ITP convergence.
+
+"""
+    make_phase_diff_eval(grid, atom;
+                         parameter_setter,
+                         phase_A_init=:m_plus_F, phase_B_init=:polar,
+                         n_steps=500, tol=1e-7,
+                         sobolev_alpha=0.0,
+                         verbose=false) → F::Function
+
+Build a closure `F(θ::Vector{Float64})::Float64` that returns
+`E_A(θ) − E_B(θ)`, where each `E_*` is computed via
+`find_ground_state_lbfgs` from the corresponding initial state.
+Suitable as the `F` argument of [`trace_phase_boundary`](@ref).
+
+`parameter_setter(θ)` must return a `NamedTuple` of `find_ground_state_lbfgs`
+kwargs (typically `interactions`, `c_dd`, `enable_ddi`, `zeeman`, …).
+The grid + atom are fixed across the trace, so the `Workspace`
+specialisation is hit once for each branch.
+
+Warm-start
+==========
+The closure caches the converged ψ of each branch between calls.
+When called at a new `θ` close to the previous one (the continuation
+predictor lands near the manifold), the L-BFGS warm-start from the
+cached ψ typically converges in 10-50 iterations instead of the
+500-2000 of a cold start — that's the load-bearing speed-up for
+`trace_phase_boundary` over a fresh full-grid scan.
+
+Pass `phase_A_init` and `phase_B_init` as `Symbol`s recognised by
+`init_psi` (e.g. `:m_plus_F`, `:polar`, `:m_minus_F`, …). The first
+call uses these symbols; subsequent calls reuse the cached ψ.
+
+Reset behaviour
+===============
+If a Newton corrector inside `trace_phase_boundary` shrinks the
+arc-step and then succeeds, the cached ψ from the *previously
+accepted* point is the correct warm-start — the closure is simply
+called again at the new predictor and Newton converges. There's no
+explicit reset hook; if the user wants to restart from cold (e.g.
+crossing into a topologically different basin), construct a new
+closure.
+"""
+function make_phase_diff_eval(
+    grid::Grid{N}, atom::AtomSpecies;
+    parameter_setter::Function,
+    phase_A_init::Symbol=:m_plus_F,
+    phase_B_init::Symbol=:polar,
+    n_steps::Int=500,
+    tol::Float64=1.0e-7,
+    sobolev_alpha::Float64=0.0,
+    verbose::Bool=false,
+) where {N}
+    psi_A_warm = Ref{Any}(nothing)
+    psi_B_warm = Ref{Any}(nothing)
+
+    function F(θ::AbstractVector{<:Real})
+        kwargs = parameter_setter(collect(Float64, θ))
+
+        # Branch A
+        psi_init_A = psi_A_warm[]
+        init_kwargs_A = psi_init_A === nothing ?
+                        (initial_state=phase_A_init,) :
+                        (psi_init=psi_init_A,)
+        r_A = find_ground_state_lbfgs(;
+            grid, atom,
+            kwargs...,
+            init_kwargs_A...,
+            n_steps, tol, sobolev_alpha,
+            verbose=verbose,
+        )
+        psi_A_warm[] = copy(r_A.workspace.state.psi)
+
+        # Branch B
+        psi_init_B = psi_B_warm[]
+        init_kwargs_B = psi_init_B === nothing ?
+                        (initial_state=phase_B_init,) :
+                        (psi_init=psi_init_B,)
+        r_B = find_ground_state_lbfgs(;
+            grid, atom,
+            kwargs...,
+            init_kwargs_B...,
+            n_steps, tol, sobolev_alpha,
+            verbose=verbose,
+        )
+        psi_B_warm[] = copy(r_B.workspace.state.psi)
+
+        Float64(r_A.energy - r_B.energy)
+    end
+    F
+end
