@@ -42,7 +42,7 @@ pipeline:
   - ground_state:
       use:           [eu151_edh_phys]
       B:             {Bz: "0.01 Gauss"}                     # = 1.0 μT  (Matsui prep)
-      initial_state: ferromagnetic
+      initial_state: m_plus_F
       spinor_lhy:    scalar
       n_steps:       100000
       tol:           1.0e-10

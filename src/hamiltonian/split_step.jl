@@ -378,7 +378,7 @@ function _half_potential_step!(
 
     c2 = get_cn(ip, 2)
     if abs(c2) > 1e-30
-        @timeit_debug TIMER "nematic" apply_nematic_step!(
+        @timeit_debug TIMER "nematic" apply_singlet_pair_step!(
             ws.state.psi, ip, ws.spin_matrices.system.F, dt_half / 2, ndim; imaginary_time
         )
     end
@@ -443,7 +443,7 @@ function _half_potential_step!(
     end
 
     if abs(c2) > 1e-30
-        @timeit_debug TIMER "nematic" apply_nematic_step!(
+        @timeit_debug TIMER "nematic" apply_singlet_pair_step!(
             ws.state.psi, ip, ws.spin_matrices.system.F, dt_half / 2, ndim; imaginary_time
         )
     end
@@ -501,7 +501,7 @@ function _outer_potential_fwd!(ws::Workspace{N}, dt_outer, n_comp, ndim, imagina
 
     c2 = get_cn(ws.interactions, 2)
     if abs(c2) > 1e-30
-        apply_nematic_step!(
+        apply_singlet_pair_step!(
             ws.state.psi, ws.interactions, ws.spin_matrices.system.F, dt_outer, ndim; imaginary_time
         )
     end
@@ -541,7 +541,7 @@ function _outer_potential_bwd!(ws::Workspace{N}, dt_outer, n_comp, ndim, imagina
 
     c2 = get_cn(ws.interactions, 2)
     if abs(c2) > 1e-30
-        apply_nematic_step!(
+        apply_singlet_pair_step!(
             ws.state.psi, ws.interactions, ws.spin_matrices.system.F, dt_outer, ndim; imaginary_time
         )
     end

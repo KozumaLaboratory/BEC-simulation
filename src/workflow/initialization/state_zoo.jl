@@ -10,12 +10,30 @@
 # Phase 1.1 closeout.
 
 const _ZOO_NAMES = (
-    :polar, :ferromagnetic, :ferromagnetic_min, :uniform, :antiferromagnetic,
+    :polar, :m_plus_F, :m_minus_F, :uniform, :antiferromagnetic,
     :random, :spin_coherent, :fl_vortex, :spin_helix, :cyclic, :biaxial_nematic,
     :polar_core_vortex, :soliton_bright, :soliton_dark, :skyrmion,
     :gaussian_wavepacket, :domain_wall, :two_packet, :chiral_spin_vortex,
     :magnetic_domain, :vortex_lattice, :skyrmion_lattice,
 )
+
+# --- Legacy state-name aliases (kept for backward compat) --------------
+#
+# Old codebase used the term "ferromagnetic" for m=+F and
+# "ferromagnetic_min" for m=−F. The latter docstring claimed it was
+# "lowest Zeeman energy when g_F > 0", which is wrong for the
+# `H_zee = -p·m` convention this codebase uses (m=+F is the lowest
+# energy state at p>0). Rename to physically unambiguous names; keep
+# the old symbols as direct aliases that downstream `init_psi` resolves
+# the same way as the new ones.
+const _STATE_ALIASES = Dict{Symbol, Symbol}(
+    :ferromagnetic => :m_plus_F,
+    :ferromagnetic_min => :m_minus_F,
+)
+
+"""Resolve a state symbol through the legacy alias table. Returns the
+canonical name (`:m_plus_F`/`:m_minus_F`/...) for downstream dispatch."""
+canonicalize_state(state::Symbol) = get(_STATE_ALIASES, state, state)
 
 """
     init_psi_polar(grid, sys; kwargs...)
@@ -27,22 +45,32 @@ init_psi_polar(grid, sys; kwargs...) = init_psi(
 )
 
 """
-    init_psi_ferromagnetic(grid, sys; kwargs...)
+    init_psi_m_plus_F(grid, sys; kwargs...)
 
-m=+F polarized state (largest Zeeman energy when g_F > 0).
+m=+F polarized state (lowest Zeeman energy when p>0 in the codebase's
+`H_zee = -p·m + q·m²` convention; the historical name was
+`ferromagnetic`).
 """
-init_psi_ferromagnetic(grid, sys; kwargs...) = init_psi(
-    grid, sys; state=:ferromagnetic, init_state_params=Dict{Symbol, Any}(kwargs...)
+init_psi_m_plus_F(grid, sys; kwargs...) = init_psi(
+    grid, sys; state=:m_plus_F, init_state_params=Dict{Symbol, Any}(kwargs...)
 )
 
 """
-    init_psi_ferromagnetic_min(grid, sys; kwargs...)
+    init_psi_m_minus_F(grid, sys; kwargs...)
 
-m=−F polarized state (lowest Zeeman energy when g_F > 0).
+m=−F polarized state. Highest Zeeman energy at p>0; only the GS when p<0
+(reversed Zeeman). Historical name was `ferromagnetic_min` whose
+docstring claimed "lowest Zeeman" — that was inverted from the `-p·m`
+convention. Use `:m_plus_F` for the actual ground state.
 """
-init_psi_ferromagnetic_min(grid, sys; kwargs...) = init_psi(
-    grid, sys; state=:ferromagnetic_min, init_state_params=Dict{Symbol, Any}(kwargs...)
+init_psi_m_minus_F(grid, sys; kwargs...) = init_psi(
+    grid, sys; state=:m_minus_F, init_state_params=Dict{Symbol, Any}(kwargs...)
 )
+
+# Legacy aliases — preserved for compat. New code should use the
+# m_plus_F / m_minus_F names.
+const init_psi_ferromagnetic = init_psi_m_plus_F
+const init_psi_ferromagnetic_min = init_psi_m_minus_F
 
 """
     init_psi_uniform(grid, sys; kwargs...)

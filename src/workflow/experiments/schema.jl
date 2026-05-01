@@ -75,7 +75,10 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
     "tol" => FieldSpec(; type=Number, default=1e-8, range=(1e-16, 1.0)),
     "m_lbfgs" => FieldSpec(; type=Number, default=10, range=(1.0, 100.0)),
     "initial_state" => FieldSpec(; type=String, default="polar",
-        enum=["polar", "ferromagnetic", "ferromagnetic_min",
+        enum=["polar", "m_plus_F", "m_minus_F",
+            # Legacy aliases for `m_plus_F` / `m_minus_F`. Resolved to
+            # the canonical names by `canonicalize_state` at init time.
+            "ferromagnetic", "ferromagnetic_min",
             "uniform", "antiferromagnetic", "random",
             "spin_coherent", "fl_vortex", "spin_helix",
             "cyclic", "biaxial_nematic", "polar_core_vortex",
@@ -87,7 +90,12 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
     "target_magnetization" => FieldSpec(; type=Number),
     "temperature_ratio" => FieldSpec(; type=Number, range=(0.0, 1.0)),
     "spinor_lhy" => FieldSpec(; type=String,
-        enum=["two_channel", "table", "scalar"]),
+        enum=["two_channel", "full_bdg", "scalar"]),
+    # ↑ "scalar" is a no-op alias (explicit form of the default) — the
+    # ScalarLHY path activates whenever interactions.c_lhy > 0,
+    # regardless of this selector. "two_channel" and "full_bdg" route
+    # to compute_spinor_lhy_{two_channel,table} respectively in
+    # initialization.jl.
     "init_state_params" => FieldSpec(; type=Dict),
     "cache" => FieldSpec(; type=String),
     "quasi_2d" => FieldSpec(; type=Bool),

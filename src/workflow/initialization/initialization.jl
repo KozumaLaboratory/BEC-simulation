@@ -21,12 +21,13 @@ function init_psi(
     sigma = ntuple(d -> grid.config.box_size[d] / 8, N)
     gauss = _gaussian(grid, sigma)
 
+    state = canonicalize_state(state)   # legacy ferromagnetic{,_min} → m_{plus,minus}_F
     if state == :polar
         mid = (D + 1) ÷ 2
         _set_component!(psi, gauss, N, n_pts, mid)
-    elseif state == :ferromagnetic
+    elseif state == :m_plus_F
         _set_component!(psi, gauss, N, n_pts, 1)  # m = +F
-    elseif state == :ferromagnetic_min
+    elseif state == :m_minus_F
         _set_component!(psi, gauss, N, n_pts, D)  # m = -F
     elseif state == :uniform
         for c in 1:D
