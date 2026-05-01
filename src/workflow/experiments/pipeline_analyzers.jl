@@ -1,456 +1,82 @@
 using JSON
 
-# --- Analyzer dispatch ---
+# --- Analyzer dispatch (R23 split 2026-05-02) ---
+#
+# This was a 710-line monolith holding every `_run_analyzer` branch +
+# helpers + _run_bogoliubov_analyzer. The bodies have been moved to
+# topical files under analyzers/ (loaded from SpinorBEC.jl):
+#
+#   analyzers/helpers.jl       ← _phase_diff, _line_through_peak, _fwhm_1d,
+#                                 _rms_width_1d, _max_forward_grad
+#   analyzers/imaging.jl       ← tomography, faraday, absorption_image,
+#                                 phase_contrast_image, sg_tof, momentum_distribution
+#   analyzers/phase.jl         ← phase_classify[/distance], energy_decomposition,
+#                                 multipole_order, majorana_order
+#   analyzers/topology.jl      ← winding_map, winding_field, monopole_charge,
+#                                 vortex_detect, skyrmion_density, non_abelian_homotopy
+#   analyzers/spectroscopy.jl  ← bragg_spectroscopy, droplet_profile,
+#                                 correlation_length, defect_density,
+#                                 kibble_zurek_stats, domain_analysis
+#   analyzers/stability.jl     ← stability, bogoliubov, bogoliubov_dispersion,
+#                                 _run_bogoliubov_analyzer
+#   analyzers/misc.jl          ← summary_json (the only analyzer needing pipeline_results)
+#   analyzers_large.jl         ← skyrmion_detect, synthetic_dim, bogoliubov_mode,
+#                                 rosensweig_pattern, column_density_movie (extracted earlier)
+#
+# Every helper is named `_analyze_<name>` and takes
+# `(psi, grid, atom, params, ws_prev)`; `_analyze_summary_json` adds
+# the `pipeline_results` dict as a 6th arg.
 
 function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev=nothing,
     pipeline_results::Dict{Symbol, Any}=Dict{Symbol, Any}())
     # Analyzers perform reductions over psi and are not GPU-safe in general.
     # Move to host once here; no-op on CPU.
     psi = _to_host(psi)
-    F = atom.F
+
     if name == :tomography
-        spin_tomography(psi, grid, F;
-            rotation_axis=Symbol(get(params, "axis", "y")),
-            n_angles=Int(get(params, "n_angles", 19)),
-            theta_min=Float64(get(params, "theta_min", 0.0)),
-            theta_max=Float64(get(params, "theta_max", Float64(π))),
-            reference_m=let v = get(params, "reference_m", nothing);
-                v === nothing ? nothing : Int(v)
-            end,
-            tof_params=let td = get(params, "tof", Dict())
-                TOFParams(Float64(get(td, "t_tof", 11.0)),
-                    Float64(get(td, "gradient", 0.0)),
-                    Int(get(td, "imaging_axis", 3)))
-            end,
-        )
+        return _analyze_tomography(psi, grid, atom, params, ws_prev)
     elseif name == :faraday
-        faraday_image(psi, grid, F;
-            params=FaradayParams(;
-                probe_axis=Int(get(params, "probe_axis", get(params, "axis", 3))),
-                detuning=Float64(get(params, "detuning", -64.0)),
-                polarization=Symbol(get(params, "polarization", "linear_x")),
-            ),
-        )
+        return _analyze_faraday(psi, grid, atom, params, ws_prev)
     elseif name == :energy_decomposition
-        sm = spin_matrices(F)
-        classify_phase_detailed(psi, F, grid, sm)
+        return _analyze_energy_decomposition(psi, grid, atom, params, ws_prev)
     elseif name == :phase_classify
-        sm = spin_matrices(F)
-        classify_phase_detailed(psi, F, grid, sm)
+        return _analyze_phase_classify(psi, grid, atom, params, ws_prev)
     elseif name == :phase_classify_distance
-        # Reference-distance classifier — primarily useful for F >= 6 where
-        # the threshold-cascade `_label_phase` saturates. Returns the
-        # detailed feature vector plus the distance ranking.
-        sm = spin_matrices(F)
-        details = classify_phase_detailed(psi, F, grid, sm)
-        threshold = Float64(get(params, "threshold", 0.4))
-        ranking = classify_phase_distance(details, F; threshold=threshold)
-        merge(
-            details,
-            (
-                phase_distance=ranking.phase,
-                distance=ranking.distance,
-                ranking=ranking.scores,
-            ),
-        )
+        return _analyze_phase_classify_distance(psi, grid, atom, params, ws_prev)
     elseif name == :stability
-        ndim = length(grid.config.n_points)
-        sp = SimParams(; dt=0.0001, n_steps=1, save_every=1)
-        ws = make_workspace(;
-            grid, atom,
-            interactions=InteractionParams(0.0, 0.0),
-            potential=HarmonicTrap(ntuple(_ -> 1.0, ndim)),
-            sim_params=sp,
-            psi_init=psi,
-        )
-        perturbation = Float64(get(params, "perturbation", 1e-4))
-        n_steps_stab = Int(get(params, "n_steps", 1000))
-        sample_every = Int(get(params, "sample_every", 10))
-        analyze_stability(ws; perturbation, n_steps=n_steps_stab, sample_every)
+        return _analyze_stability(psi, grid, atom, params, ws_prev)
     elseif name == :bogoliubov
-        _run_bogoliubov_analyzer(psi, grid, atom, params, ws_prev)
+        return _analyze_bogoliubov(psi, grid, atom, params, ws_prev)
     elseif name == :multipole_order
-        F = atom.F
-        ndim = length(grid.config.n_points)
-        ranks = let v = get(params, "ranks", nothing)
-            v === nothing ? collect(0:2:2F) : Int.(v)
-        end
-        spectrum = multipole_spectrum(psi, F, grid)
-        selected = Dict{Int, Float64}(k => get(spectrum, k, 0.0) for k in ranks)
-        (multipole_spectrum=selected, ranks=ranks)
+        return _analyze_multipole_order(psi, grid, atom, params, ws_prev)
     elseif name == :winding_map
-        F = atom.F
-        ndim = length(grid.config.n_points)
-        n_pts = grid.config.n_points
-        plans = make_fft_plans(n_pts; flags=FFTW.ESTIMATE)
-        Lz_total = orbital_angular_momentum(psi, grid, plans)
-        Mz = magnetization(psi, grid, SpinSystem(F))
-        j = probability_current(psi, grid, plans)
-        j_mag = sqrt.(sum(ji .^ 2 for ji in j))
-        (Lz=Lz_total, Mz=Mz, Jz=Lz_total + Mz, max_current=maximum(j_mag))
+        return _analyze_winding_map(psi, grid, atom, params, ws_prev)
     elseif name == :absorption_image
-        F = atom.F
-        ndim = length(grid.config.n_points)
-        axis = Int(get(params, "axis", ndim))
-        psf_sigma = Float64(get(params, "psf_sigma", 0.0))
-        n = total_density(psi, ndim)
-        col = dropdims(sum(n; dims=axis); dims=axis) .* cell_volume(grid)^(1.0 / ndim)
-        if psf_sigma > 0 && ndim >= 2
-            # Simple Gaussian blur via FFT convolution
-            remaining = [i for i in 1:ndim if i != axis]
-            sz = size(col)
-            col_c = Array{ComplexF64}(undef, sz)
-            col_c .= col
-            p_fwd = plan_fft!(col_c)
-            p_inv = plan_ifft!(col_c)
-            p_fwd * col_c
-            for I in CartesianIndices(sz)
-                ksq = sum(j -> (2π * I[j] / sz[j])^2, 1:length(sz))
-                col_c[I] *= exp(-0.5 * psf_sigma^2 * ksq)
-            end
-            p_inv * col_c
-            col = real.(col_c)
-        end
-        add_noise = Bool(get(params, "shot_noise", false))
-        if add_noise
-            rng = Random.MersenneTwister(Int(get(params, "seed", 42)))
-            col .= max.(0.0, col .+ sqrt.(max.(0.0, col)) .* randn(rng, size(col)...))
-        end
-        (column_density=col, axis=axis)
+        return _analyze_absorption_image(psi, grid, atom, params, ws_prev)
     elseif name == :sg_tof
-        F = atom.F
-        sys = SpinSystem(F)
-        gradient = Float64(get(params, "gradient", 0.1))
-        t_tof = Float64(get(params, "t_tof", 10.0))
-        imaging_axis = Int(get(params, "imaging_axis", length(grid.config.n_points)))
-        tof_params = TOFParams(t_tof, gradient, imaging_axis)
-        result = simulate_tof(psi, grid, sys, tof_params)
-        populations = Dict{Int, Float64}()
-        for (m, dens) in result
-            populations[m] = sum(dens)
-        end
-        (tof_images=result, populations=populations)
+        return _analyze_sg_tof(psi, grid, atom, params, ws_prev)
     elseif name == :domain_analysis
-        F = atom.F
-        ndim = length(grid.config.n_points)
-        sm = spin_matrices(F)
-        fx, fy, fz = spin_density_vector(psi, sm, ndim)
-        n = total_density(psi, ndim)
-        n_max = maximum(n)
-        threshold = Float64(get(params, "threshold", 0.05)) * n_max
-        # Count domain structure: regions where fz changes sign
-        n_pts = grid.config.n_points
-        domain_count = 0
-        prev_sign = 0
-        for I in CartesianIndices(n_pts)
-            n[I] > threshold || continue
-            s = sign(fz[I])
-            if s != 0 && s != prev_sign && prev_sign != 0
-                domain_count += 1
-            end
-            if s != 0
-                prev_sign = s
-            end
-        end
-        f_mag_avg = sum(sqrt.(fx .^ 2 .+ fy .^ 2 .+ fz .^ 2) .* n) / sum(n)
-        (domain_walls=domain_count, mean_spin_magnitude=f_mag_avg)
+        return _analyze_domain_analysis(psi, grid, atom, params, ws_prev)
     elseif name == :skyrmion_density
-        F = atom.F
-        ndim = length(grid.config.n_points)
-        n_pts = grid.config.n_points
-        sm = spin_matrices(F)
-        plans = make_fft_plans(n_pts; flags=FFTW.ESTIMATE)
-        if ndim == 2
-            Q = spin_texture_charge(psi, grid, plans, sm)
-            omega = berry_curvature(psi, grid, plans, sm)
-            (charge=Q, berry_curvature=omega)
-        elseif ndim == 3
-            omega_x, omega_y, omega_z = berry_curvature(psi, grid, plans, sm)
-            dV = cell_volume(grid)
-            Q_xy = sum(omega_z) * dV / (4π)
-            (charge_xy=Q_xy, berry_curvature=(omega_x, omega_y, omega_z))
-        else
-            (charge=0.0,)
-        end
+        return _analyze_skyrmion_density(psi, grid, atom, params, ws_prev)
     elseif name == :phase_contrast_image
-        F = atom.F
-        ndim = length(grid.config.n_points)
-        axis = Int(get(params, "axis", ndim))
-        detuning = Float64(get(params, "detuning", -64.0))
-        sm = spin_matrices(F)
-        fx, fy, fz = spin_density_vector(psi, sm, ndim)
-        n = total_density(psi, ndim)
-        # Phase contrast ∝ column-integrated (n ± fz) depending on probe polarization
-        n_plus = n .+ fz
-        n_minus = n .- fz
-        col_plus = dropdims(sum(n_plus; dims=axis); dims=axis) .* cell_volume(grid)^(1.0 / ndim)
-        col_minus = dropdims(sum(n_minus; dims=axis); dims=axis) .* cell_volume(grid)^(1.0 / ndim)
-        phase_signal = col_plus .- col_minus
-        (
-            phase_signal=phase_signal,
-            column_density_plus=col_plus,
-            column_density_minus=col_minus,
-            axis=axis,
-        )
+        return _analyze_phase_contrast_image(psi, grid, atom, params, ws_prev)
     elseif name == :momentum_distribution
-        F = atom.F
-        ndim = length(grid.config.n_points)
-        n_pts = grid.config.n_points
-        plans = make_fft_plans(n_pts; flags=FFTW.ESTIMATE)
-        D = 2F + 1
-        nk = zeros(Float64, n_pts)
-        for c in 1:D
-            idx = _component_slice(ndim, n_pts, c)
-            psi_c = copy(view(psi, idx...))
-            psi_k = similar(psi_c, ComplexF64)
-            psi_k .= psi_c
-            plans.forward * psi_k
-            nk .+= abs2.(psi_k)
-        end
-        # Normalize
-        dV = cell_volume(grid)
-        nk .*= dV^2
-        (momentum_density=nk,)
+        return _analyze_momentum_distribution(psi, grid, atom, params, ws_prev)
     elseif name == :vortex_detect
-        F = atom.F
-        ndim = length(grid.config.n_points)
-        n_pts = grid.config.n_points
-        ndim >= 2 || throw(ArgumentError("vortex_detect requires N >= 2"))
-        component = Int(get(params, "component", 1))
-        threshold = Float64(get(params, "threshold", 0.1))
-        idx = _component_slice(ndim, n_pts, component)
-        psi_c = view(psi, idx...)
-        n_c = abs2.(psi_c)
-        n_max = maximum(n_c)
-        phase_field = angle.(psi_c)
-        thresh = threshold * n_max
-        vortex_count = 0
-        # Per-vortex records: (i, j[, k], winding) for downstream maps / plots
-        positions = Tuple[]
-        if ndim == 2
-            @inbounds for j in 2:(n_pts[2] - 1), i in 2:(n_pts[1] - 1)
-                n_c[i, j] < thresh && continue
-                dp =
-                    _phase_diff(phase_field[i + 1, j], phase_field[i, j]) +
-                    _phase_diff(phase_field[i + 1, j + 1], phase_field[i + 1, j]) +
-                    _phase_diff(phase_field[i, j + 1], phase_field[i + 1, j + 1]) +
-                    _phase_diff(phase_field[i, j], phase_field[i, j + 1])
-                if abs(dp) > π
-                    vortex_count += 1
-                    push!(positions, (i, j, round(Int, dp / (2π))))
-                end
-            end
-        else
-            @inbounds for k in 1:n_pts[3], j in 2:(n_pts[2] - 1), i in 2:(n_pts[1] - 1)
-                n_c[i, j, k] < thresh && continue
-                dp =
-                    _phase_diff(phase_field[i + 1, j, k], phase_field[i, j, k]) +
-                    _phase_diff(phase_field[i + 1, j + 1, k], phase_field[i + 1, j, k]) +
-                    _phase_diff(phase_field[i, j + 1, k], phase_field[i + 1, j + 1, k]) +
-                    _phase_diff(phase_field[i, j, k], phase_field[i, j + 1, k])
-                if abs(dp) > π
-                    vortex_count += 1
-                    push!(positions, (i, j, k, round(Int, dp / (2π))))
-                end
-            end
-        end
-        (vortex_count=vortex_count, positions=positions, component=component)
+        return _analyze_vortex_detect(psi, grid, atom, params, ws_prev)
     elseif name == :correlation_length
-        F = atom.F
-        ndim = length(grid.config.n_points)
-        direction = Int(get(params, "direction", 1))
-        sm = spin_matrices(F)
-        fx, fy, fz = spin_density_vector(psi, sm, ndim)
-        n = total_density(psi, ndim)
-        n_max = maximum(n)
-        threshold = 0.05 * n_max
-        # Extract 1D spin correlation along specified direction through center
-        center = ntuple(d -> (grid.config.n_points[d] + 1) ÷ 2, ndim)
-        n_along = grid.config.n_points[direction]
-        fz_line = zeros(Float64, n_along)
-        for i in 1:n_along
-            idx = ntuple(d -> d == direction ? i : center[d], ndim)
-            fz_line[i] = n[idx...] > threshold ? fz[idx...] / max(n[idx...], 1e-30) : 0.0
-        end
-        # Autocorrelation
-        dx = grid.config.box_size[direction] / n_along
-        corr = zeros(Float64, n_along ÷ 2)
-        fz_mean = sum(fz_line) / n_along
-        fz_var = sum((fz_line .- fz_mean) .^ 2) / n_along
-        if fz_var > 1e-30
-            for lag in 0:(n_along ÷ 2 - 1)
-                c = 0.0
-                for i in 1:(n_along - lag)
-                    c += (fz_line[i] - fz_mean) * (fz_line[i + lag] - fz_mean)
-                end
-                corr[lag + 1] = c / ((n_along - lag) * fz_var)
-            end
-        end
-        # Find 1/e decay length
-        xi = 0.0
-        for i in 2:length(corr)
-            if corr[i] < exp(-1.0)
-                xi = (i - 1) * dx
-                break
-            end
-        end
-        xi == 0.0 && (xi = length(corr) * dx)
-        (correlation_length=xi, correlation=corr, direction=direction)
+        return _analyze_correlation_length(psi, grid, atom, params, ws_prev)
     elseif name == :defect_density
-        F = atom.F
-        ndim = length(grid.config.n_points)
-        sm = spin_matrices(F)
-        fx, fy, fz = spin_density_vector(psi, sm, ndim)
-        n = total_density(psi, ndim)
-        n_max = maximum(n)
-        threshold = Float64(get(params, "threshold", 0.1)) * n_max
-        defect_type = Symbol(get(params, "defect_type", "domain_wall"))
-        n_pts = grid.config.n_points
-        defect_count = 0
-        if defect_type == :domain_wall
-            prev_sign = 0
-            for I in CartesianIndices(n_pts)
-                n[I] > threshold || continue
-                s = sign(fz[I])
-                if s != 0 && s != prev_sign && prev_sign != 0
-                    defect_count += 1
-                end
-                s != 0 && (prev_sign = s)
-            end
-        elseif defect_type == :vortex && ndim >= 2
-            phase_field = angle.(view(psi, _component_slice(ndim, n_pts, 1)...))
-            if ndim == 2
-                for j in 2:(n_pts[2] - 1), i in 2:(n_pts[1] - 1)
-                    n[i, j] < threshold && continue
-                    dp =
-                        _phase_diff(phase_field[i + 1, j], phase_field[i, j]) +
-                        _phase_diff(phase_field[i + 1, j + 1], phase_field[i + 1, j]) +
-                        _phase_diff(phase_field[i, j + 1], phase_field[i + 1, j + 1]) +
-                        _phase_diff(phase_field[i, j], phase_field[i, j + 1])
-                    abs(dp) > π && (defect_count += 1)
-                end
-            else
-                # 3D: sum vortex detections across all (x,y) plaquettes at every z
-                for k in 1:n_pts[3], j in 2:(n_pts[2] - 1), i in 2:(n_pts[1] - 1)
-                    n[i, j, k] < threshold && continue
-                    dp =
-                        _phase_diff(phase_field[i + 1, j, k], phase_field[i, j, k]) +
-                        _phase_diff(phase_field[i + 1, j + 1, k], phase_field[i + 1, j, k]) +
-                        _phase_diff(phase_field[i, j + 1, k], phase_field[i + 1, j + 1, k]) +
-                        _phase_diff(phase_field[i, j, k], phase_field[i, j + 1, k])
-                    abs(dp) > π && (defect_count += 1)
-                end
-            end
-        end
-        volume = prod(grid.config.box_size)
-        (defect_count=defect_count, defect_density=defect_count / volume, defect_type=defect_type)
+        return _analyze_defect_density(psi, grid, atom, params, ws_prev)
     elseif name == :kibble_zurek_stats
-        # Requires ensemble data from TWA or repeated runs — reports summary stats
-        # For single-psi fallback: count defects and report
-        F = atom.F
-        ndim = length(grid.config.n_points)
-        sm = spin_matrices(F)
-        fx, fy, fz = spin_density_vector(psi, sm, ndim)
-        n = total_density(psi, ndim)
-        n_max = maximum(n)
-        threshold = Float64(get(params, "threshold", 0.1)) * n_max
-        # Count domain walls
-        prev_sign = 0
-        defect_count = 0
-        for I in CartesianIndices(grid.config.n_points)
-            n[I] > threshold || continue
-            s = sign(fz[I])
-            if s != 0 && s != prev_sign && prev_sign != 0
-                defect_count += 1
-            end
-            s != 0 && (prev_sign = s)
-        end
-        volume = prod(grid.config.box_size)
-        (defect_count=defect_count, defect_density=defect_count / volume, n_samples=1)
+        return _analyze_kibble_zurek_stats(psi, grid, atom, params, ws_prev)
     elseif name == :bragg_spectroscopy
-        F = atom.F
-        ndim = length(grid.config.n_points)
-        n_pts = grid.config.n_points
-        plans = make_fft_plans(n_pts; flags=FFTW.ESTIMATE)
-        D = 2F + 1
-        # Static structure factor S(k) from density fluctuations
-        n_total = total_density(psi, ndim)
-        n_mean = sum(n_total) * cell_volume(grid)
-        delta_n = n_total .- (n_mean / prod(grid.config.box_size))
-        delta_nk = similar(delta_n, ComplexF64)
-        delta_nk .= delta_n
-        plans.forward * delta_nk
-        Sk = abs2.(delta_nk) .* cell_volume(grid)^2
-        (structure_factor=Sk,)
+        return _analyze_bragg_spectroscopy(psi, grid, atom, params, ws_prev)
     elseif name == :droplet_profile
-        ndim = length(grid.config.n_points)
-        n = total_density(psi, ndim)
-        dV = cell_volume(grid)
-        n_peak = maximum(n)
-        N_atoms = sum(n) * dV
-        # FWHM along each axis through the density peak
-        peak_idx = Tuple(argmax(n))
-        fwhm = zeros(Float64, ndim)
-        sigma = zeros(Float64, ndim)
-        for d in 1:ndim
-            line = _line_through_peak(n, peak_idx, d)
-            fwhm[d] = _fwhm_1d(line, grid.dx[d])
-            sigma[d] = _rms_width_1d(line, grid.dx[d], grid.x[d])
-        end
-        # Surface sharpness ≈ max |∇n| / n_peak (axis-aligned max)
-        max_grad = 0.0
-        for d in 1:ndim
-            dxd = grid.dx[d]
-            # forward difference max
-            gmax = _max_forward_grad(n, d, dxd)
-            max_grad = max(max_grad, gmax)
-        end
-        sharpness = n_peak > 0 ? max_grad / n_peak : 0.0
-        (n_peak=n_peak, N_atoms=N_atoms,
-            fwhm=fwhm, sigma=sigma,
-            surface_sharpness=sharpness,
-            peak_index=collect(peak_idx))
-
+        return _analyze_droplet_profile(psi, grid, atom, params, ws_prev)
     elseif name == :bogoliubov_dispersion
-        # Full ω(k) for every BdG band, returned as a (n_k, 2D) matrix.
-        # Useful to plot the full dispersion (not just max growth)
-        # — roton dips, gapped vs gapless modes, branch crossings.
-        ws_prev === nothing && throw(ArgumentError(
-            "bogoliubov_dispersion requires a preceding ground_state step"))
-        F = atom.F
-        D = 2F + 1
-        ndim = length(grid.config.n_points)
-        psi_host = _to_host(psi)
-        n_total = total_density(psi_host, ndim)
-        peak_idx = argmax(n_total)
-        spinor = ComplexF64[psi_host[peak_idx, c] for c in 1:D]
-        n0 = sum(abs2, spinor)
-        n0 > 1e-30 && (spinor ./= sqrt(n0))
-        interactions = ws_prev.interactions
-        c_dd_val = ws_prev.ddi === nothing ? 0.0 : ws_prev.ddi.C_dd
-        zeeman = ws_prev.zeeman isa ZeemanParams ? ws_prev.zeeman : ZeemanParams(0.0, 0.0)
-        k_max = Float64(get(params, "k_max", 10.0))
-        n_k = Int(get(params, "n_k", 200))
-        k_dir_raw = get(params, "k_direction", [0.0, 0.0, 1.0])
-        k_direction = NTuple{3, Float64}(Tuple(Float64.(k_dir_raw)))
-        result = bogoliubov_spectrum(;
-            spinor=spinor, n0=n0, F=F,
-            interactions=interactions, zeeman=zeeman, c_dd=c_dd_val,
-            k_max=k_max, n_k=n_k, k_direction=k_direction,
-        )
-        # Sort each k column by Re(ω) for plottable bands
-        omega_sorted = similar(result.omega)
-        for ik in 1:n_k
-            col = result.omega[:, ik]
-            perm = sortperm(real.(col))
-            omega_sorted[:, ik] .= col[perm]
-        end
-        (k_values=result.k_values,
-            omega_real=real.(omega_sorted),
-            omega_imag=imag.(omega_sorted),
-            max_growth=result.max_growth,
-            direction=collect(k_direction))
-
+        return _analyze_bogoliubov_dispersion(psi, grid, atom, params, ws_prev)
     elseif name == :bogoliubov_mode
         return _analyze_bogoliubov_mode(psi, grid, atom, params, ws_prev)
     elseif name == :skyrmion_detect
@@ -458,253 +84,30 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev=nothing,
     elseif name == :synthetic_dim
         return _analyze_synthetic_dim(psi, grid, atom, params, ws_prev)
     elseif name == :non_abelian_homotopy
-        ndim = length(grid.config.n_points)
-        ndim >= 2 || throw(ArgumentError("non_abelian_homotopy requires N >= 2"))
-        loop_pts_raw = get(params, "loop_pts", nothing)
-        loop_pts_raw === nothing && throw(ArgumentError(
-            "non_abelian_homotopy requires loop_pts: [[i,j(,k)], ...]"))
-        # Match loop dim to grid N (2D or 3D path)
-        loop_pts = if ndim == 2
-            NTuple{2, Int}[(Int(p[1]), Int(p[2])) for p in loop_pts_raw]
-        else
-            NTuple{3, Int}[(Int(p[1]), Int(p[2]), Int(p[3])) for p in loop_pts_raw]
-        end
-        component = let v = get(params, "component", nothing)
-            v === nothing ? nothing : Int(v)
-        end
-        holonomy = non_abelian_holonomy(psi, grid, loop_pts; component=component)
-        winding = round(Int, angle(holonomy) / (2π))
-        (holonomy=holonomy, phase=angle(holonomy),
-            winding=winding, loop_length=length(loop_pts))
-
+        return _analyze_non_abelian_homotopy(psi, grid, atom, params, ws_prev)
     elseif name == :monopole_charge
-        ndim = length(grid.config.n_points)
-        ndim == 3 || throw(ArgumentError("monopole_charge requires 3D grid"))
-        smooth = Bool(get(params, "smooth", false))
-        q_field = monopole_charge_3d(psi, grid; smooth=smooth)
-        total_charge = total_monopole_charge(q_field, grid)
-        (monopole_charge_density=q_field,
-            total_charge=total_charge,
-            max_abs_density=maximum(abs, q_field))
-
+        return _analyze_monopole_charge(psi, grid, atom, params, ws_prev)
     elseif name == :majorana_order
-        # Per-point Steinhardt Q₆ icosahedral order parameter from the
-        # Majorana stars decomposition (only meaningful for F >= 6).
-        # Returns the spatially-averaged Q₆ weighted by density and a
-        # field of point-group symbols at sampled points.
-        F = atom.F
-        F >= 6 || throw(ArgumentError(
-            "majorana_order requires F >= 6 (got $F)"))
-        sm = spin_matrices(F)
-        sampling = Float64(get(params, "sampling", 1.0))
-        density_cutoff = Float64(get(params, "density_cutoff", 1e-6))
-        q6_field = icosahedral_order_parameter(psi, grid, sm;
-            density_cutoff, sampling)
-        ndim = length(grid.config.n_points)
-        n = total_density(psi, ndim)
-        n_total = sum(n) * cell_volume(grid)
-        q6_avg = n_total > 0 ?
-                 sum(@. q6_field * n) * cell_volume(grid) / n_total : 0.0
-        (q6_avg=q6_avg,
-            q6_max=maximum(q6_field),
-            q6_field=q6_field,
-            sampling=sampling)
-
+        return _analyze_majorana_order(psi, grid, atom, params, ws_prev)
     elseif name == :winding_field
-        ndim = length(grid.config.n_points)
-        ndim >= 2 || throw(ArgumentError("winding_field requires N >= 2"))
-        component = let v = get(params, "component", nothing)
-            v === nothing ? nothing : Int(v)
-        end
-        threshold = Float64(get(params, "threshold", 1e-6))
-        w = winding_number_field(psi, grid; component=component, threshold=threshold)
-        (winding_field=w,
-            total_winding=sum(w),
-            max_abs_winding=maximum(abs, w))
-
+        return _analyze_winding_field(psi, grid, atom, params, ws_prev)
     elseif name == :rosensweig_pattern
         return _analyze_rosensweig_pattern(psi, grid, atom, params, ws_prev)
     elseif name == :column_density_movie
         return _analyze_column_density_movie(psi, grid, atom, params, ws_prev)
     elseif name == :summary_json
-        # Dump the accumulated pipeline_results plus QC metadata to a JSON file.
-        output_path = String(get(params, "path", "summary.json"))
-        extras = get(params, "extras", Dict{String, Any}())
-        summary = Dict{String, Any}()
-        for (k, v) in pipeline_results
-            # Skip objects that aren't JSON-serializable (workspaces, arrays).
-            if v isa Number || v isa AbstractString || v isa Bool || v === nothing
-                summary[String(k)] = v
-            end
-        end
-        if haskey(pipeline_results, :dynamics_result)
-            dr = pipeline_results[:dynamics_result]
-            summary["n_snapshots"] = length(dr.psi_snapshots)
-            summary["t_initial"] = dr.times[1]
-            summary["t_final"] = dr.times[end]
-            if !isempty(dr.energies)
-                summary["energy_initial"] = Float64(dr.energies[1])
-                summary["energy_final"] = Float64(dr.energies[end])
-                summary["norm_drift"] = Float64(abs(dr.norms[end] - dr.norms[1]))
-            end
-        end
-        for (k, v) in extras
-            summary[String(k)] = v
-        end
-        mkpath(dirname(output_path) == "" ? "." : dirname(output_path))
-        open(output_path, "w") do io
-            JSON.print(io, summary, 2)
-        end
-        (path=output_path, n_fields=length(summary))
-
-    else
-        _known =
-            "tomography, faraday, energy_decomposition, phase_classify, stability, bogoliubov, " *
-            "multipole_order, winding_map, absorption_image, sg_tof, domain_analysis, skyrmion_density, " *
-            "phase_contrast_image, momentum_distribution, vortex_detect, correlation_length, " *
-            "defect_density, kibble_zurek_stats, bragg_spectroscopy, non_abelian_homotopy, " *
-            "monopole_charge, winding_field, droplet_profile, synthetic_dim, " *
-            "skyrmion_detect, bogoliubov_mode, bogoliubov_dispersion, " *
-            "column_density_movie, summary_json"
-        throw(ArgumentError("Unknown analyzer: $name. Supported: $_known"))
-    end
-end
-
-function _phase_diff(a::Float64, b::Float64)
-    d = a - b
-    if d > π
-        d - 2π
-    elseif d < -π
-        d + 2π
-    else
-        d
-    end
-end
-
-# --- droplet_profile helpers ---
-
-"""Extract the 1D density line through `peak_idx` along dimension `d`."""
-function _line_through_peak(n::AbstractArray, peak_idx::NTuple{D, Int}, d::Int) where {D}
-    nd = size(n, d)
-    line = Vector{Float64}(undef, nd)
-    @inbounds for i in 1:nd
-        idx = ntuple(k -> k == d ? i : peak_idx[k], D)
-        line[i] = n[idx...]
-    end
-    line
-end
-
-"""
-Full width at half maximum of a 1D profile with grid spacing `dx`.
-Returns 0 if the profile never reaches half of its peak (degenerate).
-Uses linear interpolation between adjacent grid points at the crossings.
-"""
-function _fwhm_1d(line::AbstractVector{Float64}, dx::Float64)
-    pk = maximum(line)
-    pk > 0 || return 0.0
-    half = 0.5 * pk
-    # Find first and last indices where line >= half
-    i_lo = findfirst(x -> x >= half, line)
-    i_hi = findlast(x -> x >= half, line)
-    (i_lo === nothing || i_hi === nothing || i_hi <= i_lo) && return 0.0
-    # Linear interpolation for sub-cell precision
-    lo_frac = if i_lo > 1
-        prev = line[i_lo - 1];
-        curr = line[i_lo]
-        curr > prev ? (half - prev) / (curr - prev) : 0.0
-    else
-        0.0
-    end
-    hi_frac = if i_hi < length(line)
-        curr = line[i_hi];
-        nxt = line[i_hi + 1]
-        curr > nxt ? (curr - half) / (curr - nxt) : 1.0
-    else
-        1.0
-    end
-    (i_hi + hi_frac - (i_lo - (1.0 - lo_frac))) * dx
-end
-
-"""Density-weighted RMS width of a 1D profile along a coordinate axis."""
-function _rms_width_1d(line::AbstractVector{Float64}, dx::Float64, x::AbstractVector)
-    tot = sum(line) * dx
-    tot > 0 || return 0.0
-    x̄ = sum(line .* x) * dx / tot
-    var = sum(line .* (x .- x̄) .^ 2) * dx / tot
-    sqrt(max(var, 0.0))
-end
-
-"""Max absolute forward-difference derivative of density along axis `d`."""
-function _max_forward_grad(n::AbstractArray{<:Real, D}, d::Int, dx::Float64) where {D}
-    sz = size(n)
-    gmax = 0.0
-    @inbounds for I in CartesianIndices(ntuple(k -> k == d ? sz[k] - 1 : sz[k], D))
-        Ip1 = CartesianIndex(ntuple(k -> k == d ? I[k] + 1 : I[k], D))
-        g = abs(n[Ip1] - n[I]) / dx
-        g > gmax && (gmax = g)
-    end
-    gmax
-end
-
-"""
-Extract the local spinor ζ at the density peak and run `bogoliubov_instability_scan`
-using the physical couplings (c₀, c₁, c_k, c_dd) from the preceding ground-state step.
-
-Returns a NamedTuple with `max_growth`, `unstable`, `k_peak`, `wavelength`,
-`best_direction`, `pattern`, `anisotropy`, suitable for JLD2 persistence.
-"""
-function _run_bogoliubov_analyzer(psi, grid, atom, params, ws_prev)
-    ws_prev === nothing &&
-        throw(
-            ArgumentError(
-                "bogoliubov analyzer requires a preceding ground_state step (ws_prev is nothing)"
-            ),
-        )
-
-    F = atom.F
-    D = 2F + 1
-    ndim = length(grid.config.n_points)
-
-    psi_host = _to_host(psi)
-    n_total = total_density(psi_host, ndim)
-    peak_idx = argmax(n_total)
-
-    spinor = Vector{ComplexF64}(undef, D)
-    n0 = 0.0
-    for c in 1:D
-        spinor[c] = psi_host[peak_idx, c]
-        n0 += abs2(spinor[c])
-    end
-    if n0 > 1e-30
-        spinor ./= sqrt(n0)
+        return _analyze_summary_json(psi, grid, atom, params, ws_prev, pipeline_results)
     end
 
-    interactions = ws_prev.interactions
-    c_dd_val = ws_prev.ddi === nothing ? 0.0 : ws_prev.ddi.C_dd
-    zeeman = ws_prev.zeeman isa ZeemanParams ? ws_prev.zeeman : ZeemanParams(0.0, 0.0)
-
-    k_max = Float64(get(params, "k_max", 10.0))
-    n_k = Int(get(params, "n_k", 200))
-    dir_mode = Symbol(get(params, "directions", "auto"))
-    n_dirs = Int(get(params, "n_directions", 50))
-    directions_arg = dir_mode in (:auto, :dense, :planar) ? dir_mode : :auto
-
-    imap = bogoliubov_instability_scan(;
-        spinor, n0, F, interactions, zeeman, c_dd=c_dd_val,
-        k_max, n_k,
-        directions=directions_arg,
-        n_directions=n_dirs,
-    )
-    pred = predict_supersolid_params(imap)
-
-    (
-        n0=n0,
-        max_growth=imap.max_growth_rate,
-        unstable=imap.unstable,
-        k_peak=imap.most_unstable_k,
-        wavelength=imap.predicted_wavelength,
-        best_direction=imap.most_unstable_direction,
-        pattern=pred.pattern_type,
-        anisotropy=pred.angular_anisotropy,
-    )
+    _known =
+        "tomography, faraday, energy_decomposition, phase_classify, " *
+        "phase_classify_distance, stability, bogoliubov, multipole_order, " *
+        "winding_map, absorption_image, sg_tof, domain_analysis, skyrmion_density, " *
+        "phase_contrast_image, momentum_distribution, vortex_detect, " *
+        "correlation_length, defect_density, kibble_zurek_stats, " *
+        "bragg_spectroscopy, droplet_profile, bogoliubov_dispersion, " *
+        "bogoliubov_mode, skyrmion_detect, synthetic_dim, non_abelian_homotopy, " *
+        "monopole_charge, majorana_order, winding_field, rosensweig_pattern, " *
+        "column_density_movie, summary_json"
+    throw(ArgumentError("Unknown analyzer: $name. Supported: $_known"))
 end

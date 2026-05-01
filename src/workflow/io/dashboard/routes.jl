@@ -18,18 +18,14 @@ function _route_scan_group(path::String, base_dir::String, data_cache::Dict{Stri
     # for all points declared in `runs/<scan_dir>/scan.yaml`. Backed
     # by the per-run `/api/physics_summary` data, but loaded once
     # per scan rather than per point.
-    rest = _uri_decode(path[17:end])
-    qidx = findfirst('?', rest)
-    qidx !== nothing && (rest = rest[1:(qidx - 1)])
-    scan_dir = joinpath(base_dir, rest)
-    if !isdir(scan_dir)
-        return (404, "text/plain", "scan_dir not found: $rest")
-    end
+    pq = _parse_run_only(path, "/api/scan_group/")
+    scan_dir = joinpath(base_dir, pq.name)
+    isdir(scan_dir) || return (404, "text/plain", "scan_dir not found: $(pq.name)")
     scan_yaml_path = joinpath(scan_dir, "scan.yaml")
     if !isfile(scan_yaml_path)
         return (
             404, "text/plain",
-            "scan.yaml not found in $rest — run scripts/scan_retrofit.jl first",
+            "scan.yaml not found in $(pq.name) — run scripts/scan_retrofit.jl first",
         )
     end
     json = try
@@ -67,46 +63,16 @@ function _route_scan_group(path::String, base_dir::String, data_cache::Dict{Stri
             if isfile(jld_path)
                 try
                     d = JLD2.load(jld_path)
-                    # Same fields as /api/physics_summary, abbreviated.
                     for sym in ("Lz", "Fz")
-                        v = if haskey(d, "dynamics/$sym")
-                            Float64.(d["dynamics/$sym"])
-                        elseif haskey(d, sym)
-                            Float64.(d[sym])
-                        else
-                            Float64[]
-                        end
-                        if !isempty(v)
-                            run_summary[sym * "_min"] = minimum(v)
-                            run_summary[sym * "_max"] = maximum(v)
-                            run_summary[sym * "_init"] = v[1]
-                            run_summary[sym * "_final"] = v[end]
-                        end
+                        _populate_extremes!(run_summary, d, sym)
                     end
-                    pm = if haskey(d, "dynamics/per_m_history")
-                        d["dynamics/per_m_history"]
-                    elseif haskey(d, "per_m_history")
-                        d["per_m_history"]
-                    else
-                        nothing
-                    end
+                    pm = _per_m_top_fractions(d)
                     if pm !== nothing
-                        T = size(pm, 2)
-                        col1 = sum(view(pm, :, 1))
-                        colT = sum(view(pm, :, T))
-                        run_summary["m_top_init"] = pm[1, 1] / max(col1, 1e-30)
-                        run_summary["m_top_final"] = pm[1, T] / max(colT, 1e-30)
+                        run_summary["m_top_init"] = pm.init
+                        run_summary["m_top_final"] = pm.final
                     end
-                    nv = if haskey(d, "dynamics/norms")
-                        Float64.(d["dynamics/norms"])
-                    elseif haskey(d, "norms")
-                        Float64.(d["norms"])
-                    else
-                        Float64[]
-                    end
-                    if !isempty(nv)
-                        run_summary["norm_max_dev"] = maximum(abs.(nv .- 1.0))
-                    end
+                    nd = _norm_max_dev(d)
+                    nd === nothing || (run_summary["norm_max_dev"] = nd)
                     if haskey(d, "dynamics/integrator_meta/larmor_phase_per_step")
                         run_summary["larmor_phase_per_step"] =
                             d["dynamics/integrator_meta/larmor_phase_per_step"]
@@ -142,19 +108,10 @@ function _route_physics_summary(path::String, base_dir::String, psi_cache::Dict{
     # classification + Lz/Fz/m=+F summary. Designed so a frontend physics
     # panel can render gauge widgets (Larmor ratio, ε vs threshold,
     # Lz min/max) without re-loading the multi-GB result.jld2 each time.
-    rest = _uri_decode(path[22:end])
-    slash_idx = findfirst('/', rest)
-    if slash_idx === nothing
-        return (400, "text/plain", "Expected /api/physics_summary/:run/:file")
-    end
-    name = rest[1:(slash_idx - 1)]
-    file = rest[(slash_idx + 1):end]
-    qidx = findfirst('?', file)
-    qidx !== nothing && (file = file[1:(qidx - 1)])
-    fpath = joinpath(base_dir, name, file)
-    if !isfile(fpath)
-        return (404, "text/plain", "File not found: $name/$file")
-    end
+    p = _parse_run_file(path, "/api/physics_summary/")
+    p === nothing && return (400, "text/plain", "Expected /api/physics_summary/:run/:file")
+    fpath = joinpath(base_dir, p.name, p.file)
+    isfile(fpath) || return (404, "text/plain", "File not found: $(p.name)/$(p.file)")
     json = try
         d = JLD2.load(fpath)
         out = Dict{String, Any}()
@@ -191,53 +148,23 @@ function _route_physics_summary(path::String, base_dir::String, psi_cache::Dict{
             "danger"
         end
 
-        # Lz / Fz extremes summary. Try the canonical
-        # `dynamics/<X>` keys first; fall back to top-level `<X>`
-        # for the legacy launch_*.jl Vector output (pre-2026-04-29).
+        # Lz / Fz / Fx / Fy extremes — `_populate_extremes!` reads from
+        # the canonical `dynamics/<X>` path (post-2026-04-29) or the
+        # top-level legacy `<X>` (pre-2026-04-29) without ceremony.
         for sym in ("Lz", "Fz", "Fx", "Fy")
-            v = if haskey(d, "dynamics/$sym")
-                Float64.(d["dynamics/$sym"])
-            elseif haskey(d, sym)
-                Float64.(d[sym])
-            else
-                nothing
-            end
-            v === nothing || isempty(v) && continue
-            if v !== nothing && !isempty(v)
-                out[sym * "_min"] = minimum(v)
-                out[sym * "_max"] = maximum(v)
-                out[sym * "_init"] = v[1]
-                out[sym * "_final"] = v[end]
-            end
+            _populate_extremes!(out, d, sym)
         end
 
         # m=+F population at start vs end (canonical thesis observable).
-        pm = if haskey(d, "dynamics/per_m_history")
-            d["dynamics/per_m_history"]
-        elseif haskey(d, "per_m_history")
-            d["per_m_history"]
-        else
-            nothing
-        end
+        pm = _per_m_top_fractions(d)
         if pm !== nothing
-            T = size(pm, 2)
-            col1 = sum(view(pm, :, 1))
-            colT = sum(view(pm, :, T))
-            out["m_top_init"] = pm[1, 1] / max(col1, 1e-30)
-            out["m_top_final"] = pm[1, T] / max(colT, 1e-30)
+            out["m_top_init"] = pm.init
+            out["m_top_final"] = pm.final
         end
 
         # Norm conservation diagnostic.
-        nv = if haskey(d, "dynamics/norms")
-            Float64.(d["dynamics/norms"])
-        elseif haskey(d, "norms")
-            Float64.(d["norms"])
-        else
-            nothing
-        end
-        if nv !== nothing && !isempty(nv)
-            out["norm_max_dev"] = maximum(abs.(nv .- 1.0))
-        end
+        nd = _norm_max_dev(d)
+        nd === nothing || (out["norm_max_dev"] = nd)
 
         _json_string(out)
     catch e
@@ -251,28 +178,13 @@ function _route_synthetic_dispersion(path::String, base_dir::String, psi_cache::
     # Float32 (k_real × k_synth) dispersion image. Drives the new
     # SlicePanel "dispersion" mode — same protocol shape as
     # density_bin so the same DataTexture upload path can render it.
-    rest = _uri_decode(path[27:end])
-    slash_idx = findfirst('/', rest)
-    if slash_idx === nothing
+    p = _parse_run_file(path, "/api/synthetic_dispersion/")
+    p === nothing &&
         return (400, "text/plain", "Expected /api/synthetic_dispersion/:run/:file")
-    end
-    name = rest[1:(slash_idx - 1)]
-    file = rest[(slash_idx + 1):end]
-    axis = 1
-    snap_idx = nothing
-    qidx = findfirst('?', file)
-    if qidx !== nothing
-        query = file[(qidx + 1):end]
-        file = file[1:(qidx - 1)]
-        m = match(r"axis=(\d+)", query)
-        m !== nothing && (axis = parse(Int, m.captures[1]))
-        ms = match(r"snap=(\d+)", query)
-        ms !== nothing && (snap_idx = parse(Int, ms.captures[1]))
-    end
-    fpath = joinpath(base_dir, name, file)
-    if !isfile(fpath)
-        return (404, "text/plain", "File not found: $name/$file")
-    end
+    fpath = joinpath(base_dir, p.name, p.file)
+    isfile(fpath) || return (404, "text/plain", "File not found: $(p.name)/$(p.file)")
+    axis = _q_int(p.query, "axis", 1)
+    snap_idx = _q_int_opt(p.query, "snap")
     cache_key = "synth_disp:$(fpath)#snap=$(snap_idx)#axis=$(axis)"
     bin = if haskey(psi_cache, cache_key)
         psi_cache[cache_key]
@@ -322,19 +234,10 @@ function _route_density_max(path::String, base_dir::String, psi_cache::Dict{Stri
     # The 16-frame walk takes ~0.8 s on Klaus and stalled the
     # initial run-open hop; computing it on demand keeps that hop
     # instant. Cached server-side so repeat calls are sub-ms.
-    rest = _uri_decode(path[18:end])
-    slash_idx = findfirst('/', rest)
-    if slash_idx === nothing
-        return (400, "text/plain", "Expected /api/density_max/:run/:file")
-    end
-    name = rest[1:(slash_idx - 1)]
-    file = rest[(slash_idx + 1):end]
-    qidx = findfirst('?', file)
-    qidx !== nothing && (file = file[1:(qidx - 1)])
-    fpath = joinpath(base_dir, name, file)
-    if !isfile(fpath)
-        return (404, "text/plain", "File not found: $name/$file")
-    end
+    p = _parse_run_file(path, "/api/density_max/")
+    p === nothing && return (400, "text/plain", "Expected /api/density_max/:run/:file")
+    fpath = joinpath(base_dir, p.name, p.file)
+    isfile(fpath) || return (404, "text/plain", "File not found: $(p.name)/$(p.file)")
     cache_key = "density_max:$(fpath)"
     d_max = if haskey(psi_cache, cache_key)
         psi_cache[cache_key]
@@ -446,27 +349,12 @@ function _route_density3d_atlas(path::String, base_dir::String, psi_cache::Dict{
     #   "D3AT" magic (4)
     #   Int32 header (6): n_snaps, nx, ny, nz, n_comp_total, component
     #   Float32 atlas  (n_snaps * nx * ny * nz)
-    rest = _uri_decode(path[22:end])
-    slash_idx = findfirst('/', rest)
-    if slash_idx === nothing
-        return (400, "text/plain", "Expected /api/density3d_atlas/:run/:file")
-    end
-    name = rest[1:(slash_idx - 1)]
-    file = rest[(slash_idx + 1):end]
-    comp_idx = 0
-    bsz = false
-    qidx = findfirst('?', file)
-    if qidx !== nothing
-        query = file[(qidx + 1):end]
-        file = file[1:(qidx - 1)]
-        m = match(r"comp=(-?\d+)", query)
-        m !== nothing && (comp_idx = parse(Int, m.captures[1]))
-        occursin("bsz=1", query) && (bsz = true)
-    end
-    fpath = joinpath(base_dir, name, file)
-    if !isfile(fpath)
-        return (404, "text/plain", "File not found: $name/$file")
-    end
+    p = _parse_run_file(path, "/api/density3d_atlas/")
+    p === nothing && return (400, "text/plain", "Expected /api/density3d_atlas/:run/:file")
+    fpath = joinpath(base_dir, p.name, p.file)
+    isfile(fpath) || return (404, "text/plain", "File not found: $(p.name)/$(p.file)")
+    comp_idx = _q_int(p.query, "comp", 0)
+    bsz = _q_flag(p.query, "bsz")
     cache_key = "density3d_atlas:$(fpath)#comp=$(comp_idx)#bsz=$(bsz)"
     bin = if haskey(psi_cache, cache_key)
         psi_cache[cache_key]
@@ -504,27 +392,12 @@ function _route_density_atlas(path::String, base_dir::String, psi_cache::Dict{St
     # binary blob (panel-major: total then n_comp components, each
     # n_snaps × nx × ny). Replaces ~157 separate /api/density_bin
     # round-trips with a single fetch.
-    rest = _uri_decode(path[20:end])
-    slash_idx = findfirst('/', rest)
-    if slash_idx === nothing
-        return (400, "text/plain", "Expected /api/density_atlas/:run/:file")
-    end
-    name = rest[1:(slash_idx - 1)]
-    file = rest[(slash_idx + 1):end]
-    axis = 3
-    bsz = false
-    qidx = findfirst('?', file)
-    if qidx !== nothing
-        query = file[(qidx + 1):end]
-        file = file[1:(qidx - 1)]
-        m = match(r"axis=(\d+)", query)
-        m !== nothing && (axis = parse(Int, m.captures[1]))
-        occursin("bsz=1", query) && (bsz = true)
-    end
-    fpath = joinpath(base_dir, name, file)
-    if !isfile(fpath)
-        return (404, "text/plain", "File not found: $name/$file")
-    end
+    p = _parse_run_file(path, "/api/density_atlas/")
+    p === nothing && return (400, "text/plain", "Expected /api/density_atlas/:run/:file")
+    fpath = joinpath(base_dir, p.name, p.file)
+    isfile(fpath) || return (404, "text/plain", "File not found: $(p.name)/$(p.file)")
+    axis = _q_int(p.query, "axis", 3)
+    bsz = _q_flag(p.query, "bsz")
     cache_key = "density_atlas:$(fpath)#axis=$(axis)#bsz=$(bsz)"
     bin = if haskey(psi_cache, cache_key)
         psi_cache[cache_key]
@@ -546,7 +419,7 @@ function _route_density_atlas(path::String, base_dir::String, psi_cache::Dict{St
                 meta = _snapshots_metadata(fpath)
                 n_snaps = meta === nothing ? 0 : Int(get(meta, "n_snapshots", 0))
                 if n_snaps == 0
-                    return (404, "text/plain", "No snapshots in $name/$file")
+                    return (404, "text/plain", "No snapshots in $(p.name)/$(p.file)")
                 end
                 raw = _compute_column_density_atlas_binary(fpath, axis, n_snaps, psi_cache)
                 _maybe_bitshuffle_zstd(raw, bsz)
@@ -564,28 +437,14 @@ end
 
 function _route_vortex_lines(path::String, base_dir::String, psi_cache::Dict{String, Any})
     # /api/vortex_lines/:run/:file?snap=K&mask=FRAC  → per-m polylines
-    rest = _uri_decode(path[19:end])
-    slash_idx = findfirst('/', rest)
-    if slash_idx === nothing
-        return (400, "text/plain", "Expected /api/vortex_lines/:run/:file?snap=K&mask=FRAC")
-    end
-    name = rest[1:(slash_idx - 1)]
-    file = rest[(slash_idx + 1):end]
-    snap_idx = nothing
-    mask_frac = 0.0
-    qidx = findfirst('?', file)
-    if qidx !== nothing
-        query = file[(qidx + 1):end]
-        file = file[1:(qidx - 1)]
-        ms = match(r"snap=(\d+)", query)
-        ms !== nothing && (snap_idx = parse(Int, ms.captures[1]))
-        mm = match(r"mask=([0-9.]+)", query)
-        mm !== nothing && (mask_frac = parse(Float64, mm.captures[1]))
-    end
-    fpath = joinpath(base_dir, name, file)
-    if !isfile(fpath)
-        return (404, "text/plain", "File not found: $name/$file")
-    end
+    p = _parse_run_file(path, "/api/vortex_lines/")
+    p === nothing && return (
+        400, "text/plain", "Expected /api/vortex_lines/:run/:file?snap=K&mask=FRAC"
+    )
+    fpath = joinpath(base_dir, p.name, p.file)
+    isfile(fpath) || return (404, "text/plain", "File not found: $(p.name)/$(p.file)")
+    snap_idx = _q_int_opt(p.query, "snap")
+    mask_frac = _q_float(p.query, "mask", 0.0)
     # Cache key: (file, snap, mask). Identical scrub-replay returns
     # instantly from cache instead of re-running the per-plaquette
     # phase-winding scan + greedy z-stitch (sub-second per call but
@@ -636,25 +495,13 @@ end
 
 function _route_vorticity3d_bin(path::String, base_dir::String, psi_cache::Dict{String, Any})
     # /api/vorticity3d_bin/:run/:file?snap=K
-    rest = _uri_decode(path[22:end])
-    slash_idx = findfirst('/', rest)
-    if slash_idx === nothing
-        return (400, "text/plain", "Expected /api/vorticity3d_bin/:run/:file?snap=K")
-    end
-    name = rest[1:(slash_idx - 1)]
-    file = rest[(slash_idx + 1):end]
-    qidx = findfirst('?', file)
-    snap_idx = nothing
-    if qidx !== nothing
-        query = file[(qidx + 1):end]
-        file = file[1:(qidx - 1)]
-        ms = match(r"snap=(\d+)", query)
-        ms !== nothing && (snap_idx = parse(Int, ms.captures[1]))
-    end
-    fpath = joinpath(base_dir, name, file)
-    if !isfile(fpath)
-        return (404, "text/plain", "File not found: $name/$file")
-    end
+    p = _parse_run_file(path, "/api/vorticity3d_bin/")
+    p === nothing && return (
+        400, "text/plain", "Expected /api/vorticity3d_bin/:run/:file?snap=K"
+    )
+    fpath = joinpath(base_dir, p.name, p.file)
+    isfile(fpath) || return (404, "text/plain", "File not found: $(p.name)/$(p.file)")
+    snap_idx = _q_int_opt(p.query, "snap")
     bin = try
         psi, n_comp, ndim, n_pts, F = _load_psi_cached(fpath, psi_cache, snap_idx)
         ndim == 3 || throw(ArgumentError("vorticity3d requires 3D data"))
@@ -668,28 +515,14 @@ end
 
 function _route_phase3d_bin(path::String, base_dir::String, psi_cache::Dict{String, Any})
     # /api/phase3d_bin/:run/:file?comp=N&snap=K (N >= 1)
-    rest = _uri_decode(path[18:end])
-    slash_idx = findfirst('/', rest)
-    if slash_idx === nothing
-        return (400, "text/plain", "Expected /api/phase3d_bin/:run/:file?comp=N&snap=K")
-    end
-    name = rest[1:(slash_idx - 1)]
-    file = rest[(slash_idx + 1):end]
-    qidx = findfirst('?', file)
-    comp_idx = 1
-    snap_idx = nothing
-    if qidx !== nothing
-        query = file[(qidx + 1):end]
-        file = file[1:(qidx - 1)]
-        m = match(r"comp=(-?\d+)", query)
-        m !== nothing && (comp_idx = parse(Int, m.captures[1]))
-        ms = match(r"snap=(\d+)", query)
-        ms !== nothing && (snap_idx = parse(Int, ms.captures[1]))
-    end
-    fpath = joinpath(base_dir, name, file)
-    if !isfile(fpath)
-        return (404, "text/plain", "File not found: $name/$file")
-    end
+    p = _parse_run_file(path, "/api/phase3d_bin/")
+    p === nothing && return (
+        400, "text/plain", "Expected /api/phase3d_bin/:run/:file?comp=N&snap=K"
+    )
+    fpath = joinpath(base_dir, p.name, p.file)
+    isfile(fpath) || return (404, "text/plain", "File not found: $(p.name)/$(p.file)")
+    comp_idx = _q_int(p.query, "comp", 1)
+    snap_idx = _q_int_opt(p.query, "snap")
     bin = try
         _compute_3d_phase_binary(
             _load_psi_cached(fpath, psi_cache, snap_idx)...; component=comp_idx
@@ -701,25 +534,12 @@ function _route_phase3d_bin(path::String, base_dir::String, psi_cache::Dict{Stri
 end
 
 function _route_coherence(path::String, base_dir::String, psi_cache::Dict{String, Any})
-    rest = _uri_decode(path[16:end])
-    slash_idx = findfirst('/', rest)
-    if slash_idx === nothing
+    p = _parse_run_file(path, "/api/coherence/")
+    p === nothing &&
         return (400, "text/plain", "Expected /api/coherence/:run/:file?axis=N")
-    end
-    name = rest[1:(slash_idx - 1)]
-    file = rest[(slash_idx + 1):end]
-    axis = 3
-    qidx = findfirst('?', file)
-    if qidx !== nothing
-        query = file[(qidx + 1):end]
-        file = file[1:(qidx - 1)]
-        m = match(r"axis=(\d+)", query)
-        m !== nothing && (axis = parse(Int, m.captures[1]))
-    end
-    fpath = joinpath(base_dir, name, file)
-    if !isfile(fpath)
-        return (404, "text/plain", "File not found: $name/$file")
-    end
+    fpath = joinpath(base_dir, p.name, p.file)
+    isfile(fpath) || return (404, "text/plain", "File not found: $(p.name)/$(p.file)")
+    axis = _q_int(p.query, "axis", 3)
     bin = try
         _compute_coherence_matrix_binary(_load_psi_cached(fpath, psi_cache)..., axis)
     catch e
@@ -729,30 +549,14 @@ function _route_coherence(path::String, base_dir::String, psi_cache::Dict{String
 end
 
 function _route_density3d_rotated(path::String, base_dir::String, psi_cache::Dict{String, Any})
-    rest = _uri_decode(path[23:end])
-    slash_idx = findfirst('/', rest)
-    if slash_idx === nothing
-        return (
-            400, "text/plain", "Expected /api/density3d_rotated/:run/:file?angle=DEG&comp=N"
-        )
-    end
-    name = rest[1:(slash_idx - 1)]
-    file = rest[(slash_idx + 1):end]
-    angle_deg = 0.0;
-    comp_idx = 0
-    qidx = findfirst('?', file)
-    if qidx !== nothing
-        query = file[(qidx + 1):end]
-        file = file[1:(qidx - 1)]
-        m = match(r"angle=([0-9.e+-]+)", query)
-        m !== nothing && (angle_deg = parse(Float64, m.captures[1]))
-        m2 = match(r"comp=(-?\d+)", query)
-        m2 !== nothing && (comp_idx = parse(Int, m2.captures[1]))
-    end
-    fpath = joinpath(base_dir, name, file)
-    if !isfile(fpath)
-        return (404, "text/plain", "File not found: $name/$file")
-    end
+    p = _parse_run_file(path, "/api/density3d_rotated/")
+    p === nothing && return (
+        400, "text/plain", "Expected /api/density3d_rotated/:run/:file?angle=DEG&comp=N"
+    )
+    fpath = joinpath(base_dir, p.name, p.file)
+    isfile(fpath) || return (404, "text/plain", "File not found: $(p.name)/$(p.file)")
+    angle_deg = _q_float(p.query, "angle", 0.0)
+    comp_idx = _q_int(p.query, "comp", 0)
     bin = try
         _compute_rotated_3d_density_binary(
             _load_psi_cached(fpath, psi_cache)...; angle_deg, component=comp_idx)
@@ -763,35 +567,17 @@ function _route_density3d_rotated(path::String, base_dir::String, psi_cache::Dic
 end
 
 function _route_vector3d_bin(path::String, base_dir::String, psi_cache::Dict{String, Any})
-    rest = _uri_decode(path[18:end])
-    slash_idx = findfirst('/', rest)
-    if slash_idx === nothing
-        return (
-            400,
-            "text/plain",
-            "Expected /api/vector3d_bin/:run/:file?field=current&stride=2&snap=K",
-        )
-    end
-    name = rest[1:(slash_idx - 1)]
-    file = rest[(slash_idx + 1):end]
-    vec_field = :current
-    vec_stride = 2
-    snap_idx = nothing
-    qidx = findfirst('?', file)
-    if qidx !== nothing
-        query = file[(qidx + 1):end]
-        file = file[1:(qidx - 1)]
-        m = match(r"field=(\w+)", query)
-        m !== nothing && (vec_field = Symbol(m.captures[1]))
-        m2 = match(r"stride=(\d+)", query)
-        m2 !== nothing && (vec_stride = parse(Int, m2.captures[1]))
-        ms = match(r"snap=(\d+)", query)
-        ms !== nothing && (snap_idx = parse(Int, ms.captures[1]))
-    end
-    fpath = joinpath(base_dir, name, file)
-    if !isfile(fpath)
-        return (404, "text/plain", "File not found: $name/$file")
-    end
+    p = _parse_run_file(path, "/api/vector3d_bin/")
+    p === nothing && return (
+        400,
+        "text/plain",
+        "Expected /api/vector3d_bin/:run/:file?field=current&stride=2&snap=K",
+    )
+    fpath = joinpath(base_dir, p.name, p.file)
+    isfile(fpath) || return (404, "text/plain", "File not found: $(p.name)/$(p.file)")
+    vec_field = _q_sym(p.query, "field", :current)
+    vec_stride = _q_int(p.query, "stride", 2)
+    snap_idx = _q_int_opt(p.query, "snap")
     bin = try
         psi, n_comp, ndim, n_pts, F = _load_psi_cached(fpath, psi_cache, snap_idx)
         ndim == 3 || throw(ArgumentError("vector3d requires 3D data"))
@@ -802,5 +588,314 @@ function _route_vector3d_bin(path::String, base_dir::String, psi_cache::Dict{Str
         return (500, "text/plain", "Error: $(e)")
     end
     (200, "application/octet-stream", bin)
+end
+
+# --- R21: medium-sized branches lifted out of _route_dashboard ---
+
+function _route_lab_list(path::String, base_dir::String)
+    # /api/lab/list/<run_name>?limit=N → JSON array of recent lab
+    # images uploaded via POST /api/lab/image/<run>. Most recent
+    # first, capped to `limit` (default 32 — matches the React
+    # LabImageOverlay's ring buffer expectation).
+    p = _parse_run_only(path, "/api/lab/list/")
+    limit = _q_int(p.query, "limit", 32)
+    img_dir = joinpath(base_dir, p.name, "lab_images")
+    isdir(img_dir) || return (200, "application/json", "[]")
+    files = sort(filter(f -> startswith(f, "shot_") && endswith(f, ".png"),
+            readdir(img_dir)); rev=true)
+    files = files[1:min(limit, length(files))]
+    items = map(files) do f
+        full = joinpath(img_dir, f)
+        mt = round(Int, mtime(full) * 1000)
+        sz = filesize(full)
+        "{\"name\":\"$f\",\"url\":\"/runs/$(p.name)/lab_images/$(f)\",\"mtime_ms\":$mt,\"size\":$sz}"
+    end
+    (200, "application/json", "[" * join(items, ",") * "]")
+end
+
+function _route_live_list(base_dir::String)
+    # Scan base_dir/* for runs whose _live_status.json was touched in
+    # the last 5 minutes — those are presumed actively running. Return
+    # a JSON array of {run, mtime_ms, age_s}.
+    cutoff_s = 300.0
+    active = String[]
+    if isdir(base_dir)
+        now_s = time()
+        for entry in readdir(base_dir)
+            full = joinpath(base_dir, entry, "_live_status.json")
+            isfile(full) || continue
+            age = now_s - mtime(full)
+            age <= cutoff_s || continue
+            mt = round(Int, mtime(full) * 1000)
+            push!(active,
+                "{\"run\":\"$entry\",\"mtime_ms\":$mt,\"age_s\":$(round(age; digits=1))}")
+        end
+    end
+    (200, "application/json", "[" * join(active, ",") * "]")
+end
+
+function _route_live(path::String, base_dir::String)
+    # /api/live/<run_name> → contents of base_dir/<run>/_live_status.json
+    p = _parse_run_only(path, "/api/live/")
+    status_path = joinpath(base_dir, p.name, "_live_status.json")
+    isfile(status_path) ||
+        return (404, "application/json", "{\"error\":\"no live status for $(p.name)\"}")
+    (200, "application/json", read(status_path, String))
+end
+
+function _route_scan_status(path::String, base_dir::String)
+    # /api/scan_status/<run_name> → JSON with {completed, expected,
+    # latest_mtime_s, eta_s} so the dashboard can show "12/144 done · ETA 9h"
+    # for an in-progress overnight scan. expected may be null when the
+    # config has no scan block.
+    p = _parse_run_only(path, "/api/scan_status/")
+    status = run_status(joinpath(base_dir, p.name))
+    if !status.exists
+        return (404, "application/json", "{\"error\":\"unknown run $(p.name)\"}")
+    end
+    expected_str = status.expected === nothing ? "null" : string(status.expected)
+    latest_str =
+        isnan(status.latest_mtime_s) ? "null" :
+        string(round(status.latest_mtime_s; digits=3))
+    eta_str = isnan(status.eta_s) ? "null" :
+              string(round(status.eta_s; digits=1))
+    body =
+        "{\"completed\":$(status.completed),\"expected\":$expected_str," *
+        "\"latest_mtime_s\":$latest_str,\"eta_s\":$eta_str}"
+    (200, "application/json", body)
+end
+
+function _route_data(path::String, base_dir::String, data_cache::Dict{String, String})
+    p = _parse_run_only(path, "/api/data/")
+    run_dir = joinpath(base_dir, p.name)
+    isdir(run_dir) || return (404, "text/plain", "Run not found: $(p.name)")
+    name = p.name  # used in cache key + downstream
+    # Cache only completed runs. In-progress runs (no point_*.jld2 yet,
+    # or whose point file count differs from a prior cache hit) bypass
+    # the cache so the dashboard reflects new files as the batch lands
+    # them. Without this guard the first request during a run cached
+    # the empty in-progress response and the dashboard never updated
+    # even after `point_001.jld2` appeared on disk.
+    live_count = count(f -> startswith(f, "point_") && endswith(f, ".jld2"),
+        readdir(run_dir))
+    cache_key = "$name#$live_count"
+    json = get!(data_cache, cache_key) do
+        try
+            _json_string(generate_dashboard_data(run_dir))
+        catch e
+            "{\"error\":\"$(replace(string(e), "\"" => "'"))\"}"
+        end
+    end
+    (200, "application/json", json)
+end
+
+function _route_density2d(path::String, base_dir::String, psi_cache::Dict{String, Any})
+    # /api/density/run_name/point_001.jld2?axis=3&snap=K
+    p = _parse_run_file(path, "/api/density/")
+    p === nothing && return (400, "text/plain", "Expected /api/density/:run/:file")
+    fpath = joinpath(base_dir, p.name, p.file)
+    isfile(fpath) || return (404, "text/plain", "File not found: $(p.name)/$(p.file)")
+    axis = _q_int(p.query, "axis", 3)
+    snap_idx = _q_int_opt(p.query, "snap")
+    json = try
+        cached = _load_psi_cached(fpath, psi_cache, snap_idx)
+        _json_string(_compute_column_densities_from_cache(cached..., axis, fpath))
+    catch e
+        "{\"error\":\"$(replace(string(e), "\"" => "'"))\"}"
+    end
+    (200, "application/json", json)
+end
+
+function _route_phase2d(path::String, base_dir::String, psi_cache::Dict{String, Any})
+    # /api/phase/:run/:file?axis=N&slice=K&snap=S
+    p = _parse_run_file(path, "/api/phase/")
+    p === nothing &&
+        return (400, "text/plain", "Expected /api/phase/:run/:file?axis=N&slice=K")
+    fpath = joinpath(base_dir, p.name, p.file)
+    isfile(fpath) || return (404, "text/plain", "File not found: $(p.name)/$(p.file)")
+    axis = _q_int(p.query, "axis", 3)
+    slice_idx = _q_int_opt(p.query, "slice")
+    snap_idx = _q_int_opt(p.query, "snap")
+    json = try
+        cached = _load_psi_cached(fpath, psi_cache, snap_idx)
+        _json_string(_compute_phase_slice_from_cache(cached..., axis, slice_idx, fpath))
+    catch e
+        "{\"error\":\"$(replace(string(e), "\"" => "'"))\"}"
+    end
+    (200, "application/json", json)
+end
+
+function _route_density_bin(path::String, base_dir::String, psi_cache::Dict{String, Any})
+    # /api/density_bin/:run/:file?axis=N&snap=K — packed Float32 column density.
+    # ~7× smaller than the JSON endpoint and skips JSON.parse on the
+    # client; the time-scrubber needs this to stay <20 ms per frame.
+    p = _parse_run_file(path, "/api/density_bin/")
+    p === nothing && return (400, "text/plain", "Expected /api/density_bin/:run/:file")
+    fpath = joinpath(base_dir, p.name, p.file)
+    isfile(fpath) || return (404, "text/plain", "File not found: $(p.name)/$(p.file)")
+    axis = _q_int(p.query, "axis", 3)
+    snap_idx = _q_int_opt(p.query, "snap")
+    cache_key = "density_bin:$(fpath)#snap=$(snap_idx)#axis=$(axis)"
+    bin = if haskey(psi_cache, cache_key)
+        psi_cache[cache_key]
+    else
+        while length(psi_cache) >= PSI_CACHE_MAX_ENTRIES
+            _evict_one!(psi_cache)
+        end
+        v = try
+            _compute_column_density_binary(
+                _load_psi_cached(fpath, psi_cache, snap_idx)..., axis, fpath
+            )
+        catch e
+            return (500, "text/plain", "Error: $(e)")
+        end
+        psi_cache[cache_key] = v
+        v
+    end
+    (200, "application/octet-stream", bin)
+end
+
+function _route_phase_bin(path::String, base_dir::String, psi_cache::Dict{String, Any})
+    # /api/phase_bin/:run/:file?axis=N&slice=K&snap=S — packed Float32
+    # phase + |ψ_m|² for low-density masking. Same speed motivation as
+    # density_bin.
+    p = _parse_run_file(path, "/api/phase_bin/")
+    p === nothing && return (400, "text/plain", "Expected /api/phase_bin/:run/:file")
+    fpath = joinpath(base_dir, p.name, p.file)
+    isfile(fpath) || return (404, "text/plain", "File not found: $(p.name)/$(p.file)")
+    axis = _q_int(p.query, "axis", 3)
+    slice_idx = _q_int_opt(p.query, "slice")
+    snap_idx = _q_int_opt(p.query, "snap")
+    cache_key = "phase_bin:$(fpath)#snap=$(snap_idx)#axis=$(axis)#slice=$(slice_idx)"
+    bin = if haskey(psi_cache, cache_key)
+        psi_cache[cache_key]
+    else
+        while length(psi_cache) >= PSI_CACHE_MAX_ENTRIES
+            _evict_one!(psi_cache)
+        end
+        v = try
+            _compute_phase_slice_binary(
+                _load_psi_cached(fpath, psi_cache, snap_idx)...,
+                axis, slice_idx, fpath,
+            )
+        catch e
+            return (500, "text/plain", "Error: $(e)")
+        end
+        psi_cache[cache_key] = v
+        v
+    end
+    (200, "application/octet-stream", bin)
+end
+
+function _route_density3d(path::String, base_dir::String)
+    p = _parse_run_file(path, "/api/density3d/")
+    p === nothing && return (400, "text/plain", "Expected /api/density3d/:run/:file")
+    fpath = joinpath(base_dir, p.name, p.file)
+    isfile(fpath) || return (404, "text/plain", "File not found: $(p.name)/$(p.file)")
+    json = try
+        _json_string(_compute_3d_densities(fpath))
+    catch e
+        "{\"error\":\"$(replace(string(e), "\"" => "'"))\"}"
+    end
+    (200, "application/json", json)
+end
+
+function _route_density3d_bin(path::String, base_dir::String, psi_cache::Dict{String, Any})
+    p = _parse_run_file(path, "/api/density3d_bin/")
+    p === nothing && return (400, "text/plain", "Expected /api/density3d_bin/:run/:file")
+    fpath = joinpath(base_dir, p.name, p.file)
+    isfile(fpath) || return (404, "text/plain", "File not found: $(p.name)/$(p.file)")
+    comp_idx = _q_int(p.query, "comp", 0)
+    snap_idx = _q_int_opt(p.query, "snap")
+    bsz = _q_flag(p.query, "bsz")
+    # Cache density3d_bin output by (file, snap, component). The
+    # packed Float32 volume is much smaller than the underlying ψ
+    # (524 KB for 64x64x32 vs 13.6 MB), so this is a RAM win + the
+    # time-scrubber playback hits cache after the first full pass.
+    # bsz variant cached separately to avoid re-encoding on each hit.
+    cache_key = "density3d_bin:$(fpath)#snap=$(snap_idx)#comp=$(comp_idx)#bsz=$(bsz)"
+    bin = if haskey(psi_cache, cache_key)
+        psi_cache[cache_key]
+    else
+        while length(psi_cache) >= PSI_CACHE_MAX_ENTRIES
+            _evict_one!(psi_cache)
+        end
+        v = try
+            raw = _compute_3d_density_binary(
+                _load_psi_cached(fpath, psi_cache, snap_idx)...; component=comp_idx
+            )
+            _maybe_bitshuffle_zstd(raw, bsz)
+        catch e
+            return (500, "text/plain", "Error: $(e)")
+        end
+        psi_cache[cache_key] = v
+        v
+    end
+    (200, "application/octet-stream", bin)
+end
+
+function _route_dynamics_series(path::String, base_dir::String)
+    # /api/dynamics_series/:run/:file → scalar time series for sparkline rendering
+    p = _parse_run_file(path, "/api/dynamics_series/")
+    p === nothing &&
+        return (400, "text/plain", "Expected /api/dynamics_series/:run/:file")
+    fpath = joinpath(base_dir, p.name, p.file)
+    isfile(fpath) || return (404, "text/plain", "File not found: $(p.name)/$(p.file)")
+    json = try
+        d = JLD2.load(fpath)
+        out = Dict{String, Any}("has_dynamics" => haskey(d, "dynamics/times"))
+        for k in (
+            "dynamics/times",
+            "dynamics/energies",
+            "dynamics/magnetizations",
+            "dynamics/norms",
+        )
+            haskey(d, k) || continue
+            out[split(k, "/")[2]] = Float64.(d[k])
+        end
+        if haskey(d, "dynamics/component_populations")
+            # Just return the dominant m's series so sparklines stay compact.
+            pops = d["dynamics/component_populations"]
+            n_snaps = size(pops, 1)
+            n_comp = size(pops, 2)
+            out["pop_top"] = [Float64(pops[t, 1]) for t in 1:n_snaps]  # m=+F
+            out["pop_mid"] = [Float64(pops[t, (n_comp + 1) ÷ 2]) for t in 1:n_snaps]  # m=0
+        end
+        _json_string(out)
+    catch e
+        "{\"error\":\"$(replace(string(e), "\"" => "'"))\"}"
+    end
+    (200, "application/json", json)
+end
+
+function _route_snapshots(path::String, base_dir::String, psi_cache::Dict{String, Any})
+    # /api/snapshots/:run/:file → metadata for the time-scrubber UI.
+    p = _parse_run_file(path, "/api/snapshots/")
+    p === nothing && return (400, "text/plain", "Expected /api/snapshots/:run/:file")
+    fpath = joinpath(base_dir, p.name, p.file)
+    isfile(fpath) || return (404, "text/plain", "File not found: $(p.name)/$(p.file)")
+    meta = _snapshots_metadata(fpath)
+    if meta === nothing
+        return (200, "application/json", "{\"n_snapshots\":0,\"times\":[]}")
+    end
+    # Kick off background warming of every per-snap density_bin (axis=3,
+    # the default the SlicePanel opens to). The frontend's prefetch
+    # only covers the next 1-2 frames; this turns the rest of the run
+    # into a cache hit by the time the user scrubs to it. axis=1/2 are
+    # warmed lazily via the existing per-request path.
+    n_snaps = get(meta, "n_snapshots", 0)
+    if n_snaps isa Integer && n_snaps > 0
+        # Prefer the user's most-likely first axis (z-integration)
+        # but warm 1 and 2 right behind it so the axis selector is
+        # also instant. The warmer yields between frames so the
+        # subsequent axes don't starve the active scrub.
+        for ax in (3, 1, 2)
+            inflight_key = "warm_density_bin:$(fpath)#axis=$(ax)"
+            inflight_key in _PREPACK_INFLIGHT && continue
+            push!(_PREPACK_INFLIGHT, inflight_key)
+            @async _warm_density_bin_all(fpath, Int(n_snaps), ax, psi_cache, base_dir)
+        end
+    end
+    (200, "application/json", _json_string(meta))
 end
 

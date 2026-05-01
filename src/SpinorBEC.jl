@@ -25,14 +25,22 @@ const TIMER = TimerOutput()
 # FOUNDATION: Core types, math, backend
 # ========================================
 
-# 1. Type definitions (must be first)
+# 1. Type definitions (must be first). Files load in dependency order:
+# Waveform → Grid → AbstractPotential → spin/atom → interactions+Zeeman →
+# SimParams/SimState/FFT → DDI/Loss → integrator → Workspace → results/scan.
+# types.jl itself is now a stub (R22 split 2026-05-02).
 include("foundation/waveform.jl")
-# `potentials.jl` defines AbstractPotential; main types.jl references it
-# in field declarations (Workspace.potential, etc), so must load first.
-include("foundation/types/potentials.jl")        # 12 trap / beam / lattice / gradient potential structs
-include("foundation/types.jl")                   # core: Grid, Spin, Atom, Interactions, Zeeman, SimParams, Workspace, …
+include("foundation/types/grid.jl")              # AbstractBackend, GridConfig, Grid, GridF64
+include("foundation/types/potentials.jl")        # AbstractPotential + 12 trap / beam / lattice / gradient subtypes
+include("foundation/types/spin_atom.jl")         # SpinSystem, SpinMatrices, AtomSpecies
+include("foundation/types/interactions_zeeman.jl") # InteractionParams, ZeemanParams, TimeDependent*, Raman, accessors
+include("foundation/types/sim_fft.jl")           # SimParams, SimState, FFTPlans, RFFT, BatchedKineticCache, CoriolisCache, AbsorbingBoundary
+include("foundation/types/ddi_loss.jl")          # DDIParams, DDIBuffers, DDIPaddedContext, LossParams, LightShift, TensorInteractionCache
+include("foundation/types/integrator.jl")        # AdaptiveDtParams, IntegratorConfig, SimulationResult, TWAConfig, EnsembleResult
+include("foundation/types/workspace.jl")         # Workspace + workspace_T (depends on everything above)
 include("foundation/types/results.jl")           # TOFParams, BdGResult, InstabilityMap, RotonParams, etc
 include("foundation/types/scan.jl")              # OverrideScan, ConstrainedJzScan, ITPCheckpoint
+include("foundation/types.jl")                   # stub (split into topical files above)
 
 # 2. Mathematical foundation
 include("foundation/grid.jl")
@@ -102,7 +110,8 @@ include("workflow/io/save_rotating_result.jl")
 include("workflow/io/dashboard/encoding.jl")      # bitshuffle + zstd
 include("workflow/io/dashboard/cache.jl")         # PSI_CACHE, JLD handle pool, atlas disk cache
 include("workflow/io/dashboard/snapshots.jl")     # _load_psi_cached + sibling result.jld2 redirect
-include("workflow/io/dashboard/routes.jl")        # extracted long-branch handlers (scan_group / physics_summary / density_max / synth_disp)
+include("workflow/io/dashboard/route_helpers.jl") # _parse_run_file / _parse_run_only / _q_int / _q_float / _q_flag / _q_sym
+include("workflow/io/dashboard/routes.jl")        # all _route_* handlers (R21 + R24)
 include("workflow/io/dashboard.jl")               # router + serve_dashboard + JSON helpers
 include("workflow/io/dashboard/websocket.jl")     # WS handshake + frames + serve
 include("workflow/io/dashboard/compute.jl")       # column/3d density + phase + atlas kernels
@@ -140,11 +149,23 @@ include("workflow/experiments/builders_potential.jl")       # _build_potential /
 include("workflow/experiments/builders_phase.jl")           # waveforms + zeeman + raman builders
 include("workflow/experiments/zeeman_levels.jl")
 include("workflow/experiments/pipeline_types.jl")
-include("workflow/experiments/analyzers_large.jl")     # extracted bodies for the 5 longest analyzers
-include("workflow/experiments/pipeline_analyzers.jl")
+include("workflow/experiments/analyzers/helpers.jl")        # _phase_diff, _line_through_peak, _fwhm_1d, _rms_width_1d, _max_forward_grad
+include("workflow/experiments/analyzers/imaging.jl")        # tomography, faraday, absorption, phase_contrast, sg_tof, momentum_distribution
+include("workflow/experiments/analyzers/phase.jl")          # phase_classify[/distance], energy_decomposition, multipole_order, majorana_order
+include("workflow/experiments/analyzers/topology.jl")       # winding_map, winding_field, monopole_charge, vortex_detect, skyrmion_density, non_abelian_homotopy
+include("workflow/experiments/analyzers/spectroscopy.jl")   # bragg, droplet, correlation_length, defect_density, kibble_zurek_stats, domain_analysis
+include("workflow/experiments/analyzers/stability.jl")      # stability, bogoliubov, bogoliubov_dispersion + _run_bogoliubov_analyzer
+include("workflow/experiments/analyzers/misc.jl")           # summary_json (only analyzer that needs pipeline_results)
+include("workflow/experiments/analyzers_large.jl")          # skyrmion_detect, synthetic_dim, bogoliubov_mode, rosensweig_pattern, column_density_movie
+include("workflow/experiments/pipeline_analyzers.jl")       # _run_analyzer dispatch (delegates to all the above)
 include("workflow/experiments/pipeline_dispatch.jl")    # save_every / b_hat / dt-from-eps / twa / light_shift parsers
 include("workflow/experiments/pipeline_callbacks.jl")    # sgpe / projected_gp / photon_scattering / live_monitor callback builders
-include("workflow/experiments/pipeline_runner.jl")
+include("workflow/experiments/pipeline_runner.jl")       # stub (split into pipeline/*.jl below)
+include("workflow/experiments/pipeline/runner.jl")               # parse_pipeline + run_pipeline + _step_dispatch! + AnalyzeStep
+include("workflow/experiments/pipeline/run_step_ground_state.jl") # _run_step(::GroundStateStep) + 5 GS helpers
+include("workflow/experiments/pipeline/run_step_dynamics.jl")     # _run_step(::DynamicsStep) + dyn helpers + streaming
+include("workflow/experiments/pipeline/run_step_binary.jl")       # _run_step(::Binary*Step) + binary helpers
+include("workflow/experiments/pipeline/run_step_rotating.jl")     # _run_step(::RotatingBasis*Step) + chirp helpers
 include("workflow/experiments/pulse_sequence.jl")
 include("workflow/experiments/sta_counter_diabatic.jl")
 include("workflow/experiments/feshbach_ramp.jl")
