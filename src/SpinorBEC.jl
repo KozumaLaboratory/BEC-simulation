@@ -209,6 +209,7 @@ include("solvers/binary_simulation.jl")
 export GridConfig, Grid, SpinSystem, SpinMatrices
 export AtomSpecies, InteractionParams, ZeemanParams, LossParams, AbsorbingBoundary, LightShift,
     TensorInteractionCache
+export linear_p, quadratic_q, transverse_b   # uniform Zeeman accessors
 export SimParams,
     SimState, FFTPlans, RFFTPlans, Workspace, AdaptiveDtParams, IntegratorConfig
 export SimulationResult, TWAConfig, EnsembleResult

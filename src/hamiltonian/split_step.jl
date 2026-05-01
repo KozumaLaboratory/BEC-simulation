@@ -301,12 +301,8 @@ end
 function _apply_transverse_zeeman_step!(
     ws::Workspace, t::Float64, dt_frac::Float64, ndim::Int, imaginary_time::Bool
 )
-    ws.zeeman isa TimeDependentZeeman || return nothing
-    bx_wf = ws.zeeman.bx_wf
-    by_wf = ws.zeeman.by_wf
-    (bx_wf === nothing && by_wf === nothing) && return nothing
-    bx_lab = bx_wf !== nothing ? evaluate(bx_wf, t) : 0.0
-    by_lab = by_wf !== nothing ? evaluate(by_wf, t) : 0.0
+    bx_lab, by_lab = transverse_b(ws.zeeman, t)
+    (bx_lab == 0.0 && by_lab == 0.0) && return nothing
     # Optional spin rotating frame: rotate (Bx, By) into the RF coords;
     # when ω_R = ω_drive the transverse field becomes static in RF.
     omega_R = ws.sim_params.spin_rotating_frame_omega

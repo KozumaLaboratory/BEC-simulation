@@ -249,6 +249,35 @@ TimeDependentZeeman(f::Function) = TimeDependentZeeman(
     nothing, nothing,
 )
 
+# --- Uniform Zeeman accessors -------------------------------------------
+#
+# Both ZeemanParams (constant) and TimeDependentZeeman (waveforms) are
+# valid arguments to the solver, but they expose different field names
+# (`.p` vs `.p_wf`). Without a unified accessor every call site that
+# wants the linear-Zeeman scalar at a given time has to dispatch via
+# `if zeeman isa TimeDependentZeeman`. This caused a `FieldError` in
+# `make_workspace`'s Larmor-regime advisory when the EdH config switched
+# to time-dependent Bz; rather than patching that one site we provide
+# `linear_p` / `quadratic_q` / `transverse_b` for everyone.
+
+"""Linear Zeeman coefficient at time `t`. For ZeemanParams this is the
+constant `p`; for TimeDependentZeeman it samples `p_wf` at `t`."""
+linear_p(z::ZeemanParams, ::Real=0.0) = z.p
+linear_p(z::TimeDependentZeeman, t::Real=0.0) = evaluate(z.p_wf, Float64(t))
+
+"""Quadratic Zeeman coefficient at time `t`."""
+quadratic_q(z::ZeemanParams, ::Real=0.0) = z.q
+quadratic_q(z::TimeDependentZeeman, t::Real=0.0) = evaluate(z.q_wf, Float64(t))
+
+"""Transverse field components `(Bx, By)` at time `t`. Both are zero for
+plain ZeemanParams (purely longitudinal)."""
+transverse_b(::ZeemanParams, ::Real=0.0) = (0.0, 0.0)
+function transverse_b(z::TimeDependentZeeman, t::Real=0.0)
+    bx = z.bx_wf === nothing ? 0.0 : evaluate(z.bx_wf, Float64(t))
+    by = z.by_wf === nothing ? 0.0 : evaluate(z.by_wf, Float64(t))
+    (bx, by)
+end
+
 # --- Raman Coupling ---
 
 struct RamanCoupling{N}

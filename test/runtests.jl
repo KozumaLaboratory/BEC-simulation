@@ -63,6 +63,7 @@ const FAST_TESTS = [
     "test_vtk_export.jl",
     "test_infrastructure.jl",
     "test_zeeman_levels.jl",
+    "test_zeeman_accessors.jl",
 ]
 
 # ── CI tier: fast + core integration tests that run ITP/RTP ──
