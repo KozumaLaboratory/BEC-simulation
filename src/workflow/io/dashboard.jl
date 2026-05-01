@@ -2779,9 +2779,15 @@ function _load_psi_cached(
     while length(cache) >= PSI_CACHE_MAX_ENTRIES
         _evict_one!(cache)
     end
+    # Snap requests redirect to the sibling result.jld2 when the requested
+    # file (typically point_NNN.jld2 from the lab-frame spinor pipeline)
+    # only carries a static final ψ. Static-ψ requests stay on jld2_path
+    # so the dashboard's "open run" hop still gets the metadata-bearing
+    # point file even when result.jld2 also exists.
+    src_path = snap_idx === nothing ? jld2_path : _resolve_snapshot_source(jld2_path)
     get!(cache, key) do
         if snap_idx === nothing
-            d = JLD2.load(jld2_path)
+            d = JLD2.load(src_path)
             psi = d["psi"]
         else
             # Two on-disk layouts are supported:
@@ -2799,7 +2805,7 @@ function _load_psi_cached(
             # column/phase packers already cast to Float32, and the
             # JSON helpers promote via `Float64(...)` lazily, so they
             # don't care.
-            psi = _with_jld_handle(jld2_path) do f
+            psi = _with_jld_handle(src_path) do f
                 if haskey(f, "dynamics/psi_snapshots_streamed/n_snapshots")
                     n = Int(f["dynamics/psi_snapshots_streamed/n_snapshots"])
                     k = clamp(snap_idx, 1, n)
@@ -2841,9 +2847,35 @@ function _load_psi_cached(
     end
 end
 
+"""Return the path that actually carries the streamed dynamics snapshots
+for `jld2_path`. The lab-frame spinor pipeline writes only the static
+final ψ + scalar traces to point_NNN.jld2, while the per-frame spinor
+volumes live in sibling result.jld2 (canonical streamed layout). If
+the requested file has its own snapshots (rotating_basis path, or a
+legacy run that embedded them) return it unchanged; otherwise
+redirect to the sibling result.jld2 when present."""
+function _resolve_snapshot_source(jld2_path::String)
+    try
+        has_streams = jldopen(jld2_path, "r") do f
+            haskey(f, "dynamics/psi_snapshots_streamed/n_snapshots") ||
+                haskey(f, "dynamics/psi_snapshots") ||
+                haskey(f, "psi_snapshots")
+        end
+        has_streams && return jld2_path
+    catch
+        # fall through to sibling search
+    end
+    sibling = joinpath(dirname(jld2_path), "result.jld2")
+    if isfile(sibling) && sibling != jld2_path
+        return sibling
+    end
+    jld2_path
+end
+
 """Return metadata about the saved snapshot time series, or nothing if
 the file has no `dynamics/psi_snapshots` key."""
 function _snapshots_metadata(jld2_path::String)
+    src_path = _resolve_snapshot_source(jld2_path)
     try
         # Use a fresh handle here rather than the persistent
         # _OPEN_JLD_HANDLES one: this function holds the lock for the
@@ -2852,7 +2884,7 @@ function _snapshots_metadata(jld2_path::String)
         # in-flight scrub fetches sharing the handle. /api/snapshots is
         # called once per run-open hop, so the per-call open cost is
         # acceptable in exchange for not starving the hot path.
-        jldopen(jld2_path, "r") do f
+        jldopen(src_path, "r") do f
             times = haskey(f, "dynamics/times") ?
                     Float64.(f["dynamics/times"]) : Float64[]
             if haskey(f, "dynamics/psi_snapshots_streamed/n_snapshots")
