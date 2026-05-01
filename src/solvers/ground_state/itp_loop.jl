@@ -40,16 +40,28 @@ function _run_itp_loop!(
     cc = ws.coriolis_cache
     it = true  # imaginary time
 
-    # ITP leapfrog: merge outer V substeps (diag+SM+nematic+tensor+raman)
-    # between adjacent steps. DDI stays at dt/2 (ITP real exponentials
-    # would overflow if doubled).
+    # ITP Strang split. V(dt/2) = outer_fwd(dt/4) DDI(dt/2) outer_bwd(dt/4).
+    # A full step is V(dt/2) K(dt) V(dt/2), and across adjacent steps the
+    # trailing V(dt/2) of step n and the leading V(dt/2) of step n+1 sit
+    # back-to-back between K-steps.
     #
-    # Standard split_step V(dt/2):
-    #   outer_fwd(dt/4) → DDI(dt/2) → outer_bwd(dt/4)
+    # The previous merged-leapfrog form replaced those two V(dt/2) blocks
+    # with a single `outer_fwd(dt/2) DDI(dt/2) outer_bwd(dt/2)`. That
+    # collapsed outer to dt total (correct) but DDI to dt/2 total (wrong —
+    # Strang requires dt). Empirically the converged ground state shifted
+    # by ~7% in energy and ψ became visibly different when `save_every`
+    # was changed from 1 → 100; with c_dd = 0 the same comparison was at
+    # numerical-noise level. Bug-4 (2026-05-02) — confirmed by direct
+    # comparison test in `test/test_itp_ddi_strang_save_every.jl`.
     #
-    # Leapfrog merges boundary outer_bwd(dt/4) + outer_fwd(dt/4) = outer(dt/2).
+    # Two consecutive `_ddi_step!(ws, dt/2, …)` calls are NOT equivalent
+    # to a single `_ddi_step!(ws, dt, …)`: `_compute_and_convolve_ddi!`
+    # rebuilds φ_{x,y,z} from the current ψ each call, so substepping is
+    # the more accurate scheme. Each individual call still uses dt/2 in
+    # its `exp(-2F·θ)` shift, so the comment about overflow still holds —
+    # we never call DDI at full dt.
     #
-    # Open: outer_fwd(dt/4) DDI(dt/2) outer_bwd(dt/4)
+    # Open: V(dt/2)
     _outer_potential_fwd!(ws, dt / 4, n_comp_ws, N_dim, it)
     _ddi_step!(ws, dt / 2, N_dim, it)
     _outer_potential_bwd!(ws, dt / 4, n_comp_ws, N_dim, it)
@@ -63,22 +75,12 @@ function _run_itp_loop!(
             apply_kinetic_step_batched!(ws.state.psi, bk)
             _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, it, cc)
 
-            is_check = step % sp.save_every == 0
-            is_last = step == n_steps
-            need_split = is_check || is_last
-
-            if need_split
-                # Close: outer_fwd(dt/4) DDI(dt/2) outer_bwd(dt/4)
-                _outer_potential_fwd!(ws, dt / 4, n_comp_ws, N_dim, it)
-                _ddi_step!(ws, dt / 2, N_dim, it)
-                _outer_potential_bwd!(ws, dt / 4, n_comp_ws, N_dim, it)
-            else
-                # Merged boundary: outer(dt/2) then DDI(dt/2) then outer(dt/2)
-                # bwd(dt/4)+fwd(dt/4) = single pass at dt/2
-                _outer_potential_fwd!(ws, dt / 2, n_comp_ws, N_dim, it)
-                _ddi_step!(ws, dt / 2, N_dim, it)
-                _outer_potential_bwd!(ws, dt / 2, n_comp_ws, N_dim, it)
-            end
+            # Close: V(dt/2). On non-checkpoint steps the loop's reopen
+            # block at the end appends another V(dt/2), so DDI gets the
+            # full dt per step from the V(dt/2)+V(dt/2) pair.
+            _outer_potential_fwd!(ws, dt / 4, n_comp_ws, N_dim, it)
+            _ddi_step!(ws, dt / 2, N_dim, it)
+            _outer_potential_bwd!(ws, dt / 4, n_comp_ws, N_dim, it)
 
             ws.state.step += 1
             if ws.sim_params.normalize_every > 0 &&
@@ -149,8 +151,9 @@ function _run_itp_loop!(
                 E_prev = E
             end
 
-            # Reopen leapfrog after split point
-            if need_split && !converged && step < n_steps
+            # Reopen V(dt/2) for the next K-step (skipped after the
+            # final step or once converged — no further K to chain into).
+            if !converged && step < n_steps
                 _outer_potential_fwd!(ws, dt / 4, n_comp_ws, N_dim, it)
                 _ddi_step!(ws, dt / 2, N_dim, it)
                 _outer_potential_bwd!(ws, dt / 4, n_comp_ws, N_dim, it)
