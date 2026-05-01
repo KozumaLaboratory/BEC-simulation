@@ -24,19 +24,24 @@ ws = make_workspace(...)
 result = run_simulation!(ws, live_monitor=monitor)
 ```
 """
-mutable struct LiveMonitor
+mutable struct LiveMonitor{F}
     output_file::Union{Nothing, String}
     update_interval::Int
     last_update_step::Int
-    extract_observables::Function
+    extract_observables::F
+end
 
-    function LiveMonitor(;
-        output_file::Union{Nothing, String}=nothing,
-        update_interval::Int=10,
-        extract_observables::Function=default_observable_extractor,
-    )
-        new(output_file, update_interval, 0, extract_observables)
-    end
+# Parameterising on F<:Function (instead of an abstract `::Function` field)
+# means `monitor.extract_observables(ws)` is statically dispatched. The
+# previous form re-resolved the function call dynamically every
+# `update_interval` steps; for a custom extractor that allocated, this
+# was a non-trivial fraction of the total cost in long EdH runs.
+function LiveMonitor(;
+    output_file::Union{Nothing, String}=nothing,
+    update_interval::Int=10,
+    extract_observables::F=default_observable_extractor,
+) where {F <: Function}
+    LiveMonitor{F}(output_file, update_interval, 0, extract_observables)
 end
 
 """

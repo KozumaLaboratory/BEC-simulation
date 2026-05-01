@@ -113,18 +113,30 @@ function _build_live_callback(node, status_path::Union{Nothing, String})
     end
 end
 
+"""Composed-callback wrapper: tuple-typed so each inner callback is
+statically dispatched. The previous closure-based form captured a
+`Vector{Any}` of callbacks and incurred dynamic dispatch on every
+step × every callback (a measurable cost in long Eu151 runs)."""
+struct ComposedCallbacks{T <: Tuple}
+    cbs::T
+end
+
+@inline function (cc::ComposedCallbacks)(ws, step, args...)
+    for cb in cc.cbs
+        cb(ws, step, args...)
+    end
+    nothing
+end
+
 """Compose multiple optional on_step callbacks into a single one. Each
-nothing entry is silently skipped."""
+`nothing` entry is silently skipped. Returns `nothing`, the lone callback,
+or a `ComposedCallbacks{Tuple{...}}` instance for ≥ 2 callbacks — never
+an anonymous closure (CLAUDE.md type-stability discipline)."""
 function _compose_callbacks(cbs...)
-    real_cbs = filter(cb -> cb !== nothing, collect(cbs))
+    real_cbs = tuple((cb for cb in cbs if cb !== nothing)...)
     isempty(real_cbs) && return nothing
     length(real_cbs) == 1 && return real_cbs[1]
-    function (ws, step, args...)
-        for cb in real_cbs
-            cb(ws, step, args...)
-        end
-        nothing
-    end
+    ComposedCallbacks(real_cbs)
 end
 function _build_sgpe_callback(node, dt::Float64)
     node === nothing && return nothing

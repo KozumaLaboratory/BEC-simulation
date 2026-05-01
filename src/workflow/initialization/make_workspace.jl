@@ -335,9 +335,13 @@ function _rebuild_workspace(ws::Workspace; kwargs...)
 end
 
 _shift_zeeman_for_rotating_frame(z::ZeemanParams, omega::Float64) = ZeemanParams(z.p - omega, z.q)
-_shift_zeeman_for_rotating_frame(z::TimeDependentZeeman, omega::Float64) = TimeDependentZeeman(
-    FunctionWaveform(t -> evaluate(z.p_wf, t) - omega),
-    z.q_wf,
-    z.bx_wf,
-    z.by_wf,
-)
+
+# Use the concrete `ShiftedWaveform{typeof(z.p_wf)}` rather than wrapping
+# in `FunctionWaveform(t -> ...)`. Each closure-based call leaked a fresh
+# anonymous-function type into the per-step `evaluate` dispatch table;
+# `ShiftedWaveform` keeps that static. (The narrowed concrete-type
+# annotation also lets the optimiser specialise `evaluate(p_wf, t)` —
+# see CLAUDE.md "Type stability boundaries".)
+function _shift_zeeman_for_rotating_frame(z::TimeDependentZeeman, omega::Float64)
+    TimeDependentZeeman(ShiftedWaveform(z.p_wf, omega), z.q_wf, z.bx_wf, z.by_wf)
+end

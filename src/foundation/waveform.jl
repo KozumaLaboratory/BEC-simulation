@@ -217,6 +217,22 @@ end
 evaluate(w::StepWaveform, t::Float64) = t < w.t_step ? w.value_before : w.value_after
 
 """
+    ShiftedWaveform(inner, shift)
+
+Affine shift of an existing waveform: `evaluate(w, t) = evaluate(w.inner, t) - shift`.
+Concrete + parameterised on the inner waveform's type so dispatch stays
+static — replaces the common `FunctionWaveform(t -> evaluate(inner, t) - shift)`
+pattern, which leaks a unique closure type per call site (dynamic dispatch
+in every per-step `evaluate` call thereafter).
+"""
+struct ShiftedWaveform{W <: Waveform} <: Waveform
+    inner::W
+    shift::Float64
+end
+
+evaluate(w::ShiftedWaveform, t::Float64) = evaluate(w.inner, t) - w.shift
+
+"""
     load_waveform_csv(path; time_col=1, value_col=2, header=true, delimiter=',')
 
 Load a waveform from a CSV file. Returns an InterpolatedWaveform.
