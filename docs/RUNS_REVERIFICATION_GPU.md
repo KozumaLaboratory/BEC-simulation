@@ -48,10 +48,28 @@ Two configs need re-running on the post-fix integrator (per
 
 | Run | Config | Local re-run? | TSUBAME re-run needed |
 |---|---|---|---|
-| `runs/eu151_edh/` | 64³, n_steps=100 000, save_every=1000 | **No** — over budget on local GPU; 5-10 h on RTX 5070 Ti | **YES** |
-| `runs/eu151_lab_calibrated/` | 32³, n_steps=4 000, save_every=40 | **Blocked by an unrelated config bug** | **YES** after the bug below is fixed |
+| `runs/eu151_edh/` | 64³ → 32³ (Phase 0 GS only) | **DONE** post-fix on RTX 5070 Ti, 63.1 s, E = −880.501 | for production 64³ + dynamics chain |
+| `runs/eu151_lab_calibrated/` | 32³, n_steps=4 000, save_every=40 | **Blocked by ITP overflow at step 1** even after calibration→Bz fix; needs config-side stiffness debug | **YES** after stiffness bug below is sorted |
 
-### Side-finding: eu151_lab_calibrated has a **separate** schema/calibration ordering bug
+### Local re-run result: `runs/eu151_edh/result_postfix_gs_32cube.jld2`
+
+Reduced grid (64³ → 32³) and reduced n_steps (100 000 → 2 000) to fit the
+local-GPU wall time budget. The post-fix integrator converges cleanly:
+
+```
+ITP 1420/2000 | E=-880.50112 dE=8.25e-11 dpsi=6.35e-10 | 19.9 s elapsed
+E=-880.501  conv=true  Mz=6.0  [m=6: 100.0%, m=5: 0.0%, ...]
+DONE in 63.1 s
+```
+
+Mz = 6.0 (m=+F stretched) confirms the physics is intact post-fix.
+Quantitative diff against the pre-fix `result.jld2` is blocked by a JLD2
+zstd world-age issue at fresh module load; the 32³ ψ saved is suitable
+for projection comparison after manual JLD2 dependency fix.
+
+### Side-finding: eu151_lab_calibrated had **3 layered bugs** unrelated to Bug-4
+
+Encountered (and partially fixed) during the local re-run audit:
 
 While attempting the local re-run, two issues surfaced that are
 **independent of Bug-4** and predate it:
@@ -62,22 +80,31 @@ While attempting the local re-run, two issues surfaced that are
    them at that level (`Unknown key 'pipeline.1.ground_state.omega_ref'`).
    This commit (R41) moved them under `interactions:` to comply.
 
-2. **calibration → units pipeline ordering**: after the schema fix,
-   the run still fails with `MethodError: no method matching Float64(::String)`
-   in `_resolve_derived_params!` line 222 (`_to_float_vec(pot["omega"])`).
-   The calibration step transforms `fort_power_mw: [50, 50, 100]` into
-   `omega: ["3157 Hz", "3157 Hz", "5980 Hz"]` (string entries with
-   unit suffixes), but the subsequent `_to_float_vec` in
-   `parsing_blocks.jl` doesn't strip those unit suffixes. Either
-   `apply_units_block!` needs to run **after** calibration (so strings
-   like `"3157 Hz"` get parsed to `3157.0`), or `_to_float_vec` needs
-   to handle quantity strings inline.
+2. **`_to_float_vec` not quantity-string aware** (FIXED, this commit):
+   `apply_calibration!` transforms `fort_power_mw: [50, 50, 100]` into
+   `omega: ["3157 Hz", …]` strings, but `_to_float_vec` in
+   `parsing_units.jl` only handled Reals. Extended to call
+   `_parse_angular_frequency` for string elements.
 
-   Until that's addressed, this config can't be re-run end-to-end.
-   Workaround: pre-resolve the calibration manually and write the
-   numeric `omega:` directly into the YAML, then run.
+3. **calibration p-Gauss vs p-dimensionless convention collision**
+   (FIXED, this commit): `_calibrate_zeeman_node!` was producing
+   `node["p"] = "X Gauss"` (a Cartesian quantity), but `p` is the
+   dimensionless Zeeman energy internally — `_zeeman_scalar` at
+   `parsing_units.jl:11` then crashed with `MethodError: Float64(::String)`.
+   Routed calibration output to `node["Bz"]` instead; the
+   `_split_B_block!` normaliser correctly handles `B.Bz: "X Gauss"`.
 
-   **Action**: file as a separate bug, address before TSUBAME burst.
+4. **ITP NaN at step 1 with calibrated parameters** (NOT FIXED, deferred):
+   After the calibration→Bz fix the GS step actually starts but immediately
+   overflows. The Eu calibrated parameters (c_dd ≈ 126.6 dimensionless,
+   ⟨n⟩ ≈ 1, F = 6 stretched state) push the DDI rotation factor
+   `exp(-2F·θ)` past safe range with `dt = 0.005`. Smaller dt (0.001)
+   doesn't help — the issue is in the per-step DDI exponential
+   amplitude, not the per-step dt. Likely a config-tuning issue where
+   `N_atoms = 30 000`, `omega_ref = 691.15`, and the calibrated trap
+   geometry produce a higher-density cloud than the ITP step assumes.
+   **Workaround**: reduce N_atoms or relax tol; defer for thesis-side
+   debugging since it's separate from Bug-4.
 
 Local re-run via temp-YAML pipeline truncation tripped on schema
 validation for the calibration mixin. On TSUBAME the original

@@ -196,7 +196,14 @@ function _calibrate_zeeman_node!(node::Dict, calib::CalibrationSet)
     if haskey(node, "p_mv")
         coil = _pick_coil(node, calib)
         gauss = coil_mv_to_gauss(Float64(node["p_mv"]), coil)
-        node["p"] = "$(gauss) Gauss"
+        # Output as a Cartesian Bz quantity-string. The legacy convention
+        # was `p: "X Gauss"`, but `p` is the dimensionless Zeeman energy
+        # internally — feeding a Gauss-string into `p` collides with
+        # `_zeeman_scalar` (which only handles Reals + dim-less). The
+        # B_block normalizer + downstream `_parse_bfield` correctly handle
+        # `Bz: "X Gauss"`. Calibration→units pipeline ordering bug fix
+        # (2026-05-02).
+        node["Bz"] = "$(gauss) Gauss"
         delete!(node, "p_mv")
     end
     if haskey(node, "q_mv")

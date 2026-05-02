@@ -94,5 +94,16 @@ end
 
 _to_int_vec(v::Vector) = Int[Int(x) for x in v]
 _to_int_vec(v) = Int[Int(v)]
-_to_float_vec(v::Vector) = Float64[Float64(x) for x in v]
+
+# Convert each element to Float64; quantity strings ("3157 Hz", "2π·50 rad/s")
+# are parsed via `_parse_angular_frequency`. This lets calibration outputs
+# like `omega: ["3157 Hz", "3157 Hz", "5980 Hz"]` flow through downstream
+# code (`_resolve_derived_params!` line 222) without a separate units-block
+# pass — closing the calibration→units ordering bug surfaced in the
+# 2026-05-02 eu151_lab_calibrated re-run audit.
+_to_float_vec(v::Vector) = Float64[
+    x isa AbstractString ? _parse_angular_frequency(x) : Float64(x)
+    for x in v
+]
+_to_float_vec(v::AbstractString) = Float64[_parse_angular_frequency(v)]
 _to_float_vec(v) = Float64[Float64(v)]
