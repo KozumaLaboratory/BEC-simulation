@@ -81,7 +81,7 @@ using FFTW
               n_steps: 100
               tol: 1e-6
               initial_state: polar
-              zeeman:
+              B:
                 p: 0.0
                 q: 0.0
               potential: {type: harmonic, omega: [1.0]}

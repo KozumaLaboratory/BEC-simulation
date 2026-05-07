@@ -483,7 +483,7 @@ pipeline:
   - dynamics:
       duration: 0.01
       dt: 0.001
-      zeeman:
+      B:
         p: 10.0
         q: 0.5
         bx: {sinusoidal: {amplitude: 1.0, frequency: 10.0}}

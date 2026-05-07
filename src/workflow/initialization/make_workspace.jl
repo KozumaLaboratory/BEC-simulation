@@ -277,6 +277,62 @@ function make_workspace(;
             c_dd=enable_ddi && !isnan(c_dd) ? c_dd : 0.0,
             n_max=n_max_est,
         )
+    elseif spinor_lhy === :polar_contact
+        # F-generic polar contact LHY (paper #1, contact-only). ~1000× faster
+        # than :full_bdg. Restricted to polar spinors (ζ_α = δ_{α,0}); for
+        # post-quench / mixed states fall back to :full_bdg.
+        n_max_est = if psi_init !== nothing
+            maximum(sum(abs2, psi_init; dims=ndims(psi_init))) * 3.0
+        else
+            100.0
+        end
+        g_dict = _c0c1_to_gS(atom.F, ws_interactions.c0, ws_interactions.c1)
+        if !isempty(ws_interactions.c_extra)
+            for (S, dg) in _c_extra_to_delta_gS(atom.F, ws_interactions.c_extra)
+                g_dict[S] = get(g_dict, S, 0.0) + dg
+            end
+        end
+        compute_spinor_lhy_polar_contact(; F=atom.F, g_dict=g_dict, n_max=n_max_est)
+    elseif spinor_lhy === :fm_contact
+        # FM-phase contact LHY (paper #2 contact-only piece). Single-mode
+        # collapse at m=+F: ε = (8/15π²)(g_{2F}n)^(5/2). For uniform g_S
+        # this matches scalar Lima-Pelster; for realistic per-S a_S it
+        # differs. DDI extension is not yet derived.
+        n_max_est = if psi_init !== nothing
+            maximum(sum(abs2, psi_init; dims=ndims(psi_init))) * 3.0
+        else
+            100.0
+        end
+        g_dict = _c0c1_to_gS(atom.F, ws_interactions.c0, ws_interactions.c1)
+        if !isempty(ws_interactions.c_extra)
+            for (S, dg) in _c_extra_to_delta_gS(atom.F, ws_interactions.c_extra)
+                g_dict[S] = get(g_dict, S, 0.0) + dg
+            end
+        end
+        compute_spinor_lhy_fm_contact(; F=atom.F, g_dict=g_dict, n_max=n_max_est)
+    elseif spinor_lhy === :polar_dipolar
+        # F-generic polar contact + DDI LHY (paper #1 with dipolar extension).
+        # ε̃ derived as the simple |c_dd| / |δ_1| ratio; for finer control
+        # over the convention call `compute_spinor_lhy_polar_dipolar(;
+        # eps_tilde_dd, ...)` directly and pass the resulting `SpinorLHYTable`
+        # via `lhy_table=`.
+        n_max_est = if psi_init !== nothing
+            maximum(sum(abs2, psi_init; dims=ndims(psi_init))) * 3.0
+        else
+            100.0
+        end
+        g_dict = _c0c1_to_gS(atom.F, ws_interactions.c0, ws_interactions.c1)
+        if !isempty(ws_interactions.c_extra)
+            for (S, dg) in _c_extra_to_delta_gS(atom.F, ws_interactions.c_extra)
+                g_dict[S] = get(g_dict, S, 0.0) + dg
+            end
+        end
+        c_dd_eff = enable_ddi && !isnan(c_dd) ? c_dd : 0.0
+        delta_1 = PolarContactLHY.delta_polar(atom.F, 1, g_dict)
+        eps_tilde_dd = abs(delta_1) > 1e-12 ? abs(c_dd_eff) / abs(delta_1) : 0.0
+        compute_spinor_lhy_polar_dipolar(; F=atom.F, g_dict=g_dict,
+            eps_tilde_dd=eps_tilde_dd,
+            n_max=n_max_est)
     elseif quasi_2d && abs(ws_interactions.c_lhy) > 1e-30
         compute_lhy_2d_params(ws_interactions.c0, l_z)
     elseif abs(ws_interactions.c_lhy) > 1e-30

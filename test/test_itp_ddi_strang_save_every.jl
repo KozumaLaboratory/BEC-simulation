@@ -48,8 +48,9 @@ using Test
         )
     end
 
-    run_itp(ws) =
-        _run_itp_loop!(ws, ws.sim_params.n_steps, 1.0e-13, nothing, nothing; verbose=false)
+    run_itp(ws) = _run_itp_loop!(
+        ws, ws.sim_params.n_steps, 1.0e-13, nothing, nothing; verbose=false
+    )
 
     @testset "DDI on: ψ independent of save_every" begin
         ws_a = build_ws(1; c_dd_val=2000.0)

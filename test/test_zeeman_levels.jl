@@ -13,7 +13,14 @@ const _SKIP_HEAVY_YAML_ZEEMAN =
         @test SpinorBEC._detect_zeeman_level(
             Dict{String, Any}("B_mag" => 1.0, "theta_deg" => 30)
         ) == 2
-        @test SpinorBEC._detect_zeeman_level(Dict{String, Any}("level" => 2, "B_mag" => 1.0)) == 2
+        # Explicit `level:` alone (no vector-coord keys) is detected
+        @test SpinorBEC._detect_zeeman_level(Dict{String, Any}("level" => 2)) == 2
+        # Explicit `level:` together with vector-coord keys is rejected
+        # (the keys imply the level, the explicit annotation is redundant
+        # and was tightened to a hard error 2026-04-30 to catch typos
+        # like `level: 1` paired with B_mag/theta_deg).
+        @test_throws ArgumentError SpinorBEC._detect_zeeman_level(
+            Dict{String, Any}("level" => 2, "B_mag" => 1.0))
 
         # Mixing levels rejected
         @test_throws ArgumentError SpinorBEC._detect_zeeman_level(
@@ -164,7 +171,7 @@ pipeline:
       atom: Dy164
       grid: {n: 16, box: 8.0}
       interactions: {c0: 50.0, c1: -0.2, omega_ref: 314.159}
-      zeeman: {Bz: 1.0e-4}
+      B: {Bz: 1.0e-4}
       dt: 0.01
       n_steps: 5
       tol: 1e-3
@@ -181,7 +188,7 @@ pipeline:
       atom: Dy164
       grid: {n: 16, box: 8.0}
       interactions: {c0: 50.0, c1: -0.2, omega_ref: 314.159}
-      zeeman: {Bz: 1.0e-4}
+      B: {Bz: 1.0e-4}
       dt: 0.01
       n_steps: 5
       tol: 1e-3
@@ -189,7 +196,7 @@ pipeline:
       duration: 0.01
       dt: 0.001
       interactions: {omega_ref: 314.159}
-      zeeman:
+      B:
         B_mag: 1.0e-4
         theta_deg: {from: 0.0, to: 35.0}
 """)

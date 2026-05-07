@@ -60,4 +60,7 @@ jobs:
       - uses: julia-actions/julia-buildpkg@v1
       - name: Run quick benchmark
         run: julia --project=. bench/bench_quick.jl
-        timeout-minutes: 5
+        # 5 min was too tight: JIT cascade for D=13 spinor + DDI cache +
+        # benchmark itself = ~5 min on the GitHub runner. Bumping to 8 min
+        # so a slow Julia startup doesn't kill an otherwise-green run.
+        timeout-minutes: 8

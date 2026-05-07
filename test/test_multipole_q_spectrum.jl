@@ -71,7 +71,7 @@ using Test
         for k in 0:5
             spec = multipole_q_spectrum(psi, F, k, 2; sort_descending=false)
             spec_sum = dropdims(sum(spec; dims=ndims(spec)); dims=ndims(spec))
-            @test spec_sum ≈ op_dict[k]  atol=1e-10
+            @test spec_sum ≈ op_dict[k] atol=1e-10
         end
     end
 end

@@ -84,16 +84,16 @@ TimeDependentZeeman(f::Function) = TimeDependentZeeman(
 
 """Linear Zeeman coefficient at time `t`. For ZeemanParams this is the
 constant `p`; for TimeDependentZeeman it samples `p_wf` at `t`."""
-linear_p(z::ZeemanParams, ::Real=0.0) = z.p
+linear_p(z::ZeemanParams, (::Real)=0.0) = z.p
 linear_p(z::TimeDependentZeeman, t::Real=0.0) = evaluate(z.p_wf, Float64(t))
 
 """Quadratic Zeeman coefficient at time `t`."""
-quadratic_q(z::ZeemanParams, ::Real=0.0) = z.q
+quadratic_q(z::ZeemanParams, (::Real)=0.0) = z.q
 quadratic_q(z::TimeDependentZeeman, t::Real=0.0) = evaluate(z.q_wf, Float64(t))
 
 """Transverse field components `(Bx, By)` at time `t`. Both are zero for
 plain ZeemanParams (purely longitudinal)."""
-transverse_b(::ZeemanParams, ::Real=0.0) = (0.0, 0.0)
+transverse_b(::ZeemanParams, (::Real)=0.0) = (0.0, 0.0)
 function transverse_b(z::TimeDependentZeeman, t::Real=0.0)
     bx = z.bx_wf === nothing ? 0.0 : evaluate(z.bx_wf, Float64(t))
     by = z.by_wf === nothing ? 0.0 : evaluate(z.by_wf, Float64(t))

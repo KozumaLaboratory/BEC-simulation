@@ -21,7 +21,7 @@ using SpinorBEC
           interactions: {omega_ref: 314.159, N_atoms: 5000}
           ddi: {enabled: true}
           trap: [1.0, 1.0, 2.6]
-          zeeman: {level: 1, Bz: "1.0 Gauss"}
+          B: {level: 1, Bz: "1.0 Gauss"}
           dt: 0.001
           n_steps: 500
           tol: 1.0e-5
@@ -31,7 +31,7 @@ using SpinorBEC
           dt: 0.002
           save_every: 50
           interactions: {omega_ref: 314.159}
-          zeeman:
+          B:
             level: 1
             Bz: "0.819 Gauss"
             Bx: {sinusoidal: {amplitude: 0.574, frequency: 4.52}}

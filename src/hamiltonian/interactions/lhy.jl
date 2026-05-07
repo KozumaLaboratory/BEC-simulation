@@ -169,6 +169,105 @@ function _compute_lhy_at_density(
     E_total / n_dir
 end
 
+# =================================================================
+# Closed-form polar LHY wrappers (PhiOneReg + PolarContactLHY + PolarDipolarLHY)
+# =================================================================
+#
+# These produce a SpinorLHYTable identical in shape to :two_channel /
+# :full_bdg, so the downstream evaluator (apply_lhy_step!) treats them
+# uniformly.
+
+"""
+    compute_spinor_lhy_polar_contact(; F, g_dict, n_max, n_points) → SpinorLHYTable
+
+F-polar contact LHY closed form (paper #1 main result, F-generic).
+`g_dict` maps even total-spin channels S → g_S. Returns a `SpinorLHYTable`
+with `mode = :polar_contact`.
+
+Two orders of magnitude faster than `compute_spinor_lhy_table` (`:full_bdg`)
+because the BdG diagonalisation collapses to per-mode eigvals via the
+σ/δ algebra. Restricted to polar phases (ζ_α = δ_{α,0}); for non-polar
+spinors fall back to `:full_bdg`.
+"""
+function compute_spinor_lhy_polar_contact(;
+    F::Int,
+    g_dict,
+    n_max::Float64=100.0,
+    n_points::Int=200,
+)
+    n_points >= 3 || throw(ArgumentError("n_points must be >= 3"))
+    n_max > 0 || throw(ArgumentError("n_max must be positive"))
+    coefs = PolarContactLHY.build_polar_lhy_coefs(F, g_dict)
+
+    densities = collect(range(0.0, n_max; length=n_points))
+    energy = zeros(Float64, n_points)
+    for (i, n) in enumerate(densities)
+        n < 1e-30 && continue
+        energy[i] = PolarContactLHY.lhy_energy_polar(n, coefs)
+    end
+    potential_values = _numerical_derivative(densities, energy)
+    SpinorLHYTable(:polar_contact, densities, potential_values)
+end
+
+"""
+    compute_spinor_lhy_polar_dipolar(; F, g_dict, eps_tilde_dd, n_max, n_points) → SpinorLHYTable
+
+F-polar contact + DDI LHY closed form (paper #1 with dipolar extension,
+F-generic). `eps_tilde_dd` is the dimensionless DDI/contact ratio for the
+|m|=1 antisym channel (caller convention). `eps_tilde_dd = 0` reduces to
+the contact-only result exactly.
+"""
+function compute_spinor_lhy_polar_dipolar(;
+    F::Int,
+    g_dict,
+    eps_tilde_dd::Float64,
+    n_max::Float64=100.0,
+    n_points::Int=200,
+)
+    n_points >= 3 || throw(ArgumentError("n_points must be >= 3"))
+    n_max > 0 || throw(ArgumentError("n_max must be positive"))
+    coefs = PolarContactLHY.build_polar_lhy_coefs(F, g_dict)
+
+    densities = collect(range(0.0, n_max; length=n_points))
+    energy = zeros(Float64, n_points)
+    for (i, n) in enumerate(densities)
+        n < 1e-30 && continue
+        energy[i] = PolarDipolarLHY.lhy_energy_polar_dipolar(n, coefs, eps_tilde_dd)
+    end
+    potential_values = _numerical_derivative(densities, energy)
+    SpinorLHYTable(:polar_dipolar, densities, potential_values)
+end
+
+"""
+    compute_spinor_lhy_fm_contact(; F, g_dict, n_max, n_points) → SpinorLHYTable
+
+F-FM contact LHY closed form (paper #2 contact-only piece, F=6 for now).
+For an FM-polarised condensate (ζ_α = δ_{α,+F}), the closed form collapses
+to a single mode at m=+F: ε = (8/15π²) (g_{2F} n)^(5/2). For uniform
+g_S = c_0 this is identical to scalar Lima-Pelster (no DDI). The mode
+adds value with non-uniform g_S (realistic a_S per S channel) or for
+the "Stage C" DDI extension once that closed form lands.
+"""
+function compute_spinor_lhy_fm_contact(;
+    F::Int,
+    g_dict,
+    n_max::Float64=100.0,
+    n_points::Int=200,
+)
+    n_points >= 3 || throw(ArgumentError("n_points must be >= 3"))
+    n_max > 0 || throw(ArgumentError("n_max must be positive"))
+    coefs = FMContactLHY.build_fm_lhy_coefs(F, g_dict)
+
+    densities = collect(range(0.0, n_max; length=n_points))
+    energy = zeros(Float64, n_points)
+    for (i, n) in enumerate(densities)
+        n < 1e-30 && continue
+        energy[i] = FMContactLHY.lhy_energy_fm(n, coefs)
+    end
+    potential_values = _numerical_derivative(densities, energy)
+    SpinorLHYTable(:fm_contact, densities, potential_values)
+end
+
 function _numerical_derivative(x::Vector{Float64}, y::Vector{Float64})
     n = length(x)
     dy = zeros(Float64, n)

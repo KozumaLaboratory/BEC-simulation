@@ -14,7 +14,7 @@
               n_steps: 100
               tol: 1.0e-8
               initial_state: polar
-              zeeman:
+              B:
                 p: 0.0
                 q: 0.1
               potential: {type: harmonic, omega: [1.0]}
@@ -47,7 +47,7 @@
               n_steps: 100
               tol: 1.0e-8
               initial_state: polar
-              zeeman:
+              B:
                 p: 0.0
                 q: 0.1
               potential: {type: harmonic, omega: [1.0]}
@@ -57,7 +57,7 @@
               save_every: 5
               temperature_ratio: 0.1
               noise_seed: 42
-              zeeman:
+              B:
                 p: 0.0
                 q:
                   from: 0.1
@@ -165,7 +165,7 @@
               n_steps: 200
               tol: 1.0e-6
               initial_state: polar
-              zeeman:
+              B:
                 p: 0.0
                 q: 0.1
               potential: {type: harmonic, omega: [1.0]}
@@ -193,7 +193,7 @@
               n_steps: 200
               tol: 1.0e-6
               initial_state: polar
-              zeeman:
+              B:
                 p: 0.0
                 q: 0.1
               potential: {type: harmonic, omega: [1.0]}
@@ -201,7 +201,7 @@
               duration: 0.05
               dt: 0.001
               save_every: 25
-              zeeman:
+              B:
                 p: 0.0
                 q: 0.1
               potential: {type: harmonic, omega: [1.0]}
@@ -227,7 +227,7 @@
               n_steps: 200
               tol: 1.0e-6
               initial_state: polar
-              zeeman:
+              B:
                 p: 0.0
                 q: 0.1
               potential: {type: harmonic, omega: [1.0]}
@@ -237,7 +237,7 @@
               save_every: 25
               temperature_ratio: 0.05
               noise_seed: 42
-              zeeman:
+              B:
                 p: 0.0
                 q: 0.1
               potential: {type: harmonic, omega: [1.0]}

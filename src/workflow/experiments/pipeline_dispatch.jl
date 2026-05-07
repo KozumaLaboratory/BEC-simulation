@@ -6,7 +6,6 @@
 # main run-step body doesn't introduce a `Dict{Symbol,Any}` inference
 # fence (see CLAUDE.md "Type stability boundaries").
 
-
 # Default integrator for RTP: Yoshida6 (order 6).
 function _default_rotating_integrator(duration::Float64)::String
     "yoshida6"
@@ -56,9 +55,11 @@ function _parse_b_hat_theta(b_hat::Dict)
     v = b_hat["theta"]
     if v isa AbstractDict
         haskey(v, "from") && haskey(v, "to") && haskey(v, "duration") ||
-            throw(ArgumentError(
-                "B_hat.theta dict form requires `from`, `to`, `duration`; " *
-                "got keys $(collect(keys(v)))"))
+            throw(
+                ArgumentError(
+                    "B_hat.theta dict form requires `from`, `to`, `duration`; " *
+                    "got keys $(collect(keys(v)))"),
+            )
         θ0 = Float64(v["from"])
         θ1 = Float64(v["to"])
         T_ramp = Float64(v["duration"])
@@ -82,22 +83,28 @@ function _parse_b_hat_phi(b_hat::Dict, _ω)
         return (_LinearPhi(0.0), _ConstAngle(0.0), 0.0)
     end
     v = b_hat["phi"]
-    v isa AbstractDict || throw(ArgumentError(
-        "B_hat.phi: expected `{rate: <waveform>}`, got scalar $v. " *
-        "Use `phi: {rate: <V>}` for rotation at rate V (formerly `phi_omega`)."))
-    haskey(v, "rate") || throw(ArgumentError(
-        "B_hat.phi: expected `{rate: <waveform>}`, got keys $(collect(keys(v)))"))
+    v isa AbstractDict || throw(
+        ArgumentError(
+            "B_hat.phi: expected `{rate: <waveform>}`, got scalar $v. " *
+            "Use `phi: {rate: <V>}` for rotation at rate V (formerly `phi_omega`)."),
+    )
+    haskey(v, "rate") || throw(
+        ArgumentError(
+            "B_hat.phi: expected `{rate: <waveform>}`, got keys $(collect(keys(v)))")
+    )
     rate = v["rate"]
     if rate isa AbstractDict
         haskey(rate, "from") && haskey(rate, "to") && haskey(rate, "duration") ||
-            throw(ArgumentError(
-                "B_hat.phi.rate dict form requires `from`, `to`, `duration`; " *
-                "got keys $(collect(keys(rate)))"))
+            throw(
+                ArgumentError(
+                    "B_hat.phi.rate dict form requires `from`, `to`, `duration`; " *
+                    "got keys $(collect(keys(rate)))"),
+            )
         ω0 = _ω(rate["from"])
         ω1 = _ω(rate["to"])
         T_chirp = Float64(rate["duration"])
         return (_LinearChirpPhi(ω0, ω1, T_chirp),
-                _LinearChirpPhiDot(ω0, ω1, T_chirp), ω1)
+            _LinearChirpPhiDot(ω0, ω1, T_chirp), ω1)
     end
     ω = _ω(rate)
     (_LinearPhi(ω), _ConstAngle(ω), ω)
@@ -175,4 +182,3 @@ function _parse_light_shift(raw, F::Int, V_trap, backend::AbstractBackend)
     end
     nothing
 end
-

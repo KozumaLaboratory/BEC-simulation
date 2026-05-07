@@ -51,7 +51,8 @@ function bayesian_optimize_yaml(
         config = parse_pipeline(modified)
         if verbose
             println("  [eval $(eval_count[])] params: ",
-                    join(["$(p_)=$(round(v_; digits=4))" for (p_, v_) in zip(override_paths, p)], ", "))
+                join(["$(p_)=$(round(v_; digits=4))" for (p_, v_) in zip(override_paths, p)], ", "),
+            )
         end
         result = run_pipeline(config; verbose=false)
         score = Float64(objective_fn(result))
@@ -67,16 +68,16 @@ function bayesian_optimize_yaml(
     if save_history_to !== nothing
         # Save BO trajectory for post-mortem / convergence plots
         JLD2.jldsave(save_history_to;
-            best_p = res.best_p,
-            best_y = res.best_y,
-            X_history = res.X_history,
-            y_history = res.y_history,
-            override_paths = collect(override_paths),
-            bounds = bounds,
-            yaml_path = yaml_path,
-            n_init = n_init,
-            n_iter = n_iter,
-            minimise = minimise,
+            best_p=res.best_p,
+            best_y=res.best_y,
+            X_history=res.X_history,
+            y_history=res.y_history,
+            override_paths=collect(override_paths),
+            bounds=bounds,
+            yaml_path=yaml_path,
+            n_init=n_init,
+            n_iter=n_iter,
+            minimise=minimise,
         )
         verbose && println("History saved to: $save_history_to")
     end
@@ -163,7 +164,10 @@ function multi_fidelity_optimize_yaml(
             config = parse_pipeline(modified)
             if verbose
                 println("  [$label eval $(eval_count[])] params: ",
-                    join(["$(p_)=$(round(v_; digits=4))" for (p_, v_) in zip(override_paths, p)], ", "))
+                    join(
+                        ["$(p_)=$(round(v_; digits=4))" for (p_, v_) in zip(override_paths, p)],
+                        ", ",
+                    ))
             end
             result = run_pipeline(config; verbose=false)
             score = Float64(objective_fn(result))
@@ -219,8 +223,11 @@ i.e. the total population that left the initial m=+F state. Higher score
 = more spin transfer, so use with `minimise=false`.
 """
 function bo_objective_max_m_transfer(result)
-    haskey(result, :rotating_basis_dynamics) || throw(ArgumentError(
-        "result has no :rotating_basis_dynamics; pipeline must end with rotating_basis dynamics"))
+    haskey(result, :rotating_basis_dynamics) || throw(
+        ArgumentError(
+            "result has no :rotating_basis_dynamics; pipeline must end with rotating_basis dynamics"
+        ),
+    )
     dyn = result[:rotating_basis_dynamics]::Dict
     pm = dyn[:per_m_history][end]::Vector{Float64}
     1.0 - pm[1] / sum(pm)

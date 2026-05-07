@@ -47,7 +47,7 @@
               n_steps: 100
               tol: 1.0e-4
               initial_state: polar
-              zeeman:
+              B:
                 p: 0.0
                 q: 0.0
               potential: {type: harmonic, omega: [1.0, 1.0]}

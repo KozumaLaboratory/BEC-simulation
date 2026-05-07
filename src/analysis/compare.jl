@@ -53,9 +53,11 @@ function normalize_field(x::AbstractArray{<:Real}; method::Symbol=:unit)
         s = sum(x)
         return s > 0 ? Array(x) ./ s : Array(x)
     else
-        throw(ArgumentError(
-            "normalize method must be :none, :unit, :max, or :integral, got :$method"
-        ))
+        throw(
+            ArgumentError(
+                "normalize method must be :none, :unit, :max, or :integral, got :$method"
+            )
+        )
     end
 end
 
@@ -80,14 +82,18 @@ function compare(
     relative_eps::Float64=1e-12,
 )
     size(observed) == size(simulated) ||
-        throw(DimensionMismatch(
-            "observed $(size(observed)) and simulated $(size(simulated)) shapes differ"
-        ))
+        throw(
+            DimensionMismatch(
+                "observed $(size(observed)) and simulated $(size(simulated)) shapes differ"
+            ),
+        )
     if mask !== nothing
         size(mask) == size(observed) ||
-            throw(DimensionMismatch(
-                "mask shape $(size(mask)) does not match observed $(size(observed))"
-            ))
+            throw(
+                DimensionMismatch(
+                    "mask shape $(size(mask)) does not match observed $(size(observed))"
+                ),
+            )
     end
 
     # Wasserstein needs probability-density inputs, normalisation can't
@@ -144,9 +150,11 @@ function compare(
         F_s = cumsum(s)
         return sum(abs.(F_o .- F_s))
     else
-        throw(ArgumentError(
-            "unknown metric :$metric. Valid: :l2, :l1, :linf, :relative_l2, " *
-            ":cosine, :correlation, :chi_squared, :wasserstein_1d",
-        ))
+        throw(
+            ArgumentError(
+                "unknown metric :$metric. Valid: :l2, :l1, :linf, :relative_l2, " *
+                ":cosine, :correlation, :chi_squared, :wasserstein_1d",
+            ),
+        )
     end
 end

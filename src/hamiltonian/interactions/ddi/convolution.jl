@@ -236,4 +236,3 @@ function compute_ddi_potential!(ddi::DDIParams{N}, bufs::DDIBuffers) where {N}
     mul!(bufs.Phi_z, rp.inverse, bufs.Phi_z_rk)
     nothing
 end
-

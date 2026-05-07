@@ -61,4 +61,3 @@ struct HysteresisResult
     hysteresis_intervals::Vector{Tuple{Float64, Float64}}
     transition_points::Vector{Float64}
 end
-

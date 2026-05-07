@@ -61,7 +61,7 @@ using Dates: Date
               n_steps: 50
               tol: 1.0e-4
               initial_state: polar
-              zeeman: {p: 0.0, q: 0.1}
+              B: {p: 0.0, q: 0.1}
               potential: {type: harmonic, omega: [1.0]}
         """
         config = load_config_from_string(yaml_str)
@@ -90,13 +90,13 @@ using Dates: Date
               dt: 0.01
               n_steps: 50
               tol: 1e-4
-              zeeman: {p: 0.0, q: 0.1}
+              B: {p: 0.0, q: 0.1}
               potential: {type: harmonic, omega: [1.0]}
           - dynamics:
               duration: 0.02
               dt: 0.001
               save_every: 10
-              zeeman: {p: 0.0, q: 0.1}
+              B: {p: 0.0, q: 0.1}
         """
         config = load_config_from_string(yaml_str)
         result = run_config(config; verbose=false)
@@ -122,7 +122,7 @@ using Dates: Date
               dt: 0.01
               n_steps: 50
               tol: 1e-4
-              zeeman: {p: 0.0, q: 0.1}
+              B: {p: 0.0, q: 0.1}
               potential: {type: harmonic, omega: [1.0]}
           - analyze:
               - phase_classify: {}
@@ -146,7 +146,7 @@ using Dates: Date
               n_steps: 50
               tol: 1e-4
               initial_state: ferromagnetic
-              zeeman: {p: 0.0, q: 0.1}
+              B: {p: 0.0, q: 0.1}
               potential: {type: harmonic, omega: [1.0, 1.0]}
           - analyze:
               - bogoliubov: {k_max: 5.0, n_k: 40, directions: auto}
@@ -206,7 +206,7 @@ using Dates: Date
               n_steps: 40
               tol: 1e-4
               initial_state: ferromagnetic
-              zeeman: {p: 0.0, q: 0.1}
+              B: {p: 0.0, q: 0.1}
               potential: {type: harmonic, omega: [1.0, 1.0]}
           - analyze:
               - winding_field: {component: 1, threshold: 1.0e-6}
@@ -235,7 +235,7 @@ using Dates: Date
               n_steps: 30
               tol: 1e-4
               initial_state: ferromagnetic
-              zeeman: {p: 0.0, q: 0.1}
+              B: {p: 0.0, q: 0.1}
               potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
           - analyze:
               - monopole_charge: {smooth: false}
@@ -293,7 +293,7 @@ using Dates: Date
               n_steps: 60
               tol: 1.0e-4
               initial_state: ferromagnetic
-              zeeman: {p: 0.0, q: 0.1}
+              B: {p: 0.0, q: 0.1}
               potential: {type: harmonic, omega: [1.0, 1.0]}
           - analyze:
               - bogoliubov_mode: {k_max: 5.0, n_k: 60, directions: auto}
@@ -336,7 +336,7 @@ using Dates: Date
               atom: Rb87
               grid: {n: [10, 10], box: [5.0, 5.0]}
               interactions: {c0: 5.0, c1: 0.0}
-              zeeman: {p: 0.0, q: 0.1}
+              B: {p: 0.0, q: 0.1}
               potential: {type: harmonic, omega: [1.0, 1.0]}
               dt: 0.01
               n_steps: 30
@@ -362,7 +362,7 @@ using Dates: Date
               atom: Rb87
               grid: {n: [12, 12], box: [6.0, 6.0]}
               interactions: {c0: 5.0, c1: 0.0}
-              zeeman: {p: 0.0, q: 0.1}
+              B: {p: 0.0, q: 0.1}
               potential: {type: harmonic, omega: [1.0, 1.0]}
               dt: 0.01
               n_steps: 30
@@ -391,7 +391,7 @@ pipeline:
       atom: Rb87
       grid: {n: [10, 10, 6], box: [5.0, 5.0, 4.0]}
       interactions: {c0: 5.0, c1: 0.0}
-      zeeman: {p: 0.0, q: 0.0}
+      B: {p: 0.0, q: 0.0}
       potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
       dt: 0.01
       n_steps: 20
@@ -478,7 +478,7 @@ pipeline:
       atom: Rb87
       grid: {n: [8, 8], box: [4.0, 4.0]}
       interactions: {c0: 5.0, c1: 0.0}
-      zeeman: {p_mv: 2.5, coil_mode: strong, q: 0.1}
+      B: {p_mv: 2.5, coil_mode: strong, q: 0.1}
       potential: {type: harmonic, omega: [1.0, 1.0]}
       dt: 0.01
       n_steps: 5
@@ -559,7 +559,7 @@ pipeline:
       atom: Rb87
       grid: {n: [12, 12, 6], box: [6.0, 6.0, 4.0]}
       interactions: {c0: 5.0, c1: 0.0}
-      zeeman: {p: 0.0, q: 0.0}
+      B: {p: 0.0, q: 0.0}
       potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
       dt: 0.01
       n_steps: 30
@@ -602,7 +602,7 @@ pipeline:
       n_steps: 30
       tol: 1e-4
       initial_state: ferromagnetic
-      zeeman: {p: 0.0, q: 0.1}
+      B: {p: 0.0, q: 0.1}
       potential: {type: harmonic, omega: [1.0]}
   - analyze:
       - phase_classify: {}
@@ -631,7 +631,7 @@ pipeline:
                   n_steps: 50
                   tol: 1e-4
                   initial_state: ferromagnetic
-                  zeeman: {p: 0.0, q: 0.1}
+                  B: {p: 0.0, q: 0.1}
                   potential: {type: harmonic, omega: [1.0, 1.0]}
                   cache: $cache_file
               - analyze:

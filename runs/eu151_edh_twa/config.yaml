@@ -1,0 +1,53 @@
+# ─────────────────────────────────────────────────────────────────────
+#  Eu151 EdH protocol with Truncated Wigner ensemble.
+#  Same Hamiltonian as runs/eu151_edh_postfix_local/, but Phase 2 hold
+#  runs as TWA ensemble (5 trajectories, vacuum noise on GS).
+#
+#  Diagnostic question: does quantum fluctuation averaging suppress the
+#  deterministic-GP "Townes-like collapse" observed in single-trajectory
+#  runs? If ensemble-mean density profile differs significantly from
+#  single-traj, the collapse is partially a numerical / classical-field
+#  artefact. If they agree, the collapse is robust to quantum noise.
+#
+#  Computational note: 5 trajectories × ~3 min/traj ≈ 15 min on RTX 5070
+#  Ti for 32³. Existing run_twa uses Welford online accumulation so VRAM
+#  cost is the same as single-traj.
+# ─────────────────────────────────────────────────────────────────────
+
+defaults:
+  kind:         spinor
+  backend:      gpu
+  interactions: {omega_ref: 691.15}
+
+mixins:
+  eu151_edh_phys:
+    atom:         Eu151
+    grid:         {n: [32, 32, 32], box: [20, 20, 20]}
+    potential:    {type: harmonic, omega: [1.0, 1.0, 1.182]}
+    interactions: {N_atoms: 10000, omega_ref: 691.15, c1_ratio: 0.0}
+
+pipeline:
+  - ground_state:
+      use:           [eu151_edh_phys]
+      B:             {Bz: "0.01 Gauss"}
+      initial_state: m_plus_F
+      spinor_lhy:    scalar
+      n_steps:       3000
+      tol:           1.0e-9
+      dt:            0.005
+
+  - dynamics:
+      duration: 0.14
+      dt:       0.0005
+      B:        {Bz: {from: 0.01, to: 2.6e-5, duration: 0.14}}
+      save:     {every: 280}
+
+  - dynamics:
+      duration: 1.0
+      dt:       0.0001
+      B:        {Bz: "2.6e-5 Gauss"}
+      twa:
+        n_trajectories: 50                   # converged ensemble for collapse-vs-quantum-noise diagnostic
+        seed_base:      42
+        cutoff_energy:  6.0
+        observables:    [density, magnetization, component_density]

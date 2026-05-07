@@ -66,12 +66,16 @@ using Test
 
     @testset "mask restricts comparison to cloud support" begin
         # 4×4 image with one bright pixel and a different "noise" pixel.
-        target = zeros(4, 4); target[2, 2] = 1.0
-        sim = zeros(4, 4); sim[2, 2] = 1.0; sim[4, 4] = 5.0   # bright + outlier
+        target = zeros(4, 4);
+        target[2, 2] = 1.0
+        sim = zeros(4, 4);
+        sim[2, 2] = 1.0;
+        sim[4, 4] = 5.0   # bright + outlier
         # Without mask: outlier dominates the L² loss.
         full_loss = compare(target, sim; metric=:l2, normalize=:none)
         # Mask out the outlier → loss collapses to 0.
-        mask = trues(4, 4); mask[4, 4] = false
+        mask = trues(4, 4);
+        mask[4, 4] = false
         masked_loss = compare(target, sim; metric=:l2, normalize=:none, mask)
         @test masked_loss < full_loss
         @test masked_loss < 1e-10

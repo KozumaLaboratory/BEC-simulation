@@ -207,7 +207,9 @@ function _apply_ddi_rotation!(
     F_t = RT(F)
     if phi_x isa Array
         @inbounds @simd for i in 1:N_spatial
-            px = phi_x[i]; py = phi_y[i]; pz = phi_z[i]
+            px = phi_x[i];
+            py = phi_y[i];
+            pz = phi_z[i]
             pm = sqrt(px * px + py * py + pz * pz)
             phi_mag[i] = pm
             alpha[i] = atan(py, px)

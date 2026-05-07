@@ -131,4 +131,3 @@ function refine_ground_state(result::NamedTuple;
         checkpoint_every,
     )
 end
-

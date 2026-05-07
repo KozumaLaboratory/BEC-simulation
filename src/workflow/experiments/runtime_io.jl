@@ -83,7 +83,7 @@ function _save_dynamics_timeseries!(f, result)
     # Klaus 2022.
     history = get(result, :dynamics_history, nothing)
     if history !== nothing && length(history) > 1 &&
-            all(h -> hasproperty(h.dynamics_result, :times), history)
+        all(h -> hasproperty(h.dynamics_result, :times), history)
         return _save_dynamics_timeseries_multi!(f, history, result)
     end
 
@@ -230,8 +230,10 @@ function _save_dynamics_timeseries_multi!(f, history, result)
                 f["dynamics/psi_snapshots_streamed/n_components"] = D
             else
                 (n_pts_v == n_pts_v_ref && D == D_ref) ||
-                    error("snapshot shape changed across steps: " *
-                          "$(n_pts_v_ref)/$(D_ref) → $(n_pts_v)/$D")
+                    error(
+                        "snapshot shape changed across steps: " *
+                        "$(n_pts_v_ref)/$(D_ref) → $(n_pts_v)/$D",
+                    )
             end
             ndim = length(n_pts_v)
             for s in 1:n_local

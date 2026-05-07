@@ -35,7 +35,7 @@ const _SKIP_HEAVY_YAML_AL =
     @testset "Reads :phase_classify_distance ranking (Dict shape)" begin
         scores = [(name=:a, distance=0.1)]
         result = Dict{Symbol, Any}(
-            :phase_classify_distance => Dict(:ranking => scores),
+            :phase_classify_distance => Dict(:ranking => scores)
         )
         @test default_phase_classifier_extractor(result) === scores
     end
@@ -43,7 +43,7 @@ const _SKIP_HEAVY_YAML_AL =
     @testset "Falls back to :phase_classify when :phase_classify_distance missing" begin
         scores = [(name=:a, distance=0.1), (name=:b, distance=0.2)]
         result = Dict{Symbol, Any}(
-            :phase_classify => (ranking=scores,),
+            :phase_classify => (ranking=scores,)
         )
         @test default_phase_classifier_extractor(result) === scores
     end

@@ -77,24 +77,28 @@ those don't trigger this check.)"""
 function _reject_legacy_blocks!(step::AbstractDict)
     for legacy in ("zeeman", "B_hat")
         if haskey(step, legacy)
-            throw(ArgumentError(
-                "step has legacy `$legacy:` block — removed 2026-04-30. " *
-                "Use the unified `B:` block: magnitude (Bz/B_mag/p) + " *
-                "direction (theta/phi) + q (auto from |B|² unless " *
-                "explicit) all live there."))
+            throw(
+                ArgumentError(
+                    "step has legacy `$legacy:` block — removed 2026-04-30. " *
+                    "Use the unified `B:` block: magnitude (Bz/B_mag/p) + " *
+                    "direction (theta/phi) + q (auto from |B|² unless " *
+                    "explicit) all live there."),
+            )
         end
     end
 end
 
 function _split_B_block!(step::AbstractDict)
-    haskey(step, "B") || return
+    haskey(step, "B") || return nothing
     B = pop!(step, "B")
     B isa AbstractDict || throw(ArgumentError(
         "B: must be a mapping, got $(typeof(B))"))
 
-    (haskey(step, "zeeman") || haskey(step, "B_hat")) && throw(ArgumentError(
-        "step has both `B:` and legacy `zeeman:`/`B_hat:` blocks. " *
-        "Use only the unified `B:` form."))
+    (haskey(step, "zeeman") || haskey(step, "B_hat")) && throw(
+        ArgumentError(
+            "step has both `B:` and legacy `zeeman:`/`B_hat:` blocks. " *
+            "Use only the unified `B:` form."),
+    )
 
     has_cartesian = any(haskey(B, k) for k in _CARTESIAN_KEYS)
     has_magnitude_explicit = any(haskey(B, k) for k in _MAGNITUDE_KEYS)
@@ -110,15 +114,21 @@ function _split_B_block!(step::AbstractDict)
     end
     has_direction = any(haskey(B, k) for k in _DIRECTION_KEYS)
 
-    has_cartesian && has_direction && throw(ArgumentError(
-        "B: Cartesian form (Bx/By/Bz) and non-zero spherical direction " *
-        "(theta/phi) are mutually exclusive. Cartesian implies direction " *
-        "via components; for tilted/rotating B use spherical " *
-        "magnitude + theta + phi instead."))
+    has_cartesian && has_direction &&
+        throw(
+            ArgumentError(
+                "B: Cartesian form (Bx/By/Bz) and non-zero spherical direction " *
+                "(theta/phi) are mutually exclusive. Cartesian implies direction " *
+                "via components; for tilted/rotating B use spherical " *
+                "magnitude + theta + phi instead."),
+        )
 
-    has_magnitude_explicit && has_cartesian && throw(ArgumentError(
-        "B: explicit `magnitude:` and Cartesian (Bx/By/Bz) are " *
-        "mutually exclusive — Cartesian determines magnitude from |B|."))
+    has_magnitude_explicit && has_cartesian &&
+        throw(
+            ArgumentError(
+                "B: explicit `magnitude:` and Cartesian (Bx/By/Bz) are " *
+                "mutually exclusive — Cartesian determines magnitude from |B|."),
+        )
 
     zeeman = Dict{Any, Any}()
     B_hat = Dict{Any, Any}()
@@ -143,14 +153,16 @@ function _split_B_block!(step::AbstractDict)
         elseif kk in _DIRECTION_KEYS
             B_hat[k] = v                               # theta / phi → B_hat
         else
-            throw(ArgumentError(
-                "B.$kk: unrecognised key. Cartesian: $(_CARTESIAN_KEYS); " *
-                "Spherical magnitude: $(_MAGNITUDE_KEYS); " *
-                "Direction: $(_DIRECTION_KEYS); plus q, sources, " *
-                "p_mv/coil_mode (calibration), level, n_samples, omega_ref_hz."))
+            throw(
+                ArgumentError(
+                    "B.$kk: unrecognised key. Cartesian: $(_CARTESIAN_KEYS); " *
+                    "Spherical magnitude: $(_MAGNITUDE_KEYS); " *
+                    "Direction: $(_DIRECTION_KEYS); plus q, sources, " *
+                    "p_mv/coil_mode (calibration), level, n_samples, omega_ref_hz."),
+            )
         end
     end
     isempty(zeeman) || (step["zeeman"] = zeeman)
     isempty(B_hat) || (step["B_hat"] = B_hat)
-    return
+    return nothing
 end

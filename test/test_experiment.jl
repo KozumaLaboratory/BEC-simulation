@@ -28,7 +28,7 @@
               n_steps: 100
               tol: 1.0e-8
               initial_state: polar
-              zeeman:
+              B:
                 p: 0.0
                 q: 0.1
               potential: {type: harmonic, omega: [1.0]}
@@ -36,7 +36,7 @@
               duration: 1.0
               dt: 0.01
               save_every: 10
-              zeeman:
+              B:
                 p:
                   from: 0.0
                   to: 0.5
@@ -46,14 +46,14 @@
               duration: 2.0
               dt: 0.01
               save_every: 20
-              zeeman:
+              B:
                 p: 0.5
                 q: 0.0
           - dynamics:
               duration: 0.5
               dt: 0.005
               save_every: 10
-              zeeman:
+              B:
                 p: 0.0
                 q: 0.0
         """
@@ -165,14 +165,14 @@
               dt: 0.01
               temperature_ratio: 0.1
               noise_seed: 42
-              zeeman:
+              B:
                 p: 0.0
                 q: 0.0
               potential: {type: harmonic, omega: [1.0]}
           - dynamics:
               duration: 1.0
               dt: 0.01
-              zeeman:
+              B:
                 p: 0.0
                 q: 0.0
         """
@@ -197,7 +197,7 @@
               n_steps: 200
               tol: 1.0e-6
               initial_state: polar
-              zeeman:
+              B:
                 p: 0.0
                 q: 0.1
               potential: {type: harmonic, omega: [1.0]}
@@ -205,7 +205,7 @@
               duration: 0.1
               dt: 0.001
               save_every: 50
-              zeeman:
+              B:
                 p:
                   from: 0.0
                   to: 0.1
@@ -237,7 +237,7 @@
               n_steps: 200
               tol: 1.0e-6
               initial_state: polar
-              zeeman:
+              B:
                 p: 0.0
                 q: 0.1
               potential: {type: harmonic, omega: [1.0]}
@@ -247,7 +247,7 @@
               save_every: 50
               temperature_ratio: 0.05
               noise_seed: 42
-              zeeman:
+              B:
                 p: 0.0
                 q: 0.1
               potential: {type: harmonic, omega: [1.0]}
@@ -274,7 +274,7 @@
               n_steps: 200
               tol: 1.0e-6
               initial_state: polar
-              zeeman:
+              B:
                 p: 0.0
                 q: 0.1
               potential:

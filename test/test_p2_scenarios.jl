@@ -36,7 +36,7 @@ pipeline:
       grid: {n: 8, box: 4.0}
       interactions: {c0: 10.0, c1: 0.0, omega_ref: 314.159}
       trap: [1.0, 1.0, 1.0]
-      zeeman: {Bz: 1.0e-5}
+      B: {Bz: 1.0e-5}
       dt: 0.01
       n_steps: 2
       tol: 1.0e-2
@@ -44,7 +44,7 @@ pipeline:
       duration: 1.0
       dt: 0.1
       interactions: {omega_ref: 314.159}
-      zeeman:
+      B:
         Bz:
           csv: {path: field.csv, scale: 1.0e-4}
 """,

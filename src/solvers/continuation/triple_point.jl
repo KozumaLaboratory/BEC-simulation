@@ -159,13 +159,19 @@ function detect_triple_points(
 
     if verbose
         if isempty(candidates)
-            println("detect_triple_points: 0 candidates with tie_ratio ≤ $tie_ratio_max " *
-                    "out of $(size(al.X_history, 1)) AL samples")
+            println(
+                "detect_triple_points: 0 candidates with tie_ratio ≤ $tie_ratio_max " *
+                "out of $(size(al.X_history, 1)) AL samples",
+            )
         else
-            println("detect_triple_points: $(length(candidates)) candidate(s) " *
-                    "(best tie_ratio = $(round(candidates[1].tie_ratio; sigdigits=3)))")
+            println(
+                "detect_triple_points: $(length(candidates)) candidate(s) " *
+                "(best tie_ratio = $(round(candidates[1].tie_ratio; sigdigits=3)))",
+            )
             for (i, c) in enumerate(candidates[1:min(5, length(candidates))])
-                println("  $i: θ=$(round.(c.θ; digits=4)), phases=$(c.phases), tie=$(round(c.tie_ratio; sigdigits=3))")
+                println(
+                    "  $i: θ=$(round.(c.θ; digits=4)), phases=$(c.phases), tie=$(round(c.tie_ratio; sigdigits=3))",
+                )
             end
         end
     end
@@ -215,7 +221,9 @@ function trace_triple_point_curves(
             verbose && println("  pair $(a)_$(b): tangent_at failed ($(e)), skipping")
             continue
         end
-        verbose && println("  tracing $(a)_$(b) from θ=$(round.(candidate.θ; digits=4)) tangent=$(round.(t_init; digits=3))")
+        verbose && println(
+            "  tracing $(a)_$(b) from θ=$(round.(candidate.θ; digits=4)) tangent=$(round.(t_init; digits=3))",
+        )
         trace = trace_phase_boundary(F_ab, candidate.θ, t_init;
             arc_step, max_steps, verbose=false, kwargs_for_trace...,
         )
@@ -322,9 +330,11 @@ function bogoliubov_along_boundary_curve(
         kwargs = parameter_setter(θ)
 
         haskey(kwargs, :interactions) ||
-            throw(ArgumentError(
-                "parameter_setter must return a NamedTuple containing :interactions"
-            ))
+            throw(
+                ArgumentError(
+                    "parameter_setter must return a NamedTuple containing :interactions"
+                )
+            )
 
         init_kwargs = psi_warm === nothing ?
                       (initial_state=phase_init,) :
@@ -365,9 +375,11 @@ function bogoliubov_along_boundary_curve(
         push!(samples,
             BoundaryBdGSample(θ, bdg, n0_local, r.last_step, r.converged))
 
-        verbose && println("  $i/$(size(points, 1)): θ=$(round.(θ; digits=3)), " *
-                           "max_growth=$(round(bdg.max_growth_rate; sigdigits=3)), " *
-                           "L-BFGS iter=$(r.last_step)")
+        verbose && println(
+            "  $i/$(size(points, 1)): θ=$(round.(θ; digits=3)), " *
+            "max_growth=$(round(bdg.max_growth_rate; sigdigits=3)), " *
+            "L-BFGS iter=$(r.last_step)",
+        )
     end
     samples
 end

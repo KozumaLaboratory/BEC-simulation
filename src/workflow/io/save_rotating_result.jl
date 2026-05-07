@@ -88,6 +88,7 @@ function _concat_dynamics_phases(history::AbstractVector)
     out[:norms] = Float64[]
     out[:Fz] = Float64[]
     out[:psi_snapshots] = Any[]
+    out[:ensembles] = Tuple{Int, Any}[]   # (phase_index, EnsembleResult) for TWA phases
 
     t_offset = 0.0
     for (pi, phase) in enumerate(history)
@@ -118,6 +119,14 @@ function _concat_dynamics_phases(history::AbstractVector)
             end
         elseif !isempty(dr.psi_snapshots)
             append!(out[:psi_snapshots], dr.psi_snapshots)
+        end
+
+        # TWA ensemble pass-through: record (phase_index, EnsembleResult) so
+        # the JLD2 writer can persist `mean`, `variance`, and `n_trajectories`
+        # per observable. Without this the per-phase ensemble info is lost
+        # and downstream analysis only sees the last trajectory.
+        if hasproperty(phase, :ensemble_result) && phase.ensemble_result !== nothing
+            push!(out[:ensembles], (pi, phase.ensemble_result))
         end
     end
     out
@@ -180,10 +189,12 @@ function save_rotating_basis_result!(
     # We dispatch here instead of in the caller so any auto-save hook
     # (pipeline_runner.jl) can call this function unconditionally.
     if haskey(result, :rotating_basis_history) ||
-       haskey(result, :rotating_basis_dynamics)
-        history = haskey(result, :rotating_basis_history) ?
-                  result[:rotating_basis_history] :
-                  [result[:rotating_basis_dynamics]]
+        haskey(result, :rotating_basis_dynamics)
+        history = if haskey(result, :rotating_basis_history)
+            result[:rotating_basis_history]
+        else
+            [result[:rotating_basis_dynamics]]
+        end
         isempty(history) && throw(
             ArgumentError(
                 "save_rotating_basis_result!: no rotating_basis dynamics phases in result"),
@@ -280,6 +291,41 @@ function save_rotating_basis_result!(
             (:phi_omega, "phi_omega"),
         )
             haskey(dyn, src_key) && (f["dynamics/integrator_meta/" * dst_key] = dyn[src_key])
+        end
+
+        # TWA ensemble persistence (added 2026-05-07): if any dynamics phase
+        # ran as a Truncated Wigner ensemble, write per-phase mean / variance /
+        # n_trajectories per observable. Without this only the last
+        # trajectory's psi survived through `dr.psi_snapshots`, and the
+        # ensemble statistics computed via Welford accumulation were lost
+        # at save time.
+        ensembles = get(dyn, :ensembles, Tuple{Int, Any}[])
+        for (phase_idx, ens) in ensembles
+            base = "dynamics/ensemble/phase_" * lpad(string(phase_idx), 2, '0')
+            f[base * "/n_trajectories"] = ens.n_trajectories
+            f[base * "/times"] = collect(Float64, ens.times)
+            for (sym, mean_traj) in ens.mean
+                key = base * "/" * String(sym) * "/mean"
+                # Each entry is a Vector of T arrays (one per snapshot time).
+                # Stack into a higher-rank array so it's a single dataset.
+                isempty(mean_traj) && continue
+                shape = size(mean_traj[1])
+                stacked = zeros(Float64, shape..., length(mean_traj))
+                for (t, arr) in enumerate(mean_traj)
+                    selectdim(stacked, ndims(stacked), t) .= arr
+                end
+                f[key] = stacked
+            end
+            for (sym, var_traj) in ens.var
+                key = base * "/" * String(sym) * "/variance"
+                isempty(var_traj) && continue
+                shape = size(var_traj[1])
+                stacked = zeros(Float64, shape..., length(var_traj))
+                for (t, arr) in enumerate(var_traj)
+                    selectdim(stacked, ndims(stacked), t) .= arr
+                end
+                f[key] = stacked
+            end
         end
     end
 

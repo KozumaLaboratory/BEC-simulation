@@ -140,4 +140,3 @@ function _find_ground_state_adaptive(;
         dpsi=final_dpsi,
     )
 end
-

@@ -65,6 +65,10 @@ include("hamiltonian/interactions/ddi/convolution.jl") # DDIParams + buffers + 6
 include("hamiltonian/interactions/ddi/rotation.jl")    # Euler 5-stage spinor rotation
 include("hamiltonian/interactions/ddi.jl")             # apply_ddi_step! entry point
 include("hamiltonian/interactions/ddi_padded.jl")
+include("hamiltonian/interactions/phi_one_reg.jl")        # Petrov-regularised universal LHY function
+include("hamiltonian/interactions/polar_contact_lhy.jl")  # F-generic polar contact LHY closed form
+include("hamiltonian/interactions/polar_dipolar_lhy.jl")  # polar contact + DDI extension
+include("hamiltonian/interactions/fm_contact_lhy.jl")     # FM-phase contact LHY (F=6)
 include("hamiltonian/interactions/lhy.jl")
 include("hamiltonian/interactions/losses.jl")
 include("hamiltonian/interactions/absorbing_boundary.jl")
@@ -313,6 +317,8 @@ export compute_eu151_interactions
 export lima_pelster_Q5, compute_c_lhy_with_ddi
 export compute_lhy_2d_params
 export compute_spinor_lhy_two_channel, compute_spinor_lhy_table
+export compute_spinor_lhy_polar_contact, compute_spinor_lhy_polar_dipolar
+export compute_spinor_lhy_fm_contact
 export scale_interactions_quasi_2d
 
 # DDI
@@ -481,7 +487,8 @@ export bayesian_optimize, gp_predict, expected_improvement
 export multi_fidelity_optimize_2tier, MultiFidelityBOResult
 export bayesian_optimize_yaml, multi_fidelity_optimize_yaml,
     bo_objective_max_m_transfer, bo_objective_max_lz, bo_objective_min_energy
-export active_learn_phase_scan, active_learn_phase_scan_yaml,
+export active_learn_phase_scan,
+    active_learn_phase_scan_yaml,
     phase_entropy_uncertainty, default_phase_classifier_extractor
 export CalibrationSet, CoilCalibration, FORTCalibration, RabiCalibration
 export DEFAULT_CALIBRATION, load_calibration, apply_calibration!, run_yaml_calibrated

@@ -278,4 +278,3 @@ function find_ground_state(;
         verbose=verbose,
     )
 end
-

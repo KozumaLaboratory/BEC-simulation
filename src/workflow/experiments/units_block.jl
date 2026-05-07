@@ -66,8 +66,10 @@ their parent key. So inside `phi_chirp: {from: 0, to: 226}`, both `from` and
 function apply_units_block!(data::Dict)
     haskey(data, "units") || return data
     units_raw = pop!(data, "units")
-    units_raw isa Dict || throw(ArgumentError(
-        "units: expected a mapping like {B: Gauss, ω: Hz}; got $(typeof(units_raw))"))
+    units_raw isa Dict || throw(
+        ArgumentError(
+            "units: expected a mapping like {B: Gauss, ω: Hz}; got $(typeof(units_raw))"),
+    )
 
     # Normalise key→unit-string map, accept symbols too.
     units = Dict{Symbol, String}()

@@ -111,18 +111,26 @@ function active_learn_phase_scan(
             elseif hasproperty(result, :ranking)
                 result.ranking
             else
-                throw(ArgumentError(
-                    "eval_fn returned a NamedTuple without :scores or :ranking — got fields $(propertynames(result))",
-                ))
+                throw(
+                    ArgumentError(
+                        "eval_fn returned a NamedTuple without :scores or :ranking — got fields $(propertynames(result))"
+                    ),
+                )
             end
         elseif result isa Dict
-            haskey(result, :scores) ? result[:scores] :
-            haskey(result, :ranking) ? result[:ranking] :
-            throw(ArgumentError("eval_fn returned a Dict without :scores or :ranking key"))
+            if haskey(result, :scores)
+                result[:scores]
+            elseif haskey(result, :ranking)
+                result[:ranking]
+            else
+                throw(ArgumentError("eval_fn returned a Dict without :scores or :ranking key"))
+            end
         else
-            throw(ArgumentError(
-                "eval_fn must return a NamedTuple/Dict with :scores or :ranking, or a Vector of phase-distance scores. Got $(typeof(result))",
-            ))
+            throw(
+                ArgumentError(
+                    "eval_fn must return a NamedTuple/Dict with :scores or :ranking, or a Vector of phase-distance scores. Got $(typeof(result))"
+                ),
+            )
         end
         phase_entropy_uncertainty(scores; temperature)
     end
@@ -193,7 +201,8 @@ function active_learn_phase_scan_yaml(
         config = parse_pipeline(modified)
         if verbose
             println("  [eval $(eval_count[])] params: ",
-                join(["$(p_)=$(round(v_; digits=4))" for (p_, v_) in zip(override_paths, p)], ", "))
+                join(["$(p_)=$(round(v_; digits=4))" for (p_, v_) in zip(override_paths, p)], ", "),
+            )
         end
         result = run_pipeline(config; verbose=false)
         scores = phase_classifier_extractor(result)
@@ -251,9 +260,11 @@ function default_phase_classifier_extractor(result)
             return cls.ranking
         end
     end
-    throw(ArgumentError(
-        "default_phase_classifier_extractor: result has no :phase_classify_distance " *
-        "or :phase_classify field with a `ranking` member. Got fields $(propertynames(result)). " *
-        "Pass a custom phase_classifier_extractor.",
-    ))
+    throw(
+        ArgumentError(
+            "default_phase_classifier_extractor: result has no :phase_classify_distance " *
+            "or :phase_classify field with a `ranking` member. Got fields $(propertynames(result)). " *
+            "Pass a custom phase_classifier_extractor.",
+        ),
+    )
 end

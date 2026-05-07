@@ -20,14 +20,15 @@ using Test
     atom = AtomSpecies("test", 2.5e-25, 1, 50.0e-10, 60.0e-10, 6.977e-23)
 
     points = Float64[
-        -0.1   0.0
-         0.0   0.0
-         0.1   0.0
+        -0.1 0.0
+        0.0 0.0
+        0.1 0.0
     ]
-    parameter_setter = θ -> (
-        interactions=InteractionParams(20.0, θ[1]),
-        potential=HarmonicTrap((1.0, 1.0)),
-    )
+    parameter_setter =
+        θ -> (
+            interactions=InteractionParams(20.0, θ[1]),
+            potential=HarmonicTrap((1.0, 1.0)),
+        )
 
     samples = bogoliubov_along_boundary_curve(
         points, parameter_setter, grid, atom;

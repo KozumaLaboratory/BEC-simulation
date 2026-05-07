@@ -31,9 +31,9 @@ SimParams(dt, n_steps, imaginary_time, normalize_every, save_every) = SimParams(
     dt, n_steps, imaginary_time, normalize_every, save_every, 0.0, 0.0
 )
 
-SimParams(dt, n_steps, imaginary_time, normalize_every, save_every, rotating_frame_omega) =
-    SimParams(dt, n_steps, imaginary_time, normalize_every, save_every,
-        rotating_frame_omega, 0.0)
+SimParams(dt, n_steps, imaginary_time, normalize_every, save_every, rotating_frame_omega) = SimParams(
+    dt, n_steps, imaginary_time, normalize_every, save_every,
+    rotating_frame_omega, 0.0)
 
 function SimParams(;
     dt::Float64,

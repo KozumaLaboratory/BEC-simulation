@@ -149,7 +149,8 @@ function _apply_transverse_zeeman_step!(
     # when ω_R = ω_drive the transverse field becomes static in RF.
     omega_R = ws.sim_params.spin_rotating_frame_omega
     bx, by = if abs(omega_R) > 1e-30
-        c = cos(omega_R * t); s = sin(omega_R * t)
+        c = cos(omega_R * t);
+        s = sin(omega_R * t)
         (bx_lab * c + by_lab * s, -bx_lab * s + by_lab * c)
     else
         (bx_lab, by_lab)
@@ -437,4 +438,3 @@ function _normalize_psi!(psi, grid, n_components, ndim)
     psi ./= sqrt(norm_sq)
     nothing
 end
-

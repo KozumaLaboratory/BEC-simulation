@@ -110,4 +110,3 @@ function _parse_and_build_potential(pot_d, ndim::Int)
                 _to_string_keys(Dict(k => v for (k, v) in pot_d if k != "type"))), ndim)
     end
 end
-

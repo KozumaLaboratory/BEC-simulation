@@ -23,7 +23,6 @@ import { useVorticityTexture } from '@/three/useVorticityTexture'
 import { useVectorField } from '@/three/useVectorField'
 import { useVortexLines } from '@/three/useVortexLines'
 import { useSnapshots } from '@/state/useSnapshots'
-import { useDensityMax } from '@/state/useDensityMax'
 import { TimeScrubber } from '@/components/TimeScrubber'
 import { VolumeCanvas } from '@/three/VolumeCanvas'
 import type { VolumeParams, ColorMode } from '@/three/DensityVolume'
@@ -51,10 +50,6 @@ export function View3D({ run, data }: Props) {
   // Snapshot scrubbing. snap === undefined means "render the final state"
   // (the pre-time-scrubber behaviour, used for non-snapshot runs).
   const { data: snapMeta } = useSnapshots(run, currentPoint?.file ?? null)
-  // density_max moved to its own lazy endpoint so /api/snapshots stays
-  // instant; the value lands a few hundred ms later and the volume
-  // renderer falls back to its sticky-max in the meantime.
-  const densityMax = useDensityMax(run, currentPoint?.file ?? null)
   const snapIdx = url.snap ?? 1
   const setSnapIdx = (n: number) => setUrl({ snap: n })
   useEffect(() => {
@@ -242,21 +237,41 @@ export function View3D({ run, data }: Props) {
   if (stickyMaxRef.current.key !== stickyKey) {
     stickyMaxRef.current = { key: stickyKey, value: 0 }
   }
-  if (rawVolumeTex && rawVolumeTex.maxValue > stickyMaxRef.current.value) {
+  // Between a comp change and the new fetch starting, rawVolumeTex still
+  // points at the previous component's texture (the useEffect inside
+  // useDensityTexture runs *after* this render). If we accept that stale
+  // texture as a sticky-max source, switching m=+6 → m=+5 locks sticky
+  // to m=+6's larger peak and m=+5 renders below isoMin (invisible).
+  // Trust the texture only when its embedded component metadata matches
+  // the request — vorticity has no per-comp identity so always trust it.
+  const texMatchesRequest =
+    !!rawVolumeTex &&
+    (controls.source === 'vorticity' ||
+      rawVolumeTex.meta?.component === comp)
+  if (
+    rawVolumeTex &&
+    texMatchesRequest &&
+    rawVolumeTex.maxValue > stickyMaxRef.current.value
+  ) {
     stickyMaxRef.current.value = rawVolumeTex.maxValue
   }
-  // Prefer the lazy /api/density_max value once it arrives; the legacy
-  // snapMeta.density_max_total field is kept for backward compat with
-  // older dashboards that still emit it inline.
-  const globalMax = densityMax ?? snapMeta?.density_max_total
-  const useGlobalMax =
-    controls.source === 'density' && comp === 0 && typeof globalMax === 'number'
-  const stableMax = useGlobalMax
-    ? (globalMax as number)
-    : stickyMaxRef.current.value
-  const volumeTex =
-    rawVolumeTex && stableMax > 0
-      ? { ...rawVolumeTex, maxValue: stableMax }
+  // Sticky max wins over the global max from /api/density_max. The global
+  // value is "physically correct" (preserves absolute density scale across
+  // frames) but EdH-class runs have 10× peak ratios — early-frame GS
+  // becomes invisible at isoMin=0.005 relative to a post-quench filament
+  // peak. Sticky-per-component renormalises so every visited frame renders
+  // visibly; the absolute scale is sacrificed but the cloud is actually
+  // there. The lazy /api/density_max fetch is left in place (cheap,
+  // observable in the metadata HUD) but no longer drives normalisation.
+  const stableMax = stickyMaxRef.current.value
+  // Don't render a stale texture for the previous component while the new
+  // fetch is in flight — the user reads a brief flash of the old cloud
+  // followed by it "disappearing" once the new (and dimmer) data arrives,
+  // which is more disorienting than a momentary "Loading…" placeholder.
+  const volumeTex = !texMatchesRequest
+    ? null
+    : stableMax > 0
+      ? { ...rawVolumeTex!, maxValue: stableMax }
       : rawVolumeTex
 
   // When the user flips to phase color mode while Component is still "Total"

@@ -19,7 +19,7 @@ using SpinorBEC
     F = 1
     D = 2F + 1
     config = GridConfig((8, 8, 8), (4.0, 4.0, 4.0))
-    grid = make_grid(config; dtype = Float32)
+    grid = make_grid(config; dtype=Float32)
     @test eltype(grid.x[1]) === Float32
 
     V_trap = zeros(Float32, 8, 8, 8)
@@ -29,14 +29,14 @@ using SpinorBEC
     end
 
     ws = SpinorBEC.make_rotating_basis_ws(grid, F, V_trap;
-        p = 1.0f0, q = 0.0f0,
-        c0 = 10.0f0, c1 = 0.0f0,
-        c_dd = 1.0f0, gamma_lhy = 0.0f0,
-        theta_func = (t) -> 0.5,
-        phi_func = (t) -> 1.0 * t,
-        theta_dot_func = (t) -> 0.0,
-        phi_dot_func = (t) -> 1.0,
-        gauge_fix = false)
+        p=1.0f0, q=0.0f0,
+        c0=10.0f0, c1=0.0f0,
+        c_dd=1.0f0, gamma_lhy=0.0f0,
+        theta_func=(t) -> 0.5,
+        phi_func=(t) -> 1.0 * t,
+        theta_dot_func=(t) -> 0.0,
+        phi_dot_func=(t) -> 1.0,
+        gauge_fix=false)
 
     # Type assertions: every workspace buffer is at the requested precision.
     @test eltype(ws.psi_tilde) === ComplexF32
@@ -73,7 +73,7 @@ using SpinorBEC
     @test 0.99 < n2 < 1.01
 
     # Full split-step (ITP).
-    SpinorBEC.split_step_rotating!(ws, 0.005f0, 0.0f0; imaginary_time = true)
+    SpinorBEC.split_step_rotating!(ws, 0.005f0, 0.0f0; imaginary_time=true)
     SpinorBEC.normalize_rotating!(ws)
     n3 = SpinorBEC.rotating_norm(ws)
     @test n3 ≈ 1.0 atol = 1e-5

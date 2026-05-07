@@ -20,8 +20,9 @@ using Test
         # For fully polarized m = +F: f_z(r) = F · n(r), so col_Fz = F · col_n.
         # If the bug is back, col_Fz = F · ∫n² dz which is ≠ F · col_n at all
         # but the very peak of n.
-        rel = abs.(img.column_Fz .- F .* img.column_density) ./
-              max.(abs.(F .* img.column_density), 1e-30)
+        rel =
+            abs.(img.column_Fz .- F .* img.column_density) ./
+            max.(abs.(F .* img.column_density), 1e-30)
         # Check on the support of the cloud only — the fringe of the box
         # has both numerator and denominator at noise level.
         mask = img.column_density .> 0.05 * maximum(img.column_density)

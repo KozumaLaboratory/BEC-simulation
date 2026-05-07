@@ -13,7 +13,9 @@
 #
 # Smaller branches stay inline in dashboard.jl until further refactoring.
 
-function _route_scan_group(path::String, base_dir::String, data_cache::Dict{String, String}, psi_cache::Dict{String, Any})
+function _route_scan_group(
+    path::String, base_dir::String, data_cache::Dict{String, String}, psi_cache::Dict{String, Any}
+)
     # /api/scan_group/<scan_dir_name> → aggregated cross-run summary
     # for all points declared in `runs/<scan_dir>/scan.yaml`. Backed
     # by the per-run `/api/physics_summary` data, but loaded once
@@ -51,9 +53,11 @@ function _route_scan_group(path::String, base_dir::String, data_cache::Dict{Stri
             pt_name = _point_name(value, idx)
             pt_dir = joinpath(scan_dir, pt_name)
             # Look for canonical result.jld2 first, then legacy result_legacy.jld2.
-            jld_path = isfile(joinpath(pt_dir, "result.jld2")) ?
-                       joinpath(pt_dir, "result.jld2") :
-                       joinpath(pt_dir, "result_legacy.jld2")
+            jld_path = if isfile(joinpath(pt_dir, "result.jld2"))
+                joinpath(pt_dir, "result.jld2")
+            else
+                joinpath(pt_dir, "result_legacy.jld2")
+            end
             run_summary = Dict{String, Any}(
                 "value" => value,
                 "value_display" => value * display_factor,
@@ -74,8 +78,7 @@ function _route_scan_group(path::String, base_dir::String, data_cache::Dict{Stri
                     nd = _norm_max_dev(d)
                     nd === nothing || (run_summary["norm_max_dev"] = nd)
                     if haskey(d, "dynamics/integrator_meta/larmor_phase_per_step")
-                        run_summary["larmor_phase_per_step"] =
-                            d["dynamics/integrator_meta/larmor_phase_per_step"]
+                        run_summary["larmor_phase_per_step"] = d["dynamics/integrator_meta/larmor_phase_per_step"]
                     end
                 catch e
                     run_summary["error"] = string(e)
@@ -338,7 +341,6 @@ function _route_density_max(path::String, base_dir::String, psi_cache::Dict{Stri
     end
     (200, "application/json", "{\"density_max_total\":$(d_max)}")
 end
-
 
 # --- Round 5 (R11-cont) extracted handlers ---
 function _route_density3d_atlas(path::String, base_dir::String, psi_cache::Dict{String, Any})
@@ -898,4 +900,3 @@ function _route_snapshots(path::String, base_dir::String, psi_cache::Dict{String
     end
     (200, "application/json", _json_string(meta))
 end
-

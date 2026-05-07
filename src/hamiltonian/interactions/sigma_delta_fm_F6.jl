@@ -1,0 +1,148 @@
+# sigma_delta_fm_F6.jl
+# ====================
+# σ_m, δ_m coefficients for FM-phase BdG, F=6 (ζ_α = δ_{α,+F}).
+# Auto-generated from sympy Clebsch-Gordan computation (parallel session
+# 2026-05-07 derivation).
+#
+# Structural difference from polar phase:
+#   - Polar:  δ_m non-zero for all m (anomalous pair m_tot = 0)
+#   - FM:     δ_m non-zero only for m = +F (anomalous pair m_tot = 2F = 12,
+#             realised only by α=β=+F)
+#   ⇒ FM contact LHY collapses to a single mode contribution at m = +F:
+#     ε_LHY^{FM,contact} = (8/15π²) (g_{2F} n)^(5/2) (single-mode)
+#
+# Goldstone identities (algebraic):
+#   σ_+F   = δ_+F = g_{2F}                  (U(1) phonon)
+#   2σ_+(F-1) = σ_+F                        (F_- magnon, type-B Goldstone, ω∝k²)
+#
+# Currently F=6 only (parallel session derivation). For other F, extend by
+# repeating the sympy computation; the structural pattern (δ_m = g_{2F}·δ_{m,+F})
+# generalises but coefficients require explicit CG.
+
+const SIGMA_TABLE_FM = Dict{Int, Vector{Vector{Tuple{Int, Float64}}}}(
+    6 => Vector{Tuple{Int, Float64}}[
+        # m = -6   (index 1)
+        Tuple{Int, Float64}[
+            (0, 1.0/13.0),
+            (2, 22.0/91.0),
+            (4, 891.0/6188.0),
+            (6, 11.0/323.0),
+            (8, 11.0/3458.0),
+            (10, 9.0/96577.0),
+            (12, 1.0/2704156.0),
+        ],
+        # m = -5
+        Tuple{Int, Float64}[
+            (2, 11.0/91.0),
+            (4, 1485.0/6188.0),
+            (6, 77.0/646.0),
+            (8, 33.0/1729.0),
+            (10, 165.0/193154.0),
+            (12, 1.0/208012.0),
+        ],
+        # m = -4
+        Tuple{Int, Float64}[
+            (2, 2.0/91.0),
+            (4, 1215.0/6188.0),
+            (6, 70.0/323.0),
+            (8, 15.0/247.0),
+            (10, 405.0/96577.0),
+            (12, 1.0/29716.0),
+        ],
+        # m = -3
+        Tuple{Int, Float64}[
+            (4, 81.0/884.0),
+            (6, 84.0/323.0),
+            (8, 33.0/247.0),
+            (10, 108.0/7429.0),
+            (12, 5.0/29716.0),
+        ],
+        # m = -2
+        Tuple{Int, Float64}[
+            (4, 9.0/442.0),
+            (6, 70.0/323.0),
+            (8, 55.0/247.0),
+            (10, 294.0/7429.0),
+            (12, 5.0/7429.0),
+        ],
+        # m = -1
+        Tuple{Int, Float64}[
+            (6, 77.0/646.0),
+            (8, 11.0/38.0),
+            (10, 1323.0/14858.0),
+            (12, 1.0/437.0),
+        ],
+        # m =  0
+        Tuple{Int, Float64}[
+            (6, 11.0/323.0),
+            (8, 11.0/38.0),
+            (10, 1260.0/7429.0),
+            (12, 3.0/437.0),
+        ],
+        # m = +1
+        Tuple{Int, Float64}[
+            (8, 55.0/266.0),
+            (10, 120.0/437.0),
+            (12, 3.0/161.0),
+        ],
+        # m = +2
+        Tuple{Int, Float64}[
+            (8, 11.0/133.0),
+            (10, 162.0/437.0),
+            (12, 15.0/322.0),
+        ],
+        # m = +3
+        Tuple{Int, Float64}[
+            (10, 9.0/23.0),
+            (12, 5.0/46.0),
+        ],
+        # m = +4
+        Tuple{Int, Float64}[
+            (10, 6.0/23.0),
+            (12, 11.0/46.0),
+        ],
+        # m = +5
+        Tuple{Int, Float64}[
+            (12, 1.0/2.0),
+        ],
+        # m = +6
+        Tuple{Int, Float64}[
+            (12, 1.0),
+        ],
+    ],
+)
+
+# δ_m = g_{2F} · δ_{m,+F}: only m = +F is non-zero.
+# Stored as a single dict so the structural property is explicit.
+const DELTA_TABLE_FM = Dict{Int, Vector{Vector{Tuple{Int, Float64}}}}(
+    6 => Vector{Tuple{Int, Float64}}[
+        Tuple{Int, Float64}[] for _ in 1:12
+    ],   # m = -6 .. +5: all empty
+)
+push!(DELTA_TABLE_FM[6], Tuple{Int, Float64}[(12, 1.0)])  # m = +F = +6
+
+"""
+    sigma_fm(F::Int, m::Int, g_dict) -> Float64
+
+FM-phase σ_m via lookup table. `m` indexed -F..+F via `m + F + 1`.
+"""
+@inline function sigma_fm(F::Int, m::Int, g_dict)::Float64
+    haskey(SIGMA_TABLE_FM, F) || error("F=$F FM table not pre-computed (currently F=6 only)")
+    abs(m) <= F || throw(ArgumentError("|m| > F"))
+    coefs = SIGMA_TABLE_FM[F][m + F + 1]
+    s = 0.0
+    @inbounds for (Sv, c) in coefs
+        s += c * g_dict[Sv]
+    end
+    return s
+end
+
+"""
+    delta_fm(F::Int, m::Int, g_dict) -> Float64
+
+FM-phase δ_m. Non-zero only for `m = +F`, where δ_+F = g_{2F}.
+"""
+@inline function delta_fm(F::Int, m::Int, g_dict)::Float64
+    m == F || return 0.0
+    return g_dict[2F]
+end

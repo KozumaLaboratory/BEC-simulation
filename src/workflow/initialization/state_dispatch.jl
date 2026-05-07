@@ -352,10 +352,15 @@ end
 function _extract_spinor(psi::AbstractArray{<:Complex})
     D = size(psi, ndims(psi))
     n_pts = ntuple(d -> size(psi, d), ndims(psi) - 1)
-    peak_idx = argmax(sum(abs2, psi; dims=ndims(psi)))
+    # `sum(abs2, psi; dims=last)` keeps the component axis as a singleton, so
+    # `argmax` returns a CartesianIndex with `ndims(psi)` entries. We want a
+    # spatial-only CartesianIndex to index ψ at each component slot. Drop the
+    # singleton component axis explicitly before taking argmax.
+    n_total = dropdims(sum(abs2, psi; dims=ndims(psi)); dims=ndims(psi))
+    peak_cart = argmax(n_total)
     spinor = Vector{ComplexF64}(undef, D)
     for c in 1:D
-        spinor[c] = psi[peak_idx, c]
+        spinor[c] = psi[peak_cart, c]
     end
     nrm = norm(spinor)
     nrm > 1e-30 && (spinor ./= nrm)
@@ -368,4 +373,3 @@ function _default_spinor(F::Int)
     spinor[1] = 1.0
     spinor
 end
-

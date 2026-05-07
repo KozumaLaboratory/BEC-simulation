@@ -1,6 +1,5 @@
 # --- Binary (two-component) GP step dispatch ---
 
-
 """
 Binary (two-component) ground-state YAML entry point. Returns a result
 shape compatible with the standard spinor `_run_step` path so analyzers

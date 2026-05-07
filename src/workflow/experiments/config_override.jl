@@ -199,9 +199,11 @@ function _expand_values_unit_aware(spec::Dict, raw_from, raw_to)
         u = string(Unitful.unit(q_from))
         f = Float64(Unitful.ustrip(q_from))
         # Convert to the same unit
-        t = q_to isa Unitful.Quantity ?
-            Float64(Unitful.ustrip(Unitful.uconvert(Unitful.unit(q_from), q_to))) :
+        t = if q_to isa Unitful.Quantity
+            Float64(Unitful.ustrip(Unitful.uconvert(Unitful.unit(q_from), q_to)))
+        else
             Float64(q_to)
+        end
         (u, f, t)
     else
         u = string(Unitful.unit(q_to))
@@ -217,9 +219,11 @@ function _expand_values_unit_aware(spec::Dict, raw_from, raw_to)
             throw(ArgumentError("log scale requires positive from/to"))
         [exp(v) for v in range(log(from_val), log(to_val); length=n)]
     else
-        throw(ArgumentError(
-            "scan scale=$scale not supported with unit-bearing from/to. " *
-            "Use linear or log; or strip units and use a numeric scan."))
+        throw(
+            ArgumentError(
+                "scan scale=$scale not supported with unit-bearing from/to. " *
+                "Use linear or log; or strip units and use a numeric scan."),
+        )
     end
     # Emit as "value unit" strings so the downstream parser handles them.
     [string(v, " ", unit_str) for v in raw_values]

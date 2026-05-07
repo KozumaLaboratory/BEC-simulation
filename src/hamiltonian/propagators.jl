@@ -403,12 +403,14 @@ function _total_density!(
     ndim::Int,
     n_pts,
 )
-    @inbounds for I in CartesianIndices(n_pts)
-        s = 0.0
-        for c in 1:n_components
-            s += abs2(psi[I, c])
-        end
-        buf[I] = s
+    # Broadcast form: GPU-safe. The earlier scalar-getindex loop tripped
+    # GPUArraysCore's `assertscalar` check when psi was a CuArray (e.g.
+    # apply_loss_step! → _total_density! during a `loss:` dynamics block).
+    idx1 = _component_slice(ndim, n_pts, 1)
+    buf .= abs2.(view(psi, idx1...))
+    for c in 2:n_components
+        idx = _component_slice(ndim, n_pts, c)
+        buf .+= abs2.(view(psi, idx...))
     end
     buf
 end

@@ -135,8 +135,10 @@ function multi_fidelity_optimize_2tier(
 
     cost_used = n_init_low * 1.0 + length(paired_idx) * cost_ratio
     if verbose
-        println("MFBO warmup: $n_init_low low + $(length(paired_idx)) paired high " *
-                "(cost = $(round(cost_used; digits=1)))")
+        println(
+            "MFBO warmup: $n_init_low low + $(length(paired_idx)) paired high " *
+            "(cost = $(round(cost_used; digits=1)))",
+        )
     end
 
     # Default kernel length scale: 30 % of box width (dimension-averaged)
@@ -149,20 +151,22 @@ function multi_fidelity_optimize_2tier(
     n_high_extra = 0
     for it in 1:n_iter
         # Best high-fidelity y observed so far (target for EI).
-        y_best_high = isempty(y_high) ?
-                      (minimise ? Inf : -Inf) :
-                      (minimise ? minimum(y_high) : maximum(y_high))
+        y_best_high = if isempty(y_high)
+            (minimise ? Inf : -Inf)
+        else
+            (minimise ? minimum(y_high) : maximum(y_high))
+        end
 
         # Posterior at every candidate, both at high-fidelity (via discrepancy)
         # and at low-fidelity directly.
         μ_low_at_cand, σ²_low_at_cand = gp_predict(X_low, y_low, candidates; ℓ=ℓ_use)
         μ_high_at_cand, σ²_high_at_cand = _high_posterior(
-            X_low, y_low, X_high, y_high, candidates; ℓ=ℓ_use,
+            X_low, y_low, X_high, y_high, candidates; ℓ=ℓ_use
         )
 
         # EI for *high-fidelity* y at each candidate (since high is the truth)
         ei_high = expected_improvement(
-            μ_high_at_cand, σ²_high_at_cand, y_best_high; minimise=minimise,
+            μ_high_at_cand, σ²_high_at_cand, y_best_high; minimise=minimise
         )
         # EI for *low-fidelity* y is irrelevant in isolation, but a low-fidelity
         # query still updates the y_low GP and (via discrepancy mean) the

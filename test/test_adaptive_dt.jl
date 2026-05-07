@@ -153,7 +153,7 @@ using SpinorBEC
           - dynamics:
               duration: 1.0
               dt: 0.01
-              zeeman:
+              B:
                 p: 0.0
                 q: 0.0
           - dynamics:
@@ -164,7 +164,7 @@ using SpinorBEC
                 dt_min: 0.0001
                 dt_max: 0.05
                 tol: 0.002
-              zeeman:
+              B:
                 p: 0.0
                 q: 0.0
         """
@@ -201,7 +201,7 @@ using SpinorBEC
               dt: 0.01
               adaptive_dt:
                 tol: 0.001
-              zeeman:
+              B:
                 p: 0.0
                 q: 0.0
           - dynamics:
@@ -210,7 +210,7 @@ using SpinorBEC
               adaptive_dt:
                 tol: 0.001
                 error_mode: richardson
-              zeeman:
+              B:
                 p: 0.0
                 q: 0.0
         """
@@ -239,7 +239,7 @@ using SpinorBEC
               duration: 1.0
               dt: 0.002
               adaptive_dt: {}
-              zeeman:
+              B:
                 p: 0.0
                 q: 0.0
         """
@@ -344,7 +344,7 @@ using SpinorBEC
               n_steps: 200
               tol: 1.0e-6
               initial_state: polar
-              zeeman:
+              B:
                 p: 0.0
                 q: 0.1
               potential: {type: harmonic, omega: [1.0]}
@@ -352,7 +352,7 @@ using SpinorBEC
               duration: 0.1
               dt: 0.001
               save_every: 50
-              zeeman:
+              B:
                 p: 0.0
                 q: 0.1
               potential: {type: harmonic, omega: [1.0]}

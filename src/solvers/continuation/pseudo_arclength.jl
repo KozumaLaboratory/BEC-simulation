@@ -100,10 +100,12 @@ function trace_phase_boundary(
     verbose::Bool=true,
 )
     d = length(θ_init)
-    d == 2 || throw(ArgumentError(
-        "trace_phase_boundary currently supports d = 2 (got d = $d). " *
-        "Higher-d would need the (d-1)-D tangent subspace logic.",
-    ))
+    d == 2 || throw(
+        ArgumentError(
+            "trace_phase_boundary currently supports d = 2 (got d = $d). " *
+            "Higher-d would need the (d-1)-D tangent subspace logic.",
+        ),
+    )
     length(t_init) == d ||
         throw(DimensionMismatch("t_init length $(length(t_init)) ≠ d = $d"))
 
@@ -181,9 +183,11 @@ function _tangent_2d(F::Function, θ::Vector{Float64}; finite_diff_h::Float64=1.
     g = _grad_F(F, θ; finite_diff_h)
     t = [-g[2], g[1]]
     n = norm(t)
-    n < 1.0e-30 && throw(ArgumentError(
-        "∇F vanishes at θ = $θ; cannot define a tangent (singular point or false boundary)",
-    ))
+    n < 1.0e-30 && throw(
+        ArgumentError(
+            "∇F vanishes at θ = $θ; cannot define a tangent (singular point or false boundary)"
+        ),
+    )
     t ./ n
 end
 
@@ -307,9 +311,10 @@ function make_phase_diff_eval(
 
         # Branch A
         psi_init_A = psi_A_warm[]
-        init_kwargs_A = psi_init_A === nothing ?
-                        (initial_state=phase_A_init,) :
-                        (psi_init=psi_init_A,)
+        init_kwargs_A =
+            psi_init_A === nothing ?
+            (initial_state=phase_A_init,) :
+            (psi_init=psi_init_A,)
         r_A = find_ground_state_lbfgs(;
             grid, atom,
             kwargs...,
@@ -321,9 +326,10 @@ function make_phase_diff_eval(
 
         # Branch B
         psi_init_B = psi_B_warm[]
-        init_kwargs_B = psi_init_B === nothing ?
-                        (initial_state=phase_B_init,) :
-                        (psi_init=psi_init_B,)
+        init_kwargs_B =
+            psi_init_B === nothing ?
+            (initial_state=phase_B_init,) :
+            (psi_init=psi_init_B,)
         r_B = find_ground_state_lbfgs(;
             grid, atom,
             kwargs...,

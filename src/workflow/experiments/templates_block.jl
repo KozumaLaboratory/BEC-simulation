@@ -82,8 +82,10 @@ function apply_templates_and_mixins!(data::Dict)
         tname = String(pop!(data, "template"))
         params_raw = pop!(data, "parameters", Dict{String, Any}())
         params = Dict{String, Any}(string(k) => v for (k, v) in params_raw)
-        haskey(_TEMPLATES, tname) || throw(ArgumentError(
-            "Unknown template '$tname'. Registered: $(sort(collect(keys(_TEMPLATES))))"))
+        haskey(_TEMPLATES, tname) || throw(
+            ArgumentError(
+                "Unknown template '$tname'. Registered: $(sort(collect(keys(_TEMPLATES))))"),
+        )
         expanded = _TEMPLATES[tname](params)
         # Merge expanded into data — expanded wins for pipeline, data wins
         # for top-level extras (calibration, scan, etc.)

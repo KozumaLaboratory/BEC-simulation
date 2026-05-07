@@ -177,8 +177,11 @@ function load_run_metadata(jld2_path::String)
         n_vec = _with_jld_handle(jld2_path) do f
             haskey(f, "grid_n_points") ? f["grid_n_points"] : nothing
         end
-        n_vec === nothing ? nothing :
-        NTuple{3, Int}((Int(n_vec[1]), Int(n_vec[2]), Int(n_vec[3])))
+        if n_vec === nothing
+            nothing
+        else
+            NTuple{3, Int}((Int(n_vec[1]), Int(n_vec[2]), Int(n_vec[3])))
+        end
     catch
         nothing
     end
@@ -193,8 +196,11 @@ function _read_run_physics(jld2_path::String)
     try
         out = _with_jld_handle(jld2_path) do f
             atom = haskey(f, "units/atom") ? String(f["units/atom"]) : nothing
-            omega = haskey(f, "units/omega_ref_rad_s") ?
-                    Float64(f["units/omega_ref_rad_s"]) : nothing
+            omega = if haskey(f, "units/omega_ref_rad_s")
+                Float64(f["units/omega_ref_rad_s"])
+            else
+                nothing
+            end
             n = haskey(f, "units/N_atoms") ? Int(f["units/N_atoms"]) : nothing
             (atom, omega, n)
         end

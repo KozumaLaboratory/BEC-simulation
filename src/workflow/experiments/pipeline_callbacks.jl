@@ -155,4 +155,3 @@ function _build_sgpe_callback(node, dt::Float64)
     end
     sgpe_callback(γ, T, dt; μ=μ, k_cut=k_cut, seed=seed, every=every)
 end
-

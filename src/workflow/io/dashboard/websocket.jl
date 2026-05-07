@@ -206,4 +206,3 @@ function _websocket_serve(sock, path::AbstractString, ws_key::AbstractString,
         e isa EOFError || @warn "WebSocket loop error: $e"
     end
 end
-

@@ -90,12 +90,15 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
     "target_magnetization" => FieldSpec(; type=Number),
     "temperature_ratio" => FieldSpec(; type=Number, range=(0.0, 1.0)),
     "spinor_lhy" => FieldSpec(; type=String,
-        enum=["two_channel", "full_bdg", "scalar"]),
+        enum=["two_channel", "full_bdg", "scalar",
+            "polar_contact", "polar_dipolar", "fm_contact"]),
     # ↑ "scalar" is a no-op alias (explicit form of the default) — the
     # ScalarLHY path activates whenever interactions.c_lhy > 0,
     # regardless of this selector. "two_channel" and "full_bdg" route
-    # to compute_spinor_lhy_{two_channel,table} respectively in
-    # initialization.jl.
+    # to compute_spinor_lhy_{two_channel,table} respectively. The two
+    # "polar_*" modes use the F-generic closed-form polar LHY
+    # (paper #1) and dispatch via compute_spinor_lhy_polar_{contact,
+    # dipolar}; restricted to polar phases (ζ_α = δ_{α,0}).
     "init_state_params" => FieldSpec(; type=Dict),
     "cache" => FieldSpec(; type=String),
     "quasi_2d" => FieldSpec(; type=Bool),
@@ -371,9 +374,9 @@ function _levenshtein(a::AbstractString, b::AbstractString)
         curr[1] = i
         for j in 1:n
             cost = av[i] == bv[j] ? 0 : 1
-            curr[j+1] = min(curr[j] + 1, prev[j+1] + 1, prev[j] + cost)
+            curr[j + 1] = min(curr[j] + 1, prev[j + 1] + 1, prev[j] + cost)
         end
         prev, curr = curr, prev
     end
-    prev[n+1]
+    prev[n + 1]
 end

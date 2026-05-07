@@ -230,6 +230,7 @@ end
                     snapshot_tmp_path=get(step_result, :snapshot_tmp_path, nothing),
                     save_psi_snapshots=get(step_result, :save_psi_snapshots, false),
                     snapshot_count=get(step_result, :snapshot_count, 0),
+                    ensemble_result=get(step_result, :ensemble_result, nothing),
                 ),
             )
             results[:dynamics_history] = history

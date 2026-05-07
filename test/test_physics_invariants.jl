@@ -27,9 +27,8 @@ using FFTW
 @testset "Physics invariants (CI tier)" begin
 
     # ── Test 3: Conservation under RT with non-degenerate spin_coherent ──
-    @testset "Conservation E, N, Mz under RT (F=$F, spin_coherent)" for
-        (F, atom_sym) in [(1, :Rb87), (6, :Eu151)]
-
+    @testset "Conservation E, N, Mz under RT (F=$F, spin_coherent)" for (F, atom_sym) in
+                                                                        [(1, :Rb87), (6, :Eu151)]
         grid = make_grid(GridConfig((10, 10, 10), (8.0, 8.0, 8.0)))
         atom = ATOM_REGISTRY[atom_sym]
         sys = SpinSystem(F)
@@ -42,7 +41,7 @@ using FFTW
         trap = HarmonicTrap((1.0, 1.0, 1.0))
 
         sp = SimParams(;
-            dt=0.001, n_steps=400, save_every=40, imaginary_time=false,
+            dt=0.001, n_steps=400, save_every=40, imaginary_time=false
         )
         ws = make_workspace(;
             grid, atom, interactions, potential=trap,
@@ -130,7 +129,7 @@ using FFTW
         psi0 = copy(gs.workspace.state.psi)
 
         sp_rt = SimParams(;
-            dt=0.001, n_steps=500, save_every=500, imaginary_time=false,
+            dt=0.001, n_steps=500, save_every=500, imaginary_time=false
         )
         ws_rt = make_workspace(;
             grid, atom=Rb87, interactions, potential=trap,
@@ -158,7 +157,7 @@ using FFTW
         E0 = gs.energy
 
         sp_polish = SimParams(;
-            dt=0.005, n_steps=300, save_every=300, imaginary_time=true,
+            dt=0.005, n_steps=300, save_every=300, imaginary_time=true
         )
         ws_polish = make_workspace(;
             grid, atom=Rb87, interactions, potential=trap,
@@ -192,7 +191,7 @@ using FFTW
         interactions = InteractionParams(c0, 0.0)
 
         sp = SimParams(;
-            dt=0.002, n_steps=8000, save_every=4, imaginary_time=false,
+            dt=0.002, n_steps=8000, save_every=4, imaginary_time=false
         )
         ws = make_workspace(;
             grid, atom=ATOM_REGISTRY[:Rb87], interactions,

@@ -360,14 +360,16 @@ end
         # MUST either tighten ε or pass explicit dt.
         ε_used = haskey(p, "epsilon") ? Float64(p["epsilon"]) : NaN
         if !isnan(ε_used) && ε_used >= 1e-3
-            throw(ArgumentError(
-                "rotating_basis: Larmor phase per step p·F·dt = " *
-                "$(round(larmor_phase; sigdigits=4)) > π combined with " *
-                "ε = $(round(ε_used; sigdigits=2)) ≥ 1e-3. This regime " *
-                "produced fake-physics in the 2026-04-28 audit (m=+F " *
-                "drift 0.997 → 0.106 was numerical, not physical). " *
-                "Tighten to ε ≤ 1e-6, or supply explicit " *
-                "dt < $(round(π / (p_zeeman_abs * F_atom_int); sigdigits=3))."))
+            throw(
+                ArgumentError(
+                    "rotating_basis: Larmor phase per step p·F·dt = " *
+                    "$(round(larmor_phase; sigdigits=4)) > π combined with " *
+                    "ε = $(round(ε_used; sigdigits=2)) ≥ 1e-3. This regime " *
+                    "produced fake-physics in the 2026-04-28 audit (m=+F " *
+                    "drift 0.997 → 0.106 was numerical, not physical). " *
+                    "Tighten to ε ≤ 1e-6, or supply explicit " *
+                    "dt < $(round(π / (p_zeeman_abs * F_atom_int); sigdigits=3))."),
+            )
         elseif verbose
             # Warn in the marginal regime (ε < 1e-3 but phase > π still
             # near the edge — Y6 may still under-resolve commutator

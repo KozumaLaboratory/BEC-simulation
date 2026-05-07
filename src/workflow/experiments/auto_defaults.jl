@@ -59,7 +59,7 @@ function apply_auto_defaults!(data::Dict)
     auto_grid_global = pop!(data, "auto_grid", false)
 
     if (auto_grid_global === true) && haskey(data, "pipeline") &&
-       data["pipeline"] isa AbstractVector
+        data["pipeline"] isa AbstractVector
         for step in data["pipeline"]
             step isa AbstractDict || continue
             length(keys(step)) == 1 || continue
@@ -69,7 +69,7 @@ function apply_auto_defaults!(data::Dict)
             inner isa AbstractDict || continue
             grid_node = get(inner, "grid", nothing)
             if grid_node === nothing ||
-               (grid_node isa AbstractDict && get(grid_node, "auto", false) === true)
+                (grid_node isa AbstractDict && get(grid_node, "auto", false) === true)
                 inner["grid"] = _auto_grid_from_physics(inner)
             end
         end
@@ -95,7 +95,7 @@ function _auto_grid_from_physics(gs_step::Dict)
     fallback = Dict("n" => [16, 16, 16], "box" => [12.0, 12.0, 12.0])
 
     haskey(gs_step, "atom") && haskey(gs_step, "N_atoms") &&
-        (haskey(gs_step, "omega_ref") || haskey(gs_step, "interactions")) ||
+    (haskey(gs_step, "omega_ref") || haskey(gs_step, "interactions")) ||
         return fallback
 
     atom_name = String(gs_step["atom"])
@@ -108,12 +108,24 @@ function _auto_grid_from_physics(gs_step::Dict)
     end
 
     # Resolve atom species
-    atom = if atom_name == "Eu151";  Eu151
-    elseif atom_name == "Dy164"; Dy164
-    elseif atom_name == "Rb87";  Rb87
-    elseif atom_name == "Cr52";  Cr52
-    elseif atom_name == "Er168"; Er168
-    else; return fallback
+    atom = if atom_name == "Eu151"
+        ;
+        Eu151
+    elseif atom_name == "Dy164"
+        ;
+        Dy164
+    elseif atom_name == "Rb87"
+        ;
+        Rb87
+    elseif atom_name == "Cr52"
+        ;
+        Cr52
+    elseif atom_name == "Er168"
+        ;
+        Er168
+    else
+        ;
+        return fallback
     end
 
     # Trap aspect ratio (relative trap freqs)

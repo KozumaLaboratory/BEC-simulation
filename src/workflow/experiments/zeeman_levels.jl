@@ -224,12 +224,22 @@ function _build_zeeman_level2(z::Dict, duration::Float64, atom, omega_ref::Float
     theta_wf = if theta_spec isa Number
         ConstantWaveform(Float64(theta_spec))
     else
-        (theta_spec isa Waveform ? theta_spec : _make_waveform(theta_spec, duration; omega_ref=omega_ref))
+        (
+            if theta_spec isa Waveform
+                theta_spec
+            else
+                _make_waveform(theta_spec, duration; omega_ref=omega_ref)
+            end
+        )
     end
     phi_wf = if phi_spec isa Number
         ConstantWaveform(Float64(phi_spec))
     else
-        (phi_spec isa Waveform ? phi_spec : _make_waveform(phi_spec, duration; omega_ref=omega_ref))
+        (if phi_spec isa Waveform
+                phi_spec
+            else
+                _make_waveform(phi_spec, duration; omega_ref=omega_ref)
+            end)
     end
 
     bx_vals = Vector{Float64}(undef, _ZEEMAN_SAMPLE_N)
@@ -276,12 +286,14 @@ function _resolve_q_waveform(z::Dict, p_wf, atom, omega_ref::Float64, duration::
     # Auto-derive: bosonic / no hyperfine → q = 0 silently.
     atom.Delta_E_hf > 0 || return ConstantWaveform(0.0)
     # Hyperfine present but q-geometry missing → error (incomplete atom data).
-    (atom.g_J > 0 && atom.q_geometry > 0) || throw(ArgumentError(
-        "atom $(atom.name): magnetic field set but quadratic-Zeeman " *
-        "geometry data is incomplete (g_J=$(atom.g_J), " *
-        "q_geometry=$(atom.q_geometry)). Set `q:` explicitly in the " *
-        "zeeman block, or fill in `g_J` and `q_geometry` for this atom " *
-        "in src/workflow/initialization/atoms.jl."))
+    (atom.g_J > 0 && atom.q_geometry > 0) || throw(
+        ArgumentError(
+            "atom $(atom.name): magnetic field set but quadratic-Zeeman " *
+            "geometry data is incomplete (g_J=$(atom.g_J), " *
+            "q_geometry=$(atom.q_geometry)). Set `q:` explicitly in the " *
+            "zeeman block, or fill in `g_J` and `q_geometry` for this atom " *
+            "in src/workflow/initialization/atoms.jl."),
+    )
     # Hyperfine + geometry present → derive q(t) from p(t)².
     n = _ZEEMAN_SAMPLE_N
     times = collect(range(0.0, duration; length=n))
@@ -348,7 +360,7 @@ function _build_zeeman_multi_source(z::Dict, duration::Float64, atom, p_step::Di
         sub_z = if haskey(src_dict, "Bx") || haskey(src_dict, "By") || haskey(src_dict, "Bz")
             _build_zeeman_level1(src_dict, duration, atom, omega_ref)
         elseif haskey(src_dict, "B_mag") || haskey(src_dict, "theta_deg") ||
-               haskey(src_dict, "phi_deg")
+            haskey(src_dict, "phi_deg")
             _build_zeeman_level2(src_dict, duration, atom, omega_ref)
         else
             # Treat as Level 0 vector source (p/bx/by). Wrap via _parse_zeeman.
@@ -366,7 +378,7 @@ function _build_zeeman_multi_source(z::Dict, duration::Float64, atom, p_step::Di
     total_by = zeros(Float64, n)
     for sub in sub_zeemans
         for (i, t) in enumerate(times)
-            total_p[i]  += evaluate(sub.p_wf,  t)
+            total_p[i] += evaluate(sub.p_wf, t)
             total_bx[i] += sub.bx_wf === nothing ? 0.0 : evaluate(sub.bx_wf, t)
             total_by[i] += sub.by_wf === nothing ? 0.0 : evaluate(sub.by_wf, t)
         end

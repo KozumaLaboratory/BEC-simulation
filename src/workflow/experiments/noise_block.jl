@@ -37,10 +37,10 @@
 
 const _NOISE_KEY_MAP = Dict(
     # Top-level noise: → split into legacy fields
-    "seed"            => "noise_seed",
-    "thermal"         => "temperature_ratio",
-    "twa"             => "twa",
-    "sgpe"            => "sgpe",
+    "seed" => "noise_seed",
+    "thermal" => "temperature_ratio",
+    "twa" => "twa",
+    "sgpe" => "sgpe",
     "photon_scattering" => "photon_scattering",
 )
 
@@ -69,7 +69,7 @@ const _NOISE_LEGACY_KEYS = ("temperature_ratio", "seed_amplitude", "seed_k_cut",
     "noise_seed", "twa", "sgpe", "photon_scattering")
 
 function _split_noise_block!(step::AbstractDict)
-    haskey(step, "noise") || return
+    haskey(step, "noise") || return nothing
     n = pop!(step, "noise")
     n isa AbstractDict || throw(ArgumentError(
         "noise: must be a mapping, got $(typeof(n))"))
@@ -83,10 +83,12 @@ function _split_noise_block!(step::AbstractDict)
     initial = get(n, "initial", nothing)
     has_twa = haskey(n, "twa")
     if has_twa && initial isa AbstractDict && haskey(initial, "thermal")
-        throw(ArgumentError(
-            "noise: `initial.thermal` and `twa` are mutually exclusive — " *
-            "TWA already samples thermal fluctuations via Wigner. " *
-            "Pick one: drop initial.thermal OR drop twa."))
+        throw(
+            ArgumentError(
+                "noise: `initial.thermal` and `twa` are mutually exclusive — " *
+                "TWA already samples thermal fluctuations via Wigner. " *
+                "Pick one: drop initial.thermal OR drop twa."),
+        )
     end
 
     # Top-level keys (seed, twa, sgpe, photon_scattering)
@@ -110,9 +112,11 @@ function _split_noise_block!(step::AbstractDict)
             isempty(coh) || throw(ArgumentError(
                 "noise.initial.coherent: unknown keys $(collect(keys(coh)))"))
         end
-        isempty(ini) || throw(ArgumentError(
-            "noise.initial: unknown keys $(collect(keys(ini))). " *
-            "Recognised: thermal, coherent."))
+        isempty(ini) || throw(
+            ArgumentError(
+                "noise.initial: unknown keys $(collect(keys(ini))). " *
+                "Recognised: thermal, coherent."),
+        )
     end
 
     # dissipative: alternative grouping for sgpe/photon_scattering
@@ -126,9 +130,11 @@ function _split_noise_block!(step::AbstractDict)
             "noise.dissipative: unknown keys $(collect(keys(d)))"))
     end
 
-    isempty(n) || throw(ArgumentError(
-        "noise: unknown keys $(collect(keys(n))). " *
-        "Recognised top-level: seed, initial, twa, dissipative, " *
-        "sgpe, photon_scattering."))
-    return
+    isempty(n) || throw(
+        ArgumentError(
+            "noise: unknown keys $(collect(keys(n))). " *
+            "Recognised top-level: seed, initial, twa, dissipative, " *
+            "sgpe, photon_scattering."),
+    )
+    return nothing
 end

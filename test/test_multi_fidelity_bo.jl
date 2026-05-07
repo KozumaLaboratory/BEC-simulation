@@ -18,7 +18,12 @@ using Test
 # Global minimum f* ≈ 0.397887 at three points; here we use one
 # (-π, 12.275) for the optimum reference.
 function _branin(x::Vector{Float64})
-    a = 1.0; b = 5.1 / (4π^2); c = 5.0 / π; r = 6.0; s = 10.0; t = 1.0 / (8π)
+    a = 1.0;
+    b = 5.1 / (4π^2);
+    c = 5.0 / π;
+    r = 6.0;
+    s = 10.0;
+    t = 1.0 / (8π)
     a * (x[2] - b * x[1]^2 + c * x[1] - r)^2 + s * (1 - t) * cos(x[1]) + s
 end
 

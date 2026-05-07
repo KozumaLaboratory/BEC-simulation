@@ -1,6 +1,5 @@
 # --- Phase-object builders: waveforms + Zeeman + Raman + interpolators ---
 
-
 """
     _make_waveform(spec, duration; omega_ref=NaN) -> Waveform
 

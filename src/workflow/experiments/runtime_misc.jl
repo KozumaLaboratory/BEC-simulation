@@ -51,4 +51,3 @@ function seed_noise(
     _add_noise!(psi, amplitude, n_components, ndim, grid)
     psi
 end
-

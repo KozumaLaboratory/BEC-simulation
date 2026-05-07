@@ -304,7 +304,7 @@ function compute_quadratic_zeeman(atom::AtomSpecies; p_dimless::Real, omega_ref:
     atom.Delta_E_hf > 0 && atom.g_J > 0 && atom.q_geometry > 0 || return 0.0
     Δ_rad_s = atom.Delta_E_hf / Units.HBAR
     Float64(p_dimless)^2 * omega_ref * (atom.g_J / atom.g_F)^2 *
-        atom.q_geometry / Δ_rad_s
+    atom.q_geometry / Δ_rad_s
 end
 
 """

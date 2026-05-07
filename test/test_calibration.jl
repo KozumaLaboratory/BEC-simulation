@@ -37,11 +37,14 @@ using YAML
         apply_calibration!(cfg, calib)
         z = cfg["pipeline"][1]["ground_state"]["zeeman"]
         @test !haskey(z, "p_mv")
-        @test haskey(z, "p")
-        @test z["p"] isa AbstractString
-        @test occursin("Gauss", z["p"])
+        # R42 routes p_mv → Bz (Cartesian quantity-string) instead of the
+        # legacy `p: "X Gauss"` (which was a dimensionless slot taking a
+        # quantity string and tripped _zeeman_scalar Float64(::String)).
+        @test haskey(z, "Bz")
+        @test z["Bz"] isa AbstractString
+        @test occursin("Gauss", z["Bz"])
         # 2.5 * 0.4 + 0.05 = 1.05 G
-        parsed = Units.safe_parse_quantity(z["p"])
+        parsed = Units.safe_parse_quantity(z["Bz"])
         @test abs(Float64(Units.ustrip(Units.u"Gauss", parsed)) - 1.05) < 1e-10
     end
 
@@ -54,8 +57,8 @@ using YAML
             "zeeman" => Dict{String, Any}("p_mv" => 10.0, "coil_mode" => "weak")
         )
         apply_calibration!(cfg, calib)
-        # 10 * 0.04 = 0.4 G (weak mode picked)
-        parsed = Units.safe_parse_quantity(cfg["zeeman"]["p"])
+        # 10 * 0.04 = 0.4 G (weak mode picked) — R42: now routed to Bz.
+        parsed = Units.safe_parse_quantity(cfg["zeeman"]["Bz"])
         @test abs(Float64(Units.ustrip(Units.u"Gauss", parsed)) - 0.4) < 1e-10
     end
 

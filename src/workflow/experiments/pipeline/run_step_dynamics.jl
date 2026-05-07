@@ -1,6 +1,5 @@
 # --- DynamicsStep dispatch + parsing helpers + streaming ---
 
-
 # --- DynamicsStep field-resolution helpers ---
 #
 # Same `@noinline + ::ConcreteType` pattern as the GS helpers above:

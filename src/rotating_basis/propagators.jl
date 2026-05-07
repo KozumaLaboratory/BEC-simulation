@@ -4,7 +4,6 @@
 # local-spin, DDI, gauge. Plus the lab-basis reference operators used for
 # Phase III equivalence checks.
 
-
 """
 ψ_lab = Û_B(t) ψ̃  with  Û_B = exp(-iφ F_z) exp(-iθ F_y).
 
@@ -334,4 +333,3 @@ function split_step_lab!(
     apply_kinetic_step_rotating!(ws, half; imaginary_time)
     nothing
 end
-

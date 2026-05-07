@@ -103,5 +103,6 @@ struct EnsembleResult
     # *every* trajectory and is opt-in.
     last_trajectory::Union{Nothing, SimulationResult}
 end
-EnsembleResult(times, mean, var, n_trajectories, trajectory_results) =
-    EnsembleResult(times, mean, var, n_trajectories, trajectory_results, nothing)
+EnsembleResult(times, mean, var, n_trajectories, trajectory_results) = EnsembleResult(
+    times, mean, var, n_trajectories, trajectory_results, nothing
+)

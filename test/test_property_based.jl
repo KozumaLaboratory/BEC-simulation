@@ -39,7 +39,7 @@ using Random
         @test Fz ≈ Fz' atol = 1e-12
 
         eigs = sort(real.(eigvals(Fz)))
-        @test eigs ≈ collect(Float64, -F:F) atol = 1e-10
+        @test eigs ≈ collect(Float64, (-F):F) atol = 1e-10
     end
 
     @testset "Euler 5-stage = exp(-i dt H), F=$F" for F in 1:6
@@ -191,9 +191,9 @@ end
     # label after a random global rotation — otherwise it is keying on
     # an orientation-dependent quantity (e.g. ⟨F_z⟩ sign) instead of
     # a true invariant.
-    @testset "Phase classifier respects O(3) rotation, F=$F state=$state" for
-        (F, state) in [(1, :ferromagnetic), (1, :polar), (2, :ferromagnetic)]
-
+    @testset "Phase classifier respects O(3) rotation, F=$F state=$state" for (F, state) in [
+        (1, :ferromagnetic), (1, :polar), (2, :ferromagnetic)
+    ]
         grid = make_grid(GridConfig((12, 12, 12), (8.0, 8.0, 8.0)))
         sm = spin_matrices(F)
         sys = SpinSystem(F)
@@ -219,12 +219,14 @@ end
         # `trap:` is not a known ground_state key — must error in strict.
         bad = Dict{String, Any}(
             "pipeline" => [
-                Dict{String, Any}("ground_state" => Dict{String, Any}(
-                    "atom" => "Rb87",
-                    "grid" => Dict{String, Any}(
-                        "n" => [16, 16, 16], "box" => [8.0, 8.0, 8.0]),
-                    "trap" => [1.0, 1.0, 2.6],
-                )),
+                Dict{String, Any}(
+                    "ground_state" => Dict{String, Any}(
+                        "atom" => "Rb87",
+                        "grid" => Dict{String, Any}(
+                            "n" => [16, 16, 16], "box" => [8.0, 8.0, 8.0]),
+                        "trap" => [1.0, 1.0, 2.6],
+                    ),
+                ),
             ],
         )
         @test_throws ArgumentError validate_pipeline!(deepcopy(bad); strict=true)
@@ -232,13 +234,15 @@ end
         # Same payload with `potential:` instead of `trap:` validates.
         ok = Dict{String, Any}(
             "pipeline" => [
-                Dict{String, Any}("ground_state" => Dict{String, Any}(
-                    "atom" => "Rb87",
-                    "grid" => Dict{String, Any}(
-                        "n" => [16, 16, 16], "box" => [8.0, 8.0, 8.0]),
-                    "potential" => Dict{String, Any}(
-                        "type" => "harmonic", "omega" => [1.0, 1.0, 2.6]),
-                )),
+                Dict{String, Any}(
+                    "ground_state" => Dict{String, Any}(
+                        "atom" => "Rb87",
+                        "grid" => Dict{String, Any}(
+                            "n" => [16, 16, 16], "box" => [8.0, 8.0, 8.0]),
+                        "potential" => Dict{String, Any}(
+                            "type" => "harmonic", "omega" => [1.0, 1.0, 2.6]),
+                    ),
+                ),
             ],
         )
         validate_pipeline!(deepcopy(ok); strict=true)   # no throw

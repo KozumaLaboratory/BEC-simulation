@@ -225,7 +225,11 @@ using FFTW
 
         center_idx = CartesianIndex(8, 8)
         corner_idx = CartesianIndex(1, 1)
-        @test ws.potential_values[corner_idx] > ws.potential_values[center_idx]
+        # 2026-04-27 sign fix: centrifugal term is `-(1/2)ω²r_⊥²` subtracted
+        # from V (deconfining), not added. With NoPotential as the base,
+        # corners now have LOWER potential than centre (was the opposite
+        # under the over-confining bug).
+        @test ws.potential_values[corner_idx] < ws.potential_values[center_idx]
 
         zee = SpinorBEC.zeeman_at(ws.zeeman, 0.0)
         @test zee.p ≈ -omega

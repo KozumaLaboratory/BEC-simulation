@@ -538,4 +538,3 @@ end
 
 Upsample a 3D array to `target_n` points per axis using trilinear interpolation.
 """
-

@@ -84,7 +84,6 @@ function _analyze_skyrmion_detect(psi, grid, atom, params, ws_prev)
             positions=positions,
             total_charge_xy=total_Q_xy)
     end
-
 end
 
 function _analyze_synthetic_dim(psi, grid, atom, params, ws_prev)
@@ -163,7 +162,6 @@ function _analyze_synthetic_dim(psi, grid, atom, params, ws_prev)
         synthetic_currents=currents,
         localization_length=ipr_xi,
         dispersion=dispersion_block)
-
 end
 
 function _analyze_bogoliubov_mode(psi, grid, atom, params, ws_prev)
@@ -238,7 +236,6 @@ function _analyze_bogoliubov_mode(psi, grid, atom, params, ws_prev)
         dominant_m=F - (argmax(weight_per_m) - 1),
         wavelength=wavelength,
         direction=collect(imap.most_unstable_direction))
-
 end
 
 function _analyze_rosensweig_pattern(psi, grid, atom, params, ws_prev)
@@ -325,7 +322,6 @@ function _analyze_rosensweig_pattern(psi, grid, atom, params, ws_prev)
         n_petals=n_petals,
         radial_power=radial_power,
         k_min=k_min)
-
 end
 
 function _analyze_column_density_movie(psi, grid, atom, params, ws_prev)
@@ -432,6 +428,4 @@ function _analyze_column_density_movie(psi, grid, atom, params, ws_prev)
     (output_dir=output_dir, n_frames=global_idx,
         archive_path=archive_path, manifest_path=manifest_path,
         axis=axis, n_phases=multi_step ? length(sources) : 1)
-
 end
-

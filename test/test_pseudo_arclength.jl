@@ -69,7 +69,7 @@ using Test
     @testset "d ≠ 2 throws" begin
         F(θ) = θ[1] + θ[2] + θ[3]
         @test_throws ArgumentError trace_phase_boundary(
-            F, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0]; verbose=false,
+            F, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0]; verbose=false
         )
     end
 end

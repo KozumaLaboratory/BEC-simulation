@@ -167,7 +167,6 @@ struct ShakenLatticePotential{N} <: AbstractPotential
     shake_wf::NTuple{N, Waveform}
 end
 
-
 # Time-dependent trap (kept here with other potentials despite being in
 # the original "Time-dependent extensions" section of types.jl).
 struct TimeDependentTrap{N} <: AbstractPotential
