@@ -71,6 +71,7 @@ include("hamiltonian/interactions/polar_dipolar_lhy.jl")  # polar contact + DDI 
 include("hamiltonian/interactions/fm_contact_lhy.jl")     # FM-phase contact LHY (F=6)
 include("hamiltonian/interactions/fm_dipolar_lhy.jl")     # FM contact + Lima-Pelster Q_5 DDI dressing
 include("hamiltonian/interactions/icosahedral_lhy.jl")    # F=6 icosahedral (I_h) closed-form contact LHY
+include("dynamics/sinatra_helpers.jl")                     # TWA validity helpers (healing length, k-cutoff)
 include("hamiltonian/interactions/lhy.jl")
 include("hamiltonian/interactions/losses.jl")
 include("hamiltonian/interactions/absorbing_boundary.jl")
@@ -322,6 +323,8 @@ export compute_spinor_lhy_two_channel, compute_spinor_lhy_table
 export compute_spinor_lhy_polar_contact, compute_spinor_lhy_polar_dipolar
 export compute_spinor_lhy_fm_contact, compute_spinor_lhy_fm_dipolar
 export compute_spinor_lhy_icosahedral
+export healing_length, cutoff_energy_from_xi, cutoff_energy_from_gn
+export effective_n_modes, sinatra_ratio
 export scale_interactions_quasi_2d
 
 # DDI

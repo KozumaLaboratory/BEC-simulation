@@ -58,6 +58,7 @@ const FAST_TESTS = [
     "test_bogoliubov_enhanced.jl",
     "test_spinor_lhy.jl",
     "test_icosahedral_lhy.jl",
+    "test_sinatra_helpers.jl",
     "test_absorbing_boundary.jl",
     "test_waveform.jl",
     "test_raman_timedep.jl",
