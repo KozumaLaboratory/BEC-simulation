@@ -8,15 +8,30 @@ sweep `c_dd` to mimic Cr / Er / Dy at the same Eu N=10⁴ trap geometry.
 
 ## Caveat (important — read first)
 
-The companion Sinatra-criterion check (`twa_sinatra_validation.md`,
-finished 2026-05-07 19:18) established that the 32³ × F=6 baseline is
-**contaminated by classical thermalisation**. The σ/μ ≈ 0.42 number that
-shows up in the Eu column below is therefore not a clean quantum-noise
-measurement — it shrinks ~38× when the grid is coarsened to 16³ at the
-same physics. The species-trend analysis below is still meaningful as a
-**dipolar-collapse coupling-strength scan** at fixed grid, but the
-absolute σ/μ values must not be quoted as "quantum fluctuations" until a
-Sinatra-clean repeat is run.
+The σ/μ values quoted below were originally interpreted as either
+quantum fluctuations (May 7 framing) or classical-thermalisation
+contamination (May 7 evening Sinatra "verdict"). **Both framings were
+wrong**: the corrected interpretation (May 8, after the resolution-matched
+Sinatra-clean follow-up at 16³ × box=10, see
+`twa_pinned_16g_result.md`) is that σ/μ ≈ 0.4 in the
+dipolar-instability regime measures **chaotic trajectory divergence**
+in the collapse dynamics. Different Wigner-noise seeds drive
+trajectories to different orientations of the z-elongated filament;
+trajectory-to-trajectory σ at peak voxel measures this chaos amplitude,
+which is bounded by physics (instability strength) rather than by noise
+amplitude.
+
+The species-trend analysis below survives as a **chaos-onset
+diagnostic**: σ/μ peaks at the marginal-collapse coupling because
+that's where the system enters the chaotic regime. At sub-collapse (Cr,
+ε_dd = 0.15) the GS is a unique stable Gaussian and there's no chaos
+to amplify; at super-collapse (Dy, ε_dd = 1.39) the cloud blows up and
+the ensemble mean is no longer interpretable. Eu (ε_dd = 0.55) sits
+exactly at the chaos-onset boundary.
+
+This trend interpretation is **independent of Sinatra ratio**, so the
+absolute σ/μ values are physically meaningful chaos-amplitude
+measurements (not Wigner-noise amplitudes).
 
 ## Per-species results
 

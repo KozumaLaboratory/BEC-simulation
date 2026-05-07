@@ -101,6 +101,52 @@ Bose–Einstein. If `T_class ≫ T_initial` after the protocol, classical
 thermalisation has set in. Implementation deferred — the σ/μ
 spread test above is sharper for the questions our EdH study asks.
 
+## Caveat: σ/μ in chaotic dynamical regimes is not a clean Sinatra
+diagnostic
+
+The σ/μ-spread protocol above implicitly assumes σ/μ at peak measures
+the Wigner-noise amplitude, with classical thermalisation as the only
+non-Wigner contribution. **For the Eu EdH dipolar-collapse regime, this
+assumption fails.** The dipolar instability is intrinsically chaotic:
+different Wigner-noise seeds drive trajectories to different
+orientations of the z-elongated filament, and the trajectory-to-trajectory
+spread σ at the densest voxel is dominated by this chaotic divergence
+rather than by the Wigner-noise amplitude itself.
+
+Empirical evidence (`docs/research_notes/twa_pinned_16g_result.md`,
+2026-05-08): the resolution-matched 16³ × box=10 run at Sinatra-clean
+ratio 0.53 (N=10⁵) gives σ/μ = 0.82 — *higher* than the contaminated
+32³ × box=20 baseline σ/μ = 0.42. If σ/μ were Sinatra-bound it should
+have shrunk; instead it grew, because the chaos amplitude is
+physics-bounded and not noise-bounded.
+
+**Practical consequence:** the σ/μ-spread three-config protocol works
+for "is the simulator near a unique attractor" diagnostics but not
+for "is TWA controlled in chaotic dynamics" questions. For chaotic
+regimes use:
+
+* deterministic profile / FWHM / on-axis ratio diagnostics (these
+  reflect the GS attractor — robust against Sinatra contamination
+  AND against trajectory-divergence chaos)
+* TDHFB or Beliaev for controlled beyond-mean-field σ/μ measurements
+
+Chaos-induced σ/μ is itself a meaningful **physics signature**
+(chaos-onset diagnostic, peaks at marginal collapse coupling — see
+species ε_dd scan), just not a clean quantum-fluctuation observable.
+
+## Resolution-matched Sinatra-clean test design
+
+To vary the Sinatra ratio without changing the GS profile (so the
+chaos vs Sinatra-amplitude question can be cleanly disentangled), keep
+the grid spacing dx fixed when reducing the grid:
+
+  32³ × box=20 → 16³ × box=10  (both have dx = 0.625 a_ho, same physics)
+
+This was the design used for the corrected 2026-05-08 1/N test. The
+naive 16³ × box=20 has dx = 1.25 a_ho, twice the filament-resolving
+spacing, and the cloud stays smooth Gaussian without chaos — invalidating
+the Sinatra-axis comparison.
+
 ## See also
 
 * `docs/research_notes/twa_sinatra_validation.md` — the running
