@@ -538,4 +538,48 @@ export const api = {
   refresh(): Promise<void> {
     return fetch('/api/refresh').then(() => undefined)
   },
+
+  getEnsemble(run: string, file: string): Promise<EnsembleSummary> {
+    return json(
+      `/api/ensemble/${encodeURIComponent(run)}/${encodeURIComponent(file)}`,
+    )
+  },
+}
+
+// --- TWA ensemble summary (Round-2 Task 5) -------------------------------
+// Mirrors `_compute_ensemble_summary` in src/workflow/io/dashboard/routes.jl.
+// Heavy 3D mean/variance volumes are NOT included; this is the lightweight
+// JSON the EnsemblePanel uses for time series + σ/μ histogram display.
+
+export interface EnsembleHistogram {
+  bin_edges: number[]
+  counts: number[]
+  n_voxels: number
+  threshold_frac_of_peak: number
+}
+
+export interface EnsembleObservable {
+  has_mean: boolean
+  has_variance: boolean
+  shape?: number[]
+  // density-only scalar series (filled by _density_scalars!)
+  peak_mean?: number[]
+  on_axis_ratio_mean?: number[]
+  peak_variance?: number[]
+  sigma_over_mu_at_peak?: number[]
+  sigma_over_mu_histogram?: EnsembleHistogram
+}
+
+export interface EnsemblePhase {
+  phase_idx: number
+  n_trajectories: number
+  times: number[]
+  observables: string[]
+  // dictionary keyed by observable name, e.g. "density"
+  [observable: string]: EnsembleObservable | number | number[] | string[] | undefined
+}
+
+export interface EnsembleSummary {
+  phases: EnsemblePhase[]
+  error?: string
 }

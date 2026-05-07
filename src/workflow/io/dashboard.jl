@@ -414,6 +414,9 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
     elseif startswith(path, "/api/snapshots/")
         return _route_snapshots(path, base_dir, psi_cache)
 
+    elseif startswith(path, "/api/ensemble/")
+        return _route_ensemble(path, base_dir)
+
     elseif startswith(path, "/api/density3d_atlas/")
         return _route_density3d_atlas(path, base_dir, psi_cache)
 
