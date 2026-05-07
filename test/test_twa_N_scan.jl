@@ -18,9 +18,8 @@ using JLD2
 #   - Genuine dipolar instability: FWHM_z stays in {5, 6, 7} regardless of N
 
 const _RUN_DIR = joinpath(@__DIR__, "..", "runs", "twa_N_scan")
-const _DETERMINISTIC =
-    joinpath(@__DIR__, "..", "runs", "eu151_edh_postfix_local",
-             ".archive_baseline", "point_001.jld2")
+const _DETERMINISTIC = joinpath(@__DIR__, "..", "runs", "eu151_edh_postfix_local",
+    ".archive_baseline", "point_001.jld2")
 const _N_VALUES = (1000, 10000, 100000)
 
 function _final_density_stats(path::AbstractString; ensemble::Bool)
@@ -39,7 +38,7 @@ function _final_density_stats(path::AbstractString; ensemble::Bool)
             psi = f["psi"]
             nx, ny, nz, _ = size(psi)
             cx, cy, cz = nx ÷ 2 + 1, ny ÷ 2 + 1, nz ÷ 2 + 1
-            dens = sum(abs2.(psi), dims=4)[:, :, :, 1]
+            dens = sum(abs2.(psi); dims=4)[:, :, :, 1]
             varr = nothing
             n_traj = 1
         end
@@ -67,15 +66,17 @@ end
         @info "Skipping TWA N scan tests: no ensemble JLD2 available yet" \
               run_dir=_RUN_DIR deterministic=_DETERMINISTIC
         @test_skip "ensemble outputs not present (run examples/twa_N_scan.jl first)"
-        return
+        return nothing
     end
 
     det = _final_density_stats(_DETERMINISTIC; ensemble=false)
     @test isfinite(det.peak) && det.peak > 0
     @test det.fwhm_z >= 1
 
-    results = [(; N, stats=_final_density_stats(joinpath(_RUN_DIR, "N$N", "result.jld2"); ensemble=true))
-               for N in available]
+    results = [
+        (; N, stats=_final_density_stats(joinpath(_RUN_DIR, "N$N", "result.jld2"); ensemble=true))
+        for N in available
+    ]
 
     @testset "ensemble layout" begin
         for r in results
@@ -100,7 +101,7 @@ end
                     for r in results]
             # We expect monotone decrease; allow one inversion for stat noise
             # at 50 trajectories (standard error ~1/√50 ≈ 14%).
-            inversions = sum(Δrel[i+1] > 1.5 * Δrel[i] for i in 1:length(Δrel)-1)
+            inversions = sum(Δrel[i + 1] > 1.5 * Δrel[i] for i in 1:(length(Δrel) - 1))
             @test inversions <= 1
         end
 

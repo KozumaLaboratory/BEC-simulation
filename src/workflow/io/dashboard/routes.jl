@@ -964,7 +964,7 @@ function _summarize_phase(ens_root, pname::String)
             obs_summary["shape"] = collect(Int, size(mean_arr))
             if obs_name == "density" && ndims(mean_arr) == 4
                 _density_scalars!(obs_summary, mean_arr,
-                                  obs_summary["has_variance"] ? obs_group["variance"] : nothing)
+                    obs_summary["has_variance"] ? obs_group["variance"] : nothing)
             end
         end
         out[obs_name] = obs_summary
@@ -974,7 +974,7 @@ function _summarize_phase(ens_root, pname::String)
 end
 
 function _density_scalars!(obs_summary::Dict{String, Any}, mean_arr::AbstractArray{<:Real, 4},
-                           var_arr::Union{Nothing, AbstractArray{<:Real, 4}})
+    var_arr::Union{Nothing, AbstractArray{<:Real, 4}})
     nx, ny, nz, nt = size(mean_arr)
     cx, cy, cz = nx ÷ 2 + 1, ny ÷ 2 + 1, nz ÷ 2 + 1
 
