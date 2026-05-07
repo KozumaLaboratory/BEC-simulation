@@ -9,8 +9,26 @@
 using SpinorBEC, JLD2
 using Printf
 
-const RUN_DIR = "/home/suzume/workspace/BEC-simulation/runs/twa_N_scan"
+const RUNS_ROOT = "/home/suzume/workspace/BEC-simulation/runs"
 const DETERMINISTIC = "/home/suzume/workspace/BEC-simulation/runs/eu151_edh_postfix_local/.archive_baseline/point_001.jld2"
+
+# `run_yaml` writes outputs to `runs/<config_basename>_<hash>/result.jld2`
+# unless the YAML is named `config.yaml` inside an existing dir. Our scan
+# configs live at `runs/twa_N_scan/N{N}.yaml`, so the outputs land at
+# `runs/N{N}_<hash>/`. Resolve via name pattern; pick the most recent if
+# multiple hashes (re-runs).
+function _resolve_result(N::Integer)::Union{String, Nothing}
+    hits = String[]
+    for d in readdir(RUNS_ROOT; join=true)
+        isdir(d) || continue
+        occursin(Regex("^N$(N)_[0-9a-f]+\$"), basename(d)) || continue
+        rj = joinpath(d, "result.jld2")
+        isfile(rj) && push!(hits, rj)
+    end
+    isempty(hits) && return nothing
+    sort!(hits; by=mtime, rev=true)
+    first(hits)
+end
 
 function final_density_stats(path::String; ensemble::Bool=false)
     jldopen(path, "r") do f
@@ -27,7 +45,7 @@ function final_density_stats(path::String; ensemble::Bool=false)
             psi = f["psi"]
             nx, ny, nz, nc = size(psi)
             cx, cy, cz = nx ÷ 2 + 1, ny ÷ 2 + 1, nz ÷ 2 + 1
-            dens = sum(abs2.(psi), dims=4)[:, :, :, 1]
+            dens = sum(abs2.(psi); dims=4)[:, :, :, 1]
             varr = nothing
             n_traj = 1
         end
@@ -35,10 +53,11 @@ function final_density_stats(path::String; ensemble::Bool=false)
         peak = maximum(dens)
         prof_x = dens[:, cy, cz]
         prof_z = dens[cx, cy, :]
-        fwhm(p) = let h = maximum(p) / 2
-            idx = findall(>(h), p)
-            isempty(idx) ? 0 : last(idx) - first(idx) + 1
-        end
+        fwhm(p) =
+            let h = maximum(p) / 2
+                idx = findall(>(h), p)
+                isempty(idx) ? 0 : last(idx) - first(idx) + 1
+            end
 
         on_axis = dens[cx, cy, cz] / max(peak, 1e-30)
 
@@ -71,9 +90,9 @@ det = final_density_stats(DETERMINISTIC; ensemble=false)
 # TWA ensembles
 results = []
 for N in (1000, 10000, 100000)
-    path = joinpath(RUN_DIR, "N$(N)/result.jld2")
-    if !isfile(path)
-        @printf("N=%d: result missing (%s)\n", N, path)
+    path = _resolve_result(N)
+    if path === nothing
+        @printf("N=%d: result missing (looked for runs/N%d_*/result.jld2)\n", N, N)
         continue
     end
     s = final_density_stats(path; ensemble=true)
@@ -88,7 +107,9 @@ end
 
 # 1/N scaling check: collapse pattern smearing should vanish as N → ∞
 println("=== 1/N validity check ===")
-println("(on_axis_TWA - on_axis_det) / on_axis_det vs 1/N — should follow ∝ 1/N if TWA captures genuine quantum fluctuations correctly")
+println(
+    "(on_axis_TWA - on_axis_det) / on_axis_det vs 1/N — should follow ∝ 1/N if TWA captures genuine quantum fluctuations correctly",
+)
 for r in results
     Δrel = (r.stats.on_axis - det.on_axis) / det.on_axis
     @printf("  N=%6d:  1/N = %.4e,  Δrel = %+.4f,  Δrel × N = %.2f\n",

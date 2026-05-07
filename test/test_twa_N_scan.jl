@@ -17,10 +17,25 @@ using JLD2
 #     monotonically as N grows; σ/μ at peak shrinks as N grows
 #   - Genuine dipolar instability: FWHM_z stays in {5, 6, 7} regardless of N
 
-const _RUN_DIR = joinpath(@__DIR__, "..", "runs", "twa_N_scan")
+const _RUNS_ROOT = joinpath(@__DIR__, "..", "runs")
 const _DETERMINISTIC = joinpath(@__DIR__, "..", "runs", "eu151_edh_postfix_local",
     ".archive_baseline", "point_001.jld2")
 const _N_VALUES = (1000, 10000, 100000)
+
+# `run_yaml` resolves outputs to `runs/<basename>_<hash>/result.jld2`. The
+# N-scan configs live at `runs/twa_N_scan/N{N}.yaml`, so results land at
+# `runs/N{N}_<hash>/`. Discover the freshest match per N.
+function _resolve_result(N::Integer)
+    isdir(_RUNS_ROOT) || return nothing
+    hits = String[]
+    for d in readdir(_RUNS_ROOT; join=true)
+        isdir(d) || continue
+        occursin(Regex("^N$(N)_[0-9a-f]+\$"), basename(d)) || continue
+        rj = joinpath(d, "result.jld2")
+        isfile(rj) && push!(hits, rj)
+    end
+    isempty(hits) ? nothing : (sort!(hits; by=mtime, rev=true); first(hits))
+end
 
 function _final_density_stats(path::AbstractString; ensemble::Bool)
     jldopen(path, "r") do f
@@ -61,10 +76,11 @@ function _final_density_stats(path::AbstractString; ensemble::Bool)
 end
 
 @testset "TWA N scan analysis pipeline" begin
-    available = filter(N -> isfile(joinpath(_RUN_DIR, "N$N", "result.jld2")), _N_VALUES)
+    resolved = Dict(N => _resolve_result(N) for N in _N_VALUES)
+    available = [N for N in _N_VALUES if resolved[N] !== nothing]
     if isempty(available) || !isfile(_DETERMINISTIC)
         @info "Skipping TWA N scan tests: no ensemble JLD2 available yet" \
-              run_dir=_RUN_DIR deterministic=_DETERMINISTIC
+              runs_root=_RUNS_ROOT deterministic=_DETERMINISTIC
         @test_skip "ensemble outputs not present (run examples/twa_N_scan.jl first)"
         return nothing
     end
@@ -74,7 +90,7 @@ end
     @test det.fwhm_z >= 1
 
     results = [
-        (; N, stats=_final_density_stats(joinpath(_RUN_DIR, "N$N", "result.jld2"); ensemble=true))
+        (; N, stats=_final_density_stats(resolved[N]; ensemble=true))
         for N in available
     ]
 
