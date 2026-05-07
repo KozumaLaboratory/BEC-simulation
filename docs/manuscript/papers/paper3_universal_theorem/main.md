@@ -290,7 +290,7 @@ work, F=2 cyclic paper]), the 5 modes of the BdG Even/Odd block decomposition ar
 
 LHY closed form:
 
-$$\boxed{\varepsilon_{\rm LHY}^{F=2, \rm cyc} = \frac{8\sqrt{M^3}}{15\pi^2\hbar^3}\,n^{5/2}\left[c_0^{5/2} + 3|2c_1|^{5/2}\right]} \tag{V.1}$$
+$$\boxed{\varepsilon_{\rm LHY}^{F=2, \rm cyc} = \frac{8\sqrt{M^3}}{15\pi^2\hbar^3}\,n^{5/2}\left[c_0^{5/2} + 3|2c_1|^{5/2}\right]} \tag{V.A.1}$$
 
 with $c_0 = (4g_2 + 3g_4)/7$, $c_1 = (g_4 - g_2)/7$. Convention: $\lambda_{\rm spin}^{(T_d)} = 2 c_1$.
 
