@@ -70,6 +70,7 @@ include("hamiltonian/interactions/polar_contact_lhy.jl")  # F-generic polar cont
 include("hamiltonian/interactions/polar_dipolar_lhy.jl")  # polar contact + DDI extension
 include("hamiltonian/interactions/fm_contact_lhy.jl")     # FM-phase contact LHY (F=6)
 include("hamiltonian/interactions/fm_dipolar_lhy.jl")     # FM contact + Lima-Pelster Q_5 DDI dressing
+include("hamiltonian/interactions/icosahedral_lhy.jl")    # F=6 icosahedral (I_h) closed-form contact LHY
 include("hamiltonian/interactions/lhy.jl")
 include("hamiltonian/interactions/losses.jl")
 include("hamiltonian/interactions/absorbing_boundary.jl")
@@ -320,6 +321,7 @@ export compute_lhy_2d_params
 export compute_spinor_lhy_two_channel, compute_spinor_lhy_table
 export compute_spinor_lhy_polar_contact, compute_spinor_lhy_polar_dipolar
 export compute_spinor_lhy_fm_contact, compute_spinor_lhy_fm_dipolar
+export compute_spinor_lhy_icosahedral
 export scale_interactions_quasi_2d
 
 # DDI

@@ -297,6 +297,42 @@ function compute_spinor_lhy_fm_contact(;
     SpinorLHYTable(:fm_contact, densities, potential_values)
 end
 
+"""
+    compute_spinor_lhy_icosahedral(; F, g_dict, n_max, n_points) → SpinorLHYTable
+
+F=6 icosahedral (I_h) phase contact LHY closed form (Stage D, parallel-
+session derivation 2026-05-07). Universal structure
+`ε = (8/15π²) n^(5/2) (c_0^(5/2) + 3 |λ_spin|^(5/2))` with stiffnesses
+`(c_0, λ_spin) = compute_c0_lambda_F6_Ih(g_dict)`. Restricted to F=6.
+
+`g_2`, `g_4`, `g_8` cancel exactly under I_h harmonic decomposition —
+non-zero values are accepted but do not affect the LHY potential.
+Scalar limit (uniform `g_S = g`) reduces to `(8/15π²)(g·n)^(5/2)`.
+"""
+function compute_spinor_lhy_icosahedral(;
+    F::Int,
+    g_dict,
+    n_max::Float64=100.0,
+    n_points::Int=200,
+)
+    F == 6 || throw(
+        ArgumentError(
+            "compute_spinor_lhy_icosahedral is F=6 only (got F=$F); the I_h closed " *
+            "form is specific to the F=6 even-S channel structure"),
+    )
+    n_points >= 3 || throw(ArgumentError("n_points must be >= 3"))
+    n_max > 0 || throw(ArgumentError("n_max must be positive"))
+
+    densities = collect(range(0.0, n_max; length=n_points))
+    energy = zeros(Float64, n_points)
+    for (i, n) in enumerate(densities)
+        n < 1e-30 && continue
+        energy[i] = IcosahedralLHY.epsilon_LHY_F6_Ih(n, g_dict)
+    end
+    potential_values = _numerical_derivative(densities, energy)
+    SpinorLHYTable(:icosahedral, densities, potential_values)
+end
+
 function _numerical_derivative(x::Vector{Float64}, y::Vector{Float64})
     n = length(x)
     dy = zeros(Float64, n)

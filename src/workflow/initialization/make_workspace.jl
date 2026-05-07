@@ -354,6 +354,25 @@ function make_workspace(;
         compute_spinor_lhy_polar_dipolar(; F=atom.F, g_dict=g_dict,
             eps_tilde_dd=eps_tilde_dd,
             n_max=n_max_est)
+    elseif spinor_lhy === :icosahedral
+        # F=6 I_h closed form (Stage D). Universal `c_0^(5/2) + 3|λ_spin|^(5/2)`
+        # with stiffness coefficients depending only on g_0, g_6, g_10, g_12
+        # (g_2, g_4, g_8 cancel by I_h harmonic decomposition). Restricted
+        # to F=6 — caller must arrange the I_h ground state independently.
+        atom.F == 6 || throw(ArgumentError(
+            ":icosahedral spinor_lhy is F=6 only (got F=$(atom.F))"))
+        n_max_est = if psi_init !== nothing
+            maximum(sum(abs2, psi_init; dims=ndims(psi_init))) * 3.0
+        else
+            100.0
+        end
+        g_dict = _c0c1_to_gS(atom.F, ws_interactions.c0, ws_interactions.c1)
+        if !isempty(ws_interactions.c_extra)
+            for (S, dg) in _c_extra_to_delta_gS(atom.F, ws_interactions.c_extra)
+                g_dict[S] = get(g_dict, S, 0.0) + dg
+            end
+        end
+        compute_spinor_lhy_icosahedral(; F=atom.F, g_dict=g_dict, n_max=n_max_est)
     elseif quasi_2d && abs(ws_interactions.c_lhy) > 1e-30
         compute_lhy_2d_params(ws_interactions.c0, l_z)
     elseif abs(ws_interactions.c_lhy) > 1e-30
