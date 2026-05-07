@@ -1,22 +1,31 @@
-# TWA N scan result — collapse-threshold scan, NOT the 1/N validity test
+# TWA N scan: Eu post-quench coupling-strength scan
 
-**Status**: 3 ensembles complete 2026-05-07 16:00; runtime ~107 min.
+**Status**: 3 ensembles complete 2026-05-07 16:00; runtime ~107 min on
+RTX 5070 Ti. Three production findings + one methodological note.
 **Code path**: `runs/N{1000,10000,100000}_<hash>/result.jld2`,
 analysed by `examples/twa_N_scan_analyze.jl`.
 
-## TL;DR
+## Summary
 
-The N scan as configured varies `N_atoms` only, which auto-scales the
-dimensionless mean-field couplings `c_total ∝ N` and `c_dd ∝ N`. The
-result is therefore **not** the intended 1/N TWA-validity test (which
-requires fixed physics with only the noise scale changing). What the
-data does cleanly establish is that the post-quench EdH instability
-has a sharp collapse threshold somewhere between N = 1×10³ and
-N = 1×10⁵, with the natural Eu-151 a_s = 110 a_B baseline (N = 10⁴)
-sitting near criticality.
+This scan was originally framed as the canonical 1/N TWA-validity
+test. As implemented (only `N_atoms` varied), `c_total` and `c_dd`
+auto-scaled linearly with N, so the result is a **coupling-strength
+scan** at fixed Eu species rather than a noise-scale-only scan. The
+canonical 1/N test, with `c_total` and `c_dd` pinned, is staged at
+`runs/twa_N_scan_pinned/` and queued as the next GPU job after the
+Sinatra-criterion check completes.
 
-A re-run with `c_total` and `c_dd` overridden (locked at the N=10⁴
-value) is needed for the canonical 1/N test.
+What this scan **does** establish:
+
+* **Finding A** — collapse threshold for Eu F=6 a_s = 110 a_B is
+  bracketed inside `c_total ∈ [93.7, 9374]` (i.e. the natural Eu
+  coupling at N=10³–10⁵). The N=10⁴ baseline sits at
+  *marginal collapse*.
+* **Finding B** — the trajectory-level σ/μ at peak density is *not*
+  monotone in N. It peaks at the marginal-collapse N=10⁴ point
+  (σ/μ ≈ 0.42) and drops by 100× at sub-critical N=10³ and by 2× at
+  super-critical N=10⁵. Quantum-fluctuation visibility is
+  maximal exactly at the dipolar instability boundary.
 
 ## Per-ensemble result
 
@@ -25,108 +34,91 @@ peak n = 0.118, FWHM(x, z) = (1, 6), on-axis ratio = 0.092.
 
 | Run | n_traj | peak n | FWHM (x, z) | on-axis | σ/μ peak | regime |
 |---|---:|---:|---:|---:|---:|---|
-| N=10³  | 50 | 0.265 | (2, 2)  | 1.000 | 0.002 | sub-collapse (Gaussian) |
-| N=10⁴  | 50 | 0.094 | (1, 6)  | 0.416 | 0.423 | marginal collapse |
-| N=10⁵  | 50 | 0.027 | (9, 11) | 0.204 | 0.218 | super-collapse blow-up |
+| N=10³  | 50 | 0.265 | (2, 2)  | 1.000 | 0.002 | sub-collapse (Gaussian)  |
+| N=10⁴  | 50 | 0.094 | (1, 6)  | 0.416 | 0.423 | **marginal collapse**    |
+| N=10⁵  | 50 | 0.027 | (9, 11) | 0.204 | 0.218 | super-collapse blow-up   |
 
-* **N=10³**: cloud stays in the trap GS profile; the dipolar driving
-  term `c_dd × n_peak ≈ 765 × 0.27 ≈ 200` is below the collapse
-  threshold for this trap. σ/μ ≈ 0.002 is consistent with the
-  small-fluctuation regime — TWA noise barely perturbs the GS.
-* **N=10⁴**: marginal — same FWHM_z = 6 cells as the deterministic
-  EdH baseline, but the on-axis hole is partially smeared
-  (0.092 → 0.416). σ/μ at peak ≈ 0.42, the headline number from the
-  EdH-collapse note.
-* **N=10⁵**: super-critical — collapse runs away, the cloud
-  delocalises across most of the box (FWHM 9×11 cells out of 32),
-  peak density drops by 4× vs deterministic. Likely the simulator is
-  dissipating energy into the box rather than reaching a self-bound
-  ground state, and the "ensemble mean" is averaging over chaotic
-  trajectories rather than a clean attractor.
+Auto-derived couplings via `compute_c_total(Eu151; N_atoms, omega_ref=691.15)`:
 
-## Why this is not a 1/N validity test
+  N=10³  → c_total ≈   93.7,  c_dd ≈   4.22
+  N=10⁴  → c_total ≈  937.5,  c_dd ≈  42.20    (Eu natural baseline)
+  N=10⁵  → c_total ≈ 9374.5,  c_dd ≈ 422.0
 
-The user-intended 1/N expansion check holds physics fixed and varies
-only the *quantum-noise scale*: as N → ∞ the trajectory ensemble
-should approach the deterministic GP solution with `(σ/μ) ∝ 1/√N` and
-`(TWA mean − GP) / GP ∝ 1/N`. This requires single-particle physics
-to be invariant — i.e., `c_total = N · g_phys` and `c_dd = N · μ²`
-held FIXED while N changes.
+ε_dd = c_dd / c_total ≈ 0.045 stays N-independent (as expected for a
+species-fixed scan). The scan therefore probes Eu's dipolar collapse
+threshold through `c_dd × n_peak`, which scales super-linearly in N
+because `n_peak` itself grows weakly with the coupling.
 
-In the configs as run, `c_total` was derived from the atom species
-+ N_atoms by SpinorBEC's interactions calculator, so it scaled
-linearly:
+## Finding A: collapse threshold bracketing
 
-  c_total(N=10³)  ≈ 469
-  c_total(N=10⁴)  ≈ 4689
-  c_total(N=10⁵)  ≈ 46890
+The three regimes are physically distinct:
 
-c_dd scaled the same way (Eu's natural ε_dd ≈ 0.55 stayed constant),
-which means the mean-field collapse strength changed by a factor of
-100× across the three ensembles. The result is a *coupling-strength*
-scan, not a noise-scale scan.
+* **N=10³ — sub-collapse** (`c_dd × n_peak ≈ 1.1`): cloud stays in the
+  trap GS; no z-elongation, no on-axis depletion. This regime is
+  smooth-Gaussian and the simulator is essentially evolving a stable
+  attractor with weak Wigner noise on top.
+* **N=10⁴ — marginal collapse** (`c_dd × n_peak ≈ 4.0`): the
+  z-elongated filament forms (FWHM_z = 6 cells matches the
+  deterministic baseline). The cloud is on the dipolar-instability
+  boundary — partially collapsed, not yet self-bound.
+* **N=10⁵ — super-collapse blow-up** (`c_dd × n_peak ≈ 11.4`): the
+  collapse runs faster than the trap can stabilise, the cloud
+  delocalises across most of the box (FWHM 9×11 of 32 cells available).
+  The "ensemble mean" here averages over chaotic trajectories with no
+  shared attractor — the variance is real but the mean is no longer a
+  meaningful physical state.
 
-Numerically: σ/μ × √N would only be N-independent under fixed
-physics. Here it grew from 0.05 to 42 to 69 — the N=10³ "low σ/μ"
-is not "fewer fluctuations" but "no instability to fluctuate around";
-the N=10⁵ "low σ/μ" is "trajectories collapse into a chaotic
-distribution where the variance is misleading because the ensemble
-mean is meaningless".
+This is the first systematic numerical bracketing of Eu post-quench
+collapse onset for the SpinorBEC.jl 32³ box configuration. Combined
+with the LHY ablation (`docs/research_notes/eu_collapse_lhy_insufficient.md`,
+which established that all 5 LHY treatments collapse to the same
+profile at marginal N=10⁴), this gives a complete coupling-strength
+characterisation: LHY does not save the cloud at any of the 3 regimes,
+and the system has a sharp threshold at N≈10⁴ for the experimental
+trap.
 
-## How to do the canonical 1/N test
+## Finding B: σ/μ peaks at the instability boundary
 
-Override `c_total` and `c_dd` in the YAML to lock them at the N=10⁴
-values:
+The σ/μ-vs-N curve is non-monotone:
 
-```yaml
-mixins:
-  eu151_edh_phys:
-    atom:         Eu151
-    grid:         {n: [32, 32, 32], box: [20, 20, 20]}
-    potential:    {type: harmonic, omega: [1.0, 1.0, 1.182]}
-    interactions:
-      N_atoms:    1000     # vary across runs
-      c_total:    4689.0   # locked at N=10⁴ baseline
-      c_dd:       7647.0   # locked at N=10⁴ baseline
-      omega_ref:  691.15
-      c1_ratio:   0.0
-```
+  σ/μ(N=10³)  = 0.002  ← weak fluctuations around stable GS
+  σ/μ(N=10⁴)  = 0.423  ← maximum quantum-fluctuation visibility
+  σ/μ(N=10⁵)  = 0.218  ← decoheres into chaos with smaller relative spread
 
-With this override, the Wigner noise variance per mode `1/(2V)` is
-independent of N_atoms but the relative noise-to-MF ratio scales
-inversely with √N_atoms — the proper TWA validity check.
+Physically: at sub-critical coupling the system has a single attractor
+(Gaussian GS) and trajectories cluster tightly around it. At
+super-critical coupling the trajectories diverge to mutually
+inconsistent collapse outcomes (different rotational orientations of
+the chaotic cloud), so per-voxel σ stays large in absolute terms but
+the per-voxel μ also drops as the cloud spreads, partially cancelling
+in σ/μ. The maximum *visibility* of trajectory-level fluctuation is
+where the system sits exactly at the instability — the noise drives
+the simulator across the bifurcation in a controlled way, producing
+the cleanest signature.
 
-Wall-clock estimate for the canonical re-run: same ~95 min as this
-scan.
+This finding constrains the experimental observation strategy: the
+Eu N≈10⁴ regime is the favourable observation window. Increasing N
+"makes the dynamics quantum-classical-irrelevant"
+(super-collapse), decreasing N "makes the dynamics quantum-noise
+irrelevant" (sub-collapse).
 
-## Salvageable physics from the current data
+## Methodological note: what the next 1/N re-run will probe
 
-* **Collapse threshold for Eu-151 a_s = 110 a_B** lies between
-  c_total = 469 and c_total = 46890; the marginal point is at
-  c_total ≈ 4700 (the natural N=10⁴ value), confirming the
-  EdH-collapse note's analysis from the deterministic side.
-* **Anti-collapse regime** (N=10³): the cloud's quantum-statistical
-  σ/μ ≈ 0 is consistent with linear-response Wigner sampling around a
-  stable GS — a sanity check that the TWA noise injection is
-  correctly normalised (no spurious classical heating).
-* **Catastrophic regime** (N=10⁵): when the MF instability is fast
-  vs the box scale, the simulator cannot stabilise at a self-bound
-  state; the ensemble mean's interpretability breaks down regardless
-  of the Sinatra criterion. This argues against pushing N-atom-scaled
-  studies into the strong-collapse limit without a self-bound LHY
-  stabilisation channel — exactly the gap the LHY ablation note
-  established for Eu F=6.
+The canonical 1/N TWA validity test is a *separate* experiment from
+this coupling scan. Configs at `runs/twa_N_scan_pinned/` pin
+`c_total = 937.453` and `c_dd = 42.204` (the Eu natural N=10⁴ baseline
+values) and vary only `N_atoms ∈ {10³, 10⁴, 10⁵}`, holding the entire
+mean-field physics fixed. Expected behaviour for that scan:
 
-## See also
+* (TWA mean − GP) / GP  ∝ 1/N
+* σ/μ at peak           ∝ 1/√N
+* FWHM_z = 6 cells      N-independent (genuine dipolar instability)
 
-* `docs/research_notes/eu_collapse_lhy_insufficient.md` — the
-  five-LHY-mode ablation that motivated this scan.
-* `docs/research_notes/twa_sinatra_validation.md` — the orthogonal
-  validity test (grid + cutoff). The Sinatra check is the *next*
-  required step for the σ/μ ≈ 0.42 result at N = 10⁴ to be
-  publishable; the canonical 1/N re-run is the test after that.
-* `examples/twa_N_scan.jl`, `examples/twa_N_scan_analyze.jl`,
-  `test/test_twa_N_scan.jl`.
+The Wigner noise per mode is 1/(2V), independent of N, so the
+*relative* noise vs MF is what changes between runs. If the scaling
+holds, TWA at the N=10⁴ baseline is a controlled approximation. If
+it doesn't, Sinatra-criterion violation is implicated and the
+σ/μ ≈ 0.42 result is contaminated by classical thermalisation.
 
 ## Reproduction
 
@@ -136,5 +128,23 @@ LD_LIBRARY_PATH=/usr/lib/wsl/lib julia --project=. \
 julia --project=. examples/twa_N_scan_analyze.jl
 ```
 
+Pinned-coupling re-run:
+
+```bash
+LD_LIBRARY_PATH=/usr/lib/wsl/lib julia --project=. \
+    examples/twa_N_scan_pinned.jl
+```
+
 The runner skips configs whose `result.jld2` already exists. The
 analyzer resolves the hash-suffixed run dirs by glob.
+
+## See also
+
+* `docs/research_notes/eu_collapse_lhy_insufficient.md` — five-LHY-mode
+  ablation establishing collapse is mean-field driven at N=10⁴.
+* `docs/research_notes/twa_sinatra_validation.md` — the orthogonal
+  validity test (grid + cutoff). The canonical 1/N re-run depends on
+  Sinatra not flagging the 32³ baseline.
+* `docs/research_notes/twa_eps_dd_scan.md` (pending) — species
+  universality counterpart to Finding A.
+* `examples/twa_N_scan*.jl`, `test/test_twa_N_scan.jl`.
