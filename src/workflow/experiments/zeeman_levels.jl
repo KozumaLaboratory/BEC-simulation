@@ -235,11 +235,13 @@ function _build_zeeman_level2(z::Dict, duration::Float64, atom, omega_ref::Float
     phi_wf = if phi_spec isa Number
         ConstantWaveform(Float64(phi_spec))
     else
-        (if phi_spec isa Waveform
+        (
+            if phi_spec isa Waveform
                 phi_spec
             else
                 _make_waveform(phi_spec, duration; omega_ref=omega_ref)
-            end)
+            end
+        )
     end
 
     bx_vals = Vector{Float64}(undef, _ZEEMAN_SAMPLE_N)

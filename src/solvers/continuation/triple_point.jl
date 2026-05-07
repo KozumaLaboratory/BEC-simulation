@@ -170,7 +170,7 @@ function detect_triple_points(
             )
             for (i, c) in enumerate(candidates[1:min(5, length(candidates))])
                 println(
-                    "  $i: θ=$(round.(c.θ; digits=4)), phases=$(c.phases), tie=$(round(c.tie_ratio; sigdigits=3))",
+                    "  $i: θ=$(round.(c.θ; digits=4)), phases=$(c.phases), tie=$(round(c.tie_ratio; sigdigits=3))"
                 )
             end
         end
@@ -222,7 +222,7 @@ function trace_triple_point_curves(
             continue
         end
         verbose && println(
-            "  tracing $(a)_$(b) from θ=$(round.(candidate.θ; digits=4)) tangent=$(round.(t_init; digits=3))",
+            "  tracing $(a)_$(b) from θ=$(round.(candidate.θ; digits=4)) tangent=$(round.(t_init; digits=3))"
         )
         trace = trace_phase_boundary(F_ab, candidate.θ, t_init;
             arc_step, max_steps, verbose=false, kwargs_for_trace...,
@@ -333,7 +333,7 @@ function bogoliubov_along_boundary_curve(
             throw(
                 ArgumentError(
                     "parameter_setter must return a NamedTuple containing :interactions"
-                )
+                ),
             )
 
         init_kwargs = psi_warm === nothing ?

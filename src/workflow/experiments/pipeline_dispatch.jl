@@ -90,7 +90,7 @@ function _parse_b_hat_phi(b_hat::Dict, _ω)
     )
     haskey(v, "rate") || throw(
         ArgumentError(
-            "B_hat.phi: expected `{rate: <waveform>}`, got keys $(collect(keys(v)))")
+            "B_hat.phi: expected `{rate: <waveform>}`, got keys $(collect(keys(v)))"),
     )
     rate = v["rate"]
     if rate isa AbstractDict

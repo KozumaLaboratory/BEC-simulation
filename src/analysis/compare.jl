@@ -56,7 +56,7 @@ function normalize_field(x::AbstractArray{<:Real}; method::Symbol=:unit)
         throw(
             ArgumentError(
                 "normalize method must be :none, :unit, :max, or :integral, got :$method"
-            )
+            ),
         )
     end
 end
