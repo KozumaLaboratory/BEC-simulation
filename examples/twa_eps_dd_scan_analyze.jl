@@ -14,13 +14,26 @@
 using SpinorBEC, JLD2
 using Printf
 
-const RUN_DIR = "/home/suzume/workspace/BEC-simulation/runs/twa_eps_dd_scan"
+const RUNS_ROOT = "/home/suzume/workspace/BEC-simulation/runs"
 const POINTS = (
     (label="Cr_eps0.15", eps_dd=0.15),
     (label="Eu_eps0.55", eps_dd=0.55),
     (label="Er_eps0.88", eps_dd=0.88),
     (label="Dy_eps1.39", eps_dd=1.39),
 )
+
+# `run_yaml` writes outputs to `runs/<basename>_<hash>/result.jld2`.
+function _resolve_result(label::AbstractString)::Union{String, Nothing}
+    isdir(RUNS_ROOT) || return nothing
+    hits = String[]
+    for d in readdir(RUNS_ROOT; join=true)
+        isdir(d) || continue
+        startswith(basename(d), label * "_") || continue
+        rj = joinpath(d, "result.jld2")
+        isfile(rj) && push!(hits, rj)
+    end
+    isempty(hits) ? nothing : (sort!(hits; by=mtime, rev=true); first(hits))
+end
 
 function final_density_stats(path::String)
     jldopen(path, "r") do f
@@ -35,10 +48,11 @@ function final_density_stats(path::String)
         peak = maximum(dens)
         prof_x = dens[:, cy, cz]
         prof_z = dens[cx, cy, :]
-        fwhm(p) = let h = maximum(p) / 2
-            idx = findall(>(h), p)
-            isempty(idx) ? 0 : last(idx) - first(idx) + 1
-        end
+        fwhm(p) =
+            let h = maximum(p) / 2
+                idx = findall(>(h), p)
+                isempty(idx) ? 0 : last(idx) - first(idx) + 1
+            end
         on_axis = dens[cx, cy, cz] / max(peak, 1e-30)
 
         peak_idx = argmax(dens)
@@ -47,8 +61,8 @@ function final_density_stats(path::String)
 
         z_elongation = fwhm(prof_z) / max(fwhm(prof_x), 1)
         (; n_traj, peak,
-           fwhm_x=fwhm(prof_x), fwhm_z=fwhm(prof_z), z_elongation,
-           on_axis, sigma_over_mu)
+            fwhm_x=fwhm(prof_x), fwhm_z=fwhm(prof_z), z_elongation,
+            on_axis, sigma_over_mu)
     end
 end
 
@@ -56,9 +70,10 @@ println("=== TWA ε_dd scan analysis ===\n")
 
 results = []
 for p in POINTS
-    path = joinpath(RUN_DIR, p.label, "result.jld2")
-    if !isfile(path)
-        @printf("%-14s ε_dd=%.2f: result missing (%s)\n", p.label, p.eps_dd, path)
+    path = _resolve_result(p.label)
+    if path === nothing
+        @printf("%-14s ε_dd=%.2f: result missing (looked for runs/%s_*/result.jld2)\n",
+            p.label, p.eps_dd, p.label)
         continue
     end
     s = final_density_stats(path)
@@ -66,7 +81,7 @@ for p in POINTS
     @printf("%-14s ε_dd=%.2f (%d traj):\n", p.label, p.eps_dd, s.n_traj)
     @printf("  peak n          = %.4f\n", s.peak)
     @printf("  FWHM (x, z)     = (%d, %d) cells   z/x ratio = %.2f\n",
-            s.fwhm_x, s.fwhm_z, s.z_elongation)
+        s.fwhm_x, s.fwhm_z, s.z_elongation)
     @printf("  on-axis ratio   = %.3f\n", s.on_axis)
     @printf("  σ_n / n at peak = %.3f\n\n", s.sigma_over_mu)
 end
@@ -74,22 +89,22 @@ end
 if length(results) >= 2
     println("=== ε_dd dependence ===")
     @printf("%-14s %8s %10s %10s %10s %10s\n",
-            "label", "ε_dd", "peak", "FWHM_z", "on_axis", "σ/μ")
+        "label", "ε_dd", "peak", "FWHM_z", "on_axis", "σ/μ")
     println("-"^76)
     for r in results
         @printf("%-14s %8.2f %10.4f %10d %10.3f %10.3f\n",
-                r.label, r.eps_dd, r.stats.peak,
-                r.stats.fwhm_z, r.stats.on_axis, r.stats.sigma_over_mu)
+            r.label, r.eps_dd, r.stats.peak,
+            r.stats.fwhm_z, r.stats.on_axis, r.stats.sigma_over_mu)
     end
     println()
 
-    sort!(results, by=r -> r.eps_dd)
+    sort!(results; by=r -> r.eps_dd)
     println("Crossover diagnostic (Δ on_axis | Δ σ/μ from low to high ε_dd):")
-    for i in 1:length(results)-1
-        a, b = results[i], results[i+1]
+    for i in 1:(length(results) - 1)
+        a, b = results[i], results[i + 1]
         dr = b.stats.on_axis - a.stats.on_axis
         ds = b.stats.sigma_over_mu - a.stats.sigma_over_mu
         @printf("  %s → %s   Δon_axis = %+.3f   Δσ/μ = %+.3f\n",
-                a.label, b.label, dr, ds)
+            a.label, b.label, dr, ds)
     end
 end

@@ -85,7 +85,7 @@ end
 if length(results) >= 2
     println("=== Sinatra check verdict ===")
     σs = [r.stats.sigma_over_mu for r in results]
-    σ_max, σ_min = extrema(σs)
+    σ_min, σ_max = extrema(σs)
     spread = σ_max - σ_min
     rel = spread / max(σ_max, 1e-30)
     @printf("σ/μ at peak ranges %.3f → %.3f (spread = %.3f, %.1f%% of max)\n",
