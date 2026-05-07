@@ -1,0 +1,44 @@
+# Sinatra-clean 1/N TWA validity test: N=100000 with c_total / c_dd PINNED
+# at the Eu N=10⁴ baseline AND grid coarsened to 16³ × box=10.
+#
+# Sinatra ratio at N=100000: 16³ × 13 / 100000 = 0.53 (deep in the
+# Sinatra-clean regime — TWA expansion well-controlled).
+defaults:
+  kind:         spinor
+  backend:      gpu
+  interactions: {omega_ref: 691.15}
+
+mixins:
+  eu151_edh_phys_pinned_16g:
+    atom:         Eu151
+    grid:         {n: [16, 16, 16], box: [10, 10, 10]}
+    potential:    {type: harmonic, omega: [1.0, 1.0, 1.182]}
+    interactions: {N_atoms: 100000, omega_ref: 691.15, c1_ratio: 0.0,
+                   c_total: 937.453}
+
+pipeline:
+  - ground_state:
+      use:           [eu151_edh_phys_pinned_16g]
+      ddi:           {c_dd: 42.204}
+      B:             {Bz: "0.01 Gauss"}
+      initial_state: m_plus_F
+      spinor_lhy:    scalar
+      n_steps:       3000
+      tol:           1.0e-9
+      dt:            0.005
+
+  - dynamics:
+      duration: 0.14
+      dt:       0.0005
+      B:        {Bz: {from: 0.01, to: 2.6e-5, duration: 0.14}}
+      save:     {every: 280}
+
+  - dynamics:
+      duration: 1.0
+      dt:       0.0001
+      B:        {Bz: "2.6e-5 Gauss"}
+      twa:
+        n_trajectories: 50
+        seed_base:      42
+        cutoff_energy:  6.0
+        observables:    [density, magnetization, component_density]
