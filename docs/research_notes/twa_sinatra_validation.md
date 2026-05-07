@@ -1,10 +1,18 @@
-# TWA Sinatra criterion validation — VERDICT: spurious classical thermalisation
+# TWA Sinatra criterion validation — VERDICT REVISED 2026-05-08
 
 **Status**: 3 ensembles complete 2026-05-07 19:18, runtime ~75 min on
-RTX 5070 Ti. **VERDICT: the 32³ baseline TWA σ/μ ≈ 0.42 result is
-contaminated by classical thermalisation from the violated Sinatra
-ratio.** Higher-resolution claims about "quantum fluctuations" in the Eu
-EdH ensemble require a Sinatra-clean re-run at 16³.
+RTX 5070 Ti. **VERDICT (REVISED 2026-05-08 after Sinatra-clean follow-up)**:
+the σ/μ shrinkage observed across the 3 configs in this scan was caused
+by a **ground-state-resolution artifact** (16³ × box=20 cannot resolve
+the 3.75 a_ho z-elongated filament — cloud stays smooth Gaussian), NOT
+by Sinatra contamination removal. The follow-up Sinatra-clean run at
+16³ × box=10 (resolution-matched to 32³ × box=20) reproduces σ/μ ≈ 0.4
+at N=10⁴ — same as the 32³ baseline — and even shows σ/μ = 0.82 at the
+deeply Sinatra-clean N=10⁵ point. The σ/μ ≈ 0.4 is real
+**chaotic-dipolar-instability signature**, not classical thermalisation.
+
+See `docs/research_notes/twa_pinned_16g_result.md` for the corrected
+analysis.
 **Code path**: `runs/{baseline_32g, coarse_16g, cutoff_16g}_<hash>/result.jld2`,
 analysed by `examples/twa_sinatra_validation_analyze.jl`.
 
@@ -27,19 +35,36 @@ where 32³ × 13 / 10⁴ ≈ 43?
 | coarse_16g   | 16³ | 6.0 | ≈ 3.16 | 5.3 | 0.019 | 0.970 | 0.042 | 0.012 |
 | cutoff_16g   | 16³ | 1.0 | ≈ 3.16 | 5.3 | 0.019 | 0.970 | **0.011** | 0.004 |
 
-## Verdict: SPURIOUS classical thermalisation
+## Verdict (REVISED): GS-resolution artifact, not Sinatra contamination
 
 σ/μ at peak shrinks from **0.423 → 0.042 → 0.011** across the three
-configs. That's a **38×** total drop as the Sinatra ratio drops from 43
-to 5. The acceptance criterion was "spread < 20% of max" for "real
-quantum noise"; the actual spread is **97% of max**. By the
-parallel-session-prescribed rule:
+configs. The original (May 7) verdict interpreted this as classical
+thermalisation contamination per the parallel-session prescription:
 
 > If σ/μ shrinks substantially as Sinatra ratio drops → spurious
 > classical thermalisation; the baseline 32³ result is not a controlled
 > approximation, and Eu EdH dynamics need full BdG / TDHFB.
 
-This is the verdict.
+**That interpretation was wrong.** The 16³ × box=20 setup has dx = 1.25
+a_ho, which cannot resolve the 3.75 a_ho z-elongated dipolar filament.
+At 16³ × box=20 the cloud stays as a smooth Gaussian (peak n = 0.019,
+on-axis ratio 0.97) instead of the filament that 32³ × box=20 produces
+(peak n = 0.094, FWHM_z = 6 cells, on-axis ratio 0.092). With **no
+filament there is no chaotic dipolar-instability dynamics**, and σ/μ
+collapses to the small Wigner-noise floor.
+
+The Sinatra-clean follow-up at 16³ × box=10 (`twa_pinned_16g_result.md`,
+2026-05-08) preserves dx = 0.625 a_ho and recovers FWHM_z = 6 cells.
+At N=10⁴ on this setup, σ/μ = 0.42 — exactly matches the 32³ baseline.
+At N=10⁵ (Sinatra ratio 0.53, deep Sinatra-clean), σ/μ = 0.82 —
+*higher* than the 32³ value, definitively ruling out Sinatra
+contamination as the source.
+
+The genuine cause of the σ/μ ≈ 0.4 signal is **chaotic trajectory
+divergence in the dipolar-instability regime**: different Wigner-noise
+seeds produce different filament orientations under the chaotic
+dipolar dynamics. This signal is bounded by physics (chaos amplitude),
+not by Wigner-noise amplitude — hence σ/μ does not scale as 1/√N.
 
 ## What this means for prior conclusions
 
