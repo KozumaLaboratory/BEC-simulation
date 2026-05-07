@@ -69,6 +69,7 @@ include("hamiltonian/interactions/phi_one_reg.jl")        # Petrov-regularised u
 include("hamiltonian/interactions/polar_contact_lhy.jl")  # F-generic polar contact LHY closed form
 include("hamiltonian/interactions/polar_dipolar_lhy.jl")  # polar contact + DDI extension
 include("hamiltonian/interactions/fm_contact_lhy.jl")     # FM-phase contact LHY (F=6)
+include("hamiltonian/interactions/fm_dipolar_lhy.jl")     # FM contact + Lima-Pelster Q_5 DDI dressing
 include("hamiltonian/interactions/lhy.jl")
 include("hamiltonian/interactions/losses.jl")
 include("hamiltonian/interactions/absorbing_boundary.jl")
@@ -318,7 +319,7 @@ export lima_pelster_Q5, compute_c_lhy_with_ddi
 export compute_lhy_2d_params
 export compute_spinor_lhy_two_channel, compute_spinor_lhy_table
 export compute_spinor_lhy_polar_contact, compute_spinor_lhy_polar_dipolar
-export compute_spinor_lhy_fm_contact
+export compute_spinor_lhy_fm_contact, compute_spinor_lhy_fm_dipolar
 export scale_interactions_quasi_2d
 
 # DDI

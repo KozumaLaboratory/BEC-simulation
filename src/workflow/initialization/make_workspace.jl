@@ -293,6 +293,27 @@ function make_workspace(;
             end
         end
         compute_spinor_lhy_polar_contact(; F=atom.F, g_dict=g_dict, n_max=n_max_est)
+    elseif spinor_lhy === :fm_dipolar
+        # Stage C scalar reduction: FM single-mode contact LHY × Lima-Pelster Q_5(ε_dd).
+        # `ε_dd` derived from the standard scalar definition c_dd / g_{2F};
+        # for finer control over the convention call
+        # `compute_spinor_lhy_fm_dipolar(; eps_dd, ...)` directly.
+        n_max_est = if psi_init !== nothing
+            maximum(sum(abs2, psi_init; dims=ndims(psi_init))) * 3.0
+        else
+            100.0
+        end
+        g_dict = _c0c1_to_gS(atom.F, ws_interactions.c0, ws_interactions.c1)
+        if !isempty(ws_interactions.c_extra)
+            for (S, dg) in _c_extra_to_delta_gS(atom.F, ws_interactions.c_extra)
+                g_dict[S] = get(g_dict, S, 0.0) + dg
+            end
+        end
+        c_dd_eff = enable_ddi && !isnan(c_dd) ? c_dd : 0.0
+        g_2F = get(g_dict, 2 * atom.F, 0.0)
+        eps_dd = abs(g_2F) > 1e-12 ? abs(c_dd_eff) / abs(g_2F) : 0.0
+        compute_spinor_lhy_fm_dipolar(; F=atom.F, g_dict=g_dict,
+            eps_dd=eps_dd, n_max=n_max_est)
     elseif spinor_lhy === :fm_contact
         # FM-phase contact LHY (paper #2 contact-only piece). Single-mode
         # collapse at m=+F: ε = (8/15π²)(g_{2F}n)^(5/2). For uniform g_S

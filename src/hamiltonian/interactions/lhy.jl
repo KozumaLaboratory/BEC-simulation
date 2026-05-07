@@ -239,6 +239,35 @@ function compute_spinor_lhy_polar_dipolar(;
 end
 
 """
+    compute_spinor_lhy_fm_dipolar(; F, g_dict, eps_dd, n_max, n_points) → SpinorLHYTable
+
+F-FM contact + DDI LHY closed form via Lima-Pelster Q_5 angular average
+(Stage C scalar reduction, Saito-Li 2024 convention). Single-mode at
+m=+F dressed by `Q_5(eps_dd)`. `eps_dd = 0` reduces to the pure-contact
+FM closed form (`compute_spinor_lhy_fm_contact`) exactly.
+"""
+function compute_spinor_lhy_fm_dipolar(;
+    F::Int,
+    g_dict,
+    eps_dd::Real,
+    n_max::Float64=100.0,
+    n_points::Int=200,
+)
+    n_points >= 3 || throw(ArgumentError("n_points must be >= 3"))
+    n_max > 0 || throw(ArgumentError("n_max must be positive"))
+    coefs = FMContactLHY.build_fm_lhy_coefs(F, g_dict)
+
+    densities = collect(range(0.0, n_max; length=n_points))
+    energy = zeros(Float64, n_points)
+    for (i, n) in enumerate(densities)
+        n < 1e-30 && continue
+        energy[i] = FMDipolarLHY.lhy_energy_fm_dipolar(n, coefs, eps_dd)
+    end
+    potential_values = _numerical_derivative(densities, energy)
+    SpinorLHYTable(:fm_dipolar, densities, potential_values)
+end
+
+"""
     compute_spinor_lhy_fm_contact(; F, g_dict, n_max, n_points) → SpinorLHYTable
 
 F-FM contact LHY closed form (paper #2 contact-only piece, F=6 for now).

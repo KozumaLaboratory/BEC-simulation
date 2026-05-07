@@ -1,5 +1,5 @@
 using SpinorBEC
-using SpinorBEC: PhiOneReg, PolarContactLHY, PolarDipolarLHY, FMContactLHY
+using SpinorBEC: PhiOneReg, PolarContactLHY, PolarDipolarLHY, FMContactLHY, FMDipolarLHY
 using SpinorBEC.PhiOneReg: phi_1_reg, T_KNOTS, VAL_KNOTS, DERIV_KNOTS
 using SpinorBEC.PolarContactLHY: lhy_energy_polar, sigma_polar, delta_polar,
     build_polar_lhy_coefs
@@ -8,6 +8,7 @@ using SpinorBEC.PolarDipolarLHY:
     sym_branch, sym_branch_quad
 using SpinorBEC.FMContactLHY: lhy_energy_fm, sigma_fm, delta_fm,
     build_fm_lhy_coefs
+using SpinorBEC.FMDipolarLHY: lhy_energy_fm_dipolar, Q5_dipolar
 using Test
 using LinearAlgebra: norm
 
@@ -212,6 +213,58 @@ end
         eps_scalar = (8.0 / (15.0 * π^2)) * (c_0 * n)^2.5
         @test isapprox(eps_fm, eps_scalar; rtol=1e-12)
     end
+end
+
+# =================================================================
+# FM dipolar LHY — Q5 reduction (Stage C scalar)
+# =================================================================
+
+@testset "FM dipolar LHY: Q5(0) = 1 (scalar limit)" begin
+    @test isapprox(Q5_dipolar(0.0), 1.0; atol=1e-12)
+end
+
+@testset "FM dipolar LHY: ε_dd=0 reduces to fm_contact" begin
+    g_user = Dict(S => 100.0 + 5.0 * S for S in (0, 2, 4, 6, 8, 10, 12))
+    for n in (0.5, 1.0, 2.5, 10.0)
+        eps_contact = lhy_energy_fm(n, 6, g_user)
+        eps_dipolar0 = lhy_energy_fm_dipolar(n, 6, g_user, 0.0)
+        @test isapprox(eps_contact, eps_dipolar0; rtol=1e-12)
+    end
+end
+
+@testset "FM dipolar LHY: species Q5 reference values (Lima-Pelster)" begin
+    # Reference values: parallel session 2026-05-07 honest correction +
+    # Saito-Li 2024 conventions. ε_dd = a_dd / a_s (standard scalar; F²
+    # already in c_dd via μ²).
+    references = [
+        ("Cr", 0.15, 1.03),
+        ("Eu", 0.55, 1.46),
+        ("Er", 0.88, 2.23),
+        ("Dy", 1.39, 4.11),
+    ]
+    for (atom, eps, q5_expected) in references
+        q5 = Q5_dipolar(eps)
+        @test isapprox(q5, q5_expected; atol=0.05)
+    end
+end
+
+@testset "FM dipolar LHY: monotonic enhancement with ε_dd" begin
+    g_user = Dict(S => 100.0 + 5.0 * S for S in (0, 2, 4, 6, 8, 10, 12))
+    eps_prev = lhy_energy_fm_dipolar(1.0, 6, g_user, 0.0)
+    for et in (0.05, 0.15, 0.3, 0.55, 0.88, 1.0)
+        eps = lhy_energy_fm_dipolar(1.0, 6, g_user, et)
+        @test eps >= eps_prev   # Q5 monotonically grows in (0, 1)
+        eps_prev = eps
+    end
+end
+
+@testset "compute_spinor_lhy_fm_dipolar wrapper" begin
+    g_user = Dict(S => 100.0 + 5.0 * S for S in (0, 2, 4, 6, 8, 10, 12))
+    table = compute_spinor_lhy_fm_dipolar(; F=6, g_dict=g_user, eps_dd=0.55,
+        n_max=10.0, n_points=50)
+    @test table.mode === :fm_dipolar
+    @test length(table.densities) == 50
+    @test length(table.potential_values) == 50
 end
 
 @testset "compute_spinor_lhy_fm_contact wrapper" begin

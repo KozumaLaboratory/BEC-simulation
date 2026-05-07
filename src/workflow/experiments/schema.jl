@@ -91,7 +91,8 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
     "temperature_ratio" => FieldSpec(; type=Number, range=(0.0, 1.0)),
     "spinor_lhy" => FieldSpec(; type=String,
         enum=["two_channel", "full_bdg", "scalar",
-            "polar_contact", "polar_dipolar", "fm_contact"]),
+            "polar_contact", "polar_dipolar",
+            "fm_contact", "fm_dipolar"]),
     # ↑ "scalar" is a no-op alias (explicit form of the default) — the
     # ScalarLHY path activates whenever interactions.c_lhy > 0,
     # regardless of this selector. "two_channel" and "full_bdg" route
