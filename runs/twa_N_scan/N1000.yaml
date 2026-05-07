@@ -1,0 +1,38 @@
+# TWA N scan: N=1000. 1/N validity check (Round-2 Task 1).
+defaults:
+  kind:         spinor
+  backend:      gpu
+  interactions: {omega_ref: 691.15}
+
+mixins:
+  eu151_edh_phys:
+    atom:         Eu151
+    grid:         {n: [32, 32, 32], box: [20, 20, 20]}
+    potential:    {type: harmonic, omega: [1.0, 1.0, 1.182]}
+    interactions: {N_atoms: 1000, omega_ref: 691.15, c1_ratio: 0.0}
+
+pipeline:
+  - ground_state:
+      use:           [eu151_edh_phys]
+      B:             {Bz: "0.01 Gauss"}
+      initial_state: m_plus_F
+      spinor_lhy:    scalar
+      n_steps:       3000
+      tol:           1.0e-9
+      dt:            0.005
+
+  - dynamics:
+      duration: 0.14
+      dt:       0.0005
+      B:        {Bz: {from: 0.01, to: 2.6e-5, duration: 0.14}}
+      save:     {every: 280}
+
+  - dynamics:
+      duration: 1.0
+      dt:       0.0001
+      B:        {Bz: "2.6e-5 Gauss"}
+      twa:
+        n_trajectories: 50
+        seed_base:      42
+        cutoff_energy:  6.0
+        observables:    [density, magnetization, component_density]
