@@ -324,7 +324,8 @@ function _analyze_rosensweig_pattern(psi, grid, atom, params, ws_prev)
         k_min=k_min)
 end
 
-function _analyze_column_density_movie(psi, grid, atom, params, ws_prev)
+function _analyze_column_density_movie(psi, grid, atom, params, ws_prev,
+    pipeline_results=Dict{Symbol, Any}())
     # Streams per-snapshot column densities into a single JLD2 archive
     # (`columns.jld2` with one Float32 2D array per frame, key
     # `frame_NNNNN`) and writes a JSON manifest with frame times + axis

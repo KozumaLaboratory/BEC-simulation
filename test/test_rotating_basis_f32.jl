@@ -51,7 +51,7 @@ using SpinorBEC
     end
     SpinorBEC.normalize_rotating!(ws)
     n0 = SpinorBEC.rotating_norm(ws)
-    @test n0 ≈ 1.0 atol = 1e-6
+    @test n0 ≈ 1.0 atol = 5e-6   # Float32 normalisation accumulator precision
     @test typeof(n0) <: AbstractFloat
 
     # Each substep should run cleanly without MethodError.

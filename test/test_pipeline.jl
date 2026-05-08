@@ -400,13 +400,11 @@ pipeline:
   - dynamics:
       duration: 0.1
       dt: 0.01
-      save_every: 5
-      save_psi_snapshots: true
+      save: {every: 5, psi_snapshots: true}
   - dynamics:
       duration: 0.1
       dt: 0.01
-      save_every: 5
-      save_psi_snapshots: true
+      save: {every: 5, psi_snapshots: true}
   - analyze:
       - column_density_movie:
           axis: 3
@@ -568,9 +566,7 @@ pipeline:
   - dynamics:
       duration: 0.2
       dt: 0.01
-      save_every: 5
-      save_psi_snapshots: true
-      save_snapshot_precision: "f32"
+      save: {every: 5, psi_snapshots: true, snapshot_precision: "f32"}
   - analyze:
       - column_density_movie:
           axis: 3

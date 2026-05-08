@@ -94,7 +94,8 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev=nothing,
     elseif name == :rosensweig_pattern
         return _analyze_rosensweig_pattern(psi, grid, atom, params, ws_prev)
     elseif name == :column_density_movie
-        return _analyze_column_density_movie(psi, grid, atom, params, ws_prev)
+        return _analyze_column_density_movie(psi, grid, atom, params, ws_prev,
+            pipeline_results)
     elseif name == :summary_json
         return _analyze_summary_json(psi, grid, atom, params, ws_prev, pipeline_results)
     end
