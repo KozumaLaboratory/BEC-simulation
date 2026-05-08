@@ -3,7 +3,7 @@
 Design document for a rotating-basis formulation that handles
 time-dependent magnetic-field polarization $\hat B(t)$ in spinor BECs.
 Larmor oscillations are removed analytically while spin excitations are
-preserved. Scalar eGPE (`src/scalar_egpe.jl`) is the adiabatic limit
+preserved. Scalar eGPE (`src/rotating_basis/scalar_egpe.jl`) is the adiabatic limit
 ($\tilde\psi_{m\neq -F}\to 0$) of this formulation and serves as the
 validation reference for Phase II below.
 
@@ -113,7 +113,7 @@ $$i\hbar\partial_t\tilde\psi_m = \bigl[-\tfrac{\hbar^2\nabla^2}{2m_\text{atom}} 
 If $\tilde\psi_m\approx 0$ for $m\neq-F$:
 
 - $\langle-F|\hat A|-F\rangle = -F\hbar\dot\phi\cos\theta$ — Berry-phase-like global phase
-- DDI reduces to scalar tilted-dipole (the kernel in `src/scalar_egpe.jl`)
+- DDI reduces to scalar tilted-dipole (the kernel in `src/rotating_basis/scalar_egpe.jl`)
 - Equivalent to scalar eGPE, plus a global phase
 
 ⇒ **scalar eGPE is Option γ's adiabatic limit**. Strong field + slow stir should produce overlap ≥ 0.9999 between the two; this is Phase II validation.
@@ -175,7 +175,7 @@ LOC estimate:
 
 **Phase I — static $\hat B$**: $\hat B$ = constant ⇒ $\hat A=0$. Rotating-basis spinor GP ≡ lab-frame spinor GP up to a global basis transform. All 254 existing physics-invariant tests must pass.
 
-**Phase II — static tilted $\hat B$**: $\hat B = (\sin 35°, 0, \cos 35°)$ constant. Compare lab-frame spinor (dt = 2e-5) and rotating basis (dt = 2e-3). Overlap > 0.9999, energies match. Also confirm scalar eGPE adiabatic limit: $\tilde\psi_{m\neq-F}\to 0$ in strong-field limit, density matches `src/scalar_egpe.jl`.
+**Phase II — static tilted $\hat B$**: $\hat B = (\sin 35°, 0, \cos 35°)$ constant. Compare lab-frame spinor (dt = 2e-5) and rotating basis (dt = 2e-3). Overlap > 0.9999, energies match. Also confirm scalar eGPE adiabatic limit: $\tilde\psi_{m\neq-F}\to 0$ in strong-field limit, density matches `src/rotating_basis/scalar_egpe.jl`.
 
 **Phase II PASSED (2026-04-27)**: scalar-eGPE adiabatic-limit overlap = 0.999959 on 16³ grid with F=1, p=5000, ε_dd_eff=0.033, 30° tilt. Sweep across F={1,2,4} × p={500,5000,50000} all pass with overlap ≥ 0.9995 and m=+F fraction = 1.0 to machine precision. See `test/test_rotating_basis_phase_ii.jl` (10 tests) and `scripts/validate_phase_ii_overlap.jl`. **Caveat:** stability requires ε_dd_eff ≡ c_dd·F²/(3g) < 1, not ε_dd_naive = c_dd/(3g) — the F² factor enters both solvers' effective dipolar strength.
 
@@ -209,7 +209,7 @@ Working title: *Local-frame spinor Gross-Pitaevskii formulation for time-depende
 
 ## 14. Relationship to existing code
 
-- **`src/scalar_egpe.jl`**: adiabatic limit; serves as Phase II reference
+- **`src/rotating_basis/scalar_egpe.jl`**: adiabatic limit; serves as Phase II reference
 - **Existing spinor split-step (`src/hamiltonian/split_step.jl`)**: lab-frame; Phase I/II/III ground truth at high resolution dt
 - **`spin_rotating_frame_omega` SimParams**: opt-in RF for resonant drives only; Option γ subsumes it (no resonance assumption needed)
 - **`zeeman_diagonal_quadratic_only`**: dead scaffolding from A.1 attempt; can be repurposed as the `-p F_z + q F_z²` static block in Option γ's diagonal step

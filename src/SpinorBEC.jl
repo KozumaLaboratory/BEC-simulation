@@ -179,12 +179,15 @@ include("workflow/experiments/feshbach_ramp.jl")
 include("solvers/projected_gp.jl")
 include("solvers/photon_heating.jl")
 include("solvers/sgpe.jl")
-include("scalar_egpe.jl")
+# Klaus-regime support (high p, ω_L ≫ trap): rotating-basis (Option γ)
+# + scalar-eGPE adiabatic-elimination alternative. See
+# `src/rotating_basis/README.md` for the public API and when to use.
 include("rotating_basis/workspace.jl")
 include("rotating_basis/propagators.jl")
 include("rotating_basis/integrators.jl")
 include("rotating_basis/analysis.jl")
-include("rotating_basis_analyzers.jl")
+include("rotating_basis/analyzers.jl")
+include("rotating_basis/scalar_egpe.jl")
 
 # CUDA-graph-accelerated split_step (extended by SpinorBECCUDAExt).
 # Default implementation = plain split_step! so CPU workspaces work unchanged.
