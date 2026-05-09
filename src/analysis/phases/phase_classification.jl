@@ -20,8 +20,10 @@ function classify_phase(
     sys = sm.system
 
     n_total = total_density(psi, N)
+    # `sum(n_total .^ 2)` allocates an n_pts-shape temp; `sum(x->x*x, n)`
+    # reduces in-place.
     n_sum = sum(n_total) * dV
-    n_sq_sum = sum(n_total .^ 2) * dV
+    n_sq_sum = sum(x -> x * x, n_total) * dV
     n_sum < 1e-30 && return (
         spin_order=0.0,
         nematic_order=0.0,
@@ -31,7 +33,11 @@ function classify_phase(
     )
 
     fx, fy, fz = spin_density_vector(psi, sm, N)
-    f_mag_sq_sum = sum(fx .^ 2 .+ fy .^ 2 .+ fz .^ 2) * dV
+    f_mag_sq_sum = 0.0
+    @inbounds for i in eachindex(fx, fy, fz)
+        f_mag_sq_sum += fx[i]^2 + fy[i]^2 + fz[i]^2
+    end
+    f_mag_sq_sum *= dV
     spin_order = f_mag_sq_sum / (Float64(F)^2 * n_sq_sum)
 
     spec = pair_amplitude_spectrum(psi, F, grid)
@@ -57,10 +63,17 @@ function classify_phase(
 end
 
 function _density_weighted_mean(field, density, dV)
-    w = density .^ 2
-    w_sum = sum(w) * dV
+    # Manual fused reduction: `density.^2` and `field .* w` were both
+    # n_pts-shape temporaries.
+    w_sum = 0.0
+    fw_sum = 0.0
+    @inbounds for i in eachindex(field, density)
+        wi = density[i]^2
+        w_sum += wi
+        fw_sum += field[i] * wi
+    end
     w_sum < 1e-30 && return 0.0
-    sum(field .* w) * dV / w_sum
+    fw_sum / w_sum
 end
 
 function _majorana_star_entropy(spinor::AbstractVector{ComplexF64}, F::Int)
@@ -284,7 +297,7 @@ function classify_phase_detailed(
 
     n_total = total_density(psi, N)
     n_sum = sum(n_total) * dV
-    n_sq_sum = sum(n_total .^ 2) * dV
+    n_sq_sum = sum(x -> x * x, n_total) * dV
     if n_sum < 1e-30
         return (
             spin_order=0.0,
@@ -300,7 +313,11 @@ function classify_phase_detailed(
     end
 
     fx, fy, fz = spin_density_vector(psi, sm, N)
-    f_mag_sq_sum = sum(fx .^ 2 .+ fy .^ 2 .+ fz .^ 2) * dV
+    f_mag_sq_sum = 0.0
+    @inbounds for i in eachindex(fx, fy, fz)
+        f_mag_sq_sum += fx[i]^2 + fy[i]^2 + fz[i]^2
+    end
+    f_mag_sq_sum *= dV
     spin_order = f_mag_sq_sum / (Float64(F)^2 * n_sq_sum)
 
     spec = pair_amplitude_spectrum(psi, F, grid)

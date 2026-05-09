@@ -382,26 +382,57 @@ end
 
 function _spinor_binary_energy(psi_A, psi_B, V_A, V_B, K, plans,
     c::SpinorBinaryCouplings, dV, ndim)
-    D_A = size(psi_A, ndim + 1);
+    D_A = size(psi_A, ndim + 1)
     D_B = size(psi_B, ndim + 1)
-    # Kinetic
+
+    # Kinetic — one inline reduction per FFT'd component instead of a
+    # broadcast `K .* abs2.(psi_c)` temporary.
     E_kin = 0.0
     for psi in (psi_A, psi_B)
         for cc in 1:size(psi, ndim + 1)
             psi_c = copy(selectdim(psi, ndim + 1, cc))
             plans.forward * psi_c
-            E_kin += real(sum(K .* abs2.(psi_c)))
+            ec = 0.0
+            @inbounds for i in eachindex(K, psi_c)
+                ec += K[i] * abs2(psi_c[i])
+            end
+            E_kin += ec
         end
     end
     E_kin *= dV / 2
-    # Potential
-    n_A = sum(cc -> abs2.(selectdim(psi_A, ndim + 1, cc)), 1:D_A)
-    n_B = sum(cc -> abs2.(selectdim(psi_B, ndim + 1, cc)), 1:D_B)
-    E_pot = sum(V_A .* n_A) * dV + sum(V_B .* n_B) * dV
-    # Interaction (intra + cross Hartree)
-    E_int =
-        (0.5 * c.c0_A * sum(n_A .^ 2) +
-         0.5 * c.c0_B * sum(n_B .^ 2) +
-         c.g_AB * sum(n_A .* n_B)) * dV
+
+    # Build n_A / n_B densities (allocate once, fold the abs2-sum) so
+    # the potential + interaction reductions can share them without
+    # `sum(cc -> abs2.(...))` materialising D temporaries each.
+    n_A = zeros(Float64, size(V_A))
+    @inbounds for cc in 1:D_A
+        psi_c = selectdim(psi_A, ndim + 1, cc)
+        for i in eachindex(n_A, psi_c)
+            n_A[i] += abs2(psi_c[i])
+        end
+    end
+    n_B = zeros(Float64, size(V_B))
+    @inbounds for cc in 1:D_B
+        psi_c = selectdim(psi_B, ndim + 1, cc)
+        for i in eachindex(n_B, psi_c)
+            n_B[i] += abs2(psi_c[i])
+        end
+    end
+
+    # Single fused pass: V_A·n_A, V_B·n_B, n_A², n_B², n_A·n_B all in one loop.
+    E_pot = 0.0
+    s_AA = 0.0
+    s_BB = 0.0
+    s_AB = 0.0
+    @inbounds for i in eachindex(n_A, n_B, V_A, V_B)
+        nAi = n_A[i]
+        nBi = n_B[i]
+        E_pot += V_A[i] * nAi + V_B[i] * nBi
+        s_AA += nAi * nAi
+        s_BB += nBi * nBi
+        s_AB += nAi * nBi
+    end
+    E_pot *= dV
+    E_int = (0.5 * c.c0_A * s_AA + 0.5 * c.c0_B * s_BB + c.g_AB * s_AB) * dV
     E_kin + E_pot + E_int
 end

@@ -14,7 +14,15 @@ function _analyze_domain_analysis(psi, grid, atom, params, ws_prev)
     n_max = maximum(n)
     threshold = Float64(get(params, "threshold", 0.05)) * n_max
     domain_count = _count_domain_walls(fz, n, threshold, grid.config.n_points)
-    f_mag_avg = sum(sqrt.(fx .^ 2 .+ fy .^ 2 .+ fz .^ 2) .* n) / sum(n)
+    # Inline reduction skips three n_pts-shape temporaries (the three
+    # `f.^2` arrays plus the `sqrt.()`/`.* n` chain).
+    fmag_n_sum = 0.0
+    n_sum = 0.0
+    @inbounds for i in eachindex(fx, fy, fz, n)
+        fmag_n_sum += sqrt(fx[i]^2 + fy[i]^2 + fz[i]^2) * n[i]
+        n_sum += n[i]
+    end
+    f_mag_avg = fmag_n_sum / n_sum
     (domain_walls=domain_count, mean_spin_magnitude=f_mag_avg)
 end
 
@@ -37,7 +45,14 @@ function _analyze_correlation_length(psi, grid, atom, params, ws_prev)
     dx = grid.config.box_size[direction] / n_along
     corr = zeros(Float64, n_along ÷ 2)
     fz_mean = sum(fz_line) / n_along
-    fz_var = sum((fz_line .- fz_mean) .^ 2) / n_along
+    # Variance reduction in-place — `(fz_line .- fz_mean) .^ 2` made an
+    # `n_along`-shape temp.
+    fz_var = 0.0
+    @inbounds for v in fz_line
+        d = v - fz_mean
+        fz_var += d * d
+    end
+    fz_var /= n_along
     if fz_var > 1e-30
         for lag in 0:(n_along ÷ 2 - 1)
             c = 0.0

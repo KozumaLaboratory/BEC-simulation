@@ -250,7 +250,13 @@ end
 
 function _spin_interaction_energy(psi, sm, c1, n_comp, ndim, n_pts, dV)
     fx, fy, fz = spin_density_vector(psi, sm, ndim)
-    0.5 * c1 * sum(fx .^ 2 .+ fy .^ 2 .+ fz .^ 2) * dV
+    # Broadcast `fx.^2 .+ fy.^2 .+ fz.^2` materialised an n_pts-shape
+    # temporary every call. Inline the reduction.
+    s = 0.0
+    @inbounds for i in eachindex(fx, fy, fz)
+        s += fx[i]^2 + fy[i]^2 + fz[i]^2
+    end
+    0.5 * c1 * s * dV
 end
 
 function _nematic_energy(psi, F, c2, ndim, n_pts, dV)

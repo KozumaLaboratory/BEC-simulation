@@ -62,9 +62,19 @@ end
 function _rms_width_1d(line::AbstractVector{Float64}, dx::Float64, x::AbstractVector)
     tot = sum(line) * dx
     tot > 0 || return 0.0
-    x̄ = sum(line .* x) * dx / tot
-    var = sum(line .* (x .- x̄) .^ 2) * dx / tot
-    sqrt(max(var, 0.0))
+    # Two fused reductions instead of three temp arrays
+    # (`line .* x`, `x .- x̄`, `line .* (x .- x̄).^2`).
+    sum_lx = 0.0
+    @inbounds for i in eachindex(line, x)
+        sum_lx += line[i] * x[i]
+    end
+    x̄ = sum_lx * dx / tot
+    var_acc = 0.0
+    @inbounds for i in eachindex(line, x)
+        d = x[i] - x̄
+        var_acc += line[i] * d * d
+    end
+    sqrt(max(var_acc * dx / tot, 0.0))
 end
 
 """

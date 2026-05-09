@@ -426,11 +426,30 @@ function multipole_spectrum(
     ops = multipole_order_parameters(psi, F, N; density_cutoff, include_odd_ranks)
     n_total = total_density(psi, N)
     dV = cell_volume(grid)
-    n_sq = n_total .^ 2
-    w_sum = sum(n_sq) * dV
+    # Cache `n_total[i]^2` once into a reusable buffer so the per-rank
+    # spectrum loop reduces against it without re-squaring or
+    # re-allocating `n_total .^ 2` for each operator.
+    n_sq = similar(n_total)
+    w_sum = 0.0
+    @inbounds for i in eachindex(n_total)
+        sq = n_total[i]^2
+        n_sq[i] = sq
+        w_sum += sq
+    end
+    w_sum *= dV
     w_sum < 1e-30 && return Dict{Int, Float64}(k => 0.0 for k in keys(ops))
 
-    Dict{Int, Float64}(k => sum(O_k .* n_sq) * dV / w_sum for (k, O_k) in ops)
+    out = Dict{Int, Float64}()
+    for (k, O_k) in ops
+        # `sum(O_k .* n_sq)` previously materialised an n_pts-shape temp
+        # per rank — with up to 2F+1 ranks at Eu151 this added up.
+        s = 0.0
+        @inbounds for i in eachindex(O_k, n_sq)
+            s += O_k[i] * n_sq[i]
+        end
+        out[k] = s * dV / w_sum
+    end
+    out
 end
 
 """
