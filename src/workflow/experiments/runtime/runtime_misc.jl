@@ -7,7 +7,10 @@ export scale_interactions_quasi_2d
 function scale_interactions_quasi_2d(ip::InteractionParams, l_z::Float64)
     factor = 1.0 / (sqrt(2π) * l_z)
     if ip.c_lhy != 0.0
-        @warn "c_lhy scaling under quasi-2D is approximate; 2D LHY requires logarithmic treatment"
+        # One-shot — every quasi-2D scan that hits make_workspace fires
+        # this; the user does not need to see the same warning N times.
+        @warn "c_lhy scaling under quasi-2D is approximate; 2D LHY requires logarithmic treatment" maxlog =
+            1
     end
     InteractionParams(
         ip.c0 * factor,
