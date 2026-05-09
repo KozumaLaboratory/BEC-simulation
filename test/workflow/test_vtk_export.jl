@@ -1,3 +1,7 @@
+# `WriteVTK` is a weak dep loaded via SpinorBECVTKExt; we explicitly
+# `using` it here so `export_vtk` resolves to the extension method.
+using WriteVTK
+
 @testset "VTK Export" begin
     F = 1
     sys = SpinSystem(F)

@@ -17,7 +17,8 @@ using Base64: base64encode
 import JSON
 using SpecialFunctions: erfcx
 using Sockets
-using WriteVTK
+# WriteVTK + HTTP are now weak deps (see ext/SpinorBECVTKExt,
+# ext/SpinorBECHTTPExt). No top-level `using` statements for them here.
 
 const TIMER = TimerOutput()
 

@@ -1,6 +1,9 @@
-# Notification system for simulation completion/errors
+# Notification system for simulation completion/errors.
+#
+# `send_slack_notification` is a stub here; the real method is supplied
+# by ext/SpinorBECHTTPExt when the user `using HTTP`s. Without HTTP
+# loaded, Slack webhooks are silently skipped (with one @info hint).
 
-using HTTP
 using JSON
 
 struct NotificationConfig
@@ -85,47 +88,21 @@ function send_desktop_notification(title::String, message::String, status::Symbo
     end
 end
 
-function send_slack_notification(
-    webhook_url::String, title::String, message::String, status::Symbol
-)
-    try
-        # Slack message color
-        color = if status == :success
-            "good"
-        elseif status == :error
-            "danger"
-        elseif status == :warning
-            "warning"
-        else
-            "#439FE0"
-        end
+const _SLACK_HTTP_HINT_SHOWN = Ref(false)
 
-        # Construct payload
-        payload = Dict(
-            "attachments" => [
-                Dict(
-                    "color" => color,
-                    "title" => title,
-                    "text" => message,
-                    "footer" => "SpinorBEC.jl",
-                    "ts" => round(Int, time()),
-                ),
-            ],
-        )
+"""
+    send_slack_notification(webhook_url, title, message, status)
 
-        # Send POST request
-        response = HTTP.post(
-            webhook_url,
-            ["Content-Type" => "application/json"],
-            JSON.json(payload),
-        )
-
-        if response.status != 200
-            @warn "Slack notification failed with status $(response.status)"
-        end
-    catch e
-        @warn "Slack notification failed: $e"
+POST a Slack-formatted JSON payload to `webhook_url`. Real implementation
+lives in ext/SpinorBECHTTPExt; without `using HTTP` this stub logs a
+one-shot info message and returns.
+"""
+function send_slack_notification(::String, ::String, ::String, ::Symbol)
+    if !_SLACK_HTTP_HINT_SHOWN[]
+        @info "Slack webhook skipped: load `using HTTP` to enable real POST."
+        _SLACK_HTTP_HINT_SHOWN[] = true
     end
+    return nothing
 end
 
 function notify_simulation_complete(
