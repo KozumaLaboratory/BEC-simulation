@@ -1,5 +1,7 @@
 # --- Scan result aggregation ---
-#
+
+export scan_summary, scan_energy_comparison, print_scan_summary
+
 # Walk a run directory, load all point_*.jld2 metadata, and produce
 # a summary table for quick comparison. No need to load full psi arrays.
 

@@ -1,5 +1,7 @@
 # --- Config override primitive ---
-#
+
+export apply_override!, apply_overrides, expand_scan_points, parse_override_map
+
 # A single mechanism for expressing parameter variations across the YAML
 # config tree. Used by:
 #   - scans (each scan point is one override map)

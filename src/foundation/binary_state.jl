@@ -9,6 +9,12 @@
 #   - BinaryState        — pair of ψ_A, ψ_B arrays sharing a grid
 #   - BinaryWorkspace    — pair of single-species Workspaces + couplings
 #   - find_binary_ground_state — naive ITP with alternating species update
+
+export BinaryCouplings, BinaryState
+export find_binary_ground_state
+export is_immiscible, droplet_regime_petrov
+export binary_overlap, binary_separation_radius
+export SpinorBinaryCouplings, SpinorBinaryState, find_spinor_binary_ground_state
 #
 # Use cases:
 #   - Cr-Sr immiscibility studies

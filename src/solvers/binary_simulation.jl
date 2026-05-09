@@ -1,5 +1,8 @@
 # --- Binary (two-component) GP real-time propagation ---
-#
+
+export BinarySimulation, make_binary_simulation, binary_split_step!
+export run_binary_simulation!, binary_norms, binary_total_energy
+
 # Companion to `find_binary_ground_state` in foundation/binary_state.jl,
 # completing the Phase 4.7 / Scenario #51 scaffold for the F=0 + F=0 case
 # (each species treated as a scalar GP). The split-step is the same Strang

@@ -331,27 +331,11 @@ include("solvers/binary_simulation.jl")
 
 # CUDA Graph hooks (defined at top-level, replayed by SpinorBECCUDAExt).
 export split_step_captured!, invalidate_split_step_graph!
-export BinaryCouplings, BinaryState, find_binary_ground_state,
-    is_immiscible, droplet_regime_petrov,
-    binary_overlap, binary_separation_radius,
-    SpinorBinaryCouplings, SpinorBinaryState, find_spinor_binary_ground_state,
-    BinarySimulation, make_binary_simulation, binary_split_step!,
-    run_binary_simulation!, binary_norms, binary_total_energy
-export init_psi_polar, init_psi_m_plus_F, init_psi_m_minus_F,
-    # Legacy aliases (resolve to init_psi_m_plus_F / init_psi_m_minus_F)
-    init_psi_ferromagnetic, init_psi_ferromagnetic_min,
-    init_psi_uniform, init_psi_antiferromagnetic, init_psi_random,
-    init_psi_spin_coherent, init_psi_fl_vortex, init_psi_spin_helix,
-    init_psi_cyclic, init_psi_biaxial_nematic, init_psi_polar_core_vortex,
-    init_psi_bright_soliton, init_psi_dark_soliton, init_psi_skyrmion,
-    init_psi_wavepacket, init_psi_domain_wall, init_psi_two_packets,
-    init_psi_chiral_spin_vortex, init_psi_magnetic_domain,
-    init_psi_vortex_lattice, init_psi_skyrmion_lattice
-export apply_override!, apply_overrides, expand_scan_points, parse_override_map
-export OverrideScan, ConstrainedJzScan
-export PotentialConfig, ConstantValue, LinearRamp, interpolate_value
-export validate_pipeline!, validate_config!
-export scan_summary, scan_energy_comparison, print_scan_summary
+# Binary BEC (foundation/binary_state.jl + solvers/binary_simulation.jl),
+# init_psi state zoo (workflow/initialization/state_zoo.jl), config
+# overrides (schema/config_override.jl), schema validation
+# (schema/schema.jl), helpers (schema/helpers_types.jl), scan summary
+# aggregation (io/scan_summary.jl): all exported at definition sites.
 
 # Units
 export Units

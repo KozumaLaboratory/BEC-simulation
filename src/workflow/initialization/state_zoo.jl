@@ -1,5 +1,15 @@
 # --- Phase 1.1 state zoo: named builders -------------------------------
-#
+
+export init_psi_polar, init_psi_m_plus_F, init_psi_m_minus_F
+export init_psi_ferromagnetic, init_psi_ferromagnetic_min   # legacy aliases
+export init_psi_uniform, init_psi_antiferromagnetic, init_psi_random
+export init_psi_spin_coherent, init_psi_fl_vortex, init_psi_spin_helix
+export init_psi_cyclic, init_psi_biaxial_nematic, init_psi_polar_core_vortex
+export init_psi_bright_soliton, init_psi_dark_soliton, init_psi_skyrmion
+export init_psi_wavepacket, init_psi_domain_wall, init_psi_two_packets
+export init_psi_chiral_spin_vortex, init_psi_magnetic_domain
+export init_psi_vortex_lattice, init_psi_skyrmion_lattice
+
 # Thin wrappers around `init_psi(grid, sys; state=:..., init_state_params=...)`
 # so callers can write `init_psi_polar(grid, sys)` instead of remembering
 # the right symbol. Each wrapper accepts the relevant kwargs and forwards

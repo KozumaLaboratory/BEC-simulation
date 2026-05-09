@@ -1,5 +1,7 @@
 # --- YAML schema validation ---
-#
+
+export validate_pipeline!, validate_config!
+
 # Catches typos and invalid values before a multi-hour GPU run starts.
 # Design: each schema is a Dict{String, FieldSpec}. validate_config! walks
 # the pipeline dict and reports unknown keys as warnings, missing required

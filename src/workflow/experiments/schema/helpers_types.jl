@@ -1,5 +1,7 @@
 # --- Experiment configuration value types ---
 
+export PotentialConfig, ConstantValue, LinearRamp, interpolate_value
+
 struct ConstantValue
     value::Float64
 end
