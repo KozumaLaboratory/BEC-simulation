@@ -15,12 +15,50 @@ LD_LIBRARY_PATH=/usr/lib/wsl/lib julia --project=.                # GPU (WSL2)
 
 ```
 src/
-├── foundation/      # types.jl, backend.jl, grid, spin matrices, CG coefficients
-├── hamiltonian/     # interactions, potentials (zeeman, trap, DDI, raman, LHY)
-├── solvers/         # ground_state (ITP), simulation (RTP), continuation, adaptive
-├── workflow/        # experiments (YAML config), initialization, io, monitoring
-└── analysis/        # energy, observables, phases, stability, diagnostics, TOF, vorticity
+├── SpinorBEC.jl       # Thin umbrella (~93 LOC) — loads each subsystem umbrella below
+├── foundation.jl       # → foundation/types/ (10 struct files) + math primitives
+├── hamiltonian.jl      # → interactions/, potentials/, integrator/
+├── analysis.jl         # → observables, energy, currents, vorticity, phases/, etc.
+├── solvers.jl          # → ground_state/, lbfgs/, continuation/, simulation, twa, binary
+├── rotating_basis.jl   # → Klaus-regime path (workspace, propagators, integrators)
+├── precompile.jl       # PrecompileTools workload (dashboard hot path + RB primer)
+├── cuda_graph_stubs.jl # split_step_captured! base methods (CUDA ext provides real)
+├── foundation/         # types/{grid,spin_atom,sim_fft,...} + grid.jl, spin_matrices.jl,
+│                       #   clebsch_gordan.jl, spherical_harmonics.jl, waveform.jl,
+│                       #   binary_state.jl
+├── hamiltonian/        # interactions/{ddi/, lhy/, ...}, potentials/, integrator/
+├── dynamics/           # sinatra_helpers, utils_resolution_sinatra (TWA validity)
+├── analysis/           # observables, ..., phases/{phase_classification, bogoliubov, ...}
+├── solvers/            # ground_state/, lbfgs/, continuation/, simulation, twa, binary
+├── rotating_basis/     # Klaus-regime files (workspace, propagators, integrators, ...)
+└── workflow/
+    ├── initialization.jl, io.jl, monitoring.jl, experiments.jl  # subsystem umbrellas
+    ├── initialization/ # atoms, state_dispatch, make_workspace, state_zoo, *_noise
+    ├── io/             # io.jl, save_rotating_result, vtk_export (stub), budget,
+    │                   # run_summary, html_report, scan_summary, dashboard/
+    ├── monitoring/     # ascii_plot, logging, resource_monitor, notifications,
+    │                   # progress, live_monitor
+    └── experiments/
+        ├── schema/         # config_override + 13 parsing/builder files
+        ├── runtime/        # adaptive_advice, pulse_sequence, sta_counter_diabatic, ...
+        ├── analyzers/      # imaging, phase, topology, spectroscopy, stability, ...
+        ├── pipeline/       # pipeline_types, runner, run_step_*, run_registry, pipeline_api
+        ├── optimization/   # bayesian_opt(_mf,_yaml), faraday_fit, active_learning
+        └── calibration.jl
+
+ext/
+├── SpinorBECCUDAExt/  # CUDA acceleration (CUDA in [deps]; ext is the dispatch site)
+├── SpinorBECMakieExt/ # plot_density / animate_dynamics methods (Makie weak dep)
+├── SpinorBECHTTPExt/  # send_slack_notification real method (HTTP weak dep)
+└── SpinorBECVTKExt/   # export_vtk / export_vtk_series real methods (WriteVTK weak dep)
+
+test/                  # 8451 pass + 2 broken in 8 subdirs mirroring src/ structure
 ```
+
+Each subsystem umbrella `Foo.jl` is a flat-namespace file that just
+`include`s its sub-files in dependency order. Public exports live next
+to their definitions; the umbrella module re-declares only cross-cutting
+extension stubs (CUDA Graph hooks, Makie viz placeholders).
 
 ## Key Architecture
 
@@ -188,7 +226,6 @@ two-channel table, set `ground_state.spinor_lhy: two_channel`.
 - **DDI**: c_dd=μ₀μ² (no 4π), Q_αβ=k̂_αk̂_β−δ_αβ/3 (no 1/(4π)), Q(k=0)=0. Chain self-consistent.
 - **ITP Zeeman shift**: subtracts min(E_m) to prevent overflow. Not a bug.
 - **Scalar LHY**: `@warn` present. Known approximation.
-- **`save_state` elseif branch** (`ddi_padded.ddi.C_dd`): unreachable dead code (ddi_padded only exists when ddi≠nothing).
 - **Odd-rank c_extra ignored**: `@warn` present. KU's c₃≠rank-3 tensor.
 - **`compute_interaction_params_general_f` returns (0,0)**: by design (tensor_cache handles all).
 - **`_YOSHIDA_W0 < 0`**: correct (backward middle substep, all operators time-reversible).

@@ -8,50 +8,91 @@ The spatial dimensionality `N` is handled generically via Julia's parametric typ
 
 ## Module Structure
 
+The `SpinorBEC.jl` umbrella module is intentionally thin (~100 LOC): it
+just `include`s a per-subsystem umbrella file. Each umbrella in turn
+loads the source files of its subdir in dependency order.
+
 ```
 src/
-  SpinorBEC.jl                              # Module entry, includes, exports
+  SpinorBEC.jl                              # Module entry: loads umbrellas + a few stragglers
+  foundation.jl, hamiltonian.jl, analysis.jl, solvers.jl,
+  rotating_basis.jl                         # Top-level subsystem umbrellas
+  precompile.jl, cuda_graph_stubs.jl        # Auxiliary entry-point stubs
+
   foundation/
-    types.jl                                # All struct definitions (included first)
-    backend.jl                              # AbstractBackend / CPU / CUDA dispatch
-    grid.jl                                 # Grid{N,T<:AbstractFloat}
-    spin_matrices.jl                        # SpinSystem + spin-F operators
-    clebsch_gordan.jl                       # CG / 3j / Wigner D
     waveform.jl                             # AbstractWaveform{T} + 10 subtypes
+    types/
+      grid.jl, spin_atom.jl, sim_fft.jl,
+      interactions_zeeman.jl, ddi_loss.jl,
+      integrator.jl, potentials.jl,
+      results.jl, scan.jl, workspace.jl     # Struct definitions, split by topic
+    grid.jl, fft_utils.jl, backend.jl,
+    spin_matrices.jl, spinor_utils.jl,
+    clebsch_gordan.jl, spherical_harmonics.jl  # Math primitives
     binary_state.jl                         # Two-component scaffold
-    fft_utils.jl, spinor_utils.jl, …
+
   hamiltonian/
-    split_step.jl                           # Strang splitting orchestrator
-    yoshida.jl                              # 4th-order option
-    propagators.jl                          # Kinetic + diagonal potential
-    interactions/                           # c0/c1, nematic, tensor, DDI, raman, LHY, …
-    potentials/                             # Harmonic, gravity, optical, gauge, …
+    integrator/                             # split_step.jl, yoshida.jl,
+                                            # propagators.jl, split_step_kernels.jl,
+                                            # split_step_composers.jl
+    interactions/                           # c0/c1, nematic, tensor, DDI/, lhy/, …
+    potentials/                             # Harmonic, optical, laser, light_shift, …
+  dynamics/                                 # sinatra_helpers, utils_resolution_sinatra
+                                            # (loaded from hamiltonian.jl)
+
   solvers/
-    ground_state.jl                         # ITP
-    lbfgs_ground_state.jl                   # LBFGS polish
-    simulation.jl                           # Real-time evolution
-    sgpe.jl, projected_gp.jl                # Stochastic + truncated solvers
-    photon_heating.jl                       # Spontaneous emission heating
-    twa.jl                                  # Truncated Wigner ensemble
-    binary_simulation.jl                    # Two-component RTP (scaffold)
-    continuation.jl, adaptive.jl, embedded_adaptive.jl
+    ground_state.jl + ground_state/         # ITP entry + itp_loop, checkpoint, adaptive, advanced
+    lbfgs/                                  # energy_gradient, helpers, driver
+    continuation/                           # scan_1d, scan_2d, boundary, pseudo_arclength, triple_point
+    simulation.jl, adaptive.jl, embedded_adaptive.jl
+    sgpe.jl, projected_gp.jl, photon_heating.jl
+    twa.jl, binary_simulation.jl
+
   workflow/
-    initialization/                         # atoms, make_workspace, state_zoo, thermal_noise
-    experiments/                            # pipeline_runner, pipeline_analyzers,
-                                            # run_registry (run_yaml), schema, calibration,
-                                            # pulse_sequence, sta_counter_diabatic,
-                                            # bayesian_opt, faraday_fit, feshbach_ramp,
-                                            # adaptive_advice, zeeman_levels, …
-    io/                                     # dashboard.jl (HTTP + atlas + live + lab),
-                                            # html_report, run_summary, scan_summary,
-                                            # vtk_export, units, budget
-    monitoring/                             # progress / live_monitor primitives
+    initialization.jl, io.jl, monitoring.jl, experiments.jl  # subsystem umbrellas
+    initialization/                         # atoms, state_dispatch, make_workspace,
+                                            # thomas_fermi, state_zoo,
+                                            # thermal_noise, vacuum_noise
+    io/
+      io.jl, unitful_support.jl, save_rotating_result.jl,
+      vtk_export.jl, run_summary.jl, html_report.jl,
+      budget.jl, scan_summary.jl, calibration_drift.jl, units.jl
+      dashboard.jl + dashboard/             # 21-file HTTP+WS dashboard subsystem
+    monitoring/                             # ascii_plot, logging, resource_monitor,
+                                            # notifications, progress, live_monitor
+    experiments/
+      schema/                               # config_override + 13 parsing/builder files
+      runtime/                              # adaptive_advice, runtime_misc, runtime_io,
+                                            # zeeman_levels, pulse_sequence,
+                                            # sta_counter_diabatic, feshbach_ramp
+      analyzers/                            # imaging, phase, topology, spectroscopy,
+                                            # stability, misc, analyzers_large
+      pipeline/                             # pipeline_types, pipeline_analyzers,
+                                            # pipeline_dispatch, pipeline_callbacks,
+                                            # runner, run_step_*, pipeline_api,
+                                            # pipeline_continuation, run_registry
+      optimization/                         # faraday_fit, bayesian_opt(_mf,_yaml),
+                                            # active_learning
+      calibration.jl
+
   analysis/
-    observables.jl, energy.jl, currents.jl, vorticity.jl, vortex_extraction.jl,
-    topology.jl, tomography.jl, faraday.jl, imaging.jl, tof.jl,
-    stability_analysis.jl, synthetic_dimension.jl, time_resolved.jl,
-    diagnostics.jl, ensemble.jl, majorana.jl, spin_rotation.jl,
-    phases/                                 # phase_classify primitives
+    compare.jl, observables.jl, ensemble.jl,
+    energy.jl, currents.jl, vorticity.jl, vortex_extraction.jl,
+    diagnostics.jl, majorana.jl, tof.jl,
+    tomography.jl, faraday.jl, imaging.jl,
+    topology.jl, synthetic_dimension.jl, time_resolved.jl,
+    stability_analysis.jl, spin_rotation.jl
+    phases/                                 # phase_classification, phase_boundary,
+                                            # bogoliubov, bogoliubov/scan
+
+  rotating_basis/                           # Klaus-regime path: workspace, propagators,
+                                            # integrators, analysis, analyzers, scalar_egpe
+
+ext/
+  SpinorBECCUDAExt/                         # CUDA acceleration (CUDA weak dep)
+  SpinorBECMakieExt/                        # Plot/animate methods (Makie weak dep)
+  SpinorBECHTTPExt/                         # Slack webhook (HTTP weak dep)
+  SpinorBECVTKExt/                          # ParaView export (WriteVTK weak dep)
 ```
 
 ## Core Data Flow
@@ -70,13 +111,13 @@ Workspace -> split_step! (one time step)
 
 ## Key Types
 
-### Grid (`types.jl`, `grid.jl`)
+### Grid (`foundation/types/grid.jl`, `foundation/grid.jl`)
 
 `GridConfig{N}` specifies the number of grid points (must be positive even integers) and box size per dimension. `Grid{N}` holds the computed real-space coordinates `x`, momentum-space coordinates `k`, grid spacings `dx`/`dk`, and the precomputed `k_squared` array.
 
 The grid is centered at the origin: `x` ranges from `[-L/2 + dx/2, L/2 - dx/2]`. Momentum-space vectors use `FFTW.fftfreq`.
 
-### Spin System (`types.jl`, `spin_matrices.jl`)
+### Spin System (`foundation/types/spin_atom.jl`, `foundation/spin_matrices.jl`)
 
 `SpinSystem` stores the total spin `F`, the number of components `2F+1`, and the magnetic quantum numbers `m = F, F-1, ..., -F`.
 
@@ -86,7 +127,7 @@ The grid is centered at the origin: `x` ranges from `[-L/2 + dx/2, L/2 - dx/2]`.
 F+|F,m> = sqrt(F(F+1) - m(m+1)) |F,m+1>
 ```
 
-### Atom Species (`types.jl`, `atoms.jl`)
+### Atom Species (`foundation/types/spin_atom.jl`, `workflow/initialization/atoms.jl`)
 
 `AtomSpecies` stores mass, spin `F`, scattering lengths `a0`/`a2`, and magnetic dipole moment `mu_mag`. Three atoms are predefined:
 
@@ -112,7 +153,7 @@ Quasi-low-dimensional reductions (1D, 2D) divide by the transverse confinement a
 
 The DDI coupling constant is `C_dd = mu_0 * mu^2 / (4pi)`.
 
-### Potentials (`types.jl`, `potentials.jl`, `optical_trap.jl`)
+### Potentials (`foundation/types/potentials.jl`, `hamiltonian/potentials/`)
 
 All potentials inherit from `AbstractPotential` and implement `evaluate_potential(pot, grid) -> Array{Float64,N}`.
 
@@ -126,7 +167,7 @@ All potentials inherit from `AbstractPotential` and implement `evaluate_potentia
 
 `GaussianBeam` models a focused laser beam with wavelength, power, waist (1/e^2 radius), position, and propagation direction. The intensity profile neglects axial (Rayleigh range) variation, using only the transverse Gaussian: `I(r) = I0 * exp(-2 * r_perp^2 / w0^2)`.
 
-### Zeeman Effect (`types.jl`, `zeeman.jl`)
+### Zeeman Effect (`foundation/types/interactions_zeeman.jl`, `hamiltonian/potentials/zeeman.jl`)
 
 `ZeemanParams` holds the linear (`p`) and quadratic (`q`) Zeeman coefficients. The energy shift for magnetic sublevel `m` is:
 
@@ -336,20 +377,32 @@ graph TD
 
 ## Reading order for new contributors
 
-1. `src/foundation/types.jl` — every struct in the codebase.
-2. `src/foundation/grid.jl` + `spin_matrices.jl` — math primitives.
-3. `src/hamiltonian/split_step.jl` — the inner loop.
-4. `src/solvers/ground_state.jl` — ITP loop.
-5. `src/workflow/experiments/pipeline_runner.jl` — YAML → run dispatch.
-6. `src/workflow/experiments/run_registry.jl` — `run_yaml` + scan loop.
-7. `CLAUDE.md` "Type stability boundaries" — recurring pitfall.
+1. `src/SpinorBEC.jl` — thin umbrella that loads each subsystem.
+2. `src/foundation/types/` (10 small files) — every struct in the
+   codebase, split by topic; `workspace.jl` last because it depends on
+   everything else.
+3. `src/foundation/grid.jl` + `spin_matrices.jl` — math primitives.
+4. `src/hamiltonian/integrator/split_step.jl` — the inner Strang loop.
+5. `src/solvers/ground_state.jl` — ITP loop.
+6. `src/workflow/experiments/pipeline/runner.jl` — YAML → run dispatch.
+7. `src/workflow/experiments/pipeline/run_registry.jl` — `run_yaml` +
+   scan loop.
+8. `CLAUDE.md` "Type stability boundaries" — recurring pitfall.
 
 ## Key design choices (don't reverse without careful thought)
 
 - **Workspace is one big struct with 23+ type parameters.** Adding new
   fields is fine; adding a new abstract type position is dangerous.
-- **All structs in `types.jl`** so include order is monotonic.
+- **All structs live under `foundation/types/`** so include order is
+  monotonic. The umbrella file `foundation.jl` loads them in dependency
+  order (workspace last).
 - **Calibration is a YAML preprocessor**, not a Workspace field.
 - **Snapshots stream by default at ComplexF32**.
 - **`run_yaml` is resumable** by file existence check.
 - **DDI uses `c_dd = μ₀μ²` (no 4π)** — see CLAUDE.md "Conventions".
+- **Public exports live next to definitions** (each source file declares
+  `export ...` at the top). The umbrella module `SpinorBEC.jl` only
+  re-declares cross-cutting extension stubs.
+- **Optional deps stay in `ext/`**: HTTP (Slack webhook), WriteVTK
+  (ParaView export), Makie (plotting), CUDA (GPU). The package loads
+  without any of them.
