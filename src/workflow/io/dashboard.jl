@@ -1,7 +1,6 @@
-# --- Dashboard subsystem umbrella ---
+# --- Dashboard subsystem (live HTTP/WS dashboard for SpinorBEC runs) ---
 #
-# 21 source files implementing the static-export + live HTTP/WS dashboard
-# for SpinorBEC runs. Files are split by concern:
+# 21 source files split by concern:
 #
 #   encoding/cache/snapshots/route_helpers — shared infrastructure
 #   compute/{helpers,density,phase,binary}  — number-crunch helpers
@@ -10,20 +9,36 @@
 #   server/{json,data_export,router,static} — HTTP/WS server core
 #   pack3d, websocket                       — binary packers + WS frames
 #
-# This file just `include`s each in dependency order. Public surface
-# (serve_dashboard, generate_dashboard_data, export_dashboard,
-# RunMetadata, load_run_metadata) is exported at definition sites.
-#
-# Note: this is a flat-namespace umbrella, not a `module Dashboard`. The
-# subsystem is internally cohesive and could be elevated to a submodule in
-# future work; the obstacle is the precompile workload reaching into
-# private helpers (_load_psi_cached, _compute_column_density_binary,
-# _compute_phase_slice_binary, _snapshots_metadata) and the cross-module
-# imports of Grid / GridConfig / FFTPlans / total_density / spin_density_vector
-# / probability_current / superfluid_velocity / superfluid_vorticity /
-# synthetic_dim_dispersion / make_grid / make_fft_plans / spin_matrices /
-# list_runs / run_status that would all need explicit `using ..SpinorBEC:`
-# declarations.
+# Wrapped in `module Dashboard` so dashboard internals (cache structs,
+# private helpers like `_load_psi_cached`) stay isolated from the rest of
+# SpinorBEC. Public surface is re-exported back to SpinorBEC at the
+# include site (see SpinorBEC.jl).
+
+module Dashboard
+
+using JLD2
+using JSON
+using Sockets
+using Base64: base64encode
+using FFTW
+using CodecZlib: ZlibCompressor, GzipCompressor, transcode
+using CodecZstd: ZstdCompressor
+using SHA: sha1
+using Printf
+using Dates
+using LinearAlgebra
+using Random
+
+# Pull the SpinorBEC types and free functions used inside dashboard
+# handlers. All of these must be exported at definition site by the time
+# this module is included (dashboard is loaded near the bottom of the
+# umbrella, after analysis + experiments).
+using ..SpinorBEC: Grid, GridConfig, FFTPlans, AtomSpecies, AbstractBackend, CPUBackend
+using ..SpinorBEC: make_grid, make_fft_plans, spin_matrices
+using ..SpinorBEC: total_density, spin_density_vector
+using ..SpinorBEC: probability_current, superfluid_velocity, superfluid_vorticity
+using ..SpinorBEC: synthetic_dim_dispersion
+using ..SpinorBEC: list_runs, run_status
 
 include("dashboard/encoding.jl")          # bitshuffle + zstd
 include("dashboard/cache.jl")             # PSI_CACHE, JLD handle pool, atlas disk cache
@@ -46,3 +61,5 @@ include("dashboard/compute/density.jl")   # 3D + column density compute
 include("dashboard/compute/phase.jl")     # phase slice compute
 include("dashboard/compute/binary.jl")    # binary packers (density/atlas/phase)
 include("dashboard/pack3d.jl")            # 3D density/vortex/phase/vector binary packers
+
+end # module Dashboard

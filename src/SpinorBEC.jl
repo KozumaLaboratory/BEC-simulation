@@ -61,6 +61,22 @@ include("analysis.jl")  # observables + diagnostics + phase exploration umbrella
 
 include("solvers.jl")  # ground_state + simulation + lbfgs + continuation + twa + binary umbrella
 
+# Dashboard subsystem (real submodule) — must be loaded after analysis +
+# workflow/experiments so that total_density / spin_density_vector /
+# list_runs / run_status are exported by SpinorBEC.
+include("workflow/io/dashboard.jl")  # `module Dashboard` (21 source files)
+
+# Re-export Dashboard's public surface at the umbrella level so existing
+# `using SpinorBEC; serve_dashboard(...)` call sites keep working.
+using .Dashboard:
+    serve_dashboard,
+    generate_dashboard_data,
+    export_dashboard,
+    RunMetadata,
+    load_run_metadata
+export serve_dashboard, generate_dashboard_data, export_dashboard
+export RunMetadata, load_run_metadata
+
 # All public symbols are now `export`ed at their definition sites under
 # src/foundation/, src/hamiltonian/, src/analysis/, src/solvers/, and
 # src/workflow/. The umbrella module here only declares cross-cutting

@@ -29,13 +29,13 @@ using PrecompileTools
                 f["grid_box_size"] = (1.0, 1.0, 1.0)
             end
             cache = Dict{String, Any}()
-            tup = _load_psi_cached(path, cache, 1)
-            _compute_column_density_binary(tup..., 3, path)
-            _compute_phase_slice_binary(tup..., 3, nothing, path)
+            tup = Dashboard._load_psi_cached(path, cache, 1)
+            Dashboard._compute_column_density_binary(tup..., 3, path)
+            Dashboard._compute_phase_slice_binary(tup..., 3, nothing, path)
             # _snapshots_metadata internally invokes
             # _global_density_max_total_sampled, so this single call specialises
             # both the metadata reader and the global-max walk.
-            _snapshots_metadata(path)
+            Dashboard._snapshots_metadata(path)
             # Exercise the binary HTTP-response path; the IOBuffer take! →
             # write(::TCPSocket, ::Vector{UInt8}) chain has its own specialisations.
             iob = IOBuffer()
