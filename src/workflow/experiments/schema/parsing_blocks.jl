@@ -304,12 +304,6 @@ function _parse_gs_ddi(ddi_d, inter, atom)
     (enabled, c_dd, secular, q2d, lz)
 end
 
-"""Parse constant zeeman params from a dict {p: ..., q: ...}."""
-function _parse_constant_zeeman(z)
-    z isa Dict || return ZeemanParams(0.0, 0.0)
-    ZeemanParams(_zeeman_scalar(get(z, "p", 0.0)), _zeeman_scalar(get(z, "q", 0.0)))
-end
-
 """
 Parse zeeman from pipeline params. Supports:
   - {p: 0.5, q: 0.0}                     -> constant ZeemanParams
