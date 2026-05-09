@@ -1,5 +1,7 @@
 # --- Run Registry: resumable YAML-driven experiments ---
-#
+
+export run_yaml, run_status, list_runs, compute_run_dir
+
 # Directory-per-run design: 1 config.yaml ↔ 1 directory containing one
 # self-contained JLD2 per scan point. Re-running the same YAML skips files
 # that already exist; deleting a single jld2 forces that point to recompute.

@@ -1,5 +1,7 @@
 # --- Phase 5 #65: Faraday image fit driver ----------------------------
-#
+
+export load_target_faraday, fit_faraday_param
+
 # Fit a single scalar parameter (c_1, c_dd, p, q, …) by minimising L²
 # residual between a simulated Faraday image and a loaded target. Uses
 # golden-section search + parabolic refinement — real fit, no

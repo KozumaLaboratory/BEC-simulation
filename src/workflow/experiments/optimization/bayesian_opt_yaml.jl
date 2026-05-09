@@ -1,3 +1,6 @@
+export bayesian_optimize_yaml, multi_fidelity_optimize_yaml
+export bo_objective_max_m_transfer, bo_objective_max_lz, bo_objective_min_energy
+
 """
 Bayesian optimization wired through the YAML pipeline interface.
 

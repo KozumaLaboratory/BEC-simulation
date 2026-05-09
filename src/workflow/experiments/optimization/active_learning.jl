@@ -1,5 +1,8 @@
 # --- Active learning for phase-boundary scan (R36, 2026-05-02) ---
-#
+
+export active_learn_phase_scan, active_learn_phase_scan_yaml
+export phase_entropy_uncertainty, default_phase_classifier_extractor
+
 # Reuses the existing `classify_phase_distance` output (a list of phase
 # candidates each with a "distance from canonical reference state") to
 # build a *scalar* uncertainty proxy: the Shannon entropy of the

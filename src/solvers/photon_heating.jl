@@ -1,5 +1,7 @@
 # --- P4.6: Photon-scattering heating ---
-#
+
+export apply_photon_scattering!, photon_scattering_callback
+
 # Phase-diffusion noise model: spontaneous photon scattering during imaging
 # or during red-detuned trap illumination adds random phase kicks to each
 # grid point. Equivalent to the low-temperature / thermal-free limit of

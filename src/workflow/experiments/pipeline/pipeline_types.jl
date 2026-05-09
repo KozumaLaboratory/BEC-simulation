@@ -1,5 +1,7 @@
 # --- Pipeline step types ---
 
+export PipelineConfig
+
 struct GroundStateStep
     params::Dict{String, Any}    # raw YAML dict for this step
 end

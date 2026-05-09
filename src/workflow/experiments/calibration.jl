@@ -1,5 +1,11 @@
 # --- Lab calibration layer (Phase 5.3 / Scenario #66) ---
-#
+
+export CalibrationSet, CoilCalibration, FORTCalibration, RabiCalibration
+export DEFAULT_CALIBRATION, load_calibration, apply_calibration!, run_yaml_calibrated
+export coil_mv_to_gauss, fort_mw_to_trap_hz, rabi_mw_to_rad_s
+export CalibrationHistory, load_calibration_history, load_calibration_csv,
+    interpolate_calibration
+
 # Translates lab-hardware units (mV on a coil driver, mW of FORT / microwave
 # power) into fields the existing pipeline parser already understands — i.e.
 # Unitful-tagged strings like `"1.08 Gauss"` or `"180 Hz"`. Downstream

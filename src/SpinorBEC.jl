@@ -324,31 +324,13 @@ include("solvers/binary_simulation.jl")
 # LiveMonitor): exported at definition sites under src/workflow/io/
 # and src/workflow/monitoring/.
 
-# Pipeline API
-export parse_pipeline, run_pipeline, PipelineConfig
-export sta_counter_diabatic_q_quench, build_sta_zeeman
-export feshbach_ramp, feshbach_c0_wf
-export apply_projected_gp!, projected_gp_callback
-export apply_photon_scattering!, photon_scattering_callback
-export apply_sgpe_step!, sgpe_callback
+# Pipeline API + STA + Feshbach + SGPE/PGP/photon-scattering callbacks +
+# YAML config + run registry + summaries + Bayesian / multi-fidelity opt +
+# active-learning + calibration: all exported at definition sites under
+# src/workflow/experiments/ and src/solvers/.
+
+# CUDA Graph hooks (defined at top-level, replayed by SpinorBECCUDAExt).
 export split_step_captured!, invalidate_split_step_graph!
-export load_config, load_config_from_string, run_config
-export run_yaml, run_status, list_runs, compute_run_dir
-export print_run_summary, compare_runs, generate_html_report
-export load_target_faraday, fit_faraday_param
-export bayesian_optimize, gp_predict, expected_improvement
-export multi_fidelity_optimize_2tier, MultiFidelityBOResult
-export bayesian_optimize_yaml, multi_fidelity_optimize_yaml,
-    bo_objective_max_m_transfer, bo_objective_max_lz, bo_objective_min_energy
-export active_learn_phase_scan,
-    active_learn_phase_scan_yaml,
-    phase_entropy_uncertainty, default_phase_classifier_extractor
-export CalibrationSet, CoilCalibration, FORTCalibration, RabiCalibration
-export DEFAULT_CALIBRATION, load_calibration, apply_calibration!, run_yaml_calibrated
-export coil_mv_to_gauss, fort_mw_to_trap_hz, rabi_mw_to_rad_s
-export CalibrationHistory, load_calibration_history, load_calibration_csv,
-    interpolate_calibration
-export sample_trap_drift_omegas, trap_drift_waveforms, apply_trap_drift
 export BinaryCouplings, BinaryState, find_binary_ground_state,
     is_immiscible, droplet_regime_petrov,
     binary_overlap, binary_separation_radius,

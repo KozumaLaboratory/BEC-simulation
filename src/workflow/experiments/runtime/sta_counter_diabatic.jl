@@ -1,5 +1,7 @@
 # --- P2.4: Shortcut-to-adiabaticity (STA) counter-diabatic driving ---
-#
+
+export sta_counter_diabatic_q_quench, build_sta_zeeman
+
 # For a two-level quadratic-Zeeman quench (F=1 polar → AFM at q=0), the
 # Berry-Uhlmann counter-diabatic (CD) term can be written in closed form as an
 # effective transverse field:

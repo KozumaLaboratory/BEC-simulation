@@ -1,5 +1,7 @@
 # --- P4.4: Projected / truncated-Wigner momentum cutoff ---
-#
+
+export apply_projected_gp!, projected_gp_callback
+
 # Projected GP (PGP) suppresses all Fourier modes above a cutoff `k_cut`
 # after each split-step iteration. Used both as a numerical regulariser
 # (removes high-k aliasing from nonlinear terms) and as a physical model

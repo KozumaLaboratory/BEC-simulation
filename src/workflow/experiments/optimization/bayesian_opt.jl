@@ -1,5 +1,7 @@
 # --- Phase 4 #61: real GP + Expected-Improvement Bayesian optimisation ---
-#
+
+export bayesian_optimize, gp_predict, expected_improvement
+
 # Hand-rolled — no extra deps. Adequate for 1-3D parameter spaces with
 # ~50-200 evaluations, which covers most SpinorBEC scan-replacement use
 # cases (e.g. locating the supersolid critical point in (p, q)).

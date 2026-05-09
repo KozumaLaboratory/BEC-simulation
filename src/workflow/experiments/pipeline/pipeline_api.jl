@@ -1,5 +1,7 @@
 # --- Public pipeline API ---
 
+export load_config, load_config_from_string, run_config
+
 """Load a YAML file and return a PipelineConfig.
 
 Sets `ENV["SPINORBEC_YAML_DIR"]` to the YAML's directory while parsing so

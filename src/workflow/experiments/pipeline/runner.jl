@@ -1,5 +1,7 @@
 # --- Pipeline parser & runner ---
 
+export parse_pipeline, run_pipeline
+
 function parse_pipeline(data::Dict)
     pipe_data = data["pipeline"]
     (pipe_data isa AbstractVector && !isempty(pipe_data)) ||

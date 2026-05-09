@@ -1,5 +1,7 @@
 # --- P4.3: SGPE — Stochastic Projected Gross-Pitaevskii ---
-#
+
+export apply_sgpe_step!, sgpe_callback
+
 # Finite-temperature classical-field formulation. The full Hamiltonian step
 # is already provided by the unitary split-step; SGPE adds
 #

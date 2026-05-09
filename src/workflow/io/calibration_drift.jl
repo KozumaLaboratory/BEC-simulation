@@ -1,5 +1,7 @@
 # --- Trap drift correction (Phase 4/5 #68) ---
-#
+
+export sample_trap_drift_omegas, trap_drift_waveforms, apply_trap_drift
+
 # Layered on top of CalibrationHistory (workflow/experiments/calibration.jl):
 # converts week-to-week FORT-power-to-trap-frequency drift into a vector of
 # trap frequencies as a function of simulation time, so a long run can

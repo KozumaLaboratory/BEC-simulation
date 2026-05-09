@@ -1,5 +1,7 @@
 # --- Multi-fidelity Bayesian optimisation (R33, 2026-05-02) ---
-#
+
+export multi_fidelity_optimize_2tier, MultiFidelityBOResult
+
 # Two-tier MFBO via Forrester-style discrepancy modelling. We have:
 #   - `eval_low(p)`  : cheap (low-resolution / few-step) surrogate.
 #   - `eval_high(p)` : expensive (production-grade) objective.

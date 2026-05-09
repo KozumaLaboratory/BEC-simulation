@@ -1,5 +1,7 @@
 # --- P2.10: Feshbach-resonance ramp builder ---
-#
+
+export feshbach_ramp, feshbach_c0_wf
+
 # Scattering length as a function of magnetic field near an s-wave Feshbach
 # resonance (for a spinor BEC, c0 ∝ a_s at leading order):
 #
