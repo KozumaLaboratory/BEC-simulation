@@ -27,7 +27,9 @@ let
         @benchmarkable SpinorBEC.split_step!($ws)
 end
 
-# 2. find_ground_state on a tiny grid
+# 2. find_ground_state on a tiny grid. verbose=false so the bench
+# measures the actual ITP loop rather than 50 println()/flush(stdout)
+# calls per sample (those dominate at this size, hiding kernel work).
 let
     grid = make_grid(GridConfig((16, 16), (6.0, 6.0)))
     SUITE["find_ground_state/rb87_16sq"] = @benchmarkable find_ground_state(;
@@ -37,6 +39,7 @@ let
         zeeman = ZeemanParams(0.0, 0.1),
         dt = 0.01, n_steps = 50, tol = 1e-4,
         initial_state = :ferromagnetic,
+        verbose = false,
     )
 end
 
@@ -189,11 +192,14 @@ let
         V_trap[I] = 0.5 * (x*x + y*y + z*z)
     end
     # Klaus-like setup: nonzero c_dd so apply_ddi_step! runs (not skipped),
-    # nonzero theta so rotations exercise the SU(D) matmul (not identity).
+    # nonzero theta AND phi so _apply_UB! exercises both Fy and Fz rotations
+    # (production stir trajectory: φ(t) precesses round B̂). Earlier configs
+    # with phi=0 hid the second rotation behind the apply_uniform_spin_rotation
+    # zero-angle guard, masking the gemm cost.
     ws_rb = SpinorBEC.make_rotating_basis_ws(
         grid, 6, V_trap;
         p = 100.0, q = 0.0, c0 = 50.0, c1 = 0.0, c_dd = 100.0,
-        theta_func = (_t) -> 0.3, phi_func = (_t) -> 0.0,
+        theta_func = (_t) -> 0.3, phi_func = (_t) -> 0.7,
         theta_dot_func = (_t) -> 0.05, phi_dot_func = (_t) -> 0.5,
         gauge_fix = false,
     )

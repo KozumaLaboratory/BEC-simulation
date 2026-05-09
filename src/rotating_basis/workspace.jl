@@ -108,7 +108,8 @@ struct RotatingBasisWS{T <: AbstractFloat, N, D,
     AR <: AbstractArray, ARK <: AbstractArray,
     FP, IP, DB <: DDIBuffers,
     BACK <: AbstractBackend,
-    TF, PF, TDF, PDF}
+    TF, PF, TDF, PDF,
+    SM}
     # State (rotating basis): ψ̃[r..., m] — concrete eltype Complex{T}
     psi_tilde::AC
     # Scratch: ψ in lab basis (only populated during DDI step)
@@ -131,7 +132,12 @@ struct RotatingBasisWS{T <: AbstractFloat, N, D,
     xspace_phase_buf::AC1
 
     grid::Grid{N, T}
-    spin_matrices::SpinMatrices{D}
+    # NOTE: typed as `::SM` (concrete `SpinMatrices{D, M}`) rather than
+    # `::SpinMatrices{D}`. The latter leaves `M <: SMatrix` abstract, which
+    # makes `Fz[i, j]` flow through dynamic dispatch — measured at ~500
+    # allocs / 19 KB per `apply_local_spin_step!` just from the diagonal
+    # `Hz[i, j] = -p * Fz[i, j]` initialisation loop alone.
+    spin_matrices::SM
 
     # FFT plans (in-place on spatial_buf)
     fft_fwd::FP
@@ -244,7 +250,8 @@ function make_rotating_basis_ws(
         typeof(psi_tilde), typeof(spatial_buf), typeof(rho_buf), typeof(V_trap_dev),
         typeof(fft_fwd), typeof(fft_inv), typeof(ddi_bufs), typeof(backend),
         typeof(theta_func), typeof(phi_func),
-        typeof(theta_dot_func), typeof(phi_dot_func)}(
+        typeof(theta_dot_func), typeof(phi_dot_func),
+        typeof(sm)}(
         psi_tilde, psi_lab_buf, rotation_scratch, spatial_buf, rho_buf,
         kspace_phase_buf, xspace_phase_buf,
         grid, sm,

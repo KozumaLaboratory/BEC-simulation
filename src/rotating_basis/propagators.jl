@@ -17,21 +17,24 @@ function _apply_UB!(
     psi::AbstractArray{<:Complex}, sm::SpinMatrices{D}, theta::T, phi::T, ndim::Int;
     inverse::Bool=false, scratch=nothing,
 ) where {T, D}
-    # apply_uniform_spin_rotation! takes Float64 angles for performance
-    # (avoids F32 specialization of its inner D×D rotation matrix builder).
-    # The conversion here is per-call scalar work — no array involvement —
-    # so F32 workspaces stay F32 in the per-voxel matmul.
+    # Compose the two spin-only rotations into a single D×D unitary, then
+    # apply it via one gemm against the spin axis of psi. The previous code
+    # path (two sequential apply_uniform_spin_rotation! calls) cost two
+    # gemms over the full spatial × D array — at 16³ × D=13 each gemm is
+    # ~280 μs, so this folds 4 gemms into 2 inside apply_ddi_step_rotating!.
+    # angles converted to Float64 — D×D builder + composition stays on the
+    # host; per-voxel gemm uses workspace eltype.
     θ = Float64(theta)
     φ = Float64(phi)
-    if !inverse
-        # ψ_lab = exp(-iφ F_z) exp(-iθ F_y) ψ̃
-        apply_uniform_spin_rotation!(psi, sm, 0.0, θ, 0.0, 1.0, ndim; scratch)
-        apply_uniform_spin_rotation!(psi, sm, 0.0, 0.0, φ, 1.0, ndim; scratch)
-    else
-        # ψ̃ = exp(+iθ F_y) exp(+iφ F_z) ψ_lab — same calls with negated angles in reverse order
-        apply_uniform_spin_rotation!(psi, sm, 0.0, 0.0, -φ, 1.0, ndim; scratch)
-        apply_uniform_spin_rotation!(psi, sm, 0.0, -θ, 0.0, 1.0, ndim; scratch)
-    end
+    abs(θ) + abs(φ) < 1e-30 && return nothing
+
+    sgn = inverse ? -1.0 : 1.0
+    R_y = _compute_uniform_rotation_matrix(sm, 0.0, sgn * θ, 0.0, 1.0, false)
+    R_z = _compute_uniform_rotation_matrix(sm, 0.0, 0.0, sgn * φ, 1.0, false)
+    # Forward (sgn=+1): ψ_lab = exp(-iφ F_z) · exp(-iθ F_y) · ψ̃ → R_z * R_y
+    # Inverse (sgn=-1): ψ̃ = exp(+iθ F_y) · exp(+iφ F_z) · ψ_lab → R_y * R_z
+    R_combined = inverse ? R_y * R_z : R_z * R_y
+    _apply_rotation_to_spin_axis!(psi, R_combined, ndim; scratch=scratch)
     nothing
 end
 
