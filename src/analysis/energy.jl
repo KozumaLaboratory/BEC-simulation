@@ -172,10 +172,19 @@ function _zeeman_energy(psi, zeeman, sys, n_comp, ndim, n_pts, dV)
 end
 
 function _density_interaction_energy(psi, c0, n_comp, ndim, n_pts, dV)
-    n = total_density(psi, ndim)
-    # `n .^ 2` materialises an n_pts-sized array; map-square + sum keeps
-    # the reduction allocation-free (~32 KB saved per call at 16³).
-    0.5 * c0 * sum(x -> x * x, n) * dV
+    # Fuse density build + square-sum into one pass — avoids the
+    # n_pts-sized temporary that `total_density` materialises (~2.3 KB
+    # per call at 16² which is the bulk of `energy_decomposition`'s
+    # per-call alloc on small grids).
+    s = 0.0
+    @inbounds for I in CartesianIndices(n_pts)
+        nI = 0.0
+        for c in 1:n_comp
+            nI += abs2(psi[I, c])
+        end
+        s += nI * nI
+    end
+    0.5 * c0 * s * dV
 end
 
 """
