@@ -1,3 +1,5 @@
+export estimate_run_budget
+
 """
     estimate_run_budget(yaml_path::AbstractString) -> BudgetReport
 

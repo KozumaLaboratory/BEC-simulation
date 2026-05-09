@@ -319,14 +319,10 @@ include("solvers/binary_simulation.jl")
 # all exported at definition sites under src/solvers/ and
 # src/workflow/initialization/.
 
-export LiveMonitor
-
-# I/O
-export save_state, load_state, generate_dashboard_data, export_dashboard, serve_dashboard
-export RunMetadata, load_run_metadata
-export save_rotating_basis_result!
-export estimate_run_budget
-export export_vtk, export_vtk_series
+# I/O (save_state/load_state, dashboard data + server, run summaries,
+# HTML report, budget, VTK export, rotating-basis result writer,
+# LiveMonitor): exported at definition sites under src/workflow/io/
+# and src/workflow/monitoring/.
 
 # Pipeline API
 export parse_pipeline, run_pipeline, PipelineConfig

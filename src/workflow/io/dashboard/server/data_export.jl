@@ -2,6 +2,8 @@
 #
 # Extracted from dashboard.jl in the 2026-05-09 refactor.
 
+export generate_dashboard_data, export_dashboard
+
 # --- Dashboard data extraction ---
 
 """

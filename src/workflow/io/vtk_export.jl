@@ -3,6 +3,8 @@
 # `export` and method-resolution succeed without WriteVTK in the user's
 # environment.
 
+export export_vtk, export_vtk_series
+
 """
     export_vtk(psi, grid; output, fields, atom) -> String
     export_vtk(ws::Workspace; kwargs...)        -> String

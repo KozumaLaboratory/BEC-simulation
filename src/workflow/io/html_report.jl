@@ -1,5 +1,7 @@
 # --- Per-run HTML archival report ---
-#
+
+export generate_html_report
+
 # Generate a self-contained static HTML page summarising a completed
 # run (or scan dir). No JS required to read it; embedded base64 PNGs
 # for the energy curve + first/last density snapshot. Pairs with

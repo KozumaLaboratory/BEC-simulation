@@ -1,5 +1,7 @@
 # Real-time simulation monitoring
 
+export LiveMonitor
+
 using JSON
 
 """

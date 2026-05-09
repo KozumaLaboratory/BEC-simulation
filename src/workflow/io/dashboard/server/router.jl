@@ -1,5 +1,7 @@
 # Dashboard HTTP server core (Sockets-based, no HTTP.jl dep)
 
+export serve_dashboard
+
 # --- Dashboard server (stdlib Sockets only, no HTTP.jl needed) ---
 
 const _REPO_ROOT = normpath(joinpath(@__DIR__, "..", "..", ".."))

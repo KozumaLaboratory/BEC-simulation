@@ -3,6 +3,8 @@
 # Trilinear upsampling kernel + run-metadata readers.
 # Extracted from dashboard/compute.jl in the 2026-05-09 refactor.
 
+export RunMetadata, load_run_metadata
+
 function _trilinear_upsample(data::Array{Float64, 3}, target_n::Int)
     nx, ny, nz = size(data)
     out = Array{Float64, 3}(undef, target_n, target_n, target_n)

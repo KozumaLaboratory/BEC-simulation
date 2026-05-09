@@ -1,3 +1,5 @@
+export save_state, load_state
+
 function save_state(filename::String, ws::Workspace)
     c_dd = if ws.ddi !== nothing
         ws.ddi.C_dd

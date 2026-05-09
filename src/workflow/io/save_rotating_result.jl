@@ -1,3 +1,5 @@
+export save_rotating_basis_result!
+
 """
 Concatenate consecutive rotating_basis phases (GS → tilt ramp → chirp →
 steady stir) into a single timeseries dict. Each phase's `:times` is

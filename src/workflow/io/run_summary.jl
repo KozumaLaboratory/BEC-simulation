@@ -1,5 +1,7 @@
 # --- Per-run summary helpers ---
-#
+
+export print_run_summary, compare_runs
+
 # Quick text summaries of completed runs (no plotting). Counterpart to
 # the JSON dashboard data; useful for terminal review without spinning
 # up the dashboard server.
