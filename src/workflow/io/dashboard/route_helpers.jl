@@ -45,27 +45,35 @@ end
 #
 # All accept signed integers; flags follow `key=1` convention.
 
+"""
+Anchor pattern so `key` must start a query parameter (begin-of-string or
+just after `&`). Without the anchor, asking for `key="ab"` on a query
+like `"cab=1&ab=2"` matches the embedded `ab=1` inside `cab=1` and
+returns the wrong value.
+"""
+_q_anchor(key::AbstractString) = "(?:^|&)" * key * "="
+
 function _q_int(query::AbstractString, key::AbstractString, default::Int)
-    m = match(Regex("$(key)=(-?\\d+)"), query)
+    m = match(Regex(_q_anchor(key) * "(-?\\d+)"), query)
     m === nothing ? default : parse(Int, m.captures[1])
 end
 
 function _q_int_opt(query::AbstractString, key::AbstractString)
-    m = match(Regex("$(key)=(-?\\d+)"), query)
+    m = match(Regex(_q_anchor(key) * "(-?\\d+)"), query)
     m === nothing ? nothing : parse(Int, m.captures[1])
 end
 
 function _q_float(query::AbstractString, key::AbstractString, default::Float64)
-    m = match(Regex("$(key)=([0-9.eE+-]+)"), query)
+    m = match(Regex(_q_anchor(key) * "([0-9.eE+-]+)"), query)
     m === nothing ? default : parse(Float64, m.captures[1])
 end
 
 function _q_flag(query::AbstractString, key::AbstractString)::Bool
-    occursin("$(key)=1", query)
+    occursin(Regex(_q_anchor(key) * "1(?:\$|&)"), query)
 end
 
 function _q_sym(query::AbstractString, key::AbstractString, default::Symbol)
-    m = match(Regex("$(key)=(\\w+)"), query)
+    m = match(Regex(_q_anchor(key) * "(\\w+)"), query)
     m === nothing ? default : Symbol(m.captures[1])
 end
 

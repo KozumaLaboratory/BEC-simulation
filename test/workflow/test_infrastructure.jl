@@ -382,6 +382,26 @@ const _SKIP_HEAVY_YAML_INFRA =
         @test zee isa ZeemanParams
     end
 
+    @testset "dashboard _q_* extractors require anchored key (regression)" begin
+        # Bug: prior to anchoring the regex, `_q_int(query, "ab", 0)`
+        # matched the embedded `ab=1` inside `cab=1`, returning 1 instead
+        # of the intended default. Same shape for _q_float / _q_sym /
+        # _q_int_opt / _q_flag.
+        Q = SpinorBEC.Dashboard
+        # No `ab=…` parameter — only an unrelated `cab=…`.
+        @test Q._q_int("cab=1", "ab", 0) == 0
+        @test Q._q_float("xab=2.5", "ab", 0.0) == 0.0
+        @test Q._q_int_opt("cab=7", "ab") === nothing
+        @test Q._q_sym("xab=ferro", "ab", :default) === :default
+        @test Q._q_flag("zab=1", "ab") === false
+
+        # When the key actually appears as a parameter we still match.
+        @test Q._q_int("ab=42", "ab", 0) == 42
+        @test Q._q_int("cab=1&ab=42", "ab", 0) == 42
+        @test Q._q_flag("ab=1", "ab") === true
+        @test Q._q_flag("xab=1&ab=1", "ab") === true
+    end
+
     @testset "_parse_zeeman handles transverse bx/by (regression)" begin
         # Bug: prior to the fix, _parse_zeeman only saw `p`/`q` and silently
         # dropped any `bx`/`by` keys. That broke (1) the GS path, where
