@@ -45,8 +45,22 @@ include("cuda_graph_stubs.jl")
 include("workflow/experiments/pipeline/pipeline_api.jl")
 include("workflow/experiments/pipeline/pipeline_continuation.jl")
 include("workflow/experiments/pipeline/run_registry.jl")
-include("workflow/experiments/calibration.jl")
-include("workflow/io/calibration_drift.jl")
+
+# Calibration subsystem (real submodule, 2 files: core + drift).
+include("workflow/experiments/calibration.jl")  # `module Calibration`
+using .Calibration:
+    CalibrationSet, CoilCalibration, FORTCalibration, RabiCalibration,
+    DEFAULT_CALIBRATION, load_calibration, apply_calibration!, run_yaml_calibrated,
+    coil_mv_to_gauss, fort_mw_to_trap_hz, rabi_mw_to_rad_s,
+    CalibrationHistory, load_calibration_history, load_calibration_csv,
+    interpolate_calibration,
+    sample_trap_drift_omegas, trap_drift_waveforms, apply_trap_drift
+export CalibrationSet, CoilCalibration, FORTCalibration, RabiCalibration
+export DEFAULT_CALIBRATION, load_calibration, apply_calibration!, run_yaml_calibrated
+export coil_mv_to_gauss, fort_mw_to_trap_hz, rabi_mw_to_rad_s
+export CalibrationHistory, load_calibration_history, load_calibration_csv
+export interpolate_calibration
+export sample_trap_drift_omegas, trap_drift_waveforms, apply_trap_drift
 
 # ========================================
 # ANALYSIS: Observables & diagnostics
