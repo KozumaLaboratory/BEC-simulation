@@ -65,16 +65,16 @@ include("hamiltonian/interactions/ddi/convolution.jl") # DDIParams + buffers + 6
 include("hamiltonian/interactions/ddi/rotation.jl")    # Euler 5-stage spinor rotation
 include("hamiltonian/interactions/ddi.jl")             # apply_ddi_step! entry point
 include("hamiltonian/interactions/ddi_padded.jl")
-include("hamiltonian/interactions/phi_one_reg.jl")        # Petrov-regularised universal LHY function
-include("hamiltonian/interactions/polar_contact_lhy.jl")  # F-generic polar contact LHY closed form
-include("hamiltonian/interactions/polar_dipolar_lhy.jl")  # polar contact + DDI extension
-include("hamiltonian/interactions/fm_contact_lhy.jl")     # FM-phase contact LHY (F=6)
-include("hamiltonian/interactions/fm_dipolar_lhy.jl")     # FM contact + Lima-Pelster Q_5 DDI dressing
-include("hamiltonian/interactions/icosahedral_lhy.jl")    # F=6 icosahedral (I_h) closed-form contact LHY
-include("hamiltonian/interactions/lhy_modes_round45.jl")   # 5 standalone closed forms (F=2 BN, F=3 octa, F=4 cube, F=8 octa, F=10 dodec)
+include("hamiltonian/interactions/lhy/phi_one_reg.jl")        # Petrov-regularised universal LHY function
+include("hamiltonian/interactions/lhy/polar_contact.jl")  # F-generic polar contact LHY closed form
+include("hamiltonian/interactions/lhy/polar_dipolar.jl")  # polar contact + DDI extension
+include("hamiltonian/interactions/lhy/fm_contact.jl")     # FM-phase contact LHY (F=6)
+include("hamiltonian/interactions/lhy/fm_dipolar.jl")     # FM contact + Lima-Pelster Q_5 DDI dressing
+include("hamiltonian/interactions/lhy/icosahedral.jl")    # F=6 icosahedral (I_h) closed-form contact LHY
+include("hamiltonian/interactions/lhy/modes_round45.jl")   # 5 standalone closed forms (F=2 BN, F=3 octa, F=4 cube, F=8 octa, F=10 dodec)
 include("dynamics/sinatra_helpers.jl")                     # TWA validity helpers (healing length, k-cutoff)
 include("dynamics/utils_resolution_sinatra.jl")            # suggest_grid + sinatra_check (Round-7 utilities)
-include("hamiltonian/interactions/lhy.jl")
+include("hamiltonian/interactions/lhy/dispatch.jl")
 include("hamiltonian/interactions/losses.jl")
 include("hamiltonian/interactions/absorbing_boundary.jl")
 
