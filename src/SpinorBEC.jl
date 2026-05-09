@@ -22,134 +22,17 @@ using Sockets
 
 const TIMER = TimerOutput()
 
-# ========================================
-# FOUNDATION: Core types, math, backend
-# ========================================
-
-# 1. Type definitions (must be first). Files load in dependency order:
-# Waveform → Grid → AbstractPotential → spin/atom → interactions+Zeeman →
-# SimParams/SimState/FFT → DDI/Loss → integrator → Workspace → results/scan.
-# (Topical structs split out 2026-05-02; the old `foundation/types.jl`
-# umbrella stub was removed in the 2026-05-09 refactor.)
-include("foundation/waveform.jl")
-include("foundation/types/grid.jl")              # AbstractBackend, GridConfig, Grid, GridF64
-include("foundation/types/potentials.jl")        # AbstractPotential + 12 trap / beam / lattice / gradient subtypes
-include("foundation/types/spin_atom.jl")         # SpinSystem, SpinMatrices, AtomSpecies
-include("foundation/types/interactions_zeeman.jl") # InteractionParams, ZeemanParams, TimeDependent*, Raman, accessors
-include("foundation/types/sim_fft.jl")           # SimParams, SimState, FFTPlans, RFFT, BatchedKineticCache, CoriolisCache, AbsorbingBoundary
-include("foundation/types/ddi_loss.jl")          # DDIParams, DDIBuffers, DDIPaddedContext, LossParams, LightShift, TensorInteractionCache
-include("foundation/types/integrator.jl")        # AdaptiveDtParams, IntegratorConfig, SimulationResult, TWAConfig, EnsembleResult
-include("foundation/types/workspace.jl")         # Workspace + workspace_T (depends on everything above)
-include("foundation/types/results.jl")           # TOFParams, BdGResult, InstabilityMap, RotonParams, etc
-include("foundation/types/scan.jl")              # OverrideScan, ConstrainedJzScan, ITPCheckpoint
-
-# 2. Mathematical foundation
-include("foundation/grid.jl")
-include("foundation/fft_utils.jl")
-include("foundation/backend.jl")
-include("foundation/spin_matrices.jl")
-include("foundation/spinor_utils.jl")
-include("foundation/clebsch_gordan.jl")
-include("foundation/spherical_harmonics.jl")
-
-# ========================================
-# HAMILTONIAN: Interactions & Potentials
-# ========================================
-
-# 3. Interactions
-include("hamiltonian/interactions/interactions.jl")
-include("hamiltonian/interactions/spin_mixing.jl")
-include("hamiltonian/interactions/nematic.jl")
-include("hamiltonian/interactions/tensor_interaction.jl")
-include("hamiltonian/interactions/ddi/qtensor.jl")     # k-space + quasi-2D Q-tensor builders
-include("hamiltonian/interactions/ddi/convolution.jl") # DDIParams + buffers + 6-FFT convolution
-include("hamiltonian/interactions/ddi/rotation.jl")    # Euler 5-stage spinor rotation
-include("hamiltonian/interactions/ddi.jl")             # apply_ddi_step! entry point
-include("hamiltonian/interactions/ddi_padded.jl")
-include("hamiltonian/interactions/lhy/phi_one_reg.jl")        # Petrov-regularised universal LHY function
-include("hamiltonian/interactions/lhy/polar_contact.jl")  # F-generic polar contact LHY closed form
-include("hamiltonian/interactions/lhy/polar_dipolar.jl")  # polar contact + DDI extension
-include("hamiltonian/interactions/lhy/fm_contact.jl")     # FM-phase contact LHY (F=6)
-include("hamiltonian/interactions/lhy/fm_dipolar.jl")     # FM contact + Lima-Pelster Q_5 DDI dressing
-include("hamiltonian/interactions/lhy/icosahedral.jl")    # F=6 icosahedral (I_h) closed-form contact LHY
-include("hamiltonian/interactions/lhy/modes_round45.jl")   # 5 standalone closed forms (F=2 BN, F=3 octa, F=4 cube, F=8 octa, F=10 dodec)
-include("dynamics/sinatra_helpers.jl")                     # TWA validity helpers (healing length, k-cutoff)
-include("dynamics/utils_resolution_sinatra.jl")            # suggest_grid + sinatra_check (Round-7 utilities)
-include("hamiltonian/interactions/lhy/dispatch.jl")
-include("hamiltonian/interactions/losses.jl")
-include("hamiltonian/interactions/absorbing_boundary.jl")
-
-# 4. Potentials
-include("hamiltonian/potentials/potentials.jl")
-include("hamiltonian/potentials/zeeman.jl")
-include("hamiltonian/potentials/raman.jl")
-include("hamiltonian/potentials/optics.jl")  # Must be before laser_potential (defines OpticalBeam)
-include("hamiltonian/potentials/laser_potential.jl")
-include("hamiltonian/potentials/optical_trap.jl")
-include("hamiltonian/potentials/light_shift.jl")
-
-# 5. Propagators
-include("hamiltonian/integrator/propagators.jl")          # kinetic/potential primitives
-include("hamiltonian/integrator/yoshida.jl")              # adaptive Yoshida driver
-include("hamiltonian/integrator/split_step_kernels.jl")    # _apply_coriolis_step!, _apply_1d_shear_batch!, _apply_ddi_step_gpu!
-include("hamiltonian/integrator/split_step.jl")            # split_step! + half-potential dispatcher
-include("hamiltonian/integrator/split_step_composers.jl")  # Yoshida/Suzuki/Blanes-Moan/Omelyan + core composers
+include("foundation.jl")    # types + math primitives + backends
+include("hamiltonian.jl")   # interactions + potentials + integrators
 
 # ========================================
 # WORKFLOW: Initialization, I/O, monitoring, experiments
 # ========================================
 
-# 6. Units (needed by atoms.jl and others)
-include("workflow/io/units.jl")
-
-# 7. Initialization
-include("workflow/initialization/atoms.jl")
-include("workflow/initialization/state_dispatch.jl")    # init_psi + small helpers
-include("workflow/initialization/make_workspace.jl")    # make_workspace + _rebuild_workspace
-include("workflow/initialization/thomas_fermi.jl")
-include("workflow/initialization/state_zoo.jl")
-include("foundation/binary_state.jl")
-include("workflow/initialization/thermal_noise.jl")
-include("workflow/initialization/vacuum_noise.jl")
-
-# 8. I/O
-include("workflow/io/io.jl")
-include("workflow/io/unitful_support.jl")
-include("workflow/io/save_rotating_result.jl")
-include("workflow/io/dashboard/encoding.jl")      # bitshuffle + zstd
-include("workflow/io/dashboard/cache.jl")         # PSI_CACHE, JLD handle pool, atlas disk cache
-include("workflow/io/dashboard/snapshots.jl")     # _load_psi_cached + sibling result.jld2 redirect
-include("workflow/io/dashboard/route_helpers.jl") # _parse_run_file / _parse_run_only / _q_int / _q_float / _q_flag / _q_sym
-include("workflow/io/dashboard/routes/density.jl")    # density2d/3d/_bin/_max/_atlas/_rotated handlers (8)
-include("workflow/io/dashboard/routes/phase.jl")      # phase2d/_bin/3d_bin handlers (3)
-include("workflow/io/dashboard/routes/vortex.jl")     # vortex_lines + vorticity3d_bin (2)
-include("workflow/io/dashboard/routes/scan.jl")       # scan_group/_status, physics_summary, synthetic_dispersion (4)
-include("workflow/io/dashboard/routes/snapshots.jl")  # snapshots, dynamics_series, ensemble (3)
-include("workflow/io/dashboard/routes/lab_live.jl")   # lab_list, live_list, live (3)
-include("workflow/io/dashboard/routes/misc.jl")       # data, coherence, vector3d_bin (3)
-include("workflow/io/dashboard/server/json.jl")      # _write_json + _json_string (must precede routes that build JSON)
-include("workflow/io/dashboard/server/data_export.jl") # generate_dashboard_data + export_dashboard
-include("workflow/io/dashboard/server/router.jl")    # serve_dashboard + _route_dashboard
-include("workflow/io/dashboard/server/static.jl")    # static asset + HTTP response helpers
-include("workflow/io/dashboard/websocket.jl")     # WS handshake + frames + serve
-include("workflow/io/dashboard/compute/helpers.jl")  # trilinear upsample + run metadata
-include("workflow/io/dashboard/compute/density.jl")  # 3D + column density compute
-include("workflow/io/dashboard/compute/phase.jl")    # phase slice compute
-include("workflow/io/dashboard/compute/binary.jl")   # binary packers (density/atlas/phase)
-include("workflow/io/dashboard/pack3d.jl")        # 3D density/vortex/phase/vector binary packers
-include("workflow/io/vtk_export.jl")
-include("workflow/io/run_summary.jl")
-include("workflow/io/html_report.jl")
-include("workflow/io/budget.jl")
-include("workflow/io/scan_summary.jl")
-
-# 9. Monitoring system (needed by solvers)
-include("workflow/monitoring/ascii_plot.jl")
-include("workflow/monitoring/logging.jl")
-include("workflow/monitoring/resource_monitor.jl")
-include("workflow/monitoring/notifications.jl")
-include("workflow/monitoring/progress.jl")
-include("workflow/monitoring/live_monitor.jl")
+include("workflow/io/units.jl")        # Units module (needed by atoms.jl)
+include("workflow/initialization.jl")  # atoms + init_psi + Workspace factory + state zoo
+include("workflow/io.jl")              # save_state + dashboard + VTK + run summary + budget
+include("workflow/monitoring.jl")      # logging + telemetry + LiveMonitor
 
 # 10. Experiments (defines config types needed by phases)
 include("workflow/experiments/runtime/adaptive_advice.jl")
@@ -170,14 +53,7 @@ include("workflow/experiments/schema/builders_potential.jl")       # _build_pote
 include("workflow/experiments/schema/builders_phase.jl")           # waveforms + zeeman + raman builders
 include("workflow/experiments/runtime/zeeman_levels.jl")
 include("workflow/experiments/pipeline/pipeline_types.jl")
-include("workflow/experiments/analyzers/helpers.jl")        # _phase_diff, _line_through_peak, _fwhm_1d, _rms_width_1d, _max_forward_grad
-include("workflow/experiments/analyzers/imaging.jl")        # tomography, faraday, absorption, phase_contrast, sg_tof, momentum_distribution
-include("workflow/experiments/analyzers/phase.jl")          # phase_classify[/distance], energy_decomposition, multipole_order, majorana_order
-include("workflow/experiments/analyzers/topology.jl")       # winding_map, winding_field, monopole_charge, vortex_detect, skyrmion_density, non_abelian_homotopy
-include("workflow/experiments/analyzers/spectroscopy.jl")   # bragg, droplet, correlation_length, defect_density, kibble_zurek_stats, domain_analysis
-include("workflow/experiments/analyzers/stability.jl")      # stability, bogoliubov, bogoliubov_dispersion + _run_bogoliubov_analyzer
-include("workflow/experiments/analyzers/misc.jl")           # summary_json (only analyzer that needs pipeline_results)
-include("workflow/experiments/analyzers/analyzers_large.jl")          # skyrmion_detect, synthetic_dim, bogoliubov_mode, rosensweig_pattern, column_density_movie
+include("workflow/experiments/analyzers.jl")  # 8-file analyzers/ subdir umbrella
 include("workflow/experiments/pipeline/pipeline_analyzers.jl")       # _run_analyzer dispatch (delegates to all the above)
 include("workflow/experiments/pipeline/pipeline_dispatch.jl")    # save_every / b_hat / dt-from-eps / twa / light_shift parsers
 include("workflow/experiments/pipeline/pipeline_callbacks.jl")    # sgpe / projected_gp / photon_scattering / live_monitor callback builders
@@ -192,15 +68,7 @@ include("workflow/experiments/runtime/feshbach_ramp.jl")
 include("solvers/projected_gp.jl")
 include("solvers/photon_heating.jl")
 include("solvers/sgpe.jl")
-# Klaus-regime support (high p, ω_L ≫ trap): rotating-basis (Option γ)
-# + scalar-eGPE adiabatic-elimination alternative. See
-# `src/rotating_basis/README.md` for the public API and when to use.
-include("rotating_basis/workspace.jl")
-include("rotating_basis/propagators.jl")
-include("rotating_basis/integrators.jl")
-include("rotating_basis/analysis.jl")
-include("rotating_basis/analyzers.jl")
-include("rotating_basis/scalar_egpe.jl")
+include("rotating_basis.jl")  # Klaus-regime (rotating-basis + scalar-eGPE) umbrella
 
 include("cuda_graph_stubs.jl")
 
@@ -209,65 +77,19 @@ include("workflow/experiments/pipeline/pipeline_continuation.jl")
 include("workflow/experiments/pipeline/run_registry.jl")
 include("workflow/experiments/calibration.jl")
 include("workflow/io/calibration_drift.jl")
-include("workflow/experiments/optimization/faraday_fit.jl")
-include("workflow/experiments/optimization/bayesian_opt.jl")
-include("workflow/experiments/optimization/bayesian_opt_mf.jl")    # 2-tier multi-fidelity BO
-include("workflow/experiments/optimization/bayesian_opt_yaml.jl")
-include("workflow/experiments/optimization/active_learning.jl")    # entropy-uncertainty AL for phase scan
+include("workflow/experiments/optimization.jl")  # 5-file optimization/ umbrella
 
 # ========================================
 # ANALYSIS: Observables & diagnostics
 # ========================================
 
-# 11. Analysis (needed by solvers)
-include("analysis/compare.jl")          # generic observed-vs-simulated metric stack
-include("analysis/observables.jl")
-include("analysis/ensemble.jl")
-include("analysis/energy.jl")
-include("analysis/currents.jl")
-include("analysis/vorticity.jl")
-include("analysis/vortex_extraction.jl")
-include("analysis/diagnostics.jl")
-include("analysis/majorana.jl")
-include("analysis/tof.jl")
-include("analysis/tomography.jl")
-include("analysis/faraday.jl")
-include("analysis/imaging.jl")
-include("analysis/topology.jl")
-include("analysis/synthetic_dimension.jl")
-include("analysis/time_resolved.jl")
-include("analysis/stability_analysis.jl")
-include("analysis/spin_rotation.jl")
-
-# 12. Phase exploration (needs experiments for ScanExperiment)
-include("analysis/phases/phase_classification.jl")
-include("analysis/phases/phase_boundary.jl")
-include("analysis/phases/bogoliubov.jl")            # spectrum + matrices + roton detect + angular map
-include("analysis/phases/bogoliubov/scan.jl")        # instability scan + direction grid + supersolid prediction
+include("analysis.jl")  # observables + diagnostics + phase exploration umbrella
 
 # ========================================
 # SOLVERS: Ground state & time evolution
 # ========================================
 
-# 13. Solvers (depend on observables and monitoring)
-include("solvers/ground_state.jl")               # validators + public find_ground_state
-include("solvers/ground_state/itp_loop.jl")       # _run_itp_loop! core
-include("solvers/ground_state/checkpoint.jl")     # save/load/resume/refine
-include("solvers/ground_state/adaptive.jl")       # _find_ground_state_adaptive
-include("solvers/ground_state/advanced.jl")       # multistart + Jz-constrained
-include("solvers/simulation.jl")
-include("solvers/adaptive.jl")
-include("solvers/embedded_adaptive.jl")
-include("solvers/lbfgs/energy_gradient.jl")          # E[ψ] + ∇E + constraint projection
-include("solvers/lbfgs/helpers.jl")                  # Sobolev preconditioner + L-BFGS direction + line search
-include("solvers/lbfgs/driver.jl")                   # find_ground_state_lbfgs entry
-include("solvers/continuation/scan_1d.jl")           # scan_continuation + bidirectional
-include("solvers/continuation/scan_2d.jl")           # scan_phase_diagram_2d
-include("solvers/continuation/boundary.jl")          # scan_phase_boundary bisection
-include("solvers/continuation/pseudo_arclength.jl")   # trace_phase_boundary 2D arclength continuation
-include("solvers/continuation/triple_point.jl")        # AL × continuation: triple-point hunting
-include("solvers/twa.jl")
-include("solvers/binary_simulation.jl")
+include("solvers.jl")  # ground_state + simulation + lbfgs + continuation + twa + binary umbrella
 
 # All public symbols are now `export`ed at their definition sites under
 # src/foundation/, src/hamiltonian/, src/analysis/, src/solvers/, and

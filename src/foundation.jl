@@ -1,0 +1,30 @@
+# --- Foundation subsystem umbrella ---
+#
+# Type definitions + mathematical foundation. Files load in dependency
+# order: Waveform → Grid → AbstractPotential → spin/atom →
+# interactions+Zeeman → SimParams/SimState/FFT → DDI/Loss → integrator →
+# Workspace → results/scan; then math primitives (grid factory, FFT
+# utils, backend dispatch, spin matrices, spinor utils, Clebsch-Gordan,
+# spherical harmonics).
+
+# Type definitions (must come first; Workspace depends on everything above).
+include("foundation/waveform.jl")
+include("foundation/types/grid.jl")              # AbstractBackend, GridConfig, Grid, GridF64
+include("foundation/types/potentials.jl")        # AbstractPotential + 12 trap / beam / lattice / gradient subtypes
+include("foundation/types/spin_atom.jl")         # SpinSystem, SpinMatrices, AtomSpecies
+include("foundation/types/interactions_zeeman.jl") # InteractionParams, ZeemanParams, TimeDependent*, Raman, accessors
+include("foundation/types/sim_fft.jl")           # SimParams, SimState, FFTPlans, RFFT, BatchedKineticCache, CoriolisCache, AbsorbingBoundary
+include("foundation/types/ddi_loss.jl")          # DDIParams, DDIBuffers, DDIPaddedContext, LossParams, LightShift, TensorInteractionCache
+include("foundation/types/integrator.jl")        # AdaptiveDtParams, IntegratorConfig, SimulationResult, TWAConfig, EnsembleResult
+include("foundation/types/workspace.jl")         # Workspace + workspace_T (depends on everything above)
+include("foundation/types/results.jl")           # TOFParams, BdGResult, InstabilityMap, RotonParams, etc
+include("foundation/types/scan.jl")              # OverrideScan, ConstrainedJzScan, ITPCheckpoint
+
+# Mathematical foundation.
+include("foundation/grid.jl")
+include("foundation/fft_utils.jl")
+include("foundation/backend.jl")
+include("foundation/spin_matrices.jl")
+include("foundation/spinor_utils.jl")
+include("foundation/clebsch_gordan.jl")
+include("foundation/spherical_harmonics.jl")
