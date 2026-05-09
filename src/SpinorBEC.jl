@@ -28,7 +28,8 @@ const TIMER = TimerOutput()
 # 1. Type definitions (must be first). Files load in dependency order:
 # Waveform → Grid → AbstractPotential → spin/atom → interactions+Zeeman →
 # SimParams/SimState/FFT → DDI/Loss → integrator → Workspace → results/scan.
-# types.jl itself is now a stub (R22 split 2026-05-02).
+# (Topical structs split out 2026-05-02; the old `foundation/types.jl`
+# umbrella stub was removed in the 2026-05-09 refactor.)
 include("foundation/waveform.jl")
 include("foundation/types/grid.jl")              # AbstractBackend, GridConfig, Grid, GridF64
 include("foundation/types/potentials.jl")        # AbstractPotential + 12 trap / beam / lattice / gradient subtypes
@@ -40,7 +41,6 @@ include("foundation/types/integrator.jl")        # AdaptiveDtParams, IntegratorC
 include("foundation/types/workspace.jl")         # Workspace + workspace_T (depends on everything above)
 include("foundation/types/results.jl")           # TOFParams, BdGResult, InstabilityMap, RotonParams, etc
 include("foundation/types/scan.jl")              # OverrideScan, ConstrainedJzScan, ITPCheckpoint
-include("foundation/types.jl")                   # stub (split into topical files above)
 
 # 2. Mathematical foundation
 include("foundation/grid.jl")
@@ -71,7 +71,9 @@ include("hamiltonian/interactions/polar_dipolar_lhy.jl")  # polar contact + DDI 
 include("hamiltonian/interactions/fm_contact_lhy.jl")     # FM-phase contact LHY (F=6)
 include("hamiltonian/interactions/fm_dipolar_lhy.jl")     # FM contact + Lima-Pelster Q_5 DDI dressing
 include("hamiltonian/interactions/icosahedral_lhy.jl")    # F=6 icosahedral (I_h) closed-form contact LHY
+include("hamiltonian/interactions/lhy_modes_round45.jl")   # 5 standalone closed forms (F=2 BN, F=3 octa, F=4 cube, F=8 octa, F=10 dodec)
 include("dynamics/sinatra_helpers.jl")                     # TWA validity helpers (healing length, k-cutoff)
+include("dynamics/utils_resolution_sinatra.jl")            # suggest_grid + sinatra_check (Round-7 utilities)
 include("hamiltonian/interactions/lhy.jl")
 include("hamiltonian/interactions/losses.jl")
 include("hamiltonian/interactions/absorbing_boundary.jl")
@@ -268,7 +270,6 @@ include("solvers/simulation.jl")
 include("solvers/adaptive.jl")
 include("solvers/embedded_adaptive.jl")
 include("solvers/lbfgs_ground_state.jl")
-include("solvers/continuation.jl")                  # stub (the actual code lives in 3 sub-files)
 include("solvers/continuation/scan_1d.jl")           # scan_continuation + bidirectional
 include("solvers/continuation/scan_2d.jl")           # scan_phase_diagram_2d
 include("solvers/continuation/boundary.jl")          # scan_phase_boundary bisection

@@ -1,15 +1,9 @@
-# Tests for src/lhy_modes_round45.jl — standalone LHY closed forms for
-# the Round-4/Round-5 polyhedral phase verifications.
-#
-# Loads the module directly without going through SpinorBEC.jl, since
-# the file is a NEW unintegrated module (final integration round will
-# wire it into the LHY dispatch).
+# Tests for src/hamiltonian/interactions/lhy_modes_round45.jl —
+# standalone LHY closed forms for the Round-4/Round-5 polyhedral
+# phase verifications.
 
 using Test
-
-include(joinpath(@__DIR__, "..", "src", "lhy_modes_round45.jl"))
-
-using .LHYModesRound45
+using SpinorBEC.LHYModesRound45
 
 @testset "LHY modes (Round 4-5 closed forms)" begin
     # Universal scalar prefactor at M = ℏ = 1

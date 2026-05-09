@@ -1,11 +1,9 @@
-# Tests for src/utils_resolution_sinatra.jl
+# Tests for src/dynamics/utils_resolution_sinatra.jl
 #
-# Standalone — loads the module directly without going through SpinorBEC.jl.
+# Module wired into SpinorBEC; pull exports via the qualified path.
 
 using Test
-
-include(joinpath(@__DIR__, "..", "src", "utils_resolution_sinatra.jl"))
-using .UtilsResolutionSinatra
+using SpinorBEC.UtilsResolutionSinatra
 
 @testset "Resolution + Sinatra utilities" begin
     @testset "Species data lookup" begin
