@@ -107,7 +107,6 @@ include("workflow/initialization/atoms.jl")
 include("workflow/initialization/state_dispatch.jl")    # init_psi + small helpers
 include("workflow/initialization/make_workspace.jl")    # make_workspace + _rebuild_workspace
 include("workflow/initialization/thomas_fermi.jl")
-include("workflow/initialization/initialization.jl")
 include("workflow/initialization/state_zoo.jl")
 include("foundation/binary_state.jl")
 include("workflow/initialization/thermal_noise.jl")
@@ -243,7 +242,6 @@ include("analysis/spin_rotation.jl")
 # 12. Phase exploration (needs experiments for ScanExperiment)
 include("analysis/phases/phase_classification.jl")
 include("analysis/phases/phase_boundary.jl")
-include("analysis/phases/phase_scan.jl")
 include("analysis/phases/bogoliubov.jl")            # spectrum + matrices + roton detect + angular map
 include("analysis/phases/bogoliubov/scan.jl")        # instability scan + direction grid + supersolid prediction
 
