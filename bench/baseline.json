@@ -1,57 +1,57 @@
 {
   "kernel/spin_mixing_eu151_16x16x8": {
     "allocs": 7,
-    "time_ns": 911344.0,
+    "time_ns": 900150.0,
     "memory_bytes": 17344
   },
   "analyze/tomography_16x16x8": {
     "allocs": 2156,
-    "time_ns": 1.17664e6,
+    "time_ns": 1.202023e6,
     "memory_bytes": 5771200
   },
   "kernel/kinetic_step_rotating_eu151_16cubed": {
     "allocs": 4,
-    "time_ns": 301876.0,
+    "time_ns": 306259.0,
     "memory_bytes": 160
   },
   "kernel/diagonal_step_eu151_16cubed": {
     "allocs": 0,
-    "time_ns": 248293.0,
+    "time_ns": 139823.0,
     "memory_bytes": 0
   },
   "find_ground_state/rb87_16sq": {
     "allocs": 1380,
-    "time_ns": 972326.0,
+    "time_ns": 968726.0,
     "memory_bytes": 137808
   },
   "split_step/eu151_16cubed": {
     "allocs": 44,
-    "time_ns": 1.899348e6,
+    "time_ns": 1.852544e6,
     "memory_bytes": 135424
   },
   "kernel/uniform_spin_rotation_eu151_16x16x8": {
     "allocs": 2,
-    "time_ns": 53506.0,
+    "time_ns": 51789.0,
     "memory_bytes": 96
   },
   "kernel/apply_ddi_step_rotating_eu151_16cubed": {
     "allocs": 38,
-    "time_ns": 2.134594e6,
+    "time_ns": 2.053129e6,
     "memory_bytes": 85488
   },
   "kernel/kinetic_step_eu151_16cubed": {
     "allocs": 0,
-    "time_ns": 325867.0,
+    "time_ns": 317952.0,
     "memory_bytes": 0
   },
   "kernel/local_spin_step_eu151_16cubed": {
     "allocs": 20,
-    "time_ns": 103747.0,
+    "time_ns": 104121.0,
     "memory_bytes": 14152
   },
   "kernel/apply_ddi_step_eu151_16cubed": {
     "allocs": 29,
-    "time_ns": 1.843898e6,
+    "time_ns": 1.840807e6,
     "memory_bytes": 68640
   }
 }
