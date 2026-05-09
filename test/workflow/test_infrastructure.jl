@@ -382,6 +382,32 @@ const _SKIP_HEAVY_YAML_INFRA =
         @test zee isa ZeemanParams
     end
 
+    @testset "_parse_zeeman handles transverse bx/by (regression)" begin
+        # Bug: prior to the fix, _parse_zeeman only saw `p`/`q` and silently
+        # dropped any `bx`/`by` keys. That broke (1) the GS path, where
+        # _build_zeeman_dispatched(level=0) routes through _parse_zeeman,
+        # and (2) the multi-source aggregator
+        # (zeeman_levels._build_zeeman_multi_source) which explicitly
+        # treats per-source dicts as level-0 with p/bx/by.
+        z_with_transverse = Dict{Any, Any}(
+            "p" => 10.0,
+            "bx" => Dict{String, Any}(
+                "sinusoidal" => Dict{String, Any}(
+                    "amplitude" => 1.0, "frequency" => 5.0)
+            ),
+            "by" => 0.25,
+        )
+        zee = SpinorBEC._parse_zeeman(z_with_transverse, 1.0)
+        @test zee isa TimeDependentZeeman
+        @test zee.bx_wf isa SinusoidalWaveform
+        @test zee.by_wf isa ConstantWaveform
+
+        # Static-only without transverse must still return ZeemanParams.
+        zee_static = SpinorBEC._parse_zeeman(
+            Dict{Any, Any}("p" => 5.0, "q" => 1.0), 1.0)
+        @test zee_static isa ZeemanParams
+    end
+
     @testset "YAML integration: init_state_params round-trip" begin
         _SKIP_HEAVY_YAML_INFRA && (@test_skip false; return nothing)
         cfg = SpinorBEC.load_config_from_string("""

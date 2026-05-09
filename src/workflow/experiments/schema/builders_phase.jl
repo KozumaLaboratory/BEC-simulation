@@ -111,6 +111,12 @@ end
     _build_phase_zeeman(phase_raw, t_offset, duration) -> ZeemanParams or TimeDependentZeeman
 
 Build the per-phase Zeeman object from override-applied raw YAML dict.
+
+Level 0 (dimensionless `p`/`q`/`bx`/`by`) delegates to `_parse_zeeman`,
+which handles all four channels including the transverse `bx`/`by`
+fields. Levels 1/2 (Gauss-valued) require an atom kwarg and route
+through `_build_zeeman_dispatched`. Non-zero `t_offset` post-shifts the
+resulting waveforms by sampling onto a fresh time grid.
 """
 function _build_phase_zeeman(phase_raw::Dict, t_offset::Float64, duration::Float64;
     atom=nothing, p_step::Dict=Dict{String, Any}())
@@ -118,40 +124,27 @@ function _build_phase_zeeman(phase_raw::Dict, t_offset::Float64, duration::Float
     z = get(gs, "zeeman", Dict())
     z isa Dict || return ZeemanParams(0.0, 0.0)
 
-    # Level 1/2 dispatch if the zeeman dict uses Gauss-valued keys.
-    # Requires atom for g_F and an omega_ref from p_step.
     level = _detect_zeeman_level(z)
     if level >= 1
         atom === nothing && throw(ArgumentError(
             "zeeman Level $level requires atom; caller must pass atom kwarg"))
-        return _build_zeeman_dispatched(z, duration, atom, p_step)
+        zee = _build_zeeman_dispatched(z, duration, atom, p_step)
+    else
+        zee = _parse_zeeman(z, duration)
     end
 
-    p_spec = get(z, "p", 0.0)
-    q_spec = get(z, "q", 0.0)
-    p_is_ramp = p_spec isa Dict
-    q_is_ramp = q_spec isa Dict
-    bx_spec = get(z, "bx", nothing)
-    by_spec = get(z, "by", nothing)
-    has_transverse = bx_spec !== nothing || by_spec !== nothing
-
-    if !p_is_ramp && !q_is_ramp && !has_transverse
-        return ZeemanParams(Float64(p_spec), Float64(q_spec))
+    # Time-shift (samples each waveform onto an offset grid). Static
+    # ZeemanParams are unaffected by t_offset; only TimeDependent forms
+    # need adjusting.
+    if t_offset != 0.0 && zee isa TimeDependentZeeman
+        return TimeDependentZeeman(
+            _shift_waveform(zee.p_wf, t_offset, duration),
+            _shift_waveform(zee.q_wf, t_offset, duration),
+            zee.bx_wf === nothing ? nothing : _shift_waveform(zee.bx_wf, t_offset, duration),
+            zee.by_wf === nothing ? nothing : _shift_waveform(zee.by_wf, t_offset, duration),
+        )
     end
-
-    p_wf = _make_waveform(p_spec, duration)
-    q_wf = _make_waveform(q_spec, duration)
-
-    if t_offset != 0.0
-        # Pre-sample shifted waveforms to avoid closure type leakage
-        # (see CLAUDE.md > Type stability boundaries).
-        p_wf = _shift_waveform(p_wf, t_offset, duration)
-        q_wf = _shift_waveform(q_wf, t_offset, duration)
-    end
-
-    bx_wf = bx_spec !== nothing ? _make_waveform(bx_spec, duration) : nothing
-    by_wf = by_spec !== nothing ? _make_waveform(by_spec, duration) : nothing
-    TimeDependentZeeman(p_wf, q_wf, bx_wf, by_wf)
+    zee
 end
 
 """Apply a time shift to a waveform by sampling into a PiecewiseLinearWaveform."""

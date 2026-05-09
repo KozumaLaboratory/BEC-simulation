@@ -320,17 +320,29 @@ function _parse_zeeman(z, duration::Float64)
     z isa Dict || return ZeemanParams(0.0, 0.0)
     p_spec = get(z, "p", 0.0)
     q_spec = get(z, "q", 0.0)
+    bx_spec = get(z, "bx", nothing)
+    by_spec = get(z, "by", nothing)
 
     p_is_ramp = p_spec isa Dict
     q_is_ramp = q_spec isa Dict
+    has_transverse = bx_spec !== nothing || by_spec !== nothing
 
-    if !p_is_ramp && !q_is_ramp
+    # Fast path: static + no transverse field → return the static struct.
+    if !p_is_ramp && !q_is_ramp && !has_transverse
         return ZeemanParams(_zeeman_scalar(p_spec), _zeeman_scalar(q_spec))
     end
 
+    # Time-dependent or transverse → TimeDependentZeeman with all 4
+    # waveforms (p, q, bx, by). bx/by were previously dropped on the
+    # floor here, which silently broke level-0 ground_state YAML using
+    # transverse fields and the multi-source aggregator
+    # (zeeman_levels.jl:_build_zeeman_multi_source) which explicitly
+    # treats per-source dicts as level-0 with p/bx/by.
     TimeDependentZeeman(
         _make_waveform(p_spec, duration),
         _make_waveform(q_spec, duration),
+        bx_spec !== nothing ? _make_waveform(bx_spec, duration) : nothing,
+        by_spec !== nothing ? _make_waveform(by_spec, duration) : nothing,
     )
 end
 
