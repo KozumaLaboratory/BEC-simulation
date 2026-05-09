@@ -125,20 +125,38 @@ end
 
 function _kinetic_energy(psi, grid, plans, fft_buf, n_comp, ndim, n_pts, dV)
     E = 0.0
-    for c in 1:n_comp
+    inv_npts = 1.0 / prod(n_pts)
+    k_sq = grid.k_squared
+    @inbounds for c in 1:n_comp
         idx = _component_slice(ndim, n_pts, c)
         fft_buf .= view(psi, idx...)
         plans.forward * fft_buf
-        E += real(sum(grid.k_squared .* abs2.(fft_buf))) * dV / prod(n_pts)
+        # Manual reduction loop: avoids materialising an `n_pts`-shaped
+        # `k_squared .* abs2.(fft_buf)` temporary every component
+        # (saves D × n_pts × 8 B per energy call — ~425 KB per call at
+        # 16³ × D=13).
+        Ec = 0.0
+        for i in eachindex(k_sq, fft_buf)
+            Ec += k_sq[i] * abs2(fft_buf[i])
+        end
+        E += Ec * dV * inv_npts
     end
     0.5 * E
 end
 
 function _trap_energy(psi, V_trap, n_comp, ndim, n_pts, dV)
     E = 0.0
-    for c in 1:n_comp
+    @inbounds for c in 1:n_comp
         idx = _component_slice(ndim, n_pts, c)
-        E += sum(V_trap .* abs2.(view(psi, idx...))) * dV
+        psi_c = view(psi, idx...)
+        # Manual reduction loop — same shape as _kinetic_energy. The
+        # broadcast `V_trap .* abs2.(psi_c)` previously allocated a
+        # full n_pts-shaped temporary per component.
+        Ec = 0.0
+        for i in eachindex(V_trap, psi_c)
+            Ec += V_trap[i] * abs2(psi_c[i])
+        end
+        E += Ec * dV
     end
     E
 end
@@ -155,7 +173,9 @@ end
 
 function _density_interaction_energy(psi, c0, n_comp, ndim, n_pts, dV)
     n = total_density(psi, ndim)
-    0.5 * c0 * sum(n .^ 2) * dV
+    # `n .^ 2` materialises an n_pts-sized array; map-square + sum keeps
+    # the reduction allocation-free (~32 KB saved per call at 16³).
+    0.5 * c0 * sum(x -> x * x, n) * dV
 end
 
 """
