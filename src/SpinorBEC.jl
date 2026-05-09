@@ -47,7 +47,6 @@ include("workflow/experiments/pipeline/pipeline_continuation.jl")
 include("workflow/experiments/pipeline/run_registry.jl")
 include("workflow/experiments/calibration.jl")
 include("workflow/io/calibration_drift.jl")
-include("workflow/experiments/optimization.jl")  # 5-file optimization/ umbrella
 
 # ========================================
 # ANALYSIS: Observables & diagnostics
@@ -60,6 +59,26 @@ include("analysis.jl")  # observables + diagnostics + phase exploration umbrella
 # ========================================
 
 include("solvers.jl")  # ground_state + simulation + lbfgs + continuation + twa + binary umbrella
+
+# Optimization subsystem (real submodule) — loaded after analysis so
+# `classify_phase_distance` / `DEFAULT_PHASE_REFERENCES` are in scope.
+include("workflow/experiments/optimization.jl")  # `module Optimization` (5 files)
+
+using .Optimization:
+    fit_faraday_param, load_target_faraday,
+    bayesian_optimize, gp_predict, expected_improvement,
+    multi_fidelity_optimize_2tier, MultiFidelityBOResult,
+    bayesian_optimize_yaml, multi_fidelity_optimize_yaml,
+    bo_objective_max_m_transfer, bo_objective_max_lz, bo_objective_min_energy,
+    active_learn_phase_scan, active_learn_phase_scan_yaml,
+    phase_entropy_uncertainty, default_phase_classifier_extractor
+export fit_faraday_param, load_target_faraday
+export bayesian_optimize, gp_predict, expected_improvement
+export multi_fidelity_optimize_2tier, MultiFidelityBOResult
+export bayesian_optimize_yaml, multi_fidelity_optimize_yaml
+export bo_objective_max_m_transfer, bo_objective_max_lz, bo_objective_min_energy
+export active_learn_phase_scan, active_learn_phase_scan_yaml
+export phase_entropy_uncertainty, default_phase_classifier_extractor
 
 # Dashboard subsystem (real submodule) — must be loaded after analysis +
 # workflow/experiments so that total_density / spin_density_vector /
