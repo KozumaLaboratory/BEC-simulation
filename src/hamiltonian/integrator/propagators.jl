@@ -149,8 +149,24 @@ function _diagonal_step_svec!(
     density_buf,
     imaginary_time,
 ) where {N, D}
-    n_pts = ntuple(d -> size(psi, d), Val(N))
+    # Splitting the imaginary_time branches into two methods is not just
+    # cosmetic: keeping both branches inside one function makes Julia
+    # construct the ntuple-closure objects of *both* paths every call
+    # (~42 allocs / 1184 B per call at D=13, even when only one branch
+    # runs). Routing through a Bool dispatch makes each leaf method see
+    # only its own closures, dropping the path to 0 allocs.
+    if imaginary_time
+        _diagonal_step_svec_imag!(Val(N), psi, V_trap, zeeman_diag, c0, c_lhy, dt_frac, density_buf)
+    else
+        _diagonal_step_svec_real!(Val(N), psi, V_trap, zeeman_diag, c0, c_lhy, dt_frac, density_buf)
+    end
+end
 
+function _diagonal_step_svec_real!(
+    ::Val{N}, psi::Array, V_trap, zeeman_diag::SVector{D, Float64},
+    c0, c_lhy, dt_frac, density_buf,
+) where {N, D}
+    n_pts = ntuple(d -> size(psi, d), Val(N))
     @inbounds for I in CartesianIndices(n_pts)
         s = 0.0
         for c in 1:D
@@ -158,29 +174,40 @@ function _diagonal_step_svec!(
         end
         density_buf[I] = s
     end
-
-    if imaginary_time
-        zee_shift = minimum(zeeman_diag)
-        zee_dt = SVector{D, Float64}(ntuple(c -> (zeeman_diag[c] - zee_shift) * dt_frac, Val(D)))
-        zee_exp = SVector{D, Float64}(ntuple(c -> exp(-zee_dt[c]), Val(D)))
-        @inbounds for I in CartesianIndices(n_pts)
-            n = density_buf[I]
-            V_int = c0 * n + _lhy_V(n, c_lhy)
-            exp_base = exp(-(V_trap[I] + V_int) * dt_frac)
-            for c in 1:D
-                psi[I, c] *= exp_base * zee_exp[c]
-            end
+    zee_dt = SVector{D, Float64}(ntuple(c -> zeeman_diag[c] * dt_frac, Val(D)))
+    zee_cis = SVector{D, ComplexF64}(ntuple(c -> cis(-zee_dt[c]), Val(D)))
+    @inbounds for I in CartesianIndices(n_pts)
+        n = density_buf[I]
+        V_int = c0 * n + _lhy_V(n, c_lhy)
+        cis_base = cis(-(V_trap[I] + V_int) * dt_frac)
+        for c in 1:D
+            psi[I, c] *= cis_base * zee_cis[c]
         end
-    else
-        zee_dt = SVector{D, Float64}(ntuple(c -> zeeman_diag[c] * dt_frac, Val(D)))
-        zee_cis = SVector{D, ComplexF64}(ntuple(c -> cis(-zee_dt[c]), Val(D)))
-        @inbounds for I in CartesianIndices(n_pts)
-            n = density_buf[I]
-            V_int = c0 * n + _lhy_V(n, c_lhy)
-            cis_base = cis(-(V_trap[I] + V_int) * dt_frac)
-            for c in 1:D
-                psi[I, c] *= cis_base * zee_cis[c]
-            end
+    end
+    nothing
+end
+
+function _diagonal_step_svec_imag!(
+    ::Val{N}, psi::Array, V_trap, zeeman_diag::SVector{D, Float64},
+    c0, c_lhy, dt_frac, density_buf,
+) where {N, D}
+    n_pts = ntuple(d -> size(psi, d), Val(N))
+    @inbounds for I in CartesianIndices(n_pts)
+        s = 0.0
+        for c in 1:D
+            s += abs2(psi[I, c])
+        end
+        density_buf[I] = s
+    end
+    zee_shift = minimum(zeeman_diag)
+    zee_dt = SVector{D, Float64}(ntuple(c -> (zeeman_diag[c] - zee_shift) * dt_frac, Val(D)))
+    zee_exp = SVector{D, Float64}(ntuple(c -> exp(-zee_dt[c]), Val(D)))
+    @inbounds for I in CartesianIndices(n_pts)
+        n = density_buf[I]
+        V_int = c0 * n + _lhy_V(n, c_lhy)
+        exp_base = exp(-(V_trap[I] + V_int) * dt_frac)
+        for c in 1:D
+            psi[I, c] *= exp_base * zee_exp[c]
         end
     end
     nothing
