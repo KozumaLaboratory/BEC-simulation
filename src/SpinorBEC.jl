@@ -127,9 +127,15 @@ include("workflow/io/dashboard/routes/scan.jl")       # scan_group/_status, phys
 include("workflow/io/dashboard/routes/snapshots.jl")  # snapshots, dynamics_series, ensemble (3)
 include("workflow/io/dashboard/routes/lab_live.jl")   # lab_list, live_list, live (3)
 include("workflow/io/dashboard/routes/misc.jl")       # data, coherence, vector3d_bin (3)
-include("workflow/io/dashboard.jl")               # router + serve_dashboard + JSON helpers
+include("workflow/io/dashboard/server/json.jl")      # _write_json + _json_string (must precede routes that build JSON)
+include("workflow/io/dashboard/server/data_export.jl") # generate_dashboard_data + export_dashboard
+include("workflow/io/dashboard/server/router.jl")    # serve_dashboard + _route_dashboard
+include("workflow/io/dashboard/server/static.jl")    # static asset + HTTP response helpers
 include("workflow/io/dashboard/websocket.jl")     # WS handshake + frames + serve
-include("workflow/io/dashboard/compute.jl")       # column/3d density + phase + atlas kernels
+include("workflow/io/dashboard/compute/helpers.jl")  # trilinear upsample + run metadata
+include("workflow/io/dashboard/compute/density.jl")  # 3D + column density compute
+include("workflow/io/dashboard/compute/phase.jl")    # phase slice compute
+include("workflow/io/dashboard/compute/binary.jl")   # binary packers (density/atlas/phase)
 include("workflow/io/dashboard/pack3d.jl")        # 3D density/vortex/phase/vector binary packers
 include("workflow/io/vtk_export.jl")
 include("workflow/io/run_summary.jl")
@@ -274,7 +280,9 @@ include("solvers/ground_state/advanced.jl")       # multistart + Jz-constrained
 include("solvers/simulation.jl")
 include("solvers/adaptive.jl")
 include("solvers/embedded_adaptive.jl")
-include("solvers/lbfgs_ground_state.jl")
+include("solvers/lbfgs/energy_gradient.jl")          # E[ψ] + ∇E + constraint projection
+include("solvers/lbfgs/helpers.jl")                  # Sobolev preconditioner + L-BFGS direction + line search
+include("solvers/lbfgs/driver.jl")                   # find_ground_state_lbfgs entry
 include("solvers/continuation/scan_1d.jl")           # scan_continuation + bidirectional
 include("solvers/continuation/scan_2d.jl")           # scan_phase_diagram_2d
 include("solvers/continuation/boundary.jl")          # scan_phase_boundary bisection
