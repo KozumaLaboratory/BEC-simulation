@@ -120,7 +120,13 @@ include("workflow/io/dashboard/encoding.jl")      # bitshuffle + zstd
 include("workflow/io/dashboard/cache.jl")         # PSI_CACHE, JLD handle pool, atlas disk cache
 include("workflow/io/dashboard/snapshots.jl")     # _load_psi_cached + sibling result.jld2 redirect
 include("workflow/io/dashboard/route_helpers.jl") # _parse_run_file / _parse_run_only / _q_int / _q_float / _q_flag / _q_sym
-include("workflow/io/dashboard/routes.jl")        # all _route_* handlers (R21 + R24)
+include("workflow/io/dashboard/routes/density.jl")    # density2d/3d/_bin/_max/_atlas/_rotated handlers (8)
+include("workflow/io/dashboard/routes/phase.jl")      # phase2d/_bin/3d_bin handlers (3)
+include("workflow/io/dashboard/routes/vortex.jl")     # vortex_lines + vorticity3d_bin (2)
+include("workflow/io/dashboard/routes/scan.jl")       # scan_group/_status, physics_summary, synthetic_dispersion (4)
+include("workflow/io/dashboard/routes/snapshots.jl")  # snapshots, dynamics_series, ensemble (3)
+include("workflow/io/dashboard/routes/lab_live.jl")   # lab_list, live_list, live (3)
+include("workflow/io/dashboard/routes/misc.jl")       # data, coherence, vector3d_bin (3)
 include("workflow/io/dashboard.jl")               # router + serve_dashboard + JSON helpers
 include("workflow/io/dashboard/websocket.jl")     # WS handshake + frames + serve
 include("workflow/io/dashboard/compute.jl")       # column/3d density + phase + atlas kernels
