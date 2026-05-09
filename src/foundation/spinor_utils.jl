@@ -58,25 +58,6 @@ Works with any AbstractMatrix (Matrix, Adjoint, SMatrix).
     )
 end
 
-"""
-Apply exp(iβ Fy) to vector v using precomputed Fy eigendecomposition.
-O(D²) per call. Uses _matvec to avoid SMatrix heap allocation for large D.
-"""
-@inline function _apply_exp_i_Fy(
-    V::AbstractMatrix{ComplexF64},
-    Vt::AbstractMatrix{ComplexF64},
-    λ::SVector{D, Float64},
-    beta::Float64,
-    v::SVector{D, ComplexF64},
-) where {D}
-    w = _matvec(Vt, v)
-    w = SVector{D, ComplexF64}(
-        ntuple(Val(D)) do i
-            @inbounds cis(beta * λ[i]) * w[i]
-        end,
-    )
-    _matvec(V, w)
-end
 
 """
 Apply exp(-i dt (phi·F)) via Euler angle decomposition.
