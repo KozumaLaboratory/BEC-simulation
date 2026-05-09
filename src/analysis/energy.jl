@@ -228,14 +228,10 @@ included. To use the two-channel spinor LHY table, add `spinor_lhy: two_channel`
 to the YAML ground_state step or pass `spinor_lhy=:two_channel` to make_workspace. \
 For F ≥ 3 the two-channel table is also incomplete — see _lhy_energy docstring.""" maxlog=1
     end
-    # Fuse density build + n²√n reduction in one pass to avoid the
-    # n_pts-sized temporary `total_density` would materialise.
+    n = total_density(psi, ndim)
     E = 0.0
     @inbounds for I in CartesianIndices(n_pts)
-        ni = 0.0
-        for c in 1:n_comp
-            ni += abs2(psi[I, c])
-        end
+        ni = n[I]
         E += ni * ni * sqrt(ni)
     end
     (2.0 / 5.0) * c_lhy * E * dV
@@ -246,31 +242,23 @@ function _lhy_energy(psi, lhy::ScalarLHY, n_comp, ndim, n_pts, dV)
 end
 
 function _lhy_energy(psi, lhy::Quasi2DLHY, n_comp, ndim, n_pts, dV)
-    a_2d_sq = lhy.a_2d_sq
-    log_const = lhy.log_const
+    n = total_density(psi, ndim)
     E = 0.0
     @inbounds for I in CartesianIndices(n_pts)
-        ni = 0.0
-        for c in 1:n_comp
-            ni += abs2(psi[I, c])
-        end
+        ni = n[I]
         ni < 1e-30 && continue
-        E += ni * ni * (log(ni * a_2d_sq) + log_const)
+        E += ni * ni * (log(ni * lhy.a_2d_sq) + lhy.log_const)
     end
     0.5 * lhy.c_lhy_2d * E * dV
 end
 
 function _lhy_energy(psi, lhy::SpinorLHYTable, n_comp, ndim, n_pts, dV)
-    densities = lhy.densities
-    potential_values = lhy.potential_values
+    n = total_density(psi, ndim)
     E = 0.0
     @inbounds for I in CartesianIndices(n_pts)
-        ni = 0.0
-        for c in 1:n_comp
-            ni += abs2(psi[I, c])
-        end
+        ni = n[I]
         ni < 1e-30 && continue
-        E += _interpolate_1d(densities, potential_values, ni) * ni
+        E += _interpolate_1d(lhy.densities, lhy.potential_values, ni) * ni
     end
     E * dV
 end
