@@ -302,69 +302,16 @@ include("solvers/binary_simulation.jl")
 # DDI, potentials (trap/zeeman/optical/laser/light-shift): exported at
 # definition sites under src/hamiltonian/.
 
-# Thomas-Fermi
-export thomas_fermi_density, init_psi_thomas_fermi, init_psi_thomas_fermi_textured
-export add_thermal_seed!, add_thermal_seed,                  # canonical names
-    add_thermal_noise!, add_thermal_noise,                    # legacy aliases
-    thermal_noise_amplitude, bec_critical_temperature,
-    add_symmetry_breaking_seed!
-export simulate_tof, simulate_tof_with_gradient, sg_separation_peaks
-export gaussian_psf_convolve, apply_shot_noise, apply_saturation
-export synthesise_absorption_image, faraday_polarization_components
-export faraday_snr, momentum_distribution
-export winding_number_field, monopole_charge_3d, total_monopole_charge
-export synthetic_axis_current, synthetic_dim_dispersion, synthetic_localization_length
-export non_abelian_holonomy, time_resolved_tomography
-export spin_tomography, tomography_sinogram
-export FaradayParams, faraday_image, faraday_differential, detect_vortices_faraday
-
-# Spin rotation & EdH/FL reproduction
-export spin_rotation_matrix, rotate_quantization_axis
-export dipolar_field, apply_edh_rotation, apply_fl_alignment, column_density
-
 # Propagators, integrator, spin-mixing, nematic, tensor, losses, absorbing
 # boundary, raman, split_step!: all `export`ed at their definition sites
 # under src/hamiltonian/.
 
-# Generic observed-vs-simulated comparison
-export compare, normalize_field
-
-# Higher-rank multipole observables (F ≥ 3 phases)
-export multipole_q_spectrum
-
-# Observables
-export total_density, component_density, magnetization
-export spin_density_vector, total_norm, total_energy, energy_decomposition
-export structure_factor, modulation_contrast
-export probability_current, orbital_angular_momentum
-export superfluid_velocity, total_angular_momentum, spin_texture_charge
-export circulation
-export extract_vortex_lines_per_m
-export wigner_correct_density, ensemble_correlation, ensemble_stderr
-export superfluid_vorticity, berry_curvature, singlet_pair_amplitude
-export pair_amplitude, pair_amplitude_spectrum
-export majorana_stars, icosahedral_order_parameter, detect_point_group
-export spinor_angular_density
-export nematic_tensor_eigenvalues, biaxiality_parameter
-export multipole_order_parameters, multipole_spectrum
-export get_cn
-
-# Diagnostics
-export spin_mixing_period, spin_mixing_period_si
-export compute_quadratic_zeeman                  # dimless from p_dimless (interactions.jl)
-export quadratic_zeeman_si, quadratic_zeeman_dimless_si  # from B in Tesla (diagnostics.jl)
-export healing_length_contact, healing_length_spin, healing_length_ddi
-export thomas_fermi_radius, thomas_fermi_radius_harmonic
-export phase_diagram_point, component_populations, make_conservation_monitor
-export classify_phase,
-    classify_phase_detailed,
-    classify_phase_distance, PhaseReference, DEFAULT_PHASE_REFERENCES
-export estimate_splitting_error, validate_conservation
-export power_spectrum
-export analyze_stability
-export bogoliubov_spectrum, bogoliubov_instability_scan, suggest_grid_params
-export fibonacci_sphere_directions, detect_roton, predict_supersolid_params
-export instability_angular_map
+# Analysis (observables, energy, currents, ensemble, vorticity, majorana,
+# tof, faraday, imaging, topology, synthetic_dim, time_resolved, tomography,
+# stability, spin_rotation, vortex_extraction, phase_classification,
+# bogoliubov, diagnostics, compare): exported at definition sites
+# under src/analysis/. Thomas-Fermi state initialisers are exported in
+# src/workflow/initialization/state_zoo.jl + thomas_fermi.jl.
 
 # Simulation
 export find_ground_state,

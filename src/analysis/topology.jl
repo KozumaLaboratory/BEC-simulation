@@ -3,6 +3,9 @@
 # Winding number density (2D), monopole charge (3D), and non-Abelian
 # holonomy (Wilson loop) computed from a spinor wavefunction. All three are
 # local / path-based analyzers — they do not touch the GP solver and can run
+
+export winding_number_field, monopole_charge_3d, total_monopole_charge
+export non_abelian_holonomy
 # on any post-ITP or post-dynamics snapshot.
 #
 # Conventions follow Kawaguchi-Ueda §9 for ferromagnetic vortices and

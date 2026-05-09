@@ -1,3 +1,5 @@
+export ensemble_correlation, wigner_correct_density, ensemble_stderr
+
 """
     ensemble_correlation(results_a, results_b) → corr
 

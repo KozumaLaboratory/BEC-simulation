@@ -1,3 +1,6 @@
+export spin_rotation_matrix, rotate_quantization_axis
+export dipolar_field, apply_edh_rotation, apply_fl_alignment, column_density
+
 """
     spin_rotation_matrix(F, theta_x, theta_y, theta_z) → Matrix{ComplexF64}
 

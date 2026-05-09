@@ -5,6 +5,7 @@ export compute_c_total, compute_c_dd_dimless, linear_zeeman_p
 export even_c_extra
 export compute_eu151_interactions
 export compute_lhy_2d_params
+export compute_quadratic_zeeman
 export get_cn
 
 """

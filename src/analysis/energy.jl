@@ -1,3 +1,5 @@
+export total_energy, energy_decomposition
+
 """
     energy_decomposition(ws) → NamedTuple
 

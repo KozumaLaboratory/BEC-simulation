@@ -1,3 +1,8 @@
+export add_thermal_seed!, add_thermal_seed
+export add_thermal_noise!, add_thermal_noise         # legacy aliases
+export thermal_noise_amplitude, bec_critical_temperature
+export add_symmetry_breaking_seed!
+
 """
     bec_critical_temperature(N, omega_geometric_mean) → T_c (Kelvin)
 

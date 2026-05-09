@@ -1,3 +1,5 @@
+export superfluid_vorticity, berry_curvature, spin_texture_charge
+
 """
 Superfluid vorticity ω = ∇ × v_s.
 - 1D: returns 0.0

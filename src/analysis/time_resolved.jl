@@ -1,5 +1,7 @@
 # --- P3.3: Time-resolved spin tomography ---
-#
+
+export time_resolved_tomography
+
 # Drive a dynamics phase storing wavefunction snapshots, then run
 # `spin_tomography` at each snapshot to produce a 4D image stack:
 #

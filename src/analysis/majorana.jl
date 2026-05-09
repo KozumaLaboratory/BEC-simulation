@@ -1,3 +1,5 @@
+export majorana_stars, icosahedral_order_parameter, detect_point_group
+
 """
 Majorana polynomial coefficients for a spin-F spinor.
 P(z) = Σ_{k=0}^{2F} (-1)^k √C(2F,k) ψ_{F-k} z^k

@@ -1,6 +1,10 @@
 # --- Faraday Rotation Imaging ---
 #
 # Simulates dispersive Faraday rotation imaging of a spinor BEC.
+
+export FaradayParams, faraday_image, faraday_differential, detect_vortices_faraday
+export faraday_snr
+
 #
 # Physics: A linearly polarized probe beam propagating along axis z acquires
 # a local Faraday rotation angle proportional to the column-integrated spin

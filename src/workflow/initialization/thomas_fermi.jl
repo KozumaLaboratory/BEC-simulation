@@ -1,3 +1,5 @@
+export thomas_fermi_density, init_psi_thomas_fermi, init_psi_thomas_fermi_textured
+
 """
 Thomas-Fermi density profile: n_TF(r) = max(0, (μ - V(r)) / g).
 Chemical potential μ is found via bisection so that ∫n_TF dV = N_target.

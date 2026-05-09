@@ -1,3 +1,6 @@
+export simulate_tof, simulate_tof_with_gradient, sg_separation_peaks
+export momentum_distribution
+
 """
     simulate_tof(psi, grid, sys, params; fft_plans=nothing) → Dict{Int, Array}
 

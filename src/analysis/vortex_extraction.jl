@@ -1,3 +1,5 @@
+export extract_vortex_lines_per_m
+
 """
 Per-m vortex-line extraction for 3D spinor wavefunctions.
 

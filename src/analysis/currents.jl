@@ -1,3 +1,6 @@
+export probability_current, orbital_angular_momentum, superfluid_velocity
+export total_angular_momentum, spin_texture_charge, circulation
+
 """
 Probability current density j(r) = Σ_c Im(ψ_c* ∇ψ_c).
 Returns NTuple{N, Array{Float64,N}} of current components.

@@ -1,3 +1,5 @@
+export bogoliubov_spectrum, detect_roton, instability_angular_map
+
 """
     bogoliubov_spectrum(; spinor, n0, F, interactions, zeeman, c_dd, k_max, n_k, k_direction)
 

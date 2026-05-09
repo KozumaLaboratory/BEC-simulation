@@ -1,5 +1,8 @@
 # --- Bogoliubov instability scan: direction-grid sweep + supersolid prediction ---
 
+export bogoliubov_instability_scan, suggest_grid_params
+export fibonacci_sphere_directions, predict_supersolid_params
+
 function _default_directions()
     raw = [
         (1.0, 0.0, 0.0),

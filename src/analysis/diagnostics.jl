@@ -1,5 +1,12 @@
 # --- Elliptic integral (AGM algorithm) ---
 
+export spin_mixing_period, spin_mixing_period_si
+export quadratic_zeeman_si, quadratic_zeeman_dimless_si
+export healing_length_contact, healing_length_spin, healing_length_ddi
+export thomas_fermi_radius, thomas_fermi_radius_harmonic
+export phase_diagram_point, component_populations, make_conservation_monitor
+export power_spectrum
+
 function _elliptic_k(m::Float64)
     0.0 <= m < 1.0 || throw(DomainError(m, "K(m) requires 0 ≤ m < 1"))
     a = 1.0

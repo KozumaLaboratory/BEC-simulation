@@ -1,3 +1,5 @@
+export estimate_splitting_error, validate_conservation, analyze_stability
+
 """
     estimate_splitting_error(ws) → Float64
 

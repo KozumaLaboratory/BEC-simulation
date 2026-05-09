@@ -3,6 +3,9 @@
 # Column density → observed camera counts. Models the stack of effects that
 # separate a clean |ψ|² slice from a detector readout:
 #   1. Gaussian PSF convolution (finite imaging resolution)
+
+export gaussian_psf_convolve, apply_shot_noise, apply_saturation
+export synthesise_absorption_image, faraday_polarization_components
 #   2. Saturation:  OD_raw = -log((N_probe - N_obs) / N_probe)
 #                   becomes non-linear at OD ≳ 2; we invert it.
 #   3. Poisson shot noise on photon counts

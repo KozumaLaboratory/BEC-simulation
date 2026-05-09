@@ -1,3 +1,6 @@
+export classify_phase, classify_phase_detailed, classify_phase_distance
+export PhaseReference, DEFAULT_PHASE_REFERENCES
+
 """
     classify_phase(psi, F, grid, sm) → NamedTuple
 

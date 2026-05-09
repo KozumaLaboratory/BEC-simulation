@@ -1,6 +1,9 @@
 # --- Synthetic dimension observables ---
 #
 # Treat the spinor m-axis as an extra ("synthetic") spatial dimension.
+
+export synthetic_axis_current, synthetic_dim_dispersion, synthetic_localization_length
+
 # For Raman-coupled or RF-driven spinor BECs, the m index behaves like a
 # discrete lattice site, and bulk physics — currents, band structure,
 # edge states — has a natural transcription. The pipeline analyzer

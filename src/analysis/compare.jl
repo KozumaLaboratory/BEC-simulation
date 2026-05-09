@@ -32,6 +32,8 @@
 # metric. Typical use: limit the comparison to the cloud support so the
 # vacuum noise floor doesn't dominate the loss.
 
+export compare, normalize_field
+
 """
     normalize_field(x; method=:unit) → Array
 

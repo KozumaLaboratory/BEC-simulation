@@ -1,3 +1,9 @@
+export total_density, component_density, total_norm, magnetization
+export spin_density_vector, singlet_pair_amplitude, pair_amplitude
+export nematic_tensor_eigenvalues, biaxiality_parameter
+export multipole_order_parameters, multipole_q_spectrum, multipole_spectrum
+export structure_factor, modulation_contrast, pair_amplitude_spectrum
+
 function total_density(psi::AbstractArray{<:Complex}, ndim::Int)
     n_comp = size(psi, ndim + 1)
     n_pts = ntuple(d -> size(psi, d), ndim)

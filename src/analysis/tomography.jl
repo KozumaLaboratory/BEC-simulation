@@ -1,5 +1,7 @@
 # --- Synthetic Spin Tomography ---
-#
+
+export spin_tomography, tomography_sinogram
+
 # Simulates the experimental spin tomography protocol:
 #   1. Rotate the spinor by angle θ around axis n̂ (= change quantization axis)
 #   2. Apply TOF expansion (far-field approximation)

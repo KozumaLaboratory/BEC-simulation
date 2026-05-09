@@ -1,4 +1,4 @@
-export spherical_harmonic
+export spherical_harmonic, spinor_angular_density
 
 """
     spherical_harmonic(l, m, theta, phi) → ComplexF64
