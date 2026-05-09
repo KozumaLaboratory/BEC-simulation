@@ -254,125 +254,13 @@ function make_workspace(;
         nothing
     end
 
-    lhy = if spinor_lhy === :two_channel
-        n_max_est = if psi_init !== nothing
-            maximum(sum(abs2, psi_init; dims=ndims(psi_init))) * 3.0
-        else
-            100.0
-        end
-        compute_spinor_lhy_two_channel(;
-            F=atom.F, c0=ws_interactions.c0, c1=ws_interactions.c1,
-            c_dd=enable_ddi && !isnan(c_dd) ? c_dd : 0.0,
-            n_max=n_max_est,
-        )
-    elseif spinor_lhy === :full_bdg
-        n_max_est = if psi_init !== nothing
-            maximum(sum(abs2, psi_init; dims=ndims(psi_init))) * 3.0
-        else
-            100.0
-        end
-        spinor_init = psi_init !== nothing ? _extract_spinor(psi_init) : _default_spinor(atom.F)
-        compute_spinor_lhy_table(;
-            spinor=spinor_init, F=atom.F, interactions=ws_interactions,
-            c_dd=enable_ddi && !isnan(c_dd) ? c_dd : 0.0,
-            n_max=n_max_est,
-        )
-    elseif spinor_lhy === :polar_contact
-        # F-generic polar contact LHY (paper #1, contact-only). ~1000× faster
-        # than :full_bdg. Restricted to polar spinors (ζ_α = δ_{α,0}); for
-        # post-quench / mixed states fall back to :full_bdg.
-        n_max_est = if psi_init !== nothing
-            maximum(sum(abs2, psi_init; dims=ndims(psi_init))) * 3.0
-        else
-            100.0
-        end
-        g_dict = _c0c1_to_gS(atom.F, ws_interactions.c0, ws_interactions.c1)
-        if !isempty(ws_interactions.c_extra)
-            for (S, dg) in _c_extra_to_delta_gS(atom.F, ws_interactions.c_extra)
-                g_dict[S] = get(g_dict, S, 0.0) + dg
-            end
-        end
-        compute_spinor_lhy_polar_contact(; F=atom.F, g_dict=g_dict, n_max=n_max_est)
-    elseif spinor_lhy === :fm_dipolar
-        # Stage C scalar reduction: FM single-mode contact LHY × Lima-Pelster Q_5(ε_dd).
-        # `ε_dd` derived from the standard scalar definition c_dd / g_{2F};
-        # for finer control over the convention call
-        # `compute_spinor_lhy_fm_dipolar(; eps_dd, ...)` directly.
-        n_max_est = if psi_init !== nothing
-            maximum(sum(abs2, psi_init; dims=ndims(psi_init))) * 3.0
-        else
-            100.0
-        end
-        g_dict = _c0c1_to_gS(atom.F, ws_interactions.c0, ws_interactions.c1)
-        if !isempty(ws_interactions.c_extra)
-            for (S, dg) in _c_extra_to_delta_gS(atom.F, ws_interactions.c_extra)
-                g_dict[S] = get(g_dict, S, 0.0) + dg
-            end
-        end
-        c_dd_eff = enable_ddi && !isnan(c_dd) ? c_dd : 0.0
-        g_2F = get(g_dict, 2 * atom.F, 0.0)
-        eps_dd = abs(g_2F) > 1e-12 ? abs(c_dd_eff) / abs(g_2F) : 0.0
-        compute_spinor_lhy_fm_dipolar(; F=atom.F, g_dict=g_dict,
-            eps_dd=eps_dd, n_max=n_max_est)
-    elseif spinor_lhy === :fm_contact
-        # FM-phase contact LHY (paper #2 contact-only piece). Single-mode
-        # collapse at m=+F: ε = (8/15π²)(g_{2F}n)^(5/2). For uniform g_S
-        # this matches scalar Lima-Pelster; for realistic per-S a_S it
-        # differs. DDI extension is not yet derived.
-        n_max_est = if psi_init !== nothing
-            maximum(sum(abs2, psi_init; dims=ndims(psi_init))) * 3.0
-        else
-            100.0
-        end
-        g_dict = _c0c1_to_gS(atom.F, ws_interactions.c0, ws_interactions.c1)
-        if !isempty(ws_interactions.c_extra)
-            for (S, dg) in _c_extra_to_delta_gS(atom.F, ws_interactions.c_extra)
-                g_dict[S] = get(g_dict, S, 0.0) + dg
-            end
-        end
-        compute_spinor_lhy_fm_contact(; F=atom.F, g_dict=g_dict, n_max=n_max_est)
-    elseif spinor_lhy === :polar_dipolar
-        # F-generic polar contact + DDI LHY (paper #1 with dipolar extension).
-        # ε̃ derived as the simple |c_dd| / |δ_1| ratio; for finer control
-        # over the convention call `compute_spinor_lhy_polar_dipolar(;
-        # eps_tilde_dd, ...)` directly and pass the resulting `SpinorLHYTable`
-        # via `lhy_table=`.
-        n_max_est = if psi_init !== nothing
-            maximum(sum(abs2, psi_init; dims=ndims(psi_init))) * 3.0
-        else
-            100.0
-        end
-        g_dict = _c0c1_to_gS(atom.F, ws_interactions.c0, ws_interactions.c1)
-        if !isempty(ws_interactions.c_extra)
-            for (S, dg) in _c_extra_to_delta_gS(atom.F, ws_interactions.c_extra)
-                g_dict[S] = get(g_dict, S, 0.0) + dg
-            end
-        end
-        c_dd_eff = enable_ddi && !isnan(c_dd) ? c_dd : 0.0
-        delta_1 = PolarContactLHY.delta_polar(atom.F, 1, g_dict)
-        eps_tilde_dd = abs(delta_1) > 1e-12 ? abs(c_dd_eff) / abs(delta_1) : 0.0
-        compute_spinor_lhy_polar_dipolar(; F=atom.F, g_dict=g_dict,
-            eps_tilde_dd=eps_tilde_dd,
-            n_max=n_max_est)
-    elseif spinor_lhy === :icosahedral
-        # F=6 I_h closed form (Stage D). Universal `c_0^(5/2) + 3|λ_spin|^(5/2)`
-        # with stiffness coefficients depending only on g_0, g_6, g_10, g_12
-        # (g_2, g_4, g_8 cancel by I_h harmonic decomposition). Restricted
-        # to F=6 — caller must arrange the I_h ground state independently.
-        atom.F == 6 || throw(ArgumentError(
-            ":icosahedral spinor_lhy is F=6 only (got F=$(atom.F))"))
-        n_max_est = if psi_init !== nothing
-            maximum(sum(abs2, psi_init; dims=ndims(psi_init))) * 3.0
-        else
-            100.0
-        end
-        g_dict = _c0c1_to_gS(atom.F, ws_interactions.c0, ws_interactions.c1)
-        if !isempty(ws_interactions.c_extra)
-            for (S, dg) in _c_extra_to_delta_gS(atom.F, ws_interactions.c_extra)
-                g_dict[S] = get(g_dict, S, 0.0) + dg
-            end
-        end
-        compute_spinor_lhy_icosahedral(; F=atom.F, g_dict=g_dict, n_max=n_max_est)
+    lhy_attempt =
+        spinor_lhy === nothing ? nothing :
+        _build_spinor_lhy(Val(spinor_lhy), atom, ws_interactions, psi_init,
+            c_dd, enable_ddi)
+
+    lhy = if lhy_attempt !== nothing
+        lhy_attempt
     elseif quasi_2d && abs(ws_interactions.c_lhy) > 1e-30
         compute_lhy_2d_params(ws_interactions.c0, l_z)
     elseif abs(ws_interactions.c_lhy) > 1e-30
@@ -440,4 +328,99 @@ _shift_zeeman_for_rotating_frame(z::ZeemanParams, omega::Float64) = ZeemanParams
 # see CLAUDE.md "Type stability boundaries".)
 function _shift_zeeman_for_rotating_frame(z::TimeDependentZeeman, omega::Float64)
     TimeDependentZeeman(ShiftedWaveform(z.p_wf, omega), z.q_wf, z.bx_wf, z.by_wf)
+end
+
+# ---------------------------------------------------------------------------
+# LHY table builders (Val-dispatched; replaces a 7-way elseif chain that
+# duplicated n_max + g_dict construction across every branch).
+#
+# `_build_spinor_lhy(::Val{:mode}, atom, ws_interactions, psi_init, c_dd,
+# enable_ddi)` returns an LHY table for mode `:mode`, or the fallthrough
+# `_build_spinor_lhy(::Val, ...)` returns `nothing` (caller falls through to
+# the quasi-2D / scalar LHY branches in make_workspace).
+# ---------------------------------------------------------------------------
+
+@inline function _lhy_n_max(psi_init)
+    psi_init === nothing && return 100.0
+    maximum(sum(abs2, psi_init; dims=ndims(psi_init))) * 3.0
+end
+
+function _lhy_g_dict(atom::AtomSpecies, ws::InteractionParams)
+    g_dict = _c0c1_to_gS(atom.F, ws.c0, ws.c1)
+    if !isempty(ws.c_extra)
+        for (S, dg) in _c_extra_to_delta_gS(atom.F, ws.c_extra)
+            g_dict[S] = get(g_dict, S, 0.0) + dg
+        end
+    end
+    g_dict
+end
+
+# Catch-all: unknown / unsupported mode → nothing (caller falls through).
+_build_spinor_lhy(::Val, atom, ws, psi_init, c_dd, enable_ddi) = nothing
+
+function _build_spinor_lhy(::Val{:two_channel}, atom, ws, psi_init, c_dd, enable_ddi)
+    compute_spinor_lhy_two_channel(;
+        F=atom.F, c0=ws.c0, c1=ws.c1,
+        c_dd=enable_ddi && !isnan(c_dd) ? c_dd : 0.0,
+        n_max=_lhy_n_max(psi_init))
+end
+
+function _build_spinor_lhy(::Val{:full_bdg}, atom, ws, psi_init, c_dd, enable_ddi)
+    spinor_init = psi_init !== nothing ? _extract_spinor(psi_init) : _default_spinor(atom.F)
+    compute_spinor_lhy_table(;
+        spinor=spinor_init, F=atom.F, interactions=ws,
+        c_dd=enable_ddi && !isnan(c_dd) ? c_dd : 0.0,
+        n_max=_lhy_n_max(psi_init))
+end
+
+# F-generic polar contact LHY (paper #1, contact-only). ~1000× faster than
+# :full_bdg. Restricted to polar spinors (ζ_α = δ_{α,0}); for post-quench /
+# mixed states fall back to :full_bdg.
+function _build_spinor_lhy(::Val{:polar_contact}, atom, ws, psi_init, c_dd, enable_ddi)
+    compute_spinor_lhy_polar_contact(;
+        F=atom.F, g_dict=_lhy_g_dict(atom, ws), n_max=_lhy_n_max(psi_init))
+end
+
+# FM-phase contact LHY (paper #2 contact-only piece). Single-mode collapse at
+# m=+F: ε = (8/15π²)(g_{2F}n)^(5/2). For uniform g_S this matches scalar
+# Lima-Pelster; for realistic per-S a_S it differs.
+function _build_spinor_lhy(::Val{:fm_contact}, atom, ws, psi_init, c_dd, enable_ddi)
+    compute_spinor_lhy_fm_contact(;
+        F=atom.F, g_dict=_lhy_g_dict(atom, ws), n_max=_lhy_n_max(psi_init))
+end
+
+# Stage C scalar reduction: FM single-mode contact LHY × Lima-Pelster Q_5(ε_dd).
+# `ε_dd` derived from the standard scalar definition c_dd / g_{2F}; for finer
+# control over the convention call `compute_spinor_lhy_fm_dipolar(; eps_dd)`.
+function _build_spinor_lhy(::Val{:fm_dipolar}, atom, ws, psi_init, c_dd, enable_ddi)
+    g_dict = _lhy_g_dict(atom, ws)
+    c_dd_eff = enable_ddi && !isnan(c_dd) ? c_dd : 0.0
+    g_2F = get(g_dict, 2 * atom.F, 0.0)
+    eps_dd = abs(g_2F) > 1e-12 ? abs(c_dd_eff) / abs(g_2F) : 0.0
+    compute_spinor_lhy_fm_dipolar(;
+        F=atom.F, g_dict=g_dict, eps_dd=eps_dd, n_max=_lhy_n_max(psi_init))
+end
+
+# F-generic polar contact + DDI LHY (paper #1 with dipolar extension).
+# ε̃ = |c_dd| / |δ_1|; for finer control call
+# `compute_spinor_lhy_polar_dipolar(; eps_tilde_dd, ...)` directly.
+function _build_spinor_lhy(::Val{:polar_dipolar}, atom, ws, psi_init, c_dd, enable_ddi)
+    g_dict = _lhy_g_dict(atom, ws)
+    c_dd_eff = enable_ddi && !isnan(c_dd) ? c_dd : 0.0
+    delta_1 = PolarContactLHY.delta_polar(atom.F, 1, g_dict)
+    eps_tilde_dd = abs(delta_1) > 1e-12 ? abs(c_dd_eff) / abs(delta_1) : 0.0
+    compute_spinor_lhy_polar_dipolar(;
+        F=atom.F, g_dict=g_dict, eps_tilde_dd=eps_tilde_dd,
+        n_max=_lhy_n_max(psi_init))
+end
+
+# F=6 I_h closed form (Stage D). Universal `c_0^(5/2) + 3|λ_spin|^(5/2)` with
+# stiffness coefficients depending only on g_0, g_6, g_10, g_12 (g_2, g_4, g_8
+# cancel by I_h harmonic decomposition). Restricted to F=6 — caller must
+# arrange the I_h ground state independently.
+function _build_spinor_lhy(::Val{:icosahedral}, atom, ws, psi_init, c_dd, enable_ddi)
+    atom.F == 6 || throw(ArgumentError(
+        ":icosahedral spinor_lhy is F=6 only (got F=$(atom.F))"))
+    compute_spinor_lhy_icosahedral(;
+        F=atom.F, g_dict=_lhy_g_dict(atom, ws), n_max=_lhy_n_max(psi_init))
 end
