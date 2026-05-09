@@ -140,24 +140,24 @@ include("workflow/monitoring/progress.jl")
 include("workflow/monitoring/live_monitor.jl")
 
 # 10. Experiments (defines config types needed by phases)
-include("workflow/experiments/adaptive_advice.jl")
-include("workflow/experiments/config_override.jl")  # OverrideMap + scan expansion
-include("workflow/experiments/schema.jl")           # YAML validation
-include("workflow/experiments/units_block.jl")      # opt-in `units:` rewrite
-include("workflow/experiments/templates_block.jl")  # template + mixin expansion
-include("workflow/experiments/auto_defaults.jl")    # accuracy: + auto_grid:
-include("workflow/experiments/B_block.jl")          # B: → zeeman + B_hat split
-include("workflow/experiments/noise_block.jl")      # noise: → temperature/twa/sgpe split
-include("workflow/experiments/schema_defaults.jl")  # auto-inject ddi:{} etc.
-include("workflow/experiments/helpers_types.jl")            # ConstantValue, LinearRamp, PotentialConfig
-include("workflow/experiments/runtime_misc.jl")             # scale_interactions_quasi_2d, grid normalise, noise seed
-include("workflow/experiments/runtime_io.jl")               # JLD2 result-file writers
-include("workflow/experiments/parsing_units.jl")            # Unit-aware numeric (B-field, freq, time)
-include("workflow/experiments/parsing_blocks.jl")           # Per-block YAML parsers (zeeman/ddi/inter/loss/potential/scan)
-include("workflow/experiments/builders_potential.jl")       # _build_potential / _build_beam / _parse_and_build_potential
-include("workflow/experiments/builders_phase.jl")           # waveforms + zeeman + raman builders
-include("workflow/experiments/zeeman_levels.jl")
-include("workflow/experiments/pipeline_types.jl")
+include("workflow/experiments/runtime/adaptive_advice.jl")
+include("workflow/experiments/schema/config_override.jl")  # OverrideMap + scan expansion
+include("workflow/experiments/schema/schema.jl")           # YAML validation
+include("workflow/experiments/schema/units_block.jl")      # opt-in `units:` rewrite
+include("workflow/experiments/schema/templates_block.jl")  # template + mixin expansion
+include("workflow/experiments/schema/auto_defaults.jl")    # accuracy: + auto_grid:
+include("workflow/experiments/schema/B_block.jl")          # B: → zeeman + B_hat split
+include("workflow/experiments/schema/noise_block.jl")      # noise: → temperature/twa/sgpe split
+include("workflow/experiments/schema/schema_defaults.jl")  # auto-inject ddi:{} etc.
+include("workflow/experiments/schema/helpers_types.jl")            # ConstantValue, LinearRamp, PotentialConfig
+include("workflow/experiments/runtime/runtime_misc.jl")             # scale_interactions_quasi_2d, grid normalise, noise seed
+include("workflow/experiments/runtime/runtime_io.jl")               # JLD2 result-file writers
+include("workflow/experiments/schema/parsing_units.jl")            # Unit-aware numeric (B-field, freq, time)
+include("workflow/experiments/schema/parsing_blocks.jl")           # Per-block YAML parsers (zeeman/ddi/inter/loss/potential/scan)
+include("workflow/experiments/schema/builders_potential.jl")       # _build_potential / _build_beam / _parse_and_build_potential
+include("workflow/experiments/schema/builders_phase.jl")           # waveforms + zeeman + raman builders
+include("workflow/experiments/runtime/zeeman_levels.jl")
+include("workflow/experiments/pipeline/pipeline_types.jl")
 include("workflow/experiments/analyzers/helpers.jl")        # _phase_diff, _line_through_peak, _fwhm_1d, _rms_width_1d, _max_forward_grad
 include("workflow/experiments/analyzers/imaging.jl")        # tomography, faraday, absorption, phase_contrast, sg_tof, momentum_distribution
 include("workflow/experiments/analyzers/phase.jl")          # phase_classify[/distance], energy_decomposition, multipole_order, majorana_order
@@ -165,19 +165,18 @@ include("workflow/experiments/analyzers/topology.jl")       # winding_map, windi
 include("workflow/experiments/analyzers/spectroscopy.jl")   # bragg, droplet, correlation_length, defect_density, kibble_zurek_stats, domain_analysis
 include("workflow/experiments/analyzers/stability.jl")      # stability, bogoliubov, bogoliubov_dispersion + _run_bogoliubov_analyzer
 include("workflow/experiments/analyzers/misc.jl")           # summary_json (only analyzer that needs pipeline_results)
-include("workflow/experiments/analyzers_large.jl")          # skyrmion_detect, synthetic_dim, bogoliubov_mode, rosensweig_pattern, column_density_movie
-include("workflow/experiments/pipeline_analyzers.jl")       # _run_analyzer dispatch (delegates to all the above)
-include("workflow/experiments/pipeline_dispatch.jl")    # save_every / b_hat / dt-from-eps / twa / light_shift parsers
-include("workflow/experiments/pipeline_callbacks.jl")    # sgpe / projected_gp / photon_scattering / live_monitor callback builders
-include("workflow/experiments/pipeline_runner.jl")       # stub (split into pipeline/*.jl below)
+include("workflow/experiments/analyzers/analyzers_large.jl")          # skyrmion_detect, synthetic_dim, bogoliubov_mode, rosensweig_pattern, column_density_movie
+include("workflow/experiments/pipeline/pipeline_analyzers.jl")       # _run_analyzer dispatch (delegates to all the above)
+include("workflow/experiments/pipeline/pipeline_dispatch.jl")    # save_every / b_hat / dt-from-eps / twa / light_shift parsers
+include("workflow/experiments/pipeline/pipeline_callbacks.jl")    # sgpe / projected_gp / photon_scattering / live_monitor callback builders
 include("workflow/experiments/pipeline/runner.jl")               # parse_pipeline + run_pipeline + _step_dispatch! + AnalyzeStep
 include("workflow/experiments/pipeline/run_step_ground_state.jl") # _run_step(::GroundStateStep) + 5 GS helpers
 include("workflow/experiments/pipeline/run_step_dynamics.jl")     # _run_step(::DynamicsStep) + dyn helpers + streaming
 include("workflow/experiments/pipeline/run_step_binary.jl")       # _run_step(::Binary*Step) + binary helpers
 include("workflow/experiments/pipeline/run_step_rotating.jl")     # _run_step(::RotatingBasis*Step) + chirp helpers
-include("workflow/experiments/pulse_sequence.jl")
-include("workflow/experiments/sta_counter_diabatic.jl")
-include("workflow/experiments/feshbach_ramp.jl")
+include("workflow/experiments/runtime/pulse_sequence.jl")
+include("workflow/experiments/runtime/sta_counter_diabatic.jl")
+include("workflow/experiments/runtime/feshbach_ramp.jl")
 include("solvers/projected_gp.jl")
 include("solvers/photon_heating.jl")
 include("solvers/sgpe.jl")
@@ -214,16 +213,16 @@ Drop the cached CUDA Graph for this workspace. No-op on CPU.
 """
 function invalidate_split_step_graph! end
 invalidate_split_step_graph!(::Workspace) = nothing
-include("workflow/experiments/pipeline_api.jl")
-include("workflow/experiments/pipeline_continuation.jl")
-include("workflow/experiments/run_registry.jl")
+include("workflow/experiments/pipeline/pipeline_api.jl")
+include("workflow/experiments/pipeline/pipeline_continuation.jl")
+include("workflow/experiments/pipeline/run_registry.jl")
 include("workflow/experiments/calibration.jl")
 include("workflow/io/calibration_drift.jl")
-include("workflow/experiments/faraday_fit.jl")
-include("workflow/experiments/bayesian_opt.jl")
-include("workflow/experiments/bayesian_opt_mf.jl")    # 2-tier multi-fidelity BO
-include("workflow/experiments/bayesian_opt_yaml.jl")
-include("workflow/experiments/active_learning.jl")    # entropy-uncertainty AL for phase scan
+include("workflow/experiments/optimization/faraday_fit.jl")
+include("workflow/experiments/optimization/bayesian_opt.jl")
+include("workflow/experiments/optimization/bayesian_opt_mf.jl")    # 2-tier multi-fidelity BO
+include("workflow/experiments/optimization/bayesian_opt_yaml.jl")
+include("workflow/experiments/optimization/active_learning.jl")    # entropy-uncertainty AL for phase scan
 
 # ========================================
 # ANALYSIS: Observables & diagnostics
