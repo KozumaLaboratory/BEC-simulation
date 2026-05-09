@@ -1,3 +1,7 @@
+export make_grid, make_fft_plans, make_rfft_plans, rfft_output_shape
+export cell_volume, n_spatial_points
+export load_fftw_wisdom, save_fftw_wisdom
+
 function make_grid(
     config::GridConfig{N};
     dtype::Type{T}=Float64,

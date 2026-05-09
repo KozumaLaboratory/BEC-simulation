@@ -5,6 +5,8 @@
 # carrying axis arrays + k-space buffers. Workspace and every solver
 # step depend on these.
 
+export AbstractBackend, GridConfig, Grid
+
 abstract type AbstractBackend end
 
 # --- Grid Configuration ---

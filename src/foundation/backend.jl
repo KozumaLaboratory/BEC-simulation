@@ -1,3 +1,5 @@
+export CPUBackend, CUDABackend
+
 struct CPUBackend <: AbstractBackend end
 struct CUDABackend <: AbstractBackend end
 

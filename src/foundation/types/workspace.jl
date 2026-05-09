@@ -14,6 +14,8 @@
 # SimParams, SpinMatrices, FFTPlans, etc) is already defined by the
 # time we get here.
 
+export Workspace, workspace_T
+
 struct Workspace{
     N,
     A,

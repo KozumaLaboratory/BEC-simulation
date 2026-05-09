@@ -292,41 +292,8 @@ include("solvers/continuation/triple_point.jl")        # AL × continuation: tri
 include("solvers/twa.jl")
 include("solvers/binary_simulation.jl")
 
-# Types
-export GridConfig, Grid, SpinSystem, SpinMatrices
-export AtomSpecies, InteractionParams, ZeemanParams, LossParams, AbsorbingBoundary, LightShift,
-    TensorInteractionCache
-export linear_p, quadratic_q, transverse_b   # uniform Zeeman accessors
-export SimParams,
-    SimState, FFTPlans, RFFTPlans, Workspace, AdaptiveDtParams, IntegratorConfig
-export SimulationResult, TWAConfig, EnsembleResult
-export TOFParams, BdGResult, InstabilityMap, HysteresisResult, RotonParams, SupersolidPrediction
-export HarmonicTrap, NoPotential, GravityPotential, CompositePotential
-export RingPotential, BoxPotential, OpticalLatticePotential, DoubleWellPotential, QuarticPotential
-export LaguerreGaussBeam, PlugBeam, ShakenLatticePotential
-export MagneticGradient, TimeDependentMagneticGradient
-export TimeDependentTrap, TimeDependentInteractions, interactions_at
-export AbstractBackend, CPUBackend, CUDABackend
-export AbstractLHY, ScalarLHY, Quasi2DLHY, SpinorLHYTable
-
-# Grid
-export make_grid,
-    make_fft_plans, make_rfft_plans, rfft_output_shape, cell_volume, n_spatial_points
-export load_fftw_wisdom, save_fftw_wisdom
-
-# Spin
-export spin_matrices
-
-# Atoms — alkali metals
-export Li7, Na23, K39, K41, Rb85, Rb87, Cs133
-# Atoms — magnetic lanthanides
-export Cr52, Dy164, Dy162, Er168, Er166, Eu151
-# Atoms — spinless
-export Ca40, Sr84, Sr86, Sr88, Yb170, Yb174, Yb176
-# Atoms — metastable
-export He4star
-# Atom registry
-export ATOM_REGISTRY, resolve_atom
+# Foundation types, grid utilities, atom species, spin matrices, backends:
+# all `export`ed at their definition sites in src/foundation/.
 
 # Interactions
 export compute_interaction_params,
@@ -404,26 +371,17 @@ export apply_singlet_pair_step!, apply_nematic_step!  # nematic = legacy alias
 # Tensor interaction (general-F)
 export apply_tensor_interaction_step!, make_tensor_interaction_cache
 
-# Clebsch-Gordan / Wigner coefficients
-export wigner_3j,
-    clebsch_gordan, wigner_6j, precompute_cg_table, precompute_cg_array, CGArrayTable
+# Clebsch-Gordan / Wigner: exported in src/foundation/clebsch_gordan.jl.
+# Waveform types: exported in src/foundation/waveform.jl.
 
 # Losses
 export apply_loss_step!
 
 # Absorbing boundary
-export AbsorbingBoundary, compute_absorbing_mask, apply_absorbing_boundary!
-
-# Waveform
-export AbstractWaveform, Waveform
-export ConstantWaveform, RampWaveform, PiecewiseLinearWaveform, FunctionWaveform
-export SinusoidalWaveform,
-    ChirpedSinusoidalWaveform, GaussianPulseWaveform, InterpolatedWaveform, CompositeWaveform
-export StepWaveform
-export evaluate, load_waveform_csv
+export compute_absorbing_mask, apply_absorbing_boundary!
 
 # Raman coupling
-export RamanCoupling, TimeDependentRaman, apply_raman_step!, raman_at
+export apply_raman_step!, raman_at
 export apply_uniform_spin_rotation!
 
 # Split-step
@@ -447,7 +405,7 @@ export wigner_correct_density, ensemble_correlation, ensemble_stderr
 export superfluid_vorticity, berry_curvature, singlet_pair_amplitude
 export pair_amplitude, pair_amplitude_spectrum
 export majorana_stars, icosahedral_order_parameter, detect_point_group
-export spherical_harmonic, spinor_angular_density
+export spinor_angular_density
 export nematic_tensor_eigenvalues, biaxiality_parameter
 export multipole_order_parameters, multipole_spectrum
 export get_cn

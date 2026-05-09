@@ -1,3 +1,9 @@
+export Li7, Na23, K39, K41, Rb85, Rb87, Cs133              # alkali metals
+export Cr52, Dy164, Dy162, Er168, Er166, Eu151             # magnetic lanthanides
+export Ca40, Sr84, Sr86, Sr88, Yb170, Yb174, Yb176         # spinless
+export He4star                                              # metastable
+export ATOM_REGISTRY, resolve_atom
+
 # --- Alkali Metals ---
 
 # ⁷Li: F=1 ground state (²S₁/₂, I=3/2)

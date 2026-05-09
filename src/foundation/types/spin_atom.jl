@@ -6,6 +6,8 @@
 # step can rotate via dense gemm. `AtomSpecies` carries the calibrated
 # physical constants for Eu151/Dy164/Rb87/etc.
 
+export SpinSystem, SpinMatrices, AtomSpecies
+
 # --- Spin System ---
 
 struct SpinSystem

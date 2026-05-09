@@ -9,6 +9,9 @@
 # diagonalisation. `TensorInteractionCache` holds the CG coefficients
 # for the general-F contact step.
 
+export DDIParams, DDIBuffers, DDIPaddedContext
+export LossParams, LightShift, TensorInteractionCache
+
 # --- DDI ---
 
 mutable struct DDIParams{N, AQ <: AbstractArray{<:AbstractFloat, N}}

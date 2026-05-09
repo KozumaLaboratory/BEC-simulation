@@ -8,6 +8,8 @@
 # here too; they're pure-data caches the workspace constructor builds
 # once.
 
+export SimParams, SimState, FFTPlans, RFFTPlans, BatchedKineticCache, AbsorbingBoundary
+
 # --- Simulation Parameters ---
 
 struct SimParams

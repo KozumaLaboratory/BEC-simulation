@@ -1,3 +1,5 @@
+export spin_matrices
+
 function spin_matrices(F::Int)
     sys = SpinSystem(F)
     n = sys.n_components

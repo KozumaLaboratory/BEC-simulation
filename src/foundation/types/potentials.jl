@@ -5,6 +5,13 @@
 # All inherit from `AbstractPotential`. Pure type definitions; the
 # evaluators live in `src/hamiltonian/potentials/`.
 
+export AbstractPotential
+export HarmonicTrap, NoPotential, GravityPotential, CompositePotential
+export RingPotential, BoxPotential, OpticalLatticePotential, DoubleWellPotential, QuarticPotential
+export AbstractLHY, ScalarLHY, Quasi2DLHY, SpinorLHYTable
+export MagneticGradient, TimeDependentMagneticGradient
+export LaguerreGaussBeam, PlugBeam, ShakenLatticePotential, TimeDependentTrap
+
 # --- Potential ---
 
 abstract type AbstractPotential end

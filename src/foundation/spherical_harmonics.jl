@@ -1,3 +1,5 @@
+export spherical_harmonic
+
 """
     spherical_harmonic(l, m, theta, phi) → ComplexF64
 

@@ -7,6 +7,8 @@
 # `TWAConfig` and `EnsembleResult` are the Truncated-Wigner ensemble
 # wrappers.
 
+export AdaptiveDtParams, IntegratorConfig, SimulationResult, TWAConfig, EnsembleResult
+
 # --- Adaptive Time Stepping ---
 
 struct AdaptiveDtParams

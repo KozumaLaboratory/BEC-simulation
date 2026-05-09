@@ -4,6 +4,8 @@
 # pause/resume checkpoint type. Pure data; expansion logic lives in
 # `src/workflow/experiments/config_override.jl`.
 
+export OverrideScan, ConstrainedJzScan, ITPCheckpoint
+
 # --- Phase Scan Types ---
 
 abstract type AbstractScanSpec end

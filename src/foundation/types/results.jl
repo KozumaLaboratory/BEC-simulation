@@ -4,6 +4,9 @@
 # hysteresis sweeps, and supersolid predictions. The analyses themselves
 # live in src/analysis/.
 
+export TOFParams, BdGResult, InstabilityMap, RotonParams, SupersolidPrediction,
+    HysteresisResult
+
 struct TOFParams
     t_tof::Float64
     gradient::Float64

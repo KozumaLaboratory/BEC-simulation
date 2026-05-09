@@ -1,5 +1,11 @@
 # --- Waveform: typed time-dependent parameter abstraction ---
 
+export AbstractWaveform, Waveform
+export ConstantWaveform, RampWaveform, PiecewiseLinearWaveform, FunctionWaveform
+export SinusoidalWaveform, ChirpedSinusoidalWaveform, GaussianPulseWaveform,
+    InterpolatedWaveform, CompositeWaveform, StepWaveform
+export evaluate, load_waveform_csv
+
 abstract type AbstractWaveform{T <: Number} end
 
 """Type alias for real-valued waveforms (the common case)."""

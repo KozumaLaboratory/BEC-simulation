@@ -1,3 +1,6 @@
+export wigner_3j, clebsch_gordan, wigner_6j
+export precompute_cg_table, precompute_cg_array, CGArrayTable
+
 """
 Log-space factorial for numerical stability (handles n up to ~170).
 """
