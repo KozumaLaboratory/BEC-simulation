@@ -162,11 +162,17 @@ function _trap_energy(psi, V_trap, n_comp, ndim, n_pts, dV)
 end
 
 function _zeeman_energy(psi, zeeman, sys, n_comp, ndim, n_pts, dV)
-    zee = zeeman_energies(zeeman, sys)
+    # Inline `(-z.p m + z.q m²) |ψ_m|²` instead of materialising the
+    # `zeeman_energies` Vector{Float64} per call (saves ~104 B / 1 alloc
+    # per `energy_decomposition` call at D=13).
+    p = zeeman.p
+    q = zeeman.q
     E = 0.0
-    for c in 1:n_comp
+    @inbounds for c in 1:n_comp
+        m = sys.m_values[c]
+        zee_c = -p * m + q * m * m
         idx = _component_slice(ndim, n_pts, c)
-        E += zee[c] * sum(abs2, view(psi, idx...)) * dV
+        E += zee_c * sum(abs2, view(psi, idx...)) * dV
     end
     E
 end
