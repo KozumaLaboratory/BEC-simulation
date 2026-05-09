@@ -203,29 +203,8 @@ include("rotating_basis/analysis.jl")
 include("rotating_basis/analyzers.jl")
 include("rotating_basis/scalar_egpe.jl")
 
-# CUDA-graph-accelerated split_step (extended by SpinorBECCUDAExt).
-# Default implementation = plain split_step! so CPU workspaces work unchanged.
-"""
-    split_step_captured!(ws) → Nothing
+include("cuda_graph_stubs.jl")
 
-GPU-accelerated variant of `split_step!` that captures the kernel sequence
-into a CUDA Graph on first call, then replays it via a single driver call on
-subsequent steps. Eliminates the ~5-10 μs per-kernel launch overhead that
-dominates large-D F32 runs.
-
-For CPU workspaces this falls back to plain `split_step!`. Requires
-`using CUDA` to load the optimised implementation.
-"""
-function split_step_captured! end
-split_step_captured!(ws::Workspace) = split_step!(ws)
-
-"""
-    invalidate_split_step_graph!(ws) → Nothing
-
-Drop the cached CUDA Graph for this workspace. No-op on CPU.
-"""
-function invalidate_split_step_graph! end
-invalidate_split_step_graph!(::Workspace) = nothing
 include("workflow/experiments/pipeline/pipeline_api.jl")
 include("workflow/experiments/pipeline/pipeline_continuation.jl")
 include("workflow/experiments/pipeline/run_registry.jl")
@@ -292,156 +271,30 @@ include("solvers/continuation/triple_point.jl")        # AL × continuation: tri
 include("solvers/twa.jl")
 include("solvers/binary_simulation.jl")
 
-# Foundation types, grid utilities, atom species, spin matrices, backends:
-# all `export`ed at their definition sites in src/foundation/.
+# All public symbols are now `export`ed at their definition sites under
+# src/foundation/, src/hamiltonian/, src/analysis/, src/solvers/, and
+# src/workflow/. The umbrella module here only declares cross-cutting
+# extension stubs (CUDA Graph hooks, Makie visualisation placeholders).
 
-# Interactions, LHY tables, Sinatra helpers, quasi-2D scaling: exported
-# at definition sites under src/hamiltonian/interactions/, src/dynamics/,
-# and src/workflow/experiments/runtime/.
-
-# DDI, potentials (trap/zeeman/optical/laser/light-shift): exported at
-# definition sites under src/hamiltonian/.
-
-# Propagators, integrator, spin-mixing, nematic, tensor, losses, absorbing
-# boundary, raman, split_step!: all `export`ed at their definition sites
-# under src/hamiltonian/.
-
-# Analysis (observables, energy, currents, ensemble, vorticity, majorana,
-# tof, faraday, imaging, topology, synthetic_dim, time_resolved, tomography,
-# stability, spin_rotation, vortex_extraction, phase_classification,
-# bogoliubov, diagnostics, compare): exported at definition sites
-# under src/analysis/. Thomas-Fermi state initialisers are exported in
-# src/workflow/initialization/state_zoo.jl + thomas_fermi.jl.
-
-# Solvers (find_ground_state, find_ground_state_lbfgs, scan_continuation,
-# scan_phase_*, trace_phase_boundary, detect_triple_points,
-# run_simulation*!, run_twa, add_vacuum_noise, make_workspace, init_psi):
-# all exported at definition sites under src/solvers/ and
-# src/workflow/initialization/.
-
-# I/O (save_state/load_state, dashboard data + server, run summaries,
-# HTML report, budget, VTK export, rotating-basis result writer,
-# LiveMonitor): exported at definition sites under src/workflow/io/
-# and src/workflow/monitoring/.
-
-# Pipeline API + STA + Feshbach + SGPE/PGP/photon-scattering callbacks +
-# YAML config + run registry + summaries + Bayesian / multi-fidelity opt +
-# active-learning + calibration: all exported at definition sites under
-# src/workflow/experiments/ and src/solvers/.
-
-# CUDA Graph hooks (defined at top-level, replayed by SpinorBECCUDAExt).
 export split_step_captured!, invalidate_split_step_graph!
-# Binary BEC (foundation/binary_state.jl + solvers/binary_simulation.jl),
-# init_psi state zoo (workflow/initialization/state_zoo.jl), config
-# overrides (schema/config_override.jl), schema validation
-# (schema/schema.jl), helpers (schema/helpers_types.jl), scan summary
-# aggregation (io/scan_summary.jl): all exported at definition sites.
-
-# Units
 export Units
-
-# Tracing
 export TIMER, enable_tracing!, disable_tracing!, reset_tracing!
 
 function enable_tracing!()
     TimerOutputs.enable_debug_timings(SpinorBEC)
     enable_timer!(TIMER)
 end
+disable_tracing!() = disable_timer!(TIMER)
+reset_tracing!() = TimerOutputs.reset_timer!(TIMER)
 
-function disable_tracing!()
-    disable_timer!(TIMER)
-end
-
-function reset_tracing!()
-    TimerOutputs.reset_timer!(TIMER)
-end
-
-# Visualization (defined in Makie extension, exported here for discoverability)
+# Makie ext placeholders (real methods in ext/SpinorBECMakieExt).
 function plot_density end
 function plot_spinor end
 function plot_spin_texture end
 function animate_dynamics end
 export plot_density, plot_spinor, plot_spin_texture, animate_dynamics
 
-# ---------------------------------------------------------------------------
-# Precompile workload — exercises the dashboard's hot read/write paths so
-# the first /api/density_bin scrub doesn't pay the ~9 s JIT tax. We don't
-# try to precompile the simulator (multi-minute build); only the routes a
-# freshly-opened browser session walks through.
-# ---------------------------------------------------------------------------
-using PrecompileTools
-
-@setup_workload begin
-    @compile_workload begin
-        # Tiny synthetic snapshot file mirroring the
-        # `dynamics/psi_snapshots_streamed/frame_NNNNN` layout.
-        tmpdir = mktempdir()
-        path = joinpath(tmpdir, "precompile_smoke.jld2")
-        try
-            psi_frame = zeros(ComplexF32, 4, 4, 4, 3)  # F=1 spinor on a 4³ grid
-            psi_frame[2, 2, 2, 2] = 1.0f0 + 0.0f0im
-            JLD2.jldopen(path, "w") do f
-                f["dynamics/psi_snapshots_streamed/n_snapshots"] = 1
-                f["dynamics/psi_snapshots_streamed/spatial_shape"] = [4, 4, 4]
-                f["dynamics/psi_snapshots_streamed/n_components"] = 3
-                f["dynamics/psi_snapshots_streamed/frame_00001"] = psi_frame
-                f["dynamics/times"] = [0.0, 0.1]
-                f["grid_box_size"] = (1.0, 1.0, 1.0)
-            end
-            cache = Dict{String, Any}()
-            tup = _load_psi_cached(path, cache, 1)
-            _compute_column_density_binary(tup..., 3, path)
-            _compute_phase_slice_binary(tup..., 3, nothing, path)
-            # _snapshots_metadata internally invokes
-            # _global_density_max_total_sampled, so this single call
-            # specialises both the metadata reader and the global-max walk.
-            _snapshots_metadata(path)
-            # Exercise the binary HTTP-response path too; the IOBuffer
-            # take! → write(::TCPSocket, ::Vector{UInt8}) chain has its
-            # own specialisations.
-            iob = IOBuffer()
-            write(iob, Int32(1), Int32(1), Int32(4), Int32(4), Int32(3), Int32(1))
-            write(iob, Float32[0, 1, 0, 1])
-            take!(iob)
-            # NOTE: Pre-compiling the binary-GP YAML pipeline path was
-            # tried here and made package precompile take 10+ minutes —
-            # the same JIT cascade that hits the runtime call simply
-            # moves to build time. Standalone solver path still works
-            # via test/test_binary_simulation.jl; YAML wiring remains a
-            # known slow-first-call limitation tracked in the test
-            # guards (_SKIP_HEAVY_YAML_INFRA / _SKIP_HEAVY_YAML_ZEEMAN).
-
-            # Rotating-basis specialisation primer: build tiny workspaces
-            # for both Float64 and Float32 + exercise one split_step call,
-            # so the runtime JIT does not have to specialise
-            # `make_rotating_basis_ws{T,...}` and the inner kinetic /
-            # diagonal / spin substeps for each T at first use. F=1 D=3
-            # on a 4³ grid keeps the specialisation work tiny.
-            for T in (Float64, Float32)
-                config_rb = GridConfig((4, 4, 4), (T(2.0), T(2.0), T(2.0)))
-                grid_rb = make_grid(config_rb)
-                V_rb = zeros(T, 4, 4, 4)
-                ws_rb = make_rotating_basis_ws(grid_rb, 1, V_rb;
-                    p=T(1.0), q=T(0.0), c0=T(1.0), c1=T(0.0),
-                    c_dd=T(0.0), gamma_lhy=T(0.0),
-                    theta_func=t -> 0.0, phi_func=t -> 0.0,
-                    theta_dot_func=t -> 0.0, phi_dot_func=t -> 0.0,
-                    gauge_fix=false)
-                normalize_rotating!(ws_rb)
-                split_step_rotating!(ws_rb, T(0.01), T(0.0))
-            end
-        catch
-            # Don't break package precompile if the workload trips.
-        finally
-            try
-                ;
-                rm(tmpdir; recursive=true, force=true);
-            catch
-                ;
-            end
-        end
-    end
-end
+include("precompile.jl")
 
 function __init__()
     __init_templates__()
