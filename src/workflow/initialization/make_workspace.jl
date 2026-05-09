@@ -156,7 +156,7 @@ function make_workspace(;
             end
         end
 
-        make_ddi_params(
+        ddi_params_cpu = make_ddi_params(
             grid,
             atom;
             c_dd=c_dd_val,
@@ -165,40 +165,33 @@ function make_workspace(;
             l_z=l_z_ddi,
             dtype=U,
         )
+        _ddi_params_to_device(ddi_params_cpu, backend)
     else
         nothing
     end
 
-    ddi = if ddi !== nothing
-        _ddi_params_to_device(ddi, backend)
-    else
+    ddi_bufs = ddi !== nothing ?
+        make_ddi_buffers(grid.config.n_points, backend; flags=fft_flags, dtype=U) :
         nothing
-    end
-
-    ddi_bufs = if ddi !== nothing
-        make_ddi_buffers(grid.config.n_points, backend; flags=fft_flags, dtype=U)
-    else
-        nothing
-    end
 
     density_buf = _zeros(backend, U, grid.config.n_points...)
 
-    ddi_pad = if ddi_padding && ddi !== nothing
-        c_dd_val = isnan(c_dd) ? compute_c_dd(atom) : ddi.C_dd
+    # `ddi_pad` reuses the already-resolved `ddi.C_dd` (so the un-padded and
+    # padded DDI agree on coupling), and only fires when both `ddi_padding`
+    # is requested *and* a DDI workspace exists.
+    ddi_pad = (ddi_padding && ddi !== nothing) ?
         make_ddi_padded(
             grid,
             atom;
-            c_dd=c_dd_val,
+            c_dd=ddi.C_dd,
             fft_flags,
             secular=secular_ddi,
             quasi_2d=quasi_2d_ddi,
             l_z=l_z_ddi,
             backend,
             dtype=U,
-        )
-    else
+        ) :
         nothing
-    end
 
     batched_kinetic = _make_batched_kinetic_cache(psi, kinetic_phase, N, backend; flags=fft_flags)
 
