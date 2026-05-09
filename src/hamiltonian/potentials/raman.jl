@@ -160,19 +160,44 @@ function _apply_rotation_to_spin_axis!(
     buf_2d = reshape(buf, n_spatial, D)
 
     # buf[k,i] = Σⱼ R[i,j]·psi[k,j] = Σⱼ psi[k,j]·(Rᵀ)[j,i] → buf = psi · Rᵀ.
-    # Build Rᵀ on host (D² scalar ops), then copyto! into a cached device
-    # buffer (per-scratch objectid) to keep the GPU pointer stable across
-    # calls. The h2d copy of D² complexes is trivial (~5 KB at D=17).
-    R_T_host = Matrix{T}(undef, D, D)
-    @inbounds for j in 1:D, i in 1:D
-        R_T_host[j, i] = T(R[i, j])
-    end
-    R_T = scratch === nothing ?
-          (rt=similar(psi, T, D, D); rt) :
-          _get_rt_buffer(scratch, T, D)
-    copyto!(R_T, R_T_host)
+    # CPU: populate Rᵀ in-place. GPU: build on host, single h2d copy
+    # (~5 KB at D=17). Dispatch on `psi` type since the rotation scratch
+    # cache is keyed by `objectid(scratch)` and stored under an abstract
+    # `Dict{UInt, AbstractArray}` value type — annotating the retrieved
+    # buffer keeps inference concrete in the per-element fill loop.
+    R_T = _populate_rt_buffer!(psi, R, T, Val(D), scratch)
 
     mul!(buf_2d, psi_2d, R_T)
     copyto!(psi, buf)
     nothing
+end
+
+# CPU branch: write Rᵀ entries directly into a typed Array. The `::Matrix{T}`
+# annotation defeats the abstract-value-type erasure of `_ROTATION_RT_CACHE`
+# (`Dict{UInt, AbstractArray}`).
+function _populate_rt_buffer!(
+    psi::Array{<:Complex}, R::SMatrix{D, D, ComplexF64}, ::Type{T}, ::Val{D}, scratch,
+) where {T, D}
+    R_T::Matrix{T} = scratch === nothing ?
+                     Matrix{T}(undef, D, D) :
+                     _get_rt_buffer(scratch, T, D)::Matrix{T}
+    @inbounds for j in 1:D, i in 1:D
+        R_T[j, i] = T(R[i, j])
+    end
+    R_T
+end
+
+# Generic / GPU fallback: build Rᵀ on host then `copyto!` into the device
+# buffer. Per-element scalar writes against a CuArray would launch D²
+# kernels — unacceptable.
+function _populate_rt_buffer!(
+    psi::AbstractArray{<:Complex}, R::SMatrix{D, D, ComplexF64}, ::Type{T}, ::Val{D}, scratch,
+) where {T, D}
+    R_T_host = Matrix{T}(undef, D, D)
+    @inbounds for j in 1:D, i in 1:D
+        R_T_host[j, i] = T(R[i, j])
+    end
+    R_T = scratch === nothing ? similar(psi, T, D, D) : _get_rt_buffer(scratch, T, D)
+    copyto!(R_T, R_T_host)
+    R_T
 end

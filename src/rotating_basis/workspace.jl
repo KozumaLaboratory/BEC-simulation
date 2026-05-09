@@ -107,7 +107,8 @@ struct RotatingBasisWS{T <: AbstractFloat, N, D,
     AC <: AbstractArray, AC1 <: AbstractArray,
     AR <: AbstractArray, ARK <: AbstractArray,
     FP, IP, DB <: DDIBuffers,
-    BACK <: AbstractBackend}
+    BACK <: AbstractBackend,
+    TF, PF, TDF, PDF}
     # State (rotating basis): ψ̃[r..., m] — concrete eltype Complex{T}
     psi_tilde::AC
     # Scratch: ψ in lab basis (only populated during DDI step)
@@ -150,11 +151,16 @@ struct RotatingBasisWS{T <: AbstractFloat, N, D,
     c1::T              # spin-mixing (set 0 to skip)
     gamma_lhy::T       # scalar LHY: V += γ_LHY · ρ^(3/2). Stabilizes ε_dd > 1.
 
-    # B̂(t) angles + their derivatives. Each maps t → Float64.
-    theta_func::Function
-    phi_func::Function
-    theta_dot_func::Function
-    phi_dot_func::Function
+    # B̂(t) angles + their derivatives. Each maps t → Float64. Stored
+    # under their concrete callable type (TF/PF/TDF/PDF) — declaring
+    # `::Function` here would force every call site through dynamic
+    # dispatch, so the per-step `ws.theta_func(t)` return values would
+    # be boxed and allocate ~496 B per call (~2 K allocs per
+    # `apply_local_spin_step!`).
+    theta_func::TF
+    phi_func::PF
+    theta_dot_func::TDF
+    phi_dot_func::PDF
 
     # Gauge: if true, apply χ̇ = -φ̇ cosθ to remove F_z component of Â.
     gauge_fix::Bool
@@ -171,10 +177,14 @@ function make_rotating_basis_ws(
     c0::Real, c1::Real=0.0,
     c_dd::Real=0.0,
     gamma_lhy::Real=0.0,
-    theta_func::Function=(_t) -> 0.0,
-    phi_func::Function=(_t) -> 0.0,
-    theta_dot_func::Function=(_t) -> 0.0,
-    phi_dot_func::Function=(_t) -> 0.0,
+    # Untyped kwargs so each callable's concrete type flows into the
+    # `RotatingBasisWS{...,TF,PF,TDF,PDF}` specialization. Annotating
+    # `::Function` here would erase the closure type and trigger
+    # ~496 B/call boxing in the per-step ws.theta_func(t) calls.
+    theta_func=(_t) -> 0.0,
+    phi_func=(_t) -> 0.0,
+    theta_dot_func=(_t) -> 0.0,
+    phi_dot_func=(_t) -> 0.0,
     gauge_fix::Bool=true,
     backend::AbstractBackend=CPUBackend(),
 ) where {N, T <: AbstractFloat}
@@ -232,7 +242,9 @@ function make_rotating_basis_ws(
 
     RotatingBasisWS{T, N, D,
         typeof(psi_tilde), typeof(spatial_buf), typeof(rho_buf), typeof(V_trap_dev),
-        typeof(fft_fwd), typeof(fft_inv), typeof(ddi_bufs), typeof(backend)}(
+        typeof(fft_fwd), typeof(fft_inv), typeof(ddi_bufs), typeof(backend),
+        typeof(theta_func), typeof(phi_func),
+        typeof(theta_dot_func), typeof(phi_dot_func)}(
         psi_tilde, psi_lab_buf, rotation_scratch, spatial_buf, rho_buf,
         kspace_phase_buf, xspace_phase_buf,
         grid, sm,
