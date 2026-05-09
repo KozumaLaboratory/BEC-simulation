@@ -40,6 +40,7 @@ struct Workspace{
     LS,
     TDI,
     MG,
+    T <: AbstractFloat,
 }
     state::SimState{N, A}
     fft_plans::FFTPlans{P, IP}
@@ -47,7 +48,12 @@ struct Workspace{
     potential_values::VPA
     density_buf::DBA
     spin_matrices::SM
-    grid::Grid{N}
+    # Grid has two parameters `Grid{N, T}` — declaring `::Grid{N}` here
+    # leaves T abstract. Reading `ws.grid.k_squared[i]` then routes
+    # through dynamic dispatch (~3 boxing allocs per element in a loop;
+    # measured 11.7K allocs / 188 KB on a 16³ k_squared traversal).
+    # Pin T as a workspace type parameter so the float type propagates.
+    grid::Grid{N, T}
     atom::AtomSpecies
     interactions::InteractionParams
     zeeman::ZEE

@@ -71,10 +71,18 @@ end
 # 6. apply_ddi_step! on Eu151 16³ (CPU). 6 rFFTs + spin-density + tensor
 # contraction in k-space + Euler spin rotation. Single largest cost in
 # Klaus / Berry rotating-basis runs (called every split-step).
+#
+# `make_ddi_params(grid, Eu151)` returns C_dd ≈ 1.5e-52 (compute_c_dd
+# is in SI units that don't match the dimensionless grid — see
+# compute_c_dd_dimless), which makes the per-voxel Euler rotation
+# early-return everywhere (phi_mag·dt < 1e-14). That masks ~80% of
+# apply_ddi_step's real cost — the bench was reporting 330 µs for what
+# costs ~1.8 ms in production. Override C_dd to a Klaus-regime
+# dimensionless value (~100) so the bench measures the production path.
 let
     grid = make_grid(GridConfig((16, 16, 16), (8.0, 8.0, 8.0)))
     sm = spin_matrices(6)
-    ddi = SpinorBEC.make_ddi_params(grid, Eu151)
+    ddi = SpinorBEC.make_ddi_params(grid, Eu151; c_dd = 100.0)
     bufs = SpinorBEC.make_ddi_buffers(grid.config.n_points)
     psi = randn(ComplexF64, 16, 16, 16, 13) ./ 100
     SUITE["kernel/apply_ddi_step_eu151_16cubed"] = @benchmarkable begin
