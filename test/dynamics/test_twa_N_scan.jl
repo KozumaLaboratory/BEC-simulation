@@ -17,8 +17,8 @@ using JLD2
 #     monotonically as N grows; σ/μ at peak shrinks as N grows
 #   - Genuine dipolar instability: FWHM_z stays in {5, 6, 7} regardless of N
 
-const _RUNS_ROOT = joinpath(@__DIR__, "..", "runs")
-const _DETERMINISTIC = joinpath(@__DIR__, "..", "runs", "eu151_edh_postfix_local",
+const _RUNS_ROOT = joinpath(@__DIR__, "..", "..", "runs")
+const _DETERMINISTIC = joinpath(@__DIR__, "..", "..", "runs", "eu151_edh_postfix_local",
     ".archive_baseline", "point_001.jld2")
 const _N_VALUES = (1000, 10000, 100000)
 

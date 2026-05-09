@@ -20,7 +20,7 @@ using SpinorBEC
         srv_task = @async begin
             try
                 # Build minimal HTML so serve_dashboard doesn't error on missing dist
-                webdir = joinpath(@__DIR__, "..", "web", "dist")
+                webdir = joinpath(@__DIR__, "..", "..", "web", "dist")
                 indexhtml = joinpath(webdir, "index.html")
                 isfile(indexhtml) || (mkpath(webdir); write(indexhtml, "<html></html>"))
                 serve_dashboard(port; base_dir=tmp)
@@ -86,7 +86,7 @@ end
         port = 8900 + (getpid() % 100)
         srv_task = @async begin
             try
-                webdir = joinpath(@__DIR__, "..", "web", "dist")
+                webdir = joinpath(@__DIR__, "..", "..", "web", "dist")
                 indexhtml = joinpath(webdir, "index.html")
                 isfile(indexhtml) || (mkpath(webdir); write(indexhtml, "<html></html>"))
                 serve_dashboard(port; base_dir=tmp)

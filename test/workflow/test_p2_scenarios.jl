@@ -2,7 +2,7 @@ using Test
 using SpinorBEC
 
 @testset "P2 driven-scenario YAMLs — load + parse smoke test" begin
-    scenario_dir = joinpath(@__DIR__, "..", "runs", "scenarios")
+    scenario_dir = joinpath(@__DIR__, "..", "..", "runs", "scenarios")
     yamls = String[]
     for entry in readdir(scenario_dir)
         d = joinpath(scenario_dir, entry)
