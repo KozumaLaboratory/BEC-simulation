@@ -29,6 +29,9 @@
 # implemented in `src/workflow/initialization/vacuum_noise.jl`.
 # =================================================================
 
+export healing_length, cutoff_energy_from_xi, cutoff_energy_from_gn
+export effective_n_modes, sinatra_ratio
+
 """
     healing_length(g, n; M=1.0, hbar=1.0) -> Float64
 

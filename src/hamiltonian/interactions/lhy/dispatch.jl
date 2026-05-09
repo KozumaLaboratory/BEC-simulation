@@ -1,3 +1,8 @@
+export compute_spinor_lhy_two_channel, compute_spinor_lhy_table
+export compute_spinor_lhy_polar_contact, compute_spinor_lhy_polar_dipolar
+export compute_spinor_lhy_fm_contact, compute_spinor_lhy_fm_dipolar
+export compute_spinor_lhy_icosahedral
+
 """
     compute_spinor_lhy_two_channel(; F, c0, c1, c_dd, n_max, n_points) → SpinorLHYTable
 

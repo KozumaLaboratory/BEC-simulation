@@ -1,5 +1,7 @@
 # --- Runtime utilities: interactions scaling, grid normalisation, noise seeding ---
 
+export scale_interactions_quasi_2d
+
 # --- Experiment utility functions ---
 
 function scale_interactions_quasi_2d(ip::InteractionParams, l_z::Float64)

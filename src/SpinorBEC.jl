@@ -295,22 +295,9 @@ include("solvers/binary_simulation.jl")
 # Foundation types, grid utilities, atom species, spin matrices, backends:
 # all `export`ed at their definition sites in src/foundation/.
 
-# Interactions
-export compute_interaction_params,
-    compute_interaction_params_general_f, compute_c0, compute_c_dd, compute_a_dd
-export interaction_params_from_constraint,
-    compute_c_total, compute_c_dd_dimless, linear_zeeman_p
-export even_c_extra
-export compute_eu151_interactions
-export lima_pelster_Q5, compute_c_lhy_with_ddi
-export compute_lhy_2d_params
-export compute_spinor_lhy_two_channel, compute_spinor_lhy_table
-export compute_spinor_lhy_polar_contact, compute_spinor_lhy_polar_dipolar
-export compute_spinor_lhy_fm_contact, compute_spinor_lhy_fm_dipolar
-export compute_spinor_lhy_icosahedral
-export healing_length, cutoff_energy_from_xi, cutoff_energy_from_gn
-export effective_n_modes, sinatra_ratio
-export scale_interactions_quasi_2d
+# Interactions, LHY tables, Sinatra helpers, quasi-2D scaling: exported
+# at definition sites under src/hamiltonian/interactions/, src/dynamics/,
+# and src/workflow/experiments/runtime/.
 
 # DDI
 export DDIParams,

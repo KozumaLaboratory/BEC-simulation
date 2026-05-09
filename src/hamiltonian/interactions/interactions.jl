@@ -1,3 +1,12 @@
+export compute_interaction_params, compute_interaction_params_general_f
+export compute_c0, compute_c_dd, compute_a_dd
+export interaction_params_from_constraint
+export compute_c_total, compute_c_dd_dimless, linear_zeeman_p
+export even_c_extra
+export compute_eu151_interactions
+export compute_lhy_2d_params
+export get_cn
+
 """
     compute_interaction_params(atom; N_atoms, dims, length_scale)
 
@@ -405,6 +414,8 @@ function _gauss_legendre(n::Int, a::Float64, b::Float64)
     end
     (nodes, weights)
 end
+
+export lima_pelster_Q5, compute_c_lhy_with_ddi
 
 """
     lima_pelster_Q5(eps_dd) → Float64
