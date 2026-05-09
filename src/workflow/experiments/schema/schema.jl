@@ -128,8 +128,16 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     "seed_k_cut" => FieldSpec(; type=Number, range=(0.0, 1.0e6)),
     "noise_seed" => FieldSpec(; type=Number),
     "live_monitor" => FieldSpec(; type=Union{Bool, Dict}),
+    # Standard dynamics path uses {strang, yoshida, adaptive, richardson};
+    # rotating_basis uses {strang, yoshida4, yoshida6, cfet4}. Merged here
+    # so a single DYNAMICS_SCHEMA entry covers both — kind dispatch picks
+    # the right runtime path. The schema previously declared `integrator`
+    # twice; the second declaration silently shadowed the first, causing
+    # spurious "not valid" rejections of yoshida/adaptive/richardson on
+    # the standard path.
     "integrator" => FieldSpec(; type=String,
-        enum=["strang", "yoshida", "adaptive", "richardson"]),
+        enum=["strang", "yoshida", "adaptive", "richardson",
+              "yoshida4", "yoshida6", "cfet4"]),
     "backend" => FieldSpec(; type=String, enum=["cpu", "gpu"]),
     "raman" => FieldSpec(; type=Dict),
     "absorbing_boundary" => FieldSpec(; type=Dict),
@@ -146,8 +154,6 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     "couplings" => FieldSpec(; type=Dict),
     # Option γ rotating-basis dynamics
     "B_hat" => FieldSpec(; type=Dict),
-    "integrator" => FieldSpec(; type=String,
-        enum=["strang", "yoshida4", "yoshida6", "cfet4"]),
     "epsilon" => FieldSpec(; type=Number, range=(1e-15, 1.0)),
 )
 
