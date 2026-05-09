@@ -84,10 +84,16 @@ function _run_step(
         prev_c_dd
     end
 
-    zeeman_wrapper = Dict{String, Any}(
-        "ground_state" => Dict{String, Any}("zeeman" => get(p, "zeeman", Dict()))
-    )
-    zeeman = _build_phase_zeeman(zeeman_wrapper, 0.0, duration; atom, p_step=p)
+    # Match the GS path: route the inner zeeman dict through
+    # _build_zeeman_dispatched (level 0 → _parse_zeeman, levels 1/2 →
+    # Gauss converters). The previous wrapper Dict construction —
+    # `Dict("ground_state" => Dict("zeeman" => ...))` — only existed
+    # because `_build_phase_zeeman` re-extracts that path, but
+    # `_build_zeeman_dispatched` accepts the inner dict directly.
+    z_raw = get(p, "zeeman", Dict())
+    zeeman = z_raw isa Dict ?
+        _build_zeeman_dispatched(z_raw, duration, atom, p) :
+        ZeemanParams(0.0, 0.0)
 
     pot_d = get(p, "potential", nothing)
     potential = pot_d !== nothing ? _parse_and_build_potential(pot_d, ndim) : prev_potential
