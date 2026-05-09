@@ -41,8 +41,13 @@ struct Workspace{
     TDI,
     MG,
     T <: AbstractFloat,
+    B <: AbstractArray,
 }
-    state::SimState{N, A}
+    # SimState has parameters `{N, A, B, T}`. Declaring `::SimState{N, A}`
+    # leaves B (fft_buf type) and T (float type) abstract — same boxing
+    # pitfall as the Grid issue. `ws.state.fft_buf[i]` in a hot loop
+    # measured 19,460 allocs / 508 KB without the B/T pinning.
+    state::SimState{N, A, B, T}
     fft_plans::FFTPlans{P, IP}
     kinetic_phase::KPA
     potential_values::VPA
