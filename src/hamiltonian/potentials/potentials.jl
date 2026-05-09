@@ -1,3 +1,5 @@
+export evaluate_potential
+
 function evaluate_potential(::NoPotential, grid::Grid{N, T}) where {N, T}
     zeros(T, grid.config.n_points)
 end

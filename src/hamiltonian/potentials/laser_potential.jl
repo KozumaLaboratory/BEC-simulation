@@ -1,3 +1,5 @@
+export LaserBeamPotential, crossed_laser_trap
+
 """
 Laser beam dipole trap potential using the full Gaussian beam model
 (includes Rayleigh length and beam divergence along propagation axis).

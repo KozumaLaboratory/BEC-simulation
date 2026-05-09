@@ -7,6 +7,8 @@
 #   Diagonal case: fold eigenvalues into diagonal step kernel.
 #   Off-diagonal case: separate substep with U†→phase→U per grid point.
 
+export make_light_shift, make_light_shift_from_trap, apply_light_shift_step!
+
 """
     _build_light_shift_operator(F, sm, polarization, alpha_v, alpha_t) → Matrix{ComplexF64}
 

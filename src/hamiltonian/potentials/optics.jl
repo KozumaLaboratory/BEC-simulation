@@ -1,3 +1,8 @@
+export OpticalBeam, propagate, waist_radius, rayleigh_length
+export radius_of_curvature, divergence_angle, peak_intensity, beam_intensity
+export abcd_free_space, abcd_thin_lens, abcd_curved_mirror, abcd_flat_mirror
+export mode_overlap, fiber_coupling
+
 """
 Gaussian beam with complex beam parameter q.
 

@@ -299,31 +299,8 @@ include("solvers/binary_simulation.jl")
 # at definition sites under src/hamiltonian/interactions/, src/dynamics/,
 # and src/workflow/experiments/runtime/.
 
-# DDI
-export DDIParams,
-    DDIBuffers, DDIPaddedContext, make_ddi_params, make_ddi_buffers, make_ddi_padded
-export compute_ddi_potential!, apply_ddi_step!
-
-# Potentials
-export evaluate_potential
-
-# Zeeman
-export zeeman_diagonal, zeeman_energies, TimeDependentZeeman, zeeman_at
-
-# Optical trap
-export GaussianBeam, CrossedDipoleTrap
-
-# Optics (Gaussian beam with complex q, ABCD)
-export OpticalBeam, propagate, waist_radius, rayleigh_length
-export radius_of_curvature, divergence_angle, peak_intensity, beam_intensity
-export abcd_free_space, abcd_thin_lens, abcd_curved_mirror, abcd_flat_mirror
-export mode_overlap, fiber_coupling
-
-# Light shift
-export make_light_shift, make_light_shift_from_trap, apply_light_shift_step!
-
-# Laser beam potential
-export LaserBeamPotential, crossed_laser_trap
+# DDI, potentials (trap/zeeman/optical/laser/light-shift): exported at
+# definition sites under src/hamiltonian/.
 
 # Thomas-Fermi
 export thomas_fermi_density, init_psi_thomas_fermi, init_psi_thomas_fermi_textured

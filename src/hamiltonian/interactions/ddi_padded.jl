@@ -1,3 +1,5 @@
+export make_ddi_padded
+
 """
 Build zero-padded DDI context for reduced aliasing.
 

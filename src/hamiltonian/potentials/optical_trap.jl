@@ -1,3 +1,5 @@
+export GaussianBeam, CrossedDipoleTrap
+
 struct GaussianBeam
     wavelength::Float64     # m
     power::Float64          # W

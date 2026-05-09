@@ -7,6 +7,8 @@
 #   3. apply Euler 5-stage rotation via `_apply_ddi_rotation!`
 # Quasi-2D dispatch + cached rotation lookups handled inside each helper.
 
+export apply_ddi_step!
+
 """
 Full DDI sub-step: compute spin density, rfft convolve, apply Euler spin rotation.
 """

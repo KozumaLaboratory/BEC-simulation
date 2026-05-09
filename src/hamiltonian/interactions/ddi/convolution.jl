@@ -1,5 +1,7 @@
 # --- DDI params + buffers + 6-FFT convolution ---
 
+export make_ddi_params, make_ddi_buffers, compute_ddi_potential!
+
 function make_ddi_params(
     grid::Grid{N, T},
     atom::AtomSpecies;
