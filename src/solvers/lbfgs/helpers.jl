@@ -31,20 +31,25 @@ function _lbfgs_direction(
     m = length(rho_hist)
     alphas = zeros(m)
 
+    # `dot(a, b) = sum(conj(a) * b)` for complex arrays; identical to the
+    # `real(sum(conj.(...) .* ...))` form but doesn't materialise the
+    # `conj.(s)` and product temporaries (each ~`size(grad)` complex
+    # array — for a 16³ × D=13 spinor that's ~640 KB per call, repeated
+    # 2m+1 times per L-BFGS direction).
     for i in m:-1:1
-        alphas[i] = rho_hist[i] * real(sum(conj.(s_hist[i]) .* q))
+        alphas[i] = rho_hist[i] * real(dot(s_hist[i], q))
         q .-= alphas[i] .* y_hist[i]
     end
 
     if m > 0
-        ys = real(sum(conj.(y_hist[end]) .* s_hist[end]))
+        ys = real(dot(y_hist[end], s_hist[end]))
         yy = real(sum(abs2, y_hist[end]))
         γ = ys / max(yy, 1e-30)
         q .*= γ
     end
 
     for i in 1:m
-        β = rho_hist[i] * real(sum(conj.(y_hist[i]) .* q))
+        β = rho_hist[i] * real(dot(y_hist[i], q))
         q .+= (alphas[i] - β) .* s_hist[i]
     end
 

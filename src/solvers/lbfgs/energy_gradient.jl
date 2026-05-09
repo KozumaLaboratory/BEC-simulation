@@ -189,8 +189,9 @@ function _project_constraints!(
     D = 2F + 1
 
     # 1. Remove ψ-direction: grad -= Re⟨ψ|grad⟩ × ψ
-    #    (chemical potential projection)
-    μ_real = real(sum(conj.(psi) .* grad)) * dV
+    #    (chemical potential projection). `dot(a, b) = sum(conj(a)*b)`,
+    #    no `conj.(psi)` and no broadcast-product temporary.
+    μ_real = real(dot(psi, grad)) * dV
     grad .-= μ_real .* psi
 
     # 2. Magnetization conservation
@@ -202,7 +203,7 @@ function _project_constraints!(
             idx = _component_slice(N, n_pts, c)
             gc = view(grad, idx...)
             pc = view(psi, idx...)
-            mz_grad += m * real(sum(conj.(pc) .* gc)) * dV
+            mz_grad += m * real(dot(pc, gc)) * dV
             mz_norm += m^2 * sum(abs2, pc) * dV
         end
         if mz_norm > 1e-30

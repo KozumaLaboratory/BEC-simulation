@@ -152,18 +152,36 @@ function find_binary_ground_state(
 end
 
 function _binary_energy(psi_A, psi_B, V_A, V_B, K, plans, c::BinaryCouplings, dV)
-    n_A = abs2.(psi_A);
-    n_B = abs2.(psi_B)
-    psi_kA = copy(psi_A);
+    psi_kA = copy(psi_A)
     plans.forward * psi_kA
-    psi_kB = copy(psi_B);
+    psi_kB = copy(psi_B)
     plans.forward * psi_kB
-    E_kin = (sum(K .* abs2.(psi_kA)) + sum(K .* abs2.(psi_kB))) / 2 * dV
-    E_pot = sum(V_A .* n_A) * dV + sum(V_B .* n_B) * dV
-    E_int =
-        (0.5 * c.g_AA * sum(n_A .^ 2) +
-         0.5 * c.g_BB * sum(n_B .^ 2) +
-         c.g_AB * sum(n_A .* n_B)) * dV
+
+    # Manual reductions instead of broadcast-then-sum: every line below
+    # used to materialise an `n_pts`-shaped temporary (`n_A`, `n_B`,
+    # `K .* abs2.(psi_kA)`, `V_A .* n_A`, `n_A .^ 2`, `n_A .* n_B`).
+    # In-place loops keep the energy evaluation allocation-free aside
+    # from the two FFT scratch copies.
+    E_kin = 0.0
+    @inbounds for i in eachindex(K, psi_kA, psi_kB)
+        E_kin += K[i] * (abs2(psi_kA[i]) + abs2(psi_kB[i]))
+    end
+    E_kin *= 0.5 * dV
+
+    E_pot = 0.0
+    E_int_AA = 0.0
+    E_int_BB = 0.0
+    E_int_AB = 0.0
+    @inbounds for i in eachindex(psi_A, psi_B, V_A, V_B)
+        nAi = abs2(psi_A[i])
+        nBi = abs2(psi_B[i])
+        E_pot += V_A[i] * nAi + V_B[i] * nBi
+        E_int_AA += nAi * nAi
+        E_int_BB += nBi * nBi
+        E_int_AB += nAi * nBi
+    end
+    E_pot *= dV
+    E_int = (0.5 * c.g_AA * E_int_AA + 0.5 * c.g_BB * E_int_BB + c.g_AB * E_int_AB) * dV
     E_kin + E_pot + E_int
 end
 
@@ -180,9 +198,13 @@ Requires the BinaryState carry the spatial grid implicitly; for
 the scaffold case we accept the grid as a 2nd argument.
 """
 function binary_overlap(state::BinaryState, grid)
-    n_A = abs2.(state.psi_A)
-    n_B = abs2.(state.psi_B)
-    sum(sqrt.(n_A .* n_B)) * cell_volume(grid)
+    # Manual reduction skips the `abs2.`/`sqrt.` temporaries — the
+    # overlap is just `Σ √(|ψ_A|² · |ψ_B|²)·dV = Σ |ψ_A|·|ψ_B|·dV`.
+    s = 0.0
+    @inbounds for i in eachindex(state.psi_A, state.psi_B)
+        s += abs(state.psi_A[i]) * abs(state.psi_B[i])
+    end
+    s * cell_volume(grid)
 end
 
 """

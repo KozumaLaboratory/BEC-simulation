@@ -164,8 +164,9 @@ function find_ground_state_lbfgs(;
             _lbfgs_direction(grad, s_hist, y_hist, rho_hist)
         end
 
-        # Ensure descent direction
-        slope = real(sum(conj.(grad) .* direction)) * dV
+        # Ensure descent direction (`real(dot(a, b))` skips two
+        # broadcast temporaries vs `real(sum(conj.(a) .* b))`)
+        slope = real(dot(grad, direction)) * dV
         if slope >= 0
             direction .= .-grad  # fall back to steepest descent
             slope = -sum(abs2, grad) * dV
@@ -207,9 +208,11 @@ function find_ground_state_lbfgs(;
             _project_constraints!(grad_new, psi, grid, target_magnetization, F)
         end
 
-        # L-BFGS history update
+        # L-BFGS history update — `real(dot(s_k, y_k))` is the same
+        # quantity as `real(sum(conj.(s_k) .* y_k))` without the two
+        # `size(grad)` temporaries.
         y_k = grad_new .- grad
-        ys = real(sum(conj.(s_k) .* y_k)) * dV
+        ys = real(dot(s_k, y_k)) * dV
         if ys > 1e-30
             push!(s_hist, copy(s_k))
             push!(y_hist, copy(y_k))
