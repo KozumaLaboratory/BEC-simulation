@@ -214,7 +214,13 @@ function _local_spin_h_buffer(ws::RotatingBasisWS{T, N, D}) where {T, N, D}
     buf
 end
 
-"""DDI step in rotating basis: rotate ψ̃→ψ_lab, apply existing DDI, rotate back."""
+"""DDI step in rotating basis: rotate ψ̃→ψ_lab in place, apply existing DDI,
+rotate back in place. Earlier code copied ψ̃ into `psi_lab_buf`, ran the
+forward Û_B + DDI + inverse Û_B on the buffer, then copied back. The buf
+round-trip is unnecessary — `_apply_UB!` and `apply_ddi_step!` both mutate
+their first argument in place, so operating directly on `psi_tilde`
+returns the same final state and saves two `copyto!` over the full
+spinor array (~24 µs at 16³ × D=13)."""
 function apply_ddi_step_rotating!(
     ws::RotatingBasisWS{T, N, D}, dt::T, t::T;
     imaginary_time::Bool=false,
@@ -223,23 +229,21 @@ function apply_ddi_step_rotating!(
     theta = T(ws.theta_func(Float64(t)))
     phi = T(ws.phi_func(Float64(t)))
 
-    # ψ̃ → ψ_lab
-    copyto!(ws.psi_lab_buf, ws.psi_tilde)
-    _apply_UB!(ws.psi_lab_buf, ws.spin_matrices, theta, phi, N;
+    # ψ̃ → ψ_lab (in place)
+    _apply_UB!(ws.psi_tilde, ws.spin_matrices, theta, phi, N;
         inverse=false, scratch=ws.rotation_scratch)
 
     # Apply DDI on ψ_lab using existing infrastructure. apply_ddi_step!
     # locks dt to Float64 (built around the legacy spinor solver path);
     # convert at the boundary so F32 workspaces interop.
     apply_ddi_step!(
-        ws.psi_lab_buf, ws.spin_matrices, ws.ddi_params,
+        ws.psi_tilde, ws.spin_matrices, ws.ddi_params,
         ws.ddi_bufs, Float64(dt), N; imaginary_time,
     )
 
-    # ψ_lab → ψ̃
-    _apply_UB!(ws.psi_lab_buf, ws.spin_matrices, theta, phi, N;
+    # ψ_lab → ψ̃ (in place)
+    _apply_UB!(ws.psi_tilde, ws.spin_matrices, theta, phi, N;
         inverse=true, scratch=ws.rotation_scratch)
-    copyto!(ws.psi_tilde, ws.psi_lab_buf)
     nothing
 end
 
