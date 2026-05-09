@@ -1,3 +1,5 @@
+export apply_singlet_pair_step!, apply_nematic_step!
+
 """
     apply_singlet_pair_step!(psi, interactions, F, dt, ndim; imaginary_time=false)
 

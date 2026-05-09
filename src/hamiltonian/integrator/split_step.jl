@@ -3,8 +3,10 @@
 # The top-level `split_step!` Strang step + per-step potential dispatch (diag,
 # spin-mixing, nematic, raman, DDI), time-dependent Zeeman/MG handling, and
 # the ITP leapfrog "outer-potential" merged-boundary helpers. Low-level FFT
-# shears live in split_step_kernels.jl; integrator-composition coefficients
-# and Yoshida/Suzuki/ABA cores live in split_step_composers.jl.
+# kernels and shears live in split_step_kernels.jl; integrator-composition
+# coefficients and Yoshida/Suzuki/ABA cores live in split_step_composers.jl.
+
+export split_step!
 
 """
 Perform one Strang-split time step: V(dt/2) K(dt) V(dt/2).

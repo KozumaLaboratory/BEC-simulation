@@ -1,3 +1,5 @@
+export compute_absorbing_mask, apply_absorbing_boundary!
+
 function compute_absorbing_mask(
     grid::Grid{N, T}, ab::AbsorbingBoundary, dt::Float64, backend;
     dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,

@@ -1,3 +1,5 @@
+export apply_loss_step!
+
 """
 Apply density-dependent loss step (dipolar relaxation + optional 3-body).
 

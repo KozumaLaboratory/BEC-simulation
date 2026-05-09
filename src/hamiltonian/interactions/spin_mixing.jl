@@ -1,3 +1,5 @@
+export apply_spin_mixing_step!
+
 function apply_spin_mixing_step!(
     psi::AbstractArray{<:Complex},
     sm::SpinMatrices{D},

@@ -1,3 +1,5 @@
+export apply_raman_step!, raman_at, apply_uniform_spin_rotation!
+
 """
 Raman coupling between spin states via two-photon transition.
 

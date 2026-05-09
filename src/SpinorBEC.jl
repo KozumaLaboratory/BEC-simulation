@@ -322,34 +322,9 @@ export FaradayParams, faraday_image, faraday_differential, detect_vortices_farad
 export spin_rotation_matrix, rotate_quantization_axis
 export dipolar_field, apply_edh_rotation, apply_fl_alignment, column_density
 
-# Propagators
-export apply_kinetic_step!, apply_kinetic_step_batched!, apply_diagonal_potential_step!
-export BatchedKineticCache
-
-# Spin mixing
-export apply_spin_mixing_step!
-
-# Nematic
-export apply_singlet_pair_step!, apply_nematic_step!  # nematic = legacy alias
-
-# Tensor interaction (general-F)
-export apply_tensor_interaction_step!, make_tensor_interaction_cache
-
-# Clebsch-Gordan / Wigner: exported in src/foundation/clebsch_gordan.jl.
-# Waveform types: exported in src/foundation/waveform.jl.
-
-# Losses
-export apply_loss_step!
-
-# Absorbing boundary
-export compute_absorbing_mask, apply_absorbing_boundary!
-
-# Raman coupling
-export apply_raman_step!, raman_at
-export apply_uniform_spin_rotation!
-
-# Split-step
-export split_step!, prepare_kinetic_phase
+# Propagators, integrator, spin-mixing, nematic, tensor, losses, absorbing
+# boundary, raman, split_step!: all `export`ed at their definition sites
+# under src/hamiltonian/.
 
 # Generic observed-vs-simulated comparison
 export compare, normalize_field

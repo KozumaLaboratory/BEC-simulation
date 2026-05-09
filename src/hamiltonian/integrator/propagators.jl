@@ -1,3 +1,6 @@
+export prepare_kinetic_phase, apply_kinetic_step!, apply_kinetic_step_batched!
+export apply_diagonal_potential_step!
+
 function prepare_kinetic_phase(
     grid::Grid{N, T},
     dt::Float64;

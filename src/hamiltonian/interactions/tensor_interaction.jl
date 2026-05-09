@@ -1,3 +1,5 @@
+export apply_tensor_interaction_step!, make_tensor_interaction_cache
+
 """
     make_tensor_interaction_cache(F, scattering_lengths, dims, length_scale, N_atoms, mass)
 
