@@ -88,11 +88,11 @@ include("hamiltonian/potentials/optical_trap.jl")
 include("hamiltonian/potentials/light_shift.jl")
 
 # 5. Propagators
-include("hamiltonian/propagators.jl")
-include("hamiltonian/yoshida.jl")
-include("hamiltonian/split_step_kernels.jl")    # _apply_coriolis_step!, _apply_1d_shear_batch!, _apply_ddi_step_gpu!
-include("hamiltonian/split_step.jl")            # split_step! + half-potential dispatcher
-include("hamiltonian/split_step_composers.jl")  # Yoshida/Suzuki/Blanes-Moan/Omelyan + core composers
+include("hamiltonian/integrator/propagators.jl")          # kinetic/potential primitives
+include("hamiltonian/integrator/yoshida.jl")              # adaptive Yoshida driver
+include("hamiltonian/integrator/split_step_kernels.jl")    # _apply_coriolis_step!, _apply_1d_shear_batch!, _apply_ddi_step_gpu!
+include("hamiltonian/integrator/split_step.jl")            # split_step! + half-potential dispatcher
+include("hamiltonian/integrator/split_step_composers.jl")  # Yoshida/Suzuki/Blanes-Moan/Omelyan + core composers
 
 # ========================================
 # WORKFLOW: Initialization, I/O, monitoring, experiments
