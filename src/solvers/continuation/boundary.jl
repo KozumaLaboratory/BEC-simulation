@@ -1,5 +1,7 @@
 # --- Phase-boundary bisection ---
 
+export scan_phase_boundary, find_phase_boundary
+
 """
     scan_phase_boundary(; param_range, make_params, initial_states,
                           n_coarse, bisection_tol, max_iter, ...) → NamedTuple

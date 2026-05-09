@@ -1,5 +1,9 @@
 # --- Triple-point hunting via AL × pseudo-arclength (R37, 2026-05-02) ---
-#
+
+export detect_triple_points, trace_triple_point_curves
+export TriplePointCandidate, pair_F_factory
+export bogoliubov_along_boundary_curve, BoundaryBdGSample
+
 # Combines `active_learn_phase_scan` (R36) with `trace_phase_boundary`
 # (R35) to find points in parameter space where 3+ phases coexist (the
 # "triple point" of a phase diagram, where 3 boundary curves meet) and

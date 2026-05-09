@@ -1,5 +1,7 @@
 # --- 2D phase-diagram scan ---
 
+export scan_phase_diagram_2d
+
 """
     scan_phase_diagram_2d(; param1_values, param2_values, make_params, grid, atom, ...) → Matrix{NamedTuple}
 

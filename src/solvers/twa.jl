@@ -1,3 +1,5 @@
+export run_twa
+
 """
     run_twa(; psi_gs, grid, atom, interactions, zeeman, potential, sim_params,
              twa_config, enable_ddi=false, c_dd=NaN, backend=CPUBackend(),

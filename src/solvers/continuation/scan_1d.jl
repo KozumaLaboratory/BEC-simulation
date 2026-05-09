@@ -1,5 +1,7 @@
 # --- 1D parameter sweep with continuation (psi reuse) ---
-#
+
+export scan_continuation, scan_continuation_bidirectional
+
 # `scan_continuation` walks a 1D vector of parameter values, reusing the
 # previous psi as initial condition for the next point. Multistart fallback
 # fires on energy jumps. `scan_continuation_bidirectional` runs both

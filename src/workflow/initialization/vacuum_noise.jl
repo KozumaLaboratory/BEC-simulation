@@ -1,3 +1,5 @@
+export add_vacuum_noise
+
 """
     add_vacuum_noise(psi, grid, F; seed=42, cutoff_energy=nothing) → psi_noisy
 

@@ -1,5 +1,7 @@
 # --- ITP checkpoints: save / load / resume / refine ---
 
+export resume_ground_state, refine_ground_state, load_itp_checkpoint
+
 function _save_itp_checkpoint(dir, ws, step, n_steps, energy, dE, dpsi, converged, tol)
     psi_host = _to_host(ws.state.psi)
     fname = joinpath(dir, "itp_checkpoint.jld2")

@@ -1,3 +1,6 @@
+export run_simulation!, run_simulation_checkpointed!
+export SimulationCallbacks
+
 """
     SimulationCallbacks
 

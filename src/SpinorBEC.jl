@@ -313,24 +313,13 @@ include("solvers/binary_simulation.jl")
 # under src/analysis/. Thomas-Fermi state initialisers are exported in
 # src/workflow/initialization/state_zoo.jl + thomas_fermi.jl.
 
-# Simulation
-export find_ground_state,
-    find_ground_state_multistart, scan_continuation,
-    scan_continuation_bidirectional
-export resume_ground_state, refine_ground_state, load_itp_checkpoint, ITPCheckpoint
-export scan_phase_diagram_2d, scan_phase_boundary
-export trace_phase_boundary, tangent_at, BoundaryTrace, make_phase_diff_eval
-export detect_triple_points, trace_triple_point_curves, TriplePointCandidate, pair_F_factory
-export bogoliubov_along_boundary_curve, BoundaryBdGSample
-export find_phase_boundary
-export run_simulation!, run_simulation_checkpointed!
-export run_simulation_adaptive!, run_simulation_yoshida!, run_simulation_embedded!
-export find_ground_state_lbfgs
-export run_twa, add_vacuum_noise
-export make_workspace, init_psi
+# Solvers (find_ground_state, find_ground_state_lbfgs, scan_continuation,
+# scan_phase_*, trace_phase_boundary, detect_triple_points,
+# run_simulation*!, run_twa, add_vacuum_noise, make_workspace, init_psi):
+# all exported at definition sites under src/solvers/ and
+# src/workflow/initialization/.
 
-# Monitoring & Callbacks
-export SimulationCallbacks, LiveMonitor
+export LiveMonitor
 
 # I/O
 export save_state, load_state, generate_dashboard_data, export_dashboard, serve_dashboard

@@ -1,5 +1,7 @@
 # L-BFGS ground-state driver (find_ground_state_lbfgs)
-#
+
+export find_ground_state_lbfgs
+
 # The main public entry point. Uses the energy/gradient + helpers
 # defined in the sibling files of lbfgs/.
 

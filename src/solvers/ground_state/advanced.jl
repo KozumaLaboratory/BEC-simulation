@@ -1,5 +1,7 @@
 # --- Multistart + constrained-Jz ground-state solvers ---
-#
+
+export find_ground_state_multistart
+
 # `find_ground_state_multistart` (multiple initial states + energy minimum),
 # `_normalize_psi_constrained!` (Mz-constrained renormalisation),
 # `_rebuild_workspace_with_dt`, and `_find_ground_state_Jz` (rotating-frame

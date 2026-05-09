@@ -5,6 +5,8 @@
 # _set_component!, _extract_spinor, _default_spinor) live in
 # state_dispatch_helpers.jl.
 
+export init_psi
+
 function init_psi(
     grid::Grid{N, T},
     sys::SpinSystem;

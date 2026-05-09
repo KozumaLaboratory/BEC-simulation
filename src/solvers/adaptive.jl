@@ -1,3 +1,5 @@
+export run_simulation_adaptive!, run_simulation_yoshida!
+
 function _update_kinetic_phase!(kinetic_phase, k_squared, dt)
     @. kinetic_phase = cis(-0.5 * k_squared * dt)
     nothing

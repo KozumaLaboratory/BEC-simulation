@@ -1,5 +1,7 @@
 # --- Pseudo-arclength continuation for tracing phase-boundary curves ---
-#
+
+export trace_phase_boundary, tangent_at, BoundaryTrace, make_phase_diff_eval
+
 # `scan_phase_boundary` (boundary.jl) does 1-D bisection: hunt the
 # crossing of two phase energies along a single parameter axis. This
 # file extends to **2-D parameter space** (e.g. `(c₁, c_dd)`) and

@@ -1,5 +1,7 @@
 # --- Embedded error estimation for adaptive split-step ---
-#
+
+export run_simulation_embedded!
+
 # Correct embedded pairs for Yoshida S4 and Blanes-Moan S6.
 #
 # Key insight (user derivation): intermediate stage differences ψ_mid - ψ_final

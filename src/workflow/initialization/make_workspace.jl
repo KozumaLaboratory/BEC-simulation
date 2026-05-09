@@ -6,6 +6,8 @@
 # allocation. The companion `_rebuild_workspace` lets callers swap one
 # field (e.g. dt) without re-allocating the whole struct.
 
+export make_workspace
+
 function make_workspace(;
     grid::Grid{N, T},
     atom::AtomSpecies,
