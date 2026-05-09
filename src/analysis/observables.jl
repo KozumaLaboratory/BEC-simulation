@@ -17,9 +17,9 @@ function component_density(psi::AbstractArray{<:Complex}, ndim::Int, c::Int)
 end
 
 function total_norm(psi::AbstractArray{<:Complex}, grid::Grid{N}) where {N}
-    dV = cell_volume(grid)
-    n = total_density(psi, N)
-    sum(n) * dV
+    # ∫|ψ|² dV — sum |ψ|² across all components and spatial cells, no
+    # need to materialise the per-cell density first.
+    sum(abs2, psi) * cell_volume(grid)
 end
 
 """
