@@ -64,7 +64,6 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
     "gauge_fix" => FieldSpec(; type=Bool, default=true),  # rotating_basis
     "init_m_idx" => FieldSpec(; type=Integer, range=(1, 25)),
     "init_sigma" => FieldSpec(; type=Number, range=(0.0, 100.0)),
-    "backend" => FieldSpec(; type=String, enum=["cpu", "gpu"]),
     "method" => FieldSpec(; type=String, default="itp", enum=["itp", "lbfgs"]),
     "atom" => FieldSpec(; type=String),
     "grid" => FieldSpec(; type=Dict, schema=GRID_SCHEMA),
