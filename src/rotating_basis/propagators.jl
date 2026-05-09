@@ -168,8 +168,15 @@ function apply_local_spin_step!(
     # Build U = exp(-iH·dt) (RTP) / exp(-H·dt + shift) (ITP) via eigendecomp.
     # Fuse U[i,j] = Σ_k V[i,k]·phase[k]·conj(V[j,k]) directly into MMatrix to
     # drop the Diagonal-Vector + 2 intermediate matmul heap allocations.
-    H_static = SMatrix{D, D, ComplexF64}(Hz)
-    eigs = eigen(Hermitian(Matrix(H_static)))
+    # Use a per-workspace cached Matrix buffer + eigen! so we don't pay
+    # `Matrix(H_static)` (~2.7 KB) every call. eigen!'s own values/vectors
+    # allocations remain (LAPACK heevr internals), but the dense-copy is
+    # gone — saves ~6 allocs / 6 KB / call.
+    H_dense = _local_spin_h_buffer(ws)
+    @inbounds for j in 1:D, i in 1:D
+        H_dense[i, j] = Hz[i, j]
+    end
+    eigs = eigen!(Hermitian(H_dense))
     λ = eigs.values
     Vmat = eigs.vectors
     phases = if imaginary_time
@@ -192,6 +199,19 @@ function apply_local_spin_step!(
     # spatially-uniform spin-axis rotation helper.
     _apply_rotation_to_spin_axis!(ws.psi_tilde, U_loc, N; scratch=ws.rotation_scratch)
     nothing
+end
+
+# Per-workspace cache of the D×D dense buffer used by `apply_local_spin_step!`
+# to feed `eigen!` without rebuilding `Matrix(H_static)` per call. Same pattern
+# as `_ROTATING_K2_CACHE` / `_ROTATION_RT_CACHE`: objectid-keyed lookup so
+# multiple workspaces don't collide.
+const _LOCAL_SPIN_H_CACHE = Dict{UInt, Matrix{ComplexF64}}()
+function _local_spin_h_buffer(ws::RotatingBasisWS{T, N, D}) where {T, N, D}
+    key = objectid(ws)
+    haskey(_LOCAL_SPIN_H_CACHE, key) && return _LOCAL_SPIN_H_CACHE[key]
+    buf = Matrix{ComplexF64}(undef, D, D)
+    _LOCAL_SPIN_H_CACHE[key] = buf
+    buf
 end
 
 """DDI step in rotating basis: rotate ψ̃→ψ_lab, apply existing DDI, rotate back."""
