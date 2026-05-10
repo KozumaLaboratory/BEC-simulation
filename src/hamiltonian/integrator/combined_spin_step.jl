@@ -91,29 +91,23 @@ function _apply_combined_spin_step!(
     # Combine into Phi (already holds Φ_DDI for the ddi_active case).
     # The linear z-Zeeman -p F_z is NOT here — it sits in V_diag where
     # its m-diagonal action is computed as a per-component phase.
-    @inbounds for i in eachindex(bufs.Phi_x)
-        bufs.Phi_x[i] += c1 * bufs.Fx_r[i] + bx
-        bufs.Phi_y[i] += c1 * bufs.Fy_r[i] + by
-        bufs.Phi_z[i] += c1 * bufs.Fz_r[i]
-    end
+    # Broadcast (not a manual loop) so this works on GPU arrays too.
+    bufs.Phi_x .+= c1 .* bufs.Fx_r .+ bx
+    bufs.Phi_y .+= c1 .* bufs.Fy_r .+ by
+    bufs.Phi_z .+= c1 .* bufs.Fz_r
 
     # If everything is zero (no SM, no DDI, no transverse), skip.
     something_active = abs(c1) > 1e-30 || ddi_active || (abs(bx) + abs(by) > 1e-30)
     something_active || return nothing
 
-    # Single Euler rotation per voxel (batched gemm + cis recurrence).
-    # We can reuse the DDI-rotation core verbatim because it already
-    # implements exactly this operation: apply exp(-i dt φ(r)·F̂) for an
-    # arbitrary spatial phi field.
-    if imaginary_time
-        _apply_ddi_rotation_batched_imag!(
-            psi, bufs.Phi_x, bufs.Phi_y, bufs.Phi_z, sm, dt, N,
-        )
-    else
-        _apply_ddi_rotation_batched_real!(
-            psi, bufs.Phi_x, bufs.Phi_y, bufs.Phi_z, sm, dt, N,
-        )
-    end
+    # Single Euler rotation per voxel (batched gemm + cis recurrence on
+    # CPU; fused (N,D) broadcast on GPU). We dispatch through the generic
+    # `_apply_ddi_rotation!` so the right backend path is picked
+    # automatically — same operator exp(-i dt φ(r)·F̂) either way.
+    _apply_ddi_rotation!(
+        psi, bufs.Phi_x, bufs.Phi_y, bufs.Phi_z, sm, dt, N;
+        imaginary_time = imaginary_time,
+    )
     nothing
 end
 
