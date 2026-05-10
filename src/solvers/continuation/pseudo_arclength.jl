@@ -99,7 +99,7 @@ function trace_phase_boundary(
     step_grow::Float64=1.2,
     arc_step_min::Float64=1.0e-6,
     arc_step_max::Float64=0.5,
-    verbose::Bool=true,
+    verbose::Bool=_default_solver_verbose(),
 )
     d = length(θ_init)
     d == 2 || throw(

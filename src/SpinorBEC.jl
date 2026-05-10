@@ -22,6 +22,13 @@ using Sockets
 
 const TIMER = TimerOutput()
 
+# Default `verbose` for solver entry points (find_ground_state, lbfgs,
+# run_pipeline, …). Quiet under CI so test output stays a few hundred
+# lines instead of thousands of "ITP step k/N" prints. Users running
+# locally still get progress output; explicit `verbose=true/false`
+# always overrides.
+@inline _default_solver_verbose() = !haskey(ENV, "CI")
+
 include("foundation.jl")    # types + math primitives + backends
 include("hamiltonian.jl")   # interactions + potentials + integrators
 

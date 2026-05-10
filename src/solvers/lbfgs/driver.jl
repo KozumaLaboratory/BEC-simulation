@@ -25,7 +25,7 @@ function find_ground_state_lbfgs(;
     target_magnetization::Union{Nothing, Float64}=nothing,
     backend::AbstractBackend=CPUBackend(),
     m_lbfgs::Int=10,
-    verbose::Bool=true,
+    verbose::Bool=_default_solver_verbose(),
     light_shift::Union{Nothing, LightShift}=nothing,
     dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
     sobolev_alpha::Float64=0.0,

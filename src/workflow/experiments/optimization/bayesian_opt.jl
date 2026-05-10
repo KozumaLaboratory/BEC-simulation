@@ -86,7 +86,7 @@ function bayesian_optimize(
     ℓ::Union{Nothing, Float64}=nothing,
     n_grid::Int=100,
     seed::Int=42,
-    verbose::Bool=true,
+    verbose::Bool=_default_solver_verbose(),
 )
     d = length(bounds)
     rng = MersenneTwister(seed)

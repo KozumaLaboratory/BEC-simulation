@@ -101,7 +101,7 @@ function active_learn_phase_scan(
     ℓ::Union{Nothing, Float64}=nothing,
     n_grid::Int=50,
     seed::Int=42,
-    verbose::Bool=true,
+    verbose::Bool=_default_solver_verbose(),
 )
     function obj_fn(θ::AbstractVector{Float64})
         result = eval_fn(θ)
@@ -185,7 +185,7 @@ function active_learn_phase_scan_yaml(
     ℓ::Union{Nothing, Float64}=nothing,
     n_grid::Int=20,
     seed::Int=42,
-    verbose::Bool=true,
+    verbose::Bool=_default_solver_verbose(),
     save_history_to::Union{Nothing, AbstractString}=nothing,
 )
     length(override_paths) == length(bounds) || throw(ArgumentError(

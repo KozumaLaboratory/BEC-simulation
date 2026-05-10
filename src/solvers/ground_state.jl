@@ -129,7 +129,7 @@ function find_ground_state(;
     dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
     spinor_lhy::Union{Nothing, Symbol}=nothing,
     method::Symbol=:strang,
-    verbose::Bool=true,
+    verbose::Bool=_default_solver_verbose(),
 )
     method === :strang || throw(
         ArgumentError(

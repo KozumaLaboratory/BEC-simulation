@@ -25,7 +25,7 @@ function run_twa(;
     c_dd::Float64=NaN,
     backend::AbstractBackend=CPUBackend(),
     store_trajectories::Bool=false,
-    verbose::Bool=true,
+    verbose::Bool=_default_solver_verbose(),
     kwargs...,
 ) where {N}
     n_traj = twa_config.n_trajectories
