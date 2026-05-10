@@ -106,7 +106,7 @@ function _apply_combined_spin_step!(
     # automatically — same operator exp(-i dt φ(r)·F̂) either way.
     _apply_ddi_rotation!(
         psi, bufs.Phi_x, bufs.Phi_y, bufs.Phi_z, sm, dt, N;
-        imaginary_time = imaginary_time,
+        imaginary_time=imaginary_time,
     )
     nothing
 end
@@ -163,22 +163,32 @@ end
 # higher-rank tensor channels active. Throws ArgumentError otherwise.
 function _assert_combined_step_compatible(ws::Workspace)
     c2 = get_cn(ws.interactions, 2)
-    abs(c2) < 1e-30 || throw(ArgumentError(
-        "split_step_combined! requires c2 = 0 (rank-2 nematic). Got c2=$c2. " *
-        "Use the standard split_step! for systems with non-zero c2."))
-    ws.tensor_cache === nothing || throw(ArgumentError(
-        "split_step_combined! incompatible with tensor_cache (higher-rank " *
-        "spin tensor channels c4/c6/...). Use standard split_step! or " *
-        "construct workspace without scattering-lengths channel coupling."))
-    ws.raman === nothing || throw(ArgumentError(
-        "split_step_combined! does not yet support Raman coupling. " *
-        "Use standard split_step!."))
-    ws.light_shift === nothing || throw(ArgumentError(
-        "split_step_combined! does not yet support light_shift. " *
-        "Use standard split_step!."))
-    ws.ddi_bufs !== nothing || throw(ArgumentError(
-        "split_step_combined! requires DDI buffers (the spin density " *
-        "and Φ buffers live there). Construct workspace with enable_ddi=true."))
+    abs(c2) < 1e-30 || throw(
+        ArgumentError(
+            "split_step_combined! requires c2 = 0 (rank-2 nematic). Got c2=$c2. " *
+            "Use the standard split_step! for systems with non-zero c2."),
+    )
+    ws.tensor_cache === nothing || throw(
+        ArgumentError(
+            "split_step_combined! incompatible with tensor_cache (higher-rank " *
+            "spin tensor channels c4/c6/...). Use standard split_step! or " *
+            "construct workspace without scattering-lengths channel coupling."),
+    )
+    ws.raman === nothing || throw(
+        ArgumentError(
+            "split_step_combined! does not yet support Raman coupling. " *
+            "Use standard split_step!."),
+    )
+    ws.light_shift === nothing || throw(
+        ArgumentError(
+            "split_step_combined! does not yet support light_shift. " *
+            "Use standard split_step!."),
+    )
+    ws.ddi_bufs !== nothing || throw(
+        ArgumentError(
+            "split_step_combined! requires DDI buffers (the spin density " *
+            "and Φ buffers live there). Construct workspace with enable_ddi=true."),
+    )
     nothing
 end
 
@@ -238,7 +248,7 @@ function split_step_combined!(ws::Workspace{N}) where {N}
     t_eval_2 = it ? 0.0 : t + 3dt / 4
 
     _half_potential_step_combined!(
-        ws, dt / 2, n_comp, N, it; t_eval=t_eval_1, t_start=it ? NaN : t,
+        ws, dt / 2, n_comp, N, it; t_eval=t_eval_1, t_start=it ? NaN : t
     )
 
     omega = ws.sim_params.rotating_frame_omega
@@ -247,7 +257,7 @@ function split_step_combined!(ws::Workspace{N}) where {N}
     _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, it, ws.coriolis_cache)
 
     _half_potential_step_combined!(
-        ws, dt / 2, n_comp, N, it; t_eval=t_eval_2, t_start=it ? NaN : t + dt / 2,
+        ws, dt / 2, n_comp, N, it; t_eval=t_eval_2, t_start=it ? NaN : t + dt / 2
     )
 
     if !it && ws.loss !== nothing
@@ -263,7 +273,7 @@ function split_step_combined!(ws::Workspace{N}) where {N}
     ws.state.t += it ? 0.0 : dt
     ws.state.step += 1
     if it && ws.sim_params.normalize_every > 0 &&
-       ws.state.step % ws.sim_params.normalize_every == 0
+        ws.state.step % ws.sim_params.normalize_every == 0
         _normalize_psi!(ws.state.psi, ws.grid, n_comp, N)
     end
     nothing

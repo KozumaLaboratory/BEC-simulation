@@ -21,21 +21,23 @@ import CUDA
 using SpinorBEC, BenchmarkTools, Printf
 
 function _build(::Type{T}, N::Int; gpu::Bool) where {T}
-    grid = make_grid(GridConfig((N, N, N), (8.0, 8.0, 8.0)); dtype = T)
-    sp = SimParams(; dt = 0.005, n_steps = 1)
+    grid = make_grid(GridConfig((N, N, N), (8.0, 8.0, 8.0)); dtype=T)
+    sp = SimParams(; dt=0.005, n_steps=1)
     backend = gpu ? CUDABackend() : CPUBackend()
     ws = make_workspace(;
-        grid, atom = Eu151,
-        interactions = InteractionParams(50.0, 1.0),
-        zeeman = ZeemanParams(0.5, 0.1),
-        potential = HarmonicTrap(1.0, 1.0, 1.0),
-        sim_params = sp,
-        enable_ddi = true, c_dd = 100.0,
-        dtype = T, backend = backend,
+        grid, atom=Eu151,
+        interactions=InteractionParams(50.0, 1.0),
+        zeeman=ZeemanParams(0.5, 0.1),
+        potential=HarmonicTrap(1.0, 1.0, 1.0),
+        sim_params=sp,
+        enable_ddi=true, c_dd=100.0,
+        dtype=T, backend=backend,
     )
     psi_h = Array(ws.state.psi)
     @inbounds for I in CartesianIndices((N, N, N))
-        x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+        x = grid.x[1][I[1]];
+        y = grid.x[2][I[2]];
+        z = grid.x[3][I[3]]
         g = T(exp(-(x*x + y*y + z*z) / 2.0))
         for c in 1:13
             psi_h[I, c] = g * Complex{T}(cos(T(0.1)*c), sin(T(0.1)*c))
@@ -50,11 +52,12 @@ function _build(::Type{T}, N::Int; gpu::Bool) where {T}
     ws
 end
 
-function _bench(ws; gpu::Bool, samples::Int = 50, kernel::Symbol = :combined)
+function _bench(ws; gpu::Bool, samples::Int=50, kernel::Symbol=:combined)
     f! = kernel === :combined ? SpinorBEC.split_step_combined! : SpinorBEC.split_step!
     if gpu
         b = @benchmark begin
-            $f!($ws); CUDA.synchronize()
+            $f!($ws);
+            CUDA.synchronize()
         end samples = samples evals = 1
     else
         b = @benchmark $f!($ws) samples = samples evals = 1
@@ -62,7 +65,7 @@ function _bench(ws; gpu::Bool, samples::Int = 50, kernel::Symbol = :combined)
     time(minimum(b)) / 1e3
 end
 
-function main(Ns = (16, 24, 32, 48); csv_path = get(ENV, "BENCH_CSV", "/tmp/bench_results.csv"))
+function main(Ns=(16, 24, 32, 48); csv_path=get(ENV, "BENCH_CSV", "/tmp/bench_results.csv"))
     gpu_avail = CUDA.functional()
     @printf("CUDA functional: %s\n", gpu_avail)
     write_csv = !haskey(ENV, "NO_CSV")
@@ -75,21 +78,22 @@ function main(Ns = (16, 24, 32, 48); csv_path = get(ENV, "BENCH_CSV", "/tmp/benc
     for N in Ns
         configs = if gpu_avail
             [("cpu", "f64", Float64, false), ("cpu", "f32", Float32, false),
-             ("cuda", "f64", Float64, true), ("cuda", "f32", Float32, true)]
+                ("cuda", "f64", Float64, true), ("cuda", "f32", Float32, true)]
         else
             [("cpu", "f64", Float64, false), ("cpu", "f32", Float32, false)]
         end
         ts = Dict{Tuple{String, String}, Float64}()
         for (be, dt, T, gpu) in configs
-            ws = _build(T, N; gpu = gpu)
+            ws = _build(T, N; gpu=gpu)
             for kernel in (:combined, :sequential)
-                t = _bench(ws; gpu = gpu, kernel = kernel)
+                t = _bench(ws; gpu=gpu, kernel=kernel)
                 kernel === :combined && (ts[(be, dt)] = t)
                 write_csv && println(csv_io, "$N,$be,$dt,$(String(kernel)),$(round(t, digits=1))")
             end
-            ws = nothing; gpu && (GC.gc(); CUDA.reclaim())
+            ws = nothing;
+            gpu && (GC.gc(); CUDA.reclaim())
         end
-        rec = recommend_backend_dtype(N; cuda_functional = gpu_avail, mode = :realtime)
+        rec = recommend_backend_dtype(N; cuda_functional=gpu_avail, mode=:realtime)
         @printf("%-5d %12.1f %12.1f %12.1f %12.1f   %s\n", N,
             ts[("cpu", "f64")], ts[("cpu", "f32")],
             get(ts, ("cuda", "f64"), NaN), get(ts, ("cuda", "f32"), NaN), rec)

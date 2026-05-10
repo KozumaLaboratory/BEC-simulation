@@ -220,8 +220,8 @@ want to inspect or branch on the recommendation.
 function recommend_backend_dtype(
     n_max::Int;
     cuda_functional::Bool,
-    ndim::Int = 3,
-    mode::Symbol = :realtime,
+    ndim::Int=3,
+    mode::Symbol=:realtime,
 )
     n_max > 0 || throw(ArgumentError("n_max must be positive, got $n_max"))
     ndim in (1, 2, 3) || throw(ArgumentError("ndim must be 1, 2, or 3 — got $ndim"))

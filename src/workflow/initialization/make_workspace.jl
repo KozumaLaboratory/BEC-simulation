@@ -171,28 +171,32 @@ function make_workspace(;
         nothing
     end
 
-    ddi_bufs = ddi !== nothing ?
-        make_ddi_buffers(grid.config.n_points, backend; flags=fft_flags, dtype=U) :
+    ddi_bufs = if ddi !== nothing
+        make_ddi_buffers(grid.config.n_points, backend; flags=fft_flags, dtype=U)
+    else
         nothing
+    end
 
     density_buf = _zeros(backend, U, grid.config.n_points...)
 
     # `ddi_pad` reuses the already-resolved `ddi.C_dd` (so the un-padded and
     # padded DDI agree on coupling), and only fires when both `ddi_padding`
     # is requested *and* a DDI workspace exists.
-    ddi_pad = (ddi_padding && ddi !== nothing) ?
+    ddi_pad = if (ddi_padding && ddi !== nothing)
         make_ddi_padded(
-            grid,
-            atom;
-            c_dd=ddi.C_dd,
-            fft_flags,
-            secular=secular_ddi,
-            quasi_2d=quasi_2d_ddi,
-            l_z=l_z_ddi,
-            backend,
-            dtype=U,
-        ) :
+        grid,
+        atom;
+        c_dd=ddi.C_dd,
+        fft_flags,
+        secular=secular_ddi,
+        quasi_2d=quasi_2d_ddi,
+        l_z=l_z_ddi,
+        backend,
+        dtype=U,
+    )
+    else
         nothing
+    end
 
     batched_kinetic = _make_batched_kinetic_cache(psi, kinetic_phase, N, backend; flags=fft_flags)
 
@@ -251,9 +255,12 @@ function make_workspace(;
     end
 
     lhy_attempt =
-        spinor_lhy === nothing ? nothing :
-        _build_spinor_lhy(Val(spinor_lhy), atom, ws_interactions, psi_init,
+        if spinor_lhy === nothing
+            nothing
+        else
+            _build_spinor_lhy(Val(spinor_lhy), atom, ws_interactions, psi_init,
             c_dd, enable_ddi)
+        end
 
     lhy = if lhy_attempt !== nothing
         lhy_attempt
