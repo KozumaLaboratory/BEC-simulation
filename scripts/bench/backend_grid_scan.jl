@@ -1,17 +1,21 @@
 # Reproducible benchmark behind `recommend_backend_dtype` (src/workflow/io/budget.jl).
 #
-# Measures `split_step_combined!` for Eu151 (D=13) on a cubic grid across
-# {CPU, GPU} × {Float64, Float32} for N ∈ {16, 24, 32, 48}. Prints a
-# summary table and the recommended (backend, dtype) per N.
+# Measures `split_step_combined!` and `split_step!` for Eu151 (D=13) on a
+# cubic grid across {CPU, GPU} × {Float64, Float32} for N ∈ {16, 24, 32, 48}.
+# Prints a summary table, the recommended (backend, dtype) per N, and
+# (optionally) writes a CSV consumable by the matplotlib companion
+# `plot_backend_grid_scan.py`.
 #
 # Run:
 #   LD_LIBRARY_PATH=/usr/lib/wsl/lib julia --project=. scripts/bench/backend_grid_scan.jl
+#   # → also writes /tmp/bench_results.csv unless ENV["NO_CSV"] is set
 #
-# Reference numbers (RTX 5070 Ti, Julia 1.12.6, 2026-05-10):
-#   N=16: CPU-F64 3237, GPU-F64 2450, GPU-F32 2877 µs
-#   N=24: CPU-F64 11368, GPU-F64 3195, GPU-F32 2629 µs
-#   N=32: CPU-F64 28735, GPU-F64 3835, GPU-F32 2546 µs
-#   N=48: CPU-F64 99225, GPU-F64 8428, GPU-F32 3041 µs
+# Reference numbers (RTX 5070 Ti, Julia 1.12.6, 2026-05-10, combined!):
+#   N=16: CPU-F64  3227, GPU-F64 2644, GPU-F32 2822 µs
+#   N=24: CPU-F64 12316, GPU-F64 2931, GPU-F32 2591 µs
+#   N=32: CPU-F64 27065, GPU-F64 3820, GPU-F32 2629 µs
+#   N=48: CPU-F64 105607, GPU-F64 8583, GPU-F32 2859 µs
+# GPU F32 / CPU F64 speedup: 1.1× → 4.8× → 10.3× → 36.9×
 
 import CUDA
 using SpinorBEC, BenchmarkTools, Printf
@@ -46,44 +50,53 @@ function _build(::Type{T}, N::Int; gpu::Bool) where {T}
     ws
 end
 
-function _bench(ws; gpu::Bool, samples::Int = 50)
+function _bench(ws; gpu::Bool, samples::Int = 50, kernel::Symbol = :combined)
+    f! = kernel === :combined ? SpinorBEC.split_step_combined! : SpinorBEC.split_step!
     if gpu
         b = @benchmark begin
-            SpinorBEC.split_step_combined!($ws); CUDA.synchronize()
+            $f!($ws); CUDA.synchronize()
         end samples = samples evals = 1
     else
-        b = @benchmark SpinorBEC.split_step_combined!($ws) samples = samples evals = 1
+        b = @benchmark $f!($ws) samples = samples evals = 1
     end
     time(minimum(b)) / 1e3
 end
 
-function main(Ns = (16, 24, 32, 48))
+function main(Ns = (16, 24, 32, 48); csv_path = get(ENV, "BENCH_CSV", "/tmp/bench_results.csv"))
     gpu_avail = CUDA.functional()
     @printf("CUDA functional: %s\n", gpu_avail)
+    write_csv = !haskey(ENV, "NO_CSV")
+    csv_io = write_csv ? open(csv_path, "w") : devnull
+    write_csv && println(csv_io, "N,backend,dtype,kernel,us")
+
     @printf("\nGrid scan: split_step_combined! [µs / step]\n")
     @printf("%-5s %12s %12s %12s %12s   %s\n",
         "N", "CPU F64", "CPU F32", "GPU F64", "GPU F32", "recommended")
     for N in Ns
-        ws_cf64 = _build(Float64, N; gpu = false)
-        t_cf64 = _bench(ws_cf64; gpu = false)
-        ws_cf32 = _build(Float32, N; gpu = false)
-        t_cf32 = _bench(ws_cf32; gpu = false)
-
-        if gpu_avail
-            ws_gf64 = _build(Float64, N; gpu = true)
-            t_gf64 = _bench(ws_gf64; gpu = true)
-            ws_gf32 = _build(Float32, N; gpu = true)
-            t_gf32 = _bench(ws_gf32; gpu = true)
+        configs = if gpu_avail
+            [("cpu", "f64", Float64, false), ("cpu", "f32", Float32, false),
+             ("cuda", "f64", Float64, true), ("cuda", "f32", Float32, true)]
         else
-            t_gf64 = NaN; t_gf32 = NaN
+            [("cpu", "f64", Float64, false), ("cpu", "f32", Float32, false)]
         end
-
+        ts = Dict{Tuple{String, String}, Float64}()
+        for (be, dt, T, gpu) in configs
+            ws = _build(T, N; gpu = gpu)
+            for kernel in (:combined, :sequential)
+                t = _bench(ws; gpu = gpu, kernel = kernel)
+                kernel === :combined && (ts[(be, dt)] = t)
+                write_csv && println(csv_io, "$N,$be,$dt,$(String(kernel)),$(round(t, digits=1))")
+            end
+            ws = nothing; gpu && (GC.gc(); CUDA.reclaim())
+        end
         rec = recommend_backend_dtype(N; cuda_functional = gpu_avail, mode = :realtime)
-        @printf("%-5d %12.1f %12.1f %12.1f %12.1f   %s\n",
-            N, t_cf64, t_cf32, t_gf64, t_gf32, rec)
-
-        gpu_avail && (GC.gc(); CUDA.reclaim())
+        @printf("%-5d %12.1f %12.1f %12.1f %12.1f   %s\n", N,
+            ts[("cpu", "f64")], ts[("cpu", "f32")],
+            get(ts, ("cuda", "f64"), NaN), get(ts, ("cuda", "f32"), NaN), rec)
     end
+
+    write_csv && (close(csv_io); @printf("\nWrote %s\n", csv_path))
+    write_csv && @printf("Plot:  python3 scripts/bench/plot_backend_grid_scan.py %s\n", csv_path)
 end
 
 main()
