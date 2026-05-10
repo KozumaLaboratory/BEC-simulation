@@ -124,6 +124,7 @@ const FULL_EXTRA = [
     "rotating_basis/test_rotating_basis_f32.jl",
     # Higher-order integrator tests
     "hamiltonian/test_higher_order_integrators.jl",
+    "hamiltonian/test_integrator_order_meanfield.jl",
     "hamiltonian/test_cfet4_order.jl",
     # Lima-Pelster Q5 + scalar eGPE
     "hamiltonian/test_lima_pelster_q5.jl",

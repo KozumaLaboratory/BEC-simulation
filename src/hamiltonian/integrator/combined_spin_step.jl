@@ -265,7 +265,7 @@ function split_step_combined!(ws::Workspace{N}) where {N}
     t_eval_2 = it ? 0.0 : t + 3dt / 4
 
     _half_potential_step_combined!(
-        ws, dt / 2, n_comp, N, it; t_eval=t_eval_1, t_start=it ? NaN : t,
+        ws, dt / 2, n_comp, N, it; t_eval=t_eval_1, t_start=it ? NaN : t
     )
 
     omega = ws.sim_params.rotating_frame_omega
@@ -274,7 +274,7 @@ function split_step_combined!(ws::Workspace{N}) where {N}
     _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, it, ws.coriolis_cache)
 
     _half_potential_step_combined!(
-        ws, dt / 2, n_comp, N, it; t_eval=t_eval_2, t_start=it ? NaN : t + dt / 2,
+        ws, dt / 2, n_comp, N, it; t_eval=t_eval_2, t_start=it ? NaN : t + dt / 2
     )
 
     if !it && ws.loss !== nothing
