@@ -176,6 +176,162 @@ Handles both real-time (Dz: cis) and imaginary-time (Dz: exp) propagation.
 end
 
 """
+    _apply_euler_5stage_batched_real!(P, W, conj_V, V_T, alpha, beta, theta, F, Val(D))
+
+Apply the same 5-stage Euler rotation that `_apply_euler_spin_rotation`
+implements per voxel, but batched across voxels via BLAS gemm. Caller
+supplies pre-allocated buffers + per-voxel angles.
+
+* `P` — (N_spatial, D) reshape of ψ, mutated in place
+* `W` — (N_spatial, D) scratch buffer (same layout as P)
+* `conj_V` — D×D constant `conj(Fy_eigvecs)` (= `transpose(Fy_eigvecs_adj)`)
+* `V_T` — D×D constant `transpose(Fy_eigvecs)`
+* `alpha, beta, theta` — N_spatial-length per-voxel rotation angles
+* `F` — total spin (eltype matches ψ's real type)
+
+Stage 1: Rz(-α) — phase recurrence over c
+Stage 2: Ry(-β) — gemm `mul!(W, P, conj_V)` + phase + gemm `mul!(P, W, V_T)`
+Stage 3: Dz(θ)  — phase recurrence over c (RTP: cis, ITP: exp variant)
+Stage 4: Ry(+β) — gemm + phase + gemm (conj of stage 2 phases)
+Stage 5: Rz(+α) — phase recurrence
+"""
+@inline function _apply_euler_5stage_batched_real!(
+    P, W, conj_V, V_T, alpha, beta, theta, F::T, ::Val{D},
+) where {T <: AbstractFloat, D}
+    N_spatial = size(P, 1)
+
+    # Stage 1 — Rz(-α): P[i, c] *= cis((F - c + 1) · α[i])
+    @inbounds for i in 1:N_spatial
+        ai = alpha[i]
+        z_a = cis(-ai)
+        phase = cis(F * ai)
+        for c in 1:D
+            P[i, c] *= phase
+            phase *= z_a
+        end
+    end
+
+    # Stage 2 — Ry(-β) = V · diag(exp(+iβλ)) · V†, λ_Fy = -F..F ascending
+    mul!(W, P, conj_V)
+    @inbounds for i in 1:N_spatial
+        bi = beta[i]
+        z_b = cis(bi)
+        phase = cis(-F * bi)
+        for j in 1:D
+            W[i, j] *= phase
+            phase *= z_b
+        end
+    end
+    mul!(P, W, V_T)
+
+    # Stage 3 — Dz(θ): P[i, c] *= cis(-(F - c + 1) · θ[i])
+    @inbounds for i in 1:N_spatial
+        ti = theta[i]
+        z_t = cis(ti)
+        phase = cis(-F * ti)
+        for c in 1:D
+            P[i, c] *= phase
+            phase *= z_t
+        end
+    end
+
+    # Stage 4 — Ry(+β) = conj of Stage 2 phases
+    mul!(W, P, conj_V)
+    @inbounds for i in 1:N_spatial
+        bi = beta[i]
+        z_b = cis(-bi)
+        phase = cis(F * bi)
+        for j in 1:D
+            W[i, j] *= phase
+            phase *= z_b
+        end
+    end
+    mul!(P, W, V_T)
+
+    # Stage 5 — Rz(+α)
+    @inbounds for i in 1:N_spatial
+        ai = alpha[i]
+        z_a = cis(ai)
+        phase = cis(-F * ai)
+        for c in 1:D
+            P[i, c] *= phase
+            phase *= z_a
+        end
+    end
+    nothing
+end
+
+"""ITP variant of `_apply_euler_5stage_batched_real!`. Same structure but
+Stage 3 uses `exp(-(m + F)·θ)` (recurrence in `exp(θ)`) so the lowest
+mode stays bounded by 1."""
+@inline function _apply_euler_5stage_batched_imag!(
+    P, W, conj_V, V_T, alpha, beta, theta, F::T, ::Val{D},
+) where {T <: AbstractFloat, D}
+    N_spatial = size(P, 1)
+
+    # Stage 1 — Rz(-α)
+    @inbounds for i in 1:N_spatial
+        ai = alpha[i]
+        z_a = cis(-ai)
+        phase = cis(F * ai)
+        for c in 1:D
+            P[i, c] *= phase
+            phase *= z_a
+        end
+    end
+
+    # Stage 2 — Ry(-β)
+    mul!(W, P, conj_V)
+    @inbounds for i in 1:N_spatial
+        bi = beta[i]
+        z_b = cis(bi)
+        phase = cis(-F * bi)
+        for j in 1:D
+            W[i, j] *= phase
+            phase *= z_b
+        end
+    end
+    mul!(P, W, V_T)
+
+    # Stage 3 — Dz(θ): ITP uses exp(-(m+F)·θ), recurrence ratio exp(θ).
+    two_F = T(2) * F
+    @inbounds for i in 1:N_spatial
+        ti = theta[i]
+        dz_step = exp(ti)
+        dz_r = exp(-two_F * ti)
+        for c in 1:D
+            P[i, c] *= dz_r
+            dz_r *= dz_step
+        end
+    end
+
+    # Stage 4 — Ry(+β)
+    mul!(W, P, conj_V)
+    @inbounds for i in 1:N_spatial
+        bi = beta[i]
+        z_b = cis(-bi)
+        phase = cis(F * bi)
+        for j in 1:D
+            W[i, j] *= phase
+            phase *= z_b
+        end
+    end
+    mul!(P, W, V_T)
+
+    # Stage 5 — Rz(+α)
+    @inbounds for i in 1:N_spatial
+        ai = alpha[i]
+        z_a = cis(ai)
+        phase = cis(-F * ai)
+        for c in 1:D
+            P[i, c] *= phase
+            phase *= z_a
+        end
+    end
+    nothing
+end
+
+"""
     apply_euler_5stage_fused!(P, W, α_col, β_col, θ_col,
                                m_row, m_shift_row, λ_row,
                                V_T, conj_V; imaginary_time=false)

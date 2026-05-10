@@ -57,170 +57,38 @@ end
     nothing
 end
 
-# Real-time DDI rotation. Matches the per-voxel `_apply_euler_spin_rotation`
-# stage-by-stage but applies the two Ry matvecs as BLAS gemms over (N, D).
+# Real-time DDI rotation: compute per-voxel Euler angles from the dipolar
+# field Φ(r), then call the shared batched-gemm 5-stage core.
 function _apply_ddi_rotation_batched_real!(
     psi::Array{Complex{T}}, phi_x, phi_y, phi_z,
     sm::SpinMatrices{D}, dt_frac::Float64, ndim::Int,
 ) where {T <: AbstractFloat, D}
-    n_pts = ntuple(d -> size(psi, d), ndim)
-    N_spatial = prod(n_pts)
+    N_spatial = prod(ntuple(d -> size(psi, d), ndim))
     F = T(sm.system.F)
-
     rc = _get_ddi_rotation_cache_cpu(psi, sm, ndim)
+
+    _ddi_compute_angles!(rc.alpha, rc.beta, rc.theta,
+        phi_x, phi_y, phi_z, dt_frac, N_spatial)
     P = reshape(psi, N_spatial, D)
-    W = rc.W
-    conj_V = rc.conj_V         # = conj(Fy_eigvecs) = transpose(Fy_eigvecs_adj)
-    V_T = rc.V_T               # = transpose(Fy_eigvecs)
-    alpha = rc.alpha
-    beta = rc.beta
-    theta = rc.theta
-
-    _ddi_compute_angles!(alpha, beta, theta, phi_x, phi_y, phi_z, dt_frac, N_spatial)
-
-    # Stage 1 — Rz(-α): P[i, c] *= cis((F - c + 1) · α[i])
-    @inbounds for i in 1:N_spatial
-        ai = alpha[i]
-        z_a = cis(-ai)
-        phase = cis(F * ai)
-        for c in 1:D
-            P[i, c] *= phase
-            phase *= z_a
-        end
-    end
-
-    # Stage 2 — Ry(-β) = V · diag(exp(+iβλ)) · V†, λ_Fy = -F..F ascending
-    mul!(W, P, conj_V)
-    @inbounds for i in 1:N_spatial
-        bi = beta[i]
-        z_b = cis(bi)
-        phase = cis(-F * bi)
-        for j in 1:D
-            W[i, j] *= phase
-            phase *= z_b
-        end
-    end
-    mul!(P, W, V_T)
-
-    # Stage 3 — Dz(θ): P[i, c] *= cis(-(F - c + 1) · θ[i])
-    @inbounds for i in 1:N_spatial
-        ti = theta[i]
-        z_t = cis(ti)
-        phase = cis(-F * ti)
-        for c in 1:D
-            P[i, c] *= phase
-            phase *= z_t
-        end
-    end
-
-    # Stage 4 — Ry(+β) = conj of Stage 2 phases
-    mul!(W, P, conj_V)
-    @inbounds for i in 1:N_spatial
-        bi = beta[i]
-        z_b = cis(-bi)
-        phase = cis(F * bi)
-        for j in 1:D
-            W[i, j] *= phase
-            phase *= z_b
-        end
-    end
-    mul!(P, W, V_T)
-
-    # Stage 5 — Rz(+α): P[i, c] *= cis(-(F - c + 1) · α[i])
-    @inbounds for i in 1:N_spatial
-        ai = alpha[i]
-        z_a = cis(ai)
-        phase = cis(-F * ai)
-        for c in 1:D
-            P[i, c] *= phase
-            phase *= z_a
-        end
-    end
+    _apply_euler_5stage_batched_real!(P, rc.W, rc.conj_V, rc.V_T,
+        rc.alpha, rc.beta, rc.theta, F, Val(D))
     nothing
 end
 
-# Imaginary-time DDI rotation. Stages 1, 2, 4, 5 unchanged from RTP; only the
-# Dz step uses exp(-(m+F)·θ) with the -F shift to keep the lowest mode at 1
-# (matches `_apply_euler_spin_rotation` ITP convention).
+# Imaginary-time variant: same angle pre-pass, ITP-flavoured Stage 3.
 function _apply_ddi_rotation_batched_imag!(
     psi::Array{Complex{T}}, phi_x, phi_y, phi_z,
     sm::SpinMatrices{D}, dt_frac::Float64, ndim::Int,
 ) where {T <: AbstractFloat, D}
-    n_pts = ntuple(d -> size(psi, d), ndim)
-    N_spatial = prod(n_pts)
+    N_spatial = prod(ntuple(d -> size(psi, d), ndim))
     F = T(sm.system.F)
-
     rc = _get_ddi_rotation_cache_cpu(psi, sm, ndim)
+
+    _ddi_compute_angles!(rc.alpha, rc.beta, rc.theta,
+        phi_x, phi_y, phi_z, dt_frac, N_spatial)
     P = reshape(psi, N_spatial, D)
-    W = rc.W
-    conj_V = rc.conj_V
-    V_T = rc.V_T
-    alpha = rc.alpha
-    beta = rc.beta
-    theta = rc.theta
-
-    _ddi_compute_angles!(alpha, beta, theta, phi_x, phi_y, phi_z, dt_frac, N_spatial)
-
-    # Stage 1 (RTP) — Rz(-α)
-    @inbounds for i in 1:N_spatial
-        ai = alpha[i]
-        z_a = cis(-ai)
-        phase = cis(F * ai)
-        for c in 1:D
-            P[i, c] *= phase
-            phase *= z_a
-        end
-    end
-
-    # Stage 2 — Ry(-β)
-    mul!(W, P, conj_V)
-    @inbounds for i in 1:N_spatial
-        bi = beta[i]
-        z_b = cis(bi)
-        phase = cis(-F * bi)
-        for j in 1:D
-            W[i, j] *= phase
-            phase *= z_b
-        end
-    end
-    mul!(P, W, V_T)
-
-    # Stage 3 — Dz(θ): ITP uses exp(-(m + F)·θ), so c=1 (m=F) gets exp(-2F·θ)
-    # and c=D (m=-F) gets exp(0). Recurrence ratio is exp(θ) per step.
-    two_F = T(2) * F
-    @inbounds for i in 1:N_spatial
-        ti = theta[i]
-        dz_step = exp(ti)
-        dz_r = exp(-two_F * ti)
-        for c in 1:D
-            P[i, c] *= dz_r
-            dz_r *= dz_step
-        end
-    end
-
-    # Stage 4 — Ry(+β)
-    mul!(W, P, conj_V)
-    @inbounds for i in 1:N_spatial
-        bi = beta[i]
-        z_b = cis(-bi)
-        phase = cis(F * bi)
-        for j in 1:D
-            W[i, j] *= phase
-            phase *= z_b
-        end
-    end
-    mul!(P, W, V_T)
-
-    # Stage 5 — Rz(+α)
-    @inbounds for i in 1:N_spatial
-        ai = alpha[i]
-        z_a = cis(ai)
-        phase = cis(-F * ai)
-        for c in 1:D
-            P[i, c] *= phase
-            phase *= z_a
-        end
-    end
+    _apply_euler_5stage_batched_imag!(P, rc.W, rc.conj_V, rc.V_T,
+        rc.alpha, rc.beta, rc.theta, F, Val(D))
     nothing
 end
 

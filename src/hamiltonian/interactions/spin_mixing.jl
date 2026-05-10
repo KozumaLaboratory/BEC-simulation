@@ -1,24 +1,31 @@
 export apply_spin_mixing_step!
 
 function apply_spin_mixing_step!(
-    psi::AbstractArray{<:Complex},
+    psi::AbstractArray{<:Complex, M},
     sm::SpinMatrices{D},
     c1::Float64,
     dt_frac::Float64,
     ndim::Int;
     imaginary_time::Bool=false,
-) where {D}
+) where {M, D}
     abs(c1) < 1e-30 && return nothing
-    n_pts = ntuple(d -> size(psi, d), ndim)
-
+    # Use `Val(M - 1)` (spatial dim count from psi's array dimensionality)
+    # rather than `ntuple(f, ndim::Int)` so the resulting `n_pts` is a
+    # type-stable `NTuple{M-1, Int}`. Without this, the inner
+    # `_spin_mixing_loop!(psi::Array{...})` dispatch goes through dynamic
+    # dispatch — caught when split_step jumped 1.9 → 5 ms after batched
+    # spin_mixing landed.
+    n_pts = ntuple(d -> size(psi, d), Val(M - 1))
     _spin_mixing_loop!(psi, sm, c1, dt_frac, Val(D), n_pts, imaginary_time)
     nothing
 end
 
 """
-Spin-1 loop using Rodrigues' formula (allocation-free, machine-precision unitarity).
+Spin-1 loop using Rodrigues' formula (allocation-free, machine-precision
+unitarity). Faster than the batched-gemm path at D=3 since the gemm has
+non-trivial setup cost relative to the tiny 3×3 matvec work.
 """
-function _spin_mixing_loop!(psi, sm, c1, dt_frac, ::Val{3}, n_pts, imaginary_time)
+function _spin_mixing_rodrigues!(psi, sm, c1, dt_frac, n_pts, imaginary_time)
     Threads.@threads for I in CartesianIndices(n_pts)
         @inbounds begin
             spinor = _get_spinor(psi, I, Val(3))
@@ -33,6 +40,95 @@ Generic spin-F loop using Euler angle decomposition.
 O(D) spin expectation via raising/lowering, O(D²) rotation via Euler angles.
 Uses Matrix (not SMatrix) for V_Fy to avoid heap allocation at large D.
 """
+function _spin_mixing_loop!(
+    psi::Array{Complex{T}}, sm, c1, dt_frac, ::Val{D}, n_pts, imaginary_time,
+) where {T <: AbstractFloat, D}
+    if D == 3
+        return _spin_mixing_rodrigues!(psi, sm, c1, dt_frac, n_pts, imaginary_time)
+    end
+    # Same algorithm as the per-voxel scalar Euler decomposition, but the
+    # two D×D matvecs (Stages 2 and 4) become single BLAS gemms over the
+    # (N_spatial, D) reshape. Pre-pass computes per-voxel (α, β, θ) into
+    # the shared rotation cache; the 5-stage core then runs gemm-batched.
+    # Saves 30–35% on the per-step rotation cost (matched the DDI win).
+    N_spatial = prod(n_pts)
+    F = T(sm.system.F)
+    Ff1 = T(sm.system.F * (sm.system.F + 1))
+    fp_coeffs = ntuple(c -> c == 1 ? T(0) :
+        sqrt(Ff1 - T(F - (c - 1)) * T(F - (c - 1) + 1)), Val(D))
+
+    rc = _get_ddi_rotation_cache_cpu(psi, sm, ndim_from_n_pts(n_pts))
+    alpha = rc.alpha
+    beta = rc.beta
+    theta = rc.theta
+
+    P = reshape(psi, N_spatial, D)
+    c1_t = T(c1)
+    dt_t = T(dt_frac)
+
+    # Pre-pass: for each voxel compute (α, β, θ) from local spinor.
+    # Track max|θ| so we can skip the rotation entirely when the spin
+    # density vanishes everywhere (polar GS, vacuum regions in scan
+    # warm-ups, etc.) — that case used to early-return per voxel in the
+    # scalar path. Without this guard the four BLAS gemms run on an
+    # all-zero phase array, doing 5 ms of useless work on the bench's
+    # polar workspace.
+    max_theta_sq = T(0)
+    @inbounds for k in 1:N_spatial
+        fz_val = T(0)
+        @simd for c in 1:D
+            fz_val += T(F - (c - 1)) * abs2(P[k, c])
+        end
+        fxy_re = T(0)
+        fxy_im = T(0)
+        @simd for c in 2:D
+            pc_m1 = P[k, c - 1]
+            pc = P[k, c]
+            prod = conj(pc_m1) * pc
+            coef = fp_coeffs[c]
+            fxy_re += coef * real(prod)
+            fxy_im += coef * imag(prod)
+        end
+        px = c1_t * fxy_re
+        py = c1_t * fxy_im
+        pz = c1_t * fz_val
+        pm_sq = px * px + py * py + pz * pz
+        pm = sqrt(pm_sq)
+        if pm < T(1e-100)
+            alpha[k] = T(0)
+            beta[k] = T(0)
+            theta[k] = T(0)
+        else
+            alpha[k] = atan(py, px)
+            cb = pz / pm
+            cb = cb > one(T) ? one(T) : (cb < -one(T) ? -one(T) : cb)
+            beta[k] = acos(cb)
+            th = pm * dt_t
+            theta[k] = th
+            th_sq = th * th
+            max_theta_sq = th_sq > max_theta_sq ? th_sq : max_theta_sq
+        end
+    end
+
+    # `_apply_euler_spin_rotation` skips per-voxel when phi·dt < 1e-14;
+    # mirror that here at the call level so polar / vacuum states pay
+    # only the pre-pass cost (~150 μs at 16³) instead of running four
+    # gemms over a zero phase field.
+    max_theta_sq < T(1e-28) && return nothing
+
+    if imaginary_time
+        _apply_euler_5stage_batched_imag!(P, rc.W, rc.conj_V, rc.V_T,
+            alpha, beta, theta, F, Val(D))
+    else
+        _apply_euler_5stage_batched_real!(P, rc.W, rc.conj_V, rc.V_T,
+            alpha, beta, theta, F, Val(D))
+    end
+    nothing
+end
+
+@inline ndim_from_n_pts(::NTuple{N}) where {N} = N
+
+# Generic fallback (GPU / non-Array) — keeps the per-voxel scalar path.
 function _spin_mixing_loop!(psi, sm, c1, dt_frac, ::Val{D}, n_pts, imaginary_time) where {D}
     F = sm.system.F
     Ff1 = Float64(F * (F + 1))
