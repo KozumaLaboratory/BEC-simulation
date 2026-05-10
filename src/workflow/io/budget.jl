@@ -177,7 +177,7 @@ end
 export recommend_backend_dtype
 
 """
-    recommend_backend_dtype(n_max; cuda_functional, mode=:realtime)
+    recommend_backend_dtype(n_max; cuda_functional, ndim=3, mode=:realtime)
         → (backend_kind::Symbol, dtype::DataType)
 
 Given the largest spatial dimension `n_max` of the planned grid (cubic
@@ -189,6 +189,9 @@ and float type for `split_step!` / `split_step_combined!`.
 * `n_max` — largest grid dimension (e.g. 32 for a 32³ run).
 * `cuda_functional` — whether `CUDA.functional()` is true. The caller
   is responsible for checking; this function does not import CUDA.
+* `ndim` — spatial dimensionality (1, 2, or 3). 1D/2D stay on CPU
+  regardless of size — kernel-launch overhead dominates and several
+  analyzer paths lack a GPU specialization.
 * `mode` — physics regime. `:realtime` (≤ a few hundred ms) tolerates
   Float32 on GPU. `:itp` (imaginary-time ground state) and
   `:longtime` (≫ 1 s propagation, phase accumulation matters) force
@@ -199,39 +202,33 @@ and float type for `split_step!` / `split_step_combined!`.
 Tuple `(backend_kind, dtype)` where `backend_kind ∈ (:cpu, :cuda)`
 and `dtype ∈ (Float32, Float64)`.
 
-# Use
-
-```julia
-import CUDA
-N = 48
-kind, T = recommend_backend_dtype(N;
-    cuda_functional=CUDA.functional(), mode=:realtime)
-backend = kind === :cuda ? CUDABackend() : CPUBackend()
-grid = make_grid(GridConfig((N,N,N), (8.0,8.0,8.0)); dtype=T)
-ws = make_workspace(; grid, atom=Eu151, ..., backend, dtype=T)
-```
-
-Recommendation table:
+Recommendation table (3D, GPU available):
 
 | `n_max` | `:realtime` | `:itp` / `:longtime` |
 |---------|-------------|----------------------|
 | ≤ 16    | (cpu, F64)  | (cpu, F64)           |
-| ≥ 24, GPU available | (cuda, F32) | (cuda, F64) |
-| ≥ 24, no GPU       | (cpu, F64)  | (cpu, F64)  |
+| ≥ 24    | (cuda, F32) | (cuda, F64)          |
 
-When `cuda_functional=false` we always return `(:cpu, Float64)` —
-CPU F32 is slower than CPU F64 at every measured size on the lab path.
+When `cuda_functional=false`, `ndim < 3`, or `n_max ≤ 16` we always
+return `(:cpu, Float64)` — CPU F32 is slower than CPU F64 at every
+measured size on the lab path.
+
+`make_workspace(; backend=nothing)` (the default) applies the same
+threshold automatically; this function is the explicit form when you
+want to inspect or branch on the recommendation.
 """
 function recommend_backend_dtype(
     n_max::Int;
     cuda_functional::Bool,
+    ndim::Int = 3,
     mode::Symbol = :realtime,
 )
     n_max > 0 || throw(ArgumentError("n_max must be positive, got $n_max"))
+    ndim in (1, 2, 3) || throw(ArgumentError("ndim must be 1, 2, or 3 — got $ndim"))
     mode in (:realtime, :itp, :longtime) || throw(ArgumentError(
         "mode must be :realtime, :itp, or :longtime — got $mode"))
 
-    if !cuda_functional || n_max <= 16
+    if !cuda_functional || n_max <= 16 || ndim != 3
         return (:cpu, Float64)
     end
     if mode === :realtime

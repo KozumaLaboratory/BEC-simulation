@@ -342,6 +342,16 @@ const _cuda_reclaim_callback = Ref{Function}(() -> nothing)
 _maybe_cuda_reclaim() = _cuda_reclaim_callback[]()
 
 """
+Callback returning whether CUDA is loaded *and* a working device is
+visible. Default returns `false` (CPU-only build); the CUDA extension
+overrides to `() -> CUDA.functional()` at `__init__`. This lets
+`make_workspace` auto-pick `CUDABackend()` for large grids without
+the core module having to `import CUDA` (which would force the dep).
+"""
+const _cuda_functional_callback = Ref{Function}(() -> false)
+cuda_functional() = _cuda_functional_callback[]()::Bool
+
+"""
     _scratch_tmp_path(final_path)
 
 Return a filesystem path suitable for the JLD2 `.tmp` write. When the env

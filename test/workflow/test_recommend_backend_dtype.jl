@@ -19,13 +19,20 @@ using Test, SpinorBEC
         end
     end
 
-    @testset "large grids go to GPU; mode controls dtype" begin
+    @testset "1D/2D stay on CPU regardless of size" begin
+        for n in (32, 64, 128, 256), nd in (1, 2)
+            @test recommend_backend_dtype(n; cuda_functional = true, ndim = nd) ===
+                  (:cpu, Float64)
+        end
+    end
+
+    @testset "large 3D grids go to GPU; mode controls dtype" begin
         for n in (24, 32, 48, 64, 128)
-            @test recommend_backend_dtype(n; cuda_functional = true, mode = :realtime) ===
+            @test recommend_backend_dtype(n; cuda_functional = true, ndim = 3, mode = :realtime) ===
                   (:cuda, Float32)
-            @test recommend_backend_dtype(n; cuda_functional = true, mode = :itp) ===
+            @test recommend_backend_dtype(n; cuda_functional = true, ndim = 3, mode = :itp) ===
                   (:cuda, Float64)
-            @test recommend_backend_dtype(n; cuda_functional = true, mode = :longtime) ===
+            @test recommend_backend_dtype(n; cuda_functional = true, ndim = 3, mode = :longtime) ===
                   (:cuda, Float64)
         end
     end
@@ -35,5 +42,7 @@ using Test, SpinorBEC
         @test_throws ArgumentError recommend_backend_dtype(-4; cuda_functional = true)
         @test_throws ArgumentError recommend_backend_dtype(32;
             cuda_functional = true, mode = :unknown_mode)
+        @test_throws ArgumentError recommend_backend_dtype(32;
+            cuda_functional = true, ndim = 4)
     end
 end

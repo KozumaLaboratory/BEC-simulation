@@ -20,6 +20,7 @@ function __init__()
     # workspaces accumulate on a 16 GB GPU (~150 MB pinned per point
     # across psi/fft_buf/k²/ddi_kernel) and a long scan will OOM mid-run.
     SpinorBEC._cuda_reclaim_callback[] = () -> (CUDA.reclaim(); nothing)
+    SpinorBEC._cuda_functional_callback[] = () -> CUDA.functional()
 end
 
 end # module

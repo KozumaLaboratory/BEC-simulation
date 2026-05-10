@@ -27,7 +27,7 @@ function make_workspace(;
     l_z_ddi::Float64=0.0,
     quasi_2d::Bool=false,
     l_z::Float64=0.0,
-    backend::AbstractBackend=CPUBackend(),
+    backend::Union{Nothing, AbstractBackend}=nothing,
     spinor_lhy::Union{Nothing, Symbol}=nothing,
     absorbing_boundary::Union{Nothing, AbsorbingBoundary}=nothing,
     light_shift::Union{Nothing, LightShift}=nothing,
@@ -41,6 +41,7 @@ function make_workspace(;
             "dtype=$U disagrees with grid eltype=$T. Build the grid with `make_grid(cfg; dtype=$U)` first."
         ),
     )
+    backend = _resolve_backend(backend, grid)
     if quasi_2d
         N == 2 || throw(ArgumentError("quasi_2d requires 2D grid, got $(N)D"))
         l_z > 0 || throw(ArgumentError("quasi_2d requires l_z > 0"))
@@ -399,6 +400,29 @@ end
 # F-generic polar contact + DDI LHY (paper #1 with dipolar extension).
 # ε̃ = |c_dd| / |δ_1|; for finer control call
 # `compute_spinor_lhy_polar_dipolar(; eps_tilde_dd, ...)` directly.
+# Resolve the `backend` kwarg of `make_workspace`. Explicit `::AbstractBackend`
+# is honoured verbatim (override always wins). `nothing` triggers auto-pick
+# based on `cuda_functional()` (set by SpinorBECCUDAExt at __init__) and the
+# grid's largest spatial dimension. Threshold: 3D + n_max ≥ 24 picks
+# `CUDABackend()`, else `CPUBackend()`. Matches the empirical perf table
+# in `recommend_backend_dtype` (16³ < 15% GPU advantage, kernel-launch
+# overhead and CPU L2/L3 locality dominate; 24³+ favors GPU 3-30×). 1D
+# and 2D grids stay on CPU because the per-voxel parallelism is too low
+# for kernel-launch overhead to amortize and several analyzer paths
+# don't have a GPU specialization. Set the env var
+# `SPINORBEC_NO_AUTO_BACKEND=1` to force CPU regardless of grid size
+# (test isolation, debugging GPU-vs-CPU divergences, or when the GPU
+# is reserved for another process).
+@inline function _resolve_backend(backend, grid::Grid{N}) where {N}
+    backend isa AbstractBackend && return backend
+    haskey(ENV, "SPINORBEC_NO_AUTO_BACKEND") && return CPUBackend()
+    n_max = maximum(grid.config.n_points)
+    if N == 3 && cuda_functional() && n_max >= 24
+        return CUDABackend()
+    end
+    return CPUBackend()
+end
+
 function _build_spinor_lhy(::Val{:polar_dipolar}, atom, ws, psi_init, c_dd, enable_ddi)
     g_dict = _lhy_g_dict(atom, ws)
     c_dd_eff = enable_ddi && !isnan(c_dd) ? c_dd : 0.0
