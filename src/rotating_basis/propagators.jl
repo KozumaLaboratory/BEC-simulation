@@ -64,11 +64,17 @@ function apply_kinetic_step_rotating!(
 end
 
 # Lazy device-side cache of k_squared; one entry per workspace identity.
-const _ROTATING_K2_CACHE = Dict{UInt, AbstractArray}()
-function _kinetic_kspace_buffer(ws::RotatingBasisWS{T, N}) where {T, N}
+# Stored as `Any` so a single Dict can hold both CPU `Array{T,N}` and GPU
+# `CuArray{T,N}` for different workspaces; the typed wrapper below asserts
+# the concrete element type (`AR` from the workspace's parametrisation)
+# at the lookup site so callers see a fully-typed buffer in their broadcasts.
+const _ROTATING_K2_CACHE = Dict{UInt, Any}()
+function _kinetic_kspace_buffer(
+    ws::RotatingBasisWS{T, N, D, AC, AC1, AR},
+) where {T, N, D, AC, AC1, AR}
     key = objectid(ws)
-    haskey(_ROTATING_K2_CACHE, key) && return _ROTATING_K2_CACHE[key]
-    k2_dev = _zeros(ws.backend, T, ws.grid.config.n_points...)
+    haskey(_ROTATING_K2_CACHE, key) && return _ROTATING_K2_CACHE[key]::AR
+    k2_dev = _zeros(ws.backend, T, ws.grid.config.n_points...)::AR
     copyto!(k2_dev, ws.grid.k_squared)
     _ROTATING_K2_CACHE[key] = k2_dev
     k2_dev
