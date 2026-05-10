@@ -208,20 +208,30 @@ rotation per half-potential step. Compared with `split_step!`:
 
 # Why no `:yoshida6` composition kwarg
 
-The combined operator's `Φ_DDI` and `c₁⟨F⟩` are evaluated from ψ at
-substep entry — a frozen mean-field Magnus midpoint. That freezing is
-O(dt²) accurate per V substep. A higher-order outer (Yoshida4/6,
-Blanes-Moan) reaching its nominal order requires V substeps that are
-themselves accurate to ≥ outer-order, but the frozen-field combined V
-caps at O(dt²). Empirically the result is order-1 or even worse than
-Strang because Yoshida's negative-w₀ substep amplifies the
-frozen-field error. The fix would be implicit-midpoint
-predictor-corrector for Φ_DDI / ⟨F⟩, doubling the per-V cost — at
-which point the combined-vs-sequential cost gap shrinks below what the
-higher-order outer recovers. For now: stick with Strang+combined, or
-use `run_simulation_yoshida!` with the standard sequential split_step
-(which also has frozen-field, but its nested Strang inner-V partly
-cancels the leading error in mean-field-light cases).
+Yoshida's order-N construction is derived for **separable autonomous**
+Hamiltonians H = T(p) + V(q) [Yoshida 1990, Phys. Lett. A 150, 262].
+Self-consistent mean-field problems (this combined V evaluates `Φ_DDI`
+and `c₁⟨F⟩` from ψ, making H non-autonomous through ψ) are outside
+that derivation's scope. Empirically in `test_integrator_order_meanfield`
+we observe Y6 dropping to order ≈ 1 once any mean-field channel is
+active; for general nonlinear Schrödinger settings Choi & Vaníček
+[arXiv:2006.16902, 2020] document explicit splitting losing to
+first-order accuracy and propose implicit-midpoint compositions as
+the fix. Implementing that here would mean a predictor-corrector
+iteration on `Φ_DDI[ψ]` / `⟨F⟩[ψ]` per V substep, doubling per-V cost
+and erasing most of the combined-vs-sequential saving. For now: stick
+with Strang+combined (order 2, fast), or use `run_simulation_yoshida!`
+with the sequential split_step path if you need a higher-order method
+on a problem that's effectively autonomous (where Yoshida's assumptions
+hold).
+
+The codebase's Y6 weights (`_COMP_YOSHIDA_S6` in
+`split_step_composers.jl`) are Yoshida 1990 Solution A: bs =
+(w₃, w₂, w₁, w₀, w₁, w₂, w₃) with w₀ ≈ +1.315 (positive, middle) and
+w₁ ≈ −1.178 (negative, at positions 3 and 5). Numerical magnitudes
+match the published Solution A; the convention here labels them so
+that w₁ is the negative one, whereas Yoshida's original paper labels
+them in the opposite order (same algorithm either way).
 
 # Restrictions
 

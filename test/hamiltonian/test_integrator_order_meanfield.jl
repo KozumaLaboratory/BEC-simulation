@@ -5,37 +5,57 @@ using Printf
 # Order verification under MEAN-FIELD with parameter sweep.
 #
 # Companion to `test_higher_order_integrators.jl`, which only exercises
-# the integrators with `c1 = c_dd = 0`. That trivial-MF setup validates
+# the integrators with `c1 = c_dd = 0`. That trivial setup validates
 # time-stepping infrastructure but NOT the order claim against the
-# self-consistent Hamiltonian `H_eff(t) = H_0 + V_MF[ψ(t)]`. With
-# mean-field active, frozen-midpoint splitting truncates Magnus at
-# O(dt²) per V substep, regardless of outer composition order.
+# self-consistent Hamiltonian H_eff(t) = H_0 + V_MF[ψ(t)].
 #
-# This test sweeps four (c1, c_dd) configurations × four schemes ×
-# three dt values, computes the empirical order from consecutive
-# halvings (so we get TWO order estimates per scheme — they must
-# agree, otherwise we're in a pre-asymptotic regime), and asserts
-# behavior matched to the empirical reality:
+# Theoretical framing (verified against published sources):
 #
-#   ┌────────────┬────────┬────┬────┬───────┐
-#   │ (c1, c_dd) │ Strang │ Y4 │ Y6 │ CFET4 │
-#   ├────────────┼────────┼────┼────┼───────┤
-#   │ (0, 0)     │   2    │  4 │  6 │   4   │  ← test_higher_order_integrators
-#   │ (0, c_dd)  │   2    │ ~3 │ ~1 │  ~2   │  ← DDI alone breaks Y6
-#   │ (c1, 0)    │   2    │ ~3 │ ~1 │  ~2   │  ← SM alone also breaks Y6
-#   │ (c1, c_dd) │   2    │ ~3 │ ~1 │  ~2   │  ← full mean-field
-#   └────────────┴────────┴────┴────┴───────┘
+# * Yoshida (1990, Phys. Lett. A 150, 262) constructs the 4th/6th-order
+#   composition for "Hamiltonian systems of the form H = T(p)+V(q)" —
+#   i.e. separable AND autonomous. Self-consistent mean-field falls
+#   outside that derivation.
+# * Choi & Vaníček (2020, arXiv:2006.16902) document that explicit
+#   split-operator algorithms can drop to first-order accuracy in
+#   nonlinear Schrödinger settings beyond the special "GP with local
+#   nonlinearity" case, and propose implicit-midpoint compositions.
+# * Alvermann & Fehske (2011, JCP 230, 5930) develop CFET for
+#   *time-dependent linear* Schrödinger; CFET requires Hamiltonian
+#   evaluation at Gauss-Legendre quadrature points combined linearly.
+#   Order-4 is the maximum achievable with positive real coefficients
+#   (see also Numerische Mathematik 2018).
+# * The codebase's `cfet4_real_step_rotating!` is documented in its
+#   own docstring as EXPERIMENTAL — it sequences `split_step_rotating!`
+#   at τ₁ and τ₂ but does NOT take the linear combination required by
+#   true Alvermann-Fehske CFET. Its observed order ≈ 2 here is its
+#   baseline state, not an MF-induced degradation.
 #
-# Numbers are empirical orders observed on 8³ rotating-basis F=1.
-# Y6 collapses universally whenever ANY mean-field channel is active.
-# Y4 retains super-Strang behavior. CFET4 degrades to ~Strang order
-# but with a smaller absolute constant. Strang itself is unaffected.
+# What this test measures: empirical convergence orders for each
+# integrator under three mean-field configurations.
 #
-# Test design: configurations with mean-field assert orders >=
-# empirically-measured floors. Y6 is `@test_broken` for its nominal
-# order claim because no fix is in scope — recovering Y6 with MF
-# requires implicit-midpoint predictor-corrector for V_MF[ψ], which
-# doubles per-V cost.
+#   ┌────────────┬────────┬─────────┬────────┬──────────────────────┐
+#   │ (c1, c_dd) │ Strang │   Y4    │   Y6   │ CFET4 (experimental) │
+#   ├────────────┼────────┼─────────┼────────┼──────────────────────┤
+#   │ (0, 0)     │   2    │   ~4    │  ~5-6  │   ~2 (broken)        │
+#   │ (0, c_dd)  │   2    │  3 → 1  │   ~1   │   ~2                 │
+#   │ (c1, 0)    │   2    │  ~4 → 3 │  floor │   ~2                 │
+#   │ (c1, c_dd) │   2    │  3 → 1  │   ~1   │   ~2                 │
+#   └────────────┴────────┴─────────┴────────┴──────────────────────┘
+#
+# Numbers are empirical, measured on 8³ rotating-basis F=1, T_final=0.2.
+# "x → y" means the measured order at coarser/finer dt successively.
+#
+# Y4 retains super-Strang behavior at coarse dt but its leading O(dt⁴)
+# term gets dominated at small dt by an O(dt²) sub-leading contribution
+# (mean-field tracking error). Y6 with DDI active collapses to order 1
+# — the Yoshida construction's autonomous-separable assumption is
+# violated. CFET4 in this codebase reports ≈ 2 regardless of MF (its
+# documented experimental status). Strang stays at 2 in all configs.
+#
+# Test design: assert what is empirically robust, broken-test what is
+# nominally claimed but not achieved. Whether the order collapse can
+# be repaired requires moving to implicit-midpoint / predictor-corrector
+# (Choi-Vaníček 2020); not in scope here.
 
 @testset "Order verification under mean-field (parameter sweep)" begin
     config = GridConfig((8, 8, 8), (6.0, 6.0, 6.0))
