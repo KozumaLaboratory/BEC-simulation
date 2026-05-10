@@ -115,8 +115,7 @@ Handles both real-time (Dz: cis) and imaginary-time (Dz: exp) propagation.
     @inbounds for i in 1:D
         s = zero(ComplexF64)
         for j in 1:D
-            ;
-            s += Vt_Fy[i, j] * v[j];
+            s += Vt_Fy[i, j] * v[j]
         end
         w[i] = phase * s
         phase *= z_beta
@@ -124,8 +123,7 @@ Handles both real-time (Dz: cis) and imaginary-time (Dz: exp) propagation.
     @inbounds for i in 1:D
         s = zero(ComplexF64)
         for j in 1:D
-            ;
-            s += V_Fy[i, j] * w[j];
+            s += V_Fy[i, j] * w[j]
         end
         v[i] = s
     end
@@ -157,8 +155,7 @@ Handles both real-time (Dz: cis) and imaginary-time (Dz: exp) propagation.
     @inbounds for i in 1:D
         s = zero(ComplexF64)
         for j in 1:D
-            ;
-            s += Vt_Fy[i, j] * v[j];
+            s += Vt_Fy[i, j] * v[j]
         end
         w[i] = phase * s
         phase *= z_neg_beta
@@ -169,8 +166,7 @@ Handles both real-time (Dz: cis) and imaginary-time (Dz: exp) propagation.
     @inbounds for i in 1:D
         s = zero(ComplexF64)
         for j in 1:D
-            ;
-            s += V_Fy[i, j] * w[j];
+            s += V_Fy[i, j] * w[j]
         end
         v[i] = phase * s
         phase *= z_alpha
