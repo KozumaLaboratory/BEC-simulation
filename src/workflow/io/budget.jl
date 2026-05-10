@@ -155,3 +155,88 @@ function _first_step_of_kind(pipeline::Vector, kind::String)
     end
     return nothing
 end
+
+# --- Backend / dtype recommendation ----------------------------------
+#
+# Empirical lookup table for `split_step_combined!` / `split_step!` on
+# Eu-class systems (D=13, F=6). Numbers measured 2026-05-10 on
+# RTX 5070 Ti with Julia 1.12.6, see scripts/bench/backend_grid_scan.jl
+# for the reproducible benchmark.
+#
+#   N          CPU F64   CPU F32   GPU F64   GPU F32        winner
+#   16³          3237      3607      2450      2877    GPU F64 (1.13×)
+#   24³         11368     12277      3195      2629    GPU F32 (4.32×)
+#   32³         28735     29290      3835      2546    GPU F32 (11.3×)
+#   48³         99225     97608      8428      3041    GPU F32 (32.6×)
+#                                                      [µs / split_step]
+#
+# CPU F32 is uniformly worse than CPU F64 (libm scalar trig + no
+# memory-bandwidth gain at these grid sizes). GPU F32 wins above ~16³
+# both vs CPU and vs GPU F64.
+
+export recommend_backend_dtype
+
+"""
+    recommend_backend_dtype(n_max; cuda_functional, mode=:realtime)
+        → (backend_kind::Symbol, dtype::DataType)
+
+Given the largest spatial dimension `n_max` of the planned grid (cubic
+or otherwise — pass the max), return the empirically-optimal backend
+and float type for `split_step!` / `split_step_combined!`.
+
+# Arguments
+
+* `n_max` — largest grid dimension (e.g. 32 for a 32³ run).
+* `cuda_functional` — whether `CUDA.functional()` is true. The caller
+  is responsible for checking; this function does not import CUDA.
+* `mode` — physics regime. `:realtime` (≤ a few hundred ms) tolerates
+  Float32 on GPU. `:itp` (imaginary-time ground state) and
+  `:longtime` (≫ 1 s propagation, phase accumulation matters) force
+  Float64 even on GPU.
+
+# Returns
+
+Tuple `(backend_kind, dtype)` where `backend_kind ∈ (:cpu, :cuda)`
+and `dtype ∈ (Float32, Float64)`.
+
+# Use
+
+```julia
+import CUDA
+N = 48
+kind, T = recommend_backend_dtype(N;
+    cuda_functional=CUDA.functional(), mode=:realtime)
+backend = kind === :cuda ? CUDABackend() : CPUBackend()
+grid = make_grid(GridConfig((N,N,N), (8.0,8.0,8.0)); dtype=T)
+ws = make_workspace(; grid, atom=Eu151, ..., backend, dtype=T)
+```
+
+Recommendation table:
+
+| `n_max` | `:realtime` | `:itp` / `:longtime` |
+|---------|-------------|----------------------|
+| ≤ 16    | (cpu, F64)  | (cpu, F64)           |
+| ≥ 24, GPU available | (cuda, F32) | (cuda, F64) |
+| ≥ 24, no GPU       | (cpu, F64)  | (cpu, F64)  |
+
+When `cuda_functional=false` we always return `(:cpu, Float64)` —
+CPU F32 is slower than CPU F64 at every measured size on the lab path.
+"""
+function recommend_backend_dtype(
+    n_max::Int;
+    cuda_functional::Bool,
+    mode::Symbol = :realtime,
+)
+    n_max > 0 || throw(ArgumentError("n_max must be positive, got $n_max"))
+    mode in (:realtime, :itp, :longtime) || throw(ArgumentError(
+        "mode must be :realtime, :itp, or :longtime — got $mode"))
+
+    if !cuda_functional || n_max <= 16
+        return (:cpu, Float64)
+    end
+    if mode === :realtime
+        return (:cuda, Float32)
+    else
+        return (:cuda, Float64)
+    end
+end

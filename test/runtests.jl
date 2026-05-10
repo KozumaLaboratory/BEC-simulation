@@ -47,6 +47,7 @@ const FAST_TESTS = [
     "foundation/test_general_f.jl",
     "hamiltonian/test_interactions_constraint.jl",
     "workflow/test_io.jl",
+    "workflow/test_recommend_backend_dtype.jl",
     "analysis/test_nematic_tensor.jl",
     "foundation/test_spherical_harmonics.jl",
     "analysis/test_spectral.jl",
