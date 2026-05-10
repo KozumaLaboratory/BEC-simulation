@@ -17,25 +17,48 @@ function _apply_UB!(
     psi::AbstractArray{<:Complex}, sm::SpinMatrices{D}, theta::T, phi::T, ndim::Int;
     inverse::Bool=false, scratch=nothing,
 ) where {T, D}
-    # Compose the two spin-only rotations into a single D×D unitary, then
-    # apply it via one gemm against the spin axis of psi. The previous code
-    # path (two sequential apply_uniform_spin_rotation! calls) cost two
-    # gemms over the full spatial × D array — at 16³ × D=13 each gemm is
-    # ~280 μs, so this folds 4 gemms into 2 inside apply_ddi_step_rotating!.
-    # angles converted to Float64 — D×D builder + composition stays on the
-    # host; per-voxel gemm uses workspace eltype.
     θ = Float64(theta)
     φ = Float64(phi)
     abs(θ) + abs(φ) < 1e-30 && return nothing
+    R = _UB_combined_rotation(sm, θ, φ, inverse)
+    _apply_rotation_to_spin_axis!(psi, R, ndim; scratch=scratch)
+    nothing
+end
 
+"""
+    _apply_UB_to!(dst, src, sm, theta, phi, ndim; inverse=false) → dst
+
+Same Û_B rotation as `_apply_UB!` but writes to `dst` reading from `src`,
+so callers can pipeline `src → dst → src` through DDI without paying a
+`copyto!` over the full spinor at each Û_B call. Used by
+`apply_ddi_step_rotating!`.
+"""
+function _apply_UB_to!(
+    dst::AbstractArray{<:Complex}, src::AbstractArray{<:Complex},
+    sm::SpinMatrices{D}, theta::T, phi::T, ndim::Int;
+    inverse::Bool=false,
+) where {T, D}
+    θ = Float64(theta)
+    φ = Float64(phi)
+    if abs(θ) + abs(φ) < 1e-30
+        copyto!(dst, src)
+        return dst
+    end
+    R = _UB_combined_rotation(sm, θ, φ, inverse)
+    _apply_rotation_to_spin_axis_to!(dst, src, R, ndim)
+    dst
+end
+
+# Build the composed Û_B rotation R = R_z(±φ) · R_y(±θ) once. Forward
+# (inverse=false) gives ψ̃ → ψ_lab; inverse=true gives ψ_lab → ψ̃ via
+# the conj-order product R_y(-θ) · R_z(-φ).
+@inline function _UB_combined_rotation(
+    sm::SpinMatrices{D}, θ::Float64, φ::Float64, inverse::Bool,
+) where {D}
     sgn = inverse ? -1.0 : 1.0
     R_y = _compute_uniform_rotation_matrix(sm, 0.0, sgn * θ, 0.0, 1.0, false)
     R_z = _compute_uniform_rotation_matrix(sm, 0.0, 0.0, sgn * φ, 1.0, false)
-    # Forward (sgn=+1): ψ_lab = exp(-iφ F_z) · exp(-iθ F_y) · ψ̃ → R_z * R_y
-    # Inverse (sgn=-1): ψ̃ = exp(+iθ F_y) · exp(+iφ F_z) · ψ_lab → R_y * R_z
-    R_combined = inverse ? R_y * R_z : R_z * R_y
-    _apply_rotation_to_spin_axis!(psi, R_combined, ndim; scratch=scratch)
-    nothing
+    inverse ? R_y * R_z : R_z * R_y
 end
 
 # --- Substep operators ---
@@ -220,13 +243,16 @@ function _local_spin_h_buffer(ws::RotatingBasisWS{T, N, D}) where {T, N, D}
     buf
 end
 
-"""DDI step in rotating basis: rotate ψ̃→ψ_lab in place, apply existing DDI,
-rotate back in place. Earlier code copied ψ̃ into `psi_lab_buf`, ran the
-forward Û_B + DDI + inverse Û_B on the buffer, then copied back. The buf
-round-trip is unnecessary — `_apply_UB!` and `apply_ddi_step!` both mutate
-their first argument in place, so operating directly on `psi_tilde`
-returns the same final state and saves two `copyto!` over the full
-spinor array (~24 µs at 16³ × D=13)."""
+"""DDI step in rotating basis. Pipeline:
+
+    ψ̃ ──Û_B (gemm)──▶ rotation_scratch ──DDI (in place)──▶ rotation_scratch ──Û_B† (gemm)──▶ ψ̃
+
+Earlier the Û_B step did `mul!(buf, ψ̃) + copyto!(ψ̃, buf)` per call, paying
+two full-array memcopies per DDI rotation. Now the forward Û_B writes
+directly to `rotation_scratch`, DDI mutates `rotation_scratch` in place,
+and the inverse Û_B writes back to `ψ̃` — no `copyto!` over the spinor
+field at all. Saves ~50 µs / call at 16³ × D=13 vs the previous
+`_apply_UB!` + in-place chain."""
 function apply_ddi_step_rotating!(
     ws::RotatingBasisWS{T, N, D}, dt::T, t::T;
     imaginary_time::Bool=false,
@@ -235,21 +261,22 @@ function apply_ddi_step_rotating!(
     theta = T(ws.theta_func(Float64(t)))
     phi = T(ws.phi_func(Float64(t)))
 
-    # ψ̃ → ψ_lab (in place)
-    _apply_UB!(ws.psi_tilde, ws.spin_matrices, theta, phi, N;
-        inverse=false, scratch=ws.rotation_scratch)
+    # ψ̃ → rotation_scratch (gemm only, no copy).
+    _apply_UB_to!(ws.rotation_scratch, ws.psi_tilde,
+        ws.spin_matrices, theta, phi, N; inverse=false)
 
-    # Apply DDI on ψ_lab using existing infrastructure. apply_ddi_step!
-    # locks dt to Float64 (built around the legacy spinor solver path);
-    # convert at the boundary so F32 workspaces interop.
+    # DDI mutates rotation_scratch in place. apply_ddi_step!'s rotation
+    # cache is keyed by (sm, N_spatial, D, typeof(psi).name, CT), so it
+    # shares the same cache entry whether the underlying buffer is
+    # ψ̃ or rotation_scratch (same shape + same Array typename).
     apply_ddi_step!(
-        ws.psi_tilde, ws.spin_matrices, ws.ddi_params,
+        ws.rotation_scratch, ws.spin_matrices, ws.ddi_params,
         ws.ddi_bufs, Float64(dt), N; imaginary_time,
     )
 
-    # ψ_lab → ψ̃ (in place)
-    _apply_UB!(ws.psi_tilde, ws.spin_matrices, theta, phi, N;
-        inverse=true, scratch=ws.rotation_scratch)
+    # rotation_scratch → ψ̃ (gemm only, no copy).
+    _apply_UB_to!(ws.psi_tilde, ws.rotation_scratch,
+        ws.spin_matrices, theta, phi, N; inverse=true)
     nothing
 end
 

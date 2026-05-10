@@ -172,6 +172,35 @@ function _apply_rotation_to_spin_axis!(
     nothing
 end
 
+"""
+    _apply_rotation_to_spin_axis_to!(dst, src, R, ndim) → dst
+
+Same as `_apply_rotation_to_spin_axis!` but reads `src`, writes `dst`.
+Lets the caller pipeline two rotations through a separate buffer
+without the per-call `copyto!` back to the source array (used by the
+Û_B → DDI → Û_B† chain in `apply_ddi_step_rotating!`).
+
+`dst` and `src` must be distinct arrays (no aliasing) of the same
+shape and eltype. The Rᵀ buffer is keyed off `dst` so it doesn't
+collide with the `_apply_rotation_to_spin_axis!(scratch=...)` cache
+on the same workspace.
+"""
+function _apply_rotation_to_spin_axis_to!(
+    dst::AbstractArray{<:Complex, M}, src::AbstractArray{<:Complex, M},
+    R::SMatrix{D, D, ComplexF64}, ndim::Int,
+) where {D, M}
+    T = eltype(dst)
+    n_spatial = 1
+    @inbounds for i in 1:ndim
+        n_spatial *= size(dst, i)
+    end
+    src_2d = reshape(src, n_spatial, D)
+    dst_2d = reshape(dst, n_spatial, D)
+    R_T = _populate_rt_buffer!(dst, R, T, Val(D), dst)
+    mul!(dst_2d, src_2d, R_T)
+    dst
+end
+
 # CPU branch: write Rᵀ entries directly into a typed Array. The `::Matrix{T}`
 # annotation defeats the abstract-value-type erasure of `_ROTATION_RT_CACHE`
 # (`Dict{UInt, AbstractArray}`).
