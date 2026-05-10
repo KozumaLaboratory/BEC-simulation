@@ -290,4 +290,3 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         (200, "text/html; charset=utf-8", html_content)
     end
 end
-

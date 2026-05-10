@@ -23,7 +23,6 @@ function _route_phase3d_bin(path::String, base_dir::String, psi_cache::Dict{Stri
     (200, "application/octet-stream", bin)
 end
 
-
 function _route_phase2d(path::String, base_dir::String, psi_cache::Dict{String, Any})
     # /api/phase/:run/:file?axis=N&slice=K&snap=S
     p = _parse_run_file(path, "/api/phase/")
@@ -42,7 +41,6 @@ function _route_phase2d(path::String, base_dir::String, psi_cache::Dict{String, 
     end
     (200, "application/json", json)
 end
-
 
 function _route_phase_bin(path::String, base_dir::String, psi_cache::Dict{String, Any})
     # /api/phase_bin/:run/:file?axis=N&slice=K&snap=S — packed Float32
@@ -75,5 +73,3 @@ function _route_phase_bin(path::String, base_dir::String, psi_cache::Dict{String
     end
     (200, "application/octet-stream", bin)
 end
-
-

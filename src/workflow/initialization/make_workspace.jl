@@ -184,16 +184,16 @@ function make_workspace(;
     # is requested *and* a DDI workspace exists.
     ddi_pad = if (ddi_padding && ddi !== nothing)
         make_ddi_padded(
-        grid,
-        atom;
-        c_dd=ddi.C_dd,
-        fft_flags,
-        secular=secular_ddi,
-        quasi_2d=quasi_2d_ddi,
-        l_z=l_z_ddi,
-        backend,
-        dtype=U,
-    )
+            grid,
+            atom;
+            c_dd=ddi.C_dd,
+            fft_flags,
+            secular=secular_ddi,
+            quasi_2d=quasi_2d_ddi,
+            l_z=l_z_ddi,
+            backend,
+            dtype=U,
+        )
     else
         nothing
     end
@@ -259,7 +259,7 @@ function make_workspace(;
             nothing
         else
             _build_spinor_lhy(Val(spinor_lhy), atom, ws_interactions, psi_init,
-            c_dd, enable_ddi)
+                c_dd, enable_ddi)
         end
 
     lhy = if lhy_attempt !== nothing

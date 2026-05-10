@@ -114,7 +114,6 @@ function _route_density_max(path::String, base_dir::String, psi_cache::Dict{Stri
     (200, "application/json", "{\"density_max_total\":$(d_max)}")
 end
 
-
 function _route_density3d_atlas(path::String, base_dir::String, psi_cache::Dict{String, Any})
     # /api/density3d_atlas/:run/:file?comp=N → all-snaps 3D density
     # atlas for one component. Same panel-major idea as the 2D atlas
@@ -209,7 +208,6 @@ function _route_density_atlas(path::String, base_dir::String, psi_cache::Dict{St
     (200, "application/octet-stream", bin)
 end
 
-
 function _route_density3d_rotated(path::String, base_dir::String, psi_cache::Dict{String, Any})
     p = _parse_run_file(path, "/api/density3d_rotated/")
     p === nothing && return (
@@ -228,7 +226,6 @@ function _route_density3d_rotated(path::String, base_dir::String, psi_cache::Dic
     (200, "application/octet-stream", bin)
 end
 
-
 function _route_density2d(path::String, base_dir::String, psi_cache::Dict{String, Any})
     # /api/density/run_name/point_001.jld2?axis=3&snap=K
     p = _parse_run_file(path, "/api/density/")
@@ -245,7 +242,6 @@ function _route_density2d(path::String, base_dir::String, psi_cache::Dict{String
     end
     (200, "application/json", json)
 end
-
 
 function _route_density_bin(path::String, base_dir::String, psi_cache::Dict{String, Any})
     # /api/density_bin/:run/:file?axis=N&snap=K — packed Float32 column density.
@@ -276,7 +272,6 @@ function _route_density_bin(path::String, base_dir::String, psi_cache::Dict{Stri
     end
     (200, "application/octet-stream", bin)
 end
-
 
 function _route_density3d(path::String, base_dir::String)
     p = _parse_run_file(path, "/api/density3d/")
@@ -324,5 +319,3 @@ function _route_density3d_bin(path::String, base_dir::String, psi_cache::Dict{St
     end
     (200, "application/octet-stream", bin)
 end
-
-

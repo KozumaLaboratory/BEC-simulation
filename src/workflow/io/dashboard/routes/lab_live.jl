@@ -53,5 +53,3 @@ function _route_live(path::String, base_dir::String)
         return (404, "application/json", "{\"error\":\"no live status for $(p.name)\"}")
     (200, "application/json", read(status_path, String))
 end
-
-

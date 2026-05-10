@@ -18,7 +18,6 @@ function _route_coherence(path::String, base_dir::String, psi_cache::Dict{String
     (200, "application/octet-stream", bin)
 end
 
-
 function _route_vector3d_bin(path::String, base_dir::String, psi_cache::Dict{String, Any})
     p = _parse_run_file(path, "/api/vector3d_bin/")
     p === nothing && return (
@@ -43,7 +42,6 @@ function _route_vector3d_bin(path::String, base_dir::String, psi_cache::Dict{Str
     (200, "application/octet-stream", bin)
 end
 
-
 function _route_data(path::String, base_dir::String, data_cache::Dict{String, String})
     p = _parse_run_only(path, "/api/data/")
     run_dir = joinpath(base_dir, p.name)
@@ -67,5 +65,3 @@ function _route_data(path::String, base_dir::String, data_cache::Dict{String, St
     end
     (200, "application/json", json)
 end
-
-

@@ -170,22 +170,26 @@ function _parse_light_shift(raw, F::Int, V_trap, backend::AbstractBackend)
         )
     end
     if haskey(raw, "profile")
-        throw(ArgumentError(
-            "light_shift.profile from YAML not yet supported; " *
-            "use eta_tensor with trap or pass LightShift from Julia",
-        ))
+        throw(
+            ArgumentError(
+                "light_shift.profile from YAML not yet supported; " *
+                "use eta_tensor with trap or pass LightShift from Julia",
+            ),
+        )
     end
     if haskey(raw, "alpha_tensor") || haskey(raw, "alpha_vector")
         # Reading alpha_tensor / alpha_vector from YAML requires a profile
         # array, which the parser doesn't yet accept (see the explicit
         # `profile` branch above). Earlier this branch silently returned
         # nothing, dropping the user's coupling values on the floor.
-        throw(ArgumentError(
-            "light_shift.alpha_tensor/alpha_vector require a `profile:` array, " *
-            "which is not yet supported via YAML. " *
-            "Use `light_shift.eta_tensor` (with the trap as profile) " *
-            "or pass a LightShift constructed in Julia.",
-        ))
+        throw(
+            ArgumentError(
+                "light_shift.alpha_tensor/alpha_vector require a `profile:` array, " *
+                "which is not yet supported via YAML. " *
+                "Use `light_shift.eta_tensor` (with the trap as profile) " *
+                "or pass a LightShift constructed in Julia.",
+            ),
+        )
     end
     nothing
 end

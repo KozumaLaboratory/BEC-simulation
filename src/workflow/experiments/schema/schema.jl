@@ -137,7 +137,7 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     # the standard path.
     "integrator" => FieldSpec(; type=String,
         enum=["strang", "yoshida", "adaptive", "richardson",
-              "yoshida4", "yoshida6", "cfet4"]),
+            "yoshida4", "yoshida6", "cfet4"]),
     "backend" => FieldSpec(; type=String, enum=["cpu", "gpu"]),
     "raman" => FieldSpec(; type=Dict),
     "absorbing_boundary" => FieldSpec(; type=Dict),

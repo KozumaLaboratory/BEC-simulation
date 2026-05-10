@@ -41,7 +41,7 @@ O(D) spin expectation via raising/lowering, O(D²) rotation via Euler angles.
 Uses Matrix (not SMatrix) for V_Fy to avoid heap allocation at large D.
 """
 function _spin_mixing_loop!(
-    psi::Array{Complex{T}}, sm, c1, dt_frac, ::Val{D}, n_pts, imaginary_time,
+    psi::Array{Complex{T}}, sm, c1, dt_frac, ::Val{D}, n_pts, imaginary_time
 ) where {T <: AbstractFloat, D}
     if D == 3
         return _spin_mixing_rodrigues!(psi, sm, c1, dt_frac, n_pts, imaginary_time)
@@ -55,7 +55,7 @@ function _spin_mixing_loop!(
     F = T(sm.system.F)
     Ff1 = T(sm.system.F * (sm.system.F + 1))
     fp_coeffs = ntuple(c -> c == 1 ? T(0) :
-        sqrt(Ff1 - T(F - (c - 1)) * T(F - (c - 1) + 1)), Val(D))
+                            sqrt(Ff1 - T(F - (c - 1)) * T(F - (c - 1) + 1)), Val(D))
 
     rc = _get_ddi_rotation_cache_cpu(psi, sm, ndim_from_n_pts(n_pts))
     alpha = rc.alpha

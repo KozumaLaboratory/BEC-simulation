@@ -413,7 +413,7 @@ const _SKIP_HEAVY_YAML_INFRA =
             "p" => 10.0,
             "bx" => Dict{String, Any}(
                 "sinusoidal" => Dict{String, Any}(
-                    "amplitude" => 1.0, "frequency" => 5.0)
+                    "amplitude" => 1.0, "frequency" => 5.0),
             ),
             "by" => 0.25,
         )

@@ -205,11 +205,12 @@ end
 # annotation defeats the abstract-value-type erasure of `_ROTATION_RT_CACHE`
 # (`Dict{UInt, AbstractArray}`).
 function _populate_rt_buffer!(
-    psi::Array{<:Complex}, R::SMatrix{D, D, ComplexF64}, ::Type{T}, ::Val{D}, scratch,
+    psi::Array{<:Complex}, R::SMatrix{D, D, ComplexF64}, ::Type{T}, ::Val{D}, scratch
 ) where {T, D}
-    R_T::Matrix{T} = scratch === nothing ?
-                     Matrix{T}(undef, D, D) :
-                     _get_rt_buffer(scratch, T, D)::Matrix{T}
+    R_T::Matrix{T} =
+        scratch === nothing ?
+        Matrix{T}(undef, D, D) :
+        _get_rt_buffer(scratch, T, D)::Matrix{T}
     @inbounds for j in 1:D, i in 1:D
         R_T[j, i] = T(R[i, j])
     end
@@ -220,7 +221,7 @@ end
 # buffer. Per-element scalar writes against a CuArray would launch D²
 # kernels — unacceptable.
 function _populate_rt_buffer!(
-    psi::AbstractArray{<:Complex}, R::SMatrix{D, D, ComplexF64}, ::Type{T}, ::Val{D}, scratch,
+    psi::AbstractArray{<:Complex}, R::SMatrix{D, D, ComplexF64}, ::Type{T}, ::Val{D}, scratch
 ) where {T, D}
     R_T_host = Matrix{T}(undef, D, D)
     @inbounds for j in 1:D, i in 1:D

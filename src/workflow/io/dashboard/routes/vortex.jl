@@ -80,5 +80,3 @@ function _route_vorticity3d_bin(path::String, base_dir::String, psi_cache::Dict{
     end
     (200, "application/octet-stream", bin)
 end
-
-

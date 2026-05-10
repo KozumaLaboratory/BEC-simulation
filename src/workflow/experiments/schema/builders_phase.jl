@@ -109,10 +109,12 @@ function _make_waveform(spec, duration::Float64; omega_ref::Float64=NaN)
     end
     # Reject unknown / typo'd waveform keys with a recognisable message
     # instead of letting `spec["from"]` throw a bare KeyError("from").
-    throw(ArgumentError(
-        "Unknown waveform spec: keys $(collect(keys(spec))). " *
-        "Recognised: sinusoidal, chirped_sinusoidal, gaussian_pulse, " *
-        "piecewise, interpolated, csv, or {from, to, scale}."))
+    throw(
+        ArgumentError(
+            "Unknown waveform spec: keys $(collect(keys(spec))). " *
+            "Recognised: sinusoidal, chirped_sinusoidal, gaussian_pulse, " *
+            "piecewise, interpolated, csv, or {from, to, scale}."),
+    )
 end
 
 """

@@ -59,4 +59,3 @@ function _json_string(data)
     _write_json(buf, data)
     String(take!(buf))
 end
-

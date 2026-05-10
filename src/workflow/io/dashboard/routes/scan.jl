@@ -221,7 +221,6 @@ function _route_synthetic_dispersion(path::String, base_dir::String, psi_cache::
     (200, "application/octet-stream", bin)
 end
 
-
 function _route_scan_status(path::String, base_dir::String)
     # /api/scan_status/<run_name> → JSON with {completed, expected,
     # latest_mtime_s, eta_s} so the dashboard can show "12/144 done · ETA 9h"
@@ -243,5 +242,3 @@ function _route_scan_status(path::String, base_dir::String)
         "\"latest_mtime_s\":$latest_str,\"eta_s\":$eta_str}"
     (200, "application/json", body)
 end
-
-

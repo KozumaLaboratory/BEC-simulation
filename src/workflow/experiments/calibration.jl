@@ -20,6 +20,7 @@ using LinearAlgebra
 # Cross-module imports.
 using ..SpinorBEC: AbstractPotential, TimeDependentTrap, HarmonicTrap
 using ..SpinorBEC: run_yaml, run_config, make_workspace
+using ..SpinorBEC: PiecewiseLinearWaveform
 
 include("calibration/core.jl")
 include("calibration/drift.jl")

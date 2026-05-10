@@ -68,7 +68,6 @@ function _route_snapshots(path::String, base_dir::String, psi_cache::Dict{String
     (200, "application/json", _json_string(meta))
 end
 
-
 # /api/ensemble/:run/:file → TWA EnsembleResult summary (Round-2 Task 5).
 #
 # Reads `dynamics/ensemble/phase_NN/...` from a result.jld2 written by
@@ -203,4 +202,3 @@ function _density_scalars!(obs_summary::Dict{String, Any}, mean_arr::AbstractArr
     end
     obs_summary
 end
-

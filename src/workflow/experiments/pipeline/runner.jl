@@ -114,7 +114,8 @@ Execute a pipeline sequentially. Each step receives the current psi
 and produces a new one. Analysis steps don't modify psi but accumulate
 results.
 """
-function run_pipeline(config::PipelineConfig; verbose::Bool=_default_solver_verbose(), psi_init=nothing,
+function run_pipeline(config::PipelineConfig; verbose::Bool=_default_solver_verbose(),
+    psi_init=nothing,
     checkpoint_dir::Union{Nothing, String}=nothing,
     live_status_path::Union{Nothing, String}=nothing)
     psi = psi_init

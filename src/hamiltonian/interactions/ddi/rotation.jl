@@ -226,9 +226,13 @@ end
 # value type is `Any` (it stores caches for both CPU and GPU psi types in
 # the same module-level Dict), so without the explicit type annotation the
 # callers see `::Any` and box every subfield read in their per-voxel loops.
-@inline function _get_ddi_rotation_cache_cpu(psi::Array{Complex{T}}, sm, ndim) where {T <: AbstractFloat}
-    _get_ddi_rotation_cache(psi, sm, ndim)::_DDIRotationCache{
-        Matrix{Complex{T}}, Vector{T}, Nothing, Nothing, Nothing, Matrix{Complex{T}},
+@inline function _get_ddi_rotation_cache_cpu(
+    psi::Array{Complex{T}}, sm, ndim
+) where {T <: AbstractFloat}
+    _get_ddi_rotation_cache(
+        psi, sm, ndim
+    )::_DDIRotationCache{
+        Matrix{Complex{T}}, Vector{T}, Nothing, Nothing, Nothing, Matrix{Complex{T}}
     }
 end
 

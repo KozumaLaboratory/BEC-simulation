@@ -53,7 +53,7 @@ end
 # (inverse=false) gives ψ̃ → ψ_lab; inverse=true gives ψ_lab → ψ̃ via
 # the conj-order product R_y(-θ) · R_z(-φ).
 @inline function _UB_combined_rotation(
-    sm::SpinMatrices{D}, θ::Float64, φ::Float64, inverse::Bool,
+    sm::SpinMatrices{D}, θ::Float64, φ::Float64, inverse::Bool
 ) where {D}
     sgn = inverse ? -1.0 : 1.0
     R_y = _compute_uniform_rotation_matrix(sm, 0.0, sgn * θ, 0.0, 1.0, false)
@@ -93,7 +93,7 @@ end
 # at the lookup site so callers see a fully-typed buffer in their broadcasts.
 const _ROTATING_K2_CACHE = Dict{UInt, Any}()
 function _kinetic_kspace_buffer(
-    ws::RotatingBasisWS{T, N, D, AC, AC1, AR},
+    ws::RotatingBasisWS{T, N, D, AC, AC1, AR}
 ) where {T, N, D, AC, AC1, AR}
     key = objectid(ws)
     haskey(_ROTATING_K2_CACHE, key) && return _ROTATING_K2_CACHE[key]::AR

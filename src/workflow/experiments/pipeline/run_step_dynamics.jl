@@ -91,7 +91,8 @@ function _run_step(
     # because `_build_phase_zeeman` re-extracts that path, but
     # `_build_zeeman_dispatched` accepts the inner dict directly.
     z_raw = get(p, "zeeman", Dict())
-    zeeman = z_raw isa Dict ?
+    zeeman =
+        z_raw isa Dict ?
         _build_zeeman_dispatched(z_raw, duration, atom, p) :
         ZeemanParams(0.0, 0.0)
 

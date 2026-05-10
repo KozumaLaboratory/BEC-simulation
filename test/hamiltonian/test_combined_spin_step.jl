@@ -47,11 +47,14 @@ end
             psi0 = copy(ws.state.psi)
             n0 = sqrt(SpinorBEC.total_norm(psi0, _GRID))
 
-            ws.state.t = 0.0; ws.state.step = 0
+            ws.state.t = 0.0;
+            ws.state.step = 0
             SpinorBEC.split_step!(ws)
             psi_seq = copy(ws.state.psi)
 
-            copyto!(ws.state.psi, psi0); ws.state.t = 0.0; ws.state.step = 0
+            copyto!(ws.state.psi, psi0);
+            ws.state.t = 0.0;
+            ws.state.step = 0
             SpinorBEC.split_step_combined!(ws)
             psi_comb = copy(ws.state.psi)
 

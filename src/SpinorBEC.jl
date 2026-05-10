@@ -62,6 +62,9 @@ using .Calibration:
     CalibrationHistory, load_calibration_history, load_calibration_csv,
     interpolate_calibration,
     sample_trap_drift_omegas, trap_drift_waveforms, apply_trap_drift
+# Internal: pulled in for `run_yaml`'s pre-schema calibration block parser
+# (run_registry.jl). Not exported.
+using .Calibration: _calibration_from_dict
 export CalibrationSet, CoilCalibration, FORTCalibration, RabiCalibration
 export DEFAULT_CALIBRATION, load_calibration, apply_calibration!, run_yaml_calibrated
 export coil_mv_to_gauss, fort_mw_to_trap_hz, rabi_mw_to_rad_s

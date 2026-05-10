@@ -58,7 +58,6 @@ Works with any AbstractMatrix (Matrix, Adjoint, SMatrix).
     )
 end
 
-
 """
 Apply exp(-i dt (phi·F)) via Euler angle decomposition.
 
@@ -103,10 +102,10 @@ Handles both real-time (Dz: cis) and imaginary-time (Dz: exp) propagation.
     sa, ca = sincos(alpha)
     sb, cb = sincos(beta)
     z_neg_alpha = ComplexF64(ca, -sa)
-    z_alpha     = ComplexF64(ca, sa)
-    z_beta      = ComplexF64(cb, sb)
-    rz_phase    = z_alpha^F_int                   # cis(F·α)
-    ry_phase    = ComplexF64(cb, -sb)^F_int        # cis(-F·β) = cis(-β)^F
+    z_alpha = ComplexF64(ca, sa)
+    z_beta = ComplexF64(cb, sb)
+    rz_phase = z_alpha^F_int                   # cis(F·α)
+    ry_phase = ComplexF64(cb, -sb)^F_int        # cis(-F·β) = cis(-β)^F
 
     # Rz(-α): exp(+imα) via recurrence
     phase = rz_phase
@@ -203,7 +202,7 @@ Stage 4: Ry(+β) — gemm + phase + gemm (conj of stage 2 phases)
 Stage 5: Rz(+α) — phase recurrence
 """
 @inline function _apply_euler_5stage_batched_real!(
-    P, W, conj_V, V_T, alpha, beta, theta, F::T, ::Val{D},
+    P, W, conj_V, V_T, alpha, beta, theta, F::T, ::Val{D}
 ) where {T <: AbstractFloat, D}
     N_spatial = size(P, 1)
     # AtomSpecies.F is always integer in this codebase, so cis(F·angle)
@@ -283,7 +282,7 @@ end
 Stage 3 uses `exp(-(m + F)·θ)` (recurrence in `exp(θ)`) so the lowest
 mode stays bounded by 1."""
 @inline function _apply_euler_5stage_batched_imag!(
-    P, W, conj_V, V_T, alpha, beta, theta, F::T, ::Val{D},
+    P, W, conj_V, V_T, alpha, beta, theta, F::T, ::Val{D}
 ) where {T <: AbstractFloat, D}
     N_spatial = size(P, 1)
     F_int = Int(F)
