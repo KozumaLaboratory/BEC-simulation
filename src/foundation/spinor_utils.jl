@@ -217,8 +217,8 @@ Stage 5: Rz(+α) — phase recurrence
     @inbounds for i in 1:N_spatial
         ai = alpha[i]
         sa, ca = sincos(ai)
-        z_a = ComplexF64(ca, -sa)         # cis(-α)
-        phase = ComplexF64(ca, sa)^F_int  # cis(F·α) = cis(α)^F
+        z_a = Complex{T}(ca, -sa)         # cis(-α) — Complex{T} keeps F32 workspaces F32
+        phase = Complex{T}(ca, sa)^F_int  # cis(F·α) = cis(α)^F
         for c in 1:D
             P[i, c] *= phase
             phase *= z_a
@@ -230,8 +230,8 @@ Stage 5: Rz(+α) — phase recurrence
     @inbounds for i in 1:N_spatial
         bi = beta[i]
         sb, cb = sincos(bi)
-        z_b = ComplexF64(cb, sb)              # cis(β)
-        phase = ComplexF64(cb, -sb)^F_int      # cis(-F·β) = cis(-β)^F
+        z_b = Complex{T}(cb, sb)              # cis(β)
+        phase = Complex{T}(cb, -sb)^F_int      # cis(-F·β) = cis(-β)^F
         for j in 1:D
             W[i, j] *= phase
             phase *= z_b
@@ -243,8 +243,8 @@ Stage 5: Rz(+α) — phase recurrence
     @inbounds for i in 1:N_spatial
         ti = theta[i]
         st, ct = sincos(ti)
-        z_t = ComplexF64(ct, st)              # cis(θ)
-        phase = ComplexF64(ct, -st)^F_int      # cis(-F·θ)
+        z_t = Complex{T}(ct, st)              # cis(θ)
+        phase = Complex{T}(ct, -st)^F_int      # cis(-F·θ)
         for c in 1:D
             P[i, c] *= phase
             phase *= z_t
@@ -256,8 +256,8 @@ Stage 5: Rz(+α) — phase recurrence
     @inbounds for i in 1:N_spatial
         bi = beta[i]
         sb, cb = sincos(bi)
-        z_b = ComplexF64(cb, -sb)              # cis(-β)
-        phase = ComplexF64(cb, sb)^F_int        # cis(F·β)
+        z_b = Complex{T}(cb, -sb)              # cis(-β)
+        phase = Complex{T}(cb, sb)^F_int        # cis(F·β)
         for j in 1:D
             W[i, j] *= phase
             phase *= z_b
@@ -269,8 +269,8 @@ Stage 5: Rz(+α) — phase recurrence
     @inbounds for i in 1:N_spatial
         ai = alpha[i]
         sa, ca = sincos(ai)
-        z_a = ComplexF64(ca, sa)               # cis(α)
-        phase = ComplexF64(ca, -sa)^F_int       # cis(-F·α)
+        z_a = Complex{T}(ca, sa)               # cis(α)
+        phase = Complex{T}(ca, -sa)^F_int       # cis(-F·α)
         for c in 1:D
             P[i, c] *= phase
             phase *= z_a
@@ -292,8 +292,8 @@ mode stays bounded by 1."""
     @inbounds for i in 1:N_spatial
         ai = alpha[i]
         sa, ca = sincos(ai)
-        z_a = ComplexF64(ca, -sa)
-        phase = ComplexF64(ca, sa)^F_int
+        z_a = Complex{T}(ca, -sa)
+        phase = Complex{T}(ca, sa)^F_int
         for c in 1:D
             P[i, c] *= phase
             phase *= z_a
@@ -305,8 +305,8 @@ mode stays bounded by 1."""
     @inbounds for i in 1:N_spatial
         bi = beta[i]
         sb, cb = sincos(bi)
-        z_b = ComplexF64(cb, sb)
-        phase = ComplexF64(cb, -sb)^F_int
+        z_b = Complex{T}(cb, sb)
+        phase = Complex{T}(cb, -sb)^F_int
         for j in 1:D
             W[i, j] *= phase
             phase *= z_b
@@ -331,8 +331,8 @@ mode stays bounded by 1."""
     @inbounds for i in 1:N_spatial
         bi = beta[i]
         sb, cb = sincos(bi)
-        z_b = ComplexF64(cb, -sb)
-        phase = ComplexF64(cb, sb)^F_int
+        z_b = Complex{T}(cb, -sb)
+        phase = Complex{T}(cb, sb)^F_int
         for j in 1:D
             W[i, j] *= phase
             phase *= z_b
@@ -344,8 +344,8 @@ mode stays bounded by 1."""
     @inbounds for i in 1:N_spatial
         ai = alpha[i]
         sa, ca = sincos(ai)
-        z_a = ComplexF64(ca, sa)
-        phase = ComplexF64(ca, -sa)^F_int
+        z_a = Complex{T}(ca, sa)
+        phase = Complex{T}(ca, -sa)^F_int
         for c in 1:D
             P[i, c] *= phase
             phase *= z_a
