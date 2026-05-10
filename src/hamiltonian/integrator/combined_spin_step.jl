@@ -206,6 +206,23 @@ rotation per half-potential step. Compared with `split_step!`:
 * Bit-different from `split_step!` to O(dt²) (different splitting),
   but converges to the same continuum limit.
 
+# Why no `:yoshida6` composition kwarg
+
+The combined operator's `Φ_DDI` and `c₁⟨F⟩` are evaluated from ψ at
+substep entry — a frozen mean-field Magnus midpoint. That freezing is
+O(dt²) accurate per V substep. A higher-order outer (Yoshida4/6,
+Blanes-Moan) reaching its nominal order requires V substeps that are
+themselves accurate to ≥ outer-order, but the frozen-field combined V
+caps at O(dt²). Empirically the result is order-1 or even worse than
+Strang because Yoshida's negative-w₀ substep amplifies the
+frozen-field error. The fix would be implicit-midpoint
+predictor-corrector for Φ_DDI / ⟨F⟩, doubling the per-V cost — at
+which point the combined-vs-sequential cost gap shrinks below what the
+higher-order outer recovers. For now: stick with Strang+combined, or
+use `run_simulation_yoshida!` with the standard sequential split_step
+(which also has frozen-field, but its nested Strang inner-V partly
+cancels the leading error in mean-field-light cases).
+
 # Restrictions
 
 Asserted at the first call:
@@ -248,7 +265,7 @@ function split_step_combined!(ws::Workspace{N}) where {N}
     t_eval_2 = it ? 0.0 : t + 3dt / 4
 
     _half_potential_step_combined!(
-        ws, dt / 2, n_comp, N, it; t_eval=t_eval_1, t_start=it ? NaN : t
+        ws, dt / 2, n_comp, N, it; t_eval=t_eval_1, t_start=it ? NaN : t,
     )
 
     omega = ws.sim_params.rotating_frame_omega
@@ -257,7 +274,7 @@ function split_step_combined!(ws::Workspace{N}) where {N}
     _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, it, ws.coriolis_cache)
 
     _half_potential_step_combined!(
-        ws, dt / 2, n_comp, N, it; t_eval=t_eval_2, t_start=it ? NaN : t + dt / 2
+        ws, dt / 2, n_comp, N, it; t_eval=t_eval_2, t_start=it ? NaN : t + dt / 2,
     )
 
     if !it && ws.loss !== nothing
