@@ -282,6 +282,80 @@ TWA leading-order は chaotic dynamics を capture するが、**真の量子ゆ
 
 これら 3 outcomes 全て publishable, **修論 Ch.7 framework の natural extension**。
 
+### 5.11.4 TDHFB Phase 3-6 implementation progress (2026-05-12)
+
+§5.11.1 で「TDHFB が D 論期間の課題」と書いたが、実装は既に Phase 3 (Strang
+substep) — Phase 6 (Eu post-quench production scaffold) まで landed している。
+具体的な実装現状:
+
+**Phase 1-3 (DONE)**: `src/hamiltonian/tdhfb/` 配下に
+- `channel_kernel.jl`: rank-4 V kernel via Σ_S g_S CG·CG
+- `hartree_fock_matrix_generic.jl`: generic-F HF self-energy
+  (test/test_tdhfb_hf_matrix_generic.jl: 208/208 PASS)
+- `strang_step.jl`: voxel-local BdG matrix exponential
+  (V/2 · HF/2 · K · HF/2 · V/2; 31/31 Phase-3 smoke tests PASS)
+- `energy.jl`: total functional E[φ, ρ, κ]
+
+**Phase 4 (Y4-midpoint wrapper, formal order 4 — empirical order 2)**:
+`y4_midpoint_step.jl` exists as a drop-in Yoshida-4 composition over
+the Strang sub-step. Empirically achieves only order 2 because the
+underlying TDHFB Strang substep is not yet palindromic at O(dt²) —
+the φ-R-φ inner triple is asymmetric (first φ-step reads (ρ, κ)
+BEFORE the R update; second reads them AFTER). A genuinely palindromic
+substep (full BdG-Nambu rotation that evolves the doublet (φ, conj(φ))
+under a coupled rotation preserving the Nambu conjugation constraint)
+is required before Y4 can deliver order 4. **D 論 task**.
+
+**Phase 5 (GPU port design only)**:
+`docs/design/tdhfb_gpu_port_design.md` exists; implementation
+multi-session (D 論 task). CPU wall is 1.56 s/step at F=6 (D=13) 16³
+— scan-scale TDHFB needs GPU.
+
+**Phase 6 (F=1 + F=6 production)**:
+- `scripts/tdhfb_f1_validation.jl`: F=1 16³ T=0.2 anti-polar quench
+  completes in 8.3s. κ growth linear 0 → 2.5×10⁻² (V·φφ source), ρ tiny
+  ~3×10⁻⁷. Hermiticity / symmetry preserved at machine precision.
+- `scripts/tdhfb_eu_production.jl`: F=6 16³ T=0.4 ω⁻¹ Eu production
+  scaffold. Regime A (g_S all = 1) completed: 313 s wall, κ growth
+  linear 0 → 6.2×10⁻². Run data: `docs/manuscript/figures_data/
+  tdhfb_eu_F6_T0.4_2026-05-12.md`.
+
+**Phase 4 EOM/E variational consistency**:
+A factor-2 + ρ-index transpose was identified and partially fixed in
+2026-05-12 round 1 (commit `96b7631`), dropping C4 energy drift
+1.43×10⁻² → 3.3×10⁻³ on the operational test (g_S = (0.3, 0.05), T=2).
+A residual ~3×10⁻³ drift remains, dt-independent and linear in g_S.
+
+Finite-difference per-term Wirtinger derivative audit
+(`scripts/diagnostic/tdhfb_per_term_audit.jl`) identified the correct
+**variational forms** for the φ EOM:
+- U^φ: V[c_p, c, c2, c2_p] (slot 1↔2 swap)
+- Δ^φ: V[c, c2, c_p, c2_p] (slot 2↔3 swap)
+
+These match δE_int/δφ* at machine precision (rel dev 3.3×10⁻⁶) on a
+single-voxel test. **However**, applying these to `strang_step.jl`
+INCREASED drift (3.3×10⁻³ → 1.0×10⁻² with U^φ alone, 2.0×10⁻² with
+U^R factor 2 restored). The BdG generator structure (U^φ, Δ^φ, U^R,
+Δ^R) and the inner Strang triple φ-R-φ have interconnected conventions
+where the "wrong" U^φ partially compensates other internal bugs; local
+per-term fixes break this balance.
+
+**Status**: variational targets for the φ EOM are fully characterized;
+the same approach for the ρ/κ EOM via δE/δρ and δE/δκ* FD audit
+identified that the analogous Δ^R / U^R require a fundamentally
+different mathematical structure (not a single V index swap — likely a
+**symmetric combination** of slot patterns reflecting the Nambu-density
+commutator [W^R, R]). Full fix is post-修論 work (D 論 Year 1 Q1).
+
+For the 修論-scope production runs (κ generation, qualitative Lima-
+Pelster comparison at short T < 1 where the residual drift impact is
+sub-leading), the current Phase 3-6 implementation is operationally
+adequate. The variational-target characterization is itself a
+contribution: §5.2 of `integrator_track_c_derivation.md` analog —
+the §5.x continuum derivation gives the correct variational target,
+but the discrete BdG generator structure requires per-term audit (not
+direct index mapping) for variational consistency at machine precision.
+
 ---
 
 ## 5.12 まとめ
