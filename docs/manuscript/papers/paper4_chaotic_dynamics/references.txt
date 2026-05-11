@@ -5,7 +5,7 @@ Polkovnikov2010        # 1/N expansion, validity bounds
 SinatraCastinLobo2002  # Sinatra validity criterion
 Castin2001             # particle-conserving Bogoliubov foundations
 BachEtAl2012           # spinor TWA (F=1 reference)
-Lemeshko2018           # TWA pedagogical primer
+LemeshkoNGS2018        # TWA pedagogical primer
 
 # === TDHFB / higher-order (follow-up methods) ===
 Stoof1999              # particle-conserving HFB
