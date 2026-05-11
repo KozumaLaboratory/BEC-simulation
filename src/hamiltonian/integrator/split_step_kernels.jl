@@ -140,15 +140,21 @@ end
 
 """
 GPU DDI step: convolve + rotation all on GPU using broadcast operations.
+
+`psi_mf` (optional) — when supplied, the mean-field Φ_DDI is computed from
+`psi_mf` rather than `ws.state.psi`. Rotation is still applied to `ws.state.psi`.
+Used by the Track A1 midpoint predictor-corrector V step.
 """
-function _apply_ddi_step_gpu!(ws, dt_half, ndim, imaginary_time)
+function _apply_ddi_step_gpu!(ws, dt_half, ndim, imaginary_time;
+        psi_mf::Union{Nothing, AbstractArray}=nothing)
     D = ws.spin_matrices.system.n_components
     N = ndims(ws.state.psi) - 1
     n_pts = ntuple(d -> size(ws.state.psi, d), Val(N))
+    psi_mf_eff = psi_mf === nothing ? ws.state.psi : psi_mf
 
     if ws.ddi_padded !== nothing
         @timeit_debug TIMER "ddi_convolve_padded" _compute_and_convolve_ddi_padded!(
-            ws.state.psi, ws.spin_matrices, ws.ddi, ws.ddi_padded,
+            psi_mf_eff, ws.spin_matrices, ws.ddi, ws.ddi_padded,
             Val(D), ndim, n_pts,
         )
         phi_x = ws.ddi_padded.Phi_x_pad
@@ -156,7 +162,7 @@ function _apply_ddi_step_gpu!(ws, dt_half, ndim, imaginary_time)
         phi_z = ws.ddi_padded.Phi_z_pad
     else
         @timeit_debug TIMER "ddi_convolve" _compute_and_convolve_ddi!(
-            ws.state.psi, ws.spin_matrices, ws.ddi, ws.ddi_bufs,
+            psi_mf_eff, ws.spin_matrices, ws.ddi, ws.ddi_bufs,
             Val(D), ndim, n_pts,
         )
         phi_x = ws.ddi_bufs.Phi_x

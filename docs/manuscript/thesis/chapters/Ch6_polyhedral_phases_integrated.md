@@ -36,8 +36,10 @@ uniform spinor 状態 (12 Majorana 点が icosahedron 頂点) で、F=2 cyclic p
    全てに同形式が成立 (本章 §6.7 — v1 の §6.7 は Round 5 で Paper #3 main.md に
    昇格されたため、本章では §6.7 は v2 の F=10 dodec に rename された)
 
-これは Chapter 3 (F=2 cyclic) と Chapter 4 (SpinorBEC.jl simulator) の自然な統合で、
-D 論 Chapter 2 への橋渡しとなる。
+これは Chapter 3 (F=2 cyclic warmup) で確立した手法を、Chapter 4 (Universal Structure
+Theorem) で代数化した universal framework を、6 polyhedral instances に explicit に
+適用する流れで、Chapter 4 → Chapter 6 が "framework → verification" の自然な統合を成す。
+D 論 Chapter 2 (F=5, 7, 9, 11 等の systematic completion) への橋渡しでもある。
 
 ---
 
@@ -371,50 +373,79 @@ $$\lambda_{\rm spin}^{F=8, \rm octa} = -\tfrac{1}{17}g_0 - \tfrac{10633}{113373}
 
 ---
 
-## 6.10 Sign Pattern Systematic — **NEW: Second-level Discovery**
+## 6.10 Sign Pattern — Lemma 1 General-S Closed Form (Updated 2026-05-11)
 
-### 6.10.1 観察
+### 6.10.1 観察 + 定理化
 
-6 polyhedral verifications で systematic な sign pattern emergence:
+5 polyhedral verifications + 6 F-systematic predictions (F=7/9/11) で、systematic
+な sign pattern が **closed form** に集約される結果:
 
-| F | Phase | $H$ | Sign 境界 $S_{\rm bd}$ | $S_{\rm bd}/F$ |
-|---|---|---|---|---|
-| 3 | octa ($A_2$) | $O$ | 6 | 2.0 |
-| 4 | cube ($A_1$) | $O_h$ | 6 | 1.5 |
-| 6 | icosahedral | $I_h$ | 10 | 1.67 |
-| 8 | octa ($A_1$) | $O$ | 12 | 1.5 |
-| 10 | dodecahedral | $I_h$ | 16 | 1.6 |
+$$\boxed{\beta_S^{(\lambda_{\rm spin})} = \frac{S(S+1) - 2F(F+1)}{2 F(F+1)} \cdot \beta_S^{(c_0)}}$$
 
-**Empirical 法則**: $S_{\rm bd} \approx 2F$。
+(`paper3_universal_theorem/sign_pattern_lemma1_general_S.md`, exact rational
+arithmetic 26 channel coefficients verified at F=3/4/6/8/10.)
 
-### 6.10.2 物理的解釈
+**修正済 sign 境界**: $S_{\rm bd}(F) = \sqrt{2 F(F+1)} \approx \sqrt{2}\,F \approx 1.41\,F$
+(NOT $2F$ as v1 empirical estimate)。
 
-**Spinor-Rank Matching Principle**: 高 multipole couplings ($S \gtrsim 2F$) が polyhedral
-configuration の sharp angular features と最大限 resonate ⇒ polyhedral phase を
-**stabilize** ($\lambda_{\rm spin}$ 正寄与)。低 multipole couplings ($S < 2F$) は polar/FM
-の smooth ground states を favor ⇒ polyhedral phase **destabilize** ($\lambda_{\rm spin}$
-負寄与)。
+| F | Phase | $H$ | $S_{\rm bd}$ (closed form) | $S_{\rm bd}/F$ | Discrete boundary |
+|---|---|---|---|---|---|
+| 3 | octa ($A_2$) | $O$ | $\sqrt{24} \approx 4.90$ | 1.63 | $(4, 6)$ |
+| 4 | cube ($A_1$) | $O_h$ | $\sqrt{40} \approx 6.32$ | 1.58 | $S=6$ first pos |
+| 6 | icosahedral | $I_h$ | $\sqrt{84} \approx 9.17$ | 1.53 | $S=10$ first pos |
+| 7 | T:A / O:A_2 | $T, O$ | $\sqrt{112} \approx 10.58$ | 1.51 | $(10, 12)$ |
+| 8 | octa ($A_1$) | $O$ | $\sqrt{144} = 12$ exact | 1.50 | $S = 12$ exactly |
+| 9 | O:A_1 / O:A_2 | $O$ | $\sqrt{180} \approx 13.42$ | 1.49 | $(12, 14)$ |
+| 10 | dodecahedral | $I_h$ | $\sqrt{220} \approx 14.83$ | 1.48 | $(14, 16)$ |
+| 11 | T:A / O:A_2 | $T, O$ | $\sqrt{264} \approx 16.25$ | 1.48 | $(14, 16)$ |
+| 12 | (I:A) | $I$ | $\sqrt{312} \approx 17.66$ | 1.47 | $(16, 18)$ |
 
-### 6.10.3 Predictive Recipe
+漸近的: $S_{\rm bd}/F \to \sqrt{2} \approx 1.414$。
 
-実験的 polyhedral phase realization recipe:
+### 6.10.2 物理的解釈 (REVISED: spin-spin correlation)
 
-> **「$S \sim 2F$ の Feshbach resonances を targeting すれば polyhedral phase の
-> $\lambda_{\rm spin}$ を maximize できる」**
+Lemma 1 General-S の比は spin-spin correlation の表現:
 
-各 species:
+$$\frac{\beta_S^{(\lambda_{\rm spin})}}{\beta_S^{(c_0)}} = \frac{\langle\mathbf{F}^{(1)}\cdot\mathbf{F}^{(2)}\rangle_{|S, M\rangle}}{F(F+1)}$$
 
-- $^{52}$Cr (F=3): $g_6$ Feshbach target
-- $^{151}$Eu (F=6): $g_{10}, g_{12}$ Feshbach target
-- $^{164}$Dy (F=8): $g_{12}, g_{14}, g_{16}$ Feshbach target
+= channel $S$ における 2 体 spin-spin 相関 / 単一 spin の最大値。
 
-### 6.10.4 D 論への展望
+$S$ singlet ($S=0$): $\langle\mathbf{F}^{(1)}\cdot\mathbf{F}^{(2)}\rangle = -F(F+1)$ ⇒ 比 $= -1$ (反平行)
+$S = 2F$ (max parallel): $\langle\mathbf{F}^{(1)}\cdot\mathbf{F}^{(2)}\rangle = F^2$ ⇒ 比 $= F/(F+1)$ (平行)
 
-Sign pattern conjecture を D 論期間で全 $F$ で verify:
+これは Spinor-Rank Matching Principle の **rigorous 化**。「sharp angular features
+が resonate」という直感的解釈は、**spin-spin pair correlation の符号** という代数的
+量で正確に表せる。
 
-- F=5, 7, 9, 11, 12 等の systematic completion
-- 法則の rigorous proof (representation theory + spectral analysis)
-- Conjecture → Theorem 昇格
+### 6.10.3 Predictive Recipe (REVISED)
+
+実験的 polyhedral phase realization recipe (Lemma 1 General-S に基づき修正):
+
+> **「$S > \sqrt{2 F(F+1)} \approx \sqrt{2}\,F$ の Feshbach resonances を targeting
+> すれば polyhedral phase の $\lambda_{\rm spin}$ を maximize できる」**
+
+各 species (REVISED):
+
+- $^{52}$Cr (F=3): $S_{\rm bd} \approx 4.90$; target $g_6$ Feshbach (= first allowed positive)
+- $^{151}$Eu (F=6): $S_{\rm bd} \approx 9.17$; target $g_{10}, g_{12}$ Feshbach
+- $^{164}$Dy (F=8): $S_{\rm bd} = 12.0$ exact (marginal); target $g_{12}$ (marginal +)
+  and $g_{14}, g_{16}$ (strong +) Feshbach
+
+### 6.10.4 D 論への展望 (UPDATED 2026-05-11)
+
+Sign pattern conjecture は **D 論 Q2 で Theorem 昇格済** (Lemma 1 General-S
+closed form + L2 unique sign change PROVED):
+
+- ~~F=5, 7, 9, 11, 12 等の systematic completion~~ → Lemma 1 General-S で
+  closed form 予測のみで済む (Q3 paper #6)。
+- ~~法則の rigorous proof~~ → S=0 case rigorously proved; general $S$ rank-2
+  cross-channel vanishing は唯一の残された analytic gap (6j-symbol identity)。
+
+主要 D 論 contribution:
+1. **Lemma 1 General-S Theorem**: paper #3 v4 で submission-ready
+2. **F=5/7/9/11/12 mechanical completion**: paper #6 systematic completion
+3. **Rank-2 cross-channel vanishing rigorous proof**: D 論 Year 1 Q2 target
+4. **Dipolar generalization ($Q_5$)**: Lima-Pelster correction to closed form
 
 ---
 

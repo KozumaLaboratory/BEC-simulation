@@ -139,14 +139,17 @@ function apply_tensor_interaction_step!(
     dt::Float64,
     ndim::Int;
     imaginary_time::Bool=false,
+    psi_mf::Union{Nothing, AbstractArray}=nothing,
 )
     D = cache.D
     n_pts = ntuple(d -> size(psi, d), ndim)
+    psi_mf_eff = psi_mf === nothing ? psi : psi_mf
 
     hf_entries = _precompute_hf_entries(cache)
 
     nthr = Threads.maxthreadid()
     spinor_bufs = [Vector{ComplexF64}(undef, D) for _ in 1:nthr]
+    spinor_in_bufs = [Vector{ComplexF64}(undef, D) for _ in 1:nthr]
     h_bufs = [Matrix{ComplexF64}(undef, D, D) for _ in 1:nthr]
     tmp_bufs = [Vector{ComplexF64}(undef, D) for _ in 1:nthr]
 
@@ -154,12 +157,14 @@ function apply_tensor_interaction_step!(
         tid = Threads.threadid()
         @inbounds _tensor_step_point!(
             psi,
+            psi_mf_eff,
             I,
             cache,
             hf_entries,
             dt,
             imaginary_time,
             spinor_bufs[tid],
+            spinor_in_bufs[tid],
             h_bufs[tid],
             tmp_bufs[tid],
         )
@@ -209,19 +214,22 @@ end
 
 function _tensor_step_point!(
     psi,
+    psi_mf,
     I,
     cache::TensorInteractionCache,
     hf_entries::Vector{HFEntry},
     dt::Float64,
     imaginary_time::Bool,
-    spinor::Vector{ComplexF64},
+    spinor::Vector{ComplexF64},        # MF source spinor (for Hermitian h construction)
+    spinor_in::Vector{ComplexF64},     # state spinor (rotation target)
     h::Matrix{ComplexF64},
     tmp::Vector{ComplexF64},
 )
     D = cache.D
 
     @inbounds for c in 1:D
-        spinor[c] = psi[I, c]
+        spinor[c] = psi_mf[I, c]
+        spinor_in[c] = psi[I, c]
     end
 
     n_local = real(sum(c -> abs2(spinor[c]), 1:D))
@@ -243,7 +251,7 @@ function _tensor_step_point!(
     if offdiag_sq * dt^2 < 1e-12
         @inbounds for c in 1:D
             phase = imaginary_time ? exp(-real(h[c, c]) * dt) : cis(-real(h[c, c]) * dt)
-            psi[I, c] = phase * spinor[c]
+            psi[I, c] = phase * spinor_in[c]
         end
         return nothing
     end
@@ -255,7 +263,7 @@ function _tensor_step_point!(
     @inbounds for k in 1:D
         s = zero(ComplexF64)
         for j in 1:D
-            s += conj(vecs[j, k]) * spinor[j]
+            s += conj(vecs[j, k]) * spinor_in[j]
         end
         tmp[k] = (imaginary_time ? exp(-vals[k] * dt) : cis(-vals[k] * dt)) * s
     end

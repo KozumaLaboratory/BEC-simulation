@@ -147,7 +147,8 @@ function _diagonal_step_svec!(
     c_lhy,
     dt_frac,
     density_buf,
-    imaginary_time,
+    imaginary_time;
+    psi_mf::Union{Nothing, AbstractArray}=nothing,
 ) where {N, D}
     # Splitting the imaginary_time branches into two methods is not just
     # cosmetic: keeping both branches inside one function makes Julia
@@ -155,22 +156,27 @@ function _diagonal_step_svec!(
     # (~42 allocs / 1184 B per call at D=13, even when only one branch
     # runs). Routing through a Bool dispatch makes each leaf method see
     # only its own closures, dropping the path to 0 allocs.
+    # Track A1: `psi_mf` (when supplied) supplies the density used for
+    # the c0|ψ|² + c_lhy contact terms; the phase factor still multiplies
+    # `psi`. The leaf-method split for closure-allocation hygiene is
+    # preserved.
+    psi_mf_eff = psi_mf === nothing ? psi : psi_mf
     if imaginary_time
-        _diagonal_step_svec_imag!(Val(N), psi, V_trap, zeeman_diag, c0, c_lhy, dt_frac, density_buf)
+        _diagonal_step_svec_imag!(Val(N), psi, psi_mf_eff, V_trap, zeeman_diag, c0, c_lhy, dt_frac, density_buf)
     else
-        _diagonal_step_svec_real!(Val(N), psi, V_trap, zeeman_diag, c0, c_lhy, dt_frac, density_buf)
+        _diagonal_step_svec_real!(Val(N), psi, psi_mf_eff, V_trap, zeeman_diag, c0, c_lhy, dt_frac, density_buf)
     end
 end
 
 function _diagonal_step_svec_real!(
-    ::Val{N}, psi::Array, V_trap, zeeman_diag::SVector{D, Float64},
+    ::Val{N}, psi::Array, psi_mf::AbstractArray, V_trap, zeeman_diag::SVector{D, Float64},
     c0, c_lhy, dt_frac, density_buf,
 ) where {N, D}
     n_pts = ntuple(d -> size(psi, d), Val(N))
     @inbounds for I in CartesianIndices(n_pts)
         s = 0.0
         for c in 1:D
-            s += abs2(psi[I, c])
+            s += abs2(psi_mf[I, c])
         end
         density_buf[I] = s
     end
@@ -188,14 +194,14 @@ function _diagonal_step_svec_real!(
 end
 
 function _diagonal_step_svec_imag!(
-    ::Val{N}, psi::Array, V_trap, zeeman_diag::SVector{D, Float64},
+    ::Val{N}, psi::Array, psi_mf::AbstractArray, V_trap, zeeman_diag::SVector{D, Float64},
     c0, c_lhy, dt_frac, density_buf,
 ) where {N, D}
     n_pts = ntuple(d -> size(psi, d), Val(N))
     @inbounds for I in CartesianIndices(n_pts)
         s = 0.0
         for c in 1:D
-            s += abs2(psi[I, c])
+            s += abs2(psi_mf[I, c])
         end
         density_buf[I] = s
     end
@@ -222,14 +228,16 @@ function _diagonal_step_svec!(
     c_lhy,
     dt_frac,
     density_buf,
-    imaginary_time,
+    imaginary_time;
+    psi_mf::Union{Nothing, AbstractArray}=nothing,
 ) where {N, D}
     n_pts = ntuple(d -> size(psi, d), Val(N))
+    psi_mf_eff = psi_mf === nothing ? psi : psi_mf
     idx1 = _component_slice(N, n_pts, 1)
-    density_buf .= abs2.(view(psi, idx1...))
+    density_buf .= abs2.(view(psi_mf_eff, idx1...))
     for c in 2:D
         idx = _component_slice(N, n_pts, c)
-        density_buf .+= abs2.(view(psi, idx...))
+        density_buf .+= abs2.(view(psi_mf_eff, idx...))
     end
     # Match scalar eltype to array eltype so F32 arrays stay F32 in @.
     RT = eltype(V_trap)
@@ -281,14 +289,16 @@ function _diagonal_step_with_ls!(
     density_buf,
     imaginary_time,
     ls_amp::SVector{D, Float64},
-    ls_profile,
+    ls_profile;
+    psi_mf::Union{Nothing, AbstractArray}=nothing,
 ) where {N, D}
     n_pts = ntuple(d -> size(psi, d), Val(N))
+    psi_mf_eff = psi_mf === nothing ? psi : psi_mf
 
     @inbounds for I in CartesianIndices(n_pts)
         s = 0.0
         for c in 1:D
-            s += abs2(psi[I, c])
+            s += abs2(psi_mf_eff[I, c])
         end
         density_buf[I] = s
     end
@@ -331,14 +341,16 @@ function _diagonal_step_with_ls!(
     density_buf,
     imaginary_time,
     ls_amp::SVector{D, Float64},
-    ls_profile,
+    ls_profile;
+    psi_mf::Union{Nothing, AbstractArray}=nothing,
 ) where {N, D}
     n_pts = ntuple(d -> size(psi, d), Val(N))
+    psi_mf_eff = psi_mf === nothing ? psi : psi_mf
     idx1 = _component_slice(N, n_pts, 1)
-    density_buf .= abs2.(view(psi, idx1...))
+    density_buf .= abs2.(view(psi_mf_eff, idx1...))
     for c in 2:D
         idx = _component_slice(N, n_pts, c)
-        density_buf .+= abs2.(view(psi, idx...))
+        density_buf .+= abs2.(view(psi_mf_eff, idx...))
     end
     RT = eltype(V_trap)
     dt_t = RT(dt_frac)

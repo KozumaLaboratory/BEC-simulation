@@ -45,17 +45,19 @@ function apply_singlet_pair_step!(
     dt::Float64,
     ndim::Int;
     imaginary_time::Bool=false,
+    psi_mf::Union{Nothing, AbstractArray}=nothing,
 )
     c2 = get_cn(interactions, 2)
     abs(c2) < 1e-30 && return nothing
 
     D = 2F + 1
     n_pts = ntuple(d -> size(psi, d), ndim)
-    _nematic_loop!(psi, Val(D), n_pts, c2, dt, imaginary_time)
+    psi_mf_eff = psi_mf === nothing ? psi : psi_mf
+    _nematic_loop!(psi, psi_mf_eff, Val(D), n_pts, c2, dt, imaginary_time)
     nothing
 end
 
-function _nematic_loop!(psi, ::Val{D}, n_pts, c2, dt, imaginary_time) where {D}
+function _nematic_loop!(psi, psi_mf, ::Val{D}, n_pts, c2, dt, imaginary_time) where {D}
     F = (D - 1) ÷ 2
     inv_sqrt_D = 1.0 / sqrt(Float64(D))
 
@@ -71,7 +73,7 @@ function _nematic_loop!(psi, ::Val{D}, n_pts, c2, dt, imaginary_time) where {D}
             A00 = zero(ComplexF64)
             for c in 1:D
                 c_pair = D - c + 1
-                A00 += signs[c] * psi[I, c] * psi[I, c_pair]
+                A00 += signs[c] * psi_mf[I, c] * psi_mf[I, c_pair]
             end
             A00 *= inv_sqrt_D
 

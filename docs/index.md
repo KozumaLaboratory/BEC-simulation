@@ -46,7 +46,8 @@ docs/
 | Task | Read |
 |---|---|
 | Rotating-basis derivation (math) | `design/option_gamma_rotating_basis.md` |
-| Higher-order integrator status (RTP / ITP) | `design/higher_order_integrators.md` |
+| Integrator roadmap + Ch.3 thesis plan | `design/integrator_modernization_plan.md` + `design/integrator_ch3_plan.md` |
+| TDHFB pilot | `design/tdhfb_pilot_design.md` |
 | Mixed precision rollout | `design/mixed_precision_design.md` |
 | All other active design notes | `design/*.md` |
 

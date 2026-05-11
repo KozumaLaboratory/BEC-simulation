@@ -4,10 +4,12 @@
 
 **Estimated length**: 6-8 pages (Letter or full paper)
 
-**Round-6 integration status**: Sec I + IV + V + VI + VII inlined from source files;
-Sec II + III placeholders carry the skeleton outline content. **The full Sec II
-(Theoretical Framework) and Sec III (Closed-form Mode Dispersions) source files
-were not transferred in Round 6** — paste targets are marked below.
+**Round-7 integration status** (2026-05-11): Sec II + III TODO-PAPER1-SEC2/SEC3
+placeholders **resolved** — content inlined from Ch.3 master thesis (m-parity selection
+rules + Nambu block structure §II.E-F + Mode 3 amplitude derivation §III.E-G). Paper #1
+ready for LaTeX conversion via `docs/manuscript/latex_templates/pandoc_workflow.sh 1`
+once TeX environment is set up. Submission-ready upon figure rendering (FIG-1/2/3
+placeholders per `docs/manuscript/figures_data/figures_update_2026-05-11.md`).
 
 ---
 
@@ -193,13 +195,35 @@ $h_{\rm mf}$ couples only $m \equiv m' \pmod{2}$ in the cyclic phase.
 Similarly, $M_{\rm anom}$ respects this parity.
 → Even block (m = ±2, 0): 6×6 BdG, Odd block (m = ±1): 4×4 BdG.
 
-```
-<!-- TODO-PAPER1-SEC2-START
-Paste the full content of master_thesis_Ch3_F2_cyclic.md §3.2-§3.3 (or
-F2_cyclic_paper_sections_II_III.md if available) here. The current text
-is the skeleton outline only; full derivation prose is needed.
-TODO-PAPER1-SEC2-END -->
-```
+### E. Selection rules (m-parity)
+
+The selection rules for $h_{\rm mf}$ and $M_{\rm anom}$ in the cyclic phase
+follow from the sparse structure of $\zeta_{\rm cyc}$ (non-zero only at
+$m \in \{-2, 0, +2\}$).
+
+**Selection rule S1** (Hartree-Fock):
+$$h_{\rm mf}[m, m'] \neq 0 \iff m \equiv m' \pmod{2} \tag{II.3}$$
+
+**Selection rule S2** (Anomalous):
+$$M_{\rm anom}[m, m'] \neq 0 \iff m + m' \equiv 0 \pmod{2} \tag{II.4}$$
+
+Both matrices are block-diagonal in m-parity. Even-odd cross coupling is
+exactly zero by selection rule S2.
+
+### F. Nambu-space block structure
+
+Spinor space ($D = 5$) decomposes as $\mathcal{E} \oplus \mathcal{O}$ with
+$\mathcal{E} = \{-2, 0, +2\}$ (3-dim) and $\mathcal{O} = \{-1, +1\}$ (2-dim).
+
+Nambu space (10-dim) decomposes as:
+
+| Block | Particle | Hole | Nambu dim |
+|---|---|---|---|
+| Even $\mathcal{B}^{\mathcal{E}}$ | $\mathcal{E}$ | $\mathcal{E}$ | $3+3 = 6$ |
+| Odd $\mathcal{B}^{\mathcal{O}}$ | $\mathcal{O}$ | $\mathcal{O}$ | $2+2 = 4$ |
+
+This is the **m-parity block decomposition** [T1.2] which is the central
+methodological innovation enabling closed-form mode dispersions.
 
 ---
 
@@ -240,14 +264,36 @@ Symmetry breaking: SO(3) × U(1) → T_d (order 12)
 - 1 + 3 = 4 broken generators → 4 type-I Goldstones ✓
 - Mode 3 is a non-Goldstone amplitude mode (Anderson-Higgs-like)
 
-```
-<!-- TODO-PAPER1-SEC3-START
-Paste the full content of master_thesis_Ch3_F2_cyclic.md §3.3 (BdG block
-decomposition with sympy factorization details) and §3.4 (Mode 3 amplitude
-mode discussion) here. The skeleton outline above lists the mode structure
-but the symbolic derivation prose needs inlining.
-TODO-PAPER1-SEC3-END -->
-```
+### E. Detailed derivation of Mode 3 amplitude
+
+Mode 3 has $|\Delta_3| = 0$ as a direct consequence of the singlet pair amplitude
+$\zeta$ being **invariant** under the linearized $A_{00}$ fluctuations [T1.3]. From
+$\omega^2 = (\varepsilon_k + n\xi)^2 - (n|\Delta|)^2$:
+
+$$|\Delta_3| = 0 \quad \Longrightarrow \quad \omega_3 = \varepsilon_k + n\xi_3 = \varepsilon_k + 2nc_2/5 \tag{III.4}$$
+
+This is a **linear non-Bogoliubov** dispersion: gapped at $\mathbf{k}=0$ with
+slope = 1 in $\varepsilon_k$, **lacking the Bogoliubov $\sqrt{\varepsilon_k}$
+character**.
+
+### F. Physical interpretation of Mode 3
+
+Mode 3 represents the **amplitude (Higgs-like) mode** of cyclic phase:
+
+- Fluctuations of the singlet pair amplitude $A_{00}$, which has $\langle A_{00}\rangle = 0$
+  in the cyclic phase (= $A_{00}$ is broken by the cyclic spinor structure)
+- Linear gapped dispersion + free-particle-like scaling
+- Distinct from standard Bogoliubov Goldstones (phonon, spin GMs)
+
+### G. LHY contribution of Mode 3 is exactly zero
+
+Universal LHY formula:
+$$\varepsilon_{\rm LHY} = \frac{8\sqrt{M^3}}{15\pi^2\hbar^3}\,n^{5/2}\sum_{\lambda: |\Delta_\lambda| > 0} \nu_\lambda |\Delta_\lambda|^{5/2}\,\phi_1^{\rm reg}\!\left(\frac{\xi_\lambda}{|\Delta_\lambda|} - 1\right) \tag{III.5}$$
+
+Mode 3 has $|\Delta_3| = 0$ → **excluded from sum**, contributes exactly zero.
+
+This is the basis for the closed-form simplicity in (1.1): cyclic phase has only
+the 4 Goldstones contributing, giving the 2-term closed form $c_0^{5/2} + 3(2c_1)^{5/2}$.
 
 ---
 
