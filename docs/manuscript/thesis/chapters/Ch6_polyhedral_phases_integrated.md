@@ -36,8 +36,10 @@ uniform spinor 状態 (12 Majorana 点が icosahedron 頂点) で、F=2 cyclic p
    全てに同形式が成立 (本章 §6.7 — v1 の §6.7 は Round 5 で Paper #3 main.md に
    昇格されたため、本章では §6.7 は v2 の F=10 dodec に rename された)
 
-これは Chapter 3 (F=2 cyclic) と Chapter 4 (SpinorBEC.jl simulator) の自然な統合で、
-D 論 Chapter 2 への橋渡しとなる。
+これは Chapter 3 (F=2 cyclic warmup) で確立した手法を、Chapter 4 (Universal Structure
+Theorem) で代数化した universal framework を、6 polyhedral instances に explicit に
+適用する流れで、Chapter 4 → Chapter 6 が "framework → verification" の自然な統合を成す。
+D 論 Chapter 2 (F=5, 7, 9, 11 等の systematic completion) への橋渡しでもある。
 
 ---
 
