@@ -1,15 +1,12 @@
 # Archive
 
-Dated or superseded docs. Kept for historical context but not part of the live documentation set.
-Each entry below explains why it's archived and where the live equivalent lives now.
+Dated or superseded docs. Kept for historical context but not part of the live documentation set. Each entry below explains why it's archived and where the live equivalent lives now.
 
 ## Bug audits (Bug-4: ITP merged-loop DDI half-rate)
 
-Bug fixed 2026-05-02 in `src/solvers/ground_state/itp_loop.jl`.
-Regression test: `test/test_itp_ddi_strang_save_every.jl`.
+Bug fixed 2026-05-02 in `src/solvers/ground_state/itp_loop.jl`. Regression test: `test/test_itp_ddi_strang_save_every.jl`.
 
-- **`AUDIT_BUG4.md`** — full diagnosis + affected-runs table + per-`save_every` shift formula `(N+1)/(2N)`.
-  Also documents a deferred trade-off: the analogous *2nd-order accuracy degradation* (not a rate bug) on the RTP merged-leapfrog branch (`_run_simulation_leapfrog!`) — ψ at `save_every=1` vs `save_every=100` can differ ~30% for stiff DDI in real time. Not auto-fixed; doubling DDI per-step cost was deemed not worth it.
+- **`AUDIT_BUG4.md`** — full diagnosis + affected-runs table + per-`save_every` shift formula `(N+1)/(2N)`. Also documents a deferred trade-off: the analogous *2nd-order accuracy degradation* (not a rate bug) on the RTP merged-leapfrog branch (`_run_simulation_leapfrog!`) — ψ at `save_every=1` vs `save_every=100` can differ ~30% for stiff DDI in real time. Not auto-fixed; doubling DDI per-step cost was deemed not worth it.
 - **`RUNS_INVENTORY.md`** — every `runs/<name>/config.yaml` cross-referenced against the post-fix code state. Snapshot of one moment.
 - **`RUNS_REVERIFICATION_GPU.md`** — local re-run + GPU bench. Side-finding: 4 layered bugs in `runs/eu151_lab_calibrated/` (3 fixed inline, 4th — *ITP NaN at step 1 with calibrated parameters at dt=0.005* — still relevant; see `guides/performance_tuning.md` "dt rule of thumb").
 
@@ -28,13 +25,11 @@ Regression test: `test/test_itp_ddi_strang_save_every.jl`.
 
 - **`plan.md`** — pre-implementation snapshot (~2026-04-14). Stage 0/1/2/3/4 layout; AtomOptics.jl split idea (abandoned). Marked obsolete in its own header.
 - **`plan2.md`** — pre-implementation snapshot (~2026-04-14). Test pyramid (Level 0–3) — implemented as `test/test_propagators/`, `test_conservation/`, `test_ground_state/`, `test_dynamics/`. Marked obsolete in its own header.
-- **`optimization_roadmap_2026-04-29.md`** — outstanding items split into the live design docs:
-  - CUDA Graph re-enable → see `design/higher_order_integrators.md` + `cuda_graph_stubs.jl`
-  - Mixed precision F32 → `design/mixed_precision_design.md`
-  - Multi-GPU → `design/multi_gpu_design.md`
-  - Higher-order regime-aware ε → `design/higher_order_integrators.md`
-  - F=6 LHY closed form → derived since; see `theory/icosahedral_lhy.md`
-- **`thesis_batch_audit_2026-04-28.md`** — ε threshold finding (`p·F·dt > 100` needs ε=1e-6) and regime classification table. Now enforced via `_run_rotating_basis_dynamics_inner` advisory + CLAUDE.md "Known limitations".
+- **`optimization_roadmap_2026-04-29.md`** — outstanding items split into the live design docs. CUDA Graph re-enable → `design/higher_order_integrators.md` + `cuda_graph_stubs.jl`. Mixed precision F32 → `design/mixed_precision_design.md`. Multi-GPU → `design/multi_gpu_design.md`. Higher-order regime-aware ε → `design/higher_order_integrators.md`. F=6 LHY closed form → derived since; see `theory/icosahedral_lhy.md`.
+
+## Empirical findings (now enforced in code)
+
+- **`thesis_batch_audit_2026-04-28.md`** — ε threshold finding (`p · F · dt > 100` needs ε=1e-6) + regime classification table. Now enforced via `_run_rotating_basis_dynamics_inner` advisory + `guides/klaus_regime.md` "Hard constraint".
 
 ## Superseded designs
 

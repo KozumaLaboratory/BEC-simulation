@@ -14,14 +14,7 @@ source scripts/tsubame_setup.sh
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
 ```
 
-`tsubame_setup.sh` exports:
-
-- `JULIA_DEPOT_PATH=$T4_TMPDIR/.julia` — node-local NVMe (avoids Lustre metadata storms)
-- `SPINORBEC_SCRATCH_DIR=$T4_TMPDIR/spinorbec_snaps` — streamed snapshot scratch
-- `JULIA_NUM_THREADS=$SLURM_CPUS_PER_TASK`
-- `module load cuda + julia`
-
-Falls back gracefully on dev machines (no `$T4_TMPDIR`).
+`tsubame_setup.sh` exports `JULIA_DEPOT_PATH=$T4_TMPDIR/.julia` (node-local NVMe to avoid Lustre metadata storms), `SPINORBEC_SCRATCH_DIR=$T4_TMPDIR/spinorbec_snaps` (streamed snapshot scratch), `JULIA_NUM_THREADS=$SLURM_CPUS_PER_TASK`, and runs `module load cuda + julia`. Falls back gracefully on dev machines (no `$T4_TMPDIR`).
 
 ## Memory and disk budget
 
@@ -37,8 +30,7 @@ Falls back gracefully on dev machines (no `$T4_TMPDIR`).
 | 256 | 880 MB  | 440 MB  | 440 MB         | 67.8 GB       |
 | 384 | 2.97 GB | 1.49 GB | 1.49 GB        | 229 GB        |
 
-Rule of thumb: peak GPU RAM ≈ 8 × ψ_F64. So 256³ needs ~7 GB; H100 80 GB
-holds it easily. A100 40 GB caps at ~128³ F64.
+Rule of thumb: peak GPU RAM ≈ 8 × ψ_F64. So 256³ needs ~7 GB; H100 80 GB holds it easily. A100 40 GB caps at ~128³ F64.
 
 Throughput on H100 at 128³ × D=13:
 
@@ -59,9 +51,7 @@ Throughput on H100 at 128³ × D=13:
 | `$T4_LOCAL`/`$T4_TMPDIR` | node-local NVMe   | depots, scratch snapshots  |
 | `/scratch`             | per-node, ephemeral | cleared at job end         |
 
-Lustre is bad at many small writes; `dynamics/psi_snapshots_streamed/frame_NNNNN`
-emits one metadata op per frame, which stacks. `SPINORBEC_SCRATCH_DIR=$T4_TMPDIR`
-redirects `.tmp` files to NVMe and copies to Lustre on success.
+Lustre is bad at many small writes; `dynamics/psi_snapshots_streamed/frame_NNNNN` emits one metadata op per frame, which stacks. `SPINORBEC_SCRATCH_DIR=$T4_TMPDIR` redirects `.tmp` files to NVMe and copies to Lustre on success.
 
 ## Edit-test-submit loop
 
@@ -88,8 +78,7 @@ julia --project=. scripts/slurm_helpers.jl count runs/foo/config.yaml   # → 14
 sbatch --array=1-144%12 scripts/slurm/scan_array.sbatch runs/foo/config.yaml
 ```
 
-Each task writes `runs/foo/point_NNN.jld2`; resumable — re-submitting skips
-cached files. Wired via `SPINORBEC_SCAN_ONLY_INDEX` env var inside `_run_yaml_scan`.
+Each task writes `runs/foo/point_NNN.jld2`; resumable — re-submitting skips cached files. Wired via `SPINORBEC_SCAN_ONLY_INDEX` env var inside `_run_yaml_scan`.
 
 ## Recommended YAML knobs at scale
 
@@ -105,12 +94,7 @@ pipeline:
       save_psi_snapshots: true # streamed F32, ~8.4 GB at 128³
 ```
 
-Pre-flight:
-
-```julia
-using SpinorBEC; estimate_run_budget("path/to/config.yaml")
-# Reports VRAM, host RAM, disk per scan point + total disk
-```
+Pre-flight: `using SpinorBEC; estimate_run_budget("path/to/config.yaml")` reports VRAM, host RAM, disk per scan point + total disk.
 
 ## Singularity (alternative)
 
@@ -127,8 +111,7 @@ singularity exec --nv \
         using SpinorBEC; run_yaml("/work/runs/eu151_edh_ext/config.yaml")'
 ```
 
-The `%post` block pre-warms a depot inside the image so first-time precompile
-of FFTW / CUDA / etc. is amortised at build time.
+The `%post` block pre-warms a depot inside the image so first-time precompile of FFTW / CUDA / etc. is amortised at build time.
 
 ## Live monitoring from your laptop
 
@@ -144,28 +127,13 @@ julia --project=. -e 'using SpinorBEC; serve_dashboard(8765)' &
 # laptop browser → http://localhost:8765
 ```
 
-Lab-image push uses the same tunnel:
-
-```bash
-curl --data-binary @absorption_shot.png http://localhost:8765/api/lab/image/today
-```
+Lab-image push uses the same tunnel: `curl --data-binary @absorption_shot.png http://localhost:8765/api/lab/image/today`.
 
 ## Checkpoint and resume
 
-`run_pipeline` writes periodic checkpoints to `$run_dir/.checkpoints/<filename>`
-during a dynamics step. Restart with the same `run_yaml(...)` call — the
-cache/resume logic picks up from the last checkpoint. Pair with SLURM
-`--requeue` for automatic restart after preemption.
+`run_pipeline` writes periodic checkpoints to `$run_dir/.checkpoints/<filename>` during a dynamics step. Restart with the same `run_yaml(...)` call — the cache/resume logic picks up from the last checkpoint. Pair with SLURM `--requeue` for automatic restart after preemption.
 
-For multi-attempt mixes of crashes + preemption:
-
-```bash
-sbatch scripts/slurm/eu151_h100_single.sbatch runs/foo/config.yaml
-# OR: scripts/supervised_run.sh foo 5    # 5 retries with 30s backoff
-```
-
-`--requeue` covers most SLURM cases; the supervisor wrapper helps in
-interactive sessions.
+For multi-attempt mixes of crashes + preemption: `sbatch scripts/slurm/eu151_h100_single.sbatch runs/foo/config.yaml`, or `scripts/supervised_run.sh foo 5` for 5 retries with 30 s backoff. `--requeue` covers most SLURM cases; the supervisor wrapper helps in interactive sessions.
 
 ## Troubleshooting
 
