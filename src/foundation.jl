@@ -19,6 +19,7 @@ include("foundation/types/integrator.jl")        # AdaptiveDtParams, IntegratorC
 include("foundation/types/workspace.jl")         # Workspace + workspace_T (depends on everything above)
 include("foundation/types/results.jl")           # TOFParams, BdGResult, InstabilityMap, RotonParams, etc
 include("foundation/types/scan.jl")              # OverrideScan, ConstrainedJzScan, ITPCheckpoint
+include("foundation/types/tdhfb_state.jl")        # TDHFBState (Phase 1 scaffold; kernels live in hamiltonian/tdhfb/)
 
 # Mathematical foundation.
 include("foundation/grid.jl")

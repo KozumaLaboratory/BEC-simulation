@@ -12,12 +12,7 @@
 using Test
 using LinearAlgebra
 using Random
-
-# Direct include since TDHFB not yet exported from SpinorBEC umbrella
-include(joinpath(@__DIR__, "..", "src", "foundation", "types", "tdhfb_state.jl"))
-include(joinpath(@__DIR__, "..", "src", "foundation", "clebsch_gordan.jl"))
-include(joinpath(@__DIR__, "..", "src", "hamiltonian", "tdhfb", "hartree_fock_matrix.jl"))
-include(joinpath(@__DIR__, "..", "src", "hamiltonian", "tdhfb", "hartree_fock_matrix_generic.jl"))
+using SpinorBEC
 
 @testset "TDHFB generic-F HF matrix kernel" begin
 

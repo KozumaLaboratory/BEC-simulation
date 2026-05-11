@@ -10,6 +10,14 @@
 #
 # Phase 2 minimal scope = HF matrix kernel; full coupled (φ, ρ, κ) evolution +
 # Strang TDHFB integrator + YAML pipeline integration are Phase 3-4.
+#
+# NOTE: this F=1 kernel is the GP-form (first functional derivative of E_int).
+# It is the reference for the C5 GP-reduction conservation test. The generic
+# `hf_matrix_generic!` returns the BdG self-energy (second derivative form,
+# factor-2 Bose-symmetrized) — the two differ by exactly the factor 2 in the
+# κ=0 case.
+
+export hf_matrix_F1, hf_matrix_F1!
 
 """
     hf_matrix_F1!(h_hf, phi, rho, kappa, c0, c1) -> h_hf

@@ -2,10 +2,7 @@
 
 using Test
 using LinearAlgebra
-
-# Direct include since TDHFB not yet exported from SpinorBEC umbrella
-include(joinpath(@__DIR__, "..", "src", "foundation", "types", "tdhfb_state.jl"))
-include(joinpath(@__DIR__, "..", "src", "hamiltonian", "tdhfb", "hartree_fock_matrix.jl"))
+using SpinorBEC
 
 @testset "TDHFB HF matrix F=1 Phase 2" begin
     @testset "Vacuum polar state h^HF = c_0 I" begin

@@ -15,6 +15,8 @@
 #
 # Reference: Kawaguchi-Ueda 2012 §3.2; CG factor X^{(S)} matches paper3 §III.
 
+export hf_matrix_generic, hf_matrix_generic!, ku_c01_to_g_S
+
 """
     hf_matrix_generic!(h_hf, phi, rho, F, g_S; spin_matrices=nothing) -> h_hf
 
@@ -76,38 +78,9 @@ function hf_matrix_generic!(h_hf::AbstractArray, phi::AbstractArray,
     @assert size(h_hf, ndims(h_hf)) == D
     @assert size(h_hf, ndims(h_hf) - 1) == D
 
-    # Convention: c=1 corresponds to m=+F, c=D corresponds to m=-F
-    # So m(c) = F + 1 - c, equivalently c(m) = F + 1 - m
-    c_to_m(c::Int) = F + 1 - c
-
-    # Precompute CG sum: for each (m, m', m2, m2') in (-F..F)^4 with m + m2 = m' + m2' = M,
-    # compute Σ_S g_S · ⟨F m, F m2 | S M⟩ ⟨S M | F m', F m2'⟩
-    # We store this as a 4D array indexed by (c, c', c2, c2') for c = 1..D.
-
-    # For efficiency on each spatial point, precompute the rank-4 channel projector.
-    # Memory: D^4 · 16 bytes. For D=13 Eu, that's 13^4 · 16 = 457 KB — fine.
-    P = zeros(Float64, D, D, D, D)
-    for c in 1:D, c_p in 1:D, c2 in 1:D, c2_p in 1:D
-        m = c_to_m(c)
-        m_p = c_to_m(c_p)
-        m2 = c_to_m(c2)
-        m2_p = c_to_m(c2_p)
-        # Conservation: m + m2 = m_p + m2_p = M
-        m + m2 != m_p + m2_p && continue
-        M = m + m2
-        # Sum over S
-        s_total = 0.0
-        for (S, gS) in g_S
-            # Triangle inequality
-            (abs(M) > S) && continue
-            # CG coefficient at indices: ⟨F m, F m2 | S M⟩ · ⟨S M | F m_p, F m2_p⟩
-            cg1 = clebsch_gordan(F, m, F, m2, S, M)
-            cg2 = clebsch_gordan(F, m_p, F, m2_p, S, M)
-            s_total += gS * cg1 * cg2
-        end
-        # Bose symmetrization factor of 2 (two equivalent particle-pair contractions)
-        P[c, c_p, c2, c2_p] = 2.0 * s_total
-    end
+    # Rank-4 channel projector with factor-2 Bose symmetrization. Shared with
+    # `pair_potential_generic!`, which uses the un-symmetrized form directly.
+    P = channel_kernel_symmetrized(F, g_S)
 
     # Now apply to (φ, ρ) at every spatial point
     for idx in CartesianIndices(size(phi)[1:n_spatial])

@@ -32,8 +32,11 @@
 #   - κ initialized to 0 (vacuum); thermal initial state may use non-zero
 #     pair amplitudes from BdG ground-state modes
 #
-# This struct is currently in foundation/types/ scaffolding. Kernels +
-# integrators are post-Phase 1 work (Q3-Q4 2027 per dthesis_year1_roadmap.md).
+# Phase 1 scaffold; production kernels + integrator now live in
+# src/hamiltonian/tdhfb/ (channel_kernel, pair_potential, strang_step, energy).
+
+export TDHFBState, init_tdhfb_vacuum
+export tdhfb_total_particle_number, tdhfb_hermiticity_check
 
 """
     TDHFBState{N, A, B, T}
@@ -184,24 +187,5 @@ function tdhfb_hermiticity_check(state::TDHFBState; tol::Real=1e-10)
     return rho_dev, kappa_dev
 end
 
-"""
-    tdhfb_energy(state::TDHFBState, hf_matrix; integration_weight=1.0)
-
-Compute total TDHFB energy E[φ, ρ, κ] from the Hartree-Fock matrix h^HF.
-
-Phase 1 placeholder: returns mean-field energy only (= ⟨φ| h^HF |φ⟩).
-Phase 2 will add pair-amplitude contributions tr(h^HF · ρ) and anomalous
-coupling terms.
-
-This is the conserved quantity for TDHFB Hamiltonian dynamics.
-"""
-function tdhfb_energy(state::TDHFBState, hf_matrix; integration_weight::Real=1.0)
-    # Phase 1 placeholder: not yet wired to actual HF kernel
-    # Returns dummy value; replace with proper energy functional in Phase 2
-    @warn "tdhfb_energy is a Phase 1 placeholder; production energy functional " *
-          "will be implemented alongside HF kernels in Phase 2."
-    return zero(real(eltype(state.phi)))
-end
-
-# Export TDHFBState only (kernels + integrators in Phase 2 hamiltonian/tdhfb/)
-# Not yet exported from SpinorBEC.jl umbrella; will add when Phase 2 lands.
+# The production `tdhfb_energy(state, F, g_S, V_ext; k_squared, dV)` lives
+# in src/hamiltonian/tdhfb/energy.jl (it depends on the channel kernel).
