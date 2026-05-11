@@ -267,7 +267,8 @@ function split_step_forcegrad!(ws::Workspace{N};
     # Midpoint MF (v2): estimate ψ(dt/2) via Strang half-step on a copy.
     if midpoint
         copyto!(psi_mid, ws.state.psi)
-        _strang_substep_on_copy!(psi_mid, ws, dt / 2, fgrad_buf_0, zeeman_diag, it)
+        _strang_substep_on_copy!(psi_mid, ws, dt / 2,
+            ws.density_buf, fgrad_buf_0, zeeman_diag, it)
         _total_density!(density_mid, psi_mid, D, N, n_pts)
         _compute_fgrad_squared!(fgrad_buf_mid, ws.potential_values, density_mid,
             ws.interactions.c0, ws.grid, n_pts, V_complex_buf, grad_complex_buf,
@@ -277,7 +278,8 @@ function split_step_forcegrad!(ws::Workspace{N};
     # Endpoint MF: estimate ψ(dt) via Strang full step on another copy.
     if endpoint
         copyto!(psi_end, ws.state.psi)
-        _strang_substep_on_copy!(psi_end, ws, dt, fgrad_buf_0, zeeman_diag, it)
+        _strang_substep_on_copy!(psi_end, ws, dt,
+            ws.density_buf, fgrad_buf_0, zeeman_diag, it)
         _total_density!(density_end, psi_end, D, N, n_pts)
         _compute_fgrad_squared!(fgrad_buf_end, ws.potential_values, density_end,
             ws.interactions.c0, ws.grid, n_pts, V_complex_buf, grad_complex_buf,
@@ -325,20 +327,37 @@ function split_step_forcegrad!(ws::Workspace{N};
             ws.interactions.c0, a_outer * dt, density_for_end, fgrad_for_end, 0.0, it,
         )
 
-        # Picard MF update: refine endpoint MF only from current ψ_after.
-        # NOTE: state-averaged midpoint update `(ψ(0)+ψ_after)/2` is intentionally
-        # NOT used here. State-averaging introduces the cos(Hτ/2) = 1 - (Hτ)²/8 + ...
-        # even-power-in-τ bias documented in docs/integrator_ch3_plan.md §3.3.2
-        # (AVF state-averaging negative result). Empirically confirmed at
-        # commit 390f474 v3 bench: state-avg midpoint update degraded
-        # ForceGrad p=2 from order 2.92 (p=1, Strang predictor) to order 2.00.
-        # Proper midpoint Picard would re-run Strang half-step with updated
-        # endpoint MF instead of state-averaging — deferred to v3.1+.
-        if picard_iter < n_picard && endpoint
-            _total_density!(density_end, ws.state.psi, D, N, n_pts)
-            _compute_fgrad_squared!(fgrad_buf_end, ws.potential_values, density_end,
-                ws.interactions.c0, ws.grid, n_pts, V_complex_buf, grad_complex_buf,
-                plan_fft!, plan_ifft!)
+        # Picard MF refinement (v3.1).
+        # NOTE: state-averaged midpoint update `(ψ(0)+ψ_after)/2` was tried
+        # and rejected — it reproduced the §3.3.2 cos(Hτ/2) AVF failure mode
+        # inside the FG framework (commit 0b0a822 bench: order 2.92→2.00).
+        # Proper midpoint Picard re-runs Strang half-step with UPDATED MFs
+        # (the predictor itself becomes implicit-midpoint at each Picard iter).
+        if picard_iter < n_picard
+            if endpoint
+                _total_density!(density_end, ws.state.psi, D, N, n_pts)
+                _compute_fgrad_squared!(fgrad_buf_end,
+                    ws.potential_values, density_end,
+                    ws.interactions.c0, ws.grid, n_pts,
+                    V_complex_buf, grad_complex_buf, plan_fft!, plan_ifft!)
+            end
+            if midpoint
+                # Implicit-midpoint Picard: re-run Strang half-step using
+                # the current midpoint MF as the frozen predictor MF.
+                # At Picard convergence ψ_mid satisfies
+                # ψ_mid = predictor(ψ_init, dt/2; MF=MF(ψ_mid))
+                # which is the implicit-midpoint fixed point. The predictor
+                # also sets kinetic phase to dt/2 = b_K * dt, matching the
+                # next 4A iteration's K stages (no restoration needed).
+                copyto!(psi_mid, psi_init)
+                _strang_substep_on_copy!(psi_mid, ws, dt / 2,
+                    density_mid, fgrad_buf_mid, zeeman_diag, it)
+                _total_density!(density_mid, psi_mid, D, N, n_pts)
+                _compute_fgrad_squared!(fgrad_buf_mid,
+                    ws.potential_values, density_mid,
+                    ws.interactions.c0, ws.grid, n_pts,
+                    V_complex_buf, grad_complex_buf, plan_fft!, plan_ifft!)
+            end
         end
     end
 
@@ -355,22 +374,20 @@ end
 
 """
 Strang predictor: advance `psi_buf` (a copy of ψ(0)) by `target_dt` via
-V(target_dt/2) K(target_dt) V(target_dt/2) with frozen ψ(0) MF.
+V(target_dt/2) K(target_dt) V(target_dt/2) with frozen MF given by
+the supplied `density_buf` and `fgrad_buf`.
 
-Used to estimate ψ(dt/2) (target_dt = dt/2) for the middle Ṽ stage and
-ψ(dt) (target_dt = dt) for the final V stage of 4AWW.
-
-The 2nd-order Strang local error gives O(target_dt³) accuracy on the
-predicted state; this is O(dt²) for the midpoint estimate and O(dt²)
-for the endpoint estimate, sufficient for partial 4AWW behavior.
-Picard convergence to the true 4th-order fixed point would require
-iterating the full 4A composition with updated MFs — deferred.
+For initial v2 partial-4AWW, MFs are evaluated at ψ(0) (= ws.density_buf,
+fgrad_buf_0). For v3.1 Picard refinement, the caller can pass updated MF
+buffers (e.g., from the previous Picard iteration's predicted ψ_mid or
+ψ_end), making this an implicit-midpoint Picard map.
 """
 function _strang_substep_on_copy!(
     psi_buf::AbstractArray,
     ws::Workspace{N},
     target_dt::Float64,
-    fgrad_buf_0::AbstractArray,
+    density_buf::AbstractArray,
+    fgrad_buf::AbstractArray,
     zeeman_diag,
     it::Bool,
 ) where {N}
@@ -378,11 +395,11 @@ function _strang_substep_on_copy!(
     ws.state.psi = psi_buf
     try
         _diagonal_step_forcegrad!(Val(N), psi_buf, ws.potential_values, zeeman_diag,
-            ws.interactions.c0, target_dt / 2, ws.density_buf, fgrad_buf_0, 0.0, it)
+            ws.interactions.c0, target_dt / 2, density_buf, fgrad_buf, 0.0, it)
         _update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, target_dt)
         apply_kinetic_step_batched!(psi_buf, ws.batched_kinetic)
         _diagonal_step_forcegrad!(Val(N), psi_buf, ws.potential_values, zeeman_diag,
-            ws.interactions.c0, target_dt / 2, ws.density_buf, fgrad_buf_0, 0.0, it)
+            ws.interactions.c0, target_dt / 2, density_buf, fgrad_buf, 0.0, it)
     finally
         ws.state.psi = psi_orig
     end
