@@ -49,10 +49,14 @@ in the local approximation, with the convention `c=1 ↔ m=+F`, `c=D ↔ m=-F`.
 # Returns
 The Δ array (for chaining).
 """
-function pair_potential_generic!(Delta::AbstractArray, phi::AbstractArray,
-                                 kappa::AbstractArray, F::Int,
-                                 g_S::AbstractDict{Int, Float64};
-                                 V=nothing)
+function pair_potential_generic!(
+    Delta::AbstractArray,
+    phi::AbstractArray,
+    kappa::AbstractArray,
+    F::Int,
+    g_S::AbstractDict{Int, Float64};
+    V=nothing,
+)
     D = 2 * F + 1
     sz = size(phi)
     n_spatial = length(sz) - 1
@@ -82,9 +86,13 @@ end
 
 Allocating variant of [`pair_potential_generic!`](@ref).
 """
-function pair_potential_generic(phi::AbstractArray, kappa::AbstractArray,
-                                F::Int, g_S::AbstractDict{Int, Float64};
-                                V=nothing)
+function pair_potential_generic(
+    phi::AbstractArray,
+    kappa::AbstractArray,
+    F::Int,
+    g_S::AbstractDict{Int, Float64};
+    V=nothing,
+)
     D = 2 * F + 1
     sz = size(phi)
     n_spatial = length(sz) - 1

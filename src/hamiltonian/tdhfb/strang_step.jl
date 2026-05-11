@@ -80,12 +80,15 @@ is a voxel-local Bogoliubov-de Gennes matrix exponential that evolves
 # Returns
 The state (mutated in place).
 """
-function tdhfb_strang_step!(state::TDHFBState{N}, F::Int,
-                            g_S::AbstractDict{Int, Float64},
-                            V_ext::AbstractArray,
-                            dt::Float64;
-                            k_squared=nothing,
-                            fft_plans=nothing) where {N}
+function tdhfb_strang_step!(
+    state::TDHFBState{N},
+    F::Int,
+    g_S::AbstractDict{Int, Float64},
+    V_ext::AbstractArray,
+    dt::Float64;
+    k_squared=nothing,
+    fft_plans=nothing,
+) where {N}
     # V step (dt/2): one-body trap on φ
     _tdhfb_v_step!(state.phi, V_ext, dt / 2)
 
@@ -134,9 +137,9 @@ energy-conservation test C4).
 Convention reminder: `rho[idx, c, c'] = ⟨m(c) | ρ̂ | m(c')⟩` (standard
 matrix); `kappa[idx, c, c'] = ⟨ψ_m(c) ψ_m(c')⟩` (symmetric in c, c').
 """
-function _tdhfb_hf_step!(state::TDHFBState{N}, F::Int,
-                         g_S::AbstractDict{Int, Float64},
-                         dt::Float64) where {N}
+function _tdhfb_hf_step!(
+    state::TDHFBState{N}, F::Int, g_S::AbstractDict{Int, Float64}, dt::Float64
+) where {N}
     # Symmetric inner Strang for the coupled HF substep.
     V = channel_kernel(F, g_S)
     half = dt / 2
@@ -148,10 +151,13 @@ end
 
 # φ Nambu doublet sub-update: φ ← top(M^φ · (φ, conj(φ))).
 # U^φ_{a,b} = V·(φ*φ + 2ρ),  Δ^φ_{a,b} = V·κ.
-function _tdhfb_phi_subupdate!(state::TDHFBState{N}, F::Int,
-                               g_S::AbstractDict{Int, Float64},
-                               V::AbstractArray{Float64, 4},
-                               dt::Float64) where {N}
+function _tdhfb_phi_subupdate!(
+    state::TDHFBState{N},
+    F::Int,
+    g_S::AbstractDict{Int, Float64},
+    V::AbstractArray{Float64, 4},
+    dt::Float64,
+) where {N}
     D = 2 * F + 1
     sz = size(state.phi)
     n_spatial = length(sz) - 1
@@ -206,10 +212,13 @@ end
 
 # (ρ, κ) Nambu density sub-update: R ← M^R · R · (M^R)^{-1}.
 # U^R = 2V·(φ*φ + ρ),  Δ^R = V·(φφ + κ).
-function _tdhfb_R_subupdate!(state::TDHFBState{N}, F::Int,
-                             g_S::AbstractDict{Int, Float64},
-                             V::AbstractArray{Float64, 4},
-                             dt::Float64) where {N}
+function _tdhfb_R_subupdate!(
+    state::TDHFBState{N},
+    F::Int,
+    g_S::AbstractDict{Int, Float64},
+    V::AbstractArray{Float64, 4},
+    dt::Float64,
+) where {N}
     D = 2 * F + 1
     sz = size(state.phi)
     n_spatial = length(sz) - 1
@@ -282,9 +291,9 @@ Kinetic step on φ via FFT.
 energy functional's default — so conservation tests on tiny grids are
 self-consistent).
 """
-function _tdhfb_kinetic_step!(phi::AbstractArray, dt::Float64;
-                              k_squared=nothing,
-                              fft_plans=nothing)
+function _tdhfb_kinetic_step!(
+    phi::AbstractArray, dt::Float64; k_squared=nothing, fft_plans=nothing
+)
     sz = size(phi)
     D = sz[end]
     n_spatial = length(sz) - 1

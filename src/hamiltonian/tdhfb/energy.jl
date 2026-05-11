@@ -66,11 +66,14 @@ The total energy as a `Float64`.
 - All cross terms are taken via `real(...)` to be robust against
   accumulated complex round-off.
 """
-function tdhfb_energy(state::TDHFBState, F::Int,
-                      g_S::AbstractDict{Int, Float64},
-                      V_ext::AbstractArray{<:Real};
-                      k_squared::Union{Nothing, AbstractArray{<:Real}}=nothing,
-                      dV::Real=1.0)
+function tdhfb_energy(
+    state::TDHFBState,
+    F::Int,
+    g_S::AbstractDict{Int, Float64},
+    V_ext::AbstractArray{<:Real};
+    k_squared::Union{Nothing, AbstractArray{<:Real}}=nothing,
+    dV::Real=1.0,
+)
     D = 2 * F + 1
     phi = state.phi
     rho = state.rho
