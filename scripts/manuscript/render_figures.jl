@@ -401,6 +401,317 @@ print(f'Wrote {base}.pdf and .svg')
     _emit_data_and_renderer(paper, fig, info, csv, py)
 end
 
+# ────────────────────────────────────────────────────────────────
+# Paper #1 FIG-1: F=2 cyclic Majorana tetrahedron
+# ────────────────────────────────────────────────────────────────
+function build_paper1_fig1(paper::String, fig::String, info)
+    # 4 vertices of regular tetrahedron inscribed in unit sphere
+    # Standard tetrahedral vertices: (1,1,1), (1,-1,-1), (-1,1,-1), (-1,-1,1) normalized
+    s = 1.0 / sqrt(3)
+    csv = """
+label,x,y,z
+v1,$s,$s,$s
+v2,$s,-$s,-$s
+v3,-$s,$s,-$s
+v4,-$s,-$s,$s
+"""
+    py = """
+#!/usr/bin/env python3
+\"\"\"
+Paper #1 FIG-1: F=2 cyclic Majorana tetrahedron (4 stars on Bloch sphere).
+\"\"\"
+import csv
+import matplotlib.pyplot as plt
+import numpy as np
+from mpl_toolkits.mplot3d import Axes3D  # noqa
+
+rows = []
+with open(__file__.replace('.py', '.csv')) as f:
+    for r in csv.DictReader(f):
+        rows.append(r)
+xs = [float(r['x']) for r in rows]
+ys = [float(r['y']) for r in rows]
+zs = [float(r['z']) for r in rows]
+
+fig = plt.figure(figsize=(5.0, 5.0))
+ax = fig.add_subplot(111, projection='3d')
+
+# Bloch sphere
+u, v = np.linspace(0, 2*np.pi, 60), np.linspace(0, np.pi, 30)
+xu = np.outer(np.cos(u), np.sin(v))
+yu = np.outer(np.sin(u), np.sin(v))
+zu = np.outer(np.ones_like(u), np.cos(v))
+ax.plot_surface(xu, yu, zu, alpha=0.10, color='gray', linewidth=0)
+
+# Tetrahedron edges
+edges = [(0,1),(0,2),(0,3),(1,2),(1,3),(2,3)]
+for i, j in edges:
+    ax.plot([xs[i], xs[j]], [ys[i], ys[j]], [zs[i], zs[j]],
+            'k-', lw=1.2, alpha=0.6)
+
+# Majorana points
+ax.scatter(xs, ys, zs, color='C3', s=160, edgecolor='black',
+           linewidths=1.2, zorder=10)
+for i, r in enumerate(rows):
+    ax.text(xs[i]*1.20, ys[i]*1.20, zs[i]*1.20, r['label'],
+            fontsize=11, ha='center', fontweight='bold')
+
+ax.set_box_aspect((1, 1, 1))
+ax.set_xticks([]); ax.set_yticks([]); ax.set_zticks([])
+ax.set_title('F=2 cyclic Majorana configuration\\n(regular tetrahedron, T_d symmetry)',
+             fontsize=10)
+plt.tight_layout()
+base = __file__.replace('.py', '')
+plt.savefig(base + '.pdf', bbox_inches='tight')
+plt.savefig(base + '.svg', bbox_inches='tight')
+print(f'Wrote {base}.pdf and .svg')
+"""
+    _emit_data_and_renderer(paper, fig, info, csv, py)
+end
+
+# ────────────────────────────────────────────────────────────────
+# Paper #2 FIG-1: F=6 icosahedron Majorana
+# ────────────────────────────────────────────────────────────────
+function build_paper2_fig1(paper::String, fig::String, info)
+    # 12 vertices of regular icosahedron on unit sphere
+    # Vertices: (0, ±1, ±φ), (±1, ±φ, 0), (±φ, 0, ±1) (12 total), normalized
+    φ = (1 + sqrt(5)) / 2
+    norm = sqrt(1 + φ^2)
+    pts = [
+        (0,  1,  φ), (0, -1,  φ), (0,  1, -φ), (0, -1, -φ),
+        (1,  φ,  0), (-1,  φ,  0), (1, -φ,  0), (-1, -φ,  0),
+        (φ,  0,  1), (φ,  0, -1), (-φ,  0,  1), (-φ,  0, -1),
+    ]
+    csv_lines = ["label,x,y,z"]
+    for (i, p) in enumerate(pts)
+        push!(csv_lines, "v$i,$(p[1]/norm),$(p[2]/norm),$(p[3]/norm)")
+    end
+    csv = join(csv_lines, "\n") * "\n"
+    py = """
+#!/usr/bin/env python3
+\"\"\"
+Paper #2 FIG-1: F=6 icosahedron Majorana (12 stars on Bloch sphere).
+\"\"\"
+import csv
+import matplotlib.pyplot as plt
+import numpy as np
+from mpl_toolkits.mplot3d import Axes3D  # noqa
+
+rows = []
+with open(__file__.replace('.py', '.csv')) as f:
+    for r in csv.DictReader(f):
+        rows.append(r)
+xs = [float(r['x']) for r in rows]
+ys = [float(r['y']) for r in rows]
+zs = [float(r['z']) for r in rows]
+
+fig = plt.figure(figsize=(5.0, 5.0))
+ax = fig.add_subplot(111, projection='3d')
+
+# Bloch sphere
+u, v = np.linspace(0, 2*np.pi, 60), np.linspace(0, np.pi, 30)
+xu = np.outer(np.cos(u), np.sin(v))
+yu = np.outer(np.sin(u), np.sin(v))
+zu = np.outer(np.ones_like(u), np.cos(v))
+ax.plot_surface(xu, yu, zu, alpha=0.08, color='gray', linewidth=0)
+
+# Icosahedron edges (30 edges; connect by nearest-neighbor distance)
+import itertools
+pts = list(zip(xs, ys, zs))
+dist = lambda a, b: np.sqrt(sum((a[i]-b[i])**2 for i in range(3)))
+min_d = min(dist(pts[i], pts[j]) for i, j in itertools.combinations(range(12), 2))
+for i, j in itertools.combinations(range(12), 2):
+    if abs(dist(pts[i], pts[j]) - min_d) < 0.01:
+        ax.plot([xs[i], xs[j]], [ys[i], ys[j]], [zs[i], zs[j]],
+                'k-', lw=0.7, alpha=0.4)
+
+# Majorana points
+ax.scatter(xs, ys, zs, color='C3', s=120, edgecolor='black',
+           linewidths=1.0, zorder=10)
+ax.set_box_aspect((1, 1, 1))
+ax.set_xticks([]); ax.set_yticks([]); ax.set_zticks([])
+ax.set_title('F=6 icosahedral Majorana configuration\\n(12 vertices, I_h symmetry)',
+             fontsize=10)
+plt.tight_layout()
+base = __file__.replace('.py', '')
+plt.savefig(base + '.pdf', bbox_inches='tight')
+plt.savefig(base + '.svg', bbox_inches='tight')
+print(f'Wrote {base}.pdf and .svg')
+"""
+    _emit_data_and_renderer(paper, fig, info, csv, py)
+end
+
+# ────────────────────────────────────────────────────────────────
+# Paper #3 FIG-2: Sign Pattern β_S^(λ) vs S for 6 F-cases
+# ────────────────────────────────────────────────────────────────
+function build_paper3_fig2(paper::String, fig::String, info)
+    # Lemma 1 General-S: β_S^(λ) = [S(S+1) - 2F(F+1)] / (2 F(F+1)) · β_S^(c0)
+    # Sign change at S_bd = sqrt(2F(F+1))
+    # Generate the prefactor curve for each F (β_S^(λ)/β_S^(c0)) and S_bd line.
+    lines = ["F,S,prefactor_lambda_over_c0,sign_boundary_S_bd"]
+    for F in (3, 4, 6, 8, 10, 12)
+        S_bd = sqrt(2.0 * F * (F + 1))
+        for S in 0:2:(2F)
+            prefactor = (S * (S + 1) - 2 * F * (F + 1)) / (2 * F * (F + 1))
+            push!(lines, "$F,$S,$prefactor,$S_bd")
+        end
+    end
+    csv = join(lines, "\n") * "\n"
+    py = """
+#!/usr/bin/env python3
+\"\"\"
+Paper #3 FIG-2: Sign Pattern prefactor β_S^(λ_spin) / β_S^(c0) vs S
+across F = 3, 4, 6, 8, 10, 12. Vertical lines mark S_bd = sqrt(2F(F+1))
+where the prefactor changes sign (Sign Pattern Lemma 2).
+\"\"\"
+import csv
+import matplotlib.pyplot as plt
+import numpy as np
+
+rows = []
+with open(__file__.replace('.py', '.csv')) as f:
+    for r in csv.DictReader(f):
+        rows.append(r)
+
+# Group by F
+F_vals = sorted(set(int(r['F']) for r in rows))
+fig, ax = plt.subplots(figsize=(6.5, 4.5))
+colors = plt.cm.viridis(np.linspace(0, 0.85, len(F_vals)))
+
+for k, F in enumerate(F_vals):
+    sub = [r for r in rows if int(r['F']) == F]
+    S = np.array([int(r['S']) for r in sub])
+    pre = np.array([float(r['prefactor_lambda_over_c0']) for r in sub])
+    S_bd = float(sub[0]['sign_boundary_S_bd'])
+    ax.plot(S, pre, 'o-', color=colors[k], lw=1.5, ms=6,
+            label=f'F={F} (S_bd={S_bd:.2f})')
+    ax.axvline(S_bd, ls=':', color=colors[k], alpha=0.5, lw=0.8)
+
+ax.axhline(0, color='black', lw=0.8, alpha=0.5)
+ax.set_xlabel('Total spin channel S', fontsize=11)
+ax.set_ylabel(r'\$\\beta_S^{(\\lambda_{\\rm spin})} / \\beta_S^{(c_0)}\$',
+              fontsize=11)
+ax.set_title('Sign Pattern Lemma 2: single sign change at \$S_{\\rm bd} = \\sqrt{2F(F+1)}\$',
+             fontsize=11)
+ax.legend(loc='best', fontsize=8, ncol=2)
+ax.grid(alpha=0.3)
+plt.tight_layout()
+base = __file__.replace('.py', '')
+plt.savefig(base + '.pdf', bbox_inches='tight')
+plt.savefig(base + '.svg', bbox_inches='tight')
+print(f'Wrote {base}.pdf and .svg')
+"""
+    _emit_data_and_renderer(paper, fig, info, csv, py)
+end
+
+# ────────────────────────────────────────────────────────────────
+# Paper #3 FIG-1: Schur-pipeline TikZ schematic
+# ────────────────────────────────────────────────────────────────
+function build_paper3_fig1(paper::String, fig::String, info)
+    dir = _ensure_figures_dir(paper)
+    tex_path = joinpath(dir, lowercase(fig) * "_" * paper * ".tex")
+    tikz = raw"""
+% Paper #3 FIG-1: Schur-pipeline schematic
+% Build standalone:
+%   pdflatex paper3_fig1.tex
+\documentclass[border=4pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes,backgrounds}
+\begin{document}
+\begin{tikzpicture}[
+    node distance=10mm,
+    box/.style={draw, rounded corners=2pt, minimum width=42mm,
+                minimum height=12mm, align=center, font=\small},
+    arrow/.style={-{Latex[length=2.5mm]}, thick},
+]
+% Step 1
+\node[box, fill=blue!10] (group) {Polyhedral $H \subset SO(3)$\\
+    \scriptsize $T, O, I$ or their double covers};
+% Step 2
+\node[box, fill=blue!20, right=12mm of group] (irrep) {3-dim irrep $T_1|_H$\\
+    \scriptsize spin Goldstone space};
+% Step 3
+\node[box, fill=blue!30, right=12mm of irrep] (schur) {Schur isotropy\\
+    \scriptsize $\langle F_a^2\rangle = \frac{F(F+1)}{3}$};
+% Step 4
+\node[box, fill=blue!40, below=10mm of schur] (eom) {Spin-mass matrix\\
+    $= \lambda_{\rm spin}^{(H)} \cdot \mathbf{I}_3$};
+% Step 5
+\node[box, fill=green!30, below=10mm of irrep] (closed) {Universal closed form\\
+    $\varepsilon_{\rm LHY} \propto c_0^{5/2} + 3|\lambda_{\rm spin}|^{5/2}$};
+
+% Arrows
+\draw[arrow] (group) -- (irrep);
+\draw[arrow] (irrep) -- (schur);
+\draw[arrow] (schur) -- (eom);
+\draw[arrow] (eom) -- (closed);
+\draw[arrow] (irrep) -- (closed) node[midway,fill=white,font=\scriptsize]
+    {3 degenerate};
+
+\end{tikzpicture}
+\end{document}
+"""
+    open(tex_path, "w") do io
+        write(io, tikz)
+    end
+    @printf("OK: %s %s\n", paper, fig)
+    @printf("  TikZ source: %s\n", tex_path)
+    @printf("  Build: cd %s && pdflatex %s\n", dir, basename(tex_path))
+end
+
+# ────────────────────────────────────────────────────────────────
+# Paper #3 FIG-4: Three-exception classification TikZ
+# ────────────────────────────────────────────────────────────────
+function build_paper3_fig4(paper::String, fig::String, info)
+    dir = _ensure_figures_dir(paper)
+    tex_path = joinpath(dir, lowercase(fig) * "_" * paper * ".tex")
+    tikz = raw"""
+% Paper #3 FIG-4: Three-exception classification
+\documentclass[border=4pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{shapes,positioning}
+\begin{document}
+\begin{tikzpicture}[
+    F/.style={draw, rounded corners=2pt, minimum width=20mm,
+              minimum height=10mm, align=center, font=\small},
+    ex/.style={F, fill=red!15},
+    ok/.style={F, fill=green!15},
+    skip/.style={F, dashed, draw=gray!50, text=gray!70},
+]
+% Header
+\node[font=\bfseries] at (3.5, 1.5) {Universal Theorem applies for
+    polyhedral inert states with a Schur-singlet 1-dim real irrep.};
+
+% F values
+\foreach \F/\style/\note in {
+    1/ex/{$T_1$ irred.}, 2/ex/{phase-eq.\\T:E_1},
+    3/ok/{T:A, O:A_2}, 4/ok/{T:A, O:A_1},
+    5/ex/{algebraic\\no real}, 6/ok/{all families},
+    7/ok/{T:A, O:A_2}, 8/ok/{T:A, O:A_1},
+    9/ok/{O:A_1, O:A_2}, 10/ok/{all families},
+    11/ok/{T:A, O:A_2}, 12/ok/{all families},
+    13/ok/{T:A, O:A_1, O:A_2}
+} {
+    \node[\style] at ({(\F-1)*22mm}, 0) {$F{=}\F$\\\scriptsize\note};
+}
+
+% Legend
+\node[ok, anchor=west] at (0, -1.5) {ok};
+\node[anchor=west, font=\small] at (1.5, -1.5) {Schur-singlet applies};
+\node[ex, anchor=west] at (6, -1.5) {ex};
+\node[anchor=west, font=\small] at (7.5, -1.5) {Exception (no real 1-dim irrep)};
+
+\end{tikzpicture}
+\end{document}
+"""
+    open(tex_path, "w") do io
+        write(io, tikz)
+    end
+    @printf("OK: %s %s\n", paper, fig)
+    @printf("  TikZ source: %s\n", tex_path)
+    @printf("  Build: cd %s && pdflatex %s\n", dir, basename(tex_path))
+end
+
 # Default for all other figures → stub
 for ((paper, fig), info) in FIGURE_REGISTRY
     builder_name = info.builder

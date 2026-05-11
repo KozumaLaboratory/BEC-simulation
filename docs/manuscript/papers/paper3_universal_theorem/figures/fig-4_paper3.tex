@@ -1,0 +1,37 @@
+% Paper #3 FIG-4: Three-exception classification
+\documentclass[border=4pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{shapes,positioning}
+\begin{document}
+\begin{tikzpicture}[
+    F/.style={draw, rounded corners=2pt, minimum width=20mm,
+              minimum height=10mm, align=center, font=\small},
+    ex/.style={F, fill=red!15},
+    ok/.style={F, fill=green!15},
+    skip/.style={F, dashed, draw=gray!50, text=gray!70},
+]
+% Header
+\node[font=\bfseries] at (3.5, 1.5) {Universal Theorem applies for
+    polyhedral inert states with a Schur-singlet 1-dim real irrep.};
+
+% F values
+\foreach \F/\style/\note in {
+    1/ex/{$T_1$ irred.}, 2/ex/{phase-eq.\\T:E_1},
+    3/ok/{T:A, O:A_2}, 4/ok/{T:A, O:A_1},
+    5/ex/{algebraic\\no real}, 6/ok/{all families},
+    7/ok/{T:A, O:A_2}, 8/ok/{T:A, O:A_1},
+    9/ok/{O:A_1, O:A_2}, 10/ok/{all families},
+    11/ok/{T:A, O:A_2}, 12/ok/{all families},
+    13/ok/{T:A, O:A_1, O:A_2}
+} {
+    \node[\style] at ({(\F-1)*22mm}, 0) {$F{=}\F$\\\scriptsize\note};
+}
+
+% Legend
+\node[ok, anchor=west] at (0, -1.5) {ok};
+\node[anchor=west, font=\small] at (1.5, -1.5) {Schur-singlet applies};
+\node[ex, anchor=west] at (6, -1.5) {ex};
+\node[anchor=west, font=\small] at (7.5, -1.5) {Exception (no real 1-dim irrep)};
+
+\end{tikzpicture}
+\end{document}
