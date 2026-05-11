@@ -80,6 +80,9 @@ const FAST_TESTS = [
     "hamiltonian/test_tdhfb_hf_matrix.jl",
     "hamiltonian/test_tdhfb_hf_matrix_generic.jl",
     "hamiltonian/test_tdhfb_strang_step.jl",
+    "hamiltonian/test_tdhfb_y4_midpoint.jl",
+    "hamiltonian/test_tdhfb_evolve.jl",
+    "hamiltonian/test_tdhfb_hfb_modes.jl",
     "hamiltonian/test_tdhfb_pair_potential.jl",
     "hamiltonian/test_tdhfb_conservation.jl",
 ]

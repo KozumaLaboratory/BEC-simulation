@@ -87,17 +87,21 @@ function TDHFBState{N, A, B}(phi::A, rho::B, kappa::B, t, step) where {N, A, B}
 end
 
 """
-    init_tdhfb_vacuum(psi::A) where {A <: AbstractArray}
+    init_tdhfb_vacuum(psi::A; alias::Bool=false) where {A <: AbstractArray}
 
 Initialize TDHFBState from a mean-field spinor `psi` with vacuum (ρ = κ = 0).
 
 `psi` must be a (spatial..., D) array (= SimState.psi shape). Returns a
 TDHFBState with same backend (CPU/GPU), same precision, and zero pair amplitudes.
 
-This is the starting point for TDHFB evolution of an initially condensed state
-without pre-existing pair correlations.
+By default the input `psi` is COPIED into `state.phi` — so subsequent
+`tdhfb_strang_step!` mutations do not bleed back into the caller's array,
+and two `init_tdhfb_vacuum(phi0)` calls produce independent states.
+Set `alias=true` to skip the copy and share the same backing array
+(advanced; needed only when the caller owns the buffer and wants in-place
+semantics, e.g., GPU memory-managed flows).
 """
-function init_tdhfb_vacuum(psi::AbstractArray)
+function init_tdhfb_vacuum(psi::AbstractArray; alias::Bool=false)
     sz = size(psi)
     spatial_dims = sz[1:end-1]
     D = sz[end]
@@ -114,8 +118,10 @@ function init_tdhfb_vacuum(psi::AbstractArray)
     kappa = similar(psi, T_complex, kappa_shape)
     fill!(kappa, zero(T_complex))
 
-    return TDHFBState{N, typeof(psi), typeof(rho), T_real}(
-        psi, rho, kappa, zero(T_real), 0
+    phi_stored = alias ? psi : copy(psi)
+
+    return TDHFBState{N, typeof(phi_stored), typeof(rho), T_real}(
+        phi_stored, rho, kappa, zero(T_real), 0
     )
 end
 

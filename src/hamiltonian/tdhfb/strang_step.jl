@@ -203,9 +203,13 @@ function _tdhfb_phi_subupdate!(
             for c2 in 1:D, c2_p in 1:D
                 Vk = V[c, c_p, c2, c2_p]
                 Vk == 0.0 && continue
-                # U^φ:  φ*_{c2_p} φ_{c2}  +  2 ρ_{c2_p, c2}
+                # U^φ:  φ*_{c2_p} φ_{c2}  +  ρ_{c2, c2_p}
+                # (fix 2026-05-12: previously had factor 2 + transposed ρ
+                # indices, leftover from a partial channel_kernel ↔
+                # channel_kernel_symmetrized migration — caused dt-independent
+                # energy drift scaling linearly with g_S, see memory.)
                 uval += Vk * (conj(state.phi[idx, c2_p]) * state.phi[idx, c2]
-                              + 2 * state.rho[idx, c2_p, c2])
+                              + state.rho[idx, c2, c2_p])
                 # Δ^φ:  κ_{c2, c2_p}                  (no φφ source)
                 # Popov mode (`hfb_mode = :popov`): drop the anomalous
                 # source for the φ subupdate.
@@ -268,9 +272,10 @@ function _tdhfb_R_subupdate!(
             for c2 in 1:D, c2_p in 1:D
                 Vk = V[c, c_p, c2, c2_p]
                 Vk == 0.0 && continue
-                # U^R:  2 V·(φ*φ + ρ)
-                uval += 2 * Vk * (conj(state.phi[idx, c2_p]) * state.phi[idx, c2]
-                                  + state.rho[idx, c2_p, c2])
+                # U^R:  V·(φ*φ + ρ_{c2, c2_p})  — same as U^φ after the fix
+                # (variational consistency, see strang_step.jl:206 comment).
+                uval += Vk * (conj(state.phi[idx, c2_p]) * state.phi[idx, c2]
+                              + state.rho[idx, c2, c2_p])
                 # Δ^R:  V·(φφ + κ)
                 dval += Vk * (state.phi[idx, c2] * state.phi[idx, c2_p]
                               + state.kappa[idx, c2, c2_p])

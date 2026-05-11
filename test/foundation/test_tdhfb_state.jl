@@ -18,11 +18,19 @@ using SpinorBEC
 
     @testset "Construction + types" begin
         @test state isa TDHFBState
-        @test state.phi === psi
+        # 2026-05-12: init_tdhfb_vacuum now copies psi by default
+        # (alias=true opts back into reference-sharing). state.phi has
+        # identical content but is a distinct array from psi.
+        @test state.phi == psi
+        @test state.phi !== psi
         @test size(state.rho) == (8, 3, 3)
         @test size(state.kappa) == (8, 3, 3)
         @test state.t == 0.0
         @test state.step == 0
+
+        # alias=true preserves the old reference-sharing semantics
+        state_aliased = init_tdhfb_vacuum(psi; alias=true)
+        @test state_aliased.phi === psi
     end
 
     @testset "Vacuum initial state" begin
