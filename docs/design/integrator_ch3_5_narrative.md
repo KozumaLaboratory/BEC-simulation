@@ -209,3 +209,99 @@ term is a genuine contribution to the literature.
 
 Track B (Thalhammer 2026 modified splitting) is now the next thrust
 per `docs/design/integrator_ch3_plan.md` schedule.
+
+## §3.5.8 v4 Step 1 prototype: discrete Hermiticity and the FG-on-Strang structural limit
+
+A subsequent prototype implementation campaign (post-design, 2026-05-12)
+revealed two structural lessons that were not visible in the §3.5.5
+derivation alone. We summarize them here because both are publishable
+findings; the bench code lives in `scripts/bench/track_c_v4_step1{a,b,c,d}_*.jl`.
+
+**Step 1a (multiplicative kernel verification)** — implementing terms
+(i) `−(i/2) F_ρ (m × ∇²m)_ρ` and (iii) `−(1/2){F_μ,F_ν}(∇m_μ)·(∇m_ν)`
+of §5.2 directly as a per-voxel matrix function `W(r)` passes all six
+limit tests: `c₁ = 0`, constant `m̄`, polar `⟨F⟩ = 0`, non-trivial
+spin-wave, anti-Hermitian/Hermitian symmetry split (term i alone is
+anti-Hermitian; term iii alone is Hermitian, as the derivation
+predicts), and `c₁²` scaling.
+
+**Step 1b → 1c (discrete Hermiticity failure → pivot to direct commutator)** —
+Naive implementation of the full `(i)+(ii)+(iii)` decomposition, with
+term (ii) `−i F_ρ (m × ∇m)_ρ · ∇` applied as a separate FFT-derivative
+substep, FAILS a discrete Hermiticity test `⟨φ, Aψ⟩ = ⟨Aφ, ψ⟩` at
+relative deviation `0.65` on a `16³` grid. The continuum cancellation
+between the anti-Hermitian half of term (ii) and term (i) relies on the
+identity `∂_α(Q_{ρα}) = (m × ∇²m)_ρ` where `Q_{ρα} = (m × ∂_α m)_ρ`.
+At the discrete FFT level this identity FAILS because the pointwise
+product `m_μ · ∂_α m_ν` has Fourier modes beyond `±k_Nyq`, so re-FFTing
+to compute `∂_α Q_{ρα}` produces an aliased result that differs from
+the analytic `(m × ∇²m)_ρ` by Nyquist-folded high-`k` content. We
+verified numerically: the variational-prediction ratio `T_2 / (-i⟨F·M⟩)`
+came out `1.000` (term (i) implementation correct), but
+`T_1 / (+i⟨F·M⟩) = -1.508 + 0.938i` (term (ii) integration-by-parts
+shadow does NOT match the continuum prediction).
+
+**Resolution**: implement `[V_SM, [T, V_SM]]ψ` directly as
+`2·V_SM(T(V_SM ψ)) − V_SM(V_SM(T ψ)) − T(V_SM(V_SM ψ))`. Since `V_SM`
+(diagonal in `r`, Hermitian matrix in spin) and `T = −½∇²` (Hermitian
+via the anti-Hermitian spectral derivative) are individually
+discrete-Hermitian operators, their commutator is automatically
+discrete-Hermitian. We verified `⟨φ, Aψ⟩ = ⟨Aφ, ψ⟩` at relative
+deviation `4.4e-15` (machine precision) on random test wavefunctions.
+The cost is 3 `V_SM` applications + 2 `T` applications per FG substep
+(= 4 FFT pairs), modestly more than the decomposed form (~3–5 FFTs) but
+with guaranteed unitarity of the implied propagator `exp(-i·dt²·c·[V,[T,V]])`.
+
+The lesson generalizes to any FFT-spectral implementation of a double
+commutator involving non-diagonal `V`: the analytical Leibniz/IBP
+identities used to decompose `[V,[T,V]]` into separate multiplicative
+and derivative substeps are continuum-only. Implementations should
+either (a) use the direct discrete commutator form, accepting the
+extra FFT cost, or (b) apply 2/3-rule anti-aliasing on the product
+modes before spectral differentiation.
+
+**Step 1d (FG-on-Strang gives only order 2 for non-harmonic V)** — even
+with the direct discrete commutator kernel verified Hermitian, applying
+the standard FG correction `V_eff = V + (dt²/24)[V,[T,V]]` to a Strang
+base produces order **2.00** on a `c₁ = 50` spin-mixing test problem
+(no trap, no `c₀`), identical to plain Strang. The reason is that the
+Strang BCH expansion contains TWO leading commutators:
+
+```
+err_per_step = +(dt³/24)[V,[V,T]] − (dt³/12)[T,[V,T]] + O(dt⁵)
+             = −(dt³/24)[V,[T,V]] + (dt³/12)[T,[T,V]] + O(dt⁵)
+```
+
+The FG correction modifies `V` by an additive term proportional to
+`[V,[T,V]]`, which cancels the FIRST commutator but leaves the
+`[T,[T,V]]` term untouched. For a harmonic potential `∇²V = const`,
+that second commutator vanishes (`[T, V_harm] = ∇V_harm · ∇ + const`,
+and `[T, ∇V_harm·∇]` simplifies); for non-harmonic `V`, both
+commutators contribute, so FG-on-Strang alone cannot reach order 4.
+Order-4 with FG-style force-gradient correction requires a
+Forest-Ruth-Chin composition: multiple `K` substeps at optimized
+weights, with the FG correction inserted at specific factorization
+points, so that BOTH leading-order commutators cancel. This is the
+proper "Chin-Krotscheck 4A" structure; the simpler `V_eff(dt/2) K(dt)
+V_eff(dt/2)` is in fact only order-2-with-improved-prefactor (= a
+better order-2 method, not a true order-4 method) for non-harmonic V.
+
+**Implications for the thesis narrative**: the §3.5.5 statement that
+"Force-Gradient achieves order ~3–4 on the lab path" should be
+qualified — it does so with the Aichinger-Chin-Krotscheck 4A
+composition (multiple `K` weights), NOT with a plain Strang base.
+The Track C v1–v3 implementation that achieves order ~3 nonlinear on
+1D Rb87 uses the implicit Chin-form V-K-V-K-V triplet, which already
+has the correct factorization structure; the standalone "FG kernel
+plus Strang" approach we tried in Step 1d does not. This nuance was
+implicit in the design phase and is now made explicit through the
+prototype.
+
+Implementation of Step 1c–d as production-ready code (= a
+`split_step_forcegrad_v4!` with full Forest-Ruth-Chin composition + the
+direct discrete commutator kernel + DDI extension §5.3) is logged as
+post-修論 work (task #91, Forest-Ruth-Chin composition for the v4
+spinor-matrix correction). The Step 1c discrete-Hermiticity finding
+extends the literature contribution beyond the §5.2 derivation: it is
+a constructive resolution to a discrete-implementation question that
+the analytical work alone did not surface.
