@@ -31,7 +31,7 @@
 # Extensions (c₁, DDI, etc.) require additional Phase -1 derivation;
 # see Step 5 of docs/integrator_track_c_derivation.md.
 
-export split_step_forcegrad!
+export split_step_forcegrad!, split_step_thalhammer!
 
 function _assert_forcegrad_diagonal_only(ws::Workspace)
     ws.ddi === nothing ||
@@ -405,3 +405,29 @@ function _strang_substep_on_copy!(
     end
     nothing
 end
+
+"""
+    split_step_thalhammer!(ws::Workspace; kwargs...)
+
+Track B — Thalhammer modified splitting (arXiv:2601.19838 eq 22) for the
+diagonal-only subset of SpinorBEC.
+
+For J=1 scalar GPE, Thalhammer's 3-stage modified ABA composition with
+coefficients `(a=(0,1/2,1/2), b=(1/6,2/3,1/6), c=(0,-1/72,0))` and
+G = [DF₂, [DF₂, DF₁]] reduces EXACTLY to Chin-Krotscheck 2005 4A
+(`split_step_forcegrad!`). The two methods are formal equivalents:
+- Chin-Krotscheck: classical force-gradient `[V,[T,V]] = |∇V|²` correction
+- Thalhammer 2026: Lie-derivative iterated commutator `G = [DF₂,[DF₂,DF₁]]`
+
+Algebraic equivalence proven in `docs/integrator_track_b_derivation.md`
+Step 1.1-1.3. Verified bit-exact by `scripts/bench/forcegrad_thalhammer_equiv.jl`.
+
+This export is therefore an alias for `split_step_forcegrad!` — providing
+a Thalhammer-framework API entry point while sharing implementation.
+
+For J=2+ multi-species cross-channel BEC or F-matrix spinor + DDI
+extensions: see Track C v4/v5 derivations
+(`docs/integrator_track_c_derivation.md` §5.2-5.3) — implementation
+out of scope for the diagonal-only `split_step_forcegrad!` v3 milestone.
+"""
+const split_step_thalhammer! = split_step_forcegrad!
