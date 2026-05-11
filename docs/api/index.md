@@ -12,14 +12,22 @@ The output lands in `docs/build/`.
 
 ## Manually-curated entry points
 
+**Guides (how to do something):**
+
 - [Pipeline cookbook](../guides/pipeline_cookbook.md) — common YAML patterns
 - [Lab user tutorial](../guides/lab_user_tutorial.md) — start-to-finish workflow
 - [Performance tuning](../guides/performance_tuning.md) — when to use which knob
+
+**Reference (look something up):**
+
 - [Architecture](../reference/architecture.md) — module structure & data flow
 - [YAML schema reference](../reference/yaml_schema_reference.md) — every key
-- [Mixed precision design](../design/mixed_precision_design.md) — F32 / F64 path
-- [Two-component GP design](../design/two_component_gp_design.md) — #51 plan
-- [Live monitor design](../design/live_monitor_design.md) — #67 plan
+
+**Design notes (why something exists):**
+
+- [Mixed precision](../design/mixed_precision_design.md) — F32 / F64 path
+- [Two-component GP](../design/two_component_gp_design.md) — #51 plan
+- [Live monitor](../design/live_monitor_design.md) — #67 plan
 
 ## Module exports (selected)
 

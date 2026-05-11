@@ -149,10 +149,13 @@ the Sinatra-axis comparison.
 
 ## See also
 
-* `docs/research_notes/twa_sinatra_validation.md` — the running
-  notebook for the empirical verdict.
-* `docs/theory/icosahedral_lhy.md` — the I_h closed form whose
-  validity in TWA hinges on this same Sinatra check.
+**Companion docs in this repo:**
+
+* `docs/research_notes/twa_eu_edh_synthesis.md` — synthesis of the four empirical scans this criterion was tested against.
+* `docs/research_notes/twa_sinatra_validation.md` — original empirical verdict (superseded; see `twa_pinned_16g_result.md` for the corrected reading).
+* `docs/theory/icosahedral_lhy.md` — I_h closed form whose TWA validity hinges on this same criterion.
+
+**Primary literature:**
+
 * Sinatra & Castin 2002, *J. Mod. Opt.* 47, 2671.
-* Castin 2001, in *Coherent atomic matter waves* (Les Houches
-  Summer School 1999).
+* Castin 2001, in *Coherent atomic matter waves* (Les Houches Summer School 1999).

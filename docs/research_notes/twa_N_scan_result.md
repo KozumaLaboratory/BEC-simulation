@@ -147,11 +147,10 @@ analyzer resolves the hash-suffixed run dirs by glob.
 
 ## See also
 
-* `docs/research_notes/eu_collapse_lhy_insufficient.md` — five-LHY-mode
-  ablation establishing collapse is mean-field driven at N=10⁴.
-* `docs/research_notes/twa_sinatra_validation.md` — the orthogonal
-  validity test (grid + cutoff). The canonical 1/N re-run depends on
-  Sinatra not flagging the 32³ baseline.
-* `docs/research_notes/twa_eps_dd_scan.md` (pending) — species
-  universality counterpart to Finding A.
-* `examples/twa_N_scan*.jl`, `test/test_twa_N_scan.jl`.
+**Related research notes:**
+
+* `docs/research_notes/eu_collapse_lhy_insufficient.md` — five-LHY-mode ablation establishing collapse is mean-field driven at N=10⁴.
+* `docs/research_notes/twa_sinatra_validation.md` — orthogonal validity test (grid + cutoff). The canonical 1/N re-run depends on Sinatra not flagging the 32³ baseline.
+* `docs/research_notes/twa_eps_dd_scan.md` — species universality counterpart to Finding A.
+
+**Reproduction code:** `examples/twa_N_scan*.jl`, `test/test_twa_N_scan.jl`.

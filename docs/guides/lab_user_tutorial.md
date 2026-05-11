@@ -175,7 +175,8 @@ n_peak = d["analyze/droplet_profile/n_peak"]
 
 ## Where to look next
 
-- `docs/guides/pipeline_cookbook.md` — YAML pattern recipes
-- `docs/reference/yaml_schema_reference.md` — every accepted YAML key
-- `runs/samples/` — 6 representative scenarios (quench, droplet+SGPE, Feshbach, lab-cal, SOC, pulse-Rabi)
-- `CLAUDE.md` — the repo's collaboration contract
+**More patterns:** `docs/guides/pipeline_cookbook.md` (recipes by scenario), `runs/samples/` (6 runnable scenarios — quench, droplet+SGPE, Feshbach, lab-cal, SOC, pulse-Rabi).
+
+**Looking something up:** `docs/reference/yaml_schema_reference.md` for every accepted YAML key.
+
+**Repo conventions:** `CLAUDE.md`.

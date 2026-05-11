@@ -105,4 +105,8 @@ Status: documentation only. Coefficient table + implementation deferred to a ses
 
 ## Cross-references
 
-Empirical verification harness: `test/hamiltonian/test_integrator_order_meanfield.jl`. Reference papers: Yoshida 1990, Chin 2010, Chin & Geiser 2011, Choi & Vaníček 2020 (NLS instabilities), Blanes-Casas-Ros 2024, Thalhammer 2026. ε threshold rule (separate empirical finding for Yoshida6 in the Klaus regime): `guides/klaus_regime.md` "ε rule".
+**Verification harness in this repo:** `test/hamiltonian/test_integrator_order_meanfield.jl` (empirical order table), `scripts/bench/mps_smoke.jl` (rotating-basis), `scripts/bench/mps4_lab_diagnostic.jl` (lab-path failure).
+
+**Companion guide:** `guides/klaus_regime.md` "Hard constraint" — the separate empirical ε rule for Yoshida6 in the Klaus regime.
+
+**Primary literature:** Yoshida 1990 (composition); Chin 2010, Chin & Geiser 2011 (multi-product splitting); Choi & Vaníček 2020 (NLS instabilities); Blanes-Casas-Ros 2024 (complex-coefficient ITP); Thalhammer 2026 (modified splitting).

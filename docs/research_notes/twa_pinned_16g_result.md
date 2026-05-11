@@ -127,14 +127,12 @@ results at `runs/N{N}_pinned_16g_<hash>/result.jld2`.
 
 ## See also
 
-* `docs/research_notes/twa_sinatra_validation.md` — to be revised in
-  light of this finding (the "spurious" verdict was wrong — the
-  σ/μ shrinkage was a GS-resolution effect, not Sinatra contamination)
-* `docs/research_notes/twa_N_scan_result.md` — Findings A/B (collapse
-  threshold + σ/μ peak at marginal) survive but reinterpreted
-* `docs/research_notes/twa_eps_dd_scan.md` — species trend survives;
-  σ/μ values are now real chaotic-divergence signatures
-* `docs/theory/sinatra_criterion_F6.md` — theory page should add a
-  caveat that σ/μ in chaotic dynamical regimes is not a clean Wigner
-  diagnostic; need amplitude-mode-resolved diagnostics or higher-order
-  theory
+**Other TWA scans (the data this verdict reinterprets):**
+
+* `docs/research_notes/twa_sinatra_validation.md` — original "spurious" verdict, now superseded (σ/μ shrinkage was a GS-resolution effect, not Sinatra contamination)
+* `docs/research_notes/twa_N_scan_result.md` — Findings A/B (collapse threshold + σ/μ peak at marginal) survive but reinterpreted
+* `docs/research_notes/twa_eps_dd_scan.md` — species trend survives; σ/μ values are now real chaotic-divergence signatures
+
+**Theory:**
+
+* `docs/theory/sinatra_criterion_F6.md` — σ/μ in chaotic regimes is not a clean Wigner diagnostic; amplitude-mode-resolved diagnostics or higher-order theory needed.
