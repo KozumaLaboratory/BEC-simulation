@@ -263,9 +263,8 @@ function _tdhfb_R_subupdate!(
             R[c, c_p] = state.rho[idx, c, c_p]
             R[c, D + c_p] = state.kappa[idx, c, c_p]
             R[D + c, c_p] = conj(state.kappa[idx, c, c_p])
-            R[D + c, D + c_p] =
-                (c == c_p ? one(ComplexF64) : zero(ComplexF64)) +
-                conj(state.rho[idx, c, c_p])
+            delta_cc = c == c_p ? one(ComplexF64) : zero(ComplexF64)
+            R[D + c, D + c_p] = delta_cc + conj(state.rho[idx, c, c_p])
         end
         Minv = inv(M)
         R_new = M * R * Minv

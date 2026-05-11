@@ -116,9 +116,10 @@ function hf_matrix_F1!(
         # (suppressing anomalous contribution from κ at minimal Phase 2 scope)
         for m in 1:3, m_prime in 1:3
             val = c0 * n_total * (m == m_prime ? 1.0 : 0.0)
-            val += c1 * (Fx[m, m_prime] * Fx_total +
-                         Fy[m, m_prime] * Fy_total +
-                         Fz[m, m_prime] * Fz_total)
+            fx_part = Fx[m, m_prime] * Fx_total
+            fy_part = Fy[m, m_prime] * Fy_total
+            fz_part = Fz[m, m_prime] * Fz_total
+            val += c1 * (fx_part + fy_part + fz_part)
             h_hf[idx, m, m_prime] = val
         end
     end

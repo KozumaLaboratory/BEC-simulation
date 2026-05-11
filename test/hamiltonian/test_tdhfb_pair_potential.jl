@@ -155,8 +155,8 @@ using SpinorBEC
             phi_neg_mp = phi[i, c_neg_mp]
             kappa_negm_negmp = kappa[i, c_neg_m, c_neg_mp]
             sign_factor = (-1)^(m + m_p)
-            expected = (1.0 / (2 * F + 1)) * sign_factor *
-                       (phi_neg_m * phi_neg_mp + kappa_negm_negmp)
+            prefactor = (1.0 / (2 * F + 1)) * sign_factor
+            expected = prefactor * (phi_neg_m * phi_neg_mp + kappa_negm_negmp)
             @test abs(Delta[i, c, c_p] - expected) < 1e-10
         end
     end
