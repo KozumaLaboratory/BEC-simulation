@@ -13,7 +13,7 @@ The lab-side live-monitor socket adds a push endpoint to the existing dashboard 
 
 ## Existing infrastructure
 
-- `serve_dashboard(port)` in `src/workflow/io/dashboard.jl` — HTTP server listening on `port`, serves the Vite-built React UI from `web/dist/`.
+- `serve_dashboard(port)` in `src/workflow/io/dashboard.jl` — HTTP server listening on `port`, serves the Vite-built React UI from `dashboard/dist/`.
 - WebGPU 3D raymarch already loads `dynamics/psi_snapshots_streamed/...` from `runs/<run>/<point>.jld2` over HTTP.
 
 ## What's missing

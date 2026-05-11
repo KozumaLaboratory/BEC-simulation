@@ -180,7 +180,7 @@ For per-step dynamics knobs (sgpe, projected_gp, photon_scattering, loss, pulse_
 
 ### Dashboard (`workflow/io/dashboard.jl`)
 
-`serve_dashboard(port)` launches an HTTP server backed by `HTTP.jl` that serves the Vite-built React UI from `web/dist/` plus the following JSON / binary endpoints:
+`serve_dashboard(port)` launches an HTTP server backed by `HTTP.jl` that serves the Vite-built React UI from `dashboard/dist/` plus the following JSON / binary endpoints:
 
 | endpoint                        | purpose                                       |
 |---------------------------------|-----------------------------------------------|

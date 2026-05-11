@@ -12,7 +12,7 @@ Plotly.js dashboard (`runs/tools/dashboard.html`) with:
 
 ## Toolchain
 
-Pinned via `web/mise.toml`:
+Pinned via `dashboard/mise.toml`:
 
 - Node 24
 - bun 1.3
@@ -20,7 +20,7 @@ Pinned via `web/mise.toml`:
 ## Develop
 
 ```bash
-# From web/:
+# From dashboard/:
 bun install
 bun run dev
 ```
@@ -40,8 +40,8 @@ Override the proxy target with `VITE_API_TARGET=http://other-host:8080`.
 bun run build
 ```
 
-Output goes to `web/dist/`. `serve_dashboard` in Julia serves this
-directory — it refuses to start if `web/dist/index.html` is missing.
+Output goes to `dashboard/dist/`. `serve_dashboard` in Julia serves this
+directory — it refuses to start if `dashboard/dist/index.html` is missing.
 The legacy Plotly dashboard remains reachable at `/legacy` as long as
 `runs/tools/dashboard.html` is on disk.
 

@@ -265,8 +265,8 @@ julia --project=. -e 'using SpinorBEC; serve_dashboard()'
 ```
 
 Vite + React + WebGPU dashboard at `http://localhost:8765`. Loads `runs/*/result.jld2`
-and renders 3D density + spin observables. Requires `web/dist/` (built once via
-`bun run build` in `web/` directory).
+and renders 3D density + spin observables. Requires `dashboard/dist/` (built once via
+`bun run build` in `dashboard/` directory).
 
 ### B.8.2 Static plots
 

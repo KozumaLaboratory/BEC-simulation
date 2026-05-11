@@ -75,7 +75,7 @@ src/    Solvers, Hamiltonian terms, workflow, analysis
 runs/   YAML configs (Klaus magnetostir, Einstein–de Haas, phase diagrams, …)
 docs/   guides/ reference/ design/ theory/ research_notes/ (see docs/index.md)
 test/   ~8600 tests, tiered (fast / ci / full)
-web/    React + WebGPU dashboard
+dashboard/  React + WebGPU dashboard frontend
 ext/    CUDA and Makie extensions
 bench/  Benchmarks
 ```

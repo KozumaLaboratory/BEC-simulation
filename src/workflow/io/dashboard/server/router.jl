@@ -4,8 +4,8 @@ export serve_dashboard
 
 # --- Dashboard server (stdlib Sockets only, no HTTP.jl needed) ---
 
-const _REPO_ROOT = normpath(joinpath(@__DIR__, "..", "..", ".."))
-const _WEB_DIST_DIR = joinpath(_REPO_ROOT, "web", "dist")
+const _REPO_ROOT = normpath(joinpath(@__DIR__, "..", "..", "..", "..", ".."))
+const _WEB_DIST_DIR = joinpath(_REPO_ROOT, "dashboard", "dist")
 const _WEB_DIST_INDEX = joinpath(_WEB_DIST_DIR, "index.html")
 const _LEGACY_DASHBOARD_HTML = joinpath(_REPO_ROOT, "runs", "tools", "dashboard.html")
 
@@ -15,14 +15,14 @@ const _LEGACY_DASHBOARD_HTML = joinpath(_REPO_ROOT, "runs", "tools", "dashboard.
 Start a local HTTP server for the React + WebGPU dashboard.
 Browse to http://localhost:\$port to view results.
 
-Requires `web/dist/` (run `cd web && bun run build`). The legacy
-Plotly dashboard remains reachable at `/legacy` as long as
+Requires `dashboard/dist/` (run `cd dashboard && bun run build`). The
+legacy Plotly dashboard remains reachable at `/legacy` as long as
 `runs/tools/dashboard.html` exists.
 
 API:
-- `GET /`               → React dashboard (web/dist/index.html)
-- `GET /assets/*`       → hashed static assets from web/dist/assets/
-- `GET /favicon.svg`    → favicon from web/dist/
+- `GET /`               → React dashboard (dashboard/dist/index.html)
+- `GET /assets/*`       → hashed static assets from dashboard/dist/assets/
+- `GET /favicon.svg`    → favicon from dashboard/dist/
 - `GET /legacy`         → legacy Plotly dashboard (if present)
 - `GET /api/runs`       → list of run directories
 - `GET /api/data/:name` → dashboard data JSON for a run
@@ -38,7 +38,7 @@ function serve_dashboard(port::Int=8080; base_dir::String="runs")
     if !isfile(_WEB_DIST_INDEX)
         throw(
             ArgumentError(
-                "React dashboard not built. Run: cd web && bun install && bun run build"
+                "React dashboard not built. Run: cd dashboard && bun install && bun run build"
             ),
         )
     end

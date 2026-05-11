@@ -15,7 +15,7 @@ Useful when the dashboard is reached over LAN / SSH tunnel where the 46 MB raw a
 To wire it up:
 
 ```ts
-// web/src/workers/atlasWorker.ts
+// dashboard/src/workers/atlasWorker.ts
 import { decompress as fzstdDecompress } from 'fzstd'
 
 function decodeBszAtlas(buf: ArrayBuffer): ArrayBuffer {

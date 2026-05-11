@@ -33,7 +33,7 @@ The 1%-of-peak threshold on the histogram exists so vacuum voxels (where μ ≈ 
 
 ## Frontend wiring
 
-- Component: `web/src/components/EnsemblePanel.tsx` (≈260 lines)
+- Component: `dashboard/src/components/EnsemblePanel.tsx` (≈260 lines)
 - Props: `{ runName: string; fileName: string }`
 - Aesthetic: matches `ScanGroupView` — Fraunces serif + JetBrains Mono, charcoal `#0e0f12` panels, teal `#7fb9a6` mean line, amber `#d6c7a8` σ/μ, red `#c97064` σ=μ reference. Staggered fade-in on mount.
 - View-mode toggle row: `deterministic` / `single` / `mean` / `variance`. The first two are intentionally disabled with a `line-through` style — they belong to the (future) 3D-volume surface, not this scalar panel.
