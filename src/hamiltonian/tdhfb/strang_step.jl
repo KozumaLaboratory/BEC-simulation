@@ -187,10 +187,10 @@ function _tdhfb_phi_subupdate!(
         # Assemble W^φ = [[U^φ, Δ^φ], [-conj(Δ^φ), -conj(U^φ)]].
         W = zeros(ComplexF64, twoD, twoD)
         for c in 1:D, c_p in 1:D
-            W[c, c_p]           = U_phi[c, c_p]
-            W[c, D + c_p]       = Delta_phi[c, c_p]
-            W[D + c, c_p]       = -conj(Delta_phi[c, c_p])
-            W[D + c, D + c_p]   = -conj(U_phi[c, c_p])
+            W[c, c_p] = U_phi[c, c_p]
+            W[c, D + c_p] = Delta_phi[c, c_p]
+            W[D + c, c_p] = -conj(Delta_phi[c, c_p])
+            W[D + c, D + c_p] = -conj(U_phi[c, c_p])
         end
 
         # General matrix exponential.
@@ -199,7 +199,7 @@ function _tdhfb_phi_subupdate!(
         # Apply to (φ, conj(φ)) doublet.
         phi_vec = Vector{ComplexF64}(undef, twoD)
         for c in 1:D
-            phi_vec[c]     = state.phi[idx, c]
+            phi_vec[c] = state.phi[idx, c]
             phi_vec[D + c] = conj(state.phi[idx, c])
         end
         new_phi = M * phi_vec
@@ -249,10 +249,10 @@ function _tdhfb_R_subupdate!(
         # Assemble W^R.
         W = zeros(ComplexF64, twoD, twoD)
         for c in 1:D, c_p in 1:D
-            W[c, c_p]           = U_R[c, c_p]
-            W[c, D + c_p]       = Delta_R[c, c_p]
-            W[D + c, c_p]       = -conj(Delta_R[c, c_p])
-            W[D + c, D + c_p]   = -conj(U_R[c, c_p])
+            W[c, c_p] = U_R[c, c_p]
+            W[c, D + c_p] = Delta_R[c, c_p]
+            W[D + c, c_p] = -conj(Delta_R[c, c_p])
+            W[D + c, D + c_p] = -conj(U_R[c, c_p])
         end
 
         M = exp(-1im * W * dt)
@@ -260,22 +260,23 @@ function _tdhfb_R_subupdate!(
         # R(t+dt) = M · R · M^{-1}.
         R = zeros(ComplexF64, twoD, twoD)
         for c in 1:D, c_p in 1:D
-            R[c, c_p]           = state.rho[idx, c, c_p]
-            R[c, D + c_p]       = state.kappa[idx, c, c_p]
-            R[D + c, c_p]       = conj(state.kappa[idx, c, c_p])
-            R[D + c, D + c_p]   = (c == c_p ? one(ComplexF64) : zero(ComplexF64)) +
-                                  conj(state.rho[idx, c, c_p])
+            R[c, c_p] = state.rho[idx, c, c_p]
+            R[c, D + c_p] = state.kappa[idx, c, c_p]
+            R[D + c, c_p] = conj(state.kappa[idx, c, c_p])
+            R[D + c, D + c_p] =
+                (c == c_p ? one(ComplexF64) : zero(ComplexF64)) +
+                conj(state.rho[idx, c, c_p])
         end
         Minv = inv(M)
         R_new = M * R * Minv
 
         # Read back; project ρ Hermitian and κ symmetric.
         for c in 1:D, c_p in 1:D
-            rho_new   = R_new[c, c_p]
+            rho_new = R_new[c, c_p]
             rho_new_T = R_new[c_p, c]
             state.rho[idx, c, c_p] = 0.5 * (rho_new + conj(rho_new_T))
 
-            kappa_new   = R_new[c, D + c_p]
+            kappa_new = R_new[c, D + c_p]
             kappa_new_T = R_new[c_p, D + c]
             state.kappa[idx, c, c_p] = 0.5 * (kappa_new + kappa_new_T)
         end
