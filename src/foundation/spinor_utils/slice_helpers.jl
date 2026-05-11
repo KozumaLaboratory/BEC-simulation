@@ -1,0 +1,63 @@
+# Low-level spinor / hermitian helpers.
+# All inline, no exports — internal building blocks for the propagator
+# and observable hot paths.
+
+@inline function _component_slice(ndim::Int, n_pts::NTuple{N, Int}, c::Int) where {N}
+    ntuple(N + 1) do d
+        d <= N ? (1:n_pts[d]) : c
+    end
+end
+
+@inline function _get_spinor(psi, I, n_comp)
+    SVector{n_comp, ComplexF64}(ntuple(c -> psi[I, c], n_comp))
+end
+
+@inline function _get_spinor(psi, I, ::Val{D}) where {D}
+    SVector{D, ComplexF64}(ntuple(c -> psi[I, c], Val(D)))
+end
+
+@inline function _set_spinor!(psi, I, spinor, n_comp)
+    for c in 1:n_comp
+        psi[I, c] = spinor[c]
+    end
+end
+
+@inline function _set_spinor!(psi, I, spinor, ::Val{D}) where {D}
+    for c in 1:D
+        psi[I, c] = spinor[c]
+    end
+end
+
+function _exp_i_hermitian(
+    H::SMatrix{D, D, ComplexF64},
+    dt::Float64,
+    imaginary_time::Bool,
+) where {D}
+    eig = eigen(Hermitian(H))
+    V = eig.vectors
+
+    if imaginary_time
+        expD = SVector{D, ComplexF64}(exp.(-eig.values .* dt))
+    else
+        expD = SVector{D, ComplexF64}(cis.(-eig.values .* dt))
+    end
+
+    V * Diagonal(expD) * V'
+end
+
+"""
+Allocation-free matrix-vector product: result = V * x.
+Uses ntuple to build SVector{D} without SMatrix temporaries.
+Works with any AbstractMatrix (Matrix, Adjoint, SMatrix).
+"""
+@inline function _matvec(V::AbstractMatrix{ComplexF64}, x::SVector{D, ComplexF64}) where {D}
+    SVector{D, ComplexF64}(
+        ntuple(Val(D)) do i
+            s = zero(ComplexF64)
+            for j in 1:D
+                @inbounds s += V[i, j] * x[j]
+            end
+            s
+        end,
+    )
+end
