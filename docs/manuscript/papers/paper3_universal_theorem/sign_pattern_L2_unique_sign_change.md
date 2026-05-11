@@ -138,13 +138,34 @@ This **upgrades the empirical evidence** from "26 rational coefficients match"
 closed form" (operator-level test, including channels with $\beta_S^{(c_0)} = 0$
 where rank-2 contributions would be most visible if present).
 
-## Open question — Analytical proof of rank-2 cross-channel vanishing
+## ~~Open question — Analytical proof of rank-2 cross-channel vanishing~~ — PROVED 2026-05-11
 
-The Lemma 1 General-S closed form relies on the **assumption** that the rank-2
-cross-channel part of $X_S^{(\rm anom)}$ vanishes for polyhedral inert states.
-This is verified numerically at **operator level** (4 cases, machine precision)
-and at **coefficient level** (26 channel coefficients across 5 cases, exact
-rational match). Analytical proof is the remaining gap.
+The rank-2 cross-channel vanishing is now **rigorously proved** via the
+group-theoretic argument in
+`docs/manuscript/papers/paper3_universal_theorem/rank2_vanishing_analytical_proof.md`:
+
+> For polyhedral $H \in \{T, O, I\}$ (or their double covers), $D^2|_H$
+> contains **no $A_1$ (trivial) irrep component**: $m_2^{(A_1)} = 0$ via
+> the character formula
+> $m_S^{(A_1)} = (1/|H|) \sum_g \chi^{(D^S)}(g)$
+> where $\chi^{(D^S)}(\theta) = \sin((S + 1/2)\theta) / \sin(\theta/2)$.
+> Therefore the $H$-symmetrization of any rank-2 tensor
+> $\langle T^{(2)}_{aa}\rangle_H = (1/|H|) \sum_g g^{-1} T^{(2)}_{aa} g$
+> equals zero. Since $|\zeta \otimes \zeta\rangle$ is $H$-invariant, the
+> rank-2 cross-channel matrix element
+> $\langle\zeta\otimes\zeta | T^{(2)}_{aa} P_S | \zeta\otimes\zeta\rangle$
+> reduces to its $H$-symmetrized version (= 0), and thus
+> $X_S^{(\rm anom, T^{(2)})} = 0$.
+
+Numerical verification (`D2_H_irrep_character_proof.jl`, 4/4 Tests PASS):
+$m_2^{(A_1)}(T) = m_2^{(A_1)}(O) = m_2^{(A_1)}(I) = 0$ at machine precision
+(< 1e-10). Control case $D_2$ gives $m_2^{(A_1)} = 2$, explaining why the
+Lemma 1 General-S closed form does **not** apply to $D_2$ biaxial nematic
+phases (= paper3 §VII.C "three distinct spin-Goldstone stiffnesses").
+
+**Conclusion**: Lemma 1 General-S and Lemma 2 are both rigorous theorems for
+$A_1$-irrep polyhedral inert states. Lemma 1 General-S is the central result
+of paper3 §IX.B v4.
 
 The rank-2 cross-channel term is:
 
