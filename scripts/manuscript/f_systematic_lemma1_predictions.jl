@@ -227,6 +227,13 @@ cases = [
     # F=11 (T:A, O:A_2)
     (11, :T, :A),
     (11, :O, :A_2),
+    # F=13 (T:A, O:A_1, O:A_2) — added 2026-05-12 for #75 Year 1 Q3
+    (13, :T, :A),
+    (13, :O, :A_1),
+    (13, :O, :A_2),
+    # F=5 is excluded: spin-5 decomposes under O as E + 2T_1 + T_2 (no A_1/A_2)
+    # and under I as H + 2T + G (no A) — no 1D polyhedral invariant exists,
+    # so Lemma 1 has no Schur-singlet at F=5 (algebraic obstruction).
 ]
 
 for (F, grp, irrep) in cases
@@ -240,5 +247,11 @@ end
 @printf("\n%s\n", "="^72)
 @printf("F-systematic predictions complete. Total: %d new polyhedral inert state\n", length(cases))
 @printf("instances with closed-form β_S^(λ_spin) predictions.\n")
-@printf("These extend paper3 §V verification from 5 cases (F=3/4/6/8/10) to 11 cases.\n")
+@printf("These extend paper3 §V verification beyond the 5 cases (F=3/4/6/8/10).\n")
+@printf("\nNote (2026-05-12): F=5 has no 1D polyhedral invariant (D^(5) under O\n")
+@printf("decomposes as E + 2T_1 + T_2, mult(A_1) = mult(A_2) = 0; under I = H+2T+G,\n")
+@printf("mult(A) = 0) — Lemma 1 has no Schur-singlet at F=5 (algebraic obstruction).\n")
+@printf("F=13 T:A has multiplicity 2 — random projection gives arbitrary linear\n")
+@printf("combination; Lemma 1 β_0 = 1/27 holds only for the Schur-isotropic\n")
+@printf("direction within the 2D invariant subspace.\n")
 @printf("%s\n", "="^72)

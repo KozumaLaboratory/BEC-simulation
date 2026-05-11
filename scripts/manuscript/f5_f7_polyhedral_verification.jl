@@ -292,10 +292,20 @@ end
 @printf("F=5/7 odd-F polyhedral verification (Paper #6 F-systematic completion)\n")
 
 cases = [
+    # Existing
     (5, :T, :E_1, "T:E_1 complex inert"),
     (7, :T, :A,   "T:A true invariant"),
     (7, :T, :E_1, "T:E_1 complex"),
     (7, :O, :A_2, "O:A_2 sign rep"),
+    # Added 2026-05-12 for Year 1 Q3 F-systematic completion (task #75):
+    # F=5 needs a Schur-singlet polyhedral invariant — T:E_1 (complex) fails
+    # the Schur isotropy. Try octahedral A_1 / A_2 (real 1-dim).
+    (5, :O, :A_1, "O:A_1 trivial invariant"),
+    (5, :O, :A_2, "O:A_2 sign rep"),
+    # F=13 missing entirely — add T:A, O:A_1, O:A_2.
+    (13, :T, :A,   "T:A true invariant"),
+    (13, :O, :A_1, "O:A_1 trivial invariant"),
+    (13, :O, :A_2, "O:A_2 sign rep"),
 ]
 
 for (F, grp, irrep, label) in cases
@@ -303,5 +313,5 @@ for (F, grp, irrep, label) in cases
 end
 
 @printf("\n%s\n", "="^70)
-@printf("F=5/7 verification complete.\n")
+@printf("F=5/7/13 verification complete.\n")
 @printf("%s\n", "="^70)
