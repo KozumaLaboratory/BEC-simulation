@@ -278,3 +278,165 @@
     note      = {Volume / pages to verify; user-spec entry was
                  "Bach 2012 = Bach et al. on F=1 spinor TWA".},
 }
+
+% ─────────────────────────────────────────────────────────────
+% Round-8 additions (2026-05-12): TWA validity + TDHFB + Polkovnikov
+% systematic-expansion references for Paper #3 v3 / Paper #4 chaos
+% reframing / Ch.5 master thesis.
+% ─────────────────────────────────────────────────────────────
+
+@article{Polkovnikov2010,
+    author    = {Polkovnikov, Anatoli},
+    title     = {Phase space representation of quantum dynamics},
+    journal   = {Annals of Physics},
+    volume    = {325},
+    pages     = {1790--1852},
+    year      = {2010},
+    doi       = {10.1016/j.aop.2010.02.006},
+    note      = {Systematic 1/N expansion of TWA; foundational reference
+                 for validity of leading-order TWA and higher-order
+                 corrections. Cited in Paper #4 §IV as the theoretical
+                 basis for TWA-as-chaos-diagnostic argument.},
+}
+
+@article{Stoof1999,
+    author    = {Stoof, Henk T. C.},
+    title     = {Coherent versus incoherent dynamics during
+                 {Bose}-{Einstein} condensation in atomic gases},
+    journal   = {Journal of Low Temperature Physics},
+    volume    = {114},
+    pages     = {11--108},
+    year      = {1999},
+    doi       = {10.1023/A:1021897703053},
+    note      = {Particle-conserving HFB / TDHFB formulation, with the
+                 (φ, ρ, κ) coupled equations used by our Phase 3-6 TDHFB
+                 implementation (src/hamiltonian/tdhfb/strang_step.jl).},
+}
+
+@article{CastinDum1998,
+    author    = {Castin, Yvan and Dum, Roland},
+    title     = {Low-temperature {Bose}-{Einstein} condensates in time-
+                 dependent traps: beyond the {U}(1) symmetry-breaking
+                 approach},
+    journal   = {Physical Review A},
+    volume    = {57},
+    pages     = {3008--3021},
+    year      = {1998},
+    doi       = {10.1103/PhysRevA.57.3008},
+    note      = {Particle-conserving Bogoliubov treatment used as
+                 foundation for our TDHFB Strang substep BdG generator.},
+}
+
+@article{HolzmannCastin1999,
+    author    = {Holzmann, M. and Castin, Y.},
+    title     = {Pair correlation function of an inhomogeneous
+                 interacting {Bose}-{Einstein} condensate},
+    journal   = {European Physical Journal D},
+    volume    = {7},
+    pages     = {425--432},
+    year      = {1999},
+    note      = {Castin-Dum-Holzmann particle-conserving HFB
+                 formulation we use in TDHFB Phase 3.},
+}
+
+@article{ChinKrotscheck2005,
+    author    = {Chin, Siu A. and Krotscheck, Eckhard},
+    title     = {Fourth-order algorithms for solving the imaginary-time
+                 {Gross}-{Pitaevskii} equation in a rotating
+                 anisotropic trap},
+    journal   = {Physical Review E},
+    volume    = {72},
+    pages     = {036705},
+    year      = {2005},
+    doi       = {10.1103/PhysRevE.72.036705},
+    note      = {Original force-gradient ("Chin-Krotscheck 2005") scheme
+                 used as the basis for our Track C v3 lab-path Force-
+                 Gradient implementation. The "4A" scheme reference for
+                 §3.5 narrative.},
+}
+
+@article{AichingerChinKrotscheck2005,
+    author    = {Aichinger, Markus and Chin, Siu A. and Krotscheck, Eckhard},
+    title     = {{Sixth}-order force-gradient algorithms for the
+                 high-precision solution of the {Schrödinger} equation},
+    journal   = {Computer Physics Communications},
+    volume    = {171},
+    pages     = {197--207},
+    year      = {2005},
+    doi       = {10.1016/j.cpc.2005.04.005},
+    note      = {6th-order force-gradient scheme cited in Ch.3 §3.5.5
+                 as the upper benchmark for our Force-Gradient
+                 implementation (multi-K factorization).},
+}
+
+@article{Thalhammer2008,
+    author    = {Thalhammer, Mechthild},
+    title     = {High-order exponential operator splitting methods for
+                 time-dependent {Schrödinger} equations},
+    journal   = {SIAM Journal on Numerical Analysis},
+    volume    = {46},
+    pages     = {2022--2038},
+    year      = {2008},
+    doi       = {10.1137/060674636},
+    note      = {Modern modified-splitting framework used by our Track B
+                 derivation (§3.6 narrative). The J=1 reduction is shown
+                 to be bit-exact equivalent to Chin-Krotscheck 4A in
+                 our work.},
+}
+
+@article{Yoshida1990,
+    author    = {Yoshida, Haruo},
+    title     = {Construction of higher-order symplectic integrators},
+    journal   = {Physics Letters A},
+    volume    = {150},
+    pages     = {262--268},
+    year      = {1990},
+    doi       = {10.1016/0375-9601(90)90092-3},
+    note      = {Yoshida-4 composition (w_1, w_0, w_1) with
+                 w_1 = 1/(2-2^(1/3)). Used in Track A1 baseline and
+                 referenced in Ch.3 narrative §3.5/3.7.},
+}
+
+@article{LimaPelsterDDI2011,
+    author    = {Lima, Aristeu R. P. and Pelster, Axel},
+    title     = {Beyond mean-field low-lying excitations of dipolar
+                 {Bose} gases},
+    journal   = {Physical Review A},
+    volume    = {86},
+    pages     = {063609},
+    year      = {2012},
+    doi       = {10.1103/PhysRevA.86.063609},
+    note      = {Scalar-LHY-with-DDI Q_5(ε_dd) function used by our
+                 Eu post-quench production for the
+                 ñ/n̄ ~ 5×10⁻³ prediction (Ch.5 §5.10).},
+}
+
+@article{LemeshkoNGS2018,
+    author    = {Lemeshko, Mikhail},
+    title     = {Quasi-classical methods for many-body quantum
+                 dynamics: a primer},
+    journal   = {arXiv preprint},
+    year      = {2018},
+    eprint    = {1805.03035},
+    note      = {Pedagogical TWA reference used in Paper #4 §IV
+                 methodology discussion.},
+}
+
+@article{Boudjemaa2020,
+    author    = {Boudjemâa, Abdelâali and Guebli, Nadia},
+    title     = {Quantum and thermal fluctuations of trapped dipolar
+                 spinor condensate},
+    journal   = {Physical Review A},
+    volume    = {102},
+    pages     = {023302},
+    year      = {2020},
+    doi       = {10.1103/PhysRevA.102.023302},
+    eprint    = {2007.15372},
+    note      = {TDHFB stationary droplet at Eu params, depletion 1-8%.
+                 Direct comparison target for our Phase 6 Eu post-quench
+                 long-T equilibrium ñ/n̄ extraction (Ch.5 §5.11).},
+}
+
+% ─────────────────────────────────────────────────────────────
+% End Round-8 additions. Total entries: 31 (was 20 after Round-7).
+% ─────────────────────────────────────────────────────────────

@@ -58,3 +58,6 @@ logs/ralph_perf_*.log.bench
 logs/ralph_perf_master*.log
 runs/**/_live_status.json
 runs/eu151_edh/result_postfix_gs_32cube.jld2
+
+# Generated paper LaTeX/PDF (use scripts/manuscript/build_paper_latex.sh to regenerate)
+docs/manuscript/papers/*/build/
