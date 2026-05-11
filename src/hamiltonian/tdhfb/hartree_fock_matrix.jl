@@ -56,9 +56,14 @@ Generic F + g_S channel decomposition deferred to Phase 2 extension.
 # Returns
 The h_hf array (for chaining).
 """
-function hf_matrix_F1!(h_hf::AbstractArray, phi::AbstractArray,
-                       rho::AbstractArray, kappa::AbstractArray,
-                       c0::Float64, c1::Float64)
+function hf_matrix_F1!(
+    h_hf::AbstractArray,
+    phi::AbstractArray,
+    rho::AbstractArray,
+    kappa::AbstractArray,
+    c0::Float64,
+    c1::Float64,
+)
     # F=1 spin matrices in (+1, 0, -1) basis
     # F_z = diag(1, 0, -1)
     # F_+ = √2 · (|+1⟩⟨0| + |0⟩⟨-1|)
@@ -126,8 +131,13 @@ end
 
 Allocating version of [`hf_matrix_F1!`](@ref).
 """
-function hf_matrix_F1(phi::AbstractArray, rho::AbstractArray,
-                      kappa::AbstractArray, c0::Float64, c1::Float64)
+function hf_matrix_F1(
+    phi::AbstractArray,
+    rho::AbstractArray,
+    kappa::AbstractArray,
+    c0::Float64,
+    c1::Float64,
+)
     h_hf = similar(rho)
     return hf_matrix_F1!(h_hf, phi, rho, kappa, c0, c1)
 end

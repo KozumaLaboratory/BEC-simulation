@@ -82,9 +82,9 @@ mutable struct TDHFBState{N, A <: AbstractArray, B <: AbstractArray, T <: Abstra
 end
 
 # Convenience constructor: infer T from eltype(A)
-TDHFBState{N, A, B}(phi::A, rho::B, kappa::B, t, step) where {N, A, B} = TDHFBState{
-    N, A, B, real(eltype(A))
-}(phi, rho, kappa, t, step)
+function TDHFBState{N, A, B}(phi::A, rho::B, kappa::B, t, step) where {N, A, B}
+    return TDHFBState{N, A, B, real(eltype(A))}(phi, rho, kappa, t, step)
+end
 
 """
     init_tdhfb_vacuum(psi::A) where {A <: AbstractArray}

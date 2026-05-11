@@ -67,10 +67,14 @@ to ∂κ/∂t equations, not the diagonal Bogoliubov-Hartree-Fock kernel acting 
 # Returns
 The h_hf array (for chaining).
 """
-function hf_matrix_generic!(h_hf::AbstractArray, phi::AbstractArray,
-                            rho::AbstractArray, F::Int,
-                            g_S::AbstractDict{Int, Float64};
-                            spin_matrices=nothing)
+function hf_matrix_generic!(
+    h_hf::AbstractArray,
+    phi::AbstractArray,
+    rho::AbstractArray,
+    F::Int,
+    g_S::AbstractDict{Int, Float64};
+    spin_matrices=nothing,
+)
     D = 2 * F + 1
     sz = size(phi)
     n_spatial = length(sz) - 1
@@ -108,8 +112,13 @@ end
 
 Allocating version of [`hf_matrix_generic!`](@ref).
 """
-function hf_matrix_generic(phi::AbstractArray, rho::AbstractArray, F::Int,
-                           g_S::AbstractDict{Int, Float64}; kwargs...)
+function hf_matrix_generic(
+    phi::AbstractArray,
+    rho::AbstractArray,
+    F::Int,
+    g_S::AbstractDict{Int, Float64};
+    kwargs...,
+)
     D = 2 * F + 1
     sz = size(phi)
     n_spatial = length(sz) - 1
