@@ -118,13 +118,33 @@ $\lambda_{\rm spin}$ as low-rank (= negative); $S = 12, 14, 16$ as high-rank
 
 ---
 
-## Open question — Rank-2 cross-channel vanishing
+## Numerical verification of rank-2 cross-channel vanishing (NEW 2026-05-11)
+
+The rank-2 cross-channel vanishing assumption underlying Lemma 1 General-S has
+been **directly tested** via `scripts/manuscript/rank2_cross_channel_vanishing.jl`:
+
+| F | Phase | Max |X_S^(anom) - X_S^(anom, scalar)| over all S |
+|---|---|---|
+| 3 | octa A_2 | 6.94e-16 |
+| 4 | cube | 6.11e-16 |
+| 6 | icosa | 1.46e-15 |
+| 8 | cube-octa A_1 | 5.45e-16 |
+
+All deviations are at **machine epsilon level** (< 1.5e-15), confirming that
+the rank-2 cross-channel sum vanishes for these 4 polyhedral inert states.
+
+This **upgrades the empirical evidence** from "26 rational coefficients match"
+(coefficient-level test) to "X_S^(anom) at every channel S equals the scalar
+closed form" (operator-level test, including channels with $\beta_S^{(c_0)} = 0$
+where rank-2 contributions would be most visible if present).
+
+## Open question — Analytical proof of rank-2 cross-channel vanishing
 
 The Lemma 1 General-S closed form relies on the **assumption** that the rank-2
 cross-channel part of $X_S^{(\rm anom)}$ vanishes for polyhedral inert states.
-This is verified empirically (26 channel coefficients across 5 cases match
-exactly the scalar-only formula), but the analytical proof is the **remaining
-open question** for a fully rigorous L2.
+This is verified numerically at **operator level** (4 cases, machine precision)
+and at **coefficient level** (26 channel coefficients across 5 cases, exact
+rational match). Analytical proof is the remaining gap.
 
 The rank-2 cross-channel term is:
 
