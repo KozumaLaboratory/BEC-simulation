@@ -41,9 +41,9 @@ using SpinorBEC
         # h^HF = c_0 · 1 · I + c_1 · 1 · F_z = diag(c_0+c_1, c_0, c_0-c_1)
         for i in 1:nx
             @test abs(h_hf[i, 1, 1] - (c0 + c1)) < 1e-12  # m=+1: c_0 + c_1·(+1) = c_0+c_1
-            @test abs(h_hf[i, 2, 2] - c0) < 1e-12          # m=0: c_0 + c_1·0 = c_0
+            @test abs(h_hf[i, 2, 2] - c0) < 1e-12  # m=0: c_0 + c_1·0 = c_0
             @test abs(h_hf[i, 3, 3] - (c0 - c1)) < 1e-12  # m=-1: c_0 + c_1·(-1) = c_0-c_1
-            @test abs(h_hf[i, 1, 2]) < 1e-12               # off-diagonals: 0
+            @test abs(h_hf[i, 1, 2]) < 1e-12  # off-diagonals: 0
             @test abs(h_hf[i, 2, 1]) < 1e-12
         end
     end

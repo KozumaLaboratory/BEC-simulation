@@ -144,7 +144,7 @@ function _tdhfb_hf_step!(
     V = channel_kernel(F, g_S)
     half = dt / 2
     _tdhfb_phi_subupdate!(state, F, g_S, V, half)  # uses current (ρ, κ)
-    _tdhfb_R_subupdate!(state, F, g_S, V, dt)      # uses new φ
+    _tdhfb_R_subupdate!(state, F, g_S, V, dt)  # uses new φ
     _tdhfb_phi_subupdate!(state, F, g_S, V, half)  # uses new (ρ, κ)
     return state
 end

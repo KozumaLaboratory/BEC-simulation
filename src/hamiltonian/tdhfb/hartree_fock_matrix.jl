@@ -79,7 +79,7 @@ function hf_matrix_F1!(h_hf::AbstractArray, phi::AbstractArray,
     for idx in CartesianIndices(size(phi)[1:n_spatial])
         # Mean field at this point: phi_m for m = +1, 0, -1 → index 1, 2, 3
         phi_p1 = phi[idx, 1]
-        phi_0  = phi[idx, 2]
+        phi_0 = phi[idx, 2]
         phi_m1 = phi[idx, 3]
 
         # Scalar density n = |φ|² + tr ρ
