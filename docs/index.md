@@ -31,7 +31,7 @@ docs/
 | See every accepted key in a `dynamics:` block | `reference/dynamics.md` |
 | Pick the right precision / save_every / k_cut | `guides/performance_tuning.md` |
 | Upgrade old configs after a convention change | `guides/migration_guide.md` |
-| Submit jobs on TSUBAME | `guides/tsubame_dev_workflow.md` + `guides/tsubame_scaling.md` |
+| Submit jobs on TSUBAME | `guides/tsubame.md` |
 | Understand the rotating-basis (Option γ) solver | `design/option_gamma_rotating_basis.md` |
 | Read a closed-form result | `theory/icosahedral_lhy.md` or other `theory/*.md` |
 | See the latest TWA / collapse / phase-boundary findings | `research_notes/*.md` |

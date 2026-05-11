@@ -49,19 +49,6 @@ per frame, ComplexF32 default; ComplexF64 with
 `save_snapshot_precision: "f64"`). The dashboard reader and
 `column_density_movie` analyzer accept both.
 
-## DDI normalization
-
-`c_dd = μ₀ μ²` (no 4π factor) and `Q_αβ = k̂_α k̂_β − δ_αβ/3` (no
-1/(4π)). Q(k=0) = 0 by convention. Don't try to "fix" the missing 4π —
-it's absorbed into c_dd, and the chain is internally self-consistent.
-
-## ITP convergence semantics
-
-- **Sole criterion**: `dpsi_norm < tol`
-- ITP on 64³ Eu151 with 500 steps + tol=1e-8 may hit `n_steps` without
-  converging. `converged=false` is NOT a physics bug — verify via norm
-  / Mz / monotonic E.
-
 ## Calibration auto-application
 
 **Old**: lab-unit YAML required `run_yaml_calibrated(path; calibration_path=...)`.
@@ -70,12 +57,6 @@ it's absorbed into c_dd, and the chain is internally self-consistent.
 `calibration_history:` + optional `target_date:` (interpolated) at the
 YAML root. The wrapper still works for explicit external calibration
 files.
-
-## Workspace type parameters
-
-Workspace has 23+ type parameters. Adding a new field is fine. **Adding
-a new abstract type position** can trigger 30+ minute JIT hangs. See
-CLAUDE.md > "Type stability boundaries" before making structural changes.
 
 ## Snapshot reader path
 

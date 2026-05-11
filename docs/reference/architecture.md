@@ -8,92 +8,12 @@ The spatial dimensionality `N` is handled generically via Julia's parametric typ
 
 ## Module Structure
 
-The `SpinorBEC.jl` umbrella module is intentionally thin (~100 LOC): it
-just `include`s a per-subsystem umbrella file. Each umbrella in turn
-loads the source files of its subdir in dependency order.
-
-```
-src/
-  SpinorBEC.jl                              # Module entry: loads umbrellas + a few stragglers
-  foundation.jl, hamiltonian.jl, analysis.jl, solvers.jl,
-  rotating_basis.jl                         # Top-level subsystem umbrellas
-  precompile.jl, cuda_graph_stubs.jl        # Auxiliary entry-point stubs
-
-  foundation/
-    waveform.jl                             # AbstractWaveform{T} + 10 subtypes
-    types/
-      grid.jl, spin_atom.jl, sim_fft.jl,
-      interactions_zeeman.jl, ddi_loss.jl,
-      integrator.jl, potentials.jl,
-      results.jl, scan.jl, workspace.jl     # Struct definitions, split by topic
-    grid.jl, fft_utils.jl, backend.jl,
-    spin_matrices.jl, spinor_utils.jl,
-    clebsch_gordan.jl, spherical_harmonics.jl  # Math primitives
-    binary_state.jl                         # Two-component scaffold
-
-  hamiltonian/
-    integrator/                             # split_step.jl, yoshida.jl,
-                                            # propagators.jl, split_step_kernels.jl,
-                                            # split_step_composers.jl
-    interactions/                           # c0/c1, nematic, tensor, DDI/, lhy/, …
-    potentials/                             # Harmonic, optical, laser, light_shift, …
-  dynamics/                                 # sinatra_helpers, utils_resolution_sinatra
-                                            # (loaded from hamiltonian.jl)
-
-  solvers/
-    ground_state.jl + ground_state/         # ITP entry + itp_loop, checkpoint, adaptive, advanced
-    lbfgs/                                  # energy_gradient, helpers, driver
-    continuation/                           # scan_1d, scan_2d, boundary, pseudo_arclength, triple_point
-    simulation.jl, adaptive.jl, embedded_adaptive.jl
-    sgpe.jl, projected_gp.jl, photon_heating.jl
-    twa.jl, binary_simulation.jl
-
-  workflow/
-    initialization.jl, io.jl, monitoring.jl, experiments.jl  # subsystem umbrellas
-    initialization/                         # atoms, state_dispatch, make_workspace,
-                                            # thomas_fermi, state_zoo,
-                                            # thermal_noise, vacuum_noise
-    io/
-      io.jl, unitful_support.jl, save_rotating_result.jl,
-      vtk_export.jl, run_summary.jl, html_report.jl,
-      budget.jl, scan_summary.jl, calibration_drift.jl, units.jl
-      dashboard.jl + dashboard/             # 21-file HTTP+WS dashboard subsystem
-    monitoring/                             # ascii_plot, logging, resource_monitor,
-                                            # notifications, progress, live_monitor
-    experiments/
-      schema/                               # config_override + 13 parsing/builder files
-      runtime/                              # adaptive_advice, runtime_misc, runtime_io,
-                                            # zeeman_levels, pulse_sequence,
-                                            # sta_counter_diabatic, feshbach_ramp
-      analyzers/                            # imaging, phase, topology, spectroscopy,
-                                            # stability, misc, analyzers_large
-      pipeline/                             # pipeline_types, pipeline_analyzers,
-                                            # pipeline_dispatch, pipeline_callbacks,
-                                            # runner, run_step_*, pipeline_api,
-                                            # pipeline_continuation, run_registry
-      optimization/                         # faraday_fit, bayesian_opt(_mf,_yaml),
-                                            # active_learning
-      calibration.jl
-
-  analysis/
-    compare.jl, observables.jl, ensemble.jl,
-    energy.jl, currents.jl, vorticity.jl, vortex_extraction.jl,
-    diagnostics.jl, majorana.jl, tof.jl,
-    tomography.jl, faraday.jl, imaging.jl,
-    topology.jl, synthetic_dimension.jl, time_resolved.jl,
-    stability_analysis.jl, spin_rotation.jl
-    phases/                                 # phase_classification, phase_boundary,
-                                            # bogoliubov, bogoliubov/scan
-
-  rotating_basis/                           # Klaus-regime path: workspace, propagators,
-                                            # integrators, analysis, analyzers, scalar_egpe
-
-ext/
-  SpinorBECCUDAExt/                         # CUDA acceleration (CUDA weak dep)
-  SpinorBECMakieExt/                        # Plot/animate methods (Makie weak dep)
-  SpinorBECHTTPExt/                         # Slack webhook (HTTP weak dep)
-  SpinorBECVTKExt/                          # ParaView export (WriteVTK weak dep)
-```
+`SpinorBEC.jl` is a thin umbrella (~100 LOC) that includes per-subsystem
+umbrellas (`foundation.jl`, `hamiltonian.jl`, `analysis.jl`, `solvers.jl`,
+`rotating_basis.jl`). Each in turn loads the source files of its subdir in
+dependency order. **For the full file tree see `CLAUDE.md` "Project
+Structure".** The mermaid dependency diagram at the end of this file shows
+how the subsystems compose.
 
 ## Core Data Flow
 
@@ -191,19 +111,10 @@ Component `c` is accessed via `_component_slice(ndim, n_pts, c)`, which returns 
 
 ### Split-Step Method (`split_step.jl`)
 
-Each time step uses Strang (symmetric) splitting with a nested sub-splitting for the potential part:
-
-```
-1. Half potential step:
-   a. Quarter diagonal potential (trap + Zeeman + c0*density)
-   b. Half spin-mixing (c1 * F.F interaction)
-   c. [DDI sub-step if enabled]
-   d. Quarter diagonal potential (recomputed density)
-2. Full kinetic step (FFT -> multiply by exp(-i k^2 dt/2) -> IFFT)
-3. Half potential step (symmetric repeat of step 1)
-```
-
-For imaginary time evolution, all `exp(-i H dt)` become `exp(-H dt)`, and the wavefunction is renormalized after each step.
+Strang outer split + symmetric inner V step. The exact substep ordering and
+the rule "all substeps auto-skip when coupling ≈ 0" live in `CLAUDE.md`
+"Key Architecture > Split-step". For imaginary time, every `exp(-i H dt)`
+becomes `exp(-H dt)` and ψ is renormalised after each step.
 
 ### Kinetic Propagator (`propagators.jl`)
 
@@ -281,21 +192,10 @@ Every parameter variation is a **dotted config-path override** (e.g.
 reference. The runner applies each scan point's overrides to the raw
 YAML dict, re-parses the experiment, and rebuilds a fresh workspace.
 
-Per-step dynamics knobs (compose freely in a `dynamics:` block) include
-`sgpe`, `projected_gp`, `photon_scattering`, `loss`, `pulse_sequence`,
-`live_monitor`, `seed_amplitude` + `seed_k_cut`. Each callback-style
-knob returns an `on_step` closure; `_compose_callbacks` chains them.
-See `docs/dynamics.md`.
-
-### Entry points
-
-- `run_yaml("path/to/config.yaml")` — resumable, directory-per-config,
-  one `point_NNN.jld2` per scan point. Auto-applies `calibration:` /
-  `calibration_history:` if present at YAML root. Dry-run preview via
-  `dry_run = true` returns the post-calibration YAML as a string.
-- `load_config("path") |> run_config` — in-memory run, no resume.
-- `scan_continuation(; …)` / `scan_phase_diagram_2d(; …)` — direct-Julia
-  parameter sweeps (used in tests + benches).
+For per-step dynamics knobs (sgpe, projected_gp, photon_scattering, loss,
+pulse_sequence, live_monitor, seed_amplitude/seed_k_cut) and entry points
+(`run_yaml`, `load_config`, `scan_continuation`, `scan_phase_diagram_2d`),
+see `dynamics.md` and `CLAUDE.md` "Entry points".
 
 ### Dashboard (`workflow/io/dashboard.jl`)
 
@@ -321,12 +221,10 @@ Optional bitshuffle + zstd-3 compression via `?bsz=1` (see
 
 ## I/O (`workflow/io/`)
 
-State serialization uses JLD2. Snapshots are streamed under
-`dynamics/psi_snapshots_streamed/frame_NNNNN` (ComplexF32 default,
-ComplexF64 with `save_snapshot_precision: "f64"`); legacy 5D arrays are
-still readable. Set `SPINORBEC_SCRATCH_DIR` to redirect the streamed
-`.tmp` to node-local FS (HPC / TSUBAME-friendly). `estimate_run_budget`
-prints VRAM / host RAM / disk projections from a YAML.
+JLD2 for state. Streaming snapshot format and `SPINORBEC_SCRATCH_DIR` are
+described in `dynamics.md` "Output cadence" + `guides/tsubame.md`
+"Filesystem layout". `estimate_run_budget(yaml)` prints VRAM / host RAM /
+disk projections from a YAML.
 
 ## Dependencies
 
@@ -345,12 +243,10 @@ prints VRAM / host RAM / disk projections from a YAML.
 | CUDA | GPU backend (weak extension `SpinorBECCUDAExt`) |
 | Makie | 2D/3D visualization (weak extension `SpinorBECMakieExt`) |
 
-PlotlyJS was removed (2026-04-26). All Makie plot helpers
-(`plot_density`, `plot_spinor`, `plot_spin_texture`, `animate_dynamics`)
-are exported as `function … end` stubs and only resolve when
-`using GLMakie` (or another Makie backend) is loaded. The dashboard
-frontend renders 2D heatmaps via WebGPU (`HeatmapGrid`) and time series
-via SVG (`LineChartSVG`); no server-side plotting library is required.
+No server-side plotting: dashboard renders 2D heatmaps via WebGPU
+(`HeatmapGrid`) and time series via SVG (`LineChartSVG`). PlotlyJS was
+removed 2026-04-26 — see `guides/migration_guide.md` for the user-facing
+changes.
 
 ## Module dependency diagram
 
@@ -389,20 +285,11 @@ graph TD
    scan loop.
 8. `CLAUDE.md` "Type stability boundaries" — recurring pitfall.
 
-## Key design choices (don't reverse without careful thought)
+## Key design choices
 
-- **Workspace is one big struct with 23+ type parameters.** Adding new
-  fields is fine; adding a new abstract type position is dangerous.
-- **All structs live under `foundation/types/`** so include order is
-  monotonic. The umbrella file `foundation.jl` loads them in dependency
-  order (workspace last).
-- **Calibration is a YAML preprocessor**, not a Workspace field.
-- **Snapshots stream by default at ComplexF32**.
-- **`run_yaml` is resumable** by file existence check.
-- **DDI uses `c_dd = μ₀μ²` (no 4π)** — see CLAUDE.md "Conventions".
-- **Public exports live next to definitions** (each source file declares
-  `export ...` at the top). The umbrella module `SpinorBEC.jl` only
-  re-declares cross-cutting extension stubs.
-- **Optional deps stay in `ext/`**: HTTP (Slack webhook), WriteVTK
-  (ParaView export), Makie (plotting), CUDA (GPU). The package loads
-  without any of them.
+Don't reverse without careful thought. Listed in `CLAUDE.md` —
+"Conventions" (DDI normalisation, ITP Zeeman shift, scalar LHY warning,
+…) and "Constraints" (Workspace type params, all structs in
+`foundation/types/`, calibration is a YAML preprocessor, snapshots stream
+at F32, `run_yaml` is resumable). Optional deps live in `ext/` (HTTP,
+WriteVTK, Makie, CUDA) so the package loads without any of them.

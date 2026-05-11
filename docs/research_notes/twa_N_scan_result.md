@@ -5,14 +5,12 @@ RTX 5070 Ti. Three production findings + one methodological note.
 **Code path**: `runs/N{1000,10000,100000}_<hash>/result.jld2`,
 analysed by `examples/twa_N_scan_analyze.jl`.
 
-**2026-05-08 update (σ/μ reinterpretation)**: σ/μ values quoted below
-were originally framed as "quantum fluctuation" magnitudes. The
-Sinatra-clean follow-up (`twa_pinned_16g_result.md`) established that
-σ/μ in the dipolar-instability regime is **chaotic trajectory
-divergence**, not Wigner noise — and does NOT scale as 1/√N. Finding B
-below (σ/μ peaks at marginal collapse) survives as a **chaos-onset
-diagnostic**, not as a quantum-fluctuation diagnostic. Mean-field and
-profile findings (Finding A, FWHM trends) are unaffected.
+**σ/μ interpretation note**: σ/μ in this regime measures chaotic
+trajectory divergence in the dipolar instability, not Wigner noise; see
+`docs/theory/sinatra_criterion_F6.md` "Caveat" + `twa_pinned_16g_result.md`.
+Finding B below (σ/μ peaks at marginal collapse) survives as a
+chaos-onset diagnostic; mean-field findings (Finding A, FWHM) are
+unaffected.
 
 ## Summary
 

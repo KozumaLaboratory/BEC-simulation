@@ -110,33 +110,10 @@ others — candidates for cleanup.
 
 ## dynamics step
 
-| key | type | default | notes |
-|---|---|---|---|
-| `kind` | binary / rotating_basis / option_gamma | spinor (default) | |
-| `duration` | Real or "X ms" | required | total time |
-| `dt` | Real or "X ms" | required (or use `epsilon`) | step size |
-| `epsilon` | Real | — | accuracy budget; derives dt for rotating_basis Y6 |
-| `integrator` | strang / yoshida(4/6) / cfet4 / adaptive / richardson | strang or yoshida6 | |
-| `backend` | cpu / cuda / gpu | inherited | |
-| `save_every` | Int | — | step stride for saves `[ALIAS for n_snapshots]` |
-| `n_snapshots` | Int | — | total frames (dt-invariant) `[ALIAS for save_every]` |
-| `save_psi_snapshots` | bool | false | save full ψ per frame |
-| `save_snapshot_compression` | bool | false | zlib/zstd JLD2 |
-| `save_snapshot_precision` | f32 / f64 | f32 | |
-| `temperature_ratio` | Real 0..1 | 0 | thermal noise at phase start |
-| `seed_amplitude` | Real 0..1 | 0 | Bose-Einstein noise |
-| `seed_k_cut` | Real | — | k-space lowpass for noise |
-| `noise_seed` | Int | random | |
-| `rotating_frame_omega` | Real | 0 | spatial rotating frame |
-| `spin_rotating_frame_omega` | Real | 0 | spin Larmor frame |
-| `live_monitor` | bool or dict | false | write `_live_status.json` |
-| `B_hat` | dict | — | rotating_basis path (see below) |
-
-### `dynamics` per-step physics ramps (all optional, override GS-derived)
-- `interactions`, `zeeman`, `potential`, `ddi` — same shapes as in `ground_state`
-- `loss`, `sgpe`, `projected_gp`, `photon_scattering` — bool/dict, callbacks
-- `magnetic_gradient`, `pulse_sequence`, `raman`, `absorbing_boundary`,
-  `light_shift`, `twa`, `couplings` — dicts
+Per-key reference (semantics, callback composition, examples) lives in
+`dynamics.md`. Aliases for keys in this block are listed in the table at
+the bottom of this file (`save_every` ↔ `n_snapshots`, `dt` ↔ `epsilon`,
+`cuda` ↔ `gpu` etc.).
 
 ## B_hat (rotating_basis B̂(t) trajectory)
 

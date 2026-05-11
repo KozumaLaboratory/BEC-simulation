@@ -6,32 +6,13 @@ sweep `c_dd` to mimic Cr / Er / Dy at the same Eu N=10⁴ trap geometry.
 **Code path**: `runs/{Cr,Eu,Er,Dy}_eps*_<hash>/result.jld2`, analysed by
 `examples/twa_eps_dd_scan_analyze.jl`.
 
-## Caveat (important — read first)
+## σ/μ interpretation note
 
-The σ/μ values quoted below were originally interpreted as either
-quantum fluctuations (May 7 framing) or classical-thermalisation
-contamination (May 7 evening Sinatra "verdict"). **Both framings were
-wrong**: the corrected interpretation (May 8, after the resolution-matched
-Sinatra-clean follow-up at 16³ × box=10, see
-`twa_pinned_16g_result.md`) is that σ/μ ≈ 0.4 in the
-dipolar-instability regime measures **chaotic trajectory divergence**
-in the collapse dynamics. Different Wigner-noise seeds drive
-trajectories to different orientations of the z-elongated filament;
-trajectory-to-trajectory σ at peak voxel measures this chaos amplitude,
-which is bounded by physics (instability strength) rather than by noise
-amplitude.
-
-The species-trend analysis below survives as a **chaos-onset
-diagnostic**: σ/μ peaks at the marginal-collapse coupling because
-that's where the system enters the chaotic regime. At sub-collapse (Cr,
-ε_dd = 0.15) the GS is a unique stable Gaussian and there's no chaos
-to amplify; at super-collapse (Dy, ε_dd = 1.39) the cloud blows up and
-the ensemble mean is no longer interpretable. Eu (ε_dd = 0.55) sits
-exactly at the chaos-onset boundary.
-
-This trend interpretation is **independent of Sinatra ratio**, so the
-absolute σ/μ values are physically meaningful chaos-amplitude
-measurements (not Wigner-noise amplitudes).
+σ/μ in this regime measures chaotic trajectory divergence in the dipolar
+instability (different seeds → different filament orientations), not
+Wigner noise amplitude. The species *trend* (peak at marginal Eu) is
+chaos-onset and survives — see `docs/theory/sinatra_criterion_F6.md`
+"Caveat" + `twa_pinned_16g_result.md` for the corrected reading.
 
 ## Per-species results
 

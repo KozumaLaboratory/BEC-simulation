@@ -16,8 +16,7 @@ makedocs(
             "Pipeline cookbook" => "guides/pipeline_cookbook.md",
             "Performance tuning" => "guides/performance_tuning.md",
             "Migration guide" => "guides/migration_guide.md",
-            "TSUBAME dev workflow" => "guides/tsubame_dev_workflow.md",
-            "TSUBAME scaling" => "guides/tsubame_scaling.md",
+            "TSUBAME (dev + scaling)" => "guides/tsubame.md",
         ],
         "Reference" => [
             "Architecture" => "reference/architecture.md",

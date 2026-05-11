@@ -37,45 +37,12 @@ pipeline:
       tol: 1.0e-9
 ```
 
-## Real-time dynamics with multi-knob composition
+## Real-time dynamics
 
-```yaml
-- dynamics:
-    duration: 10.0
-    dt: 0.005
-    save_every: 100
-    save_psi_snapshots: true
-    save_snapshot_precision: "f32"
-    interactions: {omega_ref: 691.15}      # required when zeeman uses Level 1/2
-    zeeman: {p: {from: 1.0, to: 0.5}, q: 0.1}
-    sgpe:              {gamma: 0.05, T: 0.1, every: 1, seed: 42}
-    projected_gp:      {k_cut: 6.0, every: 1}
-    photon_scattering: {Gamma_sc: 0.01, seed: 42}
-    loss:              {gamma_dr: 0.02, K3_per_m_si: ["1.5e-30 m^6/s"] × D}
-    pulse_sequence:    [...]
-    live_monitor:      {every: 50}            # writes <run>/_live_status.json
-```
-
-All `on_step` callbacks (sgpe / projected_gp / photon_scattering /
-pulse_sequence / live_monitor) compose freely; `_compose_callbacks`
-chains them per dynamics step.
-
-## Live monitoring (dashboard hook)
-
-```yaml
-- dynamics:
-    duration: 30.0
-    dt: 0.005
-    save_every: 100
-    live_monitor: {every: 50}      # or simply `live_monitor: true`
-```
-
-Each `every`-th step the runner atomically writes
-`<run_dir>/_live_status.json` (step, t, energy, norm, populations).
-The dashboard polls `/api/live/list` to surface the run and
-`/api/live/<run>` to stream the JSON; in the React UI the
-`LiveStatusPanel` in the App header renders it. Disable with
-`live_monitor: false` (or omit).
+For the `dynamics:` block (every accepted key + the sgpe/projected_gp/
+photon_scattering/loss/pulse_sequence/live_monitor callbacks that
+compose freely via `_compose_callbacks`) see
+`../reference/dynamics.md` — has the worked multi-knob example.
 
 ## Symmetry-breaking seed (EdH)
 

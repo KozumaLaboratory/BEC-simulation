@@ -4,23 +4,12 @@ When to reach for which knob.
 
 ## Mixed precision (Float32 vs Float64)
 
-Use `dtype = Float32` (kwarg to `make_grid`, `make_workspace`,
-`find_ground_state`, ...; YAML knob coming) when:
-
-- Grid ≥ 96³ and you're VRAM-bound on the GPU (F32 = ½ the memory)
-- ITP convergence target is ≥ 1e-5 (F32 epsilon ~6e-8 sets a floor)
-- You're prototyping a parameter sweep and the bias is acceptable
-
-Stay on Float64 when:
-
-- Final-result precision matters (publication numbers, supersolid critical
-  point, etc.)
-- LBFGS polish (sensitive to gradient noise at F32)
-- Bogoliubov spectra near the instability boundary
-
-Memory has the F32 / F64 regression test
-(`test/test_mixed_precision_phase3.jl`) which asserts ITP energies agree
-to ~1e-3 relative.
+`dtype: f32` halves VRAM and ~doubles GPU FFT throughput. Use it when
+the grid is VRAM-bound (≥ 96³) and ITP tolerance is ≥ 1e-5. Stay on F64
+for publication numbers, LBFGS polish, and Bogoliubov near instabilities.
+Full rollout plan + scalar boundaries in `../design/mixed_precision_design.md`;
+operational constraints (rotating_basis path) in `CLAUDE.md` "Mixed
+precision". Regression: `test/test_mixed_precision_phase3.jl`.
 
 ## Projected GP (k_cut)
 
