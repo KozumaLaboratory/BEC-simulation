@@ -1,0 +1,32 @@
+# Paper #3 (Universal Structure Theorem) — bibliography subset
+# Broadest scope since this is the unifying theorem paper.
+
+# === Foundational LHY ===
+LeeHuangYang1957
+LimaPelster2011
+LimaPelster2012
+LimaPelsterDDI2011
+
+# === Spinor BEC ===
+KawaguchiUeda2012
+StamperKurnUeda2013
+CiobanuYipHo2000       # F=2 cyclic phase
+KoashiUeda2000         # singlet-pair structure
+PhucUedaSaito2014      # spinor LHY analysis
+WatanabeBrauner2011    # Nambu-Goldstone counting
+
+# === Polyhedral classification ===
+MakelaSuominen2007     # Majorana / polyhedral inert
+YukawaUeda2011         # odd-F polyhedral, F=3 octa
+
+# === Group theory ===
+Hamermesh1962          # group representation theory textbook (Schur lemma)
+
+# === LHY droplets / dipolar ===
+Petrov2015
+SchmittEtAl2016
+ChomazEtAl2016
+MiyazawaEtAl2022       # Eu BEC
+SaitoLi2024            # dipolar droplet stability
+
+# Total: 18 entries (subset of 31)

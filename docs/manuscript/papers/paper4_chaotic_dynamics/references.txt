@@ -1,0 +1,28 @@
+# Paper #4 (Chaotic dipolar instability via TWA) — bibliography subset
+
+# === TWA methodology ===
+Polkovnikov2010        # 1/N expansion, validity bounds
+SinatraCastinLobo2002  # Sinatra validity criterion
+Castin2001             # particle-conserving Bogoliubov foundations
+BachEtAl2012           # spinor TWA (F=1 reference)
+Lemeshko2018           # TWA pedagogical primer
+
+# === TDHFB / higher-order (follow-up methods) ===
+Stoof1999              # particle-conserving HFB
+CastinDum1998          # BdG generator for TDHFB
+HolzmannCastin1999     # Castin-Dum-Holzmann formulation
+Boudjemaa2020          # TDHFB stationary droplet at Eu params
+
+# === Spinor BEC ===
+KawaguchiUeda2012
+StamperKurnUeda2013
+
+# === Eu / dipolar experimental ===
+MiyazawaEtAl2022       # Eu BEC realization
+SaitoLi2024            # dipolar droplet
+LimaPelster2011        # dipolar LHY context
+
+# === Numerical method ===
+Yoshida1990            # split-step composition
+
+# Total: 14 entries

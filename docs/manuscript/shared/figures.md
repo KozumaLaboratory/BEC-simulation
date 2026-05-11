@@ -97,3 +97,13 @@ with the same stable label as filename.
 * Decide colour palette per paper (PRA / PRR style guides differ).
 * Convert all matplotlib outputs to PDF + LaTeX-friendly fonts.
 * Add CC-BY licence metadata to original figures.
+
+## Paper #4 — Chaotic dipolar instability (added 2026-05-12)
+
+| Label | Description | Source / method | Status |
+|---|---|---|---|
+| `paper4_FIG-1` | Mean-field GP-LHY post-quench density snapshot at t=5 (Eu params, filament pattern) | Plots.jl from `runs/paper4_meanfield/result.jld2` | placeholder |
+| `paper4_FIG-2` | σ/μ vs N showing 1/√N breakdown (N = 10³, 10⁴, 10⁵ from Round-5 GPU + Round-6 Sinatra-clean) | matplotlib from `runs/sigma_mu_scan_round5/result.json` | placeholder |
+| `paper4_FIG-3` | Species universality: σ/μ vs ε_dd (Cr=0.15, Eu=0.55, Er=0.88, Dy=1.39) showing chaos-onset peak at Eu | matplotlib from `runs/species_scan_round6/result.json` | placeholder |
+| `paper4_FIG-4` | Lyapunov trajectory divergence: ‖Δζ(t)‖ for two nearby Wigner seeds — exponential growth + amplitude saturation | matplotlib from `runs/lyapunov_diagnostic_round6/result.jld2` | placeholder |
+| `paper4_FIG-5` | 50-trajectory ensemble traces at Eu (overlay of |ψ(t,x_center)|² for 50 Wigner samples) | matplotlib from `runs/ensemble_traces_round5/snapshots/` | placeholder |

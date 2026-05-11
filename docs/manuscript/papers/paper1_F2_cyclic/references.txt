@@ -1,0 +1,27 @@
+# Paper #1 (F=2 cyclic LHY) — bibliography subset
+#
+# Cite-keys to extract from docs/manuscript/shared/references.bib for the
+# submission package. Drawn from the 31-entry master bib.
+
+# === Foundational LHY ===
+LeeHuangYang1957       # original scalar LHY 1957
+
+# === Spinor BEC framework ===
+KawaguchiUeda2012      # primary spinor BEC review
+StamperKurnUeda2013    # complementary spinor BEC review
+CiobanuYipHo2000       # F=2 cyclic phase first proposed
+KoashiUeda2000         # F=2 spin-singlet pair structure
+
+# === Polyhedral state classification ===
+MakelaSuominen2007     # Majorana point representation
+YukawaUeda2011         # odd-F polyhedral phases
+
+# === LHY in cold-atom experiments ===
+Petrov2015             # quantum droplet from LHY
+SchmittEtAl2016        # observation of LHY-stabilized droplets
+ChomazEtAl2016         # LHY in dipolar gases
+
+# === Numerical method ===
+Yoshida1990            # Y4 composition (used in our split-step)
+
+# Total: 10 entries (out of 31 in shared/references.bib)

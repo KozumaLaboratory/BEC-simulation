@@ -164,26 +164,148 @@ species-independent diagnostic of dipolar chaos.
 
 ## IV. Methodology: TWA as a Chaos Diagnostic, Not a Quantum-Fluctuation Tool
 
-[**TBD — section to be written**]
-Brief outline:
-- Why standard $1/\sqrt{N}$ argument fails: leading-order TWA is exact only when
-  trajectory dynamics is linearizable — chaotic dynamics violates this.
-- Connection to TWA validity literature (Polkovnikov 2010; Sinatra-Lobo-Castin 2002).
-- Implications for cold-atom experiments using TWA to measure QF magnitudes
-  in dipolar regimes.
-- Methodological recommendation: TWA leading-order = chaos diagnostic only.
+### A. The $1/\sqrt{N}$ argument and its breakdown for chaotic dynamics
+
+The canonical TWA argument for $\sigma/\mu \propto 1/\sqrt{N}$ proceeds as
+follows. The Wigner distribution of an $N$-particle BEC ground state, in the
+mean-field representation $\psi(\mathbf{r}, t) = \sqrt{N}\,\phi(\mathbf{r}, t)$,
+has fluctuations of relative magnitude $\delta\psi/\psi \sim 1/\sqrt{N}$. If
+the EOMs are linearizable around $\phi$ — that is, if the linear-response
+operator has bounded eigenvalues — then the ensemble trajectory dispersion
+inherits the initial $1/\sqrt{N}$ scaling.
+
+The breakdown in our dipolar regime occurs because the post-quench dipolar
+EOMs have **positive Lyapunov exponent**: the linearized fluctuation operator
+$\mathcal{L}(t)$ around $\phi(t)$ has eigenvalues $\lambda_j(t)$ that include
+unstable modes $\text{Re}\,\lambda_j > 0$. Small Wigner-sampled initial
+seeds $\delta\zeta(0) \sim 1/\sqrt{N}$ then grow as
+$|\delta\zeta(t)| \sim \exp(\Lambda t) / \sqrt{N}$ until they saturate at
+the **physical amplitude scale** $|\delta\zeta_{\rm sat}| \sim O(1)$ when
+nearby trajectories diverge to distinct attractors (here, different filament
+orientations).
+
+The saturation time scales as $t_{\rm sat} \sim \Lambda^{-1} \log\sqrt{N}$,
+i.e., logarithmically with $N$. After saturation, $\sigma/\mu$ is determined
+by the attractor structure (essentially the dipole-orientation symmetry
+group), not by the initial noise amplitude. This is precisely why we observe
+$\sigma/\mu$ approximately *constant* with $N$ rather than scaling as
+$1/\sqrt{N}$.
+
+### B. Connection to existing TWA validity literature
+
+This phenomenon is consistent with — but more dramatic than — the validity
+bound established by Sinatra, Lobo, and Castin (2002), who showed that TWA
+becomes unreliable when the BdG modes' classical occupation exceeds
+$\sim 1/2$. In our regime, the dipolar instability drives the unstable BdG
+modes to fully macroscopic occupation within $t \sim 1$ trap unit, far
+exceeding the Sinatra threshold.
+
+More generally, Polkovnikov (2010) showed that the systematic $1/N$ expansion
+of TWA converges only for "regular" dynamics — chaotic dynamics fundamentally
+violates the truncation criterion. Our results provide a clean experimental-
+parameter realization of this theoretical caveat in spinor dipolar dynamics.
+
+### C. Methodological implications for cold-atom experiments
+
+Many cold-atom papers cite leading-order TWA $\sigma/\mu$ measurements as
+quantitative estimates of "quantum fluctuation strength." In dipolar regimes
+with $\varepsilon_{dd} \gtrsim 0.4$, this interpretation is **unsafe**: the
+TWA-measured $\sigma/\mu$ is dominated by chaotic trajectory divergence, not
+by quantum fluctuations. We recommend that experimental analyses of
+ensemble-averaged dipolar dynamics:
+
+1. Explicitly check $\sigma/\mu \cdot \sqrt{N}$ for $N$-independence
+   (genuine TWA) vs $N$-dependence (chaos signature).
+2. Cross-validate with deterministic GP-LHY runs to assess Lyapunov-like
+   instability.
+3. For genuine quantum-fluctuation magnitude, use higher-order methods —
+   TDHFB (Phase 3 implementation in `src/hamiltonian/tdhfb/` of this work,
+   characterized in our companion manuscript) or Beliaev decay.
+
+### D. What our finding does NOT do
+
+Our reframing does **not** invalidate the underlying dipolar dynamics
+predictions: the deterministic GP-LHY mean-field results (filament patterns,
+density depletion, species universality) are robust and quantitatively
+correct. We are reframing the **interpretation of the ensemble spread**, not
+the deterministic dynamics itself.
 
 ---
 
 ## V. Discussion and Conclusions
 
-[**TBD — section to be written**]
-Brief outline:
-- Summary of three independent benchmarks establishing chaos interpretation.
-- Connection to upcoming TDHFB / Beliaev follow-up for genuine QF evaluation.
-- Implications for ${}^{151}$Eu experimental program (Kozuma group, others):
-  $\sigma/\mu$ measurement in lab → confirms chaos prediction OR identifies
-  quantum-decoherence effects suppressing chaos.
+### A. Summary of evidence
+
+We have established three independent lines of evidence that leading-order
+TWA in post-quench F=6 dipolar BEC measures chaotic trajectory divergence
+rather than quantum fluctuations:
+
+1. **Resolution-matched benchmark**: $16^3 \times \text{box} = 10$ and
+   $32^3 \times \text{box} = 10$ produce essentially identical $\sigma/\mu$,
+   ruling out spatial-discretization artifacts.
+
+2. **Sinatra-clean ensemble**: Within the Sinatra validity bound at
+   $N = 10^5$, $\sigma/\mu$ is **larger** than at smaller $N$, opposite of
+   the $1/\sqrt{N}$ quantum-fluctuation prediction.
+
+3. **Lyapunov-like trajectory divergence**: Pairs of nearby Wigner samples
+   diverge exponentially with $\Lambda > 0$ rate up to amplitude saturation.
+
+Together with the species-universal $\sigma/\mu$ peak at the Eu
+$\varepsilon_{dd} \approx 0.55$, these establish chaotic dipolar instability
+as the physical origin of the observed dispersion.
+
+### B. Implications for the ${}^{151}$Eu experimental program
+
+The ${}^{151}$Eu BEC experimental program (Miyazawa et al.\ 2022 and follow-
+up) provides the ideal platform to test our prediction:
+
+- If observed $\sigma/\mu \approx 0.4$ at Eu parameters, **chaos prediction
+  confirmed** — the first experimental observation of dipolar chaos in a
+  spinor BEC.
+
+- If observed $\sigma/\mu$ smaller than predicted, this would indicate that
+  **quantum decoherence** suppresses the chaotic instability at experimental
+  timescales — also a major finding.
+
+- If $\sigma/\mu$ shows distinct $N$-dependence different from both 1/√N and
+  N-independent saturation, we likely face a **mixed regime** of chaos +
+  decoherence that warrants TDHFB-level treatment.
+
+All three outcomes are independently publishable.
+
+### C. Connection to the companion TDHFB program
+
+The chaos / quantum-fluctuation distinction motivates our companion TDHFB
+implementation (Phase 3 production code in `src/hamiltonian/tdhfb/`,
+documented in the master thesis Ch.5 §5.11.4). TDHFB tracks the BdG mode
+populations dynamically through coupled (φ, ρ, κ) evolution, providing the
+true quantum-fluctuation magnitude in regimes where leading-order TWA fails.
+A direct comparison of TDHFB $\sigma/\mu$ predictions to the experimental
+measurements is the natural follow-up to this work.
+
+### D. Generalizability
+
+The chaos-onset diagnostic — $\sigma/\mu$ peak at the dipolar-instability
+threshold — is **species-universal**. It generalizes immediately to other
+strongly-dipolar BECs (Dy ($\varepsilon_{dd} \approx 1.4$), Er (0.88), Cr
+(0.15)), as our four-species scan demonstrates. The peak position
+$\varepsilon_{dd}^{\rm peak} \approx 0.5$ is a measurable, falsifiable
+prediction independent of microscopic spinor channel details.
+
+### E. Conclusions
+
+We have established that leading-order TWA simulations of post-quench F=6
+dipolar BEC measure **chaotic dipolar instability**, not quantum
+fluctuations. The observed $\sigma/\mu$ dispersion saturates at amplitude-
+bounded values $\sim 0.4 - 0.8$ rather than scaling as $1/\sqrt{N}$, with
+the saturation explained by positive-Lyapunov trajectory divergence to
+distinct filament-orientation attractors. The species-universal
+$\sigma/\mu$ peak at $\varepsilon_{dd} \sim 0.5$ identifies the chaos-onset
+regime and is directly testable in ${}^{151}$Eu BEC experiments. This work
+methodologically reframes leading-order TWA as a chaos diagnostic in dipolar
+spinor dynamics and motivates the TDHFB / Beliaev follow-up for genuine
+quantum-fluctuation evaluation.
 
 ---
 

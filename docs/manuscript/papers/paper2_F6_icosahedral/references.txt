@@ -1,0 +1,24 @@
+# Paper #2 (F=6 icosahedral LHY) — bibliography subset
+
+# === Foundational LHY ===
+LeeHuangYang1957
+LimaPelster2011        # dipolar LHY scalar
+LimaPelster2012        # dipolar LHY follow-up
+LimaPelsterDDI2011     # Q_5(ε_dd) function for ñ/n̄ prediction
+
+# === Spinor BEC framework ===
+KawaguchiUeda2012
+StamperKurnUeda2013
+
+# === Polyhedral phases ===
+MakelaSuominen2007     # Majorana representation
+YukawaUeda2011         # F-systematic polyhedral
+
+# === Dipolar Eu experimental ===
+MiyazawaEtAl2022       # ¹⁵¹Eu BEC realization
+SaitoLi2024            # dipolar droplet at Eu
+
+# === Numerical method ===
+Yoshida1990
+
+# Total: 11 entries
