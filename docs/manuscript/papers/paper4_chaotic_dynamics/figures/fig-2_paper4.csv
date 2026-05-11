@@ -1,0 +1,4 @@
+N,sigma_over_mu,sigma_x_sqrt_N,prediction_1_over_sqrt_N
+1000,0.56,17.7,0.0316
+10000,0.41,41.0,0.01
+100000,0.82,259.3,0.00316

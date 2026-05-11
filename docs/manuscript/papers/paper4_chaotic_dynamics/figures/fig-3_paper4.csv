@@ -1,0 +1,5 @@
+species,epsilon_dd,sigma_over_mu,regime
+Cr,0.15,0.001,sub-instability
+Eu,0.55,0.423,chaos-onset (peak)
+Er,0.88,0.127,chaos-saturated
+Dy,1.39,0.049,full-collapse
