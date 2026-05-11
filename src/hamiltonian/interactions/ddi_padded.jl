@@ -154,11 +154,13 @@ function apply_ddi_step!(
     ndim::Int,
     ddi_padded::DDIPaddedContext{N};
     imaginary_time::Bool=false,
+    psi_mf::Union{Nothing, AbstractArray}=nothing,
 ) where {D, N}
     n_pts = ntuple(d -> size(psi, d), Val(N))
+    psi_mf_eff = psi_mf === nothing ? psi : psi_mf
 
     @timeit_debug TIMER "ddi_convolve_padded" _compute_and_convolve_ddi_padded!(
-        psi,
+        psi_mf_eff,
         sm,
         ddi,
         ddi_padded,

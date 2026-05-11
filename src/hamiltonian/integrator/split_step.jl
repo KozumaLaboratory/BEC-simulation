@@ -6,7 +6,7 @@
 # kernels and shears live in split_step_kernels.jl; integrator-composition
 # coefficients and Yoshida/Suzuki/ABA cores live in split_step_composers.jl.
 
-export split_step!
+export split_step!, split_step_midpoint!
 
 """
 Perform one Strang-split time step: V(dt/2) K(dt) V(dt/2).
@@ -95,7 +95,8 @@ function _dispatch_diagonal_step!(
     zeeman_diag::SVector{D, Float64},
     dt_frac,
     imaginary_time,
-    ip::InteractionParams=ws.interactions,
+    ip::InteractionParams=ws.interactions;
+    psi_mf::Union{Nothing, AbstractArray}=nothing,
 ) where {N, D}
     if ws.light_shift !== nothing && ws.light_shift.is_diagonal
         ls_amp = SVector{D, Float64}(ntuple(c -> ws.light_shift.eigvals[c], Val(D)))
@@ -104,14 +105,16 @@ function _dispatch_diagonal_step!(
             ip.c0,
             ws.lhy !== nothing ? ws.lhy : ip.c_lhy,
             dt_frac, ws.density_buf, imaginary_time,
-            ls_amp, ws.light_shift.profile,
+            ls_amp, ws.light_shift.profile;
+            psi_mf,
         )
     else
         _diagonal_step_svec!(
             Val(N), ws.state.psi, ws.potential_values, zeeman_diag,
             ip.c0,
             ws.lhy !== nothing ? ws.lhy : ip.c_lhy,
-            dt_frac, ws.density_buf, imaginary_time,
+            dt_frac, ws.density_buf, imaginary_time;
+            psi_mf,
         )
     end
 end
@@ -185,6 +188,7 @@ function _half_potential_step!(
     imaginary_time;
     t_eval::Float64=ws.state.t,
     t_start::Float64=NaN,
+    psi_mf::Union{Nothing, AbstractArray}=nothing,
 ) where {N}
     # Resolve time-dependent interactions (preserves c_lhy and c_extra from static params)
     ip = if ws.time_dep_interactions !== nothing
@@ -205,7 +209,7 @@ function _half_potential_step!(
 
     _apply_mg_to_V!(ws, t_eval)
     @timeit_debug TIMER "diagonal" _dispatch_diagonal_step!(
-        ws, Val(N), zeeman_diag_fwd, dt_half / 2, imaginary_time, ip
+        ws, Val(N), zeeman_diag_fwd, dt_half / 2, imaginary_time, ip; psi_mf,
     )
     _remove_mg_from_V!(ws, t_eval)
 
@@ -217,20 +221,21 @@ function _half_potential_step!(
 
     if abs(ip.c1) > 1e-30
         @timeit_debug TIMER "spin_mixing" apply_spin_mixing_step!(
-            ws.state.psi, ws.spin_matrices, ip.c1, dt_half / 2, ndim; imaginary_time
+            ws.state.psi, ws.spin_matrices, ip.c1, dt_half / 2, ndim; imaginary_time, psi_mf,
         )
     end
 
     c2 = get_cn(ip, 2)
     if abs(c2) > 1e-30
         @timeit_debug TIMER "nematic" apply_singlet_pair_step!(
-            ws.state.psi, ip, ws.spin_matrices.system.F, dt_half / 2, ndim; imaginary_time
+            ws.state.psi, ip, ws.spin_matrices.system.F, dt_half / 2, ndim; imaginary_time, psi_mf,
         )
     end
 
     if ws.tensor_cache !== nothing
         @timeit_debug TIMER "tensor" apply_tensor_interaction_step!(
-            ws.state.psi, ws.tensor_cache, ws.spin_matrices, dt_half / 2, ndim; imaginary_time
+            ws.state.psi, ws.tensor_cache, ws.spin_matrices, dt_half / 2, ndim;
+            imaginary_time, psi_mf,
         )
     end
 
@@ -245,7 +250,7 @@ function _half_potential_step!(
 
     if ws.ddi !== nothing
         @timeit_debug TIMER "ddi" if gpu
-            _apply_ddi_step_gpu!(ws, dt_half, ndim, imaginary_time)
+            _apply_ddi_step_gpu!(ws, dt_half, ndim, imaginary_time; psi_mf)
         else
             if ws.ddi_padded !== nothing
                 apply_ddi_step!(
@@ -256,7 +261,7 @@ function _half_potential_step!(
                     dt_half,
                     ndim,
                     ws.ddi_padded;
-                    imaginary_time,
+                    imaginary_time, psi_mf,
                 )
             else
                 apply_ddi_step!(
@@ -266,7 +271,7 @@ function _half_potential_step!(
                     ws.ddi_bufs,
                     dt_half,
                     ndim;
-                    imaginary_time,
+                    imaginary_time, psi_mf,
                 )
             end
         end
@@ -283,19 +288,20 @@ function _half_potential_step!(
 
     if ws.tensor_cache !== nothing
         @timeit_debug TIMER "tensor" apply_tensor_interaction_step!(
-            ws.state.psi, ws.tensor_cache, ws.spin_matrices, dt_half / 2, ndim; imaginary_time
+            ws.state.psi, ws.tensor_cache, ws.spin_matrices, dt_half / 2, ndim;
+            imaginary_time, psi_mf,
         )
     end
 
     if abs(c2) > 1e-30
         @timeit_debug TIMER "nematic" apply_singlet_pair_step!(
-            ws.state.psi, ip, ws.spin_matrices.system.F, dt_half / 2, ndim; imaginary_time
+            ws.state.psi, ip, ws.spin_matrices.system.F, dt_half / 2, ndim; imaginary_time, psi_mf,
         )
     end
 
     if abs(ip.c1) > 1e-30
         @timeit_debug TIMER "spin_mixing" apply_spin_mixing_step!(
-            ws.state.psi, ws.spin_matrices, ip.c1, dt_half / 2, ndim; imaginary_time
+            ws.state.psi, ws.spin_matrices, ip.c1, dt_half / 2, ndim; imaginary_time, psi_mf,
         )
     end
 
@@ -314,9 +320,162 @@ function _half_potential_step!(
 
     _apply_mg_to_V!(ws, t_eval)
     @timeit_debug TIMER "diagonal" _dispatch_diagonal_step!(
-        ws, Val(N), zeeman_diag_bwd, dt_half / 2, imaginary_time, ip
+        ws, Val(N), zeeman_diag_bwd, dt_half / 2, imaginary_time, ip; psi_mf,
     )
     _remove_mg_from_V!(ws, t_eval)
+end
+
+"""
+Strang split-step that uses `_half_potential_step_midpoint!` for each V(dt/2).
+
+Drop-in replacement for `split_step!`: same V K V outer structure, same time/step
+accounting, but the V halves are symmetric to round-off. Lets MPS-4 / Yoshida-6
+Richardson cancellation recover its nominal order on the lab path (gate test:
+`scripts/bench/mps4_lab_diagnostic.jl` and the midpoint variant of it).
+
+Costs ~1.5–2× a plain `split_step!` per call. Until adopted as default,
+opt-in only via this entry point.
+"""
+function split_step_midpoint!(ws::Workspace{N}) where {N}
+    dt = ws.sim_params.dt
+    it = ws.sim_params.imaginary_time
+    n_comp = ws.spin_matrices.system.n_components
+    t = ws.state.t
+
+    t_eval_1 = it ? 0.0 : t + dt / 4
+    t_eval_2 = it ? 0.0 : t + 3dt / 4
+
+    @timeit_debug TIMER "half_potential_mid" _half_potential_step_midpoint!(
+        ws, dt / 2, n_comp, N, it; t_eval=t_eval_1, t_start=it ? NaN : t
+    )
+
+    omega = ws.sim_params.rotating_frame_omega
+    @timeit_debug TIMER "coriolis" _apply_coriolis_step!(
+        ws.state.psi, ws.grid, omega, dt / 2, it, ws.coriolis_cache,
+    )
+    @timeit_debug TIMER "kinetic" apply_kinetic_step_batched!(
+        ws.state.psi, ws.batched_kinetic,
+    )
+    @timeit_debug TIMER "coriolis" _apply_coriolis_step!(
+        ws.state.psi, ws.grid, omega, dt / 2, it, ws.coriolis_cache,
+    )
+
+    @timeit_debug TIMER "half_potential_mid" _half_potential_step_midpoint!(
+        ws, dt / 2, n_comp, N, it; t_eval=t_eval_2, t_start=it ? NaN : t + dt / 2
+    )
+
+    if !it && ws.loss !== nothing
+        @timeit_debug TIMER "loss" apply_loss_step!(
+            ws.state.psi, ws.loss, ws.spin_matrices.system.F, dt, n_comp, N, ws.density_buf,
+        )
+    end
+
+    if !it && ws.absorbing_mask !== nothing
+        @timeit_debug TIMER "absorbing" apply_absorbing_boundary!(
+            ws.state.psi, ws.absorbing_mask, n_comp, N,
+        )
+    end
+
+    ws.state.t += it ? 0.0 : dt
+    ws.state.step += 1
+
+    if it && ws.sim_params.normalize_every > 0
+        if ws.state.step % ws.sim_params.normalize_every == 0
+            _normalize_psi!(ws.state.psi, ws.grid, n_comp, N)
+        end
+    end
+    nothing
+end
+
+# --- Track A1: predictor-corrector midpoint V step ---
+#
+# The plain `_half_potential_step!` builds the V step as a nested Strang
+#   diag · SM · nem · tensor · transB · raman · DDI · raman · transB · tensor · nem · SM · diag
+# in which each substep evaluates the mean field (Φ_DDI, c1⟨F⟩, c2 A₀₀, c4+ tensor h)
+# at substep ENTRY. The two SM substeps therefore see DIFFERENT ψ values flanking
+# the central DDI substep, breaking time-reversal symmetry of the inner Strang.
+# The resulting τ² even-power local error survives MPS-4's odd-only Richardson
+# cancellation and collapses MPS-4/Y6 to order ~1 on the lab path
+# (verified by `scripts/bench/mps4_lab_diagnostic.jl` and
+# `test/hamiltonian/test_integrator_order_meanfield.jl`).
+#
+# `_half_potential_step_midpoint!` symmetrises the V step via a one-pass
+# predictor-corrector:
+#   1. Predictor: advance a scratch copy of ψ by dt_half/2 using the inner
+#      Strang with MF FROZEN at the entry ψ. This gives a midpoint estimate
+#      ψ_mid ≈ ψ(t_eval).
+#   2. Corrector: advance the real ψ by dt_half using the inner Strang with
+#      MF FROZEN at ψ_mid (same MF for every substep — left-right symmetric).
+# Cost: ~1.5× a plain V step (predictor at dt/2 of dt_half + corrector at dt_half).
+# The predictor's accuracy only needs to be O(dt²) for the corrector to
+# achieve a fully symmetric V step, so frozen-MF Strang half-step suffices.
+#
+# Allocation note: this implementation calls `similar(psi)` per invocation
+# to obtain the midpoint buffer. For production tuning move to a dedicated
+# Workspace field; for Phase-0 validation per-call alloc is acceptable.
+# Transverse Zeeman / Raman currently use `ws.state.psi_scratch` as an
+# intermediate; they remain compatible with the midpoint variant because the
+# midpoint buffer is allocated separately from `psi_scratch`.
+
+function _half_potential_step_midpoint!(
+    ws::Workspace{N},
+    dt_half,
+    n_comp,
+    ndim,
+    imaginary_time;
+    t_eval::Float64=ws.state.t,
+    t_start::Float64=NaN,
+    n_picard::Int=2,
+) where {N}
+    # Single-iteration predictor-corrector achieves O(τ²) accuracy for ψ_mid,
+    # but the V-step is then only **approximately** time-reversal symmetric:
+    # ψ_mid depends on ψ_orig (forward) vs ψ_after (backward) and these aren't
+    # equal at finite τ, leaving an O(τ²) residual in S(τ)·S(-τ) − I. MPS-4's
+    # Richardson coefficients (-1/3, 4/3) cancel only the odd-power local-error
+    # expansion of a truly symmetric V step, so the residual τ² breaks order
+    # recovery (verified: 1-step Picard left MPS-4 lab-path at order ~1 even
+    # though absolute error improved 4×).
+    #
+    # Picard iteration drives ψ_mid toward the implicit-midpoint fixed point.
+    # n_picard=2 lifts the time-reversal residual to O(τ⁴), which is sufficient
+    # for MPS-4 order recovery. Cost: `n_picard × half-V-step + full V-step`.
+    psi_orig = ws.state.psi
+    psi_mid_prev = similar(psi_orig)
+    psi_mid_curr = similar(psi_orig)
+
+    # Iteration 1: predictor with frozen MF = ψ_orig.
+    copyto!(psi_mid_curr, psi_orig)
+    ws.state.psi = psi_mid_curr
+    try
+        _half_potential_step!(
+            ws, dt_half / 2, n_comp, ndim, imaginary_time;
+            t_eval=t_eval, t_start=t_start, psi_mf=psi_orig,
+        )
+    finally
+        ws.state.psi = psi_orig
+    end
+
+    # Refining Picard iterations: MF = previous midpoint estimate.
+    for _ in 2:n_picard
+        copyto!(psi_mid_prev, psi_mid_curr)
+        copyto!(psi_mid_curr, psi_orig)
+        ws.state.psi = psi_mid_curr
+        try
+            _half_potential_step!(
+                ws, dt_half / 2, n_comp, ndim, imaginary_time;
+                t_eval=t_eval, t_start=t_start, psi_mf=psi_mid_prev,
+            )
+        finally
+            ws.state.psi = psi_orig
+        end
+    end
+
+    # Corrector with refined midpoint as MF.
+    _half_potential_step!(
+        ws, dt_half, n_comp, ndim, imaginary_time;
+        t_eval=t_eval, t_start=t_start, psi_mf=psi_mid_curr,
+    )
+    nothing
 end
 
 # --- ITP leapfrog helpers ---
