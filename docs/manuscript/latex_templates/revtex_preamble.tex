@@ -1,0 +1,99 @@
+% RevTeX 4-2 preamble for Paper #1-4 submission.
+% Use with Pandoc command in submission_packaging.md §4.1.
+%
+% Usage:
+%   pandoc paper_main.md \
+%       --bibliography=../shared/references.bib \
+%       --csl=../shared/aps-style.csl \
+%       --template=docs/manuscript/latex_templates/revtex_template.tex \
+%       --pdf-engine=lualatex \
+%       -o paper.pdf
+%
+% Requires: TeX Live or MiKTeX with revtex4-2 package + biblatex + biber
+
+\documentclass[%
+    twocolumn,                  % standard PRA/PRR layout
+    prx,                        % PRX style (use 'pra' for PRA)
+    amsmath,
+    amssymb,
+    amsfonts,
+    superscriptaddress,
+    showpacs,
+    notitlepage,
+    floatfix,
+    aps,
+    nofootinbib,
+]{revtex4-2}
+
+% --- standard packages ---
+\usepackage{graphicx}
+\usepackage{bm}                 % bold math
+\usepackage{subcaption}         % subfigures
+\usepackage{xcolor}
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=blue,
+}
+
+% --- math conventions ---
+\newcommand{\dd}{\mathrm{d}}
+\newcommand{\ii}{\mathrm{i}}
+\newcommand{\ee}{\mathrm{e}}
+\newcommand{\eps}{\varepsilon}
+\newcommand{\Re}{\mathrm{Re}\,}
+\newcommand{\Im}{\mathrm{Im}\,}
+\newcommand{\tr}{\mathrm{tr}\,}
+\newcommand{\Tr}{\mathrm{Tr}\,}
+
+% Spinor BEC physics conventions (cf. notation.md)
+\newcommand{\cdd}{c_{\rm dd}}
+\newcommand{\eLHY}{\varepsilon_{\rm LHY}}
+\newcommand{\lspin}{\lambda_{\rm spin}}
+\newcommand{\F}{\mathbf{F}}
+\newcommand{\ket}[1]{\left|#1\right\rangle}
+\newcommand{\bra}[1]{\left\langle#1\right|}
+\newcommand{\braket}[2]{\left\langle#1\middle|#2\right\rangle}
+
+% Group theory
+\newcommand{\Td}{T_d}
+\newcommand{\Oh}{O_h}
+\newcommand{\Ih}{I_h}
+
+% --- bibliography style ---
+\usepackage[%
+    backend=biber,
+    style=phys,
+    biblabel=brackets,
+    chaptertitle=false,
+    eprint=true,
+    pageranges=false,
+    sorting=none,
+]{biblatex}
+\addbibresource{../shared/references.bib}
+
+% --- title block placeholder (replaced by paper-specific metadata) ---
+\begin{document}
+
+\title{$title$}
+
+\author{$author$}
+\affiliation{$affiliation$}
+
+\date{\today}
+
+\begin{abstract}
+$abstract$
+\end{abstract}
+
+\maketitle
+
+% --- body content (Pandoc inserts here) ---
+$body$
+
+% --- bibliography ---
+\printbibliography
+
+\end{document}
