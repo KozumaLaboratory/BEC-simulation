@@ -1,5 +1,5 @@
 # MP Phase 3 smoke: end-to-end ITP at Float32 should match Float64 to
-# the relaxed tolerance documented in `docs/mixed_precision_design.md`.
+# the relaxed tolerance documented in `docs/design/mixed_precision_design.md`.
 # This is a regression guard for the F32 hot path that's already wired
 # (Phase 1 Grid{N,T} + Phase 2 make_fft_plans dtype + the existing
 # tol auto-relax — see commit 738a3e4).

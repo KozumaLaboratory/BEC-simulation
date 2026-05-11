@@ -8,7 +8,7 @@ using Printf
 # on a small T_FINAL = 0.02 ω⁻¹ for tractable bench cost.
 #
 # Force-Gradient SKIPPED: `split_step_forcegrad!` requires c1=0 and DDI off
-# (diagonal-only scope per docs/integrator_track_c_derivation.md Step 4),
+# (diagonal-only scope per docs/design/integrator_track_c_derivation.md Step 4),
 # which doesn't represent realistic Eu151 physics.
 #
 # Run (slow on CPU due to F=6 D=13 spinor + DDI cost):

@@ -73,15 +73,16 @@ callbacks.
 ```
 src/    Solvers, Hamiltonian terms, workflow, analysis
 runs/   YAML configs (Klaus magnetostir, Einstein–de Haas, phase diagrams, …)
-docs/   Design notes and reference papers
+docs/   guides/ reference/ design/ theory/ research_notes/ (see docs/index.md)
 test/   ~8600 tests, tiered (fast / ci / full)
 web/    React + WebGPU dashboard
 ext/    CUDA and Makie extensions
 bench/  Benchmarks
 ```
 
-`CLAUDE.md` is the full YAML schema reference and internal conventions;
-`docs/` has the design of each major subsystem.
+`CLAUDE.md` is the full YAML schema reference and internal conventions.
+`docs/index.md` is the documentation map; subsystem design notes live
+under `docs/design/`.
 
 ## Tests
 

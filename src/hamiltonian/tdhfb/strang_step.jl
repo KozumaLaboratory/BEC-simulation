@@ -12,7 +12,7 @@
 #   - HF self-energy step via hf_matrix_generic! (channel-decomposed)
 #   - Anomalous κ evolution: stubbed (Phase 4 work)
 #
-# Reference: docs/tdhfb_pilot_design.md §"TDHFB equations" + Kawaguchi-Ueda 2012 §3.
+# Reference: docs/design/tdhfb_pilot_design.md §"TDHFB equations" + Kawaguchi-Ueda 2012 §3.
 #
 # Test scope: F=1 polar reduces to standard split-step GP (ρ=0 limit).
 

@@ -2,7 +2,7 @@
 #
 # Forward fourth-order factorization of e^{-iτH} for the GPE, following
 # Chin & Krotscheck, Phys. Rev. E 72, 036705 (2005) (arXiv:cond-mat/0504270).
-# Phase -1 derivation in docs/integrator_track_c_derivation.md.
+# Phase -1 derivation in docs/design/integrator_track_c_derivation.md.
 #
 # Algorithm 4A (paper eq. 6.8):
 #
@@ -29,14 +29,14 @@
 # are violated to prevent silent incorrect results.
 #
 # Extensions (c₁, DDI, etc.) require additional Phase -1 derivation;
-# see Step 5 of docs/integrator_track_c_derivation.md.
+# see Step 5 of docs/design/integrator_track_c_derivation.md.
 
 export split_step_forcegrad!, split_step_thalhammer!
 
 function _assert_forcegrad_diagonal_only(ws::Workspace)
     ws.ddi === nothing ||
         error("split_step_forcegrad!: DDI not supported in v1 (diagonal-only). " *
-              "See docs/integrator_track_c_derivation.md Step 5.")
+              "See docs/design/integrator_track_c_derivation.md Step 5.")
     ws.tensor_cache === nothing ||
         error("split_step_forcegrad!: tensor_cache not supported in v1.")
     abs(ws.interactions.c1) < 1e-30 ||
@@ -419,7 +419,7 @@ G = [DF₂, [DF₂, DF₁]] reduces EXACTLY to Chin-Krotscheck 2005 4A
 - Chin-Krotscheck: classical force-gradient `[V,[T,V]] = |∇V|²` correction
 - Thalhammer 2026: Lie-derivative iterated commutator `G = [DF₂,[DF₂,DF₁]]`
 
-Algebraic equivalence proven in `docs/integrator_track_b_derivation.md`
+Algebraic equivalence proven in `docs/design/integrator_track_b_derivation.md`
 Step 1.1-1.3. Verified bit-exact by `scripts/bench/forcegrad_thalhammer_equiv.jl`.
 
 This export is therefore an alias for `split_step_forcegrad!` — providing
@@ -427,7 +427,7 @@ a Thalhammer-framework API entry point while sharing implementation.
 
 For J=2+ multi-species cross-channel BEC or F-matrix spinor + DDI
 extensions: see Track C v4/v5 derivations
-(`docs/integrator_track_c_derivation.md` §5.2-5.3) — implementation
+(`docs/design/integrator_track_c_derivation.md` §5.2-5.3) — implementation
 out of scope for the diagonal-only `split_step_forcegrad!` v3 milestone.
 """
 const split_step_thalhammer! = split_step_forcegrad!

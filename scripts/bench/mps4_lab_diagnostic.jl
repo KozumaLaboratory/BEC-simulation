@@ -10,7 +10,7 @@ using SpinorBEC, Printf, BenchmarkTools
 # with c1, c_dd ≠ 0. This file reproduces the F=1 isolation that
 # rules out spinor-coupling matrix non-commutativity as the cause.
 #
-# Conclusion (recorded in docs/integrator_modernization_plan.md):
+# Conclusion (recorded in docs/design/higher_order_integrators.md, Track A):
 # the lab-path V-step is a NESTED Strang `diag · SM · DDI · SM · diag`
 # where each SM/DDI substep evaluates the mean field (Φ_DDI, c1⟨F⟩)
 # at substep ENTRY, not midpoint. The asymmetry between the

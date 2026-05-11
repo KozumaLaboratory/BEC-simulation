@@ -2,7 +2,7 @@
 #
 # Minimal types + ITP for the binary-condensate plumbing. NOT YET wired
 # into make_workspace / split_step / pipeline_runner — see
-# `docs/two_component_gp_design.md` for the multi-session integration
+# `docs/design/two_component_gp_design.md` for the multi-session integration
 # plan.
 #
 # 438-line monolith split into 3 sub-files (2026-05-11 refactor):

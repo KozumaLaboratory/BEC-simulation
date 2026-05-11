@@ -112,9 +112,9 @@ worked examples.
 
 ## See also
 
-* `docs/option_gamma_rotating_basis.md` — full design doc with phase
+* `docs/design/option_gamma_rotating_basis.md` — full design doc with phase
   decomposition (Phase I CPU GPE → II static tilt → III lab agreement).
-* `docs/AUDIT_BUG4.md` — DDI integration rate fix (2026-05-02);
+* `docs/archive/AUDIT_BUG4.md` — DDI integration rate fix (2026-05-02);
   rotating-basis runs were not affected since they use their own
   `apply_ddi_step_rotating!`.
 * `memory/option_gamma_rotating_basis.md`, `memory/option_gamma_gpu_optimization.md`,

@@ -1,5 +1,5 @@
 # Retrofit existing multi-dir scans into the scan.yaml format
-# (docs/scan_group_redesign.md).
+# (docs/design/scan_group_redesign.md).
 #
 # Looks at runs/<scan_dir>/*/config.yaml, infers which axis is the
 # scan parameter (the one that varies across siblings), writes a

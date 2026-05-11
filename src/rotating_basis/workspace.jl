@@ -90,7 +90,7 @@ appears at rotation-rate scale (kHz vs Larmor MHz). Spin excitations
 are preserved (FL phase, EdH spin texture). DDI Q-tensor is rotated
 in spin indices via R(t) ∈ SO(3); spatial FFT path is unchanged.
 
-See `docs/option_gamma_rotating_basis.md` for the full derivation.
+See `docs/design/option_gamma_rotating_basis.md` for the full derivation.
 
 Scope (skeleton):
 - 3D harmonic trap, contact (c0), spin-mixing (c1, optional), DDI

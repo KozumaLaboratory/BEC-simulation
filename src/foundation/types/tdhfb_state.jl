@@ -4,7 +4,7 @@
 # ⟨ψψ⟩ (κ, anomalous) and normal density ⟨ψ†ψ⟩ (ρ) alongside the mean
 # field φ = ⟨ψ⟩.
 #
-# This struct is Phase 1 of the TDHFB pilot per docs/tdhfb_pilot_design.md.
+# This struct is Phase 1 of the TDHFB pilot per docs/design/tdhfb_pilot_design.md.
 # Storage layout:
 #   φ:     spatial dims... × D     (mean field, like SimState.psi)
 #   ρ:     spatial dims... × D × D (normal density, Hermitian: ρ[m,m'] = ⟨ψ†_m ψ_m'⟩)
@@ -66,8 +66,8 @@ preserve these properties. Future Phase 2 may add `Hermitian` / `Symmetric`
 wrappers for type-stability + reduced storage.
 
 # References
-- design doc: `docs/tdhfb_pilot_design.md`
-- D 論 Year 1 Q3-Q4 plan: `docs/dthesis_year1_roadmap.md` §4.2
+- design doc: `docs/design/tdhfb_pilot_design.md`
+- D 論 Year 1 Q3-Q4 plan: `docs/design/dthesis_year1_roadmap.md` §4.2
 - physics primer: Chapter 5 §5.8 of master thesis
 """
 mutable struct TDHFBState{N, A <: AbstractArray, B <: AbstractArray, T <: AbstractFloat}
