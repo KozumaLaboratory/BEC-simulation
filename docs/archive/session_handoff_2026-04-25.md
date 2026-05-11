@@ -1,37 +1,16 @@
 # Session Handoff — 2026-04-25 @ commit `3414228`
 
-This session closed out the Phase 4/5 primitives backlog and launched a
-long-running phase-diagram scan that should complete overnight. The
-predecessor handoff (`session_handoff_2026-04-24.md`) was deleted on
-2026-04-26 once superseded; the MP refactor / dashboard UX state it
-described is now baked into CLAUDE.md.
+This session closed out the Phase 4/5 primitives backlog and launched a long-running phase-diagram scan that should complete overnight. The predecessor handoff (`session_handoff_2026-04-24.md`) was deleted on 2026-04-26 once superseded; the MP refactor / dashboard UX state it described is now baked into CLAUDE.md.
 
 ## Since 2026-04-25 (delta)
 
-- **PlotlyJS removed entirely.** All Plotly-based plot helpers
-  (`save_column_density_png`, …) deleted. `plot_density` / `plot_spinor`
-  / `plot_spin_texture` / `animate_dynamics` are now Makie-only stubs.
-  `column_density_movie` analyzer now writes
-  `<output_dir>/columns.jld2` (Float32, key `frame_NNNNN`) +
-  `<output_dir>/manifest.json` instead of PNG frames.
-- **`live_monitor` + `seed_k_cut` wired.** New YAML knob
-  `dynamics.live_monitor: {every: N}` writes
-  `<run>/_live_status.json` for the dashboard's `/api/live/list` and
-  `/api/live/<run>` endpoints (frontend: `useLiveRuns` / `useLiveStatus`
-  hooks + `LiveStatusPanel` in App header). New optional
-  `dynamics.seed_k_cut` adds k-space lowpass to the symmetry-breaking
-  seed (used in `runs/eu151_edh/`); plumbed via new `k_cut`/`grid`
-  kwargs on `add_symmetry_breaking_seed!`.
-- **Frontend WebGPU completed.** R3F `HeatmapGrid` (WebGPU raymarch),
-  binary atlas-mode protocol, `LineChartSVG` replacing all Plotly
-  charts, `LabImageOverlay` for the lab-image side of `/api/lab/*`.
-- **`dry_run` returns the YAML string.** No more
-  `redirect_stdout(IOBuffer())` in `run_yaml`; the function returns
-  the post-calibration YAML as a `String`.
+- **PlotlyJS removed entirely.** All Plotly-based plot helpers (`save_column_density_png`, …) deleted. `plot_density` / `plot_spinor` / `plot_spin_texture` / `animate_dynamics` are now Makie-only stubs. `column_density_movie` analyzer now writes `<output_dir>/columns.jld2` (Float32, key `frame_NNNNN`) + `<output_dir>/manifest.json` instead of PNG frames.
+- **`live_monitor` + `seed_k_cut` wired.** New YAML knob `dynamics.live_monitor: {every: N}` writes `<run>/_live_status.json` for the dashboard's `/api/live/list` and `/api/live/<run>` endpoints (frontend: `useLiveRuns` / `useLiveStatus` hooks + `LiveStatusPanel` in App header). New optional `dynamics.seed_k_cut` adds k-space lowpass to the symmetry-breaking seed (used in `runs/eu151_edh/`); plumbed via new `k_cut`/`grid` kwargs on `add_symmetry_breaking_seed!`.
+- **Frontend WebGPU completed.** R3F `HeatmapGrid` (WebGPU raymarch), binary atlas-mode protocol, `LineChartSVG` replacing all Plotly charts, `LabImageOverlay` for the lab-image side of `/api/lab/*`.
+- **`dry_run` returns the YAML string.** No more `redirect_stdout(IOBuffer())` in `run_yaml`; the function returns the post-calibration YAML as a `String`.
 - **CI fixes** for synthetic_dim / SGPE / vortex / dry-run tests.
 
-The rest of this doc reflects the 2026-04-25 state; cross-check with
-`CLAUDE.md` "Active handoff" before relying on PIDs / paths.
+The rest of this doc reflects the 2026-04-25 state; cross-check with `CLAUDE.md` "Active handoff" before relying on PIDs / paths.
 
 ---
 
@@ -50,8 +29,7 @@ Scripts/run_batch_overnight.jl runs these in sequence; progress with banners:
 3. `eu151_kibble_zurek`     — quench τ × seed scan, 15 points (~6 h)
 4. `eu151_phase_pq_hires`   — 64³ (p,q) phase map, 12×12 = 144 pts (~11 h)
 
-Both are session leaders (`PID == SID`), so SIGHUP from Claude's shell
-does not reach them. Health check:
+Both are session leaders (`PID == SID`), so SIGHUP from Claude's shell does not reach them. Health check:
 
 ```bash
 ps -o pid,ppid,sid,etime,cmd -C julia
@@ -75,14 +53,12 @@ disown
 `runs/eu151_phase_pq_hires/config.yaml` — 64³ Eu151 (p, q) 2D phase map.
 
 - 12×12 = 144 scan points (up from 5×5 at 32³ in `runs/eu151_phase_pq/`).
-- Per-point: ITP 10000 / dt=0.005 → LBFGS 300 steps / tol=1e-9 →
-  phase_classify + bogoliubov(k_max=8, n_k=100, n_directions=30).
+- Per-point: ITP 10000 / dt=0.005 → LBFGS 300 steps / tol=1e-9 → phase_classify + bogoliubov(k_max=8, n_k=100, n_directions=30).
 - Smoke rate: 50 ITP steps/s → point ≈ 4.5 min → 144 × 4.5 ≈ **10.8 h**.
 - Axes:
   - `p` ∈ {0, 0.1, 0.3, 1, 2, 3, 5, 10, 30, 100, 200, 500} (log-ish)
   - `q` ∈ {-3, -1.5, -1, -0.5, -0.3, -0.1, 0, 0.3, 0.5, 1, 1.5, 3}
-- Output: `runs/eu151_phase_pq_hires/point_001.jld2` … `point_144.jld2`,
-  each ≈ 52 MB (ψ at ComplexF64). Total ≈ 7.5 GB.
+- Output: `runs/eu151_phase_pq_hires/point_001.jld2` … `point_144.jld2`, each ≈ 52 MB (ψ at ComplexF64). Total ≈ 7.5 GB.
 
 ## Commits pushed this session (on `main`)
 
@@ -95,10 +71,7 @@ dc96eca feat(loss): spin-dependent three-body K₃^(m) per component
 ae17e07 feat(analyze): pipeline-level topology + droplet_profile analyzers
 ```
 
-The raman.jl fix unblocked the entire magnetostir / tilted-field path on
-the GPU (Level 1/2 Zeeman with non-zero Bx/By). Klaus 2022 reproduction
-now runs end-to-end on CUDA; previously every dynamics step with a
-transverse Zeeman field hit a scalar-indexing error.
+The raman.jl fix unblocked the entire magnetostir / tilted-field path on the GPU (Level 1/2 Zeeman with non-zero Bx/By). Klaus 2022 reproduction now runs end-to-end on CUDA; previously every dynamics step with a transverse Zeeman field hit a scalar-indexing error.
 
 Phase 4/5 primitives inventory:
 
@@ -125,13 +98,6 @@ See `PLAN.md` at the repo root for the live list.
 
 ## Pitfalls caught this session
 
-- `_to_device(::CUDABackend, ::Array)` requires `import CUDA` **before**
-  `using SpinorBEC` so the extension is loaded. Scripts that use CUDA
-  backend must start with `import CUDA; using SpinorBEC`.
-- Piping long-running Julia stdout through `tail -N` in a shell buffers
-  everything until EOF — use a direct file redirect (`> logfile 2>&1`)
-  for detached runs.
-- Survey agent incorrectly flagged Projected GP and photon-heating as
-  "missing" — both exist at `src/solvers/projected_gp.jl` and
-  `src/solvers/photon_heating.jl`. Always grep `src/solvers/` before
-  starting new solver implementations.
+- `_to_device(::CUDABackend, ::Array)` requires `import CUDA` **before** `using SpinorBEC` so the extension is loaded. Scripts that use CUDA backend must start with `import CUDA; using SpinorBEC`.
+- Piping long-running Julia stdout through `tail -N` in a shell buffers everything until EOF — use a direct file redirect (`> logfile 2>&1`) for detached runs.
+- Survey agent incorrectly flagged Projected GP and photon-heating as "missing" — both exist at `src/solvers/projected_gp.jl` and `src/solvers/photon_heating.jl`. Always grep `src/solvers/` before starting new solver implementations.

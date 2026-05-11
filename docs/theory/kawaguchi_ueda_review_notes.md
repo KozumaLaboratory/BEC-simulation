@@ -139,23 +139,11 @@ $$\frac{\tau_{\text{Eu}}}{\tau_{\text{Cr}}} \sim \frac{g_{\text{Cr}}^2 \cdot 36\
 
 ## 8. f ≥ 5 アイコサヘドラル相 / F=6 相図 / EdH 観測戦略 — formal docs に分離
 
-このノートの後半 (元 §8-§11) で議論していた以下のトピックは、コードに
-組み込まれた閉じた形を持つ理論ノートおよび数値スキャン結果として独立
-させてあります:
+このノートの後半 (元 §8-§11) で議論していた以下のトピックは、コードに 組み込まれた閉じた形を持つ理論ノートおよび数値スキャン結果として独立 させてあります:
 
-- **アイコサヘドラル ($I_h$) 対称位相、Majorana 表現の頂点数論証、F=6 で
-  初めて現れる新相** → `docs/theory/icosahedral_lhy.md` に閉形 LHY と
-  $\zeta_{I_h}$、stiffness $c_0 / \lambda_{\rm spin}$、g_2/g_4/g_8 の
-  普遍消失を記載。
-- **F=6 相図 (FM / cyclic / I_h / polar) の数値スキャン** →
-  `docs/research_notes/F6_phase_boundaries.md` に $50 \times 50$ in
-  $(g_{10}, g_{12})$ の結果と線形化境界の整合確認。
-- **EdH 効果の Eu 版 + Mermin-Ho の f=6 増幅** → 実装と negative-result
-  ablation は `docs/research_notes/eu_collapse_lhy_insufficient.md`、
-  TWA cross-check は `docs/research_notes/twa_*.md`。
-- **二次 Zeeman チューニング (Eu の I=5/2 由来 $q_B$)** → CLAUDE.md
-  ¹⁵¹Eu セクション + 実装は YAML `zeeman.q`。
+- **アイコサヘドラル ($I_h$) 対称位相、Majorana 表現の頂点数論証、F=6 で 初めて現れる新相** → `docs/theory/icosahedral_lhy.md` に閉形 LHY と $\zeta_{I_h}$、stiffness $c_0 / \lambda_{\rm spin}$、g_2/g_4/g_8 の 普遍消失を記載。
+- **F=6 相図 (FM / cyclic / I_h / polar) の数値スキャン** → `docs/research_notes/F6_phase_boundaries.md` に $50 \times 50$ in $(g_{10}, g_{12})$ の結果と線形化境界の整合確認。
+- **EdH 効果の Eu 版 + Mermin-Ho の f=6 増幅** → 実装と negative-result ablation は `docs/research_notes/eu_collapse_lhy_insufficient.md`、 TWA cross-check は `docs/research_notes/twa_*.md`。
+- **二次 Zeeman チューニング (Eu の I=5/2 由来 $q_B$)** → CLAUDE.md ¹⁵¹Eu セクション + 実装は YAML `zeeman.q`。
 
-このレビューノート自体は KU 論文を Eu 視点で読み解く最初の足がかりとして
-残しているので、上記の formal な write-up を読む前の motivation として
-眺めるのが良い。
+このレビューノート自体は KU 論文を Eu 視点で読み解く最初の足がかりとして 残しているので、上記の formal な write-up を読む前の motivation として 眺めるのが良い。

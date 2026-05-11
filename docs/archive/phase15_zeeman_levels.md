@@ -1,8 +1,6 @@
 # Phase 1.5: Zeeman-level dispatch design
 
-Author: anko (assisted by Claude Opus 4.7)
-Status: Draft — pre-implementation decision record
-Date: 2026-04-23
+Author: anko (assisted by Claude Opus 4.7) Status: Draft — pre-implementation decision record Date: 2026-04-23
 
 ## Motivation
 

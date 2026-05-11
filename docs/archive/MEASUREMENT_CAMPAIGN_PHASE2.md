@@ -1,20 +1,14 @@
 # Measurement Campaign — Phase 2 (修論 deadline 直前)
 
-**Purpose**: R32-R39 で実装した optimization / continuation インフラの
-ROI 数値を **実 Eu real-physics config で取得** する。Phase 1 の合成
-検証は完了済み。Phase 2 は TSUBAME 1 週間の burst で全数値を揃える。
+**Purpose**: R32-R39 で実装した optimization / continuation インフラの ROI 数値を **実 Eu real-physics config で取得** する。Phase 1 の合成 検証は完了済み。Phase 2 は TSUBAME 1 週間の burst で全数値を揃える。
 
-**Owner**: anko (修論)
-**Reviewer**: TBD
-**Deadline**: 修論提出 (date TBD)
-**Compute**: TSUBAME 4.0 H100 (job array, f_node, T3TMPDIR scratch)
+**Owner**: anko (修論) **Reviewer**: TBD **Deadline**: 修論提出 (date TBD) **Compute**: TSUBAME 4.0 H100 (job array, f_node, T3TMPDIR scratch)
 
 ---
 
 ## 測定マトリクス
 
-各 round の (a) 測定すべき数値、(b) 期待値、(c) 既測定値、(d) Eu real
-config で取り直す bench、(e) 想定 wall time。
+各 round の (a) 測定すべき数値、(b) 期待値、(c) 既測定値、(d) Eu real config で取り直す bench、(e) 想定 wall time。
 
 ### R32 — Sobolev preconditioner
 
@@ -26,9 +20,7 @@ config で取り直す bench、(e) 想定 wall time。
 | **Eu config**: `runs/measurement_R3x_eu/r32_sobolev_eu_64/config.yaml` | TODO |
 | **wall time**: 6 α × ~30 min/run @ 64³ ≈ 3 h | — |
 
-実 Eu 64³ で iter 削減が出れば修正、出なければ negative result を
-修論に明記。L-BFGS history が既に強い preconditioner として機能する
-ことを論じる。
+実 Eu 64³ で iter 削減が出れば修正、出なければ negative result を 修論に明記。L-BFGS history が既に強い preconditioner として機能する ことを論じる。
 
 ### R33 — Multi-fidelity Bayesian optimisation
 
@@ -40,9 +32,7 @@ config で取り直す bench、(e) 想定 wall time。
 | **Eu config**: `runs/measurement_R3x_eu/r33_mfbo_eu_phase/config.yaml` | TODO |
 | **wall time**: 16³ low (~1 min) + 32³ high (~30 min); 50 evals total ≈ 4-5 h | — |
 
-Eu real config で MFBO が単一 fidelity 比で何倍速いか測る。**期待値
-8-15× を実証できれば 修論 figure に直入** (TSUBAME wall-clock log を
-そのまま使える)。
+Eu real config で MFBO が単一 fidelity 比で何倍速いか測る。**期待値 8-15× を実証できれば 修論 figure に直入** (TSUBAME wall-clock log を そのまま使える)。
 
 ### R34 — MFBO YAML wrapper
 
@@ -53,8 +43,7 @@ Eu real config で MFBO が単一 fidelity 比で何倍速いか測る。**期�
 | **既測**: 1D F=1 throwaway YAML で E2E 動作確認 | ✅ (heavy-gate skip) |
 | **Eu config**: R33 と同じ `r33_mfbo_eu_phase/config.yaml` を YAML wrapper 経由 | TODO |
 
-YAML wrapper のオーバーヘッドは parse_pipeline + workspace
-specialisation の per-call cost。R33 (in-memory) と差が出るかを測る。
+YAML wrapper のオーバーヘッドは parse_pipeline + workspace specialisation の per-call cost。R33 (in-memory) と差が出るかを測る。
 
 ### R35 — Pseudo-arclength continuation (B-1 boundary)
 
@@ -66,8 +55,7 @@ specialisation の per-call cost。R33 (in-memory) と差が出るかを測る�
 | **Eu config**: `runs/measurement_R3x_eu/r35_b1_boundary_trace/config.yaml` | TODO |
 | **wall time**: cold 1 min + warm 30 s × 99 = ~ 50 min | — |
 
-修論 figure: B-1 boundary curve in (c₁, c_dd) plane with 100 traced
-points; overlay grid-scan baseline for visual proof of speedup.
+修論 figure: B-1 boundary curve in (c₁, c_dd) plane with 100 traced points; overlay grid-scan baseline for visual proof of speedup.
 
 ### R36 — Active learning phase scan
 
@@ -79,8 +67,7 @@ points; overlay grid-scan baseline for visual proof of speedup.
 | **Eu config**: `runs/measurement_R3x_eu/r36_4d_phase_al/config.yaml` | TODO |
 | **wall time**: 200-500 evals × 5-30 min/eval ≈ 30 h - 250 h (heavy) | — |
 
-実 Eu で 200 sample 以下にしたい。Phase 6 の 4D phase mapping は
-このベンチが load-bearing。
+実 Eu で 200 sample 以下にしたい。Phase 6 の 4D phase mapping は このベンチが load-bearing。
 
 ### R37 — Triple-point hunting
 
@@ -92,8 +79,7 @@ points; overlay grid-scan baseline for visual proof of speedup.
 | **Eu config**: `runs/measurement_R3x_eu/r37_triple_point_hunt/config.yaml` | TODO |
 | **wall time**: AL 100 evals + 3 boundary traces × ~50 min = 12-15 h | — |
 
-**論文化候補** (修論 → 共同研究 → D 論研究テーマ)。KU §5 が議論する
-F=1,2,3 の FL/CSV/PCV triple point の F=6 拡張。
+**論文化候補** (修論 → 共同研究 → D 論研究テーマ)。KU §5 が議論する F=1,2,3 の FL/CSV/PCV triple point の F=6 拡張。
 
 ### R38 — AL YAML wrapper
 
@@ -113,9 +99,7 @@ F=1,2,3 の FL/CSV/PCV triple point の F=6 拡張。
 | **Eu config**: `runs/measurement_R3x_eu/r39_bdg_along_b1/config.yaml` | TODO |
 | **wall time**: 50 points × (warm GS 30 s + BdG 0.1 s) ≈ 25 min | — |
 
-修論 figure: 2D heatmap, x = boundary arclength, y = k, color = Re ω
-or growth rate. Roton minimum が boundary に沿ってどう evolve するか
-1 plot で見える。
+修論 figure: 2D heatmap, x = boundary arclength, y = k, color = Re ω or growth rate. Roton minimum が boundary に沿ってどう evolve するか 1 plot で見える。
 
 ---
 
@@ -131,15 +115,13 @@ or growth rate. Roton minimum が boundary に沿ってどう evolve するか
 | Day 6 | R32 Sobolev sweep (low priority) | 3 h | `…/r32_*/sweep.jld2` |
 | Day 7 | Re-run / debugging slack | — | — |
 
-各 job は `#!/bin/sh` + `julia --project=. run_measurement.jl` 形式、
-`SPINORBEC_RUN_HEAVY_YAML=true` env で gate を opens。
+各 job は `#!/bin/sh` + `julia --project=. run_measurement.jl` 形式、 `SPINORBEC_RUN_HEAVY_YAML=true` env で gate を opens。
 
 ---
 
 ## 修論 table テンプレート
 
-執筆時に上の "Eu config" 列の TODO が埋まり、(d) が実値になったら以下を
-修論 §X.X に貼る:
+執筆時に上の "Eu config" 列の TODO が埋まり、(d) が実値になったら以下を 修論 §X.X に貼る:
 
 ```
 | Method                    | Wall (h) | Speedup | Quality (E_min Δ) |
@@ -157,7 +139,6 @@ R33 までは既に 3.11× 確認済。
 
 ## Canonical Eu YAML configs
 
-**Location**: `runs/measurement_R3x_eu/`
-**Status**: 雛形のみ commit、実行は TSUBAME burst time
+**Location**: `runs/measurement_R3x_eu/` **Status**: 雛形のみ commit、実行は TSUBAME burst time
 
 各 sub-dir の README に R3x との対応 + run command を記載。

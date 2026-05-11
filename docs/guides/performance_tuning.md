@@ -4,24 +4,16 @@ When to reach for which knob.
 
 ## Mixed precision (Float32 vs Float64)
 
-`dtype: f32` halves VRAM and ~doubles GPU FFT throughput. Use it when
-the grid is VRAM-bound (≥ 96³) and ITP tolerance is ≥ 1e-5. Stay on F64
-for publication numbers, LBFGS polish, and Bogoliubov near instabilities.
-Full rollout plan + scalar boundaries in `../design/mixed_precision_design.md`;
-operational constraints (rotating_basis path) in `CLAUDE.md` "Mixed
-precision". Regression: `test/test_mixed_precision_phase3.jl`.
+`dtype: f32` halves VRAM and ~doubles GPU FFT throughput. Use it when the grid is VRAM-bound (≥ 96³) and ITP tolerance is ≥ 1e-5. Stay on F64 for publication numbers, LBFGS polish, and Bogoliubov near instabilities. Full rollout plan + scalar boundaries in `../design/mixed_precision_design.md`; operational constraints (rotating_basis path) in `CLAUDE.md` "Mixed precision". Regression: `test/test_mixed_precision_phase3.jl`.
 
 ## Projected GP (k_cut)
 
 Add `dynamics.projected_gp: {k_cut: K}` when:
 
-- High-k aliasing artefacts are visible in the FFT spectrum (long
-  dynamics, attractive interactions, droplet collapse onset)
-- You want to suppress the thermal-cloud region of phase space and keep
-  the simulation in the classical-field regime
+- High-k aliasing artefacts are visible in the FFT spectrum (long dynamics, attractive interactions, droplet collapse onset)
+- You want to suppress the thermal-cloud region of phase space and keep the simulation in the classical-field regime
 
-Side effect: norm decreases as removed-mode mass leaks out. Track
-`norms[end] / norms[1]` for sanity.
+Side effect: norm decreases as removed-mode mass leaks out. Track `norms[end] / norms[1]` for sanity.
 
 ## Save_every / snapshot streaming
 
@@ -33,20 +25,13 @@ Snapshot every Nth step:
 
 Snapshot in-memory vs streamed:
 
-- `save_psi_snapshots: false` (default) — snapshots accumulate in host
-  RAM during dynamics. Caps you at ~100 frames for 64³ × 13-component
-  Eu151 (~3.5 GB).
-- `save_psi_snapshots: true` + `save_snapshot_precision: "f32"` — one
-  frame at a time streamed to a scratch JLD2. Peak RAM ≈ one frame
-  (~30 MB). Use this for long stir runs.
+- `save_psi_snapshots: false` (default) — snapshots accumulate in host RAM during dynamics. Caps you at ~100 frames for 64³ × 13-component Eu151 (~3.5 GB).
+- `save_psi_snapshots: true` + `save_snapshot_precision: "f32"` — one frame at a time streamed to a scratch JLD2. Peak RAM ≈ one frame (~30 MB). Use this for long stir runs.
 - `column_density_movie` reads both paths.
 
 ## DDI on/off
 
-`ddi: {enabled: false}` cuts wall-clock per step by ~40-60% on Eu151
-because the FFT-based convolution dominates. Drop DDI for setups where
-the dipolar contribution is physically irrelevant (low-density, weak
-ε_dd cases).
+`ddi: {enabled: false}` cuts wall-clock per step by ~40-60% on Eu151 because the FFT-based convolution dominates. Drop DDI for setups where the dipolar contribution is physically irrelevant (low-density, weak ε_dd cases).
 
 ## `dt` rule of thumb
 
@@ -62,15 +47,11 @@ For weakly dipolar / scalar:
 
 ## Scan-loop GPU memory
 
-If a long scan OOMs after ~100 points: confirm
-`SpinorBEC._cuda_reclaim_callback[]` is set (via the CUDA extension's
-__init__). Fix landed in commit 7769d84.
+If a long scan OOMs after ~100 points: confirm `SpinorBEC._cuda_reclaim_callback[]` is set (via the CUDA extension's __init__). Fix landed in commit 7769d84.
 
 ## Loss / SGPE callbacks
 
-Each `dynamics.{sgpe,projected_gp,photon_scattering,loss}` block adds
-~5-15% wall-clock per step. Composing all four ≈ 1.5x baseline.
-Drop any unused block.
+Each `dynamics.{sgpe,projected_gp,photon_scattering,loss}` block adds ~5-15% wall-clock per step. Composing all four ≈ 1.5x baseline. Drop any unused block.
 
 ## Useful diagnostics
 

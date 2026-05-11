@@ -1,7 +1,6 @@
 # Runs inventory — Bug-4 / Bug-5 audit
 
-Generated 2026-05-02 by querying every `config.yaml` under `runs/`
-and cross-referencing the post-fix code state (commit baafd08).
+Generated 2026-05-02 by querying every `config.yaml` under `runs/` and cross-referencing the post-fix code state (commit baafd08).
 
 ## Severity legend
 
@@ -35,10 +34,6 @@ and cross-referencing the post-fix code state (commit baafd08).
 
 ## Re-run plan
 
-Each affected run's ground-state phase should be re-run on GPU
-with the fixed integrator (commit 4f56cc3+). Production-grade
-phases (dynamics) chained on the GS will inherit the corrected
-initial state automatically.
+Each affected run's ground-state phase should be re-run on GPU with the fixed integrator (commit 4f56cc3+). Production-grade phases (dynamics) chained on the GS will inherit the corrected initial state automatically.
 
-See `runs/measurement_R3x_eu/` for the new canonical configs that
-the Phase 2 measurement campaign uses.
+See `runs/measurement_R3x_eu/` for the new canonical configs that the Phase 2 measurement campaign uses.

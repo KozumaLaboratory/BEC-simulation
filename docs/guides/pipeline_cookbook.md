@@ -1,8 +1,6 @@
 # Pipeline cookbook
 
-Common YAML patterns. Each block is a self-contained excerpt — combine
-them in your own configs. For complete runnable scenarios see
-`runs/samples/` and `runs/eu151_*/config.yaml`.
+Common YAML patterns. Each block is a self-contained excerpt — combine them in your own configs. For complete runnable scenarios see `runs/samples/` and `runs/eu151_*/config.yaml`.
 
 ## Basic ground state
 
@@ -39,10 +37,7 @@ pipeline:
 
 ## Real-time dynamics
 
-For the `dynamics:` block (every accepted key + the sgpe/projected_gp/
-photon_scattering/loss/pulse_sequence/live_monitor callbacks that
-compose freely via `_compose_callbacks`) see
-`../reference/dynamics.md` — has the worked multi-knob example.
+For the `dynamics:` block (every accepted key + the sgpe/projected_gp/ photon_scattering/loss/pulse_sequence/live_monitor callbacks that compose freely via `_compose_callbacks`) see `../reference/dynamics.md` — has the worked multi-knob example.
 
 ## Symmetry-breaking seed (EdH)
 
@@ -53,10 +48,7 @@ compose freely via `_compose_callbacks`) see
                                   # in long-wavelength unstable modes
 ```
 
-`seed_k_cut` is optional. Without it the seed is unfiltered white
-noise; with it, FFT components above `|k| = seed_k_cut` are zeroed
-before injecting into the dominant transverse component. For Eu151 EdH
-a typical choice is `seed_k_cut ≈ 1/ξ_h`. Used in `runs/eu151_edh/`.
+`seed_k_cut` is optional. Without it the seed is unfiltered white noise; with it, FFT components above `|k| = seed_k_cut` are zeroed before injecting into the dominant transverse component. For Eu151 EdH a typical choice is `seed_k_cut ≈ 1/ξ_h`. Used in `runs/eu151_edh/`.
 
 ## 1D scan over a YAML path
 
@@ -81,8 +73,7 @@ scan:
     pipeline.0.zeeman.q: [-1.0, -0.3, 0.0, 0.3, 1.0]
 ```
 
-`product` takes the Cartesian product. Use `zip` for paired axes of equal
-length.
+`product` takes the Cartesian product. Use `zip` for paired axes of equal length.
 
 ## Ensemble at fixed point (different noise seeds)
 
@@ -111,12 +102,8 @@ pipeline:
 
 Output (PlotlyJS removed 2026-04-26):
 
-- `<output_dir>/columns.jld2` — one Float32 2D array per frame keyed
-  `frame_NNNNN` (global frame counter across all phases).
-- `<output_dir>/manifest.json` — `n_frames`, `n_phases`, `axis`,
-  `frame_keys`, `times` (with each phase's t offset added),
-  `phase_indices`, `archive` (basename of the JLD2). The dashboard /
-  external notebooks render PNGs on demand from this archive.
+- `<output_dir>/columns.jld2` — one Float32 2D array per frame keyed `frame_NNNNN` (global frame counter across all phases).
+- `<output_dir>/manifest.json` — `n_frames`, `n_phases`, `axis`, `frame_keys`, `times` (with each phase's t offset added), `phase_indices`, `archive` (basename of the JLD2). The dashboard / external notebooks render PNGs on demand from this archive.
 
 ## Calibration: lab-unit YAML
 
@@ -178,10 +165,7 @@ pipeline:
 
 ## Resumable scan
 
-`run_yaml` writes one `point_NNN.jld2` per scan point. Re-running the
-same YAML skips already-written points. Delete an individual file to
-force that point to recompute. Partial-failure resilience: each scan
-point's GS+dynamics is independent; one failure doesn't poison neighbours.
+`run_yaml` writes one `point_NNN.jld2` per scan point. Re-running the same YAML skips already-written points. Delete an individual file to force that point to recompute. Partial-failure resilience: each scan point's GS+dynamics is independent; one failure doesn't poison neighbours.
 
 ## Dry-run preview
 
@@ -189,6 +173,4 @@ point's GS+dynamics is independent; one failure doesn't poison neighbours.
 yaml_str = run_yaml("path/to/config.yaml"; dry_run = true)
 ```
 
-Prints the post-calibration / post-validation YAML to stdout **and
-returns it as a String** without touching the GPU. Useful to capture
-the expanded YAML for diff'ing or to assert in tests.
+Prints the post-calibration / post-validation YAML to stdout **and returns it as a String** without touching the GPU. Useful to capture the expanded YAML for diff'ing or to assert in tests.

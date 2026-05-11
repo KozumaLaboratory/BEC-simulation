@@ -1,15 +1,11 @@
 # Scan group redesign — 2026-04-29
 
-Pain point identified by anko: 70+ `runs/<...>/config.yaml` files,
-many of which are 1-parameter sweeps (8 phi_omega, 6 Berry, 24 thesis
-batch). Currently:
+Pain point identified by anko: 70+ `runs/<...>/config.yaml` files, many of which are 1-parameter sweeps (8 phi_omega, 6 Berry, 24 thesis batch). Currently:
 
 - Each sweep point lives as its own dir with its own config.yaml.
 - No machine-readable record of "these 8 dirs are one scan".
-- Each analyzer (`analyze_phi_omega_scan.jl`, etc.) hard-codes the
-  member list. Keep two analyzers in sync as scans evolve = drift.
-- Dashboard shows one run at a time. Cross-run comparison requires
-  tabbing between 8 entries and copying numbers by hand.
+- Each analyzer (`analyze_phi_omega_scan.jl`, etc.) hard-codes the member list. Keep two analyzers in sync as scans evolve = drift.
+- Dashboard shows one run at a time. Cross-run comparison requires tabbing between 8 entries and copying numbers by hand.
 
 ## What's already in the project
 
@@ -26,15 +22,9 @@ scan:
       override: {...}
 ```
 
-`scan_continuation`, `comparison_runs`, `auto_rotate_psi` are wired
-into `run_yaml`. Used in `runs/eu151_mz_scan/`, `runs/eu151_phase_pq/`
-etc — those each have ONE `config.yaml` with a `scan:` block.
+`scan_continuation`, `comparison_runs`, `auto_rotate_psi` are wired into `run_yaml`. Used in `runs/eu151_mz_scan/`, `runs/eu151_phase_pq/` etc — those each have ONE `config.yaml` with a `scan:` block.
 
-Today's new scans (phi_omega, Berry crossover, thesis_batch) bypassed
-this and instead generated N separate dirs via Julia generator
-scripts. Cause: launching N parallel runs across 3-GPU chunks is
-easier when each run is its own shell call. But the result is
-duplicated YAML and orphan analyzers.
+Today's new scans (phi_omega, Berry crossover, thesis_batch) bypassed this and instead generated N separate dirs via Julia generator scripts. Cause: launching N parallel runs across 3-GPU chunks is easier when each run is its own shell call. But the result is duplicated YAML and orphan analyzers.
 
 ## Proposal
 
@@ -62,10 +52,7 @@ extra_overrides:
 runs_dir: ./   # subdirs auto-named eu151_phi1_0_500ms, etc.
 ```
 
-Each scan point's `config.yaml` gets generated from `template +
-override_path → values[i]`. The scan.yaml is the authoritative
-record; the per-point YAMLs are derivable artefacts (could be
-`.gitignore`d, or kept for readability).
+Each scan point's `config.yaml` gets generated from `template + override_path → values[i]`. The scan.yaml is the authoritative record; the per-point YAMLs are derivable artefacts (could be `.gitignore`d, or kept for readability).
 
 ### 2. Dashboard `/api/scan_group/<name>` endpoint
 
@@ -84,10 +71,7 @@ Returns aggregated cross-run summary:
 }
 ```
 
-Frontend renders this as ONE comparison plot (Lz vs phi_omega,
-m=+F vs phi_omega, etc) instead of 8 separate panels. Built on top
-of the per-run `/api/physics_summary` (commit 1ea444e) — no
-recomputation per scan point.
+Frontend renders this as ONE comparison plot (Lz vs phi_omega, m=+F vs phi_omega, etc) instead of 8 separate panels. Built on top of the per-run `/api/physics_summary` (commit 1ea444e) — no recomputation per scan point.
 
 ### 3. Generator + launcher templates
 
@@ -103,19 +87,11 @@ bash scripts/scan_launch.sh runs/phi_omega_scan/scan.yaml
 julia --project=. scripts/scan_analyze.jl runs/phi_omega_scan/scan.yaml
 ```
 
-`scripts/scan_*.jl` replace today's scattered
-`scripts/generate_phi_omega_scan_local.jl`,
-`scripts/run_phi_omega_scan.sh`, `scripts/analyze_phi_omega_scan.jl`,
-and the Berry crossover triplet, and the thesis_batch tetrad. One
-parameterised set of helpers, fed by N small `scan.yaml` files.
+`scripts/scan_*.jl` replace today's scattered `scripts/generate_phi_omega_scan_local.jl`, `scripts/run_phi_omega_scan.sh`, `scripts/analyze_phi_omega_scan.jl`, and the Berry crossover triplet, and the thesis_batch tetrad. One parameterised set of helpers, fed by N small `scan.yaml` files.
 
 ### 4. Migration
 
-Backward-compatible: existing per-point configs keep working through
-the legacy launcher path. New scans MUST start with a `scan.yaml`.
-The thesis_batch / phi_omega / Berry crossover get a *retrofit*
-`scan.yaml` written from their existing N configs (one-shot script,
-~30 min):
+Backward-compatible: existing per-point configs keep working through the legacy launcher path. New scans MUST start with a `scan.yaml`. The thesis_batch / phi_omega / Berry crossover get a *retrofit* `scan.yaml` written from their existing N configs (one-shot script, ~30 min):
 
 ```bash
 julia --project=. scripts/scan_retrofit.jl runs/phi_omega_scan/
@@ -134,13 +110,9 @@ julia --project=. scripts/scan_retrofit.jl runs/phi_omega_scan/
 
 ## What it doesn't fix (out of scope)
 
-- Multi-axis scans (currently the project's `scan:` block already
-  handles this with `product:`, but the dashboard view becomes harder
-  — punt to a later iteration).
-- Automated parameter discovery (e.g. "find all phi_omega-style
-  scans"). That's a separate indexing problem.
-- Cross-scan comparison (e.g. phi_omega scan vs Berry crossover
-  on the same axes). Needs scan-of-scans concept; later.
+- Multi-axis scans (currently the project's `scan:` block already handles this with `product:`, but the dashboard view becomes harder — punt to a later iteration).
+- Automated parameter discovery (e.g. "find all phi_omega-style scans"). That's a separate indexing problem.
+- Cross-scan comparison (e.g. phi_omega scan vs Berry crossover on the same axes). Needs scan-of-scans concept; later.
 
 ## Implementation effort
 
@@ -153,22 +125,17 @@ Approximate, in priority order:
 | Frontend cross-run plot widget | 2 days | yes (can't test UI here) |
 | Migrate phi_omega, Berry, thesis_batch to scan.yaml | half day | needs above |
 
-**Total: ~3-4 days of focused work.** Doable post-thesis, or before
-the next scan campaign.
+**Total: ~3-4 days of focused work.** Doable post-thesis, or before the next scan campaign.
 
 ## Decision point
 
-This is a real architectural improvement, not a thesis blocker. The
-question is timing:
+This is a real architectural improvement, not a thesis blocker. The question is timing:
 
-- **Do now (next 2-3 days)**: cleaner thesis writing — one scan.yaml
-  per figure instead of 8 YAML diffs to track.
-- **Defer to post-thesis**: thesis figures don't need this for the
-  defense — current analyzers work, just less ergonomic.
+- **Do now (next 2-3 days)**: cleaner thesis writing — one scan.yaml per figure instead of 8 YAML diffs to track.
+- **Defer to post-thesis**: thesis figures don't need this for the defense — current analyzers work, just less ergonomic.
 
 anko's call. If we go now, I'd recommend:
-1. Build `scan_expand.jl` + `scan_launch.sh` first (1 day) — reusable
-   immediately for any future scan
+1. Build `scan_expand.jl` + `scan_launch.sh` first (1 day) — reusable immediately for any future scan
 2. Retrofit phi_omega + Berry + thesis_batch (skim, ~2h)
 3. Dashboard endpoint (half day)
 4. Frontend widget — defer until anko has bandwidth to test in browser

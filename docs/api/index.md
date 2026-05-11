@@ -1,7 +1,6 @@
 # SpinorBEC API reference
 
-Auto-generated from docstrings via [Documenter.jl](https://documenter.juliadocs.org/).
-To rebuild locally:
+Auto-generated from docstrings via [Documenter.jl](https://documenter.juliadocs.org/). To rebuild locally:
 
 ```julia
 julia --project=docs -e 'using Pkg; Pkg.develop(PackageSpec(path=".")); Pkg.instantiate()'

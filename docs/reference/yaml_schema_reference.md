@@ -1,9 +1,6 @@
 # YAML schema — full parameter reference
 
-Generated 2026-04-30 from `src/workflow/experiments/schema.jl` and the
-pre-parse stages. Use this to spot aliases, redundancies, and inconsistent
-naming. Marked with `[ALIAS]` are fields that overlap semantically with
-others — candidates for cleanup.
+Generated 2026-04-30 from `src/workflow/experiments/schema.jl` and the pre-parse stages. Use this to spot aliases, redundancies, and inconsistent naming. Marked with `[ALIAS]` are fields that overlap semantically with others — candidates for cleanup.
 
 ## Top-level keys
 
@@ -110,10 +107,7 @@ others — candidates for cleanup.
 
 ## dynamics step
 
-Per-key reference (semantics, callback composition, examples) lives in
-`dynamics.md`. Aliases for keys in this block are listed in the table at
-the bottom of this file (`save_every` ↔ `n_snapshots`, `dt` ↔ `epsilon`,
-`cuda` ↔ `gpu` etc.).
+Per-key reference (semantics, callback composition, examples) lives in `dynamics.md`. Aliases for keys in this block are listed in the table at the bottom of this file (`save_every` ↔ `n_snapshots`, `dt` ↔ `epsilon`, `cuda` ↔ `gpu` etc.).
 
 ## B_hat (rotating_basis B̂(t) trajectory)
 
@@ -137,12 +131,9 @@ B_hat:
 | `{rate: <scalar>}` | const dφ/dt (uniform rotation) |
 | `{rate: {from, to, duration}}` | linear ramp dφ/dt (chirp) |
 
-In `ground_state.B_hat`, `theta` and `phi` are scalars (initial direction
-at t=0). The `{rate: ...}` form is for dynamics steps only.
+In `ground_state.B_hat`, `theta` and `phi` are scalars (initial direction at t=0). The `{rate: ...}` form is for dynamics steps only.
 
-The legacy flat form (`theta_const` / `theta_ramp` / `phi_omega` /
-`phi_chirp` / `phi_dot`) is removed. Writing those keys now raises
-`ArgumentError` with a migration hint.
+The legacy flat form (`theta_const` / `theta_ramp` / `phi_omega` / `phi_chirp` / `phi_dot`) is removed. Writing those keys now raises `ArgumentError` with a migration hint.
 
 ## Waveform spec (used in B_hat axes, zeeman.{Bx,By,Bz,B_mag,theta_deg,phi_deg}, q, etc.)
 

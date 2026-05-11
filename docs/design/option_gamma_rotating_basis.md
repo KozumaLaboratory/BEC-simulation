@@ -1,22 +1,14 @@
 # Option γ: Instantaneous Local Frame Spinor GPE — derivation
 
-Mathematical derivation behind `kind: rotating_basis`. **For how to use
-it (YAML, validation results, ε rule, gauge gotcha), read
-`guides/klaus_regime.md` first.** This file is the term-by-term
-Hamiltonian transform — read it when you need to understand or extend
-the math.
+Mathematical derivation behind `kind: rotating_basis`. **For how to use it (YAML, validation results, ε rule, gauge gotcha), read `guides/klaus_regime.md` first.** This file is the term-by-term Hamiltonian transform — read it when you need to understand or extend the math.
 
-Status: **production**. Phase II/III validation passed 2026-04-27 (see
-guide for the table). Scalar eGPE (`src/rotating_basis/scalar_egpe.jl`)
-is the adiabatic limit ($\tilde\psi_{m\neq -F}\to 0$) and serves as the
-Phase II reference.
+Status: **production**. Phase II/III validation passed 2026-04-27 (see guide for the table). Scalar eGPE (`src/rotating_basis/scalar_egpe.jl`) is the adiabatic limit ($\tilde\psi_{m\neq -F}\to 0$) and serves as the Phase II reference.
 
 ## 1. Setup
 
 - Spatial: $\vec r\in\mathbb{R}^3$
 - Spin: $F$ (Eu151 $F=6$), $D=2F+1$ components
-- Time-dependent polarization: $\vec B(t)=B(t)\hat B(t)$,
-  $\hat B(t)=(\sin\theta\cos\phi,\sin\theta\sin\phi,\cos\theta)$
+- Time-dependent polarization: $\vec B(t)=B(t)\hat B(t)$, $\hat B(t)=(\sin\theta\cos\phi,\sin\theta\sin\phi,\cos\theta)$
 
 Lab-frame Hamiltonian:
 
@@ -40,12 +32,9 @@ $$\hat U_B(t) = e^{-i\phi(t)\hat F_z}\,e^{-i\theta(t)\hat F_y}$$
 
 (z-y-z Euler with $\gamma=0$; $\gamma$ is the gauge degree of freedom — see §9.)
 
-Key property:
-$\hat U_B^\dagger(\hat{\vec F}\cdot\hat B)\hat U_B = \hat F_z$
-— the projection along the magnetic-field axis becomes static $\hat F_z$.
+Key property: $\hat U_B^\dagger(\hat{\vec F}\cdot\hat B)\hat U_B = \hat F_z$ — the projection along the magnetic-field axis becomes static $\hat F_z$.
 
-Wavefunction transform: $\tilde\psi(\vec r,t) \equiv \hat U_B^\dagger(t)\psi^\text{lab}(\vec r,t)$.
-In Klaus regime $\tilde\psi_{-F}$ is dominant, $\tilde\psi_{m\neq-F}$ are small spin excitations.
+Wavefunction transform: $\tilde\psi(\vec r,t) \equiv \hat U_B^\dagger(t)\psi^\text{lab}(\vec r,t)$. In Klaus regime $\tilde\psi_{-F}$ is dominant, $\tilde\psi_{m\neq-F}$ are small spin excitations.
 
 ## 3. Transformed Schrödinger equation
 
@@ -69,8 +58,7 @@ $$\hat U_B^\dagger\bigl[-p\hat{\vec F}\cdot\hat B + q(\hat{\vec F}\cdot\hat B)^2
 
 ### 4.3 Contact spin-spin
 
-$c_0 n$ is invariant under $\hat U_B$ (norm preserved).
-$c_1\hat{\vec F}\cdot\langle\hat{\vec F}\rangle$ is rotationally scalar and keeps the same form in the rotating basis.
+$c_0 n$ is invariant under $\hat U_B$ (norm preserved). $c_1\hat{\vec F}\cdot\langle\hat{\vec F}\rangle$ is rotationally scalar and keeps the same form in the rotating basis.
 
 ### 4.4 DDI (★ careful)
 
@@ -94,9 +82,7 @@ $$\hat A(t) = \hbar\bigl[\dot\theta(t)\hat F_y + \dot\phi(t)\bigl(\cos\theta(t)\
 
 Derived from $\hat U_B = e^{-i\phi\hat F_z}e^{-i\theta\hat F_y}$ via chain rule.
 
-Magnitude: $|\hat A| \sim \hbar|\dot{\hat B}| = \hbar\omega_\text{rotation}$.
-For Klaus 226 Hz this is ≈ 1.4 kHz vs Larmor 1.4 MHz ⇒ **3 decades smaller**.
-With $dt=2\times 10^{-3}$, $|\hat A|\,dt \sim 10^{-3}$ — Strang error well controlled.
+Magnitude: $|\hat A| \sim \hbar|\dot{\hat B}| = \hbar\omega_\text{rotation}$. For Klaus 226 Hz this is ≈ 1.4 kHz vs Larmor 1.4 MHz ⇒ **3 decades smaller**. With $dt=2\times 10^{-3}$, $|\hat A|\,dt \sim 10^{-3}$ — Strang error well controlled.
 
 ## 6. Final rotating-basis spinor GP
 
@@ -174,18 +160,9 @@ LOC estimate:
 
 ## 12. Two physics insights worth recording separately
 
-**Larmor sub-cycling is not solved by Option γ alone.** Naive lab-frame
-Strang splits Zeeman (transverse + diagonal) from DDI/SM, and that's
-what makes dt scale as 1/p. An eigen-exact spin step that combines all
-spin-only spatial-constant operators into one D×D unitary eliminates
-that constraint in BOTH lab-frame and rotating-basis (we have both
-solvers; they agree). So Option γ's actual advantage is **cleaner
-sparsity**: $\tilde H = -p F_z + q F_z² - Â$ stays sparse for arbitrary
-$\hat B(t)$, while $H_{\rm lab} = -p \hat F \cdot \hat B(t)$ is full.
+**Larmor sub-cycling is not solved by Option γ alone.** Naive lab-frame Strang splits Zeeman (transverse + diagonal) from DDI/SM, and that's what makes dt scale as 1/p. An eigen-exact spin step that combines all spin-only spatial-constant operators into one D×D unitary eliminates that constraint in BOTH lab-frame and rotating-basis (we have both solvers; they agree). So Option γ's actual advantage is **cleaner sparsity**: $\tilde H = -p F_z + q F_z² - Â$ stays sparse for arbitrary $\hat B(t)$, while $H_{\rm lab} = -p \hat F \cdot \hat B(t)$ is full.
 
-**ε_dd_eff has an F² factor.** Stability requires
-`ε_dd_eff ≡ c_dd · F² / (3g) < 1`, not the naive `c_dd / (3g)`.
-The F² is in both solvers' effective dipolar strength.
+**ε_dd_eff has an F² factor.** Stability requires `ε_dd_eff ≡ c_dd · F² / (3g) < 1`, not the naive `c_dd / (3g)`. The F² is in both solvers' effective dipolar strength.
 
 ## 13. Where this sits among solvers
 
@@ -198,5 +175,4 @@ The F² is in both solvers' effective dipolar strength.
 | ITP for FL phase | works | works | trivial scalar | works |
 | EdH microscopic | works | works | misses spin-orbit | works |
 
-(*) lab spinor with eigen-exact spin step also bypasses sub-cycling
-(see §12); the table reflects the historical naive Strang split.
+(*) lab spinor with eigen-exact spin step also bypasses sub-cycling (see §12); the table reflects the historical naive Strang split.

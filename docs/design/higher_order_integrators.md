@@ -93,7 +93,7 @@ Estimated effort: 5-10× the Thalhammer paper's J=2 contact-only derivation. The
 
 ITP can't use Yoshida 4th-order: real coefficients have `w₀ < 0`, and in imaginary time `exp(+w₀ H τ)` diverges (Sheng-Suzuki barrier). The [Blanes-Casas-Ros 2024 symmetric-conjugate splitting](https://arxiv.org/abs/2407.07016) uses **complex coefficients with positive real parts**:
 
-  z_k ∈ ℂ, Re(z_k) > 0 ∀k, Σ z_k = 1
+z_k ∈ ℂ, Re(z_k) > 0 ∀k, Σ z_k = 1
 
 Substeps `exp(-z_k H τ)` decay (Re part), rotate phase (Im part), but ITP renormalises each step so the imaginary-phase accumulation doesn't matter.
 

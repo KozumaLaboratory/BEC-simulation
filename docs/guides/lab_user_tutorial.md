@@ -1,16 +1,12 @@
 # Lab user tutorial
 
-End-to-end walkthrough for running a SpinorBEC simulation that mirrors a
-day-in-the-lab experiment: load calibration, write the YAML in lab units,
-run, analyze, plot. Assumes you have a working install
-(`julia --project=. -e 'using Pkg; Pkg.instantiate()'`).
+End-to-end walkthrough for running a SpinorBEC simulation that mirrors a day-in-the-lab experiment: load calibration, write the YAML in lab units, run, analyze, plot. Assumes you have a working install (`julia --project=. -e 'using Pkg; Pkg.instantiate()'`).
 
 ---
 
 ## 1. Capture today's calibration
 
-After the morning calibration run, write the constants either to a
-single YAML or append to a CSV history. Both work; CSV is Excel-friendly.
+After the morning calibration run, write the constants either to a single YAML or append to a CSV history. Both work; CSV is Excel-friendly.
 
 `runs/lab/calibration_history.csv`:
 
@@ -20,8 +16,7 @@ date,coil_strong_gauss_per_mv,coil_strong_gauss_offset,coil_weak_gauss_per_mv,co
 2026-04-22,0.41,0.05,0.040,0.002,447.0,447.0,598.0,1.20e6
 ```
 
-Append a row each calibration day. SpinorBEC will linearly interpolate
-between rows when `target_date:` is set.
+Append a row each calibration day. SpinorBEC will linearly interpolate between rows when `target_date:` is set.
 
 ## 2. Write the experiment YAML in lab units
 
@@ -74,8 +69,7 @@ pipeline:
 
 ## 3. Dry-run preview
 
-Before kicking off a long compute, check the calibration expanded
-correctly:
+Before kicking off a long compute, check the calibration expanded correctly:
 
 ```julia
 import CUDA
@@ -84,9 +78,7 @@ using SpinorBEC
 run_yaml("runs/today/config.yaml"; dry_run = true)
 ```
 
-Output is the post-calibration YAML printed to stdout. Verify
-`zeeman.p` has become a `"X Gauss"` string and `potential.omega` is now
-a list of `"Y Hz"` strings.
+Output is the post-calibration YAML printed to stdout. Verify `zeeman.p` has become a `"X Gauss"` string and `potential.omega` is now a list of `"Y Hz"` strings.
 
 ## 4. Estimate the run budget
 
@@ -94,8 +86,7 @@ a list of `"Y Hz"` strings.
 estimate_run_budget("runs/today/config.yaml")
 ```
 
-Prints VRAM / host RAM / disk estimates so you don't accidentally OOM
-the GPU.
+Prints VRAM / host RAM / disk estimates so you don't accidentally OOM the GPU.
 
 ## 5. Run
 
@@ -117,8 +108,7 @@ setsid nohup bash -c '
 disown
 ```
 
-Verify with `ps -o pid,sid,etime,cmd -C julia` — `PID == SID` means
-session leader, survives shell close.
+Verify with `ps -o pid,sid,etime,cmd -C julia` — `PID == SID` means session leader, survives shell close.
 
 ## 6. Watch progress
 
@@ -127,8 +117,7 @@ tail -f logs/today.log
 ls runs/today/frames/        # columns.jld2 + manifest.json after analyze step
 ```
 
-If you opened the dashboard (`serve_dashboard(8765)`), the run shows up
-under the active runs list and the 3D viewer streams snapshots.
+If you opened the dashboard (`serve_dashboard(8765)`), the run shows up under the active runs list and the 3D viewer streams snapshots.
 
 ## 7. Analyze offline
 

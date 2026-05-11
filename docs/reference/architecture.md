@@ -8,12 +8,7 @@ The spatial dimensionality `N` is handled generically via Julia's parametric typ
 
 ## Module Structure
 
-`SpinorBEC.jl` is a thin umbrella (~100 LOC) that includes per-subsystem
-umbrellas (`foundation.jl`, `hamiltonian.jl`, `analysis.jl`, `solvers.jl`,
-`rotating_basis.jl`). Each in turn loads the source files of its subdir in
-dependency order. **For the full file tree see `CLAUDE.md` "Project
-Structure".** The mermaid dependency diagram at the end of this file shows
-how the subsystems compose.
+`SpinorBEC.jl` is a thin umbrella (~100 LOC) that includes per-subsystem umbrellas (`foundation.jl`, `hamiltonian.jl`, `analysis.jl`, `solvers.jl`, `rotating_basis.jl`). Each in turn loads the source files of its subdir in dependency order. **For the full file tree see `CLAUDE.md` "Project Structure".** The mermaid dependency diagram at the end of this file shows how the subsystems compose.
 
 ## Core Data Flow
 
@@ -111,10 +106,7 @@ Component `c` is accessed via `_component_slice(ndim, n_pts, c)`, which returns 
 
 ### Split-Step Method (`split_step.jl`)
 
-Strang outer split + symmetric inner V step. The exact substep ordering and
-the rule "all substeps auto-skip when coupling ≈ 0" live in `CLAUDE.md`
-"Key Architecture > Split-step". For imaginary time, every `exp(-i H dt)`
-becomes `exp(-H dt)` and ψ is renormalised after each step.
+Strang outer split + symmetric inner V step. The exact substep ordering and the rule "all substeps auto-skip when coupling ≈ 0" live in `CLAUDE.md` "Key Architecture > Split-step". For imaginary time, every `exp(-i H dt)` becomes `exp(-H dt)` and ψ is renormalised after each step.
 
 ### Kinetic Propagator (`propagators.jl`)
 
@@ -161,11 +153,7 @@ Constructs the `Workspace` struct, which bundles all simulation state and parame
 
 ### `find_ground_state`
 
-Uses imaginary time propagation with per-step renormalization.
-Convergence is `dpsi_norm < tol` (sole criterion). Returns a named
-tuple `(workspace, converged, energy, dE, last_step)`. LBFGS polish is
-provided by `find_ground_state_lbfgs` with the same return shape and
-`grad_norm < tol` as the convergence check.
+Uses imaginary time propagation with per-step renormalization. Convergence is `dpsi_norm < tol` (sole criterion). Returns a named tuple `(workspace, converged, energy, dE, last_step)`. LBFGS polish is provided by `find_ground_state_lbfgs` with the same return shape and `grad_norm < tol` as the convergence check.
 
 ### `run_simulation!`
 
@@ -173,8 +161,7 @@ Runs real-time evolution for `n_steps` steps, recording observables (time, energ
 
 ## Experiment System (`workflow/experiments/`)
 
-The experiment system is YAML-driven. Top-level entry points live in
-`run_registry.jl`; per-step dispatch lives in `pipeline_runner.jl`.
+The experiment system is YAML-driven. Top-level entry points live in `run_registry.jl`; per-step dispatch lives in `pipeline_runner.jl`.
 
 ### Pipeline shape
 
@@ -187,21 +174,13 @@ pipeline:
       - column_density_movie: {axis: 3, output_dir: …}
 ```
 
-Every parameter variation is a **dotted config-path override** (e.g.
-`pipeline.0.zeeman.p`) — see `CLAUDE.md` "YAML schema" for the full
-reference. The runner applies each scan point's overrides to the raw
-YAML dict, re-parses the experiment, and rebuilds a fresh workspace.
+Every parameter variation is a **dotted config-path override** (e.g. `pipeline.0.zeeman.p`) — see `CLAUDE.md` "YAML schema" for the full reference. The runner applies each scan point's overrides to the raw YAML dict, re-parses the experiment, and rebuilds a fresh workspace.
 
-For per-step dynamics knobs (sgpe, projected_gp, photon_scattering, loss,
-pulse_sequence, live_monitor, seed_amplitude/seed_k_cut) and entry points
-(`run_yaml`, `load_config`, `scan_continuation`, `scan_phase_diagram_2d`),
-see `dynamics.md` and `CLAUDE.md` "Entry points".
+For per-step dynamics knobs (sgpe, projected_gp, photon_scattering, loss, pulse_sequence, live_monitor, seed_amplitude/seed_k_cut) and entry points (`run_yaml`, `load_config`, `scan_continuation`, `scan_phase_diagram_2d`), see `dynamics.md` and `CLAUDE.md` "Entry points".
 
 ### Dashboard (`workflow/io/dashboard.jl`)
 
-`serve_dashboard(port)` launches an HTTP server backed by `HTTP.jl` that
-serves the Vite-built React UI from `web/dist/` plus the following JSON /
-binary endpoints:
+`serve_dashboard(port)` launches an HTTP server backed by `HTTP.jl` that serves the Vite-built React UI from `web/dist/` plus the following JSON / binary endpoints:
 
 | endpoint                        | purpose                                       |
 |---------------------------------|-----------------------------------------------|
@@ -214,17 +193,11 @@ binary endpoints:
 | `/api/lab/list?run=…`           | lab images uploaded for `<run>`                |
 | `/api/lab/image` (POST)         | upload a `.png` lab image into a run dir       |
 
-Atlases are mtime-validated and cached under
-`runs/_dashboard_cache/atlas__<run>__<file>__axis<N>__bsz<true|false>.bin`.
-Optional bitshuffle + zstd-3 compression via `?bsz=1` (see
-`docs/design/dashboard_perf_notes.md`).
+Atlases are mtime-validated and cached under `runs/_dashboard_cache/atlas__<run>__<file>__axis<N>__bsz<true|false>.bin`. Optional bitshuffle + zstd-3 compression via `?bsz=1` (see `docs/design/dashboard_perf_notes.md`).
 
 ## I/O (`workflow/io/`)
 
-JLD2 for state. Streaming snapshot format and `SPINORBEC_SCRATCH_DIR` are
-described in `dynamics.md` "Output cadence" + `guides/tsubame.md`
-"Filesystem layout". `estimate_run_budget(yaml)` prints VRAM / host RAM /
-disk projections from a YAML.
+JLD2 for state. Streaming snapshot format and `SPINORBEC_SCRATCH_DIR` are described in `dynamics.md` "Output cadence" + `guides/tsubame.md` "Filesystem layout". `estimate_run_budget(yaml)` prints VRAM / host RAM / disk projections from a YAML.
 
 ## Dependencies
 
@@ -243,10 +216,7 @@ disk projections from a YAML.
 | CUDA | GPU backend (weak extension `SpinorBECCUDAExt`) |
 | Makie | 2D/3D visualization (weak extension `SpinorBECMakieExt`) |
 
-No server-side plotting: dashboard renders 2D heatmaps via WebGPU
-(`HeatmapGrid`) and time series via SVG (`LineChartSVG`). PlotlyJS was
-removed 2026-04-26 — see `guides/migration_guide.md` for the user-facing
-changes.
+No server-side plotting: dashboard renders 2D heatmaps via WebGPU (`HeatmapGrid`) and time series via SVG (`LineChartSVG`). PlotlyJS was removed 2026-04-26 — see `guides/migration_guide.md` for the user-facing changes.
 
 ## Module dependency diagram
 
@@ -274,22 +244,14 @@ graph TD
 ## Reading order for new contributors
 
 1. `src/SpinorBEC.jl` — thin umbrella that loads each subsystem.
-2. `src/foundation/types/` (10 small files) — every struct in the
-   codebase, split by topic; `workspace.jl` last because it depends on
-   everything else.
+2. `src/foundation/types/` (10 small files) — every struct in the codebase, split by topic; `workspace.jl` last because it depends on everything else.
 3. `src/foundation/grid.jl` + `spin_matrices.jl` — math primitives.
 4. `src/hamiltonian/integrator/split_step.jl` — the inner Strang loop.
 5. `src/solvers/ground_state.jl` — ITP loop.
 6. `src/workflow/experiments/pipeline/runner.jl` — YAML → run dispatch.
-7. `src/workflow/experiments/pipeline/run_registry.jl` — `run_yaml` +
-   scan loop.
+7. `src/workflow/experiments/pipeline/run_registry.jl` — `run_yaml` + scan loop.
 8. `CLAUDE.md` "Type stability boundaries" — recurring pitfall.
 
 ## Key design choices
 
-Don't reverse without careful thought. Listed in `CLAUDE.md` —
-"Conventions" (DDI normalisation, ITP Zeeman shift, scalar LHY warning,
-…) and "Constraints" (Workspace type params, all structs in
-`foundation/types/`, calibration is a YAML preprocessor, snapshots stream
-at F32, `run_yaml` is resumable). Optional deps live in `ext/` (HTTP,
-WriteVTK, Makie, CUDA) so the package loads without any of them.
+Don't reverse without careful thought. Listed in `CLAUDE.md` — "Conventions" (DDI normalisation, ITP Zeeman shift, scalar LHY warning, …) and "Constraints" (Workspace type params, all structs in `foundation/types/`, calibration is a YAML preprocessor, snapshots stream at F32, `run_yaml` is resumable). Optional deps live in `ext/` (HTTP, WriteVTK, Makie, CUDA) so the package loads without any of them.

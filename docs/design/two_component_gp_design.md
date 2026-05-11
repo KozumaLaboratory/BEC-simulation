@@ -2,9 +2,7 @@
 
 Status: **scaffold / deferred** (Phase 4.7, Scenario #51).
 
-The full two-component coupled GP solver is multi-session work (~500 lines
-across types, propagators, energy, solvers, YAML). This note pins down
-the interface and key decisions so the next session can pick up cleanly.
+The full two-component coupled GP solver is multi-session work (~500 lines across types, propagators, energy, solvers, YAML). This note pins down the interface and key decisions so the next session can pick up cleanly.
 
 ## Physics target
 
@@ -15,8 +13,7 @@ i ∂_t ψ_A = (-½∇² + V_A + g_AA |ψ_A|² + g_AB |ψ_B|² + …) ψ_A
 i ∂_t ψ_B = (-½∇² + V_B + g_BB |ψ_B|² + g_AB |ψ_A|² + …) ψ_B
 ```
 
-with optional inter-species coherent coupling Ω · ψ_B and spin-spin
-contact (a_AB^F per F) for spinor-spinor mixtures.
+with optional inter-species coherent coupling Ω · ψ_B and spin-spin contact (a_AB^F per F) for spinor-spinor mixtures.
 
 Use cases:
 - Cr-Sr immiscibility studies
@@ -62,15 +59,10 @@ pipeline:
 
 ## Risks
 
-- `Workspace` parameter explosion (already 23 type params) — `BinaryWorkspace`
-  must NOT inflate further. Keep two separate Workspaces and a thin
-  `BinaryCouplings` struct.
+- `Workspace` parameter explosion (already 23 type params) — `BinaryWorkspace` must NOT inflate further. Keep two separate Workspaces and a thin `BinaryCouplings` struct.
 - DDI cross-species term needs new kernel.
-- Mass mismatch (Cr-Sr) breaks the dimensionless ω_ref assumption — need
-  per-species scales, OR force common ω_ref and document.
+- Mass mismatch (Cr-Sr) breaks the dimensionless ω_ref assumption — need per-species scales, OR force common ω_ref and document.
 
 ## Recommendation for next session
 
-Start with **non-spinor binary** (F=0 each) at uniform mass — closes 80%
-of use cases and avoids the worst type explosions. Then layer spinor +
-DDI on top.
+Start with **non-spinor binary** (F=0 each) at uniform mass — closes 80% of use cases and avoids the worst type explosions. Then layer spinor + DDI on top.
