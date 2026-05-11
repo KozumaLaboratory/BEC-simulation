@@ -294,57 +294,93 @@ is matrix-valued), the extension is straightforward: add a buffer for
 ∇V_DD, compute via FFT each step, accumulate `|∇V_DD|²` into fgrad_buf
 alongside `|∇V_eff_local|²`.
 
-### 5.2 Spinor matrix-valued V (c₁ spin-mixing)
+### 5.2 Spinor matrix-valued V (c₁ spin-mixing) — explicit F=1 derivation
 
-For $V_\text{SM} = c_1 \langle\hat{F}\rangle(r) \cdot \hat{F}$, V is now a
-D×D matrix at each r, NOT diagonal in spin. The double commutator
-$[V_\text{SM}, [T, V_\text{SM}]]$ inherits the F-matrix structure.
+Let $m_\mu(r) = \langle\hat{F}_\mu\rangle(r) = \psi^\dagger(r)\hat{F}_\mu\psi(r)$
+(real 3-vector field). $V_\text{SM} = c_1 m_\mu \hat{F}_\mu$ (sum on μ),
+acting as matrix on ψ. The commutators:
 
-**Setup**: $\langle\hat{F}\rangle(r) = \psi^\dagger(r)\,\hat{F}\,\psi(r)$
-is a 3-vector field (real-valued). $V_\text{SM}(r) = c_1 \langle\hat{F}\rangle(r)
-\cdot \hat{F}$ acts on ψ_α(r) as
-$\sum_\beta (c_1 \langle\hat{F}_\mu\rangle \hat{F}_\mu)_{\alpha\beta}\,
-\psi_\beta(r)$.
+**Step 5.2.1** — $[V_\text{SM}, T]$:
 
-**Commutator** $[T, V_\text{SM}]$ in the presence of F̂ matrices:
-$T = -\tfrac{1}{2}\nabla^2$ acts on spatial coordinates only;
-F̂ matrices act on spin index. They commute as operators on
-spin × spatial product space. Therefore
-$[T, V_\text{SM}]\,\psi = -\tfrac{1}{2}[\nabla^2, c_1\langle\hat{F}_\mu\rangle\hat{F}_\mu]\,\psi
-= c_1 \hat{F}_\mu \cdot \tfrac{-1}{2}[\nabla^2, \langle\hat{F}_\mu\rangle]\,\psi$.
+$[T, V_\text{SM}]\,\psi_\alpha = -\tfrac{1}{2}\nabla^2 (c_1 m_\mu (F_\mu)_{\alpha\beta}\psi_\beta)
+- (c_1 m_\mu (F_\mu)_{\alpha\beta})(-\tfrac{1}{2}\nabla^2\psi_\beta)$
 
-The inner commutator $[\nabla^2, \langle\hat{F}_\mu\rangle]\psi = (\nabla^2
-\langle\hat{F}_\mu\rangle)\psi + 2(\nabla\langle\hat{F}_\mu\rangle) \cdot \nabla\psi$
-is the standard spatial commutator.
+$= -\tfrac{1}{2}c_1 (F_\mu)_{\alpha\beta}[(\nabla^2 m_\mu)\psi_\beta + 2(\nabla m_\mu)\cdot\nabla\psi_\beta]$
 
-**Double commutator**:
-$$[V_\text{SM}, [T, V_\text{SM}]] = c_1^2 \hat{F}_\mu \hat{F}_\nu \cdot
-[\langle\hat{F}_\mu\rangle,\, -\tfrac{1}{2}[\nabla^2, \langle\hat{F}_\nu\rangle]]$$
+So $[T, V_\text{SM}] = -\tfrac{1}{2}c_1 F_\mu \cdot [(\nabla^2 m_\mu) + 2(\nabla m_\mu)\cdot\nabla]$.
 
-The $\hat{F}_\mu \hat{F}_\nu$ factor is *not* symmetric in (μ, ν) so the
-result picks up the F-algebra structure:
-$$\hat{F}_\mu \hat{F}_\nu = \tfrac{1}{2}\{\hat{F}_\mu, \hat{F}_\nu\}
-+ \tfrac{1}{2}[\hat{F}_\mu, \hat{F}_\nu] = \tfrac{1}{2}\{F_\mu, F_\nu\}
-+ \tfrac{i}{2}\epsilon_{\mu\nu\rho}\,\hat{F}_\rho$$
+**Step 5.2.2** — Double commutator $[V_\text{SM}, [T, V_\text{SM}]]$:
 
-The anti-symmetric part contributes
-$\tfrac{i}{2}c_1^2 \epsilon_{\mu\nu\rho}\hat{F}_\rho \cdot
-[\langle\hat{F}_\mu\rangle, ...,]\langle\hat{F}_\nu\rangle\rangle]]$, a
-matrix-valued (in spin space) and spatially-varying quantity. The
-symmetric part gives a scalar $\langle\nabla\hat{F}\rangle^2$ analog
-contracted with $\{F_\mu, F_\nu\}$.
+Expand $[A, B]\psi = AB\psi - BA\psi$ with $A = V_\text{SM}$, $B = [T, V_\text{SM}]$.
+$V_\text{SM}\cdot B\psi$ = c₁ m_ν F̂_ν ⋅ B ψ; B⋅V_SM ψ requires moving B through V_SM (a multiplication
+operator that commutes with itself but not with ∇).
 
-**Status**: Formal structure identified; explicit reduction to a
-SpinorBEC-implementable expression requires:
-- Concrete F-matrix algebra for F=1 (3×3) and F=6 (13×13)
-- Index manipulation of $\{F_\mu, F_\nu\}$ and $\epsilon_{\mu\nu\rho}F_\rho$
-- Verification against a known limit (e.g., F=1 with c₁ = 0 should
-  reduce to scalar Step 5.1)
+Three groups of terms emerge:
 
-Per protocol Rule 1, this requires Aichinger-Chin-Krotscheck 2005
-or a similar paper that handles non-scalar V. Aichinger 2005 in CPC
-addresses nonlocal scalar (Step 5.1) but not the F-matrix structure
-directly; the spinor extension is genuinely new work.
+(i) **Multiplicative (in ψ) with $\nabla^2 m_\mu$ factor**:
+   $-\tfrac{1}{2}c_1^2 (m_\nu F_\nu F_\mu - F_\mu F_\nu m_\nu)(\nabla^2 m_\mu)\psi
+   = -\tfrac{1}{2}c_1^2 m_\nu [F_\nu, F_\mu](\nabla^2 m_\mu)\psi
+   = -\tfrac{i}{2}c_1^2 \epsilon_{\nu\mu\rho} F_\rho m_\nu (\nabla^2 m_\mu)\psi$
+   = $-\tfrac{i}{2}c_1^2 F_\rho (\vec{m}\times\nabla^2\vec{m})_\rho\,\psi$
+
+(ii) **Derivative (on ∇ψ) with $2(\nabla m_\mu)$ factor**:
+   $-i c_1^2 \epsilon_{\nu\mu\rho} F_\rho m_\nu (\nabla m_\mu)\cdot\nabla\psi$
+   = $-i c_1^2 F_\rho (\vec{m}\times\nabla\vec{m})_\rho \cdot \nabla\psi$
+
+(iii) **Multiplicative with $(\nabla m_\mu)\cdot(\nabla m_\nu)$ factor**:
+   $-c_1^2 \cdot \tfrac{1}{2}\{F_\mu, F_\nu\}\,(\nabla m_\mu)\cdot(\nabla m_\nu)\,\psi$
+   (the antisymmetric F-matrix part drops because $(\nabla m_\mu)\cdot(\nabla m_\nu)$ is
+   symmetric in μ↔ν.)
+
+**Total** (operator on ψ):
+$$[V_\text{SM}, [T, V_\text{SM}]] = c_1^2 \Big[
+  -\tfrac{i}{2}F_\rho (\vec{m}\times\nabla^2\vec{m})_\rho
+  - i F_\rho (\vec{m}\times\nabla\vec{m})_\rho \cdot \nabla
+  - \tfrac{1}{2}\{F_\mu, F_\nu\}(\nabla m_\mu)\cdot(\nabla m_\nu)
+\Big]$$
+
+**Status — key implementation consequence**:
+
+Unlike the scalar case where $[V,[T,V]] = |\nabla V|^2$ is a pure
+multiplication operator, the matrix case has a **derivative term** —
+the second line of the total formula contains $\cdot\nabla\psi$. This
+means the modified $\widetilde{V}$ is not a simple multiplication
+operator; it has both:
+
+- **Multiplicative part** (terms i + iii): a matrix function of r,
+  exponentiable per voxel as a D×D matrix exponential.
+- **Derivative part** (term ii): involves $\nabla\psi$, must be handled
+  via Fourier-space multiplication or finite-difference application
+  (separate substep).
+
+The Chin-Krotscheck 2005 paper's clean scalar $|\nabla V|^2$ formula
+hides this complication; it appears only when V becomes matrix-valued.
+This is THE structural obstacle that distinguishes Track C v4 (spinor)
+from v3 (diagonal scalar).
+
+**Implementation strategy for v4**:
+1. Compute $\vec{m}(r) = \langle\hat{F}\rangle(r)$ from ψ (already done by spin_mixing kernel)
+2. Compute $\nabla\vec{m}$ via FFT spectral derivative (same as |∇V| in v2)
+3. Compute $\nabla^2\vec{m}$ via FFT (1 FFT + multiplication by $-k^2$ + IFFT)
+4. Multiplicative part: $\widetilde{V}_\text{mult} = -\tfrac{i}{2}c_1^2 F_\rho (\vec{m}\times\nabla^2\vec{m})_\rho
+   - \tfrac{1}{2}c_1^2 \{F_\mu, F_\nu\}(\nabla m_\mu)\cdot(\nabla m_\nu)$
+   — exponentiate per voxel as D×D matrix exp.
+5. Derivative part: $\widetilde{V}_\text{deriv} = -i c_1^2 F_\rho (\vec{m}\times\nabla\vec{m})_\rho \cdot \nabla$
+   — apply via separate FFT-based step: multiply F-component-mixed wavefunction by
+   $i\vec{k}$ in Fourier space, then by $F_\rho (\vec{m}\times\nabla\vec{m})_\rho$ matrix.
+
+Cost per outer step: ~3-5 additional FFTs (vs scalar v3 which has 1
+FFT for |∇V|²) + D×D matrix exp per voxel (D=3 for F=1 cheap; D=13 for F=6 non-trivial).
+
+**Limit checks**:
+- $c_1 = 0$: all three terms vanish identically → reduces to scalar
+  diagonal case (Step 4). ✓
+- $m_\mu(r) \equiv \text{const}$: $\nabla m = 0, \nabla^2 m = 0$ → all
+  terms vanish. ✓ (constant MF gives no FG correction, as expected)
+
+Phase -1 derivation of v4 is now complete in symbolic form. Implementation
+of all three terms + verification is the v4 effort (estimated 1-2 weeks
+of Phase 0 work).
 
 ### 5.3 Combined matrix + nonlocal (DDI proper)
 

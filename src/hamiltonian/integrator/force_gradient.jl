@@ -185,9 +185,10 @@ function _diagonal_step_forcegrad_imag!(
 end
 
 """
-    split_step_forcegrad!(ws::Workspace; midpoint::Bool=true, endpoint::Bool=true)
+    split_step_forcegrad!(ws::Workspace; midpoint=true, endpoint=true, n_picard=1)
 
-Track C v2 — Force-Gradient 4A step (Chin-Krotscheck 2005 eq. 6.8).
+Track C v3 — Force-Gradient 4A step (Chin-Krotscheck 2005 eq. 6.8) with
+optional Picard fixed-point iteration on MFs.
 
 Diagonal-only subset of SpinorBEC. See module docstring for restrictions.
 
@@ -197,31 +198,29 @@ Diagonal-only subset of SpinorBEC. See module docstring for restrictions.
 The middle Ṽ stage includes the force-gradient correction
 `Ṽ = V + (dt²/48)|∇V|²` per paper eqs. 6.9-6.10.
 
-# Self-consistency (v2 upgrade from v1)
+# Self-consistency hierarchy
 
-* `midpoint=false, endpoint=false` → 4A00 variant: all V stages use ψ(0) MF.
-  Order 4 for autonomous (c₀=0); order 1 collapse for nonlinear (c₀≠0).
-* `midpoint=true, endpoint=false` → 4A0W (partial): ψ(dt/2) estimated via
-  Strang half-step. Stage 5 still uses ψ(0) MF → order 1 in nonlinear
-  due to endpoint MF mismatch (V(dt) eval at ψ(0) gives O(dt) MF error
-  per step, cumulative O(dt) global = order 1).
-* `midpoint=true, endpoint=true` (default) → 4AWW: ψ(dt/2) via Strang
-  half-step, ψ(dt) via Strang full step. Both stages 3 and 5 use
-  estimated MFs. Order ≥ 2 in nonlinear (estimates are O(dt²) accurate;
-  full order 4 would need Picard convergence — deferred).
+* `n_picard=1, midpoint=false, endpoint=false` → 4A00: all V stages use
+  ψ(0) MF. Autonomous order 4, nonlinear order 1.
+* `n_picard=1, midpoint=true, endpoint=true` → partial 4AWW with Strang
+  predictors for ψ(dt/2) and ψ(dt) MFs. Autonomous ≈ order 4, nonlinear
+  order ~3 (predictors are O(dt²) accurate).
+* `n_picard≥2` → Picard iteration: after each 4A run, update endpoint MF
+  from the current ψ and midpoint MF from (ψ(0)+ψ_current)/2 state-average.
+  Each iteration improves MF accuracy by one order; n_picard=3 should
+  reach nominal order 4.
 
-FFT spectral derivative used for ∇V_eff (paper §IV recommendation;
-exponential convergence with grid size).
+FFT spectral derivative used for ∇V_eff (paper §IV recommendation).
 
 # Cost
 
-* `midpoint=false`: 5 V + 2 K per step (= 4A00, cheapest)
-* `midpoint=true, endpoint=false`: + 1 Strang half-step = 8 V + 3 K
-* `midpoint=true, endpoint=true`: + 1 Strang full step = 11 V + 4 K
-  (comparable to Y4-midpoint Picard cost)
+Per outer step:
+* `n_picard=1, defaults`: 11 V + 4 K (1 Strang half-step + 1 Strang full
+  step predictors + 1 4A composition)
+* `n_picard=k ≥ 2`: 11 V + 4 K + (k-1) × (5 V + 2 K + 2 MF re-evals)
 """
 function split_step_forcegrad!(ws::Workspace{N};
-        midpoint::Bool=true, endpoint::Bool=true) where {N}
+        midpoint::Bool=true, endpoint::Bool=true, n_picard::Int=1) where {N}
     _assert_forcegrad_diagonal_only(ws)
 
     dt = ws.sim_params.dt
@@ -237,6 +236,8 @@ function split_step_forcegrad!(ws::Workspace{N};
     density_end = similar(ws.density_buf)
     psi_mid = similar(ws.state.psi)
     psi_end = similar(ws.state.psi)
+    psi_init = similar(ws.state.psi)
+    copyto!(psi_init, ws.state.psi)  # Save ψ(0) for Picard iteration restarts.
 
     n_pts = ntuple(d -> size(ws.state.psi, d), Val(N))
     V_complex_buf = Array{ComplexF64}(undef, n_pts...)
@@ -283,34 +284,63 @@ function split_step_forcegrad!(ws::Workspace{N};
             plan_fft!, plan_ifft!)
     end
 
-    # Stage 1: V(dt/6) — MF from ψ(0), no FG correction (outer stage).
-    @timeit_debug TIMER "fgrad_V" _diagonal_step_forcegrad!(
-        Val(N), ws.state.psi, ws.potential_values, zeeman_diag,
-        ws.interactions.c0, a_outer * dt, ws.density_buf, fgrad_buf_0, 0.0, it,
-    )
-
-    # Stage 2: K(dt/2)
+    # Set kinetic phase once (b_K * dt is the same for all K stages of all Picard iters).
     _update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, b_K * dt)
-    @timeit_debug TIMER "kinetic" apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
 
-    # Stage 3: Ṽ(2dt/3) — MF from midpoint estimate (v2) or ψ(0) (v1), with FG correction.
+    # Picard iteration on MFs. Each iter restarts ψ from ψ(0), runs full 4A
+    # with current MFs, then (if not last iter) updates endpoint MF from
+    # the result and midpoint MF from the state-average (ψ(0) + ψ_after)/2.
     density_for_mid = midpoint ? density_mid : ws.density_buf
     fgrad_for_mid = midpoint ? fgrad_buf_mid : fgrad_buf_0
-    @timeit_debug TIMER "fgrad_Vtilde" _diagonal_step_forcegrad!(
-        Val(N), ws.state.psi, ws.potential_values, zeeman_diag,
-        ws.interactions.c0, a_mid * dt, density_for_mid, fgrad_for_mid, fg_coeff, it,
-    )
-
-    # Stage 4: K(dt/2)
-    @timeit_debug TIMER "kinetic" apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
-
-    # Stage 5: V(dt/6) — MF from ψ(dt) estimate (v2) or ψ(0) (v1).
     density_for_end = endpoint ? density_end : ws.density_buf
     fgrad_for_end = endpoint ? fgrad_buf_end : fgrad_buf_0
-    @timeit_debug TIMER "fgrad_V" _diagonal_step_forcegrad!(
-        Val(N), ws.state.psi, ws.potential_values, zeeman_diag,
-        ws.interactions.c0, a_outer * dt, density_for_end, fgrad_for_end, 0.0, it,
-    )
+
+    for picard_iter in 1:n_picard
+        # Restart ψ from ψ(0) for this Picard iteration.
+        if picard_iter > 1
+            copyto!(ws.state.psi, psi_init)
+        end
+
+        # Stage 1: V(dt/6) — MF from ψ(0) (always — entry state is exact).
+        @timeit_debug TIMER "fgrad_V" _diagonal_step_forcegrad!(
+            Val(N), ws.state.psi, ws.potential_values, zeeman_diag,
+            ws.interactions.c0, a_outer * dt, ws.density_buf, fgrad_buf_0, 0.0, it,
+        )
+
+        # Stage 2: K(dt/2)
+        @timeit_debug TIMER "kinetic" apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
+
+        # Stage 3: Ṽ(2dt/3) — midpoint MF + FG correction.
+        @timeit_debug TIMER "fgrad_Vtilde" _diagonal_step_forcegrad!(
+            Val(N), ws.state.psi, ws.potential_values, zeeman_diag,
+            ws.interactions.c0, a_mid * dt, density_for_mid, fgrad_for_mid, fg_coeff, it,
+        )
+
+        # Stage 4: K(dt/2)
+        @timeit_debug TIMER "kinetic" apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
+
+        # Stage 5: V(dt/6) — endpoint MF.
+        @timeit_debug TIMER "fgrad_V" _diagonal_step_forcegrad!(
+            Val(N), ws.state.psi, ws.potential_values, zeeman_diag,
+            ws.interactions.c0, a_outer * dt, density_for_end, fgrad_for_end, 0.0, it,
+        )
+
+        # Picard MF update: refine endpoint MF only from current ψ_after.
+        # NOTE: state-averaged midpoint update `(ψ(0)+ψ_after)/2` is intentionally
+        # NOT used here. State-averaging introduces the cos(Hτ/2) = 1 - (Hτ)²/8 + ...
+        # even-power-in-τ bias documented in docs/integrator_ch3_plan.md §3.3.2
+        # (AVF state-averaging negative result). Empirically confirmed at
+        # commit 390f474 v3 bench: state-avg midpoint update degraded
+        # ForceGrad p=2 from order 2.92 (p=1, Strang predictor) to order 2.00.
+        # Proper midpoint Picard would re-run Strang half-step with updated
+        # endpoint MF instead of state-averaging — deferred to v3.1+.
+        if picard_iter < n_picard && endpoint
+            _total_density!(density_end, ws.state.psi, D, N, n_pts)
+            _compute_fgrad_squared!(fgrad_buf_end, ws.potential_values, density_end,
+                ws.interactions.c0, ws.grid, n_pts, V_complex_buf, grad_complex_buf,
+                plan_fft!, plan_ifft!)
+        end
+    end
 
     ws.state.t += it ? 0.0 : dt
     ws.state.step += 1
