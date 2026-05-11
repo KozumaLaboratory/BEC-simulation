@@ -72,6 +72,35 @@ println("=== Lemma 1 General-S closed form verification ===\n")
             @test predicted == β_λ_paper3[S]
         end
     end
+
+    # --- F=10 dodec I_h (paper3 §V.F) ---
+    @testset "F=10 dodec I_h" begin
+        F = 10
+        denom = 2 * F * (F + 1)  # = 220
+        β_c0 = Dict(
+            0 => 1//21,
+            6 => 2299//24633,
+            10 => 586625//3163581,
+            12 => 3135//20677,
+            16 => 349448//1554777,
+            18 => 131648//736281,
+            20 => 15895//134199,
+        )
+        β_λ_paper3 = Dict(
+            0 => -1//21,
+            6 => -18601//246330,
+            10 => -586625//6327162,
+            12 => -912//20677,
+            16 => 412984//7773885,
+            18 => 365024//3681405,
+            20 => 14450//134199,
+        )
+        for S in [0, 6, 10, 12, 16, 18, 20]
+            prefactor = (S*(S+1) - denom) // denom
+            predicted = prefactor * β_c0[S]
+            @test predicted == β_λ_paper3[S]
+        end
+    end
 end
 
 println("\n=== Sign-change boundary table: S_bd = sqrt(2F(F+1)) ≈ sqrt(2) F ===")
@@ -83,4 +112,4 @@ for F in [3, 4, 6, 8, 10, 12]
     println(" $F | $(round(Sbd, digits=2)) | $(round(Sbd/F, digits=3)) | $(get(empirical_Sbd, F, "?"))")
 end
 
-println("\n=== Lemma 1 General-S: 19 channel coefficients verified across 4 cases ===")
+println("\n=== Lemma 1 General-S: 26 channel coefficients verified across 5 cases ===")

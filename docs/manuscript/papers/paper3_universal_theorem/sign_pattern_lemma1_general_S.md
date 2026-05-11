@@ -395,8 +395,9 @@ verified at:
 - F=4 cube: 4 channels (S = 0, 4, 6, 8) ✓
 - F=6 icosa: 4 channels (S = 0, 6, 10, 12) ✓
 - F=8 cube-octa A_1: 8 channels (S = 0, 4, 6, 8, 10, 12, 14, 16) ✓
+- F=10 dodec I_h: 7 channels (S = 0, 6, 10, 12, 16, 18, 20) ✓
 
-**Total: 19 channel coefficients matched at exact rational arithmetic across 4 polyhedral cases.**
+**Total: 26 channel coefficients matched at exact rational arithmetic across 5 polyhedral cases.**
 
 This is a **MUCH stronger statement than Sign Pattern Anomalous Identity**: it
 gives the **explicit closed-form formula** for $\beta_S^{(\lambda_{\rm spin})}$
