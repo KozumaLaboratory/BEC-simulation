@@ -229,7 +229,30 @@ predicts), and `c₁²` scaling.
 Naive implementation of the full `(i)+(ii)+(iii)` decomposition, with
 term (ii) `−i F_ρ (m × ∇m)_ρ · ∇` applied as a separate FFT-derivative
 substep, FAILS a discrete Hermiticity test `⟨φ, Aψ⟩ = ⟨Aφ, ψ⟩` at
-relative deviation `0.65` on a `16³` grid. The continuum cancellation
+relative deviation `0.65` on a `16³` grid.
+
+The discrete-level palindromic gate test in
+`scripts/bench/track_c_v4_step1b_palindrome.jl` (Strang split
+`σ(dt) = mult(dt/2) · deriv(dt) · mult(dt/2)` where mult applies
+exp(-i α W_mult) and deriv applies the linearised `(I − iα A) ψ`)
+confirms the predicted failure mode: palindromic residual
+`‖σ(dt)·σ(-dt) ψ − ψ‖ / ‖ψ‖` scales as `O(dt²)` instead of the `O(dt⁵)`
+that a properly palindromic Strang split would give (Hermitian pieces).
+Numerically (`c₁ = 50`, spin-wave state, `N = 16³`):
+
+| dt    | residual | order |
+|-------|----------|-------|
+| 0.04  | 6.4e-6   | —     |
+| 0.02  | 1.6e-6   | 2.00  |
+| 0.01  | 4.0e-7   | 2.00  |
+| 0.005 | 1.0e-7   | 2.00  |
+| 0.0025| 2.5e-8   | 2.00  |
+
+The order-2 palindromic residual confirms that `exp(-i α W_mult)` is
+non-unitary at the discrete level (term (i)'s anti-Hermitian part does
+not cancel within the multiplicative substep alone), so Strang's
+sandwich symmetry recovers only the leading even order, not the full
+`O(dt⁵)` of a Hermitian-piece Strang. The continuum cancellation
 between the anti-Hermitian half of term (ii) and term (i) relies on the
 identity `∂_α(Q_{ρα}) = (m × ∇²m)_ρ` where `Q_{ρα} = (m × ∂_α m)_ρ`.
 At the discrete FFT level this identity FAILS because the pointwise
