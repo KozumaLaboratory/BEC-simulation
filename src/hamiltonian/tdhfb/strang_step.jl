@@ -318,3 +318,23 @@ function _tdhfb_kinetic_step!(
     end
     return phi
 end
+
+# Default |k|² grid for tests / no-Grid call sites. Matches a `dx = 1,
+# L = nx_d` box per spatial dimension (so `dk = 2π / nx_d`). Used by both
+# `_tdhfb_kinetic_step!` and `tdhfb_energy` so the kinetic propagator and
+# kinetic energy expectation stay numerically consistent.
+function _default_tdhfb_k_squared(spatial::Tuple)
+    ks2 = zeros(Float64, spatial)
+    nd = length(spatial)
+    @inbounds for idx in CartesianIndices(spatial)
+        s = 0.0
+        for d in 1:nd
+            nd_d = spatial[d]
+            ki = idx[d] - 1 < nd_d / 2 ? (idx[d] - 1) : (idx[d] - 1 - nd_d)
+            kd = 2π * ki / nd_d
+            s += kd^2
+        end
+        ks2[idx] = s
+    end
+    return ks2
+end
