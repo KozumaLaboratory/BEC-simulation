@@ -6,7 +6,7 @@
 # kernels and shears live in split_step_kernels.jl; integrator-composition
 # coefficients and Yoshida/Suzuki/ABA cores live in split_step_composers.jl.
 
-export split_step!, split_step_midpoint!
+export split_step!, split_step_midpoint!, split_step_trap!
 
 """
 Perform one Strang-split time step: V(dt/2) K(dt) V(dt/2).
@@ -475,6 +475,170 @@ function _half_potential_step_midpoint!(
         ws, dt_half, n_comp, ndim, imaginary_time;
         t_eval=t_eval, t_start=t_start, psi_mf=psi_mid_curr,
     )
+    nothing
+end
+
+"""
+State-averaged ("trap-like") mean-field V step: same predictor-corrector
+pattern as `_half_potential_step_midpoint!`, but the MF source is
+
+    psi_trap_mf = (psi_orig + psi_exit_est) / 2
+
+with Picard iteration on `psi_exit_est`.
+
+# Important distinction (state-average ≠ Quispel-McLaren AVF)
+
+This implements `(ψⁿ + ψⁿ⁺¹)/2` as the MF SOURCE — i.e. the field
+evaluation point is the average of the wavefunctions at the V-step
+entry and exit. This is NOT the Quispel-McLaren Average Vector Field
+(AVF) method, which averages the GRADIENT field
+    ∇̃H = (1/2)·(∇H(ψⁿ) + ∇H(ψⁿ⁺¹))         [trapezoidal AVF]
+or the segment integral
+    ∇̃H = ∫₀¹ ∇H((1-s)ψⁿ + s·ψⁿ⁺¹) ds      [true AVF]
+For a quadratic Hamiltonian these all coincide. For non-quadratic
+(our GPE has c0|ψ|^4 + c_dd ψ²Φ + c1⟨F⟩² quartic) they differ at
+O(τ²).
+
+# Empirical order on the lab path (Rb87 F=1 16³, Phase 2a bench)
+
+With Picard converged to fixed point (verified by
+`scripts/bench/trap_picard_diag.jl`: trap Picard residual at
+n_picard ≥ 4 reaches ~1e-14), Y4 composition of this V step gives
+**global order 2**, not 4. Diagnostic (linear-H analysis):
+
+    (ψⁿ + ψⁿ⁺¹)/2 = ψⁿ · cos(Hτ/2) · e^{-iHτ/2}
+    ψ_midpoint    = ψⁿ · e^{-iHτ/2}
+
+The state-average has an extra `cos(Hτ/2) = 1 - (Hτ)²/8 + ...` factor
+— an EVEN-power-in-τ correction. The corresponding H evaluation in
+the V step is shifted by τ²·O(H²) which Y4's odd-only Richardson
+cancellation cannot remove, collapsing the composed order to 2.
+
+In contrast, `_half_potential_step_midpoint!` (run-the-predictor-to-
+the-midpoint scheme) gives Y4 order 4 because the midpoint MF differs
+from the true midpoint only at odd powers of τ.
+
+# What this scheme is good for
+
+State-averaged trap is **implicit and time-reversible** (verified) and
+its single-V-step local error has different higher-order structure
+than midpoint. The drift behaviour vs implicit-midpoint at long times
+is open empirically — see `scripts/bench/avf_drift_phase5_smoke.jl`.
+Useful as a benchmark methodology data point, less so as a production
+high-order integrator (use Y4-midpoint for that).
+
+True trapezoidal AVF or 2-pt GL AVF (which DO preserve energy on
+quartic H) requires per-substep "averaged field" buffer plumbing
+(modify density_buf, alpha/beta/theta cache, Phi_x/y/z to be the
+average of 2 evaluations) — deferred to a separate effort.
+
+# Cost
+
+`n_picard` V-step invocations per call. Picard converges to fixed
+point in 2-4 iterations on the lab path (trap residual ~1e-6 → 1e-14
+between Picard 1 and 4). Default `n_picard=2`; callers needing
+Picard-converged trap should pass `n_picard=4`.
+
+Allocation: 2 `similar(psi)` per call. Production tuning would move
+these to dedicated Workspace fields.
+"""
+function _half_potential_step_trap!(
+    ws::Workspace{N},
+    dt_half,
+    n_comp,
+    ndim,
+    imaginary_time;
+    t_eval::Float64=ws.state.t,
+    t_start::Float64=NaN,
+    n_picard::Int=2,
+) where {N}
+    psi_orig = ws.state.psi
+    psi_exit_est = similar(psi_orig)
+    psi_trap_mf = similar(psi_orig)
+
+    # Initial exit estimate = entry state (crude; Picard refines in n_picard rounds).
+    copyto!(psi_exit_est, psi_orig)
+
+    for _ in 1:n_picard
+        # Discrete trapezoidal MF source.
+        @. psi_trap_mf = 0.5 * (psi_orig + psi_exit_est)
+
+        # Re-compute exit estimate: V step from psi_orig with MF frozen at psi_trap_mf.
+        copyto!(psi_exit_est, psi_orig)
+        ws.state.psi = psi_exit_est
+        try
+            _half_potential_step!(
+                ws, dt_half, n_comp, ndim, imaginary_time;
+                t_eval=t_eval, t_start=t_start, psi_mf=psi_trap_mf,
+            )
+        finally
+            ws.state.psi = psi_orig
+        end
+    end
+
+    # Commit converged exit estimate back to the live state psi.
+    copyto!(psi_orig, psi_exit_est)
+    nothing
+end
+
+"""
+Strang split-step using the trapezoidal-average V step
+(`_half_potential_step_trap!`) in place of the plain `_half_potential_step!`.
+
+Drop-in replacement for `split_step!`, structurally identical to
+`split_step_midpoint!` but with trapezoidal MF instead of midpoint MF.
+See `_half_potential_step_trap!` for the conservation properties.
+
+Cost per call: ~2-3× a plain Strang `split_step!` (Picard n=2 default).
+"""
+function split_step_trap!(ws::Workspace{N}) where {N}
+    dt = ws.sim_params.dt
+    it = ws.sim_params.imaginary_time
+    n_comp = ws.spin_matrices.system.n_components
+    t = ws.state.t
+
+    t_eval_1 = it ? 0.0 : t + dt / 4
+    t_eval_2 = it ? 0.0 : t + 3dt / 4
+
+    @timeit_debug TIMER "half_potential_trap" _half_potential_step_trap!(
+        ws, dt / 2, n_comp, N, it; t_eval=t_eval_1, t_start=it ? NaN : t
+    )
+
+    omega = ws.sim_params.rotating_frame_omega
+    @timeit_debug TIMER "coriolis" _apply_coriolis_step!(
+        ws.state.psi, ws.grid, omega, dt / 2, it, ws.coriolis_cache,
+    )
+    @timeit_debug TIMER "kinetic" apply_kinetic_step_batched!(
+        ws.state.psi, ws.batched_kinetic,
+    )
+    @timeit_debug TIMER "coriolis" _apply_coriolis_step!(
+        ws.state.psi, ws.grid, omega, dt / 2, it, ws.coriolis_cache,
+    )
+
+    @timeit_debug TIMER "half_potential_trap" _half_potential_step_trap!(
+        ws, dt / 2, n_comp, N, it; t_eval=t_eval_2, t_start=it ? NaN : t + dt / 2
+    )
+
+    if !it && ws.loss !== nothing
+        @timeit_debug TIMER "loss" apply_loss_step!(
+            ws.state.psi, ws.loss, ws.spin_matrices.system.F, dt, n_comp, N, ws.density_buf,
+        )
+    end
+
+    if !it && ws.absorbing_mask !== nothing
+        @timeit_debug TIMER "absorbing" apply_absorbing_boundary!(
+            ws.state.psi, ws.absorbing_mask, n_comp, N,
+        )
+    end
+
+    ws.state.t += it ? 0.0 : dt
+    ws.state.step += 1
+
+    if it && ws.sim_params.normalize_every > 0
+        if ws.state.step % ws.sim_params.normalize_every == 0
+            _normalize_psi!(ws.state.psi, ws.grid, n_comp, N)
+        end
+    end
     nothing
 end
 

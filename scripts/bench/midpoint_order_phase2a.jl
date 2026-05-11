@@ -152,6 +152,15 @@ end
 
 evolve_y4_plain!(ws, n_steps) = for _ in 1:n_steps; _y4_step!(ws, SpinorBEC._half_potential_step!); end
 evolve_y4_mid!(ws, n_steps)   = for _ in 1:n_steps; _y4_step!(ws, SpinorBEC._half_potential_step_midpoint!); end
+# Trap Picard converges slower than midpoint (constant ~50000x larger at p=2)
+# because the iteration map uses the FULL V-step duration vs midpoint's half.
+# For Y4-trap to reach order 4, Picard residual per V-step must be ≤ O(τ⁵)
+# which requires n_picard ≥ 4. With n_picard=2 (default), Y4-trap collapses to
+# order 2 due to accumulated Picard residual dominating the integration error.
+const _trap_p4 = function(w, dt, n, nd, it; kwargs...)
+    SpinorBEC._half_potential_step_trap!(w, dt, n, nd, it; kwargs..., n_picard=4)
+end
+evolve_y4_trap!(ws, n_steps)  = for _ in 1:n_steps; _y4_step!(ws, _trap_p4); end
 
 # Yoshida-6 (Yoshida 1990 solution A, 7 K stages + 8 V stages) over an arbitrary V step.
 const _Y6_W1 = -1.17767998417887
@@ -225,6 +234,8 @@ function run_scheme(label::String, dt::Float64)
         ws = _build_ws(dt); evolve_y4_plain!(ws, n_steps); return ws.state.psi
     elseif label == "Yoshida4 (midpoint)"
         ws = _build_ws(dt); evolve_y4_mid!(ws, n_steps); return ws.state.psi
+    elseif label == "Yoshida4 (trap)"
+        ws = _build_ws(dt); evolve_y4_trap!(ws, n_steps); return ws.state.psi
     elseif label == "Yoshida6 (plain)"
         ws = _build_ws(dt); evolve_y6_plain!(ws, n_steps); return ws.state.psi
     elseif label == "Yoshida6 (midpoint)"
@@ -243,7 +254,7 @@ end
 results = Dict{String, Tuple{Float64, Float64, Float64}}()
 
 for label in ["Strang", "Strang-mid",
-              "Yoshida4 (plain)", "Yoshida4 (midpoint)",
+              "Yoshida4 (plain)", "Yoshida4 (midpoint)", "Yoshida4 (trap)",
               "Yoshida6 (plain)", "Yoshida6 (midpoint)",
               "MPS-4 (plain)", "MPS-4 (midpoint)"]
     errs = Float64[]
@@ -277,6 +288,9 @@ mps_mid_o = results["MPS-4 (midpoint)"][1]
 @printf("  Yoshida4 plain o12:                       %.2f  (expect ≈ 1 = collapse)\n", y4_plain_o)
 @printf("  Yoshida4 midpoint o12:                    %.2f  (expect ≥ 3.5)  %s\n",
     y4_mid_o, y4_mid_o >= 3.5 ? "PASS" : "FAIL")
+y4_trap_o = results["Yoshida4 (trap)"][1]
+@printf("  Yoshida4 trap o12:                        %.2f  (expect ≥ 3.5)  %s\n",
+    y4_trap_o, y4_trap_o >= 3.5 ? "PASS" : "FAIL")
 @printf("  Yoshida6 plain o12:                       %.2f  (expect ≈ 1 = collapse)\n", y6_plain_o)
 @printf("  Yoshida6 midpoint err at finest dt:       %.3e (≤ ref floor ≈ 5e-10)  %s\n",
     y6_mid_err1, y6_mid_err1 ≤ 1e-9 ? "PASS (at ref floor)" : "FAIL")
