@@ -1,7 +1,7 @@
 # Phase 2 measurement-campaign canonical Eu configs
 
 YAML configs for the R32-R39 ROI measurement campaign described in
-`docs/MEASUREMENT_CAMPAIGN_PHASE2.md`. Each sub-directory contains:
+`docs/archive/MEASUREMENT_CAMPAIGN_PHASE2.md`. Each sub-directory contains:
 
 - `config.yaml` — the canonical Eu thesis-grade input
 - a `README.md` with the matching `run` command (heavy-gate envvar) and

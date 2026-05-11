@@ -1,4 +1,4 @@
-# --- Phase 1.5: Zeeman-level dispatch (docs/phase15_zeeman_levels.md) ---
+# --- Phase 1.5: Zeeman-level dispatch (docs/design/phase15_zeeman_levels.md) ---
 #
 # Level 0 (existing): p, q, bx, by — dimensionless (ℏω_ref units)
 # Level 1 (new): Bx, By, Bz — Gauss (scalar or Waveform)

@@ -10,7 +10,7 @@ using SpinorBEC, Printf, LinearAlgebra
 # evaluate whether MPS retains order 4 under our spinor + DDI
 # Hamiltonian (where Yoshida6 collapses to order 1, see
 # `test/hamiltonian/test_integrator_order_meanfield.jl` and
-# `docs/integrator_modernization_plan.md`).
+# `docs/design/integrator_modernization_plan.md`).
 #
 # Reference results (rotating-basis 8³ F=1, T=0.2, 2026-05-11):
 #   autonomous: MPS-4 order 3.95→3.14, err ~10× better than Y4 same cost

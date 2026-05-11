@@ -1,7 +1,7 @@
 # Multi-GPU per-run design — rotating_basis (Option γ)
 
 **Status**: design only, no implementation. Multi-week project flagged
-in `docs/optimization_roadmap_2026-04-29.md` item 3.
+in `docs/archive/optimization_roadmap_2026-04-29.md` item 3.
 
 ## Why
 

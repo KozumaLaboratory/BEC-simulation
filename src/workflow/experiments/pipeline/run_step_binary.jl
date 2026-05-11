@@ -7,7 +7,7 @@ that only need ψ can still consume it.
 
 Currently F=0 + F=0 via `find_binary_ground_state`. Spinor binary,
 DDI, and YAML-side analyzer integration are next-session work — see
-`docs/two_component_gp_design.md`.
+`docs/design/two_component_gp_design.md`.
 """
 function _run_binary_ground_state_step(p::AbstractDict; verbose::Bool=true)
     grid_node = p["grid"]

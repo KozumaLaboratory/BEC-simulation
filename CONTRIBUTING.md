@@ -93,10 +93,10 @@ For crash-resilience: `scripts/supervised_run.sh <run_name> <max_retries>`.
 | New YAML knob | `src/workflow/experiments/schema.jl` + parser in `pipeline_runner.jl` |
 | New analyzer kernel | `src/analysis/<topic>.jl` |
 | New scenario | `runs/samples/<name>/config.yaml` |
-| New design note | `docs/<topic>_design.md` |
+| New design note | `docs/design/<topic>.md` |
 | New CLAUDE.md entry | only if it's a non-obvious gotcha |
 
 ## Common pitfalls
 
-See `docs/lab_user_tutorial.md`'s troubleshooting table — every recurring
+See `docs/guides/lab_user_tutorial.md`'s troubleshooting table — every recurring
 error is pinned to the commit that fixed it.

@@ -317,7 +317,7 @@ binary endpoints:
 Atlases are mtime-validated and cached under
 `runs/_dashboard_cache/atlas__<run>__<file>__axis<N>__bsz<true|false>.bin`.
 Optional bitshuffle + zstd-3 compression via `?bsz=1` (see
-`docs/dashboard_perf_notes.md`).
+`docs/design/dashboard_perf_notes.md`).
 
 ## I/O (`workflow/io/`)
 

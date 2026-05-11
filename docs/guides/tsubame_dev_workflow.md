@@ -2,7 +2,7 @@
 
 Day-to-day workflow for editing, testing, and submitting SpinorBEC runs
 on TSUBAME 4.0 (or any SLURM + CUDA cluster). Pairs with
-`docs/tsubame_scaling.md` for the per-grid-size budget.
+`docs/guides/tsubame_scaling.md` for the per-grid-size budget.
 
 ## One-time setup
 

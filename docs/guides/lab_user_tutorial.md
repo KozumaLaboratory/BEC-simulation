@@ -157,7 +157,7 @@ n_peak = d["analyze/droplet_profile/n_peak"]
 
 ## 8. Common patterns
 
-- **Parameter scan**: add a `scan: {product: {pipeline.0.zeeman.p: [...]}}` block; `run_yaml` writes one .jld2 per point and skips existing ones on re-run. See `docs/pipeline_cookbook.md`.
+- **Parameter scan**: add a `scan: {product: {pipeline.0.zeeman.p: [...]}}` block; `run_yaml` writes one .jld2 per point and skips existing ones on re-run. See `docs/guides/pipeline_cookbook.md`.
 - **Resume**: just rerun `run_yaml`. Cached point files are skipped.
 - **Single-point rerun**: `julia --project=. scripts/rerun_single.jl <run_name>` cleans the .checkpoints/ but preserves completed point_NNN.jld2.
 - **Resumable batch**: combine N runs in one driver script (`scripts/run_batch_overnight.jl` template). Per-run errors are caught so one failure doesn't kill the rest.
@@ -175,7 +175,7 @@ n_peak = d["analyze/droplet_profile/n_peak"]
 
 ## Where to look next
 
-- `docs/pipeline_cookbook.md` — YAML pattern recipes
-- `docs/session_handoff_2026-04-25.md` — current work-in-progress notes
+- `docs/guides/pipeline_cookbook.md` — YAML pattern recipes
+- `docs/reference/yaml_schema_reference.md` — every accepted YAML key
 - `runs/samples/` — 6 representative scenarios (quench, droplet+SGPE, Feshbach, lab-cal, SOC, pulse-Rabi)
 - `CLAUDE.md` — the repo's collaboration contract

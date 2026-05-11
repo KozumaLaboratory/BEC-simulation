@@ -15,7 +15,7 @@ export run_binary_simulation!, binary_norms, binary_total_energy
 #   i ∂_t ψ_B = (-½∇² + V_B + g_BB |ψ_B|² + g_AB |ψ_A|²) ψ_B + Ω/2 · ψ_A
 #
 # Spinor + DDI + cross-species spin-spin are tracked as future work in
-# `docs/two_component_gp_design.md`.
+# `docs/design/two_component_gp_design.md`.
 
 """
 Real-time integrator state for a two-component scalar BEC. Holds the
