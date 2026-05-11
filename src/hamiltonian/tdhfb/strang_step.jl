@@ -55,7 +55,8 @@
 export tdhfb_strang_step!
 
 """
-    tdhfb_strang_step!(state, F, g_S, V_ext, dt; k_squared=nothing, fft_plans=nothing)
+    tdhfb_strang_step!(state, F, g_S, V_ext, dt; k_squared=nothing,
+                       fft_plans=nothing, hfb_mode=:full_hfb)
 
 Advance `state::TDHFBState{N}` by one Strang split-step of duration `dt`.
 
@@ -76,6 +77,19 @@ is a voxel-local Bogoliubov-de Gennes matrix exponential that evolves
   (matches the box convention of the energy functional).
 - `fft_plans`: reserved for future precomputed FFT plans (currently unused;
   the kinetic step allocates per call).
+- `hfb_mode::Symbol = :full_hfb`: BdG generator mode for the φ subupdate.
+  - `:full_hfb` (default): full HFB. `U^φ = V·(φ*φ + 2ρ)`, `Δ^φ = V·κ`.
+    Goldstone mode picks up an O(g·n_thermal) gap (Hugenholtz-Pines
+    anomaly), accurate two-body interaction. Standard choice for
+    thermalization and high-precision energy work.
+  - `:popov`: HFB-Popov approximation. `U^φ` unchanged, `Δ^φ = 0`
+    (anomalous self-energy dropped from the condensate equation of
+    motion). Restores gapless Goldstone (Hugenholtz-Pines satisfied)
+    at the cost of two-body inconsistency. Standard for BEC dynamics
+    where the soft mode dominates.
+  The (ρ, κ) sub-update is unaffected — both modes use the full BdG
+  generator for the Nambu-density rotation, so κ still evolves
+  normally and `hfb_mode = :popov` does NOT collapse to scalar GP.
 
 # Returns
 The state (mutated in place).
@@ -88,18 +102,19 @@ function tdhfb_strang_step!(
     dt::Float64;
     k_squared=nothing,
     fft_plans=nothing,
+    hfb_mode::Symbol=:full_hfb,
 ) where {N}
     # V step (dt/2): one-body trap on φ
     _tdhfb_v_step!(state.phi, V_ext, dt / 2)
 
     # HF step (dt/2): voxel-local BdG matrix exponential on (φ, ρ, κ)
-    _tdhfb_hf_step!(state, F, g_S, dt / 2)
+    _tdhfb_hf_step!(state, F, g_S, dt / 2; hfb_mode=hfb_mode)
 
     # K step (dt): FFT kinetic on φ
     _tdhfb_kinetic_step!(state.phi, dt; k_squared=k_squared)
 
     # HF step (dt/2)
-    _tdhfb_hf_step!(state, F, g_S, dt / 2)
+    _tdhfb_hf_step!(state, F, g_S, dt / 2; hfb_mode=hfb_mode)
 
     # V step (dt/2)
     _tdhfb_v_step!(state.phi, V_ext, dt / 2)
@@ -138,31 +153,45 @@ Convention reminder: `rho[idx, c, c'] = ⟨m(c) | ρ̂ | m(c')⟩` (standard
 matrix); `kappa[idx, c, c'] = ⟨ψ_m(c) ψ_m(c')⟩` (symmetric in c, c').
 """
 function _tdhfb_hf_step!(
-    state::TDHFBState{N}, F::Int, g_S::AbstractDict{Int, Float64}, dt::Float64
+    state::TDHFBState{N},
+    F::Int,
+    g_S::AbstractDict{Int, Float64},
+    dt::Float64;
+    hfb_mode::Symbol=:full_hfb,
 ) where {N}
     # Symmetric inner Strang for the coupled HF substep.
     V = channel_kernel(F, g_S)
     half = dt / 2
-    _tdhfb_phi_subupdate!(state, F, g_S, V, half)  # uses current (ρ, κ)
+    _tdhfb_phi_subupdate!(state, F, g_S, V, half; hfb_mode=hfb_mode)  # uses current (ρ, κ)
     _tdhfb_R_subupdate!(state, F, g_S, V, dt)  # uses new φ
-    _tdhfb_phi_subupdate!(state, F, g_S, V, half)  # uses new (ρ, κ)
+    _tdhfb_phi_subupdate!(state, F, g_S, V, half; hfb_mode=hfb_mode)  # uses new (ρ, κ)
     return state
 end
 
 # φ Nambu doublet sub-update: φ ← top(M^φ · (φ, conj(φ))).
-# U^φ_{a,b} = V·(φ*φ + 2ρ),  Δ^φ_{a,b} = V·κ.
+# U^φ_{a,b} = V·(φ*φ + 2ρ),  Δ^φ_{a,b} = V·κ (full HFB) or 0 (Popov).
+#
+# `hfb_mode = :popov` drops the anomalous self-energy Δ^φ from the φ
+# subupdate ONLY (the (ρ, κ) Nambu density rotation still uses the full
+# Δ^R). This restores a gapless Goldstone mode for the condensate at the
+# cost of two-body inconsistency — the Hugenholtz-Pines theorem fix
+# standard for BEC dynamics. See `tdhfb_strang_step!` docstring for the
+# physics summary.
 function _tdhfb_phi_subupdate!(
     state::TDHFBState{N},
     F::Int,
     g_S::AbstractDict{Int, Float64},
     V::AbstractArray{Float64, 4},
-    dt::Float64,
+    dt::Float64;
+    hfb_mode::Symbol=:full_hfb,
 ) where {N}
     D = 2 * F + 1
     sz = size(state.phi)
     n_spatial = length(sz) - 1
     spatial = sz[1:n_spatial]
     twoD = 2 * D
+
+    drop_anomalous = hfb_mode === :popov
 
     @inbounds for idx in CartesianIndices(spatial)
         # Build U^φ and Δ^φ at this voxel.
@@ -178,7 +207,11 @@ function _tdhfb_phi_subupdate!(
                 uval += Vk * (conj(state.phi[idx, c2_p]) * state.phi[idx, c2]
                               + 2 * state.rho[idx, c2_p, c2])
                 # Δ^φ:  κ_{c2, c2_p}                  (no φφ source)
-                dval += Vk * state.kappa[idx, c2, c2_p]
+                # Popov mode (`hfb_mode = :popov`): drop the anomalous
+                # source for the φ subupdate.
+                if !drop_anomalous
+                    dval += Vk * state.kappa[idx, c2, c2_p]
+                end
             end
             U_phi[c, c_p] = uval
             Delta_phi[c, c_p] = dval

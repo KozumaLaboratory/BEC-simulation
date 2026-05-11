@@ -80,7 +80,8 @@ const _TDHFB_Y4_W0 = 1.0 - 2.0 * _TDHFB_Y4_W1
 """
     tdhfb_y4_midpoint_step!(state, F, g_S, V_ext, dt;
                             k_squared=nothing, fft_plans=nothing,
-                            picard_iters=1, picard_tol=1e-10) -> state
+                            picard_iters=1, picard_tol=1e-10,
+                            hfb_mode=:full_hfb) -> state
 
 Advance `state::TDHFBState{N}` by one **Yoshida-4 composition** of three
 Strang sub-steps with widths `(w1·dt, w0·dt, w1·dt)`. Drop-in replacement
@@ -103,6 +104,8 @@ Same as `tdhfb_strang_step!`. Extra keywords:
   diagnostic Picard loop — see file header for why this does NOT help
   in practice and is defaulted off.
 - `picard_tol::Real = 1e-10`: convergence tolerance for Picard.
+- `hfb_mode::Symbol = :full_hfb`: BdG generator mode for the φ subupdate;
+  see `tdhfb_strang_step!` docstring for `:full_hfb` vs `:popov` semantics.
 """
 function tdhfb_y4_midpoint_step!(
     state::TDHFBState{N},
@@ -114,6 +117,7 @@ function tdhfb_y4_midpoint_step!(
     fft_plans=nothing,
     picard_iters::Int=1,
     picard_tol::Real=1e-10,
+    hfb_mode::Symbol=:full_hfb,
 ) where {N}
     w1 = _TDHFB_Y4_W1
     w0 = _TDHFB_Y4_W0
@@ -121,17 +125,17 @@ function tdhfb_y4_midpoint_step!(
     _tdhfb_strang_substep!(
         state, F, g_S, V_ext, w1 * dt;
         k_squared=k_squared, fft_plans=fft_plans,
-        picard_iters=picard_iters, picard_tol=picard_tol,
+        picard_iters=picard_iters, picard_tol=picard_tol, hfb_mode=hfb_mode,
     )
     _tdhfb_strang_substep!(
         state, F, g_S, V_ext, w0 * dt;
         k_squared=k_squared, fft_plans=fft_plans,
-        picard_iters=picard_iters, picard_tol=picard_tol,
+        picard_iters=picard_iters, picard_tol=picard_tol, hfb_mode=hfb_mode,
     )
     _tdhfb_strang_substep!(
         state, F, g_S, V_ext, w1 * dt;
         k_squared=k_squared, fft_plans=fft_plans,
-        picard_iters=picard_iters, picard_tol=picard_tol,
+        picard_iters=picard_iters, picard_tol=picard_tol, hfb_mode=hfb_mode,
     )
 
     return state
@@ -150,16 +154,17 @@ function _tdhfb_strang_substep!(
     fft_plans=nothing,
     picard_iters::Int=1,
     picard_tol::Real=1e-10,
+    hfb_mode::Symbol=:full_hfb,
 ) where {N}
     _tdhfb_v_step!(state.phi, V_ext, dt / 2)
     _tdhfb_hf_step_picard!(
         state, F, g_S, dt / 2;
-        picard_iters=picard_iters, picard_tol=picard_tol,
+        picard_iters=picard_iters, picard_tol=picard_tol, hfb_mode=hfb_mode,
     )
     _tdhfb_kinetic_step!(state.phi, dt; k_squared=k_squared)
     _tdhfb_hf_step_picard!(
         state, F, g_S, dt / 2;
-        picard_iters=picard_iters, picard_tol=picard_tol,
+        picard_iters=picard_iters, picard_tol=picard_tol, hfb_mode=hfb_mode,
     )
     _tdhfb_v_step!(state.phi, V_ext, dt / 2)
 
@@ -184,14 +189,15 @@ function _tdhfb_hf_step_picard!(
     dt::Float64;
     picard_iters::Int=1,
     picard_tol::Real=1e-10,
+    hfb_mode::Symbol=:full_hfb,
 ) where {N}
     V = channel_kernel(F, g_S)
     half = dt / 2
 
     if picard_iters <= 1
-        _tdhfb_phi_subupdate!(state, F, g_S, V, half)
+        _tdhfb_phi_subupdate!(state, F, g_S, V, half; hfb_mode=hfb_mode)
         _tdhfb_R_subupdate!(state, F, g_S, V, dt)
-        _tdhfb_phi_subupdate!(state, F, g_S, V, half)
+        _tdhfb_phi_subupdate!(state, F, g_S, V, half; hfb_mode=hfb_mode)
         return state
     end
 
@@ -199,9 +205,9 @@ function _tdhfb_hf_step_picard!(
     rho0 = copy(state.rho)
     kappa0 = copy(state.kappa)
 
-    _tdhfb_phi_subupdate!(state, F, g_S, V, half)
+    _tdhfb_phi_subupdate!(state, F, g_S, V, half; hfb_mode=hfb_mode)
     _tdhfb_R_subupdate!(state, F, g_S, V, dt)
-    _tdhfb_phi_subupdate!(state, F, g_S, V, half)
+    _tdhfb_phi_subupdate!(state, F, g_S, V, half; hfb_mode=hfb_mode)
 
     phi_prev = copy(state.phi)
 
@@ -212,12 +218,12 @@ function _tdhfb_hf_step_picard!(
         state.phi .= phi0
         state.rho .= rho_endpoint
         state.kappa .= kappa_endpoint
-        _tdhfb_phi_subupdate!(state, F, g_S, V, half)
+        _tdhfb_phi_subupdate!(state, F, g_S, V, half; hfb_mode=hfb_mode)
 
         state.rho .= rho0
         state.kappa .= kappa0
         _tdhfb_R_subupdate!(state, F, g_S, V, dt)
-        _tdhfb_phi_subupdate!(state, F, g_S, V, half)
+        _tdhfb_phi_subupdate!(state, F, g_S, V, half; hfb_mode=hfb_mode)
 
         delta = zero(real(eltype(state.phi)))
         @inbounds for I in eachindex(state.phi)
