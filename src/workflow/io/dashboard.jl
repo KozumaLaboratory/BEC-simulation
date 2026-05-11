@@ -39,6 +39,10 @@ using ..SpinorBEC: total_density, spin_density_vector
 using ..SpinorBEC: probability_current, superfluid_velocity, superfluid_vorticity
 using ..SpinorBEC: synthetic_dim_dispersion
 using ..SpinorBEC: list_runs, run_status
+# Dashboard internals (pack3d.jl + compute/phase.jl) call _component_slice
+# directly. It's a private helper from foundation/spinor_utils/slice_helpers.jl;
+# named import here makes the cross-module reference explicit.
+using ..SpinorBEC: _component_slice
 
 include("dashboard/encoding.jl")          # bitshuffle + zstd
 include("dashboard/cache.jl")             # PSI_CACHE, JLD handle pool, atlas disk cache
