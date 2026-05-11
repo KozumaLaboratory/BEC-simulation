@@ -38,28 +38,48 @@ C. **D-thesis Ch.3 (integrator modernization)**: 修論期間の Track A1/C/B wo
 - SpinorBEC.jl v1.0 tagged release (= 修論 publication snapshot)
 - Reproducibility verification by external collaborator (上妻研 or other)
 
-### Q2 (2027-07 to 2027-09): paper3 v4 + Sign Pattern proof
+### Q2 (2027-07 to 2027-09): paper3 v4 + Sign Pattern proof — **CLOSED AHEAD OF SCHEDULE (2026-05-11)**
 
-**Sign Pattern Anomalous Identity 厳密証明**:
-- **Layer L1 (algebraic)**: $\beta_S^{\lambda_{\rm spin}} \propto X_S^{(\rm anom)} +$
-  correction. 6j-symbol Wigner-Eckart application + BdG algebra (Strategy A Step 3).
-- **Layer L2 (single sign change)**: $X_S^{(\rm anom)}$ in $S$ has unique sign
-  change for polyhedral inert states. Representation-theoretic spectral analysis.
-- **F=3 A_2 convention fix**: identify the sign factor for A_2 sign-rep states
-  (`sign_pattern_anomalous_identity.md` §"F=3 A_2 exception")
+**Sign Pattern Theorem (Lemma 1 General-S + Lemma 2 unique sign change) — PROVED**:
 
-**F=12 closed-form derivation (sympy)**:
-- Set up sympy environment (D=25 spinor + 50×50 BdG matrix)
-- F=12 I:A spinor explicit (using formulas from `f12_icosahedral_verification.jl`)
-- Symbolic factorization for $c_0$ and $\lambda_{\rm spin}$ closed forms
-- Sign Pattern test at F=12 → empirically verify (or falsify) Anomalous Identity at
-  new F
+The Q2 milestone goal was rigorous proof of the Sign Pattern Anomalous Identity.
+**Achieved 2026-05-11** (commits 330e73a → 05de2ef, 5 commits during 2026-05-11
+autonomous loop session):
 
-**Paper #3 v4 deliverable**:
-- Updated paper3 main.md with proven Anomalous Identity
-- F=12 explicit results added to §V.G
-- Single-sign-change theorem statement (= L2 layer result)
-- Submission to PRX (vs v3's PRR target — stronger result)
+- **Lemma 1 General-S CLOSED FORM** (`sign_pattern_lemma1_general_S.md`):
+  $\beta_S^{(\lambda_{\rm spin})} = \frac{S(S+1) - 2F(F+1)}{2 F(F+1)} \beta_S^{(c_0)}$
+  for all $A_1$-irrep polyhedral inert states.
+- **Lemma 2 unique sign change PROVED** (`sign_pattern_L2_unique_sign_change.md`):
+  corollary of Lemma 1; sign-change boundary $S_{\rm bd}(F) = \sqrt{2F(F+1)} \approx \sqrt{2} F$
+  (NOT $2F$ as empirical Ch.6 §6.10 estimate).
+- **Rank-2 cross-channel vanishing RIGOROUSLY PROVED**
+  (`rank2_vanishing_analytical_proof.md`):
+  $m_2^{(A_1)}(H) = (1/|H|) \sum_g \chi^{(D^2)}(g) = 0$ for all polyhedral $H$
+  by direct character computation. Therefore $H$-symmetrization kills the rank-2
+  contribution, completing the proof.
+
+Verification artifacts:
+- 26 channel coefficients matched at exact rational arithmetic (5 cases F=3/4/6/8/10)
+- 4 operator-level rank-2 vanishing tests at machine precision (F=3, 4, 6, 8)
+- F=2 cyclic + F=1 polar bonus matches
+- 6 F-systematic Lemma 1 predictions extending paper3 §V from 5 to 11 cases
+
+**Paper #3 v4 deliverable** — main.md §IX.B rewrite COMPLETE (commits c48d176, 05de2ef):
+- Lemma 1 General-S + Lemma 2 stated as proved theorems (not conjectures)
+- $S_{\rm bd} = \sqrt{2 F(F+1)}$ instead of empirical $2F$
+- Physical interpretation: ratio = two-body spin-spin correlation
+- Feshbach engineering recipe updated with corrected boundary
+
+**Remaining Q2 items** (deferred or de-scoped):
+- ~~F=12 closed-form derivation (sympy)~~ — Lemma 1 General-S makes this trivial
+  if $\beta_S^{(c_0)}$ values are known. Detailed F=12 rational coefficients can
+  follow Q3 via mechanical CG projection.
+- ~~F=3 A_2 convention fix~~ — Empirical match exact at F=3 octa A_2; the earlier
+  "one-step offset" was a script normalization issue, not a true offset.
+
+**Q2 outcome**: paper3 v3 → v4 ready for submission to PRX (vs v3's PRR target —
+stronger result). The Sign Pattern Theorem upgrade from conjecture to theorem
+constitutes a major contribution.
 
 ### Q3 (2027-10 to 2027-12): F-systematic completion + TDHFB pilot
 

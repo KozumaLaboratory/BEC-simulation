@@ -35,12 +35,18 @@ spinor parity. The F=8 case opens application to $^{164}$Dy spinor BECs.
 Multiple F instances per polyhedral family (F=3,4,8 for $O$; F=6,10 for $I$)
 demonstrate the F-universality of the theorem.
 
-Beyond the structural theorem, our verifications reveal a **sign pattern
-systematic** in $\lambda_{\rm spin}$: rational coefficients are negative for
-low-rank coupling channels ($S < 2F$) and positive for high-rank channels
-($S \gtrsim 2F$). This empirical "spinor-rank matching" rule provides
-predictive power for experimental polyhedral phase realization, indicating
-that Feshbach engineering should target $S \sim 2F$ scattering channels.
+Beyond the structural theorem, we establish a **Sign Pattern Theorem**
+(Lemma 1 General-S + Lemma 2 unique sign change) giving the closed-form
+rational coefficients of $\lambda_{\rm spin}$ as
+$\beta_S^{(\lambda_{\rm spin})} = \frac{S(S+1) - 2F(F+1)}{2 F(F+1)} \beta_S^{(c_0)}$
+for any $A_1$-irrep polyhedral inert state. The proof uses the character-theoretic
+fact that $D^2|_H$ has no $A_1$-content for polyhedral $H$, so the rank-2
+cross-channel contribution to the anomalous overlap vanishes by
+$H$-symmetrization. The closed form reveals the sign of
+$\beta_S^{(\lambda_{\rm spin})}$ is governed by the two-body spin-spin correlation
+$\langle\mathbf{F}^{(1)}\cdot\mathbf{F}^{(2)}\rangle_S / F(F+1)$, with sign-change
+boundary $S_{\rm bd}(F) = \sqrt{2F(F+1)} \approx \sqrt{2}\,F$. For Feshbach
+engineering: target $S > \sqrt{2F(F+1)}$ scattering channels.
 
 For non-polyhedral residual symmetries (axial dihedral $D_n$, cyclic $C_n$),
 modified theorems with multiplet splittings $1 + 2$ or $1 + 1 + 1$ apply; we
@@ -669,20 +675,45 @@ spinor phase to:
 Both quantities are mean-field stiffnesses with closed-form expressions in
 terms of $g_S$ couplings (Sec. V). No full BdG diagonalization required.
 
-### B. Sign Pattern — Lemma 1 General-S Closed Form (NEW: derived structural identity)
+### B. Sign Pattern Theorem (Lemma 1 General-S + Lemma 2 unique sign change) — PROVED
 
-Beyond the structural Universal Theorem (III.1), our 5 polyhedral case
-verifications collectively reveal a **derived closed-form identity** linking
-the spin-Goldstone stiffness coefficients $\beta_S^{(\lambda_{\rm spin})}$ to
-the phonon stiffness coefficients $\beta_S^{(c_0)}$ at every channel $S$ and
-every polyhedral $A_1$-irrep ground state:
+Beyond the structural Universal Theorem (III.1), we establish a **rigorous
+closed-form theorem** linking the spin-Goldstone stiffness coefficients
+$\beta_S^{(\lambda_{\rm spin})}$ to the phonon stiffness coefficients
+$\beta_S^{(c_0)}$ at every channel $S$ and every polyhedral $A_1$-irrep ground state:
+
+**Theorem (Sign Pattern, Lemma 1 General-S)**:
 
 $$\boxed{\beta_S^{(\lambda_{\rm spin})} = \frac{S(S+1) - 2F(F+1)}{2 F(F+1)} \cdot \beta_S^{(c_0)}} \tag{IX.B.1}$$
 
-This identity (the **Anomalous Identity at the closed-form rational level**)
-was empirically discovered by direct comparison of paper3's 5-case closed forms
-to a single bilinear $S$-dependent ratio. It has been verified at **26 channel
-coefficients matched at exact rational arithmetic** across 5 polyhedral phases:
+for any polyhedral $A_1$-irrep inert state $\zeta^{(H, A_1)}_F$ with
+$H \in \{T, O, I\}$ (or double covers $T_h, O_h, I_h$).
+
+**Proof outline** (full version in `rank2_vanishing_analytical_proof.md`):
+1. Decompose $F_a^{(1)} F_a^{(2)} = \frac{1}{3}\mathbf{F}^{(1)}\!\cdot\!\mathbf{F}^{(2)} + T^{(2)}_{aa}$
+   (scalar + traceless rank-2 tensor).
+2. Scalar (rank-0) part: $\frac{1}{3}\mathbf{F}^{(1)}\!\cdot\!\mathbf{F}^{(2)}|_{|S,M\rangle} = \frac{1}{6}[S(S+1) - 2F(F+1)]$
+   acts diagonally on $|S, M\rangle$, contributing exactly the closed form
+   $X_S^{(\rm anom, scalar)} = \frac{S(S+1) - 2F(F+1)}{2 F(F+1)} \beta_S^{(c_0)}$
+   after norm $\|F_a\zeta\|^2 = F(F+1)/3$ (polyhedral Schur isotropy).
+3. **Rank-2 part vanishes**: by character formula
+   $m_2^{(A_1)}(H) = (1/|H|) \sum_g \chi^{(D^2)}(g) = 0$ for all polyhedral $H$
+   (verified via direct character computation; see `D2_H_irrep_character_proof.jl`).
+   Therefore $H$-symmetrization of any $T^{(2)}_{aa}$ is identically zero, and
+   since $|\zeta\otimes\zeta\rangle$ is $H$-invariant,
+   $\langle\zeta\otimes\zeta | T^{(2)}_{aa} P_S | \zeta\otimes\zeta\rangle = \langle\zeta\otimes\zeta | \langle T^{(2)}_{aa}\rangle_H P_S | \zeta\otimes\zeta\rangle = 0$.
+$\blacksquare$
+
+**Theorem (Lemma 2, unique sign change)**: $\beta_S^{(\lambda_{\rm spin})}$
+changes sign exactly once in $S \in [0, 2F]$, at $S_{\rm bd}(F) = \sqrt{2F(F+1)}$.
+
+**Proof**: Corollary of Lemma 1 General-S. Since $\beta_S^{(c_0)} \geq 0$ and
+$f(S) = S(S+1) - 2F(F+1)$ is strictly monotonic ($f'(S) = 2S + 1 > 0$) with
+$f(0) < 0$ and $f(2F) = 2F^2 > 0$, the unique sign change occurs at
+$S_{\rm bd} = (-1 + \sqrt{1 + 8F(F+1)})/2 \approx \sqrt{2 F(F+1)}$. $\blacksquare$
+
+Verification scope: **26 channel coefficients matched at exact rational
+arithmetic across 5 polyhedral phases**:
 
 | F | Phase | Channels (S) | All match (IX.B.1)? |
 |---|---|---|---|
@@ -720,21 +751,17 @@ coefficients matched at exact rational arithmetic** across 5 polyhedral phases:
    > $S \in [8, 10]$; for Dy (F=8), boundary $S = 12$; for Cr (F=3), boundary
    > $S \in [4, 6]$."
 
-4. **Rigorous proof status**:
-   - **S = 0 case rigorously proved** via singlet annihilation identity
-     $\mathbf{F}^{tot}|0,0\rangle = 0$ + polyhedral Schur isotropy
-     $\|F_a\zeta\|^2 = F(F+1)/3$. Gives $\beta_0^{(\lambda)} = -1/(2F+1)$
-     for any polyhedral $A_1$ state.
-   - **Scalar (rank-0) part of $X_S^{(\rm anom)}$** exactly equals (IX.B.1)
-     by direct Wigner-Eckart calculation.
-   - **Rank-2 cross-channel part** (which vanishes at all verified
-     polyhedral inert states by sparsity + Schur isotropy) — analytical
-     proof of this vanishing is the remaining gap.
-   - Empirically: 26 channel coefficients matched at exact rational arithmetic
-     across 5 cases (no exceptions, no offsets).
+4. **Rigorous proof status — Theorem fully proved (2026-05-11)**:
+   - **S = 0 case proved** via singlet annihilation identity (Schur isotropy).
+   - **Scalar (rank-0) part** exact via Wigner-Eckart on $\mathbf{F}^{(1)}\!\cdot\!\mathbf{F}^{(2)}$.
+   - **Rank-2 cross-channel part** proved zero via character formula:
+     $D^2|_H$ has no $A_1$ irrep for polyhedral $H$, so $H$-symmetrization
+     of $T^{(2)}_{aa}$ vanishes identically.
+   - 26 channel coefficients matched at exact rational arithmetic (5 cases).
+   - 4 operator-level rank-2 vanishing tests at machine precision (F=3, 4, 6, 8).
 
-Full derivation and verification details: `sign_pattern_lemma1_general_S.md`
-in the supplementary material.
+Full proof: `rank2_vanishing_analytical_proof.md`,
+`sign_pattern_lemma1_general_S.md`, `sign_pattern_L2_unique_sign_change.md`.
 
 **Predictive consequences**: This systematic provides quantitative experimental
 guidance:
