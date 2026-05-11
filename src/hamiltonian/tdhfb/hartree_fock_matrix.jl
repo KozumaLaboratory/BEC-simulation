@@ -10,6 +10,14 @@
 #
 # Phase 2 minimal scope = HF matrix kernel; full coupled (φ, ρ, κ) evolution +
 # Strang TDHFB integrator + YAML pipeline integration are Phase 3-4.
+#
+# NOTE: this F=1 kernel is the GP-form (first functional derivative of E_int).
+# It is the reference for the C5 GP-reduction conservation test. The generic
+# `hf_matrix_generic!` returns the BdG self-energy (second derivative form,
+# factor-2 Bose-symmetrized) — the two differ by exactly the factor 2 in the
+# κ=0 case.
+
+export hf_matrix_F1, hf_matrix_F1!
 
 """
     hf_matrix_F1!(h_hf, phi, rho, kappa, c0, c1) -> h_hf
@@ -48,9 +56,14 @@ Generic F + g_S channel decomposition deferred to Phase 2 extension.
 # Returns
 The h_hf array (for chaining).
 """
-function hf_matrix_F1!(h_hf::AbstractArray, phi::AbstractArray,
-                       rho::AbstractArray, kappa::AbstractArray,
-                       c0::Float64, c1::Float64)
+function hf_matrix_F1!(
+    h_hf::AbstractArray,
+    phi::AbstractArray,
+    rho::AbstractArray,
+    kappa::AbstractArray,
+    c0::Float64,
+    c1::Float64,
+)
     # F=1 spin matrices in (+1, 0, -1) basis
     # F_z = diag(1, 0, -1)
     # F_+ = √2 · (|+1⟩⟨0| + |0⟩⟨-1|)
@@ -71,7 +84,7 @@ function hf_matrix_F1!(h_hf::AbstractArray, phi::AbstractArray,
     for idx in CartesianIndices(size(phi)[1:n_spatial])
         # Mean field at this point: phi_m for m = +1, 0, -1 → index 1, 2, 3
         phi_p1 = phi[idx, 1]
-        phi_0  = phi[idx, 2]
+        phi_0 = phi[idx, 2]
         phi_m1 = phi[idx, 3]
 
         # Scalar density n = |φ|² + tr ρ
@@ -103,9 +116,10 @@ function hf_matrix_F1!(h_hf::AbstractArray, phi::AbstractArray,
         # (suppressing anomalous contribution from κ at minimal Phase 2 scope)
         for m in 1:3, m_prime in 1:3
             val = c0 * n_total * (m == m_prime ? 1.0 : 0.0)
-            val += c1 * (Fx[m, m_prime] * Fx_total +
-                         Fy[m, m_prime] * Fy_total +
-                         Fz[m, m_prime] * Fz_total)
+            fx_part = Fx[m, m_prime] * Fx_total
+            fy_part = Fy[m, m_prime] * Fy_total
+            fz_part = Fz[m, m_prime] * Fz_total
+            val += c1 * (fx_part + fy_part + fz_part)
             h_hf[idx, m, m_prime] = val
         end
     end
@@ -118,8 +132,13 @@ end
 
 Allocating version of [`hf_matrix_F1!`](@ref).
 """
-function hf_matrix_F1(phi::AbstractArray, rho::AbstractArray,
-                      kappa::AbstractArray, c0::Float64, c1::Float64)
+function hf_matrix_F1(
+    phi::AbstractArray,
+    rho::AbstractArray,
+    kappa::AbstractArray,
+    c0::Float64,
+    c1::Float64,
+)
     h_hf = similar(rho)
     return hf_matrix_F1!(h_hf, phi, rho, kappa, c0, c1)
 end

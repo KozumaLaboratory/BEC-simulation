@@ -10,12 +10,7 @@ using Test
 using LinearAlgebra
 using FFTW
 using Random
-
-include(joinpath(@__DIR__, "..", "src", "foundation", "types", "tdhfb_state.jl"))
-include(joinpath(@__DIR__, "..", "src", "foundation", "clebsch_gordan.jl"))
-include(joinpath(@__DIR__, "..", "src", "hamiltonian", "tdhfb", "hartree_fock_matrix.jl"))
-include(joinpath(@__DIR__, "..", "src", "hamiltonian", "tdhfb", "hartree_fock_matrix_generic.jl"))
-include(joinpath(@__DIR__, "..", "src", "hamiltonian", "tdhfb", "strang_step.jl"))
+using SpinorBEC
 
 @testset "TDHFB Strang step (Phase 3)" begin
     Random.seed!(42)

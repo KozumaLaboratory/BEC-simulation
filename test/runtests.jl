@@ -74,6 +74,14 @@ const FAST_TESTS = [
     "workflow/test_infrastructure.jl",
     "hamiltonian/test_zeeman_levels.jl",
     "hamiltonian/test_zeeman_accessors.jl",
+    # TDHFB local-approximation engine (channel kernel + Δ + voxel BdG step
+    # + energy functional + conservation suite).
+    "foundation/test_tdhfb_state.jl",
+    "hamiltonian/test_tdhfb_hf_matrix.jl",
+    "hamiltonian/test_tdhfb_hf_matrix_generic.jl",
+    "hamiltonian/test_tdhfb_strang_step.jl",
+    "hamiltonian/test_tdhfb_pair_potential.jl",
+    "hamiltonian/test_tdhfb_conservation.jl",
 ]
 
 # ── CI tier: fast + core integration tests that run ITP/RTP ──

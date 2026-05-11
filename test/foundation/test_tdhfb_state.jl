@@ -5,9 +5,7 @@
 
 using Test
 using LinearAlgebra
-
-# Direct include since TDHFBState not yet exported from SpinorBEC umbrella
-include(joinpath(@__DIR__, "..", "src", "foundation", "types", "tdhfb_state.jl"))
+using SpinorBEC
 
 @testset "TDHFBState Phase 1 scaffold" begin
     # Setup: 1D grid, D=3 (F=1)
