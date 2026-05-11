@@ -1,14 +1,15 @@
-# Option γ: Instantaneous Local Frame Spinor GPE
+# Option γ: Instantaneous Local Frame Spinor GPE — derivation
 
-Design document for a rotating-basis formulation that handles
-time-dependent magnetic-field polarization $\hat B(t)$ in spinor BECs.
-Larmor oscillations are removed analytically while spin excitations are
-preserved. Scalar eGPE (`src/rotating_basis/scalar_egpe.jl`) is the adiabatic limit
-($\tilde\psi_{m\neq -F}\to 0$) of this formulation and serves as the
-validation reference for Phase II below.
+Mathematical derivation behind `kind: rotating_basis`. **For how to use
+it (YAML, validation results, ε rule, gauge gotcha), read
+`guides/klaus_regime.md` first.** This file is the term-by-term
+Hamiltonian transform — read it when you need to understand or extend
+the math.
 
-Status: **design only**. Implementation pending. Estimated 700 LOC and
-multi-session work.
+Status: **production**. Phase II/III validation passed 2026-04-27 (see
+guide for the table). Scalar eGPE (`src/rotating_basis/scalar_egpe.jl`)
+is the adiabatic limit ($\tilde\psi_{m\neq -F}\to 0$) and serves as the
+Phase II reference.
 
 ## 1. Setup
 
@@ -171,59 +172,31 @@ LOC estimate:
 - Tests: ~200
 - **Total: ~700 LOC, ~1 week**
 
-## 12. Validation strategy
+## 12. Two physics insights worth recording separately
 
-**Phase I — static $\hat B$**: $\hat B$ = constant ⇒ $\hat A=0$. Rotating-basis spinor GP ≡ lab-frame spinor GP up to a global basis transform. All 254 existing physics-invariant tests must pass.
+**Larmor sub-cycling is not solved by Option γ alone.** Naive lab-frame
+Strang splits Zeeman (transverse + diagonal) from DDI/SM, and that's
+what makes dt scale as 1/p. An eigen-exact spin step that combines all
+spin-only spatial-constant operators into one D×D unitary eliminates
+that constraint in BOTH lab-frame and rotating-basis (we have both
+solvers; they agree). So Option γ's actual advantage is **cleaner
+sparsity**: $\tilde H = -p F_z + q F_z² - Â$ stays sparse for arbitrary
+$\hat B(t)$, while $H_{\rm lab} = -p \hat F \cdot \hat B(t)$ is full.
 
-**Phase II — static tilted $\hat B$**: $\hat B = (\sin 35°, 0, \cos 35°)$ constant. Compare lab-frame spinor (dt = 2e-5) and rotating basis (dt = 2e-3). Overlap > 0.9999, energies match. Also confirm scalar eGPE adiabatic limit: $\tilde\psi_{m\neq-F}\to 0$ in strong-field limit, density matches `src/rotating_basis/scalar_egpe.jl`.
+**ε_dd_eff has an F² factor.** Stability requires
+`ε_dd_eff ≡ c_dd · F² / (3g) < 1`, not the naive `c_dd / (3g)`.
+The F² is in both solvers' effective dipolar strength.
 
-**Phase II PASSED (2026-04-27)**: scalar-eGPE adiabatic-limit overlap = 0.999959 on 16³ grid with F=1, p=5000, ε_dd_eff=0.033, 30° tilt. Sweep across F={1,2,4} × p={500,5000,50000} all pass with overlap ≥ 0.9995 and m=+F fraction = 1.0 to machine precision. See `test/test_rotating_basis_phase_ii.jl` (10 tests) and `scripts/validate_phase_ii_overlap.jl`. **Caveat:** stability requires ε_dd_eff ≡ c_dd·F²/(3g) < 1, not ε_dd_naive = c_dd/(3g) — the F² factor enters both solvers' effective dipolar strength.
-
-**Phase III — dynamic $\hat B$ (Klaus)**: full magnetostir. Lab-frame spinor (dt = 2e-5, ~50 hours) vs rotating basis (dt = 2e-3, ~5 min). Final $L_z$, vortex count, density profile must match.
-
-**Phase III PASSED (2026-04-27)**: implemented an in-tree eigen-exact lab-frame solver (`split_step_lab!`, `apply_lab_spin_step!`) that uses the SAME spin-step technology as Option γ. Compared at identical trap-scale dt:
-
-| p (Larmor scale) | coherent overlap | density overlap |
-|---|---|---|
-| 100  | 1.000000 | 1.000000 |
-| 1000 | 0.999964 | 1.000000 |
-| **28428 (full Klaus)** | **0.999999** | 1.000000 |
-
-dt convergence at p=20: 0.999987 (dt=0.04) → 1.000000 (dt=0.005). **Mathematical equivalence proven**: Option γ ⇄ lab-frame at trap-scale dt when both spin steps are eigen-exact.
-
-**Important gauge note**: This equivalence requires `gauge_fix=false`. With `gauge_fix=true` the dynamics are still correct (just in a different gauge), but ψ_lab(T) ≠ Û_B(T) ψ̃(T) directly — a residual exp(+iχ F_z) needs to be applied to recover lab state. See `test/test_rotating_basis_phase_iii.jl` and `scripts/validate_phase_iii_lab_vs_gamma.jl`.
-
-**The "Larmor sub-cycling" insight**: The original spinor solver's dt constraint at large Larmor stems from the NAIVE Strang split between Zeeman (transverse + diagonal) and DDI/SM. An eigen-exact spin step (combining all spin-only spatial-constant operators into one D×D unitary) eliminates that constraint in BOTH lab-frame and rotating-basis. Option γ's primary advantage is therefore not "dt budget" but **preservation of spin-excitation structure with cleaner eigen-exact decomposition** (the rotating-basis H_tilde = -p F_z + q F_z² - Â is sparser than H_lab = -p F·B̂(t) for arbitrary B̂(t)).
-
-If Phase III passes, Option γ is production-ready and B-1 phase scan can use it.
-
-## 13. Publication potential
-
-This is publishable work:
-1. F=6 spinor BEC + DDI + time-dependent polarization rotating-basis formulation (F=1 polar/ferromagnetic exists; F=6 only sketched in KU §10)
-2. Berry connection $\hat A$ as microscopic origin of EdH spin-orbit coupling
-3. Numerical demonstration of scalar eGPE as the adiabatic limit (Klaus reproduction)
-4. Efficient B-1 phase scan computation (dt at trap scale)
-
-Working title: *Local-frame spinor Gross-Pitaevskii formulation for time-dependent polarization in dipolar Bose-Einstein condensates*.
-
-## 14. Relationship to existing code
-
-- **`src/rotating_basis/scalar_egpe.jl`**: adiabatic limit; serves as Phase II reference
-- **Existing spinor split-step (`src/hamiltonian/split_step.jl`)**: lab-frame; Phase I/II/III ground truth at high resolution dt
-- **`spin_rotating_frame_omega` SimParams**: opt-in RF for resonant drives only; Option γ subsumes it (no resonance assumption needed)
-- **`zeeman_diagonal_quadratic_only`**: dead scaffolding from A.1 attempt; can be repurposed as the `-p F_z + q F_z²` static block in Option γ's diagonal step
-
-## 15. Summary
+## 13. Where this sits among solvers
 
 | Aspect | Lab spinor | RF (`omega_R`) | scalar eGPE | Option γ |
 |---|---|---|---|---|
-| Larmor sub-cycling | required | bypassed (resonant) | bypassed (adiabatic) | bypassed (basis) |
+| Larmor sub-cycling | required* | bypassed (resonant) | bypassed (adiabatic) | bypassed (basis) |
 | Spin excitations | full | full | none | full |
 | Off-resonant drives | works | breaks | works | works |
 | Off-adiabatic dynamics | works | works | breaks | works |
 | ITP for FL phase | works | works | trivial scalar | works |
 | EdH microscopic | works | works | misses spin-orbit | works |
-| Implementation status | done | done (`09cb688`) | skeleton (`scalar_egpe.jl`) | design only |
 
-Option γ is the unique formulation that handles all four regimes correctly with a single time-step budget.
+(*) lab spinor with eigen-exact spin step also bypasses sub-cycling
+(see §12); the table reflects the historical naive Strang split.

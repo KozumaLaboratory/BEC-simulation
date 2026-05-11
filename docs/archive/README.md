@@ -29,16 +29,17 @@ Regression test: `test/test_itp_ddi_strang_save_every.jl`.
 - **`plan.md`** — pre-implementation snapshot (~2026-04-14). Stage 0/1/2/3/4 layout; AtomOptics.jl split idea (abandoned). Marked obsolete in its own header.
 - **`plan2.md`** — pre-implementation snapshot (~2026-04-14). Test pyramid (Level 0–3) — implemented as `test/test_propagators/`, `test_conservation/`, `test_ground_state/`, `test_dynamics/`. Marked obsolete in its own header.
 - **`optimization_roadmap_2026-04-29.md`** — outstanding items split into the live design docs:
-  - CUDA Graph re-enable → see `design/integrator_modernization_plan.md` + `cuda_graph_stubs.jl`
+  - CUDA Graph re-enable → see `design/higher_order_integrators.md` + `cuda_graph_stubs.jl`
   - Mixed precision F32 → `design/mixed_precision_design.md`
   - Multi-GPU → `design/multi_gpu_design.md`
-  - Higher-order regime-aware ε → `design/integrator_modernization_plan.md`
+  - Higher-order regime-aware ε → `design/higher_order_integrators.md`
   - F=6 LHY closed form → derived since; see `theory/icosahedral_lhy.md`
 - **`thesis_batch_audit_2026-04-28.md`** — ε threshold finding (`p·F·dt > 100` needs ε=1e-6) and regime classification table. Now enforced via `_run_rotating_basis_dynamics_inner` advisory + CLAUDE.md "Known limitations".
 
 ## Superseded designs
 
-- **`spin_larmor_frame.md`** — narrower Path-A Larmor-frame design (single-axis Bz, F=8 Dy164 only initially). Superseded by `design/option_gamma_rotating_basis.md` which handles full B̂(t) for general F including Eu151 F=6 (Phase II/III passed 2026-04-27; production path).
+- **`spin_larmor_frame.md`** — narrower Path-A Larmor-frame design (single-axis Bz, F=8 Dy164 only initially). Superseded by `design/option_gamma_rotating_basis.md` (math) + `guides/klaus_regime.md` (usage). Option γ handles full B̂(t) for general F including Eu151 F=6 (Phase II/III passed 2026-04-27; production path).
+- **`phase15_zeeman_levels.md`** — design rationale for Level 0/1/2 Zeeman dispatch (closures vs sampled waveforms; omega_ref resolution rules). Implementation done 2026-04-23. User-facing reference is now `reference/yaml_schema_reference.md` "zeeman" section + `guides/klaus_regime.md` "Spec B(t)".
 
 ## Historical feature description
 

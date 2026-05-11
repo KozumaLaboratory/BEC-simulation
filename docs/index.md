@@ -25,6 +25,7 @@ docs/
 | You want to... | Read this |
 |---|---|
 | Run a simulation that mirrors a lab experiment | `guides/lab_user_tutorial.md` |
+| Run anything Klaus 2022 / Eu fast-Larmor (production path) | `guides/klaus_regime.md` |
 | Find a YAML pattern (scan, droplet, calibration, …) | `guides/pipeline_cookbook.md` |
 | Look up every YAML key | `reference/yaml_schema_reference.md` |
 | Understand the module structure / data flow | `reference/architecture.md` |
@@ -32,9 +33,11 @@ docs/
 | Pick the right precision / save_every / k_cut | `guides/performance_tuning.md` |
 | Upgrade old configs after a convention change | `guides/migration_guide.md` |
 | Submit jobs on TSUBAME | `guides/tsubame.md` |
-| Understand the rotating-basis (Option γ) solver | `design/option_gamma_rotating_basis.md` |
+| Read the rotating-basis math derivation | `design/option_gamma_rotating_basis.md` |
+| See higher-order integrator status (RTP MPS / ITP Blanes) | `design/higher_order_integrators.md` |
 | Read a closed-form result | `theory/icosahedral_lhy.md` or other `theory/*.md` |
-| See the latest TWA / collapse / phase-boundary findings | `research_notes/*.md` |
+| Get the TWA-on-Eu-EdH bottom line | `research_notes/twa_eu_edh_synthesis.md` |
+| Inspect a single TWA scan's raw data | `research_notes/twa_*_result.md` |
 
 ## Documentation philosophy
 

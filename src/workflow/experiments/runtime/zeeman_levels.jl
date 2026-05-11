@@ -1,4 +1,7 @@
-# --- Phase 1.5: Zeeman-level dispatch (docs/design/phase15_zeeman_levels.md) ---
+# --- Phase 1.5: Zeeman-level dispatch ---
+# User-facing reference: docs/reference/yaml_schema_reference.md (Zeeman block).
+# Operational guide: docs/guides/klaus_regime.md "Spec B(t), not (p,q,bx,by)".
+# Original design rationale: docs/archive/phase15_zeeman_levels.md.
 #
 # Level 0 (existing): p, q, bx, by — dimensionless (ℏω_ref units)
 # Level 1 (new): Bx, By, Bz — Gauss (scalar or Waveform)
