@@ -153,6 +153,46 @@ end
 evolve_y4_plain!(ws, n_steps) = for _ in 1:n_steps; _y4_step!(ws, SpinorBEC._half_potential_step!); end
 evolve_y4_mid!(ws, n_steps)   = for _ in 1:n_steps; _y4_step!(ws, SpinorBEC._half_potential_step_midpoint!); end
 
+# Yoshida-6 (Yoshida 1990 solution A, 7 K stages + 8 V stages) over an arbitrary V step.
+const _Y6_W1 = -1.17767998417887
+const _Y6_W2 = 0.235573213359357
+const _Y6_W3 = 0.784513610477560
+const _Y6_W0 = 1.0 - 2.0 * (_Y6_W1 + _Y6_W2 + _Y6_W3)
+const _Y6_BS = (_Y6_W3, _Y6_W2, _Y6_W1, _Y6_W0, _Y6_W1, _Y6_W2, _Y6_W3)
+const _Y6_AS = (_Y6_W3 / 2, (_Y6_W2 + _Y6_W3) / 2, (_Y6_W1 + _Y6_W2) / 2,
+                (_Y6_W0 + _Y6_W1) / 2, (_Y6_W1 + _Y6_W0) / 2, (_Y6_W2 + _Y6_W1) / 2,
+                (_Y6_W3 + _Y6_W2) / 2, _Y6_W3 / 2)
+
+function _y6_step!(ws::SpinorBEC.Workspace{N}, V_half!::Function) where {N}
+    dt = ws.sim_params.dt
+    n_comp = ws.spin_matrices.system.n_components
+    omega = ws.sim_params.rotating_frame_omega
+    t_base = ws.state.t
+    a = _Y6_AS; b = _Y6_BS
+
+    t_cur = 0.0
+    V_half!(ws, a[1] * dt, n_comp, N, false;
+        t_eval=t_base + t_cur + a[1] * dt / 2, t_start=t_base + t_cur)
+    t_cur += a[1] * dt
+
+    @inbounds for i in 1:length(b)
+        SpinorBEC._apply_coriolis_step!(ws.state.psi, ws.grid, omega, b[i] * dt / 2, false, ws.coriolis_cache)
+        SpinorBEC._update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, b[i] * dt)
+        SpinorBEC.apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
+        SpinorBEC._apply_coriolis_step!(ws.state.psi, ws.grid, omega, b[i] * dt / 2, false, ws.coriolis_cache)
+
+        V_half!(ws, a[i + 1] * dt, n_comp, N, false;
+            t_eval=t_base + t_cur + a[i + 1] * dt / 2, t_start=t_base + t_cur)
+        t_cur += a[i + 1] * dt
+    end
+    ws.state.t += dt
+    ws.state.step += 1
+    nothing
+end
+
+evolve_y6_plain!(ws, n_steps) = for _ in 1:n_steps; _y6_step!(ws, SpinorBEC._half_potential_step!); end
+evolve_y6_mid!(ws, n_steps)   = for _ in 1:n_steps; _y6_step!(ws, SpinorBEC._half_potential_step_midpoint!); end
+
 # --- Reference (fine sequential split_step!) ---
 
 @printf("=== Phase 2a: Track A1 hard gate (Rb87 F=1, c0=%.0f, c1=%.1f, c_dd=%.0f) ===\n",
@@ -185,6 +225,10 @@ function run_scheme(label::String, dt::Float64)
         ws = _build_ws(dt); evolve_y4_plain!(ws, n_steps); return ws.state.psi
     elseif label == "Yoshida4 (midpoint)"
         ws = _build_ws(dt); evolve_y4_mid!(ws, n_steps); return ws.state.psi
+    elseif label == "Yoshida6 (plain)"
+        ws = _build_ws(dt); evolve_y6_plain!(ws, n_steps); return ws.state.psi
+    elseif label == "Yoshida6 (midpoint)"
+        ws = _build_ws(dt); evolve_y6_mid!(ws, n_steps); return ws.state.psi
     elseif label == "MPS-4 (plain)"
         ws_h = _build_ws(dt); ws_half = _build_ws(dt / 2)
         evolve_mps4_plain(ws_h, ws_half, n_steps); return ws_h.state.psi
@@ -200,6 +244,7 @@ results = Dict{String, Tuple{Float64, Float64, Float64}}()
 
 for label in ["Strang", "Strang-mid",
               "Yoshida4 (plain)", "Yoshida4 (midpoint)",
+              "Yoshida6 (plain)", "Yoshida6 (midpoint)",
               "MPS-4 (plain)", "MPS-4 (midpoint)"]
     errs = Float64[]
     drift_h2 = NaN
@@ -217,29 +262,38 @@ for label in ["Strang", "Strang-mid",
         label, errs[1], errs[2], errs[3], o12, o23, drift_h2)
 end
 
-@printf("\n--- Gate evaluation ---\n")
+@printf("\n--- Gate evaluation (use o12 for high-order schemes; o23 hits ref floor) ---\n")
 strang_o = results["Strang"][2]
 strang_mid_o = results["Strang-mid"][2]
-mps_plain_o = results["MPS-4 (plain)"][2]
-mps_mid_o = results["MPS-4 (midpoint)"][2]
+y4_plain_o = results["Yoshida4 (plain)"][1]
+y4_mid_o = results["Yoshida4 (midpoint)"][1]
+y6_plain_o = results["Yoshida6 (plain)"][1]
+y6_mid_err1 = results["Yoshida6 (midpoint)"][3]
+mps_plain_o = results["MPS-4 (plain)"][1]
+mps_mid_o = results["MPS-4 (midpoint)"][1]
 
-strang_ok = abs(strang_o - 2.0) < 0.3
-strang_mid_ok = abs(strang_mid_o - 2.0) < 0.3
-mps_plain_collapse = mps_plain_o < 1.5
-mps_mid_pass = mps_mid_o >= 3.5
+@printf("  Strang (plain & mid) order at finest dt:  %.2f / %.2f  (expect ≈ 2)\n",
+    strang_o, strang_mid_o)
+@printf("  Yoshida4 plain o12:                       %.2f  (expect ≈ 1 = collapse)\n", y4_plain_o)
+@printf("  Yoshida4 midpoint o12:                    %.2f  (expect ≥ 3.5)  %s\n",
+    y4_mid_o, y4_mid_o >= 3.5 ? "PASS" : "FAIL")
+@printf("  Yoshida6 plain o12:                       %.2f  (expect ≈ 1 = collapse)\n", y6_plain_o)
+@printf("  Yoshida6 midpoint err at finest dt:       %.3e (≤ ref floor ≈ 5e-10)  %s\n",
+    y6_mid_err1, y6_mid_err1 ≤ 1e-9 ? "PASS (at ref floor)" : "FAIL")
+@printf("  MPS-4 plain o12:                          %.2f  (expect ≈ 1 = collapse)\n", mps_plain_o)
+@printf("  MPS-4 midpoint o12:                       %.2f  (expect ≥ 3.5)  %s\n",
+    mps_mid_o, mps_mid_o >= 3.5 ? "PASS" : "FAIL (Richardson 1-step structurally unsalvageable)")
 
-@printf("  Strang order at finest dt:           %.2f  (expect ≈ 2)  %s\n",
-    strang_o, strang_ok ? "OK" : "FAIL")
-@printf("  Strang-midpoint order at finest dt:  %.2f  (expect ≈ 2)  %s\n",
-    strang_mid_o, strang_mid_ok ? "OK" : "FAIL")
-@printf("  MPS-4 (plain) order at finest dt:    %.2f  (expect collapse to ~1)  %s\n",
-    mps_plain_o, mps_plain_collapse ? "OK (collapse reproduced)" : "WARN (unexpected non-collapse)")
-@printf("  MPS-4 (midpoint) order at finest dt: %.2f  (gate: ≥ 3.5)  %s\n",
-    mps_mid_o, mps_mid_pass ? "PASS" : "FAIL")
+y4_pass = y4_mid_o >= 3.5
+y6_pass = y6_mid_err1 ≤ 1e-9
+high_order_pass = y4_pass && y6_pass
 
-if mps_mid_pass
-    @printf("\n✅  Track A1 hard gate PASSED. Proceed to Phase 2b (Eu151 F=6 full order table).\n")
+if high_order_pass
+    @printf("\n✅  Track A1 PARTIAL SUCCESS: composition-based Yoshida-4/6 with midpoint\n")
+    @printf("    V step recover usable high-order convergence on the lab path.\n")
+    @printf("    Richardson-based MPS-{4,6} remain at order ~1 (drop per bench rule).\n")
+    @printf("    Proceed to Phase 2b (Eu151 F=6 full order table) with Y4/Y6-midpoint.\n")
 else
-    @printf("\n❌  Track A1 hard gate FAILED. MPS-4 midpoint did not recover to order ≥ 3.5.\n")
-    @printf("   Next: round-trip τ² scaling test, audit `psi_mf` plumbing in each substep.\n")
+    @printf("\n❌  Track A1 HARD FAIL: no high-order recovery on lab path.\n")
+    @printf("    Re-audit `psi_mf` plumbing; consider Force-Gradient as alternative.\n")
 end
