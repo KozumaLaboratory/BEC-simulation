@@ -325,21 +325,26 @@ classes $C$ で和を取る。
 
 ### 4.6.2 Table II: $D^F |_H$ の 1-dim irreps multiplicity
 
-| F | dim $D^F$ | T:A | T:E_1 | O:A_1 | O:A_2 | I:A | Polyhedral inert states |
+Schur-singlet inert state は **実 1-dim irrep** ($A$, $A_1$, $A_2$) の mult ≥ 1
+を要求する。複素 1-dim irrep ($E_1$) は位相同変 (phase-equivariant) で Schur
+等方性を満たさず、Universal Theorem (4.6) の前提を満たさない (§4.6.4.1 参照)。
+
+| F | dim $D^F$ | T:A | T:E_1 | O:A_1 | O:A_2 | I:A | Schur-singlet inert states |
 |---|---|---|---|---|---|---|---|
 | 0 | 1 | 1 | 0 | 1 | 0 | 1 | 全 trivial |
-| **1** | **3** | **0** | **0** | **0** | **0** | **0** | **NONE** |
-| 2 | 5 | 0 | 1 | 0 | 0 | 0 | T:E_1 (= cyclic) |
-| 3 | 7 | 1 | 0 | 0 | 1 | 0 | T:A, O:A_2 (= octa) |
-| 4 | 9 | 1 | 1 | 1 | 0 | 0 | T:A, T:E_1, O:A_1 (= cube) |
-| 5 | 11 | 0 | 1 | 0 | 0 | 0 | T:E_1 |
-| 6 | 13 | 2 | 1 | 1 | 1 | **1** | 全 families (含 I:A = icosa) |
-| 7 | 15 | 1 | 1 | 0 | 1 | 0 | T:A, T:E_1, O:A_2 |
-| 8 | 17 | 1 | 2 | 1 | 0 | 0 | T:A, T:E_1×2, O:A_1 (Dy) |
-| 9 | 19 | 2 | 1 | 1 | 1 | 0 | T:A×2, T:E_1, O:A_1, O:A_2 |
-| 10 | 21 | 2 | 2 | 1 | 1 | 1 | 全 families |
-| 11 | 23 | 1 | 2 | 0 | 1 | 0 | T:A, T:E_1×2, O:A_2 |
-| 12 | 25 | 3 | 2 | 2 | 1 | 1 | 全 families with multiplicity |
+| **1** | **3** | **0** | **0** | **0** | **0** | **0** | **NONE** ($T_1$ irreducibility) |
+| 2 | 5 | 0 | 1 | 0 | 0 | 0 | **NONE** (T:E_1 は phase-eq, Schur 失格) |
+| 3 | 7 | 1 | 0 | 0 | 1 | 0 | T:A, O:A_2 |
+| 4 | 9 | 1 | 1 | 1 | 0 | 0 | T:A, O:A_1 |
+| **5** | **11** | **0** | **1** | **0** | **0** | **0** | **NONE** (代数的例外 §4.6.4.1) |
+| 6 | 13 | 2 | 1 | 1 | 1 | 1 | T:A, O:A_1, O:A_2, I:A |
+| 7 | 15 | 1 | 1 | 0 | 1 | 0 | T:A, O:A_2 |
+| 8 | 17 | 1 | 2 | 1 | 0 | 0 | T:A, O:A_1 |
+| 9 | 19 | 2 | 1 | 1 | 1 | 0 | T:A (mult-2 ambig), O:A_1, O:A_2 |
+| 10 | 21 | 2 | 2 | 1 | 1 | 1 | T:A (mult-2 ambig), O:A_1, O:A_2, I:A |
+| 11 | 23 | 1 | 2 | 0 | 1 | 0 | T:A, O:A_2 |
+| 12 | 25 | 3 | 2 | 2 | 1 | 1 | T:A (mult-3 ambig), O:A_1, O:A_2, I:A |
+| 13 | 27 | 2 | 2 | 1 | 1 | 0 | T:A (mult-2), O:A_1, O:A_2 *(2026-05-12 追加)* |
 
 ### 4.6.3 [T2.3 中核] F=1 の例外性
 
@@ -373,13 +378,18 @@ F=1 spinor の場合、Majorana 配置は 2 points (大円上の 2 点) で、�
 
 ### 4.6.4 F-奇数 cases: sign representation $A_2$ of $O$
 
-奇数 $F = 3, 5, 7, 9, 11$ では多くの場合 polyhedral inert state が **$A_2$ 既約**
+奇数 $F = 3, 7, 9, 11, 13$ では多くの場合 polyhedral inert state が **$A_2$ 既約**
 (reflection 下で符号反転) として現れる:
 
 - F=3: O:A_2 (octahedral, 6 Majorana points)
-- F=7: O:A_2
-- F=9: O:A_1 (×1) and O:A_2 (×1)
-- F=11: O:A_2
+- F=7: T:A, O:A_2 — 両方 mult 1, Schur dev ≤ 4×10⁻¹³ で verified
+- F=9: O:A_1 (×1) and O:A_2 (×1) — Schur dev ≤ 6×10⁻¹³ で verified
+  (T:A mult 2 は random projection で β_0 揺らぐため Schur-isotropic
+  projection 必要)
+- F=11: T:A, O:A_2 — 両方 mult 1, verified
+- F=13: T:A (mult 2 — ambiguous), O:A_1 (mult 1), O:A_2 (mult 1) —
+  octahedral 2 instances verified at Schur dev ≤ 6×10⁻¹³, $\beta_0 = 1/27$ 厳密
+  (2026-05-12 追加; 計算 `scripts/manuscript/f5_f7_polyhedral_verification.jl`)
 
 主定理 (4.6) の証明 (§4.4) は **回転群上の Schur 補題**のみを用いる。$A_2$ は
 回転下では trivial、reflection 下のみ符号反転 — 回転群 $O$ の下では $A_1$ と区別
@@ -389,14 +399,58 @@ identical に成立**する。
 これは Yukawa-Ueda 2011 で議論された奇数 F polyhedral phases (Cr 系の F=3 octa など)
 への定理拡張を**自動的に保証**する重要な corollary。
 
+### 4.6.4.1 F=5 の代数的例外 (2026-05-12 追加)
+
+F=5 は **F=1 とは別種の例外** であり、polyhedral inert state を $T:E_1$ (複素
+1-dim "magnetic-like" irrep) として naively 列挙していたが、これは Schur-singlet
+**ではなく**主定理 (4.6) の前提を満たさない:
+
+- T:E_1 は **複素 1-dim 既約**で、群作用下に位相 $\chi(g) \in \{1, \omega, \omega^*\}$
+  ($\omega = e^{2\pi i/3}$) を拾う。故に状態は厳密には不変ではなく、Schur の補題が
+  保証する $\langle F_a^2 \rangle = F(F+1)/3$ 等方性も成立しない。
+- 数値検証 (`scripts/manuscript/f5_f7_polyhedral_verification.jl` 2026-05-12 拡張):
+  F=5 T:E_1 状態は Schur isotropy deviation **6.0** (10⁻¹³ ではない) を示し、
+  Lemma 1 instance ではないことが確認された。
+
+octahedral / icosahedral 群への F=5 spin rep の分解:
+$$D^{(5)}\big|_O = E + 2T_1 + T_2 \quad (\text{mult}(A_1) = \text{mult}(A_2) = 0)$$
+$$D^{(5)}\big|_I = H + 2T + G \quad (\text{mult}(A) = 0)$$
+
+(character orthogonality $n_\alpha = (1/|G|) \sum |C| \chi_F(C) \chi_\alpha(C)$ で
+直接計算可、§4.5.2 character table 使用)
+
+故に **F=5 には 1-dim polyhedral invariant が代数的に存在しない**。F=1 が
+$D^1 \cong T_1$ irreducibility による例外であるのに対し、F=5 は同様の
+"1-dim irrep 不在" 例外で、しかし機構が異なる:
+
+- F=1: $D^1$ 全体が $T_1$ irreducible (1-dim irrep を**任意の polyhedral subgroup の下で**含まない)
+- F=5: $D^5$ は可約だが、分解した既約成分の中に 1-dim 実 irrep が偶々一つも入らない
+
+F=5 の例外性は F=1 と並んで Refined Theorem (§4.6.5) の "exception list" に
+加わる。物理的に、F=5 spinor BEC の polyhedral phase は **複素 1-dim irrep の
+T:E_1 状態**として残るが、Universal Theorem (4.6) の証明は適用できず、修正定理
+(§4.7 axial 系列の analog) が必要 — D 論期間の課題。
+
 ### 4.6.5 Refined Theorem statement
 
 §4.3.2 主定理を §4.6.3 F=1 例外と組み合わせて refine:
 
-> **Refined Universal Structure Theorem**: $F \geq 2$ かつ $F \neq $ (F=1 例外) の
+> **Refined Universal Structure Theorem (v2)**: $F \notin \{1, 2, 5\}$ の
 > あらゆるスピノル BEC inert state について、residual rotation $H$ が polyhedral で
-> あれば LHY 補正は普遍閉形式 (4.6) を取る。F=1 は唯一の例外で、$D^{F=1} \cong T_1$
-> 既約性により polyhedral inert state を持たない。
+> Schur-singlet 1-dim 実 irrep を含む場合、LHY 補正は普遍閉形式 (4.6) を取る。
+> 例外は **3 つ**:
+>
+> 1. **F=1**: $D^{F=1} \cong T_1$ の既約性により、polyhedral 1-dim irrep を一切含まない (§4.6.3)。
+> 2. **F=2**: T:E_1 の **複素 1-dim 位相同変** irrep のみ — Schur 等方性を満たさず、
+>    cyclic phase は §4.7 axial 修正系列 (cyclic = $T_d$ residual ↔ 双軸的) の対象。
+> 3. **F=5**: 代数的に 1-dim 実 irrep の multiplicity がゼロ ($D^5|_O = E + 2T_1 + T_2$,
+>    $D^5|_I = H + 2T + G$). T:E_1 のみが phase-equivariant として残る (§4.6.4.1)。
+>
+> $F \geq 6$ ではすべて Schur-singlet inert state が存在し、定理 (4.6) が適用される。
+> F=3, 4 は実 irrep を持つため例外ではない (T:A, O:A_2 など)。
+>
+> 2026-05-12 拡張: F=13 でも T:A (mult 2), O:A_1 (mult 1), O:A_2 (mult 1) を持ち、
+> 13/13 instances で $\beta_0 = 1/(2F+1)$ が機械精度で検証された。
 
 ---
 
