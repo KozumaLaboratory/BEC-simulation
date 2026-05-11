@@ -255,32 +255,126 @@ matches paper §IV eq 4.4 exactly. Force-gradient correction = paper eq
 
 ---
 
-## Step 5 — DDI + spin-mixing extension (DEFERRED)
+## Step 5 — Nonlocal scalar + spinor matrix extensions
 
-**Status**: NOT covered by this session's Phase -1. Phase 0
-implementation will be the diagonal-only subset (Step 4 result).
-Extension to c₁ ≠ 0 spin-mixing and c_dd ≠ 0 DDI is itself a
-multi-session derivation:
+This section sketches the algebraic structure of the extensions needed
+for c₁ ≠ 0 (spin-mixing) and c_dd ≠ 0 (DDI). Full implementation is
+Track C v3+; this Step 5 documents the derivation status as of
+2026-05-11.
 
-- For c₁ ≠ 0: V_SM = c₁ ⟨F⟩(r)·F̂ is matrix-valued in spin space. The
-  double commutator [V, [T, V]] picks up matrix non-commutators
-  `[F̂_α, F̂_β] = iε_{αβγ} F̂_γ` cross-terms. Aichinger-Chin-Krotscheck
-  2005 nonlocal recipe applies but with the matrix structure on top.
-- For c_dd ≠ 0: Φ_DDI = c_dd ∫ U_dd(r-r') (spin density)(r') dr'.
-  Aichinger-Chin-Krotscheck 2005's `∇V_dd^eff = U_dd ∗ ∇ρ` identity
-  makes the gradient term Fourier-tractable. Cross-term
-  [V_contact, [T, V_DDI]] arises from non-commutativity of local and
-  nonlocal V.
-- For full F=6 Eu151 (D=13): all of c₂ singlet pair, c₄/c₆ tensor
-  cache, and DDI extensions stack. The cross-commutator count grows
-  rapidly.
+### 5.1 Nonlocal SCALAR potential (DDI without spin matrix)
 
-This Phase -1 partial result (Steps 1-4 only) lets us Phase 0 implement
-the diagonal-only Force-Gradient and **measure its order on the scalar
-GPE-in-spinor-format subset**. If order 4 is recovered as predicted,
-the technical capacity to extend to c₁, c_dd, etc., is demonstrated;
-the remaining work is straightforward algebraic extension following the
-same protocol.
+Consider a nonlocal but spin-diagonal potential
+$V_\text{NL}(r) = (U \ast \rho)(r) = \int U(r-r')\,\rho(r')\,dr'$
+where $\rho(r) = |\psi(r)|^2$ (total density). When V_NL acts on ψ, it
+acts as multiplication by V_NL(r) at each r — *local* in action,
+*nonlocal* in dependence on ψ.
+
+**Claim**: $[V_\text{NL}, [T, V_\text{NL}]] = |\nabla V_\text{NL}|^2$ — the
+same scalar formula as the local case (Chin-Krotscheck eq. 6.10).
+
+**Derivation sketch**: Once V_NL(r) has been computed for a given ψ,
+the [T, V_NL] commutator involves only ∇V_NL(r) and ∇²V_NL(r) as for
+local V. The "nonlocal" property affects how V_NL is *computed* from
+ψ, not its action as a multiplication operator. Hence the same scalar
+formula applies.
+
+For DDI (without F-matrix structure, e.g., a hypothetical scalar
+density-density interaction), the gradient ∇V_DD can be computed via:
+$$\nabla V_\text{DD}(r) = \nabla (U \ast \rho)(r) = (\nabla U \ast \rho)(r) = (U \ast \nabla\rho)(r)$$
+Either form works; the Fourier-space identity $\nabla(\widehat{V_\text{DD}})
+= ik \cdot \widehat{U}(k) \cdot \widehat{\rho}(k)$ is cheapest (single FFT
++ multiplication + IFFT, comparable to the V_DD evaluation itself —
+matching Chin-Janecek-Krotscheck 2008's observation that nonlocal V
+adds ≈ 2× the propagation cost).
+
+**Implementation status**: scalar nonlocal still NOT in v1/v2 (DDI
+guard panics). For diagonal-in-spin DDI (hypothetical, since real DDI
+is matrix-valued), the extension is straightforward: add a buffer for
+∇V_DD, compute via FFT each step, accumulate `|∇V_DD|²` into fgrad_buf
+alongside `|∇V_eff_local|²`.
+
+### 5.2 Spinor matrix-valued V (c₁ spin-mixing)
+
+For $V_\text{SM} = c_1 \langle\hat{F}\rangle(r) \cdot \hat{F}$, V is now a
+D×D matrix at each r, NOT diagonal in spin. The double commutator
+$[V_\text{SM}, [T, V_\text{SM}]]$ inherits the F-matrix structure.
+
+**Setup**: $\langle\hat{F}\rangle(r) = \psi^\dagger(r)\,\hat{F}\,\psi(r)$
+is a 3-vector field (real-valued). $V_\text{SM}(r) = c_1 \langle\hat{F}\rangle(r)
+\cdot \hat{F}$ acts on ψ_α(r) as
+$\sum_\beta (c_1 \langle\hat{F}_\mu\rangle \hat{F}_\mu)_{\alpha\beta}\,
+\psi_\beta(r)$.
+
+**Commutator** $[T, V_\text{SM}]$ in the presence of F̂ matrices:
+$T = -\tfrac{1}{2}\nabla^2$ acts on spatial coordinates only;
+F̂ matrices act on spin index. They commute as operators on
+spin × spatial product space. Therefore
+$[T, V_\text{SM}]\,\psi = -\tfrac{1}{2}[\nabla^2, c_1\langle\hat{F}_\mu\rangle\hat{F}_\mu]\,\psi
+= c_1 \hat{F}_\mu \cdot \tfrac{-1}{2}[\nabla^2, \langle\hat{F}_\mu\rangle]\,\psi$.
+
+The inner commutator $[\nabla^2, \langle\hat{F}_\mu\rangle]\psi = (\nabla^2
+\langle\hat{F}_\mu\rangle)\psi + 2(\nabla\langle\hat{F}_\mu\rangle) \cdot \nabla\psi$
+is the standard spatial commutator.
+
+**Double commutator**:
+$$[V_\text{SM}, [T, V_\text{SM}]] = c_1^2 \hat{F}_\mu \hat{F}_\nu \cdot
+[\langle\hat{F}_\mu\rangle,\, -\tfrac{1}{2}[\nabla^2, \langle\hat{F}_\nu\rangle]]$$
+
+The $\hat{F}_\mu \hat{F}_\nu$ factor is *not* symmetric in (μ, ν) so the
+result picks up the F-algebra structure:
+$$\hat{F}_\mu \hat{F}_\nu = \tfrac{1}{2}\{\hat{F}_\mu, \hat{F}_\nu\}
++ \tfrac{1}{2}[\hat{F}_\mu, \hat{F}_\nu] = \tfrac{1}{2}\{F_\mu, F_\nu\}
++ \tfrac{i}{2}\epsilon_{\mu\nu\rho}\,\hat{F}_\rho$$
+
+The anti-symmetric part contributes
+$\tfrac{i}{2}c_1^2 \epsilon_{\mu\nu\rho}\hat{F}_\rho \cdot
+[\langle\hat{F}_\mu\rangle, ...,]\langle\hat{F}_\nu\rangle\rangle]]$, a
+matrix-valued (in spin space) and spatially-varying quantity. The
+symmetric part gives a scalar $\langle\nabla\hat{F}\rangle^2$ analog
+contracted with $\{F_\mu, F_\nu\}$.
+
+**Status**: Formal structure identified; explicit reduction to a
+SpinorBEC-implementable expression requires:
+- Concrete F-matrix algebra for F=1 (3×3) and F=6 (13×13)
+- Index manipulation of $\{F_\mu, F_\nu\}$ and $\epsilon_{\mu\nu\rho}F_\rho$
+- Verification against a known limit (e.g., F=1 with c₁ = 0 should
+  reduce to scalar Step 5.1)
+
+Per protocol Rule 1, this requires Aichinger-Chin-Krotscheck 2005
+or a similar paper that handles non-scalar V. Aichinger 2005 in CPC
+addresses nonlocal scalar (Step 5.1) but not the F-matrix structure
+directly; the spinor extension is genuinely new work.
+
+### 5.3 Combined matrix + nonlocal (DDI proper)
+
+For real DDI:
+$V_\text{DDI}(r) = c_\text{dd} \sum_\mu \hat{F}_\mu \cdot (U_{dd,\mu\nu} \ast
+\langle\hat{F}_\nu\rangle)(r)$
+
+This combines (5.1) nonlocality + (5.2) F-matrix structure. The double
+commutator has all four cross-term contributions:
+$[V_\text{DDI}, [T, V_\text{DDI}]] = [V_\text{DDI,contact}, ...] +
+[V_\text{DDI,nonlocal}, ...]$ etc. (~10-15 cross-terms after expansion).
+
+**Status**: This is Track C v4+ work. Phase -1 derivation incomplete.
+Estimated effort: 1-2 weeks of dedicated algebraic derivation +
+verification + implementation.
+
+### 5.4 Implementation roadmap
+
+- **v1** (commit 1ee1de8, 2026-05-11): diagonal-only, central finite diff,
+  no Picard. Order 3-4 autonomous, order 1 nonlinear (4A00).
+- **v2** (2026-05-11): + FFT spectral ∇V (Step 5.1 prerequisite implementation), + midpoint
+  MF estimate, + endpoint MF estimate (partial 4AWW). Order ≥ 2 nonlinear
+  expected (TBD).
+- **v3** (deferred): Step 5.1 implementation — nonlocal scalar V
+  (hypothetical, since DDI is matrix; useful as stepping stone).
+- **v4** (deferred): Step 5.2 implementation — matrix V (c₁ spin-mixing).
+- **v5** (deferred): Step 5.3 implementation — DDI proper (matrix + nonlocal).
+
+Each version's gate is the same: scalar reduction matches previous
+version + Phase 2 lab-path order verification.
 
 ---
 

@@ -62,7 +62,7 @@ function _assert_forcegrad_diagonal_only(ws::Workspace)
 end
 
 """
-Central finite difference with periodic wrap.
+FFT spectral derivative.
 
 Computes |∇V_eff|² pointwise where V_eff(r) = V_trap(r) + c₀·n(r),
 n = total density (sum of |ψ_α|² over components). Result stored in
@@ -71,33 +71,44 @@ n = total density (sum of |ψ_α|² over components). Result stored in
 Per paper §IV: "The partial derivatives can be computed numerically
 by use of finite differences or FFT. Since the FFT derivative converges
 exponentially with grid size, the use of FFT derivative is preferable
-when the system can be made periodic." We use central finite
-differences here for simplicity; the periodic wrap matches the periodic
-BC of the FFT kinetic step.
+when the system can be made periodic." This v2 implementation uses
+in-place complex FFT for spectral accuracy.
+
+`V_complex_buf` and `grad_complex_buf` are working buffers (allocated
+by caller; same shape as density_buf). `plan_fft!` / `plan_ifft!` are
+FFTW plans bound to `V_complex_buf`.
 """
 function _compute_fgrad_squared!(
     fgrad_buf::Array{T, N},
     V_trap::Array{T, N},
     density_buf::Array{T, N},
     c0::Float64,
-    dx::NTuple{N, T},
+    grid::Grid{N, T},
     n_pts::NTuple{N, Int},
+    V_complex_buf::Array{Complex{T}, N},
+    grad_complex_buf::Array{Complex{T}, N},
+    plan_fft!,
+    plan_ifft!,
 ) where {T <: AbstractFloat, N}
     c0_t = T(c0)
-    inv_2dx = ntuple(d -> T(0.5) / dx[d], Val(N))
+    # Form V_eff = V_trap + c0 * density (as complex for in-place FFT)
     @inbounds for I in CartesianIndices(n_pts)
-        s = zero(T)
-        for ax in 1:N
-            i_p = I[ax] == n_pts[ax] ? 1 : I[ax] + 1
-            i_m = I[ax] == 1 ? n_pts[ax] : I[ax] - 1
-            Ip = CartesianIndex(ntuple(d -> d == ax ? i_p : I[d], Val(N)))
-            Im = CartesianIndex(ntuple(d -> d == ax ? i_m : I[d], Val(N)))
-            grad_V = (V_trap[Ip] - V_trap[Im]) * inv_2dx[ax]
-            grad_n = (density_buf[Ip] - density_buf[Im]) * inv_2dx[ax]
-            g = grad_V + c0_t * grad_n
-            s += g * g
+        V_complex_buf[I] = Complex{T}(V_trap[I] + c0_t * density_buf[I], zero(T))
+    end
+    plan_fft! * V_complex_buf  # in-place forward FFT
+    # V_complex_buf now holds F[V_eff] (preserved across axis loop)
+
+    fill!(fgrad_buf, zero(T))
+    for ax in 1:N
+        k_vec = grid.k[ax]
+        @inbounds for I in CartesianIndices(n_pts)
+            grad_complex_buf[I] = im * Complex{T}(k_vec[I[ax]]) * V_complex_buf[I]
         end
-        fgrad_buf[I] = s
+        plan_ifft! * grad_complex_buf  # in-place inverse FFT
+        @inbounds for I in CartesianIndices(n_pts)
+            g = real(grad_complex_buf[I])
+            fgrad_buf[I] += g * g
+        end
     end
     nothing
 end
@@ -174,9 +185,9 @@ function _diagonal_step_forcegrad_imag!(
 end
 
 """
-    split_step_forcegrad!(ws::Workspace)
+    split_step_forcegrad!(ws::Workspace; midpoint::Bool=true, endpoint::Bool=true)
 
-Track C v1 — Force-Gradient 4A step (Chin-Krotscheck 2005 eq. 6.8).
+Track C v2 — Force-Gradient 4A step (Chin-Krotscheck 2005 eq. 6.8).
 
 Diagonal-only subset of SpinorBEC. See module docstring for restrictions.
 
@@ -184,18 +195,33 @@ Diagonal-only subset of SpinorBEC. See module docstring for restrictions.
 
 5-stage ABA composition `V K Ṽ K V` with coefficients (1/6, 1/2, 2/3, 1/2, 1/6).
 The middle Ṽ stage includes the force-gradient correction
-`Ṽ = V + (dt²/48)|∇V|²` per paper eqs. 6.9-6.10. This is the "4A00"
-variant: no Picard self-consistency. Order 4 holds cleanly for c₀ = 0
-autonomous case; for c₀ ≠ 0 the mean-field time-dependence introduces
-a sub-dominant error but the scheme still improves over Strang.
+`Ṽ = V + (dt²/48)|∇V|²` per paper eqs. 6.9-6.10.
+
+# Self-consistency (v2 upgrade from v1)
+
+* `midpoint=false, endpoint=false` → 4A00 variant: all V stages use ψ(0) MF.
+  Order 4 for autonomous (c₀=0); order 1 collapse for nonlinear (c₀≠0).
+* `midpoint=true, endpoint=false` → 4A0W (partial): ψ(dt/2) estimated via
+  Strang half-step. Stage 5 still uses ψ(0) MF → order 1 in nonlinear
+  due to endpoint MF mismatch (V(dt) eval at ψ(0) gives O(dt) MF error
+  per step, cumulative O(dt) global = order 1).
+* `midpoint=true, endpoint=true` (default) → 4AWW: ψ(dt/2) via Strang
+  half-step, ψ(dt) via Strang full step. Both stages 3 and 5 use
+  estimated MFs. Order ≥ 2 in nonlinear (estimates are O(dt²) accurate;
+  full order 4 would need Picard convergence — deferred).
+
+FFT spectral derivative used for ∇V_eff (paper §IV recommendation;
+exponential convergence with grid size).
 
 # Cost
 
-5 V stages (each = 1 diagonal step kernel call) + 2 K stages (FFT-based).
-Density computed once at the start of each outer step; |∇V_eff|² computed
-once per outer step. Comparable to Yoshida-4 plain composition.
+* `midpoint=false`: 5 V + 2 K per step (= 4A00, cheapest)
+* `midpoint=true, endpoint=false`: + 1 Strang half-step = 8 V + 3 K
+* `midpoint=true, endpoint=true`: + 1 Strang full step = 11 V + 4 K
+  (comparable to Y4-midpoint Picard cost)
 """
-function split_step_forcegrad!(ws::Workspace{N}) where {N}
+function split_step_forcegrad!(ws::Workspace{N};
+        midpoint::Bool=true, endpoint::Bool=true) where {N}
     _assert_forcegrad_diagonal_only(ws)
 
     dt = ws.sim_params.dt
@@ -203,8 +229,20 @@ function split_step_forcegrad!(ws::Workspace{N}) where {N}
     n_comp = ws.spin_matrices.system.n_components
     D = n_comp
 
-    # Allocate FG buffer (production: move to Workspace field).
-    fgrad_buf = similar(ws.density_buf)
+    # Allocate buffers (production: move to Workspace fields).
+    fgrad_buf_0 = similar(ws.density_buf)
+    fgrad_buf_mid = similar(ws.density_buf)
+    fgrad_buf_end = similar(ws.density_buf)
+    density_mid = similar(ws.density_buf)
+    density_end = similar(ws.density_buf)
+    psi_mid = similar(ws.state.psi)
+    psi_end = similar(ws.state.psi)
+
+    n_pts = ntuple(d -> size(ws.state.psi, d), Val(N))
+    V_complex_buf = Array{ComplexF64}(undef, n_pts...)
+    grad_complex_buf = Array{ComplexF64}(undef, n_pts...)
+    plan_fft! = FFTW.plan_fft!(V_complex_buf)
+    plan_ifft! = FFTW.plan_ifft!(V_complex_buf)
 
     # 4A coefficients (paper eq. 6.8)
     a_outer = 1 / 6                    # outer V stages
@@ -219,37 +257,59 @@ function split_step_forcegrad!(ws::Workspace{N}) where {N}
     zee = zeeman_at(ws.zeeman, 0.0)
     zeeman_diag = zeeman_diagonal(zee, ws.spin_matrices, ws.sim_params.spin_rotating_frame_omega)
 
-    # Compute n = Σ_c |ψ_c|² (MF source for 4A00 = ψ(0)).
-    n_pts = ntuple(d -> size(ws.state.psi, d), Val(N))
+    # MF from ψ(0): density + |∇V|²
     _total_density!(ws.density_buf, ws.state.psi, D, N, n_pts)
+    _compute_fgrad_squared!(fgrad_buf_0, ws.potential_values, ws.density_buf,
+        ws.interactions.c0, ws.grid, n_pts, V_complex_buf, grad_complex_buf,
+        plan_fft!, plan_ifft!)
 
-    # Compute |∇V_eff|² once (4A00 reuses ψ(0) MF for all V stages).
-    _compute_fgrad_squared!(fgrad_buf, ws.potential_values, ws.density_buf,
-        ws.interactions.c0, ws.grid.dx, n_pts)
+    # Midpoint MF (v2): estimate ψ(dt/2) via Strang half-step on a copy.
+    if midpoint
+        copyto!(psi_mid, ws.state.psi)
+        _strang_substep_on_copy!(psi_mid, ws, dt / 2, fgrad_buf_0, zeeman_diag, it)
+        _total_density!(density_mid, psi_mid, D, N, n_pts)
+        _compute_fgrad_squared!(fgrad_buf_mid, ws.potential_values, density_mid,
+            ws.interactions.c0, ws.grid, n_pts, V_complex_buf, grad_complex_buf,
+            plan_fft!, plan_ifft!)
+    end
 
-    # Stage 1: V(dt/6) — no FG correction (outer stage).
+    # Endpoint MF: estimate ψ(dt) via Strang full step on another copy.
+    if endpoint
+        copyto!(psi_end, ws.state.psi)
+        _strang_substep_on_copy!(psi_end, ws, dt, fgrad_buf_0, zeeman_diag, it)
+        _total_density!(density_end, psi_end, D, N, n_pts)
+        _compute_fgrad_squared!(fgrad_buf_end, ws.potential_values, density_end,
+            ws.interactions.c0, ws.grid, n_pts, V_complex_buf, grad_complex_buf,
+            plan_fft!, plan_ifft!)
+    end
+
+    # Stage 1: V(dt/6) — MF from ψ(0), no FG correction (outer stage).
     @timeit_debug TIMER "fgrad_V" _diagonal_step_forcegrad!(
         Val(N), ws.state.psi, ws.potential_values, zeeman_diag,
-        ws.interactions.c0, a_outer * dt, ws.density_buf, fgrad_buf, 0.0, it,
+        ws.interactions.c0, a_outer * dt, ws.density_buf, fgrad_buf_0, 0.0, it,
     )
 
-    # Stage 2: K(dt/2) — phase updated for half-step duration.
+    # Stage 2: K(dt/2)
     _update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, b_K * dt)
     @timeit_debug TIMER "kinetic" apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
 
-    # Stage 3: Ṽ(2dt/3) — with FG correction.
+    # Stage 3: Ṽ(2dt/3) — MF from midpoint estimate (v2) or ψ(0) (v1), with FG correction.
+    density_for_mid = midpoint ? density_mid : ws.density_buf
+    fgrad_for_mid = midpoint ? fgrad_buf_mid : fgrad_buf_0
     @timeit_debug TIMER "fgrad_Vtilde" _diagonal_step_forcegrad!(
         Val(N), ws.state.psi, ws.potential_values, zeeman_diag,
-        ws.interactions.c0, a_mid * dt, ws.density_buf, fgrad_buf, fg_coeff, it,
+        ws.interactions.c0, a_mid * dt, density_for_mid, fgrad_for_mid, fg_coeff, it,
     )
 
-    # Stage 4: K(dt/2) — phase still configured for b_K * dt from stage 2.
+    # Stage 4: K(dt/2)
     @timeit_debug TIMER "kinetic" apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
 
-    # Stage 5: V(dt/6) — no FG correction (outer stage).
+    # Stage 5: V(dt/6) — MF from ψ(dt) estimate (v2) or ψ(0) (v1).
+    density_for_end = endpoint ? density_end : ws.density_buf
+    fgrad_for_end = endpoint ? fgrad_buf_end : fgrad_buf_0
     @timeit_debug TIMER "fgrad_V" _diagonal_step_forcegrad!(
         Val(N), ws.state.psi, ws.potential_values, zeeman_diag,
-        ws.interactions.c0, a_outer * dt, ws.density_buf, fgrad_buf, 0.0, it,
+        ws.interactions.c0, a_outer * dt, density_for_end, fgrad_for_end, 0.0, it,
     )
 
     ws.state.t += it ? 0.0 : dt
@@ -259,6 +319,42 @@ function split_step_forcegrad!(ws::Workspace{N}) where {N}
         if ws.state.step % ws.sim_params.normalize_every == 0
             _normalize_psi!(ws.state.psi, ws.grid, n_comp, N)
         end
+    end
+    nothing
+end
+
+"""
+Strang predictor: advance `psi_buf` (a copy of ψ(0)) by `target_dt` via
+V(target_dt/2) K(target_dt) V(target_dt/2) with frozen ψ(0) MF.
+
+Used to estimate ψ(dt/2) (target_dt = dt/2) for the middle Ṽ stage and
+ψ(dt) (target_dt = dt) for the final V stage of 4AWW.
+
+The 2nd-order Strang local error gives O(target_dt³) accuracy on the
+predicted state; this is O(dt²) for the midpoint estimate and O(dt²)
+for the endpoint estimate, sufficient for partial 4AWW behavior.
+Picard convergence to the true 4th-order fixed point would require
+iterating the full 4A composition with updated MFs — deferred.
+"""
+function _strang_substep_on_copy!(
+    psi_buf::AbstractArray,
+    ws::Workspace{N},
+    target_dt::Float64,
+    fgrad_buf_0::AbstractArray,
+    zeeman_diag,
+    it::Bool,
+) where {N}
+    psi_orig = ws.state.psi
+    ws.state.psi = psi_buf
+    try
+        _diagonal_step_forcegrad!(Val(N), psi_buf, ws.potential_values, zeeman_diag,
+            ws.interactions.c0, target_dt / 2, ws.density_buf, fgrad_buf_0, 0.0, it)
+        _update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, target_dt)
+        apply_kinetic_step_batched!(psi_buf, ws.batched_kinetic)
+        _diagonal_step_forcegrad!(Val(N), psi_buf, ws.potential_values, zeeman_diag,
+            ws.interactions.c0, target_dt / 2, ws.density_buf, fgrad_buf_0, 0.0, it)
+    finally
+        ws.state.psi = psi_orig
     end
     nothing
 end
