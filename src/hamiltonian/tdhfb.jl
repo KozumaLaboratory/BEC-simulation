@@ -15,6 +15,8 @@
 #   pair_potential.jl              — anomalous pair potential Δ from (φφ + κ)
 #   strang_step.jl                 — voxel-local BdG Strang step (full coupled
 #                                    (φ, ρ, κ) evolution with anomalous coupling)
+#   y4_midpoint_step.jl            — Yoshida-4 + endpoint Picard wrapper around
+#                                    the Strang sub-step (Phase 4, formal order 4)
 #   energy.jl                      — total energy functional E[φ, ρ, κ]
 #                                    (conserved by tdhfb_strang_step!)
 #
@@ -32,4 +34,5 @@ include("tdhfb/hartree_fock_matrix.jl")
 include("tdhfb/hartree_fock_matrix_generic.jl")
 include("tdhfb/pair_potential.jl")
 include("tdhfb/strang_step.jl")
+include("tdhfb/y4_midpoint_step.jl")
 include("tdhfb/energy.jl")
