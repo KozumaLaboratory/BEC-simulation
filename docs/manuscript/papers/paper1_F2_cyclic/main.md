@@ -4,6 +4,8 @@
 
 **Estimated length**: 6-8 pages (Letter or full paper)
 
+**Round-8 cleanup** (2026-05-12): inline Round-6 TODO markers in §II + §III
+removed (content was already inlined in Round-7 but the marker blocks remained).
 **Round-7 integration status** (2026-05-11): Sec II + III TODO-PAPER1-SEC2/SEC3
 placeholders **resolved** — content inlined from Ch.3 master thesis (m-parity selection
 rules + Nambu block structure §II.E-F + Mode 3 amplitude derivation §III.E-G). Paper #1
@@ -160,13 +162,6 @@ and inhomogeneous spin textures. Section VII summarizes our results.
 
 ## II. Theoretical Framework
 
-> **Round-6 integration TODO**: full content of Sec II awaits source file
-> `F2_cyclic_paper_sections_II_III.md` (not transferred in Round 6). The
-> outline below carries the section structure from the skeleton; the
-> equations referenced in §IV–§VI (especially Eqs. III.5–III.9 used in the
-> mode-dispersion table) are stated in the skeleton but need full derivation
-> text inlined here.
-
 ### A. F=2 spinor BEC Hamiltonian (Kawaguchi-Ueda notation)
 
 $$\hat{H}_{\rm int} = \int d^3r \left[\frac{c_0}{2}n^2 + \frac{c_1}{2}|\mathbf{F}|^2 + \frac{c_2}{2}|A_{00}|^2\right] \tag{II.1}$$
@@ -228,8 +223,6 @@ methodological innovation enabling closed-form mode dispersions.
 ---
 
 ## III. Closed-form Mode Dispersions
-
-> **Round-6 integration TODO**: full content of Sec III awaits source file.
 
 ### A. Odd block (m = ±1)
 

@@ -507,23 +507,27 @@ of polyhedral inert states for arbitrary $F$.
 
 By character orthogonality $\langle \chi_{D^F}, \chi_\Gamma \rangle_H = (1/|H|) \sum |C| \chi_{D^F}(C) \chi_\Gamma(C)^*$:
 
-**Table II**: Multiplicity of 1-dim irreps in $D^F | H$:
+**Table II**: Multiplicity of 1-dim irreps in $D^F | H$. Schur-singlet
+inert states (where Universal Theorem applies) require a 1D **real**
+$(A, A_1, A_2)$ multiplicity ≥ 1. Complex 1D irreps $(E_1)$ give
+"phase-equivariant" states that do not satisfy Schur isotropy.
 
-| F | dim | T:A | T:E_1 | O:A_1 | O:A_2 | I:A | Polyhedral inert states |
+| F | dim | T:A | T:E_1 | O:A_1 | O:A_2 | I:A | Schur-singlet inert states |
 |---|---|---|---|---|---|---|---|
 | 0 | 1 | 1 | 0 | 1 | 0 | 1 | All trivial |
 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | **NONE** |
-| 2 | 5 | 0 | 1 | 0 | 0 | 0 | T:E_1 |
+| 2 | 5 | 0 | 1 | 0 | 0 | 0 | **NONE** (T:E_1 phase-equivariant, not Schur) |
 | 3 | 7 | 1 | 0 | 0 | 1 | 0 | T:A, O:A_2 |
-| 4 | 9 | 1 | 1 | 1 | 0 | 0 | T:A, T:E_1, O:A_1 |
-| 5 | 11 | 0 | 1 | 0 | 0 | 0 | T:E_1 |
-| 6 | 13 | 2 | 1 | 1 | 1 | 1 | All families |
-| 7 | 15 | 1 | 1 | 0 | 1 | 0 | T:A, T:E_1, O:A_2 |
-| 8 | 17 | 1 | 2 | 1 | 0 | 0 | T:A, T:E_1×2, O:A_1 |
-| 9 | 19 | 2 | 1 | 1 | 1 | 0 | T:A×2, T:E_1, O:A_1, O:A_2 |
-| 10 | 21 | 2 | 2 | 1 | 1 | 1 | All families |
-| 11 | 23 | 1 | 2 | 0 | 1 | 0 | T:A, T:E_1×2, O:A_2 |
-| 12 | 25 | 3 | 2 | 2 | 1 | 1 | All families with multiplicity |
+| 4 | 9 | 1 | 1 | 1 | 0 | 0 | T:A, O:A_1 |
+| 5 | 11 | 0 | 1 | 0 | 0 | 0 | **NONE** (T:E_1 phase-equivariant; algebraic obstruction) |
+| 6 | 13 | 2 | 1 | 1 | 1 | 1 | T:A, O:A_1, O:A_2, I:A |
+| 7 | 15 | 1 | 1 | 0 | 1 | 0 | T:A, O:A_2 |
+| 8 | 17 | 1 | 2 | 1 | 0 | 0 | T:A, O:A_1 |
+| 9 | 19 | 2 | 1 | 1 | 1 | 0 | T:A (mult-2 ambig), O:A_1, O:A_2 |
+| 10 | 21 | 2 | 2 | 1 | 1 | 1 | T:A (mult-2 ambig), O:A_1, O:A_2, I:A |
+| 11 | 23 | 1 | 2 | 0 | 1 | 0 | T:A, O:A_2 |
+| 12 | 25 | 3 | 2 | 2 | 1 | 1 | T:A (mult-3 ambig), O:A_1, O:A_2, I:A |
+| 13 | 27 | 2 | 2 | 1 | 1 | 0 | T:A (mult-2 ambig), O:A_1, O:A_2 *(added 2026-05-12)* |
 
 ### B. The F=1 Exception
 
@@ -537,22 +541,46 @@ space, so there is no "left over" subspace in which to place a polyhedral
 ground state. F=1 admits only continuous-symmetry phases (polar and FM) and
 axial discrete phases.
 
-### C. F-奇数 cases
+### C. F-奇数 cases (updated 2026-05-12)
 
-For odd $F = 3, 5, 7, 9, 11$, polyhedral inert states do exist (Table II), often
-as **non-trivial 1-dim irreps**:
+For odd $F = 3, 7, 9, 11, 13$, **Schur-singlet** polyhedral inert states do exist
+(Table II) — they admit at least one 1D real irrep of the polyhedral rotation
+group with multiplicity ≥ 1, which is the prerequisite for the Universal Theorem:
 
 - F=3: T:A (true T-invariant) and O:A_2 (sign rep — invariant under rotations
   but flips sign under reflections in $O_h$)
-- F=5: T:E_1 only (complex 1-dim, "magnetic-like")
-- F=7: T:A, T:E_1, O:A_2
-- F=9: T:A×2, T:E_1, O:A_1, O:A_2 (both even and odd parity)
-- F=11: T:A, T:E_1×2, O:A_2
+- F=7: T:A (mult 1), O:A_2 (mult 1) — both verified at Schur dev ≤ 4×10⁻¹³
+- F=9: O:A_1 (mult 1), O:A_2 (mult 1) — verified at Schur dev ≤ 6×10⁻¹³.
+  T:A has mult 2 and gives β_0 = 1/19 only for the Schur-isotropic direction
+  within the 2D invariant subspace (random projection fails)
+- F=11: T:A (mult 1), O:A_2 (mult 1) — both verified at Schur dev ≤ 7×10⁻¹³
+- F=13: T:A (mult 2 — ambiguity), O:A_1 (mult 1), O:A_2 (mult 1) — both
+  octahedral instances verified at Schur dev ≤ 6×10⁻¹³, β_0 = 1/27 exactly
 
-The Universal Theorem (III.1) applies to all these F-奇数 cases because Schur's
-lemma operates on the **rotation symmetry alone** (irrespective of parity).
-The 3 spin Goldstones remain T_1-irreducibly degenerate under the polyhedral
-rotation group $H = T$ or $O$.
+**The F=5 exception**: Naive expectation would be T:E_1 (a complex 1-dim
+"magnetic" rep) at F=5. We verify numerically that this state has Schur
+isotropy deviation **6.0** (not 10⁻¹³): T:E_1 is a COMPLEX 1D irrep where the
+state picks up a phase $\chi(g)$ under each group element rather than being
+strictly invariant, so the Schur lemma argument that forces $\langle F_a^2\rangle = F(F+1)/3$
+does NOT apply.
+
+Decomposition of $D^{(F=5)}$ under the octahedral group:
+$$D^{(5)} \big|_O = E + 2T_1 + T_2$$
+(verified directly from the standard $\chi_F$ character formula). The
+multiplicities of the 1-dim irreps $A_1, A_2$ are both **zero**, so no
+$O$-singlet exists. Under the chiral icosahedral group:
+$$D^{(5)} \big|_I = H + 2T + G$$
+again with no $A$ multiplicity. **No 1D polyhedral invariant exists at F=5**
+— this is a genuine algebraic obstruction, not a missed case. Consequently
+the Universal Theorem has no Schur-singlet realization at F=5.
+
+The Universal Theorem (III.1) applies to all the F-奇数 ≥ 7 cases listed
+above because Schur's lemma operates on the rotation symmetry alone
+(irrespective of parity). The 3 spin Goldstones remain T_1-irreducibly
+degenerate under the polyhedral rotation group $H = T$ or $O$.
+
+Regression script: `scripts/manuscript/f5_f7_polyhedral_verification.jl` and
+`f_systematic_lemma1_predictions.jl` (F=13 added 2026-05-12).
 
 ### D. F=8 case
 
