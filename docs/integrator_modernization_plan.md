@@ -1,6 +1,13 @@
 # Integrator modernization plan — verified against primary sources
 
-**Status:** verification + smoke-test phase. NO implementation commits yet.
+**Status:** Track A1 implementation COMPLETE (commits 98213f6 + 59422e6 +
+63ad7c1). Track A1.5 (state-averaging trap) NEGATIVE. Track C and Track B
+moved behind a hard `Phase -1` paper-fetch + 紙-derivation gate. See:
+- `docs/integrator_ch3_plan.md` — 修論 Ch.3 outline + Track A1/C/B framework
+- `docs/integrator_phase_minus_1_protocol.md` — Phase -1 hard-gate protocol
+- `docs/integrator_track_c_derivation.md` — Track C derivation skeleton
+- `docs/integrator_track_b_derivation.md` — Track B derivation skeleton
+
 Last update: 2026-05-11.
 
 ## Context
@@ -273,24 +280,83 @@ pull-request-sized task.
 
 ---
 
+## Outcomes (2026-05-11)
+
+### Track A1 — Midpoint Strang (DONE, partial success)
+
+Implemented as commits 98213f6 (psi_mf kwarg + `_half_potential_step_midpoint!`
++ `split_step_midpoint!`) and 59422e6 (Y6-midpoint verification).
+
+Phase 2a hard-gate result (Rb87 F=1, 16³, c0=50 c1=1 c_dd=1, see
+`scripts/bench/midpoint_order_phase2a.jl`):
+
+| scheme | err@h=4e-3 | err@h=1e-3 | o12 | verdict |
+|---|---|---|---|---|
+| Strang (plain & mid) | 2.09e-5 | 1.31e-6 | 2.00 | baseline ✓ |
+| Yoshida4 plain | 3.69e-8 | 7.70e-9 | 1.25 | collapse (as known) |
+| **Yoshida4 midpoint** | 2.00e-8 | 4.65e-10 | **4.46** | **RECOVERED** ✓ |
+| **Yoshida6 midpoint** | 5.58e-10 | 5.28e-10 | floor | ≥ Y4 ✓ |
+| MPS-4 plain | 5.42e-9 | 1.35e-9 | 1.04 | collapse |
+| MPS-4 midpoint | 1.44e-9 | 5.32e-10 | 1.32 | NOT recovered |
+
+**Composition-based** Yoshida-4/6 with midpoint V step recovers high-order
+on the lab path. **Richardson-based** MPS-{4,6} does NOT, because S(h) and
+S(h/2)² sample midpoint MF at different effective time scales — see
+§3.3.1 in `docs/integrator_ch3_plan.md` for the formal common-framework
+analysis.
+
+### Track A1.5 — State-averaging trap (DONE, NEGATIVE)
+
+Commit 63ad7c1. `_half_potential_step_trap!` with MF source
+`(ψⁿ + ψⁿ⁺¹)/2` (Picard fixed-point) gives Y4-composed order 2, NOT 4
+(`scripts/bench/midpoint_order_phase2a.jl`). Phase 5 smoke
+(`scripts/bench/avf_drift_phase5_smoke.jl`) shows energy drift 14×10⁴ times
+worse than Y4-midpoint.
+
+Linear-H analysis: `(ψⁿ + ψⁿ⁺¹)/2 = ψⁿ · cos(Hτ/2) · e^{-iHτ/2}`. The
+extra `cos(Hτ/2) = 1 - (Hτ)²/8 + ...` factor introduces an EVEN-power-in-τ
+shift that Yoshida's odd-only Richardson cancellation can't remove —
+formally identical pathology to MPS-4 (multi-scale MF mismatch). Both
+captured in §3.3 of `docs/integrator_ch3_plan.md`.
+
+This was NOT Quispel-McLaren AVF (which averages the gradient field, not
+the state). True gradient-averaged AVF requires per-substep "averaged
+field" buffer plumbing and has not been pursued because Y4-midpoint
+already preserves energy to machine precision in the Phase 5 baseline,
+making AVF investment ROI ≈ 0.
+
+### Track C — Force-Gradient + DDI (Phase -1 not started)
+
+Behind hard gate. See `docs/integrator_track_c_derivation.md`. Time cap
+2 weeks. Paper fetch (Chin 1997 + Chin-Krotscheck 2005 + Aichinger 2005)
+required before any derivation.
+
+### Track B — Thalhammer modified + DDI (Phase -1 not started, conditional)
+
+Behind hard gate. See `docs/integrator_track_b_derivation.md`. Time cap
+4 weeks. Begins only if Track C results don't already meet thesis goals
+(see Track B skip decision in `docs/integrator_ch3_plan.md`).
+
+---
+
 ## Recommended next steps (revised 2026-05-11)
 
-1. **Track A1: Midpoint-symmetrize the lab-path V step.** Add a
-   `_half_potential_step_midpoint!` variant that uses
-   predictor-corrector evaluation of the mean field at substep
-   midpoint. Cost ~2× per V step. Validation: MPS-4 order jumps from
-   1 to 4 on the lab path, AND Y6 mean-field collapse should
-   simultaneously fix (same root cause). 1-2 weeks effort.
-2. After A1 succeeds, the original "Track A — MPS on top of Strang"
-   becomes viable. Add it as an opt-in alternative to
-   `split_step!` / `split_step_combined!`
-3. Track B (Thalhammer extension to F=6 + DDI) is the thesis-Ch.3
-   contribution path, dependent on having a properly symmetric
-   inner V (= A1 done first)
-4. If A1 fails or is too expensive, fall back to the current
-   Strang + adaptive dt (no high-order). The thesis contribution
-   moves elsewhere (Universal Structure Theorem, EdH selection rules,
-   Flower phase analysis)
+1. **Track A1 follow-up bench (Phase 2b/3/4/5)** — Eu151 F=6 lab-path
+   order table, real-time Pareto, ITP integration with anko's Flower phase
+   profiling, long-time stability with Y4-mid baseline. Separate session
+   per anko's direction.
+2. **Track C Phase -1** (month 3 entry per `docs/integrator_ch3_plan.md`
+   schedule) — paper fetch + scalar-GPE → spinor + DDI 紙 derivation.
+   Hard-gated by `docs/integrator_phase_minus_1_protocol.md`.
+3. **Track C Phase 0+** — implementation, smoke, lab order verification.
+4. **Track B decision point** — month 5 entry, gated on Track C results.
+5. **Phase 3-5 integrated bench + §3.5/§3.6 manuscript draft** — month 8.
+
+If Track C fails Phase -1 within the 2-week cap, scope re-evaluation.
+If Track B is dropped, §3.6 is replaced by expanded Track C case study.
+Fallback (both fail): Y4-midpoint is already a publishable
+contribution; thesis Ch.3 stays as Track A1 + framework chapter
+without Track C/B sections.
 
 ---
 
@@ -304,3 +370,8 @@ pull-request-sized task.
 * [Choi & Vaníček 2020, arXiv:2006.16902](https://arxiv.org/abs/2006.16902)
 * [Chin 2007, arXiv:0710.0396 — NLS splitting instabilities](https://arxiv.org/abs/0710.0396)
 * [Thalhammer & Thalhammer-Thurner 2026, arXiv:2601.19838 — modified splitting GPE](https://arxiv.org/abs/2601.19838)
+* Chin 1997, Phys. Lett. A 226, 344 — original force-gradient (Track C)
+* Chin & Krotscheck 2005, PRE 72, 036705 — rotating BEC GPE force-gradient (Track C, KEY)
+* Aichinger, Chin & Krotscheck 2005 — non-local potential extension (Track C)
+* Quispel & McLaren 2008, J. Phys. A 41 — Average Vector Field method (Track A1.5 negative)
+* Hairer, Lubich & Wanner 2006, Geometric Numerical Integration Ch.III — Lie-derivative formalism (Track B)
