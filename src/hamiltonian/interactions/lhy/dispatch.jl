@@ -20,6 +20,12 @@ function compute_spinor_lhy_two_channel(;
     n_max::Float64=100.0,
     n_points::Int=200,
 )
+    F <= 2 || throw(ArgumentError(
+        "compute_spinor_lhy_two_channel is F ≤ 2 only (got F=$F). The two-channel " *
+        "reduction covers only the (S=0, S=2) BdG channels; F ≥ 3 has additional " *
+        "even-S channels (S=4, S=6, ...). Use compute_spinor_lhy_polar_contact, " *
+        "compute_spinor_lhy_polar_dipolar, compute_spinor_lhy_fm_contact, " *
+        "compute_spinor_lhy_fm_dipolar, or compute_spinor_lhy_icosahedral instead."))
     n_points >= 3 || throw(ArgumentError("n_points must be >= 3"))
     n_max > 0 || throw(ArgumentError("n_max must be positive"))
 
@@ -66,6 +72,18 @@ function compute_spinor_lhy_table(;
     length(spinor) == D ||
         throw(DimensionMismatch("spinor length $(length(spinor)) != 2F+1 = $D"))
 
+    # F=6 polar + FullBdG produces a ~3000× spurious LHY energy offset (the
+    # BdG diagonalisation produces λ<0 modes that break Petrov regularization
+    # — documented at memory/full_bdg_F6_polar_broken.md). Warn at construction
+    # so callers know to fall back to a closed-form path.
+    if F == 6 && _is_polar_spinor(spinor)
+        @warn "FullBdG LHY (compute_spinor_lhy_table) is known to produce a ~3000× " *
+              "spurious energy offset for F=6 polar (ζ_α = δ_{α,0}) initial states " *
+              "due to λ<0 BdG modes breaking Petrov regularization. Use " *
+              "compute_spinor_lhy_polar_contact (or compute_spinor_lhy_polar_dipolar " *
+              "with DDI) for F=6 polar; FullBdG remains valid for other phases." maxlog=1
+    end
+
     densities = collect(range(0.0, n_max; length=n_points))
     energy = zeros(Float64, n_points)
 
@@ -76,6 +94,16 @@ function compute_spinor_lhy_table(;
 
     potential_values = _numerical_derivative(densities, energy)
     FullBdGLHY(densities, potential_values)
+end
+
+# Detect "polar" spinor: m=0 channel dominates (purity > 99%).
+function _is_polar_spinor(spinor::Vector{ComplexF64}; purity_threshold::Float64=0.99)
+    D = length(spinor)
+    D % 2 == 1 || return false
+    F = (D - 1) ÷ 2
+    isapprox(sum(abs2, spinor), 0.0; atol=1e-12) && return false
+    total = sum(abs2, spinor)
+    abs2(spinor[F + 1]) / total >= purity_threshold
 end
 
 """

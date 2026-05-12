@@ -81,4 +81,37 @@
         @test SpinorBEC._interpolate_1d(xs, ys, -1.0) ≈ 0.0
         @test SpinorBEC._interpolate_1d(xs, ys, 5.0) ≈ 9.0
     end
+
+    @testset "validation guards: two_channel F ≤ 2 only" begin
+        # F=3,6 should error with a guidance message pointing at closed forms.
+        @test_throws ArgumentError compute_spinor_lhy_two_channel(;
+            F=3, c0=10.0, c1=-0.5, n_max=1.0, n_points=10)
+        @test_throws ArgumentError compute_spinor_lhy_two_channel(;
+            F=6, c0=10.0, c1=-0.5, n_max=1.0, n_points=10)
+        # F=1, F=2 must continue to work.
+        @test compute_spinor_lhy_two_channel(;
+            F=1, c0=10.0, c1=-0.5, n_max=1.0, n_points=10) isa TwoChannelLHY
+        @test compute_spinor_lhy_two_channel(;
+            F=2, c0=10.0, c1=-0.5, n_max=1.0, n_points=10) isa TwoChannelLHY
+    end
+
+    @testset "validation guard: F=6 polar + FullBdG emits regime warning" begin
+        # F=6 polar (ζ_α = δ_{α, 0}) is the documented broken regime.
+        D = 13
+        spinor_polar = ComplexF64[c == 7 ? 1.0 : 0.0 for c in 1:D]
+        @test_logs (:warn, r"spurious energy offset") match_mode = :any begin
+            compute_spinor_lhy_table(;
+                spinor=spinor_polar, F=6,
+                interactions=InteractionParams(10.0, 0.1),
+                n_max=1.0, n_points=4, k_max=5.0, n_k=10,
+            )
+        end
+        # Non-polar F=6 should NOT warn (table still constructed normally).
+        spinor_fm = ComplexF64[c == 1 ? 1.0 : 0.0 for c in 1:D]
+        @test compute_spinor_lhy_table(;
+            spinor=spinor_fm, F=6,
+            interactions=InteractionParams(10.0, 0.1),
+            n_max=1.0, n_points=4, k_max=5.0, n_k=10,
+        ) isa FullBdGLHY
+    end
 end
