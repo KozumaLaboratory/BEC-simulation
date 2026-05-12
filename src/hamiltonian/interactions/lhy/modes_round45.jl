@@ -2,7 +2,7 @@
 # polyhedral verifications (F=2 BN, F=3 octa, F=4 cube, F=8 octa,
 # F=10 dodec). NEW FILE; does NOT integrate into src/lhy.jl or the
 # YAML schema. Final integration round will wire these into the
-# SpinorLHYTable / make_workspace dispatch.
+# TabulatedLHY subtype builders / make_workspace dispatch.
 #
 # Convention: dimensionless `M = hbar = 1` (SpinorBEC.jl default). The
 # `M` positional argument and `hbar` keyword let callers override for

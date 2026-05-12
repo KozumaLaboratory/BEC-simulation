@@ -1,4 +1,4 @@
-# Spinor LHY validation: the two-channel SpinorLHYTable should reduce
+# Spinor LHY validation: the two-channel TwoChannelLHY table should reduce
 # to the scalar Lima-Pelster Q5 result for a fully polarized spinor
 # (single-component limit). If they disagree by > 5% we have a real
 # physics bug somewhere in the spin-dependent path — this test guards
@@ -17,7 +17,7 @@ using SpinorBEC
         F=F, c0=interactions.c0, c1=interactions.c1,
         c_dd=0.0, n_max=1.0, n_points=64,
     )
-    @test table isa SpinorLHYTable
+    @test table isa TwoChannelLHY
     @test length(table.densities) == 64
     @test length(table.potential_values) == 64
     @test all(isfinite, table.potential_values)

@@ -8,7 +8,7 @@
 export AbstractPotential
 export HarmonicTrap, NoPotential, GravityPotential, CompositePotential
 export RingPotential, BoxPotential, OpticalLatticePotential, DoubleWellPotential, QuarticPotential
-export AbstractLHY, NoLHY, ScalarLHY, Quasi2DLHY, SpinorLHYTable
+export AbstractLHY, NoLHY, ScalarLHY, Quasi2DLHY
 export TabulatedLHY
 export TwoChannelLHY, FullBdGLHY, PolarContactLHY, PolarDipolarLHY
 export FMContactLHY, FMDipolarLHY, IcosahedralLHY
@@ -104,7 +104,6 @@ end
 #     ├── ScalarLHY                  n^(3/2) contact (1D/2D/3D)
 #     ├── Quasi2DLHY                 logarithmic 2D correction
 #     └── TabulatedLHY  (abstract)   density → potential lookup
-#           ├── SpinorLHYTable       legacy concrete (kept during refactor)
 #           ├── TwoChannelLHY        F ≤ 2 two-channel reduction
 #           ├── FullBdGLHY           F-generic BdG-diagonalised
 #           ├── PolarContactLHY      F-generic polar contact closed form
@@ -131,15 +130,6 @@ struct Quasi2DLHY <: AbstractLHY
 end
 
 abstract type TabulatedLHY <: AbstractLHY end
-
-# Legacy concrete table (Symbol-tagged). Kept during the C1→C2 transition so
-# existing builders + tests still compile. C2 replaces all uses with the
-# specific concrete subtypes below.
-struct SpinorLHYTable <: TabulatedLHY
-    mode::Symbol
-    densities::Vector{Float64}
-    potential_values::Vector{Float64}
-end
 
 struct TwoChannelLHY <: TabulatedLHY
     densities::Vector{Float64}

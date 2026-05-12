@@ -3,8 +3,7 @@
         table = compute_spinor_lhy_two_channel(;
             F=1, c0=10.0, c1=-0.5, n_max=10.0, n_points=50
         )
-        @test table isa SpinorLHYTable
-        @test table.mode === :two_channel
+        @test table isa TwoChannelLHY
         @test length(table.densities) == 50
         @test length(table.potential_values) == 50
         @test table.densities[1] == 0.0
@@ -61,8 +60,7 @@
             interactions=InteractionParams(10.0, -0.5),
             n_max=5.0, n_points=20, k_max=10.0, n_k=50,
         )
-        @test table isa SpinorLHYTable
-        @test table.mode === :full_bdg
+        @test table isa FullBdGLHY
         @test length(table.densities) == 20
     end
 

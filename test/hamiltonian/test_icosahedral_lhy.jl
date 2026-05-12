@@ -118,7 +118,7 @@ using SpinorBEC.IcosahedralMod
         gd = Dict(0 => 1.0, 2 => 1.05, 4 => 0.98, 6 => 1.02,
             8 => 0.97, 10 => 1.01, 12 => 0.99)
         tbl = compute_spinor_lhy_icosahedral(F=6, g_dict=gd, n_max=2.0, n_points=200)
-        @test tbl.mode === :icosahedral
+        @test tbl isa IcosahedralLHY
         @test length(tbl.densities) == 200
         @test length(tbl.potential_values) == 200
         @test tbl.densities[1] == 0.0

@@ -134,7 +134,7 @@ end
     n < 1e-30 && return zero(n)
     l.c_lhy_2d * n * (2.0 * (log(n * l.a_2d_sq) + l.log_const) + 1.0)
 end
-# Shared eval for all table-based modes (SpinorLHYTable + 7 concrete subtypes).
+# Shared eval for all table-based modes (TabulatedLHY subtypes).
 @inline function _lhy_V(n::AbstractFloat, l::TabulatedLHY)
     _interpolate_1d(l.densities, l.potential_values, Float64(n))
 end

@@ -174,14 +174,14 @@ end
 end
 
 # =================================================================
-# Wrapper integration: SpinorLHYTable round-trip
+# Wrapper integration: TabulatedLHY round-trip
 # =================================================================
 
 @testset "compute_spinor_lhy_polar_contact wrapper" begin
     g_user = Dict(S => 100.0 + 5.0 * S for S in (0, 2, 4, 6, 8, 10, 12))
     table = compute_spinor_lhy_polar_contact(; F=6, g_dict=g_user,
         n_max=10.0, n_points=50)
-    @test table.mode === :polar_contact
+    @test table isa PolarContactLHY
     @test length(table.densities) == 50
     @test length(table.potential_values) == 50
     # Potential should be positive and monotonically increasing for repulsive LHY
@@ -262,7 +262,7 @@ end
     g_user = Dict(S => 100.0 + 5.0 * S for S in (0, 2, 4, 6, 8, 10, 12))
     table = compute_spinor_lhy_fm_dipolar(; F=6, g_dict=g_user, eps_dd=0.55,
         n_max=10.0, n_points=50)
-    @test table.mode === :fm_dipolar
+    @test table isa FMDipolarLHY
     @test length(table.densities) == 50
     @test length(table.potential_values) == 50
 end
@@ -271,7 +271,7 @@ end
     g_user = Dict(S => 100.0 + 5.0 * S for S in (0, 2, 4, 6, 8, 10, 12))
     table = compute_spinor_lhy_fm_contact(; F=6, g_dict=g_user,
         n_max=10.0, n_points=50)
-    @test table.mode === :fm_contact
+    @test table isa FMContactLHY
     @test length(table.densities) == 50
     @test length(table.potential_values) == 50
     # FM single-mode formula gives positive monotonically increasing potential

@@ -4,7 +4,7 @@ export compute_spinor_lhy_fm_contact, compute_spinor_lhy_fm_dipolar
 export compute_spinor_lhy_icosahedral
 
 """
-    compute_spinor_lhy_two_channel(; F, c0, c1, c_dd, n_max, n_points) → SpinorLHYTable
+    compute_spinor_lhy_two_channel(; F, c0, c1, c_dd, n_max, n_points) → TwoChannelLHY
 
 Simplified two-channel LHY: density (g_d=c0) and spin (g_s=c1) channels.
 
@@ -40,12 +40,12 @@ function compute_spinor_lhy_two_channel(;
     end
 
     potential_values = _numerical_derivative(densities, energy)
-    SpinorLHYTable(:two_channel, densities, potential_values)
+    TwoChannelLHY(densities, potential_values)
 end
 
 """
     compute_spinor_lhy_table(; spinor, F, interactions, zeeman, c_dd,
-                               n_max, n_points, k_max, n_k) → SpinorLHYTable
+                               n_max, n_points, k_max, n_k) → FullBdGLHY
 
 Full BdG-based spinor LHY: at each density, compute zero-point energy from
 the Bogoliubov spectrum and tabulate V_LHY = dε_LHY/dn.
@@ -75,7 +75,7 @@ function compute_spinor_lhy_table(;
     end
 
     potential_values = _numerical_derivative(densities, energy)
-    SpinorLHYTable(:full_bdg, densities, potential_values)
+    FullBdGLHY(densities, potential_values)
 end
 
 """
@@ -178,15 +178,15 @@ end
 # Closed-form polar LHY wrappers (PhiOneReg + PolarContactMod + PolarDipolarMod)
 # =================================================================
 #
-# These produce a SpinorLHYTable identical in shape to :two_channel /
+# These produce a TabulatedLHY identical in shape to :two_channel /
 # :full_bdg, so the downstream evaluator (apply_lhy_step!) treats them
 # uniformly.
 
 """
-    compute_spinor_lhy_polar_contact(; F, g_dict, n_max, n_points) → SpinorLHYTable
+    compute_spinor_lhy_polar_contact(; F, g_dict, n_max, n_points) → PolarContactLHY
 
 F-polar contact LHY closed form (paper #1 main result, F-generic).
-`g_dict` maps even total-spin channels S → g_S. Returns a `SpinorLHYTable`
+`g_dict` maps even total-spin channels S → g_S. Returns a `PolarContactLHY`
 with `mode = :polar_contact`.
 
 Two orders of magnitude faster than `compute_spinor_lhy_table` (`:full_bdg`)
@@ -211,11 +211,11 @@ function compute_spinor_lhy_polar_contact(;
         energy[i] = PolarContactMod.lhy_energy_polar(n, coefs)
     end
     potential_values = _numerical_derivative(densities, energy)
-    SpinorLHYTable(:polar_contact, densities, potential_values)
+    PolarContactLHY(densities, potential_values)
 end
 
 """
-    compute_spinor_lhy_polar_dipolar(; F, g_dict, eps_tilde_dd, n_max, n_points) → SpinorLHYTable
+    compute_spinor_lhy_polar_dipolar(; F, g_dict, eps_tilde_dd, n_max, n_points) → PolarDipolarLHY
 
 F-polar contact + DDI LHY closed form (paper #1 with dipolar extension,
 F-generic). `eps_tilde_dd` is the dimensionless DDI/contact ratio for the
@@ -240,11 +240,11 @@ function compute_spinor_lhy_polar_dipolar(;
         energy[i] = PolarDipolarMod.lhy_energy_polar_dipolar(n, coefs, eps_tilde_dd)
     end
     potential_values = _numerical_derivative(densities, energy)
-    SpinorLHYTable(:polar_dipolar, densities, potential_values)
+    PolarDipolarLHY(densities, potential_values)
 end
 
 """
-    compute_spinor_lhy_fm_dipolar(; F, g_dict, eps_dd, n_max, n_points) → SpinorLHYTable
+    compute_spinor_lhy_fm_dipolar(; F, g_dict, eps_dd, n_max, n_points) → FMDipolarLHY
 
 F-FM contact + DDI LHY closed form via Lima-Pelster Q_5 angular average
 (Stage C scalar reduction, Saito-Li 2024 convention). Single-mode at
@@ -269,11 +269,11 @@ function compute_spinor_lhy_fm_dipolar(;
         energy[i] = FMDipolarMod.lhy_energy_fm_dipolar(n, coefs, eps_dd)
     end
     potential_values = _numerical_derivative(densities, energy)
-    SpinorLHYTable(:fm_dipolar, densities, potential_values)
+    FMDipolarLHY(densities, potential_values)
 end
 
 """
-    compute_spinor_lhy_fm_contact(; F, g_dict, n_max, n_points) → SpinorLHYTable
+    compute_spinor_lhy_fm_contact(; F, g_dict, n_max, n_points) → FMContactLHY
 
 F-FM contact LHY closed form (paper #2 contact-only piece, F=6 for now).
 For an FM-polarised condensate (ζ_α = δ_{α,+F}), the closed form collapses
@@ -299,11 +299,11 @@ function compute_spinor_lhy_fm_contact(;
         energy[i] = FMContactMod.lhy_energy_fm(n, coefs)
     end
     potential_values = _numerical_derivative(densities, energy)
-    SpinorLHYTable(:fm_contact, densities, potential_values)
+    FMContactLHY(densities, potential_values)
 end
 
 """
-    compute_spinor_lhy_icosahedral(; F, g_dict, n_max, n_points) → SpinorLHYTable
+    compute_spinor_lhy_icosahedral(; F, g_dict, n_max, n_points) → IcosahedralLHY
 
 F=6 icosahedral (I_h) phase contact LHY closed form (Stage D, parallel-
 session derivation 2026-05-07). Universal structure
@@ -335,7 +335,7 @@ function compute_spinor_lhy_icosahedral(;
         energy[i] = IcosahedralMod.epsilon_LHY_F6_Ih(n, g_dict)
     end
     potential_values = _numerical_derivative(densities, energy)
-    SpinorLHYTable(:icosahedral, densities, potential_values)
+    IcosahedralLHY(densities, potential_values)
 end
 
 function _numerical_derivative(x::Vector{Float64}, y::Vector{Float64})
