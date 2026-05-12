@@ -8,7 +8,10 @@
 export AbstractPotential
 export HarmonicTrap, NoPotential, GravityPotential, CompositePotential
 export RingPotential, BoxPotential, OpticalLatticePotential, DoubleWellPotential, QuarticPotential
-export AbstractLHY, ScalarLHY, Quasi2DLHY, SpinorLHYTable
+export AbstractLHY, NoLHY, ScalarLHY, Quasi2DLHY, SpinorLHYTable
+export TabulatedLHY
+export TwoChannelLHY, FullBdGLHY, PolarContactLHY, PolarDipolarLHY
+export FMContactLHY, FMDipolarLHY, IcosahedralLHY
 export MagneticGradient, TimeDependentMagneticGradient
 export LaguerreGaussBeam, PlugBeam, ShakenLatticePotential, TimeDependentTrap
 
@@ -94,8 +97,28 @@ struct QuarticPotential{N} <: AbstractPotential
 end
 
 # --- LHY Abstraction ---
+#
+# Hierarchy:
+#   AbstractLHY
+#     ├── NoLHY                      explicit "no correction"
+#     ├── ScalarLHY                  n^(3/2) contact (1D/2D/3D)
+#     ├── Quasi2DLHY                 logarithmic 2D correction
+#     └── TabulatedLHY  (abstract)   density → potential lookup
+#           ├── SpinorLHYTable       legacy concrete (kept during refactor)
+#           ├── TwoChannelLHY        F ≤ 2 two-channel reduction
+#           ├── FullBdGLHY           F-generic BdG-diagonalised
+#           ├── PolarContactLHY      F-generic polar contact closed form
+#           ├── PolarDipolarLHY      polar contact + DDI closed form
+#           ├── FMContactLHY         FM contact closed form
+#           ├── FMDipolarLHY         FM contact + DDI Lima-Pelster
+#           └── IcosahedralLHY       F = 6 icosahedral closed form
+#
+# All `TabulatedLHY` subtypes carry the same shape (`densities` +
+# `potential_values`); shared eval methods live in propagators / energy.
 
 abstract type AbstractLHY end
+
+struct NoLHY <: AbstractLHY end
 
 struct ScalarLHY <: AbstractLHY
     c_lhy::Float64
@@ -107,8 +130,48 @@ struct Quasi2DLHY <: AbstractLHY
     log_const::Float64
 end
 
-struct SpinorLHYTable <: AbstractLHY
+abstract type TabulatedLHY <: AbstractLHY end
+
+# Legacy concrete table (Symbol-tagged). Kept during the C1→C2 transition so
+# existing builders + tests still compile. C2 replaces all uses with the
+# specific concrete subtypes below.
+struct SpinorLHYTable <: TabulatedLHY
     mode::Symbol
+    densities::Vector{Float64}
+    potential_values::Vector{Float64}
+end
+
+struct TwoChannelLHY <: TabulatedLHY
+    densities::Vector{Float64}
+    potential_values::Vector{Float64}
+end
+
+struct FullBdGLHY <: TabulatedLHY
+    densities::Vector{Float64}
+    potential_values::Vector{Float64}
+end
+
+struct PolarContactLHY <: TabulatedLHY
+    densities::Vector{Float64}
+    potential_values::Vector{Float64}
+end
+
+struct PolarDipolarLHY <: TabulatedLHY
+    densities::Vector{Float64}
+    potential_values::Vector{Float64}
+end
+
+struct FMContactLHY <: TabulatedLHY
+    densities::Vector{Float64}
+    potential_values::Vector{Float64}
+end
+
+struct FMDipolarLHY <: TabulatedLHY
+    densities::Vector{Float64}
+    potential_values::Vector{Float64}
+end
+
+struct IcosahedralLHY <: TabulatedLHY
     densities::Vector{Float64}
     potential_values::Vector{Float64}
 end

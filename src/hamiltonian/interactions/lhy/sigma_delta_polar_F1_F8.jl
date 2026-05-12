@@ -3,7 +3,7 @@
 # Auto-generated from sympy Clebsch-Gordan computation (50-digit precision
 # cast to Float64). σ_m, δ_m coefficients for polar-phase BdG, F=1..8.
 #
-# Usage (after `include` into PolarContactLHY module):
+# Usage (after `include` into PolarContactMod module):
 #   σ_m(F, m) = Σ (S, coef) ∈ SIGMA_TABLE[F][m+1]: coef × g_S
 #   δ_m(F, m) = Σ (S, coef) ∈ DELTA_TABLE[F][m+1]: coef × g_S
 #

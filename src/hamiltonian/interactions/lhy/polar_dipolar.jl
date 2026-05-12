@@ -17,22 +17,22 @@
 #                          0 at ε̃ ≥ 1/2 (Petrov regime, β diverges).
 #   |m|≥2:        Contact only (DDI LO = 0; ⟨Y_{2,M}⟩_Ω = 0).
 #
-# F-genericity: σ/δ pulled from PolarContactLHY (50-digit sympy table).
+# F-genericity: σ/δ pulled from PolarContactMod (50-digit sympy table).
 # The DDI angular-average structure (antisym/sym split for |m|=1) is
 # intrinsic to the polar phase dipole geometry and independent of F.
 # F=6 Eu is the primary application (paper #1).
 
-module PolarDipolarLHY
+module PolarDipolarMod
 
 function _phi_1_reg(t)
     return parentmodule(@__MODULE__).PhiOneReg.phi_1_reg(t)
 end
 const phi_1_reg = _phi_1_reg
 
-# σ_m / δ_m and the cache live in PolarContactLHY (sibling module already
+# σ_m / δ_m and the cache live in PolarContactMod (sibling module already
 # loaded by SpinorBEC before this one).
 function _polar_contact()
-    return parentmodule(@__MODULE__).PolarContactLHY
+    return parentmodule(@__MODULE__).PolarContactMod
 end
 
 export lhy_energy_polar_dipolar
@@ -186,4 +186,4 @@ function lhy_energy_polar_dipolar(n::Float64, coefs, eps_tilde_dd::Float64;
     return prefactor * total
 end
 
-end # module PolarDipolarLHY
+end # module PolarDipolarMod

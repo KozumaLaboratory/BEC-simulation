@@ -1,14 +1,14 @@
 using SpinorBEC
-using SpinorBEC: PhiOneReg, PolarContactLHY, PolarDipolarLHY, FMContactLHY, FMDipolarLHY
+using SpinorBEC: PhiOneReg, PolarContactMod, PolarDipolarMod, FMContactMod, FMDipolarMod
 using SpinorBEC.PhiOneReg: phi_1_reg, T_KNOTS, VAL_KNOTS, DERIV_KNOTS
-using SpinorBEC.PolarContactLHY: lhy_energy_polar, sigma_polar, delta_polar,
+using SpinorBEC.PolarContactMod: lhy_energy_polar, sigma_polar, delta_polar,
     build_polar_lhy_coefs
-using SpinorBEC.PolarDipolarLHY:
+using SpinorBEC.PolarDipolarMod:
     lhy_energy_polar_dipolar, antisym_branch,
     sym_branch, sym_branch_quad
-using SpinorBEC.FMContactLHY: lhy_energy_fm, sigma_fm, delta_fm,
+using SpinorBEC.FMContactMod: lhy_energy_fm, sigma_fm, delta_fm,
     build_fm_lhy_coefs
-using SpinorBEC.FMDipolarLHY: lhy_energy_fm_dipolar, Q5_dipolar
+using SpinorBEC.FMDipolarMod: lhy_energy_fm_dipolar, Q5_dipolar
 using Test
 using LinearAlgebra: norm
 
@@ -76,7 +76,7 @@ end
     @test isapprox(sigma_polar(1, 0, g_dict), c0_KU; atol=1e-10)
     @test isapprox(delta_polar(1, 0, g_dict), c0_KU; atol=1e-10)
 
-    # δ_1 ≡ c_1 (verified algebraically in PolarContactLHY docstring)
+    # δ_1 ≡ c_1 (verified algebraically in PolarContactMod docstring)
     @test isapprox(delta_polar(1, 1, g_dict), c1_KU; atol=1e-10)
 
     # ξ_1 = 2σ_1 - σ_0 ≡ c_1 (Goldstone identity for SO(3) breaking)

@@ -26,7 +26,7 @@
 # Stage C spinor extension (proper S=2F-2 channel coupling) is research-
 # open and NOT covered here — see paper #2 "Open issues".
 
-module FMDipolarLHY
+module FMDipolarMod
 
 # Lima-Pelster Q_5 lives in interactions.jl (one level up); reach via
 # parentmodule() to avoid `using SpinorBEC` cycles at module-load time.
@@ -35,7 +35,7 @@ function _Q5(eps_dd::Float64)
 end
 
 function _fm_contact()
-    return parentmodule(@__MODULE__).FMContactLHY
+    return parentmodule(@__MODULE__).FMContactMod
 end
 
 export lhy_energy_fm_dipolar, Q5_dipolar
@@ -79,4 +79,4 @@ function lhy_energy_fm_dipolar(n::Float64, coefs, eps_dd::Real;
     return prefactor * (n * kappa)^2.5 * Q5_dipolar(eps_dd)
 end
 
-end # module FMDipolarLHY
+end # module FMDipolarMod

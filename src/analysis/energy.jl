@@ -252,7 +252,14 @@ function _lhy_energy(psi, lhy::Quasi2DLHY, n_comp, ndim, n_pts, dV)
     0.5 * lhy.c_lhy_2d * E * dV
 end
 
-function _lhy_energy(psi, lhy::SpinorLHYTable, n_comp, ndim, n_pts, dV)
+function _lhy_energy(::Any, ::NoLHY, _n_comp, _ndim, _n_pts, _dV)
+    0.0
+end
+
+# Shared energy eval for all table-based modes (SpinorLHYTable + 7 concrete
+# TabulatedLHY subtypes). All carry the same (densities, potential_values)
+# shape; interpolation is identical across modes.
+function _lhy_energy(psi, lhy::TabulatedLHY, n_comp, ndim, n_pts, dV)
     n = total_density(psi, ndim)
     E = 0.0
     @inbounds for I in CartesianIndices(n_pts)

@@ -128,14 +128,18 @@ end
 end
 
 @inline _lhy_V(::AbstractFloat, ::Nothing) = 0.0
+@inline _lhy_V(::AbstractFloat, ::NoLHY) = 0.0
 @inline _lhy_V(n::AbstractFloat, l::ScalarLHY) = l.c_lhy * n * sqrt(n)
 @inline function _lhy_V(n::AbstractFloat, l::Quasi2DLHY)
     n < 1e-30 && return zero(n)
     l.c_lhy_2d * n * (2.0 * (log(n * l.a_2d_sq) + l.log_const) + 1.0)
 end
-@inline function _lhy_V(n::AbstractFloat, l::SpinorLHYTable)
+# Shared eval for all table-based modes (SpinorLHYTable + 7 concrete subtypes).
+@inline function _lhy_V(n::AbstractFloat, l::TabulatedLHY)
     _interpolate_1d(l.densities, l.potential_values, Float64(n))
 end
+# Float64 fallback — used when callers pass a raw c_lhy scalar instead of
+# an AbstractLHY. Dropped in C2 once all callers route through types.
 @inline _lhy_V(n::AbstractFloat, c_lhy::AbstractFloat) = c_lhy * n * sqrt(n)
 
 function _diagonal_step_svec!(

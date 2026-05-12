@@ -38,7 +38,7 @@
 #   to (8/15π²)(g·n)^(5/2) which is identical to the scalar Lima-Pelster
 #   form at coupling g.
 
-module IcosahedralLHY
+module IcosahedralMod
 
 # ---------------------------------------------------------------------------
 # F=6 I_h ground state spinor (component order m=+6, +5, ..., -6).
@@ -79,7 +79,7 @@ end
 
 Convenience overload: extracts `g_dict[S]` for S ∈ {0,2,4,6,8,10,12},
 defaulting missing channels to 0. Accepts the same `g_dict` shape as
-`PolarContactLHY.build_polar_lhy_coefs` etc.
+`PolarContactMod.build_polar_lhy_coefs` etc.
 """
 function compute_c0_lambda_F6_Ih(g_dict::AbstractDict)
     g_vec = Float64[Float64(get(g_dict, 2k, 0.0)) for k in 0:6]
@@ -109,4 +109,4 @@ end
 
 export ZETA_F6_IH, compute_c0_lambda_F6_Ih, epsilon_LHY_F6_Ih
 
-end # module IcosahedralLHY
+end # module IcosahedralMod

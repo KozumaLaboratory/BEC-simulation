@@ -1,6 +1,6 @@
 using Test
 using SpinorBEC
-using SpinorBEC.IcosahedralLHY
+using SpinorBEC.IcosahedralMod
 
 # F=6 icosahedral (I_h) closed-form contact LHY tests (Round-3 Task 1).
 # Formula derived in parallel session 2026-05-07; numerical values
