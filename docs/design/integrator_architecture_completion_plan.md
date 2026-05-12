@@ -36,7 +36,7 @@ order 4 on the F=6 Eu DDI lab path.
 
 **Remaining work (multi-session)**:
 
-### A1.1 — Forest-Ruth-Chin composition with direct commutator
+### A1.1 — Forest-Ruth-Chin composition with direct commutator (COMPLETE 2026-05-12)
 
 Implement the v4 force-gradient correction inserted into a Forest-Ruth
 or Chin Type-1 composition (multiple K substeps at optimized weights)
@@ -44,8 +44,44 @@ so that BOTH leading BCH commutators `[V,[T,V]]` AND `[T,[T,V]]`
 cancel. The Step 1c direct-commutator kernel is auto-Hermitian and
 slots cleanly into this structure.
 
-Acceptance: order 4 on F=1 spin-mixing lab path (c_1 = 50, T = 0.04),
-matching Y4-mid performance.
+Acceptance (original): order 4 on F=1 spin-mixing lab path (c_1 = 50,
+T = 0.04), matching Y4-mid performance.
+
+**Result (`scripts/bench/track_c_v4_a11_chin4A.jl` +
+`track_c_v4_a11_alpha_sweep.jl`)**:
+
+1. **FG kernel + sign verified**: bare 5-stage symmetric (1/6, 1/2,
+   2/3, 1/2, 1/6) + direct commutator at α = -dt³/72 reaches FP-floor
+   (~ 1e-12) in the AUTONOMOUS (linear V_SM = c₁·m̄_global·F) limit.
+   α-sweep confirms +1/72 sign gives order 2; only -1/72 yields
+   order 4. The negative sign comes from Wick rotation Δτ² → -dt² of
+   CK 2005 eq 6.9's (Δτ²/48) FG coefficient.
+
+2. **Nonlinear GP gate FAILS**: with self-consistent V_SM(ψ),
+   Chin 4A_freeze and Chin 4A_picard (average-m̄) yield order 2.
+   Strang half-step predictor (`Chin4A_predcorr`) reduces the
+   constant by 20× but stays at order 2 — same structural barrier
+   as Track C v3.1 (CLAUDE.md `pitfall_pipeline_inference.md` family
+   note): a 4th-order predictor is needed for the midpoint m̄, which
+   makes the scheme circular / expensive.
+
+3. **Forest-Ruth (nonlinear) reaches order 4 with freeze-m̄**: its
+   negative-coefficient slot structure tolerates freeze-m̄ at the V
+   slots, unlike Chin 4A's all-positive coefficients.
+
+**Practical conclusion**: Y4-midpoint (Track A1) remains the practical
+optimum for nonlinear GP. Track C v4 + direct commutator is a clean
+theoretical construction but hits the same structural limit as v3.1
+on GP lab paths.
+
+**Thesis impact (§3.5.x)**: Section narrative needs to be updated to
+say the direct-commutator kernel + correct FG sign achieves order 4
+in the autonomous case, and the nonlinear-GP failure is a structural
+property of all-positive-coefficient compositions — not specific to
+the multiplicative-decomposition (Step 1b) or finite-difference
+discretization. Forest-Ruth-Suzuki triple-jump remains the only
+positive-effective-coefficient route to order 4 for nonlinear GP
+that doesn't require iterative predictors.
 
 ### A1.2 — DDI cross-terms
 
@@ -75,8 +111,15 @@ all four.
 
 Acceptance: order 4 on F=6 16³ DDI + c_1 spinor lab path.
 
-**Estimated scope**: 3 sessions (A1.1 = 1 session, A1.2 = 1 session,
-A1.3 = 1 session). Linked to task #91.
+**Estimated scope**: 3 sessions (A1.1 = 1 session DONE 2026-05-12,
+A1.2 = 1 session, A1.3 = 1 session). Linked to task #91. **A1.2 and
+A1.3 are now reconsidered**: extending the direct-commutator kernel to
+DDI and full Thalhammer-Full was predicated on Chin 4A reaching order 4
+on the nonlinear lab path. Since that gate failed (autonomous order 4
+verified, nonlinear order 2 capped), A1.2/A1.3 should target order
+≥ 3.5 in the autonomous limit only — the practical takeaway for the
+modernization plan is that Y4-midpoint is the production scheme and
+Track C v4 is the theoretical complete picture.
 
 ---
 
