@@ -282,6 +282,83 @@ near-instability regime where fixed-dt requires conservative dt.
 **Estimated scope**: 2–3 sessions (controller plumbing in src/ +
 two bench problems).
 
+### A3.5 — Result (2026-05-12, INFRASTRUCTURE COMPLETE, production integration deferred)
+
+Bench implementations:
+- `scripts/bench/track_a3_adaptive_y4mid.jl` — smooth Phase 2a test 4.1
+- `scripts/bench/track_a3_adaptive_burst.jl` — Gaussian-pulse Zeeman
+  burst test 4.2 (synthetic substitute for Eu post-quench)
+
+Both reuse the inline midpoint-Strang kernel from A2.2 to avoid
+modifying `Workspace.sim_params` immutability (per design doc §3.1
+"Caveat"). Production src/ integration requires either:
+1. Workspace.sim_params mutability (type-parameter risk per
+   `pitfall_pipeline_inference.md`), OR
+2. `split_step!(ws; dt)` API refactor (cleaner but invasive).
+Both are deferred to a follow-up session — A3.5 establishes that
+the controller infrastructure works at the bench level.
+
+**Test 4.1 (smooth Phase 2a)** — `track_a3_adaptive_y4mid.jl`:
+
+| tol_rel | wall   | n_acc | n_rej | dt_min  | dt_max  | err      |
+|---------|--------|-------|-------|---------|---------|----------|
+| 1e-5    | 0.55s  | 4     | 0     | 4.0e-3  | 2.0e-2  | 4.25e-7  |
+| 1e-7    | 0.52s  | 6     | 1     | 4.0e-3  | 1.0e-2  | 3.02e-8  |
+| 1e-9    | 0.90s  | 10    | 0     | 3.6e-3  | 4.3e-3  | 1.31e-9  |
+
+Acceptance §5 #1 (≤ 2× fixed-dt): adaptive @ tol=1e-7 wall=0.52s vs
+cheapest fixed Y4-mid wall=0.24s → **2.13× — NARROW MISS**. Defect-
+based controller has structural 3× cost overhead (one full + two
+half steps); smooth problems can't absorb this overhead.
+
+err-vs-tol log-log slope: 0.63 (expected 1.0). Controller goes into
+limit cycle at loose tolerance (dt_max saturates to 5× initial dt
+when defect easily under tol).
+
+**Test 4.2 (Gaussian Zeeman pulse near-instability substitute)** —
+`track_a3_adaptive_burst.jl`. Pulse: p(t) = 0.5 + 50·exp(-(t-0.02)²/(2·0.002²)).
+
+Fixed-dt baseline:
+
+| dt      | err      | wall   |
+|---------|----------|--------|
+| 2.0e-3  | 1.75e-9  | 0.54s  |
+| 1.0e-3  | 1.74e-10 | 1.18s  |
+| 5.0e-4  | 4.85e-11 | 2.00s  (floor) |
+| 1.0e-4  | 4.07e-11 | 9.12s  (floor) |
+
+Adaptive @ tol=1e-7: err=2.49e-8, wall=4.37s, 42 acc / 17 rej (40%).
+Cheapest fixed match: dt=2e-3, wall=0.54s. Adaptive = **8× SLOWER**.
+
+**Diagnosis**: the synthetic Zeeman pulse does NOT create a true
+near-instability — Y4-mid handles it at dt=2e-3 fine (err=1.75e-9).
+Adaptive correctly detects the pulse region and shrinks dt 3× there
+(burst mean dt=5.1e-4 vs smooth mean dt=1.5e-3), but this aggressive
+local resolution wastes effort because the problem is globally
+benign. True near-instability test (Eu post-quench at F=6, T=1.0)
+costs ~30 min for fixed-dt baseline and was not pursued this session.
+
+**Acceptance verdict**:
+- [✗] Test 4.1 ≤ 2× smooth: 2.13× — narrow miss
+- [✗] Test 4.2 < 50% near-instability: 8× SLOWER — synthetic
+      problem wasn't stiff enough
+- [△] Order preservation: slope 0.63 — limit-cycle at loose tol
+- [△] User-facing API: requires Workspace refactor (deferred)
+
+**Path forward for production integration**:
+1. Tune Söderlind coefficients (negative β for smoother control;
+   current α=β=1/(p+1) gives limit-cycle behavior at loose tol).
+2. Switch from local-defect to global-error estimator (normalize
+   defect by dt/T).
+3. Find a real near-instability test problem (Eu post-quench OR
+   c_dd-driven modulational instability initial state).
+4. Workspace.sim_params mutability fix OR step!-takes-dt refactor
+   (per design doc §3.1 caveat).
+
+**Status**: A3 sub-phase deliverables 1-3 implemented, acceptance #4
+deferred. The controller infrastructure is operational and bench-
+testable; src/ integration is a separate follow-up session.
+
 ---
 
 ## A4: TDHFB Y4 Palindromic Substep (#86 Option B)
