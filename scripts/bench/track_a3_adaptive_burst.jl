@@ -26,7 +26,12 @@ const C0_BENCH = 50.0
 const C1_BENCH = 1.0
 const C_DD_BENCH = 1.0
 const P_BASE = 0.5
-const P_BURST_AMP = 50.0      # pulse amplitude (large vs base 0.5)
+# Peak Larmor period at peak amplitude must be << pulse width σ so that
+# integrating across the pulse requires many sub-σ steps. With P_BURST_AMP=5000
+# and σ=2e-3, peak Larmor period = 2π/5000 ≈ 1.3e-3, so σ spans ~ 1.6 peak
+# periods → fixed dt must be ≪ 1e-3 inside pulse, dt ~ 5e-3 outside.
+# Adaptive should refine 50-100× across the pulse boundary.
+const P_BURST_AMP = 5000.0
 const P_BURST_TC = 0.020      # pulse center (mid-simulation)
 const P_BURST_SIGMA = 0.002   # pulse width — burst timescale ~ σ
 const Q_ZEEMAN = 0.1
@@ -147,12 +152,14 @@ function adaptive_y4_step!(
     defect_prev::Float64;
     tol_abs::Float64=1e-9, tol_rel::Float64=1e-7,
     safety::Float64=0.9, p::Int=4,
-    max_factor::Float64=5.0, min_factor::Float64=0.2,
-    max_rejects::Int=8,
+    max_factor::Float64=5.0, min_factor::Float64=0.05,
+    max_rejects::Int=12,
+    pi_alpha::Float64=0.7 / p, pi_beta::Float64=-0.4 / p,
     psi_backup, psi_full, psi_half) where {NN}
 
-    α = 1.0 / (p + 1)
-    β = 1.0 / (p + 1)
+    # Söderlind PI3.4: α=0.7/p, β=-0.4/p (negative β for smooth dt sequence).
+    α = pi_alpha
+    β = pi_beta
     n_rejects = 0
     dt = dt_try
 
@@ -239,20 +246,21 @@ end
 @printf("Building Y6-mid reference at dt=2e-5... ")
 flush(stdout)
 t1 = time()
-psi_ref = build_y6_reference(2.0e-5)   # 2x coarser than test 4.1 since burst is at fast scale
+psi_ref = build_y6_reference(2.0e-5)
 @printf("done (%.1fs)\n\n", time() - t1)
 
-# Fixed-dt baseline at multiple dts
-@printf("── Fixed-dt Y4-mid baseline ──\n")
+# Fixed-dt baseline — peak Larmor period 1.3e-3 → dts down to 1e-5 needed
+@printf("── Fixed-dt Y4-mid baseline (peak Larmor period ≈ 1.3e-3) ──\n")
 @printf("%-12s %-14s %-14s %-12s %-12s\n",
     "dt", "err vs ref", "wall", "n_steps", "err/wall")
 fixed_results = NamedTuple[]
-for dt in [2e-3, 1e-3, 5e-4, 2e-4, 1e-4, 5e-5]
+for dt in [4e-3, 1e-3, 5e-4, 1e-4, 5e-5, 2e-5]
     psi, wall, n_steps = fixed_y4_run(dt)
     err = sqrt(sum(abs2, psi .- psi_ref))
     push!(fixed_results, (dt=dt, err=err, wall=wall, n_steps=n_steps))
     @printf("%-12.1e %-14.3e %-14.2fs %-12d %-12.3e\n",
         dt, err, wall, n_steps, err / wall)
+    flush(stdout)
 end
 
 # Adaptive at several tolerances
