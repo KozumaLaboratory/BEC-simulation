@@ -32,7 +32,6 @@ const INTERACTIONS_SCHEMA = Dict{String, FieldSpec}(
     "c0" => FieldSpec(; type=Number),
     "c1" => FieldSpec(; type=Number),
     "c1_ratio" => FieldSpec(; type=Number, range=(-1.0, 1.0)),
-    "c_lhy" => FieldSpec(; type=Number),  # DEPRECATED: moved to ground_state.lhy.c_lhy in C5
     "c_extra" => FieldSpec(; type=Vector),
 )
 
@@ -106,14 +105,8 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
     "target_magnetization" => FieldSpec(; type=Number),
     "temperature_ratio" => FieldSpec(; type=Number, range=(0.0, 1.0)),
     "lhy" => FieldSpec(; type=Dict, schema=LHY_SCHEMA),
-    "spinor_lhy" => FieldSpec(; type=String,                            # DEPRECATED
-        enum=["two_channel", "full_bdg", "scalar",
-            "polar_contact", "polar_dipolar",
-            "fm_contact", "fm_dipolar",
-            "icosahedral"]),
-    # ↑ DEPRECATED in C5: use `lhy: {kind: ...}` block instead. Legacy
-    # spinor_lhy + interactions.c_lhy parsing still accepted with @warn
-    # during the C5→C6 transition; removed in C6.
+    # Legacy `spinor_lhy` (string enum) + `interactions.c_lhy` (number) removed
+    # in C6 — use the `lhy: {kind: ..., c_lhy: ...}` block instead.
     "init_state_params" => FieldSpec(; type=Dict),
     "cache" => FieldSpec(; type=String),
     "quasi_2d" => FieldSpec(; type=Bool),
