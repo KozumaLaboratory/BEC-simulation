@@ -668,3 +668,208 @@ else
     @printf("✗ No improvement (slope %.2f ≈ baseline 2.0)\n", slope)
     @printf("  B-b fundamentally insufficient → pivot to B-a Castin-Dum amplitude basis\n")
 end
+
+# ====================================================================
+# Path B-a + Picard combined: full Nambu doublet + Picard midpoint
+# ====================================================================
+#
+# Empirical finding above: B-b Picard alone leaves ρ slope at 2.00 because
+# the upper-half projection on φ (source 2) breaks reversibility EVEN AT
+# FIXED state_mid generators. The reverse step starts from
+# `(phi_evolved, conj(phi_evolved))` instead of the true Nambu-evolved
+# `(phi_top, phi_bottom)` where phi_bottom ≠ conj(phi_top) when Δφ ≠ 0.
+#
+# B-a flavor fix: track the FULL Nambu doublet (phi_top, phi_bottom) as
+# independent dynamical variables. phi_bottom is initialized as
+# conj(phi) but is NOT constrained to remain so during evolution. Both
+# halves rotate under Mφ together, eliminating the projection.
+#
+# Combined with Picard midpoint (B-b), this addresses sources (1) AND (2)
+# simultaneously. Source (3) is FP-roundoff level (1e-15) per the earlier
+# analysis and not the dominant contributor.
+
+"""
+TDHFB Strang substep with FULL Nambu doublet evolution AND midpoint
+generators. State is (phi_top, phi_bottom, rho, kappa) where phi_bottom
+is an independent variable (initialized as conj(phi_top) but evolves
+freely under the BdG matrix).
+
+Returns (phi_top_new, phi_bottom_new, rho_new, kappa_new).
+"""
+function tdhfb_strang_full_doublet_at_mid(
+    phi_top_in::Vector{ComplexF64}, phi_bottom_in::Vector{ComplexF64},
+    rho_in::Matrix{ComplexF64}, kappa_in::Matrix{ComplexF64},
+    phi_top_mid::Vector{ComplexF64}, rho_mid::Matrix{ComplexF64}, kappa_mid::Matrix{ComplexF64},
+    V::Array{Float64, 4}, dt::Float64,
+)
+    half = dt / 2
+    # Generators built once from midpoint state (using phi_top_mid as "physical" phi).
+    U_mid = build_U(phi_top_mid, rho_mid, V)
+    Δφ_mid = build_Delta_phi(kappa_mid, V)
+    ΔR_mid = build_Delta_R(phi_top_mid, kappa_mid, V)
+    Wφ_mid = assemble_W(U_mid, Δφ_mid)
+    WR_mid = assemble_W(U_mid, ΔR_mid)
+    Mφ_half = exp(-1im * Wφ_mid * half)
+    MR_full = exp(-1im * WR_mid * dt)
+
+    # Working state
+    phi_top = copy(phi_top_in)
+    phi_bottom = copy(phi_bottom_in)
+    rho = copy(rho_in)
+    kappa = copy(kappa_in)
+
+    # Step 1: full doublet rotation (NO upper-half projection)
+    doublet = vcat(phi_top, phi_bottom)
+    doublet_new = Mφ_half * doublet
+    phi_top .= doublet_new[1:D]
+    phi_bottom .= doublet_new[D + 1 : 2D]
+
+    # Step 2: R subupdate (Nambu R built from rho, kappa — phi_bottom doesn't enter)
+    R = zeros(ComplexF64, TWOD, TWOD)
+    for c in 1:D, cp in 1:D
+        R[c, cp] = rho[c, cp]
+        R[c, D + cp] = kappa[c, cp]
+        R[D + c, cp] = conj(kappa[c, cp])
+        R[D + c, D + cp] = (c == cp ? 1.0 : 0.0) + conj(rho[c, cp])
+    end
+    R_new = MR_full * R / MR_full
+    for c in 1:D, cp in 1:D
+        rho[c, cp] = 0.5 * (R_new[c, cp] + conj(R_new[cp, c]))
+        kappa[c, cp] = 0.5 * (R_new[c, D + cp] + R_new[cp, D + c])
+    end
+
+    # Step 3: same full doublet rotation
+    doublet = vcat(phi_top, phi_bottom)
+    doublet_new = Mφ_half * doublet
+    phi_top .= doublet_new[1:D]
+    phi_bottom .= doublet_new[D + 1 : 2D]
+
+    return (phi_top, phi_bottom, rho, kappa)
+end
+
+"""
+B-a + Picard combined: full doublet evolution + midpoint generators.
+"""
+function tdhfb_strang_picard_full_doublet(
+    phi_top_0::Vector{ComplexF64}, phi_bottom_0::Vector{ComplexF64},
+    rho_0::Matrix{ComplexF64}, kappa_0::Matrix{ComplexF64},
+    V::Array{Float64, 4}, dt::Float64;
+    max_iter::Int=20, tol::Float64=1e-13,
+)
+    # Midpoint averages: phi_top (not the bottom), rho, kappa
+    phi_top_mid = copy(phi_top_0)
+    rho_mid = copy(rho_0)
+    kappa_mid = copy(kappa_0)
+
+    phi_top_1 = copy(phi_top_0); phi_bottom_1 = copy(phi_bottom_0)
+    rho_1 = copy(rho_0); kappa_1 = copy(kappa_0)
+    iter_count = 0
+    delta = Inf
+
+    for iter in 1:max_iter
+        phi_top_1, phi_bottom_1, rho_1, kappa_1 = tdhfb_strang_full_doublet_at_mid(
+            phi_top_0, phi_bottom_0, rho_0, kappa_0,
+            phi_top_mid, rho_mid, kappa_mid,
+            V, dt,
+        )
+        phi_top_mid_new = 0.5 .* (phi_top_0 .+ phi_top_1)
+        rho_mid_new = 0.5 .* (rho_0 .+ rho_1)
+        kappa_mid_new = 0.5 .* (kappa_0 .+ kappa_1)
+
+        delta = max(
+            maximum(abs.(phi_top_mid_new .- phi_top_mid)),
+            maximum(abs.(rho_mid_new .- rho_mid)),
+            maximum(abs.(kappa_mid_new .- kappa_mid)),
+        )
+        phi_top_mid .= phi_top_mid_new
+        rho_mid .= rho_mid_new
+        kappa_mid .= kappa_mid_new
+        iter_count = iter
+        delta < tol && break
+    end
+
+    (phi_top_1, phi_bottom_1, rho_1, kappa_1, iter_count, delta)
+end
+
+@printf("\n=== B-a + Picard combined: full doublet + midpoint generators ===\n")
+@printf("Full Nambu doublet (phi_top, phi_bottom) as independent variables.\n")
+@printf("Eliminates source (2) upper-half projection AND source (1) state-dependence.\n\n")
+
+function _gate_combined(seed; tol=1e-13, max_iter=20)
+    phi0, rho0, kappa0 = random_state(seed)
+    phi_bottom_0 = conj(phi0)  # initial: bottom = conj(top)
+    dts = [0.04, 0.02, 0.01, 0.005, 0.0025]
+    @printf("B-a + Picard combined gate (seed=%d, tol=%.0e):\n", seed, tol)
+    @printf("%-10s  %-12s  %-12s  %-12s  %-12s  %-10s  %-8s\n",
+        "dt", "φ_top resid", "φ_bot resid", "ρ resid", "κ resid", "order(ρ)", "n_iter")
+    prev_rho = NaN
+    for dt in dts
+        # Forward
+        pt1, pb1, r1, k1, nf, df = tdhfb_strang_picard_full_doublet(
+            phi0, phi_bottom_0, rho0, kappa0, V, dt; max_iter=max_iter, tol=tol,
+        )
+        # Reverse: starts from (pt1, pb1, r1, k1) — keep phi_bottom AS-IS, don't reset to conj
+        pt2, pb2, r2, k2, nr, dr = tdhfb_strang_picard_full_doublet(
+            pt1, pb1, r1, k1, V, -dt; max_iter=max_iter, tol=tol,
+        )
+        ptop_dev = maximum(abs.(pt2 .- phi0))
+        pbot_dev = maximum(abs.(pb2 .- phi_bottom_0))
+        rho_dev = maximum(abs.(r2 .- rho0))
+        kappa_dev = maximum(abs.(k2 .- kappa0))
+        ord = isnan(prev_rho) ? NaN : log2(prev_rho / max(rho_dev, 1e-30))
+        @printf("%-10.4f  %-12.3e  %-12.3e  %-12.3e  %-12.3e  %-10s  %-8d\n",
+            dt, ptop_dev, pbot_dev, rho_dev, kappa_dev,
+            isnan(ord) ? "—" : @sprintf("%.2f", ord),
+            max(nf, nr))
+        prev_rho = rho_dev
+    end
+end
+
+_gate_combined(42; tol=1e-13, max_iter=20)
+
+# Slope fit for B-a + Picard
+function _fit_slope_combined(seed; tol=1e-13)
+    phi0, rho0, kappa0 = random_state(seed)
+    phi_bottom_0 = conj(phi0)
+    dts = [0.04, 0.02, 0.01, 0.005, 0.0025]
+    rho_devs = Float64[]
+    for dt in dts
+        pt1, pb1, r1, k1, _, _ = tdhfb_strang_picard_full_doublet(
+            phi0, phi_bottom_0, rho0, kappa0, V, dt; tol=tol,
+        )
+        pt2, pb2, r2, k2, _, _ = tdhfb_strang_picard_full_doublet(
+            pt1, pb1, r1, k1, V, -dt; tol=tol,
+        )
+        push!(rho_devs, maximum(abs.(r2 .- rho0)))
+    end
+    log_dts = log.(dts)
+    log_devs = log.(max.(rho_devs, 1e-30))
+    n = length(log_dts)
+    mx = sum(log_dts) / n; my = sum(log_devs) / n
+    slope = sum((log_dts[i] - mx) * (log_devs[i] - my) for i in 1:n) /
+            sum((log_dts[i] - mx)^2 for i in 1:n)
+    slope, rho_devs
+end
+
+slope_combined, _ = _fit_slope_combined(42)
+@printf("\nρ residual log-log slope (B-a + Picard): %.3f\n", slope_combined)
+@printf("Baseline (live Strang): 2.00\n")
+@printf("B-b Picard alone:       %.2f (this run)\n", slope)
+@printf("Target for A4.1:        ≥ 5\n\n")
+
+if slope_combined >= 4.5
+    @printf("✓✓✓ A4.1 acceptance #1 PASS — B-a + Picard combined achieves order ≥ 4.5\n")
+    @printf("    Sources (1), (2) successfully eliminated.\n")
+    @printf("    Next: scale to multi-voxel, Y4 composition test, GPU port.\n")
+elseif slope_combined >= 3.0
+    @printf("△ Partial: B-a + Picard slope %.2f (vs baseline 2.0, B-b alone %.2f)\n",
+        slope_combined, slope)
+    @printf("  Sources (1), (2) partially eliminated. Source (3) may also contribute.\n")
+    @printf("  Investigate: pseudo-unitary M_R via eigen-decomp for exact Hermiticity.\n")
+elseif slope_combined > 2.2
+    @printf("△ Modest improvement: slope %.2f\n", slope_combined)
+    @printf("  Source (2) elimination may not be sufficient — investigate Δφ size dependence.\n")
+else
+    @printf("✗ No improvement (slope %.2f ≈ baseline 2.0)\n", slope_combined)
+    @printf("  Source (2) was NOT the dominant contributor. Re-examine source decomposition.\n")
+end
