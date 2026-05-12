@@ -87,13 +87,23 @@ Advance `state::TDHFBState{N}` by one **Yoshida-4 composition** of three
 Strang sub-steps with widths `(w1·dt, w0·dt, w1·dt)`. Drop-in replacement
 for `tdhfb_strang_step!`.
 
-!!! warning "Phase 4 status — order 4 NOT achieved"
-    Empirical convergence is order 2 (matching the underlying Strang
-    substep) with a worse prefactor at small dt. The TDHFB Strang
-    substep is not time-reversible at O(dt²) — see the file header
-    for the diagnostic and the route to a fully palindromic substep.
-    This wrapper is committed as documented Phase-4 WIP so future
-    palindromic substeps can plug in without API churn.
+!!! note "Order 4 requires `picard_midpoint=true`"
+    Without `picard_midpoint=true`, this wrapper inherits the underlying
+    Strang substep's O(dt²) non-palindromicity → empirical convergence
+    rate is ~order 1, *worse* than plain `tdhfb_strang_step!` (order 2).
+    With `picard_midpoint=true`, the inner HF substep becomes palindromic
+    via midpoint-state Picard iteration → A4 acceptance: order 4 measured
+    (test `Y7`).
+
+    Cost: `picard_midpoint=true` runs ~5× per HF substep (Picard ~5 iter).
+    Net efficiency relative to plain `tdhfb_strang_step!` at production
+    dt is regime-dependent — the energy-drift floor on F=1 16³ harmonic-
+    trap benchmark is ~1.7e-4 (vs Strang's ~3.7e-4 at dt=0.02), barely
+    2× improvement for 14× wall-time. Use Picard-Y4 when (a) you need
+    long-time conservation that order 2 can't deliver, or (b) you can
+    take dt large enough that the order-4 scaling resolves above the
+    F64 floor. For short-time / production-dt runs, plain
+    `tdhfb_strang_step!` is usually the better trade.
 
 # Arguments
 Same as `tdhfb_strang_step!`. Extra keywords:
@@ -102,10 +112,18 @@ Same as `tdhfb_strang_step!`. Extra keywords:
   inner HF substep. `picard_iters = 1` (default) reproduces the
   existing symmetric Strang triple. `picard_iters ≥ 2` activates a
   diagnostic Picard loop — see file header for why this does NOT help
-  in practice and is defaulted off.
-- `picard_tol::Real = 1e-10`: convergence tolerance for Picard.
+  in practice and is defaulted off. **Not the same as `picard_midpoint`
+  — that's the A4 palindromic-substep fix.**
+- `picard_tol::Real = 1e-10`: convergence tolerance for the diagnostic
+  endpoint-Picard loop (separate from `picard_midpoint_tol`).
 - `hfb_mode::Symbol = :full_hfb`: BdG generator mode for the φ subupdate;
   see `tdhfb_strang_step!` docstring for `:full_hfb` vs `:popov` semantics.
+- `picard_midpoint::Bool = false`: enable midpoint-state Picard on the
+  inner HF substep (A4 acceptance fix). Default off because the wall-
+  time / accuracy trade is regime-dependent (see warning above).
+- `picard_midpoint_max_iter::Int = 20`: Picard-midpoint iteration cap.
+- `picard_midpoint_tol::Float64 = 1e-12`: Picard-midpoint convergence
+  tolerance.
 """
 function tdhfb_y4_midpoint_step!(
     state::TDHFBState{N},
