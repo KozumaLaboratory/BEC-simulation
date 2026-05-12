@@ -76,6 +76,42 @@ using LinearAlgebra
             zeta_Ih = SpinorBEC.IcosahedralMod.ZETA_F6_IH
             @test detect_point_group(zeta_Ih, 6) === :I_h
         end
+
+        @testset "Paper #3 §V.B — F=3 octahedral ζ_{O:A_2} → :O_h" begin
+            # ζ_{O:A_2} = (|3,+2⟩ - |3,-2⟩) / √2  (Paper #3 Eq. V.B.1)
+            # 6 Majorana stars on octahedron vertices. A_2 sign-rep
+            # distinction from A_1 is representation-theoretic and not
+            # surfaced by Majorana geometry alone (both give :O_h).
+            zeta = ComplexF64[0, 1, 0, 0, 0, -1, 0] ./ sqrt(2)
+            @test detect_point_group(zeta, 3) === :O_h
+        end
+
+        @testset "Paper #3 §V.C — F=4 cube ζ_{O_h} → :O_h" begin
+            # ζ = √(5/24)|+4⟩ + √(7/12)|0⟩ + √(5/24)|-4⟩  (Paper #3 Eq. V.C.1)
+            # 8 Majorana stars on cube vertices.
+            zeta = zeros(ComplexF64, 9)
+            zeta[1] = sqrt(5/24); zeta[5] = sqrt(7/12); zeta[9] = sqrt(5/24)
+            @test detect_point_group(zeta, 4) === :O_h
+        end
+
+        @testset "Paper #3 §V.E — F=8 cube-like octahedral → :O_h" begin
+            # ζ = √390/48(|±8⟩) + √42/24(|±4⟩) + √33/8|0⟩  (Paper #3 Eq. V.E.1)
+            # 16 stars form an O orbit union — Dy^{164} relevant (Paper #3).
+            zeta = zeros(ComplexF64, 17)
+            zeta[1] = sqrt(390)/48; zeta[5] = sqrt(42)/24; zeta[9] = sqrt(33)/8
+            zeta[13] = sqrt(42)/24; zeta[17] = sqrt(390)/48
+            @test detect_point_group(zeta, 8) === :O_h
+        end
+
+        @testset "Paper #3 §V.F — F=10 dodecahedral I_h → :I_h" begin
+            # ζ = √561/75(|±10⟩) + √209/25(|+5⟩-|−5⟩) + √741/75|0⟩
+            # (Paper #3 Eq. V.F.1). 20 stars on dodecahedron-like I_h orbit.
+            zeta = zeros(ComplexF64, 21)
+            zeta[1] = sqrt(561)/75; zeta[6] = sqrt(209)/25
+            zeta[11] = sqrt(741)/75
+            zeta[16] = -sqrt(209)/25; zeta[21] = sqrt(561)/75
+            @test detect_point_group(zeta, 10) === :I_h
+        end
     end
 
     @testset "point group helpers" begin

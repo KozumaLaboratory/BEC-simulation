@@ -22,24 +22,23 @@ export PhaseReference, DEFAULT_PHASE_REFERENCES
 #    "Universal Structure Theorem for LHY Corrections in Spinor BECs",
 #    `docs/manuscript/papers/paper3_universal_theorem/main.md`).
 #
-# Paper #3 § V verification list and corresponding code support:
+# Paper #3 § V verification list and corresponding code support
+# (post-U2 stereo fix + F=8 / F=10 extension):
 #
-#   F  Phase                     Point group   Code detect_point_group
-#   -- ------------------------- ------------- -----------------------
+#   F  Phase                     Point group   detect_point_group
+#   -- ------------------------- ------------- ----------------------
 #   2  cyclic                    T_d           ✓ (4 stars → :T_d)
-#   3  octahedral (O:A_2)        O / O_h       ⚠ 6 stars → :O_h (but
-#                                              A_1 vs A_2 sign rep not
-#                                              distinguished)
+#   3  octahedral (O:A_2)        O / O_h       ✓ (6 stars → :O_h, A_1/A_2
+#                                                rep distinction is
+#                                                rep-theoretic only)
 #   4  cube                      O_h           ✓ (8 stars → :O_h)
-#   6  icosahedral (I_h)         I_h           ✗ ZETA_F6_IH returns
-#                                              :unknown — fix scheduled
-#                                              for U2 (point-group
-#                                              extension)
-#   8  cube-like octahedral      O / O_h       ✗ 16 stars not in code
-#                                              (U2)
-#   10 dodecahedral              I_h           ✗ 20 stars not in code
-#                                              (U2)
-#   12 (paper #3 §V.G)           varied        ✗ (U2)
+#   6  icosahedral (I_h)         I_h           ✓ (12 stars → :I_h)
+#   8  cube-like octahedral      O / O_h       ✓ (16 stars → :O_h)
+#   10 dodecahedral              I_h           ✓ (20 stars → :I_h)
+#   12 (Paper #3 §V.G)           varied        ✗ not yet (follow-up)
+#
+# All regression tests in `test/hamiltonian/test_majorana.jl` pin
+# each case against the canonical Paper #3 inert state spinor.
 #
 # The Sign Pattern Theorem (Paper #3 §VI; β_S coefficients with
 # closed-form sign-change boundary S_bd(F) = √(2F(F+1))) is exposed
