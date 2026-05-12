@@ -8,7 +8,8 @@ using SpinorBEC.PolarDipolarMod:
     sym_branch, sym_branch_quad
 using SpinorBEC.FMContactMod: lhy_energy_fm, sigma_fm, delta_fm,
     build_fm_lhy_coefs
-using SpinorBEC.FMDipolarMod: lhy_energy_fm_dipolar, Q5_dipolar
+using SpinorBEC.FMDipolarMod: lhy_energy_fm_dipolar
+using SpinorBEC: lima_pelster_Q5
 using Test
 using LinearAlgebra: norm
 
@@ -220,7 +221,7 @@ end
 # =================================================================
 
 @testset "FM dipolar LHY: Q5(0) = 1 (scalar limit)" begin
-    @test isapprox(Q5_dipolar(0.0), 1.0; atol=1e-12)
+    @test isapprox(lima_pelster_Q5(0.0), 1.0; atol=1e-12)
 end
 
 @testset "FM dipolar LHY: ε_dd=0 reduces to fm_contact" begin
@@ -243,7 +244,7 @@ end
         ("Dy", 1.39, 4.11),
     ]
     for (atom, eps, q5_expected) in references
-        q5 = Q5_dipolar(eps)
+        q5 = lima_pelster_Q5(eps)
         @test isapprox(q5, q5_expected; atol=0.05)
     end
 end

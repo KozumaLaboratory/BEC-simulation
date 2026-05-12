@@ -28,27 +28,13 @@
 
 module FMDipolarMod
 
-# Lima-Pelster Q_5 lives in interactions.jl (one level up); reach via
+# Canonical `lima_pelster_Q5` (closed form, interactions.jl) reached via
 # parentmodule() to avoid `using SpinorBEC` cycles at module-load time.
-function _Q5(eps_dd::Float64)
-    return parentmodule(@__MODULE__).lima_pelster_Q5(eps_dd)
-end
-
 function _fm_contact()
     return parentmodule(@__MODULE__).FMContactMod
 end
 
-export lhy_energy_fm_dipolar, Q5_dipolar
-
-"""
-    Q5_dipolar(eps_dd::Real) -> Float64
-
-Convenience alias: Lima-Pelster Q_5(ε_dd) angular factor used in the
-single-mode FM dipolar LHY formula. Q_5(0) = 1 exactly (scalar limit);
-Q_5(0.55) ≈ 1.46 for natural Eu F=6; Q_5 grows monotonically with ε_dd
-within the Petrov-regulated range.
-"""
-@inline Q5_dipolar(eps_dd::Real)::Float64 = _Q5(Float64(eps_dd))
+export lhy_energy_fm_dipolar
 
 """
     lhy_energy_fm_dipolar(n, F, g_dict, eps_dd; M_mass=1.0, hbar=1.0) -> Float64
@@ -76,7 +62,8 @@ function lhy_energy_fm_dipolar(n::Float64, coefs, eps_dd::Real;
     prefactor = (8.0 * sqrt(M_mass^3)) / (15.0 * π^2 * hbar^3)
     kappa = coefs.delta_F     # δ_+F = g_{2F}, the only non-zero δ_m for FM
     kappa < 1e-12 && return 0.0
-    return prefactor * (n * kappa)^2.5 * Q5_dipolar(eps_dd)
+    Q5 = parentmodule(@__MODULE__).lima_pelster_Q5(Float64(eps_dd))
+    return prefactor * (n * kappa)^2.5 * Q5
 end
 
 end # module FMDipolarMod

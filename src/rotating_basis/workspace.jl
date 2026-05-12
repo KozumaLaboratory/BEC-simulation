@@ -1,59 +1,11 @@
-# --- Option γ (rotating-basis) workspace + LHY helpers + lab↔tilde transforms ---
+# --- Option γ (rotating-basis) workspace + γ_LHY estimation + lab↔tilde transforms ---
 #
-# Lima-Pelster Q5 + γ_LHY estimation, the RotatingBasisWS struct, the
-# `make_rotating_basis_ws` factory, and the U_B / U_B† basis-change helpers.
+# The RotatingBasisWS struct, the `make_rotating_basis_ws` factory, and the
+# U_B / U_B† basis-change helpers. The Lima-Pelster Q5 closed form lives in
+# `src/hamiltonian/interactions/interactions.jl` (canonical, F64-exact); the
+# earlier composite-Simpson copy here was an O(numerical-integration) duplicate
+# and was removed during the LHY refactor (commit C4).
 # Extracted from rotating_basis_gpe.jl 2026-05-01.
-
-"""
-Lima-Pelster correction Q_5(ε_dd) for the dipolar BEC LHY coefficient.
-
-For ε_dd ≤ 1: Q_5 is real and positive. For ε_dd > 1, the elliptic integrand
-has imaginary excursions (roton instability of the homogeneous gas); the
-Wachter convention uses Re[Q_5] which captures the dominant stabilizing
-contribution. Reference: Lima & Pelster, PRA 84, 041604(R) (2011).
-
-Closed-form result (real part for general ε_dd):
-
-    Q_5(ε_dd) = ∫₀¹ du · Re[ (1 - ε_dd + 3 ε_dd u²)^(5/2) ]
-
-For ε_dd ≤ 1 the integrand is real throughout. For ε_dd > 1 the integrand
-becomes imaginary on u ∈ (0, √((ε_dd-1)/(3ε_dd))) and we drop that piece
-when taking Re[]. Implementation uses adaptive Gauss-Legendre quadrature.
-"""
-function lima_pelster_Q5(ε_dd::Real; n_points::Int=64)
-    ε = Float64(ε_dd)
-    # 64-point Gauss-Legendre on [0, 1]
-    function gl_points(n)
-        # Use textbook recurrence or just sample uniformly with high density
-        # for skeleton — composite Simpson on n_points is sufficient for our
-        # ±0.1% accuracy needs across ε_dd ∈ [0, 2].
-        u = collect(range(0.0, 1.0; length=n_points + 1))
-        u
-    end
-    u = gl_points(n_points)
-    # Composite Simpson: requires odd # samples
-    n = length(u) - 1
-    if isodd(n)
-        push!(u, u[end])  # pad to even — won't matter for accuracy
-        n += 1
-    end
-    h = (u[end] - u[1]) / n
-    function integrand(u_val)
-        z = 1.0 - ε + 3.0 * ε * u_val^2
-        if z >= 0.0
-            return z^2.5
-        else
-            # Re[(complex)^2.5] for negative real argument: real part = 0 of (i√|z|)⁵ = 0
-            # Strictly: (-|z|)^(5/2) = i⁵ |z|^(5/2) = i |z|^(5/2). Re = 0.
-            return 0.0
-        end
-    end
-    s = integrand(u[1]) + integrand(u[end])
-    @inbounds for i in 2:(length(u) - 1)
-        s += (isodd(i) ? 4.0 : 2.0) * integrand(u[i])
-    end
-    s * h / 3
-end
 
 """
 Dimensionless LHY coefficient γ_LHY for a polarized dipolar BEC.
