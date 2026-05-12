@@ -54,11 +54,20 @@ end
 """
 Stereographic projection: complex plane → unit sphere.
 z → (2Re(z), 2Im(z), |z|²-1) / (|z|²+1)
-z = Inf maps to south pole (0, 0, -1).
+- z = 0   maps to south pole (0, 0, -1)
+- z = ∞   maps to north pole (0, 0, +1)   ← limit of the formula
+
+(Bug fix 2026-05-12, U2: pre-fix code mapped both z=0 AND z=∞ to the
+south pole, causing two distinct Majorana roots to collide on the
+same sphere point. This broke point-group detection for any spinor
+with a vanishing m=+F component — e.g. ZETA_F6_IH where the m=+F=6
+component is 0 produces a root at infinity that the bug folded onto
+the south pole alongside the z=0 root, masking the I_h icosahedron
+pattern.)
 """
 function _stereo_to_sphere(z::ComplexF64)
     if !isfinite(z)
-        return (0.0, 0.0, -1.0)
+        return (0.0, 0.0, 1.0)
     end
     r2 = abs2(z)
     inv_denom = 1.0 / (r2 + 1.0)

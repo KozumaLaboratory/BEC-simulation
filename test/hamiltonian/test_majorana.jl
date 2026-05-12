@@ -66,17 +66,15 @@ using LinearAlgebra
             @test detect_point_group(zeta_Td, 2) == :T_d
         end
 
-        @testset "Paper #3 §V.D — F=6 I_h ζ_{I_h} CURRENTLY → :unknown (U2 gap)" begin
-            # Canonical F=6 I_h state from IcosahedralMod. The Majorana
-            # stars SHOULD form an icosahedron, but detect_point_group
-            # currently returns :unknown due to spectrum-matching
-            # tolerance + handling of the root-at-infinity (m=+F=0
-            # component). U2 fixes this by tightening reference
-            # comparison and handling the ∞ root explicitly.
+        @testset "Paper #3 §V.D — F=6 I_h ζ_{I_h} → :I_h (post-U2 stereo fix)" begin
+            # Canonical F=6 I_h state from IcosahedralMod. Pre-U2 this
+            # returned :unknown due to a stereographic-projection bug
+            # mapping both z=0 and z=∞ to the south pole — see the
+            # `_stereo_to_sphere` docstring for the bug archaeology.
+            # Post-fix the 12 Majorana stars form the icosahedron and
+            # `detect_point_group` returns `:I_h` cleanly.
             zeta_Ih = SpinorBEC.IcosahedralMod.ZETA_F6_IH
-            pg = detect_point_group(zeta_Ih, 6)
-            @test pg === :unknown                    # current behaviour
-            @test_broken pg === :I_h                 # target after U2
+            @test detect_point_group(zeta_Ih, 6) === :I_h
         end
     end
 
