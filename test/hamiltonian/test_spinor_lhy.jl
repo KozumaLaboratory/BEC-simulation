@@ -82,6 +82,22 @@
         @test SpinorBEC._interpolate_1d(xs, ys, 5.0) ≈ 9.0
     end
 
+    @testset "two_channel is polar-state LHY at F=1 (Lavoine-Bourdel form)" begin
+        # ε_LHY^polar(F=1) = (8/15π²) [c0^(5/2) + 2|c1|^(5/2)] n^(5/2)
+        # Verify against the direct formula. No DDI (Q5=1).
+        c0 = 10.0; c1 = -0.5
+        tbl = compute_spinor_lhy_two_channel(;
+            F=1, c0=c0, c1=c1, c_dd=0.0, n_max=2.0, n_points=400)
+        prefactor = 8.0 / (15.0 * π^2)
+        n_test = 1.0
+        # Energy density via integration of V_LHY = dε/dn from 0 to n_test
+        # Quick spot check: V_LHY(n) = (5/2) prefactor (c0^(5/2) + 2|c1|^(5/2)) n^(3/2)
+        V_expected = (5.0 / 2.0) * prefactor *
+            (abs(c0)^(5/2) + 2.0 * abs(c1)^(5/2)) * n_test^(3/2)
+        V_table = SpinorBEC._lhy_V(n_test, tbl)
+        @test isapprox(V_table, V_expected; rtol=1e-3)
+    end
+
     @testset "two_channel is F-generic (formula explicit in F)" begin
         # The two-channel LHY uses `2F · |c1|^(5/2)` for the spin part —
         # F appears as a parameter, so the formula evaluates for any F.

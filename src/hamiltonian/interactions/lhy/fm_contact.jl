@@ -3,7 +3,17 @@
 # Closed-form contact LHY for spinor BECs in the FM phase
 # (ζ_α = δ_{α,+F}, the m=+F polarised state).
 #
-# For the FM phase the anomalous coupling δ_m is non-zero only for m=+F
+# Physical justification (Watanabe-Brauner 2011 / Watanabe-Murayama 2012
+# Goldstone-mode counting):
+#   For the FM state, SU(2) → U(1) with broken generators (S_x, S_y) that
+#   are non-commuting in the ground state ([S_x, S_y] = i⟨S_z⟩ ≠ 0). This
+#   counts as a SINGLE Type-B Goldstone mode with ω ∝ k² (the FM magnon),
+#   NOT the 2 transverse Type-A modes (ω ∝ k) that one would naively
+#   count for SO(3) → SO(2). Type-B Goldstones have trivial u_k - v_k → 1
+#   structure and contribute ZERO to the LHY zero-point integral after
+#   UV subtraction.
+#
+# Concretely: the anomalous coupling δ_m is non-zero only for m=+F
 # (pair m_total = 2F, realised only by α=β=+F). All other modes are free
 # (κ_m = 0) and contribute zero LHY after UV subtraction. The closed
 # form collapses to a single mode:

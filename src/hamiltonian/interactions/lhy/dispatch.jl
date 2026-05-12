@@ -6,26 +6,34 @@ export compute_spinor_lhy_icosahedral
 """
     compute_spinor_lhy_two_channel(; F, c0, c1, c_dd, n_max, n_points) → TwoChannelLHY
 
-Two-channel LHY parameterised by (c0, c1, F):
+**Polar-state LHY in the two-channel approximation.** For ζ_α = δ_{α,0}
+(m=0 condensate; SO(3)→SO(2) broken with 2F Type-A Goldstones):
 
     ε_LHY = (8/15π²) [c0^(5/2) n^(5/2) Q5(ε_dd) + 2F |c1|^(5/2) n^(5/2)]
 
-The formula is F-generic via the explicit `2F` multiplier on the spin
-term — it can be evaluated for any F. Its physical interpretation
-depends on the channel content of the mean field:
+- Density term `c0^(5/2)` corresponds to the polar density stiffness
+  (mean field ⟨F⟩=0 ⇒ stiffness = c0).
+- Spin term `2F · |c1|^(5/2)` counts the 2F Type-A transverse magnons
+  with stiffness c1. At F=1 this reproduces the standard polar LHY
+  result (Lavoine-Bourdel 2021 / Petrov 2014 form).
 
-- **F = 1**: even-S channels are {S=0, S=2} only, which the (c0, c1)
-  pair fully parameterises. The two-channel formula is exact in this
-  regime (matches Yi-You 2001 spinor LHY for F=1).
-- **F ≥ 2** with `c_extra = 0`: the mean field uses only (c0, c1), so
-  the two-channel formula is consistent with the mean-field channel
-  content. Treat as a valid approximation.
-- **F ≥ 2** with `c_extra ≠ 0`: the mean field includes additional
-  even-S channels (S=4, S=6, ...) that the two-channel LHY does NOT
-  capture. The result will miss those contributions — use one of the
-  F-generic closed forms (`PolarContactLHY` / `PolarDipolarLHY` for
-  polar, `FMContactLHY` / `FMDipolarLHY` for FM, `IcosahedralLHY` for
-  F=6 I_h) instead.
+**Do NOT use for FM (m=±F) states.** For maximally-stretched FM the
+broken generators are non-commuting (S_x, S_y with ⟨S_z⟩ ≠ 0) →
+**1 Type-B Goldstone with ω∝k²**, and the FM magnon Bogoliubov modes
+have anomalous coupling κ = 0 — they vanish from the LHY zero-point
+integral after UV subtraction. The FM closed form is single-mode:
+ε_LHY^FM = (8/15π²)(g_{2F} n)^(5/2), implemented in `FMContactLHY` via
+`compute_spinor_lhy_fm_contact`. Using the two-channel formula on a FM
+state with `c0=10, c1=-0.5` would spuriously add a non-zero spin term.
+
+**Regimes of validity** (polar state assumed):
+- **F = 1**: exact (Yi-You 2001 / Lavoine-Bourdel; even-S channels are
+  {0, 2} only, fully parameterised by (c0, c1)).
+- **F ≥ 2 with `c_extra = 0`**: consistent with the (c0, c1)-only mean
+  field; valid polar approximation.
+- **F ≥ 2 with `c_extra ≠ 0`**: misses S ≥ 4 corrections — use
+  `compute_spinor_lhy_polar_contact` / `_polar_dipolar` (paper #1
+  F-generic closed forms).
 
 The potential V_LHY = dε_LHY/dn is tabulated via central differences.
 """
