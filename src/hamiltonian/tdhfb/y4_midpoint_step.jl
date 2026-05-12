@@ -92,18 +92,20 @@ for `tdhfb_strang_step!`.
     Strang substep's O(dt²) non-palindromicity → empirical convergence
     rate is ~order 1, *worse* than plain `tdhfb_strang_step!` (order 2).
     With `picard_midpoint=true`, the inner HF substep becomes palindromic
-    via midpoint-state Picard iteration → A4 acceptance: order 4 measured
-    (test `Y7`).
+    via midpoint-state Picard iteration → order 4 measured (test `Y7`,
+    state-error vs reference: 4.05).
 
     Cost: `picard_midpoint=true` runs ~5× per HF substep (Picard ~5 iter).
-    Net efficiency relative to plain `tdhfb_strang_step!` at production
-    dt is regime-dependent — the energy-drift floor on F=1 16³ harmonic-
-    trap benchmark is ~1.7e-4 (vs Strang's ~3.7e-4 at dt=0.02), barely
-    2× improvement for 14× wall-time. Use Picard-Y4 when (a) you need
-    long-time conservation that order 2 can't deliver, or (b) you can
-    take dt large enough that the order-4 scaling resolves above the
-    F64 floor. For short-time / production-dt runs, plain
-    `tdhfb_strang_step!` is usually the better trade.
+    Total Y4-Picard step is ~15× plain Strang step.
+
+    Trade-off (use state-error vs reference, NOT energy drift — the
+    latter is confounded by initial-state physics and saturates near
+    F64 floor for equilibrium states):
+    - Long-time state accuracy: Y4-Picard wins (order 4 vs order 2 of
+      Strang) when error tolerance is below the dt² floor of Strang at
+      affordable dt. dt⁴ resolution kicks in roughly at 1e-8 error.
+    - Short-time / loose tolerance: plain `tdhfb_strang_step!` is more
+      wall-time efficient (order 2 is plenty when tolerance > 1e-6).
 
 # Arguments
 Same as `tdhfb_strang_step!`. Extra keywords:
