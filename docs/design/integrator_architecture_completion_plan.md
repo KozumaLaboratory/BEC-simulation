@@ -423,7 +423,11 @@ order 2 due to palindromic gap, see
 `tdhfb_y4_palindromic_substep_design.md`).
 
 **Pre-condition**: Phase 5 GPU port complete (per Option B's 2700×
-per-voxel cost increase, see #84 design doc).
+per-voxel cost increase, see #84 design doc). **UNBLOCKED 2026-05-12**:
+commits `9d58201` (5a+5b) → `205915a` (5c-core) → `d775922` (5c HF
+substep) → `b6a375e` (5e optimization). GPU TDHFB strang_step now runs
+end-to-end at **121.7× speedup** on F=6 32³ Eu (CPU 16 s/step → GPU F32
+132 ms/step), 2× over design stretch target of 60×.
 
 **Remaining work (multi-session, post-修論)**:
 
