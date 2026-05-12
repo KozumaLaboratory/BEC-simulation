@@ -873,3 +873,66 @@ else
     @printf("✗ No improvement (slope %.2f ≈ baseline 2.0)\n", slope_combined)
     @printf("  Source (2) was NOT the dominant contributor. Re-examine source decomposition.\n")
 end
+
+# ====================================================================
+# CRITICAL diagnostic: no-projection R update — isolates source (3)
+# ====================================================================
+#
+# Hypothesis: if we track the FULL 6×6 R matrix through the substep
+# WITHOUT the `0.5(R + R†)` projection step, palindromicity should be
+# machine-precision exact (slope ~ 0). This would PROVE the projection
+# is the dominant O(dt²) source.
+
+function _no_projection_R_test(seed=42)
+    phi0, rho0, kappa0 = random_state(seed)
+    g_S = Dict{Int, Float64}(0 => 0.5, 2 => 0.1)
+    Vk = channel_kernel_F1(g_S)
+    R0 = zeros(ComplexF64, TWOD, TWOD)
+    for c in 1:D, cp in 1:D
+        R0[c, cp] = rho0[c, cp]
+        R0[c, D + cp] = kappa0[c, cp]
+        R0[D + c, cp] = conj(kappa0[c, cp])
+        R0[D + c, D + cp] = (c == cp ? 1.0 : 0.0) + conj(rho0[c, cp])
+    end
+    U_R = build_U(phi0, rho0, Vk)
+    ΔR = build_Delta_R(phi0, kappa0, Vk)
+    WR = assemble_W(U_R, ΔR)
+
+    @printf("\n=== No-projection R update test (full R tracked) ===\n")
+    @printf("dt           ‖R_2 - R_0‖_∞  order\n")
+    devs = Float64[]
+    prev = NaN
+    dts = [0.04, 0.02, 0.01, 0.005, 0.0025]
+    for dt in dts
+        M = exp(-1im * WR * dt)
+        Minv = inv(M)
+        R1 = M * R0 * Minv
+        R2 = Minv * R1 * M
+        dev = maximum(abs.(R2 - R0))
+        push!(devs, dev)
+        ord = isnan(prev) ? NaN : log2(prev / max(dev, 1e-30))
+        @printf("%-10.4f  %-14.3e  %s\n", dt, dev,
+            isnan(ord) ? "—" : @sprintf("%.2f", ord))
+        prev = dev
+    end
+    log_dts = log.(dts)
+    log_devs = log.(max.(devs, 1e-30))
+    n = length(log_dts); mx = sum(log_dts) / n; my = sum(log_devs) / n
+    slope = sum((log_dts[i] - mx) * (log_devs[i] - my) for i in 1:n) /
+            sum((log_dts[i] - mx)^2 for i in 1:n)
+    @printf("\nNo-projection slope: %.3f\n", slope)
+    @printf("With-projection slope (baseline): 2.00\n")
+    if maximum(devs) < 1e-13
+        @printf("\n*** PROJECTION IS THE SOURCE confirmed ***\n")
+        @printf("M·R·M⁻¹ preserves R's full 6×6 Hermiticity exactly (machine prec).\n")
+        @printf("The (κ†, I+conj(ρ)) Nambu constraint is what the projection enforces,\n")
+        @printf("but M·R·M⁻¹ does NOT preserve this constraint exactly (O(dt²) deviation).\n")
+        @printf("Projection discards the deviation → O(dt²) round-trip residual.\n")
+        @printf("\nNext path: Castin-Dum amplitude basis where (ρ, κ) are DERIVED from\n")
+        @printf("(u_k, v_k) — Nambu constraints automatic, no projection needed.\n")
+    else
+        @printf("\n△ Projection alone is NOT the source. Deeper structural issue remains.\n")
+    end
+end
+
+_no_projection_R_test(42)
