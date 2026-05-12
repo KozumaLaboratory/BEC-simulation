@@ -126,6 +126,7 @@ const FULL_EXTRA = [
     "workflow/test_calibration_drift.jl",
     "workflow/test_dynamics_knobs.jl",
     "gpu/test_cuda_equivalence.jl",
+    "hamiltonian/test_tdhfb_gpu_phase5ab.jl",
     # Option γ rotating-basis tests (added 2026-04-27..29).
     "rotating_basis/test_rotating_basis_gpe.jl",
     "rotating_basis/test_rotating_basis_analyzers.jl",
