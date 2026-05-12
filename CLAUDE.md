@@ -253,16 +253,18 @@ F=6, g_J=1.9934, g_F≈1.163, μ≈6.977μ_B, a_s≈110a₀. 7 unknown scatterin
 
 These are documented quirks; do not "fix" without explicit user discussion.
 
-- **F ≥ 2 spinor LHY with `c_extra ≠ 0` is research-open.** `TwoChannelLHY`
-  is F-generic in formula (uses `2F · |c1|^(5/2)`) but parameterises ONLY
-  the (S=0, S=2) channels via (c0, c1). For F=1 it's exact. For F ≥ 2 with
-  `c_extra = 0` it stays consistent with the mean field (still a valid
-  approximation). For F ≥ 2 with `c_extra ≠ 0` the S ≥ 4 channels are
-  silently missing from the LHY — use the closed-form `TabulatedLHY`
-  subtypes instead (`PolarContactLHY` / `PolarDipolarLHY` for polar,
-  `FMContactLHY` / `FMDipolarLHY` for FM, `IcosahedralLHY` for F=6 I_h).
-  F=6 polar + `FullBdGLHY` emits a `@warn` pointing at the closed forms
-  (~3000× spurious offset, see memory full_bdg_F6_polar_broken.md).
+- **TwoChannelLHY is a polar-state approximation, NOT FM.** For polar-state
+  spinor BEC, captures m=0 phonon + 2 (m=±1) SO(3) Goldstone modes only.
+  Exact at F=1 (matches Lavoine-Bourdel 2021); ~1% off at F=2; **30-70%
+  off at F=6** (regression-pinned by test_spinor_lhy.jl `two_channel vs
+  polar_contact`). For F ≥ 2 polar use `PolarContactLHY` /
+  `PolarDipolarLHY` (paper #1 F-generic closed form). For FM use
+  `FMContactLHY` / `FMDipolarLHY` (paper #2, single-mode collapse via
+  Watanabe-Brauner Type-B Goldstone vanishing). For F=6 icosahedral
+  I_h symmetric phase use `IcosahedralLHY` (paper #3).
+- **F=6 polar + `FullBdGLHY`** emits a `@warn` pointing at the closed
+  forms (~3000× spurious offset from λ<0 BdG modes; see memory
+  `full_bdg_F6_polar_broken.md`).
 - **`apply_nematic_step!` is the S=0 singlet-pair Hamiltonian, NOT the
   rank-2 nematic tensor observable.** Naming is legacy. Observable side
   is `nematic_tensor_eigenvalues` (different function). Do not conflate.

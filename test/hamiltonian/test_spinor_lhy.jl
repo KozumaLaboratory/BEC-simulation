@@ -98,6 +98,35 @@
         @test isapprox(V_table, V_expected; rtol=1e-3)
     end
 
+    @testset "two_channel vs polar_contact at c_extra=0: F=1 match, F≥3 diverge" begin
+        # PolarContactLHY (paper #1) is the authoritative F-generic closed
+        # form for polar-state contact LHY. At c_extra=0 the g_S spread is
+        # still non-zero via g_S = c0 + c1·(S(S+1)−2F(F+1))/2, so gapped
+        # modes (m≥2) contribute. TwoChannel drops them → F-dependent
+        # divergence.
+        function compare_ratio(F::Int, c0::Float64, c1::Float64; n=1.0)
+            g_dict = SpinorBEC._c0c1_to_gS(F, c0, c1)
+            tbl_2ch = compute_spinor_lhy_two_channel(;
+                F=F, c0=c0, c1=c1, c_dd=0.0, n_max=2*n, n_points=400)
+            tbl_pol = compute_spinor_lhy_polar_contact(;
+                F=F, g_dict=g_dict, n_max=2*n, n_points=400)
+            SpinorBEC._lhy_V(n, tbl_2ch) / SpinorBEC._lhy_V(n, tbl_pol)
+        end
+
+        # F=1: TwoChannel ≡ PolarContact (both reduce to Lavoine-Bourdel).
+        @test isapprox(compare_ratio(1, 10.0, -0.5), 1.0; atol=2e-3)
+        @test isapprox(compare_ratio(1, 100.0, 5.0), 1.0; atol=2e-3)
+
+        # F=2: small divergence (<2%) — TwoChannel still useful approximation.
+        @test 0.97 < compare_ratio(2, 10.0, -0.5) < 1.03
+        @test 0.95 < compare_ratio(2, 100.0, 5.0) < 1.05
+
+        # F=6: TwoChannel significantly underestimates (gapped m=±2..±6
+        # modes dropped). Pin the regime: TwoChannel/PolarContact < 0.7.
+        @test compare_ratio(6, 10.0, -0.5) < 0.7
+        @test compare_ratio(6, 100.0, 5.0) < 0.5
+    end
+
     @testset "two_channel is F-generic (formula explicit in F)" begin
         # The two-channel LHY uses `2F · |c1|^(5/2)` for the spin part —
         # F appears as a parameter, so the formula evaluates for any F.

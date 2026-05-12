@@ -29,11 +29,21 @@ state with `c0=10, c1=-0.5` would spuriously add a non-zero spin term.
 **Regimes of validity** (polar state assumed):
 - **F = 1**: exact (Yi-You 2001 / Lavoine-Bourdel; even-S channels are
   {0, 2} only, fully parameterised by (c0, c1)).
-- **F ≥ 2 with `c_extra = 0`**: consistent with the (c0, c1)-only mean
-  field; valid polar approximation.
-- **F ≥ 2 with `c_extra ≠ 0`**: misses S ≥ 4 corrections — use
-  `compute_spinor_lhy_polar_contact` / `_polar_dipolar` (paper #1
-  F-generic closed forms).
+- **F = 2**: approximate (~0.3-1.5% error vs `compute_spinor_lhy_polar_contact`
+  at c_extra=0 and natural parameter scales). Acceptable for rough
+  estimates; prefer the closed form for production work.
+- **F ≥ 3**: increasingly inaccurate. At F=3, error ~3-9% vs PolarContact.
+  At F=6 the error reaches **30-70%** because TwoChannel only captures
+  the m=0 phonon + 2 (m=±1) SO(3) Goldstones (3 of 2F+1 = 13 modes for
+  F=6), dropping all m=±2..±F gapped modes whose anomalous coupling
+  is non-zero whenever g_S varies across S. The c0/c1 → g_S relation
+  `g_S = c0 + c1·(S(S+1)−2F(F+1))/2` produces a non-trivial g_S spread
+  even at c_extra=0, so the gapped-mode contributions are NOT zero.
+
+For F ≥ 2 polar use `compute_spinor_lhy_polar_contact` (paper #1
+F-generic closed form) instead. For F ≥ 2 with `c_extra ≠ 0` (higher-S
+channels independently set) the TwoChannel approximation deteriorates
+further — PolarContact is the right tool.
 
 The potential V_LHY = dε_LHY/dn is tabulated via central differences.
 """
