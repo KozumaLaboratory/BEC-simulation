@@ -253,11 +253,14 @@ F=6, g_J=1.9934, g_F≈1.163, μ≈6.977μ_B, a_s≈110a₀. 7 unknown scatterin
 
 These are documented quirks; do not "fix" without explicit user discussion.
 
-- **F ≥ 3 spinor LHY is research-open.** `TwoChannelLHY` covers (S=0, S=2)
-  only — `compute_spinor_lhy_two_channel` errors at F ≥ 3 as of C3.
-  For F ≥ 3, use a closed-form `TabulatedLHY` subtype:
-  `PolarContactLHY` / `PolarDipolarLHY` for polar phases,
-  `FMContactLHY` / `FMDipolarLHY` for FM, `IcosahedralLHY` for F=6 I_h.
+- **F ≥ 2 spinor LHY with `c_extra ≠ 0` is research-open.** `TwoChannelLHY`
+  is F-generic in formula (uses `2F · |c1|^(5/2)`) but parameterises ONLY
+  the (S=0, S=2) channels via (c0, c1). For F=1 it's exact. For F ≥ 2 with
+  `c_extra = 0` it stays consistent with the mean field (still a valid
+  approximation). For F ≥ 2 with `c_extra ≠ 0` the S ≥ 4 channels are
+  silently missing from the LHY — use the closed-form `TabulatedLHY`
+  subtypes instead (`PolarContactLHY` / `PolarDipolarLHY` for polar,
+  `FMContactLHY` / `FMDipolarLHY` for FM, `IcosahedralLHY` for F=6 I_h).
   F=6 polar + `FullBdGLHY` emits a `@warn` pointing at the closed forms
   (~3000× spurious offset, see memory full_bdg_F6_polar_broken.md).
 - **`apply_nematic_step!` is the S=0 singlet-pair Hamiltonian, NOT the

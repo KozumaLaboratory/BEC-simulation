@@ -6,9 +6,26 @@ export compute_spinor_lhy_icosahedral
 """
     compute_spinor_lhy_two_channel(; F, c0, c1, c_dd, n_max, n_points) → TwoChannelLHY
 
-Simplified two-channel LHY: density (g_d=c0) and spin (g_s=c1) channels.
+Two-channel LHY parameterised by (c0, c1, F):
 
-ε_LHY = (8/15π²) [g_d^{5/2} n^{5/2} Q5(ε_dd) + 2F |g_s|^{5/2} n^{5/2}]
+    ε_LHY = (8/15π²) [c0^(5/2) n^(5/2) Q5(ε_dd) + 2F |c1|^(5/2) n^(5/2)]
+
+The formula is F-generic via the explicit `2F` multiplier on the spin
+term — it can be evaluated for any F. Its physical interpretation
+depends on the channel content of the mean field:
+
+- **F = 1**: even-S channels are {S=0, S=2} only, which the (c0, c1)
+  pair fully parameterises. The two-channel formula is exact in this
+  regime (matches Yi-You 2001 spinor LHY for F=1).
+- **F ≥ 2** with `c_extra = 0`: the mean field uses only (c0, c1), so
+  the two-channel formula is consistent with the mean-field channel
+  content. Treat as a valid approximation.
+- **F ≥ 2** with `c_extra ≠ 0`: the mean field includes additional
+  even-S channels (S=4, S=6, ...) that the two-channel LHY does NOT
+  capture. The result will miss those contributions — use one of the
+  F-generic closed forms (`PolarContactLHY` / `PolarDipolarLHY` for
+  polar, `FMContactLHY` / `FMDipolarLHY` for FM, `IcosahedralLHY` for
+  F=6 I_h) instead.
 
 The potential V_LHY = dε_LHY/dn is tabulated via central differences.
 """
@@ -20,12 +37,7 @@ function compute_spinor_lhy_two_channel(;
     n_max::Float64=100.0,
     n_points::Int=200,
 )
-    F <= 2 || throw(ArgumentError(
-        "compute_spinor_lhy_two_channel is F ≤ 2 only (got F=$F). The two-channel " *
-        "reduction covers only the (S=0, S=2) BdG channels; F ≥ 3 has additional " *
-        "even-S channels (S=4, S=6, ...). Use compute_spinor_lhy_polar_contact, " *
-        "compute_spinor_lhy_polar_dipolar, compute_spinor_lhy_fm_contact, " *
-        "compute_spinor_lhy_fm_dipolar, or compute_spinor_lhy_icosahedral instead."))
+    F >= 1 || throw(ArgumentError("F must be ≥ 1 (got F=$F)"))
     n_points >= 3 || throw(ArgumentError("n_points must be >= 3"))
     n_max > 0 || throw(ArgumentError("n_max must be positive"))
 

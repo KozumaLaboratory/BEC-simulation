@@ -82,17 +82,30 @@
         @test SpinorBEC._interpolate_1d(xs, ys, 5.0) ≈ 9.0
     end
 
-    @testset "validation guards: two_channel F ≤ 2 only" begin
-        # F=3,6 should error with a guidance message pointing at closed forms.
+    @testset "two_channel is F-generic (formula explicit in F)" begin
+        # The two-channel LHY uses `2F · |c1|^(5/2)` for the spin part —
+        # F appears as a parameter, so the formula evaluates for any F.
+        # Physical interpretation: exact at F=1; valid approximation for
+        # F ≥ 2 when c_extra = 0 (S ≥ 4 channels absent from mean field).
+        for F in (1, 2, 3, 6)
+            tbl = compute_spinor_lhy_two_channel(;
+                F=F, c0=10.0, c1=-0.5, n_max=1.0, n_points=10)
+            @test tbl isa TwoChannelLHY
+            @test all(isfinite, tbl.potential_values)
+        end
+        # Spin part scales linearly with F at large c1 (density term fixed).
+        # Subtract the F=1 spin contribution × (F-1) and compare to F=N result.
+        n_test = 0.5
+        v1 = SpinorBEC._lhy_V(n_test,
+            compute_spinor_lhy_two_channel(; F=1, c0=0.0, c1=-1.0,
+                n_max=1.0, n_points=200))
+        v6 = SpinorBEC._lhy_V(n_test,
+            compute_spinor_lhy_two_channel(; F=6, c0=0.0, c1=-1.0,
+                n_max=1.0, n_points=200))
+        @test isapprox(v6 / v1, 6.0; rtol=1e-2)
+        # F < 1 still rejected.
         @test_throws ArgumentError compute_spinor_lhy_two_channel(;
-            F=3, c0=10.0, c1=-0.5, n_max=1.0, n_points=10)
-        @test_throws ArgumentError compute_spinor_lhy_two_channel(;
-            F=6, c0=10.0, c1=-0.5, n_max=1.0, n_points=10)
-        # F=1, F=2 must continue to work.
-        @test compute_spinor_lhy_two_channel(;
-            F=1, c0=10.0, c1=-0.5, n_max=1.0, n_points=10) isa TwoChannelLHY
-        @test compute_spinor_lhy_two_channel(;
-            F=2, c0=10.0, c1=-0.5, n_max=1.0, n_points=10) isa TwoChannelLHY
+            F=0, c0=10.0, c1=-0.5, n_max=1.0, n_points=10)
     end
 
     @testset "validation guard: F=6 polar + FullBdG emits regime warning" begin
