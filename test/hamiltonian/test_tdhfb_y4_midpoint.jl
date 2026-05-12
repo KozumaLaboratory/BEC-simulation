@@ -284,6 +284,90 @@ import SpinorBEC: _tdhfb_strang_substep!
         @info "Y5 palindrome residual" dts residuals slope
         @test 1.5 < slope < 2.5
     end
+
+    @testset "Y6: picard_midpoint=true clears the palindromic gate (A4)" begin
+        # With picard_midpoint=true, all generators are evaluated at the
+        # midpoint state via Picard fixed-point — the substep becomes
+        # palindromic at Picard tolerance, so S(-dt) ∘ S(dt) = I to machine
+        # precision regardless of dt. A4 acceptance #1.
+        nx = 8
+        F = 1
+        D = 3
+        Random.seed!(601)
+
+        phi0 = randn(ComplexF64, nx, D) .* 0.3
+        rho0 = random_hermitian_rho(nx, D, 0.05; seed=601)
+        kappa0 = random_symmetric_kappa(nx, D, 0.05; seed=602)
+
+        V_ext = zeros(Float64, nx, D)
+        gS = Dict(0 => 0.3, 2 => 0.05)
+
+        for dt in (0.04, 0.01, 0.0025)
+            state = init_tdhfb_vacuum(copy(phi0))
+            state.rho .= rho0
+            state.kappa .= kappa0
+            tdhfb_strang_step!(state, F, gS, V_ext, dt;
+                picard_midpoint=true, picard_max_iter=30, picard_tol=1e-12)
+            tdhfb_strang_step!(state, F, gS, V_ext, -dt;
+                picard_midpoint=true, picard_max_iter=30, picard_tol=1e-12)
+            r = max(maximum(abs, state.phi .- phi0),
+                    maximum(abs, state.rho .- rho0),
+                    maximum(abs, state.kappa .- kappa0))
+            @test r < 1e-10
+        end
+    end
+
+    @testset "Y7: picard_midpoint=true unlocks Y4 order 4 (A4 acceptance)" begin
+        # With palindromic substep, Yoshida-4 composition delivers global
+        # order 4. Use a coarse dt range so the order signal sits well above
+        # the F64 noise floor (~1e-14): finer dts saturate at machine eps
+        # and report bogus order. A4 acceptance #2.
+        nx = 8
+        F = 1
+        D = 3
+        Random.seed!(701)
+
+        phi0 = randn(ComplexF64, nx, D) .* 0.3
+        rho0 = random_hermitian_rho(nx, D, 0.05; seed=701)
+        kappa0 = random_symmetric_kappa(nx, D, 0.05; seed=702)
+
+        V_ext = zeros(Float64, nx, D)
+        gS = Dict(0 => 0.3, 2 => 0.05)
+        T_FINAL = 0.04
+
+        function _run_y4(dt)
+            state = init_tdhfb_vacuum(copy(phi0))
+            state.rho .= rho0
+            state.kappa .= kappa0
+            n_steps = Int(round(T_FINAL / dt))
+            actual_dt = T_FINAL / n_steps
+            for _ in 1:n_steps
+                tdhfb_y4_midpoint_step!(state, F, gS, V_ext, actual_dt;
+                    picard_iters=1,
+                    picard_midpoint=true,
+                    picard_midpoint_max_iter=30,
+                    picard_midpoint_tol=1e-12,
+                )
+            end
+            state
+        end
+
+        # Reference at dt = 2.5e-4 (160 steps). Test dts chosen so errors
+        # are at 1e-10 ... 1e-12, well above F64 noise floor ~1e-14.
+        state_ref = _run_y4(2.5e-4)
+        dts = [4.0e-3, 2.0e-3]
+        errs = Float64[]
+        for dt in dts
+            state = _run_y4(dt)
+            e = max(maximum(abs, state.phi .- state_ref.phi),
+                    maximum(abs, state.rho .- state_ref.rho),
+                    maximum(abs, state.kappa .- state_ref.kappa))
+            push!(errs, e)
+        end
+        order = log2(errs[1] / errs[2])
+        @info "Y7 Y4 order with picard_midpoint" dts errs order
+        @test order >= 3.5
+    end
 end
 
 @info "TDHFB Y4-midpoint Phase 4 WIP tests PASS"

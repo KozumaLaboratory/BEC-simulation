@@ -146,7 +146,11 @@ function SpinorBEC._tdhfb_phi_subupdate!(
     V_arg,
     dt::Float64;
     hfb_mode::Symbol=:full_hfb,
+    state_for_gen::SpinorBEC.TDHFBState=state,
 ) where {N, A <: CuArray, B <: CuArray, T}
+    # `state_for_gen` controls which state evaluates U^φ, Δ^φ. Default
+    # `state_for_gen=state` reproduces live-state behavior bit-exactly.
+    # Picard midpoint passes `state_for_gen=state_mid`.
     D = 2 * F + 1
     TC = eltype(state.phi)
     TR = real(TC)
@@ -155,16 +159,16 @@ function SpinorBEC._tdhfb_phi_subupdate!(
     V_flat = _get_or_build_V_flat(F, g_S, TC)
     sc = _get_or_build_scratch(TC, TR, D, N_vox)
 
-    # 1. Build source_U = φ*φ + ρ and contract → U
-    _build_source_U!(sc.source_flat, state.phi, state.rho, D)
+    # 1. Build source_U = φ*φ + ρ and contract → U  (from state_for_gen)
+    _build_source_U!(sc.source_flat, state_for_gen.phi, state_for_gen.rho, D)
     _contract_V_source!(sc.out_flat, V_flat, sc.source_flat)
     sc.U .= reshape(sc.out_flat, D, D, N_vox)
 
-    # 2. Build source_Δphi = κ and contract → Δ_phi (skip if Popov)
+    # 2. Build source_Δphi = κ and contract → Δ_phi (from state_for_gen; skip if Popov)
     if hfb_mode === :popov
         fill!(sc.Delta_phi, zero(TC))
     else
-        _build_source_kappa!(sc.source_flat, state.kappa, D)
+        _build_source_kappa!(sc.source_flat, state_for_gen.kappa, D)
         _contract_V_source!(sc.out_flat, V_flat, sc.source_flat)
         sc.Delta_phi .= reshape(sc.out_flat, D, D, N_vox)
     end
@@ -194,8 +198,11 @@ function SpinorBEC._tdhfb_R_subupdate!(
     F::Int,
     g_S::AbstractDict{Int, Float64},
     V_arg,
-    dt::Float64,
+    dt::Float64;
+    state_for_gen::SpinorBEC.TDHFBState=state,
 ) where {N, A <: CuArray, B <: CuArray, T}
+    # Steps 1-4 (W^R build) use state_for_gen; steps 5-7 (apply M·R·M† to
+    # ρ, κ) operate on `state` (the working state being evolved).
     D = 2 * F + 1
     TC = eltype(state.phi)
     TR = real(TC)
@@ -204,13 +211,13 @@ function SpinorBEC._tdhfb_R_subupdate!(
     V_flat = _get_or_build_V_flat(F, g_S, TC)
     sc = _get_or_build_scratch(TC, TR, D, N_vox)
 
-    # 1. U = V·(φ*φ + ρ)  (same as in φ subupdate; rebuild for current ψ)
-    _build_source_U!(sc.source_flat, state.phi, state.rho, D)
+    # 1. U = V·(φ*φ + ρ)  (from state_for_gen)
+    _build_source_U!(sc.source_flat, state_for_gen.phi, state_for_gen.rho, D)
     _contract_V_source!(sc.out_flat, V_flat, sc.source_flat)
     sc.U .= reshape(sc.out_flat, D, D, N_vox)
 
-    # 2. Δ_R = V·(φφ + κ)
-    _build_source_DeltaR!(sc.source_flat, state.phi, state.kappa, D)
+    # 2. Δ_R = V·(φφ + κ)  (from state_for_gen)
+    _build_source_DeltaR!(sc.source_flat, state_for_gen.phi, state_for_gen.kappa, D)
     _contract_V_source!(sc.out_flat, V_flat, sc.source_flat)
     sc.Delta_R .= reshape(sc.out_flat, D, D, N_vox)
 
@@ -253,4 +260,49 @@ function SpinorBEC._tdhfb_hf_step!(
     SpinorBEC._tdhfb_R_subupdate!(state, F, g_S, nothing, dt)
     SpinorBEC._tdhfb_phi_subupdate!(state, F, g_S, nothing, half; hfb_mode=hfb_mode)
     state
+end
+
+# ----- Picard-midpoint HF substep (palindromic, A4 path) -----
+#
+# GPU mirror of `_tdhfb_hf_step_picard_midpoint!`. Same algorithm:
+#   loop: state ← state_0 (restore); subupdates with state_for_gen=state_mid;
+#         state_mid_new = 0.5*(state_0 + state); check convergence.
+function SpinorBEC._tdhfb_hf_step_picard_midpoint!(
+    state::SpinorBEC.TDHFBState{N, A, B, T},
+    F::Int,
+    g_S::AbstractDict{Int, Float64},
+    dt::Float64;
+    hfb_mode::Symbol=:full_hfb,
+    max_iter::Int=20,
+    tol::Float64=1e-12,
+) where {N, A <: CuArray, B <: CuArray, T}
+    half = dt / 2
+    state_0 = deepcopy(state)
+    state_mid = deepcopy(state)
+
+    for _ in 1:max_iter
+        copyto!(state.phi, state_0.phi)
+        copyto!(state.rho, state_0.rho)
+        copyto!(state.kappa, state_0.kappa)
+
+        SpinorBEC._tdhfb_phi_subupdate!(state, F, g_S, nothing, half;
+            hfb_mode=hfb_mode, state_for_gen=state_mid)
+        SpinorBEC._tdhfb_R_subupdate!(state, F, g_S, nothing, dt;
+            state_for_gen=state_mid)
+        SpinorBEC._tdhfb_phi_subupdate!(state, F, g_S, nothing, half;
+            hfb_mode=hfb_mode, state_for_gen=state_mid)
+
+        # Compute state_mid_new = 0.5*(state_0 + state) and track L∞ delta.
+        d_phi = maximum(abs, 0.5 .* (state_0.phi .+ state.phi) .- state_mid.phi)
+        d_rho = maximum(abs, 0.5 .* (state_0.rho .+ state.rho) .- state_mid.rho)
+        d_kap = maximum(abs, 0.5 .* (state_0.kappa .+ state.kappa) .- state_mid.kappa)
+        delta = max(d_phi, d_rho, d_kap)
+
+        state_mid.phi  .= 0.5 .* (state_0.phi  .+ state.phi)
+        state_mid.rho  .= 0.5 .* (state_0.rho  .+ state.rho)
+        state_mid.kappa .= 0.5 .* (state_0.kappa .+ state.kappa)
+
+        delta < tol && break
+    end
+    return state
 end

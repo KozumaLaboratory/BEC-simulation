@@ -118,6 +118,9 @@ function tdhfb_y4_midpoint_step!(
     picard_iters::Int=1,
     picard_tol::Real=1e-10,
     hfb_mode::Symbol=:full_hfb,
+    picard_midpoint::Bool=false,
+    picard_midpoint_max_iter::Int=20,
+    picard_midpoint_tol::Float64=1e-12,
 ) where {N}
     w1 = _TDHFB_Y4_W1
     w0 = _TDHFB_Y4_W0
@@ -126,24 +129,34 @@ function tdhfb_y4_midpoint_step!(
         state, F, g_S, V_ext, w1 * dt;
         k_squared=k_squared, fft_plans=fft_plans,
         picard_iters=picard_iters, picard_tol=picard_tol, hfb_mode=hfb_mode,
+        picard_midpoint=picard_midpoint,
+        picard_midpoint_max_iter=picard_midpoint_max_iter,
+        picard_midpoint_tol=picard_midpoint_tol,
     )
     _tdhfb_strang_substep!(
         state, F, g_S, V_ext, w0 * dt;
         k_squared=k_squared, fft_plans=fft_plans,
         picard_iters=picard_iters, picard_tol=picard_tol, hfb_mode=hfb_mode,
+        picard_midpoint=picard_midpoint,
+        picard_midpoint_max_iter=picard_midpoint_max_iter,
+        picard_midpoint_tol=picard_midpoint_tol,
     )
     _tdhfb_strang_substep!(
         state, F, g_S, V_ext, w1 * dt;
         k_squared=k_squared, fft_plans=fft_plans,
         picard_iters=picard_iters, picard_tol=picard_tol, hfb_mode=hfb_mode,
+        picard_midpoint=picard_midpoint,
+        picard_midpoint_max_iter=picard_midpoint_max_iter,
+        picard_midpoint_tol=picard_midpoint_tol,
     )
 
     return state
 end
 
-# One Strang sub-step (V/2 HF/2 K HF/2 V/2). At `picard_iters = 1` this is
-# byte-identical to `tdhfb_strang_step!`. At `picard_iters ≥ 2` the inner
-# HF substep runs an endpoint-Picard loop (diagnostic; see file header).
+# One Strang sub-step (V/2 HF/2 K HF/2 V/2). At `picard_iters = 1` and
+# `picard_midpoint=false` this is byte-identical to `tdhfb_strang_step!`.
+# `picard_midpoint=true` swaps the inner HF substeps to the midpoint-Picard
+# variant (palindromic at Picard tolerance → unlocks Y4 order 4).
 function _tdhfb_strang_substep!(
     state::TDHFBState{N},
     F::Int,
@@ -155,17 +168,38 @@ function _tdhfb_strang_substep!(
     picard_iters::Int=1,
     picard_tol::Real=1e-10,
     hfb_mode::Symbol=:full_hfb,
+    picard_midpoint::Bool=false,
+    picard_midpoint_max_iter::Int=20,
+    picard_midpoint_tol::Float64=1e-12,
 ) where {N}
     _tdhfb_v_step!(state.phi, V_ext, dt / 2)
-    _tdhfb_hf_step_picard!(
-        state, F, g_S, dt / 2;
-        picard_iters=picard_iters, picard_tol=picard_tol, hfb_mode=hfb_mode,
-    )
+    if picard_midpoint
+        _tdhfb_hf_step_picard_midpoint!(
+            state, F, g_S, dt / 2;
+            hfb_mode=hfb_mode,
+            max_iter=picard_midpoint_max_iter,
+            tol=picard_midpoint_tol,
+        )
+    else
+        _tdhfb_hf_step_picard!(
+            state, F, g_S, dt / 2;
+            picard_iters=picard_iters, picard_tol=picard_tol, hfb_mode=hfb_mode,
+        )
+    end
     _tdhfb_kinetic_step!(state.phi, dt; k_squared=k_squared)
-    _tdhfb_hf_step_picard!(
-        state, F, g_S, dt / 2;
-        picard_iters=picard_iters, picard_tol=picard_tol, hfb_mode=hfb_mode,
-    )
+    if picard_midpoint
+        _tdhfb_hf_step_picard_midpoint!(
+            state, F, g_S, dt / 2;
+            hfb_mode=hfb_mode,
+            max_iter=picard_midpoint_max_iter,
+            tol=picard_midpoint_tol,
+        )
+    else
+        _tdhfb_hf_step_picard!(
+            state, F, g_S, dt / 2;
+            picard_iters=picard_iters, picard_tol=picard_tol, hfb_mode=hfb_mode,
+        )
+    end
     _tdhfb_v_step!(state.phi, V_ext, dt / 2)
 
     state.t += dt

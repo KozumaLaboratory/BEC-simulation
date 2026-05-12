@@ -103,18 +103,35 @@ function tdhfb_strang_step!(
     k_squared=nothing,
     fft_plans=nothing,
     hfb_mode::Symbol=:full_hfb,
+    picard_midpoint::Bool=false,
+    picard_max_iter::Int=20,
+    picard_tol::Float64=1e-12,
 ) where {N}
     # V step (dt/2): one-body trap on φ
     _tdhfb_v_step!(state.phi, V_ext, dt / 2)
 
-    # HF step (dt/2): voxel-local BdG matrix exponential on (φ, ρ, κ)
-    _tdhfb_hf_step!(state, F, g_S, dt / 2; hfb_mode=hfb_mode)
+    # HF step (dt/2): voxel-local BdG matrix exponential on (φ, ρ, κ).
+    # Opt-in `picard_midpoint=true` uses Picard fixed-point iteration on the
+    # midpoint state so generators are frozen across the substep — lifts the
+    # palindromic gate to machine precision (per Picard tol) and unlocks
+    # Y4 Yoshida order 4 (A4 acceptance).
+    if picard_midpoint
+        _tdhfb_hf_step_picard_midpoint!(state, F, g_S, dt / 2;
+            hfb_mode=hfb_mode, max_iter=picard_max_iter, tol=picard_tol)
+    else
+        _tdhfb_hf_step!(state, F, g_S, dt / 2; hfb_mode=hfb_mode)
+    end
 
     # K step (dt): FFT kinetic on φ
     _tdhfb_kinetic_step!(state.phi, dt; k_squared=k_squared)
 
     # HF step (dt/2)
-    _tdhfb_hf_step!(state, F, g_S, dt / 2; hfb_mode=hfb_mode)
+    if picard_midpoint
+        _tdhfb_hf_step_picard_midpoint!(state, F, g_S, dt / 2;
+            hfb_mode=hfb_mode, max_iter=picard_max_iter, tol=picard_tol)
+    else
+        _tdhfb_hf_step!(state, F, g_S, dt / 2; hfb_mode=hfb_mode)
+    end
 
     # V step (dt/2)
     _tdhfb_v_step!(state.phi, V_ext, dt / 2)
@@ -168,6 +185,77 @@ function _tdhfb_hf_step!(
     return state
 end
 
+# Picard-midpoint inner HF substep — palindromic at Picard tolerance.
+#
+# Live-state generators in `_tdhfb_hf_step!` break time-reversal symmetry
+# at O(dt²) (S(-dt) ∘ S(dt) ≠ I at that order). Evaluating all generators
+# at state_mid = (state_0 + state_1) / 2 — where state_1 is the substep's
+# own output — restores palindromicity:
+#
+#   S(dt):  state_0 → state_1 with W built from state_mid
+#   S(-dt): state_1 → state_0 with W built from the SAME state_mid (by
+#           symmetry of the midpoint formula)
+#
+# state_1 is determined self-consistently by Picard iteration. Empirically
+# (F=1 single-voxel diagnostic, 2026-05-12) the iteration converges in
+# 4-6 steps at tol=1e-13 across dt ∈ [0.0025, 0.04].
+function _tdhfb_hf_step_picard_midpoint!(
+    state::TDHFBState{N},
+    F::Int,
+    g_S::AbstractDict{Int, Float64},
+    dt::Float64;
+    hfb_mode::Symbol=:full_hfb,
+    max_iter::Int=20,
+    tol::Float64=1e-12,
+) where {N}
+    V = channel_kernel(F, g_S)
+    half = dt / 2
+
+    state_0 = deepcopy(state)     # the substep's input (frozen)
+    state_mid = deepcopy(state)   # midpoint guess, refined each Picard iter
+    state_work = state            # the working state, reused
+
+    delta = Inf
+    for _ in 1:max_iter
+        # Reset working state to state_0 (Picard apply step starts from input).
+        copyto!(state_work.phi, state_0.phi)
+        copyto!(state_work.rho, state_0.rho)
+        copyto!(state_work.kappa, state_0.kappa)
+
+        # Inner Strang with all generators from state_mid.
+        _tdhfb_phi_subupdate!(state_work, F, g_S, V, half;
+            hfb_mode=hfb_mode, state_for_gen=state_mid)
+        _tdhfb_R_subupdate!(state_work, F, g_S, V, dt;
+            state_for_gen=state_mid)
+        _tdhfb_phi_subupdate!(state_work, F, g_S, V, half;
+            hfb_mode=hfb_mode, state_for_gen=state_mid)
+
+        # Refine midpoint as (state_0 + state_1) / 2; track convergence.
+        delta = 0.0
+        @inbounds for I in eachindex(state_mid.phi)
+            new_val = 0.5 * (state_0.phi[I] + state_work.phi[I])
+            d = abs(new_val - state_mid.phi[I])
+            d > delta && (delta = d)
+            state_mid.phi[I] = new_val
+        end
+        @inbounds for I in eachindex(state_mid.rho)
+            new_val = 0.5 * (state_0.rho[I] + state_work.rho[I])
+            d = abs(new_val - state_mid.rho[I])
+            d > delta && (delta = d)
+            state_mid.rho[I] = new_val
+        end
+        @inbounds for I in eachindex(state_mid.kappa)
+            new_val = 0.5 * (state_0.kappa[I] + state_work.kappa[I])
+            d = abs(new_val - state_mid.kappa[I])
+            d > delta && (delta = d)
+            state_mid.kappa[I] = new_val
+        end
+
+        delta < tol && break
+    end
+    return state
+end
+
 # φ Nambu doublet sub-update: φ ← top(M^φ · (φ, conj(φ))).
 # U^φ_{a,b} = V·(φ*φ + 2ρ),  Δ^φ_{a,b} = V·κ (full HFB) or 0 (Popov).
 #
@@ -184,7 +272,12 @@ function _tdhfb_phi_subupdate!(
     V::AbstractArray{Float64, 4},
     dt::Float64;
     hfb_mode::Symbol=:full_hfb,
+    state_for_gen::TDHFBState{N}=state,
 ) where {N}
+    # `state_for_gen` controls which state evaluates U^φ, Δ^φ. Default
+    # `state_for_gen=state` reproduces live-state (production) behavior
+    # bit-exactly. Picard midpoint passes `state_for_gen=state_mid` so the
+    # generator is frozen and S(-dt) ∘ S(dt) = I to Picard tolerance.
     D = 2 * F + 1
     sz = size(state.phi)
     n_spatial = length(sz) - 1
@@ -208,13 +301,13 @@ function _tdhfb_phi_subupdate!(
                 # indices, leftover from a partial channel_kernel ↔
                 # channel_kernel_symmetrized migration — caused dt-independent
                 # energy drift scaling linearly with g_S, see memory.)
-                uval += Vk * (conj(state.phi[idx, c2_p]) * state.phi[idx, c2]
-                              + state.rho[idx, c2, c2_p])
+                uval += Vk * (conj(state_for_gen.phi[idx, c2_p]) * state_for_gen.phi[idx, c2]
+                              + state_for_gen.rho[idx, c2, c2_p])
                 # Δ^φ:  κ_{c2, c2_p}                  (no φφ source)
                 # Popov mode (`hfb_mode = :popov`): drop the anomalous
                 # source for the φ subupdate.
                 if !drop_anomalous
-                    dval += Vk * state.kappa[idx, c2, c2_p]
+                    dval += Vk * state_for_gen.kappa[idx, c2, c2_p]
                 end
             end
             U_phi[c, c_p] = uval
@@ -247,14 +340,18 @@ function _tdhfb_phi_subupdate!(
     return state
 end
 
-# (ρ, κ) Nambu density sub-update: R ← M^R · R · (M^R)^{-1}.
-# U^R = 2V·(φ*φ + ρ),  Δ^R = V·(φφ + κ).
+# (ρ, κ) Nambu density sub-update: R ← M^R · R · (M^R)^†.
+# U^R = V·(φ*φ + ρ),  Δ^R = V·(φφ + κ).
+# `state_for_gen` controls which state evaluates U^R, Δ^R. Default
+# `state_for_gen=state` reproduces live-state behavior; Picard passes
+# state_mid.
 function _tdhfb_R_subupdate!(
     state::TDHFBState{N},
     F::Int,
     g_S::AbstractDict{Int, Float64},
     V::AbstractArray{Float64, 4},
-    dt::Float64,
+    dt::Float64;
+    state_for_gen::TDHFBState{N}=state,
 ) where {N}
     D = 2 * F + 1
     sz = size(state.phi)
@@ -274,11 +371,11 @@ function _tdhfb_R_subupdate!(
                 Vk == 0.0 && continue
                 # U^R:  V·(φ*φ + ρ_{c2, c2_p})  — same as U^φ after the fix
                 # (variational consistency, see strang_step.jl:206 comment).
-                uval += Vk * (conj(state.phi[idx, c2_p]) * state.phi[idx, c2]
-                              + state.rho[idx, c2, c2_p])
+                uval += Vk * (conj(state_for_gen.phi[idx, c2_p]) * state_for_gen.phi[idx, c2]
+                              + state_for_gen.rho[idx, c2, c2_p])
                 # Δ^R:  V·(φφ + κ)
-                dval += Vk * (state.phi[idx, c2] * state.phi[idx, c2_p]
-                              + state.kappa[idx, c2, c2_p])
+                dval += Vk * (state_for_gen.phi[idx, c2] * state_for_gen.phi[idx, c2_p]
+                              + state_for_gen.kappa[idx, c2, c2_p])
             end
             U_R[c, c_p] = uval
             Delta_R[c, c_p] = dval
