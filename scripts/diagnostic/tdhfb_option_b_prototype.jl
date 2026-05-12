@@ -1,0 +1,448 @@
+# A4.1 Option B prototype — single-voxel F=1 BdG-Nambu rotation.
+#
+# Design ref: `docs/design/tdhfb_y4_palindromic_substep_design.md` §3.2.
+# Castin-Dum 1998 PRA 57, 3008 + Stoof 1999 JLTP 114, 11 formulation.
+#
+# Goal: extend the current TDHFB Strang substep so that φ AND (ρ, κ)
+# evolve under ONE coupled rotation exp(-i G_ext dt), where G_ext is the
+# (2D + 2D²) × (2D + 2D²) extended Nambu generator:
+#
+#   G_ext = [[G_φφ,  G_φR],
+#            [G_Rφ,  G_RR]]
+#
+#   G_φφ = W^φ                    (2D × 2D, the current BdG φ generator)
+#   G_RR = -i [W^R, ·]            (2D² × 2D² Liouvillian on vec(R))
+#   G_φR, G_Rφ = coupling blocks  (derived from TDHFB EOM linearization)
+#
+# Without coupling (G_φR = G_Rφ = 0), G_ext is block-diagonal and
+# exp(-i G_ext dt) reproduces the current Strang substep EXACTLY:
+#   - φ block: M^φ applied to (φ, conj(φ)) doublet, upper half kept
+#   - (ρ, κ) block: vec(R)_new = vec(M^R · R · M^R⁻¹) via Liouvillian exp
+#
+# The coupling blocks are what restore palindromicity at O(dt⁵).
+#
+# This prototype:
+#   Step 1 — Build extended state, generator (block-diagonal first)
+#   Step 2 — exp(-i G_ext dt) via Base.exp (24×24 matrix, CPU)
+#   Step 3 — Verify equivalence to current Strang substep
+#   Step 4 — Add coupling blocks; measure palindromic gate slope improvement
+#
+# Run: julia --project=. scripts/diagnostic/tdhfb_option_b_prototype.jl
+
+using LinearAlgebra
+using Random
+using Printf
+
+const F = 1
+const D = 2F + 1       # = 3
+const TWOD = 2D        # = 6 (Nambu φ doublet)
+const D2 = D * D       # = 9 (size of vec(ρ) or vec(κ))
+const TWOD2 = 2 * D2   # = 18 (vec(ρ) + vec(κ) = the lower R block flattened)
+const N_EXT = TWOD + TWOD2  # = 24 (extended state vector size)
+
+# ----- TDHFB substep ingredients (single-voxel, F=1) -----
+
+"""
+Build the channel kernel V[c, c', c2, c2'] for F=1 with given g_S.
+Identical to `src/hamiltonian/tdhfb/channel_kernel.jl::channel_kernel`,
+inlined here for self-contained prototype.
+"""
+function channel_kernel_F1(g_S::Dict{Int, Float64})
+    V = zeros(Float64, D, D, D, D)
+    c_to_m(c) = F + 1 - c  # c=1 → m=+1, c=2 → m=0, c=3 → m=-1
+    # F=1 Clebsch-Gordan: only S=0 and S=2 channels relevant
+    # For simplicity, use the explicit F=1 channel formula
+    for c in 1:D, cp in 1:D, c2 in 1:D, c2p in 1:D
+        m = c_to_m(c); mp = c_to_m(cp); m2 = c_to_m(c2); m2p = c_to_m(c2p)
+        m + m2 != mp + m2p && continue
+        M = m + m2
+        s_total = 0.0
+        for (S, gS) in g_S
+            abs(M) > S && continue
+            cg1 = _cg_F1(m, m2, S, M)
+            cg2 = _cg_F1(mp, m2p, S, M)
+            s_total += gS * cg1 * cg2
+        end
+        V[c, cp, c2, c2p] = s_total
+    end
+    V
+end
+
+# Clebsch-Gordan ⟨1 m, 1 m' | S M⟩ for F=1 spinor (S = 0, 2 only).
+function _cg_F1(m1::Int, m2::Int, S::Int, M::Int)
+    m1 + m2 != M && return 0.0
+    if S == 0 && M == 0
+        m1 == m2 == 0 && return -1/sqrt(3)
+        m1 == 1 && m2 == -1 && return 1/sqrt(3)
+        m1 == -1 && m2 == 1 && return 1/sqrt(3)
+        return 0.0
+    elseif S == 2
+        M == 2 && m1 == 1 && m2 == 1 && return 1.0
+        M == -2 && m1 == -1 && m2 == -1 && return 1.0
+        if M == 1
+            (m1 == 1 && m2 == 0) && return 1/sqrt(2)
+            (m1 == 0 && m2 == 1) && return 1/sqrt(2)
+        end
+        if M == -1
+            (m1 == -1 && m2 == 0) && return 1/sqrt(2)
+            (m1 == 0 && m2 == -1) && return 1/sqrt(2)
+        end
+        if M == 0
+            m1 == 0 && m2 == 0 && return sqrt(2/3)
+            m1 == 1 && m2 == -1 && return 1/sqrt(6)
+            m1 == -1 && m2 == 1 && return 1/sqrt(6)
+        end
+    end
+    return 0.0
+end
+
+"""
+Build U^φ = U^R = V · (φ*φ + ρ) per the TDHFB convention (variational-consistent
+since the 2026-05-12 fix at strang_step.jl:206).
+"""
+function build_U(phi::Vector{ComplexF64}, rho::Matrix{ComplexF64},
+                 V::Array{Float64, 4})
+    U = zeros(ComplexF64, D, D)
+    for c in 1:D, cp in 1:D
+        u = ComplexF64(0)
+        for c2 in 1:D, c2p in 1:D
+            Vk = V[c, cp, c2, c2p]
+            Vk == 0 && continue
+            u += Vk * (conj(phi[c2p]) * phi[c2] + rho[c2, c2p])
+        end
+        U[c, cp] = u
+    end
+    U
+end
+
+"""Δ^φ = V · κ (no φφ contribution)."""
+function build_Delta_phi(kappa::Matrix{ComplexF64}, V::Array{Float64, 4})
+    Δ = zeros(ComplexF64, D, D)
+    for c in 1:D, cp in 1:D
+        d = ComplexF64(0)
+        for c2 in 1:D, c2p in 1:D
+            Vk = V[c, cp, c2, c2p]
+            Vk == 0 && continue
+            d += Vk * kappa[c2, c2p]
+        end
+        Δ[c, cp] = d
+    end
+    Δ
+end
+
+"""Δ^R = V · (φφ + κ)."""
+function build_Delta_R(phi::Vector{ComplexF64}, kappa::Matrix{ComplexF64},
+                       V::Array{Float64, 4})
+    Δ = zeros(ComplexF64, D, D)
+    for c in 1:D, cp in 1:D
+        d = ComplexF64(0)
+        for c2 in 1:D, c2p in 1:D
+            Vk = V[c, cp, c2, c2p]
+            Vk == 0 && continue
+            d += Vk * (phi[c2] * phi[c2p] + kappa[c2, c2p])
+        end
+        Δ[c, cp] = d
+    end
+    Δ
+end
+
+"""Assemble W = [[U, Δ]; [-conj(Δ), -conj(U)]]."""
+function assemble_W(U::Matrix{ComplexF64}, Δ::Matrix{ComplexF64})
+    W = zeros(ComplexF64, TWOD, TWOD)
+    for c in 1:D, cp in 1:D
+        W[c, cp] = U[c, cp]
+        W[c, D + cp] = Δ[c, cp]
+        W[D + c, cp] = -conj(Δ[c, cp])
+        W[D + c, D + cp] = -conj(U[c, cp])
+    end
+    W
+end
+
+# ----- Current TDHFB Strang substep (single-voxel, F=1) -----
+
+function tdhfb_strang_single_voxel!(phi::Vector{ComplexF64},
+                                    rho::Matrix{ComplexF64},
+                                    kappa::Matrix{ComplexF64},
+                                    V::Array{Float64, 4}, dt::Float64)
+    half = dt / 2
+
+    # φ subupdate (uses current ρ, κ)
+    U = build_U(phi, rho, V)
+    Δφ = build_Delta_phi(kappa, V)
+    Wφ = assemble_W(U, Δφ)
+    Mφ = exp(-1im * Wφ * half)
+    phi_doublet = vcat(phi, conj(phi))
+    phi_new = Mφ * phi_doublet
+    phi .= phi_new[1:D]
+
+    # R subupdate (uses new φ)
+    U = build_U(phi, rho, V)
+    ΔR = build_Delta_R(phi, kappa, V)
+    WR = assemble_W(U, ΔR)
+    MR = exp(-1im * WR * dt)
+    R = zeros(ComplexF64, TWOD, TWOD)
+    for c in 1:D, cp in 1:D
+        R[c, cp] = rho[c, cp]
+        R[c, D + cp] = kappa[c, cp]
+        R[D + c, cp] = conj(kappa[c, cp])
+        R[D + c, D + cp] = (c == cp ? 1.0 : 0.0) + conj(rho[c, cp])
+    end
+    R_new = MR * R / MR
+    for c in 1:D, cp in 1:D
+        rho[c, cp] = 0.5 * (R_new[c, cp] + conj(R_new[cp, c]))
+        kappa[c, cp] = 0.5 * (R_new[c, D + cp] + R_new[cp, D + c])
+    end
+
+    # φ subupdate (uses new ρ, κ)
+    U = build_U(phi, rho, V)
+    Δφ = build_Delta_phi(kappa, V)
+    Wφ = assemble_W(U, Δφ)
+    Mφ = exp(-1im * Wφ * half)
+    phi_doublet = vcat(phi, conj(phi))
+    phi_new = Mφ * phi_doublet
+    phi .= phi_new[1:D]
+
+    return (phi, rho, kappa)
+end
+
+# ----- Random state generator -----
+
+function random_state(seed::Int)
+    rng = MersenneTwister(seed)
+    phi = randn(rng, ComplexF64, D) * 0.1
+    rho = zeros(ComplexF64, D, D)
+    for c in 1:D, cp in 1:D
+        rho[c, cp] = randn(rng, ComplexF64) * 0.05
+    end
+    rho = 0.5 * (rho + adjoint(rho))
+    for c in 1:D
+        rho[c, c] += 0.05  # ensure ~positive
+    end
+    kappa = zeros(ComplexF64, D, D)
+    for c in 1:D, cp in 1:D
+        kappa[c, cp] = randn(rng, ComplexF64) * 0.05
+    end
+    kappa = 0.5 * (kappa + transpose(kappa))
+    (phi, rho, kappa)
+end
+
+# ----- Palindromic gate (current Strang, single-voxel sanity reproduction) -----
+
+@printf("=== A4.1 Option B prototype — F=1 single voxel ===\n")
+@printf("D = %d, twoD = %d, 2D² = %d, N_ext = %d (extended state size)\n",
+    D, TWOD, TWOD2, N_EXT)
+
+g_S = Dict{Int, Float64}(0 => 0.5, 2 => 0.1)
+V = channel_kernel_F1(g_S)
+@printf("\nChannel kernel V built, ‖V‖_∞ = %.3f\n", maximum(abs, V))
+
+# Current Strang single-voxel: verify palindromic gate slope = 2 (reproducer)
+function _gate_current(seed)
+    phi0, rho0, kappa0 = random_state(seed)
+    dts = [0.04, 0.02, 0.01, 0.005, 0.0025]
+    @printf("\nCurrent Strang substep palindromic gate (single voxel, seed=%d):\n", seed)
+    @printf("%-10s  %-12s  %-12s  %-12s  %-10s\n",
+        "dt", "φ resid", "ρ resid", "κ resid", "order(ρ)")
+    prev_rho = NaN
+    for dt in dts
+        phi = copy(phi0); rho = copy(rho0); kappa = copy(kappa0)
+        tdhfb_strang_single_voxel!(phi, rho, kappa, V, dt)
+        tdhfb_strang_single_voxel!(phi, rho, kappa, V, -dt)
+        φ_dev = maximum(abs.(phi .- phi0))
+        ρ_dev = maximum(abs.(rho .- rho0))
+        κ_dev = maximum(abs.(kappa .- kappa0))
+        ord = isnan(prev_rho) ? NaN : log2(prev_rho / max(ρ_dev, 1e-30))
+        @printf("%-10.4f  %-12.3e  %-12.3e  %-12.3e  %s\n",
+            dt, φ_dev, ρ_dev, κ_dev,
+            isnan(ord) ? "—" : @sprintf("%.2f", ord))
+        prev_rho = ρ_dev
+    end
+end
+
+_gate_current(42)
+
+# ===== Option B framework: extended G_ext (24×24) =====
+#
+# State vector: x = [φ_doublet (2D); vec(R_lower) (2D²)]
+#   where R_lower = [vec(ρ); vec(κ)]
+#
+# G_ext block structure:
+#   [G_φφ   G_φR ]    G_φφ = W^φ (2D × 2D)
+#   [G_Rφ   G_RR ]    G_RR = Liouvillian (2D² × 2D²)
+#                     G_φR, G_Rφ = coupling blocks (TODO: derive)
+
+"""
+**Open research question** (Castin-Dum 1998 §III + Stoof 1999 §3):
+
+The straightforward Liouvillian L_R = (I ⊗ W) - (W^T ⊗ I) acts on the FULL
+vec(R) of size (2D)² = 36 for F=1. But the Nambu constraint
+   R[D+c, c'] = conj(κ[c, c']) and R[D+c, D+c'] = δ_{c,c'} + conj(ρ[c, c'])
+means only 2D² = 18 independent components (vec(ρ) + vec(κ)).
+
+The Liouvillian must:
+  (a) Act on the 18-dim independent subspace (vec(ρ), vec(κ))
+  (b) Preserve the Nambu constraint exactly under exp(-i L dt)
+
+For Castin-Dum particle-conserving Bogoliubov, the natural state-space
+basis is (u_k, v_k) amplitudes for each quasi-particle mode k. The
+Liouvillian in that basis is diagonal (or block-diagonal in (u, v) Nambu
+pairs) — much simpler. But translating between (u_k, v_k) basis and
+(ρ, κ) basis requires solving the BdG eigenproblem per voxel per substep.
+
+The (ρ, κ)-basis Liouvillian for the linearized dynamics around the
+current background is derivable but algebraically involved. Stoof 1999
+eq 22 gives the explicit form for scalar BEC; the spinor extension to
+F=1 adds matrix structure that needs careful tracking.
+
+**Deferred to next session**: derive L_R block in the (ρ, κ) basis,
+not the full vec(R) basis.
+
+For NOW, this stub returns an 18×18 zero matrix as a PLACEHOLDER. The
+framework structure (state packing, G_ext assembly) is laid down so
+that filling in this block is the next concrete step.
+"""
+function build_L_R_placeholder(_W_R::Matrix{ComplexF64})
+    # PLACEHOLDER — zeros. The actual derivation is a research deliverable.
+    zeros(ComplexF64, TWOD2, TWOD2)
+end
+
+"""
+Build the extended state vector x_ext from (φ, ρ, κ).
+Layout: [φ (D); conj(φ) (D); vec(ρ) (D²); vec(κ) (D²)]
+Total length: 2D + 2D² = N_EXT.
+"""
+function pack_x_ext(phi::Vector{ComplexF64},
+                    rho::Matrix{ComplexF64},
+                    kappa::Matrix{ComplexF64})
+    vcat(phi, conj(phi), vec(rho), vec(kappa))
+end
+
+"""Unpack: x_ext → (φ, ρ, κ)."""
+function unpack_x_ext(x::Vector{ComplexF64})
+    phi = x[1:D]
+    # x[D+1:2D] = conj(phi)_evolved — for upper-half-Nambu projection
+    rho = reshape(x[2D + 1 : 2D + D*D], D, D)
+    kappa = reshape(x[2D + D*D + 1 : end], D, D)
+    (phi, rho, kappa)
+end
+
+"""
+Build the EXTENDED generator G_ext (24×24).
+Block-diagonal version with PLACEHOLDER L_R block (zeros).
+
+When L_R is filled in with the proper Castin-Dum / Stoof form, this
+gives the order-2 dynamics in the extended Nambu space. Coupling blocks
+G_φR, G_Rφ are then the next derivation work (order-4 palindromicity).
+"""
+function build_G_ext_block_diagonal(W_φ::Matrix{ComplexF64},
+                                    W_R::Matrix{ComplexF64})
+    G = zeros(ComplexF64, N_EXT, N_EXT)
+    twoD = 2 * D
+    # G_φφ block (rows 1:2D, cols 1:2D)
+    G[1:twoD, 1:twoD] .= W_φ
+    # G_RR block (rows 2D+1:end, cols 2D+1:end) = Liouvillian PLACEHOLDER
+    G[twoD+1:end, twoD+1:end] .= build_L_R_placeholder(W_R)
+    G
+end
+
+"""
+Build the Nambu R matrix from (ρ, κ).
+R = [[ρ, κ]; [conj(κ), I + conj(ρ)]] — bosonic-HFB convention matching
+production CPU code.
+"""
+function build_R_nambu(rho::Matrix{ComplexF64}, kappa::Matrix{ComplexF64})
+    twoD = 2 * D
+    R = zeros(ComplexF64, twoD, twoD)
+    for c in 1:D, cp in 1:D
+        R[c, cp] = rho[c, cp]
+        R[c, D + cp] = kappa[c, cp]
+        R[D + c, cp] = conj(kappa[c, cp])
+        R[D + c, D + cp] = (c == cp ? 1.0 : 0.0) + conj(rho[c, cp])
+    end
+    R
+end
+
+"""Extract ρ, κ from R with Hermitian/symmetric projection."""
+function project_R_to_rho_kappa(R::Matrix{ComplexF64})
+    twoD = size(R, 1)
+    D_local = twoD ÷ 2
+    rho = zeros(ComplexF64, D_local, D_local)
+    kappa = zeros(ComplexF64, D_local, D_local)
+    for c in 1:D_local, cp in 1:D_local
+        rho[c, cp] = 0.5 * (R[c, cp] + conj(R[cp, c]))
+        kappa[c, cp] = 0.5 * (R[c, D_local + cp] + R[cp, D_local + c])
+    end
+    (rho, kappa)
+end
+
+"""
+Single-voxel TDHFB substep using the BLOCK-DIAGONAL G_ext (no coupling).
+Should reproduce the current Strang substep exactly (up to the upper-half
+projection of φ_doublet) since the φ and R blocks decouple.
+"""
+function option_b_step_decoupled!(phi::Vector{ComplexF64},
+                                  rho::Matrix{ComplexF64},
+                                  kappa::Matrix{ComplexF64},
+                                  V::Array{Float64, 4}, dt::Float64)
+    # Build generators using CURRENT state (single Strang substep, not symmetric inner)
+    U = build_U(phi, rho, V)
+    Δφ = build_Delta_phi(kappa, V)
+    Wφ = assemble_W(U, Δφ)
+    ΔR = build_Delta_R(phi, kappa, V)
+    WR = assemble_W(U, ΔR)
+    G_ext = build_G_ext_block_diagonal(Wφ, WR)
+
+    # Build extended state directly from (phi, rho, kappa) — no Nambu R needed
+    x = pack_x_ext(phi, rho, kappa)
+
+    # Apply matrix exp (24×24 — small, CPU is fine)
+    M_ext = exp(-1im * G_ext * dt)
+    x_new = M_ext * x
+
+    # Read back
+    phi_new, rho_new, kappa_new = unpack_x_ext(x_new)
+    phi .= phi_new
+    rho .= rho_new
+    kappa .= kappa_new
+    return (phi, rho, kappa)
+end
+
+@printf("\n=== Block-diagonal G_ext sanity check ===\n")
+@printf("(No coupling blocks. Should reproduce a SINGLE inner substep of current Strang,\n")
+@printf(" NOT the symmetric inner triple. This is the simplest sanity test that the\n")
+@printf(" 24×24 extended rotation reproduces the φ-doublet and Nambu-R rotations.)\n\n")
+
+function _block_diag_palindromic_gate(seed)
+    phi0, rho0, kappa0 = random_state(seed)
+    dts = [0.04, 0.02, 0.01, 0.005, 0.0025]
+    @printf("Block-diagonal G_ext, single voxel, seed=%d:\n", seed)
+    @printf("%-10s  %-12s  %-12s  %-12s  %-10s\n",
+        "dt", "φ resid", "ρ resid", "κ resid", "order(ρ)")
+    prev_rho = NaN
+    for dt in dts
+        phi = copy(phi0); rho = copy(rho0); kappa = copy(kappa0)
+        option_b_step_decoupled!(phi, rho, kappa, V, dt)
+        option_b_step_decoupled!(phi, rho, kappa, V, -dt)
+        φ_dev = maximum(abs.(phi .- phi0))
+        ρ_dev = maximum(abs.(rho .- rho0))
+        κ_dev = maximum(abs.(kappa .- kappa0))
+        ord = isnan(prev_rho) ? NaN : log2(prev_rho / max(ρ_dev, 1e-30))
+        @printf("%-10.4f  %-12.3e  %-12.3e  %-12.3e  %s\n",
+            dt, φ_dev, ρ_dev, κ_dev,
+            isnan(ord) ? "—" : @sprintf("%.2f", ord))
+        prev_rho = ρ_dev
+    end
+end
+
+_block_diag_palindromic_gate(42)
+
+@printf("\nExpected: block-diagonal G_ext IS palindromic (single matrix exp).\n")
+@printf("  exp(-iG dt) · exp(+iG dt) = I exactly (modulo Base.exp roundoff)\n")
+@printf("  Residual should be at machine precision (~1e-14) for any dt.\n")
+@printf("  This isolates the palindromic failure to the SUBSTEP STRUCTURE,\n")
+@printf("  not to the kernel evaluation.\n\n")
+
+@printf("Next step: add COUPLING blocks G_φR, G_Rφ that encode the (φ, ρ, κ)\n")
+@printf("cross-derivatives from TDHFB EOMs. With proper coupling, the SAME\n")
+@printf("rotation framework will physically match TDHFB dynamics at order ≥ 4\n")
+@printf("while remaining manifestly palindromic.\n")
