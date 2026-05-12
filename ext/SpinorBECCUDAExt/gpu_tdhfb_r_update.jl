@@ -112,36 +112,42 @@ function _batched_matinv!(
     Minv
 end
 
-# ----- 3. Apply M·R·M⁻¹ via two batched gemms -----
+# ----- 3. Apply M·R·M† via two batched gemms -----
+#
+# Bosonic Bogoliubov: M is pseudo-unitary (σ_z M† σ_z = M⁻¹). The Heisenberg
+# evolution of the bosonic Nambu density R_{ab} = ⟨ψ_b† ψ_a⟩ is M·R·M†, NOT
+# M·R·M⁻¹. M·R·M† preserves Hermiticity and the Nambu structure exactly, so
+# the downstream Hermitian/symmetric projection is no longer required.
 
 """
-    _apply_mrm!(R_new, M, R, Minv, R_tmp) -> R_new
+    _apply_mrm!(R_new, M, R, R_tmp) -> R_new
 
-Compute R_new[v] = M[v] · R[v] · Minv[v] for all voxels using two batched
+Compute R_new[v] = M[v] · R[v] · M[v]† for all voxels using two batched
 gemms. `R_tmp` is scratch.
 """
 function _apply_mrm!(
     R_new::CuArray{TC, 3},
     M::CuArray{TC, 3},
     R::CuArray{TC, 3},
-    Minv::CuArray{TC, 3},
     R_tmp::CuArray{TC, 3},
 ) where {TC <: Complex}
     # R_tmp = M · R
     CUDA.CUBLAS.gemm_strided_batched!(
         'N', 'N', one(TC), M, R, zero(TC), R_tmp,
     )
-    # R_new = R_tmp · Minv
+    # R_new = R_tmp · M†  (use 'C' = conjugate-transpose on M)
     CUDA.CUBLAS.gemm_strided_batched!(
-        'N', 'N', one(TC), R_tmp, Minv, zero(TC), R_new,
+        'N', 'C', one(TC), R_tmp, M, zero(TC), R_new,
     )
     R_new
 end
 
-# ----- 4. Project R_new back to ρ, κ with Hermitian/symmetric structure -----
+# ----- 4. Read back ρ, κ from R_new -----
 #
-# rho_new[v, c, c']   = 0.5 * (R_new[c, c', v] + conj(R_new[c', c, v]))
-# kappa_new[v, c, c'] = 0.5 * (R_new[c, D+c', v] + R_new[c', D+c, v])
+# Because M·R·M† preserves Hermiticity and Nambu form exactly, no projection
+# is needed — read R_new directly:
+#   rho_new[v, c, c']   = R_new[c,   c', v]
+#   kappa_new[v, c, c'] = R_new[c, D+c', v]
 
 function _kernel_project_R!(rho, kappa, R_new, D::Int, N_vox::Int)
     c = (CUDA.blockIdx().x - 1) * CUDA.blockDim().x + CUDA.threadIdx().x
@@ -149,13 +155,8 @@ function _kernel_project_R!(rho, kappa, R_new, D::Int, N_vox::Int)
     v = (CUDA.blockIdx().z - 1) * CUDA.blockDim().z + CUDA.threadIdx().z
     if c <= D && cp <= D && v <= N_vox
         @inbounds begin
-            half = eltype(rho)(0.5)
-            r_cc = R_new[c, cp, v]
-            r_ccT = R_new[cp, c, v]
-            rho[v, c, cp] = half * (r_cc + conj(r_ccT))
-            k_cc = R_new[c, D + cp, v]
-            k_ccT = R_new[cp, D + c, v]
-            kappa[v, c, cp] = half * (k_cc + k_ccT)
+            rho[v, c, cp] = R_new[c, cp, v]
+            kappa[v, c, cp] = R_new[c, D + cp, v]
         end
     end
     return nothing
@@ -164,8 +165,8 @@ end
 """
     _project_R_to_rho_kappa!(state, R_new, D) -> state
 
-Read back rho and kappa from R_new, enforcing the Hermitian (rho) and
-symmetric (kappa) structure via averaging.
+Read back rho and kappa from R_new. With the M·R·M† update, R_new is already
+Hermitian / Nambu-symmetric by construction, so no averaging is required.
 """
 function _project_R_to_rho_kappa!(
     state::SpinorBEC.TDHFBState{N, A, B, T},

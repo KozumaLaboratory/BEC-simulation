@@ -295,7 +295,10 @@ function _tdhfb_R_subupdate!(
 
         M = exp(-1im * W * dt)
 
-        # R(t+dt) = M · R · M^{-1}.
+        # Bosonic Bogoliubov: M is pseudo-unitary (σ_z M† σ_z = M⁻¹).
+        # Heisenberg evolution of R_{ab} = ⟨ψ_b† ψ_a⟩ is M · R · M†, NOT
+        # M · R · M⁻¹. M·R·M† preserves Hermiticity and Nambu structure
+        # exactly, so no Hermitian/symmetric projection is needed.
         R = zeros(ComplexF64, twoD, twoD)
         for c in 1:D, c_p in 1:D
             R[c, c_p] = state.rho[idx, c, c_p]
@@ -304,18 +307,11 @@ function _tdhfb_R_subupdate!(
             delta_cc = c == c_p ? one(ComplexF64) : zero(ComplexF64)
             R[D + c, D + c_p] = delta_cc + conj(state.rho[idx, c, c_p])
         end
-        Minv = inv(M)
-        R_new = M * R * Minv
+        R_new = M * R * adjoint(M)
 
-        # Read back; project ρ Hermitian and κ symmetric.
         for c in 1:D, c_p in 1:D
-            rho_new = R_new[c, c_p]
-            rho_new_T = R_new[c_p, c]
-            state.rho[idx, c, c_p] = 0.5 * (rho_new + conj(rho_new_T))
-
-            kappa_new = R_new[c, D + c_p]
-            kappa_new_T = R_new[c_p, D + c]
-            state.kappa[idx, c, c_p] = 0.5 * (kappa_new + kappa_new_T)
+            state.rho[idx, c, c_p] = R_new[c, c_p]
+            state.kappa[idx, c, c_p] = R_new[c, D + c_p]
         end
     end
     return state

@@ -217,7 +217,7 @@ function SpinorBEC._tdhfb_R_subupdate!(
     # 3. Assemble W^R
     _assemble_w_blocks!(sc.W, sc.U, sc.Delta_R)
 
-    # 4. M^R = exp(-i W^R dt) and M^R^{-1}
+    # 4. M^R = exp(-i W^R dt)
     # n_taylor=8: for typical TDHFB regime ‖W·dt‖ < 0.05, Taylor accuracy
     # = (0.05)^8 / 8! ≈ 1e-15 (F64 machine eps) / 6e-12 (F32 eps × condition).
     # Drop from 14 to 8 saves 6 batched gemms per HF substep (~40% faster).
@@ -226,19 +226,14 @@ function SpinorBEC._tdhfb_R_subupdate!(
         n_taylor=8,
         A_scratch=sc.A_scratch, A_tmp=sc.A_tmp, P_tmp=sc.P_tmp,
     )
-    # Copy M into Minv scratch (matinv overwrites the input as LU storage).
-    copyto!(sc.Minv, sc.M)
-    # Use A_tmp as the LU work buffer (will be overwritten with LU factors).
-    copyto!(sc.A_tmp, sc.M)
-    _batched_matinv!(sc.Minv, sc.A_tmp)
 
     # 5. Build Nambu R from (ρ, κ)
     _build_R_nambu!(sc.R, state, D)
 
-    # 6. R_new = M · R · M^{-1}
-    _apply_mrm!(sc.R_new, sc.M, sc.R, sc.Minv, sc.R_tmp)
+    # 6. R_new = M · R · M†  (bosonic Heisenberg evolution of ⟨ψ_b† ψ_a⟩)
+    _apply_mrm!(sc.R_new, sc.M, sc.R, sc.R_tmp)
 
-    # 7. Project R_new back to ρ, κ with Hermitian/symmetric structure.
+    # 7. Read R_new back into (ρ, κ); no projection needed (Hermitian by M·R·M†).
     _project_R_to_rho_kappa!(state, sc.R_new, D)
     return state
 end
