@@ -208,12 +208,11 @@ function _resolve_derived_params!(p::Dict, atom; verbose::Bool=true)
     # ε_dd
     eps_dd = atom.a_s > 0 ? compute_a_dd(atom) / atom.a_s : 0.0
 
-    # c_lhy: derive if not explicitly specified and DDI is active
-    if !haskey(inter, "c_lhy") && !isnan(c_dd_val) && c_dd_val > 0
-        a_s_dl = atom.a_s / a_ho
-        c_lhy_scalar = (128.0 / (3.0 * sqrt(π))) * sqrt(abs(a_s_dl)^3) * N_atoms
-        inter["c_lhy"] = c_lhy_scalar * lima_pelster_Q5(eps_dd)
-    end
+    # LHY config — preferred path is the `lhy:` block (added in C5). Legacy
+    # `interactions.c_lhy` + `spinor_lhy:` still works during the C5→C6
+    # transition; the resolver normalises everything back to the legacy fields
+    # so downstream make_workspace / run_step plumbing is unchanged.
+    _resolve_lhy_block!(p, inter, atom, c_dd_val, eps_dd, N_atoms, a_ho)
 
     # l_z: derive from trap ratio if quasi_2d and not specified
     pot = get(p, "potential", nothing)
@@ -237,6 +236,54 @@ function _resolve_derived_params!(p::Dict, atom; verbose::Bool=true)
             (l_z_val > 0 ? " l_z=$(round(l_z_val; digits=4))" : ""),
         )
     end
+end
+
+# LHY block resolver — normalises the new `ground_state.lhy: {kind, c_lhy,
+# n_max, n_points}` schema (introduced in C5) back to the legacy fields
+# (`ground_state.spinor_lhy` + `interactions.c_lhy`) that downstream
+# make_workspace / run_step parses. Also handles auto-derivation of
+# `c_lhy` via Lima-Pelster Q5 for scalar / quasi_2d kinds when the user
+# leaves it absent. The legacy path (no `lhy:` block; explicit
+# `spinor_lhy:` / `interactions.c_lhy:`) emits a one-shot deprecation
+# warning but otherwise continues to work until C6.
+function _resolve_lhy_block!(p::Dict, inter::Dict, atom, c_dd_val::Float64,
+        eps_dd::Float64, N_atoms::Int, a_ho::Float64)
+    lhy_block = get(p, "lhy", nothing)
+    has_legacy_c_lhy = haskey(inter, "c_lhy")
+    has_legacy_spinor = haskey(p, "spinor_lhy")
+
+    if lhy_block isa Dict
+        kind = String(get(lhy_block, "kind", "none"))
+        # Auto-derive c_lhy for scalar / quasi_2d when user omitted it.
+        if (kind == "scalar" || kind == "quasi_2d") && !haskey(lhy_block, "c_lhy")
+            if !isnan(c_dd_val) && c_dd_val > 0
+                a_s_dl = atom.a_s / a_ho
+                c_lhy_scalar = (128.0 / (3.0 * sqrt(π))) * sqrt(abs(a_s_dl)^3) * N_atoms
+                lhy_block["c_lhy"] = c_lhy_scalar * lima_pelster_Q5(eps_dd)
+            end
+        end
+        # Normalise to legacy fields for downstream consumers.
+        if kind != "none" && !has_legacy_spinor
+            p["spinor_lhy"] = kind
+        end
+        if haskey(lhy_block, "c_lhy") && !has_legacy_c_lhy
+            inter["c_lhy"] = lhy_block["c_lhy"]
+        end
+    else
+        # No `lhy:` block. Emit a one-shot deprecation if the legacy fields
+        # are in use, then fall back to the original auto-derivation.
+        if has_legacy_c_lhy || has_legacy_spinor
+            @warn "LHY config via `interactions.c_lhy` / `spinor_lhy:` is " *
+                  "deprecated. Move into a `ground_state.lhy: {kind: ..., " *
+                  "c_lhy: ...}` block. Legacy keys removed in C6." maxlog=1
+        end
+        if !haskey(inter, "c_lhy") && !isnan(c_dd_val) && c_dd_val > 0
+            a_s_dl = atom.a_s / a_ho
+            c_lhy_scalar = (128.0 / (3.0 * sqrt(π))) * sqrt(abs(a_s_dl)^3) * N_atoms
+            inter["c_lhy"] = c_lhy_scalar * lima_pelster_Q5(eps_dd)
+        end
+    end
+    return nothing
 end
 
 function _parse_gs_interactions(inter::Dict, atom)

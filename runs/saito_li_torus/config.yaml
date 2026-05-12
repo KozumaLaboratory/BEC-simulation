@@ -54,7 +54,7 @@ pipeline:
       B:             {Bz: 0}
       initial_state: polar_core_vortex
       init_state_params: {init_vortex_charge: 1.0}              # winding=+1 around z (state_dispatch.jl arg name)
-      spinor_lhy:    scalar                                     # paper Eq. 1: scalar Lima-Pelster Q5
+      lhy: {kind: scalar}                                       # paper Eq. 1: scalar Lima-Pelster Q5
       n_steps:       8000
       tol:           1.0e-9
       dt:            0.005

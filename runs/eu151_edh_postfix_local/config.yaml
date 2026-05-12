@@ -38,14 +38,14 @@ mixins:
 
 pipeline:
   # Phase 0: m = +F stretched ground state in the Matsui prep field B = 1.0 μT.
-  # `spinor_lhy: scalar` enables Lima–Pelster Q5 LHY stabilisation — Eu151 is
+  # `lhy: {kind: scalar}` enables Lima–Pelster Q5 LHY stabilisation — Eu151 is
   # near the dipolar instability boundary (ε_dd ≈ 0.54), so without LHY the
   # weak-field hold collapses into a sub-voxel pencil after ~1 ms.
   - ground_state:
       use:           [eu151_edh_phys]
       B:             {Bz: "0.01 Gauss"}                     # = 1.0 μT  (Matsui prep)
       initial_state: m_plus_F
-      spinor_lhy:    scalar                                 # Lima-Pelster scalar approx for FM-polarized GS.
+      lhy: {kind: scalar}                                   # Lima-Pelster scalar approx for FM-polarized GS.
                                                             # Audit 2026-05-07: scalar / polar_dipolar / full_bdg ALL give
                                                             # identical density profile — LHY is sub-leading vs mean-field DDI
                                                             # for F=6 EdH at 32³. paper #2 (FM+DDI closed form with F²

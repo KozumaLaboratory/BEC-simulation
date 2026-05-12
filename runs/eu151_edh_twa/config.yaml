@@ -31,7 +31,7 @@ pipeline:
       use:           [eu151_edh_phys]
       B:             {Bz: "0.01 Gauss"}
       initial_state: m_plus_F
-      spinor_lhy:    scalar
+      lhy: {kind: scalar}
       n_steps:       3000
       tol:           1.0e-9
       dt:            0.005

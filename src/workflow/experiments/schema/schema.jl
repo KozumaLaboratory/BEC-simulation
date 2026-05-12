@@ -32,8 +32,23 @@ const INTERACTIONS_SCHEMA = Dict{String, FieldSpec}(
     "c0" => FieldSpec(; type=Number),
     "c1" => FieldSpec(; type=Number),
     "c1_ratio" => FieldSpec(; type=Number, range=(-1.0, 1.0)),
-    "c_lhy" => FieldSpec(; type=Number),
+    "c_lhy" => FieldSpec(; type=Number),  # DEPRECATED: moved to ground_state.lhy.c_lhy in C5
     "c_extra" => FieldSpec(; type=Vector),
+)
+
+# LHY block — replaces the split (interactions.c_lhy + ground_state.spinor_lhy).
+# `kind` chooses the dispatch path; the other fields are kind-specific.
+# `c_lhy` is auto-derived via Lima-Pelster Q5(ε_dd) when unset and kind ∈
+# {none, scalar, quasi_2d}. `n_max` defaults to 3 × max(|psi_init|²) at
+# workspace-build time.
+const LHY_SCHEMA = Dict{String, FieldSpec}(
+    "kind" => FieldSpec(; type=String, default="none",
+        enum=["none", "scalar", "quasi_2d", "two_channel", "full_bdg",
+            "polar_contact", "polar_dipolar", "fm_contact", "fm_dipolar",
+            "icosahedral"]),
+    "c_lhy" => FieldSpec(; type=Number),       # scalar/quasi_2d explicit override
+    "n_max" => FieldSpec(; type=Number),       # null → 3 × max(|psi_init|²)
+    "n_points" => FieldSpec(; type=Integer, default=200, range=(3, 10000)),
 )
 
 const DDI_SCHEMA = Dict{String, FieldSpec}(
@@ -90,18 +105,15 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
     "backend" => FieldSpec(; type=String, default="cpu", enum=["cpu", "gpu"]),
     "target_magnetization" => FieldSpec(; type=Number),
     "temperature_ratio" => FieldSpec(; type=Number, range=(0.0, 1.0)),
-    "spinor_lhy" => FieldSpec(; type=String,
+    "lhy" => FieldSpec(; type=Dict, schema=LHY_SCHEMA),
+    "spinor_lhy" => FieldSpec(; type=String,                            # DEPRECATED
         enum=["two_channel", "full_bdg", "scalar",
             "polar_contact", "polar_dipolar",
             "fm_contact", "fm_dipolar",
             "icosahedral"]),
-    # ↑ "scalar" is a no-op alias (explicit form of the default) — the
-    # ScalarLHY path activates whenever interactions.c_lhy > 0,
-    # regardless of this selector. "two_channel" and "full_bdg" route
-    # to compute_spinor_lhy_{two_channel,table} respectively. The two
-    # "polar_*" modes use the F-generic closed-form polar LHY
-    # (paper #1) and dispatch via compute_spinor_lhy_polar_{contact,
-    # dipolar}; restricted to polar phases (ζ_α = δ_{α,0}).
+    # ↑ DEPRECATED in C5: use `lhy: {kind: ...}` block instead. Legacy
+    # spinor_lhy + interactions.c_lhy parsing still accepted with @warn
+    # during the C5→C6 transition; removed in C6.
     "init_state_params" => FieldSpec(; type=Dict),
     "cache" => FieldSpec(; type=String),
     "quasi_2d" => FieldSpec(; type=Bool),
