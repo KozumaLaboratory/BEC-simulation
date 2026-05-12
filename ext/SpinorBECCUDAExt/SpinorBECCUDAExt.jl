@@ -14,6 +14,7 @@ include("gpu_energy.jl")
 include("gpu_raman.jl")
 include("gpu_graph.jl")
 include("gpu_tdhfb.jl")
+include("gpu_tdhfb_expm.jl")
 
 function __init__()
     # Wire the scan-loop hook so each completed point releases cached GPU
