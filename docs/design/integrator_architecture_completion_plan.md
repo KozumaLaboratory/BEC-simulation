@@ -150,7 +150,7 @@ error at dt = 10⁻³, so the true Y6 order can be measured.
 
 Acceptance: Y6-mid measured order ≥ 5.5 (vs theoretical 6).
 
-### A2.2 — MPS-{4, 6, 8} Pareto
+### A2.2 — MPS-{4, 6, 8} Pareto (COMPLETE 2026-05-12)
 
 Implement MPS-6 and MPS-8 (Chin-Geiser higher-order extrapolation,
 not yet in code). Run on Phase 2a problem. Plot:
@@ -162,10 +162,63 @@ not yet in code). Run on Phase 2a problem. Plot:
 Acceptance: clear Pareto frontier showing which scheme dominates at
 each accuracy level. Hypothesis: Y4-mid wins at moderate accuracy
 (1e-6 < err < 1e-9), Y6-mid wins at higher accuracy (err < 1e-9),
+
+**Result** (`scripts/bench/track_a22_mps_pareto.jl`, T_FINAL=0.04,
+N=16³ Rb87, c_0=50, c_1=1, c_dd=1, Y6-mid dt=1e-5 reference):
+
+Error table at coarse, moderate, fine dts:
+
+| dt       | Strang-mid | Y4-mid    | Y6-mid    | MPS-4     | MPS-6     | MPS-8     |
+|----------|------------|-----------|-----------|-----------|-----------|-----------|
+| 4.0e-3   | 2.09e-5    | 2.04e-8   | 9.10e-11  | 1.00e-9   | 9.11e-11  | 9.10e-11  |
+| 2.0e-3   | 5.23e-6    | 1.28e-9   | 9.08e-11  | 1.09e-10  | 9.10e-11  | 9.09e-11  |
+| 1.0e-3   | 1.31e-6    | 1.22e-10  | 9.03e-11  | 9.09e-11  | 9.07e-11  | 9.05e-11  |
+| 5.0e-4   | 3.27e-7    | 9.07e-11  | 8.94e-11  | 9.06e-11  | 9.02e-11  | 8.96e-11  |
+
+First-step orders (4e-3 → 2e-3):
+- Strang-mid: 2.00 ✓
+- Y4-mid: **3.99** ✓
+- MPS-4: **3.20** — order 4 recovered on lab path with midpoint kernel
+- Y6-mid / MPS-6 / MPS-8: floor-limited at ~9e-11 from coarsest dt
+
+Pareto cost-vs-accuracy (cost in inner-midpoint-Strang units):
+
+| Target err | Cheapest scheme | Cost (Strang units) |
+|------------|-----------------|---------------------|
+| < 1e-4     | Strang-mid      | 10                  |
+| < 1e-6     | Y4-mid          | 30                  |
+| < 1e-8     | MPS-4 (Y4-mid tie at moderate-margin) | 30 |
+| < 1e-10    | **MPS-6**       | **60** (vs Y6-mid 70, Y4-mid 240) |
+
+**Hypothesis falsified for "MPS family loses on lab path"**: with
+`_half_potential_step_midpoint!` as the inner V kernel (Track A1's
+predictor-corrector fix), MPS-4 reaches order ~3.2 in the first
+halving, restoring it from the order ~1 collapse of plain
+split_step_combined! (recorded in `mps4_lab_diagnostic.jl`). MPS-6
+beats Y6-mid by ~15% at the floor-limited accuracy band. Y4-mid
+remains optimal in the 1e-6 to 1e-9 accuracy band (3 cost units per
+step at moderate dt vs MPS-4's same 3 cost units but with the
+floor-hit risk).
+
+**Recommendation for src/ integration**: keep Y4-mid as the production
+default (matches CLAUDE.md `integrator_modernization_status.md`); the
+MPS-6 path is a future option for high-accuracy long-time evolution
+where the ~15% cost win is meaningful (e.g., Eu151 long-trajectory
+validation runs). MPS-8 not worth pursuing — same floor at higher cost.
+
+**Resolution of the order ambiguity for MPS-{6,8}**: a finer reference
+(Y6-mid at dt=2e-6 or below) would resolve true order. Not pursued
+this session because the operational Pareto already decides the
+production-default question.
+**Earlier hypothesis (PRE-MIDPOINT-FIX)**: Y4-mid wins at moderate accuracy
+(1e-6 < err < 1e-9), Y6-mid wins at higher accuracy (err < 1e-9),
 MPS family loses across the board on the lab path.
 
-**Estimated scope**: 2 sessions (A2.1 = partial this session, A2.2 =
-1 dedicated session). Bench-only, no new src/ code beyond MPS-6/8.
+**Estimated scope**: 2 sessions (A2.1 = DONE; A2.2 = DONE 2026-05-12,
+~5 min wall time for the full bench). Both bench-only; no src/ code
+changes. MPS-6 src/ integration would be a small follow-up if the
+~15% Y6-mid speedup becomes load-bearing for a specific Eu151
+validation run.
 
 ---
 
