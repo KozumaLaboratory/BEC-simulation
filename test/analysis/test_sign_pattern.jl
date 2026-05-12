@@ -68,6 +68,34 @@ using Test
         @test tbl2[2] == 0.0  # β_2^(c_0) absent → β_2^(λ_spin) = 0
     end
 
+    @testset "polyhedral_op_character — F=3 O:A_2 sign-rep diagnostic" begin
+        # F=3 O:A_2 state (Paper #3 §V.B): ζ = (|3,+2⟩ - |3,-2⟩)/√2.
+        # Under C_4z: |m⟩ → e^{-imπ/2}|m⟩, m=±2 picks up e^{∓iπ} = -1.
+        # So ζ → -1·(|+2⟩ - |-2⟩)/√2 = -ζ. Character ⟨ζ|U|ζ⟩ = -1.
+        zeta_A2 = ComplexF64[0, 1, 0, 0, 0, -1, 0] ./ sqrt(2)
+        chi_C4z = polyhedral_op_character(zeta_A2, 3; axis=(0.0, 0.0, 1.0), angle=π/2)
+        @test isapprox(real(chi_C4z), -1.0; atol=1e-10)
+        @test isapprox(imag(chi_C4z), 0.0; atol=1e-10)
+    end
+
+    @testset "polyhedral_op_character — F=6 I_h state under C_5z" begin
+        # F=6 I_h state: ζ = √7/5|+5⟩ + √11/5|0⟩ - √7/5|-5⟩
+        # Under C_5z (axis=z, angle=2π/5): |m⟩ → e^{-i 2πm/5} |m⟩
+        # m=±5 picks up e^{∓i 2π} = +1; m=0 picks up +1.
+        # So ζ is invariant under C_5z → character +1.
+        zeta_Ih = Vector{ComplexF64}(SpinorBEC.IcosahedralMod.ZETA_F6_IH)
+        chi = polyhedral_op_character(zeta_Ih, 6; axis=(0.0, 0.0, 1.0), angle=2π/5)
+        @test isapprox(real(chi), 1.0; atol=1e-10)
+        @test isapprox(imag(chi), 0.0; atol=1e-10)
+    end
+
+    @testset "polyhedral_op_character — input validation" begin
+        zeta = ComplexF64[1.0, 0.0, 0.0]
+        @test_throws DimensionMismatch polyhedral_op_character(zeta, 6; angle=0.0)
+        @test_throws ArgumentError polyhedral_op_character(zeta, 1;
+            axis=(0.0, 0.0, 0.0), angle=π)
+    end
+
     @testset "Cross-verify against IcosahedralMod F=6 I_h closed form (Paper #3 §V.D)" begin
         # Paper #3 §V.D / sign_pattern_lemma1_general_S.md verifies the Lemma 1
         # closed form against IcosahedralMod's c_0 and λ_spin coefficients

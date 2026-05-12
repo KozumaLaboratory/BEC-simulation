@@ -38,6 +38,7 @@
 
 export sign_pattern_beta_lambda_spin, sign_change_boundary_S_bd
 export sign_pattern_beta_lambda_spin_table, predict_lambda_spin_sign
+export polyhedral_op_character
 
 """
     sign_pattern_beta_lambda_spin(S::Int, F::Int, beta_c0::Real) → Float64
@@ -116,4 +117,49 @@ function sign_pattern_beta_lambda_spin_table(
         S => sign_pattern_beta_lambda_spin(S, F, get(beta_c0, S, 0.0))
         for S in 0:2:(2F)
     )
+end
+
+"""
+    polyhedral_op_character(zeta::Vector{ComplexF64}, F::Int;
+                            axis=(0.0, 0.0, 1.0), angle::Real) → ComplexF64
+
+Compute the character `⟨ζ | U(n̂, θ) | ζ⟩` of a normalised spinor `ζ`
+under the spin rotation `U(n̂, θ) = exp(-i θ n̂·F̂)`. Used to distinguish
+1-dimensional irreps of a polyhedral group when Majorana geometry alone
+is ambiguous (e.g. A_1 vs A_2 of O at F=7 — both give identical
+β_S^(c_0); only group-action signs differ).
+
+For polyhedral inert states, common diagnostic operations:
+- C_4z (axis=(0,0,1), angle=π/2): A_1 vs A_2 under O group character;
+  particularly relevant for F=3 / F=8 octahedral states.
+- C_3 around body diagonal (axis=(1,1,1)/√3, angle=2π/3): tetrahedral
+  vs trivial discrimination.
+- C_5z (axis=(0,0,1), angle=2π/5): icosahedral discriminant.
+
+Returns the complex character ⟨ζ | U | ζ⟩. For 1-dim irreps this equals
+exactly ±1 (or e^{ikπ/n} for C_n irreps); deviations from these values
+indicate the spinor is NOT in a 1-dim irrep of the chosen group operation.
+
+**Scope caveat**: this is a low-level diagnostic. A full A_1 vs A_2
+classifier requires applying all group generators and matching characters
+against the rep table — that infrastructure is Paper #3 §VI scope and
+not implemented here. Callers requiring rigorous irrep identification
+should use the character output to disambiguate manually against the
+expected ±1 value for the target irrep.
+"""
+function polyhedral_op_character(
+    zeta::AbstractVector{ComplexF64}, F::Int;
+    axis::Tuple{<:Real, <:Real, <:Real}=(0.0, 0.0, 1.0),
+    angle::Real,
+)
+    D = 2F + 1
+    length(zeta) == D ||
+        throw(DimensionMismatch("zeta length $(length(zeta)) != 2F+1 = $D"))
+    ax = collect(Float64, axis)
+    norm_ax = sqrt(sum(x -> x*x, ax))
+    norm_ax > 1e-12 || throw(ArgumentError("axis must be non-zero"))
+    ax ./= norm_ax
+    theta = Float64(angle)
+    U = spin_rotation_matrix(F, ax[1] * theta, ax[2] * theta, ax[3] * theta)
+    dot(zeta, U * Vector{ComplexF64}(zeta))
 end
