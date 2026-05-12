@@ -112,6 +112,19 @@ using LinearAlgebra
             zeta[16] = -sqrt(209)/25; zeta[21] = sqrt(561)/75
             @test detect_point_group(zeta, 10) === :I_h
         end
+
+        @testset "Paper #3 §V.G — F=12 I:A icosahedral → :I_h" begin
+            # Paper #3 F12_verification_result.md decimal values, U(1)-rotated
+            # to all-real form (Majorana geometry is U(1)-phase invariant):
+            # ζ_{±10} = +0.4871, ζ_{+5} = -0.3024, ζ_{-5} = +0.3024,
+            # ζ_{0} = +0.5853. Sparse on m ∈ {±10, ±5, 0} (C_5^z invariance).
+            # 24 Majorana stars on F=12 I:A icosahedral orbit.
+            zeta = zeros(ComplexF64, 25)
+            zeta[3]  = 0.4871; zeta[8] = -0.3024; zeta[13] = 0.5853
+            zeta[18] = 0.3024; zeta[23] = 0.4871
+            zeta ./= sqrt(sum(abs2, zeta))
+            @test detect_point_group(zeta, 12) === :I_h
+        end
     end
 
     @testset "point group helpers" begin

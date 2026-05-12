@@ -35,7 +35,7 @@ export PhaseReference, DEFAULT_PHASE_REFERENCES
 #   6  icosahedral (I_h)         I_h           ✓ (12 stars → :I_h)
 #   8  cube-like octahedral      O / O_h       ✓ (16 stars → :O_h)
 #   10 dodecahedral              I_h           ✓ (20 stars → :I_h)
-#   12 (Paper #3 §V.G)           varied        ✗ not yet (follow-up)
+#   12 icosahedral I:A           I_h           ✓ (24 stars → :I_h)
 #
 # All regression tests in `test/hamiltonian/test_majorana.jl` pin
 # each case against the canonical Paper #3 inert state spinor.

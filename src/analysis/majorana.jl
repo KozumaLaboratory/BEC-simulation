@@ -220,8 +220,29 @@ function _make_F10_dodec_stars()
     [_stereo_to_sphere(z) for z in stars]
 end
 
+function _make_F12_Ih_A_stars()
+    # Paper #3 §V.G / F12_verification_result.md: F=12 I:A icosahedral inert
+    # state, sparse on m ∈ {±10, ±5, 0} (C_5^z invariance). One-phase choice
+    # gives all-complex coefficients; here we use the U(1)-rotated real form
+    # (overall phase rotation doesn't affect Majorana geometry):
+    #     ζ_{+10} = +0.4871,  ζ_{+5} = -0.3024,  ζ_0 = +0.5853,
+    #     ζ_{-5} = +0.3024,   ζ_{-10} = +0.4871
+    # (±5 antisymmetric pattern, similar to F=6 I_h and F=10 dodec).
+    # Decimal precision suffices since spectrum tol = 0.15.
+    zeta = zeros(ComplexF64, 25)
+    zeta[3]  = 0.4871    # m=+10 (index = F + 1 − m = 13 − 10 = 3)
+    zeta[8]  = -0.3024   # m=+5
+    zeta[13] = 0.5853    # m=0
+    zeta[18] = 0.3024    # m=-5
+    zeta[23] = 0.4871    # m=-10
+    zeta ./= sqrt(sum(abs2, zeta))
+    stars = majorana_stars(zeta, 12)
+    [_stereo_to_sphere(z) for z in stars]
+end
+
 const _REF_F8_OCTA_A1 = _pairwise_distance_spectrum(_make_F8_octa_A1_stars())
 const _REF_F10_DODEC = _pairwise_distance_spectrum(_make_F10_dodec_stars())
+const _REF_F12_IH_A = _pairwise_distance_spectrum(_make_F12_Ih_A_stars())
 
 """
     detect_point_group(spinor, F; tol=0.15) → Symbol
@@ -249,7 +270,8 @@ Coverage (vs Paper #3 §V verification list, see
   time — see `_make_F8_octa_A1_stars`). Dy^164 relevance.
 - F=10 dodecahedral (I_h, §V.F): ✓ `:I_h` (20 stars; reference from
   canonical paper-#3 spinor via `_make_F10_dodec_stars`).
-- F=12 (§V.G): ✗ not yet implemented (24 stars). Follow-up commit.
+- F=12 icosahedral I:A (I_h, §V.G): ✓ `:I_h` (24 stars; reference from
+  paper-#3 §V.G C_5^z-invariant spinor via `_make_F12_Ih_A_stars`).
 
 Regression tests in `test/hamiltonian/test_majorana.jl` pin each
 case against the paper #3 canonical state spinor.
@@ -334,6 +356,16 @@ function detect_point_group(spinor::AbstractVector{ComplexF64}, F::Int; tol::Flo
     # orbit; reference from canonical paper #3 spinor.
     if n_stars == 20
         rms = _spectrum_rms(spec, _REF_F10_DODEC)
+        if rms < best_rms
+            best_rms = rms
+            best_sym = :I_h
+        end
+    end
+
+    # F=12 icosahedral I:A (Paper #3 §V.G). 24 stars from C_5^z-invariant
+    # spinor on m ∈ {±10, ±5, 0}. Reference from canonical paper #3 spinor.
+    if n_stars == 24
+        rms = _spectrum_rms(spec, _REF_F12_IH_A)
         if rms < best_rms
             best_rms = rms
             best_sym = :I_h
