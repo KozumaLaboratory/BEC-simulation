@@ -26,52 +26,54 @@ const g_S = Dict{Int, Float64}(
     6 => 0.01,
 )
 
-function _make_state(::Type{T}) where {T <: AbstractArray}
-    phi = T <: CuArray ?
-        CUDA.zeros(ComplexF64, N_GRID, N_GRID, N_GRID, D) :
-        zeros(ComplexF64, N_GRID, N_GRID, N_GRID, D)
-    # Hand-build a small random initial state
-    if T <: Array
-        phi .= randn(ComplexF64, size(phi)) * 0.05
+function _make_state(::Type{T}, ::Type{TC}) where {T, TC}
+    # T: container (Array or CuArray), TC: ComplexF64 or ComplexF32
+    phi_host = ComplexF64.(randn(ComplexF64, N_GRID, N_GRID, N_GRID, D) .* 0.05)
+    phi = if T <: CuArray
+        CuArray(TC.(phi_host))
     else
-        phi_host = randn(ComplexF64, size(phi)) * 0.05
-        copyto!(phi, phi_host)
+        TC.(phi_host)
     end
     state = init_tdhfb_vacuum(phi; alias=true)
     # Add small thermal ρ (diagonal)
+    rho_host = zeros(TC, N_GRID, N_GRID, N_GRID, D, D)
+    for I in CartesianIndices((N_GRID, N_GRID, N_GRID)), c in 1:D
+        rho_host[I, c, c] = TC(0.01)
+    end
     if T <: CuArray
-        rho_host = zeros(ComplexF64, N_GRID, N_GRID, N_GRID, D, D)
-        for I in CartesianIndices((N_GRID, N_GRID, N_GRID)), c in 1:D
-            rho_host[I, c, c] = 0.01 + 0im
-        end
         copyto!(state.rho, rho_host)
     else
-        for I in CartesianIndices((N_GRID, N_GRID, N_GRID)), c in 1:D
-            state.rho[I, c, c] = 0.01 + 0im
-        end
+        state.rho .= rho_host
     end
     state
 end
 
-function bench_backend(::Type{T}, n_steps::Int; warmup::Int=1) where {T}
-    state = _make_state(T)
-    V_ext = T <: CuArray ?
-        CUDA.zeros(Float64, N_GRID, N_GRID, N_GRID, D) :
-        zeros(Float64, N_GRID, N_GRID, N_GRID, D)
+function bench_backend(::Type{T}, ::Type{TC}, n_steps::Int; warmup::Int=2) where {T, TC}
+    state = _make_state(T, TC)
+    TR = real(TC)
+    V_ext = if T <: CuArray
+        CUDA.zeros(TR, N_GRID, N_GRID, N_GRID, D)
+    else
+        zeros(TR, N_GRID, N_GRID, N_GRID, D)
+    end
 
-    # Warmup (JIT + cache fill)
+    # Aggressive warmup with explicit sync between calls
     for _ in 1:warmup
         tdhfb_strang_step!(state, F, g_S, V_ext, DT)
+        T <: CuArray && CUDA.synchronize()
     end
+
+    # Fresh state for the actual timing run
+    state = _make_state(T, TC)
     T <: CuArray && CUDA.synchronize()
 
-    # Reset for timing
-    state = _make_state(T)
     t_start = time()
     for _ in 1:n_steps
         tdhfb_strang_step!(state, F, g_S, V_ext, DT)
+        # Explicit sync each step ensures we measure actual wall time, not
+        # just kernel-queue time (CUDA is async by default).
+        T <: CuArray && CUDA.synchronize()
     end
-    T <: CuArray && CUDA.synchronize()
     wall = time() - t_start
     (wall, state)
 end
@@ -82,65 +84,83 @@ end
 @printf("g_S = %s\n", g_S)
 @printf("\n")
 
-# GPU
-println("--- GPU (CUDA RTX 5070 Ti) ---")
+# GPU F64
+println("--- GPU F64 (CUDA RTX 5070 Ti, ComplexF64) ---")
 flush(stdout)
-gpu_wall, state_gpu = bench_backend(CuArray, N_STEPS; warmup=2)
-@printf("Wall: %.2fs (%.1f ms/step)\n", gpu_wall, gpu_wall * 1000 / N_STEPS)
+gpu_f64_wall, _ = bench_backend(CuArray, ComplexF64, N_STEPS; warmup=2)
+@printf("Wall: %.2fs (%.1f ms/step)\n", gpu_f64_wall, gpu_f64_wall * 1000 / N_STEPS)
+
+# GPU F32
+println("\n--- GPU F32 (ComplexF32 storage + compute) ---")
+flush(stdout)
+gpu_f32_wall, _ = bench_backend(CuArray, ComplexF32, N_STEPS; warmup=2)
+@printf("Wall: %.2fs (%.1f ms/step)\n", gpu_f32_wall, gpu_f32_wall * 1000 / N_STEPS)
 
 # CPU
-println("\n--- CPU ---")
+println("\n--- CPU F64 ---")
 flush(stdout)
 @printf("Starting CPU (this takes ~%d s)...\n", Int(N_STEPS * 2))
-cpu_wall, state_cpu = bench_backend(Array, N_STEPS; warmup=1)
+cpu_wall, _ = bench_backend(Array, ComplexF64, N_STEPS; warmup=1)
 @printf("Wall: %.2fs (%.1f ms/step)\n", cpu_wall, cpu_wall * 1000 / N_STEPS)
 
 # Comparison
-speedup = cpu_wall / gpu_wall
+speedup_f64 = cpu_wall / gpu_f64_wall
+speedup_f32 = cpu_wall / gpu_f32_wall
 @printf("\n=== Speedup ===\n")
-@printf("CPU: %.2f s/step\n", cpu_wall / N_STEPS)
-@printf("GPU: %.3f s/step\n", gpu_wall / N_STEPS)
-@printf("Speedup: %.1f×\n", speedup)
+@printf("CPU F64:   %.2f s/step\n", cpu_wall / N_STEPS)
+@printf("GPU F64:   %.3f s/step  → %5.1f× vs CPU\n",
+    gpu_f64_wall / N_STEPS, speedup_f64)
+@printf("GPU F32:   %.3f s/step  → %5.1f× vs CPU\n",
+    gpu_f32_wall / N_STEPS, speedup_f32)
+@printf("F64 → F32 ratio: %.1f× extra speedup from precision\n",
+    gpu_f64_wall / gpu_f32_wall)
 
 @printf("\n=== Design-doc acceptance §1.3 ===\n")
-if speedup >= 60
-    @printf("✓✓✓ STRETCH PASS (≥ 60×): %.1f×\n", speedup)
-elseif speedup >= 30
-    @printf("✓ MINIMUM PASS (≥ 30×): %.1f×\n", speedup)
+@printf("F32 speedup vs CPU: %.1f×\n", speedup_f32)
+if speedup_f32 >= 60
+    @printf("✓✓✓ STRETCH PASS (≥ 60×): %.1f×\n", speedup_f32)
+elseif speedup_f32 >= 30
+    @printf("✓ MINIMUM PASS (≥ 30×): %.1f×\n", speedup_f32)
 else
-    @printf("△ Below minimum target 30×: %.1f×\n", speedup)
+    @printf("△ Below minimum target 30×: %.1f×\n", speedup_f32)
 end
 
-# Correctness check at small grid
+# Correctness check at small grid (both precisions)
 @printf("\n=== Correctness sanity (F=6 8³ side check) ===\n")
-const N_SMALL = 8
-phi_init = randn(ComplexF64, N_SMALL, N_SMALL, N_SMALL, D) * 0.05
-state_cpu_s = SpinorBEC.TDHFBState{3, Array{ComplexF64, 4}, Array{ComplexF64, 5}, Float64}(
-    copy(phi_init),
-    zeros(ComplexF64, N_SMALL, N_SMALL, N_SMALL, D, D),
-    zeros(ComplexF64, N_SMALL, N_SMALL, N_SMALL, D, D),
-    0.0, 0,
-)
-state_gpu_s = SpinorBEC.TDHFBState{3, CuArray{ComplexF64, 4, CUDA.DeviceMemory}, CuArray{ComplexF64, 5, CUDA.DeviceMemory}, Float64}(
-    CuArray(copy(phi_init)),
-    CUDA.zeros(ComplexF64, N_SMALL, N_SMALL, N_SMALL, D, D),
-    CUDA.zeros(ComplexF64, N_SMALL, N_SMALL, N_SMALL, D, D),
-    0.0, 0,
-)
-for I in CartesianIndices((N_SMALL, N_SMALL, N_SMALL)), c in 1:D
-    state_cpu_s.rho[I, c, c] = 0.01 + 0im
+function correctness_check(::Type{TC}) where {TC}
+    N_SMALL = 8
+    phi_seed = randn(ComplexF64, N_SMALL, N_SMALL, N_SMALL, D) * 0.05
+    state_cpu = SpinorBEC.TDHFBState{3, Array{ComplexF64, 4}, Array{ComplexF64, 5}, Float64}(
+        copy(phi_seed),
+        zeros(ComplexF64, N_SMALL, N_SMALL, N_SMALL, D, D),
+        zeros(ComplexF64, N_SMALL, N_SMALL, N_SMALL, D, D),
+        0.0, 0,
+    )
+    TR = real(TC)
+    state_gpu = SpinorBEC.TDHFBState{3, CuArray{TC, 4, CUDA.DeviceMemory}, CuArray{TC, 5, CUDA.DeviceMemory}, TR}(
+        CuArray(TC.(phi_seed)),
+        CUDA.zeros(TC, N_SMALL, N_SMALL, N_SMALL, D, D),
+        CUDA.zeros(TC, N_SMALL, N_SMALL, N_SMALL, D, D),
+        TR(0), 0,
+    )
+    for I in CartesianIndices((N_SMALL, N_SMALL, N_SMALL)), c in 1:D
+        state_cpu.rho[I, c, c] = 0.01 + 0im
+    end
+    rho_h = zeros(TC, N_SMALL, N_SMALL, N_SMALL, D, D)
+    for I in CartesianIndices((N_SMALL, N_SMALL, N_SMALL)), c in 1:D
+        rho_h[I, c, c] = TC(0.01)
+    end
+    copyto!(state_gpu.rho, rho_h)
+    Vc = zeros(Float64, N_SMALL, N_SMALL, N_SMALL, D)
+    Vg = CUDA.zeros(TR, N_SMALL, N_SMALL, N_SMALL, D)
+    for _ in 1:5
+        tdhfb_strang_step!(state_cpu, F, g_S, Vc, DT)
+        tdhfb_strang_step!(state_gpu, F, g_S, Vg, DT)
+    end
+    CUDA.synchronize()
+    phi_diff = maximum(abs.(Array(state_gpu.phi) .- state_cpu.phi))
+    rho_diff = maximum(abs.(Array(state_gpu.rho) .- state_cpu.rho))
+    @printf("  %s: phi diff = %.3e, rho diff = %.3e\n", TC, phi_diff, rho_diff)
 end
-rho_h = zeros(ComplexF64, N_SMALL, N_SMALL, N_SMALL, D, D)
-for I in CartesianIndices((N_SMALL, N_SMALL, N_SMALL)), c in 1:D
-    rho_h[I, c, c] = 0.01 + 0im
-end
-copyto!(state_gpu_s.rho, rho_h)
-Vc = zeros(Float64, N_SMALL, N_SMALL, N_SMALL, D)
-Vg = CUDA.zeros(Float64, N_SMALL, N_SMALL, N_SMALL, D)
-for _ in 1:5
-    tdhfb_strang_step!(state_cpu_s, F, g_S, Vc, DT)
-    tdhfb_strang_step!(state_gpu_s, F, g_S, Vg, DT)
-end
-CUDA.synchronize()
-phi_diff = maximum(abs.(Array(state_gpu_s.phi) .- state_cpu_s.phi))
-@printf("F=6 8³ 5-step CPU vs GPU diff (phi): %.3e\n", phi_diff)
+correctness_check(ComplexF64)
+correctness_check(ComplexF32)

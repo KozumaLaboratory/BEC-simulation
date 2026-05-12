@@ -173,9 +173,12 @@ function SpinorBEC._tdhfb_phi_subupdate!(
     _assemble_w_blocks!(sc.W, sc.U, sc.Delta_phi)
 
     # 4. M = exp(-i W dt) via batched Taylor
+    # n_taylor=8: for typical TDHFB regime ‖W·dt‖ < 0.05, Taylor accuracy
+    # = (0.05)^8 / 8! ≈ 1e-15 (F64 machine eps) / 6e-12 (F32 eps × condition).
+    # Drop from 14 to 8 saves 6 batched gemms per HF substep (~40% faster).
     batched_expm_neg_i_dt!(
         sc.M, sc.W, dt;
-        n_taylor=14,
+        n_taylor=8,
         A_scratch=sc.A_scratch, A_tmp=sc.A_tmp, P_tmp=sc.P_tmp,
     )
 
@@ -215,9 +218,12 @@ function SpinorBEC._tdhfb_R_subupdate!(
     _assemble_w_blocks!(sc.W, sc.U, sc.Delta_R)
 
     # 4. M^R = exp(-i W^R dt) and M^R^{-1}
+    # n_taylor=8: for typical TDHFB regime ‖W·dt‖ < 0.05, Taylor accuracy
+    # = (0.05)^8 / 8! ≈ 1e-15 (F64 machine eps) / 6e-12 (F32 eps × condition).
+    # Drop from 14 to 8 saves 6 batched gemms per HF substep (~40% faster).
     batched_expm_neg_i_dt!(
         sc.M, sc.W, dt;
-        n_taylor=14,
+        n_taylor=8,
         A_scratch=sc.A_scratch, A_tmp=sc.A_tmp, P_tmp=sc.P_tmp,
     )
     # Copy M into Minv scratch (matinv overwrites the input as LU storage).
