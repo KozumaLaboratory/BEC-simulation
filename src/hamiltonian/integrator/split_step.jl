@@ -333,11 +333,15 @@ accounting, but the V halves are symmetric to round-off. Lets MPS-4 / Yoshida-6
 Richardson cancellation recover its nominal order on the lab path (gate test:
 `scripts/bench/mps4_lab_diagnostic.jl` and the midpoint variant of it).
 
-Costs ~1.5–2× a plain `split_step!` per call. Until adopted as default,
-opt-in only via this entry point.
+Costs ~1.5–2× a plain `split_step!` per call.
+
+The optional `dt` keyword overrides `ws.sim_params.dt` for THIS step only —
+useful for adaptive controllers (`adaptive_step!`) and composition schemes
+(Y4-mid, Y6-mid, MPS-{4,6,8}) that vary dt per substep. When `dt` is given,
+`ws.batched_kinetic.kinetic_phase_bc` is updated to match — subsequent calls
+must either pass `dt` again or rely on the always-update-on-entry semantics.
 """
-function split_step_midpoint!(ws::Workspace{N}) where {N}
-    dt = ws.sim_params.dt
+function split_step_midpoint!(ws::Workspace{N}; dt::Float64=ws.sim_params.dt) where {N}
     it = ws.sim_params.imaginary_time
     n_comp = ws.spin_matrices.system.n_components
     t = ws.state.t
@@ -353,6 +357,9 @@ function split_step_midpoint!(ws::Workspace{N}) where {N}
     @timeit_debug TIMER "coriolis" _apply_coriolis_step!(
         ws.state.psi, ws.grid, omega, dt / 2, it, ws.coriolis_cache,
     )
+    # Always-update-on-entry semantics: the batched kinetic phase cache is
+    # synced to the dt passed in. Costs O(N^ndim) elementwise cis per call.
+    _update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, dt)
     @timeit_debug TIMER "kinetic" apply_kinetic_step_batched!(
         ws.state.psi, ws.batched_kinetic,
     )

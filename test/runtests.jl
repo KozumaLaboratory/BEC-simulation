@@ -137,6 +137,7 @@ const FULL_EXTRA = [
     "hamiltonian/test_higher_order_integrators.jl",
     "hamiltonian/test_integrator_order_meanfield.jl",
     "hamiltonian/test_cfet4_order.jl",
+    "hamiltonian/test_adaptive_dt.jl",
     # Lima-Pelster Q5 + scalar eGPE
     "hamiltonian/test_lima_pelster_q5.jl",
     "rotating_basis/test_scalar_egpe_dipole_kernel.jl",

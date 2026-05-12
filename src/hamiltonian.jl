@@ -64,6 +64,7 @@ include("hamiltonian/integrator/split_step.jl")
 include("hamiltonian/integrator/split_step_composers.jl")
 include("hamiltonian/integrator/combined_spin_step.jl")
 include("hamiltonian/integrator/force_gradient.jl")
+include("hamiltonian/integrator/adaptive.jl")
 
 # TDHFB local-approximation engine (channel kernel + HF / Δ kernels +
 # voxel-local BdG Strang step + energy functional). YAML pipeline integration
