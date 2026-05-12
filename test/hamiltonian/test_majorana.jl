@@ -54,6 +54,30 @@ using LinearAlgebra
             pg = detect_point_group(spinor, 6)
             @test pg isa Symbol
         end
+
+        # U1 audit (2026-05-12): pin classification against Paper #3
+        # canonical inert states. Both successes and known gaps captured
+        # so regressions surface immediately.
+
+        @testset "Paper #3 §V.A — F=2 cyclic ζ_{T_d} → :T_d" begin
+            # Koashi-Ueda canonical F=2 cyclic state, component order
+            # (m=+2, +1, 0, -1, -2): ζ = (1, 0, i√2, 0, 1) / 2.
+            zeta_Td = ComplexF64[1.0, 0.0, im*sqrt(2.0), 0.0, 1.0] ./ 2.0
+            @test detect_point_group(zeta_Td, 2) == :T_d
+        end
+
+        @testset "Paper #3 §V.D — F=6 I_h ζ_{I_h} CURRENTLY → :unknown (U2 gap)" begin
+            # Canonical F=6 I_h state from IcosahedralMod. The Majorana
+            # stars SHOULD form an icosahedron, but detect_point_group
+            # currently returns :unknown due to spectrum-matching
+            # tolerance + handling of the root-at-infinity (m=+F=0
+            # component). U2 fixes this by tightening reference
+            # comparison and handling the ∞ root explicitly.
+            zeta_Ih = SpinorBEC.IcosahedralMod.ZETA_F6_IH
+            pg = detect_point_group(zeta_Ih, 6)
+            @test pg === :unknown                    # current behaviour
+            @test_broken pg === :I_h                 # target after U2
+        end
     end
 
     @testset "point group helpers" begin

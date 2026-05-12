@@ -1,6 +1,50 @@
 export classify_phase, classify_phase_detailed, classify_phase_distance
 export PhaseReference, DEFAULT_PHASE_REFERENCES
 
+# Phase classification — two complementary axes
+# ==============================================
+#
+# Spinor BEC ground-state phases are classified along two complementary
+# axes that are both populated by `classify_phase_detailed`:
+#
+# 1. **Magnetic-order / channel-weight axis** (`phase` field):
+#    KU-style coarse labels — :ferromagnetic / :polar / :nematic /
+#    :cyclic / :mixed / :vacuum. Derived from continuous order
+#    parameters (spin_order, nematic_order, channel_weights). Decision
+#    cascade lives in `_label_phase`. This axis is robust for F = 1, 2
+#    where the standard KU classification covers all candidate ground
+#    states.
+#
+# 2. **Point-group axis** (`point_group` field):
+#    `:I_h / :O_h / :T_d / :D_nh / :trivial / :unknown` from peak-density
+#    Majorana-star geometry via `detect_point_group`. Identifies
+#    polyhedral inert states relevant for F ≥ 2 (see Paper #3
+#    "Universal Structure Theorem for LHY Corrections in Spinor BECs",
+#    `docs/manuscript/papers/paper3_universal_theorem/main.md`).
+#
+# Paper #3 § V verification list and corresponding code support:
+#
+#   F  Phase                     Point group   Code detect_point_group
+#   -- ------------------------- ------------- -----------------------
+#   2  cyclic                    T_d           ✓ (4 stars → :T_d)
+#   3  octahedral (O:A_2)        O / O_h       ⚠ 6 stars → :O_h (but
+#                                              A_1 vs A_2 sign rep not
+#                                              distinguished)
+#   4  cube                      O_h           ✓ (8 stars → :O_h)
+#   6  icosahedral (I_h)         I_h           ✗ ZETA_F6_IH returns
+#                                              :unknown — fix scheduled
+#                                              for U2 (point-group
+#                                              extension)
+#   8  cube-like octahedral      O / O_h       ✗ 16 stars not in code
+#                                              (U2)
+#   10 dodecahedral              I_h           ✗ 20 stars not in code
+#                                              (U2)
+#   12 (paper #3 §V.G)           varied        ✗ (U2)
+#
+# The Sign Pattern Theorem (Paper #3 §VI; β_S coefficients with
+# closed-form sign-change boundary S_bd(F) = √(2F(F+1))) is exposed
+# at runtime via U3 (separate task).
+
 """
     classify_phase(psi, F, grid, sm) → NamedTuple
 
@@ -188,22 +232,35 @@ features per phase are populated), and `classify_phase_distance`
 falls back to `:unknown` when no reference is within the user-supplied
 distance threshold. New phase candidates can be appended at any time
 via the `references` kwarg without editing this constant.
+
+Cross-reference (Paper #3 verification list, §V):
+
+- F=2 cyclic → T_d residual symmetry (Paper #3 §V.A)
+- F=6 icosahedral → I_h residual symmetry (Paper #3 §V.D);
+  canonical spinor ζ_{I_h} = (0, √7/5, 0⁴, √11/5, 0⁴, -√7/5, 0)
+  lives in `SpinorBEC.IcosahedralMod.ZETA_F6_IH`.
+
+Missing entries (U2 scope):
+- F=3 octahedral (Paper #3 §V.B) — needs ζ_{F=3, O:A_2}
+- F=4 cube (Paper #3 §V.C) — needs ζ_{F=4, O_h}
+- F=8 cube-like octahedral (Paper #3 §V.E, Dy relevance) — ζ_{F=8, O:A_1}
+- F=10 dodecahedral (Paper #3 §V.F) — ζ_{F=10, I_h}
 """
 const DEFAULT_PHASE_REFERENCES = PhaseReference[
-    # F = 1
+    # F = 1 (no polyhedral inert state — Paper #3 §VI.B "F=1 exception")
     PhaseReference(:ferromagnetic, 1; spin_order=1.0, nematic_order=0.0),
     PhaseReference(:polar, 1; spin_order=0.0, nematic_order=1.0),
-    # F = 2
+    # F = 2 (KU 2000 / Ciobanu-Yip-Ho 2000; cyclic → Paper #3 §V.A T_d)
     PhaseReference(:ferromagnetic, 2; spin_order=1.0, nematic_order=0.0),
     PhaseReference(:uniaxial_nematic, 2; spin_order=0.0, nematic_order=1.0,
         biaxiality=0.0),
     PhaseReference(:biaxial_nematic, 2; spin_order=0.0, nematic_order=0.5,
-        biaxiality=1.0),
+        biaxiality=1.0),  # D_4 axial (Paper #3 §VII.A)
     PhaseReference(:cyclic, 2; spin_order=0.0, nematic_order=0.0,
-        dom_channel_S=4, dom_channel_weight=1.0),
-    # F = 6 (Eu151) — KU §7.5 candidate phases. Q6 is the icosahedral
-    # Steinhardt order (0 for axial / cyclic, ~1 for the icosahedral
-    # state). Reference values are best-guess analytic limits;
+        dom_channel_S=4, dom_channel_weight=1.0),  # T_d polyhedral
+    # F = 6 (Eu151) — KU §7.5 + Paper #3 §V.D candidate phases. Q6 is the
+    # icosahedral Steinhardt order (0 for axial / cyclic, ~1 for the
+    # I_h state). Reference values are best-guess analytic limits;
     # appending data-driven references is encouraged.
     PhaseReference(:ferromagnetic, 6; spin_order=1.0, nematic_order=0.0,
         Q6=0.0),
@@ -212,9 +269,9 @@ const DEFAULT_PHASE_REFERENCES = PhaseReference[
     PhaseReference(:cyclic, 6; spin_order=0.0, nematic_order=0.0,
         dom_channel_S=12, dom_channel_weight=1.0),
     PhaseReference(:biaxial_nematic, 6; spin_order=0.0, biaxiality=1.0,
-        Q6=0.0),
+        Q6=0.0),  # axial (Paper #3 §VII)
     PhaseReference(:icosahedral, 6; spin_order=0.0, nematic_order=0.0,
-        Q6=1.0),
+        Q6=1.0),  # Paper #3 §V.D — ZETA_F6_IH in IcosahedralMod
 ]
 
 """

@@ -187,6 +187,22 @@ pairwise angular distance spectrum against reference polyhedra.
 
 Returns `:I_h` (icosahedral), `:O_h` (octahedral/cubic), `:T_d` (tetrahedral),
 `:D_nh` (dihedral), `:trivial` (all stars clustered), or `:unknown`.
+
+Coverage (vs Paper #3 §V verification list, see
+`docs/manuscript/papers/paper3_universal_theorem/main.md`):
+
+- F=2 cyclic (T_d): ✓ recognised (`:T_d`, 4 Majorana stars).
+- F=3 octahedral (O:A_2): partial — 6 stars → `:O_h`, but the A_2 sign
+  representation (Paper #3 §V.B) is not distinguished from A_1.
+- F=4 cube (O_h): ✓ recognised (`:O_h`, 8 stars).
+- F=6 icosahedral (I_h): ✗ ZETA_F6_IH from `IcosahedralMod` returns
+  `:unknown` at the default tol=0.15 (one Majorana root at infinity
+  + spectrum-matching tolerance issue). U2 scope to fix.
+- F=8, F=10, F=12: not implemented — reference spectra for 16 / 20 / 24
+  Majorana stars are absent. U2 scope.
+
+The U1 audit (2026-05-12) pinned these coverage gaps with regression
+tests in `test/hamiltonian/test_majorana.jl`.
 """
 function detect_point_group(spinor::AbstractVector{ComplexF64}, F::Int; tol::Float64=0.15)
     n_stars = 2F
