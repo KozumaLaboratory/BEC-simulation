@@ -359,6 +359,61 @@ costs ~30 min for fixed-dt baseline and was not pursued this session.
 deferred. The controller infrastructure is operational and bench-
 testable; src/ integration is a separate follow-up session.
 
+### A3.6 — Production integration + Eu post-quench validation (2026-05-12)
+
+`src/hamiltonian/integrator/adaptive.jl` (NEW): `AdaptiveDtState` +
+`adaptive_step!` + `adaptive_run!` exported from SpinorBEC. The
+controller threads dt through a new `split_step_midpoint!(ws; dt=...)`
+kwarg — non-breaking for legacy positional callers.
+
+`test/hamiltonian/test_adaptive_dt.jl` (NEW, 18 tests PASS): dt kwarg
+backward compat + adaptive_step! single step + adaptive_run! on smooth
+Phase 2a + tighter-tol-more-steps monotonicity.
+
+Production usage:
+```julia
+ws = make_workspace(...)
+result = adaptive_run!(ws;
+    t_end=1.0, dt_init=1e-3,
+    tol_abs=1e-9, tol_rel=1e-7,
+    step!=split_step_midpoint!,
+)
+```
+
+`scripts/bench/track_a3_eu_postquench.jl` (NEW): Eu151 F=6 D=13 post-
+quench (Zeeman p: 1 → 100 quench at t=0.025, T=0.05) — design-doc §4.2
+substitute with tractable runtime (~3 min total).
+
+Results:
+
+| tol_rel | err     | wall   | n_acc | dt_min   | dt_max   |
+|---------|---------|--------|-------|----------|----------|
+| 1e-5    | 6.65e-5 | 3.1s   | 27    | 1.7e-4   | 4.0e-3   |
+| 1e-7    | 2.11e-6 | 11.4s  | 116   | 1.0e-5   | 8.9e-4   |
+| 1e-9    | 1.76e-7 | 42.7s  | 514   | 1.3e-5   | 1.9e-4   |
+
+Pareto:
+- tol=1e-5: 226% of cheapest fixed match (LOSES 2×)
+- tol=1e-7: 163% of cheapest fixed match (slight loss)
+- tol=1e-9: **NOT REACHABLE** by tested fixed-dt range — adaptive
+  uniquely covers this accuracy band
+
+dt adaptation correctly tracks the quench:
+- Pre-quench (t < 0.023): 26 steps, mean dt = 8.6e-4
+- Quench region (0.023 ≤ t ≤ 0.027): 19 steps, mean dt = 2.3e-4 (4× tighter)
+- Post-quench (t > 0.027): 71 steps, mean dt = 3.3e-4
+- Full dt span: 85× ratio
+
+**Phase A clean closure**: A1 + A2 + A3 verdicts in master plan,
+controller available via `src/`. Production recommendation:
+- General lab path: Y4-mid fixed-dt (Track A1 default).
+- Tight tolerance (err < 1e-7): `adaptive_run!` with tol_rel=1e-9
+  — the only path to err ~ 1e-7 without manually sweeping dt.
+- Multi-scale problems with localized stiffness (post-quench,
+  modulational instability): `adaptive_run!` with tol_rel=1e-7,
+  expect 1.5-2× cost vs hand-tuned fixed dt but with automatic
+  dt selection.
+
 ---
 
 ## A4: TDHFB Y4 Palindromic Substep (#86 Option B)
