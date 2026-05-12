@@ -214,8 +214,23 @@ Memory: [yaml_lab_units_design](yaml_lab_units_design.md).
 `init_psi(state=:..., init_state_params=...)` dispatch — same physics,
 named API.
 
-**Spinor LHY**: scalar approximation by default. To use the Lima-Pelster
-two-channel table, set `ground_state.spinor_lhy: two_channel`.
+**LHY config** (refactored 2026-05-12): single `lhy:` block inside the
+`ground_state` step. `kind` selects the mode; `c_lhy` is auto-derived
+via Lima-Pelster Q5(ε_dd) when omitted for `scalar` / `quasi_2d`.
+
+```yaml
+ground_state:
+  lhy:
+    kind: scalar | quasi_2d | two_channel | full_bdg |
+          polar_contact | polar_dipolar | fm_contact | fm_dipolar |
+          icosahedral | none
+    c_lhy: <override>   # optional; auto-derived for scalar / quasi_2d
+    n_max: <override>   # null → 3 × max(|psi_init|²)
+    n_points: 200
+```
+
+Legacy keys `interactions.c_lhy` + `ground_state.spinor_lhy` were
+removed in C6 of the refactor; configs must use the `lhy:` block.
 
 **Continuation API** (direct-Julia, for benches/tests): `make_params(val) → NamedTuple` overrides any `find_ground_state` kwargs per sweep point. Legacy `make_interactions(val) → InteractionParams` also supported.
 
@@ -238,11 +253,13 @@ F=6, g_J=1.9934, g_F≈1.163, μ≈6.977μ_B, a_s≈110a₀. 7 unknown scatterin
 
 These are documented quirks; do not "fix" without explicit user discussion.
 
-- **F ≥ 3 spinor LHY is research-open.** `SpinorLHYTable` covers (S=0, S=2)
-  only; for Eu151 F=6 it is incomplete. `_lhy_energy` emits a one-shot
-  `@warn` per process when `n_comp > 1`. For fully-polarized + strong DDI
-  use `compute_c_lhy_with_ddi` (Lima-Pelster scalar-with-DDI) instead. See
-  `_lhy_energy` docstring for the full menu.
+- **F ≥ 3 spinor LHY is research-open.** `TwoChannelLHY` covers (S=0, S=2)
+  only — `compute_spinor_lhy_two_channel` errors at F ≥ 3 as of C3.
+  For F ≥ 3, use a closed-form `TabulatedLHY` subtype:
+  `PolarContactLHY` / `PolarDipolarLHY` for polar phases,
+  `FMContactLHY` / `FMDipolarLHY` for FM, `IcosahedralLHY` for F=6 I_h.
+  F=6 polar + `FullBdGLHY` emits a `@warn` pointing at the closed forms
+  (~3000× spurious offset, see memory full_bdg_F6_polar_broken.md).
 - **`apply_nematic_step!` is the S=0 singlet-pair Hamiltonian, NOT the
   rank-2 nematic tensor observable.** Naming is legacy. Observable side
   is `nematic_tensor_eigenvalues` (different function). Do not conflate.
