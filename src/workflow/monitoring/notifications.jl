@@ -94,10 +94,12 @@ const _SLACK_HTTP_HINT_SHOWN = Ref(false)
     send_slack_notification(webhook_url, title, message, status)
 
 POST a Slack-formatted JSON payload to `webhook_url`. Real implementation
-lives in ext/SpinorBECHTTPExt; without `using HTTP` this stub logs a
-one-shot info message and returns.
+lives in ext/SpinorBECHTTPExt with the concrete signature
+`(::String, ::String, ::String, ::Symbol)`. This fallback uses untyped
+args so the ext's typed method dispatches first when HTTP is loaded;
+otherwise we log a one-shot hint and return.
 """
-function send_slack_notification(::String, ::String, ::String, ::Symbol)
+function send_slack_notification(_url, _title, _msg, _status)
     if !_SLACK_HTTP_HINT_SHOWN[]
         @info "Slack webhook skipped: load `using HTTP` to enable real POST."
         _SLACK_HTTP_HINT_SHOWN[] = true
