@@ -10,8 +10,8 @@ driven entirely from YAML.
 
 - **Arbitrary $F$.** The whole stack (spin matrices, Clebsch–Gordan, tensor
   interactions, observables) works for any $F$, not just $F=1$ or $F=2$.
-  Tested through $F=8$ (¹⁶⁴Dy, 17 components) and routinely run for ¹⁵¹Eu
-  ($F=6$).
+  Polyhedral state classification verified through $F=12$ (Paper #3);
+  routine production runs are ¹⁵¹Eu ($F=6$) and ¹⁶⁴Dy ($F=8$).
 - **Dipolar interactions are first-class.** $k$-space convolution in 6 FFTs,
   zero-padded or quasi-2D (erfcx kernel), with the spin-orbital coupling
   needed for Einstein–de Haas dynamics.
@@ -80,9 +80,10 @@ ext/    CUDA and Makie extensions
 bench/  Benchmarks
 ```
 
-`CLAUDE.md` is the full YAML schema reference and internal conventions.
-`docs/index.md` is the documentation map; subsystem design notes live
-under `docs/design/`.
+`docs/reference/yaml_schema_reference.md` is the full YAML schema.
+`CLAUDE.md` documents the internal conventions and architectural
+boundaries used by the code. `docs/index.md` is the documentation map;
+subsystem design notes live under `docs/design/`.
 
 ## Tests
 
@@ -90,4 +91,8 @@ under `docs/design/`.
 SPINORBEC_TEST_TIER=fast julia --project=. -e 'using Pkg; Pkg.test()'
 ```
 
-Tiers are `fast`, `ci`, `full`. CI runs all of them.
+Tiers: `fast` (unit tests only), `ci` (fast + ITP/RTP integration),
+`full` (everything; default), `physics` (analytic-validation only).
+CI runs `full`; the nightly workflow additionally flips
+`SPINORBEC_RUN_HEAVY_YAML=true` to cover the gated YAML integration
+blocks (see CLAUDE.md "Current cascade cost").
