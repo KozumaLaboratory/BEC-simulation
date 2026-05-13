@@ -1,0 +1,93 @@
+# ─────────────────────────────────────────────────────────────────────
+#  Eu151 EdH × K_3 three-body loss — A/B comparison
+#
+#  Goal: quantify the K_3 collapse-mitigation effect on Eu151 EdH 32³,
+#  using the now-correctly-routed K3_per_m_si (fix landed 2026-05-13).
+#  Pre-fix the SI input was silently downgraded to a 2-body shape, so
+#  prior K3 experiments here would not have shown the true effect.
+#
+#  Two comparison runs at the same eu151_edh_postfix_local 32³ setup:
+#
+#    baseline_no_K3 : gamma_dr only (the "kept for spin physics" form
+#                     from postfix_local; collapse-damping is weak by
+#                     design — postfix comments call it out explicitly)
+#    K3_dy_like     : adds K3_per_m_si = "1e-41 m^6/s" per component
+#                     (Dy164 order-of-magnitude reasonable for Eu;
+#                     CLAUDE.md / MEMORY.md: "桁が合っていれば崩壊
+#                     抑制効果はロバスト")
+#
+#  Expected: K3_dy_like should show
+#   - lower peak density at the runaway core (Townes-like singularity
+#     mitigation per eu151_edh_postfix_local config comments)
+#   - slow exponential decay of total norm (3-body loss signature)
+#   - identical early-time EdH spin redistribution (K_3 is local)
+# ─────────────────────────────────────────────────────────────────────
+
+defaults:
+  kind:         spinor
+  backend:      gpu
+  # N_atoms + omega_ref propagate into every step's `interactions:` so that
+  # K3_per_m_si SI-units conversion (n0 = N/a_ho³, factor = n0²/ω_ref) has
+  # the inputs it needs at every dynamics phase, not just ground_state.
+  interactions: {N_atoms: 10000, omega_ref: 691.15}
+
+mixins:
+  eu151_edh_phys:
+    atom:         Eu151
+    grid:         {n: [32, 32, 32], box: [20, 20, 20]}
+    potential:    {type: harmonic, omega: [1.0, 1.0, 1.182]}
+    interactions: {N_atoms: 10000, omega_ref: 691.15, c1_ratio: 0.0}
+
+pipeline:
+  # Phase 0: GS in prep field (same as eu151_edh_postfix_local).
+  - ground_state:
+      use:           [eu151_edh_phys]
+      B:             {Bz: "0.01 Gauss"}
+      initial_state: m_plus_F
+      lhy: {kind: scalar}
+      n_steps:       3000
+      tol:           1.0e-9
+      dt:            0.005
+
+  # Phase 1: Zeeman quench  Bz : 1.0 μT → 2.6 nT.
+  - dynamics:
+      duration: 0.14
+      dt:       0.0005
+      B:        {Bz: {from: 0.01, to: 2.6e-5, duration: 0.14}}
+      save:     {every: 280}
+
+  # Phase 2: weak-field hold — the EdH-active phase. K_3 if active is what
+  # changes between the comparison_runs branches below.
+  #
+  # Duration shortened to 0.3 ω⁻¹ (~ 0.43 ms) for the A/B comparison.
+  # Existing eu151_edh_postfix_local notes "Townes-like singularity within
+  # ~1.5 ms"; at 0.3 ω⁻¹ we capture the EdH spin redistribution + early
+  # collapse onset (where K_3 should bite hardest) while keeping wall-clock
+  # at ~15-25 min per branch. Restore to 1.0 ω⁻¹ for the full Matsui timeline.
+  - dynamics:
+      duration: 0.3
+      dt:       0.0001
+      B:        {Bz: "2.6e-5 Gauss"}
+      noise:
+        seed: 42
+        initial:
+          coherent: {amplitude: 1.0e-6, k_cut: 2.5}
+      loss:
+        gamma_dr: 0.02     # baseline — comparison branch may override
+      save:     {every: 200}
+
+scan:
+  comparison_runs:
+    - name: baseline_no_K3
+      override: {}      # use config as written: gamma_dr=0.02 only
+    - name: K3_dy_like
+      override:
+        # Activate K3_per_m_si on phase 2 (pipeline index 2 = third entry).
+        # Per-m identical 1e-41 m^6/s; Eu lacks measured K_3, this is the
+        # Dy164 order-of-magnitude proxy used as a "magnitude check".
+        pipeline.2.loss.K3_per_m_si:
+          ["1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s",
+           "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s",
+           "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s",
+           "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s",
+           "1.0e-41 m^6/s"]

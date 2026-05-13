@@ -91,6 +91,10 @@ function _save_dynamics_timeseries!(f, result)
     f["dynamics/energies"] = collect(Float64, dr.energies)
     f["dynamics/norms"] = collect(Float64, dr.norms)
     f["dynamics/magnetizations"] = collect(Float64, dr.magnetizations)
+    # Alias `magnetizations` (= ⟨F_z⟩ integrated) under the canonical
+    # `dynamics/Fz` key so downstream analyzers built for the rotating_basis
+    # layout (which uses Fz) work on spinor-path results without branching.
+    f["dynamics/Fz"] = collect(Float64, dr.magnetizations)
 
     # Snapshots arrive via two paths now:
     #   (A) Streamed: the dynamics step wrote ComplexF32 frames to a
@@ -114,6 +118,7 @@ function _save_dynamics_timeseries!(f, result)
             ndim = length(n_pts_v)
 
             pops = zeros(Float64, n_snaps, D)
+            peak_density = zeros(Float64, n_snaps)
             f["dynamics/psi_snapshots_streamed/n_snapshots"] = n_snaps
             f["dynamics/psi_snapshots_streamed/spatial_shape"] = n_pts_v
             f["dynamics/psi_snapshots_streamed/n_components"] = D
@@ -123,12 +128,18 @@ function _save_dynamics_timeseries!(f, result)
                 frame = src[skey]::Array{ComplexF32}
                 f["dynamics/psi_snapshots_streamed/" * skey] = frame
                 total = sum(abs2, frame)
+                # Per-frame max total density (collapse-onset proxy).
+                # Sum |ψ_m|² across the spinor axis voxel-by-voxel, then max.
+                n_tot = dropdims(sum(abs2, frame; dims=ndims(frame));
+                    dims=ndims(frame))
+                peak_density[s] = Float64(maximum(n_tot))
                 for c in 1:D
                     idx = ntuple(d -> d <= ndim ? (1:n_pts_v[d]) : c, ndim + 1)
                     pops[s, c] = sum(abs2, view(frame, idx...)) / max(total, 1e-30)
                 end
             end
             f["dynamics/component_populations"] = pops
+            f["dynamics/peak_density"] = peak_density
         end
         rm(tmp_path; force=true)
     elseif hasproperty(dr, :psi_snapshots) && !isempty(dr.psi_snapshots)
