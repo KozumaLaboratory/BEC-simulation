@@ -15,7 +15,11 @@
         @test lp3.L3 == 0.0
     end
 
-    @testset "L3_per_m: spin-dependent three-body loss (spin-1)" begin
+    @testset "L3_per_m: spin-dependent legacy 2-body-shape loss (spin-1)" begin
+        # NOTE: name is historical — `L3_per_m` applies as `exp(-γ·n·dt/2)`,
+        # i.e. linear in n. True 3-body (quadratic in n) lives in
+        # `K3_per_m_cubic`. See LossParams docstring in
+        # src/foundation/types/ddi_loss.jl.
         config = GridConfig(32, 20.0)
         grid = make_grid(config)
         sys = SpinSystem(1)

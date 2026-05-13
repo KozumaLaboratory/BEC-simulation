@@ -44,7 +44,55 @@ These return `on_step` closures and compose freely:
 | `pulse_sequence:`   | list of pulse spec dicts                 | composes Zeeman / Raman / interactions for the phase  |
 | `live_monitor:`     | `true` \| `{every: N}`                   | atomically writes `<run>/_live_status.json` every N steps for `/api/live/*` |
 
-`K3_per_m_si` accepts Unitful strings; if exactly one entry is given it is broadcast across all `D = 2F+1` components.
+### Three-body loss `K3_per_m_si`
+
+`K3_per_m_si` accepts Unitful strings (`m^6/s`); the SI value is converted to
+the dimensionless rate via `K3_dimless = K3_SI · n0² / ω_ref`, where
+`n0 = N_atoms / a_ho³` and `a_ho = √(ℏ / (m·ω_ref))`. The conversion needs
+`atom + N_atoms + omega_ref`, so dynamics steps using `K3_per_m_si` MUST
+have those reachable in their `interactions:` block. The idiomatic way is
+the top-level `defaults:` block:
+
+```yaml
+defaults:
+  interactions: {N_atoms: 10000, omega_ref: 691.15}   # propagated to every step
+
+pipeline:
+  - ground_state:
+      interactions: {c0: 1.5e3, c1_ratio: 0.028, ...}
+      ...
+  - dynamics:
+      duration: 1.0
+      dt: 1.0e-4
+      loss:
+        gamma_dr: 0.02
+        K3_per_m_si:                                   # one per m_F, length 2F+1
+          ["1.0e-41 m^6/s", "1.0e-41 m^6/s", ..., "1.0e-41 m^6/s"]
+      save: {every: 200}
+```
+
+The kernel applies `exp(-K_3 · n_tot² · dt / 2)` per component, i.e. the
+**true 3-body** form `dn_m/dt = -K_3 n² n_m`. For polarized BECs near the
+roton-instability boundary this acts as a soft cap on density spikes —
+the rate scales as `n²`, biting hardest at the runaway core. EdH magnetic-
+vortex-core simulations were the motivating use case
+(`runs/eu151_edh_k3_compare/`).
+
+If you want the **legacy 2-body-shape** rate (`dn_m/dt = -γ n n_m`,
+linear in n; sometimes used for calibration against measured `L3_eff·n0`
+constants), use `L3` / `L3_per_m`. The name is historical — same loss
+struct, different application form.
+
+Routing summary:
+
+| YAML key                                 | LossParams field    | Application form              |
+|------------------------------------------|---------------------|-------------------------------|
+| `L3`, `L3_per_m`                         | `L3` / `L3_per_m`   | `exp(-γ n dt / 2)`   (linear) |
+| `K3_cubic`, `K3_per_m_cubic`, `K3_per_m` | `K3_per_m_cubic`    | `exp(-K_3 n² dt / 2)` (true 3-body) |
+| `K3_per_m_si`                            | `K3_per_m_cubic` (via `n0²/ω_ref`) | same as above |
+
+Pre-2026-05-13 the SI input was mis-routed into `L3_per_m` (linear-in-n);
+fix in commit `6bfe9d9`. Regression test in `test/workflow/test_pipeline.jl`.
 
 ## Initial-condition perturbations
 

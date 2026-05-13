@@ -86,6 +86,10 @@ Fields:
   (Phase 4 #40): atoms in regions where the local potential energy
   exceeds `evap_energy_cutoff` are removed at rate `evap_rate`. Models
   RF-knife evaporative cooling. Both must be non-zero to activate.
+  Currently scalar (uniform across m_F components); spin-selective
+  evaporation (per-m vector) is not implemented — add via per-m vector
+  fields if a use case emerges (the apply_loss_step! evap branch already
+  iterates per-c, so the kernel side is ready).
 """
 struct LossParams
     gamma_dr::Float64
@@ -97,6 +101,9 @@ struct LossParams
     evap_rate::Float64
 end
 
+# Convenience positional constructors — bridge YAML scalar `loss: 0.02`
+# (→ `LossParams(0.02)`) to the full keyword-rich form. Prefer the keyword
+# constructor below for any new code.
 LossParams(gamma_dr::Float64) = LossParams(gamma_dr, 0.0, Float64[], 0.0, Float64[], 0.0, 0.0)
 LossParams(gamma_dr::Float64, L3::Float64) = LossParams(
     gamma_dr, L3, Float64[], 0.0, Float64[], 0.0, 0.0

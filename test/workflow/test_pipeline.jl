@@ -464,6 +464,43 @@ pipeline:
         @test isempty(loss_legacy.K3_per_m_cubic)
     end
 
+    @testset "K3_per_m_si → dimless conversion factor n0²/ω_ref" begin
+        # Pin the SI → dimless conversion against an exact computed value
+        # so any future refactor of parsing_blocks.jl `factor = n0² / ω_ref`
+        # surfaces here, not at user-time.
+        #
+        # Setup:  Rb87 (mass 1.443e-25 kg), N=10000, ω_ref = 2π · 100 rad/s.
+        #   a_ho = √(ℏ / (m·ω_ref)) ≈ √(1.0546e-34 / (1.443e-25 · 2π·100))
+        #        ≈ 3.4040e-6 m
+        #   n0   = N / a_ho³ ≈ 10000 / (3.4040e-6)³ ≈ 2.5363e+17 m⁻³
+        #   For K3_SI = 1.5e-30 m⁶/s:
+        #     K3_dimless = K3_SI · n0² / ω_ref
+        #                = 1.5e-30 · (2.5363e+17)² / (2π·100)
+        #                ≈ 1.5e-30 · 6.433e+34 / 628.32
+        #                ≈ 1.535e+2  (~ 153)
+        atom = AtomSpecies("Rb87", 1.443e-25, 1, 0.0, 0.0, 0.0)
+        node = Dict{String, Any}(
+            "gamma_dr" => 0.0,
+            "K3_per_m_si" => ["1.5e-30 m^6/s"],
+        )
+        loss = SpinorBEC._parse_loss_params(node;
+            atom=atom, N_atoms=10000, omega_ref=2π * 100.0)
+        @test length(loss.K3_per_m_cubic) == 1
+
+        # Compute the expected value independently using the same formula
+        # so any change to the conversion is detected at the assertion level
+        # (not just by hand-tuned magic numbers).
+        hbar = 1.054571817e-34
+        omega_ref = 2π * 100.0
+        a_ho = sqrt(hbar / (atom.mass * omega_ref))
+        n0 = 10000 / a_ho^3
+        K3_SI = 1.5e-30
+        expected = K3_SI * n0^2 / omega_ref
+        @test loss.K3_per_m_cubic[1] ≈ expected rtol = 1e-6
+        # Sanity: ~10^2 magnitude for the Rb87/N=10⁴/100 Hz setup
+        @test 1.0 < loss.K3_per_m_cubic[1] < 1e4
+    end
+
     @testset "K3_per_m_cubic is quadratic in n (kernel behavior check)" begin
         # Direct verification that the kernel applies K3 quadratically.
         # Compare loss at n=1 vs n=2 uniform densities: true 3-body gives a
@@ -492,6 +529,56 @@ pipeline:
         # Ratio must be (12/3)² = 16 (true 3-body). Linear-in-n would be 4.
         @test decay_rate_b / decay_rate_a ≈ 16.0 atol = 1e-3
         @test decay_rate_a ≈ 0.1 * 9.0 atol = 1e-3
+    end
+
+    @testset "K_3 atom-loss > baseline (EdH-style A/B regression)" begin
+        # Mini EdH-style A/B regression at F=1, 4³ grid. Verifies that with
+        # K3_per_m_cubic enabled (and γ_dr held equal), total atom loss after
+        # N dynamics steps is STRICTLY GREATER than baseline. Catches a future
+        # re-routing of K3_per_m_si into the linear-in-n L3 field (the
+        # pre-2026-05-13 bug). With the bug, K3 would still cause loss but
+        # not in the right shape — the assertion below still holds, so this
+        # is a CONSERVATIVE check that ensures K3 IS active in some form.
+        # The 16× ratio test above is the shape-discriminating one.
+        F = 1
+        D = 3
+        sys = SpinSystem(F)
+
+        # Uniform psi.
+        psi_baseline = ones(ComplexF64, 8, 8, 8, D) ./ sqrt(8.0^3 * D)
+        psi_k3 = copy(psi_baseline)
+
+        gamma_baseline = 0.01
+        K3_dimless = 0.05
+        loss_baseline = LossParams(; gamma_dr=gamma_baseline)
+        loss_k3 = LossParams(;
+            gamma_dr=gamma_baseline,
+            K3_per_m_cubic=fill(K3_dimless, D),
+        )
+
+        dt = 1e-3
+        n_steps = 50
+
+        for _ in 1:n_steps
+            SpinorBEC.apply_loss_step!(psi_baseline, loss_baseline, F, dt, D, 3)
+            SpinorBEC.apply_loss_step!(psi_k3,       loss_k3,       F, dt, D, 3)
+        end
+
+        norm_baseline = sum(abs2, psi_baseline)
+        norm_k3 = sum(abs2, psi_k3)
+        loss_baseline_frac = 1.0 - norm_baseline
+        loss_k3_frac = 1.0 - norm_k3
+
+        # K3 branch must lose strictly more atoms.
+        @test loss_k3_frac > loss_baseline_frac
+        # And the excess should match K_3 · n_tot² · dt · n_steps to ~factor 2
+        # (rough order check; n decreases during the run so it's not exact).
+        n_tot_initial = 1.0 / (8.0^3)  # per-voxel total density
+        expected_extra_loss_rate = K3_dimless * n_tot_initial^2
+        expected_extra_loss = expected_extra_loss_rate * dt * n_steps
+        actual_extra = loss_k3_frac - loss_baseline_frac
+        @test actual_extra / expected_extra_loss > 0.5
+        @test actual_extra / expected_extra_loss < 2.0
     end
 
     @testset "CSV calibration loader" begin

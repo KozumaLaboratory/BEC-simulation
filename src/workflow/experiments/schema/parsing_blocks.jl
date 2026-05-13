@@ -124,12 +124,22 @@ function _parse_loss_params(
     if haskey(node, "K3_per_m_si")
         atom === nothing && throw(
             ArgumentError(
-                "K3_per_m_si requires atom information (passed via dynamics step parsing)"),
+                "K3_per_m_si requires atom information. Set `atom: <Species>` on a " *
+                "ground_state step in the same pipeline."),
         )
-        N_atoms === nothing && throw(ArgumentError(
-            "K3_per_m_si requires interactions.N_atoms"))
-        omega_ref === nothing && throw(ArgumentError(
-            "K3_per_m_si requires interactions.omega_ref"))
+        (N_atoms === nothing || omega_ref === nothing) && throw(ArgumentError(
+            "K3_per_m_si requires interactions.N_atoms AND interactions.omega_ref " *
+            "for the n0²/ω_ref SI→dimless conversion. The idiomatic fix is the " *
+            "top-level `defaults:` block:\n\n" *
+            "  defaults:\n" *
+            "    interactions: {N_atoms: <N>, omega_ref: <Hz·2π>}\n\n" *
+            "so every step (including this dynamics phase) inherits the values. " *
+            "Currently missing: " *
+            (N_atoms === nothing ? "N_atoms" : "") *
+            (N_atoms === nothing && omega_ref === nothing ? " AND " : "") *
+            (omega_ref === nothing ? "omega_ref" : "") *
+            ". See docs/reference/dynamics.md `Three-body loss K3_per_m_si` for " *
+            "a worked example."))
         a_ho = sqrt(Units.HBAR / (atom.mass * Float64(omega_ref)))
         n0 = Float64(N_atoms) / a_ho^3
         # K_3 [m^6/s] · n0² [m^-6] / ω_ref [1/s] → dimless rate for
