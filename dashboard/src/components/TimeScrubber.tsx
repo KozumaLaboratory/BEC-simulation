@@ -7,12 +7,15 @@ interface Props {
   meta: SnapshotsMeta | null
   snapIdx: number
   onChange: (idx: number) => void
-  fps?: number // playback target (ignored when durationSec is set)
-  /** when true, the play loop holds the current frame instead of
-   * advancing — prevents request pile-up when the backend can't keep up. */
+  /** Fixed frame rate (frames per real-time second). When set, overrides
+   * the durationSec dropdown — used by the legacy non-snapshot viewer. */
+  fps?: number
+  /** When true the play loop holds the current frame instead of
+   * advancing — prevents the rAF tick from racing ahead of a backend
+   * that hasn't returned the next slab yet. */
   loading?: boolean
-  /** Optional default playback duration in seconds for one full pass
-   * through all snapshots. The user can override via the dropdown. */
+  /** Initial value for the duration dropdown (one full pass in N
+   * seconds). The user can override via the dropdown. */
   defaultDurationSec?: number
 }
 
@@ -26,8 +29,14 @@ const DURATION_OPTIONS = [
   { sec: 20, label: '20 s' },
 ]
 
-// Minimal time scrubber. Slider spans [1, n_snapshots] (1-indexed to match
-// Julia conventions); play advances at ~fps frames/sec and wraps at the end.
+/**
+ * 1-indexed (Julia conventions) snapshot scrubber. Slider spans
+ * `[1, n_snapshots]`; the play button drives a requestAnimationFrame
+ * loop that hits `targetSnap = 1 + floor((elapsedSec % durationSec) /
+ * durationSec * n)`. durationSec from the dropdown controls how long a
+ * full pass takes. Frames are visually skipped when n/durationSec
+ * exceeds the display refresh rate.
+ */
 export function TimeScrubber({
   meta,
   snapIdx,
@@ -40,86 +49,23 @@ export function TimeScrubber({
   const [durationSec, setDurationSec] = useState<number>(defaultDurationSec)
   const n = meta?.n_snapshots ?? 0
 
-  // Latest snapIdx + loading + onChange via refs so the rAF loop reads
-  // current values without being re-created on every tick. onChange in
-  // particular gets a new reference on every parent render (View3D
-  // declares `setSnapIdx = (n) => setUrl({snap: n})` inline); having it
-  // in the effect dep list would cancel/restart the rAF on every snap
-  // update, which re-anchors startTime and freezes playback at the
-  // current frame.
-  const snapIdxRef = useRef(snapIdx)
-  const loadingRef = useRef(loading)
-  const onChangeRef = useRef(onChange)
-  useEffect(() => {
-    snapIdxRef.current = snapIdx
-  }, [snapIdx])
-  useEffect(() => {
-    loadingRef.current = loading
-  }, [loading])
-  useEffect(() => {
-    onChangeRef.current = onChange
-  }, [onChange])
-
-  // rAF-driven elapsed-time loop. durationSec means "one full pass in N
-  // seconds, exactly" — the loop computes the target snap from elapsed
-  // wall-clock instead of advancing by `+1` per tick. Visual smoothness
-  // is capped by the display refresh rate (frames are skipped when
-  // n / durationSec exceeds the display fps), but the playback wall
-  // duration matches the dropdown value precisely. The legacy fps prop
-  // takes precedence if supplied (fixed frame rate for non-snapshot
-  // viewers).
-  useEffect(() => {
-    if (!playing || n === 0) return
-    let cancelled = false
-    let rafId = 0
-    let startTime: number | null = null
-
-    const tick = (now: number) => {
-      if (cancelled) return
-      if (loadingRef.current) {
-        // Initial atlas fetch is in flight — hold startTime relative so
-        // the elapsed-based index doesn't skip ahead while we wait.
-        startTime = null
-        rafId = requestAnimationFrame(tick)
-        return
-      }
-      if (startTime === null) {
-        // Anchor t=0 to the *previous* snap so play resumes from where
-        // the user left it instead of jumping to frame 1.
-        const startSnap = Math.max(1, snapIdxRef.current)
-        startTime = now - ((startSnap - 1) / n) * durationSec * 1000
-      }
-      const elapsedSec = (now - startTime) / 1000
-      let targetSnap: number
-      if (fps !== undefined) {
-        // Legacy fixed-rate path — snap = 1 + floor(elapsedSec * fps), wrap.
-        targetSnap = ((Math.floor(elapsedSec * fps)) % n) + 1
-      } else {
-        const cycleSec = elapsedSec % durationSec
-        targetSnap = Math.min(n, Math.floor((cycleSec / durationSec) * n) + 1)
-      }
-      if (targetSnap !== snapIdxRef.current) {
-        onChangeRef.current(targetSnap)
-      }
-      rafId = requestAnimationFrame(tick)
-    }
-    rafId = requestAnimationFrame(tick)
-    return () => {
-      cancelled = true
-      if (rafId) cancelAnimationFrame(rafId)
-    }
-  }, [playing, n, durationSec, fps])
+  usePlaybackLoop({
+    playing,
+    n,
+    durationSec,
+    fps,
+    loading,
+    snapIdx,
+    onChange,
+  })
 
   if (!meta || meta.n_snapshots === 0) return null
 
+  // Render a placeholder when t is missing (meta.times.length < n_snapshots,
+  // observed on eu151_edh_k3_compare). Keeps the row width stable and
+  // avoids layout shift of the <select> sibling at the last frame.
   const t = meta.times?.[snapIdx - 1]
-  // Render a placeholder when t is missing (happens when meta.times.length
-  // < n_snapshots — observed on eu151_edh_k3_compare where snap 18 has no
-  // dynamics/times entry). Keeps the row width stable and avoids layout
-  // shift of the <select> sibling at the last frame.
-  const tFmt = t !== undefined
-    ? ` · t = ${t.toFixed(2)} ω⁻¹`
-    : ` · t = — ω⁻¹`
+  const tFmt = t !== undefined ? ` · t = ${t.toFixed(2)} ω⁻¹` : ` · t = — ω⁻¹`
 
   return (
     <div className="flex items-center gap-2 px-2 py-1.5 rounded-md border bg-card/50">
@@ -149,11 +95,7 @@ export function TimeScrubber({
       >
         <FastForward />
       </Button>
-      <DebouncedRangeInput
-        n={n}
-        snapIdx={snapIdx}
-        onChange={onChange}
-      />
+      <DebouncedRangeInput n={n} snapIdx={snapIdx} onChange={onChange} />
       <div className="text-xs text-muted-foreground tabular-nums whitespace-nowrap">
         {snapIdx} / {n}
         <span className="text-muted-foreground/70">{tFmt}</span>
@@ -174,18 +116,103 @@ export function TimeScrubber({
   )
 }
 
+// --- helpers ---------------------------------------------------------
+
+/**
+ * Hold a ref synced to the latest value of `v`. Use this when an effect
+ * needs to read the freshest closure but must not re-run when the value
+ * changes (rAF anchors, event handlers in long-lived effects, etc).
+ */
+function useLatestRef<T>(v: T) {
+  const ref = useRef(v)
+  useEffect(() => {
+    ref.current = v
+  }, [v])
+  return ref
+}
+
+interface PlaybackLoopArgs {
+  playing: boolean
+  n: number
+  durationSec: number
+  fps?: number
+  loading: boolean
+  snapIdx: number
+  onChange: (idx: number) => void
+}
+
+/**
+ * rAF-driven elapsed-time playback. The tick computes its target snap
+ * from wall-clock so durationSec is exact regardless of display refresh
+ * rate. snapIdx / loading / onChange flow through refs to keep the
+ * effect deps stable — otherwise every parent render (View3D recreates
+ * `setSnapIdx` inline) would cancel the rAF and re-anchor startTime,
+ * freezing playback near the current frame.
+ */
+function usePlaybackLoop({
+  playing,
+  n,
+  durationSec,
+  fps,
+  loading,
+  snapIdx,
+  onChange,
+}: PlaybackLoopArgs) {
+  const loadingRef = useLatestRef(loading)
+  const snapIdxRef = useLatestRef(snapIdx)
+  const onChangeRef = useLatestRef(onChange)
+
+  useEffect(() => {
+    if (!playing || n === 0) return
+    let cancelled = false
+    let rafId = 0
+    let startTime: number | null = null
+
+    const tick = (now: number) => {
+      if (cancelled) return
+      if (loadingRef.current) {
+        // Initial atlas fetch in flight — hold startTime relative so the
+        // elapsed-based index doesn't skip ahead while we wait.
+        startTime = null
+        rafId = requestAnimationFrame(tick)
+        return
+      }
+      if (startTime === null) {
+        // Anchor t=0 to the *previous* snap so play resumes from where
+        // the user left it instead of jumping to frame 1.
+        const startSnap = Math.max(1, snapIdxRef.current)
+        startTime = now - ((startSnap - 1) / n) * durationSec * 1000
+      }
+      const elapsedSec = (now - startTime) / 1000
+      const targetSnap = fps !== undefined
+        ? (Math.floor(elapsedSec * fps) % n) + 1
+        : Math.min(n, Math.floor(((elapsedSec % durationSec) / durationSec) * n) + 1)
+      if (targetSnap !== snapIdxRef.current) {
+        onChangeRef.current(targetSnap)
+      }
+      rafId = requestAnimationFrame(tick)
+    }
+    rafId = requestAnimationFrame(tick)
+    return () => {
+      cancelled = true
+      if (rafId) cancelAnimationFrame(rafId)
+    }
+  }, [playing, n, durationSec, fps, loadingRef, snapIdxRef, onChangeRef])
+}
+
 interface DebouncedRangeInputProps {
   n: number
   snapIdx: number
   onChange: (idx: number) => void
 }
 
-// Drag-time slider with rAF-coalesced commits. The native <input type=range>
-// fires onInput on every pixel of mouse motion (50+ events/sec); without
-// debouncing each one queues a density_bin GET, and even with the loading
-// gate the request log balloons. Coalescing to one commit per animation
-// frame caps fetches at ~60/sec and matches the perceived smoothness of the
-// drag.
+/**
+ * Drag-time slider with rAF-coalesced commits. The native
+ * `<input type="range">` fires onInput on every pixel of mouse motion
+ * (50+ events/s); without coalescing each one queued a density_bin GET
+ * and the request log ballooned. One commit per animation frame caps
+ * fetches at ~60/s and matches perceived drag smoothness.
+ */
 function DebouncedRangeInput({ n, snapIdx, onChange }: DebouncedRangeInputProps) {
   const [local, setLocal] = useState(snapIdx)
   const rafRef = useRef<number | null>(null)
@@ -196,9 +223,12 @@ function DebouncedRangeInput({ n, snapIdx, onChange }: DebouncedRangeInputProps)
     setLocal(snapIdx)
   }, [snapIdx])
 
-  useEffect(() => () => {
-    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
-  }, [])
+  useEffect(
+    () => () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+    },
+    [],
+  )
 
   const handleInput = (e: ChangeEvent<HTMLInputElement>) => {
     const v = Number(e.target.value)
