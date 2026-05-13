@@ -74,7 +74,13 @@ export function TimeScrubber({
   if (!meta || meta.n_snapshots === 0) return null
 
   const t = meta.times?.[snapIdx - 1]
-  const tFmt = t !== undefined ? ` · t = ${t.toFixed(2)} ω⁻¹` : ''
+  // Render a placeholder when t is missing (happens when meta.times.length
+  // < n_snapshots — observed on eu151_edh_k3_compare where snap 18 has no
+  // dynamics/times entry). Keeps the row width stable and avoids layout
+  // shift of the <select> sibling at the last frame.
+  const tFmt = t !== undefined
+    ? ` · t = ${t.toFixed(2)} ω⁻¹`
+    : ` · t = — ω⁻¹`
 
   return (
     <div className="flex items-center gap-2 px-2 py-1.5 rounded-md border bg-card/50">
