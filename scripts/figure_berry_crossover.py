@@ -10,7 +10,7 @@ Fetches the aggregated scan summary from the SpinorBEC dashboard
   (c) Fz drift Δ⟨F_z⟩ = F_z_final − F_z_init vs p
   (d) Larmor phase per integrator step vs p, with regime bands
 
-Output: figs/berry_crossover.{pdf,png}
+Output: docs/figs/berry_crossover.{pdf,png}
 
 Usage:
   # dashboard must be running at localhost:8765
@@ -52,7 +52,7 @@ def main() -> int:
     ap.add_argument("--host", default="localhost")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--scan", default="berry_crossover_scan")
-    ap.add_argument("--out", default="figs/berry_crossover")
+    ap.add_argument("--out", default="docs/figs/berry_crossover")
     args = ap.parse_args()
 
     data = fetch_scan(args.host, args.port, args.scan)
