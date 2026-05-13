@@ -129,12 +129,23 @@ function find_ground_state(;
     dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
     spinor_lhy::Union{Nothing, Symbol}=nothing,
     method::Symbol=:strang,
+    m_lbfgs::Int=10,
+    sobolev_alpha::Float64=0.0,
     verbose::Bool=_default_solver_verbose(),
 )
+    if method === :lbfgs
+        return find_ground_state_lbfgs(;
+            grid, atom, interactions, zeeman, potential,
+            n_steps, tol, initial_state, init_state_params, psi_init,
+            enable_ddi, c_dd, secular_ddi, quasi_2d_ddi, l_z_ddi,
+            target_magnetization, backend, m_lbfgs, verbose, light_shift,
+            dtype, sobolev_alpha,
+        )
+    end
     method === :strang || throw(
         ArgumentError(
-            "find_ground_state currently supports method=:strang only " *
-            "(got :$method). The :sc4 path was disabled pending verified " *
+            "find_ground_state: method=:$method not supported " *
+            "(known: :strang, :lbfgs). The :sc4 path was disabled pending verified " *
             "complex-coefficient symmetric-conjugate weights — see " *
             "src/solvers/embedded_adaptive.jl for the design note."),
     )

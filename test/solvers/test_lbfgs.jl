@@ -82,4 +82,39 @@ using LinearAlgebra
         # well before hitting n_steps=100.
         @test result.dE < 1e-4
     end
+
+    @testset "find_ground_state(method=:lbfgs) dispatch matches direct call" begin
+        grid = make_grid(GridConfig(32, 16.0))
+        interactions = InteractionParams(5.0, -0.2)
+        trap = HarmonicTrap(1.0)
+
+        r_direct = find_ground_state_lbfgs(;
+            grid, atom=Rb87, interactions, potential=trap,
+            n_steps=100, tol=1e-7,
+            initial_state=:ferromagnetic,
+            verbose=false,
+        )
+
+        r_dispatch = find_ground_state(;
+            grid, atom=Rb87, interactions, potential=trap,
+            n_steps=100, tol=1e-7,
+            initial_state=:ferromagnetic,
+            method=:lbfgs,
+            verbose=false,
+        )
+
+        @test r_dispatch.energy ≈ r_direct.energy atol=1e-10
+        @test r_dispatch.last_step == r_direct.last_step
+        @test r_dispatch.converged == r_direct.converged
+    end
+
+    @testset "find_ground_state errors on unknown method" begin
+        grid = make_grid(GridConfig(16, 8.0))
+        interactions = InteractionParams(1.0, 0.0)
+        trap = HarmonicTrap(1.0)
+        @test_throws ArgumentError find_ground_state(;
+            grid, atom=Rb87, interactions, potential=trap,
+            n_steps=10, method=:bogus,
+        )
+    end
 end
