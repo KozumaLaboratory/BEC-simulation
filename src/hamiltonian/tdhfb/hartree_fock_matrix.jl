@@ -11,11 +11,21 @@
 # Phase 2 minimal scope = HF matrix kernel; full coupled (φ, ρ, κ) evolution +
 # Strang TDHFB integrator + YAML pipeline integration are Phase 3-4.
 #
-# NOTE: this F=1 kernel is the GP-form (first functional derivative of E_int).
-# It is the reference for the C5 GP-reduction conservation test. The generic
-# `hf_matrix_generic!` returns the BdG self-energy (second derivative form,
-# factor-2 Bose-symmetrized) — the two differ by exactly the factor 2 in the
-# κ=0 case.
+# **`hf_matrix_F1!` vs `hf_matrix_generic!` is NOT duplication** — the two
+# kernels return DIFFERENT mathematical objects:
+#
+#   - `hf_matrix_F1!`       → GP-form  (∂E_int / ∂φ*_m) / φ
+#                              (1st functional derivative; acts on φ to give
+#                               the GP Hamiltonian; this is the C5 reduction
+#                               reference for the conservation test)
+#   - `hf_matrix_generic!`  → BdG self-energy   ∂²E_int / ∂φ*_m ∂φ_{m'}
+#                              (2nd functional derivative; the diagonal block
+#                               of the BdG L(k); factor 2 Bose-symmetrised)
+#
+# Both forms are correct for their respective uses; they differ by exactly
+# the factor 2 in the diagonal self-pair element (m2 = m2') where the GP
+# 1st-derivative form chain-rules through φ. Do NOT "unify" by deleting one
+# in favour of the other — they're called from different code paths.
 
 export hf_matrix_F1, hf_matrix_F1!
 
@@ -56,6 +66,14 @@ Generic F + g_S channel decomposition deferred to Phase 2 extension.
 # Returns
 The h_hf array (for chaining).
 """
+# NOT GENERALIZABLE: `hf_matrix_F1!` and `hf_matrix_generic!` return DIFFERENT objects.
+# Reason: math
+# Why: `hf_matrix_F1!` returns the GP-form (1st functional derivative,
+#   δE_int/δφ_m* divided through by φ); `hf_matrix_generic!` returns the BdG
+#   self-energy (2nd functional derivative, δ²E_int/δφ_m*δφ_m'). They differ
+#   by exactly the factor 2 in the diagonal self-pair element. Do NOT "unify"
+#   by deleting one — they are called from different paths (GP vs BdG block).
+# See: src/hamiltonian/tdhfb/hartree_fock_matrix_generic.jl, KU 2012 §3.2
 function hf_matrix_F1!(
     h_hf::AbstractArray,
     phi::AbstractArray,
@@ -105,8 +123,12 @@ function hf_matrix_F1!(
         # F_x · ρ trace: (sqrt2/2)·(ρ[1,2] + ρ[2,1] + ρ[2,3] + ρ[3,2])
         # F_y · ρ trace: (sqrt2/2)·(...) for Fy structure
         tr_Fz_rho = real(rho[idx, 1, 1] - rho[idx, 3, 3])
-        tr_Fx_rho = real(sqrt2/2 * (rho[idx, 1, 2] + rho[idx, 2, 1] + rho[idx, 2, 3] + rho[idx, 3, 2]))
-        tr_Fy_rho = real(sqrt2*im/2 * (rho[idx, 2, 1] - rho[idx, 1, 2] + rho[idx, 3, 2] - rho[idx, 2, 3]))
+        tr_Fx_rho = real(
+            sqrt2/2 * (rho[idx, 1, 2] + rho[idx, 2, 1] + rho[idx, 2, 3] + rho[idx, 3, 2])
+        )
+        tr_Fy_rho = real(
+            sqrt2*im/2 * (rho[idx, 2, 1] - rho[idx, 1, 2] + rho[idx, 3, 2] - rho[idx, 2, 3])
+        )
 
         Fx_total = Fx_phi + tr_Fx_rho
         Fy_total = Fy_phi + tr_Fy_rho

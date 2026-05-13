@@ -1,3 +1,30 @@
+# NOT GENERALIZABLE: 23 type parameters intentionally pin every Workspace field.
+# Reason: type-inference
+# Why: every `Union{Nothing, ConcreteStruct}` field gets its own parameter so the
+#   compiler specialises through it. Collapsing parameters re-introduces the
+#   inference cascade — observed 2026-03 as a 30-min JIT hang when `Grid{N}`
+#   was used instead of `Grid{N, T}`. Do NOT "simplify" without running the
+#   make_workspace timing regression.
+# See: CLAUDE.md §"Type stability boundaries", MEMORY pitfall_partial_type_params_in_struct_fields
+#
+# DESIGN NOTE — why Workspace and RotatingBasisWS are NOT a shared AbstractWorkspace
+# (re-evaluated 2026-05-13; permanent decision):
+# (1) Tiny common surface — only grid::Grid{N,T}, spin_matrices, backend overlap.
+#     The other ~13/~10 fields are mutually exclusive (Workspace: tensor_cache,
+#     coriolis_cache, time_dep_interactions, magnetic_gradient, absorbing_mask,
+#     loss, light_shift, raman; RotatingBasisWS: theta/phi_func + their dots,
+#     psi_tilde + psi_lab + rotation_scratch + kspace/xspace phase buffers).
+# (2) Pipeline inference firewall — `run_step_rotating/ground_state.jl:197`
+#     deliberately keeps RotatingBasisWS OUT of the returned pipeline tuple
+#     because the combined inference space (Workspace ∪ RotatingBasisWS
+#     through an AbstractWorkspace-typed local) is the textbook trigger for
+#     the 30-min JIT hang documented in CLAUDE.md.
+# (3) No call-site demand — propagators already dispatch on the concrete
+#     struct (`split_step!(::Workspace{N})` vs `apply_local_spin_step!(::RotatingBasisWS)`).
+# Trait dispatch (HasGauge/NoGauge) was considered and rejected on the same
+# grounds: functionally equivalent to concrete dispatch but adds a layer the
+# compiler must resolve, with no measurable benefit.
+#
 # --- Workspace: the master per-simulation state container ---
 #
 # `Workspace{N, A, P, IP, SM, ZEE, DDI, DDIB, RAM, LOSS, DDIP, BK, TC,

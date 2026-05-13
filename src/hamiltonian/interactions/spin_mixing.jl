@@ -22,6 +22,13 @@ function apply_spin_mixing_step!(
     nothing
 end
 
+# NOT GENERALIZABLE: D=3 Rodrigues fast path is a deliberate perf specialisation.
+# Reason: performance
+# Why: at D=3 the 3×3 SMatrix Rodrigues exponential is ~2-3× faster than the
+#   generic Euler/gemm batch (gemm setup cost exceeds the 3×3 matvec work).
+#   Both paths return bit-identical results — keep BOTH. The dispatcher at
+#   D == 3 in `_spin_mixing_loop!` below routes here; D ≠ 3 falls through.
+# See: `_spin_mixing_loop!` (generic-D Euler path) below
 """
 Spin-1 loop using Rodrigues' formula (allocation-free, machine-precision
 unitarity). Faster than the batched-gemm path at D=3 since the gemm has
@@ -33,7 +40,7 @@ function _spin_mixing_rodrigues!(psi, psi_mf, sm, c1, dt_frac, n_pts, imaginary_
             spinor_mf = _get_spinor(psi_mf, I, Val(3))
             spinor_in = _get_spinor(psi, I, Val(3))
             new_spinor = _apply_rodrigues_rotation(
-                spinor_mf, spinor_in, sm, c1, dt_frac, imaginary_time,
+                spinor_mf, spinor_in, sm, c1, dt_frac, imaginary_time
             )
             _set_spinor!(psi, I, new_spinor, Val(3))
         end
@@ -47,7 +54,7 @@ Uses Matrix (not SMatrix) for V_Fy to avoid heap allocation at large D.
 """
 function _spin_mixing_loop!(
     psi::Array{Complex{T}}, psi_mf::AbstractArray, sm, c1, dt_frac,
-    ::Val{D}, n_pts, imaginary_time
+    ::Val{D}, n_pts, imaginary_time,
 ) where {T <: AbstractFloat, D}
     if D == 3
         return _spin_mixing_rodrigues!(psi, psi_mf, sm, c1, dt_frac, n_pts, imaginary_time)

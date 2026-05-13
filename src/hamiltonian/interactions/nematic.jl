@@ -127,6 +127,13 @@ function _nematic_loop!(psi, psi_mf, ::Val{D}, n_pts, c2, dt, imaginary_time) wh
     nothing
 end
 
+# NOT GENERALIZABLE (NAMING-ONLY): `apply_nematic_step!` is the S=0 singlet-pair step.
+# Reason: physics (terminology, not algorithm)
+# Why: historical name from F=2 KU Eq. 48 ("nematic" c_2|A_00|²). It is NOT the
+#   rank-2 spin nematic tensor ⟨N^(2)_αβ⟩, which lives in
+#   analysis/observables/multipole.jl (`nematic_tensor_eigenvalues`). Alias kept
+#   for back-compat only; prefer `apply_singlet_pair_step!` in new code.
+# See: src/analysis/observables/multipole.jl
 """
     apply_nematic_step!(args...; kwargs...)
 

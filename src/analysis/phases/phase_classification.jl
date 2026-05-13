@@ -188,6 +188,13 @@ function _label_phase(spin_order, nematic_order, channel_weights, F)
     if spin_order > 0.9
         :ferromagnetic
     elseif nematic_order > 0.9
+        # NOT GENERALIZABLE: F=1 reports `:polar`, F≥2 reports `:nematic` for same observable.
+        # Reason: physics (terminology, not algorithm)
+        # Why: at F=1 the ζ_α = δ_{α,0} state is conventionally *polar* (Kawaguchi-
+        #   Ueda §3.1, Stamper-Kurn 2013); at F≥2 the same m=0-dominant inert state
+        #   is *nematic* (Yip, Mäkelä-Suominen 2007). Identical spinor structure;
+        #   split is community convention, not a physics flip.
+        # See: CLAUDE.md §"Phase nomenclature"
         F == 1 ? :polar : :nematic
     elseif get(channel_weights, 2F, 0.0) > 0.5
         :cyclic
@@ -205,6 +212,13 @@ distance instead of the threshold cascade in `_label_phase`. Each
 field carries a target value in `[0, 1]` (or `nothing` to skip the
 component when computing distance — useful when a feature isn't
 characterised for a phase, e.g. Q₆ is meaningless for F < 6).
+
+The `point_group` field is categorical (a `Symbol` from `_peak_point_group`
+e.g. `:T_d`, `:O_h`, `:I_h`, `:trivial`); a mismatch contributes a fixed
+unit penalty to the distance instead of a Euclidean component. This is
+the only discriminator between polar (m=0 only, point_group ≠ polyhedral)
+and the Paper #3 polyhedral inert states, since the Lemma 1 identity
+β_0 = 1/(2F+1) forces `nematic_order = 1` on both.
 """
 struct PhaseReference
     name::Symbol
@@ -215,35 +229,44 @@ struct PhaseReference
     Q6::Union{Nothing, Float64}
     dom_channel_S::Union{Nothing, Int}
     dom_channel_weight::Union{Nothing, Float64}
+    point_group::Union{Nothing, Symbol}
 end
 
 PhaseReference(name, F; spin_order=nothing, nematic_order=nothing,
 biaxiality=nothing, Q6=nothing, dom_channel_S=nothing,
-dom_channel_weight=nothing) = PhaseReference(name, F, spin_order,
-    nematic_order, biaxiality, Q6, dom_channel_S, dom_channel_weight)
+dom_channel_weight=nothing, point_group=nothing) = PhaseReference(name, F,
+    spin_order, nematic_order, biaxiality, Q6, dom_channel_S,
+    dom_channel_weight, point_group)
 
 """
     DEFAULT_PHASE_REFERENCES
 
-Hand-curated reference table covering the canonical KU phases for
-F=1, 2, and 6. Entries are conservative (only the most diagnostic
-features per phase are populated), and `classify_phase_distance`
-falls back to `:unknown` when no reference is within the user-supplied
-distance threshold. New phase candidates can be appended at any time
-via the `references` kwarg without editing this constant.
+Hand-curated reference table covering the canonical KU phases plus the
+seven Paper #3 §V polyhedral inert states. Entries are conservative
+(only the most diagnostic features per phase are populated), and
+`classify_phase_distance` falls back to `:unknown` when no reference is
+within the user-supplied distance threshold. New phase candidates can
+be appended at any time via the `references` kwarg without editing
+this constant.
 
-Cross-reference (Paper #3 verification list, §V):
+Cross-reference (Paper #3 verification list, §V; canonical ζ vectors
+live in `canonical_polyhedral_states.jl`):
 
-- F=2 cyclic → T_d residual symmetry (Paper #3 §V.A)
-- F=6 icosahedral → I_h residual symmetry (Paper #3 §V.D);
-  canonical spinor ζ_{I_h} = (0, √7/5, 0⁴, √11/5, 0⁴, -√7/5, 0)
-  lives in `SpinorBEC.IcosahedralMod.ZETA_F6_IH`.
+| F  | Section | Point group | Phase symbol            |
+|----|---------|-------------|-------------------------|
+| 2  | §V.A    | T_d         | `:cyclic`               |
+| 3  | §V.B    | O (A_2)     | `:octahedral`           |
+| 4  | §V.C    | O_h (A_1)   | `:cubic`                |
+| 6  | §V.D    | I_h         | `:icosahedral`          |
+| 8  | §V.E    | O_h (A_1)   | `:cube_octahedral`      |
+| 10 | §V.F    | I_h         | `:dodecahedral`         |
 
-Missing entries (U2 scope):
-- F=3 octahedral (Paper #3 §V.B) — needs ζ_{F=3, O:A_2}
-- F=4 cube (Paper #3 §V.C) — needs ζ_{F=4, O_h}
-- F=8 cube-like octahedral (Paper #3 §V.E, Dy relevance) — ζ_{F=8, O:A_1}
-- F=10 dodecahedral (Paper #3 §V.F) — ζ_{F=10, I_h}
+All polyhedral inert states have `spin_order = 0` (Schur singlet identity,
+Paper #3 Sign Pattern Lemma 1). The `:icosahedral` / `:dodecahedral`
+references additionally fingerprint via `Q6 = 1` (perfect Steinhardt
+icosahedral order); `:octahedral` / `:cubic` / `:cube_octahedral` use
+`Q6 = 0` to discriminate from icosahedral neighbours when both apply
+(F ≥ 6 only).
 """
 const DEFAULT_PHASE_REFERENCES = PhaseReference[
     # F = 1 (no polyhedral inert state — Paper #3 §VI.B "F=1 exception")
@@ -256,21 +279,50 @@ const DEFAULT_PHASE_REFERENCES = PhaseReference[
     PhaseReference(:biaxial_nematic, 2; spin_order=0.0, nematic_order=0.5,
         biaxiality=1.0),  # D_4 axial (Paper #3 §VII.A)
     PhaseReference(:cyclic, 2; spin_order=0.0, nematic_order=0.0,
-        dom_channel_S=4, dom_channel_weight=1.0),  # T_d polyhedral
-    # F = 6 (Eu151) — KU §7.5 + Paper #3 §V.D candidate phases. Q6 is the
-    # icosahedral Steinhardt order (0 for axial / cyclic, ~1 for the
-    # I_h state). Reference values are best-guess analytic limits;
-    # appending data-driven references is encouraged.
+        dom_channel_S=4, dom_channel_weight=1.0,
+        point_group=:T_d),
+    # F = 3 — Paper #3 §V.B octahedral (O:A_2)
+    PhaseReference(:ferromagnetic, 3; spin_order=1.0, nematic_order=0.0,
+        point_group=:trivial),
+    PhaseReference(:polar, 3; spin_order=0.0, nematic_order=1.0,
+        point_group=:trivial),
+    PhaseReference(:octahedral, 3; spin_order=0.0, nematic_order=1.0,
+        biaxiality=0.0, point_group=:O_h),  # Lemma 1 β_0=1/(2F+1) → nem=1
+    # F = 4 — Paper #3 §V.C cube (O_h:A_1)
+    PhaseReference(:ferromagnetic, 4; spin_order=1.0, nematic_order=0.0,
+        point_group=:trivial),
+    PhaseReference(:polar, 4; spin_order=0.0, nematic_order=1.0,
+        point_group=:trivial),
+    PhaseReference(:cubic, 4; spin_order=0.0, nematic_order=1.0,
+        biaxiality=0.89, point_group=:O_h),
+    # F = 6 (Eu151) — KU §7.5 + Paper #3 §V.D candidate phases.
+    # Note: all polyhedral inert states satisfy Lemma 1 β_0 = 1/(2F+1),
+    # which implies nematic_order = 1 (not 0). `point_group` is the
+    # primary discriminator between polar and polyhedral.
     PhaseReference(:ferromagnetic, 6; spin_order=1.0, nematic_order=0.0,
-        Q6=0.0),
+        point_group=:trivial),
     PhaseReference(:polar, 6; spin_order=0.0, nematic_order=1.0,
-        biaxiality=0.0, Q6=0.0),
+        point_group=:trivial),
     PhaseReference(:cyclic, 6; spin_order=0.0, nematic_order=0.0,
         dom_channel_S=12, dom_channel_weight=1.0),
     PhaseReference(:biaxial_nematic, 6; spin_order=0.0, biaxiality=1.0,
-        Q6=0.0),  # axial (Paper #3 §VII)
-    PhaseReference(:icosahedral, 6; spin_order=0.0, nematic_order=0.0,
-        Q6=1.0),  # Paper #3 §V.D — ZETA_F6_IH in IcosahedralMod
+        point_group=:trivial),  # axial (Paper #3 §VII)
+    PhaseReference(:icosahedral, 6; spin_order=0.0, nematic_order=1.0,
+        biaxiality=0.0, Q6=1.0, point_group=:I_h),  # Paper #3 §V.D
+    # F = 8 (Dy relevance) — Paper #3 §V.E cube-like octahedral (O_h:A_1)
+    PhaseReference(:ferromagnetic, 8; spin_order=1.0, nematic_order=0.0,
+        point_group=:trivial),
+    PhaseReference(:polar, 8; spin_order=0.0, nematic_order=1.0,
+        point_group=:trivial),
+    PhaseReference(:cube_octahedral, 8; spin_order=0.0, nematic_order=1.0,
+        biaxiality=0.0, point_group=:O_h),  # 16 stars on cube + octa orbits
+    # F = 10 — Paper #3 §V.F dodecahedral (I_h)
+    PhaseReference(:ferromagnetic, 10; spin_order=1.0, nematic_order=0.0,
+        point_group=:trivial),
+    PhaseReference(:polar, 10; spin_order=0.0, nematic_order=1.0,
+        point_group=:trivial),
+    PhaseReference(:dodecahedral, 10; spin_order=0.0, nematic_order=1.0,
+        biaxiality=0.97, point_group=:I_h),  # ZETA_F10_IH_DODEC
 ]
 
 """
@@ -319,6 +371,10 @@ function classify_phase_distance(features::NamedTuple, F::Int;
             cw = features.channel_weights
             obs_w = get(cw, ref.dom_channel_S, 0.0)
             d_sq += (obs_w - ref.dom_channel_weight)^2
+            n_used += 1
+        end
+        if ref.point_group !== nothing && haskey(features, :point_group)
+            d_sq += features.point_group === ref.point_group ? 0.0 : 1.0
             n_used += 1
         end
         n_used > 0 || continue

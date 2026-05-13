@@ -1,3 +1,15 @@
+# NOT GENERALIZABLE: CPU/GPU paths stay duplicated (no KernelAbstractions.jl).
+# Reason: performance
+# Why: GPU path uses direct CUDA.jl kernels + cuFFT / cuBLAS, NOT KA.jl. (1) TDHFB
+#   F32 GPU gets 121× speedup from CUDA-native intrinsics (cuExpm-style voxel-local
+#   BdG exp, warp reductions in gpu_tdhfb_hf_step.jl); a KA.jl wrapper either loses
+#   them or re-creates the duplication. (2) Single vendor (NVIDIA), no AMD/Metal use
+#   case — portability value zero. (3) The "shared API, specialized impl" pattern
+#   is already in place (split_step! branches on _is_gpu, extension overloads
+#   split_step_captured!, _zeros factory). Migration to KA.jl is rejected, not
+#   deferred — no realistic future event re-opens this before the thesis ships.
+# See: MEMORY tdhfb_gpu_port_status, option_gamma_gpu_optimization
+
 module SpinorBECCUDAExt
 
 using SpinorBEC

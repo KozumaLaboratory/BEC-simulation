@@ -1,8 +1,25 @@
+# NOT GENERALIZABLE: each (F, point group) pairing has its own LHY closed form.
+# Reason: math
+# Why: F=2 BN / F=3 octa / F=4 cube / F=8 octa / F=10 dodec each carry a
+#   distinct harmonic decomposition under the residual symmetry of their inert
+#   state (different branch counts, channel coefficients, multiplicities).
+#   Paper #3 §V provides one closed form per family — no single F-parametric
+#   expression exists.
+# See: docs/manuscript/papers/paper3_universal_theorem/main.md §V.A-§V.G
+#
 # Standalone LHY mode functions for the Round-4/Round-5 closed-form
 # polyhedral verifications (F=2 BN, F=3 octa, F=4 cube, F=8 octa,
 # F=10 dodec). NEW FILE; does NOT integrate into src/lhy.jl or the
 # YAML schema. Final integration round will wire these into the
-# TabulatedLHY subtype builders / make_workspace dispatch.
+# TabulatedLHY subtype builders / make_workspace dispatch. Each (F, point group) pairing has its own
+# harmonic decomposition under the residual symmetry of the inert
+# state, producing a distinct closed-form set of stiffnesses (c_0,
+# λ_α). The number of stiffness branches, the channel coefficients,
+# and the multiplicity counts in the sum-of-powers formula all change
+# F-by-F. Compare e.g. `lhy_F4_cube` (3 branches, O_h irreps) vs
+# `lhy_F10_dodec` (4 branches, I_h irreps). These are derived by
+# sympy from Paper #3 §V — the manuscript provides one closed form
+# per family, not a unifying expression.
 #
 # Convention: dimensionless `M = hbar = 1` (SpinorBEC.jl default). The
 # `M` positional argument and `hbar` keyword let callers override for

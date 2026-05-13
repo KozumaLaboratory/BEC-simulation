@@ -54,6 +54,14 @@ function apply_diagonal_potential_step!(
 )
     n_pts = ntuple(d -> size(psi, d), ndim)
     _total_density!(density_buf, psi, n_components, ndim, n_pts)
+    # NOT GENERALIZABLE: ITP-only shift `zee_shift = min(zeeman_diag)` prevents exp overflow.
+    # Reason: math, performance
+    # Why: imaginary-time propagator is exp(-(E_m - μ_ref) dt); without subtracting
+    #   min(E_m) the largest-|E_m| component grows like exp(50) ~ 1e21 per step
+    #   and overflows F64 in ~10 steps for typical p (linear Zeeman). The shift is
+    #   a constant rephasing that cancels across components, does NOT bias ψ.
+    #   Skipped in real-time (cis is bounded).
+    # See: src/solvers/ground_state.jl `_ITP_EXPONENT_LIMIT` guard
     zee_shift = imaginary_time ? minimum(zeeman_diag) : 0.0
     for c in 1:n_components
         idx = _component_slice(ndim, n_pts, c)
@@ -166,9 +174,13 @@ function _diagonal_step_svec!(
     # preserved.
     psi_mf_eff = psi_mf === nothing ? psi : psi_mf
     if imaginary_time
-        _diagonal_step_svec_imag!(Val(N), psi, psi_mf_eff, V_trap, zeeman_diag, c0, c_lhy, dt_frac, density_buf)
+        _diagonal_step_svec_imag!(
+            Val(N), psi, psi_mf_eff, V_trap, zeeman_diag, c0, c_lhy, dt_frac, density_buf
+        )
     else
-        _diagonal_step_svec_real!(Val(N), psi, psi_mf_eff, V_trap, zeeman_diag, c0, c_lhy, dt_frac, density_buf)
+        _diagonal_step_svec_real!(
+            Val(N), psi, psi_mf_eff, V_trap, zeeman_diag, c0, c_lhy, dt_frac, density_buf
+        )
     end
 end
 

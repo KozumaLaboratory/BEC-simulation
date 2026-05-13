@@ -1,7 +1,23 @@
+# NOT GENERALIZABLE: F=6 I_h closed form is unique to its harmonic decomposition.
+# Reason: math
+# Why: g_2, g_4, g_8 cancel ONLY because the icosahedron has no symmetric
+#   rank-2/4/8 invariant aligned with the I_h spinor; other (F, point-group)
+#   pairings have different cancellations and different stiffness branches.
+# See: docs/manuscript/papers/paper3_universal_theorem/main.md §V.D
+#
 # icosahedral_lhy.jl
 # =================================================================
 # Closed-form contact LHY for the F=6 icosahedral (I_h) phase
 # (Stage D, parallel-session derivation 2026-05-07).
+#
+# The 7 stiffness coefficients (c_0, λ_spin) here
+# are specific to the F=6 I_h harmonic decomposition: g_2, g_4, g_8
+# cancel because the icosahedron has no symmetric rank-2/4/8 invariant
+# aligned with the I_h state. Different polyhedral inert states (e.g.
+# F=10 I:A dodec, F=12 I:A) have different closed forms — see
+# `lhy_F10_dodec` (Paper #3 §V.F) and the FM/polar §V.E entries. Each
+# F-point-group pairing requires its own sympy derivation; there is no
+# single closed form that covers all F at the I_h symmetry.
 #
 # The F=6 I_h ground state spinor lives in the m=±5 / m=0 doublet:
 #

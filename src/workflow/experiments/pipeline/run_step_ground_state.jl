@@ -1,3 +1,11 @@
+# NOT GENERALIZABLE: `@noinline + ::ConcreteType` boundary is load-bearing.
+# Reason: type-inference
+# Why: each helper parses Dict{String,Any} and must return a concrete type so
+#   the caller's inference doesn't widen to Any. Removing @noinline (or the
+#   return-type assertion) re-introduces the Workspace JIT cascade observed
+#   2026-03 (30-min compile hang on first ws construction). Keep both.
+# See: CLAUDE.md §"Type stability boundaries", MEMORY pitfall_pipeline_inference
+
 # --- GroundStateStep dispatch + parsing helpers ---
 
 # --- Step dispatch ---

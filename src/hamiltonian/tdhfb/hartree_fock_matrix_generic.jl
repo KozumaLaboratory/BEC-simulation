@@ -15,7 +15,7 @@
 #
 # Reference: Kawaguchi-Ueda 2012 §3.2; CG factor X^{(S)} matches paper3 §III.
 
-export hf_matrix_generic, hf_matrix_generic!, ku_c01_to_g_S
+export hf_matrix_generic, hf_matrix_generic!, ku_c01_to_g_S, ku_to_g_S
 
 """
     hf_matrix_generic!(h_hf, phi, rho, F, g_S; spin_matrices=nothing) -> h_hf
@@ -67,6 +67,13 @@ to ∂κ/∂t equations, not the diagonal Bogoliubov-Hartree-Fock kernel acting 
 # Returns
 The h_hf array (for chaining).
 """
+# NOT GENERALIZABLE: this kernel is the BdG self-energy, not the GP Hamiltonian.
+# Reason: math
+# Why: returns δ²E_int/δφ_m*δφ_{m'} (diagonal block of L(k) in
+#   Bogoliubov-de Gennes). Factor-2 Bose symmetrisation here is deliberate
+#   and absent from `hf_matrix_F1!`. Use this kernel for BdG spectra; use
+#   `hf_matrix_F1!` for GP evolution (factor 2 would double-count).
+# See: src/hamiltonian/tdhfb/hartree_fock_matrix.jl (GP-form twin), Paper #3 §III
 function hf_matrix_generic!(
     h_hf::AbstractArray,
     phi::AbstractArray,
@@ -127,22 +134,58 @@ function hf_matrix_generic(
 end
 
 """
-    ku_c01_to_g_S(F, c0, c1)
+    ku_c01_to_g_S(F, c0, c1) → Dict{Int, Float64}
 
-Convert Kawaguchi-Ueda (c_0, c_1) couplings to the channel-decomposed g_S Dict.
-Currently implements F=1 only (c_0 = (g_0 + 2 g_2)/3, c_1 = (g_2 - g_0)/3).
+Convert Kawaguchi-Ueda (c_0, c_1) couplings to channel-decomposed
+couplings `g_S` for arbitrary F via the physical spin-spin scalar form
 
-For F ≥ 2, the inverse relationship is not single-valued — the channel
-decomposition has more channels than the c_0/c_1/c_2/... reduction, so a
-forward map must use the spinor itself. See KU 2012 Table 2 for the F=2 case
-relating (c_0, c_1, c_2) to (g_0, g_2, g_4).
+    g_S = c_0 + c_1 · (S(S+1) − 2F(F+1)) / 2     for S ∈ 0:2:2F
 
-# Returns
-A `Dict{Int, Float64}` keyed by total spin S.
+This is the same closed-form used by the GP / BdG splitter (see
+`_c0c1_to_gS` in `interactions.jl`); the public alias here is kept so
+TDHFB callers don't reach into the underscored helper.
+
+For F ≥ 2 the two parameters (c_0, c_1) constrain F+1 independent channels
+to a one-parameter family — appropriate when higher scattering lengths
+are unknown (e.g. Eu151 a_S for S ≥ 4). To inject independent g_S, layer
+in `c_extra` via [`ku_to_g_S`](@ref) or build the tensor cache directly
+with `_make_tensor_cache_from_channels`.
+
+# Round-trip with `_gS_to_cn`
+`_gS_to_cn(F, ku_c01_to_g_S(F, c_0, c_1))` returns the rank-k tensor
+decomposition `{c₀, c₂, c₄, …}`; for F=1 this recovers
+`c₀ → c_0 − (4/3) c_1`, `c₂ → (2/3) c_1` (the rank-2 KU form, which is
+NOT the same as the `c_1` parameter — see KU 2012 §2 for the
+distinction).
 """
 function ku_c01_to_g_S(F::Int, c0::Float64, c1::Float64)
-    F == 1 || error("ku_c01_to_g_S only implemented for F=1 currently")
-    g_0 = c0 - 2 * c1
-    g_2 = c0 + c1
-    return Dict(0 => g_0, 2 => g_2)
+    _c0c1_to_gS(F, c0, c1)
+end
+
+"""
+    ku_to_g_S(F, c0, c1, c_extra) → Dict{Int, Float64}
+
+Full Kawaguchi-Ueda forward map for arbitrary F. Returns channel-decomposed
+`g_S` (for S ∈ 0:2:2F) given the scalar/spin-spin couplings (c_0, c_1)
+plus the even-rank tensor couplings in `c_extra` (index k ↔ c_{k+1}, so
+`c_extra[1] = c₂`, `c_extra[3] = c₄`, …).
+
+The combined formula is
+
+    g_S = (c_0 + c_1 · ⟨F̂_1·F̂_2⟩_S)  +  Σ_{k even, k≥2} (2k+1) {F F k; F F S} c_k
+
+For Eu151 (F=6) with seven independent channels (S=0,2,…,12), pass
+`c_extra = even_c_extra(6; c2=…, c4=…, c6=…, c8=…, c10=…, c12=…)` to
+specify all seven g_S at once.
+
+Validated against `_gS_to_cn` for round-trip identity at F=1/2/3/6 in
+`test/hamiltonian/test_tdhfb_ku_c01_to_g_S.jl`.
+"""
+function ku_to_g_S(F::Int, c0::Float64, c1::Float64, c_extra::Vector{Float64})
+    g = _c0c1_to_gS(F, c0, c1)
+    delta = _c_extra_to_delta_gS(F, c_extra)
+    for (S, dg) in delta
+        g[S] = get(g, S, 0.0) + dg
+    end
+    return g
 end

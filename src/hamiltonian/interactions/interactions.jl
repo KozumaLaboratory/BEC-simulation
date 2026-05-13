@@ -26,6 +26,13 @@ function compute_interaction_params(
     dims::Int=1,
     length_scale::Float64=1.0,
 )
+    # NOT GENERALIZABLE: F=1 path uses analytic c0/c1, F≥2 uses tensor cache.
+    # Reason: physics
+    # Why: F=1 c_0/c_1 (Ohmi-Machida / Ho 1998) is a closed-form 2-channel
+    #   reduction from a_0, a_2 — entire physics fits two scalars. For F≥2
+    #   channel couplings g_S live in TensorInteractionCache; this function
+    #   returns InteractionParams(0,0) and the tensor step takes over.
+    # See: src/hamiltonian/interactions/tensor_interaction.jl, KU 2012 §3.2
     if atom.F == 1
         a0, a2, m = atom.a0, atom.a2, atom.mass
         hbar = Units.HBAR
@@ -185,6 +192,13 @@ S=2 pair channel) is NOT a rank-3 tensor operator. To include such pair-channel
 couplings, use `_make_tensor_cache_from_channels` with explicit g_S values instead.
 """
 function _c_extra_to_delta_gS(F::Int, c_extra::Vector{Float64})
+    # NOT GENERALIZABLE: KU "c_3" is the S=2 pair-channel coupling, not a rank-3 tensor.
+    # Reason: physics
+    # Why: c_extra is indexed by tensor rank k; the 6j transform `_cn_to_gS` only
+    #   accepts even-rank inputs. KU's c_3 (F=3 cyclic) labels the S=2 pair-channel
+    #   coupling Σ_M |A_{2M}|² — a pair-channel coupling, not a rank-3 single-particle
+    #   tensor. Route via `_make_tensor_cache_from_channels(F, Dict(2 => g_2))`.
+    # See: src/hamiltonian/interactions/nematic.jl docstring
     for (idx, val) in enumerate(c_extra)
         k = idx + 1
         if abs(val) > 1e-30 && isodd(k)
