@@ -17,6 +17,8 @@ interface Props {
 }
 
 const DURATION_OPTIONS = [
+  { sec: 1, label: '1 s' },
+  { sec: 3, label: '3 s' },
   { sec: 5, label: '5 s' },
   { sec: 8, label: '8 s' },
   { sec: 10, label: '10 s' },
