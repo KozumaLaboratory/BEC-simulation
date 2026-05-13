@@ -23,11 +23,12 @@
 #   python3 docs/manuscript/papers/paper3_universal_theorem/figures/fig-7_paper3_majorana.py
 
 using SpinorBEC: majorana_stars
-using SpinorBEC.LinearAlgebra
 using Printf
 import SpinorBEC
 
-const STEREO = SpinorBEC._stereo_to_sphere  # internal, but stable since U2 fix
+# `_stereo_to_sphere` is internal but stable since U2 fix (commit a9a3d95
+# fixed z=∞ → north pole). Stable enough to depend on for figure rendering.
+const STEREO = SpinorBEC._stereo_to_sphere
 
 # ─── canonical Paper #3 §V state spinors ─────────────────────────────────────
 #

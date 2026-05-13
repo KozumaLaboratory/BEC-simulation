@@ -1,19 +1,39 @@
 export apply_loss_step!
 
 """
-Apply density-dependent loss step (dipolar relaxation + optional 3-body).
+    apply_loss_step!(psi, loss, F, dt, n_components, ndim[, density_buf])
 
-Dipolar relaxation rate per component m for downward Δm transitions (Δm = -1, -2):
+Apply a half-step of density-dependent loss to a spinor wavefunction in place.
+Used inside the split-step propagator between V/T substeps.
 
-  γ_m = Γ_dr × Σ_{q ∈ {-1,-2}} |⟨F,m+q|T²_q|F,m⟩|² / Z
+Four independent channels, applied multiplicatively (each as `exp(-rate·dt/2)`):
 
-where Z normalizes so the average rate per component equals Γ_dr.
+| Channel           | LossParams field                    | Form                            | Used for                |
+|-------------------|-------------------------------------|---------------------------------|-------------------------|
+| Dipolar relaxation | `gamma_dr`                         | `exp(-γ_m · n_tot · dt / 2)`    | Δm = -1, -2 transitions |
+| 2-body (legacy)   | `L3` / `L3_per_m`                   | `exp(-γ_lin · n_tot · dt / 2)`  | linear-in-n loss        |
+| 3-body (true)     | `K3_cubic` / `K3_per_m_cubic`       | `exp(-K_3 · n_tot² · dt / 2)`   | quadratic-in-n loss     |
+| Evaporation       | `evap_rate`, `evap_energy_cutoff`   | `exp(-rate·dt/2)` if `\\|ψ_c\\|²·n_tot > cut` | RF-knife |
 
-m = -F is stable (no downward transitions exist).
+`n_tot(r) = Σ_m |ψ_m(r)|²` is the total density at each spatial point. The
+γ_lin (dipolar + legacy 2-body) and K_3 (true 3-body) branches are combined
+via the `L3_per_m`/`K3_per_m_cubic` per-component vectors so different m_F
+states can have different rates.
 
-3-body loss L3 is m-independent.
+Dipolar relaxation: rank-2 DDI tensor allows Δm = -1, -2 transitions only.
+`γ_m = Γ_dr · Σ_{q ∈ {-1,-2}} |CG(F,m; 2,q | F,m+q)|² / Z`, normalized so the
+average rate across components equals Γ_dr. The m = -F (deepest Zeeman state)
+is stable.
 
-Applied as: ψ_m → ψ_m × exp(-rate_m × n(r) × dt / 2)
+The K3_cubic channel is the **physically correct 3-body** form (Lindblad-
+derivable). `L3` / `L3_per_m` exist for backward compat with calibrated
+2-body-shape data — use `K3_*` for new code. See LossParams docstring.
+
+`density_buf` is an optional scratch array (size = `size(psi)[1:ndim]`); pass
+to avoid allocating one per call inside hot loops.
+
+Early-exits when all rates are below 1e-30. Per-m vectors are validated
+against `n_components`.
 """
 function apply_loss_step!(
     psi::AbstractArray{<:Complex},
@@ -28,6 +48,23 @@ function apply_loss_step!(
     apply_loss_step!(psi, loss, F, dt, n_components, ndim, buf)
 end
 
+"""
+    _is_active(loss::LossParams) -> Bool
+
+True if any channel (γ_dr, L3, K3, evap) has a rate above 1e-30. Used as
+the early-exit gate in `apply_loss_step!` and as a primer target in
+`src/precompile.jl` so the cold-JIT path is already specialised when the
+first dynamics step runs.
+"""
+function _is_active(loss::LossParams)
+    L3_scalar_max = isempty(loss.L3_per_m) ? loss.L3 : maximum(abs, loss.L3_per_m)
+    K3_scalar_max = isempty(loss.K3_per_m_cubic) ? loss.K3_cubic :
+                    maximum(abs, loss.K3_per_m_cubic)
+    has_evap = loss.evap_rate > 1e-30 && loss.evap_energy_cutoff > 0
+    return loss.gamma_dr >= 1e-30 || L3_scalar_max >= 1e-30 ||
+           K3_scalar_max >= 1e-30 || has_evap
+end
+
 function apply_loss_step!(
     psi::AbstractArray{<:Complex},
     loss::LossParams,
@@ -37,14 +74,8 @@ function apply_loss_step!(
     ndim::Int,
     density_buf::AbstractArray{<:AbstractFloat},
 )
-    L3_scalar_max = isempty(loss.L3_per_m) ? loss.L3 : maximum(abs, loss.L3_per_m)
-    K3_scalar_max = isempty(loss.K3_per_m_cubic) ? loss.K3_cubic :
-                    maximum(abs, loss.K3_per_m_cubic)
+    _is_active(loss) || return nothing
     has_evap = loss.evap_rate > 1e-30 && loss.evap_energy_cutoff > 0
-    if loss.gamma_dr < 1e-30 && L3_scalar_max < 1e-30 &&
-        K3_scalar_max < 1e-30 && !has_evap
-        return nothing
-    end
 
     if !isempty(loss.L3_per_m) && length(loss.L3_per_m) != n_components
         throw(
@@ -114,11 +145,26 @@ transitions are excluded since they don't release energy at low temperature.
 
 Normalization: average rate per component = Γ_dr. m = -F is stable (no downward
 transitions exist).
+
+The F-dependent shape `raw[c] / Z` is cached per F (the only CG-dependent
+quantity); scaling by `gamma_dr` is trivial. Avoids ~D vector allocations and
+~2D CG lookups per apply_loss_step! call inside the simulation hot loop.
 """
 function _dipolar_relaxation_rates(F::Int, gamma_dr::Float64)
+    shape = _dipolar_relaxation_shape(F)
+    [gamma_dr * s for s in shape]
+end
+
+# F → normalized γ-shape vector (raw[c] / Z), cached. Single-threaded by
+# construction (simulation loops are not thread-parallel for this kernel).
+const _DIPOLAR_RELAX_SHAPE_CACHE = Dict{Int, Vector{Float64}}()
+
+function _dipolar_relaxation_shape(F::Int)
+    cached = get(_DIPOLAR_RELAX_SHAPE_CACHE, F, nothing)
+    cached === nothing || return cached
+
     D = 2F + 1
     raw = Vector{Float64}(undef, D)
-
     raw_sum = 0.0
     for c in 1:D
         m = F - (c - 1)
@@ -133,8 +179,12 @@ function _dipolar_relaxation_rates(F::Int, gamma_dr::Float64)
         raw_sum += s
     end
 
-    raw_sum < 1e-30 && return zeros(Float64, D)
-
-    Z = raw_sum / D
-    [gamma_dr * raw[c] / Z for c in 1:D]
+    shape = if raw_sum < 1e-30
+        zeros(Float64, D)
+    else
+        Z = raw_sum / D
+        [raw[c] / Z for c in 1:D]
+    end
+    _DIPOLAR_RELAX_SHAPE_CACHE[F] = shape
+    shape
 end

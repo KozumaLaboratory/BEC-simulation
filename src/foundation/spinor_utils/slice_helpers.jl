@@ -3,8 +3,13 @@
 # and observable hot paths.
 
 @inline function _component_slice(ndim::Int, n_pts::NTuple{N, Int}, c::Int) where {N}
-    ntuple(N + 1) do d
-        d <= N ? (1:n_pts[d]) : c
+    # Build a (Colon × N, c) tuple. Using `Colon()` instead of `1:n_pts[d]`
+    # keeps the element types uniform (Colon, ..., Colon, Int) which is
+    # concrete — `view(psi, slice...)` then infers to a concrete view type.
+    # Earlier shape `(1:n_pts[d], ..., c)` mixed UnitRange + Int and yielded
+    # Tuple{Vararg{...}}, forcing `view` to return ::Any in apply_loss_step!.
+    ntuple(Val(N + 1)) do d
+        d <= N ? Colon() : c
     end
 end
 
