@@ -497,8 +497,10 @@ pipeline:
         K3_SI = 1.5e-30
         expected = K3_SI * n0^2 / omega_ref
         @test loss.K3_per_m_cubic[1] ≈ expected rtol = 1e-6
-        # Sanity: ~10^2 magnitude for the Rb87/N=10⁴/100 Hz setup
-        @test 1.0 < loss.K3_per_m_cubic[1] < 1e4
+        # Sanity: ~10^11 magnitude for the Rb87/N=10⁴/100 Hz setup
+        # (n0 ~ 8e21 m⁻³, ω_ref ~ 628/s, so K3·n0²/ω_ref ~ 1.5·6.4e43/628 ~ 1.5e11).
+        # Catches a sign-flip or factor-of-c²-style error in the conversion.
+        @test 1e9 < loss.K3_per_m_cubic[1] < 1e13
     end
 
     @testset "K3_per_m_cubic is quadratic in n (kernel behavior check)" begin

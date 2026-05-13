@@ -24,15 +24,22 @@ using StaticArrays
     end
 
     @testset "_component_slice" begin
+        # Post-2026-05-13: returns Colon for the full-axis dims so the
+        # tuple is type-uniform (Colon, …, Colon, Int) — concrete view type.
+        # Functional equivalence with the old (1:n, …, c) form: same view.
         n_pts = (16,)
         idx = SpinorBEC._component_slice(1, n_pts, 2)
-        @test idx == (1:16, 2)
+        @test idx == (Colon(), 2)
+        psi = ones(ComplexF64, 16, 3)
+        @test view(psi, idx...) == view(psi, 1:16, 2)
     end
 
     @testset "_component_slice 2D" begin
         n_pts = (8, 8)
         idx = SpinorBEC._component_slice(2, n_pts, 3)
-        @test idx == (1:8, 1:8, 3)
+        @test idx == (Colon(), Colon(), 3)
+        psi = ones(ComplexF64, 8, 8, 5)
+        @test view(psi, idx...) == view(psi, 1:8, 1:8, 3)
     end
 
     @testset "_matvec is allocation-free and correct" begin
