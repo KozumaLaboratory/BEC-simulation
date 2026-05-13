@@ -38,16 +38,25 @@ export function TimeScrubber({
   const [durationSec, setDurationSec] = useState<number>(defaultDurationSec)
   const n = meta?.n_snapshots ?? 0
 
-  // Latest snapIdx + loading via refs so the rAF loop reads the
-  // current values without being re-created on every tick.
+  // Latest snapIdx + loading + onChange via refs so the rAF loop reads
+  // current values without being re-created on every tick. onChange in
+  // particular gets a new reference on every parent render (View3D
+  // declares `setSnapIdx = (n) => setUrl({snap: n})` inline); having it
+  // in the effect dep list would cancel/restart the rAF on every snap
+  // update, which re-anchors startTime and freezes playback at the
+  // current frame.
   const snapIdxRef = useRef(snapIdx)
   const loadingRef = useRef(loading)
+  const onChangeRef = useRef(onChange)
   useEffect(() => {
     snapIdxRef.current = snapIdx
   }, [snapIdx])
   useEffect(() => {
     loadingRef.current = loading
   }, [loading])
+  useEffect(() => {
+    onChangeRef.current = onChange
+  }, [onChange])
 
   // rAF-driven elapsed-time loop. durationSec means "one full pass in N
   // seconds, exactly" — the loop computes the target snap from elapsed
@@ -88,7 +97,7 @@ export function TimeScrubber({
         targetSnap = Math.min(n, Math.floor((cycleSec / durationSec) * n) + 1)
       }
       if (targetSnap !== snapIdxRef.current) {
-        onChange(targetSnap)
+        onChangeRef.current(targetSnap)
       }
       rafId = requestAnimationFrame(tick)
     }
@@ -97,7 +106,7 @@ export function TimeScrubber({
       cancelled = true
       if (rafId) cancelAnimationFrame(rafId)
     }
-  }, [playing, n, durationSec, fps, onChange])
+  }, [playing, n, durationSec, fps])
 
   if (!meta || meta.n_snapshots === 0) return null
 
