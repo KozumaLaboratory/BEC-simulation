@@ -10,15 +10,26 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Opt into Node.js 24 ahead of the September 2026 forced migration so we
+# don't carry deprecation warnings on every run.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   test:
-    name: Test (Julia 1)
+    name: Test (Julia 1.12, tier=ci)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Per-push CI runs the `ci` tier: fast units + ITP/RTP integration.
+      # The `full` tier (which adds heavy pipeline / continuation / GPU /
+      # TWA / rotating-basis tests, ~45 min) runs in the nightly workflow.
+      SPINORBEC_TEST_TIER: ci
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
         with:
-          version: "1"
+          version: "1.12"
       - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
@@ -31,7 +42,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
         with:
-          version: "1"
+          version: "1.12"
       - name: Install JuliaFormatter
         run: julia -e 'using Pkg; Pkg.add("JuliaFormatter")'
       - name: Check formatting
@@ -55,12 +66,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
         with:
-          version: "1"
+          version: "1.12"
       - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
       - name: Run quick benchmark
         run: julia --project=. bench/bench_quick.jl
         # 5 min was too tight: JIT cascade for D=13 spinor + DDI cache +
-        # benchmark itself = ~5 min on the GitHub runner. Bumping to 8 min
-        # so a slow Julia startup doesn't kill an otherwise-green run.
+        # benchmark itself = ~5 min on the GitHub runner. 8 min absorbs a
+        # slow Julia startup without killing an otherwise-green run.
         timeout-minutes: 8
