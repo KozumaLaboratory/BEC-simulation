@@ -19,7 +19,11 @@ jobs:
   test:
     name: Test (Julia 1.12, tier=ci)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 30 min absorbs the first cache-bootstrap run (Pkg.test() builds its
+    # own `--check-bounds=yes --depwarn=yes` flag-specific .ji files,
+    # ~5 min on top of the regular cache restore). Subsequent runs hit
+    # those cached entries and finish in <10 min; can tighten later.
+    timeout-minutes: 30
     env:
       # Per-push CI runs the `ci` tier: fast units + ITP/RTP integration.
       # The `full` tier (which adds heavy pipeline / continuation / GPU /
