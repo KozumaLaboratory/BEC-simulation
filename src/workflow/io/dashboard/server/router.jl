@@ -42,8 +42,20 @@ function serve_dashboard(port::Int=8080; base_dir::String="runs")
             ),
         )
     end
-    html_content = read(_WEB_DIST_INDEX, String)
-    legacy_html = isfile(_LEGACY_DASHBOARD_HTML) ? read(_LEGACY_DASHBOARD_HTML, String) : ""
+    # Read index.html / legacy.html on each request, mtime-gated. Avoids
+    # the previous footgun where a `bun run build` while the server was
+    # alive would point the cached HTML at a stale asset hash and the
+    # browser landed on a black screen until restart.
+    html_cache = Ref{Tuple{Float64, String}}((0.0, ""))
+    legacy_cache = Ref{Tuple{Float64, String}}((0.0, ""))
+    fetch_html() = _mtime_cached_read(html_cache, _WEB_DIST_INDEX)
+    fetch_legacy() =
+        if isfile(_LEGACY_DASHBOARD_HTML)
+            _mtime_cached_read(legacy_cache, _LEGACY_DASHBOARD_HTML)
+        else
+            ""
+        end
+
     data_cache = Dict{String, String}()
     psi_cache = Dict{String, Any}()  # path → (psi, n_comp, n_pts, F, pops)
 
@@ -51,7 +63,7 @@ function serve_dashboard(port::Int=8080; base_dir::String="runs")
     println("Dashboard server running at http://localhost:$port")
     println("  Serving runs from: $(abspath(base_dir))")
     println("  React app:         $(_WEB_DIST_INDEX)")
-    isempty(legacy_html) || println("  Legacy dashboard:  /legacy")
+    !isempty(fetch_legacy()) && println("  Legacy dashboard:  /legacy")
     println("  Press Ctrl+C to stop")
     flush(stdout)
 
@@ -59,7 +71,7 @@ function serve_dashboard(port::Int=8080; base_dir::String="runs")
         while true
             sock = Sockets.accept(server)
             @async _handle_dashboard_connection(
-                sock, html_content, legacy_html, data_cache, psi_cache, base_dir
+                sock, fetch_html, fetch_legacy, data_cache, psi_cache, base_dir
             )
         end
     catch e
@@ -70,8 +82,21 @@ function serve_dashboard(port::Int=8080; base_dir::String="runs")
     end
 end
 
+# Re-read a file when its mtime advances past the cached version.
+# Cheap when the file is unchanged (a single stat call); avoids stale
+# HTML when `bun run build` lands while the server is still up.
+function _mtime_cached_read(slot::Ref{Tuple{Float64, String}}, path::AbstractString)
+    m = mtime(path)
+    last_m, last_content = slot[]
+    if m != last_m
+        last_content = read(path, String)
+        slot[] = (m, last_content)
+    end
+    last_content
+end
+
 function _handle_dashboard_connection(
-    sock, html_content, legacy_html, data_cache, psi_cache, base_dir
+    sock, fetch_html, fetch_legacy, data_cache, psi_cache, base_dir
 )
     try
         # Keep-alive loop: a single TCP connection serves successive
@@ -145,7 +170,7 @@ function _handle_dashboard_connection(
                 _send_http_response(sock, status, content_type, body; keep_alive, accept_gzip)
             else
                 status, content_type, body = _route_dashboard(
-                    path, html_content, legacy_html, data_cache, psi_cache, base_dir
+                    path, fetch_html(), fetch_legacy(), data_cache, psi_cache, base_dir
                 )
                 _send_http_response(sock, status, content_type, body; keep_alive, accept_gzip)
             end
