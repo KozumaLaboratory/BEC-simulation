@@ -226,6 +226,50 @@ U^φ magnitude AND Δ^φ magnitude — sets the absorption capability for
 asymmetric perturbations. This is more physically natural: any unitary
 rotation by W^φ tends to randomise the phase contamination from δW^φ.
 
+### §3.2.6 Phase-accumulation hypothesis — REFUTED
+
+Initial framing: a single dimensionless control parameter
+`Ω · T` (Ω ~ ‖W^φ‖_∞, T integration time) would drive `slope_φ ≈ 1 + S(Ω·T)`
+with S monotonically increasing. Tested directly by `T_sweep_alpha0.jl`:
+
+| T | Ω · T | slope(φ) | slope(ρ) | slope(κ) |
+|---|---|---|---|---|
+| 0.05 | 0.017 | (pre-asymptotic) | — | — |
+| 0.2 | 0.068 | 1.702 | 0.807 | 1.019 |
+| 1.0 | 0.339 | **1.630** | 0.990 | 0.978 |
+
+T=0.05 lies in the pre-asymptotic regime (too few steps for the
+asymptotic behaviour to manifest, dt=0.02 gives only 2 Strang steps).
+At T = 0.2 and T = 1.0, both well in the asymptotic regime, slope_φ
+is essentially T-independent (1.702 vs 1.630 — within the noise of a
+4-point log-log fit). Ω·T grows by 5× but slope does NOT track it.
+
+**The phase-accumulation framing is refuted.** The slope is a static
+property of the W^φ eigenstructure at the initial state (or whatever
+state dominates the early-time integration), NOT an integrated rotation
+average. The decreasing trend 1.702 → 1.630 is the opposite of what
+phase-accumulation predicts.
+
+This is the THIRD hypothesis refutation across this analysis:
+1. "Baseline magnitude suppression by ‖ΔW^φ‖/‖W^φ‖ ratio" — refuted by
+   B-3 (ratio uniform at ~1% across regimes, yet slopes vary 1.1 to 1.9).
+2. "Nambu mixing binary threshold" — refuted by B-3.5 (continuous
+   interpolation, not threshold).
+3. "Phase accumulation Ω·T" — refuted by T-sweep (T-independent slope).
+
+The empirical evidence supports a static mechanism:
+- B-2 vacuum (‖U^φ‖ = 0.02, Δ^φ = 0): slope 1.10
+- B-3.5 α=0 (‖U^φ‖ = 0.34, Δ^φ = 0): slope 1.70
+- B-3.5 α=1 (‖U^φ‖ = 0.34, Δ^φ = 0.23): slope 1.90
+
+|U^φ| alone shifts slope by ~0.6; adding Δ^φ shifts it by a further
+~0.2. Both contributions are static (initial-state) properties. The
+mechanism is not understood at the BCH derivation level yet — the next
+diagnostic should be a per-step local-error decomposition (separate
+the per-substep truncation order from any cumulative effect) to
+isolate whether the slope-suppression mechanism lives in a single
+Strang step or across many steps.
+
 - **Mech-B** (palindrome breakdown, sets a Yoshida-composition ceiling):
   even when B_φ = 0 (symmetric V steps, e.g. lab path), the *next-order*
   palindrome residual sources a (3,4)-floor on Yoshida composition.
@@ -296,6 +340,33 @@ midpoint value. With converged Picard:
 
 Picard kills BOTH Mech-A AND Mech-B simultaneously, because both are
 symptoms of the same underlying violation (V_a ≠ V_b under frozen MF).
+
+## §4.2 Production guidance (refined)
+
+The "TDHFB plain Strang is globally order 1" framing is overshoot —
+the more accurate statement is **regime-dependent slope between 1 and
+slightly below 2**, with the effective order set by the W^φ eigenstructure
+of the running state. Polar-like / sparsely populated regimes (small
+‖U^φ‖, no Δ^φ) get worst-case slope ~1; densely populated / Bogoliubov-
+active regimes (Eu151 thermalised, dense spinor states) get up toward
+slope 2 but never reach it cleanly.
+
+For production work the universal predictability is gone without
+Picard. Use the deterministic-order variants:
+
+- **`tdhfb_strang_step!(..., picard_midpoint=true)`** — universal slope
+  2.000 across regimes (B-2: 2.000 / 2.000 / 2.018 in 9 cells), wall
+  cost ~5× plain Strang. Default for production accuracy.
+- **`tdhfb_y4_midpoint_step!(..., picard_midpoint=true)`** — universal
+  slope 4.0 across regimes (B-2: 3.97 / 4.02 / 3.98), wall cost ~15×
+  plain Strang. For tight tolerance (state error below ~1e-8).
+
+ρ, κ components show universal slope 1 with plain Strang across ALL
+regimes — there is no analogous Bogoliubov absorption for the bilinear
+sector. If ρ or κ accuracy matters (e.g., depletion / pair-coherence
+observables), Picard is required for any meaningful order. The lab-path
+suggestion "Strang is fine for short runs at loose tolerance" does NOT
+transfer to TDHFB without verification per regime.
 
 ## §5 Open questions
 
