@@ -1,74 +1,54 @@
-# TDHFB Yoshida-4 wrapper around the Strang sub-step (Phase 4, WIP).
+# TDHFB Yoshida-4 wrapper around the Strang sub-step.
 #
-# Status (2026-05-12, this commit): **order-4 NOT achieved**.
-# Empirical convergence is order 2 with a worse prefactor than plain Strang
-# at small dt. The integrator is committed as documented work-in-progress so
-# downstream code (and a future palindromic substep) can plug in cleanly.
+# Status: **A4 acceptance ACHIEVED via `picard_midpoint=true`** — order 4
+# measured (test `Y7`, state-error vs reference: ~4.05). Default off
+# because the wall-time / accuracy trade is regime-dependent (see below).
 #
-# Why Y4 does not deliver order 4 here
-# -------------------------------------
-# Yoshida-4 composition `S(w1·dt) ∘ S(w0·dt) ∘ S(w1·dt)` with
+# Why a palindromic substep is required
+# --------------------------------------
+# Yoshida-4 composition `S(w1·dt) ∘ S(w0·dt) ∘ S(w1·dt)` is order 4 IFF
+# the base integrator S is order 2 AND time-reversible (palindromic):
+# `S(−dt) ∘ S(dt) = I + O(dt^5)`. The plain TDHFB Strang substep has an
+# O(dt²) palindrome residual: the inner HF triple
+# `φ-sub(dt/2; ρ_a,κ_a) → R-sub(dt) → φ-sub(dt/2; ρ_b,κ_b)` reads
+# (ρ, κ) BEFORE the R update on the first φ-step and AFTER on the second
+# — under time reversal those tags swap, but the BdG matrix exponential
+# acts as the upper half of a Nambu rotation, so the φ subupdate is NOT
+# exactly the inverse of its negative-dt counterpart.
 #
-#     w1 = 1 / (2 − 2^(1/3)) ≈ 1.3512
-#     w0 = 1 − 2·w1          ≈ −1.7024
+# How `picard_midpoint=true` fixes it (A4 acceptance path)
+# ---------------------------------------------------------
+# Routes through `_tdhfb_hf_step_picard_midpoint!` instead of
+# `_tdhfb_hf_step_picard!`. The inner HF substep iterates a midpoint-
+# state Picard fixed point on (φ_mid, ρ_mid, κ_mid) at tol=1e-12,
+# converges in 4-6 iterations, and the resulting substep is palindromic
+# to machine eps (verified `/tmp/picard_mrmdag_no_doublet.jl`). Combined
+# with the M·R·M† bosonic Bogoliubov fix in `strang_step.jl`, this
+# unlocks the Y4 composition's order-4 scaling.
 #
-# is order 4 IF the base integrator S is order 2 AND time-reversible
-# (palindromic): `S(−dt) ∘ S(dt) = I + O(dt^5)`. Direct measurement on the
-# current TDHFB Strang substep (see `/tmp/debug_palindrome.jl` reproducer
-# in PR notes) shows the palindrome residual is `O(dt²)`, not `O(dt^5)`:
+# Cost & trade-off (see `tdhfb_a4_default_decision.md`):
+#   - `picard_midpoint=true` runs ~5× per HF substep (Picard ~5 iter).
+#     Total Y4+Picard step is ~12-15× plain Strang.
+#   - Pays off for long-time accuracy / large-dt regimes where dt⁴
+#     resolution clears the Strang dt² floor (~1e-8 error threshold).
+#   - Loose tolerance (>1e-6) or short-time: plain `tdhfb_strang_step!`
+#     is more wall-time efficient.
 #
-#     dt        |S(-dt)S(dt) - I|_∞ (ρ component)
-#     0.04      7.5e-6
-#     0.02      1.9e-6   (4× smaller — O(dt²))
-#     0.01      4.6e-7   (4× smaller — O(dt²))
-#     0.005     1.2e-7   (4× smaller — O(dt²))
-#
-# The asymmetry sits in the inner HF triple
-# `φ-sub(dt/2; ρ_a,κ_a) → R-sub(dt) → φ-sub(dt/2; ρ_b,κ_b)`: the first
-# φ-step reads (ρ, κ) BEFORE the R update; the second reads them AFTER.
-# Under time reversal those (ρ, κ) tags swap, which is fine for a true
-# palindrome — but the BdG matrix exponential applied as
-# `(φ_new, conj(φ)_new) = top( exp(-iW^φ dt) · (φ, conj(φ)) )`
-# is the upper half of a Nambu rotation and `conj(φ)_new ≠
-# conj(applied result lower half)` in general (only when Δ^φ → 0). So
-# the φ subupdate is NOT exactly the inverse of its negative-dt
-# counterpart, leaving an O(dt²) palindrome remainder.
-#
-# What would fix this
-# --------------------
-# A genuinely palindromic TDHFB substep is needed before Y4 (or any
-# Yoshida composition) can climb to order 4. Two known routes, both
-# multi-session work outside Phase 4 scope:
-#
-#   1. **State-averaged midpoint Picard** for `(φ, ρ, κ)` simultaneously
-#      (= implicit midpoint). Symmetric by construction but the prompt
-#      explicitly warns this is the `§3.7.4.b AVF anti-pattern` — it
-#      breaks order through a different mechanism (cos(Hτ/2) §3.3.2
-#      family) and FAILS empirically per Ch.3.
-#
-#   2. **Full BdG-Nambu rotation** that evolves the doublet (φ, conj(φ))
-#      AS the upper half of a (φ, ρ, κ)-coupled rotation that exactly
-#      preserves the Nambu conjugation constraint. Equivalent to writing
-#      the TDHFB EOMs in full HFB-doubled basis and matrix-exponentiating
-#      the whole `(2D + 2D²) × (2D + 2D²)` generator per voxel. Order 4
-#      then follows from Y4 of the symmetric ABA splitting around this
-#      single dressed exponential.
-#
-# What this file IS useful for right now
-# ---------------------------------------
-#   - A documented Yoshida-4 wrapper, drop-in over `tdhfb_strang_step!`
-#     and exporting the same kwargs (incl. `hfb_mode`).
-#   - The `picard_iters` keyword is wired (defaults to 1 = pure Y4 on
-#     top of the existing symmetric Strang triple); raising it activates
-#     an endpoint-Picard loop on the inner HF substep. **EMPIRICALLY
-#     this does not improve absolute error and at picard_iters ≥ 2 makes
-#     it WORSE** — the endpoint (ρ, κ) used in the first φ-half-step
-#     becomes biased toward the post-R values, which is an O(dt) bias
-#     (not a refinement). Kept for diagnostic / follow-up use but
-#     defaulted off.
+# Two other kwargs exist on this wrapper for backward compatibility:
+#   - `picard_iters::Int=1` — endpoint-Picard diagnostic loop on the
+#     inner HF substep (NOT the A4 fix). EMPIRICALLY this does not
+#     improve absolute error and at `picard_iters ≥ 2` makes it WORSE
+#     (endpoint bias is O(dt), not a refinement). Defaulted off; kept
+#     as diagnostic.
+#   - State-averaged midpoint Picard on (φ, ρ, κ) simultaneously is a
+#     KNOWN anti-pattern (`§3.7.4.b`, cos(Hτ/2) family) — NOT what
+#     `picard_midpoint=true` does. The A4 fix iterates Picard on the
+#     midpoint state only, with the M·R·M† Nambu update guaranteeing
+#     Hermiticity preservation.
 #
 # Reference: Yoshida 1990, Phys. Lett. A 150, 262.
 # Internal narrative: docs/integrator_ch3_8_narrative.md (Track A1).
+# Memo: tdhfb_a4_closed.md, tdhfb_a4_picard_minimal_scope.md.
 
 export tdhfb_y4_midpoint_step!
 

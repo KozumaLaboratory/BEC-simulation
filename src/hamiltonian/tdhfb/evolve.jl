@@ -8,7 +8,10 @@ export tdhfb_evolve!
     tdhfb_evolve!(state, F, g_S, V_ext, dt, n_steps;
                   scheme=:strang, k_squared=nothing, hfb_mode=:full_hfb,
                   on_step=nothing, save_every=0,
-                  picard_iters=1, picard_tol=1e-10) -> (state, history)
+                  picard_iters=1, picard_tol=1e-10,
+                  picard_midpoint=false,
+                  picard_midpoint_max_iter=20,
+                  picard_midpoint_tol=1e-12) -> (state, history)
 
 Run `n_steps` TDHFB integration steps under a chosen integrator scheme.
 
@@ -26,10 +29,12 @@ snapshots.
 
 # Schemes
 - `:strang` (default): `tdhfb_strang_step!` — order 2, symmetric.
-- `:y4_midpoint`: `tdhfb_y4_midpoint_step!` — formal Y4 composition. The
-  underlying TDHFB Strang substep is not yet palindromic at O(dt²) so this
-  empirically remains order 2 (with a worse prefactor at small dt). See
-  `tdhfb_y4_midpoint_step!` docstring for the route to a palindromic substep.
+- `:y4_midpoint`: `tdhfb_y4_midpoint_step!` — Y4 composition over three
+  Strang substeps. Pass `picard_midpoint=true` to engage the A4
+  palindromic-substep fix (order 4 measured, ~12-15× plain Strang cost).
+  Without `picard_midpoint`, the underlying Strang substep is non-
+  palindromic at O(dt²) and Y4 degrades to order 2 with a worse
+  prefactor — see `tdhfb_y4_midpoint_step!` docstring.
 
 # Keyword arguments
 - `k_squared`: precomputed `|k|²` grid. If `nothing`, built once and
@@ -41,7 +46,12 @@ snapshots.
   step (e.g., for energy tracing).
 - `save_every::Int = 0`: if positive, push a copy of (φ, ρ, κ, t, step)
   to the history every N steps. `0` = no snapshots, returns empty vector.
-- `picard_iters`, `picard_tol`: forwarded to `:y4_midpoint` only.
+- `picard_iters`, `picard_tol`: diagnostic endpoint-Picard knobs, forwarded
+  to `:y4_midpoint` only. Defaulted off (see file header).
+- `picard_midpoint::Bool = false`: engage the A4 palindromic-substep fix
+  for `:y4_midpoint`. Required for order-4 scaling.
+- `picard_midpoint_max_iter::Int = 20`, `picard_midpoint_tol::Float64 = 1e-12`:
+  Picard fixed-point iteration cap and convergence tolerance.
 
 # Returns
 `(state, history)` where `state` is the mutated input and `history` is
@@ -61,6 +71,9 @@ function tdhfb_evolve!(
     save_every::Int=0,
     picard_iters::Int=1,
     picard_tol::Real=1e-10,
+    picard_midpoint::Bool=false,
+    picard_midpoint_max_iter::Int=20,
+    picard_midpoint_tol::Float64=1e-12,
 ) where {N}
     # Precompute |k|² once per call (vs once per Strang step in the raw API).
     spatial = size(state.phi)[1:(end - 1)]
@@ -75,7 +88,10 @@ function tdhfb_evolve!(
         elseif scheme === :y4_midpoint
             tdhfb_y4_midpoint_step!(state, F, g_S, V_ext, dt;
                 k_squared=ksq, hfb_mode=hfb_mode,
-                picard_iters=picard_iters, picard_tol=picard_tol)
+                picard_iters=picard_iters, picard_tol=picard_tol,
+                picard_midpoint=picard_midpoint,
+                picard_midpoint_max_iter=picard_midpoint_max_iter,
+                picard_midpoint_tol=picard_midpoint_tol)
         else
             error("tdhfb_evolve!: unknown scheme $scheme. " *
                   "Valid: :strang, :y4_midpoint")

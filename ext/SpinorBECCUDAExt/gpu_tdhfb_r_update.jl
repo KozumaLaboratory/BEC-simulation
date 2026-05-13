@@ -1,17 +1,21 @@
-# Nambu R = [[ρ, κ]; [-κ̄, I + ρ̄]] update on GPU — Phase 5c piece 3/3.
+# Nambu R = [[ρ, κ]; [conj(κ), I + conj(ρ)]] update on GPU — bosonic HFB.
 #
-# Per CPU code at `src/hamiltonian/tdhfb/strang_step.jl:287-319`:
-#   1. Build R = [[ρ, κ]; [-κ̄, I + ρ̄]]  (2D × 2D per voxel)
-#   2. Compute M^{-1} via batched LU + inversion
-#   3. R_new = M · R · M^{-1} via two batched gemms
-#   4. Read back ρ and κ with Hermitian / symmetric projection.
+# Per CPU code at `src/hamiltonian/tdhfb/strang_step.jl` (M·R·M† path):
+#   1. Build R = [[ρ, κ]; [conj(κ), I + conj(ρ)]]  (2D × 2D per voxel)
+#   2. R_new = M · R · M† via two batched gemms (M† = adjoint(M)).
+#   3. Read back ρ and κ directly (M·R·M† preserves Hermiticity / Nambu
+#      form by construction, no projection needed).
 #
-# GPU plan:
-#   1. `_build_R_nambu!`     — CUDA kernel, one pass over (r, c, v).
-#   2. `_batched_matinv!`    — wrap `CUBLAS.getrf_strided_batched!` +
-#                              `CUBLAS.getri_strided_batched!`.
-#   3. `_apply_mrm!`         — two `CUBLAS.gemm_strided_batched!` calls.
-#   4. `_project_R_to_rho_kappa!` — CUDA kernel with Hermitian projection.
+# Bosonic-HFB Nambu convention (NOT fermionic): the lower-left block is
+# `+conj(κ)` with the same (c, c') ordering — verified against CPU
+# production. The Heisenberg evolution of the bosonic density is M·R·M†,
+# NOT M·R·M⁻¹ (fermionic style); the pseudo-unitarity σ_z M† σ_z = M⁻¹
+# of M still holds, but the correct contraction here is M·R·M†.
+#
+# GPU layout:
+#   1. `_build_R_nambu!`           — CUDA kernel, one pass over (r, c, v).
+#   2. `_apply_mrm!`               — two `CUBLAS.gemm_strided_batched!` calls.
+#   3. `_project_R_to_rho_kappa!`  — CUDA kernel, direct read-back.
 
 # ----- 1. Nambu R block assembly -----
 #
@@ -38,8 +42,9 @@ function _kernel_build_R!(R, rho, kappa, D::Int, twoD::Int, N_vox::Int)
             elseif r > D && c <= D
                 R[r, c, v] = conj(kappa[v, r - D, c])
             else
-                R[r, c, v] = (r - D == c - D ? one(eltype(R)) : zero(eltype(R))) +
-                             conj(rho[v, r - D, c - D])
+                R[r, c, v] =
+                    (r - D == c - D ? one(eltype(R)) : zero(eltype(R))) +
+                    conj(rho[v, r - D, c - D])
             end
         end
     end
@@ -61,7 +66,7 @@ function _build_R_nambu!(
     twoD = size(R, 1)
     @assert twoD == 2 * D
     N_vox = size(R, 3)
-    spatial = size(state.rho)[1:end-2]
+    spatial = size(state.rho)[1:(end - 2)]
     @assert prod(spatial) == N_vox
     rho_v = reshape(state.rho, N_vox, D, D)
     kappa_v = reshape(state.kappa, N_vox, D, D)
@@ -78,41 +83,7 @@ function _build_R_nambu!(
     R
 end
 
-# ----- 2. Batched matrix inversion via LU -----
-#
-# CUBLAS API requires (D, D, batch_size) — strided batch with row-major LU.
-# Our M is (2D, 2D, N_voxels); same layout.
-
-"""
-    _batched_matinv!(Minv, M_work) -> Minv
-
-Compute Minv[v] = inv(M_work[v]) for all voxels v. `M_work` is OVERWRITTEN
-(used as LU storage). Returns Minv (same shape as M).
-
-Uses `CUBLAS.getrf_strided_batched!` (LU factorization) + `getri_strided_batched!`
-(inverse-from-LU) — both are available in CUDA.jl 12+.
-"""
-function _batched_matinv!(
-    Minv::CuArray{TC, 3},
-    M_work::CuArray{TC, 3},
-) where {TC <: Complex}
-    @assert size(Minv) == size(M_work)
-    twoD = size(M_work, 1)
-    N_vox = size(M_work, 3)
-
-    # LU factorization in-place on M_work.
-    # Returns pivots (Int32 array of size (twoD, N_vox))
-    pivots, info = CUDA.CUBLAS.getrf_strided_batched!(M_work, true)
-    # info[v] == 0 → success; nonzero → singular pivot at row info[v].
-    # We don't check info per-voxel in production (cost), but a CPU sync
-    # diagnostic check could be added in dev mode.
-
-    # Invert using LU.
-    CUDA.CUBLAS.getri_strided_batched!(M_work, Minv, pivots)
-    Minv
-end
-
-# ----- 3. Apply M·R·M† via two batched gemms -----
+# ----- 2. Apply M·R·M† via two batched gemms -----
 #
 # Bosonic Bogoliubov: M is pseudo-unitary (σ_z M† σ_z = M⁻¹). The Heisenberg
 # evolution of the bosonic Nambu density R_{ab} = ⟨ψ_b† ψ_a⟩ is M·R·M†, NOT
@@ -133,16 +104,16 @@ function _apply_mrm!(
 ) where {TC <: Complex}
     # R_tmp = M · R
     CUDA.CUBLAS.gemm_strided_batched!(
-        'N', 'N', one(TC), M, R, zero(TC), R_tmp,
+        'N', 'N', one(TC), M, R, zero(TC), R_tmp
     )
     # R_new = R_tmp · M†  (use 'C' = conjugate-transpose on M)
     CUDA.CUBLAS.gemm_strided_batched!(
-        'N', 'C', one(TC), R_tmp, M, zero(TC), R_new,
+        'N', 'C', one(TC), R_tmp, M, zero(TC), R_new
     )
     R_new
 end
 
-# ----- 4. Read back ρ, κ from R_new -----
+# ----- 3. Read back ρ, κ from R_new -----
 #
 # Because M·R·M† preserves Hermiticity and Nambu form exactly, no projection
 # is needed — read R_new directly:
@@ -174,7 +145,7 @@ function _project_R_to_rho_kappa!(
     D::Int,
 ) where {N, A <: CuArray, B <: CuArray, T, TC <: Complex}
     N_vox = size(R_new, 3)
-    spatial = size(state.rho)[1:end-2]
+    spatial = size(state.rho)[1:(end - 2)]
     @assert prod(spatial) == N_vox
     rho_v = reshape(state.rho, N_vox, D, D)
     kappa_v = reshape(state.kappa, N_vox, D, D)

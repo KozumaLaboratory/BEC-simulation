@@ -7,6 +7,22 @@ measure of splitting error that the L2 estimator misses.
 
 PI controller exponent: (tol/err)^{1/(p+1)} with p=4 (4th-order global).
 Cost: ~4 Strang steps per accepted step; benefits from larger dt at same accuracy.
+
+!!! warning "Frozen mean-field base — order degrades on lab path"
+    The base scheme is `_strang_core!` (frozen MF), which is order 2 only
+    for autonomous V. On the SpinorBEC lab path (c₀, c₁, DDI, tensor
+    cache, time-dependent Zeeman, …) the mean field at intermediate
+    Yoshida sub-times is held frozen at the start-of-step value, so
+    composition coefficients no longer deliver their nominal order:
+    measured order ~3.4 for Y4 and ~1.0 for Y6 on Eu151 F=6 spinor+DDI
+    (handover §4). The Y4/Y6 coefficients themselves are correct
+    (`_COMP_YOSHIDA_*` matches Yoshida 1990).
+
+    For production high-order on the lab path use
+    `adaptive_run!(ws; step!=split_step_midpoint!)` — the implicit-
+    midpoint Picard predictor restores self-consistency at each
+    sub-time. For TDHFB use `tdhfb_y4_midpoint_step!` with
+    `picard_midpoint=true` (A4 palindromic substep).
 """
 function run_simulation_yoshida!(
     ws::Workspace{N};

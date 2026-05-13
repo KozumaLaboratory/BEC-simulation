@@ -20,7 +20,7 @@
 # requires self-consistency for full 4th-order recovery; 4A00 still
 # improves over Strang.
 #
-# # Scope (v1, this commit)
+# # Scope (v1)
 #
 # Diagonal-only subset of SpinorBEC: c₁ = 0, no DDI, no spin-mixing,
 # no tensor cache, no transverse Zeeman, no Raman / light shift /
@@ -28,8 +28,18 @@
 # _assert_forcegrad_diagonal_only! guard panics if these constraints
 # are violated to prevent silent incorrect results.
 #
-# Extensions (c₁, DDI, etc.) require additional Phase -1 derivation;
-# see Step 5 of docs/design/integrator_track_c_derivation.md.
+# # Spinor / DDI extension routing
+#
+# v4 (spinor) and v5 (DDI) extensions are DERIVED in
+# `docs/design/integrator_track_c_derivation.md` §5.2-5.3 but NOT
+# implemented — a structural order-2 ceiling on the Strang-predictor
+# Force-Gradient form was identified in the same chapter
+# (`integrator_modernization_status.md` memo).
+#
+# For high-order spinor / DDI / lab-path use cases, route through
+# `split_step_midpoint!` + Yoshida composition (= `adaptive_run!(ws;
+# step!=split_step_midpoint!)`). For TDHFB high-order paths, use
+# `tdhfb_y4_midpoint_step!` with `picard_midpoint=true` (A4 acceptance).
 
 export split_step_forcegrad!, split_step_thalhammer!
 
