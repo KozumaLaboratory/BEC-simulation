@@ -11,6 +11,14 @@
 Yoshida 4th-order triple-jump coefficients.
 S₄(dt) = S₂(w₁·dt) ∘ S₂(w₀·dt) ∘ S₂(w₁·dt)  with w₀ + 2w₁ = 1.
 """
+# NOT GENERALIZABLE: `_YOSHIDA_W0 < 0` — middle substep runs *backwards in time*.
+# Reason: math
+# Why: Yoshida's 4th-order triple-jump requires w_0 = 1 - 2 w_1 ≈ -1.7024 to
+#   cancel the 3rd-order error term. All split-step operators (kinetic, V, DDI,
+#   spin-mixing, tensor) are unitary and time-reversible, so negative dt is
+#   well-defined — but MUST NOT be replaced with abs(w_0); doing so silently
+#   demotes the integrator to 2nd order.
+# See: Yoshida 1990 Phys. Lett. A 150, 262; `_yoshida_core!` below
 const _YOSHIDA_W1 = 1.0 / (2.0 - 2.0^(1 / 3))
 const _YOSHIDA_W0 = 1.0 - 2.0 * _YOSHIDA_W1
 
@@ -238,4 +246,49 @@ function _aba_step!(
         t_cur += a[i + 1] * dt
     end
     nothing
+end
+
+"""
+    Composition{Sv, Sk, F}
+
+Bundled ABA composition coefficients plus an optional force-gradient
+callback. Wraps the same `(a, b)` tuple shape used by the existing
+NamedTuple compositions (`_COMP_YOSHIDA`, `_COMP_SUZUKI`, …) so
+`_aba_step!(ws, dt, n_comp, comp::Composition)` is a drop-in for the
+NamedTuple form.
+
+`fg_coeff_func` is the extension point for a future Y4-FG / Y6-FG hybrid
+(`Composition` makes the hook explicit without changing the NamedTuple
+path). Set to `nothing` (the default) for pure ABA compositions; the
+non-nothing path currently errors because force-gradient is not yet
+wired into the ABA composer (see `force_gradient.jl` for the standalone
+implementation and `docs/design/integrator_track_c_derivation.md`
+§5.2-5.3 for why the merger needs more derivation work).
+"""
+struct Composition{Sv, Sk, F}
+    a::NTuple{Sv, Float64}
+    b::NTuple{Sk, Float64}
+    fg_coeff_func::F
+end
+
+Composition(a::NTuple{Sv, Float64}, b::NTuple{Sk, Float64}) where {Sv, Sk} = Composition{
+    Sv, Sk, Nothing
+}(
+    a, b, nothing
+)
+
+function _aba_step!(
+    ws::Workspace{N}, dt::Float64, n_comp::Int, comp::Composition{Sv, Sk, F};
+    t_base::Float64=ws.state.t,
+) where {N, Sv, Sk, F}
+    if comp.fg_coeff_func !== nothing
+        throw(
+            ArgumentError(
+                "Composition with fg_coeff_func is not wired into the ABA composer yet. " *
+                "Use the standalone force_gradient.jl integrator for FG steps; " *
+                "Y4-FG / Y6-FG hybrids are tracked in docs/design/integrator_track_c_derivation.md " *
+                "§5.2-5.3 (post-thesis work)."),
+        )
+    end
+    _aba_step!(ws, dt, n_comp, comp.a, comp.b; t_base=t_base)
 end
