@@ -16,6 +16,15 @@
 # acts as the upper half of a Nambu rotation, so the φ subupdate is NOT
 # exactly the inverse of its negative-dt counterpart.
 #
+# Palindrome residual is state-dependent (B-1 diagnostic, 2026-05-13):
+# the leading O(dt²) commutator coefficient is *linear* in the Nambu
+# anomalous source (ρ, κ). Concretely:
+#   - vacuum ρ=κ=0:  coefficient vanishes → slope 4 (not 2). Special case.
+#   - pre-evolved / random:  slope 2.00 (production regime).
+# Memo: [[integrator-palindrome-state-dependent]] +
+# `scripts/diagnostic/palindrome_residual_probe.jl`. Don't confuse the
+# vacuum-init unit test slope with the production palindromicity.
+#
 # How `picard_midpoint=true` fixes it (A4 acceptance path)
 # ---------------------------------------------------------
 # Routes through `_tdhfb_hf_step_picard_midpoint!` instead of
