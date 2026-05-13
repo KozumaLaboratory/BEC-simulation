@@ -33,6 +33,12 @@ jobs:
       - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
+        with:
+          # Coverage instrumentation forces re-precompile of every package
+          # because the precompile cache is keyed on compile flags. We don't
+          # upload coverage anywhere, so it's pure waste. Disabling lets the
+          # julia-actions/cache@v2 restore actually hit on test-time precompile.
+          coverage: false
 
   format:
     name: JuliaFormatter check
