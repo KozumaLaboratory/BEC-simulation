@@ -39,6 +39,16 @@ end
 
 # --- Atom Species ---
 
+# NOT GENERALIZABLE: F=1 `a_s = (a0 + 2a2)/3` two-channel reduction; F≥2 uses a0 alone.
+# Reason: physics
+# Why: at F=1 only S=0 and S=2 even channels exist, so the rotationally-averaged
+#   s-wave length is exactly (a_0 + 2 a_2)/3 (Ohmi-Machida 1998). For F≥2 the
+#   channel-resolved a_S is the right input and `a_s` is just the nominal a_0
+#   placeholder; downstream `scattering_lengths` dict carries the physics.
+# See: src/hamiltonian/interactions/interactions.jl (compute_interaction_params)
+@inline _compute_mean_scattering_length(F::Int, a0::Float64, a2::Float64) =
+    F == 1 ? (a0 + 2a2) / 3 : a0
+
 """
     AtomSpecies
 
@@ -93,7 +103,7 @@ struct AtomSpecies
         g_J::Float64=0.0,
         q_geometry::Float64=0.0,
     )
-        a_s = F == 1 ? (a0 + 2a2) / 3 : a0
+        a_s = _compute_mean_scattering_length(F, a0, a2)
         new(name, mass, F, a0, a2, a_s, mu_mag, g_F, scattering_lengths,
             Delta_E_hf, g_J, q_geometry)
     end
@@ -115,7 +125,7 @@ struct AtomSpecies
         else
             Dict{Int, Float64}()
         end
-        a_s = F == 1 ? (a0 + 2a2) / 3 : a0
+        a_s = _compute_mean_scattering_length(F, a0, a2)
         new(name, mass, F, a0, a2, a_s, mu_mag, Float64(g_F), sl,
             Delta_E_hf, g_J, q_geometry)
     end
@@ -132,7 +142,7 @@ struct AtomSpecies
         g_J::Float64=0.0,
         q_geometry::Float64=0.0,
     )
-        a_s = F == 1 ? (a0 + 2a2) / 3 : a0
+        a_s = _compute_mean_scattering_length(F, a0, a2)
         new(name, mass, F, a0, a2, a_s, mu_mag, 0.0, scattering_lengths,
             Delta_E_hf, g_J, q_geometry)
     end
@@ -144,7 +154,7 @@ struct AtomSpecies
         else
             Dict{Int, Float64}()
         end
-        a_s = F == 1 ? (a0 + 2a2) / 3 : a0
+        a_s = _compute_mean_scattering_length(F, a0, a2)
         new(name, mass, F, a0, a2, a_s, mu_mag, 0.0, sl,
             Delta_E_hf, g_J, q_geometry)
     end
