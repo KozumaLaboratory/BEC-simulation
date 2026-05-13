@@ -111,34 +111,149 @@ This bound is too loose. The empirical slope is 1, not 2, so we need a
 tighter analysis showing the local truncation degrades to O(dt²)
 (global O(dt)).
 
-### §3.2 Why the asymmetry compounds (TODO — fill derivation)
+### §3.2 BCH structure of the asymmetric inner triple
 
-Claim: when V_a, V_b differ by a Nambu-anomalous component that is
-*itself* propagated through R-sub via the bosonic Bogoliubov rotation,
-the Strang factorisation loses one factor of dt in its leading error.
+The φ subupdate at each inner half-step is
+`(φ, conj(φ)) ← top( M_φ · (φ, conj(φ)) )` where `M_φ = exp(−i W^φ · dt/2)`
+and W^φ is the 2D × 2D Nambu BdG generator
 
-Specifically: the φ subupdate `(φ, conj(φ)) ← M_φ · (φ, conj(φ))` is the
-upper half of a Nambu rotation. M_φ depends on the off-diagonal Δ term,
-which is linear in κ. Pre- and post-R values of κ differ by O(dt) at
-the φ generator level. The propagated error in φ then enters the *next*
-Strang composition step (under Yoshida w_0 · dt < 0), where the
-"backward" sub-step amplifies rather than cancels the asymmetry-driven
-truncation. Result: per-step phase error ~ O(dt²) instead of O(dt³).
+```
+        ⎛  U^φ      Δ^φ   ⎞       U^φ_{c,c'} = Σ V_{c,c';c2,c2'} (conj(φ)φ + ρ)_{c2,c2'}
+W^φ  =  ⎜                  ⎟ ,    Δ^φ_{c,c'} = Σ V_{c,c';c2,c2'}  κ_{c2,c2'}
+        ⎝ −conj(Δ^φ)  −conj(U^φ) ⎠
+```
 
-Quantitative form (to derive):
+Between the left and right φ-half-steps, R-sub advances (ρ, κ) by O(dt):
 
-  err_local(dt) ~ C · dt² · ⟨κ̇⟩ + higher-order terms
+  Δρ = O(dt) · ρ̇ ,  Δκ = O(dt) · κ̇
 
-where ⟨κ̇⟩ is the rate of anomalous-source generation. At vacuum,
-κ̇ ≠ 0 *but* the leading palindrome-residual BCH coefficient vanishes
-(B-1 result) — so two error mechanisms coexist:
+with `ρ̇ = i [W^R, ρ-block]`, `κ̇ = i [W^R, κ-block]`. The induced
+generator shift between right and left is
 
-- Mech-A (slope-1 global): asymmetry × κ̇, present at vacuum AND elsewhere
-- Mech-B (slope-2 palindrome): anomalous-source linear, vanishes at vacuum
+  δW^φ ≡ W^φ_R − W^φ_L = V · (Δρ + Δκ)  ∝  dt   (B-3 confirms slope ≈ 1)
 
-The vacuum special case (B-1 slope 4 palindrome) is Mech-B vanishing.
-The slope-1 global (B-2 at vacuum AND pre-evolved) is Mech-A, which is
-state-symmetric.
+The leading correction in BCH(M_R, M_L) is `−i(dt/4) (W^φ_R + W^φ_L)` plus
+commutators; the asymmetry contribution is `−i(dt/4) · δW^φ`. Decomposed
+into Nambu blocks:
+
+```
+        ⎛ δU^φ       δΔ^φ   ⎞
+δW^φ =  ⎜                    ⎟
+        ⎝ −conj(δΔ^φ) −conj(δU^φ) ⎠
+```
+
+The φ-component contamination after applying δW^φ to the (φ, conj(φ))
+doublet is
+
+  δφ_contam = δU^φ · φ  +  δΔ^φ · conj(φ)             ← key expression
+
+The two terms have **structurally different propagation**:
+
+- `δU^φ · φ` — normal-channel contamination, a phase shift on φ. With
+  no Nambu mixing in the baseline rotation `M_φ`, this maps directly
+  into the φ amplitude.
+- `δΔ^φ · conj(φ)` — anomalous-channel leak from conj(φ) into φ via the
+  off-diagonal Δ block. Whether this leak compounds at O(dt) or partially
+  cancels at O(dt²) depends on the baseline Δ^φ rotation activity:
+  - If `Δ^φ_baseline ≈ 0` (vacuum / Popov-like states), `M_φ` is
+    block-diagonal (no Bogoliubov mixing) → the leak adds linearly to
+    φ at each substep → global slope 1.
+  - If `Δ^φ_baseline` is non-negligible relative to U^φ, the baseline
+    `M_φ` already mixes (φ, conj(φ)) via a Bogoliubov rotation with
+    frequency `Ω_Bog = √(|U^φ|² − |Δ^φ|²)`. The perturbation δΔ^φ is
+    averaged over this rotation, suppressing the leak by one factor
+    of dt → global slope partially lifted toward 2.
+
+### §3.3 Two error mechanisms
+
+Combining §3.1 + §3.2, the global φ error decomposes as
+
+  E_φ(τ) ≈ A_φ · τ² + B_φ · τ + O(τ³)
+
+with two distinct contributions:
+
+- **Mech-A** (asymmetry-driven, sets B_φ): per-step `δφ_contam` from
+  the inner triple. B_φ magnitude depends on whether `M_φ` baseline is
+  Bogoliubov-active (Δ^φ_baseline ≠ 0) — see B-3 table:
+  
+  | Regime | ‖U^φ‖ | ‖Δ^φ‖ | Δ^φ/U^φ | φ slope (B-2 / B-3.5) |
+  |---|---|---|---|---|
+  | B-2 vacuum | 0.02 | 0 | 0% | 1.10 |
+  | B-2 pre-evolved | 0.02 | 0.002 | 8.5% | 1.10 |
+  | B-3.5 α=0 (rand ρ, κ=0) | 0.34 | 0 | 0% | 1.70 |
+  | B-3.5 α=0.1 | 0.34 | 0.023 | 7% | 1.74 |
+  | B-3.5 α=0.3 | 0.34 | 0.069 | 20% | 1.80 |
+  | B-3.5 α=0.5 | 0.34 | 0.115 | 34% | 1.84 |
+  | B-3.5 α=1.0 (full random) | 0.34 | 0.230 | 68% | 1.90 |
+  
+  Cf. B-3 ‖ΔW^φ‖/‖W^φ_L‖ ratio = ~1% across ALL regimes — relative
+  perturbation magnitude does NOT explain the slope difference.
+  
+  **Both U^φ magnitude and Δ^φ magnitude contribute, continuously
+  (NOT threshold)** — see §3.2.5 below.
+
+### §3.2.5 Continuous slope interpolation (B-3.5 finding)
+
+The intermediate-Δ sweep at fixed φ, ρ = random and κ = α × (random κ)
+shows φ-slope interpolates linearly with Δ^φ/U^φ:
+
+  slope_φ(Δ^φ/U^φ) ≈ 1.70 + 0.30 · (Δ^φ/U^φ)    (for U^φ ≈ 0.34)
+
+But comparison across U^φ values reveals a second axis:
+
+  Δ slope_φ from U^φ alone (Δ^φ=0):  0.02 → 0.34 lifts slope 1.10 → 1.70
+  Δ slope_φ from Δ^φ on top of U^φ:  0% → 68% lifts slope 1.70 → 1.90
+
+The U^φ baseline magnitude is the **larger discriminator**. Combined
+phenomenology:
+
+  slope_φ ≈ 1 + f(|U^φ|) + g(Δ^φ / U^φ)
+
+with both f and g continuous and roughly linear in their argument over
+the measured range. Mechanism interpretation:
+
+- f(|U^φ|): the baseline `M_φ = exp(-i W^φ · dt/2)` is a fast unitary
+  rotation in φ-space (frequency ~ |U^φ|). The asymmetric perturbation
+  δW^φ is integrated over this rotation, suppressing the linear-in-dt
+  leak by a factor that grows with |U^φ| · τ.
+- g(Δ^φ/U^φ): when Δ^φ is active, the unitary rotation involves
+  Nambu mixing (Bogoliubov rotation), which provides an additional
+  φ ↔ conj(φ) averaging channel.
+
+The original "Nambu mixing as binary toggle" hypothesis is REFUTED.
+The corrected picture is that the entire W^φ eigenstructure — both
+U^φ magnitude AND Δ^φ magnitude — sets the absorption capability for
+asymmetric perturbations. This is more physically natural: any unitary
+rotation by W^φ tends to randomise the phase contamination from δW^φ.
+
+- **Mech-B** (palindrome breakdown, sets a Yoshida-composition ceiling):
+  even when B_φ = 0 (symmetric V steps, e.g. lab path), the *next-order*
+  palindrome residual sources a (3,4)-floor on Yoshida composition.
+  B-1 measured slope 2 palindrome residual in populated regimes (3.4
+  Y4 measured on lab path) and slope 4 at vacuum (anomalous source
+  coeff vanishes structurally — not the production regime).
+
+Mech-A and Mech-B are independent:
+- Mech-A degrades the base method itself (B-2: Strang plain slope 1)
+- Mech-B degrades only the higher-order composition over a symmetric base
+
+TDHFB suffers from BOTH; the lab/GP path suffers from Mech-B only
+(its V step has no Nambu doublet asymmetry).
+
+### §3.4 ρ, κ components — no Nambu absorption
+
+For the (ρ, κ) sub-update, the generator W^R is itself asymmetric
+across substeps (the φ update between the two R-halves changes
+`V·(φ*φ + ρ)`). There is no analogous "Bogoliubov rotation absorbs
+the leak" mechanism for the bilinear sector — the Nambu density
+R = [[ρ, κ]; [conj(κ), I + conj(ρ)]] update via M·R·M† is direct, and
+asymmetry feeds into all four blocks. As a result:
+
+- **ρ, κ slopes are universally 1** across all regimes (B-2: 0.98 to
+  1.06 for ρ and κ at every cell with plain Strang).
+- The component-specific mechanism only applies to φ, which is the
+  upper half of the Nambu doublet that *can* selectively activate
+  Bogoliubov mixing.
 
 ## §4 Yoshida composition over a Mech-A-broken base
 
@@ -184,31 +299,38 @@ symptoms of the same underlying violation (V_a ≠ V_b under frozen MF).
 
 ## §5 Open questions
 
-1. **Quantitative coefficient for Mech-A**: what is C in
-   `err_local ~ C · dt² · ⟨κ̇⟩`? Needed to predict the regime where the
-   slope-1 mechanism matters in practice.
-2. **Lab-path Y4 = 3.41 — why not 1.00?**: On the lab path, Y4 measures
-   3.41, not slope-1 like the TDHFB case. Hypothesis: the lab path V
-   step is more weakly state-dependent (c₀|ψ|² doesn't have a Nambu
-   doublet structure), so Mech-A is suppressed there but Mech-B still
-   degrades 4 → 3.41.
-3. **CFET4 = 1.94**: CFET is designed for *linear* non-autonomous H(t),
-   not nonlinear MF. The collapse to ~order 2 (nearly slope 2) suggests
-   CFET retains the symmetric-V property but loses higher-order
-   commutator cancellation. Worth a separate BCH check.
-4. **Y6 = 1.00 catastrophic**: Three negative substeps amplify base
-   palindrome residual. With Mech-B at slope 2 (lab path), Y6 might
-   inherit slope ~1 from `(τ²)^something_negative`. Needs derivation.
+1. **Threshold vs continuous Δ^φ dependence**: §3.2 hypothesis is that
+   Nambu mixing activation is a *threshold* (Δ^φ_baseline below some
+   fraction of U^φ → slope 1; above → slope partially lifted toward 2).
+   B-3 only sampled 3 regimes (Δ/U = 0%, 8.5%, 68%). An intermediate-Δ
+   sweep at α ∈ {0, 0.1, 0.3, 0.5, 1.0} (κ-scale on random ρ; script
+   `scripts/diagnostic/intermediate_delta_sweep.jl`) tests whether
+   φ-slope transitions sharply or interpolates continuously.
+2. **Quantitative coefficient for B_φ**: what fraction of the symbolic
+   `δΔ^φ · conj(φ)` Nambu leak survives one Bogoliubov rotation period
+   `2π / Ω_Bog`? Needed to predict the lift factor from slope 1 to ~2.
+3. **Lab-path Y4 = 3.41 — why not 1.00?**: On the lab path, Y4 measures
+   3.41, not slope-1 like the TDHFB case. The lab V step has no Nambu
+   doublet (c₀|ψ|² is a real scalar on the V step), so Mech-A is
+   structurally absent. Only Mech-B degrades Y4 → 3.41. Direct test
+   at F=1 16³ lab path (B-5, pending) would confirm.
+4. **CFET4 = 1.94 / Y6 = 1.00 catastrophic**: CFET is designed for
+   *linear* non-autonomous H(t), not nonlinear MF. Y6's three negative
+   substeps amplify any palindrome residual. With Mech-B at slope 2
+   (lab path), Y6 might inherit slope ~1 from compounding negative
+   substep amplification. Both warrant BCH check in a follow-up.
 
 ## §6 Next steps
 
-- T-sweep at vacuum (B-3, GPU, `transient_T_sweep_gpu.jl`): falsifies
-  any remaining "vacuum-T transient" explanation by showing slope-1 is
-  T-independent.
-- BCH symbolic expansion (B-4): SymPy / Reduce automation of the
-  commutator structure to derive Mech-A coefficient.
-- Lab-path Y4 measurement (B-5): reproduce handover §4 numbers at
-  smaller scale (F=1 16³) to confirm Mech-A is TDHFB-specific.
+- **Intermediate-Δ sweep** (B-3.5, this commit): `intermediate_delta_sweep.jl`
+  — distinguish threshold from continuous mechanism for φ slope vs
+  Δ^φ_baseline. Falsifies the §3.2 threshold hypothesis cleanly.
+- **BCH symbolic expansion** (later): SymPy / Reduce automation of the
+  commutator structure `δW^φ · M_φ^{baseline}` to derive the B_φ lift
+  factor analytically.
+- **Lab-path Y4 measurement** (B-5): reproduce handover §4 numbers at
+  smaller scale (F=1 16³) on the GP path to confirm Mech-A is TDHFB-
+  specific (no Nambu doublet → no slope-1 floor).
 
 ## References
 
@@ -225,5 +347,8 @@ symptoms of the same underlying violation (V_a ≠ V_b under frozen MF).
 Internal:
 - `scripts/diagnostic/palindrome_residual_probe.jl` (B-1)
 - `scripts/diagnostic/order_ladder_full_matrix.jl` (B-2)
+- `scripts/diagnostic/asymmetry_probe.jl` (B-3 substep generator)
+- `scripts/diagnostic/intermediate_delta_sweep.jl` (B-3.5 threshold test)
 - Memo `integrator_palindrome_state_dependent.md` (state-dep palindromicity)
+- Memo `integrator_tdhfb_base_order_is_1.md` (B-2 global order finding)
 - Handover document §4 (lab-path Y4/Y6 measurements)
