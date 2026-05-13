@@ -1,5 +1,10 @@
 .claude
 
+# Stray scratch notes occasionally dropped at repo root by tools / sessions.
+# Real plans live in docs/design/ or docs/research_notes/.
+/PLAN.md
+/plan.md
+
 # Simulation binary data (large, reproducible from config)
 *.jld2
 
