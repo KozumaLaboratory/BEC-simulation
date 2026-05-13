@@ -2,6 +2,16 @@ export compute_spinor_lhy_two_channel, compute_spinor_lhy_table
 export compute_spinor_lhy_polar_contact, compute_spinor_lhy_polar_dipolar
 export compute_spinor_lhy_fm_contact, compute_spinor_lhy_fm_dipolar
 export compute_spinor_lhy_icosahedral
+export make_lhy
+
+# NOT GENERALIZABLE: two-channel (c_0/c_1) LHY is exact only at F=1 polar.
+# Reason: physics
+# Why: TwoChannel keeps the m=0 phonon plus 2 SO(3) Goldstones (3 of 2F+1
+#   modes); the m=±2..±F gapped modes carry non-zero anomalous coupling
+#   whenever g_S varies across S, generic for F≥2. ~0.3-1.5% at F=2,
+#   ~3-9% at F=3, **30-70% at F=6**. Prefer PolarContact / FMContact /
+#   IcosahedralLHY closed forms for F≥2.
+# See: src/hamiltonian/interactions/lhy/polar_contact.jl, dispatch.jl docstring below
 
 """
     compute_spinor_lhy_two_channel(; F, c0, c1, c_dd, n_max, n_points) → TwoChannelLHY
@@ -102,16 +112,19 @@ function compute_spinor_lhy_table(;
     length(spinor) == D ||
         throw(DimensionMismatch("spinor length $(length(spinor)) != 2F+1 = $D"))
 
-    # F=6 polar + FullBdG produces a ~3000× spurious LHY energy offset (the
-    # BdG diagonalisation produces λ<0 modes that break Petrov regularization
-    # — documented at memory/full_bdg_F6_polar_broken.md). Warn at construction
-    # so callers know to fall back to a closed-form path.
+    # NOT GENERALIZABLE: FullBdG LHY produces a spurious 3000× offset for F=6 polar.
+    # Reason: physics
+    # Why: BdG diagonalisation of F=6 polar mean field produces λ<0 modes that
+    #   break Petrov's UV regularisation (negative-eigenvalue branch picks up
+    #   unphysical phase in zero-point integral). FullBdG remains correct for
+    #   other phases; only F=6 + ζ_α = δ_{α,0} is broken.
+    # See: memory/full_bdg_F6_polar_broken.md
     if F == 6 && _is_polar_spinor(spinor)
         @warn "FullBdG LHY (compute_spinor_lhy_table) is known to produce a ~3000× " *
-              "spurious energy offset for F=6 polar (ζ_α = δ_{α,0}) initial states " *
-              "due to λ<0 BdG modes breaking Petrov regularization. Use " *
-              "compute_spinor_lhy_polar_contact (or compute_spinor_lhy_polar_dipolar " *
-              "with DDI) for F=6 polar; FullBdG remains valid for other phases." maxlog=1
+            "spurious energy offset for F=6 polar (ζ_α = δ_{α,0}) initial states " *
+            "due to λ<0 BdG modes breaking Petrov regularization. Use " *
+            "compute_spinor_lhy_polar_contact (or compute_spinor_lhy_polar_dipolar " *
+            "with DDI) for F=6 polar; FullBdG remains valid for other phases." maxlog=1
     end
 
     densities = collect(range(0.0, n_max; length=n_points))
@@ -394,6 +407,72 @@ function compute_spinor_lhy_icosahedral(;
     end
     potential_values = _numerical_derivative(densities, energy)
     IcosahedralLHY(densities, potential_values)
+end
+
+"""
+    make_lhy(state::Symbol; ddi::Bool=false, F::Int, kwargs...) → TabulatedLHY
+
+Factory dispatcher for spinor LHY tables. Routes to the appropriate closed-form
+or BdG implementation based on `(state, ddi)` and validates F-range constraints.
+
+| state         | ddi=false                          | ddi=true                          |
+|---------------|------------------------------------|-----------------------------------|
+| :polar        | `compute_spinor_lhy_polar_contact` | `compute_spinor_lhy_polar_dipolar`|
+| :fm           | `compute_spinor_lhy_fm_contact`    | `compute_spinor_lhy_fm_dipolar`   |
+| :icosahedral  | `compute_spinor_lhy_icosahedral`   | (no closed form yet — errors)     |
+| :two_channel  | `compute_spinor_lhy_two_channel`   | (eps_dd via kwarg)                |
+| :full_bdg     | `compute_spinor_lhy_table`         | (c_dd via kwarg)                  |
+
+Constraints (mirrored from per-function checks):
+- `:icosahedral` requires `F == 6`.
+- `:two_channel` warns above `F=2` (~30-70% off at F=6; see this file's
+  docstring on `compute_spinor_lhy_two_channel`).
+
+Existing `compute_spinor_lhy_*` functions remain the underlying implementations
+and direct callers (incl. `make_workspace` Val-dispatch) are unchanged. This
+factory is a thin convenience wrapper for callers that prefer `(state, ddi, F)`
+over remembering the per-mode function name.
+"""
+function make_lhy(state::Symbol; ddi::Bool=false, F::Int, kwargs...)
+    if state === :polar
+        return if ddi
+            compute_spinor_lhy_polar_dipolar(; F, kwargs...)
+        else
+            compute_spinor_lhy_polar_contact(; F, kwargs...)
+        end
+    elseif state === :fm
+        return if ddi
+            compute_spinor_lhy_fm_dipolar(; F, kwargs...)
+        else
+            compute_spinor_lhy_fm_contact(; F, kwargs...)
+        end
+    elseif state === :icosahedral
+        F == 6 || throw(
+            ArgumentError(
+                "make_lhy(:icosahedral) is F=6 only (got F=$F); the I_h closed " *
+                "form is specific to the F=6 even-S channel structure"),
+        )
+        ddi && throw(
+            ArgumentError(
+                ":icosahedral + ddi=true has no closed form yet; use ddi=false " *
+                "or fall back to make_lhy(:two_channel, ddi=true)"),
+        )
+        return compute_spinor_lhy_icosahedral(; F, kwargs...)
+    elseif state === :two_channel
+        F <= 2 || @warn (
+            "make_lhy(:two_channel) above F=2 is approximate " *
+            "(~30-70% error at F=6); prefer :polar (paper #1 closed form) for F≥2."
+        ) maxlog=1
+        return compute_spinor_lhy_two_channel(; F, kwargs...)
+    elseif state === :full_bdg
+        return compute_spinor_lhy_table(; F, kwargs...)
+    else
+        throw(
+            ArgumentError(
+                "make_lhy: unknown state=:$state. Known: " *
+                ":polar, :fm, :icosahedral, :two_channel, :full_bdg"),
+        )
+    end
 end
 
 function _numerical_derivative(x::Vector{Float64}, y::Vector{Float64})
