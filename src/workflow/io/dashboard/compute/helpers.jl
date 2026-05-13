@@ -62,11 +62,16 @@ function _read_box_size(jld2_path::String)
     catch
         # fall through
     end
-    # Sibling config.yaml fallback
+    # Sibling config.yaml fallback. Apply mixins / templates expansion
+    # before reading — without it `pipeline[0].ground_state` may only
+    # carry `use: [some_mixin]` and have no `grid:` key, even though
+    # the mixin defines it. (Caught 2026-05-13 on eu151_edh_k3_compare
+    # whose GS step pulls grid from `eu151_edh_phys` mixin.)
     config_path = joinpath(dirname(jld2_path), "config.yaml")
     isfile(config_path) || return nothing
     try
         data = YAML.load_file(config_path)
+        apply_templates_and_mixins!(data)
         pipe = get(data, "pipeline", [])
         isempty(pipe) && return nothing
         gs = first(values(pipe[1]))

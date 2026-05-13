@@ -18,6 +18,7 @@ module Dashboard
 
 using JLD2
 using JSON
+using YAML
 using Sockets
 using Base64: base64encode
 using FFTW
@@ -43,6 +44,11 @@ using ..SpinorBEC: list_runs, run_status
 # directly. It's a private helper from foundation/spinor_utils/slice_helpers.jl;
 # named import here makes the cross-module reference explicit.
 using ..SpinorBEC: _component_slice
+# `_read_box_size` falls back to parsing config.yaml; mixin expansion is
+# needed so configs whose GS step pulls `grid:` via `use: [some_mixin]`
+# (e.g. eu151_edh_k3_compare via eu151_edh_phys) still resolve. Imported
+# unexported.
+using ..SpinorBEC: apply_templates_and_mixins!
 
 include("dashboard/encoding.jl")          # bitshuffle + zstd
 include("dashboard/cache.jl")             # PSI_CACHE, JLD handle pool, atlas disk cache
