@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# Pre-commit hook: gitleaks + JuliaFormatter.
+#
+# Activate once per clone:
+#   git config core.hooksPath .githooks
+#
+# Bypass selectively:
+#   SKIP=gitleaks git commit ...     # skip secret scan
+#   SKIP=format   git commit ...     # skip formatter
+#   SKIP=all      git commit ...     # skip both
+#
+# Designed for the global `core.hooksPath=~/.config/git/hooks` setup that
+# only runs gitleaks: this hook supersedes it for this repo and adds the
+# JuliaFormatter check that mirrors .github/workflows/ci.yml.
+
+set -euo pipefail
+
+SKIP_GITLEAKS=0
+SKIP_FORMAT=0
+case "${SKIP:-}" in
+    gitleaks) SKIP_GITLEAKS=1 ;;
+    format)   SKIP_FORMAT=1 ;;
+    all)      SKIP_GITLEAKS=1; SKIP_FORMAT=1 ;;
+esac
+
+# ── gitleaks: secret scan on staged content ──
+if [ $SKIP_GITLEAKS -eq 0 ]; then
+    if ! command -v gitleaks &>/dev/null; then
+        echo "error: gitleaks not on PATH. Install or bypass: SKIP=gitleaks git commit ..."
+        exit 1
+    fi
+    gitleaks protect --staged --redact --exit-code 1
+fi
+
+# ── JuliaFormatter: format-check on staged src/, test/ .jl files ──
+if [ $SKIP_FORMAT -eq 0 ]; then
+    staged_jl=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^(src|test)/.*\.jl$' || true)
+    if [ -n "$staged_jl" ]; then
+        JULIA=""
+        if command -v julia &>/dev/null; then
+            JULIA=julia
+        elif [ -x "$HOME/.juliaup/bin/julia" ]; then
+            JULIA="$HOME/.juliaup/bin/julia"
+        fi
+
+        if [ -z "$JULIA" ]; then
+            echo "warn: julia not found on PATH or in ~/.juliaup/bin/. Skipping format check (CI will catch drift)."
+        else
+            # JuliaFormatter format(...; overwrite=false) returns true if
+            # already-formatted, false if drift exists. Exit non-zero on
+            # drift so this commit is blocked.
+            if ! $JULIA --startup-file=no -e 'using JuliaFormatter; exit(format(ARGS; overwrite=false) ? 0 : 1)' $staged_jl; then
+                echo
+                echo "Formatting drift in staged .jl files. Fix with:"
+                echo "  $JULIA -e 'using JuliaFormatter; format([\"src/\", \"test/\"])'"
+                echo "Then re-stage and commit. Bypass with: SKIP=format git commit ..."
+                exit 1
+            fi
+        fi
+    fi
+fi
