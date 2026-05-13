@@ -68,6 +68,23 @@ function canonical_states()
         push!(states, (6, "F=6 icosa", "I:A (§V.D)", z))
     end
 
+    # F=7 O:A_2 (supplementary — not in §V.A-G but exists per
+    # `scripts/manuscript/f5_f7_polyhedral_verification.jl`). Support
+    # m ∈ {±6, ±2} (octahedral C_4-axis symmetry).
+    let z = ComplexF64[
+            0,
+            -0.3635626373 + 0.3114303701im, # m=+6
+            0, 0, 0,
+            -0.3952342557 + 0.3385605063im, # m=+2
+            0, 0, 0,
+             0.3952342557 - 0.3385605063im, # m=-2
+            0, 0, 0,
+             0.3635626373 - 0.3114303701im, # m=-6
+            0,
+        ]
+        push!(states, (7, "F=7 octa", "O:A_2 (supp)", z))
+    end
+
     # §V.E  F=8  O:A_1 cube-like octa: √390/48|±8⟩ + √42/24|±4⟩ + √33/8|0⟩
     let z = zeros(ComplexF64, 17)
         z[1]  = sqrt(390)/48
@@ -78,6 +95,22 @@ function canonical_states()
         push!(states, (8, "F=8 cube-octa", "O:A_1 (§V.E)", z))
     end
 
+    # F=9 O:A_1 (supplementary — `f9_f11_polyhedral_verification.jl`).
+    # Support m ∈ {±8, ±4} (octahedral A_1 trivial rep).
+    let z = ComplexF64[
+            0,
+             0.1779105488 + 0.3379070434im, # m=+8
+            0, 0, 0,
+            -0.2772535655 - 0.526590094im,  # m=+4
+            0, 0, 0, 0, 0, 0, 0,
+             0.2772535655 + 0.526590094im,  # m=-4
+            0, 0, 0,
+            -0.1779105488 - 0.3379070434im, # m=-8
+            0,
+        ]
+        push!(states, (9, "F=9 octa", "O:A_1 (supp)", z))
+    end
+
     # §V.F  F=10 I:A dodec: √561/75|±10⟩ + √209/25(|+5⟩−|−5⟩) + √741/75|0⟩
     let z = zeros(ComplexF64, 21)
         z[1]  =  sqrt(561)/75
@@ -86,6 +119,26 @@ function canonical_states()
         z[16] = -sqrt(209)/25
         z[21] =  sqrt(561)/75
         push!(states, (10, "F=10 dodec", "I:A (§V.F)", z))
+    end
+
+    # F=11 O:A_2 (supplementary — `f9_f11_polyhedral_verification.jl`).
+    # Support m ∈ {±10, ±6, ±2} (octahedral sign rep).
+    let z = ComplexF64[
+            0,
+            -0.2933098261 + 0.2952057405im, # m=+10
+            0, 0, 0,
+            -0.2288986869 + 0.2303782566im, # m=+6
+            0, 0, 0,
+            -0.3316081934 + 0.3337516632im, # m=+2
+            0, 0, 0,
+             0.3316081934 - 0.3337516632im, # m=-2
+            0, 0, 0,
+             0.2288986869 - 0.2303782566im, # m=-6
+            0, 0, 0,
+             0.2933098261 - 0.2952057405im, # m=-10
+            0,
+        ]
+        push!(states, (11, "F=11 octa", "O:A_2 (supp)", z))
     end
 
     # §V.G  F=12 I:A icosa (C_5^z-invariant), U(1)-rotated to real form

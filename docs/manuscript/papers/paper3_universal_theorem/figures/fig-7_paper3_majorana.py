@@ -109,8 +109,11 @@ def main():
         n_stars = len(panel["x"])
         if n_stars == n_geo:
             mult_note = f"{n_stars} stars"
-        else:
+        elif n_stars % n_geo == 0:
             mult_note = f"{n_stars} stars = {n_geo} × mult. {n_stars // n_geo}"
+        else:
+            # Mixed multiplicity (e.g. some 1×, some 2×).
+            mult_note = f"{n_stars} stars on {n_geo} sites (mixed mult.)"
         title = f"{panel['label']}\n{panel['ref']} — {mult_note}"
         ax.set_title(title, fontsize=9, pad=4)
         ax.set_box_aspect((1, 1, 1))
