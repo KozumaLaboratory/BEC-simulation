@@ -131,6 +131,20 @@ end
 
 abstract type TabulatedLHY <: AbstractLHY end
 
+"""
+    TwoChannelLHY
+
+Two-channel LHY reduction for polar-phase spinor BEC. Captures the m=0
+phonon plus 2 (m=±1) SO(3) Goldstone modes only.
+
+**NOT generalizable beyond F ≤ 2 — this is a mathematical constraint,
+not an implementation gap.** Two-channel reduction sums over S = 0 and
+S = 2 only, valid up to F = 2. For F ≥ 3 the S ≥ 4 channels are
+independent (Lavoine-Bourdel 2021); regression-pinned 30–70 % off at
+F = 6 in `test/test_spinor_lhy.jl`. Use `PolarContactLHY` / `PolarDipolarLHY`
+(F-generic polar closed form, Paper #1) or `IcosahedralLHY` (F = 6
+inert state, Paper #3) instead.
+"""
 struct TwoChannelLHY <: TabulatedLHY
     densities::Vector{Float64}
     potential_values::Vector{Float64}

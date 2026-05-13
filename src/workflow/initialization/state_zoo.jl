@@ -45,60 +45,47 @@ const _STATE_ALIASES = Dict{Symbol, Symbol}(
 canonical name (`:m_plus_F`/`:m_minus_F`/...) for downstream dispatch."""
 canonicalize_state(state::Symbol) = get(_STATE_ALIASES, state, state)
 
-"""
-    init_psi_polar(grid, sys; kwargs...)
-
-Polar (m=0) initial state — all population in m=0 component.
-"""
-init_psi_polar(grid, sys; kwargs...) = init_psi(
-    grid, sys; state=:polar, init_state_params=Dict{Symbol, Any}(kwargs...)
+# --- Trivial pass-through wrappers (auto-generated) --------------------
+#
+# Each entry below maps to `init_psi(grid, sys; state=:NAME,
+# init_state_params=Dict(kwargs...))`. Wrappers whose function name does
+# NOT match their state symbol (e.g. `init_psi_bright_soliton` →
+# `:soliton_bright`), or which apply default values / argument renaming
+# (e.g. `init_psi_fl_vortex`'s `winding` → `vortex_charge`), live in
+# their own hand-written `init_psi_<name>` blocks below.
+const _TRIVIAL_ZOO_STATES = (
+    (:polar,
+        "Polar (m=0) initial state — all population in m=0 component."),
+    (:m_plus_F,
+        "m=+F polarized state (lowest Zeeman energy when p>0 under " *
+        "`H_zee = -p·m + q·m²`; historical name was `ferromagnetic`)."),
+    (:m_minus_F,
+        "m=−F polarized state. Highest Zeeman energy at p>0; only the GS " *
+        "when p<0 (reversed Zeeman)."),
+    (:uniform,
+        "Equal population across all 2F+1 components."),
+    (:antiferromagnetic,
+        "Alternating (anti-aligned) magnetic structure."),
+    (:cyclic,
+        "Cyclic phase (F=2 / F=6 spinor) — three nonzero amplitudes " *
+        "with relative phase 2π/3."),
+    (:skyrmion,
+        "Single-charge skyrmion texture."),
 )
 
-"""
-    init_psi_m_plus_F(grid, sys; kwargs...)
-
-m=+F polarized state (lowest Zeeman energy when p>0 in the codebase's
-`H_zee = -p·m + q·m²` convention; the historical name was
-`ferromagnetic`).
-"""
-init_psi_m_plus_F(grid, sys; kwargs...) = init_psi(
-    grid, sys; state=:m_plus_F, init_state_params=Dict{Symbol, Any}(kwargs...)
-)
-
-"""
-    init_psi_m_minus_F(grid, sys; kwargs...)
-
-m=−F polarized state. Highest Zeeman energy at p>0; only the GS when p<0
-(reversed Zeeman). Historical name was `ferromagnetic_min` whose
-docstring claimed "lowest Zeeman" — that was inverted from the `-p·m`
-convention. Use `:m_plus_F` for the actual ground state.
-"""
-init_psi_m_minus_F(grid, sys; kwargs...) = init_psi(
-    grid, sys; state=:m_minus_F, init_state_params=Dict{Symbol, Any}(kwargs...)
-)
+for (state, doc) in _TRIVIAL_ZOO_STATES
+    fn = Symbol("init_psi_", state)
+    @eval begin
+        @doc $doc $fn(grid, sys; kwargs...) = init_psi(
+            grid, sys; state=($(QuoteNode(state))), kwargs...
+        )
+    end
+end
 
 # Legacy aliases — preserved for compat. New code should use the
 # m_plus_F / m_minus_F names.
 const init_psi_ferromagnetic = init_psi_m_plus_F
 const init_psi_ferromagnetic_min = init_psi_m_minus_F
-
-"""
-    init_psi_uniform(grid, sys; kwargs...)
-
-Equal population across all 2F+1 components.
-"""
-init_psi_uniform(grid, sys; kwargs...) = init_psi(
-    grid, sys; state=:uniform, init_state_params=Dict{Symbol, Any}(kwargs...)
-)
-
-"""
-    init_psi_antiferromagnetic(grid, sys; kwargs...)
-
-Alternating (anti-aligned) magnetic structure.
-"""
-init_psi_antiferromagnetic(grid, sys; kwargs...) = init_psi(
-    grid, sys; state=:antiferromagnetic, init_state_params=Dict{Symbol, Any}(kwargs...)
-)
 
 """
     init_psi_random(grid, sys; seed=nothing, kwargs...)
@@ -141,16 +128,6 @@ init_psi_spin_helix(grid, sys; q_vector=(0.0, 0.0, 0.0), kwargs...) = init_psi(g
     init_state_params=Dict{Symbol, Any}(:q_vector => q_vector, kwargs...))
 
 """
-    init_psi_cyclic(grid, sys; kwargs...)
-
-Cyclic phase (F=2 / F=6 spinor) — three nonzero amplitudes with relative
-phase 2π/3.
-"""
-init_psi_cyclic(grid, sys; kwargs...) = init_psi(
-    grid, sys; state=:cyclic, init_state_params=Dict{Symbol, Any}(kwargs...)
-)
-
-"""
     init_psi_biaxial_nematic(grid, sys; angles=(0.0, 0.0), kwargs...)
 
 Biaxial nematic state with director angles (θ, φ).
@@ -190,15 +167,6 @@ Dark soliton kink in component `m_state` centred at `position`.
 init_psi_dark_soliton(grid, sys; m_state=:max, position=0.0, kwargs...) = init_psi(grid, sys;
     state=:soliton_dark,
     init_state_params=Dict{Symbol, Any}(:m_state => m_state, :position => position, kwargs...))
-
-"""
-    init_psi_skyrmion(grid, sys; kwargs...)
-
-Single-charge skyrmion texture.
-"""
-init_psi_skyrmion(grid, sys; kwargs...) = init_psi(
-    grid, sys; state=:skyrmion, init_state_params=Dict{Symbol, Any}(kwargs...)
-)
 
 """
     init_psi_wavepacket(grid, sys; center=(0.0,...), momentum=(0.0,...),

@@ -31,86 +31,38 @@ grid_ndim(::SpinorBEC.Grid{N}) where {N} = N
     # resolution since psi is uniform in space; only the spinor matters.
     grid_3d = make_grid(SpinorBEC.GridConfig((8, 8, 8), (10.0, 10.0, 10.0)))
 
-    @testset "F=2 cyclic (T_d, Paper #3 §V.A)" begin
-        # ζ_cyc = (1, 0, i√2, 0, 1) / 2
-        spinor = ComplexF64[1.0, 0.0, im * sqrt(2.0), 0.0, 1.0] ./ 2.0
-        psi = _uniform_psi(spinor, grid_3d)
-        sm = spin_matrices(2)
-        r = SpinorBEC.classify_phase_detailed(psi, 2, grid_3d, sm)
-        @test r.point_group === :T_d
-        # F=2 cyclic has |F|=0 mean-field → spin_order ≈ 0
-        @test r.spin_order < 0.1
-    end
+    # Canonical ζ vectors are the single source of truth in
+    # `src/analysis/canonical_polyhedral_states.jl`. The
+    # `(F, expected_point_group, paper3_section)` triples here pin
+    # both the spinor data and the downstream detection contract.
+    polyhedral_cases = [
+        (2, :T_d, "§V.A cyclic"),
+        (3, :O_h, "§V.B O:A_2"),
+        (4, :O_h, "§V.C cube"),
+        (6, :I_h, "§V.D I_h"),
+        (8, :O_h, "§V.E cube-like octahedral"),
+        (10, :I_h, "§V.F dodecahedral"),
+    ]
 
-    @testset "F=3 octahedral O:A_2 (Paper #3 §V.B)" begin
-        # ζ = (|3,+2⟩ - |3,-2⟩) / √2
-        spinor = ComplexF64[0, 1, 0, 0, 0, -1, 0] ./ sqrt(2)
-        psi = _uniform_psi(spinor, grid_3d)
-        sm = spin_matrices(3)
-        r = SpinorBEC.classify_phase_detailed(psi, 3, grid_3d, sm)
-        @test r.point_group === :O_h
-        @test r.spin_order < 0.1
-    end
-
-    @testset "F=4 cube O_h (Paper #3 §V.C)" begin
-        # ζ = √(5/24)|+4⟩ + √(7/12)|0⟩ + √(5/24)|-4⟩
-        spinor = zeros(ComplexF64, 9)
-        spinor[1] = sqrt(5/24);
-        spinor[5] = sqrt(7/12);
-        spinor[9] = sqrt(5/24)
-        psi = _uniform_psi(spinor, grid_3d)
-        sm = spin_matrices(4)
-        r = SpinorBEC.classify_phase_detailed(psi, 4, grid_3d, sm)
-        @test r.point_group === :O_h
-        @test r.spin_order < 0.1
-    end
-
-    @testset "F=6 icosahedral I_h (Paper #3 §V.D)" begin
-        # Use IcosahedralMod's canonical state.
-        spinor = Vector{ComplexF64}(SpinorBEC.IcosahedralMod.ZETA_F6_IH)
-        psi = _uniform_psi(spinor, grid_3d)
-        sm = spin_matrices(6)
-        r = SpinorBEC.classify_phase_detailed(psi, 6, grid_3d, sm)
-        @test r.point_group === :I_h
-        @test r.spin_order < 0.1
-        # Q6 Steinhardt order ≈ 1 for icosahedral state
-        @test r.Q6 > 0.9
-    end
-
-    @testset "F=8 cube-like octahedral O:A_1 (Paper #3 §V.E)" begin
-        # ζ = √390/48 (|±8⟩) + √42/24 (|±4⟩) + √33/8 |0⟩
-        spinor = zeros(ComplexF64, 17)
-        spinor[1] = sqrt(390)/48;
-        spinor[5] = sqrt(42)/24;
-        spinor[9] = sqrt(33)/8
-        spinor[13] = sqrt(42)/24;
-        spinor[17] = sqrt(390)/48
-        psi = _uniform_psi(spinor, grid_3d)
-        sm = spin_matrices(8)
-        r = SpinorBEC.classify_phase_detailed(psi, 8, grid_3d, sm)
-        @test r.point_group === :O_h
-        @test r.spin_order < 0.1
-    end
-
-    @testset "F=10 dodecahedral I_h (Paper #3 §V.F)" begin
-        spinor = zeros(ComplexF64, 21)
-        spinor[1] = sqrt(561)/75;
-        spinor[6] = sqrt(209)/25
-        spinor[11] = sqrt(741)/75
-        spinor[16] = -sqrt(209)/25;
-        spinor[21] = sqrt(561)/75
-        psi = _uniform_psi(spinor, grid_3d)
-        sm = spin_matrices(10)
-        r = SpinorBEC.classify_phase_detailed(psi, 10, grid_3d, sm)
-        @test r.point_group === :I_h
-        @test r.spin_order < 0.1
+    for (F, expected_pg, label) in polyhedral_cases
+        @testset "F=$F $label" begin
+            spinor = Vector{ComplexF64}(SpinorBEC.canonical_polyhedral_spinor(F))
+            psi = _uniform_psi(spinor, grid_3d)
+            sm = spin_matrices(F)
+            r = SpinorBEC.classify_phase_detailed(psi, F, grid_3d, sm)
+            @test r.point_group === expected_pg
+            # Polyhedral inert states satisfy Lemma 1 ⟨F⟩ = 0.
+            @test r.spin_order < 0.1
+            # F=6 I_h is the only entry where Q6 ≈ 1 is meaningful.
+            F == 6 && @test r.Q6 > 0.9
+        end
     end
 
     @testset "Lemma 1 β_S^(c_0) lower-bound — F=6 I_h" begin
         # Lemma 1 endpoint (Paper #3 §VI): β_0^(c_0) = 1/(2F+1) for any
         # polyhedral inert state. For F=6: β_0^(c_0) = 1/13 ≈ 0.0769.
         # This is the numerical channel weight at S=0 of the I_h state.
-        spinor = Vector{ComplexF64}(SpinorBEC.IcosahedralMod.ZETA_F6_IH)
+        spinor = Vector{ComplexF64}(SpinorBEC.canonical_polyhedral_spinor(6))
         psi = _uniform_psi(spinor, grid_3d)
         F = 6
         spec = SpinorBEC.pair_amplitude_spectrum(psi, F, grid_3d)
