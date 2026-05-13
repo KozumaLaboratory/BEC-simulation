@@ -10,7 +10,7 @@
 #   Dy-like  (ε_dd = 1.39) c_dd = 106.6
 #
 # Wall-clock on RTX 5070 Ti (32^3 grid, 50 trajectories): ~31 min per point.
-# Total ~125 min. Run after `examples/twa_N_scan.jl` (single GPU; the
+# Total ~125 min. Run after `scripts/twa/twa_N_scan.jl` (single GPU; the
 # runners do not parallelise).
 
 using SpinorBEC, CUDA

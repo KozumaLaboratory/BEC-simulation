@@ -57,7 +57,7 @@ For experimental connection: σ/μ ≈ 1 means trajectory variance is comparable
 
 ```bash
 LD_LIBRARY_PATH=/usr/lib/wsl/lib bash /tmp/twa_N_scan_pinned_16g_runner.sh
-julia --project=. examples/twa_N_scan_pinned_16g_analyze.jl
+julia --project=. scripts/twa/twa_N_scan_pinned_16g_analyze.jl
 ```
 
 Configs at `runs/twa_N_scan_pinned_16g/N{1000,10000,100000}_pinned_16g.yaml`, results at `runs/N{N}_pinned_16g_<hash>/result.jld2`.

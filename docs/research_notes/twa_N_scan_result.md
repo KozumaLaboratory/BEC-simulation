@@ -1,6 +1,6 @@
 # TWA N scan: Eu post-quench coupling-strength scan
 
-**Status**: 3 ensembles complete 2026-05-07 16:00; runtime ~107 min on RTX 5070 Ti. Three production findings + one methodological note. **Code path**: `runs/N{1000,10000,100000}_<hash>/result.jld2`, analysed by `examples/twa_N_scan_analyze.jl`.
+**Status**: 3 ensembles complete 2026-05-07 16:00; runtime ~107 min on RTX 5070 Ti. Three production findings + one methodological note. **Code path**: `runs/N{1000,10000,100000}_<hash>/result.jld2`, analysed by `scripts/twa/twa_N_scan_analyze.jl`.
 
 **σ/μ interpretation note**: σ/μ in this regime measures chaotic trajectory divergence in the dipolar instability, not Wigner noise; see `docs/theory/sinatra_criterion_F6.md` "Caveat" + `twa_pinned_16g_result.md`. Finding B below (σ/μ peaks at marginal collapse) survives as a chaos-onset diagnostic; mean-field findings (Finding A, FWHM) are unaffected.
 
@@ -63,15 +63,15 @@ The Wigner noise per mode is 1/(2V), independent of N, so the *relative* noise v
 
 ```bash
 LD_LIBRARY_PATH=/usr/lib/wsl/lib julia --project=. \
-    examples/twa_N_scan.jl
-julia --project=. examples/twa_N_scan_analyze.jl
+    scripts/twa/twa_N_scan.jl
+julia --project=. scripts/twa/twa_N_scan_analyze.jl
 ```
 
 Pinned-coupling re-run:
 
 ```bash
 LD_LIBRARY_PATH=/usr/lib/wsl/lib julia --project=. \
-    examples/twa_N_scan_pinned.jl
+    scripts/twa/twa_N_scan_pinned.jl
 ```
 
 The runner skips configs whose `result.jld2` already exists. The analyzer resolves the hash-suffixed run dirs by glob.
@@ -84,4 +84,4 @@ The runner skips configs whose `result.jld2` already exists. The analyzer resolv
 * `docs/research_notes/twa_sinatra_validation.md` — orthogonal validity test (grid + cutoff). The canonical 1/N re-run depends on Sinatra not flagging the 32³ baseline.
 * `docs/research_notes/twa_eps_dd_scan.md` — species universality counterpart to Finding A.
 
-**Reproduction code:** `examples/twa_N_scan*.jl`, `test/test_twa_N_scan.jl`.
+**Reproduction code:** `scripts/twa/twa_N_scan*.jl`, `test/test_twa_N_scan.jl`.

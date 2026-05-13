@@ -66,7 +66,7 @@ so the spin-Goldstone contribution to LHY is 3 × |λ|^(5/2) ≈ 5×10⁻⁶ × 
 
 * Tests: `test/test_icosahedral_lhy.jl` — 113 assertions covering ZETA normalisation, scalar limit, g_2/g_4/g_8 cancellation, Eu-like reference, LHY positivity, scalar reduction to Lima–Pelster, and argument validation.
 
-* Numerical phase scan: `examples/F6_phase_diagram_2D.jl` plots the I_h vs FM vs cyclic vs polar boundaries in the (g_10, g_12) plane (`docs/research_notes/F6_phase_boundaries.md`).
+* Numerical phase scan: `scripts/phase_diagram/F6_phase_diagram_2D.jl` plots the I_h vs FM vs cyclic vs polar boundaries in the (g_10, g_12) plane (`docs/research_notes/F6_phase_boundaries.md`).
 
 ## Open extensions (Stage E and beyond)
 

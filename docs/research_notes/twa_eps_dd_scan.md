@@ -1,6 +1,6 @@
 # TWA ε_dd species scan — dipolar collapse universality
 
-**Status**: 4 ensembles complete 2026-05-07 (16:00–17:56), runtime ~125 min on RTX 5070 Ti. Eu (ε_dd = 0.55) used as natural baseline; the other three sweep `c_dd` to mimic Cr / Er / Dy at the same Eu N=10⁴ trap geometry. **Code path**: `runs/{Cr,Eu,Er,Dy}_eps*_<hash>/result.jld2`, analysed by `examples/twa_eps_dd_scan_analyze.jl`.
+**Status**: 4 ensembles complete 2026-05-07 (16:00–17:56), runtime ~125 min on RTX 5070 Ti. Eu (ε_dd = 0.55) used as natural baseline; the other three sweep `c_dd` to mimic Cr / Er / Dy at the same Eu N=10⁴ trap geometry. **Code path**: `runs/{Cr,Eu,Er,Dy}_eps*_<hash>/result.jld2`, analysed by `scripts/twa/twa_eps_dd_scan_analyze.jl`.
 
 ## σ/μ interpretation note
 
@@ -78,8 +78,8 @@ These predictions are independent of the Sinatra contamination above — they co
 
 ```bash
 LD_LIBRARY_PATH=/usr/lib/wsl/lib julia --project=. \
-    examples/twa_eps_dd_scan.jl
-julia --project=. examples/twa_eps_dd_scan_analyze.jl
+    scripts/twa/twa_eps_dd_scan.jl
+julia --project=. scripts/twa/twa_eps_dd_scan_analyze.jl
 ```
 
 The analyzer was updated 2026-05-08 to use a hash-suffix glob resolver (`runs/<label>_*/result.jld2`) matching the actual `run_yaml` output layout — same fix as the N-scan analyzer in `6b29e5c`.

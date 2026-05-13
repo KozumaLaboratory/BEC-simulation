@@ -7,7 +7,7 @@ using JLD2
 # This test does NOT run the 90-min ensemble batch. It validates the
 # *analysis pipeline* against pre-computed `runs/twa_N_scan/N{N}/result.jld2`
 # ensembles when they exist, and skips otherwise. The expensive runs are
-# kicked off via `examples/twa_N_scan.jl` outside the test suite.
+# kicked off via `scripts/twa/twa_N_scan.jl` outside the test suite.
 #
 # What is tested when results are present:
 #   - JLD2 layout: dynamics/ensemble/phase_02/density/{mean,variance}
@@ -81,7 +81,7 @@ end
     if isempty(available) || !isfile(_DETERMINISTIC)
         @info("Skipping TWA N scan tests: no ensemble JLD2 available yet",
             runs_root=_RUNS_ROOT, deterministic=_DETERMINISTIC)
-        @test_skip "ensemble outputs not present (run examples/twa_N_scan.jl first)"
+        @test_skip "ensemble outputs not present (run scripts/twa/twa_N_scan.jl first)"
         return nothing
     end
 

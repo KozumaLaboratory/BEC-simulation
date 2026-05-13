@@ -1,6 +1,6 @@
 # F=6 mean-field phase boundary scan in (g_10, g_12)
 
-**Status**: scan complete 2026-05-07. Full data at `runs/F6_phase_diagram/result.json` (321 KB), reproduced via `examples/F6_phase_diagram_2D.jl`.
+**Status**: scan complete 2026-05-07. Full data at `runs/F6_phase_diagram/result.json` (321 KB), reproduced via `scripts/phase_diagram/F6_phase_diagram_2D.jl`.
 
 ## Setup
 
@@ -61,7 +61,7 @@ All four candidate spinors share ε_MF = 1/2 exactly at the scalar point. This i
 ## Reproduction
 
 ```bash
-julia --project=. examples/F6_phase_diagram_2D.jl
+julia --project=. scripts/phase_diagram/F6_phase_diagram_2D.jl
 ```
 
 Output: text summary + `runs/F6_phase_diagram/result.json` containing `g_10_range`, `g_12_range`, `energies` (per-phase 50×50 matrix), `winner` (50×50 string matrix), and the linearised boundary coefficient dictionaries. Drop the JSON into any plotting tool.

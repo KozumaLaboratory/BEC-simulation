@@ -2,7 +2,7 @@
 # Quick benchmark (~10s total) for CI regression detection.
 #
 # Usage:
-#   julia --project=. examples/bench_quick.jl
+#   julia --project=. bench/bench_quick.jl
 
 using SpinorBEC
 using FFTW

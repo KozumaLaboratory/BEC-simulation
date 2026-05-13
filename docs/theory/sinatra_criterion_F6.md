@@ -53,7 +53,7 @@ For each new TWA observable (especially σ/μ at peak), run three ensembles at i
 
 If the spread of the observable across the three is < 20%, the result is grid- and cutoff-independent → the leading-order TWA is controlled and the result is publishable. If the observable shrinks by ≥ 50% as the Sinatra ratio drops, the baseline is dominated by spurious classical thermalisation.
 
-`runs/twa_sinatra_validation/` carries the canonical three-config template; `examples/twa_sinatra_validation.jl` runs and analyses them.
+`runs/twa_sinatra_validation/` carries the canonical three-config template; `scripts/twa/twa_sinatra_validation.jl` runs and analyses them.
 
 ## Effective classical temperature (advanced diagnostic)
 

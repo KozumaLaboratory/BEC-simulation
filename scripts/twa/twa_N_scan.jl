@@ -2,7 +2,7 @@
 #
 # Runs the three ensemble configs in `runs/twa_N_scan/N{1000,10000,100000}.yaml`
 # sequentially, each producing a 50-trajectory ensemble at end-of-Phase-2.
-# Then dispatches `examples/twa_N_scan_analyze.jl` for the 1/N + 1/√N scaling
+# Then dispatches `scripts/twa/twa_N_scan_analyze.jl` for the 1/N + 1/√N scaling
 # tables.
 #
 # Wall-clock budget on RTX 5070 Ti (32^3 grid, 50 trajectories):

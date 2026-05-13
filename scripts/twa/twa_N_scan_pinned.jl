@@ -1,6 +1,6 @@
 # Canonical 1/N TWA-validity test runner (Round-3 follow-up).
 #
-# Mirror of `examples/twa_N_scan.jl` but with c_total / c_dd PINNED at
+# Mirror of `scripts/twa/twa_N_scan.jl` but with c_total / c_dd PINNED at
 # the Eu-151 N=10⁴ baseline values. Only the Wigner noise scale differs
 # across the three runs, so the result probes the truncated-Wigner
 # expansion's leading-order 1/N validity directly.

@@ -12,7 +12,7 @@
 | coarse_16g   | 16³ | 6.0 | 5.3       | 0.019 | 0.970 | 0.042 |
 | cutoff_16g   | 16³ | 1.0 | 5.3       | 0.019 | 0.970 | 0.011 |
 
-Code path: `runs/{baseline_32g, coarse_16g, cutoff_16g}_<hash>/result.jld2`, analysed by `examples/twa_sinatra_validation_analyze.jl`.
+Code path: `runs/{baseline_32g, coarse_16g, cutoff_16g}_<hash>/result.jld2`, analysed by `scripts/twa/twa_sinatra_validation_analyze.jl`.
 
 ## Why the original verdict was wrong
 
@@ -22,4 +22,4 @@ The resolution-matched follow-up (16³ × box=10, dx = 0.625 a_ho) proves this: 
 
 ## Bug fix (analyzer verdict logic, kept for the record)
 
-`examples/twa_sinatra_validation_analyze.jl` initially used `σ_max, σ_min = extrema(σs)` but `extrema` returns `(min, max)` — order reversed, spread came out negative, verdict printed "REAL quantum noise (publishable)". Swapped to `σ_min, σ_max = extrema(σs)` (2026-05-08). The corrected verdict text ("SPURIOUS classical thermalisation") was itself wrong for the reason above, but the fix to the unpacking is independently correct.
+`scripts/twa/twa_sinatra_validation_analyze.jl` initially used `σ_max, σ_min = extrema(σs)` but `extrema` returns `(min, max)` — order reversed, spread came out negative, verdict printed "REAL quantum noise (publishable)". Swapped to `σ_min, σ_max = extrema(σs)` (2026-05-08). The corrected verdict text ("SPURIOUS classical thermalisation") was itself wrong for the reason above, but the fix to the unpacking is independently correct.
