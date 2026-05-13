@@ -10,7 +10,7 @@
 #   docker run -it --rm -v "$PWD":/workspaces/BEC-simulation \
 #       -w /workspaces/BEC-simulation spinorbec:dev julia --project=.
 
-FROM julia:1.11-bookworm
+FROM julia:1.12-bookworm
 
 ARG USERNAME=vscode
 ARG USER_UID=1000

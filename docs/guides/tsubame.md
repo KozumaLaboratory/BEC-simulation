@@ -98,7 +98,7 @@ Pre-flight: `using SpinorBEC; estimate_run_budget("path/to/config.yaml")` report
 
 ## Singularity (alternative)
 
-If `julia/1.11` module isn't available, build the container once:
+If a recent `julia` module isn't available, build the container once:
 
 ```bash
 cd $T4_GROUP/work

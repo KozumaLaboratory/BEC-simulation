@@ -11,7 +11,7 @@
 # H100 / TSUBAME 3 A100 nodes that expose nvidia-smi via the host.
 
 Bootstrap: docker
-From: julia:1.11-bookworm
+From: julia:1.12-bookworm
 
 %post
     apt-get update && apt-get install -y --no-install-recommends \
@@ -36,4 +36,4 @@ From: julia:1.11-bookworm
 
 %labels
     Maintainer anko
-    Description SpinorBEC dev container with CUDA 12 + Julia 1.11
+    Description SpinorBEC dev container with CUDA 12 + Julia 1.12
