@@ -15,7 +15,6 @@ using Random
 using SpinorBEC
 
 @testset "TDHFB generic-F HF matrix kernel" begin
-
     Random.seed!(42)
 
     # ---- F=1 GP vs BdG conventions ----
@@ -118,7 +117,7 @@ using SpinorBEC
 
         # 7 channels for F=6 (S = 0, 2, 4, 6, 8, 10, 12)
         g_S = Dict(0 => 1.0, 2 => 0.05, 4 => -0.02, 6 => 0.01,
-                   8 => -0.03, 10 => 0.02, 12 => 0.04)
+            8 => -0.03, 10 => 0.02, 12 => 0.04)
 
         h_hf = hf_matrix_generic(phi, rho, F, g_S)
 
@@ -190,7 +189,6 @@ using SpinorBEC
             @test abs(h_hf[i, c, c_p] - expected) < 1e-10
         end
     end
-
 end
 
 @info "TDHFB generic-F HF matrix Phase 2 extension tests PASS"

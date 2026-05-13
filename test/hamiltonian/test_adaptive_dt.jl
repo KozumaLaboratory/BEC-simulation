@@ -33,7 +33,9 @@ function _build_ws(dt::Float64)
     )
     D = size(ws.state.psi, 4)
     @inbounds for I in CartesianIndices((N, N, N))
-        x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+        x = grid.x[1][I[1]];
+        y = grid.x[2][I[2]];
+        z = grid.x[3][I[3]]
         g = exp(-(x * x + y * y + z * z) / 2)
         for c in 1:D
             ws.state.psi[I, c] = g * cis(0.1 * c)

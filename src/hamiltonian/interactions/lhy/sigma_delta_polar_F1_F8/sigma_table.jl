@@ -301,4 +301,3 @@ const SIGMA_TABLE = Dict{Int, Vector{Vector{Tuple{Int, Float64}}}}(
         ],
     ],
 )
-

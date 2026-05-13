@@ -62,7 +62,7 @@ using LinearAlgebra
         @testset "Paper #3 §V.A — F=2 cyclic ζ_{T_d} → :T_d" begin
             # Koashi-Ueda canonical F=2 cyclic state, component order
             # (m=+2, +1, 0, -1, -2): ζ = (1, 0, i√2, 0, 1) / 2.
-            zeta_Td = ComplexF64[1.0, 0.0, im*sqrt(2.0), 0.0, 1.0] ./ 2.0
+            zeta_Td = ComplexF64[1.0, 0.0, im * sqrt(2.0), 0.0, 1.0] ./ 2.0
             @test detect_point_group(zeta_Td, 2) == :T_d
         end
 
@@ -90,7 +90,9 @@ using LinearAlgebra
             # ζ = √(5/24)|+4⟩ + √(7/12)|0⟩ + √(5/24)|-4⟩  (Paper #3 Eq. V.C.1)
             # 8 Majorana stars on cube vertices.
             zeta = zeros(ComplexF64, 9)
-            zeta[1] = sqrt(5/24); zeta[5] = sqrt(7/12); zeta[9] = sqrt(5/24)
+            zeta[1] = sqrt(5/24);
+            zeta[5] = sqrt(7/12);
+            zeta[9] = sqrt(5/24)
             @test detect_point_group(zeta, 4) === :O_h
         end
 
@@ -98,8 +100,11 @@ using LinearAlgebra
             # ζ = √390/48(|±8⟩) + √42/24(|±4⟩) + √33/8|0⟩  (Paper #3 Eq. V.E.1)
             # 16 stars form an O orbit union — Dy^{164} relevant (Paper #3).
             zeta = zeros(ComplexF64, 17)
-            zeta[1] = sqrt(390)/48; zeta[5] = sqrt(42)/24; zeta[9] = sqrt(33)/8
-            zeta[13] = sqrt(42)/24; zeta[17] = sqrt(390)/48
+            zeta[1] = sqrt(390)/48;
+            zeta[5] = sqrt(42)/24;
+            zeta[9] = sqrt(33)/8
+            zeta[13] = sqrt(42)/24;
+            zeta[17] = sqrt(390)/48
             @test detect_point_group(zeta, 8) === :O_h
         end
 
@@ -107,9 +112,11 @@ using LinearAlgebra
             # ζ = √561/75(|±10⟩) + √209/25(|+5⟩-|−5⟩) + √741/75|0⟩
             # (Paper #3 Eq. V.F.1). 20 stars on dodecahedron-like I_h orbit.
             zeta = zeros(ComplexF64, 21)
-            zeta[1] = sqrt(561)/75; zeta[6] = sqrt(209)/25
+            zeta[1] = sqrt(561)/75;
+            zeta[6] = sqrt(209)/25
             zeta[11] = sqrt(741)/75
-            zeta[16] = -sqrt(209)/25; zeta[21] = sqrt(561)/75
+            zeta[16] = -sqrt(209)/25;
+            zeta[21] = sqrt(561)/75
             @test detect_point_group(zeta, 10) === :I_h
         end
 
@@ -120,8 +127,11 @@ using LinearAlgebra
             # ζ_{0} = +0.5853. Sparse on m ∈ {±10, ±5, 0} (C_5^z invariance).
             # 24 Majorana stars on F=12 I:A icosahedral orbit.
             zeta = zeros(ComplexF64, 25)
-            zeta[3]  = 0.4871; zeta[8] = -0.3024; zeta[13] = 0.5853
-            zeta[18] = 0.3024; zeta[23] = 0.4871
+            zeta[3] = 0.4871;
+            zeta[8] = -0.3024;
+            zeta[13] = 0.5853
+            zeta[18] = 0.3024;
+            zeta[23] = 0.4871
             zeta ./= sqrt(sum(abs2, zeta))
             @test detect_point_group(zeta, 12) === :I_h
         end

@@ -118,7 +118,7 @@ function _parse_loss_params(
     #   K3_per_m_si      — per-m SI-units (m^6/s), converted via n0²/ω_ref
     K3_cubic = Float64(get(node, "K3_cubic", 0.0))
     K3_per_m_cubic = let v = get(node, "K3_per_m_cubic",
-                                  get(node, "K3_per_m", nothing))
+            get(node, "K3_per_m", nothing))
         v === nothing ? Float64[] : Float64.(v)
     end
     if haskey(node, "K3_per_m_si")
@@ -127,27 +127,31 @@ function _parse_loss_params(
                 "K3_per_m_si requires atom information. Set `atom: <Species>` on a " *
                 "ground_state step in the same pipeline."),
         )
-        (N_atoms === nothing || omega_ref === nothing) && throw(ArgumentError(
-            "K3_per_m_si requires interactions.N_atoms AND interactions.omega_ref " *
-            "for the n0²/ω_ref SI→dimless conversion. The idiomatic fix is the " *
-            "top-level `defaults:` block:\n\n" *
-            "  defaults:\n" *
-            "    interactions: {N_atoms: <N>, omega_ref: <Hz·2π>}\n\n" *
-            "so every step (including this dynamics phase) inherits the values. " *
-            "Currently missing: " *
-            (N_atoms === nothing ? "N_atoms" : "") *
-            (N_atoms === nothing && omega_ref === nothing ? " AND " : "") *
-            (omega_ref === nothing ? "omega_ref" : "") *
-            ". See docs/reference/dynamics.md `Three-body loss K3_per_m_si` for " *
-            "a worked example."))
+        (N_atoms === nothing || omega_ref === nothing) && throw(
+            ArgumentError(
+                "K3_per_m_si requires interactions.N_atoms AND interactions.omega_ref " *
+                "for the n0²/ω_ref SI→dimless conversion. The idiomatic fix is the " *
+                "top-level `defaults:` block:\n\n" *
+                "  defaults:\n" *
+                "    interactions: {N_atoms: <N>, omega_ref: <Hz·2π>}\n\n" *
+                "so every step (including this dynamics phase) inherits the values. " *
+                "Currently missing: " *
+                (N_atoms === nothing ? "N_atoms" : "") *
+                (N_atoms === nothing && omega_ref === nothing ? " AND " : "") *
+                (omega_ref === nothing ? "omega_ref" : "") *
+                ". See docs/reference/dynamics.md `Three-body loss K3_per_m_si` for " *
+                "a worked example."),
+        )
         a_ho = sqrt(Units.HBAR / (atom.mass * Float64(omega_ref)))
         n0 = Float64(N_atoms) / a_ho^3
         # K_3 [m^6/s] · n0² [m^-6] / ω_ref [1/s] → dimless rate for
         # quadratic application: exp(-K3_dimless · ñ² · dt̃ / 2)
         factor = n0^2 / Float64(omega_ref)
         si_vals = node["K3_per_m_si"]
-        K3_per_m_cubic = [Units.k3_si(Units.safe_parse_quantity(String(s))) * factor
-                          for s in si_vals]
+        K3_per_m_cubic = [
+            Units.k3_si(Units.safe_parse_quantity(String(s))) * factor
+            for s in si_vals
+        ]
     end
     # Energy-selective evaporation (Phase 4 #40)
     evap_energy_cutoff = Float64(get(node, "evap_energy_cutoff", 0.0))
@@ -271,7 +275,7 @@ end
 # run_step continues to read — these slots are no longer user-visible because
 # the schema rejects them.
 function _resolve_lhy_block!(p::Dict, inter::Dict, atom, c_dd_val::Float64,
-        eps_dd::Float64, N_atoms::Int, a_ho::Float64)
+    eps_dd::Float64, N_atoms::Int, a_ho::Float64)
     lhy_block = get(p, "lhy", nothing)
     lhy_block isa Dict || return nothing
 

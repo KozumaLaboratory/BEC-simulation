@@ -53,7 +53,7 @@ using SpinorBEC
         F = 1
         phi = zeros(ComplexF64, nx, D)
         # Gaussian wavepacket in m=0 component
-        x = collect(0:nx-1) .- nx/2 .+ 0.5
+        x = collect(0:(nx - 1)) .- nx/2 .+ 0.5
         for i in 1:nx
             phi[i, 2] = exp(-x[i]^2 / 4) * (1.0 / (2π)^(1/4))
         end

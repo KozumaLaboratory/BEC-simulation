@@ -148,7 +148,7 @@ function _tdhfb_v_step!(phi::AbstractArray, V_ext::AbstractArray, dt::Float64)
     sz = size(phi)
     D = sz[end]
     @assert size(V_ext, ndims(V_ext)) == D
-    @inbounds for idx in CartesianIndices(size(phi)[1:end-1]), m in 1:D
+    @inbounds for idx in CartesianIndices(size(phi)[1:(end - 1)]), m in 1:D
         phi[idx, m] *= cis(-V_ext[idx, m] * dt)
     end
     return phi
@@ -301,8 +301,12 @@ function _tdhfb_phi_subupdate!(
                 # indices, leftover from a partial channel_kernel ↔
                 # channel_kernel_symmetrized migration — caused dt-independent
                 # energy drift scaling linearly with g_S, see memory.)
-                uval += Vk * (conj(state_for_gen.phi[idx, c2_p]) * state_for_gen.phi[idx, c2]
-                              + state_for_gen.rho[idx, c2, c2_p])
+                uval +=
+                    Vk * (
+                        conj(state_for_gen.phi[idx, c2_p]) * state_for_gen.phi[idx, c2]
+                        +
+                        state_for_gen.rho[idx, c2, c2_p]
+                    )
                 # Δ^φ:  κ_{c2, c2_p}                  (no φφ source)
                 # Popov mode (`hfb_mode = :popov`): drop the anomalous
                 # source for the φ subupdate.
@@ -371,11 +375,19 @@ function _tdhfb_R_subupdate!(
                 Vk == 0.0 && continue
                 # U^R:  V·(φ*φ + ρ_{c2, c2_p})  — same as U^φ after the fix
                 # (variational consistency, see strang_step.jl:206 comment).
-                uval += Vk * (conj(state_for_gen.phi[idx, c2_p]) * state_for_gen.phi[idx, c2]
-                              + state_for_gen.rho[idx, c2, c2_p])
+                uval +=
+                    Vk * (
+                        conj(state_for_gen.phi[idx, c2_p]) * state_for_gen.phi[idx, c2]
+                        +
+                        state_for_gen.rho[idx, c2, c2_p]
+                    )
                 # Δ^R:  V·(φφ + κ)
-                dval += Vk * (state_for_gen.phi[idx, c2] * state_for_gen.phi[idx, c2_p]
-                              + state_for_gen.kappa[idx, c2, c2_p])
+                dval +=
+                    Vk * (
+                        state_for_gen.phi[idx, c2] * state_for_gen.phi[idx, c2_p]
+                        +
+                        state_for_gen.kappa[idx, c2, c2_p]
+                    )
             end
             U_R[c, c_p] = uval
             Delta_R[c, c_p] = dval

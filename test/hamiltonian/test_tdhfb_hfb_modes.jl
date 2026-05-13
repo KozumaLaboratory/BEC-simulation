@@ -22,7 +22,6 @@ using Random
 using SpinorBEC
 
 @testset "TDHFB HFB / Popov modes" begin
-
     function random_hermitian_rho(nx::Int, D::Int, amp::Float64; seed=1)
         rng = MersenneTwister(seed)
         rho = zeros(ComplexF64, nx, D, D)

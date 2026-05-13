@@ -68,7 +68,7 @@ function adaptive_step!(ws::Workspace{N}, state::AdaptiveDtState;
     max_factor::Float64=5.0,
     min_factor::Float64=0.05,
     max_rejects::Int=12,
-    step!::F=split_step_midpoint!,
+    step!::F=(split_step_midpoint!),
 ) where {N, F}
     α = pi_alpha
     β = pi_beta
@@ -152,7 +152,7 @@ function adaptive_run!(ws::Workspace{N};
     tol_abs::Float64=1e-9,
     tol_rel::Float64=1e-7,
     save_history::Bool=true,
-    kwargs...
+    kwargs...,
 ) where {N}
     state = AdaptiveDtState(dt_init)
     t_history = Float64[]

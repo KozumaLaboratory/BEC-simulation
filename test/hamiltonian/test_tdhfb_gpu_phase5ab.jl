@@ -13,11 +13,11 @@ try
     @eval using CUDA
     if !CUDA.functional()
         @info "CUDA not functional — skipping TDHFB GPU phase5ab tests"
-        return
+        return nothing
     end
 catch e
     @info "CUDA not available — skipping TDHFB GPU phase5ab tests"
-    return
+    return nothing
 end
 
 # Reset GPU state between tests

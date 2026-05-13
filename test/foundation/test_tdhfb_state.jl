@@ -40,7 +40,7 @@ using SpinorBEC
 
     @testset "Particle number computation" begin
         # Φ-only particle number (vacuum ρ adds nothing)
-        N_total = tdhfb_total_particle_number(state; integration_weight = 1.0)
+        N_total = tdhfb_total_particle_number(state; integration_weight=1.0)
         N_phi_expected = sum(abs2, psi)
         @test N_total ≈ N_phi_expected
     end

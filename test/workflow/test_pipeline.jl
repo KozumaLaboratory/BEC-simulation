@@ -563,7 +563,7 @@ pipeline:
 
         for _ in 1:n_steps
             SpinorBEC.apply_loss_step!(psi_baseline, loss_baseline, F, dt, D, 3)
-            SpinorBEC.apply_loss_step!(psi_k3,       loss_k3,       F, dt, D, 3)
+            SpinorBEC.apply_loss_step!(psi_k3, loss_k3, F, dt, D, 3)
         end
 
         norm_baseline = sum(abs2, psi_baseline)

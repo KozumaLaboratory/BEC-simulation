@@ -17,11 +17,11 @@ try
     @eval using CUDA
     if !CUDA.functional()
         @info "CUDA not functional — skipping TDHFB GPU phase5c HF tests"
-        return
+        return nothing
     end
 catch e
     @info "CUDA not available — skipping TDHFB GPU phase5c HF tests"
-    return
+    return nothing
 end
 
 GC.gc()
@@ -44,7 +44,7 @@ function _make_states(F::Int, spatial::Tuple; with_rho::Real=0.0, with_kappa::Re
     end
     N = length(spatial)
     state_cpu = SpinorBEC.TDHFBState{N, typeof(phi_cpu), typeof(rho_cpu), Float64}(
-        copy(phi_cpu), copy(rho_cpu), copy(kappa_cpu), 0.0, 0,
+        copy(phi_cpu), copy(rho_cpu), copy(kappa_cpu), 0.0, 0
     )
     state_gpu = SpinorBEC.TDHFBState{
         N,

@@ -63,7 +63,7 @@ function tdhfb_evolve!(
     picard_tol::Real=1e-10,
 ) where {N}
     # Precompute |k|² once per call (vs once per Strang step in the raw API).
-    spatial = size(state.phi)[1:end-1]
+    spatial = size(state.phi)[1:(end - 1)]
     ksq = k_squared === nothing ? _default_tdhfb_k_squared(spatial) : k_squared
 
     history = NamedTuple[]
@@ -84,13 +84,16 @@ function tdhfb_evolve!(
         on_step === nothing || on_step(state, step)
 
         if save_every > 0 && step % save_every == 0
-            push!(history, (
-                t = state.t,
-                step = state.step,
-                phi = copy(state.phi),
-                rho = copy(state.rho),
-                kappa = copy(state.kappa),
-            ))
+            push!(
+                history,
+                (
+                    t=state.t,
+                    step=state.step,
+                    phi=copy(state.phi),
+                    rho=copy(state.rho),
+                    kappa=copy(state.kappa),
+                ),
+            )
         end
     end
 

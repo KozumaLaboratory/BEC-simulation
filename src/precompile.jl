@@ -76,10 +76,12 @@ using PrecompileTools
                     L3_per_m=[0.01, 0.01, 0.01])
                 apply_loss_step!(psi_loss, loss_l3, 1, 0.001, 3, 3)
                 # YAML parsing path (cheap; no make_workspace):
-                _parse_loss_params(Dict{String, Any}(
-                    "gamma_dr" => 0.02,
-                    "K3_per_m" => [0.01, 0.01, 0.01],
-                ))
+                _parse_loss_params(
+                    Dict{String, Any}(
+                        "gamma_dr" => 0.02,
+                        "K3_per_m" => [0.01, 0.01, 0.01],
+                    ),
+                )
             end
         catch
             # Don't break package precompile if the workload trips.

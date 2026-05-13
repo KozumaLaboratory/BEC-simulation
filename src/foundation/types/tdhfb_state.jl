@@ -103,7 +103,7 @@ semantics, e.g., GPU memory-managed flows).
 """
 function init_tdhfb_vacuum(psi::AbstractArray; alias::Bool=false)
     sz = size(psi)
-    spatial_dims = sz[1:end-1]
+    spatial_dims = sz[1:(end - 1)]
     D = sz[end]
     N = length(spatial_dims)
 

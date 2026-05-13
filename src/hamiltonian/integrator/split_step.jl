@@ -209,7 +209,7 @@ function _half_potential_step!(
 
     _apply_mg_to_V!(ws, t_eval)
     @timeit_debug TIMER "diagonal" _dispatch_diagonal_step!(
-        ws, Val(N), zeeman_diag_fwd, dt_half / 2, imaginary_time, ip; psi_mf,
+        ws, Val(N), zeeman_diag_fwd, dt_half / 2, imaginary_time, ip; psi_mf
     )
     _remove_mg_from_V!(ws, t_eval)
 
@@ -221,14 +221,14 @@ function _half_potential_step!(
 
     if abs(ip.c1) > 1e-30
         @timeit_debug TIMER "spin_mixing" apply_spin_mixing_step!(
-            ws.state.psi, ws.spin_matrices, ip.c1, dt_half / 2, ndim; imaginary_time, psi_mf,
+            ws.state.psi, ws.spin_matrices, ip.c1, dt_half / 2, ndim; imaginary_time, psi_mf
         )
     end
 
     c2 = get_cn(ip, 2)
     if abs(c2) > 1e-30
         @timeit_debug TIMER "nematic" apply_singlet_pair_step!(
-            ws.state.psi, ip, ws.spin_matrices.system.F, dt_half / 2, ndim; imaginary_time, psi_mf,
+            ws.state.psi, ip, ws.spin_matrices.system.F, dt_half / 2, ndim; imaginary_time, psi_mf
         )
     end
 
@@ -295,13 +295,13 @@ function _half_potential_step!(
 
     if abs(c2) > 1e-30
         @timeit_debug TIMER "nematic" apply_singlet_pair_step!(
-            ws.state.psi, ip, ws.spin_matrices.system.F, dt_half / 2, ndim; imaginary_time, psi_mf,
+            ws.state.psi, ip, ws.spin_matrices.system.F, dt_half / 2, ndim; imaginary_time, psi_mf
         )
     end
 
     if abs(ip.c1) > 1e-30
         @timeit_debug TIMER "spin_mixing" apply_spin_mixing_step!(
-            ws.state.psi, ws.spin_matrices, ip.c1, dt_half / 2, ndim; imaginary_time, psi_mf,
+            ws.state.psi, ws.spin_matrices, ip.c1, dt_half / 2, ndim; imaginary_time, psi_mf
         )
     end
 
@@ -320,7 +320,7 @@ function _half_potential_step!(
 
     _apply_mg_to_V!(ws, t_eval)
     @timeit_debug TIMER "diagonal" _dispatch_diagonal_step!(
-        ws, Val(N), zeeman_diag_bwd, dt_half / 2, imaginary_time, ip; psi_mf,
+        ws, Val(N), zeeman_diag_bwd, dt_half / 2, imaginary_time, ip; psi_mf
     )
     _remove_mg_from_V!(ws, t_eval)
 end
@@ -355,16 +355,16 @@ function split_step_midpoint!(ws::Workspace{N}; dt::Float64=ws.sim_params.dt) wh
 
     omega = ws.sim_params.rotating_frame_omega
     @timeit_debug TIMER "coriolis" _apply_coriolis_step!(
-        ws.state.psi, ws.grid, omega, dt / 2, it, ws.coriolis_cache,
+        ws.state.psi, ws.grid, omega, dt / 2, it, ws.coriolis_cache
     )
     # Always-update-on-entry semantics: the batched kinetic phase cache is
     # synced to the dt passed in. Costs O(N^ndim) elementwise cis per call.
     _update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, dt)
     @timeit_debug TIMER "kinetic" apply_kinetic_step_batched!(
-        ws.state.psi, ws.batched_kinetic,
+        ws.state.psi, ws.batched_kinetic
     )
     @timeit_debug TIMER "coriolis" _apply_coriolis_step!(
-        ws.state.psi, ws.grid, omega, dt / 2, it, ws.coriolis_cache,
+        ws.state.psi, ws.grid, omega, dt / 2, it, ws.coriolis_cache
     )
 
     @timeit_debug TIMER "half_potential_mid" _half_potential_step_midpoint!(
@@ -373,13 +373,13 @@ function split_step_midpoint!(ws::Workspace{N}; dt::Float64=ws.sim_params.dt) wh
 
     if !it && ws.loss !== nothing
         @timeit_debug TIMER "loss" apply_loss_step!(
-            ws.state.psi, ws.loss, ws.spin_matrices.system.F, dt, n_comp, N, ws.density_buf,
+            ws.state.psi, ws.loss, ws.spin_matrices.system.F, dt, n_comp, N, ws.density_buf
         )
     end
 
     if !it && ws.absorbing_mask !== nothing
         @timeit_debug TIMER "absorbing" apply_absorbing_boundary!(
-            ws.state.psi, ws.absorbing_mask, n_comp, N,
+            ws.state.psi, ws.absorbing_mask, n_comp, N
         )
     end
 
@@ -613,13 +613,13 @@ function split_step_trap!(ws::Workspace{N}) where {N}
 
     omega = ws.sim_params.rotating_frame_omega
     @timeit_debug TIMER "coriolis" _apply_coriolis_step!(
-        ws.state.psi, ws.grid, omega, dt / 2, it, ws.coriolis_cache,
+        ws.state.psi, ws.grid, omega, dt / 2, it, ws.coriolis_cache
     )
     @timeit_debug TIMER "kinetic" apply_kinetic_step_batched!(
-        ws.state.psi, ws.batched_kinetic,
+        ws.state.psi, ws.batched_kinetic
     )
     @timeit_debug TIMER "coriolis" _apply_coriolis_step!(
-        ws.state.psi, ws.grid, omega, dt / 2, it, ws.coriolis_cache,
+        ws.state.psi, ws.grid, omega, dt / 2, it, ws.coriolis_cache
     )
 
     @timeit_debug TIMER "half_potential_trap" _half_potential_step_trap!(
@@ -628,13 +628,13 @@ function split_step_trap!(ws::Workspace{N}) where {N}
 
     if !it && ws.loss !== nothing
         @timeit_debug TIMER "loss" apply_loss_step!(
-            ws.state.psi, ws.loss, ws.spin_matrices.system.F, dt, n_comp, N, ws.density_buf,
+            ws.state.psi, ws.loss, ws.spin_matrices.system.F, dt, n_comp, N, ws.density_buf
         )
     end
 
     if !it && ws.absorbing_mask !== nothing
         @timeit_debug TIMER "absorbing" apply_absorbing_boundary!(
-            ws.state.psi, ws.absorbing_mask, n_comp, N,
+            ws.state.psi, ws.absorbing_mask, n_comp, N
         )
     end
 

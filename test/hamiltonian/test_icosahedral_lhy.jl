@@ -163,7 +163,7 @@ using SpinorBEC.IcosahedralMod
         # (3) g_12-dominated regime: I_h-favouring g_dict gives a larger
         # state-dependence (Polar/I_h ratio ~ 2.4).
         g_ih = Dict(0 => 5.0, 2 => 2.0, 4 => 2.0, 6 => 5.0,
-                    8 => 2.0, 10 => 10.0, 12 => 50.0)
+            8 => 2.0, 10 => 10.0, 12 => 50.0)
         c0_ico2, _ = SpinorBEC.IcosahedralMod.compute_c0_lambda_F6_Ih(g_ih)
         @test c0_ico2 > 0
         pol2 = SpinorBEC.PolarContactMod.lhy_energy_polar(1.0, 6, g_ih)

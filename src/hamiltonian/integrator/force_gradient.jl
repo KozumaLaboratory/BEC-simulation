@@ -35,8 +35,10 @@ export split_step_forcegrad!, split_step_thalhammer!
 
 function _assert_forcegrad_diagonal_only(ws::Workspace)
     ws.ddi === nothing ||
-        error("split_step_forcegrad!: DDI not supported in v1 (diagonal-only). " *
-              "See docs/design/integrator_track_c_derivation.md Step 5.")
+        error(
+            "split_step_forcegrad!: DDI not supported in v1 (diagonal-only). " *
+            "See docs/design/integrator_track_c_derivation.md Step 5.",
+        )
     ws.tensor_cache === nothing ||
         error("split_step_forcegrad!: tensor_cache not supported in v1.")
     abs(ws.interactions.c1) < 1e-30 ||
@@ -220,7 +222,7 @@ Per outer step:
 * `n_picard=k ≥ 2`: 11 V + 4 K + (k-1) × (5 V + 2 K + 2 MF re-evals)
 """
 function split_step_forcegrad!(ws::Workspace{N};
-        midpoint::Bool=true, endpoint::Bool=true, n_picard::Int=1) where {N}
+    midpoint::Bool=true, endpoint::Bool=true, n_picard::Int=1) where {N}
     _assert_forcegrad_diagonal_only(ws)
 
     dt = ws.sim_params.dt

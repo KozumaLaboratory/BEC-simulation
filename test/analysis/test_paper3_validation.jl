@@ -33,7 +33,7 @@ grid_ndim(::SpinorBEC.Grid{N}) where {N} = N
 
     @testset "F=2 cyclic (T_d, Paper #3 §V.A)" begin
         # ζ_cyc = (1, 0, i√2, 0, 1) / 2
-        spinor = ComplexF64[1.0, 0.0, im*sqrt(2.0), 0.0, 1.0] ./ 2.0
+        spinor = ComplexF64[1.0, 0.0, im * sqrt(2.0), 0.0, 1.0] ./ 2.0
         psi = _uniform_psi(spinor, grid_3d)
         sm = spin_matrices(2)
         r = SpinorBEC.classify_phase_detailed(psi, 2, grid_3d, sm)
@@ -55,7 +55,9 @@ grid_ndim(::SpinorBEC.Grid{N}) where {N} = N
     @testset "F=4 cube O_h (Paper #3 §V.C)" begin
         # ζ = √(5/24)|+4⟩ + √(7/12)|0⟩ + √(5/24)|-4⟩
         spinor = zeros(ComplexF64, 9)
-        spinor[1] = sqrt(5/24); spinor[5] = sqrt(7/12); spinor[9] = sqrt(5/24)
+        spinor[1] = sqrt(5/24);
+        spinor[5] = sqrt(7/12);
+        spinor[9] = sqrt(5/24)
         psi = _uniform_psi(spinor, grid_3d)
         sm = spin_matrices(4)
         r = SpinorBEC.classify_phase_detailed(psi, 4, grid_3d, sm)
@@ -78,8 +80,11 @@ grid_ndim(::SpinorBEC.Grid{N}) where {N} = N
     @testset "F=8 cube-like octahedral O:A_1 (Paper #3 §V.E)" begin
         # ζ = √390/48 (|±8⟩) + √42/24 (|±4⟩) + √33/8 |0⟩
         spinor = zeros(ComplexF64, 17)
-        spinor[1] = sqrt(390)/48; spinor[5] = sqrt(42)/24; spinor[9] = sqrt(33)/8
-        spinor[13] = sqrt(42)/24; spinor[17] = sqrt(390)/48
+        spinor[1] = sqrt(390)/48;
+        spinor[5] = sqrt(42)/24;
+        spinor[9] = sqrt(33)/8
+        spinor[13] = sqrt(42)/24;
+        spinor[17] = sqrt(390)/48
         psi = _uniform_psi(spinor, grid_3d)
         sm = spin_matrices(8)
         r = SpinorBEC.classify_phase_detailed(psi, 8, grid_3d, sm)
@@ -89,9 +94,11 @@ grid_ndim(::SpinorBEC.Grid{N}) where {N} = N
 
     @testset "F=10 dodecahedral I_h (Paper #3 §V.F)" begin
         spinor = zeros(ComplexF64, 21)
-        spinor[1] = sqrt(561)/75; spinor[6] = sqrt(209)/25
+        spinor[1] = sqrt(561)/75;
+        spinor[6] = sqrt(209)/25
         spinor[11] = sqrt(741)/75
-        spinor[16] = -sqrt(209)/25; spinor[21] = sqrt(561)/75
+        spinor[16] = -sqrt(209)/25;
+        spinor[21] = sqrt(561)/75
         psi = _uniform_psi(spinor, grid_3d)
         sm = spin_matrices(10)
         r = SpinorBEC.classify_phase_detailed(psi, 10, grid_3d, sm)

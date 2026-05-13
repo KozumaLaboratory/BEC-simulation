@@ -17,11 +17,11 @@ try
     @eval using CUDA
     if !CUDA.functional()
         @info "CUDA not functional — skipping TDHFB GPU phase5c tests"
-        return
+        return nothing
     end
 catch e
     @info "CUDA not available — skipping TDHFB GPU phase5c tests"
-    return
+    return nothing
 end
 
 ext = Base.get_extension(SpinorBEC, :SpinorBECCUDAExt)

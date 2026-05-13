@@ -2,7 +2,6 @@ using SpinorBEC
 using Test
 
 @testset "Sign Pattern Lemma 1 + 2 (Paper #3 §VI)" begin
-
     @testset "Lemma 1 closed form β_S^(λ_spin) = [S(S+1) − 2F(F+1)] / [2F(F+1)] · β_S^(c_0)" begin
         # F=1: 2F(F+1) = 4.
         # S=0: factor = (0 - 4)/4 = -1

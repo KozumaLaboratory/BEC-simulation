@@ -57,7 +57,7 @@ using SpinorBEC
 
         # Harmonic trap
         V_ext = zeros(Float64, nx, D)
-        x = collect(0:nx-1) .- nx/2 .+ 0.5
+        x = collect(0:(nx - 1)) .- nx/2 .+ 0.5
         for i in 1:nx, m in 1:D
             V_ext[i, m] = 0.5 * 0.5^2 * x[i]^2
         end
@@ -149,7 +149,7 @@ using SpinorBEC
 
         # Gaussian-ish initial φ in m=0
         phi = zeros(ComplexF64, nx, D)
-        x = collect(0:nx-1) .- nx/2 .+ 0.5
+        x = collect(0:(nx - 1)) .- nx/2 .+ 0.5
         for i in 1:nx
             phi[i, 2] = exp(-x[i]^2 / 6) * 0.5
         end
@@ -202,7 +202,7 @@ using SpinorBEC
         Random.seed!(501)
 
         phi0 = zeros(ComplexF64, nx, D)
-        x = collect(0:nx-1) .- nx/2 .+ 0.5
+        x = collect(0:(nx - 1)) .- nx/2 .+ 0.5
         for i in 1:nx
             phi0[i, 2] = exp(-x[i]^2 / 6) * 0.4
         end

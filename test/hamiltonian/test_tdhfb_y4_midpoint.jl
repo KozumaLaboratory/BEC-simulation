@@ -20,7 +20,6 @@ using SpinorBEC
 import SpinorBEC: _tdhfb_strang_substep!
 
 @testset "TDHFB Y4-midpoint integrator (Phase 4 WIP)" begin
-
     function random_hermitian_rho(nx::Int, D::Int, amp::Float64; seed=1)
         rng = MersenneTwister(seed)
         rho = zeros(ComplexF64, nx, D, D)
@@ -85,7 +84,7 @@ import SpinorBEC: _tdhfb_strang_substep!
         state.kappa .= random_symmetric_kappa(nx, D, 0.1; seed=202)
 
         V_ext = zeros(Float64, nx, D)
-        x = collect(0:nx-1) .- nx / 2 .+ 0.5
+        x = collect(0:(nx - 1)) .- nx / 2 .+ 0.5
         for i in 1:nx, m in 1:D
             V_ext[i, m] = 0.5 * 0.5^2 * x[i]^2
         end
@@ -123,7 +122,7 @@ import SpinorBEC: _tdhfb_strang_substep!
         kappa0 = random_symmetric_kappa(nx, D, 0.05; seed=302)
 
         V_ext = zeros(Float64, nx, D)
-        x = collect(0:nx-1) .- nx / 2 .+ 0.5
+        x = collect(0:(nx - 1)) .- nx / 2 .+ 0.5
         for i in 1:nx, m in 1:D
             V_ext[i, m] = 0.5 * 0.3^2 * x[i]^2
         end
@@ -272,8 +271,8 @@ import SpinorBEC: _tdhfb_strang_substep!
             # by ~30× over φ in practice — that's the BdG non-conjugation
             # asymmetry leaking through.
             r = max(maximum(abs, state.phi .- phi0),
-                    maximum(abs, state.rho .- rho0),
-                    maximum(abs, state.kappa .- kappa0))
+                maximum(abs, state.rho .- rho0),
+                maximum(abs, state.kappa .- kappa0))
             push!(residuals, r)
         end
 
@@ -311,8 +310,8 @@ import SpinorBEC: _tdhfb_strang_substep!
             tdhfb_strang_step!(state, F, gS, V_ext, -dt;
                 picard_midpoint=true, picard_max_iter=30, picard_tol=1e-12)
             r = max(maximum(abs, state.phi .- phi0),
-                    maximum(abs, state.rho .- rho0),
-                    maximum(abs, state.kappa .- kappa0))
+                maximum(abs, state.rho .- rho0),
+                maximum(abs, state.kappa .- kappa0))
             @test r < 1e-10
         end
     end
@@ -360,8 +359,8 @@ import SpinorBEC: _tdhfb_strang_substep!
         for dt in dts
             state = _run_y4(dt)
             e = max(maximum(abs, state.phi .- state_ref.phi),
-                    maximum(abs, state.rho .- state_ref.rho),
-                    maximum(abs, state.kappa .- state_ref.kappa))
+                maximum(abs, state.rho .- state_ref.rho),
+                maximum(abs, state.kappa .- state_ref.kappa))
             push!(errs, e)
         end
         order = log2(errs[1] / errs[2])

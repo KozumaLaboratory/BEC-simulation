@@ -146,7 +146,7 @@ GPU DDI step: convolve + rotation all on GPU using broadcast operations.
 Used by the Track A1 midpoint predictor-corrector V step.
 """
 function _apply_ddi_step_gpu!(ws, dt_half, ndim, imaginary_time;
-        psi_mf::Union{Nothing, AbstractArray}=nothing)
+    psi_mf::Union{Nothing, AbstractArray}=nothing)
     D = ws.spin_matrices.system.n_components
     N = ndims(ws.state.psi) - 1
     n_pts = ntuple(d -> size(ws.state.psi, d), Val(N))
