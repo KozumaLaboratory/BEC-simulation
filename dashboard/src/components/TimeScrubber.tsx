@@ -36,14 +36,9 @@ export function TimeScrubber({
 }: Props) {
   const [playing, setPlaying] = useState(false)
   const [durationSec, setDurationSec] = useState<number>(defaultDurationSec)
-  const timerRef = useRef<number | null>(null)
   const n = meta?.n_snapshots ?? 0
-  // Effective fps: prefer fixed duration ("loop the whole sequence in
-  // 20 s") over a fixed frame rate, since the absolute time elapsed in
-  // the simulation per snap varies between runs.
-  const effectiveFps = fps ?? (n > 0 ? n / Math.max(durationSec, 0.5) : 10)
 
-  // Latest snapIdx + loading via refs so the play interval reads the
+  // Latest snapIdx + loading via refs so the rAF loop reads the
   // current values without being re-created on every tick.
   const snapIdxRef = useRef(snapIdx)
   const loadingRef = useRef(loading)
@@ -54,22 +49,55 @@ export function TimeScrubber({
     loadingRef.current = loading
   }, [loading])
 
+  // rAF-driven elapsed-time loop. durationSec means "one full pass in N
+  // seconds, exactly" — the loop computes the target snap from elapsed
+  // wall-clock instead of advancing by `+1` per tick. Visual smoothness
+  // is capped by the display refresh rate (frames are skipped when
+  // n / durationSec exceeds the display fps), but the playback wall
+  // duration matches the dropdown value precisely. The legacy fps prop
+  // takes precedence if supplied (fixed frame rate for non-snapshot
+  // viewers).
   useEffect(() => {
     if (!playing || n === 0) return
-    // With atlas mode the backend isn't hit per frame, so the play loop
-    // is GPU-only and can comfortably run at 60 fps. Cap interval to 16 ms
-    // (~60 fps) which is anyway the display refresh ceiling.
-    const interval = Math.max(1000 / effectiveFps, 16)
-    const id = window.setInterval(() => {
-      // Skip this tick if the current frame is still loading — keeps
-      // playback synced to backend throughput instead of forcing every
-      // tick onto the request queue.
-      if (loadingRef.current) return
-      onChange((snapIdxRef.current % n) + 1)
-    }, interval)
-    timerRef.current = id
-    return () => window.clearInterval(id)
-  }, [playing, n, effectiveFps, onChange])
+    let cancelled = false
+    let rafId = 0
+    let startTime: number | null = null
+
+    const tick = (now: number) => {
+      if (cancelled) return
+      if (loadingRef.current) {
+        // Initial atlas fetch is in flight — hold startTime relative so
+        // the elapsed-based index doesn't skip ahead while we wait.
+        startTime = null
+        rafId = requestAnimationFrame(tick)
+        return
+      }
+      if (startTime === null) {
+        // Anchor t=0 to the *previous* snap so play resumes from where
+        // the user left it instead of jumping to frame 1.
+        const startSnap = Math.max(1, snapIdxRef.current)
+        startTime = now - ((startSnap - 1) / n) * durationSec * 1000
+      }
+      const elapsedSec = (now - startTime) / 1000
+      let targetSnap: number
+      if (fps !== undefined) {
+        // Legacy fixed-rate path — snap = 1 + floor(elapsedSec * fps), wrap.
+        targetSnap = ((Math.floor(elapsedSec * fps)) % n) + 1
+      } else {
+        const cycleSec = elapsedSec % durationSec
+        targetSnap = Math.min(n, Math.floor((cycleSec / durationSec) * n) + 1)
+      }
+      if (targetSnap !== snapIdxRef.current) {
+        onChange(targetSnap)
+      }
+      rafId = requestAnimationFrame(tick)
+    }
+    rafId = requestAnimationFrame(tick)
+    return () => {
+      cancelled = true
+      if (rafId) cancelAnimationFrame(rafId)
+    }
+  }, [playing, n, durationSec, fps, onChange])
 
   if (!meta || meta.n_snapshots === 0) return null
 

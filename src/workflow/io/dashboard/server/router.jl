@@ -131,6 +131,12 @@ function _handle_dashboard_connection(
             end
 
             keep_alive = !client_close
+            # Profile every request — `[t=Nms s=BYTES] method path → code`.
+            # Activate by setting SPINORBEC_DASHBOARD_LOG=1; default off so
+            # production sessions don't spam stdout. Timings include both
+            # route compute and response delivery (HTTP write).
+            log_requests = get(ENV, "SPINORBEC_DASHBOARD_LOG", "") == "1"
+            t0 = log_requests ? time_ns() : UInt64(0)
             if method == "POST"
                 body_bytes = content_length > 0 ? read(sock, content_length) : UInt8[]
                 status, content_type, body = _route_dashboard_post(
@@ -142,6 +148,17 @@ function _handle_dashboard_connection(
                     path, html_content, legacy_html, data_cache, psi_cache, base_dir
                 )
                 _send_http_response(sock, status, content_type, body; keep_alive, accept_gzip)
+            end
+            if log_requests
+                # Use stdout + explicit flush — stderr is fully-buffered
+                # under nohup redirection in this Julia, so println(stderr,…)
+                # never reaches the log file in real time.
+                dt_ms = (time_ns() - t0) / 1e6
+                size_b = body isa AbstractVector ? length(body) : sizeof(body)
+                println(stdout, "[t=",
+                    round(dt_ms; digits=1), "ms s=",
+                    size_b, "] ", method, " ", status, " ", path)
+                flush(stdout)
             end
 
             keep_alive || break
