@@ -17,11 +17,11 @@ interface Props {
 }
 
 const DURATION_OPTIONS = [
+  { sec: 1, label: '1 s' },
+  { sec: 2, label: '2 s' },
   { sec: 5, label: '5 s' },
   { sec: 10, label: '10 s' },
   { sec: 20, label: '20 s' },
-  { sec: 30, label: '30 s' },
-  { sec: 60, label: '60 s' },
 ]
 
 // Minimal time scrubber. Slider spans [1, n_snapshots] (1-indexed to match
