@@ -68,8 +68,8 @@ _parse_ramp_or_constant(v) = ConstantValue(Float64(v))
 Parse a YAML `loss:` block into `LossParams`. Supported forms:
 
     loss: false | 0 | null        # no loss
-    loss: {gamma_dr: 0.02, L3: 0.001}
-    loss: {gamma_dr: 0.02, K3_per_m: [0.01, 0.02, 0.05, ...]}  # dimless
+    loss: {gamma_dr: 0.02, L3: 0.001}                          # legacy 2-body shape
+    loss: {gamma_dr: 0.02, K3_per_m: [0.01, 0.02, 0.05, ...]}  # 3-body, dimless
 
 SI-unit input (lab-friendly, requires atom + N_atoms + omega_ref to derive
 the dimensionless conversion factor):
@@ -80,6 +80,13 @@ the dimensionless conversion factor):
 
 For the SI form the dimensionless rate is K3_dimless = K3_SI · n0² / ω_ref
 with n0 = N_atoms / a_ho³ and a_ho = √(ℏ / (m·ω_ref)).
+
+Routing:
+- `L3` / `L3_per_m`        → legacy 2-body-shape `LossParams.L3` / `L3_per_m`
+                              (dn_m/dt = -γ n n_m, linear in n)
+- `K3_cubic` / `K3_per_m_cubic` / `K3_per_m` / `K3_per_m_si`
+                            → physically correct 3-body `K3_per_m_cubic`
+                              (dn_m/dt = -K_3 n² n_m, quadratic in n)
 """
 function _parse_loss_params(
     node;
@@ -97,10 +104,23 @@ function _parse_loss_params(
     node isa Dict || throw(ArgumentError("loss must be a mapping or scalar, got $(typeof(node))"))
     gamma_dr = Float64(get(node, "gamma_dr", 0.0))
     L3 = Float64(get(node, "L3", 0.0))
-    L3_per_m = let v = get(node, "K3_per_m", get(node, "L3_per_m", nothing))
+    # `L3_per_m` is the legacy 2-body-shaped per-m rate (dn_m/dt = -γ n n_m).
+    # Only the `L3_per_m` key routes here — `K3_per_m` and `K3_per_m_si`
+    # are physically 3-body and must land in `K3_per_m_cubic` below.
+    L3_per_m = let v = get(node, "L3_per_m", nothing)
         v === nothing ? Float64[] : Float64.(v)
     end
-    # SI-unit per-m K3 — convert to dimless using atom/N/ω_ref
+
+    # True 3-body cubic loss: dn_m/dt = -K_3 n² n_m. Three input forms:
+    #   K3_cubic         — scalar dimensionless
+    #   K3_per_m_cubic   — per-m dimensionless vector
+    #   K3_per_m         — per-m dimensionless (alias; same physics)
+    #   K3_per_m_si      — per-m SI-units (m^6/s), converted via n0²/ω_ref
+    K3_cubic = Float64(get(node, "K3_cubic", 0.0))
+    K3_per_m_cubic = let v = get(node, "K3_per_m_cubic",
+                                  get(node, "K3_per_m", nothing))
+        v === nothing ? Float64[] : Float64.(v)
+    end
     if haskey(node, "K3_per_m_si")
         atom === nothing && throw(
             ArgumentError(
@@ -112,17 +132,12 @@ function _parse_loss_params(
             "K3_per_m_si requires interactions.omega_ref"))
         a_ho = sqrt(Units.HBAR / (atom.mass * Float64(omega_ref)))
         n0 = Float64(N_atoms) / a_ho^3
-        # K_3 [m^6/s] · n^2 [1/m^6]^2 = [1/s]; divide by ω_ref to dimless
+        # K_3 [m^6/s] · n0² [m^-6] / ω_ref [1/s] → dimless rate for
+        # quadratic application: exp(-K3_dimless · ñ² · dt̃ / 2)
         factor = n0^2 / Float64(omega_ref)
         si_vals = node["K3_per_m_si"]
-        L3_per_m = [Units.k3_si(Units.safe_parse_quantity(String(s))) * factor
-                    for s in si_vals]
-    end
-
-    # True 3-body cubic loss (physically correct: dn/dt = -K_3 n² n_m)
-    K3_cubic = Float64(get(node, "K3_cubic", 0.0))
-    K3_per_m_cubic = let v = get(node, "K3_per_m_cubic", nothing)
-        v === nothing ? Float64[] : Float64.(v)
+        K3_per_m_cubic = [Units.k3_si(Units.safe_parse_quantity(String(s))) * factor
+                          for s in si_vals]
     end
     # Energy-selective evaporation (Phase 4 #40)
     evap_energy_cutoff = Float64(get(node, "evap_energy_cutoff", 0.0))

@@ -425,20 +425,73 @@ pipeline:
         end
     end
 
-    @testset "loss SI-unit K3_per_m parsing" begin
-        # Smoke: SI-unit K3 should parse, downstream applied as dimless rate
+    @testset "loss K3 routing — 3-body keys land in K3_per_m_cubic" begin
         atom = AtomSpecies("Rb87", 1.44e-25, 1, 0.0, 0.0, 0.0)
-        node = Dict{String, Any}(
+
+        # SI-unit input (lab-friendly form documented in CLAUDE.md).
+        # MUST route to K3_per_m_cubic (quadratic-in-n), not legacy L3_per_m
+        # (linear-in-n). Pre-2026-05 the SI input mistakenly landed in
+        # L3_per_m, attenuating EdH density-spike loss by 1/2 at n=2n0 and
+        # over-amplifying low-density loss by 10× at n=0.1n0.
+        node_si = Dict{String, Any}(
             "gamma_dr" => 0.0,
             "K3_per_m_si" => ["1.5e-30 m^6/s", "1.5e-30 m^6/s", "1.5e-30 m^6/s"],
         )
-        # N_atoms=10000, omega_ref=2π·100 → finite dimless K3
-        loss = SpinorBEC._parse_loss_params(node;
+        loss_si = SpinorBEC._parse_loss_params(node_si;
             atom=atom, N_atoms=10000, omega_ref=2π * 100.0)
-        @test loss isa LossParams
-        @test length(loss.L3_per_m) == 3
-        @test all(isfinite, loss.L3_per_m)
-        @test all(loss.L3_per_m .>= 0.0)
+        @test loss_si isa LossParams
+        @test length(loss_si.K3_per_m_cubic) == 3
+        @test all(isfinite, loss_si.K3_per_m_cubic)
+        @test all(loss_si.K3_per_m_cubic .>= 0.0)
+        @test isempty(loss_si.L3_per_m)  # SI K3 must NOT pollute legacy field
+
+        # Dimless `K3_per_m` key — same physical meaning, same routing.
+        node_dim = Dict{String, Any}(
+            "gamma_dr" => 0.0,
+            "K3_per_m" => [0.01, 0.02, 0.05],
+        )
+        loss_dim = SpinorBEC._parse_loss_params(node_dim)
+        @test loss_dim.K3_per_m_cubic == [0.01, 0.02, 0.05]
+        @test isempty(loss_dim.L3_per_m)
+
+        # Legacy `L3_per_m` key — still routes to L3_per_m (2-body shape).
+        node_legacy = Dict{String, Any}(
+            "gamma_dr" => 0.0,
+            "L3_per_m" => [0.01, 0.02, 0.05],
+        )
+        loss_legacy = SpinorBEC._parse_loss_params(node_legacy)
+        @test loss_legacy.L3_per_m == [0.01, 0.02, 0.05]
+        @test isempty(loss_legacy.K3_per_m_cubic)
+    end
+
+    @testset "K3_per_m_cubic is quadratic in n (kernel behavior check)" begin
+        # Direct verification that the kernel applies K3 quadratically.
+        # Compare loss at n=1 vs n=2 uniform densities: true 3-body gives a
+        # 4× rate ratio; legacy linear-in-n L3 would give 2×.
+        F = 1
+        D = 3
+        loss = LossParams(; gamma_dr=0.0, K3_per_m_cubic=[0.1, 0.1, 0.1])
+        dt = 1e-4
+
+        # Uniform psi with |psi|² = 1 per component (total n = 3) and
+        # |psi|² = 4 per component (total n = 12).
+        psi_a = ones(ComplexF64, 4, D)               # n_tot = 3
+        psi_b = (2.0 + 0im) .* ones(ComplexF64, 4, D)  # n_tot = 12
+
+        # Apply one half-step (dt/2 baked in by the kernel)
+        SpinorBEC.apply_loss_step!(psi_a, loss, F, dt, D, 1)
+        SpinorBEC.apply_loss_step!(psi_b, loss, F, dt, D, 1)
+
+        # |psi|² survival ratio: exp(-K3 · n² · dt). For per-component
+        # n_a=1, n_b=4 with total n_tot,a=3, n_tot,b=12, the decay rate
+        # for each component scales as n_tot². Ratio of −log survival:
+        survival_a = abs2(psi_a[1, 1]) / 1.0
+        survival_b = abs2(psi_b[1, 1]) / 4.0
+        decay_rate_a = -log(survival_a) / dt   # = K3 · n_tot,a² = 0.1 · 9
+        decay_rate_b = -log(survival_b) / dt   # = K3 · n_tot,b² = 0.1 · 144
+        # Ratio must be (12/3)² = 16 (true 3-body). Linear-in-n would be 4.
+        @test decay_rate_b / decay_rate_a ≈ 16.0 atol = 1e-3
+        @test decay_rate_a ≈ 0.1 * 9.0 atol = 1e-3
     end
 
     @testset "CSV calibration loader" begin
