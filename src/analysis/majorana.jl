@@ -186,63 +186,50 @@ const _REF_OCTAHEDRON = _pairwise_distance_spectrum(_make_octahedron_vertices())
 const _REF_CUBE = _pairwise_distance_spectrum(_make_cube_vertices())
 const _REF_TETRAHEDRON = _pairwise_distance_spectrum(_make_tetrahedron_vertices())
 
-# --- Paper #3 §V.E / §V.F reference spectra for F=8, F=10 inert states ---
+# --- Paper #3 §V.E / §V.F / §V.G reference spectra ---
 #
-# For F=8 cube-like octahedral (O:A_1) and F=10 dodecahedral (I_h), the
-# Majorana stars form orbit-unions of the respective point groups that
-# don't correspond to a single named "vertex polyhedron". We compute the
-# reference spectra DIRECTLY from the canonical paper #3 state spinors
-# at module-load time. See `docs/manuscript/papers/paper3_universal_theorem/main.md`
-# §V.E (Eq. V.E.1) and §V.F (Eq. V.F.1) for derivation.
+# For F=8 cube-like octahedral (O:A_1), F=10 dodecahedral (I_h), and
+# F=12 icosahedral (I:A), the Majorana stars form orbit-unions of the
+# respective point groups that don't correspond to a single named
+# "vertex polyhedron". We compute the reference pairwise-distance
+# spectra DIRECTLY from the canonical Paper #3 state spinors at
+# module-load time. See `docs/manuscript/papers/paper3_universal_theorem/main.md`
+# §V.E / §V.F / §V.G for derivation.
+#
+# Spinor constants live in `canonical_polyhedral_states.jl` (single
+# source of truth, shared with `phase_classification.jl` and the
+# FIG-7 rendering script).
+#
+# **NOT generalizable to a single F-parametric reference geometry.**
+# Each (F, point group) pair has a distinct Majorana-star orbit
+# structure: the m-support of the inert ζ vector, the multiplicity
+# pattern in the resulting roots, and the orbit decomposition under
+# the residual symmetry are all F-specific (cf. F=6 I_h: 12 stars on
+# the icosahedron vertices; F=8 O_h: 16 stars on cube + octa orbits;
+# F=10 I_h: 20 stars on a different I_h orbit, etc.). The reference
+# array `_REF_F<F>_<name>` is a precomputed lookup per F, not a
+# parametric formula.
 
-function _make_F8_octa_A1_stars()
-    # Paper #3 §V.E.1: ζ = √390/48 (|+8⟩+|−8⟩) + √42/24 (|+4⟩+|−4⟩) + √33/8 |0⟩
-    # Component order: m=+8, +7, ..., -8.
-    zeta = zeros(ComplexF64, 17)
-    zeta[1]  = sqrt(390) / 48      # m=+8
-    zeta[5]  = sqrt(42) / 24       # m=+4
-    zeta[9]  = sqrt(33) / 8        # m=0
-    zeta[13] = sqrt(42) / 24       # m=-4
-    zeta[17] = sqrt(390) / 48      # m=-8
-    stars = majorana_stars(zeta, 8)
-    [_stereo_to_sphere(z) for z in stars]
+function _polyhedral_reference_stars(F::Int)
+    zeta = canonical_polyhedral_spinor(F)
+    [_stereo_to_sphere(z) for z in majorana_stars(zeta, F)]
 end
 
-function _make_F10_dodec_stars()
-    # Paper #3 §V.F.1: ζ = √561/75(|+10⟩+|−10⟩) + √209/25(|+5⟩−|−5⟩) + √741/75|0⟩
-    zeta = zeros(ComplexF64, 21)
-    zeta[1]  = sqrt(561) / 75      # m=+10
-    zeta[6]  = sqrt(209) / 25      # m=+5
-    zeta[11] = sqrt(741) / 75      # m=0
-    zeta[16] = -sqrt(209) / 25     # m=-5
-    zeta[21] = sqrt(561) / 75      # m=-10
-    stars = majorana_stars(zeta, 10)
-    [_stereo_to_sphere(z) for z in stars]
-end
+const _REF_F8_OCTA_A1 = _pairwise_distance_spectrum(_polyhedral_reference_stars(8))
+const _REF_F10_DODEC = _pairwise_distance_spectrum(_polyhedral_reference_stars(10))
+const _REF_F12_IH_A = _pairwise_distance_spectrum(_polyhedral_reference_stars(12))
 
-function _make_F12_Ih_A_stars()
-    # Paper #3 §V.G / F12_verification_result.md: F=12 I:A icosahedral inert
-    # state, sparse on m ∈ {±10, ±5, 0} (C_5^z invariance). One-phase choice
-    # gives all-complex coefficients; here we use the U(1)-rotated real form
-    # (overall phase rotation doesn't affect Majorana geometry):
-    #     ζ_{+10} = +0.4871,  ζ_{+5} = -0.3024,  ζ_0 = +0.5853,
-    #     ζ_{-5} = +0.3024,   ζ_{-10} = +0.4871
-    # (±5 antisymmetric pattern, similar to F=6 I_h and F=10 dodec).
-    # Decimal precision suffices since spectrum tol = 0.15.
-    zeta = zeros(ComplexF64, 25)
-    zeta[3]  = 0.4871    # m=+10 (index = F + 1 − m = 13 − 10 = 3)
-    zeta[8]  = -0.3024   # m=+5
-    zeta[13] = 0.5853    # m=0
-    zeta[18] = 0.3024    # m=-5
-    zeta[23] = 0.4871    # m=-10
-    zeta ./= sqrt(sum(abs2, zeta))
-    stars = majorana_stars(zeta, 12)
-    [_stereo_to_sphere(z) for z in stars]
-end
-
-const _REF_F8_OCTA_A1 = _pairwise_distance_spectrum(_make_F8_octa_A1_stars())
-const _REF_F10_DODEC = _pairwise_distance_spectrum(_make_F10_dodec_stars())
-const _REF_F12_IH_A = _pairwise_distance_spectrum(_make_F12_Ih_A_stars())
+# (n_stars, reference_spectrum, point_group). n_stars = 2F drives dispatch;
+# reference spectra themselves are F-specific lookups (see header comment).
+const _PG_REFERENCE_TABLE = (
+    (4, _REF_TETRAHEDRON, :T_d),
+    (6, _REF_OCTAHEDRON, :O_h),
+    (8, _REF_CUBE, :O_h),
+    (12, _REF_ICOSAHEDRON, :I_h),
+    (16, _REF_F8_OCTA_A1, :O_h),
+    (20, _REF_F10_DODEC, :I_h),
+    (24, _REF_F12_IH_A, :I_h),
+)
 
 """
     detect_point_group(spinor, F; tol=0.15) → Symbol
@@ -309,66 +296,12 @@ function detect_point_group(spinor::AbstractVector{ComplexF64}, F::Int; tol::Flo
     best_sym = :unknown
     best_rms = Inf
 
-    if n_stars == 12
-        rms = _spectrum_rms(spec, _REF_ICOSAHEDRON)
+    for (n_target, ref_spec, pg) in _PG_REFERENCE_TABLE
+        n_stars == n_target || continue
+        rms = _spectrum_rms(spec, ref_spec)
         if rms < best_rms
             best_rms = rms
-            best_sym = :I_h
-        end
-    end
-
-    if n_stars == 6
-        rms = _spectrum_rms(spec, _REF_OCTAHEDRON)
-        if rms < best_rms
-            best_rms = rms
-            best_sym = :O_h
-        end
-    end
-
-    if n_stars == 8
-        rms = _spectrum_rms(spec, _REF_CUBE)
-        if rms < best_rms
-            best_rms = rms
-            best_sym = :O_h
-        end
-    end
-
-    if n_stars == 4
-        rms = _spectrum_rms(spec, _REF_TETRAHEDRON)
-        if rms < best_rms
-            best_rms = rms
-            best_sym = :T_d
-        end
-    end
-
-    # F=8 cube-like octahedral (Paper #3 §V.E, Dy relevance). 16 stars
-    # form a union of octahedral orbits — reference computed from the
-    # canonical paper #3 spinor.
-    if n_stars == 16
-        rms = _spectrum_rms(spec, _REF_F8_OCTA_A1)
-        if rms < best_rms
-            best_rms = rms
-            best_sym = :O_h
-        end
-    end
-
-    # F=10 dodecahedral I_h (Paper #3 §V.F). 20 stars form an icosahedral
-    # orbit; reference from canonical paper #3 spinor.
-    if n_stars == 20
-        rms = _spectrum_rms(spec, _REF_F10_DODEC)
-        if rms < best_rms
-            best_rms = rms
-            best_sym = :I_h
-        end
-    end
-
-    # F=12 icosahedral I:A (Paper #3 §V.G). 24 stars from C_5^z-invariant
-    # spinor on m ∈ {±10, ±5, 0}. Reference from canonical paper #3 spinor.
-    if n_stars == 24
-        rms = _spectrum_rms(spec, _REF_F12_IH_A)
-        if rms < best_rms
-            best_rms = rms
-            best_sym = :I_h
+            best_sym = pg
         end
     end
 
