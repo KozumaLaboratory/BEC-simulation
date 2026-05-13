@@ -1,8 +1,8 @@
 # Re-run a single config from runs/ in the foreground with full logging.
 #
 # Usage:
-#   julia --project=. scripts/rerun_single.jl klaus2022_full
-#   julia --project=. scripts/rerun_single.jl eu151_droplet
+#   julia --project=. scripts/rerun_single.jl phi_omega_scan
+#   julia --project=. scripts/rerun_single.jl eu151_edh
 #
 # Cleans any partial .checkpoints/ directory (so cached half-finished
 # state from the prior crash doesn't poison the rerun) but leaves

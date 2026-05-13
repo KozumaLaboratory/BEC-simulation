@@ -35,7 +35,6 @@ LD_LIBRARY_PATH=/usr/lib/wsl/lib julia --project=.
 - [ ] `julia -e 'using JuliaFormatter; format("src/")'` clean
 - [ ] No new `Any`-typed slots in `_run_step` paths
       (`scripts/type_stability_audit.jl` to check)
-- [ ] If touching the Klaus path: smoke `runs/klaus2022_smoke/config.yaml`
 - [ ] If touching CUDA: verify `import CUDA; using SpinorBEC` precompiles
 - [ ] CLAUDE.md updated if introducing a new convention
 - [ ] No commented-out code in the diff
@@ -72,7 +71,7 @@ Detach pattern (survives Claude / shell close):
 ```bash
 setsid nohup bash -c '
   LD_LIBRARY_PATH=/usr/lib/wsl/lib \
-  julia --project=. scripts/run_batch_overnight.jl
+  julia --project=. -e "import CUDA; using SpinorBEC; run_yaml(\"runs/<name>/config.yaml\")"
 ' > logs/x.log 2>&1 < /dev/null &
 disown
 ```

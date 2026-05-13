@@ -149,7 +149,7 @@ n_peak = d["analyze/droplet_profile/n_peak"]
 - **Parameter scan**: add a `scan: {product: {pipeline.0.zeeman.p: [...]}}` block; `run_yaml` writes one .jld2 per point and skips existing ones on re-run. See `docs/guides/pipeline_cookbook.md`.
 - **Resume**: just rerun `run_yaml`. Cached point files are skipped.
 - **Single-point rerun**: `julia --project=. scripts/rerun_single.jl <run_name>` cleans the .checkpoints/ but preserves completed point_NNN.jld2.
-- **Resumable batch**: combine N runs in one driver script (`scripts/run_batch_overnight.jl` template). Per-run errors are caught so one failure doesn't kill the rest.
+- **Resumable batch**: wrap a sequence of `run_yaml` calls in a `try/catch` so one failure doesn't kill the rest. Each call is already idempotent (cached point files are skipped).
 
 ## Troubleshooting
 

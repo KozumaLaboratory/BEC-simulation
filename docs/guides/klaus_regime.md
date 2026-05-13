@@ -79,7 +79,7 @@ Phase III (full Klaus magnetostir, dynamic B̂(t)) vs lab-frame eigen-exact solv
 | 1000 | 0.999964 |
 | **28 428 (Klaus full)** | **0.999999** |
 
-Tests: `test/test_rotating_basis_phase_ii.jl` (10 tests), `test/test_rotating_basis_phase_iii.jl`. Validation drivers: `scripts/validate_phase_ii_overlap.jl`, `scripts/validate_phase_iii_lab_vs_gamma.jl`.
+Tests: `test/test_rotating_basis_phase_ii.jl` (10 tests), `test/test_rotating_basis_phase_iii.jl`. Validation drivers: `scripts/archive/validate_phase_ii_overlap.jl`, `scripts/archive/validate_phase_iii_lab_vs_gamma.jl`.
 
 **Important gauge note.** Equivalence between rotating-basis and lab-frame requires `gauge_fix=false`. With `gauge_fix=true` (the rotating_basis default) the dynamics are still correct, but `ψ_lab(T) ≠ U_B(T) ψ̃(T)` directly — recovering lab state needs a residual `exp(+i χ F_z)`. Caveat applies only when comparing against lab-frame ground-truth code.
 
@@ -107,6 +107,6 @@ DDI: the lab kernel `Q_ab(r) = δ_ab − 3 r̂_a r̂_b` is unchanged in real spa
 
 For the full derivation (term-by-term Hamiltonian transform, gauge freedom, scalar-eGPE adiabatic limit) see `design/option_gamma_rotating_basis.md`.
 
-## What was tried before (archived)
+## What was tried before
 
-`archive/spin_larmor_frame.md` — Path A: transform away the dominant `-p F_z` only (single-axis Bz). Replaced by Option γ which handles arbitrary `B̂(t)`. Kept for historical context only.
+Path A (single-axis `B_z` only) — earlier rotating-frame attempt that transformed away the dominant `-p F_z` term but couldn't handle a time-dependent `B̂(t)`. Superseded by Option γ. See `git log -- docs/archive/spin_larmor_frame.md` if the original design note is needed.
