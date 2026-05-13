@@ -25,13 +25,15 @@ repos:
     hooks:
       - id: gitleaks
 
-  # JuliaFormatter — run as a local hook because there's no published
-  # pre-commit repo for it. Activate by uncommenting once you have
-  # JuliaFormatter installed in your default julia env.
-  # - repo: local
-  #   hooks:
-  #     - id: julia-format
-  #       name: JuliaFormatter
-  #       entry: julia -e 'using JuliaFormatter; format(ARGS)'
-  #       language: system
-  #       files: '\.jl$'
+  # JuliaFormatter — local hook (no published pre-commit repo). Mirrors
+  # the .github/workflows/ci.yml `format` job: same scope (src/, test/),
+  # same .JuliaFormatter.toml. Rewrites files in place; pre-commit then
+  # aborts so you can re-stage the formatted diff.
+  - repo: local
+    hooks:
+      - id: julia-format
+        name: JuliaFormatter
+        entry: julia -e 'using JuliaFormatter; exit(format(ARGS) ? 0 : 1)'
+        language: system
+        files: '^(src|test)/.*\.jl$'
+        pass_filenames: true
