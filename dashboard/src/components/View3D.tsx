@@ -552,7 +552,6 @@ export function View3D({ run, data }: Props) {
           meta={snapMeta}
           snapIdx={snapIdx}
           onChange={setSnapIdx}
-          fps={10}
           loading={loading}
         />
       </CardContent>
