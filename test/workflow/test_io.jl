@@ -71,3 +71,40 @@ end
         rm(fname; force=true)
     end
 end
+
+@testset "_concat_dynamics_phases boundary dedup — snapshots align with times" begin
+    # Each dynamics phase produces (n+1)-length time series (incl. initial frame).
+    # Phase 2+ should drop its first frame to avoid duplicating the previous
+    # phase's last frame at the boundary. The dedup MUST apply to both the
+    # time-aligned scalar traces AND the psi_snapshots so the saved file's
+    # `dynamics/times` and `dynamics/psi_snapshots_streamed/n_snapshots`
+    # agree (frontend TimeScrubber relies on this).
+    function _fake_phase(n_frames::Int, t_start::Float64, dt::Float64)
+        times = collect(range(t_start, step=dt, length=n_frames))
+        norms = ones(Float64, n_frames)
+        mags = zeros(Float64, n_frames)
+        snaps = [ones(ComplexF64, 2, 2, 2, 3) for _ in 1:n_frames]
+        sim = SimulationResult(times, ones(Float64, n_frames), norms, mags, snaps)
+        (
+            dynamics_result=sim,
+            snapshot_tmp_path=nothing,
+            save_psi_snapshots=true,
+            snapshot_count=n_frames,
+            ensemble_result=nothing,
+        )
+    end
+    p1 = _fake_phase(5, 0.0, 0.1)   # times 0.0 .. 0.4
+    p2 = _fake_phase(6, 0.0, 0.05)  # times 0.0 .. 0.25, joins phase 1's end
+    p3 = _fake_phase(4, 0.0, 0.02)  # times 0.0 .. 0.06
+
+    out = SpinorBEC._concat_dynamics_phases([p1, p2, p3])
+    # First phase keeps all frames; subsequent drop first (boundary).
+    expected_n = 5 + (6 - 1) + (4 - 1)   # = 13
+    @test length(out[:times]) == expected_n
+    @test length(out[:norms]) == expected_n
+    @test length(out[:Fz]) == expected_n
+    # Snapshots must agree — this was the pre-2026-05-13 mismatch
+    # (snapshots used to skip the dedup and ended up 2 longer per phase
+    # boundary, e.g. 17 times vs 18 snapshots on eu151_edh_k3_compare).
+    @test length(out[:psi_snapshots]) == expected_n
+end

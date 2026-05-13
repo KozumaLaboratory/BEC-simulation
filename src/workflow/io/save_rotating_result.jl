@@ -107,20 +107,26 @@ function _concat_dynamics_phases(history::AbstractVector)
 
         # Pull snapshots from the scratch JLD2 if the phase streamed them
         # to disk; otherwise fall back to the in-memory Vector held by
-        # `dr.psi_snapshots`. The boundary-skip rule (`keep`) only applies
-        # to time-aligned scalar traces — snapshots are emitted on a
-        # `save_every` cadence and don't share endpoints between phases.
+        # `dr.psi_snapshots`. Apply the SAME boundary-skip rule as the
+        # time-aligned scalar traces above: phase pi > 1 drops its first
+        # snapshot because it is the same physical state as the previous
+        # phase's last snapshot. Without this the times / snapshots counts
+        # disagree (observed: eu151_edh_k3_compare had 17 times vs 18
+        # snapshots, causing TimeScrubber layout shift at the last frame).
+        snap_start = pi == 1 ? 1 : 2
         if phase.snapshot_tmp_path !== nothing && isfile(phase.snapshot_tmp_path)
             JLD2.jldopen(phase.snapshot_tmp_path, "r") do f
                 n = phase.snapshot_count
-                for s in 1:n
+                for s in snap_start:n
                     key = "frame_" * lpad(string(s), 5, '0')
                     haskey(f, key) || continue
                     push!(out[:psi_snapshots], f[key])
                 end
             end
         elseif !isempty(dr.psi_snapshots)
-            append!(out[:psi_snapshots], dr.psi_snapshots)
+            for s in snap_start:length(dr.psi_snapshots)
+                push!(out[:psi_snapshots], dr.psi_snapshots[s])
+            end
         end
 
         # TWA ensemble pass-through: record (phase_index, EnsembleResult) so
