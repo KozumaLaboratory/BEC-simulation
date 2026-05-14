@@ -46,10 +46,12 @@ function apply_auto_defaults!(data::Dict)
                 step isa AbstractDict || continue
                 length(keys(step)) == 1 || continue
                 key = first(keys(step))
+                # Only dynamics steps accept `epsilon` (rotating_basis path).
+                # Seeding into ground_state / analyze tripped the schema
+                # validator since those step schemas don't list `epsilon`.
+                key in ("dynamics", :dynamics) || continue
                 inner = step[key]
                 inner isa AbstractDict || continue
-                # rotating_basis dynamics consumes `epsilon`; other steps
-                # ignore the field. Seed only when missing.
                 haskey(inner, "epsilon") || (inner["epsilon"] = accuracy)
             end
         end

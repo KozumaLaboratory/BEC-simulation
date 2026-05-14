@@ -100,7 +100,13 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
             "soliton_bright", "soliton_dark", "skyrmion",
             "gaussian_wavepacket", "domain_wall", "two_packet",
             "chiral_spin_vortex", "magnetic_domain",
-            "vortex_lattice", "skyrmion_lattice"]),
+            "vortex_lattice", "skyrmion_lattice",
+            # `from_jld2`: load the initial ψ from a prior run's
+            # result.jld2 instead of seeding a Gaussian. Pair with
+            # `init_state_params: {path: ..., snap: last|N}`. Used to
+            # continue a long Klaus / EdH run beyond its original
+            # endpoint without re-running the spin-up phase.
+            "from_jld2"]),
     "backend" => FieldSpec(; type=String, default="cpu", enum=["cpu", "gpu"]),
     "target_magnetization" => FieldSpec(; type=Number),
     "temperature_ratio" => FieldSpec(; type=Number, range=(0.0, 1.0)),

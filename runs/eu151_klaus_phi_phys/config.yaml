@@ -1,0 +1,71 @@
+# ─────────────────────────────────────────────────────────────────────
+#  Eu151 Klaus magnetostir × phi_omega scan — Eu physics on (long)
+#
+#  Klaus protocol (tilt 35° → spinup 226 Hz → steady stir) with full
+#  Eu mean-field (c1 ≠ 0, DDI on, LHY scalar) at 32 × 32 × 16, 1 s
+#  steady stir per point.
+#
+#  Mixin layout: ALL interactions: keys live in the mixin (shallow
+#  merge clobbers per-key, so splitting N_atoms/omega_ref into the
+#  mixin and c1 into the step body would lose N_atoms+omega_ref).
+#  c1 = c_total · c1_ratio = 4689 · 0.028 ≈ 131.3 (Eu baseline from
+#  CLAUDE.md eu151_edh).
+# ─────────────────────────────────────────────────────────────────────
+
+units: {B: Gauss, t: ms}
+accuracy: 1.0e-6
+defaults: {kind: rotating_basis, backend: gpu}
+
+mixins:
+  eu151_klaus_phys:
+    atom: Eu151
+    interactions:
+      N_atoms: 60000
+      omega_ref: 314.159
+      c1: 131.3
+    grid: {n: [32, 32, 16], box: [20.0, 20.0, 10.0]}
+    potential: {type: harmonic, omega: ["50 Hz", "50 Hz", "130 Hz"]}
+    gauge_fix: false
+
+pipeline:
+  # GS in tilted-prep field. Eu mean-field on; DDI auto-derived from
+  # atom + N_atoms + omega_ref; LHY scalar.
+  - ground_state:
+      use: [eu151_klaus_phys]
+      B: {Bz: "0.819 Gauss"}
+      ddi: {enabled: true}
+      lhy: {kind: scalar}
+      init_m_idx: 1
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 1500
+      tol: 1.0e-9
+
+  # tilt 0 → 35° over 20 ms
+  - dynamics:
+      use: [eu151_klaus_phys]
+      duration: "20 ms"
+      B:
+        theta: {from: 0.0, to: 0.611, duration: "20 ms"}
+        phi: {rate: 0.0}
+
+  # spinup 0 → stir freq over 50 ms (chirp endpoint slaved by zip below)
+  - dynamics:
+      use: [eu151_klaus_phys]
+      duration: "50 ms"
+      B:
+        theta: 0.611
+        phi: {rate: {from: 0.0, to: 4.524, duration: "50 ms"}}
+
+  # steady stir 1 s — vortex-lattice evolution beyond formation timescale
+  - dynamics:
+      use: [eu151_klaus_phys]
+      duration: "1000 ms"
+      B:
+        theta: 0.611
+        phi: {rate: 4.524}
+
+scan:
+  zip:
+    pipeline.3.dynamics.B.phi.rate: [1.0, 2.0, 3.0, 4.524, 6.0, 8.0, 12.0, 18.0]
+    pipeline.2.dynamics.B.phi.rate.to: [1.0, 2.0, 3.0, 4.524, 6.0, 8.0, 12.0, 18.0]
