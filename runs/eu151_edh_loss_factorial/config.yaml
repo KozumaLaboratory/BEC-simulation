@@ -1,0 +1,95 @@
+# ─────────────────────────────────────────────────────────────────────
+#  Eu151 EdH × loss-channel factorial — orthogonality study
+#
+#  Goal: cleanly separate the contribution of K3 vs gamma_dr to the
+#  collapse-suppression seen in eu151_edh_K3_long. K3_long stayed
+#  stable for 14.5 ms but had THREE candidate suppression channels
+#  active simultaneously (LHY scalar, gamma_dr=0.02, K3=1e-41 m⁶/s).
+#  This 2×2 factorial varies K3 and gamma_dr while LHY stays scalar
+#  (the GS itself diverges without LHY at ε_dd ≈ 0.54).
+#
+#  Same 32³ × 10 ω⁻¹ (≈ 14.5 ms) Phase-2 hold as eu151_edh_K3_long so
+#  the four cells map onto the same Townes-collapse timescale.
+#
+#  Predictions:
+#    cell             | K3 | γ_dr | what we expect
+#    -----------------+----+-----+----------------------------------
+#    lhy_only         | 0  |   0 | Townes singularity at ~1.5 ms
+#                                  (per eu151_edh comment)
+#    gamma_dr_only    | 0  |0.02 | depletion only — does it survive?
+#    K3_only          |1e-41|  0 | K3 brake alone — survives?
+#    both             |1e-41|0.02 | K3_long: stable 14.5 ms (control)
+# ─────────────────────────────────────────────────────────────────────
+
+defaults:
+  kind:         spinor
+  backend:      gpu
+  interactions: {N_atoms: 10000, omega_ref: 691.15}
+
+mixins:
+  eu151_edh_phys:
+    atom:         Eu151
+    grid:         {n: [32, 32, 32], box: [20, 20, 20]}
+    potential:    {type: harmonic, omega: [1.0, 1.0, 1.182]}
+    interactions: {N_atoms: 10000, omega_ref: 691.15, c1_ratio: 0.0}
+
+pipeline:
+  # Phase 0: GS in tilted-prep field. LHY scalar always on (else GS
+  # diverges at ε_dd ≈ 0.54).
+  - ground_state:
+      use:           [eu151_edh_phys]
+      B:             {Bz: "0.01 Gauss"}
+      initial_state: m_plus_F
+      lhy: {kind: scalar}
+      n_steps:       3000
+      tol:           1.0e-9
+      dt:            0.005
+
+  # Phase 1: Zeeman quench Bz : 1.0 μT → 2.6 nT in 0.14 ω⁻¹ ≈ 0.20 ms.
+  - dynamics:
+      duration: 0.14
+      dt:       0.0005
+      B:        {Bz: {from: 0.01, to: 2.6e-5, duration: 0.14}}
+      save:     {every: 280}
+
+  # Phase 2: weak-field hold 10 ω⁻¹ ≈ 14.5 ms — the EdH-active phase.
+  # The `loss:` block is the scan target below; the line here is the
+  # default ("both" branch with K3 + gamma_dr).
+  - dynamics:
+      duration: 10.0
+      dt:       0.0001
+      B:        {Bz: "2.6e-5 Gauss"}
+      noise:
+        seed: 42
+        initial:
+          coherent: {amplitude: 1.0e-6, k_cut: 2.5}
+      loss:
+        gamma_dr: 0.02
+        K3_per_m_si:
+          ["1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s",
+           "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s",
+           "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s",
+           "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s",
+           "1.0e-41 m^6/s"]
+      save:     {every: 200}
+
+# 4-cell 2×2 factorial: K3 × gamma_dr at fixed LHY scalar.
+scan:
+  comparison_runs:
+    - name: lhy_only
+      override:
+        pipeline.2.dynamics.loss: false
+    - name: gamma_dr_only
+      override:
+        pipeline.2.dynamics.loss: {gamma_dr: 0.02}
+    - name: K3_only
+      override:
+        pipeline.2.dynamics.loss:
+          K3_per_m_si:
+            ["1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s",
+             "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s",
+             "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s",
+             "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s",
+             "1.0e-41 m^6/s"]
+    - name: both
+      override: {}     # use config as written

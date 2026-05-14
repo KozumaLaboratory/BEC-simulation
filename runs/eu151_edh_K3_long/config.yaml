@@ -1,0 +1,76 @@
+# ─────────────────────────────────────────────────────────────────────
+#  Eu151 EdH long hold × K_3 — does collapse get suppressed?
+#
+#  Companion to eu151_edh_k3_compare (0.3 ω⁻¹ A/B short test). Same 32³
+#  setup but Phase 2 extended to 10 ω⁻¹ (≈ 14.5 ms) so we can tell
+#  whether the K_3 collapse-mitigation holds out, just delays the
+#  Townes-like singularity, or fails.
+#
+#  K3 routing was fixed on 2026-05-13 (commit 6bfe9d9). K3_per_m_si
+#  now flows into LossParams.K3_per_m_cubic (quadratic-in-n true 3-body
+#  loss), not the legacy linear-in-n L3_per_m field. So this is the
+#  first proper test of "K3 suppresses Eu151 EdH collapse over Matsui
+#  timescales".
+#
+#  Setup matches eu151_edh_postfix_local 32³ for apples-to-apples
+#  comparison: scalar LHY + gamma_dr=0.02 + K3_per_m_si=1e-41 m^6/s
+#  (Dy164 order-of-magnitude proxy; Eu has no measured K_3 yet).
+# ─────────────────────────────────────────────────────────────────────
+
+defaults:
+  kind:         spinor
+  backend:      gpu
+  # N_atoms + omega_ref propagate into every step's `interactions:` so
+  # the K3_per_m_si SI conversion (n0=N/a_ho³, factor=n0²/ω_ref) has the
+  # inputs it needs at every dynamics phase.
+  interactions: {N_atoms: 10000, omega_ref: 691.15}
+
+mixins:
+  eu151_edh_phys:
+    atom:         Eu151
+    grid:         {n: [32, 32, 32], box: [20, 20, 20]}
+    potential:    {type: harmonic, omega: [1.0, 1.0, 1.182]}
+    interactions: {N_atoms: 10000, omega_ref: 691.15, c1_ratio: 0.0}
+
+pipeline:
+  # Phase 0: m = +F stretched ground state in the Matsui prep field
+  # B = 1.0 μT (= 0.01 Gauss). Scalar LHY for FM-polarized GS
+  # stabilisation near the dipolar instability boundary.
+  - ground_state:
+      use:           [eu151_edh_phys]
+      B:             {Bz: "0.01 Gauss"}
+      initial_state: m_plus_F
+      lhy: {kind: scalar}
+      n_steps:       3000
+      tol:           1.0e-9
+      dt:            0.005
+
+  # Phase 1: rapid Zeeman quench  Bz : 1.0 μT → 2.6 nT  in 0.14 ω⁻¹
+  # (≈ 0.20 ms). Numeric Gauss values: 0.01 → 2.6e-5 (ramp dicts can't
+  # carry unit strings).
+  - dynamics:
+      duration: 0.14
+      dt:       0.0005
+      B:        {Bz: {from: 0.01, to: 2.6e-5, duration: 0.14}}
+      save:     {every: 280}
+
+  # Phase 2: weak-field hold — the EdH-active phase.  Bz = 2.6 nT for
+  # 10 ω⁻¹ ≈ 14.5 ms (~7× the Townes-collapse timescale seen pre-fix
+  # at 1.5 ms). 100k steps at dt=1e-4, save every 200 → ~500 snapshots.
+  - dynamics:
+      duration: 10.0
+      dt:       0.0001
+      B:        {Bz: "2.6e-5 Gauss"}
+      noise:
+        seed: 42
+        initial:
+          coherent: {amplitude: 1.0e-6, k_cut: 2.5}
+      loss:
+        gamma_dr: 0.02
+        K3_per_m_si:
+          ["1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s",
+           "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s",
+           "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s",
+           "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s",
+           "1.0e-41 m^6/s"]
+      save:     {every: 200}

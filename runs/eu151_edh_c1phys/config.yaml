@@ -1,0 +1,52 @@
+# Eu151 Einstein-de Haas (EdH) — c1 = physical 0.003 ratio variant.
+#
+# Derived from runs/eu151_edh/config.yaml. Only difference: c1_ratio
+# 0.0 → 0.003 (= natural-estimate spin-mixing / contact ratio for Eu151;
+# the 7 unknown scattering channels per CLAUDE.md "¹⁵¹Eu" leave c1 in
+# the 1e-3 range as practical estimate. The 0.028 in
+# `eu151_lab_calibrated/config.yaml` was an exploratory upper-bound).
+#
+# With c1 ≠ 0 the spin sector evolves under both Larmor + spin-mixing
+# during the weak-field hold. Force-Gradient integrator (split_step_forcegrad!)
+# is diagonal-only and won't apply; standard path uses split_step! (Strang)
+# automatically. Y4-midpoint not exposed via YAML for kind: spinor.
+#
+# Fastest currently-runnable variant for EdH with physical c1.
+
+defaults:
+  kind:         spinor
+  backend:      gpu
+  interactions: {omega_ref: 691.15}
+
+mixins:
+  eu151_edh_phys:
+    atom:         Eu151
+    grid:         {n: [64, 64, 64], box: [20, 20, 20]}
+    potential:    {type: harmonic, omega: [1.0, 1.0, 1.182]}
+    interactions: {N_atoms: 10000, omega_ref: 691.15, c1_ratio: 0.003}  # natural Eu151 spin-mixing estimate
+
+pipeline:
+  - ground_state:
+      use:           [eu151_edh_phys]
+      B:             {Bz: "0.01 Gauss"}
+      initial_state: m_plus_F
+      lhy: {kind: scalar}
+      n_steps:       100000
+      tol:           1.0e-10
+      dt:            0.005
+
+  - dynamics:
+      duration: 0.14
+      dt:       0.0005
+      B:        {Bz: {from: 0.01, to: 2.6e-5, duration: 0.14}}
+      save:     {every: 280}
+
+  - dynamics:
+      duration: 1.0
+      dt:       0.0001
+      B:        {Bz: "2.6e-5 Gauss"}
+      noise:
+        seed: 42
+        initial:
+          coherent: {amplitude: 1.0e-6, k_cut: 2.5}
+      save:     {every: 200}
