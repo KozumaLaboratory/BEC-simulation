@@ -35,6 +35,14 @@
         "implementer": "1b2d2642fd83f1ce23a3e5f11fcbef7d",
         "researcher": "ebef72d5d2c50bc2d0536f96b74c2e42",
         "theorist": "142e3c7da92c34159ccc6a87b1082f4f"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 15710710,
+        "total": 15710710
       }
     }
   ],
