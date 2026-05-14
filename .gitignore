@@ -1,14 +1,17 @@
 # Loop infrastructure — selective tracking.
-# Most of .claude/ is machine-local (agent defs, scripts, settings, logs).
-# The scientific record (reports/, knowledge/) IS tracked so loop history
-# survives git operations and is auditable.
+# .claude/ is now ENTIRELY machine-local (agent defs, scripts, settings,
+# logs, and the orchestrator's own session DB). The loop's scientific
+# record was moved to `runs/_loop/` in commit
+# <fill-in-after-commit> because Claude Code's built-in sensitive-file
+# classifier blocks `.claude/reports/**` writes from spawned `claude -p`
+# sessions (the agents can't persist their outputs there).
 .claude/*
 .claude/projects/
-.claude/reports/_local/
 
-# Un-ignore the scientific record + state machine
-!.claude/reports/
-!.claude/knowledge/
+# Loop's scientific record lives at runs/_loop/ and is tracked by default
+# (no entry needed — runs/ is not blanket-ignored, just specific subpaths).
+# Lock files and per-machine scratch under _local/ are ignored:
+runs/_loop/_local/
 
 # Stray scratch notes occasionally dropped at repo root by tools / sessions.
 # Real plans live in docs/design/ or docs/research_notes/.
