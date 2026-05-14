@@ -11,14 +11,18 @@
 #  Same 32³ × 10 ω⁻¹ (≈ 14.5 ms) Phase-2 hold as eu151_edh_K3_long so
 #  the four cells map onto the same Townes-collapse timescale.
 #
-#  Predictions:
-#    cell             | K3 | γ_dr | what we expect
-#    -----------------+----+-----+----------------------------------
-#    lhy_only         | 0  |   0 | Townes singularity at ~1.5 ms
-#                                  (per eu151_edh comment)
-#    gamma_dr_only    | 0  |0.02 | depletion only — does it survive?
-#    K3_only          |1e-41|  0 | K3 brake alone — survives?
-#    both             |1e-41|0.02 | K3_long: stable 14.5 ms (control)
+#  Predictions (cell name encodes the (K3, γ_dr) factorial coord):
+#    cell           | K3   | γ_dr | what we expect
+#    ---------------+------+------+----------------------------------
+#    K3off_gdroff   |   0  |   0  | Townes singularity at ~1.5 ms
+#                                   (LHY scalar alone, eu151_edh)
+#    K3off_gdron    |   0  | 0.02 | depletion only — does it survive?
+#    K3on_gdroff    |1e-41 |   0  | K3 brake alone — survives?
+#    K3on_gdron     |1e-41 | 0.02 | K3_long: stable 14.5 ms (control)
+#
+#  The 4 cells span a 2×2 factorial in (K3, γ_dr); side-by-side norm
+#  + peak-density curves identify whether collapse-suppression is
+#  (a) K3 alone, (b) γ_dr alone, (c) both required.
 # ─────────────────────────────────────────────────────────────────────
 
 defaults:
@@ -73,16 +77,19 @@ pipeline:
            "1.0e-41 m^6/s"]
       save:     {every: 200}
 
-# 4-cell 2×2 factorial: K3 × gamma_dr at fixed LHY scalar.
+# 4-cell 2×2 factorial: (K3 × γ_dr) at fixed LHY scalar.
+# Cell names encode the binary factorial coord (off/on) of each
+# loss channel so the orthogonality structure is visible from the
+# output filenames alone.
 scan:
   comparison_runs:
-    - name: lhy_only
+    - name: K3off_gdroff      # (0, 0): LHY scalar alone
       override:
         pipeline.2.dynamics.loss: false
-    - name: gamma_dr_only
+    - name: K3off_gdron       # (0, 1): γ_dr only
       override:
         pipeline.2.dynamics.loss: {gamma_dr: 0.02}
-    - name: K3_only
+    - name: K3on_gdroff       # (1, 0): K3 only
       override:
         pipeline.2.dynamics.loss:
           K3_per_m_si:
@@ -91,5 +98,5 @@ scan:
              "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s",
              "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s",
              "1.0e-41 m^6/s"]
-    - name: both
-      override: {}     # use config as written
+    - name: K3on_gdron        # (1, 1): both — control = K3_long
+      override: {}            # use config as written
