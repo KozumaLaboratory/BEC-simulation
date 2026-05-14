@@ -1,70 +1,112 @@
-# Loop seed — Turn 2 (Phase 2 sanity, diversity check)
+# Loop seed — Turn 3 (Phase 2 sanity, compute_sympy infrastructure verification)
 
 ## Context
 
-Turn 0 (FG sign) and Turn 1 (representation invariance under spinor
-extension) both PASSed via free-Lie-algebra BCH argument. Turn 0 §5
-left three open threads:
+T0/T1/T2 closed the FG (Force-Gradient) sign / spinor-invariance /
+nonlinear-V branches of the Chin–Krotscheck 2005 4A correction work.
+The infrastructure for sympy-backed rational arithmetic
+(`compute_sympy` action, `compute_steps[]` directive field,
+`runs/_loop/sim/turn_N.md` §4 `compute_results[]`) was added 2026-05-15
+but never exercised in a real turn.
 
-- Q1: exact CK 2005 magnitude derivation route — closed in turn 1 §2.1
-  via explicit BCH on (1/6, 2/3, 1/6; 1/2, 1/2) weights.
-- Q2: **nonlinear GPE case** — V = V₀(r) + g|ψ|² depends on ψ itself.
-- Q3: v4 spinor extension — closed in turn 1.
+This turn's purpose: **exercise the compute_sympy path end-to-end on
+a trivial-but-load-bearing arithmetic** that will exit the loop with
+high probability and validate (i) the directive schema accepts
+`compute_steps`, (ii) the implementer's `run_sympy.py` invocation
+works under `uv run --with sympy python3` ephemeral install, (iii) the
+results appear in sim §4 `compute_results[]`, and (iv) judge.py
+accepts the result.
 
-## Turn 2 task
+## Turn 3 task
 
-Address Q2. Non-trivial because:
+The FG sign work pinned in T0 (commit `c589f8f`, test
+`test_force_gradient_wick_sign.jl`) and the spinor-invariance
+docstring pinned in T1 (commit `28966b2`, force_gradient.jl lines
+41-54) rest on **three arithmetic invariants** that, if violated,
+break the whole derivation:
 
-The turn 1 §2.2 free-Lie-algebra argument relied on V entering BCH
-as an *opaque symbol* in `Lie(T, V)`. For nonlinear V = V₀(r) + g|ψ|²,
-this assumption needs scrutiny:
+(I1) Wick rotation: $(i \cdot dt)^2 = -dt^2$.
+     Equivalently: $i^2 = -1$.
 
-- During an infinitesimal step dt, V evolves as ψ does — V is not
-  constant in the BCH bookkeeping.
-- The double commutator [V,[T,V]] involves ∇|ψ|² ~ ∇ψ⋆∇ψ + c.c.
-- BCH typically assumes constants; nonlinear V brings ∂_tV terms.
+(I2) Chin 4A slot weight relation: $(2/3) \cdot (1/48) = 1/72$.
+     This bridges the production code's $\alpha_2 = -1/48$
+     coefficient (on $\tilde V$) to the bench's $\alpha_3 = -1/72$
+     coefficient (on the FG exponent gate).
 
-Possible outcomes (decide which):
-1. **Coefficient survives unchanged**: α₂ = -1/48 still cancels the
-   leading [V,[T,V]] residual. Order stays 4. The ψ-dependence of V
-   contributes only at O(dt⁴) or higher (within the existing
-   residual envelope).
-2. **Coefficient modified**: α₂ shifts by something like
-   g·⟨ψ|...|ψ⟩ / something. New explicit correction term required.
-3. **Order degrades**: BCH cancellation fails; net order drops
-   from 4 to 3 for nonlinear V. (This would be a real problem for
-   GPE applications.)
+(I3) Symmetric palindromic Strang sum: $2 \cdot (1/6) + 2/3 = 1$.
+     I.e. the outer V-slot weights $a_o = 1/6$ at each end plus the
+     middle V-slot weight $a_m = 2/3$ exactly partition unity.
 
-Anchor argument: at any fixed ψ snapshot, V is a fixed operator and
-the turn-1 argument applies. The question is whether the rate of V's
-change during one dt step introduces O(dt^k) terms for k ≤ 3 that
-disrupt the cancellation.
+You MUST use sympy via the new `compute_sympy` infrastructure to
+verify each of I1, I2, I3 as a `compute_steps[]` entry. (These are
+trivial sympy exercises — the point is to exercise the path, not to
+discover anything new. The "discovery" is the schema's first
+successful use.)
 
-Useful approach: write
-$V(t) = V_0 + V_1(t)$ with $V_1 = g|\psi(t)|^2$, expand
-$\partial_t V_1 = g \partial_t |\psi|^2 \sim g\,\nabla\cdot j$
-(continuity); plug into the BCH "extended for time-dependent
-operators" (e.g. Magnus expansion); check what order the new terms
-enter.
+In §2 of your report, walk through *why* each invariant is necessary
+for the FG sign result:
 
-Reference: CK 2005 §IV explicitly addresses the GP case; Chin 1997
-PRE 55 6841 also has the nonlinear treatment. If unavailable in
-WebFetch, `<RESEARCH_NEEDED>` is appropriate.
+- I1 is the Wick rotation sign flip — without it, real-time α stays
+  positive and the FG correction acts in the wrong direction.
+- I2 is the bridging identity — without it, the bench's empirical
+  $-1/72$ and production's $-1/48$ would look unrelated and the
+  representation-invariance proof from T1 §2.3 would lack its
+  factorization step.
+- I3 is what makes the 5-stage Chin 4A composition a normalized
+  partition of dt — without it, the BCH expansion in T1 §2.1 has the
+  wrong leading-order $-i\,dt\,(T+V)$ term and the entire residual
+  count is off.
 
-## Phase 2 sanity continuation
+In §0 declare your convention (Wick direction, slot weight notation,
+sign of $\beta_C$).
 
-Turn 2 of the post-restructure sanity sequence. Expected directive:
-`analyze_existing` or `modify_code` (no new experiments — the bench
-isn't well-suited for isolating the nonlinear correction in this
-regime). 
+In §8 (Publishability), the right answer is `Out of scope —
+infrastructure-verification turn.` This is not a publishable physics
+finding; it's an architecture sanity test.
 
-`force_critic: false` — standard PASS path.
+## Expected directive
+
+A SINGLE `modify_code` directive with `compute_steps[]` populated (3
+entries). The implementer:
+1. Runs each sympy step via `run_sympy.py` → captures results into
+   sim §4 `compute_results[]`.
+2. Adds a 3-line "verified arithmetic invariants" docstring block to
+   `src/hamiltonian/integrator/force_gradient.jl` (above the existing
+   line 41 invariance note from T1), each line citing the verified
+   identity:
+   ```
+   # Verified arithmetic invariants (turn_3 compute_sympy):
+   #   I1: (i*dt)^2 = -dt^2  ← Wick rotation sign flip
+   #   I2: (2/3)*(1/48) = 1/72  ← α_2 ↔ α_3 bridging identity
+   #   I3: 2*(1/6) + 2/3 = 1  ← Chin 4A weight partition of unity
+   ```
+3. Runs the existing regression test `test_force_gradient_wick_sign.jl`
+   (must still 18/18 PASS — the new docstring doesn't touch line 267).
+4. `tests_passed: true` in §4 metrics, all 3 compute_results status:
+   "OK".
 
 ## Stop conditions
 
-- Judge PASS → state advances to turn 3, ready for sustained Phase 2.
-- Judge FAIL_PHYSICS or SUSPICIOUS_NOVEL → halt + anko review.
-- noop is acceptable if theorist concludes the question cannot be
-  settled in 1 turn without simulation or extensive literature work.
-- `<RESEARCH_NEEDED>` emission is encouraged if CK 1997 / 2005 are
-  the load-bearing references — researcher dispatch is in scope.
+- All 3 sympy steps OK + tests pass + judge PASS → state advances to
+  turn 4, infrastructure validated, future turns can use compute_sympy
+  for non-trivial rational coefficient derivations (e.g. F=6 I_h LHY
+  closed form per the user's exemplar Round 2 deliverable).
+- Any sympy step FAILED/TIMEOUT → investigate `run_sympy.py` or
+  `uv run --with sympy` setup. Halt + diagnose.
+- Test regression → revert immediately; the docstring change must be
+  truly cosmetic.
+
+`force_critic: false` — trivial arithmetic doesn't need critic review.
+
+## Why this is a good first compute_sympy turn
+
+- Result is **mathematically certain** (1/2 + 1/2 = 1 level): no
+  physics uncertainty obscures whether the infra works.
+- Result is **mechanically simple**: 3 one-line sympy expressions
+  (e.g. `from sympy import *; print(Rational(2,3) * Rational(1,48))`).
+- Result has **realistic physical context**: ties to existing FG work,
+  not pure dummy math.
+- Result is **falsifiable trivially**: each fact has a known answer,
+  any deviation = infrastructure bug.
+- Cost is **bounded**: 3 sympy calls × ~5 sec each = ~15 sec
+  compute overhead, total turn ≤ same as T1/T2 (~12 min wall).
