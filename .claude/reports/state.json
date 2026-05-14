@@ -1,0 +1,22 @@
+{
+  "turn": 1,
+  "status": "running",
+  "retries": 0,
+  "history": [
+    {
+      "turn": 0,
+      "ts": "2026-05-14T16:35:00+00:00",
+      "judge_status": "PASS",
+      "directive_action": "modify_code",
+      "directive_label": "fg-wick-sign-regression",
+      "wall_time_sec": 0.1,
+      "commit": "c589f8f",
+      "branch": "auto/turn_0_fg-wick-sign-regression"
+    }
+  ],
+  "created_at": "2026-05-14T00:00:00+00:00",
+  "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
+  "phase": "phase1",
+  "launched_at": "2026-05-14T16:30:00+00:00",
+  "last_judge": "PASS"
+}
