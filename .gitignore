@@ -1,4 +1,15 @@
-.claude
+# Loop infrastructure — selective tracking.
+# Most of .claude/ is machine-local (agent defs, scripts, settings, logs).
+# The scientific record (reports/, knowledge/) IS tracked so loop history
+# survives git operations and is auditable. See docs/loop_architecture.md.
+.claude/*
+.claude/projects/
+.claude/reports/turn_logs/
+.claude/reports/_local/
+
+# Un-ignore the scientific record + state machine
+!.claude/reports/
+!.claude/knowledge/
 
 # Stray scratch notes occasionally dropped at repo root by tools / sessions.
 # Real plans live in docs/design/ or docs/research_notes/.
