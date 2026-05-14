@@ -1,50 +1,60 @@
-# Loop seed — Turn 0
+# Loop seed — Turn 1 (Phase 2 sanity)
 
-This is the initial seed for the autonomous research loop, written
-by anko as the first turn's task brief.
+## Context
 
-## Context built up by Phase 0
+Turn 0 closed the FG sign question (α₂ = -1/48, α₃ = -1/72, both
+forms reconciled, regression test pinned). Turn 0 §5 Open Questions
+left three threads:
 
-The Phase 0 calibration runs (both `phase0_test.md` and the v2 re-run
-`phase0_test_v2.md`) established:
+- Q1: exact CK 2005 placement convention (low priority — sign
+  result is independent of magnitude derivation route)
+- Q2: nonlinear GPE case where V = V₀ + g|ψ|² depends on ψ
+  itself — does the BCH argument transfer cleanly?
+- Q3: v4 spinor extension — does α₃ = -1/72 survive when V is
+  matrix-valued (V_SM = c₁·m·F)? §2.3's BCH algebra is
+  dimension-blind so the answer is **plausibly yes, no change**.
 
-- The Chin–Krotscheck force-gradient correction sign flips under
-  Wick rotation: imaginary-time +Δτ²/48 → real-time −dt²/48 in the
-  Ṽ form.
-- There are **two coefficient conventions in circulation**:
-  - α₂ = −1/48 on the modified potential Ṽ_real = V + α₂·dt²·[V,[T,V]]
-  - α₃ = −1/72 on the exponent of the middle-slot correction
-    operator at weight w = 2/3 (Algorithm 4A form)
-  - Map: α₃ = w·α₂ = (2/3)·(−1/48) = −1/72.
-- The project memory `gotcha_fg_correction_sign_wick_rotation.md`
-  records that `scripts/bench/track_c_v4_a11_alpha_sweep.jl`
-  performs an α sweep on autonomous F=1 Chin 4A and observes that
-  only one specific α value collapses to the F64 floor (~1e-12).
+## Turn 1 task
 
-## Turn 0 task
+Address Q3. The §2.3 argument relied only on commutator algebra
+that doesn't reference whether [V,T] components are scalars or
+matrices. Confirm by either:
 
-Verify which of the two conventions (α₂ = −1/48 vs α₃ = −1/72) is
-actually used in `scripts/bench/track_c_v4_a11_alpha_sweep.jl`.
-Determine whether the codebase elsewhere (e.g. `src/hamiltonian/`)
-implements the FG correction with the same convention or with the
-other. If there is a mismatch — i.e. the bench tests one convention
-but production code uses the other — that is a load-bearing finding
-and should be surfaced explicitly.
+- Symmetry argument: explicitly check that the BCH expansion
+  coefficients (-1/24, +1/12) are basis-independent on the spinor
+  index. They should be — they come from the structure of the
+  symmetric Strang factorisation, not from V's specific form.
+- Spot-check: read `src/hamiltonian/integrator/force_gradient.jl`
+  and the v4 prototype path to see whether the existing α₃ = -1/72
+  is referenced or re-derived for spinor V.
 
-## Constraints on this turn
+Expected directive: either `analyze_existing` (no new code, just a
+note) or `modify_code` (add a docstring/comment locking in the
+α₃ = -1/72 invariance under spinor extension). Time budget ≤ 5 min
+implementer wall-clock. No `run_experiment` this turn.
 
-- **No new experiments.** This is a code-reading and small-test
-  turn. The directive issued should be `action: "analyze_existing"`
-  or `action: "modify_code"` (add a regression test asserting the
-  observed convention), not `run_experiment`.
-- **Time budget**: ≤ 5 minutes of implementer wall-clock. No GPU
-  required.
-- **Falsification criterion** should be concrete and machine-
-  checkable (e.g. "the rational literal `1/72` appears in the bench
-  with explicit Wick-rotation sign tracking").
+## Phase 2 sanity context
 
-## Stop conditions for this turn
+This is the first turn after the pass-3 audit lands. The new infra
+to exercise:
 
-- Judge emits PASS → turn 1 receives free rein for next direction.
-- Judge emits FAIL_PHYSICS or SUSPICIOUS_NOVEL → halt for anko review.
-- Implementer emits REJECTED → halt; theorist directive was too vague.
+- `Tier-1 A` state.json flock (Step 6a)
+- `Tier-1 B` judge.py crash handling (try/except)
+- `Tier-1 D` per-turn timeout (loop.sh `timeout 1200`)
+- `Tier-1 E` <RESEARCH_NEEDED> regex narrow (extract_research_queries.py)
+- `Tier-2 G` tokens_used patching (extract_turn_tokens.py post-step)
+- `Tier-2 H` agent .md hash capture (Step 0d)
+- `Tier-2 K` force_critic seed flag — NOT used this turn (no flag below)
+- `Tier-4 R` directive.action enum validation (Step 3b)
+
+A noop directive is acceptable if you genuinely have nothing to say.
+This is sanity, not science.
+
+## Stop conditions
+
+- Judge PASS → state advances to turn 2, ready for Phase 2 sustained.
+- Judge FAIL_* or REJECTED → halt + review.
+- judge_status NOOP → also acceptable; advance to turn 2.
+
+(No `force_critic: true` flag this turn — let the standard PASS
+path run cleanly.)
