@@ -1,5 +1,5 @@
 {
-  "turn": 3,
+  "turn": 4,
   "status": "running",
   "retries": 0,
   "history": [
@@ -57,6 +57,30 @@
         "implementer": "1b2d2642fd83f1ce23a3e5f11fcbef7d",
         "researcher": "ebef72d5d2c50bc2d0536f96b74c2e42",
         "theorist": "142e3c7da92c34159ccc6a87b1082f4f"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 11865517,
+        "total": 11865517
+      }
+    },
+    {
+      "turn": 3,
+      "ts": "2026-05-14T21:26:18+00:00",
+      "judge_status": "PASS",
+      "directive_action": "modify_code",
+      "directive_label": "compute-sympy-infra-verify",
+      "wall_time_sec": 35.0,
+      "commit": "6352726",
+      "branch": "auto/turn_3_compute-sympy-infra-verify",
+      "agent_hashes": {
+        "critic": "517f7ca0fbb994ee3a350df682aaaa38",
+        "implementer": "5c459d024cff21637490e83b437a753e",
+        "researcher": "ebef72d5d2c50bc2d0536f96b74c2e42",
+        "theorist": "464b7ef19e141ac91490843df646d460"
       }
     }
   ],
@@ -69,8 +93,8 @@
   "schema_version": 1,
   "current_agent_hashes": {
     "critic": "517f7ca0fbb994ee3a350df682aaaa38",
-    "implementer": "1b2d2642fd83f1ce23a3e5f11fcbef7d",
+    "implementer": "5c459d024cff21637490e83b437a753e",
     "researcher": "ebef72d5d2c50bc2d0536f96b74c2e42",
-    "theorist": "142e3c7da92c34159ccc6a87b1082f4f"
+    "theorist": "464b7ef19e141ac91490843df646d460"
   }
 }

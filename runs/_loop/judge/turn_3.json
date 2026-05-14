@@ -1,0 +1,52 @@
+{
+  "turn": 3,
+  "status": "PASS",
+  "issues": [],
+  "metrics": {
+    "experiment_kind": "modify_only",
+    "norm_initial": null,
+    "norm_final": null,
+    "norm_drift": null,
+    "energy_initial": null,
+    "energy_final": null,
+    "energy_monotonic": null,
+    "mz_target": null,
+    "mz_final": null,
+    "fitted_order": null,
+    "fit_dt_range": null,
+    "fit_r_squared": null,
+    "wall_time_sec": 35.0,
+    "peak_memory_gb": null,
+    "tests_passed": true,
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "total": null
+    },
+    "warnings": [],
+    "physical_red_flags": [],
+    "falsification_result": "CONFIRMED",
+    "compute_results": [
+      {
+        "id": "S1",
+        "task": "I1: Wick rotation sign flip \u2014 verify (i*dt)^2 simplifies to -dt^2, equivalently i^2 = -1.",
+        "status": "OK",
+        "result": "-1"
+      },
+      {
+        "id": "S2",
+        "task": "I2: alpha_2 <-> alpha_3 bridging identity \u2014 verify Rational(2,3) * Rational(1,48) = Rational(1,72).",
+        "status": "OK",
+        "result": "1/72"
+      },
+      {
+        "id": "S3",
+        "task": "I3: Chin 4A V-slot weight partition of unity \u2014 verify 2*Rational(1,6) + Rational(2,3) = 1.",
+        "status": "OK",
+        "result": "1"
+      }
+    ]
+  }
+}
