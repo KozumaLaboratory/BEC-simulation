@@ -133,7 +133,17 @@ Testset 2 — bench alpha_factors (8 tests):
     "researcher": null,
     "implementer": null,
     "critic": null,
-    "total": null
+    "orchestrator": 7658029,
+    "total": 7658029,
+    "effective_full_rate": 1155181,
+    "breakdown": {
+      "input_fresh": 11124,
+      "cache_creation": 287689,
+      "cache_read": 7349313,
+      "output": 9903
+    },
+    "n_messages": 85,
+    "n_message_starts": 85
   },
   "warnings": [],
   "physical_red_flags": [],
@@ -141,19 +151,19 @@ Testset 2 — bench alpha_factors (8 tests):
   "compute_results": [
     {
       "id": "S1",
-      "task": "I1: Wick rotation sign flip — verify (i*dt)^2 simplifies to -dt^2, equivalently i^2 = -1.",
+      "task": "I1: Wick rotation sign flip \u2014 verify (i*dt)^2 simplifies to -dt^2, equivalently i^2 = -1.",
       "status": "OK",
       "result": "-1"
     },
     {
       "id": "S2",
-      "task": "I2: alpha_2 <-> alpha_3 bridging identity — verify Rational(2,3) * Rational(1,48) = Rational(1,72).",
+      "task": "I2: alpha_2 <-> alpha_3 bridging identity \u2014 verify Rational(2,3) * Rational(1,48) = Rational(1,72).",
       "status": "OK",
       "result": "1/72"
     },
     {
       "id": "S3",
-      "task": "I3: Chin 4A V-slot weight partition of unity — verify 2*Rational(1,6) + Rational(2,3) = 1.",
+      "task": "I3: Chin 4A V-slot weight partition of unity \u2014 verify 2*Rational(1,6) + Rational(2,3) = 1.",
       "status": "OK",
       "result": "1"
     }

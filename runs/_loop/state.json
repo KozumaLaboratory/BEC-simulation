@@ -81,7 +81,25 @@
         "implementer": "5c459d024cff21637490e83b437a753e",
         "researcher": "ebef72d5d2c50bc2d0536f96b74c2e42",
         "theorist": "464b7ef19e141ac91490843df646d460"
-      }
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 7658029,
+        "total": 7658029,
+        "effective_full_rate": 1155181,
+        "breakdown": {
+          "input_fresh": 11124,
+          "cache_creation": 287689,
+          "cache_read": 7349313,
+          "output": 9903
+        },
+        "n_messages": 85,
+        "n_message_starts": 85
+      },
+      "parent": "82b82cbe2dfd"
     }
   ],
   "created_at": "2026-05-14T00:00:00+00:00",
