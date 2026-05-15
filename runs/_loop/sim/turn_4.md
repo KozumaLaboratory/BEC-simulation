@@ -118,7 +118,17 @@ Existing 26 channels (F=3,4,6,8,10): not modified, all still pass (no edit to th
     "researcher": null,
     "implementer": null,
     "critic": null,
-    "total": null
+    "orchestrator": 10621259,
+    "total": 10621259,
+    "effective_full_rate": 1740164,
+    "breakdown": {
+      "input_fresh": 36079,
+      "cache_creation": 488600,
+      "cache_read": 10079503,
+      "output": 17077
+    },
+    "n_messages": 101,
+    "n_message_starts": 101
   },
   "warnings": [],
   "physical_red_flags": [],

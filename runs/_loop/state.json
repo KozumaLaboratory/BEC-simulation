@@ -114,7 +114,27 @@
         "implementer": "5c459d024cff21637490e83b437a753e",
         "researcher": "ebef72d5d2c50bc2d0536f96b74c2e42",
         "theorist": "464b7ef19e141ac91490843df646d460"
-      }
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 10621259,
+        "total": 10621259,
+        "effective_full_rate": 1740164,
+        "breakdown": {
+          "input_fresh": 36079,
+          "cache_creation": 488600,
+          "cache_read": 10079503,
+          "output": 17077
+        },
+        "n_messages": 101,
+        "n_message_starts": 101
+      },
+      "branch": "auto/turn_4_lemma1-f14-extension",
+      "commit": "be6a472",
+      "parent": "7888def9ceee"
     }
   ],
   "created_at": "2026-05-14T00:00:00+00:00",
