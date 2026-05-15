@@ -1,6 +1,6 @@
 {
-  "turn": 5,
-  "status": "running",
+  "turn": 6,
+  "status": "halted",
   "retries": 0,
   "history": [
     {
@@ -135,13 +135,25 @@
       "branch": "auto/turn_4_lemma1-f14-extension",
       "commit": "be6a472",
       "parent": "7888def9ceee"
+    },
+    {
+      "turn": 5,
+      "ts": "2026-05-15T01:00:00Z",
+      "judge_status": "RESEARCHER_ONLY",
+      "directive_action": "researcher",
+      "directive_label": "lhy-imaginary-mode-convention-audit",
+      "wall_time_sec": 600,
+      "subagent": "researcher",
+      "output": "runs/_loop/research/turn_5.md (205 lines, 8 refs, F=6 polar 3000x bug mechanism identified)",
+      "commit": null,
+      "branch": null
     }
   ],
   "created_at": "2026-05-14T00:00:00+00:00",
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "PASS",
+  "last_judge": "RESEARCHER_ONLY",
   "home_branch": "main",
   "schema_version": 1,
   "current_agent_hashes": {
@@ -150,5 +162,6 @@
     "implementer": "5c459d024cff21637490e83b437a753e",
     "researcher": "ebef72d5d2c50bc2d0536f96b74c2e42",
     "theorist": "464b7ef19e141ac91490843df646d460"
-  }
+  },
+  "last_error": "memory pressure - manually halted"
 }
