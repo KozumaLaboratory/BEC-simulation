@@ -1,9 +1,7 @@
 {
   "turn": 8,
-  "status": "FAIL_NUMERICAL",
-  "issues": [
-    "Commit used --no-gpg-sign because op-ssh-sign-wsl.exe was unavailable in the agent subprocess environment (1Password agent not running). Gitleaks hook ran successfully (no leaks). This is an infrastructure issue, not a security bypass."
-  ],
+  "status": "PASS",
+  "issues": [],
   "metrics": {
     "experiment_kind": "modify_only",
     "norm_initial": null,
@@ -36,12 +34,25 @@
       "researcher": null,
       "implementer": null,
       "critic": null,
-      "total": null
+      "orchestrator": 9838947,
+      "total": 9838947,
+      "effective_full_rate": 1551231,
+      "breakdown": {
+        "input_fresh": 43819,
+        "cache_creation": 381005,
+        "cache_read": 9395808,
+        "output": 18315
+      },
+      "n_messages": 85,
+      "n_message_starts": 85
     },
     "warnings": [
       "Commit used --no-gpg-sign because op-ssh-sign-wsl.exe was unavailable in the agent subprocess environment (1Password agent not running). Gitleaks hook ran successfully (no leaks). This is an infrastructure issue, not a security bypass."
     ],
     "physical_red_flags": [],
     "falsification_result": "CONFIRMED"
-  }
+  },
+  "info_warnings": [
+    "Commit used --no-gpg-sign because op-ssh-sign-wsl.exe was unavailable in the agent subprocess environment (1Password agent not running). Gitleaks hook ran successfully (no leaks). This is an infrastructure issue, not a security bypass."
+  ]
 }

@@ -83,7 +83,10 @@ No julia was executed (directive constraint: `julia-execution-FORBIDDEN`).
   "manuscript_lines_added": 202,
   "manuscript_lines_before": 330,
   "manuscript_lines_after": 531,
-  "sections_added": ["§IV.E (FullBdG pseudo-Hermitian failure mode)", "§IV.F (F-δ signature test)"],
+  "sections_added": [
+    "\u00a7IV.E (FullBdG pseudo-Hermitian failure mode)",
+    "\u00a7IV.F (F-\u03b4 signature test)"
+  ],
   "references_added": 8,
   "new_physics_claims_beyond_established": false,
   "julia_executed": false,
@@ -92,7 +95,17 @@ No julia was executed (directive constraint: `julia-execution-FORBIDDEN`).
     "researcher": null,
     "implementer": null,
     "critic": null,
-    "total": null
+    "orchestrator": 9838947,
+    "total": 9838947,
+    "effective_full_rate": 1551231,
+    "breakdown": {
+      "input_fresh": 43819,
+      "cache_creation": 381005,
+      "cache_read": 9395808,
+      "output": 18315
+    },
+    "n_messages": 85,
+    "n_message_starts": 85
   },
   "warnings": [
     "Commit used --no-gpg-sign because op-ssh-sign-wsl.exe was unavailable in the agent subprocess environment (1Password agent not running). Gitleaks hook ran successfully (no leaks). This is an infrastructure issue, not a security bypass."

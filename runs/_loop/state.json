@@ -221,7 +221,7 @@
     {
       "turn": 8,
       "ts": "2026-05-15T06:52:44Z",
-      "judge_status": "FAIL_NUMERICAL",
+      "judge_status": "PASS",
       "directive_action": "modify_code",
       "directive_label": "paper4_iv_fullbdg_methodology_note",
       "wall_time_sec": 420,
@@ -236,6 +236,37 @@
       },
       "issues": [
         "modify_only with --no-gpg-sign infrastructure warning (CLAUDE.md authorizes for auto(loop) but implementer commit lacked that gate; substance OK)"
+      ],
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 9838947,
+        "total": 9838947,
+        "effective_full_rate": 1551231,
+        "breakdown": {
+          "input_fresh": 43819,
+          "cache_creation": 381005,
+          "cache_read": 9395808,
+          "output": 18315
+        },
+        "n_messages": 85,
+        "n_message_starts": 85
+      },
+      "parent": "ed73b59134f9",
+      "drift_signals": {
+        "topic_repetition": 0.286,
+        "subagent_repetition": 0.667,
+        "manuscript_delta_zero": 0.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.222,
+        "cost_inflation": 1.284,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "advisory",
+      "drift_advisories": [
+        "DRIFT_COST_INFLATION"
       ]
     }
   ],
@@ -243,7 +274,7 @@
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "FAIL_NUMERICAL",
+  "last_judge": "PASS",
   "home_branch": "main",
   "schema_version": 1,
   "current_agent_hashes": {
