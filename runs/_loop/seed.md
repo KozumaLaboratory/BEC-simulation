@@ -1,54 +1,60 @@
-# Loop seed — 2026-05-15 morning session (director-autonomous)
+# Loop seed — 2026-05-15 morning, light-mode (Julia parallel sweep running)
 
-## Anko's stated goal (2026-05-15 07:30 JST)
+## Hard memory constraint (active this session)
+
+Anko's Klaus phi-magnetostir sweep is running 4 julia processes
+in parallel (~18 GB RAM used). The loop MUST NOT spawn additional
+julia processes — would push memory to OOM and crash the sweep.
+
+**Director MUST NOT dispatch**:
+- `implementer` for `run_experiment` (spawns julia)
+- `implementer` for `modify_code` if the directive includes
+  running `julia --project=. -e ...` or `Pkg.test()` to verify
+  the change (analytical / regex / sympy verification is fine)
+- `implementer` for `analyze_existing` if the analyzer is a
+  julia script
+
+**Director MAY dispatch**:
+- `researcher` — WebFetch / WebSearch / Read only, ~100 MB
+- `theorist` — Read / Grep / Glob / WebFetch / Write only
+- `implementer` for text-only `modify_code` (docstring, comment,
+  manuscript section) with NO julia execution to verify
+- `implementer` for `compute_sympy` via `uv run --with sympy`
+  (~100 MB python)
+- `critic` — Read only
+- `noop` — when no julia-safe move has leverage
+
+If the director would naturally choose implementer-with-julia, it
+MUST instead pick noop or switch to researcher/theorist/critic.
+
+## Goal continuation
+
+Anko's stated goal (still active):
 
 > 研究が最も進む方向性はどれかを考えた上で理論を詰める。
-> 盲目に理論をやらない。さまざまな論文を読んだり verify したり、
-> まだ実装してない効果を入れたりとかそういうのを総合的に考えて試してほしい。
+> 盲目に理論をやらない。様々な論文を読んだり verify したり、
+> まだ実装してない効果を入れたりとかそういうのを総合的に考えて。
 
-Translation: "After considering which direction advances the research
-most, drill into theory. Don't do theory blindly. Read papers, verify
-implementation, add unimplemented effects — think comprehensively and
-try."
+Translation: pick direction that advances research most; verify
+implementation against papers; identify unimplemented effects.
 
-## Director freedom this session
+## T5 left a concrete next-turn pointer
 
-This seed deliberately **does not specify a single turn's task**.
-Director picks autonomously each turn from:
+T5 (researcher, completed before halt) recommended:
 
-- **Verification gaps** (physics in code vs published reference)
-- **Physics gaps** (effects derived but not implemented)
-- **Code gaps** (known bugs / refactor / smell)
-- **Manuscript gaps** (chapters / sections / forward citations)
-- **Infra gaps** (loop architecture, untested paths)
+> Implementer adds fraction-of-unstable-modes gate to
+> `src/hamiltonian/interactions/lhy/dispatch.jl` line 231 area,
+> with @warn directing F=6 polar users to closed-form
+> `PolarContactLHY`. Citable refs: Lima-Pelster 2011/2012,
+> Petrov 2015, Zhang 2023.
 
-T4 (Lemma 1 F=14 extension) was a successful first director-driven
-turn — pivoted from FG/theorist sequence to manuscript-extending
-implementer work. Continue that pattern: each turn, pick the
-highest-leverage move from project state.
+This is exactly the implementer-with-julia case the constraint
+above forbids. Director should defer this to **post-Julia-sweep**
+and pick something else this turn — e.g. extend T5's literature
+audit, or critic-audit T5's Nambu-doubling mechanism explanation,
+or theorize about the closed-form `phi_1_reg` properties.
 
-## Constraints
+## Stop conditions
 
-- `force_critic: false` (default; director can dispatch critic on its
-  own judgment).
-- Time/cost: ≤ 15 min wall, ≤ 3M effective tokens per turn (cost cap).
-- Stuck check (4/5 consecutive FAIL → auto-halt) is the safety net.
-- If 3 consecutive turns dispatch the SAME subagent type without
-  closing a bottleneck, director should rotate routes (§B4).
-
-## What "good" looks like over a multi-turn session
-
-- Each turn advances at least one of: manuscript section, capability,
-  verification, bug-resolution.
-- Token spend per turn: ≤ 2M effective typical.
-- No more than 2 consecutive theorist-only turns (rotation rule).
-- At least one researcher dispatch within 5 turns (Phase 2 D2
-  exercise gap).
-- Critic dispatched only when load-bearing claim is paper-scale.
-
-## What director should NOT do
-
-- Re-run theorist on already-settled FG questions (T0-T3 closed).
-- Dispatch implementer for noise/cosmetic edits without bottleneck rationale.
-- Launch a `run_experiment` with ≥ 1 hour wall time (cost cap risk).
-- Skip the §5 calibrated progress check (must articulate what's on/off track).
+Same as previous seed: cost cap 3M effective, consecutive-fail 4/5,
+no more than 2 same-subagent in a row.
