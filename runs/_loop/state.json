@@ -199,7 +199,24 @@
       },
       "branch": "auto/turn_7_fullbdg-F6-mechanism-note",
       "commit": "6f92776",
-      "parent": "2e00d1c"
+      "parent": "2e00d1cd2c5c",
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 6718365,
+        "total": 6718365,
+        "effective_full_rate": 962627,
+        "breakdown": {
+          "input_fresh": 15498,
+          "cache_creation": 163334,
+          "cache_read": 6521368,
+          "output": 18165
+        },
+        "n_messages": 40,
+        "n_message_starts": 40
+      }
     }
   ],
   "created_at": "2026-05-14T00:00:00+00:00",

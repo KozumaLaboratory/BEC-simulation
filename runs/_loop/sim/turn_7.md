@@ -97,7 +97,17 @@ NOTE: `falsification_criterion` requires a post-sweep julia run (F-δ signature 
     "researcher": null,
     "implementer": null,
     "critic": null,
-    "total": null
+    "orchestrator": 6718365,
+    "total": 6718365,
+    "effective_full_rate": 962627,
+    "breakdown": {
+      "input_fresh": 15498,
+      "cache_creation": 163334,
+      "cache_read": 6521368,
+      "output": 18165
+    },
+    "n_messages": 40,
+    "n_message_starts": 40
   },
   "warnings": [],
   "physical_red_flags": [],
@@ -105,7 +115,7 @@ NOTE: `falsification_criterion` requires a post-sweep julia run (F-δ signature 
   "compute_results": [
     {
       "id": "S1",
-      "task": "Symbolically verify η H_bdg η = H_bdg† at D=2 with Hermitian L, symmetric M",
+      "task": "Symbolically verify \u03b7 H_bdg \u03b7 = H_bdg\u2020 at D=2 with Hermitian L, symmetric M",
       "status": "OK",
       "result": "Matrix([[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]])",
       "error": null
@@ -114,7 +124,7 @@ NOTE: `falsification_criterion` requires a post-sweep julia run (F-δ signature 
       "id": "S2",
       "task": "Verify orbit-R/I/Z classification at D=1 toy model",
       "status": "OK",
-      "result": "Eigenvalues: ±sqrt((a-b)(a+b)). orbit-R (a=2,b=1): ±1.732+0j. orbit-I (a=1,b=2): ±1.732j. orbit-Z (a=1,b=1): 0j (defective EP). Confirms turn_7.md §3 Check 5.",
+      "result": "Eigenvalues: \u00b1sqrt((a-b)(a+b)). orbit-R (a=2,b=1): \u00b11.732+0j. orbit-I (a=1,b=2): \u00b11.732j. orbit-Z (a=1,b=1): 0j (defective EP). Confirms turn_7.md \u00a73 Check 5.",
       "error": null
     }
   ]
