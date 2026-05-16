@@ -1,0 +1,53 @@
+{
+  "turn": 20,
+  "status": "FAIL_NUMERICAL",
+  "issues": [
+    "norm_drift=9.70e-03 exceeds tol 1e-08",
+    "falsification_criterion REFUTED per implementer \u00a77"
+  ],
+  "novel_detected": false,
+  "metrics": {
+    "experiment_kind": "analyze_existing",
+    "norm_initial": 1.0,
+    "norm_final": 0.9903,
+    "norm_drift": 0.0097,
+    "energy_initial": null,
+    "energy_final_plus_omega": 4.624,
+    "energy_final_minus_omega": 6.4694,
+    "energy_monotonic": null,
+    "mz_target": null,
+    "mz_final_plus_omega": 5.9918,
+    "mz_final_minus_omega": 0.0072,
+    "delta_cdd0_stored": -5.9268,
+    "delta_cdd0_peratom": -5.9846,
+    "delta_emp_stored": -4.5451,
+    "delta_emp_peratom": -4.6004,
+    "tau_barnett_plus_omega_cdd0": null,
+    "tau_barnett_minus_omega_cdd0": 2.84,
+    "tau_barnett_plus_omega_emp": 2.94,
+    "tau_barnett_minus_omega_emp": 2.54,
+    "n_frames_per_run": 302,
+    "n_csv_rows": 604,
+    "fz_pops_consistency_plus": 2.2e-07,
+    "fz_pops_consistency_minus": 1.7e-07,
+    "nan_in_populations": false,
+    "wall_time_sec": 180,
+    "peak_memory_gb": null,
+    "tests_passed": null,
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "total": null
+    },
+    "warnings": [
+      "Fz_stored is total integrated <F_z> (not per-atom); per-atom = Fz_from_pops = Fz_stored / norm. Discrepancy Fz_stored vs sum(m*pop_c) = 0.058 for +Omega explained by norm=0.990 factor. After normalization: |Fz_stored - Fz_from_pops * norm| < 2.2e-7 (machine precision). Populations consistent.",
+      "tau_Barnett for c_dd=0 +Omega is inf (|Fz - 6| never reaches 1.0 in [0, 30.14]): +Omega spin state remains essentially at m=+6 throughout. pop_c1=0.9919 at t=30 confirms no cascade at +Omega with DDI off.",
+      "norm_drift = 1 - norm_final = 0.0097 (0.97% K3 loss over 30 omega^-1); within expected range for gamma_dr=0.02 three-body loss. PASS for physics."
+    ],
+    "physical_red_flags": [],
+    "falsification_result": "REFUTED"
+  },
+  "directive_expected_order": null
+}
