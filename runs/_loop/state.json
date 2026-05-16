@@ -1,5 +1,5 @@
 {
-  "turn": 16,
+  "turn": 18,
   "status": "running",
   "retries": 0,
   "history": [
@@ -431,11 +431,11 @@
         "director": "cb0ea1a88213bfc3b5ab069142101c47"
       },
       "subagent": "critic",
-      "output": "runs/_loop/judge/turn_12_critic_audit.md (Audit-1..10 per-item + 5 specific findings + T13 recommendation). Verdict WEAK_PASS. Central finding (Audit-5 FAIL): T11 \u00a72.6 eq (6) uses rank-1 |F_-|^2=12 enhancement, but codebase (losses.jl:144-176) implements rank-2 spherical tensor with \u0394m\u2208{-1,-2} summed and normalized to average=\u0393_dr. The factor-12 numerical match is coincidence-of-notation, not a derivation. Audit-1,2,3,6,7,8,9 PASS; Audit-4,10 WEAK_PASS (discrete-grid DDI invariance Q4 unresolved). [Refuted] verdict against anko's secular-DDI-suppression hypothesis is PROVISIONALLY SOUND pending c_dd=0 control (\u00a75.4). \u03b3_dr=0 julia (\u00a75.3) is the right first dispatch at 22:00 JST.",
+      "output": "runs/_loop/judge/turn_12_critic_audit.md (Audit-1..10 per-item + 5 specific findings + T13 recommendation). Verdict WEAK_PASS. Central finding (Audit-5 FAIL): T11 §2.6 eq (6) uses rank-1 |F_-|^2=12 enhancement, but codebase (losses.jl:144-176) implements rank-2 spherical tensor with Δm∈{-1,-2} summed and normalized to average=Γ_dr. The factor-12 numerical match is coincidence-of-notation, not a derivation. Audit-1,2,3,6,7,8,9 PASS; Audit-4,10 WEAK_PASS (discrete-grid DDI invariance Q4 unresolved). [Refuted] verdict against anko's secular-DDI-suppression hypothesis is PROVISIONALLY SOUND pending c_dd=0 control (§5.4). γ_dr=0 julia (§5.3) is the right first dispatch at 22:00 JST.",
       "branch": null,
       "commit": null,
       "parent": null,
-      "notes": "Critic audit route (d) per director T12 dispatch. Director chose critic to gate the 22:00 JST julia \u03b3_dr=0 falsifier before resource commit (~45 min GPU + ~3M tokens) on un-audited T11 mechanism. Critic returned VERDICT: WEAK_PASS with one load-bearing FAIL on Audit-5 (rank-1 vs rank-2 CG mismatch) \u2014 qualitative mechanism survives, prefactor unjustified. T13 should: (a) keep julia \u03b3_dr=0 queued for 22:00 JST as planned, (b) parallel-dispatch a short theorist or implementer_sympy to compute the actual rank-2 CG top-rung enhancement, (c) bank T11's qualitative scaling \u03c4\u223c1/(\u03b3_dr\u00b7W_F^CG) but NOT the specific factor 12, (d) treat [Refuted] of secular-DDI as [Plausibly Refuted] until c_dd=0 control runs.",
+      "notes": "Critic audit route (d) per director T12 dispatch. Director chose critic to gate the 22:00 JST julia γ_dr=0 falsifier before resource commit (~45 min GPU + ~3M tokens) on un-audited T11 mechanism. Critic returned VERDICT: WEAK_PASS with one load-bearing FAIL on Audit-5 (rank-1 vs rank-2 CG mismatch) — qualitative mechanism survives, prefactor unjustified. T13 should: (a) keep julia γ_dr=0 queued for 22:00 JST as planned, (b) parallel-dispatch a short theorist or implementer_sympy to compute the actual rank-2 CG top-rung enhancement, (c) bank T11's qualitative scaling τ∼1/(γ_dr·W_F^CG) but NOT the specific factor 12, (d) treat [Refuted] of secular-DDI as [Plausibly Refuted] until c_dd=0 control runs.",
       "tokens_used": {
         "theorist": null,
         "researcher": null,
@@ -577,22 +577,118 @@
         "researcher": "74b438ed4a1609ab14345c66e6bf60ef",
         "director": "cb0ea1a88213bfc3b5ab069142101c47",
         "implementer": "a8e150ccbd52b496d6c4550016784955"
-      }
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 6401835,
+        "total": 6401835,
+        "effective_full_rate": 1106376,
+        "breakdown": {
+          "input_fresh": 18997,
+          "cache_creation": 328211,
+          "cache_read": 6040004,
+          "output": 14623
+        },
+        "n_messages": 54,
+        "n_message_starts": 54
+      },
+      "branch": "auto/turn_15_cascade-initial-slope-candidate-c",
+      "commit": null,
+      "parent": "07fa338",
+      "drift_signals": {
+        "topic_repetition": 0.0,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 0.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.5,
+        "cost_inflation": 0.815,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "none",
+      "drift_advisories": []
+    },
+    {
+      "turn": 16,
+      "ts": "2026-05-16T07:41:34Z",
+      "judge_status": "CRITIC_WEAK_PASS",
+      "directive_action": "critic_audit",
+      "directive_label": "T11-cascade-framework-audit-coherent-channel-flag",
+      "wall_time_sec": null,
+      "agent_hashes": {
+        "critic": "517f7ca0fbb994ee3a350df682aaaa38",
+        "director": "cb0ea1a88213bfc3b5ab069142101c47",
+        "implementer": "a8e150ccbd52b496d6c4550016784955",
+        "researcher": "74b438ed4a1609ab14345c66e6bf60ef",
+        "theorist": "7dc4ee3ff52bbf29a6665526f84ed091"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 5943057,
+        "total": 5943057,
+        "effective_full_rate": 1136939,
+        "breakdown": {
+          "input_fresh": 13079,
+          "cache_creation": 367693,
+          "cache_read": 5540241,
+          "output": 22044
+        },
+        "n_messages": 49,
+        "n_message_starts": 49
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.083,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 0.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.5,
+        "cost_inflation": 0.837,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "none",
+      "drift_advisories": []
+    },
+    {
+      "turn": 17,
+      "ts": "2026-05-16T07:58:06Z",
+      "judge_status": "NOOP",
+      "directive_action": "noop",
+      "directive_label": "coupled-lindblad-tau-asym-closed-form-fail-7-14ms",
+      "wall_time_sec": null,
+      "agent_hashes": {
+        "critic": "517f7ca0fbb994ee3a350df682aaaa38",
+        "director": "cb0ea1a88213bfc3b5ab069142101c47",
+        "implementer": "a8e150ccbd52b496d6c4550016784955",
+        "researcher": "74b438ed4a1609ab14345c66e6bf60ef",
+        "theorist": "7dc4ee3ff52bbf29a6665526f84ed091"
+      },
+      "tokens_used": null,
+      "branch": null,
+      "commit": null,
+      "parent": null
     }
   ],
   "created_at": "2026-05-14T00:00:00+00:00",
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "FAIL_PHYSICS",
+  "last_judge": "NOOP",
   "home_branch": "main",
   "schema_version": 1,
   "current_agent_hashes": {
-    "theorist": "7dc4ee3ff52bbf29a6665526f84ed091",
     "critic": "517f7ca0fbb994ee3a350df682aaaa38",
-    "researcher": "74b438ed4a1609ab14345c66e6bf60ef",
     "director": "cb0ea1a88213bfc3b5ab069142101c47",
-    "implementer": "a8e150ccbd52b496d6c4550016784955"
+    "implementer": "a8e150ccbd52b496d6c4550016784955",
+    "researcher": "74b438ed4a1609ab14345c66e6bf60ef",
+    "theorist": "7dc4ee3ff52bbf29a6665526f84ed091"
   },
   "last_directive_label": "born-markov-rate-enhancement-q3-q1",
   "last_directive_action": "researcher",
