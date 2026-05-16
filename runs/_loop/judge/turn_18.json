@@ -1,0 +1,91 @@
+{
+  "turn": 18,
+  "status": "FAIL_PHYSICS",
+  "issues": [
+    "SCENARIO C CONFIRMED: spin-only single-particle Lindblad (T1) predicts Delta [Fz(-)-Fz(+)] = +4.815 at gamma_dr=0.02, t=30 \u2014 same sign as gamma_dr=0 (Delta=+5.95). Empirical is -4.60 (OPPOSITE sign). The spin-only framework does NOT flip the asymmetry direction from gamma_dr=0 to 0.02.",
+    "Individual endpoint error: Fz(+0.5)=-0.059 vs empirical 5.02 (100% error); Fz(-0.5)=4.756 vs empirical 0.42 (1032% error). Both sides are SWAPPED.",
+    "T17 \u00a78 Q8.3 mechanism ('rotating-frame energetic bias -Omega(L_z+F_z) protects +Omega from cascading') is NOT captured in spin-only T1; this orbital channel is confirmed necessary.",
+    "falsification_criterion REFUTED per implementer \u00a77"
+  ],
+  "novel_detected": false,
+  "metrics": {
+    "experiment_kind": "rtp",
+    "norm_initial": 1.0,
+    "norm_final": 1.0,
+    "norm_drift": 1.67e-15,
+    "energy_initial": null,
+    "energy_final": null,
+    "energy_monotonic": null,
+    "mz_target": null,
+    "mz_final": null,
+    "fitted_order": null,
+    "fit_dt_range": null,
+    "fit_r_squared": null,
+    "wall_time_sec": 2.3,
+    "peak_memory_gb": null,
+    "tests_passed": null,
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "total": null
+    },
+    "warnings": [
+      "gamma_dr=0 tau_asym numerical 5.37 ms vs T17 t^4 4.90 ms (ratio 1.097, within 10%)",
+      "t^4 scaling alpha=0.171 vs predicted 0.25: Taylor radius violated at tau*omega_R > 1 for all Omega",
+      "T17 eq(12) contains sign error in dFy/dt|_0: correct is +p_perp*F, T17 wrote -p_perp*F; net d2Fz/dt2 = -p_perp^2*F (negative) confirmed by ODE"
+    ],
+    "physical_red_flags": [
+      "SCENARIO C CONFIRMED: spin-only single-particle Lindblad (T1) predicts Delta [Fz(-)-Fz(+)] = +4.815 at gamma_dr=0.02, t=30 \u2014 same sign as gamma_dr=0 (Delta=+5.95). Empirical is -4.60 (OPPOSITE sign). The spin-only framework does NOT flip the asymmetry direction from gamma_dr=0 to 0.02.",
+      "Individual endpoint error: Fz(+0.5)=-0.059 vs empirical 5.02 (100% error); Fz(-0.5)=4.756 vs empirical 0.42 (1032% error). Both sides are SWAPPED.",
+      "T17 \u00a78 Q8.3 mechanism ('rotating-frame energetic bias -Omega(L_z+F_z) protects +Omega from cascading') is NOT captured in spin-only T1; this orbital channel is confirmed necessary."
+    ],
+    "falsification_result": "REFUTED",
+    "compute_results": [
+      {
+        "id": "S1",
+        "task": "Sanity check: commutation relations and spin operator construction",
+        "status": "OK",
+        "result": "[Fx,Fy]=iFz, [Fy,Fz]=iFx, [Fz,Fx]=iFy all verified to <1e-12. Fz[0,0]=+6 (m=+F, T17 convention), Fz[12,12]=-6."
+      },
+      {
+        "id": "S2",
+        "task": "Sanity check: W^CG values and jump operator count",
+        "status": "OK",
+        "result": "W^CG_{+6,-1}=11/14=0.785714 PASS; W^CG_{+6,-2}=1/7=0.142857 PASS; 23 jump operators (12 for q=-1, 11 for q=-2) PASS; dFz/dt|_0 = -3/140 exact PASS."
+      },
+      {
+        "id": "S3",
+        "task": "Target T2: gamma_dr=0 trajectory validation against T17 closed-form",
+        "status": "OK",
+        "result": "Fz(+0.5,t=30)=0.040 [T17: 0.030]; Fz(-0.5,t=30)=5.993 [T17: 5.993]; Delta=5.952 [T17: 5.96]. Max deviation from eq(14): 2.68e-11. Time-avg Delta=2.818 [T17: 3.11, 9% discrepancy from finite-t average]. tau_asym=5.37 ms [T17 t^4: 4.90 ms, ratio 1.097]. Trace conserved to 1.67e-15. Purity=1 (no dissipation). PASS."
+      },
+      {
+        "id": "S4",
+        "task": "Target T3: gamma_dr=0.02 sign-reversal test \u2014 CRITICAL",
+        "status": "OK",
+        "result": "Fz(+0.5,t=30)=-0.059 [empirical: 5.02, error 101%]; Fz(-0.5,t=30)=4.756 [empirical: 0.42, error 1032%]. Delta [Fz(-)-Fz(+)] = +4.815 [empirical: -4.60]. SIGN MISMATCH. The spin-only Lindblad maintains -Omega HIGH/+Omega LOW at t=30, but empirically +Omega is HIGH/-Omega is LOW. SCENARIO C: spin-only framework INSUFFICIENT."
+      },
+      {
+        "id": "S5",
+        "task": "Target T4: Omega-sweep tau_asym scaling law",
+        "status": "OK",
+        "result": "tau_asym values: Omega={0.1:7.98ms, 0.3:5.95ms, 0.5:5.37ms, 0.7:5.23ms, 1.0:5.66ms}. Fit: tau=3.527*Omega^(-0.171). T17 predicts alpha=0.25. FAIL (alpha=0.171 outside [0.20,0.30]). Root cause: Taylor radius omega_R^-*tau_asym > 1.5 for all Omega values, so t^4 formula is outside validity range."
+      },
+      {
+        "id": "S6",
+        "task": "Target T5: gamma_dr=0.005 bridging trajectory",
+        "status": "OK",
+        "result": "Fz(+0.5,t=30)=0.022; Fz(-0.5,t=30)=5.678; Delta=+5.656. Monotone between gamma_dr=0 (5.952) and gamma_dr=0.02 (4.815). The dissipation REDUCES the magnitude of Delta but does NOT flip its sign. Bridge confirms spin-only framework misses the sign-flip mechanism entirely."
+      },
+      {
+        "id": "S7",
+        "task": "Target T6: diagnostics (trace, purity, dFz/dt at t=0+)",
+        "status": "OK",
+        "result": "Trace conserved to <1.67e-15 across all 14 integrations. Purity: gamma_dr=0 stays 1.0 (unitary); gamma_dr=0.02 decays to 0.345 at t=30 (decoherence correct). dFz/dt first-step numerical -0.036 vs -3/140=-0.0214: discrepancy explained by finite dt=0.1 omega^-1 including coherent contribution; at t->0+ limit the -3/140 formula is exact (SANITY 4 confirmed analytically)."
+      }
+    ]
+  },
+  "directive_expected_order": null
+}

@@ -1,5 +1,5 @@
 {
-  "turn": 18,
+  "turn": 19,
   "status": "running",
   "retries": 0,
   "history": [
@@ -670,17 +670,61 @@
         "researcher": "74b438ed4a1609ab14345c66e6bf60ef",
         "theorist": "7dc4ee3ff52bbf29a6665526f84ed091"
       },
-      "tokens_used": null,
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 9342609,
+        "total": 9342609,
+        "effective_full_rate": 1498821,
+        "breakdown": {
+          "input_fresh": 31351,
+          "cache_creation": 389844,
+          "cache_read": 8903450,
+          "output": 17964
+        },
+        "n_messages": 66,
+        "n_message_starts": 66
+      },
       "branch": null,
       "commit": null,
-      "parent": null
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.0,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 0.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.5,
+        "cost_inflation": 1.103,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "advisory",
+      "drift_advisories": [
+        "DRIFT_COST_INFLATION"
+      ]
+    },
+    {
+      "turn": 18,
+      "ts": "2026-05-16T08:17:03Z",
+      "judge_status": "FAIL_PHYSICS",
+      "directive_action": "run_experiment",
+      "directive_label": "spinonly-lindblad-scenarioC-refuted",
+      "wall_time_sec": 2.3,
+      "agent_hashes": {
+        "critic": "517f7ca0fbb994ee3a350df682aaaa38",
+        "director": "cb0ea1a88213bfc3b5ab069142101c47",
+        "implementer": "a8e150ccbd52b496d6c4550016784955",
+        "researcher": "74b438ed4a1609ab14345c66e6bf60ef",
+        "theorist": "7dc4ee3ff52bbf29a6665526f84ed091"
+      }
     }
   ],
   "created_at": "2026-05-14T00:00:00+00:00",
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "NOOP",
+  "last_judge": "FAIL_PHYSICS",
   "home_branch": "main",
   "schema_version": 1,
   "current_agent_hashes": {
