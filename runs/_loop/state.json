@@ -1,5 +1,5 @@
 {
-  "turn": 11,
+  "turn": 12,
   "status": "running",
   "retries": 0,
   "history": [
@@ -333,23 +333,76 @@
         "implementer": "a8e150ccbd52b496d6c4550016784955",
         "researcher": "74b438ed4a1609ab14345c66e6bf60ef",
         "theorist": "7dc4ee3ff52bbf29a6665526f84ed091"
-      }
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 14585393,
+        "total": 14585393,
+        "effective_full_rate": 2120910,
+        "breakdown": {
+          "input_fresh": 33593,
+          "cache_creation": 482849,
+          "cache_read": 14053265,
+          "output": 15686
+        },
+        "n_messages": 149,
+        "n_message_starts": 149
+      },
+      "commit": "0d6f1a6d96a7",
+      "parent": "dfb6cb26767a",
+      "drift_signals": {
+        "topic_repetition": 0.0,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 0.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.2,
+        "cost_inflation": 1.508,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "advisory",
+      "drift_advisories": [
+        "DRIFT_COST_INFLATION"
+      ]
+    },
+    {
+      "turn": 11,
+      "ts": "2026-05-16T06:30:51Z",
+      "judge_status": "NOOP",
+      "directive_action": "noop",
+      "directive_label": "barnett-tau-closed-form-theorist-deliverable",
+      "wall_time_sec": null,
+      "agent_hashes": {
+        "critic": "517f7ca0fbb994ee3a350df682aaaa38",
+        "theorist": "7dc4ee3ff52bbf29a6665526f84ed091",
+        "researcher": "74b438ed4a1609ab14345c66e6bf60ef",
+        "implementer": "a8e150ccbd52b496d6c4550016784955",
+        "director": "cb0ea1a88213bfc3b5ab069142101c47"
+      },
+      "subagent": "theorist",
+      "output": "runs/_loop/theorist/turn_11.md (796 lines). Closed-form tau_Barnett ~ 1/(F(F+1) gamma_dr) matches empirical 7-14 ms within factor 2. REFUTES anko secular-DDI-suppression hypothesis: real mechanism is rotating-frame energetic bias + gamma_dr cascade (dissipative). Theorist sec.7 has 3 research queries Q1-Q3 deferred to next director; sec.8 Option A = critic_audit (recommended), Option B = noop until 22:00 JST julia window for gamma_dr=0 control experiment.",
+      "branch": null,
+      "commit": null,
+      "notes": "Theorist labeled section 6 as 'Open questions' instead of directive JSON; effective directive is section 8 Option B (action=noop). Skipped researcher dispatch despite K=3 queries because (i) theorist sec.8 Option A explicitly sequences critic_audit FIRST, (ii) Q3 labeled 'not blocking', (iii) DRIFT_COST_INFLATION advisory 3 consecutive turns argues against 3-researcher overhead. Queries persist in theorist file for next director's routing. T11 partial-resume after prior timeout (state.last_error)."
     }
   ],
   "created_at": "2026-05-14T00:00:00+00:00",
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "PASS",
+  "last_judge": "NOOP",
   "home_branch": "main",
   "schema_version": 1,
   "current_agent_hashes": {
     "critic": "517f7ca0fbb994ee3a350df682aaaa38",
-    "director": "9bf5aa3fb2c140080dc51e6e3d678bd4",
-    "implementer": "a8e150ccbd52b496d6c4550016784955",
+    "theorist": "7dc4ee3ff52bbf29a6665526f84ed091",
     "researcher": "74b438ed4a1609ab14345c66e6bf60ef",
-    "theorist": "7dc4ee3ff52bbf29a6665526f84ed091"
+    "implementer": "a8e150ccbd52b496d6c4550016784955",
+    "director": "cb0ea1a88213bfc3b5ab069142101c47"
   },
-  "last_directive_label": "bch-leak-docstring-assert",
-  "last_directive_action": "modify_code"
+  "last_directive_label": "barnett-tau-closed-form-theorist-deliverable",
+  "last_directive_action": "noop",
+  "last_error": null
 }
