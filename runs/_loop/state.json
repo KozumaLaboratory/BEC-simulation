@@ -1,5 +1,5 @@
 {
-  "turn": 14,
+  "turn": 15,
   "status": "running",
   "retries": 0,
   "history": [
@@ -481,7 +481,7 @@
       },
       "subagent": "implementer",
       "branch": "auto/turn_13_rank2-cg-barnett-prefactor",
-      "commit": "6afd135",
+      "commit": null,
       "output": "runs/_loop/sim/turn_13.md + rank2_cg_prefactor.py. W^CG_{m=+F=6}=13/14 exact rational, corrected tau~78ms vs empirical 7-14ms (5-11x outside window). T11 4 claim 5 REFUTED on prefactor. losses.jl production cross-check AGREE (no bug). gamma_dr=0 julia falsifier remains decisive, queued for 22:00 JST.",
       "notes": "Director route (c) implementer compute_sympy per T12 critic recommendation (iv). Substantive D1 outcome: T11 rank-1 factor 12 was off by 13x from rank-2 normalized W^CG=13/14. T11 stretched-state-fastest intuition physically wrong for rank-2 (max raw weight at m=+4, not m=+F=6). Missing physics likely Born-Markov rate enhancement from Omega F_z energy bias (T11 Q3). Next: T14 theorist or researcher to address the 5-10x gap; julia gamma_dr=0 still queued.",
       "tokens_used": {
@@ -489,15 +489,57 @@
         "researcher": null,
         "implementer": null,
         "critic": null,
-        "total": null
-      }
+        "orchestrator": 8640857,
+        "total": 8640857,
+        "effective_full_rate": 1358310,
+        "breakdown": {
+          "input_fresh": 22837,
+          "cache_creation": 329223,
+          "cache_read": 8269396,
+          "output": 19401
+        },
+        "n_messages": 60,
+        "n_message_starts": 60
+      },
+      "parent": "c12a8fa76799",
+      "drift_signals": {
+        "topic_repetition": 0.125,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 0.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.4,
+        "cost_inflation": 0.952,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "none",
+      "drift_advisories": []
+    },
+    {
+      "turn": 14,
+      "ts": "2026-05-16T07:15:28Z",
+      "judge_status": "RESEARCHER_ONLY",
+      "directive_action": "researcher",
+      "directive_label": "born-markov-rate-enhancement-q3-q1",
+      "wall_time_sec": 733,
+      "agent_hashes": {
+        "critic": "517f7ca0fbb994ee3a350df682aaaa38",
+        "theorist": "7dc4ee3ff52bbf29a6665526f84ed091",
+        "researcher": "74b438ed4a1609ab14345c66e6bf60ef",
+        "implementer": "a8e150ccbd52b496d6c4550016784955",
+        "director": "cb0ea1a88213bfc3b5ab069142101c47"
+      },
+      "subagent": "researcher",
+      "output": "runs/_loop/research/turn_14.md (233 lines). Q3 Born-Markov DISCONFIRMED: 3D free-space Born-Markov rate is sqrt(B) Wigner-threshold, no Lorentzian in (p-Omega); pure-cooling T_eff->0 limit in losses.jl has no Omega-enhancement factor (T11 Heaviside captures asymmetry fully). 5-10x gap (78ms vs 7-14ms) NOT from Born-Markov enhancement. Hensler 2003 Cr beta_dr(44G)=3.2e-11 cm^3/s extrapolated to Eu(2.6nT) gives beta_dr~3.5e-14 cm^3/s (tau_physical~67s); confirms gamma_dr=0.02 is ~1000x phenomenological above physical rate. Q1 RESOLVED: authoritative p_z=0.315 (g_F=1.163, Bz=2.13e-5 G). Memo's 0.69 is g_J vs g_F error. T15 recommendation: theorist analyze multi-rung cascade (T13 candidate 3: shape[m=+5]=37/28>shape[m=+6]=13/14) + initial-slope vs full-decay tau definition mismatch. gamma_dr=0 julia falsifier at 22:00 JST remains decisive regardless.",
+      "branch": null,
+      "commit": null,
+      "parent": null
     }
   ],
   "created_at": "2026-05-14T00:00:00+00:00",
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "FAIL_PHYSICS",
+  "last_judge": "RESEARCHER_ONLY",
   "home_branch": "main",
   "schema_version": 1,
   "current_agent_hashes": {
@@ -507,7 +549,7 @@
     "implementer": "a8e150ccbd52b496d6c4550016784955",
     "director": "cb0ea1a88213bfc3b5ab069142101c47"
   },
-  "last_directive_label": "rank2-cg-barnett-prefactor",
-  "last_directive_action": "analyze_existing",
+  "last_directive_label": "born-markov-rate-enhancement-q3-q1",
+  "last_directive_action": "researcher",
   "last_error": null
 }
