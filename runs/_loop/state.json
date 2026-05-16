@@ -1,5 +1,5 @@
 {
-  "turn": 12,
+  "turn": 13,
   "status": "running",
   "retries": 0,
   "history": [
@@ -385,14 +385,64 @@
       "output": "runs/_loop/theorist/turn_11.md (796 lines). Closed-form tau_Barnett ~ 1/(F(F+1) gamma_dr) matches empirical 7-14 ms within factor 2. REFUTES anko secular-DDI-suppression hypothesis: real mechanism is rotating-frame energetic bias + gamma_dr cascade (dissipative). Theorist sec.7 has 3 research queries Q1-Q3 deferred to next director; sec.8 Option A = critic_audit (recommended), Option B = noop until 22:00 JST julia window for gamma_dr=0 control experiment.",
       "branch": null,
       "commit": null,
-      "notes": "Theorist labeled section 6 as 'Open questions' instead of directive JSON; effective directive is section 8 Option B (action=noop). Skipped researcher dispatch despite K=3 queries because (i) theorist sec.8 Option A explicitly sequences critic_audit FIRST, (ii) Q3 labeled 'not blocking', (iii) DRIFT_COST_INFLATION advisory 3 consecutive turns argues against 3-researcher overhead. Queries persist in theorist file for next director's routing. T11 partial-resume after prior timeout (state.last_error)."
+      "notes": "Theorist labeled section 6 as 'Open questions' instead of directive JSON; effective directive is section 8 Option B (action=noop). Skipped researcher dispatch despite K=3 queries because (i) theorist sec.8 Option A explicitly sequences critic_audit FIRST, (ii) Q3 labeled 'not blocking', (iii) DRIFT_COST_INFLATION advisory 3 consecutive turns argues against 3-researcher overhead. Queries persist in theorist file for next director's routing. T11 partial-resume after prior timeout (state.last_error).",
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 6321018,
+        "total": 6321018,
+        "effective_full_rate": 943084,
+        "breakdown": {
+          "input_fresh": 82,
+          "cache_creation": 191930,
+          "cache_read": 6110600,
+          "output": 18406
+        },
+        "n_messages": 38,
+        "n_message_starts": 38
+      },
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.0,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 0.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.2,
+        "cost_inflation": 0.608,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "none",
+      "drift_advisories": []
+    },
+    {
+      "turn": 12,
+      "ts": "2026-05-16T06:43:17Z",
+      "judge_status": "CRITIC_WEAK_PASS",
+      "directive_action": "critic_audit",
+      "directive_label": "T11-barnett-mechanism-critic-audit",
+      "wall_time_sec": null,
+      "agent_hashes": {
+        "critic": "517f7ca0fbb994ee3a350df682aaaa38",
+        "theorist": "7dc4ee3ff52bbf29a6665526f84ed091",
+        "researcher": "74b438ed4a1609ab14345c66e6bf60ef",
+        "implementer": "a8e150ccbd52b496d6c4550016784955",
+        "director": "cb0ea1a88213bfc3b5ab069142101c47"
+      },
+      "subagent": "critic",
+      "output": "runs/_loop/judge/turn_12_critic_audit.md (Audit-1..10 per-item + 5 specific findings + T13 recommendation). Verdict WEAK_PASS. Central finding (Audit-5 FAIL): T11 §2.6 eq (6) uses rank-1 |F_-|^2=12 enhancement, but codebase (losses.jl:144-176) implements rank-2 spherical tensor with Δm∈{-1,-2} summed and normalized to average=Γ_dr. The factor-12 numerical match is coincidence-of-notation, not a derivation. Audit-1,2,3,6,7,8,9 PASS; Audit-4,10 WEAK_PASS (discrete-grid DDI invariance Q4 unresolved). [Refuted] verdict against anko's secular-DDI-suppression hypothesis is PROVISIONALLY SOUND pending c_dd=0 control (§5.4). γ_dr=0 julia (§5.3) is the right first dispatch at 22:00 JST.",
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "notes": "Critic audit route (d) per director T12 dispatch. Director chose critic to gate the 22:00 JST julia γ_dr=0 falsifier before resource commit (~45 min GPU + ~3M tokens) on un-audited T11 mechanism. Critic returned VERDICT: WEAK_PASS with one load-bearing FAIL on Audit-5 (rank-1 vs rank-2 CG mismatch) — qualitative mechanism survives, prefactor unjustified. T13 should: (a) keep julia γ_dr=0 queued for 22:00 JST as planned, (b) parallel-dispatch a short theorist or implementer_sympy to compute the actual rank-2 CG top-rung enhancement, (c) bank T11's qualitative scaling τ∼1/(γ_dr·W_F^CG) but NOT the specific factor 12, (d) treat [Refuted] of secular-DDI as [Plausibly Refuted] until c_dd=0 control runs."
     }
   ],
   "created_at": "2026-05-14T00:00:00+00:00",
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "NOOP",
+  "last_judge": "CRITIC_WEAK_PASS",
   "home_branch": "main",
   "schema_version": 1,
   "current_agent_hashes": {
@@ -402,7 +452,7 @@
     "implementer": "a8e150ccbd52b496d6c4550016784955",
     "director": "cb0ea1a88213bfc3b5ab069142101c47"
   },
-  "last_directive_label": "barnett-tau-closed-form-theorist-deliverable",
-  "last_directive_action": "noop",
+  "last_directive_label": "T11-barnett-mechanism-critic-audit",
+  "last_directive_action": "critic_audit",
   "last_error": null
 }
