@@ -1,5 +1,5 @@
 {
-  "turn": 15,
+  "turn": 16,
   "status": "running",
   "retries": 0,
   "history": [
@@ -431,11 +431,11 @@
         "director": "cb0ea1a88213bfc3b5ab069142101c47"
       },
       "subagent": "critic",
-      "output": "runs/_loop/judge/turn_12_critic_audit.md (Audit-1..10 per-item + 5 specific findings + T13 recommendation). Verdict WEAK_PASS. Central finding (Audit-5 FAIL): T11 §2.6 eq (6) uses rank-1 |F_-|^2=12 enhancement, but codebase (losses.jl:144-176) implements rank-2 spherical tensor with Δm∈{-1,-2} summed and normalized to average=Γ_dr. The factor-12 numerical match is coincidence-of-notation, not a derivation. Audit-1,2,3,6,7,8,9 PASS; Audit-4,10 WEAK_PASS (discrete-grid DDI invariance Q4 unresolved). [Refuted] verdict against anko's secular-DDI-suppression hypothesis is PROVISIONALLY SOUND pending c_dd=0 control (§5.4). γ_dr=0 julia (§5.3) is the right first dispatch at 22:00 JST.",
+      "output": "runs/_loop/judge/turn_12_critic_audit.md (Audit-1..10 per-item + 5 specific findings + T13 recommendation). Verdict WEAK_PASS. Central finding (Audit-5 FAIL): T11 \u00a72.6 eq (6) uses rank-1 |F_-|^2=12 enhancement, but codebase (losses.jl:144-176) implements rank-2 spherical tensor with \u0394m\u2208{-1,-2} summed and normalized to average=\u0393_dr. The factor-12 numerical match is coincidence-of-notation, not a derivation. Audit-1,2,3,6,7,8,9 PASS; Audit-4,10 WEAK_PASS (discrete-grid DDI invariance Q4 unresolved). [Refuted] verdict against anko's secular-DDI-suppression hypothesis is PROVISIONALLY SOUND pending c_dd=0 control (\u00a75.4). \u03b3_dr=0 julia (\u00a75.3) is the right first dispatch at 22:00 JST.",
       "branch": null,
       "commit": null,
       "parent": null,
-      "notes": "Critic audit route (d) per director T12 dispatch. Director chose critic to gate the 22:00 JST julia γ_dr=0 falsifier before resource commit (~45 min GPU + ~3M tokens) on un-audited T11 mechanism. Critic returned VERDICT: WEAK_PASS with one load-bearing FAIL on Audit-5 (rank-1 vs rank-2 CG mismatch) — qualitative mechanism survives, prefactor unjustified. T13 should: (a) keep julia γ_dr=0 queued for 22:00 JST as planned, (b) parallel-dispatch a short theorist or implementer_sympy to compute the actual rank-2 CG top-rung enhancement, (c) bank T11's qualitative scaling τ∼1/(γ_dr·W_F^CG) but NOT the specific factor 12, (d) treat [Refuted] of secular-DDI as [Plausibly Refuted] until c_dd=0 control runs.",
+      "notes": "Critic audit route (d) per director T12 dispatch. Director chose critic to gate the 22:00 JST julia \u03b3_dr=0 falsifier before resource commit (~45 min GPU + ~3M tokens) on un-audited T11 mechanism. Critic returned VERDICT: WEAK_PASS with one load-bearing FAIL on Audit-5 (rank-1 vs rank-2 CG mismatch) \u2014 qualitative mechanism survives, prefactor unjustified. T13 should: (a) keep julia \u03b3_dr=0 queued for 22:00 JST as planned, (b) parallel-dispatch a short theorist or implementer_sympy to compute the actual rank-2 CG top-rung enhancement, (c) bank T11's qualitative scaling \u03c4\u223c1/(\u03b3_dr\u00b7W_F^CG) but NOT the specific factor 12, (d) treat [Refuted] of secular-DDI as [Plausibly Refuted] until c_dd=0 control runs.",
       "tokens_used": {
         "theorist": null,
         "researcher": null,
@@ -532,22 +532,67 @@
       "output": "runs/_loop/research/turn_14.md (233 lines). Q3 Born-Markov DISCONFIRMED: 3D free-space Born-Markov rate is sqrt(B) Wigner-threshold, no Lorentzian in (p-Omega); pure-cooling T_eff->0 limit in losses.jl has no Omega-enhancement factor (T11 Heaviside captures asymmetry fully). 5-10x gap (78ms vs 7-14ms) NOT from Born-Markov enhancement. Hensler 2003 Cr beta_dr(44G)=3.2e-11 cm^3/s extrapolated to Eu(2.6nT) gives beta_dr~3.5e-14 cm^3/s (tau_physical~67s); confirms gamma_dr=0.02 is ~1000x phenomenological above physical rate. Q1 RESOLVED: authoritative p_z=0.315 (g_F=1.163, Bz=2.13e-5 G). Memo's 0.69 is g_J vs g_F error. T15 recommendation: theorist analyze multi-rung cascade (T13 candidate 3: shape[m=+5]=37/28>shape[m=+6]=13/14) + initial-slope vs full-decay tau definition mismatch. gamma_dr=0 julia falsifier at 22:00 JST remains decisive regardless.",
       "branch": null,
       "commit": null,
-      "parent": null
+      "parent": null,
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 9359793,
+        "total": 9359793,
+        "effective_full_rate": 1485611,
+        "breakdown": {
+          "input_fresh": 19751,
+          "cache_creation": 387458,
+          "cache_read": 8934976,
+          "output": 17608
+        },
+        "n_messages": 67,
+        "n_message_starts": 67
+      },
+      "drift_signals": {
+        "topic_repetition": 0.0,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 0.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.4,
+        "cost_inflation": 1.117,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "advisory",
+      "drift_advisories": [
+        "DRIFT_COST_INFLATION"
+      ]
+    },
+    {
+      "turn": 15,
+      "ts": "2026-05-16T07:29:22Z",
+      "judge_status": "FAIL_PHYSICS",
+      "directive_action": "analyze_existing",
+      "directive_label": "cascade-initial-slope-candidate-c-refuted",
+      "wall_time_sec": 45.0,
+      "agent_hashes": {
+        "theorist": "7dc4ee3ff52bbf29a6665526f84ed091",
+        "critic": "517f7ca0fbb994ee3a350df682aaaa38",
+        "researcher": "74b438ed4a1609ab14345c66e6bf60ef",
+        "director": "cb0ea1a88213bfc3b5ab069142101c47",
+        "implementer": "a8e150ccbd52b496d6c4550016784955"
+      }
     }
   ],
   "created_at": "2026-05-14T00:00:00+00:00",
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "RESEARCHER_ONLY",
+  "last_judge": "FAIL_PHYSICS",
   "home_branch": "main",
   "schema_version": 1,
   "current_agent_hashes": {
-    "critic": "517f7ca0fbb994ee3a350df682aaaa38",
     "theorist": "7dc4ee3ff52bbf29a6665526f84ed091",
+    "critic": "517f7ca0fbb994ee3a350df682aaaa38",
     "researcher": "74b438ed4a1609ab14345c66e6bf60ef",
-    "implementer": "a8e150ccbd52b496d6c4550016784955",
-    "director": "cb0ea1a88213bfc3b5ab069142101c47"
+    "director": "cb0ea1a88213bfc3b5ab069142101c47",
+    "implementer": "a8e150ccbd52b496d6c4550016784955"
   },
   "last_directive_label": "born-markov-rate-enhancement-q3-q1",
   "last_directive_action": "researcher",
