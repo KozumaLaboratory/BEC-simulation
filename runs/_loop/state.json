@@ -1,5 +1,5 @@
 {
-  "turn": 19,
+  "turn": 20,
   "status": "running",
   "retries": 0,
   "history": [
@@ -717,6 +717,55 @@
         "implementer": "a8e150ccbd52b496d6c4550016784955",
         "researcher": "74b438ed4a1609ab14345c66e6bf60ef",
         "theorist": "7dc4ee3ff52bbf29a6665526f84ed091"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 10308732,
+        "total": 10308732,
+        "effective_full_rate": 1581882,
+        "breakdown": {
+          "input_fresh": 35803,
+          "cache_creation": 383499,
+          "cache_read": 9873560,
+          "output": 15870
+        },
+        "n_messages": 78,
+        "n_message_starts": 78
+      },
+      "branch": "auto/turn_18_coupled-lindblad-numerical-integration",
+      "commit": "0f755ce",
+      "parent": "9981a511d4be",
+      "drift_signals": {
+        "topic_repetition": 0.083,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.6,
+        "cost_inflation": 1.165,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "director_must_address",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "DRIFT_COST_INFLATION"
+      ]
+    },
+    {
+      "turn": 19,
+      "ts": "2026-05-16T08:42:45Z",
+      "judge_status": "NOOP",
+      "directive_action": "noop",
+      "directive_label": "orbital-ddi-3bin-falsifier-prediction",
+      "wall_time_sec": null,
+      "agent_hashes": {
+        "critic": "517f7ca0fbb994ee3a350df682aaaa38",
+        "director": "cb0ea1a88213bfc3b5ab069142101c47",
+        "implementer": "a8e150ccbd52b496d6c4550016784955",
+        "researcher": "74b438ed4a1609ab14345c66e6bf60ef",
+        "theorist": "7dc4ee3ff52bbf29a6665526f84ed091"
       }
     }
   ],
@@ -724,7 +773,7 @@
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "FAIL_PHYSICS",
+  "last_judge": "NOOP",
   "home_branch": "main",
   "schema_version": 1,
   "current_agent_hashes": {
