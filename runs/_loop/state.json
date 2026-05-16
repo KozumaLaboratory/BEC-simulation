@@ -430,11 +430,11 @@
         "director": "cb0ea1a88213bfc3b5ab069142101c47"
       },
       "subagent": "critic",
-      "output": "runs/_loop/judge/turn_12_critic_audit.md (Audit-1..10 per-item + 5 specific findings + T13 recommendation). Verdict WEAK_PASS. Central finding (Audit-5 FAIL): T11 §2.6 eq (6) uses rank-1 |F_-|^2=12 enhancement, but codebase (losses.jl:144-176) implements rank-2 spherical tensor with Δm∈{-1,-2} summed and normalized to average=Γ_dr. The factor-12 numerical match is coincidence-of-notation, not a derivation. Audit-1,2,3,6,7,8,9 PASS; Audit-4,10 WEAK_PASS (discrete-grid DDI invariance Q4 unresolved). [Refuted] verdict against anko's secular-DDI-suppression hypothesis is PROVISIONALLY SOUND pending c_dd=0 control (§5.4). γ_dr=0 julia (§5.3) is the right first dispatch at 22:00 JST.",
+      "output": "runs/_loop/judge/turn_12_critic_audit.md (Audit-1..10 per-item + 5 specific findings + T13 recommendation). Verdict WEAK_PASS. Central finding (Audit-5 FAIL): T11 \u00a72.6 eq (6) uses rank-1 |F_-|^2=12 enhancement, but codebase (losses.jl:144-176) implements rank-2 spherical tensor with \u0394m\u2208{-1,-2} summed and normalized to average=\u0393_dr. The factor-12 numerical match is coincidence-of-notation, not a derivation. Audit-1,2,3,6,7,8,9 PASS; Audit-4,10 WEAK_PASS (discrete-grid DDI invariance Q4 unresolved). [Refuted] verdict against anko's secular-DDI-suppression hypothesis is PROVISIONALLY SOUND pending c_dd=0 control (\u00a75.4). \u03b3_dr=0 julia (\u00a75.3) is the right first dispatch at 22:00 JST.",
       "branch": null,
       "commit": null,
       "parent": null,
-      "notes": "Critic audit route (d) per director T12 dispatch. Director chose critic to gate the 22:00 JST julia γ_dr=0 falsifier before resource commit (~45 min GPU + ~3M tokens) on un-audited T11 mechanism. Critic returned VERDICT: WEAK_PASS with one load-bearing FAIL on Audit-5 (rank-1 vs rank-2 CG mismatch) — qualitative mechanism survives, prefactor unjustified. T13 should: (a) keep julia γ_dr=0 queued for 22:00 JST as planned, (b) parallel-dispatch a short theorist or implementer_sympy to compute the actual rank-2 CG top-rung enhancement, (c) bank T11's qualitative scaling τ∼1/(γ_dr·W_F^CG) but NOT the specific factor 12, (d) treat [Refuted] of secular-DDI as [Plausibly Refuted] until c_dd=0 control runs.",
+      "notes": "Critic audit route (d) per director T12 dispatch. Director chose critic to gate the 22:00 JST julia \u03b3_dr=0 falsifier before resource commit (~45 min GPU + ~3M tokens) on un-audited T11 mechanism. Critic returned VERDICT: WEAK_PASS with one load-bearing FAIL on Audit-5 (rank-1 vs rank-2 CG mismatch) \u2014 qualitative mechanism survives, prefactor unjustified. T13 should: (a) keep julia \u03b3_dr=0 queued for 22:00 JST as planned, (b) parallel-dispatch a short theorist or implementer_sympy to compute the actual rank-2 CG top-rung enhancement, (c) bank T11's qualitative scaling \u03c4\u223c1/(\u03b3_dr\u00b7W_F^CG) but NOT the specific factor 12, (d) treat [Refuted] of secular-DDI as [Plausibly Refuted] until c_dd=0 control runs.",
       "tokens_used": {
         "theorist": null,
         "researcher": null,
@@ -832,7 +832,7 @@
         "tau_barnett_plus_omega_cdd0": null,
         "norm_final": 0.9903,
         "n_csv_rows": 604,
-        "falsification_result": "REFUTED_T19_§2.5.2"
+        "falsification_result": "REFUTED_T19_\u00a72.5.2"
       },
       "drift_signals": {
         "topic_repetition": 0.0,
@@ -884,13 +884,13 @@
         "director": "cb0ea1a88213bfc3b5ab069142101c47"
       },
       "subagent": "implementer",
-      "output": "T20 RETRY (attempt 2): Implementer ran extract_trajectory.jl + analyze_lz.py on cdd0 jld2 files. Trajectory.csv (605 lines, 136KB) produced; analyze_lz.png produced. KEY FINDING: dynamics/Lz was NOT saved in either stir_+0.5 or stir_-0.5 result.jld2 — Lz column is all-NaN for both runs (also true for empirical baseline). T19 §2.9 Q19.1 ⟨L_z⟩/N discriminator test is INCONCLUSIVE — data does not exist. Verified populations + Fz sanity (max |sum(pop)-1|=1.6e-7, max Fz consistency error=1.2e-6, 0 NaN in populations). Delta_cdd0=-5.9846 (M1-DOMINANT classification stands on endpoint pops alone). Audit found prior T20 'hallucinated' files actually DO exist on the auto branch (commit 96215fd) — director's Glob was against main where they're not merged. judge.py FAIL_NUMERICAL on (i) norm_drift=9.8e-3 (physical K3 loss), (ii) Lz tracking absent (a discovery, not failure), (iii) falsification REFUTED (verdict, not failure). retries 1->2. T22: re-run with Lz tracking enabled OR compute Lz post-hoc from psi_snapshots.",
+      "output": "T20 RETRY (attempt 2): Implementer ran extract_trajectory.jl + analyze_lz.py on cdd0 jld2 files. Trajectory.csv (605 lines, 136KB) produced; analyze_lz.png produced. KEY FINDING: dynamics/Lz was NOT saved in either stir_+0.5 or stir_-0.5 result.jld2 \u2014 Lz column is all-NaN for both runs (also true for empirical baseline). T19 \u00a72.9 Q19.1 \u27e8L_z\u27e9/N discriminator test is INCONCLUSIVE \u2014 data does not exist. Verified populations + Fz sanity (max |sum(pop)-1|=1.6e-7, max Fz consistency error=1.2e-6, 0 NaN in populations). Delta_cdd0=-5.9846 (M1-DOMINANT classification stands on endpoint pops alone). Audit found prior T20 'hallucinated' files actually DO exist on the auto branch (commit 96215fd) \u2014 director's Glob was against main where they're not merged. judge.py FAIL_NUMERICAL on (i) norm_drift=9.8e-3 (physical K3 loss), (ii) Lz tracking absent (a discovery, not failure), (iii) falsification REFUTED (verdict, not failure). retries 1->2. T22: re-run with Lz tracking enabled OR compute Lz post-hoc from psi_snapshots.",
       "branch": "auto/turn_20_cdd0-control-m1-vs-m2-discriminator",
       "auto_commit": "8702cb8",
       "judge_issues": [
         "norm_drift=9.80e-03 exceeds tol 1e-08 (physical K3 loss for Lindblad RTP, ITP gate misapplied)",
         "Lz tracking was not enabled in the cdd0 run config (nor in the empirical baseline). The T19 Q19.1 discriminator requires Lz data. Future runs must add Lz to save_observables.",
-        "falsification_criterion REFUTED per implementer §7 (this IS the verdict on T19 §2.5.2 sub-Landau-dormant claim — not a simulation failure)"
+        "falsification_criterion REFUTED per implementer \u00a77 (this IS the verdict on T19 \u00a72.5.2 sub-Landau-dormant claim \u2014 not a simulation failure)"
       ],
       "metrics": {
         "delta_cdd0_peratom": -5.9846,
@@ -902,8 +902,8 @@
         "lz_per_atom_plus_omega": null,
         "lz_per_atom_minus_omega": null,
         "n_csv_rows": 604,
-        "fz_pops_consistency_max": 0.00000117,
-        "pop_sum_deviation_max": 1.59E-7,
+        "fz_pops_consistency_max": 1.17e-06,
+        "pop_sum_deviation_max": 1.59e-07,
         "tau_barnett_minus_omega_cdd0": 2.84,
         "tau_barnett_plus_omega_cdd0": null,
         "falsification_result": "INCONCLUSIVE_LZ_ABSENT"
@@ -960,10 +960,10 @@
       "subagent": "implementer",
       "branch": "auto/turn_21_lz-posthoc-extraction-from-psi",
       "auto_commit": "37ea5d0",
-      "output": "Implementer wrote scripts/diagnostic/lz_extraction_from_snapshots.jl (14903B) + scripts/diagnostic/lz_vs_fz_plot.py (2446B) + runs/_loop/sim/turn_21.md (10514B). Verified all 4 jld2 files present (cdd0 stir_±0.5: 877/792 MB; empirical stir_±0.5: 967 MB each). Confirmed frame_NNNNN keys = ComplexF32 4D (32x32x32x13), 302 snapshots per run. Verified Lz column STRUCTURALLY absent from all 604 rows of both trajectory.csv files (spinor save_rotating_result.jl:251-257 only saves Lz if haskey(dyn, :Lz) and spinor pipeline never sets it). BLOCKED: julia binary requires sandbox approval in unattended loop session; both implementer agent and orchestrator hit the same gate. Lz extraction NOT executed this turn. Q19.1 status remains INCONCLUSIVE. Script + plot are validated against production code paths (currents.jl:45-84, grid.jl:48-59, save_rotating_result.jl:280-287) and ready for anko manual run: /home/suzume/.juliaup/bin/julia --project=. scripts/diagnostic/lz_extraction_from_snapshots.jl (est. ~5 min JIT + 1-2 min compute).",
+      "output": "Implementer wrote scripts/diagnostic/lz_extraction_from_snapshots.jl (14903B) + scripts/diagnostic/lz_vs_fz_plot.py (2446B) + runs/_loop/sim/turn_21.md (10514B). Verified all 4 jld2 files present (cdd0 stir_\u00b10.5: 877/792 MB; empirical stir_\u00b10.5: 967 MB each). Confirmed frame_NNNNN keys = ComplexF32 4D (32x32x32x13), 302 snapshots per run. Verified Lz column STRUCTURALLY absent from all 604 rows of both trajectory.csv files (spinor save_rotating_result.jl:251-257 only saves Lz if haskey(dyn, :Lz) and spinor pipeline never sets it). BLOCKED: julia binary requires sandbox approval in unattended loop session; both implementer agent and orchestrator hit the same gate. Lz extraction NOT executed this turn. Q19.1 status remains INCONCLUSIVE. Script + plot are validated against production code paths (currents.jl:45-84, grid.jl:48-59, save_rotating_result.jl:280-287) and ready for anko manual run: /home/suzume/.juliaup/bin/julia --project=. scripts/diagnostic/lz_extraction_from_snapshots.jl (est. ~5 min JIT + 1-2 min compute).",
       "judge_issues": [],
       "judge_warnings": [
-        "Julia binary execution requires sandbox approval — script written but unexecuted",
+        "Julia binary execution requires sandbox approval \u2014 script written but unexecuted",
         "Lz column NaN in all 4 trajectory CSVs; Q19.1 INCONCLUSIVE persists",
         "Plot turn_21_lz_comparison.png shows Fz only; Lz panel empty pending julia run",
         "cdd0 trajectory.csv was restored from auto/turn_20 commit 96215fd (was not in main)"
@@ -1033,7 +1033,7 @@
         "theorist": "7dc4ee3ff52bbf29a6665526f84ed091"
       },
       "subagent": "critic",
-      "output": "runs/_loop/judge/turn_22_critic_audit.md (4-gap audit + 7 numbered findings + T23 dispatch recommendation). VERDICT: WEAK_PASS. M1-DOMINANT verdict labels survive the M2-refutation negative-inference but quantitative pre-registration is absent (T19 §2.6 row B band [-6.1,-3.1] is empirical-tuned around -4.60, not a forward prediction). Candidate D enumeration missing: D1 (Born-Markov rate asymmetry via Omega-shifted Bohr frequency) and D2 (pure spin-only with T18-vs-T20 spatial-mode mismatch) both survive c_dd=0 control. T19 §2.7's rigorous sub-Landau Landau-criterion derivation has M1 dormant at Omega<omega_perp — T20 data refutes §2.7 (not §2.5.2 as anko stated), but the mechanism keeping M1 active is NOT derived in T19. seed.md L14 'DDI not load-bearing' overreaches: tau_Barnett(c_dd=0,-Omega)=2.84 omega^-1 is 2-3x faster than empirical 4.8-9.7 omega^-1; |Delta| at c_dd=0 is 5.985 vs empirical 4.60 (30% larger) — DDI suppresses both rate and magnitude by ~25-50%. T23 recommendation: theorist M1 reconciliation + Candidate D enumeration + julia-light third control (Omega=1.2 supra-Landau OR gamma_dr=0.005 quarter strength) that discriminates without Lz data.",
+      "output": "runs/_loop/judge/turn_22_critic_audit.md (4-gap audit + 7 numbered findings + T23 dispatch recommendation). VERDICT: WEAK_PASS. M1-DOMINANT verdict labels survive the M2-refutation negative-inference but quantitative pre-registration is absent (T19 \u00a72.6 row B band [-6.1,-3.1] is empirical-tuned around -4.60, not a forward prediction). Candidate D enumeration missing: D1 (Born-Markov rate asymmetry via Omega-shifted Bohr frequency) and D2 (pure spin-only with T18-vs-T20 spatial-mode mismatch) both survive c_dd=0 control. T19 \u00a72.7's rigorous sub-Landau Landau-criterion derivation has M1 dormant at Omega<omega_perp \u2014 T20 data refutes \u00a72.7 (not \u00a72.5.2 as anko stated), but the mechanism keeping M1 active is NOT derived in T19. seed.md L14 'DDI not load-bearing' overreaches: tau_Barnett(c_dd=0,-Omega)=2.84 omega^-1 is 2-3x faster than empirical 4.8-9.7 omega^-1; |Delta| at c_dd=0 is 5.985 vs empirical 4.60 (30% larger) \u2014 DDI suppresses both rate and magnitude by ~25-50%. T23 recommendation: theorist M1 reconciliation + Candidate D enumeration + julia-light third control (Omega=1.2 supra-Landau OR gamma_dr=0.005 quarter strength) that discriminates without Lz data.",
       "branch": null,
       "commit": null,
       "parent": null,
@@ -1042,17 +1042,62 @@
         "researcher": null,
         "implementer": null,
         "critic": null,
-        "orchestrator": null,
-        "total": null
+        "orchestrator": 8209662,
+        "total": 8209662,
+        "effective_full_rate": 1469878,
+        "breakdown": {
+          "input_fresh": 29051,
+          "cache_creation": 425142,
+          "cache_read": 7728152,
+          "output": 27317
+        },
+        "n_messages": 50,
+        "n_message_starts": 50
       },
-      "notes": "Director route (d) critic_audit per T22 §6 dispatch. M1-DOMINANT label downgrades to M1-PLAUSIBLE in campaign record. Critic returned text response (read-only per critic.md §A2); orchestrator materialized to runs/_loop/judge/turn_22_critic_audit.md. Drift T21 (DRIFT_SUBAGENT_REPETITION 1.0, DRIFT_MANUSCRIPT_DELTA_ZERO, DRIFT_COST_INFLATION) addressed: rotation reset (critic≠implementer; last critic T16, 6 turns ago), manuscript defer per anko policy, cost reduction (critic ~1.0M target vs T21's 2.38M, 58% reduction). T23 will route to theorist (rotation continues) for M1 reconciliation + Candidate D enumeration."
+      "notes": "Director route (d) critic_audit per T22 \u00a76 dispatch. M1-DOMINANT label downgrades to M1-PLAUSIBLE in campaign record. Critic returned text response (read-only per critic.md \u00a7A2); orchestrator materialized to runs/_loop/judge/turn_22_critic_audit.md. Drift T21 (DRIFT_SUBAGENT_REPETITION 1.0, DRIFT_MANUSCRIPT_DELTA_ZERO, DRIFT_COST_INFLATION) addressed: rotation reset (critic\u2260implementer; last critic T16, 6 turns ago), manuscript defer per anko policy, cost reduction (critic ~1.0M target vs T21's 2.38M, 58% reduction). T23 will route to theorist (rotation continues) for M1 reconciliation + Candidate D enumeration.",
+      "drift_signals": {
+        "topic_repetition": 0.0,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.5,
+        "cost_inflation": 0.929,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "advisory",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO"
+      ]
+    },
+    {
+      "turn": 23,
+      "ts": "2026-05-16T14:18:37Z",
+      "judge_status": "REJECTED",
+      "directive_action": "run_experiment",
+      "directive_label": "qtr-gamma-dr-d2-discriminator-blocked-by-sandbox",
+      "wall_time_sec": null,
+      "subagent": "implementer",
+      "output": "Implementer wrote runs/eu151_barnett_spin_cdd0_qtr_gamma/config.yaml (gamma_dr=0.005 quarter-strength, c_dd=0, Omega=\u00b10.5 scan zip) and committed to auto/turn_23_qtr-gamma-dr-d2-discriminator @ 245b046. Sim report at runs/_loop/sim/turn_23.md (178 lines). REJECTED reason: julia binary /home/suzume/.juliaup/bin/julia requires sandbox approval in unattended session (same gate as T21). Both pre-flight estimate_run_budget and GPU run blocked. Manual command documented in sim \u00a76.",
+      "branch": "auto/turn_23_qtr-gamma-dr-d2-discriminator",
+      "auto_commit": "245b046",
+      "rejected_reason": "julia_binary_sandbox_approval_required",
+      "commit": null,
+      "parent": null,
+      "notes": "Theorist (15% mechanism-rejection outcome) recommended D2-EXTENDED-PLAUSIBLE migration from M1-PLAUSIBLE after all M1 sub-mechanisms (M1a finite-T vortex, M1b inhomogeneous-cloud, M1c DDI-lowered threshold) rejected. M1a fails by ~100 orders of magnitude (e^-250 Boltzmann weight at T_eff/omega_perp ~ 4e-3); M1b/M1c excluded by c_dd=0. Falsification preregistered in theorist \u00a77: Delta in [-2.5, -0.5] confirms D2-extended; Delta in [-5.1, -4.0] revives M1-saturation. T21 sandbox blocker repeated; retries 0->1. T24 options: (a) anko manual julia run, (b) theorist Q23.1 closed-form spatial-mode sign-flip, (c) noop pending unblock. retries=3 escalates to human_required.",
+      "agent_hashes": {
+        "critic": "517f7ca0fbb994ee3a350df682aaaa38",
+        "director": "76daad1fe35797f8cc48e327acdea9b8",
+        "implementer": "a8e150ccbd52b496d6c4550016784955",
+        "researcher": "74b438ed4a1609ab14345c66e6bf60ef",
+        "theorist": "7dc4ee3ff52bbf29a6665526f84ed091"
+      }
     }
   ],
   "created_at": "2026-05-14T00:00:00+00:00",
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "CRITIC_WEAK_PASS",
+  "last_judge": "REJECTED",
   "home_branch": "main",
   "schema_version": 1,
   "current_agent_hashes": {
@@ -1062,8 +1107,8 @@
     "researcher": "74b438ed4a1609ab14345c66e6bf60ef",
     "theorist": "7dc4ee3ff52bbf29a6665526f84ed091"
   },
-  "last_directive_label": "T20-m1-dominant-verdict-audit",
-  "last_directive_action": "critic_audit",
+  "last_directive_label": "qtr-gamma-dr-d2-discriminator-blocked-by-sandbox",
+  "last_directive_action": "run_experiment",
   "last_error": null,
-  "retries": 0
+  "retries": 1
 }
