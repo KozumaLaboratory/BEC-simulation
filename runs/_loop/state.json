@@ -1,7 +1,7 @@
 {
   "turn": 20,
   "status": "running",
-  "retries": 1,
+  "retries": 2,
   "history": [
     {
       "turn": 0,
@@ -431,11 +431,11 @@
         "director": "cb0ea1a88213bfc3b5ab069142101c47"
       },
       "subagent": "critic",
-      "output": "runs/_loop/judge/turn_12_critic_audit.md (Audit-1..10 per-item + 5 specific findings + T13 recommendation). Verdict WEAK_PASS. Central finding (Audit-5 FAIL): T11 \u00a72.6 eq (6) uses rank-1 |F_-|^2=12 enhancement, but codebase (losses.jl:144-176) implements rank-2 spherical tensor with \u0394m\u2208{-1,-2} summed and normalized to average=\u0393_dr. The factor-12 numerical match is coincidence-of-notation, not a derivation. Audit-1,2,3,6,7,8,9 PASS; Audit-4,10 WEAK_PASS (discrete-grid DDI invariance Q4 unresolved). [Refuted] verdict against anko's secular-DDI-suppression hypothesis is PROVISIONALLY SOUND pending c_dd=0 control (\u00a75.4). \u03b3_dr=0 julia (\u00a75.3) is the right first dispatch at 22:00 JST.",
+      "output": "runs/_loop/judge/turn_12_critic_audit.md (Audit-1..10 per-item + 5 specific findings + T13 recommendation). Verdict WEAK_PASS. Central finding (Audit-5 FAIL): T11 §2.6 eq (6) uses rank-1 |F_-|^2=12 enhancement, but codebase (losses.jl:144-176) implements rank-2 spherical tensor with Δm∈{-1,-2} summed and normalized to average=Γ_dr. The factor-12 numerical match is coincidence-of-notation, not a derivation. Audit-1,2,3,6,7,8,9 PASS; Audit-4,10 WEAK_PASS (discrete-grid DDI invariance Q4 unresolved). [Refuted] verdict against anko's secular-DDI-suppression hypothesis is PROVISIONALLY SOUND pending c_dd=0 control (§5.4). γ_dr=0 julia (§5.3) is the right first dispatch at 22:00 JST.",
       "branch": null,
       "commit": null,
       "parent": null,
-      "notes": "Critic audit route (d) per director T12 dispatch. Director chose critic to gate the 22:00 JST julia \u03b3_dr=0 falsifier before resource commit (~45 min GPU + ~3M tokens) on un-audited T11 mechanism. Critic returned VERDICT: WEAK_PASS with one load-bearing FAIL on Audit-5 (rank-1 vs rank-2 CG mismatch) \u2014 qualitative mechanism survives, prefactor unjustified. T13 should: (a) keep julia \u03b3_dr=0 queued for 22:00 JST as planned, (b) parallel-dispatch a short theorist or implementer_sympy to compute the actual rank-2 CG top-rung enhancement, (c) bank T11's qualitative scaling \u03c4\u223c1/(\u03b3_dr\u00b7W_F^CG) but NOT the specific factor 12, (d) treat [Refuted] of secular-DDI as [Plausibly Refuted] until c_dd=0 control runs.",
+      "notes": "Critic audit route (d) per director T12 dispatch. Director chose critic to gate the 22:00 JST julia γ_dr=0 falsifier before resource commit (~45 min GPU + ~3M tokens) on un-audited T11 mechanism. Critic returned VERDICT: WEAK_PASS with one load-bearing FAIL on Audit-5 (rank-1 vs rank-2 CG mismatch) — qualitative mechanism survives, prefactor unjustified. T13 should: (a) keep julia γ_dr=0 queued for 22:00 JST as planned, (b) parallel-dispatch a short theorist or implementer_sympy to compute the actual rank-2 CG top-rung enhancement, (c) bank T11's qualitative scaling τ∼1/(γ_dr·W_F^CG) but NOT the specific factor 12, (d) treat [Refuted] of secular-DDI as [Plausibly Refuted] until c_dd=0 control runs.",
       "tokens_used": {
         "theorist": null,
         "researcher": null,
@@ -818,7 +818,7 @@
       },
       "subagent": "implementer",
       "output": "runs/_loop/sim/turn_20.md (282 lines). Salvage analysis of timed-out T20 julia c_dd=0 control. Delta_cdd0 = -5.98 (per-atom; sign convention (-Omega)-(+Omega)). Verdict: M1-DOMINANT. T19 sec 2.5.2 sub-Landau-dormant [Plausible-Speculative] REFUTED. T19 M1 prediction (Delta ~ -4.6) confirmed at sign and within 30 pct magnitude. T18 spin-only Lindblad sign-opposite (+5.95 vs -5.98) -- orbital DOF reverses the spin-only prediction even at c_dd=0. judge.py FAIL_NUMERICAL flagged norm_drift=9.7e-3 (physical K3 loss for Lindblad, expected) and 'falsification_criterion REFUTED' (this IS the result, refuting T19 sec 2.5.2 claim, not a sim failure). Trusted judge per protocol. retries=1, turn stays at 20.",
-      "branch": "auto/turn_20_cdd0-control-m1-vs-m2-discriminator",
+      "branch": null,
       "auto_commit": "96215fd",
       "judge_issues": [
         "norm_drift=9.70e-03 exceeds tol 1e-08 (physical K3 loss in Lindblad evolution, documented PASS in sim sec 7 warnings)",
@@ -833,22 +833,84 @@
         "tau_barnett_plus_omega_cdd0": null,
         "norm_final": 0.9903,
         "n_csv_rows": 604,
-        "falsification_result": "REFUTED_T19_\u00a72.5.2"
+        "falsification_result": "REFUTED_T19_§2.5.2"
       },
       "drift_signals": {
         "topic_repetition": 0.0,
         "subagent_repetition": 0.333,
         "manuscript_delta_zero": 1.0,
-        "code_delta_zero": 0.0,
-        "verdict_drift": 0.5,
-        "cost_inflation": 1.669,
+        "code_delta_zero": 1.0,
+        "verdict_drift": 0.6,
+        "cost_inflation": 1.569,
         "novel_claim_zero": 0.0
       },
-      "drift_escalation": "director_must_address",
+      "drift_escalation": "human_required",
       "drift_advisories": [
         "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "DRIFT_CODE_DELTA_ZERO",
         "DRIFT_COST_INFLATION"
-      ]
+      ],
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 14650623,
+        "total": 14650623,
+        "effective_full_rate": 2131161,
+        "breakdown": {
+          "input_fresh": 15559,
+          "cache_creation": 438792,
+          "cache_read": 14166173,
+          "output": 30099
+        },
+        "n_messages": 103,
+        "n_message_starts": 103
+      },
+      "commit": null,
+      "parent": null
+    },
+    {
+      "turn": 20,
+      "ts": "2026-05-16T21:25:00+09:00",
+      "judge_status": "FAIL_NUMERICAL",
+      "directive_action": "analyze_existing",
+      "directive_label": "cdd0-lz-extraction-via-redo-discovers-lz-absent",
+      "wall_time_sec": 492,
+      "agent_hashes": {
+        "critic": "517f7ca0fbb994ee3a350df682aaaa38",
+        "theorist": "7dc4ee3ff52bbf29a6665526f84ed091",
+        "researcher": "74b438ed4a1609ab14345c66e6bf60ef",
+        "implementer": "a8e150ccbd52b496d6c4550016784955",
+        "director": "cb0ea1a88213bfc3b5ab069142101c47"
+      },
+      "subagent": "implementer",
+      "output": "T20 RETRY (attempt 2): Implementer ran extract_trajectory.jl + analyze_lz.py on cdd0 jld2 files. Trajectory.csv (605 lines, 136KB) produced; analyze_lz.png produced. KEY FINDING: dynamics/Lz was NOT saved in either stir_+0.5 or stir_-0.5 result.jld2 — Lz column is all-NaN for both runs (also true for empirical baseline). T19 §2.9 Q19.1 ⟨L_z⟩/N discriminator test is INCONCLUSIVE — data does not exist. Verified populations + Fz sanity (max |sum(pop)-1|=1.6e-7, max Fz consistency error=1.2e-6, 0 NaN in populations). Delta_cdd0=-5.9846 (M1-DOMINANT classification stands on endpoint pops alone). Audit found prior T20 'hallucinated' files actually DO exist on the auto branch (commit 96215fd) — director's Glob was against main where they're not merged. judge.py FAIL_NUMERICAL on (i) norm_drift=9.8e-3 (physical K3 loss), (ii) Lz tracking absent (a discovery, not failure), (iii) falsification REFUTED (verdict, not failure). retries 1->2. T22: re-run with Lz tracking enabled OR compute Lz post-hoc from psi_snapshots.",
+      "branch": "auto/turn_20_cdd0-control-m1-vs-m2-discriminator",
+      "auto_commit": "8702cb8",
+      "judge_issues": [
+        "norm_drift=9.80e-03 exceeds tol 1e-08 (physical K3 loss for Lindblad RTP, ITP gate misapplied)",
+        "Lz tracking was not enabled in the cdd0 run config (nor in the empirical baseline). The T19 Q19.1 discriminator requires Lz data. Future runs must add Lz to save_observables.",
+        "falsification_criterion REFUTED per implementer §7 (this IS the verdict on T19 §2.5.2 sub-Landau-dormant claim — not a simulation failure)"
+      ],
+      "metrics": {
+        "delta_cdd0_peratom": -5.9846,
+        "mz_final_plus_omega": 5.9918,
+        "mz_final_minus_omega": 0.0072,
+        "norm_final_plus_omega": 0.990338,
+        "norm_final_minus_omega": 0.990199,
+        "lz_tracking_in_jld2": false,
+        "lz_per_atom_plus_omega": null,
+        "lz_per_atom_minus_omega": null,
+        "n_csv_rows": 604,
+        "fz_pops_consistency_max": 1.17e-06,
+        "pop_sum_deviation_max": 1.59e-07,
+        "tau_barnett_minus_omega_cdd0": 2.84,
+        "tau_barnett_plus_omega_cdd0": null,
+        "falsification_result": "INCONCLUSIVE_LZ_ABSENT"
+      },
+      "commit": null,
+      "parent": null
     }
   ],
   "created_at": "2026-05-14T00:00:00+00:00",
@@ -860,12 +922,12 @@
   "schema_version": 1,
   "current_agent_hashes": {
     "critic": "517f7ca0fbb994ee3a350df682aaaa38",
-    "director": "cb0ea1a88213bfc3b5ab069142101c47",
-    "implementer": "a8e150ccbd52b496d6c4550016784955",
+    "theorist": "7dc4ee3ff52bbf29a6665526f84ed091",
     "researcher": "74b438ed4a1609ab14345c66e6bf60ef",
-    "theorist": "7dc4ee3ff52bbf29a6665526f84ed091"
+    "implementer": "a8e150ccbd52b496d6c4550016784955",
+    "director": "cb0ea1a88213bfc3b5ab069142101c47"
   },
   "last_directive_label": "cdd0-control-m1-vs-m2-discriminator",
   "last_directive_action": "analyze_existing",
-  "last_error": "T20 judge.py FAIL_NUMERICAL on norm_drift (Lindblad K3 loss = physical) + falsification_criterion REFUTED (T19 sec 2.5.2 sub-Landau-dormant claim refuted, the desired outcome). Sim physically clean: M1-DOMINANT verdict, Delta_cdd0=-5.98 within 30 pct of T19 M1 prediction -4.6. Judge thresholds misclassify a successful Lindblad analysis. T21 director should consider critic_audit route to confirm the verdict OR theorist to re-derive sub-Landau M1 mechanism."
+  "last_error": "T20 retry FAIL_NUMERICAL: judge.py flagged norm_drift (physical K3) + Lz-absence (a discovery, not failure) + falsification REFUTED (the verdict). Real finding: dynamics/Lz NOT saved in cdd0 jld2 (or empirical baseline). T19 Q19.1 INCONCLUSIVE due to data absence. retries 1->2, turn unchanged per protocol Step 5c FAIL_NUMERICAL retry<3."
 }
