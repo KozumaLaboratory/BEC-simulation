@@ -1,0 +1,64 @@
+{
+  "turn": 24,
+  "status": "FAIL_PHYSICS",
+  "issues": [
+    "S3 ratio Gamma(beta_-)/Gamma(beta_+) = 1.087 at single-atom level: factor-27 rate gap is NOT explained by single-particle Rabi-tilt asymmetry; Dicke-collective N-body mechanism required if the gap is real",
+    "S1 beta_+ populations peak at m=-4 (0.294), not m=0 as theorist expected_form stated (max ~0.22 at m=0 is wrong by 30%); the distribution is distinctly sub-zero-heavy"
+  ],
+  "metrics": {
+    "experiment_kind": "modify_only",
+    "norm_initial": null,
+    "norm_final": null,
+    "norm_drift": null,
+    "energy_initial": null,
+    "energy_final": null,
+    "energy_monotonic": null,
+    "mz_target": null,
+    "mz_final": null,
+    "fitted_order": null,
+    "fit_dt_range": null,
+    "fit_r_squared": null,
+    "wall_time_sec": 62.0,
+    "peak_memory_gb": null,
+    "tests_passed": true,
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "total": null
+    },
+    "warnings": [],
+    "physical_red_flags": [
+      "S3 ratio Gamma(beta_-)/Gamma(beta_+) = 1.087 at single-atom level: factor-27 rate gap is NOT explained by single-particle Rabi-tilt asymmetry; Dicke-collective N-body mechanism required if the gap is real",
+      "S1 beta_+ populations peak at m=-4 (0.294), not m=0 as theorist expected_form stated (max ~0.22 at m=0 is wrong by 30%); the distribution is distinctly sub-zero-heavy"
+    ],
+    "falsification_result": "CONFIRMED",
+    "compute_results": [
+      {
+        "id": "S1",
+        "task": "Compute Wigner d^F=6 matrix elements d^6_{m,m'}(beta) at beta=15.1 deg and beta=130 deg, then form the coherent-state rotation R_y(beta)|+F> = sum_m d^6_{m,F}(beta)|m>. Output the populations |d^6_{m,F}(beta)|^2 for m=-6..+6 at both tilts.",
+        "status": "OK",
+        "result": "=== beta_+ = 130 deg ===\n|d^6_{m=-6,+F}(beta_+)|^2 = 0.094323\n|d^6_{m=-5,+F}(beta_+)|^2 = 0.24612\n|d^6_{m=-4,+F}(beta_+)|^2 = 0.29434\n|d^6_{m=-3,+F}(beta_+)|^2 = 0.21334\n|d^6_{m=-2,+F}(beta_+)|^2 = 0.10438\n|d^6_{m=-1,+F}(beta_+)|^2 = 0.036313\n|d^6_{m=0,+F}(beta_+)|^2 = 0.0092121\n|d^6_{m=1,+F}(beta_+)|^2 = 0.0017170\n|d^6_{m=2,+F}(beta_+)|^2 = 0.00023334\n|d^6_{m=3,+F}(beta_+)|^2 = 0.000022550\n|d^6_{m=4,+F}(beta_+)|^2 = 0.0000014710\n|d^6_{m=5,+F}(beta_+)|^2 = 5.8156E-8\n|d^6_{m=6,+F}(beta_+)|^2 = 1.0538E-9\n=== beta_- = 15.1 deg ===\n|d^6_{m=-6,+F}(beta_-)|^2 = 7.0081E-22\n|d^6_{m=-5,+F}(beta_-)|^2 = 4.7873E-19\n|d^6_{m=-4,+F}(beta_-)|^2 = 1.4988E-16\n|d^6_{m=-3,+F}(beta_-)|^2 = 2.8440E-14\n|d^6_{m=-2,+F}(beta_-)|^2 = 3.6427E-12\n|d^6_{m=-1,+F}(beta_-)|^2 = 3.3178E-10\n|d^6_{m=0,+F}(beta_-)|^2 = 2.2034E-8\n|d^6_{m=1,+F}(beta_-)|^2 = 0.0000010751\n|d^6_{m=2,+F}(beta_-)|^2 = 0.000038250\n|d^6_{m=3,+F}(beta_-)|^2 = 0.00096773\n|d^6_{m=4,+F}(beta_-)|^2 = 0.016526\n|d^6_{m=5,+F}(beta_-)|^2 = 0.17105\n|d^6_{m=6,+F}(beta_-)|^2 = 0.81142"
+      },
+      {
+        "id": "S2",
+        "task": "Compute the rank-2 spherical tensor dissipator matrix elements |<m+q | T^2_q | m>|^2 for q=-1,-2 and m=-F..+F via Wigner 3-j coefficients.",
+        "status": "OK",
+        "result": "=== rank-2 q=-1 dissipator ===\n|<-6|T^2_{q=-1}|-5>|^2 = 0.31429\n|<-5|T^2_{q=-1}|-4>|^2 = 0.38571\n|<-4|T^2_{q=-1}|-3>|^2 = 0.31818\n|<-3|T^2_{q=-1}|-2>|^2 = 0.19481\n|<-2|T^2_{q=-1}|-1>|^2 = 0.077922\n|<-1|T^2_{q=-1}|0>|^2 = 0.0090909\n|<0|T^2_{q=-1}|1>|^2 = 0.0090909\n|<1|T^2_{q=-1}|2>|^2 = 0.077922\n|<2|T^2_{q=-1}|3>|^2 = 0.19481\n|<3|T^2_{q=-1}|4>|^2 = 0.31818\n|<4|T^2_{q=-1}|5>|^2 = 0.38571\n|<5|T^2_{q=-1}|6>|^2 = 0.31429\n=== rank-2 q=-2 dissipator ===\n|<-6|T^2_{q=-2}|-4>|^2 = 0.057143\n|<-5|T^2_{q=-2}|-3>|^2 = 0.14286\n|<-4|T^2_{q=-2}|-2>|^2 = 0.23377\n|<-3|T^2_{q=-2}|-1>|^2 = 0.31169\n|<-2|T^2_{q=-2}|0>|^2 = 0.36364\n|<-1|T^2_{q=-2}|1>|^2 = 0.38182\n|<0|T^2_{q=-2}|2>|^2 = 0.36364\n|<1|T^2_{q=-2}|3>|^2 = 0.31169\n|<2|T^2_{q=-2}|4>|^2 = 0.23377\n|<3|T^2_{q=-2}|5>|^2 = 0.14286\n|<4|T^2_{q=-2}|6>|^2 = 0.057143"
+      },
+      {
+        "id": "S3",
+        "task": "Compute total single-atom cascade rate Gamma_pm(beta) = sum_m |d^6_{m,F}(beta)|^2 * sum_q |<m+q|T^2_q|m>|^2.",
+        "status": "OK",
+        "result": "Gamma(beta_+) = 0.36916\nGamma(beta_-) = 0.40142\nRatio Gamma(beta_-)/Gamma(beta_+) = 1.0874"
+      },
+      {
+        "id": "S4",
+        "task": "Dicke-collective enhancement scaling analysis for rank-2 dissipator.",
+        "status": "OK",
+        "result": "Dicke-collective scaling for rank-2 dissipator at +max (Dicke state):\nq=-1 enhancement: J^2 / F^2 = N^2 (collective N^2 superradiance)\nq=-2 enhancement: J^4 / F^4 = N^4 (super-superradiance)\nAt large tilt (dispersed coherent state), enhancement loses N-scaling, reverts to factor 2F+1=13\nPredicted collective enhancement factor for aligned (beta=0): N=10^4 atoms gives 10^8 for q=-1\nPredicted collective enhancement at tilt 130 deg (dispersed): factor ~1\nPredicted collective enhancement at tilt 15 deg (mostly-aligned): factor ~ (cos(7.5)^4F)^N = ?"
+      }
+    ]
+  }
+}

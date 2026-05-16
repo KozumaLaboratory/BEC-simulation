@@ -1,5 +1,5 @@
 {
-  "turn": 24,
+  "turn": 25,
   "status": "running",
   "history": [
     {
@@ -1126,7 +1126,7 @@
     {
       "turn": 23,
       "ts": "2026-05-16T14:42:27Z",
-      "judge_status": "RESEARCHER_ONLY",
+      "judge_status": "PASS",
       "directive_action": "researcher",
       "directive_label": "q23-1-q23-2-literature-dossier-d2-extended-anchor",
       "wall_time_sec": null,
@@ -1138,9 +1138,9 @@
         "theorist": "7dc4ee3ff52bbf29a6665526f84ed091"
       },
       "subagent": "researcher",
-      "branch": null,
-      "commit": null,
-      "parent": null,
+      "branch": "auto/turn_23_qtr-gamma-dr-d2-discriminator",
+      "commit": "245b04625aad",
+      "parent": "0f6bfc63988e",
       "output": "Researcher (route b) wrote runs/_loop/research/turn_23.md (462 lines, ~26 KB). Q23.1 (D2-EXTENDED closed-form anchor): PARTIAL productive NOT_FOUND. Stamper-Kurn-Ueda 2013 RMP §VII covers inhomogeneous spinor dynamics (polar-core vortex, spin texture) but does NOT derive closed-form <F_z> asymmetry under rotating B-field cascade in trapped extended cloud. Klaus 2020-2024 NOT FOUND as published Eu-spinor-pumping work (anko Klaus 2022 magnetostir is internal label; real Eu literature: Miyazawa 2022 first Eu BEC arXiv:2207.11692 + Matsui 2026 EdH Science 391 arXiv:2504.17357 — coherent spin-to-orbit, NOT rotating-B cascade; Klaus group at Innsbruck is Er/Dy not Eu). Sinatra-Castin (J. Phys. B 35, 3599, 2002) + spinor-TW Bradley-Blakie (PRA 90, 023631, 2014) + beyond-SMA (arXiv:2301.06461) establish stochastic framework + spatial density profile matters for F=1 c_1≠0, NOT Lindblad cascade c_1=0 F=6. VERDICT: D2-EXTENDED closed-form genuinely NOVEL; literature establishes plausibility (beyond-SMA), no formula. T24 theorist anchor: position-resolved Bloch equation with local beta(r)=arctan[p_perp / (p_z - Omega - c_0 n(r))] where contact mean-field c_0 n(r) acts as spatially-varying Larmor correction. Q23.2 (sub-Landau driven excited-state populations): RESOLVED clean NOT_FOUND. Cooper 2008 Adv. Phys. 57, 539 (arXiv:0810.4398) treats rapid rotation near omega_perp, NOT sub-Landau+Lindblad. Fetter 2009 RMP 81, 647 (arXiv:0801.2952) treats vortex dynamics + anomalous modes + thermal QP effects, NOT driven open-system at sub-Landau. Sinha-Castin 2001 PRL 87, 190402 (NOT PRA as theorist wrote) treats coherent hydrodynamic instability at specific stir freqs, NOT Lindblad heating at Omega=0.5 omega_perp. VERDICT for M1: all three confirm vortex nucleation barrier ~hbar omega_perp at sub-Landau, corroborating T23 theorist M1a e^-250 Boltzmann weight. NO literature proposes Lindblad dissipator bypassing this barrier. M1 has NO positive literature support; D2-EXTENDED-PLAUSIBLE migration is literature-consistent. Q23.3 deferred to T25.",
       "judge_issues": [],
       "judge_warnings": [],
@@ -1157,14 +1157,59 @@
         "papers_cited_total": 8,
         "novel_closed_form_required": true
       },
-      "notes": "Director route (b) researcher-only per T23-retry-2. Theorist (T23-attempt-1) deliverables already in place; researcher closed named literature gap without julia dispatch (sandbox blocker bypassed; retries stays at 1, NOT escalated). Sources: Stamper-Kurn-Ueda 2013 RMP, Cooper 2008 Adv.Phys., Fetter 2009 RMP, Sinha-Castin 2001 PRL, Miyazawa 2022 Eu, Matsui 2026 Eu-EdH, beyond-SMA 2023, Bradley-Blakie 2014 spinor-TW. Net result: M1 literature-dead; D2-EXTENDED-PLAUSIBLE literature-supported; closed-form sign-flip mechanism is novel — theorist target for T24 is position-resolved Bloch with c_0 n(r) Larmor correction. T24 candidates: (a) theorist novel closed-form attempt with researcher anchor (recommended), (b) implementer_sympy on Q23.3 detailed-balance, (c) critic audit of T23 theorist §2.5-§2.10 algebra. Julia sandbox still blocked — anko-manual remains the path for the qtr-gamma confirmation (config at 245b046)."
+      "notes": "Director route (b) researcher-only per T23-retry-2. Theorist (T23-attempt-1) deliverables already in place; researcher closed named literature gap without julia dispatch (sandbox blocker bypassed; retries stays at 1, NOT escalated). Sources: Stamper-Kurn-Ueda 2013 RMP, Cooper 2008 Adv.Phys., Fetter 2009 RMP, Sinha-Castin 2001 PRL, Miyazawa 2022 Eu, Matsui 2026 Eu-EdH, beyond-SMA 2023, Bradley-Blakie 2014 spinor-TW. Net result: M1 literature-dead; D2-EXTENDED-PLAUSIBLE literature-supported; closed-form sign-flip mechanism is novel — theorist target for T24 is position-resolved Bloch with c_0 n(r) Larmor correction. T24 candidates: (a) theorist novel closed-form attempt with researcher anchor (recommended), (b) implementer_sympy on Q23.3 detailed-balance, (c) critic audit of T23 theorist §2.5-§2.10 algebra. Julia sandbox still blocked — anko-manual remains the path for the qtr-gamma confirmation (config at 245b046).",
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 9171056,
+        "total": 9171056,
+        "effective_full_rate": 1560780,
+        "breakdown": {
+          "input_fresh": 36452,
+          "cache_creation": 426862,
+          "cache_read": 8683257,
+          "output": 24485
+        },
+        "n_messages": 66,
+        "n_message_starts": 66
+      },
+      "drift_signals": {
+        "topic_repetition": 0.067,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.4,
+        "cost_inflation": 0.747,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "advisory",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO"
+      ]
+    },
+    {
+      "turn": 24,
+      "ts": "2026-05-16T15:15:48+00:00",
+      "judge_status": "FAIL_PHYSICS",
+      "directive_action": "compute_sympy",
+      "directive_label": "dicke-collective-sympy-falsified",
+      "wall_time_sec": 62.0,
+      "agent_hashes": {
+        "critic": "517f7ca0fbb994ee3a350df682aaaa38",
+        "director": "76daad1fe35797f8cc48e327acdea9b8",
+        "implementer": "a8e150ccbd52b496d6c4550016784955",
+        "researcher": "74b438ed4a1609ab14345c66e6bf60ef",
+        "theorist": "7dc4ee3ff52bbf29a6665526f84ed091"
+      }
     }
   ],
   "created_at": "2026-05-14T00:00:00+00:00",
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "RESEARCHER_ONLY",
+  "last_judge": "FAIL_PHYSICS",
   "home_branch": "main",
   "schema_version": 1,
   "current_agent_hashes": {
@@ -1174,7 +1219,7 @@
     "researcher": "74b438ed4a1609ab14345c66e6bf60ef",
     "theorist": "7dc4ee3ff52bbf29a6665526f84ed091"
   },
-  "last_directive_label": "qtr-gamma-dr-d2-discriminator-blocked-by-sandbox",
+  "last_directive_label": "dicke-collective-sympy-falsified",
   "last_directive_action": "run_experiment",
   "last_error": null,
   "retries": 1
