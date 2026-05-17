@@ -1,0 +1,146 @@
+{
+  "turn": 34,
+  "status": "PASS",
+  "issues": [],
+  "metrics": {
+    "experiment_kind": "modify_only",
+    "norm_initial": null,
+    "norm_final": null,
+    "norm_drift": null,
+    "energy_initial": null,
+    "energy_final": null,
+    "energy_monotonic": null,
+    "mz_target": null,
+    "mz_final": null,
+    "fitted_order": null,
+    "fit_dt_range": null,
+    "fit_r_squared": null,
+    "wall_time_sec": 180,
+    "peak_memory_gb": null,
+    "tests_passed": null,
+    "julia_invocation_count": 0,
+    "ground_state_jl_has_resolve_atom_helper": true,
+    "ground_state_jl_atom_obj_calls_helper": true,
+    "config_yaml_potential_type_is_harmonic": true,
+    "config_yaml_zeeman_key_present": true,
+    "config_yaml_B_key_absent": true,
+    "config_yaml_lhy_block_absent": true,
+    "config_yaml_initial_state_fl_vortex_absent": true,
+    "config_yaml_init_m_idx_present": true,
+    "sim_turn_34_md_exists_on_disk": true,
+    "sim_turn_34_dispatch_trace_section_complete": true,
+    "grep_count_resolve_atom_or_nothing_in_run_step_rotating_ground_state_jl": 2,
+    "grep_count_SpinorBEC_Eu151_in_run_step_rotating_ground_state_jl": 0,
+    "grep_count_potential_type_harmonic_in_config_yaml": 1,
+    "grep_count_potential_type_none_in_config_yaml": 0,
+    "grep_count_zeeman_p_in_config_yaml": 1,
+    "grep_count_lone_B_colon_at_indent_in_config_yaml": 0,
+    "grep_count_initial_state_fl_vortex_in_config_yaml": 0,
+    "grep_count_init_m_idx_in_config_yaml": 1,
+    "file_exists_runs_loop_sim_turn_34_md": true,
+    "grep_count_section_dispatch_path_trace_in_sim_turn_34_md": 1,
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "total": null
+    },
+    "warnings": [
+      "BUG-6 NEW (silent-ignore, non-fatal): tol: 1.0e-9 in config is NOT parsed by _run_rotating_basis_ground_state_step; find_ground_state_rotating! has no tol kwarg and runs exactly n_steps iterations. If GS is not converged at 5000 steps, increase n_steps.",
+      "BUG-7 POTENTIAL (latent, non-triggered): V_trap.omega field access at patched file line 183 would crash if init_sigma were absent from config \u2014 V_trap is a plain Array with no .omega field. Config supplies init_sigma: 2.0 so this branch is skipped. Risk for configs that omit init_sigma with omega=0 axes.",
+      "ddi: {enabled: true} block in config is a no-op for rotating_basis GS step \u2014 c_dd is set via auto_path, not via the ddi: block. ddi.enabled: false would NOT zero c_dd in rotating_basis GS. Documented as known gap."
+    ],
+    "physical_red_flags": [],
+    "falsification_result": "INCONCLUSIVE"
+  },
+  "contract_evaluation": {
+    "verdict": "PASS",
+    "criteria_results": [
+      {
+        "id": "ground_state_jl_helper_landed",
+        "passed": true,
+        "actual": 2,
+        "reason": "grep_count_resolve_atom_or_nothing_in_run_step_rotating_ground_state_jl=2 >= 2 \u2192 True"
+      },
+      {
+        "id": "ground_state_jl_atom_if_else_chain_removed",
+        "passed": true,
+        "actual": 0,
+        "reason": "grep_count_SpinorBEC_Eu151_in_run_step_rotating_ground_state_jl=0 == 0 \u2192 True"
+      },
+      {
+        "id": "config_yaml_potential_type_fixed",
+        "passed": true,
+        "actual": 1,
+        "reason": "grep_count_potential_type_harmonic_in_config_yaml=1 >= 1 \u2192 True"
+      },
+      {
+        "id": "config_yaml_potential_type_none_absent",
+        "passed": true,
+        "actual": 0,
+        "reason": "grep_count_potential_type_none_in_config_yaml=0 == 0 \u2192 True"
+      },
+      {
+        "id": "config_yaml_zeeman_key_present",
+        "passed": true,
+        "actual": 1,
+        "reason": "grep_count_zeeman_p_in_config_yaml=1 >= 1 \u2192 True"
+      },
+      {
+        "id": "config_yaml_B_key_at_pipeline_step_absent",
+        "passed": true,
+        "actual": 0,
+        "reason": "grep_count_lone_B_colon_at_indent_in_config_yaml=0 == 0 \u2192 True"
+      },
+      {
+        "id": "config_yaml_fl_vortex_absent",
+        "passed": true,
+        "actual": 0,
+        "reason": "grep_count_initial_state_fl_vortex_in_config_yaml=0 == 0 \u2192 True"
+      },
+      {
+        "id": "config_yaml_init_m_idx_present",
+        "passed": true,
+        "actual": 1,
+        "reason": "grep_count_init_m_idx_in_config_yaml=1 >= 1 \u2192 True"
+      },
+      {
+        "id": "sim_turn_34_md_artifact_on_disk",
+        "passed": true,
+        "actual": true,
+        "reason": "file_exists_runs_loop_sim_turn_34_md=True == True \u2192 True"
+      },
+      {
+        "id": "sim_turn_34_md_has_dispatch_trace",
+        "passed": true,
+        "actual": 1,
+        "reason": "grep_count_section_dispatch_path_trace_in_sim_turn_34_md=1 >= 1 \u2192 True"
+      },
+      {
+        "id": "wall_time_within_budget",
+        "passed": true,
+        "actual": 180,
+        "reason": "wall_time_sec=180 < 600 \u2192 True"
+      },
+      {
+        "id": "no_julia_invocation_this_turn",
+        "passed": true,
+        "actual": 0,
+        "reason": "julia_invocation_count=0 == 0 \u2192 True"
+      }
+    ],
+    "triggered_failure_modes": [],
+    "issues": []
+  },
+  "investigation_id": "yan-li-saito-2026-reproduction",
+  "stage_advancing_to": "Design",
+  "investigation_update": {
+    "if_success_advance_to_stage": "Execute",
+    "if_success_tier_becomes": 0.8,
+    "if_success_falsifier_update": "Design corrective REDO at T34: 3 config bugs + 1 code-level atom-resolution bug patched. Dispatch trace re-audited end-to-end (T32's audit-scope error fixed). T35 = re-attempt F1 Execute (julia_gpu) with the corrected contract. F1 (torus-density-peak-f1) still untested. Tier stays 0.8 pending Execute. On T35 PASS, tier \u2192 1.0. BUG-4 (fl_vortex topology) deferred to T36+ if Gaussian seed fails to relax to torus.",
+    "if_refuted_advance_to_stage": "Design",
+    "if_refuted_tier_becomes": 0.7,
+    "next_falsifier_to_test_after": "T35 = re-attempt F1 (torus density peak vs paper 13000 D\u2080 \u00b110%) + F4 (|E_LHY|/|E_ddi| free post-process). On F1 PASS: F2 design (Q4 target_Jz plumbing). On F1 FALSIFIED: Update stage with critic Q1/Q2 framework-gap audit. On F1 INCONCLUSIVE: grid refinement 96\u00b3 \u00d7 box 40 (T36). On data_gap again: critic out-of-template Cross-check (T36) with hard cap on Design redos at 3 (this is redo #2)."
+  }
+}

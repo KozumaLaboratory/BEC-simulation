@@ -1,5 +1,5 @@
 {
-  "turn": 34,
+  "turn": 35,
   "status": "running",
   "history": [
     {
@@ -1637,6 +1637,54 @@
         "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
         "director": "783bdf12151be93c1b84fdef10bec44b",
         "critic": "e4cc3ddb505396ed9e55914384944cbd"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 9980187,
+        "total": 9980187,
+        "effective_full_rate": 1503082,
+        "breakdown": {
+          "input_fresh": 15565,
+          "cache_creation": 348366,
+          "cache_read": 9597800,
+          "output": 18456
+        },
+        "n_messages": 105,
+        "n_message_starts": 105
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.444,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.5,
+        "cost_inflation": 0.837,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "advisory",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO"
+      ]
+    },
+    {
+      "turn": 34,
+      "ts": "2026-05-17T05:15:11Z",
+      "judge_status": "PASS",
+      "directive_action": "modify_code",
+      "directive_label": "yan-li-saito-f1-design-corrective-redo",
+      "wall_time_sec": 180,
+      "agent_hashes": {
+        "critic": "e4cc3ddb505396ed9e55914384944cbd",
+        "director": "783bdf12151be93c1b84fdef10bec44b",
+        "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+        "researcher": "5c6277ae5ff274765786dfb8c511b568",
+        "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
       }
     }
   ],
@@ -1644,15 +1692,15 @@
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "INCONCLUSIVE",
+  "last_judge": "PASS",
   "home_branch": "main",
   "schema_version": 2.1,
   "current_agent_hashes": {
-    "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b",
-    "researcher": "5c6277ae5ff274765786dfb8c511b568",
-    "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+    "critic": "e4cc3ddb505396ed9e55914384944cbd",
     "director": "783bdf12151be93c1b84fdef10bec44b",
-    "critic": "e4cc3ddb505396ed9e55914384944cbd"
+    "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+    "researcher": "5c6277ae5ff274765786dfb8c511b568",
+    "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
   },
   "last_directive_label": "yan-li-saito-f1-design-redo",
   "last_directive_action": "modify_code",
@@ -1829,5 +1877,5 @@
       "next_stage_action": "theorist formalizes hypothesis + designs the Design-after-critic patch; researcher pulls Reflexion / LATS / AI Scientist v2 critic-frequency patterns for grounding"
     }
   },
-  "last_meta_check_turn": 32
+  "last_meta_check_turn": 33
 }
