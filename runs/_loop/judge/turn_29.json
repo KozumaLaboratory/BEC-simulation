@@ -1,0 +1,152 @@
+{
+  "turn": 29,
+  "status": "INCONCLUSIVE",
+  "issues": [
+    "metric 'file_exists(runs/_loop/by_tag/barnett-mechanism-confirmed.md)' missing from sim metrics",
+    "metric 'grep_count('Bloch-Siegert' in runs/_loop/by_tag/barnett-mechanism-confirmed.md)' missing from sim metrics",
+    "metric 'grep_count('T23' in runs/_loop/by_tag/barnett-mechanism-confirmed.md)' missing from sim metrics",
+    "metric 'state.json.investigations.barnett-mechanism-2026-05-16.tier_current' missing from sim metrics",
+    "metric 'state.json.investigations.barnett-mechanism-2026-05-16.current_stage' missing from sim metrics",
+    "metric 'state.json.investigations.yan-li-saito-2026-reproduction.priority' missing from sim metrics",
+    "metric 'state.json.active_investigation_id' missing from sim metrics",
+    "metric 'grep_count('T29' in runs/_loop/by_tag/barnett.md)' missing from sim metrics"
+  ],
+  "metrics": {
+    "experiment_kind": "modify_only",
+    "norm_initial": null,
+    "norm_final": null,
+    "norm_drift": null,
+    "energy_initial": null,
+    "energy_final": null,
+    "energy_monotonic": null,
+    "mz_target": null,
+    "mz_final": null,
+    "fitted_order": null,
+    "fit_dt_range": null,
+    "fit_r_squared": null,
+    "wall_time_sec": 180,
+    "peak_memory_gb": null,
+    "tests_passed": null,
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "total": null
+    },
+    "warnings": [],
+    "physical_red_flags": [],
+    "falsification_result": "CONFIRMED",
+    "canonical_action_used": "modify_code (text-only; document_investigation_closure treated as modify_code-class per prompt instruction)",
+    "success_criteria_assertions": {
+      "memo_created": true,
+      "memo_contains_errata": true,
+      "memo_errata_bloch_siegert_count": 5,
+      "memo_contains_sign_chain": true,
+      "memo_sign_chain_T23_count": 2,
+      "memo_sections_present": [
+        "Investigation",
+        "Verified closed form",
+        "Empirical anchors",
+        "Sign-chain history (load-bearing for reproducibility)",
+        "ERRATA (sim/turn_27.md \u00a76)",
+        "Cascade-vs-Barnett separation",
+        "Falsifier final state",
+        "Downstream cross-link",
+        "References"
+      ],
+      "state_tier_promoted": true,
+      "state_tier_current_value": 3.0,
+      "state_stage_closed": true,
+      "state_stage_value": "closed",
+      "yan_li_saito_activated": true,
+      "yan_li_saito_priority_value": 1,
+      "active_investigation_switched": true,
+      "active_investigation_value": "yan-li-saito-2026-reproduction",
+      "history_t29_appended": true,
+      "history_total_barnett_turns": 19,
+      "state_assertions_passed": 4,
+      "files_created": 1,
+      "files_appended": 1,
+      "files_edited": 1
+    }
+  },
+  "contract_evaluation": {
+    "verdict": "INCONCLUSIVE",
+    "criteria_results": [
+      {
+        "id": "memo_created",
+        "passed": null,
+        "actual": null,
+        "reason": "metric 'file_exists(runs/_loop/by_tag/barnett-mechanism-confirmed.md)' missing from sim metrics"
+      },
+      {
+        "id": "memo_contains_errata",
+        "passed": null,
+        "actual": null,
+        "reason": "metric 'grep_count('Bloch-Siegert' in runs/_loop/by_tag/barnett-mechanism-confirmed.md)' missing from sim metrics"
+      },
+      {
+        "id": "memo_contains_sign_chain",
+        "passed": null,
+        "actual": null,
+        "reason": "metric 'grep_count('T23' in runs/_loop/by_tag/barnett-mechanism-confirmed.md)' missing from sim metrics"
+      },
+      {
+        "id": "state_tier_promoted",
+        "passed": null,
+        "actual": null,
+        "reason": "metric 'state.json.investigations.barnett-mechanism-2026-05-16.tier_current' missing from sim metrics"
+      },
+      {
+        "id": "state_stage_closed",
+        "passed": null,
+        "actual": null,
+        "reason": "metric 'state.json.investigations.barnett-mechanism-2026-05-16.current_stage' missing from sim metrics"
+      },
+      {
+        "id": "yan_li_saito_activated",
+        "passed": null,
+        "actual": null,
+        "reason": "metric 'state.json.investigations.yan-li-saito-2026-reproduction.priority' missing from sim metrics"
+      },
+      {
+        "id": "active_investigation_switched",
+        "passed": null,
+        "actual": null,
+        "reason": "metric 'state.json.active_investigation_id' missing from sim metrics"
+      },
+      {
+        "id": "history_t29_appended",
+        "passed": null,
+        "actual": null,
+        "reason": "metric 'grep_count('T29' in runs/_loop/by_tag/barnett.md)' missing from sim metrics"
+      }
+    ],
+    "triggered_failure_modes": [],
+    "issues": [
+      "metric 'file_exists(runs/_loop/by_tag/barnett-mechanism-confirmed.md)' missing from sim metrics",
+      "metric 'grep_count('Bloch-Siegert' in runs/_loop/by_tag/barnett-mechanism-confirmed.md)' missing from sim metrics",
+      "metric 'grep_count('T23' in runs/_loop/by_tag/barnett-mechanism-confirmed.md)' missing from sim metrics",
+      "metric 'state.json.investigations.barnett-mechanism-2026-05-16.tier_current' missing from sim metrics",
+      "metric 'state.json.investigations.barnett-mechanism-2026-05-16.current_stage' missing from sim metrics",
+      "metric 'state.json.investigations.yan-li-saito-2026-reproduction.priority' missing from sim metrics",
+      "metric 'state.json.active_investigation_id' missing from sim metrics",
+      "metric 'grep_count('T29' in runs/_loop/by_tag/barnett.md)' missing from sim metrics"
+    ]
+  },
+  "investigation_id": "barnett-mechanism-2026-05-16",
+  "stage_advancing_to": "Document",
+  "investigation_update": {
+    "if_success_advance_to_stage": "closed",
+    "if_success_tier_becomes": 3.0,
+    "if_success_falsifier_update": {
+      "id": "gamma-dr-zero-control",
+      "tested_at_turn": 27,
+      "result_template": "T28 critic CORROBORATE: closed-form \u03c4_Barnett(\u03a9, p_z, p_perp, F) confirmed independently via Heisenberg + Slichter Ch. 2 derivation; sign-chain T23 wrong \u2192 T24 falsified \u2192 T27 corrected \u2192 T28 third-route confirmed. Tier 2.5 \u2192 3.0 at T29 Document. ERRATA: 5.5pct \u03c4-residual is Bloch-Siegert (Slichter \u00a72.7), NOT spatial GP mean-field as sim/turn_27 \u00a76 misattributed."
+    },
+    "if_refuted_advance_to_stage": "Update",
+    "if_refuted_tier_becomes": 2.5,
+    "next_falsifier_to_test_after": "None for barnett-mechanism (investigation closed at Tier 3). Active next-investigation: yan-li-saito-2026-reproduction (priority 1 after barnett closes; current_stage Research \u2192 Hypothesize at T30; theorist maps Yan-Li-Saito PRL Hamiltonian to SpinorBEC.jl notation and produces first Hypothesize-stage deliverable). The lz-buildup-presence falsifier remains INCONCLUSIVE as an optional post-closure side-quest (not load-bearing for the coherent single-particle Bloch mechanism)."
+  }
+}

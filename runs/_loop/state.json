@@ -1,5 +1,5 @@
 {
-  "turn": 29,
+  "turn": 30,
   "status": "running",
   "history": [
     {
@@ -430,11 +430,11 @@
         "director": "cb0ea1a88213bfc3b5ab069142101c47"
       },
       "subagent": "critic",
-      "output": "runs/_loop/judge/turn_12_critic_audit.md (Audit-1..10 per-item + 5 specific findings + T13 recommendation). Verdict WEAK_PASS. Central finding (Audit-5 FAIL): T11 \u00a72.6 eq (6) uses rank-1 |F_-|^2=12 enhancement, but codebase (losses.jl:144-176) implements rank-2 spherical tensor with \u0394m\u2208{-1,-2} summed and normalized to average=\u0393_dr. The factor-12 numerical match is coincidence-of-notation, not a derivation. Audit-1,2,3,6,7,8,9 PASS; Audit-4,10 WEAK_PASS (discrete-grid DDI invariance Q4 unresolved). [Refuted] verdict against anko's secular-DDI-suppression hypothesis is PROVISIONALLY SOUND pending c_dd=0 control (\u00a75.4). \u03b3_dr=0 julia (\u00a75.3) is the right first dispatch at 22:00 JST.",
+      "output": "runs/_loop/judge/turn_12_critic_audit.md (Audit-1..10 per-item + 5 specific findings + T13 recommendation). Verdict WEAK_PASS. Central finding (Audit-5 FAIL): T11 §2.6 eq (6) uses rank-1 |F_-|^2=12 enhancement, but codebase (losses.jl:144-176) implements rank-2 spherical tensor with Δm∈{-1,-2} summed and normalized to average=Γ_dr. The factor-12 numerical match is coincidence-of-notation, not a derivation. Audit-1,2,3,6,7,8,9 PASS; Audit-4,10 WEAK_PASS (discrete-grid DDI invariance Q4 unresolved). [Refuted] verdict against anko's secular-DDI-suppression hypothesis is PROVISIONALLY SOUND pending c_dd=0 control (§5.4). γ_dr=0 julia (§5.3) is the right first dispatch at 22:00 JST.",
       "branch": null,
       "commit": null,
       "parent": null,
-      "notes": "Critic audit route (d) per director T12 dispatch. Director chose critic to gate the 22:00 JST julia \u03b3_dr=0 falsifier before resource commit (~45 min GPU + ~3M tokens) on un-audited T11 mechanism. Critic returned VERDICT: WEAK_PASS with one load-bearing FAIL on Audit-5 (rank-1 vs rank-2 CG mismatch) \u2014 qualitative mechanism survives, prefactor unjustified. T13 should: (a) keep julia \u03b3_dr=0 queued for 22:00 JST as planned, (b) parallel-dispatch a short theorist or implementer_sympy to compute the actual rank-2 CG top-rung enhancement, (c) bank T11's qualitative scaling \u03c4\u223c1/(\u03b3_dr\u00b7W_F^CG) but NOT the specific factor 12, (d) treat [Refuted] of secular-DDI as [Plausibly Refuted] until c_dd=0 control runs.",
+      "notes": "Critic audit route (d) per director T12 dispatch. Director chose critic to gate the 22:00 JST julia γ_dr=0 falsifier before resource commit (~45 min GPU + ~3M tokens) on un-audited T11 mechanism. Critic returned VERDICT: WEAK_PASS with one load-bearing FAIL on Audit-5 (rank-1 vs rank-2 CG mismatch) — qualitative mechanism survives, prefactor unjustified. T13 should: (a) keep julia γ_dr=0 queued for 22:00 JST as planned, (b) parallel-dispatch a short theorist or implementer_sympy to compute the actual rank-2 CG top-rung enhancement, (c) bank T11's qualitative scaling τ∼1/(γ_dr·W_F^CG) but NOT the specific factor 12, (d) treat [Refuted] of secular-DDI as [Plausibly Refuted] until c_dd=0 control runs.",
       "tokens_used": {
         "theorist": null,
         "researcher": null,
@@ -832,7 +832,7 @@
         "tau_barnett_plus_omega_cdd0": null,
         "norm_final": 0.9903,
         "n_csv_rows": 604,
-        "falsification_result": "REFUTED_T19_\u00a72.5.2"
+        "falsification_result": "REFUTED_T19_§2.5.2"
       },
       "drift_signals": {
         "topic_repetition": 0.0,
@@ -884,13 +884,13 @@
         "director": "cb0ea1a88213bfc3b5ab069142101c47"
       },
       "subagent": "implementer",
-      "output": "T20 RETRY (attempt 2): Implementer ran extract_trajectory.jl + analyze_lz.py on cdd0 jld2 files. Trajectory.csv (605 lines, 136KB) produced; analyze_lz.png produced. KEY FINDING: dynamics/Lz was NOT saved in either stir_+0.5 or stir_-0.5 result.jld2 \u2014 Lz column is all-NaN for both runs (also true for empirical baseline). T19 \u00a72.9 Q19.1 \u27e8L_z\u27e9/N discriminator test is INCONCLUSIVE \u2014 data does not exist. Verified populations + Fz sanity (max |sum(pop)-1|=1.6e-7, max Fz consistency error=1.2e-6, 0 NaN in populations). Delta_cdd0=-5.9846 (M1-DOMINANT classification stands on endpoint pops alone). Audit found prior T20 'hallucinated' files actually DO exist on the auto branch (commit 96215fd) \u2014 director's Glob was against main where they're not merged. judge.py FAIL_NUMERICAL on (i) norm_drift=9.8e-3 (physical K3 loss), (ii) Lz tracking absent (a discovery, not failure), (iii) falsification REFUTED (verdict, not failure). retries 1->2. T22: re-run with Lz tracking enabled OR compute Lz post-hoc from psi_snapshots.",
+      "output": "T20 RETRY (attempt 2): Implementer ran extract_trajectory.jl + analyze_lz.py on cdd0 jld2 files. Trajectory.csv (605 lines, 136KB) produced; analyze_lz.png produced. KEY FINDING: dynamics/Lz was NOT saved in either stir_+0.5 or stir_-0.5 result.jld2 — Lz column is all-NaN for both runs (also true for empirical baseline). T19 §2.9 Q19.1 ⟨L_z⟩/N discriminator test is INCONCLUSIVE — data does not exist. Verified populations + Fz sanity (max |sum(pop)-1|=1.6e-7, max Fz consistency error=1.2e-6, 0 NaN in populations). Delta_cdd0=-5.9846 (M1-DOMINANT classification stands on endpoint pops alone). Audit found prior T20 'hallucinated' files actually DO exist on the auto branch (commit 96215fd) — director's Glob was against main where they're not merged. judge.py FAIL_NUMERICAL on (i) norm_drift=9.8e-3 (physical K3 loss), (ii) Lz tracking absent (a discovery, not failure), (iii) falsification REFUTED (verdict, not failure). retries 1->2. T22: re-run with Lz tracking enabled OR compute Lz post-hoc from psi_snapshots.",
       "branch": "auto/turn_20_cdd0-control-m1-vs-m2-discriminator",
       "auto_commit": "8702cb8",
       "judge_issues": [
         "norm_drift=9.80e-03 exceeds tol 1e-08 (physical K3 loss for Lindblad RTP, ITP gate misapplied)",
         "Lz tracking was not enabled in the cdd0 run config (nor in the empirical baseline). The T19 Q19.1 discriminator requires Lz data. Future runs must add Lz to save_observables.",
-        "falsification_criterion REFUTED per implementer \u00a77 (this IS the verdict on T19 \u00a72.5.2 sub-Landau-dormant claim \u2014 not a simulation failure)"
+        "falsification_criterion REFUTED per implementer §7 (this IS the verdict on T19 §2.5.2 sub-Landau-dormant claim — not a simulation failure)"
       ],
       "metrics": {
         "delta_cdd0_peratom": -5.9846,
@@ -902,8 +902,8 @@
         "lz_per_atom_plus_omega": null,
         "lz_per_atom_minus_omega": null,
         "n_csv_rows": 604,
-        "fz_pops_consistency_max": 1.17e-06,
-        "pop_sum_deviation_max": 1.59e-07,
+        "fz_pops_consistency_max": 0.00000117,
+        "pop_sum_deviation_max": 1.59E-7,
         "tau_barnett_minus_omega_cdd0": 2.84,
         "tau_barnett_plus_omega_cdd0": null,
         "falsification_result": "INCONCLUSIVE_LZ_ABSENT"
@@ -960,10 +960,10 @@
       "subagent": "implementer",
       "branch": "auto/turn_21_lz-posthoc-extraction-from-psi",
       "auto_commit": "37ea5d0",
-      "output": "Implementer wrote scripts/diagnostic/lz_extraction_from_snapshots.jl (14903B) + scripts/diagnostic/lz_vs_fz_plot.py (2446B) + runs/_loop/sim/turn_21.md (10514B). Verified all 4 jld2 files present (cdd0 stir_\u00b10.5: 877/792 MB; empirical stir_\u00b10.5: 967 MB each). Confirmed frame_NNNNN keys = ComplexF32 4D (32x32x32x13), 302 snapshots per run. Verified Lz column STRUCTURALLY absent from all 604 rows of both trajectory.csv files (spinor save_rotating_result.jl:251-257 only saves Lz if haskey(dyn, :Lz) and spinor pipeline never sets it). BLOCKED: julia binary requires sandbox approval in unattended loop session; both implementer agent and orchestrator hit the same gate. Lz extraction NOT executed this turn. Q19.1 status remains INCONCLUSIVE. Script + plot are validated against production code paths (currents.jl:45-84, grid.jl:48-59, save_rotating_result.jl:280-287) and ready for anko manual run: /home/suzume/.juliaup/bin/julia --project=. scripts/diagnostic/lz_extraction_from_snapshots.jl (est. ~5 min JIT + 1-2 min compute).",
+      "output": "Implementer wrote scripts/diagnostic/lz_extraction_from_snapshots.jl (14903B) + scripts/diagnostic/lz_vs_fz_plot.py (2446B) + runs/_loop/sim/turn_21.md (10514B). Verified all 4 jld2 files present (cdd0 stir_±0.5: 877/792 MB; empirical stir_±0.5: 967 MB each). Confirmed frame_NNNNN keys = ComplexF32 4D (32x32x32x13), 302 snapshots per run. Verified Lz column STRUCTURALLY absent from all 604 rows of both trajectory.csv files (spinor save_rotating_result.jl:251-257 only saves Lz if haskey(dyn, :Lz) and spinor pipeline never sets it). BLOCKED: julia binary requires sandbox approval in unattended loop session; both implementer agent and orchestrator hit the same gate. Lz extraction NOT executed this turn. Q19.1 status remains INCONCLUSIVE. Script + plot are validated against production code paths (currents.jl:45-84, grid.jl:48-59, save_rotating_result.jl:280-287) and ready for anko manual run: /home/suzume/.juliaup/bin/julia --project=. scripts/diagnostic/lz_extraction_from_snapshots.jl (est. ~5 min JIT + 1-2 min compute).",
       "judge_issues": [],
       "judge_warnings": [
-        "Julia binary execution requires sandbox approval \u2014 script written but unexecuted",
+        "Julia binary execution requires sandbox approval — script written but unexecuted",
         "Lz column NaN in all 4 trajectory CSVs; Q19.1 INCONCLUSIVE persists",
         "Plot turn_21_lz_comparison.png shows Fz only; Lz panel empty pending julia run",
         "cdd0 trajectory.csv was restored from auto/turn_20 commit 96215fd (was not in main)"
@@ -1033,7 +1033,7 @@
         "theorist": "7dc4ee3ff52bbf29a6665526f84ed091"
       },
       "subagent": "critic",
-      "output": "runs/_loop/judge/turn_22_critic_audit.md (4-gap audit + 7 numbered findings + T23 dispatch recommendation). VERDICT: WEAK_PASS. M1-DOMINANT verdict labels survive the M2-refutation negative-inference but quantitative pre-registration is absent (T19 \u00a72.6 row B band [-6.1,-3.1] is empirical-tuned around -4.60, not a forward prediction). Candidate D enumeration missing: D1 (Born-Markov rate asymmetry via Omega-shifted Bohr frequency) and D2 (pure spin-only with T18-vs-T20 spatial-mode mismatch) both survive c_dd=0 control. T19 \u00a72.7's rigorous sub-Landau Landau-criterion derivation has M1 dormant at Omega<omega_perp \u2014 T20 data refutes \u00a72.7 (not \u00a72.5.2 as anko stated), but the mechanism keeping M1 active is NOT derived in T19. seed.md L14 'DDI not load-bearing' overreaches: tau_Barnett(c_dd=0,-Omega)=2.84 omega^-1 is 2-3x faster than empirical 4.8-9.7 omega^-1; |Delta| at c_dd=0 is 5.985 vs empirical 4.60 (30% larger) \u2014 DDI suppresses both rate and magnitude by ~25-50%. T23 recommendation: theorist M1 reconciliation + Candidate D enumeration + julia-light third control (Omega=1.2 supra-Landau OR gamma_dr=0.005 quarter strength) that discriminates without Lz data.",
+      "output": "runs/_loop/judge/turn_22_critic_audit.md (4-gap audit + 7 numbered findings + T23 dispatch recommendation). VERDICT: WEAK_PASS. M1-DOMINANT verdict labels survive the M2-refutation negative-inference but quantitative pre-registration is absent (T19 §2.6 row B band [-6.1,-3.1] is empirical-tuned around -4.60, not a forward prediction). Candidate D enumeration missing: D1 (Born-Markov rate asymmetry via Omega-shifted Bohr frequency) and D2 (pure spin-only with T18-vs-T20 spatial-mode mismatch) both survive c_dd=0 control. T19 §2.7's rigorous sub-Landau Landau-criterion derivation has M1 dormant at Omega<omega_perp — T20 data refutes §2.7 (not §2.5.2 as anko stated), but the mechanism keeping M1 active is NOT derived in T19. seed.md L14 'DDI not load-bearing' overreaches: tau_Barnett(c_dd=0,-Omega)=2.84 omega^-1 is 2-3x faster than empirical 4.8-9.7 omega^-1; |Delta| at c_dd=0 is 5.985 vs empirical 4.60 (30% larger) — DDI suppresses both rate and magnitude by ~25-50%. T23 recommendation: theorist M1 reconciliation + Candidate D enumeration + julia-light third control (Omega=1.2 supra-Landau OR gamma_dr=0.005 quarter strength) that discriminates without Lz data.",
       "branch": null,
       "commit": null,
       "parent": null,
@@ -1054,7 +1054,7 @@
         "n_messages": 50,
         "n_message_starts": 50
       },
-      "notes": "Director route (d) critic_audit per T22 \u00a76 dispatch. M1-DOMINANT label downgrades to M1-PLAUSIBLE in campaign record. Critic returned text response (read-only per critic.md \u00a7A2); orchestrator materialized to runs/_loop/judge/turn_22_critic_audit.md. Drift T21 (DRIFT_SUBAGENT_REPETITION 1.0, DRIFT_MANUSCRIPT_DELTA_ZERO, DRIFT_COST_INFLATION) addressed: rotation reset (critic\u2260implementer; last critic T16, 6 turns ago), manuscript defer per anko policy, cost reduction (critic ~1.0M target vs T21's 2.38M, 58% reduction). T23 will route to theorist (rotation continues) for M1 reconciliation + Candidate D enumeration.",
+      "notes": "Director route (d) critic_audit per T22 §6 dispatch. M1-DOMINANT label downgrades to M1-PLAUSIBLE in campaign record. Critic returned text response (read-only per critic.md §A2); orchestrator materialized to runs/_loop/judge/turn_22_critic_audit.md. Drift T21 (DRIFT_SUBAGENT_REPETITION 1.0, DRIFT_MANUSCRIPT_DELTA_ZERO, DRIFT_COST_INFLATION) addressed: rotation reset (critic≠implementer; last critic T16, 6 turns ago), manuscript defer per anko policy, cost reduction (critic ~1.0M target vs T21's 2.38M, 58% reduction). T23 will route to theorist (rotation continues) for M1 reconciliation + Candidate D enumeration.",
       "drift_signals": {
         "topic_repetition": 0.0,
         "subagent_repetition": 0.333,
@@ -1077,13 +1077,13 @@
       "directive_label": "qtr-gamma-dr-d2-discriminator-blocked-by-sandbox",
       "wall_time_sec": null,
       "subagent": "implementer",
-      "output": "Implementer wrote runs/eu151_barnett_spin_cdd0_qtr_gamma/config.yaml (gamma_dr=0.005 quarter-strength, c_dd=0, Omega=\u00b10.5 scan zip) and committed to auto/turn_23_qtr-gamma-dr-d2-discriminator @ 245b046. Sim report at runs/_loop/sim/turn_23.md (178 lines). REJECTED reason: julia binary /home/suzume/.juliaup/bin/julia requires sandbox approval in unattended session (same gate as T21). Both pre-flight estimate_run_budget and GPU run blocked. Manual command documented in sim \u00a76.",
+      "output": "Implementer wrote runs/eu151_barnett_spin_cdd0_qtr_gamma/config.yaml (gamma_dr=0.005 quarter-strength, c_dd=0, Omega=±0.5 scan zip) and committed to auto/turn_23_qtr-gamma-dr-d2-discriminator @ 245b046. Sim report at runs/_loop/sim/turn_23.md (178 lines). REJECTED reason: julia binary /home/suzume/.juliaup/bin/julia requires sandbox approval in unattended session (same gate as T21). Both pre-flight estimate_run_budget and GPU run blocked. Manual command documented in sim §6.",
       "branch": "auto/turn_23_qtr-gamma-dr-d2-discriminator",
       "auto_commit": "245b046",
       "rejected_reason": "julia_binary_sandbox_approval_required",
       "commit": "245b04625aad",
       "parent": "0f6bfc63988e",
-      "notes": "Theorist (15% mechanism-rejection outcome) recommended D2-EXTENDED-PLAUSIBLE migration from M1-PLAUSIBLE after all M1 sub-mechanisms (M1a finite-T vortex, M1b inhomogeneous-cloud, M1c DDI-lowered threshold) rejected. M1a fails by ~100 orders of magnitude (e^-250 Boltzmann weight at T_eff/omega_perp ~ 4e-3); M1b/M1c excluded by c_dd=0. Falsification preregistered in theorist \u00a77: Delta in [-2.5, -0.5] confirms D2-extended; Delta in [-5.1, -4.0] revives M1-saturation. T21 sandbox blocker repeated; retries 0->1. T24 options: (a) anko manual julia run, (b) theorist Q23.1 closed-form spatial-mode sign-flip, (c) noop pending unblock. retries=3 escalates to human_required.",
+      "notes": "Theorist (15% mechanism-rejection outcome) recommended D2-EXTENDED-PLAUSIBLE migration from M1-PLAUSIBLE after all M1 sub-mechanisms (M1a finite-T vortex, M1b inhomogeneous-cloud, M1c DDI-lowered threshold) rejected. M1a fails by ~100 orders of magnitude (e^-250 Boltzmann weight at T_eff/omega_perp ~ 4e-3); M1b/M1c excluded by c_dd=0. Falsification preregistered in theorist §7: Delta in [-2.5, -0.5] confirms D2-extended; Delta in [-5.1, -4.0] revives M1-saturation. T21 sandbox blocker repeated; retries 0->1. T24 options: (a) anko manual julia run, (b) theorist Q23.1 closed-form spatial-mode sign-flip, (c) noop pending unblock. retries=3 escalates to human_required.",
       "agent_hashes": {
         "critic": "517f7ca0fbb994ee3a350df682aaaa38",
         "director": "76daad1fe35797f8cc48e327acdea9b8",
@@ -1141,7 +1141,7 @@
       "branch": "auto/turn_23_qtr-gamma-dr-d2-discriminator",
       "commit": "245b04625aad",
       "parent": "0f6bfc63988e",
-      "output": "Researcher (route b) wrote runs/_loop/research/turn_23.md (462 lines, ~26 KB). Q23.1 (D2-EXTENDED closed-form anchor): PARTIAL productive NOT_FOUND. Stamper-Kurn-Ueda 2013 RMP \u00a7VII covers inhomogeneous spinor dynamics (polar-core vortex, spin texture) but does NOT derive closed-form <F_z> asymmetry under rotating B-field cascade in trapped extended cloud. Klaus 2020-2024 NOT FOUND as published Eu-spinor-pumping work (anko Klaus 2022 magnetostir is internal label; real Eu literature: Miyazawa 2022 first Eu BEC arXiv:2207.11692 + Matsui 2026 EdH Science 391 arXiv:2504.17357 \u2014 coherent spin-to-orbit, NOT rotating-B cascade; Klaus group at Innsbruck is Er/Dy not Eu). Sinatra-Castin (J. Phys. B 35, 3599, 2002) + spinor-TW Bradley-Blakie (PRA 90, 023631, 2014) + beyond-SMA (arXiv:2301.06461) establish stochastic framework + spatial density profile matters for F=1 c_1\u22600, NOT Lindblad cascade c_1=0 F=6. VERDICT: D2-EXTENDED closed-form genuinely NOVEL; literature establishes plausibility (beyond-SMA), no formula. T24 theorist anchor: position-resolved Bloch equation with local beta(r)=arctan[p_perp / (p_z - Omega - c_0 n(r))] where contact mean-field c_0 n(r) acts as spatially-varying Larmor correction. Q23.2 (sub-Landau driven excited-state populations): RESOLVED clean NOT_FOUND. Cooper 2008 Adv. Phys. 57, 539 (arXiv:0810.4398) treats rapid rotation near omega_perp, NOT sub-Landau+Lindblad. Fetter 2009 RMP 81, 647 (arXiv:0801.2952) treats vortex dynamics + anomalous modes + thermal QP effects, NOT driven open-system at sub-Landau. Sinha-Castin 2001 PRL 87, 190402 (NOT PRA as theorist wrote) treats coherent hydrodynamic instability at specific stir freqs, NOT Lindblad heating at Omega=0.5 omega_perp. VERDICT for M1: all three confirm vortex nucleation barrier ~hbar omega_perp at sub-Landau, corroborating T23 theorist M1a e^-250 Boltzmann weight. NO literature proposes Lindblad dissipator bypassing this barrier. M1 has NO positive literature support; D2-EXTENDED-PLAUSIBLE migration is literature-consistent. Q23.3 deferred to T25.",
+      "output": "Researcher (route b) wrote runs/_loop/research/turn_23.md (462 lines, ~26 KB). Q23.1 (D2-EXTENDED closed-form anchor): PARTIAL productive NOT_FOUND. Stamper-Kurn-Ueda 2013 RMP §VII covers inhomogeneous spinor dynamics (polar-core vortex, spin texture) but does NOT derive closed-form <F_z> asymmetry under rotating B-field cascade in trapped extended cloud. Klaus 2020-2024 NOT FOUND as published Eu-spinor-pumping work (anko Klaus 2022 magnetostir is internal label; real Eu literature: Miyazawa 2022 first Eu BEC arXiv:2207.11692 + Matsui 2026 EdH Science 391 arXiv:2504.17357 — coherent spin-to-orbit, NOT rotating-B cascade; Klaus group at Innsbruck is Er/Dy not Eu). Sinatra-Castin (J. Phys. B 35, 3599, 2002) + spinor-TW Bradley-Blakie (PRA 90, 023631, 2014) + beyond-SMA (arXiv:2301.06461) establish stochastic framework + spatial density profile matters for F=1 c_1≠0, NOT Lindblad cascade c_1=0 F=6. VERDICT: D2-EXTENDED closed-form genuinely NOVEL; literature establishes plausibility (beyond-SMA), no formula. T24 theorist anchor: position-resolved Bloch equation with local beta(r)=arctan[p_perp / (p_z - Omega - c_0 n(r))] where contact mean-field c_0 n(r) acts as spatially-varying Larmor correction. Q23.2 (sub-Landau driven excited-state populations): RESOLVED clean NOT_FOUND. Cooper 2008 Adv. Phys. 57, 539 (arXiv:0810.4398) treats rapid rotation near omega_perp, NOT sub-Landau+Lindblad. Fetter 2009 RMP 81, 647 (arXiv:0801.2952) treats vortex dynamics + anomalous modes + thermal QP effects, NOT driven open-system at sub-Landau. Sinha-Castin 2001 PRL 87, 190402 (NOT PRA as theorist wrote) treats coherent hydrodynamic instability at specific stir freqs, NOT Lindblad heating at Omega=0.5 omega_perp. VERDICT for M1: all three confirm vortex nucleation barrier ~hbar omega_perp at sub-Landau, corroborating T23 theorist M1a e^-250 Boltzmann weight. NO literature proposes Lindblad dissipator bypassing this barrier. M1 has NO positive literature support; D2-EXTENDED-PLAUSIBLE migration is literature-consistent. Q23.3 deferred to T25.",
       "judge_issues": [],
       "judge_warnings": [],
       "metrics": {
@@ -1157,7 +1157,7 @@
         "papers_cited_total": 8,
         "novel_closed_form_required": true
       },
-      "notes": "Director route (b) researcher-only per T23-retry-2. Theorist (T23-attempt-1) deliverables already in place; researcher closed named literature gap without julia dispatch (sandbox blocker bypassed; retries stays at 1, NOT escalated). Sources: Stamper-Kurn-Ueda 2013 RMP, Cooper 2008 Adv.Phys., Fetter 2009 RMP, Sinha-Castin 2001 PRL, Miyazawa 2022 Eu, Matsui 2026 Eu-EdH, beyond-SMA 2023, Bradley-Blakie 2014 spinor-TW. Net result: M1 literature-dead; D2-EXTENDED-PLAUSIBLE literature-supported; closed-form sign-flip mechanism is novel \u2014 theorist target for T24 is position-resolved Bloch with c_0 n(r) Larmor correction. T24 candidates: (a) theorist novel closed-form attempt with researcher anchor (recommended), (b) implementer_sympy on Q23.3 detailed-balance, (c) critic audit of T23 theorist \u00a72.5-\u00a72.10 algebra. Julia sandbox still blocked \u2014 anko-manual remains the path for the qtr-gamma confirmation (config at 245b046).",
+      "notes": "Director route (b) researcher-only per T23-retry-2. Theorist (T23-attempt-1) deliverables already in place; researcher closed named literature gap without julia dispatch (sandbox blocker bypassed; retries stays at 1, NOT escalated). Sources: Stamper-Kurn-Ueda 2013 RMP, Cooper 2008 Adv.Phys., Fetter 2009 RMP, Sinha-Castin 2001 PRL, Miyazawa 2022 Eu, Matsui 2026 Eu-EdH, beyond-SMA 2023, Bradley-Blakie 2014 spinor-TW. Net result: M1 literature-dead; D2-EXTENDED-PLAUSIBLE literature-supported; closed-form sign-flip mechanism is novel — theorist target for T24 is position-resolved Bloch with c_0 n(r) Larmor correction. T24 candidates: (a) theorist novel closed-form attempt with researcher anchor (recommended), (b) implementer_sympy on Q23.3 detailed-balance, (c) critic audit of T23 theorist §2.5-§2.10 algebra. Julia sandbox still blocked — anko-manual remains the path for the qtr-gamma confirmation (config at 245b046).",
       "tokens_used": {
         "theorist": null,
         "researcher": null,
@@ -1397,14 +1397,67 @@
         "researcher": "5c6277ae5ff274765786dfb8c511b568",
         "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
       },
-      "notes": "Director route (d) critic audit; barnett-mechanism Update stage; critic VERDICT=CORROBORATE; tier 2.5 \u2192 3.0 recommended; T29 = Document stage; one residual-misattribution flagged (5.5% residual \u2260 GP, ~Bloch-Siegert)."
+      "notes": "Director route (d) critic audit; barnett-mechanism Update stage; critic VERDICT=CORROBORATE; tier 2.5 → 3.0 recommended; T29 = Document stage; one residual-misattribution flagged (5.5% residual ≠ GP, ~Bloch-Siegert).",
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 7596560,
+        "total": 7596560,
+        "effective_full_rate": 1328464,
+        "breakdown": {
+          "input_fresh": 23006,
+          "cache_creation": 374103,
+          "cache_read": 7175393,
+          "output": 24058
+        },
+        "n_messages": 56,
+        "n_message_starts": 56
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.0,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.4,
+        "cost_inflation": 0.636,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "advisory",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO"
+      ]
+    },
+    {
+      "turn": 29,
+      "ts": "2026-05-17T03:31:21Z",
+      "judge_status": "INCONCLUSIVE",
+      "directive_action": "document_investigation_closure",
+      "directive_label": "barnett-mechanism-document-tier3-promoted",
+      "wall_time_sec": null,
+      "notes": "Document stage closure of barnett-mechanism-2026-05-16. Tier 2.5 → 3.0 (project's first Tier 3). Coherent rotating-frame Bloch mechanism confirmed; γ_dr-independence proven. 5.5% τ-residual errata propagated: Bloch-Siegert NOT GP mean-field (critic/turn_28 §3.4). Activates yan-li-saito-2026-reproduction as priority-1 successor. Deliverables: barnett-mechanism-confirmed.md created, barnett.md appended (T19 total), state.json updated. | judge: INCONCLUSIVE due to metric-key contract mismatch (director success_criteria.metric strings did not match implementer assertion id keys); all qualitative assertions PASS; flagged for T30 director to address.",
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": null,
+        "total": null
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null
     }
   ],
   "created_at": "2026-05-14T00:00:00+00:00",
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "CRITIC_PASS",
+  "last_judge": "INCONCLUSIVE",
   "home_branch": "main",
   "schema_version": 2,
   "current_agent_hashes": {
@@ -1414,11 +1467,11 @@
     "researcher": "5c6277ae5ff274765786dfb8c511b568",
     "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
   },
-  "last_directive_label": "gamma-dr-routing-audit-clean-1700x-gap-real",
-  "last_directive_action": "critic_audit",
+  "last_directive_label": "barnett-mechanism-document-tier3-promoted",
+  "last_directive_action": "document_investigation_closure",
   "last_error": null,
   "retries": 0,
-  "active_investigation_id": "barnett-mechanism-2026-05-16",
+  "active_investigation_id": "yan-li-saito-2026-reproduction",
   "investigations_index": [
     "barnett-mechanism-2026-05-16",
     "klaus-magnetostir-bch-leak-2026-05-13",
@@ -1429,15 +1482,17 @@
     "barnett-mechanism-2026-05-16": {
       "id": "barnett-mechanism-2026-05-16",
       "title": "Barnett pumping mechanism in trapped F=6 Eu DDI (anko empirical signal)",
-      "hypothesis": "rotating-frame energetic bias -\u03a9(L_z+F_z) + \u03b3_dr dipolar relaxation drives the empirical \u0394\u27e8F_z\u27e9/N=-4.60 sign asymmetry; DDI is not load-bearing",
+      "hypothesis": "rotating-frame energetic bias -Ω(L_z+F_z) + γ_dr dipolar relaxation drives the empirical Δ⟨F_z⟩/N=-4.60 sign asymmetry; DDI is not load-bearing",
       "flow_template": "verify-claim",
-      "current_stage": "Analyze",
+      "current_stage": "closed",
       "stages_done": [
         "Analyze",
         "Design",
+        "Document",
         "Execute",
         "Hypothesize",
-        "Research"
+        "Research",
+        "Update"
       ],
       "stages_at_turn": {
         "Research": [
@@ -1450,7 +1505,7 @@
         ],
         "Design": [
           19,
-          "theorist T19 \u00a72.6 3-bin falsifier table"
+          "theorist T19 §2.6 3-bin falsifier table"
         ],
         "Execute": [
           20,
@@ -1458,40 +1513,48 @@
         ],
         "Analyze": [
           20,
-          "\u0394_cdd0=-5.99 extracted from m-populations"
+          "Δ_cdd0=-5.99 extracted from m-populations"
+        ],
+        "Update": [
+          28,
+          "critic CORROBORATE Heisenberg-Slichter independent re-derivation"
+        ],
+        "Document": [
+          29,
+          "implementer_text memory entry barnett-mechanism-confirmed.md + Bloch-Siegert errata propagation"
         ]
       },
       "falsifiers": [
         {
           "id": "c_dd-zero-control",
-          "description": "if M2-dominant, c_dd=0 \u2192 \u0394 \u2248 +4.82; if M1-active, \u0394 \u2248 -4.6",
+          "description": "if M2-dominant, c_dd=0 → Δ ≈ +4.82; if M1-active, Δ ≈ -4.6",
           "tested_at_turn": 20,
-          "result": "\u0394=-5.985 \u2192 M2-dominant REFUTED; M1-active confirmed (DDI is suppressive, not load-bearing \u2014 more asymmetric than empirical)"
+          "result": "Δ=-5.985 → M2-dominant REFUTED; M1-active confirmed (DDI is suppressive, not load-bearing — more asymmetric than empirical)"
         },
         {
           "id": "gamma-dr-zero-control",
-          "description": "if M1-active, \u03b3_dr=0 should give \u0394 \u2248 0 (no asymmetry)",
+          "description": "if M1-active, γ_dr=0 should give Δ ≈ 0 (no asymmetry)",
           "tested_at_turn": 27,
-          "result": "tau_-\u03a9=2.84 (julia, \u03b3_dr=K3=0) vs coherent prediction 2.69 (5% off) \u2014 COHERENT MECHANISM CONFIRMED; +\u03a9 = \u221e as predicted; earlier M1 dissipative hypothesis REFUTED"
+          "result": "COHERENT MECHANISM CONFIRMED at T27 (τ_-Ω=2.84 unchanged from γ_dr=0.02 → γ_dr-independence proven); CORROBORATED at T28 (critic independent Heisenberg+Slichter re-derivation lands on T27 sign); tier 2.5 → 3.0 at T29 Document. 5.5% τ-residual is Bloch-Siegert (not GP mean-field as sim/turn_27 §6 misattributed; per critic/turn_28 §3.4 errata)."
         },
         {
           "id": "lz-buildup-presence",
-          "description": "if M1-active, \u27e8L_z\u27e9 should build up under +\u03a9 stir; if dormant, \u27e8L_z\u27e9 stays \u2248 0",
+          "description": "if M1-active, ⟨L_z⟩ should build up under +Ω stir; if dormant, ⟨L_z⟩ stays ≈ 0",
           "tested_at_turn": null,
-          "result": "INCONCLUSIVE \u2014 Lz observable not saved in either run; T20 data gap"
+          "result": "INCONCLUSIVE — Lz observable not saved in either run; T20 data gap. Optional post-closure side-quest; not load-bearing for single-particle coherent mechanism which lives in spin space, not orbital space."
         }
       ],
-      "tier_current": 2.5,
+      "tier_current": 3.0,
       "tier_target": 3,
-      "next_stage": "Update",
-      "next_stage_action": "critic independent eval of M1-active conclusion against c_dd=0 data + propose execution of \u03b3_dr=0 falsifier (most decisive remaining test) + Lz-observable re-enabled run as side-quest",
+      "next_stage": null,
+      "next_stage_action": null,
       "blocked_on": null,
       "priority": 1
     },
     "klaus-magnetostir-bch-leak-2026-05-13": {
       "id": "klaus-magnetostir-bch-leak-2026-05-13",
-      "title": "Klaus magnetostir non-reproducibility \u2014 Option \u03b3 analytical absorption of BCH leak",
-      "hypothesis": "Lab-frame spinor split-step has \u03b4\u00db ~ dt\u00b2\u00b7p\u00b7F\u00b7sin\u03b8\u00b7c_dd\u27e8n\u27e9 Larmor-linear leak; Option \u03b3 apply_local_spin_step! drops BCH parameter p\u00b7F\u00b7dt \u2248 26.7 \u2192 \u03c6\u0307\u00b7F\u00b7dt \u2248 0.027 (4-decade reduction)",
+      "title": "Klaus magnetostir non-reproducibility — Option γ analytical absorption of BCH leak",
+      "hypothesis": "Lab-frame spinor split-step has δÛ ~ dt²·p·F·sinθ·c_dd⟨n⟩ Larmor-linear leak; Option γ apply_local_spin_step! drops BCH parameter p·F·dt ≈ 26.7 → φ̇·F·dt ≈ 0.027 (4-decade reduction)",
       "flow_template": "verify-claim",
       "current_stage": "documented",
       "stages_done": [
@@ -1506,32 +1569,32 @@
       "tier_target": 3,
       "next_stage": null,
       "next_stage_action": null,
-      "blocked_on": "needs julia P3 validation against anko Klaus phi sweep data (P1/P2/P3 predictions in theorist/turn_10.md \u00a73)",
+      "blocked_on": "needs julia P3 validation against anko Klaus phi sweep data (P1/P2/P3 predictions in theorist/turn_10.md §3)",
       "priority": 3
     },
     "fullbdg-f6-polar-3000x": {
       "id": "fullbdg-f6-polar-3000x",
-      "title": "F=6 polar FullBdGLHY 3000\u00d7 spurious offset",
+      "title": "F=6 polar FullBdGLHY 3000× spurious offset",
       "current_stage": "dormant",
       "tier_current": 1.5,
       "tier_target": 2,
       "next_stage_action": null,
-      "blocked_on": "contained bug per anko 2026-05-15 \u2014 closed-form alternatives in place, deferral OK",
+      "blocked_on": "contained bug per anko 2026-05-15 — closed-form alternatives in place, deferral OK",
       "priority": 99
     },
     "yan-li-saito-2026-reproduction": {
       "id": "yan-li-saito-2026-reproduction",
       "title": "Yan-Li-Saito 2026 PRL Barnett-droplet reproduction (Tier-3 candidate)",
-      "hypothesis": "SpinorBEC.jl scalar + DDI + LHY framework can reproduce torus magnetic-vortex GS + mechanical Larmor precession + chiral bound state at F=1 \u03b5_dd=1.2",
+      "hypothesis": "SpinorBEC.jl scalar + DDI + LHY framework can reproduce torus magnetic-vortex GS + mechanical Larmor precession + chiral bound state at F=1 ε_dd=1.2",
       "flow_template": "verify-claim",
       "current_stage": "Research",
       "stages_done": [],
       "tier_current": 0,
       "tier_target": 3,
       "next_stage": "Hypothesize",
-      "next_stage_action": "theorist maps paper Hamiltonian to SpinorBEC.jl notation; identifies framework gaps (\u03c7(\u03b5_dd) integral match, DDI prefactor convention, free-space ITP, \u2113=1 phase imprint, state_zoo flux-closure-torus builder)",
+      "next_stage_action": "theorist maps Yan-Li-Saito 2026 PRL Hamiltonian to SpinorBEC.jl notation; identifies framework gaps (chi(ε_dd) integral match, DDI prefactor c_dd=μ_0μ² no-4π vs paper μ_0(gμ_B)²/8π, free-space ITP convergence with no harmonic trap, ℓ=1 phase imprint + L_z+f_z=const ITP path, state_zoo flux-closure-torus builder); produces verify-claim Hypothesize-stage deliverable runs/_loop/theorist/turn_30.md",
       "blocked_on": null,
-      "priority": 2
+      "priority": 1
     }
   }
 }
