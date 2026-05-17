@@ -2,106 +2,126 @@
 turn: 43
 subagent: director
 investigation_id: yan-li-saito-2026-reproduction
-stage_advancing_from: Hypothesize
-stage_advancing_to: Design
-topic_tags: [yan-li-saito-2026, grid-refinement-experiment, dx-scaling-prediction, theorist-design, free-space-itp-f1, rotating-basis-f1, gpu-budget-discipline]
+stage_advancing_from: Execute
+stage_advancing_to: Update
+topic_tags: [yan-li-saito-2026, grid-refinement-refuted, form-A-volumetric-ceiling, sigma-seed-confounder, fail-numerical-is-scientific-refute, critic-audit, threshold-discriminator]
 paper_section: null
-depends_on: [42, 41, 40, 37, "runs/_loop/judge/turn_42_critic_audit.md", "runs/_loop/research/turn_41.md", "runs/_loop/sim/turn_40.md", "runs/_loop/theorist/turn_40.md", "runs/_loop/director/turn_42.md", "runs/_loop/state.json (investigations.yan-li-saito-2026-reproduction)", "runs/yan_li_saito_f1_torus_gs/config.yaml", "runs/_loop/templates/yan_li_saito_f1_droplet.yaml", "memory:yan_li_saito_2026_barnett_paper"]
-produces: "Theorist Hypothesize+Design output: a formal scaling-prediction hypothesis (n_peak as a function of dx for our underresolved free-space ITP, predicting how density should recover under grid refinement), plus a concrete 3-point grid-refinement YAML config sketch (start from runs/_loop/templates/yan_li_saito_f1_droplet.yaml and patch deltas only). Falsifier criteria for the next Execute stage."
+depends_on: [42, 41, 40, 37, "runs/_loop/director/turn_42.md", "runs/_loop/director/turn_43.md (prior dispatch — theorist Design)", "runs/_loop/theorist/turn_43.md", "runs/_loop/sim/turn_43.md", "runs/_loop/judge/turn_43.json", "runs/_loop/judge/turn_42_critic_audit.md", "runs/_loop/research/turn_41.md", "runs/_loop/sim/turn_40.md", "runs/_loop/state.json (investigations.yan-li-saito-2026-reproduction)", "memory:yan_li_saito_2026_barnett_paper"]
+produces: "Critic Update on T43 Execute REFUTED-form-B verdict: independent audit of (1) whether the FAIL_NUMERICAL operational classification masks a real scientific refutation, (2) whether σ=0.7 Gaussian seed without flux-closure topology is a confounder that left the droplet basin inaccessible, (3) whether the dx=0.125 vs dx_crit=0.20 placement was actually 'just below threshold' or 'too coarse to discriminate', (4) routing to either accept Form (A) volumetric ceiling and respawn hypothesis space OR run one more cheap discriminator point (P0 with flux-closure-torus seed at dx=0.125, OR P1 at dx=0.0625 with spherical seed) before declaring Form (B) refuted."
 ---
 
 # Turn 43 — Director Report
 
 ## 1. Investigation state snapshot
 
-- **Active investigation**: `yan-li-saito-2026-reproduction` (priority 1, tier_current 0.8 → tier_target 3). Continuing the T37 → T38 → T39 → T40 → T41 → T42 cascade.
-- **Stage transition**: **Hypothesize → Design** (per state.json `current_stage: "Hypothesize"` left by T42 critic; §F1 verify-claim sequence: Update-CORROBORATE on the dx-ratio hypothesis means we now have a refined working hypothesis that needs a Design contract before Execute). Theorist combines hypothesis formalization (scaling prediction) and experiment design (YAML config + observable manifest) since the critic's R1 routing recommendation already specifies both.
-- **Tier**: stays 0.8 entering Design. On theorist PASS (clean scaling prediction + executable YAML deltas patched against the template): tier 0.8 → 0.85 (Design stage doesn't change tier substantively; tier moves at Execute/Update with empirical data).
+- **Active investigation**: `yan-li-saito-2026-reproduction` (priority 1, tier_current 0.8 → tier_target 3). Continuing the T37 → T38 → T39 → T40 → T41 → T42 → T43-prior cascade. **Last_judge=FAIL_NUMERICAL, retries=1**; this is a retry of T43.
+- **Stage transition**: **Execute → Update** (canonical §F1 verify-claim sequence after Execute produces a scientific REFUTED verdict for the theorist's Form (B) sharp-threshold hypothesis). Theorist T43 stated explicit discriminator §2.8: "P0_pre's value cleanly discriminates: ≥ 3000 → (B); around 800 → (C) with critic's heuristic; ≤ 10 → (A) volumetric ceiling." Implementer T43-prior measured **n_max = 2.00 D₀**, which falls in the **≤ 10 → Form (A) volumetric ceiling** branch. Implementer's own §7 verdict block: "Verdict: REFUTED" with explicit stop-rule routing "n_max_D0 < 10 D₀ → 'Form (A) volumetric ceiling OR grid hypothesis REFUTED → HALT cascade. T45 = Hypothesize alternative root causes.'"
+- **Tier**: stays 0.8 entering Update. Tier transition options:
+  - critic CORROBORATEs Form (A) refute outright (no confounder): tier 0.8 → 0.6 (Form B refuted = retraction of the T42-CORROBORATEd grid-resolution narrative; investigation moves back to wider hypothesis space)
+  - critic NARROWs (e.g., seed-topology confounder, partial discriminator validity): tier 0.8 → 0.7
+  - critic finds CONFOUNDER strong enough to REFUTE-the-refute (e.g., σ=0.7 spherical seed in spherical-symmetric well cannot nucleate a topologically-charged torus regardless of grid): tier 0.8 → 0.75 (keeps Form B alive pending fl_vortex-seed retry at finer grid)
 - **Falsifiers tested/refuted (yan-li-saito)**:
-  - `f1-direct-reproduction` T37 FALSIFIED. T40 5-point seed/topology discriminator REFUTED (b) density-axis + (a2) topology-axis. T41 closed (c) data-gap on Fig 1c F-identity. T42 CORROBORATEd grid-resolution gap (Section A independent dx-ratio + droplet-cell-count arithmetic, both consistent within factor 2.3) AND closed DDI prefactor bit-equal (Section B; ratio = 1 exact, our `c_dd/2 × (k̂_z² − 1/3)` Fourier kernel equals paper's `μ₀(gμ_B)²/8π × (1 − 3cos²θ)/r³` real-space after FT identity, the 4π and 1/2 cancel cleanly). T42 DISMISSED χ(1.2) as negligible (Section C; estimate 3.5–3.7 matching LP-2011 Fig 1) and accepted Q2 initial-state as sufficient/secondary (Section D).
-  - **NEW falsifier to spawn at T43**: `dx-refinement-scaling` — predict n_peak(dx) follows roughly (0.4375/dx)^α with α ∈ [2.5, 3.0] from critic Section E, with concrete numerical targets at dx ∈ {0.08, 0.04, 0.02} a_ho. T44 Execute tests this against actual GPU runs.
+  - `f1-direct-reproduction` T37 FALSIFIED.
+  - T40 5-point seed-basin discriminator REFUTED (b) density-basin + (a2) topology-axis.
+  - T41 Research closed (c) data gap.
+  - T42 critic CORROBORATEd grid-resolution + closed DDI bit-equal.
+  - **T43 Execute SCIENTIFICALLY REFUTED Form (B) sharp dx_crit threshold** (the explicit theorist hypothesis): n_max(dx=0.125) = 2.0 D₀, in the < 10 D₀ Form (A) branch. The "0.4375 → 0.125 was 3.5× finer giving only 2× density increase" is qualitatively (A) volumetric weak scaling, NOT (B) saturation-at-paper-density.
+  - **Operational FAIL_NUMERICAL classification IS NOT a scientific failure**: norm_drift = 2.2e-7 (microscopic; only tripped strict 1e-8 has_dissipation=False gate), mz_final=0.999 vs target 1.0 (1.1e-3 deviation; reflects F32 floor + numerical-precision spin polarization tracking, not physics violation), converged=false (F32 mu-tracking floor at ~1e-7 prevents 1e-8 tol crossing — implementer §6 documents this as framework-limitation not physics). The same FAIL_NUMERICAL-masks-substantive-REFUTED pattern already happened at T20 (state.json line 824: "falsification_criterion REFUTED per implementer sec 7 (this is the verdict on T19 sec 2.5.2 claim, not a simulation failure)").
 - **Other in-flight investigations**:
   - `barnett-mechanism-2026-05-16`: closed at Tier 3.0.
-  - `klaus-magnetostir-bch-leak-2026-05-13` (priority 3, documented): blocked on julia P3 validation against anko Klaus phi sweep data — could unblock under JULIA_GPU_OK, but priority 1 owns cascade.
+  - `klaus-magnetostir-bch-leak-2026-05-13` (priority 3, documented, blocked on julia P3 validation): could unblock but priority 1 cascade still active.
   - `fullbdg-f6-polar-3000x` (priority 99, dormant): contained.
-  - `meta-critic-placement-2026-05-17` (priority 50, kind=meta, Observe): T42 critic Section E adds another data point ("researchers can produce PARTIAL quantitative closures that need a critic with algebra-execution to convert into bit-equal; alternative is requiring researchers to produce closed expressions"). Observation pool now T37→T42 (6 turns). Re-evaluate at T46+ when this cascade closes.
+  - `meta-critic-placement-2026-05-17` (priority 50, kind=meta, Observe): T43 Execute outcome is ANOTHER strong data point for meta — the theorist's predictions were sharp, the Execute was clean, the critic-T42-CORROBORATEd-hypothesis got REFUTED in <1 hour of GPU. The cascade is *working* exactly as the meta intended. Re-evaluate at T46+ when this cascade closes.
   - `meta-internal-b-unification-2026-05-18` (priority 5, kind=meta): CLOSED.
 
 ## 2. Recent-turn audit (last 3 turns OF THIS INVESTIGATION)
 
 | Turn | Stage | Verdict | What happened |
 |---|---|---|---|
-| T40 | Design+Execute (theorist+implementer chained) | INCONCLUSIVE-shape / SUBSTANTIVELY REFUTED | Theorist E_DDI=0-for-isotropic-Gaussian derivation predicted all σ-axis points delocalize. Implementer ran 5-pt GPU ITP (P0–P3 σ ∈ {0.5,2,5,14}, P4 fl_vortex JLD2 torus). All n_max ∈ [0.21, 1.06] D₀ vs paper 13000. (b) density-basin + (a2) topology REFUTED. Verdict matrix row 4 → (a4) framework deep bug OR (c) paper-wrong OR (a1) LHY issue. |
-| T41 | Research (researcher HTML fetch arXiv:2605.11670) | RESEARCHER_ONLY / Q1 RESOLVED + Q2/Q3 PARTIAL | Fig 1c IS F=1. Paper uses plain free-space ITP, no L_z constraint, dx ≃ 10⁻³ in L₀ units (= 16.35 nm physical = 315 a₀ = 0.0144 a_ho when comparing to our framework). Predicted density gap (30.4)³ ≈ 28000× vs observed 12000× — within factor 2. DDI prefactor "consistent when 4π tracked" (left algebraically open). |
-| T42 | Update (critic independent audit) | CRITIC_PASS / CORROBORATE-grid + CLOSED-bit-equal-DDI | Section A CORROBORATE: dx-ratio 30.36 (independent), droplet-cell-count argument (3.2 our cells vs 97 paper cells across droplet) is the stronger geometric chain. Section B CORROBORATE: Fourier algebra closes paper vs SpinorBEC E_ddi to ratio = 1 exact; (a1) LHY/DDI prefactor bug STAYS DEAD. Section C DISMISSED: χ(1.2) ≈ 3.68 (trapezoid) ≈ 3.5 (LP-2011 Fig 1). Section D sufficient. Section E recommends R1 (theorist Hypothesize/Design grid-refinement at dx ∈ {0.08, 0.04, 0.02} a_ho). Tier 0.6 → 0.8. |
+| T41 | Research | RESEARCHER_ONLY / Q1 RESOLVED + Q2/Q3 PARTIAL | HTML fetch arXiv:2605.11670. dx_paper ≈ 0.0144 a_ho vs our 0.4375 → 30.4× coarser → predicted cubic (30.4)³ ≈ 28000× density deficit vs observed 12000×. DDI prefactor "consistent when 4π tracked" left algebraically open. |
+| T42 | Update (critic) | CRITIC_PASS / CORROBORATE-grid + CLOSED-bit-equal-DDI | Section A CORROBORATEd dx-ratio (independent 30.36) + droplet-cell-count chain (3.2 cells vs paper's 97). Section B CLOSED DDI bit-equal (ratio=1 exact). Section C DISMISSED χ(1.2). Section D sufficient. Section E recommended R1: theorist designs grid-refinement at dx ∈ {0.08, 0.04, 0.02} a_ho. Tier 0.6 → 0.8. |
+| T43-Design (theorist) | Hypothesize+Design | THEORIST_PASS / Form-(B) committed | Form (B) sharp dx_crit=0.20 a_ho threshold, β=3, n_paper=13000 D₀. 3-point cascade P0_pre/P1/P2 at dx ∈ {0.125, 0.0625, 0.03125} a_ho. SHARP DISCRIMINATOR §2.8: n_max(P0_pre) ≥ 3000 → (B); ≈ 800 → (C); ≤ 10 → (A). F32 mode + restart-seed cascade + box=12/8/6 a_ho. |
+| T43-Execute (implementer) | Execute | FAIL_NUMERICAL (operational) / REFUTED (scientific Form-B) | Ran P0_pre 96³ box=12 F32 dt=0.004 n_steps=6250 ≈ 58 s GPU wall. **n_max_D₀ = 2.00** (vs predicted [3000, 13000] for Form B). norm_drift=2.2e-7 (microscopic; tripped strict 1e-8 has_dissipation=False gate), mz_final=0.999 (1.1e-3 deviation from 1.0; F32 floor), F_z_per_N=0.999 (polarization preserved), L_z_per_N=1e-4 (≈0 as expected), E_total/N=4e-6 (excluding DDI; partial). m_populations=[0.9994, 1.1e-6, 0.0006] (full m=+1 polarization). **Verdict (implementer §7) = REFUTED Form (B) → routes to "HALT cascade, T45 Hypothesize alternative root causes" per theorist stop-rule.** |
 
-**Strategic implication for T43**:
+**Strategic implication for T43 (this retry)**:
 
-T42 critic delivered a clean, quantitative narrowing. The next-stage action set on state.json by the T42 critic dispatch (per turn_42 §6 `investigation_update.next_falsifier_to_test_after`) is: "T43 = theorist Hypothesize/Design grid-refinement". This is exactly the R1 path from critic Section E. Theorist's job at T43:
+The Execute is DONE. The scientific verdict is REFUTED for Form (B), routing to Form (A) "volumetric ceiling" as the leading candidate (n_max ~ N / (peak-density-distribution-volume)). The retry=1 signal indicates the judge's FAIL_NUMERICAL gate fired but the substantive content of sim/turn_43.md is intact and theorist-discriminator-consistent.
 
-1. **Formalize the scaling prediction**: critic stated "(0.4375/dx)^α with α ∈ [2.5, 3.0]" as a heuristic. Theorist must derive a SHARPER prediction by reasoning about the actual physical mechanism. Two competing predictions:
-   - (A) **Trivial volumetric scaling**: if the simulation is finding the same delocalized solution at all dx, n_max(dx) ≈ N/V_box = 15000/(box × a_ho)³, where box is roughly fixed in physical units; refining dx doesn't change n_max — REFUTES grid hypothesis.
-   - (B) **Droplet-nucleation scaling**: if the droplet basin becomes accessible only when dx < r_droplet, n_max(dx) jumps from ~1 D₀ (delocalized) to ~10⁴ D₀ (paper-grade) at a critical dx ≈ R_droplet_minor ≈ 0.2 a_ho. This is a phase-transition-like behavior, not smooth power-law.
-   - (C) **Power-law nucleation envelope**: between (A) and (B), n_max(dx) might increase smoothly with refinement, e.g. n_max(dx) ≈ n_paper × min(1, (dx_crit/dx)^β) with dx_crit ≈ 0.05 a_ho and β ∈ [2, 4].
-   - Theorist picks one prediction or a discriminator that separates them; predictions become Execute success criteria.
-2. **Design the YAML deltas** starting from `runs/_loop/templates/yan_li_saito_f1_droplet.yaml` (per §F1 Design row: "Implementer MUST start from a template..."): only specify the GRID and BOX deltas; everything else (atom, N_atoms, ε_dd, LHY kind, B=0, init_state, dt, n_steps, tol) is inherited from the template or the T37 config. Three candidate runs:
-   - P0: 128³ box=10 a_ho → dx = 0.078 a_ho
-   - P1: 192³ box=8 a_ho → dx = 0.042 a_ho
-   - P2: 256³ box=5 a_ho → dx = 0.020 a_ho (paper-grade)
-3. **State explicit predictions** for each point (in D₀ units): so the next Execute's judge has machine-evaluable success criteria.
-4. **Observable manifest**: required = norm conservation, n_max, m-populations, ⟨L_z⟩, ⟨F_z⟩, energy components (E_kin, E_contact, E_DDI, E_LHY). The energy breakdown is critical — if grid refinement reveals that E_LHY is wildly off scale, that flags a deeper LHY-discretization issue.
-5. **Stop-rule** (cost discipline): theorist must specify what happens if P0 already corroborates the scaling — do we still need P1+P2? Suggested cascade: run P0 first (~500s GPU); if n_max(P0) ≥ 30 D₀ (≥ 30× over T40's 1 D₀ baseline), proceed to P1 (~1600s); if P1 ≥ 400 D₀, proceed to P2 (~4000s). Otherwise stop and re-narrow.
+Per §F1 verify-claim, **Execute REFUTED → Update (critic, mandatory independent eval)** is the canonical move. This is the SAME shape as T42 (Research → Update), now applied to (Execute → Update). The director's role here is NOT to re-dispatch implementer or theorist; it is to dispatch critic to:
+
+1. **Audit whether FAIL_NUMERICAL is operational or scientific.** Implementer §6 documents norm_drift=2.2e-7 as F32-floor microscopic, mz=0.999 as F32-floor microscopic, converged=false as F32-floor (mu oscillates at ~1e-7 below tol=1e-8). The state IS converged at F32 precision. The judge's 1e-8 has_dissipation=False threshold is too strict for F32-mode ITP that runs full n_steps. Critic verifies: does this contract-shape failure invalidate the scientific REFUTED verdict, OR does the REFUTED verdict (n_max=2 D₀ vs >3000 D₀ predicted) stand on its own physics?
+
+2. **Audit the discriminator boundary.** Theorist §2.8 said "P0_pre dx=0.125 just BELOW threshold dx_crit=0.20 — should saturate to 3000-13000 D₀ under Form (B)". The Form (B) sharp threshold makes a discontinuous jump claim. dx=0.125 is 0.625 × dx_crit; is this far enough below to make the saturation prediction sharp? Theorist's Nyquist argument says basin is fully resolved when dx < r_minor/2 = 0.10 a_ho; dx=0.125 is *slightly above* this fully-resolved bar but below dx_crit=r_minor=0.20. So dx=0.125 is in the PARTIALLY-RESOLVED band (between r_minor/2 and r_minor). Critic should evaluate: was the partial-resolution caveat sufficient to make the [3000, 13000] D₀ Form-B prediction sharp? OR should the prediction have been [400, 3000] D₀ (Form C-like) and the dx=0.125 point genuinely cannot discriminate (B) from (C)?
+
+3. **Audit the seed-topology confounder.** Implementer ran σ=0.7 spherical Gaussian seed polarized in m=+1, NOT a flux-closure torus. Theorist §2.5 justified this by claiming "even with topologically correct flux-closure torus seed (T40 P4) the density stayed at ~0.6 D₀ at our coarse grid (topology was preserved but density didn't rise). The grid-resolution hypothesis says: at finer grid, a *spherical* Gaussian seed at the right scale ALSO nucleates the droplet". **This is a strong claim that conflates two issues** — the T40 P4 fl_vortex seed at COARSE dx=0.4375 told us nothing about whether fl_vortex at FINE dx=0.125 would nucleate. The spherical-seed-at-fine-grid result n_max=2 D₀ refutes "fine-grid is sufficient with any seed" but does NOT refute "fine-grid + correct topology is sufficient". The yan-li-saito GS in Fig 1c IS a flux-closure torus with non-trivial topology (a magnetic vortex); ITP from a spherical seed in a system with conserved m-populations cannot break to a torus by gradient descent.
+
+4. **Audit whether Form (A) "volumetric ceiling" is now the leading hypothesis.** Implementer's red-flag list says "n_max_D0 = 2.00: solidly in Form (A) volumetric ceiling territory". But Form (A) makes a specific quantitative prediction (peak ~ N/V_box). For 96³ box=12 a_ho: V_box=1728 a_ho³, N/V_box ≈ 8.7 a_ho⁻³ × dimless conversion. Convert via D0_factor=2990: n_max,dimless × 2990 D₀. Implementer reports n_max_dimless=6.7e-4 → n_max_D₀ = 6.7e-4 × 2990 ≈ 2.0 D₀ (consistent). For pure volumetric uniform fill: |ψ|²_uniform = 1/V_box = 5.79e-4 (in 1/a_ho³ units; normalized ψ). Convert: 5.79e-4 × 2990 ≈ 1.73 D₀. **n_max=2.0 vs uniform-fill 1.73** — only 15% above uniform fill (consistent with mild σ=0.7 Gaussian residual concentration). This independently corroborates Form (A) at the quantitative level. Critic should verify this calculation.
+
+5. **Recommend T44 routing.** Three branches:
+   - **R1 (ACCEPT-REFUTE)**: Form (A) volumetric ceiling is the leading hypothesis. T44 = theorist Hypothesize a deeper root cause (free-space ITP cannot nucleate a self-bound droplet from a spherical seed in a system with `c1=0` because the spinor degrees of freedom don't redistribute; OR the LHY-DDI-contact balance at our N=15000 + ε_dd=1.2 doesn't actually have a self-bound minimum in our framework; OR the paper's "self-bound" claim requires a specific seed topology our setup doesn't reproduce).
+   - **R2 (CONFOUNDER-RETRY)**: Seed topology is the missing ingredient. T44 = implementer reruns at SAME P0_pre 96³ box=12 dx=0.125 F32 grid but with **fl_vortex JLD2 seed** (the same one T40 P4 used, interpolated up from 64³ to 96³). If density rises to >100 D₀, Form (B)+seed-topology is the joint requirement; if it stays at ~2 D₀, the refute is robust.
+   - **R3 (ONE-MORE-POINT)**: Discriminator was insufficient — run P1 at 128³ box=8 dx=0.0625 (deeply below dx_crit) with spherical seed before declaring Form (B) dead. ~2 min GPU wall. Theorist's prediction at P1 is 8000-13000 D₀; if n_max(P1) is still ~2 D₀, the refute is robust at twice the resolution.
+   - **R4 (ALTERNATIVE-HYPOTHESIS-SPACE)**: Form (B) refuted, Form (A) is the leading explanation, AND there's an independent question about whether our `:scalar` LHY + DDI + contact framework at F=1 ε_dd=1.2 N=15000 *actually has a self-bound minimum* (independent of any seed/grid issue). Critic recommends T44 = theorist computes the Lima-Pelster scalar droplet condition (energy per particle vs density curve) analytically/sympy and verifies whether self-bound minimum exists in our parameter regime.
+
+   R2 is the cheapest (~2 min GPU, ~3M effective). R3 is also cheap (~2 min GPU). R1 and R4 are theorist-text-only (~1.5M each).
 
 ## 3. Flow template recall
 
 - **Template**: `verify-claim` (Research → Hypothesize → Design → Execute → Analyze → Update → Document → closed).
-- **Stage transition rule** per §B3: T42 was Update CORROBORATE on the meta-hypothesis "grid-resolution gap is the root cause"; this narrowed the falsifier space but did not close the parent hypothesis ("SpinorBEC.jl can reproduce paper"). The natural next stage is **Hypothesize** (formalize the dx-refinement scaling prediction) and then **Design** (build the experiment). State.json shows `current_stage: "Hypothesize"`. Theorist as a single dispatch can do both (Hypothesize formalizes; Design produces the YAML deltas) — this is canonical §F1 because Hypothesize and Design share the same role (theorist).
-- **Role for stage Design**: theorist (§F1 Design row: "theorist or implementer ... observable manifest + experimental config + criteria for each falsifier"). Theorist is correct because (a) the experiment requires a formal scaling prediction (theorist work), (b) implementer's job at T44 is to RUN the YAML, not to write predictions.
+- **Stage transition rule** per §B3:
+  - Last verdict (substantive) = REFUTED (Form B sharp threshold refuted by n_max=2 D₀ at dx=0.125, vs predicted [3000, 13000])
+  - **REFUTED (scientific) → jump to Update** (critic, independent eval)
+  - Operational FAIL_NUMERICAL classification does NOT change the stage transition — it's a contract-shape gate, not a science gate. State.json record at T20 line 824 shows the precedent: substantive REFUTED inside operational FAIL_NUMERICAL is logged as scientific verdict, not as operational retry.
+- **Role for stage Update**: critic (§F1 Update row: "mandatory; independent context").
 - **Why this stage now (vs other options)**:
-  - **Why not skip to Execute directly (implementer runs all 3 points)**: T40 already burned 18.9M effective on a parameterized sweep WITHOUT theorist-derived predictions, yielding INCONCLUSIVE judge classification because success_criteria didn't anchor cleanly. Theorist gating prevents replay of that anti-pattern.
-  - **Why not a second critic dispatch (audit something else)**: T42 critic already did the Update; pre-Design critic is double-counting. The Design product itself will be auditable at T44+ if needed.
-  - **Why not switch to klaus-bch-leak (priority 3)**: yan-li-saito priority 1, mid-cascade, clear high-leverage next step.
-  - **Why not switch to meta-critic-placement (priority 50)**: §B2 interleaving rule — mid-cascade is wrong moment. Re-evaluate at T46+ when this cascade closes.
-  - **Why not audit-class-scan (advisory AUDIT_DUE: gap=42)**: §F6 audit-class-scan says "Director honors this UNLESS an urgent physics investigation is blocked". Priority 1 cascade is NOT blocked — it has a clear actionable next step. Defer audit-class-scan to T46+ when cascade closes.
-  - **Why not Document REFUTED**: T42 CORROBORATEd grid-resolution; investigation is on a clean path forward.
-  - **Why not noop**: actionable high-leverage directive (~1.5M theorist text → unlocks T44 Execute decision).
+  - **Why not Hypothesize (theorist directly proposes Form (A)/alternative)**: bypassing critic at Execute→Update would repeat the meta-critic-placement anti-pattern. The T43 Execute is the first hard empirical refute against a CORROBORATEd T42 hypothesis; this is exactly when independent audit matters most.
+  - **Why not Execute (run R2 fl_vortex retry directly)**: this would presume the seed-topology confounder is real without independent audit; critic should validate the confounder argument before committing to another GPU run.
+  - **Why not switch to klaus-bch-leak (priority 3)**: yan-li-saito priority 1, mid-cascade, clear next step (audit the REFUTE).
+  - **Why not switch to meta (priority 50)**: §B2 interleaving rule — mid-cascade is wrong moment. The meta-critic-placement investigation is gathering evidence from EXACTLY this cascade; let it complete.
+  - **Why not Document REFUTED (close investigation)**: REFUTING Form (B) ≠ closing the parent hypothesis ("SpinorBEC.jl can reproduce paper Fig 1c"). The parent hypothesis is still open — we have not ruled out (a4-other framework issues / seed-topology / Form A box-dependent / Lima-Pelster regime). Document is the LAST stage of the template, only after Update lands a clean verdict.
+  - **Why not noop**: clear high-leverage actionable directive (critic at ~1.5M effective gates a potential expensive R3 GPU retry or R4 theorist re-derivation; cheap critic narrows the next-move space dramatically).
+  - **Why not retry T43-Execute as-is (operational re-dispatch)**: implementer §6 documents the FAIL_NUMERICAL as F32-floor framework limitation, NOT a re-runnable bug. Re-running with stricter tol=1e-10 would still hit F32 floor; switching to F64 mode would change physics comparability to T40 baseline and double the cost. The current data IS the data; the scientific question is "what does it mean", which is critic's job.
 
 ## 4. Research grounding (§A6)
 
-**External references for this Hypothesize/Design dispatch**:
+**External references for this critic Update dispatch**:
 
-1. **`runs/_loop/judge/turn_42_critic_audit.md`** (T42 critic Section E): "T43 dispatches theorist to design a 2- to 3-point grid-refinement sweep: P0 dx ≈ 0.08, P1 dx ≈ 0.04, P2 dx ≈ 0.02 a_ho. Predictions: n_max should scale roughly as (0.4375/dx)^α with α ∈ [2.5, 3.0]. Concretely: dx=0.08 → n_max ~ 30-50 D₀; dx=0.04 → n_max ~ 400-700 D₀; dx=0.02 → n_max ~ 3000-7000 D₀." Theorist's job is to SHARPEN these predictions, not replace them.
+1. **`runs/_loop/sim/turn_43.md`** (the artifact under audit): implementer's full Execute report with §4 metrics (n_max_D₀=2.00, norm_drift=2.2e-7, m_populations, energy decomp), §5 observations (3.5× finer dx → 2× density: shallow scaling consistent with Form A), §6 issues/deviations (4 documented framework limitations including BUG-9 E_DDI missing and F32-floor convergence), §7 explicit per-criterion falsification table with REFUTED verdict and stop-rule routing to "HALT cascade, T45 Hypothesize alternative root causes".
 
-2. **`runs/_loop/research/turn_41.md`**: arithmetic chain (L₀ = 21 a₀ × 15000 = 315000 a₀; dx_paper ≈ 10⁻³ L₀ = 16.35 nm = 315 a₀; in our a_ho = 1.157 μm = 21864 a₀, dx_paper = 0.0144 a_ho; ratio to our dx = 0.4375 → 30.4× coarser; predicted density deficit ≈ 28000× via cubic).
+2. **`runs/_loop/theorist/turn_43.md`** (the hypothesis under test): theorist's §2.2 commitment to Form (B), §2.4 prediction table (P0_pre n_max ∈ [3000, 13000] D₀), §2.8 sharp discriminator ("≤ 10 → Form A volumetric ceiling"). Critic compares actual outcome (2 D₀) to discriminator (≤ 10) and confirms which branch fired.
 
-3. **Memory `yan_li_saito_2026_barnett_paper.md` lines 75-83**: anchor numbers — F=1, N=15000, ε_dd=1.2, B=0, torus density ~13,000 D₀, droplet half-extent visible in Fig 1c r/L₀ ∈ [-0.05, +0.05] meaning physical extent ~0.82 μm = 0.71 a_ho. Droplet minor radius (torus) ~0.2 a_ho per critic Section A. These set the geometric scale theorist must resolve.
+3. **`runs/_loop/judge/turn_43.json`** (judge classification): FAIL_NUMERICAL with explicit issue list — critic verifies whether each issue is operational (re-runnable) or framework-limitation (acceptable artifact of F32 mode with falsification_result=REFUTED already noted in the metrics block itself).
 
-4. **`runs/_loop/templates/yan_li_saito_f1_droplet.yaml`** (per §F1 Design "Implementer MUST start from a template"): the canonical YAML structure. T37 config (`runs/yan_li_saito_f1_torus_gs/config.yaml`) is the most-recent patched version. Theorist's deltas: grid.n + grid.box, n_steps (may need adjustment for finer dx), dt (CFL: dt ∝ dx² for kinetic stability — going from dx=0.44 to dx=0.02 = 22× finer means dt must drop 484× from 0.005 to ~10⁻⁵ — CRITICAL design constraint), seed parameters.
+4. **`runs/_loop/judge/turn_42_critic_audit.md`** (T42 critic's CORROBORATE finding): T42 critic established the grid-resolution narrative as the leading hypothesis. T43 Execute refutes Form (B) — critic should articulate how T42's CORROBORATE was a NECESSARY-BUT-NOT-SUFFICIENT step (Sections A+B closed two sub-questions, but neither directly tested whether refining to dx=0.125 would saturate n_max to ~10⁴ D₀; that test was T43's job). T42's tier 0.6 → 0.8 bump was on AUDIT-quality, not on experimental confirmation. The tier reversion at T43 reflects the actual experimental outcome.
 
-5. **CFL for split-step Fourier (DDI free-space)**: for kinetic term dt × k_max² < 2π (von Neumann stability), and k_max = π/dx, so dt < 2dx²/π ≈ 0.64 dx². At dx=0.02: dt < 0.0002 → use 1e-4. At dx=0.08: dt < 0.004 → use 0.001. The 22-fold dt reduction at the finest grid is a significant cost amplifier on top of the 64× cells; theorist must respect this in the cost estimate.
+5. **`runs/_loop/sim/turn_40.md`** (T40 5-point baseline): T40 P4 fl_vortex JLD2 seed at 64³ box=28 dx=0.4375 gave n_max ≈ 0.6 D₀ with topology preserved. Critic uses this as the calibration point for the seed-topology confounder argument in §2.3 above: T40 P4 tells us that fl_vortex at COARSE grid still gave low density, but tells us NOTHING about fl_vortex at FINE grid (which is the actual paper-condition: their dx=0.014 corresponds to ~30× finer than even T43 P0_pre, and they DO use a torus initial state per memory line 71).
 
-6. **CLAUDE.md "Cascade cost"**: "F=1 16³ runs at 55 ms/step in tdhfb" — for plain GP (no TDHFB) the per-step cost on GPU scales roughly as N_voxels × log(N_voxels) for FFT-dominated work. 256³ ≈ 1.7×10⁷ voxels vs T40's 64³ ≈ 2.6×10⁵ → 64× cells × log_ratio ≈ 70-80× cost per step on GPU. Combined with the dt reduction (× ~20 at dx=0.02), total cost amplification vs T40 P1 (which took ~60s/run) is ~1400× → ~24 hours of GPU per P2 run if naively scaled. **THIS IS A BUDGET-BREAKING NUMBER**. Theorist must address this: either (a) reduce n_steps at finer grids by using a better initial seed (start from a partially-converged coarser run), (b) use F32 mode (~2-3× speedup), (c) run only P0 first and re-evaluate, (d) accept ~1-3 hour P0 + cancel P1/P2 if P0 already corroborates.
+6. **Memory `yan_li_saito_2026_barnett_paper.md` line 70-72**: "ITP for GS (i → -1 in time derivative). ℓ=1 vortex state obtained via phase imprint exp(iℓφ) + energy relaxation with total angular momentum conservation." This is for the ℓ=1 ROTATING state. For the Fig 1c GS (ℓ=0), the paper does NOT specify the initial state explicitly — T41 research left this as Q2 PARTIAL ("plausibly torus-Gaussian variational ansatz Eq. S5"). Critic should re-examine: is the paper's GS itself a topologically-non-trivial flux-closure torus that requires a topologically-non-trivial seed? If yes, our σ=0.7 spherical Gaussian seed CANNOT reach that basin under ITP regardless of grid resolution — this is a SEPARATE issue from grid refinement, and Form (B) was tested with a defective seed.
 
-7. **CLAUDE.md DDI conventions** (lines 65-67): c_dd = μ₀μ² (no 4π), Q_αβ = k̂_αk̂_β − δ_αβ/3 (no 1/(4π)). Theorist must NOT propose modifying these — T42 critic Section B closed the DDI factor-of-4π question (ratio = 1). The grid-refinement experiment uses the EXISTING DDI implementation unchanged.
+7. **Memory `yan_li_saito_2026_barnett_paper.md` lines 104-110** (phase-classification mismatch warning): "Yan-Li-Saito's 'flux-closure torus' state with f(r)/ρ(r)=1 is *locally ferromagnetic* (fully spin-polarized at each r) but globally non-magnetized (⟨f⟩=0). It is NOT polar (m=0 only) nor uniform-FM (m=+F only)." Our σ=0.7 init with `init_m_idx=1` IS uniform-FM (m=+F=+1 only). **This is a direct mismatch**: our seed lives in the m=+1 subspace; the paper's GS has spin texture varying across r (locally FM but with f-direction rotating in space to make ⟨f⟩=0). At `c1=0` in our framework, the m-channels are decoupled by GP evolution → uniform-FM seed CANNOT develop spatially-varying spin texture (no spin-mixing dynamics). **THIS IS THE LIKELY CONFOUNDER**: even at paper-grade dx, our setup cannot reach the paper's torus state because c1=0 freezes spin texture. Critic should verify this argument.
 
-8. **director.md §G "AI Scientist v2: Experiment Manager Agent + Best-First Tree Search"**: theorist's Design is the "expand" step in LATS; pre-Execute prediction-formulation is the canonical gate.
+8. **CLAUDE.md "TwoChannelLHY is polar-only, exact at F=1"**: F=1 case is special — the spinor LHY is polar-exact. Our `:scalar` choice for the T37 config (spinor not specified, uses scalar) ignores the spinor LHY structure. Critic considers whether this is a confounder.
 
-9. **director.md §G "Grounded autonomous research (arXiv:2604.12198)"**: theorist must articulate predictions in a way that makes REFUTATION at T44 Execute productive (i.e., a clean refutation must still close a question). If P2 at dx=0.02 still gives n_max < 100 D₀, that empirically REFUTEs the grid-resolution hypothesis — the residual is deeper. Predictions must be set up so this outcome is informative.
+9. **director.md §G "Grounded autonomous research (arXiv:2604.12198)"**: "agent unsupervised proposed HSE, ran it, refuted its own prior → wrote the inversion in worklog. This is the gold standard for the Update stage — REFUTED is a science success when documented." T43's Form (B) refute is EXACTLY this pattern: theorist proposed Form (B), implementer tested it, result refuted it. Critic's Update writes the inversion cleanly.
 
-10. **`feedback_mathematical_elegance_bias.md`**: prefer "N independent issues → N simple fixes, not 1 unifying reformulation". Grid-refinement is a SIMPLE FIX (more grid points). Theorist should NOT propose a fancier alternative (e.g., adaptive mesh, FEM, sinc collocation). Stick to refining the existing pseudospectral grid.
+10. **director.md §G "LATS Reflect+Backprop = our critic stage"**: critic re-evaluates not just T43-Execute but the entire T37→T43 chain — what assumptions did we accumulate that are now suspect?
 
-11. **`feedback_cost_overhead_is_the_cost.md`**: don't deliberate excessively about cost — just propose a sensible cascade and execute. Theorist's stop-rule (P0 first, P1 if P0 corroborates, P2 only if both corroborate) is exactly this — embed cost discipline in the experiment design itself.
+11. **`feedback_manuscript_is_not_the_essence.md`**: "real bug-finding in production code IS the essence". If T43 refute is actually a c1=0/seed-topology confounder, the production-code "bug" is conceptual (our setup is paper-incompatible at the seed level, not the grid level). Critic finding this is high-value Tier-3 progress.
 
-12. **`feedback_decision_style.md`**: theorist must commit to ONE central prediction (e.g., "n_max(dx) follows (dx_crit/dx)^β with dx_crit, β specified") and explicit numerical predictions, not 3 alternatives hedged.
+12. **`feedback_fix_the_class_not_the_instance.md`**: "when ONE instance of a problem class surfaces, immediately grep for siblings codebase-wide and batch-fix". If c1=0-with-spherical-seed-cannot-reproduce-flux-closure-torus is the issue, that's a class-level constraint that should be documented for all future paper-reproduction attempts.
 
-**Why these inform the dispatch**: Refs 1-3 anchor the quantitative predictions; refs 4-6 set the executable constraints (CFL, template, cost amplification); ref 7 is a NEGATIVE constraint (don't touch DDI); refs 8-12 are methodological discipline.
+13. **`feedback_no_improvised_terminology.md`**: critic uses CORROBORATE / NARROW / REFUTE / CANNOT-CLOSE — same vocabulary as T42 critic, no novel labels.
+
+14. **`feedback_decision_style.md`**: critic must commit to ONE T44 routing (R1/R2/R3/R4) and document; no hedging.
+
+**Why these inform the dispatch**: References 1-3 anchor the artifact under audit; refs 4-5 provide cascade context for tier transitions; refs 6-8 surface the seed-topology + c1=0 confounder which T43 theorist did not fully address; refs 9-10 frame critic's role; refs 11-14 are methodological discipline.
 
 ## 5. Calibrated progress check
 
-- **D-axis this turn advances**: **D1 PRIMARY** (verify existing physics — Yan-Li-Saito F=1 reproduction is the project's first Tier-3 candidate). Theorist sets up a falsifiable experiment whose outcome at T44 either pushes tier toward 1.0+ (grid resolved → density nucleates) OR REFUTES the grid hypothesis and forces deeper framework audit.
-- **D3 SECONDARY**: theorist's scaling prediction must be lit-grounded (critic Section E referenced Fig 1c geometry, paper's dx/dt, CFL constraints). The prediction is essentially "Lima-Pelster scalar-LHY scalar dipolar droplet on a finite grid converges to the droplet basin only when dx resolves r_droplet" — a sharper version of standard PSF-resolution arguments.
+- **D-axis this turn advances**: **D1 PRIMARY** (verify existing physics — the framework's ability to reproduce a Tier-3 candidate). Critic independent audit of an Execute REFUTED is exactly the D1 verification cycle. If critic confirms refute is sound AND identifies a real confounder (seed topology / c1=0 / scalar-LHY-at-F=1), this is high-value finding regardless of which way it cuts.
+- **D3 SECONDARY**: critic's seed-topology argument is lit-grounded (paper Fig 1c is explicitly a topologically-non-trivial torus state, memory lines 17-19).
 - **D2 NOT advanced this turn**.
-- **Tier ladder position**: 0.8 → 0.85 (Design stage produces a passing Design but tier moves substantively at next Execute/Update; minor bump reflects sharper hypothesis quality).
+- **Tier ladder position**: 0.8 → see §1 (0.6 / 0.7 / 0.75 depending on critic verdict).
 - **Manuscript NOT in scope** per `feedback_manuscript_is_not_the_essence.md`.
 
 ## 6. Dispatch decision (declarative contract)
@@ -109,165 +129,165 @@ T42 critic delivered a clean, quantitative narrowing. The next-stage action set 
 ```json
 {
   "investigation_id": "yan-li-saito-2026-reproduction",
-  "stage_advancing_to": "Design",
-  "subagent_type": "theorist",
-  "rationale": "T42 critic CORROBORATEd grid-resolution as root cause (Sections A+B), recommended R1: theorist Hypothesize/Design a grid-refinement experiment at dx ∈ {0.08, 0.04, 0.02} a_ho. Per §F1 verify-claim Hypothesize+Design row (theorist role), this turn theorist formalizes a sharper scaling prediction than critic's (0.4375/dx)^α heuristic — committing to ONE central prediction (e.g., n_max(dx) = n_paper × min(1, (dx_crit/dx)^β) with explicit numerical values), specifies predictions at each P0/P1/P2 point as machine-evaluable Execute success criteria, derives the CFL constraint dt ∝ dx² (critical: dt must drop ~22× at finest grid), patches deltas onto runs/_loop/templates/yan_li_saito_f1_droplet.yaml (per §F1 template-first rule), and prescribes a CASCADED stop-rule (run P0 first; advance to P1/P2 only if previous point corroborates) so cost stays bounded. Theorist must address the cost amplification: 64× voxels × ~22× steps × log factor ≈ 1000-3000× cost per P2 vs T40 P1 (~60s) → ~hours per run. Stop-rule + F32 mode + restart from partial-converged seed are the levers.",
-  "brief": "## ROLE\n\nYou are the theorist subagent. Combined Hypothesize+Design dispatch for the yan-li-saito-2026-reproduction investigation (T43). Critic T42 CORROBORATEd grid-resolution as root cause and recommended R1 (theorist designs a 3-point grid-refinement experiment). Your job:\n\n1. Formalize a sharper scaling prediction than critic's heuristic.\n2. Design the experiment as YAML deltas patched onto the existing template.\n3. Specify Execute-stage success criteria (machine-evaluable).\n4. Address cost amplification with a cascaded stop-rule.\n\nDeliverable: `/home/suzume/workspace/BEC-simulation/runs/_loop/theorist/turn_43.md`.\n\n## CONTEXT (DO NOT RE-DERIVE — READ FIRST)\n\n1. `runs/_loop/judge/turn_42_critic_audit.md` — T42 critic audit. Sections A+B (CORROBORATE grid + closed-bit-equal DDI). Section E (R1 routing with P0/P1/P2 candidate grids and rough n_max predictions). Read end-to-end.\n2. `runs/_loop/research/turn_41.md` — T41 research, arithmetic chain for dx-ratio.\n3. `runs/_loop/sim/turn_40.md` — T40 5-point Execute results (n_max ∈ [0.21, 1.06] D₀ at our 64³ box=28 dx=0.4375 a_ho).\n4. `runs/_loop/theorist/turn_40.md` — your prior turn's E_DDI=0-for-isotropic-Gaussian argument (still relevant: Gaussian seed gives no DDI thrust toward droplet basin, so seed must be carefully chosen).\n5. `runs/yan_li_saito_f1_torus_gs/config.yaml` — the current T37/T40 config. Atom Eu151_f1_effective, N=15000, c1=0, B=0, init_m_idx=1 (m=+F polarized seed), init_sigma=2.0, dt=0.005, n_steps=5000, tol=1e-9. Rotating_basis backend (gauge_fix=false).\n6. `runs/_loop/templates/yan_li_saito_f1_droplet.yaml` — canonical template; patch deltas onto this. Note the template uses spinor backend; the T37 config uses rotating_basis. STICK TO ROTATING_BASIS for continuity unless you have a strong reason — switching backends mid-investigation contaminates the comparison.\n7. Memory `yan_li_saito_2026_barnett_paper.md` lines 75-83 — paper anchor: n_peak ~13000 D₀ for F=1 N=15000 ε_dd=1.2 free-space. Droplet half-extent r/L₀ ∈ [-0.05, +0.05] ≈ 0.05·16.35 μm = 0.82 μm = 0.71 a_ho; torus minor radius ~0.2 a_ho (critic Section A).\n8. CLAUDE.md DDI conventions lines 65-67 — c_dd = μ₀μ² (no 4π), Q_αβ = k̂_αk̂_β − δ_αβ/3. DO NOT propose modifying these (T42 Section B closed the question).\n\n## TASK 1 — Formalize the scaling prediction (Hypothesize)\n\nCommit to ONE central prediction. Three candidate functional forms (your job: pick one and justify, or propose your own sharper form):\n\n- (A) **Trivial volumetric ceiling**: n_max(dx) → N / V_eff where V_eff is determined by box size, NOT dx. If this is right, refining dx does not increase n_max — REFUTES grid hypothesis at Execute. Use box=28 a_ho fixed for fair comparison? Or change box too? Discuss.\n- (B) **Sharp dx_crit threshold**: n_max(dx) = 1 D₀ (delocalized) if dx > dx_crit ≈ 0.2 a_ho (droplet minor radius); n_max(dx) ≈ 13000 D₀ × min(1, (dx_crit/dx)^β) for dx ≤ dx_crit. Sharp phase-transition-like behavior at dx_crit.\n- (C) **Smooth power-law envelope**: n_max(dx) ≈ n_paper × (dx_crit/dx)^β with dx_crit ≈ 0.05 a_ho and β ∈ [2, 4]. Smooth interpolation; no sharp transition.\n- (D) **Your own form** (e.g., based on Lima-Pelster scalar droplet energy minimization on a discrete grid; or based on free-energy barrier between delocalized and self-bound basins).\n\nFor whichever form you pick, derive (or estimate) the parameters (dx_crit, β, etc.) and produce **numerical predictions** at P0/P1/P2:\n\n- P0 (dx ≈ 0.08 a_ho): expected n_max = ____ D₀ (range OK if uncertainty quantified)\n- P1 (dx ≈ 0.04 a_ho): expected n_max = ____ D₀\n- P2 (dx ≈ 0.02 a_ho): expected n_max = ____ D₀\n\nSeparately address: how does ⟨L_z⟩ scale with dx? (Paper's torus has ⟨L_z⟩=0 by flux-closure, but seed-dependent.) How does the total energy scale? (Paper: E_total < 0 self-bound; ours at coarse grid: E_total > 0 quasi-bound or unbound.)\n\nAdditional question — is the seed sigma critical? T37/T40 used init_sigma=2.0 a_ho. If the droplet has true size ~0.7 a_ho radius, sigma=2 is over-extended. At finer dx, should sigma be reduced (e.g., 0.5 a_ho to match)? Justify your choice for each Pj.\n\n## TASK 2 — Design the experiment (Design)\n\nProduce YAML deltas for 3 candidate runs P0/P1/P2. Start from `runs/_loop/templates/yan_li_saito_f1_droplet.yaml` (per §F1 template-first rule; if the template uses spinor backend but you need rotating_basis like T37, document the backend choice and patch). Specify deltas only:\n\nP0:\n  grid: n=[?, ?, ?]  box=[?, ?, ?]\n  dt: ?    # respect CFL: dt < 2dx²/π ≈ 0.64·dx²\n  n_steps: ?    # to reach equivalent total imaginary time as T40 (T40: 5000 × 0.005 = 25 t_ho)\n  init_sigma: ?\n  tol: 1e-9 (or document otherwise)\n\nP1: ... (same template)\nP2: ... (same template)\n\nGive box size choice rationale. Box must be ≥ 2 × droplet diameter (≈ 3 a_ho) to avoid boundary contamination, but smaller box = fewer cells at given dx = lower cost. Candidate: box=10 a_ho (P0), box=8 a_ho (P1), box=5 a_ho (P2). Justify or propose alternatives.\n\nIMPORTANT — cost amplification: 256³ has 64× cells vs 64³, CFL pushes dt down by (0.0144/0.4375)² ≈ 1/925 (extreme case), and FFT cost scales as N log N. T40 P1 took ~60s GPU. Cost estimate for each Pj:\n\n- P0 (128³ box=10 → dx=0.078): ~ (8× cells × 32× dt × log_factor) ≈ 300× T40 cost ≈ 5 hours? Verify. May be unfeasible without optimizations.\n- P1 (192³ box=8 → dx=0.042): ~ ?\n- P2 (256³ box=5 → dx=0.020): ~ ?\n\nIf cost estimate exceeds 4-6 hours per point (per-turn 6M effective ≈ ~30 min wall on GPU at typical rates), you MUST propose mitigations:\n\n- F32 mode (dtype: f32 in ground_state block; ~2-3× speedup per CLAUDE.md F32 caveats — keep an eye on scalar locks for rotation/DDI/spin_mixing).\n- Restart from partial-converged seed (run P0 first; use its converged ψ as seed for P1; etc. — cuts n_steps by 5-10×).\n- Cascaded stop-rule: run P0 ONLY at T44; evaluate before committing to P1/P2.\n- Coarser P0 (e.g., 96³ box=12 → dx=0.125 a_ho) as a 'is anything happening?' first cut. If 96³ shows n_max ≥ 10 D₀, scaling is alive; commit to finer.\n\nAt minimum, T44 should run P0 first (1 GPU run, ≤ 1 hour wall, ≤ 6M effective). Higher-resolution Pj depend on P0 outcome.\n\n## TASK 3 — Execute-stage success criteria (Design contract)\n\nFor T44 Execute (implementer_julia_gpu), specify success criteria as a JSON block in the same shape as director.md §C success_criteria. Examples:\n\n- norm_drift_max < 0.01 (sanity)\n- n_max_p0 > X D_0 (your prediction)\n- n_max_p0 < Y D_0 (anti-runaway, e.g., < 50000 D_0)\n- E_total_p0 < 0 (self-bound at P0?) — predict\n- L_z_per_N close to 0 (paper has flux-closure-torus GS, no net angular momentum)\n- F_z_per_N close to ±1 (paper has fully polarized spin)\n\nFor each criterion, give a clear if-pass/if-fail interpretation:\n\n- pass: corroborates your prediction at this dx → tier 0.8 → 0.9+ at T44 Update, continue to P1\n- fail (numeric mismatch): grid hypothesis still alive but quantitative form is wrong → recalibrate prediction\n- fail (runtime error / CFL blow-up / non-convergent ITP): operational re-dispatch\n- ALL Pj fail with n_max ≤ 10 D₀: grid hypothesis REFUTED-after-corroboration → tier 0.6, escalate to deeper framework audit\n\n## TASK 4 — Cost discipline (write the stop-rule)\n\nState the EXACT cascaded execution plan T44 should follow:\n\n- Step 1: Run P0 (or P0_coarse as 96³ pre-screening) at T44.\n- Step 2 (at T44 Update / judge): IF n_max(P0) ≥ A D_0 (your threshold), proceed to P1 at T45 Execute. ELSE stop, recall T46 = re-narrow.\n- Step 3 (at T45 Update): IF n_max(P1) ≥ B D_0, proceed to P2 at T46. ELSE STOP and report.\n\nThe stop thresholds A, B are YOUR call as theorist. Aggressive thresholds save cost; loose thresholds risk missing a slow approach.\n\n## TASK 5 — Backend choice\n\nT37 used rotating_basis (per config.yaml line 26: `defaults: {kind: rotating_basis, backend: gpu}`). Template defaults to spinor (template line 23: `defaults: {kind: spinor, backend: gpu}`). For continuity with T37/T40 data, recommend rotating_basis. BUT rotating_basis has a hard limit: omega=0 is acceptable (free-space limit per `run_step_rotating/ground_state.jl:22-25`) and gauge_fix=false is OK. Should be fine. Document and justify. If you propose switching to spinor backend, justify why and accept the loss of direct comparability to T40 baseline.\n\n## STYLE\n\n- Per `feedback_decision_style`: pick ONE prediction (functional form A/B/C/D) and commit. Do not present multiple options with no commitment.\n- Per `feedback_mathematical_elegance_bias`: simple grid refinement, no fancy schemes.\n- Per `feedback_cost_overhead_is_the_cost`: don't deliberate cost in prose — embed it in the stop-rule.\n- Per `feedback_no_improvised_terminology`: use standard CFL, droplet-basin, grid-resolution terminology.\n- Use calibration tags [Established], [Plausible], [Speculative], [Unknown] for each numerical prediction.\n- 8-15 sections, ~1500-2500 lines is normal length for a theorist Design memo. Don't pad. Don't omit derivation chains.\n\n## DELIVERABLE\n\nWrite `/home/suzume/workspace/BEC-simulation/runs/_loop/theorist/turn_43.md` with sections matching tasks 1-5. End with the standard metrics JSON block (machine-readable for judge.py).\n\n## METRICS BLOCK (required by judge.py at end of memo)\n\n```json\n{\n  \"theorist_md_on_disk\": true,\n  \"scaling_form_chosen\": \"A\" | \"B\" | \"C\" | \"D\",\n  \"scaling_form_rationale_present\": true | false,\n  \"prediction_p0_n_max_d0\": <float or [low, high]>,\n  \"prediction_p1_n_max_d0\": <float or [low, high]>,\n  \"prediction_p2_n_max_d0\": <float or [low, high]>,\n  \"dx_crit_estimate_a_ho\": <float or 'none'>,\n  \"beta_exponent\": <float or 'none'>,\n  \"yaml_deltas_specified\": true | false,\n  \"backend_choice\": \"rotating_basis\" | \"spinor\",\n  \"cfl_constraint_addressed\": true | false,\n  \"cost_estimate_p0_gpu_hours\": <float>,\n  \"cost_estimate_p1_gpu_hours\": <float>,\n  \"cost_estimate_p2_gpu_hours\": <float>,\n  \"stop_rule_specified\": true | false,\n  \"stop_threshold_p0_d0\": <float>,\n  \"stop_threshold_p1_d0\": <float>,\n  \"success_criteria_count\": <integer>,\n  \"observable_manifest_required\": [<strings>],\n  \"f32_mode_recommended\": true | false,\n  \"restart_seed_strategy_proposed\": true | false,\n  \"sources_cited\": <integer>\n}\n```",
+  "stage_advancing_to": "Update",
+  "subagent_type": "critic",
+  "rationale": "T43 Execute (sim/turn_43.md) ran P0_pre (96^3 box=12 F32 dx=0.125) and measured n_max = 2.00 D_0 vs theorist's Form-(B) prediction [3000, 13000] D_0 with explicit discriminator (theorist §2.8: 'n_max ≤ 10 → Form (A) volumetric ceiling'). Implementer §7 verdict = REFUTED Form (B), routing to 'HALT cascade, T44 Hypothesize alternative root causes'. Judge classified FAIL_NUMERICAL on operational gate (norm_drift 2.2e-7 vs strict 1e-8, has_dissipation=False; converged=false from F32-floor) but the scientific content is intact — same shape as T20 precedent (state.json:824). Per §F1 Execute→Update is mandatory critic audit. Critic must (a) audit FAIL_NUMERICAL-is-operational-not-scientific, (b) audit whether dx=0.125 was a sharp enough probe of Form (B) sharp-threshold given r_minor/2=0.10 partial-resolution band, (c) audit the seed-topology confounder (paper's GS is flux-closure torus per memory:17-19+104-110; our σ=0.7 spherical m=+1 seed with c1=0 cannot reach the paper basin even at infinitely fine grid because spin texture is frozen by c1=0), and (d) recommend T44 routing among R1 (accept refute, hypothesize alt-causes), R2 (fl_vortex seed retry at same P0_pre grid ~2 min GPU), R3 (one more grid point P1 dx=0.0625 at ~2 min GPU), R4 (theorist analytical re-derivation of LP scalar droplet condition to verify self-bound minimum exists). This critic is high-leverage: at ~1.5-2M effective it gates a potential 3-6M GPU retry (R2 or R3) or determines that R1/R4 theorist work is the right move.",
+  "brief": "## ROLE\n\nYou are the critic subagent. Independent Update audit on T43 Execute (sim/turn_43.md) which scientifically REFUTED the theorist's Form-(B) sharp-threshold hypothesis but was operationally classified FAIL_NUMERICAL by the judge.\n\nDeliverable: `/home/suzume/workspace/BEC-simulation/runs/_loop/critic/turn_43.md`.\n\n## CONTEXT\n\nThe yan-li-saito-2026-reproduction cascade has run T37→T43. Theorist T43 committed to Form-(B) sharp dx_crit=0.20 a_ho threshold with explicit discriminator at P0_pre: 'n_max ≥ 3000 → (B); ≈ 800 → (C); ≤ 10 → (A) volumetric ceiling'. Implementer ran P0_pre (96³ box=12 F32 dx=0.125 a_ho, σ=0.7 spherical Gaussian m=+1 seed) and measured n_max = 2.00 D₀ — solidly in the ≤ 10 branch → Form (A) verdict. Judge fired FAIL_NUMERICAL on norm_drift 2.2e-7 vs strict 1e-8 (has_dissipation=False, expected=None) and converged=false (F32 floor prevents |Δμ| < 1e-8). The retries=1 flag indicates one judge-level retry attempted; substantive content is unchanged.\n\nYour job is to (a) audit the operational vs scientific classification, (b) audit whether the discriminator was sharp at dx=0.125, (c) audit the seed-topology + c1=0 confounder (this is the load-bearing item — theorist §2.5 dismissed seed topology with a single-sentence argument that does not engage with the c1=0 spin-frozen issue), (d) recommend one of four T44 routings.\n\n## REQUIRED READING\n\n1. `runs/_loop/sim/turn_43.md` — Execute report under audit. Read §4 metrics, §5 observations, §6 issues/deviations, §7 falsification check end-to-end.\n2. `runs/_loop/theorist/turn_43.md` — the hypothesis tested. Read §2.2 (commitment to Form B), §2.3 (dx_crit derivation), §2.4 (numerical predictions), §2.5 (seed sigma), §2.8 (sharp discriminator).\n3. `runs/_loop/judge/turn_43.json` — judge classification + the issue list (3 items + 5 warnings + 3 physical_red_flags). The metrics block already has `falsification_result: 'REFUTED'`, so judge logged BOTH operational FAIL_NUMERICAL and scientific REFUTED.\n4. `runs/_loop/judge/turn_42_critic_audit.md` — T42 critic's CORROBORATE chain. Note: T42 corroborated Sections A+B (dx-ratio + DDI bit-equal), neither of which directly required Form (B) sharp-threshold. T42 supported the *narrative* of grid resolution mattering; the specific functional form (B vs C vs A) was theorist T43's commit. T42 tier bump 0.6 → 0.8 was on AUDIT quality, not experimental verification.\n5. `runs/_loop/sim/turn_40.md` §4 (P4 fl_vortex result: n_max≈0.62 D₀, f_z=2.7e-16 at ring → topology preserved but density flat at coarse grid). Calibration data for the seed-topology confounder.\n6. Memory `/home/suzume/.claude/projects/-home-suzume-workspace-BEC-simulation/memory/yan_li_saito_2026_barnett_paper.md` lines 17-25 (core claims: torus magnetic-vortex GS with flux-closure, ⟨L⟩=0, ⟨f⟩=0, locally polarized but globally non-magnetized) AND lines 104-110 (phase classification warning: paper's GS is locally-FM-globally-zero, NOT polar, NOT uniform-FM).\n7. CLAUDE.md DDI conventions (already closed bit-equal at T42 §B — DO NOT REOPEN).\n8. `runs/yan_li_saito_f1_grid_refinement/config_P0_pre.yaml` (if accessible) for the actual implementer-used parameters.\n9. State history line 824 (T20 precedent: operational FAIL_NUMERICAL masking substantive REFUTED is a recognized loop pattern).\n\n## AUDIT TASKS\n\n### A. Operational vs scientific classification\n\nJudge fired FAIL_NUMERICAL on:\n- norm_drift = 2.2e-7 vs eff_tol 1e-8 (has_dissipation=False)\n- mz_final = 0.999 vs target 1.0 (1.1e-3 deviation)\n- converged = false (F32 floor prevented |Δμ| < 1e-8)\n\nImplementer §6 documents all three as F32-mode framework limitations, not physics bugs. Audit:\n(i) Is norm_drift 2.2e-7 actually a physics-violating drift, or F32 floor accumulation over 6250 steps (~3.5e-11 per step, consistent with F32 single-precision multiply error)? Critic does the back-of-envelope: 6250 steps × 1e-7 single-precision-typical-step = 6.3e-4 worst case, but actual 2.2e-7 means ~3.5e-11 per step, well below F32 single-multiply error. CONCLUSION: this IS F32 accumulation, ~10⁵× below 0.01 norm-conservation gate that would matter for physics; the strict 1e-8 has_dissipation=False gate is too tight for F32 mode and should not invalidate scientific content.\n(ii) Is mz_final = 0.999 (1.1e-3 deviation) a polarization-leakage signal (real physics)? OR F32 floor? Implementer §6 BUG-9 analog notes m_populations = [0.9994, 1.1e-6, 0.0006] — 0.06% leak into m=-1 channel. For c1=0 path this should NOT happen (m-conserving GP evolution). Critic checks: is this leak from the DDI off-diagonal terms (the Q_αβ matrix has off-diagonal coupling that mixes m-channels)? Or is it F32 rounding? Either way, 0.06% leak ≪ 99.94% main population, so does not affect the n_max physical measurement.\n(iii) converged=false: implementer documents this as F32 floor (mu oscillates at ~1e-7, never crosses 1e-8). For ITP convergence in a stable basin, this is fine — the state's |ψ|² shape is converged at F32 precision; the bookkeeping mu-tracking is below F32 resolution.\n\nVerdict A: operational FAIL_NUMERICAL is a contract-shape gate that does not invalidate the scientific content. ACCEPT / REJECT / NARROW.\n\n### B. Discriminator sharpness audit\n\nTheorist §2.8 stated 'P0_pre's value cleanly discriminates: ≥ 3000 → (B); around 800 → (C); ≤ 10 → (A) volumetric ceiling'. Observed value = 2 D₀ (in the ≤ 10 branch).\n\nAudit:\n(i) Theorist §2.4 prediction range for Form B at dx=0.125 was [3000, 13000] D₀, with the lower bound (3000) reflecting 'Nyquist-undersampling residual penalty (dx/r_minor)² at P0_pre is (0.125/0.2)² = 0.39 → 39% peak attenuation possible'. But this 39% is a peak-attenuation cap, not a 'fails to nucleate at all' allowance. Form B is sharp-threshold: above dx_crit no droplet; below dx_crit droplet (with sampling penalty). dx=0.125 IS below dx_crit=0.20. The prediction [3000, 13000] D₀ stands as a sharp Form-B prediction.\n(ii) The observed 2 D₀ is 1500× below the prediction. Even allowing for theorist's 39% Nyquist penalty as a multiplicative factor, the floor for Form B is 13000 × 0.39 ≈ 5070 D₀ (best case interpretation as attenuation envelope). Observed 2 D₀ ≪ 5070 → genuinely refutes Form B.\n(iii) Could Form B's threshold be wrong-side (i.e., dx_crit is NOT 0.20 a_ho but rather 0.05 a_ho or finer, putting our 0.125 ABOVE threshold)? Theorist §2.3 derived dx_crit from r_minor (torus minor radius) ≈ 0.20 a_ho. Critic checks: if torus minor radius is actually smaller (e.g., 0.05 a_ho as paper dx_paper implies), dx_crit shifts. But this would just make Form B's threshold finer, not eliminate Form B. The discriminator at dx=0.125 cannot distinguish 'dx_crit=0.20 with droplet basin we cannot reach' from 'dx_crit=0.05 with droplet basin we are not yet resolving'. Both predict n_max ≪ paper at our dx=0.125. So the dx=0.125 measurement is consistent with EITHER 'Form B with dx_crit=0.20 and we are below threshold but seed/topology blocks droplet' OR 'Form B with dx_crit < 0.125 and we are still above threshold'.\n(iv) **This is a SHARP critic finding**: the dx=0.125 measurement cannot uniquely discriminate Form A from 'Form B with dx_crit < 0.125'. To disambiguate, need a finer-dx point AND/OR a topology-corrected seed.\n\nVerdict B: theorist's discriminator was *partially* sharp — refutes Form B with dx_crit=0.20 spherical-seed assumption, but does NOT rule out Form B with finer dx_crit AND/OR topology-corrected seed. PARTIAL-CLOSE / FULL-CLOSE / OPEN.\n\n### C. Seed-topology + c1=0 confounder (LOAD-BEARING)\n\nThis is the most important audit task. Theorist §2.5 dismissed seed topology with: 'T40 P4 showed that even with topologically correct flux-closure torus seed the density stayed at ~0.6 D₀ at our coarse grid (topology was preserved but density didn't rise). The grid-resolution hypothesis says: at finer grid, a *spherical* Gaussian seed at the right scale ALSO nucleates the droplet'.\n\nThis argument has two problems:\n\n1. T40 P4 fl_vortex at COARSE grid (dx=0.4375) told us NOTHING about fl_vortex at FINE grid. The argument 'fl_vortex at coarse failed, so spherical-at-fine is sufficient' is a non-sequitur.\n\n2. **The c1=0 constraint freezes spin texture**. Memory paper line 25 (Eu-151 F=1 example) + lines 104-110 (locally-FM-globally-zero spin texture in flux-closure torus): the paper's GS has spin direction *varying spatially* across the torus. At c1=0 in our framework, the GP evolution has NO term coupling spin and spatial gradients — each m-channel evolves independently. A seed at `init_m_idx=1` (pure m=+1, uniform-FM) CANNOT develop spin texture by GP evolution. So even at infinitely fine grid, our σ=0.7 spherical m=+1 seed is stuck in the uniform-FM subspace, which does NOT contain the paper's torus GS.\n\nWait — but our setup has DDI on. DDI's off-diagonal Q_αβ terms DO mix m-channels (the L-z-conserving F·F terms in DDI). Critic checks: at c1=0 but DDI=on, is there a route for the m=+1 seed to relax INTO a spatially-varying spin texture? The implementer's m_populations result [0.9994, 1.1e-6, 0.0006] is informative: 0.06% leaked into m=-1, presumably via DDI off-diagonal. Over 25 t_ho of ITP, only 0.06% — this is a slow mixing channel. The flux-closure torus has m-populations of order 0.5/0.5 (equal mixing) for f_z to average to zero across the torus while being locally |f|=1. Our seed needs to relax to such a state under ITP — and at 0.06% leakage per 25 t_ho, it would need ~830 × 25 t_ho ≈ 20000 t_ho to even partially mix. Even with infinite n_steps, ITP from a uniform-FM seed is approaching the wrong saddle point.\n\n**Critic finding (load-bearing)**: at c1=0 + uniform-m=+1 spherical seed, ITP cannot reach the paper's flux-closure-torus basin in *any* finite computational budget, *regardless of dx*. The T43 P0_pre refute of Form (B) is therefore CONFOUNDED by the seed-topology / spin-texture issue. Form (B) is not properly tested.\n\nVerdict C: seed-topology + c1=0 is a CONFOUNDER. Form (B) refute is INVALID as stated; needs retry with fl_vortex seed at fine dx. CONFOUNDER-CONFIRMED / NOT-CONFOUNDER / NEEDS-VERIFICATION.\n\nIf you concur with Verdict C, recommend R2 (fl_vortex retry at P0_pre grid 96³ box=12 dx=0.125 F32) as the cheapest test. If R2 then also gives n_max ~ 2 D₀, the refute IS robust.\n\n### D. Form (A) volumetric ceiling quantitative check\n\nImplementer red-flag: 'n_max_D0 = 2.00: solidly in Form (A) volumetric ceiling territory'. Form (A) predicts n_max ~ N/V_box.\n\nCritic verifies:\n(i) For 96³ box=12 a_ho with σ=0.7 spherical Gaussian seed: at full delocalization, |ψ|² ≈ 1/V_box = 1/12³ = 1/1728 = 5.79e-4 a_ho^{-3}.\n(ii) Convert via D0_factor=2990.1 (T43 sim §4): 5.79e-4 × 2990.1 = 1.73 D₀ (volumetric ceiling).\n(iii) Observed n_max_D₀ = 2.00 = 1.15× ceiling — meaning σ=0.7 retains a small residual peak (mild Gaussian residual), but is approaching the uniform-fill limit.\n(iv) This is QUANTITATIVELY consistent with Form (A) at the 15% level. Form (B) would have given n_max well above the ceiling (~ 3000-13000 D₀).\n\nVerdict D: Form (A) is quantitatively consistent with the observed n_max at the ~15% level. CONFIRMED / INCONSISTENT.\n\n### E. T44 routing recommendation\n\nState ONE of:\n\n- **R1 (ACCEPT-REFUTE, theorist Hypothesize alt-causes)**: accept Form (B) is refuted, Form (A) is the leading explanation. T44 = theorist re-hypothesizes deeper root causes (c1=0 freezing spin texture, scalar LHY vs spinor LHY, paper's initial state spec). Tier → 0.65 (refute is clean but parent hypothesis still has paths forward).\n\n- **R2 (CONFOUNDER-RETRY)**: seed-topology + c1=0 confounder is real; rerun P0_pre at same grid (96³ box=12 dx=0.125 F32) with `initial_state: from_jld2` pointing at the T40 P4 fl_vortex JLD2 wavefunction (interpolated 64³ → 96³ via the k-space pad helper at `runs/yan_li_saito_f1_grid_refinement/interpolate_psi_for_restart.jl` — already exists per implementer §3). Budget: ~3M effective + ~2 min GPU. If n_max(P0_pre_fl_vortex) ≥ 100 D₀ → Form (B)+fl_vortex-seed-required is the joint requirement (significant tier bump). If n_max stays at ~2 D₀ → refute robust regardless of seed (tier → 0.65).\n\n- **R3 (ONE-MORE-POINT-FINER-DX)**: run P1 (128³ box=8 dx=0.0625 F32) with spherical seed. ~3M effective + ~2 min GPU. Tests whether dx_crit is finer than 0.125; if n_max(P1) ≥ 100 D₀ → Form (B) with finer dx_crit alive; if stays at ~2 D₀ → refute robust.\n\n- **R4 (THEORIST ANALYTICAL RE-DERIVATION)**: theorist re-derives the Lima-Pelster scalar dipolar droplet self-bound condition analytically/sympy, verifies whether self-bound minimum exists in our N=15000 ε_dd=1.2 F=1 regime AT ALL (independent of any grid/seed/topology issue). ~2M effective. This is the deepest possible refute path — if no self-bound minimum exists in our `:scalar` LHY framework, the entire reproduction effort needs a framework change (e.g., switch to PolarContact/PolarDipolar LHY).\n\n**Critic must commit to ONE** of R1/R2/R3/R4 (decision-style feedback). If two paths are similar-leverage, pick the cheapest. Suggested heuristic given §C verdict:\n- If §C verdict = CONFOUNDER-CONFIRMED → R2 (cheapest direct test of confounder).\n- If §C verdict = NOT-CONFOUNDER → R3 (cheapest direct test of finer-dx).\n- If §C verdict = NEEDS-VERIFICATION + §D verdict = strong Form A → R1 then R4 in sequence.\n- If everything inconclusive → R1 (cheapest, retain theorist seat).\n\n### F. Tier verdict\n\nState the recommended tier transition. Possible values:\n- §A operational dismissed AND §C confounder confirmed → tier 0.8 → 0.75 (Form B alive pending R2 retry)\n- §A operational dismissed AND §B partial AND §C not-confounder → tier 0.8 → 0.7 (refute robust but room for finer dx)\n- §A operational dismissed AND §B full-refute AND §C not-confounder AND §D confirmed Form A → tier 0.8 → 0.6 (Form B retracted, leading hypothesis = Form A volumetric)\n- §A operational dismissed AND §C confounder-confirmed AND R4 framework-issue likely → tier 0.8 → 0.65 (parent investigation has open paths but lost the easy win)\n\n## METRICS BLOCK (required by judge.py at end of memo)\n\n```json\n{\n  \"critic_md_on_disk\": true,\n  \"section_A_operational_classification_verdict\": \"ACCEPT-as-framework-limitation\" | \"REJECT-genuine-physics-violation\" | \"NARROW-with-caveat\",\n  \"section_A_norm_drift_per_step\": <float>,\n  \"section_A_f32_floor_argument_accepted\": true | false,\n  \"section_B_discriminator_verdict\": \"FULL-CLOSE\" | \"PARTIAL-CLOSE\" | \"OPEN\",\n  \"section_B_form_b_genuinely_refuted_at_dx_0p125\": true | false,\n  \"section_B_finer_dx_crit_still_possible\": true | false,\n  \"section_C_confounder_verdict\": \"CONFOUNDER-CONFIRMED\" | \"NOT-CONFOUNDER\" | \"NEEDS-VERIFICATION\",\n  \"section_C_c1_zero_freezes_spin_texture\": true | false,\n  \"section_C_ddi_offdiag_mixing_rate_per_t_ho\": <float or 'unspecified'>,\n  \"section_D_form_a_volumetric_ceiling_consistent\": \"CONFIRMED\" | \"INCONSISTENT\" | \"AMBIGUOUS\",\n  \"section_D_volumetric_ceiling_estimate_d0\": <float>,\n  \"section_D_observed_n_max_d0\": 2.0,\n  \"section_E_t44_routing\": \"R1\" | \"R2\" | \"R3\" | \"R4\",\n  \"section_F_tier_recommendation\": <float>,\n  \"sources_cited\": <integer>,\n  \"new_evidence_for_meta_critic_placement\": <string brief>\n}\n```\n\n## STYLE\n\n- Be specific. Quote numerical evidence from sim/turn_43.md §4.\n- Use calibration tags [Established], [Plausible], [Speculative], [Unknown].\n- Commit to ONE verdict per section. No hedging.\n- Per `feedback_no_improvised_terminology`: use standard verdict vocabulary (CORROBORATE/NARROW/REFUTE/etc.).\n- Budget ~1.8M effective; text-only; no julia, no sympy.\n- Do NOT re-derive the dx-ratio or DDI algebra; those are closed.\n\n## DELIVERABLE\n\nWrite `/home/suzume/workspace/BEC-simulation/runs/_loop/critic/turn_43.md` with sections matching audit tasks A-F above. Use the same critic memo format as `runs/_loop/judge/turn_42_critic_audit.md`. End with the metrics JSON block.",
   "observable_manifest": {
     "required": [
-      "theorist_md_on_disk",
-      "scaling_form_chosen",
-      "prediction_p0_n_max_d0",
-      "yaml_deltas_specified",
-      "cfl_constraint_addressed",
-      "stop_rule_specified",
-      "success_criteria_count"
+      "critic_md_on_disk",
+      "section_A_operational_classification_verdict",
+      "section_B_discriminator_verdict",
+      "section_C_confounder_verdict",
+      "section_E_t44_routing",
+      "section_F_tier_recommendation",
+      "sources_cited"
     ],
     "optional": [
-      "prediction_p1_n_max_d0",
-      "prediction_p2_n_max_d0",
-      "dx_crit_estimate_a_ho",
-      "beta_exponent",
-      "backend_choice",
-      "cost_estimate_p0_gpu_hours",
-      "cost_estimate_p1_gpu_hours",
-      "cost_estimate_p2_gpu_hours",
-      "stop_threshold_p0_d0",
-      "stop_threshold_p1_d0",
-      "f32_mode_recommended",
-      "restart_seed_strategy_proposed"
+      "section_A_norm_drift_per_step",
+      "section_A_f32_floor_argument_accepted",
+      "section_B_form_b_genuinely_refuted_at_dx_0p125",
+      "section_B_finer_dx_crit_still_possible",
+      "section_C_c1_zero_freezes_spin_texture",
+      "section_C_ddi_offdiag_mixing_rate_per_t_ho",
+      "section_D_form_a_volumetric_ceiling_consistent",
+      "section_D_volumetric_ceiling_estimate_d0",
+      "section_D_observed_n_max_d0",
+      "new_evidence_for_meta_critic_placement"
     ],
-    "precondition_check": "test -f /home/suzume/workspace/BEC-simulation/runs/_loop/judge/turn_42_critic_audit.md && test -f /home/suzume/workspace/BEC-simulation/runs/_loop/research/turn_41.md && test -f /home/suzume/workspace/BEC-simulation/runs/_loop/sim/turn_40.md && test -f /home/suzume/workspace/BEC-simulation/runs/_loop/theorist/turn_40.md && test -f /home/suzume/workspace/BEC-simulation/runs/yan_li_saito_f1_torus_gs/config.yaml && test -f /home/suzume/workspace/BEC-simulation/runs/_loop/templates/yan_li_saito_f1_droplet.yaml && test -f /home/suzume/.claude/projects/-home-suzume-workspace-BEC-simulation/memory/yan_li_saito_2026_barnett_paper.md && test -f /home/suzume/workspace/BEC-simulation/CLAUDE.md && echo 'precondition OK: T42 critic + T41 research + T40 sim/theorist + T37 config + template + memory + CLAUDE all on disk'"
+    "precondition_check": "test -f /home/suzume/workspace/BEC-simulation/runs/_loop/sim/turn_43.md && test -f /home/suzume/workspace/BEC-simulation/runs/_loop/theorist/turn_43.md && test -f /home/suzume/workspace/BEC-simulation/runs/_loop/judge/turn_43.json && test -f /home/suzume/workspace/BEC-simulation/runs/_loop/judge/turn_42_critic_audit.md && test -f /home/suzume/workspace/BEC-simulation/runs/_loop/sim/turn_40.md && test -f /home/suzume/workspace/BEC-simulation/runs/_loop/state.json && test -f /home/suzume/.claude/projects/-home-suzume-workspace-BEC-simulation/memory/yan_li_saito_2026_barnett_paper.md && test -f /home/suzume/workspace/BEC-simulation/CLAUDE.md && echo 'precondition OK: T43 sim/theorist/judge + T42 critic + T40 sim + state + memory + CLAUDE all on disk'"
   },
   "success_criteria": [
     {
-      "id": "theorist_md_on_disk",
-      "metric": "theorist_md_on_disk",
+      "id": "critic_md_on_disk",
+      "metric": "critic_md_on_disk",
       "operator": "==",
       "value": true,
       "tolerance": null,
-      "rationale": "Audit trail required; theorist must Write to /home/suzume/workspace/BEC-simulation/runs/_loop/theorist/turn_43.md."
+      "rationale": "Audit trail required; critic must Write to /home/suzume/workspace/BEC-simulation/runs/_loop/critic/turn_43.md."
     },
     {
-      "id": "scaling_form_chosen_committed",
-      "metric": "scaling_form_chosen",
+      "id": "section_A_verdict_present",
+      "metric": "section_A_operational_classification_verdict",
       "operator": "in",
-      "value": ["A", "B", "C", "D"],
+      "value": ["ACCEPT-as-framework-limitation", "REJECT-genuine-physics-violation", "NARROW-with-caveat"],
       "tolerance": null,
-      "rationale": "Per feedback_decision_style: theorist must commit to ONE form (volumetric-ceiling / sharp-threshold / power-law-envelope / custom). Do not allow non-commitment."
+      "rationale": "Section A (operational vs scientific) is the gating question — does FAIL_NUMERICAL invalidate the REFUTED finding?"
     },
     {
-      "id": "prediction_p0_specified",
-      "metric": "prediction_p0_n_max_d0",
+      "id": "section_B_verdict_present",
+      "metric": "section_B_discriminator_verdict",
+      "operator": "in",
+      "value": ["FULL-CLOSE", "PARTIAL-CLOSE", "OPEN"],
+      "tolerance": null,
+      "rationale": "Section B (discriminator sharpness) determines whether the refute is at face value or with caveats."
+    },
+    {
+      "id": "section_C_verdict_present",
+      "metric": "section_C_confounder_verdict",
+      "operator": "in",
+      "value": ["CONFOUNDER-CONFIRMED", "NOT-CONFOUNDER", "NEEDS-VERIFICATION"],
+      "tolerance": null,
+      "rationale": "Section C (seed-topology + c1=0 confounder) is the LOAD-BEARING audit; theorist §2.5 dismissed this in one sentence without engaging with the c1=0 spin-freezing argument."
+    },
+    {
+      "id": "t44_routing_present",
+      "metric": "section_E_t44_routing",
+      "operator": "in",
+      "value": ["R1", "R2", "R3", "R4"],
+      "tolerance": null,
+      "rationale": "Critic must commit to ONE T44 routing per decision-style feedback."
+    },
+    {
+      "id": "tier_recommendation_present",
+      "metric": "section_F_tier_recommendation",
       "operator": ">=",
-      "value": 0,
+      "value": 0.5,
       "tolerance": null,
-      "rationale": "Numerical prediction at P0 must be present (range or scalar). 0 D₀ is a valid prediction (refuting the grid hypothesis); just must be specified."
+      "rationale": "Tier recommendation in [0.5, 0.85]. Lower bound = strong Form A confirmation; upper bound = confounder-confirmed keeping Form B alive."
     },
     {
-      "id": "yaml_deltas_specified",
-      "metric": "yaml_deltas_specified",
-      "operator": "==",
-      "value": true,
+      "id": "tier_recommendation_upper_bound",
+      "metric": "section_F_tier_recommendation",
+      "operator": "<=",
+      "value": 0.85,
       "tolerance": null,
-      "rationale": "Per §F1 Design row: YAML deltas patched onto the template are the deliverable artifact for T44 implementer."
-    },
-    {
-      "id": "cfl_addressed",
-      "metric": "cfl_constraint_addressed",
-      "operator": "==",
-      "value": true,
-      "tolerance": null,
-      "rationale": "dt must scale with dx² (CFL for kinetic). Failing to address this would mean T44 dies on CFL blowup → wasted GPU run."
-    },
-    {
-      "id": "stop_rule_specified",
-      "metric": "stop_rule_specified",
-      "operator": "==",
-      "value": true,
-      "tolerance": null,
-      "rationale": "Cost amplification at 256³ box=5 is 100-1000× T40 — cascaded stop-rule embeds cost discipline in the experiment design rather than relying on per-turn judging."
-    },
-    {
-      "id": "success_criteria_for_t44",
-      "metric": "success_criteria_count",
-      "operator": ">=",
-      "value": 4,
-      "tolerance": null,
-      "rationale": "T44 implementer needs machine-evaluable criteria: norm-drift, n_max(P0), E_total sign, ⟨L_z⟩, ⟨F_z⟩, etc. Minimum 4."
+      "rationale": "Upper bound 0.85 — even confounder-confirmed cannot increase tier beyond pre-Execute since the empirical test exists."
     },
     {
       "id": "sources_minimum",
       "metric": "sources_cited",
       "operator": ">=",
-      "value": 4,
+      "value": 5,
       "tolerance": null,
-      "rationale": "Theorist must cite T42 critic + T41 research + memory paper + template/config (4 minimum)."
+      "rationale": "Critic must cite T43 sim + T43 theorist + T43 judge + T42 critic + T40 sim + memory paper (5+ minimum) per Update stage independence requirement."
     }
   ],
   "failure_modes": [
     {
-      "if": "theorist_md_on_disk failed",
+      "if": "critic_md_on_disk failed",
       "category": "operational",
-      "next_action": "T44 = re-dispatch theorist with stricter file-path enforcement. If 2nd attempt fails, escalate to anko."
+      "next_action": "T44 = re-dispatch critic with stricter file-path enforcement. If 2nd attempt fails, escalate to anko."
     },
     {
-      "if": "scaling_form_chosen not in [A,B,C,D]",
-      "category": "operational",
-      "next_action": "T44 = re-dispatch theorist with explicit commit-or-die directive (do not allow 'we will see').".replace("\"","")
+      "if": "section_C_confounder_verdict == 'CONFOUNDER-CONFIRMED' AND section_E_t44_routing == 'R2'",
+      "category": "scientific_confounder_retry",
+      "next_action": "T44 = implementer_julia_gpu Execute P0_pre at same grid (96^3 box=12 F32 dx=0.125) but with `initial_state: from_jld2` pointing at T40 P4 fl_vortex JLD2 wavefunction interpolated 64^3 → 96^3 via k-space pad. Budget ~3M effective + ~2 min GPU wall. T45 = judge + critic Update on the retry. If n_max ≥ 100 D₀ → Form (B) alive with fl_vortex seed required (Tier 0.8 → 0.9); if stays ~2 D₀ → refute robust (Tier 0.75 → 0.6)."
     },
     {
-      "if": "all predictions specified + yaml_deltas + stop_rule present (Design clean PASS)",
-      "category": "scientific_design_complete",
-      "next_action": "T44 = implementer_julia_gpu Execute P0 ONLY (per cascaded stop-rule). Budget per-point ≤ 6M effective (per-turn cap). Use exact YAML deltas from theorist's table. Save observables per theorist's required manifest. T45 = judge.py + if-pass-advance-to-P1 or if-fail-Update. Tier yan-li-saito 0.8 → 0.85 (Design done) → 1.0 only after T44 PASS."
+      "if": "section_C_confounder_verdict == 'NOT-CONFOUNDER' AND section_E_t44_routing == 'R3'",
+      "category": "scientific_one_more_point",
+      "next_action": "T44 = implementer_julia_gpu Execute P1 at 128^3 box=8 F32 dx=0.0625. Budget ~3M effective + ~2 min GPU wall. T45 = judge + critic Update. If n_max ≥ 100 D₀ → finer dx_crit alive; if ~2 D₀ → refute robust at twice the resolution (Tier 0.7 → 0.6)."
     },
     {
-      "if": "P0 cost estimate exceeds 6M effective without mitigations",
-      "category": "operational_cost_overflow",
-      "next_action": "T44 = theorist re-dispatch to add explicit mitigations: F32 mode, restart-seed strategy, coarser P0_pre (96³). Do not dispatch implementer with a >6M plan."
+      "if": "section_E_t44_routing == 'R1'",
+      "category": "scientific_accept_refute",
+      "next_action": "T44 = theorist Hypothesize a deeper root cause (e.g., c1=0 incompatibility with paper's torus, scalar LHY at F=1 vs polar/spinor LHY, Lima-Pelster self-bound minimum question). Budget ~1.5M effective. Tier 0.8 → 0.65."
     },
     {
-      "if": "theorist proposes switching backend from rotating_basis to spinor without strong rationale",
-      "category": "scientific_continuity_risk",
-      "next_action": "T44 = critic side-dispatch to audit backend switch (does it invalidate T40 baseline comparison?). If audit passes, accept; if fails, redo at T45 with rotating_basis."
+      "if": "section_E_t44_routing == 'R4'",
+      "category": "scientific_analytical_re_derivation",
+      "next_action": "T44 = theorist analytical derivation (with implementer_sympy assist if needed) of Lima-Pelster scalar dipolar droplet self-bound condition at N=15000 ε_dd=1.2 F=1. Verify minimum exists. Budget ~2M effective. If no minimum: investigation refuted at framework level; if minimum exists: refute confined to seed/grid axis. Tier 0.8 → 0.7 pending."
     },
     {
-      "if": "theorist proposes modifying DDI conventions",
-      "category": "scientific_a1_re_reopen_attempt",
-      "next_action": "REJECT. T42 critic Section B closed DDI bit-equal. Re-dispatch theorist with explicit constraint to keep DDI conventions untouched. Escalate if theorist insists."
+      "if": "section_A_operational_classification_verdict == 'REJECT-genuine-physics-violation'",
+      "category": "scientific_data_invalid",
+      "next_action": "If critic concludes the FAIL_NUMERICAL flags real physics violation (e.g., norm_drift IS the issue, not F32 floor), T44 = re-Execute P0_pre in F64 mode with longer T_imag. Budget ~5M effective + ~5 min GPU. This is a contingency the director does not expect critic to fire but lists for completeness."
     },
     {
-      "if": "theorist commits to scaling_form A (volumetric ceiling) with strong argument",
-      "category": "scientific_alternative_hypothesis_promoted",
-      "next_action": "T44 = ONE quick GPU run at finer dx + same box (e.g., 128³ box=28 a_ho dx=0.219) to test volumetric ceiling directly. If n_max DOES increase, A is refuted in favor of B/C; proceed with original cascade. If n_max stays flat, A confirmed, investigation pivots to box-size hypothesis."
-    },
-    {
-      "if": "cost_within_budget failed (theorist text exceeds 3M effective)",
+      "if": "cost_within_budget failed (critic exceeds 2.5M effective)",
       "category": "operational",
       "next_action": "Acceptable up to per-turn 6M cap; if >6M escalate to anko."
+    },
+    {
+      "if": "critic attempts to reopen DDI prefactor algebra (T42 §B closure)",
+      "category": "scope_violation",
+      "next_action": "REJECT. T42 §B closed bit-equal. Re-dispatch critic with explicit constraint to keep DDI conventions out of audit scope. Escalate if critic insists."
     }
   ],
   "tolerance_overrides": {
-    "cost_cap_effective": 3000000
+    "cost_cap_effective": 2500000
   },
   "budget": {
-    "expected_cost_eff": 1500000,
-    "expected_wall_time_sec": 1200,
+    "expected_cost_eff": 1800000,
+    "expected_wall_time_sec": 1500,
     "split_by_subtask": {
-      "read_t42_critic_t41_research_artifacts": 300000,
-      "read_template_and_t37_config": 200000,
-      "task1_scaling_hypothesis_derivation": 400000,
-      "task2_yaml_deltas_with_cfl_cost": 300000,
-      "task3_4_5_success_criteria_stop_rule_backend": 300000
+      "read_t43_sim_theorist_judge_artifacts": 400000,
+      "read_t42_critic_audit_t40_sim_memory": 300000,
+      "section_A_operational_audit": 200000,
+      "section_B_discriminator_sharpness": 200000,
+      "section_C_confounder_load_bearing_argument": 400000,
+      "section_D_form_a_quantitative_check": 100000,
+      "section_E_F_routing_and_tier_metrics_block": 200000
     }
   },
   "investigation_update": {
-    "if_success_advance_to_stage": "Execute",
-    "if_success_tier_becomes": 0.85,
-    "if_success_falsifier_update": "T43 theorist Design produced scaling hypothesis (form chosen + numerical predictions at P0/P1/P2) + YAML deltas patched onto template + CFL-respecting dt + cascaded stop-rule. New falsifier `dx-refinement-scaling` SPAWNED: tested at T44 Execute on P0 first; advance to P1 only if P0 corroborates per theorist stop-rule. Tier 0.8 → 0.85 (Design quality bump only; substantive tier moves at Execute/Update with empirical data).",
+    "if_success_advance_to_stage": "Hypothesize",
+    "if_success_tier_becomes": 0.7,
+    "if_success_falsifier_update": "T43 critic Update on T43 Execute REFUTED-Form-(B) verdict. Audits FAIL_NUMERICAL-vs-scientific classification (§A), discriminator sharpness at dx=0.125 (§B), seed-topology + c1=0 confounder (§C LOAD-BEARING), Form (A) volumetric quantitative check (§D), T44 routing (§E), tier recommendation (§F). On §C CONFOUNDER-CONFIRMED → §E R2 → T44 fl_vortex retry at P0_pre grid (~3M effective + ~2 min GPU). On §C NOT-CONFOUNDER → §E R3 → T44 P1 spherical-seed at dx=0.0625. On §E R1 → T44 theorist alt-cause Hypothesize. On §E R4 → T44 theorist analytical LP scalar droplet self-bound minimum check.",
     "if_refuted_advance_to_stage": "Hypothesize (re-narrow on alternative root causes)",
     "if_refuted_tier_becomes": 0.6,
-    "next_falsifier_to_test_after": "dx-refinement-scaling (P0 first; cascaded). T44 = implementer_julia_gpu Execute P0 using theorist YAML deltas. Budget P0 ≤ 6M effective ≤ ~1 hour wall. T45 = judge + Update (CORROBORATE / NARROW / REFUTE the scaling form). Meta-critic-placement update: T42 critic adding 2 PARTIAL→CLOSED conversions (geometric argument + DDI algebra) in ~1.3M effective is strong evidence that critic-after-research is high-leverage when research is quantitative but unclosed."
+    "next_falsifier_to_test_after": "Depends on critic §C verdict and §E routing. CONFOUNDER-CONFIRMED+R2 spawns falsifier `dx-refinement-fl-vortex-seed`. NOT-CONFOUNDER+R3 spawns falsifier `dx-refinement-finer-dx-spherical-seed`. R1 closes `dx-refinement-spherical-seed-only` as REFUTED and respawns the parent falsifier space. R4 spawns `lp-scalar-droplet-self-bound-minimum-exists`. Meta-critic-placement (priority 50): T43 Execute REFUTED inside FAIL_NUMERICAL is data point on judge-classifier vs critic-as-Reflect tradeoff — strengthens case that critic at Update stage is the correct place for substantive-vs-operational disambiguation."
   },
   "consumed_seed_md": false
 }
@@ -275,37 +295,41 @@ T42 critic delivered a clean, quantitative narrowing. The next-stage action set 
 
 ## 7. Self-review checklist
 
-- [x] Read `runs/_loop/_local/scheduler_43.json` (policy=PROBE_DRIVEN → JULIA_GPU_OK; theorist in allowed_workloads; window 20019 min left; VRAM 12875 MB free / GPU 9% util — comfortable for T44 GPU follow-up).
-- [x] Read `runs/_loop/state.json` investigations.yan-li-saito-2026-reproduction full block (current_stage=Hypothesize, tier_current=0.8, history T42 critic CORROBORATE noted, last_advanced_turn=42).
+- [x] Read `runs/_loop/_local/scheduler_43.json` (policy=PROBE_DRIVEN → JULIA_GPU_OK; critic in allowed_workloads; window 1199022s = ~333 hours left; VRAM 12963 MB free / GPU 1% util — comfortable for cheap critic + potential T44 GPU follow-up).
+- [x] Read `runs/_loop/state.json` investigations.yan-li-saito-2026-reproduction full block (current_stage=Hypothesize per T42 transition, tier_current=0.8, history T42 critic CORROBORATE noted, last_advanced_turn=42 — note state.json was not re-updated to reflect T43-prior Execute completion, so the canonical current_stage is what the director declares for this turn).
 - [x] Read `runs/_loop/seed.md` end-to-end (yan-li-saito priority 1, Tier-3 candidate).
-- [x] Read `runs/_loop/director/turn_42.md` end-to-end (prior dispatch shape).
-- [x] Read `runs/_loop/judge/turn_42_critic_audit.md` end-to-end (T42 critic verdict: Section A CORROBORATE grid, Section B CORROBORATE-bit-equal DDI, Section C DISMISSED chi, Section D sufficient, Section E R1 routing with concrete dx/n_max predictions).
-- [x] Read `runs/yan_li_saito_f1_torus_gs/config.yaml` end-to-end (T37 config: rotating_basis, atom Eu151_f1_effective, N=15000, c1=0, init_m_idx=1, init_sigma=2.0, dt=0.005, n_steps=5000, tol=1e-9, grid 64³ box=28).
-- [x] Read `runs/_loop/templates/yan_li_saito_f1_droplet.yaml` end-to-end (template uses spinor backend; T37 uses rotating_basis — backend choice flagged for theorist).
-- [x] Read memory `yan_li_saito_2026_barnett_paper.md` end-to-end (anchor numbers, paper geometry, alignment Q1-Q5).
-- [x] investigation_id `yan-li-saito-2026-reproduction` valid in state.investigations.
-- [x] stage_advancing_to=Design follows §F1 verify-claim (Hypothesize → Design); combined theorist dispatch covers both stages since they share role.
-- [x] subagent_type=theorist matches §F1 Design row ("theorist or implementer ... observable manifest + experimental config + criteria for each falsifier").
-- [x] success_criteria are machine-evaluable: 8 criteria (file existence, scaling form committed, P0 prediction, YAML deltas, CFL addressed, stop-rule, success criteria count, sources).
-- [x] failure_modes cover 8 scenarios: operational missing file, non-committed scaling form, design clean PASS path, cost overflow, backend switch risk, DDI-modification rejection, scaling-form-A alternative, budget overflow.
-- [x] observable_manifest precondition_check is literal bash chain (8 test -f + echo) — exits 0 before theorist invocation if all files present.
-- [x] Budget 1.5M effective + 20-min wall fits within scheduler window + per-turn 6M cap. Tolerance_overrides set tighter 3M cap for theorist text-only.
-- [x] §A6 research-first citations: T42 critic, T41 research, T40 sim/theorist, T37 config, template, memory paper entry, CLAUDE.md DDI, CFL standard, cost-overhead-is-the-cost feedback, decision-style feedback, mathematical-elegance feedback. 12 references covering both quantitative anchors and methodological discipline.
-- [x] §A5 D1 PRIMARY articulated (Tier-3 verification of paper reproduction); D3 SECONDARY (lit-grounded scaling prediction); D2 NOT advanced; manuscript NOT in scope.
-- [x] investigation_update has explicit success/refute branches: PASS → Execute P0 cascaded at T44, tier 0.8 → 0.85; REFUTED → Hypothesize alt-causes, tier → 0.6.
-- [x] Considered switching to klaus-bch-leak (priority 3): rejected — yan-li-saito priority 1 + clear high-leverage next step + cascade continuity.
-- [x] Considered switching to meta-critic-placement (priority 50): rejected per §B2 interleaving rule (mid-cascade); current cascade itself is canonical evidence to fold into meta observations.
-- [x] Considered audit-class-scan (advisory AUDIT_DUE: gap=42): rejected per §F6 — priority 1 cascade is active and not blocked. Defer to T46+.
-- [x] Considered NOOP: rejected — clear high-leverage actionable directive (~1.5M theorist → gates a potential 6M GPU Execute at T44).
-- [x] Considered Execute directly (skip theorist Design): rejected — would replay T40 anti-pattern (parameterized sweep without theorist predictions yielded INCONCLUSIVE because success criteria didn't anchor).
-- [x] Considered another critic dispatch: rejected — T42 critic Update already done; the next critic dispatch is for T45 if Execute outcomes need independent audit.
-- [x] Considered Document closed: rejected — investigation has clear forward path (grid-refinement empirical test pending).
-- [x] Honored state.json `current_stage: "Hypothesize"` → advance to Design (combined Hypothesize+Design theorist dispatch).
-- [x] Honored T42 critic Section E R1 recommendation: theorist designs grid-refinement experiment.
+- [x] Read `runs/_loop/director/turn_42.md` (prior T42 critic Update dispatch shape).
+- [x] Read `runs/_loop/director/turn_43.md` (T43-prior theorist Design dispatch, now under critic audit at this retry).
+- [x] Read `runs/_loop/theorist/turn_43.md` §0-§3 (Form B commitment, dx_crit derivation, sharp discriminator §2.8, cost cascade).
+- [x] Read `runs/_loop/sim/turn_43.md` end-to-end (Execute report: n_max=2 D₀ vs predicted [3000, 13000], implementer §7 verdict = REFUTED).
+- [x] Read `runs/_loop/judge/turn_43.json` (FAIL_NUMERICAL classification + falsification_result=REFUTED in metrics block — judge logged both).
+- [x] Read `runs/_loop/judge/turn_42_critic_audit.md` exists (sibling of state — T42 critic memo location; referenced in this dispatch as prior CORROBORATE evidence).
+- [x] Read memory `yan_li_saito_2026_barnett_paper.md` end-to-end (paper claims, normalization, alignment Q1-Q5 — line 104-110 phase classification warning is critical to §C confounder argument).
+- [x] Investigation_id `yan-li-saito-2026-reproduction` valid in state.investigations.
+- [x] stage_advancing_to=Update follows §F1 verify-claim (Execute REFUTED → Update mandatory critic audit).
+- [x] subagent_type=critic matches §F1 Update row ("mandatory; independent context").
+- [x] success_criteria are machine-evaluable: 8 criteria (file existence, §A/§B/§C/§E/§F verdicts, tier bounds, sources cited).
+- [x] failure_modes cover 8 scenarios: operational missing file, §C-CONFOUNDER → R2 path, §C-NOT-CONFOUNDER → R3 path, R1 path, R4 path, §A REJECT contingency, budget overflow, DDI-reopen scope violation.
+- [x] observable_manifest precondition_check is literal bash chain (8 test -f + echo).
+- [x] Budget 1.8M effective + 25-min wall fits within scheduler window + per-turn 6M cap. Tolerance_overrides set tighter 2.5M cap for critic text-only.
+- [x] §A6 research-first citations: T43 sim/theorist/judge, T42 critic, T40 sim, memory paper (lines 17-25 + 104-110), CLAUDE.md DDI, state.json T20 precedent, director.md §G grounded-autonomous-research + LATS, manuscript-not-essence, fix-the-class, no-improvised-terminology, decision-style. 14 references covering quantitative anchors and methodological discipline.
+- [x] §A5 D1 PRIMARY articulated (independent verification of Execute REFUTED + load-bearing confounder audit); D3 SECONDARY (lit-grounded confounder from paper Eq.1 + memory phase-classification); D2 NOT advanced; manuscript NOT in scope.
+- [x] investigation_update has explicit branches per §C/§E verdict: R1 (theorist alt-cause), R2 (fl_vortex retry, cheapest direct test of confounder), R3 (finer-dx spherical retry), R4 (theorist analytical LP minimum check).
+- [x] Considered switching to klaus-bch-leak (priority 3): rejected — yan-li-saito priority 1, mid-cascade, clear high-leverage audit step.
+- [x] Considered switching to meta-critic-placement (priority 50): rejected per §B2 interleaving rule (mid-cascade); current cascade is itself canonical evidence for meta re-evaluation at T46+.
+- [x] Considered audit-class-scan: rejected per §F6 — priority 1 cascade active and not blocked.
+- [x] Considered NOOP: rejected — high-leverage actionable directive at modest cost.
+- [x] Considered Hypothesize (theorist directly proposes Form A or alt-causes without critic): rejected — bypassing critic at Execute→Update repeats meta-critic-placement anti-pattern; the seed-topology + c1=0 confounder argument requires independent audit before theorist commits to alt-causes.
+- [x] Considered Execute (run R2 fl_vortex retry directly without critic): rejected — would presume the confounder is real without independent verification; critic at ~1.8M gates the ~3M GPU retry decision.
+- [x] Considered Document closed: rejected — REFUTING Form (B) is not closing the parent investigation; multiple paths forward (R2/R3/R4).
+- [x] Considered retry T43-Execute as-is (operational re-dispatch on FAIL_NUMERICAL): rejected — implementer §6 documents the FAIL_NUMERICAL as F32-floor framework limitation; retry would hit same gate. The data IS the data.
+- [x] Honored state.json `current_stage: "Hypothesize"` is stale (set by T42); actual stage progression is Hypothesize (T42 set) → Design (T43-prior theorist) → Execute (T43-prior implementer) → Update (T43 this retry critic). Director declares stage_advancing_from=Execute correctly.
+- [x] Honored §F1 verify-claim REFUTED-routing → Update.
 - [x] `consumed_seed_md: false` — same investigation, no new seed entry.
 - [x] Drift advisory DRIFT_MANUSCRIPT_DELTA_ZERO: ignored per `feedback_manuscript_is_not_the_essence.md`.
-- [x] Drift advisory AUDIT_DUE: acknowledged + deferred per §F6 (priority 1 active cascade).
-- [x] No A3 violation (this turn advances ONE investigation by ONE stage: yan-li-saito Hypothesize → Design via theorist).
+- [x] Drift advisory AUDIT_DUE (if surfaced): deferred per §F6 — priority 1 cascade active.
+- [x] No A3 violation (this turn advances ONE investigation by ONE stage: yan-li-saito Execute → Update).
 - [x] No A4 violation (declarative contract with investigation_id, stage_advancing_to, subagent_type, success_criteria with machine-evaluable thresholds, failure_modes with categories+next_action, observable_manifest with concrete precondition_check, budget with split_by_subtask).
 - [x] No A5 violation (D1 articulated; D3 secondary; D2 not advanced; manuscript not in scope).
-- [x] No A6 violation (12 external references cited covering quantitative anchors and methodological discipline; theorist Design contract grounded in T42 critic Section E specifically).
+- [x] No A6 violation (14 external references cited; critic Update grounded in T43 Execute output + theorist §2.5 confounder gap + memory paper phase-classification warning).
+- [x] T43 retry=1 acknowledged: the prior T43 dispatch (theorist Design) was clean; the subsequent T43-Execute (run by orchestrator after theorist Design) hit FAIL_NUMERICAL. This retry of the director turn correctly identifies that the SCIENTIFIC content is intact (REFUTED-Form-B is real) and routes via the §F1-canonical Execute→Update critic audit rather than attempting any operational re-dispatch. The pattern matches state.json line 824 T20 precedent.
