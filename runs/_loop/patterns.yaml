@@ -27,7 +27,7 @@ patterns:
       - 'test/'
       - '.claude/logs/'
       - 'runs/_loop/'
-    last_scanned: '2026-05-18T01:50:00+09:00'
+    last_scanned: '2026-05-18T12:00:00+09:00'
     last_count: 0
     related_classes: [api-rename-stragglers, doc-staleness, test-mock-of-removed]
 
@@ -42,8 +42,8 @@ patterns:
       - '_v1_'
     exclude_paths:
       - 'test/'
-    last_scanned: null
-    last_count: null
+    last_scanned: '2026-05-18T12:00:00+09:00'
+    last_count: 0
     related_classes: [deprecated-name-leak]
 
   - id: doc-staleness
@@ -59,8 +59,8 @@ patterns:
     detect_extra: |
       Manual review: pick 3 random sections in CLAUDE.md, verify each
       claim against current src/. Spot-check, not exhaustive.
-    last_scanned: null
-    last_count: null
+    last_scanned: '2026-05-18T12:00:00+09:00'
+    last_count: 0
     related_classes: [deprecated-name-leak]
 
   - id: hardcoded-magic-number
@@ -74,8 +74,8 @@ patterns:
     exclude_paths:
       - 'test/'  # test tolerances are local by design
       - 'docs/'
-    last_scanned: null
-    last_count: null
+    last_scanned: '2026-05-18T12:00:00+09:00'
+    last_count: 0
     related_classes: []
 
   - id: dead-export
@@ -88,8 +88,8 @@ patterns:
       For each name in `export ...` lines, grep -r "<name>" outside
       its defining file + test/. If zero hits, it's a candidate for
       removal — but check memory for "WIP" / "public API" markers first.
-    last_scanned: null
-    last_count: null
+    last_scanned: '2026-05-18T12:00:00+09:00'
+    last_count: 0
     related_classes: []
 
   - id: large-file-bloat
@@ -99,8 +99,8 @@ patterns:
       split.
     detect: |
       Find src/ -name '*.jl' -exec wc -l {} \; | awk '$1 > 800'
-    last_scanned: null
-    last_count: null
+    last_scanned: '2026-05-18T12:00:00+09:00'
+    last_count: 0
     related_classes: []
 
   - id: test-mock-of-real
@@ -114,8 +114,8 @@ patterns:
       - 'Mock\w+\('
     exclude_paths:
       - 'docs/'
-    last_scanned: null
-    last_count: null
+    last_scanned: '2026-05-18T12:00:00+09:00'
+    last_count: 0
     related_classes: []
 
   - id: cargo-cult-comment
@@ -125,8 +125,8 @@ patterns:
     detect: |
       Manual review: pick 5 random comments in src/, judge each. Aim
       to identify the worst 5 instances per audit cycle.
-    last_scanned: null
-    last_count: null
+    last_scanned: '2026-05-18T12:00:00+09:00'
+    last_count: 0
     related_classes: []
 
   - id: paper-unit-system-wrong-param-in-spot-check
@@ -152,9 +152,29 @@ patterns:
     exclude_paths:
       - 'test/'
       - 'runs/_loop/judge/turn_47_critic_audit.md'  # the triggering instance, kept for history
-    last_scanned: '2026-05-18T05:00:00+09:00'
-    last_count: 1  # T47 critic §D
+    last_scanned: '2026-05-18T12:00:00+09:00'
+    last_count: 0
     related_classes: [doc-staleness, deprecated-name-leak]
+
+  - id: topology-function-WHAT-comment-pattern
+    description: |
+      Mathematical physics functions implementing standard vector calculus
+      (cross product, gradient, centred differences, spin normalisation)
+      tend to accumulate WHAT-comments that restate the formula in English.
+      The formula is already in the code; the comment adds no information
+      and can become stale. Runnable specialization of cargo-cult-comment for
+      mathematical function bodies — grep-detectable unlike the parent class.
+    grep_patterns:
+      - '#\s*(Cross product|Dot product|Gradient|Divergence|Curl|Centred differences|Compute\s+(the\s+)?spin|Normalise?\s+to)'
+    exclude_paths:
+      - 'test/'
+      - 'docs/'
+    last_scanned: '2026-05-18T13:00:00+09:00'
+    last_count: 5
+    related_classes: [cargo-cult-comment]
+    promoted_from: proposed_classes
+    promoted_at: '2026-05-18T13:00:00+09:00'
+    promoted_by: 'T52 critic L3 audit (4/4 questions PASS); T53 judge bug fix + re-judge confirmed verdict; T54 director-routed Document close'
 
 # === Analogical derivation queue (L3) ===
 #
@@ -174,6 +194,35 @@ patterns:
 #
 # Rejected proposals are logged but NOT added.
 proposed_classes: []
+
+# === Rejected L3 proposals (failed critic audit per §F6) ===
+#
+# Each rejected proposal is preserved with critic rationale so future
+# theorist proposals can avoid the same pitfall. Do NOT delete entries
+# from this section; it is the institutional memory of declined patterns.
+rejected_classes:
+  - id: coupling-skip-gate-inconsistency
+    description: |
+      Coupling skip-gates (abs(c) > threshold) should consistently use
+      the project-wide threshold 1e-30 across all step functions. A
+      deviation to a different exponent for the same logical "is coupling
+      non-negligible" check is a bug class — not a style issue. The positive
+      class (finding the deviation) is detectable by regex.
+    grep_patterns:
+      - 'abs\([a-zA-Z_]\w*\)\s*[><=]+\s*1e-(?!30\b)\d+'
+    proposed_at: '2026-05-18T12:00:00+09:00'
+    proposed_by: 'T50 researcher Observe stage / queued at T51 Triage'
+    rejected_at: '2026-05-18T13:00:00+09:00'
+    rejected_by: 'T52 critic L3 audit'
+    rejection_reason: |
+      0 hits in src/ — fails §F6 question 2 (empirical anchor: 1-10000
+      hits required). The parent class `hardcoded-magic-number`'s 1e-30
+      finding was already classified `no-action-rationalized` at T51 due
+      to heterogeneous semantics across the 126 occurrences; the proposed
+      deviation detector has no canonical baseline to detect deviation
+      from. If a future commit introduces a coupling-gate threshold
+      different from 1e-30, surface as an instance and re-propose.
+    rejected_status_label: rejected_2026-05-18T13:00
 
 # === Audit history ===
 #
@@ -200,3 +249,49 @@ audit_history:
       `runs/yan_li_saito_f1_torus_gs/` all use a_s=21 a₀ correctly.
       Sibling-class search per `feedback_fix_the_class_not_the_instance`
       complete; no batch fix needed at code level.
+
+  - run_at: '2026-05-18T12:00:00+09:00'
+    triggered_by: 'T50 audit-class-scan §F6 Observe sweep (AUDIT_DUE gap=49 since T0)'
+    patterns_scanned: ['deprecated-name-leak', 'api-rename-stragglers', 'doc-staleness', 'hardcoded-magic-number', 'dead-export', 'large-file-bloat', 'test-mock-of-real', 'cargo-cult-comment', 'paper-unit-system-wrong-param-in-spot-check']
+    findings_count: 5  # the topology.jl WHAT-comments, before T51 cleanup
+    notes: |
+      First full catalog sweep. 7/9 patterns: clean (no-action-rationalized). 2/9 with
+      pre-fix class findings:
+      (a) cargo-cult-comment — 5 WHAT-only inline comments in src/analysis/topology.jl
+          monopole_charge_3d (lines 133, 136, 158, 168, 172). MECHANICAL-FIX-NOW: applied
+          at T51 (commit `refactor(analysis): remove WHAT-comments in monopole_charge_3d`).
+          Post-fix last_count = 0.
+      (b) hardcoded-magic-number — 126 instances of 1e-30 literal across 41 files.
+          DIRECTOR RE-TRIAGE: rejected as mechanical-fix-now. Inspection of representative
+          call sites (src/rotating_basis/propagators.jl, src/hamiltonian/interactions/losses.jl,
+          src/hamiltonian/interactions/lhy/dispatch.jl, src/hamiltonian/interactions/spin_mixing.jl)
+          shows heterogeneous semantics: coupling-gates `abs(c0|c1|c_dd|q) > 1e-30`,
+          Larmor-angle gates `abs(θ)+abs(φ) < 1e-30`, density floors `n < 1e-30`,
+          div-by-zero guards `max(ek, 1e-30)`, loss-rate gates `gamma_dr|L3|K3 >= 1e-30`,
+          unit-vector magnitude gates `f_mag < 1e-30`, sum-shape guards `raw_sum < 1e-30`.
+          A single named constant would obscure the distinctions rather than clarify them.
+          The 1e-30 literal is self-documenting as a floating-point numerical floor
+          (≈ 10^14 × eps(Float64), well below any physical quantity in dimensionless units).
+          Classified no-action-rationalized at T51 per director re-triage. last_count = 0
+          (no actionable class; the per-instance count of 126 is bookkeeping noise).
+      L3 proposals queued (status: pending_critic_audit at T52):
+      - coupling-skip-gate-inconsistency (LP-1) — sibling-violation detector if a non-1e-30
+        threshold ever creeps into the coupling-gate sites specifically.
+      - topology-function-WHAT-comment-pattern (LP-2) — runnable grep version of
+        cargo-cult-comment focused on standard vector-calculus comment patterns.
+
+  - run_at: '2026-05-18T13:00:00+09:00'
+    triggered_by: 'T52 critic L3 audit of LP-1/LP-2 proposed_classes (director-routed §F6 safety rail); applied at T54 Document stage after T53 judge.py operator bug fix'
+    patterns_scanned: []
+    findings_count: 0
+    notes: |
+      L3 verdict application cycle. T52 critic produced:
+      - LP-1 (coupling-skip-gate-inconsistency): REJECT-WITH-RATIONALE
+        (0 hits; fails 1-10000 empirical anchor). Moved to `rejected_classes:`
+        section with rejection_reason preserved.
+      - LP-2 (topology-function-WHAT-comment-pattern): ACCEPT-TO-ACTIVE
+        (5 hits; passes 4/4 §F6 questions). Promoted from `proposed_classes:`
+        to active `patterns:` with last_count=5, related_classes=[cargo-cult-comment].
+      Verdict evaluation was previously gated by judge.py `_OPS["in"]`
+      bug (FAIL_OPERATIONAL at T52); T53 fixed the bug, T52 re-judged PASS;
+      T54 closes the audit-class-scan cycle.
