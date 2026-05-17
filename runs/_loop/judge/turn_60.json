@@ -1,0 +1,187 @@
+{
+  "turn": 60,
+  "status": "PASS",
+  "issues": [],
+  "metrics": {
+    "experiment_kind": "text_only",
+    "investigation_kind": "meta",
+    "src_files_modified": 0,
+    "new_analysis_scripts_written": 0,
+    "agents_md_files_modified": 0,
+    "investigation_id": "meta-stage-routing-2026-05-18",
+    "stage_advancing_to": "Document",
+    "flow_template": "meta-improvement",
+    "closure_verdict": "REFUTED-BY-CONFOUNDER",
+    "artifacts_created_count": 1,
+    "artifacts_modified_count": 1,
+    "state_json_touched": true,
+    "state_json_valid_after_edit": true,
+    "by_tag_index_touched": false,
+    "streak_post_t53_fail_inconclusive_count": 0,
+    "streak_turn_count": 6,
+    "investigation_closed": true,
+    "final_tier": 0.0,
+    "closing_note_present_in_state_json": true,
+    "confounder_advisory_preserved": true,
+    "new_memory_file_cites_judge_bug": true,
+    "new_memory_file_has_streak_table": true,
+    "agents_md_unchanged": true,
+    "judge_py_unchanged": true
+  },
+  "contract_evaluation": {
+    "verdict": "PASS",
+    "criteria_results": [
+      {
+        "id": "experiment_kind_correct",
+        "passed": true,
+        "actual": "text_only",
+        "reason": "experiment_kind=text_only == text_only \u2192 True"
+      },
+      {
+        "id": "investigation_kind_meta",
+        "passed": true,
+        "actual": "meta",
+        "reason": "investigation_kind=meta == meta \u2192 True"
+      },
+      {
+        "id": "src_unchanged",
+        "passed": true,
+        "actual": 0,
+        "reason": "src_files_modified=0 == 0 \u2192 True"
+      },
+      {
+        "id": "no_scripts_added",
+        "passed": true,
+        "actual": 0,
+        "reason": "new_analysis_scripts_written=0 == 0 \u2192 True"
+      },
+      {
+        "id": "no_agents_md_changes",
+        "passed": true,
+        "actual": 0,
+        "reason": "agents_md_files_modified=0 == 0 \u2192 True"
+      },
+      {
+        "id": "investigation_consistent",
+        "passed": true,
+        "actual": "meta-stage-routing-2026-05-18",
+        "reason": "investigation_id=meta-stage-routing-2026-05-18 == meta-stage-routing-2026-05-18 \u2192 True"
+      },
+      {
+        "id": "stage_consistent",
+        "passed": true,
+        "actual": "Document",
+        "reason": "stage_advancing_to=Document == Document \u2192 True"
+      },
+      {
+        "id": "template_consistent",
+        "passed": true,
+        "actual": "meta-improvement",
+        "reason": "flow_template=meta-improvement == meta-improvement \u2192 True"
+      },
+      {
+        "id": "closure_verdict_refuted_by_confounder",
+        "passed": true,
+        "actual": "REFUTED-BY-CONFOUNDER",
+        "reason": "closure_verdict=REFUTED-BY-CONFOUNDER == REFUTED-BY-CONFOUNDER \u2192 True"
+      },
+      {
+        "id": "exactly_one_artifact_created",
+        "passed": true,
+        "actual": 1,
+        "reason": "artifacts_created_count=1 == 1 \u2192 True"
+      },
+      {
+        "id": "artifacts_modified_one_or_two",
+        "passed": true,
+        "actual": 1,
+        "reason": "artifacts_modified_count=1 in [1, 2] \u2192 True"
+      },
+      {
+        "id": "state_json_touched",
+        "passed": true,
+        "actual": true,
+        "reason": "state_json_touched=True == True \u2192 True"
+      },
+      {
+        "id": "state_json_remains_valid",
+        "passed": true,
+        "actual": true,
+        "reason": "state_json_valid_after_edit=True == True \u2192 True"
+      },
+      {
+        "id": "streak_zero_failures",
+        "passed": true,
+        "actual": 0,
+        "reason": "streak_post_t53_fail_inconclusive_count=0 == 0 \u2192 True"
+      },
+      {
+        "id": "streak_six_turns",
+        "passed": true,
+        "actual": 6,
+        "reason": "streak_turn_count=6 == 6 \u2192 True"
+      },
+      {
+        "id": "investigation_closed_flag",
+        "passed": true,
+        "actual": true,
+        "reason": "investigation_closed=True == True \u2192 True"
+      },
+      {
+        "id": "tier_zero",
+        "passed": true,
+        "actual": 0.0,
+        "reason": "final_tier=0.0 == 0.0 \u2192 True"
+      },
+      {
+        "id": "closing_note_set",
+        "passed": true,
+        "actual": true,
+        "reason": "closing_note_present_in_state_json=True == True \u2192 True"
+      },
+      {
+        "id": "confounder_advisory_preserved",
+        "passed": true,
+        "actual": true,
+        "reason": "confounder_advisory_preserved=True == True \u2192 True"
+      },
+      {
+        "id": "memory_cites_judge_bug",
+        "passed": true,
+        "actual": true,
+        "reason": "new_memory_file_cites_judge_bug=True == True \u2192 True"
+      },
+      {
+        "id": "memory_has_streak_table",
+        "passed": true,
+        "actual": true,
+        "reason": "new_memory_file_has_streak_table=True == True \u2192 True"
+      },
+      {
+        "id": "agents_md_intact",
+        "passed": true,
+        "actual": true,
+        "reason": "agents_md_unchanged=True == True \u2192 True"
+      },
+      {
+        "id": "judge_py_intact",
+        "passed": true,
+        "actual": true,
+        "reason": "judge_py_unchanged=True == True \u2192 True"
+      }
+    ],
+    "triggered_failure_modes": [],
+    "issues": []
+  },
+  "investigation_id": "meta-stage-routing-2026-05-18",
+  "stage_advancing_to": "Document",
+  "investigation_update": {
+    "if_success_advance_to_stage": "closed",
+    "if_success_tier_becomes": 0.0,
+    "if_refuted_advance_to_stage": "Observe (if streak verification surfaces an unexpected FAIL/INCONCLUSIVE in T54-T59, the closure is NOT justified and the investigation holds at Observe)",
+    "if_refuted_tier_becomes": 0,
+    "if_inconclusive_advance_to_stage": "Document (re-dispatch with corrected contract per failure_modes)",
+    "if_inconclusive_tier_becomes": 0,
+    "next_falsifier_to_test_after": "Investigation closes terminal. No falsifiers remaining; no successor meta-investigation spawned per \u00a7F5 S6 meta-meta-forbidden rule. Future drift-trigger auto-spawns may reference this closure record as a precedent for confounder-check-before-pilot."
+  }
+}
