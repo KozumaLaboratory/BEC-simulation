@@ -1,5 +1,5 @@
 {
-  "turn": 30,
+  "turn": 31,
   "status": "running",
   "history": [
     {
@@ -1445,19 +1445,61 @@
         "researcher": null,
         "implementer": null,
         "critic": null,
-        "orchestrator": null,
-        "total": null
+        "orchestrator": 9942181,
+        "total": 9942181,
+        "effective_full_rate": 1526725,
+        "breakdown": {
+          "input_fresh": 6106,
+          "cache_creation": 355073,
+          "cache_read": 9556782,
+          "output": 24220
+        },
+        "n_messages": 75,
+        "n_message_starts": 75
       },
       "branch": null,
       "commit": null,
-      "parent": null
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.222,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.5,
+        "cost_inflation": 0.793,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "advisory",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO"
+      ]
+    },
+    {
+      "turn": 30,
+      "ts": "2026-05-17T03:59:26Z",
+      "judge_status": "NOOP",
+      "directive_action": "noop",
+      "directive_label": "yan-li-saito-hypothesize-zero-blockers",
+      "wall_time_sec": null,
+      "notes": "Hypothesize stage for yan-li-saito-2026-reproduction. Term-by-term paper→SpinorBEC.jl mapping (5 rows), all Q1-Q5 framework gaps resolved (Q1 LHY χ bit-exact MATCH, Q2 DDI prefactor ratio=1 with proper g_F, Q3 free-space ITP CLEAR via NoPotential, Q4 J_z-constrained ITP CLEAR via _find_ground_state_Jz, Q5 init_psi_fl_vortex matches torus topology). 4 pre-registered falsifiers (F1/F2/F3/F4) with quantitative predictions + tolerance bands. ZERO BLOCKERS for F1 (torus GS) Execute. 2 research queries dispatched in parallel: Q-Eu151-gF RESOLVED (paper uses real F=1 Eu-151 hyperfine with g_F·F=9/2 from Breit-Rabi → a_s≈21 a₀); Q-paper-energy-table NOT_FOUND (no energy table in paper; F4 becomes ratio-only discriminator).",
+      "tokens_used": null,
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "agent_hashes": {
+        "critic": "3f490a470511457f71b3fce819b12195",
+        "director": "d064dde7210fefda5e3683ec17585da7",
+        "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+        "researcher": "5c6277ae5ff274765786dfb8c511b568",
+        "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+      }
     }
   ],
   "created_at": "2026-05-14T00:00:00+00:00",
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "INCONCLUSIVE",
+  "last_judge": "NOOP",
   "home_branch": "main",
   "schema_version": 2,
   "current_agent_hashes": {
