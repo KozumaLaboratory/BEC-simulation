@@ -1,5 +1,5 @@
 {
-  "turn": 61,
+  "turn": 62,
   "status": "running",
   "history": [
     {
@@ -1470,14 +1470,68 @@
         "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
         "critic": "e4cc3ddb505396ed9e55914384944cbd",
         "director": "077a86dba89b9096e5c2fc45e8fbc3c7"
-      }
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 9338796,
+        "total": 9338796,
+        "effective_full_rate": 1489220,
+        "breakdown": {
+          "input_fresh": 11009,
+          "cache_creation": 386021,
+          "cache_read": 8921050,
+          "output": 20716
+        },
+        "n_messages": 69,
+        "n_message_starts": 69
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.067,
+        "subagent_repetition": 0.667,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.2,
+        "cost_inflation": 0.862,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "advisory",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "AUDIT_DUE: patterns.yaml last audited at T0, gap=60"
+      ]
+    },
+    {
+      "turn": 61,
+      "ts": "2026-05-17T23:47:20Z",
+      "judge_status": "RESEARCHER_ONLY",
+      "directive_action": "researcher_dispatch",
+      "directive_label": "audit-class-scan-T61-observe",
+      "wall_time_sec": null,
+      "agent_hashes": {
+        "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b",
+        "researcher": "5c6277ae5ff274765786dfb8c511b568",
+        "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+        "critic": "e4cc3ddb505396ed9e55914384944cbd",
+        "director": "077a86dba89b9096e5c2fc45e8fbc3c7"
+      },
+      "investigation_id": "audit-class-scan-2026-05-18-T61",
+      "stage_advancing_to": "Observe",
+      "branch": null,
+      "commit": null,
+      "parent": null
     }
   ],
   "created_at": "2026-05-14T00:00:00+00:00",
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "PASS",
+  "last_judge": "RESEARCHER_ONLY",
   "home_branch": "main",
   "schema_version": 2.1,
   "current_agent_hashes": {
@@ -1487,11 +1541,11 @@
     "critic": "e4cc3ddb505396ed9e55914384944cbd",
     "director": "077a86dba89b9096e5c2fc45e8fbc3c7"
   },
-  "last_directive_label": "audit-class-scan-T50-document-fold-judge-bug",
-  "last_directive_action": "modify_code",
+  "last_directive_label": "audit-class-scan-T61-observe",
+  "last_directive_action": "researcher_dispatch",
   "last_error": null,
   "retries": 0,
-  "active_investigation_id": "meta-stage-routing-2026-05-18",
+  "active_investigation_id": "audit-class-scan-2026-05-18-T61",
   "investigations_index": [
     "barnett-mechanism-2026-05-16",
     "klaus-magnetostir-bch-leak-2026-05-13",
@@ -1779,8 +1833,8 @@
       "flow_template": "meta-improvement",
       "current_stage": "closed",
       "stages_done": [
-        "Observe",
-        "Document"
+        "Document",
+        "Observe"
       ],
       "last_turn": 60,
       "last_stage": "Document",
@@ -1799,7 +1853,7 @@
       "auto_spawned_by_trigger": "same_stage_fail_streak",
       "auto_spawned_at_turn": 44,
       "falsifiers": [],
-      "tier_current": 0,
+      "tier_current": 0.0,
       "tier_target": 1,
       "priority": 25,
       "blocked_on": null,
@@ -1917,6 +1971,6 @@
       "closing_note": "Bug class: judge.py operator semantics. 1 T53 commit fixed all sibling instances. 12 historical turns flagged for anko awareness (T28/T33/T35/T38/T41-T48). Memory entry at judge_in_operator_bug_2026_05_18.md preserves the lesson."
     }
   },
-  "last_meta_check_turn": 59,
-  "last_short_label": "audit-class-scan-T50-document-fold-judge-bug"
+  "last_meta_check_turn": 60,
+  "last_short_label": "audit-class-scan-T61-observe"
 }
