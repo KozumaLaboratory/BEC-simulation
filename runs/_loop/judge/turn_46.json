@@ -1,0 +1,200 @@
+{
+  "turn": 46,
+  "status": "INCONCLUSIVE",
+  "issues": [
+    "falsification_result=UNDETERMINED_R2c in ['PASS_R2c', 'FAIL_R2c', 'UNDETERMINED_R2c'] \u2192 False",
+    "metric 'implementer_md_path_exists' missing from sim metrics",
+    "metric 'T_imag_checkpoints_count' missing from sim metrics",
+    "metric 't47_recommendation_present' missing from sim metrics"
+  ],
+  "metrics": {
+    "experiment_kind": "ground_state",
+    "norm_initial": 1.0,
+    "norm_final": 0.9999999286,
+    "norm_drift": 7.144e-08,
+    "norm_drift_max": 7.144e-08,
+    "energy_initial": null,
+    "energy_final": null,
+    "energy_monotonic": null,
+    "mz_target": null,
+    "mz_final": 0.000357,
+    "fitted_order": null,
+    "fit_dt_range": null,
+    "fit_r_squared": null,
+    "wall_time_sec": 83.6,
+    "peak_memory_gb": null,
+    "tests_passed": null,
+    "n_max_dimless": 0.000639,
+    "n_max_D0": 1.91,
+    "m_populations": [
+      0.49871,
+      0.00294,
+      0.49835
+    ],
+    "F_z_per_N": 0.000357,
+    "L_z_per_N": -2e-06,
+    "E_kinetic_per_N": 0.001144,
+    "E_contact_per_N": 0.052509,
+    "E_LHY_per_N": 0.123245,
+    "E_DDI_per_N": null,
+    "E_total_per_N": 0.176897,
+    "mu_final": 0.146117,
+    "converged": false,
+    "n_steps_completed": 12500,
+    "n_max_D0_trajectory": [
+      3.08,
+      2.72,
+      2.13,
+      1.95,
+      1.91
+    ],
+    "m_populations_trajectory": [
+      [
+        0.367,
+        0.2659,
+        0.367
+      ],
+      [
+        0.4085,
+        0.1835,
+        0.408
+      ],
+      [
+        0.4855,
+        0.03,
+        0.4845
+      ],
+      [
+        0.497,
+        0.0067,
+        0.4963
+      ],
+      [
+        0.4987,
+        0.0029,
+        0.4984
+      ]
+    ],
+    "mu_trajectory": [
+      0.315543,
+      0.254532,
+      0.157142,
+      0.146639,
+      0.146117
+    ],
+    "F_z_trajectory": [
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "L_z_trajectory": [
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "T_imag_checkpoints": [
+      35.0,
+      45.0,
+      55.0,
+      65.0,
+      75.0
+    ],
+    "D0_factor_used": 2990.1,
+    "c0": 180.99,
+    "c_dd": 639.2,
+    "gamma_lhy": 12.795,
+    "eps_dd_phys": 1.1772,
+    "restart_psi_sanity_check_passed": true,
+    "falsification_result": "UNDETERMINED_R2c",
+    "physical_red_flags": [
+      "n_max DECREASED from 3.09 (T44 end) to 1.91 D0 (T46 end) despite m=0 evacuation. Expected: PASS_R2c requires n_max >= 10 D0 rising alongside m=0 drop. Actual: n_max falling monotonically as m=0 evacuates \u2014 opposite of the PASS scenario. This is a new physics finding: the Mermin-Ho (0.5, 0, 0.5) spin texture is NOT the self-bound droplet state at dx=0.125.",
+      "mu_final dropped from 0.316 (T44) to 0.146 (T46). The chemical potential decrease coincides with n_max decrease \u2014 consistent with the system evacuating vortex gradient energy and relaxing to a lower-density Mermin-Ho delocalized state.",
+      "E_LHY/E_contact = 0.123/0.053 = 2.3x at final state. LHY term still dominant even at lower density \u2014 the system is in the strongly-LHY-dominated regime throughout. Self-binding threshold requires DDI energy (unknown due to BUG-9) to contribute a net attractive term larger than the LHY repulsion at this density."
+    ],
+    "warnings": [
+      "converged=false: ITP ran all 12500 steps without crossing tol=1e-8. F32 floor prevents |\u0394\u03bc| from reaching tol. State is at F32 precision equilibrium (same as T44).",
+      "E_DDI_per_N = NaN: BUG-9 framework limitation \u2014 rotating_basis ITP does not expose DDI energy decomposition post-hoc. E_total excludes DDI contribution.",
+      "F_z_trajectory and L_z_trajectory not extracted per-checkpoint (would double the per-checkpoint wall time for L_z). Final values only: F_z=3.6e-4, L_z=-2e-6."
+    ],
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "total": null
+    }
+  },
+  "contract_evaluation": {
+    "verdict": "INCONCLUSIVE",
+    "criteria_results": [
+      {
+        "id": "implementer_md_on_disk",
+        "passed": null,
+        "actual": null,
+        "reason": "metric 'implementer_md_path_exists' missing from sim metrics"
+      },
+      {
+        "id": "restart_sanity_check",
+        "passed": true,
+        "actual": true,
+        "reason": "restart_psi_sanity_check_passed=True == True \u2192 True"
+      },
+      {
+        "id": "norm_drift_physical",
+        "passed": true,
+        "actual": 7.144e-08,
+        "reason": "norm_drift_max=7.144e-08 < 0.01 \u2192 True"
+      },
+      {
+        "id": "n_steps_completed",
+        "passed": true,
+        "actual": 12500,
+        "reason": "n_steps_completed=12500 >= 12500 \u2192 True"
+      },
+      {
+        "id": "checkpoints_logged",
+        "passed": null,
+        "actual": null,
+        "reason": "metric 'T_imag_checkpoints_count' missing from sim metrics"
+      },
+      {
+        "id": "falsification_verdict_committed",
+        "passed": false,
+        "actual": "UNDETERMINED_R2c",
+        "reason": "falsification_result=UNDETERMINED_R2c in ['PASS_R2c', 'FAIL_R2c', 'UNDETERMINED_R2c'] \u2192 False"
+      },
+      {
+        "id": "t47_recommendation_committed",
+        "passed": null,
+        "actual": null,
+        "reason": "metric 't47_recommendation_present' missing from sim metrics"
+      },
+      {
+        "id": "wall_time_in_budget",
+        "passed": true,
+        "actual": 83.6,
+        "reason": "wall_time_sec=83.6 < 1200 \u2192 True"
+      }
+    ],
+    "triggered_failure_modes": [],
+    "issues": [
+      "falsification_result=UNDETERMINED_R2c in ['PASS_R2c', 'FAIL_R2c', 'UNDETERMINED_R2c'] \u2192 False",
+      "metric 'implementer_md_path_exists' missing from sim metrics",
+      "metric 'T_imag_checkpoints_count' missing from sim metrics",
+      "metric 't47_recommendation_present' missing from sim metrics"
+    ]
+  },
+  "investigation_id": "yan-li-saito-2026-reproduction",
+  "stage_advancing_to": "Execute",
+  "investigation_update": {
+    "if_success_advance_to_stage": "Analyze (then Update via critic) \u2014 but per T45 critic's specification, the implementer's \u00a78 T47 recommendation effectively pre-routes the next stage; the actual stage transition depends on falsification_result.",
+    "if_success_tier_becomes": "0.85 if PASS_R2c; 0.70 if UNDETERMINED_R2c; 0.60 if FAIL_R2c (placeholder values; final tier transition is set by T47 critic if Update is dispatched, or by T47 director if direct routing).",
+    "if_refuted_advance_to_stage": "Hypothesize (for R3 Design) if FAIL_R2c; Execute again (extend further) if UNDETERMINED with monotonic m_0 drop.",
+    "if_refuted_tier_becomes": 0.6,
+    "next_falsifier_to_test_after": "Per T47 critic's evaluation: if PASS_R2c \u2192 no further falsifier needed (investigation closes); if FAIL_R2c \u2192 `dx-refinement-128cubed-fl-vortex-from-state-zoo` (R3); if UNDETERMINED-monotonic \u2192 `extend-itp-25000-steps-same-grid-r2c` (R2_c continuation). Meta-stage-routing-2026-05-18 (priority 25, auto-spawned T44): actual root cause is judge.py contract-coupling, not stage routing; flag for proper meta-investigation reframing at T47+ when cascade closes. AUDIT_DUE patterns.yaml (gap=46 turns): defer to T47+ but flag for explicit attention then; fine-grid-slows-m-channel-relaxation candidate pattern depends on T46 trajectory shape."
+  }
+}
