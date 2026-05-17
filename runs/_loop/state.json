@@ -1,5 +1,5 @@
 {
-  "turn": 50,
+  "turn": 51,
   "status": "running",
   "history": [
     {
@@ -1059,6 +1059,41 @@
         "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
         "researcher": "5c6277ae5ff274765786dfb8c511b568",
         "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 12031949,
+        "total": 12031949,
+        "effective_full_rate": 1926226,
+        "breakdown": {
+          "input_fresh": 7328,
+          "cache_creation": 553229,
+          "cache_read": 11455020,
+          "output": 16372
+        },
+        "n_messages": 93,
+        "n_message_starts": 93
+      },
+      "branch": null,
+      "commit": "544b670",
+      "parent": "aa7eabd"
+    },
+    {
+      "turn": 50,
+      "ts": "2026-05-17T20:33:54Z",
+      "judge_status": "RESEARCHER_ONLY",
+      "directive_action": "researcher_audit_class_scan",
+      "directive_label": "audit-class-scan-T50-observe",
+      "wall_time_sec": 439,
+      "agent_hashes": {
+        "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b",
+        "researcher": "5c6277ae5ff274765786dfb8c511b568",
+        "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+        "critic": "e4cc3ddb505396ed9e55914384944cbd",
+        "director": "077a86dba89b9096e5c2fc45e8fbc3c7"
       }
     }
   ],
@@ -1066,15 +1101,15 @@
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "PASS",
+  "last_judge": "RESEARCHER_ONLY",
   "home_branch": "main",
   "schema_version": 2.1,
   "current_agent_hashes": {
-    "critic": "e4cc3ddb505396ed9e55914384944cbd",
-    "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
-    "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+    "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b",
     "researcher": "5c6277ae5ff274765786dfb8c511b568",
-    "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+    "critic": "e4cc3ddb505396ed9e55914384944cbd",
+    "director": "077a86dba89b9096e5c2fc45e8fbc3c7"
   },
   "last_directive_label": "yan-li-saito-T44-fl-vortex-R2-retry",
   "last_directive_action": "critic_audit",
@@ -1199,7 +1234,7 @@
       "title": "Yan-Li-Saito 2026 PRL Barnett-droplet reproduction (Tier-3 candidate)",
       "hypothesis": "SpinorBEC.jl scalar + DDI + LHY framework can reproduce torus magnetic-vortex GS + mechanical Larmor precession + chiral bound state at F=1 ε_dd=1.2",
       "flow_template": "verify-claim",
-      "current_stage": "Document",
+      "current_stage": "Document remains as terminal stage; next_stage = null (no auto-advance). T50 director may either: (a) spawn child investigation `yan-li-saito-r4-ddi-energy-sign` (build-theory, theorist+sympy ~5M) if anko prioritizes R4 analytical revival path; (b) close yan-li-saito at tier 0.4 dormant and switch to klaus-magnetostir-bch-leak (priority 3, now unblocked by JULIA_GPU_OK policy); (c) run audit-class-scan §F6 to clear AUDIT_DUE gap=49.",
       "stages_done": [
         "Design",
         "Document",
@@ -1375,5 +1410,5 @@
       "next_stage_action": "researcher Observe stage already triggered this auto-spawn; theorist Hypothesize next"
     }
   },
-  "last_meta_check_turn": 48
+  "last_meta_check_turn": 49
 }
