@@ -33,17 +33,19 @@ mixins:
       omega_ref: 314.159   # 2π·50 rad/s (same as Klaus convention)
       c1: 0.0              # F=1 polarized droplet; spin-mixing irrelevant per Q5
     grid: {n: [64, 64, 64], box: [28.0, 28.0, 28.0]}
-    potential: {type: none}
+    potential: {type: harmonic, omega: [0.0, 0.0, 0.0]}  # free space = zero-frequency harmonic (rotating_basis hard limit per run_step_rotating/ground_state.jl:22-25)
     gauge_fix: false
 
 pipeline:
   - ground_state:
       use: [yan_li_saito_f1]
-      B: {p: 0.0}
+      B: {Bz: 0.0}                          # B=0 paper setup; unified B-block schema (B_block.jl:_split_B_block! converts to internal zeeman["Bz"]=0.0, then run_step_rotating/ground_state.jl:131-133 reads default p_z=q_z=0.0)
       ddi: {enabled: true}
-      lhy: {kind: scalar}
-      initial_state: fl_vortex
-      init_state_params: {winding: 1, theta: 1.5707963267948966}
+      # lhy: auto-derived via atom_obj + auto_path branch (ε_dd=1.2 > 0.5)
+      # initial_state: Gaussian seed (rotating_basis only supports `from_jld2`;
+      # fl_vortex topology deferred — see sim/turn_34.md §9 for follow-up work item).
+      init_m_idx: 1                          # m=+F polarized seed (F=1 effective → m=+1)
+      init_sigma: 2.0                        # ~2 a_ho Gaussian width; ITP relaxes to droplet
       dt: 0.005
       n_steps: 5000
       tol: 1.0e-9

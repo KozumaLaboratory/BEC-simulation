@@ -1,5 +1,5 @@
 {
-  "turn": 35,
+  "turn": 37,
   "status": "running",
   "history": [
     {
@@ -1685,6 +1685,103 @@
         "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
         "researcher": "5c6277ae5ff274765786dfb8c511b568",
         "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 9804190,
+        "total": 9804190,
+        "effective_full_rate": 1490783,
+        "breakdown": {
+          "input_fresh": 13630,
+          "cache_creation": 359590,
+          "cache_read": 9413711,
+          "output": 17259
+        },
+        "n_messages": 81,
+        "n_message_starts": 81
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.857,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.4,
+        "cost_inflation": 0.879,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "advisory",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO"
+      ]
+    },
+    {
+      "turn": 35,
+      "ts": "2026-05-17T05:31:29Z",
+      "judge_status": "INCONCLUSIVE",
+      "directive_action": "run_experiment",
+      "directive_label": "yan-li-saito-f1-execute-bug8-zeeman-schema",
+      "wall_time_sec": 27.7,
+      "agent_hashes": {
+        "critic": "e4cc3ddb505396ed9e55914384944cbd",
+        "director": "783bdf12151be93c1b84fdef10bec44b",
+        "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+        "researcher": "5c6277ae5ff274765786dfb8c511b568",
+        "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 11978565,
+        "total": 11978565,
+        "effective_full_rate": 1711554,
+        "breakdown": {
+          "input_fresh": 6201,
+          "cache_creation": 351157,
+          "cache_read": 11599924,
+          "output": 21283
+        },
+        "n_messages": 109,
+        "n_message_starts": 109
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.5,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.4,
+        "cost_inflation": 1.121,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "director_must_address",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "DRIFT_COST_INFLATION"
+      ]
+    },
+    {
+      "turn": 36,
+      "ts": "2026-05-17T05:47:02Z",
+      "judge_status": "PASS",
+      "directive_action": "modify_code",
+      "directive_label": "yan-li-saito-f1-design-redo-bug8-fix",
+      "wall_time_sec": 15,
+      "agent_hashes": {
+        "critic": "e4cc3ddb505396ed9e55914384944cbd",
+        "director": "783bdf12151be93c1b84fdef10bec44b",
+        "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+        "researcher": "5c6277ae5ff274765786dfb8c511b568",
+        "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
       }
     }
   ],
@@ -1877,5 +1974,5 @@
       "next_stage_action": "theorist formalizes hypothesis + designs the Design-after-critic patch; researcher pulls Reflexion / LATS / AI Scientist v2 critic-frequency patterns for grounding"
     }
   },
-  "last_meta_check_turn": 33
+  "last_meta_check_turn": 35
 }
