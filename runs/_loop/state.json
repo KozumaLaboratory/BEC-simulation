@@ -1,5 +1,5 @@
 {
-  "turn": 59,
+  "turn": 60,
   "status": "running",
   "history": [
     {
@@ -1386,14 +1386,49 @@
       "errata_count": 3,
       "errata_load_bearing_count": 0,
       "errata_advisory_count": 2,
-      "n_references_cited": 6
+      "n_references_cited": 6,
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 9757057,
+        "total": 9757057,
+        "effective_full_rate": 1686967,
+        "breakdown": {
+          "input_fresh": 4266,
+          "cache_creation": 494934,
+          "cache_read": 9229643,
+          "output": 28214
+        },
+        "n_messages": 68,
+        "n_message_starts": 68
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null
+    },
+    {
+      "turn": 59,
+      "ts": "2026-05-17T23:15:33Z",
+      "judge_status": "PASS",
+      "directive_action": "modify_code",
+      "directive_label": "klaus-bch-leak-T59-document-tier3-closure",
+      "wall_time_sec": null,
+      "agent_hashes": {
+        "critic": "e4cc3ddb505396ed9e55914384944cbd",
+        "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+        "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+        "researcher": "5c6277ae5ff274765786dfb8c511b568",
+        "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+      }
     }
   ],
   "created_at": "2026-05-14T00:00:00+00:00",
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "CRITIC_PASS",
+  "last_judge": "PASS",
   "home_branch": "main",
   "schema_version": 2.1,
   "current_agent_hashes": {
@@ -1495,7 +1530,7 @@
       "title": "Klaus magnetostir non-reproducibility — Option γ analytical absorption of BCH leak",
       "hypothesis": "Lab-frame spinor split-step has δÛ ~ dt²·p·F·sinθ·c_dd⟨n⟩ Larmor-linear leak; Option γ apply_local_spin_step! drops BCH parameter p·F·dt ≈ 26.7 → φ̇·F·dt ≈ 0.027 (4-decade reduction)",
       "flow_template": "verify-claim",
-      "current_stage": "Update",
+      "current_stage": "closed",
       "stages_done": [
         "Analyze",
         "Design",
@@ -1507,16 +1542,22 @@
       ],
       "tier_current": 3.0,
       "tier_target": 3,
-      "next_stage": "Document",
+      "next_stage": null,
       "next_stage_action": null,
-      "blocked_on": "needs julia P3 validation against anko Klaus phi sweep data (P1/P2/P3 predictions in theorist/turn_10.md §3)",
+      "blocked_on": null,
       "priority": 3,
       "kind": "physics",
-      "last_turn": 57,
-      "last_stage": "Execute",
+      "last_turn": 59,
+      "last_stage": "Document",
       "last_verdict": "CORROBORATE-WITH-ERRATA",
       "last_critic_turn": 58,
-      "errata_pending": 3
+      "errata_pending": 0,
+      "closing_note": "Tier 3 closure 2026-05-18 T59. CORROBORATE-WITH-ERRATA via T58 critic independent re-derivation. 3 advisory errata propagated to memory: option_gamma_rotating_basis.md (verification stamp + errata section) + klaus_bch_leak_verification_2026_05_18.md (dedicated record). Project's 2nd Tier-3 claim after barnett-mechanism-2026-05-16. Deferred (optional post-closure): P3 p-scaling (T55 Falsifier 4) + cpu_heavy lab-frame Fz reconstruction.",
+      "errata_resolved": [
+        "E1-y4-commutator-norm-analytical-gap",
+        "E2-bch-residual-estimate-uncertainty-bars",
+        "E3-m-plus-F-drop-label-cosmetic"
+      ]
     },
     "fullbdg-f6-polar-3000x": {
       "id": "fullbdg-f6-polar-3000x",
@@ -1820,6 +1861,6 @@
       "closing_note": "Bug class: judge.py operator semantics. 1 T53 commit fixed all sibling instances. 12 historical turns flagged for anko awareness (T28/T33/T35/T38/T41-T48). Memory entry at judge_in_operator_bug_2026_05_18.md preserves the lesson."
     }
   },
-  "last_meta_check_turn": 57,
+  "last_meta_check_turn": 58,
   "last_short_label": "audit-class-scan-T50-document-fold-judge-bug"
 }
