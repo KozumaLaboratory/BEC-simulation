@@ -1,5 +1,5 @@
 export Li7, Na23, K39, K41, Rb85, Rb87, Cs133              # alkali metals
-export Cr52, Dy164, Dy162, Er168, Er166, Eu151             # magnetic lanthanides
+export Cr52, Dy164, Dy162, Er168, Er166, Eu151, Eu151_f1_effective  # magnetic lanthanides
 export Ca40, Sr84, Sr86, Sr88, Yb170, Yb174, Yb176         # spinless
 export He4star                                              # metastable
 export ATOM_REGISTRY, resolve_atom
@@ -218,6 +218,23 @@ const Eu151 = AtomSpecies(
     q_geometry=35.0 / 144.0,
 )
 
+# ¹⁵¹Eu effective F=1 model (Yan-Li-Saito 2026 PRL convention)
+#   Paper uses an effective spin-1 model with g_F·F = 9/2, so μ = 4.5 μ_B.
+#   This gives a_dd ≈ 25.2 a₀; at ε_dd = 1.2 → a_s = 21 a₀.
+#   Mass and hyperfine structure same as physical ¹⁵¹Eu.
+#   Source: T30 theorist §3 Check 2 (lines 320-326); memory yan_li_saito_2026_barnett_paper.md.
+const Eu151_f1_effective = AtomSpecies(
+    "151Eu_f1eff",
+    150.919857 * Units.AMU,
+    1,
+    21.0 * Units.BOHR_RADIUS,
+    21.0 * Units.BOHR_RADIUS,
+    4.5 * Units.MU_BOHR,
+    4.5;
+    Delta_E_hf=121.0e6 * 2π * Units.HBAR,
+    q_geometry=35.0 / 144.0,
+)
+
 # --- Spinless Species (F=0) ---
 
 # ⁴⁰Ca: ground state (¹S₀, I=0)
@@ -282,6 +299,7 @@ const ATOM_REGISTRY = Dict{Symbol, AtomSpecies}(
     :Er168 => Er168,
     :Er166 => Er166,
     :Eu151 => Eu151,
+    :Eu151_f1_effective => Eu151_f1_effective,
     :Ca40 => Ca40,
     :Sr84 => Sr84,
     :Sr86 => Sr86,

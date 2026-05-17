@@ -1,5 +1,5 @@
 {
-  "turn": 31,
+  "turn": 34,
   "status": "running",
   "history": [
     {
@@ -1482,7 +1482,23 @@
       "directive_label": "yan-li-saito-hypothesize-zero-blockers",
       "wall_time_sec": null,
       "notes": "Hypothesize stage for yan-li-saito-2026-reproduction. Term-by-term paper→SpinorBEC.jl mapping (5 rows), all Q1-Q5 framework gaps resolved (Q1 LHY χ bit-exact MATCH, Q2 DDI prefactor ratio=1 with proper g_F, Q3 free-space ITP CLEAR via NoPotential, Q4 J_z-constrained ITP CLEAR via _find_ground_state_Jz, Q5 init_psi_fl_vortex matches torus topology). 4 pre-registered falsifiers (F1/F2/F3/F4) with quantitative predictions + tolerance bands. ZERO BLOCKERS for F1 (torus GS) Execute. 2 research queries dispatched in parallel: Q-Eu151-gF RESOLVED (paper uses real F=1 Eu-151 hyperfine with g_F·F=9/2 from Breit-Rabi → a_s≈21 a₀); Q-paper-energy-table NOT_FOUND (no energy table in paper; F4 becomes ratio-only discriminator).",
-      "tokens_used": null,
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 12469441,
+        "total": 12469441,
+        "effective_full_rate": 2097949,
+        "breakdown": {
+          "input_fresh": 56342,
+          "cache_creation": 614311,
+          "cache_read": 11779637,
+          "output": 19151
+        },
+        "n_messages": 115,
+        "n_message_starts": 115
+      },
       "branch": null,
       "commit": null,
       "parent": null,
@@ -1492,6 +1508,135 @@
         "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
         "researcher": "5c6277ae5ff274765786dfb8c511b568",
         "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+      },
+      "drift_signals": {
+        "topic_repetition": 0.0,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 1.0,
+        "verdict_drift": 0.5,
+        "cost_inflation": 1.344,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "human_required",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "DRIFT_CODE_DELTA_ZERO",
+        "DRIFT_COST_INFLATION"
+      ]
+    },
+    {
+      "turn": 31,
+      "ts": "2026-05-17T04:23:58Z",
+      "judge_status": "PASS",
+      "directive_action": "modify_code",
+      "directive_label": "yan-li-saito-f1-torus-design",
+      "wall_time_sec": 240,
+      "agent_hashes": {
+        "critic": "e4cc3ddb505396ed9e55914384944cbd",
+        "director": "783bdf12151be93c1b84fdef10bec44b",
+        "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+        "researcher": "5c6277ae5ff274765786dfb8c511b568",
+        "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 12615072,
+        "total": 12615072,
+        "effective_full_rate": 1695597,
+        "breakdown": {
+          "input_fresh": 11628,
+          "cache_creation": 280856,
+          "cache_read": 12302049,
+          "output": 20539
+        },
+        "n_messages": 103,
+        "n_message_starts": 103
+      },
+      "branch": "auto/turn_31_yan-li-saito-f1-torus-design",
+      "commit": null,
+      "parent": "102b2ae",
+      "drift_signals": {
+        "topic_repetition": 0.333,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 1.0,
+        "verdict_drift": 0.4,
+        "cost_inflation": 0.881,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "director_must_address",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "DRIFT_CODE_DELTA_ZERO"
+      ]
+    },
+    {
+      "turn": 32,
+      "ts": "2026-05-17T04:40:14Z",
+      "judge_status": "PASS",
+      "directive_action": "modify_code",
+      "directive_label": "yan-li-saito-f1-design-redo",
+      "wall_time_sec": 180,
+      "agent_hashes": {
+        "critic": "e4cc3ddb505396ed9e55914384944cbd",
+        "director": "783bdf12151be93c1b84fdef10bec44b",
+        "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+        "researcher": "5c6277ae5ff274765786dfb8c511b568",
+        "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 12047006,
+        "total": 12047006,
+        "effective_full_rate": 1796144,
+        "breakdown": {
+          "input_fresh": 30711,
+          "cache_creation": 376397,
+          "cache_read": 11613174,
+          "output": 26724
+        },
+        "n_messages": 88,
+        "n_message_starts": 88
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.714,
+        "subagent_repetition": 0.667,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 1.0,
+        "verdict_drift": 0.4,
+        "cost_inflation": 1.059,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "human_required",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "DRIFT_CODE_DELTA_ZERO",
+        "DRIFT_COST_INFLATION"
+      ]
+    },
+    {
+      "turn": 33,
+      "ts": "2026-05-17T04:59:09Z",
+      "judge_status": "INCONCLUSIVE",
+      "directive_action": "run_experiment",
+      "directive_label": "yan-li-saito-f1-execute-data-gap",
+      "wall_time_sec": 0,
+      "agent_hashes": {
+        "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b",
+        "researcher": "5c6277ae5ff274765786dfb8c511b568",
+        "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+        "director": "783bdf12151be93c1b84fdef10bec44b",
+        "critic": "e4cc3ddb505396ed9e55914384944cbd"
       }
     }
   ],
@@ -1499,18 +1644,18 @@
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "NOOP",
+  "last_judge": "INCONCLUSIVE",
   "home_branch": "main",
-  "schema_version": 2,
+  "schema_version": 2.1,
   "current_agent_hashes": {
-    "critic": "3f490a470511457f71b3fce819b12195",
-    "director": "d064dde7210fefda5e3683ec17585da7",
-    "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+    "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b",
     "researcher": "5c6277ae5ff274765786dfb8c511b568",
-    "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+    "director": "783bdf12151be93c1b84fdef10bec44b",
+    "critic": "e4cc3ddb505396ed9e55914384944cbd"
   },
-  "last_directive_label": "barnett-mechanism-document-tier3-promoted",
-  "last_directive_action": "document_investigation_closure",
+  "last_directive_label": "yan-li-saito-f1-design-redo",
+  "last_directive_action": "modify_code",
   "last_error": null,
   "retries": 0,
   "active_investigation_id": "yan-li-saito-2026-reproduction",
@@ -1591,7 +1736,8 @@
       "next_stage": null,
       "next_stage_action": null,
       "blocked_on": null,
-      "priority": 1
+      "priority": 1,
+      "kind": "physics"
     },
     "klaus-magnetostir-bch-leak-2026-05-13": {
       "id": "klaus-magnetostir-bch-leak-2026-05-13",
@@ -1612,7 +1758,8 @@
       "next_stage": null,
       "next_stage_action": null,
       "blocked_on": "needs julia P3 validation against anko Klaus phi sweep data (P1/P2/P3 predictions in theorist/turn_10.md §3)",
-      "priority": 3
+      "priority": 3,
+      "kind": "physics"
     },
     "fullbdg-f6-polar-3000x": {
       "id": "fullbdg-f6-polar-3000x",
@@ -1622,21 +1769,65 @@
       "tier_target": 2,
       "next_stage_action": null,
       "blocked_on": "contained bug per anko 2026-05-15 — closed-form alternatives in place, deferral OK",
-      "priority": 99
+      "priority": 99,
+      "kind": "physics"
     },
     "yan-li-saito-2026-reproduction": {
       "id": "yan-li-saito-2026-reproduction",
       "title": "Yan-Li-Saito 2026 PRL Barnett-droplet reproduction (Tier-3 candidate)",
       "hypothesis": "SpinorBEC.jl scalar + DDI + LHY framework can reproduce torus magnetic-vortex GS + mechanical Larmor precession + chiral bound state at F=1 ε_dd=1.2",
       "flow_template": "verify-claim",
-      "current_stage": "Research",
-      "stages_done": [],
-      "tier_current": 0,
+      "current_stage": "Execute",
+      "stages_done": [
+        "Design"
+      ],
+      "tier_current": 0.8,
       "tier_target": 3,
       "next_stage": "Hypothesize",
       "next_stage_action": "theorist maps Yan-Li-Saito 2026 PRL Hamiltonian to SpinorBEC.jl notation; identifies framework gaps (chi(ε_dd) integral match, DDI prefactor c_dd=μ_0μ² no-4π vs paper μ_0(gμ_B)²/8π, free-space ITP convergence with no harmonic trap, ℓ=1 phase imprint + L_z+f_z=const ITP path, state_zoo flux-closure-torus builder); produces verify-claim Hypothesize-stage deliverable runs/_loop/theorist/turn_30.md",
       "blocked_on": null,
-      "priority": 1
+      "priority": 1,
+      "kind": "physics",
+      "falsifiers": []
+    },
+    "meta-critic-placement-2026-05-17": {
+      "id": "meta-critic-placement-2026-05-17",
+      "kind": "meta",
+      "title": "Meta-improvement: critic placement in verify-claim flow",
+      "hypothesis": "Inserting a Design-after-critic stage before expensive Execute reduces contract-level mistakes (Lz-missing, freq-sign, gamma_dr-routing class) by ≥75%",
+      "flow_template": "meta-improvement",
+      "current_stage": "Observe",
+      "stages_done": [],
+      "target_metric": "contract_level_mistakes_per_10_turns",
+      "baseline_value": 4,
+      "baseline_window": "T20-T27 cascade (8 turns, 4 contract-level mistakes)",
+      "predicted_improvement": "≤ 1 mistake per 10 turns",
+      "modifies_files": [
+        ".claude/agents/director.md"
+      ],
+      "rollback_branch": "main",
+      "safety_class": "low",
+      "falsifiers": [
+        {
+          "id": "pilot-mistake-rate",
+          "description": "10-turn pilot with Design-after-critic shows ≥ 2 contract-level mistakes → hypothesis REFUTED",
+          "tested_at_turn": null,
+          "result": null
+        },
+        {
+          "id": "pilot-cost-overhead",
+          "description": "Design-after-critic doubles per-investigation cost (≥ 2× baseline 2M effective) without proportional retry-rate gain → revert",
+          "tested_at_turn": null,
+          "result": null
+        }
+      ],
+      "tier_current": 0,
+      "tier_target": 2,
+      "priority": 50,
+      "blocked_on": null,
+      "next_stage": "Hypothesize",
+      "next_stage_action": "theorist formalizes hypothesis + designs the Design-after-critic patch; researcher pulls Reflexion / LATS / AI Scientist v2 critic-frequency patterns for grounding"
     }
-  }
+  },
+  "last_meta_check_turn": 32
 }

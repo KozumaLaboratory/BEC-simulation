@@ -1,0 +1,110 @@
+{
+  "turn": 32,
+  "status": "PASS",
+  "issues": [],
+  "metrics": {
+    "experiment_kind": "modify_only",
+    "norm_initial": null,
+    "norm_final": null,
+    "norm_drift": null,
+    "energy_initial": null,
+    "energy_final": null,
+    "energy_monotonic": null,
+    "mz_target": null,
+    "mz_final": null,
+    "fitted_order": null,
+    "fit_dt_range": null,
+    "fit_r_squared": null,
+    "wall_time_sec": 180,
+    "peak_memory_gb": null,
+    "tests_passed": null,
+    "file_exists_runs_yan_li_saito_f1_torus_gs_config_yaml_disk_truth": true,
+    "file_exists_runs_yan_li_saito_f1_torus_gs_README_md_disk_truth": true,
+    "file_exists_runs_loop_sim_turn_32_md_disk_truth": true,
+    "grep_count_Eu151_f1_effective_in_src_atoms_jl": 3,
+    "grep_count_atom_OR_potential_OR_ddi_OR_lhy_OR_init_state_in_config_yaml": 8,
+    "grep_count_init_state_OR_initial_state_OR_init_psi_in_sim_turn_32": 17,
+    "grep_count_F1_PASS_OR_n_max_OR_13000_in_sim_turn_32": 8,
+    "grep_count_test_minus_f_OR_julia_project_OR_resolve_atom_in_sim_turn_32": 8,
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "total": null
+    },
+    "warnings": [
+      "T31 phantom-PASS: files lost to 1Password SSH signing block; T32 uses Write/Edit only (no git commands)",
+      "auto_defaults.jl does not handle Eu151_f1_effective in if/elseif chain \u2014 falls to fallback (no grid auto-derive); grid is specified explicitly so no runtime impact",
+      "64x64x64 grid at box=28 a_ho is ~2xL0 \u2014 coarser than paper; T33 director may need to bump to 96x96x96 / box=40 if F1 INCONCLUSIVE",
+      "init_state_params.winding parsed as Float64(1.0) \u2014 verify fl_vortex dispatch accepts Float64 winding at T33"
+    ],
+    "physical_red_flags": [],
+    "falsification_result": "INCONCLUSIVE"
+  },
+  "contract_evaluation": {
+    "verdict": "PASS",
+    "criteria_results": [
+      {
+        "id": "config_yaml_actually_on_disk",
+        "passed": true,
+        "actual": true,
+        "reason": "file_exists_runs_yan_li_saito_f1_torus_gs_config_yaml_disk_truth=True == True \u2192 True"
+      },
+      {
+        "id": "atoms_jl_edited_for_eu151_f1_effective",
+        "passed": true,
+        "actual": 3,
+        "reason": "grep_count_Eu151_f1_effective_in_src_atoms_jl=3 >= 2 \u2192 True"
+      },
+      {
+        "id": "readme_on_disk",
+        "passed": true,
+        "actual": true,
+        "reason": "file_exists_runs_yan_li_saito_f1_torus_gs_README_md_disk_truth=True == True \u2192 True"
+      },
+      {
+        "id": "sim_turn_32_artifact_on_disk",
+        "passed": true,
+        "actual": true,
+        "reason": "file_exists_runs_loop_sim_turn_32_md_disk_truth=True == True \u2192 True"
+      },
+      {
+        "id": "config_yaml_has_required_blocks",
+        "passed": true,
+        "actual": 8,
+        "reason": "grep_count_atom_OR_potential_OR_ddi_OR_lhy_OR_init_state_in_config_yaml=8 >= 4 \u2192 True"
+      },
+      {
+        "id": "sim_turn_32_schema_audit_documented",
+        "passed": true,
+        "actual": 17,
+        "reason": "grep_count_init_state_OR_initial_state_OR_init_psi_in_sim_turn_32=17 >= 2 \u2192 True"
+      },
+      {
+        "id": "f1_falsifier_criteria_restated",
+        "passed": true,
+        "actual": 8,
+        "reason": "grep_count_F1_PASS_OR_n_max_OR_13000_in_sim_turn_32=8 >= 3 \u2192 True"
+      },
+      {
+        "id": "precondition_check_for_t33_concrete",
+        "passed": true,
+        "actual": 8,
+        "reason": "grep_count_test_minus_f_OR_julia_project_OR_resolve_atom_in_sim_turn_32=8 >= 2 \u2192 True"
+      }
+    ],
+    "triggered_failure_modes": [],
+    "issues": []
+  },
+  "investigation_id": "yan-li-saito-2026-reproduction",
+  "stage_advancing_to": "Design",
+  "investigation_update": {
+    "if_success_advance_to_stage": "Execute",
+    "if_success_tier_becomes": 0.8,
+    "if_success_falsifier_update": "F1 design artifacts ACTUALLY on disk (config.yaml + atoms.jl edit + README.md). T33 dispatches implementer_julia_gpu to run F1 ITP and compare n_max to 13000 D\u2080 \u00b110%.",
+    "if_refuted_advance_to_stage": "Design",
+    "if_refuted_tier_becomes": 0.6,
+    "next_falsifier_to_test_after": "F1 (torus-density-peak-f1) at T33 via implementer_julia_gpu. Stage advances Execute \u2192 Analyze on T33 PASS. F4 ratio is free post-process. F2 (constrained-J_z, Barnett signature) follows after Q4 target_Jz plumbing patch (T34 implementer_text, ~3-line addition to run_step_ground_state.jl per T31 \u00a72 Q4 audit). F3 (Larmor slope) is the largest, deferred."
+  }
+}

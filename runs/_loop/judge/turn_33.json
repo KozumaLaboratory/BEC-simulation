@@ -1,0 +1,115 @@
+{
+  "turn": 33,
+  "status": "INCONCLUSIVE",
+  "issues": [
+    "f1_verdict=INCONCLUSIVE in ['PASS', 'INCONCLUSIVE', 'FALSIFIED'] \u2192 False",
+    "f4_verdict=INCONCLUSIVE in ['PASS', 'FALSIFIED'] \u2192 False",
+    "metric 'precondition_check_exit_code' missing from sim metrics",
+    "metric 'norm_drift' missing from sim metrics",
+    "metric 'energy_monotonic' missing from sim metrics",
+    "metric 'file_exists_runs_loop_sim_turn_33_md_disk_truth' missing from sim metrics"
+  ],
+  "metrics": {
+    "experiment_kind": "itp_ground_state",
+    "norm_initial": null,
+    "norm_final": null,
+    "norm_drift": null,
+    "energy_initial": null,
+    "energy_final": null,
+    "energy_monotonic": null,
+    "n_max_code_units": null,
+    "n_max_paper_D0_units": null,
+    "f1_target_D0": 13000.0,
+    "f1_fractional_deviation": null,
+    "f1_verdict": "INCONCLUSIVE",
+    "E_kin": null,
+    "E_s": null,
+    "E_ddi": null,
+    "E_lhy": null,
+    "f4_ratio_lhy_over_ddi": null,
+    "f4_target_lower": 2.0,
+    "f4_target_upper": 20.0,
+    "f4_verdict": "INCONCLUSIVE",
+    "wall_time_sec": 0,
+    "tests_passed": null,
+    "warnings": [
+      "BUG-1 FATAL: potential: {type: none} causes ArgumentError in _run_rotating_basis_ground_state_step (line 22-25 of run_step_rotating/ground_state.jl); fix: add potential: {type: harmonic, omega: [0.0, 0.0, 0.0]} for free-space simulation or remove potential key",
+      "BUG-2 CRITICAL: atom: Eu151_f1_effective not in rotating_basis GS if/else chain (lines 51-72) \u2192 atom_obj=nothing \u2192 auto_path=false \u2192 c0=c_dd=gamma_lhy=0.0 (non-interacting gas, no droplet possible)",
+      "BUG-3 FAIL: config uses B: {p: 0.0} but rotating_basis GS reads p[\"zeeman\"]::Dict at line 137 \u2192 KeyError: zeeman",
+      "BUG-4 SILENT: initial_state: fl_vortex silently ignored by rotating_basis GS path; falls back to Gaussian seed; fl_vortex topology never initialized",
+      "BUG-5 SILENT: lhy: {kind: scalar} block not parsed by rotating_basis GS step; only interactions.gamma_lhy is read",
+      "Julia execution blocked by Bash security sandbox; code analysis performed via Read tool; bugs confirmed from static inspection"
+    ],
+    "physical_red_flags": [
+      "With bug fixes applied: free-space droplet in rotating_basis may require secular_ddi=false (non-secular DDI, which is the paper setup); CLAUDE.md states secular_ddi=true is user-chosen and emits @info advisory \u2014 monitor c_dd\u00b7<n> vs omega_L in any follow-up run",
+      "T32 \u00a78 risk 'Eu151_f1_effective not in auto_defaults.jl chain' was flagged as low-impact (grid only); actual impact is total physics failure (c0=c_dd=0)"
+    ],
+    "falsification_result": "data_gap"
+  },
+  "contract_evaluation": {
+    "verdict": "INCONCLUSIVE",
+    "criteria_results": [
+      {
+        "id": "precondition_passed",
+        "passed": null,
+        "actual": null,
+        "reason": "metric 'precondition_check_exit_code' missing from sim metrics"
+      },
+      {
+        "id": "norm_conservation",
+        "passed": null,
+        "actual": null,
+        "reason": "metric 'norm_drift' missing from sim metrics"
+      },
+      {
+        "id": "energy_monotonic_decrease",
+        "passed": null,
+        "actual": null,
+        "reason": "metric 'energy_monotonic' missing from sim metrics"
+      },
+      {
+        "id": "f1_falsifier_verdict_emitted",
+        "passed": false,
+        "actual": "INCONCLUSIVE",
+        "reason": "f1_verdict=INCONCLUSIVE in ['PASS', 'INCONCLUSIVE', 'FALSIFIED'] \u2192 False"
+      },
+      {
+        "id": "f4_falsifier_verdict_emitted",
+        "passed": false,
+        "actual": "INCONCLUSIVE",
+        "reason": "f4_verdict=INCONCLUSIVE in ['PASS', 'FALSIFIED'] \u2192 False"
+      },
+      {
+        "id": "sim_turn_33_artifact_on_disk",
+        "passed": null,
+        "actual": null,
+        "reason": "metric 'file_exists_runs_loop_sim_turn_33_md_disk_truth' missing from sim metrics"
+      },
+      {
+        "id": "wall_time_within_budget",
+        "passed": true,
+        "actual": 0,
+        "reason": "wall_time_sec=0 < 1800 \u2192 True"
+      }
+    ],
+    "triggered_failure_modes": [],
+    "issues": [
+      "f1_verdict=INCONCLUSIVE in ['PASS', 'INCONCLUSIVE', 'FALSIFIED'] \u2192 False",
+      "f4_verdict=INCONCLUSIVE in ['PASS', 'FALSIFIED'] \u2192 False",
+      "metric 'precondition_check_exit_code' missing from sim metrics",
+      "metric 'norm_drift' missing from sim metrics",
+      "metric 'energy_monotonic' missing from sim metrics",
+      "metric 'file_exists_runs_loop_sim_turn_33_md_disk_truth' missing from sim metrics"
+    ]
+  },
+  "investigation_id": "yan-li-saito-2026-reproduction",
+  "stage_advancing_to": "Execute",
+  "investigation_update": {
+    "if_success_advance_to_stage": "Analyze",
+    "if_success_tier_becomes": 1.0,
+    "if_success_falsifier_update": "F1 (torus-density-peak-f1) PASS at T33 \u2014 n_max within 10% of paper's 13000 D\u2080. F4 free-PASS likely. T34 advances to Analyze (or F2 Design with Q4 target_Jz patch). Tier 1.0 (internal regression PASS via paper anchor match). On path to Tier 2 (F2 PASS + critic Update) and Tier 3 (F3 RTP scan + critic Update).",
+    "if_refuted_advance_to_stage": "Update",
+    "if_refuted_tier_becomes": 0.6,
+    "next_falsifier_to_test_after": "On F1 PASS: F4 ratio check is free post-process this turn. Next falsifier = F2 (constrained-J_z Barnett signature, \u27e8f_z\u27e9 \u2248 0.04 \u00b10.01 at \u2113=1) \u2014 requires Q4 target_Jz YAML plumbing patch (~3-line Edit to run_step_ground_state.jl per sim/turn_32.md README \u00a727). T34 = implementer_text patches plumbing; T35 = implementer_julia_gpu runs F2 ITP. F3 (Larmor slope d\u03c9_L/dB_y = \u03b3 \u00b15%) is RTP scan, much larger \u2014 T36+ scope. On F1 FALSIFIED: jump to Update stage with critic Q1/Q2 framework-gap audit."
+  }
+}
