@@ -1,5 +1,5 @@
 {
-  "turn": 41,
+  "turn": 43,
   "status": "running",
   "history": [
     {
@@ -1980,6 +1980,70 @@
         "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
         "researcher": "5c6277ae5ff274765786dfb8c511b568",
         "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 18912376,
+        "total": 18912376,
+        "effective_full_rate": 2673107,
+        "breakdown": {
+          "input_fresh": 25244,
+          "cache_creation": 560188,
+          "cache_read": 18303488,
+          "output": 23456
+        },
+        "n_messages": 145,
+        "n_message_starts": 145
+      },
+      "branch": "auto/turn_40_seed-basin-discriminator",
+      "commit": "6e79a7f2120e",
+      "parent": "e74da2a4caa8",
+      "drift_signals": {
+        "topic_repetition": 0.25,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.4,
+        "cost_inflation": 1.576,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "director_must_address",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "DRIFT_COST_INFLATION"
+      ]
+    },
+    {
+      "turn": 41,
+      "ts": "2026-05-17T16:32:18Z",
+      "judge_status": "RESEARCHER_ONLY",
+      "directive_action": "researcher",
+      "directive_label": "yan-li-saito-T41-paper-pdf-read-Q1Q2Q3",
+      "wall_time_sec": null,
+      "agent_hashes": {
+        "critic": "e4cc3ddb505396ed9e55914384944cbd",
+        "director": "783bdf12151be93c1b84fdef10bec44b",
+        "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+        "researcher": "5c6277ae5ff274765786dfb8c511b568",
+        "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+      }
+    },
+    {
+      "turn": 42,
+      "ts": "2026-05-17T17:14:49Z",
+      "judge_status": "CRITIC_PASS",
+      "directive_action": "critic_audit",
+      "directive_label": "yan-li-saito-T41-research-audit",
+      "wall_time_sec": null,
+      "agent_hashes": {
+        "critic": "e4cc3ddb505396ed9e55914384944cbd",
+        "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+        "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+        "researcher": "5c6277ae5ff274765786dfb8c511b568",
+        "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
       }
     }
   ],
@@ -1987,12 +2051,12 @@
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "INCONCLUSIVE",
+  "last_judge": "CRITIC_PASS",
   "home_branch": "main",
   "schema_version": 2.1,
   "current_agent_hashes": {
     "critic": "e4cc3ddb505396ed9e55914384944cbd",
-    "director": "783bdf12151be93c1b84fdef10bec44b",
+    "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
     "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
     "researcher": "5c6277ae5ff274765786dfb8c511b568",
     "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
@@ -2120,12 +2184,12 @@
       "title": "Yan-Li-Saito 2026 PRL Barnett-droplet reproduction (Tier-3 candidate)",
       "hypothesis": "SpinorBEC.jl scalar + DDI + LHY framework can reproduce torus magnetic-vortex GS + mechanical Larmor precession + chiral bound state at F=1 ε_dd=1.2",
       "flow_template": "verify-claim",
-      "current_stage": "Execute",
+      "current_stage": "Hypothesize",
       "stages_done": [
         "Design",
         "Execute"
       ],
-      "tier_current": 0.6,
+      "tier_current": 0.8,
       "tier_target": 3,
       "next_stage": "Update",
       "next_stage_action": "T40 Execute REFUTED both (b) density-basin AND (a2) topology hypotheses: all 5 points delocalized (n_max ≤ 1.06 D₀), P4 flux-closure topology preserved (f_z=2.7e-16 at ring) but density did not increase. Per theorist §6 row 4: framework deep-bug (a4) OR paper-claim-wrong (c) OR LHY χ(ε_dd>1) issue (a1). T41 must be critic/researcher to narrow these. Parallel: paper-fetch arXiv:2605.11670 to close (c) data gap; theorist deep-audit rotating_basis F=1 + DDI path. Tier stays 0.6.",
@@ -2138,6 +2202,15 @@
           "description": "Yan-Li-Saito Fig 1c torus magnetic-vortex GS reproduction at F=1, N=15000, ε_dd=1.2, free space, :scalar LHY",
           "tested_at_turn": 37,
           "result": "FALSIFIED at T37; T40 5-point seed-basin discriminator: P0/P1/P2/P3 (Gaussian σ sweep 0.5→14) all delocalized confirming theorist E_DDI=0 isotropy derivation; P4 (fl_vortex JLD2, topology preserved to machine eps) ALSO delocalized refuting topology-axis hypothesis. Both (b) and (a2) REFUTED. Open: (a4) framework deep-bug, (a1) LHY χ(ε_dd>1) issue, (c) paper-claim wrong."
+        }
+      ],
+      "last_advanced_turn": 42,
+      "history": [
+        {
+          "turn": 42,
+          "stage": "Update",
+          "tier": 0.8,
+          "note": "Critic CORROBORATEd grid-resolution hypothesis and closed DDI prefactor bit-equal. T43 routing R1 grid-refinement Design."
         }
       ]
     },
@@ -2178,7 +2251,61 @@
       "blocked_on": null,
       "next_stage": "Hypothesize",
       "next_stage_action": "theorist formalizes hypothesis + designs the Design-after-critic patch; researcher pulls Reflexion / LATS / AI Scientist v2 critic-frequency patterns for grounding"
+    },
+    "meta-internal-b-unification-2026-05-18": {
+      "id": "meta-internal-b-unification-2026-05-18",
+      "kind": "meta",
+      "title": "True B-block unification: rename internal `zeeman:` / `B_hat:` dict keys to `B:` / `B_direction:`",
+      "hypothesis": "Internal pipeline_runner dict keys still named `zeeman:` / `B_hat:` cause schema-knowledge-leak: implementer reading src/ during Design stage learns the old user-facing form by analogy. Renaming internals to match user-facing `B:` block eliminates this leak entirely without affecting physics (TimeDependentZeeman type name keeps the physics semantic).",
+      "flow_template": "meta-improvement",
+      "current_stage": "closed",
+      "stages_done": [
+        "Document"
+      ],
+      "target_metric": "files_containing_zeeman_dict_key_or_legacy_mention",
+      "baseline_value": 8,
+      "baseline_window": "Files affected per grep audit 2026-05-18T01: schema.jl, pulse_sequence.jl, builders_phase.jl, B_block.jl, run_step_rotating/{dynamics,ground_state}.jl, run_step_{dynamics,ground_state}.jl",
+      "predicted_improvement": "≤ 1 file containing zeeman dict key (= TimeDependentZeeman type definition; struct name kept for physics semantic; all dict-key usages renamed)",
+      "modifies_files": [
+        "src/workflow/experiments/schema/schema.jl",
+        "src/workflow/experiments/runtime/pulse_sequence.jl",
+        "src/workflow/experiments/schema/builders_phase.jl",
+        "src/workflow/experiments/schema/B_block.jl",
+        "src/workflow/experiments/pipeline/run_step_rotating/dynamics.jl",
+        "src/workflow/experiments/pipeline/run_step_rotating/ground_state.jl",
+        "src/workflow/experiments/pipeline/run_step_dynamics.jl",
+        "src/workflow/experiments/pipeline/run_step_ground_state.jl"
+      ],
+      "rollback_branch": "main",
+      "safety_class": "medium",
+      "falsifiers": [
+        {
+          "id": "pilot-Pkg-test-all-pass",
+          "description": "Pkg.test() must pass 100% on pilot branch — any test failure → revert",
+          "tested_at_turn": null,
+          "result": null
+        },
+        {
+          "id": "pilot-existing-yaml-load-clean",
+          "description": "all configs in runs/eu151_*/config.yaml must still load (load_config smoke) without error on pilot branch",
+          "tested_at_turn": null,
+          "result": null
+        },
+        {
+          "id": "pilot-no-physics-drift",
+          "description": "ground_state energy + Mz output for runs/eu151_klaus_phi_phys/phi_4.524/ must match pre-rename within float epsilon — physics must not change",
+          "tested_at_turn": null,
+          "result": null
+        }
+      ],
+      "tier_current": 1,
+      "tier_target": 1,
+      "priority": 5,
+      "blocked_on": null,
+      "next_stage": "Hypothesize",
+      "next_stage_action": "researcher Observe stage: scan all 8 files, list every dict-key usage of `zeeman` and `B_hat`, distinguish dict-keys from type-names/function-names (keep). Output a 3-column table (file, line, current → proposed). Then theorist Hypothesize designs the rename patch as a diff.",
+      "closing_note": "Closed without running meta-improvement flow. Per anko 2026-05-18 (\"3s くらいでわからない？\"), this was a mechanical rename, not an investigation. Executed directly via Python regex script: 22 lines across 8 files renamed (internal dict keys zeeman→B, B_hat→B_direction; user-facing rejection in B_block.jl:77,97 preserved). Verified: using SpinorBEC loads + load_config on existing config passes. Lesson saved to memory `feedback_mechanical_vs_investigation_threshold.md`."
     }
   },
-  "last_meta_check_turn": 39
+  "last_meta_check_turn": 40
 }
