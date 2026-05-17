@@ -1,5 +1,5 @@
 {
-  "turn": 53,
+  "turn": 56,
   "status": "running",
   "history": [
     {
@@ -1154,10 +1154,118 @@
     {
       "turn": 52,
       "ts": "2026-05-17T21:01:06Z",
-      "judge_status": "CRITIC_INCONCLUSIVE",
+      "judge_status": "FAIL_OPERATIONAL",
       "directive_action": "critic_audit",
       "directive_label": "audit-class-scan-T52-critic-L3-audit",
       "wall_time_sec": null,
+      "agent_hashes": {
+        "critic": "e4cc3ddb505396ed9e55914384944cbd",
+        "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+        "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+        "researcher": "5c6277ae5ff274765786dfb8c511b568",
+        "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 8331332,
+        "total": 8331332,
+        "effective_full_rate": 1390722,
+        "breakdown": {
+          "input_fresh": 5314,
+          "cache_creation": 375560,
+          "cache_read": 7925782,
+          "output": 24676
+        },
+        "n_messages": 60,
+        "n_message_starts": 60
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null
+    },
+    {
+      "turn": 53,
+      "ts": "2026-05-17T21:19:00Z",
+      "judge_status": "FAIL_OPERATIONAL",
+      "directive_action": "modify_code",
+      "directive_label": "judge-in-operator-bug-2026-05-18-reproduce-fix-test",
+      "wall_time_sec": null,
+      "agent_hashes": {
+        "critic": "e4cc3ddb505396ed9e55914384944cbd",
+        "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+        "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+        "researcher": "5c6277ae5ff274765786dfb8c511b568",
+        "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+      },
+      "investigation_id": "judge-in-operator-bug-2026-05-18",
+      "notes": "judge.py _OPS in-operator bug fixed; 23/23 unittests pass; T52 re-judge flipped FAIL_OPERATIONAL -> PASS; sibling audit 33/33 occurrences (30 list-mem, 2 range, 1 ambiguous); historical T28/T33/T35/T38/T41-T48 flagged for anko. 1 criterion failed: historical_judge_52_preserved (implementer overwrote turn_52.json — but file was never committed pre-T53 anyway).",
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 15438853,
+        "total": 15438853,
+        "effective_full_rate": 2179092,
+        "breakdown": {
+          "input_fresh": 12574,
+          "cache_creation": 438352,
+          "cache_read": 14963481,
+          "output": 24446
+        },
+        "n_messages": 110,
+        "n_message_starts": 110
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null
+    },
+    {
+      "turn": 54,
+      "ts": "2026-05-17T21:37:06Z",
+      "judge_status": "PASS",
+      "directive_action": "modify_code",
+      "directive_label": "audit-class-scan-T50-document-fold-judge-bug",
+      "wall_time_sec": null,
+      "agent_hashes": {
+        "critic": "e4cc3ddb505396ed9e55914384944cbd",
+        "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+        "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+        "researcher": "5c6277ae5ff274765786dfb8c511b568",
+        "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 14316813,
+        "total": 14316813,
+        "effective_full_rate": 2090789,
+        "breakdown": {
+          "input_fresh": 23149,
+          "cache_creation": 480179,
+          "cache_read": 13795920,
+          "output": 17565
+        },
+        "n_messages": 78,
+        "n_message_starts": 78
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "notes": "Closed audit-class-scan-2026-05-18-T50 (tier 2 final) + judge-in-operator-bug-2026-05-18 (tier 2 final) in single text-only Document dispatch. LP-1 coupling-skip-gate-inconsistency moved to new rejected_classes section with critic rationale; LP-2 topology-function-WHAT-comment-pattern promoted from proposed_classes to active patterns: with last_count=5 and related_classes=[cargo-cult-comment]; audit_history row 4 appended at 2026-05-18T13:00:00+09:00. judge_in_operator_bug_2026_05_18.md memory file created with 33-occurrence sibling-audit table. meta-stage-routing-2026-05-18 confounder_advisory field added documenting that the T44-era FAIL/INCONCLUSIVE streak was judge.py operator bug, not contract-design — refined falsifier requires post-T53 5-turn window."
+    },
+    {
+      "turn": 55,
+      "ts": "2026-05-17T21:54:59Z",
+      "judge_status": "RESEARCHER_ONLY",
+      "directive_action": "researcher_dispatch",
+      "directive_label": "klaus-bch-leak-T55-data-inventory",
+      "wall_time_sec": 420,
       "agent_hashes": {
         "critic": "e4cc3ddb505396ed9e55914384944cbd",
         "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
@@ -1171,7 +1279,7 @@
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "CRITIC_INCONCLUSIVE",
+  "last_judge": "RESEARCHER_ONLY",
   "home_branch": "main",
   "schema_version": 2.1,
   "current_agent_hashes": {
@@ -1181,7 +1289,7 @@
     "researcher": "5c6277ae5ff274765786dfb8c511b568",
     "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
   },
-  "last_directive_label": "yan-li-saito-T44-fl-vortex-R2-retry",
+  "last_directive_label": "audit-class-scan-T50-document-fold-judge-bug",
   "last_directive_action": "modify_code",
   "last_error": null,
   "retries": 0,
@@ -1190,7 +1298,9 @@
     "barnett-mechanism-2026-05-16",
     "klaus-magnetostir-bch-leak-2026-05-13",
     "fullbdg-f6-polar-3000x",
-    "yan-li-saito-2026-reproduction"
+    "yan-li-saito-2026-reproduction",
+    "audit-class-scan-2026-05-18-T50",
+    "judge-in-operator-bug-2026-05-18"
   ],
   "investigations": {
     "barnett-mechanism-2026-05-16": {
@@ -1477,9 +1587,119 @@
       "priority": 25,
       "blocked_on": null,
       "next_stage": "Hypothesize",
-      "next_stage_action": "researcher Observe stage already triggered this auto-spawn; theorist Hypothesize next"
+      "next_stage_action": "Hold at Observe through T57. If post-T53 FAIL/INCONCLUSIVE rate stays below 1-per-4-turns, mark REFUTED-BY-CONFOUNDER and close. Else, theorist Hypothesize per original plan with refined baseline excluding judge-bug-corrupted turns.",
+      "confounder_advisory": {
+        "added_at_turn": 54,
+        "text": "T53 evidence partially refutes the original hypothesis. The 3+ FAIL/INCONCLUSIVE streak in last 4 turns up to T44 was driven by the judge.py _OPS_in_ operator bug (T28/T33/T35/T38/T41-T48 list-membership criteria silently mis-evaluated; see judge-in-operator-bug-2026-05-18). The hypothesis that contract design is wrong or observable_manifest precondition is missing or stage role is mis-assigned or success_criteria are not discriminating is NOT the primary cause for those turns. Refined falsifier: if 3+ FAIL/INCONCLUSIVE occur in any 4-turn window POST-T53, meta-stage-routing hypothesis remains testable. Otherwise, mark REFUTED-BY-CONFOUNDER at T58+. Defer Hypothesize stage advance."
+      }
+    },
+    "audit-class-scan-2026-05-18-T50": {
+      "id": "audit-class-scan-2026-05-18-T50",
+      "title": "Audit-class-scan T50 cycle -- periodic anti-pattern catalog sweep (F6 level-2/3)",
+      "flow_template": "audit-class-scan",
+      "current_stage": "closed (audit-class-scan-2026-05-18-T50 terminal closure at Document) + closed (judge-in-operator-bug-2026-05-18 terminal closure at Document). state.json reflects both as current_stage='closed' tier_current=2.",
+      "stages_done": [
+        "Document",
+        "Findings",
+        "L3_critic_audit",
+        "Observe",
+        "Triage"
+      ],
+      "stages_at_turn": {
+        "Observe": [
+          50,
+          "researcher 9-pattern sweep; 5 WHAT-comments + 126 1e-30 instances; 2 L3 proposals queued"
+        ],
+        "Findings": [
+          50,
+          "folded into Observe; mechanical-fix-eligible vs investigation-eligible triage in director T51"
+        ],
+        "Triage": [
+          51,
+          "implementer applied mechanical topology.jl cleanup; patterns.yaml updated with proposed_classes"
+        ],
+        "L3_critic_audit": [
+          52,
+          "critic produced LP-1 REJECT + LP-2 ACCEPT verdicts per F6 4-question audit"
+        ],
+        "Document": [
+          54,
+          "applied LP-1/LP-2 verdicts to patterns.yaml; audit_history row appended; investigation closed"
+        ]
+      },
+      "tier_current": 2,
+      "tier_target": 2,
+      "next_stage": null,
+      "next_stage_action": null,
+      "blocked_on": null,
+      "priority": 20,
+      "kind": "physics",
+      "closing_note": "Cycle closed cleanly. Loop-infrastructure value: (a) topology.jl cleanup mechanical fix at T51; (b) 1 new active pattern (topology-function-WHAT-comment-pattern) for future audits; (c) 1 rejected pattern preserved in institutional memory; (d) revealed the judge.py _OPS_in_ bug as a side-effect of L3 audit gating. Next audit-class-scan cycle is due ~T62 per ~10-turn cadence."
+    },
+    "judge-in-operator-bug-2026-05-18": {
+      "id": "judge-in-operator-bug-2026-05-18",
+      "title": "judge.py _OPS_in_ in-operator hard-coded as 2-element numeric range (list-membership intent silently mis-evaluated)",
+      "hypothesis": "judge.py line 97 _OPS_in_ lambda treats in as 2-element numeric range; >2-element or non-numeric list values fall into else-False and silently fail. 33 occurrences across 14 director-turn files affected.",
+      "flow_template": "fix-bug",
+      "current_stage": "closed",
+      "stages_done": [
+        "Research",
+        "Hypothesize",
+        "Reproduce",
+        "Fix",
+        "Test",
+        "Document"
+      ],
+      "stages_at_turn": {
+        "Research": [
+          53,
+          "director pre-flight grep + judge.py line-97 read; bug pin-pointed in director report"
+        ],
+        "Hypothesize": [
+          53,
+          "director report + critic-correctness verification"
+        ],
+        "Reproduce": [
+          53,
+          "unittest pre-fix assertFalse passes -- bug reproduced"
+        ],
+        "Fix": [
+          53,
+          "_in_op helper added; isinstance(x, bool) guard + 2-element-numeric path preserved"
+        ],
+        "Test": [
+          53,
+          "21 post-fix assertions pass; T52 re-judged PASS; sibling audit 33 occurrences"
+        ],
+        "Document": [
+          54,
+          "memory entry created; state.json closure recorded; T53 sibling audit table preserved"
+        ]
+      },
+      "falsifiers": [
+        {
+          "id": "t52-rejudge-three-failed-now-pass",
+          "description": "3 T52 criteria originally failed must PASS when re-judged against fixed judge.py",
+          "tested_at_turn": 53,
+          "result": "CONFIRMED -- T52 verdict flipped FAIL_OPERATIONAL -> PASS (13/13 criteria pass)"
+        },
+        {
+          "id": "unittest-prevents-regression",
+          "description": "unittest file .claude/scripts/tests/test_judge_in_operator.py prevents future regression",
+          "tested_at_turn": 53,
+          "result": "CONFIRMED -- 21 post-fix assertions cover string/boolean/range/edge cases"
+        }
+      ],
+      "tier_current": 2,
+      "tier_target": 2,
+      "next_stage": null,
+      "next_stage_action": null,
+      "blocked_on": null,
+      "priority": 2,
+      "kind": "physics",
+      "closing_note": "Bug class: judge.py operator semantics. 1 T53 commit fixed all sibling instances. 12 historical turns flagged for anko awareness (T28/T33/T35/T38/T41-T48). Memory entry at judge_in_operator_bug_2026_05_18.md preserves the lesson."
     }
   },
-  "last_meta_check_turn": 51,
-  "last_short_label": "audit-class-scan-T51-triage"
+  "last_meta_check_turn": 54,
+  "last_short_label": "audit-class-scan-T50-document-fold-judge-bug"
 }
