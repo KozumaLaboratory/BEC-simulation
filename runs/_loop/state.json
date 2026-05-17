@@ -2044,6 +2044,55 @@
         "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
         "researcher": "5c6277ae5ff274765786dfb8c511b568",
         "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 7318496,
+        "total": 7318496,
+        "effective_full_rate": 1331469,
+        "breakdown": {
+          "input_fresh": 20561,
+          "cache_creation": 385174,
+          "cache_read": 6884564,
+          "output": 28197
+        },
+        "n_messages": 51,
+        "n_message_starts": 51
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.4,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.4,
+        "cost_inflation": 0.787,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "advisory",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "AUDIT_DUE: patterns.yaml last audited at T0, gap=42"
+      ]
+    },
+    {
+      "turn": 43,
+      "ts": "2026-05-17T17:54:37Z",
+      "judge_status": "FAIL_NUMERICAL",
+      "directive_action": "run_experiment",
+      "directive_label": "yan-li-saito-T43-grid-refinement-P0-pre",
+      "wall_time_sec": 57.9,
+      "agent_hashes": {
+        "critic": "e4cc3ddb505396ed9e55914384944cbd",
+        "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+        "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+        "researcher": "5c6277ae5ff274765786dfb8c511b568",
+        "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
       }
     }
   ],
@@ -2051,7 +2100,7 @@
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "CRITIC_PASS",
+  "last_judge": "FAIL_NUMERICAL",
   "home_branch": "main",
   "schema_version": 2.1,
   "current_agent_hashes": {
@@ -2061,10 +2110,10 @@
     "researcher": "5c6277ae5ff274765786dfb8c511b568",
     "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
   },
-  "last_directive_label": "yan-li-saito-f1-design-redo",
-  "last_directive_action": "modify_code",
+  "last_directive_label": "yan-li-saito-T43-grid-refinement-P0-pre",
+  "last_directive_action": "run_experiment",
   "last_error": null,
-  "retries": 0,
+  "retries": 1,
   "active_investigation_id": "yan-li-saito-2026-reproduction",
   "investigations_index": [
     "barnett-mechanism-2026-05-16",
@@ -2307,5 +2356,5 @@
       "closing_note": "Closed without running meta-improvement flow. Per anko 2026-05-18 (\"3s くらいでわからない？\"), this was a mechanical rename, not an investigation. Executed directly via Python regex script: 22 lines across 8 files renamed (internal dict keys zeeman→B, B_hat→B_direction; user-facing rejection in B_block.jl:77,97 preserved). Verified: using SpinorBEC loads + load_config on existing config passes. Lesson saved to memory `feedback_mechanical_vs_investigation_threshold.md`."
     }
   },
-  "last_meta_check_turn": 40
+  "last_meta_check_turn": 42
 }

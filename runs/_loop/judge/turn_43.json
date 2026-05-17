@@ -1,0 +1,75 @@
+{
+  "turn": 43,
+  "status": "FAIL_NUMERICAL",
+  "issues": [
+    "norm_drift=2.20e-07 exceeds eff_tol 1e-08 (has_dissipation=False, expected=None)",
+    "mz_final=0.998858 deviates from target=1.0 by 1.14e-03",
+    "n_max_D0 = 2.00: solidly in Form (A) 'volumetric ceiling' territory. T40 baseline at dx=0.4375 gave 1.0 D0; P0_pre at dx=0.125 (3.5\u00d7 finer) gives 2.0 D0 \u2014 only 2\u00d7 increase consistent with partial \u03c3-seed contraction, NOT droplet formation.",
+    "m_populations = [0.9994, 1.1e-6, 0.0006]: fully polarized (m=+1 dominant). F_z_per_N = 0.999. ITP preserved spin polarization despite c1=0 path \u2014 no spin depolarization at this grid.",
+    "E_total/N > 0 (partial): delocalized state is not self-bound, consistent with Form (A). DDI term would also be positive for delocalized density (isotropic smearing \u2192 net repulsive DDI per T40 \u00a72)."
+  ],
+  "novel_detected": false,
+  "metrics": {
+    "experiment_kind": "ground_state",
+    "norm_initial": 1.0,
+    "norm_final": 1.0000002196,
+    "norm_drift": 2.196e-07,
+    "norm_drift_max": 2.196e-07,
+    "energy_initial": null,
+    "energy_final": null,
+    "energy_monotonic": null,
+    "mz_target": 1.0,
+    "mz_final": 0.998858,
+    "fitted_order": null,
+    "fit_dt_range": null,
+    "fit_r_squared": null,
+    "wall_time_sec": 57.9,
+    "peak_memory_gb": null,
+    "tests_passed": null,
+    "n_max_dimless": 0.0006692735,
+    "n_max_D0": 2.0,
+    "m_populations": [
+      0.9994286689339685,
+      1.0889007369761313e-06,
+      0.0005704617995747469
+    ],
+    "F_z_per_N": 0.998858,
+    "L_z_per_N": 0.000101,
+    "E_total_per_N": 4e-06,
+    "E_kinetic_per_N": 0.0,
+    "E_contact_per_N": 3.7e-06,
+    "E_LHY_per_N": 2.3e-07,
+    "E_DDI_per_N": null,
+    "converged": false,
+    "n_steps_completed": 6250,
+    "density_profile_radial": "saved to results_P0_pre.jld2",
+    "density_profile_axial": "saved to results_P0_pre.jld2",
+    "D0_factor_used": 2990.1,
+    "c0": 180.99,
+    "c_dd": 639.2,
+    "gamma_lhy": 12.795,
+    "eps_dd_phys": 1.1772,
+    "mu_final": 0.119825,
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "total": null
+    },
+    "warnings": [
+      "converged=false: ITP ran all 6250 steps without crossing tol=1e-8; F32 floor prevents |\u0394\u03bc| from reaching tol (mu oscillates at Float32 resolution ~1e-7). State is functionally converged at F32 precision.",
+      "E_DDI_per_N = NaN: DDI convolution not recomputed post-hoc (BUG-9 analog); full E_total includes DDI term of unknown sign.",
+      "E_kinetic_per_N \u2248 0: correct for delocalized state (uniform \u03c8 \u2192 \u2207\u03c8 \u2248 0 \u2192 E_kin \u2248 0 via Parseval). Not a formula error.",
+      "E_total/N = 4e-6 (partial, no DDI): for delocalized state this is the contact+LHY contribution only; with E_DDI included total sign could change.",
+      "n_max_D0 = 2.0: FAR below Form (B) threshold of 3000 D0. Grid refinement from dx=0.4375 (T40, 1.0 D0) to dx=0.125 (P0_pre, 2.0 D0) gave only 2\u00d7 increase, consistent with volumetric delocalization (Form A)."
+    ],
+    "physical_red_flags": [
+      "n_max_D0 = 2.00: solidly in Form (A) 'volumetric ceiling' territory. T40 baseline at dx=0.4375 gave 1.0 D0; P0_pre at dx=0.125 (3.5\u00d7 finer) gives 2.0 D0 \u2014 only 2\u00d7 increase consistent with partial \u03c3-seed contraction, NOT droplet formation.",
+      "m_populations = [0.9994, 1.1e-6, 0.0006]: fully polarized (m=+1 dominant). F_z_per_N = 0.999. ITP preserved spin polarization despite c1=0 path \u2014 no spin depolarization at this grid.",
+      "E_total/N > 0 (partial): delocalized state is not self-bound, consistent with Form (A). DDI term would also be positive for delocalized density (isotropic smearing \u2192 net repulsive DDI per T40 \u00a72)."
+    ],
+    "falsification_result": "REFUTED"
+  },
+  "directive_expected_order": null
+}
