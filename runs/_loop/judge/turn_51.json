@@ -1,0 +1,115 @@
+{
+  "turn": 51,
+  "status": "PASS",
+  "issues": [],
+  "metrics": {
+    "experiment_kind": "text_only",
+    "topology_jl_lines_removed": 5,
+    "topology_jl_remaining_WHAT_comments": 0,
+    "patterns_yaml_last_scanned_updated_count": 9,
+    "patterns_yaml_audit_history_rows_appended": 1,
+    "patterns_yaml_proposed_classes_count": 2,
+    "hardcoded_magic_number_director_re_triage": "no-action-rationalized",
+    "commit_messages_drafted": 2,
+    "auto_committed": false,
+    "src_files_modified": 1,
+    "state_json_modified": false,
+    "investigation_id": "audit-class-scan-2026-05-18-T50",
+    "stage_advancing_to": "Triage",
+    "flow_template": "audit-class-scan"
+  },
+  "contract_evaluation": {
+    "verdict": "PASS",
+    "criteria_results": [
+      {
+        "id": "topology_5_lines_removed",
+        "passed": true,
+        "actual": 5,
+        "reason": "topology_jl_lines_removed=5 == 5 \u2192 True"
+      },
+      {
+        "id": "topology_clean",
+        "passed": true,
+        "actual": 0,
+        "reason": "topology_jl_remaining_WHAT_comments=0 == 0 \u2192 True"
+      },
+      {
+        "id": "all_9_patterns_updated",
+        "passed": true,
+        "actual": 9,
+        "reason": "patterns_yaml_last_scanned_updated_count=9 == 9 \u2192 True"
+      },
+      {
+        "id": "audit_history_appended",
+        "passed": true,
+        "actual": 1,
+        "reason": "patterns_yaml_audit_history_rows_appended=1 == 1 \u2192 True"
+      },
+      {
+        "id": "two_l3_proposals_queued",
+        "passed": true,
+        "actual": 2,
+        "reason": "patterns_yaml_proposed_classes_count=2 == 2 \u2192 True"
+      },
+      {
+        "id": "hardcoded_magic_number_rejected",
+        "passed": true,
+        "actual": "no-action-rationalized",
+        "reason": "hardcoded_magic_number_director_re_triage=no-action-rationalized == no-action-rationalized \u2192 True"
+      },
+      {
+        "id": "two_commits_drafted",
+        "passed": true,
+        "actual": 2,
+        "reason": "commit_messages_drafted=2 == 2 \u2192 True"
+      },
+      {
+        "id": "no_auto_commit",
+        "passed": true,
+        "actual": false,
+        "reason": "auto_committed=False == False \u2192 True"
+      },
+      {
+        "id": "src_scope_one_file",
+        "passed": true,
+        "actual": 1,
+        "reason": "src_files_modified=1 == 1 \u2192 True"
+      },
+      {
+        "id": "no_state_json_touch",
+        "passed": true,
+        "actual": false,
+        "reason": "state_json_modified=False == False \u2192 True"
+      },
+      {
+        "id": "investigation_id_correct",
+        "passed": true,
+        "actual": "audit-class-scan-2026-05-18-T50",
+        "reason": "investigation_id=audit-class-scan-2026-05-18-T50 == audit-class-scan-2026-05-18-T50 \u2192 True"
+      },
+      {
+        "id": "stage_triage",
+        "passed": true,
+        "actual": "Triage",
+        "reason": "stage_advancing_to=Triage == Triage \u2192 True"
+      },
+      {
+        "id": "template_consistent",
+        "passed": true,
+        "actual": "audit-class-scan",
+        "reason": "flow_template=audit-class-scan == audit-class-scan \u2192 True"
+      }
+    ],
+    "triggered_failure_modes": [],
+    "issues": []
+  },
+  "investigation_id": "audit-class-scan-2026-05-18-T50",
+  "stage_advancing_to": "Triage",
+  "investigation_update": {
+    "if_success_advance_to_stage": "Document (T52 \u2014 close audit-class-scan cycle, tier 0.7 \u2192 1.0; AND parallel critic side-dispatch for LP-1/LP-2 L3 audit per \u00a7F6). After T52: pivot to klaus-bch-leak Hypothesize at T53.",
+    "if_success_tier_becomes": 0.7,
+    "if_refuted_advance_to_stage": "N/A \u2014 Triage is execution, not falsification. Operational failure routes to T52 re-dispatch.",
+    "if_refuted_tier_becomes": "N/A",
+    "next_falsifier_to_test_after": "N/A \u2014 meta-investigation; T52 = Document + critic L3 audit; T53 = pivot to klaus-bch-leak."
+  }
+}

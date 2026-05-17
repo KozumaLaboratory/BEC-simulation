@@ -1,5 +1,5 @@
 {
-  "turn": 51,
+  "turn": 53,
   "status": "running",
   "history": [
     {
@@ -1084,7 +1084,7 @@
     {
       "turn": 50,
       "ts": "2026-05-17T20:33:54Z",
-      "judge_status": "RESEARCHER_ONLY",
+      "judge_status": "FAIL_NO_METRICS",
       "directive_action": "researcher_audit_class_scan",
       "directive_label": "audit-class-scan-T50-observe",
       "wall_time_sec": 439,
@@ -1094,6 +1094,76 @@
         "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
         "critic": "e4cc3ddb505396ed9e55914384944cbd",
         "director": "077a86dba89b9096e5c2fc45e8fbc3c7"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 10952527,
+        "total": 10952527,
+        "effective_full_rate": 1651529,
+        "breakdown": {
+          "input_fresh": 27846,
+          "cache_creation": 390825,
+          "cache_read": 10517169,
+          "output": 16687
+        },
+        "n_messages": 101,
+        "n_message_starts": 101
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null
+    },
+    {
+      "turn": 51,
+      "ts": "2026-05-17T20:47:08Z",
+      "judge_status": "PASS",
+      "directive_action": "modify_code",
+      "directive_label": "audit-class-scan-T51-triage",
+      "wall_time_sec": null,
+      "agent_hashes": {
+        "critic": "e4cc3ddb505396ed9e55914384944cbd",
+        "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+        "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+        "researcher": "5c6277ae5ff274765786dfb8c511b568",
+        "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 9902229,
+        "total": 9902229,
+        "effective_full_rate": 1487115,
+        "breakdown": {
+          "input_fresh": 3342,
+          "cache_creation": 348538,
+          "cache_read": 9531356,
+          "output": 18993
+        },
+        "n_messages": 78,
+        "n_message_starts": 78
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null
+    },
+    {
+      "turn": 52,
+      "ts": "2026-05-17T21:01:06Z",
+      "judge_status": "CRITIC_INCONCLUSIVE",
+      "directive_action": "critic_audit",
+      "directive_label": "audit-class-scan-T52-critic-L3-audit",
+      "wall_time_sec": null,
+      "agent_hashes": {
+        "critic": "e4cc3ddb505396ed9e55914384944cbd",
+        "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+        "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+        "researcher": "5c6277ae5ff274765786dfb8c511b568",
+        "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
       }
     }
   ],
@@ -1101,18 +1171,18 @@
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "RESEARCHER_ONLY",
+  "last_judge": "CRITIC_INCONCLUSIVE",
   "home_branch": "main",
   "schema_version": 2.1,
   "current_agent_hashes": {
-    "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b",
-    "researcher": "5c6277ae5ff274765786dfb8c511b568",
-    "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
     "critic": "e4cc3ddb505396ed9e55914384944cbd",
-    "director": "077a86dba89b9096e5c2fc45e8fbc3c7"
+    "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+    "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+    "researcher": "5c6277ae5ff274765786dfb8c511b568",
+    "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
   },
   "last_directive_label": "yan-li-saito-T44-fl-vortex-R2-retry",
-  "last_directive_action": "critic_audit",
+  "last_directive_action": "modify_code",
   "last_error": null,
   "retries": 0,
   "active_investigation_id": "yan-li-saito-2026-reproduction",
@@ -1410,5 +1480,6 @@
       "next_stage_action": "researcher Observe stage already triggered this auto-spawn; theorist Hypothesize next"
     }
   },
-  "last_meta_check_turn": 49
+  "last_meta_check_turn": 51,
+  "last_short_label": "audit-class-scan-T51-triage"
 }
