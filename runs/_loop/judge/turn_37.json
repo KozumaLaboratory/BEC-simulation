@@ -1,0 +1,126 @@
+{
+  "turn": 37,
+  "status": "INCONCLUSIVE",
+  "issues": [
+    "metric 'energy_mu_final' missing from sim metrics"
+  ],
+  "metrics": {
+    "experiment_kind": "run_experiment",
+    "falsification_result": "FALSIFIED",
+    "f1_verdict": "FALSIFIED",
+    "f1_pass": false,
+    "f1_inconclusive": false,
+    "f1_falsified": true,
+    "f1_n_max_in_D0": 0.99,
+    "f1_deviation_pct_vs_paper": 99.99,
+    "f4_verdict": "INCONCLUSIVE",
+    "f4_reason": "rotating_basis_no_energy_decomposition",
+    "f4_ratio_lhy_over_ddi": null,
+    "norm_initial": null,
+    "norm_final": 1.0,
+    "norm_drift": 2.22e-16,
+    "energy_mu_final": null,
+    "converged": true,
+    "m_populations": [
+      0.9458,
+      0.0474,
+      0.0068
+    ],
+    "m_plusF_dominant": false,
+    "n_steps_completed": 5000,
+    "wall_time_sec_itp": 67.96,
+    "wall_time_sec_total": 87.9,
+    "peak_memory_gb": null,
+    "jld2_path": "/home/suzume/workspace/BEC-simulation/runs/yan_li_saito_f1_torus_gs/point_001.jld2",
+    "jld2_artifact_exists": true,
+    "precondition_check_exit_code_zero": true,
+    "f1_n_max_in_D0_extracted": true,
+    "f1_verdict_is_valid_string": true,
+    "sim_turn_37_md_exists_on_disk": true,
+    "sim_turn_37_metrics_block_present": true,
+    "warnings": [
+      "energy_mu_final is NaN: rotating_basis find_ground_state_rotating! mu estimator returned NaN \u2014 likely numerical cancellation in -log(n/target)/2dt when n/target\u22481 throughout; not a crash, just unreported mu",
+      "epsilon_dd_eff = 1.1772 (config uses Eu151_f1_effective a_s=21a0; paper uses a_s giving eps_dd=1.2 exactly \u2014 2% discrepancy, expected and noted in config header)",
+      "jld2_post_process_psi_closure_bug: first two post-process scripts (t37_post.jl, t37_post2.jl) failed due to Julia do-block closure capture: `psi = psi_raw` inside jldopen do-block does not update outer `psi` variable. Fixed by using `load()` instead (t37_post3.jl). This is a subtle Julia scoping gotcha."
+    ],
+    "physical_red_flags": [
+      "F1_FALSIFIED: n_max = 0.99 D_0 vs paper target 13000 D_0 (factor ~13000 discrepancy). Wavefunction delocalized \u2014 no self-bound dipolar droplet formed after 5000 ITP steps with Gaussian seed init_sigma=2.0",
+      "energy_mu_final_NaN: rotating_basis ITP mu estimator returned NaN for all 5000 steps. Indicates wavefunction norm stayed at target_norm=1.0 from step 1 (meaning the delocalized Gaussian is already normalized and ITP is not causing density collapse). The convergence flag conv=true from norm criterion is spurious for this use case.",
+      "m_plusF_not_dominant: m=+F population = 0.946 < 0.95 threshold. Spin mixing occurred during ITP (c1=0 in config but rotating_basis DDI couples spin components). Paper expects full polarization f/rho \u2243 1 everywhere.",
+      "n_max_dimless_too_low: n_max_dimless = 3.32e-4. For a droplet of radius ~2 a_ho, expected n_max_dimless ~ N * (1/droplet_vol_dimless) ~ 15000 * 1/(4pi/3 * 2^3) \u2248 15000/33.5 \u2248 448. Actual 3.32e-4 is 1.35e6 times smaller \u2014 completely delocalized cloud."
+    ]
+  },
+  "contract_evaluation": {
+    "verdict": "INCONCLUSIVE",
+    "criteria_results": [
+      {
+        "id": "precondition_passed",
+        "passed": true,
+        "actual": true,
+        "reason": "precondition_check_exit_code_zero=True == True \u2192 True"
+      },
+      {
+        "id": "jld2_artifact_produced",
+        "passed": true,
+        "actual": true,
+        "reason": "jld2_artifact_exists=True == True \u2192 True"
+      },
+      {
+        "id": "n_max_extracted",
+        "passed": true,
+        "actual": true,
+        "reason": "f1_n_max_in_D0_extracted=True == True \u2192 True"
+      },
+      {
+        "id": "f1_verdict_string_valid",
+        "passed": true,
+        "actual": true,
+        "reason": "f1_verdict_is_valid_string=True == True \u2192 True"
+      },
+      {
+        "id": "norm_conserved",
+        "passed": true,
+        "actual": 2.22e-16,
+        "reason": "norm_drift=2.22e-16 < 0.01 \u2192 True"
+      },
+      {
+        "id": "wall_time_within_budget",
+        "passed": true,
+        "actual": 87.9,
+        "reason": "wall_time_sec_total=87.9 < 1800 \u2192 True"
+      },
+      {
+        "id": "sim_37_on_disk",
+        "passed": true,
+        "actual": true,
+        "reason": "sim_turn_37_md_exists_on_disk=True == True \u2192 True"
+      },
+      {
+        "id": "sim_37_metrics_present",
+        "passed": true,
+        "actual": true,
+        "reason": "sim_turn_37_metrics_block_present=True == True \u2192 True"
+      },
+      {
+        "id": "energy_finite",
+        "passed": null,
+        "actual": null,
+        "reason": "metric 'energy_mu_final' missing from sim metrics"
+      }
+    ],
+    "triggered_failure_modes": [],
+    "issues": [
+      "metric 'energy_mu_final' missing from sim metrics"
+    ]
+  },
+  "investigation_id": "yan-li-saito-2026-reproduction",
+  "stage_advancing_to": "Execute",
+  "investigation_update": {
+    "if_success_advance_to_stage": "Analyze",
+    "if_success_tier_becomes": 1.0,
+    "if_success_falsifier_update": "T37 Execute PASS: F1 n_max within \u00b110% of paper 13000 D_0; rotating_basis F=1 \u03b5_dd=1.2 droplet GS reproduced. JLD2 at runs/yan_li_saito_f1_torus_gs/point_001.jld2. F4 INCONCLUSIVE-by-framework-gap (rotating_basis_no_energy_decomposition) \u2014 spawn follow-up fix-bug investigation T39+ to add E_kin/E_s/E_ddi/E_lhy snapshot. T38 = Analyze stage (density distribution + polarization map). Tier ladder: 0.8 \u2192 1.0 \u2192 2.0 (Analyze) \u2192 2.5 (critic Update) \u2192 3.0 (Document = project's first Tier-3 claim).",
+    "if_refuted_advance_to_stage": "Update",
+    "if_refuted_tier_becomes": 0.6,
+    "next_falsifier_to_test_after": "On F1 PASS: T38 = Analyze (density + polarization check); investigation eventually progresses to \u2113=1 vortex test (F2) + Larmor precession (F3). On F1 INCONCLUSIVE: T38 = grid refinement (96\u00b3 \u00d7 box 40) OR Q1 LHY \u03c7 audit (director decides based on deviation direction). On F1 FALSIFIED: T38 = critic Cross-check on Q1/Q2/Q3 framework gap; FALSIFIED is a science result, document carefully. On ITP crash: T38 = fix-bug investigation against the surfaced bug; do NOT Design redo #4 (rule SPENT). F4 framework-gap spawns T39+ fix-bug investigation regardless of F1 outcome. Meta-critic-placement (priority 50) advances at T38 or T39 (4 data points now in catalog: T20 Lz, T26 freq-sign, T33 schema, T35 BUG-8)."
+  }
+}
