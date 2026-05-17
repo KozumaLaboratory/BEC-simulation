@@ -1,5 +1,5 @@
 {
-  "turn": 48,
+  "turn": 49,
   "status": "running",
   "history": [
     {
@@ -961,6 +961,55 @@
         "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
         "researcher": "5c6277ae5ff274765786dfb8c511b568",
         "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 10080341,
+        "total": 10080341,
+        "effective_full_rate": 1722561,
+        "breakdown": {
+          "input_fresh": 46744,
+          "cache_creation": 436655,
+          "cache_read": 9562186,
+          "output": 34756
+        },
+        "n_messages": 65,
+        "n_message_starts": 65
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.455,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.5,
+        "cost_inflation": 0.99,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "advisory",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "AUDIT_DUE: patterns.yaml last audited at T0, gap=47"
+      ]
+    },
+    {
+      "turn": 48,
+      "ts": "2026-05-17T19:59:00Z",
+      "judge_status": "RESEARCHER_ONLY",
+      "directive_action": "researcher",
+      "directive_label": "yan-li-saito-T48-D0-normalization-audit",
+      "wall_time_sec": 309,
+      "agent_hashes": {
+        "critic": "e4cc3ddb505396ed9e55914384944cbd",
+        "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+        "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+        "researcher": "5c6277ae5ff274765786dfb8c511b568",
+        "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
       }
     }
   ],
@@ -968,7 +1017,7 @@
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "CRITIC_PASS",
+  "last_judge": "RESEARCHER_ONLY",
   "home_branch": "main",
   "schema_version": 2.1,
   "current_agent_hashes": {
@@ -1263,5 +1312,5 @@
       "next_stage_action": "researcher Observe stage already triggered this auto-spawn; theorist Hypothesize next"
     }
   },
-  "last_meta_check_turn": 46
+  "last_meta_check_turn": 47
 }
