@@ -1,0 +1,202 @@
+# Anti-pattern catalog for the autonomous research loop
+#
+# Per anko 2026-05-18 ("もっと抽象化してもいいんじゃない？テストによる発見
+# という前提なくても?"). Lifts the loop from "find class when triggered by
+# instance" (Level 1) to "periodically scan known classes" (Level 2) and
+# "derive analogous classes when one lands" (Level 3).
+#
+# Each entry's grep / detector is the EXTERNAL ANCHOR — the empirical
+# verification that prevents fabricated findings. A pattern entry without
+# a runnable detector is not a pattern, it's speculation.
+#
+# Director's audit-class-scan flow (director.md §F6) runs this every
+# ~10 turns and reports findings; the loop fixes them per the 3-second
+# mechanical-vs-investigation triage.
+
+patterns:
+  - id: deprecated-name-leak
+    description: |
+      Comments/docstrings name user-facing forms that have been removed or
+      renamed. Reading them teaches the loop's implementer to write the
+      deprecated form, then schema validator rejects it (bug-8 class).
+    grep_patterns:
+      - 'legacy.*(zeeman|B_hat|c_lhy|spinor_lhy|spin_rotating_frame_omega)'
+      - 'removed 20\d{2}'
+      - 'deprecated'
+    exclude_paths:
+      - 'test/'
+      - '.claude/logs/'
+      - 'runs/_loop/'
+    last_scanned: '2026-05-18T01:50:00+09:00'
+    last_count: 0
+    related_classes: [api-rename-stragglers, doc-staleness, test-mock-of-removed]
+
+  - id: api-rename-stragglers
+    description: |
+      Code still imports or calls functions/types that have been renamed
+      or moved. Sibling of deprecated-name-leak but at API level.
+    grep_patterns:
+      - '@deprecate'
+      - 'Base\.depwarn'
+      - '_old_'
+      - '_v1_'
+    exclude_paths:
+      - 'test/'
+    last_scanned: null
+    last_count: null
+    related_classes: [deprecated-name-leak]
+
+  - id: doc-staleness
+    description: |
+      CLAUDE.md / README / memory entries describe features, APIs, or
+      conventions that no longer match the code. Higher-impact than
+      source comments because anko (and the loop) read these eagerly.
+    grep_patterns:
+      - 'TODO:.*document'
+      - 'work in progress'
+      - 'WIP'
+      - 'FIXME'
+    detect_extra: |
+      Manual review: pick 3 random sections in CLAUDE.md, verify each
+      claim against current src/. Spot-check, not exhaustive.
+    last_scanned: null
+    last_count: null
+    related_classes: [deprecated-name-leak]
+
+  - id: hardcoded-magic-number
+    description: |
+      Constants buried inline that should be named or config-driven.
+      Specifically physical constants (1e-8 tolerance, ε=1e-6, etc.)
+      that recur across the codebase without a single source of truth.
+    grep_patterns:
+      - '\b1e-?\d+\b'
+      - '\b1\.0e-?\d+\b'
+    exclude_paths:
+      - 'test/'  # test tolerances are local by design
+      - 'docs/'
+    last_scanned: null
+    last_count: null
+    related_classes: []
+
+  - id: dead-export
+    description: |
+      Exported names with zero callers outside test/ — accumulated public
+      API surface that isn't used. state_zoo had 22 init_psi_* exports
+      with no production callers (was decided to be WIP-not-dead — see
+      memory `state_zoo_yaml_integration_wip.md`).
+    detect: |
+      For each name in `export ...` lines, grep -r "<name>" outside
+      its defining file + test/. If zero hits, it's a candidate for
+      removal — but check memory for "WIP" / "public API" markers first.
+    last_scanned: null
+    last_count: null
+    related_classes: []
+
+  - id: large-file-bloat
+    description: |
+      Files over 800 lines (anko user CLAUDE.md preference: 200-400
+      typical, 800 max). Suggests the file is doing too much and should
+      split.
+    detect: |
+      Find src/ -name '*.jl' -exec wc -l {} \; | awk '$1 > 800'
+    last_scanned: null
+    last_count: null
+    related_classes: []
+
+  - id: test-mock-of-real
+    description: |
+      Tests mock something that has a real production implementation —
+      hides drift between mock and prod (per [[feedback_no_db_mocks]]
+      class).
+    grep_patterns:
+      - 'mock_\w+\s*='
+      - 'stub_\w+\s*='
+      - 'Mock\w+\('
+    exclude_paths:
+      - 'docs/'
+    last_scanned: null
+    last_count: null
+    related_classes: []
+
+  - id: cargo-cult-comment
+    description: |
+      Comments that describe WHAT the code does instead of WHY. Anti-CLAUDE.md
+      principle. Detectable only via review, no grep.
+    detect: |
+      Manual review: pick 5 random comments in src/, judge each. Aim
+      to identify the worst 5 instances per audit cycle.
+    last_scanned: null
+    last_count: null
+    related_classes: []
+
+  - id: paper-unit-system-wrong-param-in-spot-check
+    description: |
+      When a critic or theorist performs an independent spot-check of a
+      paper-defined unit (D₀, L₀, T₀, B₀, etc.) using a physical constant
+      from CLAUDE.md's project-default block (e.g., a_s=110 a₀ for bulk
+      Eu-151 F=6) instead of the value the paper itself states for its
+      simulated regime (e.g., a_s=21 a₀ for F=1 effective at ε_dd=1.2),
+      the resulting >10× discrepancy is a wrong-input error, not a
+      framework or memory bug. Triggering instance: T47 critic §D 152×
+      flag on D₀ formula evaluation; resolved at T48 researcher §1-§5.
+    grep_patterns:
+      - 'a_s\s*=\s*110\s*a[_]?0'
+      - 'a_s_si\s*=\s*110\s*\*\s*a_0'
+      - 'a_s_bohr\s*=\s*110'
+    detect: |
+      Manual: any critic / theorist audit that derives a paper normalization
+      constant numerically AND obtains a ratio > 10× vs the framework's
+      reported value MUST verify the physical-parameter values came from
+      the paper's own numerical / simulation section, NOT from CLAUDE.md
+      bulk defaults, before declaring discrepancy.
+    exclude_paths:
+      - 'test/'
+      - 'runs/_loop/judge/turn_47_critic_audit.md'  # the triggering instance, kept for history
+    last_scanned: '2026-05-18T05:00:00+09:00'
+    last_count: 1  # T47 critic §D
+    related_classes: [doc-staleness, deprecated-name-leak]
+
+# === Analogical derivation queue (L3) ===
+#
+# When a NEW pattern is added (via finding), the theorist proposes
+# related_classes by analogy. Each proposal must include:
+# - id (kebab-case)
+# - description
+# - grep_patterns OR detect script
+# - external anchor (= the runnable check)
+#
+# Critic audits each proposal:
+# - Is the grep pattern likely to produce >0 findings AND <10000 (not
+#   too noisy)? Run grep, measure.
+# - Is the related-class link real, or a vibes-based association?
+# - Does the description sharply differ from existing entries (i.e.,
+#   not a near-duplicate)?
+#
+# Rejected proposals are logged but NOT added.
+proposed_classes: []
+
+# === Audit history ===
+#
+# Each audit-class-scan run appends one row here. Director reads to
+# decide priority + fix accumulated debt.
+audit_history:
+  - run_at: '2026-05-18T01:50:00+09:00'
+    triggered_by: 'manual (anko-instigated grep hunt during loop refactor)'
+    patterns_scanned: ['deprecated-name-leak']
+    findings_count: 0  # after all-instance batch fix
+    notes: |
+      First reactive audit (not via this flow): bug 8 surfaced, grep found
+      ~67 sibling instances, batch-fixed. Now in steady state.
+
+  - run_at: '2026-05-18T05:00:00+09:00'
+    triggered_by: 'T48 researcher normalization audit (yan-li-saito-2026-reproduction Research stage side-step)'
+    patterns_scanned: ['paper-unit-system-wrong-param-in-spot-check']
+    findings_count: 1  # T47 critic §D (the triggering instance)
+    notes: |
+      New class added (L1 reactive: surfaced via instance). Grep across
+      `runs/_loop/judge/`, `runs/_loop/director/`, `runs/_loop/theorist/`,
+      `runs/_loop/critic/` for `a_s = 110` or `a_s_bohr = 110` returned
+      only the T47 critic instance. Framework analysis scripts in
+      `runs/yan_li_saito_f1_torus_gs/` all use a_s=21 a₀ correctly.
+      Sibling-class search per `feedback_fix_the_class_not_the_instance`
+      complete; no batch fix needed at code level.

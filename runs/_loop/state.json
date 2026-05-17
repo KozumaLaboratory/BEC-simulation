@@ -1010,7 +1010,41 @@
         "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
         "researcher": "5c6277ae5ff274765786dfb8c511b568",
         "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
-      }
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 7454592,
+        "total": 7454592,
+        "effective_full_rate": 1242211,
+        "breakdown": {
+          "input_fresh": 10914,
+          "cache_creation": 357757,
+          "cache_read": 7070511,
+          "output": 15410
+        },
+        "n_messages": 63,
+        "n_message_starts": 63
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.364,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.5,
+        "cost_inflation": 0.72,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "advisory",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "AUDIT_DUE: patterns.yaml last audited at T0, gap=48"
+      ]
     }
   ],
   "created_at": "2026-05-14T00:00:00+00:00",
@@ -1150,15 +1184,16 @@
       "title": "Yan-Li-Saito 2026 PRL Barnett-droplet reproduction (Tier-3 candidate)",
       "hypothesis": "SpinorBEC.jl scalar + DDI + LHY framework can reproduce torus magnetic-vortex GS + mechanical Larmor precession + chiral bound state at F=1 ε_dd=1.2",
       "flow_template": "verify-claim",
-      "current_stage": "Update",
+      "current_stage": "Document",
       "stages_done": [
         "Design",
+        "Document",
         "Execute"
       ],
-      "tier_current": 0.7,
+      "tier_current": 0.4,
       "tier_target": 3,
-      "next_stage": "Update",
-      "next_stage_action": "T40 Execute REFUTED both (b) density-basin AND (a2) topology hypotheses: all 5 points delocalized (n_max ≤ 1.06 D₀), P4 flux-closure topology preserved (f_z=2.7e-16 at ring) but density did not increase. Per theorist §6 row 4: framework deep-bug (a4) OR paper-claim-wrong (c) OR LHY χ(ε_dd>1) issue (a1). T41 must be critic/researcher to narrow these. Parallel: paper-fetch arXiv:2605.11670 to close (c) data gap; theorist deep-audit rotating_basis F=1 + DDI path. Tier stays 0.6.",
+      "next_stage": null,
+      "next_stage_action": "T48 normalization audit RESOLVED 152× as T47-critic-input-error (a_s=110 instead of 21 a₀); framework D₀ ≡ paper D₀ (3.24 vs 3.43 μm⁻³, 5.5% agreement); gap to paper target 6807× unchanged. Investigation lands at partial-REFUTE (tier 0.40). Open: R4 analytical DDI energy sign / BUG-9 (low-probability revival path, ~5M effective, theorist+sympy). Otherwise dormant.",
       "blocked_on": null,
       "priority": 1,
       "kind": "physics",
@@ -1170,16 +1205,22 @@
           "result": "FALSIFIED at T37; T40 5-point seed-basin discriminator: P0/P1/P2/P3 (Gaussian σ sweep 0.5→14) all delocalized confirming theorist E_DDI=0 isotropy derivation; P4 (fl_vortex JLD2, topology preserved to machine eps) ALSO delocalized refuting topology-axis hypothesis. Both (b) and (a2) REFUTED. Open: (a4) framework deep-bug, (a1) LHY χ(ε_dd>1) issue, (c) paper-claim wrong."
         }
       ],
-      "last_advanced_turn": 42,
+      "last_advanced_turn": 49,
       "history": [
         {
           "turn": 42,
           "stage": "Update",
           "tier": 0.8,
           "note": "Critic CORROBORATEd grid-resolution hypothesis and closed DDI prefactor bit-equal. T43 routing R1 grid-refinement Design."
+        },
+        {
+          "turn": 49,
+          "stage": "Document",
+          "tier": 0.4,
+          "note": "Document closure of T48 normalization audit per Option C committed routing. Memory annotated with a_s=21 a₀ in D₀; patterns.yaml `paper-unit-system-wrong-param-in-spot-check` added; partial-REFUTE landed."
         }
       ],
-      "last_turn": 45,
+      "last_turn": 49,
       "falsifiers_tested": [
         {
           "id": "t45-critic-update-r2b-vs-r2c",
@@ -1187,9 +1228,16 @@
           "outcome": "UNDETERMINED-NEED-EXTENDED-RUN; routing R2_c-extend-itp; LHY-LOOKS-OK; CONFOUNDER-PARTIAL",
           "tier_before": 0.75,
           "tier_after": 0.7
+        },
+        {
+          "id": "t48-normalization-audit-option-C",
+          "turn": 48,
+          "outcome": "D0_FRAMEWORK_EQUIV_PAPER; T47_152x_FLAG_RESOLVED_AS_WRONG_A_S_INPUT; gap_unchanged_6807x; partial_REFUTE_LANDED",
+          "tier_before": 0.6,
+          "tier_after": 0.4
         }
       ],
-      "next_falsifier_id": "extend-itp-12500-steps-same-grid-r2-from-jld2"
+      "next_falsifier_id": "r4-analytical-ddi-energy-sign-or-dormant-at-0.4"
     },
     "meta-critic-placement-2026-05-17": {
       "id": "meta-critic-placement-2026-05-17",
@@ -1312,5 +1360,5 @@
       "next_stage_action": "researcher Observe stage already triggered this auto-spawn; theorist Hypothesize next"
     }
   },
-  "last_meta_check_turn": 47
+  "last_meta_check_turn": 48
 }
