@@ -1,5 +1,5 @@
 {
-  "turn": 67,
+  "turn": 68,
   "status": "running",
   "history": [
     {
@@ -1768,6 +1768,56 @@
         "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
         "researcher": "5c6277ae5ff274765786dfb8c511b568",
         "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 8020909,
+        "total": 8020909,
+        "effective_full_rate": 1212485,
+        "breakdown": {
+          "input_fresh": 3953,
+          "cache_creation": 282781,
+          "cache_read": 7717514,
+          "output": 16661
+        },
+        "n_messages": 62,
+        "n_message_starts": 62
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.273,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.0,
+        "cost_inflation": 0.695,
+        "novel_claim_zero": 1.0
+      },
+      "drift_escalation": "director_must_address",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "DRIFT_NOVEL_CLAIM_ZERO",
+        "AUDIT_DUE: patterns.yaml last audited at T0, gap=66"
+      ]
+    },
+    {
+      "turn": 67,
+      "ts": "2026-05-18T01:19:30Z",
+      "judge_status": "NOOP_DIRECTOR",
+      "directive_action": "noop",
+      "directive_label": "director-steady-state-noop",
+      "wall_time_sec": null,
+      "agent_hashes": {
+        "critic": "e4cc3ddb505396ed9e55914384944cbd",
+        "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+        "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+        "researcher": "5c6277ae5ff274765786dfb8c511b568",
+        "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
       }
     }
   ],
@@ -1775,7 +1825,7 @@
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "PASS",
+  "last_judge": "NOOP_DIRECTOR",
   "home_branch": "main",
   "schema_version": 2.1,
   "current_agent_hashes": {
@@ -1923,7 +1973,7 @@
       "title": "Yan-Li-Saito 2026 PRL Barnett-droplet reproduction (Tier-3 candidate)",
       "hypothesis": "SpinorBEC.jl scalar + DDI + LHY framework can reproduce torus magnetic-vortex GS + mechanical Larmor precession + chiral bound state at F=1 ε_dd=1.2",
       "flow_template": "verify-claim",
-      "current_stage": "closed",
+      "current_stage": "closed (yan-li-saito-2026-reproduction terminal; current_stage now canonical literal 'closed' — invariant restored; T67+ director picks per seed.md priority order; all anko priority 1-3 investigations canonically closed/dormant; loop steady-state moment continues; T67 may noop OR await anko-prompt OR consider survey-template low-commitment exploration if anko surfaces no new investigation)",
       "stages_done": [
         "Design",
         "Document",
@@ -2284,7 +2334,7 @@
       "closing_note": "Cycle closed cleanly 2026-05-18 T63 at tier 2. Second full §F6 audit-class-scan cycle (first since T50). 10 patterns swept (incl. LP-2 promoted at T54). 0 actionable findings; 0 L3 proposals; 0 mechanical fixes -- steady-state result confirms T50/T51/T54 prior-cycle fixes held over ~12 physics turns. Institutional value: (a) verification that periodic catalog sweep produces a clean baseline; (b) LP-2 first-scan post-promotion held T51 cleanup with 5 false-positive grep hits flagged for future refinement (deferred to ~T72 next cycle or critic_audit per §F6 safety rail); (c) §F6 stage separation (Triage T62 mechanical, Document T63 narrative) demonstrated lower per-turn cost than T54 collapsed pattern; (d) AUDIT_DUE drift advisory cleared for next ~10 turns. Memory entry: audit_class_scan_t61_cycle_2026_05_18.md."
     }
   },
-  "last_meta_check_turn": 65,
+  "last_meta_check_turn": 66,
   "last_short_label": "yan-li-saito-r4-dormant-close-document",
   "last_label": "yan-li-saito-r4-dormant-close-document"
 }
