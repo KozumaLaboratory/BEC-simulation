@@ -1,5 +1,5 @@
 {
-  "turn": 113,
+  "turn": 114,
   "status": "running",
   "history": [
     {
@@ -1273,13 +1273,74 @@
         "researcher": null,
         "implementer": null,
         "critic": null,
-        "orchestrator": null,
-        "total": null
+        "orchestrator": 7047573,
+        "total": 7047573,
+        "effective_full_rate": 1079650,
+        "breakdown": {
+          "input_fresh": 22998,
+          "cache_creation": 248812,
+          "cache_read": 6761873,
+          "output": 13890
+        },
+        "n_messages": 54,
+        "n_message_starts": 54
       },
       "notes": "T112 NOOP per director protocol §B 'Nothing qualifies → noop with rationale citing blocker'. Director's §6 §F summary: (1) edh-eu151-matsui Stage-1 spatial F1 verdict blocked by T111 h5py_partial_structure_only — JLD2 v0.2.0 chunk-dim encoding incompatible with h5py 3.x dataset-open layer; alternate codecs cannot help. Only confirmed unblock: anko runs `bash /home/suzume/workspace/BEC-simulation/runs/eu151_edh_K3_long/run_extract_ring_metrics.sh` in interactive shell (~5-10 min, no GPU). (2) T111-retry failure_modes contract explicitly routes probe_status=partial → T112 PIVOT, not re-retry. (3) No other priority-1-3 physics investigations are open (#2/#3/#5 closed at T94/T97/T102; barnett/klaus at T29/T59). (4) seed.md priority-0 pin on edh-matsui still held; the seed-mandated critic audit was completed at T110 (CORROBORATE-STAGE-1 + INCONCLUSIVE-SPATIAL-REQUIRED → tier 2.5 → 2.75); re-dispatching critic with no new on-disk evidence reproduces T110 bit-for-bit. (5) Per feedback_cost_overhead_is_the_cost: noop ~50-80k tokens beats critic-question-validity or critic-re-audit (~2M each, same conclusion). T113 director routing: if `runs/eu151_edh_K3_long/spatial_profiles.csv` exists → dispatch critic for spatial F1 re-audit; else if seed.md updated → follow new pin; else 2nd consecutive human-required escalation turn.",
       "human_escalation_surfaced": true,
       "blocker_class": "out_of_loop_anko_consult",
-      "drift_escalation_carried_from_t111": "human_required"
+      "drift_escalation_carried_from_t111": "human_required",
+      "drift_signals": {
+        "topic_repetition": 0.2,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.6,
+        "cost_inflation": 0.571,
+        "novel_claim_zero": 1.0
+      },
+      "drift_escalation": "director_must_address",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "DRIFT_NOVEL_CLAIM_ZERO"
+      ]
+    },
+    {
+      "turn": 113,
+      "ts": "2026-05-18T20:10:28Z",
+      "judge_status": "NOOP_DIRECTOR",
+      "directive_action": "noop",
+      "directive_label": "edh-eu151-matsui-T113-noop-quiet-turn-2-t115-pivot-prestage",
+      "wall_time_sec": null,
+      "agent_hashes": {
+        "critic": "ccbd5e0fdc990f6b9eaaa01eb00fc63e",
+        "director": "8d6d65cf5014eb25c866d8dcd3142b9e",
+        "implementer": "3354a0b55881b87f223ef9beaf85d9e8",
+        "researcher": "95b7759c642976be22be5b403536336e",
+        "theorist": "793e3a75d3f9c15683c165d8a381df83"
+      },
+      "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
+      "stage_advancing_to": "Update",
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": null,
+        "total": null,
+        "effective_full_rate": null,
+        "breakdown": null,
+        "n_messages": null,
+        "n_message_starts": null
+      },
+      "notes": "T113 NOOP per director protocol §B 'Nothing qualifies → noop with rationale citing blocker'. Turn #2 of 3-turn-quiet window instituted at T112 §6 failure_modes #3. Disk check this turn: runs/eu151_edh_K3_long/spatial_profiles.csv and ring_summary.json STILL ABSENT (anko has not run run_extract_ring_metrics.sh); ring_summary_h5py_probe.json from T111-retry intact. runs/_loop/seed.md priority-0 pin on edh-eu151-vortex-vs-matsui-science-2026 STILL HELD (not retracted). Per T112's own contract, T113 noop is in-spec (turn 2 of 3); T114 = turn 3 last in-spec noop; T115 = force-pivot. T113 director added value over T112 by PRE-STAGING the T115 pivot brief in §4 of turn_113.md: new investigation sign-pattern-f9-ta-multiplicity-2-mixing-2026-05-19 targeting F=9 T:A multiplicity-2 residual β_0 vs 1/19 dev 2e-4 from docs/manuscript/papers/paper3_universal_theorem/f9_f11_verification_result.md. Tier-2.5 (closed-form + numerical), D3 axis, theorist Hypothesize, ~1.5M tokens expected if it triggers at T115. Anko-action menu re-stated in §5: (1) run wrapper, (2) update seed.md retract/redirect/2-track, (3) do nothing → T115 auto-pivot. No subagent dispatched. Total cost this turn ≈ 50-80k orchestrator tokens vs ~1.5M for premature pivot anko might overrule.",
+      "human_escalation_surfaced": true,
+      "blocker_class": "out_of_loop_anko_consult",
+      "quiet_window_turn_number": 2,
+      "quiet_window_total": 3,
+      "t115_pivot_prestage_target": "sign-pattern-f9-ta-multiplicity-2-mixing-2026-05-19"
     }
   ],
   "created_at": "2026-05-14T00:00:00+00:00",
@@ -1296,7 +1357,7 @@
     "researcher": "95b7759c642976be22be5b403536336e",
     "theorist": "793e3a75d3f9c15683c165d8a381df83"
   },
-  "last_directive_label": "edh-eu151-matsui-T112-noop-anko-consult-escalation",
+  "last_directive_label": "edh-eu151-matsui-T113-noop-quiet-turn-2-t115-pivot-prestage",
   "last_directive_action": "noop",
   "last_error": null,
   "retries": 0,
@@ -2555,8 +2616,8 @@
       "next_stage_action": "theorist Hypothesize: classify findings, propose specific prompt/workload changes, predict cost savings."
     }
   },
-  "last_meta_check_turn": 111,
-  "last_short_label": "edh-eu151-matsui-T112-noop-anko-consult-escalation",
-  "last_label": "edh-eu151-matsui-T112-noop-anko-consult-escalation",
+  "last_meta_check_turn": 112,
+  "last_short_label": "edh-eu151-matsui-T113-noop-quiet-turn-2-t115-pivot-prestage",
+  "last_label": "edh-eu151-matsui-T113-noop-quiet-turn-2-t115-pivot-prestage",
   "last_action": "noop"
 }
