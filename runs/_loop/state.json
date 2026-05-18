@@ -1,5 +1,5 @@
 {
-  "turn": 106,
+  "turn": 107,
   "status": "running",
   "history": [
     {
@@ -2500,6 +2500,21 @@
         "researcher": "6635ef673d05e12621da8d38413c3a8b",
         "theorist": "e33d24bdc505b4ec69873b39f5292087"
       }
+    },
+    {
+      "turn": 106,
+      "ts": "2026-05-18T17:45:48Z",
+      "judge_status": "PASS",
+      "directive_action": "modify_code",
+      "directive_label": "audit-class-scan-T106-document-fourth-cycle-close",
+      "wall_time_sec": null,
+      "agent_hashes": {
+        "critic": "ccbd5e0fdc990f6b9eaaa01eb00fc63e",
+        "director": "8d6d65cf5014eb25c866d8dcd3142b9e",
+        "implementer": "3354a0b55881b87f223ef9beaf85d9e8",
+        "researcher": "95b7759c642976be22be5b403536336e",
+        "theorist": "793e3a75d3f9c15683c165d8a381df83"
+      }
     }
   ],
   "created_at": "2026-05-14T00:00:00+00:00",
@@ -2510,11 +2525,11 @@
   "home_branch": "main",
   "schema_version": 2.1,
   "current_agent_hashes": {
-    "critic": "cd44117d23595a18db7b2f6a1fd013e0",
-    "director": "f02c149c8cd6e8ce4d998629f74924b8",
-    "implementer": "d06804d919f6ab7fb0fe2ee1f99bcf5a",
-    "researcher": "6635ef673d05e12621da8d38413c3a8b",
-    "theorist": "e33d24bdc505b4ec69873b39f5292087"
+    "critic": "ccbd5e0fdc990f6b9eaaa01eb00fc63e",
+    "director": "8d6d65cf5014eb25c866d8dcd3142b9e",
+    "implementer": "3354a0b55881b87f223ef9beaf85d9e8",
+    "researcher": "95b7759c642976be22be5b403536336e",
+    "theorist": "793e3a75d3f9c15683c165d8a381df83"
   },
   "last_directive_label": "tdhfb-phase2-tier3-T102-document-with-julia-recompute-caveat-resolve",
   "last_directive_action": "modify_code",
@@ -2588,19 +2603,22 @@
           "id": "c_dd-zero-control",
           "description": "if M2-dominant, c_dd=0 → Δ ≈ +4.82; if M1-active, Δ ≈ -4.6",
           "tested_at_turn": 20,
-          "result": "Δ=-5.985 → M2-dominant REFUTED; M1-active confirmed (DDI is suppressive, not load-bearing — more asymmetric than empirical)"
+          "result": "Δ=-5.985 → M2-dominant REFUTED; M1-active confirmed (DDI is suppressive, not load-bearing — more asymmetric than empirical)",
+          "is_central": true
         },
         {
           "id": "gamma-dr-zero-control",
           "description": "if M1-active, γ_dr=0 should give Δ ≈ 0 (no asymmetry)",
           "tested_at_turn": 27,
-          "result": "COHERENT MECHANISM CONFIRMED at T27 (τ_-Ω=2.84 unchanged from γ_dr=0.02 → γ_dr-independence proven); CORROBORATED at T28 (critic independent Heisenberg+Slichter re-derivation lands on T27 sign); tier 2.5 → 3.0 at T29 Document. 5.5% τ-residual is Bloch-Siegert (not GP mean-field as sim/turn_27 §6 misattributed; per critic/turn_28 §3.4 errata)."
+          "result": "COHERENT MECHANISM CONFIRMED at T27 (τ_-Ω=2.84 unchanged from γ_dr=0.02 → γ_dr-independence proven); CORROBORATED at T28 (critic independent Heisenberg+Slichter re-derivation lands on T27 sign); tier 2.5 → 3.0 at T29 Document. 5.5% τ-residual is Bloch-Siegert (not GP mean-field as sim/turn_27 §6 misattributed; per critic/turn_28 §3.4 errata).",
+          "is_central": false
         },
         {
           "id": "lz-buildup-presence",
           "description": "if M1-active, ⟨L_z⟩ should build up under +Ω stir; if dormant, ⟨L_z⟩ stays ≈ 0",
           "tested_at_turn": null,
-          "result": "INCONCLUSIVE — Lz observable not saved in either run; T20 data gap. Optional post-closure side-quest; not load-bearing for single-particle coherent mechanism which lives in spin space, not orbital space."
+          "result": "INCONCLUSIVE — Lz observable not saved in either run; T20 data gap. Optional post-closure side-quest; not load-bearing for single-particle coherent mechanism which lives in spin space, not orbital space.",
+          "is_central": false
         }
       ],
       "tier_current": 3.0,
@@ -2681,7 +2699,8 @@
           "id": "f1-direct-reproduction",
           "description": "Yan-Li-Saito Fig 1c torus magnetic-vortex GS reproduction at F=1, N=15000, ε_dd=1.2, free space, :scalar LHY",
           "tested_at_turn": 37,
-          "result": "FALSIFIED at T37; T40 5-point seed-basin discriminator: P0/P1/P2/P3 (Gaussian σ sweep 0.5→14) all delocalized confirming theorist E_DDI=0 isotropy derivation; P4 (fl_vortex JLD2, topology preserved to machine eps) ALSO delocalized refuting topology-axis hypothesis. Both (b) and (a2) REFUTED. Open: (a4) framework deep-bug, (a1) LHY χ(ε_dd>1) issue, (c) paper-claim wrong."
+          "result": "FALSIFIED at T37; T40 5-point seed-basin discriminator: P0/P1/P2/P3 (Gaussian σ sweep 0.5→14) all delocalized confirming theorist E_DDI=0 isotropy derivation; P4 (fl_vortex JLD2, topology preserved to machine eps) ALSO delocalized refuting topology-axis hypothesis. Both (b) and (a2) REFUTED. Open: (a4) framework deep-bug, (a1) LHY χ(ε_dd>1) issue, (c) paper-claim wrong.",
+          "is_central": true
         }
       ],
       "last_advanced_turn": 49,
@@ -2757,13 +2776,15 @@
           "id": "pilot-mistake-rate",
           "description": "10-turn pilot with Design-after-critic shows ≥ 2 contract-level mistakes → hypothesis REFUTED",
           "tested_at_turn": null,
-          "result": null
+          "result": null,
+          "is_central": true
         },
         {
           "id": "pilot-cost-overhead",
           "description": "Design-after-critic doubles per-investigation cost (≥ 2× baseline 2M effective) without proportional retry-rate gain → revert",
           "tested_at_turn": null,
-          "result": null
+          "result": null,
+          "is_central": false
         }
       ],
       "tier_current": 0,
@@ -2804,19 +2825,22 @@
           "id": "pilot-Pkg-test-all-pass",
           "description": "Pkg.test() must pass 100% on pilot branch — any test failure → revert",
           "tested_at_turn": null,
-          "result": null
+          "result": null,
+          "is_central": true
         },
         {
           "id": "pilot-existing-yaml-load-clean",
           "description": "all configs in runs/eu151_*/config.yaml must still load (load_config smoke) without error on pilot branch",
           "tested_at_turn": null,
-          "result": null
+          "result": null,
+          "is_central": false
         },
         {
           "id": "pilot-no-physics-drift",
           "description": "ground_state energy + Mz output for runs/eu151_klaus_phi_phys/phi_4.524/ must match pre-rename within float epsilon — physics must not change",
           "tested_at_turn": null,
-          "result": null
+          "result": null,
+          "is_central": false
         }
       ],
       "tier_current": 1,
@@ -2955,13 +2979,15 @@
           "id": "t52-rejudge-three-failed-now-pass",
           "description": "3 T52 criteria originally failed must PASS when re-judged against fixed judge.py",
           "tested_at_turn": 53,
-          "result": "CONFIRMED -- T52 verdict flipped FAIL_OPERATIONAL -> PASS (13/13 criteria pass)"
+          "result": "CONFIRMED -- T52 verdict flipped FAIL_OPERATIONAL -> PASS (13/13 criteria pass)",
+          "is_central": true
         },
         {
           "id": "unittest-prevents-regression",
           "description": "unittest file .claude/scripts/tests/test_judge_in_operator.py prevents future regression",
           "tested_at_turn": 53,
-          "result": "CONFIRMED -- 21 post-fix assertions cover string/boolean/range/edge cases"
+          "result": "CONFIRMED -- 21 post-fix assertions cover string/boolean/range/edge cases",
+          "is_central": false
         }
       ],
       "tier_current": 2,
@@ -3059,13 +3085,15 @@
           "id": "audit-due-cleared",
           "description": "drift_signals.py output must not contain AUDIT_DUE after fix",
           "tested_at_turn": 68,
-          "result": "PASS — drift_signals.py output advisories=[\"DRIFT_MANUSCRIPT_DELTA_ZERO\",\"DRIFT_NOVEL_CLAIM_ZERO\"]; no AUDIT_DUE present"
+          "result": "PASS — drift_signals.py output advisories=[\"DRIFT_MANUSCRIPT_DELTA_ZERO\",\"DRIFT_NOVEL_CLAIM_ZERO\"]; no AUDIT_DUE present",
+          "is_central": true
         },
         {
           "id": "all-entries-have-turn-field",
           "description": "all 5 audit_history entries must have a non-null turn field",
           "tested_at_turn": 68,
-          "result": "PASS — OK_audit_history_turns: [0, 48, 54, 54, 63]"
+          "result": "PASS — OK_audit_history_turns: [0, 48, 54, 54, 63]",
+          "is_central": false
         }
       ],
       "tier_current": 2,
@@ -3151,25 +3179,29 @@
           "id": "F1-ring-appears-correct-timescale",
           "description": "Reproduce Matsui near-zero-B-quench from m=+F FM state; measure t_ring where azimuthally-averaged |ψ_{c=c_flip}|^2 has local minimum at r=0 within ±20% depth + annulus aspect ratio >1.5. CORROBORATE if t_ring ∈ [0.5 τ_EdH^exp, 2.0 τ_EdH^exp]; INCONCLUSIVE if t_ring ∈ [0.2, 5.0] τ_EdH^exp; REFUTED if no ring at any t<10 τ_EdH^exp OR ring in wrong spin component. τ_EdH^exp extracted at T71 from paper PDF (NOT invented).",
           "tested_at_turn": null,
-          "result": null
+          "result": null,
+          "is_central": true
         },
         {
           "id": "F2-vortex-topology-l-matches-AM-conservation",
           "description": "Extract winding number ℓ_sim from ∮ ∇ arg(ψ_{c_flip}) · dℓ / (2π) around ring density minimum. CORROBORATE if |ℓ_sim - ℓ_paper| = 0; INCONCLUSIVE if |Δℓ| = 1; REFUTED if |Δℓ| ≥ 2 OR ℓ_sim = 0 (no quantized circulation). ℓ_paper extracted at T71 from paper PDF.",
           "tested_at_turn": null,
-          "result": null
+          "result": null,
+          "is_central": false
         },
         {
           "id": "F3-ground-state-energy-self-consistency",
           "description": "Pre-quench m=+F FM GS at Matsui's N, a_s, trap ω, c_dd. CORROBORATE if |E^sim/N - E_mf/N| / |E_mf/N| < 0.20 against dipolar GP mean-field E_mf/N ≈ (1/2)∑_iℏω_i + (c_0+36 c_1)⟨n⟩/2 + E_DDI/N. OPERATIONAL_GATE (closes at Tier 0.5) if discrepancy > 100% — wiring/unit-conversion bug, implicit Bug-4 contamination check.",
           "tested_at_turn": null,
-          "result": null
+          "result": null,
+          "is_central": false
         },
         {
           "id": "F4-DDI-zero-control-OPTIONAL",
           "description": "Re-run protocol with c_dd=0. CORROBORATE if no ring forms (DDI is the AM-transfer mechanism); REFUTES_INTERPRETATION (not framework) if ring still forms (mechanism is spin-mixing c_1 or LHY artifact, not DDI). Optional: doubles GPU cost; defer to T74+ if F1+F2+F3 on track.",
           "tested_at_turn": null,
-          "result": null
+          "result": null,
+          "is_central": false
         }
       ],
       "tier_current": 2.5,
@@ -3385,19 +3417,22 @@
           "id": "racah-cg-rederivation",
           "description": "F1: independent Racah CG-table closed-form re-derivation at exact rational arithmetic",
           "tested_at_turn": 93,
-          "result": "CORROBORATE: beta_S^(c_0) and beta_S^(lambda_spin) values match T92 to exact rational"
+          "result": "CORROBORATE: beta_S^(c_0) and beta_S^(lambda_spin) values match T92 to exact rational",
+          "is_central": true
         },
         {
           "id": "lemma1-prefactor-algebra",
           "description": "F2: Lemma 1 prefactor (S(S+1) - 2F(F+1))/(2F(F+1)) well-defined at F=2 (denom = 12, no irrep multiplicity-zero obstruction unlike F=5)",
           "tested_at_turn": 93,
-          "result": "CORROBORATE: F=2 admits A_1 invariant under cyclic-tetrahedral; Lemma 1 applicable"
+          "result": "CORROBORATE: F=2 admits A_1 invariant under cyclic-tetrahedral; Lemma 1 applicable",
+          "is_central": false
         },
         {
           "id": "sum-rule-identity",
           "description": "F3: sum-rule identity sum_S [S(S+1) - 2F(F+1)] beta_S = 2|<F>|^2 = 0 for any <F>=0 polyhedral inert state",
           "tested_at_turn": 93,
-          "result": "CORROBORATE: (1/5)(-12) + (2/7)(-6) + (18/35)(+8) = 0; sum-rule satisfied independently"
+          "result": "CORROBORATE: (1/5)(-12) + (2/7)(-6) + (18/35)(+8) = 0; sum-rule satisfied independently",
+          "is_central": false
         }
       ],
       "errata": [
@@ -3458,43 +3493,50 @@
           "id": "F1-itp_loop-no-merge-branch",
           "description": "src/solvers/ground_state/itp_loop.jl has no merge branch; two _ddi_step!(ws, dt/2, ...) calls per non-final step; tombstone lines 43-63",
           "tested_at_turn": 95,
-          "result": "CONFIRMED structurally"
+          "result": "CONFIRMED structurally",
+          "is_central": true
         },
         {
           "id": "F2-regression-test-canonical",
           "description": "test/solvers/test_itp_ddi_strang_save_every.jl asserts max_dev < 1.0e-10 phase-aligned + energy diff < 1e-10 DDI-on + < 1e-9 DDI-off",
           "tested_at_turn": 95,
-          "result": "CONFIRMED structurally"
+          "result": "CONFIRMED structurally",
+          "is_central": false
         },
         {
           "id": "F3-rtp-analogue-fix",
           "description": "src/solvers/simulation/run_loops.jl has Bug-4 RTP analogue tombstone at lines 116-131; close-and-reopen with _half_potential_step!(ws, dt/2, ...) calls",
           "tested_at_turn": 95,
-          "result": "CONFIRMED structurally"
+          "result": "CONFIRMED structurally",
+          "is_central": false
         },
         {
           "id": "F4-ci-tier-coverage",
           "description": "both test_itp_ddi_strang_save_every.jl and test_rtp_ddi_strang_save_every.jl added to FULL_EXTRA in test/runtests.jl",
           "tested_at_turn": 97,
-          "result": "CONFIRMED: both strings added to FULL_EXTRA at T97 (lines 126-127 of test/runtests.jl)"
+          "result": "CONFIRMED: both strings added to FULL_EXTRA at T97 (lines 126-127 of test/runtests.jl)",
+          "is_central": false
         },
         {
           "id": "F5-julia-regression-test-pass",
           "description": "julia --project=. -e 'using SpinorBEC; include(\"test/solvers/test_itp_ddi_strang_save_every.jl\")' returns 3 Pass + 0 Fail; same for RTP companion",
           "tested_at_turn": 97,
-          "result": "DEFERRED: julia sandbox approval gate blocked direct execution in T97 implementer session; test files confirmed structurally correct (read by T97 implementer); F5 empirical execution deferred to anko manual run or T98 julia session. Tier 2 stamps with F5-deferred memo per T96 §5 permitted-skip clause."
+          "result": "DEFERRED: julia sandbox approval gate blocked direct execution in T97 implementer session; test files confirmed structurally correct (read by T97 implementer); F5 empirical execution deferred to anko manual run or T98 julia session. Tier 2 stamps with F5-deferred memo per T96 §5 permitted-skip clause.",
+          "is_central": false
         },
         {
           "id": "F6-external-convention",
           "description": "Javanainen-Ruostekoski 2004 arXiv:cond-mat/0411154 most-recent-psi convention cited",
           "tested_at_turn": 95,
-          "result": "CONFIRMED partial"
+          "result": "CONFIRMED partial",
+          "is_central": false
         },
         {
           "id": "C4-audit-bug4-md-addendum",
           "description": "docs/archive/AUDIT_BUG4.md has 2026-05-18 addendum noting the RTP fix was applied (preserving original archival text)",
           "tested_at_turn": 97,
-          "result": "CONFIRMED: addendum appended at T97 (after 'Memory note' section); original archival text lines 86-92 preserved"
+          "result": "CONFIRMED: addendum appended at T97 (after 'Memory note' section); original archival text lines 86-92 preserved",
+          "is_central": false
         }
       ],
       "tier_current": 2.0,
@@ -3552,7 +3594,8 @@
             100,
             102
           ],
-          "result": "CONFIRMED at c_0=1.0 T100 (rel_err=7.86e-6) + CONFIRMED at c_0=2.0 T102 (rel_err=3.93e-6)"
+          "result": "CONFIRMED at c_0=1.0 T100 (rel_err=7.86e-6) + CONFIRMED at c_0=2.0 T102 (rel_err=3.93e-6)",
+          "is_central": true
         },
         {
           "id": "F2-fm-phonon-sound-velocity",
@@ -3561,7 +3604,8 @@
             100,
             102
           ],
-          "result": "CONFIRMED at c_0=1.0,c_1=-0.1 T100 (rel_err=8.74e-6) + CONFIRMED at c_0=0.5,c_1=-0.2 T102 (rel_err=2.62e-5)"
+          "result": "CONFIRMED at c_0=1.0,c_1=-0.1 T100 (rel_err=8.74e-6) + CONFIRMED at c_0=0.5,c_1=-0.2 T102 (rel_err=2.62e-5)",
+          "is_central": false
         },
         {
           "id": "F3-bdg-vs-gp-factor-2-ratio",
@@ -3570,7 +3614,8 @@
             100,
             102
           ],
-          "result": "CONFIRMED parameter-independent: T100 c_0=1.0 (abs_err=1.33e-15) + T102 c_0=2.0 (abs_err=8.88e-16)"
+          "result": "CONFIRMED parameter-independent: T100 c_0=1.0 (abs_err=1.33e-15) + T102 c_0=2.0 (abs_err=8.88e-16)",
+          "is_central": false
         }
       ],
       "tier_current": 3.0,
@@ -3645,12 +3690,13 @@
       "id": "audit-class-scan-2026-05-19-T103",
       "title": "Audit-class-scan T103 cycle -- periodic anti-pattern catalog sweep (F6 level-2, 4th cycle, includes L3 REJECT)",
       "flow_template": "audit-class-scan",
-      "current_stage": "Triage",
+      "current_stage": "closed",
       "stages_done": [
         "Observe",
         "Findings",
         "Triage (L3-audit-half)",
-        "Triage (mechanical-bookkeeping-half)"
+        "Triage (mechanical-bookkeeping-half)",
+        "Document"
       ],
       "stages_at_turn": {
         "Observe": [
@@ -3668,12 +3714,16 @@
         "Triage_mechanical": [
           105,
           "implementer_text applied 10 patterns.yaml last_scanned/last_count updates + appended rejected_classes entry with T104 critic verbatim rejection_reason + appended audit_history row turn:105 + registered this investigation in state.json + flipped active_investigation_id from stale edh-eu151 to audit-class-scan-2026-05-19-T103 + closed older siblings in 2 duplicate-meta pairs"
+        ],
+        "Document": [
+          106,
+          "implementer_text created memory/audit_class_scan_t103_cycle_2026_05_19.md and flipped current_stage to closed; AUDIT_DUE drift advisory remains cleared since T105; next cycle scheduled ~T113-T115"
         ]
       },
-      "tier_current": 1.5,
+      "tier_current": 2,
       "tier_target": 2,
-      "next_stage": "Document",
-      "next_stage_action": "T106 implementer_text Document stage: memory entry audit_class_scan_t103_cycle_2026_05_19.md (1-page summary including L3 REJECT verdict + reasoning + duplicate-pair cleanup) + state.json patch current_stage=closed + tier_current=2.0",
+      "next_stage": null,
+      "next_stage_action": null,
       "blocked_on": null,
       "priority": 20,
       "kind": "physics",
@@ -3689,10 +3739,14 @@
         "duplicate_meta_pairs_folded_into_triage": 2,
         "steady_state_vs_t87": true
       },
-      "hypothesis": "Periodic anti-pattern scan, fourth invocation. Auto-spawned by AUDIT_DUE drift advisory at T102 (gap=14, director_must_address); closing after Triage and Document."
+      "hypothesis": "Periodic anti-pattern scan, fourth invocation. Auto-spawned by AUDIT_DUE drift advisory at T102 (gap=14, director_must_address); closing after Triage and Document.",
+      "closing_note": "Cycle closed cleanly 2026-05-19 T106 at tier 2. Fourth full para-F6 audit-class-scan cycle (after T50, T61, T87). 10 patterns swept; 0 actionable findings (THIRD CONSECUTIVE steady-state result); 1 L3 proposal (auto-spawn-duplicate-guard-missing) REJECTED at T104 critic Q3+Q4 FAIL (first-ever L3 REJECT in para-F6 history; entry now in patterns.yaml rejected_classes); 2 duplicate-meta pairs cleaned at T105 (first-ever duplicate-pair batch close in para-F6 history; meta-director-self-audit-2026-05-18 + meta-cost-inflation-2026-05-18 closed as superseded; 2026-05-19 newer instances remain at Observe for T107+ meta-interleave). Institutional value: (a) first 4-data-point validation of para-F6 cadence (T50 -> T61 -> T87 -> T103, ~10-turn cadence holding); (b) hardcoded-magic-number count STABLE at 126 across all 3 measured cycles (low-debt equilibrium confirmed over ~50 physics turns); (c) LP-2 grep refinement deferred for 3rd cycle (next opportunity: critic_audit side-dispatch or T113-T115 cycle); (d) drift_signals.py idempotency root cause visible as deferred fix-bug routing decision (T107+ or anko-routing); (e) Triage stage successfully split into critic-half + mechanical-half precedent for L3-candidate-containing cycles. AUDIT_DUE drift advisory cleared since T105 turn:105 audit_history row; next cycle ~T113-T115. Memory entry: `audit_class_scan_t103_cycle_2026_05_19.md`.",
+      "last_turn": 106,
+      "last_stage": "Document",
+      "last_verdict": "AUDIT_CLASS_SCAN_T103_TIER_2_CLOSURE_PASS"
     }
   },
   "last_meta_check_turn": 104,
-  "last_short_label": "tdhfb-tier3-closure",
-  "last_label": "tdhfb-phase2-tier3-T102-document-with-julia-recompute-caveat-resolve"
+  "last_short_label": "audit-class-scan-T106-document-fourth-cycle-close",
+  "last_label": "audit-class-scan-T106-document-fourth-cycle-close"
 }
