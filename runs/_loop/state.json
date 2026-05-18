@@ -1,5 +1,5 @@
 {
-  "turn": 110,
+  "turn": 111,
   "status": "running",
   "history": [
     {
@@ -1031,10 +1031,69 @@
     {
       "turn": 109,
       "ts": "2026-05-18T18:57:39Z",
-      "judge_status": "RESEARCHER_ONLY",
+      "judge_status": "FAIL_OPERATIONAL",
       "directive_action": "researcher_deep",
       "directive_label": "edh-eu151-matsui-T109-research-ring-detection-methodology-deep-pdf-second-pass",
       "wall_time_sec": 791,
+      "agent_hashes": {
+        "critic": "ccbd5e0fdc990f6b9eaaa01eb00fc63e",
+        "director": "8d6d65cf5014eb25c866d8dcd3142b9e",
+        "implementer": "3354a0b55881b87f223ef9beaf85d9e8",
+        "researcher": "95b7759c642976be22be5b403536336e",
+        "theorist": "793e3a75d3f9c15683c165d8a381df83"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 13171934,
+        "total": 13171934,
+        "effective_full_rate": 1981510,
+        "breakdown": {
+          "input_fresh": 41649,
+          "cache_creation": 443212,
+          "cache_read": 12663167,
+          "output": 23906
+        },
+        "n_messages": 92,
+        "n_message_starts": 92
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.19,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.2,
+        "cost_inflation": 1.047,
+        "novel_claim_zero": 1.0
+      },
+      "drift_escalation": "human_required",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "DRIFT_COST_INFLATION",
+        "DRIFT_NOVEL_CLAIM_ZERO"
+      ],
+      "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
+      "stage_advancing_to": "Research",
+      "cost_audit": {
+        "expected_cost_eff": 3500000,
+        "actual_cost_eff": 1981510,
+        "ratio_actual_over_expected": 0.57,
+        "deviation_pct": -43.4,
+        "flag": "BUDGET_OK"
+      }
+    },
+    {
+      "turn": 110,
+      "ts": "2026-05-18T19:17:16Z",
+      "judge_status": "CRITIC_INCONCLUSIVE",
+      "directive_action": "critic_audit",
+      "directive_label": "edh-eu151-matsui-T110-update-critic-apply-refined-f1-criterion-from-t109-research",
+      "wall_time_sec": null,
       "agent_hashes": {
         "critic": "ccbd5e0fdc990f6b9eaaa01eb00fc63e",
         "director": "8d6d65cf5014eb25c866d8dcd3142b9e",
@@ -1048,7 +1107,7 @@
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "RESEARCHER_ONLY",
+  "last_judge": "CRITIC_INCONCLUSIVE",
   "home_branch": "main",
   "schema_version": 2.1,
   "current_agent_hashes": {
@@ -1058,8 +1117,8 @@
     "researcher": "95b7759c642976be22be5b403536336e",
     "theorist": "793e3a75d3f9c15683c165d8a381df83"
   },
-  "last_directive_label": "tdhfb-phase2-tier3-T102-document-with-julia-recompute-caveat-resolve",
-  "last_directive_action": "modify_code",
+  "last_directive_label": "edh-eu151-matsui-T110-update-critic-apply-refined-f1-criterion-from-t109-research",
+  "last_directive_action": "critic_audit",
   "last_error": null,
   "retries": 0,
   "active_investigation_id": "audit-class-scan-2026-05-19-T103",
@@ -2273,7 +2332,7 @@
       "last_verdict": "AUDIT_CLASS_SCAN_T103_TIER_2_CLOSURE_PASS"
     }
   },
-  "last_meta_check_turn": 108,
+  "last_meta_check_turn": 109,
   "last_short_label": "audit-class-scan-T106-document-fourth-cycle-close",
   "last_label": "audit-class-scan-T106-document-fourth-cycle-close",
   "last_action": "researcher_deep"
