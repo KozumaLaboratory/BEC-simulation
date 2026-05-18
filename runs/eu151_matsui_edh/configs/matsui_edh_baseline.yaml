@@ -1,0 +1,167 @@
+# Matsui 2026 EdH Eu-151 reproduction — baseline Case A (isotropic trap, ω = 2π·100 Hz)
+#
+# Investigation: edh-eu151-vortex-vs-matsui-science-2026 (Tier-3 cross-validation)
+# Director: T73 (Design stage); Theorist source: runs/_loop/theorist/turn_72.md §8.2
+# Reference: Matsui et al., Science 391, 384–388 (2026) [DOI:10.1126/science.adx2872]
+#
+# Falsifiers:
+#   F1 (ring formation timescale): t_ring ∈ [2.5, 10] ms → CORROBORATE
+#   F2 (vortex winding |ℓ|=1): from ∮ ∇ arg(ψ_{c=12}) · dℓ / (2π)
+#   F3 (GS energy self-consistency): |E^sim/N - E_mf/N| / |E_mf/N| < 0.20
+#   F4 (DDI zero-control): optional, defer to T75+ if F1+F2+F3 on track
+#
+# Source parameters (T71 extraction + Miyazawa 2022 + Li-Saito 2024 bracket):
+#   N = 3e4 (central; bracket [1e4, 5e4] from Miyazawa 2022 platform inheritance)
+#   a_s = 110 a_B (CLAUDE.md §Eu151 canonical)
+#   B_initial = 1.0 μT = 0.01 Gauss (FM-stabilising during GS prep; matches eu151_edh)
+#   B_f = 2.6 nT = 2.6e-5 Gauss (T71 §2 row T4 EXTRACTED from paper)
+#   τ_EdH^exp = 5 ms (T71 §2 row T5 EXTRACTED)
+#   Trap: Case A isotropic ω = 2π·100 Hz (conservative fallback; cleaner mean-field)
+#   ω_ref = 2π·100 Hz = 628.3 rad/s (matches isotropic trap; cleaner mean-field per T72 §5.3)
+#   m_F initial = -6 → SpinorBEC.jl m_minus_F / init_m_idx = 13 (T72 §6.1 m_F→c table)
+#
+# Case A dimensionless time conversions (ω_ref = 628.3 rad/s):
+#   τ_EdH^exp = 5 ms → 3.14 dimless
+#   F1 CORROBORATE band: t_ring ∈ [1.57, 6.28] dimless
+#   simulation duration = 10 ms → 6.28 dimless (2× τ_EdH^exp)
+#   B quench to Bz = 2.6e-5 Gauss; p_dimless = g_F·μ_B·B_f / (ℏ·ω_ref) = 0.4232 (T72 §2.3)
+#   NOTE: T71 §4 reported p_dimless ~ 0.04 (factor-10 arithmetic error, corrected in T72 §2.3)
+#
+# Case B alternative (anisotropic Li-Saito bracket, NOT generated this turn):
+#   ω_ref = 2π·965.5 Hz = 6066.6 rad/s (geometric mean of [100, 1500, 6000] Hz)
+#   potential.omega = [0.1036, 1.554, 6.214] (ω_{x,y,z}/ω̄)
+#   grid.box = [12.0, 1.5, 0.4] (anisotropic cloud aspect ratio per T72 §3.2)
+#   B_f p_dimless = 0.0438 (T72 §2.3, at ω_ref = 6066.6 rad/s)
+#   Deferred: run Case A first; Case B if F1 REFUTED or INCONCLUSIVE.
+#
+# Critical pitfalls honored (T72 §8.4):
+#   [P1] initial_state: m_minus_F  (Matsui m_F=-6, SpinorBEC.jl c=13; NOT m_plus_F, NOT init_m_idx: 1)
+#   [P2] omega_ref: 628.3 consistent with potential.omega: [1.0, 1.0, 1.0] (isotropic Case A)
+#   [P3] B_f = 2.6e-5 Gauss = 2.6 nT → p_dimless = 0.4232 at ω_ref = 2π·100 Hz
+#   [P4] kind: spinor (NOT rotating_basis; Matsui is lab-frame near-zero-B quench)
+#   [P5] ddi.secular: false (non-secular regime; ω_L/ω_DDI = 0.15 per T72 §3.4)
+#
+# Bug-4 ITP note: post-2026-05-02 main branch uses corrected _run_itp_loop! (full DDI dt per
+#   substep, not half-rate). No special config flag needed; T74 precondition_check should verify.
+#
+# Save strategy:
+#   save_psi_snapshots: true streams full ψ[x,y,z,c] at every save step, enabling:
+#     - Ring detection in |ψ[...,12]|² (m=-5) and |ψ[...,13]|² (m=-6), |ψ[...,11]|² (m=-4)
+#     - Winding extraction ℓ from ∮ ∇ arg(ψ[...,12]) · dℓ / (2π)
+#   save_every: 50 → ~12 frames over 628 steps (10 ms physical at Case A; 0.8 ms between saves)
+#   Fz_total, norm, populations, energy saved automatically in SimulationResult
+#
+# Two-step pipeline:
+#   Step 1: Ground state at m_F = -6 FM-polarised (template ground_state_eu151_basic.yaml + 9 deltas)
+#   Step 2: B-quench dynamics from 1.0 μT to 2.6 nT (written from scratch; future
+#            candidate for runs/_loop/templates/dynamics_zero_field_quench.yaml template)
+
+defaults:
+  kind:         spinor                  # [P4] standard split-step, NOT rotating_basis
+  backend:      gpu
+  interactions: {N_atoms: 30000, omega_ref: 628.3}  # [P2] seed N + ω_ref for every step
+
+pipeline:
+  # ───────────────────────────────────────────────────────────────────
+  # Step 1: Ground state at m_F = -6 FM-polarised
+  #   Template base: runs/_loop/templates/ground_state_eu151_basic.yaml
+  #   9 deltas from T72 §8.2 applied:
+  #     N_atoms: 10000 → 30000
+  #     omega_ref: 691.15 → 628.3 (= 2π·100 Hz, Case A)
+  #     potential.omega: [1.0,1.0,1.0] → [1.0,1.0,1.0] (unchanged; isotropic Case A)
+  #     init_m_idx: 1 → initial_state: m_minus_F (Matsui m_F=-6; [P1])
+  #     B.Bz: 0.0 → "0.01 Gauss" (= 1.0 μT FM-stabilising; matches eu151_edh precedent)
+  #     grid.n: [32,32,32] (unchanged; fast preview; use [64,64,64] for production F3 eval)
+  #     grid.box: [12.0,12.0,12.0] (unchanged; enclosing TF radius R_TF ≈ 4.11 μm at Case A)
+  #     ddi.enabled: true (unchanged)
+  #     lhy.kind: scalar (unchanged; FM stretched state → scalar LHY is appropriate)
+  #   Also adding: ddi.secular: false [P5]; c1_ratio: -0.005 (placeholder per T72 §8.2)
+  # ───────────────────────────────────────────────────────────────────
+  - ground_state:
+      atom: Eu151
+      grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}  # [P2] isotropic Case A; ω_x=ω_y=ω_z=ω_ref
+      interactions:
+        N_atoms: 30000
+        omega_ref: 628.3                 # [P2] 2π·100 Hz (Case A); matches potential.omega=[1,1,1]
+        c1_ratio: -0.005                 # placeholder; 7 unknown Eu151 channels (NOT_EXTRACTABLE)
+                                         # T72 §Anomaly-D: sensitivity sweep {-0.001,-0.005,-0.02} deferred to T75
+      ddi:
+        enabled: true
+        secular: false                   # [P5] non-secular regime (ω_L/ω_DDI = 0.15 per T72 §3.4)
+      lhy: {kind: scalar}                # FM stretched state; scalar LHY appropriate
+      B:
+        Bz: "0.01 Gauss"                 # 1.0 μT FM-stabilising field during ITP (matches eu151_edh precedent)
+        theta: 0.0                       # quantisation axis +z (Matsui polarisation convention)
+        phi: 0.0
+      gauge_fix: false
+      initial_state: m_minus_F           # [P1] Matsui m_F=-6 = SpinorBEC.jl c=13 (T72 §6.1 m_F→c table)
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 1500                      # fast preview; increase to 50000+ for converged production GS
+      tol: 1.0e-9
+
+  # ───────────────────────────────────────────────────────────────────
+  # Step 2: B-quench dynamics (Matsui EdH protocol)
+  #   Written from scratch (T72 §8.1 recommendation: dynamics_klaus_stir.yaml NOT a fit).
+  #   Future template candidate: runs/_loop/templates/dynamics_zero_field_quench.yaml
+  #
+  #   Schema verification (T73 §2):
+  #   - 'kind' is set via defaults above (spinor) [P4]
+  #   - 'duration' and 'dt' are required top-level keys per dynamics.md
+  #   - 'save: {every: N}' is canonical (dynamics.md "save_every" / existing eu151_edh configs)
+  #   - 'save_psi_snapshots: true' is the canonical key for streaming full ψ snapshots
+  #   - B-field uses Gauss strings / numeric Gauss for ramp dicts (canonical from eu151_edh)
+  #   - 'ddi.secular: false' placed under dynamics ddi override block [P5]
+  #   - No 'integrator:' key needed; split_step is default for kind: spinor
+  #   - No 'save.path:' key (run_yaml determines output path from config location)
+  #
+  #   Case A timings at ω_ref = 628.3 rad/s:
+  #     duration = 6.28 dimless = 10 ms physical (2× τ_EdH^exp = 5 ms)
+  #     dt = 0.01 dimless = 15.9 μs physical (verify CFL at T74 dry-run)
+  #     save_every = 50 → 628/50 = 12 saves, 0.8 ms physical cadence
+  #
+  #   B-quench protocol (T71 §2 row T4 + T72 §8.2 sketch):
+  #     from: 0.01 Gauss (= 1.0 μT FM-stabilising; matches Step 1 GS condition)
+  #     to:   2.6e-5 Gauss (= 2.6 nT; T71 §2 row T4 EXTRACTED from paper)
+  #     duration: 0.0 → step quench (ramp time NOT_EXTRACTABLE from paper; worst-case assumption)
+  #     NOTE: step quench approximated as a near-instantaneous ramp (duration = 0.0 dimless).
+  #       If solver requires finite ramp, use: {from: 0.01, to: 2.6e-5, duration: 0.001}
+  #       as a 1.6 μs physical ramp (< 1% of τ_EdH^exp). T74 can test both.
+  #
+  #   Observable manifest (T72 §8.3, all 12 entries):
+  #     save_psi_snapshots: true provides:
+  #       [1] |ψ_{c=12}|² (m=-5 ring density; F1 detection)
+  #       [2] arg(ψ_{c=12}) (m=-5 phase; F2 winding extraction)
+  #       [3] |ψ_{c=13}|² (m=-6 initial-state depletion; sanity)
+  #       [4] |ψ_{c=11}|² (m=-4 multi-flip density; mechanism check)
+  #     saved automatically in SimulationResult:
+  #       [5] populations_m(t) — 13-component magnetization history (per_m_history)
+  #       [6] Lz_total(t) — orbital AM (available if Lz tracking enabled; see note below)
+  #       [7] Lz_per_component(t) — per-component Lz (post-hoc from psi snapshots)
+  #       [8] Fz_total(t) — spin AM (SimulationResult.magnetizations)
+  #       [9] norm(t) — ∫|ψ|² (unitary check; SimulationResult.norms)
+  #       [10] energy(t) — total E (SimulationResult.energies)
+  #       [11] trap_geometry — ω_x,ω_y,ω_z recorded from config above
+  #       [12] B_field_history — Bz(t) step-quench waveform recorded from B block below
+  #     NOTE on Lz_total(t): SpinorBEC.jl standard spinor dynamics records Fz, norm, energy
+  #       automatically. Lz_total is computable post-hoc from psi snapshots (T72 §8.3 note).
+  #       Full Lz real-time tracking requires the rotating_basis path or a post-hoc pass.
+  #       T75 Analyze step will compute Lz_per_component from saved psi snapshots.
+  # ───────────────────────────────────────────────────────────────────
+  - dynamics:
+      duration: 6.28                     # = 10 ms physical at ω_ref = 2π·100 Hz; 2× τ_EdH^exp
+      dt: 0.01                           # = 15.9 μs physical; verify CFL at T74; refine if needed
+      B:
+        Bz: {from: 0.01, to: 2.6e-5, duration: 0.0}  # step quench: 1.0 μT → 2.6 nT (Gauss)
+                                         # NOTE: if solver rejects duration: 0.0, use duration: 0.001
+        theta: 0.0                       # quantisation axis +z throughout
+        phi: 0.0
+      ddi:
+        secular: false                   # [P5] explicit non-secular; ω_L/ω_DDI = 0.15 (T72 §3.4)
+      seed_amplitude: 1.0e-6             # symmetry-breaking seed for ring nucleation
+      seed_k_cut: 2.5                    # concentrate seed in long-wavelength EdH unstable band
+      save:
+        every: 50                        # 12 saves over 628 steps (0.8 ms physical cadence)
+      save_psi_snapshots: true           # stream full ψ[x,y,z,c] for ring detection (F1) + winding (F2)
+      save_snapshot_precision: "f32"     # downcast to f32 for storage (~14 MB per frame at 32³×13)
