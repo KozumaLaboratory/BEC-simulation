@@ -1,5 +1,5 @@
 {
-  "turn": 95,
+  "turn": 96,
   "status": "running",
   "history": [
     {
@@ -998,7 +998,7 @@
         "F1_verdict": "REFUTED",
         "F1_ring_detected": false,
         "F2_verdict": "not_applicable",
-        "norm_drift_max": 8.41e-13,
+        "norm_drift_max": 8.41E-13,
         "mz_drift_max": 0.0014,
         "siblings_typos_fixed": 2,
         "falsification_result": "MIXED"
@@ -1958,6 +1958,56 @@
         "implementer": "d06804d919f6ab7fb0fe2ee1f99bcf5a",
         "researcher": "6635ef673d05e12621da8d38413c3a8b",
         "theorist": "e33d24bdc505b4ec69873b39f5292087"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 13036181,
+        "total": 13036181,
+        "effective_full_rate": 1872063,
+        "breakdown": {
+          "input_fresh": 2692,
+          "cache_creation": 385851,
+          "cache_read": 12622680,
+          "output": 24958
+        },
+        "n_messages": 98,
+        "n_message_starts": 98
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.462,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.2,
+        "cost_inflation": 1.122,
+        "novel_claim_zero": 1.0
+      },
+      "drift_escalation": "human_required",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "DRIFT_COST_INFLATION",
+        "DRIFT_NOVEL_CLAIM_ZERO"
+      ]
+    },
+    {
+      "turn": 95,
+      "ts": "2026-05-18T11:51:17Z",
+      "judge_status": "RESEARCHER_ONLY",
+      "directive_action": "researcher_shallow",
+      "directive_label": "bug-4-itp-ddi-revalidation-T95-research-shallow",
+      "wall_time_sec": 352,
+      "agent_hashes": {
+        "critic": "cd44117d23595a18db7b2f6a1fd013e0",
+        "director": "f02c149c8cd6e8ce4d998629f74924b8",
+        "implementer": "d06804d919f6ab7fb0fe2ee1f99bcf5a",
+        "researcher": "6635ef673d05e12621da8d38413c3a8b",
+        "theorist": "e33d24bdc505b4ec69873b39f5292087"
       }
     }
   ],
@@ -1965,7 +2015,7 @@
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "PASS",
+  "last_judge": "RESEARCHER_ONLY",
   "home_branch": "main",
   "schema_version": 2.1,
   "current_agent_hashes": {
@@ -2805,10 +2855,10 @@
       "flow_template": "verify-claim",
       "current_stage": "closed",
       "stages_done": [
-        "Research",
+        "Document",
         "Hypothesize",
-        "Update",
-        "Document"
+        "Research",
+        "Update"
       ],
       "stages_at_turn": {
         "Research": [
@@ -2872,7 +2922,7 @@
       "closing_note": "Tier 3.0 terminal closure 2026-05-18 T94. 4th project Tier-3 trajectory (after barnett T29, klaus-bch T59, edh-matsui T86); 2nd manuscript-anchored (paper3 v3 Lemma 1 General-S extended to F={2,3,4,6,8,10}). 4 turns T91-T94, ~5.3M effective."
     }
   },
-  "last_meta_check_turn": 93,
+  "last_meta_check_turn": 94,
   "last_short_label": "sign-pattern-lemma1-tier3-T91-research",
   "last_label": "sign-pattern-lemma1-tier3-T91-research-extract-ku2012-sku2013-f2-tables"
 }
