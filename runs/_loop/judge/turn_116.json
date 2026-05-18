@@ -1,0 +1,335 @@
+{
+  "turn": 116,
+  "status": "FAIL_OPERATIONAL",
+  "issues": [
+    "check_cmd FAIL: exit_code=1 != expected 0; stdout missing 'sign_pattern_lemma1_mult_aware'",
+    "check_cmd FAIL: exit_code=1 != expected 0; stdout missing 'sign_pattern_lemma1_mult_aware'"
+  ],
+  "metrics": {
+    "experiment_kind": "modify_text",
+    "workload_class": "implementer_text",
+    "investigation_id": "sign-pattern-f9-ta-multiplicity-2-mixing-2026-05-19",
+    "stage_advancing_to": "Update",
+    "subagent_type": "implementer",
+    "tests_passed": null,
+    "warnings": [
+      "Precondition anchor `canonical_mult_aware_beta_S` not present on main-branch HEAD (lives on T115 auto-branch only); not blocking \u2014 T116 is text-only and cites the function name + SHA `a323222` in \u00a7V.8 anchors. See \u00a77 issue 1.",
+      "SC9/SC10 (memory file in /home/suzume/workspace/BEC-simulation/memory) FAIL because the project's `memory/` directory does not exist on disk; the memory store is the user-local `~/.claude/projects/-home-suzume-workspace-BEC-simulation/memory/` path. Memory entry IS written at the correct on-disk location per existing project convention (same convention as T94 entry `F=2_cyclic-tetrahedral_A_1_Tier-3_closure`). Symlink creation was sandbox-blocked. See \u00a77 issue 2."
+    ],
+    "physical_red_flags": [],
+    "tokens_used": null,
+    "edh_matsui_glob_check_result": "ABSENT",
+    "state_json_investigation_registered": true,
+    "state_json_investigations_index_appended": true,
+    "state_json_central_falsifier_marked": true,
+    "state_json_investigations_count_before": 24,
+    "state_json_investigations_count_after": 25,
+    "state_json_investigations_index_count_before": 14,
+    "state_json_investigations_index_count_after": 15,
+    "state_json_trailing_keys_preserved": [
+      "last_meta_check_turn=115",
+      "last_short_label=sign-pattern-f9-ta-mult2-T115a2-test-candidate-i",
+      "last_label=sign-pattern-f9-ta-mult2-T115a2-test-candidate-i",
+      "last_action=modify_code",
+      "last_judge_turn=115"
+    ],
+    "manuscript_section_v_present_with_mrep_prefactor_formula": true,
+    "manuscript_section_v_canonical_formula_tr_pi_rho_inv_present": true,
+    "manuscript_section_v_f9_ta_verification_mentioned": true,
+    "manuscript_section_v_universal_endpoint_cited": true,
+    "manuscript_section_v_added_lines": 164,
+    "manuscript_section_v_subsections": [
+      "V.1 Setup",
+      "V.2 Canonical mult-aware formula",
+      "V.3 Universal endpoint 1/(2F+1) preserved",
+      "V.4 m_rep=1 reduction (strict generalization)",
+      "V.5 Sum rule",
+      "V.6 Verification at F=9 T (m_rep=2)",
+      "V.7 Open extensions",
+      "V.8 Source anchors"
+    ],
+    "memory_entry_file_written": true,
+    "memory_entry_path": "/home/suzume/.claude/projects/-home-suzume-workspace-BEC-simulation/memory/sign_pattern_lemma1_mult_aware_2026_05_19.md",
+    "memory_entry_section_count": 7,
+    "memory_entry_line_count": 75,
+    "memory_md_one_line_entry_added": true,
+    "memory_md_new_line_char_count": 478,
+    "no_src_modification": true,
+    "no_test_modification": true,
+    "no_scripts_modification": true,
+    "no_julia_executed": true,
+    "commit_branch_auto_turn_116": "auto/turn_116_sign-pattern-f9-ta-mult2-T116-update-manuscript",
+    "commit_sha": "f081603",
+    "commit_parent_sha": "c3e3d1f",
+    "success_criteria_results": [
+      {
+        "id": "state-json-investigation-key-registered",
+        "exit_code": 0,
+        "verdict": "PASS"
+      },
+      {
+        "id": "state-json-investigations-dict-has-new-entry",
+        "exit_code": 0,
+        "verdict": "PASS"
+      },
+      {
+        "id": "state-json-investigations-index-appended",
+        "exit_code": 0,
+        "verdict": "PASS"
+      },
+      {
+        "id": "state-json-central-falsifier-marked",
+        "exit_code": 0,
+        "verdict": "PASS"
+      },
+      {
+        "id": "manuscript-mrep-prefactor-formula-present",
+        "exit_code": 0,
+        "verdict": "PASS"
+      },
+      {
+        "id": "manuscript-canonical-formula-tr-pi-rho-inv-present",
+        "exit_code": 0,
+        "verdict": "PASS"
+      },
+      {
+        "id": "manuscript-f9-ta-verification-mentioned",
+        "exit_code": 0,
+        "verdict": "PASS"
+      },
+      {
+        "id": "manuscript-universal-endpoint-1-over-2F-plus-1-cited",
+        "exit_code": 0,
+        "verdict": "PASS"
+      },
+      {
+        "id": "memory-entry-file-exists",
+        "exit_code": 1,
+        "verdict": "FAIL_PATH_MISMATCH",
+        "note": "memory dir does not exist at /home/suzume/workspace/BEC-simulation/memory; memory file IS at ~/.claude/projects/-home-suzume-workspace-BEC-simulation/memory/sign_pattern_lemma1_mult_aware_2026_05_19.md"
+      },
+      {
+        "id": "memory-entry-mentions-mult-aware-formula",
+        "exit_code": 1,
+        "verdict": "FAIL_PATH_MISMATCH",
+        "note": "same as above; m_rep appears 21+ times in the actual memory file"
+      },
+      {
+        "id": "no-src-modification",
+        "exit_code": 0,
+        "verdict": "PASS"
+      },
+      {
+        "id": "no-test-modification",
+        "exit_code": 0,
+        "verdict": "PASS"
+      },
+      {
+        "id": "no-script-modification",
+        "exit_code": 0,
+        "verdict": "PASS"
+      },
+      {
+        "id": "seed-md-priority-0-edh-matsui-still-held",
+        "exit_code": 0,
+        "verdict": "PASS"
+      },
+      {
+        "id": "regression-script-untouched",
+        "exit_code": 0,
+        "verdict": "PASS"
+      }
+    ],
+    "success_criteria_pass_count": 13,
+    "success_criteria_fail_count": 2,
+    "success_criteria_total": 15
+  },
+  "contract_evaluation": {
+    "verdict": "FAIL_OPERATIONAL",
+    "criteria_results": [
+      {
+        "id": "state-json-investigation-key-registered",
+        "passed": true,
+        "actual": {
+          "exit_code": 0,
+          "stdout_head": ""
+        },
+        "reason": "check_cmd PASS: grep -q 'sign-pattern-f9-ta-multiplicity-2-mixing-2026-05-19",
+        "shell_check": true
+      },
+      {
+        "id": "state-json-investigations-dict-has-new-entry",
+        "passed": true,
+        "actual": {
+          "exit_code": 0,
+          "stdout_head": ""
+        },
+        "reason": "check_cmd PASS: python3 -c \"import json,sys; s=json.load(open('/home/suzume/",
+        "shell_check": true
+      },
+      {
+        "id": "state-json-investigations-index-appended",
+        "passed": true,
+        "actual": {
+          "exit_code": 0,
+          "stdout_head": ""
+        },
+        "reason": "check_cmd PASS: python3 -c \"import json,sys; s=json.load(open('/home/suzume/",
+        "shell_check": true
+      },
+      {
+        "id": "state-json-central-falsifier-marked",
+        "passed": true,
+        "actual": {
+          "exit_code": 0,
+          "stdout_head": ""
+        },
+        "reason": "check_cmd PASS: python3 -c \"import json,sys; s=json.load(open('/home/suzume/",
+        "shell_check": true
+      },
+      {
+        "id": "manuscript-mrep-prefactor-formula-present",
+        "passed": true,
+        "actual": {
+          "exit_code": 0,
+          "stdout_head": ""
+        },
+        "reason": "check_cmd PASS: grep -q -E 'm_\\{?rm rep\\}?|m_rep' /home/suzume/workspace/BEC",
+        "shell_check": true
+      },
+      {
+        "id": "manuscript-canonical-formula-tr-pi-rho-inv-present",
+        "passed": true,
+        "actual": {
+          "exit_code": 0,
+          "stdout_head": ""
+        },
+        "reason": "check_cmd PASS: grep -q -E 'rho_\\{?rm inv\\}?|rho.inv|P_W' /home/suzume/works",
+        "shell_check": true
+      },
+      {
+        "id": "manuscript-f9-ta-verification-mentioned",
+        "passed": true,
+        "actual": {
+          "exit_code": 0,
+          "stdout_head": ""
+        },
+        "reason": "check_cmd PASS: grep -q -E 'F=9.*T|F=9.*tetrahedral|F=9 T:A' /home/suzume/wo",
+        "shell_check": true
+      },
+      {
+        "id": "manuscript-universal-endpoint-1-over-2F-plus-1-cited",
+        "passed": true,
+        "actual": {
+          "exit_code": 0,
+          "stdout_head": ""
+        },
+        "reason": "check_cmd PASS: grep -q -E '1/19|1/\\(2F\\+1\\)|0\\.05263|0\\.0526' /home/suzume/",
+        "shell_check": true
+      },
+      {
+        "id": "memory-entry-file-exists",
+        "passed": false,
+        "actual": {
+          "exit_code": 1,
+          "stdout_head": ""
+        },
+        "reason": "check_cmd FAIL: exit_code=1 != expected 0; stdout missing 'sign_pattern_lemma1_mult_aware'",
+        "shell_check": true
+      },
+      {
+        "id": "memory-entry-mentions-mult-aware-formula",
+        "passed": false,
+        "actual": {
+          "exit_code": 1,
+          "stdout_head": ""
+        },
+        "reason": "check_cmd FAIL: exit_code=1 != expected 0; stdout missing 'sign_pattern_lemma1_mult_aware'",
+        "shell_check": true
+      },
+      {
+        "id": "no-src-modification",
+        "passed": true,
+        "actual": {
+          "exit_code": 0,
+          "stdout_head": ""
+        },
+        "reason": "check_cmd PASS: find /home/suzume/workspace/BEC-simulation/src -name '*.jl' ",
+        "shell_check": true
+      },
+      {
+        "id": "no-test-modification",
+        "passed": true,
+        "actual": {
+          "exit_code": 0,
+          "stdout_head": ""
+        },
+        "reason": "check_cmd PASS: find /home/suzume/workspace/BEC-simulation/test -name '*.jl'",
+        "shell_check": true
+      },
+      {
+        "id": "no-script-modification",
+        "passed": true,
+        "actual": {
+          "exit_code": 0,
+          "stdout_head": ""
+        },
+        "reason": "check_cmd PASS: find /home/suzume/workspace/BEC-simulation/scripts -name '*.",
+        "shell_check": true
+      },
+      {
+        "id": "seed-md-priority-0-edh-matsui-still-held",
+        "passed": true,
+        "actual": {
+          "exit_code": 0,
+          "stdout_head": ""
+        },
+        "reason": "check_cmd PASS: grep -q 'edh-eu151-vortex-vs-matsui-science-2026' /home/suzu",
+        "shell_check": true
+      },
+      {
+        "id": "regression-script-untouched",
+        "passed": true,
+        "actual": {
+          "exit_code": 0,
+          "stdout_head": ""
+        },
+        "reason": "check_cmd PASS: test -f /home/suzume/workspace/BEC-simulation/scripts/manusc",
+        "shell_check": true
+      }
+    ],
+    "triggered_failure_modes": [
+      {
+        "if": "memory-entry-file-exists FAILED",
+        "category": "operational",
+        "next_action": "T117 dispatches implementer_text to complete Duty C. Memory entry is the lowest-priority of the 3 duties; tolerable to defer 1 turn."
+      }
+    ],
+    "issues": [
+      "check_cmd FAIL: exit_code=1 != expected 0; stdout missing 'sign_pattern_lemma1_mult_aware'",
+      "check_cmd FAIL: exit_code=1 != expected 0; stdout missing 'sign_pattern_lemma1_mult_aware'"
+    ]
+  },
+  "cost_audit": null,
+  "central_falsifier_check": {
+    "applies": false,
+    "reason": "target tier 2.5 < 3.0"
+  },
+  "tier_cap": null,
+  "investigation_id": "sign-pattern-f9-ta-multiplicity-2-mixing-2026-05-19",
+  "stage_advancing_to": "Update",
+  "investigation_update": {
+    "if_success_advance_to_stage": "closed",
+    "if_success_tier_becomes": 2.5,
+    "if_partial_advance_to_stage": "Update",
+    "if_partial_tier_becomes": 2.5,
+    "if_refuted_advance_to_stage": "Update",
+    "if_refuted_tier_becomes": 2.5,
+    "if_success_falsifier_update": {
+      "id": "F1-mult-aware-bar_beta_0-equals-1-over-2F-plus-1",
+      "tested_at_turn": 116,
+      "result_template": "CORROBORATE registered in state.json: bar_beta_0_canonical = 0.0526315789473683 = 1/19; dev_from_1/(2F+1) = 1.388e-16; theorist J-involution derivation + 4-falsifier confirmation propagated to manuscript \u00a7V at docs/manuscript/papers/paper3_universal_theorem/sign_pattern_lemma1_general_S.md + memory at memory/sign_pattern_lemma1_mult_aware_2026_05_19.md."
+    },
+    "note": "T116: implementer_text bundle (state.json registration + manuscript \u00a7V extension + memory entry). Tier stays 2.5 (Update-stage propagation is documentation, not promotion). Tier 3 closure eligible at T117+ via critic crosswalk audit (F1 is_central=true marked at T116). edh-matsui sidebar UNCHANGED at tier 2.75 frozen-blocked. Per feedback_cost_overhead_is_the_cost: 3-duty bundle in 1 dispatch saves 2 dispatches vs sequential."
+  }
+}

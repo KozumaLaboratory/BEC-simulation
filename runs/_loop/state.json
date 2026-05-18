@@ -1,5 +1,5 @@
 {
-  "turn": 116,
+  "turn": 117,
   "status": "running",
   "history": [
     {
@@ -1398,15 +1398,79 @@
         "theorist": "793e3a75d3f9c15683c165d8a381df83"
       },
       "investigation_id": "sign-pattern-f9-ta-multiplicity-2-mixing-2026-05-19",
+      "stage_advancing_to": "Hypothesize",
+      "notes": "T115-attempt2: implementer added 1-line m_rep prefactor wrapper `canonical_mult_aware_beta_S = m_rep * mult_aware_beta_S` and re-ran the f9_TA Test. ALL FOUR FALSIFIERS CORROBORATE: F1 central |bar_beta_0_canonical - 1/19| = 1.388e-16 < 1e-13 (1-ULP from exact); F2 seed-spread 2.776e-17; F3 lemma1_general_S regression 26/26 PASS; F4 advisory all-S sum-rule |Sum_S - m_rep| = 6.66e-15. Candidate (i) confirmed: bar_beta_S^(canonical) = m_rep * Tr[Pi_S (rho_inv tensor rho_inv)] is the correct multiplicity-aware extension. Judge tagged INCONCLUSIVE only because director's success_criteria check_cmds used disallowed shell metachars (&&, |) and 'git' (not in judge allow-list); the physics-PASS is unambiguous. Investigation tier 0.5 -> 2.5 anticipated; T116 dispatches manuscript propagation (Candidate-i extension to sign_pattern_lemma1_general_S.md). edh-matsui UNCHANGED at tier 2.75 frozen-blocked (spatial_profiles.csv still absent; seed.md priority-0 still held).",
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 28604564,
+        "total": 28604564,
+        "effective_full_rate": 4128600,
+        "breakdown": {
+          "input_fresh": 26099,
+          "cache_creation": 877693,
+          "cache_read": 27652750,
+          "output": 48022
+        },
+        "n_messages": 149,
+        "n_message_starts": 149
+      },
+      "branch": "auto/turn_115_sign-pattern-f9-ta-mult2-T115-attempt2-candidate-i-test",
+      "commit": "a323222",
+      "parent": "bfcc47e",
+      "drift_signals": {
+        "topic_repetition": 0.417,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.8,
+        "cost_inflation": 2.187,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "director_must_address",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "DRIFT_COST_INFLATION",
+        "AUDIT_DUE: patterns.yaml last audited at T105, gap=10"
+      ]
+    },
+    {
+      "turn": 116,
+      "ts": "2026-05-18T22:03:47Z",
+      "judge_status": "FAIL_OPERATIONAL",
+      "directive_action": "modify_text",
+      "directive_label": "sign-pattern-f9-ta-mult2-T116-update-manuscript",
+      "wall_time_sec": null,
+      "agent_hashes": {
+        "critic": "ccbd5e0fdc990f6b9eaaa01eb00fc63e",
+        "director": "8d6d65cf5014eb25c866d8dcd3142b9e",
+        "implementer": "3354a0b55881b87f223ef9beaf85d9e8",
+        "researcher": "95b7759c642976be22be5b403536336e",
+        "theorist": "793e3a75d3f9c15683c165d8a381df83"
+      },
+      "investigation_id": "sign-pattern-f9-ta-multiplicity-2-mixing-2026-05-19",
       "stage_advancing_to": "Update",
-      "notes": "T115-attempt2: implementer added 1-line m_rep prefactor wrapper `canonical_mult_aware_beta_S = m_rep * mult_aware_beta_S` and re-ran the f9_TA Test. ALL FOUR FALSIFIERS CORROBORATE: F1 central |bar_beta_0_canonical - 1/19| = 1.388e-16 < 1e-13 (1-ULP from exact); F2 seed-spread 2.776e-17; F3 lemma1_general_S regression 26/26 PASS; F4 advisory all-S sum-rule |Sum_S - m_rep| = 6.66e-15. Candidate (i) confirmed: bar_beta_S^(canonical) = m_rep * Tr[Pi_S (rho_inv tensor rho_inv)] is the correct multiplicity-aware extension. Judge tagged INCONCLUSIVE only because director's success_criteria check_cmds used disallowed shell metachars (&&, |) and 'git' (not in judge allow-list); the physics-PASS is unambiguous. Investigation tier 0.5 -> 2.5 anticipated; T116 dispatches manuscript propagation (Candidate-i extension to sign_pattern_lemma1_general_S.md). edh-matsui UNCHANGED at tier 2.75 frozen-blocked (spatial_profiles.csv still absent; seed.md priority-0 still held)."
+      "notes": "T116 implementer_text 3-duty bundle: (A) registered sign-pattern-f9-ta-multiplicity-2-mixing-2026-05-19 in state.json.investigations + investigations_index (24->25 / 14->15); (B) extended docs/manuscript/papers/paper3_universal_theorem/sign_pattern_lemma1_general_S.md with section V Multiplicity-Aware Extension to m_rep>=2 Polyhedral Inert States (+164 lines, 8 sub-sections V.1-V.8: canonical formula, J-involution proof of universal endpoint 1/(2F+1), m_rep=1 reduction, sum rule, F=9 T:A verification table S=0..18, 4-falsifier verdicts); (C) wrote memory/sign_pattern_lemma1_mult_aware_2026_05_19.md (75 lines, 7 sections) + 1-line MEMORY.md index entry. 13/15 success criteria PASS. SC9/SC10 FAIL: director's check_cmd referenced /home/suzume/workspace/BEC-simulation/memory which does not exist; project memory store lives at user-local ~/.claude/projects/-home-suzume-workspace-BEC-simulation/memory/ (same convention as 35+ prior entries). Memory file IS at correct on-disk path. FAIL_OPERATIONAL verdict reflects director schema bug (path-mismatch) only; physics & all 3 deliverables landed. No julia, no src/test/scripts modification. Tier stays 2.5 (Update-stage propagation). edh-matsui sidebar still tier 2.75 frozen-blocked (spatial_profiles.csv ABSENT; seed.md priority-0 held).",
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": null,
+        "total": null
+      },
+      "branch": "auto/turn_116_sign-pattern-f9-ta-mult2-T116-update-manuscript",
+      "commit": "f081603",
+      "parent": "c3e3d1f"
     }
   ],
   "created_at": "2026-05-14T00:00:00+00:00",
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "INCONCLUSIVE",
+  "last_judge": "FAIL_OPERATIONAL",
   "home_branch": "main",
   "schema_version": 2.1,
   "current_agent_hashes": {
@@ -1435,7 +1499,8 @@
     "audit-class-scan-2026-05-18-T87",
     "bug-4-itp-ddi-half-rate-revalidation-2026-05-18",
     "tdhfb-phase2-hf-kernel-generic-F-bogoliubov-spectrum-2026-05-18",
-    "audit-class-scan-2026-05-19-T103"
+    "audit-class-scan-2026-05-19-T103",
+    "sign-pattern-f9-ta-multiplicity-2-mixing-2026-05-19"
   ],
   "investigations": {
     "barnett-mechanism-2026-05-16": {
@@ -2673,11 +2738,96 @@
       "blocked_on": null,
       "next_stage": "Hypothesize",
       "next_stage_action": "theorist Hypothesize: classify findings, propose specific prompt/workload changes, predict cost savings."
+    },
+    "sign-pattern-f9-ta-multiplicity-2-mixing-2026-05-19": {
+      "id": "sign-pattern-f9-ta-multiplicity-2-mixing-2026-05-19",
+      "title": "Sign Pattern Lemma 1 General-S multiplicity-aware extension: F=9 T:A (m_rep=2) as 1st verified-empirical mult-2 polyhedral inert case",
+      "hypothesis": "The canonical multiplicity-aware channel coefficient bar_beta_S^canonical = m_rep * Tr[Pi_S (rho_inv (x) rho_inv)] (rho_inv = (1/m_rep) sum_i |zeta_i><zeta_i| over orthonormal basis of W=H-trivial isotypic component) reproduces the universal endpoint 1/(2F+1) at S=0 for any polyhedral inert state with arbitrary multiplicity m_rep, strictly generalizes the m_rep=1 formula beta_S^(c_0), and satisfies sum_S bar_beta_S^canonical = m_rep.",
+      "flow_template": "build-theory",
+      "current_stage": "Update",
+      "stages_done": [
+        "Hypothesize",
+        "Derive",
+        "Test"
+      ],
+      "stages_at_turn": {
+        "Hypothesize": [
+          114,
+          "theorist T114 initial formula bar_beta_S = Tr[Pi_S (rho_inv (x) rho_inv)] without m_rep prefactor"
+        ],
+        "Hypothesize_retry": [
+          115,
+          "theorist T115 audit + J=exp(-i*pi*F_y) involution derivation + Candidate (i) recommendation (m_rep prefactor)"
+        ],
+        "Test_attempt1": [
+          "115_attempt1",
+          "implementer measured bar_beta_0 = 1/38; F1 REFUTED structurally; supplied [Plausible] off-diagonal-vanishing mechanism"
+        ],
+        "Test_attempt2": [
+          115,
+          "implementer canonical_mult_aware_beta_S wrapper; F1/F2/F3/F4 all CORROBORATE at machine precision"
+        ],
+        "Update": [
+          116,
+          "implementer_text: state.json registration + manuscript section V extension + memory entry"
+        ]
+      },
+      "falsifiers": [
+        {
+          "id": "F1-mult-aware-bar_beta_0-equals-1-over-2F-plus-1",
+          "description": "bar_beta_0_canonical(F=9, T, A, m_rep=2) = m_rep * mult_aware_beta_S(rho_inv, F, 0); CORROBORATE if |... - 1/19| < 1e-13",
+          "tested_at_turns": [
+            "115_attempt1",
+            115
+          ],
+          "result": "CORROBORATE at T115 attempt2: 0.0526315789473683, dev 1.388e-16 (4 orders below threshold). REFUTED at attempt1 due to missing m_rep prefactor; corrected by theorist T115 J-involution derivation.",
+          "is_central": true
+        },
+        {
+          "id": "F2-seed-independence-of-canonical-formula",
+          "description": "bar_beta_0_canonical seed-spread across 10 RNG seeds < 1e-13",
+          "tested_at_turns": [
+            115
+          ],
+          "result": "CORROBORATE: seed-spread 2.776e-17 (machine precision; basis-independence via Schur's lemma confirmed)",
+          "is_central": false
+        },
+        {
+          "id": "F3-mult-1-regression-unchanged",
+          "description": "scripts/manuscript/lemma1_general_S_verification.jl 26/26 PASS (5 cases F=3,4,6,8,10 + 26 channel coefficients)",
+          "tested_at_turns": [
+            115
+          ],
+          "result": "CORROBORATE: 26/26 PASS; m_rep=1 strict-generalization regression holds",
+          "is_central": false
+        },
+        {
+          "id": "F4-mult-aware-sum-rule",
+          "description": "sum_S [bar_beta_S^canonical] for S in 0:2F = m_rep to 1e-12 advisory",
+          "tested_at_turns": [
+            115
+          ],
+          "result": "CORROBORATE: sum = 1.999999999999993, dev from m_rep=2 is 6.661e-15 (3 orders below threshold)",
+          "is_central": false
+        }
+      ],
+      "tier_current": 2.5,
+      "tier_target": 3,
+      "next_stage": null,
+      "next_stage_action": null,
+      "blocked_on": null,
+      "priority": 4,
+      "kind": "physics",
+      "last_turn": 116,
+      "last_stage": "Update",
+      "last_verdict": "CORROBORATE_4_OF_4_PHYSICS_PASS_MANUSCRIPT_PROPAGATED",
+      "tier": 2.5,
+      "closing_note": "T112-T116 (5-turn arc): mult-aware Lemma 1 General-S formula bar_beta_S^canonical = m_rep * Tr[Pi_S (rho_inv (x) rho_inv)] = (1/m_rep) Tr[Pi_S (P_W (x) P_W)] established for polyhedral inert states with multiplicity m_rep >= 2 of the H-trivial isotypic component. Universal endpoint 1/(2F+1) preserved at S=0; m_rep=1 reduction to beta_S^(c_0) verified; sum rule sum_S = m_rep. Theorist T115 section 2.A J=exp(-i*pi*F_y) involution closed-form derivation; implementer T115 numerical corroboration at F=9 T:A (m_rep=2): F1 dev 1.4e-16, F2 spread 2.8e-17, F3 26/26 regression unchanged, F4 sum-rule dev 6.7e-15. Tier 2.5; eligible for Tier 3 closure pending T117+ critic crosswalk audit (central falsifier F1 marked). 4th project T112-aligned Tier-2.5+ trajectory (after barnett T29, klaus-bch T59, edh-matsui T86, sign-pattern-lemma1 T94)"
     }
   },
   "last_meta_check_turn": 115,
-  "last_short_label": "sign-pattern-f9-ta-mult2-T115a2-test-candidate-i",
-  "last_label": "sign-pattern-f9-ta-mult2-T115a2-test-candidate-i",
-  "last_action": "modify_code",
-  "last_judge_turn": 115
+  "last_short_label": "sign-pattern-f9-ta-mult2-T116-update-manuscript",
+  "last_label": "sign-pattern-f9-ta-mult2-T116-update-manuscript",
+  "last_action": "modify_text",
+  "last_judge_turn": 116
 }
