@@ -1,0 +1,198 @@
+{
+  "turn": 111,
+  "status": "INCONCLUSIVE",
+  "issues": [
+    "check_cmd argv contains shell-metachar '&&' \u2014 use one program + args only",
+    "check_cmd argv contains shell-metachar '|' \u2014 use one program + args only",
+    "check_cmd argv contains shell-metachar '&&' \u2014 use one program + args only"
+  ],
+  "metrics": {
+    "experiment_kind": "analyze_existing",
+    "investigation_kind": "verify-claim",
+    "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
+    "stage_advancing_to": "Update",
+    "flow_template": "verify-claim",
+    "workload_class": "implementer_text",
+    "directive_label": "edh-eu151-matsui-T111-retry-update-h5py-probe-plus-class-finding",
+    "probe_status": "h5py_partial_structure_only",
+    "h5py_version": "3.16.0",
+    "hdf5plugin_version": "6.0.0",
+    "file_open_success": true,
+    "root_keys_listed": true,
+    "frames_sampled": [],
+    "spatial_profiles_h5py_probe_csv_exists": false,
+    "ring_summary_h5py_probe_json_exists": true,
+    "anko_consult_stub_appended": true,
+    "patterns_yaml_patched": true,
+    "patterns_yaml_path": "/home/suzume/workspace/BEC-simulation/runs/_loop/patterns.yaml",
+    "conclusions_md_appended": true,
+    "class_finding_recurrence_count": 2,
+    "src_edited": false,
+    "test_edited": false,
+    "yaml_edited": false,
+    "loop_yaml_edited": true,
+    "state_json_edited": false,
+    "script_edited": false,
+    "new_simulations_initiated": false,
+    "julia_invoked": false,
+    "gpu_used": false,
+    "wall_time_sec": 250,
+    "tests_passed": null,
+    "warnings": [
+      "h5py_chunk_dim_encoding_length_mismatch_blocks_dataset_read",
+      "all_chunked_datasets_unreadable_via_h5py_3.16.0",
+      "anko_consult_required_for_full_501_frame_spatial_extraction"
+    ],
+    "physical_red_flags": [],
+    "tokens_used": null,
+    "preconditions_passed": true,
+    "branch_created": "auto/turn_111_retry_h5py_probe",
+    "extractor_script_modified": false,
+    "wrapper_script_modified": false,
+    "n_components_metadata_readable": 13,
+    "n_snapshots_metadata_readable": 502,
+    "frame_names_enumerated_count": 502,
+    "file_header_magic_ascii": "HDF5-based Julia Data Format, version 0.2.0.",
+    "error_class": "KeyError",
+    "error_message_dataset_open_first_120c": "'Unable to synchronously open object (stored chunk dimension encoding length does not match value calculated"
+  },
+  "contract_evaluation": {
+    "verdict": "INCONCLUSIVE",
+    "criteria_results": [
+      {
+        "id": "ring-summary-h5py-probe-json-exists",
+        "passed": true,
+        "actual": {
+          "exit_code": 0,
+          "stdout_head": ""
+        },
+        "reason": "check_cmd PASS: test -f /home/suzume/workspace/BEC-simulation/runs/eu151_edh",
+        "shell_check": true
+      },
+      {
+        "id": "ring-summary-h5py-probe-json-has-probe-status",
+        "passed": true,
+        "actual": {
+          "exit_code": 0,
+          "stdout_head": "OK_PROBE_STATUS"
+        },
+        "reason": "check_cmd PASS: python3 -c \"import json; d=json.load(open('/home/suzume/work",
+        "shell_check": true
+      },
+      {
+        "id": "conclusions-md-has-t111-retry-entry",
+        "passed": null,
+        "actual": null,
+        "reason": "check_cmd argv contains shell-metachar '&&' \u2014 use one program + args only"
+      },
+      {
+        "id": "patterns-yaml-has-sandbox-mismatch-entry",
+        "passed": null,
+        "actual": null,
+        "reason": "check_cmd argv contains shell-metachar '|' \u2014 use one program + args only"
+      },
+      {
+        "id": "sim-turn-111-deliverable-exists",
+        "passed": null,
+        "actual": null,
+        "reason": "check_cmd argv contains shell-metachar '&&' \u2014 use one program + args only"
+      },
+      {
+        "id": "no-julia-invoked",
+        "passed": true,
+        "actual": false,
+        "reason": "julia_invoked=False == False \u2192 True"
+      },
+      {
+        "id": "no-src-edited",
+        "passed": true,
+        "actual": false,
+        "reason": "src_edited=False == False \u2192 True"
+      },
+      {
+        "id": "no-test-edited",
+        "passed": true,
+        "actual": false,
+        "reason": "test_edited=False == False \u2192 True"
+      },
+      {
+        "id": "no-config-yaml-edited",
+        "passed": true,
+        "actual": false,
+        "reason": "yaml_edited=False == False \u2192 True"
+      },
+      {
+        "id": "no-state-json-edited",
+        "passed": true,
+        "actual": false,
+        "reason": "state_json_edited=False == False \u2192 True"
+      },
+      {
+        "id": "no-script-edited",
+        "passed": true,
+        "actual": false,
+        "reason": "script_edited=False == False \u2192 True"
+      },
+      {
+        "id": "no-new-simulation",
+        "passed": true,
+        "actual": false,
+        "reason": "new_simulations_initiated=False == False \u2192 True"
+      },
+      {
+        "id": "no-gpu-used",
+        "passed": true,
+        "actual": false,
+        "reason": "gpu_used=False == False \u2192 True"
+      },
+      {
+        "id": "anko-consult-stub-appended",
+        "passed": true,
+        "actual": true,
+        "reason": "anko_consult_stub_appended=True == True \u2192 True"
+      },
+      {
+        "id": "patterns-yaml-patched",
+        "passed": true,
+        "actual": true,
+        "reason": "patterns_yaml_patched=True == True \u2192 True"
+      },
+      {
+        "id": "class-finding-recurrence-2",
+        "passed": true,
+        "actual": 2,
+        "reason": "class_finding_recurrence_count=2 == 2 \u2192 True"
+      }
+    ],
+    "triggered_failure_modes": [],
+    "issues": [
+      "check_cmd argv contains shell-metachar '&&' \u2014 use one program + args only",
+      "check_cmd argv contains shell-metachar '|' \u2014 use one program + args only",
+      "check_cmd argv contains shell-metachar '&&' \u2014 use one program + args only"
+    ]
+  },
+  "cost_audit": null,
+  "central_falsifier_check": {
+    "applies": false,
+    "reason": "target tier 2.75 < 3.0"
+  },
+  "tier_cap": null,
+  "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
+  "stage_advancing_to": "Update",
+  "investigation_update": {
+    "if_success_advance_to_stage": "Update",
+    "if_success_tier_becomes": 2.75,
+    "if_partial_advance_to_stage": "Update",
+    "if_partial_tier_becomes": 2.75,
+    "if_refuted_advance_to_stage": "Update",
+    "if_refuted_tier_becomes": 2.75,
+    "if_success_falsifier_update": null,
+    "note": "T111-retry is data-acquisition probe + class-finding patch. F1 falsifier update happens at T112 critic re-audit IF h5py_full_decode (else stays pending anko-consult). Tier does NOT change at T111-retry; the tier-affecting moment is T112's verdict OR a future anko-consult-driven full-frame audit.",
+    "post_t111_retry_pivot_options_by_outcome": [
+      "h5py_full_decode \u2192 T112 critic Update \u2014 apply T109 F1 criterion to 3-frame sample; CORROBORATE-STAGE-1 / INCONCLUSIVE / REFUTED-OTHER. Tier 2.75 holds.",
+      "h5py_partial OR h5py_failed \u2192 T112 PIVOT to different investigation. Open candidates: spawn Stage-2 Bragg simulation investigation (highest-leverage for Tier-3 promotion), OR spawn fresh Tier-3 survey (since #2/#3/#5 from prior survey all closed). edh-matsui F1 verdict remains pending anko-consult.",
+      "T112+ MUST honor patterns.yaml entry \u2014 no more implementer_julia_* under JULIA_GPU_OK without `which julia && julia --version` precondition_check passing first.",
+      "Eventually (anko-driven): when anko runs `bash runs/eu151_edh_K3_long/run_extract_ring_metrics.sh`, the full spatial_profiles.csv + ring_summary.json appear; loop resumes with T-later critic re-audit."
+    ]
+  }
+}

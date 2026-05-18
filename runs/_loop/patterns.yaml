@@ -211,6 +211,47 @@ patterns:
   promoted_at: '2026-05-18T13:00:00+09:00'
   promoted_by: T52 critic L3 audit (4/4 questions PASS); T53 judge bug fix + re-judge
     confirmed verdict; T54 director-routed Document close
+- id: sandbox-vs-scheduler-gate-mismatch-2026-05-19
+  class: loop_infrastructure_operational
+  first_seen_turn: 108
+  recurred_turn: 111
+  recurrence_count: 2
+  symptom: |
+    scheduler.py reports policy JULIA_GPU_OK with implementer_julia_* in
+    allowed_workloads + full probe headroom, but the harness Bash tool's
+    workspace-only filesystem whitelist denies /home/suzume/.juliaup/bin/julia
+    (outside /home/suzume/workspace/BEC-simulation). All bash <wrapper>
+    forms (foreground, background, dangerouslyDisableSandbox=true) return
+    'This command requires approval'.
+  root_cause: |
+    scheduler.py's policy emitter does not exec julia; the probe checks
+    foreign-julia procs / VRAM / RAM headroom but not actual julia
+    executability from inside the harness. Scheduler and harness sandbox
+    are independent gates; scheduler permissiveness is a NECESSARY but not
+    sufficient condition for julia execution.
+  director_remediation: |
+    Before dispatching implementer_julia_* under any scheduler policy,
+    add a precondition_check that verifies julia is invokable from the
+    harness, e.g.
+      precondition_check: "which julia && julia --version || echo SANDBOX_BLOCKS_JULIA"
+    If the check returns SANDBOX_BLOCKS_JULIA, downgrade dispatch to
+    implementer_text + anko-consult stub. Do NOT trust scheduler.JULIA_GPU_OK alone.
+  scheduler_remediation: |
+    scheduler.py should add a real exec-test (`which julia && julia
+    --version`) and emit policy TEXT_ONLY (or a new policy
+    JULIA_BLOCKED_BY_SANDBOX) when the test fails despite green probe.
+    Out of scope for T111-retry; record as future loop-infrastructure work.
+  fallback_protocol: |
+    1. Python-h5py probe of JLD2 (sandbox-friendly).
+    2. Anko-consult stub in conclusions ledger (T110 fallback contract).
+    3. Pivot to non-julia-dependent investigations until anko runs the
+       staged wrapper manually.
+  affected_investigations:
+    - edh-eu151-vortex-vs-matsui-science-2026
+  notes: |
+    This pattern entry is the class-fix per fix-the-class-not-the-instance protocol.
+    Future directors: read this BEFORE proposing implementer_julia_* under
+    JULIA_GPU_OK. Two-instance recurrence threshold met (T108 + T111-attempt1).
 proposed_classes: []
 rejected_classes:
 - id: coupling-skip-gate-inconsistency

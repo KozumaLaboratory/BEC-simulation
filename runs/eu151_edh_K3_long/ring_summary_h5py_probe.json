@@ -1,0 +1,38 @@
+{
+  "probe_status": "h5py_partial_structure_only",
+  "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
+  "turn": 111,
+  "attempt": "retry",
+  "source_file": "/home/suzume/workspace/BEC-simulation/runs/eu151_edh_K3_long/result.jld2",
+  "source_file_bytes": 1673986053,
+  "file_open_success": true,
+  "root_keys_listed": true,
+  "root_keys": [
+    "_types",
+    "dynamics",
+    "psi"
+  ],
+  "dynamics_keys": [
+    "Fz",
+    "component_populations",
+    "norms",
+    "psi_snapshots_streamed",
+    "times"
+  ],
+  "frames_sampled": [],
+  "frames_decoded_count": 0,
+  "n_snapshots_metadata": 502,
+  "n_components_metadata": 13,
+  "spatial_shape_readable": false,
+  "spatial_profiles_h5py_probe_csv_exists": false,
+  "h5py_version": "3.16.0",
+  "hdf5plugin_version": "6.0.0",
+  "hdf5_filter_zstd_available": true,
+  "file_header_magic_ascii": "HDF5-based Julia Data Format, version 0.2.0.",
+  "error_class": "KeyError",
+  "error_message_dataset_open": "'Unable to synchronously open object (stored chunk dimension encoding length does not match value calculated from chunk dimensions)'",
+  "frame_names_enumerated_count": 502,
+  "probe_wall_time_sec": 0.036,
+  "summary_human_readable": "File IS HDF5-compliant (header: 'HDF5-based Julia Data Format, version 0.2.0.'); root keys ['_types', 'dynamics', 'psi'] and group structure under /dynamics/psi_snapshots_streamed (502 frames + scalar metadata) ARE readable via h5py 3.16.0 + hdf5plugin 6.0.0 (zstd filter shipped). Scalar metadata datasets (n_components=13, n_snapshots=502) decode correctly. However, EVERY chunked dataset (times, Fz, component_populations, norms, /psi, and all 502 per-frame psi snapshots) fails to open with KeyError: 'Unable to synchronously open object (stored chunk dimension encoding length does not match value calculated from chunk dimensions)'. This is a JLD2 (v0.2.0 HDF5-based)-vs-h5py 3.x format incompatibility at the dataset chunking layer, NOT a filter / plugin / codec issue (the zstd codec was never reached because the chunk-dim encoding parse fails first). The h5py 3.16.0 chunk-dim parser is strict per the HDF5 specification; JLD2's chunk-dim encoding is interpreted as nonconforming. Conclusion: probe_status = h5py_partial_structure_only. T112 critic spatial F1 re-audit is NOT unblocked by the h5py path. Anko-consult fallback (T110 contract) is the path forward for full 501-frame spatial extraction.",
+  "next_action_for_loop": "Anko-consult fallback: anko runs `bash /home/suzume/workspace/BEC-simulation/runs/eu151_edh_K3_long/run_extract_ring_metrics.sh` from interactive shell. Loop resumes on the appearance of spatial_profiles.csv + ring_summary.json. Loop directors MUST honor patterns.yaml entry sandbox-vs-scheduler-gate-mismatch-2026-05-19 before any future implementer_julia_* dispatch."
+}
