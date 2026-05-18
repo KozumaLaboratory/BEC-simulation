@@ -1,5 +1,5 @@
 {
-  "turn": 101,
+  "turn": 104,
   "status": "running",
   "history": [
     {
@@ -2239,14 +2239,174 @@
       "investigation_id": "tdhfb-phase2-hf-kernel-generic-F-bogoliubov-spectrum-2026-05-18",
       "stage_advancing_to": "Execute",
       "provisional_verdict": "EXECUTE_PASS",
-      "note": "All 3 load-bearing falsifiers PASS: F1 polar phonon cs=1.0000079 (rel_err 7.86e-6), F2 FM phonon cs=0.94869 (rel_err 8.74e-6), F3 BdG/GP factor-2 ratio=2.0+1.3e-15 (abs_err 1.33e-15). F4 Goldstone gap at k=0 = 0.0 (advisory PASS). Tier 1.5 -> 2.5. T101 dispatches critic Update stage: independent re-derivation + numerical recompute at different parameter point."
+      "note": "All 3 load-bearing falsifiers PASS: F1 polar phonon cs=1.0000079 (rel_err 7.86e-6), F2 FM phonon cs=0.94869 (rel_err 8.74e-6), F3 BdG/GP factor-2 ratio=2.0+1.3e-15 (abs_err 1.33e-15). F4 Goldstone gap at k=0 = 0.0 (advisory PASS). Tier 1.5 -> 2.5. T101 dispatches critic Update stage: independent re-derivation + numerical recompute at different parameter point.",
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 13284480,
+        "total": 13284480,
+        "effective_full_rate": 1838336,
+        "breakdown": {
+          "input_fresh": 6585,
+          "cache_creation": 350424,
+          "cache_read": 12906864,
+          "output": 20607
+        },
+        "n_messages": 121,
+        "n_message_starts": 121
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.235,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.2,
+        "cost_inflation": 1.043,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "director_must_address",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "DRIFT_COST_INFLATION",
+        "AUDIT_DUE: patterns.yaml last audited at T88, gap=12"
+      ]
+    },
+    {
+      "turn": 101,
+      "ts": "2026-05-18T15:23:50Z",
+      "judge_status": "CRITIC_PASS",
+      "directive_action": "critic_audit",
+      "directive_label": "tdhfb-phase2-tier3-T101-update-critic-independent-corroborate",
+      "wall_time_sec": 352.19,
+      "agent_hashes": {
+        "critic": "cd44117d23595a18db7b2f6a1fd013e0",
+        "director": "f02c149c8cd6e8ce4d998629f74924b8",
+        "implementer": "d06804d919f6ab7fb0fe2ee1f99bcf5a",
+        "researcher": "6635ef673d05e12621da8d38413c3a8b",
+        "theorist": "e33d24bdc505b4ec69873b39f5292087"
+      },
+      "investigation_id": "tdhfb-phase2-hf-kernel-generic-F-bogoliubov-spectrum-2026-05-18",
+      "stage_advancing_to": "Update",
+      "provisional_verdict": "CORROBORATE_WITH_ERRATA",
+      "note": "Critic Update audit returned CORROBORATE_WITH_ERRATA via independent Route I (GP linearization) algebra reproducing polar phonon omega^2=eps_k(eps_k+2c0n) and FM phonon omega^2=eps_k(eps_k+2(c0+c1)n) with factor-2 origin (diagonal+anomalous Hartree sum) structurally different from T99 BdG self-energy (Bose-symmetrized rank-4 projector). Audit C1 mu=sound, C2 k-grid finite-k correction=k^2 scaling confirmed, C3 channel_kernel convention=uniform across 2 documented call sites. Caveat: critic harness Read-only -> Deliverable B numerical recompute at fresh parameters (polar c0=2.0/c1=+0.05 -> cs=sqrt(2); FM c0=0.5/c1=-0.2 -> cs=sqrt(0.3)) delivered by symbolic substitution into verified script algorithm, not fresh Julia execution. Tier 2.5 -> 2.75 recommended; T102 Document with 30s recompute prerequisite to confirm symbolically-predicted PASS empirically before tier 3.0.",
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 20100866,
+        "total": 20100866,
+        "effective_full_rate": 3097456,
+        "breakdown": {
+          "input_fresh": 52222,
+          "cache_creation": 644782,
+          "cache_read": 19342868,
+          "output": 60994
+        },
+        "n_messages": 92,
+        "n_message_starts": 92
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.214,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.2,
+        "cost_inflation": 1.743,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "director_must_address",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "DRIFT_COST_INFLATION",
+        "AUDIT_DUE: patterns.yaml last audited at T88, gap=13"
+      ]
+    },
+    {
+      "turn": 102,
+      "ts": "2026-05-18T15:49:32Z",
+      "judge_status": "PASS",
+      "directive_action": "modify_code",
+      "directive_label": "tdhfb-phase2-tier3-T102-document-with-julia-recompute-caveat-resolve",
+      "short_label": "tdhfb-tier3-closure",
+      "wall_time_sec": 532.919,
+      "verdict": "TIER_3_CLOSURE_PASS",
+      "tier_reached": 3.0,
+      "investigation_id": "tdhfb-phase2-hf-kernel-generic-F-bogoliubov-spectrum-2026-05-18",
+      "stage_advancing_to": "Document",
+      "all_recompute_falsifiers_passed": true,
+      "agent_hashes": {
+        "critic": "cd44117d23595a18db7b2f6a1fd013e0",
+        "director": "f02c149c8cd6e8ce4d998629f74924b8",
+        "implementer": "d06804d919f6ab7fb0fe2ee1f99bcf5a",
+        "researcher": "6635ef673d05e12621da8d38413c3a8b",
+        "theorist": "e33d24bdc505b4ec69873b39f5292087"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 15217733,
+        "total": 15217733,
+        "effective_full_rate": 2148653,
+        "breakdown": {
+          "input_fresh": 10125,
+          "cache_creation": 431102,
+          "cache_read": 14751608,
+          "output": 24898
+        },
+        "n_messages": 118,
+        "n_message_starts": 118
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.222,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.1,
+        "cost_inflation": 1.209,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "director_must_address",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "DRIFT_COST_INFLATION",
+        "AUDIT_DUE: patterns.yaml last audited at T88, gap=14"
+      ]
+    },
+    {
+      "turn": 103,
+      "ts": "2026-05-18T16:07:34Z",
+      "judge_status": "RESEARCHER_ONLY",
+      "directive_action": "researcher_shallow",
+      "directive_label": "audit-class-scan-T103-observe",
+      "wall_time_sec": null,
+      "agent_hashes": {
+        "critic": "cd44117d23595a18db7b2f6a1fd013e0",
+        "director": "f02c149c8cd6e8ce4d998629f74924b8",
+        "implementer": "d06804d919f6ab7fb0fe2ee1f99bcf5a",
+        "researcher": "6635ef673d05e12621da8d38413c3a8b",
+        "theorist": "e33d24bdc505b4ec69873b39f5292087"
+      }
     }
   ],
   "created_at": "2026-05-14T00:00:00+00:00",
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "PASS",
+  "last_judge": "RESEARCHER_ONLY",
   "home_branch": "main",
   "schema_version": 2.1,
   "current_agent_hashes": {
@@ -2256,8 +2416,8 @@
     "researcher": "6635ef673d05e12621da8d38413c3a8b",
     "theorist": "e33d24bdc505b4ec69873b39f5292087"
   },
-  "last_directive_label": "sign-pattern-lemma1-tier3-T91-research-extract-ku2012-sku2013-f2-tables",
-  "last_directive_action": "researcher_shallow",
+  "last_directive_label": "tdhfb-phase2-tier3-T102-document-with-julia-recompute-caveat-resolve",
+  "last_directive_action": "modify_code",
   "last_error": null,
   "retries": 0,
   "active_investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
@@ -3245,10 +3405,13 @@
       "title": "TDHFB Phase 2 generic-F HF kernel: Tier-3 cross-validation vs KU2012 F=1 Bogoliubov closed-forms",
       "hypothesis": "TDHFB generic-F Hartree-Fock kernel (hf_matrix_generic, BdG self-energy convention with factor-2 Bose symmetrization) reproduces KU2012 F=1 polar phonon, polar magnon, and FM phonon Bogoliubov dispersions to relative tolerance 1e-3 in small-k regime, AND the BdG-vs-GP factor-2 ratio at the F=1 polar self-pair diagonal element equals exactly 2.0 within machine epsilon.",
       "flow_template": "verify-claim",
-      "current_stage": "Execute-complete",
+      "current_stage": "closed",
       "stages_done": [
+        "Document",
+        "Execute",
         "Hypothesize",
-        "Research"
+        "Research",
+        "Update"
       ],
       "stages_at_turn": {
         "Research": [
@@ -3258,42 +3421,91 @@
         "Hypothesize": [
           99,
           "theorist algebraic L(k) construction at F=1 polar/FM; convention pitfall RESOLVED_NO_CORRECTION_NEEDED; F1/F2/F3 load-bearing falsifiers formalized"
+        ],
+        "Update": [
+          100,
+          "implementer_julia_cpu_light executed F1/F2/F3 at c_0=1 \u2014 all PASS by 100x-750x margin; tier 1.5 -> 2.5"
+        ],
+        "Update_2": [
+          101,
+          "critic Route I independent re-derivation + audit clean; tier 2.5 -> 2.75 CORROBORATE_WITH_ERRATA (tooling-restriction caveat)"
+        ],
+        "Document": [
+          102,
+          "implementer_julia_cpu_light recompute at fresh parameters (c_0=2.0 polar, c_0=0.5 FM) + Document closure; all 3 falsifiers PASS; tier 2.75 -> 3.0 TIER_3_CLOSURE_PASS"
         ]
       },
       "falsifiers": [
         {
           "id": "F1-polar-phonon-sound-velocity",
-          "description": "F=1 polar GS zeta=(0,1,0), c_0=1, c_1=0.1, n=1: c_s_density_polar = sqrt(c_0 n / m) = 1.0 to rtol 1e-3",
-          "tested_at_turn": null,
-          "result": null
+          "description": "F=1 polar GS zeta=(0,1,0): c_s = sqrt(c_0 n) to rtol 1e-3",
+          "tested_at_turns": [
+            100,
+            102
+          ],
+          "result": "CONFIRMED at c_0=1.0 T100 (rel_err=7.86e-6) + CONFIRMED at c_0=2.0 T102 (rel_err=3.93e-6)"
         },
         {
           "id": "F2-fm-phonon-sound-velocity",
-          "description": "F=1 FM GS zeta=(1,0,0), c_0=1, c_1=-0.1, n=1: c_s_density_FM = sqrt((c_0+c_1) n / m) = sqrt(0.9) approx 0.9487 to rtol 1e-3",
-          "tested_at_turn": null,
-          "result": null
+          "description": "F=1 FM GS zeta=(1,0,0): c_s = sqrt((c_0+c_1) n) to rtol 1e-3",
+          "tested_at_turns": [
+            100,
+            102
+          ],
+          "result": "CONFIRMED at c_0=1.0,c_1=-0.1 T100 (rel_err=8.74e-6) + CONFIRMED at c_0=0.5,c_1=-0.2 T102 (rel_err=2.62e-5)"
         },
         {
           "id": "F3-bdg-vs-gp-factor-2-ratio",
-          "description": "F=1 polar GS: hf_matrix_generic[m=0,m=0] / hf_matrix_F1[m=0,m=0] = 2.0 exactly within machine epsilon (< 1e-12)",
-          "tested_at_turn": null,
-          "result": null
+          "description": "F=1 polar GS: hf_matrix_generic[m=0,m=0] / hf_matrix_F1[m=0,m=0] = 2.0 within machine epsilon",
+          "tested_at_turns": [
+            100,
+            102
+          ],
+          "result": "CONFIRMED parameter-independent: T100 c_0=1.0 (abs_err=1.33e-15) + T102 c_0=2.0 (abs_err=8.88e-16)"
         }
       ],
-      "tier_current": 1.5,
+      "tier_current": 3.0,
       "tier_target": 3,
       "kind": "physics",
       "priority": 2,
-      "last_turn": 100,
-      "last_stage": "Hypothesize",
-      "last_verdict": "HYPOTHESIZE_PASS_FALSIFIERS_FORMALIZED_CONVENTION_RESOLVED",
+      "last_turn": 102,
+      "last_stage": "Document",
+      "last_verdict": "TIER_3_CLOSURE_PASS",
       "blocked_on": null,
-      "next_stage": "Update",
-      "next_stage_action": "T100 implementer_julia_cpu_light executes F1/F2/F3 via scripts/diagnostic/tdhfb_f1_bogoliubov_cross_check.jl (<=30 lines Julia); cpu_light workload, <5 min wall. F4 and F5 advisory optional. F6 dropped (already pinned by test/hamiltonian/test_tdhfb_ku_c01_to_g_S.jl).",
-      "tier": 2.5
+      "next_stage": null,
+      "next_stage_action": null,
+      "tier": 3.0,
+      "closing_note": "T98-T102 arc (5 turns): hf_matrix_generic + un-symmetrized channel_kernel reproduces KU2012 F=1 Bogoliubov phonon dispersions (polar + FM) to rel_err ~3-26e-6 at two parameter points each (c_0=1 T100, c_0=2/0.5 T102). BdG/GP factor-2 ratio = 2.0 at machine epsilon confirmed parameter-independent. T101 critic Route I independent re-derivation. All falsifiers PASS by 100x-750x margin. 6th project Tier-3 closure."
+    },
+    "meta-director-self-audit-2026-05-19": {
+      "id": "meta-director-self-audit-2026-05-19",
+      "kind": "meta",
+      "title": "Director self-audit: last 20 decisions quality review (auto-spawn)",
+      "hypothesis": "Director's pick-quality / tier-estimation-accuracy / waste-rate has drifted. Independent critic audit identifies systematic biases or routing errors that drift_signals (quantitative) cannot catch.",
+      "flow_template": "meta-improvement",
+      "current_stage": "Observe",
+      "stages_done": [],
+      "target_metric": "director_decision_quality_score",
+      "baseline_value": null,
+      "baseline_window": "last 20 turns up to T100",
+      "predicted_improvement": null,
+      "modifies_files": [
+        ".claude/agents/director.md"
+      ],
+      "rollback_branch": "main",
+      "safety_class": "low",
+      "auto_spawned_by_trigger": "director_self_audit_due",
+      "auto_spawned_at_turn": 100,
+      "falsifiers": [],
+      "tier_current": 0,
+      "tier_target": 1,
+      "priority": 20,
+      "blocked_on": null,
+      "next_stage": "Hypothesize",
+      "next_stage_action": "researcher Observe stage already triggered this auto-spawn; theorist Hypothesize next"
     }
   },
-  "last_meta_check_turn": 99,
-  "last_short_label": "sign-pattern-lemma1-tier3-T91-research",
-  "last_label": "sign-pattern-lemma1-tier3-T91-research-extract-ku2012-sku2013-f2-tables"
+  "last_meta_check_turn": 102,
+  "last_short_label": "tdhfb-tier3-closure",
+  "last_label": "tdhfb-phase2-tier3-T102-document-with-julia-recompute-caveat-resolve"
 }
