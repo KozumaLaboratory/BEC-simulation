@@ -1,0 +1,264 @@
+{
+  "turn": 89,
+  "status": "PASS",
+  "issues": [],
+  "metrics": {
+    "experiment_kind": "text_only",
+    "investigation_kind": "physics",
+    "src_files_modified": 0,
+    "new_analysis_scripts_written": 0,
+    "agents_md_files_modified": 0,
+    "patterns_yaml_modified": false,
+    "patterns_yaml_grep_patterns_modified": false,
+    "state_json_modified": true,
+    "state_json_audit_class_scan_t87_closed": true,
+    "state_json_audit_class_scan_t87_tier_current": 2,
+    "state_json_audit_class_scan_t87_stages_done_includes_document": true,
+    "state_json_audit_class_scan_t87_has_closing_note": true,
+    "state_json_history_array_modified": false,
+    "state_json_other_investigations_modified": false,
+    "state_json_valid_after_edit": true,
+    "memory_files_added": 1,
+    "memory_files_added_list": [
+      "audit_class_scan_t87_cycle_2026_05_18.md"
+    ],
+    "memory_file_yaml_frontmatter_valid": true,
+    "memory_file_has_status_section": true,
+    "memory_file_has_cycle_summary_section": true,
+    "memory_file_has_sweep_result_section": true,
+    "memory_file_has_cross_cycle_comparison_section": true,
+    "memory_file_has_institutional_lessons_section": true,
+    "memory_file_has_cross_references_section": true,
+    "investigation_id": "audit-class-scan-2026-05-18-T87",
+    "stage_advancing_to": "Document",
+    "flow_template": "audit-class-scan",
+    "judge_py_unchanged": true,
+    "agents_md_unchanged": true,
+    "src_subtree_untouched": true,
+    "lp2_grep_unchanged": true,
+    "manuscript_edited": false,
+    "src_edited": false,
+    "julia_executed": false,
+    "tests_passed": null,
+    "falsification_result": "INCONCLUSIVE"
+  },
+  "contract_evaluation": {
+    "verdict": "PASS",
+    "criteria_results": [
+      {
+        "id": "experiment_kind_correct",
+        "passed": true,
+        "actual": "text_only",
+        "reason": "experiment_kind=text_only == text_only \u2192 True"
+      },
+      {
+        "id": "investigation_kind_physics",
+        "passed": true,
+        "actual": "physics",
+        "reason": "investigation_kind=physics == physics \u2192 True"
+      },
+      {
+        "id": "src_unchanged",
+        "passed": true,
+        "actual": 0,
+        "reason": "src_files_modified=0 == 0 \u2192 True"
+      },
+      {
+        "id": "no_scripts_committed",
+        "passed": true,
+        "actual": 0,
+        "reason": "new_analysis_scripts_written=0 == 0 \u2192 True"
+      },
+      {
+        "id": "no_agents_md_changes",
+        "passed": true,
+        "actual": 0,
+        "reason": "agents_md_files_modified=0 == 0 \u2192 True"
+      },
+      {
+        "id": "patterns_yaml_untouched",
+        "passed": true,
+        "actual": false,
+        "reason": "patterns_yaml_modified=False == False \u2192 True"
+      },
+      {
+        "id": "grep_patterns_untouched_explicit",
+        "passed": true,
+        "actual": false,
+        "reason": "patterns_yaml_grep_patterns_modified=False == False \u2192 True"
+      },
+      {
+        "id": "state_json_modified_correctly",
+        "passed": true,
+        "actual": true,
+        "reason": "state_json_modified=True == True \u2192 True"
+      },
+      {
+        "id": "t87_closed",
+        "passed": true,
+        "actual": true,
+        "reason": "state_json_audit_class_scan_t87_closed=True == True \u2192 True"
+      },
+      {
+        "id": "t87_tier_two",
+        "passed": true,
+        "actual": 2,
+        "reason": "state_json_audit_class_scan_t87_tier_current=2 == 2 \u2192 True"
+      },
+      {
+        "id": "t87_stages_done_has_document",
+        "passed": true,
+        "actual": true,
+        "reason": "state_json_audit_class_scan_t87_stages_done_includes_document=True == True \u2192 True"
+      },
+      {
+        "id": "t87_has_closing_note",
+        "passed": true,
+        "actual": true,
+        "reason": "state_json_audit_class_scan_t87_has_closing_note=True == True \u2192 True"
+      },
+      {
+        "id": "history_untouched",
+        "passed": true,
+        "actual": false,
+        "reason": "state_json_history_array_modified=False == False \u2192 True"
+      },
+      {
+        "id": "other_investigations_untouched",
+        "passed": true,
+        "actual": false,
+        "reason": "state_json_other_investigations_modified=False == False \u2192 True"
+      },
+      {
+        "id": "state_json_parses",
+        "passed": true,
+        "actual": true,
+        "reason": "state_json_valid_after_edit=True == True \u2192 True"
+      },
+      {
+        "id": "exactly_one_memory_added",
+        "passed": true,
+        "actual": 1,
+        "reason": "memory_files_added=1 == 1 \u2192 True"
+      },
+      {
+        "id": "memory_yaml_frontmatter_present",
+        "passed": true,
+        "actual": true,
+        "reason": "memory_file_yaml_frontmatter_valid=True == True \u2192 True"
+      },
+      {
+        "id": "memory_status_section",
+        "passed": true,
+        "actual": true,
+        "reason": "memory_file_has_status_section=True == True \u2192 True"
+      },
+      {
+        "id": "memory_cycle_summary_section",
+        "passed": true,
+        "actual": true,
+        "reason": "memory_file_has_cycle_summary_section=True == True \u2192 True"
+      },
+      {
+        "id": "memory_sweep_result_section",
+        "passed": true,
+        "actual": true,
+        "reason": "memory_file_has_sweep_result_section=True == True \u2192 True"
+      },
+      {
+        "id": "memory_cross_cycle_comparison",
+        "passed": true,
+        "actual": true,
+        "reason": "memory_file_has_cross_cycle_comparison_section=True == True \u2192 True"
+      },
+      {
+        "id": "memory_institutional_lessons",
+        "passed": true,
+        "actual": true,
+        "reason": "memory_file_has_institutional_lessons_section=True == True \u2192 True"
+      },
+      {
+        "id": "memory_cross_references",
+        "passed": true,
+        "actual": true,
+        "reason": "memory_file_has_cross_references_section=True == True \u2192 True"
+      },
+      {
+        "id": "investigation_consistent",
+        "passed": true,
+        "actual": "audit-class-scan-2026-05-18-T87",
+        "reason": "investigation_id=audit-class-scan-2026-05-18-T87 == audit-class-scan-2026-05-18-T87 \u2192 True"
+      },
+      {
+        "id": "stage_consistent",
+        "passed": true,
+        "actual": "Document",
+        "reason": "stage_advancing_to=Document == Document \u2192 True"
+      },
+      {
+        "id": "template_consistent",
+        "passed": true,
+        "actual": "audit-class-scan",
+        "reason": "flow_template=audit-class-scan == audit-class-scan \u2192 True"
+      },
+      {
+        "id": "judge_py_intact",
+        "passed": true,
+        "actual": true,
+        "reason": "judge_py_unchanged=True == True \u2192 True"
+      },
+      {
+        "id": "agents_md_intact",
+        "passed": true,
+        "actual": true,
+        "reason": "agents_md_unchanged=True == True \u2192 True"
+      },
+      {
+        "id": "src_subtree_intact",
+        "passed": true,
+        "actual": true,
+        "reason": "src_subtree_untouched=True == True \u2192 True"
+      },
+      {
+        "id": "lp2_grep_intact",
+        "passed": true,
+        "actual": true,
+        "reason": "lp2_grep_unchanged=True == True \u2192 True"
+      },
+      {
+        "id": "no_manuscript_polish",
+        "passed": true,
+        "actual": false,
+        "reason": "manuscript_edited=False == False \u2192 True"
+      },
+      {
+        "id": "no_src_modification_explicit",
+        "passed": true,
+        "actual": false,
+        "reason": "src_edited=False == False \u2192 True"
+      },
+      {
+        "id": "no_julia_execution",
+        "passed": true,
+        "actual": false,
+        "reason": "julia_executed=False == False \u2192 True"
+      }
+    ],
+    "triggered_failure_modes": [],
+    "issues": []
+  },
+  "cost_audit": null,
+  "investigation_id": "audit-class-scan-2026-05-18-T87",
+  "stage_advancing_to": "Document",
+  "investigation_update": {
+    "if_success_advance_to_stage": "closed",
+    "if_success_tier_becomes": 2.0,
+    "if_partial_success_advance_to_stage": "Document (T90 retry with corrected scope)",
+    "if_partial_success_tier_becomes": 1.5,
+    "if_refuted_advance_to_stage": "n/a (audit-class-scan Document has no hypothesis to refute; only mechanical closure)",
+    "if_refuted_tier_becomes": 1.0,
+    "if_inconclusive_advance_to_stage": "Document (T90 expanded clarity)",
+    "if_inconclusive_tier_becomes": 1.5,
+    "next_falsifier_to_test_after": "n/a -- audit-class-scan does not use falsifier framework."
+  }
+}
