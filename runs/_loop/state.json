@@ -1,5 +1,5 @@
 {
-  "turn": 71,
+  "turn": 72,
   "status": "running",
   "history": [
     {
@@ -1967,6 +1967,56 @@
         "implementer": "610ac60c59abbbf4af92e2c464e6bcf2",
         "researcher": "6635ef673d05e12621da8d38413c3a8b",
         "theorist": "e33d24bdc505b4ec69873b39f5292087"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 14912848,
+        "total": 14912848,
+        "effective_full_rate": 2247005,
+        "breakdown": {
+          "input_fresh": 18220,
+          "cache_creation": 518566,
+          "cache_read": 14346884,
+          "output": 29178
+        },
+        "n_messages": 106,
+        "n_message_starts": 106
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.0,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.1,
+        "cost_inflation": 1.289,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "director_must_address",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "DRIFT_COST_INFLATION"
+      ]
+    },
+    {
+      "turn": 71,
+      "ts": "2026-05-18T03:44:26Z",
+      "judge_status": "RESEARCHER_ONLY",
+      "directive_action": "researcher_dispatch",
+      "directive_label": "matsui-science-2026-pdf-extract",
+      "wall_time_sec": null,
+      "tokens_used": null,
+      "agent_hashes": {
+        "critic": "7c36d8654a723ccacaa508d16d7cfb25",
+        "director": "517de6ca2845a4eb281a5387eeba0132",
+        "implementer": "610ac60c59abbbf4af92e2c464e6bcf2",
+        "researcher": "6635ef673d05e12621da8d38413c3a8b",
+        "theorist": "e33d24bdc505b4ec69873b39f5292087"
       }
     }
   ],
@@ -1974,7 +2024,7 @@
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "PASS",
+  "last_judge": "RESEARCHER_ONLY",
   "home_branch": "main",
   "schema_version": 2.1,
   "current_agent_hashes": {
@@ -2546,7 +2596,7 @@
       "title": "Tier-3 verification pipeline candidate survey (post-pipeline-empty pipeline population)",
       "hypothesis": "Pipeline has zero open priority-1-3 physics investigations; researcher Research stage produces ranked candidate list for anko to ratify into seed.md",
       "flow_template": "survey",
-      "current_stage": "Synthesize",
+      "current_stage": "Document (deferred to T73+ steady-state via implementer_text; not blocking child investigation T71+ research)",
       "stages_done": [
         "Research",
         "Synthesize"
@@ -2614,7 +2664,7 @@
       "closing_note": null
     }
   },
-  "last_meta_check_turn": 69,
+  "last_meta_check_turn": 70,
   "last_short_label": "yan-li-saito-r4-dormant-close-document",
   "last_label": "yan-li-saito-r4-dormant-close-document"
 }
