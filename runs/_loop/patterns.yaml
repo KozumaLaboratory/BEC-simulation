@@ -27,7 +27,7 @@ patterns:
       - 'test/'
       - '.claude/logs/'
       - 'runs/_loop/'
-    last_scanned: '2026-05-18T12:00:00+09:00'
+    last_scanned: '2026-05-18T09:00:00+09:00'
     last_count: 0
     related_classes: [api-rename-stragglers, doc-staleness, test-mock-of-removed]
 
@@ -42,7 +42,7 @@ patterns:
       - '_v1_'
     exclude_paths:
       - 'test/'
-    last_scanned: '2026-05-18T12:00:00+09:00'
+    last_scanned: '2026-05-18T09:00:00+09:00'
     last_count: 0
     related_classes: [deprecated-name-leak]
 
@@ -59,7 +59,7 @@ patterns:
     detect_extra: |
       Manual review: pick 3 random sections in CLAUDE.md, verify each
       claim against current src/. Spot-check, not exhaustive.
-    last_scanned: '2026-05-18T12:00:00+09:00'
+    last_scanned: '2026-05-18T09:00:00+09:00'
     last_count: 0
     related_classes: [deprecated-name-leak]
 
@@ -74,7 +74,7 @@ patterns:
     exclude_paths:
       - 'test/'  # test tolerances are local by design
       - 'docs/'
-    last_scanned: '2026-05-18T12:00:00+09:00'
+    last_scanned: '2026-05-18T09:00:00+09:00'
     last_count: 0
     related_classes: []
 
@@ -88,7 +88,7 @@ patterns:
       For each name in `export ...` lines, grep -r "<name>" outside
       its defining file + test/. If zero hits, it's a candidate for
       removal — but check memory for "WIP" / "public API" markers first.
-    last_scanned: '2026-05-18T12:00:00+09:00'
+    last_scanned: '2026-05-18T09:00:00+09:00'
     last_count: 0
     related_classes: []
 
@@ -99,7 +99,7 @@ patterns:
       split.
     detect: |
       Find src/ -name '*.jl' -exec wc -l {} \; | awk '$1 > 800'
-    last_scanned: '2026-05-18T12:00:00+09:00'
+    last_scanned: '2026-05-18T09:00:00+09:00'
     last_count: 0
     related_classes: []
 
@@ -114,7 +114,7 @@ patterns:
       - 'Mock\w+\('
     exclude_paths:
       - 'docs/'
-    last_scanned: '2026-05-18T12:00:00+09:00'
+    last_scanned: '2026-05-18T09:00:00+09:00'
     last_count: 0
     related_classes: []
 
@@ -125,7 +125,7 @@ patterns:
     detect: |
       Manual review: pick 5 random comments in src/, judge each. Aim
       to identify the worst 5 instances per audit cycle.
-    last_scanned: '2026-05-18T12:00:00+09:00'
+    last_scanned: '2026-05-18T09:00:00+09:00'
     last_count: 0
     related_classes: []
 
@@ -152,7 +152,7 @@ patterns:
     exclude_paths:
       - 'test/'
       - 'runs/_loop/judge/turn_47_critic_audit.md'  # the triggering instance, kept for history
-    last_scanned: '2026-05-18T12:00:00+09:00'
+    last_scanned: '2026-05-18T09:00:00+09:00'
     last_count: 0
     related_classes: [doc-staleness, deprecated-name-leak]
 
@@ -169,8 +169,8 @@ patterns:
     exclude_paths:
       - 'test/'
       - 'docs/'
-    last_scanned: '2026-05-18T13:00:00+09:00'
-    last_count: 5
+    last_scanned: '2026-05-18T09:00:00+09:00'
+    last_count: 0
     related_classes: [cargo-cult-comment]
     promoted_from: proposed_classes
     promoted_at: '2026-05-18T13:00:00+09:00'
@@ -295,3 +295,21 @@ audit_history:
       Verdict evaluation was previously gated by judge.py `_OPS["in"]`
       bug (FAIL_OPERATIONAL at T52); T53 fixed the bug, T52 re-judged PASS;
       T54 closes the audit-class-scan cycle.
+  - run_at: '2026-05-18T09:00:00+09:00'
+    triggered_by: 'T61 audit-class-scan §F6 Observe sweep + T62 Triage close (AUDIT_DUE gap=61 since T0, gap=11 since T50 cycle)'
+    patterns_scanned: ['deprecated-name-leak', 'api-rename-stragglers', 'doc-staleness', 'hardcoded-magic-number', 'dead-export', 'large-file-bloat', 'test-mock-of-real', 'cargo-cult-comment', 'paper-unit-system-wrong-param-in-spot-check', 'topology-function-WHAT-comment-pattern']
+    findings_count: 0
+    notes: |
+      Second full catalog sweep (first since LP-2 promotion at T54). All 10 patterns clean:
+      4 no-finding (0 raw hits): deprecated-name-leak, api-rename-stragglers, test-mock-of-real,
+      paper-unit-system-wrong-param-in-spot-check.
+      6 no-action-rationalized: doc-staleness (1 non-actionable TODO meta-comment),
+      hardcoded-magic-number (126 1e-30 instances, heterogeneous semantics, T51 re-triage holds),
+      dead-export (TDHFB public API + state_zoo WIP excluded), large-file-bloat (all under 800
+      lines, split_step.jl stable at ~773 actual), cargo-cult-comment (5-function manual review
+      clean), topology-function-WHAT-comment-pattern (T51 cleanup held; 5 raw grep hits all false
+      positives in WHY-comments; 0 actionable).
+      0 L3 proposals (steady state).
+      LP-2 grep quality note: bare 'Gradient' keyword produces 4 false positives in driver.jl
+      and parsing_blocks.jl; tightening proposed in research/turn_61 §5 (non-blocking; deferred
+      to critic-audit or next cycle per §F6 safety rail).
