@@ -1,0 +1,1364 @@
+[
+  {
+    "turn": 28,
+    "ts": "2026-05-17T03:15:04Z",
+    "judge_status": "CRITIC_PASS",
+    "directive_action": "critic_audit",
+    "directive_label": "barnett-update-stage-corroborate-tier3-recommended",
+    "wall_time_sec": null,
+    "agent_hashes": {
+      "critic": "3f490a470511457f71b3fce819b12195",
+      "director": "d064dde7210fefda5e3683ec17585da7",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    },
+    "notes": "Director route (d) critic audit; barnett-mechanism Update stage; critic VERDICT=CORROBORATE; tier 2.5 → 3.0 recommended; T29 = Document stage; one residual-misattribution flagged (5.5% residual ≠ GP, ~Bloch-Siegert).",
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 7596560,
+      "total": 7596560,
+      "effective_full_rate": 1328464,
+      "breakdown": {
+        "input_fresh": 23006,
+        "cache_creation": 374103,
+        "cache_read": 7175393,
+        "output": 24058
+      },
+      "n_messages": 56,
+      "n_message_starts": 56
+    },
+    "branch": null,
+    "commit": null,
+    "parent": null,
+    "drift_signals": {
+      "topic_repetition": 0.0,
+      "subagent_repetition": 0.333,
+      "manuscript_delta_zero": 1.0,
+      "code_delta_zero": 0.0,
+      "verdict_drift": 0.4,
+      "cost_inflation": 0.636,
+      "novel_claim_zero": 0.0
+    },
+    "drift_escalation": "advisory",
+    "drift_advisories": [
+      "DRIFT_MANUSCRIPT_DELTA_ZERO"
+    ]
+  },
+  {
+    "turn": 29,
+    "ts": "2026-05-17T03:31:21Z",
+    "judge_status": "INCONCLUSIVE",
+    "directive_action": "document_investigation_closure",
+    "directive_label": "barnett-mechanism-document-tier3-promoted",
+    "wall_time_sec": null,
+    "notes": "Document stage closure of barnett-mechanism-2026-05-16. Tier 2.5 → 3.0 (project's first Tier 3). Coherent rotating-frame Bloch mechanism confirmed; γ_dr-independence proven. 5.5% τ-residual errata propagated: Bloch-Siegert NOT GP mean-field (critic/turn_28 §3.4). Activates yan-li-saito-2026-reproduction as priority-1 successor. Deliverables: barnett-mechanism-confirmed.md created, barnett.md appended (T19 total), state.json updated. | judge: INCONCLUSIVE due to metric-key contract mismatch (director success_criteria.metric strings did not match implementer assertion id keys); all qualitative assertions PASS; flagged for T30 director to address.",
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 9942181,
+      "total": 9942181,
+      "effective_full_rate": 1526725,
+      "breakdown": {
+        "input_fresh": 6106,
+        "cache_creation": 355073,
+        "cache_read": 9556782,
+        "output": 24220
+      },
+      "n_messages": 75,
+      "n_message_starts": 75
+    },
+    "branch": null,
+    "commit": null,
+    "parent": null,
+    "drift_signals": {
+      "topic_repetition": 0.222,
+      "subagent_repetition": 0.333,
+      "manuscript_delta_zero": 1.0,
+      "code_delta_zero": 0.0,
+      "verdict_drift": 0.5,
+      "cost_inflation": 0.793,
+      "novel_claim_zero": 0.0
+    },
+    "drift_escalation": "advisory",
+    "drift_advisories": [
+      "DRIFT_MANUSCRIPT_DELTA_ZERO"
+    ],
+    "investigation_id": "barnett-mechanism-2026-05-16",
+    "stage_advancing_to": "Document"
+  },
+  {
+    "turn": 30,
+    "ts": "2026-05-17T03:59:26Z",
+    "judge_status": "NOOP",
+    "directive_action": "noop",
+    "directive_label": "yan-li-saito-hypothesize-zero-blockers",
+    "wall_time_sec": null,
+    "notes": "Hypothesize stage for yan-li-saito-2026-reproduction. Term-by-term paper→SpinorBEC.jl mapping (5 rows), all Q1-Q5 framework gaps resolved (Q1 LHY χ bit-exact MATCH, Q2 DDI prefactor ratio=1 with proper g_F, Q3 free-space ITP CLEAR via NoPotential, Q4 J_z-constrained ITP CLEAR via _find_ground_state_Jz, Q5 init_psi_fl_vortex matches torus topology). 4 pre-registered falsifiers (F1/F2/F3/F4) with quantitative predictions + tolerance bands. ZERO BLOCKERS for F1 (torus GS) Execute. 2 research queries dispatched in parallel: Q-Eu151-gF RESOLVED (paper uses real F=1 Eu-151 hyperfine with g_F·F=9/2 from Breit-Rabi → a_s≈21 a₀); Q-paper-energy-table NOT_FOUND (no energy table in paper; F4 becomes ratio-only discriminator).",
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 12469441,
+      "total": 12469441,
+      "effective_full_rate": 2097949,
+      "breakdown": {
+        "input_fresh": 56342,
+        "cache_creation": 614311,
+        "cache_read": 11779637,
+        "output": 19151
+      },
+      "n_messages": 115,
+      "n_message_starts": 115
+    },
+    "branch": null,
+    "commit": null,
+    "parent": null,
+    "agent_hashes": {
+      "critic": "3f490a470511457f71b3fce819b12195",
+      "director": "d064dde7210fefda5e3683ec17585da7",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    },
+    "drift_signals": {
+      "topic_repetition": 0.0,
+      "subagent_repetition": 0.333,
+      "manuscript_delta_zero": 1.0,
+      "code_delta_zero": 1.0,
+      "verdict_drift": 0.5,
+      "cost_inflation": 1.344,
+      "novel_claim_zero": 0.0
+    },
+    "drift_escalation": "human_required",
+    "drift_advisories": [
+      "DRIFT_MANUSCRIPT_DELTA_ZERO",
+      "DRIFT_CODE_DELTA_ZERO",
+      "DRIFT_COST_INFLATION"
+    ]
+  },
+  {
+    "turn": 31,
+    "ts": "2026-05-17T04:23:58Z",
+    "judge_status": "PASS",
+    "directive_action": "modify_code",
+    "directive_label": "yan-li-saito-f1-torus-design",
+    "wall_time_sec": 240,
+    "agent_hashes": {
+      "critic": "e4cc3ddb505396ed9e55914384944cbd",
+      "director": "783bdf12151be93c1b84fdef10bec44b",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    },
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 12615072,
+      "total": 12615072,
+      "effective_full_rate": 1695597,
+      "breakdown": {
+        "input_fresh": 11628,
+        "cache_creation": 280856,
+        "cache_read": 12302049,
+        "output": 20539
+      },
+      "n_messages": 103,
+      "n_message_starts": 103
+    },
+    "branch": "auto/turn_31_yan-li-saito-f1-torus-design",
+    "commit": null,
+    "parent": "102b2ae",
+    "drift_signals": {
+      "topic_repetition": 0.333,
+      "subagent_repetition": 0.333,
+      "manuscript_delta_zero": 1.0,
+      "code_delta_zero": 1.0,
+      "verdict_drift": 0.4,
+      "cost_inflation": 0.881,
+      "novel_claim_zero": 0.0
+    },
+    "drift_escalation": "director_must_address",
+    "drift_advisories": [
+      "DRIFT_MANUSCRIPT_DELTA_ZERO",
+      "DRIFT_CODE_DELTA_ZERO"
+    ],
+    "investigation_id": "yan-li-saito-2026-reproduction",
+    "stage_advancing_to": "Design"
+  },
+  {
+    "turn": 32,
+    "ts": "2026-05-17T04:40:14Z",
+    "judge_status": "PASS",
+    "directive_action": "modify_code",
+    "directive_label": "yan-li-saito-f1-design-redo",
+    "wall_time_sec": 180,
+    "agent_hashes": {
+      "critic": "e4cc3ddb505396ed9e55914384944cbd",
+      "director": "783bdf12151be93c1b84fdef10bec44b",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    },
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 12047006,
+      "total": 12047006,
+      "effective_full_rate": 1796144,
+      "breakdown": {
+        "input_fresh": 30711,
+        "cache_creation": 376397,
+        "cache_read": 11613174,
+        "output": 26724
+      },
+      "n_messages": 88,
+      "n_message_starts": 88
+    },
+    "branch": null,
+    "commit": null,
+    "parent": null,
+    "drift_signals": {
+      "topic_repetition": 0.714,
+      "subagent_repetition": 0.667,
+      "manuscript_delta_zero": 1.0,
+      "code_delta_zero": 1.0,
+      "verdict_drift": 0.4,
+      "cost_inflation": 1.059,
+      "novel_claim_zero": 0.0
+    },
+    "drift_escalation": "human_required",
+    "drift_advisories": [
+      "DRIFT_MANUSCRIPT_DELTA_ZERO",
+      "DRIFT_CODE_DELTA_ZERO",
+      "DRIFT_COST_INFLATION"
+    ],
+    "investigation_id": "yan-li-saito-2026-reproduction",
+    "stage_advancing_to": "Design"
+  },
+  {
+    "turn": 33,
+    "ts": "2026-05-17T04:59:09Z",
+    "judge_status": "INCONCLUSIVE",
+    "directive_action": "run_experiment",
+    "directive_label": "yan-li-saito-f1-execute-data-gap",
+    "wall_time_sec": 0,
+    "agent_hashes": {
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "director": "783bdf12151be93c1b84fdef10bec44b",
+      "critic": "e4cc3ddb505396ed9e55914384944cbd"
+    },
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 9980187,
+      "total": 9980187,
+      "effective_full_rate": 1503082,
+      "breakdown": {
+        "input_fresh": 15565,
+        "cache_creation": 348366,
+        "cache_read": 9597800,
+        "output": 18456
+      },
+      "n_messages": 105,
+      "n_message_starts": 105
+    },
+    "branch": null,
+    "commit": null,
+    "parent": null,
+    "drift_signals": {
+      "topic_repetition": 0.444,
+      "subagent_repetition": 0.333,
+      "manuscript_delta_zero": 1.0,
+      "code_delta_zero": 0.0,
+      "verdict_drift": 0.5,
+      "cost_inflation": 0.837,
+      "novel_claim_zero": 0.0
+    },
+    "drift_escalation": "advisory",
+    "drift_advisories": [
+      "DRIFT_MANUSCRIPT_DELTA_ZERO"
+    ],
+    "investigation_id": "yan-li-saito-2026-reproduction",
+    "stage_advancing_to": "Execute"
+  },
+  {
+    "turn": 34,
+    "ts": "2026-05-17T05:15:11Z",
+    "judge_status": "PASS",
+    "directive_action": "modify_code",
+    "directive_label": "yan-li-saito-f1-design-corrective-redo",
+    "wall_time_sec": 180,
+    "agent_hashes": {
+      "critic": "e4cc3ddb505396ed9e55914384944cbd",
+      "director": "783bdf12151be93c1b84fdef10bec44b",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    },
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 9804190,
+      "total": 9804190,
+      "effective_full_rate": 1490783,
+      "breakdown": {
+        "input_fresh": 13630,
+        "cache_creation": 359590,
+        "cache_read": 9413711,
+        "output": 17259
+      },
+      "n_messages": 81,
+      "n_message_starts": 81
+    },
+    "branch": null,
+    "commit": null,
+    "parent": null,
+    "drift_signals": {
+      "topic_repetition": 0.857,
+      "subagent_repetition": 0.333,
+      "manuscript_delta_zero": 1.0,
+      "code_delta_zero": 0.0,
+      "verdict_drift": 0.4,
+      "cost_inflation": 0.879,
+      "novel_claim_zero": 0.0
+    },
+    "drift_escalation": "advisory",
+    "drift_advisories": [
+      "DRIFT_MANUSCRIPT_DELTA_ZERO"
+    ],
+    "investigation_id": "yan-li-saito-2026-reproduction",
+    "stage_advancing_to": "Design"
+  },
+  {
+    "turn": 35,
+    "ts": "2026-05-17T05:31:29Z",
+    "judge_status": "INCONCLUSIVE",
+    "directive_action": "run_experiment",
+    "directive_label": "yan-li-saito-f1-execute-bug8-zeeman-schema",
+    "wall_time_sec": 27.7,
+    "agent_hashes": {
+      "critic": "e4cc3ddb505396ed9e55914384944cbd",
+      "director": "783bdf12151be93c1b84fdef10bec44b",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    },
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 11978565,
+      "total": 11978565,
+      "effective_full_rate": 1711554,
+      "breakdown": {
+        "input_fresh": 6201,
+        "cache_creation": 351157,
+        "cache_read": 11599924,
+        "output": 21283
+      },
+      "n_messages": 109,
+      "n_message_starts": 109
+    },
+    "branch": null,
+    "commit": null,
+    "parent": null,
+    "drift_signals": {
+      "topic_repetition": 0.5,
+      "subagent_repetition": 0.333,
+      "manuscript_delta_zero": 1.0,
+      "code_delta_zero": 0.0,
+      "verdict_drift": 0.4,
+      "cost_inflation": 1.121,
+      "novel_claim_zero": 0.0
+    },
+    "drift_escalation": "director_must_address",
+    "drift_advisories": [
+      "DRIFT_MANUSCRIPT_DELTA_ZERO",
+      "DRIFT_COST_INFLATION"
+    ],
+    "investigation_id": "yan-li-saito-2026-reproduction",
+    "stage_advancing_to": "Execute"
+  },
+  {
+    "turn": 36,
+    "ts": "2026-05-17T05:47:02Z",
+    "judge_status": "PASS",
+    "directive_action": "modify_code",
+    "directive_label": "yan-li-saito-f1-design-redo-bug8-fix",
+    "wall_time_sec": 15,
+    "agent_hashes": {
+      "critic": "e4cc3ddb505396ed9e55914384944cbd",
+      "director": "783bdf12151be93c1b84fdef10bec44b",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    },
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 11835849,
+      "total": 11835849,
+      "effective_full_rate": 1671103,
+      "breakdown": {
+        "input_fresh": 37119,
+        "cache_creation": 301545,
+        "cache_read": 11475280,
+        "output": 21905
+      },
+      "n_messages": 90,
+      "n_message_starts": 90
+    },
+    "branch": null,
+    "commit": null,
+    "parent": null,
+    "drift_signals": {
+      "topic_repetition": 0.667,
+      "subagent_repetition": 0.333,
+      "manuscript_delta_zero": 1.0,
+      "code_delta_zero": 0.0,
+      "verdict_drift": 0.3,
+      "cost_inflation": 0.986,
+      "novel_claim_zero": 0.0
+    },
+    "drift_escalation": "advisory",
+    "drift_advisories": [
+      "DRIFT_MANUSCRIPT_DELTA_ZERO"
+    ],
+    "investigation_id": "yan-li-saito-2026-reproduction",
+    "stage_advancing_to": "Design"
+  },
+  {
+    "turn": 37,
+    "ts": "2026-05-17T06:12:06Z",
+    "judge_status": "INCONCLUSIVE",
+    "directive_action": "run_experiment",
+    "directive_label": "yan-li-saito-f1-execute-f1-falsified",
+    "wall_time_sec": 87.9,
+    "agent_hashes": {
+      "critic": "e4cc3ddb505396ed9e55914384944cbd",
+      "director": "783bdf12151be93c1b84fdef10bec44b",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    },
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 12463091,
+      "total": 12463091,
+      "effective_full_rate": 1773206,
+      "breakdown": {
+        "input_fresh": 28344,
+        "cache_creation": 356878,
+        "cache_read": 12059302,
+        "output": 18567
+      },
+      "n_messages": 121,
+      "n_message_starts": 121
+    },
+    "branch": null,
+    "commit": null,
+    "parent": null,
+    "drift_signals": {
+      "topic_repetition": 0.556,
+      "subagent_repetition": 0.333,
+      "manuscript_delta_zero": 1.0,
+      "code_delta_zero": 0.0,
+      "verdict_drift": 0.4,
+      "cost_inflation": 1.061,
+      "novel_claim_zero": 0.0
+    },
+    "drift_escalation": "director_must_address",
+    "drift_advisories": [
+      "DRIFT_MANUSCRIPT_DELTA_ZERO",
+      "DRIFT_COST_INFLATION"
+    ],
+    "investigation_id": "yan-li-saito-2026-reproduction",
+    "stage_advancing_to": "Execute"
+  },
+  {
+    "turn": 38,
+    "ts": "2026-05-17T06:27:40Z",
+    "judge_status": "CRITIC_PASS",
+    "directive_action": "critic_audit",
+    "directive_label": "yan-li-saito-T37-update-cross-check",
+    "wall_time_sec": 153,
+    "agent_hashes": {
+      "critic": "e4cc3ddb505396ed9e55914384944cbd",
+      "director": "783bdf12151be93c1b84fdef10bec44b",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    },
+    "critic_route": true,
+    "verdict_detail": "NEEDS-FURTHER-DISCRIMINATION",
+    "next_stage_recommended": "Design",
+    "audit_file": "runs/_loop/judge/turn_38_critic_audit.md",
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 7662090,
+      "total": 7662090,
+      "effective_full_rate": 1302431,
+      "breakdown": {
+        "input_fresh": 50688,
+        "cache_creation": 327866,
+        "cache_read": 7260361,
+        "output": 23175
+      },
+      "n_messages": 54,
+      "n_message_starts": 54
+    },
+    "branch": null,
+    "commit": null,
+    "parent": null,
+    "drift_signals": {
+      "topic_repetition": 0.3,
+      "subagent_repetition": 0.333,
+      "manuscript_delta_zero": 1.0,
+      "code_delta_zero": 0.0,
+      "verdict_drift": 0.4,
+      "cost_inflation": 0.768,
+      "novel_claim_zero": 0.0
+    },
+    "drift_escalation": "advisory",
+    "drift_advisories": [
+      "DRIFT_MANUSCRIPT_DELTA_ZERO"
+    ]
+  },
+  {
+    "turn": 39,
+    "ts": "2026-05-17T15:37:57Z",
+    "judge_status": "CRITIC_PASS",
+    "directive_action": "critic_audit",
+    "directive_label": "yan-li-saito-T38-4hypothesis-redispatch-narrowed-to-2",
+    "wall_time_sec": 320,
+    "agent_hashes": {
+      "critic": "e4cc3ddb505396ed9e55914384944cbd",
+      "director": "783bdf12151be93c1b84fdef10bec44b",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    },
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 10551821,
+      "total": 10551821,
+      "effective_full_rate": 1750309,
+      "breakdown": {
+        "input_fresh": 11984,
+        "cache_creation": 476291,
+        "cache_read": 10035667,
+        "output": 27879
+      },
+      "n_messages": 77,
+      "n_message_starts": 77
+    },
+    "branch": null,
+    "commit": null,
+    "parent": null,
+    "drift_signals": {
+      "topic_repetition": 0.25,
+      "subagent_repetition": 0.667,
+      "manuscript_delta_zero": 1.0,
+      "code_delta_zero": 0.0,
+      "verdict_drift": 0.3,
+      "cost_inflation": 1.032,
+      "novel_claim_zero": 0.0
+    },
+    "drift_escalation": "director_must_address",
+    "drift_advisories": [
+      "DRIFT_MANUSCRIPT_DELTA_ZERO",
+      "DRIFT_COST_INFLATION"
+    ]
+  },
+  {
+    "turn": 40,
+    "ts": "2026-05-17T16:13:56Z",
+    "judge_status": "INCONCLUSIVE",
+    "directive_action": "run_experiment",
+    "directive_label": "yan-li-saito-T40-seed-basin-discriminator-5pt",
+    "wall_time_sec": 299.2,
+    "agent_hashes": {
+      "critic": "e4cc3ddb505396ed9e55914384944cbd",
+      "director": "783bdf12151be93c1b84fdef10bec44b",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    },
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 18912376,
+      "total": 18912376,
+      "effective_full_rate": 2673107,
+      "breakdown": {
+        "input_fresh": 25244,
+        "cache_creation": 560188,
+        "cache_read": 18303488,
+        "output": 23456
+      },
+      "n_messages": 145,
+      "n_message_starts": 145
+    },
+    "branch": "auto/turn_40_seed-basin-discriminator",
+    "commit": "6e79a7f2120e",
+    "parent": "e74da2a4caa8",
+    "drift_signals": {
+      "topic_repetition": 0.25,
+      "subagent_repetition": 0.333,
+      "manuscript_delta_zero": 1.0,
+      "code_delta_zero": 0.0,
+      "verdict_drift": 0.4,
+      "cost_inflation": 1.576,
+      "novel_claim_zero": 0.0
+    },
+    "drift_escalation": "director_must_address",
+    "drift_advisories": [
+      "DRIFT_MANUSCRIPT_DELTA_ZERO",
+      "DRIFT_COST_INFLATION"
+    ],
+    "investigation_id": "yan-li-saito-2026-reproduction",
+    "stage_advancing_to": "Design"
+  },
+  {
+    "turn": 41,
+    "ts": "2026-05-17T16:32:18Z",
+    "judge_status": "RESEARCHER_ONLY",
+    "directive_action": "researcher",
+    "directive_label": "yan-li-saito-T41-paper-pdf-read-Q1Q2Q3",
+    "wall_time_sec": null,
+    "agent_hashes": {
+      "critic": "e4cc3ddb505396ed9e55914384944cbd",
+      "director": "783bdf12151be93c1b84fdef10bec44b",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    }
+  },
+  {
+    "turn": 42,
+    "ts": "2026-05-17T17:14:49Z",
+    "judge_status": "CRITIC_PASS",
+    "directive_action": "critic_audit",
+    "directive_label": "yan-li-saito-T41-research-audit",
+    "wall_time_sec": null,
+    "agent_hashes": {
+      "critic": "e4cc3ddb505396ed9e55914384944cbd",
+      "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    },
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 7318496,
+      "total": 7318496,
+      "effective_full_rate": 1331469,
+      "breakdown": {
+        "input_fresh": 20561,
+        "cache_creation": 385174,
+        "cache_read": 6884564,
+        "output": 28197
+      },
+      "n_messages": 51,
+      "n_message_starts": 51
+    },
+    "branch": null,
+    "commit": null,
+    "parent": null,
+    "drift_signals": {
+      "topic_repetition": 0.4,
+      "subagent_repetition": 0.333,
+      "manuscript_delta_zero": 1.0,
+      "code_delta_zero": 0.0,
+      "verdict_drift": 0.4,
+      "cost_inflation": 0.787,
+      "novel_claim_zero": 0.0
+    },
+    "drift_escalation": "advisory",
+    "drift_advisories": [
+      "DRIFT_MANUSCRIPT_DELTA_ZERO",
+      "AUDIT_DUE: patterns.yaml last audited at T0, gap=42"
+    ]
+  },
+  {
+    "turn": 43,
+    "ts": "2026-05-17T17:54:37Z",
+    "judge_status": "FAIL_NUMERICAL",
+    "directive_action": "run_experiment",
+    "directive_label": "yan-li-saito-T43-grid-refinement-P0-pre",
+    "wall_time_sec": 57.9,
+    "agent_hashes": {
+      "critic": "e4cc3ddb505396ed9e55914384944cbd",
+      "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    },
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 19839281,
+      "total": 19839281,
+      "effective_full_rate": 2768359,
+      "breakdown": {
+        "input_fresh": 27146,
+        "cache_creation": 560607,
+        "cache_read": 19227997,
+        "output": 23531
+      },
+      "n_messages": 169,
+      "n_message_starts": 169
+    },
+    "branch": "auto/turn_43_grid-refinement-P0-pre",
+    "commit": "3b8b8697fe21",
+    "parent": "17a0c77cae33",
+    "drift_signals": {
+      "topic_repetition": 0.273,
+      "subagent_repetition": 0.333,
+      "manuscript_delta_zero": 1.0,
+      "code_delta_zero": 0.0,
+      "verdict_drift": 0.4,
+      "cost_inflation": 1.637,
+      "novel_claim_zero": 0.0
+    },
+    "drift_escalation": "director_must_address",
+    "drift_advisories": [
+      "DRIFT_MANUSCRIPT_DELTA_ZERO",
+      "DRIFT_COST_INFLATION",
+      "AUDIT_DUE: patterns.yaml last audited at T0, gap=43"
+    ],
+    "investigation_id": "yan-li-saito-2026-reproduction",
+    "stage_advancing_to": "Update"
+  },
+  {
+    "turn": 43,
+    "ts": "2026-05-17T18:11:55Z",
+    "judge_status": "INCONCLUSIVE",
+    "directive_action": "critic_audit",
+    "directive_label": "yan-li-saito-T43-confounder-audit",
+    "wall_time_sec": null,
+    "agent_hashes": {
+      "critic": "e4cc3ddb505396ed9e55914384944cbd",
+      "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    },
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 6632198,
+      "total": 6632198,
+      "effective_full_rate": 1200245,
+      "breakdown": {
+        "input_fresh": 15633,
+        "cache_creation": 332636,
+        "cache_read": 6255271,
+        "output": 28658
+      },
+      "n_messages": 45,
+      "n_message_starts": 45
+    },
+    "branch": "auto/turn_43_grid-refinement-P0-pre",
+    "commit": "3b8b8697fe21",
+    "parent": "17a0c77cae33",
+    "drift_signals": {
+      "topic_repetition": 0.5,
+      "subagent_repetition": 0.333,
+      "manuscript_delta_zero": 1.0,
+      "code_delta_zero": 0.0,
+      "verdict_drift": 0.4,
+      "cost_inflation": 0.693,
+      "novel_claim_zero": 0.0
+    },
+    "drift_escalation": "advisory",
+    "drift_advisories": [
+      "DRIFT_MANUSCRIPT_DELTA_ZERO",
+      "AUDIT_DUE: patterns.yaml last audited at T0, gap=43"
+    ],
+    "investigation_id": "yan-li-saito-2026-reproduction",
+    "stage_advancing_to": "Update"
+  },
+  {
+    "turn": 44,
+    "ts": "2026-05-17T18:46:34Z",
+    "judge_status": "INCONCLUSIVE",
+    "directive_action": "run_experiment",
+    "directive_label": "yan-li-saito-T44-fl-vortex-R2-retry",
+    "wall_time_sec": 58.0,
+    "agent_hashes": {
+      "critic": "e4cc3ddb505396ed9e55914384944cbd",
+      "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    },
+    "falsification_result": "REFUTED",
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 21850261,
+      "total": 21850261,
+      "effective_full_rate": 3069491,
+      "breakdown": {
+        "input_fresh": 34090,
+        "cache_creation": 609738,
+        "cache_read": 21175293,
+        "output": 31140
+      },
+      "n_messages": 190,
+      "n_message_starts": 190
+    },
+    "branch": "auto/turn_44_fl-vortex-R2-retry",
+    "commit": "54ecb59",
+    "parent": "2eb9f97e9cc5",
+    "drift_signals": {
+      "topic_repetition": 0.273,
+      "subagent_repetition": 0.333,
+      "manuscript_delta_zero": 1.0,
+      "code_delta_zero": 0.0,
+      "verdict_drift": 0.5,
+      "cost_inflation": 1.794,
+      "novel_claim_zero": 0.0
+    },
+    "drift_escalation": "director_must_address",
+    "drift_advisories": [
+      "DRIFT_MANUSCRIPT_DELTA_ZERO",
+      "DRIFT_COST_INFLATION",
+      "AUDIT_DUE: patterns.yaml last audited at T0, gap=44"
+    ],
+    "investigation_id": "yan-li-saito-2026-reproduction",
+    "stage_advancing_to": "Hypothesize"
+  },
+  {
+    "turn": 45,
+    "ts": "2026-05-17T19:04:07Z",
+    "judge_status": "CRITIC_PASS",
+    "directive_action": "critic_audit",
+    "directive_label": "yan-li-saito-T45-r2c-extend-itp-recommended",
+    "wall_time_sec": null,
+    "agent_hashes": {
+      "critic": "e4cc3ddb505396ed9e55914384944cbd",
+      "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    },
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 8600490,
+      "total": 8600490,
+      "effective_full_rate": 1507599,
+      "breakdown": {
+        "input_fresh": 11263,
+        "cache_creation": 449656,
+        "cache_read": 8115018,
+        "output": 24553
+      },
+      "n_messages": 62,
+      "n_message_starts": 62
+    },
+    "branch": null,
+    "commit": null,
+    "parent": null,
+    "drift_signals": {
+      "topic_repetition": 0.273,
+      "subagent_repetition": 0.333,
+      "manuscript_delta_zero": 1.0,
+      "code_delta_zero": 0.0,
+      "verdict_drift": 0.5,
+      "cost_inflation": 0.856,
+      "novel_claim_zero": 0.0
+    },
+    "drift_escalation": "advisory",
+    "drift_advisories": [
+      "DRIFT_MANUSCRIPT_DELTA_ZERO",
+      "AUDIT_DUE: patterns.yaml last audited at T0, gap=45"
+    ]
+  },
+  {
+    "turn": 46,
+    "ts": "2026-05-17T19:26:02Z",
+    "judge_status": "INCONCLUSIVE",
+    "directive_action": "run_experiment",
+    "directive_label": "yan-li-saito-T46-r2c-extend-itp",
+    "wall_time_sec": 83.6,
+    "agent_hashes": {
+      "critic": "e4cc3ddb505396ed9e55914384944cbd",
+      "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    },
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 12086518,
+      "total": 12086518,
+      "effective_full_rate": 1728503,
+      "breakdown": {
+        "input_fresh": 17223,
+        "cache_creation": 361018,
+        "cache_read": 11690077,
+        "output": 18200
+      },
+      "n_messages": 113,
+      "n_message_starts": 113
+    },
+    "branch": "auto/turn_46_r2c-extend-itp-yan-li-saito",
+    "commit": "8697795",
+    "parent": "060b07a1f06c",
+    "drift_signals": {
+      "topic_repetition": 0.667,
+      "subagent_repetition": 0.333,
+      "manuscript_delta_zero": 1.0,
+      "code_delta_zero": 0.0,
+      "verdict_drift": 0.5,
+      "cost_inflation": 1.061,
+      "novel_claim_zero": 0.0
+    },
+    "drift_escalation": "director_must_address",
+    "drift_advisories": [
+      "DRIFT_MANUSCRIPT_DELTA_ZERO",
+      "DRIFT_COST_INFLATION",
+      "AUDIT_DUE: patterns.yaml last audited at T0, gap=46"
+    ],
+    "investigation_id": "yan-li-saito-2026-reproduction",
+    "stage_advancing_to": "Execute"
+  },
+  {
+    "turn": 47,
+    "ts": "2026-05-17T19:43:33Z",
+    "judge_status": "CRITIC_PASS",
+    "directive_action": "critic_audit",
+    "directive_label": "yan-li-saito-T47-critic-audit-r2c-recommended",
+    "wall_time_sec": null,
+    "agent_hashes": {
+      "critic": "e4cc3ddb505396ed9e55914384944cbd",
+      "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    },
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 10080341,
+      "total": 10080341,
+      "effective_full_rate": 1722561,
+      "breakdown": {
+        "input_fresh": 46744,
+        "cache_creation": 436655,
+        "cache_read": 9562186,
+        "output": 34756
+      },
+      "n_messages": 65,
+      "n_message_starts": 65
+    },
+    "branch": null,
+    "commit": null,
+    "parent": null,
+    "drift_signals": {
+      "topic_repetition": 0.455,
+      "subagent_repetition": 0.333,
+      "manuscript_delta_zero": 1.0,
+      "code_delta_zero": 0.0,
+      "verdict_drift": 0.5,
+      "cost_inflation": 0.99,
+      "novel_claim_zero": 0.0
+    },
+    "drift_escalation": "advisory",
+    "drift_advisories": [
+      "DRIFT_MANUSCRIPT_DELTA_ZERO",
+      "AUDIT_DUE: patterns.yaml last audited at T0, gap=47"
+    ]
+  },
+  {
+    "turn": 48,
+    "ts": "2026-05-17T19:59:00Z",
+    "judge_status": "RESEARCHER_ONLY",
+    "directive_action": "researcher",
+    "directive_label": "yan-li-saito-T48-D0-normalization-audit",
+    "wall_time_sec": 309,
+    "agent_hashes": {
+      "critic": "e4cc3ddb505396ed9e55914384944cbd",
+      "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    },
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 7454592,
+      "total": 7454592,
+      "effective_full_rate": 1242211,
+      "breakdown": {
+        "input_fresh": 10914,
+        "cache_creation": 357757,
+        "cache_read": 7070511,
+        "output": 15410
+      },
+      "n_messages": 63,
+      "n_message_starts": 63
+    },
+    "branch": null,
+    "commit": null,
+    "parent": null,
+    "drift_signals": {
+      "topic_repetition": 0.364,
+      "subagent_repetition": 0.333,
+      "manuscript_delta_zero": 1.0,
+      "code_delta_zero": 0.0,
+      "verdict_drift": 0.5,
+      "cost_inflation": 0.72,
+      "novel_claim_zero": 0.0
+    },
+    "drift_escalation": "advisory",
+    "drift_advisories": [
+      "DRIFT_MANUSCRIPT_DELTA_ZERO",
+      "AUDIT_DUE: patterns.yaml last audited at T0, gap=48"
+    ]
+  },
+  {
+    "turn": 49,
+    "ts": "2026-05-17T20:15:27Z",
+    "judge_status": "PASS",
+    "directive_action": "modify_code",
+    "directive_label": "yan-li-saito-T49-document-closure-option-C",
+    "wall_time_sec": 240,
+    "agent_hashes": {
+      "critic": "e4cc3ddb505396ed9e55914384944cbd",
+      "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    },
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 12031949,
+      "total": 12031949,
+      "effective_full_rate": 1926226,
+      "breakdown": {
+        "input_fresh": 7328,
+        "cache_creation": 553229,
+        "cache_read": 11455020,
+        "output": 16372
+      },
+      "n_messages": 93,
+      "n_message_starts": 93
+    },
+    "branch": null,
+    "commit": "544b670",
+    "parent": "aa7eabd",
+    "investigation_id": "yan-li-saito-2026-reproduction",
+    "stage_advancing_to": "Document"
+  },
+  {
+    "turn": 50,
+    "ts": "2026-05-17T20:33:54Z",
+    "judge_status": "FAIL_NO_METRICS",
+    "directive_action": "researcher_audit_class_scan",
+    "directive_label": "audit-class-scan-T50-observe",
+    "wall_time_sec": 439,
+    "agent_hashes": {
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "critic": "e4cc3ddb505396ed9e55914384944cbd",
+      "director": "077a86dba89b9096e5c2fc45e8fbc3c7"
+    },
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 10952527,
+      "total": 10952527,
+      "effective_full_rate": 1651529,
+      "breakdown": {
+        "input_fresh": 27846,
+        "cache_creation": 390825,
+        "cache_read": 10517169,
+        "output": 16687
+      },
+      "n_messages": 101,
+      "n_message_starts": 101
+    },
+    "branch": null,
+    "commit": null,
+    "parent": null
+  },
+  {
+    "turn": 51,
+    "ts": "2026-05-17T20:47:08Z",
+    "judge_status": "PASS",
+    "directive_action": "modify_code",
+    "directive_label": "audit-class-scan-T51-triage",
+    "wall_time_sec": null,
+    "agent_hashes": {
+      "critic": "e4cc3ddb505396ed9e55914384944cbd",
+      "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    },
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 9902229,
+      "total": 9902229,
+      "effective_full_rate": 1487115,
+      "breakdown": {
+        "input_fresh": 3342,
+        "cache_creation": 348538,
+        "cache_read": 9531356,
+        "output": 18993
+      },
+      "n_messages": 78,
+      "n_message_starts": 78
+    },
+    "branch": null,
+    "commit": null,
+    "parent": null,
+    "investigation_id": "audit-class-scan-2026-05-18-T50",
+    "stage_advancing_to": "Triage"
+  },
+  {
+    "turn": 52,
+    "ts": "2026-05-17T21:01:06Z",
+    "judge_status": "FAIL_OPERATIONAL",
+    "directive_action": "critic_audit",
+    "directive_label": "audit-class-scan-T52-critic-L3-audit",
+    "wall_time_sec": null,
+    "agent_hashes": {
+      "critic": "e4cc3ddb505396ed9e55914384944cbd",
+      "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    },
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 8331332,
+      "total": 8331332,
+      "effective_full_rate": 1390722,
+      "breakdown": {
+        "input_fresh": 5314,
+        "cache_creation": 375560,
+        "cache_read": 7925782,
+        "output": 24676
+      },
+      "n_messages": 60,
+      "n_message_starts": 60
+    },
+    "branch": null,
+    "commit": null,
+    "parent": null,
+    "investigation_id": "audit-class-scan-2026-05-18-T50",
+    "stage_advancing_to": "L3_critic_audit"
+  },
+  {
+    "turn": 53,
+    "ts": "2026-05-17T21:19:00Z",
+    "judge_status": "FAIL_OPERATIONAL",
+    "directive_action": "modify_code",
+    "directive_label": "judge-in-operator-bug-2026-05-18-reproduce-fix-test",
+    "wall_time_sec": null,
+    "agent_hashes": {
+      "critic": "e4cc3ddb505396ed9e55914384944cbd",
+      "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    },
+    "investigation_id": "judge-in-operator-bug-2026-05-18",
+    "notes": "judge.py _OPS in-operator bug fixed; 23/23 unittests pass; T52 re-judge flipped FAIL_OPERATIONAL -> PASS; sibling audit 33/33 occurrences (30 list-mem, 2 range, 1 ambiguous); historical T28/T33/T35/T38/T41-T48 flagged for anko. 1 criterion failed: historical_judge_52_preserved (implementer overwrote turn_52.json — but file was never committed pre-T53 anyway).",
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 15438853,
+      "total": 15438853,
+      "effective_full_rate": 2179092,
+      "breakdown": {
+        "input_fresh": 12574,
+        "cache_creation": 438352,
+        "cache_read": 14963481,
+        "output": 24446
+      },
+      "n_messages": 110,
+      "n_message_starts": 110
+    },
+    "branch": null,
+    "commit": null,
+    "parent": null,
+    "stage_advancing_to": "Reproduce_Fix_Test"
+  },
+  {
+    "turn": 54,
+    "ts": "2026-05-17T21:37:06Z",
+    "judge_status": "PASS",
+    "directive_action": "modify_code",
+    "directive_label": "audit-class-scan-T50-document-fold-judge-bug",
+    "wall_time_sec": null,
+    "agent_hashes": {
+      "critic": "e4cc3ddb505396ed9e55914384944cbd",
+      "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    },
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 14316813,
+      "total": 14316813,
+      "effective_full_rate": 2090789,
+      "breakdown": {
+        "input_fresh": 23149,
+        "cache_creation": 480179,
+        "cache_read": 13795920,
+        "output": 17565
+      },
+      "n_messages": 78,
+      "n_message_starts": 78
+    },
+    "branch": null,
+    "commit": null,
+    "parent": null,
+    "notes": "Closed audit-class-scan-2026-05-18-T50 (tier 2 final) + judge-in-operator-bug-2026-05-18 (tier 2 final) in single text-only Document dispatch. LP-1 coupling-skip-gate-inconsistency moved to new rejected_classes section with critic rationale; LP-2 topology-function-WHAT-comment-pattern promoted from proposed_classes to active patterns: with last_count=5 and related_classes=[cargo-cult-comment]; audit_history row 4 appended at 2026-05-18T13:00:00+09:00. judge_in_operator_bug_2026_05_18.md memory file created with 33-occurrence sibling-audit table. meta-stage-routing-2026-05-18 confounder_advisory field added documenting that the T44-era FAIL/INCONCLUSIVE streak was judge.py operator bug, not contract-design — refined falsifier requires post-T53 5-turn window.",
+    "investigation_id": "audit-class-scan-2026-05-18-T50",
+    "stage_advancing_to": "Document"
+  },
+  {
+    "turn": 55,
+    "ts": "2026-05-17T21:54:59Z",
+    "judge_status": "RESEARCHER_ONLY",
+    "directive_action": "researcher_dispatch",
+    "directive_label": "klaus-bch-leak-T55-data-inventory",
+    "wall_time_sec": 420,
+    "agent_hashes": {
+      "critic": "e4cc3ddb505396ed9e55914384944cbd",
+      "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    },
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 28796212,
+      "total": 28796212,
+      "effective_full_rate": 3681261,
+      "breakdown": {
+        "input_fresh": 8907,
+        "cache_creation": 503703,
+        "cache_read": 28239854,
+        "output": 43748
+      },
+      "n_messages": 152,
+      "n_message_starts": 152
+    },
+    "branch": null,
+    "commit": null,
+    "parent": null
+  },
+  {
+    "turn": 56,
+    "ts": "2026-05-17T22:25:56Z",
+    "judge_status": "NOOP",
+    "directive_action": "noop",
+    "directive_label": "klaus-bch-leak-T56-hypothesize",
+    "wall_time_sec": null,
+    "agent_hashes": {
+      "critic": "e4cc3ddb505396ed9e55914384944cbd",
+      "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+      "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+      "researcher": "5c6277ae5ff274765786dfb8c511b568",
+      "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+    },
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 10564789,
+      "total": 10564789,
+      "effective_full_rate": 1727002,
+      "breakdown": {
+        "input_fresh": 21086,
+        "cache_creation": 458447,
+        "cache_read": 10059882,
+        "output": 25374
+      },
+      "n_messages": 62,
+      "n_message_starts": 62
+    },
+    "branch": null,
+    "commit": null,
+    "parent": null
+  }
+]
