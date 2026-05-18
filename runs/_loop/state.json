@@ -1,5 +1,5 @@
 {
-  "turn": 64,
+  "turn": 65,
   "status": "running",
   "history": [
     {
@@ -1621,6 +1621,55 @@
         "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
         "researcher": "5c6277ae5ff274765786dfb8c511b568",
         "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 12032951,
+        "total": 12032951,
+        "effective_full_rate": 1755791,
+        "breakdown": {
+          "input_fresh": 28210,
+          "cache_creation": 375178,
+          "cache_read": 11610042,
+          "output": 19521
+        },
+        "n_messages": 91,
+        "n_message_starts": 91
+      },
+      "branch": null,
+      "commit": null,
+      "parent": "49e3704",
+      "drift_signals": {
+        "topic_repetition": 0.375,
+        "subagent_repetition": 0.667,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.0,
+        "cost_inflation": 0.978,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "advisory",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "AUDIT_DUE: patterns.yaml last audited at T0, gap=63"
+      ]
+    },
+    {
+      "turn": 64,
+      "ts": "2026-05-18T00:42:54Z",
+      "judge_status": "RESEARCHER_ONLY",
+      "directive_action": "researcher_dispatch",
+      "directive_label": "yan-li-saito-r4-ddi-sign-research",
+      "wall_time_sec": 443.5,
+      "agent_hashes": {
+        "critic": "e4cc3ddb505396ed9e55914384944cbd",
+        "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+        "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+        "researcher": "5c6277ae5ff274765786dfb8c511b568",
+        "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
       }
     }
   ],
@@ -1628,7 +1677,7 @@
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "PASS",
+  "last_judge": "RESEARCHER_ONLY",
   "home_branch": "main",
   "schema_version": 2.1,
   "current_agent_hashes": {
@@ -1639,7 +1688,7 @@
     "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
   },
   "last_directive_label": "audit-class-scan-T63-document-close",
-  "last_directive_action": "modify_code",
+  "last_directive_action": "researcher_dispatch",
   "last_error": null,
   "retries": 0,
   "active_investigation_id": "audit-class-scan-2026-05-18-T61",
@@ -2072,12 +2121,12 @@
       "id": "audit-class-scan-2026-05-18-T61",
       "title": "Audit-class-scan T61 cycle -- periodic anti-pattern catalog sweep (F6 level-2)",
       "flow_template": "audit-class-scan",
-      "current_stage": "closed",
+      "current_stage": "closed (cycle terminal \u2014 audit-class-scan-2026-05-18-T61 tier 2 reached; AUDIT_DUE drift advisory clears; next \u00a7F6 cycle scheduled ~T72 per ~10-turn cadence in drift_signals.py)",
       "stages_done": [
-        "Observe",
+        "Document",
         "Findings",
-        "Triage",
-        "Document"
+        "Observe",
+        "Triage"
       ],
       "stages_at_turn": {
         "Observe": [
@@ -2119,6 +2168,7 @@
       "closing_note": "Cycle closed cleanly 2026-05-18 T63 at tier 2. Second full \u00a7F6 audit-class-scan cycle (first since T50). 10 patterns swept (incl. LP-2 promoted at T54). 0 actionable findings; 0 L3 proposals; 0 mechanical fixes -- steady-state result confirms T50/T51/T54 prior-cycle fixes held over ~12 physics turns. Institutional value: (a) verification that periodic catalog sweep produces a clean baseline; (b) LP-2 first-scan post-promotion held T51 cleanup with 5 false-positive grep hits flagged for future refinement (deferred to ~T72 next cycle or critic_audit per \u00a7F6 safety rail); (c) \u00a7F6 stage separation (Triage T62 mechanical, Document T63 narrative) demonstrated lower per-turn cost than T54 collapsed pattern; (d) AUDIT_DUE drift advisory cleared for next ~10 turns. Memory entry: audit_class_scan_t61_cycle_2026_05_18.md."
     }
   },
-  "last_meta_check_turn": 62,
-  "last_short_label": "audit-class-scan-T63-document-close"
+  "last_meta_check_turn": 63,
+  "last_short_label": "audit-class-scan-T63-document-close",
+  "last_label": "yan-li-saito-r4-ddi-sign-research"
 }
