@@ -1,0 +1,128 @@
+{
+  "turn": 84,
+  "status": "PASS",
+  "issues": [],
+  "metrics": {
+    "experiment_kind": "text_only",
+    "workload_class": "implementer_text",
+    "src_files_modified": 0,
+    "new_analysis_scripts_written": 0,
+    "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
+    "stage_advancing_to": "Document",
+    "flow_template": "verify-claim",
+    "artifacts_created_count": 1,
+    "artifacts_modified_count": 6,
+    "memory_files_touched": 1,
+    "state_json_touched": true,
+    "by_tag_indices_touched": 4,
+    "status_narrative_touched": true,
+    "errata_propagated_to_memory_count": 4,
+    "errata_load_bearing_count": 1,
+    "errata_advisory_count": 3,
+    "investigation_tier_advanced": true,
+    "final_tier": 2.75,
+    "closing_note_present_in_state_json": true,
+    "errata_resolved_field_added": true,
+    "new_memory_file_has_verification_chain": true,
+    "new_memory_file_has_citations": true,
+    "new_memory_file_has_deferred_followups": true,
+    "new_memory_file_has_class_level_convention_finding": true,
+    "klaus_bch_leak_template_referenced": true,
+    "manuscript_edited": false,
+    "src_edited": false,
+    "julia_executed": false
+  },
+  "contract_evaluation": {
+    "verdict": "PASS",
+    "criteria_results": [
+      {
+        "id": "memory_file_created",
+        "passed": true,
+        "actual": 1,
+        "reason": "artifacts_created_count=1 == 1 \u2192 True"
+      },
+      {
+        "id": "state_modified",
+        "passed": true,
+        "actual": true,
+        "reason": "state_json_touched=True == True \u2192 True"
+      },
+      {
+        "id": "tier_advanced",
+        "passed": true,
+        "actual": 2.75,
+        "reason": "final_tier=2.75 == 2.75 \u2192 True"
+      },
+      {
+        "id": "tier_advance_flagged",
+        "passed": true,
+        "actual": true,
+        "reason": "investigation_tier_advanced=True == True \u2192 True"
+      },
+      {
+        "id": "all_errata_propagated",
+        "passed": true,
+        "actual": 4,
+        "reason": "errata_propagated_to_memory_count=4 == 4 \u2192 True"
+      },
+      {
+        "id": "load_bearing_erratum_counted",
+        "passed": true,
+        "actual": 1,
+        "reason": "errata_load_bearing_count=1 == 1 \u2192 True"
+      },
+      {
+        "id": "class_finding_propagated",
+        "passed": true,
+        "actual": true,
+        "reason": "new_memory_file_has_class_level_convention_finding=True == True \u2192 True"
+      },
+      {
+        "id": "verification_chain_present",
+        "passed": true,
+        "actual": true,
+        "reason": "new_memory_file_has_verification_chain=True == True \u2192 True"
+      },
+      {
+        "id": "no_src_modification",
+        "passed": true,
+        "actual": false,
+        "reason": "src_edited=False == False \u2192 True"
+      },
+      {
+        "id": "no_julia_execution",
+        "passed": true,
+        "actual": false,
+        "reason": "julia_executed=False == False \u2192 True"
+      },
+      {
+        "id": "no_manuscript_polish",
+        "passed": true,
+        "actual": false,
+        "reason": "manuscript_edited=False == False \u2192 True"
+      },
+      {
+        "id": "closing_note_landed",
+        "passed": true,
+        "actual": true,
+        "reason": "closing_note_present_in_state_json=True == True \u2192 True"
+      }
+    ],
+    "triggered_failure_modes": [],
+    "issues": []
+  },
+  "cost_audit": null,
+  "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
+  "stage_advancing_to": "Document (terminal closure path; T84 implementer_text propagates 4 errata to new memory entry, patches state.json tier 2.5 \u2192 2.75 + closing_note, appends by_tag indices)",
+  "investigation_update": {
+    "if_success_advance_to_stage": "Document-verify (T85 lightweight verification \u2014 confirms state.json patch is JSON-valid; confirms memory file is complete; appends a brief PASS row to status narrative; tier 2.75 \u2192 3.0 terminal closure)",
+    "if_success_tier_becomes": 2.75,
+    "if_partial_success_advance_to_stage": "Document (T85 implementer_text retry of the partially-completed artifacts)",
+    "if_partial_success_tier_becomes": 2.5,
+    "if_refuted_advance_to_stage": "Update (rare; would require implementer to surface a science objection to T83 critic conclusions)",
+    "if_refuted_tier_becomes": 2.0,
+    "if_inconclusive_advance_to_stage": "Document (T85 implementer_text recovery of un-landed artifacts)",
+    "if_inconclusive_tier_becomes": 2.5,
+    "next_falsifier_to_test_after": "F3 leg closed at T85 verification (Tier 3.0 trajectory). F1 NOT_APPLICABLE_NO_RING ratified pending longer-dynamics rerun (30 dimless ~ 48 ms physical, ~3M GPU effective). T86+ either F1 closure via the rerun (best case: F1 CORROBORATE \u2192 both F1+F3 in single Tier-3 record) or F1-deferred-permanently with framework limitation note (acceptable for partial-Tier-3 closure on F3 alone). F4 c_dd=0 control remains optional (deferred). F2 winding ell depends on F1 \u2192 also deferred."
+  }
+}
