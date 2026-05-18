@@ -163,5 +163,5 @@ pipeline:
       seed_k_cut: 2.5                    # concentrate seed in long-wavelength EdH unstable band
       save:
         every: 50                        # 12 saves over 628 steps (0.8 ms physical cadence)
-      save_psi_snapshots: true           # stream full ψ[x,y,z,c] for ring detection (F1) + winding (F2)
-      save_snapshot_precision: "f32"     # downcast to f32 for storage (~14 MB per frame at 32³×13)
+        psi: true                        # stream full ψ[x,y,z,c] for ring detection (F1) + winding (F2)
+        precision: "f32"                 # downcast to f32 for storage (~14 MB per frame at 32³×13)
