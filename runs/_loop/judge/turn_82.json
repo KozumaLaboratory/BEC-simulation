@@ -1,0 +1,239 @@
+{
+  "turn": 82,
+  "status": "PASS",
+  "issues": [],
+  "metrics": {
+    "experiment_kind": "analyze_existing",
+    "workload_class": "implementer_julia_cpu_light",
+    "jld2_point_001_present": true,
+    "jld2_result_present": true,
+    "analyze_script_path": "scripts/diagnostic/matsui_edh_t82_analyze.jl",
+    "analyze_script_written": true,
+    "wrapper_script_path": ".claude/scripts/run_matsui_edh_analyze_t82.sh",
+    "wrapper_script_written": true,
+    "analyze_run_completed": true,
+    "analyze_wall_time_sec": 2.0,
+    "n_snapshots_loaded": 12,
+    "snapshot_times_dimless": [
+      0.5,
+      1.0,
+      1.5,
+      2.0,
+      2.5,
+      3.0,
+      3.5,
+      4.0,
+      4.5,
+      5.0,
+      5.5,
+      6.0
+    ],
+    "f1_ring_detected": false,
+    "f1_t_ring_dimless": null,
+    "f1_t_ring_physical_ms": null,
+    "f1_ring_depth_pct_at_t_ring": null,
+    "f1_ring_aspect_at_t_ring": null,
+    "f1_max_depth_pct_across_frames": 99.9,
+    "f1_max_aspect_across_frames": 998.2,
+    "f1_max_pop_c12_across_frames": 0.001858,
+    "f1_t_ring_band": "NOT_APPLICABLE_NO_RING",
+    "f1_per_frame_summary": [
+      {
+        "t": 0.5,
+        "pop_c12": 4.78e-05,
+        "has_ring": false,
+        "depth_pct": 99.44,
+        "aspect": 178.88,
+        "r_peak": 9
+      },
+      {
+        "t": 1.0,
+        "pop_c12": 2.21e-05,
+        "has_ring": false,
+        "depth_pct": 96.89,
+        "aspect": 32.18,
+        "r_peak": 8
+      },
+      {
+        "t": 1.5,
+        "pop_c12": 1.64e-05,
+        "has_ring": false,
+        "depth_pct": 98.24,
+        "aspect": 56.74,
+        "r_peak": 9
+      },
+      {
+        "t": 2.0,
+        "pop_c12": 4.33e-05,
+        "has_ring": false,
+        "depth_pct": 99.15,
+        "aspect": 117.45,
+        "r_peak": 9
+      },
+      {
+        "t": 2.5,
+        "pop_c12": 3.52e-05,
+        "has_ring": false,
+        "depth_pct": 56.74,
+        "aspect": 2.31,
+        "r_peak": 2
+      },
+      {
+        "t": 3.0,
+        "pop_c12": 1.37e-05,
+        "has_ring": false,
+        "depth_pct": 97.05,
+        "aspect": 33.95,
+        "r_peak": 10
+      },
+      {
+        "t": 3.5,
+        "pop_c12": 3.51e-05,
+        "has_ring": false,
+        "depth_pct": 98.4,
+        "aspect": 62.52,
+        "r_peak": 6
+      },
+      {
+        "t": 4.0,
+        "pop_c12": 7.13e-05,
+        "has_ring": false,
+        "depth_pct": 99.9,
+        "aspect": 998.22,
+        "r_peak": 10
+      },
+      {
+        "t": 4.5,
+        "pop_c12": 9.79e-05,
+        "has_ring": false,
+        "depth_pct": 99.65,
+        "aspect": 289.59,
+        "r_peak": 9
+      },
+      {
+        "t": 5.0,
+        "pop_c12": 0.000125,
+        "has_ring": false,
+        "depth_pct": 96.48,
+        "aspect": 28.43,
+        "r_peak": 9
+      },
+      {
+        "t": 5.5,
+        "pop_c12": 0.000293,
+        "has_ring": false,
+        "depth_pct": 97.87,
+        "aspect": 46.88,
+        "r_peak": 9
+      },
+      {
+        "t": 6.0,
+        "pop_c12": 0.001858,
+        "has_ring": false,
+        "depth_pct": 92.2,
+        "aspect": 12.83,
+        "r_peak": 6
+      }
+    ],
+    "f2_ell_sim": null,
+    "f2_ell_band": "NOT_APPLICABLE_NO_RING",
+    "f3_e_sim_per_atom": -0.032234,
+    "f3_e_mf_per_atom_t72_pred": 10.5,
+    "f3_rel_error": 1.00307,
+    "f3_zeeman_subtracted": false,
+    "f3_band": "OPERATIONAL_GATE",
+    "f3_zeeman_reconciliation_note": "total_energy() in SpinorBEC.jl (src/analysis/energy.jl:122) computes E_kinetic + E_trap + E_zeeman + E_contact + E_DDI + E_LHY. The ITP Zeeman-shift convention (CLAUDE.md \u00a7Conventions, propagators.jl:65) subtracts min(E_m) from the ITP PROPAGATOR EXPONENT only \u2014 it does NOT subtract from the reported total_energy. Therefore gs_energy_final = -967.027 INCLUDES the full Zeeman energy. At Bz = -0.01 Gauss (p_dimless = -162.78) with dominant m_F=-6 component: E_zee \u2248 -p \u00d7 (-6) \u00d7 \u222b|\u03c8_{c=13}|\u00b2 = -(-162.78) \u00d7 6 = -976.7 \u210f\u03c9_ref (negative; m_F=-6 is the LOWEST Zeeman level at Bz<0). Non-Zeeman energy = -967.027 - (-976.7) = +9.67 \u210f\u03c9_ref total = +3.22e-4 \u210f\u03c9_ref/atom. T72 \u00a75.3 prediction of +10.5/atom is also Zeeman-free (zero-point + contact-TF + DDI + LHY). Zeeman-corrected comparison: +3.22e-4 vs +10.5 per atom = 32,580\u00d7 discrepancy. F3 remains OPERATIONAL_GATE regardless of Zeeman inclusion (+0.0322 raw vs +10.5 with-Zeeman = 100.3%; +3.22e-4 non-Zeeman vs +10.5 = 32,580\u00d7 = still OPERATIONAL_GATE).",
+    "f3_energy_decomposition_note": "The dynamics energy at t=0 (985.99) minus GS energy (-967.027) = 1953 \u2248 E_zee(B=+0.01G, m_F=-6) = +976.7 \u00d7 2 (sign flip in Bz from ITP to dynamics + additional shift). The dynamics energy drop from 985.99 to 54.88 over 10 ms corresponds to Zeeman energy release after the quench to 2.6 nT; non-Zeeman energy approximately 9.67\u219252.3 \u210f\u03c9_ref (5.4\u00d7 increase), consistent with EdH spin\u2192orbital energy conversion.",
+    "dynamics_e_t0": 985.9949,
+    "dynamics_e_tend": 54.8849,
+    "dynamics_e_drift": -931.11,
+    "pop_c12_at_t0": 4.78e-05,
+    "pop_c12_at_tend": 0.001858,
+    "pop_c13_at_tend": 0.998116,
+    "norm_drift_dynamics_max": 6.69e-13,
+    "wall_time_sec": 2.0,
+    "peak_memory_gb": null,
+    "tests_passed": null,
+    "warnings": [
+      "f1_geometric_criteria_spuriously_triggered_at_near_zero_population: depth_pct=92-99% and aspect=12-998 across all frames, but pop_c12 < 0.2% in every frame; population threshold guard (>1%) correctly classifies as NOT_APPLICABLE_NO_RING",
+      "f3_OPERATIONAL_GATE: e_sim/atom=-0.032 vs T72_pred=+10.5 (100.3% discrepancy); requires T83 critic audit of energy_decomposition convention + TF formula validity at N=30000 Case A",
+      "dynamics_energy_drop_94pct: E drops from 986 to 55 over 10 ms; 94% drop is the Zeeman energy released by B-quench (expected); BUT non-Zeeman energy increases 5.4\u00d7, suggesting EdH spin-to-orbital energy conversion is already ongoing",
+      "f1_dynamics_too_short: pop_c12_max=0.186% at t=6 dimless (10 ms); physical ring formation in Matsui experiment occurs at 5 ms; likely need 30-100 dimless (50-160 ms) at Case A to see definitive ring"
+    ],
+    "physical_red_flags": [
+      "pop_c12_grows_40x_but_stays_sub_percent: 4.78e-5 at t=0 to 1.86e-3 at t=6 (40\u00d7 growth) \u2014 EdH instability is clearly onset but ring mode has not accumulated enough population (need ~1-10% for physical ring detection)",
+      "f3_energy_sign_negative_vs_positive_theory: sim gives -0.032/atom while TF theory gives +10.5/atom \u2014 requires energy decomposition audit to separate Zeeman vs non-Zeeman contributions",
+      "dynamics_energy_non_conservation_94pct: after B-quench the total energy changes by 94%, which is the expected Zeeman release; the non-Zeeman part is NOT conserved (grows 5.4\u00d7), consistent with EdH orbital excitation"
+    ],
+    "falsification_result": "OPERATIONAL_GATE"
+  },
+  "contract_evaluation": {
+    "verdict": "PASS",
+    "criteria_results": [
+      {
+        "id": "jld2_data_present",
+        "passed": true,
+        "actual": true,
+        "reason": "jld2_point_001_present=True == True \u2192 True"
+      },
+      {
+        "id": "analyze_script_landed",
+        "passed": true,
+        "actual": true,
+        "reason": "analyze_script_written=True == True \u2192 True"
+      },
+      {
+        "id": "analyze_run_finished",
+        "passed": true,
+        "actual": true,
+        "reason": "analyze_run_completed=True == True \u2192 True"
+      },
+      {
+        "id": "snapshots_count_matches_t81",
+        "passed": true,
+        "actual": 12,
+        "reason": "n_snapshots_loaded=12 == 12 \u2192 True"
+      },
+      {
+        "id": "f1_decisive",
+        "passed": true,
+        "actual": "NOT_APPLICABLE_NO_RING",
+        "reason": "f1_t_ring_band=NOT_APPLICABLE_NO_RING in ['CORROBORATE', 'INCONCLUSIVE', 'REFUTED', 'NOT_APPLICABLE_NO_RING'] \u2192 True"
+      },
+      {
+        "id": "f3_decisive",
+        "passed": true,
+        "actual": "OPERATIONAL_GATE",
+        "reason": "f3_band=OPERATIONAL_GATE in ['CORROBORATE', 'INCONCLUSIVE', 'OPERATIONAL_GATE', 'CONVENTION_MISMATCH'] \u2192 True"
+      },
+      {
+        "id": "f3_per_atom_finite",
+        "passed": true,
+        "actual": -0.032234,
+        "reason": "f3_e_sim_per_atom=-0.032234 in [-100, 100] \u2192 True"
+      },
+      {
+        "id": "falsification_decisive",
+        "passed": true,
+        "actual": "OPERATIONAL_GATE",
+        "reason": "falsification_result=OPERATIONAL_GATE in ['ALL_CORROBORATE', 'PARTIAL_CORROBORATE', 'OPERATIONAL_GATE', 'ALL_REFUTED', 'NO_DATA'] \u2192 True"
+      }
+    ],
+    "triggered_failure_modes": [],
+    "issues": []
+  },
+  "cost_audit": null,
+  "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
+  "stage_advancing_to": "Analyze (F1 t_ring + F2 winding \u2113 + F3 E_sim vs E_mf/N extraction from runs/matsui_edh_baseline_9ca97308/point_001.jld2 + result.jld2)",
+  "investigation_update": {
+    "if_success_advance_to_stage": "Update (T83 critic independent eval of F1/F2/F3 verdicts; CORROBORATE-path tier 2.5 \u2192 2.75; closure at T84 Document)",
+    "if_success_tier_becomes": 2.5,
+    "if_partial_success_advance_to_stage": "Update (T83 critic interprets partial result; possible refinement loop)",
+    "if_partial_success_tier_becomes": 2.25,
+    "if_refuted_advance_to_stage": "Update (T83 critic deep-audit on hypothesis or framework)",
+    "if_refuted_tier_becomes": 1.5,
+    "if_inconclusive_advance_to_stage": "Analyze (T83 implementer refines analyze; OR Execute T83 implementer_julia_gpu re-runs dynamics with longer duration)",
+    "if_inconclusive_tier_becomes": 2.0,
+    "next_falsifier_to_test_after": "Upon T82 ALL_CORROBORATE: T83 critic Update + T84 implementer_text Document. Total pipeline T82\u2192T84 = 3 turns to Tier 3.0 = project's 3rd Tier-3 claim after Barnett (T29) + Klaus-BCH (T59). Memory entry edh_matsui_baseline_2026.md captures: src-anchored Zeeman convention (T80) + GS landing at correct m_F (T81) + F1/F2/F3 verdicts (T82) + Bz sign convention pitfall addendum. Optional F4 (c_dd=0 control) deferred unless F1 REFUTED."
+  }
+}
