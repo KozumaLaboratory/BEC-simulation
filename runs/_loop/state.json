@@ -1,5 +1,5 @@
 {
-  "turn": 78,
+  "turn": 79,
   "status": "running",
   "history": [
     {
@@ -1052,6 +1052,55 @@
         "implementer": "610ac60c59abbbf4af92e2c464e6bcf2",
         "researcher": "6635ef673d05e12621da8d38413c3a8b",
         "theorist": "e33d24bdc505b4ec69873b39f5292087"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 9313624,
+        "total": 9313624,
+        "effective_full_rate": 1562772,
+        "breakdown": {
+          "input_fresh": 10309,
+          "cache_creation": 426444,
+          "cache_read": 8849989,
+          "output": 26882
+        },
+        "n_messages": 59,
+        "n_message_starts": 59
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.222,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.1,
+        "cost_inflation": 0.861,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "advisory",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "AUDIT_DUE: patterns.yaml last audited at T63, gap=14"
+      ]
+    },
+    {
+      "turn": 78,
+      "ts": "2026-05-18T06:13:30Z",
+      "judge_status": "PASS",
+      "directive_action": "modify_code",
+      "directive_label": "edh-matsui-prereq-class-fix-haskey-B-yaml-bz-sign",
+      "wall_time_sec": 45,
+      "agent_hashes": {
+        "critic": "7c36d8654a723ccacaa508d16d7cfb25",
+        "director": "517de6ca2845a4eb281a5387eeba0132",
+        "implementer": "610ac60c59abbbf4af92e2c464e6bcf2",
+        "researcher": "6635ef673d05e12621da8d38413c3a8b",
+        "theorist": "e33d24bdc505b4ec69873b39f5292087"
       }
     }
   ],
@@ -1059,7 +1108,7 @@
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "CRITIC_PASS",
+  "last_judge": "PASS",
   "home_branch": "main",
   "schema_version": 2.1,
   "current_agent_hashes": {
@@ -1758,9 +1807,37 @@
       "blocked_on": null,
       "next_stage": "Hypothesize",
       "next_stage_action": "theorist Hypothesize: classify findings, propose specific prompt/workload changes, predict cost savings."
+    },
+    "meta-cost-inflation-2026-05-18": {
+      "id": "meta-cost-inflation-2026-05-18",
+      "kind": "meta",
+      "title": "Why is per-turn token cost inflating? (auto-spawn)",
+      "hypothesis": "5-turn run shows ≥4 DRIFT_COST_INFLATION — orchestrator overhead or directive bloat. Identify root cause and bound it.",
+      "flow_template": "meta-improvement",
+      "current_stage": "Observe",
+      "stages_done": [],
+      "target_metric": "median_tokens_eff_per_turn",
+      "baseline_value": null,
+      "baseline_window": "last 5 turns up to T77",
+      "predicted_improvement": null,
+      "modifies_files": [
+        ".claude/agents/director.md",
+        ".claude/agents/implementer.md"
+      ],
+      "rollback_branch": "main",
+      "safety_class": "low",
+      "auto_spawned_by_trigger": "cost_inflation_run",
+      "auto_spawned_at_turn": 77,
+      "falsifiers": [],
+      "tier_current": 0,
+      "tier_target": 1,
+      "priority": 40,
+      "blocked_on": null,
+      "next_stage": "Hypothesize",
+      "next_stage_action": "researcher Observe stage already triggered this auto-spawn; theorist Hypothesize next"
     }
   },
-  "last_meta_check_turn": 76,
+  "last_meta_check_turn": 77,
   "last_short_label": "yan-li-saito-r4-dormant-close-document",
   "last_label": "yan-li-saito-r4-dormant-close-document"
 }

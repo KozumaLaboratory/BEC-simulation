@@ -1,0 +1,89 @@
+{
+  "turn": 78,
+  "status": "PASS",
+  "issues": [],
+  "metrics": {
+    "experiment_kind": "modify_only",
+    "edits_applied": 3,
+    "files_modified": [
+      "src/workflow/experiments/pipeline/run_step_ground_state.jl",
+      "runs/eu151_matsui_edh/configs/matsui_edh_baseline.yaml"
+    ],
+    "haskey_zeeman_remaining_in_src_jl": 0,
+    "zeeman_string_in_pipeline_subdir_remaining": 0,
+    "yaml_bz_sign_flipped": true,
+    "git_commit_applied": true,
+    "git_commit_sha": "5814dba",
+    "git_branch_at_commit": "main",
+    "tests_passed": null,
+    "wall_time_sec": 45,
+    "peak_memory_gb": null,
+    "physical_red_flags": [],
+    "warnings": [],
+    "falsification_result": "CODE_CHANGE_APPLIED"
+  },
+  "contract_evaluation": {
+    "verdict": "PASS",
+    "criteria_results": [
+      {
+        "id": "edits_applied_count",
+        "passed": true,
+        "actual": 3,
+        "reason": "edits_applied=3 == 3 \u2192 True"
+      },
+      {
+        "id": "files_modified_set",
+        "passed": true,
+        "actual": [
+          "src/workflow/experiments/pipeline/run_step_ground_state.jl",
+          "runs/eu151_matsui_edh/configs/matsui_edh_baseline.yaml"
+        ],
+        "reason": "files_modified=['src/workflow/experiments/pipeline/run_step_ground_state.jl', 'runs/eu151_matsui_edh/configs/matsui_edh_baseline.yaml'] == ['src/workflow/experiments/pipeline/run_step_ground_state.jl', 'runs/eu151_matsui_edh/configs/matsui_edh_baseline.yaml'] \u2192 True"
+      },
+      {
+        "id": "haskey_zeeman_eliminated",
+        "passed": true,
+        "actual": 0,
+        "reason": "haskey_zeeman_remaining_in_src_jl=0 == 0 \u2192 True"
+      },
+      {
+        "id": "zeeman_string_in_pipeline_eliminated",
+        "passed": true,
+        "actual": 0,
+        "reason": "zeeman_string_in_pipeline_subdir_remaining=0 == 0 \u2192 True"
+      },
+      {
+        "id": "yaml_bz_sign_flipped",
+        "passed": true,
+        "actual": true,
+        "reason": "yaml_bz_sign_flipped=True == True \u2192 True"
+      },
+      {
+        "id": "commit_landed_on_main",
+        "passed": true,
+        "actual": "main",
+        "reason": "git_branch_at_commit=main == main \u2192 True"
+      },
+      {
+        "id": "commit_applied",
+        "passed": true,
+        "actual": true,
+        "reason": "git_commit_applied=True == True \u2192 True"
+      }
+    ],
+    "triggered_failure_modes": [],
+    "issues": []
+  },
+  "cost_audit": null,
+  "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
+  "stage_advancing_to": "Execute (prerequisite class-fix phase; full Execute-retry deferred to T79)",
+  "investigation_update": {
+    "if_success_advance_to_stage": "Execute (T79 R1 full retry on corrected YAML against fixed main HEAD)",
+    "if_success_tier_becomes": 1.5,
+    "if_refuted_advance_to_stage": "Execute (re-dispatch implementer_text with corrected diff)",
+    "if_refuted_tier_becomes": 1.5,
+    "if_inconclusive_advance_to_stage": "Execute (re-dispatch with broader brief)",
+    "if_inconclusive_tier_becomes": 1.5,
+    "next_falsifier_to_test_after": "T79 director routes to implementer_julia_gpu Execute-retry on matsui_edh_baseline.yaml (now with corrected Bz=-0.01G and main HEAD having the haskey(p,\"B\") fix). Expected outputs: GS at m_F=-6 stretched state (populations[c=13]>0.99), then EdH dynamics from the correct initial component. T80 Analyze extracts t_ring (F1), winding \u2113 (F2), GS energy (F3). T81 critic Update. T82 Document closure at Tier 2.5-3.0 (CORROBORATE) or 1.0-1.5 (INCONCLUSIVE) or 0.5 (REFUTED-framework)."
+  }
+}
