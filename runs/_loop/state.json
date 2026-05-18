@@ -1,5 +1,5 @@
 {
-  "turn": 119,
+  "turn": 121,
   "status": "running",
   "history": [
     {
@@ -1554,28 +1554,124 @@
         "implementer": "3354a0b55881b87f223ef9beaf85d9e8",
         "director": "8d6d65cf5014eb25c866d8dcd3142b9e"
       },
-      "notes": "T118 substantive Tier-3 terminal closure for edh-eu151-vortex-vs-matsui-science-2026. 14 of 15 SC PASS at machine-checked level (state.json tier_current 2.75 -> 3.0, current_stage closed, F1 falsifier T117 CORROBORATE, manuscript section V multiplicity-aware extension re-appended on main HEAD via git checkout f081603, auto-branch commit af32921). Judge verdict INCONCLUSIVE due to director-side check_cmd composition issue: SC10/11/12/13 used shell metachars (&&, |, cd, n=$(find)) which judge.py safe-exec allow-list rejected. Substantive verdict PASS_WITH_SHELL_QUOTING_BUG. Same class as T115."
-    }
+      "notes": "T118 substantive Tier-3 terminal closure for edh-eu151-vortex-vs-matsui-science-2026. 14 of 15 SC PASS at machine-checked level (state.json tier_current 2.75 -> 3.0, current_stage closed, F1 falsifier T117 CORROBORATE, manuscript section V multiplicity-aware extension re-appended on main HEAD via git checkout f081603, auto-branch commit af32921). Judge verdict INCONCLUSIVE due to director-side check_cmd composition issue: SC10/11/12/13 used shell metachars (&&, |, cd, n=$(find)) which judge.py safe-exec allow-list rejected. Substantive verdict PASS_WITH_SHELL_QUOTING_BUG. Same class as T115.",
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 16482765,
+        "total": 16482765,
+        "effective_full_rate": 2312923,
+        "breakdown": {
+          "input_fresh": 37965,
+          "cache_creation": 450856,
+          "cache_read": 15971088,
+          "output": 22856
+        },
+        "n_messages": 119,
+        "n_message_starts": 119
+      },
+      "branch": "auto/turn_118_edh-eu151-matsui-T118-tier3-closure-and-mult2-section-V-retry",
+      "commit": null,
+      "parent": "38fd78793a41",
+      "drift_signals": {
+        "topic_repetition": 0.2,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 0.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.8,
+        "cost_inflation": 1.212,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "advisory",
+      "drift_advisories": [
+        "DRIFT_COST_INFLATION",
+        "AUDIT_DUE: patterns.yaml last audited at T105, gap=13"
+      ],
+      "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
+      "stage_advancing_to": "closed",
+      "cost_audit": {
+        "expected_cost_eff": 1500000,
+        "actual_cost_eff": 2312923,
+        "ratio_actual_over_expected": 1.54,
+        "deviation_pct": 54.2,
+        "flag": "BUDGET_OVER"
+      }
+    },
+    {
+      "turn": 119,
+      "ts": "2026-05-18T23:08:00Z",
+      "judge_status": "FAIL_NO_METRICS",
+      "directive_action": "noop",
+      "directive_label": "sign-pattern-f9-ta-mult2-T119-critic-corroborate",
+      "wall_time_sec": null,
+      "agent_hashes": {
+        "critic": "ccbd5e0fdc990f6b9eaaa01eb00fc63e",
+        "director": "8d6d65cf5014eb25c866d8dcd3142b9e",
+        "implementer": "3354a0b55881b87f223ef9beaf85d9e8",
+        "researcher": "95b7759c642976be22be5b403536336e",
+        "theorist": "793e3a75d3f9c15683c165d8a381df83"
+      },
+      "substantive_verdict": "CORROBORATE",
+      "route": "critic",
+      "investigation_id": "sign-pattern-f9-ta-multiplicity-2-mixing-2026-05-19",
+      "note": "T119 critic-route turn: 5/5 audit deliverables (A1-A5) independently re-derived. Central falsifier F1 CORROBORATE re-confirmed. Two minor errata flagged non-blocking. Unblocks T120 director Tier-3 patch for sign-pattern-f9-ta-mult2.",
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 12031833,
+        "total": 12031833,
+        "effective_full_rate": 2079003,
+        "breakdown": {
+          "input_fresh": 34274,
+          "cache_creation": 593324,
+          "cache_read": 11371041,
+          "output": 33194
+        },
+        "n_messages": 80,
+        "n_message_starts": 80
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.154,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 0.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.8,
+        "cost_inflation": 0.98,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "none",
+      "drift_advisories": [
+        "AUDIT_DUE: patterns.yaml last audited at T105, gap=14"
+      ]
+    },
+    {"turn":120,"ts":"2026-05-18T23:35:45Z","judge_status":"PASS","directive_action":"modify_text","directive_label":"sign-pattern-f9-ta-mult2-T120-tier3-closure-bundle","wall_time_sec":null,"agent_hashes":{"critic":"ccbd5e0fdc990f6b9eaaa01eb00fc63e","director":"8d6d65cf5014eb25c866d8dcd3142b9e","implementer":"3354a0b55881b87f223ef9beaf85d9e8","researcher":"95b7759c642976be22be5b403536336e","theorist":"793e3a75d3f9c15683c165d8a381df83"},"investigation_id":"sign-pattern-f9-ta-multiplicity-2-mixing-2026-05-19","stage_advancing_to":"closed","route":"implementer","notes":"T120 implementer_text 4-duty Tier-3 terminal closure for sign-pattern-f9-ta-multiplicity-2-mixing-2026-05-19. 20/20 SCs PASS. Tier 2.5 -> 3.0; current_stage Update -> closed; F1 falsifier appended T119 result; active_investigation_id -> null. Duty A state.json patch, Duty B cherry-pick a323222 wrapper canonical_mult_aware_beta_S to main, Duty C add F=2 cyclic T_d A_1 case to lemma1_general_S_verification.jl (29ch/6cases footer), Duty D append T119+T120 closure entries to memory:sign_pattern_lemma1_mult_aware_2026_05_19.md. Auto-branch a334667. 5th project Tier-3 trajectory closure.","branch":"auto/turn_120_sign-pattern-f9-ta-mult2-T120-tier3-closure-bundle","commit":"a334667","parent":"f2a5d2c"}
   ],
   "created_at": "2026-05-14T00:00:00+00:00",
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "INCONCLUSIVE",
+  "last_judge": "TIER_3_TERMINAL_CLOSURE_F1_CORROBORATE_T119",
   "home_branch": "main",
   "schema_version": 2.1,
   "current_agent_hashes": {
     "critic": "ccbd5e0fdc990f6b9eaaa01eb00fc63e",
-    "theorist": "793e3a75d3f9c15683c165d8a381df83",
-    "researcher": "95b7759c642976be22be5b403536336e",
+    "director": "8d6d65cf5014eb25c866d8dcd3142b9e",
     "implementer": "3354a0b55881b87f223ef9beaf85d9e8",
-    "director": "8d6d65cf5014eb25c866d8dcd3142b9e"
+    "researcher": "95b7759c642976be22be5b403536336e",
+    "theorist": "793e3a75d3f9c15683c165d8a381df83"
   },
-  "last_directive_label": "edh-eu151-matsui-T118-tier3-closure-and-mult2-section-V-retry",
+  "last_directive_label": "sign-pattern-f9-ta-mult2-T120-tier3-closure-bundle",
   "last_directive_action": "modify_text",
   "last_error": null,
   "retries": 0,
-  "active_investigation_id": "sign-pattern-f9-ta-multiplicity-2-mixing-2026-05-19",
+  "active_investigation_id": null,
   "investigations_index": [
     "barnett-mechanism-2026-05-16",
     "klaus-magnetostir-bch-leak-2026-05-13",
@@ -2837,11 +2933,13 @@
       "title": "Sign Pattern Lemma 1 General-S multiplicity-aware extension: F=9 T:A (m_rep=2) as 1st verified-empirical mult-2 polyhedral inert case",
       "hypothesis": "The canonical multiplicity-aware channel coefficient bar_beta_S^canonical = m_rep * Tr[Pi_S (rho_inv (x) rho_inv)] (rho_inv = (1/m_rep) sum_i |zeta_i><zeta_i| over orthonormal basis of W=H-trivial isotypic component) reproduces the universal endpoint 1/(2F+1) at S=0 for any polyhedral inert state with arbitrary multiplicity m_rep, strictly generalizes the m_rep=1 formula beta_S^(c_0), and satisfies sum_S bar_beta_S^canonical = m_rep.",
       "flow_template": "build-theory",
-      "current_stage": "Update",
+      "current_stage": "closed",
       "stages_done": [
         "Hypothesize",
         "Derive",
-        "Test"
+        "Test",
+        "Document",
+        "closed"
       ],
       "stages_at_turn": {
         "Hypothesize": [
@@ -2863,6 +2961,14 @@
         "Update": [
           116,
           "implementer_text: state.json registration + manuscript section V extension + memory entry"
+        ],
+        "Document": [
+          119,
+          "critic T119 independent-context audit 5/5 deliverables A1-A5 CORROBORATE"
+        ],
+        "closed": [
+          120,
+          "implementer_text 4-duty terminal closure: state.json + cherry-pick a323222 + F=2 cyclic A_1 regression case + memory entry"
         ]
       },
       "falsifiers": [
@@ -2871,9 +2977,10 @@
           "description": "bar_beta_0_canonical(F=9, T, A, m_rep=2) = m_rep * mult_aware_beta_S(rho_inv, F, 0); CORROBORATE if |... - 1/19| < 1e-13",
           "tested_at_turns": [
             "115_attempt1",
-            115
+            115,
+            119
           ],
-          "result": "CORROBORATE at T115 attempt2: 0.0526315789473683, dev 1.388e-16 (4 orders below threshold). REFUTED at attempt1 due to missing m_rep prefactor; corrected by theorist T115 J-involution derivation.",
+          "result": "CORROBORATE at T115 attempt2: 0.0526315789473683, dev 1.388e-16 (4 orders below threshold). REFUTED at attempt1 due to missing m_rep prefactor; corrected by theorist T115 J-involution derivation. || T119 critic Stage-2 CORROBORATE (independent-context audit, 5/5 deliverables A1-A5: Schur-canonical formula re-derivation, J^dag P_W J = P_W + P_W^2 = P_W one-line endpoint proof, Hamermesh orbit-counting m_rep = (1/12)(19+8-3) = 2 exactly, 1.388e-16 = 2 ULP at 0.05 rounding-only, F4 sum-rule algebraic from sum_S Pi_S = I, F3 m_rep=1 reduction strict-generalization). 5th project Tier-3 trajectory closure.",
           "is_central": true
         },
         {
@@ -2904,23 +3011,54 @@
           "is_central": false
         }
       ],
-      "tier_current": 2.5,
+      "tier_current": 3.0,
       "tier_target": 3,
       "next_stage": null,
       "next_stage_action": null,
       "blocked_on": null,
       "priority": 4,
       "kind": "physics",
-      "last_turn": 116,
-      "last_stage": "Update",
-      "last_verdict": "CORROBORATE_4_OF_4_PHYSICS_PASS_MANUSCRIPT_PROPAGATED",
-      "tier": 2.5,
-      "closing_note": "T112-T116 (5-turn arc): mult-aware Lemma 1 General-S formula bar_beta_S^canonical = m_rep * Tr[Pi_S (rho_inv (x) rho_inv)] = (1/m_rep) Tr[Pi_S (P_W (x) P_W)] established for polyhedral inert states with multiplicity m_rep >= 2 of the H-trivial isotypic component. Universal endpoint 1/(2F+1) preserved at S=0; m_rep=1 reduction to beta_S^(c_0) verified; sum rule sum_S = m_rep. Theorist T115 section 2.A J=exp(-i*pi*F_y) involution closed-form derivation; implementer T115 numerical corroboration at F=9 T:A (m_rep=2): F1 dev 1.4e-16, F2 spread 2.8e-17, F3 26/26 regression unchanged, F4 sum-rule dev 6.7e-15. Tier 2.5; eligible for Tier 3 closure pending T117+ critic crosswalk audit (central falsifier F1 marked). 4th project T112-aligned Tier-2.5+ trajectory (after barnett T29, klaus-bch T59, edh-matsui T86, sign-pattern-lemma1 T94)"
+      "last_turn": 120,
+      "last_stage": "Update-Stage-2-T119-critic",
+      "last_verdict": "TIER_3_TERMINAL_CLOSURE_F1_CORROBORATE_T119_INDEPENDENT_CONTEXT_5TH_PROJECT_TIER_3_TRAJECTORY",
+      "last_critic_turn": 119,
+      "tier": 3.0,
+      "closing_note": "T112-T116 (5-turn arc): mult-aware Lemma 1 General-S formula bar_beta_S^canonical = m_rep * Tr[Pi_S (rho_inv (x) rho_inv)] = (1/m_rep) Tr[Pi_S (P_W (x) P_W)] established for polyhedral inert states with multiplicity m_rep >= 2 of the H-trivial isotypic component. Universal endpoint 1/(2F+1) preserved at S=0; m_rep=1 reduction to beta_S^(c_0) verified; sum rule sum_S = m_rep. Theorist T115 section 2.A J=exp(-i*pi*F_y) involution closed-form derivation; implementer T115 numerical corroboration at F=9 T:A (m_rep=2): F1 dev 1.4e-16, F2 spread 2.8e-17, F3 26/26 regression unchanged, F4 sum-rule dev 6.7e-15. Tier 2.5; eligible for Tier 3 closure pending T117+ critic crosswalk audit (central falsifier F1 marked). 4th project T112-aligned Tier-2.5+ trajectory (after barnett T29, klaus-bch T59, edh-matsui T86, sign-pattern-lemma1 T94)\n\nT120 closure: Tier 3.0 terminal closure at T120 via implementer_text 4-duty bundle. T119 critic CORROBORATE on 5/5 deliverables A1-A5 (independent-context audit, 5/5 deliverables A1-A5: Schur-canonical formula re-derivation, J^dag P_W J = P_W + P_W^2 = P_W one-line endpoint proof, Hamermesh orbit-counting m_rep = (1/12)(19+8-3) = 2 exactly, 1.388e-16 = 2 ULP at 0.05 rounding-only, F4 sum-rule algebraic from sum_S Pi_S = I, F3 m_rep=1 reduction strict-generalization). 5th project Tier-3 trajectory (after barnett T29, klaus-bch T59, T86-edh-matsui-original, T94-F=2-cyclic-A_1, T118-edh-matsui-resumption). Two critic-flagged errata closed: (1) cherry-picked a323222 to bring canonical_mult_aware_beta_S onto main; (2) added F=2 cyclic T_d A_1 case to lemma1_general_S_verification.jl closing the 29-vs-26 MEMORY drift. Investigation closed."
+    },
+    "meta-stage-routing-2026-05-19": {
+      "id": "meta-stage-routing-2026-05-19",
+      "kind": "meta",
+      "title": "3+ FAIL/INCONCLUSIVE in last 4 turns — stage routing / contract design flaw (auto-spawn)",
+      "hypothesis": "Multiple consecutive operational failures / inconclusives suggest either contract design is wrong, observable_manifest precondition is missing, stage role is mis-assigned, or success_criteria are not discriminating.",
+      "flow_template": "meta-improvement",
+      "current_stage": "Observe",
+      "stages_done": [],
+      "target_metric": "fail_or_inconclusive_rate_per_5_turns",
+      "baseline_value": null,
+      "baseline_window": "last 4 turns up to T118",
+      "predicted_improvement": null,
+      "modifies_files": [
+        ".claude/agents/director.md",
+        ".claude/scripts/judge.py"
+      ],
+      "rollback_branch": "main",
+      "safety_class": "low",
+      "auto_spawned_by_trigger": "same_stage_fail_streak",
+      "auto_spawned_at_turn": 118,
+      "falsifiers": [],
+      "tier_current": 0,
+      "tier_target": 1,
+      "priority": 25,
+      "blocked_on": null,
+      "next_stage": "Hypothesize",
+      "next_stage_action": "researcher Observe stage already triggered this auto-spawn; theorist Hypothesize next"
     }
   },
-  "last_meta_check_turn": 117,
+  "last_meta_check_turn": 119,
   "last_short_label": "sign-pattern-f9-ta-mult2-T116-update-manuscript",
   "last_label": "sign-pattern-f9-ta-mult2-T116-update-manuscript",
   "last_action": "modify_text",
-  "last_judge_turn": 116
+  "last_judge_turn": 116,
+  "last_critic_turn": 119,
+  "last_critic_verdict": "CORROBORATE"
 }
