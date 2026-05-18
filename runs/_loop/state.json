@@ -1,5 +1,5 @@
 {
-  "turn": 121,
+  "turn": 122,
   "status": "running",
   "history": [
     {
@@ -1651,13 +1651,87 @@
         "AUDIT_DUE: patterns.yaml last audited at T105, gap=14"
       ]
     },
-    {"turn":120,"ts":"2026-05-18T23:35:45Z","judge_status":"PASS","directive_action":"modify_text","directive_label":"sign-pattern-f9-ta-mult2-T120-tier3-closure-bundle","wall_time_sec":null,"agent_hashes":{"critic":"ccbd5e0fdc990f6b9eaaa01eb00fc63e","director":"8d6d65cf5014eb25c866d8dcd3142b9e","implementer":"3354a0b55881b87f223ef9beaf85d9e8","researcher":"95b7759c642976be22be5b403536336e","theorist":"793e3a75d3f9c15683c165d8a381df83"},"investigation_id":"sign-pattern-f9-ta-multiplicity-2-mixing-2026-05-19","stage_advancing_to":"closed","route":"implementer","notes":"T120 implementer_text 4-duty Tier-3 terminal closure for sign-pattern-f9-ta-multiplicity-2-mixing-2026-05-19. 20/20 SCs PASS. Tier 2.5 -> 3.0; current_stage Update -> closed; F1 falsifier appended T119 result; active_investigation_id -> null. Duty A state.json patch, Duty B cherry-pick a323222 wrapper canonical_mult_aware_beta_S to main, Duty C add F=2 cyclic T_d A_1 case to lemma1_general_S_verification.jl (29ch/6cases footer), Duty D append T119+T120 closure entries to memory:sign_pattern_lemma1_mult_aware_2026_05_19.md. Auto-branch a334667. 5th project Tier-3 trajectory closure.","branch":"auto/turn_120_sign-pattern-f9-ta-mult2-T120-tier3-closure-bundle","commit":"a334667","parent":"f2a5d2c"}
+    {
+      "turn": 120,
+      "ts": "2026-05-18T23:35:45Z",
+      "judge_status": "FAIL_OPERATIONAL",
+      "directive_action": "modify_text",
+      "directive_label": "sign-pattern-f9-ta-mult2-T120-tier3-closure-bundle",
+      "wall_time_sec": null,
+      "agent_hashes": {
+        "critic": "ccbd5e0fdc990f6b9eaaa01eb00fc63e",
+        "director": "8d6d65cf5014eb25c866d8dcd3142b9e",
+        "implementer": "3354a0b55881b87f223ef9beaf85d9e8",
+        "researcher": "95b7759c642976be22be5b403536336e",
+        "theorist": "793e3a75d3f9c15683c165d8a381df83"
+      },
+      "investigation_id": "sign-pattern-f9-ta-multiplicity-2-mixing-2026-05-19",
+      "stage_advancing_to": "closed",
+      "route": "implementer",
+      "notes": "T120 implementer_text 4-duty Tier-3 terminal closure for sign-pattern-f9-ta-multiplicity-2-mixing-2026-05-19. 20/20 SCs PASS. Tier 2.5 -> 3.0; current_stage Update -> closed; F1 falsifier appended T119 result; active_investigation_id -> null. Duty A state.json patch, Duty B cherry-pick a323222 wrapper canonical_mult_aware_beta_S to main, Duty C add F=2 cyclic T_d A_1 case to lemma1_general_S_verification.jl (29ch/6cases footer), Duty D append T119+T120 closure entries to memory:sign_pattern_lemma1_mult_aware_2026_05_19.md. Auto-branch a334667. 5th project Tier-3 trajectory closure.",
+      "branch": "auto/turn_120_sign-pattern-f9-ta-mult2-T120-tier3-closure-bundle",
+      "commit": "a334667",
+      "parent": "f2a5d2c",
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 19881077,
+        "total": 19881077,
+        "effective_full_rate": 2806991,
+        "breakdown": {
+          "input_fresh": 65010,
+          "cache_creation": 548274,
+          "cache_read": 19241291,
+          "output": 26502
+        },
+        "n_messages": 128,
+        "n_message_starts": 128
+      },
+      "drift_signals": {
+        "topic_repetition": 0.417,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 0.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.8,
+        "cost_inflation": 1.278,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "advisory",
+      "drift_advisories": [
+        "DRIFT_COST_INFLATION",
+        "AUDIT_DUE: patterns.yaml last audited at T105, gap=15"
+      ],
+      "cost_audit": {
+        "expected_cost_eff": 1400000,
+        "actual_cost_eff": 2806991,
+        "ratio_actual_over_expected": 2.0,
+        "deviation_pct": 100.5,
+        "flag": "BUDGET_BUSTED"
+      }
+    },
+    {
+      "turn": 121,
+      "ts": "2026-05-18T23:54:04Z",
+      "judge_status": "PASS",
+      "directive_action": "modify_text",
+      "directive_label": "sign-pattern-f9-ta-mult2-T121-cherry-pick-from-T120-auto-branch",
+      "wall_time_sec": null,
+      "agent_hashes": {
+        "critic": "ccbd5e0fdc990f6b9eaaa01eb00fc63e",
+        "director": "8d6d65cf5014eb25c866d8dcd3142b9e",
+        "implementer": "3354a0b55881b87f223ef9beaf85d9e8",
+        "researcher": "95b7759c642976be22be5b403536336e",
+        "theorist": "793e3a75d3f9c15683c165d8a381df83"
+      }
+    }
   ],
   "created_at": "2026-05-14T00:00:00+00:00",
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "TIER_3_TERMINAL_CLOSURE_F1_CORROBORATE_T119",
+  "last_judge": "PASS",
   "home_branch": "main",
   "schema_version": 2.1,
   "current_agent_hashes": {
@@ -1667,7 +1741,7 @@
     "researcher": "95b7759c642976be22be5b403536336e",
     "theorist": "793e3a75d3f9c15683c165d8a381df83"
   },
-  "last_directive_label": "sign-pattern-f9-ta-mult2-T120-tier3-closure-bundle",
+  "last_directive_label": "sign-pattern-f9-ta-mult2-T121-cherry-pick-from-T120-auto-branch",
   "last_directive_action": "modify_text",
   "last_error": null,
   "retries": 0,
@@ -3054,7 +3128,7 @@
       "next_stage_action": "researcher Observe stage already triggered this auto-spawn; theorist Hypothesize next"
     }
   },
-  "last_meta_check_turn": 119,
+  "last_meta_check_turn": 120,
   "last_short_label": "sign-pattern-f9-ta-mult2-T116-update-manuscript",
   "last_label": "sign-pattern-f9-ta-mult2-T116-update-manuscript",
   "last_action": "modify_text",
