@@ -1,5 +1,5 @@
 {
-  "turn": 80,
+  "turn": 81,
   "status": "running",
   "history": [
     {
@@ -1151,19 +1151,68 @@
         "researcher": "6635ef673d05e12621da8d38413c3a8b",
         "theorist": "e33d24bdc505b4ec69873b39f5292087"
       },
-      "note": "Julia execution blocked by Bash tool session approval gate; Step 0 + Python preconditions PASS; physics+code fix verified present on main; run_yaml not executed this turn"
+      "note": "Julia execution blocked by Bash tool session approval gate; Step 0 + Python preconditions PASS; physics+code fix verified present on main; run_yaml not executed this turn",
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 11773705,
+        "total": 11773705,
+        "effective_full_rate": 1728758,
+        "breakdown": {
+          "input_fresh": 25830,
+          "cache_creation": 365109,
+          "cache_read": 11360671,
+          "output": 22095
+        },
+        "n_messages": 107,
+        "n_message_starts": 107
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.167,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.2,
+        "cost_inflation": 0.952,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "advisory",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "AUDIT_DUE: patterns.yaml last audited at T63, gap=16"
+      ]
+    },
+    {
+      "turn": 80,
+      "ts": "2026-05-18T06:51:18Z",
+      "judge_status": "PASS",
+      "directive_action": "derive_theory",
+      "directive_label": "edh-matsui-execute-T80-bz-sign-convention-independent-derivation",
+      "wall_time_sec": null,
+      "agent_hashes": {
+        "critic": "7c36d8654a723ccacaa508d16d7cfb25",
+        "director": "7dd33642abb9a02b59e544da5fbe21b8",
+        "implementer": "610ac60c59abbbf4af92e2c464e6bcf2",
+        "researcher": "6635ef673d05e12621da8d38413c3a8b",
+        "theorist": "e33d24bdc505b4ec69873b39f5292087"
+      }
     }
   ],
   "created_at": "2026-05-14T00:00:00+00:00",
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "INCONCLUSIVE",
+  "last_judge": "PASS",
   "home_branch": "main",
   "schema_version": 2.1,
   "current_agent_hashes": {
     "critic": "7c36d8654a723ccacaa508d16d7cfb25",
-    "director": "517de6ca2845a4eb281a5387eeba0132",
+    "director": "7dd33642abb9a02b59e544da5fbe21b8",
     "implementer": "610ac60c59abbbf4af92e2c464e6bcf2",
     "researcher": "6635ef673d05e12621da8d38413c3a8b",
     "theorist": "e33d24bdc505b4ec69873b39f5292087"
@@ -1888,7 +1937,7 @@
       "next_stage_action": "researcher Observe stage already triggered this auto-spawn; theorist Hypothesize next"
     }
   },
-  "last_meta_check_turn": 78,
+  "last_meta_check_turn": 79,
   "last_short_label": "yan-li-saito-r4-dormant-close-document",
   "last_label": "yan-li-saito-r4-dormant-close-document"
 }
