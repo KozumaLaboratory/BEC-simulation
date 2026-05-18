@@ -1,5 +1,5 @@
 {
-  "turn": 70,
+  "turn": 71,
   "status": "running",
   "history": [
     {
@@ -1917,6 +1917,56 @@
         "implementer": "610ac60c59abbbf4af92e2c464e6bcf2",
         "researcher": "6635ef673d05e12621da8d38413c3a8b",
         "theorist": "e33d24bdc505b4ec69873b39f5292087"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 12025586,
+        "total": 12025586,
+        "effective_full_rate": 1794518,
+        "breakdown": {
+          "input_fresh": 19065,
+          "cache_creation": 414900,
+          "cache_read": 11571689,
+          "output": 19932
+        },
+        "n_messages": 102,
+        "n_message_starts": 102
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.0,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.1,
+        "cost_inflation": 1.205,
+        "novel_claim_zero": 1.0
+      },
+      "drift_escalation": "human_required",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "DRIFT_COST_INFLATION",
+        "DRIFT_NOVEL_CLAIM_ZERO"
+      ]
+    },
+    {
+      "turn": 70,
+      "ts": "2026-05-18T03:15:29Z",
+      "judge_status": "PASS",
+      "directive_action": "modify_code",
+      "directive_label": "edh-eu151-vortex-vs-matsui-spawn-T70",
+      "wall_time_sec": 15,
+      "agent_hashes": {
+        "critic": "7c36d8654a723ccacaa508d16d7cfb25",
+        "director": "517de6ca2845a4eb281a5387eeba0132",
+        "implementer": "610ac60c59abbbf4af92e2c464e6bcf2",
+        "researcher": "6635ef673d05e12621da8d38413c3a8b",
+        "theorist": "e33d24bdc505b4ec69873b39f5292087"
       }
     }
   ],
@@ -1924,7 +1974,7 @@
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "RESEARCHER_ONLY",
+  "last_judge": "PASS",
   "home_branch": "main",
   "schema_version": 2.1,
   "current_agent_hashes": {
@@ -1938,7 +1988,7 @@
   "last_directive_action": "modify_code",
   "last_error": null,
   "retries": 0,
-  "active_investigation_id": "tier3-verification-pipeline-survey-2026-05-18",
+  "active_investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
   "investigations_index": [
     "barnett-mechanism-2026-05-16",
     "klaus-magnetostir-bch-leak-2026-05-13",
@@ -1948,7 +1998,8 @@
     "judge-in-operator-bug-2026-05-18",
     "audit-class-scan-2026-05-18-T61",
     "audit-due-heuristic-bug-2026-05-18",
-    "tier3-verification-pipeline-survey-2026-05-18"
+    "tier3-verification-pipeline-survey-2026-05-18",
+    "edh-eu151-vortex-vs-matsui-science-2026"
   ],
   "investigations": {
     "barnett-mechanism-2026-05-16": {
@@ -2495,27 +2546,75 @@
       "title": "Tier-3 verification pipeline candidate survey (post-pipeline-empty pipeline population)",
       "hypothesis": "Pipeline has zero open priority-1-3 physics investigations; researcher Research stage produces ranked candidate list for anko to ratify into seed.md",
       "flow_template": "survey",
-      "current_stage": "Research",
+      "current_stage": "Synthesize",
       "stages_done": [
-        "Research"
+        "Research",
+        "Synthesize"
       ],
       "stages_at_turn": {
         "Research": [
           69,
           "researcher inventoried [Established] tags, produced 5 ranked candidates (edh-eu151-matsui top)"
+        ],
+        "Synthesize": [
+          70,
+          "theorist organized T69 menu, spawned child edh-eu151-vortex-vs-matsui-science-2026, recorded methodology in memory tier3_pipeline_survey_2026_05_18.md"
         ]
       },
       "tier_current": 1,
       "tier_target": 1,
-      "next_stage": "Synthesize",
-      "next_stage_action": "Pending anko ratification of candidates into seed.md OR theorist Synthesize stage at T70 if anko silent",
-      "blocked_on": "anko ratification of candidate priority",
+      "next_stage": "Document",
+      "next_stage_action": "Survey Document stage may be done at any steady-state turn (1-turn implementer_text closure); not blocking child investigation T71+ work",
+      "blocked_on": null,
       "priority": 10,
+      "kind": "physics",
+      "closing_note": null
+    },
+    "edh-eu151-vortex-vs-matsui-science-2026": {
+      "id": "edh-eu151-vortex-vs-matsui-science-2026",
+      "title": "Einstein-de Haas Eu-151 vortex emergence \u2014 reproduction of Matsui et al. Science 391, 384-388 (2026)",
+      "hypothesis": "SpinorBEC.jl spinor-DDI + split-step framework reproduces Matsui et al. Science 391, 384\u2013388 (2026) [DOI:10.1126/science.adx2872; arXiv:2504.17357] within factor-2 of the experimental EdH timescale \u03c4_EdH^exp and matches the ring-vortex topology (winding number \u2113 consistent with F=6 angular-momentum balance) when fed the paper's published parameters (N, trap frequencies \u03c9_{x,y,z}, B-quench waveform, a_s, c_dd).",
+      "flow_template": "verify-claim",
+      "current_stage": "Research",
+      "stages_done": [],
+      "stages_at_turn": {},
+      "falsifiers": [
+        {
+          "id": "F1-ring-appears-correct-timescale",
+          "description": "Reproduce Matsui near-zero-B-quench from m=+F FM state; measure t_ring where azimuthally-averaged |\u03c8_{c=c_flip}|^2 has local minimum at r=0 within \u00b120% depth + annulus aspect ratio >1.5. CORROBORATE if t_ring \u2208 [0.5 \u03c4_EdH^exp, 2.0 \u03c4_EdH^exp]; INCONCLUSIVE if t_ring \u2208 [0.2, 5.0] \u03c4_EdH^exp; REFUTED if no ring at any t<10 \u03c4_EdH^exp OR ring in wrong spin component. \u03c4_EdH^exp extracted at T71 from paper PDF (NOT invented).",
+          "tested_at_turn": null,
+          "result": null
+        },
+        {
+          "id": "F2-vortex-topology-l-matches-AM-conservation",
+          "description": "Extract winding number \u2113_sim from \u222e \u2207 arg(\u03c8_{c_flip}) \u00b7 d\u2113 / (2\u03c0) around ring density minimum. CORROBORATE if |\u2113_sim - \u2113_paper| = 0; INCONCLUSIVE if |\u0394\u2113| = 1; REFUTED if |\u0394\u2113| \u2265 2 OR \u2113_sim = 0 (no quantized circulation). \u2113_paper extracted at T71 from paper PDF.",
+          "tested_at_turn": null,
+          "result": null
+        },
+        {
+          "id": "F3-ground-state-energy-self-consistency",
+          "description": "Pre-quench m=+F FM GS at Matsui's N, a_s, trap \u03c9, c_dd. CORROBORATE if |E^sim/N - E_mf/N| / |E_mf/N| < 0.20 against dipolar GP mean-field E_mf/N \u2248 (1/2)\u2211_i\u210f\u03c9_i + (c_0+36 c_1)\u27e8n\u27e9/2 + E_DDI/N. OPERATIONAL_GATE (closes at Tier 0.5) if discrepancy > 100% \u2014 wiring/unit-conversion bug, implicit Bug-4 contamination check.",
+          "tested_at_turn": null,
+          "result": null
+        },
+        {
+          "id": "F4-DDI-zero-control-OPTIONAL",
+          "description": "Re-run protocol with c_dd=0. CORROBORATE if no ring forms (DDI is the AM-transfer mechanism); REFUTES_INTERPRETATION (not framework) if ring still forms (mechanism is spin-mixing c_1 or LHY artifact, not DDI). Optional: doubles GPU cost; defer to T74+ if F1+F2+F3 on track.",
+          "tested_at_turn": null,
+          "result": null
+        }
+      ],
+      "tier_current": 0,
+      "tier_target": 3,
+      "next_stage": "Research",
+      "next_stage_action": "T71 director: dispatch researcher_deep to extract Matsui 2026 PDF parameters (N, trap \u03c9_{x,y,z}, B-quench waveform, observed \u03c4_EdH, vortex winding number \u2113). Researcher depth MUST be deep per director.md \u00a7F1 (tier_target=3 mandates \u226530 parallel queries + full-PDF mandatory).",
+      "blocked_on": null,
+      "priority": 1,
       "kind": "physics",
       "closing_note": null
     }
   },
-  "last_meta_check_turn": 68,
+  "last_meta_check_turn": 69,
   "last_short_label": "yan-li-saito-r4-dormant-close-document",
   "last_label": "yan-li-saito-r4-dormant-close-document"
 }

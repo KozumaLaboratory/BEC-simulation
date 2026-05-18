@@ -1,0 +1,110 @@
+{
+  "turn": 70,
+  "status": "PASS",
+  "issues": [],
+  "metrics": {
+    "experiment_kind": "modify_only",
+    "tests_passed": null,
+    "norm_drift": null,
+    "wall_time_sec": 15,
+    "physical_red_flags": [],
+    "warnings": [],
+    "falsification_result": null,
+    "theorist_turn_70_md_exists": true,
+    "memory_tier3_pipeline_survey_md_exists": true,
+    "state_json_parses_as_valid_json": true,
+    "edh_eu151_vortex_vs_matsui_science_2026_in_investigations": true,
+    "edh_eu151_vortex_vs_matsui_science_2026_current_stage_equals_Research": "Research",
+    "edh_eu151_vortex_vs_matsui_science_2026_tier_target_equals_3": 3,
+    "tier3_verification_pipeline_survey_current_stage_equals_Synthesize": "Synthesize",
+    "active_investigation_id_equals_edh_eu151_vortex_vs_matsui_science_2026": "edh-eu151-vortex-vs-matsui-science-2026",
+    "established_tags_in_theorist_turn_70_md": 8,
+    "falsifier_count_in_theorist_turn_70_md": 4,
+    "webfetch_matsui_called": true
+  },
+  "contract_evaluation": {
+    "verdict": "PASS",
+    "criteria_results": [
+      {
+        "id": "theorist_report_written",
+        "passed": true,
+        "actual": true,
+        "reason": "theorist_turn_70_md_exists=True == True \u2192 True"
+      },
+      {
+        "id": "memory_entry_written",
+        "passed": true,
+        "actual": true,
+        "reason": "memory_tier3_pipeline_survey_md_exists=True == True \u2192 True"
+      },
+      {
+        "id": "state_json_valid_post_edit",
+        "passed": true,
+        "actual": true,
+        "reason": "state_json_parses_as_valid_json=True == True \u2192 True"
+      },
+      {
+        "id": "child_investigation_spawned",
+        "passed": true,
+        "actual": true,
+        "reason": "edh_eu151_vortex_vs_matsui_science_2026_in_investigations=True == True \u2192 True"
+      },
+      {
+        "id": "child_investigation_at_research_stage",
+        "passed": true,
+        "actual": "Research",
+        "reason": "edh_eu151_vortex_vs_matsui_science_2026_current_stage_equals_Research=Research == Research \u2192 True"
+      },
+      {
+        "id": "child_investigation_tier_target_3",
+        "passed": true,
+        "actual": 3,
+        "reason": "edh_eu151_vortex_vs_matsui_science_2026_tier_target_equals_3=3 == 3 \u2192 True"
+      },
+      {
+        "id": "survey_advanced_to_synthesize",
+        "passed": true,
+        "actual": "Synthesize",
+        "reason": "tier3_verification_pipeline_survey_current_stage_equals_Synthesize=Synthesize == Synthesize \u2192 True"
+      },
+      {
+        "id": "active_id_updated_to_child",
+        "passed": true,
+        "actual": "edh-eu151-vortex-vs-matsui-science-2026",
+        "reason": "active_investigation_id_equals_edh_eu151_vortex_vs_matsui_science_2026=edh-eu151-vortex-vs-matsui-science-2026 == edh-eu151-vortex-vs-matsui-science-2026 \u2192 True"
+      },
+      {
+        "id": "established_tags_count",
+        "passed": true,
+        "actual": 8,
+        "reason": "established_tags_in_theorist_turn_70_md=8 >= 3 \u2192 True"
+      },
+      {
+        "id": "falsifier_count_meets_minimum",
+        "passed": true,
+        "actual": 4,
+        "reason": "falsifier_count_in_theorist_turn_70_md=4 >= 3 \u2192 True"
+      },
+      {
+        "id": "matsui_reference_verified",
+        "passed": true,
+        "actual": true,
+        "reason": "webfetch_matsui_called=True == True \u2192 True"
+      }
+    ],
+    "triggered_failure_modes": [],
+    "issues": []
+  },
+  "cost_audit": null,
+  "investigation_id": "tier3-verification-pipeline-survey-2026-05-18",
+  "stage_advancing_to": "Synthesize",
+  "investigation_update": {
+    "if_success_advance_to_stage": "Document (deferred to T73+ steady-state via implementer_text; not blocking child investigation T71+ research)",
+    "if_success_tier_becomes": 1,
+    "if_refuted_advance_to_stage": "Synthesize (re-attempt with verified alternative benchmark)",
+    "if_refuted_tier_becomes": 0.5,
+    "if_inconclusive_advance_to_stage": "Synthesize (one-turn retry with clarified scope)",
+    "if_inconclusive_tier_becomes": 0.5,
+    "next_falsifier_to_test_after": "Survey investigation has no falsifiers (low-commitment exploration template). The CHILD investigation `edh-eu151-vortex-vs-matsui-science-2026` will be the next-turn focus at T71: researcher_deep extracts Matsui 2026 PDF parameters (N, trap omega_{x,y,z}, B-quench profile, simulation reference c_dd / c_1 / a_s, observed tau_EdH, vortex winding number l). Falsifier F1 (ring timescale) is the first execute-stage check after Hypothesize and Design stages."
+  }
+}
