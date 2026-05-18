@@ -1,0 +1,60 @@
+{
+  "turn": 115,
+  "status": "FAIL_NUMERICAL",
+  "issues": [
+    "targeted tests failed (implementer reported tests_passed=False)"
+  ],
+  "metrics": {
+    "experiment_kind": "modify_code+run_script",
+    "workload_class": "implementer_julia_cpu_light",
+    "investigation_id": "sign-pattern-f9-ta-multiplicity-2-mixing-2026-05-19",
+    "stage_advancing_to": "Test",
+    "subagent_type": "implementer",
+    "tests_passed": false,
+    "warnings": [
+      "F3 regression script tests 26 channels (5 cases) not 29 (6 cases) \u2014 MEMORY F=2 cyclic-tetrahedral A_1 entry never committed to the script; director success_criteria literal text-match for F3 will fail despite all existing tests passing"
+    ],
+    "physical_red_flags": [
+      "\u00a72.A projector-orbit-average formulation does NOT recover bar_beta_0 = 1/(2F+1) at mult-2 \u2014 F1 REFUTED at 4 orders of magnitude above the structural-refutation threshold",
+      "Theorist \u00a72.A derivation \u00a72.4 step '(predicted endpoint: bar_beta_0 = Tr[|0,0><0,0|\u00b7(rho_inv tensor rho_inv)] = 1/(2F+1))' is incorrect: at orthogonal Schur-isotropic basis the trace evaluates to (1/m_rep) \u00b7 1/(2F+1) = 1/38, NOT 1/19, due to the (1/m_rep)\u00b2 scaling of rho_inv tensor rho_inv combined with vanishing off-diagonal singlet overlaps"
+    ],
+    "tokens_used": null,
+    "m_rep_value": 2,
+    "bar_beta_0_value": 0.026315789473684,
+    "bar_beta_0_dev_from_1_over_19": 0.026315789473684,
+    "bar_beta_0_dev_from_1/19": 0.026315789473684,
+    "seed_spread_max_min": 1.388e-17,
+    "seed_spread max-min": 1.388e-17,
+    "schur_isotropy_rho_inv_x": 30.000000000000025,
+    "schur_isotropy_rho_inv_y": 29.999999999999993,
+    "schur_isotropy_rho_inv_z": 29.999999999999993,
+    "regression_29_channels_passed_count": 26,
+    "regression_29_channels_total_count": 26,
+    "f1_verdict": "REFUTED",
+    "f2_verdict": "CORROBORATE",
+    "f3_verdict": "CORROBORATE_AT_26_NOT_29",
+    "f1_dev_from_prediction": 0.026315789473684,
+    "f1_observed_value_canonical_form": "1/(2*(2F+1)) = 1/38",
+    "f2_seed_spread_at_machine_precision": true,
+    "f3_existing_testsets_pass": "26/26",
+    "wall_time_sec_julia": 6.5,
+    "rank_P_at_tol_1e-8": 2,
+    "rho_inv_hermitian_deviation": 0.0,
+    "rho_inv_trace": 1.0,
+    "schur_isotropy_max_dev_from_F_F_plus_1_over_3": 2.487e-14,
+    "bar_beta_S_table_F9_TA_mult_aware": {
+      "S=0": 0.026315789473684,
+      "S=2": 0.0,
+      "S=4": 0.023454867697027,
+      "S=6": 0.041572053826732,
+      "S=8": 0.064691075514874,
+      "S=10": 0.13135675024545,
+      "S=12": 0.123078719276357,
+      "S=14": 0.118833073730836,
+      "S=16": 0.085085035567213,
+      "S=18": 0.135612634667826
+    },
+    "bar_beta_S_total_sum": 0.749999999999999,
+    "bar_beta_S_total_sum_expected_if_self_consistent": "1/m_rep = 0.5 (NOT 1.0) per the same factor-2 issue; observed 0.75 is between 1/m_rep and 1, but does NOT match the trace-self-product algebraic upper bound of (Tr rho_inv)^2 = 1 \u2014 suggests a more delicate per-channel structure"
+  }
+}
