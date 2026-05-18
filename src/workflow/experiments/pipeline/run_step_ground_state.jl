@@ -115,8 +115,8 @@ function _run_step(
     n_steps = Int(get(p, "n_steps", method === :lbfgs ? 500 : 100000))
     dt = Float64(get(p, "dt", 0.001))
     duration = dt * n_steps
-    zeeman = if haskey(p, "zeeman")
-        _build_zeeman_dispatched(p["zeeman"], duration, atom, p)
+    zeeman = if haskey(p, "B")
+        _build_zeeman_dispatched(p["B"], duration, atom, p)
     elseif ws_prev !== nothing
         ws_prev.zeeman
     else
@@ -270,7 +270,7 @@ function _run_step(
         # Skip reuse when backend is explicitly overridden (e.g. GPU ITP → CPU LBFGS).
         if ws_prev !== nothing && !haskey(p, "backend") &&
             !haskey(p, "interactions") && !haskey(p, "ddi") &&
-            !haskey(p, "potential") && !haskey(p, "zeeman")
+            !haskey(p, "potential") && !haskey(p, "B")
             find_ground_state_lbfgs(;
                 ws_init=ws_prev, psi_init,
                 n_steps, tol, m_lbfgs,
