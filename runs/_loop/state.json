@@ -1,5 +1,5 @@
 {
-  "turn": 65,
+  "turn": 67,
   "status": "running",
   "history": [
     {
@@ -16,7 +16,7 @@
         "researcher": "5c6277ae5ff274765786dfb8c511b568",
         "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
       },
-      "notes": "Director route (d) critic audit; barnett-mechanism Update stage; critic VERDICT=CORROBORATE; tier 2.5 \u2192 3.0 recommended; T29 = Document stage; one residual-misattribution flagged (5.5% residual \u2260 GP, ~Bloch-Siegert).",
+      "notes": "Director route (d) critic audit; barnett-mechanism Update stage; critic VERDICT=CORROBORATE; tier 2.5 → 3.0 recommended; T29 = Document stage; one residual-misattribution flagged (5.5% residual ≠ GP, ~Bloch-Siegert).",
       "tokens_used": {
         "theorist": null,
         "researcher": null,
@@ -58,7 +58,7 @@
       "directive_action": "document_investigation_closure",
       "directive_label": "barnett-mechanism-document-tier3-promoted",
       "wall_time_sec": null,
-      "notes": "Document stage closure of barnett-mechanism-2026-05-16. Tier 2.5 \u2192 3.0 (project's first Tier 3). Coherent rotating-frame Bloch mechanism confirmed; \u03b3_dr-independence proven. 5.5% \u03c4-residual errata propagated: Bloch-Siegert NOT GP mean-field (critic/turn_28 \u00a73.4). Activates yan-li-saito-2026-reproduction as priority-1 successor. Deliverables: barnett-mechanism-confirmed.md created, barnett.md appended (T19 total), state.json updated. | judge: INCONCLUSIVE due to metric-key contract mismatch (director success_criteria.metric strings did not match implementer assertion id keys); all qualitative assertions PASS; flagged for T30 director to address.",
+      "notes": "Document stage closure of barnett-mechanism-2026-05-16. Tier 2.5 → 3.0 (project's first Tier 3). Coherent rotating-frame Bloch mechanism confirmed; γ_dr-independence proven. 5.5% τ-residual errata propagated: Bloch-Siegert NOT GP mean-field (critic/turn_28 §3.4). Activates yan-li-saito-2026-reproduction as priority-1 successor. Deliverables: barnett-mechanism-confirmed.md created, barnett.md appended (T19 total), state.json updated. | judge: INCONCLUSIVE due to metric-key contract mismatch (director success_criteria.metric strings did not match implementer assertion id keys); all qualitative assertions PASS; flagged for T30 director to address.",
       "tokens_used": {
         "theorist": null,
         "researcher": null,
@@ -100,7 +100,7 @@
       "directive_action": "noop",
       "directive_label": "yan-li-saito-hypothesize-zero-blockers",
       "wall_time_sec": null,
-      "notes": "Hypothesize stage for yan-li-saito-2026-reproduction. Term-by-term paper\u2192SpinorBEC.jl mapping (5 rows), all Q1-Q5 framework gaps resolved (Q1 LHY \u03c7 bit-exact MATCH, Q2 DDI prefactor ratio=1 with proper g_F, Q3 free-space ITP CLEAR via NoPotential, Q4 J_z-constrained ITP CLEAR via _find_ground_state_Jz, Q5 init_psi_fl_vortex matches torus topology). 4 pre-registered falsifiers (F1/F2/F3/F4) with quantitative predictions + tolerance bands. ZERO BLOCKERS for F1 (torus GS) Execute. 2 research queries dispatched in parallel: Q-Eu151-gF RESOLVED (paper uses real F=1 Eu-151 hyperfine with g_F\u00b7F=9/2 from Breit-Rabi \u2192 a_s\u224821 a\u2080); Q-paper-energy-table NOT_FOUND (no energy table in paper; F4 becomes ratio-only discriminator).",
+      "notes": "Hypothesize stage for yan-li-saito-2026-reproduction. Term-by-term paper→SpinorBEC.jl mapping (5 rows), all Q1-Q5 framework gaps resolved (Q1 LHY χ bit-exact MATCH, Q2 DDI prefactor ratio=1 with proper g_F, Q3 free-space ITP CLEAR via NoPotential, Q4 J_z-constrained ITP CLEAR via _find_ground_state_Jz, Q5 init_psi_fl_vortex matches torus topology). 4 pre-registered falsifiers (F1/F2/F3/F4) with quantitative predictions + tolerance bands. ZERO BLOCKERS for F1 (torus GS) Execute. 2 research queries dispatched in parallel: Q-Eu151-gF RESOLVED (paper uses real F=1 Eu-151 hyperfine with g_F·F=9/2 from Breit-Rabi → a_s≈21 a₀); Q-paper-energy-table NOT_FOUND (no energy table in paper; F4 becomes ratio-only discriminator).",
       "tokens_used": {
         "theorist": null,
         "researcher": null,
@@ -1201,7 +1201,7 @@
         "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
       },
       "investigation_id": "judge-in-operator-bug-2026-05-18",
-      "notes": "judge.py _OPS in-operator bug fixed; 23/23 unittests pass; T52 re-judge flipped FAIL_OPERATIONAL -> PASS; sibling audit 33/33 occurrences (30 list-mem, 2 range, 1 ambiguous); historical T28/T33/T35/T38/T41-T48 flagged for anko. 1 criterion failed: historical_judge_52_preserved (implementer overwrote turn_52.json \u2014 but file was never committed pre-T53 anyway).",
+      "notes": "judge.py _OPS in-operator bug fixed; 23/23 unittests pass; T52 re-judge flipped FAIL_OPERATIONAL -> PASS; sibling audit 33/33 occurrences (30 list-mem, 2 range, 1 ambiguous); historical T28/T33/T35/T38/T41-T48 flagged for anko. 1 criterion failed: historical_judge_52_preserved (implementer overwrote turn_52.json — but file was never committed pre-T53 anyway).",
       "tokens_used": {
         "theorist": null,
         "researcher": null,
@@ -1257,7 +1257,7 @@
       "branch": null,
       "commit": null,
       "parent": null,
-      "notes": "Closed audit-class-scan-2026-05-18-T50 (tier 2 final) + judge-in-operator-bug-2026-05-18 (tier 2 final) in single text-only Document dispatch. LP-1 coupling-skip-gate-inconsistency moved to new rejected_classes section with critic rationale; LP-2 topology-function-WHAT-comment-pattern promoted from proposed_classes to active patterns: with last_count=5 and related_classes=[cargo-cult-comment]; audit_history row 4 appended at 2026-05-18T13:00:00+09:00. judge_in_operator_bug_2026_05_18.md memory file created with 33-occurrence sibling-audit table. meta-stage-routing-2026-05-18 confounder_advisory field added documenting that the T44-era FAIL/INCONCLUSIVE streak was judge.py operator bug, not contract-design \u2014 refined falsifier requires post-T53 5-turn window."
+      "notes": "Closed audit-class-scan-2026-05-18-T50 (tier 2 final) + judge-in-operator-bug-2026-05-18 (tier 2 final) in single text-only Document dispatch. LP-1 coupling-skip-gate-inconsistency moved to new rejected_classes section with critic rationale; LP-2 topology-function-WHAT-comment-pattern promoted from proposed_classes to active patterns: with last_count=5 and related_classes=[cargo-cult-comment]; audit_history row 4 appended at 2026-05-18T13:00:00+09:00. judge_in_operator_bug_2026_05_18.md memory file created with 33-occurrence sibling-audit table. meta-stage-routing-2026-05-18 confounder_advisory field added documenting that the T44-era FAIL/INCONCLUSIVE streak was judge.py operator bug, not contract-design — refined falsifier requires post-T53 5-turn window."
     },
     {
       "turn": 55,
@@ -1670,6 +1670,104 @@
         "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
         "researcher": "5c6277ae5ff274765786dfb8c511b568",
         "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 10428462,
+        "total": 10428462,
+        "effective_full_rate": 1743677,
+        "breakdown": {
+          "input_fresh": 37538,
+          "cache_creation": 493511,
+          "cache_read": 9877105,
+          "output": 20308
+        },
+        "n_messages": 81,
+        "n_message_starts": 81
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.0,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.0,
+        "cost_inflation": 0.993,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "advisory",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "AUDIT_DUE: patterns.yaml last audited at T0, gap=64"
+      ]
+    },
+    {
+      "turn": 65,
+      "ts": "2026-05-18T01:00:27Z",
+      "judge_status": "PASS",
+      "directive_action": "document_investigation_closure",
+      "directive_label": "yan-li-saito-r4-dormant-close-document",
+      "wall_time_sec": null,
+      "agent_hashes": {
+        "critic": "e4cc3ddb505396ed9e55914384944cbd",
+        "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+        "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+        "researcher": "5c6277ae5ff274765786dfb8c511b568",
+        "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 8526850,
+        "total": 8526850,
+        "effective_full_rate": 1311114,
+        "breakdown": {
+          "input_fresh": 4268,
+          "cache_creation": 333401,
+          "cache_read": 8174655,
+          "output": 14526
+        },
+        "n_messages": 86,
+        "n_message_starts": 86
+      },
+      "branch": null,
+      "commit": null,
+      "parent": "490c256",
+      "drift_signals": {
+        "topic_repetition": 0.4,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.0,
+        "cost_inflation": 0.752,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "advisory",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "AUDIT_DUE: patterns.yaml last audited at T0, gap=65"
+      ]
+    },
+    {
+      "turn": 66,
+      "ts": "2026-05-18T01:12:32Z",
+      "judge_status": "PASS",
+      "directive_action": "modify_code",
+      "directive_label": "yan-li-saito-T66-current-stage-canonicalize",
+      "wall_time_sec": null,
+      "agent_hashes": {
+        "critic": "e4cc3ddb505396ed9e55914384944cbd",
+        "director": "077a86dba89b9096e5c2fc45e8fbc3c7",
+        "implementer": "ff29de2d3d5732f6093ae166ef5a41b5",
+        "researcher": "5c6277ae5ff274765786dfb8c511b568",
+        "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
       }
     }
   ],
@@ -1677,7 +1775,7 @@
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "RESEARCHER_ONLY",
+  "last_judge": "PASS",
   "home_branch": "main",
   "schema_version": 2.1,
   "current_agent_hashes": {
@@ -1687,11 +1785,11 @@
     "researcher": "5c6277ae5ff274765786dfb8c511b568",
     "theorist": "d5d5d1d7f7b821c80646c164a3bb5a5b"
   },
-  "last_directive_label": "audit-class-scan-T63-document-close",
-  "last_directive_action": "researcher_dispatch",
+  "last_directive_label": "yan-li-saito-r4-dormant-close-document",
+  "last_directive_action": "modify_code",
   "last_error": null,
   "retries": 0,
-  "active_investigation_id": "audit-class-scan-2026-05-18-T61",
+  "active_investigation_id": null,
   "investigations_index": [
     "barnett-mechanism-2026-05-16",
     "klaus-magnetostir-bch-leak-2026-05-13",
@@ -1705,7 +1803,7 @@
     "barnett-mechanism-2026-05-16": {
       "id": "barnett-mechanism-2026-05-16",
       "title": "Barnett pumping mechanism in trapped F=6 Eu DDI (anko empirical signal)",
-      "hypothesis": "rotating-frame energetic bias -\u03a9(L_z+F_z) + \u03b3_dr dipolar relaxation drives the empirical \u0394\u27e8F_z\u27e9/N=-4.60 sign asymmetry; DDI is not load-bearing",
+      "hypothesis": "rotating-frame energetic bias -Ω(L_z+F_z) + γ_dr dipolar relaxation drives the empirical Δ⟨F_z⟩/N=-4.60 sign asymmetry; DDI is not load-bearing",
       "flow_template": "verify-claim",
       "current_stage": "closed",
       "stages_done": [
@@ -1728,7 +1826,7 @@
         ],
         "Design": [
           19,
-          "theorist T19 \u00a72.6 3-bin falsifier table"
+          "theorist T19 §2.6 3-bin falsifier table"
         ],
         "Execute": [
           20,
@@ -1736,7 +1834,7 @@
         ],
         "Analyze": [
           20,
-          "\u0394_cdd0=-5.99 extracted from m-populations"
+          "Δ_cdd0=-5.99 extracted from m-populations"
         ],
         "Update": [
           28,
@@ -1750,21 +1848,21 @@
       "falsifiers": [
         {
           "id": "c_dd-zero-control",
-          "description": "if M2-dominant, c_dd=0 \u2192 \u0394 \u2248 +4.82; if M1-active, \u0394 \u2248 -4.6",
+          "description": "if M2-dominant, c_dd=0 → Δ ≈ +4.82; if M1-active, Δ ≈ -4.6",
           "tested_at_turn": 20,
-          "result": "\u0394=-5.985 \u2192 M2-dominant REFUTED; M1-active confirmed (DDI is suppressive, not load-bearing \u2014 more asymmetric than empirical)"
+          "result": "Δ=-5.985 → M2-dominant REFUTED; M1-active confirmed (DDI is suppressive, not load-bearing — more asymmetric than empirical)"
         },
         {
           "id": "gamma-dr-zero-control",
-          "description": "if M1-active, \u03b3_dr=0 should give \u0394 \u2248 0 (no asymmetry)",
+          "description": "if M1-active, γ_dr=0 should give Δ ≈ 0 (no asymmetry)",
           "tested_at_turn": 27,
-          "result": "COHERENT MECHANISM CONFIRMED at T27 (\u03c4_-\u03a9=2.84 unchanged from \u03b3_dr=0.02 \u2192 \u03b3_dr-independence proven); CORROBORATED at T28 (critic independent Heisenberg+Slichter re-derivation lands on T27 sign); tier 2.5 \u2192 3.0 at T29 Document. 5.5% \u03c4-residual is Bloch-Siegert (not GP mean-field as sim/turn_27 \u00a76 misattributed; per critic/turn_28 \u00a73.4 errata)."
+          "result": "COHERENT MECHANISM CONFIRMED at T27 (τ_-Ω=2.84 unchanged from γ_dr=0.02 → γ_dr-independence proven); CORROBORATED at T28 (critic independent Heisenberg+Slichter re-derivation lands on T27 sign); tier 2.5 → 3.0 at T29 Document. 5.5% τ-residual is Bloch-Siegert (not GP mean-field as sim/turn_27 §6 misattributed; per critic/turn_28 §3.4 errata)."
         },
         {
           "id": "lz-buildup-presence",
-          "description": "if M1-active, \u27e8L_z\u27e9 should build up under +\u03a9 stir; if dormant, \u27e8L_z\u27e9 stays \u2248 0",
+          "description": "if M1-active, ⟨L_z⟩ should build up under +Ω stir; if dormant, ⟨L_z⟩ stays ≈ 0",
           "tested_at_turn": null,
-          "result": "INCONCLUSIVE \u2014 Lz observable not saved in either run; T20 data gap. Optional post-closure side-quest; not load-bearing for single-particle coherent mechanism which lives in spin space, not orbital space."
+          "result": "INCONCLUSIVE — Lz observable not saved in either run; T20 data gap. Optional post-closure side-quest; not load-bearing for single-particle coherent mechanism which lives in spin space, not orbital space."
         }
       ],
       "tier_current": 3.0,
@@ -1777,8 +1875,8 @@
     },
     "klaus-magnetostir-bch-leak-2026-05-13": {
       "id": "klaus-magnetostir-bch-leak-2026-05-13",
-      "title": "Klaus magnetostir non-reproducibility \u2014 Option \u03b3 analytical absorption of BCH leak",
-      "hypothesis": "Lab-frame spinor split-step has \u03b4\u00db ~ dt\u00b2\u00b7p\u00b7F\u00b7sin\u03b8\u00b7c_dd\u27e8n\u27e9 Larmor-linear leak; Option \u03b3 apply_local_spin_step! drops BCH parameter p\u00b7F\u00b7dt \u2248 26.7 \u2192 \u03c6\u0307\u00b7F\u00b7dt \u2248 0.027 (4-decade reduction)",
+      "title": "Klaus magnetostir non-reproducibility — Option γ analytical absorption of BCH leak",
+      "hypothesis": "Lab-frame spinor split-step has δÛ ~ dt²·p·F·sinθ·c_dd⟨n⟩ Larmor-linear leak; Option γ apply_local_spin_step! drops BCH parameter p·F·dt ≈ 26.7 → φ̇·F·dt ≈ 0.027 (4-decade reduction)",
       "flow_template": "verify-claim",
       "current_stage": "closed",
       "stages_done": [
@@ -1811,39 +1909,40 @@
     },
     "fullbdg-f6-polar-3000x": {
       "id": "fullbdg-f6-polar-3000x",
-      "title": "F=6 polar FullBdGLHY 3000\u00d7 spurious offset",
+      "title": "F=6 polar FullBdGLHY 3000× spurious offset",
       "current_stage": "dormant",
       "tier_current": 1.5,
       "tier_target": 2,
       "next_stage_action": null,
-      "blocked_on": "contained bug per anko 2026-05-15 \u2014 closed-form alternatives in place, deferral OK",
+      "blocked_on": "contained bug per anko 2026-05-15 — closed-form alternatives in place, deferral OK",
       "priority": 99,
       "kind": "physics"
     },
     "yan-li-saito-2026-reproduction": {
       "id": "yan-li-saito-2026-reproduction",
       "title": "Yan-Li-Saito 2026 PRL Barnett-droplet reproduction (Tier-3 candidate)",
-      "hypothesis": "SpinorBEC.jl scalar + DDI + LHY framework can reproduce torus magnetic-vortex GS + mechanical Larmor precession + chiral bound state at F=1 \u03b5_dd=1.2",
+      "hypothesis": "SpinorBEC.jl scalar + DDI + LHY framework can reproduce torus magnetic-vortex GS + mechanical Larmor precession + chiral bound state at F=1 ε_dd=1.2",
       "flow_template": "verify-claim",
-      "current_stage": "Document remains as terminal stage; next_stage = null (no auto-advance). T50 director may either: (a) spawn child investigation `yan-li-saito-r4-ddi-energy-sign` (build-theory, theorist+sympy ~5M) if anko prioritizes R4 analytical revival path; (b) close yan-li-saito at tier 0.4 dormant and switch to klaus-magnetostir-bch-leak (priority 3, now unblocked by JULIA_GPU_OK policy); (c) run audit-class-scan \u00a7F6 to clear AUDIT_DUE gap=49.",
+      "current_stage": "closed",
       "stages_done": [
         "Design",
         "Document",
-        "Execute"
+        "Execute",
+        "Research"
       ],
       "tier_current": 0.4,
       "tier_target": 3,
       "next_stage": null,
-      "next_stage_action": "T48 normalization audit RESOLVED 152\u00d7 as T47-critic-input-error (a_s=110 instead of 21 a\u2080); framework D\u2080 \u2261 paper D\u2080 (3.24 vs 3.43 \u03bcm\u207b\u00b3, 5.5% agreement); gap to paper target 6807\u00d7 unchanged. Investigation lands at partial-REFUTE (tier 0.40). Open: R4 analytical DDI energy sign / BUG-9 (low-probability revival path, ~5M effective, theorist+sympy). Otherwise dormant.",
+      "next_stage_action": null,
       "blocked_on": null,
       "priority": 1,
       "kind": "physics",
       "falsifiers": [
         {
           "id": "f1-direct-reproduction",
-          "description": "Yan-Li-Saito Fig 1c torus magnetic-vortex GS reproduction at F=1, N=15000, \u03b5_dd=1.2, free space, :scalar LHY",
+          "description": "Yan-Li-Saito Fig 1c torus magnetic-vortex GS reproduction at F=1, N=15000, ε_dd=1.2, free space, :scalar LHY",
           "tested_at_turn": 37,
-          "result": "FALSIFIED at T37; T40 5-point seed-basin discriminator: P0/P1/P2/P3 (Gaussian \u03c3 sweep 0.5\u219214) all delocalized confirming theorist E_DDI=0 isotropy derivation; P4 (fl_vortex JLD2, topology preserved to machine eps) ALSO delocalized refuting topology-axis hypothesis. Both (b) and (a2) REFUTED. Open: (a4) framework deep-bug, (a1) LHY \u03c7(\u03b5_dd>1) issue, (c) paper-claim wrong."
+          "result": "FALSIFIED at T37; T40 5-point seed-basin discriminator: P0/P1/P2/P3 (Gaussian σ sweep 0.5→14) all delocalized confirming theorist E_DDI=0 isotropy derivation; P4 (fl_vortex JLD2, topology preserved to machine eps) ALSO delocalized refuting topology-axis hypothesis. Both (b) and (a2) REFUTED. Open: (a4) framework deep-bug, (a1) LHY χ(ε_dd>1) issue, (c) paper-claim wrong."
         }
       ],
       "last_advanced_turn": 49,
@@ -1858,10 +1957,19 @@
           "turn": 49,
           "stage": "Document",
           "tier": 0.4,
-          "note": "Document closure of T48 normalization audit per Option C committed routing. Memory annotated with a_s=21 a\u2080 in D\u2080; patterns.yaml `paper-unit-system-wrong-param-in-spot-check` added; partial-REFUTE landed."
+          "note": "Document closure of T48 normalization audit per Option C committed routing. Memory annotated with a_s=21 a₀ in D₀; patterns.yaml `paper-unit-system-wrong-param-in-spot-check` added; partial-REFUTE landed."
+        },
+        {
+          "turn": 65,
+          "stage": "Document",
+          "tier": 0.4,
+          "note": "Terminal closure REFUTED-CLEAN per T64 R4 analytical audit DORMANT-CLOSE verdict. DDI sign/prefactor + LHY chi conventions confirmed framework-paper equivalent at F=1 polar polarized limit. H1/H2 eliminated; H3 (grid+ITP, out of scope) is leading remaining explanation for 6807x gap. Memory entry created."
         }
       ],
-      "last_turn": 49,
+      "last_turn": 65,
+      "last_stage": "Document",
+      "last_verdict": "DORMANT-CLOSE",
+      "last_critic_turn": null,
       "falsifiers_tested": [
         {
           "id": "t45-critic-update-r2b-vs-r2c",
@@ -1876,22 +1984,30 @@
           "outcome": "D0_FRAMEWORK_EQUIV_PAPER; T47_152x_FLAG_RESOLVED_AS_WRONG_A_S_INPUT; gap_unchanged_6807x; partial_REFUTE_LANDED",
           "tier_before": 0.6,
           "tier_after": 0.4
+        },
+        {
+          "id": "r4-analytical-ddi-energy-sign-or-dormant-at-0.4",
+          "turn": 64,
+          "outcome": "REFUTED-CLEAN: framework E_ddi at F=1 polar polarized = paper Eq 1 term-by-term; LHY chi(eps_dd=1.2) truncate-to-zero matches paper Re convention; no sign/prefactor/chi discrepancy. H1+H2 eliminated; 6807x gap attributed to H3 grid+ITP (out of R4 scope).",
+          "tier_before": 0.4,
+          "tier_after": 0.4
         }
       ],
-      "next_falsifier_id": "r4-analytical-ddi-energy-sign-or-dormant-at-0.4"
+      "next_falsifier_id": "r4-analytical-ddi-energy-sign-or-dormant-at-0.4",
+      "closing_note": "R4 analytical DDI sign/prefactor audit complete at T64 (Research stage). Finding: No DDI sign-convention discrepancy at F=1 polar polarized limit. Framework E_ddi = paper Eq 1 term-by-term (prefactor mu_0(g mu_B)^2/8pi, angular sign (1-3cos^2theta)/r^3, Q_ab 4pi absorption self-consistent). LHY chi(eps_dd=1.2) truncate-to-zero prescription matches paper Re convention; cannot explain 6807x deficit directionally. H1 (DDI prefactor) + H2 (LHY chi convention) ELIMINATED. 6807x gap to paper target density attributed to H3 (grid resolution ~30x coarser than paper + ITP convergence from available initial states); H3 is a code-configuration issue, not a physics-convention bug, and falls outside R4's analytical scope. Investigation closed REFUTED-CLEAN at tier 0.4 (partial-REFUTE landing from T48 preserved; R4 analytical revival path closed cleanly at T64). DDI-convention sub-claim verified at Tier-2-equiv-against-published-paper (Yan-Li-Saito 2026 PRL + Lima-Pelster 2011 + Wachtler-Santos 2016 + Chomaz review). 8 external references consulted, 3 framework source files grepped. Memory entry yan_li_saito_2026_reproduction_dormant_close.md preserves audit chain. Next: T66+ director picks per seed.md priority order; all anko-prioritized investigations (priority 1-3) now closed/dormant; loop reaches steady-state moment."
     },
     "meta-critic-placement-2026-05-17": {
       "id": "meta-critic-placement-2026-05-17",
       "kind": "meta",
       "title": "Meta-improvement: critic placement in verify-claim flow",
-      "hypothesis": "Inserting a Design-after-critic stage before expensive Execute reduces contract-level mistakes (Lz-missing, freq-sign, gamma_dr-routing class) by \u226575%",
+      "hypothesis": "Inserting a Design-after-critic stage before expensive Execute reduces contract-level mistakes (Lz-missing, freq-sign, gamma_dr-routing class) by ≥75%",
       "flow_template": "meta-improvement",
       "current_stage": "Observe",
       "stages_done": [],
       "target_metric": "contract_level_mistakes_per_10_turns",
       "baseline_value": 4,
       "baseline_window": "T20-T27 cascade (8 turns, 4 contract-level mistakes)",
-      "predicted_improvement": "\u2264 1 mistake per 10 turns",
+      "predicted_improvement": "≤ 1 mistake per 10 turns",
       "modifies_files": [
         ".claude/agents/director.md"
       ],
@@ -1900,13 +2016,13 @@
       "falsifiers": [
         {
           "id": "pilot-mistake-rate",
-          "description": "10-turn pilot with Design-after-critic shows \u2265 2 contract-level mistakes \u2192 hypothesis REFUTED",
+          "description": "10-turn pilot with Design-after-critic shows ≥ 2 contract-level mistakes → hypothesis REFUTED",
           "tested_at_turn": null,
           "result": null
         },
         {
           "id": "pilot-cost-overhead",
-          "description": "Design-after-critic doubles per-investigation cost (\u2265 2\u00d7 baseline 2M effective) without proportional retry-rate gain \u2192 revert",
+          "description": "Design-after-critic doubles per-investigation cost (≥ 2× baseline 2M effective) without proportional retry-rate gain → revert",
           "tested_at_turn": null,
           "result": null
         }
@@ -1931,7 +2047,7 @@
       "target_metric": "files_containing_zeeman_dict_key_or_legacy_mention",
       "baseline_value": 8,
       "baseline_window": "Files affected per grep audit 2026-05-18T01: schema.jl, pulse_sequence.jl, builders_phase.jl, B_block.jl, run_step_rotating/{dynamics,ground_state}.jl, run_step_{dynamics,ground_state}.jl",
-      "predicted_improvement": "\u2264 1 file containing zeeman dict key (= TimeDependentZeeman type definition; struct name kept for physics semantic; all dict-key usages renamed)",
+      "predicted_improvement": "≤ 1 file containing zeeman dict key (= TimeDependentZeeman type definition; struct name kept for physics semantic; all dict-key usages renamed)",
       "modifies_files": [
         "src/workflow/experiments/schema/schema.jl",
         "src/workflow/experiments/runtime/pulse_sequence.jl",
@@ -1947,7 +2063,7 @@
       "falsifiers": [
         {
           "id": "pilot-Pkg-test-all-pass",
-          "description": "Pkg.test() must pass 100% on pilot branch \u2014 any test failure \u2192 revert",
+          "description": "Pkg.test() must pass 100% on pilot branch — any test failure → revert",
           "tested_at_turn": null,
           "result": null
         },
@@ -1959,7 +2075,7 @@
         },
         {
           "id": "pilot-no-physics-drift",
-          "description": "ground_state energy + Mz output for runs/eu151_klaus_phi_phys/phi_4.524/ must match pre-rename within float epsilon \u2014 physics must not change",
+          "description": "ground_state energy + Mz output for runs/eu151_klaus_phi_phys/phi_4.524/ must match pre-rename within float epsilon — physics must not change",
           "tested_at_turn": null,
           "result": null
         }
@@ -1969,13 +2085,13 @@
       "priority": 5,
       "blocked_on": null,
       "next_stage": "Hypothesize",
-      "next_stage_action": "researcher Observe stage: scan all 8 files, list every dict-key usage of `zeeman` and `B_hat`, distinguish dict-keys from type-names/function-names (keep). Output a 3-column table (file, line, current \u2192 proposed). Then theorist Hypothesize designs the rename patch as a diff.",
-      "closing_note": "Closed without running meta-improvement flow. Per anko 2026-05-18 (\"3s \u304f\u3089\u3044\u3067\u308f\u304b\u3089\u306a\u3044\uff1f\"), this was a mechanical rename, not an investigation. Executed directly via Python regex script: 22 lines across 8 files renamed (internal dict keys zeeman\u2192B, B_hat\u2192B_direction; user-facing rejection in B_block.jl:77,97 preserved). Verified: using SpinorBEC loads + load_config on existing config passes. Lesson saved to memory `feedback_mechanical_vs_investigation_threshold.md`."
+      "next_stage_action": "researcher Observe stage: scan all 8 files, list every dict-key usage of `zeeman` and `B_hat`, distinguish dict-keys from type-names/function-names (keep). Output a 3-column table (file, line, current → proposed). Then theorist Hypothesize designs the rename patch as a diff.",
+      "closing_note": "Closed without running meta-improvement flow. Per anko 2026-05-18 (\"3s くらいでわからない？\"), this was a mechanical rename, not an investigation. Executed directly via Python regex script: 22 lines across 8 files renamed (internal dict keys zeeman→B, B_hat→B_direction; user-facing rejection in B_block.jl:77,97 preserved). Verified: using SpinorBEC loads + load_config on existing config passes. Lesson saved to memory `feedback_mechanical_vs_investigation_threshold.md`."
     },
     "meta-stage-routing-2026-05-18": {
       "id": "meta-stage-routing-2026-05-18",
       "kind": "meta",
-      "title": "3+ FAIL/INCONCLUSIVE in last 4 turns \u2014 stage routing / contract design flaw (auto-spawn)",
+      "title": "3+ FAIL/INCONCLUSIVE in last 4 turns — stage routing / contract design flaw (auto-spawn)",
       "hypothesis": "Multiple consecutive operational failures / inconclusives suggest either contract design is wrong, observable_manifest precondition is missing, stage role is mis-assigned, or success_criteria are not discriminating.",
       "flow_template": "meta-improvement",
       "current_stage": "closed",
@@ -1986,7 +2102,7 @@
       "last_turn": 60,
       "last_stage": "Document",
       "last_verdict": "REFUTED-BY-CONFOUNDER",
-      "closing_note": "Closed REFUTED-BY-CONFOUNDER 2026-05-18 T60. Auto-spawned at T44 by drift_signals.py same_stage_fail_streak rule; refuted by post-T53 6-turn-clean streak (T54 PASS, T55 RESEARCHER_ONLY, T56 NOOP, T57 PASS, T58 CRITIC_PASS, T59 PASS \u2014 0 FAIL/INCONCLUSIVE in all post-T53 4-turn windows). Confounder source: judge-in-operator-bug-2026-05-18 (judge.py _OPS_in_ bug fixed at T53). T54 confounder_advisory threshold not approached. Per \u00a7F5 Revert-equivalent path for trigger-hypothesis refutation BEFORE pilot, closed via single implementer_text Document dispatch. Institutional lesson preserved in memory `meta_stage_routing_refuted_by_confounder_2026_05_18.md`.",
+      "closing_note": "Closed REFUTED-BY-CONFOUNDER 2026-05-18 T60. Auto-spawned at T44 by drift_signals.py same_stage_fail_streak rule; refuted by post-T53 6-turn-clean streak (T54 PASS, T55 RESEARCHER_ONLY, T56 NOOP, T57 PASS, T58 CRITIC_PASS, T59 PASS — 0 FAIL/INCONCLUSIVE in all post-T53 4-turn windows). Confounder source: judge-in-operator-bug-2026-05-18 (judge.py _OPS_in_ bug fixed at T53). T54 confounder_advisory threshold not approached. Per §F5 Revert-equivalent path for trigger-hypothesis refutation BEFORE pilot, closed via single implementer_text Document dispatch. Institutional lesson preserved in memory `meta_stage_routing_refuted_by_confounder_2026_05_18.md`.",
       "target_metric": "fail_or_inconclusive_rate_per_5_turns",
       "baseline_value": null,
       "baseline_window": "last 4 turns up to T44",
@@ -2015,7 +2131,7 @@
       "id": "audit-class-scan-2026-05-18-T50",
       "title": "Audit-class-scan T50 cycle -- periodic anti-pattern catalog sweep (F6 level-2/3)",
       "flow_template": "audit-class-scan",
-      "current_stage": "closed (audit-class-scan-2026-05-18-T50 terminal closure at Document) + closed (judge-in-operator-bug-2026-05-18 terminal closure at Document). state.json reflects both as current_stage='closed' tier_current=2.",
+      "current_stage": "closed",
       "stages_done": [
         "Document",
         "Findings",
@@ -2121,7 +2237,7 @@
       "id": "audit-class-scan-2026-05-18-T61",
       "title": "Audit-class-scan T61 cycle -- periodic anti-pattern catalog sweep (F6 level-2)",
       "flow_template": "audit-class-scan",
-      "current_stage": "closed (cycle terminal \u2014 audit-class-scan-2026-05-18-T61 tier 2 reached; AUDIT_DUE drift advisory clears; next \u00a7F6 cycle scheduled ~T72 per ~10-turn cadence in drift_signals.py)",
+      "current_stage": "closed",
       "stages_done": [
         "Document",
         "Findings",
@@ -2135,7 +2251,7 @@
         ],
         "Findings": [
           61,
-          "folded into Observe per \u00a7F6; researcher produced per-pattern triage classifications"
+          "folded into Observe per §F6; researcher produced per-pattern triage classifications"
         ],
         "Triage": [
           62,
@@ -2165,10 +2281,10 @@
         "hardcoded_magic_number_raw_count": 126,
         "new_active_pattern_swept_lp2_count": 5
       },
-      "closing_note": "Cycle closed cleanly 2026-05-18 T63 at tier 2. Second full \u00a7F6 audit-class-scan cycle (first since T50). 10 patterns swept (incl. LP-2 promoted at T54). 0 actionable findings; 0 L3 proposals; 0 mechanical fixes -- steady-state result confirms T50/T51/T54 prior-cycle fixes held over ~12 physics turns. Institutional value: (a) verification that periodic catalog sweep produces a clean baseline; (b) LP-2 first-scan post-promotion held T51 cleanup with 5 false-positive grep hits flagged for future refinement (deferred to ~T72 next cycle or critic_audit per \u00a7F6 safety rail); (c) \u00a7F6 stage separation (Triage T62 mechanical, Document T63 narrative) demonstrated lower per-turn cost than T54 collapsed pattern; (d) AUDIT_DUE drift advisory cleared for next ~10 turns. Memory entry: audit_class_scan_t61_cycle_2026_05_18.md."
+      "closing_note": "Cycle closed cleanly 2026-05-18 T63 at tier 2. Second full §F6 audit-class-scan cycle (first since T50). 10 patterns swept (incl. LP-2 promoted at T54). 0 actionable findings; 0 L3 proposals; 0 mechanical fixes -- steady-state result confirms T50/T51/T54 prior-cycle fixes held over ~12 physics turns. Institutional value: (a) verification that periodic catalog sweep produces a clean baseline; (b) LP-2 first-scan post-promotion held T51 cleanup with 5 false-positive grep hits flagged for future refinement (deferred to ~T72 next cycle or critic_audit per §F6 safety rail); (c) §F6 stage separation (Triage T62 mechanical, Document T63 narrative) demonstrated lower per-turn cost than T54 collapsed pattern; (d) AUDIT_DUE drift advisory cleared for next ~10 turns. Memory entry: audit_class_scan_t61_cycle_2026_05_18.md."
     }
   },
-  "last_meta_check_turn": 63,
-  "last_short_label": "audit-class-scan-T63-document-close",
-  "last_label": "yan-li-saito-r4-ddi-sign-research"
+  "last_meta_check_turn": 65,
+  "last_short_label": "yan-li-saito-r4-dormant-close-document",
+  "last_label": "yan-li-saito-r4-dormant-close-document"
 }
