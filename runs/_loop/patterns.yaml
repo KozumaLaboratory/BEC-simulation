@@ -228,8 +228,15 @@ rejected_classes:
 #
 # Each audit-class-scan run appends one row here. Director reads to
 # decide priority + fix accumulated debt.
+#
+# MANDATORY: Each entry MUST include `turn: <N>` as its FIRST key.
+# `_compute_audit_due_advisory` in drift_signals.py reads this field
+# to compute the audit gap (gap = current_turn - max(entry.turn)).
+# Document-stage of audit-class-scan flow §F6 must write this field;
+# omitting it causes last_audit_turn=0 → permanent phantom AUDIT_DUE.
 audit_history:
-  - run_at: '2026-05-18T01:50:00+09:00'
+  - turn: 0
+    run_at: '2026-05-18T01:50:00+09:00'
     triggered_by: 'manual (anko-instigated grep hunt during loop refactor)'
     patterns_scanned: ['deprecated-name-leak']
     findings_count: 0  # after all-instance batch fix
@@ -237,7 +244,8 @@ audit_history:
       First reactive audit (not via this flow): bug 8 surfaced, grep found
       ~67 sibling instances, batch-fixed. Now in steady state.
 
-  - run_at: '2026-05-18T05:00:00+09:00'
+  - turn: 48
+    run_at: '2026-05-18T05:00:00+09:00'
     triggered_by: 'T48 researcher normalization audit (yan-li-saito-2026-reproduction Research stage side-step)'
     patterns_scanned: ['paper-unit-system-wrong-param-in-spot-check']
     findings_count: 1  # T47 critic §D (the triggering instance)
@@ -250,7 +258,8 @@ audit_history:
       Sibling-class search per `feedback_fix_the_class_not_the_instance`
       complete; no batch fix needed at code level.
 
-  - run_at: '2026-05-18T12:00:00+09:00'
+  - turn: 54
+    run_at: '2026-05-18T12:00:00+09:00'
     triggered_by: 'T50 audit-class-scan §F6 Observe sweep (AUDIT_DUE gap=49 since T0)'
     patterns_scanned: ['deprecated-name-leak', 'api-rename-stragglers', 'doc-staleness', 'hardcoded-magic-number', 'dead-export', 'large-file-bloat', 'test-mock-of-real', 'cargo-cult-comment', 'paper-unit-system-wrong-param-in-spot-check']
     findings_count: 5  # the topology.jl WHAT-comments, before T51 cleanup
@@ -280,7 +289,8 @@ audit_history:
       - topology-function-WHAT-comment-pattern (LP-2) — runnable grep version of
         cargo-cult-comment focused on standard vector-calculus comment patterns.
 
-  - run_at: '2026-05-18T13:00:00+09:00'
+  - turn: 54
+    run_at: '2026-05-18T13:00:00+09:00'
     triggered_by: 'T52 critic L3 audit of LP-1/LP-2 proposed_classes (director-routed §F6 safety rail); applied at T54 Document stage after T53 judge.py operator bug fix'
     patterns_scanned: []
     findings_count: 0
@@ -295,7 +305,8 @@ audit_history:
       Verdict evaluation was previously gated by judge.py `_OPS["in"]`
       bug (FAIL_OPERATIONAL at T52); T53 fixed the bug, T52 re-judged PASS;
       T54 closes the audit-class-scan cycle.
-  - run_at: '2026-05-18T09:00:00+09:00'
+  - turn: 63
+    run_at: '2026-05-18T09:00:00+09:00'
     triggered_by: 'T61 audit-class-scan §F6 Observe sweep + T62 Triage close (AUDIT_DUE gap=61 since T0, gap=11 since T50 cycle)'
     patterns_scanned: ['deprecated-name-leak', 'api-rename-stragglers', 'doc-staleness', 'hardcoded-magic-number', 'dead-export', 'large-file-bloat', 'test-mock-of-real', 'cargo-cult-comment', 'paper-unit-system-wrong-param-in-spot-check', 'topology-function-WHAT-comment-pattern']
     findings_count: 0

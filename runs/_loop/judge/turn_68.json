@@ -1,0 +1,78 @@
+{
+  "turn": 68,
+  "status": "PASS",
+  "issues": [],
+  "metrics": {
+    "tier_target": 2,
+    "tier_current": 2,
+    "wall_time_sec": 45,
+    "tokens_used": null,
+    "audit_history_turns_added": 5,
+    "audit_due_advisory_clears": true,
+    "drift_signals_other_advisories_unchanged": true,
+    "src_files_modified_count": 0,
+    "claude_scripts_drift_signals_py_modified": false,
+    "audit_due_heuristic_bug_2026_05_18_in_state_investigations": true,
+    "audit_due_heuristic_bug_2026_05_18_current_stage": "closed"
+  },
+  "contract_evaluation": {
+    "verdict": "PASS",
+    "criteria_results": [
+      {
+        "id": "patterns_yaml_audit_history_has_turn_field_on_all_entries",
+        "passed": true,
+        "actual": 5,
+        "reason": "audit_history_turns_added=5 == 5 \u2192 True"
+      },
+      {
+        "id": "audit_due_advisory_no_longer_fires",
+        "passed": true,
+        "actual": true,
+        "reason": "audit_due_advisory_clears=True == True \u2192 True"
+      },
+      {
+        "id": "other_drift_advisories_unchanged",
+        "passed": true,
+        "actual": true,
+        "reason": "drift_signals_other_advisories_unchanged=True == True \u2192 True"
+      },
+      {
+        "id": "no_src_modification",
+        "passed": true,
+        "actual": 0,
+        "reason": "src_files_modified_count=0 == 0 \u2192 True"
+      },
+      {
+        "id": "no_drift_signals_py_modification",
+        "passed": true,
+        "actual": false,
+        "reason": "claude_scripts_drift_signals_py_modified=False == False \u2192 True"
+      },
+      {
+        "id": "investigation_recorded_in_state",
+        "passed": true,
+        "actual": true,
+        "reason": "audit_due_heuristic_bug_2026_05_18_in_state_investigations=True == True \u2192 True"
+      },
+      {
+        "id": "investigation_closed_same_turn",
+        "passed": true,
+        "actual": "closed",
+        "reason": "audit_due_heuristic_bug_2026_05_18_current_stage=closed == closed \u2192 True"
+      }
+    ],
+    "triggered_failure_modes": [],
+    "issues": []
+  },
+  "investigation_id": "audit-due-heuristic-bug-2026-05-18",
+  "stage_advancing_to": "Fix",
+  "investigation_update": {
+    "if_success_advance_to_stage": "closed (fix-bug collapsed; audit-due-heuristic-bug-2026-05-18 closes same-turn at tier 2)",
+    "if_success_tier_becomes": 2,
+    "if_refuted_advance_to_stage": "Reproduce (escalate to Option B logic fix in drift_signals.py if data fix doesn't clear advisory)",
+    "if_refuted_tier_becomes": 0,
+    "if_inconclusive_advance_to_stage": "Test (re-run verification with more diagnostic output; one-turn retry budget then escalate)",
+    "if_inconclusive_tier_becomes": 1,
+    "next_falsifier_to_test_after": "Institutional rule: future audit-class-scan Document stages (\u00a7F6) MUST include `turn: <N>` when appending a new audit_history row. Patterns.yaml comment header to be updated accordingly. No further falsifier for this investigation (closed same-turn). If novel_claim_zero hits 3-consecutive at T68 the next director should consider spawning a calibration meta-investigation."
+  }
+}
