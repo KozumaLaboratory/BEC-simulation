@@ -1,5 +1,5 @@
 {
-  "turn": 83,
+  "turn": 84,
   "status": "running",
   "history": [
     {
@@ -1037,7 +1037,15 @@
         "DRIFT_MANUSCRIPT_DELTA_ZERO",
         "DRIFT_COST_INFLATION",
         "AUDIT_DUE: patterns.yaml last audited at T63, gap=13"
-      ]
+      ],
+      "stage_advancing_to": "Analyze",
+      "cost_audit": {
+        "expected_cost_eff": 2000000,
+        "actual_cost_eff": 3055578,
+        "ratio_actual_over_expected": 1.53,
+        "deviation_pct": 52.8,
+        "flag": "BUDGET_OVER"
+      }
     },
     {
       "turn": 77,
@@ -1135,7 +1143,16 @@
       "drift_advisories": [
         "DRIFT_MANUSCRIPT_DELTA_ZERO",
         "AUDIT_DUE: patterns.yaml last audited at T63, gap=15"
-      ]
+      ],
+      "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
+      "stage_advancing_to": "Execute (prerequisite class-fix phase; full Execute-retry deferred to T79)",
+      "cost_audit": {
+        "expected_cost_eff": 700000,
+        "actual_cost_eff": 1430373,
+        "ratio_actual_over_expected": 2.04,
+        "deviation_pct": 104.3,
+        "flag": "BUDGET_BUSTED"
+      }
     },
     {
       "turn": 79,
@@ -1185,7 +1202,16 @@
       "drift_advisories": [
         "DRIFT_MANUSCRIPT_DELTA_ZERO",
         "AUDIT_DUE: patterns.yaml last audited at T63, gap=16"
-      ]
+      ],
+      "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
+      "stage_advancing_to": "Execute (full R1 retry on corrected YAML against fixed main HEAD)",
+      "cost_audit": {
+        "expected_cost_eff": 2500000,
+        "actual_cost_eff": 1728758,
+        "ratio_actual_over_expected": 0.69,
+        "deviation_pct": -30.8,
+        "flag": "BUDGET_OK"
+      }
     },
     {
       "turn": 80,
@@ -1235,7 +1261,16 @@
         "DRIFT_MANUSCRIPT_DELTA_ZERO",
         "DRIFT_COST_INFLATION",
         "AUDIT_DUE: patterns.yaml last audited at T63, gap=17"
-      ]
+      ],
+      "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
+      "stage_advancing_to": "Execute (Bz-sign-convention independent verification — non-Julia leverage path)",
+      "cost_audit": {
+        "expected_cost_eff": 1300000,
+        "actual_cost_eff": 1892821,
+        "ratio_actual_over_expected": 1.46,
+        "deviation_pct": 45.6,
+        "flag": "BUDGET_OVER"
+      }
     },
     {
       "turn": 81,
@@ -1285,7 +1320,16 @@
         "DRIFT_MANUSCRIPT_DELTA_ZERO",
         "DRIFT_COST_INFLATION",
         "AUDIT_DUE: patterns.yaml last audited at T63, gap=18"
-      ]
+      ],
+      "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
+      "stage_advancing_to": "Execute (R2 GPU retry with src-anchored high-confidence prior + pre-written wrapper-script approval-gate workaround)",
+      "cost_audit": {
+        "expected_cost_eff": 2500000,
+        "actual_cost_eff": 1879230,
+        "ratio_actual_over_expected": 0.75,
+        "deviation_pct": -24.8,
+        "flag": "BUDGET_OK"
+      }
     },
     {
       "turn": 82,
@@ -1300,14 +1344,78 @@
         "implementer": "610ac60c59abbbf4af92e2c464e6bcf2",
         "researcher": "6635ef673d05e12621da8d38413c3a8b",
         "theorist": "e33d24bdc505b4ec69873b39f5292087"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 14317528,
+        "total": 14317528,
+        "effective_full_rate": 2016169,
+        "breakdown": {
+          "input_fresh": 29199,
+          "cache_creation": 423959,
+          "cache_read": 13849965,
+          "output": 14405
+        },
+        "n_messages": 118,
+        "n_message_starts": 118
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.125,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.2,
+        "cost_inflation": 1.08,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "director_must_address",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "DRIFT_COST_INFLATION",
+        "AUDIT_DUE: patterns.yaml last audited at T63, gap=19"
+      ],
+      "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
+      "stage_advancing_to": "Analyze (F1 t_ring + F2 winding ℓ + F3 E_sim vs E_mf/N extraction from runs/matsui_edh_baseline_9ca97308/point_001.jld2 + result.jld2)",
+      "cost_audit": {
+        "expected_cost_eff": 1300000,
+        "actual_cost_eff": 2016169,
+        "ratio_actual_over_expected": 1.55,
+        "deviation_pct": 55.1,
+        "flag": "BUDGET_OVER"
       }
+    },
+    {
+      "turn": 83,
+      "ts": "2026-05-18T08:00:13Z",
+      "judge_status": "CRITIC_PASS",
+      "directive_action": "critic_audit",
+      "directive_label": "edh-matsui-update-T83-critic-operational-gate-deep-audit",
+      "wall_time_sec": null,
+      "agent_hashes": {
+        "critic": "cd44117d23595a18db7b2f6a1fd013e0",
+        "director": "7dd33642abb9a02b59e544da5fbe21b8",
+        "implementer": "610ac60c59abbbf4af92e2c464e6bcf2",
+        "researcher": "6635ef673d05e12621da8d38413c3a8b",
+        "theorist": "e33d24bdc505b4ec69873b39f5292087"
+      },
+      "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
+      "stage_advancing_to": "Document T84",
+      "verdict_token": "CORROBORATE_WITH_ERRATA",
+      "tier_recommendation": 2.75,
+      "critic_verdict": "PASS"
     }
   ],
   "created_at": "2026-05-14T00:00:00+00:00",
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "PASS",
+  "last_judge": "CRITIC_PASS",
   "home_branch": "main",
   "schema_version": 2.1,
   "current_agent_hashes": {
@@ -1908,15 +2016,17 @@
       "title": "Einstein-de Haas Eu-151 vortex emergence — reproduction of Matsui et al. Science 391, 384-388 (2026)",
       "hypothesis": "SpinorBEC.jl spinor-DDI + split-step framework reproduces Matsui et al. Science 391, 384–388 (2026) [DOI:10.1126/science.adx2872; arXiv:2504.17357] within factor-2 of the experimental EdH timescale τ_EdH^exp and matches the ring-vortex topology (winding number ℓ consistent with F=6 angular-momentum balance) when fed the paper's published parameters (N, trap frequencies ω_{x,y,z}, B-quench waveform, a_s, c_dd).",
       "flow_template": "verify-claim",
-      "current_stage": "Analyze (T82 implementer_julia_cpu_light extracts F1 t_ring, F2 winding ℓ, F3 GS energy E_sim vs E_mf/N)",
+      "current_stage": "Document (T84 implementer_text: T82 sec 8 erratum + tier 2.5 to 2.75 + memory entry)",
       "stages_done": [
         "Analyze",
+        "Analyze (F1 t_ring + F2 winding ℓ + F3 E_sim vs E_mf/N extraction from runs/matsui_edh_baseline_9ca97308/point_001.jld2 + result.jld2)",
         "Design",
         "Execute (Bz-sign-convention independent verification — non-Julia leverage path)",
         "Execute (R2 GPU retry with src-anchored high-confidence prior + pre-written wrapper-script approval-gate workaround)",
         "Execute (prerequisite class-fix phase; full Execute-retry deferred to T79)",
         "Hypothesize",
-        "Research"
+        "Research",
+        "Update (T83 critic CORROBORATE_WITH_ERRATA; F3 rel_error 8.0% within 20% band)"
       ],
       "stages_at_turn": {
         "Research": [
@@ -1958,7 +2068,7 @@
           "result": null
         }
       ],
-      "tier_current": 2.0,
+      "tier_current": 2.5,
       "tier_target": 3,
       "next_stage": "Execute",
       "next_stage_action": "T74 director: dispatch implementer_julia_gpu Execute. Run runs/eu151_matsui_edh/configs/matsui_edh_baseline.yaml on RTX 5070 Ti. Precondition_check verifies all observables in T72 §8.3 are saved (save_psi_snapshots=true present; save_every=50 present). Expected wall ~10-30 min at 32³ Case A. Outputs: runs/eu151_matsui_edh/data/ GS jld2 + psi_snapshots_streamed frames. T75 Analyze extracts t_ring (F1), winding ell (F2), GS energy (F3).",
@@ -2066,7 +2176,7 @@
       "next_stage_action": "researcher Observe stage already triggered this auto-spawn; theorist Hypothesize next"
     }
   },
-  "last_meta_check_turn": 81,
+  "last_meta_check_turn": 82,
   "last_short_label": "edh-matsui-execute-r2-gpu-pass-prediction-confirmed",
   "last_label": "yan-li-saito-r4-dormant-close-document"
 }
