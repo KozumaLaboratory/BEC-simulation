@@ -16,7 +16,7 @@ patterns:
   - test/
   - .claude/logs/
   - runs/_loop/
-  last_scanned: '2026-05-18T19:00:00+09:00'
+  last_scanned: '2026-05-19T01:30:00+09:00'
   last_count: 0
   related_classes:
   - api-rename-stragglers
@@ -35,7 +35,7 @@ patterns:
   - _v1_
   exclude_paths:
   - test/
-  last_scanned: '2026-05-18T19:00:00+09:00'
+  last_scanned: '2026-05-19T01:30:00+09:00'
   last_count: 0
   related_classes:
   - deprecated-name-leak
@@ -57,7 +57,7 @@ patterns:
     claim against current src/. Spot-check, not exhaustive.
 
     '
-  last_scanned: '2026-05-18T19:00:00+09:00'
+  last_scanned: '2026-05-19T01:30:00+09:00'
   last_count: 0
   related_classes:
   - deprecated-name-leak
@@ -75,7 +75,7 @@ patterns:
   exclude_paths:
   - test/
   - docs/
-  last_scanned: '2026-05-18T19:00:00+09:00'
+  last_scanned: '2026-05-19T01:30:00+09:00'
   last_count: 0
   related_classes: []
 - id: dead-export
@@ -95,7 +95,7 @@ patterns:
     removal — but check memory for "WIP" / "public API" markers first.
 
     '
-  last_scanned: '2026-05-18T19:00:00+09:00'
+  last_scanned: '2026-05-19T01:30:00+09:00'
   last_count: 0
   related_classes: []
 - id: large-file-bloat
@@ -109,7 +109,7 @@ patterns:
   detect: 'Find src/ -name ''*.jl'' -exec wc -l {} \; | awk ''$1 > 800''
 
     '
-  last_scanned: '2026-05-18T19:00:00+09:00'
+  last_scanned: '2026-05-19T01:30:00+09:00'
   last_count: 0
   related_classes: []
 - id: test-mock-of-real
@@ -126,7 +126,7 @@ patterns:
   - Mock\w+\(
   exclude_paths:
   - docs/
-  last_scanned: '2026-05-18T19:00:00+09:00'
+  last_scanned: '2026-05-19T01:30:00+09:00'
   last_count: 0
   related_classes: []
 - id: cargo-cult-comment
@@ -140,7 +140,7 @@ patterns:
     to identify the worst 5 instances per audit cycle.
 
     '
-  last_scanned: '2026-05-18T19:00:00+09:00'
+  last_scanned: '2026-05-19T01:30:00+09:00'
   last_count: 0
   related_classes: []
 - id: paper-unit-system-wrong-param-in-spot-check
@@ -179,7 +179,7 @@ patterns:
   exclude_paths:
   - test/
   - runs/_loop/judge/turn_47_critic_audit.md
-  last_scanned: '2026-05-18T19:00:00+09:00'
+  last_scanned: '2026-05-19T01:30:00+09:00'
   last_count: 0
   related_classes:
   - doc-staleness
@@ -203,7 +203,7 @@ patterns:
   exclude_paths:
   - test/
   - docs/
-  last_scanned: '2026-05-18T19:00:00+09:00'
+  last_scanned: '2026-05-19T01:30:00+09:00'
   last_count: 0
   related_classes:
   - cargo-cult-comment
@@ -247,6 +247,56 @@ rejected_classes:
 
     '
   rejected_status_label: rejected_2026-05-18T13:00
+- id: auto-spawn-duplicate-guard-missing
+  description: 'drift_signals auto-spawn mechanism lacks de-duplication guard;
+    trigger fires at turn N+K, spawning a second investigation alongside the prior
+    open instance from turn N. Verified empirical instance: two
+    meta-director-self-audit-2026-05-{18,19} entries in state.json (auto_spawned_at_turn
+    80 and 100, identical title/hypothesis/flow_template/tier_target/priority/next_stage_action;
+    differ only in id, baseline_window, and auto_spawned_at_turn). Symmetric pair
+    confirmed at meta-cost-inflation-2026-05-{18,19} (auto_spawned_at_turn 77 and
+    103). Underlying cause: state-machine spawn predicate in drift_signals.py
+    (gitignored .claude/ machine-local tree) lacks "open prior instance of same
+    trigger exists" idempotency check.
+
+    '
+  grep_patterns:
+  - auto_spawned_by_trigger
+  - director_self_audit_due
+  - auto_spawned_at_turn
+  proposed_at: '2026-05-19T01:00:00+09:00'
+  proposed_by: T103 researcher Observe stage / queued at T104 critic L3 audit
+  rejected_at: '2026-05-19T02:00:00+09:00'
+  rejected_by: T104 critic L3 audit
+  rejection_reason: 'Q3 FAIL + Q4 FAIL (2 of 4 §F6 safety-rail questions fail).
+    Q3: researcher claims analogy to api-rename-stragglers ("missing guard that
+    lets old form persist alongside new form"); structural analysis rejects this.
+    api-rename-stragglers captures temporal-version-skew where a renamed function
+    has lingering old-name callers — a one-way migration class. The candidate is
+    an idempotency-failure class — a state-machine spawn predicate missing an
+    "open prior instance exists" check. Different failure mechanism, different
+    fix shape, different detector shape. The "both involve a missing guard"
+    phrasing is too generic to be a §F6 concrete analogy. Q4: the candidate''s
+    empirical anchor scope (state.json + .claude/drift_signals.py) lies outside
+    the patterns.yaml established scope contract (all 10 active patterns target
+    src/+ext/+test/+docs/ production code; runs/_loop/ is explicitly excluded
+    in 6 of 10 patterns; .claude/ is gitignored machine-local infrastructure per
+    loop_architecture_2026_05_14.md and inaccessible via Read in critic dispatch).
+    The candidate''s fix-shape is a one-shot logic change to drift_signals.py
+    (add idempotency check), not a recurring batch-fix campaign in production
+    code; the cadence character is "single bug, fix once, never fires again"
+    rather than "periodic 10-turn sweep". The genuine underlying bug should be
+    addressed via a fix-bug flow (§F3) targeting drift_signals.py directly, or
+    via a new top-level catalog runs/_loop/loop_infrastructure_patterns.yaml if
+    anko wants to formalize a sibling catalog for gitignored .claude/ infrastructure
+    patterns. Q1 and Q2 PASSed cleanly (grep patterns syntactically valid;
+    measured hit count >= 6 in state.json, within [1, 10000] gate). The two
+    duplicate state.json entries are real and require cleanup (sub-3-second
+    mechanical fix per feedback_mechanical_vs_investigation_threshold) but
+    do not constitute a patterns.yaml-catalog-eligible class.
+
+    '
+  rejected_status_label: rejected_2026-05-19T02:00
 audit_history:
 - turn: 0
   run_at: '2026-05-18T01:50:00+09:00'
@@ -436,5 +486,37 @@ audit_history:
     anchor
 
     changes require critic re-audit); deferred to next cycle or critic_audit side-dispatch.
+
+    '
+- turn: 105
+  run_at: '2026-05-19T01:30:00+09:00'
+  triggered_by: T103 audit-class-scan §F6 Observe sweep (AUDIT_DUE gap=14 at T102; director_must_address
+    escalation; ~10-turn cadence since T87->T89 cycle) + T104 critic §F6 Level-3 audit
+    + T105 Triage mechanical-bookkeeping batch
+  patterns_scanned:
+  - deprecated-name-leak
+  - api-rename-stragglers
+  - doc-staleness
+  - hardcoded-magic-number
+  - dead-export
+  - large-file-bloat
+  - test-mock-of-real
+  - cargo-cult-comment
+  - paper-unit-system-wrong-param-in-spot-check
+  - topology-function-WHAT-comment-pattern
+  findings_count: 0
+  l3_proposals_count: 1
+  l3_disposition: REJECT (auto-spawn-duplicate-guard-missing rejected at T104 critic Q3+Q4 FAIL;
+    entry now in rejected_classes)
+  notes: 'Fourth full §F6 audit-class-scan cycle (after T50, T61, T87). 10 patterns
+    swept; 0 actionable findings (4 no-finding + 6 no-action-rationalized + 0 mechanical-fix-now
+    + 0 investigation-eligible); 1 L3 candidate proposed (auto-spawn-duplicate-guard-missing)
+    and REJECTED by T104 critic §F6 4-question audit (Q1+Q2 PASS, Q3+Q4 FAIL). Underlying
+    drift_signals.py idempotency bug genuine but routed to fix-bug flow (§F3) per critic
+    §6 — NOT a patterns.yaml catalog member. Two duplicate-pair state.json cleanups folded
+    into T105 batch per feedback_mechanical_vs_investigation_threshold + feedback_fix_the_class_not_the_instance:
+    closed older siblings meta-director-self-audit-2026-05-18 and meta-cost-inflation-2026-05-18
+    as superseded; newer 2026-05-19 instances remain at Observe for T107+ meta-interleave.
+    AUDIT_DUE gap reset at T106 Document close. Next cycle scheduled ~T115.
 
     '
