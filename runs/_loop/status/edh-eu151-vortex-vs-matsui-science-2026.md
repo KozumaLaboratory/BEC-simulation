@@ -80,3 +80,27 @@
 - Artifacts: 5 (new memory file edh_matsui_baseline_2026_05_18.md; state.json patch with closing_note + errata_resolved; by_tag indices appended: edh-eu151-matsui-science-2026.md + edh-eu151.md + matsui-science-2026.md + matsui-2026.md; status narrative appended)
 - Terminal Tier 3.0 trajectory at T85 verification turn (lightweight pass OR F1 longer-dynamics rerun)
 
+### T84 (2026-05-18T17:20:53.273824+09:00) — PASS — `edh-matsui-document-T84-tier-2-75-corroborate-with-errata-closure-path`
+
+- Stage: **Document (F3 CORROBORATE_WITH_ERRATA at tier 2.75; F1 NOT_APPLICABLE deferred-rerun; terminal Tier 3.0 closure at T85 verification turn)**, tier: 2.75
+- Cost: 1573k effective tokens
+- Contract: PASS
+- Budget audit: BUDGET_OVER (actual/expected = 1.43)
+
+### T85 (2026-05-18T17:37:38.543090+09:00) — FAIL_OPERATIONAL — `edh-matsui-document-verify-T85-tier-3-0-terminal-closure-lightweight`
+
+- Stage: **Document-verify (T85 lightweight verification — confirms state.json patch is JSON-valid; confirms memory file is complete; appends a brief PASS row to status narrative; tier 2.75 → 3.0 terminal closure)**, tier: 2.75
+- Cost: 1664k effective tokens
+- Issues: phase_1_checks_passed=6 == 7 → False; state_json_tier_advanced_to_3=False == True → False
+- Contract: FAIL_OPERATIONAL
+- Budget audit: BUDGET_BUSTED (actual/expected = 2.22)
+
+### T86 (2026-05-18) — PASS — `edh-matsui-document-verify-T86-tier-3-0-retry-by-tag-restore`
+
+- Stage: **Document-verify (TIER_3_TERMINAL_CLOSURE)**, tier: 2.75 → 3.0
+- Phase 0 repair: 3 by_tag files restored from T85 verbatim corrective content (root cause: T84 Edit/Write produced AM git status — index had T84 entries, working tree did not)
+- Verification: 7/7 mechanical checks PASS (Check 6 now passes after Phase 0 restore)
+- State patch: tier_current 2.75 → 3.0, current_stage "closed", last_turn=86, last_stage="Document-verify", last_verdict="TIER_3_TERMINAL_CLOSURE", closing_note extended with terminal-closure stamp + T85→T86 retry rationale
+- Project's 3rd Tier-3 trajectory closure (1st lab-paper benchmark vs Matsui Science 2026)
+- T87 next-action: audit-class-scan-2026-05-18-T87 (AUDIT_DUE gap=23 cadence trigger) OR F1 longer-dynamics rerun OR meta-investigation Hypothesize
+
