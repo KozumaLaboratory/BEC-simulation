@@ -503,13 +503,175 @@ has clear physical meaning:
 
 ---
 
+## §V Multiplicity-Aware Extension to $m_{\rm rep} \ge 2$ Polyhedral Inert States
+
+**Date**: 2026-05-19 (added at loop turn T116, propagating T115 corroboration of theorist T115 §2.A derivation; investigation `sign-pattern-f9-ta-multiplicity-2-mixing-2026-05-19`).
+
+### V.1 Setup
+
+Let $H \subset SO(3)$ be a polyhedral subgroup, $V_F$ the $(2F+1)$-dimensional
+spin-$F$ representation, and $W = (V_F)^H$ the $H$-trivial isotypic component
+of $V_F$ (the subspace of $H$-invariant vectors). Let $m_{\rm rep} = \dim W$
+(plain-text alias: `m_rep`).
+For $m_{\rm rep} = 1$ the standard Lemma 1 General-S applies. For
+$m_{\rm rep} \ge 2$, choose any orthonormal basis $\{\zeta_i\}_{i=1}^{m_{\rm rep}}$
+of $W$ and define the orthogonal projector and orbit-average density matrix
+
+$$P_W = \sum_{i=1}^{m_{\rm rep}} |\zeta_i\rangle\langle\zeta_i|, \qquad \rho_{\rm inv} = \frac{1}{m_{\rm rep}} P_W$$
+
+Both are basis-independent on $W$ (Schur's lemma applied to the $H$-action on the
+trivial isotypic component). $\rho_{\rm inv}$ is Hermitian, trace 1, and
+$H$-invariant under conjugation $g \rho_{\rm inv} g^{-1} = \rho_{\rm inv}$ for
+$g \in H$.
+
+### V.2 Canonical multiplicity-aware formula
+
+The canonical multiplicity-aware channel coefficient is
+
+$$\boxed{\bar\beta_S^{({\rm canonical})} \;=\; m_{\rm rep} \cdot \mathrm{Tr}\!\left[\hat\Pi_S \, (\rho_{\rm inv} \otimes \rho_{\rm inv})\right] \;=\; \frac{1}{m_{\rm rep}} \mathrm{Tr}\!\left[\hat\Pi_S \, (P_W \otimes P_W)\right]}$$
+
+where $\hat\Pi_S$ is the orthogonal projector onto the spin-$S$ isotypic
+component of $V_F \otimes V_F$. The two equivalent forms reflect $\rho_{\rm inv} = P_W/m_{\rm rep}$ applied twice (factor $1/m_{\rm rep}^2$) times the prefactor $m_{\rm rep}$.
+
+### V.3 Universal endpoint $1/(2F+1)$ preserved at $S=0$
+
+$$\boxed{\bar\beta_0^{({\rm canonical})} \;=\; \frac{1}{2F+1}}$$
+
+**Proof** (from theorist T115 §2.A, equations (A1)–(A3) and §2.A.3):
+
+The SU(2) singlet on $V_F \otimes V_F$ is
+
+$$|0,0\rangle = \frac{1}{\sqrt{2F+1}} \sum_m (-1)^{F-m} |F,m\rangle \otimes |F,-m\rangle$$
+
+Define $J = e^{-i\pi F_y} \in SO(3)$; standard Wigner-d gives
+$J|F,m\rangle = (-1)^{F-m}|F,-m\rangle$, hence $|F,-m\rangle = (-1)^{F-m} J|F,m\rangle$
+and $J^2 = +I$ for integer $F$. For $H \in \{T, O, I\}$, all of which contain
+$C_2$ rotations about three mutually-orthogonal Cartesian axes, $J \in H$, so
+$H$-invariance of $W$ gives $J P_W J^{-1} = P_W$. The squared overlap of
+$|0,0\rangle$ with $W \otimes W$ then reduces, after careful index bookkeeping
+(theorist T115 §2.A.3, eqs A4–A6), to
+
+$$\sum_{i,j=1}^{m_{\rm rep}} \left| \langle 0,0 \,|\, \zeta_i \otimes \zeta_j \rangle \right|^2 \;=\; \frac{m_{\rm rep}}{2F+1}$$
+
+Therefore
+$\mathrm{Tr}[\hat\Pi_0 (\rho_{\rm inv} \otimes \rho_{\rm inv})] = (1/m_{\rm rep})^2 \sum_{i,j} |\langle 0,0|\zeta_i \otimes \zeta_j\rangle|^2 = 1/(m_{\rm rep}(2F+1))$,
+and multiplying by the prefactor $m_{\rm rep}$ yields $\bar\beta_0^{(\rm canonical)} = 1/(2F+1)$. $\square$
+
+### V.4 $m_{\rm rep}=1$ reduction (strict generalization)
+
+At $m_{\rm rep} = 1$, write $\rho_{\rm inv} = |\zeta\rangle\langle\zeta|$ and
+$P_W = |\zeta\rangle\langle\zeta|$ for the unique (up to phase) inert state $\zeta$.
+Then
+
+$$\mathrm{Tr}[\hat\Pi_S (|\zeta\rangle\langle\zeta| \otimes |\zeta\rangle\langle\zeta|)] = \sum_M |\langle S, M | \zeta \otimes \zeta\rangle|^2 = \beta_S^{(c_0)}$$
+
+(by definition of $\beta_S^{(c_0)}$ as the channel weight in §0). Multiplying by
+$m_{\rm rep}=1$ reproduces the standard Lemma 1 General-S formula. The
+regression script `scripts/manuscript/lemma1_general_S_verification.jl` covers
+26 channel coefficients across 5 polyhedral cases (F=3, 4, 6, 8, 10) and
+remains 26/26 PASS unchanged at T115 (implementer T115 sim §6.3).
+
+### V.5 Sum rule
+
+$$\boxed{\sum_{S=0}^{2F} \bar\beta_S^{({\rm canonical})} \;=\; m_{\rm rep}}$$
+
+**Derivation**: $\sum_S \hat\Pi_S = I_{V_F \otimes V_F}$ (resolution of identity
+over the spin-$S$ isotypic decomposition), so
+
+$$\sum_S \mathrm{Tr}[\hat\Pi_S (\rho_{\rm inv} \otimes \rho_{\rm inv})] = \mathrm{Tr}[\rho_{\rm inv} \otimes \rho_{\rm inv}] = (\mathrm{Tr}\,\rho_{\rm inv})^2 = 1$$
+
+Multiplying by the prefactor $m_{\rm rep}$ gives $m_{\rm rep}$. Numerically
+verified at F=9 T:A: $\sum_S \bar\beta_S^{({\rm canonical})} = 1.999999999999993$,
+deviation from $m_{\rm rep}=2$ is $6.66 \times 10^{-15}$ (implementer T115 sim
+§6.4).
+
+### V.6 Verification at F=9 T (tetrahedral, A irrep, $m_{\rm rep}=2$)
+
+The case F=9 T:A is the first verified-empirical multiplicity-2 polyhedral
+inert case in this work. Construction: $H = T_d$ (24-element tetrahedral
+group); $V_{F=9}$ has dimension 19; T-character analysis gives $m_A = 2$.
+SVD of the T-equivariant projector yields a 2-dimensional invariant subspace
+$W$; the orthonormal basis $\{\zeta_1, \zeta_2\}$ is unique up to $U(2)$ basis
+rotation (Schur).
+
+**Channel coefficient table** $\bar\beta_S^{({\rm canonical})}$ for $S=0,\ldots,2F=18$
+at F=9 T:A (implementer T115 sim §5 metrics):
+
+| S | $\bar\beta_S^{({\rm canonical})}$ | comment |
+|---|---:|---|
+| 0 | 0.0526315789473683 = 1/19 | universal endpoint $1/(2F+1)$ preserved |
+| 1 | 0.0 | odd $S$; diagonal contributions vanish |
+| 2 | 0.0 | even $S$; value $0$ at this polyhedral inert |
+| 3 | 0.108851674641149 | odd $S$; off-diagonal antisymmetric ($i \ne j$) contributions |
+| 4 | 0.046909735394053 | |
+| 5 | 0.0 | |
+| 6 | 0.083144107653464 | |
+| 7 | 0.018036197212399 | |
+| 8 | 0.129382151029749 | |
+| 9 | 0.0 | |
+| 10 | 0.262713500490900 | dominant channel |
+| 11 | 0.018477515628151 | |
+| 12 | 0.246157438552715 | |
+| 13 | 0.098242491657394 | |
+| 14 | 0.237666147461671 | |
+| 15 | 0.168051540417986 | |
+| 16 | 0.170170071134426 | |
+| 17 | 0.088340580442917 | |
+| 18 | 0.271225269335651 | $S=2F$ maximal |
+| **sum** | **1.999999999999993** | $= m_{\rm rep} = 2$ (dev $6.66 \times 10^{-15}$) |
+
+**Falsifier verdicts** (implementer T115 sim §8):
+
+| Falsifier | Predicted | Observed | Verdict |
+|---|---|---|---|
+| F1 (central) $|\bar\beta_0^{({\rm canonical})} - 1/19| < 10^{-13}$ | $< 10^{-13}$ | $1.388 \times 10^{-16}$ | **CORROBORATE** |
+| F2 seed-spread of canonical formula $< 10^{-13}$ | $< 10^{-13}$ | $2.776 \times 10^{-17}$ | **CORROBORATE** |
+| F3 regression `lemma1_general_S_verification.jl` 26/26 PASS | 26/26 | 26/26 | **CORROBORATE** |
+| F4 advisory sum-rule dev $< 10^{-12}$ | $< 10^{-12}$ | $6.66 \times 10^{-15}$ | **CORROBORATE** |
+
+Schur isotropy of $\rho_{\rm inv}$ confirmed: $\mathrm{Tr}(\rho_{\rm inv} F_a^2) \approx 30 = F(F+1)/3$
+on all three Cartesian axes (max axis-deviation $2.49 \times 10^{-14}$);
+$\rho_{\rm inv}$ Hermitian deviation = 0; $\mathrm{Tr}\,\rho_{\rm inv} = 1$ exactly
+(implementer T115 sim §6.5).
+
+### V.7 Open extensions
+
+- **F=11 T:$E_1$ with $m_{\rm rep}=2$** (complex 1-dim irrep $\to$ 2-dim real
+  construction pending). `<RESEARCH_NEEDED: isotypic-allocation-complex-irreps>`
+- **F=12 polyhedral audit** per `memory/universal_structure_u1u4_2026_05_13.md`.
+  `<RESEARCH_NEEDED: F12-polyhedral-multiplicity-classification>`
+- **General-F-H isotypic-allocation conjecture** (theorist T115 §F):
+  $\|\xi_\alpha\|^2 = m_\alpha \cdot d_\alpha / (2F+1)$ empirically confirmed at
+  $\alpha = A$ (trivial irrep, $d_A = 1$, $m_A = 2$) at F=9 T;
+  non-trivial-irrep verification pending. `<RESEARCH_NEEDED: isotypic-allocation-general-F-H>`
+
+### V.8 Source anchors
+
+- **Theorist J-involution derivation**: `runs/_loop/theorist/turn_115.md §2.A`
+  (equations A1–A6; theorist re-derivation closed-form
+  $\sum_{i,j}|\langle 0,0|\zeta_i \otimes \zeta_j\rangle|^2 = m_{\rm rep}/(2F+1)$ at line ~147).
+- **Numerical verification at F=9 T:A**: `runs/_loop/sim/turn_115.md §5`
+  (metrics block: `bar_beta_0_canonical_F9_TA = 0.0526315789473683`, table
+  for $S = 0,\ldots,2F$, sum-rule dev $6.66 \times 10^{-15}$);
+  script `scripts/manuscript/f9_f11_polyhedral_verification.jl`
+  (function `canonical_mult_aware_beta_S` introduced in commit `a323222`,
+  T115 attempt2 auto-branch).
+- **$m_{\rm rep}=1$ regression**: `scripts/manuscript/lemma1_general_S_verification.jl`
+  (26/26 PASS at T115; covers F=3, F=4, F=6, F=8, F=10 polyhedral cases).
+- **Memory anchor**: `memory/sign_pattern_lemma1_mult_aware_2026_05_19.md`
+  (added at T116).
+
+---
+
 ## References
 
 - `sign_pattern_L1_v2_BdG_signs.md` — rigorous S=0 proof (singlet identity)
 - `sign_pattern_anomalous_identity.md` — empirical observation pattern
 - `Ch6_polyhedral_phases_integrated.md` §6.5 — F=6 icosa closed forms
 - `paper3_universal_theorem/main.md` §V — 5 polyhedral cases verified
+- `runs/_loop/theorist/turn_115.md` — multiplicity-aware J-involution derivation (2026-05-19)
+- `runs/_loop/sim/turn_115.md` — multiplicity-aware F=9 T:A 4-falsifier corroboration (2026-05-19)
 
 ---
 
-(sign_pattern_lemma1_general_S.md 終了 — 2026-05-11)
+(sign_pattern_lemma1_general_S.md 終了 — 2026-05-11; §V multiplicity-aware extension added 2026-05-19)
