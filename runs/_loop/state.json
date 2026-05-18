@@ -1,5 +1,5 @@
 {
-  "turn": 72,
+  "turn": 73,
   "status": "running",
   "history": [
     {
@@ -2010,7 +2010,55 @@
       "directive_action": "researcher_dispatch",
       "directive_label": "matsui-science-2026-pdf-extract",
       "wall_time_sec": null,
-      "tokens_used": null,
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 12323381,
+        "total": 12323381,
+        "effective_full_rate": 1792656,
+        "breakdown": {
+          "input_fresh": 34438,
+          "cache_creation": 379607,
+          "cache_read": 11890402,
+          "output": 18934
+        },
+        "n_messages": 106,
+        "n_message_starts": 106
+      },
+      "agent_hashes": {
+        "critic": "7c36d8654a723ccacaa508d16d7cfb25",
+        "director": "517de6ca2845a4eb281a5387eeba0132",
+        "implementer": "610ac60c59abbbf4af92e2c464e6bcf2",
+        "researcher": "6635ef673d05e12621da8d38413c3a8b",
+        "theorist": "e33d24bdc505b4ec69873b39f5292087"
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.091,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.1,
+        "cost_inflation": 1.028,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "director_must_address",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "DRIFT_COST_INFLATION"
+      ]
+    },
+    {
+      "turn": 72,
+      "ts": "2026-05-18T04:06:16Z",
+      "judge_status": "NOOP",
+      "directive_action": "noop",
+      "directive_label": "edh-eu151-matsui-hypothesize-quantification",
+      "wall_time_sec": null,
       "agent_hashes": {
         "critic": "7c36d8654a723ccacaa508d16d7cfb25",
         "director": "517de6ca2845a4eb281a5387eeba0132",
@@ -2024,7 +2072,7 @@
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "RESEARCHER_ONLY",
+  "last_judge": "NOOP",
   "home_branch": "main",
   "schema_version": 2.1,
   "current_agent_hashes": {
@@ -2664,7 +2712,7 @@
       "closing_note": null
     }
   },
-  "last_meta_check_turn": 70,
+  "last_meta_check_turn": 71,
   "last_short_label": "yan-li-saito-r4-dormant-close-document",
   "last_label": "yan-li-saito-r4-dormant-close-document"
 }
