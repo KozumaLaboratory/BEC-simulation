@@ -13,6 +13,19 @@ using Test
 println("=== Lemma 1 General-S closed form verification ===\n")
 
 @testset "Lemma 1 General-S: β_S^(λ) = (S(S+1) - 2F(F+1))/(2F(F+1)) · β_S^(c0)" begin
+    # --- F=2 cyclic T_d A_1 (paper3 §V, MEMORY 2026-05-18 T94) ---
+    @testset "F=2 cyclic T_d A_1" begin
+        F = 2
+        denom = 2 * F * (F + 1)  # = 12
+        β_c0 = Dict(0 => 1//5, 2 => 2//7, 4 => 18//35)
+        β_λ_paper3 = Dict(0 => -1//5, 2 => -1//7, 4 => 12//35)
+        for S in [0, 2, 4]
+            prefactor = (S*(S+1) - denom) // denom
+            predicted = prefactor * β_c0[S]
+            @test predicted == β_λ_paper3[S]
+        end
+    end
+
     # --- F=4 cube (paper3 §V.C) ---
     @testset "F=4 cube" begin
         F = 4
@@ -112,4 +125,4 @@ for F in [3, 4, 6, 8, 10, 12]
     println(" $F | $(round(Sbd, digits=2)) | $(round(Sbd/F, digits=3)) | $(get(empirical_Sbd, F, "?"))")
 end
 
-println("\n=== Lemma 1 General-S: 26 channel coefficients verified across 5 cases ===")
+println("\n=== Lemma 1 General-S: 29 channel coefficients verified across 6 cases ===")
