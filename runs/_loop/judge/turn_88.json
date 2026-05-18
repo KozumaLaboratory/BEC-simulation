@@ -1,0 +1,261 @@
+{
+  "turn": 88,
+  "status": "PASS",
+  "issues": [],
+  "metrics": {
+    "experiment_kind": "text_only",
+    "investigation_kind": "physics",
+    "src_files_modified": 0,
+    "new_analysis_scripts_written": 0,
+    "agents_md_files_modified": 0,
+    "patterns_yaml_modified": true,
+    "patterns_yaml_active_patterns_last_scanned_updated": 10,
+    "patterns_yaml_active_patterns_last_count_updated": 10,
+    "patterns_yaml_audit_history_row_appended": true,
+    "patterns_yaml_audit_history_new_row_has_turn_field": true,
+    "patterns_yaml_audit_history_new_row_turn": 88,
+    "patterns_yaml_audit_history_row_count": 6,
+    "patterns_yaml_grep_patterns_modified": false,
+    "patterns_yaml_proposed_classes_modified": false,
+    "patterns_yaml_rejected_classes_modified": false,
+    "patterns_yaml_valid_after_edit": true,
+    "state_json_modified": true,
+    "state_json_investigations_t87_added": true,
+    "state_json_investigations_index_t87_appended": true,
+    "state_json_active_investigation_id_flipped_to_t87": true,
+    "state_json_valid_after_edit": true,
+    "state_json_history_array_modified": false,
+    "investigation_id": "audit-class-scan-2026-05-18-T87",
+    "stage_advancing_to": "Triage",
+    "flow_template": "audit-class-scan",
+    "memory_files_added": 0,
+    "agents_md_unchanged": true,
+    "judge_py_unchanged": true,
+    "lp2_grep_unchanged": true,
+    "src_subtree_untouched": true,
+    "manuscript_edited": false,
+    "src_edited": false,
+    "julia_executed": false,
+    "tests_passed": null,
+    "falsification_result": "CONFIRMED"
+  },
+  "contract_evaluation": {
+    "verdict": "PASS",
+    "criteria_results": [
+      {
+        "id": "experiment_kind_correct",
+        "passed": true,
+        "actual": "text_only",
+        "reason": "experiment_kind=text_only == text_only \u2192 True"
+      },
+      {
+        "id": "investigation_kind_physics",
+        "passed": true,
+        "actual": "physics",
+        "reason": "investigation_kind=physics == physics \u2192 True"
+      },
+      {
+        "id": "src_unchanged",
+        "passed": true,
+        "actual": 0,
+        "reason": "src_files_modified=0 == 0 \u2192 True"
+      },
+      {
+        "id": "no_scripts_committed",
+        "passed": true,
+        "actual": 0,
+        "reason": "new_analysis_scripts_written=0 == 0 \u2192 True"
+      },
+      {
+        "id": "no_agents_md_changes",
+        "passed": true,
+        "actual": 0,
+        "reason": "agents_md_files_modified=0 == 0 \u2192 True"
+      },
+      {
+        "id": "patterns_yaml_modified_correctly",
+        "passed": true,
+        "actual": true,
+        "reason": "patterns_yaml_modified=True == True \u2192 True"
+      },
+      {
+        "id": "all_ten_last_scanned_updated",
+        "passed": true,
+        "actual": 10,
+        "reason": "patterns_yaml_active_patterns_last_scanned_updated=10 == 10 \u2192 True"
+      },
+      {
+        "id": "all_ten_last_count_updated",
+        "passed": true,
+        "actual": 10,
+        "reason": "patterns_yaml_active_patterns_last_count_updated=10 == 10 \u2192 True"
+      },
+      {
+        "id": "audit_history_row_appended",
+        "passed": true,
+        "actual": true,
+        "reason": "patterns_yaml_audit_history_row_appended=True == True \u2192 True"
+      },
+      {
+        "id": "audit_history_new_row_has_turn_field",
+        "passed": true,
+        "actual": true,
+        "reason": "patterns_yaml_audit_history_new_row_has_turn_field=True == True \u2192 True"
+      },
+      {
+        "id": "audit_history_new_row_turn_value",
+        "passed": true,
+        "actual": 88,
+        "reason": "patterns_yaml_audit_history_new_row_turn=88 == 88 \u2192 True"
+      },
+      {
+        "id": "audit_history_row_count_six",
+        "passed": true,
+        "actual": 6,
+        "reason": "patterns_yaml_audit_history_row_count=6 == 6 \u2192 True"
+      },
+      {
+        "id": "grep_patterns_untouched",
+        "passed": true,
+        "actual": false,
+        "reason": "patterns_yaml_grep_patterns_modified=False == False \u2192 True"
+      },
+      {
+        "id": "proposed_classes_untouched",
+        "passed": true,
+        "actual": false,
+        "reason": "patterns_yaml_proposed_classes_modified=False == False \u2192 True"
+      },
+      {
+        "id": "rejected_classes_untouched",
+        "passed": true,
+        "actual": false,
+        "reason": "patterns_yaml_rejected_classes_modified=False == False \u2192 True"
+      },
+      {
+        "id": "patterns_yaml_parses",
+        "passed": true,
+        "actual": true,
+        "reason": "patterns_yaml_valid_after_edit=True == True \u2192 True"
+      },
+      {
+        "id": "state_json_modified_correctly",
+        "passed": true,
+        "actual": true,
+        "reason": "state_json_modified=True == True \u2192 True"
+      },
+      {
+        "id": "t87_investigation_added",
+        "passed": true,
+        "actual": true,
+        "reason": "state_json_investigations_t87_added=True == True \u2192 True"
+      },
+      {
+        "id": "t87_index_appended",
+        "passed": true,
+        "actual": true,
+        "reason": "state_json_investigations_index_t87_appended=True == True \u2192 True"
+      },
+      {
+        "id": "active_investigation_id_flipped",
+        "passed": true,
+        "actual": true,
+        "reason": "state_json_active_investigation_id_flipped_to_t87=True == True \u2192 True"
+      },
+      {
+        "id": "state_json_parses",
+        "passed": true,
+        "actual": true,
+        "reason": "state_json_valid_after_edit=True == True \u2192 True"
+      },
+      {
+        "id": "state_history_untouched",
+        "passed": true,
+        "actual": false,
+        "reason": "state_json_history_array_modified=False == False \u2192 True"
+      },
+      {
+        "id": "investigation_consistent",
+        "passed": true,
+        "actual": "audit-class-scan-2026-05-18-T87",
+        "reason": "investigation_id=audit-class-scan-2026-05-18-T87 == audit-class-scan-2026-05-18-T87 \u2192 True"
+      },
+      {
+        "id": "stage_consistent",
+        "passed": true,
+        "actual": "Triage",
+        "reason": "stage_advancing_to=Triage == Triage \u2192 True"
+      },
+      {
+        "id": "template_consistent",
+        "passed": true,
+        "actual": "audit-class-scan",
+        "reason": "flow_template=audit-class-scan == audit-class-scan \u2192 True"
+      },
+      {
+        "id": "no_memory_files",
+        "passed": true,
+        "actual": 0,
+        "reason": "memory_files_added=0 == 0 \u2192 True"
+      },
+      {
+        "id": "agents_md_unchanged_bool",
+        "passed": true,
+        "actual": true,
+        "reason": "agents_md_unchanged=True == True \u2192 True"
+      },
+      {
+        "id": "judge_py_unchanged_bool",
+        "passed": true,
+        "actual": true,
+        "reason": "judge_py_unchanged=True == True \u2192 True"
+      },
+      {
+        "id": "lp2_grep_untouched",
+        "passed": true,
+        "actual": true,
+        "reason": "lp2_grep_unchanged=True == True \u2192 True"
+      },
+      {
+        "id": "src_subtree_untouched_bool",
+        "passed": true,
+        "actual": true,
+        "reason": "src_subtree_untouched=True == True \u2192 True"
+      },
+      {
+        "id": "no_manuscript_polish",
+        "passed": true,
+        "actual": false,
+        "reason": "manuscript_edited=False == False \u2192 True"
+      },
+      {
+        "id": "no_src_modification",
+        "passed": true,
+        "actual": false,
+        "reason": "src_edited=False == False \u2192 True"
+      },
+      {
+        "id": "no_julia_execution",
+        "passed": true,
+        "actual": false,
+        "reason": "julia_executed=False == False \u2192 True"
+      }
+    ],
+    "triggered_failure_modes": [],
+    "issues": []
+  },
+  "cost_audit": null,
+  "investigation_id": "audit-class-scan-2026-05-18-T87",
+  "stage_advancing_to": "Triage",
+  "investigation_update": {
+    "if_success_advance_to_stage": "Document (T89; implementer_text creates memory file + closes investigation at tier 2; AUDIT_DUE clears)",
+    "if_success_tier_becomes": 1.0,
+    "if_partial_success_advance_to_stage": "Triage (T89 retry with corrected scope)",
+    "if_partial_success_tier_becomes": 0.5,
+    "if_refuted_advance_to_stage": "n/a (audit-class-scan Triage has no hypothesis to refute; only mechanical bookkeeping)",
+    "if_refuted_tier_becomes": 0.5,
+    "if_inconclusive_advance_to_stage": "Triage (T89 expanded scope)",
+    "if_inconclusive_tier_becomes": 0.5,
+    "next_falsifier_to_test_after": "n/a \u2014 audit-class-scan does not use falsifier framework."
+  }
+}
