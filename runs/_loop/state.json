@@ -1,5 +1,5 @@
 {
-  "turn": 74,
+  "turn": 75,
   "status": "running",
   "history": [
     {
@@ -2113,6 +2113,56 @@
         "implementer": "610ac60c59abbbf4af92e2c464e6bcf2",
         "researcher": "6635ef673d05e12621da8d38413c3a8b",
         "theorist": "e33d24bdc505b4ec69873b39f5292087"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 12462863,
+        "total": 12462863,
+        "effective_full_rate": 1815810,
+        "breakdown": {
+          "input_fresh": 11648,
+          "cache_creation": 419640,
+          "cache_read": 12015972,
+          "output": 15603
+        },
+        "n_messages": 90,
+        "n_message_starts": 90
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.375,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.1,
+        "cost_inflation": 1.385,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "director_must_address",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "DRIFT_COST_INFLATION",
+        "AUDIT_DUE: patterns.yaml last audited at T63, gap=10"
+      ]
+    },
+    {
+      "turn": 74,
+      "ts": "2026-05-18T04:43:56Z",
+      "judge_status": "FAIL_OPERATIONAL",
+      "directive_action": "run_experiment",
+      "directive_label": "edh-matsui-execute-baseline-case-A",
+      "wall_time_sec": 39,
+      "agent_hashes": {
+        "critic": "7c36d8654a723ccacaa508d16d7cfb25",
+        "director": "517de6ca2845a4eb281a5387eeba0132",
+        "implementer": "610ac60c59abbbf4af92e2c464e6bcf2",
+        "researcher": "6635ef673d05e12621da8d38413c3a8b",
+        "theorist": "e33d24bdc505b4ec69873b39f5292087"
       }
     }
   ],
@@ -2120,7 +2170,7 @@
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "PASS",
+  "last_judge": "FAIL_OPERATIONAL",
   "home_branch": "main",
   "schema_version": 2.1,
   "current_agent_hashes": {
@@ -2721,10 +2771,11 @@
       "title": "Einstein-de Haas Eu-151 vortex emergence — reproduction of Matsui et al. Science 391, 384-388 (2026)",
       "hypothesis": "SpinorBEC.jl spinor-DDI + split-step framework reproduces Matsui et al. Science 391, 384–388 (2026) [DOI:10.1126/science.adx2872; arXiv:2504.17357] within factor-2 of the experimental EdH timescale τ_EdH^exp and matches the ring-vortex topology (winding number ℓ consistent with F=6 angular-momentum balance) when fed the paper's published parameters (N, trap frequencies ω_{x,y,z}, B-quench waveform, a_s, c_dd).",
       "flow_template": "verify-claim",
-      "current_stage": "Design",
+      "current_stage": "Execute",
       "stages_done": [
-        "Research",
-        "Hypothesize"
+        "Design",
+        "Hypothesize",
+        "Research"
       ],
       "stages_at_turn": {
         "Research": [
@@ -2776,7 +2827,7 @@
       "closing_note": null
     }
   },
-  "last_meta_check_turn": 72,
+  "last_meta_check_turn": 73,
   "last_short_label": "yan-li-saito-r4-dormant-close-document",
   "last_label": "yan-li-saito-r4-dormant-close-document"
 }
