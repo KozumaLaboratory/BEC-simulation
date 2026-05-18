@@ -1,5 +1,5 @@
 {
-  "turn": 75,
+  "turn": 76,
   "status": "running",
   "history": [
     {
@@ -91,7 +91,9 @@
       "drift_escalation": "advisory",
       "drift_advisories": [
         "DRIFT_MANUSCRIPT_DELTA_ZERO"
-      ]
+      ],
+      "investigation_id": "barnett-mechanism-2026-05-16",
+      "stage_advancing_to": "Document"
     },
     {
       "turn": 30,
@@ -191,7 +193,9 @@
       "drift_advisories": [
         "DRIFT_MANUSCRIPT_DELTA_ZERO",
         "DRIFT_CODE_DELTA_ZERO"
-      ]
+      ],
+      "investigation_id": "yan-li-saito-2026-reproduction",
+      "stage_advancing_to": "Design"
     },
     {
       "turn": 32,
@@ -241,7 +245,9 @@
         "DRIFT_MANUSCRIPT_DELTA_ZERO",
         "DRIFT_CODE_DELTA_ZERO",
         "DRIFT_COST_INFLATION"
-      ]
+      ],
+      "investigation_id": "yan-li-saito-2026-reproduction",
+      "stage_advancing_to": "Design"
     },
     {
       "turn": 33,
@@ -289,7 +295,9 @@
       "drift_escalation": "advisory",
       "drift_advisories": [
         "DRIFT_MANUSCRIPT_DELTA_ZERO"
-      ]
+      ],
+      "investigation_id": "yan-li-saito-2026-reproduction",
+      "stage_advancing_to": "Execute"
     },
     {
       "turn": 34,
@@ -337,7 +345,9 @@
       "drift_escalation": "advisory",
       "drift_advisories": [
         "DRIFT_MANUSCRIPT_DELTA_ZERO"
-      ]
+      ],
+      "investigation_id": "yan-li-saito-2026-reproduction",
+      "stage_advancing_to": "Design"
     },
     {
       "turn": 35,
@@ -386,7 +396,9 @@
       "drift_advisories": [
         "DRIFT_MANUSCRIPT_DELTA_ZERO",
         "DRIFT_COST_INFLATION"
-      ]
+      ],
+      "investigation_id": "yan-li-saito-2026-reproduction",
+      "stage_advancing_to": "Execute"
     },
     {
       "turn": 36,
@@ -434,7 +446,9 @@
       "drift_escalation": "advisory",
       "drift_advisories": [
         "DRIFT_MANUSCRIPT_DELTA_ZERO"
-      ]
+      ],
+      "investigation_id": "yan-li-saito-2026-reproduction",
+      "stage_advancing_to": "Design"
     },
     {
       "turn": 37,
@@ -483,7 +497,9 @@
       "drift_advisories": [
         "DRIFT_MANUSCRIPT_DELTA_ZERO",
         "DRIFT_COST_INFLATION"
-      ]
+      ],
+      "investigation_id": "yan-li-saito-2026-reproduction",
+      "stage_advancing_to": "Execute"
     },
     {
       "turn": 38,
@@ -633,7 +649,9 @@
       "drift_advisories": [
         "DRIFT_MANUSCRIPT_DELTA_ZERO",
         "DRIFT_COST_INFLATION"
-      ]
+      ],
+      "investigation_id": "yan-li-saito-2026-reproduction",
+      "stage_advancing_to": "Design"
     },
     {
       "turn": 41,
@@ -747,7 +765,9 @@
         "DRIFT_MANUSCRIPT_DELTA_ZERO",
         "DRIFT_COST_INFLATION",
         "AUDIT_DUE: patterns.yaml last audited at T0, gap=43"
-      ]
+      ],
+      "investigation_id": "yan-li-saito-2026-reproduction",
+      "stage_advancing_to": "Update"
     },
     {
       "turn": 43,
@@ -796,7 +816,9 @@
       "drift_advisories": [
         "DRIFT_MANUSCRIPT_DELTA_ZERO",
         "AUDIT_DUE: patterns.yaml last audited at T0, gap=43"
-      ]
+      ],
+      "investigation_id": "yan-li-saito-2026-reproduction",
+      "stage_advancing_to": "Update"
     },
     {
       "turn": 44,
@@ -847,7 +869,9 @@
         "DRIFT_MANUSCRIPT_DELTA_ZERO",
         "DRIFT_COST_INFLATION",
         "AUDIT_DUE: patterns.yaml last audited at T0, gap=44"
-      ]
+      ],
+      "investigation_id": "yan-li-saito-2026-reproduction",
+      "stage_advancing_to": "Hypothesize"
     },
     {
       "turn": 45,
@@ -946,7 +970,9 @@
         "DRIFT_MANUSCRIPT_DELTA_ZERO",
         "DRIFT_COST_INFLATION",
         "AUDIT_DUE: patterns.yaml last audited at T0, gap=46"
-      ]
+      ],
+      "investigation_id": "yan-li-saito-2026-reproduction",
+      "stage_advancing_to": "Execute"
     },
     {
       "turn": 47,
@@ -1079,7 +1105,9 @@
       },
       "branch": null,
       "commit": "544b670",
-      "parent": "aa7eabd"
+      "parent": "aa7eabd",
+      "investigation_id": "yan-li-saito-2026-reproduction",
+      "stage_advancing_to": "Document"
     },
     {
       "turn": 50,
@@ -1149,7 +1177,9 @@
       },
       "branch": null,
       "commit": null,
-      "parent": null
+      "parent": null,
+      "investigation_id": "audit-class-scan-2026-05-18-T50",
+      "stage_advancing_to": "Triage"
     },
     {
       "turn": 52,
@@ -1184,7 +1214,9 @@
       },
       "branch": null,
       "commit": null,
-      "parent": null
+      "parent": null,
+      "investigation_id": "audit-class-scan-2026-05-18-T50",
+      "stage_advancing_to": "L3_critic_audit"
     },
     {
       "turn": 53,
@@ -1221,7 +1253,8 @@
       },
       "branch": null,
       "commit": null,
-      "parent": null
+      "parent": null,
+      "stage_advancing_to": "Reproduce_Fix_Test"
     },
     {
       "turn": 54,
@@ -1257,7 +1290,9 @@
       "branch": null,
       "commit": null,
       "parent": null,
-      "notes": "Closed audit-class-scan-2026-05-18-T50 (tier 2 final) + judge-in-operator-bug-2026-05-18 (tier 2 final) in single text-only Document dispatch. LP-1 coupling-skip-gate-inconsistency moved to new rejected_classes section with critic rationale; LP-2 topology-function-WHAT-comment-pattern promoted from proposed_classes to active patterns: with last_count=5 and related_classes=[cargo-cult-comment]; audit_history row 4 appended at 2026-05-18T13:00:00+09:00. judge_in_operator_bug_2026_05_18.md memory file created with 33-occurrence sibling-audit table. meta-stage-routing-2026-05-18 confounder_advisory field added documenting that the T44-era FAIL/INCONCLUSIVE streak was judge.py operator bug, not contract-design — refined falsifier requires post-T53 5-turn window."
+      "notes": "Closed audit-class-scan-2026-05-18-T50 (tier 2 final) + judge-in-operator-bug-2026-05-18 (tier 2 final) in single text-only Document dispatch. LP-1 coupling-skip-gate-inconsistency moved to new rejected_classes section with critic rationale; LP-2 topology-function-WHAT-comment-pattern promoted from proposed_classes to active patterns: with last_count=5 and related_classes=[cargo-cult-comment]; audit_history row 4 appended at 2026-05-18T13:00:00+09:00. judge_in_operator_bug_2026_05_18.md memory file created with 33-occurrence sibling-audit table. meta-stage-routing-2026-05-18 confounder_advisory field added documenting that the T44-era FAIL/INCONCLUSIVE streak was judge.py operator bug, not contract-design — refined falsifier requires post-T53 5-turn window.",
+      "investigation_id": "audit-class-scan-2026-05-18-T50",
+      "stage_advancing_to": "Document"
     },
     {
       "turn": 55,
@@ -1362,7 +1397,9 @@
       },
       "branch": null,
       "commit": null,
-      "parent": "8db6571"
+      "parent": "8db6571",
+      "investigation_id": "klaus-magnetostir-bch-leak-2026-05-13",
+      "stage_advancing_to": "Execute"
     },
     {
       "turn": 58,
@@ -1455,7 +1492,9 @@
       "drift_advisories": [
         "DRIFT_MANUSCRIPT_DELTA_ZERO",
         "AUDIT_DUE: patterns.yaml last audited at T0, gap=59"
-      ]
+      ],
+      "investigation_id": "klaus-magnetostir-bch-leak-2026-05-13",
+      "stage_advancing_to": "Document"
     },
     {
       "turn": 60,
@@ -1504,7 +1543,9 @@
       "drift_advisories": [
         "DRIFT_MANUSCRIPT_DELTA_ZERO",
         "AUDIT_DUE: patterns.yaml last audited at T0, gap=60"
-      ]
+      ],
+      "investigation_id": "meta-stage-routing-2026-05-18",
+      "stage_advancing_to": "Document"
     },
     {
       "turn": 61,
@@ -1606,7 +1647,9 @@
         "DRIFT_MANUSCRIPT_DELTA_ZERO",
         "DRIFT_COST_INFLATION",
         "AUDIT_DUE: patterns.yaml last audited at T0, gap=62"
-      ]
+      ],
+      "investigation_id": "audit-class-scan-2026-05-18-T61",
+      "stage_advancing_to": "Triage"
     },
     {
       "turn": 63,
@@ -1655,7 +1698,9 @@
       "drift_advisories": [
         "DRIFT_MANUSCRIPT_DELTA_ZERO",
         "AUDIT_DUE: patterns.yaml last audited at T0, gap=63"
-      ]
+      ],
+      "investigation_id": "audit-class-scan-2026-05-18-T61",
+      "stage_advancing_to": "Document"
     },
     {
       "turn": 64,
@@ -1753,7 +1798,9 @@
       "drift_advisories": [
         "DRIFT_MANUSCRIPT_DELTA_ZERO",
         "AUDIT_DUE: patterns.yaml last audited at T0, gap=65"
-      ]
+      ],
+      "investigation_id": "yan-li-saito-2026-reproduction",
+      "stage_advancing_to": "Document"
     },
     {
       "turn": 66,
@@ -1803,7 +1850,9 @@
         "DRIFT_MANUSCRIPT_DELTA_ZERO",
         "DRIFT_NOVEL_CLAIM_ZERO",
         "AUDIT_DUE: patterns.yaml last audited at T0, gap=66"
-      ]
+      ],
+      "investigation_id": "yan-li-saito-2026-reproduction",
+      "stage_advancing_to": "Document"
     },
     {
       "turn": 67,
@@ -1902,7 +1951,9 @@
       "drift_advisories": [
         "DRIFT_MANUSCRIPT_DELTA_ZERO",
         "DRIFT_NOVEL_CLAIM_ZERO"
-      ]
+      ],
+      "investigation_id": "audit-due-heuristic-bug-2026-05-18",
+      "stage_advancing_to": "Fix"
     },
     {
       "turn": 69,
@@ -2001,7 +2052,16 @@
       "drift_advisories": [
         "DRIFT_MANUSCRIPT_DELTA_ZERO",
         "DRIFT_COST_INFLATION"
-      ]
+      ],
+      "investigation_id": "tier3-verification-pipeline-survey-2026-05-18",
+      "stage_advancing_to": "Synthesize",
+      "cost_audit": {
+        "expected_cost_eff": 1300000,
+        "actual_cost_eff": 2247005,
+        "ratio_actual_over_expected": 1.73,
+        "deviation_pct": 72.8,
+        "flag": "BUDGET_OVER"
+      }
     },
     {
       "turn": 71,
@@ -2148,7 +2208,16 @@
         "DRIFT_MANUSCRIPT_DELTA_ZERO",
         "DRIFT_COST_INFLATION",
         "AUDIT_DUE: patterns.yaml last audited at T63, gap=10"
-      ]
+      ],
+      "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
+      "stage_advancing_to": "Design",
+      "cost_audit": {
+        "expected_cost_eff": 700000,
+        "actual_cost_eff": 1815810,
+        "ratio_actual_over_expected": 2.59,
+        "deviation_pct": 159.4,
+        "flag": "BUDGET_BUSTED"
+      }
     },
     {
       "turn": 74,
@@ -2163,14 +2232,75 @@
         "implementer": "610ac60c59abbbf4af92e2c464e6bcf2",
         "researcher": "6635ef673d05e12621da8d38413c3a8b",
         "theorist": "e33d24bdc505b4ec69873b39f5292087"
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 15346534,
+        "total": 15346534,
+        "effective_full_rate": 2061234,
+        "breakdown": {
+          "input_fresh": 9412,
+          "cache_creation": 362859,
+          "cache_read": 14953687,
+          "output": 20576
+        },
+        "n_messages": 143,
+        "n_message_starts": 143
+      },
+      "branch": null,
+      "commit": null,
+      "parent": null,
+      "drift_signals": {
+        "topic_repetition": 0.333,
+        "subagent_repetition": 0.333,
+        "manuscript_delta_zero": 1.0,
+        "code_delta_zero": 0.0,
+        "verdict_drift": 0.2,
+        "cost_inflation": 1.572,
+        "novel_claim_zero": 0.0
+      },
+      "drift_escalation": "director_must_address",
+      "drift_advisories": [
+        "DRIFT_MANUSCRIPT_DELTA_ZERO",
+        "DRIFT_COST_INFLATION",
+        "AUDIT_DUE: patterns.yaml last audited at T63, gap=11"
+      ],
+      "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
+      "stage_advancing_to": "Execute",
+      "cost_audit": {
+        "expected_cost_eff": 4000000,
+        "actual_cost_eff": 2061234,
+        "ratio_actual_over_expected": 0.52,
+        "deviation_pct": -48.5,
+        "flag": "BUDGET_OK"
       }
+    },
+    {
+      "turn": 75,
+      "ts": "2026-05-18T05:07:49Z",
+      "judge_status": "FAIL_NO_METRICS",
+      "directive_action": "run_experiment",
+      "directive_label": "edh-matsui-execute-retry-baseline-case-A",
+      "wall_time_sec": 106,
+      "agent_hashes": {
+        "critic": "7c36d8654a723ccacaa508d16d7cfb25",
+        "director": "517de6ca2845a4eb281a5387eeba0132",
+        "implementer": "610ac60c59abbbf4af92e2c464e6bcf2",
+        "researcher": "6635ef673d05e12621da8d38413c3a8b",
+        "theorist": "e33d24bdc505b4ec69873b39f5292087"
+      },
+      "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
+      "stage_advancing_to": "Execute"
     }
   ],
   "created_at": "2026-05-14T00:00:00+00:00",
   "_note": "Status starts as 'halted' so the first manual review of the architecture happens before the loop runs. Change to 'running' to start.",
   "phase": "phase1",
   "launched_at": "2026-05-14T16:30:00+00:00",
-  "last_judge": "FAIL_OPERATIONAL",
+  "last_judge": "FAIL_NO_METRICS",
   "home_branch": "main",
   "schema_version": 2.1,
   "current_agent_hashes": {
@@ -2827,7 +2957,7 @@
       "closing_note": null
     }
   },
-  "last_meta_check_turn": 73,
+  "last_meta_check_turn": 74,
   "last_short_label": "yan-li-saito-r4-dormant-close-document",
   "last_label": "yan-li-saito-r4-dormant-close-document"
 }
