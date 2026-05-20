@@ -34,7 +34,24 @@
     "judge_py_unchanged": true,
     "agents_md_unchanged": true,
     "src_subtree_untouched": true,
-    "lp2_grep_unchanged": true
+    "lp2_grep_unchanged": true,
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 12032951,
+      "total": 12032951,
+      "effective_full_rate": 1755791,
+      "breakdown": {
+        "input_fresh": 28210,
+        "cache_creation": 375178,
+        "cache_read": 11610042,
+        "output": 19521
+      },
+      "n_messages": 91,
+      "n_message_starts": 91
+    }
   },
   "contract_evaluation": {
     "verdict": "PASS",

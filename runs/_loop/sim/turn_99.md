@@ -99,7 +99,17 @@ Both assertions passed: investigation ID is present in `state["investigations"]`
     "researcher": null,
     "implementer": null,
     "critic": null,
-    "total": null
+    "orchestrator": 19846560,
+    "total": 19846560,
+    "effective_full_rate": 2744392,
+    "breakdown": {
+      "input_fresh": 25796,
+      "cache_creation": 492992,
+      "cache_read": 19293164,
+      "output": 34608
+    },
+    "n_messages": 125,
+    "n_message_starts": 125
   }
 }
 ```

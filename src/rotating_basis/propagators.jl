@@ -381,7 +381,7 @@ function split_step_lab!(
     apply_lab_spin_step!(ws, half, t_mid; imaginary_time)
 
     # DDI directly in lab basis (no Û_B wrap). apply_ddi_step! locks dt
-    # to Float64 (legacy spinor solver path); convert at the boundary so
+    # to Float64 (spinor solver path); convert at the boundary so
     # F32 workspaces interop. Per-voxel array work stays at workspace T.
     if abs(ws.ddi_params.C_dd) > 1e-30
         apply_ddi_step!(ws.psi_tilde, ws.spin_matrices, ws.ddi_params,

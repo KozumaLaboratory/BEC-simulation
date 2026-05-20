@@ -32,7 +32,17 @@
       "researcher": null,
       "implementer": null,
       "critic": null,
-      "total": null
+      "orchestrator": 9942181,
+      "total": 9942181,
+      "effective_full_rate": 1526725,
+      "breakdown": {
+        "input_fresh": 6106,
+        "cache_creation": 355073,
+        "cache_read": 9556782,
+        "output": 24220
+      },
+      "n_messages": 75,
+      "n_message_starts": 75
     },
     "warnings": [],
     "physical_red_flags": [],
@@ -135,6 +145,21 @@
       "metric 'grep_count('T29' in runs/_loop/by_tag/barnett.md)' missing from sim metrics"
     ]
   },
+  "cost_audit": {
+    "expected_cost_eff": 1300000,
+    "actual_cost_eff": 1526725,
+    "ratio_actual_over_expected": 1.17,
+    "deviation_pct": 17.4,
+    "flag": "BUDGET_OK"
+  },
+  "central_falsifier_check": {
+    "applies": true,
+    "tier_cap": null,
+    "central_falsifier_id": "c_dd-zero-control",
+    "central_falsifier_result": "\u0394=-5.985 \u2192 M2-dominant REFUTED; M1-active confirmed (DDI is suppressive, not load-bearing \u2014 more asymmetric than empirical)",
+    "issues": []
+  },
+  "tier_cap": null,
   "investigation_id": "barnett-mechanism-2026-05-16",
   "stage_advancing_to": "Document",
   "investigation_update": {

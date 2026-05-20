@@ -128,11 +128,15 @@ EXIT: 0, ELAPSED_TOTAL: 83.6s
   "wall_time_sec": 83.6,
   "peak_memory_gb": null,
   "tests_passed": null,
-  "n_max_dimless": 6.39e-04,
+  "n_max_dimless": 0.000639,
   "n_max_D0": 1.91,
-  "m_populations": [0.49871, 0.00294, 0.49835],
+  "m_populations": [
+    0.49871,
+    0.00294,
+    0.49835
+  ],
   "F_z_per_N": 0.000357,
-  "L_z_per_N": -0.000002,
+  "L_z_per_N": -2e-06,
   "E_kinetic_per_N": 0.001144,
   "E_contact_per_N": 0.052509,
   "E_LHY_per_N": 0.123245,
@@ -141,19 +145,68 @@ EXIT: 0, ELAPSED_TOTAL: 83.6s
   "mu_final": 0.146117,
   "converged": false,
   "n_steps_completed": 12500,
-  "n_max_D0_trajectory": [3.08, 2.72, 2.13, 1.95, 1.91],
-  "m_populations_trajectory": [
-    [0.3670, 0.2659, 0.3670],
-    [0.4085, 0.1835, 0.4080],
-    [0.4855, 0.0300, 0.4845],
-    [0.4970, 0.0067, 0.4963],
-    [0.4987, 0.0029, 0.4984]
+  "n_max_D0_trajectory": [
+    3.08,
+    2.72,
+    2.13,
+    1.95,
+    1.91
   ],
-  "mu_trajectory": [0.315543, 0.254532, 0.157142, 0.146639, 0.146117],
-  "F_z_trajectory": [null, null, null, null, null],
-  "L_z_trajectory": [null, null, null, null, null],
-  "T_imag_checkpoints": [35.0, 45.0, 55.0, 65.0, 75.0],
-  "wall_time_sec": 83.6,
+  "m_populations_trajectory": [
+    [
+      0.367,
+      0.2659,
+      0.367
+    ],
+    [
+      0.4085,
+      0.1835,
+      0.408
+    ],
+    [
+      0.4855,
+      0.03,
+      0.4845
+    ],
+    [
+      0.497,
+      0.0067,
+      0.4963
+    ],
+    [
+      0.4987,
+      0.0029,
+      0.4984
+    ]
+  ],
+  "mu_trajectory": [
+    0.315543,
+    0.254532,
+    0.157142,
+    0.146639,
+    0.146117
+  ],
+  "F_z_trajectory": [
+    null,
+    null,
+    null,
+    null,
+    null
+  ],
+  "L_z_trajectory": [
+    null,
+    null,
+    null,
+    null,
+    null
+  ],
+  "T_imag_checkpoints": [
+    35.0,
+    45.0,
+    55.0,
+    65.0,
+    75.0
+  ],
   "D0_factor_used": 2990.1,
   "c0": 180.99,
   "c_dd": 639.2,
@@ -162,13 +215,13 @@ EXIT: 0, ELAPSED_TOTAL: 83.6s
   "restart_psi_sanity_check_passed": true,
   "falsification_result": "UNDETERMINED_R2c",
   "physical_red_flags": [
-    "n_max DECREASED from 3.09 (T44 end) to 1.91 D0 (T46 end) despite m=0 evacuation. Expected: PASS_R2c requires n_max >= 10 D0 rising alongside m=0 drop. Actual: n_max falling monotonically as m=0 evacuates — opposite of the PASS scenario. This is a new physics finding: the Mermin-Ho (0.5, 0, 0.5) spin texture is NOT the self-bound droplet state at dx=0.125.",
-    "mu_final dropped from 0.316 (T44) to 0.146 (T46). The chemical potential decrease coincides with n_max decrease — consistent with the system evacuating vortex gradient energy and relaxing to a lower-density Mermin-Ho delocalized state.",
-    "E_LHY/E_contact = 0.123/0.053 = 2.3x at final state. LHY term still dominant even at lower density — the system is in the strongly-LHY-dominated regime throughout. Self-binding threshold requires DDI energy (unknown due to BUG-9) to contribute a net attractive term larger than the LHY repulsion at this density."
+    "n_max DECREASED from 3.09 (T44 end) to 1.91 D0 (T46 end) despite m=0 evacuation. Expected: PASS_R2c requires n_max >= 10 D0 rising alongside m=0 drop. Actual: n_max falling monotonically as m=0 evacuates \u2014 opposite of the PASS scenario. This is a new physics finding: the Mermin-Ho (0.5, 0, 0.5) spin texture is NOT the self-bound droplet state at dx=0.125.",
+    "mu_final dropped from 0.316 (T44) to 0.146 (T46). The chemical potential decrease coincides with n_max decrease \u2014 consistent with the system evacuating vortex gradient energy and relaxing to a lower-density Mermin-Ho delocalized state.",
+    "E_LHY/E_contact = 0.123/0.053 = 2.3x at final state. LHY term still dominant even at lower density \u2014 the system is in the strongly-LHY-dominated regime throughout. Self-binding threshold requires DDI energy (unknown due to BUG-9) to contribute a net attractive term larger than the LHY repulsion at this density."
   ],
   "warnings": [
-    "converged=false: ITP ran all 12500 steps without crossing tol=1e-8. F32 floor prevents |Δμ| from reaching tol. State is at F32 precision equilibrium (same as T44).",
-    "E_DDI_per_N = NaN: BUG-9 framework limitation — rotating_basis ITP does not expose DDI energy decomposition post-hoc. E_total excludes DDI contribution.",
+    "converged=false: ITP ran all 12500 steps without crossing tol=1e-8. F32 floor prevents |\u0394\u03bc| from reaching tol. State is at F32 precision equilibrium (same as T44).",
+    "E_DDI_per_N = NaN: BUG-9 framework limitation \u2014 rotating_basis ITP does not expose DDI energy decomposition post-hoc. E_total excludes DDI contribution.",
     "F_z_trajectory and L_z_trajectory not extracted per-checkpoint (would double the per-checkpoint wall time for L_z). Final values only: F_z=3.6e-4, L_z=-2e-6."
   ],
   "tokens_used": {
@@ -176,7 +229,17 @@ EXIT: 0, ELAPSED_TOTAL: 83.6s
     "researcher": null,
     "implementer": null,
     "critic": null,
-    "total": null
+    "orchestrator": 12086518,
+    "total": 12086518,
+    "effective_full_rate": 1728503,
+    "breakdown": {
+      "input_fresh": 17223,
+      "cache_creation": 361018,
+      "cache_read": 11690077,
+      "output": 18200
+    },
+    "n_messages": 113,
+    "n_message_starts": 113
   }
 }
 ```

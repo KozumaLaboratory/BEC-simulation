@@ -28,13 +28,34 @@ One Strang step in rotating basis:
 
 For the skeleton we keep the structure simple. spin-mixing F·⟨F⟩ is omitted
 when c1 = 0 (skipped); when present it's applied symmetrically.
+
+When `with_loss=true` (the default) and `ws.loss` is active, a half-step
+loss action is sandwiched around the unitary core:
+  Loss(dt/2) → unitary core → Loss(dt/2)
+giving 2nd-order Strang splitting between unitary + dissipative. K3 / γ_dr
+act on |ψ̃|² which is basis-invariant, so applying the spinor-path
+`apply_loss_step!` directly on ψ̃ is correct.
+
+Yoshida4/6 wrappers pass `with_loss=false` so the inner negative-weight
+sub-steps don't produce anti-loss; they handle loss themselves at the
+macro-step level.
 """
 function split_step_rotating!(
     ws::RotatingBasisWS{T, N, D}, dt::T, t::T;
     imaginary_time::Bool=false,
+    with_loss::Bool=true,
 ) where {T, N, D}
     half = dt / 2
     t_mid = t + half
+    F_atom = ws.spin_matrices.system.F
+    apply_loss = with_loss && _is_active(ws.loss)
+
+    # Strang sandwich: half loss before
+    if apply_loss
+        apply_loss_step!(
+            ws.psi_tilde, ws.loss, F_atom, Float64(half), D, N, ws.rho_buf,
+        )
+    end
 
     # Spatial-diagonal (V_trap + c0 n) + Local spin step (Zeeman_diag - Â) outermost,
     # since local-spin step is exact and acts as the bridge between FFT and DDI.
@@ -61,6 +82,13 @@ function split_step_rotating!(
     apply_local_spin_step!(ws, half, t_mid; imaginary_time)
     apply_spatial_diagonal_step!(ws, half; imaginary_time)
     apply_kinetic_step_rotating!(ws, half; imaginary_time)
+
+    # Strang sandwich: half loss after
+    if apply_loss
+        apply_loss_step!(
+            ws.psi_tilde, ws.loss, F_atom, Float64(half), D, N, ws.rho_buf,
+        )
+    end
 
     nothing
 end
@@ -92,7 +120,12 @@ function find_ground_state_rotating!(
 ) where {T, N, D}
     μ_last = zero(T)
     for step in 1:n_steps
-        split_step_rotating!(ws, dt, zero(T); imaginary_time=true)
+        # ITP is for finding equilibrium GS; loss channels (which break
+        # time-reversal) are RTP-only — skip them inside ITP regardless of
+        # ws.loss state. Users wiring a loss block on a ground_state step
+        # would otherwise see GS converge to a vanishing density.
+        split_step_rotating!(ws, dt, zero(T);
+            imaginary_time=true, with_loss=false)
         n_before = rotating_norm(ws)
         if n_before > zero(T) && target_norm > zero(T)
             μ_last = -log(n_before / target_norm) / (2 * dt)
@@ -135,10 +168,32 @@ function yoshida4_step_rotating!(
     w₁ = T(1) / (T(2) - cbrt2)
     w₀ = T(1) - T(2) * w₁
 
-    # Sequence: U(w₁) U(w₀) U(w₁), each with midpoint H sampling
-    split_step_rotating!(ws, w₁ * dt, t; imaginary_time=false)           # H @ t + (w₁/2)·dt
-    split_step_rotating!(ws, w₀ * dt, t + w₁ * dt; imaginary_time=false) # H @ t + (w₁ + w₀/2)·dt
-    split_step_rotating!(ws, w₁ * dt, t + (w₁ + w₀) * dt; imaginary_time=false)
+    F_atom = ws.spin_matrices.system.F
+    apply_loss = _is_active(ws.loss)
+
+    # Macro-step loss sandwich: half before / half after the unitary triple.
+    # The triple-jump's negative w₀ would produce anti-loss inside Strang sub-steps,
+    # so loss is handled here at the macro-step level (using full dt) and
+    # split_step_rotating! is called with with_loss=false.
+    if apply_loss
+        apply_loss_step!(
+            ws.psi_tilde, ws.loss, F_atom, Float64(dt) / 2, D, N, ws.rho_buf,
+        )
+    end
+
+    # Sequence: U(w₁) U(w₀) U(w₁), each with midpoint H sampling. Unitary only.
+    split_step_rotating!(ws, w₁ * dt, t;
+        imaginary_time=false, with_loss=false)               # H @ t + (w₁/2)·dt
+    split_step_rotating!(ws, w₀ * dt, t + w₁ * dt;
+        imaginary_time=false, with_loss=false)               # H @ t + (w₁ + w₀/2)·dt
+    split_step_rotating!(ws, w₁ * dt, t + (w₁ + w₀) * dt;
+        imaginary_time=false, with_loss=false)
+
+    if apply_loss
+        apply_loss_step!(
+            ws.psi_tilde, ws.loss, F_atom, Float64(dt) / 2, D, N, ws.rho_buf,
+        )
+    end
     nothing
 end
 
@@ -204,10 +259,23 @@ function yoshida6_step_rotating!(
     w₃ = T(0.784513610477560)
     w₀ = one(T) - T(2) * (w₁ + w₂ + w₃)
     weights = (w₃, w₂, w₁, w₀, w₁, w₂, w₃)
+    F_atom = ws.spin_matrices.system.F
+    apply_loss = _is_active(ws.loss)
+    if apply_loss
+        apply_loss_step!(
+            ws.psi_tilde, ws.loss, F_atom, Float64(dt) / 2, D, N, ws.rho_buf,
+        )
+    end
     t_local = t
     for w in weights
-        split_step_rotating!(ws, w * dt, t_local + w * dt / 2; imaginary_time=false)
+        split_step_rotating!(ws, w * dt, t_local + w * dt / 2;
+            imaginary_time=false, with_loss=false)
         t_local += w * dt
+    end
+    if apply_loss
+        apply_loss_step!(
+            ws.psi_tilde, ws.loss, F_atom, Float64(dt) / 2, D, N, ws.rho_buf,
+        )
     end
     nothing
 end
@@ -266,14 +334,30 @@ function cfet4_real_step_rotating!(
     α = T(0.25) + sqrt3_12
     β = T(0.25) - sqrt3_12
 
-    # Stage 1: α at τ₁
-    split_step_rotating!(ws, α * dt, t + τ₁_offset * dt; imaginary_time=false)
+    F_atom = ws.spin_matrices.system.F
+    apply_loss = _is_active(ws.loss)
+    if apply_loss
+        apply_loss_step!(
+            ws.psi_tilde, ws.loss, F_atom, Float64(dt) / 2, D, N, ws.rho_buf,
+        )
+    end
+    # Stage 1: α at τ₁ (unitary only)
+    split_step_rotating!(ws, α * dt, t + τ₁_offset * dt;
+        imaginary_time=false, with_loss=false)
     # Stage 2: β at τ₂
-    split_step_rotating!(ws, β * dt, t + τ₂_offset * dt; imaginary_time=false)
+    split_step_rotating!(ws, β * dt, t + τ₂_offset * dt;
+        imaginary_time=false, with_loss=false)
     # Stage 3: β at τ₁
-    split_step_rotating!(ws, β * dt, t + τ₁_offset * dt; imaginary_time=false)
+    split_step_rotating!(ws, β * dt, t + τ₁_offset * dt;
+        imaginary_time=false, with_loss=false)
     # Stage 4: α at τ₂
-    split_step_rotating!(ws, α * dt, t + τ₂_offset * dt; imaginary_time=false)
+    split_step_rotating!(ws, α * dt, t + τ₂_offset * dt;
+        imaginary_time=false, with_loss=false)
+    if apply_loss
+        apply_loss_step!(
+            ws.psi_tilde, ws.loss, F_atom, Float64(dt) / 2, D, N, ws.rho_buf,
+        )
+    end
     nothing
 end
 

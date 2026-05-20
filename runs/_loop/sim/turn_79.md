@@ -110,12 +110,12 @@ All returned `This command requires approval` before any output. This is a sessi
   "haskey_zeeman_count_in_main": 0,
   "yaml_bz_negative_verified": true,
   "precondition_check_passed": false,
-  "precondition_check_partial_note": "Non-Julia checks all passed. Julia binary blocked by session approval gate — CUDA functional() not directly verified this session. Based on T75 run + scheduler_79.json (VRAM 12.689 GB, GPU util 1%) CUDA is presumed functional.",
+  "precondition_check_partial_note": "Non-Julia checks all passed. Julia binary blocked by session approval gate \u2014 CUDA functional() not directly verified this session. Based on T75 run + scheduler_79.json (VRAM 12.689 GB, GPU util 1%) CUDA is presumed functional.",
   "yaml_loaded_no_errors": true,
   "cuda_functional": null,
   "cuda_functional_note": "Not directly verified this session due to approval gate; T75 PASS + scheduler confirm GPU available",
   "run_yaml_completed": false,
-  "run_yaml_failure_reason": "Julia binary execution blocked by Bash tool session approval gate — 'This command requires approval' returned for all Julia invocations",
+  "run_yaml_failure_reason": "Julia binary execution blocked by Bash tool session approval gate \u2014 'This command requires approval' returned for all Julia invocations",
   "wall_time_sec": null,
   "first_output_sec": null,
   "timeout_triggered": false,
@@ -147,7 +147,24 @@ All returned `This command requires approval` before any output. This is a sessi
   "fallback_applied": "none",
   "falsification_result": "FAIL_NO_DATA",
   "session_approval_gate_blocked": true,
-  "session_approval_gate_note": "Director should either (a) grant Julia execution approval in the next session, or (b) dispatch a script-based approach that pre-writes the run script to disk and executes it via a pre-approved shell mechanism."
+  "session_approval_gate_note": "Director should either (a) grant Julia execution approval in the next session, or (b) dispatch a script-based approach that pre-writes the run script to disk and executes it via a pre-approved shell mechanism.",
+  "tokens_used": {
+    "theorist": null,
+    "researcher": null,
+    "implementer": null,
+    "critic": null,
+    "orchestrator": 11773705,
+    "total": 11773705,
+    "effective_full_rate": 1728758,
+    "breakdown": {
+      "input_fresh": 25830,
+      "cache_creation": 365109,
+      "cache_read": 11360671,
+      "output": 22095
+    },
+    "n_messages": 107,
+    "n_message_starts": 107
+  }
 }
 ```
 

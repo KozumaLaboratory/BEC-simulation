@@ -170,9 +170,13 @@ Note: judge.py always writes to `runs/_loop/judge/turn_52.json` on execution (li
   "experiment_kind": "text_only",
   "src_files_modified": 0,
   "claude_scripts_files_modified": 1,
-  "claude_scripts_files_modified_list": [".claude/scripts/judge.py"],
+  "claude_scripts_files_modified_list": [
+    ".claude/scripts/judge.py"
+  ],
   "tests_added": 1,
-  "tests_added_list": [".claude/scripts/tests/test_judge_in_operator.py"],
+  "tests_added_list": [
+    ".claude/scripts/tests/test_judge_in_operator.py"
+  ],
   "unittest_pre_fix_assertions_passed": 2,
   "unittest_post_fix_assertions_passed": 21,
   "unittest_total_assertions": 23,
@@ -183,7 +187,20 @@ Note: judge.py always writes to `runs/_loop/judge/turn_52.json` on execution (li
   "sibling_audit_list_membership_count": 30,
   "sibling_audit_range_count": 2,
   "sibling_audit_ambiguous_count": 1,
-  "historical_turns_flagged_for_anko": [28, 33, 35, 38, 41, 42, 43, 44, 45, 46, 47, 48],
+  "historical_turns_flagged_for_anko": [
+    28,
+    33,
+    35,
+    38,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48
+  ],
   "investigation_id": "judge-in-operator-bug-2026-05-18",
   "stage_advancing_to": "Reproduce_Fix_Test",
   "flow_template": "fix-bug",
@@ -194,7 +211,24 @@ Note: judge.py always writes to `runs/_loop/judge/turn_52.json` on execution (li
     "2-element string list pre-fix behavior: not always False. String range comparison could produce True for values lexicographically between the two elements (e.g., 'PARTIAL' <= 'RESOLVED' <= 'RESOLVED' = True). T41 q1/q2 criteria using ['RESOLVED', 'PARTIAL'] may have accidentally evaluated correctly for 'RESOLVED' inputs.",
     "2-element boolean list pre-fix behavior: always False (confirmed). 'False <= True <= False' = False, 'False <= False <= False' = False. T45/T47 boolean-list criteria were never passing pre-fix.",
     "unittest exit code 1 (expected): TestInOperatorPreFix.test_bug_* now FAIL because the fix makes those expressions True. This is the intended signal."
-  ]
+  ],
+  "tokens_used": {
+    "theorist": null,
+    "researcher": null,
+    "implementer": null,
+    "critic": null,
+    "orchestrator": 15438853,
+    "total": 15438853,
+    "effective_full_rate": 2179092,
+    "breakdown": {
+      "input_fresh": 12574,
+      "cache_creation": 438352,
+      "cache_read": 14963481,
+      "output": 24446
+    },
+    "n_messages": 110,
+    "n_message_starts": 110
+  }
 }
 ```
 

@@ -109,7 +109,9 @@ MEMORY_FILE_EXISTS
   "state_json_sibling_cleanup_count": 2,
   "patterns_yaml_modified": false,
   "memory_files_added": 1,
-  "memory_files_added_list": ["yan_li_saito_2026_reproduction_dormant_close.md"],
+  "memory_files_added_list": [
+    "yan_li_saito_2026_reproduction_dormant_close.md"
+  ],
   "memory_files_overwritten": 0,
   "sim_md_files_added": 1,
   "yan_li_saito_tier_current_at_closure": 0.4,
@@ -120,7 +122,24 @@ MEMORY_FILE_EXISTS
   "state_json_parses_clean": true,
   "judge_py_unchanged": true,
   "agents_md_unchanged": true,
-  "src_subtree_untouched": true
+  "src_subtree_untouched": true,
+  "tokens_used": {
+    "theorist": null,
+    "researcher": null,
+    "implementer": null,
+    "critic": null,
+    "orchestrator": 8526850,
+    "total": 8526850,
+    "effective_full_rate": 1311114,
+    "breakdown": {
+      "input_fresh": 4268,
+      "cache_creation": 333401,
+      "cache_read": 8174655,
+      "output": 14526
+    },
+    "n_messages": 86,
+    "n_message_starts": 86
+  }
 }
 ```
 

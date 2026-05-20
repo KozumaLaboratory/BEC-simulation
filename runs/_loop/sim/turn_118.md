@@ -80,11 +80,29 @@ N/A — no new YAML config written this turn. Duty A is JSON patch to state.json
     "SC15-active-investigation-id-set"
   ],
   "sc_failed": [],
-  "sc_post_commit_pending": ["SC13-commit-on-auto-branch"],
+  "sc_post_commit_pending": [
+    "SC13-commit-on-auto-branch"
+  ],
   "tests_passed": null,
   "warnings": [],
   "physical_red_flags": [],
-  "tokens_used": null
+  "tokens_used": {
+    "theorist": null,
+    "researcher": null,
+    "implementer": null,
+    "critic": null,
+    "orchestrator": 16482765,
+    "total": 16482765,
+    "effective_full_rate": 2312923,
+    "breakdown": {
+      "input_fresh": 37965,
+      "cache_creation": 450856,
+      "cache_read": 15971088,
+      "output": 22856
+    },
+    "n_messages": 119,
+    "n_message_starts": 119
+  }
 }
 ```
 

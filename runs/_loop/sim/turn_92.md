@@ -92,7 +92,12 @@ Appendix B addresses the polar/cyclic mean-field degeneracy.
   "formal_claim_h2_stated": true,
   "formal_claim_h3_stated": true,
   "falsifiers_count": 4,
-  "falsifier_ids_list": ["F1_6j_symbol_re_derivation", "F2_lemma1_prefactor_structural_F2", "F3_sum_lambda_zero_identity", "F4_bogoliubov_stiffness_cross_check_optional"],
+  "falsifier_ids_list": [
+    "F1_6j_symbol_re_derivation",
+    "F2_lemma1_prefactor_structural_F2",
+    "F3_sum_lambda_zero_identity",
+    "F4_bogoliubov_stiffness_cross_check_optional"
+  ],
   "each_falsifier_has_concrete_threshold": true,
   "provisional_verdict": "HYPOTHESIS_DERIVATION_ERROR",
   "recommended_t93_critic_scope_described": true,
@@ -101,9 +106,9 @@ Appendix B addresses the polar/cyclic mean-field degeneracy.
     "runs/_loop/research/turn_91.md (T91 researcher_shallow F=2 cyclic triangulation; REFUTED at S=2 and S=4 entries)",
     "runs/_loop/director/turn_92.md (T92 dispatch brief and pre-routing)",
     "docs/manuscript/papers/paper3_universal_theorem/sign_pattern_lemma1_general_S.md (Lemma 1 General-S closed-form formula + 26-channel verification at F=3/4/6/8/10)",
-    "docs/manuscript/papers/paper3_universal_theorem/sign_pattern_L1_v2_BdG_signs.md (rigorous S=0 endpoint proof: β_0^(λ) = -1/(2F+1))",
+    "docs/manuscript/papers/paper3_universal_theorem/sign_pattern_L1_v2_BdG_signs.md (rigorous S=0 endpoint proof: \u03b2_0^(\u03bb) = -1/(2F+1))",
     "scripts/manuscript/lemma1_general_S_verification.jl (26/26 PASS regression baseline at F=3/4/6/8/10; F=2 case absent)",
-    "Kawaguchi & Ueda 2012 (arXiv:1001.2072) §2 c_0/c_1/c_2 convention used in §5 cross-check (KU2012 §3 PDF binary blocked verbatim extraction, per T91 §3.1)"
+    "Kawaguchi & Ueda 2012 (arXiv:1001.2072) \u00a72 c_0/c_1/c_2 convention used in \u00a75 cross-check (KU2012 \u00a73 PDF binary blocked verbatim extraction, per T91 \u00a73.1)"
   ],
   "no_invention": true,
   "a00_calculation_verified": true,
@@ -120,6 +125,23 @@ Appendix B addresses the polar/cyclic mean-field degeneracy.
   "tier_target": 3,
   "tests_passed": true,
   "warnings": [],
-  "physical_red_flags": []
+  "physical_red_flags": [],
+  "tokens_used": {
+    "theorist": null,
+    "researcher": null,
+    "implementer": null,
+    "critic": null,
+    "orchestrator": 13533904,
+    "total": 13533904,
+    "effective_full_rate": 1990718,
+    "breakdown": {
+      "input_fresh": 7815,
+      "cache_creation": 427751,
+      "cache_read": 13070097,
+      "output": 28241
+    },
+    "n_messages": 88,
+    "n_message_starts": 88
+  }
 }
 ```

@@ -15,7 +15,17 @@
       "researcher": null,
       "implementer": null,
       "critic": null,
-      "total": null
+      "orchestrator": 8640857,
+      "total": 8640857,
+      "effective_full_rate": 1358310,
+      "breakdown": {
+        "input_fresh": 22837,
+        "cache_creation": 329223,
+        "cache_read": 8269396,
+        "output": 19401
+      },
+      "n_messages": 60,
+      "n_message_starts": 60
     },
     "warnings": [],
     "physical_red_flags": [

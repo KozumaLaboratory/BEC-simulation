@@ -82,7 +82,24 @@ will then return `p_z = get(zee, "p", 0.0) = 0.0` and `q_z = get(zee, "q", 0.0) 
   "sim_turn_36_metrics_block_present": true,
   "wall_time_sec_total": 15,
   "warnings": [],
-  "physical_red_flags": []
+  "physical_red_flags": [],
+  "tokens_used": {
+    "theorist": null,
+    "researcher": null,
+    "implementer": null,
+    "critic": null,
+    "orchestrator": 11835849,
+    "total": 11835849,
+    "effective_full_rate": 1671103,
+    "breakdown": {
+      "input_fresh": 37119,
+      "cache_creation": 301545,
+      "cache_read": 11475280,
+      "output": 21905
+    },
+    "n_messages": 90,
+    "n_message_starts": 90
+  }
 }
 ```
 

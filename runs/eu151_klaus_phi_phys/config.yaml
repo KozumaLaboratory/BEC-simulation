@@ -46,6 +46,7 @@ pipeline:
   # tilt 0 → 35° over ≈ 20 ms (6.28 ω⁻¹)
   - dynamics:
       duration: 6.28
+      integrator: yoshida4
       dt: 0.001
       epsilon: 1.0e-6
       B:
@@ -56,6 +57,7 @@ pipeline:
   # spinup 0 → stir freq over ≈ 50 ms (15.71 ω⁻¹)
   - dynamics:
       duration: 15.71
+      integrator: yoshida4
       dt: 0.001
       epsilon: 1.0e-6
       B:
@@ -66,6 +68,7 @@ pipeline:
   # steady stir 1 s ≈ 314.16 ω⁻¹ — vortex-lattice evolution past formation
   - dynamics:
       duration: 314.16
+      integrator: yoshida4
       dt: 0.001
       epsilon: 1.0e-6
       B:

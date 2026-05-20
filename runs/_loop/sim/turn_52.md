@@ -59,7 +59,24 @@ For each proposal, the critic answered §F6's 4 safety-rail questions (runnable 
   "stage_advancing_to": "L3_critic_audit",
   "flow_template": "audit-class-scan",
   "obstruction_encountered": false,
-  "verdict_summary": "mixed: LP-1 REJECT, LP-2 ACCEPT"
+  "verdict_summary": "mixed: LP-1 REJECT, LP-2 ACCEPT",
+  "tokens_used": {
+    "theorist": null,
+    "researcher": null,
+    "implementer": null,
+    "critic": null,
+    "orchestrator": 8331332,
+    "total": 8331332,
+    "effective_full_rate": 1390722,
+    "breakdown": {
+      "input_fresh": 5314,
+      "cache_creation": 375560,
+      "cache_read": 7925782,
+      "output": 24676
+    },
+    "n_messages": 60,
+    "n_message_starts": 60
+  }
 }
 ```
 

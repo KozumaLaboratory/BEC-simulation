@@ -138,7 +138,24 @@ Total: 2
   "manuscript_edited": false,
   "src_edited": false,
   "julia_executed": false,
-  "check_6_failure_detail": "3 of 4 sibling by_tag files (edh-eu151.md, matsui-science-2026.md, matsui-2026.md) have working-tree content that predates T84; T84 edits exist in git index (AM status) but not on disk. Primary file edh-eu151-matsui-science-2026.md: working tree matches index (PASS). Repair: restore working tree from index for 3 files."
+  "check_6_failure_detail": "3 of 4 sibling by_tag files (edh-eu151.md, matsui-science-2026.md, matsui-2026.md) have working-tree content that predates T84; T84 edits exist in git index (AM status) but not on disk. Primary file edh-eu151-matsui-science-2026.md: working tree matches index (PASS). Repair: restore working tree from index for 3 files.",
+  "tokens_used": {
+    "theorist": null,
+    "researcher": null,
+    "implementer": null,
+    "critic": null,
+    "orchestrator": 10954340,
+    "total": 10954340,
+    "effective_full_rate": 1664728,
+    "breakdown": {
+      "input_fresh": 10100,
+      "cache_creation": 393016,
+      "cache_read": 10529135,
+      "output": 22089
+    },
+    "n_messages": 88,
+    "n_message_starts": 88
+  }
 }
 ```
 

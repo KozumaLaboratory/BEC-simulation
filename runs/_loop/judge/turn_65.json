@@ -31,7 +31,24 @@
     "state_json_parses_clean": true,
     "judge_py_unchanged": true,
     "agents_md_unchanged": true,
-    "src_subtree_untouched": true
+    "src_subtree_untouched": true,
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 8526850,
+      "total": 8526850,
+      "effective_full_rate": 1311114,
+      "breakdown": {
+        "input_fresh": 4268,
+        "cache_creation": 333401,
+        "cache_read": 8174655,
+        "output": 14526
+      },
+      "n_messages": 86,
+      "n_message_starts": 86
+    }
   },
   "contract_evaluation": {
     "verdict": "PASS",

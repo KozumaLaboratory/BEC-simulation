@@ -39,7 +39,24 @@
     "manuscript_edited": false,
     "src_edited": false,
     "julia_executed": false,
-    "check_6_failure_detail": "3 of 4 sibling by_tag files (edh-eu151.md, matsui-science-2026.md, matsui-2026.md) have working-tree content that predates T84; T84 edits exist in git index (AM status) but not on disk. Primary file edh-eu151-matsui-science-2026.md: working tree matches index (PASS). Repair: restore working tree from index for 3 files."
+    "check_6_failure_detail": "3 of 4 sibling by_tag files (edh-eu151.md, matsui-science-2026.md, matsui-2026.md) have working-tree content that predates T84; T84 edits exist in git index (AM status) but not on disk. Primary file edh-eu151-matsui-science-2026.md: working tree matches index (PASS). Repair: restore working tree from index for 3 files.",
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 10954340,
+      "total": 10954340,
+      "effective_full_rate": 1664728,
+      "breakdown": {
+        "input_fresh": 10100,
+        "cache_creation": 393016,
+        "cache_read": 10529135,
+        "output": 22089
+      },
+      "n_messages": 88,
+      "n_message_starts": 88
+    }
   },
   "contract_evaluation": {
     "verdict": "FAIL_OPERATIONAL",
@@ -147,7 +164,21 @@
       "status_narrative_t85_appended=False == True \u2192 False"
     ]
   },
-  "cost_audit": null,
+  "cost_audit": {
+    "expected_cost_eff": 750000,
+    "actual_cost_eff": 1664728,
+    "ratio_actual_over_expected": 2.22,
+    "deviation_pct": 122.0,
+    "flag": "BUDGET_BUSTED"
+  },
+  "central_falsifier_check": {
+    "applies": true,
+    "tier_cap": null,
+    "central_falsifier_id": "F1-ring-appears-correct-timescale",
+    "central_falsifier_result": "CORROBORATE at T117 critic independent context (Stage-2): direct trajectory.csv read shows pop_c2 (m=+5) peak 17.08% at t=4.34 ms (3.00 omega^-1 with omega_ref=691.15 rad/s); within factor-2 band [2.5, 10] ms of Matsui experimental t_ring=5 ms (ratio 0.87x). Full 13-component cascade observed (c1->c2->c3->c4 sequential peaks, all 13 m states populated). Config has K3_per_m_cubic + gamma_dr=0.02 + seed=42 + coherent kick (all 3 load-bearing knobs PRESENT). Norm 1.000 -> 0.9962 monotonic, no collapse. T110 stage-1 CORROBORATE independently confirmed with stronger evidence. Stage-1 (T110) + Stage-2 (T117) = central F1 falsifier CORROBORATE. F2 winding-number topology remains BLOCKED by JLD2-vs-h5py chunk-encoding incompatibility (T111 probe); deferred per seed.md scoping to F1-only Tier-3 closure (F2 optional refinement when anko-consult wrapper produces spatial_profiles.csv). Tier 2.75 -> 3.0 TERMINAL CLOSURE.",
+    "issues": []
+  },
+  "tier_cap": null,
   "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
   "stage_advancing_to": "Document-verify (T85 lightweight verification \u2014 confirms state.json patch is JSON-valid; confirms memory file is complete; appends a brief PASS row to status narrative; tier 2.75 \u2192 3.0 terminal closure)",
   "investigation_update": {

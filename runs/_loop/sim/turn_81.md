@@ -146,7 +146,9 @@ Run in background (exit 0). Wall time: 81 seconds.
   "wrapper_script_path": ".claude/scripts/run_matsui_edh_t81.sh",
   "wrapper_invocation_pattern": "bash .claude/scripts/run_matsui_edh_t81.sh",
   "approval_gate_blocked": false,
-  "approval_gate_pattern_tried": ["bash .claude/scripts/run_matsui_edh_t81.sh"],
+  "approval_gate_pattern_tried": [
+    "bash .claude/scripts/run_matsui_edh_t81.sh"
+  ],
   "yaml_schema_fix_applied": true,
   "yaml_schema_fix_commit": "2433e32",
   "yaml_schema_fix_note": "save_psi_snapshots + save_snapshot_precision moved under save: block (same fix T75 applied on auto branch but never merged to main)",
@@ -164,7 +166,7 @@ Run in background (exit 0). Wall time: 81 seconds.
   "gs_pop_c13_at_t0": 0.999932,
   "gs_spin_state_check": "PASS_m_minus_F",
   "gs_norm_final": 1.0000000000000004,
-  "gs_energy_final": -967.027210,
+  "gs_energy_final": -967.02721,
   "gs_energy_monotonic": true,
   "gs_converged": true,
   "dynamics_step_completed": true,
@@ -175,30 +177,47 @@ Run in background (exit 0). Wall time: 81 seconds.
   "dynamics_mz_at_tend": -5.998133,
   "dynamics_pop_c13_at_t0": 0.999932,
   "dynamics_pop_c13_at_tend": 0.998138,
-  "dynamics_pop_c12_at_t0": 4.776e-5,
-  "dynamics_pop_c12_at_tend": 1.858e-3,
+  "dynamics_pop_c12_at_t0": 4.776e-05,
+  "dynamics_pop_c12_at_tend": 0.001858,
   "dynamics_energy_at_t0": 985.9949,
   "dynamics_energy_at_tend": 54.8849,
   "norm_initial": 1.0000000000000004,
   "norm_final": 0.9999999999993311,
   "norm_drift": 6.69e-13,
-  "energy_initial": -967.027210,
+  "energy_initial": -967.02721,
   "energy_final": 54.8849,
   "energy_monotonic": true,
   "mz_target": -6.0,
   "mz_final": -5.999995,
   "tests_passed": null,
   "physical_red_flags": [
-    "dynamics_energy_decreases_from_985_to_55_during_RTP: post-quench energy trajectory drops monotonically — expected for B-quench (Zeeman energy removal); NOT a physics bug, but flagged for T82 Analyze to verify energy conservation at fixed B"
+    "dynamics_energy_decreases_from_985_to_55_during_RTP: post-quench energy trajectory drops monotonically \u2014 expected for B-quench (Zeeman energy removal); NOT a physics bug, but flagged for T82 Analyze to verify energy conservation at fixed B"
   ],
   "warnings": [
-    "INFO: DDI Larmor regime: omega_L / (c_dd * n) approx 123.0 — non-secular regime as per [P5] design; expected warning",
-    "WARNING: LHY scalar approximation for spinor condensate — CLAUDE.md known limitation; expected",
+    "INFO: DDI Larmor regime: omega_L / (c_dd * n) approx 123.0 \u2014 non-secular regime as per [P5] design; expected warning",
+    "WARNING: LHY scalar approximation for spinor condensate \u2014 CLAUDE.md known limitation; expected",
     "wrapper_script_gitignored: .claude/* is in .gitignore; wrapper cannot be committed to git",
     "attempt1_yaml_schema_error: save_psi_snapshots + save_snapshot_precision were top-level keys; fixed at commit 2433e32 before attempt2",
     "T75_fix_not_merged_to_main: T75 fixed the same YAML schema bug on auto branch but it was never merged; T81 re-applies on main"
   ],
-  "falsification_result": "PASS_PREDICTION_CONFIRMED"
+  "falsification_result": "PASS_PREDICTION_CONFIRMED",
+  "tokens_used": {
+    "theorist": null,
+    "researcher": null,
+    "implementer": null,
+    "critic": null,
+    "orchestrator": 13421275,
+    "total": 13421275,
+    "effective_full_rate": 1879230,
+    "breakdown": {
+      "input_fresh": 32987,
+      "cache_creation": 375225,
+      "cache_read": 12997572,
+      "output": 15491
+    },
+    "n_messages": 135,
+    "n_message_starts": 135
+  }
 }
 ```
 

@@ -6,7 +6,23 @@
     "tier_target": 2,
     "tier_current": 2,
     "wall_time_sec": 45,
-    "tokens_used": null,
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 6579444,
+      "total": 6579444,
+      "effective_full_rate": 1082085,
+      "breakdown": {
+        "input_fresh": 6035,
+        "cache_creation": 303105,
+        "cache_read": 6255990,
+        "output": 14314
+      },
+      "n_messages": 59,
+      "n_message_starts": 59
+    },
     "audit_history_turns_added": 5,
     "audit_due_advisory_clears": true,
     "drift_signals_other_advisories_unchanged": true,

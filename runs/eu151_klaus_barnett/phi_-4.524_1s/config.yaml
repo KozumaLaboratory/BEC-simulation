@@ -1,0 +1,99 @@
+# Generated from ../config.yaml — do not edit manually.
+# Stir rate phi = -4.524 dimless (Barnett ± pair).
+
+defaults:
+  backend: gpu
+  kind: rotating_basis
+mixins:
+  eu151_klaus_phys:
+    atom: Eu151
+    gauge_fix: false
+    grid:
+      box:
+      - 20.0
+      - 20.0
+      - 10.0
+      n:
+      - 32
+      - 32
+      - 16
+    interactions:
+      N_atoms: 60000
+      c1: 131.3
+      omega_ref: 314.159
+    potential:
+      omega:
+      - 1.0
+      - 1.0
+      - 2.6
+      type: harmonic
+pipeline:
+- ground_state:
+    B:
+      p: 26700.0
+    ddi:
+      enabled: true
+    dt: 0.005
+    init_m_idx: 1
+    init_sigma: 1.5
+    lhy:
+      kind: scalar
+    n_steps: 1500
+    tol: 1.0e-09
+    use:
+    - eu151_klaus_phys
+- dynamics:
+    B:
+      phi:
+        rate: 0.0
+      theta:
+        duration: 6.28
+        from: 0.0
+        to: 0.611
+    dt: 0.001
+    duration: 6.28
+    epsilon: 1.0e-06
+    integrator: yoshida4
+    save:
+      every: 200
+- dynamics:
+    B:
+      phi:
+        rate:
+          duration: 15.71
+          from: 0.0
+          to: -4.524
+      theta: 0.611
+    dt: 0.001
+    duration: 15.71
+    epsilon: 1.0e-06
+    integrator: yoshida4
+    save:
+      every: 200
+- dynamics:
+    B:
+      phi:
+        rate: -4.524
+      theta: 0.611
+    dt: 0.001
+    duration: 314.16
+    epsilon: 1.0e-06
+    integrator: yoshida4
+    loss:
+      K3_per_m_si:
+      - 1.0e-41 m^6/s
+      - 1.0e-41 m^6/s
+      - 1.0e-41 m^6/s
+      - 1.0e-41 m^6/s
+      - 1.0e-41 m^6/s
+      - 1.0e-41 m^6/s
+      - 1.0e-41 m^6/s
+      - 1.0e-41 m^6/s
+      - 1.0e-41 m^6/s
+      - 1.0e-41 m^6/s
+      - 1.0e-41 m^6/s
+      - 1.0e-41 m^6/s
+      - 1.0e-41 m^6/s
+      gamma_dr: 0.02
+    save:
+      every: 500

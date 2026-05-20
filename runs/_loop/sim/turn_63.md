@@ -73,7 +73,9 @@ Verified:
   "state_json_other_investigations_modified": false,
   "state_json_valid_after_edit": true,
   "memory_files_added": 1,
-  "memory_files_added_list": ["audit_class_scan_t61_cycle_2026_05_18.md"],
+  "memory_files_added_list": [
+    "audit_class_scan_t61_cycle_2026_05_18.md"
+  ],
   "memory_file_yaml_frontmatter_valid": true,
   "memory_file_has_status_section": true,
   "memory_file_has_cycle_summary_section": true,
@@ -87,7 +89,24 @@ Verified:
   "judge_py_unchanged": true,
   "agents_md_unchanged": true,
   "src_subtree_untouched": true,
-  "lp2_grep_unchanged": true
+  "lp2_grep_unchanged": true,
+  "tokens_used": {
+    "theorist": null,
+    "researcher": null,
+    "implementer": null,
+    "critic": null,
+    "orchestrator": 12032951,
+    "total": 12032951,
+    "effective_full_rate": 1755791,
+    "breakdown": {
+      "input_fresh": 28210,
+      "cache_creation": 375178,
+      "cache_read": 11610042,
+      "output": 19521
+    },
+    "n_messages": 91,
+    "n_message_starts": 91
+  }
 }
 ```
 

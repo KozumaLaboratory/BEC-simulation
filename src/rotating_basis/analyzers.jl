@@ -77,7 +77,7 @@ fully polarized state has ⟨F_z⟩_tilde = +F·ρ across the cloud.
 function spin_texture_xy(dyn::Dict; frame_idxs::AbstractVector{Int}=Int[])
     haskey(dyn, :psi_snapshots) || error(
         "spin_texture_xy requires :psi_snapshots in dynamics result. " *
-        "Re-run with `save_psi_snapshots: true` (default).")
+        "Re-run with `save: {psi: true}` (default).")
     snaps = dyn[:psi_snapshots]::Vector
     times = dyn[:times]::Vector{Float64}
 

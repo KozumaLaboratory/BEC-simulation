@@ -104,3 +104,44 @@
 - Project's 3rd Tier-3 trajectory closure (1st lab-paper benchmark vs Matsui Science 2026)
 - T87 next-action: audit-class-scan-2026-05-18-T87 (AUDIT_DUE gap=23 cadence trigger) OR F1 longer-dynamics rerun OR meta-investigation Hypothesize
 
+### T86 (2026-05-18T17:52:19.405009+09:00) — PASS — `edh-matsui-document-verify-T86-tier-3-0-retry-by-tag-restore`
+
+- Stage: **closed**, tier: 3.0
+- Cost: 1827k effective tokens
+- Contract: PASS
+
+### T108 (2026-05-19T03:33:54.139788+09:00) — INCONCLUSIVE — `edh-eu151-matsui-T108-update-implementer-spatial-ring-extraction-from-k3-long-jld2`
+
+- Stage: **Update (re-opened 2026-05-18; T76-T86 closure was tier-inflation on F3 alone; F1 ring formation NOT actually reproduced. Existing `runs/eu151_edh_K3_long/trajectory.png` (May 13, 14.5 ms, clean cascade, K3+gamma_dr+noise seed) likely already shows EdH cascade — needs independent critic audit per §B1.0)**, tier: 2.5
+- Cost: 3599k effective tokens
+- Issues: check_cmd FAIL: exit_code=1 != expected 0; stdout missing 'VERDICT_DETERMINISTIC'; check_cmd argv contains shell-metachar '&&' — use one program + args only
+- Contract: INCONCLUSIVE
+
+### T109 (2026-05-19T04:01:14.880795+09:00) — FAIL_OPERATIONAL — `edh-eu151-matsui-T109-research-ring-detection-methodology-deep-pdf-second-pass`
+
+- Stage: **Update (re-opened 2026-05-18; T76-T86 closure was tier-inflation on F3 alone; F1 ring formation NOT actually reproduced. Existing `runs/eu151_edh_K3_long/trajectory.png` (May 13, 14.5 ms, clean cascade, K3+gamma_dr+noise seed) likely already shows EdH cascade — needs independent critic audit per §B1.0)**, tier: 2.5
+- Cost: 1981k effective tokens
+- Issues: symmetry_mapping_verified_kawaguchi_ueda=True in ['EXTRACTED', 'INFERRED', 'PARTIAL', 'NOT_EXTRACTABLE'] → False
+- Contract: FAIL_OPERATIONAL
+
+### T110 (2026-05-19T04:18:40.450942+09:00) — PASS — `edh-eu151-matsui-T110-update-critic-apply-refined-f1-criterion-from-t109-research`
+
+- Stage: **Update (re-opened 2026-05-18; T76-T86 closure was tier-inflation on F3 alone; F1 ring formation NOT actually reproduced. Existing `runs/eu151_edh_K3_long/trajectory.png` (May 13, 14.5 ms, clean cascade, K3+gamma_dr+noise seed) likely already shows EdH cascade — needs independent critic audit per §B1.0)**, tier: 2.5
+- Cost: 1888k effective tokens
+- Contract: PASS
+
+### T111 (2026-05-19T04:54:43.452600+09:00) — INCONCLUSIVE — `edh-eu151-matsui-T111-update-execute-staged-extract-ring-metrics`
+
+- Stage: **Document**, tier: 2.75
+- Cost: 1342k effective tokens
+- Issues: check_cmd argv contains shell-metachar '&&' — use one program + args only; check_cmd argv contains shell-metachar '|' — use one program + args only
+- Contract: INCONCLUSIVE
+
+### T118 (2026-05-19T07:48:04.387781+09:00) — INCONCLUSIVE — `edh-eu151-matsui-T118-tier3-closure-and-mult2-section-V-retry`
+
+- Stage: **closed**, tier: 3.0
+- Cost: 2312k effective tokens
+- Issues: check_cmd FAIL: stdout missing 'LAST_JUDGE_TIER3'; check_cmd argv contains shell-metachar '&&' — use one program + args only
+- Contract: INCONCLUSIVE
+- Budget audit: BUDGET_OVER (actual/expected = 1.54)
+

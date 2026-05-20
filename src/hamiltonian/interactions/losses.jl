@@ -11,12 +11,12 @@ Four independent channels, applied multiplicatively (each as `exp(-rate·dt/2)`)
 | Channel           | LossParams field                    | Form                            | Used for                |
 |-------------------|-------------------------------------|---------------------------------|-------------------------|
 | Dipolar relaxation | `gamma_dr`                         | `exp(-γ_m · n_tot · dt / 2)`    | Δm = -1, -2 transitions |
-| 2-body (legacy)   | `L3` / `L3_per_m`                   | `exp(-γ_lin · n_tot · dt / 2)`  | linear-in-n loss        |
+| 2-body (linear)   | `L3` / `L3_per_m`                   | `exp(-γ_lin · n_tot · dt / 2)`  | linear-in-n loss        |
 | 3-body (true)     | `K3_cubic` / `K3_per_m_cubic`       | `exp(-K_3 · n_tot² · dt / 2)`   | quadratic-in-n loss     |
 | Evaporation       | `evap_rate`, `evap_energy_cutoff`   | `exp(-rate·dt/2)` if `\\|ψ_c\\|²·n_tot > cut` | RF-knife |
 
 `n_tot(r) = Σ_m |ψ_m(r)|²` is the total density at each spatial point. The
-γ_lin (dipolar + legacy 2-body) and K_3 (true 3-body) branches are combined
+γ_lin (dipolar + 2-body linear) and K_3 (true 3-body) branches are combined
 via the `L3_per_m`/`K3_per_m_cubic` per-component vectors so different m_F
 states can have different rates.
 

@@ -149,6 +149,8 @@ configured to save angular momentum.
 ```json
 {
   "experiment_kind": "analyze_existing",
+  "has_dissipation": true,
+  "expected_norm_drift": 0.012,
   "norm_initial": 1.0,
   "norm_final_plus_omega": 0.990338,
   "norm_final_minus_omega": 0.990199,
@@ -167,8 +169,8 @@ configured to save angular momentum.
   "tau_barnett_minus_omega_cdd0": 2.84,
   "n_frames_per_run": 302,
   "n_csv_rows": 604,
-  "fz_pops_consistency_max": 1.17e-6,
-  "pop_sum_deviation_max": 1.59e-7,
+  "fz_pops_consistency_max": 1.17e-06,
+  "pop_sum_deviation_max": 1.59e-07,
   "nan_in_populations": false,
   "wall_time_sec": null,
   "peak_memory_gb": null,
@@ -178,17 +180,26 @@ configured to save angular momentum.
     "researcher": null,
     "implementer": null,
     "critic": null,
-    "total": null
+    "orchestrator": 23824882,
+    "total": 23824882,
+    "effective_full_rate": 3292342,
+    "breakdown": {
+      "input_fresh": 12239,
+      "cache_creation": 608092,
+      "cache_read": 23163830,
+      "output": 40721
+    },
+    "n_messages": 197,
+    "n_message_starts": 197
   },
   "warnings": [
     "dynamics/Lz NOT saved in jld2 for EITHER stir_+0.5 or stir_-0.5 runs (604/604 Lz values empty). T19 Q19.1 threshold test CANNOT be evaluated. Lz column is all NaN.",
     "Same Lz absence applies to empirical baseline (runs/eu151_barnett_spin/trajectory.csv). Neither run config saved orbital angular momentum.",
     "norm_drift = ~0.98% is physical K3 loss in RTP+Lindblad, not integration failure. Judge gate 1e-8 applies to ITP lossless only.",
-    "T19 Q19.1 verdict of M1-DEAD from analyze_lz.py is a false classification due to NaN Lz — should be treated as INCONCLUSIVE, not M1-DEAD."
+    "T19 Q19.1 verdict of M1-DEAD from analyze_lz.py is a false classification due to NaN Lz \u2014 should be treated as INCONCLUSIVE, not M1-DEAD.",
+    "Lz tracking was not enabled in the cdd0 run config (nor in the empirical baseline). The T19 Q19.1 discriminator requires Lz data. Future runs must add Lz to save_observables. (moved from physical_red_flags 2026-05-16: this is a measurement gap, not a physics bug)"
   ],
-  "physical_red_flags": [
-    "Lz tracking was not enabled in the cdd0 run config (nor in the empirical baseline). The T19 Q19.1 discriminator requires Lz data. Future runs must add Lz to save_observables."
-  ],
+  "physical_red_flags": [],
   "falsification_result": "REFUTED"
 }
 ```

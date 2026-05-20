@@ -84,7 +84,9 @@ OK_state
   "state_json_other_investigations_modified": false,
   "state_json_valid_after_edit": true,
   "memory_files_added": 1,
-  "memory_files_added_list": ["audit_class_scan_t87_cycle_2026_05_18.md"],
+  "memory_files_added_list": [
+    "audit_class_scan_t87_cycle_2026_05_18.md"
+  ],
   "memory_file_yaml_frontmatter_valid": true,
   "memory_file_has_status_section": true,
   "memory_file_has_cycle_summary_section": true,
@@ -103,7 +105,24 @@ OK_state
   "src_edited": false,
   "julia_executed": false,
   "tests_passed": null,
-  "falsification_result": "INCONCLUSIVE"
+  "falsification_result": "INCONCLUSIVE",
+  "tokens_used": {
+    "theorist": null,
+    "researcher": null,
+    "implementer": null,
+    "critic": null,
+    "orchestrator": 10861077,
+    "total": 10861077,
+    "effective_full_rate": 1590258,
+    "breakdown": {
+      "input_fresh": 15603,
+      "cache_creation": 332685,
+      "cache_read": 10490846,
+      "output": 21943
+    },
+    "n_messages": 81,
+    "n_message_starts": 81
+  }
 }
 ```
 

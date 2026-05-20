@@ -62,7 +62,7 @@ using PrecompileTools
                 split_step_rotating!(ws_rb, T(0.01), T(0.0))
             end
 
-            # Loss-kernel primer: seed apply_loss_step! for both the legacy
+            # Loss-kernel primer: seed apply_loss_step! for both the linear
             # L3_per_m (linear-in-n) and the true-3-body K3_per_m_cubic
             # (quadratic-in-n) paths so EdH / K3 runs don't pay JIT on first
             # dynamics step. Tiny F=1 D=3 4³ exercises the inner branch table

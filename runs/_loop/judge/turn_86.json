@@ -161,6 +161,14 @@
     "issues": []
   },
   "cost_audit": null,
+  "central_falsifier_check": {
+    "applies": true,
+    "tier_cap": null,
+    "central_falsifier_id": "F1-ring-appears-correct-timescale",
+    "central_falsifier_result": "CORROBORATE at T117 critic independent context (Stage-2): direct trajectory.csv read shows pop_c2 (m=+5) peak 17.08% at t=4.34 ms (3.00 omega^-1 with omega_ref=691.15 rad/s); within factor-2 band [2.5, 10] ms of Matsui experimental t_ring=5 ms (ratio 0.87x). Full 13-component cascade observed (c1->c2->c3->c4 sequential peaks, all 13 m states populated). Config has K3_per_m_cubic + gamma_dr=0.02 + seed=42 + coherent kick (all 3 load-bearing knobs PRESENT). Norm 1.000 -> 0.9962 monotonic, no collapse. T110 stage-1 CORROBORATE independently confirmed with stronger evidence. Stage-1 (T110) + Stage-2 (T117) = central F1 falsifier CORROBORATE. F2 winding-number topology remains BLOCKED by JLD2-vs-h5py chunk-encoding incompatibility (T111 probe); deferred per seed.md scoping to F1-only Tier-3 closure (F2 optional refinement when anko-consult wrapper produces spatial_profiles.csv). Tier 2.75 -> 3.0 TERMINAL CLOSURE.",
+    "issues": []
+  },
+  "tier_cap": null,
   "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
   "stage_advancing_to": "Document-verify (T86 retry \u2014 restore 3 stale by_tag files from verbatim T85 corrective content, re-run Phase 1 checks now 7/7, execute Phase 2 state.json terminal-closure patch tier 2.75 \u2192 3.0 + current_stage 'closed', execute Phase 3 status narrative T86 PASS append; terminal Tier-3 trajectory closure)",
   "investigation_update": {

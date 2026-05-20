@@ -165,7 +165,24 @@
       "f3_energy_sign_negative_vs_positive_theory: sim gives -0.032/atom while TF theory gives +10.5/atom \u2014 requires energy decomposition audit to separate Zeeman vs non-Zeeman contributions",
       "dynamics_energy_non_conservation_94pct: after B-quench the total energy changes by 94%, which is the expected Zeeman release; the non-Zeeman part is NOT conserved (grows 5.4\u00d7), consistent with EdH orbital excitation"
     ],
-    "falsification_result": "OPERATIONAL_GATE"
+    "falsification_result": "OPERATIONAL_GATE",
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 14317528,
+      "total": 14317528,
+      "effective_full_rate": 2016169,
+      "breakdown": {
+        "input_fresh": 29199,
+        "cache_creation": 423959,
+        "cache_read": 13849965,
+        "output": 14405
+      },
+      "n_messages": 118,
+      "n_message_starts": 118
+    }
   },
   "contract_evaluation": {
     "verdict": "PASS",
@@ -222,7 +239,18 @@
     "triggered_failure_modes": [],
     "issues": []
   },
-  "cost_audit": null,
+  "cost_audit": {
+    "expected_cost_eff": 1300000,
+    "actual_cost_eff": 2016169,
+    "ratio_actual_over_expected": 1.55,
+    "deviation_pct": 55.1,
+    "flag": "BUDGET_OVER"
+  },
+  "central_falsifier_check": {
+    "applies": false,
+    "reason": "target tier 2.5 < 3.0"
+  },
+  "tier_cap": null,
   "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
   "stage_advancing_to": "Analyze (F1 t_ring + F2 winding \u2113 + F3 E_sim vs E_mf/N extraction from runs/matsui_edh_baseline_9ca97308/point_001.jld2 + result.jld2)",
   "investigation_update": {

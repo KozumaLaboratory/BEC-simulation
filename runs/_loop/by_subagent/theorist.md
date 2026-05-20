@@ -1,9 +1,31 @@
 # Turns where `theorist` ran
 
-Total: 5
+Total: 27
 
-- **T0** [PASS] `fg-wick-sign-regression` — tags: —
-- **T1** [PASS] `fg-coeff-spinor-invariance-note` — tags: —
-- **T2** [PASS] `nonlinear-v-coeff-invariance` — tags: —
-- **T3** [PASS] `compute-sympy-infra-verify` — tags: —
-- **T7** [PASS] `fullbdg-F6-mechanism-note` — tags: —
+- **T0** [?] `?` — tags: —
+- **T1** [?] `?` — tags: —
+- **T2** [?] `?` — tags: —
+- **T3** [?] `?` — tags: —
+- **T7** [?] `?` — tags: —
+- **T10** [?] `?` — tags: klaus-magnetostir-diagnosis spinor-larmor-substep-failure option-gamma-upstream d1-d3-dominant julia-safe tier1-to-tier2-lift klaus-magnetostir option-gamma split-step-BCH larmor-sub-cycling rotating-basis-gauge kawaguchi-ueda-2012 stamper-kurn-ueda-2013 split-step-spinor zeeman-numerics strong-field BCH-leak bch-leak split-step larmor-subcycling rotating-basis docstring
+- **T11** [?] `?` — tags: barnett-spin-pumping weak-field-ddi secular-suppression-mechanism tau-barnett-closed-form d1-d3-dominant yan-li-saito-bridge tier1-to-tier2-lift barnett ddi-off-diagonal rotating-frame gamma-dr k3-dissipation eu151 secular-mechanism-audit
+- **T17** [?] `?` — tags: barnett framework-expansion coherent-rabi p-perp lindblad-coupling theorist d1-tier-lift pre-julia-falsifier-setup cascade rotating-frame lindblad coherent-channel p-perp-rabi eu151 gamma-dr-falsifier
+- **T19** [?] `?` — tags: barnett scenario-c-aftermath orbital-channel lz-fz-bias theorist-extension full-ddi-coherent pre-julia-mechanism-lock rotating-frame orbital-coupling full-ddi ddi-off-diagonal sign-asymmetry lindblad eu151 scenario-c-followup dispatcher rotating-BEC vortex-nucleation sub-Landau GP-ground-state angular-momentum orbital-bias M1-mechanism
+- **T23** [?] `?` — tags: barnett t23-retry-attempt-2 julia-sandbox-blocker researcher-rotation-fresh d2-extended-closed-form q23.1-q23.2-literature-target theorist-deliverables-already-complete M1-mechanism sub-landau-reconciliation candidate-d-enumeration third-control-design finite-T-vortex gamma-dr-scaling-discriminator q23.1-spatial-mode-cascade q23.2-sub-landau-excited-states stamper-kurn-ueda-2013 cooper-2008 fetter-2009 sinha-castin-2001 europium-BEC d2-extended gamma-dr-scaling M1-saturation falsifier-discriminator sandbox-blocked julia-approval-required
+- **T24** [?] `?` — tags: barnett d2-extended-closed-form position-resolved-bloch density-weighted-larmor-shift theorist-novel-derivation researcher-anchor-cash-in julia-still-sandbox-blocked-no-retry quasi-conservation-jz paper4-barnett Dicke-superradiance rank-2-dissipator collective-spin-F Tavis-Cummings Gross-Haroche coherent-spin-state tilt-angle dipolar-relaxation spinor-BEC dicke-collective wigner-d-matrix rank2-cg sympy-verify gamma-ratio d2-extended
+- **T27** [?] `?` — tags: barnett gamma-dr-zero-control coherent-mechanism-probe rotating-frame-bloch off-resonance-protection falsifier-execution julia-gpu paper4_chaotic_dynamics coherent-rotating-frame RWA-larmor-CW pre-registered-prediction sign-asymmetry-source paper4-chaotic_dynamics coherent-mechanism gamma-dr-zero K3-zero falsification
+- **T30** [?] `?` — tags: yan-li-saito-2026 tier3-candidate hypothesize-stage framework-gap-mapping lima-pelster-chi ddi-prefactor-convention free-space-itp l_z-conservation-itp flux-closure-torus paper-reproduction eu151 hyperfine g_F F=1 dipolar-length spin-convention
+- **T39** [?] `?` — tags: yan-li-saito-2026 design-stage eps-dd-sweep q1-vs-q5-discriminator falsifier-pre-registration lima-pelster-sympy-verification falsifier-F1-discriminator
+- **T40** [?] `?` — tags: yan-li-saito-2026 design-stage seed-basin-discriminator sigma-sweep fl-vortex-from-jld2 paper-fetch-parallel design-seed-basin-discriminator fl-vortex-jld2-seed droplet-itp energy-balance fl-vortex-jld2 rotating-basis-gpu all-points-delocalized topology-insufficient
+- **T43** [?] `?` — tags: yan-li-saito-2026 grid-refinement-refuted form-A-volumetric-ceiling sigma-seed-confounder fail-numerical-is-scientific-refute critic-audit threshold-discriminator grid-refinement dx-scaling droplet-basin free-space-itp cfl cascaded-stop-rule restart-seed form-B-refuted form-A-confirmed f32-mode rotating-basis-gpu delocalized
+- **T44** [?] `?` — tags: yan-li-saito-2026 r2-fl-vortex-retry seed-topology-confounder c1-zero-spin-freeze joint-falsifier-design m-populations-discriminator jld2-k-pad-restart critic-R2-routing fl-vortex-retry seed-topology c1-zero-confounder ddi-offdiag-mixing ground-state-itp joint-falsifier lima-pelster-Q5 scalar-lhy epsilon-dd-above-1 chi-branch wachtler-santos dipolar-droplet fl-vortex-R2-retry rotating-basis-gpu form-B-refuted topology-insufficient free-space-itp
+- **T56** [?] `?` — tags: klaus-magnetostir option-gamma bch-leak phi-sweep p2-norm-drift y4-truncation-vs-bch-discriminator tilde-frame-vs-lab-frame verify-claim-hypothesize tier2-to-tier3
+- **T70** [?] `?` — tags: d1-verification-depth survey-synthesize-stage child-investigation-spawn edh-eu151-matsui-science-2026 tier3-pipeline-population post-default-anko-silent drift-novel-claim-zero-clear tier3-anchor paper4-adjacent state-json patch-application survey-advance edh-eu151 matsui-2026
+- **T72** [?] `?` — tags: d1-verification-depth edh-eu151-matsui-science-2026 tier3-pipeline hypothesize-stage falsifier-quantification m_F-translation unit-conversion m_F-index-translation tier3-anchor
+- **T80** [?] `?` — tags: d1-verification-depth edh-eu151-matsui-science-2026 tier3-pipeline execute-stage-non-julia-leverage bz-sign-convention-verification theorist-independent-derivation approval-gate-pivot prediction-before-gpu-spend bz-sign-convention src-anchored-derivation h-zee-sign-check itp-descent-prediction t75-empirical-anchor
+- **T92** [FAIL_OPERATIONAL] `sign-pattern-lemma1-tier3-T92-hypothesize-F2-cyclic-cg-derivation` — tags: d1-verification tier3-promotion sign-pattern-lemma1 F2-tetrahedral-cyclic kawaguchi-ueda-2012 channel-weights cg-algebra-derivation theorist-hypothesize manuscript-anchored-tier3 t91-triangulation-error hypothesize-stage lemma1-general-S paper3-universal-theorem
+- **T96** [NOOP] `bug-4-itp-ddi-revalidation-T96-hypothesize-tier2-promotion` — tags: d1-verification tier1-to-tier2-promotion bug-4-itp-ddi-half-rate strang-splitting-ddi regression-test-ci-gap audit-bug4-staleness hypothesize-formalization verify-claim-hypothesize
+- **T99** [PASS] `tdhfb-phase2-tier3-T99-execute-state-json-registration-patch` — tags: d1-verification tdhfb-phase2-generic-f hartree-fock-self-energy bogoliubov-spectrum-f1 kawaguchi-ueda-2012-sound-velocity bdg-vs-gp-factor2 tier2-to-tier3 falsifier-formalization state-json-registration hypothesize orchestration-patch
+- **T114** [PASS] `sign-pattern-f9-ta-mult2-T114-theorist-hypothesize` — tags: sign-pattern-lemma1-general-S f9-ta-multiplicity-2 paper3-section-V-completeness schur-isotropic-projector D3-axis early-pivot-from-quiet-window sign-pattern-lemma1 schur-isotropy projector-orbit paper3-section-V
+- **T115** [INCONCLUSIVE] `sign-pattern-f9-ta-mult2-T115a2-test-candidate-i` — tags: sign-pattern-lemma1-general-S f9-ta-multiplicity-2 paper3-section-V-completeness projector-orbit-average schur-isotropic-basis D3-axis rehypothesize-after-falsification julia-cpu-light-available-not-used schur-isotropy projector-orbit paper3-section-V mrep-prefactor time-reversal-singlet-identity candidate-i-m_rep-prefactor test-stage-retry julia-cpu-light falsifier-corroborate
+- **T122** [PASS] `sign-pattern-lemma1-non-trivial-irrep-F11-Te1-2026-05-19` — tags: —

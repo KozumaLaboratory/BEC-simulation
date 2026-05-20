@@ -155,7 +155,7 @@ None observable (run failed before any physics was computed). The schema validat
   "first_output_sec": null,
   "timeout_triggered": false,
   "output_dir_populated": false,
-  "output_dir_path": "runs/eu151_matsui_edh/data/ (empty — schema validation failed before data write)",
+  "output_dir_path": "runs/eu151_matsui_edh/data/ (empty \u2014 schema validation failed before data write)",
   "n_jld2_files": 0,
   "total_data_size_bytes": 0,
   "obs_psi_snapshots_present": false,
@@ -173,7 +173,7 @@ None observable (run failed before any physics was computed). The schema validat
   "warnings": [
     "run_yaml schema validation failure at schema.jl:272: Unknown key 'pipeline.2.dynamics.save_snapshot_precision'",
     "run_yaml schema validation failure at schema.jl:272: Unknown key 'pipeline.2.dynamics.save_psi_snapshots'",
-    "Root cause: docs/reference/dynamics.md inconsistency with DYNAMICS_SCHEMA — save_psi_snapshots and save_snapshot_precision are save: sub-keys (save.psi, save.precision), not top-level dynamics keys",
+    "Root cause: docs/reference/dynamics.md inconsistency with DYNAMICS_SCHEMA \u2014 save_psi_snapshots and save_snapshot_precision are save: sub-keys (save.psi, save.precision), not top-level dynamics keys",
     "Fix: change 'save: {every: 50}\\nsave_psi_snapshots: true\\nsave_snapshot_precision: f32' to 'save: {every: 50, psi: true, precision: f32}' in matsui_edh_baseline.yaml",
     "GPU confirmed functional (RTX 5070 Ti, 17.09 GB VRAM); schema fix + retry expected to succeed",
     "duration: 0.0 B ramp not yet tested at runtime; zero-duration fallback (duration: 0.001) may still be needed"
@@ -185,7 +185,17 @@ None observable (run failed before any physics was computed). The schema validat
     "researcher": null,
     "implementer": null,
     "critic": null,
-    "total": null
+    "orchestrator": 15346534,
+    "total": 15346534,
+    "effective_full_rate": 2061234,
+    "breakdown": {
+      "input_fresh": 9412,
+      "cache_creation": 362859,
+      "cache_read": 14953687,
+      "output": 20576
+    },
+    "n_messages": 143,
+    "n_message_starts": 143
   }
 }
 ```

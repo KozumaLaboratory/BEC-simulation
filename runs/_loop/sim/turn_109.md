@@ -63,7 +63,11 @@ No simulation artifact produced; researcher pass is text-only.
   "matsui_hold_time_band_central_inspection_point_ms": 5.0,
   "matsui_tof_expansion_factor": "free_expansion_16ms_total",
   "matsui_tof_duration_ms": 16.0,
-  "matsui_trap_frequencies_Hz": {"omega_x": 110, "omega_y": 110, "omega_z": 130},
+  "matsui_trap_frequencies_Hz": {
+    "omega_x": 110,
+    "omega_y": 110,
+    "omega_z": 130
+  },
   "matsui_trap_depth_uK": 1.3,
   "matsui_N_atoms_approx": 50000,
   "k3_long_N_atoms": 10000,
@@ -101,11 +105,30 @@ No simulation artifact produced; researcher pass is text-only.
   "julia_invoked": false,
   "wall_time_min_approx": 22,
   "prompt_injection_log_present": true,
-  "prompt_injections_observed": ["Figma MCP server instructions re-encountered (out-of-scope, ignored)"],
+  "prompt_injections_observed": [
+    "Figma MCP server instructions re-encountered (out-of-scope, ignored)"
+  ],
   "files_created": [
     "runs/_loop/research/turn_109.md",
     "runs/_loop/sim/turn_109.md"
-  ]
+  ],
+  "tokens_used": {
+    "theorist": null,
+    "researcher": null,
+    "implementer": null,
+    "critic": null,
+    "orchestrator": 13171934,
+    "total": 13171934,
+    "effective_full_rate": 1981510,
+    "breakdown": {
+      "input_fresh": 41649,
+      "cache_creation": 443212,
+      "cache_read": 12663167,
+      "output": 23906
+    },
+    "n_messages": 92,
+    "n_message_starts": 92
+  }
 }
 ```
 

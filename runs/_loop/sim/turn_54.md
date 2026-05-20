@@ -180,7 +180,9 @@ Contents: Full bug description (pre-fix lambda, 3 failure modes), the fix with d
   "state_json_meta_stage_routing_confounder_added": true,
   "state_json_valid_after_edit": true,
   "memory_files_added": 1,
-  "memory_files_added_list": ["judge_in_operator_bug_2026_05_18.md"],
+  "memory_files_added_list": [
+    "judge_in_operator_bug_2026_05_18.md"
+  ],
   "investigation_id": "audit-class-scan-2026-05-18-T50",
   "secondary_investigation_id_closed": "judge-in-operator-bug-2026-05-18",
   "stage_advancing_to": "Document",
@@ -191,7 +193,24 @@ Contents: Full bug description (pre-fix lambda, 3 failure modes), the fix with d
   "tests_passed": null,
   "warnings": [],
   "physical_red_flags": [],
-  "falsification_result": "CONFIRMED"
+  "falsification_result": "CONFIRMED",
+  "tokens_used": {
+    "theorist": null,
+    "researcher": null,
+    "implementer": null,
+    "critic": null,
+    "orchestrator": 14316813,
+    "total": 14316813,
+    "effective_full_rate": 2090789,
+    "breakdown": {
+      "input_fresh": 23149,
+      "cache_creation": 480179,
+      "cache_read": 13795920,
+      "output": 17565
+    },
+    "n_messages": 78,
+    "n_message_starts": 78
+  }
 }
 ```
 

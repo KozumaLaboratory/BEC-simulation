@@ -30,7 +30,24 @@
     "klaus_bch_leak_template_referenced": true,
     "manuscript_edited": false,
     "src_edited": false,
-    "julia_executed": false
+    "julia_executed": false,
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 10420669,
+      "total": 10420669,
+      "effective_full_rate": 1573732,
+      "breakdown": {
+        "input_fresh": 29808,
+        "cache_creation": 363236,
+        "cache_read": 10009846,
+        "output": 17779
+      },
+      "n_messages": 85,
+      "n_message_starts": 85
+    }
   },
   "contract_evaluation": {
     "verdict": "PASS",
@@ -111,7 +128,13 @@
     "triggered_failure_modes": [],
     "issues": []
   },
-  "cost_audit": null,
+  "cost_audit": {
+    "expected_cost_eff": 1100000,
+    "actual_cost_eff": 1573732,
+    "ratio_actual_over_expected": 1.43,
+    "deviation_pct": 43.1,
+    "flag": "BUDGET_OVER"
+  },
   "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
   "stage_advancing_to": "Document (terminal closure path; T84 implementer_text propagates 4 errata to new memory entry, patches state.json tier 2.5 \u2192 2.75 + closing_note, appends by_tag indices)",
   "investigation_update": {

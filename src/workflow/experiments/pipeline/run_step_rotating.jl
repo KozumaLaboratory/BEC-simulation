@@ -1,6 +1,6 @@
 # --- Option γ rotating-basis step dispatch + chirp helpers ---
 #
-# YAML schema:
+# YAML schema (unified `B:` block; magnitude + direction in one mapping):
 #
 #   ground_state:
 #     kind: rotating_basis
@@ -8,8 +8,11 @@
 #     grid: {n: [16, 16, 16], box: [12, 12, 12]}
 #     potential: {type: harmonic, omega: [1, 1, 1]}
 #     interactions: {c0: 100, c1: 0, c_dd: 5, gamma_lhy: 0}
-#     zeeman: {p: 5000, q: 0}
-#     B_hat: {theta: 0, phi: 0}        # constant B̂ during ITP
+#     B:                               # unified magnetic-field block (mag + dir)
+#       Bz: 5000                       # magnitude; alternates: B_mag, p (internal)
+#       theta: 0                       # rad; constant B̂ during ITP
+#       phi: 0                         # rad
+#       # q auto-derived from |B|² (override with explicit q: <value> if needed)
 #     gauge_fix: false                 # default true; set false to recover ψ_lab=Û_B ψ̃
 #     n_steps: 200
 #     dt: 0.005
@@ -19,9 +22,10 @@
 #     kind: rotating_basis
 #     duration: 1.0
 #     dt: 0.005
-#     B_hat:                           # time-dep field. Constant theta + linear phi
-#       theta_const: 0.611             # rad
-#       phi_omega:  4.524              # rad/dimless. φ(t) = phi_omega * t
+#     B:                               # time-dep field; same block as ground_state
+#       theta: 0.611                   # rad (constant during this step)
+#       phi:
+#         rate: 4.524                  # rad/dimless. φ(t) = phi_rate * t (= ω_stir)
 #     save_every: 10                   # for trajectory observables (norm, per_m, L_z)
 #
 # Future-extensible: full waveform spec for theta(t), theta_dot(t),

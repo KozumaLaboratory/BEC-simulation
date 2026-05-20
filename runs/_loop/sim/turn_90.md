@@ -96,7 +96,24 @@ OK_state
   "src_subtree_untouched": true,
   "manuscript_edited": false,
   "src_edited": false,
-  "julia_executed": false
+  "julia_executed": false,
+  "tokens_used": {
+    "theorist": null,
+    "researcher": null,
+    "implementer": null,
+    "critic": null,
+    "orchestrator": 8575033,
+    "total": 8575033,
+    "effective_full_rate": 1309249,
+    "breakdown": {
+      "input_fresh": 6925,
+      "cache_creation": 313268,
+      "cache_read": 8237441,
+      "output": 17399
+    },
+    "n_messages": 68,
+    "n_message_starts": 68
+  }
 }
 ```
 

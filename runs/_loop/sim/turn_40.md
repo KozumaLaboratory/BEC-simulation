@@ -100,11 +100,15 @@ Total wall time: ~1.9 (fabricate) + 207.7 (P0-P3) + 87.0 (P4) + 2.6 (analyze) �
     "P0": {
       "sigma": 2.0,
       "topology": "spherical_gaussian",
-      "n_max_dimless": 3.322e-4,
+      "n_max_dimless": 0.0003322,
       "n_max_D0": 0.993,
       "norm_final": 1.0,
       "norm_drift": 2.22e-16,
-      "m_populations": [0.9458, 0.0474, 0.0068],
+      "m_populations": [
+        0.9458,
+        0.0474,
+        0.0068
+      ],
       "m_plusF": 0.9458,
       "energy_mu": "NaN",
       "converged": true,
@@ -118,11 +122,15 @@ Total wall time: ~1.9 (fabricate) + 207.7 (P0-P3) + 87.0 (P4) + 2.6 (analyze) �
     "P1": {
       "sigma": 0.5,
       "topology": "spherical_gaussian",
-      "n_max_dimless": 3.534e-4,
+      "n_max_dimless": 0.0003534,
       "n_max_D0": 1.057,
       "norm_final": 1.0,
       "norm_drift": 2.22e-16,
-      "m_populations": [0.8535, 0.0712, 0.0754],
+      "m_populations": [
+        0.8535,
+        0.0712,
+        0.0754
+      ],
       "m_plusF": 0.8535,
       "energy_mu": "NaN",
       "converged": true,
@@ -134,11 +142,15 @@ Total wall time: ~1.9 (fabricate) + 207.7 (P0-P3) + 87.0 (P4) + 2.6 (analyze) �
     "P2": {
       "sigma": 5.0,
       "topology": "spherical_gaussian",
-      "n_max_dimless": 2.005e-4,
+      "n_max_dimless": 0.0002005,
       "n_max_D0": 0.599,
       "norm_final": 1.0,
       "norm_drift": 1.11e-16,
-      "m_populations": [0.9908, 0.0091, 0.0001],
+      "m_populations": [
+        0.9908,
+        0.0091,
+        0.0001
+      ],
       "m_plusF": 0.9908,
       "energy_mu": "NaN",
       "converged": true,
@@ -150,11 +162,15 @@ Total wall time: ~1.9 (fabricate) + 207.7 (P0-P3) + 87.0 (P4) + 2.6 (analyze) �
     "P3": {
       "sigma": 14.0,
       "topology": "spherical_gaussian",
-      "n_max_dimless": 7.061e-5,
+      "n_max_dimless": 7.061e-05,
       "n_max_D0": 0.211,
       "norm_final": 1.0,
       "norm_drift": 1.11e-16,
-      "m_populations": [0.9999, 5.36e-5, 2.42e-9],
+      "m_populations": [
+        0.9999,
+        5.36e-05,
+        2.42e-09
+      ],
       "m_plusF": 0.9999,
       "energy_mu": "NaN",
       "converged": true,
@@ -166,12 +182,16 @@ Total wall time: ~1.9 (fabricate) + 207.7 (P0-P3) + 87.0 (P4) + 2.6 (analyze) �
     "P4": {
       "sigma": "torus_jld2",
       "topology": "flux_closure_torus_R7_r2",
-      "n_max_dimless": 2.052e-4,
+      "n_max_dimless": 0.0002052,
       "n_max_D0": 0.614,
       "norm_final": 1.0,
       "norm_drift": 3.33e-16,
-      "m_populations": [0.5000, 6.05e-25, 0.5000],
-      "m_plusF": 0.5000,
+      "m_populations": [
+        0.5,
+        6.05e-25,
+        0.5
+      ],
+      "m_plusF": 0.5,
       "fz_at_torus_ring": 2.74e-16,
       "energy_mu": "NaN",
       "converged": true,
@@ -180,36 +200,46 @@ Total wall time: ~1.9 (fabricate) + 207.7 (P0-P3) + 87.0 (P4) + 2.6 (analyze) �
       "verdict": "DELOCALIZED",
       "droplet_pass": false,
       "topology_preserved": true,
-      "note": "m_plusF=0.5 means equal |ψ_+1|²=|ψ_-1|² preserved throughout ITP — flux-closure spin texture maintained"
+      "note": "m_plusF=0.5 means equal |\u03c8_+1|\u00b2=|\u03c8_-1|\u00b2 preserved throughout ITP \u2014 flux-closure spin texture maintained"
     }
   },
   "D0_factor_used": 2990.1,
   "D0_factor_formula": "N/a_ho^3 / D_0_si = N^3 * (a_s/a_ho)^3",
-  "D0_factor_verification": "P0 gives 0.993 D₀, matches T37 report of 0.99 D₀ within 0.3%",
+  "D0_factor_verification": "P0 gives 0.993 D\u2080, matches T37 report of 0.99 D\u2080 within 0.3%",
   "BUG9_recurrence": true,
-  "BUG9_note": "energy_mu = NaN in all 5 points (rotating_basis μ estimator; see T37 §9 BUG-9 documentation)",
+  "BUG9_note": "energy_mu = NaN in all 5 points (rotating_basis \u03bc estimator; see T37 \u00a79 BUG-9 documentation)",
   "framework_gap_energy_decomposition": true,
-  "framework_gap_note": "No E_kin/E_contact/E_LHY/E_DDI decomposition available from rotating_basis ITP path (same gap as T37 §6 INCONCLUSIVE F4)",
-  "P4_config_fix": "Added init_sigma: 1.0 to P4 config — FieldError on V_trap.omega when from_jld2 + no init_sigma in config + auto_path=true (TF-auto-derive branch accessed V_trap.omega which is plain Array, not struct with omega field)",
+  "framework_gap_note": "No E_kin/E_contact/E_LHY/E_DDI decomposition available from rotating_basis ITP path (same gap as T37 \u00a76 INCONCLUSIVE F4)",
+  "P4_config_fix": "Added init_sigma: 1.0 to P4 config \u2014 FieldError on V_trap.omega when from_jld2 + no init_sigma in config + auto_path=true (TF-auto-derive branch accessed V_trap.omega which is plain Array, not struct with omega field)",
   "tokens_used": {
     "theorist": null,
     "researcher": null,
     "implementer": null,
     "critic": null,
-    "total": null
+    "orchestrator": 18912376,
+    "total": 18912376,
+    "effective_full_rate": 2673107,
+    "breakdown": {
+      "input_fresh": 25244,
+      "cache_creation": 560188,
+      "cache_read": 18303488,
+      "output": 23456
+    },
+    "n_messages": 145,
+    "n_message_starts": 145
   },
   "warnings": [
-    "energy_mu = NaN in all 5 points: BUG-9 recurrence in rotating_basis find_ground_state_rotating! μ estimator",
+    "energy_mu = NaN in all 5 points: BUG-9 recurrence in rotating_basis find_ground_state_rotating! \u03bc estimator",
     "No energy decomposition (E_kin/E_contact/E_LHY/E_DDI) from rotating_basis ITP path: framework gap (same as T37)",
-    "P4 first attempt failed: FieldError(Array{Float64,3}, :omega) at ground_state.jl:171 — from_jld2 path falls through to σ_init auto-derive which accesses V_trap.omega (plain Array has no .omega field). Fixed by adding init_sigma: 1.0 to P4 config (sigma is ignored by from_jld2 path but prevents the auto-derive branch)",
+    "P4 first attempt failed: FieldError(Array{Float64,3}, :omega) at ground_state.jl:171 \u2014 from_jld2 path falls through to \u03c3_init auto-derive which accesses V_trap.omega (plain Array has no .omega field). Fixed by adding init_sigma: 1.0 to P4 config (sigma is ignored by from_jld2 path but prevents the auto-derive branch)",
     "P4 wall time 87s (= JIT from P4-isolated run); P0-P3 ran sequentially in same JIT context (P1-P3 each ~40s = no JIT overhead after P0 warmed up)"
   ],
   "physical_red_flags": [
-    "ALL 5 POINTS DELOCALIZED: n_max < 10 D₀ for every point including P4 (topology). Matches theorist verdict matrix row 4: (a4) framework deep bug OR (c) paper wrong OR (a1) LHY issue. Tier stays 0.6.",
-    "P4 m_plusF = 0.500: equal ψ_+1 / ψ_-1 populations — flux-closure spin texture PRESERVED by ITP throughout 5000 steps. f_z at torus ring = 2.7e-16 (machine precision zero). ITP did NOT untwist the torus topology. Yet density did not increase.",
-    "P1 (σ=0.5, high-density Gaussian) delocalized: theorist's prediction confirmed. Critic's 'density basin' argument REFUTED by experiment. Compact seed does NOT nucleate droplet.",
-    "n_max monotonically decreasing with σ for Gaussian points: P1>P0>P2>P3 (1.057, 0.993, 0.599, 0.211 D₀). Consistent with theorist's E_DDI=0 isotropy argument.",
-    "P4 n_max (0.614 D₀) comparable to P2 (0.599 D₀), not higher than Gaussian seeds — topology provided NO advantage for droplet formation at these parameters.",
+    "ALL 5 POINTS DELOCALIZED: n_max < 10 D\u2080 for every point including P4 (topology). Matches theorist verdict matrix row 4: (a4) framework deep bug OR (c) paper wrong OR (a1) LHY issue. Tier stays 0.6.",
+    "P4 m_plusF = 0.500: equal \u03c8_+1 / \u03c8_-1 populations \u2014 flux-closure spin texture PRESERVED by ITP throughout 5000 steps. f_z at torus ring = 2.7e-16 (machine precision zero). ITP did NOT untwist the torus topology. Yet density did not increase.",
+    "P1 (\u03c3=0.5, high-density Gaussian) delocalized: theorist's prediction confirmed. Critic's 'density basin' argument REFUTED by experiment. Compact seed does NOT nucleate droplet.",
+    "n_max monotonically decreasing with \u03c3 for Gaussian points: P1>P0>P2>P3 (1.057, 0.993, 0.599, 0.211 D\u2080). Consistent with theorist's E_DDI=0 isotropy argument.",
+    "P4 n_max (0.614 D\u2080) comparable to P2 (0.599 D\u2080), not higher than Gaussian seeds \u2014 topology provided NO advantage for droplet formation at these parameters.",
     "P1 m_plusF = 0.8535 (below 0.95 threshold): significant spin mixing at compact seed. P2-P3 nearly fully polarized. Spin mixing correlates with seed peak density, not with droplet formation.",
     "All wall times much shorter than T37 (66s for P0 vs T37 87.9s): JIT was already cached from T37 run"
   ],

@@ -2,6 +2,9 @@
   "turn": 116,
   "status": "FAIL_OPERATIONAL",
   "issues": [
+    "check_cmd FAIL: exit_code=1 != expected 0",
+    "check_cmd FAIL: exit_code=1 != expected 0",
+    "check_cmd FAIL: exit_code=1 != expected 0",
     "check_cmd FAIL: exit_code=1 != expected 0; stdout missing 'sign_pattern_lemma1_mult_aware'",
     "check_cmd FAIL: exit_code=1 != expected 0; stdout missing 'sign_pattern_lemma1_mult_aware'"
   ],
@@ -189,32 +192,32 @@
       },
       {
         "id": "manuscript-mrep-prefactor-formula-present",
-        "passed": true,
+        "passed": false,
         "actual": {
-          "exit_code": 0,
+          "exit_code": 1,
           "stdout_head": ""
         },
-        "reason": "check_cmd PASS: grep -q -E 'm_\\{?rm rep\\}?|m_rep' /home/suzume/workspace/BEC",
+        "reason": "check_cmd FAIL: exit_code=1 != expected 0",
         "shell_check": true
       },
       {
         "id": "manuscript-canonical-formula-tr-pi-rho-inv-present",
-        "passed": true,
+        "passed": false,
         "actual": {
-          "exit_code": 0,
+          "exit_code": 1,
           "stdout_head": ""
         },
-        "reason": "check_cmd PASS: grep -q -E 'rho_\\{?rm inv\\}?|rho.inv|P_W' /home/suzume/works",
+        "reason": "check_cmd FAIL: exit_code=1 != expected 0",
         "shell_check": true
       },
       {
         "id": "manuscript-f9-ta-verification-mentioned",
-        "passed": true,
+        "passed": false,
         "actual": {
-          "exit_code": 0,
+          "exit_code": 1,
           "stdout_head": ""
         },
-        "reason": "check_cmd PASS: grep -q -E 'F=9.*T|F=9.*tetrahedral|F=9 T:A' /home/suzume/wo",
+        "reason": "check_cmd FAIL: exit_code=1 != expected 0",
         "shell_check": true
       },
       {
@@ -300,12 +303,20 @@
     ],
     "triggered_failure_modes": [
       {
+        "if": "manuscript-mrep-prefactor-formula-present OR manuscript-canonical-formula-tr-pi-rho-inv-present FAILED",
+        "category": "operational",
+        "next_action": "T117 dispatches implementer_text to complete Duty B. The manuscript propagation is the load-bearing D3 deliverable; partial completion is acceptable but the formula MUST appear by T118 to clear DRIFT_MANUSCRIPT_DELTA_ZERO."
+      },
+      {
         "if": "memory-entry-file-exists FAILED",
         "category": "operational",
         "next_action": "T117 dispatches implementer_text to complete Duty C. Memory entry is the lowest-priority of the 3 duties; tolerable to defer 1 turn."
       }
     ],
     "issues": [
+      "check_cmd FAIL: exit_code=1 != expected 0",
+      "check_cmd FAIL: exit_code=1 != expected 0",
+      "check_cmd FAIL: exit_code=1 != expected 0",
       "check_cmd FAIL: exit_code=1 != expected 0; stdout missing 'sign_pattern_lemma1_mult_aware'",
       "check_cmd FAIL: exit_code=1 != expected 0; stdout missing 'sign_pattern_lemma1_mult_aware'"
     ]

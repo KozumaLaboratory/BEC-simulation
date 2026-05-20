@@ -1,0 +1,78 @@
+# ─────────────────────────────────────────────────────────────────────
+#  Eu151 Klaus magnetostir × phi_omega scan — Eu physics on (long)
+#
+#  Klaus protocol (tilt 35° → spinup 226 Hz → steady stir) with full
+#  Eu mean-field (c1 ≠ 0, DDI on, LHY scalar). 32 × 32 × 16, 1 s steady
+#  stir per phi_omega point. ε = 1e-6 mandatory in the Klaus regime.
+#
+#  Times in ω_ref⁻¹ units (ω_ref = 2π·50 rad/s ⇒ 1 ω⁻¹ ≈ 3.183 ms):
+#    tilt 20 ms     ≈  6.28 ω⁻¹
+#    spinup 50 ms   ≈ 15.71 ω⁻¹
+#    steady 1000 ms ≈ 314.16 ω⁻¹
+#
+#  Mixin only seeds the GS step (grid / atom / interactions / potential
+#  / gauge_fix); dynamics steps inherit the workspace built by GS so
+#  they don't carry a `use:` line — DYNAMICS_SCHEMA rejects grid/atom
+#  fields that the mixin would otherwise drop into them.
+# ─────────────────────────────────────────────────────────────────────
+
+defaults: {kind: rotating_basis, backend: gpu}
+
+mixins:
+  eu151_klaus_phys:
+    atom: Eu151
+    interactions:
+      N_atoms: 60000
+      omega_ref: 314.159
+      c1: 131.3
+    grid: {n: [32, 32, 16], box: [20.0, 20.0, 10.0]}
+    potential: {type: harmonic, omega: [1.0, 1.0, 2.6]}   # ω_z/ω_⊥ = 130/50
+    gauge_fix: false
+
+pipeline:
+  # GS in tilted-prep field. Eu mean-field; DDI auto from atom + N + ω_ref;
+  # LHY scalar.
+  - ground_state:
+      use: [eu151_klaus_phys]
+      B: {p: 26700.0}                             # Klaus-regime Bz for Eu
+      ddi: {enabled: true}
+      lhy: {kind: scalar}
+      init_m_idx: 1
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 1500
+      tol: 1.0e-9
+
+  # tilt 0 → 35° over ≈ 20 ms (6.28 ω⁻¹)
+  - dynamics:
+      duration: 6.28
+      integrator: yoshida4
+      dt: 0.001
+      epsilon: 1.0e-6
+      B:
+        theta: {from: 0.0, to: 0.611, duration: 6.28}
+        phi: {rate: 0.0}
+      save: {every: 200}
+
+  # spinup 0 → stir freq over ≈ 50 ms (15.71 ω⁻¹)
+  - dynamics:
+      duration: 15.71
+      integrator: yoshida4
+      dt: 0.001
+      epsilon: 1.0e-6
+      B:
+        theta: 0.611
+        phi: {rate: {from: 0.0, to: 4.524, duration: 15.71}}
+      save: {every: 200}
+
+  # steady stir 1 s ≈ 314.16 ω⁻¹ — vortex-lattice evolution past formation
+  - dynamics:
+      duration: 314.16
+      integrator: yoshida4
+      dt: 0.001
+      epsilon: 1.0e-6
+      B:
+        theta: 0.611
+        phi: {rate: 4.524}
+      save: {every: 500}
+

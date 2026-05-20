@@ -1,0 +1,222 @@
+{
+  "turn": 110,
+  "status": "PASS",
+  "issues": [],
+  "metrics": {
+    "experiment_kind": "text_only_critic_audit",
+    "investigation_kind": "physics",
+    "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
+    "stage_advancing_to": "Update",
+    "flow_template": "verify-claim",
+    "critic_verdict": "INCONCLUSIVE",
+    "f1_verdict_label": "INCONCLUSIVE-SPATIAL-REQUIRED",
+    "f1_verdict_justification": "T109-refined Matsui qualitative ring criterion: NC1 PASS (pop_c2 peak 16.3% at K3_long t=5.21 ms inside [1.5, 7] ms band) + NC2 PASS-stronger-than-T109 (~6.05 ms persistence \u2248 0.67 trap period) + symmetry K3_long c=2 \u2194 Matsui c=12 SUSTAINED (Wigner-Eckart + Kawaguchi-Ueda 2012 \u00a75.4) + trap (110, 110, 130) Hz match exact to 3 sig figs from config.yaml. But Matsui criterion is QUALITATIVE annular density signature (Stage 1); result.jld2 spatial info julia-denied this sandbox (sim/turn_108 \u00a74-5). Necessary conditions not sufficient; visual ring unverified. Stage-2 Bragg phase-winding OUT_OF_SCOPE. Route T111 to anko-consult.",
+    "stage1_assessable_from_existing_artifacts": false,
+    "stage2_bragg_in_scope_this_turn": false,
+    "claim_t109_A_methodology_status": "SUSTAINED",
+    "claim_t109_B_symmetry_status": "SUSTAINED",
+    "claim_t109_C_trap_match_status": "SUSTAINED",
+    "claim_t109_D_N_scaling_status": "CHALLENGED",
+    "claim_t109_E_NC1_status": "SUSTAINED",
+    "claim_t109_F_NC2_status": "SUSTAINED",
+    "class_finding_documented": true,
+    "falsifier_update_present": true,
+    "tier_recommended": 2.5,
+    "src_edited": false,
+    "test_edited": false,
+    "yaml_edited": false,
+    "state_json_edited": false,
+    "julia_invoked": false,
+    "gpu_used": false,
+    "new_simulations_proposed": false,
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 11002473,
+      "total": 11002473,
+      "effective_full_rate": 1888141,
+      "breakdown": {
+        "input_fresh": 41020,
+        "cache_creation": 512751,
+        "cache_read": 10415781,
+        "output": 32921
+      },
+      "n_messages": 72,
+      "n_message_starts": 72
+    }
+  },
+  "contract_evaluation": {
+    "verdict": "PASS",
+    "criteria_results": [
+      {
+        "id": "critic-audit-deliverable-exists",
+        "passed": true,
+        "actual": {
+          "exit_code": 0,
+          "stdout_head": ""
+        },
+        "reason": "check_cmd PASS: test -f /home/suzume/workspace/BEC-simulation/runs/_loop/jud",
+        "shell_check": true
+      },
+      {
+        "id": "critic-audit-has-formal-verdict",
+        "passed": true,
+        "actual": {
+          "exit_code": 0,
+          "stdout_head": "8"
+        },
+        "reason": "check_cmd PASS: grep -c -E '(CORROBORATE-STAGE-1|INCONCLUSIVE-SPATIAL-REQUIR",
+        "shell_check": true
+      },
+      {
+        "id": "critic-audit-has-stage1-stage2-split",
+        "passed": true,
+        "actual": {
+          "exit_code": 0,
+          "stdout_head": "15"
+        },
+        "reason": "check_cmd PASS: grep -c -i -E '(stage.?1|stage.?2|bragg|interferomet)' /home",
+        "shell_check": true
+      },
+      {
+        "id": "critic-audit-audits-t109-claims",
+        "passed": true,
+        "actual": {
+          "exit_code": 0,
+          "stdout_head": "15"
+        },
+        "reason": "check_cmd PASS: grep -c -E '(T109-A|T109-B|T109-C|T109-D|T109-E|T109-F|SUSTA",
+        "shell_check": true
+      },
+      {
+        "id": "critic-audit-documents-class-finding",
+        "passed": true,
+        "actual": {
+          "exit_code": 0,
+          "stdout_head": "6"
+        },
+        "reason": "check_cmd PASS: grep -c -i -E '(class.find|ad.hoc|T76|T82|T86|heuristic.neve",
+        "shell_check": true
+      },
+      {
+        "id": "critic-audit-has-falsifier-update",
+        "passed": true,
+        "actual": {
+          "exit_code": 0,
+          "stdout_head": "4"
+        },
+        "reason": "check_cmd PASS: grep -c -E '(F1-ring-appears-correct-timescale|tested_at_tur",
+        "shell_check": true
+      },
+      {
+        "id": "f1-verdict-label-in-enum",
+        "passed": true,
+        "actual": "INCONCLUSIVE-SPATIAL-REQUIRED",
+        "reason": "f1_verdict_label=INCONCLUSIVE-SPATIAL-REQUIRED in ['CORROBORATE-STAGE-1', 'INCONCLUSIVE-SPATIAL-REQUIRED', 'REFUTED-TIMESCALE-MISS', 'REFUTED-OTHER'] \u2192 True"
+      },
+      {
+        "id": "tier-recommended-bounded",
+        "passed": true,
+        "actual": 2.5,
+        "reason": "tier_recommended=2.5 in [2.0, 2.5, 2.75] \u2192 True"
+      },
+      {
+        "id": "stage2-explicitly-out-of-scope",
+        "passed": true,
+        "actual": false,
+        "reason": "stage2_bragg_in_scope_this_turn=False == False \u2192 True"
+      },
+      {
+        "id": "no-src-edited",
+        "passed": true,
+        "actual": false,
+        "reason": "src_edited=False == False \u2192 True"
+      },
+      {
+        "id": "no-test-edited",
+        "passed": true,
+        "actual": false,
+        "reason": "test_edited=False == False \u2192 True"
+      },
+      {
+        "id": "no-yaml-edited",
+        "passed": true,
+        "actual": false,
+        "reason": "yaml_edited=False == False \u2192 True"
+      },
+      {
+        "id": "no-state-json-edited",
+        "passed": true,
+        "actual": false,
+        "reason": "state_json_edited=False == False \u2192 True"
+      },
+      {
+        "id": "no-julia-invoked",
+        "passed": true,
+        "actual": false,
+        "reason": "julia_invoked=False == False \u2192 True"
+      },
+      {
+        "id": "no-gpu-used",
+        "passed": true,
+        "actual": false,
+        "reason": "gpu_used=False == False \u2192 True"
+      },
+      {
+        "id": "no-new-simulation-proposed",
+        "passed": true,
+        "actual": false,
+        "reason": "new_simulations_proposed=False == False \u2192 True"
+      },
+      {
+        "id": "class-finding-documented",
+        "passed": true,
+        "actual": true,
+        "reason": "class_finding_documented=True == True \u2192 True"
+      },
+      {
+        "id": "falsifier-update-present",
+        "passed": true,
+        "actual": true,
+        "reason": "falsifier_update_present=True == True \u2192 True"
+      }
+    ],
+    "triggered_failure_modes": [],
+    "issues": []
+  },
+  "cost_audit": {
+    "expected_cost_eff": 1800000,
+    "actual_cost_eff": 1888141,
+    "ratio_actual_over_expected": 1.05,
+    "deviation_pct": 4.9,
+    "flag": "BUDGET_OK"
+  },
+  "central_falsifier_check": {
+    "applies": false,
+    "reason": "target tier 2.75 < 3.0"
+  },
+  "tier_cap": null,
+  "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
+  "stage_advancing_to": "Update",
+  "investigation_update": {
+    "if_success_advance_to_stage": "Document",
+    "if_success_tier_becomes": 2.75,
+    "if_partial_advance_to_stage": "Update",
+    "if_partial_tier_becomes": 2.5,
+    "if_refuted_advance_to_stage": "Update",
+    "if_refuted_tier_becomes": 2.0,
+    "if_success_falsifier_update": {
+      "id": "F1-ring-appears-correct-timescale",
+      "tested_at_turn": 110,
+      "result_template": "T110 critic CORROBORATE-STAGE-1: NC1 met (pop_c2 peak 16.3% at t=5.22 ms, K3_long-equivalent of Matsui 5 ms via N^(2/5) scaling factor 1.9 \u2192 2.6 ms with factor-2 band [1.5, 7] ms); symmetry mapping K3_long c=2 \u2194 Matsui c=12 verified (Wigner-Eckart + Kawaguchi-Ueda 2012 \u00a75.4); trap (110,110,130) Hz matches to 3 sig figs. Stage-1 qualitative density ring assessable from trajectory.png. Stage-2 Bragg interferometric phase-winding OUT_OF_SCOPE this turn \u2014 full Tier-3 requires anko manual run + Bragg-protocol simulation. Tier 2.5 \u2192 2.75."
+    },
+    "post_t110_pivot_options_by_outcome": [
+      "T111 implementer_text Document \u2014 update state.json F1 + conclusions/<inv_id>.md + class-finding ledger (if CORROBORATE-STAGE-1)",
+      "T111 anko-consult escalation (if INCONCLUSIVE-SPATIAL-REQUIRED \u2014 manual `bash runs/eu151_edh_K3_long/run_extract_ring_metrics.sh`)",
+      "T111 implementer_text REFUTED-update (if REFUTED-* \u2014 state.json + conclusions update + drop tier to 2.0)",
+      "T112+ pivot to non-edh-matsui priority investigation (sign-pattern-lemma1 Tier-3, TwoChannelLHY F=6, TDHFB Phase-2 HF generic-F) once edh-matsui reaches its loop-reach ceiling"
+    ]
+  }
+}

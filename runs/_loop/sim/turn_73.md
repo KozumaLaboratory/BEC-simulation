@@ -205,7 +205,17 @@ Created (bash `mkdir -p`):
     "researcher": null,
     "implementer": null,
     "critic": null,
-    "total": null
+    "orchestrator": 12462863,
+    "total": 12462863,
+    "effective_full_rate": 1815810,
+    "breakdown": {
+      "input_fresh": 11648,
+      "cache_creation": 419640,
+      "cache_read": 12015972,
+      "output": 15603
+    },
+    "n_messages": 90,
+    "n_message_starts": 90
   },
   "warnings": [
     "save.observables key does not exist in canonical dynamics schema; replaced with save_psi_snapshots:true",

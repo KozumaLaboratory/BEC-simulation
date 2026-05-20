@@ -34,12 +34,12 @@
 #
 # === Internal mapping ===
 #
-# Pipeline_runner consumes legacy `zeeman:` + `B_hat:` blocks. This module
-# rewrites `B:` → those blocks before parsing:
+# This module rewrites the user-facing unified `B:` block into the
+# internal magnitude/direction dicts that pipeline_runner consumes:
 #
-#   {Bx, By, Bz} (+ q, p_mv, ...)        → zeeman: <Level 1 keys>
-#   {magnitude, theta, phi} static       → zeeman: {B_mag, theta_deg, phi_deg}
-#   {theta, phi} time-dependent          → B_hat: {theta, phi}
+#   {Bx, By, Bz} (+ q, p_mv, ...)        → magnitude dict, Cartesian keys
+#   {magnitude, theta, phi} static       → magnitude dict, {B_mag, theta_deg, phi_deg}
+#   {theta, phi} time-dependent          → direction dict, {theta, phi}
 
 const _CARTESIAN_KEYS = ("Bx", "By", "Bz")
 const _DIRECTION_KEYS = ("theta", "phi")
@@ -48,8 +48,8 @@ const _MAGNITUDE_KEYS = ("magnitude", "B_mag", "p", "p_mv")
 """
     apply_B_block_normalize!(data::Dict) -> Dict
 
-Walk every pipeline step and split a unified `B:` block into the legacy
-`zeeman:` (magnitude + q) and `B_hat:` (direction trajectory) blocks
+Walk every pipeline step and split a unified `B:` block into the
+internal magnitude dict (with q) and direction dict (theta/phi trajectory)
 that pipeline_runner consumes.
 
 Validates form mutual exclusion: `Bx/By/Bz` cannot mix with `theta/phi`.
@@ -62,25 +62,25 @@ function apply_B_block_normalize!(data::Dict)
         step isa AbstractDict || continue
         for (_, inner) in step
             inner isa AbstractDict || continue
-            _reject_legacy_blocks!(inner)
+            _reject_unknown_step_keys!(inner)
             _split_B_block!(inner)
         end
     end
     return data
 end
 
-"""Reject user-written `zeeman:` and `B_hat:` blocks. They are removed
-from the user-facing schema; the unified `B:` block is the only form.
-(Internal post-normalize keys with the same names still exist and are
-consumed by pipeline_runner — the validator runs after normalize so
-those don't trigger this check.)"""
-function _reject_legacy_blocks!(step::AbstractDict)
-    for legacy in ("zeeman", "B_hat")
-        if haskey(step, legacy)
+"""Validate that the magnetic-field config uses the unified `B:` block
+(magnitude + direction in one mapping). Internal post-normalize keys
+with the same names still exist and are consumed by pipeline_runner —
+the validator runs after normalize so those don't trigger this check."""
+function _reject_unknown_step_keys!(step::AbstractDict)
+    for key in ("zeeman", "B_hat")
+        if haskey(step, key)
             throw(
                 ArgumentError(
-                    "step has legacy `$legacy:` block — removed 2026-04-30. " *
-                    "Use the unified `B:` block: magnitude (Bz/B_mag/p) + " *
+                    "step has step-level `$key:` key — not a valid " *
+                    "user-facing field. Magnetic field belongs in the " *
+                    "unified `B:` block: magnitude (Bz/B_mag/p) + " *
                     "direction (theta/phi) + q (auto from |B|² unless " *
                     "explicit) all live there."),
             )
@@ -96,7 +96,7 @@ function _split_B_block!(step::AbstractDict)
 
     (haskey(step, "zeeman") || haskey(step, "B_hat")) && throw(
         ArgumentError(
-            "step has both `B:` and legacy `zeeman:`/`B_hat:` blocks. " *
+            "step has both `B:` and step-level `zeeman:`/`B_hat:` keys. " *
             "Use only the unified `B:` form."),
     )
 
@@ -162,7 +162,7 @@ function _split_B_block!(step::AbstractDict)
             )
         end
     end
-    isempty(zeeman) || (step["zeeman"] = zeeman)
-    isempty(B_hat) || (step["B_hat"] = B_hat)
+    isempty(zeeman) || (step["B"] = zeeman)
+    isempty(B_hat) || (step["B_direction"] = B_hat)
     return nothing
 end

@@ -11,7 +11,7 @@ export scan_continuation, scan_continuation_bidirectional
     _normalize_sweep_result(result) → NamedTuple
 
 Convert sweep callback return value to a NamedTuple of find_ground_state kwargs.
-Accepts InteractionParams (legacy) or NamedTuple (new API).
+Accepts InteractionParams (struct-form) or NamedTuple (kwarg-form).
 """
 _normalize_sweep_result(ip::InteractionParams) = (interactions=ip,)
 _normalize_sweep_result(nt::NamedTuple) = nt
@@ -23,7 +23,7 @@ Sweep a parameter using continuation: use previous ground state as initial guess
 next point. Falls back to multistart search on energy jumps.
 
 `make_params(val)` returns either:
-- `InteractionParams` (legacy — varies interactions only)
+- `InteractionParams` (struct-form — varies interactions only)
 - `NamedTuple` of `find_ground_state` kwargs to override at each point
   e.g. `p -> (zeeman = ZeemanParams(p, 0.0),)` or
   `c -> (c_dd = c, enable_ddi = c > 0)`

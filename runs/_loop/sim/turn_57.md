@@ -146,26 +146,98 @@ Both primary and secondary observables confirm. The Option gamma rotating-basis 
   "src_files_modified": 0,
   "new_analysis_scripts_written": 1,
   "analysis_script_path": "scripts/diagnostic/klaus_bch_leak_verification.jl",
-  "phi_values_analyzed": [1.0, 2.0, 3.0, 4.524, 6.0, 8.0, 12.0, 18.0],
+  "phi_values_analyzed": [
+    1.0,
+    2.0,
+    3.0,
+    4.524,
+    6.0,
+    8.0,
+    12.0,
+    18.0
+  ],
   "n_phi_with_complete_data": 8,
   "primary_observable": "max_norm_drift_T_steady",
-  "max_norm_drift_global": 3.328204156716197e-9,
-  "max_norm_drift_per_phi": [3.220983e-9, 2.727859e-9, 2.661255e-9, 3.260656e-9, 2.593776e-9, 3.248800e-9, 2.137980e-9, 3.328204e-9],
+  "max_norm_drift_global": 3.328204156716197e-09,
+  "max_norm_drift_per_phi": [
+    3.220983e-09,
+    2.727859e-09,
+    2.661255e-09,
+    3.260656e-09,
+    2.593776e-09,
+    3.2488e-09,
+    2.13798e-09,
+    3.328204e-09
+  ],
   "norm_drift_growth_phi18_over_phi1": 1.0332883933611825,
   "primary_verdict": "CONFIRM",
   "secondary_observable": "m_plus_F_fraction_chi_square_vs_phi_smooth_trend",
-  "m_plus_F_drops_per_phi": [-4.6e-7, -4.0e-8, -3.5e-7, -6.2e-7, -2.5e-7, -2.8e-7, -1.25e-6, -1.05e-6],
-  "linear_fit_slope": -5.497208e-8,
-  "linear_fit_intercept": -1.619844e-7,
-  "residuals_per_phi": [-2.4e-7, 2.3e-7, -2.0e-8, -2.1e-7, 2.4e-7, 3.2e-7, -4.3e-7, 1.0e-7],
-  "sigma_baseline_lowphi4": 2.1814e-7,
+  "m_plus_F_drops_per_phi": [
+    -4.6e-07,
+    -4e-08,
+    -3.5e-07,
+    -6.2e-07,
+    -2.5e-07,
+    -2.8e-07,
+    -1.25e-06,
+    -1.05e-06
+  ],
+  "linear_fit_slope": -5.497208e-08,
+  "linear_fit_intercept": -1.619844e-07,
+  "residuals_per_phi": [
+    -2.4e-07,
+    2.3e-07,
+    -2e-08,
+    -2.1e-07,
+    2.4e-07,
+    3.2e-07,
+    -4.3e-07,
+    1e-07
+  ],
+  "sigma_baseline_lowphi4": 2.1814e-07,
   "max_sigma_deviation": 1.9524317442664623,
   "secondary_verdict": "CONFIRM",
-  "jz_proxy_drift_per_phi": [1.715735e-1, 1.441027e-2, 3.327028e-1, 2.129155e-1, 2.695383e-1, 2.809271e-1, 8.590288e-2, 1.388697e-2],
-  "jz_proxy_mean_per_phi": [6.052961, 6.078348, 6.026816, 6.007089, 6.002395, 6.012335, 6.007082, 6.008433],
-  "larmor_phase_metadata_per_phi": [160.2, 160.2, 160.2, 160.2, 160.2, 160.2, 160.2, 160.2],
+  "jz_proxy_drift_per_phi": [
+    0.1715735,
+    0.01441027,
+    0.3327028,
+    0.2129155,
+    0.2695383,
+    0.2809271,
+    0.08590288,
+    0.01388697
+  ],
+  "jz_proxy_mean_per_phi": [
+    6.052961,
+    6.078348,
+    6.026816,
+    6.007089,
+    6.002395,
+    6.012335,
+    6.007082,
+    6.008433
+  ],
+  "larmor_phase_metadata_per_phi": [
+    160.2,
+    160.2,
+    160.2,
+    160.2,
+    160.2,
+    160.2,
+    160.2,
+    160.2
+  ],
   "larmor_phase_constant_across_phi": true,
-  "dt_used_per_phi": [0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001],
+  "dt_used_per_phi": [
+    0.001,
+    0.001,
+    0.001,
+    0.001,
+    0.001,
+    0.001,
+    0.001,
+    0.001
+  ],
   "overall_verdict": "CONFIRM",
   "wall_time_sec": 2.87,
   "y4_truncation_floor_estimate_from_t56": 3.14e-10,
@@ -177,7 +249,7 @@ Both primary and secondary observables confirm. The Option gamma rotating-basis 
   "tests_passed": null,
   "warnings": [
     "phi=1.0: First run attempt failed with CodecZstd world-age error (dynamically loaded by JLD2 inside julia -e context). Fixed by adding 'using CodecZstd' before 'using JLD2' in script to pre-load the package. Second run with fix succeeded: all 8 phi points loaded correctly.",
-    "m+F drops are all NEGATIVE (fraction increases over steady window), not positive as T56 §4 pseudocode implies by calling it 'drop'. Values are ~40-1250 ppb magnitude. The sign is consistent across phi — no diagnostic concern, just that the label 'drop' implies decrease."
+    "m+F drops are all NEGATIVE (fraction increases over steady window), not positive as T56 \u00a74 pseudocode implies by calling it 'drop'. Values are ~40-1250 ppb magnitude. The sign is consistent across phi \u2014 no diagnostic concern, just that the label 'drop' implies decrease."
   ],
   "physical_red_flags": [],
   "falsification_result": "CONFIRMED",
@@ -186,7 +258,17 @@ Both primary and secondary observables confirm. The Option gamma rotating-basis 
     "researcher": null,
     "implementer": null,
     "critic": null,
-    "total": null
+    "orchestrator": 14346879,
+    "total": 14346879,
+    "effective_full_rate": 2189862,
+    "breakdown": {
+      "input_fresh": 25573,
+      "cache_creation": 555865,
+      "cache_read": 13746479,
+      "output": 18962
+    },
+    "n_messages": 118,
+    "n_message_starts": 118
   }
 }
 ```

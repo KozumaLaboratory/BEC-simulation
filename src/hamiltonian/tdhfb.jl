@@ -9,7 +9,7 @@
 #
 #   channel_kernel.jl              — rank-4 channel tensor Σ_S g_S Σ_M CG·CG
 #                                    (shared by HF self-energy and Δ)
-#   hartree_fock_matrix.jl         — F=1 c0/c1 GP-form kernel (legacy + GP
+#   hartree_fock_matrix.jl         — F=1 c0/c1 GP-form kernel (GP-only + GP
 #                                    reduction reference for conservation tests)
 #   hartree_fock_matrix_generic.jl — generic-F BdG self-energy U via channels
 #   pair_potential.jl              — anomalous pair potential Δ from (φφ + κ)

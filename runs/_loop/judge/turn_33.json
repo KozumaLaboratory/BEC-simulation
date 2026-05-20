@@ -44,7 +44,24 @@
       "With bug fixes applied: free-space droplet in rotating_basis may require secular_ddi=false (non-secular DDI, which is the paper setup); CLAUDE.md states secular_ddi=true is user-chosen and emits @info advisory \u2014 monitor c_dd\u00b7<n> vs omega_L in any follow-up run",
       "T32 \u00a78 risk 'Eu151_f1_effective not in auto_defaults.jl chain' was flagged as low-impact (grid only); actual impact is total physics failure (c0=c_dd=0)"
     ],
-    "falsification_result": "data_gap"
+    "falsification_result": "data_gap",
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 9980187,
+      "total": 9980187,
+      "effective_full_rate": 1503082,
+      "breakdown": {
+        "input_fresh": 15565,
+        "cache_creation": 348366,
+        "cache_read": 9597800,
+        "output": 18456
+      },
+      "n_messages": 105,
+      "n_message_starts": 105
+    }
   },
   "contract_evaluation": {
     "verdict": "INCONCLUSIVE",

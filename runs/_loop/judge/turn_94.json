@@ -206,6 +206,14 @@
     "issues": []
   },
   "cost_audit": null,
+  "central_falsifier_check": {
+    "applies": true,
+    "tier_cap": null,
+    "central_falsifier_id": "racah-cg-rederivation",
+    "central_falsifier_result": "CORROBORATE: beta_S^(c_0) and beta_S^(lambda_spin) values match T92 to exact rational",
+    "issues": []
+  },
+  "tier_cap": null,
   "investigation_id": "sign-pattern-lemma1-tier3-vs-kawaguchi-ueda-2026-05-18",
   "stage_advancing_to": "Document",
   "investigation_update": {

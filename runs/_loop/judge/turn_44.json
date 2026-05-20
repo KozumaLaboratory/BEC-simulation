@@ -69,8 +69,17 @@
       "researcher": null,
       "implementer": null,
       "critic": null,
-      "orchestrator": null,
-      "total": null
+      "orchestrator": 21850261,
+      "total": 21850261,
+      "effective_full_rate": 3069491,
+      "breakdown": {
+        "input_fresh": 34090,
+        "cache_creation": 609738,
+        "cache_read": 21175293,
+        "output": 31140
+      },
+      "n_messages": 190,
+      "n_message_starts": 190
     },
     "warnings": [
       "converged=false: ITP ran all 6250 steps without crossing tol=1e-8. F32 floor prevents |\u0394\u03bc| from reaching tol (same behavior as T43 P0_pre). State is functionally converged at F32 precision.",

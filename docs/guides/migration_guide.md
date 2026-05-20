@@ -37,7 +37,7 @@ Mixing levels in a single block raises `ArgumentError`. Pick one per step.
 
 **Old (legacy)**: `dynamics/psi_snapshots` as a single 5D array `(n_pts..., n_comp, n_snaps)` ComplexF64.
 
-**Current**: `dynamics/psi_snapshots_streamed/frame_NNNNN` (one entry per frame, ComplexF32 default; ComplexF64 with `save_snapshot_precision: "f64"`). The dashboard reader and `column_density_movie` analyzer accept both.
+**Current**: `dynamics/psi_snapshots_streamed/frame_NNNNN` (one entry per frame, ComplexF32 default; ComplexF64 with `save: {precision: "f64"}`). The dashboard reader and `column_density_movie` analyzer accept both.
 
 ## Calibration auto-application
 

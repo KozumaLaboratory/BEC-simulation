@@ -126,7 +126,24 @@ Both greps confirm the class-fix is complete with no remaining instances. No sco
   "peak_memory_gb": null,
   "physical_red_flags": [],
   "warnings": [],
-  "falsification_result": "CODE_CHANGE_APPLIED"
+  "falsification_result": "CODE_CHANGE_APPLIED",
+  "tokens_used": {
+    "theorist": null,
+    "researcher": null,
+    "implementer": null,
+    "critic": null,
+    "orchestrator": 9731752,
+    "total": 9731752,
+    "effective_full_rate": 1430373,
+    "breakdown": {
+      "input_fresh": 10568,
+      "cache_creation": 311860,
+      "cache_read": 9391151,
+      "output": 18173
+    },
+    "n_messages": 71,
+    "n_message_starts": 71
+  }
 }
 ```
 

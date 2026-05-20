@@ -63,7 +63,7 @@ from `dynamics_result` so Mz(t) and E(t) can be analysed from disk.
 Per-component populations are computed from psi_snapshots (13 floats per snapshot).
 
 Full psi snapshots are persisted only when the run was invoked with
-`save_psi_snapshots: true` (the caller stashes this as
+`save: {psi: true}` (the caller stashes this as
 `result[:save_psi_snapshots]`). When saved they are downcast to ComplexF32
 and packed into one 5D array `dynamics/psi_snapshots` of shape
 `(n_pts..., n_comp, n_snaps)` — halves the disk footprint vs ComplexF64
@@ -187,7 +187,7 @@ dynamics step's time series + ψ snapshots into one continuous record:
                          — same concatenation as times.
   - `dynamics/psi_snapshots_streamed/frame_NNNNN`
                          — globally indexed across all steps that opted
-                           in via `save_psi_snapshots: true`. Steps that
+                           in via `save: {psi: true}`. Steps that
                            opted out skip frame contribution but their
                            times/energies still join the timeline.
   - `dynamics/component_populations` — (n_global_frames × D) populations.

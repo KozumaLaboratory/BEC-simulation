@@ -1,0 +1,59 @@
+# Canonical Klaus-magnetostir dynamics template
+#
+# Klaus 2022 protocol (Phys Rev Lett 128 023605): tilt the B-field to
+# theta ≈ 35° then rotate phi at constant rate ω_stir. Drives EdH-class
+# vortex dynamics. anko's `runs/eu151_klaus_phi_phys/` series.
+#
+# Director Design stage: copy + patch (duration, integrator, dt,
+# scan grid, save_every).
+
+# Tilted-prep then steady stir at Ω = phi_rate (rad / dimless)
+pipeline:
+  # Stage A: tilt 0 → 35° over ~20 ms (6.28 ω⁻¹)
+  - dynamics:
+      kind: rotating_basis
+      duration: 6.28
+      integrator: yoshida4
+      dt: 0.001
+      epsilon: 1.0e-6
+      B:
+        theta:                       # tilt ramp
+          from: 0.0
+          to: 0.611                  # 35° in rad
+          duration: 6.28
+        phi: {rate: 0.0}             # no rotation yet
+      save: {every: 200}
+
+  # Stage B: spinup phi to ω_stir over ~50 ms (15.71 ω⁻¹)
+  - dynamics:
+      kind: rotating_basis
+      duration: 15.71
+      integrator: yoshida4
+      dt: 0.001
+      epsilon: 1.0e-6
+      B:
+        theta: 0.611                 # constant tilt
+        phi:                         # phi_rate ramp
+          rate:
+            from: 0.0
+            to: 4.524                # rad / dimless = 226.2 Hz / ω_ref·2π
+            duration: 15.71
+      save: {every: 200}
+
+  # Stage C: steady stir
+  - dynamics:
+      kind: rotating_basis
+      duration: 314.16               # ~1 s steady stir
+      integrator: yoshida4
+      dt: 0.001
+      epsilon: 1.0e-6
+      B:
+        theta: 0.611
+        phi: {rate: 4.524}
+      save: {every: 500}
+
+# Scan phi rate across multiple stir frequencies
+scan:
+  zip:
+    pipeline.2.dynamics.B.phi.rate: [1.0, 2.0, 3.0, 4.524, 6.0, 8.0, 12.0, 18.0]
+    pipeline.1.dynamics.B.phi.rate.to: [1.0, 2.0, 3.0, 4.524, 6.0, 8.0, 12.0, 18.0]

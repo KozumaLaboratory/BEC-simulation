@@ -1,7 +1,7 @@
 # --- Phase 1.1 state zoo: named builders -------------------------------
 
 export init_psi_polar, init_psi_m_plus_F, init_psi_m_minus_F
-export init_psi_ferromagnetic, init_psi_ferromagnetic_min   # legacy aliases
+export init_psi_ferromagnetic, init_psi_ferromagnetic_min   # backward-compat aliases
 export init_psi_uniform, init_psi_antiferromagnetic, init_psi_random
 export init_psi_spin_coherent, init_psi_fl_vortex, init_psi_spin_helix
 export init_psi_cyclic, init_psi_biaxial_nematic, init_psi_polar_core_vortex
@@ -41,7 +41,7 @@ const _STATE_ALIASES = Dict{Symbol, Symbol}(
     :ferromagnetic_min => :m_minus_F,
 )
 
-"""Resolve a state symbol through the legacy alias table. Returns the
+"""Resolve a state symbol through the backward-compat alias table. Returns the
 canonical name (`:m_plus_F`/`:m_minus_F`/...) for downstream dispatch."""
 canonicalize_state(state::Symbol) = get(_STATE_ALIASES, state, state)
 

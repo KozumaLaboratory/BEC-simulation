@@ -188,6 +188,11 @@
     "issues": []
   },
   "cost_audit": null,
+  "central_falsifier_check": {
+    "applies": false,
+    "reason": "target tier 1.5 < 3.0"
+  },
+  "tier_cap": null,
   "investigation_id": "audit-class-scan-2026-05-19-T103",
   "stage_advancing_to": "Triage (mechanical-bookkeeping-half)",
   "investigation_update": {

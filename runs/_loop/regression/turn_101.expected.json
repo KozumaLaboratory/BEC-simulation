@@ -1,0 +1,13 @@
+{
+  "turn": 101,
+  "status": "FAIL_NO_METRICS",
+  "issues": [
+    "sim/turn_101.md missing or \u00a74 JSON unparseable"
+  ],
+  "metrics": null,
+  "_pinned_inv_snapshot": {
+    "inv_id": null,
+    "tier_current_at_pin": null,
+    "falsifiers_at_pin": []
+  }
+}

@@ -2,7 +2,6 @@
   "turn": 27,
   "status": "PASS",
   "issues": [],
-  "novel_detected": false,
   "metrics": {
     "experiment_kind": "rtp",
     "norm_initial": 1.0,
@@ -54,8 +53,62 @@
       "researcher": null,
       "implementer": null,
       "critic": null,
-      "total": null
+      "orchestrator": 21847141,
+      "total": 21847141,
+      "effective_full_rate": 2839199,
+      "breakdown": {
+        "input_fresh": 7092,
+        "cache_creation": 481252,
+        "cache_read": 21339478,
+        "output": 19319
+      },
+      "n_messages": 211,
+      "n_message_starts": 211
     }
   },
-  "directive_expected_order": null
+  "contract_evaluation": {
+    "verdict": "PASS",
+    "criteria_results": [
+      {
+        "id": "norm_preserved",
+        "passed": true,
+        "actual": 1.09e-09,
+        "reason": "max_abs_norm_drift=1.09e-09 <= 1e-05 \u2192 True"
+      },
+      {
+        "id": "tau_minus_omega_in_window",
+        "passed": true,
+        "actual": 2.84,
+        "reason": "tau_barnett_minus_omega=2.84 in [1.5, 4.5] \u2192 True"
+      },
+      {
+        "id": "tau_plus_omega_undecayed",
+        "passed": true,
+        "actual": 5.997269,
+        "reason": "fz_at_plus_omega_t30=5.997269 >= 5.0 \u2192 True"
+      },
+      {
+        "id": "sign_of_asymmetry",
+        "passed": true,
+        "actual": 1,
+        "reason": "asymmetry_sign=1 > 0 \u2192 True"
+      }
+    ],
+    "triggered_failure_modes": [],
+    "issues": []
+  },
+  "investigation_id": "barnett-mechanism-2026-05-16",
+  "stage_advancing_to": "Execute",
+  "investigation_update": {
+    "if_success_advance_to_stage": "Analyze",
+    "if_success_tier_becomes": 2.5,
+    "if_success_falsifier_update": {
+      "id": "gamma-dr-zero-control",
+      "tested_at_turn": 27,
+      "result_template": "tau_-Omega@(gamma_dr=K3=0) = <value> omega^-1; coherent mechanism status = <SURVIVES|REFUTED>; comparison to T20 empirical (gamma_dr=0.02, K3 on, c_dd=0): <ratio>"
+    },
+    "if_refuted_advance_to_stage": "Update",
+    "if_refuted_tier_becomes": 1.5,
+    "next_falsifier_to_test_after": "lz-buildup-presence (re-run T20 c_dd=0 config with Lz observable enabled) OR cross-link to yan-li-saito-2026-reproduction (Tier-3 path)"
+  }
 }

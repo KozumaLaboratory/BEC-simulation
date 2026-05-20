@@ -176,6 +176,14 @@
     "issues": []
   },
   "cost_audit": null,
+  "central_falsifier_check": {
+    "applies": true,
+    "tier_cap": null,
+    "central_falsifier_id": "F1-polar-phonon-sound-velocity",
+    "central_falsifier_result": "CONFIRMED at c_0=1.0 T100 (rel_err=7.86e-6) + CONFIRMED at c_0=2.0 T102 (rel_err=3.93e-6)",
+    "issues": []
+  },
+  "tier_cap": null,
   "investigation_id": "tdhfb-phase2-hf-kernel-generic-F-bogoliubov-spectrum-2026-05-18",
   "stage_advancing_to": "Document",
   "investigation_update": {

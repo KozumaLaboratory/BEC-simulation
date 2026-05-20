@@ -1,0 +1,98 @@
+# ─────────────────────────────────────────────────────────────────────
+#  Eu151 Klaus magnetostir × ±phi_omega × K3 + γ_dr — Barnett spin pumping
+#
+#  Hypothesis (user's framing): rotating B in the Klaus regime
+#  (strong static Bz + tilt + steady stir) injects orbital angular
+#  momentum via the Berry connection. With dissipation enabled (K3 +
+#  γ_dr + LHY scalar), the orbital sector drains into the spin sector
+#  via DDI exchange, producing a net Barnett magnetization. Sign of
+#  ⟨F_z⟩ drift should follow rotation direction (+φ vs -φ).
+#
+#  Exactly the eu151_klaus_phi_phys setup (rotating_basis, p=26700,
+#  tilt 35°, 1 s steady stir, 32×32×16, yoshida4) PLUS a loss block on
+#  the steady-stir step. Loss support in rotating_basis was added
+#  2026-05-15: K3 / γ_dr act on |ψ̃|² (basis-invariant) so the spinor-
+#  path apply_loss_step! works directly on ψ̃. Strang sandwiches the
+#  loss around the unitary core; Y4 handles loss at the macro-step
+#  level (avoiding negative-w₀ anti-loss).
+#
+#  Scan: ±phi pair only (fastest demo of sign-asymmetry). Both run
+#  in parallel; ~7h each based on klaus_phi batch-2 timing.
+# ─────────────────────────────────────────────────────────────────────
+
+defaults: {kind: rotating_basis, backend: gpu}
+
+mixins:
+  eu151_klaus_phys:
+    atom: Eu151
+    interactions:
+      N_atoms: 60000
+      omega_ref: 314.159
+      c1: 131.3
+    grid: {n: [32, 32, 16], box: [20.0, 20.0, 10.0]}
+    potential: {type: harmonic, omega: [1.0, 1.0, 2.6]}
+    gauge_fix: false
+
+pipeline:
+  # GS in tilted-prep field (Klaus regime). Eu mean-field (DDI auto + LHY scalar).
+  - ground_state:
+      use: [eu151_klaus_phys]
+      B: {p: 26700.0}
+      ddi: {enabled: true}
+      lhy: {kind: scalar}
+      init_m_idx: 1
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 1500
+      tol: 1.0e-9
+
+  # Tilt 0 → 35° over ≈ 20 ms (6.28 ω⁻¹). No loss yet — pure unitary
+  # tilt to align ψ with the new B direction.
+  - dynamics:
+      duration: 6.28
+      integrator: yoshida4
+      dt: 0.001
+      epsilon: 1.0e-6
+      B:
+        theta: {from: 0.0, to: 0.611, duration: 6.28}
+        phi: {rate: 0.0}
+      save: {every: 200}
+
+  # Spinup 0 → stir freq over ≈ 50 ms (15.71 ω⁻¹). Still no loss.
+  - dynamics:
+      duration: 15.71
+      integrator: yoshida4
+      dt: 0.001
+      epsilon: 1.0e-6
+      B:
+        theta: 0.611
+        phi: {rate: {from: 0.0, to: 4.524, duration: 15.71}}
+      save: {every: 200}
+
+  # Steady stir 5 s ≈ 1570.8 ω⁻¹ — Barnett demo + relaxation timescale scan.
+  # 1s pilot showed ΔFz(±φ) ~ 5e-4 oscillation, not clear signal. 5s covers
+  # ~5 candidate EdH-suppressed-relaxation periods so we can locate the
+  # crossover where coherent oscillation thermalises into Fz sign-asymmetry.
+  # save_every=2000 → ~785 snapshots × 1.7 MB ≈ 1.3 GB per run.
+  - dynamics:
+      duration: 1570.8
+      integrator: yoshida4
+      dt: 0.001
+      epsilon: 1.0e-6
+      B:
+        theta: 0.611
+        phi: {rate: 4.524}
+      loss:
+        gamma_dr: 0.02
+        K3_per_m_si:
+          ["1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s",
+           "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s",
+           "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s",
+           "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s",
+           "1.0e-41 m^6/s"]
+      save: {every: 2000}
+
+scan:
+  zip:
+    pipeline.3.dynamics.B.phi.rate: [+4.524, -4.524]
+    pipeline.2.dynamics.B.phi.rate.to: [+4.524, -4.524]

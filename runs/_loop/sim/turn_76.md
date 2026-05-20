@@ -106,7 +106,7 @@ Commit `72c5b0f` on branch `auto/turn_76_edh-matsui-analyze-baseline-case-A`. Fi
   ],
   "warnings": [
     "T75 haskey-B fix not merged to main before T76 dispatch; re-applied on T76 auto branch (identical fix, 2 locations).",
-    "DDI INFO 'omega_L/(c_dd*n_peak) approx 123' fires at GS time (Bz=0.01G, p=162.7), not at dynamics Bz=2.6nT. At dynamics time: ratio=0.68. T72 §3.4 ratio=0.15 uses physical n_avg; both confirm non-secular regime. Reconciled — no physics bug.",
+    "DDI INFO 'omega_L/(c_dd*n_peak) approx 123' fires at GS time (Bz=0.01G, p=162.7), not at dynamics Bz=2.6nT. At dynamics time: ratio=0.68. T72 \u00a73.4 ratio=0.15 uses physical n_avg; both confirm non-secular regime. Reconciled \u2014 no physics bug.",
     "F3 relative error 19.6% is borderline (threshold 20%). The 2.06 hbar*omega_ref gap from T72 prediction is plausible from LHY/DDI contributions absent in the T72 TF formula."
   ],
   "falsification_result": "MIXED",
@@ -116,7 +116,17 @@ Commit `72c5b0f` on branch `auto/turn_76_edh-matsui-analyze-baseline-case-A`. Fi
     "researcher": null,
     "implementer": null,
     "critic": null,
-    "total": null
+    "orchestrator": 23773313,
+    "total": 23773313,
+    "effective_full_rate": 3055578,
+    "breakdown": {
+      "input_fresh": 28118,
+      "cache_creation": 472860,
+      "cache_read": 23250059,
+      "output": 22276
+    },
+    "n_messages": 176,
+    "n_message_starts": 176
   }
 }
 ```

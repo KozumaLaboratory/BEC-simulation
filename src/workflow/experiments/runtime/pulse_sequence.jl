@@ -39,7 +39,7 @@ end
     compile_pulse_sequence(events::Vector{PulseEvent}, duration::Float64, defaults::Dict)
         -> Dict{Symbol,Any}
 
-Compile events into a Dict of :zeeman, :raman, :interactions, :trap overrides.
+Compile events into a Dict of :B, :raman, :interactions, :trap overrides.
 Each value is the appropriate TimeDep* struct ready for make_workspace.
 """
 function compile_pulse_sequence(
@@ -54,11 +54,11 @@ function compile_pulse_sequence(
     end
 
     # --- Zeeman ---
-    if haskey(groups, :zeeman)
-        p_wf = _compile_windowed_waveform(groups[:zeeman], "p", duration, get(defaults, :p, 0.0))
-        q_wf = _compile_windowed_waveform(groups[:zeeman], "q", duration, get(defaults, :q, 0.0))
-        bx_wf = _compile_windowed_waveform_optional(groups[:zeeman], "bx", duration)
-        by_wf = _compile_windowed_waveform_optional(groups[:zeeman], "by", duration)
+    if haskey(groups, :B)
+        p_wf = _compile_windowed_waveform(groups[:B], "p", duration, get(defaults, :p, 0.0))
+        q_wf = _compile_windowed_waveform(groups[:B], "q", duration, get(defaults, :q, 0.0))
+        bx_wf = _compile_windowed_waveform_optional(groups[:B], "bx", duration)
+        by_wf = _compile_windowed_waveform_optional(groups[:B], "by", duration)
         result[:zeeman] = TimeDependentZeeman(p_wf, q_wf, bx_wf, by_wf)
     end
 
@@ -118,7 +118,7 @@ Type-narrowed pulse-sequence overlay for `_run_step(::DynamicsStep,...)`.
 Separated into its own function so the `Dict{Symbol,Any}` lookup results are
 locally-scoped and the `::TimeDependentZeeman` / `::TimeDependentInteractions`
 type assertions narrow them back to concrete types before they reach
-`make_workspace`. Without this barrier, inline assignment of `zeeman = dict[:zeeman]`
+`make_workspace`. Without this barrier, inline assignment of `zeeman = dict[:B]`
 inside `_run_step` widens the local to `Any` and detonates inference through
 `make_workspace`'s 23 type parameters (observed: 30+ min JIT hang).
 """
@@ -131,7 +131,7 @@ function _apply_pulse_sequence(ps_raw, duration::Float64, interactions,
     )
     events = parse_pulse_sequence(ps_raw, duration)
     compiled = compile_pulse_sequence(events, duration, defaults)
-    zee_out = haskey(compiled, :zeeman) ?
+    zee_out = haskey(compiled, :B) ?
               compiled[:zeeman]::TimeDependentZeeman : zeeman
     ram_out = haskey(compiled, :raman) ? compiled[:raman] : raman
     tdi_out = if haskey(compiled, :time_dep_interactions)

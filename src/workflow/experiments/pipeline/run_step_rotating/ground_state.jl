@@ -1,3 +1,15 @@
+# Resolve atom name to AtomSpecies via the canonical ATOM_REGISTRY (defined in
+# src/workflow/initialization/atoms.jl). Returns nothing if unknown, which
+# triggers the manual c0/c_dd interaction path below. Keeps type inference
+# narrow: return type is Union{AtomSpecies, Nothing}.
+@noinline function _resolve_atom_or_nothing(atom_name::AbstractString)::Union{AtomSpecies, Nothing}
+    return try
+        SpinorBEC.resolve_atom(Symbol(atom_name))::AtomSpecies
+    catch err
+        err isa ArgumentError ? nothing : rethrow()
+    end
+end
+
 # Option γ rotating-basis ground_state step: ITP from a Gaussian seed
 # in the rotating-basis workspace. Sets up grid, V_trap, B̂ initial
 # orientation, and persists ws to pipeline_results for the subsequent
@@ -48,25 +60,7 @@
     # via spin operators in the Hamiltonian).
     atom_obj = if haskey(p, "atom")
         atom_name = string(p["atom"])::String
-        if atom_name == "Eu151"
-            ;
-            SpinorBEC.Eu151
-        elseif atom_name == "Dy164"
-            ;
-            SpinorBEC.Dy164
-        elseif atom_name == "Dy162"
-            ;
-            SpinorBEC.Dy162
-        elseif atom_name == "Cr52"
-            ;
-            SpinorBEC.Cr52
-        elseif atom_name == "Rb87"
-            ;
-            SpinorBEC.Rb87
-        else
-            ;
-            nothing
-        end
+        _resolve_atom_or_nothing(atom_name)
     else
         nothing
     end
@@ -134,11 +128,11 @@
         )
     end
 
-    zee = p["zeeman"]::Dict
+    zee = p["B"]::Dict
     p_z = Float64(get(zee, "p", 0.0))
     q_z = Float64(get(zee, "q", 0.0))
 
-    B_hat = get(p, "B_hat", Dict{String, Any}())::Dict
+    B_hat = get(p, "B_direction", Dict{String, Any}())::Dict
     θ_init = Float64(get(B_hat, "theta", 0.0))
     φ_init = Float64(get(B_hat, "phi", 0.0))
     gauge_fix_flag = Bool(get(p, "gauge_fix", true))
@@ -179,7 +173,7 @@
         prod_R = prod(R_TF)
         prod_R^(1.0 / length(R_TF))
     else
-        1.0  # legacy fallback
+        1.0  # fallback when R_TF is unavailable
     end
     # `initial_state: from_jld2` short-circuits the Gaussian seed + ITP —
     # the ψ is loaded directly from a prior run's result.jld2 (streamed
@@ -258,6 +252,12 @@
         # can convert physical-unit fields ("226 Hz") to dimensionless
         # ratios via _parse_dimless_freq. NaN if manual c0/c_dd path.
         :rotating_basis_omega_ref => auto_path ? ω_ref_val : NaN,
+        # Stash atom + N_atoms for downstream loss-block SI→dimless conversion
+        # (`K3_per_m_si: ["1e-41 m^6/s", ...]` needs n0 = N/a_ho³ which
+        # depends on atom mass + N + ω_ref). Atom may be `nothing` for the
+        # manual c0/c_dd path; loss SI conversion will then error explicitly.
+        :rotating_basis_atom => atom_obj,
+        :rotating_basis_n_atoms => auto_path ? N_atoms_int : nothing,
     )
     # Type assertion: pin to a concrete 4D Complex array (either F32 or F64
     # eltype). Earlier this hard-asserted ComplexF64 to keep downstream
@@ -271,7 +271,7 @@ end
     _load_psi_from_jld2(path, snap) -> Array{ComplexF64, 4}
 
 Read one snapshot of ψ from a result.jld2 file. Supports the streamed
-layout (dynamics/psi_snapshots_streamed/frame_NNNNN) and the legacy
+layout (dynamics/psi_snapshots_streamed/frame_NNNNN) and the older
 top-level `psi` storage. `snap` is `"last"` / `:last`, a positive
 integer (1-indexed), or negative for from-end (-1 = last).
 

@@ -27,7 +27,7 @@
         ε = Float64(p["epsilon"])
         _dt_from_epsilon(ε, duration, integrator_name)
     else
-        0.005   # legacy default
+        0.005   # default when neither ε nor dt is specified
     end
     n_steps = Int(round(duration / dt_rtp))
 
@@ -74,7 +74,7 @@
     end
     save_every = _resolve_save_every(p, duration, dt_rtp; n_steps=n_steps)
 
-    B_hat_node = get(p, "B_hat", Dict{String, Any}())::Dict
+    B_hat_node = get(p, "B_direction", Dict{String, Any}())::Dict
 
     # Build θ(t) waveform: either constant or linear ramp. Save scalar
     # representatives (θ_repr, φ_omega_repr) for downstream Berry-connection
@@ -103,6 +103,15 @@
     # with the time-dep B̂(t) hooked up.
     F_atom = ws_prev.spin_matrices.system.F
     V_trap = ws_prev.V_trap
+    # Optional `loss:` block. SI K_3 conversion needs (atom, N_atoms, ω_ref);
+    # all three are stashed in pipeline_results by the GS step.
+    loss_atom = get(pipeline_results, :rotating_basis_atom, nothing)
+    loss_n_atoms = get(pipeline_results, :rotating_basis_n_atoms, nothing)
+    loss_omega_ref = get(pipeline_results, :rotating_basis_omega_ref, NaN)
+    loss_omega_ref_arg = isnan(loss_omega_ref) ? nothing : loss_omega_ref
+    loss_params = _parse_loss_params(get(p, "loss", nothing);
+        atom=loss_atom, N_atoms=loss_n_atoms, omega_ref=loss_omega_ref_arg)
+    loss_resolved = loss_params === nothing ? LossParams() : loss_params
     ws = make_rotating_basis_ws(grid, F_atom, V_trap;
         p=ws_prev.p, q=ws_prev.q,
         c0=ws_prev.c0, c1=ws_prev.c1,
@@ -110,6 +119,7 @@
         theta_func=theta_func, phi_func=phi_func,
         theta_dot_func=theta_dot_func, phi_dot_func=phi_dot_func,
         gauge_fix=ws_prev.gauge_fix,
+        loss=loss_resolved,
         backend=ws_prev.backend,                  # inherit device from GS
     )
     copyto!(ws.psi_tilde, ws_prev.psi_tilde)
@@ -121,10 +131,11 @@
     Fz_arr = Float64[]                   # ⟨F_z⟩(t) for EdH conservation
     Fx_arr = Float64[];
     Fy_arr = Float64[]
-    # ψ̃ snapshots: optional, controlled by save_psi_snapshots flag.
+    # ψ̃ snapshots: optional, controlled by save.psi flag (nested).
     # Enables per-m density (Fig 4), spin texture (Fig 3) — heavy memory but
     # only every save_every step, so 200ms × dt=0.005 / save_every=50 = 80 frames.
-    save_psi = Bool(get(p, "save_psi_snapshots", true))::Bool
+    save_block = get(p, "save", Dict{Any, Any}())::AbstractDict
+    save_psi = Bool(get(save_block, "psi", true))::Bool
     psi_snapshots = Vector{Array{ComplexF64, 4}}()
 
     if verbose

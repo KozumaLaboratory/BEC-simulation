@@ -60,7 +60,24 @@
     "fallback_applied": "none",
     "falsification_result": "FAIL_NO_DATA",
     "session_approval_gate_blocked": true,
-    "session_approval_gate_note": "Director should either (a) grant Julia execution approval in the next session, or (b) dispatch a script-based approach that pre-writes the run script to disk and executes it via a pre-approved shell mechanism."
+    "session_approval_gate_note": "Director should either (a) grant Julia execution approval in the next session, or (b) dispatch a script-based approach that pre-writes the run script to disk and executes it via a pre-approved shell mechanism.",
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 11773705,
+      "total": 11773705,
+      "effective_full_rate": 1728758,
+      "breakdown": {
+        "input_fresh": 25830,
+        "cache_creation": 365109,
+        "cache_read": 11360671,
+        "output": 22095
+      },
+      "n_messages": 107,
+      "n_message_starts": 107
+    }
   },
   "contract_evaluation": {
     "verdict": "INCONCLUSIVE",
@@ -185,7 +202,18 @@
       "metric 'dynamics_norm_drift_max' missing from sim metrics"
     ]
   },
-  "cost_audit": null,
+  "cost_audit": {
+    "expected_cost_eff": 2500000,
+    "actual_cost_eff": 1728758,
+    "ratio_actual_over_expected": 0.69,
+    "deviation_pct": -30.8,
+    "flag": "BUDGET_OK"
+  },
+  "central_falsifier_check": {
+    "applies": false,
+    "reason": "target tier 1.5 < 3.0"
+  },
+  "tier_cap": null,
   "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
   "stage_advancing_to": "Execute (full R1 retry on corrected YAML against fixed main HEAD)",
   "investigation_update": {

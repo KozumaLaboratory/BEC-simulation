@@ -122,7 +122,24 @@ Note: the large diff stat on patterns.yaml is due to PyYAML rewriting the file w
   "src_edited": false,
   "julia_executed": false,
   "tests_passed": null,
-  "falsification_result": "CONFIRMED"
+  "falsification_result": "CONFIRMED",
+  "tokens_used": {
+    "theorist": null,
+    "researcher": null,
+    "implementer": null,
+    "critic": null,
+    "orchestrator": 11240080,
+    "total": 11240080,
+    "effective_full_rate": 1664804,
+    "breakdown": {
+      "input_fresh": 42544,
+      "cache_creation": 370484,
+      "cache_read": 10811450,
+      "output": 15602
+    },
+    "n_messages": 88,
+    "n_message_starts": 88
+  }
 }
 ```
 

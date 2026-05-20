@@ -67,7 +67,24 @@
       "attempt1_yaml_schema_error: save_psi_snapshots + save_snapshot_precision were top-level keys; fixed at commit 2433e32 before attempt2",
       "T75_fix_not_merged_to_main: T75 fixed the same YAML schema bug on auto branch but it was never merged; T81 re-applies on main"
     ],
-    "falsification_result": "PASS_PREDICTION_CONFIRMED"
+    "falsification_result": "PASS_PREDICTION_CONFIRMED",
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 13421275,
+      "total": 13421275,
+      "effective_full_rate": 1879230,
+      "breakdown": {
+        "input_fresh": 32987,
+        "cache_creation": 375225,
+        "cache_read": 12997572,
+        "output": 15491
+      },
+      "n_messages": 135,
+      "n_message_starts": 135
+    }
   },
   "contract_evaluation": {
     "verdict": "PASS",
@@ -130,7 +147,13 @@
     "triggered_failure_modes": [],
     "issues": []
   },
-  "cost_audit": null,
+  "cost_audit": {
+    "expected_cost_eff": 2500000,
+    "actual_cost_eff": 1879230,
+    "ratio_actual_over_expected": 0.75,
+    "deviation_pct": -24.8,
+    "flag": "BUDGET_OK"
+  },
   "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
   "stage_advancing_to": "Execute (R2 GPU retry with src-anchored high-confidence prior + pre-written wrapper-script approval-gate workaround)",
   "investigation_update": {

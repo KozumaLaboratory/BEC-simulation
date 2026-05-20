@@ -122,8 +122,8 @@ function run_yaml(yaml_path::String; base_dir::String="runs", verbose::Bool=true
     # defaults seeded into pipeline steps where missing.
     apply_auto_defaults!(data)
 
-    # Unified `B:` block → split into legacy zeeman: + B_hat: for the
-    # runner. Validates Cartesian/spherical mutual exclusion.
+    # Unified `B:` block → split into internal magnitude + direction
+    # dicts for the runner. Validates Cartesian/spherical mutual exclusion.
     apply_B_block_normalize!(data)
 
     # Unified `noise:` block → temperature_ratio / twa / sgpe / etc.

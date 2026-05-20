@@ -222,13 +222,23 @@ T31 phantom-PASS: judge.py's contract evaluator passed `file_exists_*: true` aga
     "researcher": null,
     "implementer": null,
     "critic": null,
-    "total": null
+    "orchestrator": 12047006,
+    "total": 12047006,
+    "effective_full_rate": 1796144,
+    "breakdown": {
+      "input_fresh": 30711,
+      "cache_creation": 376397,
+      "cache_read": 11613174,
+      "output": 26724
+    },
+    "n_messages": 88,
+    "n_message_starts": 88
   },
   "warnings": [
     "T31 phantom-PASS: files lost to 1Password SSH signing block; T32 uses Write/Edit only (no git commands)",
-    "auto_defaults.jl does not handle Eu151_f1_effective in if/elseif chain — falls to fallback (no grid auto-derive); grid is specified explicitly so no runtime impact",
-    "64x64x64 grid at box=28 a_ho is ~2xL0 — coarser than paper; T33 director may need to bump to 96x96x96 / box=40 if F1 INCONCLUSIVE",
-    "init_state_params.winding parsed as Float64(1.0) — verify fl_vortex dispatch accepts Float64 winding at T33"
+    "auto_defaults.jl does not handle Eu151_f1_effective in if/elseif chain \u2014 falls to fallback (no grid auto-derive); grid is specified explicitly so no runtime impact",
+    "64x64x64 grid at box=28 a_ho is ~2xL0 \u2014 coarser than paper; T33 director may need to bump to 96x96x96 / box=40 if F1 INCONCLUSIVE",
+    "init_state_params.winding parsed as Float64(1.0) \u2014 verify fl_vortex dispatch accepts Float64 winding at T33"
   ],
   "physical_red_flags": [],
   "falsification_result": "INCONCLUSIVE"

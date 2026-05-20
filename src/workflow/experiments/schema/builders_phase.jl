@@ -16,11 +16,11 @@ frequency fields:
 
 `duration::Float64` (positional) is the dimensionless step duration used as
 default for chirp/pulse durations and as a fallback unit base for absolute
-time fields. When `omega_ref` is NaN (legacy / unrecognized callers), all
+time fields. When `omega_ref` is NaN (callers that did not provide it), all
 fields fall back to plain `Float64(get(...))`.
 """
 function _make_waveform(spec, duration::Float64; omega_ref::Float64=NaN)
-    # Helpers route Real → Float64 (legacy) and String → unit-aware parse
+    # Helpers route Real → Float64 and String → unit-aware parse
     # Frequency: dimensionless waveform-freq = ω_phys / (2π·ω_ref).
     # We re-use _parse_dimless_freq with scale = 2π·ω_ref to get this.
     _f(node) = isnan(omega_ref) ? Float64(node) :
@@ -131,7 +131,7 @@ resulting waveforms by sampling onto a fresh time grid.
 function _build_phase_zeeman(phase_raw::Dict, t_offset::Float64, duration::Float64;
     atom=nothing, p_step::Dict=Dict{String, Any}())
     gs = get(phase_raw, "ground_state", Dict())
-    z = get(gs, "zeeman", Dict())
+    z = get(gs, "B", Dict())
     z isa Dict || return ZeemanParams(0.0, 0.0)
 
     level = _detect_zeeman_level(z)

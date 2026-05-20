@@ -93,12 +93,22 @@ Production cross-check: AGREE
     "researcher": null,
     "implementer": null,
     "critic": null,
-    "total": null
+    "orchestrator": 8640857,
+    "total": 8640857,
+    "effective_full_rate": 1358310,
+    "breakdown": {
+      "input_fresh": 22837,
+      "cache_creation": 329223,
+      "cache_read": 8269396,
+      "output": 19401
+    },
+    "n_messages": 60,
+    "n_message_starts": 60
   },
   "warnings": [],
   "physical_red_flags": [
-    "W^CG_{m=+F=6} = 13/14 ≈ 0.929 is 13x SMALLER than T11's rank-1 claim of 12. The corrected τ_Barnett ≈ 78 ms (T11 ω_ref) is 5-11x OUTSIDE the empirical 7-14 ms window — NOT within factor 2. T11 §4 claim 5 must be REFUTED on the numerical prefactor.",
-    "The rank-1 factor 12 and the rank-2 normalized weight 13/14 differ by factor 168/13 ≈ 12.9 — not a coincidence-of-arithmetic but an order-of-magnitude error in T11's prefactor derivation."
+    "W^CG_{m=+F=6} = 13/14 \u2248 0.929 is 13x SMALLER than T11's rank-1 claim of 12. The corrected \u03c4_Barnett \u2248 78 ms (T11 \u03c9_ref) is 5-11x OUTSIDE the empirical 7-14 ms window \u2014 NOT within factor 2. T11 \u00a74 claim 5 must be REFUTED on the numerical prefactor.",
+    "The rank-1 factor 12 and the rank-2 normalized weight 13/14 differ by factor 168/13 \u2248 12.9 \u2014 not a coincidence-of-arithmetic but an order-of-magnitude error in T11's prefactor derivation."
   ],
   "falsification_result": "REFUTED",
   "compute_results": [
@@ -122,9 +132,9 @@ Production cross-check: AGREE
     },
     {
       "id": "S4",
-      "task": "Corrected τ_Barnett = 1/(W^CG * γ_dr) with γ_dr=0.02",
+      "task": "Corrected \u03c4_Barnett = 1/(W^CG * \u03b3_dr) with \u03b3_dr=0.02",
       "status": "OK",
-      "result": "τ_dimless = 700/13 = 53.85 ω^{-1}; τ_ms = 77.91 ms (ω_ref=691.15 rad/s) or 49.58 ms (ω_ref=1086 rad/s). Both OUTSIDE empirical 7-14 ms."
+      "result": "\u03c4_dimless = 700/13 = 53.85 \u03c9^{-1}; \u03c4_ms = 77.91 ms (\u03c9_ref=691.15 rad/s) or 49.58 ms (\u03c9_ref=1086 rad/s). Both OUTSIDE empirical 7-14 ms."
     },
     {
       "id": "S5",

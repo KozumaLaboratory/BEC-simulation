@@ -13,7 +13,7 @@ _zeeman_scalar(v) = v isa Dict ? Float64(v["from"]) : Float64(v)
 # --- Unitful-aware numeric parsing ---------------------------------------
 #
 # Policy: numeric YAML fields that represent a physical quantity accept EITHER:
-#   - a raw Real (legacy convention, default unit implicit per field)
+#   - a raw Real (default unit implicit per field)
 #   - a unit-carrying string ("0.819 G", "50 Hz", "20 μm") parsed via
 #     Units.safe_parse_quantity
 #

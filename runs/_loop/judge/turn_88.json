@@ -37,7 +37,24 @@
     "src_edited": false,
     "julia_executed": false,
     "tests_passed": null,
-    "falsification_result": "CONFIRMED"
+    "falsification_result": "CONFIRMED",
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 11240080,
+      "total": 11240080,
+      "effective_full_rate": 1664804,
+      "breakdown": {
+        "input_fresh": 42544,
+        "cache_creation": 370484,
+        "cache_read": 10811450,
+        "output": 15602
+      },
+      "n_messages": 88,
+      "n_message_starts": 88
+    }
   },
   "contract_evaluation": {
     "verdict": "PASS",
@@ -244,7 +261,18 @@
     "triggered_failure_modes": [],
     "issues": []
   },
-  "cost_audit": null,
+  "cost_audit": {
+    "expected_cost_eff": 1500000,
+    "actual_cost_eff": 1664804,
+    "ratio_actual_over_expected": 1.11,
+    "deviation_pct": 11.0,
+    "flag": "BUDGET_OK"
+  },
+  "central_falsifier_check": {
+    "applies": false,
+    "reason": "target tier 1.0 < 3.0"
+  },
+  "tier_cap": null,
   "investigation_id": "audit-class-scan-2026-05-18-T87",
   "stage_advancing_to": "Triage",
   "investigation_update": {

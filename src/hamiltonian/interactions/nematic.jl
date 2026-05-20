@@ -5,7 +5,7 @@ export apply_singlet_pair_step!, apply_nematic_step!
 
 Apply the **S=0 spin-singlet pair channel** step: exp(-i c₂ |A₀₀|² dt).
 
-> Canonical name: `apply_singlet_pair_step!`. The legacy alias
+> Canonical name: `apply_singlet_pair_step!`. The backward-compat alias
 > `apply_nematic_step!` is preserved for backwards compatibility but
 > refers to the *same* function — it is the c₂|A₀₀|² spin-singlet pair
 > Hamiltonian (KU Eq. 48), NOT the rank-2 spin nematic tensor

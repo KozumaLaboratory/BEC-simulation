@@ -153,12 +153,22 @@ Verified:
     "researcher": null,
     "implementer": null,
     "critic": null,
-    "total": null
+    "orchestrator": 17287913,
+    "total": 17287913,
+    "effective_full_rate": 2384345,
+    "breakdown": {
+      "input_fresh": 37666,
+      "cache_creation": 438432,
+      "cache_read": 16787844,
+      "output": 23971
+    },
+    "n_messages": 171,
+    "n_message_starts": 171
   },
   "warnings": [
     "Julia binary execution requires sandbox approval in current session. scripts/diagnostic/lz_extraction_from_snapshots.jl is complete and validated but has NOT been executed. Manual run required: /home/suzume/.juliaup/bin/julia --project=. scripts/diagnostic/lz_extraction_from_snapshots.jl",
     "Lz column is absent from all four trajectory CSVs (604/604 values NaN in cdd0; 604/604 in empirical). T19 Q19.1 INCONCLUSIVE status persists.",
-    "plot turn_21_lz_comparison.png shows Fz(t)/N only — Lz panel is empty pending Julia execution.",
+    "plot turn_21_lz_comparison.png shows Fz(t)/N only \u2014 Lz panel is empty pending Julia execution.",
     "trajectory.csv for cdd0 was NOT in main branch; restored from auto/turn_20_cdd0-control-m1-vs-m2-discriminator:96215fd"
   ],
   "physical_red_flags": [],

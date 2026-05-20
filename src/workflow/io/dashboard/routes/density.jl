@@ -27,7 +27,7 @@ function _route_density_max(path::String, base_dir::String, psi_cache::Dict{Stri
                     snaps = f["dynamics/psi_snapshots"]
                     nframes = size(snaps, ndims(snaps))
                     nframes == 0 && return 1.0
-                    # Sample up to 16 frames; for legacy 5D the array IS in
+                    # Sample up to 16 frames; for older 5D format the array IS in
                     # memory, so just compute peak per frame quickly.
                     sample_idxs = if nframes ≤ 16
                         (1:nframes)
@@ -55,7 +55,7 @@ function _route_density_max(path::String, base_dir::String, psi_cache::Dict{Stri
                     gmax > 0 ? gmax : 1.0
                 elseif haskey(f, "psi_snapshots")
                     # Top-level Vector{Array{Complex,4}} layout (saved by
-                    # legacy launch_*.jl direct jldsave). Each element is
+                    # older launch_*.jl direct jldsave). Each element is
                     # an N+1-D array (spatial..., D); sample up to 16.
                     snaps = f["psi_snapshots"]
                     nframes = length(snaps)

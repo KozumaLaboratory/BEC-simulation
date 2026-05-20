@@ -132,17 +132,34 @@ The rotating_basis GS step reads `inter["gamma_lhy"]` directly. The `lhy:` block
   "tests_passed": null,
   "warnings": [
     "BUG-1 FATAL: potential: {type: none} causes ArgumentError in _run_rotating_basis_ground_state_step (line 22-25 of run_step_rotating/ground_state.jl); fix: add potential: {type: harmonic, omega: [0.0, 0.0, 0.0]} for free-space simulation or remove potential key",
-    "BUG-2 CRITICAL: atom: Eu151_f1_effective not in rotating_basis GS if/else chain (lines 51-72) → atom_obj=nothing → auto_path=false → c0=c_dd=gamma_lhy=0.0 (non-interacting gas, no droplet possible)",
-    "BUG-3 FAIL: config uses B: {p: 0.0} but rotating_basis GS reads p[\"zeeman\"]::Dict at line 137 → KeyError: zeeman",
+    "BUG-2 CRITICAL: atom: Eu151_f1_effective not in rotating_basis GS if/else chain (lines 51-72) \u2192 atom_obj=nothing \u2192 auto_path=false \u2192 c0=c_dd=gamma_lhy=0.0 (non-interacting gas, no droplet possible)",
+    "BUG-3 FAIL: config uses B: {p: 0.0} but rotating_basis GS reads p[\"zeeman\"]::Dict at line 137 \u2192 KeyError: zeeman",
     "BUG-4 SILENT: initial_state: fl_vortex silently ignored by rotating_basis GS path; falls back to Gaussian seed; fl_vortex topology never initialized",
     "BUG-5 SILENT: lhy: {kind: scalar} block not parsed by rotating_basis GS step; only interactions.gamma_lhy is read",
     "Julia execution blocked by Bash security sandbox; code analysis performed via Read tool; bugs confirmed from static inspection"
   ],
   "physical_red_flags": [
-    "With bug fixes applied: free-space droplet in rotating_basis may require secular_ddi=false (non-secular DDI, which is the paper setup); CLAUDE.md states secular_ddi=true is user-chosen and emits @info advisory — monitor c_dd·<n> vs omega_L in any follow-up run",
-    "T32 §8 risk 'Eu151_f1_effective not in auto_defaults.jl chain' was flagged as low-impact (grid only); actual impact is total physics failure (c0=c_dd=0)"
+    "With bug fixes applied: free-space droplet in rotating_basis may require secular_ddi=false (non-secular DDI, which is the paper setup); CLAUDE.md states secular_ddi=true is user-chosen and emits @info advisory \u2014 monitor c_dd\u00b7<n> vs omega_L in any follow-up run",
+    "T32 \u00a78 risk 'Eu151_f1_effective not in auto_defaults.jl chain' was flagged as low-impact (grid only); actual impact is total physics failure (c0=c_dd=0)"
   ],
-  "falsification_result": "data_gap"
+  "falsification_result": "data_gap",
+  "tokens_used": {
+    "theorist": null,
+    "researcher": null,
+    "implementer": null,
+    "critic": null,
+    "orchestrator": 9980187,
+    "total": 9980187,
+    "effective_full_rate": 1503082,
+    "breakdown": {
+      "input_fresh": 15565,
+      "cache_creation": 348366,
+      "cache_read": 9597800,
+      "output": 18456
+    },
+    "n_messages": 105,
+    "n_message_starts": 105
+  }
 }
 ```
 

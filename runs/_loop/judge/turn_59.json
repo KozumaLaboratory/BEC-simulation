@@ -1,7 +1,9 @@
 {
   "turn": 59,
   "status": "PASS",
-  "issues": [],
+  "issues": [
+    "tier-3 promotion blocked: no central falsifier marked on klaus-magnetostir-bch-leak-2026-05-13 (run falsifier_central_migration.py)"
+  ],
   "metrics": {
     "experiment_kind": "text_only",
     "src_files_modified": 0,
@@ -24,7 +26,24 @@
     "new_memory_file_has_verification_chain": true,
     "new_memory_file_has_citations": true,
     "new_memory_file_has_deferred_followups": true,
-    "barnett_template_referenced": false
+    "barnett_template_referenced": false,
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 8525045,
+      "total": 8525045,
+      "effective_full_rate": 1355569,
+      "breakdown": {
+        "input_fresh": 35369,
+        "cache_creation": 350721,
+        "cache_read": 8125097,
+        "output": 13858
+      },
+      "n_messages": 61,
+      "n_message_starts": 61
+    }
   },
   "contract_evaluation": {
     "verdict": "PASS",
@@ -159,6 +178,21 @@
     "triggered_failure_modes": [],
     "issues": []
   },
+  "cost_audit": {
+    "expected_cost_eff": 1100000,
+    "actual_cost_eff": 1355569,
+    "ratio_actual_over_expected": 1.23,
+    "deviation_pct": 23.2,
+    "flag": "BUDGET_OK"
+  },
+  "central_falsifier_check": {
+    "applies": true,
+    "tier_cap": 2.75,
+    "issues": [
+      "tier-3 promotion blocked: no central falsifier marked on klaus-magnetostir-bch-leak-2026-05-13 (run falsifier_central_migration.py)"
+    ]
+  },
+  "tier_cap": 2.75,
   "investigation_id": "klaus-magnetostir-bch-leak-2026-05-13",
   "stage_advancing_to": "Document",
   "investigation_update": {

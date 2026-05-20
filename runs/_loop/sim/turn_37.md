@@ -116,7 +116,11 @@ units/omega_ref_rad_s: 314.159 rad/s
   "norm_drift": 2.22e-16,
   "energy_mu_final": null,
   "converged": true,
-  "m_populations": [0.9458, 0.0474, 0.0068],
+  "m_populations": [
+    0.9458,
+    0.0474,
+    0.0068
+  ],
   "m_plusF_dominant": false,
   "n_steps_completed": 5000,
   "wall_time_sec_itp": 67.96,
@@ -130,16 +134,33 @@ units/omega_ref_rad_s: 314.159 rad/s
   "sim_turn_37_md_exists_on_disk": true,
   "sim_turn_37_metrics_block_present": true,
   "warnings": [
-    "energy_mu_final is NaN: rotating_basis find_ground_state_rotating! mu estimator returned NaN — likely numerical cancellation in -log(n/target)/2dt when n/target≈1 throughout; not a crash, just unreported mu",
-    "epsilon_dd_eff = 1.1772 (config uses Eu151_f1_effective a_s=21a0; paper uses a_s giving eps_dd=1.2 exactly — 2% discrepancy, expected and noted in config header)",
+    "energy_mu_final is NaN: rotating_basis find_ground_state_rotating! mu estimator returned NaN \u2014 likely numerical cancellation in -log(n/target)/2dt when n/target\u22481 throughout; not a crash, just unreported mu",
+    "epsilon_dd_eff = 1.1772 (config uses Eu151_f1_effective a_s=21a0; paper uses a_s giving eps_dd=1.2 exactly \u2014 2% discrepancy, expected and noted in config header)",
     "jld2_post_process_psi_closure_bug: first two post-process scripts (t37_post.jl, t37_post2.jl) failed due to Julia do-block closure capture: `psi = psi_raw` inside jldopen do-block does not update outer `psi` variable. Fixed by using `load()` instead (t37_post3.jl). This is a subtle Julia scoping gotcha."
   ],
   "physical_red_flags": [
-    "F1_FALSIFIED: n_max = 0.99 D_0 vs paper target 13000 D_0 (factor ~13000 discrepancy). Wavefunction delocalized — no self-bound dipolar droplet formed after 5000 ITP steps with Gaussian seed init_sigma=2.0",
+    "F1_FALSIFIED: n_max = 0.99 D_0 vs paper target 13000 D_0 (factor ~13000 discrepancy). Wavefunction delocalized \u2014 no self-bound dipolar droplet formed after 5000 ITP steps with Gaussian seed init_sigma=2.0",
     "energy_mu_final_NaN: rotating_basis ITP mu estimator returned NaN for all 5000 steps. Indicates wavefunction norm stayed at target_norm=1.0 from step 1 (meaning the delocalized Gaussian is already normalized and ITP is not causing density collapse). The convergence flag conv=true from norm criterion is spurious for this use case.",
-    "m_plusF_not_dominant: m=+F population = 0.946 < 0.95 threshold. Spin mixing occurred during ITP (c1=0 in config but rotating_basis DDI couples spin components). Paper expects full polarization f/rho ≃ 1 everywhere.",
-    "n_max_dimless_too_low: n_max_dimless = 3.32e-4. For a droplet of radius ~2 a_ho, expected n_max_dimless ~ N * (1/droplet_vol_dimless) ~ 15000 * 1/(4pi/3 * 2^3) ≈ 15000/33.5 ≈ 448. Actual 3.32e-4 is 1.35e6 times smaller — completely delocalized cloud."
-  ]
+    "m_plusF_not_dominant: m=+F population = 0.946 < 0.95 threshold. Spin mixing occurred during ITP (c1=0 in config but rotating_basis DDI couples spin components). Paper expects full polarization f/rho \u2243 1 everywhere.",
+    "n_max_dimless_too_low: n_max_dimless = 3.32e-4. For a droplet of radius ~2 a_ho, expected n_max_dimless ~ N * (1/droplet_vol_dimless) ~ 15000 * 1/(4pi/3 * 2^3) \u2248 15000/33.5 \u2248 448. Actual 3.32e-4 is 1.35e6 times smaller \u2014 completely delocalized cloud."
+  ],
+  "tokens_used": {
+    "theorist": null,
+    "researcher": null,
+    "implementer": null,
+    "critic": null,
+    "orchestrator": 12463091,
+    "total": 12463091,
+    "effective_full_rate": 1773206,
+    "breakdown": {
+      "input_fresh": 28344,
+      "cache_creation": 356878,
+      "cache_read": 12059302,
+      "output": 18567
+    },
+    "n_messages": 121,
+    "n_message_starts": 121
+  }
 }
 ```
 

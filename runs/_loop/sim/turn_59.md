@@ -78,6 +78,23 @@ Fields unchanged (already correct): `tier_current` = 3.0, `tier_target` = 3, `la
   "new_memory_file_has_verification_chain": true,
   "new_memory_file_has_citations": true,
   "new_memory_file_has_deferred_followups": true,
-  "barnett_template_referenced": false
+  "barnett_template_referenced": false,
+  "tokens_used": {
+    "theorist": null,
+    "researcher": null,
+    "implementer": null,
+    "critic": null,
+    "orchestrator": 8525045,
+    "total": 8525045,
+    "effective_full_rate": 1355569,
+    "breakdown": {
+      "input_fresh": 35369,
+      "cache_creation": 350721,
+      "cache_read": 8125097,
+      "output": 13858
+    },
+    "n_messages": 61,
+    "n_message_starts": 61
+  }
 }
 ```

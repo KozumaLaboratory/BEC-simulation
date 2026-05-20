@@ -304,12 +304,22 @@ Expected wall: 5-15 min ITP + 4 min JIT precompile. Total: ~10-20 min.
     "researcher": null,
     "implementer": null,
     "critic": null,
-    "total": null
+    "orchestrator": 9804190,
+    "total": 9804190,
+    "effective_full_rate": 1490783,
+    "breakdown": {
+      "input_fresh": 13630,
+      "cache_creation": 359590,
+      "cache_read": 9413711,
+      "output": 17259
+    },
+    "n_messages": 81,
+    "n_message_starts": 81
   },
   "warnings": [
     "BUG-6 NEW (silent-ignore, non-fatal): tol: 1.0e-9 in config is NOT parsed by _run_rotating_basis_ground_state_step; find_ground_state_rotating! has no tol kwarg and runs exactly n_steps iterations. If GS is not converged at 5000 steps, increase n_steps.",
-    "BUG-7 POTENTIAL (latent, non-triggered): V_trap.omega field access at patched file line 183 would crash if init_sigma were absent from config — V_trap is a plain Array with no .omega field. Config supplies init_sigma: 2.0 so this branch is skipped. Risk for configs that omit init_sigma with omega=0 axes.",
-    "ddi: {enabled: true} block in config is a no-op for rotating_basis GS step — c_dd is set via auto_path, not via the ddi: block. ddi.enabled: false would NOT zero c_dd in rotating_basis GS. Documented as known gap."
+    "BUG-7 POTENTIAL (latent, non-triggered): V_trap.omega field access at patched file line 183 would crash if init_sigma were absent from config \u2014 V_trap is a plain Array with no .omega field. Config supplies init_sigma: 2.0 so this branch is skipped. Risk for configs that omit init_sigma with omega=0 axes.",
+    "ddi: {enabled: true} block in config is a no-op for rotating_basis GS step \u2014 c_dd is set via auto_path, not via the ddi: block. ddi.enabled: false would NOT zero c_dd in rotating_basis GS. Documented as known gap."
   ],
   "physical_red_flags": [],
   "falsification_result": "INCONCLUSIVE"

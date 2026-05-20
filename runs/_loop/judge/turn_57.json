@@ -119,7 +119,17 @@
       "researcher": null,
       "implementer": null,
       "critic": null,
-      "total": null
+      "orchestrator": 14346879,
+      "total": 14346879,
+      "effective_full_rate": 2189862,
+      "breakdown": {
+        "input_fresh": 25573,
+        "cache_creation": 555865,
+        "cache_read": 13746479,
+        "output": 18962
+      },
+      "n_messages": 118,
+      "n_message_starts": 118
     }
   },
   "contract_evaluation": {

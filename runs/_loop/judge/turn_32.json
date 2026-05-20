@@ -31,7 +31,17 @@
       "researcher": null,
       "implementer": null,
       "critic": null,
-      "total": null
+      "orchestrator": 12047006,
+      "total": 12047006,
+      "effective_full_rate": 1796144,
+      "breakdown": {
+        "input_fresh": 30711,
+        "cache_creation": 376397,
+        "cache_read": 11613174,
+        "output": 26724
+      },
+      "n_messages": 88,
+      "n_message_starts": 88
     },
     "warnings": [
       "T31 phantom-PASS: files lost to 1Password SSH signing block; T32 uses Write/Edit only (no git commands)",

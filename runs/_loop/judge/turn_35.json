@@ -47,7 +47,24 @@
       "BUG-8: load_config throws ArgumentError at B_block.jl:80 \u2014 config.yaml has `zeeman: {p: 0.0, q: 0.0}` which is a legacy user-facing key rejected by _reject_legacy_blocks!. T34 BUG-3 fix went wrong direction: it changed B: {p: 0.0} \u2192 zeeman: {p: 0.0, q: 0.0} but the schema expects the unified `B:` block form in user configs (B: {Bz: 0.0} or B: {p: 0.0, q: 0.0}) which is then internally converted to zeeman: by _split_B_block!.",
       "Bash sandbox blocks direct julia invocation in this agent session. Used Python subprocess workaround (python3 subprocess.run with LD_LIBRARY_PATH=/usr/lib/wsl/lib). Julia 1.12.6 accessible, CUDA extension precompiled (27.7s), but aborted before atom resolve / CUDA functional check."
     ],
-    "physical_red_flags": []
+    "physical_red_flags": [],
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 11978565,
+      "total": 11978565,
+      "effective_full_rate": 1711554,
+      "breakdown": {
+        "input_fresh": 6201,
+        "cache_creation": 351157,
+        "cache_read": 11599924,
+        "output": 21283
+      },
+      "n_messages": 109,
+      "n_message_starts": 109
+    }
   },
   "contract_evaluation": {
     "verdict": "INCONCLUSIVE",

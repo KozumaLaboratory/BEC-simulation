@@ -2,6 +2,7 @@
   "turn": 118,
   "status": "INCONCLUSIVE",
   "issues": [
+    "check_cmd FAIL: stdout missing 'LAST_JUDGE_TIER3'",
     "check_cmd argv contains shell-metachar '&&' \u2014 use one program + args only",
     "check_cmd argv contains shell-metachar '&&' \u2014 use one program + args only",
     "check_cmd argv contains shell-metachar '|' \u2014 use one program + args only",
@@ -65,7 +66,23 @@
     "tests_passed": null,
     "warnings": [],
     "physical_red_flags": [],
-    "tokens_used": null
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 16482765,
+      "total": 16482765,
+      "effective_full_rate": 2312923,
+      "breakdown": {
+        "input_fresh": 37965,
+        "cache_creation": 450856,
+        "cache_read": 15971088,
+        "output": 22856
+      },
+      "n_messages": 119,
+      "n_message_starts": 119
+    }
   },
   "contract_evaluation": {
     "verdict": "INCONCLUSIVE",
@@ -102,12 +119,12 @@
       },
       {
         "id": "SC4-last-judge-top-level-patched",
-        "passed": true,
+        "passed": false,
         "actual": {
           "exit_code": 0,
-          "stdout_head": "LAST_JUDGE_TIER3"
+          "stdout_head": "LAST_JUDGE_INCONCLUSIVE"
         },
-        "reason": "check_cmd PASS: python3 -c \"import json; s=json.load(open('/home/suzume/work",
+        "reason": "check_cmd FAIL: stdout missing 'LAST_JUDGE_TIER3'",
         "shell_check": true
       },
       {
@@ -195,6 +212,7 @@
     ],
     "triggered_failure_modes": [],
     "issues": [
+      "check_cmd FAIL: stdout missing 'LAST_JUDGE_TIER3'",
       "check_cmd argv contains shell-metachar '&&' \u2014 use one program + args only",
       "check_cmd argv contains shell-metachar '&&' \u2014 use one program + args only",
       "check_cmd argv contains shell-metachar '|' \u2014 use one program + args only",
@@ -204,7 +222,13 @@
       "check_cmd program 'cd' not in allow-list ['[', 'awk', 'cat', 'echo', 'file', 'find', 'grep', 'head', 'jq', 'julia', 'ls', 'python', 'python3', 'rg', 'ripgrep', 'sed', 'stat', 'tail', 'test', 'uv', 'wc']"
     ]
   },
-  "cost_audit": null,
+  "cost_audit": {
+    "expected_cost_eff": 1500000,
+    "actual_cost_eff": 2312923,
+    "ratio_actual_over_expected": 1.54,
+    "deviation_pct": 54.2,
+    "flag": "BUDGET_OVER"
+  },
   "central_falsifier_check": {
     "applies": true,
     "tier_cap": null,

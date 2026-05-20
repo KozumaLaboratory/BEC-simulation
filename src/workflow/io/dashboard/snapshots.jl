@@ -5,7 +5,7 @@
 When `snap_idx === nothing` (default) the final `psi` field is returned.
 When `snap_idx` is a positive integer, loads the requested time-slice
 from `dynamics/psi_snapshots` (saved by runs with
-`save_psi_snapshots: true`); the 5D array is up-cast to ComplexF64 so
+`save: {psi: true}`); the 5D array is up-cast to ComplexF64 so
 downstream code (FFT, probability_current, etc.) runs at its native
 precision."""
 function _load_psi_cached(
@@ -38,12 +38,12 @@ function _load_psi_cached(
             #       "dynamics/psi_snapshots_streamed/frame_00001" … 00154.
             #       Written by the current simulator; peak memory on the
             #       write side is one snapshot.
-            #   (2) legacy — a single 5D array "dynamics/psi_snapshots"
+            #   (2) older format — a single 5D array "dynamics/psi_snapshots"
             #       with the snapshot index on the trailing axis.
             # Only read the requested frame in either case; never stack.
             #
             # Read at the on-disk precision (ComplexF32 by default per
-            # `save_snapshot_precision: "f32"`). Promoting to ComplexF64
+            # `save: {precision: "f32"}`). Promoting to ComplexF64
             # here doubled disk read + conversion cost; the binary
             # column/phase packers already cast to Float32, and the
             # JSON helpers promote via `Float64(...)` lazily, so they
@@ -65,7 +65,7 @@ function _load_psi_cached(
                     )
                     Array(view(snaps, idx...))
                 elseif haskey(f, "psi_snapshots")
-                    # Top-level Vector{Array{Complex,N+1}} layout (legacy
+                    # Top-level Vector{Array{Complex,N+1}} layout (older
                     # launch_thesis_run.jl / launch_phi_omega_run.jl prior
                     # to 2026-04-28 unification — kept for back-compat).
                     snaps = f["psi_snapshots"]
@@ -76,7 +76,7 @@ function _load_psi_cached(
                     throw(
                         ArgumentError(
                             "No psi snapshots in $(jld2_path). Re-run with " *
-                            "`save_psi_snapshots: true`.",
+                            "`save: {psi: true}`.",
                         ),
                     )
                 end
@@ -95,7 +95,7 @@ for `jld2_path`. The lab-frame spinor pipeline writes only the static
 final ψ + scalar traces to point_NNN.jld2, while the per-frame spinor
 volumes live in sibling result.jld2 (canonical streamed layout). If
 the requested file has its own snapshots (rotating_basis path, or a
-legacy run that embedded them) return it unchanged; otherwise
+older run that embedded them) return it unchanged; otherwise
 redirect to the sibling result.jld2 when present."""
 function _resolve_snapshot_source(jld2_path::String)
     try

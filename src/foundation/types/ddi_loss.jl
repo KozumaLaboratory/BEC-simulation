@@ -75,7 +75,7 @@ Fields:
 - `gamma_dr` — base dipolar-relaxation rate. Internally re-weighted per m
   via Clebsch–Gordan factors so only Δm=−1,−2 transitions drive loss and
   the average rate across m equals `gamma_dr`.
-- `L3` / `L3_per_m` — **legacy 2-body-shaped** rate that uses
+- `L3` / `L3_per_m` — **2-body-shaped** rate that uses
   `exp(-rate · n_total · dt / 2)`. Convenient when calibrated against the
   same shape; physically a 2-body loss with a 3-body label.
 - `K3_cubic` / `K3_per_m_cubic` — **physically correct 3-body** rate

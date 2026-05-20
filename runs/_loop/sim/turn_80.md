@@ -58,11 +58,11 @@ modifications. No git operations.
   "step0_haskey_zeeman_count": 0,
   "step0_yaml_bz_negative_verified": true,
   "step1_unit_parse_sign_preserved": true,
-  "step1_bz_internal_tesla": -1.0e-6,
+  "step1_bz_internal_tesla": -1e-06,
   "step2_p_dimless_value": -162.78,
   "step2_p_dimless_sign": "negative",
-  "step3_h_zee_convention_from_src": "-p·m_F",
-  "step3_src_file_citation": "src/hamiltonian/potentials/zeeman.jl:10,19 — `[(-z.p * m + z.q * m^2) for m in sys.m_values]` and `ntuple(c -> -z.p * (F - (c - 1)) + z.q * (F - (c - 1))^2, Val(D))`",
+  "step3_h_zee_convention_from_src": "-p\u00b7m_F",
+  "step3_src_file_citation": "src/hamiltonian/potentials/zeeman.jl:10,19 \u2014 `[(-z.p * m + z.q * m^2) for m in sys.m_values]` and `ntuple(c -> -z.p * (F - (c - 1)) + z.q * (F - (c - 1))^2, Val(D))`",
   "t75_empirical_consistent_with_convention": true,
   "step4_target_magnetization_in_yaml": false,
   "step4_predicted_min_m_F": -6,
@@ -87,7 +87,24 @@ modifications. No git operations.
   "src_lines_quoted_verbatim_count": 6,
   "physical_red_flags": [],
   "warnings": [],
-  "falsification_result": "DERIVATION_COMPLETE"
+  "falsification_result": "DERIVATION_COMPLETE",
+  "tokens_used": {
+    "theorist": null,
+    "researcher": null,
+    "implementer": null,
+    "critic": null,
+    "orchestrator": 12671050,
+    "total": 12671050,
+    "effective_full_rate": 1892821,
+    "breakdown": {
+      "input_fresh": 20932,
+      "cache_creation": 418769,
+      "cache_read": 12205779,
+      "output": 25570
+    },
+    "n_messages": 86,
+    "n_message_starts": 86
+  }
 }
 ```
 

@@ -127,11 +127,21 @@ Estimated wall-clock: ~45-60 min per Omega run + ~7 min JIT (GPU F32 cached from
     "researcher": null,
     "implementer": null,
     "critic": null,
-    "total": null
+    "orchestrator": 9171056,
+    "total": 9171056,
+    "effective_full_rate": 1560780,
+    "breakdown": {
+      "input_fresh": 36452,
+      "cache_creation": 426862,
+      "cache_read": 8683257,
+      "output": 24485
+    },
+    "n_messages": 66,
+    "n_message_starts": 66
   },
   "warnings": [
-    "julia binary sandbox approval required — run not executed",
-    "pre-flight estimate_run_budget not run — sandbox blocked",
+    "julia binary sandbox approval required \u2014 run not executed",
+    "pre-flight estimate_run_budget not run \u2014 sandbox blocked",
     "config file committed to auto branch; julia run requires anko manual dispatch"
   ],
   "physical_red_flags": [],

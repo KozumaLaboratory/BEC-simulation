@@ -55,13 +55,13 @@ Each subsystem umbrella `Foo.jl` `include`s sub-files in dependency order. Publi
 - `scan_continuation(; make_params, ...)` — parameter sweep with continuation
 - `scan_phase_diagram_2d(; make_params, ...)` — 2D phase diagram
 
-**YAML schema**: parameter variation is expressed as a **config path override** — a dotted path into the raw YAML dict (e.g. `pipeline.0.ddi.c_dd`) mapped to a new value. Full reference: `docs/reference/yaml_schema_reference.md`. Per-step dynamics knobs: `docs/reference/dynamics.md`. The 2026-04-30 lab-units overhaul (`units:`, `accuracy:`, `auto_grid:`, `template:`, `mixins:`, `defaults:`, multi-source `zeeman:`, ε hardening) is OPT-IN — legacy bare-Real YAMLs parse unchanged.
+**YAML schema**: parameter variation is expressed as a **config path override** — a dotted path into the raw YAML dict (e.g. `pipeline.0.ddi.c_dd`) mapped to a new value. Full reference: `docs/reference/yaml_schema_reference.md`. Per-step dynamics knobs: `docs/reference/dynamics.md`. Magnetic field uses the **unified `B:` block** (`B: {Bz, theta, phi}` or `B: {p_mv, coil_mode}` for lab-units calibration); `q` auto-derives from |B|² unless explicit. Lab-units features (`units:`, `accuracy:`, `auto_grid:`, `template:`, `mixins:`, `defaults:`, ε hardening) are OPT-IN.
 
 **Mixed precision (rotating_basis only)**: set `dtype: f32` in the `ground_state` block. Plumbs Float32 through Grid, V_trap, workspace, FFT plans, DDI buffers. First-time JIT for the F32 specialisation ~10 min then cached. Caveats: `apply_uniform_spin_rotation!` + `apply_ddi_step!` + `apply_spin_mixing_step!` keep scalar Float64 locks (rotation builder + DDI dt + c1·dt) — array work stays F32. `DDIParams.C_dd` is Float64 by struct definition. F64 is the default. See `test/test_rotating_basis_f32.jl`.
 
 **Noise**: both GS (`temperature_ratio`) and phase noise (`dynamics.temperature_ratio`) use Bose-Einstein thermal noise with `T/T_c ∈ (0, 1)`, driving `add_thermal_noise(psi, F; T_over_Tc, seed)`.
 
-**Calibration**: lab-unit YAML preprocess auto-applied by `run_yaml`. Single `calibration:` block or `calibration_history:` for week-to-week interpolation. Lab fields then expand: `zeeman: {p_mv: 2.5, coil_mode: strong}` → `zeeman: {p: "X Gauss"}`. See `docs/reference/yaml_schema_reference.md`.
+**Calibration**: lab-unit YAML preprocess auto-applied by `run_yaml`. Single `calibration:` block or `calibration_history:` for week-to-week interpolation. Lab fields then expand inside the unified `B:` block: `B: {p_mv: 2.5, coil_mode: strong}` resolves via calibration table to a Gauss value before downstream parsing. See `docs/reference/yaml_schema_reference.md` for canonical examples.
 
 **`phi_omega` Hz form**: `phi_omega: 4.524` (dimensionless ω/ω_ref) and `phi_omega: "226.2 Hz"` are equivalent; Hz converts via `(2π·f)/ω_ref` using parent `interactions.omega_ref`. Eliminates the Klaus 2022 magnetostir 2π footgun (memory: `gotcha_waveform_frequency_convention.md`).
 

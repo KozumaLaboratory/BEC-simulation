@@ -123,6 +123,13 @@ struct RotatingBasisWS{T <: AbstractFloat, N, D,
     # Gauge: if true, apply χ̇ = -φ̇ cosθ to remove F_z component of Â.
     gauge_fix::Bool
 
+    # Optional loss channels (K3 / γ_dr / evap). LossParams() with all
+    # zeros is the inactive default and apply_loss_step! short-circuits
+    # via `_is_active(loss)`, so adding this field is free for callers
+    # that don't supply a loss block. K3 / γ_dr act on |ψ̃|² which is
+    # basis-invariant so applying the spinor-path step on ψ̃ is correct.
+    loss::LossParams
+
     # Backend (CPU or CUDA) — kept on the workspace so callers can dispatch.
     backend::BACK
 end
@@ -144,6 +151,7 @@ function make_rotating_basis_ws(
     theta_dot_func=(_t) -> 0.0,
     phi_dot_func=(_t) -> 0.0,
     gauge_fix::Bool=true,
+    loss::LossParams=LossParams(),
     backend::AbstractBackend=CPUBackend(),
 ) where {N, T <: AbstractFloat}
     D = 2F + 1
@@ -211,7 +219,7 @@ function make_rotating_basis_ws(
         ddi_params, ddi_bufs,
         V_trap_dev, T(p), T(q), T(c0), T(c1), T(gamma_lhy),
         theta_func, phi_func, theta_dot_func, phi_dot_func,
-        gauge_fix, backend,
+        gauge_fix, loss, backend,
     )
 end
 

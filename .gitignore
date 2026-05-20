@@ -77,3 +77,7 @@ runs/eu151_edh/result_postfix_gs_32cube.jld2
 
 # Generated paper LaTeX/PDF (use scripts/manuscript/build_paper_latex.sh to regenerate)
 docs/manuscript/papers/*/build/
+
+# Tailscale TLS certs (per-machine, never commit)
+dashboard/anko-wsl.*.crt
+dashboard/anko-wsl.*.key

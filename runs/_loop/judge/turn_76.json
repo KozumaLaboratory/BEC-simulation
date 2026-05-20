@@ -44,7 +44,17 @@
       "researcher": null,
       "implementer": null,
       "critic": null,
-      "total": null
+      "orchestrator": 23773313,
+      "total": 23773313,
+      "effective_full_rate": 3055578,
+      "breakdown": {
+        "input_fresh": 28118,
+        "cache_creation": 472860,
+        "cache_read": 23250059,
+        "output": 22276
+      },
+      "n_messages": 176,
+      "n_message_starts": 176
     }
   },
   "contract_evaluation": {
@@ -108,7 +118,18 @@
     "triggered_failure_modes": [],
     "issues": []
   },
-  "cost_audit": null,
+  "cost_audit": {
+    "expected_cost_eff": 2000000,
+    "actual_cost_eff": 3055578,
+    "ratio_actual_over_expected": 1.53,
+    "deviation_pct": 52.8,
+    "flag": "BUDGET_OVER"
+  },
+  "central_falsifier_check": {
+    "applies": false,
+    "reason": "target tier 1.5 < 3.0"
+  },
+  "tier_cap": null,
   "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
   "stage_advancing_to": "Analyze",
   "investigation_update": {

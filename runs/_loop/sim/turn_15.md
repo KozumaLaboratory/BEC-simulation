@@ -47,12 +47,22 @@ Full output captured below in §5.
     "researcher": null,
     "implementer": null,
     "critic": null,
-    "total": null
+    "orchestrator": 6401835,
+    "total": 6401835,
+    "effective_full_rate": 1106376,
+    "breakdown": {
+      "input_fresh": 18997,
+      "cache_creation": 328211,
+      "cache_read": 6040004,
+      "output": 14623
+    },
+    "n_messages": 54,
+    "n_message_starts": 54
   },
   "warnings": [],
   "physical_red_flags": [
-    "Candidate C REFUTED: pure rank-2 cascade from m=+6 does NOT reach <F_z>/N=5.02 within t=30 ω⁻¹. At t=30 ω⁻¹=43.4 ms, <F_z>/N=5.257. τ_init_slope=67.5 ms >> [7,14] ms. Gap factor ~5-10x remains.",
-    "gamma_eff(t) grows from 1.15x at t=0 to 1.34x at t=15 ω⁻¹ — multi-rung cascade acceleration (Candidate A) is real but insufficient (only ~30% speedup vs needed 5-10x)."
+    "Candidate C REFUTED: pure rank-2 cascade from m=+6 does NOT reach <F_z>/N=5.02 within t=30 \u03c9\u207b\u00b9. At t=30 \u03c9\u207b\u00b9=43.4 ms, <F_z>/N=5.257. \u03c4_init_slope=67.5 ms >> [7,14] ms. Gap factor ~5-10x remains.",
+    "gamma_eff(t) grows from 1.15x at t=0 to 1.34x at t=15 \u03c9\u207b\u00b9 \u2014 multi-rung cascade acceleration (Candidate A) is real but insufficient (only ~30% speedup vs needed 5-10x)."
   ],
   "falsification_result": "REFUTED",
   "compute_results": [
@@ -66,13 +76,13 @@ Full output captured below in §5.
       "id": "S2",
       "task": "dF_z/dt|_{t=0+} exact rational",
       "status": "OK",
-      "result": "dF_z/dt|_{t=0+} = -3/140 ω⁻¹ (exact). Dimensional: -0.0148 ms⁻¹ at ω_ref=691.15. τ_init_slope=140/3=46.67 ω⁻¹=67.52 ms. NOT in [7,14] ms."
+      "result": "dF_z/dt|_{t=0+} = -3/140 \u03c9\u207b\u00b9 (exact). Dimensional: -0.0148 ms\u207b\u00b9 at \u03c9_ref=691.15. \u03c4_init_slope=140/3=46.67 \u03c9\u207b\u00b9=67.52 ms. NOT in [7,14] ms."
     },
     {
       "id": "S3",
       "task": "Full ODE integration; find t* where <F_z>/N=5.02",
       "status": "OK",
-      "result": "<F_z>/N at t=30 ω⁻¹ is 5.257, never reaches 5.02 within t=30 ω⁻¹. t* does not exist in this window. Cascade too slow by factor ~5-10."
+      "result": "<F_z>/N at t=30 \u03c9\u207b\u00b9 is 5.257, never reaches 5.02 within t=30 \u03c9\u207b\u00b9. t* does not exist in this window. Cascade too slow by factor ~5-10."
     },
     {
       "id": "S4",
@@ -84,7 +94,7 @@ Full output captured below in §5.
       "id": "S5",
       "task": "gamma_eff(t) acceleration profile",
       "status": "OK",
-      "result": "γ_eff/γ_0: 1.15 at t=0, 1.25 at t=8 ω⁻¹, 1.34 at t=15 ω⁻¹. Cascade accelerates ~30% as mid-rungs are reached. Insufficient to close 5-10x gap."
+      "result": "\u03b3_eff/\u03b3_0: 1.15 at t=0, 1.25 at t=8 \u03c9\u207b\u00b9, 1.34 at t=15 \u03c9\u207b\u00b9. Cascade accelerates ~30% as mid-rungs are reached. Insufficient to close 5-10x gap."
     }
   ]
 }

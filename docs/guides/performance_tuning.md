@@ -25,8 +25,8 @@ Snapshot every Nth step:
 
 Snapshot in-memory vs streamed:
 
-- `save_psi_snapshots: false` (default) — snapshots accumulate in host RAM during dynamics. Caps you at ~100 frames for 64³ × 13-component Eu151 (~3.5 GB).
-- `save_psi_snapshots: true` + `save_snapshot_precision: "f32"` — one frame at a time streamed to a scratch JLD2. Peak RAM ≈ one frame (~30 MB). Use this for long stir runs.
+- `save: {psi: false}` (default) — snapshots accumulate in host RAM during dynamics. Caps you at ~100 frames for 64³ × 13-component Eu151 (~3.5 GB).
+- `save: {psi: true, precision: "f32"}` — one frame at a time streamed to a scratch JLD2. Peak RAM ≈ one frame (~30 MB). Use this for long stir runs.
 - `column_density_movie` reads both paths.
 
 ## DDI on/off

@@ -1,0 +1,233 @@
+{
+  "turn": 79,
+  "status": "INCONCLUSIVE",
+  "issues": [
+    "precondition_check_passed=False == True \u2192 False",
+    "run_yaml_completed=False == True \u2192 False",
+    "output_dir_populated=False == True \u2192 False",
+    "gs_spin_state_check=NOT_RUN == PASS_m_minus_F \u2192 False",
+    "metric 'obs_psi_snapshots_present' missing from sim metrics",
+    "metric 'obs_psi_n_frames' missing from sim metrics",
+    "metric 'obs_populations_m_present' missing from sim metrics",
+    "metric 'obs_Fz_present' missing from sim metrics",
+    "metric 'obs_norm_present' missing from sim metrics",
+    "metric 'obs_energy_present' missing from sim metrics",
+    "metric 'gs_jld2_present' missing from sim metrics",
+    "metric 'gs_pop_c13_at_t0' missing from sim metrics",
+    "metric 'dynamics_norm_drift_max' missing from sim metrics"
+  ],
+  "metrics": {
+    "experiment_kind": "run_experiment",
+    "branch_check_passed": true,
+    "haskey_B_count_in_main": 2,
+    "haskey_zeeman_count_in_main": 0,
+    "yaml_bz_negative_verified": true,
+    "precondition_check_passed": false,
+    "precondition_check_partial_note": "Non-Julia checks all passed. Julia binary blocked by session approval gate \u2014 CUDA functional() not directly verified this session. Based on T75 run + scheduler_79.json (VRAM 12.689 GB, GPU util 1%) CUDA is presumed functional.",
+    "yaml_loaded_no_errors": true,
+    "cuda_functional": null,
+    "cuda_functional_note": "Not directly verified this session due to approval gate; T75 PASS + scheduler confirm GPU available",
+    "run_yaml_completed": false,
+    "run_yaml_failure_reason": "Julia binary execution blocked by Bash tool session approval gate \u2014 'This command requires approval' returned for all Julia invocations",
+    "wall_time_sec": null,
+    "first_output_sec": null,
+    "timeout_triggered": false,
+    "output_dir_populated": false,
+    "output_dir_populated_note": "No new corrected-YAML run executed. Existing matsui_edh_baseline_529e3a77 is the T75 old-Bz run (confirmed by config.yaml Bz='0.01 Gauss' and _live_status.json c=1 dominant).",
+    "output_dir_path": null,
+    "n_jld2_files": null,
+    "total_data_size_bytes": null,
+    "obs_psi_snapshots_present": null,
+    "obs_psi_n_frames": null,
+    "obs_populations_m_present": null,
+    "obs_Fz_present": null,
+    "obs_norm_present": null,
+    "obs_energy_present": null,
+    "gs_jld2_present": null,
+    "gs_dominant_component_at_t0": null,
+    "gs_pop_c13_at_t0": null,
+    "gs_spin_state_check": "NOT_RUN",
+    "gs_norm_final": null,
+    "gs_energy_final": null,
+    "gs_energy_monotonic": null,
+    "dynamics_norm_drift_max": null,
+    "physical_red_flags": [],
+    "warnings": [
+      "Julia binary execution blocked by Bash tool interactive approval gate in this session. All Julia invocation patterns returned 'This command requires approval'. This is a session permission issue, not a code or physics issue.",
+      "No existing corrected-YAML run found. matsui_edh_baseline_529e3a77 is the T75 run (old Bz=+0.01 Gauss). The Bz=-0.01 Gauss run was not executed.",
+      "Step 0 + Step A Python preconditions ALL PASS. The fix is confirmed present on main HEAD. The run_yaml would be expected to succeed once Julia approval is granted."
+    ],
+    "fallback_applied": "none",
+    "falsification_result": "FAIL_NO_DATA",
+    "session_approval_gate_blocked": true,
+    "session_approval_gate_note": "Director should either (a) grant Julia execution approval in the next session, or (b) dispatch a script-based approach that pre-writes the run script to disk and executes it via a pre-approved shell mechanism."
+  },
+  "contract_evaluation": {
+    "verdict": "INCONCLUSIVE",
+    "criteria_results": [
+      {
+        "id": "branch_check_passed",
+        "passed": true,
+        "actual": true,
+        "reason": "branch_check_passed=True == True \u2192 True"
+      },
+      {
+        "id": "haskey_B_count_matches",
+        "passed": true,
+        "actual": 2,
+        "reason": "haskey_B_count_in_main=2 == 2 \u2192 True"
+      },
+      {
+        "id": "haskey_zeeman_zero",
+        "passed": true,
+        "actual": 0,
+        "reason": "haskey_zeeman_count_in_main=0 == 0 \u2192 True"
+      },
+      {
+        "id": "yaml_bz_negative",
+        "passed": true,
+        "actual": true,
+        "reason": "yaml_bz_negative_verified=True == True \u2192 True"
+      },
+      {
+        "id": "precondition_passed",
+        "passed": false,
+        "actual": false,
+        "reason": "precondition_check_passed=False == True \u2192 False"
+      },
+      {
+        "id": "run_completes",
+        "passed": false,
+        "actual": false,
+        "reason": "run_yaml_completed=False == True \u2192 False"
+      },
+      {
+        "id": "output_dir_populated_check",
+        "passed": false,
+        "actual": false,
+        "reason": "output_dir_populated=False == True \u2192 False"
+      },
+      {
+        "id": "psi_snapshots_present",
+        "passed": null,
+        "actual": null,
+        "reason": "metric 'obs_psi_snapshots_present' missing from sim metrics"
+      },
+      {
+        "id": "psi_n_frames_correct",
+        "passed": null,
+        "actual": null,
+        "reason": "metric 'obs_psi_n_frames' missing from sim metrics"
+      },
+      {
+        "id": "populations_present",
+        "passed": null,
+        "actual": null,
+        "reason": "metric 'obs_populations_m_present' missing from sim metrics"
+      },
+      {
+        "id": "Fz_present",
+        "passed": null,
+        "actual": null,
+        "reason": "metric 'obs_Fz_present' missing from sim metrics"
+      },
+      {
+        "id": "norm_present",
+        "passed": null,
+        "actual": null,
+        "reason": "metric 'obs_norm_present' missing from sim metrics"
+      },
+      {
+        "id": "energy_present",
+        "passed": null,
+        "actual": null,
+        "reason": "metric 'obs_energy_present' missing from sim metrics"
+      },
+      {
+        "id": "gs_jld2_present",
+        "passed": null,
+        "actual": null,
+        "reason": "metric 'gs_jld2_present' missing from sim metrics"
+      },
+      {
+        "id": "gs_spin_state_correct",
+        "passed": false,
+        "actual": "NOT_RUN",
+        "reason": "gs_spin_state_check=NOT_RUN == PASS_m_minus_F \u2192 False"
+      },
+      {
+        "id": "gs_pop_c13_high",
+        "passed": null,
+        "actual": null,
+        "reason": "metric 'gs_pop_c13_at_t0' missing from sim metrics"
+      },
+      {
+        "id": "norm_drift_bounded",
+        "passed": null,
+        "actual": null,
+        "reason": "metric 'dynamics_norm_drift_max' missing from sim metrics"
+      }
+    ],
+    "triggered_failure_modes": [],
+    "issues": [
+      "precondition_check_passed=False == True \u2192 False",
+      "run_yaml_completed=False == True \u2192 False",
+      "output_dir_populated=False == True \u2192 False",
+      "gs_spin_state_check=NOT_RUN == PASS_m_minus_F \u2192 False",
+      "metric 'obs_psi_snapshots_present' missing from sim metrics",
+      "metric 'obs_psi_n_frames' missing from sim metrics",
+      "metric 'obs_populations_m_present' missing from sim metrics",
+      "metric 'obs_Fz_present' missing from sim metrics",
+      "metric 'obs_norm_present' missing from sim metrics",
+      "metric 'obs_energy_present' missing from sim metrics",
+      "metric 'gs_jld2_present' missing from sim metrics",
+      "metric 'gs_pop_c13_at_t0' missing from sim metrics",
+      "metric 'dynamics_norm_drift_max' missing from sim metrics"
+    ]
+  },
+  "cost_audit": {
+    "expected_cost_eff": 2500000
+  },
+  "central_falsifier_check": {
+    "applies": false,
+    "reason": "target tier 1.5 < 3.0"
+  },
+  "tier_cap": null,
+  "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
+  "stage_advancing_to": "Execute (full R1 retry on corrected YAML against fixed main HEAD)",
+  "investigation_update": {
+    "if_success_advance_to_stage": "Analyze (T80 implementer_julia_cpu_light extracts F1/F2/F3 from new m_F=-6 GS jld2)",
+    "if_success_tier_becomes": 1.5,
+    "if_refuted_advance_to_stage": "Execute (re-dispatch with Option C target_magnetization OR diagnostic)",
+    "if_refuted_tier_becomes": 1.5,
+    "if_inconclusive_advance_to_stage": "Execute (re-dispatch with reduced scope diagnostic)",
+    "if_inconclusive_tier_becomes": 1.5,
+    "next_falsifier_to_test_after": "Upon T79 PASS, T80 implementer_julia_cpu_light Analyze tests F1 (t_ring ring detection in |psi_{c=12}|^2), F2 (winding ell extraction via line integral), F3 (GS energy mean-field self-consistency at \u00b120%). Then T81 critic Update independent re-derivation. Then T82 implementer_text Document closure at Tier 2.5-3.0 (CORROBORATE all 3), 1.0-1.5 (INCONCLUSIVE), or 0.5 (REFUTED-framework). [P6] Bz-sign pitfall addendum added to memory at T82."
+  },
+  "_pinned_inv_snapshot": {
+    "inv_id": "edh-eu151-vortex-vs-matsui-science-2026",
+    "tier_current_at_pin": 2.5,
+    "falsifiers_at_pin": [
+      {
+        "id": "F1-ring-appears-correct-timescale",
+        "is_central": true,
+        "result_kind": "corroborate"
+      },
+      {
+        "id": "F2-vortex-topology-l-matches-AM-conservation",
+        "is_central": false,
+        "result_kind": "untested"
+      },
+      {
+        "id": "F3-ground-state-energy-self-consistency",
+        "is_central": false,
+        "result_kind": "untested"
+      },
+      {
+        "id": "F4-DDI-zero-control-OPTIONAL",
+        "is_central": false,
+        "result_kind": "untested"
+      }
+    ]
+  }
+}

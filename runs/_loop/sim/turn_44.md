@@ -139,9 +139,13 @@ EXIT: 0, ELAPSED_TOTAL: 58.0s
   "wall_time_sec": 58.0,
   "peak_memory_gb": null,
   "tests_passed": null,
-  "n_max_dimless": 1.034180e-03,
+  "n_max_dimless": 0.00103418,
   "n_max_D0": 3.09,
-  "m_populations": [0.37496, 0.25007, 0.37496],
+  "m_populations": [
+    0.37496,
+    0.25007,
+    0.37496
+  ],
   "F_z_per_N": -1e-06,
   "L_z_per_N": 3e-06,
   "E_total_per_N": 0.196909,
@@ -159,7 +163,11 @@ EXIT: 0, ELAPSED_TOTAL: 58.0s
   "gamma_lhy": 12.795,
   "eps_dd_phys": 1.1772,
   "mu_final": 0.316267,
-  "initial_m_populations_check": [0.25000, 0.50000, 0.25000],
+  "initial_m_populations_check": [
+    0.25,
+    0.5,
+    0.25
+  ],
   "initial_L_z_per_N_check": -3.9e-15,
   "initial_F_z_per_N_check": 0.0,
   "precondition_passed": true,
@@ -168,20 +176,29 @@ EXIT: 0, ELAPSED_TOTAL: 58.0s
     "researcher": null,
     "implementer": null,
     "critic": null,
-    "orchestrator": null,
-    "total": null
+    "orchestrator": 21850261,
+    "total": 21850261,
+    "effective_full_rate": 3069491,
+    "breakdown": {
+      "input_fresh": 34090,
+      "cache_creation": 609738,
+      "cache_read": 21175293,
+      "output": 31140
+    },
+    "n_messages": 190,
+    "n_message_starts": 190
   },
   "warnings": [
-    "converged=false: ITP ran all 6250 steps without crossing tol=1e-8. F32 floor prevents |Δμ| from reaching tol (same behavior as T43 P0_pre). State is functionally converged at F32 precision.",
-    "E_DDI_per_N = NaN: BUG-9 framework limitation — rotating_basis ITP does not expose DDI energy decomposition post-hoc. E_total excludes DDI.",
-    "n_max_D0 = 3.09: in [10, 100) ×NO — actually in (0, 10), triggering REFUTE branch (R2_b). Topology-correct fl_vortex seed did not nucleate self-bound droplet at dx=0.125."
+    "converged=false: ITP ran all 6250 steps without crossing tol=1e-8. F32 floor prevents |\u0394\u03bc| from reaching tol (same behavior as T43 P0_pre). State is functionally converged at F32 precision.",
+    "E_DDI_per_N = NaN: BUG-9 framework limitation \u2014 rotating_basis ITP does not expose DDI energy decomposition post-hoc. E_total excludes DDI.",
+    "n_max_D0 = 3.09: in [10, 100) \u00d7NO \u2014 actually in (0, 10), triggering REFUTE branch (R2_b). Topology-correct fl_vortex seed did not nucleate self-bound droplet at dx=0.125."
   ],
   "physical_red_flags": [
-    "n_max_D0 = 3.09 (below REFUTE threshold 10 D0, let alone PASS threshold 100 D0). Seed topology preserved throughout ITP (F_z≈0, L_z≈0, m-populations symmetric) but density did NOT concentrate toward self-bound regime.",
-    "Post-ITP m_populations = (0.375, 0.250, 0.375) — NOT the (0.50, 0, 0.50) Mermin-Ho pair observed at T40 P4 (dx=0.4375). ITP from fl_vortex seed at dx=0.125 equilibrated to a DIFFERENT spin texture than at dx=0.4375. The m=0 component was NOT evacuated — ITP transferred population FROM m=0 TO m=±1 only partially (0.5→0.25, 0.25→0.375).",
-    "mu_final = 0.316 (vs 0.120 for spherical Gaussian seed T43 P0_pre). Higher chemical potential reflects vortex gradient energy contribution — the fl_vortex topology IS encoded in the ITP state.",
+    "n_max_D0 = 3.09 (below REFUTE threshold 10 D0, let alone PASS threshold 100 D0). Seed topology preserved throughout ITP (F_z\u22480, L_z\u22480, m-populations symmetric) but density did NOT concentrate toward self-bound regime.",
+    "Post-ITP m_populations = (0.375, 0.250, 0.375) \u2014 NOT the (0.50, 0, 0.50) Mermin-Ho pair observed at T40 P4 (dx=0.4375). ITP from fl_vortex seed at dx=0.125 equilibrated to a DIFFERENT spin texture than at dx=0.4375. The m=0 component was NOT evacuated \u2014 ITP transferred population FROM m=0 TO m=\u00b11 only partially (0.5\u21920.25, 0.25\u21920.375).",
+    "mu_final = 0.316 (vs 0.120 for spherical Gaussian seed T43 P0_pre). Higher chemical potential reflects vortex gradient energy contribution \u2014 the fl_vortex topology IS encoded in the ITP state.",
     "E_kin/N = 0.009 (vs ~0 for T43 spherical seed). Finite kinetic energy confirms vortex phase structure persists after 6250 ITP steps.",
-    "E_LHY/N = 0.129 >> E_contact/N = 0.059: LHY repulsion dominates contact in the partial-nucleation regime. Ratio E_LHY/E_contact = 2.2× (vs ~0 in T43 delocalized state). This is a qualitative change — the LHY term is more important than in the fully-delocalized case, but not sufficient to drive self-binding at dx=0.125.",
+    "E_LHY/N = 0.129 >> E_contact/N = 0.059: LHY repulsion dominates contact in the partial-nucleation regime. Ratio E_LHY/E_contact = 2.2\u00d7 (vs ~0 in T43 delocalized state). This is a qualitative change \u2014 the LHY term is more important than in the fully-delocalized case, but not sufficient to drive self-binding at dx=0.125.",
     "E_total/N = 0.197 > 0 (partial, no DDI): still positive (unbound) even with fl_vortex topology. DDI term sign unknown."
   ],
   "falsification_result": "REFUTED"

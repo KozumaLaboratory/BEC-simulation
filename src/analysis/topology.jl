@@ -130,10 +130,9 @@ function monopole_charge_3d(
     smooth::Bool=false,
 )
     n_pts = grid.config.n_points
-    # Compute spin expectation values Fx, Fy, Fz at each grid point.
     fx_field, fy_field, fz_field = _spin_expectation_fields(psi, grid)
 
-    # Normalise to unit vectors (where density > threshold)
+
     nhat_x = similar(fx_field)
     nhat_y = similar(fy_field)
     nhat_z = similar(fz_field)
@@ -155,7 +154,6 @@ function monopole_charge_3d(
     q = zeros(Float64, nx-2, ny-2, nz-2)
     inv4π = 1.0 / (4π)
     @inbounds for k in 2:(nz - 1), j in 2:(ny - 1), i in 2:(nx - 1)
-        # Centred differences for the three partials
         ∂x_nx = (nhat_x[i + 1, j, k] - nhat_x[i - 1, j, k]) / (2dx)
         ∂x_ny = (nhat_y[i + 1, j, k] - nhat_y[i - 1, j, k]) / (2dx)
         ∂x_nz = (nhat_z[i + 1, j, k] - nhat_z[i - 1, j, k]) / (2dx)
@@ -165,11 +163,9 @@ function monopole_charge_3d(
         ∂z_nx = (nhat_x[i, j, k + 1] - nhat_x[i, j, k - 1]) / (2dz)
         ∂z_ny = (nhat_y[i, j, k + 1] - nhat_y[i, j, k - 1]) / (2dz)
         ∂z_nz = (nhat_z[i, j, k + 1] - nhat_z[i, j, k - 1]) / (2dz)
-        # Cross product ∂_y n̂ × ∂_z n̂
         cx = ∂y_ny * ∂z_nz - ∂y_nz * ∂z_ny
         cy = ∂y_nz * ∂z_nx - ∂y_nx * ∂z_nz
         cz = ∂y_nx * ∂z_ny - ∂y_ny * ∂z_nx
-        # n̂ · (cross) — pointwise
         q[i - 1, j - 1, k - 1] =
             inv4π * (nhat_x[i, j, k] * cx +
                      nhat_y[i, j, k] * cy +

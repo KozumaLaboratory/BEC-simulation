@@ -156,7 +156,7 @@ dynamics:
     n_traj: 50
     seed: 42
     noise_per_component: true   # Wigner vacuum on each m-component
-  save_psi_snapshots: true
+  save: {psi: true}
   ...
 ```
 

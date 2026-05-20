@@ -213,8 +213,8 @@ For F ≥ 3 (e.g. Eu151 F=6) the spinor LHY problem is **research-open**:
   in a strong B field — but it does not capture spin-dependent depletion.
 
 For F=6 production runs, one of the following is the appropriate choice:
-1. `spinor_lhy: two_channel` for c0/c1 path with weak DDI (qualitative).
-2. `spinor_lhy: scalar_with_ddi` (planned) for fully-polarized + strong DDI.
+Use the `lhy: {kind: ...}` block in the ground_state step to select
+the LHY treatment (scalar, two_channel, polar_contact, fm_contact, etc.).
 3. Disable LHY entirely (set `gamma_lhy: 0`) and rely on TF — most reliable
    when ε_dd ≲ 1 and the cloud is far from droplet onset.
 
@@ -224,8 +224,8 @@ function _lhy_energy(psi, c_lhy, n_comp, ndim, n_pts, dV)
     if n_comp > 1
         @warn """LHY energy uses scalar (fully-polarized) approximation for a \
 spinor condensate (n_comp=$n_comp). Spin-dependent LHY corrections are not \
-included. To use the two-channel spinor LHY table, add `spinor_lhy: two_channel` \
-to the YAML ground_state step or pass `spinor_lhy=:two_channel` to make_workspace. \
+included. To use the two-channel spinor LHY table, set `lhy: {kind: two_channel}` \
+in the YAML ground_state step. \
 For F ≥ 3 the two-channel table is also incomplete — see _lhy_energy docstring.""" maxlog=1
     end
     n = total_density(psi, ndim)

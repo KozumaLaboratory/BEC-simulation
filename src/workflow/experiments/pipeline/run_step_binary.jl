@@ -141,7 +141,8 @@ end
         psi_A_init=state.psi_A,
         psi_B_init=state.psi_B)
 
-    save_psi = Bool(get(p, "save_psi_snapshots", false))
+    save_block_binary = get(p, "save", Dict{Any, Any}())::AbstractDict
+    save_psi = Bool(get(save_block_binary, "psi", false))
     times = Float64[]
     psi_A_snaps = Vector{Array{ComplexF64, ndims(sim.psi_A)}}()
     psi_B_snaps = Vector{Array{ComplexF64, ndims(sim.psi_B)}}()

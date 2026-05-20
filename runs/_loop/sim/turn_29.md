@@ -106,7 +106,17 @@ Total: 19
     "researcher": null,
     "implementer": null,
     "critic": null,
-    "total": null
+    "orchestrator": 9942181,
+    "total": 9942181,
+    "effective_full_rate": 1526725,
+    "breakdown": {
+      "input_fresh": 6106,
+      "cache_creation": 355073,
+      "cache_read": 9556782,
+      "output": 24220
+    },
+    "n_messages": 75,
+    "n_message_starts": 75
   },
   "warnings": [],
   "physical_red_flags": [],
@@ -118,7 +128,17 @@ Total: 19
     "memo_errata_bloch_siegert_count": 5,
     "memo_contains_sign_chain": true,
     "memo_sign_chain_T23_count": 2,
-    "memo_sections_present": ["Investigation", "Verified closed form", "Empirical anchors", "Sign-chain history (load-bearing for reproducibility)", "ERRATA (sim/turn_27.md §6)", "Cascade-vs-Barnett separation", "Falsifier final state", "Downstream cross-link", "References"],
+    "memo_sections_present": [
+      "Investigation",
+      "Verified closed form",
+      "Empirical anchors",
+      "Sign-chain history (load-bearing for reproducibility)",
+      "ERRATA (sim/turn_27.md \u00a76)",
+      "Cascade-vs-Barnett separation",
+      "Falsifier final state",
+      "Downstream cross-link",
+      "References"
+    ],
     "state_tier_promoted": true,
     "state_tier_current_value": 3.0,
     "state_stage_closed": true,

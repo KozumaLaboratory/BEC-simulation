@@ -152,14 +152,18 @@ Walk a raw YAML config dict (as returned by `YAML.load_file`) and rewrite
 lab-unit fields into Unitful-tagged strings that the existing pipeline
 parser already consumes via `Units.safe_parse_quantity`.
 
-Recognized conventions:
+Recognized conventions (unified `B:` block; magnitude + direction in
+one mapping):
 
-- `zeeman: {p_mv: 2.7, coil_mode: strong|weak}` →
-  `zeeman: {p: "X Gauss"}`. `coil_mode` defaults to `strong`.
+- `B: {p_mv: 2.7, coil_mode: strong|weak, theta: ..., phi: ...}` →
+  internally normalized to `zeeman: {p: "X Gauss"}` (the `p` key here
+  is internal-only). `coil_mode` defaults to `strong`. `q` is
+  auto-derived from |B|² unless explicit.
 
-- `zeeman: {q_mv: 0.1, coil_mode: ...}` → keeps `q_gauss` key for
+- `B: {q_mv: 0.1, coil_mode: ...}` → keeps `q_gauss` key for
   downstream-specific handling (pipeline default is to parse quadratic
-  Zeeman directly; leave to caller).
+  Zeeman directly; leave to caller). Note `q` is *usually* auto-derived
+  and should not be specified by users.
 
 - inside a potential block with `type: harmonic`:
   `{fort_power_mw: [Px, Py, Pz]}` → `{omega: ["fx Hz", "fy Hz", "fz Hz"]}`.
@@ -202,7 +206,7 @@ function _calibrate_zeeman_node!(node::Dict, calib::CalibrationSet)
     if haskey(node, "p_mv")
         coil = _pick_coil(node, calib)
         gauss = coil_mv_to_gauss(Float64(node["p_mv"]), coil)
-        # Output as a Cartesian Bz quantity-string. The legacy convention
+        # Output as a Cartesian Bz quantity-string. The canonical convention
         # was `p: "X Gauss"`, but `p` is the dimensionless Zeeman energy
         # internally — feeding a Gauss-string into `p` collides with
         # `_zeeman_scalar` (which only handles Reals + dim-less). The

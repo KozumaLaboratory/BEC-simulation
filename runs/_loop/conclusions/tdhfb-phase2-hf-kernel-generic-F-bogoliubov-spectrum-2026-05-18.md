@@ -45,3 +45,19 @@ all_recompute_falsifiers_passed: true. Julia wall time 2.2s (warm JIT). Return c
 
 **Conclusion**: TDHFB Phase 2 generic-F HF kernel (`hf_matrix_generic` + un-symmetrized `channel_kernel`) is [Established] to reproduce KU2012 F=1 Bogoliubov phonon dispersions at small k to relative tolerance ~3-26e-6 (well below 1e-3 threshold) across two independent parameter points, with BdG/GP factor-2 ratio confirmed at machine-epsilon precision. Tier 2.75 -> 3.0. Investigation closed.
 
+### T102 [Established] 2026-05-19T00:53:30.073542+09:00
+
+[Established]` block: polar phonon + FM phonon + BdG/GP factor-2 ratio with measured values at T100 (c_0=1) and T102 (c_0=2 polar, c_0=0.5 FM) parameter points.
+- Independent corroboration section: T101 critic Route I GP-linearization re-derivation description.
+- Arc summary: T98…
+
+### T102 [Established] 2026-05-19T00:53:30.073542+09:00
+
+[Established], T101 [Corroborate_with_errata], and T102 [Established] entries to
+`runs/_loop/conclusions/tdhfb-phase2-hf-kernel-generic-F-bogoliubov-spectrum-2026-05-18.md`.
+File: 384 bytes -> 3046 bytes (APPEND only; prior T99 placeholder preserved).
+
+### T102 [Established] 2026-05-19T00:53:30.073542+09:00
+
+[Established] Tier-2 regression — escalate to critic audit)"). Preserved for audit trail; the T100/T101/T102 entries appended here are complete.
+

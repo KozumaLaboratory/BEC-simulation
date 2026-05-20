@@ -29,7 +29,17 @@
       "researcher": null,
       "implementer": null,
       "critic": null,
-      "total": null
+      "orchestrator": 10308732,
+      "total": 10308732,
+      "effective_full_rate": 1581882,
+      "breakdown": {
+        "input_fresh": 35803,
+        "cache_creation": 383499,
+        "cache_read": 9873560,
+        "output": 15870
+      },
+      "n_messages": 78,
+      "n_message_starts": 78
     },
     "warnings": [
       "gamma_dr=0 tau_asym numerical 5.37 ms vs T17 t^4 4.90 ms (ratio 1.097, within 10%)",

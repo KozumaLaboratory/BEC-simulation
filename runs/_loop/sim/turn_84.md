@@ -93,7 +93,24 @@ Field-by-field changes on `edh-eu151-vortex-vs-matsui-science-2026` investigatio
   "klaus_bch_leak_template_referenced": true,
   "manuscript_edited": false,
   "src_edited": false,
-  "julia_executed": false
+  "julia_executed": false,
+  "tokens_used": {
+    "theorist": null,
+    "researcher": null,
+    "implementer": null,
+    "critic": null,
+    "orchestrator": 10420669,
+    "total": 10420669,
+    "effective_full_rate": 1573732,
+    "breakdown": {
+      "input_fresh": 29808,
+      "cache_creation": 363236,
+      "cache_read": 10009846,
+      "output": 17779
+    },
+    "n_messages": 85,
+    "n_message_starts": 85
+  }
 }
 ```
 

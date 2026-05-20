@@ -198,6 +198,11 @@
     ]
   },
   "cost_audit": null,
+  "central_falsifier_check": {
+    "applies": false,
+    "reason": "target tier 2.0 < 3.0"
+  },
+  "tier_cap": null,
   "investigation_id": "bug-4-itp-ddi-half-rate-revalidation-2026-05-18",
   "stage_advancing_to": "Execute",
   "investigation_update": {

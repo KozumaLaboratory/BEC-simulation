@@ -68,7 +68,7 @@ _parse_ramp_or_constant(v) = ConstantValue(Float64(v))
 Parse a YAML `loss:` block into `LossParams`. Supported forms:
 
     loss: false | 0 | null        # no loss
-    loss: {gamma_dr: 0.02, L3: 0.001}                          # legacy 2-body shape
+    loss: {gamma_dr: 0.02, K3_per_m_cubic: [0e-41, 0e-41, ...]}  # 13 entries, m^6/s
     loss: {gamma_dr: 0.02, K3_per_m: [0.01, 0.02, 0.05, ...]}  # 3-body, dimless
 
 SI-unit input (lab-friendly, requires atom + N_atoms + omega_ref to derive
@@ -82,7 +82,7 @@ For the SI form the dimensionless rate is K3_dimless = K3_SI · n0² / ω_ref
 with n0 = N_atoms / a_ho³ and a_ho = √(ℏ / (m·ω_ref)).
 
 Routing:
-- `L3` / `L3_per_m`        → legacy 2-body-shape `LossParams.L3` / `L3_per_m`
+- `L3` / `L3_per_m`        → 2-body-shape `LossParams.L3` / `L3_per_m`
                               (dn_m/dt = -γ n n_m, linear in n)
 - `K3_cubic` / `K3_per_m_cubic` / `K3_per_m` / `K3_per_m_si`
                             → physically correct 3-body `K3_per_m_cubic`
@@ -104,7 +104,7 @@ function _parse_loss_params(
     node isa Dict || throw(ArgumentError("loss must be a mapping or scalar, got $(typeof(node))"))
     gamma_dr = Float64(get(node, "gamma_dr", 0.0))
     L3 = Float64(get(node, "L3", 0.0))
-    # `L3_per_m` is the legacy 2-body-shaped per-m rate (dn_m/dt = -γ n n_m).
+    # `L3_per_m` is the 2-body-shaped per-m rate (dn_m/dt = -γ n n_m).
     # Only the `L3_per_m` key routes here — `K3_per_m` and `K3_per_m_si`
     # are physically 3-body and must land in `K3_per_m_cubic` below.
     L3_per_m = let v = get(node, "L3_per_m", nothing)
@@ -238,8 +238,7 @@ function _resolve_derived_params!(p::Dict, atom; verbose::Bool=true)
     eps_dd = atom.a_s > 0 ? compute_a_dd(atom) / atom.a_s : 0.0
 
     # LHY config — preferred path is the `lhy:` block (added in C5). Legacy
-    # `interactions.c_lhy` + `spinor_lhy:` still works during the C5→C6
-    # transition; the resolver normalises everything back to the legacy fields
+    # The resolver normalises the user-facing `lhy:` block into the internal fields
     # so downstream make_workspace / run_step plumbing is unchanged.
     _resolve_lhy_block!(p, inter, atom, c_dd_val, eps_dd, N_atoms, a_ho)
 
@@ -270,8 +269,8 @@ end
 # LHY block resolver — `ground_state.lhy: {kind, c_lhy, n_max, n_points}` is
 # the sole user-facing entry point for LHY configuration as of C6. When kind ∈
 # {scalar, quasi_2d}, `c_lhy` is auto-derived via Lima-Pelster Q5(ε_dd) if the
-# user omits it. The resolver writes the normalised fields into legacy internal
-# slots (`p["spinor_lhy"]`, `inter["c_lhy"]`) that downstream make_workspace /
+# user omits it. The resolver writes the normalised fields into the internal
+# slots (`p["lhy_kind"]`, `inter["c_lhy"]`) that downstream make_workspace /
 # run_step continues to read — these slots are no longer user-visible because
 # the schema rejects them.
 function _resolve_lhy_block!(p::Dict, inter::Dict, atom, c_dd_val::Float64,
@@ -288,9 +287,9 @@ function _resolve_lhy_block!(p::Dict, inter::Dict, atom, c_dd_val::Float64,
             lhy_block["c_lhy"] = c_lhy_scalar * lima_pelster_Q5(eps_dd)
         end
     end
-    # Normalise to legacy internal fields for downstream consumers.
+    # Normalise to internal fields for downstream consumers.
     if kind != "none"
-        p["spinor_lhy"] = kind
+        p["lhy_kind"] = kind
     end
     if haskey(lhy_block, "c_lhy")
         inter["c_lhy"] = lhy_block["c_lhy"]

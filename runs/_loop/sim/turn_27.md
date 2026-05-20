@@ -88,8 +88,8 @@ Fz at t~30: 5.997269
   "experiment_kind": "rtp",
   "norm_initial": 1.0,
   "norm_final": 0.9999999993,
-  "norm_drift": 1.09e-9,
-  "max_abs_norm_drift": 1.09e-9,
+  "norm_drift": 1.09e-09,
+  "max_abs_norm_drift": 1.09e-09,
   "energy_initial": -880.637,
   "energy_monotonic": null,
   "mz_target": null,
@@ -105,8 +105,8 @@ Fz at t~30: 5.997269
   "fz_at_plus_omega_t30": 5.997269,
   "fz_at_minus_omega_t30": 0.007258,
   "fz_min_minus_omega": -1.045707,
-  "fz_min_plus_omega": 5.182150,
-  "rabi_period_minus_omega_observed": 21.80,
+  "fz_min_plus_omega": 5.18215,
+  "rabi_period_minus_omega_observed": 21.8,
   "rabi_period_minus_omega_predicted": 21.89,
   "rabi_period_match_pct_minus": 0.4,
   "rabi_min_time_minus_omega": 11.04,
@@ -122,12 +122,12 @@ Fz at t~30: 5.997269
   "tau_vs_prediction_pct_error": 5.5,
   "tau_shift_from_removing_loss": 0.0,
   "t20_tau_minus_omega": 2.84,
-  "t20_norm_drift_minus_omega": 9.80e-3,
+  "t20_norm_drift_minus_omega": 0.0098,
   "norm_drift_plus_omega": 4.28e-10,
   "falsification_result": "CONFIRMED",
   "warnings": [
     "Julia binary execution required python subprocess wrapper (sandbox restriction); functionally equivalent",
-    "extract_trajectory.jl (julia) not used; h5py direct HDF5/JLD2 read instead — magnetizations array confirmed as Fz by initial value F=6"
+    "extract_trajectory.jl (julia) not used; h5py direct HDF5/JLD2 read instead \u2014 magnetizations array confirmed as Fz by initial value F=6"
   ],
   "physical_red_flags": [],
   "tokens_used": {
@@ -135,7 +135,17 @@ Fz at t~30: 5.997269
     "researcher": null,
     "implementer": null,
     "critic": null,
-    "total": null
+    "orchestrator": 21847141,
+    "total": 21847141,
+    "effective_full_rate": 2839199,
+    "breakdown": {
+      "input_fresh": 7092,
+      "cache_creation": 481252,
+      "cache_read": 21339478,
+      "output": 19319
+    },
+    "n_messages": 211,
+    "n_message_starts": 211
   }
 }
 ```

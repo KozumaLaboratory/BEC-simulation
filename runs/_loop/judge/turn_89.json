@@ -40,7 +40,24 @@
     "src_edited": false,
     "julia_executed": false,
     "tests_passed": null,
-    "falsification_result": "INCONCLUSIVE"
+    "falsification_result": "INCONCLUSIVE",
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 10861077,
+      "total": 10861077,
+      "effective_full_rate": 1590258,
+      "breakdown": {
+        "input_fresh": 15603,
+        "cache_creation": 332685,
+        "cache_read": 10490846,
+        "output": 21943
+      },
+      "n_messages": 81,
+      "n_message_starts": 81
+    }
   },
   "contract_evaluation": {
     "verdict": "PASS",
@@ -247,7 +264,13 @@
     "triggered_failure_modes": [],
     "issues": []
   },
-  "cost_audit": null,
+  "cost_audit": {
+    "expected_cost_eff": 1500000,
+    "actual_cost_eff": 1590258,
+    "ratio_actual_over_expected": 1.06,
+    "deviation_pct": 6.0,
+    "flag": "BUDGET_OK"
+  },
   "investigation_id": "audit-class-scan-2026-05-18-T87",
   "stage_advancing_to": "Document",
   "investigation_update": {

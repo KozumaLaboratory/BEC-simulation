@@ -26,7 +26,24 @@
     "new_memory_file_cites_judge_bug": true,
     "new_memory_file_has_streak_table": true,
     "agents_md_unchanged": true,
-    "judge_py_unchanged": true
+    "judge_py_unchanged": true,
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 9338796,
+      "total": 9338796,
+      "effective_full_rate": 1489220,
+      "breakdown": {
+        "input_fresh": 11009,
+        "cache_creation": 386021,
+        "cache_read": 8921050,
+        "output": 20716
+      },
+      "n_messages": 69,
+      "n_message_starts": 69
+    }
   },
   "contract_evaluation": {
     "verdict": "PASS",

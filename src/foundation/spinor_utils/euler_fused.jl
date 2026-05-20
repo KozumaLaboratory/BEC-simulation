@@ -1,7 +1,7 @@
 # GPU-friendly fused-broadcast Euler 5-stage rotation. Operates on the
 # `(N, D)` whole-array layout via `(N, 1) .* (1, D)` broadcasts so each
 # stage is a single CUDA kernel launch (vs. D per-column launches in the
-# legacy per-component path). `cis_PD` scratch keeps phase materialisation
+# per-component path). `cis_PD` scratch keeps phase materialisation
 # in-place for CUDA Graph capture compatibility.
 
 """
@@ -48,7 +48,7 @@ on the rotation block.
     # phase factor `cis(...)` so the broadcasts stay in-place — required
     # for any future CUDA Graph capture, since per-call `cis.(...)`
     # would allocate a fresh CuArray each invocation and invalidate the
-    # captured argument pointer. When nothing is supplied (legacy CPU
+    # captured argument pointer. When nothing is supplied (CPU
     # fallback / one-shot calls) we let Julia allocate, matching prior
     # behaviour.
     if cis_PD === nothing

@@ -1,14 +1,35 @@
 {
   "turn": 120,
-  "status": "PASS",
-  "issues": [],
+  "status": "FAIL_OPERATIONAL",
+  "issues": [
+    "check_cmd FAIL: exit_code=1 != expected 0",
+    "check_cmd FAIL: exit_code=1 != expected 0",
+    "check_cmd FAIL: exit_code=1 != expected 0",
+    "check_cmd FAIL: exit_code=1 != expected 0"
+  ],
   "metrics": {
     "experiment_kind": "modify_text",
     "workload_class": "implementer_text",
     "tests_passed": null,
     "warnings": [],
     "physical_red_flags": [],
-    "tokens_used": null,
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 19881077,
+      "total": 19881077,
+      "effective_full_rate": 2806991,
+      "breakdown": {
+        "input_fresh": 65010,
+        "cache_creation": 548274,
+        "cache_read": 19241291,
+        "output": 26502
+      },
+      "n_messages": 128,
+      "n_message_starts": 128
+    },
     "sc_passed": [
       "SC1-state-tier-3-0-set",
       "SC2-state-current-stage-closed",
@@ -59,7 +80,7 @@
     "branch": "auto/turn_120_sign-pattern-f9-ta-mult2-T120-tier3-closure-bundle"
   },
   "contract_evaluation": {
-    "verdict": "PASS",
+    "verdict": "FAIL_OPERATIONAL",
     "criteria_results": [
       {
         "id": "SC1-state-tier-3-0-set",
@@ -153,42 +174,42 @@
       },
       {
         "id": "SC10-duty-b-wrapper-on-main",
-        "passed": true,
+        "passed": false,
         "actual": {
-          "exit_code": 0,
+          "exit_code": 1,
           "stdout_head": ""
         },
-        "reason": "check_cmd PASS: grep -E -q 'canonical_mult_aware_beta_S' /home/suzume/worksp",
+        "reason": "check_cmd FAIL: exit_code=1 != expected 0",
         "shell_check": true
       },
       {
         "id": "SC11-duty-c-F2-cyclic-testset-present",
-        "passed": true,
+        "passed": false,
         "actual": {
-          "exit_code": 0,
+          "exit_code": 1,
           "stdout_head": ""
         },
-        "reason": "check_cmd PASS: grep -E -q 'F=2 cyclic' /home/suzume/workspace/BEC-simulatio",
+        "reason": "check_cmd FAIL: exit_code=1 != expected 0",
         "shell_check": true
       },
       {
         "id": "SC12-duty-c-rational-1-5-2-7-18-35-present",
-        "passed": true,
+        "passed": false,
         "actual": {
-          "exit_code": 0,
+          "exit_code": 1,
           "stdout_head": ""
         },
-        "reason": "check_cmd PASS: grep -E -q '1//5.*2//7.*18//35|18//35' /home/suzume/workspac",
+        "reason": "check_cmd FAIL: exit_code=1 != expected 0",
         "shell_check": true
       },
       {
         "id": "SC13-duty-c-footer-29-channels-6-cases",
-        "passed": true,
+        "passed": false,
         "actual": {
-          "exit_code": 0,
+          "exit_code": 1,
           "stdout_head": ""
         },
-        "reason": "check_cmd PASS: grep -E -q '29 channel.*6 cases|29 channel coefficients veri",
+        "reason": "check_cmd FAIL: exit_code=1 != expected 0",
         "shell_check": true
       },
       {
@@ -263,9 +284,20 @@
       }
     ],
     "triggered_failure_modes": [],
-    "issues": []
+    "issues": [
+      "check_cmd FAIL: exit_code=1 != expected 0",
+      "check_cmd FAIL: exit_code=1 != expected 0",
+      "check_cmd FAIL: exit_code=1 != expected 0",
+      "check_cmd FAIL: exit_code=1 != expected 0"
+    ]
   },
-  "cost_audit": null,
+  "cost_audit": {
+    "expected_cost_eff": 1400000,
+    "actual_cost_eff": 2806991,
+    "ratio_actual_over_expected": 2.0,
+    "deviation_pct": 100.5,
+    "flag": "BUDGET_BUSTED"
+  },
   "central_falsifier_check": {
     "applies": true,
     "tier_cap": null,

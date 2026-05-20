@@ -1,0 +1,212 @@
+{
+  "turn": 105,
+  "status": "PASS",
+  "issues": [],
+  "metrics": {
+    "experiment_kind": "mechanical_bookkeeping_batch",
+    "investigation_kind": "physics",
+    "investigation_id": "audit-class-scan-2026-05-19-T103",
+    "stage_advancing_to": "Triage (mechanical-bookkeeping-half)",
+    "flow_template": "audit-class-scan",
+    "patterns_yaml_modified": true,
+    "state_json_modified": true,
+    "src_files_modified": 0,
+    "docs_modified": 0,
+    "manuscript_main_edited": false,
+    "julia_executed": false,
+    "patterns_last_scanned_updated_count": 10,
+    "patterns_last_count_updated_count": 10,
+    "rejected_classes_appended_count": 1,
+    "audit_history_row_appended": true,
+    "audit_history_row_turn": 105,
+    "state_investigations_appended_id": "audit-class-scan-2026-05-19-T103",
+    "investigations_index_appended": true,
+    "active_investigation_id_flipped_from": "edh-eu151-vortex-vs-matsui-science-2026",
+    "active_investigation_id_flipped_to": "audit-class-scan-2026-05-19-T103",
+    "duplicate_pair_older_siblings_closed_count": 2,
+    "duplicate_pair_closed_ids": [
+      "meta-director-self-audit-2026-05-18",
+      "meta-cost-inflation-2026-05-18"
+    ],
+    "yaml_safe_load_post_edit_pass": true,
+    "json_load_post_edit_pass": true,
+    "tier_reached": 1.5,
+    "verdict": "PASS",
+    "tests_passed": null,
+    "warnings": [
+      "active_investigation_id flip required a targeted follow-up script (flip_active_id.py) after the first state.py run reported success but did not persist the change; all other state.json fields from that first run persisted correctly. Root cause: likely a CWD or Python environment subtle write issue in the first run, not reproduced in isolation. Verified by immediate re-read in flip_active_id.py."
+    ],
+    "physical_red_flags": [],
+    "falsification_result": "CONFIRMED"
+  },
+  "contract_evaluation": {
+    "verdict": "PASS",
+    "criteria_results": [
+      {
+        "id": "experiment_kind_correct",
+        "passed": true,
+        "actual": "mechanical_bookkeeping_batch",
+        "reason": "experiment_kind=mechanical_bookkeeping_batch == mechanical_bookkeeping_batch \u2192 True"
+      },
+      {
+        "id": "investigation_id_correct",
+        "passed": true,
+        "actual": "audit-class-scan-2026-05-19-T103",
+        "reason": "investigation_id=audit-class-scan-2026-05-19-T103 == audit-class-scan-2026-05-19-T103 \u2192 True"
+      },
+      {
+        "id": "stage_consistent",
+        "passed": true,
+        "actual": "Triage (mechanical-bookkeeping-half)",
+        "reason": "stage_advancing_to=Triage (mechanical-bookkeeping-half) in ['Triage (mechanical-bookkeeping-half)', 'Triage'] \u2192 True"
+      },
+      {
+        "id": "patterns_yaml_modified",
+        "passed": true,
+        "actual": true,
+        "reason": "patterns_yaml_modified=True == True \u2192 True"
+      },
+      {
+        "id": "state_json_modified",
+        "passed": true,
+        "actual": true,
+        "reason": "state_json_modified=True == True \u2192 True"
+      },
+      {
+        "id": "no_src_modification",
+        "passed": true,
+        "actual": 0,
+        "reason": "src_files_modified=0 == 0 \u2192 True"
+      },
+      {
+        "id": "no_julia_execution",
+        "passed": true,
+        "actual": false,
+        "reason": "julia_executed=False == False \u2192 True"
+      },
+      {
+        "id": "no_manuscript",
+        "passed": true,
+        "actual": false,
+        "reason": "manuscript_main_edited=False == False \u2192 True"
+      },
+      {
+        "id": "ten_patterns_last_scanned_updated",
+        "passed": true,
+        "actual": 10,
+        "reason": "patterns_last_scanned_updated_count=10 == 10 \u2192 True"
+      },
+      {
+        "id": "ten_patterns_last_count_updated",
+        "passed": true,
+        "actual": 10,
+        "reason": "patterns_last_count_updated_count=10 == 10 \u2192 True"
+      },
+      {
+        "id": "one_rejected_class_appended",
+        "passed": true,
+        "actual": 1,
+        "reason": "rejected_classes_appended_count=1 == 1 \u2192 True"
+      },
+      {
+        "id": "audit_history_row_appended",
+        "passed": true,
+        "actual": true,
+        "reason": "audit_history_row_appended=True == True \u2192 True"
+      },
+      {
+        "id": "audit_history_row_has_turn_field",
+        "passed": true,
+        "actual": 105,
+        "reason": "audit_history_row_turn=105 == 105 \u2192 True"
+      },
+      {
+        "id": "t103_registered",
+        "passed": true,
+        "actual": "audit-class-scan-2026-05-19-T103",
+        "reason": "state_investigations_appended_id=audit-class-scan-2026-05-19-T103 == audit-class-scan-2026-05-19-T103 \u2192 True"
+      },
+      {
+        "id": "investigations_index_appended",
+        "passed": true,
+        "actual": true,
+        "reason": "investigations_index_appended=True == True \u2192 True"
+      },
+      {
+        "id": "active_id_flipped_from_stale",
+        "passed": true,
+        "actual": "edh-eu151-vortex-vs-matsui-science-2026",
+        "reason": "active_investigation_id_flipped_from=edh-eu151-vortex-vs-matsui-science-2026 == edh-eu151-vortex-vs-matsui-science-2026 \u2192 True"
+      },
+      {
+        "id": "active_id_flipped_to_current",
+        "passed": true,
+        "actual": "audit-class-scan-2026-05-19-T103",
+        "reason": "active_investigation_id_flipped_to=audit-class-scan-2026-05-19-T103 == audit-class-scan-2026-05-19-T103 \u2192 True"
+      },
+      {
+        "id": "two_older_siblings_closed",
+        "passed": true,
+        "actual": 2,
+        "reason": "duplicate_pair_older_siblings_closed_count=2 == 2 \u2192 True"
+      },
+      {
+        "id": "closed_ids_correct",
+        "passed": true,
+        "actual": [
+          "meta-director-self-audit-2026-05-18",
+          "meta-cost-inflation-2026-05-18"
+        ],
+        "reason": "duplicate_pair_closed_ids=['meta-director-self-audit-2026-05-18', 'meta-cost-inflation-2026-05-18'] == ['meta-director-self-audit-2026-05-18', 'meta-cost-inflation-2026-05-18'] \u2192 True"
+      },
+      {
+        "id": "yaml_validates",
+        "passed": true,
+        "actual": true,
+        "reason": "yaml_safe_load_post_edit_pass=True == True \u2192 True"
+      },
+      {
+        "id": "json_validates",
+        "passed": true,
+        "actual": true,
+        "reason": "json_load_post_edit_pass=True == True \u2192 True"
+      },
+      {
+        "id": "tier_advancement",
+        "passed": true,
+        "actual": 1.5,
+        "reason": "tier_reached=1.5 >= 1.5 \u2192 True"
+      },
+      {
+        "id": "verdict_pass",
+        "passed": true,
+        "actual": "PASS",
+        "reason": "verdict=PASS == PASS \u2192 True"
+      }
+    ],
+    "triggered_failure_modes": [],
+    "issues": []
+  },
+  "cost_audit": null,
+  "central_falsifier_check": {
+    "applies": false,
+    "reason": "target tier 1.5 < 3.0"
+  },
+  "tier_cap": null,
+  "investigation_id": "audit-class-scan-2026-05-19-T103",
+  "stage_advancing_to": "Triage (mechanical-bookkeeping-half)",
+  "investigation_update": {
+    "if_success_advance_to_stage": "Document \u2014 T106 implementer_text",
+    "if_success_tier_becomes": 1.5,
+    "if_partial_advance_to_stage": "Triage (mechanical-bookkeeping-half) \u2014 re-dispatch implementer_text with corrected scope",
+    "if_partial_tier_becomes": 1.0,
+    "if_refuted_advance_to_stage": "Triage (mechanical-bookkeeping-half) \u2014 re-dispatch (scope violation revert)",
+    "if_refuted_tier_becomes": 1.0,
+    "next_falsifier_to_test_after": "T106-document-close-with-memory-entry-and-state-json-current-stage-flip-to-closed-and-tier-2"
+  },
+  "_pinned_inv_snapshot": {
+    "inv_id": "audit-class-scan-2026-05-19-T103",
+    "tier_current_at_pin": 2.0,
+    "falsifiers_at_pin": []
+  }
+}

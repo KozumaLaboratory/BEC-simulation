@@ -148,7 +148,17 @@
       "researcher": null,
       "implementer": null,
       "critic": null,
-      "total": null
+      "orchestrator": 18912376,
+      "total": 18912376,
+      "effective_full_rate": 2673107,
+      "breakdown": {
+        "input_fresh": 25244,
+        "cache_creation": 560188,
+        "cache_read": 18303488,
+        "output": 23456
+      },
+      "n_messages": 145,
+      "n_message_starts": 145
     },
     "warnings": [
       "energy_mu = NaN in all 5 points: BUG-9 recurrence in rotating_basis find_ground_state_rotating! \u03bc estimator",

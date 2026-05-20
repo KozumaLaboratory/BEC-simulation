@@ -42,7 +42,7 @@ function _route_scan_group(
         for (idx, value) in enumerate(values)
             pt_name = _point_name(value, idx)
             pt_dir = joinpath(scan_dir, pt_name)
-            # Look for canonical result.jld2 first, then legacy result_legacy.jld2.
+            # Look for canonical result.jld2 first, then result_legacy.jld2 fallback.
             jld_path = if isfile(joinpath(pt_dir, "result.jld2"))
                 joinpath(pt_dir, "result.jld2")
             else
@@ -143,7 +143,7 @@ function _route_physics_summary(path::String, base_dir::String, psi_cache::Dict{
 
         # Lz / Fz / Fx / Fy extremes — `_populate_extremes!` reads from
         # the canonical `dynamics/<X>` path (post-2026-04-29) or the
-        # top-level legacy `<X>` (pre-2026-04-29) without ceremony.
+        # top-level fallback paths without ceremony.
         for sym in ("Lz", "Fz", "Fx", "Fy")
             _populate_extremes!(out, d, sym)
         end

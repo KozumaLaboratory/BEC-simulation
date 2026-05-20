@@ -31,7 +31,24 @@
       "op-ssh-sign-wsl.exe (1Password WSL SSH signing) returned 'failed to fill whole buffer'; commit used --no-gpg-sign. Pre-commit gitleaks hook ran cleanly."
     ],
     "physical_red_flags": [],
-    "falsification_result": "CONFIRMED"
+    "falsification_result": "CONFIRMED",
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 12031949,
+      "total": 12031949,
+      "effective_full_rate": 1926226,
+      "breakdown": {
+        "input_fresh": 7328,
+        "cache_creation": 553229,
+        "cache_read": 11455020,
+        "output": 16372
+      },
+      "n_messages": 93,
+      "n_message_starts": 93
+    }
   },
   "contract_evaluation": {
     "verdict": "PASS",

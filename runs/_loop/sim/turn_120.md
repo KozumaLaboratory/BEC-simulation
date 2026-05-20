@@ -77,7 +77,23 @@ the 4 `runs/_loop/` artifacts also touched by that commit.
   "tests_passed": null,
   "warnings": [],
   "physical_red_flags": [],
-  "tokens_used": null,
+  "tokens_used": {
+    "theorist": null,
+    "researcher": null,
+    "implementer": null,
+    "critic": null,
+    "orchestrator": 19881077,
+    "total": 19881077,
+    "effective_full_rate": 2806991,
+    "breakdown": {
+      "input_fresh": 65010,
+      "cache_creation": 548274,
+      "cache_read": 19241291,
+      "output": 26502
+    },
+    "n_messages": 128,
+    "n_message_starts": 128
+  },
   "sc_passed": [
     "SC1-state-tier-3-0-set",
     "SC2-state-current-stage-closed",

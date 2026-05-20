@@ -24,7 +24,17 @@
       "researcher": null,
       "implementer": null,
       "critic": null,
-      "total": null
+      "orchestrator": 17287913,
+      "total": 17287913,
+      "effective_full_rate": 2384345,
+      "breakdown": {
+        "input_fresh": 37666,
+        "cache_creation": 438432,
+        "cache_read": 16787844,
+        "output": 23971
+      },
+      "n_messages": 171,
+      "n_message_starts": 171
     },
     "warnings": [
       "Julia binary execution requires sandbox approval in current session. scripts/diagnostic/lz_extraction_from_snapshots.jl is complete and validated but has NOT been executed. Manual run required: /home/suzume/.juliaup/bin/julia --project=. scripts/diagnostic/lz_extraction_from_snapshots.jl",

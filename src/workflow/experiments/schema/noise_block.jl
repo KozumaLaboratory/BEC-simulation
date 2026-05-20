@@ -36,7 +36,7 @@
 # implicitly handled by the Wigner sampling.
 
 const _NOISE_KEY_MAP = Dict(
-    # Top-level noise: → split into legacy fields
+    # Top-level noise: → split into internal flat fields
     "seed" => "noise_seed",
     "thermal" => "temperature_ratio",
     "twa" => "twa",
@@ -48,8 +48,8 @@ const _NOISE_KEY_MAP = Dict(
     apply_noise_block_normalize!(data::Dict) -> Dict
 
 Walk every pipeline step and split a unified `noise:` block into the
-legacy fields consumed by pipeline_runner. Mixing `noise:` with the
-legacy fields raises ArgumentError.
+internal flat fields consumed by pipeline_runner. Mixing `noise:` with
+those step-level keys raises ArgumentError.
 """
 function apply_noise_block_normalize!(data::Dict)
     haskey(data, "pipeline") || return data
@@ -65,7 +65,7 @@ function apply_noise_block_normalize!(data::Dict)
     return data
 end
 
-const _NOISE_LEGACY_KEYS = ("temperature_ratio", "seed_amplitude", "seed_k_cut",
+const _NOISE_INTERNAL_KEYS = ("temperature_ratio", "seed_amplitude", "seed_k_cut",
     "noise_seed", "twa", "sgpe", "photon_scattering")
 
 function _split_noise_block!(step::AbstractDict)
@@ -74,9 +74,9 @@ function _split_noise_block!(step::AbstractDict)
     n isa AbstractDict || throw(ArgumentError(
         "noise: must be a mapping, got $(typeof(n))"))
 
-    for k in _NOISE_LEGACY_KEYS
+    for k in _NOISE_INTERNAL_KEYS
         haskey(step, k) && throw(ArgumentError(
-            "step has both `noise:` block and legacy `$k` — pick one form."))
+            "step has both `noise:` block and step-level `$k` — pick one form."))
     end
 
     # Mutex: initial.thermal + twa double-counts thermal fluctuations.

@@ -82,7 +82,24 @@ STATE_JSON_PATCH_OK
   "active_investigation_id_equals_edh_eu151_vortex_vs_matsui_science_2026": "edh-eu151-vortex-vs-matsui-science-2026",
   "established_tags_in_theorist_turn_70_md": 8,
   "falsifier_count_in_theorist_turn_70_md": 4,
-  "webfetch_matsui_called": true
+  "webfetch_matsui_called": true,
+  "tokens_used": {
+    "theorist": null,
+    "researcher": null,
+    "implementer": null,
+    "critic": null,
+    "orchestrator": 14912848,
+    "total": 14912848,
+    "effective_full_rate": 2247005,
+    "breakdown": {
+      "input_fresh": 18220,
+      "cache_creation": 518566,
+      "cache_read": 14346884,
+      "output": 29178
+    },
+    "n_messages": 106,
+    "n_message_starts": 106
+  }
 }
 ```
 

@@ -67,13 +67,13 @@ const DDI_SCHEMA = Dict{String, FieldSpec}(
 #                              that absorbs Larmor analytically. Use for
 #                              Klaus-style protocols where B direction
 #                              evolves and p·F·dt would otherwise blow up.
-#   option_gamma               — alias for rotating_basis (legacy name).
+#   option_gamma               — alias for rotating_basis.
 const GS_SCHEMA = Dict{String, FieldSpec}(
     "kind" => FieldSpec(; type=String, enum=["spinor", "binary", "rotating_basis", "option_gamma"]),
     "dtype" => FieldSpec(; type=String, default="f64", enum=["f32", "f64"]),
     "species_A" => FieldSpec(; type=Dict),    # binary path
     "species_B" => FieldSpec(; type=Dict),    # binary path
-    "B_hat" => FieldSpec(; type=Dict),        # rotating_basis path
+    "B_direction" => FieldSpec(; type=Dict),        # rotating_basis path
     "F" => FieldSpec(; type=Integer, range=(0, 12)),   # rotating_basis F override
     "gauge_fix" => FieldSpec(; type=Bool, default=true),  # rotating_basis
     "init_m_idx" => FieldSpec(; type=Integer, range=(1, 25)),
@@ -83,7 +83,7 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
     "grid" => FieldSpec(; type=Dict, schema=GRID_SCHEMA),
     "interactions" => FieldSpec(; type=Dict, schema=INTERACTIONS_SCHEMA),
     "ddi" => FieldSpec(; type=Union{Dict, Bool}),
-    "zeeman" => FieldSpec(; type=Dict),
+    "B" => FieldSpec(; type=Dict),
     "potential" => FieldSpec(; type=Union{Dict, Vector}),
     "dt" => FieldSpec(; type=Number, default=0.001, range=(1e-8, 1.0)),
     "n_steps" => FieldSpec(; type=Number, default=100000, range=(1.0, 1e9)),
@@ -111,8 +111,6 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
     "target_magnetization" => FieldSpec(; type=Number),
     "temperature_ratio" => FieldSpec(; type=Number, range=(0.0, 1.0)),
     "lhy" => FieldSpec(; type=Dict, schema=LHY_SCHEMA),
-    # Legacy `spinor_lhy` (string enum) + `interactions.c_lhy` (number) removed
-    # in C6 — use the `lhy: {kind: ..., c_lhy: ...}` block instead.
     "init_state_params" => FieldSpec(; type=Dict),
     "cache" => FieldSpec(; type=String),
     "quasi_2d" => FieldSpec(; type=Bool),
@@ -131,7 +129,7 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     "save" => FieldSpec(; type=Dict),
     "rotating_frame_omega" => FieldSpec(; type=Number),    # spatial (rotating bucket)
     "ddi" => FieldSpec(; type=Union{Dict, Bool}),
-    "zeeman" => FieldSpec(; type=Dict),
+    "B" => FieldSpec(; type=Dict),
     "interactions" => FieldSpec(; type=Dict),
     "potential" => FieldSpec(; type=Union{Dict, Vector}),
     "temperature_ratio" => FieldSpec(; type=Number, range=(0.0, 1.0)),
@@ -164,7 +162,7 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     "kind" => FieldSpec(; type=String, enum=["binary", "rotating_basis", "option_gamma"]),
     "couplings" => FieldSpec(; type=Dict),
     # Option γ rotating-basis dynamics
-    "B_hat" => FieldSpec(; type=Dict),
+    "B_direction" => FieldSpec(; type=Dict),
     "epsilon" => FieldSpec(; type=Number, range=(1e-15, 1.0)),
 )
 

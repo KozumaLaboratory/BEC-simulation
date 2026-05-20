@@ -20,7 +20,24 @@
     "peak_memory_gb": null,
     "physical_red_flags": [],
     "warnings": [],
-    "falsification_result": "CODE_CHANGE_APPLIED"
+    "falsification_result": "CODE_CHANGE_APPLIED",
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 9731752,
+      "total": 9731752,
+      "effective_full_rate": 1430373,
+      "breakdown": {
+        "input_fresh": 10568,
+        "cache_creation": 311860,
+        "cache_read": 9391151,
+        "output": 18173
+      },
+      "n_messages": 71,
+      "n_message_starts": 71
+    }
   },
   "contract_evaluation": {
     "verdict": "PASS",
@@ -74,7 +91,18 @@
     "triggered_failure_modes": [],
     "issues": []
   },
-  "cost_audit": null,
+  "cost_audit": {
+    "expected_cost_eff": 700000,
+    "actual_cost_eff": 1430373,
+    "ratio_actual_over_expected": 2.04,
+    "deviation_pct": 104.3,
+    "flag": "BUDGET_BUSTED"
+  },
+  "central_falsifier_check": {
+    "applies": false,
+    "reason": "target tier 1.5 < 3.0"
+  },
+  "tier_cap": null,
   "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
   "stage_advancing_to": "Execute (prerequisite class-fix phase; full Execute-retry deferred to T79)",
   "investigation_update": {

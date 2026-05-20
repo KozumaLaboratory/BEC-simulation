@@ -53,7 +53,24 @@ T51 executes the Triage stage of the `audit-class-scan-2026-05-18-T50` investiga
   "state_json_modified": false,
   "investigation_id": "audit-class-scan-2026-05-18-T50",
   "stage_advancing_to": "Triage",
-  "flow_template": "audit-class-scan"
+  "flow_template": "audit-class-scan",
+  "tokens_used": {
+    "theorist": null,
+    "researcher": null,
+    "implementer": null,
+    "critic": null,
+    "orchestrator": 9902229,
+    "total": 9902229,
+    "effective_full_rate": 1487115,
+    "breakdown": {
+      "input_fresh": 3342,
+      "cache_creation": 348538,
+      "cache_read": 9531356,
+      "output": 18993
+    },
+    "n_messages": 78,
+    "n_message_starts": 78
+  }
 }
 ```
 

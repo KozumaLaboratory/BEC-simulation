@@ -77,7 +77,24 @@
     "tier_target": 3,
     "tests_passed": true,
     "warnings": [],
-    "physical_red_flags": []
+    "physical_red_flags": [],
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 13533904,
+      "total": 13533904,
+      "effective_full_rate": 1990718,
+      "breakdown": {
+        "input_fresh": 7815,
+        "cache_creation": 427751,
+        "cache_read": 13070097,
+        "output": 28241
+      },
+      "n_messages": 88,
+      "n_message_starts": 88
+    }
   },
   "contract_evaluation": {
     "verdict": "FAIL_OPERATIONAL",
@@ -338,7 +355,18 @@
       "predicted_beta_s_lambda_spin_S4=0.34285714285714286 == 0.5333333333333333 \u2192 False"
     ]
   },
-  "cost_audit": null,
+  "cost_audit": {
+    "expected_cost_eff": 1500000,
+    "actual_cost_eff": 1990718,
+    "ratio_actual_over_expected": 1.33,
+    "deviation_pct": 32.7,
+    "flag": "BUDGET_OVER"
+  },
+  "central_falsifier_check": {
+    "applies": false,
+    "reason": "target tier 2.5 < 3.0"
+  },
+  "tier_cap": null,
   "investigation_id": "sign-pattern-lemma1-tier3-vs-kawaguchi-ueda-2026-05-18",
   "stage_advancing_to": "Hypothesize",
   "investigation_update": {

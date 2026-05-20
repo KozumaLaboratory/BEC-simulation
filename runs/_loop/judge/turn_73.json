@@ -23,7 +23,17 @@
       "researcher": null,
       "implementer": null,
       "critic": null,
-      "total": null
+      "orchestrator": 12462863,
+      "total": 12462863,
+      "effective_full_rate": 1815810,
+      "breakdown": {
+        "input_fresh": 11648,
+        "cache_creation": 419640,
+        "cache_read": 12015972,
+        "output": 15603
+      },
+      "n_messages": 90,
+      "n_message_starts": 90
     },
     "warnings": [
       "save.observables key does not exist in canonical dynamics schema; replaced with save_psi_snapshots:true",
@@ -136,7 +146,13 @@
     "triggered_failure_modes": [],
     "issues": []
   },
-  "cost_audit": null,
+  "cost_audit": {
+    "expected_cost_eff": 700000,
+    "actual_cost_eff": 1815810,
+    "ratio_actual_over_expected": 2.59,
+    "deviation_pct": 159.4,
+    "flag": "BUDGET_BUSTED"
+  },
   "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
   "stage_advancing_to": "Design",
   "investigation_update": {

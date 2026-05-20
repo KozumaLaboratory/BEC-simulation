@@ -43,7 +43,7 @@ DIRECTIVE_LABEL: edh-eu151-matsui-T110-update-critic-apply-refined-f1-criterion-
   "flow_template": "verify-claim",
   "critic_verdict": "INCONCLUSIVE",
   "f1_verdict_label": "INCONCLUSIVE-SPATIAL-REQUIRED",
-  "f1_verdict_justification": "T109-refined Matsui qualitative ring criterion: NC1 PASS (pop_c2 peak 16.3% at K3_long t=5.21 ms inside [1.5, 7] ms band) + NC2 PASS-stronger-than-T109 (~6.05 ms persistence ≈ 0.67 trap period) + symmetry K3_long c=2 ↔ Matsui c=12 SUSTAINED (Wigner-Eckart + Kawaguchi-Ueda 2012 §5.4) + trap (110, 110, 130) Hz match exact to 3 sig figs from config.yaml. But Matsui criterion is QUALITATIVE annular density signature (Stage 1); result.jld2 spatial info julia-denied this sandbox (sim/turn_108 §4-5). Necessary conditions not sufficient; visual ring unverified. Stage-2 Bragg phase-winding OUT_OF_SCOPE. Route T111 to anko-consult.",
+  "f1_verdict_justification": "T109-refined Matsui qualitative ring criterion: NC1 PASS (pop_c2 peak 16.3% at K3_long t=5.21 ms inside [1.5, 7] ms band) + NC2 PASS-stronger-than-T109 (~6.05 ms persistence \u2248 0.67 trap period) + symmetry K3_long c=2 \u2194 Matsui c=12 SUSTAINED (Wigner-Eckart + Kawaguchi-Ueda 2012 \u00a75.4) + trap (110, 110, 130) Hz match exact to 3 sig figs from config.yaml. But Matsui criterion is QUALITATIVE annular density signature (Stage 1); result.jld2 spatial info julia-denied this sandbox (sim/turn_108 \u00a74-5). Necessary conditions not sufficient; visual ring unverified. Stage-2 Bragg phase-winding OUT_OF_SCOPE. Route T111 to anko-consult.",
   "stage1_assessable_from_existing_artifacts": false,
   "stage2_bragg_in_scope_this_turn": false,
   "claim_t109_A_methodology_status": "SUSTAINED",
@@ -62,7 +62,23 @@ DIRECTIVE_LABEL: edh-eu151-matsui-T110-update-critic-apply-refined-f1-criterion-
   "julia_invoked": false,
   "gpu_used": false,
   "new_simulations_proposed": false,
-  "tokens_used": null
+  "tokens_used": {
+    "theorist": null,
+    "researcher": null,
+    "implementer": null,
+    "critic": null,
+    "orchestrator": 11002473,
+    "total": 11002473,
+    "effective_full_rate": 1888141,
+    "breakdown": {
+      "input_fresh": 41020,
+      "cache_creation": 512751,
+      "cache_read": 10415781,
+      "output": 32921
+    },
+    "n_messages": 72,
+    "n_message_starts": 72
+  }
 }
 ```
 

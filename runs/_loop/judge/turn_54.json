@@ -29,7 +29,24 @@
     "tests_passed": null,
     "warnings": [],
     "physical_red_flags": [],
-    "falsification_result": "CONFIRMED"
+    "falsification_result": "CONFIRMED",
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 14316813,
+      "total": 14316813,
+      "effective_full_rate": 2090789,
+      "breakdown": {
+        "input_fresh": 23149,
+        "cache_creation": 480179,
+        "cache_read": 13795920,
+        "output": 17565
+      },
+      "n_messages": 78,
+      "n_message_starts": 78
+    }
   },
   "contract_evaluation": {
     "verdict": "PASS",

@@ -11,7 +11,7 @@ Covers:
   - ψ footprint per component dtype (ComplexF64 / ComplexF32)
   - Workspace buffer overhead during split-step (~5 × ψ)
   - DDI padded FFT workspace (~2 × ψ)
-  - psi_snapshots buffer count × size when save_psi_snapshots is true
+  - psi_snapshots buffer count × size when save.psi is true
   - Final JLD2 disk footprint, with/without zlib compression estimate
 
 Not a tight upper bound — CUDA fragmentation, analyzer passes, and
@@ -58,7 +58,8 @@ function estimate_run_budget(yaml_path::AbstractString; io::IO=stdout)
         n_steps = round(Int, dur / dt)
         total_steps += n_steps
         total_snapshots += max(1, n_steps ÷ every)
-        save_psi |= Bool(get(p, "save_psi_snapshots", false))
+        save_block = get(p, "save", Dict{Any, Any}())
+        save_psi |= Bool(get(save_block, "psi", false))
         save_compressed |= Bool(get(p, "save_snapshot_compression", false))
     end
 

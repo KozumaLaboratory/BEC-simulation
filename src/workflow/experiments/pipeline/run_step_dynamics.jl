@@ -87,10 +87,10 @@ function _run_step(
     # Match the GS path: route the inner zeeman dict through
     # _build_zeeman_dispatched (level 0 → _parse_zeeman, levels 1/2 →
     # Gauss converters). The previous wrapper Dict construction —
-    # `Dict("ground_state" => Dict("zeeman" => ...))` — only existed
+    # `Dict("ground_state" => Dict("B" => ...))` — only existed
     # because `_build_phase_zeeman` re-extracts that path, but
     # `_build_zeeman_dispatched` accepts the inner dict directly.
-    z_raw = get(p, "zeeman", Dict())
+    z_raw = get(p, "B", Dict())
     zeeman =
         z_raw isa Dict ?
         _build_zeeman_dispatched(z_raw, duration, atom, p) :
@@ -105,7 +105,7 @@ function _run_step(
 
     n_steps = round(Int, duration / dt)
     rf_omega = Float64(get(p, "rotating_frame_omega", 0.0))
-    # spin_rotating_frame_omega removed 2026-04-30 — subsumed by `kind:
+    # Spin rotating-frame transformation is subsumed by `kind:
     # rotating_basis` (Option γ removes Larmor analytically).
     spin_rf_omega = 0.0
     sp = SimParams(; dt, n_steps, save_every,

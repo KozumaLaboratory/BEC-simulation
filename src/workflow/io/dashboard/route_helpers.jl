@@ -77,7 +77,7 @@ function _q_sym(query::AbstractString, key::AbstractString, default::Symbol)
     m === nothing ? default : Symbol(m.captures[1])
 end
 
-# --- JLD2 streamed-vs-legacy compat helpers ---
+# --- JLD2 streamed-vs-flat compat helpers ---
 #
 # Saves written before 2026-04-29 stored dynamics arrays at top-level
 # (`d["Lz"]`, `d["per_m_history"]`, …); the streamed save format moved
@@ -86,7 +86,7 @@ end
 # `_route_scan_group` and `_route_physics_summary` previously repeated
 # for every field.
 
-"""Return the raw value at `dynamics/<key>` (canonical) or `<key>` (legacy),
+"""Return the raw value at `dynamics/<key>` (canonical) or `<key>` (older flat),
 or `nothing` when neither is present."""
 function _load_dynamics_field(d::AbstractDict, key::AbstractString)
     haskey(d, "dynamics/$key") && return d["dynamics/$key"]

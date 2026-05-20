@@ -44,7 +44,17 @@
       "researcher": null,
       "implementer": null,
       "critic": null,
-      "total": null
+      "orchestrator": 9804190,
+      "total": 9804190,
+      "effective_full_rate": 1490783,
+      "breakdown": {
+        "input_fresh": 13630,
+        "cache_creation": 359590,
+        "cache_read": 9413711,
+        "output": 17259
+      },
+      "n_messages": 81,
+      "n_message_starts": 81
     },
     "warnings": [
       "BUG-6 NEW (silent-ignore, non-fatal): tol: 1.0e-9 in config is NOT parsed by _run_rotating_basis_ground_state_step; find_ground_state_rotating! has no tol kwarg and runs exactly n_steps iterations. If GS is not converged at 5000 steps, increase n_steps.",

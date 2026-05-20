@@ -1,6 +1,6 @@
 {
-  "turn": 122,
-  "status": "running",
+  "turn": 123,
+  "status": "halted_quota_97pct_pre_saturday_reset",
   "history": [
     {
       "turn": 87,
@@ -1724,7 +1724,63 @@
         "implementer": "3354a0b55881b87f223ef9beaf85d9e8",
         "researcher": "95b7759c642976be22be5b403536336e",
         "theorist": "793e3a75d3f9c15683c165d8a381df83"
-      }
+      },
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 10100894,
+        "total": 10100894,
+        "effective_full_rate": 1536626,
+        "breakdown": {
+          "input_fresh": 20661,
+          "cache_creation": 378879,
+          "cache_read": 9686613,
+          "output": 14741
+        },
+        "n_messages": 80,
+        "n_message_starts": 80
+      },
+      "branch": null,
+      "commit": "f602553ba582",
+      "parent": "cdd90bd"
+    },
+    {
+      "turn": 122,
+      "ts": "2026-05-19T06:04:34Z",
+      "judge_status": "PASS",
+      "directive_action": "analyze_existing",
+      "directive_label": "sign-pattern-lemma1-non-trivial-irrep-F11-Te1-2026-05-19",
+      "wall_time_sec": null,
+      "agent_hashes": {
+        "critic": "ccbd5e0fdc990f6b9eaaa01eb00fc63e",
+        "director": "7f5f710f4d14e3931772d685448823cc",
+        "implementer": "3354a0b55881b87f223ef9beaf85d9e8",
+        "researcher": "95b7759c642976be22be5b403536336e",
+        "theorist": "793e3a75d3f9c15683c165d8a381df83"
+      },
+      "note": "Pre-existing T122 artifacts (theorist 09:11, sim 09:31, judge 09:31) from prior interrupted /run-loop honored; new director directive at 14:55 emitted same investigation_id and was functionally equivalent.",
+      "tokens_used": {
+        "theorist": null,
+        "researcher": null,
+        "implementer": null,
+        "critic": null,
+        "orchestrator": 10104817,
+        "total": 10104817,
+        "effective_full_rate": 1637580,
+        "breakdown": {
+          "input_fresh": 26047,
+          "cache_creation": 452906,
+          "cache_read": 9608963,
+          "output": 16901
+        },
+        "n_messages": 82,
+        "n_message_starts": 82
+      },
+      "branch": "auto/turn_122_sign-pattern-f11-te1-test",
+      "commit": "e477014",
+      "parent": "3e031d6"
     }
   ],
   "created_at": "2026-05-14T00:00:00+00:00",
@@ -1735,17 +1791,18 @@
   "home_branch": "main",
   "schema_version": 2.1,
   "current_agent_hashes": {
-    "critic": "ccbd5e0fdc990f6b9eaaa01eb00fc63e",
-    "director": "8d6d65cf5014eb25c866d8dcd3142b9e",
-    "implementer": "3354a0b55881b87f223ef9beaf85d9e8",
-    "researcher": "95b7759c642976be22be5b403536336e",
-    "theorist": "793e3a75d3f9c15683c165d8a381df83"
+    "critic": "7bde4f21d3232ce33b451acae9c5aa97",
+    "critic_lite": "4a056bbcbc3fcc3f0e3f31e5a94703f4",
+    "director": "951fd50256e7a88763dcdb976f9b4f2b",
+    "implementer": "b001378f1c4f12eafae3372b7f65b21c",
+    "researcher": "8e6d406d4fd12b259939454c71dcc13d",
+    "theorist": "ccd726f17e83031efb9813fc2876573c"
   },
-  "last_directive_label": "sign-pattern-f9-ta-mult2-T121-cherry-pick-from-T120-auto-branch",
-  "last_directive_action": "modify_text",
-  "last_error": null,
+  "last_directive_label": "sign-pattern-lemma1-non-trivial-irrep-F11-Te1-2026-05-19",
+  "last_directive_action": "analyze_existing",
+  "last_error": "compound bash rejected by Claude Code v2 permission gate; see TURN_LOG",
   "retries": 0,
-  "active_investigation_id": null,
+  "active_investigation_id": "sign-pattern-lemma1-non-trivial-irrep-F11-Te1-2026-05-19",
   "investigations_index": [
     "barnett-mechanism-2026-05-16",
     "klaus-magnetostir-bch-leak-2026-05-13",
@@ -1761,7 +1818,8 @@
     "bug-4-itp-ddi-half-rate-revalidation-2026-05-18",
     "tdhfb-phase2-hf-kernel-generic-F-bogoliubov-spectrum-2026-05-18",
     "audit-class-scan-2026-05-19-T103",
-    "sign-pattern-f9-ta-multiplicity-2-mixing-2026-05-19"
+    "sign-pattern-f9-ta-multiplicity-2-mixing-2026-05-19",
+    "sign-pattern-lemma1-non-trivial-irrep-F11-Te1-2026-05-19"
   ],
   "investigations": {
     "barnett-mechanism-2026-05-16": {
@@ -1836,9 +1894,13 @@
       "tier_target": 3,
       "next_stage": null,
       "next_stage_action": null,
-      "blocked_on": null,
+      "blocked_on": "BLOCKED_PENDING_POPPER (T29 PASS replays INCONCLUSIVE under new central-falsifier gate; needs sequential e-value aggregation across F1+F2+F3 to determine if Tier-3 retroactively holds)",
       "priority": 1,
-      "kind": "physics"
+      "kind": "physics",
+      "tier_clamped_at": {
+        "turn": "retroactive_2026_05_19",
+        "reason": "blocked_pending_popper_sequential_evalue"
+      }
     },
     "klaus-magnetostir-bch-leak-2026-05-13": {
       "id": "klaus-magnetostir-bch-leak-2026-05-13",
@@ -1855,7 +1917,7 @@
         "Research",
         "Update"
       ],
-      "tier_current": 3.0,
+      "tier_current": 2.75,
       "tier_target": 3,
       "next_stage": null,
       "next_stage_action": null,
@@ -1872,7 +1934,13 @@
         "E1-y4-commutator-norm-analytical-gap",
         "E2-bch-residual-estimate-uncertainty-bars",
         "E3-m-plus-F-drop-label-cosmetic"
-      ]
+      ],
+      "tier_clamped_at": {
+        "turn": "retroactive_2026_05_19",
+        "raw": 3.0,
+        "cap": 2.75,
+        "reason": "no_central_falsifier_marked_under_new_gate"
+      }
     },
     "fullbdg-f6-polar-3000x": {
       "id": "fullbdg-f6-polar-3000x",
@@ -2355,7 +2423,7 @@
       "title": "Einstein-de Haas Eu-151 vortex emergence — reproduction of Matsui et al. Science 391, 384-388 (2026)",
       "hypothesis": "SpinorBEC.jl spinor-DDI + split-step framework reproduces Matsui et al. Science 391, 384–388 (2026) [DOI:10.1126/science.adx2872; arXiv:2504.17357] within factor-2 of the experimental EdH timescale τ_EdH^exp and matches the ring-vortex topology (winding number ℓ consistent with F=6 angular-momentum balance) when fed the paper's published parameters (N, trap frequencies ω_{x,y,z}, B-quench waveform, a_s, c_dd).",
       "flow_template": "verify-claim",
-      "current_stage": "closed",
+      "current_stage": "Update",
       "stages_done": [
         "Analyze",
         "Analyze (F1 t_ring + F2 winding ℓ + F3 E_sim vs E_mf/N extraction from runs/matsui_edh_baseline_9ca97308/point_001.jld2 + result.jld2)",
@@ -2418,10 +2486,10 @@
           "is_central": false
         }
       ],
-      "tier_current": 3.0,
+      "tier_current": 2.5,
       "tier_target": 3,
       "next_stage": null,
-      "next_stage_action": null,
+      "next_stage_action": "Critic independent audit of runs/eu151_edh_K3_long/trajectory.png as Matsui Tier-3 evidence per seed.md",
       "blocked_on": null,
       "priority": 0,
       "kind": "physics",
@@ -3126,13 +3194,38 @@
       "blocked_on": null,
       "next_stage": "Hypothesize",
       "next_stage_action": "researcher Observe stage already triggered this auto-spawn; theorist Hypothesize next"
+    },
+    "sign-pattern-lemma1-non-trivial-irrep-F11-Te1-2026-05-19": {
+      "id": "sign-pattern-lemma1-non-trivial-irrep-F11-Te1-2026-05-19",
+      "kind": "physics",
+      "title": "Sign Pattern Lemma 1 — non-trivial irrep extension at F=11 (Te_1)",
+      "flow_template": "build-theory",
+      "current_stage": "Hypothesize",
+      "stages_done": [
+        "Research"
+      ],
+      "tier_current": 0,
+      "tier_target": 3,
+      "priority": 1,
+      "blocked_on": null,
+      "next_stage_action": "Theorist Hypothesize: extend Lemma 1 closed-form to non-trivial irrep Te_1 at F=11; J-involution + Hamermesh orbit-counting basis",
+      "falsifiers": [
+        {
+          "id": "F1-closed-form-prefactor-extension",
+          "description": "Lemma 1 prefactor extends to non-trivial irrep Te_1 at F=11 via J=exp(-i pi F_y) involution. CORROBORATE if closed-form value matches direct CG-table computation to exact rational.",
+          "is_central": true,
+          "tested_at_turn": null,
+          "result": null
+        }
+      ]
     }
   },
-  "last_meta_check_turn": 120,
-  "last_short_label": "sign-pattern-f9-ta-mult2-T116-update-manuscript",
-  "last_label": "sign-pattern-f9-ta-mult2-T116-update-manuscript",
-  "last_action": "modify_text",
-  "last_judge_turn": 116,
+  "last_meta_check_turn": 122,
+  "last_short_label": "sign-pattern-lemma1-non-trivial-irrep-F11-Te1",
+  "last_label": "sign-pattern-lemma1-non-trivial-irrep-F11-Te1-2026-05-19",
+  "last_action": "theorist_then_implementer_then_judge",
+  "last_judge_turn": 122,
   "last_critic_turn": 119,
-  "last_critic_verdict": "CORROBORATE"
+  "last_critic_verdict": "CORROBORATE",
+  "recent_findings": []
 }

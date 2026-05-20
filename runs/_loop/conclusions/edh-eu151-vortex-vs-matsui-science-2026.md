@@ -29,3 +29,7 @@ Expected wall time ~5-10 min (julia precompile-dominated). Outputs: `runs/eu151_
 
 Tier 2.75 holds (no demotion). Stage-2 Bragg interferometric phase-winding remains OUT_OF_SCOPE per T110 §6 — full Tier-3 promotion to 3.0 still requires a separate Stage-2 investigation regardless of T111-retry outcome.
 
+### T118 [Falsifier-tested: F1-ring-appears-correct-timescale] 2026-05-19T07:48:04.506709+09:00
+
+CORROBORATE at T117 critic independent context (Stage-2): direct trajectory.csv read shows pop_c2 (m=+5) peak 17.08% at t=4.34 ms; within factor-2 band [2.5, 10] ms of Matsui experimental t_ring=5 ms (ratio 0.87x). Full 13-component cascade observed; all 3 config knobs PRESENT. Stage-1 (T110) + Stage-2 (T117) = central F1 falsifier CORROBORATE. Tier 2.75 -> 3.0 TERMINAL CLOSURE recorded by T118 implementer state.json patch.
+

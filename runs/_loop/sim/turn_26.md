@@ -91,14 +91,24 @@ Files read (in order):
     "researcher": null,
     "implementer": null,
     "critic": null,
-    "total": null
+    "orchestrator": 10109837,
+    "total": 10109837,
+    "effective_full_rate": 1510723,
+    "breakdown": {
+      "input_fresh": 6053,
+      "cache_creation": 355701,
+      "cache_read": 9730688,
+      "output": 17395
+    },
+    "n_messages": 106,
+    "n_message_starts": 106
   },
   "warnings": [],
   "physical_red_flags": [
     "gamma_dr=0.02 in YAML arrives intact at apply_loss_step! kernel with no dimensional rescaling; confirmed CLEAN propagation",
-    "kind:spinor loss is applied ONCE per step (not Strang sandwich) with full dt, but kernel divides by 2 internally — effective rate is exp(-gamma*n*dt) on density, matching the continuous-time equation",
-    "rotating_basis path correctly uses TWO calls at dt/2 each (true Strang sandwich); spinor path uses ONE call at dt (kernel /2) — both net to exp(-gamma*n*dt) per step, but the two paths use different dt-argument conventions which is an ADVISORY source of confusion if gamma_dr values are compared across path types",
-    "1700x gap between predicted tau~4900 and empirical tau=2.84 is CONFIRMED by this audit; it is NOT explained by a routing bug in the gamma_dr chain — the code applies exactly 0.02 at the density-weighted rate per the docstring"
+    "kind:spinor loss is applied ONCE per step (not Strang sandwich) with full dt, but kernel divides by 2 internally \u2014 effective rate is exp(-gamma*n*dt) on density, matching the continuous-time equation",
+    "rotating_basis path correctly uses TWO calls at dt/2 each (true Strang sandwich); spinor path uses ONE call at dt (kernel /2) \u2014 both net to exp(-gamma*n*dt) per step, but the two paths use different dt-argument conventions which is an ADVISORY source of confusion if gamma_dr values are compared across path types",
+    "1700x gap between predicted tau~4900 and empirical tau=2.84 is CONFIRMED by this audit; it is NOT explained by a routing bug in the gamma_dr chain \u2014 the code applies exactly 0.02 at the density-weighted rate per the docstring"
   ],
   "falsification_result": "CONFIRMED"
 }

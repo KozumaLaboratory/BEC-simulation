@@ -38,7 +38,24 @@
     "src_lines_quoted_verbatim_count": 6,
     "physical_red_flags": [],
     "warnings": [],
-    "falsification_result": "DERIVATION_COMPLETE"
+    "falsification_result": "DERIVATION_COMPLETE",
+    "tokens_used": {
+      "theorist": null,
+      "researcher": null,
+      "implementer": null,
+      "critic": null,
+      "orchestrator": 12671050,
+      "total": 12671050,
+      "effective_full_rate": 1892821,
+      "breakdown": {
+        "input_fresh": 20932,
+        "cache_creation": 418769,
+        "cache_read": 12205779,
+        "output": 25570
+      },
+      "n_messages": 86,
+      "n_message_starts": 86
+    }
   },
   "contract_evaluation": {
     "verdict": "PASS",
@@ -113,7 +130,18 @@
     "triggered_failure_modes": [],
     "issues": []
   },
-  "cost_audit": null,
+  "cost_audit": {
+    "expected_cost_eff": 1300000,
+    "actual_cost_eff": 1892821,
+    "ratio_actual_over_expected": 1.46,
+    "deviation_pct": 45.6,
+    "flag": "BUDGET_OVER"
+  },
+  "central_falsifier_check": {
+    "applies": false,
+    "reason": "target tier 1.5 < 3.0"
+  },
+  "tier_cap": null,
   "investigation_id": "edh-eu151-vortex-vs-matsui-science-2026",
   "stage_advancing_to": "Execute (Bz-sign-convention independent verification \u2014 non-Julia leverage path)",
   "investigation_update": {

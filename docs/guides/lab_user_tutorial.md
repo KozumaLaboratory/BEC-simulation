@@ -52,8 +52,9 @@ pipeline:
       duration: 5.0
       dt: 0.005
       save_every: 100
-      save_psi_snapshots: true
-      save_snapshot_precision: "f32"
+      save:
+        psi: true
+        precision: "f32"
       interactions: {omega_ref: 691.15}
       zeeman:
         p_mv: {from: 2.5, to: 0.5}
@@ -157,7 +158,7 @@ n_peak = d["analyze/droplet_profile/n_peak"]
 |---|---|---|
 | `Scalar indexing is disallowed` on dynamics | Zeeman with non-zero Bx/By on GPU on a pre-fix install | upgrade to ≥ commit 59a52a1 (`apply_uniform_spin_rotation!` matmul path) |
 | ITP `NaN at step 1` | dt too large for ε_dd > 1 (Dy164, Eu151 strong DDI) | drop dt to 0.002 |
-| `column_density_movie ... done` writes 0 frames | `save_psi_snapshots: true` + pre-fix analyzer | upgrade to ≥ 3685fd7 (streamed-snapshot reader); since 2026-04-26 the analyzer writes `columns.jld2` + `manifest.json` (no PNGs) |
+| `column_density_movie ... done` writes 0 frames | `save: {psi: true}` + pre-fix analyzer | upgrade to ≥ 3685fd7 (streamed-snapshot reader); since 2026-04-26 the analyzer writes `columns.jld2` + `manifest.json` (no PNGs) |
 | Long scan OOMs at point ~100 | scan-loop GPU memory leak | upgrade to ≥ 7769d84 (CUDA.reclaim hook) |
 | `unknown key 'a_s'` warning | scattering length parsing | use `c_total:` or `c1_ratio:` directly |
 | `unknown key 'trap'` warning | shorthand notation | harmless, equivalent to `potential: {type: harmonic, omega: [...]}` |

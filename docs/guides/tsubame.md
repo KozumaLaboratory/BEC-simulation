@@ -91,7 +91,7 @@ pipeline:
       duration: 107.6
       dt: 1.0e-4
       save_every: 7000         # → 154 snapshots
-      save_psi_snapshots: true # streamed F32, ~8.4 GB at 128³
+      save: {psi: true, precision: "f32"}  # streamed F32, ~8.4 GB at 128³
 ```
 
 Pre-flight: `using SpinorBEC; estimate_run_budget("path/to/config.yaml")` reports VRAM, host RAM, disk per scan point + total disk.
@@ -141,7 +141,7 @@ For multi-attempt mixes of crashes + preemption: `sbatch scripts/slurm/eu151_h10
 |---|---|---|
 | First run very slow (~10 min before any output) | precompile on Lustre | confirm `$JULIA_DEPOT_PATH` points at NVMe (`echo $JULIA_DEPOT_PATH` after sourcing) |
 | `unable to load CUDA driver` | module not loaded | `source scripts/tsubame_setup.sh` first |
-| `ENOSPC` mid-run | streamed snapshots filled `$T4_TMPDIR` | bigger `nvme:NN` or coarser `save_psi_snapshots` cadence |
+| `ENOSPC` mid-run | streamed snapshots filled `$T4_TMPDIR` | bigger `nvme:NN` or coarser `save.psi` cadence |
 | Job killed at exact wall-clock limit | `--requeue` not set | re-submit; SLURM resumes from checkpoint |
 | Phase-diagram scan progresses one-at-a-time | not using array job | switch to `scan_array.sbatch` with `--array=1-N%K` |
 | GC pressure on big ψ across many scan points | implicit retention | `GC.gc()` between phases; `CUDA.memory_status()` to inspect |

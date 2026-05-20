@@ -121,7 +121,17 @@ SANITY 5: Number of jump operators = 23 (expect 23: 12 for q=-1, 11 for q=-2) â€
     "researcher": null,
     "implementer": null,
     "critic": null,
-    "total": null
+    "orchestrator": 10308732,
+    "total": 10308732,
+    "effective_full_rate": 1581882,
+    "breakdown": {
+      "input_fresh": 35803,
+      "cache_creation": 383499,
+      "cache_read": 9873560,
+      "output": 15870
+    },
+    "n_messages": 78,
+    "n_message_starts": 78
   },
   "warnings": [
     "gamma_dr=0 tau_asym numerical 5.37 ms vs T17 t^4 4.90 ms (ratio 1.097, within 10%)",
@@ -129,9 +139,9 @@ SANITY 5: Number of jump operators = 23 (expect 23: 12 for q=-1, 11 for q=-2) â€
     "T17 eq(12) contains sign error in dFy/dt|_0: correct is +p_perp*F, T17 wrote -p_perp*F; net d2Fz/dt2 = -p_perp^2*F (negative) confirmed by ODE"
   ],
   "physical_red_flags": [
-    "SCENARIO C CONFIRMED: spin-only single-particle Lindblad (T1) predicts Delta [Fz(-)-Fz(+)] = +4.815 at gamma_dr=0.02, t=30 â€” same sign as gamma_dr=0 (Delta=+5.95). Empirical is -4.60 (OPPOSITE sign). The spin-only framework does NOT flip the asymmetry direction from gamma_dr=0 to 0.02.",
+    "SCENARIO C CONFIRMED: spin-only single-particle Lindblad (T1) predicts Delta [Fz(-)-Fz(+)] = +4.815 at gamma_dr=0.02, t=30 \u2014 same sign as gamma_dr=0 (Delta=+5.95). Empirical is -4.60 (OPPOSITE sign). The spin-only framework does NOT flip the asymmetry direction from gamma_dr=0 to 0.02.",
     "Individual endpoint error: Fz(+0.5)=-0.059 vs empirical 5.02 (100% error); Fz(-0.5)=4.756 vs empirical 0.42 (1032% error). Both sides are SWAPPED.",
-    "T17 Â§8 Q8.3 mechanism ('rotating-frame energetic bias -Omega(L_z+F_z) protects +Omega from cascading') is NOT captured in spin-only T1; this orbital channel is confirmed necessary."
+    "T17 \u00a78 Q8.3 mechanism ('rotating-frame energetic bias -Omega(L_z+F_z) protects +Omega from cascading') is NOT captured in spin-only T1; this orbital channel is confirmed necessary."
   ],
   "falsification_result": "REFUTED",
   "compute_results": [
@@ -155,7 +165,7 @@ SANITY 5: Number of jump operators = 23 (expect 23: 12 for q=-1, 11 for q=-2) â€
     },
     {
       "id": "S4",
-      "task": "Target T3: gamma_dr=0.02 sign-reversal test â€” CRITICAL",
+      "task": "Target T3: gamma_dr=0.02 sign-reversal test \u2014 CRITICAL",
       "status": "OK",
       "result": "Fz(+0.5,t=30)=-0.059 [empirical: 5.02, error 101%]; Fz(-0.5,t=30)=4.756 [empirical: 0.42, error 1032%]. Delta [Fz(-)-Fz(+)] = +4.815 [empirical: -4.60]. SIGN MISMATCH. The spin-only Lindblad maintains -Omega HIGH/+Omega LOW at t=30, but empirically +Omega is HIGH/-Omega is LOW. SCENARIO C: spin-only framework INSUFFICIENT."
     },

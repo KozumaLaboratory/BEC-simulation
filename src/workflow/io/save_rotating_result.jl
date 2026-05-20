@@ -172,10 +172,10 @@ The canonical layout:
     dynamics/integrator_meta/larmor_phase_per_step
 
 Use this from any per-run launcher that consumes the `:rotating_basis_dynamics`
-Dict produced by `run_config`. The legacy
+Dict produced by `run_config`. The compatibility
 `launch_thesis_run.jl` / `launch_phi_omega_run.jl` saved a Vector of
 4D arrays at the top level; that layout still works in the dashboard
-via the legacy fallback, but new code should write canonical here.
+via the compatibility fallback, but new code should write canonical here.
 """
 function save_rotating_basis_result!(
     run_dir::String, result;
