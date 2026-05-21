@@ -392,14 +392,18 @@ function _build_spinor_lhy(::Val{:fm_contact}, atom, ws, psi_init, c_dd, enable_
         F=atom.F, g_dict=_lhy_g_dict(atom, ws), n_max=_lhy_n_max(psi_init))
 end
 
-# Stage C scalar reduction: FM single-mode contact LHY × Lima-Pelster Q_5(ε_dd).
-# `ε_dd` derived from the standard scalar definition c_dd / g_{2F}; for finer
-# control over the convention call `compute_spinor_lhy_fm_dipolar(; eps_dd)`.
+# Stage C scalar reduction: FM single-mode contact LHY × Lima-Pelster Q_5(eps_dd).
+# Workspace `c_dd` is the spin-Hamiltonian coupling mu0*(gF*muB)^2. For a
+# fully polarized m=+F scalar reduction, the spin operators supply F^2. Since
+# the DDI kernel uses Q = cos^2(theta) - 1/3 while Lima-Pelster uses
+# 1 + eps_dd*(3cos^2(theta)-1), convert with eps_dd = c_dd*F^2/(3*g_2F).
+# Direct callers that already have scalar eps_dd should use
+# `compute_spinor_lhy_fm_dipolar(; eps_dd)`.
 function _build_spinor_lhy(::Val{:fm_dipolar}, atom, ws, psi_init, c_dd, enable_ddi)
     g_dict = _lhy_g_dict(atom, ws)
     c_dd_eff = enable_ddi && !isnan(c_dd) ? c_dd : 0.0
     g_2F = get(g_dict, 2 * atom.F, 0.0)
-    eps_dd = abs(g_2F) > 1e-12 ? abs(c_dd_eff) / abs(g_2F) : 0.0
+    eps_dd = abs(g_2F) > 1e-12 ? abs(c_dd_eff) * atom.F^2 / (3.0 * abs(g_2F)) : 0.0
     compute_spinor_lhy_fm_dipolar(;
         F=atom.F, g_dict=g_dict, eps_dd=eps_dd, n_max=_lhy_n_max(psi_init))
 end

@@ -13,11 +13,14 @@
 #   ε_LHY^{FM,DDI}(n; ε_dd) = (8 √M³ / (15π²ℏ³)) · (g_{2F} · n)^(5/2) · Q_5(ε_dd)
 #
 # Convention (CRITICAL):
-#   ε_dd = a_dd / a_s  =  c_dd / g_{2F}     (standard scalar definition)
-#   F² amplification is ALREADY in c_dd via μ² = (g_F · F · μ_B)².
-#   Earlier session notes claiming "ε_dd^F = F² · c_dd / g_{2F} ≈ 7" were
-#   F²-double-counted — the parallel session corrected this 2026-05-07,
-#   and Saito-Li 2024 uses the same convention as Lima-Pelster.
+#   eps_dd is the standard scalar Lima-Pelster parameter in
+#      g * [1 + eps_dd * (3cos^2(theta) - 1)].
+#   Direct callers pass eps_dd explicitly.
+#   SpinorBEC workspaces store c_dd = mu0*(gF*muB)^2 per unit spin and use
+#   Q = cos^2(theta) - 1/3, so the FM workspace wrapper converts with
+#      eps_dd = c_dd * F^2 / (3*g_{2F}).
+#   If a caller instead uses a full-moment scalar C_dd = mu0*(gF*F*muB)^2,
+#   the equivalent scalar conversion is eps_dd = C_dd/(3*g_{2F}) = a_dd/a_s.
 #
 # Petrov prescription: lima_pelster_Q5 already zeros the integrand where
 # `1 + ε_dd(3cos²θ - 1) < 0`, so ε_dd > 1 (unstable angles) is handled

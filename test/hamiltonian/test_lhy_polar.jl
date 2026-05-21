@@ -268,6 +268,22 @@ end
     @test length(table.potential_values) == 50
 end
 
+@testset "make_workspace FM dipolar LHY converts per-spin c_dd to epsilon_dd" begin
+    c0 = 100.0
+    ws = InteractionParams(c0, 0.0)
+    c_dd_per_spin = 3.0
+    expected_eps = c_dd_per_spin * Eu151.F^2 / (3.0 * c0)
+    g_uniform = Dict(S => c0 for S in (0, 2, 4, 6, 8, 10, 12))
+
+    table = SpinorBEC._build_spinor_lhy(
+        Val(:fm_dipolar), Eu151, ws, nothing, c_dd_per_spin, true)
+    expected = compute_spinor_lhy_fm_dipolar(;
+        F=6, g_dict=g_uniform, eps_dd=expected_eps)
+
+    @test table.densities == expected.densities
+    @test table.potential_values ≈ expected.potential_values rtol = 1e-12
+end
+
 @testset "compute_spinor_lhy_fm_contact wrapper" begin
     g_user = Dict(S => 100.0 + 5.0 * S for S in (0, 2, 4, 6, 8, 10, 12))
     table = compute_spinor_lhy_fm_contact(; F=6, g_dict=g_user,

@@ -66,7 +66,12 @@ c1 = 4pi hbar^2 (a2 - a0) / (3m)       (spin-spin)
 
 Quasi-low-dimensional reductions (1D, 2D) divide by the transverse confinement area/length. For general F, only `c0` (s-wave) is computed.
 
-The DDI coupling constant is `C_dd = mu_0 * mu^2 / (4pi)`.
+DDI uses the SpinorBEC no-4pi convention: spinor workspaces store
+`c_dd = mu_0 * (g_F * mu_B)^2` per unit spin, and the FFT kernel is
+`Q_ab = k_hat_a*k_hat_b - delta_ab/3` with no `1/(4pi)`. The `F^2/3`
+factor belongs only when converting that solver coupling to the scalar
+Lima-Pelster parameter, `epsilon_dd = c_dd * F^2 / (3*g) = a_dd/a_s`;
+contact couplings keep their usual `4pi*hbar^2*a/m`.
 
 ### Potentials (`foundation/types/potentials.jl`, `hamiltonian/potentials/`)
 

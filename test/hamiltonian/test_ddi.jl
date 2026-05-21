@@ -28,6 +28,18 @@
         @test 0.4 < eps_dd < 0.7
     end
 
+    @testset "solver c_dd converts to physical epsilon_dd" begin
+        N_atoms = 50_000
+        omega_ref = 2π * 110.0
+        c_total = compute_c_total(Eu151; N_atoms, omega_ref)
+        c_dd = compute_c_dd_dimless(Eu151; N_atoms, omega_ref)
+
+        eps_solver = c_dd * Eu151.F^2 / (3.0 * c_total)
+        eps_phys = compute_a_dd(Eu151) / Eu151.a_s
+
+        @test eps_solver ≈ eps_phys rtol = 1e-12
+    end
+
     @testset "C_dd = 0 for non-dipolar atoms" begin
         @test compute_c_dd(Rb87) == 0.0
         @test compute_a_dd(Rb87) == 0.0

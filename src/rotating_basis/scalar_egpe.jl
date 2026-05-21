@@ -35,7 +35,7 @@ struct ScalarSimWS{T <: AbstractFloat, N, FP, IP}
 
     # couplings (all in dimensionless reference units)
     g_contact::T          # 4π·a_s·N (scalar contact)
-    c_dd::T               # μ₀μ²·N (no 4π — same convention as DDI module)
+    c_dd::T               # mu0*(gF*muB)^2*N per unit spin (no 4π)
     F::T                  # spin quantum number (only enters as F² in DDI weight)
     gamma_lhy::T          # γ_LHY (set 0 to disable)
 end

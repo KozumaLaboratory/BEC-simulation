@@ -1,0 +1,13 @@
+{
+  "_comment": "Override DEFAULT_CONFIG in quota_check.py. Per anko 2026-05-16 ('quota あるくない？'): the 15M/5h default was a self-imposed safety rail, not Anthropic Max x20 actual limit. Bump 6-8× so cascade campaigns (Barnett-class, ~10 turns × ~1.5M) don't auto-halt at the 5h boundary. Real Anthropic rate limits will assert themselves before these caps if anything truly runs away.",
+  "rolling_window_hours": 5,
+  "max_effective_tokens_per_window": 100000000,
+  "effective_tokens_safety_margin": 5000000,
+  "max_effective_tokens_per_week": 2000000000,
+  "weekly_effective_safety_margin": 100000000,
+  "max_turns_per_window": 60,
+  "safety_margin_turns": 5,
+  "weekly_window_hours": 168,
+  "max_turns_per_week": 1000,
+  "weekly_safety_margin_turns": 30
+}

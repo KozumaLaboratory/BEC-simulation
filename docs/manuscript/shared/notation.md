@@ -23,8 +23,8 @@ recorded under "Inconsistencies seen in drafts" at the end.
 | `g_S` | s-wave coupling per total-spin channel | `g_S = 4π ℏ² a_S / M`. Always lowercase g, integer S subscript. |
 | `c_0`, `c_1`, `c_2`, … | KU 2012 multipole couplings | linear in `g_S` via the standard projection table. **Do not** write `c^{KU}` or `c_n^{(2)}`. |
 | `c_total` | dimensionless `4π (a_s / a_ho) N_atoms` | reserved for the SpinorBEC.jl YAML knob; do not use as a symbol in math. |
-| `c_dd` | dimensionless DDI coupling | `μ_0 μ²` form (no 4π); see DDI convention note below. |
-| `ε_dd` | scalar dipolar parameter | `ε_dd = a_dd / a_s = c_dd / g_2F`. The F² amplification is absorbed inside `c_dd` via `μ²` already; do **not** add a second F² factor. |
+| `c_dd` | dimensionless DDI coupling | SpinorBEC solver variable: `μ_0 (g_F μ_B)^2` per unit spin for `F>0` (no `4π`). Scalar full-moment notation: `C_dd = μ_0 μ²`. |
+| `ε_dd` | scalar dipolar parameter | `ε_dd = a_dd / a_s = C_dd/(3 g_2F)`. In SpinorBEC solver variables, `ε_dd = c_dd F²/(3 g_2F)`; the `1/3` comes from `Q = cos²θ - 1/3`. |
 
 ## LHY-related symbols
 
@@ -88,13 +88,13 @@ For an icosahedral F=6 ground state:
 
 ## DDI conventions (do not "fix")
 
-* `c_dd = μ_0 μ²` — no 4π. The Q-tensor is `Q_αβ(k̂) = k̂_α k̂_β − δ_αβ/3`,
-  no 1/(4π). `Q(k=0) = 0`. This chain is internally self-consistent;
-  matches Lima-Pelster.
-* `ε_dd = a_dd / a_s` — standard scalar definition. Earlier draft notes
-  using `ε_dd^F = F² · c_dd / g_{2F}` were F²-double-counted (the F²
-  amplification is in `μ² = (g_F · F · μ_B)²` which is already inside
-  `c_dd`). All Round 2+ work uses the standard form.
+* SpinorBEC solver `c_dd = μ_0 (g_F μ_B)^2` for `F>0` — no `4π`.
+  The Q-tensor is `Q_αβ(k̂) = k̂_α k̂_β − δ_αβ/3`, no `1/(4π)`.
+  `Q(k=0) = 0`.
+* `ε_dd = a_dd / a_s` — standard scalar definition. With the solver
+  convention, convert via `ε_dd = c_dd F²/(3 g_{2F})`. If using a
+  full-moment scalar `C_dd = μ_0(g_F F μ_B)^2`, the same statement is
+  `ε_dd = C_dd/(3 g_{2F})`.
 
 ## Bra-ket and operator conventions
 

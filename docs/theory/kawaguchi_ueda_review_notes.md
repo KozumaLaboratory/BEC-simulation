@@ -125,7 +125,9 @@ $$E_{k,\text{spin}} = \varepsilon_k \quad \text{（2次分散、臨界速度ゼ�
 
 スピン角運動量 $M_z$ が DDI を通じて軌道角運動量 $L_z$ に移行する。時定数：
 
-$$\tau_{\text{EdH}} \sim \frac{h}{c_{\text{dd}} n} = \frac{4\pi}{(\mu_0 g^2 \mu_B^2) n / \hbar}$$
+SpinorBEC の no-4π convention では、4π は `c_dd` には入れません：
+
+$$\tau_{\text{EdH}} \sim \frac{h}{c_{\text{dd}} n}, \qquad c_{\text{dd}} = \mu_0 g^2 \mu_B^2$$
 
 **Cr（6µ_B）に対するEu（7µ_B）の比**：
 

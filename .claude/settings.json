@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Read(./**)",
+      "Glob(*)",
+      "Grep(*)",
+      "WebSearch",
+      "WebFetch(domain:arxiv.org)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "WebFetch(domain:journals.aps.org)",
+      "WebFetch(domain:scipost.org)",
+      "WebFetch(domain:nature.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(julia *)",
+      "Bash(LD_LIBRARY_PATH=/usr/lib/wsl/lib julia *)",
+      "Bash(python *)",
+      "Bash(python3 *)",
+      "Bash(jq *)",
+      "Bash(git status)",
+      "Bash(git status *)",
+      "Bash(git diff)",
+      "Bash(git diff *)",
+      "Bash(git log)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git branch)",
+      "Bash(git branch *)",
+      "Bash(git checkout *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git rev-parse *)",
+      "Bash(git stash)",
+      "Bash(git stash *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(wc *)",
+      "Bash(find *)",
+      "Bash(grep *)",
+      "Bash(mkdir *)",
+      "Bash(cp *)",
+      "Bash(mv *)",
+      "Bash(bash .claude/scripts/*)",
+      "Bash(.claude/scripts/*)",
+      "Bash(claude *)",
+      "Bash(uv run *)",
+      "Bash(uv pip *)",
+      "Bash(uv venv *)",
+      "Bash(git config --get *)",
+      "Bash(git config --list)",
+      "Bash(git config --list *)",
+      "Bash(git config -l)",
+      "Write(.claude/**)",
+      "Edit(.claude/**)",
+      "Write(runs/_loop/**)",
+      "Edit(runs/_loop/**)",
+      "Write(runs/auto/**)",
+      "Edit(src/**)",
+      "Edit(test/**)",
+      "Edit(docs/**)",
+      "Edit(scripts/**)",
+      "Write(src/**)",
+      "Write(test/**)",
+      "Write(docs/**)",
+      "Write(scripts/**)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(rm -fr *)",
+      "Bash(sudo *)",
+      "Bash(curl * | sh)",
+      "Bash(curl * | bash)",
+      "Bash(wget * | sh)",
+      "Bash(wget * | bash)",
+      "Bash(git push *)",
+      "Bash(git reset --hard *)",
+      "Bash(git rebase *)",
+      "Bash(git commit --amend *)",
+      "Bash(git commit --no-verify *)",
+      "Bash(git config --add *)",
+      "Bash(git config --unset *)",
+      "Bash(git config --replace-all *)",
+      "Bash(git config --rename-section *)",
+      "Bash(git config --remove-section *)",
+      "Read(/etc/**)",
+      "Read(/home/suzume/.ssh/**)",
+      "Read(/home/suzume/.aws/**)",
+      "Read(/home/suzume/.config/anthropic/**)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(**/credentials*)",
+      "Read(**/secret*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/scripts/hook_post_write.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/scripts/hook_pre_bash.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "date -Iseconds >> .claude/logs/turn_stops.log"
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "TURN=$(jq -r '.turn // 0' .claude/reports/state.json 2>/dev/null); STATUS=$(jq -r '.status // \"new\"' .claude/reports/state.json 2>/dev/null); BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null); echo \"loop[T${TURN}/${STATUS}] @${BRANCH}\""
+  }
+}

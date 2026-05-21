@@ -1,7 +1,7 @@
 @testset "Atom Species Library" begin
     all_atoms = [
         Li7, Na23, K39, K41, Rb85, Rb87, Cs133,
-        Cr52, Dy164, Dy162, Er168, Er166, Eu151,
+        Cr52, Dy164, Dy162, Er168, Er166, Eu151, Eu151_f1_effective,
         Ca40, Sr84, Sr86, Sr88, Yb170, Yb174, Yb176,
         He4star,
     ]
@@ -14,7 +14,7 @@
     end
 
     @testset "ATOM_REGISTRY" begin
-        @test length(ATOM_REGISTRY) == 21
+        @test length(ATOM_REGISTRY) == length(all_atoms)
         for (sym, atom) in ATOM_REGISTRY
             @test atom isa AtomSpecies
             @test atom === resolve_atom(sym)

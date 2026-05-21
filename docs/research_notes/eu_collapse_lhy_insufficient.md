@@ -59,7 +59,9 @@ For Eu F=6 the standard scalar dipolar parameter
 
 ε_dd = a_dd / a_s ≈ 60 a_B / 110 a_B = 0.55
 
-(Lima-Pelster definition; F² is already in c_dd via μ² = (g_F·F·μ_B)²). The Lima-Pelster correction factor at this ε_dd is
+(Lima-Pelster definition. In SpinorBEC solver units this is
+`c_dd * F^2 / (3*g_2F)`, because workspace `c_dd` is per-unit spin and
+the FFT kernel is `cos^2(theta) - 1/3`.) The Lima-Pelster correction factor at this ε_dd is
 
 Q_5(0.55) ≈ 1.46
 
