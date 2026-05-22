@@ -179,6 +179,23 @@ function _run_step(
         )
     end
 
+    # Deterministic single-mode seed (grid-convergence diagnostic).
+    # Picks the m=dominant±1 transverse component, adds amplitude·peak|ψ|·
+    # exp(i k·r + iφ). No RNG → identical seed across grids at fixed (k, φ).
+    seed_mode_raw = get(p, "seed_mode", nothing)
+    if seed_mode_raw isa Dict
+        k_vec = seed_mode_raw["k_vec"]
+        amp = Float64(seed_mode_raw["amplitude"])
+        phase = Float64(get(seed_mode_raw, "phase", 0.0))
+        add_deterministic_mode_seed!(
+            ws.state.psi, F;
+            k_vec=Tuple(Float64(k) for k in k_vec),
+            amplitude=amp,
+            grid=grid,
+            phase=phase,
+        )
+    end
+
     twa_raw = get(p, "twa", nothing)
     if twa_raw !== nothing
         twa_config = _parse_twa_config(twa_raw)

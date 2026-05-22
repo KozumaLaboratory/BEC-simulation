@@ -147,6 +147,7 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     "temperature_ratio" => FieldSpec(; type=Number, range=(0.0, 1.0)),
     "seed_amplitude" => FieldSpec(; type=Number, range=(0.0, 1.0)),
     "seed_k_cut" => FieldSpec(; type=Number, range=(0.0, 1.0e6)),
+    "seed_mode" => FieldSpec(; type=Dict),
     "noise_seed" => FieldSpec(; type=Number),
     "live_monitor" => FieldSpec(; type=Union{Bool, Dict}),
     # Standard dynamics path uses {strang, yoshida, adaptive, richardson};

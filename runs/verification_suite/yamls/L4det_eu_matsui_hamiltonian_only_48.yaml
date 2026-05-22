@@ -1,0 +1,61 @@
+# L4det — Eu-151 Matsui Hamiltonian-only 32³ with DETERMINISTIC single-mode seed.
+# Diagnostic variant of L4_eu_matsui_hamiltonian_only_32.yaml: replaces the
+# random seed_amplitude+seed_k_cut block with a deterministic plane-wave seed
+# at k_z = 2π/L = 2π/12 ≈ 0.524 (lowest non-trivial mode on this box).
+# Goal: if L4 32/48/64/96 converge under the deterministic seed but not under
+# the random one, the noise spectrum/pattern is the convergence culprit. If
+# they STILL diverge, the DDI kernel discretisation is the culprit.
+
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_det_seed_48
+  expected: grid_convergence_diagnostic
+  seed_kind: deterministic_single_mode
+
+defaults:
+  kind: spinor
+  backend: cuda
+  interactions: {N_atoms: 30000, omega_ref: 628.3}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [48, 48, 48], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      interactions:
+        N_atoms: 30000
+        omega_ref: 628.3
+        c1_ratio: -0.005
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      gauge_fix: false
+      initial_state: m_minus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 1500
+      tol: 1.0e-9
+
+  - dynamics:
+      duration: 6.28
+      dt: 0.01
+      B:
+        Bz: {from: 0.01, to: 2.6e-5, duration: 0.0}
+        theta: 0.0
+        phi: 0.0
+      ddi: {secular: false}
+      seed_mode:
+        k_vec: [0.0, 0.0, 0.5236]    # 2π/12 along z, smallest non-zero mode
+        amplitude: 1.0e-6
+        phase: 0.0
+      save:
+        every: 50
+        psi: true
+        precision: f64
+
+  - analyze:
+      - phase_classify: {}
+      - winding_map: {}
+      - energy_decomposition: {}
+      - summary_json: {path: "runs/verification_suite/outputs/L4det_eu_matsui_hamiltonian_only_48.json"}

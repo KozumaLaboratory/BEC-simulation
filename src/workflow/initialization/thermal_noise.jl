@@ -1,7 +1,7 @@
 export add_thermal_seed!, add_thermal_seed
 export add_thermal_noise!, add_thermal_noise         # backward-compat aliases
 export thermal_noise_amplitude, bec_critical_temperature
-export add_symmetry_breaking_seed!
+export add_symmetry_breaking_seed!, add_deterministic_mode_seed!
 
 """
     bec_critical_temperature(N, omega_geometric_mean) → T_c (Kelvin)
@@ -141,6 +141,81 @@ const add_thermal_noise! = add_thermal_seed!
 const add_thermal_noise = add_thermal_seed
 
 """
+    add_deterministic_mode_seed!(psi, F; k_vec, amplitude, grid, phase=0.0) → psi
+
+Deterministic-pattern alternative to `add_symmetry_breaking_seed!`. Adds a
+single plane-wave mode `amplitude * peak|ψ| * exp(i k·r + i phase)` into the
+transverse spin component (m=±F-1) adjacent to the dominant one. Total
+density is then re-normalised to the pre-seed value.
+
+The seed is **grid-independent by construction**: same `k_vec` (in
+dimensionless 1/a_ho units), same amplitude relative to peak|ψ|, identical
+phase, deterministic — no RNG. This is the diagnostic seed used to
+distinguish "noise spectrum couples to grid" from "DDI kernel resolution
+is the convergence bottleneck": if `add_symmetry_breaking_seed!` fails to
+grid-converge but `add_deterministic_mode_seed!` succeeds, the seed
+spectrum is the culprit; if both diverge, DDI discretisation is.
+
+`k_vec` must be a Tuple/Vector of `ndim` real numbers (the mode wavevector).
+For a 3D 1/a_ho grid with box L, the smallest non-zero k is `2π/L` along
+each axis. Aliasing-safe range: `|k| < π·N/L` (Nyquist) at the coarsest
+grid being compared.
+"""
+function add_deterministic_mode_seed!(
+    psi::AbstractArray{<:Complex},
+    F::Int;
+    k_vec,
+    amplitude::Float64=1e-6,
+    grid,
+    phase::Float64=0.0,
+)
+    D = 2F + 1
+    ndim = ndims(psi) - 1
+    n_pts = ntuple(d -> size(psi, d), ndim)
+    grid === nothing &&
+        throw(ArgumentError("add_deterministic_mode_seed! requires `grid` (for x-coordinates)"))
+    length(k_vec) == ndim ||
+        throw(ArgumentError("k_vec length $(length(k_vec)) ≠ ndim $(ndim)"))
+
+    original_norm = sqrt(sum(abs2, psi))
+    psi_max = maximum(abs, psi)
+    mode_scale = amplitude * psi_max
+
+    dominant_c = 1
+    dominant_norm = 0.0
+    for c in 1:D
+        idx = _component_slice(ndim, n_pts, c)
+        n_c = sum(abs2, view(psi, idx...))
+        if n_c > dominant_norm
+            dominant_norm = n_c
+            dominant_c = c
+        end
+    end
+    target_c = dominant_c < D ? dominant_c + 1 : dominant_c - 1
+
+    # Build plane wave exp(i k·r + i φ) on the grid coordinates.
+    pattern = zeros(ComplexF64, n_pts...)
+    @inbounds for I in CartesianIndices(pattern)
+        kr = 0.0
+        for d in 1:ndim
+            kr += Float64(k_vec[d]) * grid.x[d][I.I[d]]
+        end
+        pattern[I] = mode_scale * exp(1im * (kr + phase))
+    end
+
+    idx = _component_slice(ndim, n_pts, target_c)
+    seed_buf = similar(psi, ComplexF64, n_pts...)
+    copyto!(seed_buf, pattern)
+    view(psi, idx...) .+= seed_buf
+
+    total_norm = sqrt(sum(abs2, psi))
+    if total_norm > 0 && original_norm > 0
+        psi .*= (original_norm / total_norm)
+    end
+    psi
+end
+
+"""
     add_symmetry_breaking_seed!(psi, F; amplitude, seed, k_cut, grid) → psi
 
 Add a tiny perturbation to the nearest transverse spin component (Δm=±1)
@@ -156,6 +231,17 @@ the seed in the long-wavelength modes that physically drive instabilities
 (e.g. the EdH spin-wave manifold below the healing-length wavenumber)
 instead of exciting all bands uniformly. With `k_cut === nothing` (default)
 the noise is unfiltered white.
+
+**Amplitude semantics under k-space lowpass (changed 2026-05-22 for
+grid-convergent physics):** with `k_cut`, the seed is rescaled so its
+**box RMS** equals `amplitude * max|ψ|`, not its peak. Box-RMS is
+grid-independent for band-limited Gaussian noise (PSD invariant in the
+continuum limit), so dynamical observables converge as the grid is
+refined. The previous max-rescaling concentrated power in the band as
+grid refined (max_over_N pixels grew weaker for band-limited noise →
+the rescaling amplified in-band modes), producing the spurious
+"32 ≡ 48 ≪ 64 ≪ 96" Eu EdH ladder.
+The without-k_cut branch keeps the old per-pixel amplitude semantics.
 
 Typical usage: `amplitude = 1e-6` for symmetry breaking without
 injecting macroscopic energy. For EdH, also set `k_cut ≈ 1/ξ_h` with
@@ -216,10 +302,16 @@ function add_symmetry_breaking_seed!(
             end
         end
         noise = ifft(nhat)
-        # Restore the per-pixel target amplitude after spectral truncation
-        new_max = maximum(abs, noise)
-        if new_max > 0
-            noise .*= noise_scale / new_max
+        # Box-RMS rescale (grid-convergent for band-limited noise).
+        # The continuum band-limited PSD has well-defined real-space RMS
+        # independent of grid; sampling it on the lattice matches that RMS
+        # in the continuum limit. Rescaling by max-over-pixels was
+        # grid-dependent (peak of band-limited noise scales weaker than RMS
+        # with grid count), producing the L4 Eu 32≡48≪64≪96 spurious
+        # ladder. See thermal_noise docstring §"Amplitude semantics".
+        box_rms = sqrt(sum(abs2, noise) / length(noise))
+        if box_rms > 0
+            noise .*= noise_scale / box_rms
         end
     end
 
