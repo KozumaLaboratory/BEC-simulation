@@ -43,9 +43,9 @@ using Test
         @test a.potential_values == b.potential_values
     end
 
-    @testset ":two_channel F=1" begin
-        a = make_lhy(:two_channel; F=1, c0=10.0, c1=-0.5)
-        b = compute_spinor_lhy_two_channel(; F=1, c0=10.0, c1=-0.5)
+    @testset ":polar_two_channel F=1" begin
+        a = make_lhy(:polar_two_channel; F=1, c0=10.0, c1=-0.5)
+        b = compute_spinor_lhy_polar_two_channel(; F=1, c0=10.0, c1=-0.5)
         @test a.densities == b.densities
         @test a.potential_values == b.potential_values
     end
@@ -56,10 +56,10 @@ using Test
         @test_throws ArgumentError make_lhy(:unknown_state; F=6, g_dict=g_dict)
     end
 
-    @testset ":two_channel F>2 warns" begin
+    @testset ":polar_two_channel F>2 warns" begin
         # Use @test_logs to confirm the F>2 advisory fires.
         @test_logs (:warn, r"two_channel.*approximate") match_mode=:any begin
-            make_lhy(:two_channel; F=6, c0=10.0, c1=-0.5)
+            make_lhy(:polar_two_channel; F=6, c0=10.0, c1=-0.5)
         end
     end
 end

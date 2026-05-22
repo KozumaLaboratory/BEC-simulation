@@ -54,10 +54,13 @@
         @test params.c1 ≈ c1_expected rtol = 1e-10
     end
 
-    @testset "compute_interaction_params_general_f returns zero params" begin
+    @testset "F≥2 with full scattering lengths → tensor-cache path (c0=c1=0)" begin
+        # The c_S channel couplings live in TensorInteractionCache, not in
+        # InteractionParams. compute_interaction_params returns zero for the
+        # c0/c1 fields when the tensor-cache path is active.
         sl = Dict(0 => 1e-9, 2 => 2e-9, 4 => 1.5e-9)
         atom = AtomSpecies("test-f2", 1e-25, 2, 0.0, 0.0, 0.0, sl)
-        params = compute_interaction_params_general_f(atom)
+        params = compute_interaction_params(atom)
         @test params.c0 == 0.0
         @test params.c1 == 0.0
     end

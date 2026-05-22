@@ -54,7 +54,7 @@ const INTERACTIONS_SCHEMA =
 # workspace-build time.
 const LHY_SCHEMA = Dict{String, FieldSpec}(
     "kind" => FieldSpec(; type=String, default="none",
-        enum=["none", "scalar", "quasi_2d", "two_channel", "full_bdg",
+        enum=["none", "scalar", "quasi_2d", "polar_two_channel", "full_bdg",
             "polar_contact", "polar_dipolar", "fm_contact", "fm_dipolar",
             "icosahedral"]),
     "c_lhy" => FieldSpec(; type=Number),       # scalar/quasi_2d explicit override
@@ -98,7 +98,7 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
     "B" => FieldSpec(; type=Dict),
     "potential" => FieldSpec(; type=Union{Dict, Vector}),
     "dt" => FieldSpec(; type=Number, default=0.001, range=(1e-8, 1.0)),
-    "n_steps" => FieldSpec(; type=Number, default=100000, range=(1.0, 1e9)),
+    "n_steps" => FieldSpec(; type=Number, default=100000, range=(0.0, 1e9)),
     "tol" => FieldSpec(; type=Number, default=1e-8, range=(1e-16, 1.0)),
     "m_lbfgs" => FieldSpec(; type=Number, default=10, range=(1.0, 100.0)),
     "initial_state" => FieldSpec(; type=String, default="polar",
@@ -148,6 +148,7 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     "seed_amplitude" => FieldSpec(; type=Number, range=(0.0, 1.0)),
     "seed_k_cut" => FieldSpec(; type=Number, range=(0.0, 1.0e6)),
     "seed_mode" => FieldSpec(; type=Dict),
+    "hard_polarize" => FieldSpec(; type=Number, range=(-12.0, 12.0)),
     "noise_seed" => FieldSpec(; type=Number),
     "live_monitor" => FieldSpec(; type=Union{Bool, Dict}),
     # Standard dynamics path uses {strang, yoshida, adaptive, richardson};

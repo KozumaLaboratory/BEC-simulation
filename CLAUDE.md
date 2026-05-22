@@ -67,7 +67,7 @@ Each subsystem umbrella `Foo.jl` `include`s sub-files in dependency order. Publi
 
 **State zoo**: 22 named builders in `init_psi_<name>` shape (`src/workflow/initialization/state_zoo.jl`). All wrap `init_psi(state=:..., init_state_params=...)` — same physics, named API. Currently WIP for YAML integration (memory: `state_zoo_yaml_integration_wip.md`).
 
-**LHY config** (refactored 2026-05-12): single `lhy:` block inside `ground_state`. `kind` ∈ {`scalar`, `quasi_2d`, `two_channel`, `full_bdg`, `polar_contact`, `polar_dipolar`, `fm_contact`, `fm_dipolar`, `icosahedral`, `none`}. Auto-derive `c_lhy` for `scalar` / `quasi_2d`. Legacy keys (`interactions.c_lhy`, `ground_state.spinor_lhy`) removed.
+**LHY config** (refactored 2026-05-12): single `lhy:` block inside `ground_state`. `kind` ∈ {`scalar`, `quasi_2d`, `polar_two_channel`, `full_bdg`, `polar_contact`, `polar_dipolar`, `fm_contact`, `fm_dipolar`, `icosahedral`, `none`}. Auto-derive `c_lhy` for `scalar` / `quasi_2d`. Legacy keys (`interactions.c_lhy`, `ground_state.spinor_lhy`) removed.
 
 **Continuation API** (direct-Julia): `make_params(val) → NamedTuple` overrides any `find_ground_state` kwargs per sweep point. Legacy `make_interactions(val) → InteractionParams` also supported.
 
@@ -79,7 +79,6 @@ Each subsystem umbrella `Foo.jl` `include`s sub-files in dependency order. Publi
 - **ITP Zeeman shift**: subtracts `min(E_m)` to prevent overflow.
 - **Scalar LHY**: `@warn` present. Known approximation.
 - **Odd-rank c_extra ignored**: `@warn` present. KU's c₃≠rank-3 tensor.
-- **`compute_interaction_params_general_f` returns (0,0)**: by design (tensor_cache handles all).
 - **`_YOSHIDA_W0 < 0`**: correct (backward middle substep, all operators time-reversible).
 
 ## ¹⁵¹Eu
@@ -88,7 +87,7 @@ F=6, g_J=1.9934, g_F≈1.163, μ≈6.977μ_B, a_s≈110a₀. 7 unknown scatterin
 
 ## Known limitations (design boundaries — don't "fix")
 
-- **`TwoChannelLHY` is polar-only**, exact at F=1, ~1% off at F=2, **30-70% off at F=6** (pinned by `test_spinor_lhy.jl`). For F≥2 polar use `PolarContactLHY` / `PolarDipolarLHY`; FM → `FMContactLHY` / `FMDipolarLHY`; F=6 I_h → `IcosahedralLHY`.
+- **`PolarTwoChannelLHY`** (formerly `TwoChannelLHY`) is **polar-only**, exact at F=1, ~1% off at F=2, **30-70% off at F=6** (pinned by `test_spinor_lhy.jl`). The "two-channel" reduction sums over (S=0, S=2) only, which is mathematically exhaustive only up to F=2. For F≥2 polar use `PolarContactLHY` / `PolarDipolarLHY`; FM → `FMContactLHY` / `FMDipolarLHY`; F=6 I_h → `IcosahedralLHY`. Renamed 2026-05-22 so the type name carries the polar-only constraint.
 - **F=6 polar + `FullBdGLHY`** emits a `@warn` (~3000× spurious offset; memory `full_bdg_F6_polar_broken.md`).
 - **`secular_ddi=true` is user-chosen** (not auto). `make_workspace` emits `@info` advisory when `ω_L/(c_dd·⟨n⟩) > 100` — Eu experiments almost always live there.
 - **`spin_rotating_frame_omega ≠ 0` requires `secular_ddi=true`** (enforced via `ArgumentError`). Full DDI's off-diagonal components only Larmor-average to zero in the secular limit.

@@ -10,7 +10,7 @@ export HarmonicTrap, NoPotential, GravityPotential, CompositePotential
 export RingPotential, BoxPotential, OpticalLatticePotential, DoubleWellPotential, QuarticPotential
 export AbstractLHY, NoLHY, ScalarLHY, Quasi2DLHY
 export TabulatedLHY
-export TwoChannelLHY, FullBdGLHY, PolarContactLHY, PolarDipolarLHY
+export PolarTwoChannelLHY, FullBdGLHY, PolarContactLHY, PolarDipolarLHY
 export FMContactLHY, FMDipolarLHY, IcosahedralLHY
 export MagneticGradient, TimeDependentMagneticGradient
 export LaguerreGaussBeam, PlugBeam, ShakenLatticePotential, TimeDependentTrap
@@ -104,7 +104,7 @@ end
 #     ├── ScalarLHY                  n^(3/2) contact (1D/2D/3D)
 #     ├── Quasi2DLHY                 logarithmic 2D correction
 #     └── TabulatedLHY  (abstract)   density → potential lookup
-#           ├── TwoChannelLHY        F ≤ 2 two-channel reduction
+#           ├── PolarTwoChannelLHY        F ≤ 2 two-channel reduction
 #           ├── FullBdGLHY           F-generic BdG-diagonalised
 #           ├── PolarContactLHY      F-generic polar contact closed form
 #           ├── PolarDipolarLHY      polar contact + DDI closed form
@@ -132,7 +132,7 @@ end
 abstract type TabulatedLHY <: AbstractLHY end
 
 """
-    TwoChannelLHY
+    PolarTwoChannelLHY
 
 Two-channel LHY reduction for polar-phase spinor BEC. Captures the m=0
 phonon plus 2 (m=±1) SO(3) Goldstone modes only.
@@ -145,7 +145,7 @@ F = 6 in `test/test_spinor_lhy.jl`. Use `PolarContactLHY` / `PolarDipolarLHY`
 (F-generic polar closed form, Paper #1) or `IcosahedralLHY` (F = 6
 inert state, Paper #3) instead.
 """
-struct TwoChannelLHY <: TabulatedLHY
+struct PolarTwoChannelLHY <: TabulatedLHY
     densities::Vector{Float64}
     potential_values::Vector{Float64}
 end

@@ -361,8 +361,8 @@ end
 # Catch-all: unknown / unsupported mode → nothing (caller falls through).
 _build_spinor_lhy(::Val, atom, ws, psi_init, c_dd, enable_ddi) = nothing
 
-function _build_spinor_lhy(::Val{:two_channel}, atom, ws, psi_init, c_dd, enable_ddi)
-    compute_spinor_lhy_two_channel(;
+function _build_spinor_lhy(::Val{:polar_two_channel}, atom, ws, psi_init, c_dd, enable_ddi)
+    compute_spinor_lhy_polar_two_channel(;
         F=atom.F, c0=ws.c0, c1=ws.c1,
         c_dd=enable_ddi && !isnan(c_dd) ? c_dd : 0.0,
         n_max=_lhy_n_max(psi_init))

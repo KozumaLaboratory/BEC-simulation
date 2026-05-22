@@ -203,7 +203,7 @@ Bogoliubov spectrum of the full spin-F system and can differ qualitatively
 when spin degrees of freedom are dynamically active.
 
 For F ≥ 3 (e.g. Eu151 F=6) the spinor LHY problem is **research-open**:
-- The two-channel `TwoChannelLHY` table we ship covers (S=0, S=2) only — sufficient
+- The two-channel `PolarTwoChannelLHY` table we ship covers (S=0, S=2) only — sufficient
   for F ≤ 2 (Na23 F=1/2, Rb87 F=1, Cr52 F=3 limit), insufficient for F=6.
 - No closed-form Lima-Pelster–style elliptic integral is known for general F.
 - Petrov–Astrakharchik droplet stabilisation (PRL 117 100401) was derived for

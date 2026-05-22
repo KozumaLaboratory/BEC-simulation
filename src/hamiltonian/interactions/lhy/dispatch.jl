@@ -1,4 +1,4 @@
-export compute_spinor_lhy_two_channel, compute_spinor_lhy_table
+export compute_spinor_lhy_polar_two_channel, compute_spinor_lhy_table
 export compute_spinor_lhy_polar_contact, compute_spinor_lhy_polar_dipolar
 export compute_spinor_lhy_fm_contact, compute_spinor_lhy_fm_dipolar
 export compute_spinor_lhy_icosahedral
@@ -14,7 +14,7 @@ export make_lhy
 # See: src/hamiltonian/interactions/lhy/polar_contact.jl, dispatch.jl docstring below
 
 """
-    compute_spinor_lhy_two_channel(; F, c0, c1, c_dd, n_max, n_points) → TwoChannelLHY
+    compute_spinor_lhy_polar_two_channel(; F, c0, c1, c_dd, n_max, n_points) → PolarTwoChannelLHY
 
 **Polar-state LHY in the two-channel approximation.** For ζ_α = δ_{α,0}
 (m=0 condensate; SO(3)→SO(2) broken with 2F Type-A Goldstones):
@@ -57,7 +57,7 @@ further — PolarContact is the right tool.
 
 The potential V_LHY = dε_LHY/dn is tabulated via central differences.
 """
-function compute_spinor_lhy_two_channel(;
+function compute_spinor_lhy_polar_two_channel(;
     F::Int,
     c0::Float64,
     c1::Float64,
@@ -86,7 +86,7 @@ function compute_spinor_lhy_two_channel(;
     end
 
     potential_values = _numerical_derivative(densities, energy)
-    TwoChannelLHY(densities, potential_values)
+    PolarTwoChannelLHY(densities, potential_values)
 end
 
 """
@@ -249,7 +249,7 @@ end
 # Closed-form polar LHY wrappers (PhiOneReg + PolarContactMod + PolarDipolarMod)
 # =================================================================
 #
-# These produce a TabulatedLHY identical in shape to :two_channel /
+# These produce a TabulatedLHY identical in shape to :polar_two_channel /
 # :full_bdg, so the downstream evaluator (apply_lhy_step!) treats them
 # uniformly.
 
@@ -420,13 +420,13 @@ or BdG implementation based on `(state, ddi)` and validates F-range constraints.
 | :polar        | `compute_spinor_lhy_polar_contact` | `compute_spinor_lhy_polar_dipolar`|
 | :fm           | `compute_spinor_lhy_fm_contact`    | `compute_spinor_lhy_fm_dipolar`   |
 | :icosahedral  | `compute_spinor_lhy_icosahedral`   | (no closed form yet — errors)     |
-| :two_channel  | `compute_spinor_lhy_two_channel`   | (eps_dd via kwarg)                |
+| :polar_two_channel  | `compute_spinor_lhy_polar_two_channel`   | (eps_dd via kwarg)                |
 | :full_bdg     | `compute_spinor_lhy_table`         | (c_dd via kwarg)                  |
 
 Constraints (mirrored from per-function checks):
 - `:icosahedral` requires `F == 6`.
-- `:two_channel` warns above `F=2` (~30-70% off at F=6; see this file's
-  docstring on `compute_spinor_lhy_two_channel`).
+- `:polar_two_channel` warns above `F=2` (~30-70% off at F=6; see this file's
+  docstring on `compute_spinor_lhy_polar_two_channel`).
 
 Existing `compute_spinor_lhy_*` functions remain the underlying implementations
 and direct callers (incl. `make_workspace` Val-dispatch) are unchanged. This
@@ -455,22 +455,22 @@ function make_lhy(state::Symbol; ddi::Bool=false, F::Int, kwargs...)
         ddi && throw(
             ArgumentError(
                 ":icosahedral + ddi=true has no closed form yet; use ddi=false " *
-                "or fall back to make_lhy(:two_channel, ddi=true)"),
+                "or fall back to make_lhy(:polar_two_channel, ddi=true)"),
         )
         return compute_spinor_lhy_icosahedral(; F, kwargs...)
-    elseif state === :two_channel
+    elseif state === :polar_two_channel
         F <= 2 || @warn (
-            "make_lhy(:two_channel) above F=2 is approximate " *
+            "make_lhy(:polar_two_channel) above F=2 is approximate " *
             "(~30-70% error at F=6); prefer :polar (paper #1 closed form) for F≥2."
         ) maxlog=1
-        return compute_spinor_lhy_two_channel(; F, kwargs...)
+        return compute_spinor_lhy_polar_two_channel(; F, kwargs...)
     elseif state === :full_bdg
         return compute_spinor_lhy_table(; F, kwargs...)
     else
         throw(
             ArgumentError(
                 "make_lhy: unknown state=:$state. Known: " *
-                ":polar, :fm, :icosahedral, :two_channel, :full_bdg"),
+                ":polar, :fm, :icosahedral, :polar_two_channel, :full_bdg"),
         )
     end
 end

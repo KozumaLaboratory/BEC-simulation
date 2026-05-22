@@ -1,4 +1,4 @@
-export compute_interaction_params, compute_interaction_params_general_f
+export compute_interaction_params
 export compute_c0, compute_c_dd, compute_a_dd
 export interaction_params_from_constraint
 export compute_c_total, compute_c_dd_dimless, linear_zeeman_p
@@ -61,24 +61,10 @@ function compute_interaction_params(
         c0 = compute_c0(atom; N_atoms, dims, length_scale)
         return InteractionParams(c0, 0.0)
     end
-    compute_interaction_params_general_f(atom; N_atoms, dims, length_scale)
-end
-
-"""
-    compute_interaction_params_general_f(atom; N_atoms, dims, length_scale)
-
-Compute interaction params for general spin-F with channel-resolved scattering lengths.
-
-Returns `InteractionParams(0.0, 0.0)` — all contact interactions are handled by the
-tensor interaction step when scattering lengths are provided. The `g_S` values
-are stored in `TensorInteractionCache`, not in `InteractionParams`.
-"""
-function compute_interaction_params_general_f(
-    atom::AtomSpecies;
-    N_atoms::Int=1,
-    dims::Int=1,
-    length_scale::Float64=1.0,
-)
+    # F ≥ 2 with full channel scattering lengths: all S-channel couplings g_S
+    # live in TensorInteractionCache (built downstream in make_workspace).
+    # InteractionParams holds the scalar c₀ / c₁ path; for the tensor-cache
+    # path these are not used, hence zero.
     InteractionParams(0.0, 0.0)
 end
 
