@@ -71,8 +71,8 @@ using LinearAlgebra
             ip = InteractionParams(0.0, 0.0, Float64[c2])
             dt = 0.0023
             ndim = 1
-            SpinorBEC.apply_nematic_step!(psi_cpu, ip, F, dt, ndim)
-            SpinorBEC.apply_nematic_step!(psi_gpu, ip, F, dt, ndim)
+            SpinorBEC.apply_singlet_pair_step!(psi_cpu, ip, F, dt, ndim)
+            SpinorBEC.apply_singlet_pair_step!(psi_gpu, ip, F, dt, ndim)
             diff = maximum(abs, Array(psi_gpu) .- psi_cpu)
             @test diff < 1e-10
         end

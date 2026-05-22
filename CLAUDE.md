@@ -41,10 +41,10 @@ Each subsystem umbrella `Foo.jl` `include`s sub-files in dependency order. Publi
 
 **Wavefunction**: `psi[x, y, ..., c]` — spatial dims first, spinor last. c=1→m=F, c=D→m=−F.
 
-**Split-step** (`split_step.jl`): `V(dt/2) Coriolis(dt/2) K(dt) Coriolis(dt/2) V(dt/2)`. Inner V is symmetric: `diag SM nematic tensor raman DDI raman tensor nematic SM diag`. All substeps auto-skip when coupling ≈ 0.
+**Split-step** (`split_step.jl`): `V(dt/2) Coriolis(dt/2) K(dt) Coriolis(dt/2) V(dt/2)`. Inner V is symmetric: `diag SM singlet_pair tensor raman DDI raman tensor singlet_pair SM diag`. All substeps auto-skip when coupling ≈ 0.
 
 **Two interaction paths** (auto-selected in `make_workspace`):
-- **c₀/c₁ path**: diagonal(c₀) + spin_mixing(c₁) + nematic(c₂) + tensor(residual c₄,c₆,...)
+- **c₀/c₁ path**: diagonal(c₀) + spin_mixing(c₁) + singlet_pair(c₂) + tensor(residual c₄,c₆,...)
 - **Scattering-lengths path** (Cr52 etc.): tensor handles ALL channels, c₀=c₁=0
 
 **Entry points**:
@@ -90,7 +90,6 @@ F=6, g_J=1.9934, g_F≈1.163, μ≈6.977μ_B, a_s≈110a₀. 7 unknown scatterin
 
 - **`TwoChannelLHY` is polar-only**, exact at F=1, ~1% off at F=2, **30-70% off at F=6** (pinned by `test_spinor_lhy.jl`). For F≥2 polar use `PolarContactLHY` / `PolarDipolarLHY`; FM → `FMContactLHY` / `FMDipolarLHY`; F=6 I_h → `IcosahedralLHY`.
 - **F=6 polar + `FullBdGLHY`** emits a `@warn` (~3000× spurious offset; memory `full_bdg_F6_polar_broken.md`).
-- **`apply_nematic_step!` is the S=0 singlet-pair Hamiltonian**, NOT the rank-2 nematic tensor observable. Observable side is `nematic_tensor_eigenvalues`. Legacy naming.
 - **`secular_ddi=true` is user-chosen** (not auto). `make_workspace` emits `@info` advisory when `ω_L/(c_dd·⟨n⟩) > 100` — Eu experiments almost always live there.
 - **`spin_rotating_frame_omega ≠ 0` requires `secular_ddi=true`** (enforced via `ArgumentError`). Full DDI's off-diagonal components only Larmor-average to zero in the secular limit.
 - **`even_c_extra(F; c2, c4, c6, …)` is the canonical c_extra builder.** Hand-written `[c2, c4, c6]` silently misindexes for F≥3.

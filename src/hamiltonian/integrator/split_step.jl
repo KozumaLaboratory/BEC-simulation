@@ -227,7 +227,7 @@ function _half_potential_step!(
 
     c2 = get_cn(ip, 2)
     if abs(c2) > 1e-30
-        @timeit_debug TIMER "nematic" apply_singlet_pair_step!(
+        @timeit_debug TIMER "singlet_pair" apply_singlet_pair_step!(
             ws.state.psi, ip, ws.spin_matrices.system.F, dt_half / 2, ndim; imaginary_time, psi_mf
         )
     end
@@ -294,7 +294,7 @@ function _half_potential_step!(
     end
 
     if abs(c2) > 1e-30
-        @timeit_debug TIMER "nematic" apply_singlet_pair_step!(
+        @timeit_debug TIMER "singlet_pair" apply_singlet_pair_step!(
             ws.state.psi, ip, ws.spin_matrices.system.F, dt_half / 2, ndim; imaginary_time, psi_mf
         )
     end

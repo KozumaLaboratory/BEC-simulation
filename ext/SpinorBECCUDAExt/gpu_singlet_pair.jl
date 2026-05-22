@@ -1,10 +1,10 @@
-# GPU-native nematic (singlet-pair) interaction step
+# GPU-native S=0 spin-singlet pair interaction step (KU Eq. 48, c₂|A₀₀|²)
 #
-# Eliminates the _run_on_host! GPU↔CPU transfer by computing the nematic
-# step directly on GPU using broadcast operations.
+# Eliminates the _run_on_host! GPU↔CPU transfer by computing the
+# singlet-pair step directly on GPU using broadcast operations.
 # Uses cached buffers to avoid per-call GPU memory allocations.
 
-mutable struct GPUNematicCache{T <: AbstractFloat}
+mutable struct GPUSingletPairCache{T <: AbstractFloat}
     A00::CuArray{Complex{T}, 1}
     V_buf::CuArray{Complex{T}, 1}
     absV::CuArray{T, 1}
@@ -15,14 +15,14 @@ mutable struct GPUNematicCache{T <: AbstractFloat}
     psi_tmp2::CuArray{Complex{T}, 1}
 end
 
-const _GPU_NEMATIC_CACHE = Dict{UInt64, Any}()
+const _GPU_SINGLET_PAIR_CACHE = Dict{UInt64, Any}()
 
-function _get_gpu_nematic_cache(N::Int, ::Type{T}) where {T <: AbstractFloat}
+function _get_gpu_singlet_pair_cache(N::Int, ::Type{T}) where {T <: AbstractFloat}
     key = hash((N, T))
-    cache = get(_GPU_NEMATIC_CACHE, key, nothing)
-    cache !== nothing && return cache::GPUNematicCache{T}
+    cache = get(_GPU_SINGLET_PAIR_CACHE, key, nothing)
+    cache !== nothing && return cache::GPUSingletPairCache{T}
 
-    cache = GPUNematicCache{T}(
+    cache = GPUSingletPairCache{T}(
         CUDA.zeros(Complex{T}, N),
         CUDA.zeros(Complex{T}, N),
         CUDA.zeros(T, N),
@@ -32,11 +32,11 @@ function _get_gpu_nematic_cache(N::Int, ::Type{T}) where {T <: AbstractFloat}
         CUDA.zeros(Complex{T}, N),
         CUDA.zeros(Complex{T}, N),
     )
-    _GPU_NEMATIC_CACHE[key] = cache
+    _GPU_SINGLET_PAIR_CACHE[key] = cache
     cache
 end
 
-function SpinorBEC.apply_nematic_step!(
+function SpinorBEC.apply_singlet_pair_step!(
     psi::CuArray{Complex{T}},
     interactions::SpinorBEC.InteractionParams,
     F::Int,
@@ -58,7 +58,7 @@ function SpinorBEC.apply_nematic_step!(
     signs = T[iseven(F - (F - (c - 1))) ? one(T) : -one(T) for c in 1:D]
 
     psi_2d = reshape(psi, N, D)
-    cache = _get_gpu_nematic_cache(N, T)
+    cache = _get_gpu_singlet_pair_cache(N, T)
     A00 = cache.A00
     V_buf = cache.V_buf
     absV = cache.absV

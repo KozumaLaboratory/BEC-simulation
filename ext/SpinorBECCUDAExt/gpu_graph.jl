@@ -33,7 +33,7 @@
 #      allocate scratch (N, D) buffers in the per-step caches and
 #      rewrite the chains as `broadcast!(f, scratch, ...)` followed by
 #      one in-place merge into ψ. Audit: gpu_spin_mixing.jl, gpu_raman.jl,
-#      gpu_nematic.jl, gpu_tensor.jl, ddi.jl GPU path. CUDA.@allocated
+#      gpu_singlet_pair.jl, gpu_tensor.jl, ddi.jl GPU path. CUDA.@allocated
 #      should be exactly 0 once done.
 #   b. Confirm cuFFT plan scratch is bound to a pre-allocated work area
 #      (`CUFFT.cufftSetWorkArea`) so the FFT plan doesn't re-pool memory

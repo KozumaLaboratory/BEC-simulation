@@ -1,20 +1,19 @@
-export apply_singlet_pair_step!, apply_nematic_step!
+export apply_singlet_pair_step!
 
 """
     apply_singlet_pair_step!(psi, interactions, F, dt, ndim; imaginary_time=false)
 
 Apply the **S=0 spin-singlet pair channel** step: exp(-i c₂ |A₀₀|² dt).
 
-> Canonical name: `apply_singlet_pair_step!`. The backward-compat alias
-> `apply_nematic_step!` is preserved for backwards compatibility but
-> refers to the *same* function — it is the c₂|A₀₀|² spin-singlet pair
-> Hamiltonian (KU Eq. 48), NOT the rank-2 spin nematic tensor
-> ⟨N^(2)_αβ⟩ (which lives in `analysis/observables.jl` as
-> `nematic_tensor_eigenvalues`).
+The c₂|A₀₀|² spin-singlet pair Hamiltonian (KU Eq. 48). NOT the rank-2
+spin nematic tensor ⟨N^(2)_αβ⟩ — that observable lives in
+`analysis/observables/nematic.jl` as `nematic_tensor_eigenvalues`.
+The historical alias `apply_nematic_step!` and file `nematic.jl`
+were renamed 2026-05-22 to eliminate the file/name/observable mismatch.
 
 Kawaguchi-Ueda convention correspondence for contact interactions:
 - F=1: c₀n² + c₁|F|²  →  diagonal + spin_mixing           (2 channels, exact)
-- F=2: + c₂|A₀₀|²     →  + nematic                         (3 channels)
+- F=2: + c₂|A₀₀|²     →  + singlet_pair                    (3 channels)
 - F=3: + c₃ Σ_M|A₂M|² →  NOT handled here (S=2 pair channel, not rank-3 tensor)
 - F≥4: higher c_k      →  NOT handled here
 
@@ -127,19 +126,3 @@ function _nematic_loop!(psi, psi_mf, ::Val{D}, n_pts, c2, dt, imaginary_time) wh
     nothing
 end
 
-# NOT GENERALIZABLE (NAMING-ONLY): `apply_nematic_step!` is the S=0 singlet-pair step.
-# Reason: physics (terminology, not algorithm)
-# Why: historical name from F=2 KU Eq. 48 ("nematic" c_2|A_00|²). It is NOT the
-#   rank-2 spin nematic tensor ⟨N^(2)_αβ⟩, which lives in
-#   analysis/observables/multipole.jl (`nematic_tensor_eigenvalues`). Alias kept
-#   for back-compat only; prefer `apply_singlet_pair_step!` in new code.
-# See: src/analysis/observables/multipole.jl
-"""
-    apply_nematic_step!(args...; kwargs...)
-
-Legacy alias for [`apply_singlet_pair_step!`](@ref). Same function — the
-"nematic" label is historical (KU Eq. 48 for F=2 was popularised under that
-name) and conflicts with the rank-2 spin nematic tensor observable.
-Prefer `apply_singlet_pair_step!` in new code.
-"""
-const apply_nematic_step! = apply_singlet_pair_step!

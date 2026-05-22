@@ -198,7 +198,7 @@ function _c_extra_to_delta_gS(F::Int, c_extra::Vector{Float64})
     #   accepts even-rank inputs. KU's c_3 (F=3 cyclic) labels the S=2 pair-channel
     #   coupling Σ_M |A_{2M}|² — a pair-channel coupling, not a rank-3 single-particle
     #   tensor. Route via `_make_tensor_cache_from_channels(F, Dict(2 => g_2))`.
-    # See: src/hamiltonian/interactions/nematic.jl docstring
+    # See: src/hamiltonian/interactions/singlet_pair.jl docstring
     for (idx, val) in enumerate(c_extra)
         k = idx + 1
         if abs(val) > 1e-30 && isodd(k)

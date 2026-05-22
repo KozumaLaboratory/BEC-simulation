@@ -41,7 +41,7 @@ const FAST_TESTS = [
     "analysis/test_diagnostics.jl",
     "analysis/test_phase_classification_polyhedral.jl",
     "hamiltonian/test_lhy.jl",
-    "hamiltonian/test_nematic.jl",
+    "hamiltonian/test_singlet_pair.jl",
     "hamiltonian/test_batched_kinetic.jl",
     "hamiltonian/test_ddi_padded.jl",
     "foundation/test_clebsch_gordan.jl",

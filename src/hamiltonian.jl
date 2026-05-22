@@ -3,8 +3,8 @@
 # Interaction kernels + scalar potentials + integrator primitives. Files
 # group by topic and rely on foundation types being already in scope.
 #
-#   interactions/{interactions,spin_mixing,nematic,tensor_interaction}
-#       — c0/c1 contact + spin-mixing + singlet-pair + general-F tensor
+#   interactions/{interactions,spin_mixing,singlet_pair,tensor_interaction}
+#       — c0/c1 contact + spin-mixing + S=0 singlet-pair + general-F tensor
 #   interactions/ddi/{qtensor,convolution,rotation} + ddi.jl + ddi_padded.jl
 #       — k-space DDI Q-tensor + 6-FFT convolution + Euler 5-stage spinor
 #         rotation + zero-padded DDI for non-periodic geometries
@@ -27,7 +27,7 @@
 # Interactions.
 include("hamiltonian/interactions/interactions.jl")
 include("hamiltonian/interactions/spin_mixing.jl")
-include("hamiltonian/interactions/nematic.jl")
+include("hamiltonian/interactions/singlet_pair.jl")
 include("hamiltonian/interactions/tensor_interaction.jl")
 include("hamiltonian/interactions/ddi/qtensor.jl")
 include("hamiltonian/interactions/ddi/convolution.jl")

@@ -1,4 +1,4 @@
-@testset "Nematic / Singlet Pair Amplitude" begin
+@testset "Singlet Pair (S=0) — Amplitude + Step" begin
     @testset "F=1 polar state: |A₀₀|² = n²/3" begin
         config = GridConfig(64, 20.0)
         grid = make_grid(config)
@@ -76,66 +76,66 @@
         @test E < 1e-28
     end
 
-    @testset "apply_nematic_step! c2=0 identity" begin
+    @testset "apply_singlet_pair_step! c2=0 identity" begin
         config = GridConfig(64, 20.0)
         grid = make_grid(config)
         sys = SpinSystem(1)
         psi = init_psi(grid, sys; state=:uniform)
         psi_orig = copy(psi)
         interactions = InteractionParams(10.0, -0.5)  # c2=0
-        apply_nematic_step!(psi, interactions, 1, 0.01, 1)
+        apply_singlet_pair_step!(psi, interactions, 1, 0.01, 1)
         @test psi ≈ psi_orig atol = 1e-15
     end
 
-    @testset "apply_nematic_step! norm conservation (F=1)" begin
+    @testset "apply_singlet_pair_step! norm conservation (F=1)" begin
         config = GridConfig(64, 20.0)
         grid = make_grid(config)
         sys = SpinSystem(1)
         psi = init_psi(grid, sys; state=:uniform)
         interactions = InteractionParams(10.0, -0.5, [50.0])  # c2=50
         N0 = total_norm(psi, grid)
-        apply_nematic_step!(psi, interactions, 1, 0.01, 1)
+        apply_singlet_pair_step!(psi, interactions, 1, 0.01, 1)
         N1 = total_norm(psi, grid)
         @test abs(N1 - N0) / N0 < 1e-12
     end
 
-    @testset "apply_nematic_step! norm conservation (F=2)" begin
+    @testset "apply_singlet_pair_step! norm conservation (F=2)" begin
         config = GridConfig(64, 20.0)
         grid = make_grid(config)
         sys = SpinSystem(2)
         psi = init_psi(grid, sys; state=:uniform)
         interactions = InteractionParams(10.0, -0.5, [30.0])
         N0 = total_norm(psi, grid)
-        apply_nematic_step!(psi, interactions, 2, 0.01, 1)
+        apply_singlet_pair_step!(psi, interactions, 2, 0.01, 1)
         N1 = total_norm(psi, grid)
         @test abs(N1 - N0) / N0 < 1e-12
     end
 
-    @testset "apply_nematic_step! ferromagnetic invariance" begin
+    @testset "apply_singlet_pair_step! ferromagnetic invariance" begin
         config = GridConfig(64, 20.0)
         grid = make_grid(config)
         sys = SpinSystem(1)
         psi = init_psi(grid, sys; state=:ferromagnetic)
         psi_orig = copy(psi)
         interactions = InteractionParams(10.0, -0.5, [50.0])
-        apply_nematic_step!(psi, interactions, 1, 0.01, 1)
+        apply_singlet_pair_step!(psi, interactions, 1, 0.01, 1)
         # Ferromagnetic: A₀₀=0, so nematic step is identity
         @test psi ≈ psi_orig atol = 1e-14
     end
 
-    @testset "apply_nematic_step! 2D norm conservation" begin
+    @testset "apply_singlet_pair_step! 2D norm conservation" begin
         config = GridConfig((32, 32), (10.0, 10.0))
         grid = make_grid(config)
         sys = SpinSystem(1)
         psi = init_psi(grid, sys; state=:uniform)
         interactions = InteractionParams(10.0, -0.5, [50.0])
         N0 = total_norm(psi, grid)
-        apply_nematic_step!(psi, interactions, 1, 0.01, 2)
+        apply_singlet_pair_step!(psi, interactions, 1, 0.01, 2)
         N1 = total_norm(psi, grid)
         @test abs(N1 - N0) / N0 < 1e-12
     end
 
-    @testset "apply_nematic_step! total norm with complex state (F=1)" begin
+    @testset "apply_singlet_pair_step! total norm with complex state (F=1)" begin
         psi = zeros(ComplexF64, 1, 3)
         psi[1, 1] = 0.5 * cis(0.7)
         psi[1, 2] = 0.3 + 0.2im
@@ -145,14 +145,14 @@
         total_before = sum(abs2, psi)
 
         for _ in 1:50
-            apply_nematic_step!(psi, interactions, 1, 0.01, 1)
+            apply_singlet_pair_step!(psi, interactions, 1, 0.01, 1)
         end
 
         total_after = sum(abs2, psi)
         @test total_after ≈ total_before rtol = 1e-6
     end
 
-    @testset "apply_nematic_step! total norm with complex state (F=2)" begin
+    @testset "apply_singlet_pair_step! total norm with complex state (F=2)" begin
         psi = zeros(ComplexF64, 1, 5)
         psi[1, 1] = 0.4 * cis(0.5)    # m=+2
         psi[1, 2] = 0.3 * cis(-0.8)   # m=+1
@@ -164,14 +164,14 @@
         total_before = sum(abs2, psi)
 
         for _ in 1:50
-            apply_nematic_step!(psi, interactions, 2, 0.01, 1)
+            apply_singlet_pair_step!(psi, interactions, 2, 0.01, 1)
         end
 
         total_after = sum(abs2, psi)
         @test total_after ≈ total_before rtol = 1e-6
     end
 
-    @testset "apply_nematic_step! RTP small-dt matches GP equation" begin
+    @testset "apply_singlet_pair_step! RTP small-dt matches GP equation" begin
         psi = zeros(ComplexF64, 1, 3)
         psi[1, 1] = 0.5 * cis(0.7)    # m=+1
         psi[1, 2] = 0.3 + 0.2im       # m=0
@@ -181,7 +181,7 @@
         interactions = InteractionParams(10.0, -0.5, [c2])
         dt = 1e-6
 
-        apply_nematic_step!(psi, interactions, 1, dt, 1)
+        apply_singlet_pair_step!(psi, interactions, 1, dt, 1)
 
         D = 3
         inv_sqrt_D = 1.0 / sqrt(3.0)
@@ -203,7 +203,7 @@
         end
     end
 
-    @testset "apply_nematic_step! RTP symmetry (m ↔ -m same sign)" begin
+    @testset "apply_singlet_pair_step! RTP symmetry (m ↔ -m same sign)" begin
         psi = zeros(ComplexF64, 1, 3)
         psi[1, 1] = 0.5 * cis(0.7)
         psi[1, 2] = 0.3 + 0.2im
@@ -215,28 +215,28 @@
         psi_swapped[1, 2] = psi[1, 2]
         psi_swapped[1, 3] = psi[1, 1]
 
-        apply_nematic_step!(psi, interactions, 1, 0.05, 1)
-        apply_nematic_step!(psi_swapped, interactions, 1, 0.05, 1)
+        apply_singlet_pair_step!(psi, interactions, 1, 0.05, 1)
+        apply_singlet_pair_step!(psi_swapped, interactions, 1, 0.05, 1)
 
         @test psi[1, 1] ≈ psi_swapped[1, 3] atol = 1e-14
         @test psi[1, 3] ≈ psi_swapped[1, 1] atol = 1e-14
     end
 
-    @testset "apply_nematic_step! ITP norm decrease" begin
+    @testset "apply_singlet_pair_step! ITP norm decrease" begin
         config = GridConfig(64, 20.0)
         grid = make_grid(config)
         sys = SpinSystem(1)
         psi = init_psi(grid, sys; state=:polar)
         interactions = InteractionParams(10.0, -0.5, [50.0])
         N0 = total_norm(psi, grid)
-        apply_nematic_step!(psi, interactions, 1, 0.001, 1; imaginary_time=true)
+        apply_singlet_pair_step!(psi, interactions, 1, 0.001, 1; imaginary_time=true)
         N1 = total_norm(psi, grid)
         # ITP step doesn't conserve norm (damping), but shouldn't explode
         @test N1 < 2 * N0
         @test N1 > 0.0
     end
 
-    @testset "apply_nematic_step! ITP symmetry with complex A₀₀ (F=1)" begin
+    @testset "apply_singlet_pair_step! ITP symmetry with complex A₀₀ (F=1)" begin
         # ITP formula: ψ_m' = ch*ψ_m - ph*sh*ψ*_{-m}, ψ_{-m}' = ch*ψ_{-m} - ph*sh*ψ*_m
         # Both have minus sign → symmetric under m ↔ -m exchange
         psi = zeros(ComplexF64, 1, 3)
@@ -251,15 +251,15 @@
         psi_swapped[1, 2] = psi[1, 2]
         psi_swapped[1, 3] = psi[1, 1]
 
-        apply_nematic_step!(psi, interactions, 1, 0.05, 1; imaginary_time=true)
-        apply_nematic_step!(psi_swapped, interactions, 1, 0.05, 1; imaginary_time=true)
+        apply_singlet_pair_step!(psi, interactions, 1, 0.05, 1; imaginary_time=true)
+        apply_singlet_pair_step!(psi_swapped, interactions, 1, 0.05, 1; imaginary_time=true)
 
         # Symmetric ITP: swap(input) → swap(output)
         @test psi[1, 1] ≈ psi_swapped[1, 3] atol = 1e-14
         @test psi[1, 3] ≈ psi_swapped[1, 1] atol = 1e-14
     end
 
-    @testset "apply_nematic_step! integrated in split_step" begin
+    @testset "apply_singlet_pair_step! integrated in split_step" begin
         config = GridConfig(64, 20.0)
         grid = make_grid(config)
         interactions = InteractionParams(10.0, -0.5, [50.0])
