@@ -116,6 +116,14 @@ function _save_dynamics_timeseries!(f, result)
             n_pts_v = Int.(src["spatial_shape"])
             D = Int(src["n_components"])
             ndim = length(n_pts_v)
+            # Frames stream-written by `run_step_dynamics.jl` use the
+            # `save.precision` setting (default f32; explicit f64 also
+            # supported). Read the actual eltype from `snap_eltype` rather
+            # than hardcoding ComplexF32 (which 2026-05-22 incident on
+            # verification YAMLs 00 + 05 exposed: precision: f64 frames
+            # tripped the typeassert).
+            snap_eltype_str = haskey(src, "snap_eltype") ? String(src["snap_eltype"]) : "ComplexF32"
+            snap_T = snap_eltype_str == "ComplexF64" ? ComplexF64 : ComplexF32
 
             pops = zeros(Float64, n_snaps, D)
             peak_density = zeros(Float64, n_snaps)
@@ -125,7 +133,7 @@ function _save_dynamics_timeseries!(f, result)
 
             for s in 1:n_snaps
                 skey = "frame_" * lpad(string(s), 5, '0')
-                frame = src[skey]::Array{ComplexF32}
+                frame = src[skey]::Array{snap_T}
                 f["dynamics/psi_snapshots_streamed/" * skey] = frame
                 total = sum(abs2, frame)
                 # Per-frame max total density (collapse-onset proxy).
@@ -247,12 +255,17 @@ function _save_dynamics_timeseries_multi!(f, history, result)
                     )
             end
             ndim = length(n_pts_v)
+            # Read frame eltype from the streamed file (same fix as the
+            # single-step path above): supports both ComplexF32 (default)
+            # and ComplexF64 (precision: f64).
+            snap_eltype_str = haskey(src, "snap_eltype") ? String(src["snap_eltype"]) : "ComplexF32"
+            snap_T = snap_eltype_str == "ComplexF64" ? ComplexF64 : ComplexF32
             for s in 1:n_local
                 n_global += 1
                 src_key = "frame_" * lpad(string(s), 5, '0')
                 dst_key = "dynamics/psi_snapshots_streamed/frame_" *
                           lpad(string(n_global), 5, '0')
-                frame = src[src_key]::Array{ComplexF32}
+                frame = src[src_key]::Array{snap_T}
                 f[dst_key] = frame
                 total = sum(abs2, frame)
                 row = Vector{Float64}(undef, D)

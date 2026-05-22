@@ -68,8 +68,8 @@ _parse_ramp_or_constant(v) = ConstantValue(Float64(v))
 Parse a YAML `loss:` block into `LossParams`. Supported forms:
 
     loss: false | 0 | null        # no loss
-    loss: {gamma_dr: 0.02, K3_per_m_cubic: [0e-41, 0e-41, ...]}  # 13 entries, m^6/s
-    loss: {gamma_dr: 0.02, K3_per_m: [0.01, 0.02, 0.05, ...]}  # 3-body, dimless
+    loss: {gamma_dr: 0.02, K3_per_m_cubic: [0.01, 0.02, ...]}  # dimensionless rates
+    loss: {gamma_dr: 0.02, K3_per_m: [0.01, 0.02, 0.05, ...]}  # alias, dimensionless
 
 SI-unit input (lab-friendly, requires atom + N_atoms + omega_ref to derive
 the dimensionless conversion factor):
@@ -119,7 +119,20 @@ function _parse_loss_params(
     K3_cubic = Float64(get(node, "K3_cubic", 0.0))
     K3_per_m_cubic = let v = get(node, "K3_per_m_cubic",
             get(node, "K3_per_m", nothing))
-        v === nothing ? Float64[] : Float64.(v)
+        if v === nothing
+            Float64[]
+        elseif any(x -> x isa AbstractString, v)
+            throw(
+                ArgumentError(
+                    "K3_per_m_cubic / K3_per_m expects dimensionless numbers, " *
+                    "but got string entries (e.g. \"1e-41 m^6/s\"). For SI-unit " *
+                    "input use `K3_per_m_si: [\"... m^6/s\", ...]` instead — " *
+                    "the parser converts via n0²/ω_ref using atom + N_atoms + " *
+                    "omega_ref. See docs/reference/dynamics.md."),
+            )
+        else
+            Float64.(v)
+        end
     end
     if haskey(node, "K3_per_m_si")
         atom === nothing && throw(

@@ -72,6 +72,7 @@ function SpinorBEC.apply_spin_mixing_step!(
     dt_frac::Float64,
     ndim::Int;
     imaginary_time::Bool=false,
+    psi_mf::Union{Nothing, AbstractArray}=nothing,
 ) where {D, T <: AbstractFloat}
     abs(c1) < 1e-30 && return nothing
     n_pts = ntuple(d -> size(psi, d), ndim)
@@ -80,7 +81,16 @@ function SpinorBEC.apply_spin_mixing_step!(
     c1_t = T(c1)
     dt_t = T(dt_frac)
 
+    # 2026-05-22 verification suite (L1 yaml 06 spin-1 SMA) call passes
+    # `psi_mf` kwarg from split_step. CPU path uses psi_mf as the source
+    # for the spin expectation when computing the SMA Euler rotation,
+    # then applies the rotation to `psi`. Mirror that here: build psi_2d
+    # from psi (rotated target) and psi_mf_2d from psi_mf (expectation
+    # source). When psi_mf is nothing, use psi itself (default SMA).
     psi_2d = reshape(psi, N, D)
+    psi_mf_2d = psi_mf === nothing ?
+                psi_2d :
+                reshape(psi_mf::CuArray{Complex{T}}, N, D)
     tmp = cache.tmp
     fz = cache.fz
     fx = cache.fx
@@ -95,10 +105,12 @@ function SpinorBEC.apply_spin_mixing_step!(
     F_t = cache.F
 
     # --- Compute spin vector components (O(D) broadcasts, each over (N,)) ---
+    # Use psi_mf_2d (=== psi_2d when psi_mf was nothing) so the spin
+    # expectation uses the mean-field source per the CPU/SMA contract.
     fz .= zero(T)
     for c in 1:D
         m = T(F_t - T(c - 1))
-        fz .+= m .* abs2.(view(psi_2d, :, c))
+        fz .+= m .* abs2.(view(psi_mf_2d, :, c))
     end
 
     fx .= zero(T)
@@ -107,7 +119,7 @@ function SpinorBEC.apply_spin_mixing_step!(
         # fp = sqrt(F(F+1) - m(m+1)) where m = F - (c-1)
         m = F_t - T(c - 1)
         fp = sqrt(F_t * (F_t + one(T)) - m * (m + one(T)))
-        pb .= conj.(view(psi_2d, :, c-1)) .* view(psi_2d, :, c)
+        pb .= conj.(view(psi_mf_2d, :, c-1)) .* view(psi_mf_2d, :, c)
         fx .+= fp .* real.(pb)
         fy .+= fp .* imag.(pb)
     end

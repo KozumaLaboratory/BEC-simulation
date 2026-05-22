@@ -53,8 +53,15 @@ function _analyze_majorana_order(psi, grid, atom, params, ws_prev)
     # Returns the spatially-averaged Q₆ weighted by density and a
     # field of point-group symbols at sampled points.
     F = atom.F
-    F >= 6 || throw(ArgumentError(
-        "majorana_order requires F >= 6 (got $F)"))
+    if F < 6
+        # 2026-05-22 verification suite (L1 yaml 04 spin-2 cyclic) listed
+        # `majorana_order` as an analyzer step. Q₆ is icosahedral and only
+        # meaningful for F ≥ 6; lower F should skip gracefully rather than
+        # crash the whole pipeline.
+        @warn "majorana_order skipped: F=$F < 6 (Q₆ icosahedral order requires F ≥ 6)"
+        return (q6_avg=NaN, q6_max=NaN, q6_field=Float64[], sampling=NaN,
+            skipped=true, reason="F=$F below F=6 threshold")
+    end
     sm = spin_matrices(F)
     sampling = Float64(get(params, "sampling", 1.0))
     density_cutoff = Float64(get(params, "density_cutoff", 1e-6))

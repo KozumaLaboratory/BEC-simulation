@@ -67,7 +67,7 @@ function _analyze_bogoliubov_dispersion(psi, grid, atom, params, ws_prev)
     (k_values=result.k_values,
         omega_real=real.(omega_sorted),
         omega_imag=imag.(omega_sorted),
-        max_growth=result.max_growth,
+        max_growth=result.max_growth_rate,
         direction=collect(k_direction))
 end
 

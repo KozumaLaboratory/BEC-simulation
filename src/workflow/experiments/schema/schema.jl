@@ -25,15 +25,27 @@ const GRID_SCHEMA = Dict{String, FieldSpec}(
     "box" => FieldSpec(; required=true, type=Union{Vector, Float64}),
 )
 
-const INTERACTIONS_SCHEMA = Dict{String, FieldSpec}(
-    "N_atoms" => FieldSpec(; type=Number),
-    "omega_ref" => FieldSpec(; type=Number, range=(0.0, 1e10)),
-    "c_total" => FieldSpec(; type=Number),
-    "c0" => FieldSpec(; type=Number),
-    "c1" => FieldSpec(; type=Number),
-    "c1_ratio" => FieldSpec(; type=Number, range=(-1.0, 1.0)),
-    "c_extra" => FieldSpec(; type=Vector),
-)
+const INTERACTIONS_SCHEMA =
+    let s = Dict{String, FieldSpec}(
+            "N_atoms" => FieldSpec(; type=Number),
+            "omega_ref" => FieldSpec(; type=Number, range=(0.0, 1e10)),
+            "c_total" => FieldSpec(; type=Number),
+            "c0" => FieldSpec(; type=Number),
+            "c1" => FieldSpec(; type=Number),
+            "c1_ratio" => FieldSpec(; type=Number, range=(-1.0, 1.0)),
+            "c_extra" => FieldSpec(; type=Vector),
+        )
+        # Sparse c_N keys (c2, c3, ..., c12) are accepted as alternative input
+        # to c_extra. `_parse_c_extra` (parsing_blocks.jl:26) reads any `cN` for
+        # N ≥ 2 and routes into the c_extra vector. Schema validator must
+        # whitelist these so strict-mode pipelines (run_registry.jl) don't
+        # reject e.g. spin-2 cyclic YAML that writes `c2: 2.0` directly.
+        # Range up to N=12 covers Eu-151 F=6 (channels S=0..12).
+        for n in 2:12
+            s["c$n"] = FieldSpec(; type=Number)
+        end
+        s
+    end
 
 # LHY block — replaces the split (interactions.c_lhy + ground_state.spinor_lhy).
 # `kind` chooses the dispatch path; the other fields are kind-specific.
