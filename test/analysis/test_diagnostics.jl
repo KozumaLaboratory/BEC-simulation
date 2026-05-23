@@ -281,7 +281,7 @@ using FFTW
         sys = SpinSystem(1)
 
         @testset "ferromagnetic |F,+F⟩" begin
-            psi = init_psi(grid, sys; state=:ferromagnetic)
+            psi = init_psi(grid, sys; state=:m_plus_F)
             r = classify_phase(psi, 1, grid, sm)
             @test r.phase == :ferromagnetic
             @test r.spin_order > 0.9
@@ -299,7 +299,7 @@ using FFTW
             grid2 = make_grid(GridConfig(32, 10.0))
             sm2 = spin_matrices(2)
             sys2 = SpinSystem(2)
-            psi2 = init_psi(grid2, sys2; state=:ferromagnetic)
+            psi2 = init_psi(grid2, sys2; state=:m_plus_F)
             r = classify_phase(psi2, 2, grid2, sm2)
             @test r.phase == :ferromagnetic
         end
@@ -310,7 +310,7 @@ using FFTW
             grid = make_grid(GridConfig(64, 10.0))
             sm = spin_matrices(1)
             sys = SpinSystem(1)
-            psi = init_psi(grid, sys; state=:ferromagnetic)
+            psi = init_psi(grid, sys; state=:m_plus_F)
             r = classify_phase_detailed(psi, 1, grid, sm)
             @test r.spin_order > 0.9
             @test r.biaxiality ≈ 0.0 atol = 0.1
@@ -338,7 +338,7 @@ using FFTW
             grid = make_grid(GridConfig(32, 10.0))
             sm = spin_matrices(2)
             sys = SpinSystem(2)
-            psi = init_psi(grid, sys; state=:ferromagnetic)
+            psi = init_psi(grid, sys; state=:m_plus_F)
             r = classify_phase_detailed(psi, 2, grid, sm)
             @test isfinite(r.spin_order)
             @test isfinite(r.nematic_order)

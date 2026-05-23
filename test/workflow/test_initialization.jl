@@ -8,7 +8,7 @@ using FFTW: fft
         sys = SpinSystem(1)
         dV = cell_volume(grid)
 
-        for state in [:polar, :ferromagnetic, :uniform, :antiferromagnetic, :random]
+        for state in [:polar, :m_plus_F, :uniform, :antiferromagnetic, :random]
             psi = init_psi(grid, sys; state)
             norm = sum(abs2, psi) * dV
             @test norm ≈ 1.0 atol = 1e-12
@@ -45,7 +45,7 @@ using FFTW: fft
         sys = SpinSystem(1)
         dV = cell_volume(grid)
 
-        psi = init_psi(grid, sys; state=:ferromagnetic)
+        psi = init_psi(grid, sys; state=:m_plus_F)
         pop1 = sum(abs2, psi[:, 1]) * dV
         pop2 = sum(abs2, psi[:, 2]) * dV
         pop3 = sum(abs2, psi[:, 3]) * dV
@@ -92,7 +92,7 @@ using FFTW: fft
         sys = SpinSystem(2)
         dV = cell_volume(grid)
 
-        for state in [:polar, :ferromagnetic, :uniform, :antiferromagnetic]
+        for state in [:polar, :m_plus_F, :uniform, :antiferromagnetic]
             psi = init_psi(grid, sys; state)
             norm = sum(abs2, psi) * dV
             @test norm ≈ 1.0 atol = 1e-12
@@ -115,7 +115,7 @@ using FFTW: fft
         sys = SpinSystem(1)
         dV = cell_volume(grid)
         # Ferromagnetic: dominant is m=+1 (index 1), so seed target = index 2.
-        psi0 = init_psi(grid, sys; state=:ferromagnetic)
+        psi0 = init_psi(grid, sys; state=:m_plus_F)
         norm0 = sum(abs2, psi0) * dV
         psi = copy(psi0)
         SpinorBEC.add_symmetry_breaking_seed!(psi, 1;

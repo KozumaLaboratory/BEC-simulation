@@ -10,7 +10,7 @@ using FFTW
         result = find_ground_state(;
             grid, atom=Rb87, interactions, potential=trap,
             zeeman=ZeemanParams(1.0, 0.0),
-            dt=0.005, n_steps=5000, initial_state=:ferromagnetic,
+            dt=0.005, n_steps=5000, initial_state=:m_plus_F,
             fft_flags=FFTW.ESTIMATE,
         )
         psi = result.workspace.state.psi
@@ -37,7 +37,7 @@ using FFTW
 
         r_ferro = find_ground_state(;
             grid, atom=Rb87, interactions, potential=trap,
-            dt=0.005, n_steps=3000, initial_state=:ferromagnetic,
+            dt=0.005, n_steps=3000, initial_state=:m_plus_F,
             fft_flags=FFTW.ESTIMATE,
         )
 
@@ -55,7 +55,7 @@ using FFTW
 
         r_ferro = find_ground_state(;
             grid, atom=Na23, interactions, potential=trap,
-            dt=0.005, n_steps=3000, initial_state=:ferromagnetic,
+            dt=0.005, n_steps=3000, initial_state=:m_plus_F,
             fft_flags=FFTW.ESTIMATE,
         )
 

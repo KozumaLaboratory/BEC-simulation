@@ -27,7 +27,7 @@ using FFTW
         grid = make_grid(config)
         sys = SpinSystem(1)
 
-        psi = init_psi(grid, sys; state=:ferromagnetic)
+        psi = init_psi(grid, sys; state=:m_plus_F)
         Mz = magnetization(psi, grid, sys)
         @test Mz ≈ 1.0 atol = 1e-10
     end
@@ -47,7 +47,7 @@ using FFTW
         grid = make_grid(config)
         sys = SpinSystem(1)
 
-        for state in [:polar, :ferromagnetic, :uniform]
+        for state in [:polar, :m_plus_F, :uniform]
             psi = init_psi(grid, sys; state)
             N = total_norm(psi, grid)
             @test N ≈ 1.0 atol = 1e-12
@@ -191,7 +191,7 @@ using FFTW
         end
 
         @testset "ferromagnetic state: dominant S=2" begin
-            psi = init_psi(grid, sys; state=:ferromagnetic)
+            psi = init_psi(grid, sys; state=:m_plus_F)
             spec = pair_amplitude_spectrum(psi, 1, grid)
             total = spec.channel_weights[0] + spec.channel_weights[2]
             @test spec.channel_weights[2] / total > 0.99
@@ -213,7 +213,7 @@ using FFTW
         @testset "F=2 returns ranks 0,2,4" begin
             grid = make_grid(GridConfig(32, 10.0))
             sys = SpinSystem(2)
-            psi = init_psi(grid, sys; state=:ferromagnetic)
+            psi = init_psi(grid, sys; state=:m_plus_F)
             ops = multipole_order_parameters(psi, 2, 1)
             @test Set(keys(ops)) == Set([0, 2, 4])
             for (k, O_k) in ops

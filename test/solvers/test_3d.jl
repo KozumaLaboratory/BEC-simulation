@@ -66,7 +66,7 @@
         result = find_ground_state(;
             grid, atom, interactions, potential=trap,
             dt=0.001, n_steps=500, tol=1e-8,
-            initial_state=:ferromagnetic,
+            initial_state=:m_plus_F,
         )
 
         @test total_norm(result.workspace.state.psi, grid) ≈ 1.0 atol = 1e-8

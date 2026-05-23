@@ -17,7 +17,7 @@ forwarded to `find_ground_state`.
 Returns `(workspace, converged, energy, initial_state, all_results)`.
 """
 function find_ground_state_multistart(;
-    initial_states::Vector{Symbol}=[:polar, :ferromagnetic, :uniform, :antiferromagnetic],
+    initial_states::Vector{Symbol}=[:polar, :m_plus_F, :uniform, :antiferromagnetic],
     n_random::Int=3,
     seed::Int=42,
     grid,

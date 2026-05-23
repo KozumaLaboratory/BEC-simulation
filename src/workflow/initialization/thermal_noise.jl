@@ -1,5 +1,4 @@
 export add_thermal_seed!, add_thermal_seed
-export add_thermal_noise!, add_thermal_noise         # backward-compat aliases
 export thermal_noise_amplitude, bec_critical_temperature
 export add_symmetry_breaking_seed!, add_deterministic_mode_seed!
 
@@ -42,10 +41,9 @@ to seed spin-rotational symmetry breaking before / during ITP.
 > hand-tuned for ferromagnetic / polar GS scenarios. For a true thermal
 > Wigner sample (Bogoliubov-weighted occupations on each k-mode), use the
 > SGPE callback (`apply_sgpe_step!`) followed by a measurement window —
-> see `test_sgpe_fdr.jl` for the FDR contract.
-
-The backward-compat alias `add_thermal_noise!` is preserved so existing callers
-keep working; new code should use `add_thermal_seed!`.
+> see `test_sgpe_fdr.jl` for the FDR contract. The legacy `add_thermal_noise!`
+> alias was removed 2026-05-22 because it implied a true thermal Wigner
+> sample that this function does not provide.
 
 # Arguments
 - `psi`: spinor wavefunction (modified in place)
@@ -125,20 +123,13 @@ end
 """
     add_thermal_seed(psi, F; kwargs...) → psi_noisy
 
-Non-mutating version of [`add_thermal_seed!`](@ref). The backward-compat alias
-`add_thermal_noise` is preserved for backwards compatibility.
+Non-mutating version of [`add_thermal_seed!`](@ref).
 """
 function add_thermal_seed(psi::AbstractArray{<:Complex}, F::Int; kwargs...)
     psi_copy = copy(psi)
     add_thermal_seed!(psi_copy, F; kwargs...)
     psi_copy
 end
-
-# Legacy aliases — see add_thermal_seed!/add_thermal_seed docstrings for
-# why the rename happened (the previous name implied a true thermal Wigner
-# initialisation, which this function is not).
-const add_thermal_noise! = add_thermal_seed!
-const add_thermal_noise = add_thermal_seed
 
 """
     add_deterministic_mode_seed!(psi, F; k_vec, amplitude, grid, phase=0.0) → psi

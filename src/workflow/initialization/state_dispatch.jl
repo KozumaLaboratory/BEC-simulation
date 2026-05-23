@@ -30,7 +30,6 @@ function init_psi(
     sigma = ntuple(d -> grid.config.box_size[d] / 8, N)
     gauss = _gaussian(grid, sigma)
 
-    state = canonicalize_state(state)   # ferromagnetic{,_min} → m_{plus,minus}_F
     if state == :polar
         mid = (D + 1) ÷ 2
         _set_component!(psi, gauss, N, n_pts, mid)

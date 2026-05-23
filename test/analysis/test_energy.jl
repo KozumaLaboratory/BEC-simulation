@@ -111,7 +111,7 @@ using SpinorBEC
         interactions = InteractionParams(0.0, 0.0)
         sp = SimParams(; dt=0.001, n_steps=1)
 
-        psi_ferro = init_psi(grid, SpinSystem(1); state=:ferromagnetic)
+        psi_ferro = init_psi(grid, SpinSystem(1); state=:m_plus_F)
         ws = make_workspace(; grid, atom, interactions, sim_params=sp,
             zeeman=ZeemanParams(1.0, 0.0), psi_init=psi_ferro)
 

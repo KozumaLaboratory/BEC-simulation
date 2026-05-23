@@ -66,7 +66,7 @@
         grid = make_grid(config)
         sys = SpinSystem(1)
         sm = spin_matrices(1)
-        psi = init_psi(grid, sys; state=:ferromagnetic)
+        psi = init_psi(grid, sys; state=:m_plus_F)
         ddi = make_ddi_params(grid, Eu151)
         bufs = make_ddi_buffers(grid.config.n_points)
 
@@ -159,7 +159,7 @@
         sys = SpinSystem(1)
         sm = spin_matrices(1)
 
-        psi = init_psi(grid, sys; state=:ferromagnetic)
+        psi = init_psi(grid, sys; state=:m_plus_F)
 
         ddi_full = make_ddi_params(grid, Eu151; secular=false)
         bufs_full = make_ddi_buffers(grid.config.n_points)

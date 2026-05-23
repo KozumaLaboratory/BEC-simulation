@@ -186,7 +186,7 @@ function _run_step(
         psi_base = init_psi(
             grid, SpinSystem(atom.F); state=initial_state, pairs(init_state_params)...
         )
-        psi_init = add_thermal_noise(psi_base, atom.F;
+        psi_init = add_thermal_seed(psi_base, atom.F;
             T_over_Tc=temp_ratio, seed=Int(get(p, "noise_seed", 42)))
     end
 

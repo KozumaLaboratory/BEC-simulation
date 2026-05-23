@@ -627,7 +627,14 @@ pipeline:
 """,
             )
             # dry_run returns the expanded YAML string — must NOT touch GPU
-            out = run_yaml(cfg_path; base_dir=tmp, verbose=false, dry_run=true)
+            logbuf = IOBuffer()
+            out = redirect_stdout(logbuf) do
+                run_yaml(cfg_path; base_dir=tmp, verbose=true, dry_run=true)
+            end
+            log = String(take!(logbuf))
+            @test occursin("# [run_yaml] loading config:", log)
+            @test occursin("# [run_yaml] normalizing B blocks", log)
+            @test occursin("# [run_yaml] dry-run complete", log)
             @test occursin("dry-run", out)
             @test occursin("Gauss", out)        # p_mv → "X Gauss" in expanded form
             @test !occursin("p_mv", out)        # lab key stripped
@@ -792,7 +799,7 @@ pipeline:
         # Construct a simple ferromagnetic psi (1D, F=1)
         grid = make_grid(GridConfig((16,), (10.0,)))
         sys = SpinSystem(1)
-        psi = init_psi(grid, sys; state=:ferromagnetic)
+        psi = init_psi(grid, sys; state=:m_plus_F)
 
         # No rotation when prev_mz is NaN
         psi_out = SpinorBEC.auto_rotate_psi(psi,

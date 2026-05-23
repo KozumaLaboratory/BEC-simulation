@@ -141,7 +141,7 @@ function SpinorBEC._energy_decomposition_gpu(ws::SpinorBEC.Workspace{N}) where {
         e = 0.0
         c2 = SpinorBEC.get_cn(ws.interactions, 2)
         abs(c2) > 1e-30 &&
-            (e += SpinorBEC._nematic_energy(psi, ws.spin_matrices.system.F, c2, N, n_pts, dV))
+            (e += SpinorBEC._singlet_pair_energy(psi, ws.spin_matrices.system.F, c2, N, n_pts, dV))
         ws.tensor_cache !== nothing &&
             (e += SpinorBEC._tensor_interaction_energy(psi, ws.tensor_cache, N, n_pts, dV))
         e

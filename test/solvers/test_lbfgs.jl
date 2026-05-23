@@ -11,7 +11,7 @@ using LinearAlgebra
         result = find_ground_state_lbfgs(;
             grid, atom=Rb87, interactions, potential=trap,
             n_steps=200, tol=1e-7,
-            initial_state=:ferromagnetic,
+            initial_state=:m_plus_F,
             verbose=false,
         )
 
@@ -28,7 +28,7 @@ using LinearAlgebra
 
         r_itp = find_ground_state(;
             grid, atom=Rb87, interactions, potential=trap,
-            dt=0.005, n_steps=200, initial_state=:ferromagnetic,
+            dt=0.005, n_steps=200, initial_state=:m_plus_F,
         )
         E_itp = r_itp.energy
         psi_itp = copy(r_itp.workspace.state.psi)
@@ -91,14 +91,14 @@ using LinearAlgebra
         r_direct = find_ground_state_lbfgs(;
             grid, atom=Rb87, interactions, potential=trap,
             n_steps=100, tol=1e-7,
-            initial_state=:ferromagnetic,
+            initial_state=:m_plus_F,
             verbose=false,
         )
 
         r_dispatch = find_ground_state(;
             grid, atom=Rb87, interactions, potential=trap,
             n_steps=100, tol=1e-7,
-            initial_state=:ferromagnetic,
+            initial_state=:m_plus_F,
             method=:lbfgs,
             verbose=false,
         )

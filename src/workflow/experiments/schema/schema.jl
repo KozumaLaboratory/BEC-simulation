@@ -103,9 +103,6 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
     "m_lbfgs" => FieldSpec(; type=Number, default=10, range=(1.0, 100.0)),
     "initial_state" => FieldSpec(; type=String, default="polar",
         enum=["polar", "m_plus_F", "m_minus_F",
-            # Legacy aliases for `m_plus_F` / `m_minus_F`. Resolved to
-            # the canonical names by `canonicalize_state` at init time.
-            "ferromagnetic", "ferromagnetic_min",
             "uniform", "antiferromagnetic", "random",
             "spin_coherent", "fl_vortex", "spin_helix",
             "cyclic", "biaxial_nematic", "polar_core_vortex",

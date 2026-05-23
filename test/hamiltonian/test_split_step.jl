@@ -198,7 +198,7 @@ using SpinorBEC
         sys = SpinSystem(1)
         interactions = InteractionParams(1.0, 0.0)
         sp = SimParams(; dt=0.01, n_steps=1)
-        psi0 = init_psi(grid, sys; state=:ferromagnetic)
+        psi0 = init_psi(grid, sys; state=:m_plus_F)
         ws = make_workspace(; grid, atom=Rb87, interactions, sim_params=sp, psi_init=psi0,
             zeeman=ZeemanParams(0.1, 0.0))
 
@@ -249,7 +249,7 @@ using SpinorBEC
         sys = SpinSystem(1)
         interactions = InteractionParams(1.0, 0.0)
         sp = SimParams(; dt=0.01, n_steps=1)
-        psi0 = init_psi(grid, sys; state=:ferromagnetic)
+        psi0 = init_psi(grid, sys; state=:m_plus_F)
         ws = make_workspace(; grid, atom=Rb87, interactions, sim_params=sp, psi_init=psi0,
             zeeman=ZeemanParams(0.1, 0.0))
 
@@ -339,7 +339,7 @@ using SpinorBEC
         sys = SpinSystem(1)
         interactions = InteractionParams(1.0, 0.0)
         sp = SimParams(; dt=0.01, n_steps=1)
-        psi0 = init_psi(grid, sys; state=:ferromagnetic)
+        psi0 = init_psi(grid, sys; state=:m_plus_F)
         ws = make_workspace(; grid, atom=Rb87, interactions, sim_params=sp, psi_init=psi0,
             zeeman=ZeemanParams(0.1, 0.0))
 
@@ -360,7 +360,7 @@ using SpinorBEC
         sys = SpinSystem(1)
         interactions = InteractionParams(1.0, 0.0)
         sp = SimParams(; dt=0.01, n_steps=1)
-        psi0 = init_psi(grid, sys; state=:ferromagnetic)
+        psi0 = init_psi(grid, sys; state=:m_plus_F)
         ws = make_workspace(; grid, atom=Rb87, interactions, sim_params=sp, psi_init=psi0,
             zeeman=ZeemanParams(0.1, 0.0))
 

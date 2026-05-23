@@ -85,7 +85,7 @@ using LinearAlgebra
             result = find_ground_state(;
                 grid, atom=Rb87, interactions, potential=trap,
                 zeeman=ZeemanParams(1.0, 0.0),
-                dt=0.002, n_steps=10000, initial_state=:ferromagnetic,
+                dt=0.002, n_steps=10000, initial_state=:m_plus_F,
                 fft_flags=FFTW.ESTIMATE,
             )
             psi = result.workspace.state.psi
@@ -127,7 +127,7 @@ using LinearAlgebra
             result = find_ground_state(;
                 grid, atom=test_atom, interactions, potential=trap,
                 zeeman=ZeemanParams(0.5, 0.0),
-                dt=0.002, n_steps=15000, initial_state=:ferromagnetic,
+                dt=0.002, n_steps=15000, initial_state=:m_plus_F,
                 fft_flags=FFTW.ESTIMATE,
             )
             psi = result.workspace.state.psi

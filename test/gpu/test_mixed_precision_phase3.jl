@@ -26,7 +26,7 @@ using SpinorBEC
         zeeman=ZeemanParams(0.0, 0.1),
         potential=HarmonicTrap(1.0, 1.0),
         dt=0.01, n_steps=200, tol=1e-7,
-        initial_state=:ferromagnetic,
+        initial_state=:m_plus_F,
     )
 
     # F32 path (Grid + plans only — Workspace-wide T parametrisation pending)
@@ -40,7 +40,7 @@ using SpinorBEC
         zeeman=ZeemanParams(0.0, 0.1),
         potential=HarmonicTrap(1.0f0, 1.0f0),
         dt=0.01, n_steps=200, tol=1e-5,
-        initial_state=:ferromagnetic,
+        initial_state=:m_plus_F,
         dtype=Float32,
     )
 

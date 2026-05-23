@@ -297,7 +297,7 @@
             potential=HarmonicTrap(1.0),
             zeeman=ZeemanParams(0.1, 0.0),
             dt=0.002, n_steps=5000, tol=1e-8,
-            initial_state=:ferromagnetic,
+            initial_state=:m_plus_F,
         )
         @test result.converged
 

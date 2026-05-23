@@ -6,7 +6,7 @@
         sys = SpinSystem(F)
         sm = spin_matrices(F)
         grid = make_grid(GridConfig((16,), (10.0,)))
-        psi = init_psi(grid, sys; state=:ferromagnetic)
+        psi = init_psi(grid, sys; state=:m_plus_F)
 
         l1, l2, l3 = nematic_tensor_eigenvalues(psi, sm, 1)
         beta = biaxiality_parameter(l1, l2, l3)
@@ -46,7 +46,7 @@
         sys = SpinSystem(F)
         sm = spin_matrices(F)
         grid = make_grid(GridConfig((16,), (10.0,)))
-        psi = init_psi(grid, sys; state=:ferromagnetic)
+        psi = init_psi(grid, sys; state=:m_plus_F)
 
         l1, l2, l3 = nematic_tensor_eigenvalues(psi, sm, 1)
 

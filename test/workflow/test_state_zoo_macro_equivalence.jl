@@ -33,10 +33,4 @@ using SpinorBEC
             @test psi_wrapper == psi_direct
         end
     end
-
-    @testset "legacy ferromagnetic aliases" begin
-        # init_psi_ferromagnetic / _min preserved as direct method aliases
-        @test init_psi_ferromagnetic === init_psi_m_plus_F
-        @test init_psi_ferromagnetic_min === init_psi_m_minus_F
-    end
 end

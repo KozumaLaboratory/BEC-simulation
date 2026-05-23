@@ -60,7 +60,7 @@ using SpinorBEC
         sys = SpinSystem(1)
 
         # Start from ferromagnetic state: M ≈ 1
-        psi0 = init_psi(grid, sys; state=:ferromagnetic)
+        psi0 = init_psi(grid, sys; state=:m_plus_F)
 
         sp = SimParams(; dt=0.002, n_steps=2000, imaginary_time=false, save_every=2000)
         ws = make_workspace(;

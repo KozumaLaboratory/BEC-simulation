@@ -71,7 +71,7 @@ using FFTW
 
         gs = find_ground_state(;
             grid, atom=Rb87, interactions, potential=trap,
-            dt=0.005, n_steps=2000, tol=1e-8, initial_state=:ferromagnetic,
+            dt=0.005, n_steps=2000, tol=1e-8, initial_state=:m_plus_F,
             verbose=false,
         )
 
@@ -104,7 +104,7 @@ using FFTW
 
         gs = find_ground_state(;
             grid, atom=Rb87, interactions, potential=trap,
-            dt=0.005, n_steps=2000, tol=1e-9, initial_state=:ferromagnetic,
+            dt=0.005, n_steps=2000, tol=1e-9, initial_state=:m_plus_F,
             verbose=false,
         )
         edec = energy_decomposition(gs.workspace)
@@ -123,7 +123,7 @@ using FFTW
 
         gs = find_ground_state(;
             grid, atom=Rb87, interactions, potential=trap,
-            dt=0.005, n_steps=2000, tol=1e-9, initial_state=:ferromagnetic,
+            dt=0.005, n_steps=2000, tol=1e-9, initial_state=:m_plus_F,
             verbose=false,
         )
         psi0 = copy(gs.workspace.state.psi)
@@ -150,7 +150,7 @@ using FFTW
 
         gs = find_ground_state(;
             grid, atom=Rb87, interactions, potential=trap,
-            dt=0.005, n_steps=3000, tol=1e-9, initial_state=:ferromagnetic,
+            dt=0.005, n_steps=3000, tol=1e-9, initial_state=:m_plus_F,
             verbose=false,
         )
         psi0 = copy(gs.workspace.state.psi)

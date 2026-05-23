@@ -192,7 +192,7 @@ end
     # an orientation-dependent quantity (e.g. ⟨F_z⟩ sign) instead of
     # a true invariant.
     @testset "Phase classifier respects O(3) rotation, F=$F state=$state" for (F, state) in [
-        (1, :ferromagnetic), (1, :polar), (2, :ferromagnetic)
+        (1, :m_plus_F), (1, :polar), (2, :m_plus_F)
     ]
         grid = make_grid(GridConfig((12, 12, 12), (8.0, 8.0, 8.0)))
         sm = spin_matrices(F)
@@ -201,7 +201,7 @@ end
         psi = init_psi(grid, sys; state=state)
         base = classify_phase(psi, F, grid, sm)
 
-        rng = MersenneTwister(F * 100 + Int(state == :ferromagnetic))
+        rng = MersenneTwister(F * 100 + Int(state == :m_plus_F))
         for trial in 1:5
             tx, ty, tz = randn(rng, 3) .* π
             psi_rot = rotate_quantization_axis(psi, F, tx, ty, tz)

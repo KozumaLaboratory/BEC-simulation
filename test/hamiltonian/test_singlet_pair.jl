@@ -16,7 +16,7 @@
         config = GridConfig(64, 20.0)
         grid = make_grid(config)
         sys = SpinSystem(1)
-        psi = init_psi(grid, sys; state=:ferromagnetic)
+        psi = init_psi(grid, sys; state=:m_plus_F)
         A = singlet_pair_amplitude(psi, 1, 1)
         # Ferromagnetic: ψ₊₁ = f(x), rest zero → A₀₀ = 0
         @test sum(abs2, A) < 1e-28
@@ -54,25 +54,25 @@
         @test sum(abs2, A) ≈ sum(n .^ 2) / 5 rtol = 1e-12
     end
 
-    @testset "_nematic_energy positive for polar state" begin
+    @testset "_singlet_pair_energy positive for polar state" begin
         config = GridConfig(64, 20.0)
         grid = make_grid(config)
         sys = SpinSystem(1)
         psi = init_psi(grid, sys; state=:polar)
         n_pts = grid.config.n_points
         dV = cell_volume(grid)
-        E = SpinorBEC._nematic_energy(psi, 1, 1.0, 1, n_pts, dV)
+        E = SpinorBEC._singlet_pair_energy(psi, 1, 1.0, 1, n_pts, dV)
         @test E > 0.0
     end
 
-    @testset "_nematic_energy zero for ferromagnetic" begin
+    @testset "_singlet_pair_energy zero for ferromagnetic" begin
         config = GridConfig(64, 20.0)
         grid = make_grid(config)
         sys = SpinSystem(1)
-        psi = init_psi(grid, sys; state=:ferromagnetic)
+        psi = init_psi(grid, sys; state=:m_plus_F)
         n_pts = grid.config.n_points
         dV = cell_volume(grid)
-        E = SpinorBEC._nematic_energy(psi, 1, 1.0, 1, n_pts, dV)
+        E = SpinorBEC._singlet_pair_energy(psi, 1, 1.0, 1, n_pts, dV)
         @test E < 1e-28
     end
 
@@ -115,7 +115,7 @@
         config = GridConfig(64, 20.0)
         grid = make_grid(config)
         sys = SpinSystem(1)
-        psi = init_psi(grid, sys; state=:ferromagnetic)
+        psi = init_psi(grid, sys; state=:m_plus_F)
         psi_orig = copy(psi)
         interactions = InteractionParams(10.0, -0.5, [50.0])
         apply_singlet_pair_step!(psi, interactions, 1, 0.01, 1)

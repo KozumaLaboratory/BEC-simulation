@@ -1,7 +1,6 @@
 # --- Phase 1.1 state zoo: named builders -------------------------------
 
 export init_psi_polar, init_psi_m_plus_F, init_psi_m_minus_F
-export init_psi_ferromagnetic, init_psi_ferromagnetic_min   # backward-compat aliases
 export init_psi_uniform, init_psi_antiferromagnetic, init_psi_random
 export init_psi_spin_coherent, init_psi_fl_vortex, init_psi_spin_helix
 export init_psi_cyclic, init_psi_biaxial_nematic, init_psi_polar_core_vortex
@@ -26,24 +25,6 @@ const _ZOO_NAMES = (
     :gaussian_wavepacket, :domain_wall, :two_packet, :chiral_spin_vortex,
     :magnetic_domain, :vortex_lattice, :skyrmion_lattice,
 )
-
-# --- Legacy state-name aliases (kept for backward compat) --------------
-#
-# Old codebase used the term "ferromagnetic" for m=+F and
-# "ferromagnetic_min" for m=−F. The latter docstring claimed it was
-# "lowest Zeeman energy when g_F > 0", which is wrong for the
-# `H_zee = -p·m` convention this codebase uses (m=+F is the lowest
-# energy state at p>0). Rename to physically unambiguous names; keep
-# the old symbols as direct aliases that downstream `init_psi` resolves
-# the same way as the new ones.
-const _STATE_ALIASES = Dict{Symbol, Symbol}(
-    :ferromagnetic => :m_plus_F,
-    :ferromagnetic_min => :m_minus_F,
-)
-
-"""Resolve a state symbol through the backward-compat alias table. Returns the
-canonical name (`:m_plus_F`/`:m_minus_F`/...) for downstream dispatch."""
-canonicalize_state(state::Symbol) = get(_STATE_ALIASES, state, state)
 
 # --- Trivial pass-through wrappers (auto-generated) --------------------
 #
@@ -81,11 +62,6 @@ for (state, doc) in _TRIVIAL_ZOO_STATES
         )
     end
 end
-
-# Legacy aliases — preserved for compat. New code should use the
-# m_plus_F / m_minus_F names.
-const init_psi_ferromagnetic = init_psi_m_plus_F
-const init_psi_ferromagnetic_min = init_psi_m_minus_F
 
 """
     init_psi_random(grid, sys; seed=nothing, kwargs...)

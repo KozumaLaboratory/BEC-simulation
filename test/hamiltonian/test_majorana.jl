@@ -169,7 +169,7 @@ using LinearAlgebra
         grid = make_grid(GridConfig(32, 10.0))
         sm = spin_matrices(1)
         sys = SpinSystem(1)
-        psi = init_psi(grid, sys; state=:ferromagnetic)
+        psi = init_psi(grid, sys; state=:m_plus_F)
         r = SpinorBEC.classify_phase_detailed(psi, 1, grid, sm)
         @test hasproperty(r, :point_group)
         @test r.point_group isa Symbol

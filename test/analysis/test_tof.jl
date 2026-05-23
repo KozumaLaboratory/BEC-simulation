@@ -3,7 +3,7 @@
         F = 1
         sys = SpinSystem(F)
         grid = make_grid(GridConfig((128,), (20.0,)))
-        psi = init_psi(grid, sys; state=:ferromagnetic)
+        psi = init_psi(grid, sys; state=:m_plus_F)
 
         params = TOFParams(1.0, 0.0, 1)
         result = simulate_tof(psi, grid, sys, params)
@@ -32,7 +32,7 @@
         F = 1
         sys = SpinSystem(F)
         grid = make_grid(GridConfig((8, 8, 8), (6.0, 6.0, 6.0)))
-        psi = init_psi(grid, sys; state=:ferromagnetic)
+        psi = init_psi(grid, sys; state=:m_plus_F)
 
         params = TOFParams(1.0, 0.0, 3)
         result = simulate_tof(psi, grid, sys, params)

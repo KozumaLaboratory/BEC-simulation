@@ -11,7 +11,7 @@ using FFTW
 
         result = find_ground_state(;
             grid, atom=Rb87, interactions, potential=trap,
-            dt=0.005, n_steps=5000, initial_state=:ferromagnetic,
+            dt=0.005, n_steps=5000, initial_state=:m_plus_F,
         )
 
         psi = result.workspace.state.psi
@@ -51,7 +51,7 @@ using FFTW
         config = GridConfig(64, 10.0)
         grid = make_grid(config)
         sys = SpinSystem(1)
-        psi_gs = init_psi(grid, sys; state=:ferromagnetic)
+        psi_gs = init_psi(grid, sys; state=:m_plus_F)
         dV = cell_volume(grid)
 
         psi_noisy = SpinorBEC.seed_noise(psi_gs, sys.n_components, 1, grid)
@@ -113,10 +113,10 @@ using FFTW
             result = find_ground_state_multistart(;
                 grid, atom=Rb87, interactions, potential=trap,
                 dt=0.005, n_steps=2000,
-                initial_states=[:polar, :ferromagnetic],
+                initial_states=[:polar, :m_plus_F],
                 fft_flags=FFTW.ESTIMATE,
             )
-            @test result.initial_state == :ferromagnetic
+            @test result.initial_state == :m_plus_F
             @test result.converged || result.energy < 10.0
             @test length(result.all_results) == 2
         end
@@ -143,7 +143,7 @@ using FFTW
         @testset "target Mz=1 for ferromagnetic c1<0 → ferromagnetic" begin
             result = find_ground_state(;
                 grid, atom=Rb87, interactions, potential=trap,
-                dt=0.005, n_steps=3000, initial_state=:ferromagnetic,
+                dt=0.005, n_steps=3000, initial_state=:m_plus_F,
                 target_magnetization=1.0,
                 fft_flags=FFTW.ESTIMATE,
             )
@@ -186,7 +186,7 @@ using FFTW
         config = GridConfig((16, 16), (10.0, 10.0))
         grid = make_grid(config)
         sys = SpinSystem(1)
-        psi = init_psi(grid, sys; state=:ferromagnetic)
+        psi = init_psi(grid, sys; state=:m_plus_F)
         psi_copy = copy(psi)
 
         SpinorBEC._apply_coriolis_step!(psi, grid, 0.0, 0.01, false)

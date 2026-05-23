@@ -9,7 +9,7 @@ using SpinorBEC
 
         result = find_ground_state(;
             grid, atom=Rb87, interactions, potential=trap,
-            dt=0.005, n_steps=200, initial_state=:ferromagnetic,
+            dt=0.005, n_steps=200, initial_state=:m_plus_F,
         )
 
         @test result.energy < 0 || result.energy < 100
@@ -31,7 +31,7 @@ using SpinorBEC
         )
         r_ferro = find_ground_state(;
             grid, atom=Na23, interactions, potential=trap,
-            dt=0.005, n_steps=200, initial_state=:ferromagnetic,
+            dt=0.005, n_steps=200, initial_state=:m_plus_F,
         )
 
         @test abs(r_polar.energy - r_ferro.energy) / max(abs(r_polar.energy), 1e-10) < 0.3
@@ -63,7 +63,7 @@ using SpinorBEC
         result = find_ground_state_multistart(;
             grid, atom=Na23, interactions, potential=trap,
             dt=0.005, n_steps=50,
-            initial_states=[:polar, :ferromagnetic],
+            initial_states=[:polar, :m_plus_F],
             n_random=0,
         )
 

@@ -72,7 +72,7 @@ function _energy_decomposition_cpu(ws::Workspace{N}) where {N}
         e = 0.0
         c2 = get_cn(ws.interactions, 2)
         abs(c2) > 1e-30 &&
-            (e += _nematic_energy(psi, ws.spin_matrices.system.F, c2, N, n_pts, dV))
+            (e += _singlet_pair_energy(psi, ws.spin_matrices.system.F, c2, N, n_pts, dV))
         ws.tensor_cache !== nothing &&
             (e += _tensor_interaction_energy(psi, ws.tensor_cache, N, n_pts, dV))
         e
@@ -281,7 +281,7 @@ function _spin_interaction_energy(psi, sm, c1, n_comp, ndim, n_pts, dV)
     0.5 * c1 * s * dV
 end
 
-function _nematic_energy(psi, F, c2, ndim, n_pts, dV)
+function _singlet_pair_energy(psi, F, c2, ndim, n_pts, dV)
     A = singlet_pair_amplitude(psi, F, ndim)
     0.5 * c2 * sum(abs2, A) * dV
 end

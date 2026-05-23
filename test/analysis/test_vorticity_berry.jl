@@ -83,7 +83,7 @@ using LinearAlgebra
             plans = make_fft_plans(grid.config.n_points)
             sm = spin_matrices(1)
 
-            psi = init_psi(grid, SpinSystem(1); state=:ferromagnetic)
+            psi = init_psi(grid, SpinSystem(1); state=:m_plus_F)
             omega = berry_curvature(psi, grid, plans, sm)
             @test maximum(abs, omega) < 1e-10
         end

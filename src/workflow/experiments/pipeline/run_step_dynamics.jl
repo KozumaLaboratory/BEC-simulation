@@ -157,10 +157,37 @@ function _run_step(
     )
 
     if temp_ratio !== nothing
-        psi_noisy = add_thermal_noise(
+        psi_noisy = add_thermal_seed(
             ws.state.psi, F; T_over_Tc=temp_ratio, seed=Int(get(p, "noise_seed", 42))
         )
         ws.state.psi .= psi_noisy
+    end
+
+    # Hard-polarize: project ψ onto a single m component, zero the rest,
+    # renormalise. ITP-converged Fz floats at ~5e-6 below |F| (numerical
+    # floor in spin-mixing/DDI bilinear steps); DDI then amplifies that
+    # floor in a grid-dependent way, producing a spurious "32 ≡ 48 ≪ 64"
+    # ladder. Hard-polarize gives a numerically clean (m=±F) starting
+    # state so dynamics-driven transfer can be compared across grids.
+    polarize = get(p, "hard_polarize", nothing)
+    if polarize !== nothing
+        target_m = Float64(polarize)
+        target_c = Int(round(F - target_m)) + 1   # c = F - m + 1
+        (1 <= target_c <= 2F + 1) ||
+            throw(ArgumentError("hard_polarize: m=$(target_m) not in [-F, F]"))
+        psi = ws.state.psi
+        n_pts_h = ntuple(d -> size(psi, d), ndim)
+        D = 2F + 1
+        for c in 1:D
+            if c != target_c
+                idx_c = SpinorBEC._component_slice(ndim, n_pts_h, c)
+                view(psi, idx_c...) .= 0
+            end
+        end
+        # Physical-norm renormalisation: ∫|ψ|² dr̃ = sum(|ψ|²) · dV = 1
+        dV_h = SpinorBEC.cell_volume(grid)
+        norm_sq = sum(abs2, psi) * dV_h
+        norm_sq > 0 && (psi ./= sqrt(norm_sq))
     end
 
     seed_amp = let v = get(p, "seed_amplitude", nothing)

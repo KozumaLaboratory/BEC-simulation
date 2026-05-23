@@ -22,7 +22,7 @@ Arguments
 - `make_params(p) → NamedTuple` — same hook as `scan_continuation`;
   returns the `find_ground_state` kwargs for parameter value `p`.
 - `initial_states::Vector{Symbol}` — competing branches (e.g.
-  `[:ferromagnetic, :polar]`). At least 2 required.
+  `[:m_plus_F, :polar]`). At least 2 required.
 - `n_coarse::Int=9` — coarse grid resolution for the initial pass.
 - `bisection_tol::Float64=1e-3` — stop bisection once ΔE / |E| < tol
   AND `(p_hi − p_lo) / range < tol`.

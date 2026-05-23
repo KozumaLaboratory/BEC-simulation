@@ -358,7 +358,7 @@
         config = GridConfig(64, 20.0)
         grid = make_grid(config)
         sys = SpinSystem(1)
-        psi = init_psi(grid, sys; state=:ferromagnetic)
+        psi = init_psi(grid, sys; state=:m_plus_F)
         dominant_before = copy(psi[:, 1])
 
         SpinorBEC._add_noise!(psi, 0.01, sys.n_components, 1, grid)

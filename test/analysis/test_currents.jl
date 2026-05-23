@@ -66,7 +66,7 @@ using FFTW
     @testset "total_angular_momentum = Lz + Sz" begin
         grid = make_grid(GridConfig((32, 32), (10.0, 10.0)))
         sys = SpinSystem(1)
-        psi = init_psi(grid, sys; state=:ferromagnetic)
+        psi = init_psi(grid, sys; state=:m_plus_F)
         plans = make_fft_plans(grid.config.n_points)
 
         Jz = total_angular_momentum(psi, grid, plans, sys)

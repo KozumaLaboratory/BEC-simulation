@@ -51,7 +51,7 @@ using Random
             potential=HarmonicTrap(1.0, 1.0),
             zeeman=ZeemanParams(0.0, 0.1),
             dt=0.01, n_steps=200, tol=1e-7,
-            initial_state=:ferromagnetic,
+            initial_state=:m_plus_F,
         )
         @test gs.energy < 5.0   # bound state, energy small
     end

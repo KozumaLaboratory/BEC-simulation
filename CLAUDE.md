@@ -59,7 +59,7 @@ Each subsystem umbrella `Foo.jl` `include`s sub-files in dependency order. Publi
 
 **Mixed precision (rotating_basis only)**: set `dtype: f32` in the `ground_state` block. Plumbs Float32 through Grid, V_trap, workspace, FFT plans, DDI buffers. First-time JIT for the F32 specialisation ~10 min then cached. Caveats: `apply_uniform_spin_rotation!` + `apply_ddi_step!` + `apply_spin_mixing_step!` keep scalar Float64 locks (rotation builder + DDI dt + c1·dt) — array work stays F32. `DDIParams.C_dd` is Float64 by struct definition. F64 is the default. See `test/test_rotating_basis_f32.jl`.
 
-**Noise**: both GS (`temperature_ratio`) and phase noise (`dynamics.temperature_ratio`) use Bose-Einstein thermal noise with `T/T_c ∈ (0, 1)`, driving `add_thermal_noise(psi, F; T_over_Tc, seed)`.
+**Noise**: both GS (`temperature_ratio`) and phase noise (`dynamics.temperature_ratio`) drive a heuristic symmetry-breaking kick (Bose-Einstein-scaling amplitude `η=√((T/T_c)³/4)`, NOT a true thermal Wigner sample), via `add_thermal_seed(psi, F; T_over_Tc, seed)`. For a true thermal initialisation use the SGPE callback.
 
 **Calibration**: lab-unit YAML preprocess auto-applied by `run_yaml`. Single `calibration:` block or `calibration_history:` for week-to-week interpolation. Lab fields then expand inside the unified `B:` block: `B: {p_mv: 2.5, coil_mode: strong}` resolves via calibration table to a Gauss value before downstream parsing. See `docs/reference/yaml_schema_reference.md` for canonical examples.
 

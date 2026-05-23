@@ -66,7 +66,7 @@ using LinearAlgebra
         sys = SpinSystem(1)
 
         # Initial state with nonzero magnetization
-        psi0 = init_psi(grid, sys; state=:ferromagnetic)
+        psi0 = init_psi(grid, sys; state=:m_plus_F)
 
         sp = SimParams(; dt=0.005, n_steps=1000, imaginary_time=false, save_every=100)
         ws = make_workspace(;
@@ -100,7 +100,7 @@ using LinearAlgebra
             interactions=InteractionParams(10.0, -0.5),
             potential=HarmonicTrap(1.0),
             dt=0.005, n_steps=5000,
-            initial_state=:ferromagnetic,
+            initial_state=:m_plus_F,
         )
 
         psi = result.workspace.state.psi
@@ -171,7 +171,7 @@ using LinearAlgebra
             potential=HarmonicTrap(1.0),
             zeeman=ZeemanParams(0.1, 0.0),
             dt=0.005, n_steps=5000,
-            initial_state=:ferromagnetic,
+            initial_state=:m_plus_F,
         )
 
         psi = result.workspace.state.psi
@@ -191,7 +191,7 @@ using LinearAlgebra
         c_total = 200.0
         ip = interaction_params_from_constraint(; c_total, c1_ratio=1.0 / 36.0, F=6)
 
-        psi0 = init_psi(grid, sys; state=:ferromagnetic)
+        psi0 = init_psi(grid, sys; state=:m_plus_F)
 
         n_steps = 200
         sp = SimParams(; dt=1e-4, n_steps, imaginary_time=false, save_every=50)
