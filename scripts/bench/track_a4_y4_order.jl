@@ -60,7 +60,7 @@ function _run_y4(state0, dt, F, g_S, V_ext)
     actual_dt = T_FINAL / n_steps
     for _ in 1:n_steps
         SpinorBEC.tdhfb_y4_midpoint_step!(state, F, g_S, V_ext, actual_dt;
-            picard_iters=1, hfb_mode=:full_hfb,
+            hfb_mode=:full_hfb,
         )
     end
     state
