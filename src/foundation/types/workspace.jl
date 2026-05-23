@@ -1,6 +1,7 @@
-# Workspace has 21 type parameters (down from 25 as of 2026-05-23):
+# Workspace has 20 type parameters (down from 25 as of 2026-05-23):
 #   Phase 1 (5a8bced): dropped LOSS / TDI / MG
-#   Phase 2 (this commit): dropped TC (TensorInteractionCache; non-parametric)
+#   Phase 2 (242fb3b): dropped TC (TensorInteractionCache; non-parametric)
+#   Phase 3 (this commit): dropped ZEE (2-way Union of non-parametric structs)
 #
 # `RAM` was a Phase 2 candidate but reverted after measurement
 # (`scripts/diag/workspace_jit_baseline.jl`): the 3-way Union
@@ -56,16 +57,16 @@
 #
 # --- Workspace: the master per-simulation state container ---
 #
-# `Workspace{N, A, P, IP, SM, ZEE, DDI, DDIB, RAM, DDIP, BK, CC, KPA,
-# VPA, DBA, BACK, LHY, ABM, LS, T, B}` — 21 type parameters.
-# CLAUDE.md's "Type stability boundaries" section explains why these
-# parameters are load-bearing: every field that might be `Nothing` vs.
-# a concrete struct gets a parameter so the compiler can specialise.
-# Helper functions that take a workspace field must dispatch on a
-# concrete type, never on `Any`-typed locals.
+# `Workspace{N, A, P, IP, SM, DDI, DDIB, RAM, DDIP, BK, CC, KPA, VPA,
+# DBA, BACK, LHY, ABM, LS, T, B}` — 20 type parameters. CLAUDE.md's
+# "Type stability boundaries" section explains why these parameters
+# are load-bearing: every field that might be `Nothing` vs. a concrete
+# struct gets a parameter so the compiler can specialise. Helper
+# functions that take a workspace field must dispatch on a concrete
+# type, never on `Any`-typed locals.
 #
-# Four parameters were dropped 2026-05-23 (LOSS / TDI / MG / TC); see
-# the file-header comment above for the rationale + measurement.
+# Five parameters were dropped 2026-05-23 (LOSS / TDI / MG / TC / ZEE);
+# see the file-header comment above for the rationale + measurement.
 #
 # This struct lives in its own file (rather than the main types.jl)
 # so the include order can stay legible: every type Workspace depends
@@ -81,7 +82,6 @@ struct Workspace{
     P,
     IP,
     SM <: SpinMatrices,
-    ZEE,
     DDI,
     DDIB,
     RAM,
@@ -116,7 +116,12 @@ struct Workspace{
     grid::Grid{N, T}
     atom::AtomSpecies
     interactions::InteractionParams
-    zeeman::ZEE
+    # `zeeman::Union{ZeemanParams, TimeDependentZeeman}` — 2-way Union of
+    # two non-parametric structs. Phase 3 drop (TC pattern). Hot-path
+    # accessors (linear_p / quadratic_q / transverse_b) dispatch on the
+    # concrete type via Julia's Union splitting; the parametric form
+    # carried no additional information.
+    zeeman::Union{ZeemanParams, TimeDependentZeeman}
     potential::AbstractPotential
     sim_params::SimParams
     ddi::DDI
