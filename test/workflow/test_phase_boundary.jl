@@ -8,7 +8,7 @@
 
         result = find_phase_boundary(;
             param_range=(-10.0, 10.0),
-            make_interactions=make_ip,
+            make_params=make_ip,
             grid, atom,
             tol=1.0,
             max_bisections=5,
@@ -29,7 +29,7 @@
 
         result = find_phase_boundary(;
             param_range=(-10.0, -5.0),
-            make_interactions=make_ip,
+            make_params=make_ip,
             grid, atom,
             tol=0.1,
             max_bisections=3,
@@ -46,7 +46,7 @@
 
         r1 = find_phase_boundary(;
             param_range=(-20.0, 20.0),
-            make_interactions=make_ip,
+            make_params=make_ip,
             grid, atom,
             tol=5.0,
             max_bisections=3,
@@ -56,7 +56,7 @@
 
         r2 = find_phase_boundary(;
             param_range=(-20.0, 20.0),
-            make_interactions=make_ip,
+            make_params=make_ip,
             grid, atom,
             tol=2.0,
             max_bisections=10,

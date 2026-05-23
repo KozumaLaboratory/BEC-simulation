@@ -29,15 +29,10 @@ next point. Falls back to multistart search on energy jumps.
   `c -> (c_dd = c, enable_ddi = c > 0)`
 
 All other kwargs are forwarded to `find_ground_state` as fixed defaults.
-
-# Legacy keyword
-
-`make_interactions` is accepted as an alias for `make_params` (backward compat).
 """
 function scan_continuation(;
     param_values::AbstractVector{Float64},
-    make_params::Union{Function, Nothing}=nothing,
-    make_interactions::Union{Function, Nothing}=nothing,
+    make_params::Function,
     grid,
     atom,
     initial_state::Symbol=:polar,
@@ -46,7 +41,7 @@ function scan_continuation(;
     n_steps_fresh::Int=5000,
     kwargs...,
 )
-    sweep_fn = _resolve_sweep_fn(make_params, make_interactions)
+    sweep_fn = make_params
 
     results = NamedTuple[]
     prev_psi = nothing
@@ -117,16 +112,6 @@ function scan_continuation(;
     results
 end
 
-function _resolve_sweep_fn(make_params, make_interactions)
-    if make_params !== nothing
-        make_params
-    elseif make_interactions !== nothing
-        make_interactions
-    else
-        throw(ArgumentError("Either `make_params` or `make_interactions` must be provided"))
-    end
-end
-
 function _detect_hysteresis(
     param_values::AbstractVector{Float64},
     forward::Vector{NamedTuple},
@@ -160,12 +145,11 @@ end
 
 Run forward and backward continuation scans to detect hysteresis in first-order transitions.
 
-See `scan_continuation` for the `make_params` / `make_interactions` interface.
+See `scan_continuation` for the `make_params` interface.
 """
 function scan_continuation_bidirectional(;
     param_values::AbstractVector{Float64},
-    make_params::Union{Function, Nothing}=nothing,
-    make_interactions::Union{Function, Nothing}=nothing,
+    make_params::Function,
     grid,
     atom,
     initial_state_forward::Symbol=:polar,
@@ -175,11 +159,9 @@ function scan_continuation_bidirectional(;
     n_steps_fresh::Int=5000,
     kwargs...,
 )
-    sweep_fn = _resolve_sweep_fn(make_params, make_interactions)
-
     forward = scan_continuation(;
         param_values,
-        make_params=sweep_fn,
+        make_params,
         grid,
         atom,
         initial_state=initial_state_forward,
@@ -191,7 +173,7 @@ function scan_continuation_bidirectional(;
 
     backward_raw = scan_continuation(;
         param_values=reverse(param_values),
-        make_params=sweep_fn,
+        make_params,
         grid,
         atom,
         initial_state=initial_state_backward,

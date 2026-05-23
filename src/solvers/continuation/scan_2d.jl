@@ -12,14 +12,11 @@ At each new param2 value, restarts from the end of the previous param2 row.
 `make_params(v1, v2)` returns either `InteractionParams` or a `NamedTuple` of overrides.
 
 Returns a Matrix of NamedTuples with shape `(length(param1_values), length(param2_values))`.
-
-See `scan_continuation` for the `make_params` / `make_interactions` interface.
 """
 function scan_phase_diagram_2d(;
     param1_values::AbstractVector{Float64},
     param2_values::AbstractVector{Float64},
-    make_params::Union{Function, Nothing}=nothing,
-    make_interactions::Union{Function, Nothing}=nothing,
+    make_params::Function,
     grid,
     atom,
     initial_state::Symbol=:polar,
@@ -28,7 +25,7 @@ function scan_phase_diagram_2d(;
     energy_jump_threshold::Float64=0.1,
     kwargs...,
 )
-    sweep_fn = _resolve_sweep_fn(make_params, make_interactions)
+    sweep_fn = make_params
 
     n1 = length(param1_values)
     n2 = length(param2_values)

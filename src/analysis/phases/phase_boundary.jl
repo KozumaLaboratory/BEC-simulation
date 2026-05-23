@@ -1,5 +1,5 @@
 """
-    find_phase_boundary(; param_range, make_interactions, grid, atom, tol, max_bisections, kwargs...)
+    find_phase_boundary(; param_range, make_params, grid, atom, tol, max_bisections, kwargs...)
 
 Find a phase boundary by bisection within `param_range`.
 Uses `find_ground_state` + `classify_phase` at each probe point.
@@ -8,7 +8,7 @@ Returns `(boundary_value, phase_left, phase_right, n_evaluations)`.
 """
 function find_phase_boundary(;
     param_range::Tuple{Float64, Float64},
-    make_interactions::Function,
+    make_params::Function,
     grid,
     atom,
     tol::Float64=0.01,
@@ -18,7 +18,7 @@ function find_phase_boundary(;
     sm = spin_matrices(atom.F)
 
     function _classify_at(val)
-        interactions = make_interactions(val)
+        interactions = make_params(val)
         r = find_ground_state(; grid, atom, interactions, kwargs...)
         classify_phase(r.workspace.state.psi, atom.F, grid, sm).phase
     end

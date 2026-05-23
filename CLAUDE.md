@@ -69,7 +69,7 @@ Each subsystem umbrella `Foo.jl` `include`s sub-files in dependency order. Publi
 
 **LHY config** (refactored 2026-05-12): single `lhy:` block inside `ground_state`. `kind` ∈ {`scalar`, `quasi_2d`, `polar_two_channel`, `full_bdg`, `polar_contact`, `polar_dipolar`, `fm_contact`, `fm_dipolar`, `icosahedral`, `none`}. Auto-derive `c_lhy` for `scalar` / `quasi_2d`. Legacy keys (`interactions.c_lhy`, `ground_state.spinor_lhy`) removed.
 
-**Continuation API** (direct-Julia): `make_params(val) → NamedTuple` overrides any `find_ground_state` kwargs per sweep point. Legacy `make_interactions(val) → InteractionParams` also supported.
+**Continuation API** (direct-Julia): `make_params(val)` returns either a `NamedTuple` of `find_ground_state` kwarg overrides per sweep point, or an `InteractionParams` struct (the latter is interpreted as `(interactions = ...)`). The legacy `make_interactions` kwarg was removed 2026-05-22 — pass via `make_params` instead.
 
 **GPU**: `import CUDA` before `using SpinorBEC` loads the extension. Pass `backend=CUDABackend()`. WSL2 needs `LD_LIBRARY_PATH=/usr/lib/wsl/lib`.
 

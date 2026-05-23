@@ -3,13 +3,13 @@
     grid = make_grid(GridConfig((16,), (10.0,)))
     atom = Rb87
 
-    @testset "Basic sweep returns results (legacy make_interactions)" begin
+    @testset "Basic sweep returns results" begin
         param_values = [-2.0, -1.0, 0.0, 1.0, 2.0]
         make_ip = val -> InteractionParams(10.0, val)
 
         results = scan_continuation(;
             param_values,
-            make_interactions=make_ip,
+            make_params=make_ip,
             grid, atom,
             n_steps_continuation=100,
             n_steps_fresh=500,
@@ -66,7 +66,7 @@
 
         results = scan_continuation(;
             param_values,
-            make_interactions=make_ip,
+            make_params=make_ip,
             grid, atom,
             n_steps_continuation=100,
             n_steps_fresh=500,
@@ -84,7 +84,7 @@
 
         results = scan_continuation(;
             param_values,
-            make_interactions=make_ip,
+            make_params=make_ip,
             grid, atom,
             n_steps_continuation=200,
             n_steps_fresh=1000,
@@ -98,7 +98,7 @@
         @test length(results) == 4
     end
 
-    @testset "Error when neither make_params nor make_interactions given" begin
+    @testset "Error when make_params not provided" begin
         @test_throws ArgumentError scan_continuation(;
             param_values=[1.0],
             grid, atom,
@@ -111,7 +111,7 @@
 
         hr = scan_continuation_bidirectional(;
             param_values,
-            make_interactions=make_ip,
+            make_params=make_ip,
             grid, atom,
             n_steps_continuation=100,
             n_steps_fresh=500,
@@ -150,7 +150,7 @@
 
         hr = scan_continuation_bidirectional(;
             param_values,
-            make_interactions=make_ip,
+            make_params=make_ip,
             grid, atom,
             n_steps_continuation=100,
             n_steps_fresh=500,
@@ -168,7 +168,7 @@
 
         hr = scan_continuation_bidirectional(;
             param_values,
-            make_interactions=make_ip,
+            make_params=make_ip,
             grid, atom,
             n_steps_continuation=200,
             n_steps_fresh=1000,
