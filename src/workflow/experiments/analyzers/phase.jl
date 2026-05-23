@@ -12,11 +12,27 @@ function _analyze_phase_classify(psi, grid, atom, params, ws_prev)
     classify_phase_detailed(psi, F, grid, sm)
 end
 
-# `:energy_decomposition` was a separate analyzer name but always called
-# the exact same `classify_phase_detailed` path as `:phase_classify`.
-# Aliased to the canonical name; the dispatch table maps both Symbols
-# to this single implementation.
-const _analyze_energy_decomposition = _analyze_phase_classify
+"""
+`:energy_decomposition` YAML analyzer. Decomposes total energy into
+kinetic / trap / zeeman / contact-c0 / contact-c1 / DDI / LHY / tensor /
+raman / light_shift components, plus the sum. Requires `ws_prev` since
+the components are evaluated against the live Workspace (kernels are
+already configured for the trap, DDI, etc.).
+
+Until 2026-05-22 this name was incorrectly aliased to
+`_analyze_phase_classify`, returning the phase-classifier feature
+vector instead of energy components. YAML pipelines that wrote
+`analyze: [- energy_decomposition: {}]` were silently getting phase
+data. Fixed to call the real `energy_decomposition(ws)` function.
+"""
+function _analyze_energy_decomposition(psi, grid, atom, params, ws_prev)
+    ws_prev === nothing && throw(
+        ArgumentError(
+            "`:energy_decomposition` requires `ws_prev` (the live Workspace " *
+            "with configured trap/DDI/LHY kernels). Did the pipeline runner " *
+            "forget to thread `ws_prev` through?"))
+    energy_decomposition(ws_prev)
+end
 
 function _analyze_phase_classify_distance(psi, grid, atom, params, ws_prev)
     # Reference-distance classifier — primarily useful for F >= 6 where

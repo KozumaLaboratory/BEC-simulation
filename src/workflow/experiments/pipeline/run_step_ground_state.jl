@@ -245,7 +245,13 @@ function _run_step(
     V_trap_for_ls = evaluate_potential(potential, grid)
     ls_raw = get(p, "light_shift", nothing)
     gs_light_shift = _parse_light_shift(ls_raw, atom.F, V_trap_for_ls, backend)
-    spinor_lhy_mode = let v = get(p, "spinor_lhy", nothing)
+    # `_resolve_lhy_block!` writes the resolved LHY mode (from the user-facing
+    # `lhy: {kind: ...}` block) into the internal `lhy_kind` slot. Prior to
+    # 2026-05-22 this read `p["spinor_lhy"]` — a stale reference to the old
+    # YAML key — which was never written by the new resolver, silently
+    # disabling non-scalar LHY modes (polar_contact / icosahedral / ...)
+    # for every YAML pipeline run.
+    spinor_lhy_mode = let v = get(p, "lhy_kind", nothing)
         v === nothing ? nothing : Symbol(String(v))
     end
 
