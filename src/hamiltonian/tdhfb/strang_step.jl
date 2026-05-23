@@ -56,7 +56,7 @@ export tdhfb_strang_step!
 
 """
     tdhfb_strang_step!(state, F, g_S, V_ext, dt; k_squared=nothing,
-                       fft_plans=nothing, hfb_mode=:full_hfb)
+                       hfb_mode=:full_hfb)
 
 Advance `state::TDHFBState{N}` by one Strang split-step of duration `dt`.
 
@@ -75,8 +75,6 @@ is a voxel-local Bogoliubov-de Gennes matrix exponential that evolves
 - `k_squared::AbstractArray{<:Real, N}`: precomputed `|k|²` for the FFT
   kinetic step. If `nothing`, a default `dx = 1, L = nx_d` grid is used
   (matches the box convention of the energy functional).
-- `fft_plans`: reserved for future precomputed FFT plans (currently unused;
-  the kinetic step allocates per call).
 - `hfb_mode::Symbol = :full_hfb`: BdG generator mode for the φ subupdate.
   - `:full_hfb` (default): full HFB. `U^φ = V·(φ*φ + 2ρ)`, `Δ^φ = V·κ`.
     Goldstone mode picks up an O(g·n_thermal) gap (Hugenholtz-Pines
@@ -101,7 +99,6 @@ function tdhfb_strang_step!(
     V_ext::AbstractArray,
     dt::Float64;
     k_squared=nothing,
-    fft_plans=nothing,
     hfb_mode::Symbol=:full_hfb,
     picard_midpoint::Bool=false,
     picard_max_iter::Int=20,
@@ -435,7 +432,7 @@ energy functional's default — so conservation tests on tiny grids are
 self-consistent).
 """
 function _tdhfb_kinetic_step!(
-    phi::AbstractArray, dt::Float64; k_squared=nothing, fft_plans=nothing
+    phi::AbstractArray, dt::Float64; k_squared=nothing
 )
     sz = size(phi)
     D = sz[end]

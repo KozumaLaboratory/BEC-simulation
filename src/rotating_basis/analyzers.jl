@@ -141,8 +141,7 @@ function spin_texture_xy(dyn::Dict; frame_idxs::AbstractVector{Int}=Int[])
                         fy_acc += real(Fy_mat[i, j] * a)
                     end
                 end
-                fz_acc += real(Fz_mat[Nz - Nz + 1, Nz - Nz + 1] * 0)  # placeholder no-op
-                # F_z is diagonal, simpler:
+                # F_z is diagonal:
                 for i in 1:D
                     fz_acc += real(Fz_mat[i, i]) * abs2(ψ[ix, iy, iz, i])
                 end

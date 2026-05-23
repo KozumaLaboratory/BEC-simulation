@@ -28,7 +28,7 @@
 # How `picard_midpoint=true` fixes it (A4 acceptance path)
 # ---------------------------------------------------------
 # Routes through `_tdhfb_hf_step_picard_midpoint!` instead of
-# `_tdhfb_hf_step_picard!`. The inner HF substep iterates a midpoint-
+# `_tdhfb_hf_step!`. The inner HF substep iterates a midpoint-
 # state Picard fixed point on (φ_mid, ρ_mid, κ_mid) at tol=1e-12,
 # converges in 4-6 iterations, and the resulting substep is palindromic
 # to machine eps (verified `/tmp/picard_mrmdag_no_doublet.jl`). Combined
@@ -43,17 +43,11 @@
 #   - Loose tolerance (>1e-6) or short-time: plain `tdhfb_strang_step!`
 #     is more wall-time efficient.
 #
-# Two other kwargs exist on this wrapper for backward compatibility:
-#   - `picard_iters::Int=1` — endpoint-Picard diagnostic loop on the
-#     inner HF substep (NOT the A4 fix). EMPIRICALLY this does not
-#     improve absolute error and at `picard_iters ≥ 2` makes it WORSE
-#     (endpoint bias is O(dt), not a refinement). Defaulted off; kept
-#     as diagnostic.
-#   - State-averaged midpoint Picard on (φ, ρ, κ) simultaneously is a
-#     KNOWN anti-pattern (`§3.7.4.b`, cos(Hτ/2) family) — NOT what
-#     `picard_midpoint=true` does. The A4 fix iterates Picard on the
-#     midpoint state only, with the M·R·M† Nambu update guaranteeing
-#     Hermiticity preservation.
+# State-averaged midpoint Picard on (φ, ρ, κ) simultaneously is a
+# KNOWN anti-pattern (`§3.7.4.b`, cos(Hτ/2) family) — NOT what
+# `picard_midpoint=true` does. The A4 fix iterates Picard on the
+# midpoint state only, with the M·R·M† Nambu update guaranteeing
+# Hermiticity preservation.
 #
 # Reference: Yoshida 1990, Phys. Lett. A 150, 262.
 # Internal narrative: docs/integrator_ch3_8_narrative.md (Track A1).
@@ -68,8 +62,7 @@ const _TDHFB_Y4_W0 = 1.0 - 2.0 * _TDHFB_Y4_W1
 
 """
     tdhfb_y4_midpoint_step!(state, F, g_S, V_ext, dt;
-                            k_squared=nothing, fft_plans=nothing,
-                            picard_iters=1, picard_tol=1e-10,
+                            k_squared=nothing,
                             hfb_mode=:full_hfb) -> state
 
 Advance `state::TDHFBState{N}` by one **Yoshida-4 composition** of three
@@ -99,14 +92,6 @@ for `tdhfb_strang_step!`.
 # Arguments
 Same as `tdhfb_strang_step!`. Extra keywords:
 
-- `picard_iters::Int = 1`: number of endpoint-Picard iterations on the
-  inner HF substep. `picard_iters = 1` (default) reproduces the
-  existing symmetric Strang triple. `picard_iters ≥ 2` activates a
-  diagnostic Picard loop — see file header for why this does NOT help
-  in practice and is defaulted off. **Not the same as `picard_midpoint`
-  — that's the A4 palindromic-substep fix.**
-- `picard_tol::Real = 1e-10`: convergence tolerance for the diagnostic
-  endpoint-Picard loop (separate from `picard_midpoint_tol`).
 - `hfb_mode::Symbol = :full_hfb`: BdG generator mode for the φ subupdate;
   see `tdhfb_strang_step!` docstring for `:full_hfb` vs `:popov` semantics.
 - `picard_midpoint::Bool = false`: enable midpoint-state Picard on the
@@ -123,9 +108,6 @@ function tdhfb_y4_midpoint_step!(
     V_ext::AbstractArray,
     dt::Float64;
     k_squared=nothing,
-    fft_plans=nothing,
-    picard_iters::Int=1,
-    picard_tol::Real=1e-10,
     hfb_mode::Symbol=:full_hfb,
     picard_midpoint::Bool=false,
     picard_midpoint_max_iter::Int=20,
@@ -136,24 +118,21 @@ function tdhfb_y4_midpoint_step!(
 
     _tdhfb_strang_substep!(
         state, F, g_S, V_ext, w1 * dt;
-        k_squared=k_squared, fft_plans=fft_plans,
-        picard_iters=picard_iters, picard_tol=picard_tol, hfb_mode=hfb_mode,
+        k_squared=k_squared, hfb_mode=hfb_mode,
         picard_midpoint=picard_midpoint,
         picard_midpoint_max_iter=picard_midpoint_max_iter,
         picard_midpoint_tol=picard_midpoint_tol,
     )
     _tdhfb_strang_substep!(
         state, F, g_S, V_ext, w0 * dt;
-        k_squared=k_squared, fft_plans=fft_plans,
-        picard_iters=picard_iters, picard_tol=picard_tol, hfb_mode=hfb_mode,
+        k_squared=k_squared, hfb_mode=hfb_mode,
         picard_midpoint=picard_midpoint,
         picard_midpoint_max_iter=picard_midpoint_max_iter,
         picard_midpoint_tol=picard_midpoint_tol,
     )
     _tdhfb_strang_substep!(
         state, F, g_S, V_ext, w1 * dt;
-        k_squared=k_squared, fft_plans=fft_plans,
-        picard_iters=picard_iters, picard_tol=picard_tol, hfb_mode=hfb_mode,
+        k_squared=k_squared, hfb_mode=hfb_mode,
         picard_midpoint=picard_midpoint,
         picard_midpoint_max_iter=picard_midpoint_max_iter,
         picard_midpoint_tol=picard_midpoint_tol,
@@ -162,10 +141,10 @@ function tdhfb_y4_midpoint_step!(
     return state
 end
 
-# One Strang sub-step (V/2 HF/2 K HF/2 V/2). At `picard_iters = 1` and
-# `picard_midpoint=false` this is byte-identical to `tdhfb_strang_step!`.
-# `picard_midpoint=true` swaps the inner HF substeps to the midpoint-Picard
-# variant (palindromic at Picard tolerance → unlocks Y4 order 4).
+# One Strang sub-step (V/2 HF/2 K HF/2 V/2). At `picard_midpoint=false`
+# this is byte-identical to `tdhfb_strang_step!`. `picard_midpoint=true`
+# swaps the inner HF substeps to the midpoint-Picard variant (palindromic
+# at Picard tolerance → unlocks Y4 order 4).
 function _tdhfb_strang_substep!(
     state::TDHFBState{N},
     F::Int,
@@ -173,9 +152,6 @@ function _tdhfb_strang_substep!(
     V_ext::AbstractArray,
     dt::Float64;
     k_squared=nothing,
-    fft_plans=nothing,
-    picard_iters::Int=1,
-    picard_tol::Real=1e-10,
     hfb_mode::Symbol=:full_hfb,
     picard_midpoint::Bool=false,
     picard_midpoint_max_iter::Int=20,
@@ -190,10 +166,7 @@ function _tdhfb_strang_substep!(
             tol=picard_midpoint_tol,
         )
     else
-        _tdhfb_hf_step_picard!(
-            state, F, g_S, dt / 2;
-            picard_iters=picard_iters, picard_tol=picard_tol, hfb_mode=hfb_mode,
-        )
+        _tdhfb_hf_step!(state, F, g_S, dt / 2; hfb_mode=hfb_mode)
     end
     _tdhfb_kinetic_step!(state.phi, dt; k_squared=k_squared)
     if picard_midpoint
@@ -204,79 +177,11 @@ function _tdhfb_strang_substep!(
             tol=picard_midpoint_tol,
         )
     else
-        _tdhfb_hf_step_picard!(
-            state, F, g_S, dt / 2;
-            picard_iters=picard_iters, picard_tol=picard_tol, hfb_mode=hfb_mode,
-        )
+        _tdhfb_hf_step!(state, F, g_S, dt / 2; hfb_mode=hfb_mode)
     end
     _tdhfb_v_step!(state.phi, V_ext, dt / 2)
 
     state.t += dt
     state.step += 1
-    return state
-end
-
-# Picard-iterated inner HF substep.
-#
-# `picard_iters = 1` reproduces the symmetric Strang triple of `_tdhfb_hf_step!`
-# byte-for-byte (verified by the strang-substep equivalence smoke test).
-#
-# `picard_iters ≥ 2` runs the iteration: restart from saved (φ, ρ, κ), but
-# rebuild the FIRST φ-half-step using endpoint (ρ, κ). Empirically this
-# biases φ toward post-R (ρ, κ), introducing O(dt) error — kept as
-# diagnostic / placeholder for a future state-averaged variant.
-function _tdhfb_hf_step_picard!(
-    state::TDHFBState{N},
-    F::Int,
-    g_S::AbstractDict{Int, Float64},
-    dt::Float64;
-    picard_iters::Int=1,
-    picard_tol::Real=1e-10,
-    hfb_mode::Symbol=:full_hfb,
-) where {N}
-    V = channel_kernel(F, g_S)
-    half = dt / 2
-
-    if picard_iters <= 1
-        _tdhfb_phi_subupdate!(state, F, g_S, V, half; hfb_mode=hfb_mode)
-        _tdhfb_R_subupdate!(state, F, g_S, V, dt)
-        _tdhfb_phi_subupdate!(state, F, g_S, V, half; hfb_mode=hfb_mode)
-        return state
-    end
-
-    phi0 = copy(state.phi)
-    rho0 = copy(state.rho)
-    kappa0 = copy(state.kappa)
-
-    _tdhfb_phi_subupdate!(state, F, g_S, V, half; hfb_mode=hfb_mode)
-    _tdhfb_R_subupdate!(state, F, g_S, V, dt)
-    _tdhfb_phi_subupdate!(state, F, g_S, V, half; hfb_mode=hfb_mode)
-
-    phi_prev = copy(state.phi)
-
-    for _ in 2:picard_iters
-        rho_endpoint = copy(state.rho)
-        kappa_endpoint = copy(state.kappa)
-
-        state.phi .= phi0
-        state.rho .= rho_endpoint
-        state.kappa .= kappa_endpoint
-        _tdhfb_phi_subupdate!(state, F, g_S, V, half; hfb_mode=hfb_mode)
-
-        state.rho .= rho0
-        state.kappa .= kappa0
-        _tdhfb_R_subupdate!(state, F, g_S, V, dt)
-        _tdhfb_phi_subupdate!(state, F, g_S, V, half; hfb_mode=hfb_mode)
-
-        delta = zero(real(eltype(state.phi)))
-        @inbounds for I in eachindex(state.phi)
-            delta = max(delta, abs(state.phi[I] - phi_prev[I]))
-        end
-        if delta < picard_tol
-            break
-        end
-        phi_prev .= state.phi
-    end
-
     return state
 end

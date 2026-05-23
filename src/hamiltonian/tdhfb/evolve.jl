@@ -8,7 +8,6 @@ export tdhfb_evolve!
     tdhfb_evolve!(state, F, g_S, V_ext, dt, n_steps;
                   scheme=:strang, k_squared=nothing, hfb_mode=:full_hfb,
                   on_step=nothing, save_every=0,
-                  picard_iters=1, picard_tol=1e-10,
                   picard_midpoint=false,
                   picard_midpoint_max_iter=20,
                   picard_midpoint_tol=1e-12) -> (state, history)
@@ -46,8 +45,6 @@ snapshots.
   step (e.g., for energy tracing).
 - `save_every::Int = 0`: if positive, push a copy of (φ, ρ, κ, t, step)
   to the history every N steps. `0` = no snapshots, returns empty vector.
-- `picard_iters`, `picard_tol`: diagnostic endpoint-Picard knobs, forwarded
-  to `:y4_midpoint` only. Defaulted off (see file header).
 - `picard_midpoint::Bool = false`: engage the A4 palindromic-substep fix
   for `:y4_midpoint`. Required for order-4 scaling.
 - `picard_midpoint_max_iter::Int = 20`, `picard_midpoint_tol::Float64 = 1e-12`:
@@ -69,8 +66,6 @@ function tdhfb_evolve!(
     hfb_mode::Symbol=:full_hfb,
     on_step=nothing,
     save_every::Int=0,
-    picard_iters::Int=1,
-    picard_tol::Real=1e-10,
     picard_midpoint::Bool=false,
     picard_midpoint_max_iter::Int=20,
     picard_midpoint_tol::Float64=1e-12,
@@ -88,7 +83,6 @@ function tdhfb_evolve!(
         elseif scheme === :y4_midpoint
             tdhfb_y4_midpoint_step!(state, F, g_S, V_ext, dt;
                 k_squared=ksq, hfb_mode=hfb_mode,
-                picard_iters=picard_iters, picard_tol=picard_tol,
                 picard_midpoint=picard_midpoint,
                 picard_midpoint_max_iter=picard_midpoint_max_iter,
                 picard_midpoint_tol=picard_midpoint_tol)

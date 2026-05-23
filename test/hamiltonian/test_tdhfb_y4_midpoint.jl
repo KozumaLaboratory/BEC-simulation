@@ -5,7 +5,7 @@
 # Y1: Smoke — one step preserves dimensions, advances state.t/step
 # Y2: ρ Hermiticity + κ symmetry preserved over 100 Y4 steps
 # Y3: Order test — verify order >= 2 (matches Strang, NOT order 4)
-# Y4: Inner-substep equivalence at picard_iters=1 (regression guard)
+# Y4: Inner-substep equivalence (regression guard against semantic drift)
 # Y5: Palindrome residual is O(dt²) (= proof of why Y4 cannot give order 4)
 #
 # Reference: src/hamiltonian/tdhfb/y4_midpoint_step.jl
@@ -188,10 +188,10 @@ import SpinorBEC: _tdhfb_strang_substep!
         @test 0.7 < order_y4 < 3.5
     end
 
-    @testset "Y4: picard_iters=1 reproduces tdhfb_strang_step! byte-for-byte" begin
-        # Regression guard: the inner substep at picard_iters=1 must match
-        # the existing Strang step exactly (within machine epsilon). This
-        # protects the wrapper from silent semantic drift if someone
+    @testset "Y4: substep reproduces tdhfb_strang_step! byte-for-byte" begin
+        # Regression guard: the inner substep (picard_midpoint=false) must
+        # match the existing Strang step exactly (within machine epsilon).
+        # This protects the wrapper from silent semantic drift if someone
         # rewrites `_tdhfb_strang_substep!`.
         nx = 8
         F = 1
@@ -214,14 +214,14 @@ import SpinorBEC: _tdhfb_strang_substep!
         state_sub = init_tdhfb_vacuum(copy(phi))
         state_sub.rho .= rho
         state_sub.kappa .= kappa
-        _tdhfb_strang_substep!(state_sub, F, gS, V_ext, dt; picard_iters=1)
+        _tdhfb_strang_substep!(state_sub, F, gS, V_ext, dt)
 
         @test maximum(abs, state_s.phi .- state_sub.phi) < 1e-14
         @test maximum(abs, state_s.rho .- state_sub.rho) < 1e-14
         @test maximum(abs, state_s.kappa .- state_sub.kappa) < 1e-14
 
         # And manually composing three tdhfb_strang_step! calls at (w1, w0, w1)
-        # reproduces tdhfb_y4_midpoint_step! at picard_iters=1.
+        # reproduces tdhfb_y4_midpoint_step!.
         w1 = 1.0 / (2.0 - 2.0^(1.0 / 3.0))
         w0 = 1.0 - 2 * w1
 
@@ -235,7 +235,7 @@ import SpinorBEC: _tdhfb_strang_substep!
         state_y = init_tdhfb_vacuum(copy(phi))
         state_y.rho .= rho
         state_y.kappa .= kappa
-        tdhfb_y4_midpoint_step!(state_y, F, gS, V_ext, dt; picard_iters=1)
+        tdhfb_y4_midpoint_step!(state_y, F, gS, V_ext, dt)
 
         @test maximum(abs, state_h.phi .- state_y.phi) < 1e-14
         @test maximum(abs, state_h.rho .- state_y.rho) < 1e-14
@@ -342,7 +342,6 @@ import SpinorBEC: _tdhfb_strang_substep!
             actual_dt = T_FINAL / n_steps
             for _ in 1:n_steps
                 tdhfb_y4_midpoint_step!(state, F, gS, V_ext, actual_dt;
-                    picard_iters=1,
                     picard_midpoint=true,
                     picard_midpoint_max_iter=30,
                     picard_midpoint_tol=1e-12,

@@ -55,7 +55,6 @@ function SpinorBEC._tdhfb_kinetic_step!(
     phi::CuArray{<:Complex},
     dt::Float64;
     k_squared=nothing,
-    fft_plans=nothing,
 )
     sz = size(phi)
     D = sz[end]
