@@ -1,10 +1,26 @@
-# NOT GENERALIZABLE: 23 type parameters intentionally pin every Workspace field.
-# Reason: type-inference
-# Why: every `Union{Nothing, ConcreteStruct}` field gets its own parameter so the
-#   compiler specialises through it. Collapsing parameters re-introduces the
-#   inference cascade — observed 2026-03 as a 30-min JIT hang when `Grid{N}`
-#   was used instead of `Grid{N, T}`. Do NOT "simplify" without running the
-#   make_workspace timing regression.
+# Workspace has 22 type parameters (down from 25 as of 2026-05-23 Phase 1
+# refactor). Each `Union{Nothing, ConcreteStruct}` field originally had
+# its own parameter so the compiler could specialise through it. Three
+# were dropped — `LOSS`, `TDI`, `MG` — because each Union arm is a
+# single concrete struct (or two siblings whose other type params are
+# already pinned via `N`), so post-`!== nothing` narrowing gives the
+# compiler a concrete type at the call site. Measured with
+# `scripts/diag/workspace_jit_baseline.jl`: cold combos unchanged, loss-
+# only cold swap dropped from ~150ms to ~0ms.
+#
+# Keep these AS PARAMETERS (collapsing has measurable cost):
+# - `LS` (light_shift): LightShift{A} where A depends on backend (CPU
+#   Array vs CuArray) — collapsing breaks hot-path dispatch.
+# - `ABM` (absorbing_mask): the broadcast `psi_view .*= mask` in
+#   `apply_absorbing_boundary!` dispatches on the concrete array type.
+# - `DDI / DDIB / DDIP`: hot-path DDI step needs concrete FFT buffer
+#   types; collapsing breaks the rFFT plan dispatch.
+# - Anything with array eltype/backend dependence.
+#
+# Re-introducing parameters is fine; collapsing the wrong one has hit
+# the inference cascade (observed 2026-03 as a 30-min JIT hang with
+# `Grid{N}`). Run `scripts/diag/workspace_jit_baseline.jl` before/after
+# any future refactor.
 # See: CLAUDE.md §"Type stability boundaries", MEMORY pitfall_partial_type_params_in_struct_fields
 #
 # DESIGN NOTE — why Workspace and RotatingBasisWS are NOT a shared AbstractWorkspace
@@ -27,13 +43,16 @@
 #
 # --- Workspace: the master per-simulation state container ---
 #
-# `Workspace{N, A, P, IP, SM, ZEE, DDI, DDIB, RAM, LOSS, DDIP, BK, TC,
-# CC, KPA, VPA, DBA, BACK, LHY, ABM, LS, TDI, MG}` — 23 type
-# parameters. CLAUDE.md's "Type stability boundaries" section
-# explains why this many parameters is load-bearing: every field that
-# might be `Nothing` vs. a concrete struct gets a parameter so the
-# compiler can specialise. Helper functions that take a workspace
-# field must dispatch on a concrete type, never on `Any`-typed locals.
+# `Workspace{N, A, P, IP, SM, ZEE, DDI, DDIB, RAM, DDIP, BK, TC, CC,
+# KPA, VPA, DBA, BACK, LHY, ABM, LS, T, B}` — 22 type parameters.
+# CLAUDE.md's "Type stability boundaries" section explains why this
+# many parameters is load-bearing: every field that might be `Nothing`
+# vs. a concrete struct gets a parameter so the compiler can
+# specialise. Helper functions that take a workspace field must
+# dispatch on a concrete type, never on `Any`-typed locals.
+#
+# Three parameters were dropped 2026-05-23 (LOSS / TDI / MG); see the
+# file-header comment above for the rationale and the measurement.
 #
 # This struct lives in its own file (rather than the main types.jl)
 # so the include order can stay legible: every type Workspace depends
@@ -53,7 +72,6 @@ struct Workspace{
     DDI,
     DDIB,
     RAM,
-    LOSS,
     DDIP,
     BK,
     TC,
@@ -65,8 +83,6 @@ struct Workspace{
     LHY,
     ABM,
     LS,
-    TDI,
-    MG,
     T <: AbstractFloat,
     B <: AbstractArray,
 }
@@ -94,7 +110,12 @@ struct Workspace{
     ddi::DDI
     ddi_bufs::DDIB
     raman::RAM
-    loss::LOSS
+    # `loss::Union{Nothing, LossParams}` — concrete LossParams has no
+    # parametric subtypes, so Union splitting at `if ws.loss !== nothing`
+    # narrows to the concrete type at the call site. Dropping the LOSS
+    # parameter (was 10th) saves ~150ms of cold JIT on a swap-loss-only
+    # combo with no hot-path measurable regression.
+    loss::Union{Nothing, LossParams}
     ddi_padded::DDIP
     batched_kinetic::BK
     tensor_cache::TC
@@ -103,8 +124,16 @@ struct Workspace{
     lhy::LHY
     absorbing_mask::ABM
     light_shift::LS
-    time_dep_interactions::TDI
-    magnetic_gradient::MG
+    # `time_dep_interactions::Union{Nothing, TimeDependentInteractions}` —
+    # concrete `TimeDependentInteractions` carries Waveform fields with
+    # abstract type already, so the workspace-level parameter added no
+    # specialisation. Dropped in the same Phase 1 refactor.
+    time_dep_interactions::Union{Nothing, TimeDependentInteractions}
+    # `magnetic_gradient::Union{Nothing, MagneticGradient{N},
+    # TimeDependentMagneticGradient{N}}` — both concrete arms are
+    # parameterised on N which is already a Workspace type parameter,
+    # so Union splitting gives the call site a concrete narrowed type.
+    magnetic_gradient::Union{Nothing, MagneticGradient{N}, TimeDependentMagneticGradient{N}}
 end
 
 """
