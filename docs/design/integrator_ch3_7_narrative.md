@@ -138,9 +138,9 @@ State-averaging negative is a **load-bearing finding** for the thesis:
   Force-Gradient Picard refinements
 - It justifies the Y4-midpoint design choice (= predictor-corrector
   with Strang half-step, NOT state-avg)
-- It is novel — neither Chin-Krotscheck 2005 nor Thalhammer 2026
-  flags this explicitly; the joint negative result requires testing
-  all three frameworks side-by-side
+- It is novel — Chin-Krotscheck 2005 does not flag this explicitly;
+  the joint negative result requires testing the framework
+  side-by-side with AVF and MPS-4
 
 Future work direction: a formal proof of the §3.7.6 theorem for
 general nonlinear $H[\psi]$ with bounded derivatives. Currently

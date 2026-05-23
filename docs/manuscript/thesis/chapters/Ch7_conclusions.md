@@ -126,9 +126,8 @@ contradiction せず、適用 regime が異なる:
 
 本修論期間 (~5 ヶ月) で 3 つの大規模 verify-first workflow を運用:
 
-1. **Track A1+C+B integrator modernization** (Chapter 3 of D-thesis, post-修論):
-   Y4-midpoint, Track C Force-Gradient, Track B Thalhammer modified-splitting の
-   3 frameworks を相互 cross-validate
+1. **Track A1 + Track C integrator modernization** (Chapter 3 of D-thesis, post-修論):
+   Y4-midpoint と Track C Force-Gradient を相互 cross-validate
 2. **paper3 v3 5-case polyhedral audit** (Chapter 4 / Chapter 6, 本修論):
    F=3/4/6/8/10 polyhedral inert states を independent reconstruction で
    machine-precision 一致確認
@@ -224,8 +223,8 @@ Chapter 3-6 にわたる negative results が **publishable structural failures*
   での quantum fluctuation 抑制 (stabilize) vs re-renormalization の区別
 - **Beliaev for uniform F=6 polyhedral phases**: full self-consistent Bogoliubov mode
   resummation、Universal Theorem との analytical comparison
-- **Two-component / binary spinor extension**: Thalhammer 2026 J=2 framework の SpinorBEC
-  への拡張、$^{87}$Rb-$^{23}$Na 系統への applicability
+- **Two-component / binary spinor extension**: 既存 binary path への
+  cross-channel ハミルトニアン拡張 ($^{87}$Rb-$^{23}$Na 系統への applicability)
 
 ### 7.5.3 Year 3: experimental synthesis
 

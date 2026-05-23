@@ -256,7 +256,7 @@ D 論 Year 1 candidates for extending E.2-E.4 framework:
    sign factorization)
 4. **Dipolar generalization audit**: Lima-Pelster $Q_5$-corrected closed forms for
    polyhedral phases
-5. **Multi-species Thalhammer J=2 framework verification**: binary BEC cross-channel
+5. **Multi-species J=2 framework verification**: binary BEC cross-channel
    couplings
 
 各 extension は本 Appendix の framework に increment 追加可能、reproducibility chain

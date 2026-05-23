@@ -123,13 +123,6 @@ paper4 directory should be created mirroring paper1-3 structure.
   eprint = {cond-mat/0504270},
 }
 
-@article{ThalhammerThalhammerThurner2026,
-  author = {Thalhammer, Mechthild and Thalhammer, Sebastian and Thurner, ?},
-  title = {Modified splitting methods for the Gross-Pitaevskii equation},
-  journal = {arXiv preprint}, year = {2026},
-  eprint = {2601.19838},
-}
-
 @article{Yoshida1990,
   author = {Yoshida, Haruo},
   title = {Construction of higher order symplectic integrators},
@@ -242,7 +235,7 @@ Chomaz2016, LimaPelster2012, KU2012.
 ### 修論本体
 
 Union of all 4 papers + integrator references (ChinKrotscheck2005,
-ThalhammerThalhammerThurner2026, Yoshida1990) + 上妻 experimental.
+Yoshida1990) + 上妻 experimental.
 
 ---
 

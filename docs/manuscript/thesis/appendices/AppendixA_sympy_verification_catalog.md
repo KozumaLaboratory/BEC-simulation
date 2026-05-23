@@ -165,7 +165,7 @@ D 論 Year 1 で planning される verification extensions:
 2. **F=5, 7, 9, 11 odd-F polyhedral** systematic completion (Chapter 6 master table
    extension to all $F \leq 12$)
 3. **Dipolar generalization audit**: Lima-Pelster $Q_5$ for polyhedral phases
-4. **Multi-species (binary BEC) Thalhammer J=2 framework** verification
+4. **Multi-species (binary BEC) J=2 cross-channel framework** verification
 
 各 extension は本 Appendix A の framework に increment 追加可能、reproducibility chain
 は consistent に保たれる。

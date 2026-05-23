@@ -270,8 +270,7 @@ SpinorBEC.jl で提供される integrators (Chapter 3 of D-thesis で詳述):
 - **Strang** (`split_step!`): 2nd order, baseline
 - **Strang-midpoint** (Track A1, `split_step_midpoint!`): 2nd order, predictor-corrector
 - **Yoshida-4 midpoint**: 4th order, machine-precision energy drift
-- **Force-Gradient v3.1** (`split_step_forcegrad!`): 3rd order, diagonal-only Eu support
-- **Thalhammer modified-splitting** (`split_step_thalhammer!`): equivalent to FG for J=1
+- **Force-Gradient v3.1** (`split_step_forcegrad!`): 3rd order, diagonal-only scalar-GP support
 
 修論期間で確立: Yoshida-4 midpoint が lab-path 実用 optimum (D-thesis Ch.3 §3.8)。
 

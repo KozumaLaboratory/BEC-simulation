@@ -84,20 +84,6 @@ fixed in `docs/design/integrator_phase_minus_1_protocol.md`.
   `docs/design/integrator_track_c_derivation.md`. Phase 0+ implementation,
   smoke / lab / Pareto bench.
 
-- **§3.6 Modified splitting for spinor + DDI** (Track B, Thalhammer
-  arXiv:2601.19838 + Hairer-Lubich-Wanner Ch.III). Independent extension
-  of the iterated commutator G = [DF₂, [DF₂, DF₁]] from paper's J=2
-  contact-only case to F=6 / D=13 + DDI. 4th-order coefficient match
-  against eq.(22) structure. Phase -1 manuscript:
-  `docs/design/integrator_track_b_derivation.md`. Phase 0+ implementation.
-
-  Track B may be skipped if Track C achieves "order 4 lab path AND
-  Phase 5 ≥ 10× energy-drift improvement vs Y4-mid AND Phase 3 Pareto
-  cost-per-accuracy win". In that case §3.6 becomes a detailed
-  Force-Gradient case study + ablation (Track C bulked into 2 sections),
-  and §3.7 (originally AVF optional) is re-purposed as Force-Gradient
-  comparison vs alternative high-orders.
-
 - **§3.7 [or §3.3.2 if framework integration accepted] State-averaging
   AVF negative result.** See §3.3.2 above. If §3.3 is kept as the
   positive theorem + 2 failure modes joint section, §3.7 is freed up for
@@ -119,7 +105,6 @@ fixed in `docs/design/integrator_phase_minus_1_protocol.md`.
 | A1 — midpoint Strang | Done | commits 98213f6 + 59422e6 |
 | A1.5 — state-averaging trap | Negative, see §3.3.2 | commit 63ad7c1 |
 | C — Force-Gradient + DDI | Phase -1 not started | template at `docs/design/integrator_track_c_derivation.md` |
-| B — Thalhammer modified + DDI | Phase -1 not started | template at `docs/design/integrator_track_b_derivation.md` |
 
 ## Verify-first reinforcement
 
@@ -128,12 +113,12 @@ The AVF state-averaging negative result (§3.3.2) traced back to a
 mode as the earlier MPS-{10,12} over-optimism and the Chin C₆₀ misread
 (both documented in `docs/design/integrator_modernization_plan.md` and
 `memory/integrator_modernization_status.md`). The Phase -1 protocol
-(`docs/design/integrator_phase_minus_1_protocol.md`) hardens against this for
-Track C and B: no formula enters the derivation manuscript without
+(`docs/design/integrator_phase_minus_1_protocol.md`) hardens against this
+for Track C: no formula enters the derivation manuscript without
 verbatim transcription from the cited paper, and Phase 0 implementation
 is blocked until anko's review confirms transcription + justification +
-self-checks all pass. Time hard cap (2 weeks Track C, 4 weeks Track B)
-prevents sunk-cost continuation when derivation diverges.
+self-checks all pass. Time hard cap (2 weeks Track C) prevents
+sunk-cost continuation when derivation diverges.
 
 ## Schedule (M2 8-month plan)
 
@@ -143,10 +128,5 @@ prevents sunk-cost continuation when derivation diverges.
   stability with Y4-mid baseline) in next session(s).
 - **Month 3-4**: Track C — Phase -1 (paper fetch + 紙 derivation, 2-week
   hard cap), then Phase 0 implementation + Phase 1-2 smoke / lab bench.
-- **Month 5-7**: Track B IF Track C results don't already satisfy thesis
-  goals. Phase -1 (4-week cap) + Phase 0-2.
-- **Month 8**: Phase 3-5 integrated bench. §3.5/§3.6 manuscript draft.
+- **Month 5-8**: Phase 3-5 integrated bench. §3.5 manuscript draft.
   §3.8 comparison + Ch.3 final.
-
-Track B skip decision point: month 5 entry, gated on Track C Phase 3
-Pareto + Phase 5 results.

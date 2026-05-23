@@ -1,12 +1,11 @@
 # Integrator modernization plan — verified against primary sources
 
 **Status:** Track A1 implementation COMPLETE (commits 98213f6 + 59422e6 +
-63ad7c1). Track A1.5 (state-averaging trap) NEGATIVE. Track C and Track B
-moved behind a hard `Phase -1` paper-fetch + 紙-derivation gate. See:
-- `docs/design/integrator_ch3_plan.md` — 修論 Ch.3 outline + Track A1/C/B framework
+63ad7c1). Track A1.5 (state-averaging trap) NEGATIVE. Track C moved behind
+a hard `Phase -1` paper-fetch + 紙-derivation gate. See:
+- `docs/design/integrator_ch3_plan.md` — 修論 Ch.3 outline + Track A1/C framework
 - `docs/design/integrator_phase_minus_1_protocol.md` — Phase -1 hard-gate protocol
 - `docs/design/integrator_track_c_derivation.md` — Track C derivation skeleton
-- `docs/design/integrator_track_b_derivation.md` — Track B derivation skeleton
 
 Last update: 2026-05-11.
 
@@ -42,8 +41,6 @@ This file records two parallel exploratory tracks that *might* enable
 * Track A (MPS-4 as drop-in on existing Strang): **parked, see below**
 * Track A1 (midpoint-symmetrize lab Strang first, then MPS-4 / Y6 /
   Force-Gradient on top): the actually-actionable next step
-* Track B (Thalhammer 2026 spinor + DDI extension): still scope of
-  thesis Ch.3, dependent on A1 succeeding
 
 ---
 
@@ -189,97 +186,6 @@ in the V step, and we need to look elsewhere.
 
 ---
 
-## Track B — Modified Splitting (Thalhammer & Thalhammer-Thurner 2026)
-
-**Source:** [arXiv:2601.19838](https://arxiv.org/abs/2601.19838) (34 pages, January 2026)
-
-### What the paper actually contains (verified by reading)
-
-* J-component coupled GPE with **contact-only** interactions
-  (eq. 11): `i ∂_t ψ_j = ∆_{α_j} ψ_j + V_j ψ_j + Σ_k ϑ_{jk} |ψ_k|² ψ_j`
-* Modified splitting structure (eq. 18a-c): standard ABA composition
-  but the V-step gets a `+ c_i τ² G` correction term, where G is
-  the iterated commutator `[DF₂, [DF₂, DF₁]]` of Lie-derivatives
-* Fourth-order example method (eq. 22):
-  ```
-  s = 3,  a = (0, 1/2, 1/2),  b = (1/6, 2/3, 1/6),  c = (0, -1/72, 0)
-  ```
-  Principal coefficients (a, b) all non-negative ⇒ stable in
-  imaginary time. The τ² scaling on c kills the negative-coefficient
-  problem
-* Explicit `G_1` formula for J=2 case (eq. 19a-e): substantial — 30+
-  terms involving `∇_{α_j} ψ̃_k · ∇ ψ̃_l ψ̃_m` triple products and
-  `∆_{α_j} V_k` Laplacians of potentials and `(∆_{α_1} - ∆_{α_2}) ψ̃`
-  cross-component Laplacian differences
-* Both real-time (eq. 11) and imaginary-time (eq. 14) handled by the
-  same scheme
-
-### What the paper does NOT contain
-
-* **Spinor / F=1/2/3 / matrix-valued F̂ structure**: not mentioned
-  anywhere in 34 pages
-* **DDI / dipolar / nonlocal interactions**: zero mentions of
-  "DDI", "dipol", "long-range", or "nonlocal"
-* **Explicit J=3+ formulas**: only J=2 worked out
-* **Specific speedup numbers vs Yoshida4**: figures show curves but
-  the claim of "500× smaller error coefficient" cited elsewhere is
-  not in this paper — it likely comes from Chin's original 1997
-  modified-potential paper for the linear case
-
-### Adaptation cost for ¹⁵¹Eu (F=6, D=13) + DDI
-
-To bring the Thalhammer 2026 framework to our system, three
-extensions are needed:
-
-1. **F₁ extension**: their F₁ = ∆_{α_j} + V_j is local diagonal in
-   component index j. Ours has the same structure plus linear Zeeman
-   p m_j (still local diagonal) and quadratic q m_j² (local diagonal).
-   The local-diagonal property is preserved — **easy**
-
-2. **F₂ extension** (the hard part):
-    * Their F₂_j = Σ_k ϑ_{jk} |ψ_k|² ψ_j — scalar contact, diagonal in
-      component index, real-symmetric ϑ matrix
-    * Ours: F₂_j = c₀ |ψ|² ψ_j + c₁ Σ_{αβ} (F_α F_β)_{jk} ⟨F_β⟩ ψ_k
-      + (DDI nonlocal)
-    * The c₁ term couples components via spin matrices F̂ — **NOT a
-      diagonal action**. Thalhammer's `(ϑ_{jk})` is real, ours has
-      F-matrix structure
-    * The DDI term involves an FFT convolution — **nonlocal** while
-      Thalhammer's F₂ is purely pointwise multiplication. The
-      iterated commutator [F₂, [F₂, F₁]] picks up nonlocal pieces
-      from both `[T, V_DDI]` and `[V_DDI, V_contact]`
-
-3. **Iterated commutator G derivation**: eq (19a-e) gives J=2
-   contact-only G. For J=13 spinor + DDI, G has additional terms
-   from spin-matrix non-commutativity (`[F_α, F_β] = i ε_{αβγ} F_γ`)
-   and from kinetic-DDI cross terms. **Has to be derived from
-   scratch** — not a translation, a derivation
-
-### Estimated effort
-
-The derivation in §3 of Thalhammer 2026 occupies ~3 pages for J=2
-contact-only. F=6 (J=13) with full F̂ + DDI is plausibly **5-10×
-larger** in algebraic complexity. Implementation + numerical
-verification + spinor invariant checks (mass, magnetization, energy
-conservation) is **修論 Ch.3 contribution** territory, not a
-pull-request-sized task.
-
-### Decision criteria
-
-* If MPS-4 (Track A) gives us order 4 with acceptable norm drift
-  on the lab path (16-48³ Eu) at production cost, it likely
-  satisfies Phase-1 needs of the thesis without the Track-B
-  derivation
-* Track B is the path forward if MPS-4 has unfixable drawbacks
-  (e.g., stream parallelism doesn't pan out or norm drift accumulates
-  unacceptably for long-time integrations) OR if the thesis explicitly
-  needs a tailored method as a publishable contribution
-* Either way, the Thalhammer 2026 paper is **not a drop-in template**.
-  Calling it "Phase 3 of a 2-3 month plan" was an underestimate of
-  the spinor + DDI extension cost
-
----
-
 ## Outcomes (2026-05-11)
 
 ### Track A1 — Midpoint Strang (DONE, partial success)
@@ -331,12 +237,6 @@ Behind hard gate. See `docs/design/integrator_track_c_derivation.md`. Time cap
 2 weeks. Paper fetch (Chin 1997 + Chin-Krotscheck 2005 + Aichinger 2005)
 required before any derivation.
 
-### Track B — Thalhammer modified + DDI (Phase -1 not started, conditional)
-
-Behind hard gate. See `docs/design/integrator_track_b_derivation.md`. Time cap
-4 weeks. Begins only if Track C results don't already meet thesis goals
-(see Track B skip decision in `docs/design/integrator_ch3_plan.md`).
-
 ---
 
 ## Recommended next steps (revised 2026-05-11)
@@ -349,14 +249,11 @@ Behind hard gate. See `docs/design/integrator_track_b_derivation.md`. Time cap
    schedule) — paper fetch + scalar-GPE → spinor + DDI 紙 derivation.
    Hard-gated by `docs/design/integrator_phase_minus_1_protocol.md`.
 3. **Track C Phase 0+** — implementation, smoke, lab order verification.
-4. **Track B decision point** — month 5 entry, gated on Track C results.
-5. **Phase 3-5 integrated bench + §3.5/§3.6 manuscript draft** — month 8.
+4. **Phase 3-5 integrated bench + §3.5 manuscript draft** — month 8.
 
 If Track C fails Phase -1 within the 2-week cap, scope re-evaluation.
-If Track B is dropped, §3.6 is replaced by expanded Track C case study.
-Fallback (both fail): Y4-midpoint is already a publishable
-contribution; thesis Ch.3 stays as Track A1 + framework chapter
-without Track C/B sections.
+Fallback: Y4-midpoint is already a publishable contribution; thesis
+Ch.3 stays as Track A1 + framework chapter without a Track C section.
 
 ---
 
@@ -369,9 +266,7 @@ without Track C/B sections.
 * [Alvermann & Fehske 2011, JCP 230, 5930 — arXiv:1102.5071](https://arxiv.org/abs/1102.5071)
 * [Choi & Vaníček 2020, arXiv:2006.16902](https://arxiv.org/abs/2006.16902)
 * [Chin 2007, arXiv:0710.0396 — NLS splitting instabilities](https://arxiv.org/abs/0710.0396)
-* [Thalhammer & Thalhammer-Thurner 2026, arXiv:2601.19838 — modified splitting GPE](https://arxiv.org/abs/2601.19838)
 * Chin 1997, Phys. Lett. A 226, 344 — original force-gradient (Track C)
 * Chin & Krotscheck 2005, PRE 72, 036705 — rotating BEC GPE force-gradient (Track C, KEY)
 * Aichinger, Chin & Krotscheck 2005 — non-local potential extension (Track C)
 * Quispel & McLaren 2008, J. Phys. A 41 — Average Vector Field method (Track A1.5 negative)
-* Hairer, Lubich & Wanner 2006, Geometric Numerical Integration Ch.III — Lie-derivative formalism (Track B)

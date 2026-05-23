@@ -286,7 +286,7 @@ Quantitative target: 6+ papers submitted, 2+ accepted by end of Year 1.
 
 Year 2 (2028-04 to 2029-04):
 - Beliaev formalism for uniform polyhedral phases (analytical)
-- Multi-species (binary) BEC Thalhammer J=2 extension
+- Multi-species (binary) BEC extension (Y4-midpoint baseline)
 - Dipolar generalization (Lima-Pelster $Q_5$) for polyhedral
 - Eu droplet realization prediction + 上妻研 experimental collaboration
 

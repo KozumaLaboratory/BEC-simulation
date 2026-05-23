@@ -207,9 +207,6 @@ clean (composition-based wins over forward-positive-coefficient
 approach for our problem class). The §5.2 spinor matrix derivative
 term is a genuine contribution to the literature.
 
-Track B (Thalhammer 2026 modified splitting) is now the next thrust
-per `docs/design/integrator_ch3_plan.md` schedule.
-
 ## §3.5.8 v4 Step 1 prototype: discrete Hermiticity and the FG-on-Strang structural limit
 
 A subsequent prototype implementation campaign (post-design, 2026-05-12)

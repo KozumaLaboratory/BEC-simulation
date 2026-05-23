@@ -14,7 +14,6 @@ V step:
 | **Yoshida-4 midpoint** (Track A1) | **4** | **~12×** | **machine precision** |
 | Yoshida-6 midpoint (Track A1) | 6 (ref-floor limited) | ~24× | machine precision |
 | Force-Gradient v3 (Track C) | 3-4 | ~11× | order-3 limited |
-| Thalhammer modified (Track B) | = Force-Gradient | = | = |
 | MPS-4 (Track A) | 1 (collapse) | 3× | — |
 | AVF state-avg (Track A1.5) | 2 (collapse) | 4× | 14万× worse than Y4 |
 
@@ -36,8 +35,7 @@ Justification:
    does not require switching to specialised energy-preserving schemes
    (e.g., true Quispel-McLaren AVF).
 3. **Cost competitive** with the alternatives: ~12× plain Strang per
-   outer step, comparable to Force-Gradient v3 (11×) and Thalhammer
-   modified (11×, formally equivalent to Force-Gradient). For order-2
+   outer step, comparable to Force-Gradient v3 (11×). For order-2
    schemes the cost ratio is ~2×.
 4. **Numerically robust**: Picard fixed-point on midpoint MF converges
    in 2 iterations to machine precision on the lab path. No special
@@ -48,13 +46,13 @@ Justification:
 ### Real-time vortex dynamics (T_FINAL ~ 100-1000 ω⁻¹)
 
 **Use Y4-midpoint.** Order 4 + machine-precision energy drift gives
-clean trajectories. Force-Gradient/Thalhammer offer no measurable
-benefit on the lab path.
+clean trajectories. Force-Gradient offers no measurable benefit on
+the lab path.
 
 ### Imaginary time propagation (ground state computation)
 
 **Use Y4-midpoint** for the V step, with adaptive PI controller for
-time stepping. Force-Gradient/Thalhammer would be needed if the
+time stepping. Force-Gradient would be needed if the
 all-positive-coefficients property were essential (= ITP convergence
 in some special regimes). For our Eu151 Flower phase, anko's
 `itp_profile.jl` will determine integrator-limited vs
@@ -77,9 +75,7 @@ the lab path so the ROI is low.
 ### Multi-species BEC (two-component, J=2)
 
 **Not supported by SpinorBEC** as currently structured (single-species
-F-matrix spinor). For binary BEC like 87Rb-23Na, the Thalhammer paper
-eq 19-20 cross-channel formulas would apply directly with a new
-SpinorBEC framework extension. Out of scope.
+F-matrix spinor). Out of scope.
 
 ### Long-time energy conservation critical (T_FINAL >> 1000 ω⁻¹)
 
@@ -132,12 +128,6 @@ contribution**.
 - Practical recommendation: don't implement F-matrix extension unless
   a specific motivation arises
 
-Track B (Thalhammer modified): **formal unification**.
-- Phase -1 shows Thalhammer eq 22 ≡ Chin-Krotscheck 4A for J=1
-- `split_step_thalhammer!` alias for `split_step_forcegrad!` (bit-exact)
-- F-matrix + DDI extension = Track C content via Lie-derivative
-  formalism — same publishable finding from different angle
-
 ## §3.8.6 Negative results catalogue (Ch.3 §3.7 + scattered)
 
 The thesis contribution includes a deliberate catalogue of negative
@@ -167,13 +157,13 @@ that complements the positive Y4-midpoint recommendation.
    Y4-mid already achieves machine precision drift; ROI assessment
    negative.
 
-3. **Multi-species BEC extension** (Thalhammer J=2+): requires new
-   SpinorBEC framework infrastructure for cross-channel coupling.
-   Outside current Eu151 single-species scope.
+3. **Multi-species BEC extension** (J=2+): requires new SpinorBEC
+   framework infrastructure for cross-channel coupling. Outside
+   current Eu151 single-species scope.
 
 4. **Adaptive PI controller** for Y4-mid: existing L2-PI controller
-   covers production scope; Thalhammer's local error estimator
-   (= comparison of Y4 with Strang) could replace it for cleaner
+   covers production scope. Embedded local error estimators (e.g.,
+   compare Y4 with Strang each step) could replace it for cleaner
    adaptive behaviour but the gain is small.
 
 5. **Higher-order force-gradient (6th-order modified splitting)**:
@@ -188,20 +178,17 @@ that complements the positive Y4-midpoint recommendation.
 
 Yoshida-4 midpoint (Track A1) is the practical optimum for the
 SpinorBEC lab path. Order 4 + machine-precision energy drift, with
-cost comparable to alternatives. Force-Gradient (Track C) and
-Thalhammer modified (Track B) provide derivation-level contributions
-(spinor matrix + DDI extension, framework unification) but lose
-cost-per-accuracy to Y4-mid on the lab path.
+cost comparable to alternatives. Force-Gradient (Track C) provides
+a derivation-level contribution (spinor matrix + DDI extension) but
+loses cost-per-accuracy to Y4-mid on the lab path.
 
 The thesis Ch.3 chapter delivers: (a) Y4-mid as the empirically
 verified practical optimum, (b) Track C derivation of the spinor
-matrix ∇ψ derivative term (novel), (c) Track B equivalence proof for
-the modified splitting framework family, and (d) a catalogue of
-negative results that justify the design choices via formal failure
-analysis.
+matrix ∇ψ derivative term (novel), and (c) a catalogue of negative
+results that justify the design choices via formal failure analysis.
 
 Ch.3 = ~60-80 pages combining §3.1-§3.4 (positive theorem + Track A1
-implementation), §3.5-§3.6 (Track C + B derivation + unification),
+implementation), §3.5 (Track C derivation),
 §3.7 (state-averaging negative theorem), §3.8 (this section,
 comparison + recommendations). Thesis-body chapter alongside Universal
 Structure Theorem, EdH, and Flower phase chapters.

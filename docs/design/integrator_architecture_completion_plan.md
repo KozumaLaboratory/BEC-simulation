@@ -2,7 +2,7 @@
 
 **Scope**: A1–A4 sub-phase program to bring the SpinorBEC.jl integrator
 suite from "Y4-midpoint baseline + Track C v3.1 lab-path FG + Step 1c
-direct-commutator v4 prototype" to production-grade Thalhammer-Full
+direct-commutator v4 prototype" to production-grade Full Force-Gradient (spinor + DDI)
 (spinor + DDI) with full adaptive control + TDHFB palindromic substep.
 
 **Status**: master plan only. Sub-phase A1, A4 individually scoped in
@@ -15,10 +15,10 @@ implementation.
 
 ---
 
-## A1: Track C v4 Step 1b-3 Completion → Thalhammer-Full
+## A1: Track C v4 Step 1b-3 Completion → Full Force-Gradient (spinor + DDI)
 
 **Goal**: A working spinor + DDI Force-Gradient v4 implementation
-equivalent to Thalhammer 2008's modified-splitting framework, achieving
+equivalent to Chin-Krotscheck 2005 force-gradient framework extended to spinor + DDI, achieving
 order 4 on the F=6 Eu DDI lab path.
 
 **Pre-conditions met (this session series, 2026-05-12)**:
@@ -106,7 +106,7 @@ The DDI is matrix-valued in spin (via the dipole coupling structure)
 and nonlocal (via convolution). The full v4 correction in this
 combined regime has additional cross-terms beyond just `[V_SM, [T,V_SM]]`
 or `[V_DD, [T, V_DD]]` — there's also `[V_SM, [T, V_DD]]` and
-`[V_DD, [T, V_SM]]`. The full Thalhammer-Full implementation captures
+`[V_DD, [T, V_SM]]`. The full Full Force-Gradient (spinor + DDI) implementation captures
 all four.
 
 Acceptance: order 4 on F=6 16³ DDI + c_1 spinor lab path.
@@ -114,7 +114,7 @@ Acceptance: order 4 on F=6 16³ DDI + c_1 spinor lab path.
 **Estimated scope**: 3 sessions (A1.1 = 1 session DONE 2026-05-12,
 A1.2 = 1 session, A1.3 = 1 session). Linked to task #91. **A1.2 and
 A1.3 are now reconsidered**: extending the direct-commutator kernel to
-DDI and full Thalhammer-Full was predicated on Chin 4A reaching order 4
+DDI and full Full Force-Gradient (spinor + DDI) was predicated on Chin 4A reaching order 4
 on the nonlinear lab path. Since that gate failed (autonomous order 4
 verified, nonlinear order 2 capped), A1.2/A1.3 should target order
 ≥ 3.5 in the autonomous limit only — the practical takeaway for the
@@ -470,7 +470,7 @@ C3 / C4 conservation tests at strict 10⁻⁶ tolerance, Eu Regime A
               ↓
        (A1: Track C v4
         Step 1b-3,
-        Thalhammer-Full)
+        Full Force-Gradient (spinor + DDI))
               |
               ↓
        (修論 Ch.3 final
@@ -506,7 +506,7 @@ Submission-prep (#78):
 4. **A3.4**: Adaptive control (defect-based + L2-PI).
 5. **Phase 5 GPU port** (#84).
 6. **A4.1-4**: TDHFB Y4 palindromic substep.
-7. **A1.2, A1.3**: DDI cross-terms + Thalhammer-Full unified.
+7. **A1.2, A1.3**: DDI cross-terms + Full Force-Gradient (spinor + DDI) unified.
 
 ---
 
