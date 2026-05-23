@@ -307,9 +307,11 @@ const _SKIP_HEAVY_YAML_INFRA =
         @test ws.magnetic_gradient === mg
     end
 
-    @testset "YAML integration: schema accepts all 18 init states" begin
+    @testset "YAML integration: schema accepts all init states" begin
+        # `ferromagnetic` / `ferromagnetic_min` aliases removed in
+        # c2b0bec (use `m_plus_F` / `m_minus_F`).
         all_states = [
-            "polar", "ferromagnetic", "ferromagnetic_min",
+            "polar", "m_plus_F", "m_minus_F",
             "uniform", "antiferromagnetic", "random",
             "spin_coherent", "fl_vortex", "spin_helix",
             "cyclic", "biaxial_nematic", "polar_core_vortex",
@@ -356,7 +358,10 @@ const _SKIP_HEAVY_YAML_INFRA =
     @testset "YAML integration: transverse Zeeman Bx/By" begin
         phase_raw = Dict{String, Any}(
             "ground_state" => Dict{String, Any}(
-                "zeeman" => Dict{String, Any}(
+                # `_build_phase_zeeman` reads the unified `B:` block since
+                # the schema unification (2026-Q1). Old `zeeman:` key is
+                # silently ignored — see builders_phase.jl:134.
+                "B" => Dict{String, Any}(
                     "p" => 100.0, "q" => 0.5,
                     "bx" => Dict{String, Any}(
                         "sinusoidal" => Dict{String, Any}(
@@ -375,7 +380,7 @@ const _SKIP_HEAVY_YAML_INFRA =
     @testset "YAML integration: transverse Zeeman static fallback" begin
         phase_raw = Dict{String, Any}(
             "ground_state" => Dict{String, Any}(
-                "zeeman" => Dict{String, Any}("p" => 10.0, "q" => 0.5)
+                "B" => Dict{String, Any}("p" => 10.0, "q" => 0.5)
             ),
         )
         zee = SpinorBEC._build_phase_zeeman(phase_raw, 0.0, 1.0)

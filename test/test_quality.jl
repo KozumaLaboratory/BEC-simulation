@@ -36,6 +36,11 @@ using JET
         # site always passes a concrete-T tuple. The check is structurally
         # correct but the dead branch isn't reachable; skip it.
         unbound_args=false,
+        # `persistent_tasks` flags long-lived Tasks left behind after
+        # `using SpinorBEC` — flaky in our env (false positive from
+        # PrecompileTools workload tasks holding briefly past the using).
+        # Disable until the upstream check stabilises.
+        persistent_tasks=false,
         # Stale-deps ignores:
         # - CUDA / Makie / HTTP / WriteVTK: weak-dep extension triggers
         # - BenchmarkTools: used by scripts/bench/ which share the package

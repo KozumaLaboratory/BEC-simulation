@@ -182,8 +182,9 @@
         g_empty = SpinorBEC._c_extra_to_delta_gS(2, Float64[])
         @test isempty(g_empty)
 
-        g_odd = SpinorBEC._c_extra_to_delta_gS(2, [0.0, 3.0])
-        @test isempty(g_odd)
+        # Odd-rank c_extra (c3 here, idx=2) now raises ArgumentError instead of
+        # the previous silent @warn-and-drop. See refactor commit 0b0f48e.
+        @test_throws ArgumentError SpinorBEC._c_extra_to_delta_gS(2, [0.0, 3.0])
     end
 
     @testset "interaction_params_from_constraint with c_extra" begin
