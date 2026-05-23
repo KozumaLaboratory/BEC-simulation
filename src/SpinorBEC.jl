@@ -47,8 +47,6 @@ include("solvers/photon_heating.jl")
 include("solvers/sgpe.jl")
 include("rotating_basis.jl")  # Klaus-regime (rotating-basis + scalar-eGPE) umbrella
 
-include("cuda_graph_stubs.jl")
-
 include("workflow/experiments/pipeline/pipeline_api.jl")
 include("workflow/experiments/pipeline/pipeline_continuation.jl")
 include("workflow/experiments/pipeline/run_registry.jl")
@@ -123,9 +121,8 @@ export RunMetadata, load_run_metadata
 # All public symbols are now `export`ed at their definition sites under
 # src/foundation/, src/hamiltonian/, src/analysis/, src/solvers/, and
 # src/workflow/. The umbrella module here only declares cross-cutting
-# extension stubs (CUDA Graph hooks, Makie visualisation placeholders).
+# extension stubs (e.g. Makie visualisation placeholders).
 
-export split_step_captured!, invalidate_split_step_graph!
 export Units
 export TIMER, enable_tracing!, disable_tracing!, reset_tracing!
 

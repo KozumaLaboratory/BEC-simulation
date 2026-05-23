@@ -6,8 +6,9 @@
 #   them or re-creates the duplication. (2) Single vendor (NVIDIA), no AMD/Metal use
 #   case — portability value zero. (3) The "shared API, specialized impl" pattern
 #   is already in place (split_step! branches on _is_gpu, extension overloads
-#   split_step_captured!, _zeros factory). Migration to KA.jl is rejected, not
-#   deferred — no realistic future event re-opens this before the thesis ships.
+#   the GPU-specific apply_*_step! kernels, _zeros factory). Migration to KA.jl
+#   is rejected, not deferred — no realistic future event re-opens this before
+#   the thesis ships.
 # See: MEMORY tdhfb_gpu_port_status, option_gamma_gpu_optimization
 
 module SpinorBECCUDAExt

@@ -92,7 +92,6 @@ F=6, g_J=1.9934, g_F≈1.163, μ≈6.977μ_B, a_s≈110a₀. 7 unknown scatterin
 - **`spin_rotating_frame_omega ≠ 0` requires `secular_ddi=true`** (enforced via `ArgumentError`). Full DDI's off-diagonal components only Larmor-average to zero in the secular limit.
 - **`even_c_extra(F; c2, c4, c6, …)` is the canonical c_extra builder.** Hand-written `[c2, c4, c6]` silently misindexes for F≥3.
 - **Bogoliubov k=0 Goldstone**: μ convention is correct (re-audited 2026-05-02). Earlier "bug" was a test-indexing error — `omega[1, :]` row slice vs `omega[:, 1]` column. Memory `bogoliubov_test_indexing.md`.
-- **`split_step_captured!` on GPU silently falls back** to `split_step!`. CUDA Graph implementation in `ext/SpinorBECCUDAExt/gpu_graph.jl` is disabled — replay drift from per-call broadcast allocations (4× slower in bench). Memory `option_gamma_gpu_optimization.md`.
 - **`_get_spinor(psi, I, Val(13))` allocates ~352 bytes/call at D=13**. SROA elides some inside hot loops; call site still pays when `c1 ≠ 0`. Rotating-basis path uses gemm-form rotation and is unaffected.
 
 ## Constraints

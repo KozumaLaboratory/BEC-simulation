@@ -38,8 +38,10 @@
 #   b. Confirm cuFFT plan scratch is bound to a pre-allocated work area
 #      (`CUFFT.cufftSetWorkArea`) so the FFT plan doesn't re-pool memory
 #      across capture/replay.
-#   c. Wrap the actual capture / instantiate / launch sequence behind
-#      `split_step_captured!` and exercise on an end-to-end ITP run.
+#   c. Wrap the actual capture / instantiate / launch sequence behind a
+#      `split_step_captured!`-style entry point (deleted 2026-05-22 since
+#      it was just an alias for `split_step!`) and exercise on an
+#      end-to-end ITP run.
 #
 # Once (a) succeeds, the replay drift should vanish and `@captured`
 # should overtake plain split_step! at the targeted ~1.5-2× speedup on
@@ -65,7 +67,7 @@ Reports:
 
 Use after every cache refactor that targets a per-step allocation:
 when `bytes_per_step → 0` and `max_replay_diff → 0`, graph capture is
-ready to be enabled in `split_step_captured!`.
+ready to be wired in as a new `split_step_*` entry point.
 """
 function bench_split_step_capture(
     ws::SpinorBEC.Workspace{N, A};
@@ -131,21 +133,3 @@ function bench_split_step_capture(
         speedup=isnan(t_capt) ? NaN : round(t_plain / t_capt; digits=2))
 end
 
-"""
-    split_step_captured!(ws::Workspace{N,<:CuArray}) → Nothing
-
-Fallback to `split_step!` on GPU — graph capture is **experimental** and
-disabled pending allocation-free refactor (see gpu_graph.jl source for
-details). CPU path already falls back at the main-module stub.
-"""
-function SpinorBEC.split_step_captured!(
-    ws::SpinorBEC.Workspace{N, A}
-) where {N, A <: CuArray}
-    SpinorBEC.split_step!(ws)
-end
-
-function SpinorBEC.invalidate_split_step_graph!(
-    ::SpinorBEC.Workspace{N, A}
-) where {N, A <: CuArray}
-    nothing
-end
