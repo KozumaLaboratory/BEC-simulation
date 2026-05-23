@@ -1,12 +1,21 @@
-# Workspace has 22 type parameters (down from 25 as of 2026-05-23 Phase 1
-# refactor). Each `Union{Nothing, ConcreteStruct}` field originally had
-# its own parameter so the compiler could specialise through it. Three
-# were dropped — `LOSS`, `TDI`, `MG` — because each Union arm is a
-# single concrete struct (or two siblings whose other type params are
-# already pinned via `N`), so post-`!== nothing` narrowing gives the
-# compiler a concrete type at the call site. Measured with
-# `scripts/diag/workspace_jit_baseline.jl`: cold combos unchanged, loss-
-# only cold swap dropped from ~150ms to ~0ms.
+# Workspace has 21 type parameters (down from 25 as of 2026-05-23):
+#   Phase 1 (5a8bced): dropped LOSS / TDI / MG
+#   Phase 2 (this commit): dropped TC (TensorInteractionCache; non-parametric)
+#
+# `RAM` was a Phase 2 candidate but reverted after measurement
+# (`scripts/diag/workspace_jit_baseline.jl`): the 3-way Union
+# `Union{Nothing, RamanCoupling{N}, TimeDependentRaman{N}}` triggered
+# a +20-40 % cold-JIT regression on F=1/3/6 combos vs the parametric
+# form. Keep RAM as a type parameter.
+#
+# Each dropped parameter fronts a `Union{Nothing, ConcreteStruct}`
+# field where the concrete arm has no further parametric subtypes
+# (LossParams, TimeDependentInteractions, TensorInteractionCache;
+# MagneticGradient{N} / TimeDependentMagneticGradient{N} share the
+# Workspace's `N`). Post-`!== nothing` narrowing gives the call site
+# a concrete type. Measured: cold combos 12-32 % faster across
+# F=0/1/3/6, swap-only combos (loss=nothing ↔ LossParams) become free
+# since both produce the same Workspace type (hash matches).
 #
 # Keep these AS PARAMETERS (collapsing has measurable cost):
 # - `LS` (light_shift): LightShift{A} where A depends on backend (CPU
@@ -15,6 +24,10 @@
 #   `apply_absorbing_boundary!` dispatches on the concrete array type.
 # - `DDI / DDIB / DDIP`: hot-path DDI step needs concrete FFT buffer
 #   types; collapsing breaks the rFFT plan dispatch.
+# - `CC` (coriolis_cache): CoriolisCache{P1,IP1,P2,IP2} carries 4 FFT
+#   plan type params; abstract-Union would lose them all.
+# - `LHY`: 10+ concrete subtypes of AbstractLHY; Julia's Union splitting
+#   degrades past ~4 alternatives.
 # - Anything with array eltype/backend dependence.
 #
 # Re-introducing parameters is fine; collapsing the wrong one has hit
@@ -43,16 +56,16 @@
 #
 # --- Workspace: the master per-simulation state container ---
 #
-# `Workspace{N, A, P, IP, SM, ZEE, DDI, DDIB, RAM, DDIP, BK, TC, CC,
-# KPA, VPA, DBA, BACK, LHY, ABM, LS, T, B}` — 22 type parameters.
-# CLAUDE.md's "Type stability boundaries" section explains why this
-# many parameters is load-bearing: every field that might be `Nothing`
-# vs. a concrete struct gets a parameter so the compiler can
-# specialise. Helper functions that take a workspace field must
-# dispatch on a concrete type, never on `Any`-typed locals.
+# `Workspace{N, A, P, IP, SM, ZEE, DDI, DDIB, RAM, DDIP, BK, CC, KPA,
+# VPA, DBA, BACK, LHY, ABM, LS, T, B}` — 21 type parameters.
+# CLAUDE.md's "Type stability boundaries" section explains why these
+# parameters are load-bearing: every field that might be `Nothing` vs.
+# a concrete struct gets a parameter so the compiler can specialise.
+# Helper functions that take a workspace field must dispatch on a
+# concrete type, never on `Any`-typed locals.
 #
-# Three parameters were dropped 2026-05-23 (LOSS / TDI / MG); see the
-# file-header comment above for the rationale and the measurement.
+# Four parameters were dropped 2026-05-23 (LOSS / TDI / MG / TC); see
+# the file-header comment above for the rationale + measurement.
 #
 # This struct lives in its own file (rather than the main types.jl)
 # so the include order can stay legible: every type Workspace depends
@@ -74,7 +87,6 @@ struct Workspace{
     RAM,
     DDIP,
     BK,
-    TC,
     CC,
     KPA <: AbstractArray,
     VPA <: AbstractArray,
@@ -112,13 +124,17 @@ struct Workspace{
     raman::RAM
     # `loss::Union{Nothing, LossParams}` — concrete LossParams has no
     # parametric subtypes, so Union splitting at `if ws.loss !== nothing`
-    # narrows to the concrete type at the call site. Dropping the LOSS
-    # parameter (was 10th) saves ~150ms of cold JIT on a swap-loss-only
-    # combo with no hot-path measurable regression.
+    # narrows to the concrete type at the call site. Phase 1 drop —
+    # saves ~150ms of cold JIT on a swap-loss-only combo with no
+    # hot-path measurable regression.
     loss::Union{Nothing, LossParams}
     ddi_padded::DDIP
     batched_kinetic::BK
-    tensor_cache::TC
+    # `tensor_cache::Union{Nothing, TensorInteractionCache}` —
+    # TensorInteractionCache is a plain parameter-less struct (Int + Dict
+    # + Vector fields), so dropping the TC parameter has no inference
+    # impact. Phase 2 drop.
+    tensor_cache::Union{Nothing, TensorInteractionCache}
     coriolis_cache::CC
     backend::BACK
     lhy::LHY
