@@ -68,8 +68,7 @@ function _parse_step(d::Dict)
         kind = get(params, "kind", nothing)
         if kind == "binary" || kind == :binary
             BinaryGroundStateStep(params)
-        elseif kind == "rotating_basis" || kind == :rotating_basis ||
-            kind == "option_gamma" || kind == :option_gamma
+        elseif kind == "rotating_basis" || kind == :rotating_basis
             RotatingBasisGroundStateStep(params)
         else
             GroundStateStep(params)
@@ -79,8 +78,7 @@ function _parse_step(d::Dict)
         kind = get(params, "kind", nothing)
         if kind == "binary" || kind == :binary
             BinaryDynamicsStep(params)
-        elseif kind == "rotating_basis" || kind == :rotating_basis ||
-            kind == "option_gamma" || kind == :option_gamma
+        elseif kind == "rotating_basis" || kind == :rotating_basis
             RotatingBasisDynamicsStep(params)
         else
             DynamicsStep(params)

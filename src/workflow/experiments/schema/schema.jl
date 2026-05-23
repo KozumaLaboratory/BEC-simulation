@@ -75,13 +75,12 @@ const DDI_SCHEMA = Dict{String, FieldSpec}(
 #                              Use for static B / weak-field experiments.
 #   binary                     — two-component miscible/immiscible GP
 #                              (species_A, species_B blocks required).
-#   rotating_basis             — Option γ: B̂(t) rotating-direction frame
+#   rotating_basis             — B̂(t) rotating-direction frame (Option γ; see docs/design/option_gamma_rotating_basis.md)
 #                              that absorbs Larmor analytically. Use for
 #                              Klaus-style protocols where B direction
 #                              evolves and p·F·dt would otherwise blow up.
-#   option_gamma               — alias for rotating_basis.
 const GS_SCHEMA = Dict{String, FieldSpec}(
-    "kind" => FieldSpec(; type=String, enum=["spinor", "binary", "rotating_basis", "option_gamma"]),
+    "kind" => FieldSpec(; type=String, enum=["spinor", "binary", "rotating_basis"]),
     "dtype" => FieldSpec(; type=String, default="f64", enum=["f32", "f64"]),
     "species_A" => FieldSpec(; type=Dict),    # binary path
     "species_B" => FieldSpec(; type=Dict),    # binary path
@@ -170,7 +169,7 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     "photon_scattering" => FieldSpec(; type=Union{Dict, Bool}),
     "loss" => FieldSpec(; type=Union{Dict, Bool, Number}),
     # Two-component / binary GP path (Phase 4/5 #51 scaffold).
-    "kind" => FieldSpec(; type=String, enum=["binary", "rotating_basis", "option_gamma"]),
+    "kind" => FieldSpec(; type=String, enum=["binary", "rotating_basis"]),
     "couplings" => FieldSpec(; type=Dict),
     # Option γ rotating-basis dynamics
     "B_direction" => FieldSpec(; type=Dict),
