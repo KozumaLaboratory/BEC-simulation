@@ -64,7 +64,9 @@ function init_psi(
         # ℓ × atan(y, x) so the spin texture has winding number ℓ. This
         # generalizes the flower (FL) vortex (θ=π/2, ℓ=1).
         #
-        # :fl_vortex is a backward-compat alias that forces θ=π/2, ℓ=1.
+        # :fl_vortex is the "flower vortex" named state — equivalent to
+        # :spin_coherent with the kwargs forced to θ=π/2, ℓ=1 (xy-plane spin
+        # texture with unit winding). Public via `init_psi_fl_vortex(grid, sys)`.
         theta_use, vortex_charge_use = if state == :fl_vortex
             N >= 2 || throw(ArgumentError(":fl_vortex requires N >= 2 (needs xy-plane)"))
             (Float64(π) / 2, 1)

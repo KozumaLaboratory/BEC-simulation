@@ -42,11 +42,6 @@ on_complete=nothing
 ) = SimulationCallbacks{typeof(on_step), typeof(on_snapshot), typeof(on_complete)}(
     on_step, on_snapshot, on_complete)
 
-# Backward compatibility: convert simple function to callbacks
-_normalize_callbacks(::Nothing) = SimulationCallbacks()
-_normalize_callbacks(f::Function) = SimulationCallbacks(on_snapshot=f)
-_normalize_callbacks(c::SimulationCallbacks) = c
-
 function _record_snapshot!(
     times,
     energies,

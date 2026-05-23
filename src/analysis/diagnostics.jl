@@ -151,7 +151,7 @@ After simulation completes, `data` contains:
 
 Usage:
     cb, mon = make_conservation_monitor(ws)
-    run_simulation!(ws; callback=cb)
+    run_simulation!(ws; callbacks=SimulationCallbacks(on_snapshot=cb))
     # mon.t, mon.E, mon.N, mon.Sz now contain time series
 """
 function make_conservation_monitor(ws::Workspace{N}; track_Jz::Bool=false) where {N}

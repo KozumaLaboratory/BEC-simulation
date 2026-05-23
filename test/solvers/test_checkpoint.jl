@@ -62,8 +62,9 @@
         cb_count = Ref(0)
         run_simulation_checkpointed!(ws;
             checkpoint_dir=dir, checkpoint_every=25,
-            callback=(_, _) -> cb_count[] += 1)
+            callbacks=SimulationCallbacks(
+                on_snapshot=(_, _, _) -> cb_count[] += 1))
 
-        @test cb_count[] == 2  # save_every=25, n_steps=50 → 2 callbacks
+        @test cb_count[] == 2  # save_every=25, n_steps=50 → 2 snapshots
     end
 end

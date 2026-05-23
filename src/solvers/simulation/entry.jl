@@ -5,13 +5,12 @@
 export run_simulation!, run_simulation_checkpointed!
 
 """
-    run_simulation!(ws::Workspace; callback=nothing, callbacks=nothing, live_monitor=nothing)
+    run_simulation!(ws::Workspace; callbacks=nothing, live_monitor=nothing)
 
 Run time evolution simulation with optional event-driven monitoring.
 
 # Arguments
 - `ws::Workspace`: Simulation workspace
-- `callback::Union{Nothing,Function}`: Legacy callback (for backward compatibility)
 - `callbacks::Union{Nothing,SimulationCallbacks}`: Event-driven callbacks
 - `live_monitor::Union{Nothing,LiveMonitor}`: Real-time monitoring
 
@@ -37,7 +36,6 @@ result = run_simulation!(ws, callbacks=callbacks)
 """
 function run_simulation!(
     ws::Workspace{N};
-    callback::Union{Nothing, Function}=nothing,
     callbacks::Union{Nothing, SimulationCallbacks}=nothing,
     live_monitor::Union{Nothing, LiveMonitor}=nothing,
     stream_snapshots::Bool=false,
@@ -46,12 +44,7 @@ function run_simulation!(
     sys = ws.spin_matrices.system
     it = sp.imaginary_time
 
-    # Normalize callbacks (backward compatibility)
-    cbs = if callbacks !== nothing
-        callbacks
-    else
-        _normalize_callbacks(callback)
-    end
+    cbs = callbacks === nothing ? SimulationCallbacks() : callbacks
 
     times = Float64[]
     energies = Float64[]
@@ -107,7 +100,6 @@ function run_simulation_checkpointed!(
     ws::Workspace{N};
     checkpoint_dir::String="checkpoints",
     checkpoint_every::Int=1000,
-    callback::Union{Nothing, Function}=nothing,
     callbacks::Union{Nothing, SimulationCallbacks}=nothing,
     resume::Bool=false,
 ) where {N}
@@ -130,9 +122,9 @@ function run_simulation_checkpointed!(
 
     start_step = ws.state.step
     remaining = ws.sim_params.n_steps - start_step
-    remaining <= 0 && return run_simulation!(ws; callback, callbacks)
+    remaining <= 0 && return run_simulation!(ws; callbacks)
 
-    # Create checkpoint callback compatible with new signature
+    # Compose user callbacks (if any) with the checkpoint snapshot writer.
     checkpoint_callbacks = SimulationCallbacks(;
         on_snapshot=function (ws_cb, step, snapshot)
             global_step = start_step + step
@@ -140,11 +132,6 @@ function run_simulation_checkpointed!(
                 fname = joinpath(checkpoint_dir, "step_$(lpad(global_step, 8, '0')).jld2")
                 save_state(fname, ws_cb)
             end
-            # Call user's old-style callback if provided (backward compatibility)
-            if callback !== nothing
-                callback(ws_cb, step)
-            end
-            # Call user's new callbacks if provided
             if callbacks !== nothing && callbacks.on_snapshot !== nothing
                 callbacks.on_snapshot(ws_cb, step, snapshot)
             end

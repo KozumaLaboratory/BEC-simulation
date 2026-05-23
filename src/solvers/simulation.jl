@@ -3,8 +3,7 @@
 # 438-line monolith split into 3 sub-files (2026-05-11 refactor):
 #
 #   simulation/callbacks.jl  — SimulationCallbacks event-driven hooks,
-#                              _normalize_callbacks, _record_snapshot!,
-#                              _check_energy_drift
+#                              _record_snapshot!, _check_energy_drift
 #   simulation/run_loops.jl  — _run_simulation_standard! +
 #                              _run_simulation_leapfrog! (the actual
 #                              per-step machinery, including the Bug-4
