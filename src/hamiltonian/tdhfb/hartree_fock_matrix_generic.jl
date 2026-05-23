@@ -18,7 +18,7 @@
 export hf_matrix_generic, hf_matrix_generic!, ku_c01_to_g_S, ku_to_g_S
 
 """
-    hf_matrix_generic!(h_hf, phi, rho, F, g_S; spin_matrices=nothing) -> h_hf
+    hf_matrix_generic!(h_hf, phi, rho, F, g_S) -> h_hf
 
 Compute Hartree-Fock matrix h^HF[φ, ρ] for spin-F spinor BEC, local approximation,
 channel-decomposed form with arbitrary `g_S` couplings.
@@ -53,9 +53,6 @@ to ∂κ/∂t equations, not the diagonal Bogoliubov-Hartree-Fock kernel acting 
 - `g_S::AbstractDict{Int, Float64}`: channel couplings, key = total spin S
   (must be even non-negative integers, 0 ≤ S ≤ 2F by triangle inequality)
 
-# Keyword arguments
-- `spin_matrices`: not used; reserved for future caching of CG table
-
 # Notes
 - D = 2F+1.
 - Indices in the spinor axis are 1-based with the convention `c = 1 ↔ m = +F`,
@@ -79,8 +76,7 @@ function hf_matrix_generic!(
     phi::AbstractArray,
     rho::AbstractArray,
     F::Int,
-    g_S::AbstractDict{Int, Float64};
-    spin_matrices=nothing,
+    g_S::AbstractDict{Int, Float64},
 )
     D = 2 * F + 1
     sz = size(phi)
@@ -115,7 +111,7 @@ function hf_matrix_generic!(
 end
 
 """
-    hf_matrix_generic(phi, rho, F, g_S; kwargs...) -> h_hf
+    hf_matrix_generic(phi, rho, F, g_S) -> h_hf
 
 Allocating version of [`hf_matrix_generic!`](@ref).
 """
@@ -123,14 +119,13 @@ function hf_matrix_generic(
     phi::AbstractArray,
     rho::AbstractArray,
     F::Int,
-    g_S::AbstractDict{Int, Float64};
-    kwargs...,
+    g_S::AbstractDict{Int, Float64},
 )
     D = 2 * F + 1
     sz = size(phi)
     n_spatial = length(sz) - 1
     h_hf = zeros(ComplexF64, sz[1:n_spatial]..., D, D)
-    return hf_matrix_generic!(h_hf, phi, rho, F, g_S; kwargs...)
+    return hf_matrix_generic!(h_hf, phi, rho, F, g_S)
 end
 
 """

@@ -54,7 +54,7 @@ function _assert_forcegrad_diagonal_only(ws::Workspace)
     abs(ws.interactions.c1) < 1e-30 ||
         error("split_step_forcegrad!: c₁ ≠ 0 (spin-mixing) not supported in v1.")
     abs(get_cn(ws.interactions, 2)) < 1e-30 ||
-        error("split_step_forcegrad!: c₂ ≠ 0 (nematic singlet pair) not supported in v1.")
+        error("split_step_forcegrad!: c₂ ≠ 0 (singlet-pair S=0 channel) not supported in v1.")
     ws.raman === nothing ||
         error("split_step_forcegrad!: Raman not supported in v1.")
     ws.light_shift === nothing ||

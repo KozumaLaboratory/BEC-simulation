@@ -24,7 +24,7 @@
 #
 # This is only correct when the contact interaction is well-approximated
 # by `c0 (scalar density)` + `c1 (rank-1 spin)` channels. For F ≥ 2
-# atoms with non-negligible higher-rank coupling (c2 nematic, c4/c6
+# atoms with non-negligible higher-rank coupling (c2 singlet_pair, c4/c6
 # tensor channels), those terms are NOT representable as `n·F̂` and must
 # be applied separately. The function asserts c2 = 0 and tensor_cache
 # === nothing at entry; explicitly opt out for c2/tensor systems.
@@ -165,7 +165,7 @@ function _assert_combined_step_compatible(ws::Workspace)
     c2 = get_cn(ws.interactions, 2)
     abs(c2) < 1e-30 || throw(
         ArgumentError(
-            "split_step_combined! requires c2 = 0 (rank-2 nematic). Got c2=$c2. " *
+            "split_step_combined! requires c2 = 0 (S=0 singlet-pair channel). Got c2=$c2. " *
             "Use the standard split_step! for systems with non-zero c2."),
     )
     ws.tensor_cache === nothing || throw(

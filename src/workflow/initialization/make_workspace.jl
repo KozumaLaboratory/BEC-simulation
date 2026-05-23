@@ -208,7 +208,8 @@ function make_workspace(;
     #
     # Lower-rank terms are handled by dedicated steps:
     #   k=0 (c₀): diagonal step    k=1 (c₁): spin_mixing step
-    #   k=2 (c₂): nematic step     k=3: skipped (odd rank; see below)
+    #   k=2 (c₂): singlet_pair step (S=0 pair channel)
+    #   k=3: rejected (odd rank; see below)
     #
     # Note on Kawaguchi-Ueda convention: their c₃ Σ_M|A₂M|² (F=3) is a coupling
     # to the S=2 pair channel, NOT a rank-3 tensor operator. To include such terms,

@@ -1,7 +1,7 @@
 # --- Split-step dispatcher: top-level Strang/Yoshida + half-potential helpers ---
 #
 # The top-level `split_step!` Strang step + per-step potential dispatch (diag,
-# spin-mixing, nematic, raman, DDI), time-dependent Zeeman/MG handling, and
+# spin-mixing, singlet_pair, raman, DDI), time-dependent Zeeman/MG handling, and
 # the ITP leapfrog "outer-potential" merged-boundary helpers. Low-level FFT
 # kernels and shears live in split_step_kernels.jl; integrator-composition
 # coefficients and Yoshida/Suzuki/ABA cores live in split_step_composers.jl.
@@ -12,8 +12,8 @@ export split_step!, split_step_midpoint!, split_step_trap!
 Perform one Strang-split time step: V(dt/2) K(dt) V(dt/2).
 
 Half potential step uses nested symmetric splitting:
-    diag(dt/4) → SM(dt/4) → nematic(dt/4) → raman(dt/4) → DDI(dt/2)
-              → raman(dt/4) → nematic(dt/4) → SM(dt/4) → diag(dt/4)
+    diag(dt/4) → SM(dt/4) → singlet_pair(dt/4) → raman(dt/4) → DDI(dt/2)
+              → raman(dt/4) → singlet_pair(dt/4) → SM(dt/4) → diag(dt/4)
 
 For imaginary time: replace i with 1 in exponentials, optionally renormalize.
 """
@@ -170,12 +170,12 @@ end
 """
 Symmetric inner splitting (all non-commuting operators symmetrized for 2nd-order accuracy):
 
-    diag(dt/4) → SM(dt/4) → nematic(dt/4) → tensor(dt/4) → transB(dt/4) → raman(dt/4) → DDI(dt/2)
-              → raman(dt/4) → transB(dt/4) → tensor(dt/4) → nematic(dt/4) → SM(dt/4) → diag(dt/4)
+    diag(dt/4) → SM(dt/4) → singlet_pair(dt/4) → tensor(dt/4) → transB(dt/4) → raman(dt/4) → DDI(dt/2)
+              → raman(dt/4) → transB(dt/4) → tensor(dt/4) → singlet_pair(dt/4) → SM(dt/4) → diag(dt/4)
 
-Additive dispatch: SM (c₁) and nematic (c₂) always run (auto-skip when coupling ≈ 0).
+Additive dispatch: SM (c₁) and singlet_pair (c₂) always run (auto-skip when coupling ≈ 0).
 Tensor cache, when active, handles only the residual channels (c₄, c₆, ...).
-Scattering-lengths path: c₀=c₁=0 in ws_interactions, so SM/nematic skip; tensor handles all.
+Scattering-lengths path: c₀=c₁=0 in ws_interactions, so SM/singlet_pair skip; tensor handles all.
 
 DDI is innermost (most expensive: 6 FFTs). Cheaper operators wrap symmetrically.
 Time-dependent interactions (c₀, c₁) and magnetic gradient are resolved per half-step.
@@ -650,12 +650,12 @@ function split_step_trap!(ws::Workspace{N}) where {N}
 end
 
 # --- ITP leapfrog helpers ---
-# Split V(dt/2) into outer (diag+SM+nematic+tensor+raman) and inner (DDI).
+# Split V(dt/2) into outer (diag+SM+singlet_pair+tensor+raman) and inner (DDI).
 # Outer part can be merged between adjacent steps; DDI stays at dt/2.
 
 """
 Outer part of half-potential step: everything except DDI.
-Forward direction: diag → SM → nematic → tensor → raman
+Forward direction: diag → SM → singlet_pair → tensor → raman
 """
 function _outer_potential_fwd!(ws::Workspace{N}, dt_outer, n_comp, ndim, imaginary_time) where {N}
     gpu = _is_gpu(ws.state.psi)
@@ -696,7 +696,7 @@ function _outer_potential_fwd!(ws::Workspace{N}, dt_outer, n_comp, ndim, imagina
 end
 
 """
-Outer part of half-potential step, backward direction: raman → tensor → nematic → SM → diag
+Outer part of half-potential step, backward direction: raman → tensor → singlet_pair → SM → diag
 """
 function _outer_potential_bwd!(ws::Workspace{N}, dt_outer, n_comp, ndim, imaginary_time) where {N}
     gpu = _is_gpu(ws.state.psi)
