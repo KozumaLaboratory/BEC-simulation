@@ -20,7 +20,7 @@ Kawaguchi-Ueda convention correspondence for contact interactions:
 For F≥2 with higher-rank interactions (c₃ and above in KU notation), use the
 tensor_cache path via `_make_tensor_cache_from_channels(F, g_S_dict)`, which
 handles all pair channels S=0,2,...,2F simultaneously. When tensor_cache is
-active, this nematic step is skipped (split_step.jl dispatch).
+active, this singlet-pair step is skipped (split_step.jl dispatch).
 
 The c₂ term couples m and -m components via a Bogoliubov-type transformation:
     i∂ψ_m/∂t = c₂ (-1)^{F-m}/√D × A₀₀ × ψ*_{-m}
@@ -52,11 +52,11 @@ function apply_singlet_pair_step!(
     D = 2F + 1
     n_pts = ntuple(d -> size(psi, d), ndim)
     psi_mf_eff = psi_mf === nothing ? psi : psi_mf
-    _nematic_loop!(psi, psi_mf_eff, Val(D), n_pts, c2, dt, imaginary_time)
+    _singlet_pair_loop!(psi, psi_mf_eff, Val(D), n_pts, c2, dt, imaginary_time)
     nothing
 end
 
-function _nematic_loop!(psi, psi_mf, ::Val{D}, n_pts, c2, dt, imaginary_time) where {D}
+function _singlet_pair_loop!(psi, psi_mf, ::Val{D}, n_pts, c2, dt, imaginary_time) where {D}
     F = (D - 1) ÷ 2
     inv_sqrt_D = 1.0 / sqrt(Float64(D))
 
@@ -125,4 +125,3 @@ function _nematic_loop!(psi, psi_mf, ::Val{D}, n_pts, c2, dt, imaginary_time) wh
     end
     nothing
 end
-

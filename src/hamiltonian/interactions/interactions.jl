@@ -178,19 +178,24 @@ S=2 pair channel) is NOT a rank-3 tensor operator. To include such pair-channel
 couplings, use `_make_tensor_cache_from_channels` with explicit g_S values instead.
 """
 function _c_extra_to_delta_gS(F::Int, c_extra::Vector{Float64})
-    # NOT GENERALIZABLE: KU "c_3" is the S=2 pair-channel coupling, not a rank-3 tensor.
-    # Reason: physics
-    # Why: c_extra is indexed by tensor rank k; the 6j transform `_cn_to_gS` only
-    #   accepts even-rank inputs. KU's c_3 (F=3 cyclic) labels the S=2 pair-channel
-    #   coupling Σ_M |A_{2M}|² — a pair-channel coupling, not a rank-3 single-particle
-    #   tensor. Route via `_make_tensor_cache_from_channels(F, Dict(2 => g_2))`.
-    # See: src/hamiltonian/interactions/singlet_pair.jl docstring
+    # c_extra is indexed by rank k (k = idx + 1); the 6j transform `_cn_to_gS`
+    # only accepts even ranks. The YAML parser (`_parse_c_extra` in
+    # workflow/experiments/schema/parsing_blocks.jl) now rejects odd-indexed
+    # entries with a clear ArgumentError at config-validation time. Reject
+    # any odd-rank nonzero values that bypassed the parser (programmatic
+    # InteractionParams construction) — KU "c_3" is the S=2 pair-channel
+    # coupling, NOT a rank-3 single-particle tensor, and must be routed via
+    # `_make_tensor_cache_from_channels(F, Dict(S => g_S))`.
     for (idx, val) in enumerate(c_extra)
         k = idx + 1
         if abs(val) > 1e-30 && isodd(k)
-            @warn "c_extra[$idx] (c$k) is odd-rank and will be ignored. " *
-                "If this is a Kawaguchi-Ueda pair-channel coupling (e.g. c₃ → S=2 channel), " *
-                "use _make_tensor_cache_from_channels(F, Dict(S => g_S, ...)) instead." maxlog=1
+            throw(
+                ArgumentError(
+                    "c_extra[$idx] (c$k) is odd-rank and not a physical tensor coupling. " *
+                    "If this is a Kawaguchi-Ueda pair-channel coupling (e.g. c₃ → S=2 channel), " *
+                    "use `_make_tensor_cache_from_channels(F, Dict(S => g_S, ...))` directly. " *
+                    "See src/hamiltonian/interactions/singlet_pair.jl docstring."),
+            )
         end
     end
     c_dict = Dict{Int, Float64}()

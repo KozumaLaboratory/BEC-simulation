@@ -212,7 +212,11 @@ using LinearAlgebra
             @test !haskey(p["interactions"], "c2")
         end
 
-        @testset "with c2, c3" begin
+        @testset "with c2, c4 (even-rank only)" begin
+            # Odd-rank c_extra entries (c3, c5, ...) are now rejected at parse
+            # time — they would represent KU pair-channel S-couplings (e.g.
+            # c₃ → S=2 channel), which must be routed through scattering_lengths
+            # or tensor_cache, not c_extra. See src/.../singlet_pair.jl docstring.
             yaml = """
             pipeline:
               - ground_state:
@@ -224,7 +228,7 @@ using LinearAlgebra
                     c0: 100.0
                     c1: -5.0
                     c2: 3.0
-                    c3: 1.5
+                    c4: 1.5
                   dt: 0.01
                   n_steps: 10
                   tol: 1e-4
@@ -235,7 +239,7 @@ using LinearAlgebra
             @test p["interactions"]["c0"] == 100.0
             @test p["interactions"]["c1"] == -5.0
             @test p["interactions"]["c2"] == 3.0
-            @test p["interactions"]["c3"] == 1.5
+            @test p["interactions"]["c4"] == 1.5
         end
     end
 end

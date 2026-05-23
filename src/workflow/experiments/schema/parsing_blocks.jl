@@ -20,20 +20,47 @@ _get_optional_int(d::Dict, key::String) =
     end
 
 """
-Parse c_extra (c2, c3, c4, ...) from a YAML interactions dict. Handles sparse keys
-(e.g. c4 present without c2/c3) by filling zeros up to the largest cN found.
+Parse c_extra (c2, c4, c6, ...) from a YAML interactions dict. Only **even**
+ranks are physical for tensor-rank pair-channel couplings; odd-indexed entries
+(e.g. c3, c5) are rejected with an ArgumentError pointing to the correct
+API. Sparse keys (e.g. c4 present without c2) are supported — missing even
+ranks default to zero.
+
+Why odd-rank is rejected (not silently dropped):
+- KU "c₃" (e.g. F=3 cyclic) is the **S=2 pair-channel coupling**, NOT a
+  rank-3 single-particle tensor. The `c_extra` slot is for rank-k tensor
+  couplings (even k only), so an entry named c₃ is meaningless here.
+- For S-channel pair couplings, use `scattering_lengths` (in `AtomSpecies`)
+  or `_make_tensor_cache_from_channels(F, Dict(S => g_S, ...))` directly.
 """
 function _parse_c_extra(inter::Dict, ::Int)
     max_n = 0
+    odd_indices = Int[]
     for k in keys(inter)
         m = match(r"^c(\d+)$", string(k))
         m === nothing && continue
         n = parse(Int, m.captures[1])
-        n >= 2 && (max_n = max(max_n, n))
+        n >= 2 || continue
+        if isodd(n)
+            push!(odd_indices, n)
+        else
+            max_n = max(max_n, n)
+        end
+    end
+    if !isempty(odd_indices)
+        throw(
+            ArgumentError(
+                "Odd-rank c_extra entries (got c$(join(sort(odd_indices), ", c"))) " *
+                "are not physical here. The c_extra slot is for rank-k single-particle " *
+                "tensor couplings — even k only. For pair-channel S-couplings (e.g. KU's " *
+                "c_3 = S=2 pair channel), use `scattering_lengths` on the AtomSpecies " *
+                "or `_make_tensor_cache_from_channels(F, Dict(S => g_S, ...))` directly. " *
+                "See src/hamiltonian/interactions/singlet_pair.jl docstring."),
+        )
     end
     max_n < 2 && return Float64[]
     c_extra = zeros(Float64, max_n - 1)
-    for n in 2:max_n
+    for n in 2:2:max_n
         haskey(inter, "c$n") && (c_extra[n - 1] = Float64(inter["c$n"]))
     end
     c_extra

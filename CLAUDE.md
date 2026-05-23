@@ -78,7 +78,6 @@ Each subsystem umbrella `Foo.jl` `include`s sub-files in dependency order. Publi
 - **DDI**: `c_dd=μ₀μ²` (no 4π), `Q_αβ=k̂_αk̂_β−δ_αβ/3` (no 1/(4π)), `Q(k=0)=0`. Chain self-consistent.
 - **ITP Zeeman shift**: subtracts `min(E_m)` to prevent overflow.
 - **Scalar LHY**: `@warn` present. Known approximation.
-- **Odd-rank c_extra ignored**: `@warn` present. KU's c₃≠rank-3 tensor.
 - **`_YOSHIDA_W0 < 0`**: correct (backward middle substep, all operators time-reversible).
 
 ## ¹⁵¹Eu
