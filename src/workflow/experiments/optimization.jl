@@ -18,11 +18,9 @@ using JLD2
 using YAML
 using Random
 using Printf
-using LinearAlgebra
 
 # Pipeline + classification helpers come from SpinorBEC.
-using ..SpinorBEC: parse_pipeline, run_pipeline, run_config, apply_overrides
-using ..SpinorBEC: classify_phase_distance, DEFAULT_PHASE_REFERENCES
+using ..SpinorBEC: parse_pipeline, run_pipeline, apply_overrides
 using ..SpinorBEC: OverrideMap
 
 include("optimization/faraday_fit.jl")

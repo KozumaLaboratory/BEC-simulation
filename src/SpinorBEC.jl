@@ -4,7 +4,7 @@ using LinearAlgebra
 using StaticArrays
 using FFTW
 using JLD2
-using CodecZlib: ZlibCompressor, GzipCompressor, transcode
+using CodecZlib: ZlibCompressor
 using CodecZstd: ZstdCompressor
 using YAML
 using Unitful
@@ -13,7 +13,6 @@ using Random
 using Printf
 using Dates
 using SHA
-using Base64: base64encode
 import JSON
 using SpecialFunctions: erfcx
 using Sockets

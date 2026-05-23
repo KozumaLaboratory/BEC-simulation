@@ -24,7 +24,7 @@ function make_grid(
 
     dk = ntuple(d -> T(2π / config.box_size[d]), N)
 
-    k_squared = _compute_k_squared(k, config.n_points, T)
+    k_squared = _compute_k_squared(k, config.n_points)
 
     Grid{N, T}(config, x, dx, k, dk, k_squared)
 end
@@ -32,7 +32,6 @@ end
 function _compute_k_squared(
     k::NTuple{N, Vector{T}},
     n_points::NTuple{N, Int},
-    (::Type{T})=T,
 ) where {N, T <: AbstractFloat}
     ksq = zeros(T, n_points)
     @inbounds for I in CartesianIndices(n_points)

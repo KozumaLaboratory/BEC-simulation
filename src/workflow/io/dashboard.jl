@@ -22,7 +22,8 @@ using YAML
 using Sockets
 using Base64: base64encode
 using FFTW
-using CodecZlib: ZlibCompressor, GzipCompressor, transcode
+using CodecZlib: GzipCompressor
+using Base: transcode
 using CodecZstd: ZstdCompressor
 using SHA: sha1
 using Printf
@@ -34,9 +35,9 @@ using Random
 # handlers. All of these must be exported at definition site by the time
 # this module is included (dashboard is loaded near the bottom of the
 # umbrella, after analysis + experiments).
-using ..SpinorBEC: Grid, GridConfig, FFTPlans, AtomSpecies, AbstractBackend, CPUBackend
+using ..SpinorBEC: Grid, GridConfig, FFTPlans
 using ..SpinorBEC: make_grid, make_fft_plans, spin_matrices
-using ..SpinorBEC: total_density, spin_density_vector
+using ..SpinorBEC: spin_density_vector
 using ..SpinorBEC: probability_current, superfluid_velocity, superfluid_vorticity
 using ..SpinorBEC: synthetic_dim_dispersion
 using ..SpinorBEC: list_runs, run_status

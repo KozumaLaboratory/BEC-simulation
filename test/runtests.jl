@@ -20,6 +20,7 @@ const TEST_TIER = lowercase(get(ENV, "SPINORBEC_TEST_TIER", "full"))
 
 # ── Fast tier: pure unit tests, no find_ground_state / run_simulation ──
 const FAST_TESTS = [
+    "test_quality.jl",
     "foundation/test_atoms.jl",
     "foundation/test_grid.jl",
     "foundation/test_spin_matrices.jl",

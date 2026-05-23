@@ -101,6 +101,15 @@ F=6, g_J=1.9934, g_F≈1.163, μ≈6.977μ_B, a_s≈110a₀. 7 unknown scatterin
 - D=13 (Eu): `SMatrix` heap-allocates. Use `Matrix`/`MVector` in hot loops.
 - `Val(N)` from type parameter, not `Val(ndim::Int)`.
 
+## Naming convention
+
+The 2026-05-22/23 cleanup sweep removed 11 commits' worth of file/function/observable mismatches (e.g. `nematic.jl` defining `apply_singlet_pair_step!`, `TwoChannelLHY` actually polar-only, `:energy_decomposition` analyzer returning phase-classifier data, non-scalar LHY YAML never reaching `find_ground_state`). Static analysis CANNOT catch these (per `test/test_quality.jl` research; semantic mismatch is not type-visible). The discipline is:
+
+- **File name = primary export.** `src/foo/bar.jl` should define `bar`, `apply_bar_step!`, `BarLHY`, etc. as its main exports. If the file's main symbol changes name, rename the file in the same commit.
+- **Function name = what the body actually computes.** Do not preserve a misleading name as an alias. If you rename, delete the old name (no `const Old = New`); migrate callers in the same commit.
+- **YAML analyzer names must match real implementations**, not stub aliases. `analyze: [- foo: {}]` returning data labelled `foo` should literally be the output of an entry point named `foo`. Aliased dispatch through unrelated functions is a silent-bug factory (see fix `76e9f24`).
+- **Backward-compat aliases default to "delete".** Keep one only if there's a load-bearing external consumer that can't be migrated; document the consumer at the alias definition.
+
 ## Type stability boundaries
 
 `Workspace` has 23+ type params and `run_pipeline` dispatches abstractly on `PipelineStep`. Any type widening in a `_run_step` branch (e.g. assigning `zeeman = dict[:zeeman]` from `Dict{Symbol,Any}`) propagates to `make_workspace`'s type parameter combinations, causing inference to explode — symptom is a **30 min JIT hang with no stack trace**, not a runtime error. Prevent with two rules:

@@ -18,8 +18,8 @@ using Printf
 using LinearAlgebra
 
 # Cross-module imports.
-using ..SpinorBEC: AbstractPotential, TimeDependentTrap, HarmonicTrap
-using ..SpinorBEC: run_yaml, run_config, make_workspace
+using ..SpinorBEC: AbstractPotential, TimeDependentTrap
+using ..SpinorBEC: run_yaml
 using ..SpinorBEC: PiecewiseLinearWaveform
 
 include("calibration/core.jl")

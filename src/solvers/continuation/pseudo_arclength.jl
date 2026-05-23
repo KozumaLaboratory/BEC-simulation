@@ -22,7 +22,7 @@ export trace_phase_boundary, tangent_at, BoundaryTrace, make_phase_diff_eval
 # first implementation. The tangent update for `d = 2` reduces to
 # rotating `∇F` by 90°; we exploit that here for clarity.
 
-using LinearAlgebra: dot, norm, qr, I as IDENT
+using LinearAlgebra: dot, norm, I as IDENT
 
 """
     BoundaryTrace

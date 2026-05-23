@@ -11,8 +11,6 @@ export non_abelian_holonomy
 # Conventions follow Kawaguchi-Ueda §9 for ferromagnetic vortices and
 # §13.4 for nematic-phase textures.
 
-using LinearAlgebra: det
-
 """
     winding_number_field(psi, grid; component=nothing, threshold=1e-6)
         -> Matrix{Int}
@@ -131,7 +129,6 @@ function monopole_charge_3d(
 )
     n_pts = grid.config.n_points
     fx_field, fy_field, fz_field = _spin_expectation_fields(psi, grid)
-
 
     nhat_x = similar(fx_field)
     nhat_y = similar(fy_field)
