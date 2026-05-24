@@ -64,151 +64,187 @@ for (state, doc) in _TRIVIAL_ZOO_STATES
 end
 
 """
-    init_psi_random(grid, sys; seed=nothing, kwargs...)
+    init_psi_random(grid, sys; seed=nothing)
 
-Random-amplitude initial state seeded by `seed` (Int).
+Random-amplitude initial state seeded by `seed` (Int). `nothing` keeps
+`init_psi`'s default `seed=42`.
 """
-init_psi_random(grid, sys; seed=nothing, kwargs...) = begin
-    p = Dict{Symbol, Any}(kwargs...)
-    seed !== nothing && (p[:seed] = seed)
-    init_psi(grid, sys; state=:random, init_state_params=p)
-end
+init_psi_random(grid, sys; seed=nothing) =
+    if seed === nothing
+        init_psi(grid, sys; state=:random)
+    else
+        init_psi(grid, sys; state=:random, seed=Int(seed))
+    end
+
+# Parameterised wrappers below forward their kwargs through `init_psi`'s
+# real keyword surface (`init_theta`, `init_phi`, `init_vortex_charge`,
+# `helix_k`, `seed`). The earlier `init_state_params=Dict(...)` route
+# pre-dates a 2026-05 refactor of `init_psi` to a flat-kwarg signature
+# and was silently broken (MethodError at call time) until the audit
+# turn caught it. Wrappers whose user-API kwarg has no `init_psi`
+# counterpart simply accept-and-drop it for backwards compatibility.
 
 """
-    init_psi_spin_coherent(grid, sys; theta=0.0, phi=0.0, kwargs...)
+    init_psi_spin_coherent(grid, sys; theta=0.0, phi=0.0)
 
 Spin-coherent state along the (theta, phi) direction on the Bloch sphere.
 """
-init_psi_spin_coherent(grid, sys; theta=0.0, phi=0.0, kwargs...) = init_psi(grid, sys;
+init_psi_spin_coherent(grid, sys; theta::Real=0.0, phi::Real=0.0) = init_psi(grid, sys;
     state=:spin_coherent,
-    init_state_params=Dict{Symbol, Any}(:theta => theta, :phi => phi, kwargs...))
+    init_theta=theta, init_phi=phi)
 
 """
-    init_psi_fl_vortex(grid, sys; winding=1, theta=π/2, kwargs...)
+    init_psi_fl_vortex(grid, sys; winding=1)
 
-Flux-closure (FL) vortex — singular spin-coherent texture with given
-winding number around the trap centre.
+Flux-closure (FL) vortex — spin-coherent texture forced to θ=π/2 with
+the given winding number around the trap centre. (`theta` is fixed
+inside `init_psi` for this state; only `winding` is plumbed through.)
 """
-init_psi_fl_vortex(grid, sys; winding::Int=1, theta=π/2, kwargs...) = init_psi(grid, sys;
-    state=:fl_vortex,
-    init_state_params=Dict{Symbol, Any}(
-        :vortex_charge => winding, :theta => theta, kwargs...))
-
-"""
-    init_psi_spin_helix(grid, sys; q_vector, kwargs...)
-
-Spin helix winding along the wave vector `q_vector`.
-"""
-init_psi_spin_helix(grid, sys; q_vector=(0.0, 0.0, 0.0), kwargs...) = init_psi(grid, sys;
-    state=:spin_helix,
-    init_state_params=Dict{Symbol, Any}(:q_vector => q_vector, kwargs...))
+init_psi_fl_vortex(grid, sys; winding::Int=1) = init_psi(
+    grid, sys; state=:fl_vortex, init_vortex_charge=winding
+)
 
 """
-    init_psi_biaxial_nematic(grid, sys; angles=(0.0, 0.0), kwargs...)
+    init_psi_spin_helix(grid, sys; q_vector=ntuple(_->0, N))
 
-Biaxial nematic state with director angles (θ, φ).
+Spin helix winding along the wave vector `q_vector`. Must have
+length matching the grid dimensionality.
 """
-init_psi_biaxial_nematic(grid, sys; angles=(0.0, 0.0), kwargs...) = begin
-    p = Dict{Symbol, Any}(kwargs...)
-    angles isa Tuple && length(angles) == 2 || throw(ArgumentError("angles must be (θ, φ)"))
-    p[:theta] = angles[1];
-    p[:phi] = angles[2]
-    init_psi(grid, sys; state=:biaxial_nematic, init_state_params=p)
+init_psi_spin_helix(grid::Grid{N}, sys; q_vector=ntuple(_ -> 0.0, N)) where {N} = init_psi(grid,
+    sys; state=:spin_helix,
+    helix_k=NTuple{N, Float64}(Float64(q_vector[d]) for d in 1:N))
+
+"""
+    init_psi_biaxial_nematic(grid, sys; angles=(0.0, 0.0))
+
+Biaxial nematic state. `init_psi` constructs the canonical
+(|+δ⟩+|−δ⟩)/√2 representative and ignores the angle pair — kept as
+a wrapper kwarg for API symmetry with other oriented states.
+"""
+init_psi_biaxial_nematic(grid, sys; angles=(0.0, 0.0)) = begin
+    angles isa Tuple && length(angles) == 2 ||
+        throw(ArgumentError("angles must be a 2-tuple (θ, φ)"))
+    init_psi(grid, sys; state=:biaxial_nematic)
 end
 
 """
-    init_psi_polar_core_vortex(grid, sys; winding=1, axis=:z, kwargs...)
+    init_psi_polar_core_vortex(grid, sys; winding=1, axis=:z)
 
 Polar-core vortex — m=0 vortex core surrounded by m=±F density.
+(`axis` is currently hardcoded to z inside `init_psi`; accepted for
+forward compatibility.)
 """
-init_psi_polar_core_vortex(grid, sys; winding::Int=1, axis::Symbol=:z, kwargs...) = init_psi(grid,
-    sys; state=:polar_core_vortex,
-    init_state_params=Dict{Symbol, Any}(:vortex_charge => winding, :axis => axis, kwargs...))
-
-"""
-    init_psi_bright_soliton(grid, sys; m_state=:max, width=1.0, kwargs...)
-
-Bright soliton in component `m_state` (defaults to the m with the
-strongest attractive interaction).
-"""
-init_psi_bright_soliton(grid, sys; m_state=:max, width=1.0, kwargs...) = init_psi(grid, sys;
-    state=:soliton_bright,
-    init_state_params=Dict{Symbol, Any}(:m_state => m_state, :width => width, kwargs...))
-
-"""
-    init_psi_dark_soliton(grid, sys; m_state=:max, position=0.0, kwargs...)
-
-Dark soliton kink in component `m_state` centred at `position`.
-"""
-init_psi_dark_soliton(grid, sys; m_state=:max, position=0.0, kwargs...) = init_psi(grid, sys;
-    state=:soliton_dark,
-    init_state_params=Dict{Symbol, Any}(:m_state => m_state, :position => position, kwargs...))
-
-"""
-    init_psi_wavepacket(grid, sys; center=(0.0,...), momentum=(0.0,...),
-                        width=1.0, m_state=1, kwargs...)
-
-Gaussian wavepacket in component `m_state` with optional momentum kick.
-"""
-init_psi_wavepacket(grid, sys; center=nothing, momentum=nothing,
-    width=1.0, m_state::Int=1, kwargs...) = begin
-    p = Dict{Symbol, Any}(:width => width, :m_state => m_state, kwargs...)
-    center !== nothing && (p[:center] = center)
-    momentum !== nothing && (p[:momentum] = momentum)
-    init_psi(grid, sys; state=:gaussian_wavepacket, init_state_params=p)
+init_psi_polar_core_vortex(grid, sys; winding::Int=1, axis::Symbol=:z) = begin
+    axis === :z || throw(ArgumentError(
+        ":polar_core_vortex currently only supports axis=:z (got $axis)"))
+    init_psi(grid, sys; state=:polar_core_vortex, init_vortex_charge=winding)
 end
 
 """
-    init_psi_domain_wall(grid, sys; axis=1, kwargs...)
+    init_psi_bright_soliton(grid, sys; m_state=:max, width=1.0)
 
-Two oppositely-magnetized regions joined by a wall along `axis`.
+Bright soliton in the central m component. `width` is currently
+derived from the grid box size inside `init_psi`; the kwarg is
+accepted for API symmetry.
 """
-init_psi_domain_wall(grid, sys; axis::Int=1, kwargs...) = init_psi(grid, sys; state=:domain_wall,
-    init_state_params=Dict{Symbol, Any}(:axis => axis, kwargs...))
-
-"""
-    init_psi_two_packets(grid, sys; separation=2.0, momentum_kick=1.0, kwargs...)
-
-Pair of Gaussian packets boosted toward each other for collision dynamics.
-"""
-init_psi_two_packets(grid, sys; separation=2.0, momentum_kick=1.0, kwargs...) = init_psi(grid, sys;
-    state=:two_packet,
-    init_state_params=Dict{Symbol, Any}(
-        :separation => separation, :momentum_kick => momentum_kick, kwargs...))
+init_psi_bright_soliton(grid, sys; m_state=:max, width::Real=1.0) = init_psi(
+    grid, sys; state=:soliton_bright
+)
 
 """
-    init_psi_chiral_spin_vortex(grid, sys; winding=1, kwargs...)
+    init_psi_dark_soliton(grid, sys; m_state=:max, position=0.0)
 
-Chiral spin vortex (vortex with non-trivial spin texture in the core).
+Dark soliton kink in the central m component. `position` is fixed at
+0 inside `init_psi`; the kwarg is accepted for API symmetry.
 """
-init_psi_chiral_spin_vortex(grid, sys; winding::Int=1, kwargs...) = init_psi(grid, sys;
+init_psi_dark_soliton(grid, sys; m_state=:max, position::Real=0.0) = init_psi(
+    grid, sys; state=:soliton_dark
+)
+
+"""
+    init_psi_wavepacket(grid, sys; momentum=0.0, width=1.0, m_state=1)
+
+Gaussian wavepacket with momentum kick along dim 1. `momentum` plumbs
+through `init_theta` (which `init_psi` uses as k₀ for this state).
+"""
+init_psi_wavepacket(grid, sys;
+momentum::Real=0.0, width::Real=1.0, m_state::Int=1) = init_psi(
+    grid, sys; state=:gaussian_wavepacket, init_theta=momentum
+)
+
+"""
+    init_psi_domain_wall(grid, sys; axis=1)
+
+Two oppositely-magnetized regions joined by a wall along axis 1.
+(`axis` is currently hardcoded to 1 inside `init_psi`.)
+"""
+init_psi_domain_wall(grid, sys; axis::Int=1) = begin
+    axis == 1 || throw(ArgumentError(
+        ":domain_wall currently only supports axis=1 (got $axis)"))
+    init_psi(grid, sys; state=:domain_wall)
+end
+
+"""
+    init_psi_two_packets(grid, sys; separation=2.0, momentum_kick=1.0)
+
+Pair of Gaussian packets boosted toward each other. `momentum_kick`
+plumbs through `init_theta`; `separation` is fixed inside `init_psi`.
+"""
+init_psi_two_packets(grid, sys;
+separation::Real=2.0, momentum_kick::Real=1.0) = init_psi(
+    grid, sys; state=:two_packet, init_theta=momentum_kick
+)
+
+"""
+    init_psi_chiral_spin_vortex(grid, sys; winding=1)
+
+Chiral spin vortex — vortex with non-trivial spin texture in the core.
+"""
+init_psi_chiral_spin_vortex(grid, sys; winding::Int=1) = init_psi(grid, sys;
     state=:chiral_spin_vortex,
-    init_state_params=Dict{Symbol, Any}(:vortex_charge => winding, kwargs...))
+    init_vortex_charge=winding)
 
 """
-    init_psi_magnetic_domain(grid, sys; pattern=:stripe, kwargs...)
+    init_psi_magnetic_domain(grid, sys; pattern=:stripe)
 
-2D magnetic domain pattern. `pattern ∈ {:stripe, :hexagonal, :square}`.
+2D magnetic domain pattern. `pattern ∈ {:stripe, :square, :hexagonal}`
+maps to `init_psi`'s `init_vortex_charge` enum (0/1=stripe, 2=square,
+3=hexagonal).
 """
-init_psi_magnetic_domain(grid, sys; pattern::Symbol=:stripe, kwargs...) = init_psi(grid, sys;
-    state=:magnetic_domain,
-    init_state_params=Dict{Symbol, Any}(:pattern => pattern, kwargs...))
+init_psi_magnetic_domain(grid, sys; pattern::Symbol=:stripe) = begin
+    pattern_code = if pattern === :stripe
+        1
+    elseif pattern === :square
+        2
+    elseif pattern === :hexagonal
+        3
+    else
+        throw(
+            ArgumentError(
+                "magnetic_domain pattern must be :stripe / :square / :hexagonal (got $pattern)"
+            ),
+        )
+    end
+    init_psi(grid, sys; state=:magnetic_domain, init_vortex_charge=pattern_code)
+end
 
 """
-    init_psi_vortex_lattice(grid, sys; n_vortices=4, lattice=:triangular, kwargs...)
+    init_psi_vortex_lattice(grid, sys; n_vortices=4, lattice=:triangular)
 
-Regular array of vortices. `lattice ∈ {:triangular, :square}`.
+Regular array of vortices. `n_vortices` plumbs through `init_vortex_charge`
+(used as lattice size). `lattice` is currently unused (only the default
+square pattern is implemented inside `init_psi`).
 """
-init_psi_vortex_lattice(grid, sys; n_vortices::Int=4,
-lattice::Symbol=:triangular, kwargs...) = init_psi(grid, sys; state=:vortex_lattice,
-    init_state_params=Dict{Symbol, Any}(
-        :n_vortices => n_vortices, :lattice => lattice, kwargs...))
+init_psi_vortex_lattice(grid, sys;
+n_vortices::Int=4, lattice::Symbol=:triangular) = init_psi(grid, sys; state=:vortex_lattice,
+    init_vortex_charge=n_vortices)
 
 """
-    init_psi_skyrmion_lattice(grid, sys; q_vector=(2π,0,0), kwargs...)
+    init_psi_skyrmion_lattice(grid, sys; q_vector=(2π,0,0))
 
-Skyrmion lattice with reciprocal-lattice vector `q_vector`.
+Skyrmion lattice with reciprocal-lattice scale `q_vector[1]` (only the
+x-component is used as q0 in the triple-Q ansatz inside `init_psi`).
 """
-init_psi_skyrmion_lattice(grid, sys; q_vector=(2π, 0.0, 0.0), kwargs...) = init_psi(grid, sys;
+init_psi_skyrmion_lattice(grid, sys; q_vector=(2π, 0.0, 0.0)) = init_psi(grid, sys;
     state=:skyrmion_lattice,
-    init_state_params=Dict{Symbol, Any}(:q_vector => q_vector, kwargs...))
+    init_theta=Float64(q_vector[1]))
