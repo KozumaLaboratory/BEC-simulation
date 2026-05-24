@@ -32,6 +32,43 @@ using LinearAlgebra: normalize
         end
     end
 
+    @testset "F=1 polar spin branch dispersion (analytical ω² = ε_k(ε_k+2c1n0))" begin
+        # Companion to the density-branch test above: F=1 polar ground state
+        # ψ_0 = √n_0 (0, 1, 0) breaks SU(2)→D_2(z), giving 2 spin Goldstones
+        # at q=0 with dispersion ω_spin² = ε_k(ε_k + 2 c_1 n_0).
+        # Pre-condition: c_1 > 0 (the polar phase).
+        F = 1
+        c0 = 10.0
+        c1 = 3.0
+        n0 = 1.0
+        spinor = ComplexF64[0.0, 1.0, 0.0]
+
+        result = bogoliubov_spectrum(;
+            spinor, n0, F,
+            interactions=InteractionParams(c0, c1),
+            k_max=4.0, n_k=40,
+        )
+
+        # The spectrum has 6 branches (3 components × particle-hole).
+        # At each k there are: ±ω_density, ±ω_spin (degenerate at q=0).
+        # Verify the spin branch by picking the eigenvalue NOT matching
+        # the density formula, then comparing to ω_spin formula.
+        for ik in 5:12
+            k = result.k_values[ik]
+            ek = k^2 / 2
+            omega_density_expected = sqrt(ek * (ek + 2 * c0 * n0))
+            omega_spin_expected = sqrt(ek * (ek + 2 * c1 * n0))
+
+            evals_k = result.omega[:, ik]
+            pos_real = filter(e -> real(e) > 0.01 && abs(imag(e)) < 0.5, evals_k)
+            # find which eigenvalue best matches spin branch (not density)
+            spin_matches = filter(
+                e -> abs(real(e) - omega_spin_expected) <
+                     0.2 * omega_spin_expected, pos_real)
+            @test !isempty(spin_matches)
+        end
+    end
+
     @testset "Particle-hole symmetry: eigenvalues in ±ω pairs" begin
         F = 1
         spinor = ComplexF64[1.0, 0.0, 0.0]  # ferromagnetic

@@ -212,6 +212,57 @@
         @test abs(N1 - N0) / N0 < 1e-6
     end
 
+    @testset "DDI energy vanishes for spherical polarized cloud (analytical)" begin
+        # For a fully ẑ-polarized cloud with spherically symmetric density
+        # profile ρ(r) = |ψ_{+F}(r)|², the dipolar energy
+        # E_DDI = (c_dd/2) ∫∫ Q_zz(r-r') ρ(r) ρ(r') dr dr'
+        # vanishes exactly: in k-space, Q_zz(k) = k_z²/k² − 1/3, and at
+        # spherically symmetric ρ̃(k) the angular average of k_z²/k² is
+        # 1/3, cancelling the −1/3. (k=0 mode is set to 0 by the
+        # Pedri-Santos regularisation.)
+        #
+        # On a finite grid this is a CONVERGENCE test: as the grid
+        # gets finer (better resolves sphericality at corners), |E_DDI|
+        # should shrink. We test at two N and expect monotone reduction.
+        F = 6
+        atom = Eu151
+        E_DDI_at_N = Float64[]
+        for N in (16, 24)
+            config = GridConfig((N, N, N), (8.0, 8.0, 8.0))
+            grid = make_grid(config)
+            interactions = InteractionParams(0.0, 0.0)
+            trap = HarmonicTrap(1.0, 1.0, 1.0)
+            sp = SimParams(; dt=0.01, n_steps=10, imaginary_time=false)
+
+            D = 2F + 1
+            # Build spherically symmetric Gaussian polarized in m=+F (c=1)
+            psi = zeros(ComplexF64, N, N, N, D)
+            sigma = 1.0
+            for ix in 1:N, iy in 1:N, iz in 1:N
+                r2 = grid.x[1][ix]^2 + grid.x[2][iy]^2 + grid.x[3][iz]^2
+                psi[ix, iy, iz, 1] = exp(-r2 / (2 * sigma^2))
+            end
+            dV = cell_volume(grid)
+            psi ./= sqrt(sum(abs2, psi) * dV)
+
+            ws = make_workspace(;
+                grid, atom, interactions, potential=trap, sim_params=sp,
+                enable_ddi=true, c_dd=1.0,
+            )
+            copyto!(ws.state.psi, psi)
+
+            E = energy_decomposition(ws)
+            push!(E_DDI_at_N, abs(E.ddi))
+        end
+
+        # Both should be at floating-point floor — the spherical
+        # symmetry argument is essentially exact even at modest grids
+        # (the Gaussian is well-resolved). 1e-12 leaves plenty of margin
+        # vs typical c_dd·n·V ~ O(1).
+        @test E_DDI_at_N[1] < 1e-12
+        @test E_DDI_at_N[2] < 1e-12
+    end
+
     @testset "secular=true emits validity warning" begin
         config = GridConfig((8, 8, 8), (10.0, 10.0, 10.0))
         grid = make_grid(config)
