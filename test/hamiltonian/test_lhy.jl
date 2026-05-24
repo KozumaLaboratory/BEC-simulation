@@ -45,6 +45,55 @@
         @test E_lhy == 0.0
     end
 
+    @testset "scalar LHY n^(5/2) scaling (Level 8)" begin
+        # For a uniform ψ at density n_0:
+        #   ε_LHY(n_0) = (2/5) · c_lhy · n_0^(5/2)   (energy density)
+        #   E_LHY(n_0) = (2/5) · c_lhy · n_0^(5/2) · V_total
+        # μ_LHY = ∂E_LHY/∂N = c_lhy · n_0^(3/2)  (this is why c_lhy has the
+        # bare scaling; the (2/5) is the energy-vs-chemical-potential primitive).
+        # Verify the slope 5/2 by varying n_0 over half a decade. Single
+        # component (m=+F) suffices — scalar LHY acts on n_total = Σ_c|ψ_c|².
+        ndim = 3
+        n_pt = 8
+        L = 4.0
+        config = GridConfig{ndim}(ntuple(_ -> n_pt, ndim), ntuple(_ -> L, ndim))
+        grid = make_grid(config)
+        dV = cell_volume(grid)
+        V_total = dV * prod(grid.config.n_points)
+        sys = SpinSystem(1)
+        n_comp = sys.n_components
+        c_lhy = 0.5
+
+        n0_values = [0.25, 0.5, 1.0, 2.0, 4.0]
+        E_values = Float64[]
+        for n0 in n0_values
+            psi = zeros(ComplexF64, n_pt, n_pt, n_pt, n_comp)
+            psi[:, :, :, 1] .= sqrt(n0)
+            E = SpinorBEC._lhy_energy(psi, c_lhy, n_comp, ndim, grid.config.n_points, dV)
+            push!(E_values, E)
+        end
+
+        # Log-log slope: log(E) = (5/2) log(n_0) + const
+        logn = log.(n0_values)
+        logE = log.(E_values)
+        slopes = [
+            (logE[i + 1] - logE[i]) / (logn[i + 1] - logn[i]) for
+            i in 1:(length(n0_values) - 1)
+        ]
+        for s in slopes
+            @test isapprox(s, 5 / 2; atol=1e-6)
+        end
+
+        # Absolute value at n_0=1: E = (2/5) · c_lhy · 1 · V_total
+        idx_1 = findfirst(==(1.0), n0_values)
+        @test isapprox(E_values[idx_1], (2 / 5) * c_lhy * V_total; rtol=1e-12)
+
+        # Spot check the formula at n_0=2: E = (2/5) · c_lhy · 2^(5/2) · V_total
+        idx_2 = findfirst(==(2.0), n0_values)
+        @test isapprox(
+            E_values[idx_2], (2 / 5) * c_lhy * 2^2.5 * V_total; rtol=1e-12)
+    end
+
     @testset "LHY modifies total energy" begin
         config = GridConfig(64, 20.0)
         grid = make_grid(config)
@@ -104,7 +153,9 @@
         @test ip4.c_extra == [3.0]
     end
 
-    @testset "YAML parsing of c_lhy" begin
+    @testset "YAML parsing of lhy.c_lhy" begin
+        # Post-2026-05-12: c_lhy moved from `interactions.c_lhy` to
+        # `lhy.c_lhy` (single LHY block; see lhy_refactor_2026_05_12 memory).
         yaml = """
         pipeline:
           - ground_state:
@@ -115,6 +166,8 @@
               interactions:
                 c0: 10.0
                 c1: -0.5
+              lhy:
+                kind: scalar
                 c_lhy: 100.0
               dt: 0.01
               n_steps: 10
@@ -124,7 +177,7 @@
         cfg = load_config_from_string(yaml)
         @test cfg isa PipelineConfig
         p = cfg.steps[1].params
-        @test p["interactions"]["c_lhy"] == 100.0
+        @test p["lhy"]["c_lhy"] == 100.0
     end
 
     @testset "Lima-Pelster Q5" begin
