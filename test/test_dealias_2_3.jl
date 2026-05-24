@@ -89,4 +89,29 @@ using SpinorBEC
         @test size(m) == (8, 8, 8)
         @test sum(m) == 125.0
     end
+
+    @testset "DEALIAS_K_CUTOFF override (fixed physical k_cut)" begin
+        # Default behaviour: cutoff = n÷3 per axis.
+        @test SpinorBEC.DEALIAS_K_CUTOFF[] === nothing
+        m_default = SpinorBEC._get_orszag_mask((16,))
+        # 16-grid box L=12 (assumed). dk = 2π/12 ≈ 0.524. n÷3=5
+        # → physical cutoff = 5·0.524 = 2.62.
+        # Set DEALIAS_K_CUTOFF = 2.62 should give same mask.
+        SpinorBEC.DEALIAS_K_CUTOFF[] = 5 * 2π / 12.0
+        m_kcut_match = SpinorBEC._get_orszag_mask((16,))
+        SpinorBEC.DEALIAS_K_CUTOFF[] = nothing  # reset
+        @test m_default == m_kcut_match
+
+        # Tighter cutoff zeros more modes.
+        SpinorBEC.DEALIAS_K_CUTOFF[] = 1.0  # k ≤ 1.0 → idx ≤ ~1.9 → 2 modes
+        m_tight = SpinorBEC._get_orszag_mask((16,))
+        SpinorBEC.DEALIAS_K_CUTOFF[] = nothing  # reset
+        @test sum(m_tight) < sum(m_default)
+
+        # Looser cutoff keeps more modes (capped by grid Nyquist).
+        SpinorBEC.DEALIAS_K_CUTOFF[] = 100.0  # well above any Nyq
+        m_loose = SpinorBEC._get_orszag_mask((16,))
+        SpinorBEC.DEALIAS_K_CUTOFF[] = nothing  # reset
+        @test sum(m_loose) == 16.0  # all modes kept
+    end
 end

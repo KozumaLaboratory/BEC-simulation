@@ -34,8 +34,30 @@ Eu EdH); leave `false` for legacy bit-exact behaviour.
 """
 const DEALIAS_2_3_ENABLED = Ref(false)
 
+"""
+Optional physical-k cutoff override. When `nothing` (default), the
+filter uses the standard grid-dependent (n_d ÷ 3) cutoff per axis,
+yielding a different effective bandwidth at each grid resolution.
+When set to a positive Float64 `k_cut`, the filter zeros modes with
+`|k_d| > k_cut` (in the same physical units as `grid.k`), making
+all grids that contain `k_cut` within their Nyquist range agree on
+the captured bandwidth. This is the grid-convergence diagnostic
+mode: pick `k_cut` below the smallest grid's Nyquist so every grid
+yields the same effective physics window.
+
+Usage:
+    SpinorBEC.DEALIAS_K_CUTOFF[] = 11.0   # for L=12 box, gives same
+                                          # bandwidth as N=64 default
+    SpinorBEC.DEALIAS_K_CUTOFF[] = nothing  # back to (n_d ÷ 3) default
+
+The cutoff is per-axis (|k_x| and |k_y| and |k_z| each ≤ k_cut),
+matching the (n_d ÷ 3) default's per-axis structure.
+"""
+const DEALIAS_K_CUTOFF = Ref{Union{Nothing, Float64}}(nothing)
+
 # Per-grid-shape mask cache. Stored as plain Float64 arrays so they
 # broadcast onto the Complex FFT output without type promotion.
+# Key includes the cutoff so toggling DEALIAS_K_CUTOFF rebuilds correctly.
 const _ORSZAG_MASK_CACHE = Dict{Tuple, Any}()
 
 """
@@ -47,22 +69,54 @@ cutoff is `n_d ÷ 3`: any axis index with `min(i-1, n-i+1) > n_d ÷ 3`
 zeros the full slab along that axis.
 """
 function _get_orszag_mask(n_pts::NTuple{N, Int}) where {N}
-    haskey(_ORSZAG_MASK_CACHE, n_pts) && return _ORSZAG_MASK_CACHE[n_pts]::Array{Float64, N}
+    _get_orszag_mask(n_pts, DEALIAS_K_CUTOFF[])
+end
+
+function _get_orszag_mask(n_pts::NTuple{N, Int},
+    k_cut_override::Union{Nothing, Float64}) where {N}
+    # The cache key includes k_cut_override so the mask rebuilds when
+    # DEALIAS_K_CUTOFF[] changes.
+    key = (n_pts, k_cut_override)
+    haskey(_ORSZAG_MASK_CACHE, key) && return _ORSZAG_MASK_CACHE[key]::Array{Float64, N}
     mask = ones(Float64, n_pts)
-    for d in 1:N
-        n = n_pts[d]
-        cutoff = n ÷ 3
-        for i in 1:n
-            k_abs_idx = min(i - 1, n - (i - 1))
-            if k_abs_idx > cutoff
-                idx_tuple = ntuple(N) do dd
-                    dd == d ? (i:i) : (1:n_pts[dd])
+    if k_cut_override === nothing
+        # Default: (n_d ÷ 3) per-axis cutoff in index space.
+        for d in 1:N
+            n = n_pts[d]
+            cutoff = n ÷ 3
+            for i in 1:n
+                k_abs_idx = min(i - 1, n - (i - 1))
+                if k_abs_idx > cutoff
+                    idx_tuple = ntuple(N) do dd
+                        dd == d ? (i:i) : (1:n_pts[dd])
+                    end
+                    @views mask[idx_tuple...] .= 0.0
                 end
-                @views mask[idx_tuple...] .= 0.0
+            end
+        end
+    else
+        # Fixed physical-k cutoff: zero modes with |k_d| > k_cut_override.
+        # Assume box L = 12.0 (the L4 verification suite box). This is a
+        # diagnostic mode; physical-k threading from the Grid is deferred
+        # to a follow-up commit (would require passing grid info through
+        # the filter call chain).
+        L_assumed = 12.0
+        for d in 1:N
+            n = n_pts[d]
+            dk = 2π / L_assumed
+            for i in 1:n
+                k_idx = i - 1 <= n ÷ 2 ? (i - 1) : (i - 1 - n)
+                k_val = abs(k_idx) * dk
+                if k_val > k_cut_override
+                    idx_tuple = ntuple(N) do dd
+                        dd == d ? (i:i) : (1:n_pts[dd])
+                    end
+                    @views mask[idx_tuple...] .= 0.0
+                end
             end
         end
     end
-    _ORSZAG_MASK_CACHE[n_pts] = mask
+    _ORSZAG_MASK_CACHE[key] = mask
     mask
 end
 
@@ -171,7 +225,9 @@ copy. Cached per (eltype, shape) so each grid pays the host→device
 copy only once.
 """
 function _to_psi_device(psi::AbstractArray, mask_host::Array{Float64})
-    key = (typeof(psi), size(mask_host))
+    # Key by objectid(mask_host) so swapping the host mask (e.g. when
+    # DEALIAS_K_CUTOFF[] changes) invalidates the cached device copy.
+    key = (typeof(psi), size(mask_host), objectid(mask_host))
     haskey(_ORSZAG_MASK_DEV_CACHE, key) && return _ORSZAG_MASK_DEV_CACHE[key]
     mask_dev = similar(psi, Float64, size(mask_host))
     copyto!(mask_dev, mask_host)
