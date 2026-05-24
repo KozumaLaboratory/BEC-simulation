@@ -445,14 +445,23 @@ pipeline:
         @test all(loss_si.K3_per_m_cubic .>= 0.0)
         @test isempty(loss_si.L3_per_m)  # SI K3 must NOT pollute legacy field
 
-        # Dimless `K3_per_m` key — same physical meaning, same routing.
+        # Dimless `K3_per_m_cubic` key — canonical name (alias `K3_per_m`
+        # removed 2026-05-24, raises ArgumentError, see below).
         node_dim = Dict{String, Any}(
             "gamma_dr" => 0.0,
-            "K3_per_m" => [0.01, 0.02, 0.05],
+            "K3_per_m_cubic" => [0.01, 0.02, 0.05],
         )
         loss_dim = SpinorBEC._parse_loss_params(node_dim)
         @test loss_dim.K3_per_m_cubic == [0.01, 0.02, 0.05]
         @test isempty(loss_dim.L3_per_m)
+
+        # `K3_per_m` alias removal regression: must raise with a guiding
+        # error message that points to `K3_per_m_cubic` / `K3_per_m_si`.
+        node_alias = Dict{String, Any}(
+            "gamma_dr" => 0.0,
+            "K3_per_m" => [0.01, 0.02, 0.05],
+        )
+        @test_throws ArgumentError SpinorBEC._parse_loss_params(node_alias)
 
         # Legacy `L3_per_m` key — still routes to L3_per_m (2-body shape).
         node_legacy = Dict{String, Any}(
