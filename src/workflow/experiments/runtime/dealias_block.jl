@@ -58,14 +58,30 @@ function apply_dealias_block!(data::Dict)
     block isa Dict || throw(ArgumentError(
         "YAML `dealias:` block must be a mapping; got $(typeof(block))"))
 
-    enabled = Bool(get(block, "enabled", false))
-    DEALIAS_2_3_ENABLED[] = enabled
+    # Validate FIRST (before modifying any Refs), so a bogus key in the
+    # YAML doesn't leak the partial-write into the global state. A
+    # previous version validated AFTER `DEALIAS_2_3_ENABLED[] = enabled`,
+    # which on ArgumentError left the toggle stuck at true and caused
+    # downstream split_step!() calls in unrelated tests to silently apply
+    # the dealias filter — broke norm conservation at 1e-10 instead of
+    # the expected 1e-12 (caught 2026-05-25 by Pkg.test() suite ordering).
+    known = ("enabled", "k_cut", "auto_dt", "dt_safety")
+    for k in keys(block)
+        k in known || throw(ArgumentError(
+            "Unknown key `dealias.$k`. Allowed: $(join(known, ", "))"))
+    end
 
+    # k_cut value validation (also before Ref writes).
     if haskey(block, "k_cut") && block["k_cut"] !== nothing
-        k_cut = Float64(block["k_cut"])
-        k_cut > 0 || throw(ArgumentError(
-            "dealias.k_cut must be positive, got $k_cut"))
-        DEALIAS_K_CUTOFF[] = k_cut
+        k_cut_val = Float64(block["k_cut"])
+        k_cut_val > 0 || throw(ArgumentError(
+            "dealias.k_cut must be positive, got $k_cut_val"))
+    end
+
+    # Now all-or-nothing Ref writes.
+    DEALIAS_2_3_ENABLED[] = Bool(get(block, "enabled", false))
+    if haskey(block, "k_cut") && block["k_cut"] !== nothing
+        DEALIAS_K_CUTOFF[] = Float64(block["k_cut"])
     else
         DEALIAS_K_CUTOFF[] = nothing
     end
@@ -80,13 +96,6 @@ function apply_dealias_block!(data::Dict)
             dt_bound = dt_max_for_k_cut(DEALIAS_K_CUTOFF[]; safety)
             _tighten_dt_in_pipeline!(data, dt_bound)
         end
-    end
-
-    # Validate unknown keys
-    known = ("enabled", "k_cut", "auto_dt", "dt_safety")
-    for k in keys(block)
-        k in known || throw(ArgumentError(
-            "Unknown key `dealias.$k`. Allowed: $(join(known, ", "))"))
     end
 
     (was_enabled, was_k_cut)
