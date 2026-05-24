@@ -90,6 +90,19 @@ using SpinorBEC
         @test sum(m) == 125.0
     end
 
+    @testset "dt_max_for_k_cut formula" begin
+        # dt_max = 1 / (safety · k_cut); default safety = 10.0
+        @test SpinorBEC.dt_max_for_k_cut(11.0) ≈ 1.0 / 110.0
+        @test SpinorBEC.dt_max_for_k_cut(16.0) ≈ 1.0 / 160.0
+        @test SpinorBEC.dt_max_for_k_cut(20.0) ≈ 1.0 / 200.0
+        # Tighter safety multiplies the divisor
+        @test SpinorBEC.dt_max_for_k_cut(16.0; safety=100.0) ≈ 1.0 / 1600.0
+        # L4 empirical: dt=0.005 at k_cut=16 was grid-converged (dt=0.005 < 0.00625 ✓)
+        @test 0.005 < SpinorBEC.dt_max_for_k_cut(16.0)
+        # dt=0.01 at k_cut=16 was NOT converged (dt=0.01 > 0.00625 ✗)
+        @test 0.01 > SpinorBEC.dt_max_for_k_cut(16.0)
+    end
+
     @testset "safe_k_cut_boundary formula" begin
         # k_Nyq = π·N/L; safe = 2·k_Nyq/3
         @test SpinorBEC.safe_k_cut_boundary(64, 12.0) ≈ 2 * (π * 64 / 12.0) / 3

@@ -24,7 +24,7 @@
 # grid-convergence regression is in place this will graduate to a
 # Workspace field + YAML knob.
 
-export apply_orszag_2_3_filter!, safe_k_cut_boundary
+export apply_orszag_2_3_filter!, safe_k_cut_boundary, dt_max_for_k_cut
 
 """
     safe_k_cut_boundary(n_grid::Int, box_L::Float64) -> Float64
@@ -51,6 +51,40 @@ Examples (box L=12):
 - N=192 → safe cutoff ≤ 33.51
 """
 safe_k_cut_boundary(n_grid::Int, box_L::Float64) = 2 * (π * n_grid / box_L) / 3
+
+"""
+    dt_max_for_k_cut(k_cut::Float64; safety::Float64=10.0) -> Float64
+
+Maximum `dt` for the Strang split-step propagator at a given `k_cut`,
+above which the dt²·k_cut² truncation error contaminates the dynamics.
+
+Derivation: the leading Strang commutator error is
+  E_step ~ (dt³/24) · ([V,[V,K]] + 2[K,[V,K]]) ψ
+At plane wave ψ_k = e^{ikx}, [K,[V,K]] ψ_k ~ k²·V_pre · ψ_k, giving
+local error ~ dt³·k². Over T steps, global error ~ T·dt²·k². For the
+Eu Hamiltonian-only dynamics (T=6.28, c_dd≈121) the empirical pre-factor
+is ~5, so the heuristic safe bound is `dt·k_cut ≲ 1/safety` with
+`safety=10` (~10% accuracy) by default.
+
+L4 verification empirical data:
+
+| dt    | k_cut | dt·k_cut | ΔF_z observed | grid-converged? |
+|-------|-------|---------:|--------------:|:----------------|
+| 0.01  | 11    |    0.110 | 0.008857      | yes (5 digit)   |
+| 0.005 | 16    |    0.080 | 0.008856      | yes (5 digit)   |
+| 0.01  | 16    |    0.160 | 0.00761       | NO (15% off)    |
+| 0.01  | 20    |    0.200 | 0.00553       | NO              |
+
+The product `dt·k_cut` should stay below ~0.1 for the dynamics to
+clear Strang error at this DDI strength.
+
+Examples (safety=10 default):
+- `dt_max_for_k_cut(11.0)` ≈ 0.00909  (use dt ≤ 0.009 for k_cut=11)
+- `dt_max_for_k_cut(16.0)` ≈ 0.00625  (use dt ≤ 0.006 for k_cut=16)
+- `dt_max_for_k_cut(20.0)` ≈ 0.00500  (use dt ≤ 0.005 for k_cut=20)
+- `dt_max_for_k_cut(16.0; safety=100)` ≈ 0.000625  (1% accuracy)
+"""
+dt_max_for_k_cut(k_cut::Float64; safety::Float64=10.0) = 1.0 / (safety * k_cut)
 
 """
 Global toggle for Orszag 2/3-rule dealiasing in `split_step!` and
