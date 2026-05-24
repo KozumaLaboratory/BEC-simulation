@@ -1,0 +1,23 @@
+# Level 10 smoke test: tiny F=1 polar ground state, exports
+# operator_rhs.jld2 for round-trip verification of the export tool.
+#
+# Physical setup: Rb87, harmonic trap, c1>0 polar phase, 8³ grid, 50 ITP
+# steps. Designed to converge in seconds on CPU; not a physics result —
+# just a smoke test for the export pipeline.
+
+pipeline:
+  - ground_state:
+      atom: Rb87
+      grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      interactions: {N_atoms: 1000, omega_ref: 1.0, c1_ratio: 0.01}
+      ddi: {enabled: false}
+      lhy: {kind: none}
+      B: {Bz: 0.0, q: 0.0}
+      initial_state: polar
+      init_sigma: 1.0
+      dt: 0.01
+      n_steps: 50
+      tol: 1.0e-6
+  - analyze:
+      - hpsi_export: {}
