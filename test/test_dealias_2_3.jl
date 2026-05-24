@@ -299,6 +299,35 @@ using SpinorBEC
         @test_throws ArgumentError SpinorBEC.apply_dealias_block!(cfg6)
     end
 
+    @testset "F-filter safe-k guard math" begin
+        # When DEALIAS_K_CUTOFF[] exceeds 2·k_Nyq/3 at the current grid,
+        # bilinear aliasing cannot be suppressed and answers are contaminated.
+        # The runtime guard `_check_safe_k_cut` emits a @warn so users see
+        # it. The maxlog=1 makes the warn itself fragile to test from
+        # session state, so we instead pin the math + the no-throw contract.
+
+        n_pts = (32, 32, 32)
+        F_pad = zeros(Float64, n_pts...)
+
+        # k_safe formula: at n=32 axis with box L=12, k_safe = 2·π·32/(3·12)
+        # ≈ 5.585. Smaller axis is the binding constraint.
+        k_safe_32 = SpinorBEC.safe_k_cut_boundary(32, 12.0)
+        @test isapprox(k_safe_32, 2 * π * 32 / 36.0; rtol=1e-12)
+
+        # All three regimes must run without throwing — the guard is
+        # advisory (warn), not enforcement.
+        for k_cut in (nothing, k_safe_32 * 0.5, k_safe_32, k_safe_32 * 2.0)
+            SpinorBEC.DEALIAS_K_CUTOFF[] = k_cut
+            @test SpinorBEC.apply_orszag_2_3_F_filter!(F_pad, n_pts) === nothing
+        end
+
+        # _check_safe_k_cut itself must return nothing (side-effect only).
+        SpinorBEC.DEALIAS_K_CUTOFF[] = 100.0  # far above any reasonable safe k
+        @test SpinorBEC._check_safe_k_cut(n_pts) === nothing
+        SpinorBEC.DEALIAS_K_CUTOFF[] = nothing
+        @test SpinorBEC._check_safe_k_cut(n_pts) === nothing
+    end
+
     @testset "DEALIAS_K_CUTOFF override (fixed physical k_cut)" begin
         # Default behaviour: cutoff = n÷3 per axis.
         @test SpinorBEC.DEALIAS_K_CUTOFF[] === nothing
