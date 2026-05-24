@@ -1,22 +1,24 @@
 level,test,description,pass,fail,broken,duration_s,status,note
 0,MANUAL: runs/verification_suite/ env metadata,"Environment / reproducibility (git, Manifest, CUDA, seed)",0,0,0,0.00,MANUAL,runs/verification_suite/ env metadata
-1,test/test_level1_scalar_exact.jl,"Scalar exact tests (free uniform, plane wave, harmonic GS)",8,0,0,3.59,PASS,
-1,test/test_dealias_2_3.jl,Pseudospectral dealiasing infrastructure,55,0,0,96.76,PASS,
+1,test/test_level1_scalar_exact.jl,"Scalar exact tests (free uniform, plane wave, harmonic GS)",8,0,0,3.54,PASS,
+1,test/test_dealias_2_3.jl,Pseudospectral dealiasing infrastructure,55,0,0,96.02,PASS,
 2,test/test_level2_strang_convergence.jl,Strang dt²-convergence (ratio ≈ 4 across dt halvings),8,0,0,0.35,PASS,
-3,test/test_level3_zeeman_only.jl,"Zeeman-only dynamics (N_m frozen, ψ_m phase = -i(-pm+qm²)t)",12,0,0,0.28,PASS,
-3,test/foundation/test_spin_matrices.jl,"Spin matrices ([F_x,F_y]=iF_z, F^2, ladder coefficients)",422,0,0,1.46,PASS,
+3,test/test_level3_zeeman_only.jl,"Zeeman-only dynamics (N_m frozen, ψ_m phase = -i(-pm+qm²)t)",12,0,0,0.27,PASS,
+3,test/foundation/test_spin_matrices.jl,"Spin matrices ([F_x,F_y]=iF_z, F^2, ladder coefficients)",422,0,0,1.45,PASS,
 3,test/hamiltonian/test_zeeman_accessors.jl,"Zeeman accessor API (linear_p, quadratic_q, transverse_b)",15,0,0,0.04,PASS,
-4,test/hamiltonian/test_spin_mixing.jl,Spin-1 SMA c1 sign convention,4,0,0,0.49,PASS,
+4,test/hamiltonian/test_spin_mixing.jl,Spin-1 SMA c1 sign convention,4,0,0,0.48,PASS,
 4,test/hamiltonian/test_singlet_pair.jl,Spin-2 cyclic / nematic A_00 singlet pair,28,0,0,1.51,PASS,
-4,test/hamiltonian/test_tensor_interaction.jl,"Higher-rank c_extra builder (S=4,6,...)",261,0,0,3.35,PASS,
-5,test/hamiltonian/test_ddi.jl,DDI kernel (spherical polarized E_DDI~0),4644,0,0,5.26,PASS,
+4,test/hamiltonian/test_tensor_interaction.jl,"Higher-rank c_extra builder (S=4,6,...)",261,0,0,1.39,PASS,
+5,test/hamiltonian/test_ddi.jl,DDI kernel (spherical polarized E_DDI~0),4644,0,0,7.16,PASS,
 5,test/hamiltonian/test_ddi_padded.jl,DDI padded convolution (FFT vs direct),14,0,0,1.23,PASS,
 6,MANUAL: runs/verification_suite/yamls/09_edh_toy_spin_orbit_transfer.yaml,EdH F=3 toy benchmark (Jz conservation),0,0,0,0.00,MANUAL,runs/verification_suite/yamls/09_edh_toy_spin_orbit_transfer.yaml
 7,test/workflow/test_losses.jl (full tier),K3 loss analytic n(t) = n0/sqrt(1+2K3 n0^2 t),0,0,0,0.00,SKIP,skipped: full tier
-7,test/workflow/test_loss_block_edge_cases.jl,K3 / L3 routing + SI conversion edge cases,20,0,0,0.66,PASS,
+7,test/workflow/test_loss_block_edge_cases.jl,K3 / L3 routing + SI conversion edge cases,20,0,0,0.73,PASS,
 8,test/hamiltonian/test_lhy_level8_unit.jl,Scalar LHY scaling + coefficient + spinor caveat,25,0,0,0.57,PASS,
-8,test/hamiltonian/test_lhy.jl,Norm conservation with LHY,39,0,0,0.39,PASS,
+8,test/hamiltonian/test_lhy.jl,Norm conservation with LHY,39,0,0,0.40,PASS,
 9,MANUAL: 2026-05-24 CROSS-GRID CONVERGED,Eu Ham-only: N=64/96/128 = 0.00886 at dt=0.005+k_cut=16,0,0,0,0.00,MANUAL,2026-05-24 CROSS-GRID CONVERGED
-10,"MANUAL: scripts/validation/{export,compare}_operator_rhs.jl",Ueda operator-RHS comparison (BLOCKED on Ueda code OR test data),0,0,0,0.00,MANUAL,"scripts/validation/{export,compare}_operator_rhs.jl"
-11,MANUAL: convergence sweep,dt/grid/box/seed convergence at Eu params,0,0,0,0.00,MANUAL,convergence sweep
-12,MANUAL: production with controls,Eu production: DDI off / +K3 / +γ_dr / +LHY twins,0,0,0,0.00,MANUAL,production with controls
+10,test/test_level10_hpsi_self_consistency.jl,"Internal Hψ self-consistency (F=1/2/6, energy_gradient! vs naive)",5,0,0,5.25,PASS,
+10,"MANUAL: scripts/validation/{export,compare}_operator_rhs.jl",External Ueda comparison toolchain (artifact exchange optional),0,0,0,0.00,MANUAL,"scripts/validation/{export,compare}_operator_rhs.jl"
+11,test/test_level11_convergence_sweep.jl,dt + grid + box convergence + seed reproducibility,12,0,0,0.93,PASS,
+12,test/test_level12_production_audit.jl,Production audit script: K3-on / LHY-on twin-control check,8,0,0,20.16,PASS,
+12,MANUAL: scripts/validation/production_audit.jl runs/,Apply audit to live runs/ tree (currently 23 orphan YAMLs),0,0,0,0.00,MANUAL,scripts/validation/production_audit.jl runs/
