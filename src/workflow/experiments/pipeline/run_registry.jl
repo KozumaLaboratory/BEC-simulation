@@ -209,7 +209,10 @@ end
     if haskey(data, "dealias")
         _run_yaml_status(verbose, "applying dealias block"; comment=dry_run)
         snapshot = apply_dealias_block!(data)
-        data["_dealias_snapshot"] = snapshot
+        # Module-level Ref instead of `data["_dealias_snapshot"]` — strict
+        # schema validation rejects unknown top-level keys, so we cannot
+        # stash the snapshot inside the YAML dict.
+        _DEALIAS_PENDING_SNAPSHOT[] = snapshot
         if verbose && DEALIAS_2_3_ENABLED[]
             println("  dealias: enabled=$(DEALIAS_2_3_ENABLED[]), " *
                     "k_cut=$(DEALIAS_K_CUTOFF[])")
@@ -354,7 +357,8 @@ end
     # Snapshot the dealias Refs so they can be restored after the run —
     # avoids state leakage when the same Julia session runs multiple
     # YAMLs back-to-back with different dealias settings.
-    dealias_snapshot = pop!(data, "_dealias_snapshot", nothing)
+    dealias_snapshot = _DEALIAS_PENDING_SNAPSHOT[]
+    _DEALIAS_PENDING_SNAPSHOT[] = nothing
 
     try
         # Expand scan points (if any)

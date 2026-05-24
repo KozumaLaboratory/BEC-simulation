@@ -103,6 +103,62 @@ using SpinorBEC
         @test 0.01 > SpinorBEC.dt_max_for_k_cut(16.0)
     end
 
+    @testset "YAML dealias block end-to-end via run_yaml" begin
+        # Smoke test: a minimal YAML config with `dealias:` block triggers
+        # the apply_dealias_block! → set Refs → run pipeline → restore
+        # Refs flow. Verifies state leakage is prevented across multiple
+        # run_yaml calls.
+
+        # State before is reset.
+        SpinorBEC.DEALIAS_2_3_ENABLED[] = false
+        SpinorBEC.DEALIAS_K_CUTOFF[] = nothing
+
+        yaml_text = """
+        dealias:
+          enabled: true
+          k_cut: 8.0
+
+        defaults:
+          kind: spinor
+          backend: cpu
+          interactions: {N_atoms: 50, omega_ref: 1.0}
+
+        pipeline:
+          - ground_state:
+              atom: Rb87
+              grid: {n: [12], box: [10.0]}
+              potential: {type: harmonic, omega: [1.0]}
+              interactions: {N_atoms: 50, omega_ref: 1.0, c1_ratio: 0.0}
+              ddi: {enabled: false}
+              lhy: {kind: none}
+              B: {Bz: 0.0, q: 0.0, theta: 0.0, phi: 0.0}
+              initial_state: m_plus_F
+              init_sigma: 1.0
+              dt: 0.005
+              n_steps: 20
+              tol: 1.0e-6
+        """
+
+        # Write to a temp file (run_yaml requires path-based input)
+        yaml_path, io = mktemp()
+        try
+            write(io, yaml_text)
+            close(io)
+            # Pre-run probe: Refs are off (default)
+            @test SpinorBEC.DEALIAS_2_3_ENABLED[] == false
+            @test SpinorBEC.DEALIAS_K_CUTOFF[] === nothing
+
+            # Run — should temporarily set Refs, then restore in finally.
+            run_yaml(yaml_path; base_dir=mktempdir(), verbose=false)
+
+            # Post-run: Refs restored to default.
+            @test SpinorBEC.DEALIAS_2_3_ENABLED[] == false
+            @test SpinorBEC.DEALIAS_K_CUTOFF[] === nothing
+        finally
+            rm(yaml_path; force=true)
+        end
+    end
+
     @testset "safe_k_cut_boundary formula" begin
         # k_Nyq = π·N/L; safe = 2·k_Nyq/3
         @test SpinorBEC.safe_k_cut_boundary(64, 12.0) ≈ 2 * (π * 64 / 12.0) / 3

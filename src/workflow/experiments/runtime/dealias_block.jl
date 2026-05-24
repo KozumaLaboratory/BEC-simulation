@@ -24,6 +24,20 @@
 export apply_dealias_block!
 
 """
+Pending snapshot (was_enabled, was_k_cut) of the dealias Refs from the
+most recent `apply_dealias_block!` call. `_run_yaml_execute` reads
+this in a `finally` block to restore prior state and prevent leakage
+across runs in the same Julia session.
+
+Module-level Ref because the snapshot CANNOT be stashed inside the YAML
+`data::Dict` — strict schema validation (validate_pipeline!) walks all
+top-level keys and rejects unknown ones, so any `_dealias_snapshot`
+sentinel placed there triggers ArgumentError before the execute phase
+runs.
+"""
+const _DEALIAS_PENDING_SNAPSHOT = Ref{Union{Nothing, Tuple{Bool, Union{Nothing, Float64}}}}(nothing)
+
+"""
     apply_dealias_block!(data::Dict) -> (was_enabled, was_k_cut)
 
 If `data["dealias"]` is present, pop it, set the global filter Refs,
