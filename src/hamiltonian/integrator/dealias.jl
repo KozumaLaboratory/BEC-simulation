@@ -24,7 +24,33 @@
 # grid-convergence regression is in place this will graduate to a
 # Workspace field + YAML knob.
 
-export apply_orszag_2_3_filter!
+export apply_orszag_2_3_filter!, safe_k_cut_boundary
+
+"""
+    safe_k_cut_boundary(n_grid::Int, box_L::Float64) -> Float64
+
+The maximum `DEALIAS_K_CUTOFF` value (in physical k units) for which
+the F filter fully suppresses bilinear aliasing on an `n_grid`-point
+axis of length `box_L`.
+
+Derivation: a bilinear F mode at original per-axis `|k_d|` in
+`(k_Nyq, 2K)` folds via FFT wraparound to `|k_d|` in `(2·k_Nyq - 2K, k_Nyq)`.
+The F filter at cutoff `K` zeros only folded modes with `|k_d| > K`.
+Modes with original `K_alias > 2·k_Nyq - K` fold to `|k_d| < K` and
+escape the filter. For zero escape we need `2K ≤ 2·k_Nyq - K`, i.e.
+`K ≤ 2·k_Nyq/3`.
+
+At larger `K`, the ΔF_z answer becomes non-monotonic in K (alias
+contamination), so the diagnostic / production rule is:
+`DEALIAS_K_CUTOFF[] ≤ safe_k_cut_boundary(N, L)`.
+
+Examples (box L=12):
+- N=64  → safe cutoff ≤ 11.17  (default n÷3·dk = 11.0 is just inside)
+- N=96  → safe cutoff ≤ 16.76  (default n÷3·dk = 16.76 is at boundary)
+- N=128 → safe cutoff ≤ 22.34
+- N=192 → safe cutoff ≤ 33.51
+"""
+safe_k_cut_boundary(n_grid::Int, box_L::Float64) = 2 * (π * n_grid / box_L) / 3
 
 """
 Global toggle for Orszag 2/3-rule dealiasing in `split_step!` and
@@ -201,6 +227,7 @@ Call once per spin component (Fx, Fy, Fz) after the bilinear
 function apply_orszag_2_3_F_filter!(
     F_pad::AbstractArray{T, N}, n_pts::NTuple{N, Int}
 ) where {T <: Real, N}
+    _check_safe_k_cut(n_pts)
     buf, plans = _get_orszag_F_filter_resources(F_pad, n_pts)
     mask = _get_orszag_mask(n_pts)
     mask_dev = _to_psi_device(buf, mask)
@@ -210,6 +237,29 @@ function apply_orszag_2_3_F_filter!(
     buf .*= mask_dev
     plans.inverse * buf
     @views F_pad[idx...] .= real.(buf)
+    nothing
+end
+
+"""
+Runtime check: if `DEALIAS_K_CUTOFF[]` exceeds the safe boundary
+`2·k_Nyq/3` at the current grid, the F filter cannot fully suppress
+bilinear aliasing — the result will be contaminated and (per L4
+k-scan data) non-monotonic in `k_cut`. Emit a single `@warn` on first
+violation so the user sees it without spam.
+"""
+function _check_safe_k_cut(n_pts::NTuple{N, Int}) where {N}
+    k_cut = DEALIAS_K_CUTOFF[]
+    k_cut === nothing && return nothing
+    # Use the smallest axis as the binding constraint; per-axis cutoff
+    # in physical k is the same across axes for cubic boxes (assumed
+    # L=12 here; see DEALIAS_K_CUTOFF docstring for the box assumption).
+    n_min = minimum(n_pts)
+    k_safe = safe_k_cut_boundary(n_min, 12.0)
+    if k_cut > k_safe + 1e-9
+        @warn "DEALIAS_K_CUTOFF[] = $k_cut exceeds safe boundary $(round(k_safe; digits=4)) " *
+            "(= 2·k_Nyq/3 at n=$n_min, L=12); F-filter cannot fully suppress bilinear " *
+            "aliasing — answer will be contaminated. Reduce k_cut or use a larger grid." maxlog=1
+    end
     nothing
 end
 

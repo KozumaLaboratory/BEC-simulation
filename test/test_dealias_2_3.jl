@@ -90,6 +90,16 @@ using SpinorBEC
         @test sum(m) == 125.0
     end
 
+    @testset "safe_k_cut_boundary formula" begin
+        # k_Nyq = π·N/L; safe = 2·k_Nyq/3
+        @test SpinorBEC.safe_k_cut_boundary(64, 12.0) ≈ 2 * (π * 64 / 12.0) / 3
+        @test SpinorBEC.safe_k_cut_boundary(96, 12.0) ≈ 2 * (π * 96 / 12.0) / 3
+        @test SpinorBEC.safe_k_cut_boundary(128, 12.0) ≈ 2 * (π * 128 / 12.0) / 3
+        # Values match the L4 k-scan analysis comment in the docstring
+        @test isapprox(SpinorBEC.safe_k_cut_boundary(96, 12.0), 16.755; atol=1e-3)
+        @test isapprox(SpinorBEC.safe_k_cut_boundary(128, 12.0), 22.34; atol=1e-2)
+    end
+
     @testset "DEALIAS_K_CUTOFF override (fixed physical k_cut)" begin
         # Default behaviour: cutoff = n÷3 per axis.
         @test SpinorBEC.DEALIAS_K_CUTOFF[] === nothing
