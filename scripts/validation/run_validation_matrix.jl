@@ -37,6 +37,8 @@ const VALIDATION_LEVELS = [
     # (level, test_file_or_marker, short_description)
     (0, "MANUAL: runs/verification_suite/ env metadata",
         "Environment / reproducibility (git, Manifest, CUDA, seed)"),
+    (0, "test/test_level0_gpu_cpu_consistency.jl",
+        "GPU/CPU consistency on small system (gated on CUDA.functional)"),
     (1, "test/test_level1_scalar_exact.jl",
         "Scalar exact tests (free uniform, plane wave, harmonic GS)"),
     (1, "test/test_dealias_2_3.jl",
@@ -51,6 +53,8 @@ const VALIDATION_LEVELS = [
         "Zeeman accessor API (linear_p, quadratic_q, transverse_b)"),
     (4, "test/hamiltonian/test_spin_mixing.jl",
         "Spin-1 SMA c1 sign convention"),
+    (4, "test/test_level4_f1_phase_emergence.jl",
+        "F=1 phase emergence: c1>0 → polar, c1<0 → FM (energy ordering)"),
     (4, "test/hamiltonian/test_singlet_pair.jl",
         "Spin-2 cyclic / nematic A_00 singlet pair"),
     (4, "test/hamiltonian/test_tensor_interaction.jl",
