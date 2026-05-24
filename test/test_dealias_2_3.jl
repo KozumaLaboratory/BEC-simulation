@@ -113,6 +113,79 @@ using SpinorBEC
         @test isapprox(SpinorBEC.safe_k_cut_boundary(128, 12.0), 22.34; atol=1e-2)
     end
 
+    @testset "YAML dealias block automation" begin
+        # apply_dealias_block! pops the key + sets Refs
+        cfg = Dict{String, Any}(
+            "dealias" => Dict{String, Any}("enabled" => true, "k_cut" => 16.0),
+            "pipeline" => [],
+        )
+        snapshot = SpinorBEC.apply_dealias_block!(cfg)
+        @test SpinorBEC.DEALIAS_2_3_ENABLED[] == true
+        @test SpinorBEC.DEALIAS_K_CUTOFF[] == 16.0
+        @test !haskey(cfg, "dealias")  # popped for schema-safety
+        @test snapshot isa Tuple  # previous (enabled, k_cut) for restore
+
+        # Restore round-trip
+        SpinorBEC.restore_dealias_refs!(snapshot...)
+        @test SpinorBEC.DEALIAS_2_3_ENABLED[] == false
+        @test SpinorBEC.DEALIAS_K_CUTOFF[] === nothing
+
+        # auto_dt clamps dynamics.dt
+        cfg2 = Dict{String, Any}(
+            "dealias" => Dict{String, Any}(
+                "enabled" => true, "k_cut" => 16.0, "auto_dt" => true
+            ),
+            "pipeline" => [
+                Dict{String, Any}(
+                    "dynamics" => Dict{String, Any}("dt" => 0.01, "duration" => 6.28)
+                ),
+            ],
+        )
+        snap = SpinorBEC.apply_dealias_block!(cfg2)
+        @test cfg2["pipeline"][1]["dynamics"]["dt"] ≈ SpinorBEC.dt_max_for_k_cut(16.0)
+        @test cfg2["pipeline"][1]["dynamics"]["dt"] < 0.01  # tightened
+        SpinorBEC.restore_dealias_refs!(snap...)
+
+        # auto_dt LEAVES dt alone when already smaller than bound
+        cfg3 = Dict{String, Any}(
+            "dealias" => Dict{String, Any}(
+                "enabled" => true, "k_cut" => 16.0, "auto_dt" => true
+            ),
+            "pipeline" => [
+                Dict{String, Any}(
+                    "dynamics" => Dict{String, Any}("dt" => 0.001, "duration" => 1.0)
+                ),
+            ],
+        )
+        snap = SpinorBEC.apply_dealias_block!(cfg3)
+        @test cfg3["pipeline"][1]["dynamics"]["dt"] == 0.001  # below bound, untouched
+        SpinorBEC.restore_dealias_refs!(snap...)
+
+        # Unknown key rejection
+        cfg4 = Dict{String, Any}(
+            "dealias" => Dict{String, Any}("bogus_key" => true),
+            "pipeline" => [],
+        )
+        @test_throws ArgumentError SpinorBEC.apply_dealias_block!(cfg4)
+
+        # k_cut=nothing keeps default per-axis cutoff
+        cfg5 = Dict{String, Any}(
+            "dealias" => Dict{String, Any}("enabled" => true),  # no k_cut
+            "pipeline" => [],
+        )
+        snap = SpinorBEC.apply_dealias_block!(cfg5)
+        @test SpinorBEC.DEALIAS_2_3_ENABLED[] == true
+        @test SpinorBEC.DEALIAS_K_CUTOFF[] === nothing  # default
+        SpinorBEC.restore_dealias_refs!(snap...)
+
+        # Negative k_cut rejected
+        cfg6 = Dict{String, Any}(
+            "dealias" => Dict{String, Any}("enabled" => true, "k_cut" => -1.0),
+            "pipeline" => [],
+        )
+        @test_throws ArgumentError SpinorBEC.apply_dealias_block!(cfg6)
+    end
+
     @testset "DEALIAS_K_CUTOFF override (fixed physical k_cut)" begin
         # Default behaviour: cutoff = n÷3 per axis.
         @test SpinorBEC.DEALIAS_K_CUTOFF[] === nothing

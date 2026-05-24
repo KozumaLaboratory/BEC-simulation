@@ -49,6 +49,122 @@ end
 
 _now_iso() = Dates.format(now(), "yyyy-mm-ddTHH:MM:SS")
 
+function _run_yaml_status(verbose::Bool, msg::AbstractString; comment::Bool=false)
+    verbose || return nothing
+    prefix = comment ? "# [run_yaml] " : "[run_yaml] "
+    println(prefix, msg)
+    flush(stdout)
+    ccall(:fflush, Cint, (Ptr{Cvoid},), C_NULL)
+    return nothing
+end
+
+function _pipeline_step_summary(data::Dict)
+    pipe = get(data, "pipeline", Any[])
+    pipe isa AbstractVector || return "pipeline: unavailable"
+    names = String[]
+    for step in pipe
+        if step isa AbstractDict && length(step) == 1
+            push!(names, string(first(keys(step))))
+        else
+            push!(names, "<?>")
+        end
+    end
+    isempty(names) && return "pipeline: 0 steps"
+    return "pipeline: $(length(names)) step(s): " * join(names, " -> ")
+end
+
+function _short_preview(x; maxchars::Int=180)
+    s = replace(sprint(show, x), '\n' => ' ')
+    length(s) <= maxchars && return s
+    return first(s, maxchars) * "..."
+end
+
+function _pipeline_step_kind(data::Dict, idx0::Int)
+    pipe = get(data, "pipeline", Any[])
+    pipe isa AbstractVector || return nothing
+    idx = idx0 + 1
+    1 <= idx <= length(pipe) || return nothing
+    step = pipe[idx]
+    step isa AbstractDict && length(step) == 1 || return nothing
+    return string(first(keys(step)))
+end
+
+function _get_unwrapped_path(data::Dict, path::AbstractString)
+    parts = split(path, '.')
+    cursor::Any = data
+    for part in parts
+        key = String(part)
+        if cursor isa AbstractVector
+            idx0 = tryparse(Int, key)
+            idx0 === nothing && return nothing
+            idx = idx0 + 1
+            1 <= idx <= length(cursor) || return nothing
+            elem = cursor[idx]
+            cursor = elem isa AbstractDict && length(elem) == 1 ? first(values(elem)) : elem
+        elseif cursor isa AbstractDict
+            haskey(cursor, key) || return nothing
+            cursor = cursor[key]
+        else
+            return nothing
+        end
+    end
+    return cursor
+end
+
+function _override_path_warning(data::Dict, path::AbstractString)
+    parts = split(path, '.')
+    length(parts) >= 4 || return nothing
+    parts[1] == "pipeline" || return nothing
+    idx0 = tryparse(Int, parts[2])
+    idx0 === nothing && return nothing
+    kind = _pipeline_step_kind(data, idx0)
+    kind === nothing && return nothing
+    parts[3] == kind || return nothing
+    corrected = join(["pipeline", parts[2], parts[4:end]...], ".")
+    return "WARNING: path includes step kind '$kind' after pipeline index; " *
+           "pipeline steps are auto-unwrapped. Use '$corrected'."
+end
+
+function _scan_preview_lines(data::Dict)
+    scan_dict = get(data, "scan", nothing)
+    scan_dict isa AbstractDict || return String[]
+    runs = get(scan_dict, "comparison_runs", nothing)
+    runs isa AbstractVector && !isempty(runs) || return String[]
+
+    lines = String["# Scan comparison preview:"]
+    push!(lines, "#   comparison_runs: $(length(runs))")
+    for r in runs
+        r isa AbstractDict || continue
+        name = string(get(r, "name", "<unnamed>"))
+        override = parse_override_map(get(r, "override", Dict()))
+        push!(lines, "#   - $name: $(length(override)) override(s)")
+        patched = apply_overrides(data, override)
+        for (path, value) in sort(collect(override); by=first)
+            push!(lines, "#       $path = $(_short_preview(value))")
+            warn = _override_path_warning(data, path)
+            warn === nothing || push!(lines, "#         $warn")
+        end
+        pipe = get(patched, "pipeline", Any[])
+        if pipe isa AbstractVector
+            for (i, step) in enumerate(pipe)
+                step isa AbstractDict && length(step) == 1 || continue
+                kind = string(first(keys(step)))
+                params = first(values(step))
+                if params isa AbstractDict && haskey(params, kind)
+                    push!(lines,
+                        "#         WARNING: nested key pipeline.$(i - 1).$kind.$kind exists after overrides",
+                    )
+                end
+            end
+        end
+        loss = _get_unwrapped_path(patched, "pipeline.2.loss")
+        loss === nothing ||
+            push!(lines, "#       effective pipeline.2.loss = $(_short_preview(loss))")
+    end
+    push!(lines, "#")
+    return lines
+end
+
 function _point_filename(i::Int, run_name::String="")
     base = "point_$(lpad(i, 3, '0'))"
     isempty(run_name) ? "$(base).jld2" : "$(base)_$(run_name).jld2"
@@ -65,9 +181,40 @@ each scan point × comparison run is executed independently via
 """
 function run_yaml(yaml_path::String; base_dir::String="runs", verbose::Bool=true,
     dry_run::Bool=false)
+    _run_yaml_status(verbose, "starting run_yaml: $yaml_path"; comment=dry_run)
+    return Base.invokelatest(_run_yaml_impl, yaml_path, base_dir, verbose, dry_run)
+end
+
+@noinline function _run_yaml_impl(
+    yaml_path::String, base_dir::String, verbose::Bool, dry_run::Bool
+)
+    data = Base.invokelatest(_run_yaml_prepare, yaml_path, verbose, dry_run)::Dict
+    if dry_run
+        return Base.invokelatest(_run_yaml_dry_run_output, data, yaml_path, verbose)
+    end
+    return Base.invokelatest(_run_yaml_execute, data, yaml_path, base_dir, verbose)
+end
+
+@noinline function _run_yaml_prepare(yaml_path::String, verbose::Bool, dry_run::Bool)
+    _run_yaml_status(verbose, "loading config: $yaml_path"; comment=dry_run)
     data = YAML.load_file(yaml_path)
+    _run_yaml_status(verbose, "checking required top-level keys"; comment=dry_run)
     haskey(data, "pipeline") || throw(ArgumentError(
         "YAML must have a 'pipeline:' key. Got keys: $(collect(keys(data)))"))
+
+    # Auto-apply Orszag 2/3 dealias settings. Pop the optional top-level
+    # `dealias:` block so schema validation (strict=true) doesn't reject
+    # it as unknown; the prepare/execute pair stashes the previous Ref
+    # snapshot on the dict so execute can restore in a `finally`.
+    if haskey(data, "dealias")
+        _run_yaml_status(verbose, "applying dealias block"; comment=dry_run)
+        snapshot = apply_dealias_block!(data)
+        data["_dealias_snapshot"] = snapshot
+        if verbose && DEALIAS_2_3_ENABLED[]
+            println("  dealias: enabled=$(DEALIAS_2_3_ENABLED[]), " *
+                    "k_cut=$(DEALIAS_K_CUTOFF[])")
+        end
+    end
 
     # Auto-apply lab-unit calibration. Three forms recognised:
     #
@@ -80,10 +227,12 @@ function run_yaml(yaml_path::String; base_dir::String="runs", verbose::Bool=true
     # All calibration-related top-level keys are popped before schema
     # validation so they don't trigger "unknown key" warnings.
     if haskey(data, "calibration") && data["calibration"] isa Dict
+        _run_yaml_status(verbose, "applying calibration block"; comment=dry_run)
         calib = _calibration_from_dict(pop!(data, "calibration"))
         verbose && println("  applying calibration epoch=$(calib.epoch) date=$(calib.date)")
         apply_calibration!(data, calib)
     elseif haskey(data, "calibration_history")
+        _run_yaml_status(verbose, "applying calibration history"; comment=dry_run)
         hist_raw = pop!(data, "calibration_history")
         target = if haskey(data, "target_date")
             Dates.Date(String(pop!(data, "target_date")))
@@ -105,62 +254,79 @@ function run_yaml(yaml_path::String; base_dir::String="runs", verbose::Bool=true
     end
 
     # Expand templates + mixins (named protocols, reusable parameter sets).
+    _run_yaml_status(verbose, "expanding templates and mixins"; comment=dry_run)
     apply_templates_and_mixins!(data)
 
     # Auto-inject schema-level block defaults (e.g. `ground_state.ddi: {}`
     # so the parser auto-derives c_dd from atom + N_atoms + ω_ref). Must
     # run after templates/mixins so the steps it walks are fully expanded;
     # before unit/B/noise normalisation so those see consistent shape.
+    _run_yaml_status(verbose, "injecting schema defaults"; comment=dry_run)
     apply_schema_defaults!(data)
 
     # Apply opt-in `units:` block AFTER calibration + templates (template
     # output may already be in Quantity strings; `units:` rewrite only
     # touches bare Reals).
+    _run_yaml_status(verbose, "applying units block"; comment=dry_run)
     apply_units_block!(data)
 
     # Top-level `accuracy:` and `auto_grid:` shortcuts → physics-first
     # defaults seeded into pipeline steps where missing.
+    _run_yaml_status(verbose, "applying accuracy and auto-grid defaults"; comment=dry_run)
     apply_auto_defaults!(data)
 
     # Unified `B:` block → split into internal magnitude + direction
     # dicts for the runner. Validates Cartesian/spherical mutual exclusion.
+    _run_yaml_status(verbose, "normalizing B blocks"; comment=dry_run)
     apply_B_block_normalize!(data)
 
     # Unified `noise:` block → temperature_ratio / twa / sgpe / etc.
     # Validates `initial.thermal` ⊕ `twa` mutex.
+    _run_yaml_status(verbose, "normalizing noise blocks"; comment=dry_run)
     apply_noise_block_normalize!(data)
 
     # Schema validation: catch typos and invalid values before starting.
     # strict=true fails the run on unknown keys; this is the production
     # default so silent-drop bugs (2026-04-27 `trap:` incident) cannot
     # repeat.
+    _run_yaml_status(verbose, "validating schema"; comment=dry_run)
     validate_pipeline!(data; strict=true)
+    _run_yaml_status(verbose, _pipeline_step_summary(data); comment=dry_run)
+    return data
+end
 
+@noinline function _run_yaml_dry_run_output(data::Dict, yaml_path::String, verbose::Bool)
     # Dry-run: print the calibration-applied + units-applied + validated
     # YAML and exit without touching the GPU / building any workspace.
     # Useful for checking that lab-unit YAML expanded as expected before
     # committing to a long compute.
-    if dry_run
-        buf = IOBuffer()
-        println(buf, "# === run_yaml dry-run (post calibration + units + validation) ===")
-        println(buf, "# original: $yaml_path")
-        println(buf, "#")
-        println(buf, "# Stages applied:")
-        println(buf, "#   1. calibration:  lab-control values → physical units")
-        println(buf, "#   2. units:        bare Reals → unit-bearing strings")
-        println(buf, "#   3. schema:       unknown-key + range + enum validation")
-        println(buf, "#")
-        println(buf, "# Numerics defaults (dt, save_every, n_steps) are still expressed")
-        println(buf, "# in their YAML form here; final resolved values are logged when")
-        println(buf, "# the actual run starts. To inspect resolved values without running,")
-        println(buf, "# use a 1-step ground_state with verbose=true.")
-        println(buf, "#")
-        YAML.write(buf, data)
-        out = String(take!(buf))
-        print(out)
-        return out
+    _run_yaml_status(verbose, "dry-run complete; printing normalized YAML"; comment=true)
+    buf = IOBuffer()
+    println(buf, "# === run_yaml dry-run (post calibration + units + validation) ===")
+    println(buf, "# original: $yaml_path")
+    println(buf, "#")
+    println(buf, "# Stages applied:")
+    println(buf, "#   1. calibration:  lab-control values → physical units")
+    println(buf, "#   2. units:        bare Reals → unit-bearing strings")
+    println(buf, "#   3. schema:       unknown-key + range + enum validation")
+    println(buf, "#")
+    println(buf, "# Numerics defaults (dt, save_every, n_steps) are still expressed")
+    println(buf, "# in their YAML form here; final resolved values are logged when")
+    println(buf, "# the actual run starts. To inspect resolved values without running,")
+    println(buf, "# use a 1-step ground_state with verbose=true.")
+    println(buf, "#")
+    for line in _scan_preview_lines(data)
+        println(buf, line)
     end
+    YAML.write(buf, data)
+    out = String(take!(buf))
+    print(out)
+    return out
+end
 
+@noinline function _run_yaml_execute(
+    data::Dict, yaml_path::String, base_dir::String, verbose::Bool
+)
     # If the YAML is already runs/foo/config.yaml, use runs/foo/ as the run dir
     # (user manages directory names). Otherwise compute a hash-based dir.
     run_dir = if basename(yaml_path) == "config.yaml" && isdir(dirname(yaml_path))
@@ -168,13 +334,16 @@ function run_yaml(yaml_path::String; base_dir::String="runs", verbose::Bool=true
     else
         compute_run_dir(yaml_path; base_dir)
     end
+    _run_yaml_status(verbose, "using run directory: $run_dir")
     mkpath(run_dir)
 
     config_snapshot = joinpath(run_dir, "config.yaml")
     if abspath(yaml_path) != abspath(config_snapshot)
+        _run_yaml_status(verbose, "snapshotting config: $config_snapshot")
         isfile(config_snapshot) || cp(yaml_path, config_snapshot)
     end
 
+    _run_yaml_status(verbose, "collecting environment metadata")
     env = _env_metadata()
 
     # Make relative paths inside the YAML (e.g. `csv: beams.csv`) resolve
@@ -182,14 +351,21 @@ function run_yaml(yaml_path::String; base_dir::String="runs", verbose::Bool=true
     prev_yaml_dir = get(ENV, "SPINORBEC_YAML_DIR", nothing)
     ENV["SPINORBEC_YAML_DIR"] = dirname(abspath(yaml_path))
 
+    # Snapshot the dealias Refs so they can be restored after the run —
+    # avoids state leakage when the same Julia session runs multiple
+    # YAMLs back-to-back with different dealias settings.
+    dealias_snapshot = pop!(data, "_dealias_snapshot", nothing)
+
     try
         # Expand scan points (if any)
         scan_dict = get(data, "scan", nothing)
         if scan_dict !== nothing
+            _run_yaml_status(verbose, "expanding scan points")
             scan = _parse_override_scan(scan_dict)
             _run_yaml_scan(data, scan, run_dir, env; verbose)
         else
             # Single-shot pipeline: one point
+            _run_yaml_status(verbose, "starting single pipeline run")
             _run_yaml_single(data, run_dir, env, 1, ""; verbose)
         end
     finally
@@ -197,6 +373,10 @@ function run_yaml(yaml_path::String; base_dir::String="runs", verbose::Bool=true
             delete!(ENV, "SPINORBEC_YAML_DIR")
         else
             (ENV["SPINORBEC_YAML_DIR"] = prev_yaml_dir)
+        end
+        if dealias_snapshot !== nothing
+            (was_enabled, was_k_cut) = dealias_snapshot
+            restore_dealias_refs!(was_enabled, was_k_cut)
         end
     end
 
@@ -206,6 +386,9 @@ end
 
 function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=true)
     has_comparison = !isempty(scan.comparison_runs)
+    n_recipes = has_comparison ? length(scan.comparison_runs) : 1
+    _run_yaml_status(verbose,
+        "scan: $(length(scan.points)) point(s), $n_recipes run recipe(s)")
     chain_state = Dict{String, Any}()  # run_name → (psi, mz_actual)
 
     pause_file = joinpath(run_dir, ".pause")
@@ -248,6 +431,7 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
             verbose && println("  → $(basename(psi_file))")
 
             # Apply overrides to pipeline dict
+            _run_yaml_status(verbose, "applying overrides for $(basename(psi_file))")
             patched = apply_overrides(data, merged)
             # Strip scan block to prevent recursion
             delete!(patched, "scan")
@@ -264,10 +448,12 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
                 psi_prev = auto_rotate_psi(psi_prev, patched, prev_mz)
             end
 
+            _run_yaml_status(verbose, "parsing pipeline for $(basename(psi_file))")
             config = parse_pipeline(patched)
             ckpt_dir = joinpath(run_dir, ".checkpoints", basename(psi_file))
             live_path = joinpath(run_dir, "_live_status.json")
-            result = run_pipeline(config; verbose=false, psi_init=psi_prev,
+            _run_yaml_status(verbose, "running pipeline for $(basename(psi_file))")
+            result = run_pipeline(config; verbose=verbose, psi_init=psi_prev,
                 checkpoint_dir=ckpt_dir, live_status_path=live_path)
 
             finished_at = _now_iso()
@@ -287,6 +473,7 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
             tmp_file = _scratch_tmp_path(psi_file)
             jld_kwargs = _snapshot_compression_kwargs(result)
             try
+                _run_yaml_status(verbose, "writing result: $(basename(psi_file))")
                 jldopen(tmp_file, "w"; jld_kwargs...) do f
                     f["psi"] = psi_host
                     f["scan_index"] = i
@@ -413,9 +600,11 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
     started_at = _now_iso()
     t_start = time()
 
+    _run_yaml_status(verbose, "parsing pipeline for $(basename(psi_file))")
     config = parse_pipeline(data)
     ckpt_dir = joinpath(run_dir, ".checkpoints", basename(psi_file))
     live_path = joinpath(run_dir, "_live_status.json")
+    _run_yaml_status(verbose, "running pipeline for $(basename(psi_file))")
     result = run_pipeline(config; verbose, checkpoint_dir=ckpt_dir,
         live_status_path=live_path)
 
@@ -429,6 +618,7 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
     tmp_file = _scratch_tmp_path(psi_file)
     jld_kwargs = _snapshot_compression_kwargs(result)
     try
+        _run_yaml_status(verbose, "writing result: $(basename(psi_file))")
         jldopen(tmp_file, "w"; jld_kwargs...) do f
             f["psi"] = psi_host
             f["scan_index"] = index
