@@ -115,6 +115,59 @@ using SpinorBEC
         end
     end
 
+    @testset ":antiferromagnetic (F=1) → all-components alt-sign, ⟨F_z⟩=0" begin
+        # CAVEAT: init_psi(:antiferromagnetic) is the all-components
+        # ψ = sign(c) · gauss/sqrt(D)  with sign = (-1)^{F-m}, NOT the
+        # 2-state (|+F⟩+|-F⟩)/sqrt(2) often called "AFM" in literature.
+        # Specifically for F=1 this gives (1, -1, 1)·gauss/sqrt(3),
+        # which has ⟨F_z⟩=0 but ⟨F_x⟩ ≠ 0 (i.e. |⟨F⟩|² ≠ 0, NOT a
+        # singlet-pair / polar state).
+        #
+        # Useful as an ITP seed (spreads weight across components) but
+        # NOT a phase-classification reference. For paper3 work use
+        # :biaxial_nematic (which is the (|+F⟩+|-F⟩)/sqrt(2) state).
+        F = 1
+        grid = make_grid(GridConfig((8,), (4.0,)))
+        sys = SpinSystem(F)
+        psi = init_psi(grid, sys; state=:antiferromagnetic)
+        sm = spin_matrices(F)
+
+        # Robust: ⟨F_z⟩ = 0 (equal weights at ±1, sign cancels in F_z)
+        fz_total = magnetization(psi, grid, sm.system)
+        norm = total_norm(psi, grid)
+        @test abs(fz_total / norm) < 1e-12
+
+        # A_00 = (1/√D) Σ_c sign_c · ψ_c · ψ_{D-c+1}
+        # For F=1: signs=(+1,−1,+1), pairs c↔(D−c+1)=(1↔3,2↔2,3↔1)
+        # ψ = (1,−1,1)·gauss/√3 → A_00 = (1/√3)·(gauss²/3 − gauss²/3 + gauss²/3)
+        # = (1/√3)·gauss²/3 → |A_00|² = gauss^4 / 27
+        # → sum(|A_00|²) / sum(n²) = 1/27 (with n = gauss²)
+        A = singlet_pair_amplitude(psi, F, 1)
+        n = total_density(psi, 1)
+        @test isapprox(sum(abs2, A), sum(n .^ 2) / 27; rtol=1e-12)
+    end
+
+    @testset ":biaxial_nematic (F=2) → ⟨F⟩=0 and |A_00|²=n²/5" begin
+        # Biaxial nematic at F=2: ψ = (1/√2)(|+2⟩ + |-2⟩). Properties:
+        #   ⟨F_z⟩ = 2·1/2 + (-2)·1/2 = 0
+        #   ⟨F_x⟩, ⟨F_y⟩ = 0 (no adjacent components)
+        #   A_00 = (1/√5)(2 · sign_1 · 1/2) = (1/√5)·1 → |A_00|² = 1/5
+        # Per paper3 §VII.A this is the D_4 axial state at F=2.
+        F = 2
+        grid = make_grid(GridConfig((8,), (4.0,)))
+        sys = SpinSystem(F)
+        psi = init_psi(grid, sys; state=:biaxial_nematic)
+        sm = spin_matrices(F)
+
+        fz_total = magnetization(psi, grid, sm.system)
+        norm = total_norm(psi, grid)
+        @test abs(fz_total / norm) < 1e-12
+
+        A = singlet_pair_amplitude(psi, F, 1)
+        n = total_density(psi, 1)
+        @test sum(abs2, A) ≈ sum(n .^ 2) / 5 rtol = 1e-12
+    end
+
     @testset "all named states: normalised ∫|ψ|² dV = 1" begin
         # Sanity: every named state is normalised. Catches bugs in
         # init_psi normalization that would leak into ITP / dynamics.
