@@ -25,6 +25,7 @@ const FAST_TESTS = [
     "test_level1_scalar_exact.jl",
     "analysis/test_faraday.jl",
     "analysis/test_sign_pattern.jl",
+    "workflow/test_phi_omega_convention.jl",
     "foundation/test_atoms.jl",
     "foundation/test_grid.jl",
     "foundation/test_spin_matrices.jl",
