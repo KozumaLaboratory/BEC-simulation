@@ -103,6 +103,63 @@ using SpinorBEC
         @test 0.01 > SpinorBEC.dt_max_for_k_cut(16.0)
     end
 
+    @testset "YAML dealias persists across scan points" begin
+        # A YAML scan runs multiple points through `run_pipeline` from
+        # one outer `run_yaml` call. Dealias settings come from the
+        # top-level block, so EVERY scan point should see them. This
+        # test catches a regression where the snapshot restore (in
+        # the per-point loop) could clobber the per-point Refs to the
+        # PRIOR run_yaml's defaults.
+        SpinorBEC.DEALIAS_2_3_ENABLED[] = false
+        SpinorBEC.DEALIAS_K_CUTOFF[] = nothing
+
+        # A YAML with `scan:` (2 points sweeping a benign value), all
+        # under one outer dealias block. The hook fires once per
+        # run_yaml invocation, so the snapshot pattern must survive
+        # multiple per-point run_pipeline calls inside.
+        yaml_text = """
+        dealias:
+          enabled: true
+          k_cut: 8.0
+
+        defaults:
+          kind: spinor
+          backend: cpu
+          interactions: {N_atoms: 50, omega_ref: 1.0}
+
+        scan:
+          parameter_path: pipeline.0.interactions.c1_ratio
+          values: [0.0, 0.01]
+
+        pipeline:
+          - ground_state:
+              atom: Rb87
+              grid: {n: [10], box: [10.0]}
+              potential: {type: harmonic, omega: [1.0]}
+              interactions: {N_atoms: 50, omega_ref: 1.0, c1_ratio: 0.0}
+              ddi: {enabled: false}
+              lhy: {kind: none}
+              B: {Bz: 0.0, q: 0.0, theta: 0.0, phi: 0.0}
+              initial_state: m_plus_F
+              init_sigma: 1.0
+              dt: 0.005
+              n_steps: 10
+              tol: 1.0e-6
+        """
+
+        yaml_path, io = mktemp()
+        try
+            write(io, yaml_text)
+            close(io)
+            run_yaml(yaml_path; base_dir=mktempdir(), verbose=false)
+            # Final state must be restored cleanly even after a scan.
+            @test SpinorBEC.DEALIAS_2_3_ENABLED[] == false
+            @test SpinorBEC.DEALIAS_K_CUTOFF[] === nothing
+        finally
+            rm(yaml_path; force=true)
+        end
+    end
+
     @testset "YAML dealias block end-to-end via run_yaml" begin
         # Smoke test: a minimal YAML config with `dealias:` block triggers
         # the apply_dealias_block! → set Refs → run pipeline → restore
