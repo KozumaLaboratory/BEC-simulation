@@ -61,6 +61,16 @@ function _run_itp_loop!(
     # its `exp(-2F·θ)` shift, so the comment about overflow still holds —
     # we never call DDI at full dt.
     #
+    # Optional Orszag 2/3 dealias filter on ψ at ITP entry — needed when
+    # we want grid-convergent GS for the downstream dynamics (else the
+    # ITP-converged GS contains grid-dependent high-k content that survives
+    # to the dynamics phase and propagates a residual cross-grid disagreement
+    # even after the dynamics filter is applied; see L4 cross-grid probe
+    # 2026-05-24).
+    if DEALIAS_2_3_ENABLED[]
+        apply_orszag_2_3_filter!(ws.state.psi, ws.fft_plans, n_comp_ws, N_dim)
+    end
+
     # Open: V(dt/2)
     _outer_potential_fwd!(ws, dt / 4, n_comp_ws, N_dim, it)
     _ddi_step!(ws, dt / 2, N_dim, it)
@@ -69,6 +79,10 @@ function _run_itp_loop!(
     try
         for step in (start_step + 1):n_steps
             on_step !== nothing && on_step(ws, step, n_steps)
+
+            if DEALIAS_2_3_ENABLED[]
+                apply_orszag_2_3_filter!(ws.state.psi, ws.fft_plans, n_comp_ws, N_dim)
+            end
 
             # Kinetic step K(dt)
             _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, it, cc)
