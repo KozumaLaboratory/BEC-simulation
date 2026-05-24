@@ -58,6 +58,7 @@ const FAST_TESTS = [
     "workflow/test_phase_scan.jl",
     "workflow/test_initialization.jl",
     "workflow/test_state_zoo_macro_equivalence.jl",
+    "workflow/test_state_zoo_physics.jl",
     "analysis/test_spinor_utils.jl",
     "foundation/test_property_based.jl",
     "foundation/test_types_validation.jl",
@@ -75,7 +76,7 @@ const FAST_TESTS = [
     "hamiltonian/test_raman_timedep.jl",
     "workflow/test_vtk_export.jl",
     "workflow/test_infrastructure.jl",
-    "hamiltonian/test_zeeman_levels.jl",
+    "hamiltonian/test_b_block_builders.jl",
     "hamiltonian/test_zeeman_accessors.jl",
     # TDHFB local-approximation engine (channel kernel + Δ + voxel BdG step
     # + energy functional + conservation suite).
