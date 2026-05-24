@@ -128,6 +128,17 @@ function _compute_and_convolve_ddi_padded!(
 
     _compute_spin_density!(ctx.Fx_pad, ctx.Fy_pad, ctx.Fz_pad, psi, sm, Val(D), ndim, n_pts)
 
+    # Full Orszag 2/3 rule: ψ pre-filter (in split_step) reduces ψ bandwidth
+    # to (2/3)·k_Nyq, but bilinear F still has bandwidth (4/3)·k_Nyq and
+    # aliases on the N grid. Filter F to (2/3)·k_Nyq here to complete the
+    # rule. The first n_pts entries of F_pad are modified; the
+    # convolution-pad (the rest) stays zero.
+    if DEALIAS_2_3_ENABLED[]
+        apply_orszag_2_3_F_filter!(ctx.Fx_pad, n_pts)
+        apply_orszag_2_3_F_filter!(ctx.Fy_pad, n_pts)
+        apply_orszag_2_3_F_filter!(ctx.Fz_pad, n_pts)
+    end
+
     rp = ctx.rfft_plans
     mul!(ctx.Fx_pad_rk, rp.forward, ctx.Fx_pad)
     mul!(ctx.Fy_pad_rk, rp.forward, ctx.Fy_pad)

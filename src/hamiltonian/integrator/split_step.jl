@@ -26,6 +26,12 @@ function split_step!(ws::Workspace{N}) where {N}
     t_eval_1 = it ? 0.0 : t + dt / 4
     t_eval_2 = it ? 0.0 : t + 3dt / 4
 
+    if DEALIAS_2_3_ENABLED[]
+        @timeit_debug TIMER "dealias" apply_orszag_2_3_filter!(
+            ws.state.psi, ws.fft_plans, n_comp, N
+        )
+    end
+
     @timeit_debug TIMER "half_potential" _half_potential_step!(
         ws, dt / 2, n_comp, N, it; t_eval=t_eval_1, t_start=it ? NaN : t
     )
@@ -349,6 +355,12 @@ function split_step_midpoint!(ws::Workspace{N}; dt::Float64=ws.sim_params.dt) wh
     t_eval_1 = it ? 0.0 : t + dt / 4
     t_eval_2 = it ? 0.0 : t + 3dt / 4
 
+    if DEALIAS_2_3_ENABLED[]
+        @timeit_debug TIMER "dealias" apply_orszag_2_3_filter!(
+            ws.state.psi, ws.fft_plans, n_comp, N
+        )
+    end
+
     @timeit_debug TIMER "half_potential_mid" _half_potential_step_midpoint!(
         ws, dt / 2, n_comp, N, it; t_eval=t_eval_1, t_start=it ? NaN : t
     )
@@ -606,6 +618,12 @@ function split_step_trap!(ws::Workspace{N}) where {N}
 
     t_eval_1 = it ? 0.0 : t + dt / 4
     t_eval_2 = it ? 0.0 : t + 3dt / 4
+
+    if DEALIAS_2_3_ENABLED[]
+        @timeit_debug TIMER "dealias" apply_orszag_2_3_filter!(
+            ws.state.psi, ws.fft_plans, n_comp, N
+        )
+    end
 
     @timeit_debug TIMER "half_potential_trap" _half_potential_step_trap!(
         ws, dt / 2, n_comp, N, it; t_eval=t_eval_1, t_start=it ? NaN : t

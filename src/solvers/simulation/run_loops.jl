@@ -98,12 +98,20 @@ function _run_simulation_leapfrog!(
     omega = sp.rotating_frame_omega
     cc = ws.coriolis_cache
 
+    if DEALIAS_2_3_ENABLED[]
+        apply_orszag_2_3_filter!(ws.state.psi, ws.fft_plans, n_comp, N)
+    end
+
     _half_potential_step!(
         ws, dt / 2, n_comp, N, false; t_eval=(ws.state.t + dt / 4), t_start=ws.state.t
     )
 
     try
         for step in 1:sp.n_steps
+            if DEALIAS_2_3_ENABLED[]
+                apply_orszag_2_3_filter!(ws.state.psi, ws.fft_plans, n_comp, N)
+            end
+
             _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, false, cc)
             apply_kinetic_step_batched!(ws.state.psi, bk)
             _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, false, cc)

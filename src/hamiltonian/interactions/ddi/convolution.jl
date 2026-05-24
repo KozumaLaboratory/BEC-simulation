@@ -172,6 +172,14 @@ function _compute_and_convolve_ddi!(
 ) where {D, N}
     _compute_spin_density!(bufs.Fx_r, bufs.Fy_r, bufs.Fz_r, psi, sm, Val(D), ndim, n_pts)
 
+    # Full Orszag 2/3 rule companion (see dealias.jl + ddi_padded.jl). Filter
+    # bilinear F to (2/3)·k_Nyq to suppress aliased fold-back into low-k F.
+    if DEALIAS_2_3_ENABLED[]
+        apply_orszag_2_3_F_filter!(bufs.Fx_r, n_pts)
+        apply_orszag_2_3_F_filter!(bufs.Fy_r, n_pts)
+        apply_orszag_2_3_F_filter!(bufs.Fz_r, n_pts)
+    end
+
     rp = bufs.rfft_plans
     mul!(bufs.Fx_rk, rp.forward, bufs.Fx_r)
     mul!(bufs.Fy_rk, rp.forward, bufs.Fy_r)
