@@ -9,6 +9,30 @@
         @test cache2 === nothing
     end
 
+    @testset "odd-rank c_extra entries are silently ignored (CLAUDE.md convention)" begin
+        # CLAUDE.md "do NOT fix": odd-rank c_extra entries (c3, c5, c7, ...)
+        # are silently dropped by `make_tensor_interaction_cache` because
+        # the `for k in 0:2:2F` loop in `_make_tensor_cache_from_channels`
+        # only inspects even ranks. Bosonic spinor pair channels exist
+        # only at S = 0, 2, 4, ..., 2F.
+        #
+        # If a future refactor accidentally starts reading odd ranks
+        # (e.g., changes the step to 1 or introduces an off-by-one),
+        # this probe catches it: a c_extra with ONLY c3 set should still
+        # give a nothing cache.
+        for F in (2, 3, 6)
+            slots = 2F - 1
+            # Only odd-rank slot 2 (= c3) set; even ranks all zero.
+            c_extra = zeros(Float64, slots)
+            slots >= 2 && (c_extra[2] = 99.0)   # c3 = 99
+            slots >= 4 && (c_extra[4] = 88.0)   # c5
+            slots >= 6 && (c_extra[6] = 77.0)   # c7
+            ip = InteractionParams(0.0, 0.0, 0.0, c_extra)
+            cache = make_tensor_interaction_cache(F, ip)
+            @test cache === nothing  # cache must NOT activate from odd-rank only
+        end
+    end
+
     @testset "make_tensor_interaction_cache activates for higher channels" begin
         # F=2: c_extra = [c2=5.0, c3=0.0, c4=3.0]
         # get_cn(ip, 2) = c_extra[1] = 5.0
