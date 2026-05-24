@@ -83,6 +83,50 @@
         @test norm_final ≈ norm0 rtol = 1e-8
     end
 
+    @testset "Per-voxel h matrix is Hermitian (CG factor cause-isolation)" begin
+        # CLAUDE.md flags `even_c_extra is canonical builder. Hand-written
+        # [c2, c4, c6] silently misindexes for F ≥ 3` as a risk area, and
+        # `apply_tensor_interaction_step!` later does `eigen!(Hermitian(h))`
+        # which silently symmetrises any non-Hermitian construction. This
+        # test rebuilds h explicitly from the cache's pre-computed HF
+        # entries and asserts ‖h − h†‖∞ < 1e-12 across F=2/3/6.
+        for F in (2, 3, 6)
+            D = 2F + 1
+            # Build a cache with non-trivial channels — for F=2 active
+            # are c4 (rank-2 tensor coupling at idx 1) and c4 (rank-4 at
+            # idx 3); for F=3/6, also higher channels via even_c_extra.
+            c_extra = if F == 2
+                [3.0, 0.0, 1.5]                                   # c2, c3=0, c4
+            elseif F == 3
+                even_c_extra(F; c2=2.0, c4=1.5, c6=0.7)
+            else
+                even_c_extra(F; c2=1.0, c4=0.5, c6=0.3, c8=0.2, c10=0.1, c12=0.05)
+            end
+            ip = InteractionParams(0.0, 0.0, 0.0, c_extra)
+            cache = SpinorBEC.make_tensor_interaction_cache(F, ip)
+            @test cache !== nothing  # higher channels active
+
+            hf_entries = SpinorBEC._precompute_hf_entries(cache)
+
+            # Random spinor — fixed seed so the test is deterministic.
+            rng = MersenneTwister(20260524 + F)
+            spinor = randn(rng, ComplexF64, D)
+
+            h = zeros(ComplexF64, D, D)
+            for e in hf_entries
+                h[e.c_m, e.c_mp] +=
+                    cache.g_values[e.ch_idx] * e.cg_prod *
+                    conj(spinor[e.c_mu]) * spinor[e.c_nu]
+            end
+
+            # Hermiticity: h[i,j] should equal conj(h[j,i])
+            herm_residual = maximum(abs, h .- h')
+            @test herm_residual < 1e-12
+            # Spot trace check: tr(h) is real (Hermitian → diagonals real)
+            @test abs(imag(tr(h))) < 1e-12
+        end
+    end
+
     @testset "Zero coupling = identity" begin
         F = 2
         ip_zero = InteractionParams(0.0, 0.0)
