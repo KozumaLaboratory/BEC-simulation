@@ -1,3 +1,44 @@
+@testset "even_c_extra canonical builder (hand-written misindex regression)" begin
+    # CLAUDE.md flags `[c2, c4, c6]` hand-written arrays as silently
+    # misindexing for F >= 3: c_extra is indexed by (rank - 1), so a
+    # 3-element array `[c2, c4, c6]` sets c_extra[1]=c2 (rank=2, correct),
+    # c_extra[2]=c4 (rank=3, ODD — should be 0!), c_extra[3]=c6 (rank=4,
+    # NOT rank 6). For F >= 3 the canonical entry point is
+    # `even_c_extra(F; c2, c4, ...)` which interleaves odd-rank zeros.
+
+    out_F1 = even_c_extra(1; c2=10.0)
+    @test out_F1 == [10.0]
+    @test length(out_F1) == 1
+
+    out_F2 = even_c_extra(2; c2=10.0, c4=20.0)
+    @test out_F2 == [10.0, 0.0, 20.0]
+    @test length(out_F2) == 3
+
+    # F=3: 2F-1=5 slots. The misindex case.
+    out_F3 = even_c_extra(3; c2=10.0, c4=20.0, c6=30.0)
+    @test out_F3 == [10.0, 0.0, 20.0, 0.0, 30.0]
+    @test length(out_F3) == 5
+    # Hand-written [10, 20, 30] would silently misalign — verify this
+    # diverges from the canonical layout:
+    @test out_F3 != [10.0, 20.0, 30.0, 0.0, 0.0]
+
+    # F=6 (Eu): 2F-1=11 slots. c2/c4/c6/c8/c10/c12 active.
+    out_F6 = even_c_extra(6;
+        c2=1.0, c4=2.0, c6=3.0, c8=4.0, c10=5.0, c12=6.0)
+    @test length(out_F6) == 11
+    @test out_F6 == [1.0, 0.0, 2.0, 0.0, 3.0, 0.0, 4.0, 0.0, 5.0, 0.0, 6.0]
+    @test all(out_F6[2:2:end] .== 0.0)
+    @test out_F6[1:2:end] == [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+
+    # Refusing to set c_k > 2F (would be silently dropped otherwise).
+    @test_throws ArgumentError even_c_extra(2; c2=1.0, c6=2.0)  # c6 > 2F=4
+    @test_throws ArgumentError even_c_extra(3; c2=1.0, c8=2.0)  # c8 > 2F=6
+
+    # Zero above 2F is OK (no-op).
+    out_F2_zero = even_c_extra(2; c2=1.0, c6=0.0)
+    @test out_F2_zero == [1.0, 0.0, 0.0]
+end
+
 @testset "Constraint-based interactions" begin
     @testset "interaction_params_from_constraint basic" begin
         ip = interaction_params_from_constraint(; c_total=4689.0, c1_ratio=0.0, F=6)

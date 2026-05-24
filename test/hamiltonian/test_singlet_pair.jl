@@ -41,6 +41,33 @@
         @test sum(abs2, A) > 0
     end
 
+    @testset "F=2 cyclic state: A_00 = 0 (T_d Schur-isotropic representative)" begin
+        # Memory `f2-cyclic-tetrahedral-a1-tier3-closure-2026_05_18`:
+        # the T_d-symmetric cyclic state ζ_T = (1/2, 0, i/√2, 0, 1/2)
+        # is Schur-isotropic and has S=0 projection amplitude A_00 = 0.
+        # Tier-3 closure (paper3 §5 / Lemma 1 general-S) hinges on
+        # this. Test it explicitly so a future change to the
+        # singlet-pair sign convention or m-ordering breaks the cyclic
+        # phase classification audibly.
+        config = GridConfig(8, 4.0)
+        grid = make_grid(config)
+        D = 5  # F=2
+        # Single spatial point representative
+        psi = zeros(ComplexF64, 8, D)
+        zeta_cyclic = ComplexF64[1 / 2, 0, im / sqrt(2), 0, 1 / 2]
+        for i in 1:8
+            psi[i, :] .= zeta_cyclic
+        end
+        A = singlet_pair_amplitude(psi, 2, 1)
+        @test maximum(abs, A) < 1e-14
+
+        # Schur isotropy spot-check: <F_z²> per atom = F(F+1)/3 = 2.
+        sm = spin_matrices(2)
+        m_vals = collect(sm.system.m_values)
+        Fz2 = sum(m_vals[c]^2 * abs2(zeta_cyclic[c]) for c in 1:D)
+        @test isapprox(Fz2, 2.0; rtol=1e-12)
+    end
+
     @testset "F=2 polar state" begin
         config = GridConfig(64, 20.0)
         grid = make_grid(config)
