@@ -96,6 +96,8 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev=nothing,
     elseif name == :column_density_movie
         return _analyze_column_density_movie(psi, grid, atom, params, ws_prev,
             pipeline_results)
+    elseif name == :hpsi_export
+        return _analyze_hpsi_export(psi, grid, atom, params, ws_prev)
     elseif name == :summary_json
         return _analyze_summary_json(psi, grid, atom, params, ws_prev, pipeline_results)
     end
@@ -109,6 +111,6 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev=nothing,
         "bragg_spectroscopy, droplet_profile, bogoliubov_dispersion, " *
         "bogoliubov_mode, skyrmion_detect, synthetic_dim, non_abelian_homotopy, " *
         "monopole_charge, majorana_order, winding_field, rosensweig_pattern, " *
-        "column_density_movie, summary_json"
+        "column_density_movie, hpsi_export, summary_json"
     throw(ArgumentError("Unknown analyzer: $name. Supported: $_known"))
 end

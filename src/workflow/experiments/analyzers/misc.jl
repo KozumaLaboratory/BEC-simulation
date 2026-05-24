@@ -6,6 +6,115 @@
 # consumption). Other one-off analyzers can also live here as the
 # rosters grow.
 
+"""
+    _analyze_hpsi_export(psi, grid, atom, params, ws_prev) -> NamedTuple
+
+Level 10 deliverable: compute Hψ via `energy_gradient!` and save to JLD2
+along with the wavefunction, per-term energy decomposition, and the full
+parameter set. Used to hand off operator-level results to external labs
+(e.g. Prof. Ueda's spinor-BEC code at U. Tokyo) for cross-code
+verification.
+
+YAML usage:
+
+    analyze:
+      - hpsi_export:
+          path: "operator_rhs.jld2"  # optional; default in run dir
+
+Output JLD2 keys:
+  - `psi`             — host-array copy of ψ (shape n_pts × D)
+  - `Hpsi`            — δE/δψ\\* (NOT 2·δE/δψ\\*), the operator action
+  - `E_decomp`        — `Dict{String,Float64}` per-term energies
+                        (kinetic / trap / zeeman / density / spin / ddi /
+                        lhy / tensor / raman / light_shift / coriolis / total)
+  - `grid_n_pts`, `grid_box`, `grid_dx`
+  - `atom_name`, `atom_F`, `atom_mass`, `atom_a_s`, `atom_mu_mag`, `atom_g_F`
+  - `interactions_c0`, `interactions_c1`, `interactions_c_lhy`, `interactions_c_extra`
+  - `ddi_c_dd`
+  - `dealias_enabled`, `dealias_k_cut`
+  - `conventions`     — list of strings documenting Eu sign / 4π / ordering choices
+
+Requires `ws_prev` (the live `Workspace`) — pipeline runner threads this
+from the ground_state step. As with `energy_decomposition`, calling
+without ws_prev throws.
+
+Hψ coverage matches `energy_gradient!` in `src/solvers/lbfgs/energy_gradient.jl`:
+kinetic + trap + Zeeman + c₀·n + LHY + c₁·⟨F̂⟩·F̂ + light_shift + DDI.
+Does NOT include c₂·|A₀₀|² singlet-pair or c_extra higher-rank tensor.
+Activate this analyzer on configs where those channels are zero.
+"""
+function _analyze_hpsi_export(psi, grid, atom, params, ws_prev)
+    ws_prev === nothing && throw(
+        ArgumentError(
+            "`:hpsi_export` requires `ws_prev` (the live Workspace with " *
+            "configured trap/DDI/LHY kernels). Add it after a ground_state " *
+            "step in the pipeline."),
+    )
+
+    # Hψ via energy_gradient! (it returns 2·δE/δψ* by the complex-ψ
+    # gradient convention; we divide by 2 to get the operator action).
+    psi_dev = ws_prev.state.psi
+    grad = similar(psi_dev)
+    fill!(grad, zero(eltype(grad)))
+    E_total = energy_gradient!(grad, psi_dev, ws_prev)
+    Hpsi_host = Array(grad) ./ 2
+    psi_host = Array(psi_dev)
+
+    decomp = energy_decomposition(ws_prev)
+    decomp_dict = Dict{String, Float64}(
+        string(k) => Float64(getproperty(decomp, k)) for k in propertynames(decomp))
+
+    # Default output path: under the run dir's analyze/ subtree so it
+    # ends up next to other analyzer outputs. The user can override via
+    # `path:` (absolute or relative to YAML dir).
+    yaml_dir = get(ENV, "SPINORBEC_YAML_DIR", pwd())
+    default_path = joinpath(yaml_dir, "operator_rhs.jld2")
+    output_path = String(get(params, "path", default_path))
+    isabspath(output_path) || (output_path = joinpath(yaml_dir, output_path))
+    mkpath(dirname(output_path) == "" ? "." : dirname(output_path))
+
+    JLD2.jldopen(output_path, "w") do f
+        f["psi"] = psi_host
+        f["Hpsi"] = Hpsi_host
+        f["E_decomp"] = decomp_dict
+        f["grid_n_pts"] = collect(ws_prev.grid.config.n_points)
+        f["grid_box"] = collect(ws_prev.grid.config.box_size)
+        f["grid_dx"] = collect(ws_prev.grid.dx)
+        f["atom_name"] = atom.name
+        f["atom_F"] = atom.F
+        f["atom_mass"] = atom.mass
+        f["atom_a_s"] = atom.a_s
+        f["atom_mu_mag"] = atom.mu_mag
+        f["atom_g_F"] = atom.g_F
+        f["interactions_c0"] = ws_prev.interactions.c0
+        f["interactions_c1"] = ws_prev.interactions.c1
+        f["interactions_c_lhy"] = ws_prev.interactions.c_lhy
+        f["interactions_c_extra"] = collect(ws_prev.interactions.c_extra)
+        f["ddi_c_dd"] = ws_prev.ddi === nothing ? 0.0 : ws_prev.ddi.C_dd
+        f["dealias_enabled"] = DEALIAS_2_3_ENABLED[]
+        f["dealias_k_cut"] = DEALIAS_K_CUTOFF[] === nothing ? -1.0 :
+                             Float64(DEALIAS_K_CUTOFF[])
+        f["conventions"] = String[
+            "DDI: c_dd = mu_0*mu^2 (NO 4*pi factor)",
+            "Q_ab(k) = khat_a*khat_b - delta_ab/3 (NO 4*pi factor)",
+            "Q(k=0) = 0 by Pedri-Santos regularisation",
+            "psi ordering: c=1 <-> m=+F, c=D <-> m=-F",
+            "Zeeman: H_Z = -p*F_z + q*F_z^2 (with p, q in units of hbar*omega_ref)",
+            "Hpsi = dE/dpsi^* (NOT 2*dE/dpsi^*, factor 2 stripped from energy_gradient!)",
+            "Coverage: kinetic + trap + Zeeman + c0*n + LHY + c1*<F>*F + light_shift + DDI",
+            "Does NOT cover: c2*|A_00|^2 singlet-pair, c_extra higher-rank tensor",
+        ]
+    end
+
+    dV = prod(ws_prev.grid.dx)
+    (
+        Hpsi_l2_norm=sqrt(sum(abs2, Hpsi_host) * dV),
+        psi_l2_norm=sqrt(sum(abs2, psi_host) * dV),
+        E_total=Float64(E_total),
+        path=output_path,
+    )
+end
+
 function _analyze_summary_json(psi, grid, atom, params, ws_prev, pipeline_results)
     output_path = String(get(params, "path", "summary.json"))
     extras = get(params, "extras", Dict{String, Any}())
