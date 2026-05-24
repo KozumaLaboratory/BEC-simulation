@@ -23,6 +23,8 @@ const FAST_TESTS = [
     "test_quality.jl",
     "test_dealias_2_3.jl",
     "test_level1_scalar_exact.jl",
+    "analysis/test_faraday.jl",
+    "analysis/test_sign_pattern.jl",
     "foundation/test_atoms.jl",
     "foundation/test_grid.jl",
     "foundation/test_spin_matrices.jl",
