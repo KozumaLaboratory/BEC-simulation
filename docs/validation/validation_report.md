@@ -1,6 +1,6 @@
 # Validation matrix report
 
-Generated: 2026-05-25T08:51:29.006
+Generated: 2026-05-25T09:24:26.702
 
 Source: `scripts/validation/run_validation_matrix.jl`
 Ladder: `memory/validation_ladder_2026_05_24.md` (13 levels, 0-12)
@@ -9,13 +9,13 @@ Ladder: `memory/validation_ladder_2026_05_24.md` (13 levels, 0-12)
 
 | Status | Rows | Notes |
 |---|---|---|
-| PASS | 19 | automated test rows whose tests all passed |
+| PASS | 20 | automated test rows whose tests all passed |
 | FAIL | 0 | automated test rows with at least one failure |
 | MANUAL | 5 | levels requiring manual runs or external code |
 | SKIP | 1 | tests in full tier (slow), skipped by matrix runner |
 | ERROR | 0 | test file missing or threw an exception |
 
-Total automated assertions: 5609 pass, 0 fail, 0 broken.
+Total automated assertions: 5721 pass, 0 fail, 0 broken.
 
 ## Per-level results
 
@@ -30,7 +30,8 @@ Total automated assertions: 5609 pass, 0 fail, 0 broken.
 | 3 | ✅ PASS | Spin matrices ([F_x,F_y]=iF_z, F^2, ladder coefficients) | `test/foundation/test_spin_matrices.jl` | 422 | 0 | 0 |  |
 | 3 | ✅ PASS | Zeeman accessor API (linear_p, quadratic_q, transverse_b) | `test/hamiltonian/test_zeeman_accessors.jl` | 15 | 0 | 0 |  |
 | 4 | ✅ PASS | Spin-1 SMA c1 sign convention | `test/hamiltonian/test_spin_mixing.jl` | 4 | 0 | 0 |  |
-| 4 | ✅ PASS | F=1 phase emergence: c1>0 → polar, c1<0 → FM (energy ordering) | `test/test_level4_f1_phase_emergence.jl` | 9 | 0 | 0 |  |
+| 4 | ✅ PASS | F=1 phase emergence: Mz=0 sector + analytic gap + Bogoliubov + Mz sweep | `test/test_level4_f1_phase_emergence.jl` | 28 | 0 | 0 |  |
+| 4 | ✅ PASS | General-F (1,2,3,6,8) phase emergence + FM-up F-flip + polyhedral instability | `test/test_level4_general_F_phase_emergence.jl` | 93 | 0 | 0 |  |
 | 4 | ✅ PASS | Spin-2 cyclic / nematic A_00 singlet pair | `test/hamiltonian/test_singlet_pair.jl` | 28 | 0 | 0 |  |
 | 4 | ✅ PASS | Higher-rank c_extra builder (S=4,6,...) | `test/hamiltonian/test_tensor_interaction.jl` | 261 | 0 | 0 |  |
 | 5 | ✅ PASS | DDI kernel (spherical polarized E_DDI~0) | `test/hamiltonian/test_ddi.jl` | 4644 | 0 | 0 |  |

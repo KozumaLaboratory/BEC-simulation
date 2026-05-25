@@ -26,6 +26,7 @@ const FAST_TESTS = [
     "test_level2_strang_convergence.jl",
     "test_level3_zeeman_only.jl",
     "test_level4_f1_phase_emergence.jl",
+    "test_level4_general_F_phase_emergence.jl",
     "test_level10_hpsi_self_consistency.jl",
     "test_level11_convergence_sweep.jl",
     "test_level12_production_audit.jl",
