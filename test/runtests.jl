@@ -40,6 +40,7 @@ const FAST_TESTS = [
     "workflow/test_calibration_edge_cases.jl",
     "workflow/test_loss_block_edge_cases.jl",
     "workflow/test_b_block_normalize.jl",
+    "workflow/test_waveform_inner_duration.jl",
     "workflow/test_state_zoo_wrappers_runnable.jl",
     "foundation/test_atoms.jl",
     "foundation/test_grid.jl",

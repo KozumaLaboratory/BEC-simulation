@@ -101,11 +101,22 @@ function _make_waveform(spec, duration::Float64; omega_ref::Float64=NaN)
         end
         return w
     elseif haskey(spec, "from")
-        # Implicit ramp form: {from, to?, scale?}
+        # Implicit ramp form: {from, to?, duration?, scale?}
+        # Honor inner `duration` if specified. `duration: 0` (or negative)
+        # is shorthand for an instantaneous jump to `to` — build a
+        # ConstantWaveform(to). This restores user-intuited "quench"
+        # semantics; the pre-fix parser silently used the outer step's
+        # duration as the ramp time, turning intended quenches into
+        # full-window linear ramps. See
+        # memory/gotcha_bz_ramp_duration_ignored.md.
         from = Float64(spec["from"])
         to = Float64(get(spec, "to", from))
         scale = Symbol(get(spec, "scale", "linear"))
-        return RampWaveform(from, to, duration, scale)
+        inner_dur = haskey(spec, "duration") ? _t(spec["duration"]) : duration
+        if inner_dur <= 0.0
+            return ConstantWaveform(to)
+        end
+        return RampWaveform(from, to, inner_dur, scale)
     end
     # Reject unknown / typo'd waveform keys with a recognisable message
     # instead of letting `spec["from"]` throw a bare KeyError("from").
