@@ -15,7 +15,7 @@
 
 export save_operator_rhs
 
-using SHA: sha256, bytes2hex
+using SHA: sha256
 using Dates: now
 
 """
