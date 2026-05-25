@@ -100,6 +100,7 @@ Fields:
 struct RunResult{N, D}
     path::String
     psi::Array{ComplexF64, N}                       # spatial dims + spinor (so N = ndim+1)
+    hpsi::Union{Array{ComplexF64, N}, Nothing}      # operator-RHS, when exported
     grid::Grid{D}                                   # D = spatial dims (= N-1)
     atom::AtomSpecies
     interactions::InteractionParams
@@ -113,18 +114,29 @@ struct RunResult{N, D}
         grid::Grid{D},
         atom::AtomSpecies,
         interactions::InteractionParams;
+        hpsi::Union{AbstractArray{<:Complex, N}, Nothing}=nothing,
         dynamics::Union{DynamicsTimeSeries, Nothing}=nothing,
         e_decomp::Dict{String, Float64}=Dict{String, Float64}(),
         metadata::Dict{String, Any}=Dict{String, Any}(),
     ) where {N, D}
-        N == D + 1 || throw(ArgumentError(
-            "psi rank $N must equal grid ndim $D + 1 (spatial + spinor)"))
+        N == D + 1 || throw(
+            ArgumentError(
+                "psi rank $N must equal grid ndim $D + 1 (spatial + spinor)"),
+        )
         spinor_dim = size(psi, N)
-        spinor_dim == 2 * atom.F + 1 || throw(ArgumentError(
-            "ψ last-axis size $spinor_dim ≠ 2F+1 = $(2 * atom.F + 1)"))
+        spinor_dim == 2 * atom.F + 1 || throw(
+            ArgumentError(
+                "ψ last-axis size $spinor_dim ≠ 2F+1 = $(2 * atom.F + 1)"),
+        )
+        hpsi !== nothing && size(hpsi) != size(psi) &&
+            throw(
+                ArgumentError(
+                    "Hψ shape $(size(hpsi)) ≠ ψ shape $(size(psi))"),
+            )
         new{N, D}(
             String(path),
             convert(Array{ComplexF64, N}, psi),
+            hpsi === nothing ? nothing : convert(Array{ComplexF64, N}, hpsi),
             grid, atom, interactions,
             dynamics, e_decomp, metadata,
         )

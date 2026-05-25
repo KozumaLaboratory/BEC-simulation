@@ -43,6 +43,7 @@ function open_result(path::AbstractString)
     data = JLD2.load(path)
 
     psi = _extract_psi(data, path)
+    hpsi = _extract_hpsi(data, psi)
     grid = _extract_grid(data, psi)
     atom = _extract_atom(data, psi)
     interactions = _extract_interactions(data, atom)
@@ -52,8 +53,16 @@ function open_result(path::AbstractString)
 
     RunResult(
         path, psi, grid, atom, interactions;
-        dynamics, e_decomp, metadata,
+        hpsi, dynamics, e_decomp, metadata,
     )
+end
+
+function _extract_hpsi(data::Dict, psi::AbstractArray)
+    haskey(data, "Hpsi") || return nothing
+    raw = data["Hpsi"]
+    raw isa AbstractArray || return nothing
+    size(raw) == size(psi) || return nothing
+    convert(Array{ComplexF64, ndims(raw)}, raw)
 end
 
 function _extract_psi(data::Dict, path::AbstractString)

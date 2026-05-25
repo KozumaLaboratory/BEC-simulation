@@ -23,3 +23,5 @@
 include("validation/types.jl")
 include("validation/observable_dispatch.jl")    # Base.getproperty(RunResult, ...)
 include("validation/open_result.jl")            # JLD2 → RunResult loader
+include("validation/operations.jl")             # sweep_runs / compare_runs
+include("validation/specs.jl")                  # Specs + check() dispatch
