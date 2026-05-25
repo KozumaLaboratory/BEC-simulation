@@ -1,0 +1,23 @@
+# --- Validation subsystem umbrella ---
+#
+# Typed views over jld2 run artifacts + spec-driven verdicts. Designed
+# to subsume the ad-hoc `scripts/validation/*.jl` patterns that have
+# accumulated bugs from API drift (e.g. stale `interactions_c_extra`
+# key, `HarmonicTrap(1.0f0)`, `cp` same-path crash, duplicate analyzer
+# implementations).
+#
+# Public surface (10 symbols, exported via SpinorBEC umbrella):
+#
+#   Types
+#     RunResult, RunSweep, RunComparison
+#     DynamicsTimeSeries, CheckResult
+#     ConservationSpec, OperatorRHSSpec
+#
+#   Operations
+#     open_result, sweep_runs, compare_runs, check, save_operator_rhs
+#
+# Phase 0 (this file) ships types only — operations land in subsequent
+# phases. See docs/validation/validation_api_migration.md for the full
+# rollout schedule.
+
+include("validation/types.jl")

@@ -41,6 +41,7 @@ include("workflow/io.jl")              # save_state + dashboard + VTK + run summ
 include("workflow/monitoring.jl")      # logging + telemetry + LiveMonitor
 
 include("workflow/experiments.jl")     # schema + runtime + pipeline + analyzers
+include("workflow/validation.jl")      # RunResult + spec-driven validation (Phase 0: types only)
 include("solvers/projected_gp.jl")
 include("solvers/photon_heating.jl")
 include("solvers/sgpe.jl")
