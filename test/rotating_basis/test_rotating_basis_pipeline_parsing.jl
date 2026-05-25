@@ -12,7 +12,7 @@ using SpinorBEC
                 "grid" => Dict("n" => [8, 8, 8], "box" => [4.0, 4.0, 4.0]),
                 "potential" => Dict("type" => "harmonic", "omega" => [1.0, 1.0, 1.0]),
                 "interactions" => Dict("c0" => 10.0, "c1" => 0.0, "c_dd" => 0.0),
-                "zeeman" => Dict("p" => 1.0, "q" => 0.0),
+                "B" => Dict("p" => 1.0, "q" => 0.0),
                 "n_steps" => 10,
                 "dt" => 0.01,
             ),
@@ -20,7 +20,7 @@ using SpinorBEC
         step = SpinorBEC._parse_step(d)
         @test step isa SpinorBEC.RotatingBasisGroundStateStep
         @test step.params["atom"] == "Eu151"
-        @test step.params["zeeman"]["p"] == 1.0
+        @test step.params["B"]["p"] == 1.0
     end
 
     @testset "kind: option_gamma alias" begin
@@ -31,7 +31,7 @@ using SpinorBEC
                 "grid" => Dict("n" => [8, 8, 8], "box" => [4.0, 4.0, 4.0]),
                 "potential" => Dict("type" => "harmonic", "omega" => [1.0, 1.0, 1.0]),
                 "interactions" => Dict("c0" => 10.0),
-                "zeeman" => Dict("p" => 1.0),
+                "B" => Dict("p" => 1.0),
                 "n_steps" => 10,
                 "dt" => 0.01,
             ),
@@ -105,17 +105,21 @@ using SpinorBEC
     end
 
     @testset "load_config parses rotating_basis YAML" begin
-        # Smoke config curated out 2026-04-30 (commits d178b3a, 35245e7) —
-        # only run this assertion if a representative rotating_basis YAML
-        # is still present in the tree.
-        candidate = "runs/option_gamma_smoke/config.yaml"
-        if isfile(candidate)
-            config = SpinorBEC.load_config(candidate)
-            @test length(config.steps) == 2
+        # Fallback chain: prefer the canonical klaus_barnett config (always
+        # tracked); skip only if both that and the legacy smoke config are
+        # absent. The legacy smoke YAML was curated out 2026-04-30
+        # (commits d178b3a, 35245e7) but klaus_barnett carries the same
+        # RotatingBasisGroundStateStep + RotatingBasisDynamicsStep layout.
+        candidates = ["runs/eu151_klaus_barnett/config.yaml",
+            "runs/option_gamma_smoke/config.yaml"]
+        present = filter(isfile, candidates)
+        if !isempty(present)
+            config = SpinorBEC.load_config(first(present))
+            @test length(config.steps) >= 2
             @test config.steps[1] isa SpinorBEC.RotatingBasisGroundStateStep
             @test config.steps[2] isa SpinorBEC.RotatingBasisDynamicsStep
         else
-            @test_skip "runs/option_gamma_smoke/config.yaml not present (curated out)"
+            @test_skip "no rotating_basis YAML present (all candidates curated out)"
         end
     end
 end
@@ -130,8 +134,8 @@ end
             "grid" => Dict("n" => [8, 8, 8], "box" => [4.0, 4.0, 4.0]),
             "potential" => Dict("type" => "harmonic", "omega" => [1.0, 1.0, 1.0]),
             "interactions" => Dict("c0" => 10.0, "c1" => 0.0, "c_dd" => 0.0),
-            "zeeman" => Dict("p" => 1.0, "q" => 0.0),
-            "B_hat" => Dict("theta" => 0.0, "phi" => 0.0),
+            "B" => Dict("p" => 1.0, "q" => 0.0),
+            "B_direction" => Dict("theta" => 0.0, "phi" => 0.0),
             "gauge_fix" => false,
             "n_steps" => 10,
             "dt" => 0.01,
@@ -155,7 +159,7 @@ end
             "grid" => Dict("n" => [8, 8, 8], "box" => [4.0, 4.0, 4.0]),
             "potential" => Dict("type" => "harmonic", "omega" => [1.0, 1.0, 1.0]),
             "interactions" => Dict("c0" => 10.0),
-            "zeeman" => Dict("p" => 1.0),
+            "B" => Dict("p" => 1.0),
             "n_steps" => 5,
             "dt" => 0.01,
         )
