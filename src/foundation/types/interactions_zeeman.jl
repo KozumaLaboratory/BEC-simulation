@@ -10,7 +10,7 @@
 # Raman-laser parameters; `TimeDependentInteractions` swaps c0/c1 in
 # time with `interactions_at(td, t)`.
 
-export InteractionParams, ZeemanParams, TimeDependentZeeman
+export InteractionParams, ZeemanParams, TimeDependentZeeman, c_dict
 export RamanCoupling, TimeDependentRaman, TimeDependentInteractions
 export linear_p, quadratic_q, transverse_b, interactions_at
 
@@ -42,11 +42,90 @@ struct InteractionParams
     )
 end
 
+"""
+    InteractionParams(c_dict::Dict{Int,Float64}; c_lhy=0.0)
+
+Dict-keyed constructor — addresses the `c_0, c_1` (struct field) vs
+`c_extra` (positional Vector) asymmetry by letting the user write all
+`c_n` as a single Dict keyed by rank n:
+
+    InteractionParams(Dict(0 => 2.0, 1 => 0.1, 4 => 0.5))
+    InteractionParams(Dict(0 => 2.0, 1 => 0.1, 2 => 0.3, 4 => 0.5); c_lhy=10.0)
+
+Equivalent to the positional Vector form but eliminates two footguns:
+  (i)  hand-writing `c_extra = [c_2, c_4, c_6]` silently misindexes
+       (c_4 → c_3 slot, c_6 → c_4 slot)
+  (ii) odd-rank slots (c_3, c_5, ...) must be explicit zeros in the
+       Vector form; the Dict form omits them naturally.
+
+Rejects:
+  - negative keys (n < 0)
+  - odd keys with n ≥ 3 (Kawaguchi-Ueda's c_3 is the S=2 pair channel,
+    NOT a rank-3 tensor — use `_make_tensor_cache_from_channels` for that)
+"""
+function InteractionParams(c_dict::Dict{Int, Float64}; c_lhy::Real=0.0)
+    for (k, _) in c_dict
+        k >= 0 || throw(ArgumentError(
+            "InteractionParams: c_n key must be ≥ 0 (got n=$k)"))
+        if k >= 3 && isodd(k)
+            throw(
+                ArgumentError(
+                    "InteractionParams: c_$k is odd-rank and not a physical " *
+                    "single-particle tensor coupling. For Kawaguchi-Ueda " *
+                    "pair-channel couplings (c_3 = S=2 pair, etc.), use " *
+                    "_make_tensor_cache_from_channels(F, Dict(S => g_S)) directly."),
+            )
+        end
+    end
+    c0 = Float64(get(c_dict, 0, 0.0))
+    c1 = Float64(get(c_dict, 1, 0.0))
+    max_n = isempty(c_dict) ? 1 : maximum(keys(c_dict))
+    extra = if max_n >= 2
+        vec = zeros(Float64, max_n - 1)
+        for (k, v) in c_dict
+            k >= 2 && (vec[k - 1] = Float64(v))
+        end
+        vec
+    else
+        Float64[]
+    end
+    InteractionParams(c0, c1, Float64(c_lhy), extra)
+end
+
+"""
+    get_cn(ip::InteractionParams, n::Int) -> Float64
+
+Unified accessor for any c_n. Returns 0 for n outside the populated range.
+"""
 function get_cn(ip::InteractionParams, n::Int)
     n == 0 && return ip.c0
     n == 1 && return ip.c1
     idx = n - 1
     idx <= length(ip.c_extra) ? ip.c_extra[idx] : 0.0
+end
+
+"""
+    Base.getindex(ip::InteractionParams, n::Int)
+
+Index syntax for `c_n`: write `ip[0]` instead of `ip.c0`, `ip[4]` instead
+of `ip.c_extra[3]`. Symmetric across all ranks — addresses the
+`ip.c0 / ip.c1 / ip.c_extra[3]` asymmetry by giving one indexing rule.
+"""
+Base.getindex(ip::InteractionParams, n::Int) = get_cn(ip, n)
+
+"""
+    c_dict(ip::InteractionParams) -> Dict{Int,Float64}
+
+Round-trip back to the Dict form. Only nonzero c_n entries appear.
+"""
+function c_dict(ip::InteractionParams)
+    d = Dict{Int, Float64}()
+    abs(ip.c0) > 0 && (d[0] = ip.c0)
+    abs(ip.c1) > 0 && (d[1] = ip.c1)
+    for (idx, v) in enumerate(ip.c_extra)
+        abs(v) > 0 && (d[idx + 1] = v)
+    end
+    d
 end
 
 # --- Zeeman Parameters ---

@@ -28,6 +28,7 @@ const FAST_TESTS = [
     "test_level4_f1_phase_emergence.jl",
     "test_level4_general_F_phase_emergence.jl",
     "test_cn_gS_basis_mapping.jl",
+    "test_interactions_dict_api.jl",
     "test_level10_hpsi_self_consistency.jl",
     "test_level11_convergence_sweep.jl",
     "test_level12_production_audit.jl",
