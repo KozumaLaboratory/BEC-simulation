@@ -38,7 +38,7 @@ using SpinorBEC
         grid=grid_f32, atom=Rb87,
         interactions=InteractionParams(Dict(0 => 5.0, 1 => 0.0)),
         zeeman=ZeemanParams(0.0, 0.1),
-        potential=HarmonicTrap(1.0f0, 1.0f0),
+        potential=HarmonicTrap(1.0, 1.0),
         dt=0.01, n_steps=200, tol=1e-5,
         initial_state=:m_plus_F,
         dtype=Float32,

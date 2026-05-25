@@ -1,5 +1,6 @@
 using Test
 using SpinorBEC
+using Statistics: mean
 
 @testset "P3 imaging analyzers" begin
     # Synthetic Gaussian column density for testing

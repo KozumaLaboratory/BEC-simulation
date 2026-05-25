@@ -8,7 +8,7 @@ export bayesian_optimize, gp_predict, expected_improvement
 #
 # For higher-dim spaces or noisy evaluations, swap in BayesianOptimization.jl.
 
-using LinearAlgebra: cholesky, Symmetric, I as IDENT
+using LinearAlgebra: cholesky, Symmetric, diag, I as IDENT
 using Random
 using SpecialFunctions: erf
 

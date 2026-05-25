@@ -174,10 +174,13 @@ using LinearAlgebra
         atom = AtomSpecies("Eu151", 2.5e-25, 6, 110 * 5.29e-11, 0.0, 6.977 * 9.274e-24)
         ip = InteractionParams(Dict(0 => 100.0, 1 => 2.8))
         sp = SimParams(; dt=0.001, n_steps=1)
+        sys = SpinSystem(6)
+        psi_init = ComplexF32.(init_psi(grid32, sys; state=:m_plus_F))
         ws = make_workspace(;
             grid=grid32, atom, interactions=ip, sim_params=sp,
             potential=HarmonicTrap(1.0, 1.0, 1.0),
             enable_ddi=true, c_dd=10.0,
+            psi_init=psi_init,
             dtype=Float32,
         )
         @test eltype(ws.ddi.Q_xx) === Float32

@@ -87,6 +87,7 @@ const FAST_TESTS = [
     "hamiltonian/test_lhy_2d.jl",
     "analysis/test_bogoliubov_enhanced.jl",
     "hamiltonian/test_spinor_lhy.jl",
+    "hamiltonian/test_spinor_lhy_validation.jl",
     "hamiltonian/test_icosahedral_lhy.jl",
     "hamiltonian/test_lhy_modes_round45.jl",
     "dynamics/test_sinatra_helpers.jl",
@@ -111,6 +112,16 @@ const FAST_TESTS = [
     "hamiltonian/test_tdhfb_hfb_modes.jl",
     "hamiltonian/test_tdhfb_pair_potential.jl",
     "hamiltonian/test_tdhfb_conservation.jl",
+    # Orphan-test audit 2026-05-25: promoted from unregistered → FAST_TESTS.
+    # All are pure unit tests (no ITP / RTP / find_ground_state / run_yaml).
+    "analysis/test_imaging.jl",
+    "analysis/test_paper3_validation.jl",
+    "hamiltonian/test_lhy_factory.jl",
+    "hamiltonian/test_lhy_polar.jl",
+    "hamiltonian/test_multipole_q_spectrum.jl",
+    "solvers/test_compare.jl",
+    "solvers/test_pseudo_arclength.jl",
+    "workflow/test_active_learning.jl",
 ]
 
 # ── CI tier: fast + core integration tests that run ITP/RTP ──
@@ -175,6 +186,23 @@ const FULL_EXTRA = [
     "rotating_basis/test_rotating_frame_regression.jl",
     "analysis/test_bogoliubov_goldstone.jl",
     "dynamics/test_sgpe_fdr.jl",
+    # Orphan-test audit 2026-05-25: promoted from unregistered → FULL_EXTRA.
+    # All run ITP / RTP / find_ground_state and require the "full" tier.
+    # The two Bug-4 regression pins are particularly load-bearing.
+    "analysis/test_bogoliubov_along_boundary.jl",
+    "gpu/test_mixed_precision.jl",
+    "gpu/test_mixed_precision_phase3.jl",
+    "hamiltonian/test_combined_spin_step.jl",
+    "hamiltonian/test_light_shift.jl",
+    "solvers/test_conservation_properties.jl",
+    "solvers/test_itp_ddi_strang_save_every.jl",      # Bug-4 ITP regression pin
+    "solvers/test_lbfgs_sobolev_preconditioner.jl",
+    "solvers/test_rtp_ddi_strang_save_every.jl",      # Bug-4 RTP regression pin
+    "workflow/test_phase_diff_eval.jl",
+    # BO-heavy tests: pure Julia (no SpinorBEC physics) but GP fitting is
+    # >100s wall, so they live in FULL not FAST.
+    "workflow/test_multi_fidelity_bo.jl",
+    "workflow/test_triple_point.jl",
 ]
 
 # ── Physics tier: analytic validation + physics level tests ──
