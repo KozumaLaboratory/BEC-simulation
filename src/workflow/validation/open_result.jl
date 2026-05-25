@@ -95,8 +95,21 @@ function _extract_atom(data::Dict, psi::AbstractArray)
         try
             return resolve_atom(sym)
         catch
-            # Fall through to anonymous AtomSpecies construction.
+            # Fall through to reconstruction from atom_* fields, or
+            # minimal anonymous AtomSpecies.
         end
+    end
+    # Reconstruct from explicit atom_* fields if save_operator_rhs wrote
+    # them (covers user-defined atoms that won't resolve via the registry).
+    if haskey(data, "atom_F")
+        return AtomSpecies(
+            isempty(name_str) ? "unknown" : String(name_str),
+            Float64(get(data, "atom_mass", 1.0e-26)),
+            Int(data["atom_F"]),
+            Float64(get(data, "atom_a_s", 0.0)),
+            Float64(get(data, "atom_mu_mag", 0.0)),
+            Float64(get(data, "atom_g_F", 0.0)),
+        )
     end
     # Last-resort: construct minimal AtomSpecies from psi spinor dimension.
     F = (size(psi, ndims(psi)) - 1) ÷ 2

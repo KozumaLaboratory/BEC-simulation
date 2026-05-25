@@ -25,3 +25,4 @@ include("validation/observable_dispatch.jl")    # Base.getproperty(RunResult, ..
 include("validation/open_result.jl")            # JLD2 → RunResult loader
 include("validation/operations.jl")             # sweep_runs / compare_runs
 include("validation/specs.jl")                  # Specs + check() dispatch
+include("validation/save_operator_rhs.jl")      # Level-10 hand-off (operator_rhs.jld2 + MANIFEST)
