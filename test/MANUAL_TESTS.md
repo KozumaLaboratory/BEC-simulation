@@ -61,14 +61,6 @@ SPINORBEC_RUN_HEAVY_YAML=true \
 
 ## Pending Step 2 schema audit (2026-05-25 priorities)
 
-These tests `load_config` / `run_config` against YAMLs in `runs/`.
-The 2026-05-25 priorities doc flags `runs/*.yaml` as needing a schema
-migration scan (`losses: → loss:`, `save_every: → save: {every:}`,
-step-level `zeeman: → B:`, `psi_snapshots: → psi:`,
-`initial_state: ferromagnetic → m_plus_F`). Wire them only after
-Step 2 completes so a stale-schema failure cannot be mistaken for a
-physics regression.
-
 ### `workflow/test_klaus_validation.jl`
 
 Klaus 2022 minimal regression — Dy164 16²×8 + 0.5 ω_ref⁻¹ stir.
@@ -78,24 +70,6 @@ wiring.
 
 ```bash
 julia --project=. -e 'using SpinorBEC; include("test/workflow/test_klaus_validation.jl")'
-```
-
-### `workflow/test_p2_scenarios.jl`
-
-Discovers `runs/scenarios/p2_*/params.yaml` and loads each. Functions
-as the live audit for P2-tier scenarios.
-
-```bash
-julia --project=. -e 'using SpinorBEC; include("test/workflow/test_p2_scenarios.jl")'
-```
-
-### `workflow/test_p34_scenarios.jl`
-
-Same shape for `runs/scenarios/p3_*` and `p4_*`. Requires ≥6 such
-scenarios on disk.
-
-```bash
-julia --project=. -e 'using SpinorBEC; include("test/workflow/test_p34_scenarios.jl")'
 ```
 
 ## External-process dependent
@@ -116,8 +90,11 @@ julia --project=. -e 'using SpinorBEC; include("test/workflow/test_live_monitor.
 This file was produced by the orphan-test audit step of the
 post-InteractionParams-refactor priorities. Of 28 orphan tests
 identified, 8 were promoted to `FAST_TESTS`, 12 to `FULL_EXTRA`,
-and the 8 above remained manual. Zero were deleted — all referenced
-symbols were verified alive in `src/`.
+6 remained manual (above), and 2 were deleted:
+`test_p2_scenarios.jl` and `test_p34_scenarios.jl` referenced
+`runs/scenarios/p*` directories that were curated away by commit
+`35245e7 chore(runs)!: curate to 8 essential YAMLs`. The tests
+couldn't function without the deleted fixtures.
 
 Four latent bugs surfaced by the audit and fixed in the same pass:
 

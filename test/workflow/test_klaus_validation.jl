@@ -13,6 +13,8 @@ using SpinorBEC
 
 @testset "Klaus 2022 minimal regression" begin
     # Tiny smoke version of runs/klaus2022_full
+    # Schema notes: `trap:` migrated to `potential:`,
+    # `level:` removed from B-block, `ferromagnetic_min` → `m_plus_F`.
     yaml_str = """
     pipeline:
       - ground_state:
@@ -20,19 +22,18 @@ using SpinorBEC
           grid: {n: [16, 16, 8], box: [10.0, 10.0, 5.0]}
           interactions: {omega_ref: 314.159, N_atoms: 5000}
           ddi: {enabled: true}
-          trap: [1.0, 1.0, 2.6]
-          B: {level: 1, Bz: "1.0 Gauss"}
+          potential: {type: harmonic, omega: [1.0, 1.0, 2.6]}
+          B: {Bz: "1.0 Gauss"}
           dt: 0.001
           n_steps: 500
           tol: 1.0e-5
-          initial_state: ferromagnetic_min
+          initial_state: m_plus_F
       - dynamics:
           duration: 0.5
           dt: 0.002
-          save_every: 50
+          save: {every: 50}
           interactions: {omega_ref: 314.159}
           B:
-            level: 1
             Bz: "0.819 Gauss"
             Bx: {sinusoidal: {amplitude: 0.574, frequency: 4.52}}
             By: {sinusoidal: {amplitude: 0.574, frequency: 4.52, phase: -1.5708}}
