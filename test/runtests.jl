@@ -45,6 +45,8 @@ const FAST_TESTS = [
     "workflow/validation/test_observable_dispatch.jl",
     "workflow/validation/test_open_result.jl",
     "workflow/validation/test_specs_and_check.jl",
+    "workflow/validation/test_save_operator_rhs.jl",
+    "workflow/validation/test_show.jl",
     "workflow/test_state_zoo_wrappers_runnable.jl",
     "foundation/test_atoms.jl",
     "foundation/test_grid.jl",
