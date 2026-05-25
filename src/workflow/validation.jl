@@ -21,3 +21,5 @@
 # rollout schedule.
 
 include("validation/types.jl")
+include("validation/observable_dispatch.jl")    # Base.getproperty(RunResult, ...)
+include("validation/open_result.jl")            # JLD2 → RunResult loader

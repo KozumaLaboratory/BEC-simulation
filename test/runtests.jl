@@ -42,6 +42,8 @@ const FAST_TESTS = [
     "workflow/test_b_block_normalize.jl",
     "workflow/test_waveform_inner_duration.jl",
     "workflow/validation/test_run_result.jl",
+    "workflow/validation/test_observable_dispatch.jl",
+    "workflow/validation/test_open_result.jl",
     "workflow/test_state_zoo_wrappers_runnable.jl",
     "foundation/test_atoms.jl",
     "foundation/test_grid.jl",
