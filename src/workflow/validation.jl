@@ -28,3 +28,4 @@ include("validation/specs.jl")                  # Specs + check() dispatch
 include("validation/save_operator_rhs.jl")      # Level-10 hand-off (operator_rhs.jld2 + MANIFEST)
 include("validation/convenience.jl")            # audit / hand_off / diff_yamls — top-level 1-liners
 include("validation/show.jl")                   # Base.show pretty printing for REPL
+include("validation/twin_audit.jl")             # Level-12 production audit (twin control check)
