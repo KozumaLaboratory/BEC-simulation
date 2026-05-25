@@ -87,12 +87,15 @@ println("=" ^ 80)
 
 all_stats = L4Stats[]
 for (prefix, grid) in [
-    ("L4_eu_matsui_hamiltonian_only_32", 32),
-    ("L4_eu_matsui_hamiltonian_only_48", 48),
-    ("L4_eu_matsui_hamiltonian_only_64", 64),
-    ("L4det_eu_matsui_hamiltonian_only_32", 32),
-    ("L4det_eu_matsui_hamiltonian_only_48", 48),
-    ("L4det_eu_matsui_hamiltonian_only_64", 64),
+    ("L4_eu_matsui_hamiltonian_only_32",  32),
+    ("L4_eu_matsui_hamiltonian_only_48",  48),
+    ("L4_eu_matsui_hamiltonian_only_64",  64),
+    ("L4_eu_matsui_hamiltonian_only_96",  96),
+    ("L4_eu_matsui_hamiltonian_only_128", 128),
+    ("L4det_eu_matsui_hamiltonian_only_32",  32),
+    ("L4det_eu_matsui_hamiltonian_only_48",  48),
+    ("L4det_eu_matsui_hamiltonian_only_64",  64),
+    ("L4det_eu_matsui_hamiltonian_only_96",  96),
 ]
     append!(all_stats, classify_runs(prefix, grid, prefix))
 end
@@ -109,7 +112,9 @@ end
 
 # Highlight the parser-fix impact
 println("\nParser-fix impact (POST-fix EdH transfer is unlocked):")
-for prefix in ["L4_eu_matsui_hamiltonian_only_32", "L4_eu_matsui_hamiltonian_only_48", "L4_eu_matsui_hamiltonian_only_64"]
+for prefix in ["L4_eu_matsui_hamiltonian_only_32", "L4_eu_matsui_hamiltonian_only_48",
+                "L4_eu_matsui_hamiltonian_only_64", "L4_eu_matsui_hamiltonian_only_96",
+                "L4_eu_matsui_hamiltonian_only_128"]
     runs = filter(s -> s.found && s.label == prefix, all_stats)
     pres = filter(s -> s.pre_post == :pre, runs)
     posts = filter(s -> s.pre_post == :post, runs)
