@@ -152,7 +152,7 @@ using LinearAlgebra
         end
         psi0 ./= sqrt(sum(abs2, psi0) * dV)
 
-        interactions = InteractionParams(10.0, -0.5)
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5))
         sp = SimParams(; dt=0.001, n_steps=200, imaginary_time=false, save_every=200)
         ws = make_workspace(;
             grid, atom=Rb87, interactions, sim_params=sp, psi_init=psi0,
@@ -219,7 +219,7 @@ using LinearAlgebra
         @testset "1D + target_Jz → ArgumentError" begin
             grid = make_grid(GridConfig(32, 10.0))
             @test_throws ArgumentError find_ground_state(;
-                grid, atom=Rb87, interactions=InteractionParams(10.0, -0.5),
+                grid, atom=Rb87, interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.5)),
                 potential=HarmonicTrap(1.0), target_Jz=1.0, n_steps=100,
                 fft_flags=FFTW.ESTIMATE)
         end
@@ -228,7 +228,7 @@ using LinearAlgebra
             grid = make_grid(GridConfig((32, 32), (10.0, 10.0)))
             r = find_ground_state(;
                 grid, atom=Rb87,
-                interactions=InteractionParams(10.0, -0.5),
+                interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.5)),
                 potential=HarmonicTrap(1.0, 1.0),
                 target_Jz=0.0, Jz_tol=0.1, Jz_max_iter=5,
                 n_steps=200, dt=0.005, fft_flags=FFTW.ESTIMATE)
@@ -242,7 +242,7 @@ using LinearAlgebra
         grid = make_grid(GridConfig((32, 32), (10.0, 10.0)))
         sp = SimParams(; dt=0.001, n_steps=100, imaginary_time=false, save_every=100)
         ws = make_workspace(; grid, atom=Rb87,
-            interactions=InteractionParams(10.0, -0.5),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.5)),
             potential=HarmonicTrap(1.0, 1.0),
             sim_params=sp, fft_flags=FFTW.ESTIMATE)
         result = validate_conservation(ws; n_steps=20, track_Jz=true)

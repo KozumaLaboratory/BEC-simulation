@@ -70,7 +70,7 @@ function energy_gradient!(
 
     # --- Density interaction: c₀ n ψ ---
     n_density = total_density(psi, N)
-    c0 = ws.interactions.c0
+    c0 = ws.interactions[0]
     if abs(c0) > 1e-30
         for c in 1:D
             idx = _component_slice(N, n_pts, c)
@@ -89,7 +89,7 @@ function energy_gradient!(
     end
 
     # --- Spin interaction: c₁ (F⃗·f⃗) ψ ---
-    c1 = ws.interactions.c1
+    c1 = ws.interactions[1]
     if abs(c1) > 1e-30
         sm = ws.spin_matrices
         # device-aware allocation: GPU when psi is CuArray, CPU otherwise

@@ -46,7 +46,7 @@ using SpinorBEC
     @testset "run_simulation_adaptive!" begin
         grid = make_grid(GridConfig(64, 20.0))
         atom = Rb87
-        interactions = InteractionParams(10.0, -0.5)
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5))
         potential = HarmonicTrap(1.0)
 
         sp = SimParams(; dt=0.001, n_steps=1)
@@ -109,7 +109,7 @@ using SpinorBEC
     @testset "run_simulation_adaptive! richardson mode" begin
         grid = make_grid(GridConfig(64, 20.0))
         atom = Rb87
-        interactions = InteractionParams(10.0, -0.5)
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5))
         potential = HarmonicTrap(1.0)
 
         sp = SimParams(; dt=0.001, n_steps=1)

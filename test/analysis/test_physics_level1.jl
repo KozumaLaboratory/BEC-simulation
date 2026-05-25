@@ -11,7 +11,7 @@ using SpinorBEC
         sp = SimParams(; dt=0.002, n_steps=2000, imaginary_time=false, save_every=2000)
         ws = make_workspace(;
             grid, atom=Rb87,
-            interactions=InteractionParams(10.0, -0.5),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.5)),
             zeeman=ZeemanParams(0.0, 0.1),
             potential=HarmonicTrap(1.0),
             sim_params=sp,
@@ -36,7 +36,7 @@ using SpinorBEC
         sp = SimParams(; dt=0.002, n_steps=2000, imaginary_time=false, save_every=2000)
         ws = make_workspace(;
             grid, atom=Rb87,
-            interactions=InteractionParams(10.0, -0.5),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.5)),
             zeeman=ZeemanParams(0.0, 0.1),
             potential=HarmonicTrap(1.0),
             sim_params=sp,
@@ -65,7 +65,7 @@ using SpinorBEC
         sp = SimParams(; dt=0.002, n_steps=2000, imaginary_time=false, save_every=2000)
         ws = make_workspace(;
             grid, atom=Rb87,
-            interactions=InteractionParams(10.0, -0.5),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.5)),
             zeeman=ZeemanParams(0.0, 0.1),
             potential=HarmonicTrap(1.0),
             sim_params=sp,

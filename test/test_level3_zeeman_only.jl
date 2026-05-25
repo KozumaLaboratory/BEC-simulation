@@ -26,7 +26,7 @@ using SpinorBEC
         L = 4.0
         grid = make_grid(GridConfig((n_pt,), (L,)))
         atom = Rb87
-        interactions = InteractionParams(0.0, 0.0)
+        interactions = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
         zeeman = ZeemanParams(0.7, 0.3)  # arbitrary p, q
         sp = SimParams(; dt=0.01, n_steps=100, save_every=100)
         ws = make_workspace(; grid, atom, interactions, zeeman,
@@ -64,7 +64,7 @@ using SpinorBEC
         L = 4.0
         grid = make_grid(GridConfig((n_pt,), (L,)))
         atom = Rb87
-        interactions = InteractionParams(0.0, 0.0)
+        interactions = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
         p = 0.5
         q = 0.2
         zeeman = ZeemanParams(p, q)
@@ -103,7 +103,7 @@ using SpinorBEC
         grid = make_grid(GridConfig((n_pt,), (L,)))
         F = 1
         atom = Rb87
-        interactions = InteractionParams(0.0, 0.0)
+        interactions = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
         p = 0.4
         zeeman = ZeemanParams(p, 0.0)
         T = 1.5
@@ -140,7 +140,7 @@ using SpinorBEC
         L = 4.0
         grid = make_grid(GridConfig((n_pt,), (L,)))
         atom = Rb87
-        interactions = InteractionParams(0.0, 0.0)
+        interactions = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
         q = 0.3
         zeeman = ZeemanParams(0.0, q)
         T = 0.8

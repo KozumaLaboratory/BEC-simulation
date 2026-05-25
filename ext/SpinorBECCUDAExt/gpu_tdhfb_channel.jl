@@ -102,7 +102,7 @@ function _build_source_U!(
     rho::CuArray{TC, M_rho},
     D::Int,
 ) where {TC, M, M_rho}
-    spatial = size(phi)[1:end-1]
+    spatial = size(phi)[1:(end - 1)]
     N_vox = prod(spatial)
     phi_v = reshape(phi, N_vox, D)
     rho_v = reshape(rho, N_vox, D, D)
@@ -117,7 +117,7 @@ function _build_source_kappa!(
     kappa::CuArray{TC, M_kappa},
     D::Int,
 ) where {TC, M_kappa}
-    spatial = size(kappa)[1:end-2]
+    spatial = size(kappa)[1:(end - 2)]
     N_vox = prod(spatial)
     kappa_v = reshape(kappa, N_vox, D, D)
     source_3d = reshape(source_flat, D, D, N_vox)
@@ -132,7 +132,7 @@ function _build_source_DeltaR!(
     kappa::CuArray{TC, M_kappa},
     D::Int,
 ) where {TC, M, M_kappa}
-    spatial = size(phi)[1:end-1]
+    spatial = size(phi)[1:(end - 1)]
     N_vox = prod(spatial)
     phi_v = reshape(phi, N_vox, D)
     kappa_v = reshape(kappa, N_vox, D, D)

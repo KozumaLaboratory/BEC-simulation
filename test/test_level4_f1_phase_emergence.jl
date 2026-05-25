@@ -41,7 +41,7 @@ using SpinorBEC: classify_phase, spin_matrices, bogoliubov_spectrum, BdGResult
     function _itp_seeded(c1::Float64, seed_state::Symbol; q::Float64=0.0)
         find_ground_state(;
             grid, atom=Rb87,
-            interactions=InteractionParams(5.0, c1),
+            interactions=InteractionParams(Dict(0 => 5.0, 1 => c1)),
             zeeman=ZeemanParams(0.0, q),
             potential=HarmonicTrap((1.0,)),
             n_steps=1000, dt=0.005, tol=1e-9,
@@ -153,7 +153,7 @@ using SpinorBEC: classify_phase, spin_matrices, bogoliubov_spectrum, BdGResult
         # LBFGS minimisation with Mz=0 enforced.
         r_fmx = find_ground_state_lbfgs(;
             grid, atom,
-            interactions=InteractionParams(c0, c1),
+            interactions=InteractionParams(Dict(0 => c0, 1 => c1)),
             potential=HarmonicTrap((1.0,)),
             n_steps=400, tol=1e-9,
             target_magnetization=0.0,
@@ -224,7 +224,7 @@ using SpinorBEC: classify_phase, spin_matrices, bogoliubov_spectrum, BdGResult
         # is 100× below the c₁<0 instability rate measured below.
         bdg_stable = bogoliubov_spectrum(;
             spinor=zeta_polar, n0=n0, F=F,
-            interactions=InteractionParams(2.0, 0.3),
+            interactions=InteractionParams(Dict(0 => 2.0, 1 => 0.3)),
             k_max=2.0, n_k=40,
         )
         @test bdg_stable.max_growth_rate < 1e-5
@@ -234,7 +234,7 @@ using SpinorBEC: classify_phase, spin_matrices, bogoliubov_spectrum, BdGResult
         # require growth > 1e-3 which is many orders above numerical noise.
         bdg_unstable = bogoliubov_spectrum(;
             spinor=zeta_polar, n0=n0, F=F,
-            interactions=InteractionParams(2.0, -0.3),
+            interactions=InteractionParams(Dict(0 => 2.0, 1 => -0.3)),
             k_max=2.0, n_k=40,
         )
         @test bdg_unstable.unstable
@@ -258,13 +258,13 @@ using SpinorBEC: classify_phase, spin_matrices, bogoliubov_spectrum, BdGResult
         zeta_fm = ComplexF64[1.0, 0.0, 0.0]
         bdg_fm = bogoliubov_spectrum(;
             spinor=zeta_fm, n0=1.0, F=1,
-            interactions=InteractionParams(2.0, -0.3),
+            interactions=InteractionParams(Dict(0 => 2.0, 1 => -0.3)),
             k_max=2.0, n_k=40,
         )
         zeta_polar = ComplexF64[0.0, 1.0, 0.0]
         bdg_polar = bogoliubov_spectrum(;
             spinor=zeta_polar, n0=1.0, F=1,
-            interactions=InteractionParams(2.0, -0.3),
+            interactions=InteractionParams(Dict(0 => 2.0, 1 => -0.3)),
             k_max=2.0, n_k=40,
         )
         # FM growth rate at machine-noise floor; polar growth rate is
@@ -297,7 +297,7 @@ using SpinorBEC: classify_phase, spin_matrices, bogoliubov_spectrum, BdGResult
             psi_seed ./= sqrt(sum(abs2, psi_seed) * cell_volume(grid))
             r = find_ground_state_lbfgs(;
                 grid, atom,
-                interactions=InteractionParams(c0, c1),
+                interactions=InteractionParams(Dict(0 => c0, 1 => c1)),
                 potential=HarmonicTrap((1.0,)),
                 n_steps=300, tol=1e-8,
                 target_magnetization=Mz,

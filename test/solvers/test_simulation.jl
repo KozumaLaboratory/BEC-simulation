@@ -6,7 +6,7 @@ using FFTW
     @testset "Ground state: 87Rb ferromagnetic (c1 < 0)" begin
         config = GridConfig(128, 20.0)
         grid = make_grid(config)
-        interactions = InteractionParams(10.0, -0.5)
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5))
         trap = HarmonicTrap(1.0)
 
         result = find_ground_state(;
@@ -29,7 +29,7 @@ using FFTW
     @testset "Ground state: 23Na polar (c1 > 0)" begin
         config = GridConfig(128, 20.0)
         grid = make_grid(config)
-        interactions = InteractionParams(10.0, 0.5)
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => 0.5))
         trap = HarmonicTrap(1.0)
 
         result = find_ground_state(;
@@ -109,7 +109,7 @@ using FFTW
         trap = HarmonicTrap(1.0)
 
         @testset "ferromagnetic (c1 < 0) picks ferro" begin
-            interactions = InteractionParams(10.0, -0.5)
+            interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5))
             result = find_ground_state_multistart(;
                 grid, atom=Rb87, interactions, potential=trap,
                 dt=0.005, n_steps=2000,
@@ -126,7 +126,7 @@ using FFTW
         config = GridConfig(64, 10.0)
         grid = make_grid(config)
         trap = HarmonicTrap(1.0)
-        interactions = InteractionParams(10.0, -0.5)
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5))
 
         @testset "target Mz=0 for ferromagnetic c1<0 → polar-like" begin
             result = find_ground_state(;
@@ -156,7 +156,7 @@ using FFTW
     @testset "run_simulation! returns result" begin
         config = GridConfig(64, 10.0)
         grid = make_grid(config)
-        interactions = InteractionParams(1.0, 0.1)
+        interactions = InteractionParams(Dict(0 => 1.0, 1 => 0.1))
         sp = SimParams(; dt=0.01, n_steps=50, imaginary_time=false, save_every=10)
 
         ws = make_workspace(;
@@ -215,7 +215,7 @@ using FFTW
     @testset "Rotating frame: centrifugal + Zeeman shift in workspace" begin
         config = GridConfig((16, 16), (10.0, 10.0))
         grid = make_grid(config)
-        interactions = InteractionParams(1.0, 0.0)
+        interactions = InteractionParams(Dict(0 => 1.0, 1 => 0.0))
         omega = 0.3
 
         sp = SimParams(; dt=0.01, n_steps=10, imaginary_time=true,
@@ -238,7 +238,7 @@ using FFTW
     @testset "find_ground_state with rotating_frame_omega" begin
         config = GridConfig((16, 16), (10.0, 10.0))
         grid = make_grid(config)
-        interactions = InteractionParams(5.0, 0.0)
+        interactions = InteractionParams(Dict(0 => 5.0, 1 => 0.0))
         trap = HarmonicTrap(1.0, 1.0)
 
         r = find_ground_state(; grid, atom=Rb87, interactions, potential=trap,

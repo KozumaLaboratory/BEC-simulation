@@ -4,28 +4,20 @@
 const _SKIP_HEAVY_YAML_ZEEMAN =
     get(ENV, "SPINORBEC_RUN_HEAVY_YAML", "false") != "true"
 
-@testset "Phase 1.5: Zeeman level dispatch" begin
-    @testset "Level detection" begin
-        @test SpinorBEC._detect_zeeman_level(Dict{String, Any}()) == 0
-        @test SpinorBEC._detect_zeeman_level(Dict{String, Any}("p" => 0.5)) == 0
-        @test SpinorBEC._detect_zeeman_level(Dict{String, Any}("Bz" => 1.0)) == 1
-        @test SpinorBEC._detect_zeeman_level(Dict{String, Any}("Bx" => 0.1, "By" => 0.2)) == 1
-        @test SpinorBEC._detect_zeeman_level(
-            Dict{String, Any}("B_mag" => 1.0, "theta_deg" => 30)
-        ) == 2
-        # Explicit `level:` alone (no vector-coord keys) is detected
-        @test SpinorBEC._detect_zeeman_level(Dict{String, Any}("level" => 2)) == 2
-        # Explicit `level:` together with vector-coord keys is rejected
-        # (the keys imply the level, the explicit annotation is redundant
-        # and was tightened to a hard error 2026-04-30 to catch typos
-        # like `level: 1` paired with B_mag/theta_deg).
-        @test_throws ArgumentError SpinorBEC._detect_zeeman_level(
-            Dict{String, Any}("level" => 2, "B_mag" => 1.0))
+@testset "Unified B-block builders" begin
+    @testset "Coord detection" begin
+        @test SpinorBEC._detect_b_coord(Dict{String, Any}()) === :dimless
+        @test SpinorBEC._detect_b_coord(Dict{String, Any}("p" => 0.5)) === :dimless
+        @test SpinorBEC._detect_b_coord(Dict{String, Any}("Bz" => 1.0)) === :cartesian
+        @test SpinorBEC._detect_b_coord(
+            Dict{String, Any}("Bx" => 0.1, "By" => 0.2)) === :cartesian
+        @test SpinorBEC._detect_b_coord(
+            Dict{String, Any}("B_mag" => 1.0, "theta_deg" => 30)) === :spherical
 
-        # Mixing levels rejected
-        @test_throws ArgumentError SpinorBEC._detect_zeeman_level(
+        # Mixing coord systems rejected
+        @test_throws ArgumentError SpinorBEC._detect_b_coord(
             Dict{String, Any}("p" => 1.0, "Bz" => 1.0))
-        @test_throws ArgumentError SpinorBEC._detect_zeeman_level(
+        @test_throws ArgumentError SpinorBEC._detect_b_coord(
             Dict{String, Any}("Bz" => 1.0, "B_mag" => 1.0))
     end
 
@@ -44,12 +36,12 @@ const _SKIP_HEAVY_YAML_ZEEMAN =
         @test p3 ≈ p / 2
     end
 
-    @testset "Level 1: Bz scalar → TimeDependentZeeman" begin
+    @testset "Cartesian: Bz scalar → TimeDependentZeeman" begin
         atom = Dy164
         omega_ref = 2π * 50.0
         z = Dict{String, Any}("Bz" => 1.0)
         p_step = Dict{String, Any}("interactions" => Dict("omega_ref" => omega_ref))
-        tdz = SpinorBEC._build_zeeman_dispatched(z, 1.0, atom, p_step)
+        tdz = SpinorBEC._build_zeeman_from_b_block(z, 1.0, atom, p_step)
         @test tdz isa TimeDependentZeeman
         # Constant Bz → ConstantWaveform p
         @test tdz.p_wf isa ConstantWaveform
@@ -58,12 +50,12 @@ const _SKIP_HEAVY_YAML_ZEEMAN =
         @test evaluate(tdz.p_wf, 0.5) ≈ expected_p
     end
 
-    @testset "Level 1: Bx linear ramp" begin
+    @testset "Cartesian: Bx linear ramp" begin
         atom = Dy164
         omega_ref = 2π * 50.0
         z = Dict{String, Any}("Bx" => Dict("from" => 0.0, "to" => 0.574))
         p_step = Dict{String, Any}("interactions" => Dict("omega_ref" => omega_ref))
-        tdz = SpinorBEC._build_zeeman_dispatched(z, 0.020, atom, p_step)
+        tdz = SpinorBEC._build_zeeman_from_b_block(z, 0.020, atom, p_step)
         @test tdz.bx_wf isa PiecewiseLinearWaveform
         # Endpoints
         p_at_0 = evaluate(tdz.bx_wf, 0.0)
@@ -76,7 +68,7 @@ const _SKIP_HEAVY_YAML_ZEEMAN =
         @test p_mid ≈ expected_end / 2 rtol=1e-2
     end
 
-    @testset "Level 2: theta ramp projects correctly" begin
+    @testset "Spherical: theta ramp projects correctly" begin
         atom = Dy164
         omega_ref = 2π * 50.0
         # B_mag=1 G fixed, theta 0 → 90 deg: B rotates from z-axis to x-axis
@@ -86,7 +78,7 @@ const _SKIP_HEAVY_YAML_ZEEMAN =
             "phi_deg" => 0.0,
         )
         p_step = Dict{String, Any}("interactions" => Dict("omega_ref" => omega_ref))
-        tdz = SpinorBEC._build_zeeman_dispatched(z, 1.0, atom, p_step)
+        tdz = SpinorBEC._build_zeeman_from_b_block(z, 1.0, atom, p_step)
         unit_p = SpinorBEC._gauss_to_dimless(1.0, atom.g_F, omega_ref)
 
         # t=0: pure z
@@ -99,32 +91,32 @@ const _SKIP_HEAVY_YAML_ZEEMAN =
         @test abs(evaluate(tdz.by_wf, 0.5)) < unit_p * 1e-6
     end
 
-    @testset "Unitful string: Level 1 Bz" begin
+    @testset "Unitful string: Cartesian Bz" begin
         atom = Dy164
         omega_ref = 2π * 50.0
         # String with explicit Gauss — note: "G" alone is gravitational constant
         # in Unitful's namespace, use "Gauss" or SI prefix (mT, μT, T).
         z = Dict{String, Any}("Bz" => "0.819 Gauss")
         p_step = Dict{String, Any}("interactions" => Dict("omega_ref" => omega_ref))
-        tdz = SpinorBEC._build_zeeman_dispatched(z, 1.0, atom, p_step)
+        tdz = SpinorBEC._build_zeeman_from_b_block(z, 1.0, atom, p_step)
         expected = SpinorBEC.Units.bfield_to_p(0.819, atom.g_F, omega_ref)
         @test evaluate(tdz.p_wf, 0.0) ≈ expected rtol=1e-10
 
         # μT prefix should give the same result: 0.819 Gauss = 81.9 μT
         z2 = Dict{String, Any}("Bz" => "81.9 μT")
-        tdz2 = SpinorBEC._build_zeeman_dispatched(z2, 1.0, atom, p_step)
+        tdz2 = SpinorBEC._build_zeeman_from_b_block(z2, 1.0, atom, p_step)
         @test evaluate(tdz2.p_wf, 0.0) ≈ expected rtol=1e-6
 
         # Bogus unit (not magnetic field) rejected
         z_bad = Dict{String, Any}("Bz" => "1.0 m")
-        @test_throws ArgumentError SpinorBEC._build_zeeman_dispatched(z_bad, 1.0, atom, p_step)
+        @test_throws ArgumentError SpinorBEC._build_zeeman_from_b_block(z_bad, 1.0, atom, p_step)
 
         # Bogus string rejected by regex before reaching uparse
         z_evil = Dict{String, Any}("Bz" => "1.0 rm(\"/\")")
-        @test_throws ArgumentError SpinorBEC._build_zeeman_dispatched(z_evil, 1.0, atom, p_step)
+        @test_throws ArgumentError SpinorBEC._build_zeeman_from_b_block(z_evil, 1.0, atom, p_step)
     end
 
-    @testset "Unitful string: Level 2 B_mag" begin
+    @testset "Unitful string: Spherical B_mag" begin
         atom = Dy164
         omega_ref = 2π * 50.0
         z = Dict{String, Any}(
@@ -133,7 +125,7 @@ const _SKIP_HEAVY_YAML_ZEEMAN =
             "phi_deg" => 0.0,
         )
         p_step = Dict{String, Any}("interactions" => Dict("omega_ref" => omega_ref))
-        tdz = SpinorBEC._build_zeeman_dispatched(z, 1.0, atom, p_step)
+        tdz = SpinorBEC._build_zeeman_from_b_block(z, 1.0, atom, p_step)
         expected = SpinorBEC.Units.bfield_to_p(0.819, atom.g_F, omega_ref)
         # At theta=90, B is pure x → bx = full p, p (z) ≈ 0
         @test evaluate(tdz.bx_wf, 0.5) ≈ expected rtol=1e-6
@@ -142,16 +134,16 @@ const _SKIP_HEAVY_YAML_ZEEMAN =
 
     @testset "omega_ref resolution priority" begin
         atom = Dy164
-        # Explicit in zeeman takes priority (50 Hz linear → 2π·50)
+        # Explicit in B block takes priority (50 Hz linear → 2π·50)
         z = Dict{String, Any}("Bz" => 1.0, "omega_ref_hz" => 50.0)
         p_step = Dict{String, Any}("interactions" => Dict("omega_ref" => 2π * 100.0))
-        tdz = SpinorBEC._build_zeeman_dispatched(z, 1.0, atom, p_step)
+        tdz = SpinorBEC._build_zeeman_from_b_block(z, 1.0, atom, p_step)
         expected = SpinorBEC._gauss_to_dimless(1.0, atom.g_F, 2π * 50.0)
         @test evaluate(tdz.p_wf, 0.0) ≈ expected rtol=1e-6
 
         # Falls back to interactions.omega_ref
         z2 = Dict{String, Any}("Bz" => 1.0)
-        tdz2 = SpinorBEC._build_zeeman_dispatched(z2, 1.0, atom, p_step)
+        tdz2 = SpinorBEC._build_zeeman_from_b_block(z2, 1.0, atom, p_step)
         expected2 = SpinorBEC._gauss_to_dimless(1.0, atom.g_F, 2π * 100.0)
         @test evaluate(tdz2.p_wf, 0.0) ≈ expected2 rtol=1e-6
 
@@ -160,7 +152,7 @@ const _SKIP_HEAVY_YAML_ZEEMAN =
             Dict{String, Any}(), Dict{String, Any}())
     end
 
-    @testset "YAML round-trip: Level 1 in ground_state" begin
+    @testset "YAML round-trip: Cartesian Bz in ground_state" begin
         _SKIP_HEAVY_YAML_ZEEMAN && (@test_skip false; return nothing)
         # Tiny Bz to avoid ITP exp-V underflow at large dimensionless p.
         # Real experimental values (e.g. Klaus 2022 Bz=0.819G) give p≈3e4 which
@@ -180,7 +172,7 @@ pipeline:
         @test isfinite(result.ground_state_energy)
     end
 
-    @testset "YAML round-trip: Level 2 dynamics (tilt ramp)" begin
+    @testset "YAML round-trip: Spherical dynamics (tilt ramp)" begin
         _SKIP_HEAVY_YAML_ZEEMAN && (@test_skip false; return nothing)
         cfg = SpinorBEC.load_config_from_string("""
 pipeline:

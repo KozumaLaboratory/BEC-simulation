@@ -25,7 +25,7 @@ using SpinorBEC
     @testset "F=1 contact-only ferromagnetic phase, zero field" begin
         F = 1
         spinor_FM = ComplexF64[1.0, 0.0, 0.0]   # |m = +F⟩
-        ip = InteractionParams(50.0, -2.0)      # c1 < 0 → ferromagnetic
+        ip = InteractionParams(Dict(0 => 50.0, 1 => -2.0))      # c1 < 0 → ferromagnetic
         zee = ZeemanParams(0.0, 0.0)
 
         bdg = bogoliubov_spectrum(;
@@ -47,7 +47,7 @@ using SpinorBEC
     @testset "F=6 DDI-on ferromagnetic, k̂ ∥ magnetization, zero field" begin
         F = 6
         spinor_FM = ComplexF64[1.0, zeros(ComplexF64, 12)...]
-        ip = InteractionParams(100.0, 0.0)
+        ip = InteractionParams(Dict(0 => 100.0, 1 => 0.0))
         zee = ZeemanParams(0.0, 0.0)
         c_dd_eu = 200.0
 

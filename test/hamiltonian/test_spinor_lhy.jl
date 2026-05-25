@@ -57,7 +57,7 @@
         spinor = ComplexF64[1.0, 0.0, 0.0]
         table = compute_spinor_lhy_table(;
             spinor, F=1,
-            interactions=InteractionParams(10.0, -0.5),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.5)),
             n_max=5.0, n_points=20, k_max=10.0, n_k=50,
         )
         @test table isa FullBdGLHY
@@ -161,7 +161,7 @@
         @test_logs (:warn, r"spurious energy offset") match_mode = :any begin
             compute_spinor_lhy_table(;
                 spinor=spinor_polar, F=6,
-                interactions=InteractionParams(10.0, 0.1),
+                interactions=InteractionParams(Dict(0 => 10.0, 1 => 0.1)),
                 n_max=1.0, n_points=4, k_max=5.0, n_k=10,
             )
         end
@@ -169,7 +169,7 @@
         spinor_fm = ComplexF64[c == 1 ? 1.0 : 0.0 for c in 1:D]
         @test compute_spinor_lhy_table(;
             spinor=spinor_fm, F=6,
-            interactions=InteractionParams(10.0, 0.1),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => 0.1)),
             n_max=1.0, n_points=4, k_max=5.0, n_k=10,
         ) isa FullBdGLHY
     end

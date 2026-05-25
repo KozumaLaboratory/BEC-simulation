@@ -5,7 +5,7 @@
 
     @testset "Basic sweep returns results" begin
         param_values = [-2.0, -1.0, 0.0, 1.0, 2.0]
-        make_ip = val -> InteractionParams(10.0, val)
+        make_ip = val -> InteractionParams(Dict(0 => 10.0, 1 => val))
 
         results = scan_continuation(;
             param_values,
@@ -30,7 +30,7 @@
 
         results = scan_continuation(;
             param_values,
-            make_params=val -> (interactions=InteractionParams(10.0, val),),
+            make_params=val -> (interactions=InteractionParams(Dict(0 => 10.0, 1 => val)),),
             grid, atom,
             n_steps_continuation=100,
             n_steps_fresh=500,
@@ -49,7 +49,7 @@
             param_values,
             make_params=p -> (zeeman=ZeemanParams(p, 0.0),),
             grid, atom,
-            interactions=InteractionParams(10.0, -1.0),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => -1.0)),
             n_steps_continuation=100,
             n_steps_fresh=500,
             dt=0.01,
@@ -62,7 +62,7 @@
 
     @testset "Continuation uses previous psi" begin
         param_values = [1.0, 1.01]
-        make_ip = val -> InteractionParams(10.0, val)
+        make_ip = val -> InteractionParams(Dict(0 => 10.0, 1 => val))
 
         results = scan_continuation(;
             param_values,
@@ -80,7 +80,7 @@
 
     @testset "All results have valid phase" begin
         param_values = [-5.0, -2.0, 2.0, 5.0]
-        make_ip = val -> InteractionParams(10.0, val)
+        make_ip = val -> InteractionParams(Dict(0 => 10.0, 1 => val))
 
         results = scan_continuation(;
             param_values,
@@ -107,7 +107,7 @@
 
     @testset "Bidirectional returns valid structure" begin
         param_values = [-2.0, -1.0, 0.0, 1.0, 2.0]
-        make_ip = val -> InteractionParams(10.0, val)
+        make_ip = val -> InteractionParams(Dict(0 => 10.0, 1 => val))
 
         hr = scan_continuation_bidirectional(;
             param_values,
@@ -132,7 +132,7 @@
 
         hr = scan_continuation_bidirectional(;
             param_values,
-            make_params=val -> (interactions=InteractionParams(10.0, val),),
+            make_params=val -> (interactions=InteractionParams(Dict(0 => 10.0, 1 => val)),),
             grid, atom,
             n_steps_continuation=100,
             n_steps_fresh=500,
@@ -146,7 +146,7 @@
 
     @testset "Identical parameters → no hysteresis" begin
         param_values = [1.0, 1.0, 1.0]
-        make_ip = val -> InteractionParams(10.0, val)
+        make_ip = val -> InteractionParams(Dict(0 => 10.0, 1 => val))
 
         hr = scan_continuation_bidirectional(;
             param_values,
@@ -164,7 +164,7 @@
 
     @testset "Phase-crossing sweep detects hysteresis" begin
         param_values = collect(range(-5.0, 5.0; length=6))
-        make_ip = val -> InteractionParams(10.0, val)
+        make_ip = val -> InteractionParams(Dict(0 => 10.0, 1 => val))
 
         hr = scan_continuation_bidirectional(;
             param_values,

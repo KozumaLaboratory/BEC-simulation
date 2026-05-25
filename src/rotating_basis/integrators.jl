@@ -53,7 +53,7 @@ function split_step_rotating!(
     # Strang sandwich: half loss before
     if apply_loss
         apply_loss_step!(
-            ws.psi_tilde, ws.loss, F_atom, Float64(half), D, N, ws.rho_buf,
+            ws.psi_tilde, ws.loss, F_atom, Float64(half), D, N, ws.rho_buf
         )
     end
 
@@ -86,7 +86,7 @@ function split_step_rotating!(
     # Strang sandwich: half loss after
     if apply_loss
         apply_loss_step!(
-            ws.psi_tilde, ws.loss, F_atom, Float64(half), D, N, ws.rho_buf,
+            ws.psi_tilde, ws.loss, F_atom, Float64(half), D, N, ws.rho_buf
         )
     end
 
@@ -177,7 +177,7 @@ function yoshida4_step_rotating!(
     # split_step_rotating! is called with with_loss=false.
     if apply_loss
         apply_loss_step!(
-            ws.psi_tilde, ws.loss, F_atom, Float64(dt) / 2, D, N, ws.rho_buf,
+            ws.psi_tilde, ws.loss, F_atom, Float64(dt) / 2, D, N, ws.rho_buf
         )
     end
 
@@ -191,7 +191,7 @@ function yoshida4_step_rotating!(
 
     if apply_loss
         apply_loss_step!(
-            ws.psi_tilde, ws.loss, F_atom, Float64(dt) / 2, D, N, ws.rho_buf,
+            ws.psi_tilde, ws.loss, F_atom, Float64(dt) / 2, D, N, ws.rho_buf
         )
     end
     nothing
@@ -263,7 +263,7 @@ function yoshida6_step_rotating!(
     apply_loss = _is_active(ws.loss)
     if apply_loss
         apply_loss_step!(
-            ws.psi_tilde, ws.loss, F_atom, Float64(dt) / 2, D, N, ws.rho_buf,
+            ws.psi_tilde, ws.loss, F_atom, Float64(dt) / 2, D, N, ws.rho_buf
         )
     end
     t_local = t
@@ -274,7 +274,7 @@ function yoshida6_step_rotating!(
     end
     if apply_loss
         apply_loss_step!(
-            ws.psi_tilde, ws.loss, F_atom, Float64(dt) / 2, D, N, ws.rho_buf,
+            ws.psi_tilde, ws.loss, F_atom, Float64(dt) / 2, D, N, ws.rho_buf
         )
     end
     nothing
@@ -338,7 +338,7 @@ function cfet4_real_step_rotating!(
     apply_loss = _is_active(ws.loss)
     if apply_loss
         apply_loss_step!(
-            ws.psi_tilde, ws.loss, F_atom, Float64(dt) / 2, D, N, ws.rho_buf,
+            ws.psi_tilde, ws.loss, F_atom, Float64(dt) / 2, D, N, ws.rho_buf
         )
     end
     # Stage 1: α at τ₁ (unitary only)
@@ -355,7 +355,7 @@ function cfet4_real_step_rotating!(
         imaginary_time=false, with_loss=false)
     if apply_loss
         apply_loss_step!(
-            ws.psi_tilde, ws.loss, F_atom, Float64(dt) / 2, D, N, ws.rho_buf,
+            ws.psi_tilde, ws.loss, F_atom, Float64(dt) / 2, D, N, ws.rho_buf
         )
     end
     nothing

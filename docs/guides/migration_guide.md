@@ -23,15 +23,18 @@ interactions: {c0: 4500.0, c1: 130.0}
 
 `a_s` is on the AtomSpecies struct (used internally for c_total derivation) but NOT a YAML field. To override the published a_s, edit the AtomSpecies definition in `src/workflow/initialization/atoms.jl`.
 
-## Zeeman levels
+## Zeeman block (`B:`)
 
-Three levels coexist in the same `zeeman:` block:
+The unified `B:` block accepts three coord-system inputs, auto-detected from
+keys (the step-level `zeeman:` / `B_hat:` keys are rejected outright):
 
-- **Level 0** (legacy): dimensionless `p`, `q`, `bx`, `by`
-- **Level 1**: `Bx`, `By`, `Bz` in Gauss strings (`"0.819 Gauss"`)
-- **Level 2**: `B_mag` + `theta_deg` + `phi_deg` (spherical spec)
+- **`:dimless`**: dimensionless `p`, `q`, `bx`, `by`
+- **`:cartesian`**: `Bx`, `By`, `Bz` in Gauss (Number or `"0.819 Gauss"` strings)
+- **`:spherical`**: `B_mag` + `theta_deg` + `phi_deg`
 
-Mixing levels in a single block raises `ArgumentError`. Pick one per step.
+Mixing coord systems in a single block raises `ArgumentError`. Pick one
+per step. `q` (quadratic Zeeman) is coord-orthogonal and can be combined
+with any of the three.
 
 ## Snapshot format
 

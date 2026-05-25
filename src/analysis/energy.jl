@@ -36,13 +36,13 @@ function _energy_decomposition_cpu(ws::Workspace{N}) where {N}
     zee = zeeman_at(ws.zeeman, ws.state.t)
     E_zee = _zeeman_energy(psi, zee, ws.spin_matrices.system, n_comp, N, n_pts, dV)
 
-    E_c0 = if abs(ws.interactions.c0) > 1e-30
-        _density_interaction_energy(psi, ws.interactions.c0, n_comp, N, n_pts, dV)
+    E_c0 = if abs(ws.interactions[0]) > 1e-30
+        _density_interaction_energy(psi, ws.interactions[0], n_comp, N, n_pts, dV)
     else
         0.0
     end
-    E_c1 = if abs(ws.interactions.c1) > 1e-30
-        _spin_interaction_energy(psi, ws.spin_matrices, ws.interactions.c1, n_comp, N, n_pts, dV)
+    E_c1 = if abs(ws.interactions[1]) > 1e-30
+        _spin_interaction_energy(psi, ws.spin_matrices, ws.interactions[1], n_comp, N, n_pts, dV)
     else
         0.0
     end

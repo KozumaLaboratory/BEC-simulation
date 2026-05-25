@@ -2,7 +2,6 @@ export compute_interaction_params
 export compute_c0, compute_c_dd, compute_a_dd
 export interaction_params_from_constraint
 export compute_c_total, compute_c_dd_dimless, linear_zeeman_p
-export even_c_extra
 export compute_eu151_interactions
 export compute_lhy_2d_params
 export compute_quadratic_zeeman
@@ -53,19 +52,19 @@ function compute_interaction_params(
             c1 = c1_3d * N_atoms
         end
 
-        return InteractionParams(c0, c1)
+        return InteractionParams(Dict(0 => c0, 1 => c1))
     end
 
     if isempty(atom.scattering_lengths)
         @warn "No channel scattering lengths for F=$(atom.F) atom $(atom.name); using c0-only (c1=0)" maxlog=1
         c0 = compute_c0(atom; N_atoms, dims, length_scale)
-        return InteractionParams(c0, 0.0)
+        return InteractionParams(Dict(0 => c0))
     end
     # F ≥ 2 with full channel scattering lengths: all S-channel couplings g_S
     # live in TensorInteractionCache (built downstream in make_workspace).
     # InteractionParams holds the scalar c₀ / c₁ path; for the tensor-cache
     # path these are not used, hence zero.
-    InteractionParams(0.0, 0.0)
+    InteractionParams(Dict{Int, Float64}())
 end
 
 """
@@ -143,7 +142,8 @@ function compute_interaction_params_dimless(
     params_si = compute_interaction_params(atom; N_atoms, dims, length_scale=a_ho)
 
     energy_scale = hbar * omega
-    InteractionParams(params_si.c0 / energy_scale, params_si.c1 / energy_scale)
+    InteractionParams(Dict(0 => params_si[0] / energy_scale,
+        1 => params_si[1] / energy_scale))
 end
 
 """
@@ -166,74 +166,73 @@ function _c0c1_to_gS(F::Int, c0::Float64, c1::Float64)
 end
 
 """
-    _c_extra_to_delta_gS(F, c_extra) → Dict{Int,Float64}
+    c_to_g(F::Int, ip::InteractionParams) → Dict{Int,Float64}
 
-Convert higher-rank tensor couplings c_k to channel coupling perturbations δg_S
-via 6j transform.
+Map the c_n couplings to channel couplings g_S for S ∈ 0:2:2F.
 
-Processes even-rank entries k ∈ {2, 4, ..., 2F} from `c_extra`, where
-`c_extra[idx]` = c_{idx+1} (i.e. c_extra[1]=c₂, c_extra[3]=c₄, c_extra[5]=c₆).
-Odd-rank entries are skipped — note that Kawaguchi-Ueda's "c₃" (coupling to the
-S=2 pair channel) is NOT a rank-3 tensor operator. To include such pair-channel
-couplings, use `_make_tensor_cache_from_channels` with explicit g_S values instead.
+The c_n keys carry two physics conventions that combine into the same
+g_S Dict:
+
+  c_0    rank-0 identity              → constant: g_S += c_0
+  c_1    F̂·F̂ scalar product           → linear-in-S(S+1): g_S += c_1·λ_S
+                                          where λ_S = (S(S+1) − 2F(F+1))/2
+  c_k    rank-k tensor T̂^(k)·T̂^(k)    → Wigner 6j: g_S += (2k+1)·{F F k; F F S}·c_k
+         (k ≥ 2, even)
+
+The two conventions have different numerical normalisations (c_1
+specifically is in the Kawaguchi-Ueda "F̂·F̂" form, not the rank-1 6j
+form), so the n=0,1 entries route through the closed-form `_c0c1_to_gS`
+while n≥2 entries route through the 6j transform `_dict_to_delta_gS`.
 """
-function _c_extra_to_delta_gS(F::Int, c_extra::Vector{Float64})
-    # c_extra is indexed by rank k (k = idx + 1); the 6j transform `_cn_to_gS`
-    # only accepts even ranks. The YAML parser (`_parse_c_extra` in
-    # workflow/experiments/schema/parsing_blocks.jl) now rejects odd-indexed
-    # entries with a clear ArgumentError at config-validation time. Reject
-    # any odd-rank nonzero values that bypassed the parser (programmatic
-    # InteractionParams construction) — KU "c_3" is the S=2 pair-channel
-    # coupling, NOT a rank-3 single-particle tensor, and must be routed via
-    # `_make_tensor_cache_from_channels(F, Dict(S => g_S))`.
-    for (idx, val) in enumerate(c_extra)
-        k = idx + 1
-        if abs(val) > 1e-30 && isodd(k)
-            throw(
-                ArgumentError(
-                    "c_extra[$idx] (c$k) is odd-rank and not a physical tensor coupling. " *
-                    "If this is a Kawaguchi-Ueda pair-channel coupling (e.g. c₃ → S=2 channel), " *
-                    "use `_make_tensor_cache_from_channels(F, Dict(S => g_S, ...))` directly. " *
-                    "See src/hamiltonian/interactions/singlet_pair.jl docstring."),
-            )
-        end
+function c_to_g(F::Int, ip::InteractionParams)
+    g = _c0c1_to_gS(F, ip[0], ip[1])
+    delta = _dict_to_delta_gS(F, ip.c)
+    isempty(delta) && return g
+    for (S, dg) in delta
+        g[S] = get(g, S, 0.0) + dg
     end
-    c_dict = Dict{Int, Float64}()
-    for (idx, val) in enumerate(c_extra)
-        k = idx + 1
-        abs(val) > 1e-30 && iseven(k) && k <= 2F && (c_dict[k] = val)
-    end
-    isempty(c_dict) && return Dict{Int, Float64}()
-    _cn_to_gS(F, c_dict)
+    g
 end
 
 """
-    even_c_extra(F::Int; c2=0.0, c4=0.0, c6=0.0, c8=0.0, c10=0.0, c12=0.0) -> Vector{Float64}
+    _dict_to_delta_gS(F, c_dict) → Dict{Int,Float64}
 
-Build a `c_extra` vector with odd-rank slots auto-zeroed for spin-F. Use this
-instead of constructing the vector by hand — only even-rank tensor couplings
-(k = 2, 4, ..., 2F) are physical; odd-rank slots must be zero.
+Convert higher-rank tensor couplings c_k (n ≥ 2) to channel coupling
+perturbations δg_S via 6j transform. Takes the same Dict that
+`InteractionParams.c` stores (keys 0, 1, 2, 4, 6, ...) and processes
+ONLY even-rank entries with k ≥ 2 and k ≤ 2F. Lower ranks (n=0, n=1)
+are c_0, c_1 and routed through diagonal + spin_mixing steps separately.
 
-For F=6 (Eu151), the returned vector has 11 entries
-`[c₂, 0, c₄, 0, c₆, 0, c₈, 0, c₁₀, 0, c₁₂]`. Without this helper, supplying
-`c_extra = [c2, c4, c6]` (length 3) silently misinterprets `c4 → c3` and
-`c6 → c4`.
+Odd-rank n ≥ 3 entries are not allowed in `InteractionParams.c` (the
+constructor rejects them) so any encountered here would indicate a
+direct field-access bypass; we re-check defensively.
 """
-function even_c_extra(F::Int;
-    c2::Float64=0.0, c4::Float64=0.0, c6::Float64=0.0,
-    c8::Float64=0.0, c10::Float64=0.0, c12::Float64=0.0)
-    vals = Dict{Int, Float64}(2 => c2, 4 => c4, 6 => c6, 8 => c8, 10 => c10, 12 => c12)
-    out = zeros(Float64, 2F - 1)  # c_extra[idx] = c_{idx+1}, idx ∈ 1:2F-1
-    for k in 2:2:2F
-        haskey(vals, k) && (out[k - 1] = vals[k])
-    end
-    # Refuse passing nonzero c_k for k > 2F (would be silently dropped).
-    for (k, v) in vals
-        if k > 2F && abs(v) > 1e-30
-            throw(ArgumentError("even_c_extra: c$k supplied but F=$F only supports up to c$(2F)"))
+function _dict_to_delta_gS(F::Int, c_dict::Dict{Int, Float64})
+    for (k, val) in c_dict
+        if k >= 3 && isodd(k) && abs(val) > 1e-30
+            throw(
+                ArgumentError(
+                    "c_$k is odd-rank and not a physical tensor coupling. " *
+                    "Use _make_tensor_cache_from_channels(F, Dict(S => g_S, ...)) " *
+                    "for KU-style pair-channel couplings."),
+            )
+        end
+        # Silent-drop guard: reject k > 2F so high-rank entries don't
+        # silently disappear when the user passes c_8 for an F=2 atom.
+        if k > 2F && abs(val) > 1e-30
+            throw(
+                ArgumentError(
+                    "c_$k coupling supplied but F=$F only supports up to c_$(2F). " *
+                    "Either set the entry to 0 or use a larger F."),
+            )
         end
     end
-    out
+    extra = Dict{Int, Float64}()
+    for (k, val) in c_dict
+        k >= 2 && k <= 2F && iseven(k) && abs(val) > 1e-30 && (extra[k] = val)
+    end
+    isempty(extra) && return Dict{Int, Float64}()
+    _cn_to_gS(F, extra)
 end
 
 """
@@ -266,11 +265,12 @@ function interaction_params_from_constraint(;
     c_total::Float64,
     c1_ratio::Float64=0.0,
     F::Int,
-    c_extra::Vector{Float64}=Float64[],
+    c_extra::Dict{Int, Float64}=Dict{Int, Float64}(),
 )
     c0 = c_total / (1.0 + F^2 * c1_ratio)
     c1 = c1_ratio * c0
-    InteractionParams(c0, c1, 0.0, c_extra)
+    full = merge(Dict(0 => c0, 1 => c1), c_extra)
+    InteractionParams(full)
 end
 
 """
@@ -342,7 +342,7 @@ function compute_eu151_interactions(;
     N_atoms::Int,
     omega_ref::Float64,
     c1_ratio::Float64,
-    c_extra::Vector{Float64}=Float64[],
+    c_extra::Dict{Int, Float64}=Dict{Int, Float64}(),
 )
     c_total = compute_c_total(Eu151; N_atoms, omega_ref)
     interaction_params_from_constraint(; c_total, c1_ratio, F=6, c_extra)

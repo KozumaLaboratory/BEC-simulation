@@ -104,8 +104,8 @@ using Dates: Date
         @test result.dynamics_result !== nothing
         @test length(result.dynamics_result.energies) > 0
         ws = result.dynamics_workspace
-        @test ws.interactions.c0 ≈ 10.0
-        @test ws.interactions.c1 ≈ -0.5
+        @test ws.interactions[0] ≈ 10.0
+        @test ws.interactions[1] ≈ -0.5
     end
 
     @testset "analyzer dispatch" begin
@@ -858,7 +858,7 @@ pipeline:
               potential: {type: harmonic, omega: [1.0]}
         scan:
           zip:
-            pipeline.0.interactions.c1: [-1.0, 0.0, 1.0]
+            pipeline.0.interactions[1]: [-1.0, 0.0, 1.0]
           continuation: true
         """
         config = load_config_from_string(yaml_str)

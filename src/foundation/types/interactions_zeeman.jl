@@ -17,116 +17,96 @@ export linear_p, quadratic_q, transverse_b, interactions_at
 # --- Interaction Parameters ---
 
 """
-    InteractionParams(c0, c1, [c_lhy], [c_extra])
+    InteractionParams(c::Dict{Int,Float64}; c_lhy=0.0)
 
-Contact interaction parameters. `c0` is the density coupling, `c1` the spin coupling.
+Contact interaction parameters keyed by rank n.
 
-`c_extra` stores higher-rank couplings: `c_extra[n-1]` = cₙ for n ≥ 2.
-Access via `get_cn(ip, n)`. When any even-rank c_extra entry with k ≥ 4 is nonzero,
-`make_workspace` builds a `TensorInteractionCache` and zeros c0/c1 (all contact
-interactions are then handled by the tensor step).
-"""
-struct InteractionParams
-    c0::Float64
-    c1::Float64
-    c_lhy::Float64
-    c_extra::Vector{Float64}
-
-    InteractionParams(c0::Float64, c1::Float64) = new(c0, c1, 0.0, Float64[])
-    InteractionParams(c0::Float64, c1::Float64, c_extra::Vector{Float64}) = new(
-        c0, c1, 0.0, c_extra
-    )
-    InteractionParams(c0::Float64, c1::Float64, c_lhy::Float64) = new(c0, c1, c_lhy, Float64[])
-    InteractionParams(c0::Float64, c1::Float64, c_lhy::Float64, c_extra::Vector{Float64}) = new(
-        c0, c1, c_lhy, c_extra
-    )
-end
-
-"""
-    InteractionParams(c_dict::Dict{Int,Float64}; c_lhy=0.0)
-
-Dict-keyed constructor — addresses the `c_0, c_1` (struct field) vs
-`c_extra` (positional Vector) asymmetry by letting the user write all
-`c_n` as a single Dict keyed by rank n:
-
-    InteractionParams(Dict(0 => 2.0, 1 => 0.1, 4 => 0.5))
-    InteractionParams(Dict(0 => 2.0, 1 => 0.1, 2 => 0.3, 4 => 0.5); c_lhy=10.0)
-
-Equivalent to the positional Vector form but eliminates two footguns:
-  (i)  hand-writing `c_extra = [c_2, c_4, c_6]` silently misindexes
-       (c_4 → c_3 slot, c_6 → c_4 slot)
-  (ii) odd-rank slots (c_3, c_5, ...) must be explicit zeros in the
-       Vector form; the Dict form omits them naturally.
+    ip = InteractionParams(Dict(0 => 2.0, 1 => 0.1, 4 => 0.5))
+    ip[0]                # c_0 (density coupling)
+    ip[1]                # c_1 (spin coupling ⟨F̂_1·F̂_2⟩)
+    ip[2]                # c_2 (S=0 singlet pair, unset → 0)
+    ip[4]                # c_4 (rank-4 tensor)
 
 Rejects:
   - negative keys (n < 0)
-  - odd keys with n ≥ 3 (Kawaguchi-Ueda's c_3 is the S=2 pair channel,
-    NOT a rank-3 tensor — use `_make_tensor_cache_from_channels` for that)
+  - odd keys with n ≥ 3 (Kawaguchi-Ueda's c_3 is the S=2 pair channel
+    coupling, NOT a rank-3 single-particle tensor — use
+    `_make_tensor_cache_from_channels(F, Dict(S => g_S))` for pair channels)
 """
-function InteractionParams(c_dict::Dict{Int, Float64}; c_lhy::Real=0.0)
-    for (k, _) in c_dict
-        k >= 0 || throw(ArgumentError(
-            "InteractionParams: c_n key must be ≥ 0 (got n=$k)"))
-        if k >= 3 && isodd(k)
-            throw(
-                ArgumentError(
-                    "InteractionParams: c_$k is odd-rank and not a physical " *
-                    "single-particle tensor coupling. For Kawaguchi-Ueda " *
-                    "pair-channel couplings (c_3 = S=2 pair, etc.), use " *
-                    "_make_tensor_cache_from_channels(F, Dict(S => g_S)) directly."),
-            )
+struct InteractionParams
+    c::Dict{Int, Float64}
+    c_lhy::Float64
+
+    function InteractionParams(c::Dict{Int, Float64}; c_lhy::Real=0.0)
+        for (k, _) in c
+            k >= 0 || throw(ArgumentError(
+                "InteractionParams: c_n key must be ≥ 0 (got n=$k)"))
+            if k >= 3 && isodd(k)
+                throw(
+                    ArgumentError(
+                        "InteractionParams: c_$k is odd-rank and not a physical " *
+                        "single-particle tensor coupling. For Kawaguchi-Ueda " *
+                        "pair-channel couplings (c_3 = S=2 pair, etc.), use " *
+                        "_make_tensor_cache_from_channels(F, Dict(S => g_S)) directly."),
+                )
+            end
         end
+        new(c, Float64(c_lhy))
     end
-    c0 = Float64(get(c_dict, 0, 0.0))
-    c1 = Float64(get(c_dict, 1, 0.0))
-    max_n = isempty(c_dict) ? 1 : maximum(keys(c_dict))
-    extra = if max_n >= 2
-        vec = zeros(Float64, max_n - 1)
-        for (k, v) in c_dict
-            k >= 2 && (vec[k - 1] = Float64(v))
-        end
-        vec
-    else
-        Float64[]
-    end
-    InteractionParams(c0, c1, Float64(c_lhy), extra)
+end
+
+# Reject positional (c0, c1, ...) form — only the Dict form is supported.
+function InteractionParams(::Real, ::Real, args...; kwargs...)
+    throw(
+        ArgumentError(
+            "InteractionParams takes a Dict{Int,Float64}: " *
+            "InteractionParams(Dict(0 => c0, 1 => c1, 2 => c2, ...))"),
+    )
 end
 
 """
     get_cn(ip::InteractionParams, n::Int) -> Float64
 
-Unified accessor for any c_n. Returns 0 for n outside the populated range.
+Unified accessor for any c_n. Returns 0 for n outside the populated set.
 """
-function get_cn(ip::InteractionParams, n::Int)
-    n == 0 && return ip.c0
-    n == 1 && return ip.c1
-    idx = n - 1
-    idx <= length(ip.c_extra) ? ip.c_extra[idx] : 0.0
-end
+get_cn(ip::InteractionParams, n::Int) = get(ip.c, n, 0.0)
 
 """
-    Base.getindex(ip::InteractionParams, n::Int)
+    Base.getindex(ip::InteractionParams, n::Int) -> Float64
 
-Index syntax for `c_n`: write `ip[0]` instead of `ip.c0`, `ip[4]` instead
-of `ip.c_extra[3]`. Symmetric across all ranks — addresses the
-`ip.c0 / ip.c1 / ip.c_extra[3]` asymmetry by giving one indexing rule.
+Symmetric c_n indexing. `ip[0]` is c_0, `ip[1]` is c_1, `ip[4]` is c_4.
 """
 Base.getindex(ip::InteractionParams, n::Int) = get_cn(ip, n)
 
 """
     c_dict(ip::InteractionParams) -> Dict{Int,Float64}
 
-Round-trip back to the Dict form. Only nonzero c_n entries appear.
+Return the underlying Dict (alias of `ip.c`). Only nonzero entries are
+filtered out at the call site if needed.
 """
-function c_dict(ip::InteractionParams)
-    d = Dict{Int, Float64}()
-    abs(ip.c0) > 0 && (d[0] = ip.c0)
-    abs(ip.c1) > 0 && (d[1] = ip.c1)
-    for (idx, v) in enumerate(ip.c_extra)
-        abs(v) > 0 && (d[idx + 1] = v)
+c_dict(ip::InteractionParams) = ip.c
+
+"""
+    has_higher_rank_couplings(ip::InteractionParams) -> Bool
+
+True iff any nonzero c_k with k ≥ 4 is present (the trigger for
+tensor_cache routing in `make_workspace`). c_0 and c_1 are handled by
+specialized diagonal + spin_mixing steps; c_2 is handled by the
+singlet_pair step; only k ≥ 4 needs the general tensor_cache.
+"""
+function has_higher_rank_couplings(ip::InteractionParams)
+    for (k, v) in ip.c
+        k >= 4 && abs(v) > 1e-30 && return true
     end
-    d
+    false
 end
+
+"""
+    max_rank(ip::InteractionParams) -> Int
+
+Largest n with a stored entry (nonzero or not). Returns -1 if empty.
+"""
+max_rank(ip::InteractionParams) = isempty(ip.c) ? -1 : maximum(keys(ip.c))
 
 # --- Zeeman Parameters ---
 
@@ -216,5 +196,6 @@ function interactions_at(ip::InteractionParams, ::Float64)
 end
 
 function interactions_at(td::TimeDependentInteractions, t::Float64)
-    InteractionParams(evaluate(td.c0_wf, t), evaluate(td.c1_wf, t))
+    InteractionParams(Dict(0 => evaluate(td.c0_wf, t),
+        1 => evaluate(td.c1_wf, t)))
 end

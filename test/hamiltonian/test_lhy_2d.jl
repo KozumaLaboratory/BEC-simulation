@@ -34,7 +34,7 @@
         grid = make_grid(GridConfig((16,), (10.0,)))
         atom = Rb87
         c_lhy = 0.5
-        interactions = InteractionParams(10.0, -0.5, c_lhy)
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5); c_lhy=c_lhy)
 
         sp = SimParams(; dt=0.01, n_steps=10, save_every=10)
         ws = make_workspace(;
@@ -51,7 +51,7 @@
     @testset "No LHY → lhy=nothing" begin
         grid = make_grid(GridConfig((16,), (10.0,)))
         atom = Rb87
-        interactions = InteractionParams(10.0, -0.5)
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5))
 
         sp = SimParams(; dt=0.01, n_steps=10, save_every=10)
         ws = make_workspace(;
@@ -66,7 +66,7 @@
         grid = make_grid(GridConfig((16,), (10.0,)))
         atom = Rb87
         c_lhy = 0.5
-        interactions = InteractionParams(10.0, -0.5, c_lhy)
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5); c_lhy=c_lhy)
         sp = SimParams(; dt=0.01, n_steps=1, save_every=1)
         ws = make_workspace(;
             grid, atom, interactions,

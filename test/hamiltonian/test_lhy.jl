@@ -5,7 +5,7 @@
         sp = SimParams(; dt=0.01, n_steps=50)
         ws = make_workspace(;
             grid, atom=Rb87,
-            interactions=InteractionParams(10.0, -0.5),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.5)),
             potential=HarmonicTrap(1.0),
             sim_params=sp,
         )
@@ -101,7 +101,7 @@
 
         ws0 = make_workspace(;
             grid, atom=Rb87,
-            interactions=InteractionParams(10.0, -0.5),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.5)),
             potential=HarmonicTrap(1.0),
             sim_params=sp,
         )
@@ -109,7 +109,7 @@
 
         ws1 = make_workspace(;
             grid, atom=Rb87,
-            interactions=InteractionParams(10.0, -0.5, 100.0),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.5); c_lhy=100.0),
             potential=HarmonicTrap(1.0),
             sim_params=sp,
         )
@@ -124,7 +124,7 @@
         sp = SimParams(; dt=0.005, n_steps=100)
         ws = make_workspace(;
             grid, atom=Rb87,
-            interactions=InteractionParams(10.0, -0.5, 50.0),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.5); c_lhy=50.0),
             potential=HarmonicTrap(1.0),
             sim_params=sp,
         )
@@ -136,21 +136,17 @@
     end
 
     @testset "InteractionParams c_lhy constructors" begin
-        ip1 = InteractionParams(1.0, 2.0)
+        ip1 = InteractionParams(Dict(0 => 1.0, 1 => 2.0))
         @test ip1.c_lhy == 0.0
-        @test ip1.c_extra == Float64[]
+        @test ip1[2] == 0.0
 
-        ip2 = InteractionParams(1.0, 2.0, [3.0, 4.0])
-        @test ip2.c_lhy == 0.0
-        @test ip2.c_extra == [3.0, 4.0]
-
-        ip3 = InteractionParams(1.0, 2.0, 5.0)
+        ip3 = InteractionParams(Dict(0 => 1.0, 1 => 2.0); c_lhy=5.0)
         @test ip3.c_lhy == 5.0
-        @test ip3.c_extra == Float64[]
+        @test ip3[2] == 0.0
 
-        ip4 = InteractionParams(1.0, 2.0, 5.0, [3.0])
+        ip4 = InteractionParams(Dict(0 => 1.0, 1 => 2.0, 2 => 3.0); c_lhy=5.0)
         @test ip4.c_lhy == 5.0
-        @test ip4.c_extra == [3.0]
+        @test ip4[2] == 3.0
     end
 
     @testset "YAML parsing of lhy.c_lhy" begin

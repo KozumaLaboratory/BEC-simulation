@@ -109,7 +109,7 @@ SpinorBEC phase scans:
 ```julia
 res = multi_fidelity_optimize_yaml(
     "runs/eu151_phase_diagram_lbfgs/config.yaml",
-    ["pipeline.0.ground_state.B.p", "pipeline.0.ground_state.interactions.c1_ratio"],
+    ["pipeline.0.ground_state.B.p", "pipeline.0.ground_state.interactions[1]_ratio"],
     [(10.0, 1000.0), (-0.1, 0.1)];
     objective_fn = bo_objective_min_energy,
     low_overrides = Dict{String,Any}(

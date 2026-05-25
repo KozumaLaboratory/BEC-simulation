@@ -65,7 +65,7 @@ function batched_expm_neg_i_dt!(
         # Use batched gemm: P_tmp = A_tmp · A_scratch
         k == n_taylor && break   # don't compute the next power if we're done
         CUDA.CUBLAS.gemm_strided_batched!(
-            'N', 'N', one(Complex{T}), A_tmp, A_scratch, zero(Complex{T}), P_tmp,
+            'N', 'N', one(Complex{T}), A_tmp, A_scratch, zero(Complex{T}), P_tmp
         )
         copyto!(A_tmp, P_tmp)
     end
@@ -90,7 +90,7 @@ function _add_identity_to_batch!(M::CuArray{Complex{T}, 3}, val::Complex{T}) whe
     blocks_x = cld(D, threads_x)
     blocks_y = cld(N_vox, threads_y)
     CUDA.@cuda threads=(threads_x, threads_y) blocks=(blocks_x, blocks_y) _kernel(
-        M, val, D, N_vox,
+        M, val, D, N_vox
     )
     M
 end

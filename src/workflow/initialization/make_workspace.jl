@@ -201,46 +201,41 @@ function make_workspace(;
     batched_kinetic = _make_batched_kinetic_cache(psi, kinetic_phase, N, backend; flags=fft_flags)
 
     F = atom.F
-    # Tensor interaction path activation:
-    # c_extra[idx] = c_{idx+1} stores higher-rank tensor couplings (c₂, c₃, ...).
-    # Only even-rank k ∈ {4, 6, ..., 2F} triggers the full tensor_cache, because the
-    # 6j transform (_c_extra_to_delta_gS) maps even-rank c_k to channel g_S.
+    # Tensor interaction path activation: InteractionParams.c is a
+    # Dict{Int,Float64} keyed by rank n. Only even-rank k ∈ {4, 6, ..., 2F}
+    # triggers the full tensor_cache, because the 6j transform
+    # (_dict_to_delta_gS) maps even-rank c_k to channel g_S.
     #
     # Lower-rank terms are handled by dedicated steps:
     #   k=0 (c₀): diagonal step    k=1 (c₁): spin_mixing step
     #   k=2 (c₂): singlet_pair step (S=0 pair channel)
-    #   k=3: rejected (odd rank; see below)
+    #   k=3: rejected (odd rank; InteractionParams constructor catches this)
     #
-    # Note on Kawaguchi-Ueda convention: their c₃ Σ_M|A₂M|² (F=3) is a coupling
-    # to the S=2 pair channel, NOT a rank-3 tensor operator. To include such terms,
-    # map them to g_S channel couplings directly via _make_tensor_cache_from_channels,
-    # bypassing c_extra entirely.
-    has_higher_c_extra = any(
-        i ->
-            iseven(i + 1) &&
-            (i + 1) >= 4 &&
-            (i + 1) <= 2F &&
-            abs(effective_interactions.c_extra[i]) > 1e-30,
-        eachindex(effective_interactions.c_extra),
+    # Kawaguchi-Ueda c₃ Σ_M|A₂M|² is a S=2 pair-channel coupling, NOT a
+    # rank-3 tensor — use _make_tensor_cache_from_channels(F, g_S) for it.
+    has_higher_rank = any(
+        k -> iseven(k) && k >= 4 && k <= 2F &&
+             abs(get(effective_interactions.c, k, 0.0)) > 1e-30,
+        keys(effective_interactions.c),
     )
 
-    tensor_cache, ws_interactions = if has_higher_c_extra
-        g_delta = _c_extra_to_delta_gS(F, effective_interactions.c_extra)
+    tensor_cache, ws_interactions = if has_higher_rank
+        g_delta = _dict_to_delta_gS(F, effective_interactions.c)
         tc = _make_tensor_cache_from_channels(F, g_delta)
         tc,
         InteractionParams(
-            effective_interactions.c0,
-            effective_interactions.c1,
-            effective_interactions.c_lhy,
-            Float64[],
+            Dict(0 => effective_interactions[0],
+                1 => effective_interactions[1]);
+            c_lhy=effective_interactions.c_lhy,
         )
     else
         tc = make_tensor_interaction_cache(F, effective_interactions)
         if tc !== nothing &&
-            (abs(effective_interactions.c0) > 1e-30 || abs(effective_interactions.c1) > 1e-30)
+            (abs(effective_interactions[0]) > 1e-30 ||
+            abs(effective_interactions[1]) > 1e-30)
             throw(
                 ArgumentError(
-                    "tensor_cache active with non-zero c0=$(effective_interactions.c0), c1=$(effective_interactions.c1). " *
+                    "tensor_cache active with non-zero c0=$(effective_interactions[0]), c1=$(effective_interactions[1]). " *
                     "When tensor_cache handles all channels, set c0=c1=0 in InteractionParams " *
                     "to avoid double-counting (diagonal step still uses c0, tensor step includes c0+c1).",
                 ),
@@ -266,7 +261,7 @@ function make_workspace(;
     lhy = if lhy_attempt !== nothing
         lhy_attempt
     elseif quasi_2d && abs(ws_interactions.c_lhy) > 1e-30
-        compute_lhy_2d_params(ws_interactions.c0, l_z)
+        compute_lhy_2d_params(ws_interactions[0], l_z)
     elseif abs(ws_interactions.c_lhy) > 1e-30
         ScalarLHY(ws_interactions.c_lhy)
     else
@@ -349,22 +344,14 @@ end
     maximum(sum(abs2, psi_init; dims=ndims(psi_init))) * 3.0
 end
 
-function _lhy_g_dict(atom::AtomSpecies, ws::InteractionParams)
-    g_dict = _c0c1_to_gS(atom.F, ws.c0, ws.c1)
-    if !isempty(ws.c_extra)
-        for (S, dg) in _c_extra_to_delta_gS(atom.F, ws.c_extra)
-            g_dict[S] = get(g_dict, S, 0.0) + dg
-        end
-    end
-    g_dict
-end
+_lhy_g_dict(atom::AtomSpecies, ws::InteractionParams) = c_to_g(atom.F, ws)
 
 # Catch-all: unknown / unsupported mode → nothing (caller falls through).
 _build_spinor_lhy(::Val, atom, ws, psi_init, c_dd, enable_ddi) = nothing
 
 function _build_spinor_lhy(::Val{:polar_two_channel}, atom, ws, psi_init, c_dd, enable_ddi)
     compute_spinor_lhy_polar_two_channel(;
-        F=atom.F, c0=ws.c0, c1=ws.c1,
+        F=atom.F, c0=ws[0], c1=ws[1],
         c_dd=enable_ddi && !isnan(c_dd) ? c_dd : 0.0,
         n_max=_lhy_n_max(psi_init))
 end

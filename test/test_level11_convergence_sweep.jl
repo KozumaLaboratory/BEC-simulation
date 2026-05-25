@@ -37,7 +37,7 @@ using LinearAlgebra
         for dt in (0.04, 0.02, 0.01)
             ws = make_workspace(;
                 grid, atom,
-                interactions=InteractionParams(5.0, 0.1),
+                interactions=InteractionParams(Dict(0 => 5.0, 1 => 0.1)),
                 zeeman=ZeemanParams(0.0, 0.0),
                 potential=HarmonicTrap((1.0,)),
                 sim_params=SimParams(; dt=dt, n_steps=500, save_every=500),
@@ -46,7 +46,7 @@ using LinearAlgebra
             # the IIP loop; instead use find_ground_state.
             result = find_ground_state(;
                 grid, atom,
-                interactions=InteractionParams(5.0, 0.1),
+                interactions=InteractionParams(Dict(0 => 5.0, 1 => 0.1)),
                 potential=HarmonicTrap((1.0,)),
                 dt=dt, n_steps=500, tol=1e-7,
             )
@@ -68,7 +68,7 @@ using LinearAlgebra
             grid = make_grid(GridConfig{1}((n,), (L,)))
             result = find_ground_state(;
                 grid, atom=Rb87,
-                interactions=InteractionParams(5.0, 0.1),
+                interactions=InteractionParams(Dict(0 => 5.0, 1 => 0.1)),
                 potential=HarmonicTrap((1.0,)),
                 dt=0.01, n_steps=500, tol=1e-7,
             )
@@ -100,7 +100,7 @@ using LinearAlgebra
             grid = make_grid(GridConfig{1}((n,), (L,)))
             result = find_ground_state(;
                 grid, atom=Rb87,
-                interactions=InteractionParams(5.0, 0.1),
+                interactions=InteractionParams(Dict(0 => 5.0, 1 => 0.1)),
                 potential=HarmonicTrap((1.0,)),
                 dt=0.01, n_steps=500, tol=1e-7,
             )

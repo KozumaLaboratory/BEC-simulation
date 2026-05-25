@@ -9,7 +9,7 @@ using LinearAlgebra: normalize
 
         result = bogoliubov_spectrum(;
             spinor, n0, F,
-            interactions=InteractionParams(c0, 0.0),
+            interactions=InteractionParams(Dict(0 => c0, 1 => 0.0)),
             k_max=5.0, n_k=50,
         )
 
@@ -45,7 +45,7 @@ using LinearAlgebra: normalize
 
         result = bogoliubov_spectrum(;
             spinor, n0, F,
-            interactions=InteractionParams(c0, c1),
+            interactions=InteractionParams(Dict(0 => c0, 1 => c1)),
             k_max=4.0, n_k=40,
         )
 
@@ -74,7 +74,7 @@ using LinearAlgebra: normalize
         spinor = ComplexF64[1.0, 0.0, 0.0]  # ferromagnetic
         result = bogoliubov_spectrum(;
             spinor, n0=1.0, F,
-            interactions=InteractionParams(10.0, -5.0),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => -5.0)),
             k_max=3.0, n_k=20,
         )
 
@@ -93,7 +93,7 @@ using LinearAlgebra: normalize
         spinor = ComplexF64[0.0, 1.0, 0.0]
         result = bogoliubov_spectrum(;
             spinor, n0=1.0, F,
-            interactions=InteractionParams(10.0, 0.0),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => 0.0)),
             k_max=5.0, n_k=50,
         )
 
@@ -107,7 +107,7 @@ using LinearAlgebra: normalize
         spinor = ComplexF64[0.0, 1.0, 0.0]
         result = bogoliubov_spectrum(;
             spinor, n0=1.0, F,
-            interactions=InteractionParams(10.0, 2.0),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => 2.0)),
             zeeman=ZeemanParams(0.0, 1.0),
             k_max=5.0, n_k=30,
         )
@@ -123,7 +123,7 @@ using LinearAlgebra: normalize
 
         result = bogoliubov_spectrum(;
             spinor, n0=1.0, F,
-            interactions=InteractionParams(10.0, 1.0),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => 1.0)),
             k_max=5.0, n_k=20,
         )
 
@@ -138,7 +138,7 @@ using LinearAlgebra: normalize
         # Along z (dipole axis) should be different from perpendicular
         r_z = bogoliubov_spectrum(;
             spinor, n0=1.0, F,
-            interactions=InteractionParams(5.0, -2.0),
+            interactions=InteractionParams(Dict(0 => 5.0, 1 => -2.0)),
             c_dd=10.0,
             k_direction=(0.0, 0.0, 1.0),
             k_max=5.0, n_k=20,
@@ -146,7 +146,7 @@ using LinearAlgebra: normalize
 
         r_x = bogoliubov_spectrum(;
             spinor, n0=1.0, F,
-            interactions=InteractionParams(5.0, -2.0),
+            interactions=InteractionParams(Dict(0 => 5.0, 1 => -2.0)),
             c_dd=10.0,
             k_direction=(1.0, 0.0, 0.0),
             k_max=5.0, n_k=20,
@@ -175,7 +175,7 @@ using LinearAlgebra: normalize
         result = bogoliubov_spectrum(;
             spinor=ComplexF64[0.0, 1.0, 0.0],
             n0=1.0, F=1,
-            interactions=InteractionParams(10.0, 0.0),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => 0.0)),
             k_max=3.0, n_k=10,
         )
 
@@ -190,7 +190,7 @@ using LinearAlgebra: normalize
         spinor = ComplexF64[0.0, 1.0, 0.0]
         imap = bogoliubov_instability_scan(;
             spinor, n0=1.0, F,
-            interactions=InteractionParams(10.0, 2.0),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => 2.0)),
             zeeman=ZeemanParams(0.0, 1.0),
             k_max=5.0, n_k=30,
         )
@@ -206,7 +206,7 @@ using LinearAlgebra: normalize
         spinor = ComplexF64[1.0, 0.0, 0.0]
         imap = bogoliubov_instability_scan(;
             spinor, n0=1.0, F,
-            interactions=InteractionParams(5.0, -2.0),
+            interactions=InteractionParams(Dict(0 => 5.0, 1 => -2.0)),
             c_dd=10.0,
             k_max=5.0, n_k=30,
         )
@@ -223,7 +223,7 @@ using LinearAlgebra: normalize
         spinor = ComplexF64[1.0, 0.0, 0.0]
         imap = bogoliubov_instability_scan(;
             spinor, n0=1.0, F,
-            interactions=InteractionParams(5.0, -2.0),
+            interactions=InteractionParams(Dict(0 => 5.0, 1 => -2.0)),
             c_dd=0.0,
             k_max=5.0, n_k=30,
         )
@@ -239,7 +239,7 @@ using LinearAlgebra: normalize
 
         ref = bogoliubov_spectrum(;
             spinor, n0=1.0, F,
-            interactions=InteractionParams(5.0, -2.0),
+            interactions=InteractionParams(Dict(0 => 5.0, 1 => -2.0)),
             c_dd=5.0,
             k_direction=dir,
             k_max=5.0, n_k=30,
@@ -247,7 +247,7 @@ using LinearAlgebra: normalize
 
         imap = bogoliubov_instability_scan(;
             spinor, n0=1.0, F,
-            interactions=InteractionParams(5.0, -2.0),
+            interactions=InteractionParams(Dict(0 => 5.0, 1 => -2.0)),
             c_dd=5.0,
             k_max=5.0, n_k=30,
             directions=[dir],
@@ -262,7 +262,7 @@ using LinearAlgebra: normalize
         spinor = ComplexF64[1.0, 0.0, 0.0]
         imap = bogoliubov_instability_scan(;
             spinor, n0=1.0, F,
-            interactions=InteractionParams(5.0, -2.0),
+            interactions=InteractionParams(Dict(0 => 5.0, 1 => -2.0)),
             c_dd=10.0,
             k_max=5.0, n_k=30,
         )
@@ -287,7 +287,7 @@ using LinearAlgebra: normalize
         spinor = ComplexF64[0.0, 1.0, 0.0]
         imap = bogoliubov_instability_scan(;
             spinor, n0=1.0, F,
-            interactions=InteractionParams(10.0, 2.0),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => 2.0)),
             zeeman=ZeemanParams(0.0, 1.0),
             k_max=5.0, n_k=20,
             directions=:dense,
@@ -302,12 +302,12 @@ using LinearAlgebra: normalize
         spinor = ComplexF64[1.0, 0.0, 0.0]
         imap_auto = bogoliubov_instability_scan(;
             spinor, n0=1.0, F,
-            interactions=InteractionParams(5.0, -2.0),
+            interactions=InteractionParams(Dict(0 => 5.0, 1 => -2.0)),
             c_dd=0.0, k_max=5.0, n_k=30,
         )
         imap_dense = bogoliubov_instability_scan(;
             spinor, n0=1.0, F,
-            interactions=InteractionParams(5.0, -2.0),
+            interactions=InteractionParams(Dict(0 => 5.0, 1 => -2.0)),
             c_dd=0.0, k_max=5.0, n_k=30,
             directions=:dense, n_directions=50,
         )
@@ -319,12 +319,12 @@ using LinearAlgebra: normalize
         spinor = ComplexF64[1.0, 0.0, 0.0]
         imap_auto = bogoliubov_instability_scan(;
             spinor, n0=1.0, F,
-            interactions=InteractionParams(5.0, -2.0),
+            interactions=InteractionParams(Dict(0 => 5.0, 1 => -2.0)),
             c_dd=10.0, k_max=5.0, n_k=30,
         )
         imap_dense = bogoliubov_instability_scan(;
             spinor, n0=1.0, F,
-            interactions=InteractionParams(5.0, -2.0),
+            interactions=InteractionParams(Dict(0 => 5.0, 1 => -2.0)),
             c_dd=10.0, k_max=5.0, n_k=30,
             directions=:dense, n_directions=200,
         )
@@ -337,7 +337,7 @@ using LinearAlgebra: normalize
         spinor = ComplexF64[1.0, 0.0, 0.0]
         imap = bogoliubov_instability_scan(;
             spinor, n0=1.0, F,
-            interactions=InteractionParams(5.0, -2.0),
+            interactions=InteractionParams(Dict(0 => 5.0, 1 => -2.0)),
             c_dd=10.0,
             k_max=5.0, n_k=30,
         )

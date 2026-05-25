@@ -21,7 +21,7 @@ using Test
 
     F = make_phase_diff_eval(grid, atom;
         parameter_setter=θ -> (
-            interactions=InteractionParams(θ[1], θ[2]),
+            interactions=InteractionParams(Dict(0 => θ[1], 1 => θ[2])),
             potential=HarmonicTrap((1.0, 1.0)),
         ),
         phase_A_init=:m_plus_F,
@@ -49,7 +49,7 @@ using Test
         # Build a fresh closure so the warm-start counter starts at zero.
         Fw = make_phase_diff_eval(grid, atom;
             parameter_setter=θ -> (
-                interactions=InteractionParams(θ[1], θ[2]),
+                interactions=InteractionParams(Dict(0 => θ[1], 1 => θ[2])),
                 potential=HarmonicTrap((1.0, 1.0)),
             ),
             phase_A_init=:m_plus_F, phase_B_init=:polar,
@@ -64,7 +64,7 @@ using Test
         # for both branches (no JIT, since warmup above paid that).
         Fc = make_phase_diff_eval(grid, atom;
             parameter_setter=θ -> (
-                interactions=InteractionParams(θ[1], θ[2]),
+                interactions=InteractionParams(Dict(0 => θ[1], 1 => θ[2])),
                 potential=HarmonicTrap((1.0, 1.0)),
             ),
             phase_A_init=:m_plus_F, phase_B_init=:polar,

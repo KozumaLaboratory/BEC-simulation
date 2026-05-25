@@ -109,7 +109,7 @@
         sys = SpinSystem(1)
         psi = init_psi(grid, sys; state=:uniform)
         psi_orig = copy(psi)
-        interactions = InteractionParams(10.0, -0.5)  # c2=0
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5))  # c2=0
         apply_singlet_pair_step!(psi, interactions, 1, 0.01, 1)
         @test psi ≈ psi_orig atol = 1e-15
     end
@@ -119,7 +119,7 @@
         grid = make_grid(config)
         sys = SpinSystem(1)
         psi = init_psi(grid, sys; state=:uniform)
-        interactions = InteractionParams(10.0, -0.5, [50.0])  # c2=50
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5, 2 => 50.0))  # c2=50
         N0 = total_norm(psi, grid)
         apply_singlet_pair_step!(psi, interactions, 1, 0.01, 1)
         N1 = total_norm(psi, grid)
@@ -131,7 +131,7 @@
         grid = make_grid(config)
         sys = SpinSystem(2)
         psi = init_psi(grid, sys; state=:uniform)
-        interactions = InteractionParams(10.0, -0.5, [30.0])
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5, 2 => 30.0))
         N0 = total_norm(psi, grid)
         apply_singlet_pair_step!(psi, interactions, 2, 0.01, 1)
         N1 = total_norm(psi, grid)
@@ -144,7 +144,7 @@
         sys = SpinSystem(1)
         psi = init_psi(grid, sys; state=:m_plus_F)
         psi_orig = copy(psi)
-        interactions = InteractionParams(10.0, -0.5, [50.0])
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5, 2 => 50.0))
         apply_singlet_pair_step!(psi, interactions, 1, 0.01, 1)
         # Ferromagnetic: A₀₀=0, so nematic step is identity
         @test psi ≈ psi_orig atol = 1e-14
@@ -155,7 +155,7 @@
         grid = make_grid(config)
         sys = SpinSystem(1)
         psi = init_psi(grid, sys; state=:uniform)
-        interactions = InteractionParams(10.0, -0.5, [50.0])
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5, 2 => 50.0))
         N0 = total_norm(psi, grid)
         apply_singlet_pair_step!(psi, interactions, 1, 0.01, 2)
         N1 = total_norm(psi, grid)
@@ -167,7 +167,7 @@
         psi[1, 1] = 0.5 * cis(0.7)
         psi[1, 2] = 0.3 + 0.2im
         psi[1, 3] = 0.4 * cis(-0.3)
-        interactions = InteractionParams(10.0, -0.5, [50.0])
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5, 2 => 50.0))
 
         total_before = sum(abs2, psi)
 
@@ -186,7 +186,7 @@
         psi[1, 3] = 0.2 + 0.1im       # m=0
         psi[1, 4] = 0.35 * cis(1.2)   # m=-1
         psi[1, 5] = 0.25 * cis(-0.3)  # m=-2
-        interactions = InteractionParams(10.0, -0.5, [30.0])
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5, 2 => 30.0))
 
         total_before = sum(abs2, psi)
 
@@ -205,7 +205,7 @@
         psi[1, 3] = 0.4 * cis(-0.3)   # m=-1
         psi0 = copy(psi)
         c2 = 50.0
-        interactions = InteractionParams(10.0, -0.5, [c2])
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5, 2 => c2))
         dt = 1e-6
 
         apply_singlet_pair_step!(psi, interactions, 1, dt, 1)
@@ -235,7 +235,7 @@
         psi[1, 1] = 0.5 * cis(0.7)
         psi[1, 2] = 0.3 + 0.2im
         psi[1, 3] = 0.4 * cis(-0.3)
-        interactions = InteractionParams(10.0, -0.5, [50.0])
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5, 2 => 50.0))
 
         psi_swapped = zeros(ComplexF64, 1, 3)
         psi_swapped[1, 1] = psi[1, 3]
@@ -254,7 +254,7 @@
         grid = make_grid(config)
         sys = SpinSystem(1)
         psi = init_psi(grid, sys; state=:polar)
-        interactions = InteractionParams(10.0, -0.5, [50.0])
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5, 2 => 50.0))
         N0 = total_norm(psi, grid)
         apply_singlet_pair_step!(psi, interactions, 1, 0.001, 1; imaginary_time=true)
         N1 = total_norm(psi, grid)
@@ -270,7 +270,7 @@
         psi[1, 1] = 0.5 * cis(0.7)    # m=+1
         psi[1, 2] = 0.3 + 0.2im       # m=0
         psi[1, 3] = 0.4 * cis(-0.3)   # m=-1
-        interactions = InteractionParams(10.0, -0.5, [50.0])
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5, 2 => 50.0))
 
         # Swap m=+1 ↔ m=-1
         psi_swapped = zeros(ComplexF64, 1, 3)
@@ -289,7 +289,7 @@
     @testset "apply_singlet_pair_step! integrated in split_step" begin
         config = GridConfig(64, 20.0)
         grid = make_grid(config)
-        interactions = InteractionParams(10.0, -0.5, [50.0])
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5, 2 => 50.0))
         sp = SimParams(; dt=0.001, n_steps=10)
         ws = make_workspace(;
             grid, atom=Rb87, interactions,
@@ -311,7 +311,7 @@
         # Without c2
         ws0 = make_workspace(;
             grid, atom=Rb87,
-            interactions=InteractionParams(10.0, -0.5),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.5)),
             potential=HarmonicTrap(1.0),
             sim_params=sp,
         )
@@ -320,7 +320,7 @@
         # With c2 = 50.0 (stored in c_extra[1])
         ws1 = make_workspace(;
             grid, atom=Rb87,
-            interactions=InteractionParams(10.0, -0.5, [50.0]),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.5, 2 => 50.0)),
             potential=HarmonicTrap(1.0),
             sim_params=sp,
         )

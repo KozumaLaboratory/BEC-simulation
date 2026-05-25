@@ -51,7 +51,7 @@ function _assert_forcegrad_diagonal_only(ws::Workspace)
         )
     ws.tensor_cache === nothing ||
         error("split_step_forcegrad!: tensor_cache not supported in v1.")
-    abs(ws.interactions.c1) < 1e-30 ||
+    abs(ws.interactions[1]) < 1e-30 ||
         error("split_step_forcegrad!: c₁ ≠ 0 (spin-mixing) not supported in v1.")
     abs(get_cn(ws.interactions, 2)) < 1e-30 ||
         error("split_step_forcegrad!: c₂ ≠ 0 (singlet-pair S=0 channel) not supported in v1.")
@@ -273,7 +273,7 @@ function split_step_forcegrad!(ws::Workspace{N};
     # MF from ψ(0): density + |∇V|²
     _total_density!(ws.density_buf, ws.state.psi, D, N, n_pts)
     _compute_fgrad_squared!(fgrad_buf_0, ws.potential_values, ws.density_buf,
-        ws.interactions.c0, ws.grid, n_pts, V_complex_buf, grad_complex_buf,
+        ws.interactions[0], ws.grid, n_pts, V_complex_buf, grad_complex_buf,
         plan_fft!, plan_ifft!)
 
     # Midpoint MF (v2): estimate ψ(dt/2) via Strang half-step on a copy.
@@ -283,7 +283,7 @@ function split_step_forcegrad!(ws::Workspace{N};
             ws.density_buf, fgrad_buf_0, zeeman_diag, it)
         _total_density!(density_mid, psi_mid, D, N, n_pts)
         _compute_fgrad_squared!(fgrad_buf_mid, ws.potential_values, density_mid,
-            ws.interactions.c0, ws.grid, n_pts, V_complex_buf, grad_complex_buf,
+            ws.interactions[0], ws.grid, n_pts, V_complex_buf, grad_complex_buf,
             plan_fft!, plan_ifft!)
     end
 
@@ -294,7 +294,7 @@ function split_step_forcegrad!(ws::Workspace{N};
             ws.density_buf, fgrad_buf_0, zeeman_diag, it)
         _total_density!(density_end, psi_end, D, N, n_pts)
         _compute_fgrad_squared!(fgrad_buf_end, ws.potential_values, density_end,
-            ws.interactions.c0, ws.grid, n_pts, V_complex_buf, grad_complex_buf,
+            ws.interactions[0], ws.grid, n_pts, V_complex_buf, grad_complex_buf,
             plan_fft!, plan_ifft!)
     end
 
@@ -318,7 +318,7 @@ function split_step_forcegrad!(ws::Workspace{N};
         # Stage 1: V(dt/6) — MF from ψ(0) (always — entry state is exact).
         @timeit_debug TIMER "fgrad_V" _diagonal_step_forcegrad!(
             Val(N), ws.state.psi, ws.potential_values, zeeman_diag,
-            ws.interactions.c0, a_outer * dt, ws.density_buf, fgrad_buf_0, 0.0, it,
+            ws.interactions[0], a_outer * dt, ws.density_buf, fgrad_buf_0, 0.0, it,
         )
 
         # Stage 2: K(dt/2)
@@ -327,7 +327,7 @@ function split_step_forcegrad!(ws::Workspace{N};
         # Stage 3: Ṽ(2dt/3) — midpoint MF + FG correction.
         @timeit_debug TIMER "fgrad_Vtilde" _diagonal_step_forcegrad!(
             Val(N), ws.state.psi, ws.potential_values, zeeman_diag,
-            ws.interactions.c0, a_mid * dt, density_for_mid, fgrad_for_mid, fg_coeff, it,
+            ws.interactions[0], a_mid * dt, density_for_mid, fgrad_for_mid, fg_coeff, it,
         )
 
         # Stage 4: K(dt/2)
@@ -336,7 +336,7 @@ function split_step_forcegrad!(ws::Workspace{N};
         # Stage 5: V(dt/6) — endpoint MF.
         @timeit_debug TIMER "fgrad_V" _diagonal_step_forcegrad!(
             Val(N), ws.state.psi, ws.potential_values, zeeman_diag,
-            ws.interactions.c0, a_outer * dt, density_for_end, fgrad_for_end, 0.0, it,
+            ws.interactions[0], a_outer * dt, density_for_end, fgrad_for_end, 0.0, it,
         )
 
         # Picard MF refinement (v3.1).
@@ -350,7 +350,7 @@ function split_step_forcegrad!(ws::Workspace{N};
                 _total_density!(density_end, ws.state.psi, D, N, n_pts)
                 _compute_fgrad_squared!(fgrad_buf_end,
                     ws.potential_values, density_end,
-                    ws.interactions.c0, ws.grid, n_pts,
+                    ws.interactions[0], ws.grid, n_pts,
                     V_complex_buf, grad_complex_buf, plan_fft!, plan_ifft!)
             end
             if midpoint
@@ -367,7 +367,7 @@ function split_step_forcegrad!(ws::Workspace{N};
                 _total_density!(density_mid, psi_mid, D, N, n_pts)
                 _compute_fgrad_squared!(fgrad_buf_mid,
                     ws.potential_values, density_mid,
-                    ws.interactions.c0, ws.grid, n_pts,
+                    ws.interactions[0], ws.grid, n_pts,
                     V_complex_buf, grad_complex_buf, plan_fft!, plan_ifft!)
             end
         end
@@ -407,11 +407,11 @@ function _strang_substep_on_copy!(
     ws.state.psi = psi_buf
     try
         _diagonal_step_forcegrad!(Val(N), psi_buf, ws.potential_values, zeeman_diag,
-            ws.interactions.c0, target_dt / 2, density_buf, fgrad_buf, 0.0, it)
+            ws.interactions[0], target_dt / 2, density_buf, fgrad_buf, 0.0, it)
         _update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, target_dt)
         apply_kinetic_step_batched!(psi_buf, ws.batched_kinetic)
         _diagonal_step_forcegrad!(Val(N), psi_buf, ws.potential_values, zeeman_diag,
-            ws.interactions.c0, target_dt / 2, density_buf, fgrad_buf, 0.0, it)
+            ws.interactions[0], target_dt / 2, density_buf, fgrad_buf, 0.0, it)
     finally
         ws.state.psi = psi_orig
     end

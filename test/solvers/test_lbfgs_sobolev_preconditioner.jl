@@ -24,7 +24,7 @@ using Test
         grid = make_grid(GridConfig((16, 16, 8), (8.0, 8.0, 4.0)))
         find_ground_state_lbfgs(;
             grid, atom,
-            interactions=InteractionParams(20.0, 0.0),
+            interactions=InteractionParams(Dict(0 => 20.0, 1 => 0.0)),
             potential=HarmonicTrap((1.0, 1.0, 2.0)),
             n_steps=400,
             tol=1.0e-8,

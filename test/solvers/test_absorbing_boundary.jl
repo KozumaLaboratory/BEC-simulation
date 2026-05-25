@@ -66,7 +66,7 @@
         sp = SimParams(; dt=0.01, n_steps=10)
         ws = make_workspace(;
             grid, atom=Rb87,
-            interactions=InteractionParams(1.0, 0.0),
+            interactions=InteractionParams(Dict(0 => 1.0, 1 => 0.0)),
             sim_params=sp,
         )
         @test ws.absorbing_mask === nothing
@@ -84,7 +84,7 @@
         ab = AbsorbingBoundary(strength=10.0, width=3.0, power=2)
         ws = make_workspace(;
             grid, atom=Rb87,
-            interactions=InteractionParams(1.0, 0.0),
+            interactions=InteractionParams(Dict(0 => 1.0, 1 => 0.0)),
             sim_params=sp,
             absorbing_boundary=ab,
         )
@@ -103,7 +103,7 @@
         ab = AbsorbingBoundary(strength=100.0, width=5.0, power=2)
         ws = make_workspace(;
             grid, atom=Rb87,
-            interactions=InteractionParams(1.0, 0.0),
+            interactions=InteractionParams(Dict(0 => 1.0, 1 => 0.0)),
             potential=HarmonicTrap(1.0),
             sim_params=sp,
             absorbing_boundary=ab,
@@ -136,7 +136,7 @@
         sp = SimParams(; dt=0.001, n_steps=200)
         ws = make_workspace(;
             grid, atom=Rb87,
-            interactions=InteractionParams(0.0, 0.0),
+            interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
             sim_params=sp,
             absorbing_boundary=ab,
             psi_init=psi,

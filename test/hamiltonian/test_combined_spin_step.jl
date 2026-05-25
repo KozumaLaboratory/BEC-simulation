@@ -17,7 +17,7 @@ function _make_ws_with_active_spin(dt::Float64; imaginary_time::Bool=false)
     sp = SimParams(; dt=dt, n_steps=1, imaginary_time=imaginary_time)
     ws = make_workspace(;
         grid=_GRID, atom=Eu151,
-        interactions=InteractionParams(50.0, 1.0),
+        interactions=InteractionParams(Dict(0 => 50.0, 1 => 1.0)),
         zeeman=ZeemanParams(0.5, 0.1),
         potential=HarmonicTrap(1.0, 1.0, 1.0),
         sim_params=sp,
@@ -105,7 +105,7 @@ end
         sp = SimParams(; dt=0.005, n_steps=1)
         ws_c2 = make_workspace(;
             grid=_GRID, atom=Eu151,
-            interactions=InteractionParams(50.0, 1.0, 0.0, [1.0]),  # c2=1
+            interactions=InteractionParams(Dict(0 => 50.0, 1 => 1.0, 2 => 1.0); c_lhy=0.0),  # c2=1
             zeeman=ZeemanParams(0.5, 0.1),
             potential=HarmonicTrap(1.0, 1.0, 1.0),
             sim_params=sp,
@@ -116,7 +116,7 @@ end
         # No DDI buffers → throw
         ws_nodi = make_workspace(;
             grid=_GRID, atom=Eu151,
-            interactions=InteractionParams(50.0, 1.0),
+            interactions=InteractionParams(Dict(0 => 50.0, 1 => 1.0)),
             zeeman=ZeemanParams(0.5, 0.1),
             potential=HarmonicTrap(1.0, 1.0, 1.0),
             sim_params=sp,

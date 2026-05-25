@@ -4,7 +4,7 @@
     atom = Rb87
 
     @testset "Returns valid result" begin
-        make_ip = val -> InteractionParams(10.0, val)
+        make_ip = val -> InteractionParams(Dict(0 => 10.0, 1 => val))
 
         result = find_phase_boundary(;
             param_range=(-10.0, 10.0),
@@ -25,7 +25,7 @@
     end
 
     @testset "Same phase returns midpoint" begin
-        make_ip = val -> InteractionParams(10.0, val)
+        make_ip = val -> InteractionParams(Dict(0 => 10.0, 1 => val))
 
         result = find_phase_boundary(;
             param_range=(-10.0, -5.0),
@@ -42,7 +42,7 @@
     end
 
     @testset "Bisection narrows interval" begin
-        make_ip = val -> InteractionParams(10.0, val)
+        make_ip = val -> InteractionParams(Dict(0 => 10.0, 1 => val))
 
         r1 = find_phase_boundary(;
             param_range=(-20.0, 20.0),

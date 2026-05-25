@@ -22,7 +22,7 @@ using SpinorBEC: _rebuild_workspace_with_dt
 @testset "rotating-frame regression" begin
     config = GridConfig((16, 16), (10.0, 10.0))
     grid = make_grid(config)
-    interactions = InteractionParams(1.0, 0.0)
+    interactions = InteractionParams(Dict(0 => 1.0, 1 => 0.0))
 
     @testset "SimParams positional 5-arg / 6-arg do NOT touch caller fields" begin
         # The 5-arg/6-arg constructors zero by design; callers must instead

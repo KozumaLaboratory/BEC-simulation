@@ -52,7 +52,7 @@ const F_CASES = [
         function _itp(c1, seed)
             find_ground_state(;
                 grid, atom,
-                interactions=InteractionParams(5.0, c1),
+                interactions=InteractionParams(Dict(0 => 5.0, 1 => c1)),
                 potential=HarmonicTrap((1.0,)),
                 n_steps=400, dt=0.005, tol=1e-8,
                 initial_state=seed,
@@ -82,7 +82,7 @@ const F_CASES = [
         function _itp(c1, seed)
             find_ground_state(;
                 grid, atom,
-                interactions=InteractionParams(5.0, c1),
+                interactions=InteractionParams(Dict(0 => 5.0, 1 => c1)),
                 potential=HarmonicTrap((1.0,)),
                 n_steps=400, dt=0.005, tol=1e-8,
                 initial_state=seed,
@@ -133,14 +133,14 @@ const F_CASES = [
 
         bdg_stable = bogoliubov_spectrum(;
             spinor=zeta_polar, n0=n0, F=Fval,
-            interactions=InteractionParams(2.0, 0.3),
+            interactions=InteractionParams(Dict(0 => 2.0, 1 => 0.3)),
             k_max=3.0, n_k=40,
         )
         @test bdg_stable.max_growth_rate < noise_cutoff
 
         bdg_unstable = bogoliubov_spectrum(;
             spinor=zeta_polar, n0=n0, F=Fval,
-            interactions=InteractionParams(2.0, -0.3),
+            interactions=InteractionParams(Dict(0 => 2.0, 1 => -0.3)),
             k_max=3.0, n_k=40,
         )
         @test bdg_unstable.unstable
@@ -163,7 +163,7 @@ const F_CASES = [
 
             bdg = bogoliubov_spectrum(;
                 spinor=zeta_fm, n0=1.0, F=Fval,
-                interactions=InteractionParams(2.0, -0.3),
+                interactions=InteractionParams(Dict(0 => 2.0, 1 => -0.3)),
                 k_max=3.0, n_k=40,
             )
 
@@ -200,7 +200,7 @@ const F_CASES = [
             psi_seed ./= sqrt(sum(abs2, psi_seed) * cell_volume(grid))
             r = find_ground_state_lbfgs(;
                 grid, atom,
-                interactions=InteractionParams(c0, c1),
+                interactions=InteractionParams(Dict(0 => c0, 1 => c1)),
                 potential=HarmonicTrap((1.0,)),
                 n_steps=200, tol=1e-7,
                 target_magnetization=Float64(Mz_per_atom),

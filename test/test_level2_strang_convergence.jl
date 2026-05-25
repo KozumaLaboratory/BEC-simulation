@@ -29,7 +29,7 @@ using SpinorBEC
         # halving sequence even though absolute residual is FP-floor.
         grid = make_grid(GridConfig((16,), (8.0,)))
         atom = Rb87
-        interactions = InteractionParams(0.0, 0.0)
+        interactions = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
         T = 0.4
         results = Float64[]
         for dt in (0.04, 0.02, 0.01)
@@ -60,7 +60,7 @@ using SpinorBEC
         L = 8.0
         grid = make_grid(GridConfig((n_pt,), (L,)))
         atom = Rb87
-        interactions = InteractionParams(0.0, 0.0)
+        interactions = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
         T = 0.5
 
         function _run_to_T(dt)
@@ -114,7 +114,7 @@ using SpinorBEC
         L = 8.0
         grid = make_grid(GridConfig((n_pt,), (L,)))
         atom = Rb87
-        interactions = InteractionParams(10.0, -0.5)
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5))
         T = 0.5
         norms = Float64[]
         for dt in (0.04, 0.02, 0.01)

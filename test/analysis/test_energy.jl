@@ -5,7 +5,7 @@ using SpinorBEC
     @testset "energy_decomposition returns all fields" begin
         grid = make_grid(GridConfig(64, 20.0))
         atom = Rb87
-        interactions = InteractionParams(1.0, 0.1)
+        interactions = InteractionParams(Dict(0 => 1.0, 1 => 0.1))
         sp = SimParams(; dt=0.001, n_steps=1)
         ws = make_workspace(; grid, atom, interactions, sim_params=sp,
             potential=HarmonicTrap(1.0))
@@ -30,7 +30,7 @@ using SpinorBEC
     @testset "total_energy matches decomposition sum" begin
         grid = make_grid(GridConfig(64, 20.0))
         atom = Rb87
-        interactions = InteractionParams(1.0, 0.1)
+        interactions = InteractionParams(Dict(0 => 1.0, 1 => 0.1))
         sp = SimParams(; dt=0.001, n_steps=1)
         ws = make_workspace(; grid, atom, interactions, sim_params=sp,
             potential=HarmonicTrap(1.0))
@@ -41,7 +41,7 @@ using SpinorBEC
     @testset "kinetic energy positive for non-uniform state" begin
         grid = make_grid(GridConfig(64, 20.0))
         atom = Rb87
-        interactions = InteractionParams(0.0, 0.0)
+        interactions = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
         sp = SimParams(; dt=0.001, n_steps=1)
         ws = make_workspace(; grid, atom, interactions, sim_params=sp)
 
@@ -52,7 +52,7 @@ using SpinorBEC
     @testset "trap energy positive with harmonic trap" begin
         grid = make_grid(GridConfig(64, 20.0))
         atom = Rb87
-        interactions = InteractionParams(0.0, 0.0)
+        interactions = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
         sp = SimParams(; dt=0.001, n_steps=1)
         ws = make_workspace(; grid, atom, interactions, sim_params=sp,
             potential=HarmonicTrap(1.0))
@@ -66,9 +66,11 @@ using SpinorBEC
         atom = Rb87
         sp = SimParams(; dt=0.001, n_steps=1)
 
-        ws_pos = make_workspace(; grid, atom, interactions=InteractionParams(10.0, 0.0),
+        ws_pos = make_workspace(; grid, atom,
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => 0.0)),
             sim_params=sp)
-        ws_neg = make_workspace(; grid, atom, interactions=InteractionParams(-10.0, 0.0),
+        ws_neg = make_workspace(; grid, atom,
+            interactions=InteractionParams(Dict(0 => -10.0, 1 => 0.0)),
             sim_params=sp)
 
         E_pos = energy_decomposition(ws_pos).density
@@ -80,7 +82,7 @@ using SpinorBEC
     @testset "zero interactions give zero interaction energies" begin
         grid = make_grid(GridConfig(64, 20.0))
         atom = Rb87
-        interactions = InteractionParams(0.0, 0.0)
+        interactions = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
         sp = SimParams(; dt=0.001, n_steps=1)
         ws = make_workspace(; grid, atom, interactions, sim_params=sp)
 
@@ -94,7 +96,7 @@ using SpinorBEC
     @testset "Raman energy nonzero with coupling" begin
         grid = make_grid(GridConfig(32, 10.0))
         atom = Rb87
-        interactions = InteractionParams(1.0, 0.1)
+        interactions = InteractionParams(Dict(0 => 1.0, 1 => 0.1))
         sp = SimParams(; dt=0.001, n_steps=1)
         rc = RamanCoupling{1}(2.0, 0.5, (1.0,))
         psi = init_psi(grid, SpinSystem(1); state=:uniform)
@@ -108,7 +110,7 @@ using SpinorBEC
     @testset "Zeeman energy with linear Zeeman" begin
         grid = make_grid(GridConfig(64, 20.0))
         atom = Rb87
-        interactions = InteractionParams(0.0, 0.0)
+        interactions = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
         sp = SimParams(; dt=0.001, n_steps=1)
 
         psi_ferro = init_psi(grid, SpinSystem(1); state=:m_plus_F)
@@ -122,7 +124,7 @@ using SpinorBEC
     @testset "energy conservation after ITP" begin
         grid = make_grid(GridConfig(64, 20.0))
         atom = Rb87
-        interactions = InteractionParams(5.0, 0.3)
+        interactions = InteractionParams(Dict(0 => 5.0, 1 => 0.3))
         sp = SimParams(; dt=0.001, n_steps=100, imaginary_time=false, save_every=100)
 
         r = find_ground_state(; grid, atom, interactions,

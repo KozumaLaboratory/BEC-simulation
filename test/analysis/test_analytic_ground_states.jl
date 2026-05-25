@@ -6,7 +6,7 @@ using FFTW
     trap = HarmonicTrap(1.0)
 
     @testset "ferromagnetic (c1 < 0) → |F,+F⟩ with Zeeman bias" begin
-        interactions = InteractionParams(10.0, -0.5)
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5))
         result = find_ground_state(;
             grid, atom=Rb87, interactions, potential=trap,
             zeeman=ZeemanParams(1.0, 0.0),
@@ -20,7 +20,7 @@ using FFTW
     end
 
     @testset "polar (c1 > 0) → |F,0⟩" begin
-        interactions = InteractionParams(10.0, 0.5)
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => 0.5))
         result = find_ground_state(;
             grid, atom=Na23, interactions, potential=trap,
             dt=0.005, n_steps=5000, initial_state=:polar,
@@ -33,7 +33,7 @@ using FFTW
     end
 
     @testset "energy ordering: E_ferro < E_polar when c1 < 0" begin
-        interactions = InteractionParams(10.0, -0.5)
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5))
 
         r_ferro = find_ground_state(;
             grid, atom=Rb87, interactions, potential=trap,
@@ -51,7 +51,7 @@ using FFTW
     end
 
     @testset "energy ordering: E_polar < E_ferro when c1 > 0" begin
-        interactions = InteractionParams(10.0, 0.5)
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => 0.5))
 
         r_ferro = find_ground_state(;
             grid, atom=Na23, interactions, potential=trap,

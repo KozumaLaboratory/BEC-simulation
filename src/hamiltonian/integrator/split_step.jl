@@ -108,7 +108,7 @@ function _dispatch_diagonal_step!(
         ls_amp = SVector{D, Float64}(ntuple(c -> ws.light_shift.eigvals[c], Val(D)))
         _diagonal_step_with_ls!(
             Val(N), ws.state.psi, ws.potential_values, zeeman_diag,
-            ip.c0,
+            ip[0],
             ws.lhy !== nothing ? ws.lhy : ip.c_lhy,
             dt_frac, ws.density_buf, imaginary_time,
             ls_amp, ws.light_shift.profile;
@@ -117,7 +117,7 @@ function _dispatch_diagonal_step!(
     else
         _diagonal_step_svec!(
             Val(N), ws.state.psi, ws.potential_values, zeeman_diag,
-            ip.c0,
+            ip[0],
             ws.lhy !== nothing ? ws.lhy : ip.c_lhy,
             dt_frac, ws.density_buf, imaginary_time;
             psi_mf,
@@ -196,10 +196,15 @@ function _half_potential_step!(
     t_start::Float64=NaN,
     psi_mf::Union{Nothing, AbstractArray}=nothing,
 ) where {N}
-    # Resolve time-dependent interactions (preserves c_lhy and c_extra from static params)
+    # Resolve time-dependent interactions (preserves c_lhy and the
+    # higher-rank tensor couplings from the static params).
     ip = if ws.time_dep_interactions !== nothing
         td_ip = interactions_at(ws.time_dep_interactions, t_eval)
-        InteractionParams(td_ip.c0, td_ip.c1, ws.interactions.c_lhy, ws.interactions.c_extra)
+        merged = Dict{Int, Float64}(k => v for (k, v) in ws.interactions.c
+                                               if k >= 2)
+        merged[0] = td_ip[0]
+        merged[1] = td_ip[1]
+        InteractionParams(merged; c_lhy=ws.interactions.c_lhy)
     else
         ws.interactions
     end
@@ -225,9 +230,9 @@ function _half_potential_step!(
         )
     end
 
-    if abs(ip.c1) > 1e-30
+    if abs(ip[1]) > 1e-30
         @timeit_debug TIMER "spin_mixing" apply_spin_mixing_step!(
-            ws.state.psi, ws.spin_matrices, ip.c1, dt_half / 2, ndim; imaginary_time, psi_mf
+            ws.state.psi, ws.spin_matrices, ip[1], dt_half / 2, ndim; imaginary_time, psi_mf
         )
     end
 
@@ -305,9 +310,9 @@ function _half_potential_step!(
         )
     end
 
-    if abs(ip.c1) > 1e-30
+    if abs(ip[1]) > 1e-30
         @timeit_debug TIMER "spin_mixing" apply_spin_mixing_step!(
-            ws.state.psi, ws.spin_matrices, ip.c1, dt_half / 2, ndim; imaginary_time, psi_mf
+            ws.state.psi, ws.spin_matrices, ip[1], dt_half / 2, ndim; imaginary_time, psi_mf
         )
     end
 
@@ -686,9 +691,9 @@ function _outer_potential_fwd!(ws::Workspace{N}, dt_outer, n_comp, ndim, imagina
         apply_light_shift_step!(ws.state.psi, ws.light_shift, dt_outer, ndim; imaginary_time)
     end
 
-    if abs(ws.interactions.c1) > 1e-30
+    if abs(ws.interactions[1]) > 1e-30
         apply_spin_mixing_step!(
-            ws.state.psi, ws.spin_matrices, ws.interactions.c1, dt_outer, ndim; imaginary_time
+            ws.state.psi, ws.spin_matrices, ws.interactions[1], dt_outer, ndim; imaginary_time
         )
     end
 
@@ -739,9 +744,9 @@ function _outer_potential_bwd!(ws::Workspace{N}, dt_outer, n_comp, ndim, imagina
         )
     end
 
-    if abs(ws.interactions.c1) > 1e-30
+    if abs(ws.interactions[1]) > 1e-30
         apply_spin_mixing_step!(
-            ws.state.psi, ws.spin_matrices, ws.interactions.c1, dt_outer, ndim; imaginary_time
+            ws.state.psi, ws.spin_matrices, ws.interactions[1], dt_outer, ndim; imaginary_time
         )
     end
 

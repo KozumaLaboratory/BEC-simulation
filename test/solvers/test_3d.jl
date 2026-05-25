@@ -43,7 +43,7 @@
         config = GridConfig((16, 16, 16), (20.0, 20.0, 20.0))
         grid = make_grid(config)
         atom = Rb87
-        interactions = InteractionParams(0.0, 0.0)
+        interactions = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
         sp = SimParams(dt=0.001, n_steps=20, imaginary_time=false, normalize_every=0, save_every=20)
         ws = make_workspace(; grid, atom, interactions, sim_params=sp)
 

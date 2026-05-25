@@ -25,8 +25,8 @@ end
     c0_spec = get(inter_raw, "c0", nothing)
     c1_spec = get(inter_raw, "c1", nothing)
     (c0_spec isa Dict) || (c1_spec isa Dict) || return nothing
-    c0_wf = _make_waveform(c0_spec !== nothing ? c0_spec : interactions.c0, duration)
-    c1_wf = _make_waveform(c1_spec !== nothing ? c1_spec : interactions.c1, duration)
+    c0_wf = _make_waveform(c0_spec !== nothing ? c0_spec : interactions[0], duration)
+    c1_wf = _make_waveform(c1_spec !== nothing ? c1_spec : interactions[1], duration)
     return TimeDependentInteractions(c0_wf, c1_wf)
 end
 
@@ -84,17 +84,19 @@ function _run_step(
         prev_c_dd
     end
 
-    # Match the GS path: route the inner zeeman dict through
-    # _build_zeeman_dispatched (level 0 → _parse_zeeman, levels 1/2 →
-    # Gauss converters). The previous wrapper Dict construction —
-    # `Dict("ground_state" => Dict("B" => ...))` — only existed
-    # because `_build_phase_zeeman` re-extracts that path, but
-    # `_build_zeeman_dispatched` accepts the inner dict directly.
+    # Match the GS path: route the inner B dict through
+    # `_build_zeeman_from_b_block` (:dimless → `_parse_zeeman`,
+    # :cartesian / :spherical → Gauss converters). The previous wrapper
+    # Dict construction — `Dict("ground_state" => Dict("B" => ...))` —
+    # only existed because `_build_phase_zeeman` re-extracts that path,
+    # but `_build_zeeman_from_b_block` accepts the inner dict directly.
     z_raw = get(p, "B", Dict())
     zeeman =
-        z_raw isa Dict ?
-        _build_zeeman_dispatched(z_raw, duration, atom, p) :
-        ZeemanParams(0.0, 0.0)
+        if z_raw isa Dict
+            _build_zeeman_from_b_block(z_raw, duration, atom, p)
+        else
+            ZeemanParams(0.0, 0.0)
+        end
 
     pot_d = get(p, "potential", nothing)
     potential = pot_d !== nothing ? _parse_and_build_potential(pot_d, ndim) : prev_potential

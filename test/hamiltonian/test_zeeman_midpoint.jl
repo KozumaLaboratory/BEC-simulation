@@ -2,7 +2,7 @@
     @testset "Time-dependent Zeeman: O(dt^2) convergence" begin
         grid = make_grid(GridConfig((16,), (10.0,)))
         atom = Rb87
-        interactions = InteractionParams(10.0, -0.5)
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5))
 
         p_func(t) = ZeemanParams(sin(t), 0.0)
         zee = TimeDependentZeeman(p_func)
@@ -43,7 +43,7 @@
     @testset "Quadratic ramp: q(t) = t², per-sub-step improves convergence" begin
         grid = make_grid(GridConfig((16,), (10.0,)))
         atom = Rb87
-        interactions = InteractionParams(10.0, -0.5)
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5))
 
         q_func(t) = ZeemanParams(0.0, t^2)
         zee = TimeDependentZeeman(q_func)
@@ -82,7 +82,7 @@
     @testset "Static Zeeman: unchanged results" begin
         grid = make_grid(GridConfig((16,), (10.0,)))
         atom = Rb87
-        interactions = InteractionParams(10.0, -0.5)
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5))
         zee = ZeemanParams(1.0, 0.5)
 
         sp = SimParams(; dt=0.01, n_steps=50, save_every=50)

@@ -57,7 +57,7 @@ function _apply_combined_spin_step!(
     n_pts = ntuple(d -> size(psi, d), Val(N))
     D = n_comp
 
-    c1 = ws.interactions.c1
+    c1 = ws.interactions[1]
 
     # Compute spin density into bufs.{Fx_r, Fy_r, Fz_r}, then if DDI is
     # active fold it through the FFT convolution to produce the dipolar
@@ -131,7 +131,11 @@ function _half_potential_step_combined!(
 
     ip = if ws.time_dep_interactions !== nothing
         td_ip = interactions_at(ws.time_dep_interactions, t_eval)
-        InteractionParams(td_ip.c0, td_ip.c1, ws.interactions.c_lhy, ws.interactions.c_extra)
+        merged = Dict{Int, Float64}(k => v for (k, v) in ws.interactions.c
+                                               if k >= 2)
+        merged[0] = td_ip[0]
+        merged[1] = td_ip[1]
+        InteractionParams(merged; c_lhy=ws.interactions.c_lhy)
     else
         ws.interactions
     end

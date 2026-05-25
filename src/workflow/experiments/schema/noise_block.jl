@@ -75,8 +75,10 @@ function _split_noise_block!(step::AbstractDict)
         "noise: must be a mapping, got $(typeof(n))"))
 
     for k in _NOISE_INTERNAL_KEYS
-        haskey(step, k) && throw(ArgumentError(
-            "step has both `noise:` block and step-level `$k` — pick one form."))
+        haskey(step, k) && throw(
+            ArgumentError(
+                "step has both `noise:` block and step-level `$k` — pick one form."),
+        )
     end
 
     # Mutex: initial.thermal + twa double-counts thermal fluctuations.

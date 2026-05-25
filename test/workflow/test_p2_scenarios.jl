@@ -88,7 +88,7 @@ end
     cfg = GridConfig((16, 16, 16), (6.0, 6.0, 6.0))
     grid = make_grid(cfg)
     atom = Dy164
-    ip = InteractionParams(20.0, 0.0)
+    ip = InteractionParams(Dict(0 => 20.0, 1 => 0.0))
     sp = SimParams(; dt=0.005, n_steps=1, imaginary_time=false)
     ws = make_workspace(;
         grid, atom, interactions=ip, sim_params=sp,

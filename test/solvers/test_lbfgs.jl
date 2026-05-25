@@ -5,7 +5,7 @@ using LinearAlgebra
 @testset "L-BFGS ground state" begin
     @testset "basic convergence (1D F=1)" begin
         grid = make_grid(GridConfig(32, 16.0))
-        interactions = InteractionParams(5.0, -0.2)
+        interactions = InteractionParams(Dict(0 => 5.0, 1 => -0.2))
         trap = HarmonicTrap(1.0)
 
         result = find_ground_state_lbfgs(;
@@ -23,7 +23,7 @@ using LinearAlgebra
 
     @testset "polishes ITP output to lower energy" begin
         grid = make_grid(GridConfig(32, 12.0))
-        interactions = InteractionParams(10.0, -0.5)
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5))
         trap = HarmonicTrap(1.0)
 
         r_itp = find_ground_state(;
@@ -48,7 +48,7 @@ using LinearAlgebra
 
     @testset "respects target magnetization" begin
         grid = make_grid(GridConfig(32, 12.0))
-        interactions = InteractionParams(5.0, -0.2)
+        interactions = InteractionParams(Dict(0 => 5.0, 1 => -0.2))
         trap = HarmonicTrap(1.0)
         target_Mz = 0.5
 
@@ -68,7 +68,7 @@ using LinearAlgebra
 
     @testset "dE shrinks below reasonable threshold" begin
         grid = make_grid(GridConfig(32, 12.0))
-        interactions = InteractionParams(3.0, 0.1)
+        interactions = InteractionParams(Dict(0 => 3.0, 1 => 0.1))
         trap = HarmonicTrap(1.0)
 
         result = find_ground_state_lbfgs(;
@@ -85,7 +85,7 @@ using LinearAlgebra
 
     @testset "find_ground_state(method=:lbfgs) dispatch matches direct call" begin
         grid = make_grid(GridConfig(32, 16.0))
-        interactions = InteractionParams(5.0, -0.2)
+        interactions = InteractionParams(Dict(0 => 5.0, 1 => -0.2))
         trap = HarmonicTrap(1.0)
 
         r_direct = find_ground_state_lbfgs(;
@@ -110,7 +110,7 @@ using LinearAlgebra
 
     @testset "find_ground_state errors on unknown method" begin
         grid = make_grid(GridConfig(16, 8.0))
-        interactions = InteractionParams(1.0, 0.0)
+        interactions = InteractionParams(Dict(0 => 1.0, 1 => 0.0))
         trap = HarmonicTrap(1.0)
         @test_throws ArgumentError find_ground_state(;
             grid, atom=Rb87, interactions, potential=trap,

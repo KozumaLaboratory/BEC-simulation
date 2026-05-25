@@ -62,6 +62,163 @@ const LHY_SCHEMA = Dict{String, FieldSpec}(
     "n_points" => FieldSpec(; type=Integer, default=200, range=(3, 10000)),
 )
 
+# Unified `B:` Zeeman block (replaces the legacy step-level `zeeman:` /
+# `B_hat:` keys; those are rejected outright in `_reject_unknown_step_keys!`
+# inside `schema/B_block.jl`). Three coord-system inputs, auto-detected
+# by `b_block_builders.jl:_detect_b_coord`:
+#   :dimless    `p`, `q`, `bx`, `by`            (dimensionless, ℏω_ref units)
+#   :cartesian  `Bx`, `By`, `Bz`                (Gauss; scalar or waveform)
+#   :spherical  `B_mag`, `theta`, `phi`         (Gauss; + `q` auto-derived
+#                                               from |B|² unless explicit)
+# Lab-units (`p_mv`, `coil_mode`) work alongside `:spherical` — they expand
+# through the calibration table to `B_mag: "X Gauss"` before reaching here.
+#
+# Each field accepts either a scalar (Number / String when units are
+# attached) or a waveform dict (e.g. `Bz: {from: 0.01, to: 0.0,
+# duration: 0.0}` for a ramp); leaving the type unconstrained as `Any`
+# keeps the validator from blocking the legitimate waveform forms.
+const B_SCHEMA = Dict{String, FieldSpec}(
+    "p" => FieldSpec(),        # dimensionless linear Zeeman
+    "q" => FieldSpec(),        # quadratic Zeeman (coord-orthogonal scalar)
+    "bx" => FieldSpec(),       # dimensionless transverse Bx
+    "by" => FieldSpec(),       # dimensionless transverse By
+    "Bx" => FieldSpec(),       # Gauss Cartesian
+    "By" => FieldSpec(),
+    "Bz" => FieldSpec(),
+    "B_mag" => FieldSpec(),    # Gauss spherical: |B| magnitude
+    "theta" => FieldSpec(),    # polar angle
+    "phi" => FieldSpec(),      # azimuthal angle
+    "p_mv" => FieldSpec(),     # coil-calibration lab-units (→ B_mag via calib)
+    "coil_mode" => FieldSpec(; type=String),
+)
+
+# `loss:` block — three input shapes accepted by `_parse_loss_params`:
+#   * Bool / Number (e.g. `loss: false`, `loss: 0.02`)
+#   * Mapping with the keys below (validated here)
+# `K3_per_m` (alias of `K3_per_m_cubic`) was removed 2026-05-24; canonical-only.
+const LOSS_SCHEMA = Dict{String, FieldSpec}(
+    "gamma_dr" => FieldSpec(; type=Number, range=(0.0, 1e10)),
+    "L3" => FieldSpec(; type=Number, range=(0.0, 1e10)),
+    "L3_per_m" => FieldSpec(; type=Vector),
+    "K3_cubic" => FieldSpec(; type=Number, range=(0.0, 1e10)),
+    "K3_per_m_cubic" => FieldSpec(; type=Vector),
+    "K3_per_m_si" => FieldSpec(; type=Vector),  # SI-unit strings
+    "evap_energy_cutoff" => FieldSpec(; type=Number, range=(0.0, 1e10)),
+    "evap_rate" => FieldSpec(; type=Number, range=(0.0, 1e10)),
+)
+
+# `seed_mode:` block — deterministic single-mode symmetry-breaking seed
+# (added 2026-05-22 alongside the random `seed_amplitude` / `seed_k_cut`
+# pair). See `add_deterministic_mode_seed!` in
+# `src/workflow/initialization/thermal_noise.jl`.
+const SEED_MODE_SCHEMA = Dict{String, FieldSpec}(
+    "k_vec" => FieldSpec(; required=true, type=Vector),  # ndim-length wavevector
+    "amplitude" => FieldSpec(; required=true, type=Number, range=(0.0, 1.0)),
+    "phase" => FieldSpec(; type=Number, range=(-1e6, 1e6)),  # radians
+)
+
+# `save:` block (dynamics output sub-block).
+const SAVE_SCHEMA = Dict{String, FieldSpec}(
+    "every" => FieldSpec(; type=Integer, range=(0.0, 1e9)),
+    "n_snapshots" => FieldSpec(; type=Integer, range=(0.0, 1e6)),
+    "psi" => FieldSpec(; type=Bool),
+    "compression" => FieldSpec(; type=Union{Bool, String}),
+    "precision" => FieldSpec(; type=String, enum=["f32", "f64"]),
+)
+
+# `magnetic_gradient:` block (dynamics + GS).
+const MAGNETIC_GRADIENT_SCHEMA = Dict{String, FieldSpec}(
+    "gradient" => FieldSpec(; required=true),  # scalar or waveform dict
+    "axis" => FieldSpec(; type=Integer, range=(1.0, 3.0)),
+    "g_F" => FieldSpec(; type=Number),
+)
+
+# `raman:` block. Optional all-around.
+const RAMAN_SCHEMA = Dict{String, FieldSpec}(
+    "Omega_R" => FieldSpec(; type=Number),
+    "delta" => FieldSpec(; type=Number),
+    "k_eff" => FieldSpec(; type=Vector),
+    "omega_wf" => FieldSpec(; type=Dict),  # waveform mapping
+    "delta_wf" => FieldSpec(; type=Dict),
+)
+
+# `absorbing_boundary:` block.
+const ABSORBING_SCHEMA = Dict{String, FieldSpec}(
+    "strength" => FieldSpec(; required=true, type=Number, range=(0.0, 1e10)),
+    "width" => FieldSpec(; required=true, type=Number, range=(0.0, 1e6)),
+    "power" => FieldSpec(; type=Integer, range=(1.0, 16.0)),
+)
+
+# `light_shift:` block. Parser path in `pipeline_dispatch.jl:_parse_light_shift`.
+# eta_tensor + (eta_vector / polarization) is the supported branch; the
+# alpha_* / profile keys are accepted at the schema level so users can write
+# the keys without typo warnings, but the parser will throw ArgumentError if
+# they are present (current implementation limit).
+const LIGHT_SHIFT_SCHEMA = Dict{String, FieldSpec}(
+    "eta_tensor" => FieldSpec(; type=Number),
+    "eta_vector" => FieldSpec(; type=Number),
+    "polarization" => FieldSpec(; type=Vector),
+    "alpha_tensor" => FieldSpec(; type=Number),     # parser-error path
+    "alpha_vector" => FieldSpec(; type=Number),     # parser-error path
+    "profile" => FieldSpec(; type=Vector),          # parser-error path
+)
+
+# `twa:` block (`_parse_twa_config` in pipeline_dispatch.jl + `store_trajectories`
+# read inline in run_step_dynamics.jl). n_trajectories is the only required key.
+const TWA_SCHEMA = Dict{String, FieldSpec}(
+    "n_trajectories" => FieldSpec(; required=true, type=Integer, range=(1.0, 1e9)),
+    "seed_base" => FieldSpec(; type=Integer),
+    "cutoff_energy" => FieldSpec(; type=Number),
+    "observables" => FieldSpec(; type=Vector),
+    "store_trajectories" => FieldSpec(; type=Bool, default=false),
+)
+
+# `sgpe:` block (`_build_sgpe_callback` in pipeline_callbacks.jl).
+const SGPE_SCHEMA = Dict{String, FieldSpec}(
+    "gamma" => FieldSpec(; required=true, type=Number, range=(0.0, 1e10)),
+    "T" => FieldSpec(; required=true, type=Number, range=(0.0, 1e10)),
+    "mu" => FieldSpec(; type=Number),
+    "k_cut" => FieldSpec(; type=Number, range=(0.0, 1e10)),
+    "every" => FieldSpec(; type=Integer, range=(1.0, 1e9)),
+    "seed" => FieldSpec(; type=Integer),
+)
+
+# `projected_gp:` block (`_build_pgp_callback`).
+const PROJECTED_GP_SCHEMA = Dict{String, FieldSpec}(
+    "k_cut" => FieldSpec(; required=true, type=Number, range=(0.0, 1e10)),
+    "smooth" => FieldSpec(; type=Bool, default=false),
+    "every" => FieldSpec(; type=Integer, range=(1.0, 1e9)),
+)
+
+# `photon_scattering:` block (`_build_photon_callback`). Canonical
+# `Gamma_sc` only; the lowercase `gamma_sc` alias was removed 2026-05-24.
+const PHOTON_SCATTERING_SCHEMA = Dict{String, FieldSpec}(
+    "Gamma_sc" => FieldSpec(; required=true, type=Number, range=(0.0, 1e10)),
+    "seed" => FieldSpec(; type=Integer),
+)
+
+# `live_monitor:` block (`_build_live_callback`).
+const LIVE_MONITOR_SCHEMA = Dict{String, FieldSpec}(
+    "every" => FieldSpec(; type=Integer, range=(1.0, 1e9))
+)
+
+# Single entry in `pulse_sequence:` list. `compile_pulse_sequence` reads
+# `t` + `apply` as positional; everything else is target-specific (B → p/q/bx/by,
+# raman → Omega/delta/k_eff, interactions → c0/c1, trap → omega/center).
+# Keys vary per `apply` target, so we leave the per-target params untyped
+# but at least enforce the `t` / `apply` envelope.
+const PULSE_EVENT_SCHEMA = Dict{String, FieldSpec}(
+    "t" => FieldSpec(; required=true, type=Number, range=(0.0, 1e6)),
+    "apply" => FieldSpec(; required=true, type=String,
+        enum=["B", "raman", "interactions", "trap"]),
+    "duration" => FieldSpec(; type=Number, range=(0.0, 1e6)),
+    # Per-target params (left permissive; `_apply_pulse_sequence` validates):
+    "p" => FieldSpec(), "q" => FieldSpec(), "bx" => FieldSpec(), "by" => FieldSpec(),
+    "Omega" => FieldSpec(), "delta" => FieldSpec(), "k_eff" => FieldSpec(; type=Vector),
+    "c0" => FieldSpec(), "c1" => FieldSpec(),
+    "omega" => FieldSpec(), "center" => FieldSpec(; type=Vector),
+)
+
 const DDI_SCHEMA = Dict{String, FieldSpec}(
     "enabled" => FieldSpec(; type=Bool, default=true),     # was false, flipped 2026-04-30
     "c_dd" => FieldSpec(; type=Union{Number, Dict}),
@@ -94,7 +251,7 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
     "grid" => FieldSpec(; type=Dict, schema=GRID_SCHEMA),
     "interactions" => FieldSpec(; type=Dict, schema=INTERACTIONS_SCHEMA),
     "ddi" => FieldSpec(; type=Union{Dict, Bool}),
-    "B" => FieldSpec(; type=Dict),
+    "B" => FieldSpec(; type=Dict, schema=B_SCHEMA),
     "potential" => FieldSpec(; type=Union{Dict, Vector}),
     "dt" => FieldSpec(; type=Number, default=0.001, range=(1e-8, 1.0)),
     "n_steps" => FieldSpec(; type=Number, default=100000, range=(0.0, 1e9)),
@@ -125,8 +282,8 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
     "l_z" => FieldSpec(; type=Number, range=(0.0, 100.0)),
     "noise_seed" => FieldSpec(; type=Number),
     "rotating_frame_omega" => FieldSpec(; type=Number),
-    "light_shift" => FieldSpec(; type=Dict),
-    "raman" => FieldSpec(; type=Dict),
+    "light_shift" => FieldSpec(; type=Dict, schema=LIGHT_SHIFT_SCHEMA),
+    "raman" => FieldSpec(; type=Dict, schema=RAMAN_SCHEMA),
 )
 
 const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
@@ -134,19 +291,18 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     "dt" => FieldSpec(; required=true, type=Number, range=(1e-8, 1.0)),
     # Unified `save:` block. Sub-keys: every (steps) | n_snapshots (frames)
     # | psi (Bool) | compression (Bool) | precision ("f32"|"f64").
-    "save" => FieldSpec(; type=Dict),
+    "save" => FieldSpec(; type=Dict, schema=SAVE_SCHEMA),
     "rotating_frame_omega" => FieldSpec(; type=Number),    # spatial (rotating bucket)
     "ddi" => FieldSpec(; type=Union{Dict, Bool}),
-    "B" => FieldSpec(; type=Dict),
+    "B" => FieldSpec(; type=Dict, schema=B_SCHEMA),
     "interactions" => FieldSpec(; type=Dict),
     "potential" => FieldSpec(; type=Union{Dict, Vector}),
     "temperature_ratio" => FieldSpec(; type=Number, range=(0.0, 1.0)),
     "seed_amplitude" => FieldSpec(; type=Number, range=(0.0, 1.0)),
     "seed_k_cut" => FieldSpec(; type=Number, range=(0.0, 1.0e6)),
-    "seed_mode" => FieldSpec(; type=Dict),
+    "seed_mode" => FieldSpec(; type=Dict, schema=SEED_MODE_SCHEMA),
     "hard_polarize" => FieldSpec(; type=Number, range=(-12.0, 12.0)),
     "noise_seed" => FieldSpec(; type=Number),
-    "live_monitor" => FieldSpec(; type=Union{Bool, Dict}),
     # Standard dynamics path uses {strang, yoshida, adaptive, richardson};
     # rotating_basis uses {strang, yoshida4, yoshida6, cfet4}. Merged here
     # so a single DYNAMICS_SCHEMA entry covers both — kind dispatch picks
@@ -158,16 +314,17 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
         enum=["strang", "yoshida", "adaptive", "richardson",
             "yoshida4", "yoshida6", "cfet4"]),
     "backend" => FieldSpec(; type=String, enum=["cpu", "gpu"]),
-    "raman" => FieldSpec(; type=Dict),
-    "absorbing_boundary" => FieldSpec(; type=Dict),
-    "light_shift" => FieldSpec(; type=Dict),
-    "twa" => FieldSpec(; type=Dict),
-    "magnetic_gradient" => FieldSpec(; type=Dict),
+    "raman" => FieldSpec(; type=Dict, schema=RAMAN_SCHEMA),
+    "absorbing_boundary" => FieldSpec(; type=Dict, schema=ABSORBING_SCHEMA),
+    "light_shift" => FieldSpec(; type=Dict, schema=LIGHT_SHIFT_SCHEMA),
+    "twa" => FieldSpec(; type=Dict, schema=TWA_SCHEMA),
+    "magnetic_gradient" => FieldSpec(; type=Dict, schema=MAGNETIC_GRADIENT_SCHEMA),
     "pulse_sequence" => FieldSpec(; type=Vector),
-    "sgpe" => FieldSpec(; type=Union{Dict, Bool}),
-    "projected_gp" => FieldSpec(; type=Union{Dict, Bool}),
-    "photon_scattering" => FieldSpec(; type=Union{Dict, Bool}),
-    "loss" => FieldSpec(; type=Union{Dict, Bool, Number}),
+    "sgpe" => FieldSpec(; type=Union{Dict, Bool}, schema=SGPE_SCHEMA),
+    "projected_gp" => FieldSpec(; type=Union{Dict, Bool}, schema=PROJECTED_GP_SCHEMA),
+    "photon_scattering" => FieldSpec(; type=Union{Dict, Bool}, schema=PHOTON_SCATTERING_SCHEMA),
+    "loss" => FieldSpec(; type=Union{Dict, Bool, Number}, schema=LOSS_SCHEMA),
+    "live_monitor" => FieldSpec(; type=Union{Bool, Dict}, schema=LIVE_MONITOR_SCHEMA),
     # Two-component / binary GP path (Phase 4/5 #51 scaffold).
     "kind" => FieldSpec(; type=String, enum=["binary", "rotating_basis"]),
     "couplings" => FieldSpec(; type=Dict),
@@ -322,7 +479,11 @@ function validate_pipeline!(data::Dict; strict::Bool=false)
                 "pipeline.$i.$step_type"; strict)
             # Cross-field F-dependent validation.
             if step_type == "ground_state"
-                _validate_ground_state_physics!(step_params, "pipeline.$i.ground_state"; strict)
+                _validate_ground_state_physics!(step_params,
+                    "pipeline.$i.ground_state", data; strict)
+            elseif step_type == "dynamics"
+                _validate_dynamics_physics!(step_params,
+                    "pipeline.$i.dynamics"; strict)
             end
         elseif !(step_type in ("ground_state", "dynamics", "analyze"))
             msg = "Unknown pipeline step kind '$step_type' (line $i) — typo? Recognised: ground_state, dynamics, analyze"
@@ -332,19 +493,25 @@ function validate_pipeline!(data::Dict; strict::Bool=false)
 end
 
 """
-    _validate_ground_state_physics!(step_params, path; strict)
+    _validate_ground_state_physics!(step_params, path, top_level; strict)
 
 F-dependent cross-field validation that the static schema cannot express:
 
 - `c1_ratio > -1/F²` (singularity in `interaction_params_from_constraint`:
   `c0 = c_total / (1 + F²·c1_ratio)`, so values at or below `-1/F²` give
   `c0 ≤ 0` — non-physical density attraction).
+- `lhy.kind` ↔ F mapping: `polar_two_channel` is polar-only-up-to-F=2,
+  `icosahedral` is F=6 specific, `full_bdg` at F=6 polar warns
+  (3000× spurious offset — memory `full_bdg_F6_polar_broken.md`).
+- Lab-units `B.{p_mv, coil_mode}` requires a top-level `calibration:`
+  (or `calibration_history:`) block to expand against.
 
 The schema's `c1_ratio` range `(-1.0, 1.0)` is generous on purpose so
 F=1 (singularity at -1) and F=6 (singularity at -1/36) share one declaration.
 This function tightens it once `F` is known.
 """
-function _validate_ground_state_physics!(step_params::Dict, path::String; strict::Bool=false)
+function _validate_ground_state_physics!(step_params::Dict, path::String,
+    top_level::Dict; strict::Bool=false)
     # Resolve F: prefer `atom:` lookup, fall back to F=1 if neither given.
     atom_str = get(step_params, "atom", nothing)
     F = if atom_str !== nothing
@@ -365,10 +532,72 @@ function _validate_ground_state_physics!(step_params::Dict, path::String; strict
         bound = -1.0 / F^2
         if cr <= bound + 1e-10
             msg =
-                "$path.interactions.c1_ratio = $cr is at or below the singularity " *
+                "$path.interactions[1]_ratio = $cr is at or below the singularity " *
                 "-1/F² = $(round(bound; sigdigits=4)) for F=$F. " *
                 "interaction_params_from_constraint gives c0 → ∞ or c0 ≤ 0 (non-physical). " *
                 "Use c1_ratio > $(round(bound; sigdigits=4))."
+            strict ? throw(ArgumentError(msg)) : @warn msg
+        end
+    end
+
+    # LHY kind ↔ F constraints (memory: `lhy_refactor_2026_05_12.md`,
+    # `full_bdg_F6_polar_broken.md`).
+    lhy = get(step_params, "lhy", nothing)
+    if lhy isa Dict
+        kind = String(get(lhy, "kind", "none"))
+        init = String(get(step_params, "initial_state", "polar"))
+        if kind == "polar_two_channel" && F > 2
+            msg =
+                "$path.lhy.kind = polar_two_channel is exact at F=1, ~1% off at F=2, " *
+                "30-70% off at F=$F. Use `polar_contact` / `polar_dipolar` for polar " *
+                "(or `fm_contact` / `fm_dipolar` for ferromagnetic, " *
+                "`icosahedral` for F=6 I_h)."
+            strict ? throw(ArgumentError(msg)) : @warn msg
+        elseif kind == "icosahedral" && F != 6
+            msg = "$path.lhy.kind = icosahedral is F=6 specific (I_h symmetry); got F=$F."
+            strict ? throw(ArgumentError(msg)) : @warn msg
+        elseif kind == "full_bdg" && F == 6 && init == "polar"
+            @warn "$path.lhy.kind = full_bdg at F=6 polar reports ~3000× spurious " *
+                "LHY offset (memory `full_bdg_F6_polar_broken.md`). Use `polar_contact` " *
+                "or `polar_dipolar` for the F=6 polar state."
+        end
+    end
+
+    # Lab-units calibration requirement: `B.{p_mv, coil_mode}` needs a
+    # top-level calibration block to resolve against.
+    b = get(step_params, "B", nothing)
+    if b isa Dict && (haskey(b, "p_mv") || haskey(b, "coil_mode"))
+        has_calib = haskey(top_level, "calibration") || haskey(top_level, "calibration_history")
+        if !has_calib
+            msg =
+                "$path.B uses lab-units (p_mv / coil_mode) but no top-level " *
+                "`calibration:` or `calibration_history:` block is present. " *
+                "Add the calibration block, or use direct Gauss / dimensionless input."
+            strict ? throw(ArgumentError(msg)) : @warn msg
+        end
+    end
+end
+
+"""
+    _validate_dynamics_physics!(step_params, path; strict)
+
+Cross-field validation for `dynamics:` steps:
+
+- `spin_rotating_frame_omega ≠ 0` requires `ddi.secular = true` (full DDI
+  off-diagonals only Larmor-average to zero in the secular limit; the
+  runtime check in `make_workspace.jl:131` reproduces this).
+"""
+function _validate_dynamics_physics!(step_params::Dict, path::String; strict::Bool=false)
+    sro = get(step_params, "spin_rotating_frame_omega", nothing)
+    if sro isa Number && abs(Float64(sro)) > 1e-15
+        ddi = get(step_params, "ddi", nothing)
+        secular = ddi isa Dict ? get(ddi, "secular", false) : false
+        if !(secular === true || secular == true)
+            msg =
+                "$path.spin_rotating_frame_omega = $sro ≠ 0 but `ddi.secular` is " *
+                "not set to true. Full DDI off-diagonals only Larmor-average to " *
+                "zero in the secular limit; set `ddi: {secular: true}` (or use a " *
+                "non-rotating spin frame)."
             strict ? throw(ArgumentError(msg)) : @warn msg
         end
     end

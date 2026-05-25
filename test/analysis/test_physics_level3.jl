@@ -34,7 +34,7 @@ using LinearAlgebra
         )
         ws = make_workspace(;
             grid, atom,
-            interactions=InteractionParams(0.0, 0.0),
+            interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
             zeeman=ZeemanParams(p, 0.0),
             potential=NoPotential(),
             sim_params=sp,
@@ -71,7 +71,7 @@ using LinearAlgebra
         sp = SimParams(; dt=0.005, n_steps=1000, imaginary_time=false, save_every=100)
         ws = make_workspace(;
             grid, atom=Rb87,
-            interactions=InteractionParams(10.0, -0.5),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.5)),
             zeeman=ZeemanParams(0.0, 0.5),
             potential=HarmonicTrap(1.0),
             sim_params=sp,
@@ -97,7 +97,7 @@ using LinearAlgebra
 
         result = find_ground_state(;
             grid, atom=Rb87,
-            interactions=InteractionParams(10.0, -0.5),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.5)),
             potential=HarmonicTrap(1.0),
             dt=0.005, n_steps=5000,
             initial_state=:m_plus_F,
@@ -120,7 +120,7 @@ using LinearAlgebra
 
         result = find_ground_state(;
             grid, atom=Na23,
-            interactions=InteractionParams(10.0, 0.5),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => 0.5)),
             potential=HarmonicTrap(1.0),
             dt=0.005, n_steps=5000,
             initial_state=:polar,
@@ -141,7 +141,7 @@ using LinearAlgebra
         grid = make_grid(gc)
 
         ip = compute_interaction_params(Na23; N_atoms=1000, dims=1, length_scale=1.0)
-        @test ip.c1 > 0
+        @test ip[1] > 0
 
         result = find_ground_state(;
             grid, atom=Na23,
@@ -163,7 +163,7 @@ using LinearAlgebra
         grid = make_grid(gc)
 
         ip_na = compute_interaction_params(Na23; N_atoms=1000, dims=1, length_scale=1.0)
-        ip_flip = InteractionParams(ip_na.c0, -abs(ip_na.c1))
+        ip_flip = InteractionParams(Dict(0 => ip_na.c0, 1 => -abs(ip_na.c1)))
 
         result = find_ground_state(;
             grid, atom=Na23,

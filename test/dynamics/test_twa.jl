@@ -75,7 +75,7 @@ using FFTW
     end
 
     @testset "Serial ensemble" begin
-        interactions = InteractionParams(100.0, -0.5)
+        interactions = InteractionParams(Dict(0 => 100.0, 1 => -0.5))
         sp = SimParams(; dt=0.01, n_steps=20, save_every=10)
         twa_cfg = TWAConfig(3, 42, nothing, [:density, :magnetization])
 
@@ -106,7 +106,7 @@ using FFTW
     end
 
     @testset "Store trajectories" begin
-        interactions = InteractionParams(100.0, -0.5)
+        interactions = InteractionParams(Dict(0 => 100.0, 1 => -0.5))
         sp = SimParams(; dt=0.01, n_steps=10, save_every=10)
         twa_cfg = TWAConfig(2, 42, nothing, [:density])
 

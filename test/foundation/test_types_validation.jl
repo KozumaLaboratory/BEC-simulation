@@ -49,12 +49,12 @@ using SpinorBEC
     end
 
     @testset "InteractionParams" begin
-        ip = InteractionParams(1.0, 0.5)
+        ip = InteractionParams(Dict(0 => 1.0, 1 => 0.5))
         @test get_cn(ip, 0) == 1.0
         @test get_cn(ip, 1) == 0.5
         @test get_cn(ip, 2) == 0.0
 
-        ip2 = InteractionParams(1.0, 0.5, [0.3])
+        ip2 = InteractionParams(Dict(0 => 1.0, 1 => 0.5, 2 => 0.3))
         @test get_cn(ip2, 2) == 0.3
     end
 

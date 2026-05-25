@@ -3,7 +3,7 @@
     grid = make_grid(GridConfig((16,), (10.0,)))
     sys = SpinSystem(F)
     atom = Rb87
-    interactions = InteractionParams(1.0, 0.0)
+    interactions = InteractionParams(Dict(0 => 1.0, 1 => 0.0))
     dt = 0.01
 
     @testset "Checkpoint creates files" begin

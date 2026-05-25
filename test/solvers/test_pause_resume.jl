@@ -4,7 +4,7 @@
         result = find_ground_state(;
             grid=make_grid(GridConfig((16,), (10.0,))),
             atom=Rb87,
-            interactions=InteractionParams(10.0, -0.5),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.5)),
             zeeman=ZeemanParams(0.0, 0.1),
             potential=HarmonicTrap((1.0,)),
             dt=0.01, n_steps=100, tol=1e-20,  # tol impossible → runs all steps
@@ -30,7 +30,7 @@
         r1 = find_ground_state(;
             grid=make_grid(GridConfig((16,), (10.0,))),
             atom=Rb87,
-            interactions=InteractionParams(10.0, -0.5),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.5)),
             zeeman=ZeemanParams(0.0, 0.1),
             potential=HarmonicTrap((1.0,)),
             dt=0.01, n_steps=50, tol=1e-20,
@@ -43,7 +43,7 @@
         r2 = resume_ground_state(ckpt_dir;
             grid=make_grid(GridConfig((16,), (10.0,))),
             atom=Rb87,
-            interactions=InteractionParams(10.0, -0.5),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.5)),
             zeeman=ZeemanParams(0.0, 0.1),
             potential=HarmonicTrap((1.0,)),
             n_steps=100, tol=1e-20,
@@ -57,7 +57,7 @@
         r1 = find_ground_state(;
             grid=make_grid(GridConfig((16,), (10.0,))),
             atom=Rb87,
-            interactions=InteractionParams(10.0, -0.5),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.5)),
             zeeman=ZeemanParams(0.0, 0.1),
             potential=HarmonicTrap((1.0,)),
             dt=0.01, n_steps=200, tol=1e-4,
@@ -86,7 +86,7 @@
         r = find_ground_state(;
             grid=make_grid(GridConfig((16,), (10.0,))),
             atom=Rb87,
-            interactions=InteractionParams(10.0, -0.5),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.5)),
             zeeman=ZeemanParams(0.0, 0.1),
             potential=HarmonicTrap((1.0,)),
             dt=0.01, n_steps=50, tol=1e-20,
@@ -115,7 +115,7 @@ pipeline:
       potential: {type: harmonic, omega: [1.0]}
 scan:
   zip:
-    pipeline.0.interactions.c1: [0.0, -0.5, -1.0]
+    pipeline.0.interactions[1]: [0.0, -0.5, -1.0]
 """,
         )
 

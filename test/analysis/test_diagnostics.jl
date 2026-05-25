@@ -190,7 +190,7 @@ using FFTW
 
     @testset "Splitting error estimator" begin
         grid = make_grid(GridConfig(64, 10.0))
-        interactions = InteractionParams(10.0, -0.5)
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5))
         trap = HarmonicTrap(1.0)
 
         sp1 = SimParams(; dt=0.01, n_steps=10, imaginary_time=false, save_every=10)
@@ -210,7 +210,7 @@ using FFTW
 
     @testset "Conservation validation" begin
         grid = make_grid(GridConfig(64, 10.0))
-        interactions = InteractionParams(10.0, -0.5)
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5))
         trap = HarmonicTrap(1.0)
 
         @testset "passes for reasonable dt" begin
@@ -235,7 +235,7 @@ using FFTW
     @testset "Stability analysis" begin
         @testset "stable state has small growth rate" begin
             grid = make_grid(GridConfig(64, 10.0))
-            interactions = InteractionParams(10.0, 0.0)
+            interactions = InteractionParams(Dict(0 => 10.0, 1 => 0.0))
             trap = HarmonicTrap(1.0)
             sp = SimParams(; dt=0.001, n_steps=200, imaginary_time=false, save_every=200)
             ws = make_workspace(; grid, atom=Rb87, interactions, potential=trap,
@@ -249,7 +249,7 @@ using FFTW
 
         @testset "restores state after analysis" begin
             grid = make_grid(GridConfig(64, 10.0))
-            interactions = InteractionParams(10.0, 0.0)
+            interactions = InteractionParams(Dict(0 => 10.0, 1 => 0.0))
             trap = HarmonicTrap(1.0)
             sp = SimParams(; dt=0.001, n_steps=200, imaginary_time=false, save_every=200)
             ws = make_workspace(; grid, atom=Rb87, interactions, potential=trap,
@@ -263,7 +263,7 @@ using FFTW
 
         @testset "structure factor arrays have correct size" begin
             grid = make_grid(GridConfig(64, 10.0))
-            interactions = InteractionParams(10.0, 0.0)
+            interactions = InteractionParams(Dict(0 => 10.0, 1 => 0.0))
             sp = SimParams(; dt=0.001, n_steps=200, imaginary_time=false, save_every=200)
             ws = make_workspace(; grid, atom=Rb87, interactions,
                 potential=HarmonicTrap(1.0),

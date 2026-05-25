@@ -87,21 +87,21 @@ function find_ground_state_lbfgs(;
     # Gradient-coverage guard: energy_gradient! covers kinetic + trap +
     # Zeeman + c0 + c_lhy + c1 + light_shift + DDI. It does NOT cover
     # the c2 singlet-pair channel (apply_singlet_pair_step!) nor the
-    # tensor_cache c_extra (c4, c6, …) terms. Energy *evaluation* is
+    # tensor_cache higher-rank tensor (c4, c6, …) terms. Energy *evaluation* is
     # correct (energy_decomposition.total at line ~95), but the gradient
     # direction is missing those contributions, so LBFGS would converge
     # to a wrong minimum. Warn the user to fall back to ITP.
     c2_val = abs(get_cn(ws.interactions, 2))
-    has_c_extra = !isempty(ws.interactions.c_extra) &&
-                  any(>(1e-30) ∘ abs, ws.interactions.c_extra)
+    has_high_rank = any(((k, v),) -> k >= 2 && abs(v) > 1e-30,
+        ws.interactions.c)
     has_tensor = ws.tensor_cache !== nothing
-    if c2_val > 1e-30 || has_c_extra || has_tensor
+    if c2_val > 1e-30 || has_high_rank || has_tensor
         @warn "find_ground_state_lbfgs: gradient does NOT include c2 singlet-pair " *
-            "or c_extra/tensor_cache contributions. The optimizer will converge " *
+            "or tensor_cache contributions. The optimizer will converge " *
             "to a biased minimum. Use find_ground_state (ITP) for these channels, " *
             "or only LBFGS-polish a state that has already been ITP-converged with " *
             "the full Hamiltonian. " *
-            "(c2=$(round(c2_val; sigdigits=3)), c_extra=$has_c_extra, tensor=$has_tensor)"
+            "(c2=$(round(c2_val; sigdigits=3)), has_high_rank=$has_high_rank, tensor=$has_tensor)"
     end
 
     # Device-resident k² for energy_gradient! (matches ws.state.psi's backend)

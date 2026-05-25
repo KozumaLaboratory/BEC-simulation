@@ -128,7 +128,7 @@ using SpinorBEC
           interactions: {N_atoms: 50, omega_ref: 1.0}
 
         scan:
-          parameter_path: pipeline.0.interactions.c1_ratio
+          parameter_path: pipeline.0.interactions[1]_ratio
           values: [0.0, 0.01]
 
         pipeline:

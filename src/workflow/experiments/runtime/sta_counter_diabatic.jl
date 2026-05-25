@@ -40,7 +40,7 @@ Arguments:
 - `omega_ref`: reference frequency used in the dθ/dt → b_y mapping; kept at
   1.0 unless you're driving in SI and need rescaling.
 - `n_samples`: number of time-grid points (default 2048, matches the Zeeman
-  default in zeeman_levels.jl).
+  default in b_block_builders.jl).
 - `p_base`: constant linear-Zeeman offset (rare; usually 0).
 - `q0_reference`: the θ=arctan(q0/q) denominator offset. Defaults to
   `|q_start - q_end| / 4` — empirically the STA prefactor that keeps the

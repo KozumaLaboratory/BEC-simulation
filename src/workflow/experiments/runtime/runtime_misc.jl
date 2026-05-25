@@ -12,12 +12,8 @@ function scale_interactions_quasi_2d(ip::InteractionParams, l_z::Float64)
         @warn "c_lhy scaling under quasi-2D is approximate; 2D LHY requires logarithmic treatment" maxlog =
             1
     end
-    InteractionParams(
-        ip.c0 * factor,
-        ip.c1 * factor,
-        ip.c_lhy * factor,
-        isempty(ip.c_extra) ? Float64[] : ip.c_extra .* factor,
-    )
+    scaled = Dict{Int, Float64}(k => v * factor for (k, v) in ip.c)
+    InteractionParams(scaled; c_lhy=(ip.c_lhy * factor))
 end
 
 function _normalize_grid(n_raw, box_raw)

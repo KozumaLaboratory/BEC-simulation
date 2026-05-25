@@ -1,10 +1,10 @@
 @testset "Tensor interaction" begin
     @testset "make_tensor_interaction_cache returns nothing for c2-only" begin
-        ip = InteractionParams(100.0, 10.0, 0.0, [5.0])
+        ip = InteractionParams(Dict(0 => 100.0, 1 => 10.0, 2 => 5.0); c_lhy=0.0)
         cache = make_tensor_interaction_cache(1, ip)
         @test cache === nothing
 
-        ip2 = InteractionParams(100.0, 10.0, 0.0, Float64[])
+        ip2 = InteractionParams(Dict(0 => 100.0, 1 => 10.0); c_lhy=0.0)
         cache2 = make_tensor_interaction_cache(2, ip2)
         @test cache2 === nothing
     end
@@ -27,7 +27,9 @@
             slots >= 2 && (c_extra[2] = 99.0)   # c3 = 99
             slots >= 4 && (c_extra[4] = 88.0)   # c5
             slots >= 6 && (c_extra[6] = 77.0)   # c7
-            ip = InteractionParams(0.0, 0.0, 0.0, c_extra)
+            ip = InteractionParams(
+                merge(Dict(0 => 0.0, 1 => 0.0), SpinorBEC._vec_to_c_dict(c_extra)); c_lhy=0.0
+            )
             cache = make_tensor_interaction_cache(F, ip)
             @test cache === nothing  # cache must NOT activate from odd-rank only
         end
@@ -37,7 +39,7 @@
         # F=2: c_extra = [c2=5.0, c3=0.0, c4=3.0]
         # get_cn(ip, 2) = c_extra[1] = 5.0
         # get_cn(ip, 4) = c_extra[3] = 3.0
-        ip = InteractionParams(100.0, 10.0, 0.0, [5.0, 0.0, 3.0])
+        ip = InteractionParams(Dict(0 => 100.0, 1 => 10.0, 2 => 5.0, 4 => 3.0); c_lhy=0.0)
         cache = make_tensor_interaction_cache(2, ip)
         @test cache !== nothing
         @test cache.F == 2
@@ -93,7 +95,7 @@
         dV = cell_volume(grid)
         norm0 = sum(abs2, psi) * dV
 
-        ip = InteractionParams(0.0, 0.0, 0.0, [5.0, 0.0, 3.0])
+        ip = InteractionParams(Dict(0 => 0.0, 1 => 0.0, 2 => 5.0, 4 => 3.0); c_lhy=0.0)
         cache = make_tensor_interaction_cache(F, ip)
         @test cache !== nothing
 
@@ -122,11 +124,13 @@
             c_extra = if F == 2
                 [3.0, 0.0, 1.5]                                   # c2, c3=0, c4
             elseif F == 3
-                even_c_extra(F; c2=2.0, c4=1.5, c6=0.7)
+                Dict(2 => 2.0, 4 => 1.5, 6 => 0.7)
             else
-                even_c_extra(F; c2=1.0, c4=0.5, c6=0.3, c8=0.2, c10=0.1, c12=0.05)
+                Dict(2 => 1.0, 4 => 0.5, 6 => 0.3, 8 => 0.2, 10 => 0.1, 12 => 0.05)
             end
-            ip = InteractionParams(0.0, 0.0, 0.0, c_extra)
+            ip = InteractionParams(
+                merge(Dict(0 => 0.0, 1 => 0.0), SpinorBEC._vec_to_c_dict(c_extra)); c_lhy=0.0
+            )
             cache = SpinorBEC.make_tensor_interaction_cache(F, ip)
             @test cache !== nothing  # higher channels active
 
@@ -153,7 +157,7 @@
 
     @testset "Zero coupling = identity" begin
         F = 2
-        ip_zero = InteractionParams(0.0, 0.0)
+        ip_zero = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
         cache_zero = make_tensor_interaction_cache(F, ip_zero)
         @test cache_zero === nothing
     end
@@ -168,7 +172,7 @@
 
         mag0 = magnetization(psi, grid, sm.system)
 
-        ip = InteractionParams(0.0, 0.0, 0.0, [5.0, 0.0, 3.0])
+        ip = InteractionParams(Dict(0 => 0.0, 1 => 0.0, 2 => 5.0, 4 => 3.0); c_lhy=0.0)
         cache = make_tensor_interaction_cache(F, ip)
         @test cache !== nothing
 
@@ -194,7 +198,7 @@
         norm = sqrt(sum(abs2, psi) * dV)
         psi ./= norm
 
-        ip = InteractionParams(0.0, 0.0, 0.0, [5.0, 0.0, 3.0])
+        ip = InteractionParams(Dict(0 => 0.0, 1 => 0.0, 2 => 5.0, 4 => 3.0); c_lhy=0.0)
         cache = make_tensor_interaction_cache(F, ip)
         @test cache !== nothing
 
@@ -207,7 +211,7 @@
         D = 2F + 1
         grid = make_grid(GridConfig((16,), (10.0,)))
 
-        interactions = InteractionParams(0.0, 0.0, 0.0, [5.0, 0.0, 3.0])
+        interactions = InteractionParams(Dict(0 => 0.0, 1 => 0.0, 2 => 5.0, 4 => 3.0); c_lhy=0.0)
         atom = AtomSpecies(
             "test-f2", 1e-25, 2, 0.0, 0.0, 0.0, Dict(0 => 1e-9, 2 => 2e-9, 4 => 1.5e-9)
         )
@@ -233,7 +237,7 @@
 
     @testset "basis=:channel skips 6j transform" begin
         F = 2
-        ip = InteractionParams(0.0, 0.0, 0.0, [5.0, 0.0, 3.0])
+        ip = InteractionParams(Dict(0 => 0.0, 1 => 0.0, 2 => 5.0, 4 => 3.0); c_lhy=0.0)
 
         cache_coupling = make_tensor_interaction_cache(F, ip; basis=:coupling)
         cache_channel = make_tensor_interaction_cache(F, ip; basis=:channel)
@@ -257,7 +261,7 @@
         dV = cell_volume(grid)
         norm0 = sum(abs2, psi) * dV
 
-        ip = InteractionParams(0.0, 0.0, 0.0, [5.0, 0.0, 3.0])
+        ip = InteractionParams(Dict(0 => 0.0, 1 => 0.0, 2 => 5.0, 4 => 3.0); c_lhy=0.0)
         cache = make_tensor_interaction_cache(F, ip; basis=:channel)
         @test cache !== nothing
 
@@ -310,15 +314,17 @@
 
         c_extra = zeros(Float64, 5)
         c_extra[3] = 50.0  # c4
-        interactions = InteractionParams(4000.0, 20.0, 0.0, c_extra)
+        interactions = InteractionParams(
+            merge(Dict(0 => 4000.0, 1 => 20.0), SpinorBEC._vec_to_c_dict(c_extra)); c_lhy=0.0
+        )
         atom = AtomSpecies("test-f6", 1e-25, 6, 0.0, 0.0, 0.0, 0.0)
         sp = SimParams(; dt=0.001, n_steps=5)
 
         ws = make_workspace(; grid, atom, interactions, sim_params=sp)
         @test ws.tensor_cache !== nothing
-        @test ws.interactions.c0 ≈ 4000.0
-        @test ws.interactions.c1 ≈ 20.0
-        @test isempty(ws.interactions.c_extra)
+        @test ws.interactions[0] ≈ 4000.0
+        @test ws.interactions[1] ≈ 20.0
+        @test !SpinorBEC.has_higher_rank_couplings(ws.interactions)
 
         dV = cell_volume(grid)
         norm0 = sum(abs2, ws.state.psi) * dV
@@ -335,7 +341,9 @@
 
         c0, c1 = 50.0, 5.0
         c_extra = [0.0, 0.0, 2.0]  # c4 nonzero → tensor_cache active
-        interactions = InteractionParams(c0, c1, 0.0, c_extra)
+        interactions = InteractionParams(
+            merge(Dict(0 => c0, 1 => c1), SpinorBEC._vec_to_c_dict(c_extra)); c_lhy=0.0
+        )
 
         result = find_ground_state(;
             grid, atom, interactions,
@@ -358,7 +366,9 @@
 
         c0, c1 = 50.0, -5.0
         c_extra = [0.0, 0.0, 2.0]  # c4 nonzero → tensor_cache active
-        interactions = InteractionParams(c0, c1, 0.0, c_extra)
+        interactions = InteractionParams(
+            merge(Dict(0 => c0, 1 => c1), SpinorBEC._vec_to_c_dict(c_extra)); c_lhy=0.0
+        )
 
         result = find_ground_state(;
             grid, atom, interactions,
@@ -414,14 +424,16 @@
 
         c_extra = zeros(Float64, 5)
         c_extra[3] = 50.0  # c4
-        interactions = InteractionParams(4000.0, 20.0, 0.0, c_extra)
+        interactions = InteractionParams(
+            merge(Dict(0 => 4000.0, 1 => 20.0), SpinorBEC._vec_to_c_dict(c_extra)); c_lhy=0.0
+        )
         atom = AtomSpecies("test-f6", 1e-25, 6, 0.0, 0.0, 0.0, 0.0)
         sp = SimParams(; dt=0.001, n_steps=100)
 
         ws = make_workspace(; grid, atom, interactions, sim_params=sp)
         @test ws.tensor_cache !== nothing
-        @test ws.interactions.c0 ≈ 4000.0
-        @test ws.interactions.c1 ≈ 20.0
+        @test ws.interactions[0] ≈ 4000.0
+        @test ws.interactions[1] ≈ 20.0
 
         dV = cell_volume(grid)
         norm0 = sum(abs2, ws.state.psi) * dV
@@ -451,7 +463,7 @@
             end
         end
 
-        ip = InteractionParams(0.0, 0.0, 0.0, [5.0, 0.0, 3.0])
+        ip = InteractionParams(Dict(0 => 0.0, 1 => 0.0, 2 => 5.0, 4 => 3.0); c_lhy=0.0)
         cache = make_tensor_interaction_cache(F, ip)
         @test cache !== nothing
         sm = spin_matrices(F)
@@ -479,7 +491,7 @@
         end
         norm0 = sum(abs2, psi) * dV
 
-        ip = InteractionParams(0.0, 0.0, 0.0, [5.0, 0.0, 3.0])
+        ip = InteractionParams(Dict(0 => 0.0, 1 => 0.0, 2 => 5.0, 4 => 3.0); c_lhy=0.0)
         cache = make_tensor_interaction_cache(F, ip)
         sm = spin_matrices(F)
 
@@ -491,7 +503,7 @@
 
     @testset "HF entries sorted by (c_m, c_mp)" begin
         F = 2
-        ip = InteractionParams(0.0, 0.0, 0.0, [5.0, 0.0, 3.0])
+        ip = InteractionParams(Dict(0 => 0.0, 1 => 0.0, 2 => 5.0, 4 => 3.0); c_lhy=0.0)
         cache = make_tensor_interaction_cache(F, ip)
         entries = SpinorBEC._precompute_hf_entries(cache)
         for i in 2:length(entries)
@@ -503,7 +515,7 @@
 
     @testset "Workspace without tensor cache" begin
         grid = make_grid(GridConfig((16,), (10.0,)))
-        interactions = InteractionParams(100.0, 10.0)
+        interactions = InteractionParams(Dict(0 => 100.0, 1 => 10.0))
         sp = SimParams(; dt=0.001, n_steps=5)
 
         ws = make_workspace(;

@@ -106,7 +106,7 @@ function _apply_M_to_phi_doublet!(
 ) where {TC <: Complex, TR, M}
     twoD = 2 * D
     N_vox = size(M_mat, 3)
-    spatial = size(phi)[1:end-1]
+    spatial = size(phi)[1:(end - 1)]
     @assert prod(spatial) == N_vox
     phi_v = reshape(phi, N_vox, D)
 
@@ -124,7 +124,7 @@ function _apply_M_to_phi_doublet!(
     # Use gemv-strided-batched: per voxel, M_mat[:, :, v] @ phi_doublet[:, v]
     # CUDA.CUBLAS supports gemv_strided_batched! with separate scalar args.
     CUDA.CUBLAS.gemv_strided_batched!(
-        'N', one(TC), M_mat, sc.phi_doublet, zero(TC), sc.phi_doublet_new,
+        'N', one(TC), M_mat, sc.phi_doublet, zero(TC), sc.phi_doublet_new
     )
 
     # Read back top half into phi
@@ -154,7 +154,7 @@ function SpinorBEC._tdhfb_phi_subupdate!(
     D = 2 * F + 1
     TC = eltype(state.phi)
     TR = real(TC)
-    N_vox = prod(size(state.phi)[1:end-1])
+    N_vox = prod(size(state.phi)[1:(end - 1)])
 
     V_flat = _get_or_build_V_flat(F, g_S, TC)
     sc = _get_or_build_scratch(TC, TR, D, N_vox)
@@ -206,7 +206,7 @@ function SpinorBEC._tdhfb_R_subupdate!(
     D = 2 * F + 1
     TC = eltype(state.phi)
     TR = real(TC)
-    N_vox = prod(size(state.phi)[1:end-1])
+    N_vox = prod(size(state.phi)[1:(end - 1)])
 
     V_flat = _get_or_build_V_flat(F, g_S, TC)
     sc = _get_or_build_scratch(TC, TR, D, N_vox)
@@ -298,8 +298,8 @@ function SpinorBEC._tdhfb_hf_step_picard_midpoint!(
         d_kap = maximum(abs, 0.5 .* (state_0.kappa .+ state.kappa) .- state_mid.kappa)
         delta = max(d_phi, d_rho, d_kap)
 
-        state_mid.phi  .= 0.5 .* (state_0.phi  .+ state.phi)
-        state_mid.rho  .= 0.5 .* (state_0.rho  .+ state.rho)
+        state_mid.phi .= 0.5 .* (state_0.phi .+ state.phi)
+        state_mid.rho .= 0.5 .* (state_0.rho .+ state.rho)
         state_mid.kappa .= 0.5 .* (state_0.kappa .+ state.kappa)
 
         delta < tol && break

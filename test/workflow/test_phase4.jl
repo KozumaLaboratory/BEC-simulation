@@ -9,7 +9,7 @@ using SpinorBEC
         sp = SimParams(; dt=0.005, n_steps=1)
         ws = make_workspace(;
             grid, atom,
-            interactions=InteractionParams(10.0, 0.0),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => 0.0)),
             sim_params=sp,
             potential=HarmonicTrap(1.0, 1.0),
             zeeman=ZeemanParams(),
@@ -37,7 +37,7 @@ using SpinorBEC
         sp = SimParams(; dt=0.01, n_steps=1)
         ws = make_workspace(;
             grid, atom,
-            interactions=InteractionParams(10.0, 0.0),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => 0.0)),
             sim_params=sp, potential=HarmonicTrap(1.0, 1.0, 1.0),
             zeeman=ZeemanParams(),
         )
@@ -98,7 +98,7 @@ using SpinorBEC
         sp = SimParams(; dt=0.01, n_steps=1)
         ws = make_workspace(;
             grid, atom,
-            interactions=InteractionParams(5.0, 0.0),
+            interactions=InteractionParams(Dict(0 => 5.0, 1 => 0.0)),
             sim_params=sp,
             potential=HarmonicTrap(1.0, 1.0),
             zeeman=ZeemanParams(),
@@ -115,7 +115,7 @@ using SpinorBEC
         sp = SimParams(; dt=0.01, n_steps=1)
         ws = make_workspace(;
             grid, atom,
-            interactions=InteractionParams(5.0, 0.0),
+            interactions=InteractionParams(Dict(0 => 5.0, 1 => 0.0)),
             sim_params=sp,
             potential=HarmonicTrap(1.0, 1.0),
             zeeman=ZeemanParams(),
@@ -140,7 +140,7 @@ using SpinorBEC
         sp = SimParams(; dt=0.01, n_steps=1)
         ws = make_workspace(;
             grid, atom,
-            interactions=InteractionParams(5.0, 0.0),
+            interactions=InteractionParams(Dict(0 => 5.0, 1 => 0.0)),
             sim_params=sp,
             potential=HarmonicTrap(1.0, 1.0),
             zeeman=ZeemanParams(),
@@ -161,7 +161,7 @@ using SpinorBEC
         sp = SimParams(; dt=0.01, n_steps=1)
         ws = make_workspace(;
             grid, atom,
-            interactions=InteractionParams(5.0, 0.0),
+            interactions=InteractionParams(Dict(0 => 5.0, 1 => 0.0)),
             sim_params=sp,
             potential=HarmonicTrap(1.0, 1.0),
             zeeman=ZeemanParams(),

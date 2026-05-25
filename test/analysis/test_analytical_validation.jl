@@ -59,7 +59,7 @@ using LinearAlgebra
         sp = SimParams(; dt=0.01, n_steps=1, save_every=1)
         ws = make_workspace(;
             grid, atom=Rb87,
-            interactions=InteractionParams(0.0, 0.0),
+            interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
             sim_params=sp,
             psi_init=psi,
             enable_ddi=true, c_dd=1.0,
@@ -81,7 +81,7 @@ using LinearAlgebra
 
         @testset "ferromagnetic: E_c1 ≈ 0.5*c1*∫n²" begin
             c0, c1 = 50.0, -5.0
-            interactions = InteractionParams(c0, c1)
+            interactions = InteractionParams(Dict(0 => c0, 1 => c1))
             result = find_ground_state(;
                 grid, atom=Rb87, interactions, potential=trap,
                 zeeman=ZeemanParams(1.0, 0.0),
@@ -98,7 +98,7 @@ using LinearAlgebra
 
         @testset "polar: E_c1 ≈ 0" begin
             c0, c1 = 50.0, 5.0
-            interactions = InteractionParams(c0, c1)
+            interactions = InteractionParams(Dict(0 => c0, 1 => c1))
             result = find_ground_state(;
                 grid, atom=Na23, interactions, potential=trap,
                 dt=0.002, n_steps=10000, initial_state=:polar,
@@ -123,7 +123,7 @@ using LinearAlgebra
 
         @testset "ferromagnetic: c1<0, c2 < 4|c1|" begin
             c1_val, c2_val = -5.0, 10.0
-            interactions = InteractionParams(c0, c1_val, 0.0, [c2_val])
+            interactions = InteractionParams(Dict(0 => c0, 1 => c1_val, 2 => c2_val); c_lhy=0.0)
             result = find_ground_state(;
                 grid, atom=test_atom, interactions, potential=trap,
                 zeeman=ZeemanParams(0.5, 0.0),
@@ -137,7 +137,7 @@ using LinearAlgebra
 
         @testset "uniaxial nematic: c1>0" begin
             c1_val, c2_val = 5.0, 10.0
-            interactions = InteractionParams(c0, c1_val, 0.0, [c2_val])
+            interactions = InteractionParams(Dict(0 => c0, 1 => c1_val, 2 => c2_val); c_lhy=0.0)
             result = find_ground_state(;
                 grid, atom=test_atom, interactions, potential=trap,
                 dt=0.002, n_steps=15000, initial_state=:polar,
@@ -259,28 +259,28 @@ using LinearAlgebra
 
     @testset "ITP overflow detection" begin
         @testset "contact interaction overflow throws" begin
-            huge = InteractionParams(1e6, 0.0)
+            huge = InteractionParams(Dict(0 => 1e6, 1 => 0.0))
             @test_throws ArgumentError SpinorBEC._validate_itp_interactions(huge, 1, 0.01)
         end
 
         @testset "safe contact interaction passes" begin
-            safe = InteractionParams(100.0, 10.0)
+            safe = InteractionParams(Dict(0 => 100.0, 1 => 10.0))
             @test SpinorBEC._validate_itp_interactions(safe, 1, 0.001) === nothing
         end
 
         @testset "DDI overflow throws" begin
-            small_contact = InteractionParams(1.0, 0.0)
+            small_contact = InteractionParams(Dict(0 => 1.0, 1 => 0.0))
             @test_throws ArgumentError SpinorBEC._validate_itp_interactions(
                 small_contact, 6, 0.01; c_dd=1e5)
         end
 
         @testset "DDI safe passes" begin
-            ip = InteractionParams(100.0, 10.0)
+            ip = InteractionParams(Dict(0 => 100.0, 1 => 10.0))
             @test SpinorBEC._validate_itp_interactions(ip, 1, 0.001; c_dd=10.0) === nothing
         end
 
         @testset "DDI check disabled when c_dd=0" begin
-            ip = InteractionParams(100.0, 0.0)
+            ip = InteractionParams(Dict(0 => 100.0, 1 => 0.0))
             @test SpinorBEC._validate_itp_interactions(ip, 6, 0.01; c_dd=0.0) === nothing
         end
 
@@ -291,7 +291,7 @@ using LinearAlgebra
             psi_nan[1, 1] = NaN
             sp = SimParams(; dt=0.001, n_steps=1, imaginary_time=true)
             ws = make_workspace(; grid, atom=Rb87,
-                interactions=InteractionParams(100.0, 0.0),
+                interactions=InteractionParams(Dict(0 => 100.0, 1 => 0.0)),
                 zeeman=ZeemanParams(), potential=NoPotential(),
                 sim_params=sp, psi_init=psi_nan)
             @test_throws ArgumentError SpinorBEC._check_itp_overflow(ws, 1)

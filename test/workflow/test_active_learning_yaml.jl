@@ -81,7 +81,7 @@ end
 
     result = active_learn_phase_scan_yaml(
         yaml_path,
-        ["pipeline.0.ground_state.interactions.c1"],
+        ["pipeline.0.ground_state.interactions[1]"],
         [(-1.0, 1.0)];
         n_init=3, n_iter=4,
         temperature=0.1,

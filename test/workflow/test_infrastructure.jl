@@ -229,10 +229,10 @@ const _SKIP_HEAVY_YAML_INFRA =
     @testset "TimeDependentInteractions" begin
         tdi = TimeDependentInteractions(ConstantWaveform(100.0), ConstantWaveform(-0.5))
         ip = interactions_at(tdi, 0.0)
-        @test ip.c0 ≈ 100.0
-        @test ip.c1 ≈ -0.5
+        @test ip[0] ≈ 100.0
+        @test ip[1] ≈ -0.5
 
-        ip_const = InteractionParams(100.0, -0.5)
+        ip_const = InteractionParams(Dict(0 => 100.0, 1 => -0.5))
         @test interactions_at(ip_const, 0.5) === ip_const
     end
 
@@ -267,7 +267,7 @@ const _SKIP_HEAVY_YAML_INFRA =
         grid = make_grid(GridConfig(32, 10.0))
         ws = make_workspace(;
             grid, atom=Rb87,
-            interactions=InteractionParams(100.0, -0.5),
+            interactions=InteractionParams(Dict(0 => 100.0, 1 => -0.5)),
             sim_params=SimParams(dt=0.01, n_steps=10, imaginary_time=true),
         )
         sp2 = SimParams(dt=0.005, n_steps=20, imaginary_time=true)
@@ -286,7 +286,7 @@ const _SKIP_HEAVY_YAML_INFRA =
         )
         ws = make_workspace(;
             grid, atom=Rb87,
-            interactions=InteractionParams(100.0, -0.5),
+            interactions=InteractionParams(Dict(0 => 100.0, 1 => -0.5)),
             sim_params=SimParams(dt=0.01, n_steps=10),
             time_dep_interactions=tdi,
         )
@@ -299,7 +299,7 @@ const _SKIP_HEAVY_YAML_INFRA =
         mg = MagneticGradient{1}(0.5, 1, 1.0)
         ws = make_workspace(;
             grid, atom=Rb87,
-            interactions=InteractionParams(100.0, -0.5),
+            interactions=InteractionParams(Dict(0 => 100.0, 1 => -0.5)),
             sim_params=SimParams(dt=0.01, n_steps=10),
             magnetic_gradient=mg,
         )
@@ -410,10 +410,10 @@ const _SKIP_HEAVY_YAML_INFRA =
     @testset "_parse_zeeman handles transverse bx/by (regression)" begin
         # Bug: prior to the fix, _parse_zeeman only saw `p`/`q` and silently
         # dropped any `bx`/`by` keys. That broke (1) the GS path, where
-        # _build_zeeman_dispatched(level=0) routes through _parse_zeeman,
-        # and (2) the multi-source aggregator
-        # (zeeman_levels._build_zeeman_multi_source) which explicitly
-        # treats per-source dicts as level-0 with p/bx/by.
+        # `_build_zeeman_from_b_block` (coord=:dimless) routes through
+        # `_parse_zeeman`, and (2) the multi-source aggregator
+        # (`b_block_builders._build_zeeman_multi_source`) which treats
+        # each per-source dict with p/bx/by as a `:dimless` sub-block.
         z_with_transverse = Dict{Any, Any}(
             "p" => 10.0,
             "bx" => Dict{String, Any}(

@@ -39,7 +39,7 @@ using Test
         )
         make_workspace(;
             grid, atom,
-            interactions=InteractionParams(50.0, 0.5),
+            interactions=InteractionParams(Dict(0 => 50.0, 1 => 0.5)),
             potential=HarmonicTrap((1.0, 1.0, 2.0)),
             sim_params=sp,
             psi_init=psi0,

@@ -25,7 +25,7 @@ Snapshots land at `dynamics/psi_snapshots_streamed/frame_NNNNN`. Set `SPINORBEC_
 Each of these falls back to the previous step's value if omitted:
 
 - `interactions:` — `c0` / `c1` / `c1_ratio` / `N_atoms` / `omega_ref` / per-channel `c_extra` / `c_lhy`. Time-dependent `c0` / `c1` produce `TimeDependentInteractions`.
-- `zeeman:` — Level 0 (`p`/`q`/`bx`/`by`), Level 1 (`Bx`/`By`/`Bz` in Gauss strings), Level 2 (`B_mag`/`theta_deg`/`phi_deg`). Mixing levels in one block raises `ArgumentError`. Ramps via `{from: …, to: …}` are expanded to a `TimeDependentZeeman`.
+- `B:` — unified Zeeman block. Three coord systems auto-detected from keys: `:dimless` (`p`/`q`/`bx`/`by`), `:cartesian` (`Bx`/`By`/`Bz`, Gauss or `"X Gauss"` strings), `:spherical` (`B_mag`/`theta_deg`/`phi_deg`). Mixing coord systems in one block raises `ArgumentError`. `q` is coord-orthogonal and may be combined with any. Ramps via `{from: …, to: …}` expand to a `TimeDependentZeeman`. The legacy step-level `zeeman:` / `B_hat:` keys are rejected.
 - `ddi:` — `enabled`, `c_dd` (with optional `{from, to}` ramp), `secular`, `quasi_2d`, `l_z`.
 - `potential:` — single dict or list (composite). Same syntax as the ground-state block.
 - `raman:` — Rabi pulses (rectangular / Gaussian envelopes).

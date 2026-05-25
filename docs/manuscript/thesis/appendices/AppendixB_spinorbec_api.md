@@ -233,7 +233,7 @@ SPINORBEC_RUN_HEAVY_YAML=true julia --project=. -e 'using Pkg; Pkg.test()'
 ```
 
 Adds 8 YAML integration tests that take ~30 min total (`test_infrastructure.jl`,
-`test_zeeman_levels.jl`). Gated off in regular CI for runtime.
+`test_b_block_builders.jl`). Gated off in regular CI for runtime.
 
 ### B.7.3 GPU tests (manual)
 

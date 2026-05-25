@@ -20,21 +20,21 @@ pipeline:
       grid: {n: [48, 48, 24], box: [12.0, 12.0, 6.0]}
       interactions: {N_atoms: 50000, omega_ref: 691.15}
       ddi: {enabled: true}
-      zeeman:
-        B_mag: 1.0           # Gauss (Level 2 spec)
+      B:                       # unified Zeeman block (:spherical coord)
+        B_mag: 1.0             # Gauss
         theta_deg: 0
         phi_deg: 0
       potential: {type: harmonic, omega: [1.0, 1.0, 1.182]}
-      epsilon: 1.0e-6        # required — see "ε rule" below
-      backend: cuda
+      epsilon: 1.0e-6          # required — see "ε rule" below
+      backend: gpu
 
   - dynamics:
-      duration: 1.0          # ~1.45 ms
+      duration: 1.0            # ~1.45 ms
       epsilon: 1.0e-6
-      B_hat:                 # rotating-frame B̂(t) trajectory
+      B_direction:             # rotating-frame B̂(t) trajectory
         theta: {from: 0, to: 0.611}     # 0 → 35°, in radians
         phi:   {rate: 4.524}            # = 226 Hz at ω_ref = 2π·50 Hz
-      save_every: 100
+      save: {every: 100}
 ```
 
 ## Hard constraint: `epsilon: 1.0e-6` is mandatory
@@ -43,21 +43,28 @@ Empirical finding (audit 2026-04-28): with the default `ε = 1e-3` and `p · F �
 
 ## How to specify B(t)
 
-### Pick a level
+### Pick a coord system
 
-Three equivalent ways to write the field, pick whichever matches your mental model:
+Three equivalent ways to write the field, pick whichever matches your
+mental model. The B-block builder auto-detects from keys; mixing across
+coord systems in a single block raises `ArgumentError`.
 
-| Level | Form | When to use |
+| coord | Form | When to use |
 |---|---|---|
-| 0 | `p, q, bx, by` (dimensionless) | physics-level testing, scans of c₁/c₀ |
-| 1 | `Bx, By, Bz` (Gauss strings) | Cartesian lab convention |
-| 2 | `B_mag, theta_deg, phi_deg` | tilt/stir experiments |
+| `:dimless`   | `p, q, bx, by`                  | physics-level testing, scans of c₁/c₀ |
+| `:cartesian` | `Bx, By, Bz` (Gauss / strings)  | Cartesian lab convention |
+| `:spherical` | `B_mag, theta_deg, phi_deg`     | tilt/stir experiments |
 
-Mixing levels in one block raises `ArgumentError`. Calibration block (`p_mv` + `coil_mode`) auto-converts to Level 1 Gauss.
+Calibration block (`p_mv` + `coil_mode`) auto-converts to a Gauss
+`B_mag` value before reaching the parser.
 
 ### Unit pitfall: `phi_omega` is dimensionless ω/ω_ref, not Hz
 
-The `B_hat.phi: {rate: X}` form takes a dimensionless rate. Klaus 226 Hz at ω_ref = 2π·50 Hz is `4.524`, not `226`. Use the Hz string form (`"226 Hz"`) if you want the system to do the conversion. The dimensionless form silently runs at 36× the intended frequency — this costs an evening if you miss it.
+The `B_direction.phi: {rate: X}` form takes a dimensionless rate. Klaus
+226 Hz at ω_ref = 2π·50 Hz is `4.524`, not `226`. Use the Hz string
+form (`"226 Hz"`) if you want the system to do the conversion. The
+dimensionless form silently runs at 36× the intended frequency — this
+costs an evening if you miss it.
 
 ## DDI behaviour in the Klaus regime
 

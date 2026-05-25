@@ -15,7 +15,12 @@ _is_gpu(::Array) = false
 _is_gpu(::AbstractArray) = true
 
 function _resolve_backend(name::Symbol)
-    name == :cpu && return CPUBackend()
-    name in (:cuda, :gpu) && return CUDABackend()
-    throw(ArgumentError("Unknown backend: $name"))
+    name === :cpu && return CPUBackend()
+    name === :gpu && return CUDABackend()
+    name === :cuda && throw(
+        ArgumentError(
+            "backend: `:cuda` was renamed to `:gpu` (alias removed 2026-05-24). " *
+            "Update YAML / Julia callers to `backend: gpu`."),
+    )
+    throw(ArgumentError("Unknown backend: $name (expected :cpu or :gpu)"))
 end

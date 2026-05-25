@@ -34,8 +34,8 @@ Why odd-rank is rejected (not silently dropped):
   or `_make_tensor_cache_from_channels(F, Dict(S => g_S, ...))` directly.
 """
 function _parse_c_extra(inter::Dict, ::Int)
-    max_n = 0
     odd_indices = Int[]
+    out = Dict{Int, Float64}()
     for k in keys(inter)
         m = match(r"^c(\d+)$", string(k))
         m === nothing && continue
@@ -44,7 +44,7 @@ function _parse_c_extra(inter::Dict, ::Int)
         if isodd(n)
             push!(odd_indices, n)
         else
-            max_n = max(max_n, n)
+            out[n] = Float64(inter["c$n"])
         end
     end
     if !isempty(odd_indices)
@@ -58,12 +58,7 @@ function _parse_c_extra(inter::Dict, ::Int)
                 "See src/hamiltonian/interactions/singlet_pair.jl docstring."),
         )
     end
-    max_n < 2 && return Float64[]
-    c_extra = zeros(Float64, max_n - 1)
-    for n in 2:2:max_n
-        haskey(inter, "c$n") && (c_extra[n - 1] = Float64(inter["c$n"]))
-    end
-    c_extra
+    out
 end
 
 function _parse_potential_config(d::Dict)
@@ -140,18 +135,22 @@ function _parse_loss_params(
 
     # True 3-body cubic loss: dn_m/dt = -K_3 n² n_m. Three input forms:
     #   K3_cubic         — scalar dimensionless
-    #   K3_per_m_cubic   — per-m dimensionless vector
-    #   K3_per_m         — per-m dimensionless (alias; same physics)
+    #   K3_per_m_cubic   — per-m dimensionless vector (canonical)
     #   K3_per_m_si      — per-m SI-units (m^6/s), converted via n0²/ω_ref
+    # (The `K3_per_m` alias was removed 2026-05-24; canonical-only.)
+    haskey(node, "K3_per_m") && throw(
+        ArgumentError(
+            "loss.K3_per_m: alias removed 2026-05-24 — use canonical " *
+            "`K3_per_m_cubic` (dimensionless) or `K3_per_m_si` (SI \"X m^6/s\")."),
+    )
     K3_cubic = Float64(get(node, "K3_cubic", 0.0))
-    K3_per_m_cubic = let v = get(node, "K3_per_m_cubic",
-            get(node, "K3_per_m", nothing))
+    K3_per_m_cubic = let v = get(node, "K3_per_m_cubic", nothing)
         if v === nothing
             Float64[]
         elseif any(x -> x isa AbstractString, v)
             throw(
                 ArgumentError(
-                    "K3_per_m_cubic / K3_per_m expects dimensionless numbers, " *
+                    "K3_per_m_cubic expects dimensionless numbers, " *
                     "but got string entries (e.g. \"1e-41 m^6/s\"). For SI-unit " *
                     "input use `K3_per_m_si: [\"... m^6/s\", ...]` instead — " *
                     "the parser converts via n0²/ω_ref using atom + N_atoms + " *
@@ -349,7 +348,7 @@ function _parse_gs_interactions(inter::Dict, atom)
         c1_ratio = Float64(get(inter, "c1_ratio", 0.0))
         c_lhy = Float64(get(inter, "c_lhy", 0.0))
         ip = interaction_params_from_constraint(; c_total, c1_ratio, F, c_extra)
-        InteractionParams(ip.c0, ip.c1, c_lhy, ip.c_extra)
+        InteractionParams(ip.c; c_lhy=c_lhy)
     elseif haskey(inter, "N_atoms") && haskey(inter, "omega_ref")
         N_atoms = Int(inter["N_atoms"])
         omega_ref = Float64(inter["omega_ref"])
@@ -357,14 +356,15 @@ function _parse_gs_interactions(inter::Dict, atom)
         c1_ratio = Float64(get(inter, "c1_ratio", 0.0))
         c_lhy = Float64(get(inter, "c_lhy", 0.0))
         ip = interaction_params_from_constraint(; c_total, c1_ratio, F, c_extra)
-        InteractionParams(ip.c0, ip.c1, c_lhy, ip.c_extra)
+        InteractionParams(ip.c; c_lhy=c_lhy)
     else
         c0_raw = get(inter, "c0", 0.0)
         c1_raw = get(inter, "c1", 0.0)
         c0 = c0_raw isa Dict ? Float64(get(c0_raw, "from", 0.0)) : Float64(c0_raw)
         c1 = c1_raw isa Dict ? Float64(get(c1_raw, "from", 0.0)) : Float64(c1_raw)
         c_lhy = Float64(get(inter, "c_lhy", 0.0))
-        InteractionParams(c0, c1, c_lhy, c_extra)
+        merged = merge(Dict(0 => c0, 1 => c1), c_extra)
+        InteractionParams(merged; c_lhy=c_lhy)
     end
 end
 
@@ -426,10 +426,10 @@ function _parse_zeeman(z, duration::Float64)
 
     # Time-dependent or transverse → TimeDependentZeeman with all 4
     # waveforms (p, q, bx, by). bx/by were previously dropped on the
-    # floor here, which silently broke level-0 ground_state YAML using
-    # transverse fields and the multi-source aggregator
-    # (zeeman_levels.jl:_build_zeeman_multi_source) which explicitly
-    # treats per-source dicts as level-0 with p/bx/by.
+    # floor here, which silently broke `:dimless` ground_state YAML
+    # using transverse fields and the multi-source aggregator
+    # (`b_block_builders.jl:_build_zeeman_multi_source` treats each
+    # per-source dict as a sub-block with p/bx/by).
     TimeDependentZeeman(
         _make_waveform(p_spec, duration),
         _make_waveform(q_spec, duration),

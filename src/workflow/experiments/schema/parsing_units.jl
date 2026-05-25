@@ -33,7 +33,7 @@ function _parse_bfield(node, g_F::Real, omega_ref::Real)
         return Units.bfield_to_p(q, g_F, omega_ref)
     elseif node isa Real
         # Real → already-dimensionless Zeeman OR raw Gauss number?
-        # Convention: In Level 1/2 zeeman context (caller decides), Real = Gauss.
+        # Convention: in Gauss-valued B-block context (caller decides), Real = Gauss.
         # This function is only called from the Gauss-context parsers, so
         # always convert as Gauss for consistency.
         return Units.bfield_to_p(Float64(node), g_F, omega_ref)

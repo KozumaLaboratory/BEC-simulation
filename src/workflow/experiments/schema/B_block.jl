@@ -16,8 +16,8 @@
 #
 # Form B — Spherical (natural for rotating B̂):
 #
-#   B: {magnitude: "0.819 Gauss", theta: 0.611, phi: 0.0}
-#   B: {magnitude: "0.819 Gauss",
+#   B: {B_mag: "0.819 Gauss", theta: 0.611, phi: 0.0}
+#   B: {B_mag: "0.819 Gauss",
 #       theta: {from: 0, to: 0.611, duration: "20 ms"},
 #       phi:   {rate: 4.524}}
 #
@@ -32,18 +32,20 @@
 # `q` (quadratic Zeeman, auto-derived from |B|² if user omits) belongs in
 # B too — it's a Zeeman-effect parameter tied to |B|.
 #
+# (The `magnitude:` alias of `B_mag:` was removed 2026-05-24; canonical-only.)
+#
 # === Internal mapping ===
 #
 # This module rewrites the user-facing unified `B:` block into the
 # internal magnitude/direction dicts that pipeline_runner consumes:
 #
-#   {Bx, By, Bz} (+ q, p_mv, ...)        → magnitude dict, Cartesian keys
-#   {magnitude, theta, phi} static       → magnitude dict, {B_mag, theta_deg, phi_deg}
-#   {theta, phi} time-dependent          → direction dict, {theta, phi}
+#   {Bx, By, Bz} (+ q, p_mv, ...)    → magnitude dict, Cartesian keys
+#   {B_mag, theta, phi} static       → magnitude dict, {B_mag, theta_deg, phi_deg}
+#   {theta, phi} time-dependent      → direction dict, {theta, phi}
 
 const _CARTESIAN_KEYS = ("Bx", "By", "Bz")
 const _DIRECTION_KEYS = ("theta", "phi")
-const _MAGNITUDE_KEYS = ("magnitude", "B_mag", "p", "p_mv")
+const _MAGNITUDE_KEYS = ("B_mag", "p", "p_mv")
 
 """
     apply_B_block_normalize!(data::Dict) -> Dict
@@ -135,30 +137,31 @@ function _split_B_block!(step::AbstractDict)
     for (k, v) in B
         kk = String(k)
         if kk in ("Bx", "By", "Bz")
-            zeeman[k] = v                              # Level 1 Cartesian
+            zeeman[k] = v                              # Gauss Cartesian
         elseif kk == "magnitude"
-            zeeman["B_mag"] = v                        # rename → Level 2 internal name
+            throw(ArgumentError(
+                "B.magnitude: alias removed 2026-05-24 — use canonical `B_mag`."))
         elseif kk == "B_mag"
-            zeeman["B_mag"] = v
+            zeeman["B_mag"] = v                        # Gauss spherical
         elseif kk == "p" || kk == "bx" || kk == "by"
-            zeeman[k] = v                              # Level 0 dimless
+            zeeman[k] = v                              # dimensionless Cartesian
         elseif kk == "q"
             zeeman[k] = v                              # quadratic Zeeman
         elseif kk == "p_mv" || kk == "coil_mode"
             zeeman[k] = v                              # calibration lab-units
-        elseif kk == "level" || kk == "n_samples" || kk == "omega_ref_hz"
-            zeeman[k] = v                              # zeeman-internal misc
+        elseif kk == "n_samples" || kk == "omega_ref_hz"
+            zeeman[k] = v                              # sample-grid / ω_ref override
         elseif kk == "sources"
             zeeman[k] = v                              # multi-source list
         elseif kk in _DIRECTION_KEYS
-            B_hat[k] = v                               # theta / phi → B_hat
+            B_hat[k] = v                               # theta / phi → B_direction
         else
             throw(
                 ArgumentError(
                     "B.$kk: unrecognised key. Cartesian: $(_CARTESIAN_KEYS); " *
                     "Spherical magnitude: $(_MAGNITUDE_KEYS); " *
                     "Direction: $(_DIRECTION_KEYS); plus q, sources, " *
-                    "p_mv/coil_mode (calibration), level, n_samples, omega_ref_hz."),
+                    "p_mv/coil_mode (calibration), n_samples, omega_ref_hz."),
             )
         end
     end

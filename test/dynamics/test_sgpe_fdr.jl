@@ -29,7 +29,7 @@ using SpinorBEC
     sys = SpinSystem(0)   # F=0, scalar (D=1)
 
     # Free dynamics: zero potential, zero interactions
-    ip = InteractionParams(0.0, 0.0)
+    ip = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
     sp = SimParams(; dt=0.01, n_steps=1, imaginary_time=false,
         save_every=1, normalize_every=0)
     ws = make_workspace(; grid, atom=Rb87, interactions=ip,

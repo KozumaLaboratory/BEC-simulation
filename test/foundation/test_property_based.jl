@@ -174,14 +174,14 @@ end
     # integrated over z). Catches any future regression that scales
     # only c0/c1 and forgets the higher-rank channels.
     @testset "Quasi-2D scaling: 1/(√(2π)·l_z) factor uniform across channels" begin
-        inter = InteractionParams(50.0, 5.0, 1.0, [0.3])
+        inter = InteractionParams(Dict(0 => 50.0, 1 => 5.0, 2 => 0.3); c_lhy=1.0)
         for l_z in [0.5, 1.0, 2.0]
             inter_q = SpinorBEC.scale_interactions_quasi_2d(inter, l_z)
             scale = 1.0 / (sqrt(2π) * l_z)
-            @test inter_q.c0 ≈ inter.c0 * scale rtol = 1e-12
-            @test inter_q.c1 ≈ inter.c1 * scale rtol = 1e-12
+            @test inter_q[0] ≈ inter[0] * scale rtol = 1e-12
+            @test inter_q[1] ≈ inter[1] * scale rtol = 1e-12
             @test inter_q.c_lhy ≈ inter.c_lhy * scale rtol = 1e-12
-            @test inter_q.c_extra[1] ≈ inter.c_extra[1] * scale rtol = 1e-12
+            @test inter_q[2] ≈ inter[2] * scale rtol = 1e-12
         end
     end
 

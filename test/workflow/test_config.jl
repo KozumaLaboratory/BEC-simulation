@@ -113,7 +113,7 @@
               potential: {type: harmonic, omega: [1.0]}
         scan:
           zip:
-            pipeline.0.interactions.c1: [-5.0, -2.0, 0.0, 2.0, 5.0]
+            pipeline.0.interactions[1]: [-5.0, -2.0, 0.0, 2.0, 5.0]
           continuation: true
         """
         cfg = load_config_from_string(yaml)
@@ -264,7 +264,7 @@
               potential: {type: harmonic, omega: [1.0]}
         scan:
           zip:
-            pipeline.0.interactions.c1: [-5.0, 0.0, 5.0]
+            pipeline.0.interactions[1]: [-5.0, 0.0, 5.0]
           comparison_runs:
             - name: polar
               override:

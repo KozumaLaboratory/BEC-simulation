@@ -15,14 +15,14 @@ using SpinorBEC
     sp = SimParams(; dt=0.01, n_steps=200)
     ws_f64 = make_workspace(;
         grid=grid_f64, atom=Rb87,
-        interactions=InteractionParams(5.0, 0.0),
+        interactions=InteractionParams(Dict(0 => 5.0, 1 => 0.0)),
         zeeman=ZeemanParams(0.0, 0.1),
         potential=HarmonicTrap(1.0, 1.0),
         sim_params=sp,
     )
     gs_f64 = find_ground_state(;
         grid=grid_f64, atom=Rb87,
-        interactions=InteractionParams(5.0, 0.0),
+        interactions=InteractionParams(Dict(0 => 5.0, 1 => 0.0)),
         zeeman=ZeemanParams(0.0, 0.1),
         potential=HarmonicTrap(1.0, 1.0),
         dt=0.01, n_steps=200, tol=1e-7,
@@ -36,7 +36,7 @@ using SpinorBEC
     # Run F32 ITP via dtype kwarg
     gs_f32 = find_ground_state(;
         grid=grid_f32, atom=Rb87,
-        interactions=InteractionParams(5.0, 0.0),
+        interactions=InteractionParams(Dict(0 => 5.0, 1 => 0.0)),
         zeeman=ZeemanParams(0.0, 0.1),
         potential=HarmonicTrap(1.0f0, 1.0f0),
         dt=0.01, n_steps=200, tol=1e-5,

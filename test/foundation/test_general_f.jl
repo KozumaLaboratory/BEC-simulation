@@ -50,8 +50,8 @@
         c0_expected = 4π * hbar^2 * (a0 + 2a2) / (3m)
         c1_expected = 4π * hbar^2 * (a2 - a0) / (3m)
 
-        @test params.c0 ≈ c0_expected rtol = 1e-10
-        @test params.c1 ≈ c1_expected rtol = 1e-10
+        @test params[0] ≈ c0_expected rtol = 1e-10
+        @test params[1] ≈ c1_expected rtol = 1e-10
     end
 
     @testset "F≥2 with full scattering lengths → tensor-cache path (c0=c1=0)" begin
@@ -61,16 +61,16 @@
         sl = Dict(0 => 1e-9, 2 => 2e-9, 4 => 1.5e-9)
         atom = AtomSpecies("test-f2", 1e-25, 2, 0.0, 0.0, 0.0, sl)
         params = compute_interaction_params(atom)
-        @test params.c0 == 0.0
-        @test params.c1 == 0.0
+        @test params[0] == 0.0
+        @test params[1] == 0.0
     end
 
     @testset "F>1 without scattering_lengths falls back to c0-only" begin
         atom_bare = AtomSpecies("bare", 1.0, 3, 0.1, 0.0)
         ip = @test_logs (:warn, r"No channel scattering lengths") compute_interaction_params(
             atom_bare; N_atoms=1, dims=3)
-        @test ip.c0 > 0
-        @test ip.c1 == 0.0
+        @test ip[0] > 0
+        @test ip[1] == 0.0
     end
 
     @testset "TensorInteractionCache from scattering_lengths" begin

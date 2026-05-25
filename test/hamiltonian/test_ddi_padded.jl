@@ -22,7 +22,7 @@
         sp = SimParams(; dt=0.01, n_steps=50)
         ws = make_workspace(;
             grid, atom=Rb87,
-            interactions=InteractionParams(10.0, -0.5),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.5)),
             potential=HarmonicTrap(1.0),
             sim_params=sp,
             enable_ddi=true, c_dd=1.0,
@@ -45,7 +45,7 @@
 
         ws_pad = make_workspace(;
             grid, atom=Rb87,
-            interactions=InteractionParams(10.0, -0.5),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.5)),
             potential=HarmonicTrap(1.0),
             sim_params=sp,
             enable_ddi=true, c_dd=1.0,
@@ -54,7 +54,7 @@
 
         ws_no = make_workspace(;
             grid, atom=Rb87,
-            interactions=InteractionParams(10.0, -0.5),
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.5)),
             potential=HarmonicTrap(1.0),
             sim_params=sp,
             enable_ddi=true, c_dd=1.0,
@@ -81,7 +81,7 @@
         sp = SimParams(; dt=0.01, n_steps=10)
         ws = make_workspace(;
             grid, atom=Rb87,
-            interactions=InteractionParams(1.0, 0.0),
+            interactions=InteractionParams(Dict(0 => 1.0, 1 => 0.0)),
             sim_params=sp,
             enable_ddi=true, c_dd=1.0,
             ddi_padding=false,
@@ -95,7 +95,7 @@
         sp = SimParams(; dt=0.01, n_steps=10)
         ws = make_workspace(;
             grid, atom=Rb87,
-            interactions=InteractionParams(1.0, 0.0),
+            interactions=InteractionParams(Dict(0 => 1.0, 1 => 0.0)),
             sim_params=sp,
             ddi_padding=true,
         )

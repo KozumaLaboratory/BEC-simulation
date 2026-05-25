@@ -13,7 +13,7 @@
 # specialisation for the freshly-emitted `Workspace{…23 type params…}`.
 # Skip by default — set SPINORBEC_RUN_HEAVY_YAML=true to opt in (mirrors
 # the gating pattern used by test_infrastructure.jl +
-# test_zeeman_levels.jl). Nightly CI flips the env var on cron so the
+# test_b_block_builders.jl). Nightly CI flips the env var on cron so the
 # integration still gets covered.
 
 using SpinorBEC
@@ -66,7 +66,7 @@ pipeline:
         # Vary c0 in [1, 20] only — single-parameter scan
         result = multi_fidelity_optimize_yaml(
             yaml_path,
-            ["pipeline.0.ground_state.interactions.c0"],
+            ["pipeline.0.ground_state.interactions[0]"],
             [(1.0, 20.0)];
             objective_fn=objective_total_energy,
             low_overrides=Dict{String, Any}(

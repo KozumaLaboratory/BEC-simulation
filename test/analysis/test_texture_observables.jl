@@ -3,37 +3,15 @@ using SpinorBEC
 using LinearAlgebra
 
 @testset "Texture Observables & Extended Interactions" begin
-    @testset "InteractionParams backward compatibility" begin
-        @testset "2-arg constructor" begin
-            ip = InteractionParams(1.0, 2.0)
-            @test ip.c0 == 1.0
-            @test ip.c1 == 2.0
-            @test ip.c_extra == Float64[]
-        end
-
-        @testset "3-arg constructor" begin
-            ip = InteractionParams(1.0, 2.0, [3.0, 4.0, 5.0])
-            @test ip.c0 == 1.0
-            @test ip.c1 == 2.0
-            @test ip.c_extra == [3.0, 4.0, 5.0]
-        end
-
-        @testset "get_cn" begin
-            ip = InteractionParams(10.0, 20.0, [30.0, 40.0])
-            @test get_cn(ip, 0) == 10.0
-            @test get_cn(ip, 1) == 20.0
-            @test get_cn(ip, 2) == 30.0
-            @test get_cn(ip, 3) == 40.0
-            @test get_cn(ip, 4) == 0.0
-            @test get_cn(ip, 99) == 0.0
-        end
-
-        @testset "get_cn with empty c_extra" begin
-            ip = InteractionParams(5.0, 6.0)
-            @test get_cn(ip, 0) == 5.0
-            @test get_cn(ip, 1) == 6.0
-            @test get_cn(ip, 2) == 0.0
-        end
+    # Post-2026-05-25 refactor: InteractionParams uses Dict{Int,Float64}
+    # storage; the old positional Vector form is removed. Comprehensive
+    # API coverage lives in test/test_interactions_dict_api.jl; this
+    # block keeps a minimal sanity probe on the production path.
+    @testset "InteractionParams Dict construction" begin
+        ip = InteractionParams(Dict(0 => 1.0, 1 => 2.0))
+        @test ip[0] == 1.0
+        @test ip[1] == 2.0
+        @test get_cn(ip, 2) == 0.0
     end
 
     @testset "superfluid_velocity" begin

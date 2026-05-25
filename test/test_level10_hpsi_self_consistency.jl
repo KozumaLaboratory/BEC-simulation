@@ -114,7 +114,7 @@ end
         L = 4.0
         grid = make_grid(GridConfig{3}((n, n, n), (L, L, L)))
         atom = Rb87  # F=1
-        interactions = InteractionParams(2.5, 0.1)
+        interactions = InteractionParams(Dict(0 => 2.5, 1 => 0.1))
         zeeman = ZeemanParams(0.0, 0.0)  # turned off first
         sp = SimParams(; dt=0.01, n_steps=1)
         ws = make_workspace(; grid, atom, interactions, zeeman,
@@ -132,8 +132,8 @@ end
 
         # Path B: naive textbook from-scratch.
         Hpsi_B = _naive_Hpsi(
-            Array(ws.state.psi), grid, atom, ws.interactions.c0,
-            ws.interactions.c1, 0.0, 0.0, ws.potential_values)
+            Array(ws.state.psi), grid, atom, ws.interactions[0],
+            ws.interactions[1], 0.0, 0.0, ws.potential_values)
 
         # L² relative residual.
         diff = sqrt(sum(abs2, Hpsi_A .- Hpsi_B))
@@ -147,7 +147,7 @@ end
         L = 4.0
         grid = make_grid(GridConfig{3}((n, n, n), (L, L, L)))
         atom = Rb87
-        interactions = InteractionParams(2.5, 0.1)
+        interactions = InteractionParams(Dict(0 => 2.5, 1 => 0.1))
         p, q = 0.7, 0.3
         zeeman = ZeemanParams(p, q)
         sp = SimParams(; dt=0.01, n_steps=1)
@@ -162,8 +162,8 @@ end
         Hpsi_A = Array(grad) ./ 2
 
         Hpsi_B = _naive_Hpsi(
-            Array(ws.state.psi), grid, atom, ws.interactions.c0,
-            ws.interactions.c1, p, q, ws.potential_values)
+            Array(ws.state.psi), grid, atom, ws.interactions[0],
+            ws.interactions[1], p, q, ws.potential_values)
 
         diff = sqrt(sum(abs2, Hpsi_A .- Hpsi_B))
         norm_A = sqrt(sum(abs2, Hpsi_A))
@@ -177,7 +177,7 @@ end
         grid = make_grid(GridConfig{3}((n, n, n), (L, L, L)))
         atom = Rb85  # F=2
         @test atom.F == 2
-        interactions = InteractionParams(3.0, -0.4)
+        interactions = InteractionParams(Dict(0 => 3.0, 1 => -0.4))
         zeeman = ZeemanParams(0.0, 0.0)
         sp = SimParams(; dt=0.01, n_steps=1)
         ws = make_workspace(; grid, atom, interactions, zeeman,
@@ -191,8 +191,8 @@ end
         Hpsi_A = Array(grad) ./ 2
 
         Hpsi_B = _naive_Hpsi(
-            Array(ws.state.psi), grid, atom, ws.interactions.c0,
-            ws.interactions.c1, 0.0, 0.0, ws.potential_values)
+            Array(ws.state.psi), grid, atom, ws.interactions[0],
+            ws.interactions[1], 0.0, 0.0, ws.potential_values)
 
         diff = sqrt(sum(abs2, Hpsi_A .- Hpsi_B))
         norm_A = sqrt(sum(abs2, Hpsi_A))
@@ -205,7 +205,7 @@ end
         L = 4.0
         grid = make_grid(GridConfig{3}((n, n, n), (L, L, L)))
         atom = Eu151  # F=6
-        interactions = InteractionParams(5.0, 0.05)
+        interactions = InteractionParams(Dict(0 => 5.0, 1 => 0.05))
         zeeman = ZeemanParams(0.0, 0.0)
         sp = SimParams(; dt=0.01, n_steps=1)
         ws = make_workspace(; grid, atom, interactions, zeeman,
@@ -219,8 +219,8 @@ end
         Hpsi_A = Array(grad) ./ 2
 
         Hpsi_B = _naive_Hpsi(
-            Array(ws.state.psi), grid, atom, ws.interactions.c0,
-            ws.interactions.c1, 0.0, 0.0, ws.potential_values)
+            Array(ws.state.psi), grid, atom, ws.interactions[0],
+            ws.interactions[1], 0.0, 0.0, ws.potential_values)
 
         diff = sqrt(sum(abs2, Hpsi_A .- Hpsi_B))
         norm_A = sqrt(sum(abs2, Hpsi_A))

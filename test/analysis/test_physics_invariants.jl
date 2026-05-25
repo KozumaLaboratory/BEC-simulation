@@ -37,7 +37,7 @@ using FFTW
             init_theta=π / 3, init_phi=0.4)
 
         # Modest interactions to keep stable; c1 ≠ 0 exercises spin sector.
-        interactions = InteractionParams(10.0, 1.0)
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => 1.0))
         trap = HarmonicTrap((1.0, 1.0, 1.0))
 
         sp = SimParams(;
@@ -66,7 +66,7 @@ using FFTW
     # ── Test 4: Thomas-Fermi limit (3D harmonic, scalar GP regime) ──────
     @testset "Thomas-Fermi limit (3D harmonic, F=1 ferromagnetic)" begin
         grid = make_grid(GridConfig((32, 32, 32), (12.0, 12.0, 12.0)))
-        interactions = InteractionParams(200.0, 0.0)
+        interactions = InteractionParams(Dict(0 => 200.0, 1 => 0.0))
         trap = HarmonicTrap((1.0, 1.0, 1.0))
 
         gs = find_ground_state(;
@@ -80,8 +80,8 @@ using FFTW
         n_peak = maximum(n_total)
 
         # TF prediction (N=1, ω=1): μ = (1/2)(15 c₀ / (4π))^(2/5)
-        μ_TF = 0.5 * (15 * interactions.c0 / (4π))^(2 / 5)
-        n_peak_TF = μ_TF / interactions.c0
+        μ_TF = 0.5 * (15 * interactions[0] / (4π))^(2 / 5)
+        n_peak_TF = μ_TF / interactions[0]
 
         @test abs(n_peak - n_peak_TF) / n_peak_TF < 0.10
 
@@ -99,7 +99,7 @@ using FFTW
     # ── Test 11: Virial theorem in harmonic trap ────────────────────────
     @testset "Virial theorem (3D harmonic, F=1)" begin
         grid = make_grid(GridConfig((24, 24, 24), (10.0, 10.0, 10.0)))
-        interactions = InteractionParams(40.0, 0.0)
+        interactions = InteractionParams(Dict(0 => 40.0, 1 => 0.0))
         trap = HarmonicTrap((1.0, 1.0, 1.0))
 
         gs = find_ground_state(;
@@ -118,7 +118,7 @@ using FFTW
     # ── Test 13: GS is stationary under real-time evolution ─────────────
     @testset "GS is stationary under RT (overlap ≈ 1)" begin
         grid = make_grid(GridConfig((16, 16, 16), (10.0, 10.0, 10.0)))
-        interactions = InteractionParams(20.0, 0.0)
+        interactions = InteractionParams(Dict(0 => 20.0, 1 => 0.0))
         trap = HarmonicTrap((1.0, 1.0, 1.0))
 
         gs = find_ground_state(;
@@ -145,7 +145,7 @@ using FFTW
     # ── Test 8: GS minimum (energy plateau on extra ITP) ────────────────
     @testset "GS energy plateaus under additional ITP polish" begin
         grid = make_grid(GridConfig((16, 16, 16), (8.0, 8.0, 8.0)))
-        interactions = InteractionParams(15.0, 0.5)
+        interactions = InteractionParams(Dict(0 => 15.0, 1 => 0.5))
         trap = HarmonicTrap((1.0, 1.0, 1.0))
 
         gs = find_ground_state(;
@@ -188,7 +188,7 @@ using FFTW
         psi_init[:, F + 1] .= sqrt(complex(n0)) .+ ε .* cos.(k_phys .* x)
 
         c0 = 5.0
-        interactions = InteractionParams(c0, 0.0)
+        interactions = InteractionParams(Dict(0 => c0, 1 => 0.0))
 
         sp = SimParams(;
             dt=0.002, n_steps=8000, save_every=4, imaginary_time=false

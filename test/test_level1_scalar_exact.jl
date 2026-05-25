@@ -29,7 +29,7 @@ using SpinorBEC
         L = 8.0
         grid = make_grid(GridConfig((n_pt,), (L,)))
         atom = Rb87
-        interactions = InteractionParams(0.0, 0.0)
+        interactions = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
         sp = SimParams(; dt=0.05, n_steps=100, save_every=100)
         ws = make_workspace(;
             grid, atom, interactions,
@@ -68,7 +68,7 @@ using SpinorBEC
         L = 8.0
         grid = make_grid(GridConfig((n_pt,), (L,)))
         atom = Rb87
-        interactions = InteractionParams(0.0, 0.0)
+        interactions = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
         T = 0.5
         dt = 0.01
         n_steps = Int(round(T / dt))
@@ -107,7 +107,7 @@ using SpinorBEC
         L = 12.0
         grid = make_grid(GridConfig((n_pt,), (L,)))
         atom = Rb87
-        interactions = InteractionParams(0.0, 0.0)
+        interactions = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
         dt = 0.005
         T = 2π  # one harmonic period
         n_steps = Int(round(T / dt))

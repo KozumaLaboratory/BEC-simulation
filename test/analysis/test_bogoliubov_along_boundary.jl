@@ -26,7 +26,7 @@ using Test
     ]
     parameter_setter =
         θ -> (
-            interactions=InteractionParams(20.0, θ[1]),
+            interactions=InteractionParams(Dict(0 => 20.0, 1 => θ[1])),
             potential=HarmonicTrap((1.0, 1.0)),
         )
 

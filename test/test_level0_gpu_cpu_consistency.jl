@@ -50,7 +50,7 @@ using SpinorBEC: energy_gradient!, energy_decomposition, _to_device
         # must agree at machine precision.
         grid = make_grid(GridConfig{1}((16,), (8.0,)))
         atom = Rb87
-        interactions = InteractionParams(5.0, 0.1)
+        interactions = InteractionParams(Dict(0 => 5.0, 1 => 0.1))
         sp = SimParams(; dt=0.01, n_steps=1)
 
         ws_cpu = make_workspace(; grid, atom, interactions,
@@ -89,7 +89,7 @@ using SpinorBEC: energy_gradient!, energy_decomposition, _to_device
     @testset "Energy decomposition match: every term agrees" begin
         grid = make_grid(GridConfig{1}((16,), (8.0,)))
         atom = Rb87
-        interactions = InteractionParams(5.0, 0.1)
+        interactions = InteractionParams(Dict(0 => 5.0, 1 => 0.1))
         sp = SimParams(; dt=0.01, n_steps=1)
         ws_cpu = make_workspace(; grid, atom, interactions,
             zeeman=ZeemanParams(0.4, 0.1),
@@ -135,7 +135,7 @@ using SpinorBEC: energy_gradient!, energy_decomposition, _to_device
         # Run the full ITP on CPU and on GPU, compare final ψ + energy.
         grid = make_grid(GridConfig{1}((16,), (8.0,)))
         atom = Rb87
-        interactions = InteractionParams(5.0, 0.1)
+        interactions = InteractionParams(Dict(0 => 5.0, 1 => 0.1))
         r_cpu = find_ground_state(;
             grid, atom, interactions,
             potential=HarmonicTrap((1.0,)),
@@ -160,7 +160,7 @@ using SpinorBEC: energy_gradient!, energy_decomposition, _to_device
         # an order of magnitude of each other.
         grid = make_grid(GridConfig{1}((16,), (8.0,)))
         atom = Rb87
-        interactions = InteractionParams(5.0, 0.1)
+        interactions = InteractionParams(Dict(0 => 5.0, 1 => 0.1))
         sp = SimParams(; dt=0.005, n_steps=100)
 
         ws_cpu = make_workspace(; grid, atom, interactions,
@@ -206,7 +206,7 @@ using SpinorBEC: energy_gradient!, energy_decomposition, _to_device
         atom = Eu151
         # Use minimal interactions to keep the test fast; the goal is
         # to exercise the dispatch tables, not to converge a GS.
-        interactions = InteractionParams(1.0, 0.05)
+        interactions = InteractionParams(Dict(0 => 1.0, 1 => 0.05))
         sp = SimParams(; dt=0.005, n_steps=5)
         ws_gpu = make_workspace(; grid, atom, interactions,
             potential=HarmonicTrap((1.0,)), sim_params=sp,

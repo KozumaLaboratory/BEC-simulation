@@ -42,14 +42,14 @@ function _build_photon_callback(node, dt::Float64)
         ArgumentError(
             "dynamics.photon_scattering must be a Dict or `false`, got $(typeof(node))"),
     )
-    Γ_sc_key = if haskey(node, "Gamma_sc")
-        "Gamma_sc"
-    elseif haskey(node, "gamma_sc")
-        "gamma_sc"
-    else
+    haskey(node, "gamma_sc") && throw(
+        ArgumentError(
+            "dynamics.photon_scattering: `gamma_sc` (lowercase) was removed " *
+            "2026-05-24 — use canonical `Gamma_sc`."),
+    )
+    haskey(node, "Gamma_sc") ||
         throw(ArgumentError("dynamics.photon_scattering requires `Gamma_sc`"))
-    end
-    Γ_sc = Float64(node[Γ_sc_key])
+    Γ_sc = Float64(node["Gamma_sc"])
     seed = let v = get(node, "seed", nothing)
         v === nothing ? nothing : Int(v)
     end

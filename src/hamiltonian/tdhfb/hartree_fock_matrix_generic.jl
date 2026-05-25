@@ -176,11 +176,8 @@ specify all seven g_S at once.
 Validated against `_gS_to_cn` for round-trip identity at F=1/2/3/6 in
 `test/hamiltonian/test_tdhfb_ku_c01_to_g_S.jl`.
 """
-function ku_to_g_S(F::Int, c0::Float64, c1::Float64, c_extra::Vector{Float64})
-    g = _c0c1_to_gS(F, c0, c1)
-    delta = _c_extra_to_delta_gS(F, c_extra)
-    for (S, dg) in delta
-        g[S] = get(g, S, 0.0) + dg
-    end
-    return g
+function ku_to_g_S(F::Int, c0::Float64, c1::Float64, c_extra::Dict{Int, Float64})
+    # Build the c_n Dict and route through the unified c_to_g.
+    c = merge(Dict(0 => c0, 1 => c1), c_extra)
+    c_to_g(F, InteractionParams(c))
 end

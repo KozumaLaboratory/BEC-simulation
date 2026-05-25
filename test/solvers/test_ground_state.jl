@@ -4,7 +4,7 @@ using SpinorBEC
 @testset "Ground State" begin
     @testset "Basic convergence (1D F=1)" begin
         grid = make_grid(GridConfig(32, 16.0))
-        interactions = InteractionParams(5.0, -0.2)
+        interactions = InteractionParams(Dict(0 => 5.0, 1 => -0.2))
         trap = HarmonicTrap(1.0)
 
         result = find_ground_state(;
@@ -22,7 +22,7 @@ using SpinorBEC
 
     @testset "Different initial states converge to same energy" begin
         grid = make_grid(GridConfig(32, 16.0))
-        interactions = InteractionParams(5.0, 0.3)
+        interactions = InteractionParams(Dict(0 => 5.0, 1 => 0.3))
         trap = HarmonicTrap(1.0)
 
         r_polar = find_ground_state(;
@@ -39,7 +39,7 @@ using SpinorBEC
 
     @testset "Constrained magnetization" begin
         grid = make_grid(GridConfig(32, 16.0))
-        interactions = InteractionParams(5.0, -0.2)
+        interactions = InteractionParams(Dict(0 => 5.0, 1 => -0.2))
         trap = HarmonicTrap(1.0)
 
         target_Mz = 0.5
@@ -57,7 +57,7 @@ using SpinorBEC
 
     @testset "Multistart returns lowest energy" begin
         grid = make_grid(GridConfig(16, 12.0))
-        interactions = InteractionParams(3.0, 0.1)
+        interactions = InteractionParams(Dict(0 => 3.0, 1 => 0.1))
         trap = HarmonicTrap(1.0)
 
         result = find_ground_state_multistart(;
@@ -84,7 +84,7 @@ using SpinorBEC
 
     @testset "ITP overflow: extreme interactions" begin
         @test_throws ArgumentError SpinorBEC._validate_itp_interactions(
-            InteractionParams(1e8, 0.0), 1, 0.01
+            InteractionParams(Dict(0 => 1e8, 1 => 0.0)), 1, 0.01
         )
     end
 end

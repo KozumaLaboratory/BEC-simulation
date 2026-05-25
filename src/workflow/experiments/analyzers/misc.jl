@@ -29,7 +29,7 @@ Output JLD2 keys:
                         lhy / tensor / raman / light_shift / coriolis / total)
   - `grid_n_pts`, `grid_box`, `grid_dx`
   - `atom_name`, `atom_F`, `atom_mass`, `atom_a_s`, `atom_mu_mag`, `atom_g_F`
-  - `interactions_c0`, `interactions_c1`, `interactions_c_lhy`, `interactions_c_extra`
+  - `interactions_c0`, `interactions_c1`, `interactions_c_lhy`, `interactions_c_high_rank`
   - `ddi_c_dd`
   - `dealias_enabled`, `dealias_k_cut`
   - `conventions`     — list of strings documenting Eu sign / 4π / ordering choices
@@ -40,7 +40,7 @@ without ws_prev throws.
 
 Hψ coverage matches `energy_gradient!` in `src/solvers/lbfgs/energy_gradient.jl`:
 kinetic + trap + Zeeman + c₀·n + LHY + c₁·⟨F̂⟩·F̂ + light_shift + DDI.
-Does NOT include c₂·|A₀₀|² singlet-pair or c_extra higher-rank tensor.
+Does NOT include c₂·|A₀₀|² singlet-pair or higher-rank tensor couplings (n≥2).
 Activate this analyzer on configs where those channels are zero.
 """
 function _analyze_hpsi_export(psi, grid, atom, params, ws_prev)
@@ -86,10 +86,17 @@ function _analyze_hpsi_export(psi, grid, atom, params, ws_prev)
         f["atom_a_s"] = atom.a_s
         f["atom_mu_mag"] = atom.mu_mag
         f["atom_g_F"] = atom.g_F
-        f["interactions_c0"] = ws_prev.interactions.c0
-        f["interactions_c1"] = ws_prev.interactions.c1
+        f["interactions_c0"] = ws_prev.interactions[0]
+        f["interactions_c1"] = ws_prev.interactions[1]
         f["interactions_c_lhy"] = ws_prev.interactions.c_lhy
-        f["interactions_c_extra"] = collect(ws_prev.interactions.c_extra)
+        # Sorted (n, c_n) pairs for higher-rank tensor couplings (n ≥ 2).
+        # Sorted to give a deterministic layout for cross-code diff
+        # regardless of Dict iteration order.
+        f["interactions_c_high_rank"] = sort(
+            [k => v
+             for (k, v) in ws_prev.interactions.c
+             if k >= 2];
+            by=p -> p.first)
         f["ddi_c_dd"] = ws_prev.ddi === nothing ? 0.0 : ws_prev.ddi.C_dd
         f["dealias_enabled"] = DEALIAS_2_3_ENABLED[]
         f["dealias_k_cut"] = DEALIAS_K_CUTOFF[] === nothing ? -1.0 :
@@ -102,7 +109,7 @@ function _analyze_hpsi_export(psi, grid, atom, params, ws_prev)
             "Zeeman: H_Z = -p*F_z + q*F_z^2 (with p, q in units of hbar*omega_ref)",
             "Hpsi = dE/dpsi^* (NOT 2*dE/dpsi^*, factor 2 stripped from energy_gradient!)",
             "Coverage: kinetic + trap + Zeeman + c0*n + LHY + c1*<F>*F + light_shift + DDI",
-            "Does NOT cover: c2*|A_00|^2 singlet-pair, c_extra higher-rank tensor",
+            "Does NOT cover: c2*|A_00|^2 singlet-pair, higher-rank tensor couplings (n≥2)",
         ]
     end
 

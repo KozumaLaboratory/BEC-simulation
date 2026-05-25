@@ -178,7 +178,7 @@
         config = GridConfig((8, 8, 8), (10.0, 10.0, 10.0))
         grid = make_grid(config)
         atom = Eu151
-        interactions = InteractionParams(100.0, 0.0)
+        interactions = InteractionParams(Dict(0 => 100.0, 1 => 0.0))
         sp = SimParams(dt=0.001, n_steps=1, imaginary_time=false, normalize_every=0, save_every=1)
 
         ws = make_workspace(;
@@ -192,7 +192,7 @@
         config = GridConfig((16, 16, 16), (10.0, 10.0, 10.0))
         grid = make_grid(config)
         atom = Eu151
-        interactions = InteractionParams(compute_c0(atom; N_atoms=100, dims=3), 0.0)
+        interactions = InteractionParams(Dict(0 => compute_c0(atom; N_atoms=100, dims=3), 1 => 0.0))
         trap = HarmonicTrap(1.0, 1.0, 1.0)
         sp = SimParams(dt=0.001, n_steps=10, imaginary_time=false, normalize_every=0, save_every=10)
 
@@ -230,7 +230,7 @@
         for N in (16, 24)
             config = GridConfig((N, N, N), (8.0, 8.0, 8.0))
             grid = make_grid(config)
-            interactions = InteractionParams(0.0, 0.0)
+            interactions = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
             trap = HarmonicTrap(1.0, 1.0, 1.0)
             sp = SimParams(; dt=0.01, n_steps=10, imaginary_time=false)
 
@@ -316,7 +316,7 @@
     @testset "DDI requires explicit c_dd for dipolar atoms" begin
         config = GridConfig((8,), (10.0,))
         grid = make_grid(config)
-        interactions = InteractionParams(1.0, 0.0)
+        interactions = InteractionParams(Dict(0 => 1.0, 1 => 0.0))
         sp = SimParams(dt=0.001, n_steps=1, imaginary_time=false, normalize_every=0, save_every=1)
         @test_throws ArgumentError make_workspace(;
             grid, atom=Eu151, interactions, sim_params=sp, enable_ddi=true

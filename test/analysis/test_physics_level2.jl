@@ -15,7 +15,7 @@ using SpinorBEC
 
         result = find_ground_state(;
             grid, atom,
-            interactions=InteractionParams(c0, 0.0),
+            interactions=InteractionParams(Dict(0 => c0, 1 => 0.0)),
             potential=HarmonicTrap(1.0),
             dt=0.005, n_steps=10000, tol=1e-10,
             initial_state=:polar,
@@ -55,7 +55,7 @@ using SpinorBEC
 
         result = find_ground_state(;
             grid, atom,
-            interactions=InteractionParams(c0, 0.0),
+            interactions=InteractionParams(Dict(0 => c0, 1 => 0.0)),
             potential=HarmonicTrap(1.0, 1.0),
             dt=0.005, n_steps=10000, tol=1e-10,
             initial_state=:polar,

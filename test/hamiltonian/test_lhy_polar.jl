@@ -270,7 +270,7 @@ end
 
 @testset "make_workspace FM dipolar LHY converts per-spin c_dd to epsilon_dd" begin
     c0 = 100.0
-    ws = InteractionParams(c0, 0.0)
+    ws = InteractionParams(Dict(0 => c0, 1 => 0.0))
     c_dd_per_spin = 3.0
     expected_eps = c_dd_per_spin * Eu151.F^2 / (3.0 * c0)
     g_uniform = Dict(S => c0 for S in (0, 2, 4, 6, 8, 10, 12))

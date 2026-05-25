@@ -18,7 +18,7 @@ using Random
             sp = SimParams(; dt=0.005, n_steps=1)
             ws = make_workspace(;
                 grid, atom=Eu151,
-                interactions=InteractionParams(2.0, 0.1),
+                interactions=InteractionParams(Dict(0 => 2.0, 1 => 0.1)),
                 zeeman=ZeemanParams(0.5, 0.05),
                 potential=HarmonicTrap(1.0, 1.0),
                 sim_params=sp,
@@ -47,7 +47,7 @@ using Random
         gs = find_ground_state(;
             grid=make_grid(GridConfig((16, 16), (6.0, 6.0))),
             atom=Rb87,
-            interactions=InteractionParams(5.0, -0.5),
+            interactions=InteractionParams(Dict(0 => 5.0, 1 => -0.5)),
             potential=HarmonicTrap(1.0, 1.0),
             zeeman=ZeemanParams(0.0, 0.1),
             dt=0.01, n_steps=200, tol=1e-7,
@@ -72,7 +72,7 @@ using Random
         sp = SimParams(; dt=0.01, n_steps=1)
         ws = make_workspace(;
             grid, atom=Rb87,
-            interactions=InteractionParams(5.0, 0.0),
+            interactions=InteractionParams(Dict(0 => 5.0, 1 => 0.0)),
             zeeman=ZeemanParams(0.0, 0.0),
             potential=HarmonicTrap(1.0, 1.0),
             sim_params=sp,

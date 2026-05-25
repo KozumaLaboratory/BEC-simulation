@@ -61,13 +61,13 @@ function _validate_itp_interactions(
         1.0
     end
 
-    max_c = max(abs(interactions.c0), abs(interactions.c1))
+    max_c = max(abs(interactions[0]), abs(interactions[1]))
     if max_c > 1e-30
         max_exponent = max_c * n_peak * dt / 4
         if max_exponent > _ITP_EXPONENT_LIMIT
             throw(
                 ArgumentError(
-                    "Spin interaction c0=$(interactions.c0), c1=$(interactions.c1) with " *
+                    "Spin interaction c0=$(interactions[0]), c1=$(interactions[1]) with " *
                     "n_peak≈$(round(n_peak, sigdigits=3)) and dt=$dt " *
                     "may cause overflow in imaginary time (estimated exponent=$(round(max_exponent, digits=1)) " *
                     "> $_ITP_EXPONENT_LIMIT). Reduce c0/c1 magnitude or dt.",

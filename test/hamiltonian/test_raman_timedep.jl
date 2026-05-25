@@ -26,7 +26,7 @@ using SpinorBEC
     @testset "TimeDependentRaman in split_step" begin
         grid = make_grid(GridConfig(32, 10.0))
         atom = Rb87
-        ip = InteractionParams(100.0, -0.5)
+        ip = InteractionParams(Dict(0 => 100.0, 1 => -0.5))
         raman = TimeDependentRaman(
             RampWaveform(0.0, 2.0, 0.05, :cosine),
             ConstantWaveform(0.0),

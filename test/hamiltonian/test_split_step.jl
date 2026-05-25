@@ -8,7 +8,7 @@ using SpinorBEC
         sys = SpinSystem(1)
 
         psi0 = init_psi(grid, sys; state=:polar)
-        interactions = InteractionParams(1.0, 0.1)
+        interactions = InteractionParams(Dict(0 => 1.0, 1 => 0.1))
         sp = SimParams(; dt=0.001, n_steps=100, imaginary_time=false, save_every=100)
 
         ws = make_workspace(;
@@ -30,7 +30,7 @@ using SpinorBEC
         sys = SpinSystem(1)
 
         psi0 = init_psi(grid, sys; state=:uniform)
-        interactions = InteractionParams(0.5, 0.05)
+        interactions = InteractionParams(Dict(0 => 0.5, 1 => 0.05))
         sp = SimParams(; dt=0.001, n_steps=200, imaginary_time=false, save_every=200)
 
         ws = make_workspace(;
@@ -50,7 +50,7 @@ using SpinorBEC
         config = GridConfig(128, 20.0)
         grid = make_grid(config)
         sys = SpinSystem(1)
-        interactions = InteractionParams(1.0, 0.1)
+        interactions = InteractionParams(Dict(0 => 1.0, 1 => 0.1))
 
         T = 0.1
         errors = Float64[]
@@ -81,7 +81,7 @@ using SpinorBEC
         config = GridConfig(128, 20.0)
         grid = make_grid(config)
         sys = SpinSystem(1)
-        interactions = InteractionParams(1.0, 0.1)
+        interactions = InteractionParams(Dict(0 => 1.0, 1 => 0.1))
         sp = SimParams(; dt=0.01, n_steps=1, imaginary_time=false, save_every=1)
         psi0 = init_psi(grid, sys; state=:polar)
         ws = make_workspace(; grid, atom=Rb87, interactions, sim_params=sp, psi_init=psi0)
@@ -101,7 +101,7 @@ using SpinorBEC
         config = GridConfig(128, 20.0)
         grid = make_grid(config)
         sys = SpinSystem(1)
-        interactions = InteractionParams(0.5, 0.05)
+        interactions = InteractionParams(Dict(0 => 0.5, 1 => 0.05))
         sp = SimParams(; dt=0.01, n_steps=1, imaginary_time=false, save_every=1)
         psi0 = init_psi(grid, sys; state=:uniform)
         ws = make_workspace(; grid, atom=Rb87, interactions, sim_params=sp, psi_init=psi0)
@@ -120,7 +120,7 @@ using SpinorBEC
         config = GridConfig(128, 20.0)
         grid = make_grid(config)
         sys = SpinSystem(1)
-        interactions = InteractionParams(1.0, 0.1)
+        interactions = InteractionParams(Dict(0 => 1.0, 1 => 0.1))
         n_comp = sys.n_components
 
         T = 0.1
@@ -163,7 +163,7 @@ using SpinorBEC
         config = GridConfig(128, 20.0)
         grid = make_grid(config)
         sys = SpinSystem(1)
-        interactions = InteractionParams(1.0, 0.1)
+        interactions = InteractionParams(Dict(0 => 1.0, 1 => 0.1))
         n_comp = sys.n_components
 
         T = 0.1
@@ -196,7 +196,7 @@ using SpinorBEC
         config = GridConfig(64, 20.0)
         grid = make_grid(config)
         sys = SpinSystem(1)
-        interactions = InteractionParams(1.0, 0.0)
+        interactions = InteractionParams(Dict(0 => 1.0, 1 => 0.0))
         sp = SimParams(; dt=0.01, n_steps=1)
         psi0 = init_psi(grid, sys; state=:m_plus_F)
         ws = make_workspace(; grid, atom=Rb87, interactions, sim_params=sp, psi_init=psi0,
@@ -216,7 +216,7 @@ using SpinorBEC
         config = GridConfig(128, 20.0)
         grid = make_grid(config)
         sys = SpinSystem(1)
-        interactions = InteractionParams(1.0, 0.1)
+        interactions = InteractionParams(Dict(0 => 1.0, 1 => 0.1))
         n_comp = sys.n_components
 
         T = 0.1
@@ -247,7 +247,7 @@ using SpinorBEC
         config = GridConfig(64, 20.0)
         grid = make_grid(config)
         sys = SpinSystem(1)
-        interactions = InteractionParams(1.0, 0.0)
+        interactions = InteractionParams(Dict(0 => 1.0, 1 => 0.0))
         sp = SimParams(; dt=0.01, n_steps=1)
         psi0 = init_psi(grid, sys; state=:m_plus_F)
         ws = make_workspace(; grid, atom=Rb87, interactions, sim_params=sp, psi_init=psi0,
@@ -268,7 +268,7 @@ using SpinorBEC
         config = GridConfig(128, 20.0)
         grid = make_grid(config)
         sys = SpinSystem(1)
-        interactions = InteractionParams(1.0, 0.1)
+        interactions = InteractionParams(Dict(0 => 1.0, 1 => 0.1))
         n_comp = sys.n_components
         dt = 0.01
 
@@ -294,7 +294,7 @@ using SpinorBEC
         config = GridConfig(128, 20.0)
         grid = make_grid(config)
         sys = SpinSystem(1)
-        interactions = InteractionParams(1.0, 0.1)
+        interactions = InteractionParams(Dict(0 => 1.0, 1 => 0.1))
         n_comp = sys.n_components
 
         T = 0.5
@@ -337,7 +337,7 @@ using SpinorBEC
         config = GridConfig(64, 20.0)
         grid = make_grid(config)
         sys = SpinSystem(1)
-        interactions = InteractionParams(1.0, 0.0)
+        interactions = InteractionParams(Dict(0 => 1.0, 1 => 0.0))
         sp = SimParams(; dt=0.01, n_steps=1)
         psi0 = init_psi(grid, sys; state=:m_plus_F)
         ws = make_workspace(; grid, atom=Rb87, interactions, sim_params=sp, psi_init=psi0,
@@ -358,7 +358,7 @@ using SpinorBEC
         config = GridConfig(64, 20.0)
         grid = make_grid(config)
         sys = SpinSystem(1)
-        interactions = InteractionParams(1.0, 0.0)
+        interactions = InteractionParams(Dict(0 => 1.0, 1 => 0.0))
         sp = SimParams(; dt=0.01, n_steps=1)
         psi0 = init_psi(grid, sys; state=:m_plus_F)
         ws = make_workspace(; grid, atom=Rb87, interactions, sim_params=sp, psi_init=psi0,

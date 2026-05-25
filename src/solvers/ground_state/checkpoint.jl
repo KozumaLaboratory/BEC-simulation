@@ -20,8 +20,8 @@ function _save_itp_checkpoint(dir, ws, step, n_steps, energy, dE, dpsi, converge
             f["atom_name"] = ws.atom.name
             f["grid_n_points"] = ws.grid.config.n_points
             f["grid_box_size"] = ws.grid.config.box_size
-            f["c0"] = ws.interactions.c0
-            f["c1"] = ws.interactions.c1
+            f["c0"] = ws.interactions[0]
+            f["c1"] = ws.interactions[1]
         end
         mv(tmp, fname; force=true)
     catch err

@@ -6,15 +6,15 @@
 #  - For arbitrary F, going g_S → tensor c_k (`_gS_to_cn`) → g_S
 #    (`_cn_to_gS`) is the identity (Wigner 6j orthogonality)
 #  - `ku_to_g_S(F, c_0, c_1, c_extra)` combines `_c0c1_to_gS` and
-#    `_c_extra_to_delta_gS` consistently with the rest of `make_workspace`
+#    `_dict_to_delta_gS` consistently with the rest of `make_workspace`
 #
 # Regression coverage for the B-3 generalization (was F=1-only pre-2026-05-13).
 
 using Test
 using SpinorBEC
 using SpinorBEC:
-    ku_c01_to_g_S, ku_to_g_S, even_c_extra,
-    _c0c1_to_gS, _c_extra_to_delta_gS, _gS_to_cn, _cn_to_gS
+    ku_c01_to_g_S, ku_to_g_S,
+    _c0c1_to_gS, _dict_to_delta_gS, _gS_to_cn, _cn_to_gS
 
 @testset "ku_c01_to_g_S generalized to F = 1, 2, 3, 6" begin
     @testset "F=1 analytic round-trip" begin
@@ -48,12 +48,13 @@ using SpinorBEC:
     @testset "Wigner 6j round-trip: g_S → c_k → g_S (F = $F)" for F in (1, 2, 3, 6)
         # Build a random-ish g_S dict from a non-trivial (c_0, c_1, c_extra)
         c0, c1 = 100.0, 5.0
-        c_extra = even_c_extra(F; c2=10.0,
-            c4=(F >= 2 ? 3.0 : 0.0),
-            c6=(F >= 3 ? 1.5 : 0.0),
-            c8=(F >= 4 ? 0.7 : 0.0),
-            c10=(F >= 5 ? 0.3 : 0.0),
-            c12=(F >= 6 ? 0.1 : 0.0))
+        c_extra = Dict{Int, Float64}()
+        c_extra[2] = 10.0
+        F >= 2 && (c_extra[4] = 3.0)
+        F >= 3 && (c_extra[6] = 1.5)
+        F >= 4 && (c_extra[8] = 0.7)
+        F >= 5 && (c_extra[10] = 0.3)
+        F >= 6 && (c_extra[12] = 0.1)
         g = ku_to_g_S(F, c0, c1, c_extra)
 
         # Round-trip via tensor representation
@@ -69,14 +70,14 @@ using SpinorBEC:
         # Realistic Eu151 input: 7 independent channel couplings.
         F = 6
         c0, c1 = 4689.0, 110.0
-        c_extra = even_c_extra(F; c2=50.0, c4=30.0, c6=20.0, c8=10.0,
-            c10=5.0, c12=2.0)
+        c_extra = Dict(2 => 50.0, 4 => 30.0, 6 => 20.0, 8 => 10.0,
+            10 => 5.0, 12 => 2.0)
         g = ku_to_g_S(F, c0, c1, c_extra)
         @test sort(collect(keys(g))) == collect(0:2:12)
 
         # Reconstruct via the two-step decomposition used by make_workspace
         base = _c0c1_to_gS(F, c0, c1)
-        delta = _c_extra_to_delta_gS(F, c_extra)
+        delta = _dict_to_delta_gS(F, c_extra)
         for S in 0:2:12
             expected = get(base, S, 0.0) + get(delta, S, 0.0)
             @test g[S] ≈ expected
@@ -85,8 +86,7 @@ using SpinorBEC:
 
     @testset "ku_to_g_S with empty c_extra reduces to ku_c01_to_g_S" begin
         for F in (1, 2, 3, 6)
-            c_extra = zeros(Float64, 2F - 1)
-            g_full = ku_to_g_S(F, 50.0, 1.5, c_extra)
+            g_full = ku_to_g_S(F, 50.0, 1.5, Dict{Int, Float64}())
             g_c01 = ku_c01_to_g_S(F, 50.0, 1.5)
             for S in 0:2:2F
                 @test g_full[S] ≈ g_c01[S]

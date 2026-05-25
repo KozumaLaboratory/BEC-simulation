@@ -64,7 +64,7 @@ using SpinorBEC
         F = 1
         grid = make_grid(GridConfig((32,), (10.0,)))
         atom = Rb87
-        interactions = InteractionParams(1.0, 0.0)
+        interactions = InteractionParams(Dict(0 => 1.0, 1 => 0.0))
         sp = SimParams(; dt=0.001, n_steps=10, imaginary_time=true)
         V_trap = evaluate_potential(HarmonicTrap(1.0), grid)
         ls = make_light_shift_from_trap(V_trap, F, 0.05)
@@ -84,7 +84,7 @@ using SpinorBEC
         D = 2F + 1
         grid = make_grid(GridConfig((32,), (10.0,)))
         atom = Rb87
-        interactions = InteractionParams(1.0, 0.0)
+        interactions = InteractionParams(Dict(0 => 1.0, 1 => 0.0))
         profile = evaluate_potential(HarmonicTrap(1.0), grid)
         # Strong tensor LS: favors m=0 (negative eigenvalue for ε∥ẑ)
         ls = make_light_shift(; F, polarization=(0, 0, 1), alpha_tensor=5.0, profile=abs.(profile))
@@ -108,7 +108,7 @@ using SpinorBEC
         F = 1
         grid = make_grid(GridConfig((32,), (10.0,)))
         atom = Rb87
-        interactions = InteractionParams(1.0, 0.1)
+        interactions = InteractionParams(Dict(0 => 1.0, 1 => 0.1))
         sp = SimParams(; dt=0.001, n_steps=10)
         psi0 = init_psi(grid, SpinSystem(F); state=:uniform)
         ws1 = make_workspace(; grid, atom, interactions, sim_params=sp, psi_init=copy(psi0))

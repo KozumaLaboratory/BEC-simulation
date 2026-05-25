@@ -41,7 +41,7 @@ using FFTW
     @testset "expand_scan_points: product" begin
         scan = Dict{String, Any}(
             "product" => Dict{String, Any}(
-                "system.interactions.c1_ratio" => [-0.01, 0.0],
+                "system.interactions[1]_ratio" => [-0.01, 0.0],
                 "ground_state.target_magnetization" => [-6.0, -3.0, 0.0],
             ),
         )
@@ -49,7 +49,7 @@ using FFTW
         @test length(pts) == 6
         # Each combination present exactly once
         combos = Set([
-            (p["system.interactions.c1_ratio"], p["ground_state.target_magnetization"]) for p in pts
+            (p["system.interactions[1]_ratio"], p["ground_state.target_magnetization"]) for p in pts
         ])
         @test length(combos) == 6
     end
@@ -115,7 +115,7 @@ using FFTW
               potential: {type: harmonic, omega: [1.0]}
         scan:
           zip:
-            pipeline.0.interactions.c1: [-5.0, -1.0, 0.0]
+            pipeline.0.interactions[1]: [-5.0, -1.0, 0.0]
           comparison_runs:
             - name: polar
               override:

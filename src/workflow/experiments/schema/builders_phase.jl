@@ -122,11 +122,11 @@ end
 
 Build the per-phase Zeeman object from override-applied raw YAML dict.
 
-Level 0 (dimensionless `p`/`q`/`bx`/`by`) delegates to `_parse_zeeman`,
-which handles all four channels including the transverse `bx`/`by`
-fields. Levels 1/2 (Gauss-valued) require an atom kwarg and route
-through `_build_zeeman_dispatched`. Non-zero `t_offset` post-shifts the
-resulting waveforms by sampling onto a fresh time grid.
+`:dimless` (`p` / `q` / `bx` / `by`) delegates to `_parse_zeeman`, which
+handles all four channels including the transverse `bx` / `by` fields.
+`:cartesian` / `:spherical` (Gauss-valued) require an `atom` kwarg and
+route through `_build_zeeman_from_b_block`. Non-zero `t_offset`
+post-shifts the resulting waveforms by sampling onto a fresh time grid.
 """
 function _build_phase_zeeman(phase_raw::Dict, t_offset::Float64, duration::Float64;
     atom=nothing, p_step::Dict=Dict{String, Any}())
@@ -134,11 +134,11 @@ function _build_phase_zeeman(phase_raw::Dict, t_offset::Float64, duration::Float
     z = get(gs, "B", Dict())
     z isa Dict || return ZeemanParams(0.0, 0.0)
 
-    level = _detect_zeeman_level(z)
-    if level >= 1
+    coord = _detect_b_coord(z)
+    if coord !== :dimless
         atom === nothing && throw(ArgumentError(
-            "zeeman Level $level requires atom; caller must pass atom kwarg"))
-        zee = _build_zeeman_dispatched(z, duration, atom, p_step)
+            "B coord=$coord requires atom; caller must pass atom kwarg"))
+        zee = _build_zeeman_from_b_block(z, duration, atom, p_step)
     else
         zee = _parse_zeeman(z, duration)
     end

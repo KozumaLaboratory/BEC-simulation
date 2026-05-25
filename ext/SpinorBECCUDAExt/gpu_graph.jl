@@ -132,4 +132,3 @@ function bench_split_step_capture(
         t_captured_ms=isnan(t_capt) ? NaN : round(t_capt * 1000; digits=2),
         speedup=isnan(t_capt) ? NaN : round(t_plain / t_capt; digits=2))
 end
-

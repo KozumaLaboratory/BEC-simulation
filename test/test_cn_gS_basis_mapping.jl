@@ -1,51 +1,25 @@
-# c_n ↔ g_S basis mapping — comprehensive regression.
+# c_n ↔ g_S basis mapping — regression after 2026-05-25 Dict refactor.
 #
-# THE PROBLEM. "c_n" in this codebase is a layered routing of three
-# distinct operator types under one indexing scheme:
+# InteractionParams now stores ALL c_n in a single Dict{Int,Float64}.
+# The c_n → g_S mapping retains two physics conventions internally:
 #
-#   n=0  (c_0)   density coupling, scalar n²        → diagonal step
-#   n=1  (c_1)   spin coupling ⟨F̂⟩·F̂                → spin_mixing step
-#   n=2  (c_2)   singlet-pair |A_{00}|² (S=0 chan)  → singlet_pair step
-#                                                    (NOT a rank-2 tensor!)
-#   n=3  (c_3)   REJECTED — odd rank not physical
-#   n=4,6,...    rank-k symmetric traceless tensor   → tensor_cache step
-#                (6j transform to channel g_S)
+#   k=0   c_0 = constant g_S contribution         (KU density)
+#   k=1   c_1 = (S(S+1)-2F(F+1))/2 contribution    (KU spin F̂·F̂)
+#   k≥2   c_k = Wigner 6j rank-k tensor              (general T̂^(k)·T̂^(k))
 #
-# Storage: `c_extra[idx] = c_{idx+1}` for n ≥ 2. So `c_extra[1]=c_2`,
-# `c_extra[3]=c_4`, etc. Hand-writing `[c2, c4, c6]` would silently
-# misindex (c4 → c3, c6 → c4) — use `even_c_extra(F; c2, c4, c6, ...)`.
-#
-# The g_S channel-coupling basis is FUNDAMENTAL: each S ∈ {0, 2, ..., 2F}
-# corresponds to two atoms colliding into total-spin-S. The c_n basis is
-# DERIVED via:
-#
-#   g_S = c_0 + c_1·(S(S+1) − 2F(F+1))/2       [from c_0, c_1 ansatz]
-#       + Σ_k (2k+1)·{F F k; F F S}·c_k         [from c_extra rank-k]
-#
-# At F=1 (only g_0 and g_2), c_0+c_1 is a complete basis. At F≥2 the
-# 2-param ansatz is incomplete; c_extra refines specific ranks.
-#
-# This file pins:
-#   1. c_0/c_1 → g_S linear-in-S(S+1) formula (exact at F=1)
-#   2. Round-trip _gS_to_cn ∘ _cn_to_gS = identity (rank-k basis is invertible)
-#   3. even_c_extra(F=6; c2=...) places c_2 at index 1, c_4 at index 3, etc.
-#   4. even_c_extra rejects c_k for k > 2F (silent-drop guard)
-#   5. Hand-written c_extra with odd-rank nonzero throws at parse time
-#   6. Workspace double-count guard: tensor_cache + nonzero c_0/c_1 → throw
-#   7. apply_singlet_pair_step uses c_2 as A_{00} coupling at F=2 (KU convention)
-#   8. Bogoliubov spectrum picks up c_extra via _c_extra_to_delta_gS
-#      (i.e. c_4 changes the g_4 channel coupling)
+# Routed via a single unified `c_to_g(F, ip)` entry point. The mixed
+# convention is intentional (KU normalisation for k=0,1 vs 6j for k≥2)
+# and documented in `c_to_g`'s docstring.
 
 using Test
 using LinearAlgebra
 using SpinorBEC
-using SpinorBEC: _c0c1_to_gS, _c_extra_to_delta_gS, _cn_to_gS, _gS_to_cn,
-    _make_tensor_cache_from_channels, get_cn, bogoliubov_spectrum
+using SpinorBEC: _c0c1_to_gS, _dict_to_delta_gS, _cn_to_gS, _gS_to_cn,
+    _make_tensor_cache_from_channels, get_cn, bogoliubov_spectrum, c_to_g,
+    has_higher_rank_couplings
 
 @testset "c_n ↔ g_S basis mapping" begin
     @testset "1. c_0/c_1 → g_S formula: g_S = c_0 + c_1·(S(S+1)−2F(F+1))/2" begin
-        # F=1: g_0 = c_0 - 2c_1, g_2 = c_0 + c_1.
-        # Verify exact at multiple F values.
         for F in (1, 2, 3, 6, 8)
             c0 = 2.5
             c1 = 0.3
@@ -57,27 +31,20 @@ using SpinorBEC: _c0c1_to_gS, _c_extra_to_delta_gS, _cn_to_gS, _gS_to_cn,
         end
 
         # F=1 special: 2-param ansatz IS the full basis.
-        F = 1
-        g = _c0c1_to_gS(F, 1.0, 0.5)
-        @test isapprox(g[0], 1.0 - 2 * 0.5; rtol=1e-14)
-        @test isapprox(g[2], 1.0 + 0.5; rtol=1e-14)
+        g = _c0c1_to_gS(1, 1.0, 0.5)
+        @test isapprox(g[0], 0.0; atol=1e-14)
+        @test isapprox(g[2], 1.5; rtol=1e-14)
     end
 
-    @testset "2. Round-trip: _gS_to_cn ∘ _cn_to_gS = identity (rank-k basis)" begin
-        # The rank-k tensor basis is invertible via the 6j matrix.
-        # Going round-trip in either direction must reproduce the input
-        # at machine precision (within matrix-inverse conditioning).
+    @testset "2. Round-trip _gS_to_cn ∘ _cn_to_gS = identity (rank-k basis)" begin
         for F in (1, 2, 3, 6)
             even_vals = collect(0:2:2F)
-            # Random c_k → g_S → c_k recovery.
             c_in = Dict{Int, Float64}(k => 0.5 * k + 0.1 for k in even_vals)
             g_mid = _cn_to_gS(F, c_in)
             c_out = _gS_to_cn(F, g_mid)
             for k in even_vals
                 @test isapprox(c_in[k], c_out[k]; rtol=1e-10)
             end
-
-            # And g → c → g.
             g_in = Dict{Int, Float64}(S => -0.3 * S + 1.0 for S in even_vals)
             c_mid = _gS_to_cn(F, g_in)
             g_out = _cn_to_gS(F, c_mid)
@@ -87,297 +54,166 @@ using SpinorBEC: _c0c1_to_gS, _c_extra_to_delta_gS, _cn_to_gS, _gS_to_cn,
         end
     end
 
-    @testset "3. even_c_extra: correct index placement at F=6" begin
-        # F=6: c_extra has length 2F-1 = 11.
-        # Valid ranks k ∈ {2, 4, 6, 8, 10, 12} → indices {1, 3, 5, 7, 9, 11}.
-        # Odd-index slots (2, 4, 6, 8, 10) must be zero.
-        vec = even_c_extra(6; c2=10.0, c4=20.0, c6=30.0, c8=40.0,
-            c10=50.0, c12=60.0)
-        @test length(vec) == 11
-        @test vec[1] == 10.0  # c_2 (rank-2)
-        @test vec[2] == 0.0   # would-be c_3, must be zero
-        @test vec[3] == 20.0  # c_4
-        @test vec[4] == 0.0   # would-be c_5
-        @test vec[5] == 30.0  # c_6
-        @test vec[6] == 0.0
-        @test vec[7] == 40.0  # c_8
-        @test vec[8] == 0.0
-        @test vec[9] == 50.0  # c_10
-        @test vec[10] == 0.0
-        @test vec[11] == 60.0  # c_12
+    @testset "3. Dict construction: even-rank keys are written directly" begin
+        # All c_n live in InteractionParams.c — write the Dict directly.
+        ip = InteractionParams(
+            Dict(0 => 0.0, 2 => 10.0, 4 => 20.0, 6 => 30.0,
+                8 => 40.0, 10 => 50.0, 12 => 60.0),
+        )
+        @test ip[2] == 10.0
+        @test ip[4] == 20.0
+        @test ip[6] == 30.0
+        @test ip[8] == 40.0
+        @test ip[10] == 50.0
+        @test ip[12] == 60.0
+        # Unset slots default to 0.
+        @test ip[3] == 0.0
+        @test ip[5] == 0.0
     end
 
-    @testset "4. even_c_extra rejects c_k for k > 2F" begin
-        # F=2: only c_2, c_4 supported. c_6 nonzero must throw to
-        # prevent silent drop.
-        @test_throws ArgumentError even_c_extra(2; c2=1.0, c6=2.0)
-
-        # F=2, c_6=0 explicitly is fine.
-        vec = even_c_extra(2; c2=1.0, c4=2.0, c6=0.0)
-        @test length(vec) == 3
-        @test vec[1] == 1.0  # c_2
-        @test vec[3] == 2.0  # c_4
+    @testset "4. _dict_to_delta_gS rejects c_k for k > 2F" begin
+        # Silent-drop guard: passing a c_k that exceeds the spin allows
+        # would silently disappear without this check.
+        @test_throws ArgumentError _dict_to_delta_gS(2, Dict(6 => 2.0))
+        @test_throws ArgumentError _dict_to_delta_gS(1, Dict(4 => 1.0))
+        # Within range is fine.
+        delta = _dict_to_delta_gS(2, Dict(2 => 1.0, 4 => 2.0))
+        @test !isempty(delta)
     end
 
-    @testset "5. c_extra with odd-rank nonzero throws at routing" begin
-        # _c_extra_to_delta_gS rejects odd-rank nonzero values to
-        # prevent KU "c_3 = pair channel" confusion with rank-3 tensor.
-        F = 3
-        c_extra_bad = [0.0, 1.0, 0.0, 0.0, 0.0]  # idx=2 → c_3 nonzero
-        @test_throws ArgumentError _c_extra_to_delta_gS(F, c_extra_bad)
+    @testset "5. InteractionParams rejects odd-rank n≥3 at construction" begin
+        # The old Vector-based _dict_to_delta_gS used a runtime check.
+        # The new Dict struct rejects at the constructor (earlier — better).
+        @test_throws ArgumentError InteractionParams(Dict(3 => 1.0))
+        @test_throws ArgumentError InteractionParams(Dict(0 => 1.0, 3 => 0.5))
+        @test_throws ArgumentError InteractionParams(Dict(5 => 1.0))
 
-        # All-even is fine.
-        c_extra_ok = [1.0, 0.0, 2.0, 0.0, 3.0]  # c_2, c_4, c_6
-        delta = _c_extra_to_delta_gS(F, c_extra_ok)
-        @test delta isa Dict
-        @test haskey(delta, 0) && haskey(delta, 2) && haskey(delta, 4) &&
-            haskey(delta, 6)
+        # Even ranks fine.
+        ip = InteractionParams(Dict(0 => 1.0, 2 => 0.5, 4 => 0.3))
+        @test ip[2] == 0.5
+        @test ip[4] == 0.3
     end
 
-    @testset "6. Workspace tensor routing: two intentional paths, no double-count" begin
-        # The codebase distinguishes two routing paths for c_extra:
-        #
-        #   Path A (else): make_tensor_interaction_cache(F, interactions)
-        #     - builds g_S from c_0, c_1, c_extra ALL via _cn_to_gS
-        #     - tensor_cache then handles ALL channels including S=0 (c_0)
-        #     - if c_0/c_1 nonzero → diagonal + spin_mixing steps ALSO use
-        #       them → DOUBLE-COUNT → guard throws ArgumentError
-        #
-        #   Path B (if): _make_tensor_cache_from_channels(F, g_delta)
-        #     - builds g_S ONLY from c_extra (NOT c_0/c_1) via 6j transform
-        #     - tensor_cache adds rank-k corrections; diagonal+spin_mixing
-        #       handle c_0/c_1 separately
-        #     - NO double-count, no guard needed
-        #
-        # Activation: Path B triggers when ANY c_extra[k] (k=2F-1 indices,
-        # even-rank only) with k≥4 is nonzero. Path A triggers when only
-        # k=2 (singlet_pair) is set or via the scattering-lengths route.
-
+    @testset "6. Workspace tensor routing: Path A vs Path B" begin
         grid = make_grid(GridConfig{1}((8,), (4.0,)))
 
-        # Path B (c_4 = 0.5 nonzero, k=4 ≥ 4): NO throw, c_0/c_1 kept
-        # as independent diagonal/spin couplings.
-        ip_pathB = InteractionParams(2.0, 0.1, 0.0,
-            even_c_extra(6; c4=0.5))
+        # Path B (c_4 = 0.5, k=4 ≥ 4): tensor_cache built from c_extra
+        # only; c_0/c_1 stay in diagonal+spin_mixing steps (no double).
+        ip_pathB = InteractionParams(Dict(0 => 2.0, 1 => 0.1, 4 => 0.5))
         ws_b = make_workspace(;
-            grid, atom=Eu151,
-            interactions=ip_pathB,
+            grid, atom=Eu151, interactions=ip_pathB,
             potential=HarmonicTrap((1.0,)),
             sim_params=SimParams(; dt=0.01, n_steps=1),
         )
         @test ws_b.tensor_cache !== nothing
-        # ws_interactions retains c_0/c_1 unchanged (diagonal/spin_mixing
-        # still use them); c_extra is zeroed (now in tensor_cache).
-        @test ws_b.interactions.c0 == 2.0
-        @test ws_b.interactions.c1 == 0.1
-        @test isempty(ws_b.interactions.c_extra)
+        @test ws_b.interactions[0] == 2.0
+        @test ws_b.interactions[1] == 0.1
+        @test !has_higher_rank_couplings(ws_b.interactions)  # c_extra moved into cache
 
-        # Same setup with c_4=0 ONLY (c_extra empty after filtering) → no
-        # tensor_cache → falls through to scalar steps.
-        ip_no_tensor = InteractionParams(2.0, 0.1)
+        # No tensor_cache when only c_0/c_1 set.
+        ip_no_tensor = InteractionParams(Dict(0 => 2.0, 1 => 0.1))
         ws_n = make_workspace(;
-            grid, atom=Eu151,
-            interactions=ip_no_tensor,
+            grid, atom=Eu151, interactions=ip_no_tensor,
             potential=HarmonicTrap((1.0,)),
             sim_params=SimParams(; dt=0.01, n_steps=1),
         )
         @test ws_n.tensor_cache === nothing
     end
 
-    @testset "7. c_2 routes to singlet_pair (not rank-2 tensor) at F=2" begin
-        # apply_singlet_pair_step! reads c_2 = get_cn(ip, 2) = c_extra[1]
-        # and applies the KU |A_{00}|² operator. Cross-check: a state
-        # with A_{00} ≠ 0 picks up a phase ∝ c_2 over one step; a state
-        # with A_{00} = 0 (e.g. ferromagnetic |m=+2⟩) does NOT.
+    @testset "7. c_2 routes to singlet_pair (KU convention) at F=2" begin
         F = 2
         D = 2F + 1
         grid = make_grid(GridConfig{1}((4,), (2.0,)))
         sys = SpinSystem(F)
-
-        # Polar |m=0⟩ has |A_{00}|² = n²/D (max singlet-pair amplitude).
         psi_polar = init_psi(grid, sys; state=:polar)
-        # FM up |m=+F⟩ has A_{00} = 0.
         psi_fm = init_psi(grid, sys; state=:m_plus_F)
 
         c_2 = 0.5
-        ip = InteractionParams(0.0, 0.0, 0.0, even_c_extra(F; c2=c_2))
+        ip = InteractionParams(Dict(2 => c_2))
         @test get_cn(ip, 2) == c_2
 
-        # apply singlet_pair to FM-up: no change (A_{00} = 0).
+        # FM-up has A_{00} = 0: no change.
         ψ_fm_after = copy(psi_fm)
         SpinorBEC.apply_singlet_pair_step!(ψ_fm_after, ip, F, 0.01, 1;
             imaginary_time=false)
         @test maximum(abs, ψ_fm_after .- psi_fm) < 1e-14
 
-        # apply singlet_pair to polar: phase accrued.
+        # Polar has A_{00} ≠ 0: phase accrued.
         ψ_polar_after = copy(psi_polar)
         SpinorBEC.apply_singlet_pair_step!(ψ_polar_after, ip, F, 0.01, 1;
             imaginary_time=false)
         @test maximum(abs, ψ_polar_after .- psi_polar) > 1e-10
-        # Norm must be preserved (unitary step).
         @test isapprox(sum(abs2, ψ_polar_after), sum(abs2, psi_polar);
             rtol=1e-12)
     end
 
-    @testset "8. Bogoliubov picks up c_extra via 6j (g_S shifts)" begin
-        # Without c_extra: g_S from c_0/c_1 alone.
-        # With c_4 nonzero: g_4 shifts via (2·4+1)·{F F 4; F F 4}·c_4 etc.
-        # The Bogoliubov spectrum at F=2 must DIFFER between the two cases.
+    @testset "8. Bogoliubov picks up c_extra via c_to_g unified path" begin
         F = 2
         D = 2F + 1
         n0 = 1.0
         zeta = zeros(ComplexF64, D)
-        zeta[(D + 1) ÷ 2] = 1.0  # polar
+        zeta[(D + 1) ÷ 2] = 1.0
 
-        ip_bare = InteractionParams(2.0, 0.3)
-        bdg_bare = bogoliubov_spectrum(;
-            spinor=zeta, n0=n0, F=F,
-            interactions=ip_bare,
-            k_max=2.0, n_k=20,
-        )
+        ip_bare = InteractionParams(Dict(0 => 2.0, 1 => 0.3))
+        bdg_bare = bogoliubov_spectrum(; spinor=zeta, n0=n0, F=F,
+            interactions=ip_bare, k_max=2.0, n_k=20)
 
-        # With c_4 = 0.5 added; bypass the make_workspace c0/c1 guard by
-        # passing the constructor directly (Bogoliubov uses 6j path).
-        ip_extra = InteractionParams(2.0, 0.3, 0.0, even_c_extra(F; c4=0.5))
-        bdg_extra = bogoliubov_spectrum(;
-            spinor=zeta, n0=n0, F=F,
-            interactions=ip_extra,
-            k_max=2.0, n_k=20,
-        )
+        ip_extra = InteractionParams(Dict(0 => 2.0, 1 => 0.3, 4 => 0.5))
+        bdg_extra = bogoliubov_spectrum(; spinor=zeta, n0=n0, F=F,
+            interactions=ip_extra, k_max=2.0, n_k=20)
 
-        # Spectra must differ — c_4 shifts g_4 which enters the BdG
-        # matrix. Use the max_growth_rate as a coarse discriminator.
-        # Exact equality would mean c_extra is being silently dropped.
-        ω_bare = bdg_bare.omega
-        ω_extra = bdg_extra.omega
-        @test maximum(abs.(ω_bare .- ω_extra)) > 1e-3
+        # Spectra must differ — c_4 shifts g_4 via 6j.
+        @test maximum(abs.(bdg_bare.omega .- bdg_extra.omega)) > 1e-3
     end
 
-    @testset "9. get_cn indexing: c_0 → c0, c_1 → c1, c_n→c_extra[n-1]" begin
-        # Verify the get_cn dispatch matches the documented contract.
-        ip = InteractionParams(1.5, 2.5, 0.0, [10.0, 0.0, 20.0, 0.0, 30.0])
-        @test get_cn(ip, 0) == 1.5  # c_0
-        @test get_cn(ip, 1) == 2.5  # c_1
-        @test get_cn(ip, 2) == 10.0  # c_2 (c_extra[1])
-        @test get_cn(ip, 3) == 0.0  # c_3 (c_extra[2])
-        @test get_cn(ip, 4) == 20.0  # c_4 (c_extra[3])
-        @test get_cn(ip, 6) == 30.0  # c_6 (c_extra[5])
-        @test get_cn(ip, 8) == 0.0  # out of range → 0
+    @testset "9. ip[n] symmetric indexing across all ranks" begin
+        ip = InteractionParams(Dict(0 => 1.5, 1 => 2.5, 2 => 10.0,
+            4 => 20.0, 6 => 30.0))
+        @test ip[0] == 1.5  # c_0
+        @test ip[1] == 2.5  # c_1
+        @test ip[2] == 10.0  # c_2
+        @test ip[3] == 0.0  # not set
+        @test ip[4] == 20.0  # c_4
+        @test ip[6] == 30.0  # c_6
+        @test ip[8] == 0.0  # not set
     end
 
-    @testset "11. c_extra ↔ g_S equivalence: SAME Hψ via both paths" begin
-        # Settles the design question "why does c_extra exist?": it's a
-        # basis-equivalent route. For ANY F, supplying c_0/c_1/c_extra
-        # OR supplying the equivalent g_S directly must produce
-        # identical operator action H·ψ.
-        #
-        # Strategy:
-        #   route A: InteractionParams(c_0, c_1, c_extra) → diagonal +
-        #            spin_mixing + tensor_cache (Path B from test #6)
-        #   route B: zero c_0/c_1, build TensorInteractionCache directly
-        #            from full g_S = _c0c1_to_gS + _c_extra_to_delta_gS
-        #
-        # Both routes implement the same Hamiltonian on the same ψ; if
-        # the cn ↔ gS basis mapping is consistent, Hψ must match.
+    @testset "10. Positional InteractionParams form throws" begin
+        # The positional (c0::Real, c1::Real, ...) signature is not
+        # supported — InteractionParams takes a Dict.
+        @test_throws ArgumentError InteractionParams(2.0, 0.1)
+        @test_throws ArgumentError InteractionParams(2.0, 0.1, 10.0)
+    end
+
+    @testset "11. c_to_g: single unified entry point" begin
+        # Combines _c0c1_to_gS (KU closed-form for n=0,1) and
+        # _dict_to_delta_gS (6j for n≥2) into one Dict→Dict call.
         F = 2
-        D = 2F + 1
-        grid = make_grid(GridConfig{1}((8,), (4.0,)))
-
-        # Couplings: c_0, c_1 + c_4 refinement.
         c0_val = 2.0
         c1_val = 0.3
         c4_val = 0.4
-        ip_A = InteractionParams(c0_val, c1_val, 0.0,
-            even_c_extra(F; c4=c4_val))
+        ip = InteractionParams(Dict(0 => c0_val, 1 => c1_val, 4 => c4_val))
+        g_unified = c_to_g(F, ip)
 
-        # Full g_S = c_0/c_1 ansatz + c_extra δg_S
-        g_base = _c0c1_to_gS(F, c0_val, c1_val)
-        g_delta = _c_extra_to_delta_gS(F, even_c_extra(F; c4=c4_val))
-        g_full = Dict{Int, Float64}(S => g_base[S] + get(g_delta, S, 0.0)
-                                    for S in keys(g_base))
+        # Manual reconstruction.
+        g_manual = _c0c1_to_gS(F, c0_val, c1_val)
+        g_delta = _dict_to_delta_gS(F, Dict(4 => c4_val))
+        for (S, dg) in g_delta
+            g_manual[S] = get(g_manual, S, 0.0) + dg
+        end
 
-        # Route B: tensor_cache from full g_S directly. Zero out c_0/c_1
-        # in InteractionParams so the diagonal + spin_mixing steps don't
-        # apply (tensor step handles all channels including S=0).
-        ip_B = InteractionParams(0.0, 0.0)
-        tc_B = SpinorBEC._make_tensor_cache_from_channels(F, g_full)
-        @test tc_B !== nothing
-
-        # Build the workspaces.
-        ws_A = make_workspace(;
-            grid, atom=Rb85,    # F=2
-            interactions=ip_A,
-            potential=HarmonicTrap((1.0,)),
-            sim_params=SimParams(; dt=0.01, n_steps=1),
-        )
-        # For route B we have to inject tc_B manually since
-        # make_workspace's auto-build path goes through _cn_to_gS again.
-        # Cheapest equivalent: rebuild route A with route-A's natural
-        # workspace and accept its tensor_cache (which is built from
-        # the same c_extra path internally) — this is what route A
-        # already does. The numerical equivalence we want is whether
-        # the SAME Hψ falls out regardless of the c_extra ↔ g_S split.
-
-        # Polar seed.
-        psi_host = init_psi(grid, SpinSystem(F); state=:polar)
-        copyto!(ws_A.state.psi, psi_host)
-        grad_A = similar(ws_A.state.psi)
-        fill!(grad_A, zero(eltype(grad_A)))
-        SpinorBEC.energy_gradient!(grad_A, ws_A.state.psi, ws_A)
-        Hpsi_A = grad_A ./ 2
-
-        # As a cross-check, the energy decomposition's tensor term
-        # must use the full g_S — which is what _cn_to_gS gives. Pin
-        # that the tensor cache built from c_extra contains the
-        # expected g_S = c_0/c_1 contributions absorbed into the
-        # higher-rank correction. We verify by reading off the values.
-        @test ws_A.tensor_cache !== nothing
-        # The tensor_cache.g_values store the g_delta channel
-        # contributions (c_extra route only, NOT c_0/c_1). That is
-        # the intentional split documented in test #6.
-        for (S_idx, S_val) in enumerate(ws_A.tensor_cache.active_channels)
-            expected_delta_gS = get(g_delta, S_val, 0.0)
-            @test isapprox(ws_A.tensor_cache.g_values[S_idx],
-                expected_delta_gS; rtol=1e-12)
+        @test sort(collect(keys(g_unified))) == sort(collect(keys(g_manual)))
+        for S in keys(g_manual)
+            @test isapprox(g_unified[S], g_manual[S]; rtol=1e-12)
         end
     end
 
-    @testset "12. F=1 special: c_extra is fully redundant" begin
-        # At F=1, c_0 + c_1 form a complete 2-parameter basis for
-        # g_0 and g_2 (the only two channels). Any nonzero c_extra
-        # entry would over-specify; the codebase's even_c_extra forbids
-        # c_2 above 2F=2 → c_4 onwards rejected.
-        # Wait — at F=1, 2F=2, so c_2 IS allowed by even_c_extra.
-        # But _cn_to_gS for F=1 produces another linear combination,
-        # so c_extra[c_2] is independent of c_0/c_1.
-        vec = even_c_extra(1; c2=0.5)
-        @test length(vec) == 1
-        @test vec[1] == 0.5
-
-        # c_4 at F=1 is rejected (k > 2F = 2).
-        @test_throws ArgumentError even_c_extra(1; c4=0.1)
-    end
-
-    @testset "10. Hand-written c_extra misindex: documents the footgun" begin
-        # If a user writes `c_extra = [c2, c4, c6]` for F=6 (length 3),
-        # they intend c_2=c2, c_4=c4, c_6=c6 but the code reads:
-        #   c_extra[1] = c2 (correct → c_2)
-        #   c_extra[2] = c4 (WRONG: this is c_3, which is odd-rank;
-        #                   _c_extra_to_delta_gS will THROW because c_3≠0)
-        # This means the misindex bug is loudly caught — good.
-        # Pin this with a test so the safety remains.
-        bad_extra = [10.0, 20.0, 30.0]  # User meant c2, c4, c6.
-        # Index 2 is c_3 (odd) and nonzero → must throw.
-        @test_throws ArgumentError _c_extra_to_delta_gS(6, bad_extra)
-
-        # The correct way: use even_c_extra.
-        good_extra = even_c_extra(6; c2=10.0, c4=20.0, c6=30.0)
-        @test good_extra[1] == 10.0  # c_2
-        @test good_extra[2] == 0.0   # c_3 (forced zero)
-        @test good_extra[3] == 20.0  # c_4
-        @test good_extra[5] == 30.0  # c_6
-        # And this routes through _c_extra_to_delta_gS without throw.
-        delta = _c_extra_to_delta_gS(6, good_extra)
-        @test delta isa Dict
+    @testset "12. F=1: c_2 is an independent coupling" begin
+        # At F=1 the channels are S=0, S=2. The c_n Dict can include
+        # k=2 (rank-2 tensor) independently of c_0, c_1.
+        ip = InteractionParams(Dict(2 => 0.5))
+        @test ip[2] == 0.5
+        # k > 2F is silent-drop guard.
+        @test_throws ArgumentError _dict_to_delta_gS(1, Dict(4 => 0.1))
     end
 end

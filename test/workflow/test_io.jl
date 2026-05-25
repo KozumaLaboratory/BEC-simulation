@@ -5,7 +5,7 @@ using SpinorBEC
     gc = GridConfig((32,), (10.0,))
     grid = make_grid(gc)
     atom = AtomSpecies("test-io", 1.0, 1, 0.0, 0.0)
-    ip = InteractionParams(100.0, -0.5, 0.1, [0.0, 0.0, 5.0])
+    ip = InteractionParams(Dict(0 => 100.0, 1 => -0.5, 2 => 0.0, 4 => 5.0); c_lhy=0.1)
     zee = ZeemanParams(0.3, 0.8)
 
     sp = SimParams(; dt=0.002, n_steps=100, imaginary_time=false, save_every=100)
@@ -37,7 +37,10 @@ using SpinorBEC
         @test data.c0 == 100.0
         @test data.c1 == -0.5
         @test data.c_lhy == 0.1
-        @test data.c_extra == [0.0, 0.0, 5.0]
+        # Post-Dict refactor: c_extra storage is now Dict{Int,Float64}
+        # via the c_dict field (renamed in io.jl).
+        @test data.c_dict[4] == 5.0
+        @test get(data.c_dict, 2, 0.0) == 0.0
         @test data.zeeman_p == 0.3
         @test data.zeeman_q == 0.8
         @test data.c_dd == 0.0
@@ -56,7 +59,7 @@ end
     sp = SimParams(; dt=0.001, n_steps=10, imaginary_time=false, save_every=10)
     ws = make_workspace(;
         grid, atom,
-        interactions=InteractionParams(10.0, 0.0),
+        interactions=InteractionParams(Dict(0 => 10.0, 1 => 0.0)),
         potential=NoPotential(),
         sim_params=sp,
         enable_ddi=true, c_dd=50.0,

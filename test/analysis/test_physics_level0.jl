@@ -26,7 +26,7 @@ using LinearAlgebra
         sp = SimParams(; dt, n_steps, imaginary_time=false, save_every=n_steps)
         ws = make_workspace(;
             grid, atom,
-            interactions=InteractionParams(0.0, 0.0),
+            interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
             potential=NoPotential(),
             sim_params=sp,
             psi_init=psi,
@@ -73,7 +73,7 @@ using LinearAlgebra
             sp = SimParams(; dt, n_steps, imaginary_time=false, save_every=n_steps)
             ws = make_workspace(;
                 grid, atom,
-                interactions=InteractionParams(0.0, 0.0),
+                interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
                 zeeman=ZeemanParams(p, 0.0),
                 potential=NoPotential(),
                 sim_params=sp,

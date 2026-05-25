@@ -47,7 +47,7 @@ pipeline:
             ws = make_workspace(;
                 grid=grid,
                 atom=AtomSpecies("Rb87", 1.44e-25, 1, 0.0, 0.0, 0.0),
-                interactions=InteractionParams(5.0, 0.0),
+                interactions=InteractionParams(Dict(0 => 5.0, 1 => 0.0)),
                 sim_params=SimParams(dt=0.001, n_steps=1, save_every=1),
             )
             cb(ws, 1, [0.0], [1.234])
@@ -78,7 +78,7 @@ pipeline:
             ws = make_workspace(;
                 grid=grid,
                 atom=AtomSpecies("Rb87", 1.44e-25, 1, 0.0, 0.0, 0.0),
-                interactions=InteractionParams(5.0, 0.0),
+                interactions=InteractionParams(Dict(0 => 5.0, 1 => 0.0)),
                 sim_params=SimParams(dt=0.001, n_steps=1, save_every=1),
             )
             cb(ws, 1, Float64[], Float64[])    # not a multiple of 5

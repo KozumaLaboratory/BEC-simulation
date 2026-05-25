@@ -53,11 +53,7 @@ function _bdg_contact_matrices(spinor, F, interactions, zeeman)
     D = 2F + 1
     cg_table = precompute_cg_table(F)
 
-    g_dict = _c0c1_to_gS(F, interactions.c0, interactions.c1)
-    if !isempty(interactions.c_extra)
-        g_delta = _c_extra_to_delta_gS(F, interactions.c_extra)
-        g_dict = merge(+, g_dict, g_delta)
-    end
+    g_dict = c_to_g(F, interactions)
 
     sys = SpinSystem(F)
     zee = zeeman_energies(zeeman, sys)

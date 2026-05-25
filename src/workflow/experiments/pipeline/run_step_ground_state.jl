@@ -116,7 +116,7 @@ function _run_step(
     dt = Float64(get(p, "dt", 0.001))
     duration = dt * n_steps
     zeeman = if haskey(p, "B")
-        _build_zeeman_dispatched(p["B"], duration, atom, p)
+        _build_zeeman_from_b_block(p["B"], duration, atom, p)
     elseif ws_prev !== nothing
         ws_prev.zeeman
     else

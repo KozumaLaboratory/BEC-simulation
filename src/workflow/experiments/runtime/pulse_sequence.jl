@@ -127,7 +127,7 @@ function _apply_pulse_sequence(ps_raw, duration::Float64, interactions,
     ps_raw isa Vector || return (zeeman, raman, tdi)
     defaults = Dict{Symbol, Any}(
         :p => 0.0, :q => 0.0,
-        :c0 => interactions.c0, :c1 => interactions.c1,
+        :c0 => interactions[0], :c1 => interactions[1],
     )
     events = parse_pulse_sequence(ps_raw, duration)
     compiled = compile_pulse_sequence(events, duration, defaults)
