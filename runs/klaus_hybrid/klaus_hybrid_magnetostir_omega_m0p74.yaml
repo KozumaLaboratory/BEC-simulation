@@ -1,0 +1,110 @@
+# Klaus hybrid Cell B — MAGNETOSTIR + weak-field EdH readout.
+# GS → tilt-up → spin-up → steady Klaus magnetostir → B quench → weak-field readout.
+
+metadata:
+  suite: klaus_hybrid
+  cell_name: klaus_hybrid_magnetostir_omega_m0p74
+  rotation_omega: -0.74
+  protocol_kind: hybrid_magnetostir
+  generator: scripts/validation/klaus_hybrid_magnetostir_edh_gen.jl
+
+defaults:
+  kind: spinor
+  backend: cpu
+  interactions: {N_atoms: 10000, omega_ref: 691.1504}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+      interactions:
+        N_atoms: 10000
+        omega_ref: 691.1504
+        c1_ratio: 0.02778
+      ddi: {enabled: true, secular: true}
+      lhy: {kind: none}
+      B: {B_mag: "0.01 Gauss", theta: 3.14159, phi: 0.0}
+      gauge_fix: false
+      initial_state: m_minus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 3000
+      tol: 1.0e-9
+
+  - dynamics:   # tilt-up
+      duration: 3.45575
+      dt: 0.005
+      B:
+        B_mag: "0.01 Gauss"
+        theta: {from: 3.14159, to: 2.53059, duration: 3.45575}
+        phi: 0.0
+      ddi: {enabled: true, secular: true}
+      lhy: {kind: none}
+      seed_amplitude: 1.0e-6
+      seed_k_cut: 2.5
+      save:
+        every: 200
+        psi: true
+        precision: f64
+
+  - dynamics:   # spin-up (φ-rate 0 → -0.74) at θ=35°
+      duration: 3.45575
+      dt: 0.005
+      B:
+        B_mag: "0.01 Gauss"
+        theta: 2.53059
+        phi: {rate: {from: 0.0, to: -0.74, duration: 3.45575}}
+      ddi: {enabled: true, secular: true}
+      lhy: {kind: none}
+      save:
+        every: 200
+        psi: true
+        precision: f64
+
+  - dynamics:   # steady Klaus magnetostir, 314 ms
+      duration: 217.02123
+      dt: 0.005
+      B:
+        B_mag: "0.01 Gauss"
+        theta: 2.53059
+        phi: {rate: -0.74}
+      ddi: {enabled: true, secular: true}
+      lhy: {kind: none}
+      save:
+        every: 1000
+        psi: true
+        precision: f64
+
+  - dynamics:   # B quench (high → low magnitude, direction + φ-rate preserved)
+      duration: 0.69115
+      dt: 0.001
+      B:
+        B_mag: {from: 0.01, to: 2.6e-5, duration: 0.69115}
+        theta: 2.53059
+        phi: {rate: -0.74}
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      save:
+        every: 50
+        psi: true
+        precision: f64
+
+  - dynamics:   # weak-field EdH readout (rotation OFF after quench)
+      duration: 13.82301
+      dt: 0.005
+      B:
+        B_mag: "2.6e-5 Gauss"
+        theta: 2.53059
+        phi: 0.0
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      save:
+        every: 100
+        psi: true
+        precision: f64
+
+  - analyze:
+      - phase_classify: {}
+      - winding_map: {}
+      - energy_decomposition: {}

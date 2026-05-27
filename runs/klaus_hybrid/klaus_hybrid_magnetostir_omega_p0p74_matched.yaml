@@ -1,0 +1,104 @@
+# Klaus hybrid v4 — MATCHED chirality Klaus magnetostir → weak-field EdH.
+#
+# Background: v3 ran with B_mag spherical positive, which forces effective
+# m=+F + B along +z (schema treats B_mag magnitude as +z aligned, theta=π
+# is ignored).  For m=+F init, matched chirality (Klaus-I Gate 4) is
+# Ω > 0.  v3 used Ω = -0.74 → mismatched → null result (identical to
+# no-stir control).
+#
+# This cell: Ω = +0.74 (MATCHED with m=+F init).  Tests whether matched-
+# chirality Klaus magnetostir actually produces an orbital state that
+# carries through the B quench to amplify EdH cascade.
+
+metadata:
+  suite: klaus_hybrid
+  cell_name: klaus_hybrid_magnetostir_omega_p0p74_matched
+  rotation_omega: +0.74
+  protocol_kind: hybrid_magnetostir_matched
+  generator: hand-written 2026-05-27
+
+defaults:
+  kind: spinor
+  backend: cpu
+  interactions: {N_atoms: 10000, omega_ref: 691.1504}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+      interactions:
+        N_atoms: 10000
+        omega_ref: 691.1504
+        c1_ratio: 0.02778
+      ddi: {enabled: true, secular: true}
+      lhy: {kind: none}
+      B: {B_mag: "0.01 Gauss", theta: 0.0, phi: 0.0}     # along +z, m=+F GS
+      gauge_fix: false
+      initial_state: m_plus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 3000
+      tol: 1.0e-9
+
+  - dynamics:   # adiabatic tilt-up θ 0 → π/4 at strong B
+      duration: 3.456
+      dt: 0.005
+      B:
+        B_mag: "0.01 Gauss"
+        theta: {from: 0.0, to: 0.611, duration: 3.456}
+        phi: 0.0
+      ddi: {enabled: true, secular: true}
+      lhy: {kind: none}
+      seed_amplitude: 1.0e-6
+      seed_k_cut: 2.5
+      save: {every: 100, psi: true, precision: f64}
+
+  - dynamics:   # spin-up φ-rate 0 → +0.74
+      duration: 3.456
+      dt: 0.005
+      B:
+        B_mag: "0.01 Gauss"
+        theta: 0.611
+        phi: {rate: {from: 0.0, to: 0.74, duration: 3.456}}
+      ddi: {enabled: true, secular: true}
+      lhy: {kind: none}
+      save: {every: 100, psi: true, precision: f64}
+
+  - dynamics:   # steady Klaus magnetostir at matched chirality, 314 ms
+      duration: 217.099
+      dt: 0.005
+      B:
+        B_mag: "0.01 Gauss"
+        theta: 0.611
+        phi: {rate: 0.74}
+      ddi: {enabled: true, secular: true}
+      lhy: {kind: none}
+      save: {every: 1000, psi: true, precision: f64}
+
+  - dynamics:   # B quench: B_mag 0.01 → 2.6e-5 G, direction preserved
+      duration: 0.691
+      dt: 0.001
+      B:
+        B_mag: {from: 0.01, to: 2.6e-5, duration: 0.691}
+        theta: 0.611
+        phi: {rate: 0.74}
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      save: {every: 50, psi: true, precision: f64}
+
+  - dynamics:   # weak-field EdH readout, no rotation, 20 ms
+      duration: 13.823
+      dt: 0.005
+      B:
+        B_mag: "2.6e-5 Gauss"
+        theta: 0.611
+        phi: 0.0
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      save: {every: 100, psi: true, precision: f64}
+
+  - analyze:
+      - phase_classify: {}
+      - winding_map: {}
+      - energy_decomposition: {}

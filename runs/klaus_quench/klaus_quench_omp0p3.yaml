@@ -1,0 +1,94 @@
+# Klaus 2-phase quench protocol — auto-generated.
+# Source: scripts/validation/klaus_quench_gen.jl
+#
+# Cell : klaus_quench_omp0p3
+#   Ω/ω_⊥ rotation prep   : 0.3
+#   Ω/ω_⊥ quench + hold   : 0.0 / 0.0
+#   DDI in dynamics       : true
+#   B quench applied      : true
+#   rotation kept in hold : false
+#
+# Pipeline:
+#   GS (Ω=0, B=-0.01 G, DDI on)
+#   → rotation_prep (10.0 ms, B=-0.01 G, Ω=0.3, DDI=true)
+#   → B_quench (1.0 ms, B ramp true, Ω=0.0, DDI=true)
+#   → weak_field_hold (10.0 ms, B=-2.6e-5 G, Ω=0.0, DDI=true)
+
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omp0p3
+  rotation_omega: 0.3
+  ddi_on_dynamics: true
+  do_B_quench: true
+  rotation_kept_in_hold: false
+  generator: scripts/validation/klaus_quench_gen.jl
+  protocol_summary: |
+    Rotation preparation at strong B → quench to weak B → free hold.
+    Observable: post-quench spin excitation in m=-5, m=-4 components.
+
+defaults:
+  kind: spinor
+  backend: cpu
+  interactions: {N_atoms: 10000, omega_ref: 691.1504}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+      interactions:
+        N_atoms: 10000
+        omega_ref: 691.1504
+        c1_ratio: 0.02778
+      ddi: {enabled: true, secular: true}
+      lhy: {kind: none}
+      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      gauge_fix: false
+      initial_state: m_minus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 3000
+      tol: 1.0e-9
+
+  - dynamics:   # rotation_prep
+      duration: 6.9115
+      dt: 0.005
+      rotating_frame_omega: 0.3
+      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      seed_amplitude: 1.0e-6
+      seed_k_cut: 2.5
+      save:
+        every: 100
+        psi: true
+        precision: f64
+
+  - dynamics:   # B_quench
+      duration: 0.69115
+      dt: 0.001
+      rotating_frame_omega: 0.0
+      B: {Bz: {from: -0.01, to: -2.6e-5, duration: 0.6911504}, theta: 0.0, phi: 0.0}
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      save:
+        every: 50
+        psi: true
+        precision: f64
+
+  - dynamics:   # weak_field_hold
+      duration: 6.9115
+      dt: 0.005
+      rotating_frame_omega: 0.0
+      B: {Bz: "-2.6e-5 Gauss", theta: 0.0, phi: 0.0}
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      save:
+        every: 100
+        psi: true
+        precision: f64
+
+  - analyze:
+      - phase_classify: {}
+      - winding_map: {}
+      - energy_decomposition: {}

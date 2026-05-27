@@ -1,0 +1,80 @@
+# Klaus 2-phase quench — B × Ω 2D robustness map corner (batch 4 B).
+# Source: scripts/validation/klaus_quench_batch4_gen.jl
+#   Ω/ω_⊥ = -0.7
+#   B_final = -1.3000000000000001e-5 G (1.3 nT)
+#   keep_rot, m=-F init, DDI on.
+
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omm0p7_keeprot_Bf1p3
+  rotation_omega: -0.7
+  B_final_nT: 1.3
+  variant_kind: grid_corner
+  generator: scripts/validation/klaus_quench_batch4_gen.jl
+
+defaults:
+  kind: spinor
+  backend: cpu
+  interactions: {N_atoms: 10000, omega_ref: 691.1504}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+      interactions:
+        N_atoms: 10000
+        omega_ref: 691.1504
+        c1_ratio: 0.02778
+      ddi: {enabled: true, secular: true}
+      lhy: {kind: none}
+      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      gauge_fix: false
+      initial_state: m_minus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 3000
+      tol: 1.0e-9
+
+  - dynamics:   # rotation_prep
+      duration: 6.9115
+      dt: 0.005
+      rotating_frame_omega: -0.7
+      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      seed_amplitude: 1.0e-6
+      seed_k_cut: 2.5
+      save:
+        every: 100
+        psi: true
+        precision: f64
+
+  - dynamics:   # B_quench
+      duration: 0.69115
+      dt: 0.001
+      rotating_frame_omega: -0.7
+      B: {Bz: {from: -0.01, to: -1.3000000000000001e-5, duration: 0.6911504}, theta: 0.0, phi: 0.0}
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      save:
+        every: 50
+        psi: true
+        precision: f64
+
+  - dynamics:   # weak_field_hold
+      duration: 6.9115
+      dt: 0.005
+      rotating_frame_omega: -0.7
+      B: {Bz: "-1.3000000000000001e-5 Gauss", theta: 0.0, phi: 0.0}
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      save:
+        every: 100
+        psi: true
+        precision: f64
+
+  - analyze:
+      - phase_classify: {}
+      - winding_map: {}
+      - energy_decomposition: {}
