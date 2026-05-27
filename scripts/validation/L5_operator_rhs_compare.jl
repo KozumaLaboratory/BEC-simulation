@@ -645,7 +645,7 @@ function check_singlet_pair_L1_a00_zero(fx::L5Fixture; c2::Float64=0.5)
     chi[1] = 1.3 + 0.4im  # only m=+F populated → ψ_{-F}=0 → A_{00}=0
 
     psi_sb = reshape(copy(chi), 1, D)
-    ip = SpinorBEC.InteractionParams(0.0, 0.0, 0.0, [c2])
+    ip = SpinorBEC.InteractionParams(Dict(2 => c2))
     SpinorBEC.apply_singlet_pair_step!(psi_sb, ip, fx.F, DT_PROBE, 1; imaginary_time=false)
     chi_sb = vec(psi_sb)
 
@@ -663,7 +663,7 @@ function check_singlet_pair_L2_single_voxel(fx::L5Fixture; c2::Float64=0.5)
     chi_ref = textbook_singlet_pair(psi_in, fx.F, c2, DT_PROBE)
 
     psi_sb = reshape(copy(chi), 1, D)
-    ip = SpinorBEC.InteractionParams(0.0, 0.0, 0.0, [c2])
+    ip = SpinorBEC.InteractionParams(Dict(2 => c2))
     SpinorBEC.apply_singlet_pair_step!(psi_sb, ip, fx.F, DT_PROBE, 1; imaginary_time=false)
 
     res = maximum(abs, chi_ref .- psi_sb)
@@ -679,7 +679,7 @@ function check_singlet_pair_L3_multi_voxel(fx::L5Fixture; n_grid::Int=8, c2::Flo
     psi_ref = textbook_singlet_pair(psi_grid, fx.F, c2, DT_PROBE)
 
     psi_sb = copy(psi_grid)
-    ip = SpinorBEC.InteractionParams(0.0, 0.0, 0.0, [c2])
+    ip = SpinorBEC.InteractionParams(Dict(2 => c2))
     SpinorBEC.apply_singlet_pair_step!(psi_sb, ip, fx.F, DT_PROBE, 1; imaginary_time=false)
 
     res = maximum(abs, psi_ref .- psi_sb)
@@ -694,7 +694,7 @@ function check_singlet_pair_L4_norm_preserved(fx::L5Fixture; n_grid::Int=8, c2::
     norm_before = sum(abs2, psi_grid)
 
     psi_sb = copy(psi_grid)
-    ip = SpinorBEC.InteractionParams(0.0, 0.0, 0.0, [c2])
+    ip = SpinorBEC.InteractionParams(Dict(2 => c2))
     SpinorBEC.apply_singlet_pair_step!(psi_sb, ip, fx.F, DT_PROBE, 1; imaginary_time=false)
     norm_after = sum(abs2, psi_sb)
 

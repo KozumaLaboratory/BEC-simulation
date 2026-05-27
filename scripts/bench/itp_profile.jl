@@ -194,7 +194,7 @@ function _demo_eu_itp_setup(; N::Int=16, n_steps::Int=500, dt::Float64=0.005)
     result = find_ground_state(;
         grid=grid,
         atom=Eu151,
-        interactions=InteractionParams(50.0, 1.0),
+        interactions=InteractionParams(Dict(0 => 50.0, 1 => 1.0)),
         zeeman=ZeemanParams(0.5, 0.1),
         potential=HarmonicTrap(1.0, 1.0, 1.0),
         dt=dt,

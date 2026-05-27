@@ -7,7 +7,7 @@ const c1 = EU_c0 / 36
 
 atom = AtomSpecies("Eu151", 1.0, 6, EU_a_s_dl, 0.0)
 grid = make_grid(GridConfig((32, 32, 32), (20.0, 20.0, 20.0)))
-interactions = InteractionParams(EU_c0, c1)
+interactions = InteractionParams(Dict(0 => EU_c0, 1 => c1))
 trap = HarmonicTrap((1.0, 1.0, EU_λ_z))
 sys = SpinSystem(atom.F)
 n_comp = sys.n_components

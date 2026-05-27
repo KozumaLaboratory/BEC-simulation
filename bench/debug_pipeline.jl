@@ -11,7 +11,7 @@ println("=" ^ 60)
 println("\n--- Test 1: Rb87 F=1 basic ground state ---")
 grid1 = make_grid(GridConfig((32,), (20.0,)))
 atom1 = Rb87
-int1 = InteractionParams(10.0, -0.5)
+int1 = InteractionParams(Dict(0 => 10.0, 1 => -0.5))
 pot1 = HarmonicTrap((1.0,))
 
 gs1 = find_ground_state(;
@@ -30,7 +30,7 @@ println("  density range: $(extrema(total_density(psi1, 1)))")
 println("\n--- Test 2: Eu151 F=6, no DDI, p=10 ---")
 grid2 = make_grid(GridConfig((32, 32), (20.0, 20.0)))
 atom2 = Eu151
-int2 = InteractionParams(378.0, 0.0)
+int2 = InteractionParams(Dict(0 => 378.0))
 sys2 = SpinSystem(atom2.F)
 sm2 = spin_matrices(atom2.F)
 

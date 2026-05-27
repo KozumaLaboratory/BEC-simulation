@@ -41,7 +41,7 @@ using SpinorBEC
 ws, converged, energy, dE, last_step = find_ground_state(;
     atom = Eu151,
     grid = GridConfig((64, 64, 64), (20.0, 20.0, 20.0)),
-    interactions = InteractionParams(4689.0, 4689.0 * 0.028),  # c_total, c1_ratio
+    interactions = InteractionParams(Dict(0 => 4689.0, 1 => 4689.0 * 0.028)),
     ddi = DDIParams(7647.0, true),                              # c_dd, enabled
     zeeman = ZeemanParams(100.0, 0.0),                         # p, q
     trap = HarmonicTrap(1.0, 1.0, 1.182),                      # ω_x, ω_y, ω_z

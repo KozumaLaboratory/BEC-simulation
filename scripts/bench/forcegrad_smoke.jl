@@ -29,7 +29,7 @@ function _build_ws(dt::Float64, c0::Float64)
     sp = SimParams(; dt=dt, n_steps=1)
     ws = make_workspace(;
         grid, atom=ATOM,
-        interactions=InteractionParams(c0, 0.0),  # c1 = 0 (diagonal-only)
+        interactions=InteractionParams(Dict(0 => c0)),  # c1 = 0 (diagonal-only)
         zeeman=ZeemanParams(0.5, 0.1),
         potential=HarmonicTrap(1.0),
         sim_params=sp,

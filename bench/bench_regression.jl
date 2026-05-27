@@ -18,7 +18,7 @@ let
     sp = SimParams(; dt = 0.005, n_steps = 1)
     ws = make_workspace(;
         grid, atom = Eu151,
-        interactions = InteractionParams(50.0, 1.0),
+        interactions = InteractionParams(Dict(0 => 50.0, 1 => 1.0)),
         zeeman = ZeemanParams(0.5, 0.1),
         potential = HarmonicTrap(1.0, 1.0, 1.0),
         sim_params = sp,
@@ -34,7 +34,7 @@ let
     grid = make_grid(GridConfig((16, 16), (6.0, 6.0)))
     SUITE["find_ground_state/rb87_16sq"] = @benchmarkable find_ground_state(;
         grid = $grid, atom = Rb87,
-        interactions = InteractionParams(5.0, 0.0),
+        interactions = InteractionParams(Dict(0 => 5.0)),
         potential = HarmonicTrap(1.0, 1.0),
         zeeman = ZeemanParams(0.0, 0.1),
         dt = 0.01, n_steps = 50, tol = 1e-4,
@@ -117,7 +117,7 @@ let
     sp = SimParams(; dt = 0.005, n_steps = 1)
     ws = make_workspace(;
         grid, atom = Eu151,
-        interactions = InteractionParams(50.0, 1.0),
+        interactions = InteractionParams(Dict(0 => 50.0, 1 => 1.0)),
         zeeman = ZeemanParams(0.5, 0.1),
         potential = HarmonicTrap(1.0, 1.0, 1.0),
         sim_params = sp,
@@ -140,7 +140,7 @@ let
     sp = SimParams(; dt = 0.005, n_steps = 1)
     ws = make_workspace(;
         grid, atom = Eu151,
-        interactions = InteractionParams(50.0, 1.0),
+        interactions = InteractionParams(Dict(0 => 50.0, 1 => 1.0)),
         zeeman = ZeemanParams(0.5, 0.1),
         potential = HarmonicTrap(1.0, 1.0, 1.0),
         sim_params = sp,

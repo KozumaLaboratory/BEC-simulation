@@ -18,7 +18,7 @@ atom = AtomSpecies("Eu151", 1.0, 6, EU_a_s_dl, 0.0)
 psi_gs = load(joinpath(@__DIR__, "cache_eu151_gs_3d.jld2"), "psi")
 
 trap = HarmonicTrap((1.0, 1.0, EU_λ_z))
-interactions = InteractionParams(EU_c0, c1)
+interactions = InteractionParams(Dict(0 => EU_c0, 1 => c1))
 sys = SpinSystem(atom.F)
 n_comp = sys.n_components
 

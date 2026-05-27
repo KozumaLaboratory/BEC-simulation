@@ -104,7 +104,7 @@ function _build_ws(dt::Float64)
     sp = SimParams(; dt=dt, n_steps=1)
     ws = make_workspace(;
         grid, atom=ATOM,
-        interactions=InteractionParams(C0, C1),
+        interactions=InteractionParams(Dict(0 => C0, 1 => C1)),
         zeeman=ZeemanParams(0.5, 0.1),
         potential=HarmonicTrap(1.0),
         sim_params=sp,

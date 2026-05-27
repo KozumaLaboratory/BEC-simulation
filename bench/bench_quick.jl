@@ -35,7 +35,7 @@ let
     grid = make_grid(GridConfig(256, 20.0))
     sp = SimParams(; dt=0.005, n_steps=1)
     ms = bench_split_step("1D F=1 (256pt)";
-        grid, atom=Rb87, interactions=InteractionParams(10.0, -0.5),
+        grid, atom=Rb87, interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.5)),
         potential=HarmonicTrap(1.0), sim_params=sp, n_bench=200)
     results["1d_f1"] = ms
 end
@@ -45,7 +45,7 @@ let
     grid = make_grid(GridConfig((64, 64), (16.0, 16.0)))
     sp = SimParams(; dt=0.005, n_steps=1)
     ms = bench_split_step("2D F=1+DDI (64²)";
-        grid, atom=Rb87, interactions=InteractionParams(10.0, -0.5),
+        grid, atom=Rb87, interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.5)),
         potential=HarmonicTrap((1.0, 1.0)), sim_params=sp,
         enable_ddi=true, c_dd=1.0, n_bench=50)
     results["2d_f1_ddi"] = ms
@@ -57,7 +57,7 @@ let
     sp = SimParams(; dt=0.005, n_steps=1)
     atom = AtomSpecies("Eu151", 1.0, 6, 1.0, 0.0)
     ms = bench_split_step("3D F=6 (16³)";
-        grid, atom, interactions=InteractionParams(100.0, 0.0),
+        grid, atom, interactions=InteractionParams(Dict(0 => 100.0)),
         potential=HarmonicTrap((1.0, 1.0, 1.0)), sim_params=sp, n_bench=20)
     results["3d_f6"] = ms
 end
@@ -68,7 +68,7 @@ let
     sp = SimParams(; dt=0.005, n_steps=1)
     atom = AtomSpecies("Eu151", 1.0, 6, 1.0, 0.0)
     ms = bench_split_step("3D F=6+DDI (16³)";
-        grid, atom, interactions=InteractionParams(100.0, 0.0),
+        grid, atom, interactions=InteractionParams(Dict(0 => 100.0)),
         potential=HarmonicTrap((1.0, 1.0, 1.0)), sim_params=sp,
         enable_ddi=true, c_dd=100.0, n_bench=10)
     results["3d_f6_ddi"] = ms

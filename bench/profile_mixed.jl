@@ -10,7 +10,7 @@ function mk_ws(; T, F=6, enable_ddi=true, dims=(128,128,128))
     grid = make_grid(cfg; dtype=T)
     atom = F == 1 ? AtomSpecies("Na23", 3.8e-26, 1, 52.0*5.29e-11, 54.3*5.29e-11, 0.0) :
                      AtomSpecies("Eu151", 2.5e-25, 6, 110*5.29e-11, 0.0, 6.977*9.274e-24)
-    ip = F == 1 ? InteractionParams(50.0, -0.2) : InteractionParams(100.0, 2.8)
+    ip = F == 1 ? InteractionParams(Dict(0 => 50.0, 1 => -0.2)) : InteractionParams(Dict(0 => 100.0, 1 => 2.8))
     trap = HarmonicTrap(1.0,1.0,1.0)
     sp = SimParams(; dt=0.001, n_steps=50)
     kw = (; grid, atom, interactions=ip, sim_params=sp, potential=trap,

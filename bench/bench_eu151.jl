@@ -18,7 +18,7 @@ psi_gs = load_or_compute_gs(grid)
 dt = 0.005
 sp = SimParams(; dt, n_steps=1)
 ws = make_workspace(;
-    grid, atom, interactions=InteractionParams(EU_c0, c1),
+    grid, atom, interactions=InteractionParams(Dict(0 => EU_c0, 1 => c1)),
     zeeman=ZeemanParams(EU_p_weak, 0.0),
     potential=HarmonicTrap((1.0, 1.0, EU_λ_z)),
     sim_params=sp, psi_init=copy(psi_gs),

@@ -32,7 +32,7 @@ t_load = @elapsed using SpinorBEC
     else
         AtomSpecies("scalar", 1e-25, 0, 100.0 * 5.29e-11, 0.0)
     end
-    interactions = InteractionParams(10.0, 0.0)
+    interactions = InteractionParams(Dict(0 => 10.0))
     pot = if ndim == 1
         HarmonicTrap(1.0)
     else

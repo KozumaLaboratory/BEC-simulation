@@ -11,7 +11,7 @@ function load_or_compute_gs(grid; cache_suffix="", trap=HarmonicTrap((1.0, 1.0, 
     println("Finding ground state (ITP, no DDI)...")
     atom = AtomSpecies("Eu151", 1.0, 6, EU_a_s_dl, 0.0)
     gs = find_ground_state(;
-        grid, atom, interactions=InteractionParams(EU_c0, 0.0),
+        grid, atom, interactions=InteractionParams(Dict(0 => EU_c0)),
         zeeman=ZeemanParams(100.0, 0.0), potential=trap,
         dt=0.005, n_steps=20000, tol=1e-9,
         initial_state=:ferromagnetic, enable_ddi=false,

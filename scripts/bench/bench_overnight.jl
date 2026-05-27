@@ -48,7 +48,7 @@ _section("R33") do
         grid = make_grid(GridConfig((n_pts, n_pts, n_z), (8.0, 8.0, 4.0)))
         r = find_ground_state(;
             grid, atom,
-            interactions=InteractionParams(20.0, p[1]),
+            interactions=InteractionParams(Dict(0 => 20.0, 1 => p[1])),
             potential=HarmonicTrap((1.0, 1.0, 2.0)),
             enable_ddi=(p[2] > 0), c_dd=p[2],
             dt=0.005, n_steps,
@@ -99,7 +99,7 @@ _section("R35") do
     # Build F closure: c0=20, scan (c1, c_dd_proxy)
     Fboundary = make_phase_diff_eval(grid, atom;
         parameter_setter=θ -> (
-            interactions=InteractionParams(20.0, θ[1]),
+            interactions=InteractionParams(Dict(0 => 20.0, 1 => θ[1])),
             potential=HarmonicTrap((1.0, 1.0)),
         ),
         phase_A_init=:m_plus_F,
@@ -139,7 +139,7 @@ _section("R36") do
     function eval_fn(θ::AbstractVector)
         r = find_ground_state(;
             grid, atom,
-            interactions=InteractionParams(20.0, θ[1]),
+            interactions=InteractionParams(Dict(0 => 20.0, 1 => θ[1])),
             potential=HarmonicTrap((1.0, 1.0)),
             dt=0.005, n_steps=150, tol=1.0e-5,
             initial_state=:polar, verbose=false,
@@ -189,7 +189,7 @@ _section("R39") do
 
     t_bdg = @elapsed samples = bogoliubov_along_boundary_curve(
         points,
-        θ -> (interactions=InteractionParams(20.0, θ[1]),
+        θ -> (interactions=InteractionParams(Dict(0 => 20.0, 1 => θ[1])),
             potential=HarmonicTrap((1.0, 1.0))),
         grid, atom;
         phase_init=:m_plus_F,
@@ -215,7 +215,7 @@ _section("R32") do
         GC.gc()
         t = @elapsed r = find_ground_state_lbfgs(;
             grid, atom,
-            interactions=InteractionParams(50.0, 0.0),
+            interactions=InteractionParams(Dict(0 => 50.0)),
             potential=HarmonicTrap((1.0, 1.0, 1.5)),
             n_steps=300, tol=1.0e-7,
             initial_state=:m_plus_F,

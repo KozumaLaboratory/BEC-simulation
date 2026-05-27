@@ -55,7 +55,7 @@ function bench_case(; dims::NTuple, T::Type, F::Int, enable_ddi::Bool, backend,
         error("unsupported F=$F")
     end
 
-    ip = F == 1 ? InteractionParams(50.0, -0.2) : InteractionParams(100.0, 2.8)
+    ip = F == 1 ? InteractionParams(Dict(0 => 50.0, 1 => -0.2)) : InteractionParams(Dict(0 => 100.0, 1 => 2.8))
     trap = length(dims) == 3 ? HarmonicTrap(1.0, 1.0, 1.0) :
            length(dims) == 2 ? HarmonicTrap(1.0, 1.0) : HarmonicTrap(1.0)
     sp = SimParams(; dt = 0.001, n_steps = n_bench_steps)
