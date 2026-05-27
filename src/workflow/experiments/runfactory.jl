@@ -13,39 +13,64 @@
 using YAML
 using Dates: now
 
-export config, ground_state, dynamics, analyze,
-    B, ddi, lhy, loss, save, ramp,
+export config,
+    ground_state, dynamics, analyze,
+    B, ddi, lhy, loss, save, ramp, rate,
     sweep, regenerate
 
-# === ramp value marker ===
+# === ramp / rate value markers ===
 struct Ramp
     from::Any
     to::Any
     duration::Float64
 end
 
+struct RateSpec
+    value::Any  # Number or Ramp
+end
+
 """
     ramp(from, to; duration=0.0)
 
 Linear ramp from `from` → `to` over `duration` (dimensionless ω_ref⁻¹).
-Embed in a `B(...)` call to drive a time-dependent field.
+Embeds in a `B(...)` call for time-dependent Bz / B_mag / theta.
 """
 ramp(from, to; duration::Real=0.0) = Ramp(from, to, float(duration))
 
+"""
+    rate(v)
+
+Wraps `v` (a Number or a `ramp(...)`) into the `{rate: ...}` form used
+for time-dependent `phi` in the spherical-B schema. Equivalent to the
+YAML `phi: {rate: <v>}` and `phi: {rate: {from, to, duration}}`.
+"""
+rate(v) = RateSpec(v)
+rate(from, to; duration::Real=0.0) = RateSpec(ramp(from, to; duration=duration))
+
 # === Block builders (match YAML sub-keys 1:1) ===
 
-"""
-    B(; Bz, theta=0.0, phi=0.0)
+_serialize_b(v::Ramp) = Dict("from" => v.from, "to" => v.to, "duration" => v.duration)
+function _serialize_b(v::RateSpec)
+    inner = v.value isa Ramp ? _serialize_b(v.value) : v.value
+    Dict("rate" => inner)
+end
+_serialize_b(v) = v
 
-Magnetic-field block. `Bz` may be a constant (Number or "X Gauss" string)
-or a `ramp(from, to; duration)` for time-dependent fields.
 """
-function B(; Bz, theta::Real=0.0, phi::Real=0.0)
-    body = Dict{Any, Any}("theta" => float(theta), "phi" => float(phi))
-    body["Bz"] =
-        Bz isa Ramp ?
-        Dict("from" => Bz.from, "to" => Bz.to, "duration" => Bz.duration) :
-        Bz
+    B(; kwargs...)
+
+Magnetic-field block. Pass any subset of `Bz`, `B_mag`, `theta`, `phi`.
+Each value may be a constant (Number or "X Gauss" string), a
+`ramp(from, to; duration)`, or — for `phi` — a `rate(...)` wrapper.
+`theta` and `phi` default to `0.0` when not supplied.
+"""
+function B(; kwargs...)
+    body = Dict{Any, Any}()
+    haskey(kwargs, :theta) || (body["theta"] = 0.0)
+    haskey(kwargs, :phi) || (body["phi"] = 0.0)
+    for (k, v) in pairs(kwargs)
+        body[string(k)] = _serialize_b(v)
+    end
     body
 end
 
@@ -155,9 +180,9 @@ function dynamics(;
     ddi::Dict=Dict{Any, Any}("secular" => false),
     lhy::Dict=lhy(),
     loss::Union{Nothing, Dict}=nothing,
-    rotating_frame_omega::Real=0.0,
-    seed_amplitude::Real=1.0e-6,
-    seed_k_cut::Real=2.5,
+    rotating_frame_omega::Union{Nothing, Real}=nothing,
+    seed_amplitude::Union{Nothing, Real}=1.0e-6,
+    seed_k_cut::Union{Nothing, Real}=2.5,
     save::Dict=save(),
     extra::Dict=Dict{Any, Any}(),
 )
@@ -168,10 +193,11 @@ function dynamics(;
         "ddi" => ddi,
         "lhy" => lhy,
     )
-    iszero(rotating_frame_omega) || (body["rotating_frame_omega"] = float(rotating_frame_omega))
+    rotating_frame_omega === nothing ||
+        (body["rotating_frame_omega"] = float(rotating_frame_omega))
     loss === nothing || (body["loss"] = loss)
-    body["seed_amplitude"] = float(seed_amplitude)
-    body["seed_k_cut"] = float(seed_k_cut)
+    seed_amplitude === nothing || (body["seed_amplitude"] = float(seed_amplitude))
+    seed_k_cut === nothing || (body["seed_k_cut"] = float(seed_k_cut))
     body["save"] = save
     merge!(body, extra)
     Dict{Any, Any}("dynamics" => body)
