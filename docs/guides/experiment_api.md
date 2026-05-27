@@ -1,16 +1,18 @@
 # Experiment / Batch — the unified workflow API
 
-`Experiment` is the unit object of SpinorBEC. A single triple
+`Experiment` is the unit object of SpinorBEC. A pair
 
 ```
-(spec, outdir, lazy observation cache)
+(spec, store)   →   outdir derived via SHA-256 of canonical spec bytes
 ```
 
 owns the full simulation lifecycle: define → persist → run → observe.
-`Batch` is a `Vector{Experiment}` paired with the sweep axis they vary
-over. Together they subsume the scattered `run_yaml + skip-if-cached
-loops + RunResult + free observable functions` patterns that used to
-live across `scripts/`.
+Users never name an outdir — the spec uniquely determines it
+(content-addressable storage, Nix-derivation style). `Batch` is a
+`Vector{Experiment}` paired with the sweep axis they vary over.
+Together they subsume the scattered `run_yaml + skip-if-cached loops +
+RunResult + free observable functions` patterns that used to live
+across `scripts/`.
 
 This guide is a reference. For the REPL-first builder DSL
 (`config / B / ddi / lhy / loss / save / ramp / rate / ground_state /
@@ -42,9 +44,10 @@ spec = config([
     analyze(:phase_classify, :winding_map, :energy_decomposition),
 ])
 
-exp = Experiment(spec; outdir="runs/eu_demo/K3x1p0")
+exp = Experiment(spec)       # outdir auto-derived: runs/<16hex>/
+outdir(exp)                  # e.g. "runs/12174e883326ecac"
 
-write_run!(exp)              # writes runs/eu_demo/K3x1p0/config.yaml
+write_run!(exp)              # writes config.yaml into outdir
 run!(exp)                    # runs (idempotent — no-op if result.jld2 exists)
 
 exp.times                    # Vector{Float64}, snapshot time axis
@@ -56,26 +59,54 @@ exp.density_stats_at(20.0)   # (peak, fwhm_x, fwhm_z, on_axis, σ/μ)
 ```
 
 The Experiment is cheap to construct (no I/O until you touch an
-observable). Repeated property access is O(1) cache hits.
+observable). Repeated property access is O(1) cache hits. Identical
+specs share an outdir automatically — re-running the cell finds the
+cached result.
+
+---
+
+## Content-addressable storage (CAS)
+
+A spec hashes to a 16-hex content id via SHA-256 of its canonical bytes
+(`{sorted_key:value,...}` recursively, Float64 in `%.17g`, NaN/Inf
+errors). The id is the cell's directory under the store root:
+
+```julia
+content_id(spec)             # "12174e883326ecac"
+outdir(exp)                  # "<store.root>/12174e883326ecac"
+```
+
+Store root defaults to `runs/`, overridable via `ENV["SPINORBEC_STORE"]`
+or an explicit `CASStore("/data/runs")` passed as `store=`.
+
+Properties this gives:
+
+| Class of bug | After CAS |
+|---|---|
+| edit spec, forget to rename outdir | impossible — hash changes automatically |
+| same spec run twice | automatic dedupe |
+| naming scheme drift across batches | no naming at all |
+| "which dir is the latest run of this config?" | the question dissolves |
+| multi-node cluster collision on shared FS | content addresses are unique per spec |
 
 ---
 
 ## Construction
 
 ```julia
-Experiment(spec::Dict; outdir::AbstractString)
-Experiment(yaml_path::AbstractString)
+Experiment(spec::Dict; store=default_store(), outdir=nothing)
+Experiment(yaml_path::AbstractString; store=default_store())
 ```
 
-- `Experiment(spec; outdir)` — from an in-memory spec Dict (typically
-  built via `config([...])`). `outdir` is where `write_run!` will
-  persist the YAML and where `run!` looks for / writes `result.jld2`.
-- `Experiment(yaml_path)` — from an existing YAML file. `outdir` is
-  resolved by:
-  1. if `yaml_path` is `<dir>/config.yaml`, use `<dir>`;
-  2. else scan `runs/` for `<base>_<hash>/` siblings newer than the
-     YAML (via `find_run_dir`) and pick the most recent;
-  3. else fall back to `<yaml_dir>/<base>/`.
+- `Experiment(spec)` — outdir auto-derived from `content_id(spec)`.
+  Pass `outdir=` only when overriding CAS (e.g. for migration); doing
+  so disables CAS dedup for that Experiment.
+- `Experiment(yaml_path)` — outdir resolution is four-way:
+  1. content_id CAS dir if it already holds a result;
+  2. else `yaml`'s own dir if it holds a result (directory-per-config form);
+  3. else legacy `runs/<base>_<hash>/` via `find_run_dir` (read-only
+     fallback for pre-CAS artifacts);
+  4. else the empty CAS dir as the write target for the next `run!`.
 
 ---
 
@@ -133,12 +164,6 @@ function: `density_stats(density3d; variance=nothing)`.
 batch = Batch(
     base_spec;
     over = :pipeline_2_dynamics_loss => [loss(K3_si=f*1e-41) for f in factors],
-    outdir = "runs/eu_k3_sweep",
-    name = d -> begin
-        v = d === nothing ? 0.0 :
-            parse(Float64, split(d["K3_per_m_si"][1], " ")[1]) / 1e-41
-        "K3x" * replace(string(round(v; digits=1)), "." => "p")
-    end,
 )
 
 write_run!(batch)            # N config.yaml files + _manifest.yaml
@@ -146,9 +171,13 @@ run!(batch)                  # serial, skip cached cells (parallel arg
                              #   reserved; today only parallel=1 works)
 ```
 
-- `batch.outdir` is the batch root. Each cell's outdir is
-  `<batch.outdir>/<name(value)>/` (directory-per-cell layout, matching
-  the directory-per-config form of `run_yaml`).
+- Each cell is an Experiment with its own content_id outdir — no
+  per-cell naming needed. The legacy `name = v -> "..."` callback is
+  silently ignored (the warn-once path stays, in case you rely on it).
+- The optional `outdir=` kwarg now controls only the location of the
+  batch's `_manifest.yaml`. It defaults to
+  `<store.root>/_batches/<batch_content_id>/` — also CAS-derived from
+  the `(base_spec, over)` pair.
 - `batch[i]`, `length(batch)`, and iteration work as on a Vector.
 
 ### Sweep axis: `over`
@@ -159,16 +188,29 @@ vectors — `:pipeline_2_dynamics_loss` walks `spec["pipeline"][2]
   ["dynamics"]["loss"]`. The values list is what gets substituted; the
 length determines the number of cells.
 
-Multi-axis (cartesian) sweeps and multi-override cell lists from the
-old `sweep(outdir, base, cells)` are NOT yet wired on `Batch`; for now
-build the cell list yourself and construct one Experiment per cell.
+Multi-override cell-list form (one Pair per cell, each carrying
+multiple dotted-path overrides):
+
+```julia
+cells = [
+    1.0 => Dict(:pipeline_2_dynamics_duration => 5.0,
+                :pipeline_2_dynamics_loss     => loss(K3_si=1e-41)),
+    2.0 => Dict(:pipeline_2_dynamics_duration => 10.0,
+                :pipeline_2_dynamics_loss     => loss(K3_si=3e-41)),
+]
+batch = Batch(base, cells)
+```
 
 ### Rehydrate from disk
 
 ```julia
-batch = Batch("runs/eu_k3_sweep")   # reads _manifest.yaml
-batch[1].Fz_t                       # works without re-running
+batch = Batch("runs/_batches/<bid>")   # reads _manifest.yaml
+batch[1].Fz_t                          # works without re-running
 ```
+
+Legacy pre-CAS sweeps (cells under `<manifest_dir>/<cellname>/`)
+remain readable — the rehydrator detects them via `manifest["points"][i]["filename"]`
+and pins the cell's outdir override to the legacy path.
 
 ### Tabulate
 
