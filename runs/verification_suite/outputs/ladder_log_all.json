@@ -1,0 +1,102 @@
+{
+  "07_spin1_polar_bogoliubov_stable.yaml": {
+    "elapsed_sec": 2.96,
+    "status": "OK",
+    "level": 1
+  },
+  "_total_sec": 256.69,
+  "L3_cr_f3_edh_toy_ddi_on.yaml": {
+    "elapsed_sec": 7.89,
+    "status": "FAIL",
+    "error": "ArgumentError: zeeman Level 1/2 requires omega_ref; set zeeman.omega_ref_hz (Hz) or interactions.omega_ref (rad/s)",
+    "level": 3
+  },
+  "02_spin1_polar_contact_ground.yaml": {
+    "elapsed_sec": 9.16,
+    "status": "OK",
+    "level": 1
+  },
+  "00_scalar_free_uniform_stationary.yaml": {
+    "elapsed_sec": 38.82,
+    "status": "OK",
+    "level": 1
+  },
+  "05_spin1_zeeman_phase_only.yaml": {
+    "elapsed_sec": 1.13,
+    "status": "OK",
+    "level": 1
+  },
+  "06_spin1_sma_spin_mixing.yaml": {
+    "elapsed_sec": 4.3,
+    "status": "FAIL",
+    "error": "MethodError: no method matching apply_spin_mixing_step!(::CuArray{ComplexF64, 4, CUDA.DeviceMemory}, ::SpinMatrices{3, StaticArraysCore.SMatrix{3, 3, ComplexF64, 9}}, ::Float64, ::Float64, ::Int64; imaginary_time::Bool, psi_mf::Nothing)\nThis method does not support all of the given keyword arguments (and may not support any).\n\nClosest candidates are:\n  apply_spin_mixing_step!(::CuArray{Complex{T}}",
+    "level": 1
+  },
+  "04_spin2_cyclic_contact_ground.yaml": {
+    "elapsed_sec": 11.67,
+    "status": "OK",
+    "level": 1
+  },
+  "L2_ddi_axis_flip_Bx.yaml": {
+    "elapsed_sec": 0.01,
+    "status": "FAIL",
+    "error": "ArgumentError: B: Cartesian form (Bx/By/Bz) and non-zero spherical direction (theta/phi) are mutually exclusive. Cartesian implies direction via components; for tilted/rotating B use spherical magnitude + theta + phi instead.",
+    "level": 2
+  },
+  "L2_ddi_prolate_trap.yaml": {
+    "elapsed_sec": 12.01,
+    "status": "OK",
+    "level": 2
+  },
+  "L4_eu_matsui_hamiltonian_only_32.yaml": {
+    "elapsed_sec": 9.22,
+    "status": "FAIL",
+    "error": "ArgumentError: zeeman Level 1/2 requires omega_ref; set zeeman.omega_ref_hz (Hz) or interactions.omega_ref (rad/s)",
+    "level": 4
+  },
+  "_level_filter": null,
+  "L4_eu_matsui_hamiltonian_only_ddi_off_32.yaml": {
+    "elapsed_sec": 6.93,
+    "status": "FAIL",
+    "error": "ArgumentError: zeeman Level 1/2 requires omega_ref; set zeeman.omega_ref_hz (Hz) or interactions.omega_ref (rad/s)",
+    "level": 4
+  },
+  "01_scalar_harmonic_oscillator_ground.yaml": {
+    "elapsed_sec": 14.31,
+    "status": "OK",
+    "level": 1
+  },
+  "_n_yamls": 18,
+  "L3_cr_f3_edh_toy_ddi_off.yaml": {
+    "elapsed_sec": 1.45,
+    "status": "FAIL",
+    "error": "ArgumentError: zeeman Level 1/2 requires omega_ref; set zeeman.omega_ref_hz (Hz) or interactions.omega_ref (rad/s)",
+    "level": 3
+  },
+  "L2_ddi_oblate_trap.yaml": {
+    "elapsed_sec": 21.16,
+    "status": "OK",
+    "level": 2
+  },
+  "09_edh_toy_spin_orbit_transfer.yaml": {
+    "elapsed_sec": 33.78,
+    "status": "OK",
+    "level": 1
+  },
+  "L4_eu_matsui_hamiltonian_only_64.yaml": {
+    "elapsed_sec": 38.76,
+    "status": "FAIL",
+    "error": "ArgumentError: zeeman Level 1/2 requires omega_ref; set zeeman.omega_ref_hz (Hz) or interactions.omega_ref (rad/s)",
+    "level": 4
+  },
+  "03_spin1_ferromagnetic_contact_ground.yaml": {
+    "elapsed_sec": 3.75,
+    "status": "OK",
+    "level": 1
+  },
+  "08_ddi_spherical_polarized_zero_kernel.yaml": {
+    "elapsed_sec": 26.36,
+    "status": "OK",
+    "level": 1
+  }
+}

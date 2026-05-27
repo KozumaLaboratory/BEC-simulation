@@ -1,0 +1,1405 @@
+{
+  "04_spin2_cyclic_contact_ground": {
+    "psi_shape": [
+      24,
+      24,
+      24,
+      5
+    ],
+    "duration_seconds": 11.542212009429932,
+    "energy": 2.8713143189853443,
+    "path": "runs/04_spin2_cyclic_contact_ground_e5c7a627/point_001.jld2",
+    "analyze/phase_classify/keys": [
+      "spin_order",
+      "nematic_order",
+      "biaxiality",
+      "Q6",
+      "star_entropy",
+      "magnetization_density",
+      "phase",
+      "point_group",
+      "channel_weights"
+    ],
+    "psi_norm2": 13.824,
+    "analyze/energy_decomposition/keys": [
+      "spin_order",
+      "nematic_order",
+      "biaxiality",
+      "Q6",
+      "star_entropy",
+      "magnetization_density",
+      "phase",
+      "point_group",
+      "channel_weights"
+    ],
+    "found_keys": [
+      "psi",
+      "scan_index",
+      "run_name",
+      "started_at",
+      "finished_at",
+      "duration_seconds",
+      "energy",
+      "converged",
+      "grid_box_size",
+      "grid_n_points",
+      "env",
+      "analyze"
+    ],
+    "converged": true,
+    "kind": "scan_point",
+    "analyze_keys": [
+      "energy_decomposition",
+      "phase_classify"
+    ]
+  },
+  "L7_loss_only_uniform_K3": {
+    "dynamics/times": {
+      "max": 0.9999999999999453,
+      "min": 0.0,
+      "rel_drift": null,
+      "first": 0.0,
+      "drift": 0.9999999999999453,
+      "last": 0.9999999999999453,
+      "n": 41
+    },
+    "kind": "pipeline",
+    "dynamics/norms": {
+      "max": 1.0,
+      "min": 0.9890860779293127,
+      "rel_drift": -0.01091392207068731,
+      "first": 1.0,
+      "drift": -0.01091392207068731,
+      "last": 0.9890860779293127,
+      "n": 41
+    },
+    "found_keys": [
+      "psi",
+      "dynamics"
+    ],
+    "dynamics_keys": [
+      "times",
+      "norms",
+      "Fz",
+      "component_populations",
+      "psi_snapshots_streamed"
+    ],
+    "dynamics/component_populations": {
+      "per_col_drift": [
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0
+      ],
+      "shape": [
+        41,
+        7
+      ],
+      "max_abs_per_col_drift": 8.326672684688674e-17,
+      "first_row": [
+        0.142857,
+        0.142857,
+        0.142857,
+        0.142857,
+        0.142857,
+        0.142857,
+        0.142857
+      ],
+      "last_row": [
+        0.142857,
+        0.142857,
+        0.142857,
+        0.142857,
+        0.142857,
+        0.142857,
+        0.142857
+      ]
+    },
+    "path": "runs/L7_loss_only_uniform_K3_23bdda03/result.jld2",
+    "dynamics/Fz": {
+      "max": 5.551115123125783e-17,
+      "min": -5.551115123125783e-17,
+      "rel_drift": -1.0,
+      "first": 5.551115123125783e-17,
+      "drift": -5.551115123125783e-17,
+      "last": 0.0,
+      "n": 41
+    }
+  },
+  "L2_ddi_axis_flip_Bx": {
+    "psi_shape": [
+      32,
+      32,
+      32,
+      7
+    ],
+    "duration_seconds": 22.00781512260437,
+    "energy": 4.993759595230199,
+    "path": "runs/L2_ddi_axis_flip_Bx_f3009b94/point_001.jld2",
+    "analyze/phase_classify/keys": [
+      "spin_order",
+      "nematic_order",
+      "biaxiality",
+      "Q6",
+      "star_entropy",
+      "magnetization_density",
+      "phase",
+      "point_group",
+      "channel_weights"
+    ],
+    "psi_norm2": 18.962962962962962,
+    "analyze/energy_decomposition/keys": [
+      "spin_order",
+      "nematic_order",
+      "biaxiality",
+      "Q6",
+      "star_entropy",
+      "magnetization_density",
+      "phase",
+      "point_group",
+      "channel_weights"
+    ],
+    "found_keys": [
+      "psi",
+      "scan_index",
+      "run_name",
+      "started_at",
+      "finished_at",
+      "duration_seconds",
+      "energy",
+      "converged",
+      "grid_box_size",
+      "grid_n_points",
+      "env",
+      "units",
+      "analyze"
+    ],
+    "converged": false,
+    "kind": "scan_point",
+    "analyze_keys": [
+      "energy_decomposition",
+      "phase_classify"
+    ]
+  },
+  "L4_eu_matsui_hamiltonian_only_48": {
+    "dynamics/times": {
+      "max": 5.9999999999999165,
+      "min": 0.0,
+      "rel_drift": null,
+      "first": 0.0,
+      "drift": 5.9999999999999165,
+      "last": 5.9999999999999165,
+      "n": 13
+    },
+    "kind": "pipeline",
+    "dynamics/norms": {
+      "max": 1.0000000000000002,
+      "min": 0.9999999999992076,
+      "rel_drift": -7.925882172798991e-13,
+      "first": 1.0000000000000002,
+      "drift": -7.925882172798993e-13,
+      "last": 0.9999999999992076,
+      "n": 13
+    },
+    "found_keys": [
+      "psi",
+      "dynamics"
+    ],
+    "dynamics_keys": [
+      "times",
+      "norms",
+      "Fz",
+      "component_populations",
+      "psi_snapshots_streamed"
+    ],
+    "dynamics/component_populations": {
+      "per_col_drift": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        5.0e-6,
+        0.001854,
+        -0.001859
+      ],
+      "shape": [
+        12,
+        13
+      ],
+      "max_abs_per_col_drift": 0.001858930660064595,
+      "first_row": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        4.9e-5,
+        0.999951
+      ],
+      "last_row": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        5.0e-6,
+        0.001903,
+        0.998092
+      ]
+    },
+    "path": "runs/L4_eu_matsui_hamiltonian_only_48_308ca6aa/result.jld2",
+    "dynamics/Fz": {
+      "max": -5.998087732419732,
+      "min": -5.999995062723197,
+      "rel_drift": -0.0003178886454948197,
+      "first": -5.999995062723197,
+      "drift": 0.0019073303034646827,
+      "last": -5.998087732419732,
+      "n": 13
+    }
+  },
+  "05_spin1_zeeman_phase_only": {
+    "dynamics/times": {
+      "max": 1.9999999999998905,
+      "min": 0.0,
+      "rel_drift": null,
+      "first": 0.0,
+      "drift": 1.9999999999998905,
+      "last": 1.9999999999998905,
+      "n": 21
+    },
+    "kind": "pipeline",
+    "dynamics/norms": {
+      "max": 1.0,
+      "min": 0.9999999999998819,
+      "rel_drift": -1.1812772982011666e-13,
+      "first": 1.0,
+      "drift": -1.1812772982011666e-13,
+      "last": 0.9999999999998819,
+      "n": 21
+    },
+    "found_keys": [
+      "psi",
+      "dynamics"
+    ],
+    "dynamics_keys": [
+      "times",
+      "norms",
+      "Fz",
+      "component_populations",
+      "psi_snapshots_streamed"
+    ],
+    "dynamics/component_populations": {
+      "per_col_drift": [
+        -0.0,
+        0.0,
+        0.0
+      ],
+      "shape": [
+        20,
+        3
+      ],
+      "max_abs_per_col_drift": 1.230682222796986e-13,
+      "first_row": [
+        0.333333,
+        0.333333,
+        0.333333
+      ],
+      "last_row": [
+        0.333333,
+        0.333333,
+        0.333333
+      ]
+    },
+    "path": "runs/05_spin1_zeeman_phase_only_487eb6c5/result.jld2",
+    "dynamics/Fz": {
+      "max": 0.0,
+      "min": -2.573496971081113e-13,
+      "rel_drift": null,
+      "first": 0.0,
+      "drift": -2.573496971081113e-13,
+      "last": -2.573496971081113e-13,
+      "n": 21
+    }
+  },
+  "09_edh_toy_spin_orbit_transfer": {
+    "dynamics/times": {
+      "max": 0.7999999999999673,
+      "min": 0.0,
+      "rel_drift": null,
+      "first": 0.0,
+      "drift": 0.7999999999999673,
+      "last": 0.7999999999999673,
+      "n": 41
+    },
+    "kind": "pipeline",
+    "dynamics/norms": {
+      "max": 1.0000000000014684,
+      "min": 1.0,
+      "rel_drift": 1.468380972369232e-12,
+      "first": 1.0,
+      "drift": 1.468380972369232e-12,
+      "last": 1.0000000000014684,
+      "n": 41
+    },
+    "found_keys": [
+      "psi",
+      "dynamics"
+    ],
+    "dynamics_keys": [
+      "times",
+      "norms",
+      "Fz",
+      "component_populations",
+      "psi_snapshots_streamed"
+    ],
+    "dynamics/component_populations": {
+      "per_col_drift": [
+        -0.015483,
+        0.015235,
+        0.000245,
+        3.0e-6,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "shape": [
+        40,
+        13
+      ],
+      "max_abs_per_col_drift": 0.015482783316663529,
+      "first_row": [
+        0.999985,
+        1.5e-5,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "last_row": [
+        0.984502,
+        0.01525,
+        0.000245,
+        3.0e-6,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "path": "runs/09_edh_toy_spin_orbit_transfer_17fe1cec/result.jld2",
+    "dynamics/Fz": {
+      "max": 5.99999852266131,
+      "min": 5.984251681961809,
+      "rel_drift": -0.0026244740961230474,
+      "first": 5.99999852266131,
+      "drift": -0.015746840699501163,
+      "last": 5.984251681961809,
+      "n": 41
+    }
+  },
+  "L3_cr_f3_edh_toy_ddi_off": {
+    "dynamics/times": {
+      "max": 7.999999999999852,
+      "min": 0.0,
+      "rel_drift": null,
+      "first": 0.0,
+      "drift": 7.999999999999852,
+      "last": 7.999999999999852,
+      "n": 33
+    },
+    "kind": "pipeline",
+    "dynamics/norms": {
+      "max": 0.9999999999999996,
+      "min": 0.9999999999998178,
+      "rel_drift": -1.817435091311382e-13,
+      "first": 0.9999999999999996,
+      "drift": -1.8174350913113813e-13,
+      "last": 0.9999999999998178,
+      "n": 33
+    },
+    "found_keys": [
+      "psi",
+      "dynamics"
+    ],
+    "dynamics_keys": [
+      "times",
+      "norms",
+      "Fz",
+      "component_populations",
+      "psi_snapshots_streamed"
+    ],
+    "dynamics/component_populations": {
+      "per_col_drift": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -0.0,
+        0.0
+      ],
+      "shape": [
+        32,
+        7
+      ],
+      "max_abs_per_col_drift": 3.3306690738754696e-16,
+      "first_row": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "last_row": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "path": "runs/L3_cr_f3_edh_toy_ddi_off_e0dd21ff/result.jld2",
+    "dynamics/Fz": {
+      "max": -2.999999999997032,
+      "min": -2.9999999999975775,
+      "rel_drift": -1.8178051656543908e-13,
+      "first": -2.9999999999975775,
+      "drift": 5.453415496958769e-13,
+      "last": -2.999999999997032,
+      "n": 33
+    }
+  },
+  "01_scalar_harmonic_oscillator_ground": {
+    "psi_shape": [
+      32,
+      32,
+      32,
+      1
+    ],
+    "duration_seconds": 14.185713052749634,
+    "energy": 1.5000000000642852,
+    "path": "runs/01_scalar_harmonic_oscillator_ground_47669c8c/point_001.jld2",
+    "analyze/phase_classify/keys": [
+      "spin_order",
+      "nematic_order",
+      "biaxiality",
+      "Q6",
+      "star_entropy",
+      "magnetization_density",
+      "phase",
+      "point_group",
+      "channel_weights"
+    ],
+    "psi_norm2": 32.76799999999999,
+    "analyze/energy_decomposition/keys": [
+      "spin_order",
+      "nematic_order",
+      "biaxiality",
+      "Q6",
+      "star_entropy",
+      "magnetization_density",
+      "phase",
+      "point_group",
+      "channel_weights"
+    ],
+    "found_keys": [
+      "psi",
+      "scan_index",
+      "run_name",
+      "started_at",
+      "finished_at",
+      "duration_seconds",
+      "energy",
+      "converged",
+      "grid_box_size",
+      "grid_n_points",
+      "env",
+      "analyze"
+    ],
+    "converged": true,
+    "kind": "scan_point",
+    "analyze_keys": [
+      "energy_decomposition",
+      "phase_classify"
+    ]
+  },
+  "02_spin1_polar_contact_ground": {
+    "psi_shape": [
+      24,
+      24,
+      24,
+      3
+    ],
+    "duration_seconds": 9.007463932037354,
+    "energy": 2.867936434278235,
+    "path": "runs/02_spin1_polar_contact_ground_fde06119/point_001.jld2",
+    "analyze/phase_classify/keys": [
+      "spin_order",
+      "nematic_order",
+      "biaxiality",
+      "Q6",
+      "star_entropy",
+      "magnetization_density",
+      "phase",
+      "point_group",
+      "channel_weights"
+    ],
+    "analyze/bogoliubov/keys": [
+      "n0",
+      "max_growth",
+      "unstable",
+      "k_peak",
+      "wavelength",
+      "best_direction",
+      "pattern",
+      "anisotropy"
+    ],
+    "psi_norm2": 13.824000000000002,
+    "analyze/energy_decomposition/keys": [
+      "spin_order",
+      "nematic_order",
+      "biaxiality",
+      "Q6",
+      "star_entropy",
+      "magnetization_density",
+      "phase",
+      "point_group",
+      "channel_weights"
+    ],
+    "found_keys": [
+      "psi",
+      "scan_index",
+      "run_name",
+      "started_at",
+      "finished_at",
+      "duration_seconds",
+      "energy",
+      "converged",
+      "grid_box_size",
+      "grid_n_points",
+      "env",
+      "analyze"
+    ],
+    "converged": true,
+    "kind": "scan_point",
+    "analyze_keys": [
+      "energy_decomposition",
+      "phase_classify",
+      "bogoliubov"
+    ]
+  },
+  "L2_ddi_prolate_trap": {
+    "psi_shape": [
+      24,
+      24,
+      48,
+      7
+    ],
+    "duration_seconds": 11.996600866317749,
+    "energy": -8391.408910198756,
+    "path": "runs/L2_ddi_prolate_trap_ec4d1b34/point_001.jld2",
+    "analyze/phase_classify/keys": [
+      "spin_order",
+      "nematic_order",
+      "biaxiality",
+      "Q6",
+      "star_entropy",
+      "magnetization_density",
+      "phase",
+      "point_group",
+      "channel_weights"
+    ],
+    "psi_norm2": 27.000000000000007,
+    "analyze/energy_decomposition/keys": [
+      "spin_order",
+      "nematic_order",
+      "biaxiality",
+      "Q6",
+      "star_entropy",
+      "magnetization_density",
+      "phase",
+      "point_group",
+      "channel_weights"
+    ],
+    "found_keys": [
+      "psi",
+      "scan_index",
+      "run_name",
+      "started_at",
+      "finished_at",
+      "duration_seconds",
+      "energy",
+      "converged",
+      "grid_box_size",
+      "grid_n_points",
+      "env",
+      "units",
+      "analyze"
+    ],
+    "converged": false,
+    "kind": "scan_point",
+    "analyze_keys": [
+      "energy_decomposition",
+      "phase_classify"
+    ]
+  },
+  "L2_ddi_oblate_trap": {
+    "psi_shape": [
+      48,
+      48,
+      24,
+      7
+    ],
+    "duration_seconds": 21.010231018066406,
+    "energy": -8393.83555966949,
+    "path": "runs/L2_ddi_oblate_trap_35fd5bce/point_001.jld2",
+    "analyze/phase_classify/keys": [
+      "spin_order",
+      "nematic_order",
+      "biaxiality",
+      "Q6",
+      "star_entropy",
+      "magnetization_density",
+      "phase",
+      "point_group",
+      "channel_weights"
+    ],
+    "psi_norm2": 27.0,
+    "analyze/energy_decomposition/keys": [
+      "spin_order",
+      "nematic_order",
+      "biaxiality",
+      "Q6",
+      "star_entropy",
+      "magnetization_density",
+      "phase",
+      "point_group",
+      "channel_weights"
+    ],
+    "found_keys": [
+      "psi",
+      "scan_index",
+      "run_name",
+      "started_at",
+      "finished_at",
+      "duration_seconds",
+      "energy",
+      "converged",
+      "grid_box_size",
+      "grid_n_points",
+      "env",
+      "units",
+      "analyze"
+    ],
+    "converged": false,
+    "kind": "scan_point",
+    "analyze_keys": [
+      "energy_decomposition",
+      "phase_classify"
+    ]
+  },
+  "00_scalar_free_uniform_stationary": {
+    "dynamics/times": {
+      "max": 1.0000000000000007,
+      "min": 0.0,
+      "rel_drift": null,
+      "first": 0.0,
+      "drift": 1.0000000000000007,
+      "last": 1.0000000000000007,
+      "n": 11
+    },
+    "kind": "pipeline",
+    "dynamics/norms": {
+      "max": 1.0000000000000004,
+      "min": 0.9999999999999474,
+      "rel_drift": -5.306866057708246e-14,
+      "first": 1.0000000000000004,
+      "drift": -5.306866057708248e-14,
+      "last": 0.9999999999999474,
+      "n": 11
+    },
+    "found_keys": [
+      "psi",
+      "dynamics"
+    ],
+    "dynamics_keys": [
+      "times",
+      "norms",
+      "Fz",
+      "component_populations",
+      "psi_snapshots_streamed"
+    ],
+    "dynamics/component_populations": {
+      "per_col_drift": [
+        0.0
+      ],
+      "shape": [
+        10,
+        1
+      ],
+      "max_abs_per_col_drift": 0.0,
+      "first_row": [
+        1.0
+      ],
+      "last_row": [
+        1.0
+      ]
+    },
+    "path": "runs/00_scalar_free_uniform_stationary_0ece2fdb/result.jld2",
+    "dynamics/Fz": {
+      "max": 0.0,
+      "min": 0.0,
+      "rel_drift": null,
+      "first": 0.0,
+      "drift": 0.0,
+      "last": 0.0,
+      "n": 11
+    }
+  },
+  "06_spin1_sma_spin_mixing": {
+    "dynamics/times": {
+      "max": 7.999999999999341,
+      "min": 0.0,
+      "rel_drift": null,
+      "first": 0.0,
+      "drift": 7.999999999999341,
+      "last": 7.999999999999341,
+      "n": 81
+    },
+    "kind": "pipeline",
+    "dynamics/norms": {
+      "max": 1.000000000009966,
+      "min": 1.0000000000000002,
+      "rel_drift": 9.965805958245254e-12,
+      "first": 1.0000000000000002,
+      "drift": 9.965805958245255e-12,
+      "last": 1.000000000009966,
+      "n": 81
+    },
+    "found_keys": [
+      "psi",
+      "dynamics"
+    ],
+    "dynamics_keys": [
+      "times",
+      "norms",
+      "Fz",
+      "component_populations",
+      "psi_snapshots_streamed"
+    ],
+    "dynamics/component_populations": {
+      "per_col_drift": [
+        0.0,
+        -0.0,
+        0.0
+      ],
+      "shape": [
+        80,
+        3
+      ],
+      "max_abs_per_col_drift": 1.1920928955078125e-7,
+      "first_row": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "last_row": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "path": "runs/06_spin1_sma_spin_mixing_cbfd2388/result.jld2",
+    "dynamics/Fz": {
+      "max": -9.858963290074079e-8,
+      "min": -9.858963345108295e-8,
+      "rel_drift": 5.582150422532202e-9,
+      "first": -9.858963290074079e-8,
+      "drift": -5.503421609541649e-16,
+      "last": -9.858963345108295e-8,
+      "n": 81
+    }
+  },
+  "03_spin1_ferromagnetic_contact_ground": {
+    "psi_shape": [
+      24,
+      24,
+      24,
+      3
+    ],
+    "duration_seconds": 3.708599805831909,
+    "energy": 2.8509558282677125,
+    "path": "runs/03_spin1_ferromagnetic_contact_ground_cb144f9c/point_001.jld2",
+    "analyze/phase_classify/keys": [
+      "spin_order",
+      "nematic_order",
+      "biaxiality",
+      "Q6",
+      "star_entropy",
+      "magnetization_density",
+      "phase",
+      "point_group",
+      "channel_weights"
+    ],
+    "analyze/bogoliubov/keys": [
+      "n0",
+      "max_growth",
+      "unstable",
+      "k_peak",
+      "wavelength",
+      "best_direction",
+      "pattern",
+      "anisotropy"
+    ],
+    "psi_norm2": 13.823999999999998,
+    "analyze/energy_decomposition/keys": [
+      "spin_order",
+      "nematic_order",
+      "biaxiality",
+      "Q6",
+      "star_entropy",
+      "magnetization_density",
+      "phase",
+      "point_group",
+      "channel_weights"
+    ],
+    "found_keys": [
+      "psi",
+      "scan_index",
+      "run_name",
+      "started_at",
+      "finished_at",
+      "duration_seconds",
+      "energy",
+      "converged",
+      "grid_box_size",
+      "grid_n_points",
+      "env",
+      "analyze"
+    ],
+    "converged": true,
+    "kind": "scan_point",
+    "analyze_keys": [
+      "energy_decomposition",
+      "phase_classify",
+      "bogoliubov"
+    ]
+  },
+  "L3_cr_f3_edh_toy_ddi_on": {
+    "dynamics/times": {
+      "max": 7.999999999999852,
+      "min": 0.0,
+      "rel_drift": null,
+      "first": 0.0,
+      "drift": 7.999999999999852,
+      "last": 7.999999999999852,
+      "n": 33
+    },
+    "kind": "pipeline",
+    "dynamics/norms": {
+      "max": 1.0000000000000002,
+      "min": 0.9999999999960236,
+      "rel_drift": -3.976596829602385e-12,
+      "first": 1.0000000000000002,
+      "drift": -3.976596829602386e-12,
+      "last": 0.9999999999960236,
+      "n": 33
+    },
+    "found_keys": [
+      "psi",
+      "dynamics"
+    ],
+    "dynamics_keys": [
+      "times",
+      "norms",
+      "Fz",
+      "component_populations",
+      "psi_snapshots_streamed"
+    ],
+    "dynamics/component_populations": {
+      "per_col_drift": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        3.3e-5,
+        0.000217,
+        -0.00025
+      ],
+      "shape": [
+        32,
+        7
+      ],
+      "max_abs_per_col_drift": 0.00025012555491643607,
+      "first_row": [
+        0.0,
+        0.0,
+        0.0,
+        4.0e-6,
+        0.000454,
+        0.014116,
+        0.985426
+      ],
+      "last_row": [
+        0.0,
+        0.0,
+        0.0,
+        5.0e-6,
+        0.000487,
+        0.014333,
+        0.985175
+      ]
+    },
+    "path": "runs/L3_cr_f3_edh_toy_ddi_on_2236eb0f/result.jld2",
+    "dynamics/Fz": {
+      "max": -2.9844697685822066,
+      "min": -2.984973732818192,
+      "rel_drift": -9.879877689197042e-5,
+      "first": -2.984973732818192,
+      "drift": 0.00029491175385709667,
+      "last": -2.984678821064335,
+      "n": 33
+    }
+  },
+  "07_spin1_polar_bogoliubov_stable": {
+    "psi_shape": [
+      24,
+      24,
+      24,
+      3
+    ],
+    "analyze/bogoliubov_dispersion/keys": [
+      "k_values",
+      "omega_real",
+      "omega_imag",
+      "max_growth",
+      "direction"
+    ],
+    "duration_seconds": 2.799314022064209,
+    "energy": 2.8679364345958973,
+    "path": "runs/07_spin1_polar_bogoliubov_stable_42129a59/point_001.jld2",
+    "analyze/phase_classify/keys": [
+      "spin_order",
+      "nematic_order",
+      "biaxiality",
+      "Q6",
+      "star_entropy",
+      "magnetization_density",
+      "phase",
+      "point_group",
+      "channel_weights"
+    ],
+    "analyze/bogoliubov/keys": [
+      "n0",
+      "max_growth",
+      "unstable",
+      "k_peak",
+      "wavelength",
+      "best_direction",
+      "pattern",
+      "anisotropy"
+    ],
+    "psi_norm2": 13.823999999999995,
+    "found_keys": [
+      "psi",
+      "scan_index",
+      "run_name",
+      "started_at",
+      "finished_at",
+      "duration_seconds",
+      "energy",
+      "converged",
+      "grid_box_size",
+      "grid_n_points",
+      "env",
+      "analyze"
+    ],
+    "converged": true,
+    "kind": "scan_point",
+    "analyze_keys": [
+      "phase_classify",
+      "bogoliubov",
+      "bogoliubov_dispersion"
+    ]
+  },
+  "L4_eu_matsui_hamiltonian_only_ddi_off_32": {
+    "dynamics/times": {
+      "max": 5.9999999999999165,
+      "min": 0.0,
+      "rel_drift": null,
+      "first": 0.0,
+      "drift": 5.9999999999999165,
+      "last": 5.9999999999999165,
+      "n": 13
+    },
+    "kind": "pipeline",
+    "dynamics/norms": {
+      "max": 1.0000000000000002,
+      "min": 0.9999999999999638,
+      "rel_drift": -3.641531520770513e-14,
+      "first": 1.0000000000000002,
+      "drift": -3.6415315207705135e-14,
+      "last": 0.9999999999999638,
+      "n": 13
+    },
+    "found_keys": [
+      "psi",
+      "dynamics"
+    ],
+    "dynamics_keys": [
+      "times",
+      "norms",
+      "Fz",
+      "component_populations",
+      "psi_snapshots_streamed"
+    ],
+    "dynamics/component_populations": {
+      "per_col_drift": [
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        0.0
+      ],
+      "shape": [
+        12,
+        13
+      ],
+      "max_abs_per_col_drift": 8.57270922921778e-26,
+      "first_row": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "last_row": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "path": "runs/L4_eu_matsui_hamiltonian_only_ddi_off_32_63a258b3/result.jld2",
+    "dynamics/Fz": {
+      "max": -5.9999999999989555,
+      "min": -5.999999999999175,
+      "rel_drift": -3.656334494432685e-14,
+      "first": -5.999999999999175,
+      "drift": 2.1938006966593093e-13,
+      "last": -5.9999999999989555,
+      "n": 13
+    }
+  },
+  "L4_eu_matsui_hamiltonian_only_64": {
+    "dynamics/times": {
+      "max": 5.9999999999999165,
+      "min": 0.0,
+      "rel_drift": null,
+      "first": 0.0,
+      "drift": 5.9999999999999165,
+      "last": 5.9999999999999165,
+      "n": 13
+    },
+    "kind": "pipeline",
+    "dynamics/norms": {
+      "max": 1.0000000000000002,
+      "min": 0.9999999999995526,
+      "rel_drift": -4.47641923528863e-13,
+      "first": 1.0000000000000002,
+      "drift": -4.476419235288631e-13,
+      "last": 0.9999999999995526,
+      "n": 13
+    },
+    "found_keys": [
+      "psi",
+      "dynamics"
+    ],
+    "dynamics_keys": [
+      "times",
+      "norms",
+      "Fz",
+      "component_populations",
+      "psi_snapshots_streamed"
+    ],
+    "dynamics/component_populations": {
+      "per_col_drift": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        2.0e-6,
+        0.000111,
+        0.012066,
+        -0.012179
+      ],
+      "shape": [
+        12,
+        13
+      ],
+      "max_abs_per_col_drift": 0.01217908388086908,
+      "first_row": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        4.9e-5,
+        0.999951
+      ],
+      "last_row": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        2.0e-6,
+        0.000111,
+        0.012115,
+        0.987772
+      ]
+    },
+    "path": "runs/L4_eu_matsui_hamiltonian_only_64_68e603b6/result.jld2",
+    "dynamics/Fz": {
+      "max": -5.987657381903818,
+      "min": -5.999995063525326,
+      "rel_drift": -0.002056281962048518,
+      "first": -5.999995063525326,
+      "drift": 0.01233768162150728,
+      "last": -5.987657381903818,
+      "n": 13
+    }
+  },
+  "L4_eu_matsui_hamiltonian_only_32": {
+    "dynamics/times": {
+      "max": 5.9999999999999165,
+      "min": 0.0,
+      "rel_drift": null,
+      "first": 0.0,
+      "drift": 5.9999999999999165,
+      "last": 5.9999999999999165,
+      "n": 13
+    },
+    "kind": "pipeline",
+    "dynamics/norms": {
+      "max": 1.0000000000000002,
+      "min": 0.9999999999993275,
+      "rel_drift": -6.726841306203822e-13,
+      "first": 1.0000000000000002,
+      "drift": -6.726841306203823e-13,
+      "last": 0.9999999999993275,
+      "n": 13
+    },
+    "found_keys": [
+      "psi",
+      "dynamics"
+    ],
+    "dynamics_keys": [
+      "times",
+      "norms",
+      "Fz",
+      "component_populations",
+      "psi_snapshots_streamed"
+    ],
+    "dynamics/component_populations": {
+      "per_col_drift": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        5.0e-6,
+        0.001853,
+        -0.001858
+      ],
+      "shape": [
+        12,
+        13
+      ],
+      "max_abs_per_col_drift": 0.0018576947845522218,
+      "first_row": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        4.9e-5,
+        0.999951
+      ],
+      "last_row": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        5.0e-6,
+        0.001902,
+        0.998094
+      ]
+    },
+    "path": "runs/L4_eu_matsui_hamiltonian_only_32_1b03a6a0/result.jld2",
+    "dynamics/Fz": {
+      "max": -5.998088983649624,
+      "min": -5.999995064674299,
+      "rel_drift": -0.00031768043208855567,
+      "first": -5.999995064674299,
+      "drift": 0.0019060810246749327,
+      "last": -5.998088983649624,
+      "n": 13
+    }
+  },
+  "08_ddi_spherical_polarized_zero_kernel": {
+    "psi_shape": [
+      32,
+      32,
+      32,
+      7
+    ],
+    "duration_seconds": 26.222809076309204,
+    "energy": -3.0779987020066555,
+    "path": "runs/08_ddi_spherical_polarized_zero_kernel_af6c1737/point_001.jld2",
+    "analyze/phase_classify/keys": [
+      "spin_order",
+      "nematic_order",
+      "biaxiality",
+      "Q6",
+      "star_entropy",
+      "magnetization_density",
+      "phase",
+      "point_group",
+      "channel_weights"
+    ],
+    "psi_norm2": 18.96296296296296,
+    "analyze/energy_decomposition/keys": [
+      "spin_order",
+      "nematic_order",
+      "biaxiality",
+      "Q6",
+      "star_entropy",
+      "magnetization_density",
+      "phase",
+      "point_group",
+      "channel_weights"
+    ],
+    "found_keys": [
+      "psi",
+      "scan_index",
+      "run_name",
+      "started_at",
+      "finished_at",
+      "duration_seconds",
+      "energy",
+      "converged",
+      "grid_box_size",
+      "grid_n_points",
+      "env",
+      "units",
+      "analyze"
+    ],
+    "converged": true,
+    "kind": "scan_point",
+    "analyze_keys": [
+      "energy_decomposition",
+      "phase_classify"
+    ]
+  }
+}

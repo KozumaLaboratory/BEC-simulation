@@ -1,0 +1,82 @@
+# [run_yaml] starting run_yaml: runs/eu151_matsui_edh/configs/matsui_edh_baseline.yaml
+# [run_yaml] loading config: runs/eu151_matsui_edh/configs/matsui_edh_baseline.yaml
+# [run_yaml] checking required top-level keys
+# [run_yaml] expanding templates and mixins
+# [run_yaml] injecting schema defaults
+# [run_yaml] applying units block
+# [run_yaml] applying accuracy and auto-grid defaults
+# [run_yaml] normalizing B blocks
+# [run_yaml] normalizing noise blocks
+# [run_yaml] validating schema
+# [run_yaml] pipeline: 2 step(s): ground_state -> dynamics
+# [run_yaml] dry-run complete; printing normalized YAML
+# === run_yaml dry-run (post calibration + units + validation) ===
+# original: runs/eu151_matsui_edh/configs/matsui_edh_baseline.yaml
+#
+# Stages applied:
+#   1. calibration:  lab-control values → physical units
+#   2. units:        bare Reals → unit-bearing strings
+#   3. schema:       unknown-key + range + enum validation
+#
+# Numerics defaults (dt, save_every, n_steps) are still expressed
+# in their YAML form here; final resolved values are logged when
+# the actual run starts. To inspect resolved values without running,
+# use a 1-step ground_state with verbose=true.
+#
+pipeline:
+  - ground_state:
+      dt: 0.005
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 1.0
+        type: "harmonic"
+      B:
+        Bz: "-0.01 Gauss"
+      gauge_fix: false
+      initial_state: "m_minus_F"
+      tol: 1.0e-9
+      ddi:
+        enabled: true
+        secular: false
+      grid:
+        box:
+          - 12.0
+          - 12.0
+          - 12.0
+        n:
+          - 32
+          - 32
+          - 32
+      lhy:
+        kind: "scalar"
+      interactions:
+        omega_ref: 628.3
+        c1_ratio: -0.005
+        N_atoms: 30000
+      init_sigma: 1.5
+      n_steps: 1500
+  - dynamics:
+      duration: 6.28
+      B:
+        Bz:
+          duration: 0.0
+          to: 2.6e-5
+          from: 0.01
+      ddi:
+        secular: false
+      seed_k_cut: 2.5
+      dt: 0.01
+      save:
+        psi: true
+        every: 50
+        precision: "f32"
+      seed_amplitude: 1.0e-6
+defaults:
+  kind: "spinor"
+  backend: "gpu"
+  interactions:
+    omega_ref: 628.3
+    N_atoms: 30000

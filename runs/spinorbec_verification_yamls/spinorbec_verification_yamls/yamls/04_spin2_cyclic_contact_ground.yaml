@@ -1,0 +1,37 @@
+# 04 — Spin-2 cyclic contact benchmark
+# Physics: F=2 mean-field energy contains c1|F|^2 and c2|A00|^2.
+# For c1>0 and c2>0, the cyclic state minimizes both spin and singlet-pair amplitudes.
+# Expected: phase_classify -> cyclic-like; spin_order ~ 0; singlet-pair amplitude ~ 0 if reported.
+
+metadata:
+  suite: spinorbec_physics_verification
+  reference: Kawaguchi_Ueda_spin2_cyclic_c1_c2_positive
+  expected_phase: cyclic
+
+defaults:
+  kind: spinor
+  backend: cpu
+
+pipeline:
+  - ground_state:
+      atom: Rb85
+      grid: {n: [24, 24, 24], box: [10.0, 10.0, 10.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      interactions:
+        c0: 100.0
+        c1: 2.0
+        # YAML parser accepts sparse tensor keys c2, c4, ...; here c2 is the singlet-pair coupling.
+        c2: 2.0
+      ddi: {enabled: false}
+      B: {p: 0.0, q: 0.0}
+      initial_state: cyclic
+      method: itp
+      dt: 0.003
+      n_steps: 5000
+      tol: 1.0e-9
+
+  - analyze:
+      - phase_classify: {}
+      - majorana_order: {}
+      - energy_decomposition: {}
+      - summary_json: {path: "verify_outputs/04_spin2_cyclic_summary.json"}

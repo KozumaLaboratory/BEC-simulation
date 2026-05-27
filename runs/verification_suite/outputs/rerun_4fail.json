@@ -1,0 +1,19 @@
+{
+  "00_scalar_free_uniform_stationary.yaml": {
+    "elapsed_sec": 3.45,
+    "status": "OK"
+  },
+  "05_spin1_zeeman_phase_only.yaml": {
+    "elapsed_sec": 0.01,
+    "status": "OK"
+  },
+  "04_spin2_cyclic_contact_ground.yaml": {
+    "elapsed_sec": 19.11,
+    "status": "FAIL",
+    "error": "ArgumentError: majorana_order requires F >= 6 (got 2)"
+  },
+  "07_spin1_polar_bogoliubov_stable.yaml": {
+    "elapsed_sec": 8.38,
+    "status": "OK"
+  }
+}

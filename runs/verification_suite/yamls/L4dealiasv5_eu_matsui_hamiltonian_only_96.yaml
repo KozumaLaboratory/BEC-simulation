@@ -1,0 +1,62 @@
+# L4 — Eu-151 Matsui Hamiltonian-only 96³ (high-resolution convergence)
+# Anomaly seen at 32/48/64: Fz_drift(32) ≈ Fz_drift(48) = +1.91e-3,
+# Fz_drift(64) = +1.23e-2 (6× larger). Possible explanations:
+#   (a) 64 captures high-k DDI modes 32/48 alias out → 96 should match 64 or exceed
+#   (b) 32/48 share a low-resolution plateau, true answer is closer to 64 → 96 ≈ 64
+#   (c) seed_amplitude noise spectrum interacts with grid resolution → 96 differs
+# This run distinguishes (a) from (c) by adding one more grid resolution.
+
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 6
+  reference: Matsui_Science_2026_Hamiltonian_only_96grid
+  expected: convergence_test_after_anomalous_32_48_plateau
+  noise_convention: rms_rescale_2026_05_22
+
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 30000, omega_ref: 628.3}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [96, 96, 96], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      interactions:
+        N_atoms: 30000
+        omega_ref: 628.3
+        c1_ratio: -0.005
+      ddi:
+        enabled: true
+        secular: false
+      lhy: {kind: none}
+      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      gauge_fix: false
+      initial_state: m_minus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 1500
+      tol: 1.0e-9
+
+  - dynamics:
+      duration: 6.28
+      dt: 0.01
+      B:
+        Bz: {from: 0.01, to: 2.6e-5, duration: 0.0}
+        theta: 0.0
+        phi: 0.0
+      ddi:
+        secular: false
+      seed_amplitude: 1.0e-6
+      seed_k_cut: 2.5
+      save:
+        every: 50
+        psi: true
+        precision: f64
+
+  - analyze:
+      - phase_classify: {}
+      - winding_map: {}
+      - energy_decomposition: {}
+      - summary_json: {path: "runs/verification_suite/outputs/L4dealiasv5_eu_matsui_hamiltonian_only_96.json"}

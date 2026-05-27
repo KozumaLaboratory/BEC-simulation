@@ -1,0 +1,140 @@
+# [run_yaml] starting run_yaml: runs/eu151_edh_loss_factorial/config.yaml
+# [run_yaml] loading config: runs/eu151_edh_loss_factorial/config.yaml
+# [run_yaml] checking required top-level keys
+# [run_yaml] expanding templates and mixins
+# [run_yaml] injecting schema defaults
+# [run_yaml] applying units block
+# [run_yaml] applying accuracy and auto-grid defaults
+# [run_yaml] normalizing B blocks
+# [run_yaml] normalizing noise blocks
+# [run_yaml] validating schema
+# [run_yaml] pipeline: 3 step(s): ground_state -> dynamics -> dynamics
+# [run_yaml] dry-run complete; printing normalized YAML
+# === run_yaml dry-run (post calibration + units + validation) ===
+# original: runs/eu151_edh_loss_factorial/config.yaml
+#
+# Stages applied:
+#   1. calibration:  lab-control values → physical units
+#   2. units:        bare Reals → unit-bearing strings
+#   3. schema:       unknown-key + range + enum validation
+#
+# Numerics defaults (dt, save_every, n_steps) are still expressed
+# in their YAML form here; final resolved values are logged when
+# the actual run starts. To inspect resolved values without running,
+# use a 1-step ground_state with verbose=true.
+#
+# Scan comparison preview:
+#   comparison_runs: 4
+#   - K3off_gdroff: 1 override(s)
+#       pipeline.2.loss = false
+#       effective pipeline.2.loss = false
+#   - K3off_gdron: 1 override(s)
+#       pipeline.2.loss = Dict{Any, Any}("gamma_dr" => 0.02)
+#       effective pipeline.2.loss = Dict{Any, Any}("gamma_dr" => 0.02)
+#   - K3on_gdroff: 1 override(s)
+#       pipeline.2.loss = Dict{Any, Any}("K3_per_m_si" => ["1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^...
+#       effective pipeline.2.loss = Dict{Any, Any}("K3_per_m_si" => ["1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^...
+#   - K3on_gdron: 0 override(s)
+#       effective pipeline.2.loss = Dict{Any, Any}("K3_per_m_si" => ["1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^...
+#
+scan:
+  comparison_runs:
+    - name: "K3off_gdroff"
+      override:
+        pipeline.2.loss: false
+    - name: "K3off_gdron"
+      override:
+        pipeline.2.loss:
+          gamma_dr: 0.02
+    - name: "K3on_gdroff"
+      override:
+        pipeline.2.loss:
+          K3_per_m_si:
+            - "1.0e-41 m^6/s"
+            - "1.0e-41 m^6/s"
+            - "1.0e-41 m^6/s"
+            - "1.0e-41 m^6/s"
+            - "1.0e-41 m^6/s"
+            - "1.0e-41 m^6/s"
+            - "1.0e-41 m^6/s"
+            - "1.0e-41 m^6/s"
+            - "1.0e-41 m^6/s"
+            - "1.0e-41 m^6/s"
+            - "1.0e-41 m^6/s"
+            - "1.0e-41 m^6/s"
+            - "1.0e-41 m^6/s"
+    - name: "K3on_gdron"
+      override: {}
+pipeline:
+  - ground_state:
+      dt: 0.005
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 1.182
+        type: "harmonic"
+      B:
+        Bz: "0.01 Gauss"
+      initial_state: "m_plus_F"
+      tol: 1.0e-9
+      ddi: {}
+      grid:
+        box:
+          - 20
+          - 20
+          - 20
+        n:
+          - 32
+          - 32
+          - 32
+      lhy:
+        kind: "scalar"
+      interactions:
+        omega_ref: 691.15
+        c1_ratio: 0.0
+        N_atoms: 10000
+      n_steps: 3000
+  - dynamics:
+      duration: 0.14
+      B:
+        Bz:
+          duration: 0.14
+          to: 2.6e-5
+          from: 0.01
+      dt: 0.0005
+      save:
+        every: 280
+  - dynamics:
+      duration: 10.0
+      B:
+        Bz: "2.6e-5 Gauss"
+      seed_k_cut: 2.5
+      noise_seed: 42
+      dt: 0.0001
+      save:
+        every: 200
+      loss:
+        K3_per_m_si:
+          - "1.0e-41 m^6/s"
+          - "1.0e-41 m^6/s"
+          - "1.0e-41 m^6/s"
+          - "1.0e-41 m^6/s"
+          - "1.0e-41 m^6/s"
+          - "1.0e-41 m^6/s"
+          - "1.0e-41 m^6/s"
+          - "1.0e-41 m^6/s"
+          - "1.0e-41 m^6/s"
+          - "1.0e-41 m^6/s"
+          - "1.0e-41 m^6/s"
+          - "1.0e-41 m^6/s"
+          - "1.0e-41 m^6/s"
+        gamma_dr: 0.02
+      seed_amplitude: 1.0e-6
+defaults:
+  kind: "spinor"
+  backend: "gpu"
+  interactions:
+    omega_ref: 691.15
+    N_atoms: 10000

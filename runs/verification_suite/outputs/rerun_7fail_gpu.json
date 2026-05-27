@@ -1,0 +1,31 @@
+{
+  "_total_sec": 355.37,
+  "L3_cr_f3_edh_toy_ddi_on.yaml": {
+    "elapsed_sec": 20.66,
+    "status": "OK"
+  },
+  "06_spin1_sma_spin_mixing.yaml": {
+    "elapsed_sec": 52.33,
+    "status": "OK"
+  },
+  "L2_ddi_axis_flip_Bx.yaml": {
+    "elapsed_sec": 22.16,
+    "status": "OK"
+  },
+  "L3_cr_f3_edh_toy_ddi_off.yaml": {
+    "elapsed_sec": 8.05,
+    "status": "OK"
+  },
+  "L4_eu_matsui_hamiltonian_only_ddi_off_32.yaml": {
+    "elapsed_sec": 24.65,
+    "status": "OK"
+  },
+  "L4_eu_matsui_hamiltonian_only_64.yaml": {
+    "elapsed_sec": 185.89,
+    "status": "OK"
+  },
+  "L4_eu_matsui_hamiltonian_only_32.yaml": {
+    "elapsed_sec": 30.5,
+    "status": "OK"
+  }
+}

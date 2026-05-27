@@ -1,0 +1,47 @@
+# L7 — loss-only validation: uniform box, K3-only.
+# Anko's ladder Level 7: BEFORE any K3 production claim, verify the loss
+# implementation reproduces the analytic n(t) = n0 / sqrt(1 + 2 K3 n0² t)
+# in a uniform box (no trap, no DDI, no contact, no LHY).
+
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 7
+  reference: analytic_K3_uniform_3body_loss
+  expected: n_t_equals_n0_over_sqrt_one_plus_2K3_n0sq_t
+
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 100000, omega_ref: 628.3}
+
+pipeline:
+  - ground_state:
+      atom: Cr52
+      grid: {n: [16, 16, 16], box: [4.0, 4.0, 4.0]}
+      potential: {type: none}
+      interactions: {N_atoms: 100000, omega_ref: 628.3, c0: 0.0, c1: 0.0}
+      ddi: {enabled: false}
+      lhy: {kind: none}
+      B: {Bz: 0.0}
+      gauge_fix: false
+      initial_state: uniform
+      init_sigma: 1.5
+      dt: 0.001
+      n_steps: 20
+      tol: 1.0e-12
+
+  - dynamics:
+      duration: 1.0
+      dt: 0.0005
+      B: {Bz: 0.0}
+      ddi: {enabled: false}
+      loss:
+        K3_per_m_si: [
+          "1.0e-41 m^6/s","1.0e-41 m^6/s","1.0e-41 m^6/s","1.0e-41 m^6/s",
+          "1.0e-41 m^6/s","1.0e-41 m^6/s","1.0e-41 m^6/s"
+        ]
+      save: {every: 50, psi: false, precision: f64}
+
+  - analyze:
+      - energy_decomposition: {}
+      - summary_json: {path: "runs/verification_suite/outputs/L7_loss_only_uniform_K3.json"}

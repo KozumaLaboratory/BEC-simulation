@@ -1,0 +1,12 @@
+{
+  "_total_sec": 153.28,
+  "L7_loss_only_uniform_K3.yaml": {
+    "elapsed_sec": 0.05,
+    "status": "FAIL",
+    "error": "ArgumentError: zeeman Level 1/2 requires omega_ref; set zeeman.omega_ref_hz (Hz) or interactions.omega_ref (rad/s)"
+  },
+  "L4_eu_matsui_hamiltonian_only_48.yaml": {
+    "elapsed_sec": 141.63,
+    "status": "OK"
+  }
+}

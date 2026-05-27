@@ -1,0 +1,36 @@
+# 00 — Exact stationary scalar benchmark
+# Physics: F=0, no trap, no interaction, uniform k=0 state.
+# Expected: only a global phase; norm, energy, populations constant to roundoff.
+
+metadata:
+  suite: spinorbec_physics_verification
+  reference: scalar_GPE_free_uniform
+  expected: stationary_exact
+
+defaults:
+  kind: spinor
+  backend: gpu
+
+pipeline:
+  - ground_state:
+      atom: Ca40
+      grid: {n: [32], box: [16.0]}
+      potential: {type: none}
+      interactions: {c0: 0.0, c1: 0.0}
+      ddi: {enabled: false}
+      B: {p: 0.0, q: 0.0}
+      initial_state: uniform
+      method: itp
+      dt: 0.001
+      n_steps: 20
+      tol: 1.0e-12
+
+  - dynamics:
+      duration: 1.0
+      dt: 0.001
+      B: {p: 0.0, q: 0.0}
+      save: {every: 100, psi: true, precision: f64}
+
+  - analyze:
+      - energy_decomposition: {}
+      - summary_json: {path: "verify_outputs/00_scalar_free_uniform_summary.json"}

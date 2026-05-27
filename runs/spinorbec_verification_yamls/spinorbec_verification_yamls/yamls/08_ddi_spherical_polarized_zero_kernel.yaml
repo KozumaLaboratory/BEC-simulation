@@ -1,0 +1,35 @@
+# 08 — DDI kernel convention benchmark
+# Physics: a spherical spin-polarized cloud has near-zero net dipolar mean-field energy
+# because Q_ab is traceless. This catches sign, 4π, k=0, and axis convention mistakes.
+# Expected: DDI energy small and converges toward zero with larger n/box.
+
+metadata:
+  suite: spinorbec_physics_verification
+  reference: spherical_DDI_traceless_kernel
+  expected: small_DDI_energy
+
+defaults:
+  kind: spinor
+  backend: cpu
+
+pipeline:
+  - ground_state:
+      atom: Cr52
+      grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      interactions:
+        N_atoms: 2000
+        omega_ref: 628.319
+        c1_ratio: 0.0
+      ddi: {enabled: true}
+      B: {p: 2.0, q: 0.0}
+      initial_state: m_plus_F
+      method: itp
+      dt: 0.003
+      n_steps: 3500
+      tol: 1.0e-8
+
+  - analyze:
+      - phase_classify: {}
+      - energy_decomposition: {}
+      - summary_json: {path: "verify_outputs/08_ddi_spherical_summary.json"}

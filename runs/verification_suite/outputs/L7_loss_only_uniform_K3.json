@@ -1,0 +1,15 @@
+{
+  "energy_final": 76.32149730612872,
+  "_live_status_path": "runs/L7_loss_only_uniform_K3_23bdda03/_live_status.json",
+  "snapshot_tmp_path": null,
+  "snapshot_count": 0,
+  "n_snapshots": 41,
+  "ground_state_energy": 78.16296145340694,
+  "save_snapshot_compression": false,
+  "t_initial": 0.0,
+  "t_final": 0.9999999999999453,
+  "energy_initial": 78.16296145340694,
+  "ground_state_converged": false,
+  "norm_drift": 0.01091392207068731,
+  "save_psi_snapshots": false
+}

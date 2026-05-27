@@ -1,0 +1,15 @@
+{
+  "energy_final": 208.47983418300407,
+  "_live_status_path": "runs/L4dealiasv5_eu_matsui_hamiltonian_only_96_dba061b9/_live_status.json",
+  "snapshot_tmp_path": "/tmp/spinorbec_snaps_c5e72fcf4100d085.jld2",
+  "snapshot_count": 12,
+  "n_snapshots": 0,
+  "ground_state_energy": -967.0692371443293,
+  "save_snapshot_compression": false,
+  "t_initial": 0.0,
+  "t_final": 5.9999999999999165,
+  "energy_initial": 985.9947836978649,
+  "ground_state_converged": true,
+  "norm_drift": 0.26407383358077896,
+  "save_psi_snapshots": true
+}

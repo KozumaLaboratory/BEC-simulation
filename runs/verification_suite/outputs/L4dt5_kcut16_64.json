@@ -1,0 +1,15 @@
+{
+  "energy_final": 16.136628168755184,
+  "_live_status_path": "runs/L4dt5_kcut16_64_c4b60926/_live_status.json",
+  "snapshot_tmp_path": "/tmp/spinorbec_snaps_e3370b9915dda260.jld2",
+  "snapshot_count": 25,
+  "n_snapshots": 0,
+  "ground_state_energy": -967.069259491916,
+  "save_snapshot_compression": false,
+  "t_initial": 0.0,
+  "t_final": 6.249999999999889,
+  "energy_initial": 985.9947616188825,
+  "ground_state_converged": true,
+  "norm_drift": 1.1758763962532726e-9,
+  "save_psi_snapshots": true
+}

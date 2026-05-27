@@ -1,0 +1,77 @@
+# L4 — Eu-151 Matsui Hamiltonian-only (no loss, no LHY, DDI on)
+# Anko's validation ladder (2026-05-22) Level 4: Eu Hamiltonian-only validation.
+# DERIVED from runs/eu151_matsui_edh/configs/matsui_edh_baseline.yaml with these
+# DELIBERATE differences:
+#   - lhy.kind: scalar → none        (Hamiltonian-only — no Lee-Huang-Yang)
+#   - loss block:       (absent → explicit no-loss)
+#   - K3, gamma_dr:     (none) — never set
+#   - precision:        f64 (was f32; need exact Jz/E conservation check)
+#   - grid:             [32,32,32] preview; companion L4_eu_..._64.yaml for convergence
+# All other parameters (N, ω_ref, c1_ratio, Bz quench, trap, init m=-F) match the
+# baseline so a per-step Hamiltonian comparison with Ueda code is meaningful.
+#
+# Pass criteria (anko ladder, Level 4):
+#   - GS converges to m=-F polarized state
+#   - Bz step quench triggers EdH transfer per K&U
+#   - DDI is the ONLY non-conservative spin-flip (no LHY/loss source)
+#   - Jz = Fz + Lz approximately conserved (deviations should be numerical only,
+#     ≤ grid/dt/box resolution band; checked in L4 convergence sweep)
+# Compare-with-Ueda checklist (see [[validation-ladder-2026-05-22]] parameter contract):
+#   DDI coefficient (1/4π?), μ convention, kernel sign, m ordering, B sign,
+#   initial state, secular vs full, K3=0 (here), ψ normalization.
+
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_strip
+  expected: Jz_approx_conserved_under_DDI_alone
+  noise_convention: rms_rescale_2026_05_22
+
+defaults:
+  kind: spinor
+  backend: gpu                              # CPU for laptop / CI; gpu after convergence
+  interactions: {N_atoms: 30000, omega_ref: 628.3}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      interactions:
+        N_atoms: 30000
+        omega_ref: 628.3
+        c1_ratio: -0.005                    # baseline placeholder (Eu has 7 unknown channels)
+      ddi:
+        enabled: true
+        secular: false
+      lhy: {kind: none}                     # ← Hamiltonian-only: LHY OFF
+      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      gauge_fix: false
+      initial_state: m_minus_F              # Matsui m_F=-6
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 1500
+      tol: 1.0e-9
+
+  - dynamics:
+      duration: 6.28                        # 10 ms physical (2× τ_EdH^exp = 5 ms)
+      dt: 0.01                              # 15.9 μs physical
+      B:
+        Bz: {from: 0.01, to: 2.6e-5, duration: 0.0}
+        theta: 0.0
+        phi: 0.0
+      ddi:
+        secular: false
+      # NO loss block — Hamiltonian-only
+      seed_amplitude: 1.0e-6                # symmetry-breaking seed only
+      seed_k_cut: 2.5
+      save:
+        every: 50                           # 12 saves over 628 steps
+        psi: true
+        precision: f64                      # ← exact conservation check
+
+  - analyze:
+      - phase_classify: {}
+      - winding_map: {}
+      - energy_decomposition: {}
+      - summary_json: {path: "runs/verification_suite/outputs/L4dealiasv3_eu_matsui_hamiltonian_only_32.json"}

@@ -1,0 +1,66 @@
+# L3 — Cr-52 F=3 EdH toy (DDI on, no loss, no LHY)
+# Anko's validation ladder (2026-05-22) Level 3: Kawaguchi & Ueda canonical EdH.
+# Initial m=-F spin-polarized BEC under DDI in weak Bz should transfer spin
+# angular momentum to orbital angular momentum (EdH), with each component
+#   ψ_m(r,φ,z) = e^{i (Jz - m) φ} η_m(r,z)
+# so m=-F+1 grows with winding ℓ=1, m=-F+2 with ℓ=2, etc.
+# Total angular momentum Jz = Lz + Fz is exactly conserved (closed system).
+#
+# This is BEFORE Eu Hamiltonian-only — Cr is the canonical EdH textbook system
+# with known a_s and DDI strength, no LHY/loss complications, no unknown
+# scattering channels.
+#
+# Companion: L3_cr_f3_edh_toy_ddi_off.yaml (control; DDI off should kill the EdH signature).
+#
+# Pass criteria (anko ladder, Level 3):
+#   - Fz(t) decreases monotonically from -F
+#   - Lz(t) increases (mirror image of Fz drop)
+#   - Jz(t) = Fz + Lz conserved to ~1e-6 absolute
+#   - m=-F+1 component winding ℓ ≈ 1 from ∮ ∇ arg(ψ_{m=-F+1}) · dℓ / (2π)
+#   - m=-F+2 component winding ℓ ≈ 2 (if populated)
+#   - DDI off (companion YAML) shows none of the above
+
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 3
+  reference: Kawaguchi_Ueda_review_EdH_canonical
+  expected: Jz_conserved_with_spin_to_orbital_transfer
+
+defaults:
+  kind: spinor
+  backend: gpu                              # CPU sufficient for 32^3 toy
+  interactions: {N_atoms: 10000, omega_ref: 628.3}
+
+pipeline:
+  - ground_state:
+      atom: Cr52
+      grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}  # spherical
+      interactions: {N_atoms: 10000, omega_ref: 628.3}     # 2π·100 Hz reference
+      ddi: {enabled: true, secular: false}                 # full non-secular DDI
+      lhy: {kind: none}                                    # explicit LHY off
+      B: {Bz: 0.0, theta: 0.0, phi: 0.0}                   # zero field (pure DDI dynamics)
+      gauge_fix: false
+      initial_state: m_minus_F                             # m = -F seed
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 2000
+      tol: 1.0e-9
+
+  - dynamics:
+      duration: 8.0                          # long enough for visible Fz transfer
+      dt: 0.005
+      B: {Bz: 0.0, theta: 0.0, phi: 0.0}     # B remains zero — DDI is the only spin-flip mechanism
+      ddi: {secular: false}                  # explicit
+      seed_amplitude: 1.0e-6                 # symmetry-breaking seed for EdH onset
+      seed_k_cut: 2.5
+      save:
+        every: 50                            # ~32 snapshots over 1600 steps
+        psi: true
+        precision: f64                       # f64 for exact Jz conservation check
+
+  - analyze:
+      - phase_classify: {}
+      - winding_map: {}
+      - energy_decomposition: {}
+      - summary_json: {path: "runs/verification_suite/outputs/L3_cr_f3_edh_toy_ddi_on.json"}

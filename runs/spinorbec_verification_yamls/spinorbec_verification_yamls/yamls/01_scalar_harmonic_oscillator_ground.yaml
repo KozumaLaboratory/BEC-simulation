@@ -1,0 +1,31 @@
+# 01 — Noninteracting harmonic oscillator ground state
+# Physics: scalar F=0 GPE with c0=0. In dimensionless units, E/N = 3/2 for omega=(1,1,1).
+# Expected: Gaussian ground state, zero spin order, energy converges to 1.5 per particle.
+
+metadata:
+  suite: spinorbec_physics_verification
+  reference: noninteracting_harmonic_oscillator
+  expected_energy_per_particle: 1.5
+
+defaults:
+  kind: spinor
+  backend: cpu
+
+pipeline:
+  - ground_state:
+      atom: Ca40
+      grid: {n: [32, 32, 32], box: [10.0, 10.0, 10.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      interactions: {c0: 0.0, c1: 0.0}
+      ddi: {enabled: false}
+      B: {p: 0.0, q: 0.0}
+      initial_state: polar
+      method: itp
+      dt: 0.002
+      n_steps: 3000
+      tol: 1.0e-10
+
+  - analyze:
+      - energy_decomposition: {}
+      - phase_classify: {}
+      - summary_json: {path: "verify_outputs/01_scalar_ho_summary.json"}

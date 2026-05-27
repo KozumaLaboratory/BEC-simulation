@@ -1,0 +1,64 @@
+# TWIN CONTROL (auto-generated). Companion of:
+#   runs/validation_ladder/dry_run/dry_k3_long.yaml
+# Regenerate with:
+#   julia --project=. scripts/validation/generate_twin_controls.jl
+# LHY and loss blocks stripped; everything else preserved.
+# Comments from the original YAML are lost on the round-trip.
+
+pipeline:
+  - ground_state:
+      dt: 0.005
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 1.182
+        type: "harmonic"
+      B:
+        Bz: "0.01 Gauss"
+      initial_state: "m_plus_F"
+      tol: 1.0e-9
+      ddi: {}
+      grid:
+        box:
+          - 20
+          - 20
+          - 20
+        n:
+          - 32
+          - 32
+          - 32
+      lhy:
+        kind: "none"
+      interactions:
+        omega_ref: 691.15
+        c1_ratio: 0.0
+        N_atoms: 10000
+      n_steps: 3000
+  - dynamics:
+      duration: 0.14
+      B:
+        Bz:
+          duration: 0.14
+          to: 2.6e-5
+          from: 0.01
+      dt: 0.0005
+      save:
+        every: 280
+  - dynamics:
+      duration: 10.0
+      B:
+        Bz: "2.6e-5 Gauss"
+      seed_k_cut: 2.5
+      noise_seed: 42
+      dt: 0.0001
+      save:
+        every: 200
+      seed_amplitude: 1.0e-6
+defaults:
+  kind: "spinor"
+  backend: "gpu"
+  interactions:
+    omega_ref: 691.15
+    N_atoms: 10000

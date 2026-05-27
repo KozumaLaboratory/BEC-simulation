@@ -1,0 +1,101 @@
+# Expected checks for the verification YAML suite.
+# Numerical tolerances assume small CPU grids. Tighten after convergence studies.
+
+00_scalar_free_uniform_stationary:
+  theory: "Free scalar uniform state: k=0 mode, no trap, no interactions; state is exactly stationary up to global phase."
+  inspect:
+    - dynamics/norms
+    - dynamics/energies
+    - dynamics/component_populations
+  pass:
+    norm_relative_drift: "< 1e-10 for f64 CPU; < 1e-7 acceptable if f32/GPU"
+    energy_absolute_drift: "< 1e-10"
+    component_population_drift: "zero within numerical roundoff"
+
+01_scalar_harmonic_oscillator_ground:
+  theory: "Noninteracting 3D harmonic oscillator in dimensionless units. Ground state energy per particle should be 3/2 for omega=(1,1,1)."
+  inspect:
+    - ground_state/energy
+    - analyze/energy_decomposition
+    - final density rms widths
+  pass:
+    energy_per_particle: "approximately 1.5; grid and finite box errors should decrease with n and box"
+    spin_order: "zero, because F=0"
+
+02_spin1_polar_contact_ground:
+  theory: "Spin-1 contact interaction: E_spin=(c1/2)|F|^2. For c1>0, polar state minimizes |F|."
+  inspect:
+    - analyze/phase_classify
+  pass:
+    phase: "polar or polar-like"
+    spin_order: "< 1e-3 after convergence"
+    magnetization_density: "near 0"
+
+03_spin1_ferromagnetic_contact_ground:
+  theory: "Spin-1 contact interaction: for c1<0, energy is minimized by maximal spin order."
+  inspect:
+    - analyze/phase_classify
+  pass:
+    phase: "ferromagnetic or ferromagnetic-like"
+    spin_order: "> 0.99"
+    magnetization_density: "near +1 for m_plus_F seed unless the classifier reports a rotated ferromagnet"
+
+04_spin2_cyclic_contact_ground:
+  theory: "Spin-2 mean-field contact model. With c1>0 and c2>0, cyclic minimizes both |F| and singlet amplitude A00."
+  inspect:
+    - analyze/phase_classify
+    - analyze/majorana_order
+  pass:
+    phase: "cyclic or cyclic-like"
+    spin_order: "near 0"
+    singlet_pair: "near 0 if reported"
+
+05_spin1_zeeman_phase_only:
+  theory: "Pure diagonal Zeeman evolution changes phases but not populations."
+  inspect:
+    - dynamics/norms
+    - dynamics/magnetizations
+    - dynamics/component_populations
+  pass:
+    norm_relative_drift: "< 1e-10 f64 CPU"
+    magnetization_drift: "< 1e-10"
+    component_population_drift: "< 1e-10"
+
+06_spin1_sma_spin_mixing:
+  theory: "Spin-exchange collision 2 m0 <-> m+1 + m-1; total atom number and total Mz are conserved."
+  inspect:
+    - dynamics/norms
+    - dynamics/magnetizations
+    - dynamics/component_populations
+  pass:
+    norm_relative_drift: "< 1e-7 coarse grid"
+    magnetization_drift: "< 1e-8"
+    qualitative: "m0 and m±1 populations should oscillate after seed; no net Mz should be generated"
+
+07_spin1_polar_bogoliubov_stable:
+  theory: "Polar c1>0, q>=0 spin-1 state has stable small-k Bogoliubov modes for this parameter choice."
+  inspect:
+    - analyze/bogoliubov
+    - analyze/bogoliubov_dispersion
+  pass:
+    max_growth_rate: "0 or below numerical tolerance"
+    imaginary_frequency: "none above tolerance"
+
+08_ddi_spherical_polarized_zero_kernel:
+  theory: "For a spherical spin-polarized Gaussian-like density, the traceless DDI contribution should be very small; the test catches 4pi/sign/kernel errors."
+  inspect:
+    - analyze/energy_decomposition
+    - analyze/phase_classify
+  pass:
+    ddi_energy: "small compared with contact/trap energy; should converge toward zero as grid/box improve"
+    phase: "ferromagnetic / stretched spinor remains polarized"
+
+09_edh_toy_spin_orbit_transfer:
+  theory: "Dipolar spinor BEC under weak field should exchange spin and orbital angular momentum while approximately conserving Jz=Lz+Sz in the closed-system limit."
+  inspect:
+    - analyze/winding_map
+    - dynamics/magnetizations
+    - dynamics/component_populations
+  pass:
+    Jz: "approximately conserved in final winding_map; tighten after saving time-resolved Lz"
+    qualitative: "small population transfer out of stretched component and nonzero Lz/winding signal"

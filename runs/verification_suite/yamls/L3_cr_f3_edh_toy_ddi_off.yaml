@@ -1,0 +1,57 @@
+# L3 — Cr-52 F=3 EdH toy (DDI OFF — control)
+# Companion to L3_cr_f3_edh_toy_ddi_on.yaml. DDI is the only mechanism
+# for spin-to-orbital angular momentum transfer in this setup; with DDI off,
+# m=-F population should stay ~1 and Lz(t) should stay ~0.
+#
+# Pass criteria (anko ladder, Level 3, DDI-OFF control):
+#   - Fz(t) ≈ -F constant (no transfer)
+#   - Lz(t) ≈ 0 constant
+#   - m=-F population stays ≈ 1
+#   - No winding develops in any component
+# If DDI-off run STILL shows EdH-like behavior, the mechanism is misidentified
+# (e.g., contact-c1 spin mixing alone is producing the transfer).
+
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 3
+  reference: Kawaguchi_Ueda_review_EdH_canonical
+  expected: no_spin_to_orbital_transfer_without_DDI
+
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 10000, omega_ref: 628.3}
+
+pipeline:
+  - ground_state:
+      atom: Cr52
+      grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      interactions: {N_atoms: 10000, omega_ref: 628.3}
+      ddi: {enabled: false}                                # ← ONLY DIFFERENCE FROM DDI-ON
+      lhy: {kind: none}
+      B: {Bz: 0.0, theta: 0.0, phi: 0.0}
+      gauge_fix: false
+      initial_state: m_minus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 2000
+      tol: 1.0e-9
+
+  - dynamics:
+      duration: 8.0
+      dt: 0.005
+      B: {Bz: 0.0, theta: 0.0, phi: 0.0}
+      ddi: {enabled: false}                                # ← ONLY DIFFERENCE
+      seed_amplitude: 1.0e-6
+      seed_k_cut: 2.5
+      save:
+        every: 50
+        psi: true
+        precision: f64
+
+  - analyze:
+      - phase_classify: {}
+      - winding_map: {}
+      - energy_decomposition: {}
+      - summary_json: {path: "runs/verification_suite/outputs/L3_cr_f3_edh_toy_ddi_off.json"}

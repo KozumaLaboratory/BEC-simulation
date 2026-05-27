@@ -1,0 +1,12 @@
+{
+  "created_at": "2026-05-24T12:16:56.876",
+  "results": {
+    "L5_operator_rhs_compare": {
+      "elapsed_sec": 4.11,
+      "status": "OK",
+      "script": "scripts/validation/L5_operator_rhs_compare.jl",
+      "log": "runs/validation_ladder/reports/L5_operator_rhs_compare.log"
+    }
+  }
+}
+

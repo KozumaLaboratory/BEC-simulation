@@ -1,0 +1,63 @@
+# L4 — Eu-151 Matsui Hamiltonian-only 64³ (convergence variant)
+# Identical to L4_eu_matsui_hamiltonian_only_32.yaml except grid 32→64.
+# Used together with the 32³ run for Level 6 grid convergence check:
+#   - early-time Fz(t) slope should agree between 32 and 64
+#   - collapse onset (peak_density spike) should agree if it exists
+#   - if 64 disagrees with 32 BEFORE collapse onset → unconverged
+# This run is significantly more expensive (64³ ≈ 8× 32³ on the same dt).
+
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_64grid
+  expected: same_qualitative_signature_as_32grid_before_collapse
+  noise_convention: rms_rescale_2026_05_22
+
+defaults:
+  kind: spinor
+  backend: gpu                              # use cuda for production
+  interactions: {N_atoms: 30000, omega_ref: 628.3}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [64, 64, 64], box: [12.0, 12.0, 12.0]}   # ← 32→64
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      interactions:
+        N_atoms: 30000
+        omega_ref: 628.3
+        c1_ratio: -0.005
+      ddi:
+        enabled: false
+        secular: false
+      lhy: {kind: none}
+      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      gauge_fix: false
+      initial_state: m_minus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 1500
+      tol: 1.0e-9
+
+  - dynamics:
+      duration: 6.28
+      dt: 0.01
+      B:
+        Bz: {from: 0.01, to: 2.6e-5, duration: 0.0}
+        theta: 0.0
+        phi: 0.0
+      ddi:
+        enabled: false
+        secular: false
+      seed_amplitude: 1.0e-6
+      seed_k_cut: 2.5
+      save:
+        every: 50
+        psi: true
+        precision: f64
+
+  - analyze:
+      - phase_classify: {}
+      - winding_map: {}
+      - energy_decomposition: {}
+      - summary_json: {path: "runs/verification_suite/outputs/L4probe3_ddiOFF_64.json"}

@@ -1,0 +1,32 @@
+# 07 — Bogoliubov stability benchmark for spin-1 polar phase
+# Physics: stable polar state for c1>0 and q>=0. The BdG analyzer should not report growing modes.
+# Expected: max growth rate zero within numerical tolerance; dispersion has real modes.
+
+metadata:
+  suite: spinorbec_physics_verification
+  reference: Kawaguchi_Ueda_spin1_polar_BdG_stable
+  expected: no_BdG_instability
+
+defaults:
+  kind: spinor
+  backend: cpu
+
+pipeline:
+  - ground_state:
+      atom: Na23
+      grid: {n: [24, 24, 24], box: [10.0, 10.0, 10.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      interactions: {c0: 100.0, c1: 2.0}
+      ddi: {enabled: false}
+      B: {p: 0.0, q: 0.4}
+      initial_state: polar
+      method: itp
+      dt: 0.003
+      n_steps: 3500
+      tol: 1.0e-9
+
+  - analyze:
+      - phase_classify: {}
+      - bogoliubov: {k_max: 6.0, n_k: 80, directions: auto, n_directions: 12}
+      - bogoliubov_dispersion: {k_max: 6.0, n_k: 80, direction: [1.0, 0.0, 0.0]}
+      - summary_json: {path: "verify_outputs/07_spin1_polar_bdg_summary.json"}

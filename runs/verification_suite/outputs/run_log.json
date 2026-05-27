@@ -1,0 +1,47 @@
+{
+  "_total_sec": 1623.28,
+  "07_spin1_polar_bogoliubov_stable.yaml": {
+    "elapsed_sec": 4.74,
+    "status": "FAIL",
+    "error": "FieldError: type BdGResult has no field `max_growth`, available fields: `k_values`, `omega`, `max_growth_rate`, `unstable`"
+  },
+  "02_spin1_polar_contact_ground.yaml": {
+    "elapsed_sec": 7.78,
+    "status": "OK"
+  },
+  "00_scalar_free_uniform_stationary.yaml": {
+    "elapsed_sec": 13.69,
+    "status": "FAIL",
+    "error": "TypeError: in typeassert, expected Array{ComplexF32}, got a value of type Matrix{ComplexF64}"
+  },
+  "05_spin1_zeeman_phase_only.yaml": {
+    "elapsed_sec": 2.18,
+    "status": "FAIL",
+    "error": "TypeError: in typeassert, expected Array{ComplexF32}, got a value of type Matrix{ComplexF64}"
+  },
+  "06_spin1_sma_spin_mixing.yaml": {
+    "elapsed_sec": 27.19,
+    "status": "OK"
+  },
+  "04_spin2_cyclic_contact_ground.yaml": {
+    "elapsed_sec": 0.0,
+    "status": "FAIL",
+    "error": "ArgumentError: Config validation errors:\n  • Unknown key 'pipeline.1.ground_state.interactions.c2' — did you mean 'c1'? Known keys: [\"N_atoms\", \"c0\", \"c1\", \"c1_ratio\", \"c_extra\", \"c_total\", \"omega_ref\"]"
+  },
+  "01_scalar_harmonic_oscillator_ground.yaml": {
+    "elapsed_sec": 10.12,
+    "status": "OK"
+  },
+  "09_edh_toy_spin_orbit_transfer.yaml": {
+    "elapsed_sec": 96.17,
+    "status": "OK"
+  },
+  "03_spin1_ferromagnetic_contact_ground.yaml": {
+    "elapsed_sec": 7.15,
+    "status": "OK"
+  },
+  "08_ddi_spherical_polarized_zero_kernel.yaml": {
+    "elapsed_sec": 28.98,
+    "status": "OK"
+  }
+}

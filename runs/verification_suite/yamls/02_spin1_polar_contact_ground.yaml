@@ -1,0 +1,34 @@
+# 02 — Spin-1 polar contact benchmark
+# Physics: E_spin=(c1/2)|F|^2. For c1>0, polar state minimizes |F|.
+# Expected: phase_classify -> polar-like, spin_order ~ 0, Mz ~ 0.
+
+metadata:
+  suite: spinorbec_physics_verification
+  reference: Kawaguchi_Ueda_spin1_polar_c1_positive
+  expected_phase: polar
+
+defaults:
+  kind: spinor
+  backend: gpu
+
+pipeline:
+  - ground_state:
+      atom: Na23
+      grid: {n: [24, 24, 24], box: [10.0, 10.0, 10.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      interactions:
+        c0: 100.0
+        c1: 2.0
+      ddi: {enabled: false}
+      B: {p: 0.0, q: 0.0}
+      initial_state: polar
+      method: itp
+      dt: 0.003
+      n_steps: 4000
+      tol: 1.0e-9
+
+  - analyze:
+      - phase_classify: {}
+      - energy_decomposition: {}
+      - bogoliubov: {k_max: 4.0, n_k: 40, directions: auto, n_directions: 6}
+      - summary_json: {path: "verify_outputs/02_spin1_polar_summary.json"}

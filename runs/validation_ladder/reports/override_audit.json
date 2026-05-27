@@ -1,0 +1,138 @@
+{
+  "created_at": "2026-05-22T19:54:19.177",
+  "results": {
+    "dry_k3_long": {
+      "status": "NO_SCAN",
+      "path": "runs/eu151_edh_K3_long/config.yaml"
+    },
+    "dry_eu151_edh_c1phys": {
+      "status": "NO_SCAN",
+      "path": "runs/eu151_edh_c1phys/config.yaml"
+    },
+    "eu151_edh_loss_factorial": {
+      "comparison_runs": [
+        {
+          "name": "K3off_gdroff",
+          "warnings": [],
+          "override_keys": [
+            "pipeline.2.loss"
+          ],
+          "effective_pipeline_2_loss": "false"
+        },
+        {
+          "name": "K3off_gdron",
+          "warnings": [],
+          "override_keys": [
+            "pipeline.2.loss"
+          ],
+          "effective_pipeline_2_loss": "Dict{Any, Any}(\"gamma_dr\" => 0.02)"
+        },
+        {
+          "name": "K3on_gdroff",
+          "warnings": [],
+          "override_keys": [
+            "pipeline.2.loss"
+          ],
+          "effective_pipeline_2_loss": "Dict{Any, Any}(\"K3_per_m_si\" => [\"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\"])"
+        },
+        {
+          "name": "K3on_gdron",
+          "warnings": [],
+          "override_keys": [],
+          "effective_pipeline_2_loss": "Dict{Any, Any}(\"K3_per_m_si\" => [\"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\"], \"gamma_dr\" => 0.02)"
+        }
+      ],
+      "status": "OK",
+      "path": "runs/eu151_edh_loss_factorial/config.yaml"
+    },
+    "dry_eu151_edh": {
+      "status": "NO_SCAN",
+      "path": "runs/eu151_edh/config.yaml"
+    },
+    "dry_matsui_baseline": {
+      "status": "NO_SCAN",
+      "path": "runs/eu151_matsui_edh/configs/matsui_edh_baseline.yaml"
+    },
+    "eu151_edh_K3_long": {
+      "status": "NO_SCAN",
+      "path": "runs/eu151_edh_K3_long/config.yaml"
+    },
+    "dry_k3_compare": {
+      "comparison_runs": [
+        {
+          "name": "baseline_no_K3",
+          "warnings": [],
+          "override_keys": [],
+          "effective_pipeline_2_loss": "Dict{Any, Any}(\"gamma_dr\" => 0.02)"
+        },
+        {
+          "name": "K3_dy_like",
+          "warnings": [],
+          "override_keys": [
+            "pipeline.2.loss.K3_per_m_si"
+          ],
+          "effective_pipeline_2_loss": "Dict{Any, Any}(\"K3_per_m_si\" => [\"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\"], \"gamma_dr\" => 0.02)"
+        }
+      ],
+      "status": "OK",
+      "path": "runs/eu151_edh_k3_compare/config.yaml"
+    },
+    "dry_loss_factorial": {
+      "comparison_runs": [
+        {
+          "name": "K3off_gdroff",
+          "warnings": [],
+          "override_keys": [
+            "pipeline.2.loss"
+          ],
+          "effective_pipeline_2_loss": "false"
+        },
+        {
+          "name": "K3off_gdron",
+          "warnings": [],
+          "override_keys": [
+            "pipeline.2.loss"
+          ],
+          "effective_pipeline_2_loss": "Dict{Any, Any}(\"gamma_dr\" => 0.02)"
+        },
+        {
+          "name": "K3on_gdroff",
+          "warnings": [],
+          "override_keys": [
+            "pipeline.2.loss"
+          ],
+          "effective_pipeline_2_loss": "Dict{Any, Any}(\"K3_per_m_si\" => [\"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\"])"
+        },
+        {
+          "name": "K3on_gdron",
+          "warnings": [],
+          "override_keys": [],
+          "effective_pipeline_2_loss": "Dict{Any, Any}(\"K3_per_m_si\" => [\"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\"], \"gamma_dr\" => 0.02)"
+        }
+      ],
+      "status": "OK",
+      "path": "runs/eu151_edh_loss_factorial/config.yaml"
+    },
+    "eu151_edh_k3_compare": {
+      "comparison_runs": [
+        {
+          "name": "baseline_no_K3",
+          "warnings": [],
+          "override_keys": [],
+          "effective_pipeline_2_loss": "Dict{Any, Any}(\"gamma_dr\" => 0.02)"
+        },
+        {
+          "name": "K3_dy_like",
+          "warnings": [],
+          "override_keys": [
+            "pipeline.2.loss.K3_per_m_si"
+          ],
+          "effective_pipeline_2_loss": "Dict{Any, Any}(\"K3_per_m_si\" => [\"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\", \"1.0e-41 m^6/s\"], \"gamma_dr\" => 0.02)"
+        }
+      ],
+      "status": "OK",
+      "path": "runs/eu151_edh_k3_compare/config.yaml"
+    }
+  }
+}
+

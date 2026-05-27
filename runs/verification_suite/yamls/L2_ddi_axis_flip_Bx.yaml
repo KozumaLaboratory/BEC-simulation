@@ -1,0 +1,49 @@
+# L2 — DDI axis flip: B along x (companion to L2_ddi_axis_flip_Bz reference)
+# Anko's validation ladder Level 2: DDI kernel convention check via axis sensitivity.
+#
+# Reference frame for spin-polarized DDI:
+#   B along z → cloud stretches along z (head-to-tail attractive) if prolate-compatible
+#   B along x → cloud should stretch along x (DDI kernel must transform consistently)
+# If both axes give identical density evolution, DDI kernel is direction-blind (BUG).
+# If B-axis flip rotates the response, kernel transforms correctly.
+#
+# Companion: L2_ddi_axis_flip_Bz uses the existing 08_ddi_spherical_polarized_zero_kernel
+# (B=0 baseline). This file sets Bz=0 and θ=π/2 (B along x), keeping all else identical.
+#
+# Pass criteria (anko ladder Level 2):
+#   - DDI energy decomposition (analyze/energy_decomposition) reports E_ddi non-zero
+#   - density anisotropy aligns with B direction (qualitative; quantitative via post-hoc moments)
+#   - rotating B axis 90° rotates the elongation 90°
+#   - phase remains FM (m=+F or m=-F)
+
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 2
+  reference: DDI_kernel_axis_flip_test
+  expected: density_elongation_aligns_with_B_axis
+
+defaults:
+  kind: spinor
+  backend: gpu
+
+pipeline:
+  - ground_state:
+      atom: Cr52
+      grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      interactions: {N_atoms: 10000, omega_ref: 628.3}
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B:                                    # ← B along x: Cartesian form (Bx only)
+        Bx: "0.1 Gauss"
+      gauge_fix: false
+      initial_state: m_minus_F              # spin-polarized
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 2500
+      tol: 1.0e-9
+
+  - analyze:
+      - phase_classify: {}
+      - energy_decomposition: {}
+      - summary_json: {path: "runs/verification_suite/outputs/L2_ddi_axis_flip_Bx.json"}

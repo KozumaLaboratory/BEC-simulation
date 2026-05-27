@@ -1,0 +1,43 @@
+# 09 — Toy Einstein-de Haas spin-orbit-transfer sanity check
+# Physics: DDI couples spin and orbital angular momentum. In a closed system, Jz=Lz+Sz should be approximately conserved.
+# Expected: small spin depolarization and nonzero orbital/winding signal; not a quantitative Matsui reproduction.
+
+metadata:
+  suite: spinorbec_physics_verification
+  reference: Kawaguchi_Saito_Ueda_EdH_toy
+  expected: qualitative_spin_orbit_transfer
+
+defaults:
+  kind: spinor
+  backend: cpu
+  interactions: {N_atoms: 2000, omega_ref: 691.15}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [32, 32, 32], box: [16.0, 16.0, 16.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.1]}
+      interactions: {N_atoms: 2000, omega_ref: 691.15, c1_ratio: 0.0}
+      ddi: {enabled: true}
+      B: {Bz: "0.01 Gauss"}
+      initial_state: m_plus_F
+      lhy: {kind: scalar}
+      method: itp
+      dt: 0.004
+      n_steps: 3500
+      tol: 1.0e-8
+
+  - dynamics:
+      duration: 0.8
+      dt: 0.0005
+      B: {Bz: "2.6e-5 Gauss"}
+      noise_seed: 42
+      seed_amplitude: 1.0e-5
+      seed_k_cut: 1.5
+      save: {every: 40, psi: true, precision: f32}
+
+  - analyze:
+      - phase_classify: {}
+      - winding_map: {}
+      - vortex_detect: {component: 1, threshold: 0.05}
+      - summary_json: {path: "verify_outputs/09_edh_toy_summary.json"}
