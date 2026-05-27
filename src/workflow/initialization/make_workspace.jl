@@ -251,12 +251,33 @@ function make_workspace(;
     end
 
     lhy_attempt =
-        if spinor_lhy === nothing
+        if spinor_lhy === nothing || spinor_lhy === :none
             nothing
         else
             _build_spinor_lhy(Val(spinor_lhy), atom, ws_interactions, psi_init,
                 c_dd, enable_ddi)
         end
+
+    # Silent-zero defense (2026-05-26): when the user explicitly requested
+    # a non-scalar spinor LHY mode and the builder returned `nothing`, the
+    # historical fall-through hid the failure — the run would produce
+    # results as if LHY were off, but with the user thinking it was on.
+    # `:scalar` / `:quasi_2d` legitimately fall through to the
+    # `c_lhy` branch below; everything else must build.
+    if spinor_lhy !== nothing && spinor_lhy !== :none &&
+        spinor_lhy !== :scalar && spinor_lhy !== :quasi_2d &&
+        lhy_attempt === nothing
+        throw(
+            ArgumentError(
+                "spinor_lhy=:$(spinor_lhy) requested but the LHY builder " *
+                "returned `nothing`. Either the kind is unimplemented " *
+                "(no `_build_spinor_lhy(::Val{:$(spinor_lhy)}, ...)` method) " *
+                "or the builder bailed out (check F vs kind restrictions, " *
+                "e.g. `:icosahedral` is F=6 only, `:polar_two_channel` is F≤2). " *
+                "Refusing silent-zero: dynamics with this LHY block would " *
+                "have run as if LHY were off."),
+        )
+    end
 
     lhy = if lhy_attempt !== nothing
         lhy_attempt

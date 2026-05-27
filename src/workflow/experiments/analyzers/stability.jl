@@ -16,7 +16,7 @@ function _analyze_stability(psi, grid, atom, params, ws_prev)
     sp = SimParams(; dt=0.0001, n_steps=1, save_every=1)
     ws = make_workspace(;
         grid, atom,
-        interactions=InteractionParams(0.0, 0.0),
+        interactions=InteractionParams(Dict{Int, Float64}()),
         potential=HarmonicTrap(ntuple(_ -> 1.0, ndim)),
         sim_params=sp,
         psi_init=psi,

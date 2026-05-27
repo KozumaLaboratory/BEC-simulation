@@ -62,7 +62,8 @@ function _run_step(
     dt = Float64(p["dt"])
     save_every = _resolve_save_every(p, duration, dt)
 
-    prev_interactions = ws_prev !== nothing ? ws_prev.interactions : InteractionParams(0.0, 0.0)
+    prev_interactions =
+        ws_prev !== nothing ? ws_prev.interactions : InteractionParams(Dict{Int, Float64}())
     prev_potential = ws_prev !== nothing ? ws_prev.potential : HarmonicTrap(ntuple(_ -> 1.0, ndim))
     prev_ddi = ws_prev !== nothing ? ws_prev.ddi : nothing
     prev_c_dd = prev_ddi !== nothing ? prev_ddi.C_dd : NaN
@@ -143,6 +144,23 @@ function _run_step(
         zeeman, raman, time_dep_interactions,
     )
 
+    # LHY in dynamics:
+    #   * `lhy:` absent + scalar LHY active in GS: propagates automatically
+    #     via `interactions.c_lhy > 0` fallback in `make_workspace`.
+    #     Non-scalar LHY does NOT propagate this way and would be silently
+    #     dropped — this is the historical foot-gun (see
+    #     docs/validation/self_contained_validation_report.md → known
+    #     limitations).
+    #   * `lhy:` present: build the LHY object explicitly via the same
+    #     `spinor_lhy=Symbol` dispatch as GS. Overrides any implicit
+    #     inheritance.
+    spinor_lhy_mode = let v = get(p, "lhy", nothing)
+        v isa Dict ? Symbol(get(v, "kind", "none")) : nothing
+    end
+    if spinor_lhy_mode === :none
+        spinor_lhy_mode = nothing
+    end
+
     ws = make_workspace(;
         grid, atom, interactions,
         zeeman, potential,
@@ -156,6 +174,7 @@ function _run_step(
         raman,
         time_dep_interactions,
         magnetic_gradient,
+        spinor_lhy=spinor_lhy_mode,
     )
 
     if temp_ratio !== nothing

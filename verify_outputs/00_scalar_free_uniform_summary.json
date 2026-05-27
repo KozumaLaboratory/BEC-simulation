@@ -1,0 +1,15 @@
+{
+  "energy_final": 0.062188976637663956,
+  "_live_status_path": "runs/00_scalar_free_uniform_stationary_0ece2fdb/_live_status.json",
+  "snapshot_tmp_path": "/tmp/spinorbec_snaps_50af0cc4dba483f1.jld2",
+  "snapshot_count": 10,
+  "n_snapshots": 0,
+  "ground_state_energy": 0.06218897663767034,
+  "save_snapshot_compression": false,
+  "t_initial": 0.0,
+  "t_final": 1.0000000000000007,
+  "energy_initial": 0.06218897663767034,
+  "ground_state_converged": false,
+  "norm_drift": 5.306866057708248e-14,
+  "save_psi_snapshots": true
+}

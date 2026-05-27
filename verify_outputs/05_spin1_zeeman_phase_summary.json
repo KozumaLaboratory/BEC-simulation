@@ -1,0 +1,15 @@
+{
+  "energy_final": 0.3288556433048056,
+  "_live_status_path": "runs/05_spin1_zeeman_phase_only_487eb6c5/_live_status.json",
+  "snapshot_tmp_path": "/tmp/spinorbec_snaps_f18d512ca02c9cb8.jld2",
+  "snapshot_count": 20,
+  "n_snapshots": 0,
+  "ground_state_energy": 0.062188976637670326,
+  "save_snapshot_compression": false,
+  "t_initial": 0.0,
+  "t_final": 1.9999999999998905,
+  "energy_initial": 0.3288556433043369,
+  "ground_state_converged": false,
+  "norm_drift": 1.1812772982011666e-13,
+  "save_psi_snapshots": true
+}

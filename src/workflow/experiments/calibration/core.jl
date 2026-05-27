@@ -203,28 +203,29 @@ function _pick_coil(node::Dict, calib::CalibrationSet)
 end
 
 function _calibrate_zeeman_node!(node::Dict, calib::CalibrationSet)
+    consumed = false
     if haskey(node, "p_mv")
         coil = _pick_coil(node, calib)
         gauss = coil_mv_to_gauss(Float64(node["p_mv"]), coil)
-        # Output as a Cartesian Bz quantity-string. The canonical convention
-        # was `p: "X Gauss"`, but `p` is the dimensionless Zeeman energy
-        # internally — feeding a Gauss-string into `p` collides with
-        # `_zeeman_scalar` (which only handles Reals + dim-less). The
-        # B_block normalizer + downstream `_parse_bfield` correctly handle
-        # `Bz: "X Gauss"`. Calibration→units pipeline ordering bug fix
-        # (2026-05-02).
+        # Output as a Cartesian Bz quantity-string. `p` is the dimensionless
+        # Zeeman energy internally; feeding a Gauss-string into `p` collides
+        # with `_zeeman_scalar`. The B_block normalizer + downstream
+        # `_parse_bfield` correctly handle `Bz: "X Gauss"`.
         node["Bz"] = "$(gauss) Gauss"
         delete!(node, "p_mv")
+        consumed = true
     end
     if haskey(node, "q_mv")
         coil = _pick_coil(node, calib)
         gauss = coil_mv_to_gauss(Float64(node["q_mv"]), coil)
         node["q_gauss"] = gauss
         delete!(node, "q_mv")
+        consumed = true
     end
-    # coil_mode was only meaningful alongside the lab-unit fields; drop it.
-    (haskey(node, "coil_mode") && !haskey(node, "p") && !haskey(node, "q")) &&
-        delete!(node, "coil_mode")
+    # coil_mode is only meaningful alongside p_mv / q_mv lab-unit fields.
+    # Once those are consumed, drop coil_mode so downstream schema validation
+    # doesn't flag the node as still using lab-units.
+    consumed && haskey(node, "coil_mode") && delete!(node, "coil_mode")
 end
 
 function _calibrate_trap_node!(node::Dict, calib::CalibrationSet)

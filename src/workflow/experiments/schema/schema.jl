@@ -33,13 +33,11 @@ const INTERACTIONS_SCHEMA =
             "c0" => FieldSpec(; type=Number),
             "c1" => FieldSpec(; type=Number),
             "c1_ratio" => FieldSpec(; type=Number, range=(-1.0, 1.0)),
-            "c_extra" => FieldSpec(; type=Vector),
         )
-        # Sparse c_N keys (c2, c3, ..., c12) are accepted as alternative input
-        # to c_extra. `_parse_c_extra` (parsing_blocks.jl:26) reads any `cN` for
-        # N ≥ 2 and routes into the c_extra vector. Schema validator must
-        # whitelist these so strict-mode pipelines (run_registry.jl) don't
-        # reject e.g. spin-2 cyclic YAML that writes `c2: 2.0` directly.
+        # Sparse c_N keys (c2, c4, ..., c12) declare higher-rank tensor
+        # couplings directly. The parser (`_parse_higher_rank_c_n`,
+        # parsing_blocks.jl) consumes any `cN` for N ≥ 2. Whitelist them
+        # so strict-mode validation doesn't reject `c2: 2.0` etc.
         # Range up to N=12 covers Eu-151 F=6 (channels S=0..12).
         for n in 2:12
             s["c$n"] = FieldSpec(; type=Number)
@@ -219,6 +217,15 @@ const PULSE_EVENT_SCHEMA = Dict{String, FieldSpec}(
     "omega" => FieldSpec(), "center" => FieldSpec(; type=Vector),
 )
 
+const ADAPTIVE_DT_SCHEMA = Dict{String, FieldSpec}(
+    "dt_init" => FieldSpec(; type=Number, range=(1e-8, 1.0)),
+    "dt_min" => FieldSpec(; type=Number, range=(1e-10, 1.0)),
+    "dt_max" => FieldSpec(; type=Number, range=(1e-8, 1.0)),
+    "tol" => FieldSpec(; type=Number, range=(1e-12, 1.0)),
+    "error_mode" => FieldSpec(; type=String,
+        enum=["step_change", "richardson", "embedded"]),
+)
+
 const DDI_SCHEMA = Dict{String, FieldSpec}(
     "enabled" => FieldSpec(; type=Bool, default=true),     # was false, flipped 2026-04-30
     "c_dd" => FieldSpec(; type=Union{Number, Dict}),
@@ -237,7 +244,8 @@ const DDI_SCHEMA = Dict{String, FieldSpec}(
 #                              Klaus-style protocols where B direction
 #                              evolves and p·F·dt would otherwise blow up.
 const GS_SCHEMA = Dict{String, FieldSpec}(
-    "kind" => FieldSpec(; type=String, enum=["spinor", "binary", "rotating_basis"]),
+    "kind" => FieldSpec(; type=String,
+        enum=["spinor", "binary", "rotating_basis", "option_gamma"]),
     "dtype" => FieldSpec(; type=String, default="f64", enum=["f32", "f64"]),
     "species_A" => FieldSpec(; type=Dict),    # binary path
     "species_B" => FieldSpec(; type=Dict),    # binary path
@@ -289,6 +297,13 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
 const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     "duration" => FieldSpec(; required=true, type=Number, range=(0.0, 1e6)),
     "dt" => FieldSpec(; required=true, type=Number, range=(1e-8, 1.0)),
+    # LHY block override for dynamics. When absent, scalar LHY propagates
+    # automatically via the inherited `prev_interactions.c_lhy` from the
+    # preceding GS step; non-scalar (table-based) LHY does NOT propagate
+    # implicitly and must be re-declared here. When present, the dynamics
+    # step builds its own LHY at make_workspace time (overrides any
+    # implicit inheritance). Mirrors `GROUND_STATE_SCHEMA["lhy"]`.
+    "lhy" => FieldSpec(; type=Dict, schema=LHY_SCHEMA),
     # Unified `save:` block. Sub-keys: every (steps) | n_snapshots (frames)
     # | psi (Bool) | compression (Bool) | precision ("f32"|"f64").
     "save" => FieldSpec(; type=Dict, schema=SAVE_SCHEMA),
@@ -310,9 +325,7 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     # twice; the second declaration silently shadowed the first, causing
     # spurious "not valid" rejections of yoshida/adaptive/richardson on
     # the standard path.
-    "integrator" => FieldSpec(; type=String,
-        enum=["strang", "yoshida", "adaptive", "richardson",
-            "yoshida4", "yoshida6", "cfet4"]),
+    "integrator" => FieldSpec(; type=Union{String, Dict}),
     "backend" => FieldSpec(; type=String, enum=["cpu", "gpu"]),
     "raman" => FieldSpec(; type=Dict, schema=RAMAN_SCHEMA),
     "absorbing_boundary" => FieldSpec(; type=Dict, schema=ABSORBING_SCHEMA),
@@ -324,6 +337,7 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     "projected_gp" => FieldSpec(; type=Union{Dict, Bool}, schema=PROJECTED_GP_SCHEMA),
     "photon_scattering" => FieldSpec(; type=Union{Dict, Bool}, schema=PHOTON_SCATTERING_SCHEMA),
     "loss" => FieldSpec(; type=Union{Dict, Bool, Number}, schema=LOSS_SCHEMA),
+    "adaptive_dt" => FieldSpec(; type=Dict, schema=ADAPTIVE_DT_SCHEMA),
     "live_monitor" => FieldSpec(; type=Union{Bool, Dict}, schema=LIVE_MONITOR_SCHEMA),
     # Two-component / binary GP path (Phase 4/5 #51 scaffold).
     "kind" => FieldSpec(; type=String, enum=["binary", "rotating_basis"]),
