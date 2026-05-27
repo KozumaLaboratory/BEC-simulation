@@ -1,0 +1,72 @@
+# Step 6 Ueda compare — canonical reference state.
+#
+# This YAML defines THE single reference state for the bilateral
+# operator-RHS exchange with the Ueda lab. Configured per the signed
+# parameter contract in ../parameter_contract_with_Ueda.md.
+#
+# DESIGN CHOICES (locked-in 2026-05-26):
+#   * Eu151 F=6 (target species for the Matsui Science 2026 work)
+#   * 32³ grid, box 12 — smallest grid where L4 post-parser-fix
+#     conservation passes cleanly (|ΔE/E| ≈ 9e-5 at the integrator
+#     floor; ΔFz ≈ +3.31 over 6.28 ω_ref⁻¹). Bigger grids hit Townes
+#     collapse without K3, which contaminates the operator-RHS
+#     comparison.
+#   * GS at Bz = -0.01 G, m_minus_F initial state, isotropic trap
+#     ω = (1, 1, 1). Same parameter family as the L4 verification
+#     suite, no quench, no dynamics — operator-RHS is evaluated on
+#     the converged GS only.
+#   * lhy: none, no loss, secular=false. Pure Hamiltonian-only
+#     operator action.
+#   * dt=0.005, n_steps=2000, tol=1e-9. Tighter than L4 (1e-7) to
+#     drive the operator-RHS residual to numerical floor.
+#   * c1_ratio = -0.005 (matches L4 baseline).
+#
+# RUN:
+#   julia --project=. scripts/validation/export_operator_rhs.jl \
+#       docs/validation/step6_ueda_reference_state/reference_state.yaml \
+#       docs/validation/step6_ueda_reference_state/
+#
+# OUTPUT:
+#   docs/validation/step6_ueda_reference_state/operator_rhs.jld2
+#   docs/validation/step6_ueda_reference_state/MANIFEST.md
+#
+# After Ueda lab produces their counterpart `operator_rhs.jld2`:
+#   julia --project=. scripts/validation/compare_operator_rhs.jl \
+#       ours/operator_rhs.jld2 theirs/operator_rhs.jld2
+
+metadata:
+  suite: step6_ueda_reference_state
+  ladder_level: 10
+  reference: parameter_contract_with_Ueda.md_signed_2026_05_26
+  origin: locked_in_post_parser_fix_e8584f4
+
+defaults:
+  kind: spinor
+  backend: cpu                          # CPU for portability — Level-10 deliverable
+                                        # must run anywhere, no CUDA dep
+  interactions: {N_atoms: 30000, omega_ref: 628.3}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      interactions:
+        N_atoms: 30000
+        omega_ref: 628.3
+        c1_ratio: -0.005
+      ddi:
+        enabled: true
+        secular: false                  # full DDI (matches contract row 4.7 default for non-Larmor reference)
+      lhy: {kind: none}                  # Hamiltonian-only (contract row 6.x N/A)
+      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      gauge_fix: false
+      initial_state: m_minus_F           # contract row 10.3
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 2000                     # tighter than L4's 1500 to push tol
+      tol: 1.0e-9
+
+  - analyze:
+      - hpsi_export:
+          path: "operator_rhs.jld2"
