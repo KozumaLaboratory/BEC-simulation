@@ -60,13 +60,13 @@ function _audit_uniform_decay()
 
     ws = make_workspace(; grid, atom, interactions,
         potential=NoPotential(), sim_params=sp,
-        loss=loss,
+        loss=loss, backend=CPUBackend(),
     )
 
     # Uniform ψ: ψ_m=0 = sqrt(n0); other m = 0. So n(r) = n0 everywhere.
     n0 = 0.5
     fill!(ws.state.psi, 0)
-    psi_view = view(ws.state.psi, :, :, :, F + 1)  # m=0 for F=1
+    psi_view = view(ws.state.psi,:,:,:,(F + 1))  # m=0 for F=1
     psi_view .= sqrt(n0)
 
     n_before = abs2(ws.state.psi[1, 1, 1, F + 1])
@@ -101,7 +101,8 @@ function _audit_gaussian_dndt()
 
     loss = SpinorBEC.LossParams(; K3_per_m_cubic=[K3])
     ws = make_workspace(; grid, atom, interactions,
-        potential=NoPotential(), sim_params=sp, loss=loss)
+        potential=NoPotential(), sim_params=sp, loss=loss,
+        backend=CPUBackend())
 
     # Normalised Gaussian ψ in m=0 (only) component.
     sigma = 1.0
