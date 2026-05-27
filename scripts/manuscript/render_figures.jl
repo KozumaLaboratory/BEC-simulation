@@ -17,6 +17,7 @@
 # infrastructure is fully working and can be exercised via --list.
 
 using Printf
+import SpinorBEC
 
 # ────────────────────────────────────────────────────────────────
 # Figure dispatch table
@@ -710,6 +711,147 @@ function build_paper3_fig4(paper::String, fig::String, info)
     @printf("OK: %s %s\n", paper, fig)
     @printf("  TikZ source: %s\n", tex_path)
     @printf("  Build: cd %s && pdflatex %s\n", dir, basename(tex_path))
+end
+
+# ────────────────────────────────────────────────────────────────
+# Paper #3 FIG-6: Polyhedral inert state Majorana configurations
+# ────────────────────────────────────────────────────────────────
+# Canonical Paper #3 §V state spinors. Component order: index k+1
+# corresponds to m = F-k, so the first index is m=+F and the last
+# is m=-F. F=0 components live at the centre index F+1.
+function _paper3_canonical_states()
+    states = Tuple{Int, String, String, Vector{ComplexF64}}[]
+
+    # §V.A  F=2  T_d cyclic: ζ = (1, 0, i√2, 0, 1) / 2
+    let z = ComplexF64[1.0, 0.0, im * sqrt(2.0), 0.0, 1.0] ./ 2.0
+        push!(states, (2, "F=2 cyclic", "T_d (§V.A)", z))
+    end
+    # §V.B  F=3  O:A_2:  ζ = (|+2⟩ − |−2⟩) / √2
+    let z = zeros(ComplexF64, 7)
+        z[2] = 1.0 / sqrt(2.0);
+        z[6] = -1.0 / sqrt(2.0)
+        push!(states, (3, "F=3 octa", "O:A_2 (§V.B)", z))
+    end
+    # §V.C  F=4  O:A_1 cube: ζ = √(5/24)|+4⟩ + √(7/12)|0⟩ + √(5/24)|−4⟩
+    let z = zeros(ComplexF64, 9)
+        z[1] = sqrt(5 / 24);
+        z[5] = sqrt(7 / 12);
+        z[9] = sqrt(5 / 24)
+        push!(states, (4, "F=4 cube", "O:A_1 (§V.C)", z))
+    end
+    # §V.D  F=6  I:A canonical (ZETA_F6_IH): ζ = √7/5(|+5⟩−|−5⟩)+√11/5|0⟩
+    let z = ComplexF64[
+            0, sqrt(7.0) / 5, 0, 0, 0, 0, sqrt(11.0) / 5,
+            0, 0, 0, 0, -sqrt(7.0) / 5, 0,
+        ]
+        push!(states, (6, "F=6 icosa", "I:A (§V.D)", z))
+    end
+    # F=7 O:A_2 (supplementary — m ∈ {±6, ±2}).
+    let z = ComplexF64[
+            0,
+            -0.3635626373 + 0.3114303701im,  # m=+6
+            0, 0, 0,
+            -0.3952342557 + 0.3385605063im,  # m=+2
+            0, 0, 0,
+            0.3952342557 - 0.3385605063im,  # m=-2
+            0, 0, 0,
+            0.3635626373 - 0.3114303701im,  # m=-6
+            0,
+        ]
+        push!(states, (7, "F=7 octa", "O:A_2 (supp)", z))
+    end
+    # §V.E  F=8  O:A_1 cube-octa: √390/48|±8⟩+√42/24|±4⟩+√33/8|0⟩
+    let z = zeros(ComplexF64, 17)
+        z[1] = sqrt(390) / 48;
+        z[5] = sqrt(42) / 24;
+        z[9] = sqrt(33) / 8
+        z[13] = sqrt(42) / 24;
+        z[17] = sqrt(390) / 48
+        push!(states, (8, "F=8 cube-octa", "O:A_1 (§V.E)", z))
+    end
+    # F=9 O:A_1 (supplementary — m ∈ {±8, ±4}).
+    let z = ComplexF64[
+            0,
+            0.1779105488 + 0.3379070434im,  # m=+8
+            0, 0, 0,
+            -0.2772535655 - 0.526590094im,  # m=+4
+            0, 0, 0, 0, 0, 0, 0,
+            0.2772535655 + 0.526590094im,  # m=-4
+            0, 0, 0,
+            -0.1779105488 - 0.3379070434im,  # m=-8
+            0,
+        ]
+        push!(states, (9, "F=9 octa", "O:A_1 (supp)", z))
+    end
+    # §V.F  F=10 I:A dodec: √561/75|±10⟩+√209/25(|+5⟩−|−5⟩)+√741/75|0⟩
+    let z = zeros(ComplexF64, 21)
+        z[1] = sqrt(561) / 75;
+        z[6] = sqrt(209) / 25;
+        z[11] = sqrt(741) / 75
+        z[16] = -sqrt(209) / 25;
+        z[21] = sqrt(561) / 75
+        push!(states, (10, "F=10 dodec", "I:A (§V.F)", z))
+    end
+    # F=11 O:A_2 (supplementary — m ∈ {±10, ±6, ±2}).
+    let z = ComplexF64[
+            0,
+            -0.2933098261 + 0.2952057405im,  # m=+10
+            0, 0, 0,
+            -0.2288986869 + 0.2303782566im,  # m=+6
+            0, 0, 0,
+            -0.3316081934 + 0.3337516632im,  # m=+2
+            0, 0, 0,
+            0.3316081934 - 0.3337516632im,  # m=-2
+            0, 0, 0,
+            0.2288986869 - 0.2303782566im,  # m=-6
+            0, 0, 0,
+            0.2933098261 - 0.2952057405im,  # m=-10
+            0,
+        ]
+        push!(states, (11, "F=11 octa", "O:A_2 (supp)", z))
+    end
+    # §V.G  F=12 I:A icosa (C_5^z-invariant), U(1)-rotated to real form
+    let z = zeros(ComplexF64, 25)
+        z[3] = 0.4871;
+        z[8] = -0.3024;
+        z[13] = 0.5853
+        z[18] = 0.3024;
+        z[23] = 0.4871
+        z ./= sqrt(sum(abs2, z))
+        push!(states, (12, "F=12 I:A", "I:A (§V.G)", z))
+    end
+    states
+end
+
+function build_paper3_fig6(paper::String, fig::String, info)
+    # Output preserves the existing on-disk filename `fig-7_paper3_majorana`
+    # (matching the committed matplotlib renderer in docs/manuscript/...
+    # /figures/fig-7_paper3_majorana.py). The registry FIG-6 ↔ disk fig-7
+    # offset is historical; the renderer side is the load-bearing contract.
+    dir = _ensure_figures_dir(paper)
+    csv_path = joinpath(dir, "fig-7_paper3_majorana.csv")
+
+    # `_stereo_to_sphere` is internal but stable since the U2 z=∞ → north
+    # pole fix (commit a9a3d95).
+    stereo = SpinorBEC._stereo_to_sphere
+
+    open(csv_path, "w") do io
+        println(io, "panel_idx,F,label,ref,point_idx,x,y,z")
+        for (panel_idx, (F, label, ref, spinor)) in
+            enumerate(_paper3_canonical_states())
+            stars = SpinorBEC.majorana_stars(spinor, F)
+            for (i, z) in enumerate(stars)
+                p = stereo(z)
+                println(io, "$panel_idx,$F,$label,$ref,$i,$(p[1]),$(p[2]),$(p[3])")
+            end
+        end
+    end
+
+    py_path = joinpath(dir, "fig-7_paper3_majorana.py")
+    @printf("OK: %s %s\n", paper, fig)
+    @printf("  CSV: %s\n", csv_path)
+    @printf("  renderer: %s (committed)\n", py_path)
+    @printf("  Build: python3 %s\n", py_path)
 end
 
 # Default for all other figures → stub
