@@ -135,7 +135,7 @@ For paper3 v4 (post-修論 follow-up), recommended:
    > and the function $X_S^{(\rm anom)}$ in $S$ has a single sign change in $[2, 2F]$
    > for polyhedral inert states, with $S_{\rm bd} \in [1.5F, 2F]$."
 4. **Provide F=12 check**: the Anomalous Identity at F=12 (via the F=12 spinor from
-   `f12_icosahedral_verification.jl`) would empirically test the conjecture at the next
+   `test_f12_icosahedral.jl`) would empirically test the conjecture at the next
    F value.
 
 ## Open: analytical proof of Anomalous Identity

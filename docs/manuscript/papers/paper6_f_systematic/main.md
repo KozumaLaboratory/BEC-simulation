@@ -256,7 +256,7 @@ verified via `test/manuscript/test_f_systematic_lemma1_predictions.jl`.)
   Closed-form predictions for F=7/9/11
 - `test/manuscript/test_f_systematic_lemma1_predictions.jl` — verification script
 - `test/manuscript/test_f5_f7_polyhedral.jl`,
-  `f9_f11_polyhedral_verification.jl` — numerical verification
+  `test_f9_f11_polyhedral.jl` — numerical verification
 - `paper3_universal_theorem/sign_pattern_lemma1_general_S.md` — closed-form derivation
 - `paper3_universal_theorem/sign_pattern_L2_unique_sign_change.md` — sign-change uniqueness
 - `paper3_universal_theorem/rank2_vanishing_analytical_proof.md` — group-theoretic proof

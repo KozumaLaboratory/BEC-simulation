@@ -626,7 +626,7 @@ at F=9 T:A (implementer T115 sim §5 metrics):
 |---|---|---|---|
 | F1 (central) $|\bar\beta_0^{({\rm canonical})} - 1/19| < 10^{-13}$ | $< 10^{-13}$ | $1.388 \times 10^{-16}$ | **CORROBORATE** |
 | F2 seed-spread of canonical formula $< 10^{-13}$ | $< 10^{-13}$ | $2.776 \times 10^{-17}$ | **CORROBORATE** |
-| F3 regression `lemma1_general_S_verification.jl` 26/26 PASS | 26/26 | 26/26 | **CORROBORATE** |
+| F3 regression `test_lemma1_general_S.jl` 26/26 PASS | 26/26 | 26/26 | **CORROBORATE** |
 | F4 advisory sum-rule dev $< 10^{-12}$ | $< 10^{-12}$ | $6.66 \times 10^{-15}$ | **CORROBORATE** |
 
 Schur isotropy of $\rho_{\rm inv}$ confirmed: $\mathrm{Tr}(\rho_{\rm inv} F_a^2) \approx 30 = F(F+1)/3$

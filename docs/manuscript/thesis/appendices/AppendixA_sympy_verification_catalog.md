@@ -177,8 +177,8 @@ D 論 Year 1 で planning される verification extensions:
 | Script | F values | Group | Verified | Status |
 |---|---|---|---|---|
 | `paper3_audit.jl` | 3, 4, 6, 8, 10 | O, I | $\beta_S^{c_0}$ closed forms | ✓ PASS 6+ decimals |
-| `f12_icosahedral_verification.jl` | 12 | I | spinor + selection rule | ✓ structural sanity |
-| `sign_pattern_6j_numerical.jl` | 3, 4, 6, 8, 10 | O, I | sign($\beta_S^{\lambda_{\rm spin}}$) | ✓ 4/5 cases match |
+| `test_f12_icosahedral.jl` | 12 | I | spinor + selection rule | ✓ structural sanity |
+| `test_sign_pattern_6j.jl` | 3, 4, 6, 8, 10 | O, I | sign($\beta_S^{\lambda_{\rm spin}}$) | ✓ 4/5 cases match |
 | (deferred D 論) | 12 | I | $\beta_S^{c_0/\lambda_{\rm spin}}$ closed form | sympy required |
 | (deferred D 論) | 5, 7, 9, 11 | O | spinor + closed forms | systematic completion |
 

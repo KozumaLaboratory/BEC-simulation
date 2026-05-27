@@ -289,7 +289,7 @@ says $X_0^{(\rm anom)} = -1/9 = -1/(2F+1)$ for F=4. Not $-F(F+1)/(3(2F+1)^2)$.
 So either the precise formula for $X_S^{(\rm anom)}$ differs from my derivation, or
 the numerical script computes it differently.
 
-Looking at the script `sign_pattern_6j_numerical.jl`:
+Looking at the script `test_sign_pattern_6j.jl`:
 ```julia
 F_a_ζ = Fz * ζ
 norm_Fz = norm(F_a_ζ)

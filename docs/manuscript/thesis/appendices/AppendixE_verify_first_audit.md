@@ -97,7 +97,7 @@ paper3 §IX.B "Sign Pattern Systematic" conjecture が F=12 で $S_{\rm bd} \sim
 
 ### E.3.2 Result
 
-F=12 I:A spinor (script: `f12_icosahedral_verification.jl`):
+F=12 I:A spinor (script: `test_f12_icosahedral.jl`):
 - ζ sparse on $m \in \{\pm 10, \pm 5, 0\}$
 - $\langle F^2\rangle = 156 = F(F+1)$ exact
 - Schur isotropy 1.28e-13 (machine precision)
@@ -123,7 +123,7 @@ with $X_S^{(\rm anom)} = \text{Re}[\langle S | F_a \zeta \otimes F_a \zeta\rangl
 
 ### E.4.2 Verification (4 of 5 cases match)
 
-Script: `sign_pattern_6j_numerical.jl`.
+Script: `test_sign_pattern_6j.jl`.
 
 - F=4 cube: sign change at $S=6$ ✓ matches paper3
 - F=6 icosa: sign change at $S=10$ ✓ matches paper3

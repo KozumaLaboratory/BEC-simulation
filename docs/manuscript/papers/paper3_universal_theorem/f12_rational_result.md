@@ -93,7 +93,7 @@ claim in paper3 §V.G. paper3 v4 should mention F=12 as a third instance.
    - Symbolic factorization of $\sum_S g_S \cdot |\zeta_S|^2$ in $\{g_S\}$ basis
    - Output: canonical rationals with prime-factor structure
 2. **Sign Pattern Anomalous Identity at F=12**: extend
-   `sign_pattern_6j_numerical.jl` with F=12 case → verify $\text{sign}(\beta_S^{\lambda_{\rm spin}}) = \text{sign}(X_S^{(\rm anom)})$ at one more F
+   `test_sign_pattern_6j.jl` with F=12 case → verify $\text{sign}(\beta_S^{\lambda_{\rm spin}}) = \text{sign}(X_S^{(\rm anom)})$ at one more F
 3. **F=12 in paper3 v4 §V.G**: cite this numerical verification as 3rd I_h instance
    (canonical closed form = D 論 Year 1 Q2 follow-up paper)
 

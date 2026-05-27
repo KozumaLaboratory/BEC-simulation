@@ -201,7 +201,7 @@ also vanish.)
 
 ## Verification matches the argument
 
-The numerical test `rank2_cross_channel_vanishing.jl` checked F=3 octa, F=4
+The numerical test `test_rank2_cross_channel_vanishing.jl` checked F=3 octa, F=4
 cube, F=6 icosa, F=8 cube-octa A_1 — **all polyhedral groups**. All passed at
 machine precision.
 
@@ -257,7 +257,7 @@ core result alongside the Universal Structure Theorem.
 
 - `sign_pattern_lemma1_general_S.md` — closed form derivation
 - `sign_pattern_L2_unique_sign_change.md` — sign-change uniqueness corollary
-- `rank2_cross_channel_vanishing.jl` — numerical verification (4 cases PASS)
+- `test_rank2_cross_channel_vanishing.jl` — numerical verification (4 cases PASS)
 - `paper3_universal_theorem/main.md` §IX.B — integration in paper3 v4
 
 ---

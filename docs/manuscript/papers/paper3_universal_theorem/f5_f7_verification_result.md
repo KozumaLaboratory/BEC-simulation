@@ -151,7 +151,7 @@ For F=5/F=7 T:E_1, the proper construction is **deferred to Paper #6 development
 - $\beta_S^{c_0}$ rational coefficients: closed-form sympy derivation for F=7 T:A
   / O:A_2 (similar to F=4 cube structure)
 - Sign Pattern Anomalous Identity test at F=7: extend
-  `sign_pattern_6j_numerical.jl` to include F=7 cases (= verify
+  `test_sign_pattern_6j.jl` to include F=7 cases (= verify
   Identity at one more odd-F instance to strengthen the conjecture)
 
 These items align with `dthesis_year1_roadmap.md` Q3 milestone.

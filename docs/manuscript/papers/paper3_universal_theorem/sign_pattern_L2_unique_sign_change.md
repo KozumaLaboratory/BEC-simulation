@@ -121,7 +121,7 @@ $\lambda_{\rm spin}$ as low-rank (= negative); $S = 12, 14, 16$ as high-rank
 ## Numerical verification of rank-2 cross-channel vanishing (NEW 2026-05-11)
 
 The rank-2 cross-channel vanishing assumption underlying Lemma 1 General-S has
-been **directly tested** via `scripts/manuscript/rank2_cross_channel_vanishing.jl`:
+been **directly tested** via `test/manuscript/test_rank2_cross_channel_vanishing.jl`:
 
 | F | Phase | Max |X_S^(anom) - X_S^(anom, scalar)| over all S |
 |---|---|---|
@@ -157,7 +157,7 @@ group-theoretic argument in
 > reduces to its $H$-symmetrized version (= 0), and thus
 > $X_S^{(\rm anom, T^{(2)})} = 0$.
 
-Numerical verification (`D2_H_irrep_character_proof.jl`, 4/4 Tests PASS):
+Numerical verification (`test_D2_H_irrep_character_proof.jl`, 4/4 Tests PASS):
 $m_2^{(A_1)}(T) = m_2^{(A_1)}(O) = m_2^{(A_1)}(I) = 0$ at machine precision
 (< 1e-10). Control case $D_2$ gives $m_2^{(A_1)} = 2$, explaining why the
 Lemma 1 General-S closed form does **not** apply to $D_2$ biaxial nematic

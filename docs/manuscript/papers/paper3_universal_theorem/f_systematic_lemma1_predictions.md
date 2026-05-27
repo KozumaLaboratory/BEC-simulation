@@ -16,7 +16,7 @@ $$\beta_S^{(\lambda_{\rm spin})} = \frac{S(S+1) - 2F(F+1)}{2 F(F+1)} \cdot \beta
 (`sign_pattern_lemma1_general_S.md`), we predict the spin-Goldstone stiffness
 rational coefficients for **6 new polyhedral inert state instances** by:
 1. Computing $\beta_S^{(c_0)}$ from CG-projector on the inert state (same
-   numerical method as `f9_f11_polyhedral_verification.jl`).
+   numerical method as `test_f9_f11_polyhedral.jl`).
 2. Applying the closed-form prefactor.
 
 This extends paper3 §V from **5 cases (F=3/4/6/8/10) to 11 cases**.
@@ -49,7 +49,7 @@ in sparsity pattern and in selection rule:
 - T:A: $S \in \{0, 4, 6, 8, 10, 12, 14\}$ allowed
 - O:A_2: same $S$, different $\beta_S^{(c_0)}$ weights
 
-(Verbatim output in `runs/` from `f_systematic_lemma1_predictions.jl`.)
+(Verbatim output in `runs/` from `test_f_systematic_lemma1_predictions.jl`.)
 
 ---
 
@@ -170,7 +170,7 @@ across multiple F values, polyhedral families ($T, O, I$), and parities (even/od
 - `sign_pattern_L2_unique_sign_change.md` — sign-change uniqueness
 - `f5_f7_verification_result.md` — F=7 numerical verification
 - `f9_f11_verification_result.md` — F=9, 11 numerical verification
-- `f_systematic_lemma1_predictions.jl` — this analysis script
+- `test_f_systematic_lemma1_predictions.jl` — this analysis script
 
 ---
 

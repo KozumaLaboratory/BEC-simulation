@@ -40,8 +40,8 @@ function spin_matrices_F(F::Int)
 end
 ```
 
-Used in `scripts/manuscript/paper3_audit.jl`, `f12_icosahedral_verification.jl`,
-`sign_pattern_6j_numerical.jl` (Appendix A).
+Used in `scripts/manuscript/paper3_audit.jl`, `test_f12_icosahedral.jl`,
+`test_sign_pattern_6j.jl` (Appendix A).
 
 ---
 

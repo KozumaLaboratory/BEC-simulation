@@ -580,7 +580,7 @@ above because Schur's lemma operates on the rotation symmetry alone
 degenerate under the polyhedral rotation group $H = T$ or $O$.
 
 Regression script: `test/manuscript/test_f5_f7_polyhedral.jl` and
-`f_systematic_lemma1_predictions.jl` (F=13 added 2026-05-12).
+`test_f_systematic_lemma1_predictions.jl` (F=13 added 2026-05-12).
 
 ### D. F=8 case
 
@@ -726,7 +726,7 @@ $H \in \{T, O, I\}$ (or double covers $T_h, O_h, I_h$).
    after norm $\|F_a\zeta\|^2 = F(F+1)/3$ (polyhedral Schur isotropy).
 3. **Rank-2 part vanishes**: by character formula
    $m_2^{(A_1)}(H) = (1/|H|) \sum_g \chi^{(D^2)}(g) = 0$ for all polyhedral $H$
-   (verified via direct character computation; see `D2_H_irrep_character_proof.jl`).
+   (verified via direct character computation; see `test_D2_H_irrep_character_proof.jl`).
    Therefore $H$-symmetrization of any $T^{(2)}_{aa}$ is identically zero, and
    since $|\zeta\otimes\zeta\rangle$ is $H$-invariant,
    $\langle\zeta\otimes\zeta | T^{(2)}_{aa} P_S | \zeta\otimes\zeta\rangle = \langle\zeta\otimes\zeta | \langle T^{(2)}_{aa}\rangle_H P_S | \zeta\otimes\zeta\rangle = 0$.
