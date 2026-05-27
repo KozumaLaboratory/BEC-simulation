@@ -88,17 +88,17 @@ Replaces: `compare_operator_rhs.jl`.
 
 ## What remains in this dir
 
-Larger orchestrators that don't fit the simple
-`open_result / sweep_runs / compare_runs` pattern:
+Past orchestrator scripts have all been retired in favour of the
+`Experiment` / `Batch` model + the corresponding @testset blocks:
 
-* `L5_operator_rhs_compare.jl` — Kawaguchi-Ueda term-by-term Level-5
-  operator-RHS audit (distinct from the Level-10 bilateral diff)
-* `edh_validation_ladder.jl` — Eu EdH/K3 validation ladder orchestrator
-* `production_audit.jl` — Level-12 twin-control audit
-* `run_validation_matrix.jl` — 13-level matrix runner
+* `L5_operator_rhs_compare.jl` → `test/validation/test_L5_operator_rhs_compare.jl`
+* `production_audit.jl` → `audit_twin_controls(runs_root)` (validation submodule)
+* `run_validation_matrix.jl` → `test/validation/test_validation_matrix.jl`
+* `edh_validation_ladder.jl` → deleted (CLI ladder; equivalent via Batch
+  + per-level @test_skip gating)
 
-These may be promoted to `src/workflow/validation/` in a future
-phase. For now they remain as CLI orchestrators.
+For ladder-style audits, build a Batch of Experiments per level and
+guard heavy levels with `SPINORBEC_TEST_TIER` checks.
 
 ## API reference
 
