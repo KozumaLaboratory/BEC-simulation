@@ -1,12 +1,22 @@
-# Per-run launcher for the thesis batch. Writes the canonical
-# dashboard-compatible JLD2 layout via `save_rotating_basis_result!` so
-# results show up in `serve_dashboard` without a separate repack step.
+# Per-run launcher (parameterised over batch). Resolves config from
+# `runs/<batch>/<name>/config.yaml`, runs the pipeline, and writes the
+# canonical dashboard-compatible JLD2 layout via
+# `save_rotating_basis_result!` (auto-save → `result.jld2` + a
+# `point_001.jld2` symlink; dashboard sees the run with no repack step).
+#
+# Usage:
+#   julia --project=. scripts/launch_run.jl <batch> <run_name>
+#
+# Replaces the per-batch launch_*_run.jl trio (thesis / berry / phi_omega).
 using CUDA
 using SpinorBEC
 
-run_name = ARGS[1]
-config_path = "runs/thesis_batch/$run_name/config.yaml"
-run_dir = "runs/thesis_batch/$run_name"
+length(ARGS) == 2 || error(
+    "usage: julia --project=. scripts/launch_run.jl <batch> <run_name>"
+)
+batch, run_name = ARGS[1], ARGS[2]
+config_path = "runs/$batch/$run_name/config.yaml"
+run_dir = "runs/$batch/$run_name"
 
 config = SpinorBEC.load_config(config_path)
 @time result = SpinorBEC.run_config(config; verbose=true)
@@ -18,7 +28,7 @@ pm_final = dyn[:per_m_history][end] / sum(dyn[:per_m_history][end])
 dyn_hist = get(result, :dynamics_history, nothing)
 n_phases = dyn_hist === nothing ? 1 : length(dyn_hist)
 
-println("\n=== thesis_batch/$run_name COMPLETED ===")
+println("\n=== $batch/$run_name COMPLETED ===")
 println("  phases: $n_phases")
 println(
     "  Lz (final phase): [",

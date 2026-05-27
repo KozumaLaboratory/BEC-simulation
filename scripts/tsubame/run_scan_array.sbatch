@@ -56,8 +56,8 @@ if [ -f "$PROJECT_ROOT/spinor_sysimage.so" ]; then
 fi
 
 # --- Run via the same launcher we use locally ---
-# Note: scripts/launch_thesis_run.jl hardcodes runs/thesis_batch/<name>/.
-# For tsubame_scan we use a similar wrapper:
+# Equivalent to: scripts/launch_run.jl tsubame_scan <RUN_NAME>
+# (kept inline here so the sbatch is self-contained for HPC submission.)
 julia --project=. $SYSIMAGE_FLAG -e "
 using CUDA, SpinorBEC, JLD2
 config = SpinorBEC.load_config(\"runs/tsubame_scan/${RUN_NAME}/config.yaml\")
