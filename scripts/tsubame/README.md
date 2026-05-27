@@ -94,7 +94,12 @@ rsync -av --include='*.jld2' --include='*/' --exclude='*' \
     user@login.t3.gsic.titech.ac.jp:/gs/bs/$USER/SpinorBEC.jl/runs/tsubame_scan/ \
     runs/tsubame_scan/
 
-julia --project=. scripts/audit_thesis_batch.jl    # adjusted to scan tsubame_scan/
+# REPL audit:
+julia --project=. -e '
+    using SpinorBEC
+    batch = Batch("runs/tsubame_scan")  # if _manifest.yaml present
+    tab = tabulate(batch, [:norm_drift, :Fz, :per_m_t])
+'
 ```
 
 ## What to do BEFORE submitting

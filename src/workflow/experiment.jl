@@ -276,6 +276,34 @@ function _compute_observable(exp::Experiment, name::Symbol)
             ),
         )
         return spin_populations_trajectory(_result_path(exp))
+    elseif name === :per_m_t
+        # Rotating-basis save layout: `dynamics/per_m_history` is a
+        # D × T matrix (per-component population at each saved frame).
+        # Surface as Vector{Vector{Float64}} for parity with
+        # populations_t (D-vector per frame).
+        jld = _result_path(exp)
+        return jldopen(jld, "r") do f
+            haskey(f, "dynamics/per_m_history") || throw(
+                ArgumentError(
+                    "Experiment.per_m_t: dynamics/per_m_history missing " *
+                    "(this run did not use save_rotating_basis_result!)",
+                ),
+            )
+            pm = f["dynamics/per_m_history"]
+            T = size(pm, 2)
+            [Vector{Float64}(view(pm, :, t)) for t in 1:T]
+        end
+    elseif name === :integrator_meta
+        # Rotating-basis save layout: dynamics/integrator_meta/<key>.
+        jld = _result_path(exp)
+        return jldopen(jld, "r") do f
+            meta = Dict{String, Any}()
+            haskey(f, "dynamics/integrator_meta") || return meta
+            for k in keys(f["dynamics/integrator_meta"])
+                meta[String(k)] = f["dynamics/integrator_meta/$k"]
+            end
+            meta
+        end
     elseif name === :classification
         peaks = _compute_observable(exp, :peaks)
         norms = _runresult(exp).norm_t
@@ -289,8 +317,8 @@ function _compute_observable(exp::Experiment, name::Symbol)
         ArgumentError(
             "Experiment: no observable `$name`. Known: " *
             "scalar/trajectory/drift via observable_dispatch, plus " *
-            ":peaks :populations_t :classification :density_at :psi_at " *
-            ":density_stats_at :n_trajectories",
+            ":peaks :populations_t :per_m_t :classification :density_at :psi_at " *
+            ":density_stats_at :n_trajectories :integrator_meta",
         ),
     )
 end
@@ -471,7 +499,26 @@ function Batch(
     Batch(exps, Pair{Symbol, Vector}(over.first, values_), String(outdir))
 end
 
-function Batch(outdir::AbstractString)
+"""
+    Batch(path::AbstractString) -> Batch
+
+Loads a Batch from disk in one of two forms:
+
+- a directory with `_manifest.yaml` — rehydration of a Batch that was
+  previously created + `write_run!`'d;
+- a `scan.yaml` file (legacy format, see `docs/design/scan_group_redesign.md`)
+  — `parameter.values` + `template` + `override_path` + `extra_overrides`
+  + `point_dir_pattern` get converted to the Batch cell-list form.
+
+Dotted path conventions in scan.yaml (`pipeline.3.dynamics.B_hat.phi_omega`,
+0-based indices) are translated to the internal underscore-joined,
+1-based form used by `_set_path!`.
+"""
+function Batch(path::AbstractString)
+    if isfile(path) && endswith(basename(path), ".yaml")
+        return _batch_from_scan_yaml(path)
+    end
+    outdir = path
     manifest_path = joinpath(outdir, "_manifest.yaml")
     isfile(manifest_path) || throw(ArgumentError(
         "Batch($outdir): no _manifest.yaml — cannot rehydrate."
@@ -491,6 +538,106 @@ function Batch(outdir::AbstractString)
         push!(values_, pt["value"])
     end
     Batch(exps, Pair{Symbol, Vector}(over_key, values_), String(outdir))
+end
+
+function _dotted_to_underscore(dotted::AbstractString)
+    parts = String[]
+    for p in split(dotted, '.')
+        idx = tryparse(Int, p)
+        push!(parts, idx === nothing ? p : string(idx + 1))  # 0-based → 1-based
+    end
+    join(parts, "_")
+end
+
+function _format_scan_point_name(pattern::AbstractString, value, idx)
+    s = String(pattern)
+    s = replace(s, "\${idx}" => string(idx))
+    val_str = replace(string(value), "." => "_")
+    val_str = replace(val_str, " " => "")
+    val_str = replace(val_str, r"[^A-Za-z0-9_]" => "")
+    replace(s, "\${value}" => val_str)
+end
+
+function _resolve_scan_placeholder(literal, value, idx)
+    literal isa AbstractString || return literal
+    literal == "\${value}" && return value
+    literal == "\${idx}" && return idx
+    s = String(literal)
+    s = replace(s, "\${value}" => string(value))
+    s = replace(s, "\${idx}" => string(idx))
+    s
+end
+
+function _batch_from_scan_yaml(scan_yaml_path::AbstractString)
+    scan = YAML.load_file(scan_yaml_path)
+    scan_dir = dirname(abspath(scan_yaml_path))
+    template_rel = scan["template"]
+    template_path =
+        isabspath(template_rel) ? template_rel :
+        normpath(joinpath(scan_dir, template_rel))
+    base = YAML.load_file(template_path)
+    override_path = _dotted_to_underscore(scan["override_path"])
+    extra_overrides = get(scan, "extra_overrides", Dict{Any, Any}())
+    values = scan["parameter"]["values"]
+    pattern = get(scan, "point_dir_pattern", "$(scan["name"])_p\${idx}")
+    cells = Pair{Any, Dict{Any, Any}}[]
+    for (idx, v) in enumerate(values)
+        overrides = Dict{Any, Any}(Symbol(override_path) => v)
+        for (ep, ev) in extra_overrides
+            overrides[Symbol(_dotted_to_underscore(ep))] = _resolve_scan_placeholder(ev, v, idx)
+        end
+        push!(cells, v => overrides)
+    end
+    # Cache the value→idx map for the name callback.
+    val_to_idx = Dict(v => i for (i, v) in enumerate(values))
+    Batch(base, cells; outdir=scan_dir,
+        name=v -> _format_scan_point_name(pattern, v, val_to_idx[v]))
+end
+
+"""
+    Batch(base_spec, cells; outdir, name) -> Batch
+
+Multi-override cell-list form. Each cell is a `Pair{Any, Dict}` of
+`(label, overrides)` where `overrides` maps dotted-path symbols to
+the value to set at that path. Used when one sweep dim doesn't capture
+the variation (e.g. epsilon + duration + phi_omega all changing
+together, with phi_omega written into two pipeline steps).
+
+```julia
+cells = [
+    1.0 => Dict(
+        :pipeline_3_dynamics_B_hat_phi_chirp_to => 1.0,
+        :pipeline_end_dynamics_B_hat_phi_omega  => 1.0,
+        :pipeline_end_dynamics_duration         => 157.0,
+    ),
+    # ... one entry per cell
+]
+batch = Batch(base, cells; outdir="runs/phi_omega_scan",
+              name=v -> "eu151_phi\$(replace(string(v),"."=>"_"))_500ms")
+```
+
+`name(v)` receives the cell label (the `Pair.first`).
+"""
+function Batch(
+    base_spec::AbstractDict,
+    cells::AbstractVector{<:Pair};
+    outdir::AbstractString,
+    name::Function,
+)
+    exps = Experiment[]
+    values_ = Any[]
+    for cell in cells
+        label, overrides = cell
+        spec = deepcopy(Dict{Any, Any}(base_spec))
+        for (path, val) in overrides
+            _set_path!(spec, split(String(path), '_'), val)
+        end
+        cellname = String(name(label))
+        cell_outdir = joinpath(String(outdir), cellname)
+        push!(exps, Experiment(spec; outdir=cell_outdir))
+        push!(values_, label)
+    end
+    Batch(exps, Pair{Symbol, Vector}(:cells, values_), String(outdir))
 end
 
 # ---------------------------------------------------------------------------

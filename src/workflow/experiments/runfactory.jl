@@ -251,20 +251,24 @@ _dictify(p::AbstractDict) = Dict{Any, Any}(string(k) => v for (k, v) in p)
 # Vector levels. Numeric path tokens index into vectors (1-based,
 # matching pipeline list index). Used by `Batch` to apply the sweep
 # axis to a base spec.
+# Resolve a path-token to a vector index. Supports literal integers and
+# the keyword `end` for "last cell" (matches Julia's `vec[end]` idiom).
+_path_idx(token::AbstractString, vec) = token == "end" ? lastindex(vec) : parse(Int, token)
+
 function _set_path!(node, tokens::AbstractVector, value)
     isempty(tokens) && throw(ArgumentError("empty path"))
     if length(tokens) == 1
         key = tokens[1]
         if node isa AbstractVector
-            value === nothing ? deleteat!(node, parse(Int, key)) :
-            (node[parse(Int, key)] = value)
+            idx = _path_idx(key, node)
+            value === nothing ? deleteat!(node, idx) : (node[idx] = value)
         else
             value === nothing ? delete!(node, key) : (node[key] = value)
         end
         return value
     end
     if node isa AbstractVector
-        idx = parse(Int, tokens[1])
+        idx = _path_idx(tokens[1], node)
         return _set_path!(node[idx], tokens[2:end], value)
     end
     # Progressively longer prefixes match multi-word keys when a numeric

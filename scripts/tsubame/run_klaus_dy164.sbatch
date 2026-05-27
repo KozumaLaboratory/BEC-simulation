@@ -40,8 +40,9 @@ export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 
 # --- Run ---
 # This assumes runs/${RUN_NAME}/config.yaml has been prepared with ε=1e-6
-# (see scripts/audit_thesis_batch.jl notes). For the original ε=1e-3 config,
-# expect false convergence in the Klaus p·F·dt > 300 regime.
+# (REPL audit: tabulate(Batch("runs/thesis_batch"), [:norm_drift, :Fz, :per_m_t])).
+# For the original ε=1e-3 config, expect false convergence in the
+# Klaus p·F·dt > 300 regime.
 julia --project=. -e "
 using CUDA, SpinorBEC, JLD2
 config = SpinorBEC.load_config(\"runs/${RUN_NAME}/config.yaml\")
