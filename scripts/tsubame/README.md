@@ -94,11 +94,12 @@ rsync -av --include='*.jld2' --include='*/' --exclude='*' \
     user@login.t3.gsic.titech.ac.jp:/gs/bs/$USER/SpinorBEC.jl/runs/tsubame_scan/ \
     runs/tsubame_scan/
 
-# REPL audit:
+# REPL audit (Vector{Experiment} from on-disk YAMLs):
 julia --project=. -e '
     using SpinorBEC
-    batch = Batch("runs/tsubame_scan")  # if _manifest.yaml present
-    tab = tabulate(batch, [:norm_drift, :Fz, :per_m_t])
+    exps = [Experiment(p) for p in
+            sort(filter(endswith(".yaml"), readdir("runs/tsubame_scan"; join=true)))]
+    tab = tabulate(exps, [norm_drift, Fz_t, per_m_t])
 '
 ```
 

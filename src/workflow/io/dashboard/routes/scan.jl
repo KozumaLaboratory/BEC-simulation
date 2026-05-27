@@ -17,8 +17,8 @@ function _route_scan_group(
     if !isfile(scan_yaml_path)
         return (
             404, "text/plain",
-            "scan.yaml not found in $(pq.name) — use `Batch(\"runs/<batch>/\")` " *
-            "from REPL to inspect (requires _manifest.yaml) or manually author scan.yaml",
+            "scan.yaml not found in $(pq.name) — author one, or inspect " *
+            "the cells from REPL: `using SpinorBEC; exps = [Experiment(p) for p in <yamls>]`",
         )
     end
     json = try

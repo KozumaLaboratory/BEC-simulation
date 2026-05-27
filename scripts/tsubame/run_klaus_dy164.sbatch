@@ -40,7 +40,7 @@ export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 
 # --- Run ---
 # This assumes runs/${RUN_NAME}/config.yaml has been prepared with ε=1e-6
-# (REPL audit: tabulate(Batch("runs/thesis_batch"), [:norm_drift, :Fz, :per_m_t])).
+# (REPL audit: tabulate([Experiment(p) for p in yamls], [norm_drift, Fz_t, per_m_t])).
 # For the original ε=1e-3 config, expect false convergence in the
 # Klaus p·F·dt > 300 regime.
 julia --project=. -e "

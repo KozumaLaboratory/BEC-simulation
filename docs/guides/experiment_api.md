@@ -126,70 +126,62 @@ a YAML edit after the run flags `:stale`.
 
 ---
 
-## Observable surface
+## Observables
 
-Properties are lazy. The first access reads the jld2 (or computes from
-RunResult), caches in `exp._cache`, and serves subsequent accesses in
-O(μs).
+Plain functions on Experiment — no `getproperty` magic. First call
+reads the jld2 (or computes from RunResult); subsequent calls hit the
+in-Experiment memo in O(μs).
 
-| Category | Properties |
+| Category | Functions |
 |---|---|
-| Terminal scalar | `:norm`, `:energy`, `:Fz`, `:Lz`, `:Jz` |
-| Trajectory (Vector{Float64}) | `:norm_t`, `:energy_t`, `:Fz_t`, `:Lz_t`, `:Jz_t`, `:times`, `:peaks` |
-| Per-frame populations | `:populations_t` (Vector{Vector{Float64}}, single trajectory only) |
-| Drift summaries | `:norm_drift`, `:Fz_drift`, `:energy_drift`, `:Lz_drift`, `:norm_rel_drift`, `:Fz_rel_drift`, `:energy_rel_drift` |
-| Classification | `:classification` — Symbol from `classify_collapse` |
-| Ensemble meta | `:n_trajectories` (1 for single, N for TWA) |
-| Parametrised | `exp.density_at(t)`, `exp.psi_at(t)`, `exp.density_stats_at(t)` |
+| Trajectory `Vector{Float64}` | `Fz_t(exp)`, `Lz_t(exp)`, `Jz_t(exp)`, `norm_t(exp)`, `energy_t(exp)`, `times(exp)`, `peaks(exp)` |
+| Per-frame populations | `populations_t(exp)` (single trajectory only), `per_m_t(exp)` (rotating_basis layout) |
+| Drift summaries | `Fz_drift(exp)`, `Lz_drift(exp)`, `energy_drift(exp)`, `norm_drift(exp)`, `Fz_rel_drift(exp)`, `energy_rel_drift(exp)`, `norm_rel_drift(exp)` |
+| Classification | `classify(exp)` — Symbol from the 5-category collapse classifier |
+| Ensemble meta | `n_trajectories(exp)` (1 for single, N for TWA), `integrator_meta(exp)` |
+| Parametrised | `density(exp, t)`, `psi(exp, t)`, `density_stats_at(exp, t)` |
 
-`exp.density_at(t)` returns:
+Terminal scalar at the end of a trajectory: `last(Fz_t(exp))` etc.
+
+`density(exp, t)` returns:
 - `Array{Float64, 3}` for a single-trajectory run, or
-- `(mean::Array, variance::Array)` named tuple for an ensemble run
-  (TWA — the jld2 has `dynamics/ensemble/phase_<N>/density/...`).
+- a `(mean, variance)` named tuple of 3D arrays for ensemble runs
+  (TWA — jld2 has `dynamics/ensemble/phase_<N>/density/...`).
 
-`exp.psi_at(t)` is undefined for ensemble runs (no per-trajectory psi).
-`exp.populations_t` likewise errors with a clear message.
+`psi(exp, t)` is undefined for ensemble runs (no per-trajectory psi).
+`populations_t(exp)` likewise errors with a clear message.
 
-`exp.density_stats_at(t)` returns
+`density_stats_at(exp, t)` returns
 `(peak, peak_voxel, fwhm_x, fwhm_z, on_axis, sigma_over_mu)` —
 `sigma_over_mu = NaN` for single trajectory; uses the variance at the
-peak voxel for ensembles. The same primitive is also exposed as a free
-function: `density_stats(density3d; variance=nothing)`.
+peak voxel for ensembles. The free function form
+`density_stats(density3d; variance=nothing)` is also exported.
 
 ---
 
-## Batch
+## Sweep — `Vector{Experiment}`, no Batch type
+
+A sweep is just a vector of experiments. The collection itself has no
+new type; standard `length`, indexing, iteration, `map`, `filter` all
+work.
 
 ```julia
-batch = Batch(
-    base_spec;
-    over = :pipeline_2_dynamics_loss => [loss(K3_si=f*1e-41) for f in factors],
-)
-
-write_run!(batch)            # N config.yaml files + _manifest.yaml
-run!(batch)                  # serial, skip cached cells (parallel arg
-                             #   reserved; today only parallel=1 works)
+exps = sweep(base;
+    over = :pipeline_2_dynamics_loss => [loss(K3_si=f*1e-41) for f in factors])
+run!.(exps)                       # serial run; each cell's CAS outdir
+tabulate(exps, [Fz_t, classify, norm_drift])
 ```
 
-- Each cell is an Experiment with its own content_id outdir — no
-  per-cell naming needed. The legacy `name = v -> "..."` callback is
-  silently ignored (the warn-once path stays, in case you rely on it).
-- The optional `outdir=` kwarg now controls only the location of the
-  batch's `_manifest.yaml`. It defaults to
-  `<store.root>/_batches/<batch_content_id>/` — also CAS-derived from
-  the `(base_spec, over)` pair.
-- `batch[i]`, `length(batch)`, and iteration work as on a Vector.
+Sweep axis is recoverable post-hoc via `spec_diff`:
 
-### Sweep axis: `over`
+```julia
+spec_diff(exps[1], exps[2])       # → [(path="pipeline.2.dynamics.loss", a=…, b=…)]
+```
 
-`over` is a `Pair{Symbol, Vector}` where the symbol is a *dotted-path
-key* into the spec Dict. Numeric path tokens (1-based) index into
-vectors — `:pipeline_2_dynamics_loss` walks `spec["pipeline"][2]
-  ["dynamics"]["loss"]`. The values list is what gets substituted; the
-length determines the number of cells.
+### Multi-override form
 
-Multi-override cell-list form (one Pair per cell, each carrying
-multiple dotted-path overrides):
+When one sweep dim isn't enough (e.g. epsilon + duration + phi_omega
+all changing together with phi_omega written into two pipeline steps):
 
 ```julia
 cells = [
@@ -198,80 +190,84 @@ cells = [
     2.0 => Dict(:pipeline_2_dynamics_duration => 10.0,
                 :pipeline_2_dynamics_loss     => loss(K3_si=3e-41)),
 ]
-batch = Batch(base, cells)
+exps = sweep(base, cells)
 ```
 
-### Rehydrate from disk
+The cell label (`Pair.first`) is informational only — CAS handles
+naming.
+
+### Legacy scan.yaml reader
 
 ```julia
-batch = Batch("runs/_batches/<bid>")   # reads _manifest.yaml
-batch[1].Fz_t                          # works without re-running
+exps = sweep("runs/eu151_klaus_phi_phys/scan.yaml")
 ```
 
-Legacy pre-CAS sweeps (cells under `<manifest_dir>/<cellname>/`)
-remain readable — the rehydrator detects them via `manifest["points"][i]["filename"]`
-and pins the cell's outdir override to the legacy path.
+Reads the legacy `scan.yaml` schema (template + parameter.values +
+override_path + extra_overrides + point_dir_pattern) and returns
+`Vector{Experiment}` directly. No `_manifest.yaml` is written.
 
 ### Tabulate
 
 ```julia
-tab = tabulate(batch, [:Fz, :classification, :norm_drift])
-# NamedTuple with columns: values, Fz, classification, norm_drift
+tab = tabulate(exps, [Fz_t, classify, norm_drift])
+tab.Fz_t          # Vector of Vectors
+tab.classify      # Vector{Symbol}
+tab.norm_drift    # Vector{Float64}
 ```
 
-Each column is length-`length(batch)`. Failed cells (e.g. result.jld2
-missing) put the caught exception in the corresponding row so the table
-still assembles.
+Each column is length-`length(exps)`. Failed cells (e.g. jld2 missing)
+put the caught Exception in their slot so the table still assembles.
+
+### Why no `Batch` type
+
+`Batch` was a `Vector{Experiment}` with a `Pair{Symbol,Vector}` axis
+attached. The axis is recoverable from `spec_diff` across the cells,
+and the manifest is recoverable from the directory listing. Carrying
+both as a separate type was redundant; `Vector{Experiment}` is the
+collection type.
 
 ---
 
-## Audit / compare / check
-
-These bridge Experiment to the existing spec-driven verdict layer.
+## Audit / compare / check / diff
 
 ```julia
-res = check(ConservationSpec(), exp)        # CheckResult
-cmp = compare(exp_a, exp_b; label_a="A", label_b="B")  # RunComparison
-res = check(OperatorRHSSpec(...), cmp)      # CheckResult on the pair
+res = check(ConservationSpec(), exp)         # CheckResult
+cmp = compare(exp_a, exp_b)                  # RunComparison
+verdict = audit(exp; spec=ConservationSpec())
 
-verdict = audit(exp; spec=ConservationSpec()) # run! + check, idempotent
+# spec_diff is the single primitive — used by sweep-axis discovery,
+# twin verification, and compare provenance:
+spec_diff(exp_a.spec, exp_b.spec)            # → Vector{(path, a, b)}
+spec_diff(exp_a, exp_b)                       # same, on Experiments
 ```
 
-`check / compare` are thin adapters over `check_runs / compare_runs` —
-they reuse each Experiment's cached RunResult so repeated audits are
-fast.
-
-The legacy `audit(yaml::AbstractString)` and `hand_off(yaml)` forms
-continue to work; they construct an Experiment internally.
+`spec_diff` walks two specs recursively and returns the dotted paths
+whose leaves differ. Missing-on-one-side leaves are marked with the
+sentinel `:__SPEC_DIFF_MISSING__`.
 
 ---
 
-## Twin controls
+## Twin
 
 ```julia
-twin = twin_off(exp)   # outdir = exp.outdir * "_TWIN_OFF"
-write_run!(twin)
-run!(twin)
+t = twin(exp)        # Experiment with lhy/loss stripped; CAS-named
+spec_diff(exp, t)    # → only `lhy` / `loss` keys should appear
 ```
 
-`twin_off(exp)` returns a sibling Experiment whose spec has every
-`lhy:` block reset to `{kind: "none"}` and every `loss:` block removed.
-Does not touch disk — the caller does the write/run.
+`twin(exp)` returns a sibling Experiment whose spec has every `lhy:`
+block reset to `{kind: "none"}` and every `loss:` block removed. Its
+outdir comes from CAS on the modified spec — no `_TWIN_OFF` suffix,
+no naming.
 
-For producing twins of every K3-on / LHY-on YAML under `runs/` (the
-old `generate_twin_controls.jl` workflow):
+Verifying that a twin differs *only* on the expected keys (the old
+`audit_twin_controls` Level-12 check) is a one-liner over `spec_diff`.
+
+For batch-producing twins of every K3-on / LHY-on YAML in `runs/`:
 
 ```julia
-using YAML, SpinorBEC
-for orig in audit_twin_controls("runs").loss_orphans
-    raw = YAML.load_file(orig)
-    walk_dicts!(raw) do d
-        haskey(d, "lhy") && d["lhy"] isa AbstractDict &&
-            (d["lhy"] = Dict("kind" => "none"))
-        delete!(d, "loss")
-    end
-    YAML.write_file(replace(orig, ".yaml" => "_TWIN_OFF.yaml"), raw)
-end
+using SpinorBEC
+exps = [twin(Experiment(y)) for y in audit_twin_controls("runs").loss_orphans]
+run!.(exps)
 ```
 
 ---
@@ -281,11 +277,13 @@ end
 | Old pattern | Now |
 |---|---|
 | `run_yaml(path)` + manual skip-if-cached | `run!(exp)` |
-| `open_result(jld2) + RunResult.Fz_t` | `exp.Fz_t` (delegates via `getproperty`) |
-| `peak_density_trajectory(jld2)` | `exp.peaks` |
-| `find_run_dir(yaml)` | inside `Experiment(yaml_path)` |
-| `classify_collapse(peaks, ratio)` | `exp.classification` |
-| `sweep(outdir, base; over, name)` + manifest | `Batch(base; over, outdir, name)` + `write_run!` |
-| `regenerate(outdir)` | `Batch(outdir)` then `write_run!` |
-| TWA `final_density_stats(jld2; ensemble=true)` | `exp.density_stats_at(t)` |
-| `audit(yaml)` / `hand_off(yaml)` | same names, Experiment-typed (yaml form still works) |
+| `open_result(jld2) + RunResult.Fz_t` | `Fz_t(exp)` |
+| `peak_density_trajectory(jld2)` | `peaks(exp)` |
+| `find_run_dir(yaml)` | inside `Experiment(yaml_path)` ctor |
+| `classify_collapse(peaks, ratio)` | `classify(exp)` |
+| `sweep(outdir, base; over, name)` + manifest | `sweep(base; over)` |
+| `regenerate(outdir)` | re-call `sweep(base; over)` (CAS dedupes) |
+| `Batch(...)` + `Batch(outdir)` | `sweep(...)` returns `Vector{Experiment}` directly |
+| TWA `final_density_stats(jld2; ensemble=true)` | `density_stats_at(exp, t)` |
+| `twin_off(exp)` | `twin(exp)` (suffix concept retired — CAS handles naming) |
+| `audit(yaml)` / `hand_off(yaml)` | `audit(Experiment(yaml))` |

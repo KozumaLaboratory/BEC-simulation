@@ -1,47 +1,54 @@
 # ============================================================================
-# Experiment / Batch — unified model for the SpinorBEC workflow.
+# Experiment — unified model for the SpinorBEC workflow.
 # ============================================================================
 #
-# An *experiment* is the unit object: a (spec, outdir, lazy cache) triple
-# that owns its full lifecycle from definition through observation. A
-# *batch* is a `Vector{Experiment}` plus the sweep axis it varies over,
-# plus a directory root. Ensembles (TWA) are not a separate type —
-# `exp.density_at(t)` dispatches at observation time on the jld2 layout,
-# returning either an `Array` (single trajectory) or a `(mean, variance)`
-# tuple (`dynamics/ensemble/...` layout).
+# Reducible essence (anko 2026-05-27):
+#   spec   - what to simulate (Dict, built via the DSL)
+#   run    - execute (idempotent on cached result.jld2)
+#   observe - read derived quantities from the result
 #
-# See the docstrings on `Experiment` / `Batch` for the full observable
-# property table.
+# Everything else (sweep, twin, diff, classification, etc.) is a plain
+# function that *falls out* of these three. There is no Batch / RunResult
+# type — `Vector{Experiment}` is the sweep collection, and the lazy
+# result-jld2 lives in `exp.memo`.
+#
+# Content-addressable storage (CAS): `spec` uniquely determines `outdir`
+# via SHA-256 of canonical bytes. Users never name an outdir.
 
 using JLD2
 using YAML
 using SHA: sha256
 using Printf: @printf
 
-export Experiment, Batch, CASStore
-export write_run!, run!, status, tabulate, twin_off
+# Core types + lifecycle
+export Experiment, CASStore
 export outdir, content_id, default_store
+export write_run!, run!, status
+
+# Observables (plain functions on Experiment)
+export times, Fz_t, Lz_t, Jz_t, norm_t, energy_t
+export Fz_drift, Lz_drift, energy_drift, norm_drift
+export Fz_rel_drift, energy_rel_drift, norm_rel_drift
+export peaks, populations_t, per_m_t
+export classify, n_trajectories, integrator_meta
+export density, psi, density_stats_at
+
+# Collection-level operations
+export sweep, twin, spec_diff, tabulate
 
 # ===========================================================================
 # Content-addressable storage (CAS)
 # ===========================================================================
 #
-# A spec uniquely determines its outdir via SHA-256 of canonical bytes —
-# users never name an outdir. Equal specs share storage; spec edits
-# automatically land in a fresh dir.
-#
-# Canonical form (deterministic across Julia versions / dict orderings):
-#   Dict       → "{<sorted_key>:<value>,...}"  (keys sorted by string repr)
+# Canonical bytes are deterministic across dict-iteration order:
+#   Dict       → "{<sorted_key>:<value>,...}" (keys sorted by string repr)
 #   Vector     → "[<value>,...]" (order preserved)
-#   AbstractFloat → printf("%.17g", x); errors on NaN / Inf
+#   Float      → printf("%.17g", x); NaN / Inf error out
 #   Integer    → decimal
 #   Bool       → true | false
-#   AbstractString / Symbol → JSON-escaped "<utf8>"
+#   String / Symbol → JSON-escaped "<utf8>"
 #   nothing    → null
-# Anything else → error.
-#
-# ID truncated to 16 hex (64-bit), enough for ~10^10 distinct specs
-# before birthday collision risk reaches 1%.
+# 16 hex (64-bit) ≈ birthday-safe to ~10^10 distinct specs.
 
 struct CASStore
     root::String
@@ -106,98 +113,43 @@ end
 """
     content_id(spec; n=16) -> String
 
-Canonical hash of a YAML-shaped spec Dict. Same spec → same id, byte-for-byte,
-independent of dict-iteration order, Julia version, or YAML round-trip.
+SHA-256 of the canonical-bytes serialisation, truncated to `n` hex
+chars. Pure function of `spec` — independent of dict ordering / YAML
+round-trip / Julia version.
 """
 content_id(spec; n::Int=_CONTENT_ID_HEX) = bytes2hex(sha256(_canonical_bytes(spec)))[1:n]
 
-# ---------------------------------------------------------------------------
-# Types
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# Experiment
+# ===========================================================================
 
 """
-    Experiment(spec; outdir) — Experiment(yaml_path)
+    Experiment(spec; store=default_store(), outdir=nothing) -> Experiment
+    Experiment(yaml_path; store=default_store()) -> Experiment
 
-A single simulation cell. Cheap to construct (no I/O). Observable
-properties (`exp.Fz_t`, `exp.classification`, `exp.density_at(t)`, ...)
-are lazy — they open / cache the jld2 on first access.
+A single simulation cell. The triple `(spec, store, memo)` is enough
+to define what to run, where the result lives, and to cache derived
+quantities lazily.
 
-Scalar accessors (terminal value of the trajectory):
-  `:norm  :energy  :Fz  :Lz  :Jz`
+- `spec` is the YAML-shaped Dict built by the DSL (`config([...])`).
+- `store` is the CAS root; the cell's outdir is
+  `<store.root>/<content_id(spec)>/`.
+- `memo` is a lazy property cache used by `Fz_t`, `peaks`, … etc.
 
-Trajectory accessors (Vector{Float64}, one per snapshot):
-  `:norm_t  :energy_t  :Fz_t  :Lz_t  :Jz_t  :times  :peaks`
-  `:populations_t` — `Vector{Vector{Float64}}`
-
-Drift summaries:
-  `:norm_drift  :Fz_drift  :energy_drift  :Lz_drift`
-  `:norm_rel_drift  :Fz_rel_drift  :energy_rel_drift`
-
-Classification:
-  `:classification` — `Symbol` from `classify_collapse`
-
-Parametrised (call like methods):
-  `exp.density_at(t)` → `Array{Float64,3}` (single) or
-                       `(mean::Array, variance::Array)` (ensemble)
-  `exp.psi_at(t)`     → `Array{Complex,4}` (single trajectory only)
+Construction is I/O-free. `run!(exp)` performs the simulation (skipping
+if the cached jld2 already exists). Observables (plain functions:
+`Fz_t(exp)`, `peaks(exp)`, `classify(exp)`, `density(exp, t)`, …) read
+the jld2 on first call and memoise.
 """
 mutable struct Experiment
     spec::Dict{Any, Any}
     store::CASStore
     _outdir_override::Union{Nothing, String}  # legacy / explicit override
-    _cache::Dict{Any, Any}
+    memo::Dict{Symbol, Any}
 end
 
-"""
-    outdir(exp::Experiment) -> String
+# --- construction ---
 
-Derived directory path for `exp`. Pure function of `exp.spec` via CAS:
-`<store.root>/<content_id(spec)>/`. Users never name it; the spec
-uniquely determines it.
-
-If the spec was constructed from an existing YAML on disk and a legacy
-`runs/<base>_<hash>/` sibling exists (pre-CAS layout), that path is
-returned read-only via the `_outdir_override` field so old artifacts
-remain accessible.
-"""
-function outdir(exp::Experiment)
-    ovr = getfield(exp, :_outdir_override)
-    ovr !== nothing && return ovr
-    cid = content_id(getfield(exp, :spec))
-    joinpath(getfield(exp, :store).root, cid)
-end
-
-"""
-    Batch(base_spec; over, outdir, name) — Batch(outdir)
-
-A swept set of experiments differing along one dim (`over`). Each cell's
-outdir is `<batch.outdir>/<name(value)>/`, holding `config.yaml` and
-`result.jld2` (after `run!`).
-
-`Batch(outdir::AbstractString)` rehydrates from `<outdir>/_manifest.yaml`
-without touching the per-cell jld2 files.
-
-# Indexing
-`batch[i]`, `length(batch)`, `for exp in batch ... end` work as expected.
-"""
-mutable struct Batch
-    experiments::Vector{Experiment}
-    over::Pair{Symbol, Vector}
-    outdir::String
-end
-
-# ---------------------------------------------------------------------------
-# Experiment construction
-# ---------------------------------------------------------------------------
-
-"""
-    Experiment(spec; store=default_store(), outdir=nothing) -> Experiment
-
-Build an Experiment from an in-memory spec Dict. `outdir` is normally
-*not* supplied — CAS auto-derives it from `content_id(spec)`. Pass
-`outdir=` only to override (e.g. migration, deliberate placement);
-this disables CAS deduplication for the constructed Experiment.
-"""
 function Experiment(
     spec::AbstractDict;
     store::CASStore=default_store(),
@@ -207,63 +159,100 @@ function Experiment(
         Dict{Any, Any}(spec),
         store,
         outdir === nothing ? nothing : String(outdir),
-        Dict{Any, Any}(),
+        Dict{Symbol, Any}(),
     )
 end
 
-"""
-    Experiment(yaml_path; store=default_store()) -> Experiment
-
-Construct from an on-disk YAML. Outdir derivation:
-  1. content_id-based CAS dir (`<store.root>/<cid>/`) — if it holds a
-     result jld2, use it directly;
-  2. otherwise if `yaml_path` itself sits in a dir containing a
-     `result.jld2` / `point_001.jld2` (e.g. `runs/<batch>/<cell>/config.yaml`),
-     use that dir (read-only fallback for the directory-per-config form);
-  3. otherwise if a legacy `runs/<base>_<hash>/` sibling has a result,
-     use that as an `_outdir_override` (read-only fallback);
-  4. otherwise let CAS choose the (currently-empty) cid dir as the
-     write target for the next `run!`.
-"""
 function Experiment(yaml_path::AbstractString; store::CASStore=default_store())
-    isfile(yaml_path) || throw(ArgumentError("Experiment: no such file: $yaml_path"))
+    isfile(yaml_path) ||
+        throw(ArgumentError("Experiment: no such file: $yaml_path"))
     spec = YAML.load_file(yaml_path)
     spec_dict = Dict{Any, Any}(spec)
     cid = content_id(spec_dict)
     cas_dir = joinpath(store.root, cid)
-    if _has_result(cas_dir)
-        return Experiment(spec_dict, store, nothing, Dict{Any, Any}())
-    end
-    # Directory-per-config form: yaml lives inside a dir that already
-    # holds the result (older sweeps wrote per-cell config.yaml + result.jld2
-    # under the same dir).
+    _has_result(cas_dir) && return Experiment(
+        spec_dict, store, nothing, Dict{Symbol, Any}()
+    )
     if basename(yaml_path) == "config.yaml"
         same_dir = dirname(abspath(yaml_path))
-        if _has_result(same_dir)
-            return Experiment(spec_dict, store, same_dir, Dict{Any, Any}())
-        end
+        _has_result(same_dir) && return Experiment(
+            spec_dict, store, same_dir, Dict{Symbol, Any}()
+        )
     end
     legacy = find_run_dir(yaml_path)
-    if legacy !== nothing
-        return Experiment(spec_dict, store, String(legacy), Dict{Any, Any}())
-    end
-    Experiment(spec_dict, store, nothing, Dict{Any, Any}())
+    legacy !== nothing && return Experiment(
+        spec_dict, store, String(legacy), Dict{Symbol, Any}()
+    )
+    Experiment(spec_dict, store, nothing, Dict{Symbol, Any}())
 end
 
 _has_result(dir::AbstractString) =
     isdir(dir) && (isfile(joinpath(dir, "result.jld2")) ||
                    isfile(joinpath(dir, "point_001.jld2")))
 
-# ---------------------------------------------------------------------------
-# Persist
-# ---------------------------------------------------------------------------
+# --- outdir (CAS-derived getter; no field access) ---
 
 """
-    write_run!(exp::Experiment) -> String
+    outdir(exp::Experiment) -> String
 
-Write `exp.spec` to `<exp.outdir>/config.yaml`. Creates the outdir if
-missing. Returns the path written. (Named `write_run!` rather than
-`write!` to avoid colliding with `Base.write`.)
+Derived directory path. Pure function of `exp.spec` (via CAS),
+overridable only via the legacy `_outdir_override` field for migration.
+"""
+function outdir(exp::Experiment)
+    ovr = getfield(exp, :_outdir_override)
+    ovr !== nothing && return ovr
+    joinpath(getfield(exp, :store).root, content_id(getfield(exp, :spec)))
+end
+
+# Property forwarding: `exp.spec` / `exp.store` / `exp.memo` / `exp.outdir`.
+# `getproperty` no longer carries observable dispatch — those are plain
+# functions exported above.
+function Base.getproperty(exp::Experiment, name::Symbol)
+    name === :spec && return getfield(exp, :spec)
+    name === :store && return getfield(exp, :store)
+    name === :memo && return getfield(exp, :memo)
+    name === :outdir && return outdir(exp)
+    throw(
+        ArgumentError(
+            "Experiment.$(name) is not a property. Observables are now " *
+            "plain functions: Fz_t(exp), peaks(exp), classify(exp), " *
+            "density(exp, t), … (see exports in src/workflow/experiment.jl).",
+        ),
+    )
+end
+
+Base.propertynames(::Experiment) = (:spec, :store, :memo, :outdir)
+
+# ---------------------------------------------------------------------------
+# Lifecycle
+# ---------------------------------------------------------------------------
+
+const _RESULT_NAMES = ("result.jld2", "point_001.jld2")
+
+function _result_path_or_nothing(exp::Experiment)
+    dir = outdir(exp)
+    for n in _RESULT_NAMES
+        p = joinpath(dir, n)
+        isfile(p) && return p
+    end
+    nothing
+end
+
+function _result_path(exp::Experiment)
+    p = _result_path_or_nothing(exp)
+    p === nothing && throw(ArgumentError(
+        "Experiment: no result jld2 in $(outdir(exp)). Did you `run!`?"
+    ))
+    p
+end
+
+"""
+    write_run!(exp) -> String
+
+Write `exp.spec` to `<outdir(exp)>/config.yaml`. Internal: `run!`
+calls it automatically before launching the simulation. The only
+external reason to call it directly is the cluster split-flow
+(write here, run on HPC).
 """
 function write_run!(exp::Experiment)
     mkpath(outdir(exp))
@@ -272,39 +261,28 @@ function write_run!(exp::Experiment)
     path
 end
 
-# ---------------------------------------------------------------------------
-# Run
-# ---------------------------------------------------------------------------
-
 """
-    run!(exp::Experiment; force=false) -> Experiment
+    run!(exp; force=false) -> Experiment
 
-Idempotent: returns immediately if `result.jld2` / `point_001.jld2`
-already exists in `exp.outdir`. With `force=true`, clears the lazy
-cache and reruns regardless.
+Idempotent: if a `result.jld2` / `point_001.jld2` exists in `outdir(exp)`,
+returns immediately. With `force=true`, clears the memo + reruns.
+Writes `config.yaml` if missing.
 """
 function run!(exp::Experiment; force::Bool=false)
     if !force && _result_path_or_nothing(exp) !== nothing
         return exp
     end
-    force && empty!(getfield(exp, :_cache))
+    force && empty!(getfield(exp, :memo))
     cfg_path = joinpath(outdir(exp), "config.yaml")
     isfile(cfg_path) || write_run!(exp)
-    # `run_yaml` writes outputs alongside config.yaml when invoked on a
-    # `<dir>/config.yaml` path (directory-per-config form), so passing
-    # `cfg_path` lands the result in `exp.outdir` directly.
     run_yaml(cfg_path)
     exp
 end
 
-# ---------------------------------------------------------------------------
-# Status
-# ---------------------------------------------------------------------------
-
 """
-    status(exp::Experiment) -> Symbol
+    status(exp) -> Symbol
 
-  `:cached`  result jld2 present and YAML mtime ≤ jld2 mtime
+  `:cached`  result jld2 present and config.yaml mtime ≤ jld2 mtime
   `:stale`   jld2 present but older than the YAML (rerun needed)
   `:pending` outdir exists, no jld2 yet
   `:missing` outdir does not exist
@@ -320,142 +298,154 @@ function status(exp::Experiment)
 end
 
 # ---------------------------------------------------------------------------
-# Internals — jld2 path resolution + raw access
+# Memo helper + RunResult bridge
 # ---------------------------------------------------------------------------
+# RunResult stays as the internal jld2-view used by observable_dispatch.jl;
+# Experiment caches it in memo[:_runresult]. Phase B may collapse RunResult
+# into the memo entirely.
 
-_RESULT_NAMES = ("result.jld2", "point_001.jld2")
-
-function _result_path_or_nothing(exp::Experiment)
-    dir = outdir(exp)
-    for n in _RESULT_NAMES
-        p = joinpath(dir, n)
-        isfile(p) && return p
-    end
-    nothing
+# `do`-block-friendly arg order: `_memoize(do …; end, exp, key)`.
+function _memoize(compute::Function, exp::Experiment, key::Symbol)
+    memo = getfield(exp, :memo)
+    haskey(memo, key) && return memo[key]
+    val = compute()
+    memo[key] = val
+    val
 end
 
-function _result_path(exp::Experiment)
-    p = _result_path_or_nothing(exp)
-    p === nothing && throw(
-        ArgumentError(
-            "Experiment: no result jld2 in $(outdir(exp)). Did you `run!`?"
-        ),
-    )
-    p
-end
+_runresult(exp::Experiment) = _memoize(() -> open_result(_result_path(exp)), exp, :_runresult)
 
-# RunResult-backed scalar / trajectory access. Existing
-# `observable_dispatch.jl` does the heavy lifting; we just cache the
-# RunResult so repeated accesses are O(1).
-function _runresult(exp::Experiment)
-    cache = getfield(exp, :_cache)
-    haskey(cache, :_runresult) && return cache[:_runresult]
-    rr = open_result(_result_path(exp))
-    cache[:_runresult] = rr
-    rr
-end
-
-# Detect ensemble layout once and cache.
 function _is_ensemble(exp::Experiment)
-    cache = getfield(exp, :_cache)
-    haskey(cache, :_is_ensemble) && return cache[:_is_ensemble]
-    jld = _result_path_or_nothing(exp)
-    flag = if jld === nothing
-        false
-    else
+    _memoize(exp, :_is_ensemble) do
+        jld = _result_path_or_nothing(exp)
+        jld === nothing && return false
         jldopen(jld, "r") do f
             any(k -> startswith(k, "dynamics") && haskey(f[k], "ensemble"),
                 collect(keys(f)))
         end
     end
-    cache[:_is_ensemble] = flag
-    flag
 end
 
 # ---------------------------------------------------------------------------
-# Observable surface — getproperty dispatch
+# Observables (plain functions)
 # ---------------------------------------------------------------------------
+#
+# Convention: function name == observable name. Trajectory observables
+# have `_t` suffix (e.g. `Fz_t`); drift summaries `_drift` /
+# `_rel_drift`; classification `classify`; meta `n_trajectories`,
+# `integrator_meta`; parametrised `density(exp, t)`, `psi(exp, t)`,
+# `density_stats_at(exp, t)`.
+#
+# For terminal scalar from a trajectory: `last(Fz_t(exp))` etc.
 
-const _SCALAR_OR_TRAJECTORY = (
-    :norm, :energy, :Fz, :Lz, :Jz,
-    :norm_t, :energy_t, :Fz_t, :Lz_t, :Jz_t,
+# --- trajectories from RunResult dispatch ---
+
+for (name, src) in (
+    (:Fz_t, :Fz_t), (:Lz_t, :Lz_t), (:Jz_t, :Jz_t),
+    (:norm_t, :norm_t), (:energy_t, :energy_t),
 )
-
-const _DRIFT_SUFFIXES = (
-    "_rel_drift", "_drift"
-)
-
-function Base.getproperty(exp::Experiment, name::Symbol)
-    # Direct struct fields:
-    name === :spec && return getfield(exp, :spec)
-    name === :store && return getfield(exp, :store)
-    # `outdir` is a derived function — surface it as a property too so
-    # legacy `exp.outdir` callers still work.
-    name === :outdir && return outdir(exp)
-    cache = getfield(exp, :_cache)
-    haskey(cache, name) && return cache[name]
-    val = _compute_observable(exp, name)
-    cache[name] = val
-    val
+    @eval $name(exp::Experiment) =
+        _memoize(exp, $(QuoteNode(name))) do
+            getproperty(_runresult(exp), $(QuoteNode(src)))
+        end
 end
 
-function _compute_observable(exp::Experiment, name::Symbol)
-    # Parametrised accessors return closures bound to `exp`.
-    if name === :density_at
-        return (t::Real) -> _density_at(exp, float(t))
-    elseif name === :psi_at
-        return (t::Real) -> _psi_at(exp, float(t))
-    elseif name === :density_stats_at
-        return (t::Real) -> _density_stats_at(exp, float(t))
-    end
-
-    # `times` lives on the dynamics block but isn't in the observable
-    # dispatch table; surface it directly.
-    if name === :times
+times(exp::Experiment) =
+    _memoize(exp, :times) do
         dyn = _runresult(exp).dynamics
         dyn === nothing && throw(ArgumentError(
-            "Experiment.times: this run has no dynamics block"
+            "times(exp): this run has no dynamics block"
         ))
-        return Float64.(dyn.times)
+        Float64.(dyn.times)
     end
 
-    # Scalar / trajectory / drift — delegate to RunResult's dispatch.
-    if name in _SCALAR_OR_TRAJECTORY || _has_drift_suffix(name)
-        return getproperty(_runresult(exp), name)
+# --- drift summaries ---
+
+for (fn, base) in (
+    (:Fz_drift, :Fz_t), (:Lz_drift, :Lz_t),
+    (:energy_drift, :energy_t), (:norm_drift, :norm_t),
+)
+    @eval $fn(exp::Experiment) =
+        _memoize(exp, $(QuoteNode(fn))) do
+            ts = $base(exp)
+            maximum(abs.(ts .- ts[1]))
+        end
+end
+
+for (fn, base) in (
+    (:Fz_rel_drift, :Fz_t),
+    (:energy_rel_drift, :energy_t),
+    (:norm_rel_drift, :norm_t),
+)
+    @eval $fn(exp::Experiment) =
+        _memoize(exp, $(QuoteNode(fn))) do
+            ts = $base(exp)
+            maximum(abs.(ts .- ts[1])) / max(abs(ts[1]), 1e-30)
+        end
+end
+
+# --- derived trajectories ---
+
+"""
+    peaks(exp) -> Vector{Float64}
+
+Maximum total density per snapshot. For ensemble runs, peaks of the
+ensemble-mean density.
+"""
+peaks(exp::Experiment) =
+    _memoize(exp, :peaks) do
+        _is_ensemble(exp) ? _ensemble_peaks(exp) :
+        peak_density_trajectory(_result_path(exp))
     end
 
-    # Derived from psi snapshots (single) or ensemble-mean density (ensemble).
-    if name === :peaks
-        return _is_ensemble(exp) ? _ensemble_peaks(exp) :
-               peak_density_trajectory(_result_path(exp))
-    elseif name === :populations_t
+"""
+    populations_t(exp) -> Vector{Vector{Float64}}
+
+Per-frame `|ψ_m|²` integrated over space, length-`D` per frame.
+Errors for ensemble runs (no per-trajectory psi available).
+"""
+populations_t(exp::Experiment) =
+    _memoize(exp, :populations_t) do
         _is_ensemble(exp) && throw(
             ArgumentError(
-                "Experiment.populations_t: undefined for ensemble (no per-trajectory psi)"
+                "populations_t(exp): undefined for ensemble (no per-trajectory psi)"
             ),
         )
-        return spin_populations_trajectory(_result_path(exp))
-    elseif name === :per_m_t
-        # Rotating-basis save layout: `dynamics/per_m_history` is a
-        # D × T matrix (per-component population at each saved frame).
-        # Surface as Vector{Vector{Float64}} for parity with
-        # populations_t (D-vector per frame).
+        spin_populations_trajectory(_result_path(exp))
+    end
+
+"""
+    per_m_t(exp) -> Vector{Vector{Float64}}
+
+Rotating-basis save layout: `dynamics/per_m_history` D×T matrix
+surfaced as a D-vector per frame.
+"""
+per_m_t(exp::Experiment) =
+    _memoize(exp, :per_m_t) do
         jld = _result_path(exp)
-        return jldopen(jld, "r") do f
+        jldopen(jld, "r") do f
             haskey(f, "dynamics/per_m_history") || throw(
                 ArgumentError(
-                    "Experiment.per_m_t: dynamics/per_m_history missing " *
-                    "(this run did not use save_rotating_basis_result!)",
+                    "per_m_t(exp): dynamics/per_m_history missing (this run did " *
+                    "not use save_rotating_basis_result!)",
                 ),
             )
             pm = f["dynamics/per_m_history"]
             T = size(pm, 2)
             [Vector{Float64}(view(pm, :, t)) for t in 1:T]
         end
-    elseif name === :integrator_meta
-        # Rotating-basis save layout: dynamics/integrator_meta/<key>.
+    end
+
+"""
+    integrator_meta(exp) -> Dict{String,Any}
+
+Rotating-basis save layout: contents of `dynamics/integrator_meta/`.
+Empty Dict if the group is missing.
+"""
+integrator_meta(exp::Experiment) =
+    _memoize(exp, :integrator_meta) do
         jld = _result_path(exp)
-        return jldopen(jld, "r") do f
+        jldopen(jld, "r") do f
             meta = Dict{String, Any}()
             haskey(f, "dynamics/integrator_meta") || return meta
             for k in keys(f["dynamics/integrator_meta"])
@@ -463,52 +453,78 @@ function _compute_observable(exp::Experiment, name::Symbol)
             end
             meta
         end
-    elseif name === :classification
-        peaks = _compute_observable(exp, :peaks)
-        norms = _runresult(exp).norm_t
-        N_ratio = norms[end] / norms[1]
-        return classify_collapse(peaks, N_ratio)
-    elseif name === :n_trajectories
-        return _n_trajectories(exp)
     end
 
-    throw(
-        ArgumentError(
-            "Experiment: no observable `$name`. Known: " *
-            "scalar/trajectory/drift via observable_dispatch, plus " *
-            ":peaks :populations_t :per_m_t :classification :density_at :psi_at " *
-            ":density_stats_at :n_trajectories :integrator_meta",
-        ),
-    )
-end
+# --- classification + ensemble meta ---
 
-function _has_drift_suffix(name::Symbol)
-    s = String(name)
-    any(endswith(s, suf) for suf in _DRIFT_SUFFIXES)
-end
+"""
+    classify(exp) -> Symbol
 
-# ---------------------------------------------------------------------------
-# Parametrised field accessors
-# ---------------------------------------------------------------------------
+5-category collapse classifier on the peaks trajectory + final norm
+ratio. Categories: `:collapse / :delay / :marginal_arrest /
+:sacrificial_arrest / :stable_arrest`.
+"""
+classify(exp::Experiment) =
+    _memoize(exp, :classify) do
+        ps = peaks(exp)
+        ns = norm_t(exp)
+        classify_collapse(ps, ns[end] / ns[1])
+    end
 
-function _density_at(exp::Experiment, t::Float64)
-    jld = _result_path(exp)
-    if _is_ensemble(exp)
+"""
+    n_trajectories(exp) -> Int
+
+1 for single-trajectory runs, the recorded ensemble size for TWA runs.
+"""
+n_trajectories(exp::Experiment) =
+    _memoize(exp, :n_trajectories) do
+        _is_ensemble(exp) || return 1
+        jld = _result_path(exp)
         jldopen(jld, "r") do f
+            for k in sort(collect(keys(f)))
+                startswith(k, "dynamics") || continue
+                haskey(f[k], "ensemble") || continue
+                eg = f["$k/ensemble"]
+                for pk in sort(collect(keys(eg)))
+                    startswith(pk, "phase_") || continue
+                    haskey(eg[pk], "n_trajectories") || continue
+                    return Int(f["$k/ensemble/$pk/n_trajectories"])
+                end
+            end
+            return 1
+        end
+    end
+
+# --- parametrised observables ---
+
+"""
+    density(exp, t) -> Array{Float64,3} or (mean=…, variance=…)
+
+Total density at the snapshot closest to time `t`. For ensemble runs,
+returns a named tuple `(mean, variance)` of 3D arrays.
+"""
+function density(exp::Experiment, t::Real)
+    t = float(t)
+    if _is_ensemble(exp)
+        return jldopen(_result_path(exp), "r") do f
             _ensemble_density_at(f, t)
         end
-    else
-        psi = _psi_at(exp, t)
-        total_density(psi, ndims(psi) - 1)
     end
+    p = psi(exp, t)
+    total_density(p, ndims(p) - 1)
 end
 
-function _psi_at(exp::Experiment, t::Float64)
+"""
+    psi(exp, t) -> Array{Complex,4}
+
+Raw ψ snapshot closest to time `t` (single trajectory only).
+"""
+function psi(exp::Experiment, t::Real)
+    t = float(t)
     _is_ensemble(exp) && throw(ArgumentError(
-        "Experiment.psi_at: undefined for ensemble runs; use density_at"
+        "psi(exp, t): undefined for ensemble runs; use density(exp, t)"
     ))
-    jld = _result_path(exp)
-    jldopen(jld, "r") do f
+    jldopen(_result_path(exp), "r") do f
         g = f["dynamics/psi_snapshots_streamed"]
         frames = sort(filter(s -> startswith(s, "frame_"), collect(keys(g))))
         snap_times = _snapshot_times(f, frames)
@@ -517,24 +533,33 @@ function _psi_at(exp::Experiment, t::Float64)
     end
 end
 
-# Snapshot-aligned time axis. `dynamics/times` may include the initial
-# t=0 state even when psi_snapshots_streamed only stores post-step
-# frames (save_every offset), giving `length(times) == length(frames)+1`.
 function _snapshot_times(f, frames::AbstractVector{<:AbstractString})
-    times = Vector{Float64}(f["dynamics/times"])
+    ts = Vector{Float64}(f["dynamics/times"])
     nf = length(frames)
-    if length(times) == nf + 1
-        return @view times[2:end]
-    elseif length(times) == nf
-        return times
-    else
-        return @view times[1:min(nf, length(times))]
-    end
+    length(ts) == nf + 1 && return @view ts[2:end]
+    length(ts) == nf && return ts
+    @view ts[1:min(nf, length(ts))]
 end
 
+"""
+    density_stats_at(exp, t) -> NamedTuple
+
+`(peak, peak_voxel, fwhm_x, fwhm_z, on_axis, sigma_over_mu)`. For
+single trajectories `sigma_over_mu = NaN`; for ensembles it is
+`sqrt(variance[peak_voxel]) / peak`.
+"""
+function density_stats_at(exp::Experiment, t::Real)
+    t = float(t)
+    if _is_ensemble(exp)
+        snap = density(exp, t)
+        return density_stats(snap.mean; variance=snap.variance)
+    end
+    density_stats(density(exp, t))
+end
+
+# --- ensemble internals (kept private — surfaced via density / peaks) ---
+
 function _ensemble_density_at(f, t::Float64)
-    # Find the last ensemble phase group: dynamics_<n>/ensemble or
-    # dynamics/ensemble. Aggregate by 'times' length match.
     phase_groups = String[]
     for k in collect(keys(f))
         startswith(k, "dynamics") || continue
@@ -543,28 +568,27 @@ function _ensemble_density_at(f, t::Float64)
     end
     sort!(phase_groups)
     isempty(phase_groups) && throw(ArgumentError(
-        "ensemble density_at: no dynamics/ensemble/ group in jld2"
+        "density(exp, t): no dynamics/ensemble/ group in jld2"
     ))
-    # Walk phases, find which holds the requested time.
     for pg in phase_groups
         eg = f["$pg/ensemble"]
         for k in keys(eg)
             startswith(k, "phase_") || continue
             tk = "$pg/ensemble/$k/times"
             haskey(f, tk) || continue
-            times = Vector{Float64}(f[tk])
-            tmin, tmax = extrema(times)
+            times_arr = Vector{Float64}(f[tk])
+            tmin, tmax = extrema(times_arr)
             (t < tmin - 1e-12 || t > tmax + 1e-12) && continue
-            idx = argmin(abs.(times .- t))
+            idx = argmin(abs.(times_arr .- t))
             mean_arr = f["$pg/ensemble/$k/density/mean"]
             var_arr = f["$pg/ensemble/$k/density/variance"]
-            return (mean=mean_arr[:, :, :, idx], variance=var_arr[:, :, :, idx])
+            return (mean=mean_arr[:, :, :, idx],
+                variance=var_arr[:, :, :, idx])
         end
     end
-    throw(ArgumentError("ensemble density_at: t=$t outside all phase windows"))
+    throw(ArgumentError("density(exp, t): t=$t outside all phase windows"))
 end
 
-# Per-frame max(ensemble-mean density) trajectory.
 function _ensemble_peaks(exp::Experiment)
     jld = _result_path(exp)
     jldopen(jld, "r") do f
@@ -577,182 +601,167 @@ function _ensemble_peaks(exp::Experiment)
                 haskey(eg[pk], "density") || continue
                 mean_arr = f["$k/ensemble/$pk/density/mean"]
                 _, _, _, nt = size(mean_arr)
-                return [Float64(maximum(view(mean_arr,:,:,:,it))) for it in 1:nt]
+                return [
+                    Float64(maximum(view(mean_arr,:,:,:,it))) for it in 1:nt
+                ]
             end
         end
-        throw(ArgumentError("ensemble peaks: no dynamics/ensemble/phase_*/density/mean"))
+        throw(ArgumentError(
+            "peaks(exp): no dynamics/ensemble/phase_*/density/mean"
+        ))
     end
 end
 
-function _n_trajectories(exp::Experiment)
-    _is_ensemble(exp) || return 1
-    jld = _result_path(exp)
-    jldopen(jld, "r") do f
-        for k in sort(collect(keys(f)))
-            startswith(k, "dynamics") || continue
-            haskey(f[k], "ensemble") || continue
-            eg = f["$k/ensemble"]
-            for pk in sort(collect(keys(eg)))
-                startswith(pk, "phase_") || continue
-                haskey(eg[pk], "n_trajectories") || continue
-                return Int(f["$k/ensemble/$pk/n_trajectories"])
-            end
+# ===========================================================================
+# spec_diff — the single primitive
+# ===========================================================================
+#
+# `spec_diff` is the workhorse: returns the dotted paths whose values
+# differ between two specs. It powers (a) twin verification, (b) sweep
+# axis discovery, (c) provenance / compare labels — one primitive, three
+# users.
+
+"""
+    spec_diff(a::AbstractDict, b::AbstractDict) -> Vector{NamedTuple}
+
+Recursively diff two YAML-shaped Dicts. Returns a vector of entries
+`(path::String, a, b)` for every leaf whose value differs (or is
+present on only one side).
+
+Used by:
+- `twin` verification (twin should differ on lhy + loss only)
+- sweep-axis discovery (which keys vary across a Vector{Experiment})
+- compare provenance / auto-labelling
+"""
+function spec_diff(a::AbstractDict, b::AbstractDict)
+    out = Tuple{String, Any, Any}[]
+    _spec_diff!(out, a, b, String[])
+    [(path=p, a=va, b=vb) for (p, va, vb) in out]
+end
+
+spec_diff(a::Experiment, b::Experiment) = spec_diff(a.spec, b.spec)
+
+function _spec_diff!(out, a, b, prefix)
+    if a isa AbstractDict && b isa AbstractDict
+        ks = union(keys(a), keys(b))
+        for k in sort!(collect(ks); by=string)
+            ak = haskey(a, k) ? a[k] : _MISSING
+            bk = haskey(b, k) ? b[k] : _MISSING
+            _spec_diff!(out, ak, bk, vcat(prefix, string(k)))
         end
-        return 1
+    elseif a isa AbstractVector && b isa AbstractVector
+        for i in 1:max(length(a), length(b))
+            ai = i ≤ length(a) ? a[i] : _MISSING
+            bi = i ≤ length(b) ? b[i] : _MISSING
+            _spec_diff!(out, ai, bi, vcat(prefix, string(i)))
+        end
+    else
+        if !_spec_equal(a, b)
+            push!(out, (join(prefix, "."), a, b))
+        end
     end
 end
 
-# Single-frame stats helper: (peak, fwhm_x, fwhm_z, on_axis, σ_over_μ).
-# Accepts a 3D density array, optionally with a matching variance array
-# for σ_over_μ at the peak voxel.
-function _density_stats_at(exp::Experiment, t::Float64)
-    if _is_ensemble(exp)
-        snap = _density_at(exp, t)
-        return density_stats(snap.mean; variance=snap.variance)
-    end
-    return density_stats(_density_at(exp, t))
-end
+const _MISSING = :__SPEC_DIFF_MISSING__
 
-# ---------------------------------------------------------------------------
-# Twin off
-# ---------------------------------------------------------------------------
+_spec_equal(a, b) = a == b
+_spec_equal(::typeof(_MISSING), ::typeof(_MISSING)) = true
+
+# ===========================================================================
+# Sweep — returns Vector{Experiment} directly. No Batch type.
+# ===========================================================================
 
 """
-    twin_off(exp::Experiment; suffix="_TWIN_OFF") -> Experiment
+    sweep(base::AbstractDict; over::Pair, store=default_store())
+        -> Vector{Experiment}
 
-Return a sibling Experiment with every `lhy:` reset to `{kind: "none"}`
-and every `loss:` block removed. The new outdir is the original with
-`suffix` appended. Does not touch disk — caller does `write_run!` +
-`run!` as needed.
+1-axis sweep. Each cell gets its own CAS outdir derived from its own
+modified spec. No naming, no manifest — the sweep axis is recoverable
+post-hoc via `spec_diff` across the returned vector.
+
+```julia
+exps = sweep(base;
+    over = :pipeline_2_dynamics_loss => [loss(K3_si=f*1e-41) for f in factors])
+run!.(exps)
+tabulate(exps, [Fz_t, classify, norm_drift])
+```
 """
-function twin_off(exp::Experiment; suffix::AbstractString="_TWIN_OFF")
-    new_spec = deepcopy(getfield(exp, :spec))
-    walk_dicts!(new_spec) do d
-        haskey(d, "lhy") && d["lhy"] isa AbstractDict &&
-            (d["lhy"] = Dict("kind" => "none"))
-        delete!(d, "loss")
-    end
-    # `suffix` is now informational only — the twin's outdir comes from
-    # CAS on the modified spec, not from string concat on the original.
-    # Kept as a kwarg for backward-compat; ignored unless explicitly
-    # combined with an explicit outdir override.
-    Experiment(new_spec; store=getfield(exp, :store))
-end
-
-# ---------------------------------------------------------------------------
-# Batch construction
-# ---------------------------------------------------------------------------
-
-"""
-    Batch(base_spec; over, store=default_store(), outdir=nothing) -> Batch
-
-Build a sweep along one dim. Each cell is an `Experiment` whose own
-outdir is content-addressed by its spec (no per-cell naming needed).
-
-`outdir` (kwarg) is the location of the batch's `_manifest.yaml` —
-not the cells' outdirs, which CAS derives independently. Defaults to
-a content-id-derived path under `<store.root>/_batches/`.
-
-The legacy `name = v -> "..."` callback is no longer needed (and is
-silently ignored if passed) — CAS replaces the cell-naming step.
-"""
-function Batch(
-    base_spec::AbstractDict;
+function sweep(
+    base::AbstractDict;
     over::Pair{Symbol, <:AbstractVector},
     store::CASStore=default_store(),
-    outdir::Union{Nothing, AbstractString}=nothing,
-    name=nothing,  # accepted + ignored for backward-compat
 )
-    name === nothing || @warn "Batch: `name` callback is no longer used " *
-        "(CAS auto-names cells by content_id)."
     path_tokens = split(String(over.first), '_')
-    values_ = collect(over.second)
     exps = Experiment[]
-    for v in values_
-        spec = deepcopy(Dict{Any, Any}(base_spec))
+    for v in over.second
+        spec = deepcopy(Dict{Any, Any}(base))
         _set_path!(spec, path_tokens, v)
         push!(exps, Experiment(spec; store))
     end
-    manifest_dir =
-        outdir === nothing ?
-        _default_batch_manifest_dir(base_spec, over, store) :
-        String(outdir)
-    Batch(exps, Pair{Symbol, Vector}(over.first, values_), manifest_dir)
-end
-
-function _default_batch_manifest_dir(base, over, store::CASStore)
-    bid = content_id(
-        Dict{Any, Any}(
-            "base" => Dict{Any, Any}(base),
-            "over_key" => String(over.first),
-            "over_values" => collect(over.second),
-        ),
-    )
-    joinpath(store.root, "_batches", bid)
+    exps
 end
 
 """
-    Batch(path::AbstractString) -> Batch
+    sweep(base::AbstractDict, cells::Vector{<:Pair}; store=default_store())
+        -> Vector{Experiment}
 
-Loads a Batch from disk in one of two forms:
-
-- a directory with `_manifest.yaml` — rehydration of a Batch that was
-  previously created + `write_run!`'d;
-- a `scan.yaml` file (legacy format, see `docs/design/scan_group_redesign.md`)
-  — `parameter.values` + `template` + `override_path` + `extra_overrides`
-  + `point_dir_pattern` get converted to the Batch cell-list form.
-
-Dotted path conventions in scan.yaml (`pipeline.3.dynamics.B_hat.phi_omega`,
-0-based indices) are translated to the internal underscore-joined,
-1-based form used by `_set_path!`.
+Multi-override form. Each cell is `label => Dict(:dotted_path => value, ...)`
+applying multiple overrides per cell. The label is informational only
+(no longer used for naming — CAS handles that).
 """
-function Batch(path::AbstractString)
-    if isfile(path) && endswith(basename(path), ".yaml")
-        return _batch_from_scan_yaml(path)
-    end
-    manifest_dir = path
-    manifest_path = joinpath(manifest_dir, "_manifest.yaml")
-    isfile(manifest_path) || throw(ArgumentError(
-        "Batch($manifest_dir): no _manifest.yaml — cannot rehydrate."
-    ))
-    m = YAML.load_file(manifest_path)
-    base = Dict{Any, Any}(m["base_config"])
-    over_key = Symbol(m["over_path"])
-    path_tokens = split(m["over_path"], '_')
+function sweep(
+    base::AbstractDict,
+    cells::AbstractVector{<:Pair};
+    store::CASStore=default_store(),
+)
     exps = Experiment[]
-    values_ = Any[]
-    for pt in m["points"]
-        spec = deepcopy(base)
-        _set_path!(spec, path_tokens, pt["value"])
-        # Try legacy <manifest_dir>/<name>/ first (pre-CAS sweeps), then
-        # fall back to CAS via the default Experiment(spec; store) ctor.
-        ovr = nothing
-        if haskey(pt, "filename")
-            legacy_cell = joinpath(manifest_dir, splitext(pt["filename"])[1])
-            _has_result(legacy_cell) && (ovr = legacy_cell)
+    for cell in cells
+        _, overrides = cell
+        spec = deepcopy(Dict{Any, Any}(base))
+        for (path, val) in overrides
+            _set_path!(spec, split(String(path), '_'), val)
         end
-        push!(exps, Experiment(spec, default_store(), ovr, Dict{Any, Any}()))
-        push!(values_, pt["value"])
+        push!(exps, Experiment(spec; store))
     end
-    Batch(exps, Pair{Symbol, Vector}(over_key, values_), String(manifest_dir))
+    exps
+end
+
+"""
+    sweep(scan_yaml_path::AbstractString; store=default_store())
+        -> Vector{Experiment}
+
+Legacy scan.yaml reader. Loads template + parameter.values +
+override_path + extra_overrides and returns the Vector{Experiment}.
+"""
+function sweep(scan_yaml_path::AbstractString; store::CASStore=default_store())
+    scan = YAML.load_file(scan_yaml_path)
+    scan_dir = dirname(abspath(scan_yaml_path))
+    template_rel = scan["template"]
+    template_path =
+        isabspath(template_rel) ? template_rel :
+        normpath(joinpath(scan_dir, template_rel))
+    base = YAML.load_file(template_path)
+    override_path = _dotted_to_underscore(scan["override_path"])
+    extra_overrides = get(scan, "extra_overrides", Dict{Any, Any}())
+    values = scan["parameter"]["values"]
+    cells = Pair{Any, Dict{Any, Any}}[]
+    for (idx, v) in enumerate(values)
+        ovr = Dict{Any, Any}(Symbol(override_path) => v)
+        for (ep, ev) in extra_overrides
+            ovr[Symbol(_dotted_to_underscore(ep))] = _resolve_scan_placeholder(ev, v, idx)
+        end
+        push!(cells, v => ovr)
+    end
+    sweep(base, cells; store)
 end
 
 function _dotted_to_underscore(dotted::AbstractString)
     parts = String[]
     for p in split(dotted, '.')
         idx = tryparse(Int, p)
-        push!(parts, idx === nothing ? p : string(idx + 1))  # 0-based → 1-based
+        push!(parts, idx === nothing ? p : string(idx + 1))
     end
     join(parts, "_")
-end
-
-function _format_scan_point_name(pattern::AbstractString, value, idx)
-    s = String(pattern)
-    s = replace(s, "\${idx}" => string(idx))
-    val_str = replace(string(value), "." => "_")
-    val_str = replace(val_str, " " => "")
-    val_str = replace(val_str, r"[^A-Za-z0-9_]" => "")
-    replace(s, "\${value}" => val_str)
 end
 
 function _resolve_scan_placeholder(literal, value, idx)
@@ -765,192 +774,101 @@ function _resolve_scan_placeholder(literal, value, idx)
     s
 end
 
-function _batch_from_scan_yaml(scan_yaml_path::AbstractString)
-    scan = YAML.load_file(scan_yaml_path)
-    scan_dir = dirname(abspath(scan_yaml_path))
-    template_rel = scan["template"]
-    template_path =
-        isabspath(template_rel) ? template_rel :
-        normpath(joinpath(scan_dir, template_rel))
-    base = YAML.load_file(template_path)
-    override_path = _dotted_to_underscore(scan["override_path"])
-    extra_overrides = get(scan, "extra_overrides", Dict{Any, Any}())
-    values = scan["parameter"]["values"]
-    pattern = get(scan, "point_dir_pattern", "$(scan["name"])_p\${idx}")
-    cells = Pair{Any, Dict{Any, Any}}[]
-    for (idx, v) in enumerate(values)
-        overrides = Dict{Any, Any}(Symbol(override_path) => v)
-        for (ep, ev) in extra_overrides
-            overrides[Symbol(_dotted_to_underscore(ep))] = _resolve_scan_placeholder(ev, v, idx)
-        end
-        push!(cells, v => overrides)
-    end
-    Batch(base, cells; outdir=scan_dir)
-end
+# --- run! / write_run! on a collection ---
+
+run!(exps::AbstractVector{Experiment}; force::Bool=false) =
+    (
+        for e in exps
+            ;
+            run!(e; force);
+        end;
+        exps
+    )
+
+write_run!(exps::AbstractVector{Experiment}) = [write_run!(e) for e in exps]
+
+# ===========================================================================
+# twin — spec-edit + new Experiment, not a new concept
+# ===========================================================================
 
 """
-    Batch(base_spec, cells; outdir, name) -> Batch
+    twin(exp) -> Experiment
 
-Multi-override cell-list form. Each cell is a `Pair{Any, Dict}` of
-`(label, overrides)` where `overrides` maps dotted-path symbols to
-the value to set at that path. Used when one sweep dim doesn't capture
-the variation (e.g. epsilon + duration + phi_omega all changing
-together, with phi_omega written into two pipeline steps).
+Sibling Experiment with every `lhy:` block reset to `{kind: "none"}`
+and every `loss:` block removed. The twin's outdir comes from CAS on
+its own (modified) spec — no naming, no `_TWIN_OFF` suffix needed.
+
+Verifying that a twin differs from its source on the expected keys
+only is just `spec_diff(exp, twin(exp))`.
+"""
+function twin(exp::Experiment)
+    s = deepcopy(getfield(exp, :spec))
+    walk_dicts!(s) do d
+        haskey(d, "lhy") && d["lhy"] isa AbstractDict &&
+            (d["lhy"] = Dict("kind" => "none"))
+        delete!(d, "loss")
+    end
+    Experiment(s; store=getfield(exp, :store))
+end
+
+# ===========================================================================
+# tabulate — Vector{Experiment} × [observable functions] → NamedTuple
+# ===========================================================================
+
+"""
+    tabulate(exps::AbstractVector{Experiment}, fields::AbstractVector)
+        -> NamedTuple
+
+Per-cell column table. `fields` is a vector of observable functions
+(`Fz_t`, `classify`, `norm_drift`, …). Column names are derived via
+`nameof(f)`. Failed cells (jld2 missing, etc.) put the caught Exception
+in their slot so the table still assembles.
 
 ```julia
-cells = [
-    1.0 => Dict(
-        :pipeline_3_dynamics_B_hat_phi_chirp_to => 1.0,
-        :pipeline_end_dynamics_B_hat_phi_omega  => 1.0,
-        :pipeline_end_dynamics_duration         => 157.0,
-    ),
-    # ... one entry per cell
-]
-batch = Batch(base, cells; outdir="runs/phi_omega_scan",
-              name=v -> "eu151_phi\$(replace(string(v),"."=>"_"))_500ms")
-```
-
-`name(v)` receives the cell label (the `Pair.first`).
-"""
-function Batch(
-    base_spec::AbstractDict,
-    cells::AbstractVector{<:Pair};
-    store::CASStore=default_store(),
-    outdir::Union{Nothing, AbstractString}=nothing,
-    name=nothing,  # accepted + ignored for backward-compat
-)
-    name === nothing || @warn "Batch: `name` callback is no longer used " *
-        "(CAS auto-names cells by content_id)."
-    exps = Experiment[]
-    values_ = Any[]
-    for cell in cells
-        label, overrides = cell
-        spec = deepcopy(Dict{Any, Any}(base_spec))
-        for (path, val) in overrides
-            _set_path!(spec, split(String(path), '_'), val)
-        end
-        push!(exps, Experiment(spec; store))
-        push!(values_, label)
-    end
-    manifest_dir = if outdir === nothing
-        joinpath(store.root, "_batches",
-            content_id(
-                Dict{Any, Any}("base" => Dict{Any, Any}(base_spec),
-                    "cells" => [string(c.first) for c in cells]),
-            ))
-    else
-        String(outdir)
-    end
-    Batch(exps, Pair{Symbol, Vector}(:cells, values_), manifest_dir)
-end
-
-# ---------------------------------------------------------------------------
-# Batch persist / run
-# ---------------------------------------------------------------------------
-
-function write_run!(batch::Batch)
-    manifest_dir = getfield(batch, :outdir)
-    mkpath(manifest_dir)
-    paths = String[]
-    points = Dict{Any, Any}[]
-    for (exp, v) in zip(getfield(batch, :experiments), getfield(batch, :over).second)
-        cfg = write_run!(exp)
-        push!(paths, cfg)
-        push!(
-            points,
-            Dict{Any, Any}(
-                "content_id" => content_id(getfield(exp, :spec)),
-                "value" => v,
-            ),
-        )
-    end
-    over = getfield(batch, :over)
-    base = deepcopy(getfield(getfield(batch, :experiments)[1], :spec))
-    _set_path!(base, split(String(over.first), '_'), nothing)
-    manifest = Dict{Any, Any}(
-        "base_config" => base,
-        "over_path" => String(over.first),
-        "points" => points,
-    )
-    YAML.write_file(joinpath(manifest_dir, "_manifest.yaml"), manifest)
-    paths
-end
-
-function run!(batch::Batch; force::Bool=false, parallel::Int=1)
-    # parallel > 1 is a future hook; today everything runs serial.
-    parallel == 1 || @warn "Batch run!: parallel>1 not yet wired; running serial."
-    for exp in getfield(batch, :experiments)
-        run!(exp; force)
-    end
-    batch
-end
-
-# ---------------------------------------------------------------------------
-# Batch indexing / iteration / tabulation
-# ---------------------------------------------------------------------------
-
-Base.length(batch::Batch) = length(getfield(batch, :experiments))
-Base.getindex(batch::Batch, i::Integer) = getfield(batch, :experiments)[i]
-Base.iterate(batch::Batch, args...) = iterate(getfield(batch, :experiments), args...)
-
-function Base.getproperty(batch::Batch, name::Symbol)
-    name in (:experiments, :over, :outdir) && return getfield(batch, name)
-    error(
-        "Batch: no field $name (known: :experiments :over :outdir; " *
-        "for per-cell access use `batch[i]` or `tabulate(batch, [:fields])`)",
-    )
-end
-
-"""
-    tabulate(batch::Batch, fields::Vector{Symbol}) -> NamedTuple
-
-Per-cell column table. Each entry of `fields` is an Experiment
-property name. The returned NamedTuple also carries a `values`
-column with the sweep-axis values.
-
-```julia
-tab = tabulate(batch, [:Fz, :classification, :norm_drift])
-tab.values, tab.Fz, tab.classification, tab.norm_drift
+tab = tabulate(exps, [Fz_t, classify, norm_drift])
+tab.Fz_t          # Vector of trajectories
+tab.classify      # Vector{Symbol}
+tab.norm_drift    # Vector{Float64}
 ```
 """
-function tabulate(batch::Batch, fields::AbstractVector{Symbol})
-    cols = Dict{Symbol, Vector}(:values => collect(getfield(batch, :over).second))
+function tabulate(exps::AbstractVector{Experiment}, fields::AbstractVector)
+    cols = Dict{Symbol, Vector}()
     for f in fields
         col = Any[]
-        for exp in getfield(batch, :experiments)
+        for e in exps
             push!(
                 col,
                 try
-                    getproperty(exp, f)
-                catch e
-                    e
+                    f(e)
+                catch err
+                    err
                 end,
             )
         end
-        cols[f] = col
+        cols[nameof(f)] = col
     end
-    (; (k => cols[k] for k in (:values, fields...))...)
+    (; (k => cols[k] for k in (nameof(f) for f in fields))...)
 end
 
-# ---------------------------------------------------------------------------
-# check / compare — Experiment ↔ RunResult bridges
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# check / compare / audit — work on Experiment directly
+# ===========================================================================
+#
+# These adapters bridge Experiment to the existing Spec-driven verdict
+# layer (src/workflow/validation/{specs,operations}.jl).
 
 """
     check(spec, exp::Experiment) -> CheckResult
 
-Adapter: applies an existing Spec (ConservationSpec / OperatorRHSSpec /
-…) to an Experiment by routing through its cached RunResult. The
-result is identical to `check(spec, open_result(_result_path(exp)))`
-but reuses the lazy cache.
+Apply a validation spec via the cached RunResult inside `exp.memo`.
 """
 check(spec, exp::Experiment) = check(spec, _runresult(exp))
 
 """
-    compare(a::Experiment, b::Experiment; label_a="A", label_b="B") -> RunComparison
+    compare(a::Experiment, b::Experiment; label_a="A", label_b="B")
+        -> RunComparison
 
-Pair two Experiments for A/B diff. Thin wrapper over `compare_runs`
-that reuses each Experiment's lazy RunResult.
+Pair two Experiments for A/B diff.
 """
 function compare(
     a::Experiment, b::Experiment;
@@ -959,16 +877,10 @@ function compare(
     compare_runs(_runresult(a), _runresult(b); label_a, label_b)
 end
 
-# ---------------------------------------------------------------------------
-# audit(::Experiment) — end-to-end run + check
-# ---------------------------------------------------------------------------
-
 """
     audit(exp::Experiment; spec=ConservationSpec(), verbose=true) -> CheckResult
 
-End-to-end: `run!(exp)` (idempotent — no-op if cached) followed by
-`check(spec, exp)`. The 1-liner that replaces the old
-`audit(yaml::AbstractString)` glue.
+`run!` + `check`. The 1-liner for "this spec must respect conservation".
 """
 function audit(exp::Experiment; spec=ConservationSpec(), verbose::Bool=true)
     run!(exp)
