@@ -12,9 +12,9 @@
 # script with bespoke CLI). The functional core is the same; the
 # packaging is now a callable that returns a structured result.
 
-export audit_twin_controls, TwinAuditResult
+export audit_twin_controls, TwinAuditResult, write_twin_off, write_missing_twins
 
-using YAML: load_file
+using YAML
 
 """
     TwinAuditResult
@@ -116,6 +116,88 @@ function _twin_find_yamls(root::AbstractString)
         end
     end
     out
+end
+
+# --- twin-control writer ---
+
+function _strip_lhy_loss!(node)
+    if node isa AbstractDict
+        for k in collect(keys(node))
+            v = node[k]
+            if string(k) == "lhy" && v isa AbstractDict
+                node[k] = Dict("kind" => "none")
+            elseif string(k) == "loss"
+                delete!(node, k)
+            else
+                _strip_lhy_loss!(v)
+            end
+        end
+    elseif node isa AbstractVector
+        for x in node
+            _strip_lhy_loss!(x)
+        end
+    end
+    node
+end
+
+_twin_off_path(orig::AbstractString) =
+    let
+        dir = dirname(orig)
+        base, ext = splitext(basename(orig))
+        joinpath(dir, base * "_TWIN_OFF" * ext)
+    end
+
+"""
+    write_twin_off(orig_path) -> twin_path
+
+Produce a LHY-off / loss-off sibling YAML next to `orig_path`. The
+twin's filename is `<orig>_TWIN_OFF.yaml`. Every `lhy:` block is
+replaced by `lhy: {kind: "none"}` and every `loss:` block is removed.
+
+YAML.jl round-trips lose source comments; the new file embeds a header
+pointing back to the original.
+"""
+function write_twin_off(orig::AbstractString)
+    raw = YAML.load_file(orig)
+    _strip_lhy_loss!(raw)
+    twin = _twin_off_path(orig)
+    open(twin, "w") do io
+        println(io, "# TWIN CONTROL (auto-generated). Companion of:")
+        println(io, "#   ", orig)
+        println(io, "# Regenerate with: SpinorBEC.write_twin_off(\"$orig\")")
+        println(io, "# LHY and loss blocks stripped; everything else preserved.")
+        println(io, "# Comments from the original YAML are lost on the round-trip.")
+        println(io)
+        YAML.write(io, raw)
+    end
+    twin
+end
+
+"""
+    write_missing_twins(runs_root="runs"; verbose=true) -> Vector{String}
+
+Walk `runs_root`, find every K3-on / LHY-on YAML lacking a sibling
+control, and emit a `_TWIN_OFF.yaml` twin for each. Returns the list of
+twin paths written. Replaces the old `generate_twin_controls.jl` script.
+"""
+function write_missing_twins(runs_root::AbstractString="runs"; verbose::Bool=true)
+    r = audit_twin_controls(runs_root; verbose=false)
+    orphans = vcat(r.loss_orphans, r.lhy_orphans)
+    isempty(orphans) && (verbose && println("No orphans — nothing to do."); return String[])
+    verbose && println("Found $(length(orphans)) orphan YAML(s).")
+    written = String[]
+    for o in orphans
+        twin = write_twin_off(o)
+        verbose && println("  wrote $twin")
+        push!(written, twin)
+    end
+    if verbose
+        r2 = audit_twin_controls(runs_root; verbose=false)
+        show(stdout, MIME("text/plain"), r2)
+        println()
+        r2.pass || println("\nWARNING: audit still reports orphans after twin generation.")
+    end
+    written
 end
 
 function _twin_classify(yaml_path::AbstractString)

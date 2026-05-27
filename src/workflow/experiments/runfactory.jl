@@ -76,10 +76,16 @@ end
 
 """
     ddi(; enabled=true, secular=false)
+
+When `enabled=false`, the `secular` key is omitted (matches the schema's
+"DDI off" form, where secular has no meaning).
 """
-ddi(; enabled::Bool=true, secular::Bool=false) = Dict{Any, Any}(
-    "enabled" => enabled, "secular" => secular
-)
+function ddi(; enabled::Bool=true, secular::Union{Nothing, Bool}=nothing)
+    body = Dict{Any, Any}("enabled" => enabled)
+    enabled || return body
+    body["secular"] = secular === nothing ? false : secular
+    body
+end
 
 """
     lhy(kind=:none)
@@ -176,7 +182,7 @@ Single dynamics pipeline step.
 function dynamics(;
     duration::Real,
     dt::Real=0.005,
-    B::Dict,
+    B::Union{Nothing, Dict}=nothing,
     ddi::Dict=Dict{Any, Any}("secular" => false),
     lhy::Dict=lhy(),
     loss::Union{Nothing, Dict}=nothing,
@@ -189,10 +195,10 @@ function dynamics(;
     body = Dict{Any, Any}(
         "duration" => float(duration),
         "dt" => float(dt),
-        "B" => B,
         "ddi" => ddi,
         "lhy" => lhy,
     )
+    B === nothing || (body["B"] = B)
     rotating_frame_omega === nothing ||
         (body["rotating_frame_omega"] = float(rotating_frame_omega))
     loss === nothing || (body["loss"] = loss)
