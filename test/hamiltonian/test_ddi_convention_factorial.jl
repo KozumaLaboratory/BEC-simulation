@@ -30,12 +30,13 @@
 #     E_DDI matrix for later cross-reference
 #
 # Usage:
-#   julia --project=. scripts/validation/ddi_convention_factorial.jl
+#   include("test/hamiltonian/test_ddi_convention_factorial.jl")
 
 using LinearAlgebra
 using Printf
 using JLD2
 using SpinorBEC
+using Test
 
 const ATOM = Cr52   # native dipolar, c_dd ≈ μ₀·(g_F μ_B)² is meaningful
 const C_DD = 10.0   # dimensionless probe value (1 Cr52 a₀-rescaled unit)
@@ -181,23 +182,17 @@ function main()
 
     all_pass = pass1 && pass2 && pass3 && pass4 && pass5 && pass6
 
-    # Write results.
-    outdir = joinpath(@__DIR__, "..", "..", "runs", "ddi_convention_factorial")
-    mkpath(outdir)
-    outpath = joinpath(outdir, "results.jld2")
-    jldopen(outpath, "w") do f
-        f["c_dd"] = C_DD
-        f["box"] = BOX
-        f["atom_name"] = ATOM.name
-        f["atom_F"] = ATOM.F
-        f["rows"] = rows
-        f["all_pass"] = all_pass
-        f["timestamp"] = string(Dates.now())
-    end
-    println("\nWrote $outpath")
-
-    exit(all_pass ? 0 : 1)
+    (rows=rows, pass1=pass1, pass2=pass2, pass3=pass3,
+        pass4=pass4, pass5=pass5, pass6=pass6, all_pass=all_pass)
 end
 
 using Dates
-main()
+@testset "DDI convention factorial (Cr52, c_dd=10)" begin
+    result = main()
+    @test result.pass1
+    @test result.pass2
+    @test result.pass3
+    @test result.pass4
+    @test result.pass5
+    @test result.pass6
+end

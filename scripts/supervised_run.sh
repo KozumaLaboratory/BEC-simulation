@@ -25,8 +25,13 @@ while [[ $attempt -lt $MAX_RETRIES ]]; do
     echo "--- attempt $attempt / $MAX_RETRIES at $(date) ---" | tee -a "$LOG"
 
     LD_LIBRARY_PATH=/usr/lib/wsl/lib \
-        julia --project="$PROJECT_ROOT" "$PROJECT_ROOT/scripts/rerun_single.jl" "$RUN_NAME" \
-        2>&1 | tee -a "$LOG"
+        julia --project="$PROJECT_ROOT" -e "
+            using SpinorBEC
+            exp = Experiment(joinpath(\"runs\", \"$RUN_NAME\", \"config.yaml\"))
+            ckpt = joinpath(exp.outdir, \".checkpoints\")
+            isdir(ckpt) && (@info \"removing stale checkpoint dir\" ckpt; rm(ckpt; recursive=true, force=true))
+            run!(exp; force=true)
+        " 2>&1 | tee -a "$LOG"
     exit_code=${PIPESTATUS[0]}
 
     if [[ $exit_code -eq 0 ]]; then

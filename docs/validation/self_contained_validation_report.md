@@ -84,9 +84,9 @@ Coverage gaps (intentional, deferred):
 | Spin-1 polar / ferromagnetic GS | `test/test_level4_f1_phase_emergence.jl` | PASS (28/28) |
 | Spin-2 cyclic / nematic singlet pair | `test/hamiltonian/test_singlet_pair.jl` | PASS (28/28) |
 | F=2/3/6/8 phase emergence | `test/test_level4_general_F_phase_emergence.jl` | PASS (93/93) |
-| DDI spherical-cloud E_DDI → 0 | `scripts/validation/ddi_convention_factorial.jl` | PASS (1e-16 floor) |
-| DDI prolate vs oblate sign | `scripts/validation/ddi_convention_factorial.jl` | PASS (head-to-tail attractive; side-by-side repulsive) |
-| DDI axis-flip rotational invariance | `scripts/validation/ddi_convention_factorial.jl` | PASS (3% bound; FFT box anisotropy) |
+| DDI spherical-cloud E_DDI → 0 | `test/hamiltonian/test_ddi_convention_factorial.jl` | PASS (1e-16 floor) |
+| DDI prolate vs oblate sign | `test/hamiltonian/test_ddi_convention_factorial.jl` | PASS (head-to-tail attractive; side-by-side repulsive) |
+| DDI axis-flip rotational invariance | `test/hamiltonian/test_ddi_convention_factorial.jl` | PASS (3% bound; FFT box anisotropy) |
 | Bogoliubov k=0 Goldstone | `test/analysis/test_bogoliubov.jl` | PASS (gap < 1e-6) |
 | EdH F=3 toy J_z conservation | `runs/verification_suite/yamls/09_edh_toy_spin_orbit_transfer.yaml` | PASS (manual run) |
 | Scalar LHY n^{5/2} scaling | `test/hamiltonian/test_lhy_level8_unit.jl` | PASS (25/25) |
@@ -108,7 +108,7 @@ production runs.
 
 ### Layer F — DDI convention factorial
 
-Script: `scripts/validation/ddi_convention_factorial.jl`.
+Script: `test/hamiltonian/test_ddi_convention_factorial.jl`.
 Output: `runs/ddi_convention_factorial/results.jld2`.
 
 Factors: cloud shape ∈ {spherical, prolate, oblate}; B-axis ∈ {z, x};
@@ -143,7 +143,7 @@ Sanity checks (6/6 PASS):
 | 2 Strang convergence | PASS | `test/test_level2_strang_convergence.jl` (8/8) |
 | 3 Zeeman / spin matrices | PASS | `test/test_level3_zeeman_only.jl` (12/12), `test/foundation/test_spin_matrices.jl` (422/422) |
 | 4 spinor contact | PASS | `test/test_level4_f1_phase_emergence.jl` (28/28), `test/test_level4_general_F_phase_emergence.jl` (93/93) |
-| 5 DDI kernel | PASS | `test/hamiltonian/test_ddi.jl` (4644/4644), `scripts/validation/ddi_convention_factorial.jl` (6/6) |
+| 5 DDI kernel | PASS | `test/hamiltonian/test_ddi.jl` (4644/4644), `test/hamiltonian/test_ddi_convention_factorial.jl` (6/6) |
 | 6 EdH F=3 toy | PASS (manual) | `runs/verification_suite/yamls/09_edh_toy_spin_orbit_transfer.yaml` |
 | 7 K3 analytic | PASS | `test/workflow/test_loss_block_edge_cases.jl` (20/20); `reference_k3_uniform_analytic` (5/5) |
 | 8 LHY unit | PASS | `test/hamiltonian/test_lhy_level8_unit.jl` (25/25), `test/hamiltonian/test_lhy.jl` (37/37) |
@@ -228,7 +228,7 @@ SPINORBEC_TEST_TIER=full julia --project=. -e 'using Pkg; Pkg.test()'
 julia --project=. -e 'include("test/test_reference_rhs.jl")'
 
 # Layer F: DDI convention factorial (~30 s)
-julia --project=. scripts/validation/ddi_convention_factorial.jl
+julia --project=. test/hamiltonian/test_ddi_convention_factorial.jl
 
 # Auto-generated matrix report
 julia --project=. scripts/validation/run_validation_matrix.jl

@@ -312,7 +312,7 @@ multi-session (D 論 task). CPU wall is 1.56 s/step at F=6 (D=13) 16³
 — scan-scale TDHFB needs GPU.
 
 **Phase 6 (F=1 + F=6 production)**:
-- `scripts/tdhfb_f1_validation.jl`: F=1 16³ T=0.2 anti-polar quench
+- `test/dynamics/test_tdhfb_f1_validation.jl`: F=1 16³ T=0.2 anti-polar quench
   completes in 8.3s. κ growth linear 0 → 2.5×10⁻² (V·φφ source), ρ tiny
   ~3×10⁻⁷. Hermiticity / symmetry preserved at machine precision.
 - `scripts/tdhfb_eu_production.jl`: F=6 16³ T=0.4 ω⁻¹ Eu production

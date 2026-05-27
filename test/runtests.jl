@@ -61,6 +61,8 @@ const FAST_TESTS = [
     "manuscript/test_D2_H_irrep_character_proof.jl",
     "manuscript/test_rank2_cross_channel_vanishing.jl",
     "validation/test_k3_unit_audit.jl",
+    "dynamics/test_tdhfb_f1_validation.jl",
+    "hamiltonian/test_ddi_convention_factorial.jl",
     "foundation/test_atoms.jl",
     "foundation/test_grid.jl",
     "foundation/test_spin_matrices.jl",
