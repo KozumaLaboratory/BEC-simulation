@@ -12,7 +12,7 @@ metadata:
 
 defaults:
   kind: spinor
-  backend: cuda
+  backend: gpu
   interactions: {N_atoms: 30000, omega_ref: 628.3}
 
 pipeline:

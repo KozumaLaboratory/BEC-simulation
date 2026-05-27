@@ -1,27 +1,27 @@
-# L4 — Eu-151 Matsui Hamiltonian-only 64³ (convergence variant)
-# Identical to L4_eu_matsui_hamiltonian_only_32.yaml except grid 32→64.
-# Used together with the 32³ run for Level 6 grid convergence check:
-#   - early-time Fz(t) slope should agree between 32 and 64
-#   - collapse onset (peak_density spike) should agree if it exists
-#   - if 64 disagrees with 32 BEFORE collapse onset → unconverged
-# This run is significantly more expensive (64³ ≈ 8× 32³ on the same dt).
+# L4 — Eu-151 Matsui Hamiltonian-only 96³ (high-resolution convergence)
+# Anomaly seen at 32/48/64: Fz_drift(32) ≈ Fz_drift(48) = +1.91e-3,
+# Fz_drift(64) = +1.23e-2 (6× larger). Possible explanations:
+#   (a) 64 captures high-k DDI modes 32/48 alias out → 96 should match 64 or exceed
+#   (b) 32/48 share a low-resolution plateau, true answer is closer to 64 → 96 ≈ 64
+#   (c) seed_amplitude noise spectrum interacts with grid resolution → 96 differs
+# This run distinguishes (a) from (c) by adding one more grid resolution.
 
 metadata:
   suite: spinorbec_physics_verification
-  ladder_level: 4
-  reference: Matsui_Science_2026_Hamiltonian_only_64grid
-  expected: same_qualitative_signature_as_32grid_before_collapse
+  ladder_level: 6
+  reference: Matsui_Science_2026_Hamiltonian_only_128grid
+  expected: convergence_test_after_anomalous_32_48_plateau
   noise_convention: rms_rescale_2026_05_22
 
 defaults:
   kind: spinor
-  backend: gpu                              # use cuda for production
+  backend: gpu
   interactions: {N_atoms: 30000, omega_ref: 628.3}
 
 pipeline:
   - ground_state:
       atom: Eu151
-      grid: {n: [64, 64, 64], box: [12.0, 12.0, 12.0]}   # ← 32→64
+      grid: {n: [128, 128, 128], box: [12.0, 12.0, 12.0]}
       potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
       interactions:
         N_atoms: 30000
@@ -59,4 +59,4 @@ pipeline:
       - phase_classify: {}
       - winding_map: {}
       - energy_decomposition: {}
-      - summary_json: {path: "runs/verification_suite/outputs/L4_eu_matsui_hamiltonian_only_64.json"}
+      - summary_json: {path: "runs/verification_suite/outputs/L4_eu_matsui_hamiltonian_only_128.json"}

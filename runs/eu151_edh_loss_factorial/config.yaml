@@ -85,13 +85,13 @@ scan:
   comparison_runs:
     - name: K3off_gdroff      # (0, 0): LHY scalar alone
       override:
-        pipeline.2.dynamics.loss: false
+        pipeline.2.loss: false
     - name: K3off_gdron       # (0, 1): γ_dr only
       override:
-        pipeline.2.dynamics.loss: {gamma_dr: 0.02}
+        pipeline.2.loss: {gamma_dr: 0.02}
     - name: K3on_gdroff       # (1, 0): K3 only
       override:
-        pipeline.2.dynamics.loss:
+        pipeline.2.loss:
           K3_per_m_si:
             ["1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s",
              "1.0e-41 m^6/s", "1.0e-41 m^6/s", "1.0e-41 m^6/s",

@@ -1,0 +1,72 @@
+# TWIN CONTROL (auto-generated). Companion of:
+#   runs/twa_N_scan_pinned/N1000_pinned.yaml
+# Regenerate with:
+#   julia --project=. scripts/validation/generate_twin_controls.jl
+# LHY and loss blocks stripped; everything else preserved.
+# Comments from the original YAML are lost on the round-trip.
+
+mixins:
+  eu151_edh_phys_pinned:
+    grid:
+      box:
+        - 20
+        - 20
+        - 20
+      n:
+        - 32
+        - 32
+        - 32
+    atom: "Eu151"
+    potential:
+      omega:
+        - 1.0
+        - 1.0
+        - 1.182
+      type: "harmonic"
+    interactions:
+      omega_ref: 691.15
+      c1_ratio: 0.0
+      N_atoms: 1000
+      c_total: 937.453
+pipeline:
+  - ground_state:
+      B:
+        Bz: "0.01 Gauss"
+      ddi:
+        c_dd: 42.204
+      tol: 1.0e-9
+      use:
+        - "eu151_edh_phys_pinned"
+      initial_state: "m_plus_F"
+      dt: 0.005
+      lhy:
+        kind: "none"
+      n_steps: 3000
+  - dynamics:
+      duration: 0.14
+      B:
+        Bz:
+          duration: 0.14
+          to: 2.6e-5
+          from: 0.01
+      dt: 0.0005
+      save:
+        every: 280
+  - dynamics:
+      duration: 1.0
+      B:
+        Bz: "2.6e-5 Gauss"
+      twa:
+        n_trajectories: 50
+        seed_base: 42
+        cutoff_energy: 6.0
+        observables:
+          - "density"
+          - "magnetization"
+          - "component_density"
+      dt: 0.0001
+defaults:
+  kind: "spinor"
+  backend: "gpu"
+  interactions:
+    omega_ref: 691.15

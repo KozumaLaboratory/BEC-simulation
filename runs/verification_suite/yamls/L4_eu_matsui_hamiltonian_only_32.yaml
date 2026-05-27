@@ -29,7 +29,7 @@ metadata:
 
 defaults:
   kind: spinor
-  backend: cuda                              # CPU for laptop / CI; cuda after convergence
+  backend: gpu                              # CPU for laptop / CI; gpu after convergence
   interactions: {N_atoms: 30000, omega_ref: 628.3}
 
 pipeline:
