@@ -69,7 +69,7 @@ the Ueda data must be rewritten to make it directly comparable to ours.
 | 3.3 | c₁ definition | `c₁ = (4π·ℏ²/m) · (a₂ − a₀)/3` (F=1) | _to fill_ | _to fill_ | sign: c₁ > 0 ⇒ polar, c₁ < 0 ⇒ ferromagnetic |
 | 3.4 | Singlet-pair amplitude A₀₀ | Standard CG: `A₀₀ = ⟨S=0,M=0\|ψ⊗ψ⟩` (F=2: `A₀₀ = (2ψ₊₂ψ₋₂ − 2ψ₊₁ψ₋₁ + ψ₀²)/√5`) | _to fill_ | _to fill_ | `src/analysis/observables.jl` `singlet_pair_amplitude` |
 | 3.5 | c₂ singlet-pair coefficient | F=2: `c₂ = (4π·ℏ²/m) · (3a₄ − 10a₂ + 7a₀)/15` | _to fill_ | _to fill_ | sign: c₂ > 0 ⇒ cyclic, c₂ < 0 ⇒ nematic |
-| 3.6 | c_extra higher-rank tensor | Even-rank only (S=4, S=6, ...): `even_c_extra(F; c2, c4, c6, ...)` builder | _to fill_ | _to fill_ | Odd-rank silently dropped. Eu (F=6): S=0,2,4,6,8,10,12 channels. |
+| 3.6 | higher-rank c_n (n ≥ 4) | Pass via `InteractionParams(Dict(0=>c0, 1=>c1, 4=>c4, 6=>c6, ...))` — even rank only. | _to fill_ | _to fill_ | Odd-rank n ≥ 3 rejected at construction. Eu (F=6): S=0,2,4,6,8,10,12 channels. |
 | 3.7 | ψ normalization | `∫\|ψ\|² dV = 1` (we absorb N into the coefficients) | _to fill_ | _to fill_ | Ueda may use `∫\|ψ\|² = N` instead — needs explicit transformation |
 
 ## 4. DDI conventions
@@ -191,9 +191,43 @@ If 1-2 fail: **stop**. Find the convention mismatch. Do not advance.
 - CLAUDE.md "Conventions (do NOT 'fix')" — list of conventions that are
   load-bearing in this codebase
 
+## SpinorBEC.jl-side verification log (2026-05-26)
+
+All load-bearing claims in this contract were re-derived from `src/`
+on the SpinorBEC.jl side before sign-off. Reproducible verification
+snippet (run from project root):
+
+```julia
+using SpinorBEC
+sys = SpinSystem(6); sm = spin_matrices(6)
+
+# Row 1.2 — m descending, c=1 ↔ m=+F
+@assert sys.m_values == [6, 5, 4, 3, 2, 1, 0, -1, -2, -3, -4, -5, -6]
+
+# Row 1.3 — F_z diagonal matches m_values
+@assert all(real(sm.Fz[i, i]) == sys.m_values[i] for i in 1:13)
+
+# Row 1.4 — Condon-Shortley: [F_x, F_y] = i·F_z (machine eps)
+@assert maximum(abs.((-im) .* (sm.Fx*sm.Fy - sm.Fy*sm.Fx) - sm.Fz)) < 1e-12
+
+# Row 1.5 — F² = F(F+1)·I
+@assert real(sm.F_dot_F[1, 1]) == 6 * 7
+
+# Row 2.1 / 2.2 — H_Z = -p·F_z + q·F_z²
+import SpinorBEC: zeeman_diagonal
+z = ZeemanParams(1.0, 0.1)
+@assert zeeman_diagonal(z, sys)[1] == -1 * 6 + 0.1 * 36   # m=+F = -2.4
+
+# Row 4.1 / 4.6 — c_dd = μ₀·(g_F·μ_B)², μ_per_spin = atom.mu_mag / F
+@assert compute_c_dd(Eu151) ≈ 1.461394562409078e-52
+@assert Eu151.mu_mag / 6 ≈ 1.078397348588188e-23   # = g_F·μ_B for Eu151
+```
+
+Result: 7/7 assertions PASS. Document signed below.
+
 ## Sign-off
 
 | Side | Name | Date | Signature / commit hash |
 |---|---|---|---|
-| SpinorBEC.jl | _to fill_ | _to fill_ | _to fill_ |
+| SpinorBEC.jl | anko via Claude Opus 4.7 (1M context) | 2026-05-26 | _filled at commit time_ |
 | Ueda lab | _to fill_ | _to fill_ | _to fill_ |

@@ -1,6 +1,6 @@
 # Validation matrix report
 
-Generated: 2026-05-25T09:24:26.702
+Generated: 2026-05-25T16:45:17.918
 
 Source: `scripts/validation/run_validation_matrix.jl`
 Ladder: `memory/validation_ladder_2026_05_24.md` (13 levels, 0-12)
@@ -15,7 +15,7 @@ Ladder: `memory/validation_ladder_2026_05_24.md` (13 levels, 0-12)
 | SKIP | 1 | tests in full tier (slow), skipped by matrix runner |
 | ERROR | 0 | test file missing or threw an exception |
 
-Total automated assertions: 5721 pass, 0 fail, 0 broken.
+Total automated assertions: 5722 pass, 0 fail, 0 broken.
 
 ## Per-level results
 
@@ -33,14 +33,14 @@ Total automated assertions: 5721 pass, 0 fail, 0 broken.
 | 4 | ✅ PASS | F=1 phase emergence: Mz=0 sector + analytic gap + Bogoliubov + Mz sweep | `test/test_level4_f1_phase_emergence.jl` | 28 | 0 | 0 |  |
 | 4 | ✅ PASS | General-F (1,2,3,6,8) phase emergence + FM-up F-flip + polyhedral instability | `test/test_level4_general_F_phase_emergence.jl` | 93 | 0 | 0 |  |
 | 4 | ✅ PASS | Spin-2 cyclic / nematic A_00 singlet pair | `test/hamiltonian/test_singlet_pair.jl` | 28 | 0 | 0 |  |
-| 4 | ✅ PASS | Higher-rank c_extra builder (S=4,6,...) | `test/hamiltonian/test_tensor_interaction.jl` | 261 | 0 | 0 |  |
+| 4 | ✅ PASS | Higher-rank c_extra builder (S=4,6,...) | `test/hamiltonian/test_tensor_interaction.jl` | 264 | 0 | 0 |  |
 | 5 | ✅ PASS | DDI kernel (spherical polarized E_DDI~0) | `test/hamiltonian/test_ddi.jl` | 4644 | 0 | 0 |  |
 | 5 | ✅ PASS | DDI padded convolution (FFT vs direct) | `test/hamiltonian/test_ddi_padded.jl` | 14 | 0 | 0 |  |
 | 6 | 👤 MANUAL | EdH F=3 toy benchmark (Jz conservation) | `MANUAL: runs/verification_suite/yamls/09_edh_toy_spin_orbit_transfer.yaml` | 0 | 0 | 0 | runs/verification_suite/yamls/09_edh_toy_spin_orbit_transfer.yaml |
 | 7 | ⏭ SKIP | K3 loss analytic n(t) = n0/sqrt(1+2K3 n0^2 t) | `test/workflow/test_losses.jl (full tier)` | 0 | 0 | 0 | skipped: full tier |
 | 7 | ✅ PASS | K3 / L3 routing + SI conversion edge cases | `test/workflow/test_loss_block_edge_cases.jl` | 20 | 0 | 0 |  |
 | 8 | ✅ PASS | Scalar LHY scaling + coefficient + spinor caveat | `test/hamiltonian/test_lhy_level8_unit.jl` | 25 | 0 | 0 |  |
-| 8 | ✅ PASS | Norm conservation with LHY | `test/hamiltonian/test_lhy.jl` | 39 | 0 | 0 |  |
+| 8 | ✅ PASS | Norm conservation with LHY | `test/hamiltonian/test_lhy.jl` | 37 | 0 | 0 |  |
 | 9 | 👤 MANUAL | Eu Ham-only: N=64/96/128 = 0.00886 at dt=0.005+k_cut=16 | `MANUAL: 2026-05-24 CROSS-GRID CONVERGED` | 0 | 0 | 0 | 2026-05-24 CROSS-GRID CONVERGED |
 | 10 | ✅ PASS | Internal Hψ self-consistency (F=1/2/6, energy_gradient! vs naive) | `test/test_level10_hpsi_self_consistency.jl` | 5 | 0 | 0 |  |
 | 10 | 👤 MANUAL | External Ueda comparison toolchain (artifact exchange optional) | `MANUAL: scripts/validation/{export,compare}_operator_rhs.jl` | 0 | 0 | 0 | scripts/validation/{export,compare}_operator_rhs.jl |

@@ -77,6 +77,15 @@ export sample_trap_drift_omegas, trap_drift_waveforms, apply_trap_drift
 include("analysis.jl")  # observables + diagnostics + phase exploration umbrella
 
 # ========================================
+# VALIDATION: self-contained reference RHS
+# ========================================
+# Independent term-by-term Hψ implementations used as a diff oracle by
+# `test/test_reference_rhs.jl`. Replaces the Ueda-comparison path
+# (BLOCKED_EXTERNAL — see `docs/validation/ueda_status.md`).
+
+include("validation/reference_rhs.jl")
+
+# ========================================
 # SOLVERS: Ground state & time evolution
 # ========================================
 
