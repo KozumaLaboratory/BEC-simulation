@@ -1,0 +1,121 @@
+# ─────────────────────────────────────────────────────────────────────
+#  Eu-151 Einstein-de Haas (EdH) — Matsui-aligned canonical, v2.
+#  Reference: Matsui et al., Science 391, 384–388 (2026), Fig. 2.
+#
+#  Successor / improvement of:
+#    runs/eu151_edh/                — baseline (1.5 ms only, c1=0, N=10k)
+#    runs/eu151_edh_c1phys/         — added c1=0.003 (still N=10k)
+#    runs/eu151_edh_K3_long/        — extended to 14.5 ms with K3 + γ_dr
+#    runs/eu151_edh_k3_compare/     — A/B K3 comparison
+#    runs/eu151_edh_loss_factorial/ — 2×2 K3 × γ_dr factorial
+#    runs/matsui_baseline/          — N=5e4, c1=1/36, 40 ms loss-free + K3 sweep
+#
+#  v2 consolidates the best choices from all of the above:
+#    • N = 50 000              (real Matsui scale, from matsui_baseline)
+#    • c1/c0 = 1/36            (Matsui best-fit, from matsui_baseline)
+#    • m_minus_F + Bz<0        (project sign convention; m=-F stretched)
+#    • box [12, 12, 12]        (matsui_baseline; finer dx than [20,20,20])
+#    • lhy: none               (scalar LHY = no-LHY at F=6, verified)
+#    • K3 calibrated to Matsui's ~40% loss (NOT γ_dr — K3 alone is enough)
+#    • full 40 ms hold         (Matsui Fig. 2 timeline)
+#    • defaults.interactions.{N_atoms, omega_ref} propagate into every
+#      step (needed for K3 SI conversion at every dynamics phase per
+#      eu151_edh_K3_long comment)
+#    • scan: comparison_runs   (loss-free reference + K3-calibrated)
+#
+#  Three improvements over the calibration runs in matsui_baseline:
+#    (1) Single canonical YAML (was 6 separate matsui_40ms_lossy_*.yaml).
+#    (2) Direct A/B comparison via comparison_runs (one dispatch, two
+#        cells: K3=0 and K3=2.1e-40).
+#    (3) trajectory + ring extraction scripts co-located in this dir,
+#        following the eu151_edh_K3_long pattern.
+#
+#  Calibration provenance:
+#    K3 fine bracket at factor ∈ {5, 10, 15, 20, 25, 30, 100} × proxy
+#    (where proxy = 1.0×10⁻⁴¹ m⁶/s, Dy164 order-of-magnitude):
+#      K3 / proxy   N(40 ms)/N(0)
+#         5         0.865
+#        10         0.762
+#        15         0.681
+#        20         0.615   ←─ matches Matsui experimental ~0.60
+#        25         0.561
+#        30         0.516
+#       100         0.244
+#    Linear interpolation: K3 ≈ 21 × proxy = 2.1×10⁻⁴⁰ m⁶/s → 0.60.
+# ─────────────────────────────────────────────────────────────────────
+
+defaults:
+  kind: spinor
+  backend: gpu
+  # N_atoms + omega_ref propagate into every step's `interactions:` so
+  # the K3_per_m_si SI conversion has the inputs it needs at every
+  # dynamics phase (per eu151_edh_K3_long convention).
+  interactions: {N_atoms: 50000, omega_ref: 691.1504}
+
+dealias:
+  enabled: true
+  k_cut: 16.0
+  auto_dt: true
+  dt_safety: 10.0
+
+mixins:
+  eu151_matsui_phys:
+    atom: Eu151
+    grid: {n: [64, 64, 64], box: [12.0, 12.0, 12.0]}
+    potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}    # 130/110 Hz
+    interactions:
+      N_atoms: 50000
+      omega_ref: 691.1504
+      c1_ratio: 0.0277777778                                     # = 1/36, Matsui best-fit
+    gauge_fix: false
+
+pipeline:
+  # Phase 0 — m=-6 stretched ground state at Matsui prep field B = -1 μT.
+  # Sign convention (project): Bz<0 makes m=-F the GS for Eu (g_F > 0).
+  - ground_state:
+      use: [eu151_matsui_phys]
+      ddi: {enabled: true, secular: true}                        # time-averaged at strong B
+      lhy: {kind: none}                                          # scalar LHY = no-LHY at F=6
+      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}              # = -1 μT (Matsui prep, signed)
+      initial_state: m_minus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 2000
+      tol: 1.0e-9
+
+  # Phase 1 — Zeeman quench Bz : -1 μT → -2.6 nT in 0.14 ω_ref⁻¹ ≈ 0.20 ms.
+  - dynamics:
+      duration: 0.14
+      dt: 0.0005
+      B:
+        Bz: {from: -0.01, to: -2.6e-5, duration: 0.14}
+        theta: 0.0
+        phi: 0.0
+      ddi: {enabled: true, secular: false}                       # full MDDI as B drops
+      lhy: {kind: none}
+      save: {every: 50, psi: true, precision: f64}
+
+  # Phase 2 — weak-field hold (EdH-active) for 27.646 ω_ref⁻¹ ≈ 40 ms.
+  # `loss:` block is the comparison_runs scan target below; this default
+  # carries the K3-calibrated value.
+  - dynamics:
+      duration: 27.646
+      dt: 0.005
+      B: {Bz: "-2.6e-5 Gauss", theta: 0.0, phi: 0.0}             # = -2.6 nT (Matsui weak)
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      loss:
+        K3_per_m_si:
+          ["2.1e-40 m^6/s", "2.1e-40 m^6/s", "2.1e-40 m^6/s",
+           "2.1e-40 m^6/s", "2.1e-40 m^6/s", "2.1e-40 m^6/s",
+           "2.1e-40 m^6/s", "2.1e-40 m^6/s", "2.1e-40 m^6/s",
+           "2.1e-40 m^6/s", "2.1e-40 m^6/s", "2.1e-40 m^6/s",
+           "2.1e-40 m^6/s"]
+      seed_amplitude: 1.0e-6
+      seed_k_cut: 2.5
+      save: {every: 200, psi: true, precision: f64}
+
+  - analyze:
+      - phase_classify: {}
+      - winding_map: {}
+      - energy_decomposition: {}
