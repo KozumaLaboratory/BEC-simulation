@@ -1,7 +1,7 @@
 # F=12 icosahedral Universal Theorem verification — partial result
 
 **Date**: 2026-05-11
-**Script**: `scripts/manuscript/f12_icosahedral_verification.jl`
+**Script**: `test/manuscript/test_f12_icosahedral.jl`
 **Status**: spinor construction + structural sanity checks COMPLETE; per-channel
 β_S^{λ_spin} sign extraction deferred to sympy closed-form derivation.
 
@@ -143,7 +143,7 @@ $2F=24$). Cannot determine empirically from this verification.
 
 ### Reproducibility
 
-Run: `julia --project=. scripts/manuscript/f12_icosahedral_verification.jl`
+Run: `julia --project=. test/manuscript/test_f12_icosahedral.jl`
 
 Runtime ~3 min on standard CPU (dominated by 60-element group closure and CG table
 construction). Output is fully deterministic (random seed 42).

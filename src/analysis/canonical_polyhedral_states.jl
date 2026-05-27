@@ -85,7 +85,7 @@ end
 # NOT GENERALIZABLE: canonical inert spinors exist only for F ∈ {2,3,4,6,8,10,12}.
 # Reason: math
 # Why: F=1 has no polyhedral inert state (only polar/FM). F=5 has an algebraic
-#   obstruction proved in scripts/manuscript/f_systematic_lemma1_predictions.jl.
+#   obstruction proved in test/manuscript/test_f_systematic_lemma1_predictions.jl.
 #   F=7,9,11 not covered by Paper #3 §V — no symmetric rank-(F) invariant known.
 #   This is a structural absence in the manuscript, not an unfilled TODO.
 # See: docs/manuscript/papers/paper3_universal_theorem/f5_f7_verification_result.md
@@ -106,7 +106,7 @@ Return the canonical Paper #3 §V inert-state spinor for spin-F.
 
 Errors for F values without a canonical inert state defined in Paper #3
 (currently F=1, F=5, F=7, F=9, F=11 — F=5 has an algebraic obstruction
-documented in `scripts/manuscript/f_systematic_lemma1_predictions.jl`).
+documented in `test/manuscript/test_f_systematic_lemma1_predictions.jl`).
 """
 function canonical_polyhedral_spinor(F::Int)
     if F == 2

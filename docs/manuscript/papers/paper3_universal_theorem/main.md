@@ -579,7 +579,7 @@ above because Schur's lemma operates on the rotation symmetry alone
 (irrespective of parity). The 3 spin Goldstones remain T_1-irreducibly
 degenerate under the polyhedral rotation group $H = T$ or $O$.
 
-Regression script: `scripts/manuscript/f5_f7_polyhedral_verification.jl` and
+Regression script: `test/manuscript/test_f5_f7_polyhedral.jl` and
 `f_systematic_lemma1_predictions.jl` (F=13 added 2026-05-12).
 
 ### D. F=8 case

@@ -1,7 +1,7 @@
 # Sign Pattern Systematic — Anomalous Identity (numerical evidence)
 
 **Date**: 2026-05-11
-**Script**: `scripts/manuscript/sign_pattern_6j_numerical.jl`
+**Script**: `test/manuscript/test_sign_pattern_6j.jl`
 **Status**: numerical identity verified at 4 of 5 paper3 polyhedral cases; analytical
 proof outline + remaining gap documented.
 
@@ -155,7 +155,7 @@ for polyhedral inert $\zeta$.
 
 ## Implementation status
 
-- **Script**: `scripts/manuscript/sign_pattern_6j_numerical.jl` reproduces all tables above
+- **Script**: `test/manuscript/test_sign_pattern_6j.jl` reproduces all tables above
 - **Runtime**: ~5 min on standard CPU
 - **Tested on**: F = 3, 4, 6, 8, 10 paper3 cases
 - **Pending**: F=12 verification using the spinor from F12_verification_result.md;

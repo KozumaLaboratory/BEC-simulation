@@ -670,4 +670,4 @@ end
 @printf("\n%s\n", "="^70)
 @printf("F3 REGRESSION: lemma1_general_S_verification.jl\n")
 @printf("%s\n", "="^70)
-include(joinpath(@__DIR__, "lemma1_general_S_verification.jl"))
+include(joinpath(@__DIR__, "test_lemma1_general_S.jl"))

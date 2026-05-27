@@ -389,7 +389,7 @@ F=1 spinor の場合、Majorana 配置は 2 points (大円上の 2 点) で、�
 - F=11: T:A, O:A_2 — 両方 mult 1, verified
 - F=13: T:A (mult 2 — ambiguous), O:A_1 (mult 1), O:A_2 (mult 1) —
   octahedral 2 instances verified at Schur dev ≤ 6×10⁻¹³, $\beta_0 = 1/27$ 厳密
-  (2026-05-12 追加; 計算 `scripts/manuscript/f5_f7_polyhedral_verification.jl`)
+  (2026-05-12 追加; 計算 `test/manuscript/test_f5_f7_polyhedral.jl`)
 
 主定理 (4.6) の証明 (§4.4) は **回転群上の Schur 補題**のみを用いる。$A_2$ は
 回転下では trivial、reflection 下のみ符号反転 — 回転群 $O$ の下では $A_1$ と区別
@@ -408,7 +408,7 @@ F=5 は **F=1 とは別種の例外** であり、polyhedral inert state を $T:
 - T:E_1 は **複素 1-dim 既約**で、群作用下に位相 $\chi(g) \in \{1, \omega, \omega^*\}$
   ($\omega = e^{2\pi i/3}$) を拾う。故に状態は厳密には不変ではなく、Schur の補題が
   保証する $\langle F_a^2 \rangle = F(F+1)/3$ 等方性も成立しない。
-- 数値検証 (`scripts/manuscript/f5_f7_polyhedral_verification.jl` 2026-05-12 拡張):
+- 数値検証 (`test/manuscript/test_f5_f7_polyhedral.jl` 2026-05-12 拡張):
   F=5 T:E_1 状態は Schur isotropy deviation **6.0** (10⁻¹³ ではない) を示し、
   Lemma 1 instance ではないことが確認された。
 

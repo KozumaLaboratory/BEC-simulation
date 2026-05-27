@@ -49,7 +49,7 @@ $\beta_S^{c_0}$ が paper3 stated に 6+ decimal places 一致。
 
 **Runtime**: ~5 min on CPU.
 
-### A.2.2 `scripts/manuscript/f12_icosahedral_verification.jl`
+### A.2.2 `test/manuscript/test_f12_icosahedral.jl`
 
 **Purpose**: F=12 icosahedral I:A 新 instance の verification (paper3 §IX.B follow-up,
 predictive test for Sign Pattern conjecture)。
@@ -69,7 +69,7 @@ BdG factorization が必要、post-修論 D-thesis Year 1 candidate).
 
 **Runtime**: ~3 min on CPU.
 
-### A.2.3 `scripts/manuscript/sign_pattern_6j_numerical.jl`
+### A.2.3 `test/manuscript/test_sign_pattern_6j.jl`
 
 **Purpose**: Sign Pattern Systematic の **Anomalous Identity** 数値 verification
 (Strategy A Step 4):
@@ -113,10 +113,10 @@ julia --project=. -e 'using Pkg; Pkg.instantiate()'
 julia --project=. scripts/manuscript/paper3_audit.jl
 
 # F=12 icosahedral verification (~3 min)
-julia --project=. scripts/manuscript/f12_icosahedral_verification.jl
+julia --project=. test/manuscript/test_f12_icosahedral.jl
 
 # Sign Pattern Anomalous Identity numerical (~5 min)
-julia --project=. scripts/manuscript/sign_pattern_6j_numerical.jl
+julia --project=. test/manuscript/test_sign_pattern_6j.jl
 ```
 
 各 script の stdout に detailed table が output される。Random seed (42) で結果 deterministic。

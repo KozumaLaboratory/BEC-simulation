@@ -1,7 +1,7 @@
 # F=9 / F=11 odd-F polyhedral verification result
 
 **Date**: 2026-05-11
-**Script**: `scripts/manuscript/f9_f11_polyhedral_verification.jl`
+**Script**: `test/manuscript/test_f9_f11_polyhedral.jl`
 **Status**: 4 of 5 cases pass machine precision; F=9 T:A multiplicity 2 case has
 2e-4 deviation due to random subspace mixing.
 
@@ -122,7 +122,7 @@ extends naturally to F=9, F=11. Future work (= D 論 Year 1):
 
 ## Reproducibility
 
-`scripts/manuscript/f9_f11_polyhedral_verification.jl` reuses f5_f7 framework.
+`test/manuscript/test_f9_f11_polyhedral.jl` reuses f5_f7 framework.
 Runtime ~2-3 min on CPU. Random seed 42 throughout.
 
 ---

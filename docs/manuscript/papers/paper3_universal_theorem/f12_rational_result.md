@@ -1,7 +1,7 @@
 # F=12 closed-form $\beta_S^{(c_0)}$ — rational identification result
 
 **Date**: 2026-05-11
-**Script**: `scripts/manuscript/f12_rational_derivation.jl`
+**Script**: `test/manuscript/test_f12_rational.jl`
 **Status**: Numerical $\beta_S^{(c_0)}$ values + rational approximations identified;
 canonical simplified form (= primes-structured denominators) requires sympy derivation.
 

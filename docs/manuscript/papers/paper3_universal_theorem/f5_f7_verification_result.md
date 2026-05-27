@@ -1,7 +1,7 @@
 # F=5 / F=7 odd-F polyhedral verification result
 
 **Date**: 2026-05-11
-**Script**: `scripts/manuscript/f5_f7_polyhedral_verification.jl`
+**Script**: `test/manuscript/test_f5_f7_polyhedral.jl`
 **Status**: F=7 T:A + F=7 O:A_2 VERIFIED at machine precision; F=5/F=7 T:E_1 complex
 1-dim irreps need 2-dim real representation projection (limitation).
 

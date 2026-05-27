@@ -234,7 +234,7 @@ Future work:
 (Full tabular catalog of $c_0$ and $\lambda_{\rm spin}$ for each of the 20
 instances, with rational coefficients computed via numerical CG projection
 then verified analytically at F=3/4/6/8/10/12 instances. Numerical values
-verified via `scripts/manuscript/f_systematic_lemma1_predictions.jl`.)
+verified via `test/manuscript/test_f_systematic_lemma1_predictions.jl`.)
 
 ---
 
@@ -254,8 +254,8 @@ verified via `scripts/manuscript/f_systematic_lemma1_predictions.jl`.)
 - `paper3_universal_theorem/main.md` §IX.B — Lemma 1 General-S + Lemma 2 proofs
 - `paper3_universal_theorem/f_systematic_lemma1_predictions.md` —
   Closed-form predictions for F=7/9/11
-- `scripts/manuscript/f_systematic_lemma1_predictions.jl` — verification script
-- `scripts/manuscript/f5_f7_polyhedral_verification.jl`,
+- `test/manuscript/test_f_systematic_lemma1_predictions.jl` — verification script
+- `test/manuscript/test_f5_f7_polyhedral.jl`,
   `f9_f11_polyhedral_verification.jl` — numerical verification
 - `paper3_universal_theorem/sign_pattern_lemma1_general_S.md` — closed-form derivation
 - `paper3_universal_theorem/sign_pattern_L2_unique_sign_change.md` — sign-change uniqueness

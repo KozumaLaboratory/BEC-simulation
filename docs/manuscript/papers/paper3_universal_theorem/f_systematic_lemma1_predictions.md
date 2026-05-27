@@ -1,7 +1,7 @@
 # F-systematic Completion via Lemma 1 General-S — Predictions for F=7, 9, 11
 
 **Date**: 2026-05-11
-**Script**: `scripts/manuscript/f_systematic_lemma1_predictions.jl`
+**Script**: `test/manuscript/test_f_systematic_lemma1_predictions.jl`
 **Status**: 6 new polyhedral inert state instances with closed-form
 $\beta_S^{(\lambda_{\rm spin})}$ predictions via Lemma 1 General-S.
 

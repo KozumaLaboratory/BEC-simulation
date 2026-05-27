@@ -567,7 +567,7 @@ $$\mathrm{Tr}[\hat\Pi_S (|\zeta\rangle\langle\zeta| \otimes |\zeta\rangle\langle
 
 (by definition of $\beta_S^{(c_0)}$ as the channel weight in §0). Multiplying by
 $m_{\rm rep}=1$ reproduces the standard Lemma 1 General-S formula. The
-regression script `scripts/manuscript/lemma1_general_S_verification.jl` covers
+regression script `test/manuscript/test_lemma1_general_S.jl` covers
 26 channel coefficients across 5 polyhedral cases (F=3, 4, 6, 8, 10) and
 remains 26/26 PASS unchanged at T115 (implementer T115 sim §6.3).
 
@@ -653,10 +653,10 @@ $\rho_{\rm inv}$ Hermitian deviation = 0; $\mathrm{Tr}\,\rho_{\rm inv} = 1$ exac
 - **Numerical verification at F=9 T:A**: `runs/_loop/sim/turn_115.md §5`
   (metrics block: `bar_beta_0_canonical_F9_TA = 0.0526315789473683`, table
   for $S = 0,\ldots,2F$, sum-rule dev $6.66 \times 10^{-15}$);
-  script `scripts/manuscript/f9_f11_polyhedral_verification.jl`
+  script `test/manuscript/test_f9_f11_polyhedral.jl`
   (function `canonical_mult_aware_beta_S` introduced in commit `a323222`,
   T115 attempt2 auto-branch).
-- **$m_{\rm rep}=1$ regression**: `scripts/manuscript/lemma1_general_S_verification.jl`
+- **$m_{\rm rep}=1$ regression**: `test/manuscript/test_lemma1_general_S.jl`
   (26/26 PASS at T115; covers F=3, F=4, F=6, F=8, F=10 polyhedral cases).
 - **Memory anchor**: `memory/sign_pattern_lemma1_mult_aware_2026_05_19.md`
   (added at T116).
