@@ -8,7 +8,7 @@ export find_ground_state_lbfgs
 function find_ground_state_lbfgs(;
     grid::Union{Nothing, Grid}=nothing,
     atom::Union{Nothing, AtomSpecies}=nothing,
-    interactions::InteractionParams=InteractionParams(0.0, 0.0),
+    interactions::InteractionParams=InteractionParams(Dict{Int, Float64}()),
     zeeman::Union{ZeemanParams, TimeDependentZeeman}=ZeemanParams(0.0, 0.0),
     potential::AbstractPotential=NoPotential(),
     n_steps::Int=1000,

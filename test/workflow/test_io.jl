@@ -37,8 +37,6 @@ using SpinorBEC
         @test data.c0 == 100.0
         @test data.c1 == -0.5
         @test data.c_lhy == 0.1
-        # Post-Dict refactor: c_extra storage is now Dict{Int,Float64}
-        # via the c_dict field (renamed in io.jl).
         @test data.c_dict[4] == 5.0
         @test get(data.c_dict, 2, 0.0) == 0.0
         @test data.zeeman_p == 0.3

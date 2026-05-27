@@ -58,10 +58,8 @@ using LinearAlgebra
     end
 
     @testset "nematic — random complex spinors, F=2..6" begin
-        # F=1 has no nematic step (S=0 pair channel needs F≥2). The c2
-        # coefficient is read via get_cn(ip, 2) → ip.c_extra[1], so the
-        # 3-arg positional InteractionParams(merge(Dict(0 => c0, 1 => c1), SpinorBEC._vec_to_c_dict(c_extra))) form is
-        # the right entry point here.
+        # F=1 has no nematic step (S=0 pair channel needs F≥2). The c_2
+        # coupling is read via `get_cn(ip, 2)` from the InteractionParams Dict.
         rng = Random.MersenneTwister(0xBEEF)
         for F in 2:6, trial in 1:4
             sm = SpinorBEC.spin_matrices(F)

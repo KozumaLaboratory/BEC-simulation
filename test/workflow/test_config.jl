@@ -29,7 +29,7 @@
         @test p["interactions"]["c0"] == 10.0
         @test p["dt"] == 0.005
         @test p["n_steps"] == 100
-        @test p["zeeman"]["q"] == 0.1
+        @test p["B"]["q"] == 0.1
     end
 
     @testset "parsing - dynamics type" begin
@@ -54,7 +54,7 @@
           - dynamics:
               duration: 0.1
               dt: 0.01
-              save_every: 5
+              save: {every: 5}
               temperature_ratio: 0.1
               noise_seed: 42
               B:
@@ -72,7 +72,7 @@
         dp = cfg.steps[2].params
         @test dp["temperature_ratio"] == 0.1
         @test dp["noise_seed"] == 42
-        @test dp["zeeman"]["q"] isa Dict
+        @test dp["B"]["q"] isa Dict
     end
 
     @testset "parsing - dynamics without perturbation" begin
@@ -200,7 +200,7 @@
           - dynamics:
               duration: 0.05
               dt: 0.001
-              save_every: 25
+              save: {every: 25}
               B:
                 p: 0.0
                 q: 0.1
@@ -234,7 +234,7 @@
           - dynamics:
               duration: 0.05
               dt: 0.001
-              save_every: 25
+              save: {every: 25}
               temperature_ratio: 0.05
               noise_seed: 42
               B:
@@ -272,7 +272,7 @@
                 pipeline.0.tol: 1.0e-10
             - name: ferro
               override:
-                pipeline.0.initial_state: ferromagnetic
+                pipeline.0.initial_state: m_plus_F
         """
         cfg = load_config_from_string(yaml)
         @test cfg.scan isa OverrideScan

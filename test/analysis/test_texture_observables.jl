@@ -3,10 +3,6 @@ using SpinorBEC
 using LinearAlgebra
 
 @testset "Texture Observables & Extended Interactions" begin
-    # Post-2026-05-25 refactor: InteractionParams uses Dict{Int,Float64}
-    # storage; the old positional Vector form is removed. Comprehensive
-    # API coverage lives in test/test_interactions_dict_api.jl; this
-    # block keeps a minimal sanity probe on the production path.
     @testset "InteractionParams Dict construction" begin
         ip = InteractionParams(Dict(0 => 1.0, 1 => 2.0))
         @test ip[0] == 1.0
@@ -167,7 +163,7 @@ using LinearAlgebra
     end
 
     @testset "YAML parsing with higher-order c_n" begin
-        @testset "backward compat (no c_extra)" begin
+        @testset "no higher-rank couplings" begin
             yaml = """
             pipeline:
               - ground_state:
@@ -191,10 +187,9 @@ using LinearAlgebra
         end
 
         @testset "with c2, c4 (even-rank only)" begin
-            # Odd-rank c_extra entries (c3, c5, ...) are now rejected at parse
-            # time — they would represent KU pair-channel S-couplings (e.g.
-            # c₃ → S=2 channel), which must be routed through scattering_lengths
-            # or tensor_cache, not c_extra. See src/.../singlet_pair.jl docstring.
+            # Odd-rank c_n (c3, c5, ...) are rejected at parse time — they would
+            # represent KU pair-channel S-couplings (e.g. c₃ → S=2 channel), which
+            # must be routed through scattering_lengths or tensor_cache.
             yaml = """
             pipeline:
               - ground_state:

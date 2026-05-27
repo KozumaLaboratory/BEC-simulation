@@ -1,7 +1,8 @@
 # --- Contact interactions, Zeeman, Raman ---
 #
-# `InteractionParams` holds c0/c1/c_lhy + arbitrary even-rank c_extra
-# couplings. `ZeemanParams` is the constant-in-time form; the
+# `InteractionParams` stores all c_n (for n ≥ 0) in a single
+# `Dict{Int, Float64}` plus the LHY coefficient. `ZeemanParams` is the
+# constant-in-time form; the
 # time-dependent counterpart `TimeDependentZeeman` carries waveforms
 # for p, q, and (optionally) transverse Bx/By. `linear_p` /
 # `quadratic_q` / `transverse_b` are the unified accessors so call

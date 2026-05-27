@@ -265,6 +265,8 @@
     end
 
     @testset "YAML parsing of losses" begin
+        # `loss:` block lives on dynamics steps — ITP skips loss by design,
+        # so the schema accepts it only on `dynamics:`.
         yaml = """
         pipeline:
           - ground_state:
@@ -275,19 +277,22 @@
               interactions:
                 c0: 1.0
                 c1: 0.0
-              losses:
-                gamma_dr: 1.0e-3
-                L3: 2.0e-5
               dt: 0.01
               n_steps: 10
               tol: 1e-4
               potential: {type: harmonic, omega: [1.0]}
+          - dynamics:
+              duration: 0.05
+              dt: 0.001
+              loss:
+                gamma_dr: 1.0e-3
+                L3: 2.0e-5
         """
         cfg = load_config_from_string(yaml)
         @test cfg isa PipelineConfig
-        p = cfg.steps[1].params
-        @test p["losses"]["gamma_dr"] == 1e-3
-        @test p["losses"]["L3"] == 2e-5
+        p = cfg.steps[2].params
+        @test p["loss"]["gamma_dr"] == 1e-3
+        @test p["loss"]["L3"] == 2e-5
     end
 
     @testset "YAML without losses" begin

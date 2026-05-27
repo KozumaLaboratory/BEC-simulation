@@ -9,29 +9,13 @@
         @test cache2 === nothing
     end
 
-    @testset "odd-rank c_extra entries are silently ignored (CLAUDE.md convention)" begin
-        # CLAUDE.md "do NOT fix": odd-rank c_extra entries (c3, c5, c7, ...)
-        # are silently dropped by `make_tensor_interaction_cache` because
-        # the `for k in 0:2:2F` loop in `_make_tensor_cache_from_channels`
-        # only inspects even ranks. Bosonic spinor pair channels exist
-        # only at S = 0, 2, 4, ..., 2F.
-        #
-        # If a future refactor accidentally starts reading odd ranks
-        # (e.g., changes the step to 1 or introduces an off-by-one),
-        # this probe catches it: a c_extra with ONLY c3 set should still
-        # give a nothing cache.
+    @testset "Odd-rank c_n entries are rejected at construction" begin
+        # Bosonic spinor pair channels exist only at S = 0, 2, 4, ..., 2F.
+        # Single-particle tensor couplings are even-rank only. Odd-rank
+        # c_n keys (n ≥ 3) are rejected by InteractionParams at construction.
         for F in (2, 3, 6)
-            slots = 2F - 1
-            # Only odd-rank slot 2 (= c3) set; even ranks all zero.
-            c_extra = zeros(Float64, slots)
-            slots >= 2 && (c_extra[2] = 99.0)   # c3 = 99
-            slots >= 4 && (c_extra[4] = 88.0)   # c5
-            slots >= 6 && (c_extra[6] = 77.0)   # c7
-            ip = InteractionParams(
-                merge(Dict(0 => 0.0, 1 => 0.0), SpinorBEC._vec_to_c_dict(c_extra)); c_lhy=0.0
-            )
-            cache = make_tensor_interaction_cache(F, ip)
-            @test cache === nothing  # cache must NOT activate from odd-rank only
+            @test_throws ArgumentError InteractionParams(Dict(3 => 99.0))
+            @test_throws ArgumentError InteractionParams(Dict(5 => 88.0))
         end
     end
 
@@ -110,27 +94,20 @@
     end
 
     @testset "Per-voxel h matrix is Hermitian (CG factor cause-isolation)" begin
-        # CLAUDE.md flags `even_c_extra is canonical builder. Hand-written
-        # [c2, c4, c6] silently misindexes for F ≥ 3` as a risk area, and
         # `apply_tensor_interaction_step!` later does `eigen!(Hermitian(h))`
         # which silently symmetrises any non-Hermitian construction. This
         # test rebuilds h explicitly from the cache's pre-computed HF
         # entries and asserts ‖h − h†‖∞ < 1e-12 across F=2/3/6.
         for F in (2, 3, 6)
             D = 2F + 1
-            # Build a cache with non-trivial channels — for F=2 active
-            # are c4 (rank-2 tensor coupling at idx 1) and c4 (rank-4 at
-            # idx 3); for F=3/6, also higher channels via even_c_extra.
-            c_extra = if F == 2
-                [3.0, 0.0, 1.5]                                   # c2, c3=0, c4
+            c_n = if F == 2
+                Dict(2 => 3.0, 4 => 1.5)
             elseif F == 3
                 Dict(2 => 2.0, 4 => 1.5, 6 => 0.7)
             else
                 Dict(2 => 1.0, 4 => 0.5, 6 => 0.3, 8 => 0.2, 10 => 0.1, 12 => 0.05)
             end
-            ip = InteractionParams(
-                merge(Dict(0 => 0.0, 1 => 0.0), SpinorBEC._vec_to_c_dict(c_extra)); c_lhy=0.0
-            )
+            ip = InteractionParams(c_n; c_lhy=0.0)
             cache = SpinorBEC.make_tensor_interaction_cache(F, ip)
             @test cache !== nothing  # higher channels active
 
@@ -312,10 +289,8 @@
         F = 6
         grid = make_grid(GridConfig((16,), (10.0,)))
 
-        c_extra = zeros(Float64, 5)
-        c_extra[3] = 50.0  # c4
         interactions = InteractionParams(
-            merge(Dict(0 => 4000.0, 1 => 20.0), SpinorBEC._vec_to_c_dict(c_extra)); c_lhy=0.0
+            Dict(0 => 4000.0, 1 => 20.0, 4 => 50.0); c_lhy=0.0
         )
         atom = AtomSpecies("test-f6", 1e-25, 6, 0.0, 0.0, 0.0, 0.0)
         sp = SimParams(; dt=0.001, n_steps=5)
@@ -340,9 +315,8 @@
         atom = AtomSpecies("test-f2", 1e-25, 2, 0.0, 0.0, 0.0, 0.0)
 
         c0, c1 = 50.0, 5.0
-        c_extra = [0.0, 0.0, 2.0]  # c4 nonzero → tensor_cache active
         interactions = InteractionParams(
-            merge(Dict(0 => c0, 1 => c1), SpinorBEC._vec_to_c_dict(c_extra)); c_lhy=0.0
+            Dict(0 => c0, 1 => c1, 4 => 2.0); c_lhy=0.0
         )
 
         result = find_ground_state(;
@@ -365,9 +339,8 @@
         atom = AtomSpecies("test-f2", 1e-25, 2, 0.0, 0.0, 0.0, 0.0)
 
         c0, c1 = 50.0, -5.0
-        c_extra = [0.0, 0.0, 2.0]  # c4 nonzero → tensor_cache active
         interactions = InteractionParams(
-            merge(Dict(0 => c0, 1 => c1), SpinorBEC._vec_to_c_dict(c_extra)); c_lhy=0.0
+            Dict(0 => c0, 1 => c1, 4 => 2.0); c_lhy=0.0
         )
 
         result = find_ground_state(;
@@ -397,10 +370,9 @@
         n_pts = grid.config.n_points
 
         c0, c1 = 50.0, 5.0
-        c_extra = [0.0, 0.0, 2.0]  # c4
 
         g_base = SpinorBEC._c0c1_to_gS(F, c0, c1)
-        g_delta = SpinorBEC._c_extra_to_delta_gS(F, c_extra)
+        g_delta = SpinorBEC._dict_to_delta_gS(F, Dict(4 => 2.0))
         g_total = merge(+, g_base, g_delta)
         cache_total = SpinorBEC._make_tensor_cache_from_channels(F, g_total)
         E_total = SpinorBEC._tensor_interaction_energy(psi, cache_total, 1, n_pts, dV)
@@ -422,10 +394,8 @@
         F = 6
         grid = make_grid(GridConfig((16,), (10.0,)))
 
-        c_extra = zeros(Float64, 5)
-        c_extra[3] = 50.0  # c4
         interactions = InteractionParams(
-            merge(Dict(0 => 4000.0, 1 => 20.0), SpinorBEC._vec_to_c_dict(c_extra)); c_lhy=0.0
+            Dict(0 => 4000.0, 1 => 20.0, 4 => 50.0); c_lhy=0.0
         )
         atom = AtomSpecies("test-f6", 1e-25, 6, 0.0, 0.0, 0.0, 0.0)
         sp = SimParams(; dt=0.001, n_steps=100)

@@ -35,7 +35,7 @@
           - dynamics:
               duration: 1.0
               dt: 0.01
-              save_every: 10
+              save: {every: 10}
               B:
                 p:
                   from: 0.0
@@ -45,14 +45,14 @@
           - dynamics:
               duration: 2.0
               dt: 0.01
-              save_every: 20
+              save: {every: 20}
               B:
                 p: 0.5
                 q: 0.0
           - dynamics:
               duration: 0.5
               dt: 0.005
-              save_every: 10
+              save: {every: 10}
               B:
                 p: 0.0
                 q: 0.0
@@ -74,18 +74,18 @@
         @test gp["n_steps"] == 100
         @test gp["tol"] == 1.0e-8
         @test gp["initial_state"] == "polar"
-        @test gp["zeeman"]["p"] == 0.0
-        @test gp["zeeman"]["q"] == 0.1
+        @test gp["B"]["p"] == 0.0
+        @test gp["B"]["q"] == 0.1
 
         @test config.steps[2] isa SpinorBEC.DynamicsStep
         ramp = config.steps[2].params
         @test ramp["duration"] == 1.0
         @test ramp["dt"] == 0.01
-        @test ramp["save_every"] == 10
-        @test ramp["zeeman"]["p"] isa Dict
-        @test ramp["zeeman"]["p"]["from"] == 0.0
-        @test ramp["zeeman"]["p"]["to"] == 0.5
-        @test ramp["zeeman"]["q"] == 0.0
+        @test ramp["save"]["every"] == 10
+        @test ramp["B"]["p"] isa Dict
+        @test ramp["B"]["p"]["from"] == 0.0
+        @test ramp["B"]["p"]["to"] == 0.5
+        @test ramp["B"]["q"] == 0.0
 
         hold = config.steps[3].params
         @test hold["duration"] == 2.0
@@ -204,7 +204,7 @@
           - dynamics:
               duration: 0.1
               dt: 0.001
-              save_every: 50
+              save: {every: 50}
               B:
                 p:
                   from: 0.0
@@ -244,7 +244,7 @@
           - dynamics:
               duration: 0.1
               dt: 0.001
-              save_every: 50
+              save: {every: 50}
               temperature_ratio: 0.05
               noise_seed: 42
               B:

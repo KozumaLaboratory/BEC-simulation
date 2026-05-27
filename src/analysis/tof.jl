@@ -146,7 +146,7 @@ function simulate_tof_with_gradient(
     atom = ws_source.atom
     D = ws_source.spin_matrices.system.n_components
 
-    ip_tof = drop_interactions ? InteractionParams(0.0, 0.0) :
+    ip_tof = drop_interactions ? InteractionParams(Dict{Int, Float64}()) :
              ws_source.interactions
     potential_tof = keep_trap ? ws_source.potential : NoPotential()
 

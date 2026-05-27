@@ -231,7 +231,7 @@ kinetic, trap, Zeeman, c0 (density), c_lhy, c1 (spin), light_shift, DDI.
 
 It does **NOT** cover:
 - c2 (the S=0 singlet-pair channel — `apply_singlet_pair_step!`)
-- `c_extra` higher-rank tensor couplings (c4, c6, …)
+- higher-rank c_n tensor couplings (c4, c6, …)
 - `tensor_cache` (per-channel g_S table)
 
 The energy evaluation at end of step is correct (uses

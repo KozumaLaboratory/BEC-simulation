@@ -351,7 +351,7 @@ using SpinorBEC
           - dynamics:
               duration: 0.1
               dt: 0.001
-              save_every: 50
+              save: {every: 50}
               B:
                 p: 0.0
                 q: 0.1

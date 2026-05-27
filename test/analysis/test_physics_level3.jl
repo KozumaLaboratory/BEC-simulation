@@ -163,7 +163,7 @@ using LinearAlgebra
         grid = make_grid(gc)
 
         ip_na = compute_interaction_params(Na23; N_atoms=1000, dims=1, length_scale=1.0)
-        ip_flip = InteractionParams(Dict(0 => ip_na.c0, 1 => -abs(ip_na.c1)))
+        ip_flip = InteractionParams(Dict(0 => ip_na[0], 1 => -abs(ip_na[1])))
 
         result = find_ground_state(;
             grid, atom=Na23,

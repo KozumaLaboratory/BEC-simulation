@@ -1,9 +1,5 @@
-# InteractionParams Dict-keyed API — pure-Dict storage (2026-05-25 refactor).
-#
-# Old positional Vector form `InteractionParams(c0, c1, c_extra::Vector)`
-# REMOVED. All c_n now live in `ip.c::Dict{Int, Float64}`. Access via
-# `ip[n]` or `get_cn(ip, n)`. No more `ip.c0` / `ip.c1` field-access
-# asymmetry — the user's "c0 c1 だけ分かれてるのきもちあ" critique.
+# InteractionParams Dict-keyed API — all c_n live in `ip.c::Dict{Int, Float64}`.
+# Access via `ip[n]` or `get_cn(ip, n)`.
 
 using Test
 using SpinorBEC

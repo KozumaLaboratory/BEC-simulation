@@ -30,7 +30,7 @@ function compute_interaction_params(
     # Why: F=1 c_0/c_1 (Ohmi-Machida / Ho 1998) is a closed-form 2-channel
     #   reduction from a_0, a_2 — entire physics fits two scalars. For F≥2
     #   channel couplings g_S live in TensorInteractionCache; this function
-    #   returns InteractionParams(0,0) and the tensor step takes over.
+    #   returns an empty `InteractionParams` and the tensor step takes over.
     # See: src/hamiltonian/interactions/tensor_interaction.jl, KU 2012 §3.2
     if atom.F == 1
         a0, a2, m = atom.a0, atom.a2, atom.mass
@@ -158,8 +158,9 @@ This is the physical relation, NOT the 6j tensor transform. It gives:
 
 For F≥2, two parameters (c₀, c₁) constrain F+1 independent channels g_S to a
 one-parameter family. This is appropriate when higher scattering lengths are
-unknown (e.g. Eu151). To specify independent g_S, provide higher-rank couplings
-via `c_extra` or use `_make_tensor_cache_from_channels` directly.
+unknown (e.g. Eu151). To specify independent g_S, provide higher-rank c_n
+couplings (n ≥ 4) via the InteractionParams Dict, or use
+`_make_tensor_cache_from_channels` directly.
 """
 function _c0c1_to_gS(F::Int, c0::Float64, c1::Float64)
     Dict{Int, Float64}(S => c0 + c1 * (S * (S + 1) - 2 * F * (F + 1)) / 2 for S in 0:2:2F)
@@ -248,16 +249,16 @@ by ratio r = c₁/c₀:
   c₀ = c_total / (1 + F²r)
   c₁ = r × c₀
 
-The optional `c_extra` vector provides higher-rank tensor couplings where
-`c_extra[n-1]` = cₙ (same indexing as `InteractionParams`). When any even-rank
-entry with k ≥ 4 is nonzero, `make_workspace` activates the tensor interaction
-path and zeros c₀/c₁.
+The optional `c_extra::Dict{Int, Float64}` provides higher-rank tensor
+couplings keyed by rank (`c_extra[4] = c₄`, `c_extra[6] = c₆`, …). When
+any even-rank entry with k ≥ 4 is nonzero, `make_workspace` activates the
+tensor interaction path and zeros c₀/c₁.
 
 Example with c₄ = 50:
 
     ip = interaction_params_from_constraint(;
         c_total=4689.0, c1_ratio=1/36, F=6,
-        c_extra=[0.0, 0.0, 50.0])  # c_extra[3] = c₄
+        c_extra=Dict(4 => 50.0))
 
 Note: r = -1/F² is singular (c₀ → ∞). For F=6, avoid r ≤ -1/36.
 """

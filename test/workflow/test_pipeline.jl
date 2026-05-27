@@ -95,7 +95,7 @@ using Dates: Date
           - dynamics:
               duration: 0.02
               dt: 0.001
-              save_every: 10
+              save: {every: 10}
               B: {p: 0.0, q: 0.1}
         """
         config = load_config_from_string(yaml_str)
@@ -145,7 +145,7 @@ using Dates: Date
               dt: 0.01
               n_steps: 50
               tol: 1e-4
-              initial_state: ferromagnetic
+              initial_state: m_plus_F
               B: {p: 0.0, q: 0.1}
               potential: {type: harmonic, omega: [1.0, 1.0]}
           - analyze:
@@ -205,7 +205,7 @@ using Dates: Date
               dt: 0.01
               n_steps: 40
               tol: 1e-4
-              initial_state: ferromagnetic
+              initial_state: m_plus_F
               B: {p: 0.0, q: 0.1}
               potential: {type: harmonic, omega: [1.0, 1.0]}
           - analyze:
@@ -234,7 +234,7 @@ using Dates: Date
               dt: 0.01
               n_steps: 30
               tol: 1e-4
-              initial_state: ferromagnetic
+              initial_state: m_plus_F
               B: {p: 0.0, q: 0.1}
               potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
           - analyze:
@@ -292,7 +292,7 @@ using Dates: Date
               dt: 0.01
               n_steps: 60
               tol: 1.0e-4
-              initial_state: ferromagnetic
+              initial_state: m_plus_F
               B: {p: 0.0, q: 0.1}
               potential: {type: harmonic, omega: [1.0, 1.0]}
           - analyze:
@@ -341,11 +341,11 @@ using Dates: Date
               dt: 0.01
               n_steps: 30
               tol: 1.0e-4
-              initial_state: ferromagnetic
+              initial_state: m_plus_F
           - dynamics:
               duration: 0.2
               dt: 0.005
-              save_every: 10
+              save: {every: 10}
               sgpe: {gamma: 0.05, T: 0.05, mu: 0.0, every: 1, seed: 11}
         """
         result = run_config(load_config_from_string(yaml_str); verbose=false)
@@ -367,11 +367,11 @@ using Dates: Date
               dt: 0.01
               n_steps: 30
               tol: 1.0e-4
-              initial_state: ferromagnetic
+              initial_state: m_plus_F
           - dynamics:
               duration: 0.2
               dt: 0.005
-              save_every: 100
+              save: {every: 100}
               projected_gp: {k_cut: 4.0, every: 1}
         """
         # Should run without error; high-k modes get truncated each step
@@ -396,15 +396,15 @@ pipeline:
       dt: 0.01
       n_steps: 20
       tol: 1.0e-3
-      initial_state: ferromagnetic
+      initial_state: m_plus_F
   - dynamics:
       duration: 0.1
       dt: 0.01
-      save: {every: 5, psi_snapshots: true}
+      save: {every: 5, psi: true}
   - dynamics:
       duration: 0.1
       dt: 0.01
-      save: {every: 5, psi_snapshots: true}
+      save: {every: 5, psi: true}
   - analyze:
       - column_density_movie:
           axis: 3
@@ -632,15 +632,19 @@ pipeline:
       dt: 0.01
       n_steps: 5
       tol: 1.0e-3
-      initial_state: ferromagnetic
+      initial_state: m_plus_F
 """,
             )
-            # dry_run returns the expanded YAML string — must NOT touch GPU
-            logbuf = IOBuffer()
-            out = redirect_stdout(logbuf) do
-                run_yaml(cfg_path; base_dir=tmp, verbose=true, dry_run=true)
+            # dry_run returns the expanded YAML string — must NOT touch GPU.
+            # Julia 1.12 dropped IOBuffer in redirect_stdout; route through a
+            # temp file instead.
+            logfile = joinpath(tmp, "stdout.log")
+            out = open(logfile, "w") do io
+                redirect_stdout(io) do
+                    run_yaml(cfg_path; base_dir=tmp, verbose=true, dry_run=true)
+                end
             end
-            log = String(take!(logbuf))
+            log = read(logfile, String)
             @test occursin("# [run_yaml] loading config:", log)
             @test occursin("# [run_yaml] normalizing B blocks", log)
             @test occursin("# [run_yaml] dry-run complete", log)
@@ -720,11 +724,11 @@ pipeline:
       dt: 0.01
       n_steps: 30
       tol: 1.0e-4
-      initial_state: ferromagnetic
+      initial_state: m_plus_F
   - dynamics:
       duration: 0.2
       dt: 0.01
-      save: {every: 5, psi_snapshots: true, snapshot_precision: "f32"}
+      save: {every: 5, psi: true, precision: "f32"}
   - analyze:
       - column_density_movie:
           axis: 3
@@ -755,7 +759,7 @@ pipeline:
       dt: 0.01
       n_steps: 30
       tol: 1e-4
-      initial_state: ferromagnetic
+      initial_state: m_plus_F
       B: {p: 0.0, q: 0.1}
       potential: {type: harmonic, omega: [1.0]}
   - analyze:
@@ -784,7 +788,7 @@ pipeline:
                   dt: 0.01
                   n_steps: 50
                   tol: 1e-4
-                  initial_state: ferromagnetic
+                  initial_state: m_plus_F
                   B: {p: 0.0, q: 0.1}
                   potential: {type: harmonic, omega: [1.0, 1.0]}
                   cache: $cache_file

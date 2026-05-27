@@ -217,9 +217,8 @@
         @test p["interactions"]["c4"] == 50.0
         @test p["interactions"]["c6"] == -20.0
 
-        # Regression test: c_extra MUST reach InteractionParams via the
-        # actual parsing pipeline. Pre-Apr 2026 _parse_gs_interactions
-        # hardcoded c_extra=Float64[] and silently dropped these keys.
+        # Regression test: higher-rank c_n keys reach InteractionParams via
+        # the actual parsing pipeline (not silently dropped).
         ip = SpinorBEC._parse_gs_interactions(p["interactions"], Eu151)
         @test ip[4] == 50.0       # c4
         @test ip[6] == -20.0      # c6

@@ -143,8 +143,8 @@ TDHFB callers don't reach into the underscored helper.
 For F ≥ 2 the two parameters (c_0, c_1) constrain F+1 independent channels
 to a one-parameter family — appropriate when higher scattering lengths
 are unknown (e.g. Eu151 a_S for S ≥ 4). To inject independent g_S, layer
-in `c_extra` via [`ku_to_g_S`](@ref) or build the tensor cache directly
-with `_make_tensor_cache_from_channels`.
+in higher-rank c_n (n ≥ 4) via [`ku_to_g_S`](@ref) or build the tensor
+cache directly with `_make_tensor_cache_from_channels`.
 
 # Round-trip with `_gS_to_cn`
 `_gS_to_cn(F, ku_c01_to_g_S(F, c_0, c_1))` returns the rank-k tensor
@@ -158,26 +158,21 @@ function ku_c01_to_g_S(F::Int, c0::Float64, c1::Float64)
 end
 
 """
-    ku_to_g_S(F, c0, c1, c_extra) → Dict{Int, Float64}
+    ku_to_g_S(F, c0, c1, c_higher) → Dict{Int, Float64}
 
 Full Kawaguchi-Ueda forward map for arbitrary F. Returns channel-decomposed
-`g_S` (for S ∈ 0:2:2F) given the scalar/spin-spin couplings (c_0, c_1)
-plus the even-rank tensor couplings in `c_extra` (index k ↔ c_{k+1}, so
-`c_extra[1] = c₂`, `c_extra[3] = c₄`, …).
+`g_S` (for S ∈ 0:2:2F) given the scalar/spin-spin couplings (c_0, c_1) plus
+even-rank tensor couplings `c_higher::Dict{Int, Float64}` (keys are the rank
+k ≥ 2, values are the c_k coupling).
 
 The combined formula is
 
     g_S = (c_0 + c_1 · ⟨F̂_1·F̂_2⟩_S)  +  Σ_{k even, k≥2} (2k+1) {F F k; F F S} c_k
 
-For Eu151 (F=6) with seven independent channels (S=0,2,…,12), pass
-`c_extra = even_c_extra(6; c2=…, c4=…, c6=…, c8=…, c10=…, c12=…)` to
-specify all seven g_S at once.
-
 Validated against `_gS_to_cn` for round-trip identity at F=1/2/3/6 in
 `test/hamiltonian/test_tdhfb_ku_c01_to_g_S.jl`.
 """
-function ku_to_g_S(F::Int, c0::Float64, c1::Float64, c_extra::Dict{Int, Float64})
-    # Build the c_n Dict and route through the unified c_to_g.
-    c = merge(Dict(0 => c0, 1 => c1), c_extra)
+function ku_to_g_S(F::Int, c0::Float64, c1::Float64, c_higher::Dict{Int, Float64})
+    c = merge(Dict(0 => c0, 1 => c1), c_higher)
     c_to_g(F, InteractionParams(c))
 end

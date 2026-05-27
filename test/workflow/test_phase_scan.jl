@@ -122,12 +122,12 @@ using FFTW
                 pipeline.0.initial_state: polar
             - name: ferro
               override:
-                pipeline.0.initial_state: ferromagnetic
+                pipeline.0.initial_state: m_plus_F
         """
         config = load_config_from_string(yaml)
         @test length(config.scan.comparison_runs) == 2
         @test config.scan.comparison_runs[1][1] == "polar"
-        @test config.scan.comparison_runs[2][2]["pipeline.0.initial_state"] == "ferromagnetic"
+        @test config.scan.comparison_runs[2][2]["pipeline.0.initial_state"] == "m_plus_F"
     end
 
     @testset "YAML parsing - constrained Jz scan" begin

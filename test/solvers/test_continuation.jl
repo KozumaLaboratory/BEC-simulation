@@ -99,7 +99,7 @@
     end
 
     @testset "Error when make_params not provided" begin
-        @test_throws ArgumentError scan_continuation(;
+        @test_throws UndefKeywordError scan_continuation(;
             param_values=[1.0],
             grid, atom,
         )

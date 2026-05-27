@@ -14,7 +14,7 @@ using SpinorBEC
     spinor = ComplexF64[c == 1 ? 1.0 : 0.0 for c in 1:D]
     interactions = InteractionParams(Dict(0 => 50.0, 1 => 0.0))   # c0=50, c1=0
     table = compute_spinor_lhy_polar_two_channel(;
-        F=F, c0=interactions.c0, c1=interactions.c1,
+        F=F, c0=interactions[0], c1=interactions[1],
         c_dd=0.0, n_max=1.0, n_points=64,
     )
     @test table isa PolarTwoChannelLHY
