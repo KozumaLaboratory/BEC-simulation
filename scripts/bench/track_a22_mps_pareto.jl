@@ -97,7 +97,9 @@ function _seed_psi!(ws)
     D = size(psi, 4)
     grid = ws.grid
     @inbounds for I in CartesianIndices((N, N, N))
-        x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+        x = grid.x[1][I[1]];
+        y = grid.x[2][I[2]];
+        z = grid.x[3][I[3]]
         g = exp(-(x*x + y*y + z*z) / 2)
         for c in 1:D
             psi[I, c] = g * cis(0.1 * c)
@@ -146,7 +148,8 @@ end
 function y4_mid_step!(ws::SpinorBEC.Workspace{NN}) where {NN}
     dt = ws.sim_params.dt
     t_base = ws.state.t
-    w1 = _Y4_W1; w0 = _Y4_W0
+    w1 = _Y4_W1;
+    w0 = _Y4_W0
     inline_strang_mid!(ws, w1 * dt, t_base)
     inline_strang_mid!(ws, w0 * dt, t_base + w1 * dt)
     inline_strang_mid!(ws, w1 * dt, t_base + (w1 + w0) * dt)
@@ -189,7 +192,7 @@ end
 # Uses ws.state.psi for each branch's working buffer, restoring from psi_save
 # at the start of each branch.
 function mps_step!(ws::SpinorBEC.Workspace{NN}, dt::Float64, coefs,
-                   psi_save, psi_branch, psi_accum) where {NN}
+    psi_save, psi_branch, psi_accum) where {NN}
     t_base = ws.state.t
     psi_save .= ws.state.psi
     psi_accum .= 0
@@ -243,11 +246,11 @@ end
 # Cost per outer step in "inner midpoint Strang" units
 const COST = Dict(
     :strang_mid => 1,
-    :y4_mid     => 3,
-    :y6_mid     => 7,
-    :mps4       => 3,
-    :mps6       => 6,
-    :mps8       => 10,
+    :y4_mid => 3,
+    :y6_mid => 7,
+    :mps4 => 3,
+    :mps6 => 6,
+    :mps8 => 10,
 )
 
 # ----- Order test -----
@@ -304,9 +307,9 @@ for l in labels
 end
 @printf("\n")
 for idx in 2:length(dts)
-    @printf("%-18s", @sprintf("%.1e/%.1e", dts[idx-1], dts[idx]))
+    @printf("%-18s", @sprintf("%.1e/%.1e", dts[idx - 1], dts[idx]))
     for s in schemes
-        e_prev = errs[s][idx-1]
+        e_prev = errs[s][idx - 1]
         e_curr = errs[s][idx]
         ord = (e_curr > 0 && e_prev > 0) ? log2(e_prev / e_curr) : NaN
         @printf("%-14s", isnan(ord) ? "—" : @sprintf("%.2f", ord))
@@ -338,12 +341,21 @@ end
 floor_warning = false
 for s in schemes
     label = labels[findfirst(==(s), schemes)]
-    exp_str = s === :strang_mid ? "2" :
-              s === :y4_mid     ? "4" :
-              s === :y6_mid     ? "6" :
-              s === :mps4       ? "4" :
-              s === :mps6       ? "6" :
-              s === :mps8       ? "8" : "?"
+    exp_str = if s === :strang_mid
+        "2"
+    elseif s === :y4_mid
+        "4"
+    elseif s === :y6_mid
+        "6"
+    elseif s === :mps4
+        "4"
+    elseif s === :mps6
+        "6"
+    elseif s === :mps8
+        "8"
+    else
+        "?"
+    end
     floor_marker = errs[s][1] < 1e-9 ? " [FLOOR-LIMITED]" : ""
     if errs[s][1] < 1e-9
         floor_warning = true

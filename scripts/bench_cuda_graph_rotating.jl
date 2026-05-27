@@ -36,12 +36,12 @@ V_trap = zeros(Float64, 24, 24, 12)
 end
 
 ws = SpinorBEC.make_rotating_basis_ws(grid, F, V_trap;
-    p = 26700.0, q = 0.0, c0 = 3792.0, c1 = 0.0,
-    c_dd = 170.7, gamma_lhy = 0.0,
-    theta_func = t -> 0.611, phi_func = t -> 4.524 * t,
-    theta_dot_func = t -> 0.0, phi_dot_func = t -> 4.524,
-    gauge_fix = false,
-    backend = SpinorBEC.CUDABackend())
+    p=26700.0, q=0.0, c0=3792.0, c1=0.0,
+    c_dd=170.7, gamma_lhy=0.0,
+    theta_func=t -> 0.611, phi_func=t -> 4.524 * t,
+    theta_dot_func=t -> 0.0, phi_dot_func=t -> 4.524,
+    gauge_fix=false,
+    backend=SpinorBEC.CUDABackend())
 
 # Initialise GS
 psi_init = zeros(ComplexF64, 24, 24, 12, D)

@@ -159,6 +159,7 @@ fd_kappa = fd_wirtinger(p -> E_phi_phi_kappa(p, kappa_value, V_chan, D), copy(ph
 @printf("\nφφκ* piece — δE/δφ* = %s\n", fd_kappa[1])
 for V_conv in (:orig, :slot_1_2, :slot_2_3, :slot_1_2_and_2_3),
     kappa_swap in (false, true)
+
     eom = eom_kappa_form(phi_value, kappa_value, V_chan, D;
         V_conv=V_conv, kappa_swap=kappa_swap)
     rel = norm(eom - fd_kappa) / max(norm(fd_kappa), 1e-20)

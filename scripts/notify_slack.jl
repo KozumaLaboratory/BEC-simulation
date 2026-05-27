@@ -13,13 +13,13 @@ function main()
     url = get(ENV, "SLACK_WEBHOOK_URL", "")
     if isempty(url)
         @info "SLACK_WEBHOOK_URL unset, skipping notification"
-        return
+        return nothing
     end
     msg = isempty(ARGS) ? "(no message)" : join(ARGS, " ")
     payload = JSON.json(Dict("text" => msg))
     try
         r = HTTP.post(url, ["Content-Type" => "application/json"], payload;
-                      readtimeout = 10)
+            readtimeout=10)
         @info "Slack notify OK" status = r.status
     catch e
         @warn "Slack notify failed" error = e

@@ -40,7 +40,9 @@ function _seed_psi!(ws, grid)
     psi = ws.state.psi
     D = size(psi, 4)
     @inbounds for I in CartesianIndices((N, N, N))
-        x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+        x = grid.x[1][I[1]];
+        y = grid.x[2][I[2]];
+        z = grid.x[3][I[3]]
         g = exp(-(x * x + y * y + z * z) / 2)
         for c in 1:D
             psi[I, c] = g * cis(0.1 * c)
@@ -117,30 +119,44 @@ function _y4_step!(ws::SpinorBEC.Workspace{N}, V_half!::Function) where {N}
     omega = ws.sim_params.rotating_frame_omega
     t_base = ws.state.t
 
-    w1 = _Y4_W1; w0 = _Y4_W0; wm = _Y4_WM
+    w1 = _Y4_W1;
+    w0 = _Y4_W0;
+    wm = _Y4_WM
 
     V_half!(ws, w1 * dt / 2, n_comp, N, false;
         t_eval=t_base + w1 * dt / 4, t_start=t_base)
-    SpinorBEC._apply_coriolis_step!(ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache)
+    SpinorBEC._apply_coriolis_step!(
+        ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache
+    )
     SpinorBEC._update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, w1 * dt)
     SpinorBEC.apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
-    SpinorBEC._apply_coriolis_step!(ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache)
+    SpinorBEC._apply_coriolis_step!(
+        ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache
+    )
 
     t_v2 = t_base + w1 * dt / 2
     V_half!(ws, wm * dt, n_comp, N, false;
         t_eval=t_v2 + wm * dt / 2, t_start=t_v2)
-    SpinorBEC._apply_coriolis_step!(ws.state.psi, ws.grid, omega, w0 * dt / 2, false, ws.coriolis_cache)
+    SpinorBEC._apply_coriolis_step!(
+        ws.state.psi, ws.grid, omega, w0 * dt / 2, false, ws.coriolis_cache
+    )
     SpinorBEC._update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, w0 * dt)
     SpinorBEC.apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
-    SpinorBEC._apply_coriolis_step!(ws.state.psi, ws.grid, omega, w0 * dt / 2, false, ws.coriolis_cache)
+    SpinorBEC._apply_coriolis_step!(
+        ws.state.psi, ws.grid, omega, w0 * dt / 2, false, ws.coriolis_cache
+    )
 
     t_v3 = t_base + w1 * dt / 2 + wm * dt
     V_half!(ws, wm * dt, n_comp, N, false;
         t_eval=t_v3 + wm * dt / 2, t_start=t_v3)
-    SpinorBEC._apply_coriolis_step!(ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache)
+    SpinorBEC._apply_coriolis_step!(
+        ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache
+    )
     SpinorBEC._update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, w1 * dt)
     SpinorBEC.apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
-    SpinorBEC._apply_coriolis_step!(ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache)
+    SpinorBEC._apply_coriolis_step!(
+        ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache
+    )
 
     V_half!(ws, w1 * dt / 2, n_comp, N, false;
         t_eval=t_base + dt - w1 * dt / 4, t_start=t_base + dt - w1 * dt / 2)
@@ -150,17 +166,29 @@ function _y4_step!(ws::SpinorBEC.Workspace{N}, V_half!::Function) where {N}
     nothing
 end
 
-evolve_y4_plain!(ws, n_steps) = for _ in 1:n_steps; _y4_step!(ws, SpinorBEC._half_potential_step!); end
-evolve_y4_mid!(ws, n_steps)   = for _ in 1:n_steps; _y4_step!(ws, SpinorBEC._half_potential_step_midpoint!); end
+evolve_y4_plain!(ws, n_steps) =
+    for _ in 1:n_steps
+        ;
+        _y4_step!(ws, SpinorBEC._half_potential_step!);
+    end
+evolve_y4_mid!(ws, n_steps) =
+    for _ in 1:n_steps
+        ;
+        _y4_step!(ws, SpinorBEC._half_potential_step_midpoint!);
+    end
 # Trap Picard converges slower than midpoint (constant ~50000x larger at p=2)
 # because the iteration map uses the FULL V-step duration vs midpoint's half.
 # For Y4-trap to reach order 4, Picard residual per V-step must be ≤ O(τ⁵)
 # which requires n_picard ≥ 4. With n_picard=2 (default), Y4-trap collapses to
 # order 2 due to accumulated Picard residual dominating the integration error.
-const _trap_p4 = function(w, dt, n, nd, it; kwargs...)
+const _trap_p4 = function (w, dt, n, nd, it; kwargs...)
     SpinorBEC._half_potential_step_trap!(w, dt, n, nd, it; kwargs..., n_picard=4)
 end
-evolve_y4_trap!(ws, n_steps)  = for _ in 1:n_steps; _y4_step!(ws, _trap_p4); end
+evolve_y4_trap!(ws, n_steps) =
+    for _ in 1:n_steps
+        ;
+        _y4_step!(ws, _trap_p4);
+    end
 
 # Yoshida-6 (Yoshida 1990 solution A, 7 K stages + 8 V stages) over an arbitrary V step.
 const _Y6_W1 = -1.17767998417887
@@ -169,15 +197,16 @@ const _Y6_W3 = 0.784513610477560
 const _Y6_W0 = 1.0 - 2.0 * (_Y6_W1 + _Y6_W2 + _Y6_W3)
 const _Y6_BS = (_Y6_W3, _Y6_W2, _Y6_W1, _Y6_W0, _Y6_W1, _Y6_W2, _Y6_W3)
 const _Y6_AS = (_Y6_W3 / 2, (_Y6_W2 + _Y6_W3) / 2, (_Y6_W1 + _Y6_W2) / 2,
-                (_Y6_W0 + _Y6_W1) / 2, (_Y6_W1 + _Y6_W0) / 2, (_Y6_W2 + _Y6_W1) / 2,
-                (_Y6_W3 + _Y6_W2) / 2, _Y6_W3 / 2)
+    (_Y6_W0 + _Y6_W1) / 2, (_Y6_W1 + _Y6_W0) / 2, (_Y6_W2 + _Y6_W1) / 2,
+    (_Y6_W3 + _Y6_W2) / 2, _Y6_W3 / 2)
 
 function _y6_step!(ws::SpinorBEC.Workspace{N}, V_half!::Function) where {N}
     dt = ws.sim_params.dt
     n_comp = ws.spin_matrices.system.n_components
     omega = ws.sim_params.rotating_frame_omega
     t_base = ws.state.t
-    a = _Y6_AS; b = _Y6_BS
+    a = _Y6_AS;
+    b = _Y6_BS
 
     t_cur = 0.0
     V_half!(ws, a[1] * dt, n_comp, N, false;
@@ -185,10 +214,14 @@ function _y6_step!(ws::SpinorBEC.Workspace{N}, V_half!::Function) where {N}
     t_cur += a[1] * dt
 
     @inbounds for i in 1:length(b)
-        SpinorBEC._apply_coriolis_step!(ws.state.psi, ws.grid, omega, b[i] * dt / 2, false, ws.coriolis_cache)
+        SpinorBEC._apply_coriolis_step!(
+            ws.state.psi, ws.grid, omega, b[i] * dt / 2, false, ws.coriolis_cache
+        )
         SpinorBEC._update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, b[i] * dt)
         SpinorBEC.apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
-        SpinorBEC._apply_coriolis_step!(ws.state.psi, ws.grid, omega, b[i] * dt / 2, false, ws.coriolis_cache)
+        SpinorBEC._apply_coriolis_step!(
+            ws.state.psi, ws.grid, omega, b[i] * dt / 2, false, ws.coriolis_cache
+        )
 
         V_half!(ws, a[i + 1] * dt, n_comp, N, false;
             t_eval=t_base + t_cur + a[i + 1] * dt / 2, t_start=t_base + t_cur)
@@ -199,8 +232,16 @@ function _y6_step!(ws::SpinorBEC.Workspace{N}, V_half!::Function) where {N}
     nothing
 end
 
-evolve_y6_plain!(ws, n_steps) = for _ in 1:n_steps; _y6_step!(ws, SpinorBEC._half_potential_step!); end
-evolve_y6_mid!(ws, n_steps)   = for _ in 1:n_steps; _y6_step!(ws, SpinorBEC._half_potential_step_midpoint!); end
+evolve_y6_plain!(ws, n_steps) =
+    for _ in 1:n_steps
+        ;
+        _y6_step!(ws, SpinorBEC._half_potential_step!);
+    end
+evolve_y6_mid!(ws, n_steps) =
+    for _ in 1:n_steps
+        ;
+        _y6_step!(ws, SpinorBEC._half_potential_step_midpoint!);
+    end
 
 # --- Reference (fine sequential split_step!) ---
 
@@ -227,25 +268,43 @@ dts = (4e-3, 2e-3, 1e-3)
 function run_scheme(label::String, dt::Float64)
     n_steps = Int(round(T_FINAL / dt))
     if label == "Strang"
-        ws = _build_ws(dt); evolve_strang!(ws, n_steps); return ws.state.psi
+        ws = _build_ws(dt);
+        evolve_strang!(ws, n_steps);
+        return ws.state.psi
     elseif label == "Strang-mid"
-        ws = _build_ws(dt); evolve_strang_mid!(ws, n_steps); return ws.state.psi
+        ws = _build_ws(dt);
+        evolve_strang_mid!(ws, n_steps);
+        return ws.state.psi
     elseif label == "Yoshida4 (plain)"
-        ws = _build_ws(dt); evolve_y4_plain!(ws, n_steps); return ws.state.psi
+        ws = _build_ws(dt);
+        evolve_y4_plain!(ws, n_steps);
+        return ws.state.psi
     elseif label == "Yoshida4 (midpoint)"
-        ws = _build_ws(dt); evolve_y4_mid!(ws, n_steps); return ws.state.psi
+        ws = _build_ws(dt);
+        evolve_y4_mid!(ws, n_steps);
+        return ws.state.psi
     elseif label == "Yoshida4 (trap)"
-        ws = _build_ws(dt); evolve_y4_trap!(ws, n_steps); return ws.state.psi
+        ws = _build_ws(dt);
+        evolve_y4_trap!(ws, n_steps);
+        return ws.state.psi
     elseif label == "Yoshida6 (plain)"
-        ws = _build_ws(dt); evolve_y6_plain!(ws, n_steps); return ws.state.psi
+        ws = _build_ws(dt);
+        evolve_y6_plain!(ws, n_steps);
+        return ws.state.psi
     elseif label == "Yoshida6 (midpoint)"
-        ws = _build_ws(dt); evolve_y6_mid!(ws, n_steps); return ws.state.psi
+        ws = _build_ws(dt);
+        evolve_y6_mid!(ws, n_steps);
+        return ws.state.psi
     elseif label == "MPS-4 (plain)"
-        ws_h = _build_ws(dt); ws_half = _build_ws(dt / 2)
-        evolve_mps4_plain(ws_h, ws_half, n_steps); return ws_h.state.psi
+        ws_h = _build_ws(dt);
+        ws_half = _build_ws(dt / 2)
+        evolve_mps4_plain(ws_h, ws_half, n_steps);
+        return ws_h.state.psi
     elseif label == "MPS-4 (midpoint)"
-        ws_h = _build_ws(dt); ws_half = _build_ws(dt / 2)
-        evolve_mps4_mid(ws_h, ws_half, n_steps); return ws_h.state.psi
+        ws_h = _build_ws(dt);
+        ws_half = _build_ws(dt / 2)
+        evolve_mps4_mid(ws_h, ws_half, n_steps);
+        return ws_h.state.psi
     else
         error("unknown scheme $label")
     end
@@ -254,9 +313,9 @@ end
 results = Dict{String, Tuple{Float64, Float64, Float64}}()
 
 for label in ["Strang", "Strang-mid",
-              "Yoshida4 (plain)", "Yoshida4 (midpoint)", "Yoshida4 (trap)",
-              "Yoshida6 (plain)", "Yoshida6 (midpoint)",
-              "MPS-4 (plain)", "MPS-4 (midpoint)"]
+    "Yoshida4 (plain)", "Yoshida4 (midpoint)", "Yoshida4 (trap)",
+    "Yoshida6 (plain)", "Yoshida6 (midpoint)",
+    "MPS-4 (plain)", "MPS-4 (midpoint)"]
     errs = Float64[]
     drift_h2 = NaN
     for (idx, h) in enumerate(dts)

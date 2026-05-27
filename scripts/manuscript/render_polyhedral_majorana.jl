@@ -39,20 +39,22 @@ function canonical_states()
     states = Tuple{Int, String, String, Vector{ComplexF64}}[]
 
     # §V.A  F=2  T_d cyclic: ζ = (1, 0, i√2, 0, 1) / 2
-    let z = ComplexF64[1.0, 0.0, im*sqrt(2.0), 0.0, 1.0] ./ 2.0
+    let z = ComplexF64[1.0, 0.0, im * sqrt(2.0), 0.0, 1.0] ./ 2.0
         push!(states, (2, "F=2 cyclic", "T_d (§V.A)", z))
     end
 
     # §V.B  F=3  O:A_2:  ζ = (|+2⟩ − |−2⟩) / √2
     let z = zeros(ComplexF64, 7)
-        z[2] =  1.0 / sqrt(2.0)   # m=+2
+        z[2] = 1.0 / sqrt(2.0)   # m=+2
         z[6] = -1.0 / sqrt(2.0)   # m=-2
         push!(states, (3, "F=3 octa", "O:A_2 (§V.B)", z))
     end
 
     # §V.C  F=4  O:A_1 cube: ζ = √(5/24)|+4⟩ + √(7/12)|0⟩ + √(5/24)|−4⟩
     let z = zeros(ComplexF64, 9)
-        z[1] = sqrt(5/24); z[5] = sqrt(7/12); z[9] = sqrt(5/24)
+        z[1] = sqrt(5/24);
+        z[5] = sqrt(7/12);
+        z[9] = sqrt(5/24)
         push!(states, (4, "F=4 cube", "O:A_1 (§V.C)", z))
     end
 
@@ -62,8 +64,8 @@ function canonical_states()
     # The Barnett-Mukerjee form (ψ_+6, ψ_+1, ψ_-4) gives the same I_h state
     # but collapses 2 roots at the north pole — avoided here.
     let z = ComplexF64[
-            0, sqrt(7.0)/5, 0, 0, 0, 0, sqrt(11.0)/5,
-            0, 0, 0, 0, -sqrt(7.0)/5, 0,
+            0, sqrt(7.0) / 5, 0, 0, 0, 0, sqrt(11.0) / 5,
+            0, 0, 0, 0, -sqrt(7.0) / 5, 0,
         ]
         push!(states, (6, "F=6 icosa", "I:A (§V.D)", z))
     end
@@ -77,9 +79,9 @@ function canonical_states()
             0, 0, 0,
             -0.3952342557 + 0.3385605063im, # m=+2
             0, 0, 0,
-             0.3952342557 - 0.3385605063im, # m=-2
+            0.3952342557 - 0.3385605063im, # m=-2
             0, 0, 0,
-             0.3635626373 - 0.3114303701im, # m=-6
+            0.3635626373 - 0.3114303701im, # m=-6
             0,
         ]
         push!(states, (7, "F=7 octa", "O:A_2 (supp)", z))
@@ -87,9 +89,9 @@ function canonical_states()
 
     # §V.E  F=8  O:A_1 cube-like octa: √390/48|±8⟩ + √42/24|±4⟩ + √33/8|0⟩
     let z = zeros(ComplexF64, 17)
-        z[1]  = sqrt(390)/48
-        z[5]  = sqrt(42)/24
-        z[9]  = sqrt(33)/8
+        z[1] = sqrt(390)/48
+        z[5] = sqrt(42)/24
+        z[9] = sqrt(33)/8
         z[13] = sqrt(42)/24
         z[17] = sqrt(390)/48
         push!(states, (8, "F=8 cube-octa", "O:A_1 (§V.E)", z))
@@ -99,11 +101,11 @@ function canonical_states()
     # Support m ∈ {±8, ±4} (octahedral A_1 trivial rep).
     let z = ComplexF64[
             0,
-             0.1779105488 + 0.3379070434im, # m=+8
+            0.1779105488 + 0.3379070434im, # m=+8
             0, 0, 0,
             -0.2772535655 - 0.526590094im,  # m=+4
             0, 0, 0, 0, 0, 0, 0,
-             0.2772535655 + 0.526590094im,  # m=-4
+            0.2772535655 + 0.526590094im,  # m=-4
             0, 0, 0,
             -0.1779105488 - 0.3379070434im, # m=-8
             0,
@@ -113,11 +115,11 @@ function canonical_states()
 
     # §V.F  F=10 I:A dodec: √561/75|±10⟩ + √209/25(|+5⟩−|−5⟩) + √741/75|0⟩
     let z = zeros(ComplexF64, 21)
-        z[1]  =  sqrt(561)/75
-        z[6]  =  sqrt(209)/25
-        z[11] =  sqrt(741)/75
+        z[1] = sqrt(561)/75
+        z[6] = sqrt(209)/25
+        z[11] = sqrt(741)/75
         z[16] = -sqrt(209)/25
-        z[21] =  sqrt(561)/75
+        z[21] = sqrt(561)/75
         push!(states, (10, "F=10 dodec", "I:A (§V.F)", z))
     end
 
@@ -131,11 +133,11 @@ function canonical_states()
             0, 0, 0,
             -0.3316081934 + 0.3337516632im, # m=+2
             0, 0, 0,
-             0.3316081934 - 0.3337516632im, # m=-2
+            0.3316081934 - 0.3337516632im, # m=-2
             0, 0, 0,
-             0.2288986869 - 0.2303782566im, # m=-6
+            0.2288986869 - 0.2303782566im, # m=-6
             0, 0, 0,
-             0.2933098261 - 0.2952057405im, # m=-10
+            0.2933098261 - 0.2952057405im, # m=-10
             0,
         ]
         push!(states, (11, "F=11 octa", "O:A_2 (supp)", z))
@@ -143,11 +145,11 @@ function canonical_states()
 
     # §V.G  F=12 I:A icosa (C_5^z-invariant), U(1)-rotated to real form
     let z = zeros(ComplexF64, 25)
-        z[3]  =  0.4871    # m=+10
-        z[8]  = -0.3024    # m=+5
-        z[13] =  0.5853    # m=0
-        z[18] =  0.3024    # m=-5
-        z[23] =  0.4871    # m=-10
+        z[3] = 0.4871    # m=+10
+        z[8] = -0.3024    # m=+5
+        z[13] = 0.5853    # m=0
+        z[18] = 0.3024    # m=-5
+        z[23] = 0.4871    # m=-10
         z ./= sqrt(sum(abs2, z))
         push!(states, (12, "F=12 I:A", "I:A (§V.G)", z))
     end
@@ -190,10 +192,10 @@ end
 
 function main()
     fig_dir = joinpath(@__DIR__, "..", "..", "docs", "manuscript", "papers",
-                       "paper3_universal_theorem", "figures")
+        "paper3_universal_theorem", "figures")
     mkpath(fig_dir)
     csv_path = joinpath(fig_dir, "fig-7_paper3_majorana.csv")
-    py_path  = joinpath(fig_dir, "fig-7_paper3_majorana.py")
+    py_path = joinpath(fig_dir, "fig-7_paper3_majorana.py")
 
     panels = compute_panels()
     emit_csv(panels, csv_path)
@@ -219,10 +221,13 @@ function main()
         end
         n_geo = length(clusters)
         n_stars = length(pts)
-        mult_note = n_stars == n_geo ? "$(n_stars) stars" :
-                    "$(n_stars) stars = $(n_geo) × mult. $(div(n_stars, n_geo))"
+        mult_note = if n_stars == n_geo
+            "$(n_stars) stars"
+        else
+            "$(n_stars) stars = $(n_geo) × mult. $(div(n_stars, n_geo))"
+        end
         @printf("  panel %d  %-14s  %-14s  %s\n",
-                panel_idx, label, ref, mult_note)
+            panel_idx, label, ref, mult_note)
     end
 end
 

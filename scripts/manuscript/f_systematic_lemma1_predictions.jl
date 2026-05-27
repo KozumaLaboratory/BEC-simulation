@@ -18,11 +18,11 @@ using Random
 # f9_f11_polyhedral_verification.jl
 function spin_matrices_general(F::Int)
     D = 2F + 1
-    Fz = Diagonal(ComplexF64[F - i for i in 0:D-1])
+    Fz = Diagonal(ComplexF64[F - i for i in 0:(D - 1)])
     Fp = zeros(ComplexF64, D, D)
-    for i in 1:(D-1)
+    for i in 1:(D - 1)
         m = F - i
-        Fp[i, i+1] = sqrt(F * (F + 1) - m * (m + 1))
+        Fp[i, i + 1] = sqrt(F * (F + 1) - m * (m + 1))
     end
     Fm = Fp'
     Fx = (Fp + Fm) / 2
@@ -56,9 +56,9 @@ function group_close(generators::Vector{<:AbstractMatrix}, tol::Float64=1e-6, ma
 end
 
 tetrahedral_gen(F) = [wigner_D(F, [1.0, 1.0, 1.0] / sqrt(3), Float64(2π/3)),
-                     wigner_D(F, [0.0, 0.0, 1.0], Float64(π))]
+    wigner_D(F, [0.0, 0.0, 1.0], Float64(π))]
 octahedral_gen(F) = [wigner_D(F, [0.0, 0.0, 1.0], Float64(π/2)),
-                    wigner_D(F, [1.0, 1.0, 1.0] / sqrt(3), Float64(2π/3))]
+    wigner_D(F, [1.0, 1.0, 1.0] / sqrt(3), Float64(2π/3))]
 
 function compute_T_character(group_elements, irrep::Symbol)
     chars = ComplexF64[]
@@ -98,8 +98,11 @@ function compute_O_character(group_elements, irrep::Symbol)
         is_order_3 = norm(g^3 - Imat) < 1e-6
         is_order_2 = norm(g^2 - Imat) < 1e-6
         # Axial C_2 = square of some C_4 in G
-        is_axial_C2 = is_order_2 && any(norm(h * h - g) < 1e-6 for h in group_elements
-                                          if norm(h^4 - Imat) < 1e-6 && norm(h^2 - Imat) > 1e-6)
+        is_axial_C2 =
+            is_order_2 && any(
+                norm(h * h - g) < 1e-6 for h in group_elements
+                if norm(h^4 - Imat) < 1e-6 && norm(h^2 - Imat) > 1e-6
+            )
         if irrep === :A_1
             push!(chars, 1)
         elseif irrep === :A_2
@@ -117,7 +120,9 @@ function compute_O_character(group_elements, irrep::Symbol)
 end
 
 function project_onto_irrep(group_elements, chars::Vector{ComplexF64})
-    P = sum(conj(chars[i]) * group_elements[i] for i in 1:length(group_elements)) / length(group_elements)
+    P =
+        sum(conj(chars[i]) * group_elements[i] for i in 1:length(group_elements)) /
+        length(group_elements)
     return P
 end
 
@@ -135,9 +140,9 @@ end
 
 function project_S_channel(ζ::Vector, F::Int, S::Int)
     total = 0.0
-    for M in -S:S
+    for M in (-S):S
         amp = 0.0im
-        for m1 in -F:F
+        for m1 in (-F):F
             m2 = M - m1
             if -F <= m2 <= F
                 cg = clebsch_gordan(F, m1, F, m2, S, M)
@@ -176,7 +181,7 @@ function verify_case_with_lemma1(F::Int, group::Symbol, irrep::Symbol)
 
     if ζ === nothing
         @printf("[NO INVARIANT VECTOR FOUND]\n")
-        return
+        return nothing
     end
 
     # Check Schur isotropy

@@ -80,7 +80,13 @@ function gradient_spectral(m::Array{Float64, 4}, k_vecs::NTuple{3, Vector{Float6
             k = k_vecs[ax]
             # ∂/∂x_ax in k-space: multiply by i k_ax
             @inbounds for I in CartesianIndices(n_pts)
-                kc = (ax == 1) ? k[I[1]] : (ax == 2) ? k[I[2]] : k[I[3]]
+                kc = if (ax == 1)
+                    k[I[1]]
+                elseif (ax == 2)
+                    k[I[2]]
+                else
+                    k[I[3]]
+                end
                 buf[I] = im * kc * m_k[I]
             end
             plan_inv * buf  # in-place inverse FFT

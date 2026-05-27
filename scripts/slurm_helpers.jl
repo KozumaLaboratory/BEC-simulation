@@ -25,8 +25,11 @@ function _suggest_sbatch(yaml_path::String)
 
     # Heuristic: 64³ Eu151 ITP + dynamics ≈ 5 min/pt on H100.
     # Refine later by reading grid + n_steps.
-    grid_node = haskey(data, "pipeline") && !isempty(data["pipeline"]) ?
-                first(values(data["pipeline"][1])) : Dict()
+    grid_node = if haskey(data, "pipeline") && !isempty(data["pipeline"])
+        first(values(data["pipeline"][1]))
+    else
+        Dict()
+    end
     n_pts_grid = haskey(grid_node, "grid") ?
                  prod(Int.(grid_node["grid"]["n"])) : 64^3
     minutes_per_pt = max(1, round(Int, 5 * (n_pts_grid / 64^3)))
@@ -66,7 +69,8 @@ function main()
     elseif cmd == "sbatch-suggest"
         _suggest_sbatch(path)
     else
-        println("unknown command: $cmd"); exit(1)
+        println("unknown command: $cmd");
+        exit(1)
     end
 end
 

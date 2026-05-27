@@ -67,7 +67,13 @@ function gradient_spectral(m, k_vecs)
         for ax in 1:3
             k = k_vecs[ax]
             @inbounds for I in CartesianIndices(n_pts)
-                kc = (ax == 1) ? k[I[1]] : (ax == 2) ? k[I[2]] : k[I[3]]
+                kc = if (ax == 1)
+                    k[I[1]]
+                elseif (ax == 2)
+                    k[I[2]]
+                else
+                    k[I[3]]
+                end
                 buf[I] = im * kc * m_k[I]
             end
             plan_inv * buf
@@ -117,7 +123,13 @@ function gradient_psi_spectral(psi, k_vecs)
         for ax in 1:3
             k = k_vecs[ax]
             @inbounds for I in CartesianIndices(n_pts)
-                kc = (ax == 1) ? k[I[1]] : (ax == 2) ? k[I[2]] : k[I[3]]
+                kc = if (ax == 1)
+                    k[I[1]]
+                elseif (ax == 2)
+                    k[I[2]]
+                else
+                    k[I[3]]
+                end
                 buf[I] = im * kc * psi_k[I]
             end
             plan_inv * buf
@@ -143,7 +155,8 @@ function build_W_mult(psi, k_vecs, c1)
         lv = (lap_m[I, 1], lap_m[I, 2], lap_m[I, 3])
         cross_i = (mv[2]*lv[3]-mv[3]*lv[2], mv[3]*lv[1]-mv[1]*lv[3], mv[1]*lv[2]-mv[2]*lv[1])
         for a in 1:D, b in 1:D
-            v_i = ComplexF64(0); v_iii = ComplexF64(0)
+            v_i = ComplexF64(0);
+            v_iii = ComplexF64(0)
             for ρ in 1:3
                 v_i += cross_i[ρ] * F_MATS[ρ][a, b]
             end

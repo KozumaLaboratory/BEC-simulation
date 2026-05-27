@@ -25,106 +25,106 @@ using Printf
 const FIGURE_REGISTRY = Dict{Tuple{String, String}, NamedTuple}(
     # Paper #1
     ("paper1", "FIG-1") => (
-        title = "F=2 cyclic Majorana tetrahedron",
-        data_source = "analytical",
-        kind = :majorana_3d,
-        builder = :build_paper1_fig1,
+        title="F=2 cyclic Majorana tetrahedron",
+        data_source="analytical",
+        kind=:majorana_3d,
+        builder=:build_paper1_fig1,
     ),
     ("paper1", "FIG-2") => (
-        title = "F=2 BdG block decomposition schematic",
-        data_source = "symbolic",
-        kind = :tikz_diagram,
-        builder = :build_paper1_fig2,
+        title="F=2 BdG block decomposition schematic",
+        data_source="symbolic",
+        kind=:tikz_diagram,
+        builder=:build_paper1_fig2,
     ),
     ("paper1", "FIG-3") => (
-        title = "F=2 mode dispersion ω(k)",
-        data_source = "runs/paper1_dispersion_verify/",
-        kind = :dispersion_plot,
-        builder = :build_paper1_fig3,
+        title="F=2 mode dispersion ω(k)",
+        data_source="runs/paper1_dispersion_verify/",
+        kind=:dispersion_plot,
+        builder=:build_paper1_fig3,
     ),
 
     # Paper #2
     ("paper2", "FIG-1") => (
-        title = "F=6 icosahedron Majorana",
-        data_source = "analytical",
-        kind = :majorana_3d,
-        builder = :build_paper2_fig1,
+        title="F=6 icosahedron Majorana",
+        data_source="analytical",
+        kind=:majorana_3d,
+        builder=:build_paper2_fig1,
     ),
     ("paper2", "FIG-2") => (
-        title = "F=6 mod-5 block structure (26-dim BdG → 5 blocks)",
-        data_source = "symbolic",
-        kind = :tikz_diagram,
-        builder = :build_paper2_fig2,
+        title="F=6 mod-5 block structure (26-dim BdG → 5 blocks)",
+        data_source="symbolic",
+        kind=:tikz_diagram,
+        builder=:build_paper2_fig2,
     ),
     ("paper2", "FIG-3") => (
-        title = "¹⁵¹Eu LHY/MF ratio vs trap omega",
-        data_source = "runs/paper2_Eu_predictions/",
-        kind = :line_plot,
-        builder = :build_paper2_fig3,
+        title="¹⁵¹Eu LHY/MF ratio vs trap omega",
+        data_source="runs/paper2_Eu_predictions/",
+        kind=:line_plot,
+        builder=:build_paper2_fig3,
     ),
 
     # Paper #3
     ("paper3", "FIG-1") => (
-        title = "Schur-pipeline schematic (H ⊂ SO(3) → T₁ → isotropy → universal form)",
-        data_source = "conceptual",
-        kind = :tikz_diagram,
-        builder = :build_paper3_fig1,
+        title="Schur-pipeline schematic (H ⊂ SO(3) → T₁ → isotropy → universal form)",
+        data_source="conceptual",
+        kind=:tikz_diagram,
+        builder=:build_paper3_fig1,
     ),
     ("paper3", "FIG-2") => (
-        title = "Sign Pattern β_S^(λ_spin) vs S for 6 F-cases",
-        data_source = "scripts/manuscript/lemma1_general_S_verification.jl",
-        kind = :scatter_grid,
-        builder = :build_paper3_fig2,
+        title="Sign Pattern β_S^(λ_spin) vs S for 6 F-cases",
+        data_source="scripts/manuscript/lemma1_general_S_verification.jl",
+        kind=:scatter_grid,
+        builder=:build_paper3_fig2,
     ),
     ("paper3", "FIG-3") => (
-        title = "F-systematic 13-instance verification (β_0 = 1/(2F+1))",
-        data_source = "scripts/manuscript/f_systematic_lemma1_predictions.jl",
-        kind = :verification_table,
-        builder = :build_paper3_fig3,
+        title="F-systematic 13-instance verification (β_0 = 1/(2F+1))",
+        data_source="scripts/manuscript/f_systematic_lemma1_predictions.jl",
+        kind=:verification_table,
+        builder=:build_paper3_fig3,
     ),
     ("paper3", "FIG-4") => (
-        title = "Three-exception classification {F=1, F=2, F=5}",
-        data_source = "conceptual",
-        kind = :tikz_diagram,
-        builder = :build_paper3_fig4,
+        title="Three-exception classification {F=1, F=2, F=5}",
+        data_source="conceptual",
+        kind=:tikz_diagram,
+        builder=:build_paper3_fig4,
     ),
     ("paper3", "FIG-6") => (
-        title = "Polyhedral inert state Majorana configurations",
-        data_source = "rendered 2026-05-11 (existing)",
-        kind = :majorana_3d_grid,
-        builder = :build_paper3_fig6,
+        title="Polyhedral inert state Majorana configurations",
+        data_source="rendered 2026-05-11 (existing)",
+        kind=:majorana_3d_grid,
+        builder=:build_paper3_fig6,
     ),
 
     # Paper #4
     ("paper4", "FIG-1") => (
-        title = "Mean-field GP-LHY post-quench snapshot at t=5",
-        data_source = "runs/paper4_meanfield/",
-        kind = :density_2d,
-        builder = :build_paper4_fig1,
+        title="Mean-field GP-LHY post-quench snapshot at t=5",
+        data_source="runs/paper4_meanfield/",
+        kind=:density_2d,
+        builder=:build_paper4_fig1,
     ),
     ("paper4", "FIG-2") => (
-        title = "σ/μ vs N showing 1/√N breakdown",
-        data_source = "runs/sigma_mu_scan_round5/",
-        kind = :loglog_plot,
-        builder = :build_paper4_fig2,
+        title="σ/μ vs N showing 1/√N breakdown",
+        data_source="runs/sigma_mu_scan_round5/",
+        kind=:loglog_plot,
+        builder=:build_paper4_fig2,
     ),
     ("paper4", "FIG-3") => (
-        title = "Species universality: σ/μ vs ε_dd",
-        data_source = "runs/species_scan_round6/",
-        kind = :scatter_plot,
-        builder = :build_paper4_fig3,
+        title="Species universality: σ/μ vs ε_dd",
+        data_source="runs/species_scan_round6/",
+        kind=:scatter_plot,
+        builder=:build_paper4_fig3,
     ),
     ("paper4", "FIG-4") => (
-        title = "Lyapunov trajectory divergence",
-        data_source = "runs/lyapunov_diagnostic_round6/",
-        kind = :semilog_plot,
-        builder = :build_paper4_fig4,
+        title="Lyapunov trajectory divergence",
+        data_source="runs/lyapunov_diagnostic_round6/",
+        kind=:semilog_plot,
+        builder=:build_paper4_fig4,
     ),
     ("paper4", "FIG-5") => (
-        title = "50-trajectory ensemble traces at Eu",
-        data_source = "runs/ensemble_traces_round5/",
-        kind = :trace_overlay,
-        builder = :build_paper4_fig5,
+        title="50-trajectory ensemble traces at Eu",
+        data_source="runs/ensemble_traces_round5/",
+        kind=:trace_overlay,
+        builder=:build_paper4_fig5,
     ),
 )
 
@@ -141,7 +141,7 @@ function output_path(paper::String, fig::String, ext::String)
     )
     paper_dir = get(parts, paper, paper)
     return joinpath(@__DIR__, "..", "..", "docs", "manuscript", "papers",
-                    paper_dir, "figures", "$(lowercase(fig))_$(paper).$ext")
+        paper_dir, "figures", "$(lowercase(fig))_$(paper).$ext")
 end
 
 # ────────────────────────────────────────────────────────────────
@@ -172,14 +172,14 @@ function _ensure_figures_dir(paper)
     )
     paper_dir = get(parts, paper, paper)
     fig_dir = joinpath(@__DIR__, "..", "..", "docs", "manuscript", "papers",
-                       paper_dir, "figures")
+        paper_dir, "figures")
     mkpath(fig_dir)
     return fig_dir
 end
 
 # Helper: write structured CSV alongside a matplotlib renderer.
 function _emit_data_and_renderer(paper, fig, info, csv_content::String,
-                                 py_template::String)
+    py_template::String)
     dir = _ensure_figures_dir(paper)
     base = joinpath(dir, lowercase(fig) * "_" * paper)
     csv_path = base * ".csv"
@@ -478,9 +478,9 @@ function build_paper2_fig1(paper::String, fig::String, info)
     φ = (1 + sqrt(5)) / 2
     norm = sqrt(1 + φ^2)
     pts = [
-        (0,  1,  φ), (0, -1,  φ), (0,  1, -φ), (0, -1, -φ),
-        (1,  φ,  0), (-1,  φ,  0), (1, -φ,  0), (-1, -φ,  0),
-        (φ,  0,  1), (φ,  0, -1), (-φ,  0,  1), (-φ,  0, -1),
+        (0, 1, φ), (0, -1, φ), (0, 1, -φ), (0, -1, -φ),
+        (1, φ, 0), (-1, φ, 0), (1, -φ, 0), (-1, -φ, 0),
+        (φ, 0, 1), (φ, 0, -1), (-φ, 0, 1), (-φ, 0, -1),
     ]
     csv_lines = ["label,x,y,z"]
     for (i, p) in enumerate(pts)
@@ -733,16 +733,19 @@ function parse_args(args)
     i = 1
     while i <= length(args)
         if args[i] == "--paper" && i + 1 <= length(args)
-            paper = args[i + 1]; i += 2
+            paper = args[i + 1];
+            i += 2
         elseif args[i] == "--fig" && i + 1 <= length(args)
-            fig = args[i + 1]; i += 2
+            fig = args[i + 1];
+            i += 2
         elseif args[i] == "--list"
-            list = true; i += 1
+            list = true;
+            i += 1
         else
             i += 1
         end
     end
-    (paper = paper, fig = fig, list = list)
+    (paper=paper, fig=fig, list=list)
 end
 
 function list_figures()
@@ -759,20 +762,20 @@ function main()
     opts = parse_args(ARGS)
     if opts.list
         list_figures()
-        return
+        return nothing
     end
     if opts.paper === nothing || opts.fig === nothing
         @printf("Usage: julia render_figures.jl [--list | --paper <paper> --fig <FIG-N>]\n")
         @printf("\nAvailable figures:\n")
         list_figures()
-        return
+        return nothing
     end
     fig_normalized = uppercase(opts.fig)
     if !haskey(FIGURE_REGISTRY, (opts.paper, fig_normalized))
         @printf("ERROR: figure (%s, %s) not in registry\n", opts.paper, fig_normalized)
         @printf("\nAvailable figures:\n")
         list_figures()
-        return
+        return nothing
     end
     info = FIGURE_REGISTRY[(opts.paper, fig_normalized)]
     builder_func = getfield(@__MODULE__, info.builder)

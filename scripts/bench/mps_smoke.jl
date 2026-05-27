@@ -113,21 +113,21 @@ end
 @printf("=== MPS-4 smoke test (rotating-basis 8³, F=1) ===\n\n")
 
 for (label, c1, c_dd) in [
-        ("autonomous (c1=c_dd=0)", 0.0, 0.0),
-        ("DDI only", 0.0, 0.3),
-        ("c1 only", 0.5, 0.0),
-        ("full MF", 0.5, 0.3),
-    ]
+    ("autonomous (c1=c_dd=0)", 0.0, 0.0),
+    ("DDI only", 0.0, 0.3),
+    ("c1 only", 0.5, 0.0),
+    ("full MF", 0.5, 0.3),
+]
     @printf("--- %s ---\n", label)
     psi_ref = final_psi(SpinorBEC.evolve_rotating!, 0.0001, c1, c_dd)
 
     @printf("%-9s  %12s  %12s  %12s  %6s %6s\n",
         "scheme", "err@.04", "err@.02", "err@.01", "ord_a", "ord_b")
     for (name, drv) in [
-            ("Strang", SpinorBEC.evolve_rotating!),
-            ("Yoshida4", SpinorBEC.evolve_rotating_yoshida4!),
-            ("MPS-4", evolve_mps4!),
-        ]
+        ("Strang", SpinorBEC.evolve_rotating!),
+        ("Yoshida4", SpinorBEC.evolve_rotating_yoshida4!),
+        ("MPS-4", evolve_mps4!),
+    ]
         e1 = err_at(drv, 0.04, c1, c_dd, psi_ref)
         e2 = err_at(drv, 0.02, c1, c_dd, psi_ref)
         e3 = err_at(drv, 0.01, c1, c_dd, psi_ref)
@@ -138,10 +138,10 @@ for (label, c1, c_dd) in [
     # Norm drift (should be 1.0 for unitary schemes)
     @printf("Norm drift after T=0.2 at h=0.02:\n")
     for (name, drv) in [
-            ("Strang", SpinorBEC.evolve_rotating!),
-            ("Yoshida4", SpinorBEC.evolve_rotating_yoshida4!),
-            ("MPS-4", evolve_mps4!),
-        ]
+        ("Strang", SpinorBEC.evolve_rotating!),
+        ("Yoshida4", SpinorBEC.evolve_rotating_yoshida4!),
+        ("MPS-4", evolve_mps4!),
+    ]
         nrm = norm_drift(drv, 0.02, c1, c_dd)
         @printf("  %-9s  norm = %.10f  drift = %.2e\n", name, nrm, nrm - 1.0)
     end

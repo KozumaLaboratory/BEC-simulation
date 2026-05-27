@@ -28,7 +28,7 @@ isempty(point_dirs) && error("no per-point config.yaml found under $SCAN_DIR")
 sort!(point_dirs)
 
 # Load all configs and collect their leaf-paths → values.
-function _walk_paths(d, prefix = String[])
+function _walk_paths(d, prefix=String[])
     out = Dict{String, Any}()
     if d isa AbstractDict
         for (k, v) in d
@@ -77,7 +77,9 @@ if length(varying) == 0
 elseif length(varying) > 1
     println()
     println("Multiple varying axes detected. Pick one for scan.yaml.parameter.key.")
-    println("Set SCAN_PARAM env var to override (e.g. SCAN_PARAM=pipeline.3.dynamics.B_hat.phi_omega).")
+    println(
+        "Set SCAN_PARAM env var to override (e.g. SCAN_PARAM=pipeline.3.dynamics.B_hat.phi_omega)."
+    )
     chosen = get(ENV, "SCAN_PARAM", nothing)
     chosen === nothing && error("aborting — too ambiguous")
     chosen ∈ varying || error("SCAN_PARAM=$chosen not in detected list")

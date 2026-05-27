@@ -26,7 +26,7 @@
 using YAML
 
 length(ARGS) == 1 || error(
-    "Usage: julia --project=. scripts/scan_expand.jl <path/to/scan.yaml>",
+    "Usage: julia --project=. scripts/scan_expand.jl <path/to/scan.yaml>"
 )
 const SCAN_PATH = ARGS[1]
 const SCAN_DIR = dirname(SCAN_PATH)

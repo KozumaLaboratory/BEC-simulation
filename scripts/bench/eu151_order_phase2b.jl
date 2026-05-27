@@ -18,10 +18,10 @@ const N = 16
 const T_FINAL = 0.005
 const ATOM = Eu151
 const C0 = 100.0           # reduced from realistic 4689 — bench focuses on
-                           # Track A1 order recovery, not Eu physics matching
+# Track A1 order recovery, not Eu physics matching
 const C1_RATIO = 0.05      # c1 enabled (= spinor coupling exercised)
 const C_DD = 50.0          # reduced from realistic 7647 — DDI enabled but not stiff
-                           # for tractable bench dt range
+# for tractable bench dt range
 
 function _make_grid()
     make_grid(GridConfig((N, N, N), (20.0, 20.0, 20.0)))
@@ -31,7 +31,9 @@ function _seed_psi!(ws, grid)
     psi = ws.state.psi
     D = size(psi, 4)
     @inbounds for I in CartesianIndices((N, N, N))
-        x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+        x = grid.x[1][I[1]];
+        y = grid.x[2][I[2]];
+        z = grid.x[3][I[3]]
         r2 = x * x + y * y + z * z
         g = exp(-r2 / 8)
         for c in 1:D
@@ -79,25 +81,39 @@ function _y4_step!(ws::SpinorBEC.Workspace{N}, V_half!::Function) where {N}
     n_comp = ws.spin_matrices.system.n_components
     omega = ws.sim_params.rotating_frame_omega
     t_base = ws.state.t
-    w1 = _Y4_W1; w0 = _Y4_W0; wm = _Y4_WM
+    w1 = _Y4_W1;
+    w0 = _Y4_W0;
+    wm = _Y4_WM
     V_half!(ws, w1 * dt / 2, n_comp, N, false;
         t_eval=t_base + w1 * dt / 4, t_start=t_base)
-    SpinorBEC._apply_coriolis_step!(ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache)
+    SpinorBEC._apply_coriolis_step!(
+        ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache
+    )
     SpinorBEC._update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, w1 * dt)
     SpinorBEC.apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
-    SpinorBEC._apply_coriolis_step!(ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache)
+    SpinorBEC._apply_coriolis_step!(
+        ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache
+    )
     t_v2 = t_base + w1 * dt / 2
     V_half!(ws, wm * dt, n_comp, N, false; t_eval=t_v2 + wm * dt / 2, t_start=t_v2)
-    SpinorBEC._apply_coriolis_step!(ws.state.psi, ws.grid, omega, w0 * dt / 2, false, ws.coriolis_cache)
+    SpinorBEC._apply_coriolis_step!(
+        ws.state.psi, ws.grid, omega, w0 * dt / 2, false, ws.coriolis_cache
+    )
     SpinorBEC._update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, w0 * dt)
     SpinorBEC.apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
-    SpinorBEC._apply_coriolis_step!(ws.state.psi, ws.grid, omega, w0 * dt / 2, false, ws.coriolis_cache)
+    SpinorBEC._apply_coriolis_step!(
+        ws.state.psi, ws.grid, omega, w0 * dt / 2, false, ws.coriolis_cache
+    )
     t_v3 = t_base + w1 * dt / 2 + wm * dt
     V_half!(ws, wm * dt, n_comp, N, false; t_eval=t_v3 + wm * dt / 2, t_start=t_v3)
-    SpinorBEC._apply_coriolis_step!(ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache)
+    SpinorBEC._apply_coriolis_step!(
+        ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache
+    )
     SpinorBEC._update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, w1 * dt)
     SpinorBEC.apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
-    SpinorBEC._apply_coriolis_step!(ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache)
+    SpinorBEC._apply_coriolis_step!(
+        ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache
+    )
     V_half!(ws, w1 * dt / 2, n_comp, N, false;
         t_eval=t_base + dt - w1 * dt / 4, t_start=t_base + dt - w1 * dt / 2)
     ws.state.t += dt
@@ -105,7 +121,11 @@ function _y4_step!(ws::SpinorBEC.Workspace{N}, V_half!::Function) where {N}
     nothing
 end
 
-evolve_y4_mid!(ws, n_steps) = for _ in 1:n_steps; _y4_step!(ws, SpinorBEC._half_potential_step_midpoint!); end
+evolve_y4_mid!(ws, n_steps) =
+    for _ in 1:n_steps
+        ;
+        _y4_step!(ws, SpinorBEC._half_potential_step_midpoint!);
+    end
 
 @printf("=== Phase 2b: Eu151 F=6 D=13 lab-path order verification ===\n")
 @printf("16³ Eu151, c0=%.0f c1=%.1f c_dd=%.0f, T=%.3f ω⁻¹\n\n",

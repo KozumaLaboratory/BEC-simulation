@@ -25,11 +25,11 @@ using Random
 
 function spin_matrices_general(F::Int)
     D = 2F + 1
-    Fz = Diagonal(ComplexF64[F - i for i in 0:D-1])
+    Fz = Diagonal(ComplexF64[F - i for i in 0:(D - 1)])
     Fp = zeros(ComplexF64, D, D)
-    for i in 1:(D-1)
+    for i in 1:(D - 1)
         m = F - i
-        Fp[i, i+1] = sqrt(F * (F + 1) - m * (m + 1))
+        Fp[i, i + 1] = sqrt(F * (F + 1) - m * (m + 1))
     end
     Fm = Fp'
     Fx = (Fp + Fm) / 2
@@ -175,7 +175,9 @@ end
 # ----- Projector + ζ construction -----
 
 function project_onto_irrep(group_elements, chars::Vector{ComplexF64})
-    P = sum(conj(chars[i]) * group_elements[i] for i in 1:length(group_elements)) / length(group_elements)
+    P =
+        sum(conj(chars[i]) * group_elements[i] for i in 1:length(group_elements)) /
+        length(group_elements)
     return P
 end
 
@@ -195,9 +197,9 @@ end
 
 function project_S_channel(ζ::Vector, F::Int, S::Int)
     total = 0.0
-    for M in -S:S
+    for M in (-S):S
         amp = 0.0im
-        for m1 in -F:F
+        for m1 in (-F):F
             m2 = M - m1
             if -F <= m2 <= F
                 cg = clebsch_gordan(F, m1, F, m2, S, M)
@@ -246,7 +248,7 @@ function verify_case(F::Int, group::Symbol, irrep::Symbol, label::String)
 
         # Sparsity
         @printf("ζ support m ∈ {")
-        for m in F:-1:-F
+        for m in F:-1:(-F)
             i = F - m + 1
             if abs(ζ[i]) > 1e-6
                 @printf("%d, ", m)
@@ -263,7 +265,9 @@ function verify_case(F::Int, group::Symbol, irrep::Symbol, label::String)
         @printf("⟨F²⟩ = %.6f (expected %d = F(F+1))\n", F2, F*(F+1))
         @printf("⟨F_a²⟩ = (%.3f, %.3f, %.3f) (Schur: %.3f); deviation %.2e\n",
             Fx2, Fy2, Fz2, F2/3, schur_dev)
-        Fx_m = real(ζ' * Fx * ζ); Fy_m = real(ζ' * Fy * ζ); Fz_m = real(ζ' * Fz * ζ)
+        Fx_m = real(ζ' * Fx * ζ);
+        Fy_m = real(ζ' * Fy * ζ);
+        Fz_m = real(ζ' * Fz * ζ)
         @printf("⟨F⟩ = (%.2e, %.2e, %.2e)\n", Fx_m, Fy_m, Fz_m)
 
         # Selection rule via β_S^{c_0}
@@ -294,7 +298,7 @@ end
 cases = [
     # Existing
     (5, :T, :E_1, "T:E_1 complex inert"),
-    (7, :T, :A,   "T:A true invariant"),
+    (7, :T, :A, "T:A true invariant"),
     (7, :T, :E_1, "T:E_1 complex"),
     (7, :O, :A_2, "O:A_2 sign rep"),
     # Added 2026-05-12 for Year 1 Q3 F-systematic completion (task #75):
@@ -303,7 +307,7 @@ cases = [
     (5, :O, :A_1, "O:A_1 trivial invariant"),
     (5, :O, :A_2, "O:A_2 sign rep"),
     # F=13 missing entirely — add T:A, O:A_1, O:A_2.
-    (13, :T, :A,   "T:A true invariant"),
+    (13, :T, :A, "T:A true invariant"),
     (13, :O, :A_1, "O:A_1 trivial invariant"),
     (13, :O, :A_2, "O:A_2 sign rep"),
 ]

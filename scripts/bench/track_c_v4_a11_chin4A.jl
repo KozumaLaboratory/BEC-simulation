@@ -66,7 +66,7 @@ function _make_k_vecs()
     (k, k, k)
 end
 
-function spin_density!(m::Array{Float64,4}, psi::Array{ComplexF64,4})
+function spin_density!(m::Array{Float64, 4}, psi::Array{ComplexF64, 4})
     n_pts = size(psi)[1:3]
     fill!(m, 0.0)
     @inbounds for I in CartesianIndices(n_pts)
@@ -167,7 +167,7 @@ function apply_K_step!(psi, k_vecs, dt, buf, plan_f, plan_b)
 end
 
 function apply_v4_direct!(out, psi, m_bg, c1, k_vecs, tmp1, tmp2, tmp3,
-                          buf, plan_f, plan_b)
+    buf, plan_f, plan_b)
     apply_VSM!(tmp1, psi, m_bg, c1)
     apply_T!(tmp2, tmp1, k_vecs, buf, plan_f, plan_b)
     apply_VSM!(tmp3, tmp2, m_bg, c1)
@@ -188,9 +188,9 @@ end
 ψ ← exp(-i α [V,[T,V]]) ψ via first-order Taylor (α ~ dt³ so dt⁶ truncation).
 """
 function apply_fg_correction!(psi, m_bg, c1, alpha, k_vecs,
-                              tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
+    tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
     apply_v4_direct!(Aψ, psi, m_bg, c1, k_vecs, tmp1, tmp2, tmp3,
-                     buf, plan_f, plan_b)
+        buf, plan_f, plan_b)
     @inbounds psi .-= im * alpha .* Aψ
     nothing
 end
@@ -207,17 +207,17 @@ end
 
 # ----- Strang + FG (Step 1d ansatz — confirmed order 2) -----
 function strang_v4_step!(psi, c1, dt, k_vecs, m_buf,
-                         tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
+    tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
     alpha = dt^3 / 48.0
     spin_density!(m_buf, psi)
     apply_V_step!(psi, m_buf, c1, dt / 2)
     spin_density!(m_buf, psi)
     apply_fg_correction!(psi, m_buf, c1, alpha, k_vecs,
-                         tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
+        tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
     apply_K_step!(psi, k_vecs, dt, buf, plan_f, plan_b)
     spin_density!(m_buf, psi)
     apply_fg_correction!(psi, m_buf, c1, alpha, k_vecs,
-                         tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
+        tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
     spin_density!(m_buf, psi)
     apply_V_step!(psi, m_buf, c1, dt / 2)
     nothing
@@ -237,7 +237,7 @@ For GP nonlinear V, this drops to order 2 in practice due to midpoint
 self-consistency error.
 """
 function chin4A_freeze_step!(psi, c1, dt, k_vecs, m_buf,
-                             tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
+    tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
     alpha = -dt^3 / 72.0   # NEGATIVE — Wick rotation flips imaginary-time +Δτ²/48
 
     spin_density!(m_buf, psi)
@@ -249,7 +249,7 @@ function chin4A_freeze_step!(psi, c1, dt, k_vecs, m_buf,
     apply_V_step!(psi, m_buf, c1, dt / 3)
     spin_density!(m_buf, psi)
     apply_fg_correction!(psi, m_buf, c1, alpha, k_vecs,
-                         tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
+        tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
     spin_density!(m_buf, psi)
     apply_V_step!(psi, m_buf, c1, dt / 3)
 
@@ -268,9 +268,9 @@ For autonomous-V the iteration converges in 1 pass (no nonlinearity). For
 nonlinear GP, expect 2-4 iterations to reach 1e-12 convergence of m̄_mid.
 """
 function chin4A_picard_step!(psi, c1, dt, k_vecs, m_buf,
-                             tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b,
-                             psi_save, m_entry, m_mid, m_exit, psi_trial;
-                             max_iter::Int=6, tol::Float64=1e-12)
+    tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b,
+    psi_save, m_entry, m_mid, m_exit, psi_trial;
+    max_iter::Int=6, tol::Float64=1e-12)
     alpha = -dt^3 / 72.0   # NEGATIVE — Wick rotation flips imaginary-time +Δτ²/48
 
     # Stage 1: first V(dt/6) + K(dt/2)
@@ -287,7 +287,7 @@ function chin4A_picard_step!(psi, c1, dt, k_vecs, m_buf,
         psi_trial .= psi_save
         apply_V_step!(psi_trial, m_mid, c1, dt / 3)
         apply_fg_correction!(psi_trial, m_mid, c1, alpha, k_vecs,
-                             tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
+            tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
         apply_V_step!(psi_trial, m_mid, c1, dt / 3)
         spin_density!(m_exit, psi_trial)
         # New estimate: average of entry and exit m̄
@@ -304,7 +304,7 @@ function chin4A_picard_step!(psi, c1, dt, k_vecs, m_buf,
     psi .= psi_save
     apply_V_step!(psi, m_mid, c1, dt / 3)
     apply_fg_correction!(psi, m_mid, c1, alpha, k_vecs,
-                         tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
+        tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
     apply_V_step!(psi, m_mid, c1, dt / 3)
 
     # Stage 3: K(dt/2) + V(dt/6)
@@ -323,8 +323,8 @@ Predictor: apply Strang(dt/2) from ψ_in to get ψ_predictor ≈ ψ(t + dt/2).
 Corrector: apply Chin 4A with m_mid = m̄(ψ_predictor) frozen in middle slot.
 """
 function chin4A_predcorr_step!(psi, c1, dt, k_vecs, m_buf,
-                               tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b,
-                               psi_predictor, m_mid)
+    tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b,
+    psi_predictor, m_mid)
     alpha = -dt^3 / 72.0
 
     # ===== Predictor: Strang half-step to estimate ψ(dt/2) =====
@@ -342,7 +342,7 @@ function chin4A_predcorr_step!(psi, c1, dt, k_vecs, m_buf,
     apply_K_step!(psi, k_vecs, dt / 2, buf, plan_f, plan_b)
     apply_V_step!(psi, m_mid, c1, dt / 3)
     apply_fg_correction!(psi, m_mid, c1, alpha, k_vecs,
-                         tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
+        tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
     apply_V_step!(psi, m_mid, c1, dt / 3)
     apply_K_step!(psi, k_vecs, dt / 2, buf, plan_f, plan_b)
     spin_density!(m_buf, psi)
@@ -358,13 +358,13 @@ Used to verify that the FG kernel implementation itself reaches order 4
 in the absence of self-consistency complications.
 """
 function chin4A_autonomous_step!(psi, c1, dt, k_vecs, m_global,
-                                 tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
+    tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
     alpha = -dt^3 / 72.0   # NEGATIVE — Wick rotation flips imaginary-time +Δτ²/48
     apply_V_step!(psi, m_global, c1, dt / 6)
     apply_K_step!(psi, k_vecs, dt / 2, buf, plan_f, plan_b)
     apply_V_step!(psi, m_global, c1, dt / 3)
     apply_fg_correction!(psi, m_global, c1, alpha, k_vecs,
-                         tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
+        tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
     apply_V_step!(psi, m_global, c1, dt / 3)
     apply_K_step!(psi, k_vecs, dt / 2, buf, plan_f, plan_b)
     apply_V_step!(psi, m_global, c1, dt / 6)
@@ -385,13 +385,17 @@ function forest_ruth_step!(psi, c1, dt, k_vecs, m_buf, buf, plan_f, plan_b)
     γ₁ = 1.0 / (2 - 2^(1/3))
     γ₂ = -2^(1/3) / (2 - 2^(1/3))
 
-    spin_density!(m_buf, psi); apply_V_step!(psi, m_buf, c1, γ₁ * dt / 2)
+    spin_density!(m_buf, psi);
+    apply_V_step!(psi, m_buf, c1, γ₁ * dt / 2)
     apply_K_step!(psi, k_vecs, γ₁ * dt, buf, plan_f, plan_b)
-    spin_density!(m_buf, psi); apply_V_step!(psi, m_buf, c1, (γ₁ + γ₂) * dt / 2)
+    spin_density!(m_buf, psi);
+    apply_V_step!(psi, m_buf, c1, (γ₁ + γ₂) * dt / 2)
     apply_K_step!(psi, k_vecs, γ₂ * dt, buf, plan_f, plan_b)
-    spin_density!(m_buf, psi); apply_V_step!(psi, m_buf, c1, (γ₁ + γ₂) * dt / 2)
+    spin_density!(m_buf, psi);
+    apply_V_step!(psi, m_buf, c1, (γ₁ + γ₂) * dt / 2)
     apply_K_step!(psi, k_vecs, γ₁ * dt, buf, plan_f, plan_b)
-    spin_density!(m_buf, psi); apply_V_step!(psi, m_buf, c1, γ₁ * dt / 2)
+    spin_density!(m_buf, psi);
+    apply_V_step!(psi, m_buf, c1, γ₁ * dt / 2)
     nothing
 end
 
@@ -441,28 +445,28 @@ function run_scheme(scheme::Symbol, c1::Float64, dt::Float64)
             strang_step!(psi, c1, actual_dt, k_vecs, m_buf, buf, plan_f, plan_b)
         elseif scheme === :strang_v4
             strang_v4_step!(psi, c1, actual_dt, k_vecs, m_buf,
-                            tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
+                tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
         elseif scheme === :chin4A_freeze
             chin4A_freeze_step!(psi, c1, actual_dt, k_vecs, m_buf,
-                                tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
+                tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
         elseif scheme === :chin4A_picard
             chin4A_picard_step!(psi, c1, actual_dt, k_vecs, m_buf,
-                                tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b,
-                                psi_save, m_entry, m_mid, m_exit, psi_trial)
+                tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b,
+                psi_save, m_entry, m_mid, m_exit, psi_trial)
         elseif scheme === :chin4A_predcorr
             chin4A_predcorr_step!(psi, c1, actual_dt, k_vecs, m_buf,
-                                  tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b,
-                                  psi_trial, m_mid)
+                tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b,
+                psi_trial, m_mid)
         elseif scheme === :chin4A_autonomous
             chin4A_autonomous_step!(psi, c1, actual_dt, k_vecs, m_global,
-                                    tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
+                tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
         elseif scheme === :forest_ruth
             forest_ruth_step!(psi, c1, actual_dt, k_vecs, m_buf,
-                              buf, plan_f, plan_b)
+                buf, plan_f, plan_b)
         elseif scheme === :forest_ruth_frozen
             # Autonomous baseline: Forest-Ruth with frozen global m̄
             forest_ruth_frozen_step!(psi, c1, actual_dt, k_vecs, m_global,
-                                     buf, plan_f, plan_b)
+                buf, plan_f, plan_b)
         else
             error("unknown scheme $scheme")
         end
@@ -570,11 +574,11 @@ for (i, h) in enumerate(header)
 end
 @printf("\n")
 for idx in 2:length(dts)
-    dt_ratio = dts[idx-1] / dts[idx]
+    dt_ratio = dts[idx - 1] / dts[idx]
     @assert abs(dt_ratio - 2.0) < 1e-9
-    @printf("%-15s", @sprintf("%.1e/%.1e", dts[idx-1], dts[idx]))
+    @printf("%-15s", @sprintf("%.1e/%.1e", dts[idx - 1], dts[idx]))
     for s in schemes
-        ord = log2(errs[s][idx-1] / errs[s][idx])
+        ord = log2(errs[s][idx - 1] / errs[s][idx])
         @printf("%-15s", @sprintf("%.2f", ord))
     end
     @printf("\n")
@@ -603,17 +607,22 @@ gate_freeze = first_orders[:chin4A_freeze] >= 3.5
 if gate_predcorr
     @printf("✓ A1.1 GATE PASS — Chin 4A predictor-corrector (4AWW) reaches order %.2f ≥ 3.5\n",
         freeze_pred_order)
-    @printf("                   Composition + direct-commutator kernel + Strang midpoint predictor = order 4.\n")
+    @printf(
+        "                   Composition + direct-commutator kernel + Strang midpoint predictor = order 4.\n"
+    )
     @printf("                   Proceed to A1.2 (DDI cross-terms).\n")
 elseif gate_freeze
     @printf("✓ A1.1 GATE PASS (no predcorr needed) — Chin 4A freeze-m̄ reaches order ≥ 3.5\n")
 elseif chin_auto_floor
-    @printf("△ A1.1 PARTIAL — Chin 4A in autonomous limit reaches FP-floor (err=%.2e ≤ FR_frozen %.2e)\n",
+    @printf(
+        "△ A1.1 PARTIAL — Chin 4A in autonomous limit reaches FP-floor (err=%.2e ≤ FR_frozen %.2e)\n",
         chin_auto_err, fr_frozen_err)
     @printf("                  → FG kernel + composition + sign all verified at order 4\n")
     @printf("                  Nonlinear self-consistent variants stuck at order %.2f\n",
         first_orders[:chin4A_predcorr])
-    @printf("                  → predictor-corrector still insufficient; investigate iterated 4AWW\n")
+    @printf(
+        "                  → predictor-corrector still insufficient; investigate iterated 4AWW\n"
+    )
 else
     @printf("✗ A1.1 FAIL — even autonomous Chin 4A doesn't reach floor.\n")
     @printf("  Check FG sign, composition coefficients, reference accuracy.\n")

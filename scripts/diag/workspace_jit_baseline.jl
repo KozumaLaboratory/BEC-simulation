@@ -33,7 +33,11 @@ t_load = @elapsed using SpinorBEC
         AtomSpecies("scalar", 1e-25, 0, 100.0 * 5.29e-11, 0.0)
     end
     interactions = InteractionParams(10.0, 0.0)
-    pot = ndim == 1 ? HarmonicTrap(1.0) : (ndim == 2 ? HarmonicTrap(1.0, 1.0) : HarmonicTrap(1.0, 1.0, 1.0))
+    pot = if ndim == 1
+        HarmonicTrap(1.0)
+    else
+        (ndim == 2 ? HarmonicTrap(1.0, 1.0) : HarmonicTrap(1.0, 1.0, 1.0))
+    end
     sp = SimParams(; dt=0.001, n_steps=10)
     kwargs = (; grid, atom, interactions, sim_params=sp,
         potential=pot, zeeman=ZeemanParams(),
@@ -45,11 +49,11 @@ t_load = @elapsed using SpinorBEC
 end
 
 direct_combos = [
-    ("scalar_no_ddi",    () -> _mk_direct(0, false)),
-    ("F1_no_ddi",        () -> _mk_direct(1, false)),
-    ("F1_no_ddi_loss",   () -> _mk_direct(1, false, true)),
-    ("F3_ddi",           () -> _mk_direct(3, true)),
-    ("F6_ddi",           () -> _mk_direct(6, true)),
+    ("scalar_no_ddi", () -> _mk_direct(0, false)),
+    ("F1_no_ddi", () -> _mk_direct(1, false)),
+    ("F1_no_ddi_loss", () -> _mk_direct(1, false, true)),
+    ("F3_ddi", () -> _mk_direct(3, true)),
+    ("F6_ddi", () -> _mk_direct(6, true)),
 ]
 
 println("\n" * "─"^76)

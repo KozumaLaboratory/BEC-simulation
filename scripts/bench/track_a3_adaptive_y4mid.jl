@@ -46,7 +46,9 @@ function _seed_psi!(ws)
     D = size(psi, 4)
     grid = ws.grid
     @inbounds for I in CartesianIndices((N, N, N))
-        x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+        x = grid.x[1][I[1]];
+        y = grid.x[2][I[2]];
+        z = grid.x[3][I[3]]
         g = exp(-(x*x + y*y + z*z) / 2)
         for c in 1:D
             psi[I, c] = g * cis(0.1 * c)
@@ -91,7 +93,8 @@ end
 
 # ----- Y4-mid step with explicit dt argument (dt-parametric) -----
 function y4_mid_step!(ws::SpinorBEC.Workspace{NN}, dt::Float64, t_base::Float64) where {NN}
-    w1 = _Y4_W1; w0 = _Y4_W0
+    w1 = _Y4_W1;
+    w0 = _Y4_W0
     inline_strang_mid!(ws, w1 * dt, t_base)
     inline_strang_mid!(ws, w0 * dt, t_base + w1 * dt)
     inline_strang_mid!(ws, w1 * dt, t_base + (w1 + w0) * dt)
@@ -198,8 +201,8 @@ end
 
 # ----- Adaptive run: outer loop, returns trajectory of (t, dt, defect) -----
 function adaptive_y4_run(; dt_init::Float64=4e-3,
-                          tol_abs::Float64=1e-9, tol_rel::Float64=1e-7,
-                          safety::Float64=0.9)
+    tol_abs::Float64=1e-9, tol_rel::Float64=1e-7,
+    safety::Float64=0.9)
     ws = _build_ws(dt_init)
     psi_backup = similar(ws.state.psi)
     psi_full = similar(ws.state.psi)
@@ -295,8 +298,9 @@ end
 results = Dict{Float64, NamedTuple}()
 for tol_rel in [1e-5, 1e-7, 1e-9]
     tol_abs = tol_rel
-    psi_adap, wall, n_acc, n_rej, t_hist, dt_hist, def_hist =
-        adaptive_y4_run(; dt_init=4e-3, tol_abs, tol_rel)
+    psi_adap, wall, n_acc, n_rej, t_hist, dt_hist, def_hist = adaptive_y4_run(;
+        dt_init=4e-3, tol_abs, tol_rel
+    )
     err = sqrt(sum(abs2, psi_adap .- psi_ref))
     results[tol_rel] = (
         wall=wall, n_acc=n_acc, n_rej=n_rej,
@@ -373,7 +377,7 @@ for i in 1:min(10, length(r7.t_hist))
 end
 if length(r7.t_hist) > 15
     @printf("  ...\n")
-    for i in length(r7.t_hist)-4:length(r7.t_hist)
+    for i in (length(r7.t_hist) - 4):length(r7.t_hist)
         @printf("%-6d %-12.6f %-12.3e %-12.3e\n",
             i, r7.t_hist[i], r7.dt_hist[i], r7.def_hist[i])
     end

@@ -26,11 +26,11 @@ const Smax = 2F    # 24
 # -- spin matrices for arbitrary F --
 function spin_matrices_general(F::Int)
     D = 2F + 1
-    Fz = Diagonal(ComplexF64[F - i for i in 0:D-1])
+    Fz = Diagonal(ComplexF64[F - i for i in 0:(D - 1)])
     Fp = zeros(ComplexF64, D, D)
-    for i in 1:(D-1)
+    for i in 1:(D - 1)
         m = F - i
-        Fp[i, i+1] = sqrt(F * (F + 1) - m * (m + 1))
+        Fp[i, i + 1] = sqrt(F * (F + 1) - m * (m + 1))
     end
     Fm = Fp'
     Fx = (Fp + Fm) / 2
@@ -83,11 +83,11 @@ phi_gold = (1 + sqrt(5)) / 2
 theta_3fold = acos((1 + phi_gold) / sqrt(3 * (1 + phi_gold^2)))
 azimuth_3fold = π / 5
 n_3fold = [sin(theta_3fold) * cos(azimuth_3fold),
-           sin(theta_3fold) * sin(azimuth_3fold),
-           cos(theta_3fold)]
+    sin(theta_3fold) * sin(azimuth_3fold),
+    cos(theta_3fold)]
 
 C5z = wigner_D(F, [0.0, 0.0, 1.0], 2π/5)
-C3  = wigner_D(F, n_3fold, 2π/3)
+C3 = wigner_D(F, n_3fold, 2π/3)
 
 @printf("Generators built. Closing group...\n")
 I_grp = group_close([C5z, C3], 1e-6, 150)
@@ -117,7 +117,7 @@ max_err = maximum(norm(g * ζ - ζ) for g in I_grp)
 @printf("I-invariance check: max ||g·ζ - ζ|| = %.2e\n", max_err)
 
 @printf("\nSpinor ζ (non-zero components, |ζ_m| > 1e-6):\n")
-for m in F:-1:-F
+for m in F:-1:(-F)
     i = F - m + 1
     if abs(ζ[i]) > 1e-6
         @printf("  m = %3d: %s\n", m, ζ[i])
@@ -180,8 +180,8 @@ function build_hf_matrices(ζ::Vector{ComplexF64}, F::Int, g_S::Dict{Int, Float6
     for S in keys(g_S)
         gS = g_S[S]
         gS == 0.0 && continue
-        for M_q in -S:S
-            for m1 in -F:F, m1p in -F:F
+        for M_q in (-S):S
+            for m1 in (-F):F, m1p in (-F):F
                 m2 = M_q - m1
                 m2p = M_q - m1p
                 (-F <= m2 <= F) || continue
@@ -218,14 +218,14 @@ end
 # Procedure: compute BdG at two values ε_k1 < ε_k2. Goldstones have
 # ω(ε_k1)/ω(ε_k2) ≈ √(ε_k1/ε_k2). Pick the 3 lowest Bogoliubov-form modes.
 function compute_lambda_spin(ζ::Vector{ComplexF64}, F::Int, g_S::Dict{Int, Float64};
-                              n_density::Float64=1.0)
+    n_density::Float64=1.0)
     function bdg_eigs(ε_k)
         h, M_anom = build_hf_matrices(ζ, F, g_S)
         μ = real(ζ' * h * ζ)
         D = 2F + 1
         L = (ε_k - μ * n_density) * Matrix{ComplexF64}(I, D, D) + 2 * n_density * h
-        H_BdG = [L                       n_density * M_anom;
-                 -n_density * conj.(M_anom)   -conj.(L)]
+        H_BdG = [L n_density * M_anom;
+            -n_density * conj.(M_anom) -conj.(L)]
         σz = Diagonal(ComplexF64[ones(D); -ones(D)])
         eigvals_BdG = eigvals(σz * H_BdG)
         ω_pos = sort(real(eigvals_BdG[real.(eigvals_BdG) .> 1e-9]))
@@ -240,7 +240,7 @@ function compute_lambda_spin(ζ::Vector{ComplexF64}, F::Int, g_S::Dict{Int, Floa
     # gapped: ω ≈ const, ω1/ω2 ≈ 1
     # phonon excluded by picking modes 2-4 (after phonon at index 1)
     n_modes = min(length(ω1), length(ω2))
-    n_modes < 4 && return NaN, ω1[1:min(5,length(ω1))]
+    n_modes < 4 && return NaN, ω1[1:min(5, length(ω1))]
     is_bogoliubov = falses(n_modes)
     for i in 1:n_modes
         if ω1[i] > 1e-12 && ω2[i] > 1e-12
@@ -252,7 +252,7 @@ function compute_lambda_spin(ζ::Vector{ComplexF64}, F::Int, g_S::Dict{Int, Floa
         end
     end
     bog_indices = findall(is_bogoliubov)
-    length(bog_indices) < 4 && return NaN, ω1[1:min(5,length(ω1))]
+    length(bog_indices) < 4 && return NaN, ω1[1:min(5, length(ω1))]
     # Among Bogoliubov modes, sort by λ extracted from ω² = ε(ε + 2nλ)
     λ_values = Float64[]
     for i in bog_indices
@@ -269,18 +269,18 @@ function compute_lambda_spin(ζ::Vector{ComplexF64}, F::Int, g_S::Dict{Int, Floa
         spin_3 = λ_values[1:3]
         max_dev = (maximum(spin_3) - minimum(spin_3)) / max(abs(sum(spin_3)/3), 1e-12)
         if max_dev < 0.1  # 3 are clustered
-            return sum(spin_3) / 3, ω1[1:min(5,length(ω1))]
+            return sum(spin_3) / 3, ω1[1:min(5, length(ω1))]
         end
         # Try modes 2-4 (skip lowest as phonon)
         if length(λ_values) >= 5
             spin_3b = λ_values[2:4]
             max_dev_b = (maximum(spin_3b) - minimum(spin_3b)) / max(abs(sum(spin_3b)/3), 1e-12)
             if max_dev_b < 0.1
-                return sum(spin_3b) / 3, ω1[1:min(5,length(ω1))]
+                return sum(spin_3b) / 3, ω1[1:min(5, length(ω1))]
             end
         end
     end
-    return NaN, ω1[1:min(5,length(ω1))]
+    return NaN, ω1[1:min(5, length(ω1))]
 end
 
 # Scalar limit: g_S = g for all S → c_0 = g, λ_spin = 0
@@ -321,12 +321,13 @@ end
 @printf("\n--- Sign Pattern Systematic test (S_bd predicted ≈ 2F = %d) ---\n", 2F)
 sign_changes = Int[]
 for i in 2:length(β_lambda)
-    if sign(β_lambda[i]) != sign(β_lambda[i-1]) && abs(β_lambda[i]) > 1e-8 && abs(β_lambda[i-1]) > 1e-8
+    if sign(β_lambda[i]) != sign(β_lambda[i - 1]) && abs(β_lambda[i]) > 1e-8 &&
+        abs(β_lambda[i - 1]) > 1e-8
         S_below = 2 * (i - 2)
         S_above = 2 * (i - 1)
         push!(sign_changes, S_below)
         @printf("  Sign change between S=%d (β=%.3e) and S=%d (β=%.3e)\n",
-            S_below, β_lambda[i-1], S_above, β_lambda[i])
+            S_below, β_lambda[i - 1], S_above, β_lambda[i])
     end
 end
 if !isempty(sign_changes)

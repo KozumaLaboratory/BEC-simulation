@@ -76,8 +76,9 @@ end
 # Per-component diagonal Zeeman array, textbook form:
 #   (H_Z ψ)_m = (-p · m + q · m²) · ψ_m
 # Returns `zeeman_diag[c] = -p·m + q·m²`.
-textbook_zeeman_diag(fx::L5Fixture, p::Float64, q::Float64) =
-    Float64[-p * m + q * m^2 for m in fx.m_values]
+textbook_zeeman_diag(fx::L5Fixture, p::Float64, q::Float64) = Float64[
+    -p * m + q * m^2 for m in fx.m_values
+]
 
 """
     textbook_propagator_diagonal(psi, V_trap, zeeman_diag, c0, dt) -> ψ'
@@ -144,15 +145,15 @@ end
 function check_linear_zeeman(fx::L5Fixture; p::Float64=0.5)
     zee = textbook_zeeman_diag(fx, p, 0.0)
     ref = textbook_propagator_diagonal(fx.psi, zeros(fx.n_pts), zee, 0.0, DT_PROBE)
-    sb  = spinorbec_propagator_diagonal(fx.psi, zeros(fx.n_pts), zee, 0.0, DT_PROBE)
+    sb = spinorbec_propagator_diagonal(fx.psi, zeros(fx.n_pts), zee, 0.0, DT_PROBE)
     res = maximum(abs, ref .- sb)
-    CheckResult("linear Zeeman   -p·F̂_z",  res, TOL_PER_TERM, res < TOL_PER_TERM)
+    CheckResult("linear Zeeman   -p·F̂_z", res, TOL_PER_TERM, res < TOL_PER_TERM)
 end
 
 function check_quadratic_zeeman(fx::L5Fixture; q::Float64=0.05)
     zee = textbook_zeeman_diag(fx, 0.0, q)
     ref = textbook_propagator_diagonal(fx.psi, zeros(fx.n_pts), zee, 0.0, DT_PROBE)
-    sb  = spinorbec_propagator_diagonal(fx.psi, zeros(fx.n_pts), zee, 0.0, DT_PROBE)
+    sb = spinorbec_propagator_diagonal(fx.psi, zeros(fx.n_pts), zee, 0.0, DT_PROBE)
     res = maximum(abs, ref .- sb)
     CheckResult("quadratic Zeeman q·F̂_z²", res, TOL_PER_TERM, res < TOL_PER_TERM)
 end
@@ -160,24 +161,24 @@ end
 function check_trap(fx::L5Fixture)
     zee = zeros(fx.D)
     ref = textbook_propagator_diagonal(fx.psi, fx.V_trap, zee, 0.0, DT_PROBE)
-    sb  = spinorbec_propagator_diagonal(fx.psi, fx.V_trap, zee, 0.0, DT_PROBE)
+    sb = spinorbec_propagator_diagonal(fx.psi, fx.V_trap, zee, 0.0, DT_PROBE)
     res = maximum(abs, ref .- sb)
-    CheckResult("trap V(r)·𝟙",            res, TOL_PER_TERM, res < TOL_PER_TERM)
+    CheckResult("trap V(r)·𝟙", res, TOL_PER_TERM, res < TOL_PER_TERM)
 end
 
 function check_contact_c0(fx::L5Fixture; c0::Float64=2.5)
     zee = zeros(fx.D)
     ref = textbook_propagator_diagonal(fx.psi, zeros(fx.n_pts), zee, c0, DT_PROBE)
-    sb  = spinorbec_propagator_diagonal(fx.psi, zeros(fx.n_pts), zee, c0, DT_PROBE)
+    sb = spinorbec_propagator_diagonal(fx.psi, zeros(fx.n_pts), zee, c0, DT_PROBE)
     res = maximum(abs, ref .- sb)
-    CheckResult("contact c0·n·𝟙",          res, TOL_PER_TERM, res < TOL_PER_TERM)
+    CheckResult("contact c0·n·𝟙", res, TOL_PER_TERM, res < TOL_PER_TERM)
 end
 
 function check_combined_diagonal(fx::L5Fixture;
     p::Float64=0.5, q::Float64=0.05, c0::Float64=2.5)
     zee = textbook_zeeman_diag(fx, p, q)
     ref = textbook_propagator_diagonal(fx.psi, fx.V_trap, zee, c0, DT_PROBE)
-    sb  = spinorbec_propagator_diagonal(fx.psi, fx.V_trap, zee, c0, DT_PROBE)
+    sb = spinorbec_propagator_diagonal(fx.psi, fx.V_trap, zee, c0, DT_PROBE)
     res = maximum(abs, ref .- sb)
     CheckResult("combined (V + Zeeman + c0·n)", res, TOL_PER_TERM, res < TOL_PER_TERM)
 end
@@ -346,15 +347,18 @@ function check_uniform_spin_rotation(fx::L5Fixture;
     CheckResult("uniform rotation: $label", res, 1e-12, res < 1e-12)
 end
 
-check_uniform_rotation_x(fx::L5Fixture) =
-    check_uniform_spin_rotation(fx; phi_x=0.7, label="φ_x only (Bx)")
-check_uniform_rotation_y(fx::L5Fixture) =
-    check_uniform_spin_rotation(fx; phi_y=0.7, label="φ_y only (By)")
-check_uniform_rotation_z(fx::L5Fixture) =
-    check_uniform_spin_rotation(fx; phi_z=0.7, label="φ_z only (Bz)")
-check_uniform_rotation_xyz(fx::L5Fixture) =
-    check_uniform_spin_rotation(fx; phi_x=0.5, phi_y=0.3, phi_z=0.2,
-        label="φ_x + φ_y + φ_z (composition)")
+check_uniform_rotation_x(fx::L5Fixture) = check_uniform_spin_rotation(
+    fx; phi_x=0.7, label="φ_x only (Bx)"
+)
+check_uniform_rotation_y(fx::L5Fixture) = check_uniform_spin_rotation(
+    fx; phi_y=0.7, label="φ_y only (By)"
+)
+check_uniform_rotation_z(fx::L5Fixture) = check_uniform_spin_rotation(
+    fx; phi_z=0.7, label="φ_z only (Bz)"
+)
+check_uniform_rotation_xyz(fx::L5Fixture) = check_uniform_spin_rotation(fx; phi_x=0.5, phi_y=0.3,
+    phi_z=0.2,
+    label="φ_x + φ_y + φ_z (composition)")
 
 # ---------------- spin-mixing c1: 4 layered probes ----------------
 #
@@ -466,7 +470,7 @@ function check_spin_mixing_L2_single_voxel(fx::L5Fixture; c1::Float64=0.5)
 
     psi_sb = reshape(copy(chi), 1, D)
     SpinorBEC.apply_spin_mixing_step!(
-        psi_sb, sm, c1, DT_PROBE, 1; imaginary_time=false,
+        psi_sb, sm, c1, DT_PROBE, 1; imaginary_time=false
     )
     chi_sb = vec(psi_sb)
 
@@ -510,7 +514,7 @@ function check_spin_mixing_L3_multi_voxel(fx::L5Fixture; n_grid::Int=8, c1::Floa
 
     psi_sb = copy(psi_grid)
     SpinorBEC.apply_spin_mixing_step!(
-        psi_sb, sm, c1, DT_PROBE, 1; imaginary_time=false,
+        psi_sb, sm, c1, DT_PROBE, 1; imaginary_time=false
     )
 
     res = maximum(abs, psi_ref .- psi_sb)
@@ -547,7 +551,7 @@ function check_spin_mixing_L4_pure_z(fx::L5Fixture; c1::Float64=0.5)
 
     psi_sb = reshape(copy(chi), 1, D)
     SpinorBEC.apply_spin_mixing_step!(
-        psi_sb, sm, c1, DT_PROBE, 1; imaginary_time=false,
+        psi_sb, sm, c1, DT_PROBE, 1; imaginary_time=false
     )
     chi_sb = vec(psi_sb)
 
@@ -616,7 +620,7 @@ function textbook_singlet_pair(
                 if c == c_pair
                     out[I, c] = ch * psi_in[I, c] - phase * sh * conj(psi_in[I, c])
                 else
-                    out[I, c]      = ch * psi_in[I, c]      - phase * sh * conj(psi_in[I, c_pair])
+                    out[I, c] = ch * psi_in[I, c] - phase * sh * conj(psi_in[I, c_pair])
                     out[I, c_pair] = ch * psi_in[I, c_pair] - phase * sh * conj(psi_in[I, c])
                 end
             else
@@ -625,8 +629,9 @@ function textbook_singlet_pair(
                 if c == c_pair
                     out[I, c] = cosV * psi_in[I, c] - im * phase * sinV * conj(psi_in[I, c])
                 else
-                    out[I, c]      = cosV * psi_in[I, c]      - im * phase * sinV * conj(psi_in[I, c_pair])
-                    out[I, c_pair] = cosV * psi_in[I, c_pair] - im * phase * sinV * conj(psi_in[I, c])
+                    out[I, c] = cosV * psi_in[I, c] - im * phase * sinV * conj(psi_in[I, c_pair])
+                    out[I, c_pair] =
+                        cosV * psi_in[I, c_pair] - im * phase * sinV * conj(psi_in[I, c])
                 end
             end
         end
@@ -804,7 +809,7 @@ function check_ddi_L4_plane_wave_phi(; n::Int=8, box::Float64=8.0, F::Int=6,
     for k in 1:n
         Phi_z_expected[:, :, k] .=
             (2.0 / 3.0) * (2 * F * alpha * beta * cos(k_0 * z[k]) +
-                          F * beta^2 / 2 * cos(2 * k_0 * z[k]))
+             F * beta^2 / 2 * cos(2 * k_0 * z[k]))
     end
 
     SpinorBEC._compute_and_convolve_ddi!(psi, sm, ddi, bufs, Val(D), 3, (n, n, n))
@@ -826,8 +831,10 @@ function run_all_checks()
     println()
 
     fx = build_fixture(; F=6, ndim=1, n_pts=16)
-    println("Fixture: Eu151 F=$(fx.F) (D=$(fx.D)), 1D grid n_pts=$(fx.n_pts), " *
-            "seed=20260524, dt=$(DT_PROBE), tol=$(TOL_PER_TERM)")
+    println(
+        "Fixture: Eu151 F=$(fx.F) (D=$(fx.D)), 1D grid n_pts=$(fx.n_pts), " *
+        "seed=20260524, dt=$(DT_PROBE), tol=$(TOL_PER_TERM)",
+    )
     println()
 
     results = CheckResult[

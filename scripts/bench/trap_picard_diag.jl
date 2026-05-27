@@ -15,7 +15,9 @@ function _seed_psi!(ws, grid)
     psi = ws.state.psi
     D = size(psi, 4)
     @inbounds for I in CartesianIndices((N, N, N))
-        x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+        x = grid.x[1][I[1]];
+        y = grid.x[2][I[2]];
+        z = grid.x[3][I[3]]
         g = exp(-(x * x + y * y + z * z) / 2)
         for c in 1:D
             psi[I, c] = g * cis(0.1 * c)
@@ -54,7 +56,7 @@ for h in (4e-3, 2e-3, 1e-3)
         copyto!(ws.state.psi, psi0)
         SpinorBEC._half_potential_step_trap!(
             ws, h / 2, n_comp, 3, false;
-            t_eval=ws.state.t + h / 4, t_start=ws.state.t, n_picard=np,
+            t_eval=(ws.state.t + h / 4), t_start=ws.state.t, n_picard=np,
         )
         psi_results[np] = copy(ws.state.psi)
     end
@@ -75,7 +77,7 @@ for h in (4e-3, 2e-3, 1e-3)
     copyto!(ws.state.psi, psi0)
     SpinorBEC._half_potential_step_midpoint!(
         ws, h / 2, n_comp, 3, false;
-        t_eval=ws.state.t + h / 4, t_start=ws.state.t, n_picard=4,
+        t_eval=(ws.state.t + h / 4), t_start=ws.state.t, n_picard=4,
     )
     psi_mid = copy(ws.state.psi)
     d_trap_mid = sqrt(sum(abs2, psi_results[4] - psi_mid))

@@ -32,11 +32,11 @@ const D = 2F + 1
 
 function spin_matrices_general(F::Int)
     D = 2F + 1
-    Fz = Diagonal(ComplexF64[F - i for i in 0:D-1])
+    Fz = Diagonal(ComplexF64[F - i for i in 0:(D - 1)])
     Fp = zeros(ComplexF64, D, D)
-    for i in 1:(D-1)
+    for i in 1:(D - 1)
         m = F - i
-        Fp[i, i+1] = sqrt(F * (F + 1) - m * (m + 1))
+        Fp[i, i + 1] = sqrt(F * (F + 1) - m * (m + 1))
     end
     Fm = Fp'
     Fx = (Fp + Fm) / 2
@@ -91,9 +91,9 @@ v_random = randn(ComplexF64, D)
 # Compute β_S^{c_0} for each S in {0, 6, 10, 12, 16, 18, 20, 24}
 function project_S_channel(ζ::Vector, F::Int, S::Int)
     total = 0.0
-    for M in -S:S
+    for M in (-S):S
         amp = 0.0im
-        for m1 in -F:F
+        for m1 in (-F):F
             m2 = M - m1
             if -F <= m2 <= F
                 cg = clebsch_gordan(F, m1, F, m2, S, M)

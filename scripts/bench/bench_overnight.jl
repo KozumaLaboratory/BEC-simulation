@@ -182,9 +182,9 @@ _section("R39") do
 
     # Reconstruct trace points (we saved last_point; for R39 use a 3-point synthetic curve)
     points = Float64[
-        -0.1   0.0
-         0.0   0.0
-         0.1   0.0
+        -0.1 0.0
+        0.0 0.0
+        0.1 0.0
     ]
 
     t_bdg = @elapsed samples = bogoliubov_along_boundary_curve(

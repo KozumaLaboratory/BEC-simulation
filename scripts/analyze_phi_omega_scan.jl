@@ -33,7 +33,7 @@ function _summarise(path)
         # Normalise per-m at first and last frames (in case norms drifted).
         col1_sum = sum(view(pm, :, 1))
         colT_sum = sum(view(pm, :, T))
-        m_F_init  = pm[1, 1] / max(col1_sum, 1e-30)
+        m_F_init = pm[1, 1] / max(col1_sum, 1e-30)
         m_F_final = pm[1, T] / max(colT_sum, 1e-30)
 
         # Largest-|m| populations at end (gives qualitative spectrum).
@@ -47,14 +47,16 @@ function _summarise(path)
         end
 
         (
-            n_frames = T,
-            duration = times[end] - times[1],
-            Lz_min = minimum(Lz), Lz_max = maximum(Lz),
-            Fz_init = Fz[1], Fz_final = Fz[end], Fz_drift = Fz[end] - Fz[1],
-            m_F_init = m_F_init, m_F_final = m_F_final,
-            spectrum_top3 = collect(zip(sortperm(col_T; rev = true)[1:min(3, D)],
-                round.(sort(col_T; rev = true)[1:min(3, D)]; digits = 4))),
-            meta = meta,
+            n_frames=T,
+            duration=times[end] - times[1],
+            Lz_min=minimum(Lz), Lz_max=maximum(Lz),
+            Fz_init=Fz[1], Fz_final=Fz[end], Fz_drift=Fz[end] - Fz[1],
+            m_F_init=m_F_init, m_F_final=m_F_final,
+            spectrum_top3=collect(
+                zip(sortperm(col_T; rev=true)[1:min(3, D)],
+                    round.(sort(col_T; rev=true)[1:min(3, D)]; digits=4)),
+            ),
+            meta=meta,
         )
     end
 end
@@ -75,7 +77,9 @@ function main()
         s === nothing && (println("  $name  no /dynamics/Lz key in result"); continue)
 
         @printf "  phi_omega = %-7.3f  | frames=%-4d  duration=%.1f\n" ω s.n_frames s.duration
-        @printf "    m=+F: %.4f → %.4f  (Δ = %+.4f)\n" s.m_F_init s.m_F_final (s.m_F_final - s.m_F_init)
+        @printf "    m=+F: %.4f → %.4f  (Δ = %+.4f)\n" s.m_F_init s.m_F_final (
+            s.m_F_final - s.m_F_init
+        )
         @printf "    Lz range:  [%+.3f, %+.3f]\n" s.Lz_min s.Lz_max
         @printf "    Fz drift:  %+.4f  (init %.3f → final %.3f)\n" s.Fz_drift s.Fz_init s.Fz_final
         @printf "    end-spectrum top: "

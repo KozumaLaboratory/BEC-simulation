@@ -63,12 +63,12 @@ function _build_initial_state(seed::Int)
         end
     end
     SpinorBEC.TDHFBState{3, typeof(phi), typeof(rho), Float64}(
-        phi, rho, kappa, 0.0, 0,
+        phi, rho, kappa, 0.0, 0
     )
 end
 
 function _measure_residual(state0::SpinorBEC.TDHFBState, dt::Float64,
-                           F::Int, g_S, V_ext)
+    F::Int, g_S, V_ext)
     # S(dt) then S(-dt)
     s = deepcopy(state0)
     SpinorBEC.tdhfb_strang_step!(s, F, g_S, V_ext, dt)
@@ -115,9 +115,11 @@ log_dts = log.([r.dt for r in results])
 log_rho = log.([r.rho for r in results])
 # Least-squares slope
 n = length(log_dts)
-mean_x = sum(log_dts) / n; mean_y = sum(log_rho) / n
-slope = sum((log_dts[i] - mean_x) * (log_rho[i] - mean_y) for i in 1:n) /
-        sum((log_dts[i] - mean_x)^2 for i in 1:n)
+mean_x = sum(log_dts) / n;
+mean_y = sum(log_rho) / n
+slope =
+    sum((log_dts[i] - mean_x) * (log_rho[i] - mean_y) for i in 1:n) /
+    sum((log_dts[i] - mean_x)^2 for i in 1:n)
 @printf("ρ residual log-log slope (LSQ over %d dts): %.3f\n", n, slope)
 @printf("Theoretical for palindromic substep: ≥ 5 (= O(dt⁵) residual)\n")
 @printf("Documented current value: ≈ 2 (= O(dt²) residual, Option B fix needed)\n")

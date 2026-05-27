@@ -65,7 +65,9 @@ function _build_ws(dt::Float64)
     D = size(psi, 4)
     grid_cur = ws.grid
     @inbounds for I in CartesianIndices((N, N, N))
-        x = grid_cur.x[1][I[1]]; y = grid_cur.x[2][I[2]]; z = grid_cur.x[3][I[3]]
+        x = grid_cur.x[1][I[1]];
+        y = grid_cur.x[2][I[2]];
+        z = grid_cur.x[3][I[3]]
         g = exp(-(x * x + y * y + z * z) / 4)
         # Spin-coherent state along +x for F=6: components c[m] proportional to
         # binomial coefficients in (cos(π/4), sin(π/4))^{2F}
@@ -140,7 +142,7 @@ end
     "tol_rel", "wall", "n_accept", "n_reject", "dt_min", "dt_max", "err vs ref")
 adaptive_results = Dict{Float64, NamedTuple}()
 for tol_rel in [1e-5, 1e-7, 1e-9]
-    psi, wall, res = adaptive_run(dt_init=4e-3, tol_rel=tol_rel)
+    psi, wall, res = adaptive_run(; dt_init=4e-3, tol_rel=tol_rel)
     err = sqrt(sum(abs2, psi .- psi_ref))
     adaptive_results[tol_rel] = (
         wall=wall, n_acc=res.n_accept, n_rej=res.n_reject,
@@ -171,9 +173,15 @@ for tol_rel in [1e-5, 1e-7, 1e-9]
         tol_rel, r.err, r.wall, r.n_acc, r.n_rej)
     if isfinite(best_wall)
         ratio = r.wall / best_wall
-        verdict = ratio < 0.5 ? "✓ WINS (< 50%)" :
-                  ratio < 1.0 ? "△ marginal (50-100%)" :
-                  ratio < 2.0 ? "△ slight loss" : "✗ LOSES (≥ 2×)"
+        verdict = if ratio < 0.5
+            "✓ WINS (< 50%)"
+        elseif ratio < 1.0
+            "△ marginal (50-100%)"
+        elseif ratio < 2.0
+            "△ slight loss"
+        else
+            "✗ LOSES (≥ 2×)"
+        end
         @printf("  Fixed match dt=%.1e wall=%.2fs → adaptive ratio = %.0f%% [%s]\n",
             best_dt, best_wall, 100 * ratio, verdict)
     else
@@ -187,8 +195,8 @@ r7 = adaptive_results[1e-7]
 @printf("Pre-quench  (t < %.3f):   %d steps, mean dt = %.3e\n",
     QUENCH_T_CENTER - QUENCH_WIDTH,
     count(t -> t < QUENCH_T_CENTER - QUENCH_WIDTH, r7.t_history),
-    let times = r7.t_history, dts = r7.dt_history,
-        mask = times .< QUENCH_T_CENTER - QUENCH_WIDTH
+    let times = r7.t_history, dts = r7.dt_history, mask = times .< QUENCH_T_CENTER - QUENCH_WIDTH
+
         sum(dts[mask]) / max(count(mask), 1)
     end,
 )
@@ -197,14 +205,15 @@ r7 = adaptive_results[1e-7]
         r7.t_history),
     let times = r7.t_history, dts = r7.dt_history,
         mask = (QUENCH_T_CENTER - QUENCH_WIDTH) .≤ times .≤ (QUENCH_T_CENTER + QUENCH_WIDTH)
+
         sum(dts[mask]) / max(count(mask), 1)
     end,
 )
 @printf("Post-quench (t > %.3f):   %d steps, mean dt = %.3e\n",
     QUENCH_T_CENTER + QUENCH_WIDTH,
     count(t -> t > QUENCH_T_CENTER + QUENCH_WIDTH, r7.t_history),
-    let times = r7.t_history, dts = r7.dt_history,
-        mask = times .> QUENCH_T_CENTER + QUENCH_WIDTH
+    let times = r7.t_history, dts = r7.dt_history, mask = times .> QUENCH_T_CENTER + QUENCH_WIDTH
+
         sum(dts[mask]) / max(count(mask), 1)
     end,
 )

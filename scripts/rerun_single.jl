@@ -20,10 +20,15 @@ isfile(config_path) || error("config not found: $config_path")
 ckpt_dir = joinpath("runs", run_name, ".checkpoints")
 if isdir(ckpt_dir)
     @info "removing stale checkpoint dir" ckpt_dir
-    rm(ckpt_dir; recursive = true, force = true)
+    rm(ckpt_dir; recursive=true, force=true)
 end
 
-@async while true; flush(stdout); flush(stderr); sleep(10); end
+@async while true
+    ;
+    flush(stdout);
+    flush(stderr);
+    sleep(10);
+end
 
 println("=" ^ 72)
 println("[$(now())] rerun_single: $run_name")
@@ -31,7 +36,7 @@ println("=" ^ 72)
 flush(stdout)
 
 t0 = time()
-run_yaml(config_path; base_dir = "runs", verbose = true)
+run_yaml(config_path; base_dir="runs", verbose=true)
 dt = time() - t0
 println("\n[$(now())] $run_name done in $(round(dt/3600; digits=2)) h")
 flush(stdout)

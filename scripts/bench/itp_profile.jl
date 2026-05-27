@@ -38,7 +38,7 @@ mutable struct ItpTrace
 end
 ItpTrace() = ItpTrace([], [], [], [], [], [], [], [])
 
-function _make_logging_callback(trace::ItpTrace; every::Int = 1)
+function _make_logging_callback(trace::ItpTrace; every::Int=1)
     last_E = Ref{Float64}(NaN)
     last_psi = Ref{Any}(nothing)
     t0 = Ref{Float64}(NaN)
@@ -90,9 +90,10 @@ function _log_decay_fit(y::Vector{Float64})
     length(valid) < 8 && return (slope=NaN, exp_score=NaN)
     half = (length(valid) ÷ 2) + 1
     tail = log.(valid[half:end])
-    iters = collect(0:length(tail) - 1)
+    iters = collect(0:(length(tail) - 1))
     n = length(tail)
-    x̄ = mean(iters); ȳ = mean(tail)
+    x̄ = mean(iters);
+    ȳ = mean(tail)
     Sxx = sum((iters .- x̄) .^ 2)
     Sxy = sum((iters .- x̄) .* (tail .- ȳ))
     slope = Sxy / Sxx
@@ -104,7 +105,7 @@ function _log_decay_fit(y::Vector{Float64})
     (slope=slope, exp_score=r2)
 end
 
-function classify_itp(trace::ItpTrace; dt_cap::Union{Nothing, Float64} = nothing)
+function classify_itp(trace::ItpTrace; dt_cap::Union{Nothing, Float64}=nothing)
     fit_dE = _log_decay_fit(trace.dE)
     fit_dpsi = _log_decay_fit(trace.dpsi)
 
@@ -185,29 +186,29 @@ end
 # Replace this with your production setup (e.g. read a YAML config and
 # call `find_ground_state` directly, or read a JLD2 trace from runs/).
 
-function _demo_eu_itp_setup(; N::Int = 16, n_steps::Int = 500, dt::Float64 = 0.005)
+function _demo_eu_itp_setup(; N::Int=16, n_steps::Int=500, dt::Float64=0.005)
     grid = make_grid(GridConfig((N, N, N), (8.0, 8.0, 8.0)))
     trace = ItpTrace()
-    callback = _make_logging_callback(trace; every = 5)
+    callback = _make_logging_callback(trace; every=5)
 
     result = find_ground_state(;
-        grid = grid,
-        atom = Eu151,
-        interactions = InteractionParams(50.0, 1.0),
-        zeeman = ZeemanParams(0.5, 0.1),
-        potential = HarmonicTrap(1.0, 1.0, 1.0),
-        dt = dt,
-        n_steps = n_steps,
-        tol = 1.0e-10,
-        enable_ddi = true,
-        c_dd = 100.0,
-        on_step = callback,
-        verbose = false,
+        grid=grid,
+        atom=Eu151,
+        interactions=InteractionParams(50.0, 1.0),
+        zeeman=ZeemanParams(0.5, 0.1),
+        potential=HarmonicTrap(1.0, 1.0, 1.0),
+        dt=dt,
+        n_steps=n_steps,
+        tol=1.0e-10,
+        enable_ddi=true,
+        c_dd=100.0,
+        on_step=callback,
+        verbose=false,
     )
 
     println("\nfind_ground_state returned:")
-    println("  E_final = ", round(result.energy; digits = 8))
-    println("  dE_final = ", round(result.dE; sigdigits = 4))
+    println("  E_final = ", round(result.energy; digits=8))
+    println("  dE_final = ", round(result.dE; sigdigits=4))
     println("  converged = ", result.converged)
     println("  last_step = ", result.last_step)
 
@@ -218,6 +219,6 @@ if abspath(PROGRAM_FILE) == @__FILE__
     println("=== ITP profiling — demo on small Eu ITP (16³) ===")
     println("(Replace `_demo_eu_itp_setup` with your production setup or JLD2 reader.)\n")
     trace, _result, dt_cap = _demo_eu_itp_setup()
-    classify_itp(trace; dt_cap = dt_cap)
+    classify_itp(trace; dt_cap=dt_cap)
     save_trace_csv(trace, "/tmp/itp_profile_trace.csv")
 end

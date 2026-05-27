@@ -64,13 +64,19 @@ function load_run(name)
 end
 
 function print_summary(sum_::RunSummary)
-    pm_top3_init = sortperm(sum_.pm_init, rev = true)[1:min(3, length(sum_.pm_init))]
-    pm_top3_final = sortperm(sum_.pm_final, rev = true)[1:min(3, length(sum_.pm_final))]
+    pm_top3_init = sortperm(sum_.pm_init; rev=true)[1:min(3, length(sum_.pm_init))]
+    pm_top3_final = sortperm(sum_.pm_final; rev=true)[1:min(3, length(sum_.pm_final))]
     println("  $(sum_.name)")
     println("    frames=$(sum_.n_frames), duration=$(round(sum_.duration; digits=2))")
-    println("    norm: $(round(sum_.norm_init; digits=6)) → $(round(sum_.norm_final; digits=6))   max-dev: $(round(sum_.norm_max_dev; sigdigits=3))")
-    println("    Lz:   final=$(round(sum_.Lz_final; digits=4))   range=[$(round(sum_.Lz_min; digits=3)), $(round(sum_.Lz_max; digits=3))]")
-    println("    Fz:   $(round(sum_.Fz_init; digits=4)) → $(round(sum_.Fz_final; digits=4))   drift=$(round(sum_.Fz_drift; sigdigits=3))")
+    println(
+        "    norm: $(round(sum_.norm_init; digits=6)) → $(round(sum_.norm_final; digits=6))   max-dev: $(round(sum_.norm_max_dev; sigdigits=3))",
+    )
+    println(
+        "    Lz:   final=$(round(sum_.Lz_final; digits=4))   range=[$(round(sum_.Lz_min; digits=3)), $(round(sum_.Lz_max; digits=3))]",
+    )
+    println(
+        "    Fz:   $(round(sum_.Fz_init; digits=4)) → $(round(sum_.Fz_final; digits=4))   drift=$(round(sum_.Fz_drift; sigdigits=3))",
+    )
     @printf "    pm_init  top:  "
     for i in pm_top3_init
         @printf "[%d:%.4f] " i sum_.pm_init[i]
@@ -112,7 +118,7 @@ println("=" ^ 80)
 
 # Norm conservation — should be 1.0 throughout (RTP unitary)
 println("\n# Norm conservation (max deviation from 1.0 across run)")
-sorted_by_norm = sort(all_summaries, by = s -> s.norm_max_dev, rev = true)
+sorted_by_norm = sort(all_summaries; by=s -> s.norm_max_dev, rev=true)
 for s in sorted_by_norm[1:min(5, length(sorted_by_norm))]
     @printf "  %-25s max_dev = %.3e\n" s.name s.norm_max_dev
 end
@@ -120,7 +126,7 @@ end
 # Fz drift — for spinor evolution, Fz can change (it's not strictly conserved
 # under DDI), but huge drift suggests numerical issue.
 println("\n# Fz drift (final − initial)")
-sorted_by_fz = sort(all_summaries, by = s -> abs(s.Fz_drift), rev = true)
+sorted_by_fz = sort(all_summaries; by=s -> abs(s.Fz_drift), rev=true)
 for s in sorted_by_fz[1:min(5, length(sorted_by_fz))]
     @printf "  %-25s drift = %+.4f  (init→final = %+.3f → %+.3f)\n" s.name s.Fz_drift s.Fz_init s.Fz_final
 end
@@ -128,7 +134,7 @@ end
 # GS quality — pm_init should ideally be 1.0 (m=+F polarised) for runs that
 # initialise at m=+F. Anything < 0.95 indicates GS not properly converged.
 println("\n# GS quality (pm_init for m=+F: should be ≈ 1.0 for polarised init)")
-sorted_by_gs = sort(all_summaries, by = s -> s.pm_init_top1)
+sorted_by_gs = sort(all_summaries; by=s -> s.pm_init_top1)
 for s in sorted_by_gs[1:min(8, length(sorted_by_gs))]
     @printf "  %-25s pm_init[m=+F] = %.4f  (concerning if < 0.95)\n" s.name s.pm_init_top1
 end
@@ -166,21 +172,21 @@ end
 
 println("\n# Anomaly inspection: p_3000 final spectrum")
 s = first(filter(s -> s.name == "p_3000", all_summaries))
-println("  pm_init  = ", round.(s.pm_init; digits = 4))
-println("  pm_final = ", round.(s.pm_final; digits = 4))
+println("  pm_init  = ", round.(s.pm_init; digits=4))
+println("  pm_final = ", round.(s.pm_final; digits=4))
 
 println("\n# Anomaly inspection: p_10000 initial spectrum")
 s = first(filter(s -> s.name == "p_10000", all_summaries))
-println("  pm_init  = ", round.(s.pm_init; digits = 4))
-println("  pm_final = ", round.(s.pm_final; digits = 4))
+println("  pm_init  = ", round.(s.pm_init; digits=4))
+println("  pm_final = ", round.(s.pm_final; digits=4))
 
 println("\n# Anomaly inspection: grid_48cube initial spectrum")
 s = first(filter(s -> s.name == "grid_48cube", all_summaries))
-println("  pm_init  = ", round.(s.pm_init; digits = 4))
-println("  pm_final = ", round.(s.pm_final; digits = 4))
+println("  pm_init  = ", round.(s.pm_init; digits=4))
+println("  pm_final = ", round.(s.pm_final; digits=4))
 
 println("\n# Anomaly inspection: dy164_main_500ms (D=17)")
 s = first(filter(s -> s.name == "dy164_main_500ms", all_summaries))
-println("  pm_init  = ", round.(s.pm_init; digits = 4))
-println("  pm_final = ", round.(s.pm_final; digits = 4))
+println("  pm_init  = ", round.(s.pm_init; digits=4))
+println("  pm_final = ", round.(s.pm_final; digits=4))
 println("\nDone.")

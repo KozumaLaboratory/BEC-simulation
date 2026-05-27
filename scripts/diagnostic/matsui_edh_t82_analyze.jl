@@ -17,27 +17,29 @@ Snapshot layout in jld2 may be (13,32,32,32) or (32,32,32,13) — detected at ru
 
 using JLD2, Statistics, LinearAlgebra
 
-const DATA_DIR   = "runs/matsui_edh_baseline_9ca97308"
-const N_ATOMS    = 30_000
-const OMEGA_REF  = 628.3   # rad/s = 2π·100 Hz (Case A)
-const BOX_HALF   = 6.0     # box = [12,12,12]; half-extent in dimless units
-const NGRID      = 32
+const DATA_DIR = "runs/matsui_edh_baseline_9ca97308"
+const N_ATOMS = 30_000
+const OMEGA_REF = 628.3   # rad/s = 2π·100 Hz (Case A)
+const BOX_HALF = 6.0     # box = [12,12,12]; half-extent in dimless units
+const NGRID = 32
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 function load_dynamics(fname)
     jldopen(fname, "r") do f
-        times    = f["dynamics/times"]
-        pops     = f["dynamics/component_populations"]  # (13, Nt) or (Nt, 13)
-        mags     = f["dynamics/magnetizations"]
-        norms    = f["dynamics/norms"]
+        times = f["dynamics/times"]
+        pops = f["dynamics/component_populations"]  # (13, Nt) or (Nt, 13)
+        mags = f["dynamics/magnetizations"]
+        norms = f["dynamics/norms"]
         energies = f["dynamics/energies"]
 
         # snapshot keys are inside a subgroup; keys(f) only lists top-level.
         # Enumerate by looking for n_snapshots sentinel key.
         n_snaps_stored = Int(f["dynamics/psi_snapshots_streamed/n_snapshots"])
-        snap_keys = ["dynamics/psi_snapshots_streamed/frame_$(lpad(i, 5, '0'))"
-                     for i in 1:n_snaps_stored]
+        snap_keys = [
+            "dynamics/psi_snapshots_streamed/frame_$(lpad(i, 5, '0'))"
+            for i in 1:n_snaps_stored
+        ]
         snapshots = [f[k] for k in snap_keys]
 
         # GS energy if available
@@ -68,16 +70,16 @@ end
 function azimuthal_average(psi_c::AbstractArray, z_idx::Int)
     # psi_c: (Nx, Ny, Nz); returns radial density profile, length = NGRID÷2
     dens2d = abs2.(psi_c[:, :, z_idx])
-    nr  = NGRID ÷ 2
-    dx  = 2 * BOX_HALF / NGRID
-    sums   = zeros(Float64, nr)
+    nr = NGRID ÷ 2
+    dx = 2 * BOX_HALF / NGRID
+    sums = zeros(Float64, nr)
     counts = zeros(Int, nr)
     for j in 1:NGRID, i in 1:NGRID
         x = (i - NGRID/2 - 0.5) * dx
         y = (j - NGRID/2 - 0.5) * dx
         r = sqrt(x^2 + y^2)
         idx = clamp(Int(ceil(r / dx)), 1, nr)
-        sums[idx]   += dens2d[i, j]
+        sums[idx] += dens2d[i, j]
         counts[idx] += 1
     end
     return [counts[i] > 0 ? sums[i] / counts[i] : 0.0 for i in 1:nr]
@@ -94,14 +96,14 @@ function detect_ring(radial::Vector{Float64}; pop_c12::Float64=0.0, pop_threshol
     n_peak = radial[peak_idx]
     n_peak < 1e-30 && return (false, 0.0, 0.0, peak_idx)
     depth_pct = (n_peak - n0) / n_peak * 100.0
-    aspect    = n_peak / (n0 + 1e-30)
+    aspect = n_peak / (n0 + 1e-30)
     # Geometric criteria from T72 §6.2
-    geom_ok   = (depth_pct > 20.0) && (aspect > 1.5)
+    geom_ok = (depth_pct > 20.0) && (aspect > 1.5)
     # Population guard: ring detection is only physically meaningful when
     # the component has accumulated substantial population (>= 1%).
     # At near-zero population, the center is numerically zero by initialization
     # and the criterion spuriously triggers.
-    has_ring  = geom_ok && (pop_c12 >= pop_threshold)
+    has_ring = geom_ok && (pop_c12 >= pop_threshold)
     return (has_ring, depth_pct, aspect, peak_idx)
 end
 
@@ -122,7 +124,7 @@ function compute_winding(psi_c::AbstractArray, z_idx::Int, r_peak_idx::Int)
     total = 0.0
     for k in 1:n_phi
         d = phases[mod1(k + 1, n_phi)] - phases[k]
-        d >  π && (d -= 2π)
+        d > π && (d -= 2π)
         d < -π && (d += 2π)
         total += d
     end
@@ -204,37 +206,39 @@ function main()
         t = data.times[i + 1]   # frame i → times[i+1] (times[1]=t=0 is pre-dynamics)
         pop_c12_i = pop_c12_series[i]
         psi_c12 = extract_component(snap, 12)   # m_F=-5 ring component
-        z_mid   = NGRID ÷ 2 + 1
-        radial  = azimuthal_average(complex.(Float64.(real.(psi_c12)),
-                                             Float64.(imag.(psi_c12))), z_mid)
+        z_mid = NGRID ÷ 2 + 1
+        radial = azimuthal_average(complex.(Float64.(real.(psi_c12)),
+                Float64.(imag.(psi_c12))), z_mid)
         has_ring, depth_pct, aspect, r_peak = detect_ring(radial; pop_c12=pop_c12_i)
-        println("frame $i  t=$(round(t, digits=4))  pop_c12=$(round(pop_c12_i, sigdigits=3))  has_ring=$has_ring  depth%=$(round(depth_pct, digits=2))  aspect=$(round(aspect, digits=2))  r_peak=$r_peak")
+        println(
+            "frame $i  t=$(round(t, digits=4))  pop_c12=$(round(pop_c12_i, sigdigits=3))  has_ring=$has_ring  depth%=$(round(depth_pct, digits=2))  aspect=$(round(aspect, digits=2))  r_peak=$r_peak",
+        )
         push!(frame_results, (; i, t, pop_c12=pop_c12_i, has_ring, depth_pct, aspect, r_peak))
     end
 
     # F1 verdict
     t_ring_dimless = nothing
     t_ring_phys_ms = nothing
-    f1_ring_depth  = nothing
+    f1_ring_depth = nothing
     f1_ring_aspect = nothing
-    f1_r_peak      = nothing
+    f1_r_peak = nothing
     first_ring_idx = nothing
     for r in frame_results
         if r.has_ring
             t_ring_dimless = r.t
             t_ring_phys_ms = r.t / OMEGA_REF * 1000.0
-            f1_ring_depth  = r.depth_pct
+            f1_ring_depth = r.depth_pct
             f1_ring_aspect = r.aspect
-            f1_r_peak      = r.r_peak
+            f1_r_peak = r.r_peak
             first_ring_idx = r.i
             break
         end
     end
 
     # Find maximum depth across all frames (for NA reporting)
-    max_depth  = isempty(frame_results) ? 0.0 : maximum(r.depth_pct for r in frame_results)
-    max_aspect = isempty(frame_results) ? 0.0 : maximum(r.aspect    for r in frame_results)
-    max_pop    = isempty(frame_results) ? 0.0 : maximum(r.pop_c12   for r in frame_results)
+    max_depth = isempty(frame_results) ? 0.0 : maximum(r.depth_pct for r in frame_results)
+    max_aspect = isempty(frame_results) ? 0.0 : maximum(r.aspect for r in frame_results)
+    max_pop = isempty(frame_results) ? 0.0 : maximum(r.pop_c12 for r in frame_results)
 
     if isnothing(t_ring_dimless)
         f1_band = "NOT_APPLICABLE_NO_RING"
@@ -254,15 +258,21 @@ function main()
         else
             f1_band = "REFUTED"
         end
-        println("\nF1: Ring detected at frame $first_ring_idx, t_dimless=$(round(t_ring_dimless, digits=4))")
+        println(
+            "\nF1: Ring detected at frame $first_ring_idx, t_dimless=$(round(t_ring_dimless, digits=4))",
+        )
         println("  Physical: $(round(t_ring_ms, digits=3)) ms")
-        println("  Depth: $(round(f1_ring_depth, digits=2))%  Aspect: $(round(f1_ring_aspect, digits=2))")
+        println(
+            "  Depth: $(round(f1_ring_depth, digits=2))%  Aspect: $(round(f1_ring_aspect, digits=2))",
+        )
         println("  F1 band: $f1_band")
         # Also check dimless band at ω_ref = 628.3 rad/s: [1.57, 6.28]
         if 1.57 <= t_ring_dimless <= 6.28
             println("  Dimless check (ω_ref=2π·100 Hz): IN [1.57, 6.28] ✓")
         else
-            println("  Dimless check (ω_ref=2π·100 Hz): OUTSIDE [1.57, 6.28]  (t=$(round(t_ring_dimless,digits=3)))")
+            println(
+                "  Dimless check (ω_ref=2π·100 Hz): OUTSIDE [1.57, 6.28]  (t=$(round(t_ring_dimless,digits=3)))",
+            )
         end
     end
 
@@ -271,12 +281,12 @@ function main()
     ell_sim = nothing
     f2_band = "NOT_APPLICABLE_NO_RING"
     if !isnothing(first_ring_idx)
-        snap   = data.snapshots[first_ring_idx]
+        snap = data.snapshots[first_ring_idx]
         psi_c12 = extract_component(snap, 12)
-        z_mid   = NGRID ÷ 2 + 1
+        z_mid = NGRID ÷ 2 + 1
         ell_sim = compute_winding(complex.(Float64.(real.(psi_c12)),
-                                           Float64.(imag.(psi_c12))),
-                                  z_mid, f1_r_peak)
+                Float64.(imag.(psi_c12))),
+            z_mid, f1_r_peak)
         println("Winding number at t_ring (frame $first_ring_idx): ℓ ≈ $(round(ell_sim, digits=3))")
         ell_rounded = round(Int, ell_sim)
         # T72 §4.3 bands: CORROBORATE if |ℓ|=1; INCONCLUSIVE if ∈{0,±2}; REFUTED if |ℓ|≥3
@@ -304,7 +314,7 @@ function main()
     # Conclusion: gs_energy_final has Zeeman contribution of exactly 0 for m_F=-6 dominant component.
     # The reported energy is kinetic + trap + contact + DDI + LHY (no Zeeman for m_F=-6).
 
-    e_gs_total     = -967.027    # ℏω_ref, from T81 metrics
+    e_gs_total = -967.027    # ℏω_ref, from T81 metrics
     e_sim_per_atom = e_gs_total / N_ATOMS    # ℏω_ref/atom
 
     # T72 §5.3 prediction at Case A (isotropic ω_ref = 2π·100 Hz):
@@ -313,7 +323,7 @@ function main()
     #   DDI: ≈ 0 (κ=1 spherical, f(κ=1)=0)
     #   LHY: negligible (~0.035)
     #   Total: ≈ 10.535 → quoted as 10.5 ℏω_ref/atom
-    e_mf_per_atom  = 10.5   # ℏω_ref/atom (T72 §5.3)
+    e_mf_per_atom = 10.5   # ℏω_ref/atom (T72 §5.3)
 
     # The SIGN difference: sim = -0.032, theory = +10.5.
     # Zeeman is ruled out (zero for m_F=-6 by ITP convention).
@@ -406,12 +416,14 @@ function main()
         "but with c1_ratio=-0.005, there may be partial cancellation. Alternatively, the GS converged ",
         "to a state where the trap zero-point (+1.5) is offset by negative contact interaction (from c1<0), ",
         "giving near-zero total. T83 critic must verify the c0+36c1 constraint wiring and compare ",
-        "with ITP energy decomposition (trap vs contact vs DDI vs LHY separately)."
+        "with ITP energy decomposition (trap vs contact vs DDI vs LHY separately).",
     )
 
     println("GS energy from T81: $(e_gs_total) ℏω_ref total")
     println("Per atom: $(round(e_sim_per_atom, digits=6)) ℏω_ref/atom")
-    println("T72 §5.3 prediction: $(e_mf_per_atom) ℏω_ref/atom (zero-point 1.5 + contact-TF 9.0 + DDI≈0)")
+    println(
+        "T72 §5.3 prediction: $(e_mf_per_atom) ℏω_ref/atom (zero-point 1.5 + contact-TF 9.0 + DDI≈0)",
+    )
     println("Relative error: $(round(rel_err, digits=4)) ($(round(rel_err*100, digits=1))%)")
     println("F3 band: $f3_band")
     println("Note: $(zeeman_note[1:min(200,end)])...")
@@ -420,25 +432,35 @@ function main()
     println("\n=== Energy conservation post-quench (T81 red flag) ===")
     # dynamics energies[1] = energy at t=0 after quench, energies[end] = at t=t_end
     println("Dynamics energies: $(data.energies)")
-    e_t0   = data.energies[1]
+    e_t0 = data.energies[1]
     e_tend = data.energies[end]
     e_drift = e_tend - e_t0
     println("Energy at t0 = $e_t0,  at t_end = $e_tend")
-    println("Energy drift = $(round(e_drift, digits=4)) ℏω_ref ($(round(100*abs(e_drift)/(abs(e_t0)+1e-30), digits=2))%)")
-    println("Note: after B-quench to near-zero, Zeeman ~ 0 → energy should plateau unless EdH dynamics redistribute it.")
+    println(
+        "Energy drift = $(round(e_drift, digits=4)) ℏω_ref ($(round(100*abs(e_drift)/(abs(e_t0)+1e-30), digits=2))%)",
+    )
+    println(
+        "Note: after B-quench to near-zero, Zeeman ~ 0 → energy should plateau unless EdH dynamics redistribute it.",
+    )
 
     # ── falsification summary ──────────────────────────────────────────────────
     println("\n=== SUMMARY ===")
-    println("F1 (ring detection): $(isnothing(t_ring_dimless) ? "NO_RING" : "t_ring=$(round(t_ring_dimless,digits=3)) dimless = $(round(t_ring_phys_ms,digits=2)) ms")  band=$f1_band")
-    println("F2 (winding number): ell=$(isnothing(ell_sim) ? "N/A" : round(ell_sim,digits=2))  band=$f2_band")
-    println("F3 (GS energy):      e_sim/atom=$(round(e_sim_per_atom,digits=4))  e_mf/atom=$(e_mf_per_atom)  rel_err=$(round(rel_err,digits=4))  band=$f3_band")
+    println(
+        "F1 (ring detection): $(isnothing(t_ring_dimless) ? "NO_RING" : "t_ring=$(round(t_ring_dimless,digits=3)) dimless = $(round(t_ring_phys_ms,digits=2)) ms")  band=$f1_band",
+    )
+    println(
+        "F2 (winding number): ell=$(isnothing(ell_sim) ? "N/A" : round(ell_sim,digits=2))  band=$f2_band",
+    )
+    println(
+        "F3 (GS energy):      e_sim/atom=$(round(e_sim_per_atom,digits=4))  e_mf/atom=$(e_mf_per_atom)  rel_err=$(round(rel_err,digits=4))  band=$f3_band",
+    )
 
     # Composite falsification verdict
     all_decisive = [f1_band, f2_band, f3_band]
     n_corroborate = count(==("CORROBORATE"), all_decisive)
-    n_opgate      = count(==("OPERATIONAL_GATE"), all_decisive)
-    n_refuted     = count(==("REFUTED"), all_decisive)
-    n_na          = count(==("NOT_APPLICABLE_NO_RING"), all_decisive)
+    n_opgate = count(==("OPERATIONAL_GATE"), all_decisive)
+    n_refuted = count(==("REFUTED"), all_decisive)
+    n_na = count(==("NOT_APPLICABLE_NO_RING"), all_decisive)
 
     if n_opgate > 0
         falsification_result = "OPERATIONAL_GATE"
@@ -455,10 +477,13 @@ function main()
 
     # Machine-parseable output block
     println("\n=== METRICS_JSON ===")
-    per_frame = [(t=r.t, pop_c12=r.pop_c12, has_ring=r.has_ring, depth_pct=round(r.depth_pct,digits=3),
-                  aspect=round(r.aspect,digits=3), r_peak=r.r_peak) for r in frame_results]
+    per_frame = [
+        (t=r.t, pop_c12=r.pop_c12, has_ring=r.has_ring, depth_pct=round(r.depth_pct; digits=3),
+            aspect=round(r.aspect; digits=3), r_peak=r.r_peak) for r in frame_results
+    ]
 
-    println("""
+    println(
+        """
 {
   "experiment_kind": "analyze_existing",
   "workload_class": "implementer_julia_cpu_light",
@@ -487,20 +512,21 @@ function main()
   "dynamics_e_tend": $(e_tend),
   "dynamics_e_drift": $(round(e_drift, digits=4)),
   "falsification_result": "$(falsification_result)"
-}""")
+}"""
+    )
 
     return (;
-        n_snaps    = data.n_snaps,
-        times      = data.times,
+        n_snaps=data.n_snaps,
+        times=data.times,
         f1_band,
-        f1_ring_detected = !isnothing(t_ring_dimless),
+        f1_ring_detected=(!isnothing(t_ring_dimless)),
         t_ring_dimless,
         t_ring_phys_ms,
         ell_sim,
         f2_band,
         e_sim_per_atom,
         f3_band,
-        falsification_result
+        falsification_result,
     )
 end
 

@@ -18,11 +18,11 @@ using Random
 
 function spin_matrices_general(F::Int)
     D = 2F + 1
-    Fz = Diagonal(ComplexF64[F - i for i in 0:D-1])
+    Fz = Diagonal(ComplexF64[F - i for i in 0:(D - 1)])
     Fp = zeros(ComplexF64, D, D)
-    for i in 1:(D-1)
+    for i in 1:(D - 1)
         m = F - i
-        Fp[i, i+1] = sqrt(F * (F + 1) - m * (m + 1))
+        Fp[i, i + 1] = sqrt(F * (F + 1) - m * (m + 1))
     end
     Fm = Fp'
     Fx = (Fp + Fm) / 2
@@ -142,9 +142,9 @@ end
 # ⟨S M | ζ1 ⊗ ζ2⟩ for all M; returns Vector{Complex}
 function project_2body(ζ1::Vector, ζ2::Vector, F::Int, S::Int)
     amps = ComplexF64[]
-    for M in -S:S
+    for M in (-S):S
         amp = 0.0im
-        for m1 in -F:F
+        for m1 in (-F):F
             m2 = M - m1
             if -F <= m2 <= F
                 cg = clebsch_gordan(F, m1, F, m2, S, M)
@@ -205,9 +205,9 @@ end
 cases = [
     (3, :O, :A_2, "F=3 octa A_2", "paper3 §V.B"),
     (4, :O, :A_1, "F=4 cube", "paper3 §V.C"),
-    (6, :I, :A,   "F=6 icosa", "paper3 §V.D"),
+    (6, :I, :A, "F=6 icosa", "paper3 §V.D"),
     (8, :O, :A_1, "F=8 cube-octa Dy", "paper3 §V.E"),
-    (10, :I, :A,  "F=10 dodec", "paper3 §V.F"),
+    (10, :I, :A, "F=10 dodec", "paper3 §V.F"),
 ]
 
 # Reference: paper3 stated β_S^{λ_spin} signs (S, sign)
@@ -230,7 +230,7 @@ for (F, grp, irrep, label, ref) in cases
     println("─"^80)
     ζ = build_polyhedral_spinor(F, grp, irrep)
     @printf("Spinor support m ∈ {")
-    for m in F:-1:-F
+    for m in F:-1:(-F)
         i = F - m + 1
         if abs(ζ[i]) > 1e-6
             print("$m, ")

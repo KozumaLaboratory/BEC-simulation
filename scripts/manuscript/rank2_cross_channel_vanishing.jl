@@ -22,9 +22,9 @@ using Test
 
 function project_S_channel_amp(v1::Vector{ComplexF64}, v2::Vector{ComplexF64}, F::Int, S::Int)
     amps = ComplexF64[]
-    for M in -S:S
+    for M in (-S):S
         amp = 0.0im
-        for m1 in -F:F
+        for m1 in (-F):F
             m2 = M - m1
             if -F <= m2 <= F
                 cg = clebsch_gordan(F, m1, F, m2, S, M)
@@ -39,7 +39,7 @@ function project_S_channel_amp(v1::Vector{ComplexF64}, v2::Vector{ComplexF64}, F
 end
 
 function test_rank2_vanishing(F::Int, ζ::Vector{ComplexF64}, case_name::String;
-                              tol::Float64=1e-12)
+    tol::Float64=1e-12)
     D = 2F + 1
     @assert length(ζ) == D
     @assert abs(sum(abs2.(ζ)) - 1.0) < 1e-10
@@ -52,7 +52,8 @@ function test_rank2_vanishing(F::Int, ζ::Vector{ComplexF64}, case_name::String;
 
     # Schur isotropy sanity
     schur_dev = abs(norm_Fz_ζ_sq - F*(F+1)/3)
-    schur_dev < 1e-10 || @warn "$case_name: Schur isotropy ‖F_z ζ‖² = $norm_Fz_ζ_sq, expected $(F*(F+1)/3)"
+    schur_dev < 1e-10 ||
+        @warn "$case_name: Schur isotropy ‖F_z ζ‖² = $norm_Fz_ζ_sq, expected $(F*(F+1)/3)"
 
     max_dev = 0.0
     devs = Float64[]
@@ -73,7 +74,8 @@ end
 
 @testset "Rank-2 cross-channel vanishing for polyhedral inert states" begin
     # ---- F=3 octa A_2 ----
-    F = 3; D = 2F + 1
+    F = 3;
+    D = 2F + 1
     ζ_octa3 = zeros(ComplexF64, D)
     ζ_octa3[2] = 1/sqrt(2)
     ζ_octa3[6] = -1/sqrt(2)
@@ -81,7 +83,8 @@ end
     @test max_dev < 1e-12
 
     # ---- F=4 cube ----
-    F = 4; D = 2F + 1
+    F = 4;
+    D = 2F + 1
     ζ_cube = zeros(ComplexF64, D)
     ζ_cube[1] = sqrt(5/24)
     ζ_cube[5] = sqrt(7/12)
@@ -90,7 +93,8 @@ end
     @test max_dev < 1e-12
 
     # ---- F=6 icosa ----
-    F = 6; D = 2F + 1
+    F = 6;
+    D = 2F + 1
     ζ_ico = zeros(ComplexF64, D)
     ζ_ico[2] = sqrt(7.0)/5
     ζ_ico[7] = sqrt(11.0)/5
@@ -99,7 +103,8 @@ end
     @test max_dev < 1e-12
 
     # ---- F=8 cube-octa A_1 ----
-    F = 8; D = 2F + 1
+    F = 8;
+    D = 2F + 1
     ζ_F8 = zeros(ComplexF64, D)
     ζ_F8[1] = sqrt(390)/48
     ζ_F8[5] = sqrt(42)/24

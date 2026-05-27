@@ -62,27 +62,41 @@ function _y4_step!(ws::SpinorBEC.Workspace{N}, V_half!::Function) where {N}
     n_comp = ws.spin_matrices.system.n_components
     omega = ws.sim_params.rotating_frame_omega
     t_base = ws.state.t
-    w1 = _Y4_W1; w0 = _Y4_W0; wm = _Y4_WM
+    w1 = _Y4_W1;
+    w0 = _Y4_W0;
+    wm = _Y4_WM
     V_half!(ws, w1 * dt / 2, n_comp, N, false;
         t_eval=t_base + w1 * dt / 4, t_start=t_base)
-    SpinorBEC._apply_coriolis_step!(ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache)
+    SpinorBEC._apply_coriolis_step!(
+        ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache
+    )
     SpinorBEC._update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, w1 * dt)
     SpinorBEC.apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
-    SpinorBEC._apply_coriolis_step!(ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache)
+    SpinorBEC._apply_coriolis_step!(
+        ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache
+    )
     t_v2 = t_base + w1 * dt / 2
     V_half!(ws, wm * dt, n_comp, N, false;
         t_eval=t_v2 + wm * dt / 2, t_start=t_v2)
-    SpinorBEC._apply_coriolis_step!(ws.state.psi, ws.grid, omega, w0 * dt / 2, false, ws.coriolis_cache)
+    SpinorBEC._apply_coriolis_step!(
+        ws.state.psi, ws.grid, omega, w0 * dt / 2, false, ws.coriolis_cache
+    )
     SpinorBEC._update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, w0 * dt)
     SpinorBEC.apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
-    SpinorBEC._apply_coriolis_step!(ws.state.psi, ws.grid, omega, w0 * dt / 2, false, ws.coriolis_cache)
+    SpinorBEC._apply_coriolis_step!(
+        ws.state.psi, ws.grid, omega, w0 * dt / 2, false, ws.coriolis_cache
+    )
     t_v3 = t_base + w1 * dt / 2 + wm * dt
     V_half!(ws, wm * dt, n_comp, N, false;
         t_eval=t_v3 + wm * dt / 2, t_start=t_v3)
-    SpinorBEC._apply_coriolis_step!(ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache)
+    SpinorBEC._apply_coriolis_step!(
+        ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache
+    )
     SpinorBEC._update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, w1 * dt)
     SpinorBEC.apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
-    SpinorBEC._apply_coriolis_step!(ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache)
+    SpinorBEC._apply_coriolis_step!(
+        ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache
+    )
     V_half!(ws, w1 * dt / 2, n_comp, N, false;
         t_eval=t_base + dt - w1 * dt / 4, t_start=t_base + dt - w1 * dt / 2)
     ws.state.t += dt
@@ -127,10 +141,10 @@ evolve_fg_p2!(ws) = SpinorBEC.split_step_forcegrad!(ws; n_picard=2)
     C0, C1, T_FINAL, DT, N_STEPS)
 
 results = [
-    run_drift("Strang",          evolve_strang!),
-    run_drift("Y4-mid",          evolve_y4_mid!),
-    run_drift("ForceGrad p=1",   evolve_fg_p1!),
-    run_drift("ForceGrad p=2",   evolve_fg_p2!),
+    run_drift("Strang", evolve_strang!),
+    run_drift("Y4-mid", evolve_y4_mid!),
+    run_drift("ForceGrad p=1", evolve_fg_p1!),
+    run_drift("ForceGrad p=2", evolve_fg_p2!),
 ]
 
 # --- Summary table ---
@@ -143,7 +157,7 @@ function _at(times, drifts, t)
     idx === nothing ? drifts[end] : drifts[idx]
 end
 for (label, times, drifts, wall) in results
-    d5  = _at(times, drifts, 5.0)
+    d5 = _at(times, drifts, 5.0)
     d10 = _at(times, drifts, 10.0)
     d20 = _at(times, drifts, 20.0)
     @printf("%-20s  %+.4e   %+.4e   %+.4e   %.1f\n",

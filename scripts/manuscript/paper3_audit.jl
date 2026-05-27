@@ -25,11 +25,11 @@ using Random
 
 function spin_matrices_general(F::Int)
     D = 2F + 1
-    Fz = Diagonal(ComplexF64[F - i for i in 0:D-1])
+    Fz = Diagonal(ComplexF64[F - i for i in 0:(D - 1)])
     Fp = zeros(ComplexF64, D, D)
-    for i in 1:(D-1)
+    for i in 1:(D - 1)
         m = F - i
-        Fp[i, i+1] = sqrt(F * (F + 1) - m * (m + 1))
+        Fp[i, i + 1] = sqrt(F * (F + 1) - m * (m + 1))
     end
     Fm = Fp'
     Fx = (Fp + Fm) / 2
@@ -178,7 +178,7 @@ end
 
 # Build characters by enumerating group then sorting by conjugacy class.
 function compute_character(group_elements::Vector{<:AbstractMatrix},
-                            irrep::Symbol, point_group::Symbol, F::Int)
+    irrep::Symbol, point_group::Symbol, F::Int)
     chars = Vector{Float64}(undef, length(group_elements))
     # Determine each element's conjugacy class by computing its trace in F=1
     # (= the SO(3) trace) and its order
@@ -268,17 +268,19 @@ function compute_character(group_elements::Vector{<:AbstractMatrix},
 end
 
 function project_onto_irrep(ψ::Vector, group_elements::Vector{<:AbstractMatrix},
-                             chars::Vector{Float64})
-    P = sum(chars[i] * group_elements[i] * ψ for i in 1:length(group_elements)) / length(group_elements)
+    chars::Vector{Float64})
+    P =
+        sum(chars[i] * group_elements[i] * ψ for i in 1:length(group_elements)) /
+        length(group_elements)
     return P
 end
 
 # Build interaction projection coefficient β_S^{c_0} = ⟨ζ⊗ζ|P_S|ζ⊗ζ⟩
 function project_S_channel(ζ::Vector, F::Int, S::Int)
     total = 0.0
-    for M in -S:S
+    for M in (-S):S
         amp = 0.0im
-        for m1 in -F:F
+        for m1 in (-F):F
             m2 = M - m1
             if -F <= m2 <= F
                 cg = clebsch_gordan(F, m1, F, m2, S, M)
@@ -293,7 +295,7 @@ function project_S_channel(ζ::Vector, F::Int, S::Int)
 end
 
 function audit_case(F::Int, group::Symbol, irrep::Symbol, label::String,
-                     paper3_excluded::Vector{Int}, paper3_section::String)
+    paper3_excluded::Vector{Int}, paper3_section::String)
     @printf("\n%s\n", "="^70)
     @printf("AUDIT: F=%d, %s phase (%s:%s) — paper3 %s\n", F, label, group, irrep, paper3_section)
     @printf("%s\n", "="^70)
@@ -310,7 +312,7 @@ function audit_case(F::Int, group::Symbol, irrep::Symbol, label::String,
     @printf("Group order: %d (expected %d)\n", length(G), expected_order)
     if length(G) != expected_order
         @warn "Group closure failed for $label"
-        return
+        return nothing
     end
 
     # Characters
@@ -318,7 +320,7 @@ function audit_case(F::Int, group::Symbol, irrep::Symbol, label::String,
     nan_count = count(isnan, chars)
     if nan_count > 0
         @warn "Character computation has $nan_count NaN entries"
-        return
+        return nothing
     end
     @printf("Character sum: %.2f (should be 0 for non-trivial, |G|=%d for trivial)\n",
         sum(chars), expected_order)
@@ -343,7 +345,7 @@ function audit_case(F::Int, group::Symbol, irrep::Symbol, label::String,
         end
         if !found
             @warn "Cannot find $irrep invariant vector (multiplicity = 0)"
-            return
+            return nothing
         end
     end
     ζ = ζ / norm(ζ)
@@ -363,7 +365,9 @@ function audit_case(F::Int, group::Symbol, irrep::Symbol, label::String,
     Fy2 = real(ζ' * (Fy*Fy) * ζ)
     Fz2 = real(ζ' * (Fz*Fz) * ζ)
     schur_dev = max(abs(Fx2 - F2/3), abs(Fy2 - F2/3), abs(Fz2 - F2/3))
-    Fx_m = real(ζ' * Fx * ζ); Fy_m = real(ζ' * Fy * ζ); Fz_m = real(ζ' * Fz * ζ)
+    Fx_m = real(ζ' * Fx * ζ);
+    Fy_m = real(ζ' * Fy * ζ);
+    Fz_m = real(ζ' * Fz * ζ)
 
     @printf("⟨F²⟩ = %.6f (expected %d = F(F+1))\n", F2, F*(F+1))
     @printf("⟨F_a²⟩ = (%.3f, %.3f, %.3f) (Schur: %.3f); deviation %.2e\n",
@@ -372,7 +376,7 @@ function audit_case(F::Int, group::Symbol, irrep::Symbol, label::String,
 
     # Sparsity
     @printf("ζ non-zero m components: ")
-    for m in F:-1:-F
+    for m in F:-1:(-F)
         i = F - m + 1
         if abs(ζ[i]) > 1e-6
             @printf("%d ", m)
@@ -405,11 +409,11 @@ function audit_case(F::Int, group::Symbol, irrep::Symbol, label::String,
 end
 
 # Run audits
-audit_case(3, :O, :A_2, "octahedral",  [2],              "§V.B (Round 5 NEW)")
-audit_case(4, :O, :A_1, "cube",        [2],              "§V.C (Round 4 NEW)")
-audit_case(6, :I, :A,   "icosahedral", [2, 4, 8, 14],    "§V.D (Paper #2)")
-audit_case(8, :O, :A_1, "cube-like octa", [2],          "§V.E (Round 5 NEW, Dy)")
-audit_case(10, :I, :A,  "dodecahedral", [2, 4, 8, 14],   "§V.F (Round 4 NEW)")
+audit_case(3, :O, :A_2, "octahedral", [2], "§V.B (Round 5 NEW)")
+audit_case(4, :O, :A_1, "cube", [2], "§V.C (Round 4 NEW)")
+audit_case(6, :I, :A, "icosahedral", [2, 4, 8, 14], "§V.D (Paper #2)")
+audit_case(8, :O, :A_1, "cube-like octa", [2], "§V.E (Round 5 NEW, Dy)")
+audit_case(10, :I, :A, "dodecahedral", [2, 4, 8, 14], "§V.F (Round 4 NEW)")
 
 @printf("\n%s\n", "="^70)
 @printf("paper3 v3 polyhedral cases AUDIT COMPLETE.\n")

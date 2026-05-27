@@ -122,7 +122,9 @@ println("--|--------|--------|----------------")
 empirical_Sbd = Dict(3 => "[4, 6]", 4 => 6, 6 => 10, 8 => 12, 10 => 16, 12 => "predict 18")
 for F in [3, 4, 6, 8, 10, 12]
     Sbd = sqrt(2.0 * F * (F + 1))
-    println(" $F | $(round(Sbd, digits=2)) | $(round(Sbd/F, digits=3)) | $(get(empirical_Sbd, F, "?"))")
+    println(
+        " $F | $(round(Sbd, digits=2)) | $(round(Sbd/F, digits=3)) | $(get(empirical_Sbd, F, "?"))"
+    )
 end
 
 println("\n=== Lemma 1 General-S: 29 channel coefficients verified across 6 cases ===")

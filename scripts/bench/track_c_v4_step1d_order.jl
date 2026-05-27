@@ -166,7 +166,7 @@ Compute Aψ = [V_SM(m_bg), [T, V_SM(m_bg)]] ψ_test.
 Returns out — does NOT modify psi.
 """
 function apply_v4_direct!(out, psi, m_bg, c1, k_vecs, tmp1, tmp2, tmp3,
-                          buf, plan_f, plan_b)
+    buf, plan_f, plan_b)
     n_pts = size(psi)[1:3]
     # tmp1 = V ψ
     apply_VSM!(tmp1, psi, m_bg, c1)
@@ -201,10 +201,10 @@ For machine-precision Hermiticity preservation, use a SYMMETRIC Crank-Nicolson:
 Approximated to leading order: ψ_new = ψ - iα·Aψ (real solution for first-order).
 """
 function apply_fg_correction!(psi, m_bg, c1, alpha, k_vecs,
-                              tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
+    tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
     # Aψ = [V,[T,V]] ψ
     apply_v4_direct!(Aψ, psi, m_bg, c1, k_vecs, tmp1, tmp2, tmp3,
-                     buf, plan_f, plan_b)
+        buf, plan_f, plan_b)
     # Symmetric expansion: ψ ← ψ - iα·Aψ - (α²/2)·A(Aψ) + ...
     # For order 4 sufficient: keep linear term (leading α ~ dt² so quadratic
     # term ~ dt⁴ matches truncation order).
@@ -228,20 +228,20 @@ end
 #                      = exp(-i(dt/2)V) · exp(-i(dt³/48)[V,[T,V]])
 # Total per full step: 2× FG correction at α=dt³/48 (symmetric placement).
 function strang_v4_step!(psi, c1, dt, k_vecs, m_buf,
-                         tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
+    tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
     alpha = dt^3 / 48.0   # FG coefficient (dt³ scaling, per Chin 2005)
     # V_eff right-half: V(dt/2) then FG-corr(dt³/48)
     spin_density!(m_buf, psi)
     apply_V_step!(psi, m_buf, c1, dt / 2)
     spin_density!(m_buf, psi)
     apply_fg_correction!(psi, m_buf, c1, alpha, k_vecs,
-                         tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
+        tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
     # K step
     apply_K_step!(psi, k_vecs, dt, buf, plan_f, plan_b)
     # V_eff left-half: FG-corr(dt³/48) then V(dt/2)
     spin_density!(m_buf, psi)
     apply_fg_correction!(psi, m_buf, c1, alpha, k_vecs,
-                         tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
+        tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
     spin_density!(m_buf, psi)
     apply_V_step!(psi, m_buf, c1, dt / 2)
     nothing
@@ -282,7 +282,7 @@ function run_scheme(scheme::Symbol, c1::Float64, dt::Float64)
             strang_step!(psi, c1, actual_dt, k_vecs, m_buf, buf, plan_f, plan_b)
         elseif scheme === :strang_v4
             strang_v4_step!(psi, c1, actual_dt, k_vecs, m_buf,
-                            tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
+                tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
         else
             error("unknown scheme $scheme")
         end
@@ -315,14 +315,20 @@ v_errs = Float64[]
 s_walls = Float64[]
 v_walls = Float64[]
 for dt in dts
-    t1 = time(); ψS = run_scheme(:strang, c1, dt); wS = time() - t1
-    t2 = time(); ψV = run_scheme(:strang_v4, c1, dt); wV = time() - t2
+    t1 = time();
+    ψS = run_scheme(:strang, c1, dt);
+    wS = time() - t1
+    t2 = time();
+    ψV = run_scheme(:strang_v4, c1, dt);
+    wV = time() - t2
     eS = sqrt(sum(abs2, ψS - psi_ref))
     eV = sqrt(sum(abs2, ψV - psi_ref))
-    push!(s_errs, eS); push!(v_errs, eV)
-    push!(s_walls, wS); push!(v_walls, wV)
-    oS = length(s_errs) >= 2 ? log2(s_errs[end-1] / s_errs[end]) : NaN
-    oV = length(v_errs) >= 2 ? log2(v_errs[end-1] / v_errs[end]) : NaN
+    push!(s_errs, eS);
+    push!(v_errs, eV)
+    push!(s_walls, wS);
+    push!(v_walls, wV)
+    oS = length(s_errs) >= 2 ? log2(s_errs[end - 1] / s_errs[end]) : NaN
+    oV = length(v_errs) >= 2 ? log2(v_errs[end - 1] / v_errs[end]) : NaN
     @printf("%-8.1e  %-12.3e  %-12s  %-8.2f  %-12.3e  %-12s  %-8.2f\n",
         dt, eS, isnan(oS) ? "—" : @sprintf("%.2f", oS), wS,
         eV, isnan(oV) ? "—" : @sprintf("%.2f", oV), wV)
@@ -330,8 +336,8 @@ end
 
 # Verdict
 @printf("\n%s\n", "═"^60)
-strang_order = log2(s_errs[end-1] / s_errs[end])
-v4_order = log2(v_errs[end-1] / v_errs[end])
+strang_order = log2(s_errs[end - 1] / s_errs[end])
+v4_order = log2(v_errs[end - 1] / v_errs[end])
 @printf("Strang final order:  %.2f (expect ≈ 2.0)\n", strang_order)
 @printf("v4 final order:      %.2f (gate: ≥ 3.5 → continue Step 2/3)\n", v4_order)
 @printf("\nv4 vs Strang error ratio at dt=%.1e: %.2f×\n",

@@ -82,50 +82,90 @@ function _y4_step!(ws::SpinorBEC.Workspace{N}, V_half!::Function) where {N}
     n_comp = ws.spin_matrices.system.n_components
     omega = ws.sim_params.rotating_frame_omega
     t_base = ws.state.t
-    w1 = _Y4_W1; w0 = _Y4_W0; wm = _Y4_WM
+    w1 = _Y4_W1;
+    w0 = _Y4_W0;
+    wm = _Y4_WM
     V_half!(ws, w1 * dt / 2, n_comp, N, false; t_eval=t_base + w1 * dt / 4, t_start=t_base)
-    SpinorBEC._apply_coriolis_step!(ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache)
+    SpinorBEC._apply_coriolis_step!(
+        ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache
+    )
     SpinorBEC._update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, w1 * dt)
     SpinorBEC.apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
-    SpinorBEC._apply_coriolis_step!(ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache)
+    SpinorBEC._apply_coriolis_step!(
+        ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache
+    )
     t_v2 = t_base + w1 * dt / 2
     V_half!(ws, wm * dt, n_comp, N, false; t_eval=t_v2 + wm * dt / 2, t_start=t_v2)
-    SpinorBEC._apply_coriolis_step!(ws.state.psi, ws.grid, omega, w0 * dt / 2, false, ws.coriolis_cache)
+    SpinorBEC._apply_coriolis_step!(
+        ws.state.psi, ws.grid, omega, w0 * dt / 2, false, ws.coriolis_cache
+    )
     SpinorBEC._update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, w0 * dt)
     SpinorBEC.apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
-    SpinorBEC._apply_coriolis_step!(ws.state.psi, ws.grid, omega, w0 * dt / 2, false, ws.coriolis_cache)
+    SpinorBEC._apply_coriolis_step!(
+        ws.state.psi, ws.grid, omega, w0 * dt / 2, false, ws.coriolis_cache
+    )
     t_v3 = t_base + w1 * dt / 2 + wm * dt
     V_half!(ws, wm * dt, n_comp, N, false; t_eval=t_v3 + wm * dt / 2, t_start=t_v3)
-    SpinorBEC._apply_coriolis_step!(ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache)
+    SpinorBEC._apply_coriolis_step!(
+        ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache
+    )
     SpinorBEC._update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, w1 * dt)
     SpinorBEC.apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
-    SpinorBEC._apply_coriolis_step!(ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache)
-    V_half!(ws, w1 * dt / 2, n_comp, N, false; t_eval=t_base + dt - w1 * dt / 4, t_start=t_base + dt - w1 * dt / 2)
+    SpinorBEC._apply_coriolis_step!(
+        ws.state.psi, ws.grid, omega, w1 * dt / 2, false, ws.coriolis_cache
+    )
+    V_half!(
+        ws,
+        w1 * dt / 2,
+        n_comp,
+        N,
+        false;
+        t_eval=t_base + dt - w1 * dt / 4,
+        t_start=t_base + dt - w1 * dt / 2,
+    )
     ws.state.t += dt
     ws.state.step += 1
     nothing
 end
 
-evolve_y4_mid!(ws, n_steps) = for _ in 1:n_steps; _y4_step!(ws, SpinorBEC._half_potential_step_midpoint!); end
+evolve_y4_mid!(ws, n_steps) =
+    for _ in 1:n_steps
+        ;
+        _y4_step!(ws, SpinorBEC._half_potential_step_midpoint!);
+    end
 
 # --- Order verification ---
 
 function run_scheme(label::String, c0::Float64, dt::Float64)
     n_steps = Int(round(T_FINAL / dt))
     if label == "Strang"
-        ws = _build_ws(dt, c0); evolve_strang!(ws, n_steps); return ws.state.psi
+        ws = _build_ws(dt, c0);
+        evolve_strang!(ws, n_steps);
+        return ws.state.psi
     elseif label == "Strang-mid"
-        ws = _build_ws(dt, c0); evolve_strang_mid!(ws, n_steps); return ws.state.psi
+        ws = _build_ws(dt, c0);
+        evolve_strang_mid!(ws, n_steps);
+        return ws.state.psi
     elseif label == "Y4-mid"
-        ws = _build_ws(dt, c0); evolve_y4_mid!(ws, n_steps); return ws.state.psi
+        ws = _build_ws(dt, c0);
+        evolve_y4_mid!(ws, n_steps);
+        return ws.state.psi
     elseif label == "ForceGrad p=1"
-        ws = _build_ws(dt, c0); evolve_forcegrad!(ws, n_steps; n_picard=1); return ws.state.psi
+        ws = _build_ws(dt, c0);
+        evolve_forcegrad!(ws, n_steps; n_picard=1);
+        return ws.state.psi
     elseif label == "ForceGrad p=2"
-        ws = _build_ws(dt, c0); evolve_forcegrad!(ws, n_steps; n_picard=2); return ws.state.psi
+        ws = _build_ws(dt, c0);
+        evolve_forcegrad!(ws, n_steps; n_picard=2);
+        return ws.state.psi
     elseif label == "ForceGrad p=3"
-        ws = _build_ws(dt, c0); evolve_forcegrad!(ws, n_steps; n_picard=3); return ws.state.psi
+        ws = _build_ws(dt, c0);
+        evolve_forcegrad!(ws, n_steps; n_picard=3);
+        return ws.state.psi
     elseif label == "ForceGrad p=4"
-        ws = _build_ws(dt, c0); evolve_forcegrad!(ws, n_steps; n_picard=4); return ws.state.psi
+        ws = _build_ws(dt, c0);
+        evolve_forcegrad!(ws, n_steps; n_picard=4);
+        return ws.state.psi
     else
         error("unknown scheme $label")
     end
@@ -150,7 +190,7 @@ function order_table(c0::Float64, label_for_problem::String)
         "scheme", "err@h₁", "err@h₂", "err@h₃", "err@h₄",
         "o12", "o23", "o34")
     for label in ["Strang", "Strang-mid", "Y4-mid",
-                  "ForceGrad p=1", "ForceGrad p=2", "ForceGrad p=3", "ForceGrad p=4"]
+        "ForceGrad p=1", "ForceGrad p=2", "ForceGrad p=3", "ForceGrad p=4"]
         errs = Float64[]
         for h in dts
             psi = run_scheme(label, c0, h)

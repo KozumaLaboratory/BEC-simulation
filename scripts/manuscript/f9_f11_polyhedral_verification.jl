@@ -23,11 +23,11 @@ using Random
 # Reuse infrastructure from f5_f7
 function spin_matrices_general(F::Int)
     D = 2F + 1
-    Fz = Diagonal(ComplexF64[F - i for i in 0:D-1])
+    Fz = Diagonal(ComplexF64[F - i for i in 0:(D - 1)])
     Fp = zeros(ComplexF64, D, D)
-    for i in 1:(D-1)
+    for i in 1:(D - 1)
         m = F - i
-        Fp[i, i+1] = sqrt(F * (F + 1) - m * (m + 1))
+        Fp[i, i + 1] = sqrt(F * (F + 1) - m * (m + 1))
     end
     Fm = Fp'
     Fx = (Fp + Fm) / 2
@@ -157,7 +157,9 @@ function compute_O_character(group_elements, irrep::Symbol)
 end
 
 function project_onto_irrep(group_elements, chars::Vector{ComplexF64})
-    P = sum(conj(chars[i]) * group_elements[i] for i in 1:length(group_elements)) / length(group_elements)
+    P =
+        sum(conj(chars[i]) * group_elements[i] for i in 1:length(group_elements)) /
+        length(group_elements)
     return P
 end
 
@@ -175,9 +177,9 @@ end
 
 function project_S_channel(ζ::Vector, F::Int, S::Int)
     total = 0.0
-    for M in -S:S
+    for M in (-S):S
         amp = 0.0im
-        for m1 in -F:F
+        for m1 in (-F):F
             m2 = M - m1
             if -F <= m2 <= F
                 cg = clebsch_gordan(F, m1, F, m2, S, M)
@@ -245,9 +247,9 @@ by Hermiticity, but we keep the literal transpose for index-convention clarity.
 function mult_aware_beta_S(rho_inv::AbstractMatrix, F::Int, S::Int)
     D = 2F + 1
     total = 0.0
-    for M in -S:S
+    for M in (-S):S
         A = zeros(ComplexF64, D, D)
-        for m1 in -F:F
+        for m1 in (-F):F
             m2 = M - m1
             if -F <= m2 <= F
                 cg = clebsch_gordan(F, m1, F, m2, S, M)
@@ -293,7 +295,7 @@ The `seeds` parameter perturbs the basis by a small seeded random kick before
 re-orthonormalization; the orbit-average MUST be invariant to machine precision.
 """
 function verify_case_mult_aware(F::Int, group::Symbol, irrep::Symbol;
-                                seeds::AbstractRange=1:10, tol::Real=1e-8)
+    seeds::AbstractRange=1:10, tol::Real=1e-8)
     @printf("\n%s\n", "─"^70)
     @printf("F=%d  %s:%s  (mult-aware: projector-orbit average)\n", F, group, irrep)
     @printf("%s\n", "─"^70)
@@ -386,7 +388,7 @@ function verify_case_mult_aware(F::Int, group::Symbol, irrep::Symbol;
     @printf("schur_isotropy_rho_inv_y: %.15f (expected %.15f)\n", iso_y, iso_target)
     @printf("schur_isotropy_rho_inv_z: %.15f (expected %.15f)\n", iso_z, iso_target)
     @printf("Schur isotropy max-deviation: %.3e\n",
-            max(abs(iso_x - iso_target), abs(iso_y - iso_target), abs(iso_z - iso_target)))
+        max(abs(iso_x - iso_target), abs(iso_y - iso_target), abs(iso_z - iso_target)))
 
     # Full bar_beta_S table
     @printf("\nbar_beta_S^{c_0} table (mult-aware orbit average):\n")
@@ -397,24 +399,34 @@ function verify_case_mult_aware(F::Int, group::Symbol, irrep::Symbol;
     end
 
     # Verdicts
-    f1_verdict = dev_from_canonical < 1e-13 ? "CORROBORATE" :
-                 dev_from_canonical < 1e-6  ? "INCONCLUSIVE" : "REFUTED"
-    f2_verdict = seed_spread < 1e-13 ? "CORROBORATE" :
-                 seed_spread < 1e-10 ? "ADVISORY_PASS" : "REFUTED"
+    f1_verdict = if dev_from_canonical < 1e-13
+        "CORROBORATE"
+    elseif dev_from_canonical < 1e-6
+        "INCONCLUSIVE"
+    else
+        "REFUTED"
+    end
+    f2_verdict = if seed_spread < 1e-13
+        "CORROBORATE"
+    elseif seed_spread < 1e-10
+        "ADVISORY_PASS"
+    else
+        "REFUTED"
+    end
     @printf("\nF1 verdict (|bar_beta_0 - 1/%d| < 1e-13): %s\n", 2F + 1, f1_verdict)
     @printf("F2 verdict (seed_spread < 1e-13): %s\n", f2_verdict)
 
     return (
-        m_rep = m_rep,
-        bar_beta_0 = bar_beta_0,
-        dev = dev_from_canonical,
-        seed_spread = seed_spread,
-        iso_x = iso_x,
-        iso_y = iso_y,
-        iso_z = iso_z,
-        f1_verdict = f1_verdict,
-        f2_verdict = f2_verdict,
-        bar_beta_0_per_seed = bar_beta_0_per_seed,
+        m_rep=m_rep,
+        bar_beta_0=bar_beta_0,
+        dev=dev_from_canonical,
+        seed_spread=seed_spread,
+        iso_x=iso_x,
+        iso_y=iso_y,
+        iso_z=iso_z,
+        f1_verdict=f1_verdict,
+        f2_verdict=f2_verdict,
+        bar_beta_0_per_seed=bar_beta_0_per_seed,
     )
 end
 
@@ -440,7 +452,7 @@ function verify_case(F::Int, group::Symbol, irrep::Symbol)
 
     if ζ === nothing
         @printf("[NO INVARIANT VECTOR FOUND] — multiplicity = 0 OR projector issue\n")
-        return
+        return nothing
     end
 
     max_dev = maximum(norm(g * ζ - chars[i] * ζ) for (i, g) in enumerate(G))
@@ -448,7 +460,7 @@ function verify_case(F::Int, group::Symbol, irrep::Symbol)
 
     if max_dev > 1e-7
         @printf("[EQUIVARIANCE FAILED]\n")
-        return
+        return nothing
     end
 
     F2 = real(ζ' * (Fx*Fx + Fy*Fy + Fz*Fz) * ζ)
@@ -456,14 +468,16 @@ function verify_case(F::Int, group::Symbol, irrep::Symbol)
     Fy2 = real(ζ' * (Fy*Fy) * ζ)
     Fz2 = real(ζ' * (Fz*Fz) * ζ)
     schur_dev = max(abs(Fx2 - F2/3), abs(Fy2 - F2/3), abs(Fz2 - F2/3))
-    Fx_m = real(ζ' * Fx * ζ); Fy_m = real(ζ' * Fy * ζ); Fz_m = real(ζ' * Fz * ζ)
+    Fx_m = real(ζ' * Fx * ζ);
+    Fy_m = real(ζ' * Fy * ζ);
+    Fz_m = real(ζ' * Fz * ζ)
 
     @printf("⟨F²⟩ = %.6f (expected %d)\n", F2, F*(F+1))
     @printf("Schur isotropy deviation: %.2e\n", schur_dev)
     @printf("⟨F⟩ = (%.2e, %.2e, %.2e)\n", Fx_m, Fy_m, Fz_m)
 
     @printf("ζ support m ∈ {")
-    for m in F:-1:-F
+    for m in F:-1:(-F)
         i = F - m + 1
         if abs(ζ[i]) > 1e-6
             @printf("%d ", m)
@@ -617,21 +631,36 @@ let F = 9, group = :T, irrep = :A, seeds = 1:10, tol = 1e-8
         @printf("  S=%2d (%s): bar_beta_S_canonical = %.15f%s\n", S, parity, b_canonical, marker)
     end
     @printf("sum_S_all_S_at_F9_TA_canonical: %.15f (expected ≈ m_rep = %d)\n",
-            full_sum, m_rep)
+        full_sum, m_rep)
     @printf("sum_S_even_S_partial_at_F9_TA_canonical: %.15f\n", even_sum)
 
     # Verdicts
-    f1_verdict = dev_from_endpoint < 1e-13 ? "CORROBORATE" :
-                 dev_from_endpoint < 1e-6  ? "INCONCLUSIVE" : "REFUTED"
-    f2_verdict = seed_spread < 1e-13 ? "CORROBORATE" :
-                 seed_spread < 1e-10 ? "ADVISORY_PASS" : "REFUTED"
+    f1_verdict = if dev_from_endpoint < 1e-13
+        "CORROBORATE"
+    elseif dev_from_endpoint < 1e-6
+        "INCONCLUSIVE"
+    else
+        "REFUTED"
+    end
+    f2_verdict = if seed_spread < 1e-13
+        "CORROBORATE"
+    elseif seed_spread < 1e-10
+        "ADVISORY_PASS"
+    else
+        "REFUTED"
+    end
     f4_dev_from_m_rep = abs(full_sum - m_rep)
-    f4_verdict = f4_dev_from_m_rep < 1e-12 ? "CORROBORATE" :
-                 f4_dev_from_m_rep < 1e-6  ? "ADVISORY_PASS" : "REFUTED"
+    f4_verdict = if f4_dev_from_m_rep < 1e-12
+        "CORROBORATE"
+    elseif f4_dev_from_m_rep < 1e-6
+        "ADVISORY_PASS"
+    else
+        "REFUTED"
+    end
     @printf("\nF1 verdict (|bar_beta_0_canonical - 1/19| < 1e-13): %s\n", f1_verdict)
     @printf("F2 verdict (seed_spread_canonical < 1e-13): %s\n", f2_verdict)
     @printf("F4 verdict (|sum_S_all_S - m_rep| < 1e-12): %s (dev = %.3e)\n",
-            f4_verdict, f4_dev_from_m_rep)
+        f4_verdict, f4_dev_from_m_rep)
 end
 
 # =====================================================================

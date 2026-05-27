@@ -253,9 +253,9 @@ apply_v4_direct_F1!(A_psi, psi_test, m_bg, k_vecs, 1.0, tmp1, tmp2, tmp3)
 apply_v4_direct_F1!(A_phi, phi_test, m_bg, k_vecs, 1.0, tmp1, tmp2, tmp3)
 
 lhs = sum(conj(phi_test[I, c]) * A_psi[I, c]
-    for I in CartesianIndices(n_pts), c in 1:D)
+          for I in CartesianIndices(n_pts), c in 1:D)
 rhs = sum(conj(A_phi[I, c]) * psi_test[I, c]
-    for I in CartesianIndices(n_pts), c in 1:D)
+          for I in CartesianIndices(n_pts), c in 1:D)
 
 herm_dev = abs(lhs - rhs)
 herm_rel = herm_dev / max(abs(lhs), 1e-30)

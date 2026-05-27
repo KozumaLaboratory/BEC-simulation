@@ -42,7 +42,9 @@ function _seed_psi!(ws, grid)
     psi = ws.state.psi
     D = size(psi, 4)
     @inbounds for I in CartesianIndices((N, N, N))
-        x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
+        x = grid.x[1][I[1]];
+        y = grid.x[2][I[2]];
+        z = grid.x[3][I[3]]
         g = exp(-(x*x + y*y + z*z) / 2)
         for c in 1:D
             psi[I, c] = g * cis(0.1*c)
@@ -159,11 +161,11 @@ function evolve_mps4_split!(ws_h, ws_half, n_steps)
 end
 
 for (label, _) in [
-        ("split_step!",          :split_step),
-        ("split_step_combined!", :combined),
-        ("MPS-4 (combined)",     :mps4_combined),
-        ("MPS-4 (split_step!)",  :mps4_split),
-    ]
+    ("split_step!", :split_step),
+    ("split_step_combined!", :combined),
+    ("MPS-4 (combined)", :mps4_combined),
+    ("MPS-4 (split_step!)", :mps4_split),
+]
     errs = Float64[]
     drift_at_h2 = NaN
     for (idx, h) in enumerate(dts)
@@ -176,12 +178,12 @@ for (label, _) in [
             evolve_strang_combined!(ws, Int(round(T_FINAL / h)))
             psi = ws.state.psi
         elseif label == "MPS-4 (combined)"
-            ws_h    = _build_ws(h)
+            ws_h = _build_ws(h)
             ws_half = _build_ws(h/2)
             evolve_mps4_combined!(ws_h, ws_half, Int(round(T_FINAL / h)))
             psi = ws_h.state.psi
         else  # MPS-4 (split_step!)
-            ws_h    = _build_ws(h)
+            ws_h = _build_ws(h)
             ws_half = _build_ws(h/2)
             evolve_mps4_split!(ws_h, ws_half, Int(round(T_FINAL / h)))
             psi = ws_h.state.psi
@@ -197,7 +199,7 @@ for (label, _) in [
 end
 
 @printf("\n=== Cost per outer step (single MPS-4 call vs split_step_combined!) ===\n")
-ws_h    = _build_ws(2e-3)
+ws_h = _build_ws(2e-3)
 ws_half = _build_ws(1e-3)
 psi_in = similar(ws_h.state.psi)
 
@@ -209,12 +211,12 @@ for _ in 1:3
 end
 
 b_strang = @benchmark SpinorBEC.split_step_combined!($ws_h) samples=50 evals=1
-b_mps    = @benchmark begin
+b_mps = @benchmark begin
     copyto!($psi_in, $ws_h.state.psi)
     mps4_combined_step!($ws_h.state.psi, $ws_h, $ws_half, $psi_in)
 end samples=50 evals=1
 t_strang = time(minimum(b_strang)) / 1e3
-t_mps    = time(minimum(b_mps)) / 1e3
+t_mps = time(minimum(b_mps)) / 1e3
 @printf("Strang (split_step_combined!): %.1f µs/step\n", t_strang)
 @printf("MPS-4 (1×S(h) + 2×S(h/2)):     %.1f µs/step (%.2f× Strang, expected ~3×)\n",
     t_mps, t_mps / t_strang)

@@ -79,10 +79,10 @@ end
 function _mean_density(state::TDHFBState)
     phi = state.phi
     rho = state.rho
-    n_voxels = prod(size(phi)[1:end-1])
+    n_voxels = prod(size(phi)[1:(end - 1)])
     n_total = 0.0
     n_thermal = 0.0
-    @inbounds for I in CartesianIndices(size(phi)[1:end-1])
+    @inbounds for I in CartesianIndices(size(phi)[1:(end - 1)])
         n_phi = 0.0
         n_rho = 0.0
         for c in 1:D
@@ -92,16 +92,16 @@ function _mean_density(state::TDHFBState)
         n_total += n_phi + n_rho
         n_thermal += n_rho
     end
-    (mean_total = n_total / n_voxels, mean_thermal = n_thermal / n_voxels,
-     ratio = n_thermal / max(n_total, 1e-30))
+    (mean_total=n_total / n_voxels, mean_thermal=n_thermal / n_voxels,
+        ratio=n_thermal / max(n_total, 1e-30))
 end
 
 # RMS pair amplitude (κ Frobenius norm over voxels, normalised by sqrt(n_voxels))
 function _mean_kappa(state::TDHFBState)
     kappa = state.kappa
-    n_voxels = prod(size(kappa)[1:end-2])
+    n_voxels = prod(size(kappa)[1:(end - 2)])
     s = 0.0
-    @inbounds for I in CartesianIndices(size(kappa)[1:end-2])
+    @inbounds for I in CartesianIndices(size(kappa)[1:(end - 2)])
         for a in 1:D, b in 1:D
             s += abs2(kappa[I, a, b])
         end
@@ -163,14 +163,14 @@ function _run(label::String, g_S::Dict{Int, Float64})
     @printf("  Hermiticity dev: ρ=%.2e, κ=%.2e\n", rho_dev, kappa_dev)
 
     return (
-        label = label,
-        rho_final = norm(state.rho),
-        kappa_final = norm(state.kappa),
-        depletion_ratio = final.ratio,
-        kappa_rms = k_rms,
-        rho_dev = rho_dev,
-        kappa_dev = kappa_dev,
-        elapsed = elapsed,
+        label=label,
+        rho_final=norm(state.rho),
+        kappa_final=norm(state.kappa),
+        depletion_ratio=final.ratio,
+        kappa_rms=k_rms,
+        rho_dev=rho_dev,
+        kappa_dev=kappa_dev,
+        elapsed=elapsed,
     )
 end
 

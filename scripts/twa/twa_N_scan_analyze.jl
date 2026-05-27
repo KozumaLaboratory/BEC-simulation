@@ -108,7 +108,7 @@ end
 # 1/N scaling check: collapse pattern smearing should vanish as N → ∞
 println("=== 1/N validity check ===")
 println(
-    "(on_axis_TWA - on_axis_det) / on_axis_det vs 1/N — should follow ∝ 1/N if TWA captures genuine quantum fluctuations correctly",
+    "(on_axis_TWA - on_axis_det) / on_axis_det vs 1/N — should follow ∝ 1/N if TWA captures genuine quantum fluctuations correctly"
 )
 for r in results
     Δrel = (r.stats.on_axis - det.on_axis) / det.on_axis

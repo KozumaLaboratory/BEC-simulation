@@ -38,7 +38,7 @@ function _make_k_vecs()
     (k, k, k)
 end
 
-function spin_density!(m::Array{Float64,4}, psi::Array{ComplexF64,4})
+function spin_density!(m::Array{Float64, 4}, psi::Array{ComplexF64, 4})
     n_pts = size(psi)[1:3]
     fill!(m, 0.0)
     @inbounds for I in CartesianIndices(n_pts)
@@ -139,7 +139,7 @@ function apply_K_step!(psi, k_vecs, dt, buf, plan_f, plan_b)
 end
 
 function apply_v4_direct!(out, psi, m_bg, c1, k_vecs, tmp1, tmp2, tmp3,
-                          buf, plan_f, plan_b)
+    buf, plan_f, plan_b)
     apply_VSM!(tmp1, psi, m_bg, c1)
     apply_T!(tmp2, tmp1, k_vecs, buf, plan_f, plan_b)
     apply_VSM!(tmp3, tmp2, m_bg, c1)
@@ -155,21 +155,21 @@ function apply_v4_direct!(out, psi, m_bg, c1, k_vecs, tmp1, tmp2, tmp3,
 end
 
 function apply_fg_correction!(psi, m_bg, c1, alpha, k_vecs,
-                              tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
+    tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
     alpha == 0 && return nothing
     apply_v4_direct!(Aψ, psi, m_bg, c1, k_vecs, tmp1, tmp2, tmp3,
-                     buf, plan_f, plan_b)
+        buf, plan_f, plan_b)
     @inbounds psi .-= im * alpha .* Aψ
     nothing
 end
 
 function chin4A_auto_step!(psi, c1, dt, k_vecs, m_global, alpha_val,
-                           tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
+    tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
     apply_V_step!(psi, m_global, c1, dt / 6)
     apply_K_step!(psi, k_vecs, dt / 2, buf, plan_f, plan_b)
     apply_V_step!(psi, m_global, c1, dt / 3)
     apply_fg_correction!(psi, m_global, c1, alpha_val, k_vecs,
-                         tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
+        tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
     apply_V_step!(psi, m_global, c1, dt / 3)
     apply_K_step!(psi, k_vecs, dt / 2, buf, plan_f, plan_b)
     apply_V_step!(psi, m_global, c1, dt / 6)
@@ -221,7 +221,7 @@ function run_chin4A_auto(c1, dt, alpha_factor)
     for _ in 1:n_steps
         alpha_val = alpha_factor * actual_dt^3
         chin4A_auto_step!(psi, c1, actual_dt, k_vecs, m_global, alpha_val,
-                          tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
+            tmp1, tmp2, tmp3, Aψ, buf, plan_f, plan_b)
     end
     psi
 end
@@ -257,7 +257,7 @@ psi_ref = run_fr_auto(C1_BENCH, 5.0e-5)
 dts = [4.0e-3, 2.0e-3, 1.0e-3]
 alpha_factors = [0.0, 1/144, 1/72, 1/48, 1/24, -1/144, -1/72, -1/48, -1/24]
 alpha_labels = ("α=0 (bare)", "+1/144", "+1/72", "+1/48", "+1/24",
-                "-1/144", "-1/72", "-1/48", "-1/24")
+    "-1/144", "-1/72", "-1/48", "-1/24")
 
 @printf("%-15s ", "α / dt³")
 for dt in dts
@@ -280,5 +280,7 @@ for (af, al) in zip(alpha_factors, alpha_labels)
     @printf("%-12.2f %-12.2f\n", ord1, ord2)
 end
 
-@printf("\nExpected order-4 behavior: errs ~ dt^4 → 16× reduction per dt halving → log2(16) = 4.0\n")
+@printf(
+    "\nExpected order-4 behavior: errs ~ dt^4 → 16× reduction per dt halving → log2(16) = 4.0\n"
+)
 @printf("Read: which α gives order ~4 in both columns? That's the correct CK FG coefficient.\n")
