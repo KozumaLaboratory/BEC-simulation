@@ -180,19 +180,68 @@ each scan point × comparison run is executed independently via
 `run_pipeline` with the corresponding overrides applied to the raw dict.
 """
 function run_yaml(yaml_path::String; base_dir::String="runs", verbose::Bool=true,
-    dry_run::Bool=false)
+    dry_run::Bool=false, audit::Bool=true)
     _run_yaml_status(verbose, "starting run_yaml: $yaml_path"; comment=dry_run)
-    return Base.invokelatest(_run_yaml_impl, yaml_path, base_dir, verbose, dry_run)
+    return Base.invokelatest(_run_yaml_impl,
+        yaml_path, base_dir, verbose, dry_run, audit)
 end
 
 @noinline function _run_yaml_impl(
-    yaml_path::String, base_dir::String, verbose::Bool, dry_run::Bool
+    yaml_path::String, base_dir::String, verbose::Bool, dry_run::Bool, audit::Bool
 )
     data = Base.invokelatest(_run_yaml_prepare, yaml_path, verbose, dry_run)::Dict
+    # Audit hook: run inspector on normalised data; abort on :error severity
+    # before any sim work hits the cluster. SPINORBEC_AUDIT=0 disables;
+    # callers can also pass audit=false.
+    if audit && lowercase(get(ENV, "SPINORBEC_AUDIT", "1")) ∉ ("0", "false", "off")
+        Base.invokelatest(_run_yaml_audit, data, verbose)
+    end
     if dry_run
         return Base.invokelatest(_run_yaml_dry_run_output, data, yaml_path, verbose)
     end
     return Base.invokelatest(_run_yaml_execute, data, yaml_path, base_dir, verbose)
+end
+
+@noinline function _run_yaml_audit(data::Dict, verbose::Bool)
+    warnings = try
+        audit_loaded_data(data)
+    catch e
+        # Parse failure here is a bug in the inspector or a config that
+        # somehow passed validate_pipeline! but not parse_pipeline. Surface
+        # the error but do not abort — the actual run will fail with the
+        # canonical message a moment later.
+        verbose && println(stderr,
+            "[audit] inspector failed to run: ", sprint(showerror, e))
+        return nothing
+    end
+    isempty(warnings) && return nothing
+    blockers = ConfigWarning[]
+    for w in warnings
+        # Suppress :info from stderr — keeps the audit chatter quiet
+        # during sweep dispatches. Full findings remain in the
+        # ConfigInspection / dashboard panel.
+        if w.severity !== :info
+            println(stderr, terse_warning_line(w))
+        end
+        w.severity === :block && push!(blockers, w)
+    end
+    flush(stderr)
+    if !isempty(blockers)
+        # Surface the first blocker's full message + suggestion. The terse
+        # line above already lists every blocker tag-by-tag.
+        e = first(blockers)
+        throw(
+            ArgumentError(
+                "audit blocked run_yaml: $(e.title)\n" *
+                "  $(e.message)\n" *
+                "  → $(e.suggestion)\n" *
+                "  ($(length(blockers)) :block severity warning(s); " *
+                "see [audit] lines above for the full list. " *
+                "Pass `audit=false` or set SPINORBEC_AUDIT=0 to override.)",
+            ),
+        )
+    end
+    return nothing
 end
 
 @noinline function _run_yaml_prepare(yaml_path::String, verbose::Bool, dry_run::Bool)
@@ -541,6 +590,17 @@ the core module having to `import CUDA` (which would force the dep).
 """
 const _cuda_functional_callback = Ref{Function}(() -> false)
 cuda_functional() = _cuda_functional_callback[]()::Bool
+
+"""
+Callback returning a vector of formatted lines describing the active
+CUDA device — name, total memory, available memory, compute capability.
+Default returns a single-line "CUDA not loaded" notice; the CUDA
+extension overrides at `__init__`.
+"""
+const _cuda_state_lines_callback = Ref{Function}(
+    () -> ["CUDA not loaded (using HTTP / using CUDA before `using SpinorBEC` to enable)"]
+)
+cuda_state_lines() = _cuda_state_lines_callback[]()::Vector{String}
 
 """
     _scratch_tmp_path(final_path)

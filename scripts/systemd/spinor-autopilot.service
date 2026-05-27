@@ -1,0 +1,23 @@
+[Unit]
+Description=SpinorBEC autopilot — single-shot tick (paired with timer)
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/workspace/BEC-simulation
+Environment="LD_LIBRARY_PATH=/usr/lib/wsl/lib"
+# %h is the systemd-user home expansion; SPINORBEC_QUEUE defaults to runs/
+# Pass `--sysimage=spinor_sysimage.so` if you've built one (TSUBAME setup).
+ExecStart=/home/%u/.julia/juliaup/julia-1.12.6+0.x64.linux.gnu/bin/julia \
+    --project=. scripts/cli.jl autopilot tick
+StandardOutput=journal
+StandardError=journal
+
+# Don't make systemd retry inside a single tick — the timer is the retry
+# loop. If a tick panics, `Restart=no` keeps it from looping a broken
+# binary; the timer fires again on schedule.
+Restart=no
+
+# Keep the working tree readable; everything else is sandboxed-ish.
+ProtectSystem=full
+PrivateTmp=false

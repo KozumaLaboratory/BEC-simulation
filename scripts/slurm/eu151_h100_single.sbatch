@@ -25,16 +25,12 @@ cd "$PROJECT"
 
 source scripts/tsubame_setup.sh
 
-# Verbose CUDA report at start
+# Verbose CUDA report + budget + run
 julia --project="$PROJECT" -e '
-    import CUDA
-    using SpinorBEC
-    @info "CUDA" device = CUDA.name(CUDA.device()) mem_gb = CUDA.totalmem(CUDA.device()) / 2^30
-    @info "Project" project = "'$PROJECT'" config = "'$CONFIG'"
-    @info "Budget"; estimate_run_budget("'$CONFIG'")
-    run_yaml("'$CONFIG'")
-'
+    using CUDA, SpinorBEC
+    report_cuda_state(); estimate_run_budget(ARGS[1]); run_yaml(ARGS[1])
+' "$CONFIG"
 
 # Optional: notify on completion (no-op without SLACK_WEBHOOK_URL)
-julia --project="$PROJECT" scripts/notify_slack.jl \
+julia --project="$PROJECT" -e 'using HTTP, SpinorBEC; notify_slack(ARGS[1])' \
     ":white_check_mark: SLURM ${SLURM_JOB_NAME} #${SLURM_JOB_ID} done — config=$CONFIG"

@@ -157,6 +157,72 @@ function _first_step_of_kind(pipeline::Vector, kind::String)
     return nothing
 end
 
+# --- SLURM / cluster sizing -------------------------------------------
+
+export scan_point_count, suggest_sbatch_flags
+
+"""
+    scan_point_count(yaml_path) -> Int
+
+Count the scan points implied by a config YAML. Multiplies
+`length(scan.points) × length(scan.comparison_runs)` when both are
+present. Returns 1 for non-scan configs. Used to size SLURM array jobs.
+"""
+function scan_point_count(yaml_path::AbstractString)
+    data = YAML.load_file(String(yaml_path))
+    haskey(data, "scan") || return 1
+    scan = _parse_override_scan(data["scan"])
+    n_pts = length(scan.points)
+    n_cmp = max(1, length(scan.comparison_runs))
+    n_pts * n_cmp
+end
+
+"""
+    suggest_sbatch_flags(yaml_path; io=stdout, minutes_per_64cube=5, safety=1.5)
+
+Print recommended `#SBATCH` flags for `yaml_path` based on grid size,
+scan point count, and a rough H100 throughput model. The model assumes
+~5 min per 64³ point and scales linearly with voxel count; override
+via `minutes_per_64cube=` for other GPUs / problem classes. `safety`
+multiplies the time budget.
+"""
+function suggest_sbatch_flags(
+    yaml_path::AbstractString;
+    io::IO=stdout,
+    minutes_per_64cube::Real=5,
+    safety::Real=1.5,
+)
+    data = YAML.load_file(String(yaml_path))
+    n_pts = scan_point_count(yaml_path)
+
+    grid_node = if haskey(data, "pipeline") && !isempty(data["pipeline"])
+        first(values(data["pipeline"][1]))
+    else
+        Dict()
+    end
+    n_vox = haskey(grid_node, "grid") ?
+            prod(Int.(grid_node["grid"]["n"])) : 64^3
+    minutes_per_pt = max(1, round(Int, minutes_per_64cube * (n_vox / 64^3)))
+
+    total_min = ceil(Int, minutes_per_pt * n_pts * safety)
+    hours, mins = divrem(total_min, 60)
+
+    vram_gb = max(2, ceil(Int, 8 * 16 * n_vox * 13 / 2^30 + 2))
+    mem_gb = max(32, vram_gb * 2)
+
+    println(io, "# Suggested SLURM flags for $yaml_path")
+    println(io, "# scan points: $n_pts  ;  grid: $n_vox")
+    @printf io "#SBATCH --time=%02d:%02d:00\n" hours mins
+    println(io, "#SBATCH --gres=gpu:h100:1")
+    println(io, "#SBATCH --cpus-per-task=8")
+    @printf io "#SBATCH --mem=%dG\n" mem_gb
+    println(io, "#")
+    println(io, "# For an array job (parallel scan): add")
+    @printf io "#SBATCH --array=1-%d%%4   # 4 in flight at once\n" n_pts
+    println(io, "# and submit with scripts/slurm/scan_array.sbatch")
+    return nothing
+end
+
 # --- Backend / dtype recommendation ----------------------------------
 #
 # Empirical lookup table for `split_step_combined!` / `split_step!` on

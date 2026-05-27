@@ -94,7 +94,8 @@ const VALIDATION_LEVELS = [
     (12, "MANUAL: scripts/validation/ddi_convention_factorial.jl",
         "DDI convention factorial (6/6 PASS at 24³ Cr52 — sphericity, axis flip, secular/full)"),
     (12, "MANUAL: scripts/validation/eu_robust_factorial_gen.jl + _summary.jl",
-        "Eu robust factorial (K3 × γ_dr × LHY at 32³, 8 cells; run via /tmp/run_eu_factorial_all.sh)"),
+        "Eu robust factorial (K3 × γ_dr × LHY at 32³, 8 cells; run via /tmp/run_eu_factorial_all.sh)",
+    ),
 ]
 
 output_dir = length(ARGS) >= 1 ? String(ARGS[1]) : "docs/validation"

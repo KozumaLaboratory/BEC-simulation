@@ -119,3 +119,11 @@ dashboard/anko-wsl.*.key
 # attached when files are downloaded on Windows / WSL. Not real
 # content; always ignore.
 *:Zone.Identifier
+
+
+# Autopilot runtime state
+runs/budget.toml
+runs/.autopilot.lock
+runs/.autopilot.paused
+runs/.autopilot.metrics.jsonl
+runs/.autopilot.errors.log

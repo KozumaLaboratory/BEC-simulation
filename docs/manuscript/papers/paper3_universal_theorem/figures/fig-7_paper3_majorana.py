@@ -2,7 +2,7 @@
 """Paper #3 FIG-7 renderer: polyhedral inert state Majorana configurations.
 
 Reads `fig-7_paper3_majorana.csv` (one row per Majorana star — produced by
-`scripts/manuscript/render_figures.jl --paper paper3 --fig FIG-6` via SpinorBEC.majorana_stars)
+`scripts/cli.jl figure --paper paper3 --fig 6` via SpinorBEC.majorana_stars)
 and renders a grid of Bloch spheres covering Paper #3 §V.A through §V.G.
 
 Near-coincident stars are clustered (tol 0.05) so multiplicity-2 cases

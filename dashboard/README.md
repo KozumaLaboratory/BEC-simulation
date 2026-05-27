@@ -19,50 +19,70 @@ Pinned via `dashboard/mise.toml`:
 
 ## Develop
 
-Two processes are required. From the repo root:
+Two processes (Julia API on `:8090`, Vite dev server on `:9876`). On
+this host (WSL2) **always** start Vite with the API target pinned to
+the WSL2 external IP — see the loopback note below for why.
 
 ```bash
-# Terminal 1 — Julia HTTP backend (default port 8090).
+# Backend — first run precompiles for ~20 s. dist/index.html must exist.
 julia --project=. -e 'using SpinorBEC; serve_dashboard(8090)'
 
-# Terminal 2 — Vite dev server (default port 9876, binds 0.0.0.0).
+# Frontend — first time only:  bun install
 cd dashboard
-bun install   # first time only
-bun run dev
-```
-
-Then open <http://localhost:9876/>. Vite proxies `/api/*` to the Julia
-backend per `vite.config.ts` (`VITE_API_TARGET`, default
-`http://localhost:8090`).
-
-### Tailscale HTTPS (WSL2 setup)
-
-`tailscale serve` is preconfigured on `anko-wsl` to terminate HTTPS at
-`https://anko-wsl.tailfd804.ts.net:9877` and reverse-proxy to
-`http://10.255.255.254:9876` (the WSL2 external-facing IP). After
-starting both processes above, the dashboard is reachable from any
-tailnet device at:
-
-```
-https://anko-wsl.tailfd804.ts.net:9877/
-```
-
-**WSL2 loopback footgun** — on this host the kernel periodically loses
-the `127.0.0.1` route under load. Symptom: `nc -z 127.0.0.1 <any-port>`
-hangs, while `nc -z 10.255.255.254 <port>` succeeds, even though
-`ss -tln` shows the listener up. When this happens, `vite.config.ts`'s
-default proxy target (`http://localhost:8090`) breaks and `/api/*`
-returns 502.
-
-Workaround: override the API target to the WSL2 external IP for the
-Vite session:
-
-```bash
 VITE_API_TARGET=http://10.255.255.254:8090 bun run dev
 ```
 
-Backend still listens on `0.0.0.0:8090`, so it is reachable via either
-address — only Vite's proxy lookup needs the working route.
+URLs to open, in order of reliability on this host:
+
+| URL | When to use |
+|---|---|
+| `http://10.255.255.254:9876/` | default — Vite HMR, loopback-independent |
+| `https://anko-wsl.tailfd804.ts.net:9877/` | from another tailnet device (HTTPS via `tailscale serve` → WSL2 ext-IP → Vite) |
+| `http://10.255.255.254:8090/` | Julia-only, no HMR; minimal process count |
+| `http://localhost:9876/` | only after confirming loopback works (see below) |
+
+Stop with `pkill -f vite` + `pkill -f 'julia.*serve_dashboard'`.
+
+### WSL2 loopback footgun
+
+On this host the kernel periodically loses the `127.0.0.1` route under
+load. Symptom: `curl http://localhost:<port>` hangs and exits with
+code 28 (000 status); `ss -tln` still shows the listener UP; the WSL2
+external IP `10.255.255.254` keeps working.
+
+When this happens, Vite's *default* proxy (`http://localhost:8090`)
+returns 502 on every `/api/*` call.
+
+Diagnosis from a shell:
+
+```bash
+curl -s -o /dev/null -w "%{http_code} (exit=%{exitcode})\n" \
+     --max-time 5 http://127.0.0.1:8090/api/runs
+# 200 → loopback OK.
+# 000 (exit=28) → loopback DOWN. Use 10.255.255.254 in user-facing URLs
+#                 AND set VITE_API_TARGET when starting Vite.
+```
+
+Backend listens on `0.0.0.0:8090` regardless, so it's reachable via
+either address — only Vite's proxy lookup needs the working route.
+The `VITE_API_TARGET` override is harmless when loopback is healthy,
+so the recommended habit is to set it always rather than diagnose
+per session.
+
+### Smoke test
+
+After starting both processes:
+
+```bash
+# Use the external IP — loopback may be silently down.
+curl -s -o /dev/null -w "Julia /api/runs    → %{http_code}\n" --max-time 5 http://10.255.255.254:8090/api/runs
+curl -s -o /dev/null -w "Vite serve         → %{http_code}\n" --max-time 5 http://10.255.255.254:9876/
+curl -s -o /dev/null -w "Vite-proxied /api  → %{http_code}\n" --max-time 8 http://10.255.255.254:9876/api/runs
+```
+
+All three should return `200`. The last one exercises the Vite → Julia
+proxy path; if it returns `502` and the first one is `200`, the
+`VITE_API_TARGET` override is the fix.
 
 ## Production build
 

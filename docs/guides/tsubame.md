@@ -62,7 +62,8 @@ $EDITOR runs/eu151_edh_ext/config.yaml
 julia --project=. -e 'using SpinorBEC; run_yaml("runs/eu151_edh_ext/config.yaml"; dry_run=true)'
 
 # Suggested SLURM flags from grid + scan size
-julia --project=. scripts/slurm_helpers.jl sbatch-suggest runs/eu151_edh_ext/config.yaml
+julia --project=. -e 'using SpinorBEC; suggest_sbatch_flags(ARGS[1])' \
+    runs/eu151_edh_ext/config.yaml
 
 # Submit (single H100, 12 h)
 sbatch scripts/slurm/eu151_h100_single.sbatch runs/eu151_edh_ext/config.yaml
@@ -74,7 +75,8 @@ tail -f logs/spinorbec-*.out
 Phase-diagram scans where points are independent → array job:
 
 ```bash
-julia --project=. scripts/slurm_helpers.jl count runs/foo/config.yaml   # → 144
+julia --project=. -e 'using SpinorBEC; println(scan_point_count(ARGS[1]))' \
+    runs/foo/config.yaml   # → 144
 sbatch --array=1-144%12 scripts/slurm/scan_array.sbatch runs/foo/config.yaml
 ```
 

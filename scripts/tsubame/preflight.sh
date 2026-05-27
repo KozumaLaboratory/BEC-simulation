@@ -33,34 +33,14 @@ cd "$PROJECT_ROOT"
 echo "--- Project: $PROJECT_ROOT ---"
 ls -la Project.toml Manifest.toml 2>/dev/null
 
-# 4. Try precompiling the package
-echo "--- Precompile check ---"
+# 4. Precompile + CUDA state + smoke test (all via library helper)
+echo "--- Precompile + preflight ---"
 LD_LIBRARY_PATH=${CUDA_HOME:-/usr/local/cuda}/lib64:${LD_LIBRARY_PATH:-} \
     julia --project=. -e '
-using Pkg
-println("Active project: ", Pkg.project().path)
-@time Pkg.precompile()
-println("Loading SpinorBEC + CUDA…")
-@time using CUDA
-@time using SpinorBEC
-println()
-println("CUDA functional: ", CUDA.functional())
-println("CUDA device:     ", CUDA.functional() ? CUDA.name(CUDA.device()) : "none")
-println("CUDA capability: ", CUDA.functional() ? CUDA.capability(CUDA.device()) : "none")
-println("CUDA mem free:   ",
-    CUDA.functional() ? "$(round(CUDA.available_memory()/1e9; digits=1)) GB" : "none")
-'
-
-# 5. Tiny end-to-end smoke test
-echo
-echo "--- Smoke test (option_gamma_micro) ---"
-LD_LIBRARY_PATH=${CUDA_HOME:-/usr/local/cuda}/lib64:${LD_LIBRARY_PATH:-} \
-    julia --project=. -e '
-using CUDA, SpinorBEC
-config = SpinorBEC.load_config("runs/option_gamma_micro/config.yaml")
-@time SpinorBEC.run_config(config; verbose=false)
-println("✅ smoke test passed")
-'
+        using Pkg; @time Pkg.precompile()
+        using CUDA, SpinorBEC
+        cuda_preflight_check(; smoke_config="runs/option_gamma_micro/config.yaml")
+    '
 
 # 6. Scratch dir check
 echo

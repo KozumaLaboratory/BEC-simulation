@@ -30,17 +30,23 @@ const View3D = lazy(() =>
 const SlicePanel = lazy(() =>
   import('@/components/SlicePanel').then((m) => ({ default: m.SlicePanel })),
 )
-const ConfigViewer = lazy(() =>
-  import('@/components/ConfigViewer').then((m) => ({ default: m.ConfigViewer })),
+const EffectiveConfigPanel = lazy(() =>
+  import('@/components/EffectiveConfigPanel').then((m) => ({
+    default: m.EffectiveConfigPanel,
+  })),
 )
 const ScanGroupView = lazy(() => import('@/components/ScanGroupView'))
+const QueuePanel = lazy(() =>
+  import('@/components/QueuePanel').then((m) => ({ default: m.QueuePanel })),
+)
 
 const TAB_ITEMS = [
   { id: 'overview', label: 'Overview', sheet: '01' },
   { id: 'slice', label: '2D · slice', sheet: '02' },
   { id: 'view3d', label: '3D · volume', sheet: '03' },
   { id: 'data', label: 'Data', sheet: '04' },
-  { id: 'config', label: 'Config', sheet: '05' },
+  { id: 'config', label: 'Effective config', sheet: '05' },
+  { id: 'queue', label: 'Queue', sheet: '06' },
 ] as const
 
 const SIDEBAR_DEFAULT_W = 280
@@ -274,7 +280,18 @@ export default function App() {
             <TabsContent value="config">
               <TabBoundary>
                 <Suspense fallback={<TabFallback />}>
-                  <ConfigViewer yaml={data?.config_yaml || ''} />
+                  <EffectiveConfigPanel
+                    runName={selectedRun ?? undefined}
+                    yaml={data?.config_yaml || ''}
+                  />
+                </Suspense>
+              </TabBoundary>
+            </TabsContent>
+
+            <TabsContent value="queue">
+              <TabBoundary>
+                <Suspense fallback={<TabFallback />}>
+                  <QueuePanel />
                 </Suspense>
               </TabBoundary>
             </TabsContent>
@@ -321,7 +338,7 @@ function WorkbenchHeader({
       <div className="sheet-strip -mx-1.5 mb-5">
         <div>
           <span className="text-[var(--ink-faint)]">Sheet</span>{' '}
-          <span className="text-[var(--ink)]">{sheetCode} / 05</span>
+          <span className="text-[var(--ink)]">{sheetCode} / 06</span>
         </div>
         <div>
           <span className="text-[var(--ink-faint)]">Drawn</span>{' '}

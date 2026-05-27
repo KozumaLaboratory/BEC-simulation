@@ -7,7 +7,7 @@
 #     feature values for nearest-neighbour classification)
 #   - `majorana.jl` (`_make_F8_octa_A1_stars`, `_make_F10_dodec_stars`,
 #     `_make_F12_Ih_A_stars` — pairwise-distance spectrum lookups)
-#   - `scripts/manuscript/render_figures.jl --paper paper3 --fig FIG-6` (FIG-7 rendering)
+#   - `scripts/cli.jl figure --paper paper3 --fig 6` (FIG-7 rendering)
 #
 # Component order: index k corresponds to m = F-k+1, so index 1 is m=+F
 # and index 2F+1 is m=-F. F=0 component lives at index F+1.

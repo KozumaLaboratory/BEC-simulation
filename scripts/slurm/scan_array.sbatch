@@ -18,8 +18,9 @@
 # Usage:
 #   sbatch --array=1-N scripts/slurm/scan_array.sbatch runs/eu151_phase_pq_hires/config.yaml
 #
-# (N must match the actual scan point count; use scripts/slurm_helpers.jl
-# count_scan_points("runs/foo/config.yaml") to get the right N.)
+# (N must match the actual scan point count; use
+# `julia --project=. -e 'using SpinorBEC; println(scan_point_count(ARGS[1]))' <yaml>`
+# to get the right N.)
 
 set -euo pipefail
 
@@ -34,8 +35,6 @@ source scripts/tsubame_setup.sh
 export SPINORBEC_SCAN_ONLY_INDEX="$SLURM_ARRAY_TASK_ID"
 
 julia --project="$PROJECT" -e '
-    import CUDA
-    using SpinorBEC
-    @info "Array task" idx = ENV["SPINORBEC_SCAN_ONLY_INDEX"] config = "'$CONFIG'"
-    run_yaml("'$CONFIG'")
-'
+    using CUDA, SpinorBEC
+    @info "Array task" idx=ENV["SPINORBEC_SCAN_ONLY_INDEX"] config=ARGS[1]; run_yaml(ARGS[1])
+' "$CONFIG"

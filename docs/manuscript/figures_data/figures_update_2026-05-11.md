@@ -12,7 +12,7 @@
 | Label | Description | Source / method | Status |
 |---|---|---|---|
 | `paper3_FIG-6` | **Sign Pattern Anomalous Identity** result — 5 polyhedral cases (F=3, 4, 6, 8, 10) showing β_S^{λ_spin} sign vs X_S^{(anom)} sign, with sign change locations marked | matplotlib stacked bar from `figures_data/sign_pattern_table.csv` | **data ready** |
-| `paper3_FIG-7` | **Polyhedral inert state Majorana grid (F=2 to F=12)** — 7-panel Bloch-sphere figure covering Paper #3 §V.A–§V.G inert states, including F=12 I:A. Stars computed via `SpinorBEC.majorana_stars` (single source of truth); multiplicity-2 orbits at F=8 (cube) and F=12 (icosa) shown as larger markers | `scripts/manuscript/render_figures.jl --paper paper3 --fig FIG-6` → CSV → matplotlib (`fig-7_paper3_majorana.py`) | **rendered** |
+| `paper3_FIG-7` | **Polyhedral inert state Majorana grid (F=2 to F=12)** — 7-panel Bloch-sphere figure covering Paper #3 §V.A–§V.G inert states, including F=12 I:A. Stars computed via `SpinorBEC.majorana_stars` (single source of truth); multiplicity-2 orbits at F=8 (cube) and F=12 (icosa) shown as larger markers | `scripts/cli.jl figure --paper paper3 --fig 6` → CSV → matplotlib (`fig-7_paper3_majorana.py`) | **rendered** |
 | `paper3_FIG-8` | **F-universality of I_h selection rule** — exclusion pattern $\{S=2,4,8,14\}$ shared across F=6, F=10, F=12 (bar chart with $\beta_S^{c_0}$ heights, zero entries highlighted) | matplotlib from CSV | data ready |
 | `paper3_FIG-9` | **Schur isotropy verification heatmap** — $\langle F_a^2\rangle$ for each polyhedral case showing perfect $F(F+1)/3$ value (deviation < $10^{-12}$) | matplotlib from `audit_result_2026-05-11.md` table | data ready |
 
@@ -76,7 +76,7 @@ result = load("runs/twa_N_scan_pinned_16g/N100000_pinned_16g_e439bbff/result.jld
 # Extract σ/μ time series, plot
 ```
 
-Both pipelines deterministic, can be added to `scripts/manuscript/render_figures.jl`.
+Both pipelines deterministic, can be added to `scripts/cli.jl figure`.
 
 ---
 

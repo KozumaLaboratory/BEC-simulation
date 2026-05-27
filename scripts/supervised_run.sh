@@ -25,13 +25,11 @@ while [[ $attempt -lt $MAX_RETRIES ]]; do
     echo "--- attempt $attempt / $MAX_RETRIES at $(date) ---" | tee -a "$LOG"
 
     LD_LIBRARY_PATH=/usr/lib/wsl/lib \
-        julia --project="$PROJECT_ROOT" -e "
+        julia --project="$PROJECT_ROOT" -e '
             using SpinorBEC
-            exp = Experiment(joinpath(\"runs\", \"$RUN_NAME\", \"config.yaml\"))
-            ckpt = joinpath(exp.outdir, \".checkpoints\")
-            isdir(ckpt) && (@info \"removing stale checkpoint dir\" ckpt; rm(ckpt; recursive=true, force=true))
-            run!(exp; force=true)
-        " 2>&1 | tee -a "$LOG"
+            exp = Experiment(joinpath("runs", ARGS[1], "config.yaml"))
+            clear_stale_checkpoints!(exp); run!(exp; force=true)
+        ' "$RUN_NAME" 2>&1 | tee -a "$LOG"
     exit_code=${PIPESTATUS[0]}
 
     if [[ $exit_code -eq 0 ]]; then
@@ -49,5 +47,6 @@ else
     msg=":x: SpinorBEC run *${RUN_NAME}* gave up after $MAX_RETRIES attempts"
 fi
 
-julia --project="$PROJECT_ROOT" "$PROJECT_ROOT/scripts/notify_slack.jl" "$msg" || true
+julia --project="$PROJECT_ROOT" -e 'using HTTP, SpinorBEC; notify_slack(ARGS[1])' \
+    "$msg" || true
 exit $exit_code

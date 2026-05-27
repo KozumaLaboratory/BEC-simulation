@@ -114,6 +114,39 @@ Execute a pipeline sequentially. Each step receives the current psi
 and produces a new one. Analysis steps don't modify psi but accumulate
 results.
 """
+_is_nan_error(err) =
+    err isa DomainError ||
+    (err isa ErrorException && occursin(r"NaN|Inf"i, err.msg))
+
+_is_oom_error(err) =
+    err isa OutOfMemoryError ||
+    (err isa ErrorException && occursin(r"out of memory|OOM"i, err.msg))
+
+function _write_exit_summary(path::Union{Nothing, String};
+    completed::Bool, exception_type::Union{Nothing, AbstractString},
+    last_step::Int, runtime_seconds::Real,
+    nan_encountered::Bool, oom_killed::Bool,
+)
+    path === nothing && return nothing
+    payload = Dict{String, Any}(
+        "completed" => completed,
+        "exception_type" => exception_type,
+        "last_step" => last_step,
+        "runtime_seconds" => runtime_seconds,
+        "nan_encountered" => nan_encountered,
+        "oom_killed" => oom_killed,
+        "written_at" => string(now()),
+    )
+    try
+        open(path, "w") do io
+            JSON.print(io, payload, 2)
+        end
+    catch e
+        @warn "_write_exit_summary failed" path=path exception=e
+    end
+    return path
+end
+
 function run_pipeline(config::PipelineConfig; verbose::Bool=_default_solver_verbose(),
     psi_init=nothing,
     checkpoint_dir::Union{Nothing, String}=nothing,
@@ -127,25 +160,53 @@ function run_pipeline(config::PipelineConfig; verbose::Bool=_default_solver_verb
         results[:_live_status_path] = live_status_path
     end
 
-    for (i, step) in enumerate(config.steps)
-        if verbose
-            println("Step $i/$(length(config.steps)): $(nameof(typeof(step)))")
-            flush(stdout);
-            ccall(:fflush, Cint, (Ptr{Cvoid},), C_NULL)
-        end
-        # Push the per-iteration dispatch + tuple destructuring into a
-        # @nospecialize-tagged helper. Without that, Julia specialises
-        # this loop body across every PipelineStep concrete type AND
-        # every _run_step return-tuple shape, which compounds into a
-        # multi-minute JIT cascade once the binary GP path is in the
-        # union (CLAUDE.md "Type stability boundaries"). The helper
-        # treats step as Any, so dispatch happens at runtime and the
-        # surrounding inference world stays narrow.
-        psi, grid, atom, workspace = _step_dispatch!(
-            results, step, psi, grid, atom, workspace,
-            verbose, checkpoint_dir, live_status_path,
-        )
+    # Exit summary — derive path from live_status_path (same dir) so the
+    # autopilot can classify transient vs permanent failures without log
+    # scraping. See docs/guides/autopilot.md.
+    exit_summary_path = if live_status_path === nothing
+        nothing
+    else
+        joinpath(dirname(live_status_path), "_exit_summary.json")
     end
+    t_start = time()
+    last_step = 0
+    exit_exception = nothing
+
+    try
+        for (i, step) in enumerate(config.steps)
+            if verbose
+                println("Step $i/$(length(config.steps)): $(nameof(typeof(step)))")
+                flush(stdout);
+                ccall(:fflush, Cint, (Ptr{Cvoid},), C_NULL)
+            end
+            last_step = i
+            # Push the per-iteration dispatch + tuple destructuring into a
+            # @nospecialize-tagged helper. Without that, Julia specialises
+            # this loop body across every PipelineStep concrete type AND
+            # every _run_step return-tuple shape, which compounds into a
+            # multi-minute JIT cascade once the binary GP path is in the
+            # union (CLAUDE.md "Type stability boundaries"). The helper
+            # treats step as Any, so dispatch happens at runtime and the
+            # surrounding inference world stays narrow.
+            psi, grid, atom, workspace = _step_dispatch!(
+                results, step, psi, grid, atom, workspace,
+                verbose, checkpoint_dir, live_status_path,
+            )
+        end
+    catch err
+        exit_exception = err
+        _write_exit_summary(exit_summary_path; completed=false,
+            exception_type=string(typeof(err).name.name),
+            last_step=last_step, runtime_seconds=time() - t_start,
+            nan_encountered=_is_nan_error(err),
+            oom_killed=_is_oom_error(err))
+        rethrow(err)
+    end
+
+    _write_exit_summary(exit_summary_path; completed=true,
+        exception_type=nothing, last_step=last_step,
+        runtime_seconds=time() - t_start,
+        nan_encountered=false, oom_killed=false)
 
     # Auto-save dynamics pipelines into the dashboard-canonical layout
     # whenever the caller supplied a `checkpoint_dir`. Fires for both

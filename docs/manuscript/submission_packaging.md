@@ -287,7 +287,7 @@ PRR/PRX target requires RevTeX 4-2. Custom preamble:
 \end{figure}
 ```
 
-Figure rendering script: `scripts/manuscript/render_figures.jl` (Appendix 別 task).
+Figure rendering script: `scripts/cli.jl figure` (Appendix 別 task).
 
 ---
 

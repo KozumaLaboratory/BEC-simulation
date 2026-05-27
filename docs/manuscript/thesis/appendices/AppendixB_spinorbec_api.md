@@ -325,7 +325,7 @@ julia --project=. test/manuscript/test_sign_pattern_6j.jl
 julia --project=. -e 'using SpinorBEC; run_yaml("runs/F6_phase_diagram/config.yaml")'
 
 # Step 4: regenerate figures (see Appendix C / figures.md)
-julia --project=. scripts/manuscript/render_figures.jl
+julia --project=. scripts/cli.jl figure
 ```
 
 All scripts are deterministic (random seed 42), output JLD2 + log files in

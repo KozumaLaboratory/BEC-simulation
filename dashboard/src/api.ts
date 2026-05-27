@@ -79,6 +79,34 @@ export interface DynamicsSeries {
   pop_mid?: number[]
 }
 
+export interface AutopilotQueueResponse {
+  pending: AutopilotQueueEntry[]
+  running: AutopilotQueueEntry[]
+  done: AutopilotQueueEntry[]
+  killed_data: AutopilotQueueEntry[]
+  killed_bug: AutopilotQueueEntry[]
+}
+
+export interface AutopilotQueueEntry {
+  content_id: string
+  status: 'pending' | 'running' | 'done' | 'killed_data' | 'killed_bug'
+  kill_reason: string
+  attempt: number
+  priority: number
+  enqueued_at: string
+  enqueued_by: string
+  parent_id: string | null
+  recipe: { name: string | null; autonomy_level: 'suggest' | 'propose' | 'dispatch' }
+  backend: {
+    type: 'local' | 'slurm'
+    job_id: string | null
+    profile: string
+    estimated_walltime_hours: number
+  }
+  budget: { gpu_hours_realized: number }
+  run_dir: string
+}
+
 export interface VortexLine {
   m: string // "+5", "-3", "0"
   charge: number // ±1, ±2, ...
@@ -193,6 +221,12 @@ export const api = {
    * the dashboard's "what's running right now" panel polls this. */
   listLiveRuns(): Promise<Array<{ run: string; mtime_ms: number; age_s: number }>> {
     return json('/api/live/list')
+  },
+
+  /** Returns the autopilot queue state: pending/running/done/failed entries
+   * with their content_id, priority, parent_id, on_complete metadata. */
+  autopilotQueue(): Promise<AutopilotQueueResponse> {
+    return json('/api/queue')
   },
 
   /** Per-run scan progress: how many `point_NNN.jld2` files have landed
@@ -544,6 +578,54 @@ export const api = {
       `/api/ensemble/${encodeURIComponent(run)}/${encodeURIComponent(file)}`,
     )
   },
+
+  /** Pre-run config inspector. Loads the run's config.yaml, runs the full
+   * normalize_and_validate pipeline, samples the resolved B(t)/q(t)/Raman
+   * for each step, and returns typed warnings for silent semantic
+   * mismatches (e.g. `B.theta` dropped on split-step, ramp collapsed to
+   * quench, Hz strings, rotating_frame_omega + GPU). Backed by the Julia
+   * `inspect_config` function. */
+  getEffectiveConfig(run: string): Promise<EffectiveConfig> {
+    return json(`/api/effective_config/${encodeURIComponent(run)}`)
+  },
+}
+
+// --- Effective-config inspector ----------------------------------------
+// Mirrors src/workflow/experiments/inspect.jl::to_dict. Optional fields
+// reflect the per-step variation in the Julia struct (analyze steps carry
+// no traces; ground_state steps may have 1-sample traces).
+
+export interface EffectiveConfigTrace {
+  kind: string                            // "zeeman" | "raman"
+  t: number[]
+  channels: Record<string, number[]>       // e.g. bx, by, bz, q
+}
+
+export interface EffectiveConfigStep {
+  index: number
+  name: string                            // "ground_state" | "dynamics" | "analyze"
+  kind: string                            // "split_step" | "rotating_basis" | "binary" | "analyze"
+  duration: number
+  params_summary: Record<string, unknown>
+  traces: EffectiveConfigTrace[]
+}
+
+export interface EffectiveConfigWarning {
+  kind: string
+  severity: 'error' | 'warn' | 'info'
+  step_index: number
+  title: string
+  message: string
+  suggestion: string
+  details: Record<string, unknown>
+}
+
+export interface EffectiveConfig {
+  path: string
+  raw: Record<string, unknown>
+  normalised: Record<string, unknown>
+  warnings: EffectiveConfigWarning[]
+  steps: EffectiveConfigStep[]
 }
 
 // --- TWA ensemble summary (Round-2 Task 5) -------------------------------

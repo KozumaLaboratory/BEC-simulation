@@ -50,6 +50,9 @@ include("rotating_basis.jl")  # Klaus-regime (rotating-basis + scalar-eGPE) umbr
 include("workflow/experiments/pipeline/pipeline_api.jl")
 include("workflow/experiments/pipeline/pipeline_continuation.jl")
 include("workflow/experiments/pipeline/run_registry.jl")
+include("workflow/experiments/diff_dicts.jl")
+include("workflow/experiments/inspect.jl")
+include("workflow/experiments/inspect_batch.jl")
 
 # Calibration subsystem (real submodule, 2 files: core + drift).
 include("workflow/experiments/calibration.jl")  # `module Calibration`
@@ -75,6 +78,7 @@ export sample_trap_drift_omegas, trap_drift_waveforms, apply_trap_drift
 # ========================================
 
 include("analysis.jl")  # observables + diagnostics + phase exploration umbrella
+include("manuscript.jl")  # manuscript figure registry + builders
 
 # ========================================
 # VALIDATION: self-contained reference RHS
@@ -95,6 +99,8 @@ include("validation/reference_rhs.jl")
 #             spin_populations_trajectory, classify_collapse), and
 #             runfactory's internal _set_path!.
 include("workflow/experiment.jl")
+include("workflow/io/cluster.jl")  # cluster helpers (needs Experiment)
+include("workflow/autopilot.jl")   # queue + tick + on_complete + retry
 
 # ========================================
 # SOLVERS: Ground state & time evolution

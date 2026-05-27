@@ -1,4 +1,102 @@
-export save_rotating_basis_result!
+export save_rotating_basis_result!, summarize_rotating_basis_result,
+    launch_experiment
+
+"""
+    summarize_rotating_basis_result(io, result; label="")
+
+Print a short one-block summary of a `run_config` result containing a
+rotating_basis dynamics phase. Reports Lz/Fz ranges over the final
+phase, m=+F initial/final populations, and integrator metadata
+(Larmor phase per step, dt). `label` is a free-form tag printed on
+the header line — typically `"<batch>/<run_name>"`.
+"""
+function summarize_rotating_basis_result(
+    io::IO, result; label::AbstractString=""
+)
+    dyn = if haskey(result, :rotating_basis_dynamics)
+        result[:rotating_basis_dynamics]
+    elseif haskey(result, :rotating_basis_history) &&
+        !isempty(result[:rotating_basis_history])
+        last(result[:rotating_basis_history])
+    else
+        throw(
+            ArgumentError(
+                "summarize_rotating_basis_result: result has no rotating_basis dynamics phase"
+            ),
+        )
+    end
+
+    pm_hist = get(dyn, :per_m_history, Any[])
+    pm_init = isempty(pm_hist) ? nothing : pm_hist[1] / sum(pm_hist[1])
+    pm_final = isempty(pm_hist) ? nothing : pm_hist[end] / sum(pm_hist[end])
+
+    dyn_hist = get(result, :dynamics_history, nothing)
+    n_phases = dyn_hist === nothing ? 1 : length(dyn_hist)
+
+    header = isempty(label) ? "=== COMPLETED ===" : "=== $label COMPLETED ==="
+    println(io, "\n", header)
+    println(io, "  phases: $n_phases")
+    if haskey(dyn, :Lz)
+        println(io, "  Lz (final phase): [",
+            round(minimum(dyn[:Lz]); digits=4), ", ",
+            round(maximum(dyn[:Lz]); digits=4), "]")
+    end
+    if haskey(dyn, :Fz)
+        println(io, "  Fz (final phase): [",
+            round(minimum(dyn[:Fz]); digits=4), ", ",
+            round(maximum(dyn[:Fz]); digits=4), "]")
+    end
+    if pm_init !== nothing
+        println(io, "  m=+F: ",
+            round(pm_init[1]; digits=6), " -> ",
+            round(pm_final[1]; digits=6))
+    end
+    println(io, "  Larmor phase per step: ",
+        round(get(dyn, :larmor_phase_per_step, NaN); sigdigits=4))
+    println(io, "  dt_used: ", get(dyn, :dt_used, NaN))
+    return nothing
+end
+
+summarize_rotating_basis_result(result; kwargs...) = summarize_rotating_basis_result(
+    stdout, result; kwargs...
+)
+
+"""
+    launch_experiment(run_name; batch="", verbose=true, io=stdout) -> result
+
+Per-run launcher convention. Resolves the YAML to
+`runs/<batch?>/<run_name>/config.yaml` (omits the `batch` segment when
+empty), runs `load_config |> run_config`, prints a rotating_basis
+summary, and persists the canonical dashboard layout via
+`save_rotating_basis_result!`. Returns the `run_config` result so
+callers can post-process.
+
+`save_rotating_basis_result!` is also called automatically by
+`run_pipeline` since 2026-04-29 — the explicit call here is idempotent
+and ensures the canonical path is written even if the pipeline branch
+hasn't run.
+"""
+function launch_experiment(
+    run_name::AbstractString;
+    batch::AbstractString="",
+    verbose::Bool=true,
+    io::IO=stdout,
+)
+    run_dir = if isempty(batch)
+        joinpath("runs", String(run_name))
+    else
+        joinpath("runs", String(batch), String(run_name))
+    end
+    label = isempty(batch) ? String(run_name) :
+            "$(batch)/$(run_name)"
+
+    config = load_config(joinpath(run_dir, "config.yaml"))
+    result = @time run_config(config; verbose=verbose)
+    summarize_rotating_basis_result(io, result; label=label)
+    out_path = save_rotating_basis_result!(run_dir, result)
+    println(io, "Saved (dashboard-canonical) -> $out_path")
+    return result
+end
 
 """
 Concatenate consecutive rotating_basis phases (GS → tilt ramp → chirp →

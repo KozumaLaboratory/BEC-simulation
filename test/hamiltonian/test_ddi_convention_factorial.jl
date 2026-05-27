@@ -52,8 +52,10 @@ function _make_polarised_psi(grid::Grid{3}, F::Int; sigma::Tuple{Float64, Float6
         y = grid.x[2][I[2]]
         z = grid.x[3][I[3]]
         env = exp(-x^2 / (2 * sigma[1]^2)
-                  - y^2 / (2 * sigma[2]^2)
-                  - z^2 / (2 * sigma[3]^2))
+                  -
+                  y^2 / (2 * sigma[2]^2)
+                  -
+                  z^2 / (2 * sigma[3]^2))
         psi[I, 1] = env
     end
     # Normalise to unit integral.
@@ -126,7 +128,9 @@ function main()
     seculars = (false, true)
     grids = (16, 24)
 
-    rows = Vector{NamedTuple{(:shape, :axis, :secular, :n, :E_ddi), Tuple{Symbol, Symbol, Bool, Int, Float64}}}()
+    rows = Vector{
+        NamedTuple{(:shape, :axis, :secular, :n, :E_ddi), Tuple{Symbol, Symbol, Bool, Int, Float64}}
+    }()
     println("# DDI convention factorial — E_DDI / N (c_dd = $(C_DD), atom = $(ATOM.name))")
     @printf("%-12s %-7s %-9s %-5s %-15s\n", "shape", "B_axis", "secular", "n", "E_DDI")
     println(repeat("-", 60))

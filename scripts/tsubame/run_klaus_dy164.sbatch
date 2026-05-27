@@ -43,15 +43,7 @@ export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 # (REPL audit: tabulate([Experiment(p) for p in yamls], [norm_drift, Fz_t, per_m_t])).
 # For the original ε=1e-3 config, expect false convergence in the
 # Klaus p·F·dt > 300 regime.
-julia --project=. -e "
-using CUDA, SpinorBEC, JLD2
-config = SpinorBEC.load_config(\"runs/${RUN_NAME}/config.yaml\")
-@time result = SpinorBEC.run_config(config; verbose=true)
-dyn = result[:rotating_basis_dynamics]
-println(\"Larmor phase per step: \", get(dyn, :larmor_phase_per_step, NaN))
-println(\"dt_used: \", get(dyn, :dt_used, NaN))
-println(\"epsilon_target: \", get(dyn, :epsilon_target, NaN))
-"
+julia --project=. scripts/cli.jl launch "$RUN_NAME"
 
 # --- Dashboard format is auto-saved by run_pipeline (since 2026-04-29); no
 # --- separate repack step required. The result.jld2 + point_001.jld2 symlink

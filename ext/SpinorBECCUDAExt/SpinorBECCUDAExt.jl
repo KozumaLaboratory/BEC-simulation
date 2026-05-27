@@ -40,6 +40,20 @@ function __init__()
     # across psi/fft_buf/k²/ddi_kernel) and a long scan will OOM mid-run.
     SpinorBEC._cuda_reclaim_callback[] = () -> (CUDA.reclaim(); nothing)
     SpinorBEC._cuda_functional_callback[] = () -> CUDA.functional()
+    SpinorBEC._cuda_state_lines_callback[] = function ()
+        if !CUDA.functional()
+            return ["CUDA loaded but no functional device"]
+        end
+        dev = CUDA.device()
+        cap = CUDA.capability(dev)
+        round_gb(b) = string(round(b / 2^30; digits=1), " GB")
+        [
+            "device: $(CUDA.name(dev))",
+            "capability: $(cap.major).$(cap.minor)",
+            "total memory: $(round_gb(CUDA.totalmem(dev)))",
+            "available memory: $(round_gb(CUDA.available_memory()))",
+        ]
+    end
 end
 
 end # module

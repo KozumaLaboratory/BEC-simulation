@@ -13,7 +13,6 @@ with open(__file__.replace('.py', '.csv')) as f:
     for r in csv.DictReader(f):
         rows.append(r)
 
-# Group by F
 F_vals = sorted(set(int(r['F']) for r in rows))
 fig, ax = plt.subplots(figsize=(6.5, 4.5))
 colors = plt.cm.viridis(np.linspace(0, 0.85, len(F_vals)))

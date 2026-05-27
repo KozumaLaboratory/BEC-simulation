@@ -50,6 +50,7 @@ using ..SpinorBEC: _component_slice
 # (e.g. eu151_edh_k3_compare via eu151_edh_phys) still resolve. Imported
 # unexported.
 using ..SpinorBEC: apply_templates_and_mixins!
+using ..SpinorBEC: QueueEntry, autopilot_queue_root, list_queue
 
 include("dashboard/encoding.jl")          # bitshuffle + zstd
 include("dashboard/cache.jl")             # PSI_CACHE, JLD handle pool, atlas disk cache
@@ -63,6 +64,8 @@ include("dashboard/routes/snapshots.jl")  # snapshots, dynamics_series, ensemble
 include("dashboard/routes/lab_live.jl")   # lab_list, live_list, live
 include("dashboard/routes/misc.jl")       # data, coherence, vector3d_bin
 include("dashboard/server/json.jl")       # _write_json + _json_string
+include("dashboard/routes/inspect.jl")    # /api/effective_config — depends on _json_string
+include("dashboard/routes/autopilot_queue.jl")  # /api/queue — autopilot state
 include("dashboard/server/data_export.jl")  # generate_dashboard_data + export_dashboard
 include("dashboard/server/router.jl")     # serve_dashboard + _route_dashboard
 include("dashboard/server/static.jl")     # static asset + HTTP response helpers

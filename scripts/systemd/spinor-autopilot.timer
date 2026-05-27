@@ -1,0 +1,15 @@
+[Unit]
+Description=Fire spinor-autopilot.service every 5 minutes
+Requires=spinor-autopilot.service
+
+[Timer]
+# OnBootSec: don't fire immediately at boot; let other services come up.
+OnBootSec=2min
+# OnUnitActiveSec: 5-min cadence after the previous tick finished.
+OnUnitActiveSec=5min
+# AccuracySec: don't queue ticks more frequently than 1 min.
+AccuracySec=1min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

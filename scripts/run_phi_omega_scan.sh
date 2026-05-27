@@ -20,7 +20,7 @@ CONFIGS=(
 )
 
 JULIA=/home/suzume/.julia/juliaup/julia-1.12.6+0.x64.linux.gnu/bin/julia
-LAUNCHER=scripts/launch_run.jl
+LAUNCHER=scripts/cli.jl
 BATCH=phi_omega_scan
 LOGS_DIR=logs/phi_omega_scan
 mkdir -p "$LOGS_DIR"
@@ -35,7 +35,7 @@ while [ $i -lt ${#CONFIGS[@]} ]; do
     for ((j = 0; j < PARALLEL && i + j < ${#CONFIGS[@]}; j++)); do
         name="${CONFIGS[$((i + j))]}"
         logf="$LOGS_DIR/${name}.log"
-        LD_LIBRARY_PATH=/usr/lib/wsl/lib "$JULIA" --project=. "$LAUNCHER" "$BATCH" "$name" > "$logf" 2>&1 &
+        LD_LIBRARY_PATH=/usr/lib/wsl/lib "$JULIA" --project=. "$LAUNCHER" launch "$BATCH" "$name" > "$logf" 2>&1 &
         pids+=($!)
         echo "  launched $name (PID $!)"
         sleep 3
