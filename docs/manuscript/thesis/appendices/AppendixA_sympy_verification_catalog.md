@@ -24,7 +24,7 @@ confirm (`audit_result_2026-05-11.md`).
 
 ## A.2 Script inventory
 
-### A.2.1 `scripts/manuscript/paper3_audit.jl`
+### A.2.1 `test/manuscript/test_paper3_audit.jl`
 
 **Purpose**: paper3 v3 の 5 polyhedral cases (F=3 octa A_2, F=4 cube, F=6 ico, F=8
 cube-octa Dy, F=10 dodec) を independent reconstruction で audit する。
@@ -110,7 +110,7 @@ cd BEC-simulation
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
 
 # Audit paper3 v3 polyhedral cases (5 cases, ~5 min)
-julia --project=. scripts/manuscript/paper3_audit.jl
+julia --project=. test/manuscript/test_paper3_audit.jl
 
 # F=12 icosahedral verification (~3 min)
 julia --project=. test/manuscript/test_f12_icosahedral.jl

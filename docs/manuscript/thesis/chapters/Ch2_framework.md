@@ -377,7 +377,7 @@ WSL2: `LD_LIBRARY_PATH=/usr/lib/wsl/lib julia --project=. ...`。
 - (etc.)
 
 scripts:
-- `scripts/manuscript/paper3_audit.jl`: 5-case paper3 verification (Ch.6, §V.B-V.F)
+- `test/manuscript/test_paper3_audit.jl`: 5-case paper3 verification (Ch.6, §V.B-V.F)
 - `test/manuscript/test_f12_icosahedral.jl`: F=12 (paper3 §IX.B follow-up)
 - `test/manuscript/test_sign_pattern_6j.jl`: Sign Pattern Anomalous Identity
 - `scripts/bench/*.jl`: integrator order/cost benchmarks (D-thesis Ch.3 prep)

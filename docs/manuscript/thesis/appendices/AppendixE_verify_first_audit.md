@@ -39,7 +39,7 @@ cross-validation" 第 3 pillar)。
 
 ### E.2.2 Independent methodology
 
-Audit framework (script: `scripts/manuscript/paper3_audit.jl`):
+Audit framework (script: `test/manuscript/test_paper3_audit.jl`):
 
 **Step 1**: Spin matrices $F_x, F_y, F_z$ を direct construction (raising/lowering
 operator $\sqrt{F(F+1) - m(m \pm 1)}$ 公式)

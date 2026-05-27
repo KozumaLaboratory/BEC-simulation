@@ -205,7 +205,7 @@ before `using SpinorBEC`. Then `backend = CUDABackend()` enables GPU kernels.
 
 | Script | Purpose | Runtime |
 |---|---|---|
-| `scripts/manuscript/paper3_audit.jl` | 5-case paper3 audit | ~5 min CPU |
+| `test/manuscript/test_paper3_audit.jl` | 5-case paper3 audit | ~5 min CPU |
 | `test/manuscript/test_f12_icosahedral.jl` | F=12 I:A verification | ~3 min CPU |
 | `test/manuscript/test_sign_pattern_6j.jl` | Sign Pattern Anomalous Identity | ~5 min CPU |
 
@@ -317,7 +317,7 @@ git clone <repo> BEC-simulation && cd BEC-simulation
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
 
 # Step 2: run verify-first audits (~15 min CPU)
-julia --project=. scripts/manuscript/paper3_audit.jl
+julia --project=. test/manuscript/test_paper3_audit.jl
 julia --project=. test/manuscript/test_f12_icosahedral.jl
 julia --project=. test/manuscript/test_sign_pattern_6j.jl
 

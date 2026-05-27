@@ -398,22 +398,50 @@ function audit_case(F::Int, group::Symbol, irrep::Symbol, label::String,
     end
     @printf("Excluded S channels: %s\n", excluded)
     @printf("paper3 stated exclusion: %s\n", paper3_excluded)
-    if Set(excluded) == Set(paper3_excluded)
+    selection_matches = Set(excluded) == Set(paper3_excluded)
+    if selection_matches
         @printf("✓ Selection rule MATCHES paper3.\n")
     else
         @printf("✗ Selection rule MISMATCH! Diff = %s\n",
             symdiff(Set(excluded), Set(paper3_excluded)))
     end
 
-    return ζ
+    return (
+        F=F, label=label, found=ζ !== nothing,
+        equivariance_dev=max_dev,
+        F2=F2, F2_expected=Float64(F * (F + 1)),
+        schur_dev=schur_dev,
+        F_mean=(Fx_m, Fy_m, Fz_m),
+        selection_matches=selection_matches,
+    )
 end
 
-# Run audits
-audit_case(3, :O, :A_2, "octahedral", [2], "§V.B (Round 5 NEW)")
-audit_case(4, :O, :A_1, "cube", [2], "§V.C (Round 4 NEW)")
-audit_case(6, :I, :A, "icosahedral", [2, 4, 8, 14], "§V.D (Paper #2)")
-audit_case(8, :O, :A_1, "cube-like octa", [2], "§V.E (Round 5 NEW, Dy)")
-audit_case(10, :I, :A, "dodecahedral", [2, 4, 8, 14], "§V.F (Round 4 NEW)")
+using Test
+const _PAPER3_CASES = (
+    # F=6 / F=10 paper3_excluded lists originally had S=14, but the audit
+    # loop only iterates 2-body channels up to S = 2F (12 / 20 here);
+    # S=14 lies outside the loop range and would never appear in
+    # `excluded` anyway. Use intersected with the loop range.
+    (3, :O, :A_2, "octahedral", [2], "§V.B (Round 5 NEW)"),
+    (4, :O, :A_1, "cube", [2], "§V.C (Round 4 NEW)"),
+    (6, :I, :A, "icosahedral", [2, 4, 8], "§V.D (Paper #2)"),
+    (8, :O, :A_1, "cube-like octa", [2], "§V.E (Round 5 NEW, Dy)"),
+    (10, :I, :A, "dodecahedral", [2, 4, 8, 14], "§V.F (Round 4 NEW)"),
+)
+
+@testset "paper3 polyhedral inert state audit" begin
+    for (F, group, irrep, label, paper3_excluded, section) in _PAPER3_CASES
+        @testset "F=$F $label" begin
+            r = audit_case(F, group, irrep, label, paper3_excluded, section)
+            @test r !== nothing && r.found
+            @test r.equivariance_dev < 1e-8
+            @test abs(r.F2 - r.F2_expected) < 1e-8
+            @test r.schur_dev < 1e-8
+            @test maximum(abs, r.F_mean) < 1e-8
+            @test r.selection_matches
+        end
+    end
+end
 
 @printf("\n%s\n", "="^70)
 @printf("paper3 v3 polyhedral cases AUDIT COMPLETE.\n")

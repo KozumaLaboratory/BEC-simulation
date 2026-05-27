@@ -1,7 +1,7 @@
 # paper3 v3 independent audit — 5 polyhedral cases VERIFIED
 
 **Date**: 2026-05-11
-**Script**: `scripts/manuscript/paper3_audit.jl`
+**Script**: `test/manuscript/test_paper3_audit.jl`
 **Status**: ALL 5 paper3 polyhedral cases pass independent verification.
 
 ## Methodology

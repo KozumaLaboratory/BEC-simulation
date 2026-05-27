@@ -315,7 +315,7 @@ multi-session (D 論 task). CPU wall is 1.56 s/step at F=6 (D=13) 16³
 - `test/dynamics/test_tdhfb_f1_validation.jl`: F=1 16³ T=0.2 anti-polar quench
   completes in 8.3s. κ growth linear 0 → 2.5×10⁻² (V·φφ source), ρ tiny
   ~3×10⁻⁷. Hermiticity / symmetry preserved at machine precision.
-- `scripts/tdhfb_eu_production.jl`: F=6 16³ T=0.4 ω⁻¹ Eu production
+- `scripts/bench/tdhfb_eu_production.jl`: F=6 16³ T=0.4 ω⁻¹ Eu production
   scaffold. Regime A (g_S all = 1) completed: 313 s wall, κ growth
   linear 0 → 6.2×10⁻². Run data: `docs/manuscript/figures_data/
   tdhfb_eu_F6_T0.4_2026-05-12.md`.
