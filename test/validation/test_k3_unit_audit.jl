@@ -182,7 +182,10 @@ function main()
     println()
     println(all_pass ? "✓ All K3 unit-scale audits PASS." :
             "✗ K3 unit-scale audit FAILED.")
-    exit(all_pass ? 0 : 1)
+    return rows
 end
 
-main()
+@testset "K3 unit-scale audit" begin
+    rows = main()
+    @test all(r -> r.pass, rows)
+end

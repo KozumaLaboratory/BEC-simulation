@@ -319,5 +319,7 @@ println()
 println("Summary: $n_pass PASS, $n_fail FAIL, $n_manual MANUAL, $n_skip SKIP, $n_error ERROR")
 println("         $total_pass total assertions pass, $total_fail fail, $total_broken broken")
 
-# Exit code: 1 if any automated row failed.
-exit(n_fail > 0 || n_error > 0 ? 1 : 0)
+@testset "validation matrix summary" begin
+    @test n_fail == 0
+    @test n_error == 0
+end
