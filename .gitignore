@@ -58,6 +58,11 @@ runs/**/movie.mp4
 # is a duplicate of the tracked input under runs/<scan>/. Same for
 # checkpoints and point_NNN.jld2 snapshots.
 runs/*_[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]/
+# Variants with a trailing tag (e.g. `_pre_parserfix`) — same pattern,
+# additional suffix after the hash.
+runs/*_[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]_*/
+# Auto-saved copies that show up under docs/validation/ (mirrored runs).
+docs/validation/**/*_[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]/
 
 # Generated dashboards (reproducible from data)
 *.html
