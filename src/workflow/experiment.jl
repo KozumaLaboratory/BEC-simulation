@@ -246,6 +246,8 @@ function _compute_observable(exp::Experiment, name::Symbol)
         return (t::Real) -> _density_at(exp, float(t))
     elseif name === :psi_at
         return (t::Real) -> _psi_at(exp, float(t))
+    elseif name === :density_stats_at
+        return (t::Real) -> _density_stats_at(exp, float(t))
     end
 
     # `times` lives on the dynamics block but isn't in the observable
@@ -263,23 +265,32 @@ function _compute_observable(exp::Experiment, name::Symbol)
         return getproperty(_runresult(exp), name)
     end
 
-    # Derived from psi snapshots.
+    # Derived from psi snapshots (single) or ensemble-mean density (ensemble).
     if name === :peaks
-        return peak_density_trajectory(_result_path(exp))
+        return _is_ensemble(exp) ? _ensemble_peaks(exp) :
+               peak_density_trajectory(_result_path(exp))
     elseif name === :populations_t
+        _is_ensemble(exp) && throw(
+            ArgumentError(
+                "Experiment.populations_t: undefined for ensemble (no per-trajectory psi)"
+            ),
+        )
         return spin_populations_trajectory(_result_path(exp))
     elseif name === :classification
         peaks = _compute_observable(exp, :peaks)
         norms = _runresult(exp).norm_t
         N_ratio = norms[end] / norms[1]
         return classify_collapse(peaks, N_ratio)
+    elseif name === :n_trajectories
+        return _n_trajectories(exp)
     end
 
     throw(
         ArgumentError(
             "Experiment: no observable `$name`. Known: " *
             "scalar/trajectory/drift via observable_dispatch, plus " *
-            ":peaks :populations_t :classification :density_at :psi_at",
+            ":peaks :populations_t :classification :density_at :psi_at " *
+            ":density_stats_at :n_trajectories",
         ),
     )
 end
@@ -364,6 +375,55 @@ function _ensemble_density_at(f, t::Float64)
         end
     end
     throw(ArgumentError("ensemble density_at: t=$t outside all phase windows"))
+end
+
+# Per-frame max(ensemble-mean density) trajectory.
+function _ensemble_peaks(exp::Experiment)
+    jld = _result_path(exp)
+    jldopen(jld, "r") do f
+        for k in sort(collect(keys(f)))
+            startswith(k, "dynamics") || continue
+            haskey(f[k], "ensemble") || continue
+            eg = f["$k/ensemble"]
+            for pk in sort(collect(keys(eg)))
+                startswith(pk, "phase_") || continue
+                haskey(eg[pk], "density") || continue
+                mean_arr = f["$k/ensemble/$pk/density/mean"]
+                _, _, _, nt = size(mean_arr)
+                return [Float64(maximum(view(mean_arr,:,:,:,it))) for it in 1:nt]
+            end
+        end
+        throw(ArgumentError("ensemble peaks: no dynamics/ensemble/phase_*/density/mean"))
+    end
+end
+
+function _n_trajectories(exp::Experiment)
+    _is_ensemble(exp) || return 1
+    jld = _result_path(exp)
+    jldopen(jld, "r") do f
+        for k in sort(collect(keys(f)))
+            startswith(k, "dynamics") || continue
+            haskey(f[k], "ensemble") || continue
+            eg = f["$k/ensemble"]
+            for pk in sort(collect(keys(eg)))
+                startswith(pk, "phase_") || continue
+                haskey(eg[pk], "n_trajectories") || continue
+                return Int(f["$k/ensemble/$pk/n_trajectories"])
+            end
+        end
+        return 1
+    end
+end
+
+# Single-frame stats helper: (peak, fwhm_x, fwhm_z, on_axis, σ_over_μ).
+# Accepts a 3D density array, optionally with a matching variance array
+# for σ_over_μ at the peak voxel.
+function _density_stats_at(exp::Experiment, t::Float64)
+    if _is_ensemble(exp)
+        snap = _density_at(exp, t)
+        return density_stats(snap.mean; variance=snap.variance)
+    end
+    return density_stats(_density_at(exp, t))
 end
 
 # ---------------------------------------------------------------------------
@@ -519,4 +579,48 @@ function tabulate(batch::Batch, fields::AbstractVector{Symbol})
         cols[f] = col
     end
     (; (k => cols[k] for k in (:values, fields...))...)
+end
+
+# ---------------------------------------------------------------------------
+# check / compare — Experiment ↔ RunResult bridges
+# ---------------------------------------------------------------------------
+
+"""
+    check(spec, exp::Experiment) -> CheckResult
+
+Adapter: applies an existing Spec (ConservationSpec / OperatorRHSSpec /
+…) to an Experiment by routing through its cached RunResult. The
+result is identical to `check(spec, open_result(_result_path(exp)))`
+but reuses the lazy cache.
+"""
+check(spec, exp::Experiment) = check(spec, _runresult(exp))
+
+"""
+    compare(a::Experiment, b::Experiment; label_a="A", label_b="B") -> RunComparison
+
+Pair two Experiments for A/B diff. Thin wrapper over `compare_runs`
+that reuses each Experiment's lazy RunResult.
+"""
+function compare(
+    a::Experiment, b::Experiment;
+    label_a::AbstractString="A", label_b::AbstractString="B",
+)
+    compare_runs(_runresult(a), _runresult(b); label_a, label_b)
+end
+
+# ---------------------------------------------------------------------------
+# audit(::Experiment) — end-to-end run + check
+# ---------------------------------------------------------------------------
+
+"""
+    audit(exp::Experiment; spec=ConservationSpec(), verbose=true) -> CheckResult
+
+End-to-end: `run!(exp)` (idempotent — no-op if cached) followed by
+`check(spec, exp)`. The 1-liner that replaces the old
+`audit(yaml::AbstractString)` glue.
+"""
+function audit(exp::Experiment; spec=ConservationSpec(), verbose::Bool=true)
+    run!(exp)
+    verbose && @info "audit" outdir = getfield(exp, :outdir)
+    check(spec, exp)
 end

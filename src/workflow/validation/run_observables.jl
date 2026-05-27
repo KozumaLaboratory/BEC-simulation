@@ -15,7 +15,7 @@ using ..SpinorBEC: total_density
 
 export find_run_dir, psi_snapshots,
     peak_density_trajectory, spin_populations, spin_populations_trajectory,
-    classify_collapse
+    classify_collapse, density_stats
 
 """
     find_run_dir(yaml_path; runs_root=nothing) -> Union{String, Nothing}
@@ -144,4 +144,44 @@ function classify_collapse(peaks::AbstractVector{<:Real}, N_final_ratio::Real)
     end
     peak_growing_at_end && return :marginal_arrest
     N_final_ratio < 0.5 ? :sacrificial_arrest : :stable_arrest
+end
+
+"""
+    density_stats(density::AbstractArray{<:Real, 3}; variance=nothing) -> NamedTuple
+
+Compute the standard single-frame density observables used across the
+old TWA / Klaus density-slice analyzers:
+
+  `peak`        — `maximum(density)`
+  `peak_voxel`  — `CartesianIndex` of the peak voxel
+  `fwhm_x`      — FWHM of the on-axis x-profile, in voxels
+  `fwhm_z`      — FWHM of the on-axis z-profile, in voxels
+  `on_axis`     — `density[center] / peak` (≤ 1)
+  `sigma_over_mu` — `sqrt(variance[peak_voxel]) / peak` if `variance`
+                   is given, else `NaN`
+
+The grid centre is `(nx÷2+1, ny÷2+1, nz÷2+1)` (matches the convention
+used by the deleted twa_*_analyze.jl scripts).
+"""
+function density_stats(density::AbstractArray{<:Real, 3}; variance=nothing)
+    nx, ny, nz = size(density)
+    cx, cy, cz = nx ÷ 2 + 1, ny ÷ 2 + 1, nz ÷ 2 + 1
+    peak = Float64(maximum(density))
+    peak_voxel = argmax(density)
+    prof_x = view(density, :, cy, cz)
+    prof_z = view(density, cx, cy, :)
+    fwhm(p) =
+        let h = maximum(p) / 2
+            idx = findall(>(h), p)
+            isempty(idx) ? 0 : last(idx) - first(idx) + 1
+        end
+    on_axis = peak > 0 ? Float64(density[cx, cy, cz]) / peak : 0.0
+    sigma_over_mu = if variance === nothing || peak <= 0
+        NaN
+    else
+        sqrt(max(Float64(variance[peak_voxel]), 0.0)) / peak
+    end
+    (peak=peak, peak_voxel=peak_voxel,
+        fwhm_x=fwhm(prof_x), fwhm_z=fwhm(prof_z),
+        on_axis=on_axis, sigma_over_mu=sigma_over_mu)
 end
