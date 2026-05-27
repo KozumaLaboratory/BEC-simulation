@@ -48,3 +48,6 @@ include("experiments/pipeline/run_step_rotating.jl")
 include("experiments/runtime/pulse_sequence.jl")
 include("experiments/runtime/sta_counter_diabatic.jl")
 include("experiments/runtime/feshbach_ramp.jl")
+
+# Abstract config builders + batch sweep (replaces scripts/validation/*_gen.jl).
+include("experiments/runfactory.jl")
