@@ -25,14 +25,14 @@ const PAD_R = 16
 const PAD_T = 28
 const PAD_B = 36
 const LEGEND_H = 22
-const COLORS = {
-  axis: '#3d4550',
-  grid: '#21262d',
-  text: '#e6edf3',
-  textMuted: '#7d8590',
-  title: '#00d9ff',
-  bg: 'rgba(0,0,0,0)',
-}
+// All ink derived from the parent CSS color (var(--ink)) so the chart
+// inherits drafting paper / cyanotype mode automatically. Opacity
+// separates the visual hierarchy without introducing new colors.
+const AXIS_OPACITY = 0.45
+const GRID_OPACITY = 0.18
+const TEXT_OPACITY = 1
+const TEXT_MUTED_OPACITY = 0.55
+const TITLE_OPACITY = 0.9
 
 /**
  * Multi-trace line + marker chart rendered as inline SVG. Handles the
@@ -72,10 +72,21 @@ export function LineChartSVG({
     return { xs, ys }
   }, [traces])
 
-  const xMin = xRange ? xRange[0] : flat.xs.length ? Math.min(...flat.xs) : 0
-  const xMax = xRange ? xRange[1] : flat.xs.length ? Math.max(...flat.xs) : 1
-  const yMin = yRange ? yRange[0] : flat.ys.length ? Math.min(...flat.ys) : 0
-  const yMax = yRange ? yRange[1] : flat.ys.length ? Math.max(...flat.ys) : 1
+  let xMin = xRange ? xRange[0] : flat.xs.length ? Math.min(...flat.xs) : 0
+  let xMax = xRange ? xRange[1] : flat.xs.length ? Math.max(...flat.xs) : 1
+  let yMin = yRange ? yRange[0] : flat.ys.length ? Math.min(...flat.ys) : 0
+  let yMax = yRange ? yRange[1] : flat.ys.length ? Math.max(...flat.ys) : 1
+  // Single-point (or zero-span) data would collapse to xSpan=0 and stick all
+  // markers on the left edge. Pad ±1 (or ±50% of |center|, whichever is bigger)
+  // so the point centers in the plot area instead of vanishing into the axis.
+  if (!xRange && xMax <= xMin) {
+    const pad = Math.max(Math.abs(xMin) * 0.5, 1)
+    xMin -= pad; xMax += pad
+  }
+  if (!yRange && yMax <= yMin) {
+    const pad = Math.max(Math.abs(yMin) * 0.5, 1)
+    yMin -= pad; yMax += pad
+  }
   const xSpan = xMax - xMin || 1
   const ySpan = yMax - yMin || 1
 
@@ -114,15 +125,23 @@ export function LineChartSVG({
     <svg
       viewBox={`0 0 ${W} ${H}`}
       preserveAspectRatio="none"
-      style={{ width: '100%', height, background: COLORS.bg, display: 'block' }}
+      style={{
+        width: '100%',
+        height,
+        background: 'transparent',
+        display: 'block',
+        color: 'var(--ink)',
+        fontFamily: 'IBM Plex Mono, ui-monospace, monospace',
+      }}
     >
       {title && (
         <text
           x={W / 2}
           y={16}
           textAnchor="middle"
-          fontSize={13}
-          fill={COLORS.title}
+          fontSize={12}
+          fill="currentColor"
+          fillOpacity={TITLE_OPACITY}
           fontWeight={500}
         >
           {title}
@@ -133,14 +152,23 @@ export function LineChartSVG({
         const y = sy(t)
         return (
           <g key={`y${i}`}>
-            <line x1={PAD_L} y1={y} x2={W - PAD_R} y2={y} stroke={COLORS.grid} strokeWidth={1} />
+            <line
+              x1={PAD_L}
+              y1={y}
+              x2={W - PAD_R}
+              y2={y}
+              stroke="currentColor"
+              strokeOpacity={GRID_OPACITY}
+              strokeWidth={0.75}
+            />
             <text
               x={PAD_L - 6}
               y={y}
               textAnchor="end"
               dominantBaseline="middle"
               fontSize={10}
-              fill={COLORS.textMuted}
+              fill="currentColor"
+              fillOpacity={TEXT_MUTED_OPACITY}
             >
               {fmtTick(t)}
             </text>
@@ -152,13 +180,22 @@ export function LineChartSVG({
         const x = sx(t)
         return (
           <g key={`x${i}`}>
-            <line x1={x} y1={PAD_T} x2={x} y2={PAD_T + innerH} stroke={COLORS.grid} strokeWidth={1} />
+            <line
+              x1={x}
+              y1={PAD_T}
+              x2={x}
+              y2={PAD_T + innerH}
+              stroke="currentColor"
+              strokeOpacity={GRID_OPACITY}
+              strokeWidth={0.75}
+            />
             <text
               x={x}
               y={PAD_T + innerH + 14}
               textAnchor="middle"
               fontSize={10}
-              fill={COLORS.textMuted}
+              fill="currentColor"
+              fillOpacity={TEXT_MUTED_OPACITY}
             >
               {fmtTick(t)}
             </text>
@@ -171,7 +208,8 @@ export function LineChartSVG({
         y={PAD_T + innerH + 30}
         textAnchor="middle"
         fontSize={11}
-        fill={COLORS.text}
+        fill="currentColor"
+        fillOpacity={TEXT_OPACITY}
       >
         {xLabel}
       </text>
@@ -181,7 +219,8 @@ export function LineChartSVG({
         textAnchor="middle"
         dominantBaseline="middle"
         fontSize={11}
-        fill={COLORS.text}
+        fill="currentColor"
+        fillOpacity={TEXT_OPACITY}
         transform={`rotate(-90 14 ${PAD_T + innerH / 2})`}
       >
         {yLabel}
@@ -193,7 +232,8 @@ export function LineChartSVG({
         width={innerW}
         height={innerH}
         fill="none"
-        stroke={COLORS.axis}
+        stroke="currentColor"
+        strokeOpacity={AXIS_OPACITY}
         strokeWidth={1}
       />
       {/* trace lines */}
@@ -230,7 +270,13 @@ export function LineChartSVG({
           {traces.map((t, i) => (
             <g key={`leg${i}`} transform={`translate(${i * 100}, 0)`}>
               <rect x={0} y={2} width={12} height={3} fill={t.color} />
-              <text x={16} y={8} fontSize={10} fill={COLORS.text}>
+              <text
+                x={16}
+                y={8}
+                fontSize={10}
+                fill="currentColor"
+                fillOpacity={TEXT_OPACITY}
+              >
                 {t.name}
               </text>
             </g>

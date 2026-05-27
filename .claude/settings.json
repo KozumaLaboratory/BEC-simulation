@@ -123,7 +123,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "date -Iseconds >> .claude/logs/turn_stops.log"
+            "command": "mkdir -p \"$CLAUDE_PROJECT_DIR/.claude/logs\" && date -Iseconds >> \"$CLAUDE_PROJECT_DIR/.claude/logs/turn_stops.log\""
           }
         ]
       }

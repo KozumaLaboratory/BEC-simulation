@@ -900,7 +900,15 @@ function run_all_checks()
     println("is pure sampling-Nyquist: F_α bilinear has 2× ψ's k-content, high-k")
     println("folds back via PBC. Fix is at the sampling layer (2× k-pad or Orszag 2/3),")
     println("not in any of the verified operators above.")
-    return n_pass == length(results) ? 0 : 1
+    return results
 end
 
-exit(run_all_checks())
+using Test
+@testset "L5 operator-RHS comparison (Kawaguchi-Ueda 2012)" begin
+    results = run_all_checks()
+    for r in results
+        @testset "$(r.name)" begin
+            @test r.pass
+        end
+    end
+end

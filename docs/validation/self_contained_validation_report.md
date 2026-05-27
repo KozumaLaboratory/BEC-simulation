@@ -75,7 +75,7 @@ Coverage gaps (intentional, deferred):
 - LHY operator — covered analytically at Layer A (scaling) and
   production-internally; no separate reference RHS yet.
 - Raman, light_shift, Coriolis — covered by the L5 operator-rhs
-  compare path (`scripts/validation/L5_operator_rhs_compare.jl`).
+  compare path (`test/validation/test_L5_operator_rhs_compare.jl`).
 
 ### Layer D — Literature / known-physics benchmarks
 

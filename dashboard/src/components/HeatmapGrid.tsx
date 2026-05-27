@@ -130,10 +130,9 @@ export function HeatmapGrid({
           zoom: 1,
         }}
         dpr={1}
-        gl={{ antialias: false, alpha: false }}
+        gl={{ antialias: false, alpha: true }}
         style={{ position: 'absolute', inset: 0 }}
       >
-        <color attach="background" args={['#0a0e14']} />
         <SyncOrthoFrustum width={containerW} height={layout.totalH} />
         {panels.map((p, i) => {
           const r = layout.rects[i]
@@ -174,7 +173,10 @@ export function HeatmapGrid({
                   right: 0,
                   textAlign: 'center',
                   fontSize: 11,
-                  color: '#00d9ff',
+                  color: 'var(--ink)',
+                  opacity: 0.85,
+                  fontFamily: 'IBM Plex Mono, ui-monospace, monospace',
+                  letterSpacing: '0.04em',
                 }}
               >
                 {p.title}
@@ -190,7 +192,9 @@ export function HeatmapGrid({
                     right: 0,
                     textAlign: 'center',
                     fontSize: 10,
-                    color: '#7d8590',
+                    color: 'var(--ink)',
+                    opacity: 0.6,
+                    fontFamily: 'IBM Plex Mono, ui-monospace, monospace',
                   }}
                 >
                   {axisLabels[0]}
@@ -203,7 +207,9 @@ export function HeatmapGrid({
                     transform: 'translateY(-50%) rotate(-90deg)',
                     transformOrigin: 'left center',
                     fontSize: 10,
-                    color: '#7d8590',
+                    color: 'var(--ink)',
+                    opacity: 0.6,
+                    fontFamily: 'IBM Plex Mono, ui-monospace, monospace',
                   }}
                 >
                   {axisLabels[1]}

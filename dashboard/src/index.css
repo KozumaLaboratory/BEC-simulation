@@ -2,47 +2,84 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ─────────────────────────────────────────────────────────────────────────
+   SPINORBEC dashboard — Architectural Drafting
+   Light  = ink-on-paper   (graphite #1b1b1b on offwhite #fafaf6)
+   Dark   = cyanotype      (warm offwhite ink on deep navy)
+   Single-ink discipline; vermillion appears only as a "critical-note"
+   accent (registration marks, live indicators). All forms are
+   draughtsman's primitives: hairlines, 24pt fine + 96pt heavy grids,
+   leader dots, dimension brackets, registration crosses.
+   ───────────────────────────────────────────────────────────────────────── */
+
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --radius: 0.5rem;
+  /* Paper — warm offwhite, slight green undertone (Mylar/vellum) */
+  --background: oklch(0.972 0.006 95);
+  --foreground: oklch(0.18 0.005 240);
+  --card: oklch(0.987 0.004 95);
+  --card-foreground: oklch(0.18 0.005 240);
+  --popover: oklch(0.987 0.004 95);
+  --popover-foreground: oklch(0.18 0.005 240);
+  --primary: oklch(0.22 0.005 240);
+  --primary-foreground: oklch(0.972 0.006 95);
+  --secondary: oklch(0.93 0.006 95);
+  --secondary-foreground: oklch(0.18 0.005 240);
+  --muted: oklch(0.94 0.005 95);
+  --muted-foreground: oklch(0.42 0.008 240);
+  --accent: oklch(0.50 0.18 30);
+  --accent-foreground: oklch(0.972 0.006 95);
+  --destructive: oklch(0.50 0.18 30);
+  --border: oklch(0.30 0.008 240 / 22%);
+  --input: oklch(0.30 0.008 240 / 28%);
+  --ring: oklch(0.30 0.008 240 / 60%);
+
+  --radius: 0; /* drafting is square */
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+
+  /* Drafting palette — only used as exact tokens, never as decoration */
+  --ink: oklch(0.18 0.005 240);
+  --ink-soft: oklch(0.30 0.008 240);
+  --ink-faint: oklch(0.50 0.01 240);
+  --vermillion: oklch(0.55 0.20 30);
+  --paper: oklch(0.972 0.006 95);
+  --paper-tint: oklch(0.93 0.012 95);
+
+  --grid-fine: oklch(0.30 0.008 240 / 8%);
+  --grid-heavy: oklch(0.30 0.008 240 / 18%);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  /* Cyanotype — deep blue print, paper inverts to dark navy */
+  --background: oklch(0.225 0.045 245);
+  --foreground: oklch(0.93 0.018 95);
+  --card: oklch(0.265 0.04 245);
+  --card-foreground: oklch(0.93 0.018 95);
+  --popover: oklch(0.28 0.04 245);
+  --popover-foreground: oklch(0.93 0.018 95);
+  --primary: oklch(0.93 0.018 95);
+  --primary-foreground: oklch(0.225 0.045 245);
+  --secondary: oklch(0.30 0.04 245);
+  --secondary-foreground: oklch(0.93 0.018 95);
+  --muted: oklch(0.30 0.04 245);
+  --muted-foreground: oklch(0.70 0.02 95);
+  --accent: oklch(0.70 0.18 35);
+  --accent-foreground: oklch(0.225 0.045 245);
+  --destructive: oklch(0.72 0.20 30);
+  --border: oklch(0.75 0.02 95 / 28%);
+  --input: oklch(0.75 0.02 95 / 32%);
+  --ring: oklch(0.75 0.02 95 / 50%);
+
+  --ink: oklch(0.93 0.018 95);
+  --ink-soft: oklch(0.80 0.02 95);
+  --ink-faint: oklch(0.65 0.02 95);
+  --vermillion: oklch(0.72 0.20 30);
+  --paper: oklch(0.225 0.045 245);
+  --paper-tint: oklch(0.27 0.045 245);
+
+  --grid-fine: oklch(0.80 0.02 95 / 8%);
+  --grid-heavy: oklch(0.80 0.02 95 / 18%);
 }
 
 @theme inline {
@@ -64,27 +101,438 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --radius-lg: var(--radius);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-sm: calc(var(--radius) - 4px);
+
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+  --color-vermillion: var(--vermillion);
+  --color-paper: var(--paper);
+
+  --radius-lg: 0;
+  --radius-md: 0;
+  --radius-sm: 0;
+
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-condensed: "IBM Plex Sans Condensed", "IBM Plex Sans",
+    ui-sans-serif, sans-serif;
 }
 
 @layer base {
   * {
     border-color: var(--border);
   }
-  body {
-    background: var(--background);
-    color: var(--foreground);
-    font-family: ui-sans-serif, system-ui, sans-serif;
-  }
+
   html {
     color-scheme: light dark;
   }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system,
+      "Segoe UI", sans-serif;
+    font-weight: 400;
+    font-feature-settings: "ss03" 1, "tnum" 0;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
+    letter-spacing: -0.003em;
+    position: relative;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── DRAFTING GRID ────────────────────────────────────────────────
+     Two layers: 24pt fine grid (always on) + 96pt heavy grid (every
+     4 fine cells). Mimics drafting paper rulings. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(to right, var(--grid-fine) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--grid-fine) 1px, transparent 1px),
+      linear-gradient(to right, var(--grid-heavy) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--grid-heavy) 1px, transparent 1px);
+    background-size: 24px 24px, 24px 24px, 96px 96px, 96px 96px;
+    background-position: 0 0, 0 0, 0 0, 0 0;
+  }
+
+  #root {
+    position: relative;
+    z-index: 1;
+  }
+
+  ::selection {
+    background: var(--ink);
+    color: var(--paper);
+  }
+
+  /* Headings — IBM Plex Sans Condensed, tracking tight, weight 600 */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: "IBM Plex Sans Condensed", "IBM Plex Sans",
+      ui-sans-serif, sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+
+  input, select, textarea, button {
+    font-family: inherit;
+  }
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   Sheet / title block
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* A drafting sheet — runs full bleed of its container, with two heavy
+   horizontal rules framing the work area and corner registration marks. */
+.sheet {
+  position: relative;
+  border-top: 1.5px solid var(--ink);
+  border-bottom: 1.5px solid var(--ink);
+  padding: 1.75rem 1.5rem;
+}
+.sheet::before,
+.sheet::after,
+.sheet > .reg-tl,
+.sheet > .reg-tr,
+.sheet > .reg-bl,
+.sheet > .reg-br {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  color: var(--ink-soft);
+}
+.sheet > .reg-tl { top: -7px;  left: -7px; }
+.sheet > .reg-tr { top: -7px;  right: -7px; }
+.sheet > .reg-bl { bottom: -7px; left: -7px; }
+.sheet > .reg-br { bottom: -7px; right: -7px; }
+.sheet > .reg-tl::before,
+.sheet > .reg-tr::before,
+.sheet > .reg-bl::before,
+.sheet > .reg-br::before,
+.sheet > .reg-tl::after,
+.sheet > .reg-tr::after,
+.sheet > .reg-bl::after,
+.sheet > .reg-br::after {
+  content: "";
+  position: absolute;
+  background: currentColor;
+}
+.sheet > .reg-tl::before,
+.sheet > .reg-tr::before,
+.sheet > .reg-bl::before,
+.sheet > .reg-br::before {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  margin-top: -0.5px;
+}
+.sheet > .reg-tl::after,
+.sheet > .reg-tr::after,
+.sheet > .reg-bl::after,
+.sheet > .reg-br::after {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  margin-left: -0.5px;
+}
+
+/* Sheet bar — the single thick rule that opens / closes a section */
+.sheet-rule {
+  height: 1.5px;
+  background: var(--ink);
+  width: 100%;
+}
+.sheet-rule.is-hair {
+  height: 1px;
+  background: var(--ink-faint);
+}
+
+/* Sheet header strip — sheet number / title / scale */
+.sheet-strip {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--ink-faint);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.sheet-strip > * {
+  padding: 0.5rem 0.875rem;
+  border-right: 1px solid var(--ink-faint);
+}
+.sheet-strip > *:last-child {
+  border-right: 0;
+  margin-left: auto;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Section header — "§01 ENERGY ─────────────────── ℏω_ref"
+   ───────────────────────────────────────────────────────────────────────── */
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: 1rem;
+  width: 100%;
+}
+.section-head > .num {
+  color: var(--ink-faint);
+  font-weight: 400;
+}
+.section-head > .rule {
+  flex: 1;
+  height: 1px;
+  background: var(--ink-faint);
+  align-self: center;
+}
+.section-head > .unit {
+  color: var(--ink-faint);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  font-style: italic;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Leader-dot row — "label ........... value"
+   ───────────────────────────────────────────────────────────────────────── */
+
+.leader {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  color: var(--ink);
+}
+.leader > .label {
+  color: var(--ink-soft);
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+.leader > .fill {
+  flex: 1;
+  min-width: 1rem;
+  height: 1.2em;
+  border-bottom: 1px solid var(--ink-faint);
+  align-self: end;
+  margin-bottom: 0.36em;
+}
+.leader > .value {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums slashed-zero;
+  color: var(--ink);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+.leader > .annot {
+  color: var(--ink-faint);
+  font-size: 11.5px;
+  white-space: nowrap;
+  font-style: italic;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Dimension bracket — "⊢ Δ 0.000 ⊣"
+   ───────────────────────────────────────────────────────────────────────── */
+
+.dim {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  letter-spacing: 0.01em;
+}
+.dim::before { content: "⊢"; font-size: 12.5px; }
+.dim::after  { content: "⊣"; font-size: 12.5px; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Numeric — IBM Plex Mono, tabular-nums, slashed-zero
+   ───────────────────────────────────────────────────────────────────────── */
+
+.numeric, .terminal-numeric {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums slashed-zero;
+  letter-spacing: -0.005em;
+}
+
+.tabular { font-variant-numeric: tabular-nums slashed-zero; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Cards — square, ink hairline, no shadow (this is paper, not screen)
+   ───────────────────────────────────────────────────────────────────────── */
+
+[data-slot="card"] {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: var(--card);
+  border: 1px solid var(--ink-faint);
+  position: relative;
+}
+[data-slot="card"]::before,
+[data-slot="card"]::after {
+  /* Drafting corner ticks: tiny serif-like tick marks at corners */
+  content: "";
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: var(--ink);
+  pointer-events: none;
+}
+[data-slot="card"]::before { top: -1px; left: -1px; clip-path: polygon(0 0, 100% 0, 0 100%); }
+[data-slot="card"]::after  { bottom: -1px; right: -1px; clip-path: polygon(100% 100%, 100% 0, 0 100%); }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Tabs — drafting tab strip (square, ink rules, active = ink fill)
+   ───────────────────────────────────────────────────────────────────────── */
+
+[data-slot="tabs-list"] {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1.5px solid var(--ink) !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  height: auto !important;
+  gap: 0;
+  display: inline-flex !important;
+}
+[data-slot="tabs-trigger"] {
+  border-radius: 0 !important;
+  border: 1px solid var(--ink-faint) !important;
+  border-bottom: none !important;
+  margin-right: -1px;
+  font-family: "IBM Plex Mono", monospace !important;
+  font-size: 11.5px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.55rem 1.05rem !important;
+  color: var(--ink-soft) !important;
+  background: var(--card) !important;
+  transition: color 120ms ease, background 120ms ease;
+}
+[data-slot="tabs-trigger"]:hover {
+  color: var(--ink) !important;
+  background: var(--paper-tint) !important;
+}
+[data-slot="tabs-trigger"][data-state="active"] {
+  background: var(--ink) !important;
+  color: var(--paper) !important;
+  border-color: var(--ink) !important;
+  box-shadow: none !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Buttons — square ink-outline, no pill
+   ───────────────────────────────────────────────────────────────────────── */
+
+button[data-slot="button"] {
+  border-radius: 0;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-color: var(--ink-faint);
+}
+button[data-slot="button"]:hover {
+  border-color: var(--ink);
+}
+
+/* Inputs */
+input, select, textarea {
+  border-radius: 0 !important;
+  background: var(--card);
+  border-color: var(--ink-faint) !important;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--ink) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Status / live marker — vermillion (critical-note ink)
+   ───────────────────────────────────────────────────────────────────────── */
+
+.status-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  background: var(--ink-soft);
+  flex-shrink: 0;
+  border-radius: 0; /* square pip — drafting marker, not a UI bullet */
+}
+.status-dot.is-live,
+.status-dot.is-red {
+  background: var(--vermillion);
+  animation: live-blink 1.4s steps(1) infinite;
+}
+.status-dot.is-cyan {
+  background: var(--ink);
+}
+.status-dot.is-green { background: var(--ink); }
+.status-dot.is-amber { background: var(--ink-soft); }
+.status-dot.is-magenta { background: var(--ink); }
+
+@keyframes live-blink {
+  0%, 60% { opacity: 1; }
+  61%, 100% { opacity: 0.25; }
+}
+
+/* Loading bar — ink hairline sweep */
+.loading-sweep {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--ink) 50%,
+    transparent 100%
+  );
+}
 @keyframes loading-sweep {
   0%   { transform: translateX(-100%); }
   50%  { transform: translateX(150%); }
   100% { transform: translateX(400%); }
+}
+
+/* Caret — pure ink block, no glow */
+.caret::after {
+  content: "";
+  display: inline-block;
+  width: 0.55em;
+  height: 0.95em;
+  margin-left: 0.18em;
+  vertical-align: -0.1em;
+  background: currentColor;
+  animation: caret-blink 1.05s steps(1) infinite;
+}
+@keyframes caret-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-dot, .caret::after, .loading-sweep { animation: none !important; }
 }
