@@ -15,9 +15,101 @@
 
 using JLD2
 using YAML
+using SHA: sha256
+using Printf: @printf
 
-export Experiment, Batch
+export Experiment, Batch, CASStore
 export write_run!, run!, status, tabulate, twin_off
+export outdir, content_id, default_store
+
+# ===========================================================================
+# Content-addressable storage (CAS)
+# ===========================================================================
+#
+# A spec uniquely determines its outdir via SHA-256 of canonical bytes —
+# users never name an outdir. Equal specs share storage; spec edits
+# automatically land in a fresh dir.
+#
+# Canonical form (deterministic across Julia versions / dict orderings):
+#   Dict       → "{<sorted_key>:<value>,...}"  (keys sorted by string repr)
+#   Vector     → "[<value>,...]" (order preserved)
+#   AbstractFloat → printf("%.17g", x); errors on NaN / Inf
+#   Integer    → decimal
+#   Bool       → true | false
+#   AbstractString / Symbol → JSON-escaped "<utf8>"
+#   nothing    → null
+# Anything else → error.
+#
+# ID truncated to 16 hex (64-bit), enough for ~10^10 distinct specs
+# before birthday collision risk reaches 1%.
+
+struct CASStore
+    root::String
+end
+
+default_store() = CASStore(get(ENV, "SPINORBEC_STORE", "runs"))
+
+const _CONTENT_ID_HEX = 16
+
+function _canonical_bytes!(io::IO, x)
+    if x isa AbstractDict
+        print(io, "{")
+        first = true
+        for k in sort!(collect(keys(x)); by=string)
+            first || print(io, ",")
+            _canonical_bytes!(io, string(k))
+            print(io, ":")
+            _canonical_bytes!(io, x[k])
+            first = false
+        end
+        print(io, "}")
+    elseif x isa AbstractVector
+        print(io, "[")
+        for (i, v) in enumerate(x)
+            i == 1 || print(io, ",")
+            _canonical_bytes!(io, v)
+        end
+        print(io, "]")
+    elseif x isa Bool
+        print(io, x)
+    elseif x isa Integer
+        print(io, x)
+    elseif x isa AbstractFloat
+        (isnan(x) || isinf(x)) &&
+            error("content_id: non-finite Float in spec ($x); refuse to hash")
+        @printf io "%.17g" x
+    elseif x isa AbstractString || x isa Symbol
+        print(io, '"')
+        for c in string(x)
+            if c == '\\' || c == '"'
+                print(io, '\\', c)
+            elseif c < ' '
+                @printf io "\\u%04x" Int(c)
+            else
+                print(io, c)
+            end
+        end
+        print(io, '"')
+    elseif x === nothing
+        print(io, "null")
+    else
+        error("content_id: unsupported type $(typeof(x)) for value $(repr(x))")
+    end
+end
+
+function _canonical_bytes(x)
+    io = IOBuffer()
+    _canonical_bytes!(io, x)
+    take!(io)
+end
+
+"""
+    content_id(spec; n=16) -> String
+
+Canonical hash of a YAML-shaped spec Dict. Same spec → same id, byte-for-byte,
+independent of dict-iteration order, Julia version, or YAML round-trip.
+"""
+content_id(spec; n::Int=_CONTENT_ID_HEX) = bytes2hex(sha256(_canonical_bytes(spec)))[1:n]
 
 # ---------------------------------------------------------------------------
 # Types
@@ -51,8 +143,28 @@ Parametrised (call like methods):
 """
 mutable struct Experiment
     spec::Dict{Any, Any}
-    outdir::String
+    store::CASStore
+    _outdir_override::Union{Nothing, String}  # legacy / explicit override
     _cache::Dict{Any, Any}
+end
+
+"""
+    outdir(exp::Experiment) -> String
+
+Derived directory path for `exp`. Pure function of `exp.spec` via CAS:
+`<store.root>/<content_id(spec)>/`. Users never name it; the spec
+uniquely determines it.
+
+If the spec was constructed from an existing YAML on disk and a legacy
+`runs/<base>_<hash>/` sibling exists (pre-CAS layout), that path is
+returned read-only via the `_outdir_override` field so old artifacts
+remain accessible.
+"""
+function outdir(exp::Experiment)
+    ovr = getfield(exp, :_outdir_override)
+    ovr !== nothing && return ovr
+    cid = content_id(getfield(exp, :spec))
+    joinpath(getfield(exp, :store).root, cid)
 end
 
 """
@@ -78,25 +190,69 @@ end
 # Experiment construction
 # ---------------------------------------------------------------------------
 
-function Experiment(spec::AbstractDict; outdir::AbstractString)
-    Experiment(Dict{Any, Any}(spec), String(outdir), Dict{Any, Any}())
+"""
+    Experiment(spec; store=default_store(), outdir=nothing) -> Experiment
+
+Build an Experiment from an in-memory spec Dict. `outdir` is normally
+*not* supplied — CAS auto-derives it from `content_id(spec)`. Pass
+`outdir=` only to override (e.g. migration, deliberate placement);
+this disables CAS deduplication for the constructed Experiment.
+"""
+function Experiment(
+    spec::AbstractDict;
+    store::CASStore=default_store(),
+    outdir::Union{Nothing, AbstractString}=nothing,
+)
+    Experiment(
+        Dict{Any, Any}(spec),
+        store,
+        outdir === nothing ? nothing : String(outdir),
+        Dict{Any, Any}(),
+    )
 end
 
-function Experiment(yaml_path::AbstractString)
+"""
+    Experiment(yaml_path; store=default_store()) -> Experiment
+
+Construct from an on-disk YAML. Outdir derivation:
+  1. content_id-based CAS dir (`<store.root>/<cid>/`) — if it holds a
+     result jld2, use it directly;
+  2. otherwise if `yaml_path` itself sits in a dir containing a
+     `result.jld2` / `point_001.jld2` (e.g. `runs/<batch>/<cell>/config.yaml`),
+     use that dir (read-only fallback for the directory-per-config form);
+  3. otherwise if a legacy `runs/<base>_<hash>/` sibling has a result,
+     use that as an `_outdir_override` (read-only fallback);
+  4. otherwise let CAS choose the (currently-empty) cid dir as the
+     write target for the next `run!`.
+"""
+function Experiment(yaml_path::AbstractString; store::CASStore=default_store())
     isfile(yaml_path) || throw(ArgumentError("Experiment: no such file: $yaml_path"))
     spec = YAML.load_file(yaml_path)
-    outdir = if basename(yaml_path) == "config.yaml"
-        dirname(abspath(yaml_path))
-    else
-        candidate = find_run_dir(yaml_path)
-        if candidate !== nothing
-            candidate
-        else
-            joinpath(dirname(abspath(yaml_path)), splitext(basename(yaml_path))[1])
+    spec_dict = Dict{Any, Any}(spec)
+    cid = content_id(spec_dict)
+    cas_dir = joinpath(store.root, cid)
+    if _has_result(cas_dir)
+        return Experiment(spec_dict, store, nothing, Dict{Any, Any}())
+    end
+    # Directory-per-config form: yaml lives inside a dir that already
+    # holds the result (older sweeps wrote per-cell config.yaml + result.jld2
+    # under the same dir).
+    if basename(yaml_path) == "config.yaml"
+        same_dir = dirname(abspath(yaml_path))
+        if _has_result(same_dir)
+            return Experiment(spec_dict, store, same_dir, Dict{Any, Any}())
         end
     end
-    Experiment(spec, String(outdir), Dict{Any, Any}())
+    legacy = find_run_dir(yaml_path)
+    if legacy !== nothing
+        return Experiment(spec_dict, store, String(legacy), Dict{Any, Any}())
+    end
+    Experiment(spec_dict, store, nothing, Dict{Any, Any}())
 end
+
+_has_result(dir::AbstractString) =
+    isdir(dir) && (isfile(joinpath(dir, "result.jld2")) ||
+                   isfile(joinpath(dir, "point_001.jld2")))
 
 # ---------------------------------------------------------------------------
 # Persist
@@ -110,8 +266,8 @@ missing. Returns the path written. (Named `write_run!` rather than
 `write!` to avoid colliding with `Base.write`.)
 """
 function write_run!(exp::Experiment)
-    mkpath(getfield(exp, :outdir))
-    path = joinpath(getfield(exp, :outdir), "config.yaml")
+    mkpath(outdir(exp))
+    path = joinpath(outdir(exp), "config.yaml")
     YAML.write_file(path, getfield(exp, :spec))
     path
 end
@@ -132,7 +288,7 @@ function run!(exp::Experiment; force::Bool=false)
         return exp
     end
     force && empty!(getfield(exp, :_cache))
-    cfg_path = joinpath(getfield(exp, :outdir), "config.yaml")
+    cfg_path = joinpath(outdir(exp), "config.yaml")
     isfile(cfg_path) || write_run!(exp)
     # `run_yaml` writes outputs alongside config.yaml when invoked on a
     # `<dir>/config.yaml` path (directory-per-config form), so passing
@@ -154,11 +310,11 @@ end
   `:missing` outdir does not exist
 """
 function status(exp::Experiment)
-    outdir = getfield(exp, :outdir)
-    isdir(outdir) || return :missing
+    dir = outdir(exp)
+    isdir(dir) || return :missing
     jld = _result_path_or_nothing(exp)
     jld === nothing && return :pending
-    cfg = joinpath(outdir, "config.yaml")
+    cfg = joinpath(dir, "config.yaml")
     isfile(cfg) && mtime(cfg) > mtime(jld) && return :stale
     :cached
 end
@@ -170,9 +326,9 @@ end
 _RESULT_NAMES = ("result.jld2", "point_001.jld2")
 
 function _result_path_or_nothing(exp::Experiment)
-    outdir = getfield(exp, :outdir)
+    dir = outdir(exp)
     for n in _RESULT_NAMES
-        p = joinpath(outdir, n)
+        p = joinpath(dir, n)
         isfile(p) && return p
     end
     nothing
@@ -182,7 +338,7 @@ function _result_path(exp::Experiment)
     p = _result_path_or_nothing(exp)
     p === nothing && throw(
         ArgumentError(
-            "Experiment: no result jld2 in $(getfield(exp, :outdir)). Did you `run!`?"
+            "Experiment: no result jld2 in $(outdir(exp)). Did you `run!`?"
         ),
     )
     p
@@ -230,9 +386,12 @@ const _DRIFT_SUFFIXES = (
 )
 
 function Base.getproperty(exp::Experiment, name::Symbol)
-    if name === :spec || name === :outdir
-        return getfield(exp, name)
-    end
+    # Direct struct fields:
+    name === :spec && return getfield(exp, :spec)
+    name === :store && return getfield(exp, :store)
+    # `outdir` is a derived function — surface it as a property too so
+    # legacy `exp.outdir` callers still work.
+    name === :outdir && return outdir(exp)
     cache = getfield(exp, :_cache)
     haskey(cache, name) && return cache[name]
     val = _compute_observable(exp, name)
@@ -473,30 +632,63 @@ function twin_off(exp::Experiment; suffix::AbstractString="_TWIN_OFF")
             (d["lhy"] = Dict("kind" => "none"))
         delete!(d, "loss")
     end
-    Experiment(new_spec; outdir=getfield(exp, :outdir) * suffix)
+    # `suffix` is now informational only — the twin's outdir comes from
+    # CAS on the modified spec, not from string concat on the original.
+    # Kept as a kwarg for backward-compat; ignored unless explicitly
+    # combined with an explicit outdir override.
+    Experiment(new_spec; store=getfield(exp, :store))
 end
 
 # ---------------------------------------------------------------------------
 # Batch construction
 # ---------------------------------------------------------------------------
 
+"""
+    Batch(base_spec; over, store=default_store(), outdir=nothing) -> Batch
+
+Build a sweep along one dim. Each cell is an `Experiment` whose own
+outdir is content-addressed by its spec (no per-cell naming needed).
+
+`outdir` (kwarg) is the location of the batch's `_manifest.yaml` —
+not the cells' outdirs, which CAS derives independently. Defaults to
+a content-id-derived path under `<store.root>/_batches/`.
+
+The legacy `name = v -> "..."` callback is no longer needed (and is
+silently ignored if passed) — CAS replaces the cell-naming step.
+"""
 function Batch(
     base_spec::AbstractDict;
     over::Pair{Symbol, <:AbstractVector},
-    outdir::AbstractString,
-    name::Function,
+    store::CASStore=default_store(),
+    outdir::Union{Nothing, AbstractString}=nothing,
+    name=nothing,  # accepted + ignored for backward-compat
 )
+    name === nothing || @warn "Batch: `name` callback is no longer used " *
+        "(CAS auto-names cells by content_id)."
     path_tokens = split(String(over.first), '_')
     values_ = collect(over.second)
     exps = Experiment[]
     for v in values_
         spec = deepcopy(Dict{Any, Any}(base_spec))
         _set_path!(spec, path_tokens, v)
-        cellname = String(name(v))
-        cell_outdir = joinpath(String(outdir), cellname)
-        push!(exps, Experiment(spec; outdir=cell_outdir))
+        push!(exps, Experiment(spec; store))
     end
-    Batch(exps, Pair{Symbol, Vector}(over.first, values_), String(outdir))
+    manifest_dir =
+        outdir === nothing ?
+        _default_batch_manifest_dir(base_spec, over, store) :
+        String(outdir)
+    Batch(exps, Pair{Symbol, Vector}(over.first, values_), manifest_dir)
+end
+
+function _default_batch_manifest_dir(base, over, store::CASStore)
+    bid = content_id(
+        Dict{Any, Any}(
+            "base" => Dict{Any, Any}(base),
+            "over_key" => String(over.first),
+            "over_values" => collect(over.second),
+        ),
+    )
+    joinpath(store.root, "_batches", bid)
 end
 
 """
@@ -518,10 +710,10 @@ function Batch(path::AbstractString)
     if isfile(path) && endswith(basename(path), ".yaml")
         return _batch_from_scan_yaml(path)
     end
-    outdir = path
-    manifest_path = joinpath(outdir, "_manifest.yaml")
+    manifest_dir = path
+    manifest_path = joinpath(manifest_dir, "_manifest.yaml")
     isfile(manifest_path) || throw(ArgumentError(
-        "Batch($outdir): no _manifest.yaml — cannot rehydrate."
+        "Batch($manifest_dir): no _manifest.yaml — cannot rehydrate."
     ))
     m = YAML.load_file(manifest_path)
     base = Dict{Any, Any}(m["base_config"])
@@ -532,12 +724,17 @@ function Batch(path::AbstractString)
     for pt in m["points"]
         spec = deepcopy(base)
         _set_path!(spec, path_tokens, pt["value"])
-        cellname = splitext(pt["filename"])[1]
-        cell_outdir = joinpath(outdir, cellname)
-        push!(exps, Experiment(spec; outdir=cell_outdir))
+        # Try legacy <manifest_dir>/<name>/ first (pre-CAS sweeps), then
+        # fall back to CAS via the default Experiment(spec; store) ctor.
+        ovr = nothing
+        if haskey(pt, "filename")
+            legacy_cell = joinpath(manifest_dir, splitext(pt["filename"])[1])
+            _has_result(legacy_cell) && (ovr = legacy_cell)
+        end
+        push!(exps, Experiment(spec, default_store(), ovr, Dict{Any, Any}()))
         push!(values_, pt["value"])
     end
-    Batch(exps, Pair{Symbol, Vector}(over_key, values_), String(outdir))
+    Batch(exps, Pair{Symbol, Vector}(over_key, values_), String(manifest_dir))
 end
 
 function _dotted_to_underscore(dotted::AbstractString)
@@ -588,10 +785,7 @@ function _batch_from_scan_yaml(scan_yaml_path::AbstractString)
         end
         push!(cells, v => overrides)
     end
-    # Cache the value→idx map for the name callback.
-    val_to_idx = Dict(v => i for (i, v) in enumerate(values))
-    Batch(base, cells; outdir=scan_dir,
-        name=v -> _format_scan_point_name(pattern, v, val_to_idx[v]))
+    Batch(base, cells; outdir=scan_dir)
 end
 
 """
@@ -621,9 +815,12 @@ batch = Batch(base, cells; outdir="runs/phi_omega_scan",
 function Batch(
     base_spec::AbstractDict,
     cells::AbstractVector{<:Pair};
-    outdir::AbstractString,
-    name::Function,
+    store::CASStore=default_store(),
+    outdir::Union{Nothing, AbstractString}=nothing,
+    name=nothing,  # accepted + ignored for backward-compat
 )
+    name === nothing || @warn "Batch: `name` callback is no longer used " *
+        "(CAS auto-names cells by content_id)."
     exps = Experiment[]
     values_ = Any[]
     for cell in cells
@@ -632,12 +829,19 @@ function Batch(
         for (path, val) in overrides
             _set_path!(spec, split(String(path), '_'), val)
         end
-        cellname = String(name(label))
-        cell_outdir = joinpath(String(outdir), cellname)
-        push!(exps, Experiment(spec; outdir=cell_outdir))
+        push!(exps, Experiment(spec; store))
         push!(values_, label)
     end
-    Batch(exps, Pair{Symbol, Vector}(:cells, values_), String(outdir))
+    manifest_dir = if outdir === nothing
+        joinpath(store.root, "_batches",
+            content_id(
+                Dict{Any, Any}("base" => Dict{Any, Any}(base_spec),
+                    "cells" => [string(c.first) for c in cells]),
+            ))
+    else
+        String(outdir)
+    end
+    Batch(exps, Pair{Symbol, Vector}(:cells, values_), manifest_dir)
 end
 
 # ---------------------------------------------------------------------------
@@ -645,7 +849,8 @@ end
 # ---------------------------------------------------------------------------
 
 function write_run!(batch::Batch)
-    mkpath(getfield(batch, :outdir))
+    manifest_dir = getfield(batch, :outdir)
+    mkpath(manifest_dir)
     paths = String[]
     points = Dict{Any, Any}[]
     for (exp, v) in zip(getfield(batch, :experiments), getfield(batch, :over).second)
@@ -654,21 +859,20 @@ function write_run!(batch::Batch)
         push!(
             points,
             Dict{Any, Any}(
-                "filename" => basename(getfield(exp, :outdir)) * ".yaml",
+                "content_id" => content_id(getfield(exp, :spec)),
                 "value" => v,
             ),
         )
     end
     over = getfield(batch, :over)
-    # Reconstruct base by inverting over on the first cell.
     base = deepcopy(getfield(getfield(batch, :experiments)[1], :spec))
-    _set_path!(base, split(String(over.first), '_'), nothing)  # delete sweep dim
+    _set_path!(base, split(String(over.first), '_'), nothing)
     manifest = Dict{Any, Any}(
         "base_config" => base,
         "over_path" => String(over.first),
         "points" => points,
     )
-    YAML.write_file(joinpath(getfield(batch, :outdir), "_manifest.yaml"), manifest)
+    YAML.write_file(joinpath(manifest_dir, "_manifest.yaml"), manifest)
     paths
 end
 
@@ -768,6 +972,6 @@ End-to-end: `run!(exp)` (idempotent — no-op if cached) followed by
 """
 function audit(exp::Experiment; spec=ConservationSpec(), verbose::Bool=true)
     run!(exp)
-    verbose && @info "audit" outdir = getfield(exp, :outdir)
+    verbose && @info "audit" outdir = outdir(exp)
     check(spec, exp)
 end
