@@ -86,6 +86,17 @@ include("analysis.jl")  # observables + diagnostics + phase exploration umbrella
 include("validation/reference_rhs.jl")
 
 # ========================================
+# EXPERIMENT / BATCH: unified workflow model
+# ========================================
+# Cheap lifecycle object: (spec, outdir, lazy obs cache). Subsumes
+# scattered run_yaml / open_result / classify_collapse / sweep patterns.
+# Depends on: open_result, run_yaml, walk_dicts!, total_density,
+#             run_observables (find_run_dir, peak_density_trajectory,
+#             spin_populations_trajectory, classify_collapse), and
+#             runfactory's internal _set_path!.
+include("workflow/experiment.jl")
+
+# ========================================
 # SOLVERS: Ground state & time evolution
 # ========================================
 

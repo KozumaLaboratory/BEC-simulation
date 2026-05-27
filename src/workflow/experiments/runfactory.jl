@@ -1,22 +1,20 @@
-# --- Abstract config builders + batch sweep ---
+# --- Spec-builder DSL (config / block primitives) ---
 #
-# YAML-schema as Julia kwargs. Replaces scripts/validation/*_gen.jl with
-# REPL-callable functions whose names match YAML keys 1:1.
+# YAML-schema as Julia kwargs. Returns plain `Dict` objects shaped for
+# YAML serialisation. `config([ground_state(...), dynamics(...), ...])`
+# assembles them into a full pipeline-config Dict, which is then handed
+# to `Experiment(spec; outdir)` (see `workflow/experiment.jl`) for the
+# lifecycle (persist → run → observe).
 #
-# Pattern: each function returns a `Dict` (or vector of Dicts) shaped for
-# YAML serialisation. `config([...])` assembles them into a full pipeline
-# config; `sweep(outdir, base; over, name)` writes N variants + a
-# `_manifest.yaml` so the batch is reproducible via `regenerate(outdir)`.
-#
-# No atom / protocol / experiment names appear in this layer.
+# This layer has no I/O and no atom / protocol / experiment names — it's
+# the schema constructor only. Batch persistence + sweep + run live on
+# top in `Batch` / `Experiment`.
 
 using YAML
-using Dates: now
 
 export config,
     ground_state, dynamics, analyze,
-    B, ddi, lhy, loss, save, ramp, rate,
-    sweep, regenerate
+    B, ddi, lhy, loss, save, ramp, rate
 
 # === ramp / rate value markers ===
 struct Ramp
@@ -243,198 +241,16 @@ function config(
     out
 end
 
-# === Sweep / manifest / regenerate ===
-
-"""
-    sweep(outdir, base_config; over, name, header="", manifest_extras=Dict()) -> Vector{String}
-
-Generate N YAML configs by varying one parameter dotted-path within
-`base_config`. Writes `_manifest.yaml` capturing the call so
-`regenerate(outdir)` can recreate the batch byte-equivalent.
-
-`over` is a `Pair{Symbol, AbstractVector}` where the symbol is a
-dotted-path key (e.g. `:pipeline_2_dynamics_loss_K3_si`) into the config
-tree. The numeric tokens denote pipeline-list index (1-based).
-
-`name` is a function `value -> String` for the YAML filename (no .yaml).
-
-```julia
-base = config([
-    ground_state(atom="Eu151", grid=32, trap=(1,1,0.25), ...),
-    dynamics(duration=20.0, B=B(Bz=ramp(0.01, 2.6e-5)), loss=loss()),
-    analyze(:phase_classify, :winding_map, :energy_decomposition),
-])
-sweep("runs/eu_k3_sweep", base;
-    over = :pipeline_2_dynamics_loss => map(K3 -> loss(K3_si=K3),
-                                            [0, 1e-41, 3e-41, ...]),
-    name = i -> "K3x\$(i)",
-)
-```
-"""
-function sweep(
-    outdir::AbstractString,
-    base_config::Dict;
-    over::Pair{Symbol, <:AbstractVector},
-    name::Function,
-    header::AbstractString="",
-    manifest_extras::Dict=Dict{Any, Any}(),
-)
-    mkpath(outdir)
-    path_str = String(over.first)
-    values_ = collect(over.second)
-    points = Vector{Dict{Any, Any}}(undef, length(values_))
-    written = String[]
-    for (i, v) in enumerate(values_)
-        cfg = _override(base_config, path_str, v)
-        fname = String(name(v)) * ".yaml"
-        path = joinpath(outdir, fname)
-        _write_yaml(path, cfg; header)
-        points[i] = Dict{Any, Any}("filename" => fname, "value" => _to_yaml_value(v))
-        push!(written, path)
-        println("wrote $fname")
-    end
-    manifest = Dict{Any, Any}(
-        "base_config" => base_config,
-        "over_path" => path_str,
-        "points" => points,
-        "name_fn_source" => string(name),
-        "generated_at" => string(now()),
-        "header" => String(header),
-    )
-    merge!(manifest, manifest_extras)
-    manifest_path = joinpath(outdir, "_manifest.yaml")
-    YAML.write_file(manifest_path, manifest)
-    println("manifest at $manifest_path")
-    written
-end
-
-"""
-    sweep(outdir, base_config, cells; header="", manifest_extras=Dict()) -> Vector{String}
-
-Multi-override cell list variant. Each `cell` is a `Pair{String, Dict}`
-mapping a filename (no `.yaml`) to a Dict of dotted-path => value
-overrides. Applies all overrides per cell before writing.
-
-```julia
-cells = Pair{String,Dict}[]
-for (K3, gdr, LHY) in Iterators.product([false,true], [false,true], [false,true])
-    name = "K\$(Int(K3))_gdr\$(Int(gdr))_LHY\$(Int(LHY))"
-    push!(cells, name => Dict(
-        :pipeline_1_ground_state_lhy => lhy(LHY ? :scalar : :none),
-        :pipeline_2_dynamics_lhy => lhy(LHY ? :scalar : :none),
-        :pipeline_2_dynamics_loss => loss(K3_si=(K3 ? 1e-41 : 0.0),
-                                          gamma_dr=(gdr ? 0.02 : 0.0)),
-    ))
-end
-sweep("runs/eu_k3_arrest", base, cells)
-```
-"""
-function sweep(
-    outdir::AbstractString,
-    base_config::Dict,
-    cells::AbstractVector;
-    header::AbstractString="",
-    manifest_extras::Dict=Dict{Any, Any}(),
-)
-    mkpath(outdir)
-    written = String[]
-    manifest_cells = Vector{Dict{Any, Any}}(undef, length(cells))
-    for (i, cell) in enumerate(cells)
-        name, overrides = cell
-        cfg = deepcopy(base_config)
-        for (path, value) in overrides
-            _set_path!(cfg, split(String(path), '_'), value)
-        end
-        fname = String(name) * ".yaml"
-        path = joinpath(outdir, fname)
-        _write_yaml(path, cfg; header)
-        manifest_cells[i] = Dict{Any, Any}(
-            "filename" => fname,
-            "overrides" => Dict{Any, Any}(string(k) => _to_yaml_value(v)
-                                          for (k, v) in overrides),
-        )
-        push!(written, path)
-        println("wrote $fname")
-    end
-    manifest = Dict{Any, Any}(
-        "base_config" => base_config,
-        "cells" => manifest_cells,
-        "generated_at" => string(now()),
-        "header" => String(header),
-    )
-    merge!(manifest, manifest_extras)
-    manifest_path = joinpath(outdir, "_manifest.yaml")
-    YAML.write_file(manifest_path, manifest)
-    println("manifest at $manifest_path")
-    written
-end
-
-"""
-    regenerate(outdir) -> Vector{String}
-
-Read `outdir/_manifest.yaml` and rewrite every YAML point. Useful for
-audits ("does the recorded recipe still reproduce the on-disk YAMLs?")
-and for upgrading after a runfactory bug fix.
-"""
-function regenerate(outdir::AbstractString)
-    mpath = joinpath(outdir, "_manifest.yaml")
-    isfile(mpath) || throw(ArgumentError("no _manifest.yaml in $outdir"))
-    manifest = YAML.load_file(mpath)
-    base = manifest["base_config"]
-    header = get(manifest, "header", "")
-    written = String[]
-    if haskey(manifest, "points")
-        path_str = manifest["over_path"]
-        for pt in manifest["points"]
-            cfg = _override(base, path_str, pt["value"])
-            path = joinpath(outdir, pt["filename"])
-            _write_yaml(path, cfg; header)
-            push!(written, path)
-            println("regenerated $(pt["filename"])")
-        end
-    elseif haskey(manifest, "cells")
-        for cell in manifest["cells"]
-            cfg = deepcopy(base)
-            for (path_str, value) in cell["overrides"]
-                _set_path!(cfg, split(String(path_str), '_'), value)
-            end
-            path = joinpath(outdir, cell["filename"])
-            _write_yaml(path, cfg; header)
-            push!(written, path)
-            println("regenerated $(cell["filename"])")
-        end
-    else
-        throw(ArgumentError("_manifest.yaml has neither `points` nor `cells`"))
-    end
-    written
-end
-
-# === Internal helpers ===
+# === Internal helpers (used by config() and by Experiment / Batch) ===
 
 _dictify(d::Dict) = d
 _dictify(nt::NamedTuple) = Dict{Any, Any}(string(k) => v for (k, v) in pairs(nt))
 _dictify(p::AbstractDict) = Dict{Any, Any}(string(k) => v for (k, v) in p)
 
-_to_yaml_value(d::Dict) = d
-_to_yaml_value(x) = x
-
-function _write_yaml(path::AbstractString, cfg::Dict; header::AbstractString="")
-    open(path, "w") do io
-        isempty(header) || (write(io, header); endswith(header, "\n") || write(io, "\n"))
-        YAML.write(io, cfg)
-    end
-end
-
-# Dotted-path override: parses `:pipeline_2_dynamics_loss_K3_si` style into a
-# walk through Dict / Vector levels. Numeric path tokens index into vectors
-# (1-based, matching pipeline list index).
-function _override(cfg::Dict, dotted_path::AbstractString, value)
-    out = deepcopy(cfg)
-    tokens = split(dotted_path, '_')
-    _set_path!(out, tokens, value)
-    out
-end
-
+# Dotted-path override: `:pipeline_2_dynamics_loss` walks through Dict /
+# Vector levels. Numeric path tokens index into vectors (1-based,
+# matching pipeline list index). Used by `Batch` to apply the sweep
+# axis to a base spec.
 function _set_path!(node, tokens::AbstractVector, value)
     isempty(tokens) && throw(ArgumentError("empty path"))
     if length(tokens) == 1
