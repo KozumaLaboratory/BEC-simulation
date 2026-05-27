@@ -12,7 +12,7 @@
 # script with bespoke CLI). The functional core is the same; the
 # packaging is now a callable that returns a structured result.
 
-export audit_twin_controls, TwinAuditResult, strip_lhy_loss!
+export audit_twin_controls, TwinAuditResult, walk_dicts!
 
 using YAML: load_file
 
@@ -119,38 +119,35 @@ function _twin_find_yamls(root::AbstractString)
 end
 
 """
-    strip_lhy_loss!(node)
+    walk_dicts!(f, node) -> node
 
-In-place: replace every `lhy:` block with `{kind: "none"}` and remove
-every `loss:` block. Use to derive a LHY-off / loss-off twin from a
-loaded YAML config dict.
+Apply `f(d)` to every `AbstractDict` reachable from `node` (in-place
+modification expected). Useful for whole-config rewrites of nested
+YAML structures.
 
-REPL pattern for writing twins of every orphan in `runs/`:
+REPL pattern for writing LHY-off / loss-off twins of every orphan:
 ```julia
 using YAML
 for orig in audit_twin_controls("runs").loss_orphans
     raw = YAML.load_file(orig)
-    strip_lhy_loss!(raw)
-    twin = replace(orig, ".yaml" => "_TWIN_OFF.yaml")
-    YAML.write_file(twin, raw)
+    walk_dicts!(raw) do d
+        haskey(d, "lhy") && d["lhy"] isa AbstractDict &&
+            (d["lhy"] = Dict("kind" => "none"))
+        delete!(d, "loss")
+    end
+    YAML.write_file(replace(orig, ".yaml" => "_TWIN_OFF.yaml"), raw)
 end
 ```
 """
-function strip_lhy_loss!(node)
+function walk_dicts!(f, node)
     if node isa AbstractDict
-        for k in collect(keys(node))
-            v = node[k]
-            if string(k) == "lhy" && v isa AbstractDict
-                node[k] = Dict("kind" => "none")
-            elseif string(k) == "loss"
-                delete!(node, k)
-            else
-                strip_lhy_loss!(v)
-            end
+        f(node)
+        for v in values(node)
+            walk_dicts!(f, v)
         end
     elseif node isa AbstractVector
         for x in node
-            strip_lhy_loss!(x)
+            walk_dicts!(f, x)
         end
     end
     node
