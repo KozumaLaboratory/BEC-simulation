@@ -206,7 +206,7 @@ function build_hf_matrices(ζ::Vector{ComplexF64}, F::Int, g_S::Dict{Int, Float6
 end
 
 # Compute c_0 = ⟨ζ|h|ζ⟩
-function compute_c0(ζ::Vector{ComplexF64}, F::Int, g_S::Dict{Int, Float64})
+function _compute_c0_local(ζ::Vector{ComplexF64}, F::Int, g_S::Dict{Int, Float64})
     h, _ = build_hf_matrices(ζ, F, g_S)
     return real(ζ' * h * ζ)
 end
@@ -286,7 +286,7 @@ end
 # Scalar limit: g_S = g for all S → c_0 = g, λ_spin = 0
 @printf("\n--- Scalar limit test (g_S = 1 for all S = 0,2,...,%d) ---\n", Smax)
 g_scalar = Dict{Int, Float64}(S => 1.0 for S in 0:2:Smax)
-c0_scalar = compute_c0(ζ, F, g_scalar)
+c0_scalar = _compute_c0_local(ζ, F, g_scalar)
 λ_scalar, ω_spec = compute_lambda_spin(ζ, F, g_scalar)
 @printf("c_0 (scalar) = %.6f (expected 1.0)\n", c0_scalar)
 @printf("λ_spin (scalar) = %.6e (expected 0.0)\n", λ_scalar)
@@ -299,7 +299,7 @@ c0_scalar = compute_c0(ζ, F, g_scalar)
 β_lambda = Float64[]
 for S in 0:2:Smax
     g_one = Dict{Int, Float64}(S => 1.0)
-    c0_S = compute_c0(ζ, F, g_one)
+    c0_S = _compute_c0_local(ζ, F, g_one)
     λ_S, _ = compute_lambda_spin(ζ, F, g_one)
     push!(β_c0, c0_S)
     push!(β_lambda, λ_S)
