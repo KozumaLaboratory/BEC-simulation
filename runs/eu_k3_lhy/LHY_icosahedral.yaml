@@ -1,0 +1,62 @@
+# Task #19C — LHY interference at K3=200× cigar regime.
+# Source: scripts/validation/eu_k3_lhy_gen.jl
+# LHY kind = icosahedral (applied outside nominal regime; see scope note).
+
+metadata:
+  suite: eu_k3_lhy
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 200.0
+  LHY_kind: icosahedral
+  generator: scripts/validation/eu_k3_lhy_gen.jl
+
+defaults:
+  kind: spinor
+  backend: cpu
+  interactions: {N_atoms: 30000, omega_ref: 628.3}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 0.25]}
+      interactions:
+        N_atoms: 30000
+        omega_ref: 628.3
+        c1_ratio: -0.005
+      ddi:
+        enabled: true
+        secular: false
+      lhy: {kind: icosahedral}
+      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      gauge_fix: false
+      initial_state: m_minus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 2000
+      tol: 1.0e-9
+
+  - dynamics:
+      duration: 20.0
+      dt: 0.005
+      B:
+        Bz: {from: 0.01, to: 2.6e-5, duration: 0.0}
+        theta: 0.0
+        phi: 0.0
+      ddi:
+        secular: false
+      lhy: {kind: icosahedral}
+      loss:
+        K3_per_m_si:
+          ["2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s"]
+      seed_amplitude: 1.0e-6
+      seed_k_cut: 2.5
+      save:
+        every: 50
+        psi: true
+        precision: f64
+
+  - analyze:
+      - phase_classify: {}
+      - winding_map: {}
+      - energy_decomposition: {}

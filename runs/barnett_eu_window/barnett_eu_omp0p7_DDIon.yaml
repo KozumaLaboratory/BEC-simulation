@@ -1,0 +1,65 @@
+# Klaus/Barnett parameter window — auto-generated.
+# Source: scripts/validation/barnett_eu_window_gen.jl
+# Ω/ω_ref = 0.7, DDI = true
+
+metadata:
+  suite: barnett_eu_window
+  ladder_level: 0
+  rotating_frame_omega: 0.7
+  ddi_on: true
+  generator: scripts/validation/barnett_eu_window_gen.jl
+  notes: |
+    Eu-151 F=6 in near-isotropic Matsui-like trap.
+    Rotation Ω applied in rotating frame; DDI on/off as origin control.
+    Initial m=-F polarized. B = 2.6 nT (weak, post-quench Matsui value).
+    Target observables: ⟨F_z⟩(t), ⟨L_z⟩(t), ⟨J_z⟩(t), peak density, N(t).
+
+defaults:
+  kind: spinor
+  backend: cpu
+  interactions: {N_atoms: 10000, omega_ref: 691.1504}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+      interactions:
+        N_atoms: 10000
+        omega_ref: 691.1504
+        c1_ratio: 0.02778                        # Matsui best-fit
+      ddi:
+        enabled: true
+        secular: false
+      lhy: {kind: none}
+      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      gauge_fix: false
+      initial_state: m_minus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 2000
+      tol: 1.0e-9
+
+  - dynamics:
+      duration: 10.0
+      dt: 0.005
+      rotating_frame_omega: 0.7          # ← Barnett rotation
+      B:
+        Bz: {from: -0.01, to: -2.6e-5, duration: 0.0}
+        theta: 0.0
+        phi: 0.0
+      ddi:
+        enabled: true
+        secular: false
+      lhy: {kind: none}
+      seed_amplitude: 1.0e-6
+      seed_k_cut: 2.5
+      save:
+        every: 50
+        psi: true
+        precision: f64
+
+  - analyze:
+      - phase_classify: {}
+      - winding_map: {}
+      - energy_decomposition: {}

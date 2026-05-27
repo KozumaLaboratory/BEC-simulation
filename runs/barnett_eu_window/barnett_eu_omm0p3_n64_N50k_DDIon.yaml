@@ -1,0 +1,78 @@
+# Klaus/Barnett — experimental-scale production target at Ω/ω_⊥ = -0.3.
+# Source: hand-derived from barnett_eu_omm0p3_n64_DDIon.yaml.
+# Goal: lift N from 1e4 (window-scan scale) to 5e4 (Matsui experimental
+# scale) at the recommended Ω. Single cell; pairs with the 64³ Ω=-0.3
+# anchor at N=1e4 — together they verify both grid- AND scale-stability
+# of the Barnett recommendation.
+
+metadata:
+  suite: barnett_eu_window
+  variant: omm0p3_n64_N50k_production
+  ladder_level: 0
+  rotating_frame_omega: -0.3
+  ddi_on: true
+  grid_n: 64
+  N_atoms: 50000
+  caveat: |
+    N=5e4 at fixed Ω=-0.3 is the experimental-scale target. Higher N
+    means stronger DDI ⟶ potentially larger Barnett signal but also
+    higher peak densities (collapse pressure increases). If peak ratio
+    stays < 1.5 and Δ⟨F_z⟩/N is order unity, the recommendation
+    Ω/ω_⊥ ≈ -0.3 promotes from "32³ window scan" to "experimentally
+    targeted parameter".
+
+defaults:
+  kind: spinor
+  backend: cpu   # rotating_frame_omega Coriolis step has scalar indexing on GPU (see memory).
+  interactions: {N_atoms: 50000, omega_ref: 691.1504}
+
+dealias:
+  enabled: true
+  k_cut: 16.0
+  auto_dt: true
+  dt_safety: 10.0
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [64, 64, 64], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+      interactions:
+        N_atoms: 50000
+        omega_ref: 691.1504
+        c1_ratio: 0.02778
+      ddi:
+        enabled: true
+        secular: false
+      lhy: {kind: none}
+      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      gauge_fix: false
+      initial_state: m_minus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 2000
+      tol: 1.0e-9
+
+  - dynamics:
+      duration: 10.0
+      dt: 0.005
+      rotating_frame_omega: -0.3
+      B:
+        Bz: {from: -0.01, to: -2.6e-5, duration: 0.0}
+        theta: 0.0
+        phi: 0.0
+      ddi:
+        enabled: true
+        secular: false
+      lhy: {kind: none}
+      seed_amplitude: 1.0e-6
+      seed_k_cut: 2.5
+      save:
+        every: 50
+        psi: true
+        precision: f64
+
+  - analyze:
+      - phase_classify: {}
+      - winding_map: {}
+      - energy_decomposition: {}

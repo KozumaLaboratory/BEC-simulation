@@ -1,0 +1,62 @@
+# K3 arrest factorial at collapsing regime — auto-generated.
+# Source: scripts/validation/eu_k3_arrest_gen.jl
+# Regime: N=30000, ω_z=0.25 (cigar), Eu Hamiltonian-only collapses
+#         at this baseline (peak doubles at t=4.0 dimless per collapse
+#         search). This factorial tests whether K3/γ_dr/LHY arrest it.
+
+metadata:
+  suite: eu_k3_arrest
+  ladder_level: 12
+  parent_search: eu_collapse_search/N30000_omz0p25
+  K3_on: false
+  gdr_on: false
+  LHY_on: true
+  generator: scripts/validation/eu_k3_arrest_gen.jl
+
+defaults:
+  kind: spinor
+  backend: cpu
+  interactions: {N_atoms: 30000, omega_ref: 628.3}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 0.25]}
+      interactions:
+        N_atoms: 30000
+        omega_ref: 628.3
+        c1_ratio: -0.005
+      ddi:
+        enabled: true
+        secular: false
+      lhy: {kind: scalar}
+      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      gauge_fix: false
+      initial_state: m_minus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 2000
+      tol: 1.0e-9
+
+  - dynamics:
+      duration: 20.0
+      dt: 0.005
+      B:
+        Bz: {from: 0.01, to: 2.6e-5, duration: 0.0}
+        theta: 0.0
+        phi: 0.0
+      ddi:
+        secular: false
+      lhy: {kind: scalar}
+      seed_amplitude: 1.0e-6
+      seed_k_cut: 2.5
+      save:
+        every: 100
+        psi: true
+        precision: f64
+
+  - analyze:
+      - phase_classify: {}
+      - winding_map: {}
+      - energy_decomposition: {}

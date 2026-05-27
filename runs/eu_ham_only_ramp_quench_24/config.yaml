@@ -1,0 +1,66 @@
+# Step 5 — Eu151 Hamiltonian-only EdH sanity probe.
+#
+# Per 2026-05-25 next_session_priorities.md Step 5:
+#   loss off, LHY off, DDI on, EdH short-time
+#   Sanity before adding K3 / LHY layers.
+#
+# Stripped down from runs/verification_suite/yamls/L4_eu_matsui_hamiltonian_only_32.yaml:
+#   - Grid 32³ → 24³ (faster CPU smoke; convergence happens at L4_*_64)
+#   - n_steps ITP 1500 → 400 (sanity, NOT GS convergence demo)
+#   - dynamics duration 6.28 → 0.5 (short-time only, no Townes-collapse risk)
+#   - backend: gpu → cpu (CI-friendly)
+#
+# Pass = norm conserved < 1e-6, energy stable, ⟨F_z⟩+⟨L_z⟩ drift small at short time.
+
+metadata:
+  suite: step5_eu_hamiltonian_only_sanity
+  origin: post_interaction_params_refactor_2026_05_25
+  purpose: validation_ladder_level_5_sanity
+
+defaults:
+  kind: spinor
+  backend: cpu
+  interactions: {N_atoms: 30000, omega_ref: 628.3}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [24, 24, 24], box: [10.0, 10.0, 10.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      interactions:
+        N_atoms: 30000
+        omega_ref: 628.3
+        c1_ratio: -0.005
+      ddi:
+        enabled: true
+        secular: false
+      lhy: {kind: none}                       # ← LHY OFF (Hamiltonian-only)
+      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      gauge_fix: false
+      initial_state: m_minus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 400
+      tol: 1.0e-7
+
+  - dynamics:
+      duration: 0.5                           # short-time EdH window (≈ 0.8 ms)
+      dt: 0.005
+      B:
+        Bz: {from: -0.01, to: 2.6e-5, duration: 0.0}
+        theta: 0.0
+        phi: 0.0
+      ddi:
+        secular: false
+      # NO loss block — Hamiltonian-only
+      seed_amplitude: 1.0e-6
+      seed_k_cut: 2.5
+      save:
+        every: 10
+        psi: true
+        precision: f64
+
+  - analyze:
+      - energy_decomposition: {}
+      - winding_map: {}                         # ⟨L_z⟩ + ⟨F_z⟩ + Jz at final ψ
+      - summary_json: {path: "runs/step5_eu_hamiltonian_only_sanity/summary.json"}

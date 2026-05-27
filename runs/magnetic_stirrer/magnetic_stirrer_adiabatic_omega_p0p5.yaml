@@ -1,0 +1,132 @@
+# Klaus-II adiabatic prototype — addresses the null result of the sudden-tilt
+# Klaus-II batch.  In the sudden-tilt version (theta jumps 0 → π/4 at hold
+# start), the spin failed to track the new B direction, so DDI anisotropy
+# rotation had no spin sector to act on.  Here we ramp theta slowly at
+# strong B (where ω_L ≫ dθ/dt), let the spin polarisation track the B
+# direction, then ramp phi rate up, then quench to weak field with rotation
+# preserved.  If the spin co-rotates with B through the quench, the
+# weak-field hold should see a genuine rotating-DDI-axis drive.
+#
+# 6-stage dynamics pipeline:
+#   1. GS at z-aligned strong B  (m=+F polarised along +z)
+#   2. tilt-up   : theta 0 → π/4 over 5 ms, B_mag = 0.01 G, phi=0
+#   3. spin-up   : phi rate 0 → +0.5 over 5 ms at theta = π/4
+#   4. steady    : theta = π/4, phi rate = +0.5, 5 ms
+#   5. B quench  : B_mag 0.01 → 2.6e-5 G over 1 ms, theta + phi rate preserved
+#   6. hold      : B_mag = 2.6e-5 G, theta = π/4, phi rate = +0.5, 10 ms
+#
+# Matched chirality with m=+F initial state ⇒ Ω = +0.5 (per Gate 4).
+# If P_{+5,+4} > Klaus-II sudden-tilt value (0.219), adiabatic ramp works.
+
+metadata:
+  suite: magnetic_stirrer
+  cell_name: magnetic_stirrer_adiabatic_omega_p0p5
+  rotation_omega: +0.5
+  protocol_kind: adiabatic_7stage
+  generator: hand-written 2026-05-27
+  hypothesis: |
+    Adiabatic theta tilt-up + phi spin-up at strong B should let spin
+    track B direction, so the DDI-anisotropy rotation has a coherent
+    spin sector to act on. Sudden-tilt Klaus-II gave 0.2191 (= baseline).
+    Predicted: P_{+5,+4} > 0.3 if adiabatic works.
+
+defaults:
+  kind: spinor
+  backend: cpu
+  interactions: {N_atoms: 10000, omega_ref: 691.1504}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+      interactions:
+        N_atoms: 10000
+        omega_ref: 691.1504
+        c1_ratio: 0.02778
+      ddi: {enabled: true, secular: true}
+      lhy: {kind: none}
+      B: {B_mag: "0.01 Gauss", theta: 0.0, phi: 0.0}
+      gauge_fix: false
+      initial_state: m_plus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 3000
+      tol: 1.0e-9
+
+  - dynamics:   # tilt-up: theta 0 → π/4 over 5 ms ≈ 3.456 ω⁻¹ (adiabatic at strong B)
+      duration: 3.456
+      dt: 0.005
+      B:
+        B_mag: "0.01 Gauss"
+        theta: {from: 0.0, to: 0.7854, duration: 3.456}
+        phi: 0.0
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      seed_amplitude: 1.0e-6
+      seed_k_cut: 2.5
+      save:
+        every: 100
+        psi: true
+        precision: f64
+
+  - dynamics:   # spin-up: phi rate 0 → +0.5 over 5 ms at theta = π/4
+      duration: 3.456
+      dt: 0.005
+      B:
+        B_mag: "0.01 Gauss"
+        theta: 0.7854
+        phi: {rate: {from: 0.0, to: 0.5, duration: 3.456}}
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      save:
+        every: 100
+        psi: true
+        precision: f64
+
+  - dynamics:   # steady stir at strong B, 5 ms
+      duration: 3.456
+      dt: 0.005
+      B:
+        B_mag: "0.01 Gauss"
+        theta: 0.7854
+        phi: {rate: 0.5}
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      save:
+        every: 100
+        psi: true
+        precision: f64
+
+  - dynamics:   # B quench: B_mag 0.01 → 2.6e-5 G over 1 ms, direction preserved
+      duration: 0.691
+      dt: 0.001
+      B:
+        B_mag: {from: 0.01, to: 2.6e-5, duration: 0.691}
+        theta: 0.7854
+        phi: {rate: 0.5}
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      save:
+        every: 50
+        psi: true
+        precision: f64
+
+  - dynamics:   # weak-field hold with rotating B, 10 ms
+      duration: 6.9115
+      dt: 0.005
+      B:
+        B_mag: "2.6e-5 Gauss"
+        theta: 0.7854
+        phi: {rate: 0.5}
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      save:
+        every: 100
+        psi: true
+        precision: f64
+
+  - analyze:
+      - phase_classify: {}
+      - winding_map: {}
+      - energy_decomposition: {}

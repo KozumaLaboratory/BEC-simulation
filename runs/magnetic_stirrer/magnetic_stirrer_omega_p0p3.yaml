@@ -1,0 +1,89 @@
+# Klaus-II magnetic-stirrer protocol — auto-generated.
+# Source: scripts/validation/klaus_magnetic_stirrer_gen.jl
+#
+# Cell : magnetic_stirrer_omega_p0p3
+#   phi rotation rate during hold : Ω/ω_⊥ = 0.3
+#   DDI in dynamics               : true
+#   B quench applied              : true
+#   static B (no rotation)        : false
+#   theta tilt during hold        : 0.7854 rad ≈ π/4
+#   B magnitude during hold       : 2.6e-5 G
+
+metadata:
+  suite: magnetic_stirrer
+  cell_name: magnetic_stirrer_omega_p0p3
+  rotation_omega: 0.3
+  ddi_on_dynamics: true
+  do_B_quench: true
+  static_B: false
+  theta_tilt: 0.7854
+  generator: scripts/validation/klaus_magnetic_stirrer_gen.jl
+  protocol_summary: |
+    Klaus-II rotating-B / DDI-anisotropy stirrer. m=+F GS in +z-aligned
+    strong B, then rotation_prep with no rotation, then B quench to weak
+    field, then weak-field hold with B tilted at π/4 and phi rotated at Ω.
+    Matched-chirality for m=+F init is Ω > 0 (Klaus-I Gate 4 verified).
+
+defaults:
+  kind: spinor
+  backend: cpu
+  interactions: {N_atoms: 10000, omega_ref: 691.1504}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+      interactions:
+        N_atoms: 10000
+        omega_ref: 691.1504
+        c1_ratio: 0.02778
+      ddi: {enabled: true, secular: true}
+      lhy: {kind: none}
+      B: {B_mag: "0.01 Gauss", theta: 0.0, phi: 0.0}
+      gauge_fix: false
+      initial_state: m_plus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 3000
+      tol: 1.0e-9
+
+  - dynamics:   # rotation_prep (z-aligned, no rotation)
+      duration: 6.9115
+      dt: 0.005
+      B: {B_mag: "0.01 Gauss", theta: 0.0, phi: 0.0}
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      seed_amplitude: 1.0e-6
+      seed_k_cut: 2.5
+      save:
+        every: 100
+        psi: true
+        precision: f64
+
+  - dynamics:   # B_quench (magnitude drop, direction still z-aligned)
+      duration: 0.69115
+      dt: 0.001
+      B: {B_mag: {from: 0.01, to: 2.6e-5, duration: 0.6911504}, theta: 0.0, phi: 0.0}
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      save:
+        every: 50
+        psi: true
+        precision: f64
+
+  - dynamics:   # weak_field_hold WITH rotating B direction (Klaus-II hallmark)
+      duration: 6.9115
+      dt: 0.005
+      B: {B_mag: "2.6e-5 Gauss", theta: 0.7854, phi: {rate: 0.3}}
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      save:
+        every: 100
+        psi: true
+        precision: f64
+
+  - analyze:
+      - phase_classify: {}
+      - winding_map: {}
+      - energy_decomposition: {}

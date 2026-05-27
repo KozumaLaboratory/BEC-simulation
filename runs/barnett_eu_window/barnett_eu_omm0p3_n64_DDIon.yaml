@@ -1,0 +1,75 @@
+# Klaus/Barnett parameter window — 64³ anchor at Ω/ω_⊥ = -0.3.
+# Source: hand-derived from barnett_eu_omm0p3_DDIon.yaml (32³).
+# Goal: confirm the 32³ peak Barnett response (ΔF_z/N = +2.115, peak ratio
+# 1.318 at Ω/ω_⊥ = -0.3) survives at 64³ — i.e. is not a grid artifact.
+# Same N=1e4 / duration / B-ramp as the 32³ cell so the comparison is direct.
+
+metadata:
+  suite: barnett_eu_window
+  variant: omm0p3_n64_anchor
+  ladder_level: 0
+  rotating_frame_omega: -0.3
+  ddi_on: true
+  grid_n: 64
+  caveat: |
+    Grid-doubling anchor for the 32³ Ω=-0.3 cell. If ΔF_z/N agrees
+    to within ~5%, the recommendation Ω/ω_⊥ ∈ [-0.5, -0.3] for the
+    Klaus/Barnett experimental window hardens. If it diverges, the
+    32³ scan is grid-artifact contaminated and the recommendation
+    must be reset.
+
+defaults:
+  kind: spinor
+  backend: cpu   # rotating_frame_omega Coriolis step has scalar indexing on GPU (see memory).
+  interactions: {N_atoms: 10000, omega_ref: 691.1504}
+
+dealias:
+  enabled: true
+  k_cut: 16.0
+  auto_dt: true
+  dt_safety: 10.0
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [64, 64, 64], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+      interactions:
+        N_atoms: 10000
+        omega_ref: 691.1504
+        c1_ratio: 0.02778
+      ddi:
+        enabled: true
+        secular: false
+      lhy: {kind: none}
+      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      gauge_fix: false
+      initial_state: m_minus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 2000
+      tol: 1.0e-9
+
+  - dynamics:
+      duration: 10.0
+      dt: 0.005
+      rotating_frame_omega: -0.3
+      B:
+        Bz: {from: -0.01, to: -2.6e-5, duration: 0.0}
+        theta: 0.0
+        phi: 0.0
+      ddi:
+        enabled: true
+        secular: false
+      lhy: {kind: none}
+      seed_amplitude: 1.0e-6
+      seed_k_cut: 2.5
+      save:
+        every: 50
+        psi: true
+        precision: f64
+
+  - analyze:
+      - phase_classify: {}
+      - winding_map: {}
+      - energy_decomposition: {}

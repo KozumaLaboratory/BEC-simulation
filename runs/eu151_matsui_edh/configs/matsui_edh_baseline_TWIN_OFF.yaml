@@ -1,0 +1,68 @@
+# TWIN CONTROL (auto-generated). Companion of:
+#   runs/eu151_matsui_edh/configs/matsui_edh_baseline.yaml
+# Regenerate with:
+#   julia --project=. scripts/validation/generate_twin_controls.jl
+# LHY and loss blocks stripped; everything else preserved.
+# Comments from the original YAML are lost on the round-trip.
+
+pipeline:
+  - ground_state:
+      dt: 0.005
+      atom: "Eu151"
+      potential:
+        omega:
+          - 1.0
+          - 1.0
+          - 1.0
+        type: "harmonic"
+      B:
+        theta: 0.0
+        phi: 0.0
+        Bz: "-0.01 Gauss"
+      gauge_fix: false
+      initial_state: "m_minus_F"
+      tol: 1.0e-9
+      ddi:
+        enabled: true
+        secular: false
+      grid:
+        box:
+          - 12.0
+          - 12.0
+          - 12.0
+        n:
+          - 32
+          - 32
+          - 32
+      lhy:
+        kind: "none"
+      interactions:
+        omega_ref: 628.3
+        c1_ratio: -0.005
+        N_atoms: 30000
+      init_sigma: 1.5
+      n_steps: 1500
+  - dynamics:
+      duration: 6.28
+      B:
+        theta: 0.0
+        phi: 0.0
+        Bz:
+          duration: 0.0
+          to: 2.6e-5
+          from: 0.01
+      ddi:
+        secular: false
+      seed_k_cut: 2.5
+      dt: 0.01
+      save:
+        psi: true
+        every: 50
+        precision: "f32"
+      seed_amplitude: 1.0e-6
+defaults:
+  kind: "spinor"
+  backend: "gpu"
+  interactions:
+    omega_ref: 628.3
+    N_atoms: 30000
