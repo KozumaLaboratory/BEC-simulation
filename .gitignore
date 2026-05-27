@@ -53,6 +53,12 @@ runs/**/dashboard_data.json
 runs/**/movie.gif
 runs/**/movie.mp4
 
+# Auto-generated per-run output directories (`<inputbase>_<8 hex>/`).
+# run_yaml copies the input YAML into the output dir, so config.yaml here
+# is a duplicate of the tracked input under runs/<scan>/. Same for
+# checkpoints and point_NNN.jld2 snapshots.
+runs/*_[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]/
+
 # Generated dashboards (reproducible from data)
 *.html
 
