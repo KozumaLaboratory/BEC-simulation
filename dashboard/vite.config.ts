@@ -3,7 +3,7 @@ import { fileURLToPath, URL } from 'node:url'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
-const API_TARGET = process.env.VITE_API_TARGET ?? 'http://localhost:8080'
+const API_TARGET = process.env.VITE_API_TARGET ?? 'http://localhost:8090'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -13,10 +13,17 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    // Tailscale serve config (`tailscale serve status`) terminates HTTPS
+    // at https://anko-wsl.tailfd804.ts.net:9877 and proxies to
+    // http://10.255.255.254:9876.  Bind on 0.0.0.0:9876 so the proxy can
+    // reach us.  Local HTTP access remains at http://localhost:9876.
+    host: '0.0.0.0',
+    port: 9876,
     proxy: {
       '/api': { target: API_TARGET, changeOrigin: true },
     },
+    // Allow the tailscale hostname so vite doesn't reject the Host header.
+    allowedHosts: ['anko-wsl.tailfd804.ts.net', 'localhost', '127.0.0.1'],
   },
   build: {
     // Manual chunking — keep the initial paint chunk small by pushing
