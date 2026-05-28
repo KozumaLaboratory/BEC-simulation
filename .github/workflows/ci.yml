@@ -54,7 +54,11 @@ jobs:
         with:
           version: "1.12"
       - name: Install JuliaFormatter
-        run: julia -e 'using Pkg; Pkg.add("JuliaFormatter")'
+        # Pin the version: the repo is formatted to the 2.3.x blue style and
+        # the .githooks/pre-commit check runs the same. An unpinned add floats
+        # to the latest (2.5.0 reflows ~26 files differently) and fails CI on
+        # code that is locally clean. Bump deliberately alongside a reformat.
+        run: julia -e 'using Pkg; Pkg.add(name="JuliaFormatter", version="2.3.2")'
       - name: Check formatting
         run: |
           julia -e '
