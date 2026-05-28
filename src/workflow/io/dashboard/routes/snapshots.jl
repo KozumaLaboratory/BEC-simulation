@@ -23,12 +23,33 @@ function _route_dynamics_series(path::String, base_dir::String)
             out[split(k, "/")[2]] = Float64.(d[k])
         end
         if haskey(d, "dynamics/component_populations")
-            # Just return the dominant m's series so sparklines stay compact.
             pops = d["dynamics/component_populations"]
             n_snaps = size(pops, 1)
             n_comp = size(pops, 2)
+            # Compact dominant-m series kept for the DataTable sparklines.
             out["pop_top"] = [Float64(pops[t, 1]) for t in 1:n_snaps]  # m=+F
             out["pop_mid"] = [Float64(pops[t, (n_comp + 1) ÷ 2]) for t in 1:n_snaps]  # m=0
+            # Full per-m series for the time-series Overview. Row t is one
+            # snapshot; column c is m = F-(c-1). Sent as a flat row-major
+            # Float64 array (snap-major) the client reshapes to [snap][m].
+            F = (n_comp - 1) ÷ 2
+            out["m_values"] = Int[F - (c - 1) for c in 1:n_comp]
+            out["n_comp"] = n_comp
+            out["populations"] = [Float64(pops[t, c]) for t in 1:n_snaps for c in 1:n_comp]
+            # component_populations is recorded once per snapshot frame, so
+            # it usually has one fewer row than `times` (which includes the
+            # t=0 initial state). Align by dropping t=0 when the lengths
+            # differ by exactly one; otherwise fall back to the raw times.
+            if haskey(d, "dynamics/times")
+                ts = Float64.(d["dynamics/times"])
+                out["pop_times"] = if length(ts) == n_snaps + 1
+                    ts[2:end]
+                elseif length(ts) == n_snaps
+                    ts
+                else
+                    collect(1.0:n_snaps)
+                end
+            end
         end
         _json_string(out)
     catch e
