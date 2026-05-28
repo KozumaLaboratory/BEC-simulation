@@ -81,7 +81,7 @@ using LinearAlgebra
         M0 = magnetization(ws.state.psi, ws.grid, sys)
 
         # Check at every save point
-        for step in 1:sp.n_steps
+        for step in 1:(sp.n_steps)
             split_step!(ws)
             if step % sp.save_every == 0
                 M = magnetization(ws.state.psi, ws.grid, sys)

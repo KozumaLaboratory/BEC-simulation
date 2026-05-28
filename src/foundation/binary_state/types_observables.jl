@@ -16,7 +16,7 @@ struct BinaryCouplings
 end
 
 BinaryCouplings(; g_AA::Real, g_BB::Real, g_AB::Real,
-omega_coupling::Real=0.0, delta_coupling::Real=0.0) = BinaryCouplings(Float64(g_AA), Float64(g_BB),
+    omega_coupling::Real=0.0, delta_coupling::Real=0.0) = BinaryCouplings(Float64(g_AA), Float64(g_BB),
     Float64(g_AB),
     Float64(omega_coupling), Float64(delta_coupling))
 
@@ -115,7 +115,7 @@ struct SpinorBinaryCouplings
 end
 
 SpinorBinaryCouplings(; F_A::Int, F_B::Int, c0_A::Real, c1_A::Real,
-c0_B::Real, c1_B::Real, g_AB::Real) = SpinorBinaryCouplings(F_A, F_B,
+    c0_B::Real, c1_B::Real, g_AB::Real) = SpinorBinaryCouplings(F_A, F_B,
     Float64(c0_A), Float64(c1_A),
     Float64(c0_B), Float64(c1_B),
     Float64(g_AB))

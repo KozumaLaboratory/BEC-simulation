@@ -196,9 +196,9 @@ struct SlurmBackend <: AutopilotBackend
 end
 
 SlurmBackend(;
-ssh_host::Union{Nothing, AbstractString}=nothing,
-max_concurrent::Union{Nothing, Int}=nothing,
-project_root::AbstractString=pwd()
+    ssh_host::Union{Nothing, AbstractString}=nothing,
+    max_concurrent::Union{Nothing, Int}=nothing,
+    project_root::AbstractString=pwd(),
 ) = SlurmBackend(
     ssh_host === nothing ? nothing : String(ssh_host),
     max_concurrent,

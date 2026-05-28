@@ -267,9 +267,9 @@ function berry_connection_trajectory(dyn::Dict; gauge_fix::Bool=false)
     θ_const = dyn[:theta_const]::Float64
     φ_omega = dyn[:phi_omega]::Float64
     berry_connection_trajectory(times;
-        theta_func=(t)->θ_const,
-        phi_func=(t)->φ_omega * t,
-        theta_dot_func=(t)->0.0,
-        phi_dot_func=(t)->φ_omega,
+        theta_func=(t) -> θ_const,
+        phi_func=(t) -> φ_omega * t,
+        theta_dot_func=(t) -> 0.0,
+        phi_dot_func=(t) -> φ_omega,
         gauge_fix=gauge_fix)
 end

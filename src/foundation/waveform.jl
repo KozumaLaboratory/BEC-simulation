@@ -98,8 +98,8 @@ struct ChirpedSinusoidalWaveform <: Waveform
 end
 
 ChirpedSinusoidalWaveform(; center=0.0, amplitude=1.0,
-freq_start=0.0, freq_end=1.0,
-duration=1.0, phase=0.0) = ChirpedSinusoidalWaveform(
+    freq_start=0.0, freq_end=1.0,
+    duration=1.0, phase=0.0) = ChirpedSinusoidalWaveform(
     center, amplitude, freq_start, freq_end, duration, phase
 )
 
@@ -110,9 +110,10 @@ struct GaussianPulseWaveform <: Waveform
     sigma::Float64
 end
 
-GaussianPulseWaveform(; center=0.0, amplitude=1.0, t_center=0.0, sigma=0.01) = GaussianPulseWaveform(
-    center, amplitude, t_center, sigma
-)
+GaussianPulseWaveform(; center=0.0, amplitude=1.0, t_center=0.0, sigma=0.01) =
+    GaussianPulseWaveform(
+        center, amplitude, t_center, sigma
+    )
 
 struct InterpolatedWaveform <: Waveform
     times::Vector{Float64}

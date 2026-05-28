@@ -168,7 +168,7 @@ Gaussian wavepacket with momentum kick along dim 1. `momentum` plumbs
 through `init_theta` (which `init_psi` uses as k₀ for this state).
 """
 init_psi_wavepacket(grid, sys;
-momentum::Real=0.0, width::Real=1.0, m_state::Int=1) = init_psi(
+    momentum::Real=0.0, width::Real=1.0, m_state::Int=1) = init_psi(
     grid, sys; state=:gaussian_wavepacket, init_theta=momentum
 )
 
@@ -191,7 +191,7 @@ Pair of Gaussian packets boosted toward each other. `momentum_kick`
 plumbs through `init_theta`; `separation` is fixed inside `init_psi`.
 """
 init_psi_two_packets(grid, sys;
-separation::Real=2.0, momentum_kick::Real=1.0) = init_psi(
+    separation::Real=2.0, momentum_kick::Real=1.0) = init_psi(
     grid, sys; state=:two_packet, init_theta=momentum_kick
 )
 
@@ -236,7 +236,7 @@ Regular array of vortices. `n_vortices` plumbs through `init_vortex_charge`
 square pattern is implemented inside `init_psi`).
 """
 init_psi_vortex_lattice(grid, sys;
-n_vortices::Int=4, lattice::Symbol=:triangular) = init_psi(grid, sys; state=:vortex_lattice,
+    n_vortices::Int=4, lattice::Symbol=:triangular) = init_psi(grid, sys; state=:vortex_lattice,
     init_vortex_charge=n_vortices)
 
 """

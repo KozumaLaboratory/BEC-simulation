@@ -61,11 +61,12 @@ struct BoxPotential{N} <: AbstractPotential
     wall_width::Float64
 end
 
-BoxPotential(size::NTuple{N, Float64}; wall_strength=1000.0, wall_width=0.5) where {N} = BoxPotential{
-    N
-}(
-    size, wall_strength, wall_width
-)
+BoxPotential(size::NTuple{N, Float64}; wall_strength=1000.0, wall_width=0.5) where {N} =
+    BoxPotential{
+        N
+    }(
+        size, wall_strength, wall_width
+    )
 
 struct OpticalLatticePotential{N} <: AbstractPotential
     depth::NTuple{N, Float64}
@@ -74,7 +75,7 @@ struct OpticalLatticePotential{N} <: AbstractPotential
 end
 
 OpticalLatticePotential(depth::NTuple{N, Float64}, period::NTuple{N, Float64};
-phase::NTuple{N, Float64}=ntuple(_ -> 0.0, N)) where {N} = OpticalLatticePotential{N}(
+    phase::NTuple{N, Float64}=ntuple(_ -> 0.0, N)) where {N} = OpticalLatticePotential{N}(
     depth, period, phase
 )
 
@@ -208,11 +209,12 @@ struct TimeDependentMagneticGradient{N}
     end
 end
 
-TimeDependentMagneticGradient(; gradient_wf::Waveform, axis::Int=3, g_F::Float64=1.0, ndim::Int=3) = TimeDependentMagneticGradient{
-    ndim
-}(
-    gradient_wf, axis, g_F
-)
+TimeDependentMagneticGradient(; gradient_wf::Waveform, axis::Int=3, g_F::Float64=1.0, ndim::Int=3) =
+    TimeDependentMagneticGradient{
+        ndim
+    }(
+        gradient_wf, axis, g_F
+    )
 
 struct LaguerreGaussBeam{N} <: AbstractPotential
     power::Float64
@@ -222,11 +224,12 @@ struct LaguerreGaussBeam{N} <: AbstractPotential
     polarizability::Float64
 end
 
-LaguerreGaussBeam(; power=1.0, waist=10.0, l_mode=1, p_mode=0, polarizability=1.0, ndim::Int=2) = LaguerreGaussBeam{
-    ndim
-}(
-    power, waist, l_mode, p_mode, polarizability
-)
+LaguerreGaussBeam(; power=1.0, waist=10.0, l_mode=1, p_mode=0, polarizability=1.0, ndim::Int=2) =
+    LaguerreGaussBeam{
+        ndim
+    }(
+        power, waist, l_mode, p_mode, polarizability
+    )
 
 struct PlugBeam{N} <: AbstractPotential
     strength::Float64

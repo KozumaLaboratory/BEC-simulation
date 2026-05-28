@@ -198,7 +198,7 @@ function dump_F6_phase_diagram_json(
         "energies" => Dict(String(label) => result.energies[label]
                            for label in result.labels),
         "winner" => [String(result.winner[i, j])
-                     for i in 1:result.nscan, j in 1:result.nscan],
+                     for i in 1:(result.nscan), j in 1:(result.nscan)],
         "linear_boundaries" => Dict(
             "I_h_vs_polar" => _F6_PD_COEF_IH_VS_POLAR,
             "I_h_vs_FM" => _F6_PD_COEF_IH_VS_FM,

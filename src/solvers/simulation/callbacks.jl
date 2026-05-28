@@ -36,9 +36,9 @@ struct SimulationCallbacks{F1, F2, F3}
 end
 
 SimulationCallbacks(;
-on_step=nothing,
-on_snapshot=nothing,
-on_complete=nothing
+    on_step=nothing,
+    on_snapshot=nothing,
+    on_complete=nothing,
 ) = SimulationCallbacks{typeof(on_step), typeof(on_snapshot), typeof(on_complete)}(
     on_step, on_snapshot, on_complete)
 

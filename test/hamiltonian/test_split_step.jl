@@ -16,7 +16,7 @@ using SpinorBEC
         )
 
         E0 = total_energy(ws)
-        for _ in 1:sp.n_steps
+        for _ in 1:(sp.n_steps)
             split_step!(ws)
         end
         E1 = total_energy(ws)
@@ -38,7 +38,7 @@ using SpinorBEC
         )
 
         N0 = total_norm(ws.state.psi, grid)
-        for _ in 1:sp.n_steps
+        for _ in 1:(sp.n_steps)
             split_step!(ws)
         end
         N1 = total_norm(ws.state.psi, grid)

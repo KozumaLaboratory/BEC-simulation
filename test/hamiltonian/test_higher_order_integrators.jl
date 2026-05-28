@@ -30,8 +30,8 @@ using StaticArrays: SVector
     function make_ws()
         ws = SpinorBEC.make_rotating_basis_ws(grid, F_t, V_trap;
             p=10.0, q=0.0, c0=20.0, c1=0.0, c_dd=0.0,
-            theta_func=(t)->π/6, phi_func=(t)->omega_rot*t,
-            theta_dot_func=(t)->0.0, phi_dot_func=(t)->omega_rot,
+            theta_func=(t) -> π/6, phi_func=(t) -> omega_rot*t,
+            theta_dot_func=(t) -> 0.0, phi_dot_func=(t) -> omega_rot,
             gauge_fix=false)
         @inbounds for I in CartesianIndices(grid.config.n_points)
             x = grid.x[1][I[1]];
@@ -94,7 +94,7 @@ end
     V_trap = zeros(Float64, 6, 6, 6)
     ws = SpinorBEC.make_rotating_basis_ws(grid, 1, V_trap;
         p=1.0, q=0.0, c0=1.0, c1=0.0, c_dd=0.0,
-        theta_func=(t)->0.0, phi_func=(t)->0.0)
+        theta_func=(t) -> 0.0, phi_func=(t) -> 0.0)
     @test_throws ErrorException SpinorBEC.yoshida6_step_rotating!(
         ws, 0.01, 0.0; imaginary_time=true
     )

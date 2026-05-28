@@ -16,7 +16,9 @@ struct FieldSpec
     schema::Union{Nothing, Dict{String, FieldSpec}}  # for nested dicts
 end
 
-FieldSpec(; required=false, type=Any, default=nothing, range=nothing, enum=nothing, schema=nothing) = FieldSpec(
+FieldSpec(;
+    required=false, type=Any, default=nothing, range=nothing, enum=nothing, schema=nothing
+) = FieldSpec(
     required, type, default, range, enum, schema
 )
 

@@ -66,7 +66,7 @@ function _audit_uniform_decay()
     # Uniform ψ: ψ_m=0 = sqrt(n0); other m = 0. So n(r) = n0 everywhere.
     n0 = 0.5
     fill!(ws.state.psi, 0)
-    psi_view = view(ws.state.psi,:,:,:,(F + 1))  # m=0 for F=1
+    psi_view = view((ws.state.psi),:,:,:,(F + 1))  # m=0 for F=1
     psi_view .= sqrt(n0)
 
     n_before = abs2(ws.state.psi[1, 1, 1, F + 1])

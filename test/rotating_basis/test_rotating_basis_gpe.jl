@@ -140,7 +140,7 @@ using StaticArrays: SVector
         ws_no = SpinorBEC.make_rotating_basis_ws(grid, F_t, V_trap;
             p=5.0, q=0.0, c0=80.0, c1=0.0, c_dd=200.0,  # ε_dd_eff = 0.83
             gamma_lhy=0.0,
-            theta_func=(_t)->0.0, phi_func=(_t)->0.0)
+            theta_func=(_t) -> 0.0, phi_func=(_t) -> 0.0)
         σ_l = 1.0
         @inbounds for I in CartesianIndices(grid.config.n_points)
             x = grid.x[1][I[1]];
@@ -154,7 +154,7 @@ using StaticArrays: SVector
         ws_lhy = SpinorBEC.make_rotating_basis_ws(grid, F_t, V_trap;
             p=5.0, q=0.0, c0=80.0, c1=0.0, c_dd=200.0,
             gamma_lhy=100.0,                              # nontrivial LHY
-            theta_func=(_t)->0.0, phi_func=(_t)->0.0)
+            theta_func=(_t) -> 0.0, phi_func=(_t) -> 0.0)
         @inbounds for I in CartesianIndices(grid.config.n_points)
             x = grid.x[1][I[1]];
             y = grid.x[2][I[2]];
@@ -173,7 +173,7 @@ using StaticArrays: SVector
     @testset "L_z observable: real Gaussian → 0, vortex (l=1) → 1" begin
         ws = SpinorBEC.make_rotating_basis_ws(grid, 1, V_trap;
             p=1.0, q=0.0, c0=10.0, c1=0.0, c_dd=0.0,
-            theta_func=(_t)->0.0, phi_func=(_t)->0.0)
+            theta_func=(_t) -> 0.0, phi_func=(_t) -> 0.0)
         σ_l = 1.0
         @inbounds for I in CartesianIndices(grid.config.n_points)
             x = grid.x[1][I[1]];

@@ -94,7 +94,7 @@ using SpinorBEC
             potential=HarmonicTrap(1.0),
             light_shift=ls,
         )
-        for _ in 1:ws.sim_params.n_steps
+        for _ in 1:(ws.sim_params.n_steps)
             split_step!(ws)
         end
         # m=0 component should have significant population

@@ -184,7 +184,7 @@ function component_populations(
     dV = cell_volume(grid)
     n_pts = ntuple(d -> size(psi, d), N)
     pops = Vector{Float64}(undef, sys.n_components)
-    for c in 1:sys.n_components
+    for c in 1:(sys.n_components)
         idx = _component_slice(N, n_pts, c)
         pops[c] = sum(abs2, view(psi, idx...)) * dV
     end

@@ -31,8 +31,8 @@ CUDA.functional() || error("CUDA not functional — cannot run GPU tests")
     function make_ws_gpu(; c_dd=0.0, c1=0.0)
         ws = SpinorBEC.make_rotating_basis_ws(grid, F_t, V_trap;
             p=2.0, q=0.0, c0=10.0, c1=c1, c_dd=c_dd, gamma_lhy=0.0,
-            theta_func=(t)->π/8, phi_func=(t)->1.0*t,
-            theta_dot_func=(t)->0.0, phi_dot_func=(t)->1.0,
+            theta_func=(t) -> π/8, phi_func=(t) -> 1.0*t,
+            theta_dot_func=(t) -> 0.0, phi_dot_func=(t) -> 1.0,
             gauge_fix=false,
             backend=SpinorBEC.CUDABackend())
         # Initialize Gaussian on host, copy to device

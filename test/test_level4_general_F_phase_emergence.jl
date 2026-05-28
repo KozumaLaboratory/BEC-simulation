@@ -218,8 +218,8 @@ const F_CASES = [
     end
 
     @testset "Initial states: :polar has ⟨F⟩=0, :m_plus_F has ⟨F_z⟩=F at F=$Fval" for (
-        Fval, atom, label
-    ) in F_CASES
+            Fval, atom, label
+        ) in F_CASES
 
         grid = make_grid(GridConfig{1}((16,), (8.0,)))
         sys = SpinSystem(Fval)

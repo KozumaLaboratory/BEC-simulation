@@ -233,8 +233,8 @@ struct PhaseReference
 end
 
 PhaseReference(name, F; spin_order=nothing, nematic_order=nothing,
-biaxiality=nothing, Q6=nothing, dom_channel_S=nothing,
-dom_channel_weight=nothing, point_group=nothing) = PhaseReference(name, F,
+    biaxiality=nothing, Q6=nothing, dom_channel_S=nothing,
+    dom_channel_weight=nothing, point_group=nothing) = PhaseReference(name, F,
     spin_order, nematic_order, biaxiality, Q6, dom_channel_S,
     dom_channel_weight, point_group)
 

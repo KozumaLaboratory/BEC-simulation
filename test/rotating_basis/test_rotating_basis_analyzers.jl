@@ -119,10 +119,10 @@ using SpinorBEC
         # Constant tilt + linear stir (Klaus-style)
         times_x6 = collect(0.0:0.1:1.0)
         res = SpinorBEC.berry_connection_trajectory(times_x6;
-            theta_func=(t)->0.611,
-            phi_func=(t)->4.524*t,
-            theta_dot_func=(t)->0.0,
-            phi_dot_func=(t)->4.524,
+            theta_func=(t) -> 0.611,
+            phi_func=(t) -> 4.524*t,
+            theta_dot_func=(t) -> 0.0,
+            phi_dot_func=(t) -> 4.524,
             gauge_fix=false)
         @test length(res.a_x) == length(times_x6)
         # Steady stir → constant Â magnitude
@@ -136,10 +136,10 @@ using SpinorBEC
 
         # gauge_fix=true: a_z absorbed into χ
         res_gf = SpinorBEC.berry_connection_trajectory(times_x6;
-            theta_func=(t)->0.611,
-            phi_func=(t)->4.524*t,
-            theta_dot_func=(t)->0.0,
-            phi_dot_func=(t)->4.524,
+            theta_func=(t) -> 0.611,
+            phi_func=(t) -> 4.524*t,
+            theta_dot_func=(t) -> 0.0,
+            phi_dot_func=(t) -> 4.524,
             gauge_fix=true)
         @test res_gf.a_z[1] ≈ 0.0 atol=1e-10
         @test res_gf.a_x[1] ≈ -4.524 * sin(0.611) atol=1e-10

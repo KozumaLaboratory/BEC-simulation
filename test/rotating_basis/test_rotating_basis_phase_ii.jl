@@ -41,8 +41,8 @@ using StaticArrays: SVector
     # --- Option γ ITP (adiabatic limit) ---
     ws_g = SpinorBEC.make_rotating_basis_ws(grid, F_t, V_trap;
         p=p_t, q=0.0, c0=g_t, c1=0.0, c_dd=c_t,
-        theta_func=(_t)->tilt, phi_func=(_t)->0.0,
-        theta_dot_func=(_t)->0.0, phi_dot_func=(_t)->0.0)
+        theta_func=(_t) -> tilt, phi_func=(_t) -> 0.0,
+        theta_dot_func=(_t) -> 0.0, phi_dot_func=(_t) -> 0.0)
     @inbounds for I in CartesianIndices(grid.config.n_points)
         x = grid.x[1][I[1]];
         y = grid.x[2][I[2]];
@@ -128,8 +128,8 @@ end
 
         ws_g = SpinorBEC.make_rotating_basis_ws(grid, F_t, V_trap;
             p=p_t, q=0.0, c0=g_t, c1=0.0, c_dd=c_t,
-            theta_func=(_t)->tilt, phi_func=(_t)->0.0,
-            theta_dot_func=(_t)->0.0, phi_dot_func=(_t)->0.0)
+            theta_func=(_t) -> tilt, phi_func=(_t) -> 0.0,
+            theta_dot_func=(_t) -> 0.0, phi_dot_func=(_t) -> 0.0)
         @inbounds for I in CartesianIndices(grid.config.n_points)
             x = grid.x[1][I[1]];
             y = grid.x[2][I[2]];
