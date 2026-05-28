@@ -544,6 +544,35 @@ function _capture_recipe_version(name::Union{Nothing, Symbol})
 end
 
 """
+    _capture_autopilot_config_hash(config) -> String
+
+SHA-256 of the AutopilotConfig's serializable shape (backend kind,
+queue root path, dispatch caps, gate flags). Called at dispatch
+time by tick.jl and persisted on the entry. Answers "what
+autopilot config rules dispatched this run?".
+"""
+function _capture_autopilot_config_hash(config)
+    config === nothing && return ""
+    payload = try
+        Dict{String, Any}(
+            "backend_type" => string(typeof(config.backend).name.name),
+            "qr_path" => config.qr.path,
+            "inspect_before_dispatch" => config.inspect_before_dispatch,
+            "max_dispatches_per_tick" => config.max_dispatches_per_tick,
+            "on_complete_max_descendants" => config.on_complete_max_descendants,
+            "notify_slack_on_failure" => config.notify_slack_on_failure,
+            "dry_run" => hasproperty(config, :dry_run) ? config.dry_run : false,
+            "respect_budget" =>
+                hasproperty(config, :respect_budget) ?
+                config.respect_budget : true,
+        )
+    catch
+        return ""
+    end
+    bytes2hex(SHA.sha256(JSON.json(payload)))
+end
+
+"""
     _capture_inspector_snapshot_hash(spec_path) -> String
 
 Run `inspect_config(spec_path)` and hash its serialized output. The

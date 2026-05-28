@@ -379,6 +379,132 @@ journalctl --user -u spinor-autopilot.service -f
 `Restart=no` is intentional — the timer is the retry loop, so panics
 don't tight-loop on a broken binary.
 
+## Week-0 dry-run rollout runbook
+
+Concrete steps to take the autopilot from "tested in a unit suite" to
+"running on real GPU time", staged so you can back out at each gate.
+
+### Day 1 — install + dry-run on
+
+```bash
+# 1. Install systemd-user unit + timer
+mkdir -p ~/.config/systemd/user
+cp scripts/spinor-autopilot.{service,timer} ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now spinor-autopilot.timer
+
+# 2. Verify timer fires
+systemctl --user list-timers spinor-autopilot.timer
+journalctl --user -u spinor-autopilot.service --since "5 min ago"
+
+# 3. Flip dry_run on so dispatch! is short-circuited
+julia --project=. scripts/cli.jl autopilot dry-run on
+# → autopilot dry_run: ON
+
+# 4. Enqueue one harmless config to exercise the path
+julia --project=. scripts/cli.jl autopilot enqueue runs/option_gamma_micro/config.yaml
+julia --project=. scripts/cli.jl autopilot status
+# states: pending 1, rest 0
+```
+
+### Day 2 — verify the tick walked the state machine
+
+```bash
+# Expect: pending → running (synthetic) → done in ≤ 1 tick (5 min)
+julia --project=. scripts/cli.jl autopilot status
+# states: done 1
+
+# Confirm outcome.toml was written with the dry-run synthetic
+cat runs/<content_id>/outcome.toml
+# [outcome]
+# completed = true
+# reason = "dry-run synthetic"
+
+# Confirm metrics jsonl grew
+wc -l runs/.autopilot.metrics.jsonl   # → ~288 lines after 24h at 5min cadence
+
+# Confirm reproducibility metadata captured at enqueue
+grep -E "code_sha|recipe_version|autopilot_config_hash" runs/<content_id>/state.toml
+```
+
+### Day 3-7 — observe normal operation
+
+Smoke-check daily:
+
+```bash
+# Breaker not tripped, queue throughput sane
+julia --project=. scripts/cli.jl autopilot status
+
+# Recent ticks dispatched / completed / killed counts:
+julia --project=. -e '
+    using SpinorBEC, JSON
+    samples = recent_metric_samples(288)
+    println("ticks observed: ", length(samples))
+    println("dispatched (24h): ", sum(s -> s["dispatched"], samples))
+    println("completed (24h): ", sum(s -> s["completed"], samples))
+    println("killed_divergent (24h): ", sum(s -> s["killed_divergent"], samples))
+'
+
+# Per-recipe success rate trajectory
+julia --project=. -e '
+    using SpinorBEC
+    for r in (:next_random_in_bounds, :refine_around_best, :analyze_majorana)
+        s = recipe_outcome_summary(r)
+        println(r, ": ", s)
+    end
+'
+```
+
+### Day 8+ — flip dry-run off (gated rollout)
+
+```bash
+# 1. Set the daily GPU·h budget cap LOW (e.g. 5 hrs/day)
+julia --project=. scripts/cli.jl autopilot budget set --daily=5 --quarter=200
+
+# 2. Flip dry-run off — autopilot will now call sbatch for real
+julia --project=. scripts/cli.jl autopilot dry-run off
+
+# 3. Keep the existing pending entries small; monitor first dispatch
+journalctl --user -u spinor-autopilot.service -f
+```
+
+### Emergency stop
+
+```bash
+# Pause: dispatch halts; running jobs continue
+julia --project=. scripts/cli.jl autopilot pause
+
+# Drain: wait for running queue to empty (timeout 1h)
+julia --project=. scripts/cli.jl autopilot drain --timeout=3600
+
+# Resume:
+julia --project=. scripts/cli.jl autopilot resume
+
+# Force kill all running:
+julia --project=. -e '
+    using SpinorBEC
+    for e in list_queue(:running)
+        e.job_id !== nothing && cancel!(SlurmBackend(), e)
+        set_status!(e, :killed_bug; kill_reason="manual emergency stop")
+    end
+'
+```
+
+### What to look for in metrics.jsonl
+
+After a week of dry-run, healthy patterns:
+
+- `dispatched`: matches your enqueue rate (one entry per pending → done cycle)
+- `completed` ≈ `dispatched` (dry-run synthesizes success)
+- `killed_divergent`: 0 unless `_live_status.json` writes show drift
+- `inspected_blocked`: 0 unless a config has `inspect_config :error`-level findings
+- `breaker.*`: empty Dict unless a breaker tripped (and you'd already be paused)
+
+Unhealthy signals to chase before Day 8:
+- `dispatched=0` for >12h with pending>0: timer not firing OR pause sentinel is up
+- `inspected_blocked` repeatedly nonzero: real config bug, not autopilot fault
+- `recipe_*_rate` > breaker threshold: recipe needs fix or removal
+
 ## TODO
 
 - Warmup window before `is_divergent_status` fires (currently from t=0)

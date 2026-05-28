@@ -60,8 +60,36 @@ running, fires on_complete. Holds the autopilot lockfile for the duration.
 """
 function autopilot_tick!(; config::AutopilotConfig=default_autopilot_config())
     stats = AutopilotStats()
+    breaker_details = Dict{String, Any}()
     return with_autopilot_lock(; qr=config.qr) do
+        # Pre-tick circuit-breaker check. Trip → auto-pause + log; the
+        # body still runs so reap/cleanup happens (only dispatch is gated
+        # by the pause sentinel).
+        trip, breaker_details = try
+            check_breakers(; qr=config.qr)
+        catch err
+            @warn "check_breakers threw" exception=err
+            (BREAKER_OK, Dict{String, Any}("breaker_error" => string(err)))
+        end
+        if trip !== BREAKER_OK
+            @warn "circuit breaker tripped — auto-pausing" trip=trip details=breaker_details
+            autopilot_pause!(; qr=config.qr)
+            append_error_event!("breaker:$(trip)", breaker_details; qr=config.qr)
+            try
+                notify_slack("[autopilot] breaker $(trip) tripped — paused. $(breaker_details)")
+            catch
+            end
+        end
+
         _autopilot_tick_body!(config, stats)
+
+        # Post-tick metrics snapshot — append one JSONL record so
+        # `recent_metric_samples(288)` gives 24h at 5-min cadence.
+        try
+            append_metric_sample!(stats, breaker_details; qr=config.qr)
+        catch err
+            @warn "append_metric_sample! threw" exception=err
+        end
         stats
     end
 end
@@ -152,6 +180,9 @@ function _autopilot_tick_body!(config::AutopilotConfig, stats::AutopilotStats)
                 dispatched += 1
                 continue
             end
+            # Capture the autopilot config hash at dispatch time —
+            # answers "what autopilot rules dispatched this run?".
+            entry.autopilot_config_hash = _capture_autopilot_config_hash(config)
             ok = _dispatch_one!(config.backend, entry)
             if !ok
                 break    # backend full or transient error; try next tick
@@ -168,6 +199,7 @@ function _autopilot_tick_body!(config::AutopilotConfig, stats::AutopilotStats)
         if status === :done
             _terminal_classify!(entry, :done; reason="completed")
             stats.completed += 1
+            _record_outcome_safe!(entry, :done; qr=config.qr)
             _maybe_fire_on_complete!(entry, config, stats)
         elseif status === :failed
             # SLURM said failed. Look at outcome.toml + sacct to decide
@@ -176,6 +208,7 @@ function _autopilot_tick_body!(config::AutopilotConfig, stats::AutopilotStats)
             terminal, reason = _classify_terminal_failure(entry, config.backend)
             _terminal_classify!(entry, terminal; reason=reason)
             stats.failed += 1
+            _record_outcome_safe!(entry, terminal; qr=config.qr)
             if config.notify_slack_on_failure
                 try
                     notify_slack("[autopilot] $(entry.content_id) → $(terminal): $(reason)")
@@ -195,6 +228,7 @@ function _autopilot_tick_body!(config::AutopilotConfig, stats::AutopilotStats)
                 set_status!(entry, :killed_data;
                     kill_reason="divergent ($(string(_divergence_metric(entry))))")
                 stats.killed_divergent += 1
+                _record_outcome_safe!(entry, :killed_data; qr=config.qr)
             end
         else
             # :unknown — backend lost track; leave for next tick
@@ -385,4 +419,18 @@ function _dry_run_dispatch!(entry::QueueEntry)
     end
     set_status!(entry, :done; kill_reason="")
     return entry
+end
+
+# Bump the per-recipe outcome counter; no-op when entry has no recipe.
+# Wrapped because trust-store writes shouldn't crash a reap loop.
+function _record_outcome_safe!(entry::QueueEntry, outcome::Symbol;
+    qr::QueueRoot,
+)
+    entry.recipe_name === nothing && return nothing
+    try
+        record_recipe_outcome!(entry.recipe_name, outcome; qr=qr)
+    catch err
+        @warn "record_recipe_outcome! threw" recipe=entry.recipe_name outcome=outcome exception=err
+    end
+    return nothing
 end

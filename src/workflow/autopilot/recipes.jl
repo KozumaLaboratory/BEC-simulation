@@ -132,23 +132,38 @@ the registry + on_complete chain is wired before any sim cycles.
 """
 function recipe_analyze_majorana(entry, params::AbstractDict)
     out_path = joinpath(entry.run_dir, "analysis_majorana.toml")
-    # Best-effort: if the classifier symbol exists in the umbrella, call
-    # it. Otherwise log and continue. This keeps the recipe safe when
-    # the analysis subsystem isn't loaded (e.g. in lightweight tests).
     summary = Dict{String, Any}(
         "produced_at" => string(now()),
         "by_recipe" => "analyze_majorana",
         "content_id" => entry.content_id,
     )
-    if isdefined(Main, :classify_phase_polyhedral)
-        try
-            cls = Main.classify_phase_polyhedral(entry.spec_path)
-            summary["classification"] = string(cls)
-        catch err
-            summary["error"] = sprint(showerror, err)
+    # Open the Experiment, pull psi at the final snapshot, classify.
+    try
+        exp = Experiment(entry.spec_path)
+        ts = times(exp)
+        if isempty(ts)
+            summary["classification"] = "(no time samples)"
+        else
+            t_final = last(ts)
+            psi = density(exp, t_final)
+            # `psi` is either Array{Float64,3} (single-trajectory) or a
+            # NamedTuple for ensembles; classify_phase only handles the
+            # former. Skip ensemble runs with a note.
+            if psi isa AbstractArray
+                # Need atom + grid for classify_phase; reload from spec.
+                spec = SpinorBEC.load_config(entry.spec_path)
+                gs_step = first(spec.steps)
+                grid, atom = gs_step.grid, gs_step.atom
+                sm = spin_matrices(atom.F)
+                cls = classify_phase(psi, atom.F, grid, sm)
+                summary["classification"] = string(cls.phase)
+                summary["t_final"] = t_final
+            else
+                summary["classification"] = "(ensemble run; analyzer skipped)"
+            end
         end
-    else
-        summary["classification"] = "(classifier symbol not loaded)"
+    catch err
+        summary["error"] = sprint(showerror, err)
     end
     open(out_path, "w") do io
         TOML.print(io, summary)

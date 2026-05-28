@@ -16,7 +16,9 @@ using Printf
 include("figures/paths.jl")
 include("figures/canonical_states.jl")
 include("figures/paper1_fig1.jl")
+include("figures/paper1_fig2.jl")
 include("figures/paper2_fig1.jl")
+include("figures/paper2_fig2.jl")
 include("figures/paper3_fig1.jl")
 include("figures/paper3_fig2.jl")
 include("figures/paper3_fig3.jl")
@@ -37,7 +39,7 @@ const MANUSCRIPT_FIGURE_REGISTRY = Dict{Tuple{String, String}, NamedTuple}(
         title="F=2 BdG block decomposition schematic",
         data_source="symbolic",
         kind=:tikz_diagram,
-        builder=nothing,
+        builder=build_paper1_fig2,
     ),
     ("paper1", "FIG-3") => (
         title="F=2 mode dispersion ω(k)",
@@ -55,7 +57,7 @@ const MANUSCRIPT_FIGURE_REGISTRY = Dict{Tuple{String, String}, NamedTuple}(
         title="F=6 mod-5 block structure (26-dim BdG → 5 blocks)",
         data_source="symbolic",
         kind=:tikz_diagram,
-        builder=nothing,
+        builder=build_paper2_fig2,
     ),
     ("paper2", "FIG-3") => (
         title="¹⁵¹Eu LHY/MF ratio vs trap omega",

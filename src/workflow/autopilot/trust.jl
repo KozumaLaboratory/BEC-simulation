@@ -19,7 +19,8 @@
 # tool*, not a decision tool.
 
 export RecipeTrust, get_recipe_trust, set_recipe_trust!, list_recipe_trust,
-    record_calibration!, recipe_calibration_history
+    record_calibration!, recipe_calibration_history,
+    record_recipe_outcome!, recipe_outcome_summary
 
 const _TRUST_SUBDIR = "trust"
 
@@ -37,6 +38,13 @@ Base.@kwdef mutable struct RecipeTrust
     coverage_history::Vector{Float64} = Float64[]      # observed 90% interval coverage
     last_measured::String = ""                          # ISO timestamp
     notes::String = ""                                  # operator's rationale
+
+    # Raw outcome counters — bumped by `record_recipe_outcome!` on each
+    # terminal classification. Descriptive only; auto-promotion is still
+    # disabled.
+    n_done::Int = 0
+    n_killed_data::Int = 0
+    n_killed_bug::Int = 0
 end
 
 function _trust_dir(qr::QueueRoot)
@@ -67,6 +75,9 @@ function get_recipe_trust(recipe::Symbol;
         coverage_history=Float64.(get(d, "coverage_history", Float64[])),
         last_measured=String(get(d, "last_measured", "")),
         notes=String(get(d, "notes", "")),
+        n_done=Int(get(d, "n_done", 0)),
+        n_killed_data=Int(get(d, "n_killed_data", 0)),
+        n_killed_bug=Int(get(d, "n_killed_bug", 0)),
     )
 end
 
@@ -82,6 +93,9 @@ function set_recipe_trust!(t::RecipeTrust;
         "coverage_history" => t.coverage_history,
         "last_measured" => t.last_measured,
         "notes" => t.notes,
+        "n_done" => t.n_done,
+        "n_killed_data" => t.n_killed_data,
+        "n_killed_bug" => t.n_killed_bug,
     )
     tmp = p * ".tmp"
     open(tmp, "w") do io
@@ -141,4 +155,46 @@ function recipe_calibration_history(recipe::Symbol;
         autonomy_level=t.autonomy_level,
         nll=t.nll_history,
         coverage_90=t.coverage_history)
+end
+
+"""
+    record_recipe_outcome!(recipe::Symbol, outcome::Symbol;
+                           qr=autopilot_queue_root())
+
+Bump the per-recipe terminal-outcome counter. `outcome` is one of
+`:done`, `:killed_data`, `:killed_bug`. Called from `autopilot_tick!`'s
+reap loop when a recipe-attached entry reaches a terminal state.
+
+Descriptive only — does NOT change `autonomy_level`. The trust struct
+already disables auto-promotion; this is just outcome telemetry the
+dashboard / operator surfaces (`autopilot_recipe_success_rate` in
+observability.jl).
+"""
+function record_recipe_outcome!(recipe::Symbol, outcome::Symbol;
+    qr::QueueRoot=autopilot_queue_root())
+    outcome in (:done, :killed_data, :killed_bug) ||
+        throw(ArgumentError("outcome must be :done|:killed_data|:killed_bug, got $outcome"))
+    t = get_recipe_trust(recipe; qr=qr)
+    if outcome === :done
+        t.n_done += 1
+    elseif outcome === :killed_data
+        t.n_killed_data += 1
+    else
+        t.n_killed_bug += 1
+    end
+    set_recipe_trust!(t; qr=qr)
+    return t
+end
+
+"""
+    recipe_outcome_summary(recipe::Symbol; qr=...) ->
+        (done, killed_data, killed_bug, total, success_rate)
+"""
+function recipe_outcome_summary(recipe::Symbol;
+    qr::QueueRoot=autopilot_queue_root())
+    t = get_recipe_trust(recipe; qr=qr)
+    total = t.n_done + t.n_killed_data + t.n_killed_bug
+    rate = total == 0 ? 0.0 : t.n_done / total
+    (done=t.n_done, killed_data=t.n_killed_data, killed_bug=t.n_killed_bug,
+        total=total, success_rate=rate)
 end
