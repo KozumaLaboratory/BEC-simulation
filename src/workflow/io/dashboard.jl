@@ -73,6 +73,7 @@ include("dashboard/routes/autopilot_queue.jl")  # /api/queue — autopilot state
 include("dashboard/routes/autopilot_enqueue.jl") # /api/queue/enqueue — POST
 include("dashboard/routes/autopilot_action.jl")  # /api/queue/action — POST
 include("dashboard/routes/tags.jl")              # /api/tags — GET + POST (catalog)
+include("dashboard/routes/catalog.jl")           # /api/index — navigable flat catalog
 include("dashboard/server/data_export.jl")  # generate_dashboard_data + export_dashboard
 include("dashboard/server/router.jl")     # serve_dashboard + _route_dashboard
 include("dashboard/server/static.jl")     # static asset + HTTP response helpers

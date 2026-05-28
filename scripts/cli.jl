@@ -25,6 +25,7 @@ function _print_help(io::IO=stdout)
     println(io, "  preflight [<smoke_config>]                      cluster CUDA + smoke")
     println(io, "  autopilot <sub> [args]                          queue meta-loop ops")
     println(io, "  tag       {add <name> <cid>|remove <name>|list} catalog human pointers")
+    println(io, "  catalog   {index | reindex [--force]}            navigable run index")
     println(io, "  help                                            this message")
     println(io)
     println(io, "autopilot subcommands:")
@@ -294,6 +295,26 @@ function _cmd_tag(args)
     2
 end
 
+# ── catalog subcommand (navigable index over the CAS run store) ──────
+
+function _cmd_catalog(args)
+    sub = isempty(args) ? "index" : args[1]
+    if sub == "reindex" || sub == "backfill"
+        force = "--force" in args
+        n = SpinorBEC.backfill_summaries!(; force=force)
+        println("catalog reindex: wrote $n summary.json" * (force ? " (forced)" : ""))
+        return 0
+    elseif sub == "index" || sub == "status"
+        rows = SpinorBEC.run_catalog_index()
+        n = length(rows)
+        n_sum = count(r -> get(r, "has_summary", false), rows)
+        println("catalog: $n runs · $n_sum with summary · $(n - n_sum) need reindex")
+        return 0
+    end
+    println(stderr, "cli.jl catalog: unknown subcommand '$sub' (index | reindex [--force])")
+    2
+end
+
 # ── main ─────────────────────────────────────────────────────────────
 
 function _main(args)
@@ -306,6 +327,7 @@ function _main(args)
     sub == "preflight" && return _cmd_preflight(rest)
     sub == "autopilot" && return _cmd_autopilot(rest)
     sub == "tag" && return _cmd_tag(rest)
+    sub == "catalog" && return _cmd_catalog(rest)
     println(stderr, "cli.jl: unknown subcommand '$sub'")
     _print_help(stderr)
     2
