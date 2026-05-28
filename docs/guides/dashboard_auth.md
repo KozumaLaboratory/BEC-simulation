@@ -1,12 +1,21 @@
-# Dashboard auth — Caddy + htpasswd recipe
+# Dashboard auth
 
-Scope: Kozuma Lab (10 people or fewer). HTTP Basic auth in front of the
-dashboard via Caddy is the right granularity for this size — cheap to
-set up, identity flows into `enqueued_by` provenance, no SSO machinery.
+Scope: Kozuma Lab @ Science Tokyo (isct.ac.jp Google Workspace).
 
-Upgrade path (when Lab grows or SSO is preferred): GitHub OAuth via
-`oauth2-proxy` slots in front of Caddy without touching the dashboard
-itself.
+**Recommended: Google Workspace OAuth** with the `hd=isct.ac.jp`
+parameter. Provider-side enforcement of the institutional domain
+collapses "lab membership" to "valid isct.ac.jp Google account" — no
+allow-list to maintain, no password handling, automatic lifecycle
+tracking, provenance is the user's institutional email.
+
+**Fallback: Caddy + htpasswd Basic auth.** Documented below for sites
+without Google Workspace, or as a transient setup while the OAuth app
+is being approved. Same dashboard-side wiring works for both.
+
+The dashboard-side code does NOT validate credentials. The front-end
+proxy (Caddy + oauth2-proxy, or Caddy alone) enforces auth, then
+forwards the authenticated identity via a header the dashboard reads
+into `enqueued_by`.
 
 ## Why now
 
@@ -15,9 +24,157 @@ endpoints landed. Those endpoints mutate filesystem state and can submit
 GPU jobs. Past this point, "LAN binding + no auth" is not sufficient
 anymore — any host on the LAN can enqueue.
 
-The dashboard backend itself does NOT validate credentials. The Caddy
-front-end enforces auth, then forwards the authenticated username via a
-header that the dashboard reads into `enqueued_by`.
+## Recommended: Google Workspace OAuth (hd=isct.ac.jp)
+
+Two layers of domain restriction (defense in depth):
+
+1. **Provider-side**: pass `hd=isct.ac.jp` to the Google authorization
+   URL. Google's consent screen refuses any sign-in from outside the
+   isct.ac.jp Workspace tenant — `gmail.com` and other domains never
+   reach the redirect.
+2. **Proxy-side**: oauth2-proxy `--email-domain=isct.ac.jp` re-verifies
+   the token's email after callback. Redundant when (1) is honored but
+   cheap and catches misconfiguration.
+
+### 1. Google Cloud Console — OAuth 2.0 Client
+
+- Create / pick a Google Cloud project under your institutional account.
+- APIs & Services → Credentials → **Create credentials → OAuth client ID**.
+- Application type: **Web application**.
+- Authorized redirect URI: `https://suzume.lan/oauth2/callback`.
+- Note the **Client ID** and **Client secret**.
+
+If the OAuth consent screen is set to "Internal" (Workspace-scoped),
+the `hd` enforcement is implicit. "External" mode requires the explicit
+`hd=` parameter on every auth request — set it via oauth2-proxy below.
+
+### 2. oauth2-proxy config
+
+`/etc/oauth2-proxy/oauth2-proxy.cfg`:
+
+```
+provider                = "google"
+client_id               = "<google_client_id>"
+client_secret           = "<google_client_secret>"
+
+# Two-layer domain enforcement:
+email_domains           = ["isct.ac.jp"]   # post-callback verification
+# `hd` is sent automatically when the consent screen is "Internal".
+# For "External" consent, pin it explicitly:
+google_admin_email      = ""               # leave empty for hd-only enforcement
+# Some oauth2-proxy versions accept `--google-target-aud`; the
+# canonical knob is the consent-screen tenancy setting above.
+
+cookie_secret           = "<32-byte-base64>"   # openssl rand -base64 32
+cookie_domains          = ["suzume.lan"]
+cookie_secure           = true
+
+http_address            = "127.0.0.1:4180"
+reverse_proxy           = true
+
+# Forward identity to upstream. X-Auth-Request-Email gives the full
+# isct.ac.jp address; the dashboard reads it as enqueued_by.
+set_xauthrequest        = true
+pass_user_headers       = true
+pass_access_token       = false
+
+upstreams               = ["http://127.0.0.1:8090"]
+```
+
+systemd unit `/etc/systemd/system/oauth2-proxy.service`:
+
+```ini
+[Unit]
+Description=oauth2-proxy in front of dashboard
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/oauth2-proxy --config=/etc/oauth2-proxy/oauth2-proxy.cfg
+Restart=on-failure
+User=oauth2-proxy
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### 3. Caddyfile
+
+```caddyfile
+suzume.lan {
+    # oauth2-proxy's own routes.
+    handle /oauth2/* {
+        reverse_proxy localhost:4180
+    }
+
+    # Everything else: require auth via forward_auth, then proxy.
+    handle {
+        forward_auth localhost:4180 {
+            uri /oauth2/auth
+            # oauth2-proxy emits X-Auth-Request-Email and X-Auth-Request-User
+            # on the auth response; copy them to the upstream request.
+            copy_headers X-Auth-Request-Email X-Auth-Request-User
+        }
+        reverse_proxy localhost:8090
+    }
+
+    tls internal
+}
+```
+
+The dashboard accepts `X-Auth-Request-Email` with top priority, so
+`enqueued_by` becomes the institutional address (`anko@isct.ac.jp`) —
+the most natural identity for `autopilot why <cid>` to surface.
+
+### 4. TLS — mkcert for `suzume.lan`
+
+Google requires HTTPS on the redirect URI; `http://localhost` is the
+only exception and won't work for `suzume.lan`. Caddy's `tls internal`
+issues a cert from a local CA, which browsers warn about by default —
+fix once per device with mkcert:
+
+```bash
+# On suzume (run once)
+sudo apt install mkcert libnss3-tools          # or: brew install mkcert nss
+mkcert -install                                  # installs the local CA
+
+# Copy mkcert's root CA to each lab device that needs to reach the
+# dashboard, then run `mkcert -install` there too. Browsers then trust
+# `tls internal` certs without warning.
+```
+
+Alternative: use Caddy's automatic Let's Encrypt issuance if `suzume.lan`
+resolves publicly — but for an internal hostname, mkcert is simpler and
+the certs don't expire (mkcert default is 10 years).
+
+### 5. Verifying the full chain
+
+```bash
+# Browser flow:
+#   1. visit https://suzume.lan/ → redirected to accounts.google.com
+#   2. Workspace consent screen (only isct.ac.jp accounts pass)
+#   3. callback → back to dashboard
+#   4. enqueue from Sheet 06 → state.toml.enqueued_by = "anko@isct.ac.jp"
+
+# Programmatic: oauth2-proxy supports cookie-based session reuse for
+# scripts run from a browser-authenticated environment. For headless
+# CI / cron, use Caddy basicauth on a separate /api/admin/* path or
+# bind to localhost-only and call directly.
+```
+
+### When to skip Google Workspace OAuth
+
+- Science Tokyo isn't using Google Workspace (verify before deploying)
+- Need to grant access to people without isct.ac.jp accounts (visiting
+  collaborators on personal Gmail / GitHub) → fall through to the
+  Basic auth recipe below for those guest accounts on a separate
+  hostname, or add their personal addresses to `email_domains`
+
+## Fallback: Caddy + htpasswd Basic auth
+
+For sites without Google Workspace, or as a one-hour transient setup
+while the OAuth client is being approved. Identity flows the same way:
+Caddy basicauth username → `X-Authenticated-User` → dashboard's
+`enqueued_by`.
 
 ## Caddy v2 — `/etc/caddy/Caddyfile`
 
@@ -130,19 +287,28 @@ SPINORBEC_DASHBOARD_BIND=127.0.0.1 \
 After this, `ss -tln` shows `127.0.0.1:8090` (not `0.0.0.0:*`) and any
 non-Caddy attempt to reach the port is refused at the socket layer.
 
-## Upgrade trigger → GitHub OAuth via oauth2-proxy
+## Alternative provider: GitHub OAuth
 
-Swap `basicauth` for `oauth2-proxy` in front of Caddy when any of:
+If Google Workspace is unavailable but lab members all have GitHub
+accounts, swap the oauth2-proxy provider:
 
-- the lab exceeds ~10 active members and password rotation is annoying,
-- guest accounts (e.g. visiting collaborators) need short-lived access,
-- audit beyond `enqueued_by` is desired (oauth2-proxy emits structured
-  access logs with GitHub username + IP per request).
+```
+provider      = "github"
+github_users  = ["anko-handle", "member_b-handle", ...]
+client_id     = "<github_client_id>"
+client_secret = "<github_client_secret>"
+```
 
-**The dashboard-side code does not change** — `oauth2-proxy` sets the
-same `X-Forwarded-User` header (the dashboard already accepts
-`X-Authenticated-User` / `X-Forwarded-User` / `Remote-User`
-interchangeably).
+Caddyfile and dashboard wiring are identical. `X-Auth-Request-User`
+carries the GitHub username; `enqueued_by` becomes `<github-handle>`
+(no email suffix, since GitHub OAuth doesn't surface a verified email
+by default). The institutional-domain assertion (Google's `hd`) is
+lost — replace it with the explicit `github_users` allow-list.
+
+Pros over Google: works without an institutional Workspace. Cons:
+allow-list to maintain by hand; identity is "GitHub handle" not
+"institutional email", which is less natural for `autopilot why` audit
+trails.
 
 ### 1. GitHub OAuth app
 

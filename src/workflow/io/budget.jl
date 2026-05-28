@@ -219,7 +219,7 @@ function suggest_sbatch_flags(
     println(io, "#")
     println(io, "# For an array job (parallel scan): add")
     @printf io "#SBATCH --array=1-%d%%4   # 4 in flight at once\n" n_pts
-    println(io, "# and submit with scripts/slurm/scan_array.sbatch")
+    println(io, "# and dispatch through the autopilot (SlurmBackend renders sbatch on the fly)")
     return nothing
 end
 

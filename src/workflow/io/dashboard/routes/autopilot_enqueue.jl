@@ -55,11 +55,11 @@ function _route_autopilot_enqueue(body_bytes, base_dir;
     recipe_params = Dict{String, Any}(get(req, "recipe_params", Dict()))
     recipe_version = String(get(req, "recipe_version", "1"))
     profile = String(get(req, "profile", "default"))
-    if !haskey(PROFILE_TEMPLATES, profile)
+    if !haskey(PROFILE_DIRECTIVES, profile)
         return (400, "application/json",
             _enq_err(
                 "unknown profile '$(profile)'; known: " *
-                join(collect(keys(PROFILE_TEMPLATES)), ","),
+                join(collect(keys(PROFILE_DIRECTIVES)), ","),
             ))
     end
     walltime = Float64(get(req, "estimated_walltime_hours", 2.0))

@@ -10,11 +10,16 @@ cd $T4_GROUP/work     # NOT $HOME — only 30 GB quota there
 git clone git@github.com:anko9801/BEC-simulation.git
 cd BEC-simulation
 
-source scripts/tsubame_setup.sh
+source scripts/tsubame_setup.sh   # module load + depot + scratch + threads
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
 ```
 
-`tsubame_setup.sh` exports `JULIA_DEPOT_PATH=$T4_TMPDIR/.julia` (node-local NVMe to avoid Lustre metadata storms), `SPINORBEC_SCRATCH_DIR=$T4_TMPDIR/spinorbec_snaps` (streamed snapshot scratch), `JULIA_NUM_THREADS=$SLURM_CPUS_PER_TASK`, and runs `module load cuda + julia`. Falls back gracefully on dev machines (no `$T4_TMPDIR`).
+`scripts/tsubame_setup.sh` exports `JULIA_DEPOT_PATH=$T4_TMPDIR/.julia`
+(node-local NVMe to avoid Lustre metadata storms),
+`SPINORBEC_SCRATCH_DIR=$T4_TMPDIR/spinorbec_snaps` (streamed snapshot
+scratch), `JULIA_NUM_THREADS=$SLURM_CPUS_PER_TASK`, and runs
+`module load cuda + julia`. Falls back gracefully on dev machines
+without `$T4_TMPDIR`.
 
 ## Memory and disk budget
 
@@ -65,22 +70,77 @@ julia --project=. -e 'using SpinorBEC; run_yaml("runs/eu151_edh_ext/config.yaml"
 julia --project=. -e 'using SpinorBEC; suggest_sbatch_flags(ARGS[1])' \
     runs/eu151_edh_ext/config.yaml
 
-# Submit (single H100, 12 h)
-sbatch scripts/slurm/eu151_h100_single.sbatch runs/eu151_edh_ext/config.yaml
+# Preview the rendered sbatch script (no submission):
+julia --project=. -e 'using SpinorBEC;
+    print(render_sbatch_script("default", "runs/eu151_edh_ext/config.yaml"))'
+
+# Submit through the autopilot (renders sbatch on the fly):
+julia --project=. scripts/cli.jl autopilot enqueue runs/eu151_edh_ext/config.yaml
+julia --project=. scripts/cli.jl autopilot tick    # dispatches via SlurmBackend
+
+# Or submit a single config directly (auto-rendered into a tmpfile):
+julia --project=. -e '
+    using SpinorBEC
+    b = SlurmBackend()
+    e = enqueue!(Experiment("runs/eu151_edh_ext/config.yaml"))
+    dispatch!(b, e)
+'
 
 squeue -u $USER
 tail -f logs/spinorbec-*.out
 ```
 
-Phase-diagram scans where points are independent → array job:
+The SBATCH directives live in `PROFILE_DIRECTIVES` in
+`src/workflow/autopilot/backends.jl` — edit there to tune memory /
+walltime / GPU class. Profiles escalate on OOM/TIMEOUT via the
+`next_profile` chain (see `docs/guides/autopilot.md`).
+
+### Array jobs (multi-point scans)
 
 ```bash
 julia --project=. -e 'using SpinorBEC; println(scan_point_count(ARGS[1]))' \
     runs/foo/config.yaml   # → 144
-sbatch --array=1-144%12 scripts/slurm/scan_array.sbatch runs/foo/config.yaml
 ```
 
-Each task writes `runs/foo/point_NNN.jld2`; resumable — re-submitting skips cached files. Wired via `SPINORBEC_SCAN_ONLY_INDEX` env var inside `_run_yaml_scan`.
+For an array submission, prepend `#SBATCH --array=1-N%K` to the
+rendered script — extend `PROFILE_DIRECTIVES` with a new `"scan_array"`
+profile carrying the array directive, or pipe `render_sbatch_script`
+output through `sed`. Each task writes `runs/foo/point_NNN.jld2`;
+resumable — re-submitting skips cached files (`SPINORBEC_SCAN_ONLY_INDEX`
+env var inside `_run_yaml_scan`).
+
+### TSUBAME 3 / SGE-style submission
+
+For SGE-based clusters (`qsub` / `qstat` / `qdel`), use a per-job
+script of the shape:
+
+```bash
+#!/bin/bash
+#$ -cwd
+#$ -l h_rt=06:00:00
+#$ -l f_node=1
+#$ -N spinor_run
+#$ -o logs/tsubame/$JOB_NAME_$JOB_ID.log
+#$ -j y
+
+. /etc/profile.d/modules.sh
+source scripts/tsubame_setup.sh
+export SPINORBEC_SCRATCH_DIR=$T3TMPDIR
+
+# Sysimage support (optional):
+SYSIMAGE_FLAG=""
+[ -f "spinor_sysimage.so" ] && SYSIMAGE_FLAG="--sysimage=spinor_sysimage.so"
+
+julia --project=. $SYSIMAGE_FLAG scripts/cli.jl launch <run_name>
+```
+
+Add `#$ -t 1-N` + `#$ -tc K` for array jobs; `mapfile -t CONFIGS < <(ls -d runs/<batch>/*/ | sort)`
+then `RUN_NAME="${CONFIGS[$((SGE_TASK_ID - 1))]}"` to pick the per-task
+config.
+
+A SLURM-native `SgeBackend` is not implemented — the autopilot ships
+with `SlurmBackend` only. SGE clusters operate the cli.jl entry
+manually for now.
 
 ## Recommended YAML knobs at scale
 
@@ -135,7 +195,70 @@ Lab-image push uses the same tunnel: `curl --data-binary @absorption_shot.png ht
 
 `run_pipeline` writes periodic checkpoints to `$run_dir/.checkpoints/<filename>` during a dynamics step. Restart with the same `run_yaml(...)` call — the cache/resume logic picks up from the last checkpoint. Pair with SLURM `--requeue` for automatic restart after preemption.
 
-For multi-attempt mixes of crashes + preemption: `sbatch scripts/slurm/eu151_h100_single.sbatch runs/foo/config.yaml` + SLURM `--requeue`. For long-running campaigns, enqueue via `julia --project=. scripts/cli.jl autopilot enqueue runs/foo/config.yaml` and let the autopilot's `retry_failed!` (called per-tick by the systemd timer) handle re-dispatch.
+For multi-attempt mixes of crashes + preemption: enqueue via
+`julia --project=. scripts/cli.jl autopilot enqueue runs/foo/config.yaml`
+and let the autopilot's `retry_failed!` (called per-tick by the systemd
+timer) handle re-dispatch with profile escalation on OOM/TIMEOUT.
+
+## High-res scan inventory (target table for `runs/tsubame_scan/`)
+
+Generate the YAMLs via the sweep API (see `docs/guides/experiment_api.md`)
+on `runs/klaus_eu151_v2_full/config.yaml` as the template:
+
+### Dy164 (3 configs)
+| name | grid | duration | est. wall (H100) |
+|---|---|---|---|
+| `dy164_klaus_500ms`            | 48×48×24 | 500 ms  | 4–5h |
+| `dy164_klaus_1000ms`           | 48×48×24 | 1000 ms | 8–9h |
+| `dy164_klaus_64cube_200ms`     | 64×64×32 | 200 ms  | 4–5h |
+
+### Eu151 (8 configs)
+| name | grid | duration | est. wall (H100) |
+|---|---|---|---|
+| `eu151_full_500ms_48cube`      | 48×48×24 | 500 ms  | 3–4h |
+| `eu151_full_1000ms_48cube`     | 48×48×24 | 1000 ms | 6–7h |
+| `eu151_no_ddi_500ms_48cube`    | 48×48×24 | 500 ms  | 3–4h |
+| `eu151_p_300_48cube`           | 48×48×24 | 500 ms  | 3–4h |
+| `eu151_p_3000_48cube`          | 48×48×24 | 500 ms  | 3–4h |
+| `eu151_c1_FM_48cube`           | 48×48×24 | 500 ms  | 3–4h |
+| `eu151_c1_AFM_48cube`          | 48×48×24 | 500 ms  | 3–4h |
+| `eu151_full_64cube_200ms`      | 64×64×32 | 200 ms  | 3–4h |
+
+All configs use `epsilon: 1.0e-6` per the audit finding (Y6 ε=1e-3
+silently fails for `p·F·dt > 300` in Klaus regime — see
+`docs/archive/thesis_batch_audit_2026-04-28.md` and the
+`gotcha_K3_routing_pre_2026_05_13` memory note).
+
+Total budget: 11 jobs × ~5h average = 55 GPU-hours; ~14h wall clock
+with 4-way concurrency. Disk: psi_snapshots at 48³ × D=13 × ComplexF64
+× ~60 frames ≈ 200 MB / run.
+
+### Pulling results back
+
+```bash
+rsync -av --include='*.jld2' --include='*/' --exclude='*' \
+    user@login.t3.gsic.titech.ac.jp:/gs/bs/$USER/SpinorBEC.jl/runs/tsubame_scan/ \
+    runs/tsubame_scan/
+
+# REPL audit:
+julia --project=. -e '
+    using SpinorBEC
+    exps = [Experiment(p) for p in
+            sort(filter(endswith(".yaml"), readdir("runs/tsubame_scan"; join=true)))]
+    tab = tabulate(exps, [norm_drift, Fz_t, per_m_t])
+'
+```
+
+### Pre-submit checklist
+
+1. **`dy164_main_eps1e6` parity**: if local ε=1e-6 result still shows
+   m=+F: 1.0→1.0 frozen, the Dy164 Klaus reproduction is real (just
+   deeply adiabatic); fine to submit. If it differs, the original was
+   a numerical artifact — investigate before committing TSUBAME hours.
+2. **Project.toml + Manifest.toml** must match TSUBAME's Julia
+   version. Add a compatible version or pin to 1.12 via juliaup.
+3. **CUDA driver compat**: `nvidia-smi` on the cluster must report a
+   driver compatible with the `module load`'d CUDA toolkit.
 
 ## Troubleshooting
 

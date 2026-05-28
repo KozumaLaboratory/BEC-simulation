@@ -140,11 +140,21 @@ function _handle_dashboard_connection(
             ws_key = ""
             ws_upgrade = false
             # Upstream-proxy auth headers — Caddy/oauth2-proxy/nginx pass
-            # the authenticated username here so write endpoints can use
+            # the authenticated identity here so write endpoints can use
             # it as `enqueued_by` provenance. We trust these only when
             # the dashboard is behind a reverse proxy; direct access
             # bypasses them and falls back to session_id.
+            #
+            # Priority (most specific → least):
+            #   X-Auth-Request-Email     — oauth2-proxy w/ Google Workspace
+            #                              (full institutional address,
+            #                              e.g. anko@isct.ac.jp)
+            #   X-Authenticated-User     — Caddy basicauth
+            #   X-Forwarded-User         — oauth2-proxy GitHub / generic
+            #   Remote-User              — nginx / legacy
+            # First non-empty header in this order wins.
             authed_user = ""
+            authed_user_priority = typemax(Int)
             while true
                 line = readline(sock)
                 (isempty(line) || line == "\r") && break
@@ -168,10 +178,26 @@ function _handle_dashboard_connection(
                 elseif startswith(lc, "accept-encoding:")
                     val = lowercase(split(line, ':'; limit=2)[2])
                     accept_gzip = occursin("gzip", val)
-                elseif startswith(lc, "x-authenticated-user:") ||
-                    startswith(lc, "x-forwarded-user:") ||
-                    startswith(lc, "remote-user:")
-                    authed_user = String(strip(split(line, ':'; limit=2)[2]))
+                else
+                    p =
+                        if startswith(lc, "x-auth-request-email:")
+                            1
+                        elseif startswith(lc, "x-authenticated-user:")
+                            2
+                        elseif startswith(lc, "x-forwarded-user:")
+                            3
+                        elseif startswith(lc, "remote-user:")
+                            4
+                        else
+                            0
+                        end
+                    if p > 0 && p < authed_user_priority
+                        v = String(strip(split(line, ':'; limit=2)[2]))
+                        if !isempty(v)
+                            authed_user = v
+                            authed_user_priority = p
+                        end
+                    end
                 end
             end
 

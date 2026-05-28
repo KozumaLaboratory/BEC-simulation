@@ -119,10 +119,15 @@ enqueue.
 ```julia
 LocalBackend(; max_concurrent=1)             # serial in-process, for tests
 SlurmBackend(;
-    sbatch_template = "scripts/slurm/eu151_h100_single.sbatch",
-    ssh_host        = nothing,                # nothing → run sbatch locally
+    ssh_host     = nothing,                  # nothing → sbatch on this host
+    project_root = pwd(),                    # cd target inside the rendered script
 )
 ```
+
+`SlurmBackend.dispatch!` renders the SBATCH script from
+`PROFILE_DIRECTIVES[entry.profile]` via `render_sbatch_script` and
+writes it to `<run_dir>/.autopilot/submit.sbatch` before invoking
+`sbatch`. No static `.sbatch` files in `scripts/`.
 
 Dispatch is 2-stage and crash-safe:
 1. mark `status=:running, job_id=nothing`, fsync state.toml
