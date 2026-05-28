@@ -2,7 +2,7 @@
 # CUDA 12 host libs).
 #
 # Build (need root or fakeroot):
-#   singularity build --fakeroot spinorbec.sif containers/spinorbec.def
+#   singularity build --fakeroot spinorbec.sif scripts/spinorbec.def
 #
 # Use:
 #   singularity exec --nv spinorbec.sif julia --project=. ...

@@ -48,7 +48,28 @@ If the OAuth consent screen is set to "Internal" (Workspace-scoped),
 the `hd` enforcement is implicit. "External" mode requires the explicit
 `hd=` parameter on every auth request — set it via oauth2-proxy below.
 
-### 2. oauth2-proxy config
+### 2. Permission model — choose explicitly
+
+Google Workspace `hd=isct.ac.jp` enforcement is a **domain tenant**
+boundary, not a lab-membership boundary. Anyone with a valid
+isct.ac.jp Workspace account passes auth. The dashboard now has
+write endpoints (enqueue / promote / cancel) that consume real GPU
+allocations. Three postures, pick deliberately:
+
+- **(a) anko-only — recommended starting point.** oauth2-proxy
+  `authenticated_emails_file` lists exactly the people allowed in.
+  Tenant-wide access stays closed until you mean to open it.
+- **(b) viewer = all isct.ac.jp, write = allow-list.** Requires a
+  10–20 LOC role check in the Julia POST handlers (`enqueue` /
+  `action`) keyed on `X-Auth-Request-Email`. Not implemented yet; add
+  when you actively want lab members to browse without writing.
+- **(c) full access for every Workspace member.** What `hd=isct.ac.jp`
+  alone gives you. Almost never the right default — pick this only
+  after explicitly deciding all members should have GPU-spend authority.
+
+This guide assumes **(a)**. Promote to **(b)** when opening to the lab.
+
+### 3. oauth2-proxy config
 
 `/etc/oauth2-proxy/oauth2-proxy.cfg`:
 
@@ -57,13 +78,16 @@ provider                = "google"
 client_id               = "<google_client_id>"
 client_secret           = "<google_client_secret>"
 
-# Two-layer domain enforcement:
-email_domains           = ["isct.ac.jp"]   # post-callback verification
+# --- Posture (a): anko-only allow-list ---
+# Until you deliberately open to the lab, the allow-list is the
+# write-boundary. Even though `hd=isct.ac.jp` admits the whole tenant
+# at the consent screen, this file is checked AFTER auth and rejects
+# anyone not listed.
+authenticated_emails_file = "/etc/oauth2-proxy/emails.txt"
+
+# Two-layer domain enforcement (still useful as defense in depth):
+email_domains           = ["isct.ac.jp"]
 # `hd` is sent automatically when the consent screen is "Internal".
-# For "External" consent, pin it explicitly:
-google_admin_email      = ""               # leave empty for hd-only enforcement
-# Some oauth2-proxy versions accept `--google-target-aud`; the
-# canonical knob is the consent-screen tenancy setting above.
 
 cookie_secret           = "<32-byte-base64>"   # openssl rand -base64 32
 cookie_domains          = ["suzume.lan"]
@@ -81,6 +105,44 @@ pass_access_token       = false
 upstreams               = ["http://127.0.0.1:8090"]
 ```
 
+`/etc/oauth2-proxy/emails.txt` (one email per line):
+
+```
+anko@isct.ac.jp
+```
+
+When opening to the lab, append addresses one per line and `systemctl
+reload oauth2-proxy`. No code change needed for posture (a) → still-(a).
+The (a) → (b) transition (viewer-vs-writer split) requires the Julia
+role check below.
+
+### 4. Promoting to posture (b) later
+
+Drop `authenticated_emails_file` from oauth2-proxy.cfg (so the whole
+tenant gets in for viewing), and add a role check on the Julia POST
+handlers. Sketch:
+
+```julia
+# In src/workflow/io/dashboard/routes/autopilot_enqueue.jl
+const WRITE_ALLOWLIST = Set([
+    "anko@isct.ac.jp",
+    # ... other writers
+])
+function _route_autopilot_enqueue(body_bytes, base_dir; authed_user::AbstractString="")
+    if isempty(authed_user) || !(authed_user in WRITE_ALLOWLIST)
+        return (403, "application/json",
+            _enq_err("write access denied for $(authed_user)"))
+    end
+    # ... existing handler ...
+end
+```
+
+Same pattern for `_route_autopilot_action`. ~15 LOC total. Read-only
+endpoints (`/api/queue` GET, `/api/effective_config/...`) stay open
+to the tenant.
+
+Do this when you actively want the lab to browse. Not now.
+
 systemd unit `/etc/systemd/system/oauth2-proxy.service`:
 
 ```ini
@@ -97,7 +159,7 @@ User=oauth2-proxy
 WantedBy=multi-user.target
 ```
 
-### 3. Caddyfile
+### 5. Caddyfile
 
 ```caddyfile
 suzume.lan {
@@ -125,7 +187,7 @@ The dashboard accepts `X-Auth-Request-Email` with top priority, so
 `enqueued_by` becomes the institutional address (`anko@isct.ac.jp`) —
 the most natural identity for `autopilot why <cid>` to surface.
 
-### 4. TLS — mkcert for `suzume.lan`
+### 6. TLS — mkcert for `suzume.lan`
 
 Google requires HTTPS on the redirect URI; `http://localhost` is the
 only exception and won't work for `suzume.lan`. Caddy's `tls internal`
@@ -146,7 +208,7 @@ Alternative: use Caddy's automatic Let's Encrypt issuance if `suzume.lan`
 resolves publicly — but for an internal hostname, mkcert is simpler and
 the certs don't expire (mkcert default is 10 years).
 
-### 5. Verifying the full chain
+### 7. Verifying the full chain
 
 ```bash
 # Browser flow:

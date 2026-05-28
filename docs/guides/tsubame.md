@@ -165,7 +165,7 @@ If a recent `julia` module isn't available, build the container once:
 ```bash
 cd $T4_GROUP/work
 singularity build --fakeroot spinorbec.sif \
-    /path/to/BEC-simulation/containers/spinorbec.def
+    /path/to/BEC-simulation/scripts/spinorbec.def
 
 singularity exec --nv \
     --bind /path/to/BEC-simulation:/work \

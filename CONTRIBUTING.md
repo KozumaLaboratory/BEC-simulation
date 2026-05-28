@@ -9,25 +9,33 @@ PR review.
 
 ## `scripts/` invariant
 
-`scripts/` is for **thin entry points**, not for logic. Concretely, a
-new `.jl` file is allowed in `scripts/` only if it falls into one of
-two categories:
+`scripts/` holds **operational artifacts** — entry points, build
+tooling, and declarative ops specs (systemd units, container builds,
+SLURM env bootstrap). Flat, no subdirs. A new file is allowed only
+if it falls into one of three categories:
 
-1. **Pure dispatch / arg-parse.** Body contains nothing but argument
-   parsing, calling library functions, and `exit(code)`. All compute
-   lives in `src/`. The canonical CLI is `scripts/cli.jl` (single
-   entry; subcommands include autopilot operator ops). Each subcommand
-   handler stays ≤20 LOC and contains no compute. No per-subsystem
-   sibling CLIs — they fragment operator memory and duplicate flag-parse
-   code.
+1. **Pure dispatch / arg-parse entry point.** Body contains nothing
+   but argument parsing, calling library functions, and `exit(code)`.
+   All compute lives in `src/`. The canonical Julia CLI is
+   `scripts/cli.jl` (single entry; subcommands include autopilot
+   operator ops). Each subcommand handler stays ≤20 LOC and contains
+   no compute. No per-subsystem sibling CLIs — they fragment operator
+   memory and duplicate flag-parse code. Bash entries that orchestrate
+   non-Julia tools (LaTeX, deploy, install) are fine alongside.
 
 2. **Build-time tooling that cannot run from the package.** Currently
-   just `scripts/build_sysimage.jl` (PackageCompiler invocation).
+   `scripts/build_sysimage.jl` (PackageCompiler invocation).
 
-Anything else — config generators, figure builders, summary tabulators,
-cluster helpers, post-processing — goes into `src/` as a library
-function exported from the SpinorBEC umbrella. Then the entry point
-(if any is needed) is a tiny CLI in `scripts/cli.jl`.
+3. **Declarative ops specs** for tools whose configuration lives in
+   their own format. Currently: `scripts/spinor-autopilot.{service,timer}`
+   (systemd-user units), `scripts/spinorbec.def` (Singularity image),
+   `scripts/tsubame_setup.sh` (cluster env bootstrap sourced by
+   operators).
+
+Anything else — config generators, figure builders, summary
+tabulators, cluster helpers, post-processing — goes into `src/` as a
+library function exported from the SpinorBEC umbrella. Then the entry
+point (if any is needed) is a tiny CLI in `scripts/cli.jl`.
 
 ### Why
 
