@@ -201,6 +201,40 @@ export interface Tag {
   created_by: string
 }
 
+/** One row of the navigable catalog index (`/api/index`). Sparse: the
+ * observable fields are present only when the run has a summary.json, and
+ * the autopilot fields only when it's queue-tracked. */
+export interface CatalogRow {
+  name: string
+  family: string
+  mtime: number
+  has_summary: boolean
+  has_jld2: boolean
+  // observables (present when has_summary)
+  ndim?: number
+  F?: number
+  n_points?: number[]
+  energy?: number
+  converged?: boolean
+  norm?: number
+  Mz?: number
+  populations?: number[]
+  norm_rel_drift?: number
+  energy_rel_drift?: number
+  Fz_drift?: number
+  collapsed?: string
+  extraction_error?: string[]
+  _source?: string
+  _extractor_version?: string
+  // autopilot (present when state.toml exists)
+  status?: string
+  recipe?: string | null
+  group_id?: string
+  enqueued_by?: string
+  kill_reason?: string
+  [k: string]: unknown
+}
+
 export interface VortexLine {
   m: string // "+5", "-3", "0"
   charge: number // ±1, ±2, ...
@@ -363,6 +397,13 @@ export const api = {
     session_id?: string,
   ): Promise<QueueActionResponse | QueueActionErrorResponse> {
     return _post('/api/queue/action', { content_id, action, session_id })
+  },
+
+  /** The navigable catalog: one sparse row per run (observables + status
+   * + family + mtime). Cheap read path — never opens jld2 server-side.
+   * Faceting + parallel-coordinates run client-side over this array. */
+  catalogIndex(): Promise<CatalogRow[]> {
+    return json('/api/index')
   },
 
   /** All catalog tags (name → content_id), sorted by name. */

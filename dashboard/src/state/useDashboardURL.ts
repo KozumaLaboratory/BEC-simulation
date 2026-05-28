@@ -6,7 +6,7 @@ import {
 } from 'nuqs'
 
 export const TABS = [
-  'overview', 'slice', 'view3d', 'data', 'config', 'queue',
+  'overview', 'slice', 'view3d', 'data', 'config', 'queue', 'catalog',
 ] as const
 export type TabId = (typeof TABS)[number]
 

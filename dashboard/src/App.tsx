@@ -43,6 +43,9 @@ const ScanGroupView = lazy(() => import('@/components/ScanGroupView'))
 const QueuePanel = lazy(() =>
   import('@/components/QueuePanel').then((m) => ({ default: m.QueuePanel })),
 )
+const CatalogPanel = lazy(() =>
+  import('@/components/CatalogPanel').then((m) => ({ default: m.CatalogPanel })),
+)
 
 const TAB_ITEMS = [
   { id: 'overview', label: 'Overview', sheet: '01' },
@@ -51,6 +54,7 @@ const TAB_ITEMS = [
   { id: 'data', label: 'Data', sheet: '04' },
   { id: 'config', label: 'Effective config', sheet: '05' },
   { id: 'queue', label: 'Queue', sheet: '06' },
+  { id: 'catalog', label: 'Catalog', sheet: '07' },
 ] as const
 
 const SIDEBAR_DEFAULT_W = 280
@@ -281,6 +285,16 @@ export default function App() {
                 </Suspense>
               </TabBoundary>
             </TabsContent>
+
+            <TabsContent value="catalog">
+              <TabBoundary>
+                <Suspense fallback={<TabFallback />}>
+                  <CatalogPanel
+                    onOpenRun={(name) => setUrl({ run: name, tab: 'overview' })}
+                  />
+                </Suspense>
+              </TabBoundary>
+            </TabsContent>
           </Tabs>
         </div>
       </main>
@@ -303,7 +317,7 @@ interface WBHeaderProps {
 // Tab-driven fallback title for sheets where "run" isn't the right
 // noun (Queue is global; queue lives outside per-run state). Per-run
 // tabs still show the run name when one is selected.
-const _TAB_NEUTRAL = new Set(['queue'])
+const _TAB_NEUTRAL = new Set(['queue', 'catalog'])
 
 function WorkbenchHeader({
   runName,
@@ -333,7 +347,7 @@ function WorkbenchHeader({
       <div className="sheet-strip -mx-1.5 mb-5">
         <div>
           <span className="text-[var(--ink-faint)]">Sheet</span>{' '}
-          <span className="text-[var(--ink)]">{sheetCode} / 06</span>
+          <span className="text-[var(--ink)]">{sheetCode} / 07</span>
         </div>
         <div>
           <span className="text-[var(--ink-faint)]">Drawn</span>{' '}
