@@ -11,7 +11,11 @@
 # to a few lines of REPL composition.
 
 using JLD2
-using ..SpinorBEC: total_density
+# `total_density` is defined later in the SpinorBEC load order (analysis.jl
+# at SpinorBEC.jl:80, after this validation file at :44). Importing it
+# here at load time would bind an undeclared symbol; since it's only
+# called at runtime (peak_density_trajectory), let normal module scope
+# resolve it then instead of an eager self-import.
 
 export find_run_dir, psi_snapshots,
     peak_density_trajectory, spin_populations, spin_populations_trajectory,
