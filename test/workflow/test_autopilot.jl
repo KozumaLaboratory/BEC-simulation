@@ -129,5 +129,69 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
             rm(joinpath(qr.path, ".autopilot.paused"); force=true)
             @test !is_autopilot_paused(qr)
         end
+
+        @testset "dry-run fires on_complete chain (recipe fan-out)" begin
+            # Regression for the 2026-05-28 observation: pre-fix, the
+            # dry-run path bypassed _maybe_fire_on_complete! because it
+            # advanced :pending → :done in-line, never letting the reap
+            # loop see :running. Recipes registered against a parent
+            # silently produced no children under dry-run, masking the
+            # main value of the observation lap.
+
+            # Fresh root so this test is independent of any state above.
+            mktempdir() do tmp
+                local_qr = SpinorBEC.QueueRoot(joinpath(tmp, "runs"))
+                local_store = SpinorBEC.CASStore(local_qr.path)
+
+                # Recipe that spawns exactly one child per invocation,
+                # tagged so we can find it. Stop at depth 1 to avoid
+                # unbounded fan-out in the test.
+                spawn_count = Ref(0)
+                register_on_complete!(:_dryrun_test_recipe) do entry, params
+                    spawn_count[] += 1
+                    depth = Int(get(params, "depth", 0))
+                    depth >= 1 && return nothing
+                    child_spec = deepcopy(entry.spec_path)
+                    # Distinct content by tweaking a non-load-bearing
+                    # field; here we just clone the YAML byte-for-byte
+                    # but with a unique enqueued_by tag downstream.
+                    new_spec = Dict{Any, Any}(
+                        "pipeline" => [Dict("ground_state" =>
+                            Dict("_dryrun_child_tag" => spawn_count[]))],
+                    )
+                    [SpinorBEC.Experiment(new_spec; store=local_store)]
+                end
+
+                parent_spec = Dict{Any, Any}(
+                    "pipeline" => [Dict("ground_state" =>
+                        Dict("_dryrun_parent_tag" => 1))],
+                )
+                parent = SpinorBEC.Experiment(parent_spec; store=local_store)
+                e = enqueue!(parent;
+                    recipe_name=:_dryrun_test_recipe,
+                    recipe_params=Dict{String, Any}("depth" => 0),
+                    autonomy_level=:dispatch,
+                    qr=local_qr)
+
+                # Tick under dry-run via the persistent sentinel.
+                touch(joinpath(local_qr.path, ".autopilot.dry_run"))
+                @test is_autopilot_dry_run(local_qr)
+
+                cfg = default_autopilot_config(;
+                    qr=local_qr, inspect_before_dispatch=false)
+                stats1 = autopilot_tick!(; config=cfg)
+
+                @test stats1.dispatched == 1
+                @test stats1.completed == 1
+                @test spawn_count[] == 1
+                @test stats1.on_complete_fired == 1
+
+                # Parent done, child pending.
+                @test length(list_queue(:done; qr=local_qr)) == 1
+                @test length(list_queue(:pending; qr=local_qr)) == 1
+
+                rm(joinpath(local_qr.path, ".autopilot.dry_run"); force=true)
+            end
+        end
     end
 end

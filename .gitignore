@@ -65,6 +65,9 @@ runs/*_[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]/
 # Variants with a trailing tag (e.g. `_pre_parserfix`) — same pattern,
 # additional suffix after the hash.
 runs/*_[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]_*/
+# CAS-keyed run dirs (Experiment / autopilot — 16 hex chars, no
+# inputbase prefix). content_id(spec) is the basename.
+runs/[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]/
 # Auto-saved copies that show up under docs/validation/ (mirrored runs).
 docs/validation/**/*_[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]/
 

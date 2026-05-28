@@ -175,8 +175,9 @@ function _autopilot_tick_body!(config::AutopilotConfig, stats::AutopilotStats)
             # sentinel set by the operator (CLI/dashboard). Either is
             # sufficient to keep the autopilot in shadow mode.
             if config.dry_run || is_autopilot_dry_run(config.qr)
-                _dry_run_dispatch!(entry)
+                _dry_run_dispatch!(entry, config, stats)
                 stats.dispatched += 1
+                stats.completed += 1
                 dispatched += 1
                 continue
             end
@@ -382,11 +383,14 @@ end
 _divergence_metric(entry::QueueEntry) = "norm/Fz drift"
 
 # Dry-run: simulate one full dispatch cycle on a single entry. Logs the
-# command we WOULD have run, writes a synthetic outcome.toml, and
-# advances state to :done so on_complete can fire end-to-end. First
-# dispatch safety net — operator inspects state.toml diff against what
-# they expected before flipping `dry_run=false`.
-function _dry_run_dispatch!(entry::QueueEntry)
+# command we WOULD have run, writes a synthetic outcome.toml, advances
+# state to :done, AND fires the on_complete chain so recipe-driven
+# fan-out is exercised end-to-end during the observation lap. Without
+# the explicit on_complete call here, dry-run silently masks recipe
+# behavior because the reap loop only sees backend-driven completions.
+# `on_complete_max_descendants` (default 64) bounds the chain length.
+function _dry_run_dispatch!(entry::QueueEntry,
+    config::AutopilotConfig, stats::AutopilotStats)
     println(stderr, "[autopilot dry-run] would dispatch ",
         entry.content_id[1:min(8, length(entry.content_id))],
         "  recipe=", entry.recipe_name === nothing ? "—" : entry.recipe_name,
@@ -418,6 +422,9 @@ function _dry_run_dispatch!(entry::QueueEntry)
         @warn "_dry_run_dispatch! failed to write outcome.toml" exception=err
     end
     set_status!(entry, :done; kill_reason="")
+    # Fire the on_complete chain — recipes spawn children which land in
+    # :pending and get picked up on the next tick.
+    _maybe_fire_on_complete!(entry, config, stats)
     return entry
 end
 
