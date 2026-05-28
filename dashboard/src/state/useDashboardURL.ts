@@ -18,7 +18,7 @@ export function useDashboardURL() {
     {
       run: parseAsString,
       point: parseAsInteger.withDefault(0),
-      tab: parseAsStringLiteral(TABS).withDefault('overview'),
+      tab: parseAsStringLiteral(TABS).withDefault('catalog'),
       comp: parseAsInteger.withDefault(0),
       snap: parseAsInteger,
       scan: parseAsString,

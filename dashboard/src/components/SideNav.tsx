@@ -46,6 +46,10 @@ export function SideNav({
 }: Props) {
   const { runs, selectedRun, setSelectedRun, refresh } = state
   const [q, setQ] = useState('')
+  // The flat run list is demoted: the Catalog tab (faceted query +
+  // parallel coordinates) is the primary navigation now. Keep the list as
+  // a collapsed quick-switcher that auto-opens when you start filtering.
+  const [indexOpen, setIndexOpen] = useState(false)
   const { runs: liveRuns } = useLiveRuns()
   const liveStatus = useLiveStatus(selectedRun)
   const { tagsByCid, refresh: refreshTags } = useTags()
@@ -247,30 +251,54 @@ export function SideNav({
         </div>
       )}
 
-      {/* Index */}
-      <div className="px-5 pb-3 flex-1 min-h-0 flex flex-col">
-        <SectionHead label={`Index · ${filteredRuns.length}`} />
-        <ol className="mt-2 flex-1 min-h-0 overflow-y-auto -mx-1 px-1 space-y-0.5">
-          {filteredRuns.length === 0 && (
-            <li className="px-2 py-2 text-[11px] font-mono text-[var(--ink-faint)] italic">
-              no matching runs
-            </li>
-          )}
-          {filteredRuns.map((r, i) => (
-            <RunRow
-              key={r}
-              index={i + 1}
-              name={r}
-              isLive={liveSet.has(r)}
-              isSelected={r === selectedRun}
-              onClick={() => setSelectedRun(r)}
-              tags={tagsByCid[r] ?? []}
-              onTag={() => onTagRun(r)}
-              onUntag={onUntag}
-            />
-          ))}
-        </ol>
-      </div>
+      {/* Index — demoted to a collapsed quick-switcher (Catalog is primary) */}
+      {(() => {
+        const showList = indexOpen || q.trim() !== ''
+        return (
+          <div className="px-5 pb-3 flex-1 min-h-0 flex flex-col">
+            <button
+              type="button"
+              onClick={() => setIndexOpen((v) => !v)}
+              className="flex items-baseline gap-1.5 text-left"
+              title={showList ? 'collapse' : 'expand the flat run list'}
+            >
+              <span className="text-[var(--ink-faint)] font-mono text-[10px]">
+                {showList ? '▾' : '▸'}
+              </span>
+              <SectionHead label={`Index · ${filteredRuns.length}`} />
+            </button>
+            {!showList ? (
+              <p className="mt-2 px-1 text-[10.5px] font-mono text-[var(--ink-faint)] leading-relaxed">
+                browse + filter runs in the{' '}
+                <span className="text-[var(--ink-soft)]">Catalog</span> tab —
+                facets, parallel coordinates, triage. Type above or expand for
+                the flat list.
+              </p>
+            ) : (
+              <ol className="mt-2 flex-1 min-h-0 overflow-y-auto -mx-1 px-1 space-y-0.5">
+                {filteredRuns.length === 0 && (
+                  <li className="px-2 py-2 text-[11px] font-mono text-[var(--ink-faint)] italic">
+                    no matching runs
+                  </li>
+                )}
+                {filteredRuns.map((r, i) => (
+                  <RunRow
+                    key={r}
+                    index={i + 1}
+                    name={r}
+                    isLive={liveSet.has(r)}
+                    isSelected={r === selectedRun}
+                    onClick={() => setSelectedRun(r)}
+                    tags={tagsByCid[r] ?? []}
+                    onTag={() => onTagRun(r)}
+                    onUntag={onUntag}
+                  />
+                ))}
+              </ol>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Live status footer */}
       {liveStatus.status && selectedRun && liveSet.has(selectedRun) && (

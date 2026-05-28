@@ -178,43 +178,50 @@ export default function App() {
             </div>
           )}
 
-          <div className="mt-7 flex flex-wrap items-center gap-x-7 gap-y-3 pb-3 border-b border-[var(--ink-faint)]">
-            <span className="font-mono text-[10.5px] uppercase tracking-[0.10em] text-[var(--ink-faint)]">
-              Plot params
-            </span>
-            <DraftingSelect
-              label="x-axis"
-              value={xKey}
-              onChange={state.setXKey}
-              options={[
-                { value: 'index', label: 'Point index' },
-                ...(data?.scan_keys ?? []).map((k) => ({
-                  value: k,
-                  label: k.replace(/^pipeline\.\d+\./, ''),
-                })),
-              ]}
-            />
-            {(data?.run_names?.length ?? 0) > 1 && (
-              <DraftingSelect
-                label="series"
-                value={runFilter || '__all__'}
-                onChange={(v) =>
-                  state.setRunFilter(v === '__all__' ? '' : v)
-                }
-                options={[
-                  { value: '__all__', label: 'All runs' },
-                  ...(data?.run_names ?? []).map((r) => ({
-                    value: r,
-                    label: r,
-                  })),
-                ]}
-              />
-            )}
-          </div>
+          {/* Plot params + Stats are per-run/scan UI — hide them on the
+              global surfaces (Catalog landing, Queue) so the primary
+              navigation view isn't cluttered with empty per-run controls. */}
+          {!_TAB_NEUTRAL.has(url.tab) && (
+            <>
+              <div className="mt-7 flex flex-wrap items-center gap-x-7 gap-y-3 pb-3 border-b border-[var(--ink-faint)]">
+                <span className="font-mono text-[10.5px] uppercase tracking-[0.10em] text-[var(--ink-faint)]">
+                  Plot params
+                </span>
+                <DraftingSelect
+                  label="x-axis"
+                  value={xKey}
+                  onChange={state.setXKey}
+                  options={[
+                    { value: 'index', label: 'Point index' },
+                    ...(data?.scan_keys ?? []).map((k) => ({
+                      value: k,
+                      label: k.replace(/^pipeline\.\d+\./, ''),
+                    })),
+                  ]}
+                />
+                {(data?.run_names?.length ?? 0) > 1 && (
+                  <DraftingSelect
+                    label="series"
+                    value={runFilter || '__all__'}
+                    onChange={(v) =>
+                      state.setRunFilter(v === '__all__' ? '' : v)
+                    }
+                    options={[
+                      { value: '__all__', label: 'All runs' },
+                      ...(data?.run_names ?? []).map((r) => ({
+                        value: r,
+                        label: r,
+                      })),
+                    ]}
+                  />
+                )}
+              </div>
 
-          <div className="mt-6">
-            <Stats data={data} runFilter={runFilter} />
-          </div>
+              <div className="mt-6">
+                <Stats data={data} runFilter={runFilter} />
+              </div>
+            </>
+          )}
 
           <Tabs
             value={url.tab}
