@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Search, RefreshCw, Keyboard, Sun, Moon, X } from 'lucide-react'
+import { Search, RefreshCw, Keyboard, Sun, Moon, X, Tag as TagIcon } from 'lucide-react'
 import { useLiveRuns, useLiveStatus } from '@/state/useLiveRuns'
+import { useTags } from '@/state/useTags'
+import { api } from '@/api'
 import type { RunDataState } from '@/state/useRunData'
 import { cn } from '@/lib/utils'
 
@@ -46,6 +48,7 @@ export function SideNav({
   const [q, setQ] = useState('')
   const { runs: liveRuns } = useLiveRuns()
   const liveStatus = useLiveStatus(selectedRun)
+  const { tagsByCid, refresh: refreshTags } = useTags()
   const dragging = useRef(false)
 
   const liveSet = useMemo(
@@ -53,11 +56,44 @@ export function SideNav({
     [liveRuns],
   )
 
+  // Filter matches a run's name OR any tag pinned to it, so searching
+  // "fig6" finds both `..._fig6_...` dirs and runs tagged `paper3_fig6`.
   const filteredRuns = useMemo(() => {
     if (!q.trim()) return runs
     const needle = q.toLowerCase()
-    return runs.filter((r) => r.toLowerCase().includes(needle))
-  }, [runs, q])
+    return runs.filter(
+      (r) =>
+        r.toLowerCase().includes(needle) ||
+        (tagsByCid[r] ?? []).some((t) => t.toLowerCase().includes(needle)),
+    )
+  }, [runs, q, tagsByCid])
+
+  const onTagRun = useCallback(
+    async (run: string) => {
+      const name = window.prompt(
+        `Tag run "${run}" — enter a name (e.g. paper3_fig6_final):`,
+      )
+      const trimmed = name?.trim()
+      if (!trimmed) return
+      try {
+        await api.tagRun(trimmed, run)
+      } finally {
+        refreshTags()
+      }
+    },
+    [refreshTags],
+  )
+
+  const onUntag = useCallback(
+    async (name: string) => {
+      try {
+        await api.untagRun(name)
+      } finally {
+        refreshTags()
+      }
+    },
+    [refreshTags],
+  )
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
@@ -165,7 +201,7 @@ export function SideNav({
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="substring"
+            placeholder="name or tag"
             className="flex-1 bg-transparent text-[12.5px] font-mono outline-none placeholder:text-[var(--ink-faint)]"
           />
           {q && (
@@ -202,6 +238,9 @@ export function SideNav({
                 isSelected={r.run === selectedRun}
                 onClick={() => setSelectedRun(r.run)}
                 annot={`${r.age_s.toFixed(0)}s`}
+                tags={tagsByCid[r.run] ?? []}
+                onTag={() => onTagRun(r.run)}
+                onUntag={onUntag}
               />
             ))}
           </ol>
@@ -225,6 +264,9 @@ export function SideNav({
               isLive={liveSet.has(r)}
               isSelected={r === selectedRun}
               onClick={() => setSelectedRun(r)}
+              tags={tagsByCid[r] ?? []}
+              onTag={() => onTagRun(r)}
+              onUntag={onUntag}
             />
           ))}
         </ol>
@@ -297,6 +339,9 @@ function RunRow({
   isLive,
   onClick,
   annot,
+  tags = [],
+  onTag,
+  onUntag,
 }: {
   index: number
   name: string
@@ -304,58 +349,108 @@ function RunRow({
   isLive?: boolean
   onClick: () => void
   annot?: string
+  tags?: string[]
+  onTag?: () => void
+  onUntag?: (name: string) => void
 }) {
+  // The row select is one <button>; tag controls are sibling buttons (not
+  // nested) so the markup stays valid. `group` reveals +tag on hover.
   return (
     <li>
-      <button
-        type="button"
-        onClick={onClick}
+      <div
         className={
-          'w-full leader px-2 py-1 text-left text-[12px] transition-colors ' +
-          (isSelected
-            ? 'bg-[var(--ink)] text-[var(--paper)]'
-            : 'hover:bg-[var(--paper-tint)]')
+          'group px-2 py-1 transition-colors ' +
+          (isSelected ? 'bg-[var(--ink)]' : 'hover:bg-[var(--paper-tint)]')
         }
-        style={{ borderRadius: 0 }}
-        title={name}
       >
-        <span
-          className="label"
-          style={
-            isSelected
-              ? { color: 'var(--paper)', opacity: 0.7 }
-              : undefined
-          }
-        >
-          {String(index).padStart(2, '0')}
-        </span>
-        {isLive && (
-          <span
-            className="status-dot is-live mr-1"
-            style={{ width: 6, height: 6 }}
-          />
-        )}
-        <span
-          className="value flex-1 truncate font-sans font-normal text-left"
-          style={{
-            color: isSelected ? 'var(--paper)' : 'var(--ink)',
-            letterSpacing: '-0.005em',
-          }}
-        >
-          {name}
-        </span>
-        {annot && (
-          <span
-            className="annot"
-            style={{
-              color: isSelected ? 'var(--paper)' : 'var(--ink-faint)',
-              opacity: isSelected ? 0.75 : 1,
-            }}
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onClick}
+            className="flex-1 min-w-0 leader text-left text-[12px]"
+            title={name}
           >
-            {annot}
-          </span>
+            <span
+              className="label"
+              style={isSelected ? { color: 'var(--paper)', opacity: 0.7 } : undefined}
+            >
+              {String(index).padStart(2, '0')}
+            </span>
+            {isLive && (
+              <span
+                className="status-dot is-live mr-1"
+                style={{ width: 6, height: 6 }}
+              />
+            )}
+            <span
+              className="value flex-1 truncate font-sans font-normal text-left"
+              style={{
+                color: isSelected ? 'var(--paper)' : 'var(--ink)',
+                letterSpacing: '-0.005em',
+              }}
+            >
+              {name}
+            </span>
+            {annot && (
+              <span
+                className="annot"
+                style={{
+                  color: isSelected ? 'var(--paper)' : 'var(--ink-faint)',
+                  opacity: isSelected ? 0.75 : 1,
+                }}
+              >
+                {annot}
+              </span>
+            )}
+          </button>
+          {onTag && (
+            <button
+              type="button"
+              onClick={onTag}
+              title={`tag "${name}"`}
+              aria-label={`tag ${name}`}
+              className={
+                'shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity ' +
+                (isSelected
+                  ? 'text-[var(--paper)]'
+                  : 'text-[var(--ink-faint)] hover:text-[var(--ink)]')
+              }
+            >
+              <TagIcon className="size-3" />
+            </button>
+          )}
+        </div>
+        {tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1 pl-[1.6em]">
+            {tags.map((t) => (
+              <span
+                key={t}
+                className="inline-flex items-center gap-0.5 font-mono text-[9.5px] px-1 leading-tight border"
+                style={{
+                  borderRadius: 0,
+                  borderColor: isSelected
+                    ? 'color-mix(in oklch, var(--paper) 50%, transparent)'
+                    : 'var(--t-cyan,#4a8bb8)',
+                  color: isSelected ? 'var(--paper)' : 'var(--t-cyan,#4a8bb8)',
+                }}
+                title={`tag: ${t}`}
+              >
+                {t}
+                {onUntag && (
+                  <button
+                    type="button"
+                    onClick={() => onUntag(t)}
+                    className="hover:text-[var(--t-red,#d94e1f)] leading-none"
+                    aria-label={`remove tag ${t}`}
+                  >
+                    ×
+                  </button>
+                )}
+              </span>
+            ))}
+          </div>
         )}
-      </button>
+      </div>
     </li>
   )
 }
