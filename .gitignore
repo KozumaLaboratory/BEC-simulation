@@ -46,6 +46,10 @@ runs/_loop/_local/
 # Dashboard atlas cache (server-rebuildable from per-snap binaries)
 runs/_dashboard_cache/
 
+# Autopilot runtime sentinels (paused / dry_run / lock) — per-machine
+# operational state, never source-of-truth.
+runs/.autopilot.*
+
 # Per-run generated artefacts (movie frames, summaries, dashboard JSON)
 runs/**/frames/
 runs/**/summary.json
