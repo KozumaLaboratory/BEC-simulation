@@ -1,6 +1,6 @@
 # ── Operator CLI ──────────────────────────────────────────────────────
 #
-# Day-to-day operator commands. Backs scripts/autopilot.jl. Daemon-side
+# Day-to-day operator commands. Backs scripts/cli.jl autopilot. Daemon-side
 # operations should also go through this layer (one truth, two
 # consumers) — see _route_autopilot_op for the dashboard POST surface.
 

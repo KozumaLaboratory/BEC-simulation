@@ -2,7 +2,7 @@
 #
 # Returns JSON of the 5-state autopilot queue. Read-only here; operate
 # via filesystem (the per-run state.toml is the truth) or via the
-# operator CLI (scripts/autopilot.jl pause/drain/resume).
+# operator CLI (scripts/cli.jl autopilot pause/drain/resume).
 
 const _QUEUE_STATES_JSON = ("pending", "running", "done", "killed_data", "killed_bug")
 
@@ -24,7 +24,12 @@ function _route_autopilot_queue(path::String)
 
     out_io = IOBuffer()
     print(out_io, "{")
-    first_block = true
+    # Global flags up front so the frontend can label its actions
+    # (dry_run shapes the Enqueue button label; paused dims it).
+    print(out_io, "\"autopilot\":{",
+        "\"dry_run\":", is_autopilot_dry_run(qr),
+        ",\"paused\":", is_autopilot_paused(qr),
+        "}")
     for st_str in (wanted === nothing ? _QUEUE_STATES_JSON : (wanted,))
         st = Symbol(st_str)
         entries = try
@@ -32,8 +37,7 @@ function _route_autopilot_queue(path::String)
         catch
             QueueEntry[]
         end
-        first_block || print(out_io, ",")
-        first_block = false
+        print(out_io, ",")
         print(out_io, "\"$(st_str)\":[")
         for (i, e) in enumerate(entries)
             i > 1 && print(out_io, ",")

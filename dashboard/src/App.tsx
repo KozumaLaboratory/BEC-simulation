@@ -107,6 +107,10 @@ export default function App() {
             sheetCode={
               TAB_ITEMS.find((t) => t.id === url.tab)?.sheet ?? '01'
             }
+            currentTabLabel={
+              TAB_ITEMS.find((t) => t.id === url.tab)?.label ?? 'Overview'
+            }
+            currentTabId={url.tab}
           />
 
           {error && (
@@ -310,7 +314,14 @@ interface WBHeaderProps {
   scanKeys: string[]
   loading: boolean
   sheetCode: string
+  currentTabLabel: string
+  currentTabId: string
 }
+
+// Tab-driven fallback title for sheets where "run" isn't the right
+// noun (Queue is global; queue lives outside per-run state). Per-run
+// tabs still show the run name when one is selected.
+const _TAB_NEUTRAL = new Set(['queue'])
 
 function WorkbenchHeader({
   runName,
@@ -320,6 +331,8 @@ function WorkbenchHeader({
   scanKeys,
   loading,
   sheetCode,
+  currentTabLabel,
+  currentTabId,
 }: WBHeaderProps) {
   const now = new Date()
   const stamp = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(
@@ -359,8 +372,19 @@ function WorkbenchHeader({
       </div>
 
       <h1 className="font-condensed font-semibold uppercase tracking-[-0.012em] text-[40px] md:text-[54px] leading-[0.95] text-[var(--ink)] break-words">
-        {runName ?? (
-          <span className="text-[var(--ink-faint)] caret">awaiting run</span>
+        {_TAB_NEUTRAL.has(currentTabId) ? (
+          // Sheets that aren't keyed to a single run (e.g. Queue) get
+          // the tab label as their title so "awaiting run" never shows.
+          currentTabLabel
+        ) : runName ? (
+          runName
+        ) : (
+          <>
+            <span className="text-[var(--ink)]">{currentTabLabel}</span>
+            <span className="text-[var(--ink-faint)] text-[60%] ml-3 align-middle">
+              · select a run
+            </span>
+          </>
         )}
       </h1>
 

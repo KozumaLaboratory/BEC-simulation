@@ -80,11 +80,87 @@ export interface DynamicsSeries {
 }
 
 export interface AutopilotQueueResponse {
+  autopilot: { dry_run: boolean; paused: boolean }
   pending: AutopilotQueueEntry[]
   running: AutopilotQueueEntry[]
   done: AutopilotQueueEntry[]
   killed_data: AutopilotQueueEntry[]
   killed_bug: AutopilotQueueEntry[]
+}
+
+export interface EnqueueFinding {
+  kind: string
+  severity: 'info' | 'warn' | 'error' | 'block'
+  step_index: number
+  title: string
+}
+
+export interface EnqueuePreviewResponse {
+  ok: true
+  preview: true
+  content_id: string
+  profile: string
+  estimated_walltime_hours: number
+  inspector: {
+    block_count: number
+    warn_count: number
+    error_count: number
+    blocked: EnqueueFinding[]
+    warned: EnqueueFinding[]
+    errored: EnqueueFinding[]
+  }
+  budget: {
+    available: boolean
+    allow?: boolean
+    reason?: string
+    realized?: number
+    predicted?: number
+    quarter_cap?: number
+    daily_cap?: number
+  }
+}
+
+export interface EnqueueCommitResponse {
+  ok: true
+  preview: false
+  content_id: string
+  status: 'pending'
+  autonomy_level: 'suggest' | 'propose' | 'dispatch'
+  backend: 'local' | 'slurm'
+  profile: string
+  run_dir: string
+  enqueued_by: string
+}
+
+export interface EnqueueErrorResponse {
+  ok: false
+  error: string
+}
+
+export interface EnqueueRequest {
+  preview: boolean
+  yaml: string
+  backend?: 'local' | 'slurm'
+  priority?: number
+  autonomy_level?: 'suggest' | 'propose' | 'dispatch'
+  recipe_name?: string
+  recipe_params?: Record<string, unknown>
+  profile?: string
+  estimated_walltime_hours?: number
+  session_id?: string
+}
+
+export interface QueueActionResponse {
+  ok: true
+  content_id: string
+  status: 'pending' | 'killed_bug'
+  autonomy_level?: 'suggest' | 'propose' | 'dispatch'
+  action: 'promote' | 'cancel'
+}
+
+export interface QueueActionErrorResponse {
+  ok: false
+  error: string
 }
 
 export interface AutopilotQueueEntry {
@@ -158,6 +234,23 @@ async function bin(url: string): Promise<ArrayBuffer> {
   return r.arrayBuffer()
 }
 
+async function _post<TResp>(url: string, body: unknown): Promise<TResp> {
+  // Tolerate non-2xx responses — handlers return structured errors as
+  // JSON, and the caller surfaces them in the UI. Only network failures
+  // throw.
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const text = await r.text()
+  try {
+    return JSON.parse(text) as TResp
+  } catch {
+    return { ok: false, error: `non-JSON ${r.status}: ${text}` } as unknown as TResp
+  }
+}
+
 export const api = {
   listRuns(): Promise<string[]> {
     return json('/api/runs')
@@ -223,10 +316,35 @@ export const api = {
     return json('/api/live/list')
   },
 
-  /** Returns the autopilot queue state: pending/running/done/failed entries
-   * with their content_id, priority, parent_id, on_complete metadata. */
+  /** Returns the autopilot queue state across the 5-state model plus
+   * the global `autopilot` flags (dry_run, paused). */
   autopilotQueue(): Promise<AutopilotQueueResponse> {
     return json('/api/queue')
+  },
+
+  /** Preview an enqueue. Returns content_id, inspector findings, and
+   * budget impact WITHOUT writing state.toml. */
+  autopilotEnqueuePreview(
+    req: Omit<EnqueueRequest, 'preview'>,
+  ): Promise<EnqueuePreviewResponse | EnqueueErrorResponse> {
+    return _post('/api/queue/enqueue', { ...req, preview: true })
+  },
+
+  /** Commit an enqueue to disk. Refused if inspector returns any :block. */
+  autopilotEnqueueCommit(
+    req: Omit<EnqueueRequest, 'preview'>,
+  ): Promise<EnqueueCommitResponse | EnqueueErrorResponse> {
+    return _post('/api/queue/enqueue', { ...req, preview: false })
+  },
+
+  /** Promote a :propose entry to :dispatch, or cancel a :pending entry.
+   * Refused for any non-:pending entry. */
+  autopilotAction(
+    content_id: string,
+    action: 'promote' | 'cancel',
+    session_id?: string,
+  ): Promise<QueueActionResponse | QueueActionErrorResponse> {
+    return _post('/api/queue/action', { content_id, action, session_id })
   },
 
   /** Per-run scan progress: how many `point_NNN.jld2` files have landed

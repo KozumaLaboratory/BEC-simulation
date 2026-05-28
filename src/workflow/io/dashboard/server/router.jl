@@ -34,7 +34,9 @@ API:
 See src/workflow/io/dashboard.jl for the full /api surface that the
 React app consumes.
 """
-function serve_dashboard(port::Int=8080; base_dir::String="runs")
+function serve_dashboard(port::Int=8080; base_dir::String="runs",
+    bind::AbstractString=get(ENV, "SPINORBEC_DASHBOARD_BIND", "0.0.0.0"),
+)
     if !isfile(_WEB_DIST_INDEX)
         throw(
             ArgumentError(
@@ -59,8 +61,23 @@ function serve_dashboard(port::Int=8080; base_dir::String="runs")
     data_cache = Dict{String, String}()
     psi_cache = Dict{String, Any}()  # path → (psi, n_comp, n_pts, F, pops)
 
-    server = Sockets.listen(Sockets.InetAddr(ip"0.0.0.0", port))
-    println("Dashboard server running at http://localhost:$port")
+    # `bind` controls which interface the server listens on. Default
+    # `"0.0.0.0"` keeps the dev workflow (LAN access from any host on
+    # the lab network, VITE_API_TARGET reachable). Set to `"127.0.0.1"`
+    # (or via `SPINORBEC_DASHBOARD_BIND=127.0.0.1`) when fronted by a
+    # reverse proxy like Caddy — the dashboard then refuses direct LAN
+    # access and only the proxied + authenticated path remains.
+    bind_addr = try
+        parse(IPAddr, String(bind))
+    catch
+        throw(
+            ArgumentError(
+                "serve_dashboard: bind=$(repr(bind)) is not a valid IP literal " *
+                "(expected e.g. \"0.0.0.0\" or \"127.0.0.1\")"),
+        )
+    end
+    server = Sockets.listen(Sockets.InetAddr(bind_addr, port))
+    println("Dashboard server running at http://$(bind_addr):$port")
     println("  Serving runs from: $(abspath(base_dir))")
     println("  React app:         $(_WEB_DIST_INDEX)")
     !isempty(fetch_legacy()) && println("  Legacy dashboard:  /legacy")
@@ -122,6 +139,12 @@ function _handle_dashboard_connection(
             accept_gzip = false
             ws_key = ""
             ws_upgrade = false
+            # Upstream-proxy auth headers — Caddy/oauth2-proxy/nginx pass
+            # the authenticated username here so write endpoints can use
+            # it as `enqueued_by` provenance. We trust these only when
+            # the dashboard is behind a reverse proxy; direct access
+            # bypasses them and falls back to session_id.
+            authed_user = ""
             while true
                 line = readline(sock)
                 (isempty(line) || line == "\r") && break
@@ -145,6 +168,10 @@ function _handle_dashboard_connection(
                 elseif startswith(lc, "accept-encoding:")
                     val = lowercase(split(line, ':'; limit=2)[2])
                     accept_gzip = occursin("gzip", val)
+                elseif startswith(lc, "x-authenticated-user:") ||
+                    startswith(lc, "x-forwarded-user:") ||
+                    startswith(lc, "remote-user:")
+                    authed_user = String(strip(split(line, ':'; limit=2)[2]))
                 end
             end
 
@@ -165,7 +192,7 @@ function _handle_dashboard_connection(
             if method == "POST"
                 body_bytes = content_length > 0 ? read(sock, content_length) : UInt8[]
                 status, content_type, body = _route_dashboard_post(
-                    path, body_bytes, base_dir
+                    path, body_bytes, base_dir; authed_user=authed_user
                 )
                 _send_http_response(sock, status, content_type, body; keep_alive, accept_gzip)
             else
@@ -207,7 +234,17 @@ POST endpoints. Currently supports:
 Lab acquisition scripts can ship images straight off the camera with
 `curl --data-binary @shot.png http://host:port/api/lab/image/today`.
 """
-function _route_dashboard_post(path, body_bytes, base_dir)
+function _route_dashboard_post(path, body_bytes, base_dir;
+    authed_user::AbstractString="",
+)
+    if path == "/api/queue/enqueue"
+        return _route_autopilot_enqueue(body_bytes, base_dir;
+            authed_user=authed_user)
+    end
+    if path == "/api/queue/action"
+        return _route_autopilot_action(body_bytes, base_dir;
+            authed_user=authed_user)
+    end
     if startswith(path, "/api/lab/image/")
         run_name = _uri_decode(path[(length("/api/lab/image/") + 1):end])
         run_dir = joinpath(base_dir, run_name)

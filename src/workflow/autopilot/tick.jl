@@ -11,12 +11,40 @@
 # If a crash occurs between (a) and (c), the next tick sees status=:running
 # with job_id=nothing and reconciles via `squeue --name=<content_id>`.
 
-export autopilot_tick!, default_autopilot_config, is_autopilot_paused
+export autopilot_tick!,
+    default_autopilot_config,
+    is_autopilot_paused, is_autopilot_dry_run, autopilot_set_dry_run!
 
 # Sentinel file that pauses dispatch. Touch this to halt new submissions;
 # remove to resume. `drain` is just "touch + wait for running to drain".
 _pause_file(qr::QueueRoot) = joinpath(qr.path, ".autopilot.paused")
 is_autopilot_paused(qr::QueueRoot=autopilot_queue_root()) = isfile(_pause_file(qr))
+
+# Global dry-run sentinel. Persists across cron-driven ticks so the
+# operator can flip it via CLI/dashboard without restarting any process.
+# `autopilot_tick!` consults this in addition to `config.dry_run`.
+_dry_run_file(qr::QueueRoot) = joinpath(qr.path, ".autopilot.dry_run")
+is_autopilot_dry_run(qr::QueueRoot=autopilot_queue_root()) = isfile(_dry_run_file(qr))
+
+"""
+    autopilot_set_dry_run!(on::Bool; qr=autopilot_queue_root()) -> Bool
+
+Touch or remove `<qr>/.autopilot.dry_run`. Returns the new state.
+"""
+function autopilot_set_dry_run!(on::Bool;
+    qr::QueueRoot=autopilot_queue_root())
+    f = _dry_run_file(qr)
+    isdir(qr.path) || mkpath(qr.path)
+    if on
+        open(f, "w") do io
+            println(io, "enabled_at: ", now())
+            println(io, "by: ", get(ENV, "USER", "unknown"))
+        end
+    else
+        isfile(f) && rm(f; force=true)
+    end
+    return on
+end
 
 default_autopilot_config(; kwargs...) = AutopilotConfig(;
     backend=LocalBackend(),
@@ -115,7 +143,10 @@ function _autopilot_tick_body!(config::AutopilotConfig, stats::AutopilotStats)
                 end
             end
 
-            if config.dry_run
+            # Honor either in-process config.dry_run OR the persistent
+            # sentinel set by the operator (CLI/dashboard). Either is
+            # sufficient to keep the autopilot in shadow mode.
+            if config.dry_run || is_autopilot_dry_run(config.qr)
                 _dry_run_dispatch!(entry)
                 stats.dispatched += 1
                 dispatched += 1

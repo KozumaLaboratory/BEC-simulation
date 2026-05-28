@@ -69,6 +69,12 @@ The `VITE_API_TARGET` override is harmless when loopback is healthy,
 so the recommended habit is to set it always rather than diagnose
 per session.
 
+### Auth (production / multi-user)
+
+Web UI enqueue is write-capable, so once more than one person hits the
+dashboard, put Caddy + Basic auth in front. Recipe + trust-model notes
+are in [`docs/guides/dashboard_auth.md`](../docs/guides/dashboard_auth.md).
+
 ### Smoke test
 
 After starting both processes:

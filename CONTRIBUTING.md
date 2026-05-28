@@ -15,9 +15,11 @@ two categories:
 
 1. **Pure dispatch / arg-parse.** Body contains nothing but argument
    parsing, calling library functions, and `exit(code)`. All compute
-   lives in `src/`. Per-file ≤30 LOC, or the canonical CLI dispatcher
-   `cli.jl` (scales with subcommand count, but each subcommand handler
-   stays ≤20 LOC and contains no compute).
+   lives in `src/`. The canonical CLI is `scripts/cli.jl` (single
+   entry; subcommands include autopilot operator ops). Each subcommand
+   handler stays ≤20 LOC and contains no compute. No per-subsystem
+   sibling CLIs — they fragment operator memory and duplicate flag-parse
+   code.
 
 2. **Build-time tooling that cannot run from the package.** Currently
    just `scripts/tsubame/build_sysimage.jl` (PackageCompiler invocation).
@@ -29,7 +31,7 @@ function exported from the SpinorBEC umbrella. Then the entry point
 
 ### Why
 
-The campaign that took `scripts/` from 117 → 1 (`cli.jl`, plus 1
+The campaign that took `scripts/` from 117 → 2 (`cli.jl`, plus 1
 PackageCompiler entry) revealed three failure modes when logic lived
 in `scripts/`:
 

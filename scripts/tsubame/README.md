@@ -12,7 +12,7 @@ julia --project=. -e 'using Pkg; Pkg.instantiate()'         # one-shot
 
 # Pre-flight (interactive node, 30 min):
 qrsh -l gpu_h=1,h_rt=00:30:00
-bash scripts/tsubame/preflight.sh                           # CUDA + Julia + smoke
+julia --project=. scripts/cli.jl preflight runs/option_gamma_micro/config.yaml  # CUDA + Julia + smoke
 julia --project=. scripts/tsubame/build_sysimage.jl         # optional, saves JIT cost
 exit
 

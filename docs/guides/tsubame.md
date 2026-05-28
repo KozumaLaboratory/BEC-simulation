@@ -135,7 +135,7 @@ Lab-image push uses the same tunnel: `curl --data-binary @absorption_shot.png ht
 
 `run_pipeline` writes periodic checkpoints to `$run_dir/.checkpoints/<filename>` during a dynamics step. Restart with the same `run_yaml(...)` call — the cache/resume logic picks up from the last checkpoint. Pair with SLURM `--requeue` for automatic restart after preemption.
 
-For multi-attempt mixes of crashes + preemption: `sbatch scripts/slurm/eu151_h100_single.sbatch runs/foo/config.yaml`, or `scripts/supervised_run.sh foo 5` for 5 retries with 30 s backoff. `--requeue` covers most SLURM cases; the supervisor wrapper helps in interactive sessions.
+For multi-attempt mixes of crashes + preemption: `sbatch scripts/slurm/eu151_h100_single.sbatch runs/foo/config.yaml` + SLURM `--requeue`. For long-running campaigns, enqueue via `julia --project=. scripts/cli.jl autopilot enqueue runs/foo/config.yaml` and let the autopilot's `retry_failed!` (called per-tick by the systemd timer) handle re-dispatch.
 
 ## Troubleshooting
 

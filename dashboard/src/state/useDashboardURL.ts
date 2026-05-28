@@ -5,7 +5,9 @@ import {
   parseAsStringLiteral,
 } from 'nuqs'
 
-export const TABS = ['overview', 'slice', 'view3d', 'data', 'config'] as const
+export const TABS = [
+  'overview', 'slice', 'view3d', 'data', 'config', 'queue',
+] as const
 export type TabId = (typeof TABS)[number]
 
 // URL state for everything that should round-trip across reload / shared
