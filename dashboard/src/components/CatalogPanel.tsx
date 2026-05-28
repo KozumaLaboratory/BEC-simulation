@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { useCatalogIndex } from '@/state/useCatalogIndex'
+import { ParallelCoordinates } from '@/components/ParallelCoordinates'
 import type { CatalogRow } from '@/api'
 
 // Facets are derived, zero-discipline axes the system already stamps —
@@ -176,13 +177,22 @@ export function CatalogPanel({ onOpenRun }: { onOpenRun: (name: string) => void 
       <FacetBar facetValues={facetValues} selected={selected} onToggle={toggle} />
 
       {hasFilter ? (
-        <ResultTable
-          rows={sorted}
-          sortKey={sortKey}
-          sortDir={sortDir}
-          onSort={setSort}
-          onOpenRun={onOpenRun}
-        />
+        <>
+          {filtered.length >= 2 && (
+            <Card>
+              <CardContent className="p-4">
+                <ParallelCoordinates rows={filtered} />
+              </CardContent>
+            </Card>
+          )}
+          <ResultTable
+            rows={sorted}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSort={setSort}
+            onOpenRun={onOpenRun}
+          />
+        </>
       ) : (
         <TriageLanding rows={rows} onOpenRun={onOpenRun} />
       )}
