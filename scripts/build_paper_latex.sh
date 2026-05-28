@@ -2,10 +2,10 @@
 # build_paper_latex.sh — convert a paper main.md → RevTeX LaTeX
 #
 # Usage:
-#   scripts/manuscript/build_paper_latex.sh paper1_F2_cyclic
-#   scripts/manuscript/build_paper_latex.sh paper2_F6_icosahedral
-#   scripts/manuscript/build_paper_latex.sh paper3_universal_theorem
-#   scripts/manuscript/build_paper_latex.sh paper4_chaotic_dynamics
+#   scripts/build_paper_latex.sh paper1_F2_cyclic
+#   scripts/build_paper_latex.sh paper2_F6_icosahedral
+#   scripts/build_paper_latex.sh paper3_universal_theorem
+#   scripts/build_paper_latex.sh paper4_chaotic_dynamics
 #
 # Output:
 #   docs/manuscript/papers/<paper>/build/<paper>.tex

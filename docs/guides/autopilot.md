@@ -366,11 +366,11 @@ autopilot_recipe_success_rate(:next_phi)
 `append_error_event!(reason, details)` writes to
 `<qr.path>/.autopilot.errors.log` for in-tick recoverables.
 
-systemd-user unit + timer ship in `scripts/systemd/`:
+systemd-user unit + timer ship in `scripts/`:
 
 ```bash
 mkdir -p ~/.config/systemd/user
-cp scripts/systemd/spinor-autopilot.{service,timer} ~/.config/systemd/user/
+cp scripts/spinor-autopilot.{service,timer} ~/.config/systemd/user/
 systemctl --user daemon-reload
 systemctl --user enable --now spinor-autopilot.timer
 journalctl --user -u spinor-autopilot.service -f

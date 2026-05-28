@@ -6,7 +6,7 @@
 # `--sysimage=spinor_sysimage.so` and skip the SpinorBEC JIT.
 #
 # Usage:
-#   julia --project=. scripts/tsubame/build_sysimage.jl
+#   julia --project=. scripts/build_sysimage.jl
 #
 # Output: spinor_sysimage.so (typically 200-400 MB, depends on Julia version)
 

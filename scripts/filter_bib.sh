@@ -2,7 +2,7 @@
 # filter_bib.sh — extract bibtex entries matching keys in references.txt
 #
 # Usage:
-#   scripts/manuscript/filter_bib.sh paper1_F2_cyclic
+#   scripts/filter_bib.sh paper1_F2_cyclic
 #
 # Reads docs/manuscript/papers/<paper>/references.txt (one cite-key per line,
 # # comments allowed) and writes docs/manuscript/papers/<paper>/build/<paper>.bib

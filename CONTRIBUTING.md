@@ -22,7 +22,7 @@ two categories:
    code.
 
 2. **Build-time tooling that cannot run from the package.** Currently
-   just `scripts/tsubame/build_sysimage.jl` (PackageCompiler invocation).
+   just `scripts/build_sysimage.jl` (PackageCompiler invocation).
 
 Anything else — config generators, figure builders, summary tabulators,
 cluster helpers, post-processing — goes into `src/` as a library
