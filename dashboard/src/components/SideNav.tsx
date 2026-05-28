@@ -13,6 +13,10 @@ interface Props {
   onResize: (w: number) => void
   onShortcuts: () => void
   onToggleTheme: () => void
+  /** Current top-level tab, for highlighting the active global destination. */
+  currentTab: string
+  /** Switch the global surface (Catalog / Queue). */
+  onNavigate: (tab: string) => void
   /** Below the md breakpoint the sidebar becomes a slide-in drawer. */
   isMobile?: boolean
   mobileOpen?: boolean
@@ -40,6 +44,8 @@ export function SideNav({
   onResize,
   onShortcuts,
   onToggleTheme,
+  currentTab,
+  onNavigate,
   isMobile = false,
   mobileOpen = false,
   onClose,
@@ -196,6 +202,35 @@ export function SideNav({
           </IconBtn>
         </div>
       </div>
+
+      {/* Destinations — global surfaces (run-independent). Catalog is the
+          primary navigation; Queue is the autopilot view. */}
+      <nav className="px-3 pt-3 pb-2 flex flex-col gap-0.5">
+        {(
+          [
+            ['catalog', 'Catalog'],
+            ['queue', 'Queue'],
+          ] as const
+        ).map(([id, label]) => {
+          const active = currentTab === id
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onNavigate(id)}
+              className={cn(
+                'w-full text-left px-2 py-1.5 font-mono text-[12px] uppercase tracking-[0.08em] transition-colors',
+                active
+                  ? 'bg-[var(--ink)] text-[var(--paper)]'
+                  : 'text-[var(--ink-soft)] hover:bg-[var(--paper-tint)] hover:text-[var(--ink)]',
+              )}
+              style={{ borderRadius: 0 }}
+            >
+              {label}
+            </button>
+          )
+        })}
+      </nav>
 
       {/* Search */}
       <div className="px-5 pt-4 pb-3">

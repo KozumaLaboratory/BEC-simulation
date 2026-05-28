@@ -53,9 +53,15 @@ const TAB_ITEMS = [
   { id: 'view3d', label: '3D · volume', sheet: '03' },
   { id: 'data', label: 'Data', sheet: '04' },
   { id: 'config', label: 'Effective config', sheet: '05' },
-  { id: 'queue', label: 'Queue', sheet: '06' },
-  { id: 'catalog', label: 'Catalog', sheet: '07' },
 ] as const
+
+// Labels for every tab id, including the global surfaces that live in the
+// sidebar (Catalog / Queue) rather than the per-run tab strip.
+const TAB_LABELS: Record<string, string> = {
+  ...Object.fromEntries(TAB_ITEMS.map((t) => [t.id, t.label])),
+  queue: 'Queue',
+  catalog: 'Catalog',
+}
 
 const SIDEBAR_DEFAULT_W = 280
 const SIDEBAR_MIN_W = 220
@@ -65,6 +71,9 @@ export default function App() {
   const state = useRunData()
   const [url, setUrl] = useDashboardURL()
   const { data, selectedRun, loading, error, xKey, runFilter, runs } = state
+  // Catalog + Queue are global surfaces (run-independent), not per-run
+  // views — they render full-width without the per-run tab strip.
+  const isGlobal = url.tab === 'catalog' || url.tab === 'queue'
   const [helpOpen, setHelpOpen] = useState(false)
   const isDark = useThemeMode()
   const [sidebarW, setSidebarW] = useSidebarWidth()
@@ -106,6 +115,8 @@ export default function App() {
         onResize={setSidebarW}
         onShortcuts={() => setHelpOpen(true)}
         onToggleTheme={toggleTheme}
+        currentTab={url.tab}
+        onNavigate={(t) => setUrl({ tab: t as typeof url.tab })}
         isMobile={isMobile}
         mobileOpen={mobileNavOpen}
         onClose={() => setMobileNavOpen(false)}
@@ -147,11 +158,9 @@ export default function App() {
             scanKeys={data?.scan_keys ?? []}
             loading={loading}
             sheetCode={
-              TAB_ITEMS.find((t) => t.id === url.tab)?.sheet ?? '01'
+              TAB_ITEMS.find((t) => t.id === url.tab)?.sheet ?? '—'
             }
-            currentTabLabel={
-              TAB_ITEMS.find((t) => t.id === url.tab)?.label ?? 'Overview'
-            }
+            currentTabLabel={TAB_LABELS[url.tab] ?? 'Overview'}
             currentTabId={url.tab}
           />
 
@@ -171,17 +180,33 @@ export default function App() {
             </div>
           )}
 
-          {loading && !data && (
+          {loading && !data && !isGlobal && (
             <div className="mt-6 flex items-center gap-2.5 text-sm text-muted-foreground">
               <span className="status-dot is-cyan" />
               <span className="caret">acquiring</span>
             </div>
           )}
 
-          {/* Plot params + Stats are per-run/scan UI — hide them on the
-              global surfaces (Catalog landing, Queue) so the primary
-              navigation view isn't cluttered with empty per-run controls. */}
-          {!_TAB_NEUTRAL.has(url.tab) && (
+          {isGlobal ? (
+            // Global surfaces render full-width — no per-run tab strip, no
+            // per-run Plot params / Stats. Picking a run from the Catalog
+            // switches to a per-run tab.
+            <div className="mt-8">
+              <TabBoundary>
+                <Suspense fallback={<TabFallback />}>
+                  {url.tab === 'catalog' ? (
+                    <CatalogPanel
+                      onOpenRun={(name) =>
+                        setUrl({ run: name, tab: 'overview' })
+                      }
+                    />
+                  ) : (
+                    <QueuePanel />
+                  )}
+                </Suspense>
+              </TabBoundary>
+            </div>
+          ) : (
             <>
               <div className="mt-7 flex flex-wrap items-center gap-x-7 gap-y-3 pb-3 border-b border-[var(--ink-faint)]">
                 <span className="font-mono text-[10.5px] uppercase tracking-[0.10em] text-[var(--ink-faint)]">
@@ -220,89 +245,68 @@ export default function App() {
               <div className="mt-6">
                 <Stats data={data} runFilter={runFilter} />
               </div>
+
+              <Tabs
+                value={url.tab}
+                onValueChange={(v) => setUrl({ tab: v as typeof url.tab })}
+                className="w-full mt-10"
+              >
+                <div className="mb-5">
+                  <TabsList className="flex w-full h-auto flex-wrap gap-y-1">
+                    {TAB_ITEMS.map((t) => (
+                      <TabsTrigger key={t.id} value={t.id} className="h-8">
+                        {t.label}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </div>
+
+                <TabsContent value="overview" className="space-y-5">
+                  <TabBoundary>
+                    <OverviewPanel
+                      data={data}
+                      selectedRun={selectedRun}
+                      xKey={xKey}
+                      runFilter={runFilter}
+                    />
+                  </TabBoundary>
+                </TabsContent>
+
+                <TabsContent value="slice">
+                  <TabBoundary>
+                    <Suspense fallback={<TabFallback />}>
+                      <SlicePanel run={selectedRun} data={data} />
+                    </Suspense>
+                  </TabBoundary>
+                </TabsContent>
+
+                <TabsContent value="view3d">
+                  <TabBoundary>
+                    <Suspense fallback={<TabFallback />}>
+                      <View3D run={selectedRun} data={data} />
+                    </Suspense>
+                  </TabBoundary>
+                </TabsContent>
+
+                <TabsContent value="data">
+                  <TabBoundary>
+                    <DataTable data={data} runFilter={runFilter} />
+                  </TabBoundary>
+                </TabsContent>
+
+                <TabsContent value="config">
+                  <TabBoundary>
+                    <Suspense fallback={<TabFallback />}>
+                      <EffectiveConfigPanel
+                        runName={selectedRun ?? undefined}
+                        yaml={data?.config_yaml || ''}
+                      />
+                    </Suspense>
+                  </TabBoundary>
+                </TabsContent>
+              </Tabs>
             </>
           )}
-
-          <Tabs
-            value={url.tab}
-            onValueChange={(v) => setUrl({ tab: v as typeof url.tab })}
-            className="w-full mt-10"
-          >
-            <div className="mb-5">
-              {/* Wrap (not scroll) the tab bar on narrow screens: flex-1
-                  keeps equal-width tabs on one row at desktop, flex-wrap +
-                  h-auto lets them flow onto extra rows on mobile. */}
-              <TabsList className="flex w-full h-auto flex-wrap gap-y-1">
-                {TAB_ITEMS.map((t) => (
-                  <TabsTrigger key={t.id} value={t.id} className="h-8">
-                    {t.label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </div>
-
-            <TabsContent value="overview" className="space-y-5">
-              <TabBoundary>
-                <OverviewPanel
-                  data={data}
-                  selectedRun={selectedRun}
-                  xKey={xKey}
-                  runFilter={runFilter}
-                />
-              </TabBoundary>
-            </TabsContent>
-
-            <TabsContent value="slice">
-              <TabBoundary>
-                <Suspense fallback={<TabFallback />}>
-                  <SlicePanel run={selectedRun} data={data} />
-                </Suspense>
-              </TabBoundary>
-            </TabsContent>
-
-            <TabsContent value="view3d">
-              <TabBoundary>
-                <Suspense fallback={<TabFallback />}>
-                  <View3D run={selectedRun} data={data} />
-                </Suspense>
-              </TabBoundary>
-            </TabsContent>
-
-            <TabsContent value="data">
-              <TabBoundary>
-                <DataTable data={data} runFilter={runFilter} />
-              </TabBoundary>
-            </TabsContent>
-
-            <TabsContent value="config">
-              <TabBoundary>
-                <Suspense fallback={<TabFallback />}>
-                  <EffectiveConfigPanel
-                    runName={selectedRun ?? undefined}
-                    yaml={data?.config_yaml || ''}
-                  />
-                </Suspense>
-              </TabBoundary>
-            </TabsContent>
-
-            <TabsContent value="queue">
-              <TabBoundary>
-                <Suspense fallback={<TabFallback />}>
-                  <QueuePanel />
-                </Suspense>
-              </TabBoundary>
-            </TabsContent>
-
-            <TabsContent value="catalog">
-              <TabBoundary>
-                <Suspense fallback={<TabFallback />}>
-                  <CatalogPanel
-                    onOpenRun={(name) => setUrl({ run: name, tab: 'overview' })}
-                  />
-                </Suspense>
-              </TabBoundary>
-            </TabsContent>
-          </Tabs>
         </div>
       </main>
     </div>
@@ -354,7 +358,7 @@ function WorkbenchHeader({
       <div className="sheet-strip -mx-1.5 mb-5">
         <div>
           <span className="text-[var(--ink-faint)]">Sheet</span>{' '}
-          <span className="text-[var(--ink)]">{sheetCode} / 07</span>
+          <span className="text-[var(--ink)]">{sheetCode} / 05</span>
         </div>
         <div>
           <span className="text-[var(--ink-faint)]">Drawn</span>{' '}
