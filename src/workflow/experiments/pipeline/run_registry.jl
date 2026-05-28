@@ -553,6 +553,15 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
                 rethrow(err)
             end
 
+            # Catalog fuel: project scalars from the just-persisted jld2.
+            # Non-fatal — the run already succeeded; never let summary
+            # emission kill a multi-hour run or touch the jld2.
+            try
+                write_run_summary(run_dir, psi_file; source="finish_hook")
+            catch err
+                @warn "run summary emit failed (non-fatal)" run_dir exception=err
+            end
+
             # Clean up checkpoint (point completed successfully)
             isdir(ckpt_dir) && rm(ckpt_dir; recursive=true, force=true)
 
@@ -712,6 +721,13 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
     catch err
         isfile(tmp_file) && rm(tmp_file; force=true)
         rethrow(err)
+    end
+
+    # Catalog fuel (non-fatal) — see scan-path emit for rationale.
+    try
+        write_run_summary(run_dir, psi_file; source="finish_hook")
+    catch err
+        @warn "run summary emit failed (non-fatal)" run_dir exception=err
     end
 
     isdir(ckpt_dir) && rm(ckpt_dir; recursive=true, force=true)
