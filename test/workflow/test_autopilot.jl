@@ -193,5 +193,45 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
                 rm(joinpath(local_qr.path, ".autopilot.dry_run"); force=true)
             end
         end
+
+        @testset "backfill_group_ids! clusters legacy lineage" begin
+            # Entries enqueued before group_id inheritance deserialize with
+            # group_id == their own content_id (each its own singleton).
+            # backfill walks parent_id to the lineage root and adopts the
+            # root's group_id, reconstructing what inheritance would produce.
+            mktempdir() do tmp
+                local_qr = SpinorBEC.QueueRoot(joinpath(tmp, "runs"))
+
+                function _legacy_entry(cid, parent)
+                    rd = joinpath(local_qr.path, cid)
+                    mkpath(rd)
+                    sp = joinpath(rd, "config.yaml")
+                    touch(sp)
+                    e = QueueEntry(cid; run_dir=rd, spec_path=sp,
+                        parent_id=parent, group_id="")  # empty → own cid
+                    save_entry!(e)
+                    e
+                end
+
+                r = _legacy_entry("rootaaaaaaaaaaaa", nothing)
+                c1 = _legacy_entry("child1bbbbbbbbbb", "rootaaaaaaaaaaaa")
+                c2 = _legacy_entry("child2cccccccccc", "child1bbbbbbbbbb")
+                s = _legacy_entry("standaloneddddd", nothing)
+
+                # Pre-state: scattered (each is its own group).
+                @test get_entry(c1.run_dir).group_id == "child1bbbbbbbbbb"
+
+                changes = backfill_group_ids!(; qr=local_qr)
+                @test length(changes) == 2  # c1, c2 reassigned; r, s untouched
+
+                @test get_entry(r.run_dir).group_id == "rootaaaaaaaaaaaa"
+                @test get_entry(c1.run_dir).group_id == "rootaaaaaaaaaaaa"
+                @test get_entry(c2.run_dir).group_id == "rootaaaaaaaaaaaa"
+                @test get_entry(s.run_dir).group_id == "standaloneddddd"
+
+                # Idempotent: a second pass is a no-op.
+                @test isempty(backfill_group_ids!(; qr=local_qr))
+            end
+        end
     end
 end

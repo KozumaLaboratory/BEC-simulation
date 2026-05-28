@@ -105,6 +105,7 @@ function _maybe_fire_on_complete!(entry::QueueEntry,
                 recipe_name=name,
                 recipe_params=entry.recipe_params,
                 parent_id=entry.content_id,
+                group_id=entry.group_id,    # child stays in parent's intention group
                 qr=config.qr,
             )
             stats.on_complete_fired += 1

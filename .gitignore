@@ -50,6 +50,10 @@ runs/_dashboard_cache/
 # operational state, never source-of-truth.
 runs/.autopilot.*
 
+# Catalog human-layer (tags / index) — references local content_ids and
+# is rebuildable; per-machine, not source-of-truth.
+runs/.catalog/
+
 # Per-run generated artefacts (movie frames, summaries, dashboard JSON)
 runs/**/frames/
 runs/**/summary.json

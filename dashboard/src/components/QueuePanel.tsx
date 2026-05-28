@@ -5,6 +5,7 @@ import {
   api,
   type AutopilotQueueEntry,
   type AutopilotQueueResponse,
+  type Tag,
 } from '@/api'
 import { useDashboardURL } from '@/state/useDashboardURL'
 import { EnqueueDialog } from '@/components/EnqueueDialog'
@@ -29,6 +30,74 @@ const STATE_COLOR: Record<State, string> = {
   killed_bug: 'var(--t-red, #d94e1f)',
 }
 
+const STATE_SYMBOL: Record<State, string> = {
+  pending: '◦',
+  running: '⟳',
+  done: '✓',
+  killed_data: '⚡',
+  killed_bug: '✗',
+}
+
+// An "intention" — one manual enqueue, one sweep, or one recipe lineage —
+// is the unit an operator reasons about. The backend stamps every entry
+// with a shared `group_id` (== content_id for singletons, `grp-<hash>` for
+// sweeps, inherited by on_complete children). We bucket the flat 5-state
+// snapshot back into those intentions so 100 sweep cells collapse to one
+// expandable row with a status rollup instead of 100 disconnected rows.
+interface IntentionGroupData {
+  group_id: string
+  cells: AutopilotQueueEntry[]
+  label: string
+  recipeName: string | null
+  rollup: Record<State, number>
+  total: number
+  latest: string // most recent enqueued_at, for ordering
+}
+
+function groupByIntention(snap: AutopilotQueueResponse): IntentionGroupData[] {
+  const buckets = new Map<string, AutopilotQueueEntry[]>()
+  for (const s of STATES) {
+    for (const e of snap[s] ?? []) {
+      const arr = buckets.get(e.group_id)
+      if (arr) arr.push(e)
+      else buckets.set(e.group_id, [e])
+    }
+  }
+  const groups: IntentionGroupData[] = []
+  for (const [group_id, cells] of buckets) {
+    const rollup: Record<State, number> = {
+      pending: 0,
+      running: 0,
+      done: 0,
+      killed_data: 0,
+      killed_bug: 0,
+    }
+    let latest = ''
+    for (const e of cells) {
+      rollup[e.status] += 1
+      if (e.enqueued_at > latest) latest = e.enqueued_at
+    }
+    const recipeName = cells.find((c) => c.recipe.name)?.recipe.name ?? null
+    const isGrp = group_id.startsWith('grp-')
+    const label =
+      cells.length === 1
+        ? recipeName ?? cells[0].content_id.slice(0, 8)
+        : recipeName ?? (isGrp ? 'sweep' : group_id.slice(0, 8))
+    groups.push({
+      group_id,
+      cells,
+      label,
+      recipeName,
+      rollup,
+      total: cells.length,
+      latest,
+    })
+  }
+  // Most recently touched intentions first; stable for equal timestamps.
+  groups.sort((a, b) => (a.latest < b.latest ? 1 : a.latest > b.latest ? -1 : 0))
+  return groups
+}
+
 function sessionId(): string {
   try {
     const k = 'spinorbec.dashboard.session_id'
@@ -44,6 +113,7 @@ function sessionId(): string {
 
 function useAutopilotQueue(intervalMs = 5000) {
   const [snap, setSnap] = useState<AutopilotQueueResponse | null>(null)
+  const [tagsByCid, setTagsByCid] = useState<Record<string, string[]>>({})
   const [error, setError] = useState<string | null>(null)
   const stopRef = useRef(false)
   const tickRef = useRef<(() => Promise<void>) | null>(null)
@@ -54,8 +124,19 @@ function useAutopilotQueue(intervalMs = 5000) {
       if (document.hidden) return
       try {
         const q = await api.autopilotQueue()
+        // Tags are a separate, newer endpoint — don't let its absence
+        // (old server) take down the queue view.
+        let tags: Tag[] = []
+        try {
+          tags = await api.listTags()
+        } catch {
+          tags = []
+        }
         if (!stopRef.current) {
           setSnap(q)
+          const map: Record<string, string[]> = {}
+          for (const t of tags) (map[t.content_id] ??= []).push(t.name)
+          setTagsByCid(map)
           setError(null)
         }
       } catch (e) {
@@ -74,15 +155,16 @@ function useAutopilotQueue(intervalMs = 5000) {
   const refresh = () => {
     void tickRef.current?.()
   }
-  return { snap, error, refresh }
+  return { snap, tagsByCid, error, refresh }
 }
 
 export function QueuePanel() {
-  const { snap, error, refresh } = useAutopilotQueue()
+  const { snap, tagsByCid, error, refresh } = useAutopilotQueue()
   const [, setUrl] = useDashboardURL()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogInitialYaml, setDialogInitialYaml] = useState<string | undefined>()
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
+  const [groupExpanded, setGroupExpanded] = useState<Set<string>>(() => new Set())
   const [flashCid, setFlashCid] = useState<string | null>(null)
   const [actionBusy, setActionBusy] = useState<Set<string>>(() => new Set())
   const [toasts, setToasts] = useState<QueueToastInfo[]>([])
@@ -115,10 +197,26 @@ export function QueuePanel() {
     })
   }
 
+  function toggleGroup(gid: string) {
+    setGroupExpanded((cur) => {
+      const next = new Set(cur)
+      if (next.has(gid)) next.delete(gid)
+      else next.add(gid)
+      return next
+    })
+  }
+
   function revealAndFlash(cid: string) {
     // Expand the row + flash highlight + scroll into view. Used by toast
     // click after a fresh enqueue and by parent_id click for lineage.
+    // The row only renders if its intention group is open, so open that too.
     setExpanded((cur) => new Set(cur).add(cid))
+    if (snap) {
+      const gid = STATES.flatMap((s) => snap[s] ?? []).find(
+        (e) => e.content_id === cid,
+      )?.group_id
+      if (gid) setGroupExpanded((cur) => new Set(cur).add(gid))
+    }
     setFlashCid(cid)
     requestAnimationFrame(() => {
       const el = document.querySelector(`[data-cid="${cid}"]`)
@@ -156,6 +254,48 @@ export function QueuePanel() {
         setDialogOpen(true)
       })
   }
+
+  const doTag = useCallback(
+    async (cid: string) => {
+      const name = window.prompt(
+        `Tag run ${cid.slice(0, 8)} — enter a name (e.g. paper3_fig6_final):`,
+      )
+      if (!name) return
+      const trimmed = name.trim()
+      if (!trimmed) return
+      try {
+        const r = await api.tagRun(trimmed, cid)
+        pushToast(
+          r.ok
+            ? {
+                content_id: cid,
+                kind: 'success',
+                message: `tagged "${trimmed}"`,
+                onClick: () => revealAndFlash(cid),
+              }
+            : { content_id: cid, kind: 'error', message: 'tag failed', detail: r.error },
+        )
+      } catch (e) {
+        pushToast({ content_id: cid, kind: 'error', message: 'tag threw', detail: String(e) })
+      } finally {
+        refresh()
+      }
+    },
+    [refresh],
+  )
+
+  const doUntag = useCallback(
+    async (name: string, cid: string) => {
+      try {
+        await api.untagRun(name)
+      } catch (e) {
+        pushToast({ content_id: cid, kind: 'error', message: 'untag threw', detail: String(e) })
+      } finally {
+        refresh()
+      }
+    },
+    [refresh],
+  )
 
   const doAction = useCallback(
     async (cid: string, action: 'promote' | 'cancel') => {
@@ -214,23 +354,25 @@ export function QueuePanel() {
         onEnqueueClick={openBlank}
       />
       {snap &&
-        STATES.map((s) =>
-          (snap[s]?.length ?? 0) > 0 ? (
-            <StateGroup
-              key={s}
-              state={s}
-              entries={snap[s]}
-              expanded={expanded}
-              flashCid={flashCid}
-              actionBusy={actionBusy}
-              onToggleExpand={toggleExpand}
-              onFork={openFork}
-              onAction={doAction}
-              onJumpToCid={revealAndFlash}
-              onOpenConfig={openEffectiveConfig}
-            />
-          ) : null,
-        )}
+        groupByIntention(snap).map((g) => (
+          <IntentionGroup
+            key={g.group_id}
+            group={g}
+            groupOpen={g.cells.length === 1 || groupExpanded.has(g.group_id)}
+            expanded={expanded}
+            flashCid={flashCid}
+            actionBusy={actionBusy}
+            tagsByCid={tagsByCid}
+            onToggleGroup={() => toggleGroup(g.group_id)}
+            onToggleExpand={toggleExpand}
+            onFork={openFork}
+            onAction={doAction}
+            onTag={doTag}
+            onUntag={doUntag}
+            onJumpToCid={revealAndFlash}
+            onOpenConfig={openEffectiveConfig}
+          />
+        ))}
       {snap && Object.values(counts ?? {}).every((n) => n === 0) && (
         <Card>
           <CardContent className="p-6 text-sm text-muted-foreground text-center">
@@ -371,83 +513,183 @@ function StateChip({
   )
 }
 
-function StateGroup({
-  state,
-  entries,
+function TagPill({ name, onRemove }: { name: string; onRemove: () => void }) {
+  return (
+    <span
+      data-row-action
+      className="inline-flex items-center gap-1 font-mono text-[10px] px-1.5 py-px border"
+      style={{
+        borderRadius: 0,
+        borderColor: 'var(--t-cyan,#4a8bb8)',
+        color: 'var(--t-cyan,#4a8bb8)',
+        background: 'color-mix(in oklch, var(--t-cyan,#4a8bb8) 10%, transparent)',
+      }}
+      title={`tag: ${name}`}
+    >
+      {name}
+      <button
+        type="button"
+        data-row-action
+        onClick={(ev) => {
+          ev.stopPropagation()
+          onRemove()
+        }}
+        className="hover:text-[var(--t-red,#d94e1f)] leading-none"
+        title={`remove tag "${name}"`}
+        aria-label={`remove tag ${name}`}
+      >
+        ×
+      </button>
+    </span>
+  )
+}
+
+function Rollup({ rollup }: { rollup: Record<State, number> }) {
+  const active = STATES.filter((s) => rollup[s] > 0)
+  return (
+    <span className="inline-flex items-baseline gap-2 font-mono text-[12px]">
+      {active.map((s) => (
+        <span
+          key={s}
+          style={{ color: STATE_COLOR[s] }}
+          title={STATE_LABEL[s]}
+          className="inline-flex items-baseline gap-0.5"
+        >
+          <span className="numeric">{rollup[s]}</span>
+          <span aria-hidden>{STATE_SYMBOL[s]}</span>
+        </span>
+      ))}
+    </span>
+  )
+}
+
+function IntentionGroup({
+  group,
+  groupOpen,
   expanded,
   flashCid,
   actionBusy,
+  tagsByCid,
+  onToggleGroup,
   onToggleExpand,
   onFork,
   onAction,
+  onTag,
+  onUntag,
   onJumpToCid,
   onOpenConfig,
 }: {
-  state: State
-  entries: AutopilotQueueEntry[]
+  group: IntentionGroupData
+  groupOpen: boolean
   expanded: Set<string>
   flashCid: string | null
   actionBusy: Set<string>
+  tagsByCid: Record<string, string[]>
+  onToggleGroup: () => void
   onToggleExpand: (cid: string) => void
   onFork: (e: AutopilotQueueEntry) => void
   onAction: (cid: string, action: 'promote' | 'cancel') => void
+  onTag: (cid: string) => void
+  onUntag: (name: string, cid: string) => void
   onJumpToCid: (cid: string) => void
   onOpenConfig: (cid: string) => void
 }) {
+  const isSingleton = group.total === 1
+  // A group's headline colour follows its "worst" live state so a sweep
+  // with any bug stands out: bug > data > running > pending > done.
+  const headState: State =
+    group.rollup.killed_bug > 0
+      ? 'killed_bug'
+      : group.rollup.killed_data > 0
+      ? 'killed_data'
+      : group.rollup.running > 0
+      ? 'running'
+      : group.rollup.pending > 0
+      ? 'pending'
+      : 'done'
+
   return (
     <Card>
       <CardContent className="p-0">
         <div
-          className="px-5 py-3 border-b border-[var(--ink-faint)] flex items-baseline gap-2"
+          className={
+            'px-5 py-3 border-b border-[var(--ink-faint)] flex items-center gap-3 ' +
+            (isSingleton ? '' : 'cursor-pointer select-none')
+          }
           style={{
             background:
-              'color-mix(in oklch, ' + STATE_COLOR[state] + ' 7%, transparent)',
+              'color-mix(in oklch, ' + STATE_COLOR[headState] + ' 7%, transparent)',
           }}
+          onClick={isSingleton ? undefined : onToggleGroup}
         >
+          {!isSingleton && (
+            <span className="text-[var(--ink-faint)] font-mono text-xs">
+              {groupOpen ? '▾' : '▸'}
+            </span>
+          )}
           <span
-            className="inline-block w-2 h-2 rounded-full"
-            style={{ background: STATE_COLOR[state] }}
+            className="inline-block w-2 h-2 rounded-full shrink-0"
+            style={{ background: STATE_COLOR[headState] }}
             aria-hidden
           />
-          <span className="font-mono text-[10.5px] uppercase tracking-[0.10em] text-[var(--ink)]">
-            {STATE_LABEL[state]} · {entries.length}
+          <span className="font-mono text-[12px] text-[var(--ink)] truncate">
+            {group.label}
+          </span>
+          {!isSingleton && (
+            <span className="font-mono text-[10.5px] text-[var(--ink-faint)] shrink-0">
+              {group.group_id.startsWith('grp-')
+                ? group.group_id
+                : group.group_id.slice(0, 12)}
+            </span>
+          )}
+          <span className="ml-auto flex items-baseline gap-3 shrink-0">
+            <span className="font-mono numeric text-[13px] text-[var(--ink-soft)]">
+              {group.total}
+            </span>
+            <Rollup rollup={group.rollup} />
           </span>
         </div>
-        <div className="overflow-auto">
-          <table className="w-full text-xs font-mono">
-            <thead className="text-[var(--ink-faint)] uppercase tracking-[0.06em] text-[10px]">
-              <tr className="border-b border-[var(--ink-faint)]">
-                <th className="px-3 py-2 text-left w-6"></th>
-                <th className="px-3 py-2 text-left">cid</th>
-                <th className="px-3 py-2 text-left">recipe / autonomy</th>
-                <th className="px-3 py-2 text-left">profile</th>
-                <th className="px-3 py-2 text-right">attempt</th>
-                <th className="px-3 py-2 text-right">est wall (h)</th>
-                <th className="px-3 py-2 text-right">gpu·h done</th>
-                <th className="px-3 py-2 text-left">job_id</th>
-                <th className="px-3 py-2 text-left">parent</th>
-                <th className="px-3 py-2 text-left">reason / by</th>
-                <th className="px-3 py-2 text-right">actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries.map((e) => (
-                <EntryRow
-                  key={e.content_id + '@' + e.enqueued_at}
-                  e={e}
-                  expanded={expanded.has(e.content_id)}
-                  flashed={flashCid === e.content_id}
-                  busy={actionBusy.has(e.content_id)}
-                  onToggle={() => onToggleExpand(e.content_id)}
-                  onFork={() => onFork(e)}
-                  onAction={(action) => onAction(e.content_id, action)}
-                  onJumpToCid={onJumpToCid}
-                  onOpenConfig={onOpenConfig}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {groupOpen && (
+          <div className="overflow-auto">
+            <table className="w-full text-xs font-mono">
+              <thead className="text-[var(--ink-faint)] uppercase tracking-[0.06em] text-[10px]">
+                <tr className="border-b border-[var(--ink-faint)]">
+                  <th className="px-3 py-2 text-left w-6"></th>
+                  <th className="px-3 py-2 text-left">cid</th>
+                  <th className="px-3 py-2 text-left">state</th>
+                  <th className="px-3 py-2 text-left">recipe / autonomy</th>
+                  <th className="px-3 py-2 text-left">profile</th>
+                  <th className="px-3 py-2 text-right">attempt</th>
+                  <th className="px-3 py-2 text-right">est wall (h)</th>
+                  <th className="px-3 py-2 text-right">gpu·h done</th>
+                  <th className="px-3 py-2 text-left">job_id</th>
+                  <th className="px-3 py-2 text-left">parent</th>
+                  <th className="px-3 py-2 text-left">reason / by</th>
+                  <th className="px-3 py-2 text-right">actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {group.cells.map((e) => (
+                  <EntryRow
+                    key={e.content_id + '@' + e.enqueued_at}
+                    e={e}
+                    expanded={expanded.has(e.content_id)}
+                    flashed={flashCid === e.content_id}
+                    busy={actionBusy.has(e.content_id)}
+                    tags={tagsByCid[e.content_id] ?? []}
+                    onToggle={() => onToggleExpand(e.content_id)}
+                    onFork={() => onFork(e)}
+                    onAction={(action) => onAction(e.content_id, action)}
+                    onTag={() => onTag(e.content_id)}
+                    onUntag={(name) => onUntag(name, e.content_id)}
+                    onJumpToCid={onJumpToCid}
+                    onOpenConfig={onOpenConfig}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </CardContent>
     </Card>
   )
@@ -458,9 +700,12 @@ function EntryRow({
   expanded,
   flashed,
   busy,
+  tags,
   onToggle,
   onFork,
   onAction,
+  onTag,
+  onUntag,
   onJumpToCid,
   onOpenConfig,
 }: {
@@ -468,9 +713,12 @@ function EntryRow({
   expanded: boolean
   flashed: boolean
   busy: boolean
+  tags: string[]
   onToggle: () => void
   onFork: () => void
   onAction: (action: 'promote' | 'cancel') => void
+  onTag: () => void
+  onUntag: (name: string) => void
   onJumpToCid: (cid: string) => void
   onOpenConfig: (cid: string) => void
 }) {
@@ -504,18 +752,43 @@ function EntryRow({
           {expanded ? '▾' : '▸'}
         </td>
         <td className="px-3 py-2" title={e.content_id}>
-          <button
-            type="button"
-            data-row-action
-            onClick={(ev) => {
-              ev.stopPropagation()
-              onOpenConfig(e.content_id)
-            }}
-            className="font-mono text-[var(--ink)] underline decoration-dotted underline-offset-2 hover:text-[var(--t-cyan,#4a8bb8)]"
-            title={`open Effective config for ${e.content_id}`}
-          >
-            {e.content_id.slice(0, 8)}
-          </button>
+          <span className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              data-row-action
+              onClick={(ev) => {
+                ev.stopPropagation()
+                onOpenConfig(e.content_id)
+              }}
+              className="font-mono text-[var(--ink)] underline decoration-dotted underline-offset-2 hover:text-[var(--t-cyan,#4a8bb8)]"
+              title={`open Effective config for ${e.content_id}`}
+            >
+              {e.content_id.slice(0, 8)}
+            </button>
+            {tags.map((name) => (
+              <TagPill
+                key={name}
+                name={name}
+                onRemove={() => onUntag(name)}
+              />
+            ))}
+            <button
+              type="button"
+              data-row-action
+              onClick={(ev) => {
+                ev.stopPropagation()
+                onTag()
+              }}
+              className="font-mono text-[10px] text-[var(--ink-faint)] hover:text-[var(--ink)] px-1 leading-none"
+              title="pin a stable human name to this run"
+            >
+              +tag
+            </button>
+          </span>
+        </td>
+        <td className="px-3 py-2 whitespace-nowrap" style={{ color: STATE_COLOR[e.status] }}>
+          <span aria-hidden>{STATE_SYMBOL[e.status]}</span>{' '}
+          {STATE_LABEL[e.status]}
         </td>
         <td className="px-3 py-2 text-[var(--ink-soft)]">
           {e.recipe.name ?? '—'}{' '}
@@ -580,7 +853,7 @@ function EntryRow({
       </tr>
       {expanded && (
         <tr style={flashStyle}>
-          <td colSpan={11} className="px-3 py-3 bg-[color-mix(in_oklch,var(--ink)_2%,transparent)] border-b border-[var(--ink-faint)]">
+          <td colSpan={12} className="px-3 py-3 bg-[color-mix(in_oklch,var(--ink)_2%,transparent)] border-b border-[var(--ink-faint)]">
             <EntryDetail
               e={e}
               onOpenConfig={() => onOpenConfig(e.content_id)}

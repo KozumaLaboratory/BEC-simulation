@@ -59,6 +59,7 @@ function _entry_to_json(e::QueueEntry)
         "\"enqueued_at\":\"$(string(e.enqueued_at))\"",
         "\"enqueued_by\":\"$(_jsonesc(e.enqueued_by))\"",
         "\"parent_id\":$(e.parent_id === nothing ? "null" : "\"$(e.parent_id)\"")",
+        "\"group_id\":\"$(_jsonesc(e.group_id))\"",
         "\"recipe\":{" *
         "\"name\":$(e.recipe_name === nothing ? "null" : "\"$(String(e.recipe_name))\"")," *
         "\"autonomy_level\":\"$(String(e.autonomy_level))\"" *

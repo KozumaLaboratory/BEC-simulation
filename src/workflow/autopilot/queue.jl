@@ -34,6 +34,7 @@ export QueueEntry, QueueRoot,
     QUEUE_STATES, RUN_STATE_FILENAME, OUTCOME_FILENAME,
     STATE_TOML_SCHEMA_VERSION,
     enqueue!, list_queue, get_entry, save_entry!,
+    backfill_group_ids!,
     queue_root_default, autopilot_queue_root,
     set_status!, with_autopilot_lock, with_entry_lock
 
@@ -96,6 +97,12 @@ mutable struct QueueEntry
     enqueued_at::DateTime
     enqueued_by::String
     parent_id::Union{Nothing, String}
+    # Intention grouping key. A manual sweep shares one group_id across
+    # all cells; an on_complete child inherits its parent's group_id; a
+    # lone run defaults to its own content_id (singleton group). The
+    # dashboard groups the queue by this so 100-cell sweeps collapse to
+    # one expandable row instead of 100 flat rows.
+    group_id::String
 
     # recipe (named registry — no closures)
     recipe_name::Union{Nothing, Symbol}
@@ -132,6 +139,7 @@ function QueueEntry(content_id::AbstractString;
     enqueued_at::DateTime=now(),
     enqueued_by::AbstractString="manual",
     parent_id::Union{Nothing, AbstractString}=nothing,
+    group_id::AbstractString="",
     recipe_name::Union{Nothing, Symbol}=nothing,
     recipe_params::AbstractDict=Dict{String, Any}(),
     autonomy_level::Symbol=:dispatch,
@@ -149,10 +157,13 @@ function QueueEntry(content_id::AbstractString;
         throw(ArgumentError("unknown status $status; expected one of $QUEUE_STATES"))
     autonomy_level in (:suggest, :propose, :dispatch) ||
         throw(ArgumentError("autonomy_level must be :suggest|:propose|:dispatch"))
+    # Empty group_id → singleton group keyed on the run's own content_id.
+    resolved_group = isempty(group_id) ? String(content_id) : String(group_id)
     QueueEntry(
         status, String(kill_reason), attempt, priority,
         String(content_id), enqueued_at, String(enqueued_by),
         parent_id === nothing ? nothing : String(parent_id),
+        resolved_group,
         recipe_name,
         Dict{String, Any}(string(k) => v for (k, v) in recipe_params),
         autonomy_level,
@@ -218,6 +229,7 @@ function _entry_to_toml_dict(e::QueueEntry)
             "enqueued_at" => string(e.enqueued_at),
             "enqueued_by" => e.enqueued_by,
             "parent_id" => e.parent_id === nothing ? "" : e.parent_id,
+            "group_id" => e.group_id,
         ),
         "recipe" => Dict{String, Any}(
             "name" => e.recipe_name === nothing ? "" : String(e.recipe_name),
@@ -269,6 +281,7 @@ function _entry_from_toml_dict(d::AbstractDict, run_dir::AbstractString)
         enqueued_at=DateTime(String(get(prov, "enqueued_at", string(now())))),
         enqueued_by=get(prov, "enqueued_by", "unknown"),
         parent_id=isempty(parent_raw) ? nothing : parent_raw,
+        group_id=String(get(prov, "group_id", "")),
         recipe_name=isempty(name_raw) ? nothing : Symbol(name_raw),
         recipe_params=Dict{String, Any}(get(rec, "params", Dict())),
         autonomy_level=Symbol(get(rec, "autonomy_level", "dispatch")),
@@ -410,6 +423,46 @@ function list_queue(state::Symbol=:pending;
 end
 
 """
+    backfill_group_ids!(; qr=autopilot_queue_root(), dry_run=false)
+        -> Vector{Pair{String,String}}
+
+Reconstruct intention `group_id`s for legacy lineages. For each entry,
+walk the `parent_id` chain to its lineage root and adopt the root's
+`group_id`; parentless entries keep their own. Needed only for on_complete
+trees enqueued before `group_id` inheritance existed — read-time
+deserialization already resolves an empty id to the entry's own
+`content_id`, so this is purely a clustering pass, never invents grouping
+that lineage doesn't already imply. Returns the `content_id => new_group_id`
+changes applied (or that would apply when `dry_run`).
+"""
+function backfill_group_ids!(; qr::QueueRoot=autopilot_queue_root(),
+    dry_run::Bool=false)
+    all_entries = list_queue(:all; qr=qr)
+    by_cid = Dict(e.content_id => e for e in all_entries)
+    changes = Pair{String, String}[]
+    for e in all_entries
+        root = e
+        seen = Set{String}((e.content_id,))
+        while root.parent_id !== nothing && haskey(by_cid, root.parent_id) &&
+                  !(root.parent_id in seen)
+            push!(seen, root.parent_id)
+            root = by_cid[root.parent_id]
+        end
+        target = root.group_id
+        e.group_id == target && continue
+        push!(changes, e.content_id => target)
+        dry_run && continue
+        with_entry_lock(e) do
+            latest = get_entry(e.run_dir)
+            latest === nothing && return nothing
+            latest.group_id = target
+            save_entry!(latest)
+        end
+    end
+    return changes
+end
+
+"""
     set_status!(entry, new_status; kill_reason="") -> QueueEntry
 
 Update status (and optionally kill_reason) and persist atomically.
@@ -468,6 +521,7 @@ function enqueue!(exp::Experiment;
     recipe_params::AbstractDict=Dict{String, Any}(),
     autonomy_level::Symbol=:dispatch,
     parent_id::Union{Nothing, AbstractString}=nothing,
+    group_id::AbstractString="",
     profile::AbstractString="default",
     estimated_walltime_hours::Real=2.0,
     backend_type::Symbol=:local,
@@ -487,6 +541,7 @@ function enqueue!(exp::Experiment;
         run_dir=od, spec_path=cfg_path,
         status=:pending, priority=priority,
         enqueued_by=enqueued_by, parent_id=parent_id,
+        group_id=group_id,
         recipe_name=recipe_name, recipe_params=recipe_params,
         autonomy_level=autonomy_level,
         profile=profile, estimated_walltime_hours=estimated_walltime_hours,
@@ -603,8 +658,23 @@ end
 # (`register_on_complete_version!`); `_capture_recipe_version` resolves
 # it via `Base.invokelatest`.
 
-function enqueue!(exps::AbstractVector{<:Experiment}; kwargs...)
-    [enqueue!(e; kwargs...) for e in exps]
+"""
+    enqueue!(exps::Vector{Experiment}; group_id="", kwargs...) -> Vector{QueueEntry}
+
+Enqueue a sweep. All cells share one `group_id` so the dashboard renders
+them as a single expandable group rather than N flat rows. When
+`group_id` is empty, derive a deterministic one from the sorted member
+content_ids — re-enqueuing the same sweep yields the same group.
+"""
+function enqueue!(exps::AbstractVector{<:Experiment}; group_id::AbstractString="", kwargs...)
+    isempty(exps) && return QueueEntry[]
+    gid = if !isempty(group_id)
+        String(group_id)
+    else
+        cids = sort([content_id(e.spec) for e in exps])
+        "grp-" * bytes2hex(SHA.sha256(join(cids, ",")))[1:12]
+    end
+    [enqueue!(e; group_id=gid, kwargs...) for e in exps]
 end
 
 # ── Lockfile (process-level mutex for autopilot_tick!) ──────────────

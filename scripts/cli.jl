@@ -24,6 +24,7 @@ function _print_help(io::IO=stdout)
     println(io, "  figure    --paper <p> --fig <n> | --list        manuscript figure builder")
     println(io, "  preflight [<smoke_config>]                      cluster CUDA + smoke")
     println(io, "  autopilot <sub> [args]                          queue meta-loop ops")
+    println(io, "  tag       {add <name> <cid>|remove <name>|list} catalog human pointers")
     println(io, "  help                                            this message")
     println(io)
     println(io, "autopilot subcommands:")
@@ -44,7 +45,7 @@ function _kv(args, key, default="")
     pref = "--" * key * "="
     for a in args
         startswith(String(a), pref) || continue
-        return String(a)[length(pref)+1:end]
+        return String(a)[(length(pref) + 1):end]
     end
     default
 end
@@ -96,11 +97,14 @@ function _cmd_figure(args)
     i = 1
     while i <= length(args)
         if args[i] == "--paper" && i + 1 <= length(args)
-            paper = args[i + 1]; i += 2
+            paper = args[i + 1];
+            i += 2
         elseif args[i] == "--fig" && i + 1 <= length(args)
-            fig = args[i + 1]; i += 2
+            fig = args[i + 1];
+            i += 2
         elseif args[i] == "--list"
-            list = true; i += 1
+            list = true;
+            i += 1
         else
             i += 1
         end
@@ -123,20 +127,24 @@ end
 
 function _cmd_autopilot(args)
     if isempty(args)
-        println(stderr, "usage: cli.jl autopilot {tick|status|enqueue|retry|pause|resume|drain|why|budget|dry-run}")
+        println(
+            stderr,
+            "usage: cli.jl autopilot {tick|status|enqueue|retry|pause|resume|drain|why|budget|dry-run|backfill-groups}",
+        )
         return 2
     end
     sub, rest = args[1], args[2:end]
-    sub == "tick"     && return _ap_tick(rest)
-    sub == "status"   && return _ap_status(rest)
-    sub == "enqueue"  && return _ap_enqueue(rest)
-    sub == "retry"    && return _ap_retry(rest)
-    sub == "pause"    && return _ap_pause(rest)
-    sub == "resume"   && return _ap_resume(rest)
-    sub == "drain"    && return _ap_drain(rest)
-    sub == "why"      && return _ap_why(rest)
-    sub == "budget"   && return _ap_budget(rest)
-    sub == "dry-run"  && return _ap_dryrun(rest)
+    sub == "tick" && return _ap_tick(rest)
+    sub == "status" && return _ap_status(rest)
+    sub == "enqueue" && return _ap_enqueue(rest)
+    sub == "retry" && return _ap_retry(rest)
+    sub == "pause" && return _ap_pause(rest)
+    sub == "resume" && return _ap_resume(rest)
+    sub == "drain" && return _ap_drain(rest)
+    sub == "why" && return _ap_why(rest)
+    sub == "budget" && return _ap_budget(rest)
+    sub == "dry-run" && return _ap_dryrun(rest)
+    sub == "backfill-groups" && return _ap_backfill_groups(rest)
     println(stderr, "cli.jl autopilot: unknown subcommand '$sub'")
     return 2
 end
@@ -155,7 +163,10 @@ function _ap_status(_)
 end
 
 function _ap_enqueue(rest)
-    isempty(rest) && (println(stderr, "usage: cli.jl autopilot enqueue <yaml> [--priority N] [--enqueued-by T]"); return 2)
+    isempty(rest) && (
+        println(stderr, "usage: cli.jl autopilot enqueue <yaml> [--priority N] [--enqueued-by T]");
+        return 2
+    )
     yaml_path = rest[1]
     priority = _kvi(rest, "priority", 5)
     tag = _kv(rest, "enqueued-by", "cli")
@@ -168,6 +179,26 @@ function _ap_retry(rest)
     max_r = _kvi(rest, "max", 3)
     out = retry_failed!(; max_retries=max_r)
     println("retry: ", out)
+    0
+end
+
+function _ap_backfill_groups(rest)
+    dry = "--dry-run" in rest
+    changes = SpinorBEC.backfill_group_ids!(; dry_run=dry)
+    if isempty(changes)
+        println("backfill-groups: nothing to do (all group_ids consistent)")
+    else
+        println(
+            if dry
+                "backfill-groups (DRY-RUN), would update $(length(changes)):"
+            else
+                "backfill-groups: updated $(length(changes)):"
+            end,
+        )
+        for (cid, gid) in changes
+            println("  $(cid[1:min(end,16)]) → group_id $(gid[1:min(end,16)])")
+        end
+    end
     0
 end
 
@@ -185,7 +216,7 @@ end
 
 function _ap_drain(rest)
     tmo = _kvf(rest, "timeout", 3600.0)
-    ok = autopilot_drain_wait(timeout_s=tmo)
+    ok = autopilot_drain_wait(; timeout_s=tmo)
     println(ok ? "drained" : "drain timed out")
     ok ? 0 : 1
 end
@@ -201,9 +232,9 @@ function _ap_budget(rest)
     if !isempty(rest) && rest[1] == "set"
         b = SpinorBEC.get_budget()
         qcap = _kvf(rest, "quarter", b.quarter_cap_gpu_hours)
-        dcap = _kvf(rest, "daily",   b.daily_cap_gpu_hours)
+        dcap = _kvf(rest, "daily", b.daily_cap_gpu_hours)
         b.quarter_cap_gpu_hours = qcap
-        b.daily_cap_gpu_hours   = dcap
+        b.daily_cap_gpu_hours = dcap
         SpinorBEC.set_budget!(b)
         println("budget caps updated: quarter=$(qcap), daily=$(dcap)")
         return 0
@@ -234,17 +265,47 @@ function _ap_dryrun(rest)
     2
 end
 
+# ── tag subcommand (catalog human pointers) ─────────────────────────
+
+function _cmd_tag(args)
+    if isempty(args)
+        println(stderr, "usage: cli.jl tag {add <name> <cid>|remove <name>|list}")
+        return 2
+    end
+    sub, rest = args[1], args[2:end]
+    if sub == "add"
+        length(rest) >= 2 ||
+            (println(stderr, "usage: cli.jl tag add <name> <content_id>"); return 2)
+        rec = SpinorBEC.tag_run!(rest[1], rest[2]; created_by="cli")
+        println("tagged \"$(rec.name)\" → $(rec.content_id)")
+        return 0
+    elseif sub == "remove"
+        isempty(rest) && (println(stderr, "usage: cli.jl tag remove <name>"); return 2)
+        ok = SpinorBEC.untag!(rest[1])
+        println(ok ? "removed \"$(rest[1])\"" : "no such tag \"$(rest[1])\"")
+        return ok ? 0 : 1
+    elseif sub == "list"
+        for t in SpinorBEC.load_tags()
+            println(rpad(t.name, 28), " ", t.content_id)
+        end
+        return 0
+    end
+    println(stderr, "cli.jl tag: unknown subcommand '$sub'")
+    2
+end
+
 # ── main ─────────────────────────────────────────────────────────────
 
 function _main(args)
     isempty(args) && (_print_help(); return 0)
     sub, rest = args[1], args[2:end]
     sub in ("help", "-h", "--help") && (_print_help(); return 0)
-    sub == "inspect"   && return _cmd_inspect(rest)
-    sub == "launch"    && return _cmd_launch(rest)
-    sub == "figure"    && return _cmd_figure(rest)
+    sub == "inspect" && return _cmd_inspect(rest)
+    sub == "launch" && return _cmd_launch(rest)
+    sub == "figure" && return _cmd_figure(rest)
     sub == "preflight" && return _cmd_preflight(rest)
     sub == "autopilot" && return _cmd_autopilot(rest)
+    sub == "tag" && return _cmd_tag(rest)
     println(stderr, "cli.jl: unknown subcommand '$sub'")
     _print_help(stderr)
     2

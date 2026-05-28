@@ -192,6 +192,15 @@ export interface AutopilotQueueEntry {
   run_dir: string
 }
 
+/** A catalog tag: a stable human name pinned to a run's content_id —
+ * the git-tag / nix-profile analogue over the CAS store. */
+export interface Tag {
+  name: string
+  content_id: string
+  created_at: string
+  created_by: string
+}
+
 export interface VortexLine {
   m: string // "+5", "-3", "0"
   charge: number // ±1, ±2, ...
@@ -354,6 +363,26 @@ export const api = {
     session_id?: string,
   ): Promise<QueueActionResponse | QueueActionErrorResponse> {
     return _post('/api/queue/action', { content_id, action, session_id })
+  },
+
+  /** All catalog tags (name → content_id), sorted by name. */
+  listTags(): Promise<Tag[]> {
+    return json('/api/tags')
+  },
+
+  /** Pin a stable human name to a run. Re-points if the name exists. */
+  tagRun(
+    name: string,
+    content_id: string,
+  ): Promise<{ ok: boolean; error?: string }> {
+    return _post('/api/tags', { action: 'add', name, content_id })
+  },
+
+  /** Remove a tag by name. */
+  untagRun(
+    name: string,
+  ): Promise<{ ok: boolean; error?: string; removed?: boolean }> {
+    return _post('/api/tags', { action: 'remove', name })
   },
 
   /** Per-run scan progress: how many `point_NNN.jld2` files have landed

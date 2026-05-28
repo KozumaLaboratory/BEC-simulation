@@ -271,6 +271,10 @@ function _route_dashboard_post(path, body_bytes, base_dir;
         return _route_autopilot_action(body_bytes, base_dir;
             authed_user=authed_user)
     end
+    if path == "/api/tags"
+        return _route_tags_post(body_bytes, base_dir;
+            authed_user=authed_user)
+    end
     if startswith(path, "/api/lab/image/")
         run_name = _uri_decode(path[(length("/api/lab/image/") + 1):end])
         run_dir = joinpath(base_dir, run_name)
@@ -326,6 +330,8 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         return _route_data(path, base_dir, data_cache)
     elseif startswith(path, "/api/effective_config/")
         return _route_effective_config(path, base_dir)
+    elseif path == "/api/tags"
+        return _route_tags_get(base_dir)
     elseif startswith(path, "/api/queue")
         return _route_autopilot_queue(path)
     elseif startswith(path, "/api/density/")

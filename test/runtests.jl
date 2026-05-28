@@ -150,6 +150,7 @@ const FAST_TESTS = [
     "workflow/test_diff_dicts.jl",
     "workflow/test_inspect_batch.jl",
     "workflow/test_autopilot.jl",
+    "workflow/test_catalog.jl",
 ]
 
 # ── CI tier: fast + core integration tests that run ITP/RTP ──
