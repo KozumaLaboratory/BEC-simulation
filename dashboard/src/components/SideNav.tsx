@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Search, RefreshCw, Keyboard, Sun, Moon } from 'lucide-react'
+import { Search, RefreshCw, Keyboard, Sun, Moon, X } from 'lucide-react'
 import { useLiveRuns, useLiveStatus } from '@/state/useLiveRuns'
 import type { RunDataState } from '@/state/useRunData'
+import { cn } from '@/lib/utils'
 
 interface Props {
   state: RunDataState
@@ -10,7 +11,15 @@ interface Props {
   onResize: (w: number) => void
   onShortcuts: () => void
   onToggleTheme: () => void
+  /** Below the md breakpoint the sidebar becomes a slide-in drawer. */
+  isMobile?: boolean
+  mobileOpen?: boolean
+  onClose?: () => void
 }
+
+// Drawer width on phones: most of the viewport but capped so a sliver of
+// the dimmed page stays visible as an affordance to tap-to-close.
+const MOBILE_WIDTH = 'min(86vw, 320px)'
 
 const DEFAULT_WIDTH = 280
 
@@ -29,6 +38,9 @@ export function SideNav({
   onResize,
   onShortcuts,
   onToggleTheme,
+  isMobile = false,
+  mobileOpen = false,
+  onClose,
 }: Props) {
   const { runs, selectedRun, setSelectedRun, refresh } = state
   const [q, setQ] = useState('')
@@ -84,11 +96,16 @@ export function SideNav({
 
   return (
     <aside
-      className="fixed left-0 top-0 bottom-0 z-30 border-r border-[var(--ink)] bg-background flex flex-col"
-      style={{ width }}
+      className={cn(
+        'fixed left-0 top-0 bottom-0 z-30 border-r border-[var(--ink)] bg-background flex flex-col',
+        isMobile && 'transition-transform duration-200',
+        isMobile && !mobileOpen && '-translate-x-full',
+      )}
+      style={{ width: isMobile ? MOBILE_WIDTH : width }}
       aria-label="Run index"
+      aria-hidden={isMobile && !mobileOpen}
     >
-      {/* Resize handle — 6px wide, sits flush with right border */}
+      {/* Resize handle — desktop only (6px wide, flush with right border) */}
       <div
         role="separator"
         aria-orientation="vertical"
@@ -96,7 +113,10 @@ export function SideNav({
         title="Drag to resize · double-click to reset"
         onPointerDown={onPointerDown}
         onDoubleClick={onResetWidth}
-        className="absolute top-0 right-0 bottom-0 w-[6px] -mr-[3px] cursor-col-resize group z-40"
+        className={cn(
+          'absolute top-0 right-0 bottom-0 w-[6px] -mr-[3px] cursor-col-resize group z-40',
+          isMobile && 'hidden',
+        )}
       >
         <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-[var(--ink-faint)] group-hover:bg-[var(--ink)] group-active:bg-[var(--vermillion)] transition-colors" />
         {/* knurl marks — 3 short ticks centered vertically */}
@@ -123,6 +143,11 @@ export function SideNav({
           </div>
         </div>
         <div className="flex flex-col gap-1">
+          {isMobile && (
+            <IconBtn onClick={() => onClose?.()} title="Close run index">
+              <X className="size-3.5" />
+            </IconBtn>
+          )}
           <IconBtn onClick={onToggleTheme} title="Toggle theme">
             {isDark ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
           </IconBtn>

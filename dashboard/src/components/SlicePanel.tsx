@@ -52,7 +52,7 @@ export function SlicePanel({ run, data }: Props) {
   const [mode, setMode] = useState<Mode>('density')
   const [scaleMode, setScaleMode] = useState<'shared' | 'individual'>('shared')
   const [densityMaskFrac, setDensityMaskFrac] = useState<number>(0.01)
-  const [panelMode, setPanelMode] = useState<PanelMode>('total_selected')
+  const [panelMode, setPanelMode] = useState<PanelMode>('all')
   const [selectedM, setSelectedM] = useState<number>(0)
 
   const currentPoint = points[Math.min(pointIdx, points.length - 1)] ?? null
@@ -257,12 +257,20 @@ export function SlicePanel({ run, data }: Props) {
 
   const sizeInfo =
     mode === 'density'
-      ? colDens && `${colDens.shape[0]}×${colDens.shape[1]}`
+      ? useAtlas && atlas.ready
+        ? `${atlas.nx}×${atlas.ny}`
+        : colDens && `${colDens.shape[0]}×${colDens.shape[1]}`
       : phaseData && `slice #${phaseData.slice_index} / ${phaseData.shape.join('×')}`
 
+  // m_values for the per-m selector: atlas takes precedence (it knows the
+  // full component list bulk-loaded for the whole scrub), then single-snap
+  // density, then phase. Without this fallback chain the dropdown silently
+  // disappeared whenever atlas-mode was active.
   const m_values =
     mode === 'density'
-      ? colDens?.m_values ?? []
+      ? useAtlas && atlas.ready
+        ? atlas.m_values
+        : colDens?.m_values ?? []
       : phaseData?.m_values ?? []
 
   return (
@@ -396,6 +404,9 @@ export function SlicePanel({ run, data }: Props) {
             zmax: p.zmax,
             colormap: p.colormap,
             mask: p.mask,
+            // Spatial density/phase maps: keep the grid's nx:ny aspect so
+            // a square field renders square, not stretched to the panel.
+            preserveAspect: true,
           }))
           const mCount = specs.length - (totalIsFirst ? 1 : 0)
           const cols: 1 | 2 | 4 = mCount <= 1 ? 1 : mCount <= 2 ? 2 : 4

@@ -68,7 +68,7 @@ export function TimeScrubber({
   const tFmt = t !== undefined ? ` · t = ${t.toFixed(2)} ω⁻¹` : ` · t = — ω⁻¹`
 
   return (
-    <div className="flex items-center gap-2 px-2 py-1.5 rounded-md border bg-card/50">
+    <div className="flex flex-wrap items-center gap-2 px-2 py-1.5 rounded-md border bg-card/50">
       <Button
         variant="outline"
         size="icon-sm"
@@ -252,7 +252,7 @@ function DebouncedRangeInput({ n, snapIdx, onChange }: DebouncedRangeInputProps)
       step={1}
       value={local}
       onChange={handleInput}
-      className="flex-1 accent-primary"
+      className="flex-1 min-w-[120px] accent-primary"
     />
   )
 }

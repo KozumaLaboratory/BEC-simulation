@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
+import { Menu } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent } from '@/components/ui/card'
 import { useRunData } from '@/state/useRunData'
@@ -10,6 +11,9 @@ import {
   PopulationsChart,
   PopulationsHeatmap,
 } from '@/components/charts/PopulationsChart'
+import { DynamicsOverview } from '@/components/charts/DynamicsOverview'
+import { useDynamicsSeries } from '@/state/useDynamicsSeries'
+import type { DashboardData } from '@/api'
 import { DataTable } from '@/components/DataTable'
 import { LoadingBar } from '@/components/LoadingBar'
 import { TabBoundary } from '@/components/TabBoundary'
@@ -60,6 +64,14 @@ export default function App() {
   const [helpOpen, setHelpOpen] = useState(false)
   const isDark = useThemeMode()
   const [sidebarW, setSidebarW] = useSidebarWidth()
+  const isMobile = useIsMobile()
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+
+  // Close the mobile drawer whenever a run is picked, so the chosen run's
+  // charts are immediately visible instead of staying hidden behind it.
+  useEffect(() => {
+    if (isMobile) setMobileNavOpen(false)
+  }, [selectedRun, isMobile])
 
   if (url.scan) {
     return (
@@ -90,13 +102,39 @@ export default function App() {
         onResize={setSidebarW}
         onShortcuts={() => setHelpOpen(true)}
         onToggleTheme={toggleTheme}
+        isMobile={isMobile}
+        mobileOpen={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
       />
+
+      {/* Mobile drawer backdrop */}
+      {isMobile && mobileNavOpen && (
+        <button
+          type="button"
+          aria-label="Close run index"
+          className="fixed inset-0 z-20 bg-black/50"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
+
+      {/* Mobile hamburger — opens the run index drawer */}
+      {isMobile && (
+        <button
+          type="button"
+          aria-label="Open run index"
+          onClick={() => setMobileNavOpen(true)}
+          className="fixed top-3 left-3 z-20 inline-flex items-center justify-center size-9 border border-[var(--ink)] bg-background text-[var(--ink)]"
+          style={{ borderRadius: 0 }}
+        >
+          <Menu className="size-4" />
+        </button>
+      )}
 
       <main
         className="min-h-screen"
-        style={{ marginLeft: sidebarW }}
+        style={{ marginLeft: isMobile ? 0 : sidebarW }}
       >
-        <div className="max-w-[1320px] mx-auto px-8 md:px-14 py-10 md:py-12">
+        <div className="max-w-[1320px] mx-auto px-4 sm:px-8 md:px-14 pt-16 md:pt-12 pb-10 md:pb-12">
           <WorkbenchHeader
             runName={data?.run}
             f={data?.F}
@@ -180,9 +218,12 @@ export default function App() {
             className="w-full mt-10"
           >
             <div className="mb-5">
-              <TabsList>
+              {/* Wrap (not scroll) the tab bar on narrow screens: flex-1
+                  keeps equal-width tabs on one row at desktop, flex-wrap +
+                  h-auto lets them flow onto extra rows on mobile. */}
+              <TabsList className="flex w-full h-auto flex-wrap gap-y-1">
                 {TAB_ITEMS.map((t) => (
-                  <TabsTrigger key={t.id} value={t.id}>
+                  <TabsTrigger key={t.id} value={t.id} className="h-8">
                     {t.label}
                   </TabsTrigger>
                 ))}
@@ -191,71 +232,12 @@ export default function App() {
 
             <TabsContent value="overview" className="space-y-5">
               <TabBoundary>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <Card>
-                    <CardContent className="p-6">
-                      <ChartLabel index={1} name="Energy" expr="ℏω_ref" />
-                      <MetricLineChart
-                        data={data}
-                        xKey={xKey}
-                        runFilter={runFilter}
-                        yLabel="Energy"
-                        yAccessor={(p) => p.energy}
-                        title=""
-                      />
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-6">
-                      <ChartLabel index={2} name="Magnetization" expr="⟨Fz⟩" />
-                      <MetricLineChart
-                        data={data}
-                        xKey={xKey}
-                        runFilter={runFilter}
-                        yLabel="Mz"
-                        yAccessor={(p) => p.mz_actual}
-                        title=""
-                      />
-                    </CardContent>
-                  </Card>
-                </div>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <ChartLabel index={3} name="Populations" expr="|c_m|²" />
-                    <PopulationsChart
-                      data={data}
-                      xKey={xKey}
-                      runFilter={runFilter}
-                    />
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <ChartLabel index={4} name="Populations · heatmap" />
-                    <PopulationsHeatmap
-                      data={data}
-                      xKey={xKey}
-                      runFilter={runFilter}
-                    />
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <ChartLabel index={5} name="Wall time / point" expr="seconds" />
-                    <MetricLineChart
-                      data={data}
-                      xKey={xKey}
-                      runFilter={runFilter}
-                      yLabel="duration (s)"
-                      yAccessor={(p) => p.duration_seconds}
-                      title=""
-                      height={260}
-                    />
-                  </CardContent>
-                </Card>
+                <OverviewPanel
+                  data={data}
+                  selectedRun={selectedRun}
+                  xKey={xKey}
+                  runFilter={runFilter}
+                />
               </TabBoundary>
             </TabsContent>
 
@@ -473,6 +455,96 @@ function DraftingSelect({
   )
 }
 
+// The Overview adapts to the run type. A parameter scan (n_points > 1)
+// plots each metric across the scan axis. A single dynamics run collapses
+// every per-point chart to one marker, so when the sole point carries a
+// `dynamics/*` block we plot the time evolution instead — otherwise the
+// page looks empty (the original "few points" bug report).
+function OverviewPanel({
+  data,
+  selectedRun,
+  xKey,
+  runFilter,
+}: {
+  data: DashboardData | null
+  selectedRun: string | null
+  xKey: string
+  runFilter: string
+}) {
+  const singleFile =
+    data && data.points.length === 1 ? data.points[0].file : null
+  const dyn = useDynamicsSeries(
+    singleFile ? selectedRun : null,
+    singleFile,
+  )
+
+  if (singleFile && dyn.data?.has_dynamics) {
+    return <DynamicsOverview series={dyn.data} />
+  }
+
+  return (
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <Card>
+          <CardContent className="p-6">
+            <ChartLabel index={1} name="Energy" expr="ℏω_ref" />
+            <MetricLineChart
+              data={data}
+              xKey={xKey}
+              runFilter={runFilter}
+              yLabel="Energy"
+              yAccessor={(p) => p.energy}
+              title=""
+            />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <ChartLabel index={2} name="Magnetization" expr="⟨Fz⟩" />
+            <MetricLineChart
+              data={data}
+              xKey={xKey}
+              runFilter={runFilter}
+              yLabel="Mz"
+              yAccessor={(p) => p.mz_actual}
+              title=""
+            />
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardContent className="p-6">
+          <ChartLabel index={3} name="Populations" expr="|c_m|²" />
+          <PopulationsChart data={data} xKey={xKey} runFilter={runFilter} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-6">
+          <ChartLabel index={4} name="Populations · heatmap" />
+          <PopulationsHeatmap data={data} xKey={xKey} runFilter={runFilter} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-6">
+          <ChartLabel index={5} name="Wall time / point" expr="seconds" />
+          <MetricLineChart
+            data={data}
+            xKey={xKey}
+            runFilter={runFilter}
+            yLabel="duration (s)"
+            yAccessor={(p) => p.duration_seconds}
+            title=""
+            height={260}
+          />
+        </CardContent>
+      </Card>
+    </>
+  )
+}
+
 function ChartLabel({
   name,
   expr,
@@ -564,6 +636,26 @@ function useThemeMode() {
   }, [])
 
   return isDark
+}
+
+// Below Tailwind's lg (<1024px) the 280px fixed sidebar would eat a third
+// of a tablet's width and crush the main column, so the nav collapses to a
+// slide-in drawer and the content goes full-width. ≥1024px keeps the
+// persistent rail.
+const COMPACT_QUERY = '(max-width: 1023px)'
+function useIsMobile(): boolean {
+  const [isMobile, setIsMobile] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      window.matchMedia(COMPACT_QUERY).matches,
+  )
+  useEffect(() => {
+    const mq = window.matchMedia(COMPACT_QUERY)
+    const onChange = () => setIsMobile(mq.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  return isMobile
 }
 
 function TabFallback() {

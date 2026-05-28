@@ -156,8 +156,10 @@ function HeatmapMesh({ data, nx, ny, zmin, zmax, colormap, mask }: MeshProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nx, ny])
 
-  useEffect(() => () => dataTex.dispose(), [dataTex])
-
+  // See the long note in HeatmapGrid.tsx — the canonical
+  // cleanup-time dispose pattern silently breaks under React StrictMode
+  // because the cached useMemo value gets disposed between the dev-
+  // double-mount cycle. Skip the cleanup and accept the bounded leak.
   useEffect(() => {
     dataTex.image.data = data
     dataTex.needsUpdate = true
@@ -181,10 +183,6 @@ function HeatmapMesh({ data, nx, ny, zmin, zmax, colormap, mask }: MeshProps) {
     return tex
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nx, ny, mask !== undefined])
-
-  useEffect(() => () => {
-    maskTex?.dispose()
-  }, [maskTex])
 
   useEffect(() => {
     if (!maskTex || !mask) return
@@ -235,6 +233,11 @@ function HeatmapMesh({ data, nx, ny, zmin, zmax, colormap, mask }: MeshProps) {
           gl_FragColor = vec4(rgb, 1.0);
         }
       `,
+      // DoubleSide is precautionary here (this canvas uses the standard
+      // top=1, bottom=-1 frustum so winding isn't actually inverted),
+      // but kept consistent with HeatmapGrid where the HTML-overlay
+      // frustum (top < bottom) silently broke ShaderMaterial planes.
+      side: THREE.DoubleSide,
       depthTest: false,
       depthWrite: false,
     })
@@ -243,7 +246,6 @@ function HeatmapMesh({ data, nx, ny, zmin, zmax, colormap, mask }: MeshProps) {
 
   useEffect(() => {
     matRef.current = material
-    return () => material.dispose()
   }, [material])
 
   // Patch scalar uniforms in place — recreating the material would force a

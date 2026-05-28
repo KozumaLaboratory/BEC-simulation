@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 export interface LineChartTrace {
   name: string
@@ -51,7 +51,24 @@ export function LineChartSVG({
   xRange,
   ticks = 6,
 }: Props) {
-  const W = 800 // SVG viewBox width — preserveAspectRatio scales to container
+  // Track the real pixel width so the SVG viewBox matches it 1:1. The old
+  // fixed-800 viewBox + preserveAspectRatio="none" stretched every glyph
+  // horizontally (container ÷ 800 ≈ 1.4×), which is why the axis/tick
+  // labels looked crushed. With viewBox width == rendered width the SVG
+  // user units equal CSS pixels, so text renders at its true aspect ratio.
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [W, setW] = useState(800)
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const apply = (w: number) => {
+      if (w > 0) setW(Math.round(w))
+    }
+    apply(el.clientWidth)
+    const ro = new ResizeObserver((entries) => apply(entries[0]?.contentRect.width ?? 0))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
   const H = height
   const innerW = W - PAD_L - PAD_R
   const innerH = H - PAD_T - PAD_B - LEGEND_H
@@ -122,9 +139,11 @@ export function LineChartSVG({
   }, [traces, xMin, xMax, yMin, yMax, innerW, innerH])
 
   return (
+    <div ref={containerRef} style={{ width: '100%' }}>
     <svg
       viewBox={`0 0 ${W} ${H}`}
-      preserveAspectRatio="none"
+      width={W}
+      height={H}
       style={{
         width: '100%',
         height,
@@ -284,6 +303,7 @@ export function LineChartSVG({
         </g>
       )}
     </svg>
+    </div>
   )
 }
 

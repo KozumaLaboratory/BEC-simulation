@@ -27,6 +27,11 @@ export interface HeatmapPanelSpec {
    * If atlasFrames > 1, mask.data must also be an atlas of the same
    * shape (nx · ny · atlasFrames). */
   mask?: { data: Float32Array; threshold: number }
+  /** Letterbox the plane to the data's nx:ny aspect instead of filling
+   * the panel rect. Use for spatial density/phase maps so a square grid
+   * doesn't render as a stretched ellipse. Leave false for matrix-style
+   * panels (e.g. population vs point-index) that are meant to fill. */
+  preserveAspect?: boolean
 }
 
 interface Props {
@@ -77,31 +82,58 @@ export function HeatmapGrid({
     return () => ro.disconnect()
   }, [])
 
+  // Data aspect (nx:ny) when the panels are aspect-preserving spatial
+  // maps. Drives square-ish panel rects so the rendered field matches
+  // the physical proportions instead of stretching to fill.
+  const aspect =
+    panels[0]?.preserveAspect && (panels[0]?.ny ?? 0) > 0
+      ? panels[0].nx / panels[0].ny
+      : null
+
   const layout = useMemo(() => {
     const out: Array<{ x: number; y: number; w: number; h: number }> = []
     if (panels.length === 0) return { rects: out, totalH: rowHeight }
     let cursorY = 0
     let start = 0
     if (firstFull) {
-      out.push({ x: 0, y: 0, w: containerW, h: totalHeight })
+      // Aspect-preserving: a centered block at the configured height with
+      // width = height·aspect (capped to the container). Otherwise the
+      // legacy full-width band.
+      const tw =
+        aspect != null ? Math.min(containerW, totalHeight * aspect) : containerW
+      out.push({ x: (containerW - tw) / 2, y: 0, w: tw, h: totalHeight })
       cursorY = totalHeight + gap
       start = 1
     }
-    const colW = (containerW - gap * (cols - 1)) / cols
+    // Aspect-preserving panels auto-size their column count from the
+    // container so each spatial map stays ~totalHeight square — fewer
+    // columns on a phone, more on a wide monitor (responsive by width,
+    // not by a fixed `cols`). Non-spatial panels keep the passed `cols`.
+    // Column count from the container width / target cell size. NOT capped
+    // by the panel count — a single map should be one normal-sized cell
+    // with empty columns beside it, not stretched to fill the whole row.
+    const effCols =
+      aspect != null
+        ? Math.max(1, Math.min(6, Math.round(containerW / totalHeight)))
+        : cols
+    const colW = (containerW - gap * (effCols - 1)) / effCols
+    // Square-ish cells when aspect-preserving (cellH = colW/aspect) so the
+    // map fills its cell without letterbox bands; else the fixed rowHeight.
+    const cellH = aspect != null ? colW / aspect : rowHeight
     for (let i = start; i < panels.length; i++) {
       const localIdx = i - start
-      const col = localIdx % cols
-      const row = Math.floor(localIdx / cols)
+      const col = localIdx % effCols
+      const row = Math.floor(localIdx / effCols)
       out.push({
         x: col * (colW + gap),
-        y: cursorY + row * (rowHeight + gap),
+        y: cursorY + row * (cellH + gap),
         w: colW,
-        h: rowHeight,
+        h: cellH,
       })
     }
     const totalH = out.length > 0 ? Math.max(...out.map((r) => r.y + r.h)) : rowHeight
     return { rects: out, totalH }
-  }, [panels.length, containerW, cols, rowHeight, firstFull, totalHeight, gap])
+  }, [panels.length, containerW, cols, rowHeight, firstFull, totalHeight, gap, aspect])
 
   return (
     <div
@@ -257,6 +289,17 @@ function PositionedHeatmap({ spec, cx, cy, w, h }: PositionedProps) {
   // the fragment shader picks the active slab via the atlasFrame uniform.
   const texHeight = ny * atlasFrames
 
+  // NOTE on disposal: an earlier version added the canonical
+  // `useEffect(() => () => tex.dispose(), [tex])` cleanups for the
+  // textures and material below. In React StrictMode (dev) the effect
+  // dance runs mount → cleanup → mount, and the cleanup disposes the
+  // useMemo-cached object before the second mount re-attaches it to
+  // the mesh — so the panel rendered as a transparent blank.
+  // Workaround: skip the cleanup-based dispose. New textures replace
+  // old ones only on shape change (rare: switching runs / atlases),
+  // which leaks bounded amounts of GPU memory per session. R3F's own
+  // scene-tree disposal handles the unmount case for JSX-attached
+  // resources, but not for these manually-constructed ones.
   const dataTex = useMemo(() => {
     const tex = new THREE.DataTexture(data, nx, texHeight, THREE.RedFormat, THREE.FloatType)
     tex.minFilter = THREE.LinearFilter
@@ -268,8 +311,6 @@ function PositionedHeatmap({ spec, cx, cy, w, h }: PositionedProps) {
     return tex
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nx, texHeight])
-
-  useEffect(() => () => dataTex.dispose(), [dataTex])
 
   useEffect(() => {
     dataTex.image.data = data
@@ -296,10 +337,6 @@ function PositionedHeatmap({ spec, cx, cy, w, h }: PositionedProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nx, texHeight, mask !== undefined])
 
-  useEffect(() => () => {
-    maskTex?.dispose()
-  }, [maskTex])
-
   useEffect(() => {
     if (!maskTex || !mask) return
     maskTex.image.data = mask.data
@@ -311,7 +348,7 @@ function PositionedHeatmap({ spec, cx, cy, w, h }: PositionedProps) {
 
   const material = useMemo(() => {
     const useMask = mask !== undefined
-    return new THREE.ShaderMaterial({
+    const mat = new THREE.ShaderMaterial({
       uniforms: {
         dataTex: { value: dataTex },
         lut: { value: lut },
@@ -361,16 +398,24 @@ function PositionedHeatmap({ spec, cx, cy, w, h }: PositionedProps) {
           gl_FragColor = vec4(rgb, 1.0);
         }
       `,
+      // OrthographicCamera with top < bottom (the HTML-overlay convention
+      // we use to align the panes 1-to-1 with the surrounding DOM) makes
+      // m[1][1] of the projection matrix negative, which flips triangle
+      // winding from CCW to CW. The renderer's auto-flipSided detection
+      // only triggers when the *mesh's* world matrix has a negative
+      // determinant (https://github.com/mrdoob/three.js/blob/r184/src/renderers/webgl/WebGLState.js#L657)
+      // — it does NOT inspect the projection matrix. Built-in materials
+      // (MeshBasicMaterial etc) work because three.js's own pipeline
+      // accounts for this elsewhere, but raw ShaderMaterial planes get
+      // back-face culled. Use DoubleSide so the panel always shows.
+      side: THREE.DoubleSide,
       depthTest: false,
       depthWrite: false,
     })
+    matRef.current = mat
+    return mat
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataTex, maskTex, lut, mask !== undefined])
-
-  useEffect(() => {
-    matRef.current = material
-    return () => material.dispose()
-  }, [material])
 
   // Patch scalar uniforms in place — recreating the material would force a
   // GLSL recompile per frame, which is much slower than a uniform write.
@@ -389,9 +434,19 @@ function PositionedHeatmap({ spec, cx, cy, w, h }: PositionedProps) {
     invalidate()
   }, [zmin, zmax, mask?.threshold, mask, atlasFrame, atlasFrames, invalidate])
 
+  // Letterbox to the data aspect (nx:ny) when requested, so square
+  // spatial grids stay square instead of stretching to the panel rect.
+  let pw = w
+  let ph = h
+  if (spec.preserveAspect && nx > 0 && ny > 0) {
+    const dataAspect = nx / ny
+    if (w / h > dataAspect) pw = h * dataAspect
+    else ph = w / dataAspect
+  }
+
   return (
     <mesh material={material} position={[cx, cy, 0]}>
-      <planeGeometry args={[w, h]} />
+      <planeGeometry args={[pw, ph]} />
     </mesh>
   )
 }

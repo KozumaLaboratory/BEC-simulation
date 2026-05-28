@@ -77,6 +77,14 @@ export interface DynamicsSeries {
   norms?: number[]
   pop_top?: number[]
   pop_mid?: number[]
+  /** Full per-m population time series (snap-major flat array, length
+   * n_snaps × n_comp). Reshape to [snap][m] with n_comp. */
+  populations?: number[]
+  n_comp?: number
+  m_values?: number[]
+  /** Times aligned to the `populations` rows (t=0 dropped when the
+   * snapshot count is one fewer than `times`). */
+  pop_times?: number[]
 }
 
 export interface AutopilotQueueResponse {
@@ -172,6 +180,7 @@ export interface AutopilotQueueEntry {
   enqueued_at: string
   enqueued_by: string
   parent_id: string | null
+  group_id: string
   recipe: { name: string | null; autonomy_level: 'suggest' | 'propose' | 'dispatch' }
   backend: {
     type: 'local' | 'slurm'
