@@ -171,6 +171,11 @@ export function CatalogPanel({ onOpenRun }: { onOpenRun: (name: string) => void 
               {error}
             </span>
           )}
+          <p className="w-full font-mono text-[11px] text-[var(--ink-faint)] leading-relaxed">
+            Click a facet value below (or type above) to narrow to a cohort —
+            parallel coordinates + a sortable table appear. Click any run to
+            open it. With nothing selected, the lists below are picked for you.
+          </p>
         </CardContent>
       </Card>
 
@@ -209,9 +214,14 @@ function FacetBar({
   selected: Record<string, Set<string>>
   onToggle: (key: FacetKey, value: string) => void
 }) {
+  const anyValues = FACETS.some((f) => (facetValues[f.key]?.size ?? 0) > 0)
   return (
     <Card>
       <CardContent className="p-5 space-y-3">
+        <div className="font-mono text-[10px] uppercase tracking-[0.10em] text-[var(--ink-faint)]">
+          Filter — click a value to narrow{' '}
+          {!anyValues && '(waiting for the index…)'}
+        </div>
         {FACETS.map((f) => {
           const counts = facetValues[f.key]
           if (!counts || counts.size === 0) return null
