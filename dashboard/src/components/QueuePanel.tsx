@@ -7,7 +7,7 @@ import {
   type AutopilotQueueResponse,
   type Tag,
 } from '@/api'
-import { useDashboardURL } from '@/state/useDashboardURL'
+import { useDashboardURL, type TabId } from '@/state/useDashboardURL'
 import { EnqueueDialog } from '@/components/EnqueueDialog'
 import { QueueToastStack, type QueueToastInfo } from '@/components/QueueToast'
 
@@ -252,6 +252,21 @@ export function QueuePanel() {
     setDialogOpen(true)
   }
 
+  // Close the dialog and, if we were routed here by a per-config enqueue,
+  // return to the originating tab so tab=queue doesn't stick.
+  function closeEnqueue() {
+    setDialogOpen(false)
+    try {
+      const rt = sessionStorage.getItem('spinorbec.enqueueReturnTab')
+      if (rt) {
+        sessionStorage.removeItem('spinorbec.enqueueReturnTab')
+        setUrl({ tab: rt as TabId })
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
   // Routed here with ?enqueue=true (per-config "Enqueue this config" from
   // the Effective Config panel / Catalog) → open the dialog pre-filled
   // with the stashed YAML if present, else blank; then clear the flag.
@@ -424,7 +439,7 @@ export function QueuePanel() {
       )}
       <EnqueueDialog
         open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
+        onClose={closeEnqueue}
         initialYaml={dialogInitialYaml}
         dryRun={dryRun}
         paused={paused}

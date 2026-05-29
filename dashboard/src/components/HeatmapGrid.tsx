@@ -117,11 +117,14 @@ export function HeatmapGrid({
     // columns instead of 3 wide ones. A lone map keeps a normal cell with
     // empty columns beside it (not stretched).
     const nSpatial = panels.length - start
+    // Smaller target cell when there are many panels so a PC-width column
+    // reaches ~6 (floor 110px ⇒ ~640px container already hits 6); narrower
+    // screens fall to fewer. Cap at 6.
     const targetW =
-      nSpatial <= 4 ? totalHeight : Math.max(160, (totalHeight * 4) / nSpatial)
+      nSpatial <= 4 ? totalHeight : Math.max(110, (totalHeight * 4) / nSpatial)
     const effCols =
       aspect != null
-        ? Math.max(1, Math.min(8, Math.round(containerW / targetW)))
+        ? Math.max(1, Math.min(6, Math.round(containerW / targetW)))
         : cols
     const colW = (containerW - gap * (effCols - 1)) / effCols
     // Square-ish cells when aspect-preserving (cellH = colW/aspect) so the

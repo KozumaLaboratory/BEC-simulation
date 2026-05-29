@@ -43,7 +43,7 @@ export function TimeScrubber({
   onChange,
   fps,
   loading = false,
-  defaultDurationSec = 20,
+  defaultDurationSec = 5,
 }: Props) {
   const [playing, setPlaying] = useState(false)
   const [durationSec, setDurationSec] = useState<number>(defaultDurationSec)

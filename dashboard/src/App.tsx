@@ -84,12 +84,15 @@ export default function App() {
     (yaml: string) => {
       try {
         sessionStorage.setItem('spinorbec.enqueueYaml', yaml)
+        // Remember where we came from so closing the dialog returns there
+        // instead of stranding the user on tab=queue.
+        sessionStorage.setItem('spinorbec.enqueueReturnTab', url.tab)
       } catch {
         /* ignore */
       }
       setUrl({ tab: 'queue', enqueue: true }, { history: 'push' })
     },
-    [setUrl],
+    [setUrl, url.tab],
   )
   const enqueueRun = useCallback(
     async (name: string) => {
