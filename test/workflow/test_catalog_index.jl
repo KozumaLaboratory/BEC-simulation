@@ -1,7 +1,8 @@
 using Test
 using SpinorBEC
-using SpinorBEC: run_catalog_index, backfill_summaries!, run_family,
-    run_level, RUN_SUMMARY_FILENAME
+using SpinorBEC:
+    run_catalog_index, backfill_summaries!, run_family,
+    run_level, run_layer, RUN_SUMMARY_FILENAME
 using JLD2
 using JSON
 
@@ -35,6 +36,22 @@ using JSON
         @test run_level("klaus_quench_om0p0") === nothing
         @test run_level("00_scalar_free_uniform_stationary") === nothing
         @test run_level("K3x150p0") === nothing
+    end
+
+    @testset "run_layer — coarse top-tier grouping" begin
+        @test run_layer("L4det_eu_matsui_hamiltonian_only_64") == "L4"
+        @test run_layer("L7_loss_only_uniform_K3") == "L7"
+        @test run_layer("00_scalar_free_uniform_stationary_0ece2fdb") == "bench"
+        @test run_layer("klaus_quench_om0p0") == "klaus"
+        @test run_layer("matsui_5ms_morphology_n64") == "matsui"
+        @test run_layer("barnett_eu_omm0p3_n64_DDIon") == "barnett"
+        @test run_layer("K0_gdr0_LHY0") == "K-sweep"
+        @test run_layer("K3x150p0") == "K-sweep"
+        @test run_layer("eu_k3_sweep") == "K-sweep"
+        @test run_layer("F6_phase_diagram") == "F6"
+        @test run_layer("jit_probe") == "jit"
+        @test run_layer("a1a20f308b886fce") == "autopilot"  # pure-hash, not "bench"
+        @test run_layer("something_unrecognised") == "other"
     end
 
     @testset "read path: rows from summary + partial runs, recent first" begin

@@ -208,6 +208,7 @@ export interface CatalogRow {
   name: string
   family: string
   level?: string
+  layer: string
   mtime: number
   has_summary: boolean
   has_jld2: boolean

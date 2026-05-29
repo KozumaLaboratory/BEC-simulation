@@ -21,7 +21,7 @@
 # the row count makes the flat array too big to ship to the browser
 # (~10^4+). At a few hundred runs, in-memory is milliseconds.
 
-export run_catalog_index, backfill_summaries!, run_family, run_level
+export run_catalog_index, backfill_summaries!, run_family, run_level, run_layer
 
 # Validation-ladder level from the leading `L<n>` token (L0–L13): `L4_*`,
 # `L4det_*`, `L4dealiasv4_*`, `L7_*` all map to their level. Returns
@@ -31,6 +31,26 @@ export run_catalog_index, backfill_summaries!, run_family, run_level
 function run_level(name::AbstractString)
     m = match(r"^L(\d{1,2})(?![0-9])", String(name))
     m === nothing ? nothing : "L" * m.captures[1]
+end
+
+# Coarse top-tier grouping (the "Layer" the operator browses by) —
+# aggressively consolidated. Validation-ladder runs keep their level;
+# everything else collapses to a handful of campaign buckets so the tree's
+# top tier stays short. Always returns a value (`other` is the catch-all).
+function run_layer(name::AbstractString)
+    s = String(name)
+    lv = run_level(s)
+    lv === nothing || return lv
+    occursin(r"^[0-9a-f]{16}$", s) && return "autopilot"   # pure-hash CAS dir
+    occursin(r"^\d\d?_", s) && return "bench"               # 00_…09_ suite
+    startswith(s, "klaus") && return "klaus"
+    startswith(s, "matsui") && return "matsui"
+    startswith(s, "barnett") && return "barnett"
+    startswith(s, "F6") && return "F6"
+    (startswith(s, "K0") || startswith(s, "K3") || startswith(s, "eu_k3")) &&
+        return "K-sweep"
+    startswith(s, "jit") && return "jit"
+    return "other"
 end
 
 # Group key for the run index. Strip the trailing content hash, then peel
@@ -96,6 +116,7 @@ function run_catalog_index(; runs_root::AbstractString=default_store().root)
         )
         lv = run_level(name)
         lv === nothing || (row["level"] = lv)
+        row["layer"] = run_layer(name)
 
         if has_summary
             try
