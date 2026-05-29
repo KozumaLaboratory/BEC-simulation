@@ -6,9 +6,19 @@ using JLD2
 using JSON
 
 @testset "catalog index" begin
-    @testset "run_family strips the content hash" begin
+    @testset "run_family strips hash + trailing value tokens" begin
+        # Hash + grid size both peel → the convergence study is one family.
         @test run_family("L4_eu_matsui_hamiltonian_only_128_41227542") ==
-            "L4_eu_matsui_hamiltonian_only_128"
+            "L4_eu_matsui_hamiltonian_only"
+        @test run_family("L4_eu_matsui_hamiltonian_only_32_deadbeef0badf00d") ==
+            "L4_eu_matsui_hamiltonian_only"
+        # _n<N> point-count suffix peels too.
+        @test run_family("matsui_5ms_morphology_n64") == "matsui_5ms_morphology"
+        # Trailing sweep value peels (K3factor sweep).
+        @test run_family("matsui_40ms_lossy_K3factor_15") == "matsui_40ms_lossy_K3factor"
+        # Alphabetic name tokens are KEPT (not swept values).
+        @test run_family("L7_loss_only_uniform_K3") == "L7_loss_only_uniform_K3"
+        @test run_family("K0_gdr0_LHY0") == "K0_gdr0_LHY0"
         @test run_family("klaus_quench_omm0p1_holdonly_delay2ms_refine_90bfb48f") ==
             "klaus_quench_omm0p1_holdonly_delay2ms_refine"
         # Pure-hash CAS dir → stays whole (singleton family).

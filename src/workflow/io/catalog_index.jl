@@ -23,12 +23,25 @@
 
 export run_catalog_index, backfill_summaries!, run_family
 
-# Group key for the run index: the run name with its trailing content hash
-# stripped, so sweep cells (same base, different hash) and re-runs collapse
-# to one family. Pure-hash CAS dirs keep their hash (singleton family).
+# Group key for the run index. Strip the trailing content hash, then peel
+# trailing *value-like* tokens (grid sizes / point counts / sweep values:
+# `_64`, `_n96`, `_128cube`, `_5`) so a grid-convergence or parameter sweep
+# collapses to one family instead of one-per-cell. Stops at alphabetic
+# tokens (`K3`, `DDIon`, `om0p3`) which name the experiment rather than a
+# swept value. Pure-hash CAS dirs keep their hash (singleton family).
+#
+# Heuristic, not exact: params encoded MID-name (`barnett_..._n64_DDIon`)
+# don't collapse — only trailing tokens peel. Exact grouping (runs whose
+# specs differ only on a sweep axis) needs spec_diff over configs; this is
+# the cheap 80% that needs no config reads.
 function run_family(name::AbstractString)
-    fam = replace(String(name), r"_[0-9a-f]{8,}$" => "")
-    isempty(fam) ? String(name) : fam
+    s = replace(String(name), r"_[0-9a-f]{8,}$" => "")
+    while true
+        s2 = replace(s, r"_(?:n?\d+|\d+cube|\d+pts?)$" => "")
+        s2 == s && break
+        s = s2
+    end
+    isempty(s) ? String(name) : s
 end
 
 function _find_run_jld2(dir::AbstractString)
