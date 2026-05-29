@@ -158,9 +158,24 @@ function useAutopilotQueue(intervalMs = 5000) {
   return { snap, tagsByCid, error, refresh }
 }
 
+// Open the enqueue dialog when routed here with ?enqueue (from the SideNav
+// "+ Enqueue"), then clear the flag so it doesn't re-fire on remount.
+function useEnqueueFlag(
+  flag: boolean,
+  open: () => void,
+  clear: () => void,
+) {
+  useEffect(() => {
+    if (!flag) return
+    open()
+    clear()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flag])
+}
+
 export function QueuePanel() {
   const { snap, tagsByCid, error, refresh } = useAutopilotQueue()
-  const [, setUrl] = useDashboardURL()
+  const [url, setUrl] = useDashboardURL()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogInitialYaml, setDialogInitialYaml] = useState<string | undefined>()
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
@@ -236,6 +251,33 @@ export function QueuePanel() {
     setDialogInitialYaml(undefined)
     setDialogOpen(true)
   }
+
+  // Routed here with ?enqueue=true (per-config "Enqueue this config" from
+  // the Effective Config panel / Catalog) → open the dialog pre-filled
+  // with the stashed YAML if present, else blank; then clear the flag.
+  useEnqueueFlag(
+    url.enqueue,
+    () => {
+      let y: string | null = null
+      try {
+        y = sessionStorage.getItem('spinorbec.enqueueYaml')
+      } catch {
+        /* sessionStorage disabled — fall through to blank */
+      }
+      if (y) {
+        try {
+          sessionStorage.removeItem('spinorbec.enqueueYaml')
+        } catch {
+          /* ignore */
+        }
+        setDialogInitialYaml(y)
+        setDialogOpen(true)
+      } else {
+        openBlank()
+      }
+    },
+    () => setUrl({ enqueue: false }),
+  )
 
   function openFork(entry: AutopilotQueueEntry) {
     api

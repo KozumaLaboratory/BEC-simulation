@@ -13,10 +13,12 @@ function RunTags({
   tags,
   onTag,
   onUntag,
+  onEnqueue,
 }: {
   tags: string[]
   onTag: () => void
   onUntag: (name: string) => void
+  onEnqueue?: () => void
 }) {
   return (
     <span className="inline-flex flex-wrap items-center gap-1 shrink-0">
@@ -56,6 +58,19 @@ function RunTags({
       >
         +tag
       </button>
+      {onEnqueue && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onEnqueue()
+          }}
+          className="font-mono text-[10px] text-[var(--ink-faint)] hover:text-[var(--ink)] px-1 leading-none"
+          title="enqueue this config as a new run"
+        >
+          +q
+        </button>
+      )}
     </span>
   )
 }
@@ -115,7 +130,13 @@ function passesExcept(
   return true
 }
 
-export function CatalogPanel({ onOpenRun }: { onOpenRun: (name: string) => void }) {
+export function CatalogPanel({
+  onOpenRun,
+  onEnqueueRun,
+}: {
+  onOpenRun: (name: string) => void
+  onEnqueueRun: (name: string) => void
+}) {
   const { rows, loading, error, refresh } = useCatalogIndex()
   const { tagsByCid, refresh: refreshTags } = useTags()
 
@@ -283,6 +304,7 @@ export function CatalogPanel({ onOpenRun }: { onOpenRun: (name: string) => void 
             onOpenRun={onOpenRun}
             onTag={onTag}
             onUntag={onUntag}
+            onEnqueueRun={onEnqueueRun}
           />
         </>
       ) : (
@@ -293,6 +315,7 @@ export function CatalogPanel({ onOpenRun }: { onOpenRun: (name: string) => void 
             onOpenRun={onOpenRun}
             onTag={onTag}
             onUntag={onUntag}
+            onEnqueueRun={onEnqueueRun}
           />
           <CatalogTree
             rows={rows}
@@ -300,6 +323,7 @@ export function CatalogPanel({ onOpenRun }: { onOpenRun: (name: string) => void 
             onOpenRun={onOpenRun}
             onTag={onTag}
             onUntag={onUntag}
+            onEnqueueRun={onEnqueueRun}
           />
         </>
       )}
@@ -316,12 +340,14 @@ function CatalogTree({
   onOpenRun,
   onTag,
   onUntag,
+  onEnqueueRun,
 }: {
   rows: CatalogRow[]
   tagsByCid: Record<string, string[]>
   onOpenRun: (name: string) => void
   onTag: (name: string) => void
   onUntag: (name: string) => void
+  onEnqueueRun: (name: string) => void
 }) {
   const [openLayers, setOpenLayers] = useState<Set<string>>(() => new Set())
   const [openFams, setOpenFams] = useState<Set<string>>(() => new Set())
@@ -442,6 +468,7 @@ function CatalogTree({
                                       tags={tagsByCid[r.name] ?? []}
                                       onTag={() => onTag(r.name)}
                                       onUntag={onUntag}
+                                      onEnqueue={() => onEnqueueRun(r.name)}
                                     />
                                   </li>
                                 ))}
@@ -467,12 +494,14 @@ function AttentionBanner({
   onOpenRun,
   onTag,
   onUntag,
+  onEnqueueRun,
 }: {
   rows: CatalogRow[]
   tagsByCid: Record<string, string[]>
   onOpenRun: (name: string) => void
   onTag: (name: string) => void
   onUntag: (name: string) => void
+  onEnqueueRun: (name: string) => void
 }) {
   const att = rows.filter(needsAttention)
   if (att.length === 0) return null
@@ -506,6 +535,7 @@ function AttentionBanner({
                 tags={tagsByCid[r.name] ?? []}
                 onTag={() => onTag(r.name)}
                 onUntag={onUntag}
+                onEnqueue={() => onEnqueueRun(r.name)}
               />
             </li>
           ))}
@@ -597,6 +627,7 @@ function ResultTable({
   onOpenRun,
   onTag,
   onUntag,
+  onEnqueueRun,
 }: {
   rows: CatalogRow[]
   sortKey: string
@@ -606,6 +637,7 @@ function ResultTable({
   onOpenRun: (name: string) => void
   onTag: (name: string) => void
   onUntag: (name: string) => void
+  onEnqueueRun: (name: string) => void
 }) {
   return (
     <Card>
@@ -647,6 +679,7 @@ function ResultTable({
                     tags={tagsByCid[r.name] ?? []}
                     onTag={() => onTag(r.name)}
                     onUntag={onUntag}
+                    onEnqueue={() => onEnqueueRun(r.name)}
                   />
                 </td>
               </tr>

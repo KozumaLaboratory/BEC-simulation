@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Search, RefreshCw, Keyboard, Sun, Moon, X, Tag as TagIcon } from 'lucide-react'
 import { useLiveRuns, useLiveStatus } from '@/state/useLiveRuns'
 import { useTags } from '@/state/useTags'
+import { useCatalogIndex } from '@/state/useCatalogIndex'
 import { api } from '@/api'
 import type { RunDataState } from '@/state/useRunData'
 import { cn } from '@/lib/utils'
@@ -52,10 +53,16 @@ export function SideNav({
 }: Props) {
   const { runs, selectedRun, setSelectedRun, refresh } = state
   const [q, setQ] = useState('')
-  // The flat run list is demoted: the Catalog tab (faceted query +
-  // parallel coordinates) is the primary navigation now. Keep the list as
-  // a collapsed quick-switcher that auto-opens when you start filtering.
-  const [indexOpen, setIndexOpen] = useState(false)
+  // Simplified mini-catalog: group the run list by Layer (the same coarse
+  // tier as the Catalog tab) so the always-visible rail is navigable, not
+  // a flat 300. Layers collapse independently; a filter auto-opens them.
+  const { rows: catRows } = useCatalogIndex()
+  const [openLayers, setOpenLayers] = useState<Set<string>>(() => new Set())
+  const layerOf = useMemo(() => {
+    const m: Record<string, string> = {}
+    for (const r of catRows) m[r.name] = r.layer ?? 'other'
+    return m
+  }, [catRows])
   const { runs: liveRuns } = useLiveRuns()
   const liveStatus = useLiveStatus(selectedRun)
   const { tagsByCid, refresh: refreshTags } = useTags()
@@ -286,54 +293,82 @@ export function SideNav({
         </div>
       )}
 
-      {/* Index — demoted to a collapsed quick-switcher (Catalog is primary) */}
-      {(() => {
-        const showList = indexOpen || q.trim() !== ''
-        return (
-          <div className="px-5 pb-3 flex-1 min-h-0 flex flex-col">
-            <button
-              type="button"
-              onClick={() => setIndexOpen((v) => !v)}
-              className="flex items-baseline gap-1.5 text-left"
-              title={showList ? 'collapse' : 'expand the flat run list'}
-            >
-              <span className="text-[var(--ink-faint)] font-mono text-[10px]">
-                {showList ? '▾' : '▸'}
-              </span>
-              <SectionHead label={`Index · ${filteredRuns.length}`} />
-            </button>
-            {!showList ? (
-              <p className="mt-2 px-1 text-[10.5px] font-mono text-[var(--ink-faint)] leading-relaxed">
-                browse + filter runs in the{' '}
-                <span className="text-[var(--ink-soft)]">Catalog</span> tab —
-                facets, parallel coordinates, triage. Type above or expand for
-                the flat list.
-              </p>
-            ) : (
-              <ol className="mt-2 flex-1 min-h-0 overflow-y-auto -mx-1 px-1 space-y-0.5">
-                {filteredRuns.length === 0 && (
-                  <li className="px-2 py-2 text-[11px] font-mono text-[var(--ink-faint)] italic">
-                    no matching runs
-                  </li>
-                )}
-                {filteredRuns.map((r, i) => (
-                  <RunRow
-                    key={r}
-                    index={i + 1}
-                    name={r}
-                    isLive={liveSet.has(r)}
-                    isSelected={r === selectedRun}
-                    onClick={() => setSelectedRun(r)}
-                    tags={tagsByCid[r] ?? []}
-                    onTag={() => onTagRun(r)}
-                    onUntag={onUntag}
-                  />
-                ))}
-              </ol>
-            )}
-          </div>
-        )
-      })()}
+      {/* Mini-catalog — runs grouped by Layer (the simplified Catalog) */}
+      <div className="px-5 pb-3 flex-1 min-h-0 flex flex-col">
+        <SectionHead label={`Catalog · ${filteredRuns.length}`} />
+        <div className="mt-2 flex-1 min-h-0 overflow-y-auto -mx-1 px-1">
+          {filteredRuns.length === 0 && (
+            <p className="px-2 py-2 text-[11px] font-mono text-[var(--ink-faint)] italic">
+              no matching runs
+            </p>
+          )}
+          {(() => {
+            const byLayer = new Map<string, string[]>()
+            for (const name of filteredRuns) {
+              const L = layerOf[name] ?? 'other'
+              const arr = byLayer.get(L)
+              if (arr) arr.push(name)
+              else byLayer.set(L, [name])
+            }
+            const lvlNum = (k: string) =>
+              /^L\d+$/.test(k) ? parseInt(k.slice(1), 10) : null
+            const order = [...byLayer.keys()].sort((a, b) => {
+              const la = lvlNum(a)
+              const lb = lvlNum(b)
+              if (la !== null && lb !== null) return la - lb
+              if (la !== null) return -1
+              if (lb !== null) return 1
+              return byLayer.get(b)!.length - byLayer.get(a)!.length
+            })
+            const filtering = q.trim() !== ''
+            return order.map((L) => {
+              const names = byLayer.get(L)!
+              const lopen = filtering || openLayers.has(L)
+              return (
+                <div key={L}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setOpenLayers((cur) => {
+                        const n = new Set(cur)
+                        if (n.has(L)) n.delete(L)
+                        else n.add(L)
+                        return n
+                      })
+                    }
+                    className="w-full flex items-baseline gap-1.5 px-1 py-1 text-left hover:bg-[var(--paper-tint)]"
+                  >
+                    <span className="text-[var(--ink-faint)] font-mono text-[10px] w-2.5">
+                      {lopen ? '▾' : '▸'}
+                    </span>
+                    <span className="font-mono text-[11px] text-[var(--ink)]">{L}</span>
+                    <span className="font-mono text-[10px] text-[var(--ink-faint)]">
+                      {names.length}
+                    </span>
+                  </button>
+                  {lopen && (
+                    <ol className="space-y-0.5 mb-1">
+                      {names.map((name, i) => (
+                        <RunRow
+                          key={name}
+                          index={i + 1}
+                          name={name}
+                          isLive={liveSet.has(name)}
+                          isSelected={name === selectedRun}
+                          onClick={() => setSelectedRun(name)}
+                          tags={tagsByCid[name] ?? []}
+                          onTag={() => onTagRun(name)}
+                          onUntag={onUntag}
+                        />
+                      ))}
+                    </ol>
+                  )}
+                </div>
+              )
+            })
+          })()}
+        </div>
+      </div>
 
       {/* Live status footer */}
       {liveStatus.status && selectedRun && liveSet.has(selectedRun) && (

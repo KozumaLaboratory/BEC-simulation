@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import { stringify as yamlStringify } from 'yaml'
 import { Menu } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent } from '@/components/ui/card'
@@ -13,7 +14,7 @@ import {
 } from '@/components/charts/PopulationsChart'
 import { DynamicsOverview } from '@/components/charts/DynamicsOverview'
 import { useDynamicsSeries } from '@/state/useDynamicsSeries'
-import type { DashboardData } from '@/api'
+import { api, type DashboardData } from '@/api'
 import { DataTable } from '@/components/DataTable'
 import { LoadingBar } from '@/components/LoadingBar'
 import { TabBoundary } from '@/components/TabBoundary'
@@ -74,6 +75,33 @@ export default function App() {
   // Catalog + Queue are global surfaces (run-independent), not per-run
   // views — they render full-width without the per-run tab strip.
   const isGlobal = url.tab === 'catalog' || url.tab === 'queue'
+
+  // Enqueue is per-config: stash the config's YAML, route to the Queue,
+  // and let QueuePanel pop the dialog pre-filled (the YAML is too big for
+  // the URL, so it rides in sessionStorage). enqueueRun fetches a run's
+  // config first. The blank "new from scratch" path stays in the Queue.
+  const enqueueYaml = useCallback(
+    (yaml: string) => {
+      try {
+        sessionStorage.setItem('spinorbec.enqueueYaml', yaml)
+      } catch {
+        /* ignore */
+      }
+      setUrl({ tab: 'queue', enqueue: true }, { history: 'push' })
+    },
+    [setUrl],
+  )
+  const enqueueRun = useCallback(
+    async (name: string) => {
+      try {
+        const d = await api.getEffectiveConfig(name)
+        enqueueYaml(yamlStringify(d.raw, { indent: 2, lineWidth: 0 }))
+      } catch {
+        /* config fetch failed — skip rather than enqueue a blank */
+      }
+    },
+    [enqueueYaml],
+  )
   const [helpOpen, setHelpOpen] = useState(false)
   const isDark = useThemeMode()
   const [sidebarW, setSidebarW] = useSidebarWidth()
@@ -116,7 +144,9 @@ export default function App() {
         onShortcuts={() => setHelpOpen(true)}
         onToggleTheme={toggleTheme}
         currentTab={url.tab}
-        onNavigate={(t) => setUrl({ tab: t as typeof url.tab })}
+        onNavigate={(t) =>
+          setUrl({ tab: t as typeof url.tab }, { history: 'push' })
+        }
         isMobile={isMobile}
         mobileOpen={mobileNavOpen}
         onClose={() => setMobileNavOpen(false)}
@@ -197,8 +227,12 @@ export default function App() {
                   {url.tab === 'catalog' ? (
                     <CatalogPanel
                       onOpenRun={(name) =>
-                        setUrl({ run: name, tab: 'overview' })
+                        setUrl(
+                          { run: name, tab: 'overview' },
+                          { history: 'push' },
+                        )
                       }
+                      onEnqueueRun={enqueueRun}
                     />
                   ) : (
                     <QueuePanel />
@@ -300,6 +334,7 @@ export default function App() {
                       <EffectiveConfigPanel
                         runName={selectedRun ?? undefined}
                         yaml={data?.config_yaml || ''}
+                        onEnqueue={enqueueYaml}
                       />
                     </Suspense>
                   </TabBoundary>

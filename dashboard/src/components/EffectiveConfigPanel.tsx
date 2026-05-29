@@ -16,6 +16,8 @@ interface Props {
   /** Raw YAML text from `data.config_yaml` — shown alongside the resolved
    * view so the user can compare what they wrote vs what the simulator sees. */
   yaml: string
+  /** Enqueue this config as a new run (pre-fills the dialog with `yaml`). */
+  onEnqueue?: (yaml: string) => void
 }
 
 /**
@@ -29,7 +31,7 @@ interface Props {
  * Backed by `/api/effective_config/<run>`, which runs the full
  * `_normalize_and_validate!` pipeline + per-step waveform sampling.
  */
-export function EffectiveConfigPanel({ runName, yaml }: Props) {
+export function EffectiveConfigPanel({ runName, yaml, onEnqueue }: Props) {
   const [ins, setIns] = useState<EffectiveConfig | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -70,6 +72,22 @@ export function EffectiveConfigPanel({ runName, yaml }: Props) {
 
   return (
     <div className="space-y-5">
+      {onEnqueue && yaml && (
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => onEnqueue(yaml)}
+            className="font-mono text-[11px] uppercase tracking-[0.10em] px-3 py-1.5 border border-[var(--ink)] text-[var(--ink)] hover:bg-[var(--ink)] hover:text-background"
+            style={{ borderRadius: 0 }}
+            title="enqueue this config as a new run (pre-fills the dialog)"
+          >
+            + Enqueue this config
+          </button>
+          <span className="font-mono text-[11px] text-[var(--ink-faint)]">
+            re-run or tweak this config as a new run
+          </span>
+        </div>
+      )}
       {loading && (
         <div className="text-xs text-muted-foreground">
           <span className="status-dot is-cyan mr-2" />

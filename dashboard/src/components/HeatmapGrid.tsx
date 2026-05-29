@@ -112,9 +112,16 @@ export function HeatmapGrid({
     // Column count from the container width / target cell size. NOT capped
     // by the panel count — a single map should be one normal-sized cell
     // with empty columns beside it, not stretched to fill the whole row.
+    // Normal cell ~totalHeight wide; but as the spatial panel count grows
+    // (e.g. F=6 → 13 components) shrink the target so they pack into more
+    // columns instead of 3 wide ones. A lone map keeps a normal cell with
+    // empty columns beside it (not stretched).
+    const nSpatial = panels.length - start
+    const targetW =
+      nSpatial <= 4 ? totalHeight : Math.max(160, (totalHeight * 4) / nSpatial)
     const effCols =
       aspect != null
-        ? Math.max(1, Math.min(6, Math.round(containerW / totalHeight)))
+        ? Math.max(1, Math.min(8, Math.round(containerW / targetW)))
         : cols
     const colW = (containerW - gap * (effCols - 1)) / effCols
     // Square-ish cells when aspect-preserving (cellH = colW/aspect) so the

@@ -1,5 +1,6 @@
 import {
   useQueryStates,
+  parseAsBoolean,
   parseAsInteger,
   parseAsString,
   parseAsStringLiteral,
@@ -22,6 +23,9 @@ export function useDashboardURL() {
       comp: parseAsInteger.withDefault(0),
       snap: parseAsInteger,
       scan: parseAsString,
+      // Transient: SideNav "+ Enqueue" sets this to route to the Queue and
+      // pop the dialog; QueuePanel clears it on open (self-clearing flag).
+      enqueue: parseAsBoolean.withDefault(false),
     },
     { history: 'replace', shallow: true },
   )
