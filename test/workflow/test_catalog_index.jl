@@ -1,7 +1,7 @@
 using Test
 using SpinorBEC
 using SpinorBEC: run_catalog_index, backfill_summaries!, run_family,
-    RUN_SUMMARY_FILENAME
+    run_level, RUN_SUMMARY_FILENAME
 using JLD2
 using JSON
 
@@ -23,6 +23,18 @@ using JSON
             "klaus_quench_omm0p1_holdonly_delay2ms_refine"
         # Pure-hash CAS dir → stays whole (singleton family).
         @test run_family("a1a20f308b886fce") == "a1a20f308b886fce"
+    end
+
+    @testset "run_level — validation ladder L<n>" begin
+        @test run_level("L4_eu_matsui_hamiltonian_only_64_abc12345") == "L4"
+        @test run_level("L4det_eu_matsui_hamiltonian_only_32") == "L4"
+        @test run_level("L4dealiasv6_kcut11_eu_matsui_hamiltonian_only") == "L4"
+        @test run_level("L7_loss_only_uniform_K3") == "L7"
+        @test run_level("L13_something") == "L13"
+        # Non-ladder runs have no level.
+        @test run_level("klaus_quench_om0p0") === nothing
+        @test run_level("00_scalar_free_uniform_stationary") === nothing
+        @test run_level("K3x150p0") === nothing
     end
 
     @testset "read path: rows from summary + partial runs, recent first" begin

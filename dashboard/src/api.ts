@@ -207,6 +207,7 @@ export interface Tag {
 export interface CatalogRow {
   name: string
   family: string
+  level?: string
   mtime: number
   has_summary: boolean
   has_jld2: boolean

@@ -21,7 +21,17 @@
 # the row count makes the flat array too big to ship to the browser
 # (~10^4+). At a few hundred runs, in-memory is milliseconds.
 
-export run_catalog_index, backfill_summaries!, run_family
+export run_catalog_index, backfill_summaries!, run_family, run_level
+
+# Validation-ladder level from the leading `L<n>` token (L0–L13): `L4_*`,
+# `L4det_*`, `L4dealiasv4_*`, `L7_*` all map to their level. Returns
+# nothing for non-ladder runs (the 00–09 benchmark suite, klaus/matsui/
+# K3 sweeps, …) — they're navigated by family/recipe instead. The
+# negative lookahead keeps `L13` whole and won't mis-read a longer number.
+function run_level(name::AbstractString)
+    m = match(r"^L(\d{1,2})(?![0-9])", String(name))
+    m === nothing ? nothing : "L" * m.captures[1]
+end
 
 # Group key for the run index. Strip the trailing content hash, then peel
 # trailing *value-like* tokens (grid sizes / point counts / sweep values:
@@ -84,6 +94,8 @@ function run_catalog_index(; runs_root::AbstractString=default_store().root)
             "has_summary" => has_summary,
             "has_jld2" => has_jld2,
         )
+        lv = run_level(name)
+        lv === nothing || (row["level"] = lv)
 
         if has_summary
             try

@@ -8,9 +8,10 @@ import type { CatalogRow } from '@/api'
 // the primary navigation. Each maps a row to its value (or undefined when
 // the field is absent, so a run without observables still shows under
 // family/status but drops out of observable facets).
-type FacetKey = 'family' | 'F' | 'status' | 'collapsed' | 'state'
+type FacetKey = 'level' | 'family' | 'F' | 'status' | 'collapsed' | 'state'
 
 const FACETS: { key: FacetKey; label: string; of: (r: CatalogRow) => string | undefined }[] = [
+  { key: 'level', label: 'Level', of: (r) => (typeof r.level === 'string' ? r.level : undefined) },
   { key: 'family', label: 'Family', of: (r) => r.family },
   { key: 'F', label: 'Spin F', of: (r) => (r.F != null ? `F=${r.F}` : undefined) },
   { key: 'status', label: 'Status', of: (r) => r.status },
@@ -225,7 +226,17 @@ function FacetBar({
         {FACETS.map((f) => {
           const counts = facetValues[f.key]
           if (!counts || counts.size === 0) return null
-          const values = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 24)
+          const entries = [...counts.entries()]
+          // Level reads as a ladder (L2, L3, L4, L7); everything else by
+          // frequency so the dominant values surface first.
+          const values =
+            f.key === 'level'
+              ? entries.sort(
+                  (a, b) =>
+                    (parseInt(a[0].slice(1), 10) || 0) -
+                    (parseInt(b[0].slice(1), 10) || 0),
+                )
+              : entries.sort((a, b) => b[1] - a[1]).slice(0, 24)
           const sel = selected[f.key] ?? new Set<string>()
           return (
             <div key={f.key} className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5">
