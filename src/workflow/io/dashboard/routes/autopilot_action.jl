@@ -68,7 +68,7 @@ function _route_autopilot_action(body_bytes, base_dir;
             return (409, "application/json",
                 _act_err(
                     "can only cancel :pending entries; this one is :$(entry.status). " *
-                    "Use the CLI to scancel a running job.",
+                    "Use the CLI to qdel a running job.",
                 ))
         end
         set_status!(entry, :killed_bug;

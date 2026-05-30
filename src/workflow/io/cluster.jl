@@ -1,10 +1,11 @@
-# Cluster / deployment helpers — extracted from sbatch / supervised_run
-# inline `julia -e` heredocs so heredocs collapse to ≤2 lines each.
+# Cluster / deployment helpers — extracted from submit scripts and
+# supervised_run inline `julia -e` heredocs so heredocs collapse to
+# ≤2 lines each.
 #
 # The boundary: any logic that used to live as a multi-line `julia -e`
-# block inside `scripts/*.sbatch` or `scripts/*.sh` belongs here. The
-# shell scripts call a single library function; the function carries the
-# behaviour, the .sh carries the env setup.
+# block inside `scripts/*.sh` belongs here. The shell scripts call a
+# single library function; the function carries the behaviour, the .sh
+# carries the env setup.
 
 export clear_stale_checkpoints!, report_cuda_state, cuda_preflight_check
 
@@ -30,7 +31,7 @@ end
     report_cuda_state(io=stdout)
 
 Print the active CUDA device name, compute capability, and memory
-usage in the format the sbatch scripts previously emitted inline.
+usage in the format the cluster submit scripts emit inline.
 Falls back to a "CUDA not loaded" notice when the SpinorBECCUDAExt
 extension isn't active (i.e. `using CUDA` hasn't been called).
 """

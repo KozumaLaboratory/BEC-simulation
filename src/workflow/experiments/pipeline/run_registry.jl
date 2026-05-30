@@ -446,15 +446,15 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
 
     pause_file = joinpath(run_dir, ".pause")
 
-    # SLURM array-job hook: if SPINORBEC_SCAN_ONLY_INDEX is set (e.g. by
-    # autopilot SlurmBackend array dispatch), compute only that single point and
-    # exit. Indices are 1-based and clamped silently.
+    # Array-job hook: if SPINORBEC_SCAN_ONLY_INDEX is set (e.g. by an
+    # autopilot backend's array dispatch), compute only that single
+    # point and exit. Indices are 1-based and clamped silently.
     only_idx = let v = get(ENV, "SPINORBEC_SCAN_ONLY_INDEX", nothing)
         v === nothing ? nothing : parse(Int, v)
     end
 
     for (i, point_override) in enumerate(scan.points)
-        # SLURM array-job mode: skip everything except the assigned index
+        # Array-job mode: skip everything except the assigned index
         if only_idx !== nothing && i != only_idx
             continue
         end
@@ -616,7 +616,7 @@ cuda_state_lines() = _cuda_state_lines_callback[]()::Vector{String}
 
 Return a filesystem path suitable for the JLD2 `.tmp` write. When the env
 var `SPINORBEC_SCRATCH_DIR` is set (typically node-local fast storage on
-HPC — TSUBAME's T4_TMPDIR, SLURM's TMPDIR, or `/tmp`), write there and
+HPC — TSUBAME's T4_TMPDIR, the scheduler's TMPDIR, or `/tmp`), write there and
 copy to the final shared-filesystem path at the end. On Lustre-style
 shared storage the per-dataset JLD2 writes can otherwise saturate the
 metadata server.

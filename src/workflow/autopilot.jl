@@ -7,7 +7,8 @@
 #
 # Composition is strictly bottom-up:
 #   queue.jl       — types + serialization + enqueue/dequeue
-#   backends.jl    — Local + Slurm dispatch
+#   backends.jl    — Local subprocess dispatch
+#   backends_uge.jl — UGE (TSUBAME) dispatch
 #   monitor.jl     — _live_status.json divergence detector
 #   on_complete.jl — callback registry + lineage
 #   tick.jl        — autopilot_tick! orchestration
@@ -20,6 +21,7 @@ using Printf
 include("autopilot/types.jl")       # AutopilotConfig, AutopilotStats, AutopilotBackend
 include("autopilot/queue.jl")
 include("autopilot/backends.jl")
+include("autopilot/backends_uge.jl")
 include("autopilot/monitor.jl")
 include("autopilot/on_complete.jl")
 include("autopilot/tick.jl")

@@ -4,8 +4,8 @@
 # mates; running the autopilot 24h could exhaust a quarterly allocation
 # in 1–2 weeks. This module:
 #
-#   1. Polls `sacct` (or any other usage source) to track realized hours
-#      and writes to `<qr.path>/budget.toml`.
+#   1. Polls the scheduler (`qacct` on TSUBAME UGE, or any other usage
+#      source) to track realized hours and writes to `<qr.path>/budget.toml`.
 #   2. Predicts in-flight usage as Σ(entry.estimated_walltime_hours × n_gpu)
 #      for status ∈ {pending, running}.
 #   3. Gates the dispatch loop with both:
@@ -13,10 +13,10 @@
 #        - daily soft cap (e.g. 50 GPU·hours/day)
 #   4. Returns a `BudgetDecision` consumed by `autopilot_tick!`.
 #
-# Tonight's implementation is intentionally minimal — sacct integration
-# is stubbed so the gate works on `gpu_hours_realized` already written
-# into state.toml by the autopilot's run loop. Plug in a real sacct
-# poller later (`refresh_budget!` is the seam).
+# Tonight's implementation is intentionally minimal — scheduler
+# integration is stubbed so the gate works on `gpu_hours_realized`
+# already written into state.toml by the autopilot's run loop. Plug in
+# a real qacct/scheduler poller later (`refresh_budget!` is the seam).
 
 export AutopilotBudget,
     BudgetDecision,
@@ -108,8 +108,8 @@ end
 
 Recompute realized usage from the queue's terminal-state entries. Resets
 `realized_today` when the date rolls over. This is the seam for plugging
-in a live sacct poller later — for now, state.toml's
-`gpu_hours_realized` is authoritative.
+in a live scheduler-accounting poller later (qacct on UGE, etc.) —
+for now, state.toml's `gpu_hours_realized` is authoritative.
 """
 function refresh_budget!(; qr::QueueRoot=autopilot_queue_root())
     b = get_budget(qr)

@@ -4,7 +4,7 @@
 #
 #   { "preview":          true | false,
 #     "yaml":             "<inline yaml content>",
-#     "backend":          "local" | "slurm",
+#     "backend":          "local" | "uge",
 #     "priority":         5,
 #     "autonomy_level":   "propose" | "suggest" | "dispatch",
 #     "recipe_name":      "next_random_in_bounds" | "",
@@ -41,9 +41,9 @@ function _route_autopilot_enqueue(body_bytes, base_dir;
 
     preview = Bool(get(req, "preview", true))
     backend_str = String(get(req, "backend", "local"))
-    if !(backend_str in ("local", "slurm"))
+    if !(backend_str in ("local", "uge"))
         return (400, "application/json",
-            _enq_err("backend must be 'local' or 'slurm', got '$(backend_str)'"))
+            _enq_err("backend must be 'local' or 'uge', got '$(backend_str)'"))
     end
     priority = Int(get(req, "priority", 5))
     autonomy_str = String(get(req, "autonomy_level", "propose"))
@@ -55,11 +55,15 @@ function _route_autopilot_enqueue(body_bytes, base_dir;
     recipe_params = Dict{String, Any}(get(req, "recipe_params", Dict()))
     recipe_version = String(get(req, "recipe_version", "1"))
     profile = String(get(req, "profile", "default"))
-    if !haskey(PROFILE_DIRECTIVES, profile)
+    # Profile resource keys only matter for backends that render a
+    # submit script (UGE). Local subprocess ignores the field — accept
+    # any string when backend=="local" so a default-shape request from
+    # the dialog stays valid.
+    if backend_str == "uge" && !haskey(UGE_PROFILE_DIRECTIVES, profile)
         return (400, "application/json",
             _enq_err(
-                "unknown profile '$(profile)'; known: " *
-                join(collect(keys(PROFILE_DIRECTIVES)), ","),
+                "unknown profile '$(profile)' for backend 'uge'; known: " *
+                join(collect(keys(UGE_PROFILE_DIRECTIVES)), ","),
             ))
     end
     walltime = Float64(get(req, "estimated_walltime_hours", 2.0))
@@ -142,6 +146,25 @@ function _route_autopilot_enqueue(body_bytes, base_dir;
     catch e
         return (500, "application/json",
             _enq_err("enqueue! threw: $(typeof(e).name.name): $(e)"))
+    end
+
+    # Immediate tick-on-click: when the operator picks autonomy=:dispatch
+    # they mean "run this now", not "wait up to 5 min for the systemd
+    # timer". Fire one tick asynchronously so the HTTP response stays
+    # snappy (dispatch only STARTS the subprocess/qsub — reaping is
+    # later). A lock-held error means a tick is already in flight (the
+    # timer beat us or another click did) — swallow it; the next tick
+    # picks our entry up.
+    if entry.autonomy_level === :dispatch
+        @async begin
+            try
+                autopilot_tick!(; config=default_autopilot_config())
+            catch err
+                if !occursin("lock", string(err))
+                    @warn "tick-on-click failed" cid=entry.content_id exception=err
+                end
+            end
+        end
     end
 
     body = _commit_json(entry)

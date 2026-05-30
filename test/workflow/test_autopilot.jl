@@ -5,7 +5,16 @@ using TOML
 using SpinorBEC
 using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
     _is_divergent, _maybe_fire_on_complete!, OUTCOME_FILENAME,
-    RUN_STATE_FILENAME
+    RUN_STATE_FILENAME,
+    AutopilotConfig, AutopilotBackend, LocalBackend, UGEBackend,
+    resolve_backend, stage_in, pull_live, collect!,
+    UGE_PROFILE_DIRECTIVES, UGE_PROFILE_ESCALATION,
+    next_profile, render_uge_script,
+    _uge_remote_run_dir, _uge_remote_spec_path,
+    _uge_mkdir_cmd, _uge_rsync_config_cmd, _uge_pull_live_cmd,
+    _uge_collect_cmd, _uge_rsync_script_cmd, _uge_code_sync_cmd,
+    _uge_qsub_cmd, _uge_qstat_cmd, _uge_qdel_cmd, _uge_qstat_list_cmd,
+    _uge_qacct_cmd, _parse_qsub_jobid, _uge_extract_job_state
 
 @testset "autopilot" begin
     mktempdir() do tmp
@@ -191,6 +200,341 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
                 @test length(list_queue(:pending; qr=local_qr)) == 1
 
                 rm(joinpath(local_qr.path, ".autopilot.dry_run"); force=true)
+            end
+        end
+
+        @testset "AutopilotConfig backend registry" begin
+            local_b = LocalBackend()
+            uge_b = UGEBackend(ssh_host="example.tld",
+                remote_runs_root="/scratch/runs",
+                compute_group="tga-test")
+
+            # Primary form: explicit registry. Mixed-typed backends are
+            # held under one Dict{Symbol,AutopilotBackend} so per-entry
+            # dispatch can route to the right concrete type.
+            cfg = AutopilotConfig(;
+                backends=Dict{Symbol, AutopilotBackend}(
+                    :local => local_b, :uge => uge_b),
+                qr=qr)
+            @test cfg.backends[:local] === local_b
+            @test cfg.backends[:uge] === uge_b
+
+            # Resolve by entry.backend_type.
+            run_dir_l = joinpath(qr.path, "reg_local_aaaa")
+            run_dir_u = joinpath(qr.path, "reg_uge_bbbbbb")
+            mkpath(run_dir_l);
+            mkpath(run_dir_u)
+            touch(joinpath(run_dir_l, "config.yaml"))
+            touch(joinpath(run_dir_u, "config.yaml"))
+            e_local = QueueEntry("reg_local_aaaa";
+                run_dir=run_dir_l,
+                spec_path=joinpath(run_dir_l, "config.yaml"),
+                backend_type=:local)
+            e_uge = QueueEntry("reg_uge_bbbbbb";
+                run_dir=run_dir_u,
+                spec_path=joinpath(run_dir_u, "config.yaml"),
+                backend_type=:uge)
+            @test resolve_backend(cfg, e_local) === local_b
+            @test resolve_backend(cfg, e_uge) === uge_b
+
+            # Unknown backend on the entry surfaces loudly — silent
+            # mis-routing would be worse than a thrown error.
+            e_bad = QueueEntry("reg_bad_cccccccc";
+                run_dir=joinpath(qr.path, "reg_bad_cccccccc"),
+                spec_path=joinpath(qr.path, "reg_bad_cccccccc", "config.yaml"),
+                backend_type=:nonexistent)
+            mkpath(e_bad.run_dir);
+            touch(e_bad.spec_path)
+            @test_throws ErrorException resolve_backend(cfg, e_bad)
+
+            # Back-compat: passing a single backend wraps it as :local.
+            cfg_compat = AutopilotConfig(; backend=local_b, qr=qr)
+            @test cfg_compat.backends[:local] === local_b
+            @test resolve_backend(cfg_compat, e_local) === local_b
+
+            # Passing both forms is an explicit error.
+            @test_throws ArgumentError AutopilotConfig(;
+                backends=Dict{Symbol, AutopilotBackend}(:local => local_b),
+                backend=local_b, qr=qr)
+        end
+
+        @testset "default no-op contract on AutopilotBackend" begin
+            # A backend that overrides nothing inherits no-op stage_in /
+            # pull_live / collect! — this is what makes "local is the
+            # zero-latency instance of the same contract" hold.
+            local_b = LocalBackend()
+            run_dir = joinpath(qr.path, "contract_noop_aaaa")
+            mkpath(run_dir)
+            spec_path = joinpath(run_dir, "config.yaml")
+            touch(spec_path)
+            e = QueueEntry("contract_noop_aaaa";
+                run_dir=run_dir, spec_path=spec_path)
+            # All three must return nothing and produce no FS side-effects.
+            sentinel = readdir(run_dir)
+            @test stage_in(local_b, e) === nothing
+            @test pull_live(local_b, e) === nothing
+            @test collect!(local_b, e) === nothing
+            @test readdir(run_dir) == sentinel
+        end
+
+        @testset "UGEBackend data-movement gating" begin
+            # ssh_host=nothing → everything is a no-op (local UGE mode,
+            # shared FS, nothing to mirror).
+            b_local = UGEBackend()  # ssh_host=nothing by default
+            run_dir = joinpath(qr.path, "uge_local_aaaaa")
+            mkpath(run_dir)
+            spec_path = joinpath(run_dir, "config.yaml")
+            touch(spec_path)
+            e = QueueEntry("uge_local_aaaaa";
+                run_dir=run_dir, spec_path=spec_path,
+                backend_type=:uge)
+            @test stage_in(b_local, e) === nothing
+            @test pull_live(b_local, e) === nothing
+            @test collect!(b_local, e) === nothing
+
+            # ssh_host set but remote_runs_root missing → stage_in must
+            # surface that loudly (we cannot guess where on the remote
+            # the run_dir lives).
+            b_misconfigured = UGEBackend(ssh_host="example.tld")
+            @test_throws ArgumentError stage_in(b_misconfigured, e)
+        end
+
+        @testset "UGEBackend command construction (remote mode)" begin
+            # Assert the exact ssh/rsync/qsub command shapes. This is the
+            # contract a real cluster sees; getting it wrong silently
+            # fails at the wrong layer (e.g. config never lands on TSUBAME
+            # and qsub reports "no such file").
+            b = UGEBackend(ssh_host="tsubame",
+                project_root="/gs/fs/tga-kozuma-kouhi/uk07267/BEC-simulation",
+                remote_runs_root="/gs/fs/tga-kozuma-kouhi/uk07267/runs",
+                compute_group="tga-kozuma-kouhi",
+                julia_path="/gs/fs/tga-kozuma-kouhi/shared/.juliaup/bin/julia",
+                cuda_module="cuda/12.8.0")
+            run_dir = joinpath(qr.path, "uge_cmd_aaaaaa")
+            mkpath(run_dir)
+            spec_path = joinpath(run_dir, "config.yaml")
+            touch(spec_path)
+            e = QueueEntry("uge_cmd_aaaaaa";
+                run_dir=run_dir, spec_path=spec_path,
+                backend_type=:uge, code_sha="deadbeef")
+
+            remote_dir = _uge_remote_run_dir(b, e)
+            @test remote_dir ==
+                "/gs/fs/tga-kozuma-kouhi/uk07267/runs/uge_cmd_aaaaaa"
+            @test _uge_remote_spec_path(b, e) ==
+                "/gs/fs/tga-kozuma-kouhi/uk07267/runs/uge_cmd_aaaaaa/config.yaml"
+
+            # mkdir + config-rsync (stage_in).
+            mkdir_args = _uge_mkdir_cmd(b, remote_dir).exec
+            @test mkdir_args[1] == "ssh"
+            @test mkdir_args[2] == "tsubame"
+            @test mkdir_args[end - 1] == "-p"
+            @test mkdir_args[end] == remote_dir
+
+            rsync_args = _uge_rsync_config_cmd(b, e, remote_dir).exec
+            @test rsync_args[1] == "rsync"
+            @test "-e" in rsync_args && "ssh" in rsync_args
+            @test e.spec_path in rsync_args
+            @test "tsubame:$(remote_dir)/" in rsync_args
+
+            # pull_live: just _live_status.json, with --ignore-missing-args
+            # so the first ticks (before the file exists) don't fail.
+            live_args = _uge_pull_live_cmd(b, e, remote_dir).exec
+            @test "--ignore-missing-args" in live_args
+            @test "tsubame:$(remote_dir)/_live_status.json" in live_args
+            @test joinpath(e.run_dir, "_live_status.json") in live_args
+
+            # collect!: mirror but PRESERVE local state.toml (canonical
+            # queue metadata) and skip .state.lock.
+            coll_args = _uge_collect_cmd(b, e, remote_dir).exec
+            @test "--exclude=state.toml" in coll_args
+            @test "--exclude=.state.lock" in coll_args
+            @test "tsubame:$(remote_dir)/" in coll_args
+            @test "$(e.run_dir)/" in coll_args
+
+            # Code-sync rsync builder: SHA stripped of -dirty marker, full
+            # snippet wrapped in `bash -lc`, julia_path baked in.
+            code_args = _uge_code_sync_cmd(b, "abc123-dirty").exec
+            @test code_args[1] == "ssh"
+            @test code_args[2] == "tsubame"
+            @test code_args[3] == "bash"
+            @test code_args[4] == "-lc"
+            snippet = code_args[5]
+            @test occursin("git checkout --quiet abc123", snippet)
+            @test !occursin("-dirty", snippet)
+            @test occursin("Pkg.instantiate", snippet)
+            @test occursin(b.julia_path, snippet)
+
+            # rsync of the rendered submit.uge.sh.
+            script_args = _uge_rsync_script_cmd(b,
+                "/local/x.uge.sh",
+                "/gs/fs/tga-kozuma-kouhi/uk07267/runs/x/x.uge.sh").exec
+            @test "/local/x.uge.sh" in script_args
+            @test ("tsubame:" *
+                   "/gs/fs/tga-kozuma-kouhi/uk07267/runs/x/x.uge.sh") in script_args
+
+            # qsub / qstat / qdel / qacct / qstat-list shells.
+            @test _uge_qsub_cmd(b, "/remote/x.uge.sh").exec ==
+                ["ssh", "tsubame", "qsub", "/remote/x.uge.sh"]
+            @test _uge_qstat_cmd(b, "12345").exec ==
+                ["ssh", "tsubame", "qstat", "-j", "12345"]
+            @test _uge_qdel_cmd(b, "12345").exec ==
+                ["ssh", "tsubame", "qdel", "12345"]
+            @test _uge_qacct_cmd(b, "12345").exec ==
+                ["ssh", "tsubame", "qacct", "-j", "12345"]
+            @test _uge_qstat_list_cmd(b).exec == ["ssh", "tsubame", "qstat"]
+        end
+
+        @testset "UGE script rendering" begin
+            script = render_uge_script("default", "/remote/cfg.yaml";
+                project_root="/remote/proj",
+                julia_path="/remote/julia",
+                cuda_module="cuda/12.8.0",
+                jobname="cid_abcdef",
+                compute_group="tga-kozuma-kouhi")
+            # Required UGE directives (`#$` lines) and TSUBAME-specific
+            # billing flag must all be present; getting any one wrong
+            # silently sends the job to the wrong queue/account.
+            @test occursin("#\$ -cwd", script)
+            @test occursin("#\$ -N cid_abcdef", script)
+            @test occursin("#\$ -o stdout.log", script)
+            @test occursin("#\$ -e stderr.log", script)
+            @test occursin("#\$ -g tga-kozuma-kouhi", script)
+            @test occursin("#\$ -l node_q=1", script)
+            @test occursin("#\$ -l h_rt=12:00:00", script)
+            @test occursin("module load cuda/12.8.0", script)
+            @test occursin("cd \"/remote/proj\"", script)
+            @test occursin("/remote/julia", script)
+            @test occursin("run_yaml(ARGS[1])", script)
+            @test occursin("/remote/cfg.yaml", script)
+
+            # Without compute_group / cuda_module the lines are omitted.
+            bare = render_uge_script("gpu_1", "/cfg.yaml";
+                project_root="/proj", jobname="j")
+            @test !occursin("-g ", bare)
+            @test !occursin("module load", bare)
+            @test occursin("#\$ -l gpu_1=1", bare)
+
+            # Unknown profile must throw, not silently submit nothing.
+            @test_throws ArgumentError render_uge_script("nope", "/x";
+                project_root="/p", jobname="j")
+        end
+
+        @testset "UGE qsub jobid parsing + qstat job_state extraction" begin
+            # Canonical UGE qsub stdout (a couple of common variants).
+            @test _parse_qsub_jobid(
+                "Your job 1234567 (\"foo\") has been submitted") == "1234567"
+            @test _parse_qsub_jobid(
+                "Your job-array 88.1-10:1 (\"bar\") has been submitted") == "88"
+            @test_throws ErrorException _parse_qsub_jobid("\n   \n")
+
+            # qstat -j job_state field extraction tolerates surrounding
+            # KEY VALUE lines.
+            sample = """
+            ==============================================================
+            job_number:                 1234567
+            job_state                   r
+            cwd                         /gs/fs/...
+            """
+            @test _uge_extract_job_state(sample) == "r"
+            @test isempty(_uge_extract_job_state("no field here"))
+        end
+
+        @testset "UGE retry-escalation ladder" begin
+            b = UGEBackend()
+            # node_q → node_h → node_f → nothing
+            @test next_profile(b, "default") == "node_h"
+            @test next_profile(b, "node_h") == "node_f"
+            @test next_profile(b, "node_f") === nothing
+            # Unknown profile name: no escalation, retry caps.
+            @test next_profile(b, "unknown_profile") === nothing
+            # LocalBackend has no ladder — always nothing.
+            @test next_profile(LocalBackend(), "default") === nothing
+        end
+
+        @testset "LocalBackend subprocess shape" begin
+            # End-to-end subprocess test would pay another Julia startup
+            # (~30s with cache, multiple minutes cold). Skip by default
+            # in fast/ci tiers; gate behind SPINORBEC_RUN_HEAVY_LOCAL.
+            # What we DO test cheaply:
+            #   - construction holds the configured fields
+            #   - cancel! on a missing entry is a graceful false
+            #   - find_job_by_name on an unknown name reports :no_such_job
+            #   - n_running on empty table is 0
+            b = LocalBackend(; max_concurrent=2,
+                project_root="/tmp/proj", julia_bin="julia")
+            @test b.max_concurrent == 2
+            @test b.project_root == "/tmp/proj"
+            @test b.julia_bin == "julia"
+            @test SpinorBEC.n_running(b) == 0
+
+            run_dir = joinpath(qr.path, "local_shape_aaaa")
+            mkpath(run_dir)
+            spec_path = joinpath(run_dir, "config.yaml")
+            touch(spec_path)
+            e = QueueEntry("local_shape_aaaa";
+                run_dir=run_dir, spec_path=spec_path)
+            @test cancel!(b, e) === false   # nothing in flight
+            @test SpinorBEC.find_job_by_name(b, "no_such") === :no_such_job
+            @test occursin("not in local table",
+                SpinorBEC.backend_failure_reason(b, e))
+        end
+
+        @testset "default_autopilot_config: env-driven UGE registration" begin
+            # When the SPINORBEC_TSUBAME_* env triple is set, the
+            # systemd timer / dashboard server picks up a :uge backend
+            # without code edits. Unset → :local-only.
+            saved = Dict{String, Any}(
+                k => get(ENV, k, nothing) for k in
+                ("SPINORBEC_TSUBAME_HOST", "SPINORBEC_TSUBAME_PROJECT_ROOT",
+                    "SPINORBEC_TSUBAME_RUNS_ROOT", "SPINORBEC_TSUBAME_GROUP",
+                    "SPINORBEC_TSUBAME_JULIA", "SPINORBEC_TSUBAME_CUDA_MODULE",
+                    "SPINORBEC_TSUBAME_SYNC_CODE")
+            )
+            try
+                # Unset → :local only.
+                for k in keys(saved)
+                    ;
+                    delete!(ENV, k);
+                end
+                cfg_bare = SpinorBEC.default_autopilot_config(; qr=qr,
+                    inspect_before_dispatch=false)
+                @test haskey(cfg_bare.backends, :local)
+                @test !haskey(cfg_bare.backends, :uge)
+
+                # Partial triple (missing runs root) → still :local only.
+                ENV["SPINORBEC_TSUBAME_HOST"] = "tsubame"
+                ENV["SPINORBEC_TSUBAME_PROJECT_ROOT"] = "/p"
+                cfg_partial = SpinorBEC.default_autopilot_config(; qr=qr,
+                    inspect_before_dispatch=false)
+                @test !haskey(cfg_partial.backends, :uge)
+
+                # Full triple + optional fields → :uge registered with
+                # the env values plumbed through.
+                ENV["SPINORBEC_TSUBAME_RUNS_ROOT"] = "/scratch/runs"
+                ENV["SPINORBEC_TSUBAME_GROUP"] = "tga-test"
+                ENV["SPINORBEC_TSUBAME_JULIA"] = "/opt/julia"
+                ENV["SPINORBEC_TSUBAME_CUDA_MODULE"] = "cuda/12.8.0"
+                ENV["SPINORBEC_TSUBAME_SYNC_CODE"] = "true"
+                cfg_full = SpinorBEC.default_autopilot_config(; qr=qr,
+                    inspect_before_dispatch=false)
+                @test haskey(cfg_full.backends, :uge)
+                u = cfg_full.backends[:uge]::UGEBackend
+                @test u.ssh_host == "tsubame"
+                @test u.project_root == "/p"
+                @test u.remote_runs_root == "/scratch/runs"
+                @test u.compute_group == "tga-test"
+                @test u.julia_path == "/opt/julia"
+                @test u.cuda_module == "cuda/12.8.0"
+                @test u.sync_code === true
+            finally
+                for (k, v) in saved
+                    if v === nothing
+                        delete!(ENV, k)
+                    else
+                        ENV[k] = v
+                    end
+                end
             end
         end
 

@@ -9,7 +9,7 @@
 #   (b) call backend.dispatch! → real job_id
 #   (c) save_entry! with job_id
 # If a crash occurs between (a) and (c), the next tick sees status=:running
-# with job_id=nothing and reconciles via `squeue --name=<content_id>`.
+# with job_id=nothing and reconciles via the backend's find_job_by_name.
 
 export autopilot_tick!,
     default_autopilot_config,
@@ -46,11 +46,56 @@ function autopilot_set_dry_run!(on::Bool;
     return on
 end
 
-default_autopilot_config(; kwargs...) = AutopilotConfig(;
-    backend=LocalBackend(),
-    qr=autopilot_queue_root(),
+function default_autopilot_config(;
+    backends::Union{Nothing, Dict{Symbol, <:AutopilotBackend}}=nothing,
+    backend::Union{Nothing, AutopilotBackend}=nothing,
+    qr::QueueRoot=autopilot_queue_root(),
     kwargs...,
 )
+    if backends !== nothing && backend !== nothing
+        throw(ArgumentError(
+            "default_autopilot_config: pass backends= or backend=, not both"))
+    end
+    resolved = if backends !== nothing
+        Dict{Symbol, AutopilotBackend}(backends)
+    elseif backend !== nothing
+        Dict{Symbol, AutopilotBackend}(:local => backend)
+    else
+        # Always register :local. Auto-register :uge when env says so —
+        # this is what lets the systemd timer / dashboard server pick up
+        # TSUBAME without anyone editing code.
+        d = Dict{Symbol, AutopilotBackend}(:local => LocalBackend())
+        uge = _maybe_uge_backend_from_env()
+        uge === nothing || (d[:uge] = uge)
+        d
+    end
+    AutopilotConfig(; backends=resolved, qr=qr, kwargs...)
+end
+
+"""
+    _maybe_uge_backend_from_env() -> Union{Nothing, UGEBackend}
+
+Build a UGEBackend from the SPINORBEC_TSUBAME_* env triple
+(host / project_root / runs_root) if all three are set, otherwise
+return nothing. Compute group / julia path / cuda module are optional
+and default to TSUBAME 4-friendly values when unset.
+"""
+function _maybe_uge_backend_from_env()
+    host = get(ENV, "SPINORBEC_TSUBAME_HOST", "")
+    proj = get(ENV, "SPINORBEC_TSUBAME_PROJECT_ROOT", "")
+    runs = get(ENV, "SPINORBEC_TSUBAME_RUNS_ROOT", "")
+    (isempty(host) || isempty(proj) || isempty(runs)) && return nothing
+    UGEBackend(;
+        ssh_host=host,
+        project_root=proj,
+        remote_runs_root=runs,
+        compute_group=get(ENV, "SPINORBEC_TSUBAME_GROUP", ""),
+        julia_path=get(ENV, "SPINORBEC_TSUBAME_JULIA", "julia"),
+        cuda_module=get(ENV, "SPINORBEC_TSUBAME_CUDA_MODULE", ""),
+        sync_code=lowercase(get(ENV, "SPINORBEC_TSUBAME_SYNC_CODE", "")) in
+                  ("1", "true", "yes"),
+    )
+end
 
 """
     autopilot_tick!(; config=default_autopilot_config()) -> AutopilotStats
@@ -105,7 +150,7 @@ function _autopilot_tick_body!(config::AutopilotConfig, stats::AutopilotStats)
     #    or reset.
     for entry in running
         entry.job_id === nothing || continue
-        recovered = _reconcile_zombie!(config.backend, entry)
+        recovered = _reconcile_zombie!(resolve_backend(config, entry), entry)
         if recovered === :recovered_running
             # job_id now set on entry; save below by reap loop
         elseif recovered === :reset_to_pending
@@ -184,7 +229,7 @@ function _autopilot_tick_body!(config::AutopilotConfig, stats::AutopilotStats)
             # Capture the autopilot config hash at dispatch time —
             # answers "what autopilot rules dispatched this run?".
             entry.autopilot_config_hash = _capture_autopilot_config_hash(config)
-            ok = _dispatch_one!(config.backend, entry)
+            ok = _dispatch_one!(resolve_backend(config, entry), entry)
             if !ok
                 break    # backend full or transient error; try next tick
             end
@@ -196,17 +241,22 @@ function _autopilot_tick_body!(config::AutopilotConfig, stats::AutopilotStats)
     # 2. Reap running → done / killed_data / killed_bug ──────────────
     for entry in list_queue(:running; qr=config.qr)   # re-list to pick up reconciliations
         entry.job_id === nothing && continue   # still mid-submit (other process?)
-        status = job_status(config.backend, entry)
+        backend = resolve_backend(config, entry)
+        status = job_status(backend, entry)
         if status === :done
             _terminal_classify!(entry, :done; reason="completed")
             stats.completed += 1
             _record_outcome_safe!(entry, :done; qr=config.qr)
+            _collect_safe!(backend, entry)
             _maybe_fire_on_complete!(entry, config, stats)
         elseif status === :failed
-            # SLURM said failed. Look at outcome.toml + sacct to decide
+            # Backend said failed. Look at outcome.toml + backend-side reason to decide
             # killed_data vs killed_bug (OOM is resource-permanent and
             # classified as killed_bug; divergence is killed_data).
-            terminal, reason = _classify_terminal_failure(entry, config.backend)
+            # Collect first so the classifier can read outcome.toml even
+            # when the producer was a remote backend.
+            _collect_safe!(backend, entry)
+            terminal, reason = _classify_terminal_failure(entry, backend)
             _terminal_classify!(entry, terminal; reason=reason)
             stats.failed += 1
             _record_outcome_safe!(entry, terminal; qr=config.qr)
@@ -219,16 +269,25 @@ function _autopilot_tick_body!(config::AutopilotConfig, stats::AutopilotStats)
                 end
             end
         elseif status === :running || status === :pending
+            # Refresh _live_status.json in canonical local runs/ so the
+            # divergence check and the dashboard see fresh data. No-op
+            # for LocalBackend (already local); rsync for UGEBackend.
+            try
+                pull_live(backend, entry)
+            catch err
+                @warn "pull_live threw" cid=entry.content_id exception=err
+            end
             # Still in flight; check for divergence kill.
             if _is_divergent(entry)
                 @info "kill-divergent" cid=entry.content_id job=entry.job_id
                 try
-                    cancel!(config.backend, entry)
+                    cancel!(backend, entry)
                 catch
                 end
                 set_status!(entry, :killed_data;
                     kill_reason="divergent ($(string(_divergence_metric(entry))))")
                 stats.killed_divergent += 1
+                _collect_safe!(backend, entry)
                 _record_outcome_safe!(entry, :killed_data; qr=config.qr)
             end
         else
@@ -286,10 +345,24 @@ end
 function _dispatch_one!(backend::AutopilotBackend, entry::QueueEntry)
     # Stage (a): mark running + job_id=nothing + fsync. If the autopilot
     # crashes between here and stage (c), the next tick's zombie
-    # reconciliation will recover or roll back via squeue --name.
+    # reconciliation will recover or roll back via find_job_by_name.
     entry.status = :running
     entry.job_id = nothing
     save_entry!(entry)
+
+    # Stage (a+): stage_in places config + code at the execution site.
+    # No-op for LocalBackend; rsync+ssh for UGEBackend. A failure here
+    # rolls back identically to a dispatch! failure — the entry returns
+    # to :pending and the next tick retries.
+    try
+        stage_in(backend, entry)
+    catch err
+        @warn "stage_in threw; rolling back to pending" cid=entry.content_id exception=err
+        entry.status = :pending
+        entry.job_id = nothing
+        save_entry!(entry)
+        return false
+    end
 
     # Stage (b): backend.dispatch! mutates entry.job_id on success.
     ok = try
@@ -338,7 +411,7 @@ function _terminal_classify!(entry::QueueEntry, terminal::Symbol;
         kill_reason=terminal === :done ? "" : String(reason))
 end
 
-# Classify SLURM "failed" → killed_bug (resource-permanent / NaN) or
+# Classify backend "failed" → killed_bug (resource-permanent / NaN) or
 # killed_data (divergence detected post-run by the runtime itself).
 function _classify_terminal_failure(entry::QueueEntry, backend::AutopilotBackend)
     # First: outcome.toml (written by run_yaml at exit) — most informative.
@@ -426,6 +499,20 @@ function _dry_run_dispatch!(entry::QueueEntry,
     # :pending and get picked up on the next tick.
     _maybe_fire_on_complete!(entry, config, stats)
     return entry
+end
+
+# Pull results into canonical local runs/<cid>/ via the backend's
+# `collect!` contract method. No-op for LocalBackend (already there);
+# rsync for UGEBackend. Best-effort — a collection failure must NOT
+# crash the reap loop; we'd rather record a terminal status with
+# missing artefacts than wedge the tick.
+function _collect_safe!(backend::AutopilotBackend, entry::QueueEntry)
+    try
+        collect!(backend, entry)
+    catch err
+        @warn "collect! threw" cid=entry.content_id exception=err
+    end
+    return nothing
 end
 
 # Bump the per-recipe outcome counter; no-op when entry has no recipe.

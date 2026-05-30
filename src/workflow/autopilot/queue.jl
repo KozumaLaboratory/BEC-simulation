@@ -110,12 +110,12 @@ mutable struct QueueEntry
     autonomy_level::Symbol                  # :suggest | :propose | :dispatch
 
     # backend
-    backend_type::Symbol                    # :local | :slurm
+    backend_type::Symbol                    # :local | :uge
     job_id::Union{Nothing, String}           # nothing during the submit window
-    profile::String                         # sbatch profile / resource class
+    profile::String                         # submit-script profile / resource class
     estimated_walltime_hours::Float64
 
-    # budget (filled in by sacct poller)
+    # budget (filled in by qacct/scheduler poller)
     gpu_hours_realized::Float64
 
     # filesystem
@@ -609,8 +609,15 @@ autopilot config rules dispatched this run?".
 function _capture_autopilot_config_hash(config)
     config === nothing && return ""
     payload = try
+        # Hash the registry as a sorted (kind => backend-typename) map so
+        # the digest is stable across iteration order and reflects "which
+        # backends were available at dispatch time".
+        backend_kinds = Dict{String, String}()
+        for (k, b) in config.backends
+            backend_kinds[String(k)] = string(typeof(b).name.name)
+        end
         Dict{String, Any}(
-            "backend_type" => string(typeof(config.backend).name.name),
+            "backends" => backend_kinds,
             "qr_path" => config.qr.path,
             "inspect_before_dispatch" => config.inspect_before_dispatch,
             "max_dispatches_per_tick" => config.max_dispatches_per_tick,

@@ -75,7 +75,7 @@ export function EnqueueDialog({
 }: Props) {
   const [step, setStep] = useState<Step>('form')
   const [yamlText, setYamlText] = useState<string>(initialYaml || DEFAULT_YAML)
-  const [backend, setBackend] = useState<'local' | 'slurm'>('local')
+  const [backend, setBackend] = useState<'local' | 'uge'>('local')
   const [priority, setPriority] = useState<number>(5)
   const [autonomy, setAutonomy] = useState<'suggest' | 'propose' | 'dispatch'>(
     'propose',
@@ -150,6 +150,30 @@ export function EnqueueDialog({
     }
   }
 
+  // Run-now: single-click commit with autonomy forced to :dispatch.
+  // Server runs the inspector + budget gate before accepting; on commit
+  // it kicks an immediate tick so the subprocess/qsub starts in
+  // seconds, not at the next 5-min timer beat. Skips the preview pane;
+  // for nuanced launches (read findings first) keep using Preview → Enqueue.
+  async function handleRunNow() {
+    setBusy(true)
+    setError(null)
+    try {
+      const r = await api.autopilotEnqueueCommit({ ...req, autonomy_level: 'dispatch' })
+      if (!r.ok) {
+        setError(r.error || 'run-now failed')
+      } else {
+        setAutonomy('dispatch')
+        onCommitted?.(r)
+        onClose()
+      }
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (!open) return null
   return (
     <div
@@ -197,6 +221,7 @@ export function EnqueueDialog({
             preview={preview}
             onBack={() => setStep('form')}
             onPreview={handlePreview}
+            onRunNow={handleRunNow}
             onCommit={handleCommit}
             onCancel={onClose}
           />
@@ -264,8 +289,8 @@ function DialogHeader({
 function FormStep(props: {
   yamlText: string
   onYamlChange: (v: string) => void
-  backend: 'local' | 'slurm'
-  onBackendChange: (v: 'local' | 'slurm') => void
+  backend: 'local' | 'uge'
+  onBackendChange: (v: 'local' | 'uge') => void
   priority: number
   onPriorityChange: (v: number) => void
   autonomy: 'suggest' | 'propose' | 'dispatch'
@@ -298,9 +323,9 @@ function FormStep(props: {
           value={props.backend}
           options={[
             { value: 'local', label: 'suzume (local, default)' },
-            { value: 'slurm', label: 'tsubame (slurm)' },
+            { value: 'uge', label: 'tsubame (uge)' },
           ]}
-          onChange={(v) => props.onBackendChange(v as 'local' | 'slurm')}
+          onChange={(v) => props.onBackendChange(v as 'local' | 'uge')}
         />
         <SelectField
           label="autonomy"
@@ -519,6 +544,7 @@ function DialogFooter({
   preview,
   onBack,
   onPreview,
+  onRunNow,
   onCommit,
   onCancel,
 }: {
@@ -528,11 +554,13 @@ function DialogFooter({
   preview: EnqueuePreviewResponse | null
   onBack: () => void
   onPreview: () => void
+  onRunNow: () => void
   onCommit: () => void
   onCancel: () => void
 }) {
   const blockCount = preview?.inspector.block_count ?? 0
   const commitLabel = dryRun ? 'Enqueue [DRY-RUN]' : 'Enqueue'
+  const runNowLabel = dryRun ? 'Run now [DRY-RUN]' : 'Run now ▶'
   return (
     <div className="px-5 py-3 border-t border-[var(--ink-faint)] flex justify-between items-center">
       <button
@@ -554,15 +582,31 @@ function DialogFooter({
           </button>
         )}
         {step === 'form' ? (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onPreview}
-            className="text-xs font-mono px-3 py-1.5 border border-[var(--ink)] text-[var(--ink)] hover:bg-[var(--ink)] hover:text-background disabled:opacity-50"
-            style={{ borderRadius: 0 }}
-          >
-            {busy ? 'previewing…' : 'Preview →'}
-          </button>
+          <>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onRunNow}
+              className="text-xs font-mono px-3 py-1.5 border disabled:opacity-50"
+              style={{
+                borderColor: 'var(--t-green,#5a8b5a)',
+                color: 'var(--t-green,#5a8b5a)',
+                borderRadius: 0,
+              }}
+              title="Commit with autonomy=:dispatch + kick a tick immediately. Inspector still runs server-side."
+            >
+              {busy ? 'starting…' : runNowLabel}
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onPreview}
+              className="text-xs font-mono px-3 py-1.5 border border-[var(--ink)] text-[var(--ink)] hover:bg-[var(--ink)] hover:text-background disabled:opacity-50"
+              style={{ borderRadius: 0 }}
+            >
+              {busy ? 'previewing…' : 'Preview →'}
+            </button>
+          </>
         ) : (
           <button
             type="button"

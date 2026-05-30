@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# TSUBAME (4.0 / 3.0) environment bootstrap. Source this from interactive
-# shells or sbatch scripts:
+# TSUBAME 4 environment bootstrap. Source this from interactive shells
+# or UGE submit scripts:
 #
 #   source scripts/tsubame_setup.sh
 #
@@ -10,7 +10,7 @@
 #     doesn't thrash Lustre's metadata server
 #   - SPINORBEC_SCRATCH_DIR for per-frame snapshot streaming
 #   - LD_LIBRARY_PATH so CUDA.jl finds the runtime
-#   - JULIA_NUM_THREADS sized to the SLURM cpus-per-task
+#   - JULIA_NUM_THREADS sized to NHOSTS / NSLOTS / fallback
 #
 # Idempotent — safe to source multiple times.
 
@@ -50,8 +50,10 @@ export SPINORBEC_SCRATCH_DIR="${SBEC_LOCAL}/spinorbec_snaps"
 mkdir -p "$SPINORBEC_SCRATCH_DIR"
 
 # --- Threads ----------------------------------------------------------
-if [[ -n "${SLURM_CPUS_PER_TASK:-}" ]]; then
-    export JULIA_NUM_THREADS="$SLURM_CPUS_PER_TASK"
+# UGE exports NSLOTS (slot count for parallel envs); fall back to a
+# sensible default when running outside the scheduler (interactive node).
+if [[ -n "${NSLOTS:-}" ]]; then
+    export JULIA_NUM_THREADS="$NSLOTS"
 elif [[ -z "${JULIA_NUM_THREADS:-}" ]]; then
     export JULIA_NUM_THREADS=4
 fi

@@ -6,6 +6,9 @@ After=network.target
 Type=oneshot
 WorkingDirectory=%h/workspace/BEC-simulation
 Environment="LD_LIBRARY_PATH=/usr/lib/wsl/lib"
+# TSUBAME (UGE) backend auto-registration. Edit values in the file;
+# unsetting the host/project/runs triple disables :uge cleanly.
+EnvironmentFile=-%h/workspace/BEC-simulation/scripts/spinorbec.env
 # %h is the systemd-user home expansion; SPINORBEC_QUEUE defaults to runs/
 # Pass `--sysimage=spinor_sysimage.so` if you've built one (TSUBAME setup).
 ExecStart=/home/%u/.julia/juliaup/julia-1.12.6+0.x64.linux.gnu/bin/julia \

@@ -134,7 +134,7 @@ export interface EnqueueCommitResponse {
   content_id: string
   status: 'pending'
   autonomy_level: 'suggest' | 'propose' | 'dispatch'
-  backend: 'local' | 'slurm'
+  backend: 'local' | 'uge'
   profile: string
   run_dir: string
   enqueued_by: string
@@ -148,7 +148,7 @@ export interface EnqueueErrorResponse {
 export interface EnqueueRequest {
   preview: boolean
   yaml: string
-  backend?: 'local' | 'slurm'
+  backend?: 'local' | 'uge'
   priority?: number
   autonomy_level?: 'suggest' | 'propose' | 'dispatch'
   recipe_name?: string
@@ -183,7 +183,7 @@ export interface AutopilotQueueEntry {
   group_id: string
   recipe: { name: string | null; autonomy_level: 'suggest' | 'propose' | 'dispatch' }
   backend: {
-    type: 'local' | 'slurm'
+    type: 'local' | 'uge'
     job_id: string | null
     profile: string
     estimated_walltime_hours: number

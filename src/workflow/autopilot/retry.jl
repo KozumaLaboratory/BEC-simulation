@@ -22,7 +22,7 @@ export retry_failed!, RetryClassification, classify_failure
         -> RetryClassification
 
 Pure predicate. `outcome` is the parsed outcome.toml's `[outcome]` table
-(or empty). `backend_reason` is the sacct/squeue post-mortem string.
+(or empty). `backend_reason` is the scheduler post-mortem string.
 """
 function classify_failure(outcome::AbstractDict, backend_reason::AbstractString="")
     # Outcome.toml takes precedence — it's the simulator's own report.
@@ -82,7 +82,7 @@ function retry_failed!(;
             abandoned += 1
             continue
         elseif cls === RESOURCE_PERMANENT
-            next = next_profile(entry.profile)
+            next = next_profile(backend, entry.profile)
             if next === nothing
                 abandoned += 1                 # no larger class; give up
                 continue

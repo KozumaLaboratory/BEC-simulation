@@ -1,327 +1,193 @@
-# ── Dispatch backends ─────────────────────────────────────────────────
+# ── Dispatch backends (ExecutionTarget contract) ──────────────────────
 #
-# Each backend implements three operations:
+# Each backend implements the contract below. The dashboard / catalog /
+# inspector NEVER branch on backend: they only ever read canonical local
+# `runs/<cid>/`. Every backend is responsible for making its run_dir
+# appear there — local does so by being local (no-ops), remote does so
+# by `stage_in` (push config out) + `pull_live` (refresh live status) +
+# `collect!` (pull results back). This confines remote-ness to one place.
 #
-#   dispatch!(backend, entry)        # start the run; mutates entry.job_id
-#   job_status(backend, entry)       # → :running | :done | :failed | :unknown
-#   cancel!(backend, entry)          # request cancellation
+#   stage_in(b, entry)         # place config + code where the job runs
+#   dispatch!(b, entry)        # start the run; mutates entry.job_id
+#   job_status(b, entry)       # → :pending | :running | :done | :failed | :unknown
+#   pull_live(b, entry)        # refresh _live_status.json in local runs/
+#   collect!(b, entry)         # mirror results into local runs/<cid>/
+#   cancel!(b, entry)          # request cancellation
+#   find_job_by_name(b, name)  # reconcile after mid-submit crash
+#   backend_failure_reason(b, entry)  # post-mortem string
+#   next_profile(b, profile)   # retry-escalation: next resource tier or nothing
 #
-# `LocalBackend` executes `run!` inline — used by tests and the
-# single-machine workflow. `SlurmBackend` shells out via sbatch/squeue/
-# scancel (optionally over SSH).
-
-export LocalBackend, SlurmBackend,
-    dispatch!, job_status, cancel!,
-    find_job_by_name, backend_failure_reason,
-    PROFILE_DIRECTIVES, next_profile, render_sbatch_script
-
-# Profile → SBATCH directive Dict. Each profile encodes a resource
-# class; the sbatch script body is identical (run_yaml + auto-save) and
-# rendered on the fly by `render_sbatch_script`. Escalation
-# (default → single_h100 → ...) is used by retry.jl for OOM failures
-# so the next attempt has more headroom.
+# `stage_in`, `pull_live`, `collect!` have default no-op fallbacks on
+# `AutopilotBackend` so a fully-local backend declares nothing extra.
+# `next_profile` defaults to `nothing` (no escalation) so a backend
+# without a profile ladder simply caps at its current tier.
 #
-# Adding a new profile = adding a dict entry here (no new .sbatch file
-# in scripts/). Tuning resource caps = editing the directives dict.
-const PROFILE_DIRECTIVES = Dict{String, Dict{String, String}}(
-    "default" => Dict(
-        "job-name" => "spinorbec",
-        "partition" => "gpu_h",
-        "gres" => "gpu:h100:1",
-        "cpus-per-task" => "8",
-        "mem" => "128G",
-        "time" => "12:00:00",
-        "requeue" => "",
-        "output" => "logs/%x-%j.out",
-        "error" => "logs/%x-%j.err",
-    ),
-    "single_h100" => Dict(
-        "job-name" => "spinorbec",
-        "partition" => "gpu_h",
-        "gres" => "gpu:h100:1",
-        "cpus-per-task" => "8",
-        "mem" => "256G",          # 2× memory vs default
-        "time" => "24:00:00",     # 2× walltime
-        "requeue" => "",
-        "output" => "logs/%x-%j.out",
-        "error" => "logs/%x-%j.err",
-    ),
-)
+# `LocalBackend` runs jobs in a **detached subprocess** writing to
+# `runs/<cid>/` (same shape the UGE submit script writes), so kill /
+# GPU isolation / concurrency match the remote backend and the
+# dashboard process never holds the GPU. `UGEBackend` lives in
+# `backends_uge.jl`.
 
-# Linear chain of escalation. Returns the next profile in the table, or
-# `nothing` if no further headroom is registered.
-const PROFILE_ESCALATION = Dict{String, Union{Nothing, String}}(
-    "default" => "single_h100",
-    "single_h100" => nothing,
-)
+export LocalBackend,
+    stage_in, dispatch!, job_status, pull_live, collect!, cancel!,
+    find_job_by_name, backend_failure_reason, next_profile
 
-next_profile(current::AbstractString) = get(PROFILE_ESCALATION, String(current), nothing)
+# Default no-op contract methods. Local execution lives in the canonical
+# place already, so a backend that doesn't override these is implicitly
+# local-shape (entry.run_dir IS where the job runs and where results land).
+stage_in(::AutopilotBackend, entry) = nothing
+pull_live(::AutopilotBackend, entry) = nothing
+collect!(::AutopilotBackend, entry) = nothing
 
-"""
-    render_sbatch_script(profile::AbstractString, config_path::AbstractString;
-                         project_root=pwd()) -> String
-
-Render the full SBATCH submission script for `profile` (looked up in
-`PROFILE_DIRECTIVES`) targeting `config_path` (the YAML the job will
-run). The returned string is what `SlurmBackend.dispatch!` writes to a
-tmpfile and submits via `sbatch`.
-
-Operators can override directives by mutating `PROFILE_DIRECTIVES`
-in-process before dispatch, or by registering a new profile entry.
-"""
-function render_sbatch_script(profile::AbstractString, config_path::AbstractString;
-    project_root::AbstractString=pwd(),
-)
-    prof = String(profile)
-    haskey(PROFILE_DIRECTIVES, prof) ||
-        throw(ArgumentError("unknown profile $prof; known: $(collect(keys(PROFILE_DIRECTIVES)))"))
-    dirs = PROFILE_DIRECTIVES[prof]
-    directive_lines = String[]
-    for k in sort!(collect(keys(dirs)))
-        v = dirs[k]
-        push!(directive_lines,
-            isempty(v) ? "#SBATCH --$k" : "#SBATCH --$k=$v")
-    end
-    body = """
-    #!/bin/bash
-    $(join(directive_lines, "\n"))
-    #
-    # Auto-generated by SpinorBEC.render_sbatch_script — profile=$prof.
-    # Edit PROFILE_DIRECTIVES in src/workflow/autopilot/backends.jl to
-    # change resource caps. Do NOT edit this file by hand; submission
-    # writes a fresh script per job.
-
-    set -euo pipefail
-
-    cd "$(project_root)" || exit 1
-    mkdir -p logs
-
-    julia --project=. -e '
-        using CUDA, SpinorBEC
-        report_cuda_state()
-        estimate_run_budget(ARGS[1])
-        run_yaml(ARGS[1])
-    ' "$(config_path)"
-    """
-    return body
-end
+# Default retry-escalation: no further resource tier. Backends with a
+# profile ladder (UGEBackend) override this.
+next_profile(::AutopilotBackend, current::AbstractString) = nothing
 
 # `AutopilotBackend` abstract type is declared in types.jl.
 
-# Local in-process backend ─────────────────────────────────────────────
+# Local subprocess backend ────────────────────────────────────────────
+
+# Julia snippet the subprocess runs. Identical-shape to the UGE script
+# body (render_uge_script) so local and remote dispatch produce
+# byte-for-byte identical run artefacts under runs/<cid>/.
+const _LOCAL_RUN_SNIPPET = """
+using SpinorBEC
+SpinorBEC.run_yaml(ARGS[1])
+"""
 
 """
-    LocalBackend(; max_concurrent=1)
+    LocalBackend(; max_concurrent=1, project_root=pwd(),
+                 julia_bin="julia", extra_env=Pair{String,String}[])
 
-Run jobs in the same Julia process via `run!(Experiment(...))`.
-`max_concurrent=1` means strict serial — appropriate for testing and
-single-GPU desktops. Sets `entry.job_id = entry.content_id` for tracking.
+Run jobs in a **detached subprocess** via
+`julia --project=<project_root> -e 'using SpinorBEC; run_yaml(ARGS[1])'
+<spec_path>`. The spawned process writes `summary.json` / `outcome.toml`
+/ `_live_status.json` / `*.jld2` into `entry.run_dir` — the same layout
+the UGE submit script produces — so the dashboard and
+`run_catalog_index` never need to branch on local-vs-remote.
+
+`max_concurrent=1` is the single-GPU desktop default. `cancel!` actually
+kills the subprocess (was a no-op under the old `Threads.@spawn` model).
+`LD_LIBRARY_PATH=/usr/lib/wsl/lib` is set automatically when not already
+present — required for WSL2 GPU runs, harmless otherwise.
+
+`entry.job_id` is set to the subprocess's OS pid (string). `_running`
+keys on `content_id` so `find_job_by_name(content_id)` reconciles a
+zombie after a mid-submit crash in the same process — for cross-process
+recovery (autopilot restart), the subprocess will have been re-parented
+to init and we can't adopt it; the next tick falls through to
+`:gave_up` and the entry rolls to `:killed_bug`.
 """
 struct LocalBackend <: AutopilotBackend
     max_concurrent::Int
-    _running::Dict{String, Task}    # content_id => Task
+    project_root::String
+    julia_bin::String
+    extra_env::Vector{Pair{String, String}}
+    _running::Dict{String, Base.Process}    # content_id => Process
 end
 
-LocalBackend(; max_concurrent::Int=1) = LocalBackend(max_concurrent, Dict{String, Task}())
+function LocalBackend(;
+    max_concurrent::Int=1,
+    project_root::AbstractString=pwd(),
+    julia_bin::AbstractString="julia",
+    extra_env=Pair{String, String}[],
+)
+    env_vec = Pair{String, String}[String(k) => String(v) for (k, v) in extra_env]
+    LocalBackend(max_concurrent, String(project_root), String(julia_bin),
+        env_vec, Dict{String, Base.Process}())
+end
 
-n_running(b::LocalBackend) = count(t -> !istaskdone(t), values(b._running))
+function n_running(b::LocalBackend)
+    n = 0
+    for (_, p) in b._running
+        process_running(p) && (n += 1)
+    end
+    return n
+end
 
 function dispatch!(b::LocalBackend, entry::QueueEntry)
     n_running(b) >= b.max_concurrent && return false   # backend full
-    t = Threads.@spawn try
-        exp = Experiment(entry.spec_path)
-        run!(exp)
-    catch err
-        @warn "LocalBackend run! threw" entry=entry.content_id exception=err
-        rethrow(err)
+
+    log_dir = joinpath(entry.run_dir, ".autopilot")
+    isdir(log_dir) || mkpath(log_dir)
+    out_path = joinpath(log_dir, "stdout.log")
+    err_path = joinpath(log_dir, "stderr.log")
+
+    cmd = `$(b.julia_bin) --project=$(b.project_root) -e $(_LOCAL_RUN_SNIPPET) $(entry.spec_path)`
+
+    env = copy(ENV)
+    haskey(env, "LD_LIBRARY_PATH") || (env["LD_LIBRARY_PATH"] = "/usr/lib/wsl/lib")
+    for (k, v) in b.extra_env
+        env[k] = v
     end
-    b._running[entry.content_id] = t
-    entry.job_id = entry.content_id
+
+    p = try
+        run(pipeline(detach(setenv(cmd, env));
+                stdout=out_path, stderr=err_path); wait=false)
+    catch err
+        @warn "LocalBackend dispatch! failed to spawn subprocess" cid=entry.content_id exception=err
+        return false
+    end
+
+    b._running[entry.content_id] = p
+    entry.job_id = string(getpid(p))
     return true
 end
 
 function job_status(b::LocalBackend, entry::QueueEntry)
-    job_id = entry.job_id
-    job_id === nothing && return :unknown
-    t = get(b._running, String(job_id), nothing)
-    t === nothing && return :unknown
-    if !istaskdone(t)
+    entry.job_id === nothing && return :unknown
+    p = get(b._running, entry.content_id, nothing)
+    p === nothing && return :unknown
+    if process_running(p)
         return :running
-    elseif istaskfailed(t)
-        return :failed
-    else
+    elseif success(p)
         return :done
+    else
+        return :failed
     end
 end
 
 function cancel!(b::LocalBackend, entry::QueueEntry)
-    @warn "LocalBackend.cancel! is a no-op (Julia tasks can't be killed)" cid=entry.content_id
-    return false
-end
-
-function find_job_by_name(b::LocalBackend, name::AbstractString)
-    haskey(b._running, String(name)) ? String(name) : :no_such_job
-end
-
-function backend_failure_reason(b::LocalBackend, entry::QueueEntry)
-    job_id = entry.job_id
-    job_id === nothing && return "no job_id"
-    t = get(b._running, String(job_id), nothing)
-    t === nothing && return "unknown (task not in local table)"
-    if istaskfailed(t)
-        return "LocalBackend task threw: " * sprint(showerror, t.exception)
-    end
-    return "completed without failure"
-end
-
-# SLURM backend ────────────────────────────────────────────────────────
-
-"""
-    SlurmBackend(;
-        ssh_host = nothing,             # nothing → run sbatch locally
-        max_concurrent = nothing,       # nothing → let SLURM fair-share decide
-        project_root = pwd(),           # working dir baked into the script
-    )
-
-Submits jobs to a SLURM scheduler. The SBATCH script is **rendered on
-the fly** from `PROFILE_DIRECTIVES[entry.profile]` via
-`render_sbatch_script` — no static `.sbatch` files in `scripts/`.
-When `ssh_host` is set, prepends `ssh <host>` so the autopilot can
-run on a non-SLURM machine (e.g. WSL) while the cluster sits behind SSH.
-"""
-struct SlurmBackend <: AutopilotBackend
-    ssh_host::Union{Nothing, String}
-    max_concurrent::Union{Nothing, Int}
-    project_root::String
-end
-
-SlurmBackend(;
-    ssh_host::Union{Nothing, AbstractString}=nothing,
-    max_concurrent::Union{Nothing, Int}=nothing,
-    project_root::AbstractString=pwd(),
-) = SlurmBackend(
-    ssh_host === nothing ? nothing : String(ssh_host),
-    max_concurrent,
-    String(project_root),
-)
-
-function dispatch!(b::SlurmBackend, entry::QueueEntry)
-    profile = isempty(entry.profile) ? "default" : entry.profile
-    script = render_sbatch_script(profile, entry.spec_path;
-        project_root=b.project_root)
-
-    # Write the rendered script to a tempfile alongside the run dir so
-    # the on-disk record survives for forensics, then submit. The path
-    # is jobname-stable: re-submission with the same content_id reuses
-    # the same file.
-    script_dir = joinpath(entry.run_dir, ".autopilot")
-    isdir(script_dir) || mkpath(script_dir)
-    script_path = joinpath(script_dir, "submit.sbatch")
-    open(script_path, "w") do io
-        write(io, script)
-    end
-
-    # --job-name=<content_id> enables reconciliation after mid-submit
-    # crash: squeue --name=<content_id> can re-locate the job.
-    cmd = if b.ssh_host === nothing
-        `sbatch --parsable --job-name=$(entry.content_id) $script_path`
-    else
-        `ssh $(b.ssh_host) sbatch --parsable --job-name=$(entry.content_id) $script_path`
-    end
-    job_id = strip(read(cmd, String))
-    isempty(job_id) && throw(ErrorException("sbatch returned empty job id"))
-    entry.job_id = String(job_id)
-    return true
-end
-
-function job_status(b::SlurmBackend, entry::QueueEntry)
-    job_id = entry.job_id
-    job_id === nothing && return :unknown
-    cmd = if b.ssh_host === nothing
-        `squeue --noheader -j $(job_id) -h -o "%T"`
-    else
-        `ssh $(b.ssh_host) squeue --noheader -j $(job_id) -h -o "%T"`
-    end
-    state = try
-        strip(read(cmd, String))
-    catch
-        return :unknown
-    end
-    if isempty(state)
-        return _slurm_terminal_state(b, job_id)
-    elseif state in ("PENDING", "CONFIGURING")
-        return :pending
-    elseif state in ("RUNNING", "COMPLETING")
-        return :running
-    elseif state == "COMPLETED"
-        return :done
-    else
-        return :failed
-    end
-end
-
-function _slurm_terminal_state(b::SlurmBackend, job_id::AbstractString)
-    cmd = if b.ssh_host === nothing
-        `sacct --noheader -j $(job_id) --format=State -P`
-    else
-        `ssh $(b.ssh_host) sacct --noheader -j $(job_id) --format=State -P`
-    end
-    state = try
-        first(split(strip(read(cmd, String)), '\n'))
-    catch
-        return :unknown
-    end
-    state == "COMPLETED" ? :done : :failed
-end
-
-function cancel!(b::SlurmBackend, entry::QueueEntry)
-    job_id = entry.job_id
-    job_id === nothing && return false
-    cmd = if b.ssh_host === nothing
-        `scancel $(job_id)`
-    else
-        `ssh $(b.ssh_host) scancel $(job_id)`
-    end
+    p = get(b._running, entry.content_id, nothing)
+    p === nothing && return false
+    process_running(p) || return false
     try
-        run(cmd)
+        kill(p)
         return true
     catch err
-        @warn "scancel failed" job_id=job_id exception=err
+        @warn "LocalBackend kill failed" cid=entry.content_id exception=err
         return false
     end
 end
 
-# Reconciliation: look up a job by its sbatch --job-name. Returns the job
-# ID if SLURM still sees it, :no_such_job if not, nothing on probe error.
-function find_job_by_name(b::SlurmBackend, name::AbstractString)
-    cmd = if b.ssh_host === nothing
-        `squeue --noheader -h --name=$(name) -o "%i"`
-    else
-        `ssh $(b.ssh_host) squeue --noheader -h --name=$(name) -o "%i"`
-    end
-    out = try
-        strip(read(cmd, String))
-    catch err
-        @warn "squeue --name probe failed" exception=err
-        return nothing
-    end
-    isempty(out) && return :no_such_job
-    return String(first(split(out, '\n')))
+# Returns the subprocess pid (string) when we still have a handle; only
+# useful for in-process zombie reconciliation. Across-process recovery
+# is not supported — a fresh LocalBackend has an empty table.
+function find_job_by_name(b::LocalBackend, name::AbstractString)
+    p = get(b._running, String(name), nothing)
+    p === nothing && return :no_such_job
+    return string(getpid(p))
 end
 
-# Post-mortem reason from sacct (OOM_KILLED / TIMEOUT / NODE_FAIL / ...).
-function backend_failure_reason(b::SlurmBackend, entry::QueueEntry)
-    job_id = entry.job_id
-    job_id === nothing && return "no job_id"
-    cmd = if b.ssh_host === nothing
-        `sacct --noheader -j $(job_id) --format=State,Reason,ExitCode -P`
-    else
-        `ssh $(b.ssh_host) sacct --noheader -j $(job_id) --format=State,Reason,ExitCode -P`
-    end
-    line = try
-        first(split(strip(read(cmd, String)), '\n'))
+function backend_failure_reason(b::LocalBackend, entry::QueueEntry)
+    p = get(b._running, entry.content_id, nothing)
+    p === nothing && return "unknown (subprocess not in local table)"
+    process_running(p) && return "still running"
+    code = p.exitcode
+    code == 0 && return "completed (exit 0)"
+    tail = try
+        err_path = joinpath(entry.run_dir, ".autopilot", "stderr.log")
+        if isfile(err_path)
+            sz = stat(err_path).size
+            open(err_path, "r") do io
+                seek(io, max(0, sz - 4096))
+                String(read(io))
+            end
+        else
+            ""
+        end
     catch
-        return "sacct probe failed"
+        ""
     end
-    return String(line)
+    return "subprocess exit $(code)" * (isempty(tail) ? "" : " | tail: $(tail)")
 end

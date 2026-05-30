@@ -54,7 +54,7 @@ using ..SpinorBEC: QueueEntry, autopilot_queue_root, list_queue,
     is_autopilot_dry_run, is_autopilot_paused,
     enqueue!, Experiment, content_id, default_store,
     inspect_config_string, inspect_config, budget_gate, refresh_budget!,
-    PROFILE_DIRECTIVES
+    UGE_PROFILE_DIRECTIVES
 
 include("dashboard/encoding.jl")          # bitshuffle + zstd
 include("dashboard/cache.jl")             # PSI_CACHE, JLD handle pool, atlas disk cache
