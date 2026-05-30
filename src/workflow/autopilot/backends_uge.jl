@@ -85,6 +85,7 @@ struct UGEBackend <: AutopilotBackend
     remote_runs_root::Union{Nothing, String}
     compute_group::String
     julia_path::String
+    julia_depot::String   # `JULIA_DEPOT_PATH` for the submitted script (compute nodes don't inherit login env)
     cuda_module::String
     sync_code::Bool
 end
@@ -96,6 +97,7 @@ UGEBackend(;
     remote_runs_root::Union{Nothing, AbstractString}=nothing,
     compute_group::AbstractString="",
     julia_path::AbstractString="julia",
+    julia_depot::AbstractString="",
     cuda_module::AbstractString="",
     sync_code::Bool=false,
 ) = UGEBackend(
@@ -105,6 +107,7 @@ UGEBackend(;
     remote_runs_root === nothing ? nothing : String(remote_runs_root),
     String(compute_group),
     String(julia_path),
+    String(julia_depot),
     String(cuda_module),
     sync_code,
 )
@@ -119,6 +122,12 @@ _uge_remote_run_dir(b::UGEBackend, entry::QueueEntry) =
 _uge_remote_spec_path(b::UGEBackend, entry::QueueEntry) =
     joinpath(_uge_remote_run_dir(b, entry), basename(entry.spec_path))
 
+# UGE rejects job names that start with a digit ("not a valid object
+# name"). Content IDs are hex, so prefix unconditionally. Used by both
+# dispatch (as `qsub -N`) and reconcile (as the search key in
+# `qstat`'s name column) so the two halves agree.
+_uge_jobname(cid::AbstractString) = "sb_" * String(cid)
+
 # ── render ───────────────────────────────────────────────────────────
 
 """
@@ -131,10 +140,12 @@ optionally `module load`s CUDA, and invokes `julia run_yaml <config_path>`
 """
 function render_uge_script(profile::AbstractString, config_path::AbstractString;
     project_root::AbstractString,
+    log_dir::AbstractString,
     julia_path::AbstractString="julia",
+    julia_depot::AbstractString="",
     cuda_module::AbstractString="",
     jobname::AbstractString="spinorbec",
-    compute_group::AbstractString="",
+    compute_group::AbstractString="",  # kept in signature for symmetry; placed on qsub CLI, not in script
 )
     prof = String(profile)
     haskey(UGE_PROFILE_DIRECTIVES, prof) ||
@@ -146,16 +157,26 @@ function render_uge_script(profile::AbstractString, config_path::AbstractString;
         )
     profile_lines = UGE_PROFILE_DIRECTIVES[prof]
 
+    # Two non-portable conventions baked in:
+    # (1) TSUBAME 4's qsub wrapper REJECTS `#$ -g <group>` as a script
+    #     directive ("ERROR! invalid option argument '-g'"). The compute
+    #     group is instead passed on the qsub command line by dispatch!
+    #     via `_uge_qsub_cmd`. Keep this renderer free of -g.
+    # (2) Absolute -o/-e paths land logs in the run_dir. `-cwd` plus
+    #     relative `stdout.log`/`stderr.log` would land them in $HOME
+    #     instead — ssh to TSUBAME starts in $HOME and qsub uses that
+    #     as the job's initial cwd. The script body then `cd`s into
+    #     project_root for the julia invocation.
     fixed = String[
-        "#\$ -cwd",
         "#\$ -N $(jobname)",
-        "#\$ -o stdout.log",
-        "#\$ -e stderr.log",
+        "#\$ -o $(log_dir)/stdout.log",
+        "#\$ -e $(log_dir)/stderr.log",
     ]
-    isempty(compute_group) || push!(fixed, "#\$ -g $(compute_group)")
     profile_directives = ["#\$ " * d for d in profile_lines]
 
     module_line = isempty(cuda_module) ? "" : "module load $(cuda_module)"
+    depot_line = isempty(julia_depot) ? "" :
+                 "export JULIA_DEPOT_PATH=\"$(julia_depot)\""
 
     body = """
     #!/bin/bash
@@ -171,12 +192,17 @@ function render_uge_script(profile::AbstractString, config_path::AbstractString;
     $(module_line)
     cd "$(project_root)" || exit 1
 
-    "$(julia_path)" --project=. -e '
-        using CUDA, SpinorBEC
-        report_cuda_state()
-        estimate_run_budget(ARGS[1])
-        run_yaml(ARGS[1])
-    ' "$(config_path)"
+    # Compute nodes on TSUBAME do NOT inherit the login-node depot env,
+    # so without this every job sees an empty ~/.julia and fails
+    # with "Package X is required but does not seem to be installed".
+    # Point at the lab's shared depot installed once on the login node.
+    $(depot_line)
+
+    # Same snippet shape as LocalBackend's _LOCAL_RUN_SNIPPET so local
+    # and remote dispatch produce byte-for-byte identical artefacts.
+    # CUDA isn't `using`'d explicitly — SpinorBEC's extension fires
+    # when CUDA is loaded (it lives in the project's deps).
+    "$(julia_path)" --project=. -e 'using SpinorBEC; SpinorBEC.run_yaml(ARGS[1])' "$(config_path)"
     """
     return body
 end
@@ -211,10 +237,18 @@ function _uge_code_sync_cmd(b::UGEBackend, code_sha::AbstractString)
     `ssh $(b.ssh_host) bash -lc $(snippet)`
 end
 
-_uge_qsub_cmd(b::UGEBackend, remote_script::AbstractString) =
-    b.ssh_host === nothing ?
-    `qsub $(remote_script)` :
-    `ssh $(b.ssh_host) qsub $(remote_script)`
+function _uge_qsub_cmd(b::UGEBackend, remote_script::AbstractString)
+    # On TSUBAME 4 `-g <group>` MUST be on the qsub command line (not as
+    # a `#$ -g` script directive — the TSUBAME qsub wrapper rejects that
+    # with "invalid option argument"). Skip the flag when compute_group
+    # is unset — qsub then falls back to its "trial" mode (non-billed).
+    base = if isempty(b.compute_group)
+        `qsub $(remote_script)`
+    else
+        `qsub -g $(b.compute_group) $(remote_script)`
+    end
+    b.ssh_host === nothing ? base : `ssh $(b.ssh_host) $base`
+end
 
 _uge_qstat_cmd(b::UGEBackend, job_id::AbstractString) =
     b.ssh_host === nothing ?
@@ -293,9 +327,11 @@ function dispatch!(b::UGEBackend, entry::QueueEntry)
     eff_config_path = _uge_remote_spec_path(b, entry)
     script = render_uge_script(profile, eff_config_path;
         project_root=b.project_root,
+        log_dir=_uge_remote_run_dir(b, entry),
         julia_path=b.julia_path,
+        julia_depot=b.julia_depot,
         cuda_module=b.cuda_module,
-        jobname=entry.content_id,
+        jobname=_uge_jobname(entry.content_id),
         compute_group=b.compute_group)
 
     script_dir = joinpath(entry.run_dir, ".autopilot")
@@ -321,53 +357,91 @@ end
 
 # ── status / cancel / reconcile / failure reason ─────────────────────
 
-# UGE job_state codes (from `man qstat`):
+# UGE job_state codes (from `man qstat`, listing mode column 5):
 #   r/t = running/transferring
 #   qw/hqw/hRwq = pending (queued, waiting, restart-pending)
 #   E* (Eqw etc.) = error state
 #   d* = being deleted
-# When qstat -j <id> says the job doesn't exist (returns nonzero), the
-# job is terminal — fall back to qacct -j <id> for the exit_status.
+#
+# Why listing mode, not `qstat -j`: on TSUBAME 4 the detail output of
+# `qstat -j <id>` does NOT include a `job_state:` field (it contains
+# `job_number`, `submission_time`, `script_file`, ... but no state).
+# The state lives in the plain `qstat` table, column 5. So we parse
+# the listing and key off the job-ID column.
 function job_status(b::UGEBackend, entry::QueueEntry)
     entry.job_id === nothing && return :unknown
     job_id = entry.job_id
-    state = try
-        _uge_extract_job_state(read(_uge_qstat_cmd(b, job_id), String))
+    listing = try
+        read(pipeline(_uge_qstat_list_cmd(b); stderr=devnull), String)
     catch
-        # qstat -j errors when the job is no longer in the active list.
-        return _uge_terminal_state(b, job_id)
+        return :unknown   # transient ssh / qstat failure; next tick retries
     end
-    isempty(state) && return _uge_terminal_state(b, job_id)
-    if occursin(r"^(qw|hqw|hRwq)$"i, state)
+    state = _uge_extract_job_state_from_listing(listing, job_id)
+    if state == "pending"
         return :pending
-    elseif startswith(state, "r") || startswith(state, "t")
+    elseif state == "running"
         return :running
-    elseif startswith(state, "E") || startswith(state, "d")
+    elseif state == "failed"
         return :failed
+    elseif state == "absent"
+        # Not in the active listing → scheduler considers it terminal.
+        # Outcome.toml landed by `collect!` is the authoritative
+        # done/failed signal (qacct can lag minutes on TSUBAME and
+        # often returns "not found" for short jobs).
+        collect!(b, entry)
+        outcome_path = joinpath(entry.run_dir, OUTCOME_FILENAME)
+        if isfile(outcome_path)
+            d = try
+                TOML.parsefile(outcome_path)
+            catch
+                nothing
+            end
+            if d isa AbstractDict
+                term = String(get(get(d, "outcome", Dict()), "terminal", ""))
+                term == "done" && return :done
+                term in ("killed_data", "killed_bug") && return :failed
+            end
+        end
+        # No outcome.toml yet — last resort, try qacct. If still no
+        # record, return :unknown (next tick retries).
+        return _uge_terminal_state(b, job_id)
     end
     return :unknown
 end
 
-# Pull the "job_state" field from `qstat -j <id>` output (free-form KEY VALUE
-# lines). UGE prints state on a line like "job_state                   r".
-function _uge_extract_job_state(out::AbstractString)
-    for line in eachsplit(out, '\n')
-        m = match(r"^job_state\s+(\S+)", line)
-        m === nothing && continue
-        return String(m.captures[1])
+# Parse plain `qstat` table output, find the row for `job_id`, and
+# normalise the state column (5) into pending / running / failed /
+# absent. Listing format:
+#   job-ID  prior  name  user  state  submit/start at  queue ...  slots
+# Header lines are skipped (first column is not all-digits).
+function _uge_extract_job_state_from_listing(listing::AbstractString,
+    job_id::AbstractString)
+    for line in eachsplit(listing, '\n')
+        cols = split(strip(line))
+        length(cols) >= 5 || continue
+        all(isdigit, cols[1]) || continue
+        cols[1] == String(job_id) || continue
+        state = cols[5]
+        occursin(r"^(qw|hqw|hRwq)$"i, state) && return "pending"
+        (startswith(state, "r") || startswith(state, "t")) && return "running"
+        (startswith(state, "E") || startswith(state, "d")) && return "failed"
+        return "running"   # unknown active state code; assume in-flight
     end
-    return ""
+    return "absent"
 end
 
+# Last-resort terminal classification via qacct. Used only when the
+# job is no longer in qstat AND outcome.toml hasn't landed yet. qacct
+# on TSUBAME can lag minutes after job exit and may return
+# "error: job id N not found" for short jobs that didn't make it into
+# accounting (e.g. early script failure with bad directives).
 function _uge_terminal_state(b::UGEBackend, job_id::AbstractString)
     out = try
-        read(_uge_qacct_cmd(b, job_id), String)
+        read(pipeline(_uge_qacct_cmd(b, job_id); stderr=devnull), String)
     catch
-        # qacct unavailable / job not yet recorded → caller treats as :unknown,
-        # next tick retries.
         return :unknown
     end
-    m = match(r"^exit_status\s+(\d+)", out)
+    m = match(r"^exit_status\s+(\d+)"m, out)
     m === nothing && return :unknown
     return parse(Int, m.captures[1]) == 0 ? :done : :failed
 end
@@ -383,7 +457,9 @@ function cancel!(b::UGEBackend, entry::QueueEntry)
     end
 end
 
-# Reconciliation: scan `qstat` for a job whose name (col 3) == content_id.
+# Reconciliation: scan `qstat` for a job whose name column matches the
+# `sb_<cid>` shape dispatch used. The caller passes `entry.content_id`
+# raw, so wrap with `_uge_jobname` to stay symmetric with dispatch.
 function find_job_by_name(b::UGEBackend, name::AbstractString)
     out = try
         read(_uge_qstat_list_cmd(b), String)
@@ -391,12 +467,13 @@ function find_job_by_name(b::UGEBackend, name::AbstractString)
         @warn "qstat probe failed" exception=err
         return nothing
     end
+    target = _uge_jobname(name)
     for line in eachsplit(out, '\n')
         cols = split(strip(line))
         length(cols) >= 3 || continue
         # Header lines start with letters / dashes; skip.
         all(isdigit, cols[1]) || continue
-        cols[3] == String(name) || continue
+        cols[3] == target || continue
         return String(cols[1])
     end
     return :no_such_job

@@ -1,0 +1,29 @@
+[Unit]
+Description=SpinorBEC dashboard (Julia serve_dashboard on :8090)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/workspace/BEC-simulation
+Environment="LD_LIBRARY_PATH=/usr/lib/wsl/lib"
+# Same env file the autopilot tick reads — gives the dashboard process
+# the SPINORBEC_TSUBAME_* values so the EnqueueDialog's "tsubame (uge)"
+# option lands on a registered backend.
+EnvironmentFile=-%h/workspace/BEC-simulation/scripts/spinorbec.env
+
+ExecStart=/home/%u/.julia/juliaup/julia-1.12.6+0.x64.linux.gnu/bin/julia \
+    --project=. -e 'using SpinorBEC; SpinorBEC.serve_dashboard(8090)'
+
+# Restart on crash; backoff a little so a precompile-time failure
+# doesn't hot-loop the JIT.
+Restart=on-failure
+RestartSec=15s
+
+StandardOutput=journal
+StandardError=journal
+
+ProtectSystem=full
+PrivateTmp=false
+
+[Install]
+WantedBy=default.target

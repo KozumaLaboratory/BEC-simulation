@@ -10,11 +10,11 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
     resolve_backend, stage_in, pull_live, collect!,
     UGE_PROFILE_DIRECTIVES, UGE_PROFILE_ESCALATION,
     next_profile, render_uge_script,
-    _uge_remote_run_dir, _uge_remote_spec_path,
+    _uge_remote_run_dir, _uge_remote_spec_path, _uge_jobname,
     _uge_mkdir_cmd, _uge_rsync_config_cmd, _uge_pull_live_cmd,
     _uge_collect_cmd, _uge_rsync_script_cmd, _uge_code_sync_cmd,
     _uge_qsub_cmd, _uge_qstat_cmd, _uge_qdel_cmd, _uge_qstat_list_cmd,
-    _uge_qacct_cmd, _parse_qsub_jobid, _uge_extract_job_state
+    _uge_qacct_cmd, _parse_qsub_jobid, _uge_extract_job_state_from_listing
 
 @testset "autopilot" begin
     mktempdir() do tmp
@@ -374,7 +374,14 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
                    "/gs/fs/tga-kozuma-kouhi/uk07267/runs/x/x.uge.sh") in script_args
 
             # qsub / qstat / qdel / qacct / qstat-list shells.
+            # `-g <group>` lives on the qsub command line, NOT in the
+            # script (TSUBAME 4's qsub wrapper rejects `#$ -g` as
+            # "invalid option argument").
             @test _uge_qsub_cmd(b, "/remote/x.uge.sh").exec ==
+                ["ssh", "tsubame", "qsub", "-g", "tga-kozuma-kouhi", "/remote/x.uge.sh"]
+            # When no compute_group is set, the flag is omitted (trial mode).
+            b_nogroup = UGEBackend(ssh_host="tsubame")
+            @test _uge_qsub_cmd(b_nogroup, "/remote/x.uge.sh").exec ==
                 ["ssh", "tsubame", "qsub", "/remote/x.uge.sh"]
             @test _uge_qstat_cmd(b, "12345").exec ==
                 ["ssh", "tsubame", "qstat", "-j", "12345"]
@@ -388,18 +395,19 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
         @testset "UGE script rendering" begin
             script = render_uge_script("default", "/remote/cfg.yaml";
                 project_root="/remote/proj",
+                log_dir="/remote/runs/cid_abcdef",
                 julia_path="/remote/julia",
                 cuda_module="cuda/12.8.0",
                 jobname="cid_abcdef",
                 compute_group="tga-kozuma-kouhi")
-            # Required UGE directives (`#$` lines) and TSUBAME-specific
-            # billing flag must all be present; getting any one wrong
-            # silently sends the job to the wrong queue/account.
-            @test occursin("#\$ -cwd", script)
             @test occursin("#\$ -N cid_abcdef", script)
-            @test occursin("#\$ -o stdout.log", script)
-            @test occursin("#\$ -e stderr.log", script)
-            @test occursin("#\$ -g tga-kozuma-kouhi", script)
+            # Absolute log paths land logs in the run_dir. `-cwd` +
+            # relative paths would land them in $HOME because ssh to
+            # TSUBAME starts in $HOME and qsub uses that as the job's
+            # initial cwd.
+            @test occursin("#\$ -o /remote/runs/cid_abcdef/stdout.log", script)
+            @test occursin("#\$ -e /remote/runs/cid_abcdef/stderr.log", script)
+            @test !occursin("#\$ -cwd", script)
             @test occursin("#\$ -l node_q=1", script)
             @test occursin("#\$ -l h_rt=12:00:00", script)
             @test occursin("module load cuda/12.8.0", script)
@@ -407,17 +415,33 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
             @test occursin("/remote/julia", script)
             @test occursin("run_yaml(ARGS[1])", script)
             @test occursin("/remote/cfg.yaml", script)
+            # `-g <group>` MUST NOT appear as a script directive on
+            # TSUBAME 4 (rejected with "invalid option argument").
+            # The dispatch path passes it on the qsub command line instead.
+            @test !occursin("#\$ -g", script)
 
-            # Without compute_group / cuda_module the lines are omitted.
+            # Without cuda_module the load line is omitted.
             bare = render_uge_script("gpu_1", "/cfg.yaml";
-                project_root="/proj", jobname="j")
-            @test !occursin("-g ", bare)
+                project_root="/proj", log_dir="/runs/j", jobname="j")
             @test !occursin("module load", bare)
             @test occursin("#\$ -l gpu_1=1", bare)
 
             # Unknown profile must throw, not silently submit nothing.
             @test_throws ArgumentError render_uge_script("nope", "/x";
-                project_root="/p", jobname="j")
+                project_root="/p", log_dir="/runs/j", jobname="j")
+        end
+
+        @testset "_uge_jobname prefixes numeric content IDs" begin
+            # UGE rejects job names starting with a digit. Content IDs
+            # are hex so they routinely start with 0-9; the prefix is
+            # what makes `qsub -N` and `qstat`-name reconciliation
+            # actually reach the scheduler.
+            @test _uge_jobname("468a96d062a66d6d") == "sb_468a96d062a66d6d"
+            @test _uge_jobname("abc") == "sb_abc"
+            # The character class is `[a-zA-Z][a-zA-Z0-9_]*` after the
+            # prefix — `_uge_jobname` doesn't try to sanitize internal
+            # characters, only to defuse the leading-digit case.
+            @test startswith(_uge_jobname("9foo"), "sb_")
         end
 
         @testset "UGE qsub jobid parsing + qstat job_state extraction" begin
@@ -428,16 +452,24 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
                 "Your job-array 88.1-10:1 (\"bar\") has been submitted") == "88"
             @test_throws ErrorException _parse_qsub_jobid("\n   \n")
 
-            # qstat -j job_state field extraction tolerates surrounding
-            # KEY VALUE lines.
-            sample = """
-            ==============================================================
-            job_number:                 1234567
-            job_state                   r
-            cwd                         /gs/fs/...
+            # qstat listing parser extracts state from column 5 keyed
+            # by job-ID. TSUBAME 4's `qstat -j <id>` detail output does
+            # NOT include a `job_state:` line (only listing mode does),
+            # so we parse the listing here.
+            listing = """
+            job-ID     prior   name       user         state submit/start at     queue                          jclass                         slots ja-task-ID
+            ------------------------------------------------------------------------------------------------------------------------------------------------
+               7805539 0.55256 sb_468a96d uk07267      qw    05/30/2026 22:15:59                                                                  48
+               7805600 0.49000 sb_other   uk07267      r     05/30/2026 22:30:00 all.q                                                            48
+               7805700 0.10000 sb_dying   uk07267      dr    05/30/2026 22:45:00                                                                  48
             """
-            @test _uge_extract_job_state(sample) == "r"
-            @test isempty(_uge_extract_job_state("no field here"))
+            @test _uge_extract_job_state_from_listing(listing, "7805539") == "pending"
+            @test _uge_extract_job_state_from_listing(listing, "7805600") == "running"
+            @test _uge_extract_job_state_from_listing(listing, "7805700") == "failed"
+            # Missing from the listing → "absent" → caller treats as
+            # terminal and consults outcome.toml.
+            @test _uge_extract_job_state_from_listing(listing, "9999999") == "absent"
+            @test _uge_extract_job_state_from_listing("", "1") == "absent"
         end
 
         @testset "UGE retry-escalation ladder" begin
