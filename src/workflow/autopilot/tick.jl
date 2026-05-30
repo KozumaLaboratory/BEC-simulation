@@ -145,6 +145,11 @@ running, fires on_complete. Holds the autopilot lockfile for the duration.
 function autopilot_tick!(; config::AutopilotConfig=default_autopilot_config())
     stats = AutopilotStats()
     breaker_details = Dict{String, Any}()
+    # Task-local sentinel so any `enqueue!` called from *inside* this
+    # tick (most importantly on_complete recipe children) skips
+    # `kick_tick_async` — the second dispatch pass below picks the new
+    # entries up in the same tick, no async storm needed.
+    task_local_storage(:spinorbec_in_tick, true)
     return with_autopilot_lock(; qr=config.qr) do
         # Pre-tick circuit-breaker check. Trip → auto-pause + log; the
         # body still runs so reap/cleanup happens (only dispatch is gated
@@ -212,70 +217,9 @@ function _autopilot_tick_body!(config::AutopilotConfig, stats::AutopilotStats)
     else
         nothing
     end
-    dispatched = 0
-    if !paused && (budget_decision === nothing || budget_decision.allow)
-        for entry in pending
-            dispatched >= config.max_dispatches_per_tick && break
-
-            # Autonomy gate: :suggest / :propose recipes never dispatch
-            # (autopilot only records the suggestion).
-            if entry.autonomy_level !== :dispatch
-                continue
-            end
-
-            # Pre-flight inspector with explicit 4-level severity mapping:
-            #   :block → killed_bug (don't dispatch)
-            #   :error → dispatch but record findings on entry
-            #   :warn  → dispatch + Slack notify
-            #   :info  → silent
-            if config.inspect_before_dispatch
-                pre = _inspector_preflight(entry)
-                if pre.blocked !== nothing
-                    set_status!(entry, :killed_bug;
-                        kill_reason="inspector blocked: $(pre.blocked)")
-                    stats.inspected_blocked += 1
-                    continue
-                end
-                if !isempty(pre.error_kinds) || !isempty(pre.warn_kinds)
-                    entry.recipe_params["_inspector_findings"] = Dict{String, Any}(
-                        "error_kinds" => pre.error_kinds,
-                        "warn_kinds" => pre.warn_kinds,
-                    )
-                    save_entry!(entry)
-                end
-                if !isempty(pre.warn_kinds) && config.notify_slack_on_failure
-                    try
-                        notify_slack(
-                            "[autopilot] pre-flight :warn on " *
-                            "$(entry.content_id): $(join(pre.warn_kinds, ", "))",
-                        )
-                    catch err
-                        @warn "notify_slack threw" exception=err
-                    end
-                end
-            end
-
-            # Honor either in-process config.dry_run OR the persistent
-            # sentinel set by the operator (CLI/dashboard). Either is
-            # sufficient to keep the autopilot in shadow mode.
-            if config.dry_run || is_autopilot_dry_run(config.qr)
-                _dry_run_dispatch!(entry, config, stats)
-                stats.dispatched += 1
-                stats.completed += 1
-                dispatched += 1
-                continue
-            end
-            # Capture the autopilot config hash at dispatch time —
-            # answers "what autopilot rules dispatched this run?".
-            entry.autopilot_config_hash = _capture_autopilot_config_hash(config)
-            ok = _dispatch_one!(resolve_backend(config, entry), entry)
-            if !ok
-                break    # backend full or transient error; try next tick
-            end
-            stats.dispatched += 1
-            dispatched += 1
-        end
-    end
+    dispatched_ref = Ref(0)
+    _dispatch_pending_pass!(config, stats, pending, paused, budget_decision,
+        dispatched_ref)
 
     # 2. Reap running → done / killed_data / killed_bug ──────────────
     for entry in list_queue(:running; qr=config.qr)   # re-list to pick up reconciliations
@@ -332,6 +276,90 @@ function _autopilot_tick_body!(config::AutopilotConfig, stats::AutopilotStats)
         else
             # :unknown — backend lost track; leave for next tick
         end
+    end
+
+    # 3. Second dispatch pass to pick up on_complete children created
+    #    by the reap loop above. Their `enqueue!` saw the in-tick
+    #    sentinel and suppressed `kick_tick_async`, so without this
+    #    pass they'd wait for the next 5-min systemd tick. Shares the
+    #    same dispatch budget (`max_dispatches_per_tick`) so it cannot
+    #    runaway. Skipped if no on_complete fired (stats unchanged).
+    if stats.on_complete_fired > 0
+        new_pending = list_queue(:pending; qr=config.qr)
+        _dispatch_pending_pass!(config, stats, new_pending, paused,
+            budget_decision, dispatched_ref)
+    end
+    return nothing
+end
+
+# Dispatch loop body, extracted so step 1 (initial) and step 3
+# (post-on_complete catch-up) can share it without duplicating the
+# autonomy/inspector/dry-run gating. The `dispatched_ref` is shared
+# across passes so the per-tick cap is honored cluster-wide, not
+# reset between passes.
+function _dispatch_pending_pass!(config::AutopilotConfig,
+    stats::AutopilotStats,
+    pending::AbstractVector,
+    paused::Bool,
+    budget_decision,
+    dispatched_ref::Ref{Int},
+)
+    (paused || (budget_decision !== nothing && !budget_decision.allow)) &&
+        return nothing
+    for entry in pending
+        dispatched_ref[] >= config.max_dispatches_per_tick && break
+
+        # Autonomy gate: :suggest / :propose recipes never dispatch.
+        entry.autonomy_level === :dispatch || continue
+
+        # Pre-flight inspector with explicit 4-level severity mapping:
+        #   :block → killed_bug (don't dispatch)
+        #   :error → dispatch but record findings on entry
+        #   :warn  → dispatch + Slack notify
+        #   :info  → silent
+        if config.inspect_before_dispatch
+            pre = _inspector_preflight(entry)
+            if pre.blocked !== nothing
+                set_status!(entry, :killed_bug;
+                    kill_reason="inspector blocked: $(pre.blocked)")
+                stats.inspected_blocked += 1
+                continue
+            end
+            if !isempty(pre.error_kinds) || !isempty(pre.warn_kinds)
+                entry.recipe_params["_inspector_findings"] = Dict{String, Any}(
+                    "error_kinds" => pre.error_kinds,
+                    "warn_kinds" => pre.warn_kinds,
+                )
+                save_entry!(entry)
+            end
+            if !isempty(pre.warn_kinds) && config.notify_slack_on_failure
+                try
+                    notify_slack(
+                        "[autopilot] pre-flight :warn on " *
+                        "$(entry.content_id): $(join(pre.warn_kinds, ", "))",
+                    )
+                catch err
+                    @warn "notify_slack threw" exception=err
+                end
+            end
+        end
+
+        # Honor either in-process config.dry_run OR the persistent
+        # sentinel set by the operator. Either is sufficient.
+        if config.dry_run || is_autopilot_dry_run(config.qr)
+            _dry_run_dispatch!(entry, config, stats)
+            stats.dispatched += 1
+            stats.completed += 1
+            dispatched_ref[] += 1
+            continue
+        end
+        # Capture the autopilot config hash at dispatch time —
+        # answers "what autopilot rules dispatched this run?".
+        entry.autopilot_config_hash = _capture_autopilot_config_hash(config)
+        ok = _dispatch_one!(resolve_backend(config, entry), entry)
+        ok || break    # backend full or transient error; try next tick
+        stats.dispatched += 1
+        dispatched_ref[] += 1
     end
     return nothing
 end

@@ -558,9 +558,15 @@ function enqueue!(exp::Experiment;
         autopilot_config_hash="",   # filled at dispatch time by tick.jl
     )
     save_entry!(e)
-    if kick_tick && autonomy_level === :dispatch
+    if kick_tick && autonomy_level === :dispatch &&
+        !get(task_local_storage(), :spinorbec_in_tick, false)
         # `kick_tick_async` lives in tick.jl (loaded after queue.jl),
         # so look it up lazily via the parent module.
+        # Suppressed when we're already inside `autopilot_tick!`
+        # (e.g. on_complete recipe enqueueing children) — the parent
+        # tick will pick them up via its second dispatch pass, so
+        # there's no thundering-herd of 64 async kick tasks competing
+        # for the same autopilot lock.
         kicker = if isdefined(@__MODULE__, :kick_tick_async)
             getfield(@__MODULE__, :kick_tick_async)
         else
@@ -701,7 +707,8 @@ function enqueue!(exps::AbstractVector{<:Experiment}; group_id::AbstractString="
     # Suppress per-entry ticks; fire ONE tick after the batch lands so a
     # 100-cell sweep doesn't spawn 100 async ticks fighting for the lock.
     entries = [enqueue!(e; group_id=gid, kick_tick=false, kwargs...) for e in exps]
-    if kick_tick && any(en -> en.autonomy_level === :dispatch, entries)
+    if kick_tick && any(en -> en.autonomy_level === :dispatch, entries) &&
+        !get(task_local_storage(), :spinorbec_in_tick, false)
         kicker = if isdefined(@__MODULE__, :kick_tick_async)
             getfield(@__MODULE__, :kick_tick_async)
         else

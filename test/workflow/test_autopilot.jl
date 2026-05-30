@@ -153,17 +153,16 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
                 local_store = SpinorBEC.CASStore(local_qr.path)
 
                 # Recipe that spawns exactly one child per invocation,
-                # tagged so we can find it. Stop at depth 1 to avoid
-                # unbounded fan-out in the test.
+                # Recipe spawns exactly one child on first invocation
+                # (the parent), then returns nothing on every subsequent
+                # call so the in-tick 2nd dispatch pass terminates at
+                # parent+child rather than running until lineage cap.
                 spawn_count = Ref(0)
                 register_on_complete!(:_dryrun_test_recipe) do entry, params
+                    if spawn_count[] >= 1
+                        return nothing   # stop after the parent spawn
+                    end
                     spawn_count[] += 1
-                    depth = Int(get(params, "depth", 0))
-                    depth >= 1 && return nothing
-                    child_spec = deepcopy(entry.spec_path)
-                    # Distinct content by tweaking a non-load-bearing
-                    # field; here we just clone the YAML byte-for-byte
-                    # but with a unique enqueued_by tag downstream.
                     new_spec = Dict{Any, Any}(
                         "pipeline" => [Dict("ground_state" =>
                             Dict("_dryrun_child_tag" => spawn_count[]))],
@@ -191,14 +190,18 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
                     qr=local_qr, inspect_before_dispatch=false)
                 stats1 = autopilot_tick!(; config=cfg)
 
-                @test stats1.dispatched == 1
-                @test stats1.completed == 1
+                # New semantics (2026-05-31): the in-tick 2nd dispatch
+                # pass picks up on_complete children in the SAME tick.
+                # Parent and child both dispatch + complete + land in
+                # :done — no leftover :pending. spawn_count and
+                # on_complete_fired are 1 because the recipe early-
+                # returns for the child invocation.
+                @test stats1.dispatched == 2
+                @test stats1.completed == 2
                 @test spawn_count[] == 1
                 @test stats1.on_complete_fired == 1
-
-                # Parent done, child pending.
-                @test length(list_queue(:done; qr=local_qr)) == 1
-                @test length(list_queue(:pending; qr=local_qr)) == 1
+                @test length(list_queue(:done; qr=local_qr)) == 2
+                @test length(list_queue(:pending; qr=local_qr)) == 0
 
                 rm(joinpath(local_qr.path, ".autopilot.dry_run"); force=true)
             end
