@@ -7,7 +7,8 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
     _is_divergent, _maybe_fire_on_complete!, OUTCOME_FILENAME,
     RUN_STATE_FILENAME,
     AutopilotConfig, AutopilotBackend, LocalBackend, UGEBackend,
-    resolve_backend, stage_in, pull_live, collect!,
+    resolve_backend, stage_in, pull_live, collect!, prepare_status_snapshot,
+    job_status,
     UGE_PROFILE_DIRECTIVES, UGE_PROFILE_ESCALATION,
     next_profile, render_uge_script,
     _uge_remote_run_dir, _uge_remote_spec_path, _uge_jobname,
@@ -328,16 +329,29 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
             @test _uge_remote_spec_path(b, e) ==
                 "/gs/fs/tga-kozuma-kouhi/uk07267/runs/uge_cmd_aaaaaa/config.yaml"
 
+            # All ssh-prefixed commands inject ControlMaster opts so a
+            # tick reaping N entries pays 1 TCP+SSH handshake instead
+            # of N+1. Tests assert membership rather than exact arg
+            # order so the opts can grow without churning every test.
+            has_cm(args) =
+                "ControlMaster=auto" in args ||
+                any(a -> occursin("ControlMaster=auto", a), args)
+
             # mkdir + config-rsync (stage_in).
             mkdir_args = _uge_mkdir_cmd(b, remote_dir).exec
             @test mkdir_args[1] == "ssh"
-            @test mkdir_args[2] == "tsubame"
+            @test "tsubame" in mkdir_args
+            @test has_cm(mkdir_args)
             @test mkdir_args[end - 1] == "-p"
             @test mkdir_args[end] == remote_dir
 
             rsync_args = _uge_rsync_config_cmd(b, e, remote_dir).exec
             @test rsync_args[1] == "rsync"
-            @test "-e" in rsync_args && "ssh" in rsync_args
+            @test "-e" in rsync_args
+            # rsync -e takes ONE shell-tokenised argument; ControlMaster
+            # opts live inside that string, not as separate argv entries.
+            @test any(a -> occursin("ControlMaster=auto", a) && startswith(a, "ssh"),
+                rsync_args)
             @test e.spec_path in rsync_args
             @test "tsubame:$(remote_dir)/" in rsync_args
 
@@ -347,6 +361,7 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
             @test "--ignore-missing-args" in live_args
             @test "tsubame:$(remote_dir)/_live_status.json" in live_args
             @test joinpath(e.run_dir, "_live_status.json") in live_args
+            @test any(a -> occursin("ControlMaster=auto", a), live_args)
 
             # collect!: mirror but PRESERVE local state.toml (canonical
             # queue metadata) and skip .state.lock.
@@ -355,15 +370,19 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
             @test "--exclude=.state.lock" in coll_args
             @test "tsubame:$(remote_dir)/" in coll_args
             @test "$(e.run_dir)/" in coll_args
+            @test any(a -> occursin("ControlMaster=auto", a), coll_args)
 
             # Code-sync rsync builder: SHA stripped of -dirty marker, full
             # snippet wrapped in `bash -lc`, julia_path baked in.
             code_args = _uge_code_sync_cmd(b, "abc123-dirty").exec
             @test code_args[1] == "ssh"
-            @test code_args[2] == "tsubame"
-            @test code_args[3] == "bash"
-            @test code_args[4] == "-lc"
-            snippet = code_args[5]
+            @test "tsubame" in code_args
+            @test "bash" in code_args
+            @test "-lc" in code_args
+            @test has_cm(code_args)
+            # snippet is the arg after `-lc`.
+            lc_idx = findfirst(==("-lc"), code_args)
+            snippet = code_args[lc_idx + 1]
             @test occursin("git checkout --quiet abc123", snippet)
             @test !occursin("-dirty", snippet)
             @test occursin("Pkg.instantiate", snippet)
@@ -376,24 +395,28 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
             @test "/local/x.uge.sh" in script_args
             @test ("tsubame:" *
                    "/gs/fs/tga-kozuma-kouhi/uk07267/runs/x/x.uge.sh") in script_args
+            @test any(a -> occursin("ControlMaster=auto", a), script_args)
 
-            # qsub / qstat / qdel / qacct / qstat-list shells.
-            # `-g <group>` lives on the qsub command line, NOT in the
-            # script (TSUBAME 4's qsub wrapper rejects `#$ -g` as
-            # "invalid option argument").
-            @test _uge_qsub_cmd(b, "/remote/x.uge.sh").exec ==
-                ["ssh", "tsubame", "qsub", "-g", "tga-kozuma-kouhi", "/remote/x.uge.sh"]
-            # When no compute_group is set, the flag is omitted (trial mode).
+            # qsub / qstat / qdel / qacct / qstat-list — all over ssh
+            # with ControlMaster baked in.
+            for builder in (() -> _uge_qsub_cmd(b, "/remote/x.uge.sh"),
+                () -> _uge_qstat_cmd(b, "12345"),
+                () -> _uge_qdel_cmd(b, "12345"),
+                () -> _uge_qacct_cmd(b, "12345"),
+                () -> _uge_qstat_list_cmd(b))
+                args = builder().exec
+                @test args[1] == "ssh"
+                @test "tsubame" in args
+                @test has_cm(args)
+            end
+            # Operation-specific argv contents.
+            @test "qsub" in _uge_qsub_cmd(b, "/x").exec
+            @test "-g" in _uge_qsub_cmd(b, "/x").exec
+            @test "tga-kozuma-kouhi" in _uge_qsub_cmd(b, "/x").exec
+            @test "/x" in _uge_qsub_cmd(b, "/x").exec
+            # No compute_group → no -g.
             b_nogroup = UGEBackend(ssh_host="tsubame")
-            @test _uge_qsub_cmd(b_nogroup, "/remote/x.uge.sh").exec ==
-                ["ssh", "tsubame", "qsub", "/remote/x.uge.sh"]
-            @test _uge_qstat_cmd(b, "12345").exec ==
-                ["ssh", "tsubame", "qstat", "-j", "12345"]
-            @test _uge_qdel_cmd(b, "12345").exec ==
-                ["ssh", "tsubame", "qdel", "12345"]
-            @test _uge_qacct_cmd(b, "12345").exec ==
-                ["ssh", "tsubame", "qacct", "-j", "12345"]
-            @test _uge_qstat_list_cmd(b).exec == ["ssh", "tsubame", "qstat"]
+            @test !("-g" in _uge_qsub_cmd(b_nogroup, "/x").exec)
         end
 
         @testset "UGE script rendering" begin
@@ -497,6 +520,51 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
 
                 rm(joinpath(local_qr.path, ".autopilot.paused"); force=true)
             end
+        end
+
+        @testset "status snapshot batching (one qstat per tick, not per entry)" begin
+            # Per-tick contract: prepare_status_snapshot is called ONCE
+            # per backend, then job_status(b, entry; snapshot=…) parses
+            # the cached string for each entry. Without this, reaping N
+            # running entries on UGE pays N+1 ssh round-trips.
+            b_local = LocalBackend()
+            @test prepare_status_snapshot(b_local) === nothing   # LocalBackend doesn't batch
+
+            # Synthesise a qstat listing manually and feed it as snapshot.
+            listing = """
+            job-ID     prior   name       user         state submit/start at     queue
+            ------------------------------------------------------------------------------
+              1000001 0.55256 sb_aaaa      uk07267      qw    05/31/2026 07:00:00
+              1000002 0.49000 sb_bbbb      uk07267      r     05/31/2026 07:00:30 all.q
+              1000003 0.10000 sb_cccc      uk07267      dr    05/31/2026 07:01:00
+            """
+            b = UGEBackend(ssh_host="tsubame",
+                project_root="/p", remote_runs_root="/r")
+            run_dir = joinpath(qr.path, "snap_test_aaaa")
+            mkpath(run_dir)
+            spec = joinpath(run_dir, "config.yaml");
+            touch(spec)
+            mk(jobid, cid) = QueueEntry(cid; run_dir=joinpath(qr.path, cid),
+                spec_path=spec, backend_type=:uge, job_id=jobid)
+            for cid in ("snap_test_aaaa", "snap_test_bbbb", "snap_test_cccc")
+                mkpath(joinpath(qr.path, cid))
+            end
+            e_pending = mk("1000001", "snap_test_aaaa")
+            e_running = mk("1000002", "snap_test_bbbb")
+            e_failed = mk("1000003", "snap_test_cccc")
+
+            # All three resolve from the SAME snapshot string — no SSH.
+            @test job_status(b, e_pending; snapshot=listing) === :pending
+            @test job_status(b, e_running; snapshot=listing) === :running
+            @test job_status(b, e_failed; snapshot=listing) === :failed
+
+            # job_id not in listing → returns absent → tries terminal path,
+            # which (no remote here) just returns :unknown via qacct stub.
+            e_gone = mk("9999999", "snap_test_aaaa")
+            # Don't actually call (would attempt ssh); just assert the
+            # snapshot path differentiates a present-but-active vs absent
+            # job_id by the listing extraction alone.
+            @test SpinorBEC._uge_extract_job_state_from_listing(listing, "9999999") == "absent"
         end
 
         @testset "_uge_jobname prefixes numeric content IDs" begin

@@ -208,25 +208,50 @@ function render_uge_script(profile::AbstractString, config_path::AbstractString;
 end
 
 # ── command builders (separate so tests can assert shape) ────────────
+#
+# SSH ControlMaster pools all the tick's ssh/rsync calls into a single
+# persistent connection — without it, each `ssh tsubame qstat …` opens
+# a fresh TCP+SSH handshake (~hundreds of ms each), and a tick reaping
+# N running entries pays that cost N+1 times. With ControlPersist=60s
+# the socket survives across the tick body AND across the next tick
+# (5-min systemd timer beats 60s persist, but tick-on-enqueue and
+# closely-spaced ticks benefit).
+#
+# `ControlPath=/tmp/ssh-spinorbec-%C` — %C is a hash of host:port:user
+# so different SSH targets get different sockets; safe to share across
+# spinor-autopilot.service / spinor-dashboard.service since both run
+# as the same user.
+
+const _SSH_CM_OPTS = [
+    "-o", "ControlMaster=auto",
+    "-o", "ControlPath=/tmp/ssh-spinorbec-%C",
+    "-o", "ControlPersist=60s",
+]
+
+# Pre-quoted string for rsync's -e (which takes a single shell-tokenised
+# argument). Must match _SSH_CM_OPTS exactly.
+const _RSYNC_SSH_CM = "ssh -o ControlMaster=auto -o ControlPath=/tmp/ssh-spinorbec-%C -o ControlPersist=60s"
+
+_ssh_cm(host::AbstractString) = `ssh $_SSH_CM_OPTS $host`
 
 _uge_mkdir_cmd(b::UGEBackend, remote_dir::AbstractString) =
-    `ssh $(b.ssh_host) mkdir -p $(remote_dir)`
+    `$(_ssh_cm(b.ssh_host)) mkdir -p $(remote_dir)`
 
 _uge_rsync_config_cmd(b::UGEBackend, entry::QueueEntry,
     remote_dir::AbstractString) =
-    `rsync -e ssh $(entry.spec_path) $(b.ssh_host):$(remote_dir)/`
+    `rsync -e $_RSYNC_SSH_CM $(entry.spec_path) $(b.ssh_host):$(remote_dir)/`
 
 _uge_pull_live_cmd(b::UGEBackend, entry::QueueEntry,
     remote_dir::AbstractString) =
-    `rsync -e ssh --ignore-missing-args $(b.ssh_host):$(remote_dir)/_live_status.json $(entry.run_dir)/_live_status.json`
+    `rsync -e $_RSYNC_SSH_CM --ignore-missing-args $(b.ssh_host):$(remote_dir)/_live_status.json $(entry.run_dir)/_live_status.json`
 
 _uge_collect_cmd(b::UGEBackend, entry::QueueEntry,
     remote_dir::AbstractString) =
-    `rsync -av -e ssh --exclude=state.toml --exclude=.state.lock $(b.ssh_host):$(remote_dir)/ $(entry.run_dir)/`
+    `rsync -av -e $_RSYNC_SSH_CM --exclude=state.toml --exclude=.state.lock $(b.ssh_host):$(remote_dir)/ $(entry.run_dir)/`
 
 _uge_rsync_script_cmd(b::UGEBackend, local_script::AbstractString,
     remote_script::AbstractString) =
-    `rsync -e ssh $(local_script) $(b.ssh_host):$(remote_script)`
+    `rsync -e $_RSYNC_SSH_CM $(local_script) $(b.ssh_host):$(remote_script)`
 
 function _uge_code_sync_cmd(b::UGEBackend, code_sha::AbstractString)
     sha = replace(code_sha, r"-dirty$" => "")
@@ -234,7 +259,7 @@ function _uge_code_sync_cmd(b::UGEBackend, code_sha::AbstractString)
         "cd $(b.project_root) && git fetch --quiet && " *
         "git checkout --quiet $(sha) && " *
         "$(b.julia_path) --project=. -e 'using Pkg; Pkg.instantiate()'"
-    `ssh $(b.ssh_host) bash -lc $(snippet)`
+    `$(_ssh_cm(b.ssh_host)) bash -lc $(snippet)`
 end
 
 function _uge_qsub_cmd(b::UGEBackend, remote_script::AbstractString)
@@ -247,29 +272,29 @@ function _uge_qsub_cmd(b::UGEBackend, remote_script::AbstractString)
     else
         `qsub -g $(b.compute_group) $(remote_script)`
     end
-    b.ssh_host === nothing ? base : `ssh $(b.ssh_host) $base`
+    b.ssh_host === nothing ? base : `$(_ssh_cm(b.ssh_host)) $base`
 end
 
 _uge_qstat_cmd(b::UGEBackend, job_id::AbstractString) =
     b.ssh_host === nothing ?
     `qstat -j $(job_id)` :
-    `ssh $(b.ssh_host) qstat -j $(job_id)`
+    `$(_ssh_cm(b.ssh_host)) qstat -j $(job_id)`
 
 _uge_qdel_cmd(b::UGEBackend, job_id::AbstractString) =
     b.ssh_host === nothing ?
     `qdel $(job_id)` :
-    `ssh $(b.ssh_host) qdel $(job_id)`
+    `$(_ssh_cm(b.ssh_host)) qdel $(job_id)`
 
 # qstat plain listing: name in col 3, jobid in col 1. We grep by name
 # for reconciliation. -u<user> would be more precise but $USER on the
 # remote may differ from local; rely on the per-user default of qstat.
 _uge_qstat_list_cmd(b::UGEBackend) =
-    b.ssh_host === nothing ? `qstat` : `ssh $(b.ssh_host) qstat`
+    b.ssh_host === nothing ? `qstat` : `$(_ssh_cm(b.ssh_host)) qstat`
 
 _uge_qacct_cmd(b::UGEBackend, job_id::AbstractString) =
     b.ssh_host === nothing ?
     `qacct -j $(job_id)` :
-    `ssh $(b.ssh_host) qacct -j $(job_id)`
+    `$(_ssh_cm(b.ssh_host)) qacct -j $(job_id)`
 
 # ── data movement ────────────────────────────────────────────────────
 
@@ -368,13 +393,29 @@ end
 # `job_number`, `submission_time`, `script_file`, ... but no state).
 # The state lives in the plain `qstat` table, column 5. So we parse
 # the listing and key off the job-ID column.
-function job_status(b::UGEBackend, entry::QueueEntry)
-    entry.job_id === nothing && return :unknown
-    job_id = entry.job_id
-    listing = try
+# Pre-fetch the full `qstat` listing once per tick (shared across all
+# running entries for this backend). The reap loop calls this and
+# passes the result back into `job_status` via `snapshot=`.
+prepare_status_snapshot(b::UGEBackend) =
+    try
         read(pipeline(_uge_qstat_list_cmd(b); stderr=devnull), String)
     catch
-        return :unknown   # transient ssh / qstat failure; next tick retries
+        nothing
+    end
+
+function job_status(b::UGEBackend, entry::QueueEntry;
+    snapshot::Union{Nothing, AbstractString}=nothing)
+    entry.job_id === nothing && return :unknown
+    job_id = entry.job_id
+    listing = if snapshot !== nothing
+        snapshot   # tick supplied a cached listing — no round-trip
+    else
+        out = try
+            read(pipeline(_uge_qstat_list_cmd(b); stderr=devnull), String)
+        catch
+            return :unknown   # transient ssh / qstat failure; next tick retries
+        end
+        out
     end
     state = _uge_extract_job_state_from_listing(listing, job_id)
     if state == "pending"

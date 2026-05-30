@@ -222,10 +222,26 @@ function _autopilot_tick_body!(config::AutopilotConfig, stats::AutopilotStats)
         dispatched_ref)
 
     # 2. Reap running → done / killed_data / killed_bug ──────────────
-    for entry in list_queue(:running; qr=config.qr)   # re-list to pick up reconciliations
+    # Pre-fetch one status snapshot per backend so per-entry polls
+    # don't each pay an ssh round-trip. Default `prepare_status_snapshot`
+    # returns nothing for backends without batch support (LocalBackend);
+    # UGEBackend returns its qstat listing.
+    running_now = list_queue(:running; qr=config.qr)
+    status_snapshots = IdDict{AutopilotBackend, Any}()
+    for entry in running_now
+        backend = resolve_backend(config, entry)
+        haskey(status_snapshots, backend) && continue
+        status_snapshots[backend] = prepare_status_snapshot(backend)
+    end
+    for entry in running_now
         entry.job_id === nothing && continue   # still mid-submit (other process?)
         backend = resolve_backend(config, entry)
-        status = job_status(backend, entry)
+        snap = get(status_snapshots, backend, nothing)
+        status = if snap === nothing
+            job_status(backend, entry)
+        else
+            job_status(backend, entry; snapshot=snap)
+        end
         if status === :done
             _terminal_classify!(entry, :done; reason="completed")
             stats.completed += 1

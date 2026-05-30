@@ -30,7 +30,8 @@
 
 export LocalBackend,
     stage_in, dispatch!, job_status, pull_live, collect!, cancel!,
-    find_job_by_name, backend_failure_reason, next_profile
+    find_job_by_name, backend_failure_reason, next_profile,
+    prepare_status_snapshot
 
 # Default no-op contract methods. Local execution lives in the canonical
 # place already, so a backend that doesn't override these is implicitly
@@ -42,6 +43,20 @@ collect!(::AutopilotBackend, entry) = nothing
 # Default retry-escalation: no further resource tier. Backends with a
 # profile ladder (UGEBackend) override this.
 next_profile(::AutopilotBackend, current::AbstractString) = nothing
+
+# Status-snapshot lifecycle. `prepare_status_snapshot(backend)` is
+# called ONCE per backend per tick, before the reap loop polls
+# individual entries. The returned snapshot is passed to
+# `job_status(backend, entry; snapshot=...)` so per-entry polls can
+# read from the snapshot instead of doing a fresh round-trip.
+#
+# Default = nothing: backends that don't want batching fall back to
+# per-entry fetches (LocalBackend doesn't need it — process state
+# is in-memory and free to poll). UGEBackend overrides to fetch the
+# full qstat listing once, then `job_status` per entry just parses a
+# row from the cached string. Without this, a tick reaping N running
+# UGE entries paid N+1 ssh+qstat round-trips even with ControlMaster.
+prepare_status_snapshot(::AutopilotBackend) = nothing
 
 # `AutopilotBackend` abstract type is declared in types.jl.
 
