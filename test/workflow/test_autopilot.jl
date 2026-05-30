@@ -52,7 +52,7 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
         @testset "enqueue! + list_queue + set_status!" begin
             spec = Dict{Any, Any}("pipeline" => [])
             exp = SpinorBEC.Experiment(spec; store=store)
-            e = enqueue!(exp; priority=4, enqueued_by="unit-test")
+            e = enqueue!(exp; priority=4, enqueued_by="unit-test", kick_tick=false)
             @test e.status === :pending
             @test isfile(joinpath(e.run_dir, RUN_STATE_FILENAME))
 
@@ -180,7 +180,8 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
                     recipe_name=:_dryrun_test_recipe,
                     recipe_params=Dict{String, Any}("depth" => 0),
                     autonomy_level=:dispatch,
-                    qr=local_qr)
+                    qr=local_qr,
+                    kick_tick=false)
 
                 # Tick under dry-run via the persistent sentinel.
                 touch(joinpath(local_qr.path, ".autopilot.dry_run"))
@@ -429,6 +430,70 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
             # Unknown profile must throw, not silently submit nothing.
             @test_throws ArgumentError render_uge_script("nope", "/x";
                 project_root="/p", log_dir="/runs/j", jobname="j")
+        end
+
+        @testset "enqueue! kick_tick: gating + async fire" begin
+            # Bare `enqueue!` (default kick_tick=true) fires a tick the
+            # moment the entry lands, so every path (CLI, recipe-spawn,
+            # dashboard, future callers) gets immediate dispatch
+            # without each site wiring its own async block. The kick is
+            # GATED on autonomy_level=:dispatch — there's nothing to
+            # dispatch for :propose / :suggest, so no kick is fired.
+            mktempdir() do tmp
+                local_qr = SpinorBEC.QueueRoot(joinpath(tmp, "runs"))
+                mkpath(local_qr.path)
+                SpinorBEC.autopilot_queue_root(local_qr)
+                local_store = SpinorBEC.CASStore(local_qr.path)
+                # Sentinel autopilot pause so any tick that does fire
+                # is a no-op (we just want to verify the call shape,
+                # not actually dispatch onto LocalBackend's subprocess).
+                touch(joinpath(local_qr.path, ".autopilot.paused"))
+
+                spec_a = Dict{Any, Any}(
+                    "pipeline" => [Dict("ground_state" =>
+                        Dict("_kick_test" => "a"))],
+                )
+                spec_b = Dict{Any, Any}(
+                    "pipeline" => [Dict("ground_state" =>
+                        Dict("_kick_test" => "b"))],
+                )
+
+                # :propose → no kick (Task list len snapshot stays the
+                # same modulo other system tasks; we use the more
+                # robust observation that the call returns synchronously
+                # without throwing).
+                e_pr = enqueue!(SpinorBEC.Experiment(spec_a; store=local_store);
+                    autonomy_level=:propose, qr=local_qr)
+                @test e_pr.autonomy_level === :propose
+
+                # :dispatch with kick_tick=true → returns immediately
+                # (the @async means the kick runs in the background;
+                # there's no blocking lock acquire on the caller side).
+                t0 = time()
+                e_di = enqueue!(SpinorBEC.Experiment(spec_b; store=local_store);
+                    autonomy_level=:dispatch, qr=local_qr)
+                @test time() - t0 < 1.0   # enqueue returns synchronously
+                @test e_di.autonomy_level === :dispatch
+
+                # The async tick eventually runs; since pause sentinel
+                # is set, dispatch is gated to 0 and no real subprocess
+                # is spawned. Give the task a moment to attempt.
+                sleep(0.5)
+
+                # kick_tick=false is the explicit opt-out used by bulk
+                # callers (tests, batched sweep enqueue).
+                e_quiet = enqueue!(
+                    SpinorBEC.Experiment(
+                        Dict{Any, Any}(
+                            "pipeline" => [
+                                Dict("ground_state" => Dict("_kick_test" => "c"))],
+                        );
+                        store=local_store);
+                    autonomy_level=:dispatch, kick_tick=false, qr=local_qr)
+                @test e_quiet.status === :pending
+
+                rm(joinpath(local_qr.path, ".autopilot.paused"); force=true)
+            end
         end
 
         @testset "_uge_jobname prefixes numeric content IDs" begin

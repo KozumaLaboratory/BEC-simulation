@@ -526,6 +526,12 @@ function enqueue!(exp::Experiment;
     estimated_walltime_hours::Real=2.0,
     backend_type::Symbol=:local,
     qr::QueueRoot=autopilot_queue_root(),
+    # When true (default), spawn an async `autopilot_tick!` so the new
+    # entry dispatches within seconds instead of waiting for the next
+    # 5-min systemd timer fire. Skipped automatically when
+    # autonomy_level != :dispatch (nothing to dispatch). Set false in
+    # bulk-load / test contexts where the side-effect would be noise.
+    kick_tick::Bool=true,
 )
     od = outdir(exp)
     isdir(od) || mkpath(od)
@@ -552,6 +558,16 @@ function enqueue!(exp::Experiment;
         autopilot_config_hash="",   # filled at dispatch time by tick.jl
     )
     save_entry!(e)
+    if kick_tick && autonomy_level === :dispatch
+        # `kick_tick_async` lives in tick.jl (loaded after queue.jl),
+        # so look it up lazily via the parent module.
+        kicker = if isdefined(@__MODULE__, :kick_tick_async)
+            getfield(@__MODULE__, :kick_tick_async)
+        else
+            nothing
+        end
+        kicker === nothing || Base.invokelatest(kicker)
+    end
     return e
 end
 
@@ -673,7 +689,8 @@ them as a single expandable group rather than N flat rows. When
 `group_id` is empty, derive a deterministic one from the sorted member
 content_ids — re-enqueuing the same sweep yields the same group.
 """
-function enqueue!(exps::AbstractVector{<:Experiment}; group_id::AbstractString="", kwargs...)
+function enqueue!(exps::AbstractVector{<:Experiment}; group_id::AbstractString="",
+    kick_tick::Bool=true, kwargs...)
     isempty(exps) && return QueueEntry[]
     gid = if !isempty(group_id)
         String(group_id)
@@ -681,7 +698,18 @@ function enqueue!(exps::AbstractVector{<:Experiment}; group_id::AbstractString="
         cids = sort([content_id(e.spec) for e in exps])
         "grp-" * bytes2hex(SHA.sha256(join(cids, ",")))[1:12]
     end
-    [enqueue!(e; group_id=gid, kwargs...) for e in exps]
+    # Suppress per-entry ticks; fire ONE tick after the batch lands so a
+    # 100-cell sweep doesn't spawn 100 async ticks fighting for the lock.
+    entries = [enqueue!(e; group_id=gid, kick_tick=false, kwargs...) for e in exps]
+    if kick_tick && any(en -> en.autonomy_level === :dispatch, entries)
+        kicker = if isdefined(@__MODULE__, :kick_tick_async)
+            getfield(@__MODULE__, :kick_tick_async)
+        else
+            nothing
+        end
+        kicker === nothing || Base.invokelatest(kicker)
+    end
+    return entries
 end
 
 # ── Lockfile (process-level mutex for autopilot_tick!) ──────────────

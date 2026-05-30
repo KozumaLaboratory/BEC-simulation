@@ -148,24 +148,10 @@ function _route_autopilot_enqueue(body_bytes, base_dir;
             _enq_err("enqueue! threw: $(typeof(e).name.name): $(e)"))
     end
 
-    # Immediate tick-on-click: when the operator picks autonomy=:dispatch
-    # they mean "run this now", not "wait up to 5 min for the systemd
-    # timer". Fire one tick asynchronously so the HTTP response stays
-    # snappy (dispatch only STARTS the subprocess/qsub — reaping is
-    # later). A lock-held error means a tick is already in flight (the
-    # timer beat us or another click did) — swallow it; the next tick
-    # picks our entry up.
-    if entry.autonomy_level === :dispatch
-        @async begin
-            try
-                autopilot_tick!(; config=default_autopilot_config())
-            catch err
-                if !occursin("lock", string(err))
-                    @warn "tick-on-click failed" cid=entry.content_id exception=err
-                end
-            end
-        end
-    end
+    # Tick-on-enqueue is now baked into `enqueue!` itself via
+    # `kick_tick_async`, so this route inherits the immediate-dispatch
+    # behaviour from the same place CLI / on_complete / future enqueue
+    # paths use. Nothing extra to do here.
 
     body = _commit_json(entry)
     return (200, "application/json", body)

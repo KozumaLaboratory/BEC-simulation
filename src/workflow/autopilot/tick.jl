@@ -11,7 +11,7 @@
 # If a crash occurs between (a) and (c), the next tick sees status=:running
 # with job_id=nothing and reconciles via the backend's find_job_by_name.
 
-export autopilot_tick!,
+export autopilot_tick!, kick_tick_async,
     default_autopilot_config,
     is_autopilot_paused, is_autopilot_dry_run, autopilot_set_dry_run!
 
@@ -96,6 +96,44 @@ function _maybe_uge_backend_from_env()
         sync_code=lowercase(get(ENV, "SPINORBEC_TSUBAME_SYNC_CODE", "")) in
                   ("1", "true", "yes"),
     )
+end
+
+"""
+    kick_tick_async(; max_wait_s=120) -> Task
+
+Fire an `autopilot_tick!` asynchronously, retrying with 2s backoff
+if the autopilot lock is held by another tick (e.g. the systemd timer,
+or the parent tick that just ran the on_complete recipe that called us).
+The retry deadline is `max_wait_s` — long enough to outlast any
+reasonable tick body (dispatch is fast; the only thing that can hold
+the lock for minutes is a Julia precompile inside a synchronous job,
+which LocalBackend has already moved to a subprocess).
+
+This is the "tick on enqueue" plumbing: called by `enqueue!`, the
+dashboard's Run-now route, and on_complete's child enqueues so every
+new pending entry gets picked up within seconds instead of waiting
+for the next 5-min systemd timer fire.
+"""
+function kick_tick_async(; max_wait_s::Real=120)
+    @async begin
+        deadline = time() + max_wait_s
+        while time() < deadline
+            try
+                autopilot_tick!()
+                return nothing
+            catch err
+                msg = string(err)
+                if occursin("lock", msg) || occursin("locked", msg)
+                    sleep(2)   # back off; current tick is in flight
+                    continue
+                else
+                    @warn "kick_tick_async tick failed" exception=err
+                    return nothing
+                end
+            end
+        end
+        @warn "kick_tick_async gave up after $(max_wait_s)s — lock held too long"
+    end
 end
 
 """
