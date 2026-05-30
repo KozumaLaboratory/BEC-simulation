@@ -253,14 +253,36 @@ _uge_rsync_script_cmd(b::UGEBackend, local_script::AbstractString,
     remote_script::AbstractString) =
     `rsync -e $_RSYNC_SSH_CM $(local_script) $(b.ssh_host):$(remote_script)`
 
-function _uge_code_sync_cmd(b::UGEBackend, code_sha::AbstractString)
-    sha = replace(code_sha, r"-dirty$" => "")
-    snippet =
-        "cd $(b.project_root) && git fetch --quiet && " *
-        "git checkout --quiet $(sha) && " *
-        "$(b.julia_path) --project=. -e 'using Pkg; Pkg.instantiate()'"
-    `$(_ssh_cm(b.ssh_host)) bash -lc $(snippet)`
+# Sync the LOCAL project working tree to remote project_root via rsync.
+# Earlier impl used `git fetch && git checkout <code_sha>` which only
+# worked when entry.code_sha had been pushed to a GitHub remote that
+# the cluster could reach. rsync avoids that — TSUBAME doesn't need
+# GitHub round-trip, the dispatcher's exact files (including
+# uncommitted edits) become the remote state.
+#
+# Trade-off: `entry.code_sha` in state.toml is informational (which
+# commit was HEAD at enqueue) but not what gets executed — last-write-
+# wins on the remote project_root. For single-user iterative work
+# this is what the operator wants; for strict per-SHA reproducibility,
+# push first and wrap the dispatch in a git-checkout step.
+#
+# Excludes match the bootstrap rsync (runs/ lives in remote_runs_root,
+# .git/ is heavy and unused on remote, jld2/dist/cache are build
+# artefacts). `--update` is a guardrail: never clobber files that are
+# newer on remote (protects in-flight edits made directly on TSUBAME).
+function _uge_code_sync_cmd(b::UGEBackend)
+    local_root = _uge_local_project_root()
+    # `--exclude=*.jld2` must be a single quoted token in Julia
+    # backticks (raw `*` is unquoted-special). Interpolate via a String
+    # so the glob reaches rsync verbatim.
+    jld_excl = "--exclude=*.jld2"
+    `rsync -az --update -e $_RSYNC_SSH_CM --exclude=runs/ --exclude=.git/ --exclude=node_modules/ --exclude=dashboard/dist/ --exclude=dashboard/.vite/ --exclude=.venv/ $jld_excl $(local_root)/ $(b.ssh_host):$(b.project_root)/`
 end
+
+# Resolve the LOCAL Julia project directory (where Project.toml sits).
+# `Base.active_project()` returns the path to the Project.toml file;
+# dirname() gives the project dir. Robust against cwd shenanigans.
+_uge_local_project_root() = dirname(Base.active_project())
 
 function _uge_qsub_cmd(b::UGEBackend, remote_script::AbstractString)
     # On TSUBAME 4 `-g <group>` MUST be on the qsub command line (not as
@@ -308,8 +330,8 @@ function stage_in(b::UGEBackend, entry::QueueEntry)
     remote_dir = _uge_remote_run_dir(b, entry)
     run(_uge_mkdir_cmd(b, remote_dir))
     run(_uge_rsync_config_cmd(b, entry, remote_dir))
-    if b.sync_code && !isempty(entry.code_sha)
-        run(_uge_code_sync_cmd(b, entry.code_sha))
+    if b.sync_code
+        run(_uge_code_sync_cmd(b))
     end
     return nothing
 end

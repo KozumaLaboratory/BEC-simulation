@@ -188,6 +188,19 @@ export interface AutopilotQueueEntry {
     profile: string
     estimated_walltime_hours: number
   }
+  /** Lifecycle timestamps so the UI can show per-phase elapsed
+   * (queue wait → cluster qw → running → terminal). All ISO strings,
+   * nullable until the autopilot observes the corresponding transition. */
+  timing: {
+    dispatched_at: string | null
+    cluster_started_at: string | null
+    terminal_at: string | null
+    /** The scheduler-side state the last tick observed for this entry.
+     * For LocalBackend this stays :unknown / :running / terminal.
+     * For UGEBackend `:pending` means "qw on TSUBAME" (cluster queue
+     * wait), `:running` means "actually executing on a compute node". */
+    cluster_state: 'unknown' | 'pending' | 'running' | 'done' | 'failed'
+  }
   budget: { gpu_hours_realized: number }
   run_dir: string
 }

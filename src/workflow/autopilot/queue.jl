@@ -115,6 +115,14 @@ mutable struct QueueEntry
     profile::String                         # submit-script profile / resource class
     estimated_walltime_hours::Float64
 
+    # lifecycle timestamps — each phase boundary that the autopilot can
+    # observe is captured so the dashboard can show "queued 2m / cluster
+    # qw 5m / running 3m" instead of a flat ":running for N min".
+    dispatched_at::Union{Nothing, DateTime}        # when dispatch! succeeded (qsub / subprocess spawn)
+    cluster_started_at::Union{Nothing, DateTime}   # when scheduler flipped pending→running (qw→r on UGE)
+    terminal_at::Union{Nothing, DateTime}          # when status went to :done / :killed_*
+    cluster_state::Symbol                          # :unknown | :pending | :running | :done | :failed (transient, refreshed each tick)
+
     # budget (filled in by qacct/scheduler poller)
     gpu_hours_realized::Float64
 
@@ -147,6 +155,10 @@ function QueueEntry(content_id::AbstractString;
     job_id::Union{Nothing, AbstractString}=nothing,
     profile::AbstractString="default",
     estimated_walltime_hours::Real=2.0,
+    dispatched_at::Union{Nothing, DateTime}=nothing,
+    cluster_started_at::Union{Nothing, DateTime}=nothing,
+    terminal_at::Union{Nothing, DateTime}=nothing,
+    cluster_state::Symbol=:unknown,
     gpu_hours_realized::Real=0.0,
     code_sha::AbstractString="",
     recipe_version::AbstractString="1",
@@ -170,6 +182,7 @@ function QueueEntry(content_id::AbstractString;
         backend_type,
         job_id === nothing ? nothing : String(job_id),
         String(profile), Float64(estimated_walltime_hours),
+        dispatched_at, cluster_started_at, terminal_at, cluster_state,
         Float64(gpu_hours_realized),
         abspath(String(run_dir)),
         abspath(String(spec_path)),
@@ -187,13 +200,29 @@ end
 # `save_entry!(get_entry(run_dir))`. Schema history is documented at
 # the top of this file.
 
-const STATE_TOML_SCHEMA_VERSION = "1.0"
+const STATE_TOML_SCHEMA_VERSION = "1.1"
 
 # Map: schema-version-string → migration function. Each migration takes
 # the parsed TOML dict and returns the dict normalized to the NEXT
 # version. Chain runs until current version is reached.
 const _STATE_TOML_MIGRATIONS = Dict{String, Function}(
-# No migrations yet — v1.0 is the initial schema.
+    # v1.0 → v1.1 (2026-05-31): added lifecycle timestamps to [timing]
+    # block (dispatched_at / cluster_started_at / terminal_at /
+    # cluster_state) for queue-wait display in the dashboard. Old
+    # entries get nothings/`:unknown` for missing values; the tick
+    # will fill in dispatched_at / cluster_started_at on next observation.
+    "1.0" => function (d)
+        haskey(d, "timing") || (
+            d["timing"] = Dict{String, Any}(
+                "dispatched_at" => "",
+                "cluster_started_at" => "",
+                "terminal_at" => "",
+                "cluster_state" => "unknown",
+            )
+        )
+        d["schema_version"] = "1.1"
+        d
+    end,
 )
 
 function _migrate_state_toml(d::AbstractDict)
@@ -242,6 +271,13 @@ function _entry_to_toml_dict(e::QueueEntry)
             "profile" => e.profile,
             "estimated_walltime_hours" => e.estimated_walltime_hours,
         ),
+        "timing" => Dict{String, Any}(
+            "dispatched_at" => e.dispatched_at === nothing ? "" : string(e.dispatched_at),
+            "cluster_started_at" =>
+                e.cluster_started_at === nothing ? "" : string(e.cluster_started_at),
+            "terminal_at" => e.terminal_at === nothing ? "" : string(e.terminal_at),
+            "cluster_state" => String(e.cluster_state),
+        ),
         "budget" => Dict{String, Any}(
             "gpu_hours_realized" => e.gpu_hours_realized
         ),
@@ -263,6 +299,7 @@ function _entry_from_toml_dict(d::AbstractDict, run_dir::AbstractString)
     prov = get(d, "provenance", Dict())
     rec = get(d, "recipe", Dict())
     bk = get(d, "backend", Dict())
+    timing = get(d, "timing", Dict())
     bud = get(d, "budget", Dict())
     spec = get(d, "spec", Dict())
     repro = get(d, "reproducibility", Dict())
@@ -270,6 +307,7 @@ function _entry_from_toml_dict(d::AbstractDict, run_dir::AbstractString)
     job_raw = String(get(bk, "job_id", ""))
     parent_raw = String(get(prov, "parent_id", ""))
     name_raw = String(get(rec, "name", ""))
+    _maybe_dt(s) = isempty(s) ? nothing : DateTime(String(s))
     QueueEntry(
         get(prov, "content_id", basename(run_dir));
         run_dir=run_dir,
@@ -289,6 +327,10 @@ function _entry_from_toml_dict(d::AbstractDict, run_dir::AbstractString)
         job_id=isempty(job_raw) ? nothing : job_raw,
         profile=get(bk, "profile", "default"),
         estimated_walltime_hours=Float64(get(bk, "estimated_walltime_hours", 2.0)),
+        dispatched_at=_maybe_dt(get(timing, "dispatched_at", "")),
+        cluster_started_at=_maybe_dt(get(timing, "cluster_started_at", "")),
+        terminal_at=_maybe_dt(get(timing, "terminal_at", "")),
+        cluster_state=Symbol(get(timing, "cluster_state", "unknown")),
         gpu_hours_realized=Float64(get(bud, "gpu_hours_realized", 0.0)),
         code_sha=get(repro, "code_sha", ""),
         recipe_version=get(repro, "recipe_version", "1"),
@@ -485,11 +527,24 @@ function set_status!(e::QueueEntry, new_status::Symbol; kill_reason::AbstractStr
                 (new_status in (:killed_data, :killed_bug) ?
                  latest.kill_reason : "")
             end
+            # Pull lifecycle fields the caller may have stamped on `e`
+            # but on-disk hadn't seen (e.g. `_terminal_classify!` sets
+            # terminal_at + cluster_state right before calling
+            # set_status!). Only overwrite when `e` has the newer value;
+            # otherwise keep what disk has.
+            e.dispatched_at === nothing || (latest.dispatched_at = e.dispatched_at)
+            e.cluster_started_at === nothing || (latest.cluster_started_at = e.cluster_started_at)
+            e.terminal_at === nothing || (latest.terminal_at = e.terminal_at)
+            e.cluster_state === :unknown || (latest.cluster_state = e.cluster_state)
             # Sync back to caller's struct so they see fresh fields too.
             e.status = latest.status
             e.kill_reason = latest.kill_reason
             e.job_id = latest.job_id
             e.attempt = latest.attempt
+            e.dispatched_at = latest.dispatched_at
+            e.cluster_started_at = latest.cluster_started_at
+            e.terminal_at = latest.terminal_at
+            e.cluster_state = latest.cluster_state
             save_entry!(latest)
         else
             e.status = new_status

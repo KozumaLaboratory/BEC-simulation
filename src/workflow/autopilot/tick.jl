@@ -242,6 +242,23 @@ function _autopilot_tick_body!(config::AutopilotConfig, stats::AutopilotStats)
         else
             job_status(backend, entry; snapshot=snap)
         end
+        # Record cluster-state transitions so the dashboard can show
+        # "qw" vs "actually running" wait time. The pending→running
+        # transition stamps cluster_started_at (only the first time)
+        # and emits a structured @info line — visible in journalctl
+        # and in CLI stdout, captures the actual TSUBAME qw wait the
+        # operator just paid.
+        if entry.cluster_state !== status
+            if entry.cluster_started_at === nothing &&
+                status in (:running, :done, :failed)
+                entry.cluster_started_at = now()
+                @info "autopilot: cluster started" cid=entry.content_id qw_wait_s=_elapsed_s(
+                    entry.dispatched_at, entry.cluster_started_at
+                ) est_walltime_h=entry.estimated_walltime_hours
+            end
+            entry.cluster_state = status
+            save_entry!(entry)
+        end
         if status === :done
             _terminal_classify!(entry, :done; reason="completed")
             stats.completed += 1
@@ -462,9 +479,25 @@ function _dispatch_one!(backend::AutopilotBackend, entry::QueueEntry)
     end
 
     # Stage (c): persist the entry with the real job_id (already set by
-    # dispatch!).
+    # dispatch!) and stamp dispatched_at for queue-wait visibility. The
+    # cluster_state stays :unknown until the reap loop polls — for
+    # LocalBackend that's effectively immediate (next tick); for UGE
+    # the gap is the qw → r wait.
+    entry.dispatched_at = now()
     save_entry!(entry)
+    @info "autopilot: dispatched" cid=entry.content_id backend=string(entry.backend_type) profile=entry.profile queue_wait_s=_elapsed_s(
+        entry.enqueued_at, entry.dispatched_at
+    ) est_walltime_h=entry.estimated_walltime_hours
     return true
+end
+
+# Elapsed seconds between two timestamps. Returns nothing when `start`
+# is missing (e.g. legacy entry pre-1.1 schema). Used in @info lines
+# so the journal/stdout shows the actual wait at each transition.
+function _elapsed_s(start::Union{Nothing, DateTime},
+    stop::DateTime=now())
+    start === nothing && return nothing
+    return round(Millisecond(stop - start).value / 1000; digits=1)
 end
 
 function _reconcile_zombie!(backend::AutopilotBackend, entry::QueueEntry)
@@ -490,6 +523,13 @@ end
 
 function _terminal_classify!(entry::QueueEntry, terminal::Symbol;
     reason::AbstractString="")
+    # Stamp terminal_at so the dashboard can show "ran for Nm" on
+    # completed entries without guessing from file mtimes.
+    entry.terminal_at = now()
+    entry.cluster_state = terminal === :done ? :done : :failed
+    @info "autopilot: terminal" cid=entry.content_id status=string(terminal) ran_s=_elapsed_s(
+        entry.cluster_started_at, entry.terminal_at
+    ) total_s=_elapsed_s(entry.enqueued_at, entry.terminal_at) reason=String(reason)
     set_status!(entry, terminal;
         kill_reason=terminal === :done ? "" : String(reason))
 end
@@ -555,6 +595,13 @@ function _dry_run_dispatch!(entry::QueueEntry,
         "  spec=", entry.spec_path)
     entry.status = :running
     entry.job_id = "dryrun-" * entry.content_id[1:min(8, length(entry.content_id))]
+    # Stamp lifecycle timestamps so dry-run entries get the same
+    # dashboard ETA / per-phase breakdown that real dispatches do.
+    # cluster_started_at = dispatched_at since dry-run has no queue.
+    t = now()
+    entry.dispatched_at = t
+    entry.cluster_started_at = t
+    entry.cluster_state = :running
     save_entry!(entry)
     # Synthetic outcome.toml — marks the run as "completed by dry-run"
     # so retry / on_complete / archival downstream can see something
@@ -577,7 +624,11 @@ function _dry_run_dispatch!(entry::QueueEntry,
     catch err
         @warn "_dry_run_dispatch! failed to write outcome.toml" exception=err
     end
-    set_status!(entry, :done; kill_reason="")
+    # Route through _terminal_classify! so dry-run entries get
+    # terminal_at stamped + the same @info "terminal" line that real
+    # runs produce. Without this, dashboard ETA / journal-replay
+    # would be incomplete for dry-run dispatches.
+    _terminal_classify!(entry, :done; reason="dry-run synthetic")
     # Fire the on_complete chain — recipes spawn children which land in
     # :pending and get picked up on the next tick.
     _maybe_fire_on_complete!(entry, config, stats)

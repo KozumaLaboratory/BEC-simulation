@@ -11,6 +11,7 @@ import { useDashboardURL, type TabId } from '@/state/useDashboardURL'
 import { EnqueueDialog } from '@/components/EnqueueDialog'
 import { QueueToastStack, type QueueToastInfo } from '@/components/QueueToast'
 import { displayName } from '@/lib/displayName'
+import { entryETA, entryElapsedBreakdown } from '@/lib/elapsed'
 
 type State = AutopilotQueueEntry['status']
 const STATES: State[] = ['pending', 'running', 'done', 'killed_data', 'killed_bug']
@@ -715,6 +716,7 @@ function IntentionGroup({
                   <th className="px-3 py-2 text-left w-6"></th>
                   <th className="px-3 py-2 text-left">cid</th>
                   <th className="px-3 py-2 text-left">state</th>
+                  <th className="px-3 py-2 text-left">ETA</th>
                   <th className="px-3 py-2 text-left">recipe / autonomy</th>
                   <th className="px-3 py-2 text-left">profile</th>
                   <th className="px-3 py-2 text-right">attempt</th>
@@ -750,6 +752,35 @@ function IntentionGroup({
         )}
       </CardContent>
     </Card>
+  )
+}
+
+/** Per-entry ETA cell. Re-renders every 5 s so the displayed "ETA 7m"
+ * counts down without waiting for the next /api/queue poll. Tooltip
+ * shows the per-phase elapsed breakdown for audit. */
+function ETACell({ e }: { e: AutopilotQueueEntry }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 5_000)
+    return () => window.clearInterval(id)
+  }, [])
+  const eta = entryETA(e, now)
+  const breakdown = entryElapsedBreakdown(e, now)
+  if (!eta) {
+    // Terminal entries: no ETA, show actual breakdown (queue/qw/run).
+    return (
+      <span className="text-[var(--ink-faint)]" title={breakdown}>
+        —
+      </span>
+    )
+  }
+  return (
+    <span
+      className="text-[var(--ink-soft)] numeric"
+      title={`${eta.basis} · ${breakdown}`}
+    >
+      {eta.lower_bound ? '≥ ' : ''}{eta.eta}
+    </span>
   )
 }
 
@@ -847,6 +878,9 @@ function EntryRow({
         <td className="px-3 py-2 whitespace-nowrap" style={{ color: STATE_COLOR[e.status] }}>
           <span aria-hidden>{STATE_SYMBOL[e.status]}</span>{' '}
           {STATE_LABEL[e.status]}
+        </td>
+        <td className="px-3 py-2 whitespace-nowrap">
+          <ETACell e={e} />
         </td>
         <td className="px-3 py-2 text-[var(--ink-soft)]">
           {e.recipe.name ?? '—'}{' '}

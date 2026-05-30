@@ -153,7 +153,6 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
                 local_qr = SpinorBEC.QueueRoot(joinpath(tmp, "runs"))
                 local_store = SpinorBEC.CASStore(local_qr.path)
 
-                # Recipe that spawns exactly one child per invocation,
                 # Recipe spawns exactly one child on first invocation
                 # (the parent), then returns nothing on every subsequent
                 # call so the in-tick 2nd dispatch pass terminates at
@@ -372,21 +371,24 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
             @test "$(e.run_dir)/" in coll_args
             @test any(a -> occursin("ControlMaster=auto", a), coll_args)
 
-            # Code-sync rsync builder: SHA stripped of -dirty marker, full
-            # snippet wrapped in `bash -lc`, julia_path baked in.
-            code_args = _uge_code_sync_cmd(b, "abc123-dirty").exec
-            @test code_args[1] == "ssh"
-            @test "tsubame" in code_args
-            @test "bash" in code_args
-            @test "-lc" in code_args
-            @test has_cm(code_args)
-            # snippet is the arg after `-lc`.
-            lc_idx = findfirst(==("-lc"), code_args)
-            snippet = code_args[lc_idx + 1]
-            @test occursin("git checkout --quiet abc123", snippet)
-            @test !occursin("-dirty", snippet)
-            @test occursin("Pkg.instantiate", snippet)
-            @test occursin(b.julia_path, snippet)
+            # Code-sync now rsyncs the LOCAL project tree (no git, no
+            # Pkg.instantiate). Avoids the "unpushed commit" problem of
+            # the previous git checkout impl. `entry.code_sha` is no
+            # longer consulted here — it stays as a trace in state.toml.
+            code_args = _uge_code_sync_cmd(b).exec
+            @test code_args[1] == "rsync"
+            @test "--update" in code_args
+            @test "-e" in code_args
+            @test any(a -> occursin("ControlMaster=auto", a), code_args)
+            @test "--exclude=runs/" in code_args
+            @test "--exclude=.git/" in code_args
+            @test "--exclude=*.jld2" in code_args
+            # Destination is host:project_root with trailing slash.
+            @test any(
+                a ->
+                    startswith(a, "tsubame:") &&
+                    occursin("/gs/fs/tga-kozuma-kouhi/uk07267/BEC-simulation",
+                        a), code_args)
 
             # rsync of the rendered submit.uge.sh.
             script_args = _uge_rsync_script_cmd(b,
@@ -646,6 +648,70 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
             @test SpinorBEC.find_job_by_name(b, "no_such") === :no_such_job
             @test occursin("not in local table",
                 SpinorBEC.backend_failure_reason(b, e))
+        end
+
+        @testset "lifecycle timestamps land on dry-run entries" begin
+            # Dry-run dispatch should stamp dispatched_at +
+            # cluster_started_at (synthetic, both = now()) and the
+            # subsequent terminal classification should stamp
+            # terminal_at. Without this, the dashboard's ETA column
+            # has nothing to count from.
+            mktempdir() do tmp
+                lq = SpinorBEC.QueueRoot(joinpath(tmp, "runs"))
+                mkpath(lq.path)
+                local_store = SpinorBEC.CASStore(lq.path)
+                touch(joinpath(lq.path, ".autopilot.dry_run"))
+                spec = Dict{Any, Any}(
+                    "pipeline" => [Dict("ground_state" =>
+                        Dict("_lifecycle_test" => 1))],
+                )
+                exp = SpinorBEC.Experiment(spec; store=local_store)
+                e = enqueue!(exp; autonomy_level=:dispatch, qr=lq,
+                    kick_tick=false)
+                @test e.dispatched_at === nothing
+                @test e.cluster_started_at === nothing
+                @test e.terminal_at === nothing
+                @test e.cluster_state === :unknown
+
+                cfg = default_autopilot_config(;
+                    qr=lq, inspect_before_dispatch=false)
+                autopilot_tick!(; config=cfg)
+
+                final = get_entry(e.run_dir)
+                @test final.status === :done
+                @test final.dispatched_at !== nothing
+                @test final.cluster_started_at !== nothing
+                @test final.terminal_at !== nothing
+                @test final.cluster_state === :done
+                @test final.dispatched_at <= final.cluster_started_at
+                @test final.cluster_started_at <= final.terminal_at
+                rm(joinpath(lq.path, ".autopilot.dry_run"); force=true)
+            end
+        end
+
+        @testset "state.toml schema v1.0 → v1.1 migration" begin
+            # Old entries (pre-2026-05-31) had no [timing] block.
+            # _migrate_state_toml fills in defaults so newer code can
+            # read them. The dashboard ETA column handles null
+            # timestamps gracefully.
+            legacy_toml = Dict{String, Any}(
+                "schema_version" => "1.0",
+                "state" => Dict("status" => "pending"),
+                "provenance" => Dict("content_id" => "legacy_aaaa",
+                    "enqueued_at" => string(now())),
+                "recipe" => Dict("autonomy_level" => "dispatch"),
+                "backend" => Dict("type" => "local"),
+                "budget" => Dict(),
+                "spec" => Dict("path" => "/tmp/x.yaml"),
+                "reproducibility" => Dict(),
+            )
+            mktempdir() do tmp
+                e2 = SpinorBEC._entry_from_toml_dict(legacy_toml, tmp)
+                @test e2.dispatched_at === nothing
+                @test e2.cluster_started_at === nothing
+                @test e2.terminal_at === nothing
+                @test e2.cluster_state === :unknown
+            end
         end
 
         @testset "default_autopilot_config: env-driven UGE registration" begin
