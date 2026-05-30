@@ -21,6 +21,7 @@ import { TabBoundary } from '@/components/TabBoundary'
 import { GlobalHotkeys } from '@/components/GlobalHotkeys'
 import { ShortcutHelp } from '@/components/ShortcutHelp'
 import { CommandPalette } from '@/components/CommandPalette'
+import { displayName } from '@/lib/displayName'
 import {
   Select,
   SelectContent,
@@ -416,13 +417,16 @@ function WorkbenchHeader({
         </div>
       </div>
 
-      <h1 className="font-condensed font-semibold uppercase tracking-[-0.012em] text-[40px] md:text-[54px] leading-[0.95] text-[var(--ink)] break-words">
+      <h1
+        className="font-condensed font-semibold uppercase tracking-[-0.012em] text-[40px] md:text-[54px] leading-[0.95] text-[var(--ink)] break-words"
+        title={runName}
+      >
         {_TAB_NEUTRAL.has(currentTabId) ? (
           // Sheets that aren't keyed to a single run (e.g. Queue) get
           // the tab label as their title so "awaiting run" never shows.
           currentTabLabel
         ) : runName ? (
-          runName
+          displayName(runName)
         ) : (
           <>
             <span className="text-[var(--ink)]">{currentTabLabel}</span>

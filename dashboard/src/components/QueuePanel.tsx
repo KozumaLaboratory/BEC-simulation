@@ -10,6 +10,7 @@ import {
 import { useDashboardURL, type TabId } from '@/state/useDashboardURL'
 import { EnqueueDialog } from '@/components/EnqueueDialog'
 import { QueueToastStack, type QueueToastInfo } from '@/components/QueueToast'
+import { displayName } from '@/lib/displayName'
 
 type State = AutopilotQueueEntry['status']
 const STATES: State[] = ['pending', 'running', 'done', 'killed_data', 'killed_bug']
@@ -81,8 +82,8 @@ function groupByIntention(snap: AutopilotQueueResponse): IntentionGroupData[] {
     const isGrp = group_id.startsWith('grp-')
     const label =
       cells.length === 1
-        ? recipeName ?? cells[0].content_id.slice(0, 8)
-        : recipeName ?? (isGrp ? 'sweep' : group_id.slice(0, 8))
+        ? displayName(cells[0].content_id, { recipeName })
+        : recipeName ?? (isGrp ? 'sweep' : displayName(group_id))
     groups.push({
       group_id,
       cells,

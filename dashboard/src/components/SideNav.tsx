@@ -6,6 +6,7 @@ import { useCatalogIndex } from '@/state/useCatalogIndex'
 import { api } from '@/api'
 import type { RunDataState } from '@/state/useRunData'
 import { cn } from '@/lib/utils'
+import { displayName } from '@/lib/displayName'
 
 interface Props {
   state: RunDataState
@@ -487,7 +488,7 @@ function RunRow({
                 letterSpacing: '-0.005em',
               }}
             >
-              {name}
+              {displayName(name)}
             </span>
             {annot && (
               <span
