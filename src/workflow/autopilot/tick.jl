@@ -92,6 +92,7 @@ function _maybe_uge_backend_from_env()
         compute_group=get(ENV, "SPINORBEC_TSUBAME_GROUP", ""),
         julia_path=get(ENV, "SPINORBEC_TSUBAME_JULIA", "julia"),
         julia_depot=get(ENV, "SPINORBEC_TSUBAME_DEPOT", ""),
+        sysimage_path=get(ENV, "SPINORBEC_TSUBAME_SYSIMAGE", ""),
         cuda_module=get(ENV, "SPINORBEC_TSUBAME_CUDA_MODULE", ""),
         sync_code=lowercase(get(ENV, "SPINORBEC_TSUBAME_SYNC_CODE", "")) in
                   ("1", "true", "yes"),

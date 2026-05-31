@@ -26,6 +26,7 @@ function _print_help(io::IO=stdout)
     println(io, "  autopilot <sub> [args]                          queue meta-loop ops")
     println(io, "  tag       {add <name> <cid>|remove <name>|list} catalog human pointers")
     println(io, "  catalog   {index | reindex [--force]}            navigable run index")
+    println(io, "  tsubame   {build-sysimage}                       cluster helper(s)")
     println(io, "  help                                            this message")
     println(io)
     println(io, "autopilot subcommands:")
@@ -315,6 +316,64 @@ function _cmd_catalog(args)
     2
 end
 
+# ── tsubame helpers ──────────────────────────────────────────────────
+
+function _cmd_tsubame(args)
+    if isempty(args)
+        println(stderr, "usage: cli.jl tsubame {build-sysimage}")
+        return 2
+    end
+    sub = args[1]
+    sub == "build-sysimage" && return _tsubame_build_sysimage()
+    println(stderr, "cli.jl tsubame: unknown subcommand '$sub'")
+    return 2
+end
+
+"""
+Build a Julia sysimage on TSUBAME via PackageCompiler. One-shot
+operator helper — rebuild when Project.toml / Manifest.toml change.
+With the sysimage set in `SPINORBEC_TSUBAME_SYSIMAGE`, each job's
+first-output latency drops from ~30 s (cold JIT) to ~2 s. Build time
+is ~5–10 minutes; sysimage is ~1 GB.
+"""
+function _tsubame_build_sysimage()
+    host = get(ENV, "SPINORBEC_TSUBAME_HOST", "")
+    proj = get(ENV, "SPINORBEC_TSUBAME_PROJECT_ROOT", "")
+    julia = get(ENV, "SPINORBEC_TSUBAME_JULIA", "julia")
+    depot = get(ENV, "SPINORBEC_TSUBAME_DEPOT", "")
+    syspath = get(ENV, "SPINORBEC_TSUBAME_SYSIMAGE", "")
+    cuda_module = get(ENV, "SPINORBEC_TSUBAME_CUDA_MODULE", "")
+    if isempty(host) || isempty(proj) || isempty(syspath)
+        println(stderr,
+            "missing env: need SPINORBEC_TSUBAME_HOST / PROJECT_ROOT / SYSIMAGE\n" *
+            "(SYSIMAGE = absolute remote path where the sysimage will be written, " *
+            "e.g. /gs/fs/<group>/<user>/spinor_sysimage.so)")
+        return 2
+    end
+    depot_exp = isempty(depot) ? "" : "export JULIA_DEPOT_PATH=\"$(depot)\"; "
+    mod_load =
+        isempty(cuda_module) ? "" :
+        ". /etc/profile.d/modules.sh && module load $(cuda_module) && "
+    julia_e =
+        "using Pkg; Pkg.add(\"PackageCompiler\"); " *
+        "using PackageCompiler; " *
+        "create_sysimage([:SpinorBEC]; sysimage_path=\"$(syspath)\")"
+    snippet =
+        "set -euo pipefail; $(mod_load)$(depot_exp)cd $(proj) && " *
+        "$(julia) --project=. -e '$(julia_e)'"
+    println("building sysimage on $(host) → $(syspath)")
+    println("  (this takes ~5–10 minutes; output streams below)")
+    cmd = `ssh $host bash -lc $snippet`
+    try
+        run(cmd)
+        println("sysimage built. Job dispatches will now use `-J $(syspath)`.")
+        return 0
+    catch err
+        println(stderr, "build failed: $(err)")
+        return 1
+    end
+end
+
 # ── main ─────────────────────────────────────────────────────────────
 
 function _main(args)
@@ -328,6 +387,7 @@ function _main(args)
     sub == "autopilot" && return _cmd_autopilot(rest)
     sub == "tag" && return _cmd_tag(rest)
     sub == "catalog" && return _cmd_catalog(rest)
+    sub == "tsubame" && return _cmd_tsubame(rest)
     println(stderr, "cli.jl: unknown subcommand '$sub'")
     _print_help(stderr)
     2

@@ -86,6 +86,7 @@ struct UGEBackend <: AutopilotBackend
     compute_group::String
     julia_path::String
     julia_depot::String   # `JULIA_DEPOT_PATH` for the submitted script (compute nodes don't inherit login env)
+    sysimage_path::String # `-J <path>` for the submitted julia; empty = no sysimage (full JIT each job)
     cuda_module::String
     sync_code::Bool
 end
@@ -98,6 +99,7 @@ UGEBackend(;
     compute_group::AbstractString="",
     julia_path::AbstractString="julia",
     julia_depot::AbstractString="",
+    sysimage_path::AbstractString="",
     cuda_module::AbstractString="",
     sync_code::Bool=false,
 ) = UGEBackend(
@@ -108,6 +110,7 @@ UGEBackend(;
     String(compute_group),
     String(julia_path),
     String(julia_depot),
+    String(sysimage_path),
     String(cuda_module),
     sync_code,
 )
@@ -143,6 +146,7 @@ function render_uge_script(profile::AbstractString, config_path::AbstractString;
     log_dir::AbstractString,
     julia_path::AbstractString="julia",
     julia_depot::AbstractString="",
+    sysimage_path::AbstractString="",
     cuda_module::AbstractString="",
     jobname::AbstractString="spinorbec",
     compute_group::AbstractString="",  # kept in signature for symmetry; placed on qsub CLI, not in script
@@ -177,6 +181,7 @@ function render_uge_script(profile::AbstractString, config_path::AbstractString;
     module_line = isempty(cuda_module) ? "" : "module load $(cuda_module)"
     depot_line = isempty(julia_depot) ? "" :
                  "export JULIA_DEPOT_PATH=\"$(julia_depot)\""
+    sysimage_arg = isempty(sysimage_path) ? "" : "-J $(sysimage_path)"
 
     body = """
     #!/bin/bash
@@ -202,7 +207,12 @@ function render_uge_script(profile::AbstractString, config_path::AbstractString;
     # and remote dispatch produce byte-for-byte identical artefacts.
     # CUDA isn't `using`'d explicitly — SpinorBEC's extension fires
     # when CUDA is loaded (it lives in the project's deps).
-    "$(julia_path)" --project=. -e 'using SpinorBEC; SpinorBEC.run_yaml(ARGS[1])' "$(config_path)"
+    #
+    # `-J <sysimage>` (when set) loads a pre-baked PackageCompiler
+    # sysimage so first-output latency drops from ~30 s (cold JIT) to
+    # ~2 s. Operator builds the sysimage once via the CLI helper —
+    # rebuild only on Project.toml / Manifest.toml change.
+    "$(julia_path)" $(sysimage_arg) --project=. -e 'using SpinorBEC; SpinorBEC.run_yaml(ARGS[1])' "$(config_path)"
     """
     return body
 end
@@ -284,6 +294,65 @@ end
 # dirname() gives the project dir. Robust against cwd shenanigans.
 _uge_local_project_root() = dirname(Base.active_project())
 
+# Manifest-hash helpers for auto-instantiate. The remote stores a
+# `.manifest_hash` file under project_root containing the sha256 of
+# the Manifest.toml that was last `Pkg.instantiate`d there. After
+# rsync, we compare local hash → remote hash; differ → run instantiate
+# + write new hash. Same → skip (instantiate is 10-60s, not free).
+_uge_local_manifest_path() =
+    joinpath(_uge_local_project_root(), "Manifest.toml")
+
+_uge_local_manifest_hash() =
+    if isfile(_uge_local_manifest_path())
+        bytes2hex(SHA.sha256(read(_uge_local_manifest_path())))
+    else
+        ""
+    end
+
+_uge_remote_manifest_hash_path(b::UGEBackend) =
+    joinpath(b.project_root, ".manifest_hash")
+
+function _uge_remote_manifest_hash(b::UGEBackend)
+    b.ssh_host === nothing && return ""
+    try
+        strip(read(`$(_ssh_cm(b.ssh_host)) cat $(_uge_remote_manifest_hash_path(b))`,
+            String))
+    catch
+        ""   # file absent / first run / ssh blip — treat as "differs"
+    end
+end
+
+"""
+    _uge_instantiate_if_needed(b::UGEBackend) -> Bool
+
+After `_uge_code_sync_cmd` rsyncs the local tree, check whether the
+remote needs `Pkg.instantiate` re-run. Returns true iff instantiate
+was actually invoked. No-op when ssh_host is unset, when there's no
+local Manifest.toml, or when local hash matches remote.
+"""
+function _uge_instantiate_if_needed(b::UGEBackend)
+    b.ssh_host === nothing && return false
+    local_hash = _uge_local_manifest_hash()
+    isempty(local_hash) && return false
+    remote_hash = _uge_remote_manifest_hash(b)
+    local_hash == remote_hash && return false
+    @info "autopilot: Manifest.toml changed; running Pkg.instantiate on remote" host=b.ssh_host local_sha=local_hash[1:8] remote_sha=(
+        isempty(remote_hash) ? "none" : remote_hash[1:8]
+    )
+    # Single ssh round-trip: instantiate + write hash. depot_export is
+    # important — without it the compute node's $JULIA_DEPOT_PATH might
+    # differ from the login node's, instantiating into the wrong depot.
+    depot_export = isempty(b.julia_depot) ? "" :
+                   "export JULIA_DEPOT_PATH=\"$(b.julia_depot)\"; "
+    snippet =
+        depot_export *
+        "cd $(b.project_root) && " *
+        "$(b.julia_path) --project=. -e 'using Pkg; Pkg.instantiate()' && " *
+        "printf %s $(local_hash) > $(_uge_remote_manifest_hash_path(b))"
+    run(`$(_ssh_cm(b.ssh_host)) bash -lc $snippet`)
+    return true
+end
+
 function _uge_qsub_cmd(b::UGEBackend, remote_script::AbstractString)
     # On TSUBAME 4 `-g <group>` MUST be on the qsub command line (not as
     # a `#$ -g` script directive — the TSUBAME qsub wrapper rejects that
@@ -332,6 +401,10 @@ function stage_in(b::UGEBackend, entry::QueueEntry)
     run(_uge_rsync_config_cmd(b, entry, remote_dir))
     if b.sync_code
         run(_uge_code_sync_cmd(b))
+        # Auto Pkg.instantiate when local Manifest.toml has changed
+        # since the last instantiate on this remote — cheap no-op
+        # when unchanged (one ssh + cat of a 64-char file).
+        _uge_instantiate_if_needed(b)
     end
     return nothing
 end
@@ -377,6 +450,7 @@ function dispatch!(b::UGEBackend, entry::QueueEntry)
         log_dir=_uge_remote_run_dir(b, entry),
         julia_path=b.julia_path,
         julia_depot=b.julia_depot,
+        sysimage_path=b.sysimage_path,
         cuda_module=b.cuda_module,
         jobname=_uge_jobname(entry.content_id),
         compute_group=b.compute_group)

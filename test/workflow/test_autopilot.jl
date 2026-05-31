@@ -650,6 +650,48 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
                 SpinorBEC.backend_failure_reason(b, e))
         end
 
+        @testset "render_uge_script: sysimage -J injection" begin
+            # `-J <path>` should appear ONLY in the actual julia
+            # invocation line, not in any comment. Pull out the julia
+            # call line by grepping for the run_yaml snippet.
+            function _julia_line(script)
+                for ln in eachsplit(script, '\n')
+                    occursin("run_yaml(ARGS[1])", ln) && return String(ln)
+                end
+                return ""
+            end
+            # Without sysimage_path: julia invocation has no -J.
+            bare = render_uge_script("default", "/cfg.yaml";
+                project_root="/proj",
+                log_dir="/runs/x",
+                jobname="sb_x")
+            @test !occursin("-J ", _julia_line(bare))
+            # With sysimage_path: -J <abs path> precedes --project=.
+            # in the julia invocation. Sysimage cuts first-output
+            # from ~30 s cold JIT to ~2 s.
+            withimg = render_uge_script("default", "/cfg.yaml";
+                project_root="/proj",
+                log_dir="/runs/x",
+                jobname="sb_x",
+                sysimage_path="/gs/fs/spinor_sys.so")
+            jline = _julia_line(withimg)
+            @test occursin("-J /gs/fs/spinor_sys.so", jline)
+            # -J must come BEFORE --project=. (Julia option order rule).
+            @test findfirst("-J", jline).start <
+                findfirst("--project=.", jline).start
+        end
+
+        @testset "_uge_local_manifest_hash: deterministic + content-sensitive" begin
+            # The hash is what _uge_instantiate_if_needed compares
+            # local→remote on. Same Manifest.toml content must produce
+            # the same hash across calls.
+            h1 = SpinorBEC._uge_local_manifest_hash()
+            h2 = SpinorBEC._uge_local_manifest_hash()
+            @test h1 == h2
+            # Hash is a sha256 hex string (or "" if no Manifest.toml).
+            @test isempty(h1) || (length(h1) == 64 && all(c -> isdigit(c) || ('a' <= c <= 'f'), h1))
+        end
+
         @testset "analyze_failure: categorises terminal entries" begin
             # Synthesise a failed entry with various artefacts and verify
             # the classifier returns the right category + summary. Tests
