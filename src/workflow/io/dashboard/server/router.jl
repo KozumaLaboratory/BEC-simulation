@@ -334,6 +334,8 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         return _route_tags_get(base_dir)
     elseif path == "/api/index"
         return _route_catalog_index(base_dir)
+    elseif path == "/api/budget"
+        return _route_autopilot_budget()
     elseif startswith(path, "/api/queue")
         return _route_autopilot_queue(path)
     elseif startswith(path, "/api/density/")

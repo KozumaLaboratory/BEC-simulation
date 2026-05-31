@@ -87,6 +87,35 @@ export interface DynamicsSeries {
   pop_times?: number[]
 }
 
+/** Snapshot of the running job's _live_status.json, written by
+ * run_yaml every few steps. Used by the queue panel to show
+ * "step 1200/3000 E=1.23" inline with the ETA. */
+export interface LiveStatusSnapshot {
+  step: number
+  t: number
+  energy: number
+  norm: number
+  populations: number[]
+  updated_ms: number
+}
+
+/** Autopilot-budget snapshot. `days_to_exhaust` is -1 when the quarter
+ * cap is unlimited (== 0) or no burn happened today yet (so the
+ * projection is undefined). */
+export interface BudgetSnapshot {
+  ok: true
+  quarter_cap_gpu_hours: number
+  daily_cap_gpu_hours: number
+  realized_total: number
+  realized_today: number
+  predicted_in_flight: number
+  remaining: number
+  days_to_exhaust: number
+  today: string
+  allow: boolean
+  reason: string
+}
+
 export interface AutopilotQueueResponse {
   autopilot: { dry_run: boolean; paused: boolean }
   pending: AutopilotQueueEntry[]
@@ -366,15 +395,14 @@ export const api = {
   /** Live status snapshot for an in-progress run. Returns the latest
    * step / energy / Mz / populations the simulator wrote to its
    * `_live_status.json`. 404 when the run isn't actively writing. */
-  liveStatus(run: string): Promise<{
-    step: number
-    t: number
-    energy: number
-    norm: number
-    populations: number[]
-    updated_ms: number
-  }> {
+  liveStatus(run: string): Promise<LiveStatusSnapshot> {
     return json(`/api/live/${encodeURIComponent(run)}`)
+  },
+
+  /** Autopilot budget snapshot (TSUBAME points / day burn / projected
+   * exhaustion). Polled by the dashboard's budget widget. */
+  budget(): Promise<BudgetSnapshot> {
+    return json('/api/budget')
   },
 
   /** Returns runs whose live status was touched in the last 5 minutes —

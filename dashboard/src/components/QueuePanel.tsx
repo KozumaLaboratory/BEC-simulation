@@ -6,6 +6,8 @@ import {
   type AutopilotQueueEntry,
   type AutopilotQueueResponse,
   type Tag,
+  type LiveStatusSnapshot,
+  type BudgetSnapshot,
 } from '@/api'
 import { useDashboardURL, type TabId } from '@/state/useDashboardURL'
 import { EnqueueDialog } from '@/components/EnqueueDialog'
@@ -521,6 +523,7 @@ function SummaryStrip({
           </span>
         )}
         <span className="ml-auto flex items-center gap-3">
+          <BudgetBadge />
           <button
             type="button"
             onClick={onEnqueueClick}
@@ -755,6 +758,53 @@ function IntentionGroup({
   )
 }
 
+/** Persistent budget badge — TSUBAME GPU·h consumed today + projected
+ * days to exhaustion based on today's burn rate. Polls /api/budget
+ * every 30 s. Hides when no quarter cap is configured (unlimited
+ * mode — no budget to display). */
+function BudgetBadge() {
+  const [snap, setSnap] = useState<BudgetSnapshot | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    const poll = async () => {
+      try {
+        const s = await api.budget()
+        if (!cancelled) setSnap(s)
+      } catch {
+        // 5xx / connection error → silently hide. Budget is
+        // informational, not gating.
+      }
+    }
+    poll()
+    const id = window.setInterval(poll, 30_000)
+    return () => { cancelled = true; window.clearInterval(id) }
+  }, [])
+  if (!snap || snap.quarter_cap_gpu_hours === 0) return null
+  const pct = snap.realized_total / snap.quarter_cap_gpu_hours
+  const warn = pct >= 0.8 || (snap.days_to_exhaust > 0 && snap.days_to_exhaust < 7)
+  const color = warn ? 'var(--vermillion,#d97a3c)' : 'var(--ink-soft)'
+  const eta =
+    snap.days_to_exhaust > 0
+      ? `exhausts in ~${snap.days_to_exhaust}d`
+      : 'no burn today'
+  return (
+    <span
+      className="font-mono text-[10.5px] tracking-[0.05em] px-2 py-0.5 border whitespace-nowrap"
+      style={{ borderColor: color, color, borderRadius: 0 }}
+      title={
+        `realized ${snap.realized_total.toFixed(2)} / ${snap.quarter_cap_gpu_hours.toFixed(0)} GPU·h ` +
+        `(${(pct * 100).toFixed(0)}%)\n` +
+        `today ${snap.realized_today.toFixed(2)} GPU·h, in-flight ${snap.predicted_in_flight.toFixed(2)} GPU·h\n` +
+        `${eta}\n` +
+        `gate: ${snap.allow ? 'ALLOW' : 'BLOCKED'} — ${snap.reason}`
+      }
+    >
+      budget {snap.realized_total.toFixed(1)}/{snap.quarter_cap_gpu_hours.toFixed(0)}h
+      {snap.days_to_exhaust > 0 ? ` · ${eta}` : ''}
+    </span>
+  )
+}
+
 /** Per-entry ETA cell. Re-renders every 5 s so the displayed "ETA 7m"
  * counts down without waiting for the next /api/queue poll. Tooltip
  * shows the per-phase elapsed breakdown for audit. */
@@ -780,6 +830,48 @@ function ETACell({ e }: { e: AutopilotQueueEntry }) {
       title={`${eta.basis} · ${breakdown}`}
     >
       {eta.lower_bound ? '≥ ' : ''}{eta.eta}
+    </span>
+  )
+}
+
+/** Inline live-status badge for :running entries. Polls
+ * /api/live/<cid> every 5 s and shows the most recent step + energy
+ * the simulator wrote. Renders nothing when the run hasn't yet
+ * flushed a status (e.g. still in TSUBAME qw) or when the fetch
+ * 404s. Tooltip carries the full snapshot for audit. */
+function LiveProgressBadge({ cid }: { cid: string }) {
+  const [snap, setSnap] = useState<LiveStatusSnapshot | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    const poll = async () => {
+      try {
+        const s = await api.liveStatus(cid)
+        if (!cancelled) setSnap(s)
+      } catch {
+        // 404 / connection error → leave the previous snapshot in
+        // place; the cell silently hides. No noisy retries.
+      }
+    }
+    poll()
+    const id = window.setInterval(poll, 5_000)
+    return () => { cancelled = true; window.clearInterval(id) }
+  }, [cid])
+  if (!snap) return null
+  // Compact one-line view: step + energy + norm. Energy/norm are the
+  // two scalars an operator scans for "is this run sane".
+  const compact =
+    `step ${snap.step}` +
+    (Number.isFinite(snap.energy) ? `  E=${snap.energy.toPrecision(4)}` : '') +
+    (Number.isFinite(snap.norm) ? `  ‖ψ‖=${snap.norm.toPrecision(3)}` : '')
+  const title =
+    `step=${snap.step} t=${snap.t} energy=${snap.energy} norm=${snap.norm}` +
+    `\nupdated ${new Date(snap.updated_ms).toISOString()}`
+  return (
+    <span
+      className="text-[var(--ink-faint)] text-[10px] font-mono ml-2"
+      title={title}
+    >
+      ▷ {compact}
     </span>
   )
 }
@@ -823,6 +915,7 @@ function EntryRow({
       }
     : {}
   const isPending = e.status === 'pending'
+  const isRunning = e.status === 'running'
   const isPropose = e.recipe.autonomy_level === 'propose'
 
   return (
@@ -881,6 +974,7 @@ function EntryRow({
         </td>
         <td className="px-3 py-2 whitespace-nowrap">
           <ETACell e={e} />
+          {isRunning && <LiveProgressBadge cid={e.content_id} />}
         </td>
         <td className="px-3 py-2 text-[var(--ink-soft)]">
           {e.recipe.name ?? '—'}{' '}
@@ -936,6 +1030,7 @@ function EntryRow({
         >
           <RowActions
             isPending={isPending}
+            isRunning={isRunning}
             isPropose={isPropose}
             busy={busy}
             onFork={onFork}
@@ -959,18 +1054,28 @@ function EntryRow({
 
 function RowActions({
   isPending,
+  isRunning,
   isPropose,
   busy,
   onFork,
   onAction,
 }: {
   isPending: boolean
+  isRunning: boolean
   isPropose: boolean
   busy: boolean
   onFork: () => void
   onAction: (action: 'promote' | 'cancel') => void
 }) {
   const [confirmCancel, setConfirmCancel] = useState(false)
+  // :pending uses "cancel" (no backend job to kill yet);
+  // :running uses "kill" (qdel / process kill via backend.cancel!).
+  // Confirm dialog gates both because either is destructive.
+  const showCancel = isPending || isRunning
+  const cancelLabel = isRunning ? 'kill' : 'cancel'
+  const cancelTitle = isRunning
+    ? 'backend.cancel! (qdel / kill) → :killed_bug'
+    : 'move :pending → :killed_bug'
   return (
     <span className="inline-flex gap-1.5">
       {isPending && isPropose && (
@@ -982,7 +1087,7 @@ function RowActions({
           title="autonomy_level :propose → :dispatch (tick will submit on next pass)"
         />
       )}
-      {isPending &&
+      {showCancel &&
         (confirmCancel ? (
           <>
             <ActionButton
@@ -1003,11 +1108,11 @@ function RowActions({
           </>
         ) : (
           <ActionButton
-            label="cancel"
+            label={cancelLabel}
             tone="bad"
             disabled={busy}
             onClick={() => setConfirmCancel(true)}
-            title="move :pending → :killed_bug"
+            title={cancelTitle}
           />
         ))}
       <ActionButton

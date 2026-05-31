@@ -11,7 +11,9 @@
 # Refuses transitions that violate state invariants (409). All other
 # states reject — modifying running/done/killed_* via UI is not in scope.
 
-using ..SpinorBEC: get_entry, set_status!, save_entry!
+using ..SpinorBEC:
+    get_entry, set_status!, save_entry!,
+    default_autopilot_config, resolve_backend, cancel!
 
 function _route_autopilot_action(body_bytes, base_dir;
     authed_user::AbstractString="",
@@ -64,19 +66,51 @@ function _route_autopilot_action(body_bytes, base_dir;
             "\"status\":\"pending\",\"autonomy_level\":\"dispatch\"," *
             "\"action\":\"promote\"}")
     else    # cancel
-        if entry.status !== :pending
+        # :pending → just set killed_bug (no backend job to kill).
+        # :running → resolve backend, call cancel! (qdel on UGE, kill
+        #            on LocalBackend subprocess), THEN set killed_bug.
+        # Terminal states → reject.
+        if entry.status === :pending
+            set_status!(entry, :killed_bug;
+                kill_reason="cancelled by operator ($(provenance))")
+            return (200, "application/json",
+                "{\"ok\":true,\"content_id\":\"$cid\"," *
+                "\"status\":\"killed_bug\"," *
+                "\"action\":\"cancel\"}")
+        elseif entry.status === :running
+            cfg = default_autopilot_config()
+            backend = try
+                resolve_backend(cfg, entry)
+            catch err
+                return (500, "application/json",
+                    _act_err("backend $(entry.backend_type) not registered: $(err)"))
+            end
+            killed_ok = try
+                cancel!(backend, entry)
+            catch err
+                @warn "cancel! threw" cid=cid exception=err
+                false
+            end
+            # Mark killed_bug regardless of backend response. cancel!
+            # returning false means "couldn't reach the scheduler" —
+            # the entry is still ours to mark; the scheduler-side job
+            # might linger but the autopilot will reconcile on the
+            # next reap tick.
+            set_status!(entry, :killed_bug;
+                kill_reason=if killed_ok
+                    "cancelled by operator ($(provenance))"
+                else
+                    "cancelled by operator ($(provenance)); backend cancel failed"
+                end)
+            return (200, "application/json",
+                "{\"ok\":true,\"content_id\":\"$cid\"," *
+                "\"status\":\"killed_bug\"," *
+                "\"action\":\"cancel\"," *
+                "\"backend_killed\":$(killed_ok)}")
+        else
             return (409, "application/json",
-                _act_err(
-                    "can only cancel :pending entries; this one is :$(entry.status). " *
-                    "Use the CLI to qdel a running job.",
-                ))
+                _act_err("cannot cancel terminal entry (status :$(entry.status))"))
         end
-        set_status!(entry, :killed_bug;
-            kill_reason="cancelled by operator ($(provenance))")
-        return (200, "application/json",
-            "{\"ok\":true,\"content_id\":\"$cid\"," *
-            "\"status\":\"killed_bug\"," *
-            "\"action\":\"cancel\"}")
     end
 end
 
