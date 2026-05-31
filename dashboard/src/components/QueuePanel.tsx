@@ -8,6 +8,7 @@ import {
   type Tag,
   type LiveStatusSnapshot,
   type BudgetSnapshot,
+  type FailureWhy,
 } from '@/api'
 import { useDashboardURL, type TabId } from '@/state/useDashboardURL'
 import { EnqueueDialog } from '@/components/EnqueueDialog'
@@ -121,6 +122,12 @@ function useAutopilotQueue(intervalMs = 5000) {
   const [error, setError] = useState<string | null>(null)
   const stopRef = useRef(false)
   const tickRef = useRef<(() => Promise<void>) | null>(null)
+  // Previous-tick status map so we can detect entry → terminal
+  // transitions and fire browser notifications. `null` until the
+  // first poll arrives, so the very first load doesn't notify the
+  // operator about every pre-existing terminal entry as if it just
+  // finished.
+  const prevStatusRef = useRef<Map<string, string> | null>(null)
 
   useEffect(() => {
     stopRef.current = false
@@ -137,6 +144,8 @@ function useAutopilotQueue(intervalMs = 5000) {
           tags = []
         }
         if (!stopRef.current) {
+          notifyTerminalTransitions(prevStatusRef.current, q)
+          prevStatusRef.current = _statusMap(q)
           setSnap(q)
           const map: Record<string, string[]> = {}
           for (const t of tags) (map[t.content_id] ??= []).push(t.name)
@@ -160,6 +169,66 @@ function useAutopilotQueue(intervalMs = 5000) {
     void tickRef.current?.()
   }
   return { snap, tagsByCid, error, refresh }
+}
+
+/** Flatten the 5-state response into a flat cid → status map for
+ * cheap diffing between polls. */
+function _statusMap(q: AutopilotQueueResponse): Map<string, string> {
+  const m = new Map<string, string>()
+  for (const s of ['pending', 'running', 'done', 'killed_data', 'killed_bug'] as const) {
+    for (const e of q[s]) m.set(e.content_id, s)
+  }
+  return m
+}
+
+/** When entries transition from :pending/:running to a terminal state,
+ * fire a browser Notification. Permission is requested lazily on the
+ * first would-be notification — denied = silent forever (browsers
+ * gate this once). No-op on the first poll (prev == null) so the
+ * operator doesn't get a flood of "this thing from yesterday finished"
+ * messages on dashboard load. */
+function notifyTerminalTransitions(
+  prev: Map<string, string> | null,
+  curr: AutopilotQueueResponse,
+) {
+  if (prev === null) return
+  if (typeof Notification === 'undefined') return
+  const transitions: Array<{ cid: string; from: string; to: string }> = []
+  for (const term of ['done', 'killed_data', 'killed_bug'] as const) {
+    for (const e of curr[term]) {
+      const prevSt = prev.get(e.content_id)
+      if (prevSt && prevSt !== term &&
+          (prevSt === 'pending' || prevSt === 'running')) {
+        transitions.push({ cid: e.content_id, from: prevSt, to: term })
+      }
+    }
+  }
+  if (transitions.length === 0) return
+  const ensure = async () => {
+    if (Notification.permission === 'granted') return true
+    if (Notification.permission === 'denied') return false
+    try {
+      const p = await Notification.requestPermission()
+      return p === 'granted'
+    } catch {
+      return false
+    }
+  }
+  void ensure().then((ok) => {
+    if (!ok) return
+    for (const t of transitions) {
+      const icon = t.to === 'done' ? '✓' : '✗'
+      const title = `SpinorBEC ${icon} ${t.to.replace('killed_', 'killed ')}`
+      const body = `${t.cid.slice(0, 12)}  (${t.from} → ${t.to})`
+      try {
+        // tag = cid de-dupes so the same transition only notifies once
+        // even if multiple polls race.
+        new Notification(title, { body, tag: `sb-${t.cid}` })
+      } catch {
+        /* iframe / non-secure context / quota — silently skip */
+      }
+    }
+  })
 }
 
 // Open the enqueue dialog when routed here with ?enqueue (from the SideNav
@@ -608,8 +677,31 @@ function TagPill({ name, onRemove }: { name: string; onRemove: () => void }) {
 
 function Rollup({ rollup }: { rollup: Record<State, number> }) {
   const active = STATES.filter((s) => rollup[s] > 0)
+  // Group-level progress: "8 / 16 done · 2 failed" for multi-cell
+  // intentions (sweeps, recipe fan-outs). Shown alongside the per-
+  // state count chips so operators can scan "is this group close to
+  // done?" without doing the addition in their head.
+  const total = STATES.reduce((acc, s) => acc + rollup[s], 0)
+  const done = rollup['done'] ?? 0
+  const failed = (rollup['killed_data'] ?? 0) + (rollup['killed_bug'] ?? 0)
+  const showProgress = total > 1
   return (
-    <span className="inline-flex items-baseline gap-2 font-mono text-[12px]">
+    <span className="inline-flex items-baseline gap-3 font-mono text-[12px]">
+      {showProgress && (
+        <span
+          className="text-[var(--ink-soft)] tracking-wide"
+          title={`${done} done, ${failed} failed, ${total - done - failed} in flight`}
+        >
+          <span className="numeric">{done}</span>/
+          <span className="numeric">{total}</span>
+          <span className="text-[var(--ink-faint)] ml-1">done</span>
+          {failed > 0 && (
+            <span style={{ color: 'var(--t-red,#d94e1f)' }} className="ml-2">
+              · <span className="numeric">{failed}</span> failed
+            </span>
+          )}
+        </span>
+      )}
       {active.map((s) => (
         <span
           key={s}
@@ -756,6 +848,45 @@ function IntentionGroup({
       </CardContent>
     </Card>
   )
+}
+
+/** "Why did this fail?" badge for terminal-failed entries. Fetches
+ * /api/queue/why/<cid> once on mount, renders a one-line summary
+ * tagged by failure category (color-coded by severity class). Hover
+ * shows the verbatim evidence the classifier matched on. */
+function FailureWhyBadge({ cid }: { cid: string }) {
+  const [why, setWhy] = useState<FailureWhy | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    api
+      .queueWhy(cid)
+      .then((w) => { if (!cancelled) setWhy(w) })
+      .catch(() => { /* 404 / fetch error: silent — fall back to raw kill_reason */ })
+    return () => { cancelled = true }
+  }, [cid])
+  if (!why) return null
+  const color = _WHY_COLOR[why.category] ?? 'var(--ink-soft)'
+  return (
+    <span
+      className="font-mono text-[10.5px] tracking-wide"
+      style={{ color }}
+      title={why.details}
+    >
+      <span className="uppercase mr-1">{why.category.replace('_', ' ')}</span>
+      <span className="text-[var(--ink-soft)] normal-case">{why.summary}</span>
+    </span>
+  )
+}
+
+const _WHY_COLOR: Record<FailureWhy['category'], string> = {
+  oom: 'var(--vermillion,#d97a3c)',
+  timeout: 'var(--vermillion,#d97a3c)',
+  nan_cascade: 'var(--t-red,#d94e1f)',
+  missing_dep: 'var(--t-red,#d94e1f)',
+  config_error: 'var(--t-red,#d94e1f)',
+  scheduler_kill: 'var(--ink-soft)',
+  other_julia: 'var(--ink)',
+  unknown: 'var(--ink-faint)',
 }
 
 /** Persistent budget badge — TSUBAME GPU·h consumed today + projected
@@ -1018,10 +1149,14 @@ function EntryRow({
           )}
         </td>
         <td
-          className="px-3 py-2 text-[var(--ink-soft)] truncate max-w-[280px]"
+          className="px-3 py-2 text-[var(--ink-soft)] truncate max-w-[320px]"
           title={reasonOrBy}
         >
-          {reasonOrBy}
+          {(e.status === 'killed_data' || e.status === 'killed_bug') ? (
+            <FailureWhyBadge cid={e.content_id} />
+          ) : (
+            reasonOrBy
+          )}
         </td>
         <td
           className="px-3 py-2 text-right whitespace-nowrap"

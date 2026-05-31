@@ -29,6 +29,8 @@ include("autopilot/retry.jl")
 include("autopilot/cli.jl")          # pause/drain/resume/status/why
 include("autopilot/budget.jl")       # quarter+daily caps, dispatch gate
 include("autopilot/qw_history.jl")   # historical-median qw-wait estimator
+include("autopilot/failure_analysis.jl") # "why did this fail?" summariser
+include("autopilot/profile_recommend.jl") # grid → suggested UGE profile
 include("autopilot/trust.jl")        # autonomy gradient + calibration history
 include("autopilot/archive.jl")      # done/killed_* retention
 include("autopilot/recipes.jl")      # Day-1 recipes (next_random / refine / analyze)

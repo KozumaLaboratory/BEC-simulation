@@ -6,6 +6,7 @@
 
 export gaussian_psf_convolve, apply_shot_noise, apply_saturation
 export synthesise_absorption_image, faraday_polarization_components
+export apply_sg_overlap, apply_fringe_noise!, synthesise_image_ensemble
 #   2. Saturation:  OD_raw = -log((N_probe - N_obs) / N_probe)
 #                   becomes non-linear at OD ≳ 2; we invert it.
 #   3. Poisson shot noise on photon counts
@@ -149,6 +150,141 @@ function synthesise_absorption_image(
         end
     end
     img
+end
+
+# --- SG overlap + σ_eff(m) weighted composition ---
+#
+# `simulate_tof` and `simulate_tof_with_gradient` return Dict{Int, Matrix} of
+# per-m column densities, each already shifted to the SG-displaced position
+# (via integer circshift in the far-field path or real-time evolution with the
+# magnetic gradient). The composite image observed by the camera is the
+# σ_eff(m)-weighted sum, broadened by the residual momentum-distribution
+# width (initial cloud momentum width × t_tof) which sets the per-m Gaussian
+# kernel σ_SG. When adjacent m clouds have centres separated by less than
+# σ_SG, they overlap in the observed image — this is what `apply_sg_overlap`
+# models.
+
+"""
+    apply_sg_overlap(components, sigma_sg_pixels; sigma_eff=nothing) -> Matrix{Float64}
+
+Compose the camera-side OD image from per-m component column densities.
+
+- `components::Dict{Int, <:AbstractMatrix}`: output of `simulate_tof` or
+  `simulate_tof_with_gradient`, keyed by m.
+- `sigma_sg_pixels::Real`: Gaussian broadening (pixels) applied per component
+  to model finite initial momentum spread × TOF. `0` disables broadening.
+- `sigma_eff::Union{Nothing, Dict{Int, Float64}}`: per-m σ_eff weight (output
+  of `build_sigma_eff_table` keyed by m); `nothing` ⇒ uniform σ_eff = 1.
+
+Returns the composite OD `Σ_m σ_eff(m) · Gaussian_σ_SG ⊗ Σ_m(x, y)`.
+"""
+function apply_sg_overlap(
+    components::Dict{<:Integer, <:AbstractArray},
+    sigma_sg_pixels::Real;
+    sigma_eff::Union{Nothing, Dict{<:Integer, <:Real}}=nothing,
+)
+    isempty(components) && throw(ArgumentError("components must be non-empty"))
+    ms = sort(collect(keys(components)))
+    ref = components[ms[1]]
+    ndims(ref) == 2 || throw(
+        ArgumentError(
+            "apply_sg_overlap currently supports 2D component images (got $(ndims(ref))D). " *
+            "For a 1D SG output use a 3D source grid with imaging_axis=3."),
+    )
+    nx, ny = size(ref)
+    composite = zeros(Float64, nx, ny)
+    σ = Float64(sigma_sg_pixels)
+    @inbounds for m in ms
+        c = components[m]
+        ndims(c) == 2 && size(c) == (nx, ny) ||
+            throw(DimensionMismatch("components[$m] shape $(size(c)) ≠ ($(nx), $(ny))"))
+        c2d = reshape(c, nx, ny)  # ensure AbstractMatrix view for gaussian_psf_convolve
+        broadened = σ > 0 ? gaussian_psf_convolve(c2d, σ) : Matrix{Float64}(c2d)
+        weight = sigma_eff === nothing ? 1.0 :
+                 Float64(get(sigma_eff, m, 1.0))
+        composite .+= weight .* broadened
+    end
+    composite
+end
+
+# --- Fringe noise + 116-shot ensemble ---
+#
+# Absorption imaging shot-to-shot reproducibility is limited by interference
+# fringes from probe-beam wavefront drift. These fringes are typically rank-K
+# patterns (PCA basis of K ≲ 10 modes) with shot-to-shot Gaussian amplitudes.
+# Averaging N ~ 100 shots suppresses fringe variance as 1/N. SBI likelihoods
+# must distinguish the iid component (Poisson + readout, also ∝ 1/N) from the
+# shot-correlated fringe component (whose pixel covariance is low-rank rather
+# than diagonal).
+
+"""
+    apply_fringe_noise!(image, fringe_basis, fringe_sigmas; seed=nothing) -> image
+
+Add a single random fringe realization to `image` in-place. `fringe_basis` is
+`(nx, ny, K)` with K orthonormal patterns; `fringe_sigmas` is length-K giving
+the per-mode RMS amplitude. Each shot draws K independent Gaussian
+amplitudes a_k ~ N(0, σ_k²) and adds `Σ_k a_k φ_k`.
+"""
+function apply_fringe_noise!(
+    image::AbstractMatrix,
+    fringe_basis::AbstractArray{<:Real, 3},
+    fringe_sigmas::AbstractVector{<:Real};
+    seed::Union{Nothing, Int}=nothing,
+)
+    K = length(fringe_sigmas)
+    size(fringe_basis, 3) == K ||
+        throw(DimensionMismatch("fringe_basis depth $(size(fringe_basis, 3)) ≠ K=$K"))
+    size(fringe_basis)[1:2] == size(image) ||
+        throw(DimensionMismatch("fringe_basis spatial dims ≠ image dims"))
+    rng = seed === nothing ? Random.default_rng() : Random.MersenneTwister(seed)
+    @inbounds for k in 1:K
+        a = Float64(fringe_sigmas[k]) * randn(rng)
+        @views image .+= a .* fringe_basis[:, :, k]
+    end
+    image
+end
+
+"""
+    synthesise_image_ensemble(clean, grid; n_shots, ..., seed=nothing)
+        -> (mean=Matrix, var=Matrix)
+
+Generate `n_shots` independent realizations of the noise chain
+(PSF → saturation → Poisson photons → readout → optional fringe) and return
+the per-pixel mean and sample variance (Welford accumulator).
+
+Single-shot ⇒ variance is zero. Use `n_shots = 116` to match the Matsui 2026
+EdH protocol averaging.
+"""
+function synthesise_image_ensemble(
+    clean::AbstractMatrix, grid::Grid{N};
+    sigma_pixels::Real=0.0,
+    photons_per_unit::Real=0.0,
+    OD_sat::Real=Inf,
+    read_noise_sigma::Real=0.0,
+    fringe_basis::Union{Nothing, AbstractArray{<:Real, 3}}=nothing,
+    fringe_sigmas::Union{Nothing, AbstractVector{<:Real}}=nothing,
+    n_shots::Int=1,
+    seed::Union{Nothing, Int}=nothing,
+) where {N}
+    n_shots >= 1 || throw(ArgumentError("n_shots must be ≥ 1"))
+    sz = size(clean)
+    mean_img = zeros(Float64, sz)
+    M2 = zeros(Float64, sz)
+    for shot in 1:n_shots
+        seed_shot = seed === nothing ? nothing : seed + 1000 * shot
+        img = synthesise_absorption_image(clean, grid;
+            sigma_pixels, photons_per_unit, OD_sat,
+            read_noise_sigma, seed=seed_shot)
+        if fringe_basis !== nothing && fringe_sigmas !== nothing
+            seed_fringe = seed_shot === nothing ? nothing : seed_shot + 1
+            apply_fringe_noise!(img, fringe_basis, fringe_sigmas; seed=seed_fringe)
+        end
+        delta = img .- mean_img
+        mean_img .+= delta ./ shot
+        M2 .+= delta .* (img .- mean_img)
+    end
+    var_img = n_shots > 1 ? M2 ./ (n_shots - 1) : zeros(Float64, sz)
+    (mean=mean_img, var=var_img)
 end
 
 # --- P3.2: Phase-contrast / polarization-resolved imaging ---

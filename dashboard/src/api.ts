@@ -99,6 +99,23 @@ export interface LiveStatusSnapshot {
   updated_ms: number
 }
 
+/** Compact "what broke?" classification of a terminal-failed entry.
+ * `category` enum mirrors `FailureAnalysis.category` in Julia. */
+export interface FailureWhy {
+  content_id: string
+  category:
+    | 'oom'
+    | 'timeout'
+    | 'nan_cascade'
+    | 'missing_dep'
+    | 'config_error'
+    | 'scheduler_kill'
+    | 'other_julia'
+    | 'unknown'
+  summary: string
+  details: string
+}
+
 /** Autopilot-budget snapshot. `days_to_exhaust` is -1 when the quarter
  * cap is unlimited (== 0) or no burn happened today yet (so the
  * projection is undefined). */
@@ -154,6 +171,13 @@ export interface EnqueuePreviewResponse {
     predicted?: number
     quarter_cap?: number
     daily_cap?: number
+  }
+  /** Resource-profile recommendation from the grid-size heuristic.
+   * Absent when the spec couldn't be parsed (malformed YAML, etc). */
+  recommend?: {
+    profile: string
+    reason: string
+    est_vram_gb: number
   }
 }
 
@@ -408,6 +432,12 @@ export const api = {
    * exhaustion). Polled by the dashboard's budget widget. */
   budget(): Promise<BudgetSnapshot> {
     return json('/api/budget')
+  },
+
+  /** "Why did this fail?" — backend walks outcome.toml / exit_summary /
+   * stderr.log to categorise + summarise a terminal-failed entry. */
+  queueWhy(cid: string): Promise<FailureWhy> {
+    return json(`/api/queue/why/${encodeURIComponent(cid)}`)
   },
 
   /** Returns runs whose live status was touched in the last 5 minutes —

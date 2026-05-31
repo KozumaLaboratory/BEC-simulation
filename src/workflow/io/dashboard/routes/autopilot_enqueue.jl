@@ -21,7 +21,9 @@
 # then commit. autonomy_level defaults to :propose so a Web-driven
 # enqueue does not auto-dispatch.
 
-using ..SpinorBEC: ConfigInspection, ConfigWarning, to_dict
+using ..SpinorBEC:
+    ConfigInspection, ConfigWarning, to_dict,
+    recommend_uge_profile, ProfileRecommendation
 
 function _route_autopilot_enqueue(body_bytes, base_dir;
     authed_user::AbstractString="",
@@ -89,6 +91,7 @@ function _route_autopilot_enqueue(body_bytes, base_dir;
 
     # Compute the content_id by routing through Experiment construction.
     cid = ""
+    spec = nothing
     try
         spec = YAML.load(yaml_src)
         cid = content_id(spec)
@@ -105,9 +108,19 @@ function _route_autopilot_enqueue(body_bytes, base_dir;
         nothing
     end
 
+    # Resource recommendation: heuristic profile suggestion based on
+    # grid voxel count × spinor multiplicity. Only meaningful for UGE
+    # backend; for local it's informational.
+    rec = try
+        spec isa AbstractDict ? recommend_uge_profile(spec) : nothing
+    catch err
+        @warn "recommend_uge_profile threw" exception=err
+        nothing
+    end
+
     if preview
         body = _preview_json(cid, ins, blocked_findings, warn_findings,
-            error_findings, budget_d, walltime, profile)
+            error_findings, budget_d, walltime, profile, rec)
         return (200, "application/json", body)
     end
 
@@ -162,7 +175,8 @@ end
 _enq_err(msg::AbstractString) = "{\"ok\":false,\"error\":\"$(_jsonesc(String(msg)))\"}"
 
 function _preview_json(cid::String, ins::ConfigInspection,
-    blocked, warned, errored, budget_d, walltime, profile)
+    blocked, warned, errored, budget_d, walltime, profile,
+    rec::Union{Nothing, ProfileRecommendation}=nothing)
     io = IOBuffer()
     print(io, "{\"ok\":true,\"preview\":true,",
         "\"content_id\":\"$(cid)\",",
@@ -193,6 +207,16 @@ function _preview_json(cid::String, ins::ConfigInspection,
             "\"predicted\":", budget_d.predicted, ",",
             "\"quarter_cap\":", budget_d.quarter_cap, ",",
             "\"daily_cap\":", budget_d.daily_cap,
+            "}")
+    end
+    # Recommended profile from grid-size heuristic. Only emitted when
+    # we could parse the spec; the dashboard's EnqueueDialog renders
+    # a hint next to the profile selector.
+    if rec !== nothing
+        print(io, ",\"recommend\":{",
+            "\"profile\":\"$(_jsonesc(rec.profile))\",",
+            "\"reason\":\"$(_jsonesc(rec.reason))\",",
+            "\"est_vram_gb\":", rec.est_vram_gb,
             "}")
     end
     print(io, "}")

@@ -448,6 +448,30 @@ function PreviewStep({ preview }: { preview: EnqueuePreviewResponse }) {
         color="var(--vermillion,#d97a3c)"
       />
 
+      {preview.recommend && (
+        <div>
+          <div className="text-[10.5px] uppercase tracking-[0.10em] text-[var(--ink-faint)] font-mono mb-1">
+            Recommended profile
+          </div>
+          <div className="text-xs font-mono">
+            <span
+              style={{ color: 'var(--t-green,#5a8b5a)' }}
+              className="font-semibold"
+            >
+              {preview.recommend.profile}
+            </span>
+            <span className="text-[var(--ink-soft)] ml-2">
+              — {preview.recommend.reason}
+            </span>
+            {preview.profile !== preview.recommend.profile && (
+              <span className="text-[var(--vermillion,#d97a3c)] ml-2">
+                (you picked {preview.profile})
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       <div>
         <div className="text-[10.5px] uppercase tracking-[0.10em] text-[var(--ink-faint)] font-mono mb-1">
           Budget impact

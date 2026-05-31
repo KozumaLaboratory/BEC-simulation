@@ -650,6 +650,140 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
                 SpinorBEC.backend_failure_reason(b, e))
         end
 
+        @testset "analyze_failure: categorises terminal entries" begin
+            # Synthesise a failed entry with various artefacts and verify
+            # the classifier returns the right category + summary. Tests
+            # the priority order (outcome.toml > _exit_summary.json >
+            # stderr.log tail > kill_reason).
+            mktempdir() do tmp
+                lq = SpinorBEC.QueueRoot(joinpath(tmp, "runs"))
+                mkpath(lq.path)
+
+                function _mkentry(name, kind)
+                    rd = joinpath(lq.path, name)
+                    mkpath(rd)
+                    sp = joinpath(rd, "config.yaml")
+                    touch(sp)
+                    e = QueueEntry(name;
+                        run_dir=rd, spec_path=sp,
+                        status=:killed_bug, backend_type=:uge,
+                        profile="default")
+                    rd, e
+                end
+
+                # 1. outcome.toml wins.
+                rd, e = _mkentry("ana_outcome_aaaaaa", :oom)
+                open(joinpath(rd, "outcome.toml"), "w") do io
+                    TOML.print(
+                        io,
+                        Dict(
+                            "outcome" => Dict(
+                                "terminal" => "killed_bug",
+                                "reason" => "OOM_KILLED at step 1500"),
+                        ),
+                    )
+                end
+                a = SpinorBEC.analyze_failure(e)
+                @test a.category === :oom
+                @test occursin("OOM_KILLED", a.summary)
+
+                # 2. _exit_summary.json with NaN flag.
+                rd2, e2 = _mkentry("ana_nan_aaaaaaa", :nan)
+                open(joinpath(rd2, "_exit_summary.json"), "w") do io
+                    write(io, "{\"nan_encountered\":true,\"last_step\":2700}")
+                end
+                a2 = SpinorBEC.analyze_failure(e2)
+                @test a2.category === :nan_cascade
+                @test occursin("2700", a2.summary)
+
+                # 3. stderr.log tail with CUDA missing.
+                rd3, e3 = _mkentry("ana_missdep_aaaa", :dep)
+                open(joinpath(rd3, "stderr.log"), "w") do io
+                    write(
+                        io,
+                        "ERROR: ArgumentError: Package CUDA " *
+                        "[052768ef-5323-5732-b1bb-66c8b64840ba] is " *
+                        "required but does not seem to be installed:\n" *
+                        "stack...\n",
+                    )
+                end
+                a3 = SpinorBEC.analyze_failure(e3)
+                @test a3.category === :missing_dep
+                @test occursin("CUDA", a3.summary)
+
+                # 4. kill_reason fallback.
+                rd4, e4 = _mkentry("ana_killreason_a", :tmo)
+                e4.kill_reason = "TIMEOUT: walltime exceeded"
+                a4 = SpinorBEC.analyze_failure(e4)
+                @test a4.category === :timeout
+
+                # 5. No signal → unknown.
+                _, e5 = _mkentry("ana_unknown_aaaa", :none)
+                a5 = SpinorBEC.analyze_failure(e5)
+                @test a5.category === :unknown
+            end
+        end
+
+        @testset "recommend_uge_profile: grid → profile" begin
+            # Trivial Rb87 16³ → gpu_1 (sub-4GB).
+            r = SpinorBEC.recommend_uge_profile(
+                Dict{Any, Any}(
+                    "pipeline" => [
+                        Dict(
+                            "ground_state" =>
+                                Dict("atom" => "Rb87",
+                                    "grid" => Dict("n" => [16, 16, 16])),
+                        ),
+                    ]),
+            )
+            @test r.profile == "gpu_1"
+            @test r.est_vram_gb < 4.0
+
+            # Eu151 64³ → ~0.51 GB → gpu_1 band.
+            r2 = SpinorBEC.recommend_uge_profile(
+                Dict{Any, Any}(
+                    "pipeline" => [
+                        Dict(
+                            "ground_state" =>
+                                Dict("atom" => "Eu151",
+                                    "grid" => Dict("n" => [64, 64, 64])),
+                        ),
+                    ]),
+            )
+            @test r2.profile == "gpu_1"
+
+            # Eu151 128³ → ~4.06 GB → node_q (default).
+            r3 = SpinorBEC.recommend_uge_profile(
+                Dict{Any, Any}(
+                    "pipeline" => [
+                        Dict(
+                            "ground_state" =>
+                                Dict("atom" => "Eu151",
+                                    "grid" => Dict("n" => [128, 128, 128])),
+                        ),
+                    ]),
+            )
+            @test r3.profile == "default"
+
+            # Eu151 256³ → ~32 GB → node_h.
+            r3b = SpinorBEC.recommend_uge_profile(
+                Dict{Any, Any}(
+                    "pipeline" => [
+                        Dict(
+                            "ground_state" =>
+                                Dict("atom" => "Eu151",
+                                    "grid" => Dict("n" => [256, 256, 256])),
+                        ),
+                    ]),
+            )
+            @test r3b.profile == "node_h"
+
+            # Unparseable spec → fallback to "default" (node_q).
+            r4 = SpinorBEC.recommend_uge_profile(
+                Dict{Any, Any}("pipeline" => "not a list"))
+            @test r4.profile == "default"
+        end
+
         @testset "historical_qw_medians: per-profile median from past entries" begin
             mktempdir() do tmp
                 hqr = SpinorBEC.QueueRoot(joinpath(tmp, "runs"))
