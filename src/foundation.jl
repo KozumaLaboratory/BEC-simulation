@@ -29,3 +29,4 @@ include("foundation/spin_matrices.jl")
 include("foundation/spinor_utils.jl")
 include("foundation/clebsch_gordan.jl")
 include("foundation/spherical_harmonics.jl")
+include("foundation/optical_pumping_rate_eq.jl")  # F→F+1 cycling rate eq, σ_eff(m) for absorption imaging

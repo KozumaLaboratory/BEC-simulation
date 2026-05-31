@@ -268,6 +268,14 @@ function interaction_params_from_constraint(;
     F::Int,
     c_extra::Dict{Int, Float64}=Dict{Int, Float64}(),
 )
+    if !isempty(c_extra) && any(!iszero, values(c_extra))
+        @warn """interaction_params_from_constraint: c_total constraint applies only to the
+                 c_0/c_1 textbook truncation. With nonzero c_extra (higher-rank tensor channels)
+                 the tensor path takes over and the physical stretched-pair coupling g_{S=2F}
+                 is determined by Wigner-6j transform, NOT by c_0 + F²·c_1 = c_total.
+                 For SBI / inverse-problem work, parameterize in the channel basis {g_S}
+                 directly via `_make_tensor_cache_from_channels(F, Dict(S => g_S))`.""" maxlog=1
+    end
     c0 = c_total / (1.0 + F^2 * c1_ratio)
     c1 = c1_ratio * c0
     full = merge(Dict(0 => c0, 1 => c1), c_extra)

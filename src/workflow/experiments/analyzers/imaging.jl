@@ -98,6 +98,82 @@ function _analyze_sg_tof(psi, grid, atom, params, ws_prev)
     (tof_images=result, populations=populations)
 end
 
+function _analyze_forward_image(psi, grid, atom, params, ws_prev)
+    F = atom.F
+    sys = SpinSystem(F)
+
+    # 1. SG/TOF: per-m column densities, σ_eff(m) optical pumping table.
+    sg_tof = TOFParams(Float64(get(params, "t_tof", 10.0)),
+        Float64(get(params, "sg_gradient", 0.1)),
+        Int(get(params, "imaging_axis", min(3, length(grid.config.n_points)))))
+    tof_dict = simulate_tof(psi, grid, sys, sg_tof)
+    opp = OpticalPumpingParams(; F_ground=F,
+        polarization=Symbol(get(params, "polarization", "sigma_plus")),
+        saturation=Float64(get(params, "saturation", 0.1)),
+        detuning_over_gamma=Float64(get(params, "detuning_over_gamma", 0.0)),
+        t_pulse_gamma=Float64(get(params, "t_pulse_gamma", 1.0)))
+    sigma_eff_vec = build_sigma_eff_table(opp)
+    imaging = ImagingParams(;
+        view_geometry=Symbol(get(params, "view_geometry", "face_on")),
+        sg_tof=sg_tof,
+        sigma_eff=sigma_eff_vec,
+        sigma_sg_pixels=Float64(get(params, "sigma_sg_pixels", 0.0)),
+        psf_sigma_pixels=Float64(get(params, "psf_sigma_pixels", 0.0)),
+        photons_per_pixel=Float64(get(params, "photons_per_pixel", 0.0)),
+        read_noise_sigma=Float64(get(params, "read_noise_sigma", 0.0)),
+        n_shots_avg=Int(get(params, "n_shots_avg", 1)))
+
+    # 2. σ_eff weighted overlap composition (G2).
+    sigma_eff_map = Dict{Int, Float64}(m => sigma_eff_vec[m + F + 1] for m in (-F):F)
+    od_clean = apply_sg_overlap(tof_dict, imaging.sigma_sg_pixels;
+        sigma_eff=sigma_eff_map)
+
+    # 3. Camera-side noise + 116-shot ensemble (G3).
+    seed = get(params, "seed", nothing)
+    seed_int = seed === nothing ? nothing : Int(seed)
+    ensemble = synthesise_image_ensemble(od_clean, grid;
+        sigma_pixels=imaging.psf_sigma_pixels,
+        photons_per_unit=imaging.photons_per_pixel,
+        read_noise_sigma=imaging.read_noise_sigma,
+        n_shots=imaging.n_shots_avg,
+        seed=seed_int)
+
+    # 4. Summary statistics (v0 minimal — extended in §2).
+    populations = Dict{Int, Float64}(m => sum(dens) for (m, dens) in tof_dict)
+    total_od = sum(ensemble.mean)
+
+    # 5. Per-pixel Gaussian log-likelihood closure (diagonal Σ for v0; fringe
+    # covariance to be added once basis is calibrated against experiment).
+    # `log_likelihood_kernel` is NOT persisted to JLD2 (Function fallback in
+    # `_write_jld2_value!` silently skips it); it lives in the returned
+    # NamedTuple for direct call from Fisher/SBI Julia drivers.
+    mean_img = ensemble.mean
+    var_floor = max(1e-12, 1e-6 * (total_od / length(mean_img))^2)
+    sigma_per_pixel = sqrt.(ensemble.var .+ var_floor)
+    log_likelihood_kernel = function (image_exp::AbstractMatrix)
+        size(image_exp) == size(mean_img) || throw(
+            DimensionMismatch(
+                "image_exp size $(size(image_exp)) ≠ sim mean size $(size(mean_img))"),
+        )
+        s = 0.0
+        @inbounds for i in eachindex(mean_img)
+            r = (Float64(image_exp[i]) - mean_img[i]) / sigma_per_pixel[i]
+            s += r * r
+        end
+        -0.5 * s
+    end
+
+    (
+        od_image=Float32.(mean_img),
+        od_var=Float32.(ensemble.var),
+        populations=populations,
+        total_od=total_od,
+        view_geometry=imaging.view_geometry,
+        sigma_eff_table=sigma_eff_vec,
+        log_likelihood_kernel=log_likelihood_kernel,
+    )
+end
+
 function _analyze_momentum_distribution(psi, grid, atom, params, ws_prev)
     F = atom.F
     ndim = length(grid.config.n_points)

@@ -55,6 +55,8 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev=nothing,
         return _analyze_absorption_image(psi, grid, atom, params, ws_prev)
     elseif name == :sg_tof
         return _analyze_sg_tof(psi, grid, atom, params, ws_prev)
+    elseif name == :forward_image
+        return _analyze_forward_image(psi, grid, atom, params, ws_prev)
     elseif name == :domain_analysis
         return _analyze_domain_analysis(psi, grid, atom, params, ws_prev)
     elseif name == :skyrmion_density
@@ -105,7 +107,8 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev=nothing,
     _known =
         "tomography, faraday, energy_decomposition, phase_classify, " *
         "phase_classify_distance, stability, bogoliubov, multipole_order, " *
-        "winding_map, absorption_image, sg_tof, domain_analysis, skyrmion_density, " *
+        "winding_map, absorption_image, sg_tof, forward_image, " *
+        "domain_analysis, skyrmion_density, " *
         "phase_contrast_image, momentum_distribution, vortex_detect, " *
         "correlation_length, defect_density, kibble_zurek_stats, " *
         "bragg_spectroscopy, droplet_profile, bogoliubov_dispersion, " *

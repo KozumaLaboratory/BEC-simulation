@@ -47,7 +47,7 @@ function _save_analyzer_results!(f, result)
     analyzer_names = (:tomography, :faraday, :energy_decomposition, :phase_classify,
         :stability, :bogoliubov, :bogoliubov_mode, :bogoliubov_dispersion,
         :non_abelian_homotopy, :monopole_charge, :winding_field,
-        :droplet_profile, :synthetic_dim, :skyrmion_detect)
+        :droplet_profile, :synthetic_dim, :skyrmion_detect, :forward_image)
     for name in analyzer_names
         haskey(result, name) || continue
         val = result[name]
