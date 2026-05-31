@@ -229,6 +229,11 @@ export interface AutopilotQueueEntry {
      * For UGEBackend `:pending` means "qw on TSUBAME" (cluster queue
      * wait), `:running` means "actually executing on a compute node". */
     cluster_state: 'unknown' | 'pending' | 'running' | 'done' | 'failed'
+    /** Median historical qw-wait (seconds) for entries matching this
+     * (backend, profile). Lets the dashboard convert "≥ Nh" lower
+     * bounds into "likely ~5m + Nh" when we have enough recent data.
+     * Null when fewer than min_samples (3) entries are on record. */
+    qw_median_s: number | null
   }
   budget: { gpu_hours_realized: number }
   run_dir: string

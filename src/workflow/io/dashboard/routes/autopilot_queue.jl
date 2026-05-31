@@ -22,6 +22,17 @@ function _route_autopilot_queue(path::String)
             join(_QUEUE_STATES_JSON, "/") * "\"}")
     end
 
+    # Compute historical qw-wait medians once per request — pending /
+    # running entries will look themselves up by (backend_type, profile)
+    # so the dashboard ETA can tighten "≥ Nh" into "likely ~Nm + Nh"
+    # when we have data. Sub-millisecond at typical run counts.
+    qw_medians = try
+        historical_qw_medians(; qr=qr)
+    catch err
+        @warn "historical_qw_medians threw" exception=err
+        Dict{Tuple{Symbol, String}, Float64}()
+    end
+
     out_io = IOBuffer()
     print(out_io, "{")
     # Global flags up front so the frontend can label its actions
@@ -41,7 +52,7 @@ function _route_autopilot_queue(path::String)
         print(out_io, "\"$(st_str)\":[")
         for (i, e) in enumerate(entries)
             i > 1 && print(out_io, ",")
-            print(out_io, _entry_to_json(e))
+            print(out_io, _entry_to_json(e, qw_medians))
         end
         print(out_io, "]")
     end
@@ -49,7 +60,9 @@ function _route_autopilot_queue(path::String)
     return (200, "application/json", String(take!(out_io)))
 end
 
-function _entry_to_json(e::QueueEntry)
+function _entry_to_json(e::QueueEntry,
+    qw_medians::Dict{Tuple{Symbol, String}, Float64}=Dict{Tuple{Symbol, String}, Float64}())
+    qw_med = get(qw_medians, (e.backend_type, e.profile), nothing)
     fields = [
         "\"content_id\":\"$(e.content_id)\"",
         "\"status\":\"$(String(e.status))\"",
@@ -69,6 +82,18 @@ function _entry_to_json(e::QueueEntry)
         "\"job_id\":$(e.job_id === nothing ? "null" : "\"$(e.job_id)\"")," *
         "\"profile\":\"$(_jsonesc(e.profile))\"," *
         "\"estimated_walltime_hours\":$(e.estimated_walltime_hours)" *
+        "}",
+        # Lifecycle timestamps so the dashboard can show per-phase
+        # elapsed (queue → cluster qw → running → terminal).
+        # `qw_median_s`: historical median wait time for entries
+        # matching this (backend, profile) — lets the frontend tighten
+        # the ETA estimate for pending / cluster-qw entries.
+        "\"timing\":{" *
+        "\"dispatched_at\":$(e.dispatched_at === nothing ? "null" : "\"$(string(e.dispatched_at))\"")," *
+        "\"cluster_started_at\":$(e.cluster_started_at === nothing ? "null" : "\"$(string(e.cluster_started_at))\"")," *
+        "\"terminal_at\":$(e.terminal_at === nothing ? "null" : "\"$(string(e.terminal_at))\"")," *
+        "\"cluster_state\":\"$(String(e.cluster_state))\"," *
+        "\"qw_median_s\":$(qw_med === nothing ? "null" : qw_med)" *
         "}",
         "\"budget\":{" *
         "\"gpu_hours_realized\":$(e.gpu_hours_realized)" *

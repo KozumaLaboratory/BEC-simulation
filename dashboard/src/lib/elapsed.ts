@@ -83,13 +83,44 @@ export function entryETA(
       basis: `est ${humanizeElapsed(estMs)} − ran ${humanizeElapsed(ran)}`,
     }
   }
-  // Pending or stuck in cluster qw: compute hasn't started so we know
-  // it'll take AT LEAST est_walltime, plus an unknown qw addend.
+  // Pending or stuck in cluster qw: compute hasn't started. If we have
+  // a historical qw median for this (backend, profile), use it to
+  // tighten the estimate — otherwise fall back to the lower-bound view
+  // ("at least est_walltime, qw remaining unknown").
+  const qwMedianS = e.timing?.qw_median_s ?? null
+  if (qwMedianS !== null) {
+    const qwRemainingMs = qwAdjustedRemaining(e, qwMedianS, now)
+    return {
+      eta: humanizeElapsed(qwRemainingMs + estMs),
+      lower_bound: false,
+      basis:
+        `est compute ${humanizeElapsed(estMs)} + qw remaining ` +
+        `~${humanizeElapsed(qwRemainingMs)} (historical median ${humanizeElapsed(qwMedianS * 1000)})`,
+    }
+  }
   return {
     eta: humanizeElapsed(estMs),
     lower_bound: true,
     basis: `est compute ${humanizeElapsed(estMs)} (cluster qw remaining unknown)`,
   }
+}
+
+/** When we have a historical qw median, the remaining wait is
+ * `median - already_waited`. For :pending entries we haven't waited
+ * yet (dispatched_at not stamped), so the full median applies. For
+ * entries already in qw (dispatched but not yet running), subtract
+ * the already-elapsed qw time. Floor at 0 — a job past its median
+ * isn't going to start MORE recently. */
+function qwAdjustedRemaining(
+  e: AutopilotQueueEntry,
+  qwMedianS: number,
+  now: number,
+): number {
+  const disp = ms(e.timing?.dispatched_at ?? null)
+  const medianMs = qwMedianS * 1000
+  if (!disp) return medianMs
+  const waited = now - disp
+  return Math.max(0, medianMs - waited)
 }
 
 /** Per-phase elapsed breakdown for hover-title audit. Always

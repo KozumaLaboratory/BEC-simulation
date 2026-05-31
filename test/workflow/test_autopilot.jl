@@ -650,6 +650,41 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
                 SpinorBEC.backend_failure_reason(b, e))
         end
 
+        @testset "historical_qw_medians: per-profile median from past entries" begin
+            mktempdir() do tmp
+                hqr = SpinorBEC.QueueRoot(joinpath(tmp, "runs"))
+                mkpath(hqr.path)
+
+                function _done(cid, backend, profile, disp_s_ago, qw_s)
+                    rd = joinpath(hqr.path, cid)
+                    mkpath(rd)
+                    sp = joinpath(rd, "config.yaml")
+                    touch(sp)
+                    d = now() - Second(disp_s_ago)
+                    e = QueueEntry(cid;
+                        run_dir=rd, spec_path=sp,
+                        status=:done,
+                        backend_type=backend, profile=profile,
+                        dispatched_at=d,
+                        cluster_started_at=d + Second(qw_s),
+                        terminal_at=d + Second(qw_s + 60))
+                    SpinorBEC.save_entry!(e)
+                end
+                # 3× node_q UGE → median 120s
+                _done("histq_a1aaaaaaaaaaaa", :uge, "node_q", 7200, 60)
+                _done("histq_a2aaaaaaaaaaaa", :uge, "node_q", 5400, 120)
+                _done("histq_a3aaaaaaaaaaaa", :uge, "node_q", 3600, 180)
+                # 2× gpu_1 UGE: too few for min_samples=3 → no median
+                _done("histq_b1aaaaaaaaaaaa", :uge, "gpu_1", 7200, 30)
+                _done("histq_b2aaaaaaaaaaaa", :uge, "gpu_1", 3600, 90)
+
+                medians = SpinorBEC.historical_qw_medians(; qr=hqr)
+                @test haskey(medians, (:uge, "node_q"))
+                @test medians[(:uge, "node_q")] ≈ 120.0
+                @test !haskey(medians, (:uge, "gpu_1"))
+            end
+        end
+
         @testset "lifecycle timestamps land on dry-run entries" begin
             # Dry-run dispatch should stamp dispatched_at +
             # cluster_started_at (synthetic, both = now()) and the
