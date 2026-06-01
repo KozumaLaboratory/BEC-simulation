@@ -33,6 +33,39 @@ the lab prefers stretched for prep convenience, σ(a_S) does degrade per
 Recommendation: **use polar (q<0 pin), not stretched, for the σ(a_S) ≈
 0.05 a_B precision**. Stretched is for cross-check or convenience only.
 
+## Symmetric-mode detection requirement (essential)
+
+The first-order B-protection applies to the **symmetric (ΔM_z=0)**
+combinations of ±magnon doublets, not to individual ±1 magnons. Individual
+m=+1 and m=−1 magnons DO Larmor-split under residual Bz. The protocol must
+therefore:
+
+- Drive and detect the symmetric combination (e.g., quadrupolar drive
+  exciting `|+m⟩ + |−m⟩` symmetrically, or two-tone drive at ω_+ and ω_−
+  with equal amplitudes), NOT a single-chirality Δm transition
+- Detection coupling must also be symmetric, otherwise residual Bz
+  re-enters via the asymmetry-projection coefficient
+
+If detection biases to one chirality, the σ_B-induced split between
+±magnons gives σ_freq = `|m|·dω/dB` instead of 0; for m=±1 modes this
+reverts to single-atom Larmor scale.
+
+## Frequency-estimation gate (√N averaging)
+
+The σ_freq ≈ 0.1 Hz quoted assumes shot-noise-limited estimation:
+`σ_freq ≈ 1/(T_obs · √N)`. For N ≈ 5·10⁴ atoms, √N ≈ 220. T_obs is set
+by the K_3-driven loss floor: at K_3 ≈ 50 dimensionless (calibrated to
+Matsui's 40%/40 ms), 50% population loss happens around 40-80 ms. So
+T_obs ~ 0.04 s gives `σ_freq ≈ 1/(0.04 × 220) ≈ 0.11 Hz`. **The √N
+averaging works only because the polar protection eliminates the
+shot-to-shot Bz jitter that would otherwise destroy ensemble averaging.**
+
+This connects two findings tightly:
+- Polar protection enables √N estimation
+- Lab K_3 (Matsui-calibrated) sets T_obs and thus √N reachability
+
+Both must hold for the 0.1 Hz σ_freq to be defensible.
+
 ## Protocol
 
 1. **Prepare polar (m=0) ground state**, pinned by negative quadratic
