@@ -1,5 +1,20 @@
 # ¹⁵¹Eu Bogoliubov spectroscopy → scattering-length determination
 
+**Honest framing (2026-06-02 close)**
+
+This document describes a **proposed protocol**, not a completed
+measurement. The σ(a_S) ≈ 0.05 a_B figure is the *expected precision* if
+the protocol is executed; c determination is not finished until the
+lab runs the polar-magnon spectroscopy described below, or until Matsui's
+existing ring-count data is independently used to extract c_1.
+
+Remaining caveats (√N reachable at T_obs ≈ 40 ms, symmetric-mode
+detection actually couples to the symmetric combinations) are
+**experimental feasibility questions for the lab**, not theory gaps.
+Theory-side protocol hardening reaches diminishing returns at this point;
+the project's downstream goal (Eu ground-state phase diagram, item ⑥)
+is the value-bearing next step, not further protocol refinement.
+
 **Magnetic-jitter check (2026-06-02): polar GS is FIRST-ORDER B-PROTECTED.**
 
 Initial worry: Bogoliubov c-sensitive modes (11/12/15/16) inherit a
@@ -20,10 +35,24 @@ polar collective modes used here.
 
 Caveat: quadratic Zeeman q couples through `⟨F_z²⟩` (m²-dependent, NOT
 m → −m symmetric). At static q ≈ -2 used for polar pinning, `dω/dq` is
-non-zero. Residual q-jitter from a ±1 nT Bz fluctuation is
-`dq/dB·σ_B ≈ B/B_typical × q_pin`, which for typical Eu parameters is
-~10⁻³ × q ≈ small. The polar configuration thus survives ~1 nT shielded-
-lab residuals with σ_freq ≈ 0.1 Hz intrinsic-limited.
+non-zero. The q-jitter residual depends on HOW q is pinned:
+
+- **Default: microwave-dressed q-pin (no static Bz bias).** Δq from σ_B = 1 nT
+  is σ_B² leakage ⇒ σ_freq ≈ 1×10⁻⁸ dimensionless (5 orders below intrinsic
+  0.1 Hz). m→−m doublets remain degenerate at p=0; first-order protection holds.
+  **Use this regime for the precision target.**
+- **Fallback: static-Bz q-pin (B_bias ~ 12 μT for q=−2).** Δq linear in σ_B
+  ⇒ q-channel itself contributes only 0.025 Hz at the c-sensitive modes, but
+  the static B_bias = 12 μT *Larmor-splits the ±magnon pair by ~400 kHz*,
+  physically breaking the m→−m degeneracy. The 9×10⁻¹² Hz/nT first-order
+  result for case (a) does NOT apply here. Re-protection requires
+  **simultaneous common-mode rejection** of the two members of the doublet
+  (single-shot acquisition of both ω_+m and ω_−m, then averaging); sequential
+  measurement re-exposes 17 Hz/nT × |m| Larmor floor and the precision
+  collapses to stretched-comparable scale. Additionally, the 12 μT linear
+  Zeeman (≈ 204 kHz) must still be < |q|·F² (the polar quadratic stabiliser)
+  to keep polar as the ground state. Use only if (i) common-mode detection
+  is available and (ii) the polar stability bound is verified.
 
 **Stretched (m=±F) does NOT have this protection.** Modes around
 stretched do feel linear Zeeman p (single-atom Larmor slope applies). If
@@ -168,10 +197,25 @@ GS pinned by strong linear Zeeman p:
 
 ## Next steps (next session)
 
-- Confirm 2↔3 ring discrimination at T=40 ms / 24³ grid /
-  K_3 m-dependent calibrated. In flight as
-  `scripts/sprint5_matsui_ring_extended.jl`.
-- Joint Fisher polar + stretched (52 obs / 5 params) for the
-  independence-vs-redundancy verdict.
-- Whether the lab can stabilise Bz to < 100 nT and prepare polar at
-  q < 0 are the only experimental open questions.
+Theory side — protocol is closed; downstream physics is the next move:
+
+- **⑥ Phase diagram**: translate σ(a_S) ≈ 0.05 a_B into phase
+  discrimination. Map the GP ground-state phase boundaries in the
+  6-D unknown-a_S subspace (a_12 fixed). Compute the smallest a_S
+  separation between competing phases (polar / cyclic / FM / I_h);
+  σ(a_S) < that separation ⇒ phase is unambiguously determined by the
+  protocol. Where boundaries are nearly degenerate, LHY / TDHFB
+  corrections may decide — that's the natural place for the
+  beyond-mean-field code paths already in the codebase.
+- **Matsui ring path** (`scripts/sprint5_matsui_ring_extended.jl`,
+  in flight): independently extract c_1 from the dynamics ring-count
+  observable (2 vs 3 rings at m=−4). Two-route consistency of c_1
+  (spectroscopy ↔ ring count) is the cleanest cross-check.
+
+Experimental side (lab to judge):
+
+- Whether √N estimation reaches σ_freq ≈ 0.1 Hz at T_obs ~ 40 ms
+  (K_3-loss limited) with detection SNR.
+- Whether symmetric-mode drive/detection is implementable.
+- Whether the lab can stabilise Bz to ~ 1 nT and prepare polar via
+  microwave-dressed q < 0 pin.
