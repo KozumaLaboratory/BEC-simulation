@@ -111,4 +111,36 @@ using SpinorBEC: fisher_jacobian, fisher_information, identifiable_directions
         @test_throws DimensionMismatch identifiable_directions(fish;
             param_names=["only_one"])
     end
+
+    @testset "Absolute cutoff rescues prior-conditioned subspace" begin
+        # Synthetic: one giant direction (λ=1e6, like a prior-pinned axis)
+        # plus a small but informative direction (λ=100, σ_post=0.1).
+        # Relative cutoff 1e-4 rejects the small direction; absolute cutoff
+        # at 1e-3 keeps it (1e-3 << 100). The script-level "rank=1" trap is
+        # avoided.
+        I_mat = Diagonal([1e6, 100.0])
+        fish = (matrix=Matrix(I_mat),
+            eigenvalues=[100.0, 1e6],
+            eigenvectors=Matrix{Float64}(I, 2, 2))
+
+        # Default: relative cutoff only ⇒ rank 1 (the trap)
+        ident_rel = identifiable_directions(fish; cutoff_ratio=1e-4)
+        @test ident_rel.measurable_count == 1
+
+        # Absolute cutoff at 1e-3 ⇒ rank 2 (informative direction recovered)
+        ident_abs = identifiable_directions(fish;
+            cutoff_ratio=1e-4, cutoff_absolute=1e-3)
+        @test ident_abs.measurable_count == 2
+        @test all(isfinite, ident_abs.posterior_sigma)
+
+        # posterior_sigma_absolute is always populated independently
+        @test ident_rel.posterior_sigma_absolute ≈ [0.1, 1e-3] atol = 1e-12
+        @test ident_abs.posterior_sigma_absolute ≈ [0.1, 1e-3] atol = 1e-12
+
+        # Absolute cutoff above all eigenvalues ⇒ rank 0 (still backward-compat
+        # if user wants stricter)
+        ident_strict = identifiable_directions(fish;
+            cutoff_ratio=10.0, cutoff_absolute=1e10)
+        @test ident_strict.measurable_count == 0
+    end
 end

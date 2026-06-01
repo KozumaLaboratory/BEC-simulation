@@ -83,52 +83,87 @@ function fisher_information(J::AbstractMatrix, sigma_y::AbstractVector{<:Real})
 end
 
 """
-    identifiable_directions(fisher; cutoff_ratio=1e-3, param_names=nothing)
-        -> NamedTuple
+    identifiable_directions(fisher; cutoff_ratio=1e-3, cutoff_absolute=0.0,
+                            param_names=nothing) -> NamedTuple
 
-Classify each Fisher eigenvector as identifiable (eigenvalue / max > cutoff_ratio)
-or null. For identifiable directions, posterior 1σ width is 1/√eigenvalue;
-for null directions it is `Inf`.
+Classify each Fisher eigenvector as identifiable or null. A direction is
+identifiable iff its eigenvalue passes EITHER cutoff:
+- `cutoff_ratio`: relative threshold `λ_i / max(λ) > cutoff_ratio`. Default
+  1e-3. Catches directions that are well-conditioned relative to the
+  dominant direction.
+- `cutoff_absolute`: absolute eigenvalue threshold `λ_i > cutoff_absolute`.
+  Default 0.0 (disabled). When set to the inverse-square of a meaningful
+  prior precision (e.g. `(1/σ_prior)^2`), this avoids the
+  "relative-cutoff trap" where a single large eigenvalue (a tightly
+  prior-constrained direction like a known scattering length) wipes out
+  other directions that *are* informative against the prior baseline.
+
+Always pass `cutoff_absolute = 1 / σ_prior²` for prior-aware Fisher
+classification in physics applications. The relative cutoff alone
+silently mis-reports "rank=1" when one eigenvalue (a known/prior-pinned
+direction) dwarfs informative-but-smaller eigenvalues by orders of
+magnitude.
+
+The posterior σ is always reported as `1/√λ_i` (the Cramér-Rao bound for
+that direction); `Inf` is only assigned when the eigenvalue is < both
+cutoffs.
 
 Returns:
 - `measurable_count`: number of identifiable eigenvectors
 - `eigenvalues`, `eigenvectors`: pass-through from `fisher`
 - `is_identifiable::Vector{Bool}`: per-eigenvector flag
-- `posterior_sigma::Vector{Float64}`: σ for identifiable, Inf for null
-- `summary::String`: human-readable line listing each direction with its
-  dominant parameter (if `param_names` provided).
+- `posterior_sigma::Vector{Float64}`: 1/√λ for identifiable, Inf for null
+- `posterior_sigma_absolute::Vector{Float64}`: 1/√λ unconditionally, so
+  the operator can compare against an external prior precision after-the-fact
+- `summary::String`: human-readable summary (uses `param_names` if given)
 """
 function identifiable_directions(
     fisher::NamedTuple; cutoff_ratio::Real=1e-3,
+    cutoff_absolute::Real=0.0,
     param_names::Union{Nothing, AbstractVector{<:AbstractString}}=nothing,
 )
     evals = Float64.(fisher.eigenvalues)
     evecs = Matrix{Float64}(fisher.eigenvectors)
     n_par = length(evals)
     evmax = maximum(evals)
-    is_identifiable = (evals ./ max(evmax, eps(Float64))) .> cutoff_ratio
+    pass_rel = (evals ./ max(evmax, eps(Float64))) .> cutoff_ratio
+    # cutoff_absolute > 0 enables the absolute test; default 0 = disabled
+    # (otherwise all positive eigenvalues would pass and override the
+    # relative cutoff).
+    is_identifiable = cutoff_absolute > 0 ?
+                      (pass_rel .| (evals .> cutoff_absolute)) :
+                      pass_rel
     n_meas = sum(is_identifiable)
-    posterior_sigma = [is_identifiable[i] ? 1 / sqrt(evals[i]) : Inf
+    posterior_sigma_absolute = [evals[i] > 0 ? 1 / sqrt(evals[i]) : Inf
+                                for i in 1:n_par]
+    posterior_sigma = [is_identifiable[i] ? posterior_sigma_absolute[i] : Inf
                        for i in 1:n_par]
+    cutoff_str = if cutoff_absolute > 0
+        "ratio=$cutoff_ratio OR absolute=$cutoff_absolute"
+    else
+        "ratio=$cutoff_ratio"
+    end
     summary_str = if param_names === nothing
-        "measurable rank = $n_meas / $n_par (cutoff ratio = $cutoff_ratio)"
+        "measurable rank = $n_meas / $n_par (cutoff $cutoff_str)"
     else
         length(param_names) == n_par || throw(
             DimensionMismatch(
                 "param_names length $(length(param_names)) ≠ n_params $n_par"),
         )
-        lines = String["measurable rank = $n_meas / $n_par (cutoff ratio = $cutoff_ratio)"]
+        lines = String["measurable rank = $n_meas / $n_par (cutoff $cutoff_str)"]
         for i in 1:n_par
             v = view(evecs, :, i)
             dom_idx = argmax(abs.(v))
             tag = is_identifiable[i] ? "MEAS" : "NULL"
+            σabs = round(posterior_sigma_absolute[i]; sigdigits=3)
             push!(lines,
-                "  [$tag] eigval=$(round(evals[i]; sigdigits=3)) σ=$(round(posterior_sigma[i]; sigdigits=3)) dominant=$(param_names[dom_idx])",
+                "  [$tag] eigval=$(round(evals[i]; sigdigits=3)) σ_abs=$σabs dominant=$(param_names[dom_idx])",
             )
         end
         join(lines, "\n")
     end
     (measurable_count=n_meas, eigenvalues=evals, eigenvectors=evecs,
         is_identifiable=is_identifiable, posterior_sigma=posterior_sigma,
+        posterior_sigma_absolute=posterior_sigma_absolute,
         summary=summary_str)
 end
