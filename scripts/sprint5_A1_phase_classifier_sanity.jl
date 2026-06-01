@@ -57,9 +57,9 @@ function summarise(ws, E)
     D = 2F_loc + 1
     # Per-m populations
     n_per_m = Float64[sum(abs2, view(psi, :, c)) * dV for c in 1:D]
-    # ⟨F_z⟩
-    Mz_density = SpinorBEC.spin_density_z(psi, sm, 1)
-    Mz_total = sum(Mz_density) * dV
+    # ⟨F_z⟩ (use the codebase's magnetization observable)
+    sys = SpinSystem(F_loc)
+    Mz_total = SpinorBEC.magnetization(psi, ws.grid, sys)
     # Phase classifier
     phase_info = SpinorBEC.classify_phase_detailed(psi, F_loc, ws.grid, sm)
     (E=E, Mz=Mz_total, n_per_m=n_per_m, phase=phase_info)
