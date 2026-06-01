@@ -36,6 +36,7 @@ const FAST_TESTS = [
     "test_level0_gpu_cpu_consistency.jl",
     "analysis/test_faraday.jl",
     "analysis/test_sign_pattern.jl",
+    "analysis/test_polyhedral_classifier.jl",
     "workflow/test_phi_omega_convention.jl",
     "workflow/test_schema_validation_edge_cases.jl",
     "workflow/test_calibration_edge_cases.jl",

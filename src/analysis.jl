@@ -47,3 +47,4 @@ include("analysis/phases/bogoliubov.jl")
 include("analysis/phases/bogoliubov/scan.jl")
 include("analysis/phases/sign_pattern.jl")  # Paper #3 §VI Sign Pattern Lemma 1
 include("analysis/phases/F6_phase_diagram.jl")  # Paper #2 (g_10, g_12) scan
+include("analysis/phases/polyhedral_classifier.jl")  # σ_S fingerprint classifier + direct ΔE
