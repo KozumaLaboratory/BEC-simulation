@@ -13,7 +13,7 @@
 # experimental knobs (interferometer fringes, microwave Feshbach, alternate
 # trap geometry) are needed.
 
-using LinearAlgebra: Diagonal, Symmetric, eigen, svd
+using LinearAlgebra: Diagonal, Symmetric, eigen
 
 export fisher_jacobian, fisher_information, identifiable_directions
 
