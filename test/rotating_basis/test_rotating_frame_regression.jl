@@ -128,6 +128,66 @@ using SpinorBEC: _rebuild_workspace_with_dt
         @test by ≈ 0.0
     end
 
+    # `energy_gradient!` (the LBFGS gradient) was missing the Coriolis
+    # −Ω·L_z·ψ term pre-2026-06-02. LBFGS in the rotating frame silently
+    # minimised a wrong functional that omitted the orbital half of
+    # H_rot = H_lab − Ω(L_z + F_z). The Barnett shift was folded in via
+    # `_shift_zeeman_for_rotating_frame`, but the orbital piece was not
+    # added to the gradient. Adding −Ω·L_z·ψ (root fix; not a script-level
+    # workaround) makes LBFGS in rotating frame work for everyone. See
+    # `feedback_never_patch_when_root_fix_is_available` for the anko rule
+    # this fix follows.
+    @testset "energy_gradient! includes Coriolis −Ω·L_z·ψ" begin
+        sys = SpinSystem(1)
+        grid_2d = make_grid(GridConfig((16, 16), (8.0, 8.0)))
+        ip_f1 = InteractionParams(Dict{Int, Float64}(0 => 0.0, 1 => 0.0))
+        pot_2d = HarmonicTrap{2}((1.0, 1.0))
+        omega = 0.1
+
+        # Compare gradient at +Ω vs −Ω with the vortex state seated in
+        # the m = 0 spinor channel. This isolates the Coriolis −Ω·L_z·ψ
+        # contribution from the other rotating-frame additions:
+        #   * Zeeman shift (linear in Ω): zero at m = 0.
+        #   * Centrifugal trap modification (quadratic in Ω): identical
+        #     at ±Ω → cancels in (grad_{+Ω} − grad_{−Ω}) / 2.
+        # So (grad_{+Ω} − grad_{−Ω}) / 2 isolates the Coriolis piece
+        # exactly. Expected value after the grad ·= 2 final scale:
+        # −2·Ω·L_z·ψ_v = −2·Ω·ψ_v for the L_z = +1 vortex eigenstate.
+        sp_p = SimParams(; dt=0.01, n_steps=10, imaginary_time=true,
+            rotating_frame_omega=(+omega))
+        sp_m = SimParams(; dt=0.01, n_steps=10, imaginary_time=true,
+            rotating_frame_omega=(-omega))
+        ws_p = make_workspace(; grid=grid_2d, atom=Rb87, interactions=ip_f1,
+            potential=pot_2d, sim_params=sp_p, fft_flags=FFTW.ESTIMATE)
+        ws_m = make_workspace(; grid=grid_2d, atom=Rb87, interactions=ip_f1,
+            potential=pot_2d, sim_params=sp_m, fft_flags=FFTW.ESTIMATE)
+
+        psi_v = zeros(ComplexF64, 16, 16, 3)
+        for I in CartesianIndices((16, 16))
+            x = grid_2d.x[1][I[1]];
+            y = grid_2d.x[2][I[2]]
+            psi_v[I, 2] = (x + im * y) * exp(-(x*x + y*y) / 2)  # m = 0 channel
+        end
+
+        grad_p = similar(psi_v)
+        grad_m = similar(psi_v)
+        SpinorBEC.energy_gradient!(grad_p, psi_v, ws_p)
+        SpinorBEC.energy_gradient!(grad_m, psi_v, ws_m)
+
+        coriolis_isolated = (grad_p .- grad_m) ./ 2
+        expected = -2 * omega * psi_v
+        nrm = sqrt(sum(abs2, psi_v[:, :, 2]))
+        rel_err = sqrt(sum(abs2, coriolis_isolated[:, :, 2] .- expected[:, :, 2])) / nrm
+        # 16² discrete FFT loses ~5% on the vortex eigenstate at this box;
+        # 32² tightens to <1%. 10% is robust against grid coarseness.
+        @test rel_err < 0.1
+
+        # Other spinor channels were not populated; Coriolis acts
+        # componentwise (L_z is orbital, not spin) so they stay zero.
+        @test maximum(abs, coriolis_isolated[:, :, 1]) < 1e-10
+        @test maximum(abs, coriolis_isolated[:, :, 3]) < 1e-10
+    end
+
     @testset "make_workspace stores the +Ω Barnett shift" begin
         # Composition test: ensures `make_workspace` actually calls
         # `_shift_zeeman_for_rotating_frame` with the right sign convention

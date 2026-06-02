@@ -21,7 +21,9 @@ using Printf
 # a fresh CuArray that the CUDA memory pool kept growing for, leading to
 # 30 GB RSS at 1000 LBFGS steps before this fix).
 # Keyed by (typeof(psi), spatial_n_pts). Single-threaded Julia assumption.
-const _ENERGY_GRADIENT_SCRATCH = IdDict{Any, NTuple{4, AbstractArray}}()
+# The 5th buffer is the Coriolis derivative scratch (∂_x ψ or ∂_y ψ) used
+# when `rotating_frame_omega ≠ 0`.
+const _ENERGY_GRADIENT_SCRATCH = IdDict{Any, NTuple{5, AbstractArray}}()
 
 function _energy_gradient_scratch(psi, n_pts)
     key = (typeof(psi), n_pts)
@@ -32,20 +34,47 @@ function _energy_gradient_scratch(psi, n_pts)
             similar(psi, Float64, n_pts),     # fx scratch
             similar(psi, Float64, n_pts),     # fy scratch
             similar(psi, Float64, n_pts),     # fz scratch
+            similar(psi, ComplexF64, n_pts),  # coriolis derivative scratch
         )
         _ENERGY_GRADIENT_SCRATCH[key] = sc
     end
     return sc
 end
 
+# Build a device-resident, broadcast-shaped view of a CPU-side coordinate
+# or wavenumber vector onto a single axis of an N-dim spatial array. Used
+# by the Coriolis gradient term. CPU path returns a `reshape` of the
+# original vector (zero-copy); GPU path copies once to the device. The
+# result is a singleton-padded ND array suitable for broadcasting against
+# `fft_buf` (and the spinor `grad` view per component).
+function _coord_broadcast(template::AbstractArray, vec::AbstractVector, axis::Int)
+    N = ndims(template)
+    shape = ntuple(d -> d == axis ? length(vec) : 1, N)
+    if template isa Array
+        return reshape(vec, shape)
+    else
+        dev = copyto!(similar(template, eltype(vec), length(vec)), vec)
+        return reshape(dev, shape)
+    end
+end
+
 """
     energy_gradient!(grad, psi, ws; k_squared_dev) → E
 
 Compute δE/δψ* = H_eff ψ and return total energy.
-The gradient includes kinetic, trap, contact, LHY, spin, and DDI terms.
 
-`k_squared_dev` must live on the same device as `psi` (defaults to `ws.grid.k_squared`,
-which only works on CPU). L-BFGS on GPU should pass a device-resident copy.
+Covered terms: kinetic, trap (incl. centrifugal modification when
+`rotating_frame_omega ≠ 0`), Zeeman (incl. Barnett shift when
+`rotating_frame_omega ≠ 0`), c₀, LHY, c₁ spin, light shift, DDI, and
+the Coriolis `−Ω·L_z·ψ` orbital piece of the rotating-frame functional.
+
+NOT covered: c₂ singlet-pair and tensor-cache higher-rank channels
+(c₄, c₆, …). For those, `find_ground_state_lbfgs` emits a warning and
+the caller should fall back to ITP.
+
+`k_squared_dev` must live on the same device as `psi` (defaults to
+`ws.grid.k_squared`, which only works on CPU). L-BFGS on GPU should
+pass a device-resident copy.
 """
 function energy_gradient!(
     grad::AbstractArray{<:Complex},
@@ -68,7 +97,9 @@ function energy_gradient!(
     # --- Kinetic: (-∇²/2) ψ via FFT ---
     # Scratch reused across LBFGS iterations (avoids ~0.5 MB/call leak that
     # OOMs at 1000+ LBFGS steps on GPU). Keyed by (typeof, spatial_size).
-    fft_buf, _fx_scratch, _fy_scratch, _fz_scratch = _energy_gradient_scratch(psi, n_pts)
+    fft_buf, _fx_scratch, _fy_scratch, _fz_scratch, deriv_buf = _energy_gradient_scratch(
+        psi, n_pts
+    )
     for c in 1:D
         idx = _component_slice(N, n_pts, c)
         fft_buf .= view(psi, idx...)
@@ -76,6 +107,36 @@ function energy_gradient!(
         fft_buf .*= (0.5 .* k_squared_dev)
         ws.fft_plans.inverse * fft_buf
         view(grad, idx...) .+= fft_buf
+    end
+
+    # --- Coriolis: −Ω·L_z·ψ ---
+    # L_z = −i(x·∂_y − y·∂_x); δE_cor/δψ* = +iΩ·(x·∂_y − y·∂_x)·ψ.
+    # Closes the rotating-frame functional alongside the Barnett shift
+    # (already folded into ws.zeeman via `_shift_zeeman_for_rotating_frame`
+    # at workspace construction) and the centrifugal trap modification
+    # (already in ws.potential_values). Pre-2026-06-02 this term was
+    # absent — LBFGS in rotating frame silently minimised the wrong
+    # functional. See [[feedback_never_patch_when_root_fix_is_available]].
+    Ω = ws.sim_params.rotating_frame_omega
+    if abs(Ω) > 1e-15 && N >= 2
+        x_bcast = _coord_broadcast(fft_buf, grid.x[1], 1)
+        y_bcast = _coord_broadcast(fft_buf, grid.x[2], 2)
+        kx_bcast = _coord_broadcast(fft_buf, grid.k[1], 1)
+        ky_bcast = _coord_broadcast(fft_buf, grid.k[2], 2)
+        iΩ = im * Ω
+        for c in 1:D
+            idx = _component_slice(N, n_pts, c)
+            fft_buf .= view(psi, idx...)
+            ws.fft_plans.forward * fft_buf
+            # +iΩ · x · ∂_y ψ
+            deriv_buf .= fft_buf .* (im .* ky_bcast)
+            ws.fft_plans.inverse * deriv_buf
+            view(grad, idx...) .+= iΩ .* x_bcast .* deriv_buf
+            # −iΩ · y · ∂_x ψ
+            deriv_buf .= fft_buf .* (im .* kx_bcast)
+            ws.fft_plans.inverse * deriv_buf
+            view(grad, idx...) .-= iΩ .* y_bcast .* deriv_buf
+        end
     end
 
     # --- Trap potential: V_trap ψ ---

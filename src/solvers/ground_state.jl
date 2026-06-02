@@ -139,7 +139,7 @@ function find_ground_state(;
             n_steps, tol, initial_state, init_state_params, psi_init,
             enable_ddi, c_dd, secular_ddi, quasi_2d_ddi, l_z_ddi,
             target_magnetization, backend, m_lbfgs, verbose, light_shift,
-            dtype, sobolev_alpha,
+            dtype, sobolev_alpha, rotating_frame_omega,
         )
     end
     method === :strang || throw(

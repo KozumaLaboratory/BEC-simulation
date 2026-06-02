@@ -29,6 +29,7 @@ function find_ground_state_lbfgs(;
     light_shift::Union{Nothing, LightShift}=nothing,
     dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
     sobolev_alpha::Float64=0.0,
+    rotating_frame_omega::Float64=0.0,
 )
     # F32 gradient norm floors around unit roundoff (~1e-7 scaled by grid dV).
     # Relax the default convergence test so F32 runs don't burn all n_steps.
@@ -71,7 +72,8 @@ function find_ground_state_lbfgs(;
             psi_init = init_psi(grid, sys; init_kwargs...)
         end
         sp = SimParams(; dt=0.001, n_steps, imaginary_time=true,
-            save_every=max(1, n_steps ÷ 100))
+            save_every=max(1, n_steps ÷ 100),
+            rotating_frame_omega=rotating_frame_omega)
         ws = make_workspace(;
             grid, atom, interactions, zeeman, potential,
             sim_params=sp, psi_init,
@@ -235,11 +237,22 @@ function find_ground_state_lbfgs(;
     copyto!(ws.state.psi, psi)
     E_final = total_energy(ws)
 
+    # Recompute the physical residual at the final point so callers can
+    # gate verdict claims on ‖∇E‖ without having to plumb `k_squared_dev`
+    # to the device themselves. Same expression LBFGS uses internally for
+    # its convergence test (line 130). `grad` may still hold the
+    # preconditioned direction from the last accepted step, so refill it
+    # cleanly before measuring.
+    E_at_final = energy_gradient!(grad, psi, ws; k_squared_dev)
+    _project_constraints!(grad, psi, grid, target_magnetization, F)
+    grad_norm_final = sqrt(real(sum(abs2, grad)) * dV)
+
     (
         workspace=ws,
         converged=converged,
         energy=E_final,
         dE=abs(E_final - E_prev),
+        grad_norm=grad_norm_final,
         last_step=last_step,
     )
 end
