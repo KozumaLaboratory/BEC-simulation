@@ -80,6 +80,36 @@ function _apply_coriolis_step!(
     nothing
 end
 
+"""
+Apply diagonal phase `psi .*= imaginary_time ? exp.(arg) : cis.(arg)` where
+`arg = factor * coord_vals[I[coord_dim]] * k_vals[I[fft_dim]]`. CPU uses the
+direct scalar loop (cache-friendly); GPU uses reshape/broadcast (the scalar
+loop scalar-indexes a CuArray and crashes — see gotcha memo).
+"""
+function _shear_phase!(psi, coord_vals, k_vals, fft_dim::Int, coord_dim::Int,
+    factor::Float64, imaginary_time::Bool)
+    if psi isa Array
+        @inbounds for I in CartesianIndices(size(psi))
+            arg = factor * coord_vals[I[coord_dim]] * k_vals[I[fft_dim]]
+            psi[I] *= imaginary_time ? exp(arg) : cis(arg)
+        end
+    else
+        ndim_psi = ndims(psi)
+        coord_dev = copyto!(similar(psi, Float64, length(coord_vals)), coord_vals)
+        k_dev = copyto!(similar(psi, Float64, length(k_vals)), k_vals)
+        coord_shape = ntuple(d -> d == coord_dim ? length(coord_vals) : 1, ndim_psi)
+        k_shape = ntuple(d -> d == fft_dim ? length(k_vals) : 1, ndim_psi)
+        coord_r = reshape(coord_dev, coord_shape)
+        k_r = reshape(k_dev, k_shape)
+        if imaginary_time
+            psi .*= exp.(factor .* coord_r .* k_r)
+        else
+            psi .*= cis.(factor .* coord_r .* k_r)
+        end
+    end
+    nothing
+end
+
 function _apply_1d_shear_batch!(
     psi::AbstractArray{<:Complex},
     coord_vals::Vector{Float64},
@@ -92,12 +122,7 @@ function _apply_1d_shear_batch!(
     abs(factor) < 1e-30 && return nothing
 
     psi_k = fft(psi, fft_dim)
-
-    @inbounds for I in CartesianIndices(size(psi_k))
-        arg = factor * coord_vals[I[coord_dim]] * k_vals[I[fft_dim]]
-        psi_k[I] *= imaginary_time ? exp(arg) : cis(arg)
-    end
-
+    _shear_phase!(psi_k, coord_vals, k_vals, fft_dim, coord_dim, factor, imaginary_time)
     psi .= ifft(psi_k, fft_dim)
     nothing
 end
@@ -116,12 +141,7 @@ function _apply_1d_shear_batch!(
     abs(factor) < 1e-30 && return nothing
 
     fwd_plan * psi
-
-    @inbounds for I in CartesianIndices(size(psi))
-        arg = factor * coord_vals[I[coord_dim]] * k_vals[I[fft_dim]]
-        psi[I] *= imaginary_time ? exp(arg) : cis(arg)
-    end
-
+    _shear_phase!(psi, coord_vals, k_vals, fft_dim, coord_dim, factor, imaginary_time)
     inv_plan * psi
     nothing
 end

@@ -57,6 +57,13 @@ function orbital_angular_momentum(
     dpsi_x = zeros(ComplexF64, n_pts)
     dpsi_y = zeros(ComplexF64, n_pts)
 
+    # psi_k is always a CPU Array (from `zeros`); ensure plans match the
+    # CPU array, not whatever backend `plans` was originally created for.
+    # When called with `ws.fft_plans` from a GPU workspace, those are
+    # CUFFT plans and applying them to a CPU array triggers massive
+    # implicit transfers (saw 30 GB RSS spike at 24³ × D=13 before fix).
+    local_plans = make_fft_plans(n_pts; flags=FFTW.ESTIMATE)
+
     Lz = 0.0
 
     for c in 1:n_comp
@@ -64,14 +71,14 @@ function orbital_angular_momentum(
         psi_c = view(psi, idx...)
 
         psi_k .= psi_c
-        plans.forward * psi_k
+        local_plans.forward * psi_k
 
         @inbounds for I in CartesianIndices(n_pts)
             dpsi_x[I] = im * grid.k[1][I[1]] * psi_k[I]
             dpsi_y[I] = im * grid.k[2][I[2]] * psi_k[I]
         end
-        plans.inverse * dpsi_x
-        plans.inverse * dpsi_y
+        local_plans.inverse * dpsi_x
+        local_plans.inverse * dpsi_y
 
         @inbounds for I in CartesianIndices(n_pts)
             x = grid.x[1][I[1]]
