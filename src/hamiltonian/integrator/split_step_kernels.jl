@@ -94,13 +94,8 @@ function _shear_phase!(psi, coord_vals, k_vals, fft_dim::Int, coord_dim::Int,
             psi[I] *= imaginary_time ? exp(arg) : cis(arg)
         end
     else
-        ndim_psi = ndims(psi)
-        coord_dev = copyto!(similar(psi, Float64, length(coord_vals)), coord_vals)
-        k_dev = copyto!(similar(psi, Float64, length(k_vals)), k_vals)
-        coord_shape = ntuple(d -> d == coord_dim ? length(coord_vals) : 1, ndim_psi)
-        k_shape = ntuple(d -> d == fft_dim ? length(k_vals) : 1, ndim_psi)
-        coord_r = reshape(coord_dev, coord_shape)
-        k_r = reshape(k_dev, k_shape)
+        coord_r = _axis_broadcast(psi, coord_vals, coord_dim)
+        k_r = _axis_broadcast(psi, k_vals, fft_dim)
         if imaginary_time
             psi .*= exp.(factor .* coord_r .* k_r)
         else
