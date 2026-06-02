@@ -24,48 +24,29 @@ end
 const T0 = time()
 mark(s) = @printf "[%6.1fs RSS=%5d] %s\n" (time() - T0) rss_mb() s
 
-const F = 6
-const ATOM = SpinorBEC.Eu151
-const N_ATOMS = 50000
-const OMEGA_REF = 691.15
-const A_HO = sqrt(SpinorBEC.Units.HBAR / (ATOM.mass * OMEGA_REF))
-const C_TOTAL = 4π * (ATOM.a_s / A_HO) * N_ATOMS
-const C0 = C_TOTAL / (1 + F^2 / 36.0)
-const C1 = C0 / 36.0
-const C_DD = SpinorBEC.compute_c_dd_dimless(ATOM; N_atoms=N_ATOMS, omega_ref=OMEGA_REF)
-const GRID = make_grid(GridConfig((24, 24, 24), (30.0, 30.0, 26.0)))
-const POT = HarmonicTrap{3}((1.0, 1.0, 1.1818))
+include(joinpath(@__DIR__, "lib", "eu_digital_twin.jl"))
 
-# M1-ITP-style helper functions (the suspects)
+const TW = eu_digital_twin()
+
 function build_seed(state::Symbol, grid)
-    sys = SpinSystem(F)
+    sys = SpinSystem(TW.F)
     return init_psi(grid, sys; state=state)
 end
 
-function apply_noise!(psi::AbstractArray, amp::Float64, seed::Int, grid)
-    rng = MersenneTwister(seed)
-    @inbounds for i in eachindex(psi)
-        psi[i] += amp * (randn(rng) + im * randn(rng))
-    end
-    n = sqrt(sum(abs2, psi) * SpinorBEC.cell_volume(grid))
-    psi ./= n
-end
-
 function run_cell(omega::Float64, B_nT::Float64, seed_state::Symbol)
-    ip = InteractionParams(Dict{Int, Float64}(0 => C0, 1 => C1))
-    p_lab = B_nT * 0.148
+    p_lab = B_nT * TW.p_per_nT
     zeeman = ZeemanParams(p_lab, 0.0)
-    psi_init = build_seed(seed_state, GRID)
-    apply_noise!(psi_init, 0.01, 1, GRID)
+    psi_init = build_seed(seed_state, TW.grid)
+    add_noise!(psi_init, 0.01, 1, TW.grid)
     initial_state_for_fgs = seed_state == :fl_vortex ? :fl_vortex : :polar
     mark("about to call find_ground_state inside run_cell")
     ws_itp, conv_itp, E_itp, _, _ = find_ground_state(;
-        grid=GRID, atom=ATOM, interactions=ip,
-        zeeman=zeeman, potential=POT,
+        grid=TW.grid, atom=TW.atom, interactions=TW.interactions,
+        zeeman=zeeman, potential=TW.potential,
         dt=0.005, n_steps=500, tol=1e-7,
         initial_state=initial_state_for_fgs, verbose=false,
         psi_init=psi_init,
-        enable_ddi=true, c_dd=C_DD, secular_ddi=false,
+        enable_ddi=true, c_dd=TW.c_dd, secular_ddi=false,
         rotating_frame_omega=omega,
         backend=CUDABackend())
     mark("find_ground_state DONE in run_cell")

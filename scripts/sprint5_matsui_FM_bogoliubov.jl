@@ -18,18 +18,11 @@ using SpinorBEC
 using LinearAlgebra
 using Printf
 
-const F = 6
-const D = 2F + 1
-const ATOM = SpinorBEC.Eu151
-const N_ATOMS = 50000
-const OMEGA_REF = 691.15  # 2π × 110 Hz
+include(joinpath(@__DIR__, "lib", "eu_digital_twin.jl"))
 
-const A_HO = sqrt(SpinorBEC.Units.HBAR / (ATOM.mass * OMEGA_REF))
-const C_TOTAL = 4π * (ATOM.a_s / A_HO) * N_ATOMS
-const C0 = C_TOTAL / (1 + F^2 / 36.0)
-const C1 = C0 / 36.0
-const C_DD = SpinorBEC.compute_c_dd_dimless(ATOM;
-    N_atoms=N_ATOMS, omega_ref=OMEGA_REF)
+const TW = eu_digital_twin()
+const F = TW.F          # convenience local binding (preserves original symbol)
+const D = TW.D
 
 # Matsui dynamics Bz = 2.6 nT = 2.6e-5 Gauss = 2.6e-9 T
 # Zeeman p = g_F μ_B B in Hz, then dimensionless by ω_ref
@@ -37,12 +30,12 @@ const G_F_EU = 1.163
 const MU_B_HZ_PER_T = 1.3996e10   # Bohr magneton in Hz/T
 const BZ_DYNAMICS_T = 2.6e-9
 const P_HZ = G_F_EU * MU_B_HZ_PER_T * BZ_DYNAMICS_T   # Hz per m
-const P_DIMLESS = P_HZ * 2π / OMEGA_REF                # ω/ω_ref
+const P_DIMLESS = P_HZ * 2π / TW.omega_ref             # ω/ω_ref
 const Q_DIMLESS = 0.0                                   # neglect quadratic Zeeman for now
 
 # TF peak density estimate
-const G_EFF = C0
-const MU_TF = (15 * N_ATOMS * G_EFF / (16π))^(2/5)
+const G_EFF = TW.c0
+const MU_TF = (15 * TW.n_atoms * G_EFF / (16π))^(2/5)
 const N_PEAK = MU_TF / G_EFF
 
 # m=-F state: ζ_m = δ_{m,-F}
@@ -101,14 +94,14 @@ end
 
 function scan_m_minus_F(label::String, zee::ZeemanParams; n_dirs::Int=32, n_k::Int=200)
     ζ = mF_spinor()
-    ip = InteractionParams(Dict{Int, Float64}(0 => C0, 1 => C1))
+    ip = TW.interactions
     @printf "\n--- m=-F FM stability: %s ---\n" label
-    @printf "  Zeeman p = %.4f (=%.1f Hz), q = %.4f (=%.1f Hz)\n" zee.p (zee.p * OMEGA_REF / (2π)) zee.q (
-        zee.q * OMEGA_REF / (2π)
+    @printf "  Zeeman p = %.4f (=%.1f Hz), q = %.4f (=%.1f Hz)\n" zee.p (zee.p * TW.omega_ref / (2π)) zee.q (
+        zee.q * TW.omega_ref / (2π)
     )
     @printf "  n0 (TF peak) = %.4f, c_0·n0 = %.1f, c_1·n0 = %.1f, c_dd·n0 = %.1f\n" N_PEAK (
-        C0*N_PEAK
-    ) (C1*N_PEAK) (C_DD*N_PEAK)
+        TW.c0*N_PEAK
+    ) (TW.c1*N_PEAK) (TW.c_dd*N_PEAK)
     flush(stdout)
 
     dirs = fibonacci_directions(n_dirs)
@@ -116,7 +109,7 @@ function scan_m_minus_F(label::String, zee::ZeemanParams; n_dirs::Int=32, n_k::I
     worst_dir = (0.0, 0.0, 0.0)
     worst_k = 0.0
     for dir in dirs
-        res = bdg_at_dir(ζ, N_PEAK, ip, zee, C_DD, dir, 5.0, n_k)
+        res = bdg_at_dir(ζ, N_PEAK, ip, zee, TW.c_dd, dir, 5.0, n_k)
         if res.max_growth_rate > worst_growth
             worst_growth = res.max_growth_rate
             worst_dir = dir
@@ -133,12 +126,12 @@ function scan_m_minus_F(label::String, zee::ZeemanParams; n_dirs::Int=32, n_k::I
     end
     if worst_growth > 1e-8
         # Extract eigenvector at worst direction
-        ev, evec = extract_mode_at_max_growth(ζ, N_PEAK, ip, zee, C_DD, worst_dir, worst_k)
+        ev, evec = extract_mode_at_max_growth(ζ, N_PEAK, ip, zee, TW.c_dd, worst_dir, worst_k)
         u = evec[1:D]
         v_part = evec[(D + 1):2D]
         @printf "  → UNSTABLE: max growth = %.4e at k_dir=(%.2f, %.2f, %.2f), k=%.3f\n" worst_growth worst_dir... worst_k
         # Timescale
-        tau_s = 1.0 / (worst_growth * OMEGA_REF)
+        tau_s = 1.0 / (worst_growth * TW.omega_ref)
         @printf "  → τ_inst = %.3e s = %.4f ms\n" tau_s (tau_s*1000)
         # m-content of unstable mode
         @printf "  → Unstable mode m-content (|u|²+|v|²):\n"
@@ -159,8 +152,8 @@ end
 
 function main()
     println("=== Bogoliubov stability of m=-F FM at Matsui digital twin ===\n")
-    @printf "Atom: %s, F=%d, N=%d, ω_ref=%.1f rad/s\n" ATOM.name F N_ATOMS OMEGA_REF
-    @printf "c_0=%.4e c_1=%.4e c_dd=%.4e (c_dd/c_0=%.4f)\n" C0 C1 C_DD (C_DD/C0)
+    @printf "Atom: %s, F=%d, N=%d, ω_ref=%.1f rad/s\n" TW.atom.name F TW.n_atoms TW.omega_ref
+    @printf "c_0=%.4e c_1=%.4e c_dd=%.4e (c_dd/c_0=%.4f)\n" TW.c0 TW.c1 TW.c_dd (TW.c_dd/TW.c0)
 
     # Test 1: zero Zeeman (FM pure GS, sanity)
     zee0 = ZeemanParams(0.0, 0.0)
@@ -171,7 +164,7 @@ function main()
     g_dyn, d_dyn, k_dyn, w_dyn = scan_m_minus_F("Matsui dynamics B_z=2.6 nT", zee_dyn; n_dirs=24)
 
     # Test 3: Matsui GS Bz = 1 μT (10x larger)
-    p_gs = G_F_EU * MU_B_HZ_PER_T * 1e-6 * 2π / OMEGA_REF
+    p_gs = G_F_EU * MU_B_HZ_PER_T * 1e-6 * 2π / TW.omega_ref
     zee_gs = ZeemanParams(p_gs, 0.0)
     g_gs, d_gs, k_gs, w_gs = scan_m_minus_F("Matsui GS B_z=1 μT (10× dynamics)", zee_gs; n_dirs=16)
 

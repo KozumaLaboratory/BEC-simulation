@@ -22,28 +22,15 @@ using Random
 using Printf
 using JLD2
 
-const F = 6
-const D = 2F + 1
-const ATOM = SpinorBEC.Eu151
-const N_ATOMS = 50000
-const OMEGA_REF = 691.15
+include(joinpath(@__DIR__, "lib", "eu_digital_twin.jl"))
 
-# Smaller grid for CPU envelope
-const GRID = make_grid(GridConfig((16, 16, 16), (20.0, 20.0, 18.0)))
-const POT = HarmonicTrap{3}((1.0, 1.0, 1.1818))
+# Smaller grid for CPU envelope (16³, box=(20,20,18) vs digital-twin default 24³).
+const TW = eu_digital_twin(; n_pts=(16, 16, 16), box=(20.0, 20.0, 18.0))
 
 const DT_ITP = 0.005
 const N_ITP = 8000
 const TOL_ITP = 1e-8
 
-const A_HO = sqrt(SpinorBEC.Units.HBAR / (ATOM.mass * OMEGA_REF))
-const C_TOTAL = 4π * (ATOM.a_s / A_HO) * N_ATOMS
-const C0 = C_TOTAL / (1 + F^2 / 36.0)
-const C1 = C0 / 36.0
-const C_DD = SpinorBEC.compute_c_dd_dimless(ATOM;
-    N_atoms=N_ATOMS, omega_ref=OMEGA_REF)
-
-const P_PER_NT = 0.148
 const OMEGAS = [0.0, 0.3, 0.6]
 const B_VALUES_NT = [0.0, 2.6, 10.0]
 const OUT_DIR = "runs/sprint5_M1_ITP_cpu_scout"
@@ -60,29 +47,22 @@ function compute_grad_norm_cpu(ws::Workspace)
 end
 
 function run_cell(omega::Float64, B_nT::Float64)
-    ip = InteractionParams(Dict{Int, Float64}(0 => C0, 1 => C1))
     # Pass lab-frame p directly; make_workspace adds the Barnett −Ω·F_z
     # via the rotating_frame_omega kwarg (sign corrected 2026-06-02).
-    p_lab = B_nT * P_PER_NT
+    p_lab = B_nT * TW.p_per_nT
     zeeman = ZeemanParams(p_lab, 0.0)
-    sys = SpinSystem(F)
-    psi_init = init_psi(GRID, sys; state=:polar)
-    # noise
-    rng = MersenneTwister(1)
-    @inbounds for i in eachindex(psi_init)
-        psi_init[i] += 0.01 * (randn(rng) + im * randn(rng))
-    end
-    n = sqrt(sum(abs2, psi_init) * SpinorBEC.cell_volume(GRID))
-    psi_init ./= n
+    sys = SpinSystem(TW.F)
+    psi_init = init_psi(TW.grid, sys; state=:polar)
+    add_noise!(psi_init, 0.01, 1, TW.grid)
 
     t0 = time()
     ws, conv, E, _, _ = find_ground_state(;
-        grid=GRID, atom=ATOM, interactions=ip,
-        zeeman=zeeman, potential=POT,
+        grid=TW.grid, atom=TW.atom, interactions=TW.interactions,
+        zeeman=zeeman, potential=TW.potential,
         dt=DT_ITP, n_steps=N_ITP, tol=TOL_ITP,
         initial_state=:polar, verbose=false,
         psi_init=psi_init,
-        enable_ddi=true, c_dd=C_DD, secular_ddi=false,
+        enable_ddi=true, c_dd=TW.c_dd, secular_ddi=false,
         rotating_frame_omega=omega,
         backend=CPUBackend())
     t_run = time() - t0
@@ -93,10 +73,10 @@ function run_cell(omega::Float64, B_nT::Float64)
     sm = ws.spin_matrices
     fx, fy, fz = spin_density_vector(psi, sm, 3)
     f_max = maximum(sqrt.(abs2.(fx) .+ abs2.(fy) .+ abs2.(fz)))
-    dV = SpinorBEC.cell_volume(GRID)
+    dV = SpinorBEC.cell_volume(TW.grid)
     fz_total = sum(fz) * dV
-    m_dist = zeros(D)
-    for c in 1:D
+    m_dist = zeros(TW.D)
+    for c in 1:TW.D
         m_dist[c] = sum(abs2, psi[:, :, :, c]) * dV
     end
     plans = ws.fft_plans
@@ -113,7 +93,7 @@ end
 function main()
     isdir(OUT_DIR) || mkpath(OUT_DIR)
     println("=== M1-ITP CPU scout (16³, 9 cells) ===\n")
-    @printf "N=%d, ω=(110,110,130) Hz, c_dd/c_0=%.4f\n" N_ATOMS (C_DD/C0)
+    @printf "N=%d, ω=(110,110,130) Hz, c_dd/c_0=%.4f\n" TW.n_atoms (TW.c_dd/TW.c0)
     @printf "Sweep: %d Ω × %d B = %d cells (1 seed each)\n\n" length(OMEGAS) length(B_VALUES_NT) (
         length(OMEGAS) * length(B_VALUES_NT)
     )

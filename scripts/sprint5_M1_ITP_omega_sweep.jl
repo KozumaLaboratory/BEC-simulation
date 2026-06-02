@@ -33,37 +33,16 @@
 import CUDA
 using SpinorBEC
 using LinearAlgebra
-using Random
 using Printf
 using JLD2
 
-const F = 6
-const D = 2F + 1
-const ATOM = SpinorBEC.Eu151
-const N_ATOMS = 50000
-const OMEGA_REF = 691.15
-const GRID = make_grid(GridConfig((24, 24, 24), (30.0, 30.0, 26.0)))
-const POT = HarmonicTrap{3}((1.0, 1.0, 1.1818))
+include(joinpath(@__DIR__, "lib", "eu_digital_twin.jl"))
 
+const TW = eu_digital_twin()
 const DT_ITP = 0.005
-const N_ITP = 500   # scout level — leak still present, keep minimal
+const N_ITP = 500   # scout level
 const TOL_ITP = 1e-7
-const N_LBFGS = 0   # SKIP LBFGS for scout — leak still present in some allocators
-const TOL_LBFGS = 1e-8
-const SOBOLEV = 0.02
 const NOISE_AMP = 0.01
-
-const A_HO = sqrt(SpinorBEC.Units.HBAR / (ATOM.mass * OMEGA_REF))
-const C_TOTAL = 4π * (ATOM.a_s / A_HO) * N_ATOMS
-const C0 = C_TOTAL / (1 + F^2 / 36.0)
-const C1 = C0 / 36.0
-const C_DD = SpinorBEC.compute_c_dd_dimless(ATOM;
-    N_atoms=N_ATOMS, omega_ref=OMEGA_REF)
-
-# B [nT] → p (dimensionless Zeeman, lab B field; Eu g_F=1.163)
-# p = g_F μ_B B / (ω_ref ℏ) ; γ_Eu/2π = 1.628 MHz/G = 16.28 Hz/nT
-# In dim units: p_per_nT = 16.28 × 2π / 691.15 = 0.148
-const P_PER_NT = 0.148
 
 const OMEGAS = [0.0, 0.1, 0.2, 0.4, 0.6]
 const B_VALUES_NT = [0.0, 1.0, 2.6, 5.0, 10.0, 100.0]
@@ -73,7 +52,7 @@ const NOISE_SEED = 1
 const OUT_DIR = "runs/sprint5_M1_ITP_omega_sweep"
 
 function build_seed(state::Symbol, grid::Grid)
-    sys = SpinSystem(F)
+    sys = SpinSystem(TW.F)
     if state == :fl_vortex
         return init_psi(grid, sys; state=:fl_vortex, init_vortex_charge=1)
     else
@@ -81,34 +60,13 @@ function build_seed(state::Symbol, grid::Grid)
     end
 end
 
-function apply_noise!(psi::AbstractArray, amp::Float64, seed::Int, grid::Grid)
-    rng = MersenneTwister(seed)
-    @inbounds for i in eachindex(psi)
-        psi[i] += amp * (randn(rng) + im * randn(rng))
-    end
-    n = sqrt(sum(abs2, psi) * SpinorBEC.cell_volume(grid))
-    psi ./= n
-end
-
-function compute_grad_norm(ws::Workspace, k_squared_dev)
-    psi = ws.state.psi
-    grad = similar(psi)
-    fill!(grad, 0.0)
-    SpinorBEC.energy_gradient!(grad, psi, ws; k_squared_dev=k_squared_dev)
-    dV = SpinorBEC.cell_volume(ws.grid)
-    overlap = sum(conj.(psi) .* grad) * dV
-    grad .-= overlap .* psi
-    sqrt(real(sum(abs2, grad)) * dV)
-end
-
 # Run one (Ω, B, seed) cell. Returns NamedTuple with diagnostics.
 function run_cell(omega::Float64, B_nT::Float64, seed_state::Symbol)
-    ip = InteractionParams(Dict{Int, Float64}(0 => C0, 1 => C1))
     # B is rotating-frame x̂. p_lab is the in-plane Zeeman strength γB/ω_ref.
     # z.p_wf = 0 (no z-Zeeman); the workspace adds Barnett −Ω·F_z via
     # rotating_frame_omega=omega kwarg. (Sign now correct after make_workspace
     # fix 2026-06-02.) Cross-check: B=0 row of ⟨F_z⟩ should rise with Ω.
-    p_lab = B_nT * P_PER_NT
+    p_lab = B_nT * TW.p_per_nT
     zeeman = TimeDependentZeeman(
         ConstantWaveform(0.0),         # p_wf: z-Zeeman (none — B is in-plane)
         ConstantWaveform(0.0),         # q_wf: quadratic Zeeman
@@ -116,19 +74,19 @@ function run_cell(omega::Float64, B_nT::Float64, seed_state::Symbol)
         ConstantWaveform(0.0),         # by_wf
     )
 
-    psi_init = build_seed(seed_state, GRID)
-    apply_noise!(psi_init, NOISE_AMP, NOISE_SEED, GRID)
+    psi_init = build_seed(seed_state, TW.grid)
+    add_noise!(psi_init, NOISE_AMP, NOISE_SEED, TW.grid)
 
     initial_state_for_fgs = seed_state == :fl_vortex ? :fl_vortex : :polar
 
     t0 = time()
     ws_itp, conv_itp, E_itp, _, _ = find_ground_state(;
-        grid=GRID, atom=ATOM, interactions=ip,
-        zeeman=zeeman, potential=POT,
+        grid=TW.grid, atom=TW.atom, interactions=TW.interactions,
+        zeeman=zeeman, potential=TW.potential,
         dt=DT_ITP, n_steps=N_ITP, tol=TOL_ITP,
         initial_state=initial_state_for_fgs, verbose=false,
         psi_init=psi_init,
-        enable_ddi=true, c_dd=C_DD, secular_ddi=false,
+        enable_ddi=true, c_dd=TW.c_dd, secular_ddi=false,
         rotating_frame_omega=omega,
         backend=CUDABackend())
     t_run = time() - t0
@@ -142,10 +100,10 @@ function run_cell(omega::Float64, B_nT::Float64, seed_state::Symbol)
     sm = ws.spin_matrices
     fx, fy, fz = spin_density_vector(psi, sm, 3)
     f_max = maximum(sqrt.(abs2.(fx) .+ abs2.(fy) .+ abs2.(fz)))
-    dV = SpinorBEC.cell_volume(GRID)
+    dV = SpinorBEC.cell_volume(TW.grid)
     fz_total = sum(fz) * dV
-    m_dist = zeros(D)
-    for c in 1:D
+    m_dist = zeros(TW.D)
+    for c in 1:TW.D
         m_dist[c] = sum(abs2, psi[:, :, :, c]) * dV
     end
     plans = ws.fft_plans
@@ -163,7 +121,7 @@ function main()
     isdir(OUT_DIR) || mkpath(OUT_DIR)
     println("=== M1-ITP — rotating-frame Ω-sweep (Gate-1 scout) ===\n")
     @info "Free GPU memory (GB)" CUDA.free_memory() / 1e9
-    @printf "N=%d, ω=(110,110,130) Hz, c_dd/c_0=%.4f, Sobolev α=%.3f\n" N_ATOMS (C_DD/C0) SOBOLEV
+    @printf "N=%d, ω=(110,110,130) Hz, c_dd/c_0=%.4f\n" TW.n_atoms (TW.c_dd/TW.c0)
     @printf "Sweep: %d Ω × %d B × %d seeds = %d ITP+LBFGS runs\n\n" length(OMEGAS) length(
         B_VALUES_NT
     ) length(SEEDS_BUILDERS) (length(OMEGAS) * length(B_VALUES_NT) * length(SEEDS_BUILDERS))

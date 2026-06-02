@@ -23,18 +23,12 @@
 import CUDA
 using SpinorBEC
 using LinearAlgebra
-using Random
 using Printf
 using JLD2
 
-const F = 6
-const D = 2F + 1
-const ATOM = SpinorBEC.Eu151
-const N_ATOMS = 50000
-const OMEGA_REF = 691.15
-const GRID = make_grid(GridConfig((24, 24, 24), (30.0, 30.0, 26.0)))
-const POT = HarmonicTrap{3}((1.0, 1.0, 1.1818))
+include(joinpath(@__DIR__, "lib", "eu_digital_twin.jl"))
 
+const TW = eu_digital_twin()  # 24³, N=5×10⁴, box=(30,30,26)
 const DT_ITP = 0.005
 const N_ITP = 2000
 const TOL_ITP = 1e-7
@@ -43,30 +37,13 @@ const TOL_LBFGS = 1e-5
 const SOBOLEV = 0.02
 const NOISE_AMP = 0.01
 
-const A_HO = sqrt(SpinorBEC.Units.HBAR / (ATOM.mass * OMEGA_REF))
-const C_TOTAL = 4π * (ATOM.a_s / A_HO) * N_ATOMS
-const C0 = C_TOTAL / (1 + F^2 / 36.0)
-const C1 = C0 / 36.0
-const C_DD = SpinorBEC.compute_c_dd_dimless(ATOM; N_atoms=N_ATOMS, omega_ref=OMEGA_REF)
-
-const P_PER_NT = 0.148
 const OMEGAS = [0.0, 0.1, 0.2, 0.4, 0.6]
 const B_VALUES_NT = [0.0, 1.0, 2.6, 5.0, 10.0, 100.0]
 const NOISE_SEED = 1
 const OUT_DIR = "runs/sprint5_M1_ITP_omega_sweep_polished"
 
-function apply_noise!(psi::AbstractArray, amp::Float64, seed::Int, grid::Grid)
-    rng = MersenneTwister(seed)
-    @inbounds for i in eachindex(psi)
-        psi[i] += amp * (randn(rng) + im * randn(rng))
-    end
-    n = sqrt(sum(abs2, psi) * SpinorBEC.cell_volume(grid))
-    psi ./= n
-end
-
 function run_cell(omega::Float64, B_nT::Float64)
-    ip = InteractionParams(Dict{Int, Float64}(0 => C0, 1 => C1))
-    p_lab = B_nT * P_PER_NT
+    p_lab = B_nT * TW.p_per_nT
     zeeman = TimeDependentZeeman(
         ConstantWaveform(0.0),
         ConstantWaveform(0.0),
@@ -74,19 +51,19 @@ function run_cell(omega::Float64, B_nT::Float64)
         ConstantWaveform(0.0),
     )
 
-    sys = SpinSystem(F)
-    psi_init = init_psi(GRID, sys; state=:polar)
-    apply_noise!(psi_init, NOISE_AMP, NOISE_SEED, GRID)
+    sys = SpinSystem(TW.F)
+    psi_init = init_psi(TW.grid, sys; state=:polar)
+    add_noise!(psi_init, NOISE_AMP, NOISE_SEED, TW.grid)
 
     # Stage 1: ITP warm-up (Strang propagator includes Coriolis substep).
     t0 = time()
     r_itp = find_ground_state(;
-        grid=GRID, atom=ATOM, interactions=ip,
-        zeeman=zeeman, potential=POT,
+        grid=TW.grid, atom=TW.atom, interactions=TW.interactions,
+        zeeman=zeeman, potential=TW.potential,
         dt=DT_ITP, n_steps=N_ITP, tol=TOL_ITP,
         initial_state=:polar, verbose=false,
         psi_init=psi_init,
-        enable_ddi=true, c_dd=C_DD, secular_ddi=false,
+        enable_ddi=true, c_dd=TW.c_dd, secular_ddi=false,
         rotating_frame_omega=omega,
         backend=CUDABackend())
     t_itp = time() - t0
@@ -114,12 +91,12 @@ function run_cell(omega::Float64, B_nT::Float64)
     sm = ws.spin_matrices
     fx, fy, fz = spin_density_vector(psi, sm, 3)
     f_max = maximum(sqrt.(abs2.(fx) .+ abs2.(fy) .+ abs2.(fz)))
-    dV = SpinorBEC.cell_volume(GRID)
+    dV = SpinorBEC.cell_volume(TW.grid)
     fz_total = sum(fz) * dV
     fx_total = sum(fx) * dV
     fy_total = sum(fy) * dV
-    m_dist = zeros(D)
-    for c in 1:D
+    m_dist = zeros(TW.D)
+    for c in 1:TW.D
         m_dist[c] = sum(abs2, psi[:, :, :, c]) * dV
     end
     Lz = orbital_angular_momentum(psi, ws.grid, ws.fft_plans)
@@ -138,7 +115,7 @@ function main()
     isdir(OUT_DIR) || mkpath(OUT_DIR)
     println("=== M1-ITP polished — rotating-frame Ω×B sweep ===\n")
     @info "Free GPU memory (GB)" CUDA.free_memory() / 1e9
-    @printf "N=%d, ω=(110,110,130) Hz, c_dd/c_0=%.4f\n" N_ATOMS (C_DD/C0)
+    @printf "N=%d, ω=(110,110,130) Hz, c_dd/c_0=%.4f\n" TW.n_atoms (TW.c_dd/TW.c0)
     @printf "Long-ITP: n_steps=%d dt=%.4f tol=%.0e (imag-time = %.1f)\n" N_ITP DT_ITP TOL_ITP (
         N_ITP * DT_ITP
     )
