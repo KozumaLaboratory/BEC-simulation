@@ -537,10 +537,18 @@ export const api = {
     F: number
     component: number
     snaps: Float32Array[]
-  }> {
-    const buf = await bin(
-      `/api/density3d_atlas/${encodeURIComponent(run)}/${encodeURIComponent(file)}?comp=${component}`,
-    )
+  } | null> {
+    let buf: ArrayBuffer
+    try {
+      buf = await bin(
+        `/api/density3d_atlas/${encodeURIComponent(run)}/${encodeURIComponent(file)}?comp=${component}`,
+      )
+    } catch (e) {
+      // Same convention as getDensity3d / getVector3d: 404 → null
+      // (no wavefunction atlas for this run); other failures throw.
+      if (e instanceof Error && e.message.startsWith('404')) return null
+      throw e
+    }
     // "D3AT" magic (4) + 6 Int32 header (24) = 28 byte header
     const magic = new Uint8Array(buf, 0, 4)
     if (
@@ -630,7 +638,7 @@ export const api = {
     component = 0,
     angleDeg = 0,
     snap?: number,
-  ): Promise<Density3D> {
+  ): Promise<Density3D | null> {
     // Rotation only matters for per-component requests; the total density
     // (component=0) is invariant under quantization-axis rotation.
     const useRotated = component > 0 && Math.abs(angleDeg) > 0.01
@@ -638,7 +646,17 @@ export const api = {
     const url = useRotated
       ? `/api/density3d_rotated/${encodeURIComponent(run)}/${encodeURIComponent(file)}?angle=${angleDeg}&comp=${component}${snapArg}`
       : `/api/density3d_bin/${encodeURIComponent(run)}/${encodeURIComponent(file)}?comp=${component}${snapArg}`
-    const buf = await bin(url)
+    let buf: ArrayBuffer
+    try {
+      buf = await bin(url)
+    } catch (e) {
+      // 404 from the backend means "no wavefunction data for this run"
+      // (e.g. M1 scan exports with scalar-only point files). Return null
+      // so the rendering layer can show "Not available" instead of a
+      // raw HTTP-error toast. Non-404 errors still propagate.
+      if (e instanceof Error && e.message.startsWith('404')) return null
+      throw e
+    }
     const header = new Int32Array(buf, 0, 6)
     const nx = header[0],
       ny = header[1],
@@ -657,11 +675,19 @@ export const api = {
     field: VectorFieldKind = 'current',
     stride = 2,
     snap?: number,
-  ): Promise<VectorField3D> {
+  ): Promise<VectorField3D | null> {
     const snapArg = snap !== undefined ? `&snap=${snap}` : ''
-    const buf = await bin(
-      `/api/vector3d_bin/${encodeURIComponent(run)}/${encodeURIComponent(file)}?field=${field}&stride=${stride}${snapArg}`,
-    )
+    let buf: ArrayBuffer
+    try {
+      buf = await bin(
+        `/api/vector3d_bin/${encodeURIComponent(run)}/${encodeURIComponent(file)}?field=${field}&stride=${stride}${snapArg}`,
+      )
+    } catch (e) {
+      // Same convention as getDensity3d: 404 → null (no wavefunction
+      // data); other failures throw.
+      if (e instanceof Error && e.message.startsWith('404')) return null
+      throw e
+    }
     const header = new Int32Array(buf, 0, 7)
     const nx = header[0],
       ny = header[1],
@@ -701,11 +727,19 @@ export const api = {
     file: string,
     axis: 1 | 2 | 3,
     snap?: number,
-  ): Promise<ColumnDensity> {
+  ): Promise<ColumnDensity | null> {
     const snapArg = snap !== undefined ? `&snap=${snap}` : ''
-    const buf = await bin(
-      `/api/density_bin/${encodeURIComponent(run)}/${encodeURIComponent(file)}?axis=${axis}${snapArg}`,
-    )
+    let buf: ArrayBuffer
+    try {
+      buf = await bin(
+        `/api/density_bin/${encodeURIComponent(run)}/${encodeURIComponent(file)}?axis=${axis}${snapArg}`,
+      )
+    } catch (e) {
+      // Same convention as getDensity3d / getVector3d: 404 → null
+      // (no wavefunction data for this run); other failures throw.
+      if (e instanceof Error && e.message.startsWith('404')) return null
+      throw e
+    }
     const header = new Int32Array(buf, 0, 6)
     const ndim = header[0],
       ax = header[1],
@@ -860,8 +894,16 @@ export const api = {
    * mismatches (e.g. `B.theta` dropped on split-step, ramp collapsed to
    * quench, Hz strings, rotating_frame_omega + GPU). Backed by the Julia
    * `inspect_config` function. */
-  getEffectiveConfig(run: string): Promise<EffectiveConfig> {
-    return json(`/api/effective_config/${encodeURIComponent(run)}`)
+  async getEffectiveConfig(run: string): Promise<EffectiveConfig | null> {
+    try {
+      return await json<EffectiveConfig>(`/api/effective_config/${encodeURIComponent(run)}`)
+    } catch (e) {
+      // Same convention as the density / vector endpoints: 404 → null
+      // (e.g. M1 scan exports have no YAML config). Other failures
+      // throw so genuine backend bugs surface.
+      if (e instanceof Error && e.message.startsWith('404')) return null
+      throw e
+    }
   },
 }
 

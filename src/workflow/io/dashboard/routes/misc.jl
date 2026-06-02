@@ -37,6 +37,9 @@ function _route_vector3d_bin(path::String, base_dir::String, psi_cache::Dict{Str
         _compute_vector3d_binary(psi, n_comp, ndim, n_pts, F, box_size;
             field=vec_field, stride=vec_stride)
     catch e
+        if e isa NoPsiAvailable
+            return (404, "text/plain", "No wavefunction data in $(p.name)/$(p.file)")
+        end
         return (500, "text/plain", "Error: $(e)")
     end
     (200, "application/octet-stream", bin)

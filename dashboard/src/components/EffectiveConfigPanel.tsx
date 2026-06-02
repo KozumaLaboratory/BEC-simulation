@@ -95,6 +95,12 @@ export function EffectiveConfigPanel({ runName, yaml, onEnqueue }: Props) {
         </div>
       )}
       {error && <ErrorBox message={error} />}
+      {!loading && !error && !ins && (
+        <div className="text-xs text-muted-foreground">
+          No effective config for this run (e.g. a scan export with no YAML
+          source).
+        </div>
+      )}
       {ins && <WarningsSection warnings={ins.warnings} />}
       {ins && <StepsSection steps={ins.steps} />}
       {ins && <RawVsResolvedSection ins={ins} rawYaml={yaml} />}

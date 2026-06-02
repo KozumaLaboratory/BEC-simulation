@@ -44,16 +44,28 @@ function generate_dashboard_data(run_dir::String; F::Union{Nothing, Int}=nothing
     for fname in jld2_files
         d = JLD2.load(joinpath(run_dir, fname))
         psi = d["psi"]
-        n_comp = size(psi, ndims(psi))
-        F_local = F !== nothing ? F : div(n_comp - 1, 2)
-        m_values = [F_local - (c - 1) for c in 1:n_comp]
 
-        ndim = ndims(psi) - 1
-        n_pts = ntuple(i -> size(psi, i), ndim)
-        pops = [sum(abs2, view(psi, _component_slice(ndim, n_pts, c)...))
-                for c in 1:n_comp]
-        total = sum(pops)
-        pops_norm = total > 0 ? pops ./ total : pops
+        # Two paths: psi-bearing point files (the standard YAML-pipeline
+        # case) recompute observables on the fly; scalar-only exports
+        # (e.g. M1 sweep → point_NNN.jld2 converter) carry pre-computed
+        # `m_values` / `populations` / `mz_actual` on the file itself and
+        # set `psi` to an empty array as a marker.
+        if length(psi) == 0
+            m_values = collect(get(d, "m_values", Int[]))
+            pops_norm = collect(get(d, "populations", Float64[]))
+            mz_actual_val = get(d, "mz_actual", NaN)
+        else
+            n_comp = size(psi, ndims(psi))
+            F_local = F !== nothing ? F : div(n_comp - 1, 2)
+            m_values = [F_local - (c - 1) for c in 1:n_comp]
+            ndim = ndims(psi) - 1
+            n_pts = ntuple(i -> size(psi, i), ndim)
+            pops = [sum(abs2, view(psi, _component_slice(ndim, n_pts, c)...))
+                    for c in 1:n_comp]
+            total = sum(pops)
+            pops_norm = total > 0 ? pops ./ total : pops
+            mz_actual_val = get(d, "mz_actual", NaN)
+        end
 
         override = get(d, "override", Dict{String, Any}())
         scan_params = Dict{String, Any}()
@@ -72,10 +84,11 @@ function generate_dashboard_data(run_dir::String; F::Union{Nothing, Int}=nothing
                 "run_name" => rn,
                 "energy" => get(d, "energy", NaN),
                 "converged" => get(d, "converged", false),
-                "mz_actual" => get(d, "mz_actual", NaN),
+                "mz_actual" => mz_actual_val,
                 "populations" => pops_norm,
                 "m_values" => m_values,
                 "override" => scan_params,
+                "analyze" => get(d, "analyze", Dict{String, Any}()),
                 "duration_seconds" => get(d, "duration_seconds", NaN),
                 "started_at" => get(d, "started_at", ""),
                 "finished_at" => get(d, "finished_at", ""),

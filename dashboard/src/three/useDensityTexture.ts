@@ -71,6 +71,12 @@ export function useDensityTexture(
       .getDensity3dAtlas(run, file, component)
       .then((d) => {
         if (cancelled) return
+        // `d === null` ⇒ backend has no wavefunction atlas for this
+        // run (e.g. M1 scan export). Silent "no data" — no toast.
+        if (d === null) {
+          setAtlas({ data: null, loading: false, error: null })
+          return
+        }
         const maxValues = d.snaps.map((slab) => {
           let m = 0
           for (let i = 0; i < slab.length; i++) {
@@ -116,6 +122,12 @@ export function useDensityTexture(
       .getDensity3d(run, file, component, angleDeg, snap)
       .then((d) => {
         if (cancelled) return
+        // `d === null` ⇒ backend has no wavefunction data for this run
+        // (e.g. M1 scan export). Silent "no data" — no error toast.
+        if (d === null) {
+          setPerSnap({ data: null, loading: false, error: null })
+          return
+        }
         const tex = makeTexture(d.density, d.nx, d.ny, d.nz)
         let maxValue = 0
         for (let i = 0; i < d.density.length; i++) {

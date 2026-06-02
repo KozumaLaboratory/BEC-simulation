@@ -82,6 +82,14 @@ function _load_psi_cached(
                 end
             end
         end
+        # Guard against scalar-only point files (e.g. M1 sweep export
+        # which records `analyze.*` but no wavefunction). Without this,
+        # downstream 3D / vector / column-density routes throw on
+        # n_comp=0 and the dashboard surfaces a 500. Treat as "no
+        # wavefunction available" and let the route return a clean 404.
+        if length(psi) == 0
+            throw(NoPsiAvailable("psi field is empty in $(jld2_path)"))
+        end
         n_comp = size(psi, ndims(psi))
         ndim = ndims(psi) - 1
         F = div(n_comp - 1, 2)
@@ -89,6 +97,13 @@ function _load_psi_cached(
         (psi, n_comp, ndim, n_pts, F)
     end
 end
+
+"""Sentinel exception: the requested jld2 has no wavefunction data,
+so any density / vector / column route should return 404 cleanly."""
+struct NoPsiAvailable <: Exception
+    msg::String
+end
+Base.showerror(io::IO, e::NoPsiAvailable) = print(io, "NoPsiAvailable: ", e.msg)
 
 """Return the path that actually carries the streamed dynamics snapshots
 for `jld2_path`. The lab-frame spinor pipeline writes only the static

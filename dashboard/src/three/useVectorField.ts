@@ -26,6 +26,9 @@ export function useVectorField(
       .getVector3d(run, file, field, stride, snap)
       .then((d) => {
         if (cancelled) return
+        // `d === null` ⇒ backend has no wavefunction data for this run
+        // (e.g. M1 scan export). Treat as silent "no data", not as a
+        // toast-worthy error.
         setState({ data: d, loading: false, error: null })
       })
       .catch((e: Error) => {

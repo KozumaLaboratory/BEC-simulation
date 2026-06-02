@@ -24,6 +24,12 @@ export function useColumnDensity(
       .getColumnDensityBin(run, file, axis, snap)
       .then((d) => {
         if (cancelled) return
+        // `d === null` ⇒ backend has no wavefunction data for this run
+        // (e.g. M1 scan export). Silent "no data" — no toast.
+        if (d === null) {
+          setState({ data: null, loading: false, error: null })
+          return
+        }
         const err = (d as unknown as { error?: string }).error
         if (typeof err === 'string') {
           setState({ data: null, loading: false, error: err })

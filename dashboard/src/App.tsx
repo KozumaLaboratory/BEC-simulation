@@ -99,6 +99,7 @@ export default function App() {
     async (name: string) => {
       try {
         const d = await api.getEffectiveConfig(name)
+        if (d === null) return  // no YAML source for this run
         enqueueYaml(yamlStringify(d.raw, { indent: 2, lineWidth: 0 }))
       } catch {
         /* config fetch failed — skip rather than enqueue a blank */

@@ -372,7 +372,7 @@ export function QueuePanel() {
       .getEffectiveConfig(entry.content_id)
       .then((d) => {
         try {
-          const text = yamlStringify(d.raw, { indent: 2, lineWidth: 0 })
+          const text = d === null ? undefined : yamlStringify(d.raw, { indent: 2, lineWidth: 0 })
           setDialogInitialYaml(text)
         } catch {
           setDialogInitialYaml(undefined)

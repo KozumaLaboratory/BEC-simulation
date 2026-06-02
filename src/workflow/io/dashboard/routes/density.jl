@@ -150,6 +150,9 @@ function _route_density3d_atlas(path::String, base_dir::String, psi_cache::Dict{
                 raw = _compute_density3d_atlas_binary(fpath, comp_idx, n_snaps, psi_cache)
                 _maybe_bitshuffle_zstd(raw, bsz)
             catch e
+                if e isa NoPsiAvailable
+                    return (404, "text/plain", "No wavefunction data in $(p.name)/$(p.file)")
+                end
                 return (500, "text/plain", "Error: $(e)")
             end
             psi_cache[cache_key] = v
@@ -197,6 +200,9 @@ function _route_density_atlas(path::String, base_dir::String, psi_cache::Dict{St
                 raw = _compute_column_density_atlas_binary(fpath, axis, n_snaps, psi_cache)
                 _maybe_bitshuffle_zstd(raw, bsz)
             catch e
+                if e isa NoPsiAvailable
+                    return (404, "text/plain", "No wavefunction data in $(p.name)/$(p.file)")
+                end
                 return (500, "text/plain", "Error: $(e)")
             end
             psi_cache[cache_key] = v
@@ -221,6 +227,9 @@ function _route_density3d_rotated(path::String, base_dir::String, psi_cache::Dic
         _compute_rotated_3d_density_binary(
             _load_psi_cached(fpath, psi_cache)...; angle_deg, component=comp_idx)
     catch e
+        if e isa NoPsiAvailable
+            return (404, "text/plain", "No wavefunction data in $(p.name)/$(p.file)")
+        end
         return (500, "text/plain", "Error: $(e)")
     end
     (200, "application/octet-stream", bin)
@@ -265,6 +274,9 @@ function _route_density_bin(path::String, base_dir::String, psi_cache::Dict{Stri
                 _load_psi_cached(fpath, psi_cache, snap_idx)..., axis, fpath
             )
         catch e
+            if e isa NoPsiAvailable
+                return (404, "text/plain", "No wavefunction data in $(p.name)/$(p.file)")
+            end
             return (500, "text/plain", "Error: $(e)")
         end
         psi_cache[cache_key] = v
@@ -312,6 +324,9 @@ function _route_density3d_bin(path::String, base_dir::String, psi_cache::Dict{St
             )
             _maybe_bitshuffle_zstd(raw, bsz)
         catch e
+            if e isa NoPsiAvailable
+                return (404, "text/plain", "No wavefunction data in $(p.name)/$(p.file)")
+            end
             return (500, "text/plain", "Error: $(e)")
         end
         psi_cache[cache_key] = v
