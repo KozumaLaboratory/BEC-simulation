@@ -8,6 +8,26 @@
 
 export make_workspace
 
+# Kwarg names accepted by `make_workspace`. Grouped semantically for
+# documentation and for the kwarg-coverage regression test
+# (`test_make_workspace_kwarg_coverage`). When you add a new kwarg to
+# `make_workspace`, add it here too; the test fails otherwise.
+const _MAKE_WORKSPACE_KWARGS = (
+    # Required physics core
+    :grid, :atom, :interactions, :sim_params,
+    # Optional physics terms
+    :zeeman, :potential, :raman, :loss, :light_shift,
+    :magnetic_gradient, :time_dep_interactions, :absorbing_boundary,
+    # DDI bundle
+    :enable_ddi, :c_dd, :secular_ddi, :quasi_2d_ddi, :l_z_ddi, :ddi_padding,
+    # Quasi-2D bundle
+    :quasi_2d, :l_z,
+    # LHY dispatch
+    :spinor_lhy,
+    # Runtime / backend
+    :backend, :fft_flags, :dtype, :psi_init,
+)
+
 function make_workspace(;
     grid::Grid{N, T},
     atom::AtomSpecies,
@@ -85,7 +105,7 @@ function make_workspace(;
     V = evaluate_potential(potential, grid)
 
     omega = sim_params.rotating_frame_omega
-    if abs(omega) > 1e-15 && N >= 2
+    if is_active(omega, ROTATION_TOL) && N >= 2
         # Rotating-frame Hamiltonian: H_rot = H_lab − Ω L_z. Completing
         # the square in (p − mΩ×r) gives the centrifugal term
         # −(1/2)Ω²r_⊥² **subtracted** from the trap (so the effective
@@ -104,7 +124,7 @@ function make_workspace(;
     end
     V = _to_device(backend, V)
 
-    effective_zeeman = if abs(omega) > 1e-15
+    effective_zeeman = if is_active(omega, ROTATION_TOL)
         _shift_zeeman_for_rotating_frame(zeeman, omega)
     else
         zeeman
@@ -128,7 +148,7 @@ function make_workspace(;
         # average to zero only in the secular limit. With a non-zero
         # spin_rotating_frame_omega and full (non-secular) DDI, the chosen
         # propagator silently violates rotating-frame consistency.
-        if abs(sim_params.spin_rotating_frame_omega) > 1e-15 && !secular_ddi
+        if is_active(sim_params.spin_rotating_frame_omega, ROTATION_TOL) && !secular_ddi
             throw(
                 ArgumentError(
                     "spin_rotating_frame_omega = $(sim_params.spin_rotating_frame_omega) ≠ 0 " *
@@ -146,7 +166,7 @@ function make_workspace(;
         # Only @info, not error: the user may intentionally want the full
         # kernel to study transverse Larmor-coherent dynamics.
         p_now = linear_p(zeeman)   # uniform accessor handles both forms
-        if !secular_ddi && abs(p_now) > 1e-15 && c_dd_val > 1e-30
+        if !secular_ddi && is_active(p_now, ROTATION_TOL) && is_active(c_dd_val)
             n_peak_est =
                 sum(abs2, _to_host(psi)) / cell_volume(grid) /
                 max(1, prod(grid.config.n_points))  # rough mean → upper bound on n_peak
@@ -215,7 +235,7 @@ function make_workspace(;
     # rank-3 tensor — use _make_tensor_cache_from_channels(F, g_S) for it.
     has_higher_rank = any(
         k -> iseven(k) && k >= 4 && k <= 2F &&
-             abs(get(effective_interactions.c, k, 0.0)) > 1e-30,
+             is_active(get(effective_interactions.c, k, 0.0)),
         keys(effective_interactions.c),
     )
 
@@ -231,8 +251,8 @@ function make_workspace(;
     else
         tc = make_tensor_interaction_cache(F, effective_interactions)
         if tc !== nothing &&
-            (abs(effective_interactions[0]) > 1e-30 ||
-            abs(effective_interactions[1]) > 1e-30)
+            (is_active(effective_interactions[0]) ||
+            is_active(effective_interactions[1]))
             throw(
                 ArgumentError(
                     "tensor_cache active with non-zero c0=$(effective_interactions[0]), c1=$(effective_interactions[1]). " *
@@ -281,9 +301,9 @@ function make_workspace(;
 
     lhy = if lhy_attempt !== nothing
         lhy_attempt
-    elseif quasi_2d && abs(ws_interactions.c_lhy) > 1e-30
+    elseif quasi_2d && is_active(ws_interactions.c_lhy)
         compute_lhy_2d_params(ws_interactions[0], l_z)
-    elseif abs(ws_interactions.c_lhy) > 1e-30
+    elseif is_active(ws_interactions.c_lhy)
         ScalarLHY(ws_interactions.c_lhy)
     else
         nothing
