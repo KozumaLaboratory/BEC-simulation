@@ -67,6 +67,11 @@ include("hamiltonian/integrator/combined_spin_step.jl")
 include("hamiltonian/integrator/force_gradient.jl")
 include("hamiltonian/integrator/adaptive.jl")
 
+# Rotating-basis (Klaus-regime) propagators + integrators. Cross-layer
+# dispersal of the former src/rotating_basis/ vertical-slice subsystem.
+include("hamiltonian/integrator/rotating_basis_propagators.jl")
+include("hamiltonian/integrator/rotating_basis_integrators.jl")
+
 # TDHFB local-approximation engine (channel kernel + HF / Δ kernels +
 # voxel-local BdG Strang step + energy functional). YAML pipeline integration
 # is deferred (see hamiltonian/tdhfb.jl docstring).

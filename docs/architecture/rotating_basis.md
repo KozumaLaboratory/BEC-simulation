@@ -1,4 +1,28 @@
-# `src/rotating_basis/` — Klaus-regime support
+# Rotating-basis (Klaus-regime) support — layer map
+
+**Architecture note (2026-06-02):** The rotating-basis code used to
+live as a vertical slice at `src/rotating_basis/` (workspace +
+propagators + integrators + analysis + analyzers + scalar-eGPE all in
+one directory). That split disagreed with the codebase's
+foundation→hamiltonian→analysis→solvers→workflow horizontal layering
+and made cross-layer drift bugs (the Coriolis-sign class) harder to
+spot. The code was dispersed into the appropriate layers:
+
+  | Old path | New path | Layer |
+  |---|---|---|
+  | `src/rotating_basis/workspace.jl` | `src/foundation/rotating_basis_workspace.jl` | foundation |
+  | `src/rotating_basis/propagators.jl` | `src/hamiltonian/integrator/rotating_basis_propagators.jl` | hamiltonian/integrator |
+  | `src/rotating_basis/integrators.jl` | `src/hamiltonian/integrator/rotating_basis_integrators.jl` | hamiltonian/integrator |
+  | `src/rotating_basis/analysis.jl` | `src/analysis/rotating_basis.jl` | analysis |
+  | `src/rotating_basis/analyzers.jl` | `src/workflow/experiments/analyzers/rotating_basis.jl` | workflow/experiments/analyzers |
+  | `src/rotating_basis/scalar_egpe.jl` | `src/solvers/scalar_egpe.jl` | solvers |
+
+The public API (function names, struct names, export surface) is
+unchanged.
+
+---
+
+## What the rotating-basis path does
 
 Specialised solver path for the **strong-field / fast-Larmor regime**:
 roughly `B ≳ 0.1 G` (Eu) or `ω_L / ω_trap ≳ 100`. Used for Klaus 2022

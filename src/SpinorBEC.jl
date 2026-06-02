@@ -45,7 +45,10 @@ include("workflow/validation.jl")      # RunResult + spec-driven validation (Pha
 include("solvers/projected_gp.jl")
 include("solvers/photon_heating.jl")
 include("solvers/sgpe.jl")
-include("rotating_basis.jl")  # Klaus-regime (rotating-basis + scalar-eGPE) umbrella
+# Klaus-regime rotating-basis + scalar-eGPE used to live as a vertical
+# slice at src/rotating_basis/; 2026-06-02 dispersed into proper layers
+# (foundation/, hamiltonian/integrator/, analysis/, solvers/,
+# workflow/experiments/analyzers/). See docs/architecture/rotating_basis.md.
 
 include("workflow/experiments/pipeline/pipeline_api.jl")
 include("workflow/experiments/pipeline/pipeline_continuation.jl")
