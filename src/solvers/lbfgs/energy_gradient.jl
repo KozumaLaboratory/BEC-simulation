@@ -16,6 +16,28 @@
 
 using Printf
 
+# Scratch buffer cache for energy_gradient! — avoids ~0.5 MB/call alloc that
+# accumulates over LBFGS iterations on GPU (each `similar(psi, ...)` returned
+# a fresh CuArray that the CUDA memory pool kept growing for, leading to
+# 30 GB RSS at 1000 LBFGS steps before this fix).
+# Keyed by (typeof(psi), spatial_n_pts). Single-threaded Julia assumption.
+const _ENERGY_GRADIENT_SCRATCH = IdDict{Any, NTuple{4, AbstractArray}}()
+
+function _energy_gradient_scratch(psi, n_pts)
+    key = (typeof(psi), n_pts)
+    sc = get(_ENERGY_GRADIENT_SCRATCH, key, nothing)
+    if sc === nothing
+        sc = (
+            similar(psi, ComplexF64, n_pts),  # fft_buf
+            similar(psi, Float64, n_pts),     # fx scratch
+            similar(psi, Float64, n_pts),     # fy scratch
+            similar(psi, Float64, n_pts),     # fz scratch
+        )
+        _ENERGY_GRADIENT_SCRATCH[key] = sc
+    end
+    return sc
+end
+
 """
     energy_gradient!(grad, psi, ws; k_squared_dev) → E
 
@@ -44,7 +66,9 @@ function energy_gradient!(
     copyto!(ws.state.psi, psi)
 
     # --- Kinetic: (-∇²/2) ψ via FFT ---
-    fft_buf = similar(psi, ComplexF64, n_pts)
+    # Scratch reused across LBFGS iterations (avoids ~0.5 MB/call leak that
+    # OOMs at 1000+ LBFGS steps on GPU). Keyed by (typeof, spatial_size).
+    fft_buf, _fx_scratch, _fy_scratch, _fz_scratch = _energy_gradient_scratch(psi, n_pts)
     for c in 1:D
         idx = _component_slice(N, n_pts, c)
         fft_buf .= view(psi, idx...)
@@ -92,10 +116,8 @@ function energy_gradient!(
     c1 = ws.interactions[1]
     if abs(c1) > 1e-30
         sm = ws.spin_matrices
-        # device-aware allocation: GPU when psi is CuArray, CPU otherwise
-        fx = similar(psi, Float64, n_pts)
-        fy = similar(psi, Float64, n_pts)
-        fz = similar(psi, Float64, n_pts)
+        # device-aware buffers from scratch cache (allocated once per shape)
+        fx, fy, fz = _fx_scratch, _fy_scratch, _fz_scratch
         _compute_spin_density!(fx, fy, fz, psi, sm, Val(D), N, n_pts)
         # Fz part (diagonal)
         for c in 1:D

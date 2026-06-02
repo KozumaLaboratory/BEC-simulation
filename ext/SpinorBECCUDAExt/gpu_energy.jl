@@ -11,6 +11,10 @@ mutable struct EnergyHostCache
     ddi_host::Union{Nothing, SpinorBEC.DDIParams}
     ddi_bufs::Union{Nothing, SpinorBEC.DDIBuffers}
     n_pts::Tuple
+    # Reused buffers for per-call host transfers (avoid ~5 MB/call leak
+    # at 24³ × D=13 that accumulated to 23 GB over 1000 LBFGS iterations).
+    psi_host::Union{Nothing, Array{ComplexF64}}
+    V_trap_host::Union{Nothing, Array{Float64}}
 end
 
 const _ENERGY_CACHE = Dict{UInt64, EnergyHostCache}()
@@ -47,7 +51,7 @@ function _get_energy_cache(ws::SpinorBEC.Workspace{N}) where {N}
         )
     end
 
-    cache = EnergyHostCache(fft_buf, plans, ddi_host, ddi_bufs, n_pts)
+    cache = EnergyHostCache(fft_buf, plans, ddi_host, ddi_bufs, n_pts, nothing, nothing)
     _ENERGY_CACHE[key] = cache
     cache
 end
@@ -82,16 +86,26 @@ end
 GPU-optimized energy_decomposition: caches FFT plans and DDI host resources.
 """
 function SpinorBEC._energy_decomposition_gpu(ws::SpinorBEC.Workspace{N}) where {N}
-    psi = SpinorBEC._to_host(ws.state.psi)  # still need this transfer
     grid = ws.grid
     n_comp = ws.spin_matrices.system.n_components
     dV = SpinorBEC.cell_volume(grid)
-    n_pts = ntuple(d -> size(psi, d), Val(N))
+    psi_src = ws.state.psi
+    n_pts = ntuple(d -> size(psi_src, d), Val(N))
 
     ecache = _get_energy_cache(ws)
+    # Reuse host buffers — avoid 5 MB/call * 1000+ LBFGS calls = GB-scale leak
+    if ecache.psi_host === nothing || size(ecache.psi_host) != size(psi_src)
+        ecache.psi_host = Array{ComplexF64}(undef, size(psi_src))
+    end
+    copyto!(ecache.psi_host, psi_src)
+    psi = ecache.psi_host
+    if ecache.V_trap_host === nothing || size(ecache.V_trap_host) != size(ws.potential_values)
+        ecache.V_trap_host = Array{Float64}(undef, size(ws.potential_values))
+    end
+    copyto!(ecache.V_trap_host, ws.potential_values)
+    V_trap = ecache.V_trap_host
     fft_buf = ecache.fft_buf
     plans = ecache.plans
-    V_trap = SpinorBEC._to_host(ws.potential_values)
 
     E_kin = SpinorBEC._kinetic_energy(psi, grid, plans, fft_buf, n_comp, N, n_pts, dV)
     E_trap = SpinorBEC._trap_energy(psi, V_trap, n_comp, N, n_pts, dV)

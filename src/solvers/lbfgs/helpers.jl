@@ -1,6 +1,24 @@
 # L-BFGS internal helpers: Sobolev preconditioner + 2-loop direction
 # update + line search.
 
+# Scratch cache for LBFGS — avoids per-iteration allocations that accumulate
+# to GB-scale memory pressure during long LBFGS runs on GPU. Keyed by
+# (typeof, size). Single-threaded Julia assumption.
+const _LBFGS_SCRATCH = IdDict{Any, NamedTuple}()
+
+function _lbfgs_scratch(template)
+    key = (typeof(template), size(template))
+    sc = get(_LBFGS_SCRATCH, key, nothing)
+    if sc === nothing
+        sc = (
+            q=similar(template),
+            psi_trial=similar(template),
+        )
+        _LBFGS_SCRATCH[key] = sc
+    end
+    return sc
+end
+
 function _sobolev_precondition!(
     grad::AbstractArray{<:Complex},
     ws::Workspace{N},
@@ -27,7 +45,9 @@ function _lbfgs_direction(
     grad::AbstractArray{<:Complex},
     s_hist::Vector, y_hist::Vector, rho_hist::Vector{Float64},
 )
-    q = copy(grad)
+    sc = _lbfgs_scratch(grad)
+    q = sc.q
+    copyto!(q, grad)
     m = length(rho_hist)
     alphas = zeros(m)
 
@@ -68,7 +88,7 @@ function _line_search_energy_decrease(
 )
     D = 2F + 1
     N_dim = length(grid.config.n_points)
-    psi_trial = similar(psi)
+    psi_trial = _lbfgs_scratch(psi).psi_trial
 
     α = α_init
     for _ in 1:max_iter
