@@ -90,6 +90,18 @@ function _validate_itp_interactions(
     end
 end
 
+# Kwarg names that `find_ground_state(method=:lbfgs)` forwards to
+# `find_ground_state_lbfgs`. Audited by `test_lbfgs_forward_coverage`.
+# Add a kwarg here when you add one to `find_ground_state_lbfgs` AND
+# include it in the forward block inside `find_ground_state` below.
+const _LBFGS_FORWARD_KWARGS = (
+    :grid, :atom, :interactions, :zeeman, :potential,
+    :n_steps, :tol, :initial_state, :init_state_params, :psi_init,
+    :enable_ddi, :c_dd, :secular_ddi, :quasi_2d_ddi, :l_z_ddi,
+    :target_magnetization, :backend, :m_lbfgs, :verbose, :light_shift,
+    :dtype, :sobolev_alpha, :rotating_frame_omega,
+)
+
 function find_ground_state(;
     grid,
     atom,
@@ -133,6 +145,13 @@ function find_ground_state(;
     sobolev_alpha::Float64=0.0,
     verbose::Bool=_default_solver_verbose(),
 )
+    # KEEP IN SYNC: `_LBFGS_FORWARD_KWARGS` below lists every kwarg this
+    # dispatcher forwards to `find_ground_state_lbfgs`. The pinning test
+    # `test_lbfgs_forward_coverage` (test/solvers/) walks both kwarg sets
+    # and fails if a kwarg present on `find_ground_state_lbfgs` is missing
+    # from this forward — the same class of bug that hid
+    # `rotating_frame_omega` from LBFGS pre-2026-06-02. See
+    # `feedback_never_patch_when_root_fix_is_available`.
     if method === :lbfgs
         return find_ground_state_lbfgs(;
             grid, atom, interactions, zeeman, potential,
