@@ -93,4 +93,61 @@ using SpinorBEC: _rebuild_workspace_with_dt
         ed = SpinorBEC.energy_decomposition(ws)
         @test ed.coriolis == 0.0
     end
+
+    # Pre-2026-06-02 `_shift_zeeman_for_rotating_frame` used `z.p − omega`,
+    # which silently *cancelled* the Barnett −Ω·F_z term instead of installing
+    # it. Symptom: passing the lab-frame p (z.p = p_lab) gave a rotating-frame
+    # state with ⟨F_z⟩ < 0 (anti-Barnett) instead of > 0. The half-term
+    # cancellation was missed because the orbital piece −Ω·L_z worked, so
+    # vortex nucleation looked correct while the spin piece was inverted.
+    # sprint5_M1_barnett_test caught it; see mistake memo
+    # `mistake_frame_transformation_half_term_silent_cancellation`.
+    @testset "Barnett shift sign convention (post-2026-06-02 fix)" begin
+        # ZeemanParams: passing z.p = p_lab → effective_p = p_lab + Ω.
+        # `-effective_p · F_z` gives `-p_lab · F_z - Ω · F_z` (Barnett included).
+        shifted = SpinorBEC._shift_zeeman_for_rotating_frame(
+            ZeemanParams(0.3, 0.05), 0.4)
+        @test shifted.p ≈ 0.7
+        @test shifted.q == 0.05
+        # Sign of the addend: + Ω, not − Ω.
+        shifted_zero_p = SpinorBEC._shift_zeeman_for_rotating_frame(
+            ZeemanParams(0.0, 0.0), 0.5)
+        @test shifted_zero_p.p ≈ 0.5
+
+        # TimeDependentZeeman: ShiftedWaveform must add Ω too.
+        td = TimeDependentZeeman(
+            ConstantWaveform(0.0), ConstantWaveform(0.0),
+            ConstantWaveform(0.3),  # bx
+            ConstantWaveform(0.0),
+        )
+        td_shifted = SpinorBEC._shift_zeeman_for_rotating_frame(td, 0.4)
+        @test SpinorBEC.linear_p(td_shifted, 0.0) ≈ 0.4
+        # Transverse components untouched by frame shift.
+        bx, by = SpinorBEC.transverse_b(td_shifted, 0.0)
+        @test bx ≈ 0.3
+        @test by ≈ 0.0
+    end
+
+    @testset "make_workspace stores the +Ω Barnett shift" begin
+        # Composition test: ensures `make_workspace` actually calls
+        # `_shift_zeeman_for_rotating_frame` with the right sign convention
+        # — guards against future refactors removing the call site or
+        # negating the sign at the workspace boundary.
+        omega = 0.5
+        sp = SimParams(; dt=0.01, n_steps=10, imaginary_time=true,
+            rotating_frame_omega=omega)
+        ws = make_workspace(; grid, atom=Rb87, interactions,
+            zeeman=ZeemanParams(0.3, 0.05), sim_params=sp,
+            fft_flags=FFTW.ESTIMATE)
+        # Effective p should be lab + Ω, not lab − Ω.
+        @test ws.zeeman.p ≈ 0.8
+        @test ws.zeeman.q ≈ 0.05
+        # Ω = 0 path must NOT shift.
+        sp0 = SimParams(; dt=0.01, n_steps=10, imaginary_time=true,
+            rotating_frame_omega=0.0)
+        ws0 = make_workspace(; grid, atom=Rb87, interactions,
+            zeeman=ZeemanParams(0.3, 0.05), sim_params=sp0,
+            fft_flags=FFTW.ESTIMATE)
+        @test ws0.zeeman.p ≈ 0.3
+    end
 end

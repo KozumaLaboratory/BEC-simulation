@@ -338,7 +338,18 @@ function _rebuild_workspace(ws::Workspace; kwargs...)
     Workspace(args...)
 end
 
-_shift_zeeman_for_rotating_frame(z::ZeemanParams, omega::Float64) = ZeemanParams(z.p - omega, z.q)
+# Rotating-frame Zeeman absorbs the Barnett −Ω·F_z into an effective linear
+# coefficient. With Zeeman convention H_Zee = −p·F_z, the rotating-frame
+# Hamiltonian H_rot = H_lab − Ω(L_z + F_z) corresponds to
+#   effective_p = z.p + Ω      (so that −effective_p·F_z = −z.p·F_z − Ω·F_z)
+# i.e. the user passes the *lab-frame* p (z.p = p_lab) and the workspace
+# adds the Barnett term automatically.
+#
+# (Pre-2026-06-02 the sign was `z.p − omega`, which silently *cancelled*
+# the Barnett term instead of installing it. Caught by sprint5_M1_barnett_test
+# at B = 0 — Barnett response only appeared when the script over-corrected
+# with `p_input = p_lab + 2Ω`. See `mistake_frame_transformation_half_term_silent_cancellation`.)
+_shift_zeeman_for_rotating_frame(z::ZeemanParams, omega::Float64) = ZeemanParams(z.p + omega, z.q)
 
 # Use the concrete `ShiftedWaveform{typeof(z.p_wf)}` rather than wrapping
 # in `FunctionWaveform(t -> ...)`. Each closure-based call leaked a fresh
@@ -347,7 +358,7 @@ _shift_zeeman_for_rotating_frame(z::ZeemanParams, omega::Float64) = ZeemanParams
 # annotation also lets the optimiser specialise `evaluate(p_wf, t)` —
 # see CLAUDE.md "Type stability boundaries".)
 function _shift_zeeman_for_rotating_frame(z::TimeDependentZeeman, omega::Float64)
-    TimeDependentZeeman(ShiftedWaveform(z.p_wf, omega), z.q_wf, z.bx_wf, z.by_wf)
+    TimeDependentZeeman(ShiftedWaveform(z.p_wf, -omega), z.q_wf, z.bx_wf, z.by_wf)
 end
 
 # ---------------------------------------------------------------------------

@@ -231,8 +231,15 @@ using FFTW
         # under the over-confining bug).
         @test ws.potential_values[corner_idx] < ws.potential_values[center_idx]
 
+        # Sign convention (2026-06-02 fix, see
+        # mistake_frame_transformation_half_term_silent_cancellation):
+        # rotating frame H_rot = H_lab − Ω(L_z + F_z); with Zeeman convention
+        # H_Zee = −p·F_z, effective_p = z.p + Ω so that the −Ω·F_z Barnett
+        # term is installed when user passes z.p = p_lab. Pre-fix this test
+        # asserted `≈ -omega` — which pinned the broken sign that silently
+        # cancelled Barnett and let half the rotating-frame term go missing.
         zee = SpinorBEC.zeeman_at(ws.zeeman, 0.0)
-        @test zee.p ≈ -omega
+        @test zee.p ≈ +omega
     end
 
     @testset "find_ground_state with rotating_frame_omega" begin

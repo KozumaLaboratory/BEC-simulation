@@ -209,56 +209,33 @@ function _half_potential_step!(
         ws.interactions
     end
 
-    zeeman_diag_fwd = if !isnan(t_start) && ws.zeeman isa TimeDependentZeeman
+    # Midpoint-evaluate the diagonal Zeeman when a `t_start` is supplied
+    # and the field is time-dependent — preserves 2nd-order accuracy in the
+    # symmetric Strang sandwich when the field has appreciable drift over
+    # a single dt_half. Otherwise fall back to a single t_eval sample.
+    zeeman_diag_fwd, zeeman_diag_bwd = if !isnan(t_start) && ws.zeeman isa TimeDependentZeeman
         zee_fwd = zeeman_at(ws.zeeman, t_start + dt_half / 4)
-        zeeman_diagonal(zee_fwd, ws.spin_matrices, ws.sim_params.spin_rotating_frame_omega)
+        zee_bwd = zeeman_at(ws.zeeman, t_start + 3 * dt_half / 4)
+        (zeeman_diagonal(zee_fwd, ws.spin_matrices, ws.sim_params.spin_rotating_frame_omega),
+            zeeman_diagonal(zee_bwd, ws.spin_matrices, ws.sim_params.spin_rotating_frame_omega),
+        )
     else
-        zee = zeeman_at(ws.zeeman, t_eval)
-        zeeman_diagonal(zee, ws.spin_matrices, ws.sim_params.spin_rotating_frame_omega)
+        zd = zeeman_diagonal(
+            zeeman_at(ws.zeeman, t_eval), ws.spin_matrices,
+            ws.sim_params.spin_rotating_frame_omega,
+        )
+        (zd, zd)
     end
     gpu = _is_gpu(ws.state.psi)
 
-    _apply_mg_to_V!(ws, t_eval)
-    @timeit_debug TIMER "diagonal" _dispatch_diagonal_step!(
-        ws, Val(N), zeeman_diag_fwd, dt_half / 2, imaginary_time, ip; psi_mf
+    # Forward outer chain — shared with ITP via `_outer_operators_fwd!`.
+    _outer_operators_fwd!(
+        ws, dt_half / 2, ndim, imaginary_time;
+        t_eval, ip, zeeman_diag=zeeman_diag_fwd, psi_mf, mg_active=true,
     )
-    _remove_mg_from_V!(ws, t_eval)
 
-    if ws.light_shift !== nothing && !ws.light_shift.is_diagonal
-        @timeit_debug TIMER "light_shift" apply_light_shift_step!(
-            ws.state.psi, ws.light_shift, dt_half / 2, ndim; imaginary_time
-        )
-    end
-
-    if abs(ip[1]) > 1e-30
-        @timeit_debug TIMER "spin_mixing" apply_spin_mixing_step!(
-            ws.state.psi, ws.spin_matrices, ip[1], dt_half / 2, ndim; imaginary_time, psi_mf
-        )
-    end
-
-    c2 = get_cn(ip, 2)
-    if abs(c2) > 1e-30
-        @timeit_debug TIMER "singlet_pair" apply_singlet_pair_step!(
-            ws.state.psi, ip, ws.spin_matrices.system.F, dt_half / 2, ndim; imaginary_time, psi_mf
-        )
-    end
-
-    if ws.tensor_cache !== nothing
-        @timeit_debug TIMER "tensor" apply_tensor_interaction_step!(
-            ws.state.psi, ws.tensor_cache, ws.spin_matrices, dt_half / 2, ndim;
-            imaginary_time, psi_mf,
-        )
-    end
-
-    _apply_transverse_zeeman_step!(ws, t_eval, dt_half / 2, ndim, imaginary_time)
-
-    if ws.raman !== nothing
-        raman_now = raman_at(ws.raman, t_eval)
-        @timeit_debug TIMER "raman" apply_raman_step!(
-            ws.state.psi, ws.spin_matrices, raman_now, ws.grid, dt_half / 2; imaginary_time
-        )
-    end
-
+    # Inner DDI(dt_half) — RTP only; ITP separates DDI for Strang-merge
+    # at the loop boundary (see `_run_itp_loop!`).
     if ws.ddi !== nothing
         @timeit_debug TIMER "ddi" if gpu
             _apply_ddi_step_gpu!(ws, dt_half, ndim, imaginary_time; psi_mf)
@@ -288,52 +265,11 @@ function _half_potential_step!(
         end
     end
 
-    if ws.raman !== nothing
-        raman_now = raman_at(ws.raman, t_eval)
-        @timeit_debug TIMER "raman" apply_raman_step!(
-            ws.state.psi, ws.spin_matrices, raman_now, ws.grid, dt_half / 2; imaginary_time
-        )
-    end
-
-    _apply_transverse_zeeman_step!(ws, t_eval, dt_half / 2, ndim, imaginary_time)
-
-    if ws.tensor_cache !== nothing
-        @timeit_debug TIMER "tensor" apply_tensor_interaction_step!(
-            ws.state.psi, ws.tensor_cache, ws.spin_matrices, dt_half / 2, ndim;
-            imaginary_time, psi_mf,
-        )
-    end
-
-    if abs(c2) > 1e-30
-        @timeit_debug TIMER "singlet_pair" apply_singlet_pair_step!(
-            ws.state.psi, ip, ws.spin_matrices.system.F, dt_half / 2, ndim; imaginary_time, psi_mf
-        )
-    end
-
-    if abs(ip[1]) > 1e-30
-        @timeit_debug TIMER "spin_mixing" apply_spin_mixing_step!(
-            ws.state.psi, ws.spin_matrices, ip[1], dt_half / 2, ndim; imaginary_time, psi_mf
-        )
-    end
-
-    zeeman_diag_bwd = if !isnan(t_start) && ws.zeeman isa TimeDependentZeeman
-        zee_bwd = zeeman_at(ws.zeeman, t_start + 3 * dt_half / 4)
-        zeeman_diagonal(zee_bwd, ws.spin_matrices, ws.sim_params.spin_rotating_frame_omega)
-    else
-        zeeman_diag_fwd
-    end
-
-    if ws.light_shift !== nothing && !ws.light_shift.is_diagonal
-        @timeit_debug TIMER "light_shift" apply_light_shift_step!(
-            ws.state.psi, ws.light_shift, dt_half / 2, ndim; imaginary_time
-        )
-    end
-
-    _apply_mg_to_V!(ws, t_eval)
-    @timeit_debug TIMER "diagonal" _dispatch_diagonal_step!(
-        ws, Val(N), zeeman_diag_bwd, dt_half / 2, imaginary_time, ip; psi_mf
+    # Backward outer chain — shared with ITP via `_outer_operators_bwd!`.
+    _outer_operators_bwd!(
+        ws, dt_half / 2, ndim, imaginary_time;
+        t_eval, ip, zeeman_diag=zeeman_diag_bwd, psi_mf, mg_active=true,
     )
-    _remove_mg_from_V!(ws, t_eval)
 end
 
 """
@@ -672,91 +608,189 @@ function split_step_trap!(ws::Workspace{N}) where {N}
     nothing
 end
 
-# --- ITP leapfrog helpers ---
-# Split V(dt/2) into outer (diag+SM+singlet_pair+tensor+raman) and inner (DDI).
-# Outer part can be merged between adjacent steps; DDI stays at dt/2.
+# --- Outer-operator chain: single source of truth ---
+#
+# The V(dt/2) potential half-step decomposes into an "outer" operator chain
+# (everything except DDI) and an "inner" DDI step. Both ITP (which separates
+# DDI explicitly to enable Strang-merge at the loop boundary) and RTP (which
+# folds DDI inside the half-potential) traverse the SAME outer operator
+# order; they only differ in where DDI is called.
+#
+# This file defines that operator order ONCE in `_outer_operators_fwd!` /
+# `_outer_operators_bwd!`. Both `_outer_potential_{fwd,bwd}!` (ITP) and
+# `_half_potential_step!` (RTP) delegate to these helpers. Adding a new
+# operator → both paths pick it up automatically.
+#
+# Canonical order (forward):
+#   diag → light_shift_offdiag → spin_mixing → singlet_pair → tensor → transverse_zeeman → raman
+# Backward direction reverses this for the symmetric Strang sandwich.
+#
+# History: pre-2026-06-02 ITP and RTP had divergent chains — RTP added the
+# transverse Zeeman step but ITP did not, silently dropping bx_wf/by_wf in
+# ground-state finding. See
+# `mistake_frame_transformation_half_term_silent_cancellation` for context;
+# the regression test in `test/integrator/test_outer_operator_equivalence.jl`
+# pins ITP and RTP to identical output for the non-DDI chain.
 
 """
-Outer part of half-potential step: everything except DDI.
-Forward direction: diag → SM → singlet_pair → tensor → raman
+    _outer_operators_fwd!(ws, dt_outer, ndim, imaginary_time; t_eval, ip,
+                          zeeman_diag, psi_mf, mg_active)
+
+Forward half of the V(dt/2) outer operator chain. Applied at time `t_eval`
+(default `ws.state.t`), with operator interactions `ip` (default
+`ws.interactions`). Pass `zeeman_diag` to inject a pre-computed diagonal
+(e.g. midpoint-evaluated `TimeDependentZeeman`); otherwise resolved from
+`ws.zeeman` at `t_eval`. `psi_mf` plumbs the Picard-midpoint state into
+operators that consume it. `mg_active=true` wraps the diag step in
+magnetic-gradient apply/remove (RTP only).
 """
-function _outer_potential_fwd!(ws::Workspace{N}, dt_outer, n_comp, ndim, imaginary_time) where {N}
-    gpu = _is_gpu(ws.state.psi)
-    zee = zeeman_at(ws.zeeman, ws.state.t)
-    zeeman_diag = zeeman_diagonal(zee, ws.spin_matrices, ws.sim_params.spin_rotating_frame_omega)
-
-    _dispatch_diagonal_step!(ws, Val(N), zeeman_diag, dt_outer, imaginary_time)
-
-    if ws.light_shift !== nothing && !ws.light_shift.is_diagonal
-        apply_light_shift_step!(ws.state.psi, ws.light_shift, dt_outer, ndim; imaginary_time)
+function _outer_operators_fwd!(
+    ws::Workspace{N}, dt_outer, ndim, imaginary_time;
+    t_eval::Float64=ws.state.t,
+    ip::InteractionParams=ws.interactions,
+    zeeman_diag=nothing,
+    psi_mf::Union{Nothing, AbstractArray}=nothing,
+    mg_active::Bool=false,
+) where {N}
+    zd = if zeeman_diag === nothing
+        begin
+            zee = zeeman_at(ws.zeeman, t_eval)
+            zeeman_diagonal(zee, ws.spin_matrices, ws.sim_params.spin_rotating_frame_omega)
+        end
+    else
+        zeeman_diag
     end
 
-    if abs(ws.interactions[1]) > 1e-30
-        apply_spin_mixing_step!(
-            ws.state.psi, ws.spin_matrices, ws.interactions[1], dt_outer, ndim; imaginary_time
+    mg_active && _apply_mg_to_V!(ws, t_eval)
+    @timeit_debug TIMER "diagonal" _dispatch_diagonal_step!(
+        ws, Val(N), zd, dt_outer, imaginary_time, ip; psi_mf
+    )
+    mg_active && _remove_mg_from_V!(ws, t_eval)
+
+    if ws.light_shift !== nothing && !ws.light_shift.is_diagonal
+        @timeit_debug TIMER "light_shift" apply_light_shift_step!(
+            ws.state.psi, ws.light_shift, dt_outer, ndim; imaginary_time
         )
     end
 
-    c2 = get_cn(ws.interactions, 2)
+    if abs(ip[1]) > 1e-30
+        @timeit_debug TIMER "spin_mixing" apply_spin_mixing_step!(
+            ws.state.psi, ws.spin_matrices, ip[1], dt_outer, ndim; imaginary_time, psi_mf
+        )
+    end
+
+    c2 = get_cn(ip, 2)
     if abs(c2) > 1e-30
-        apply_singlet_pair_step!(
-            ws.state.psi, ws.interactions, ws.spin_matrices.system.F, dt_outer, ndim; imaginary_time
+        @timeit_debug TIMER "singlet_pair" apply_singlet_pair_step!(
+            ws.state.psi, ip, ws.spin_matrices.system.F, dt_outer, ndim; imaginary_time, psi_mf
         )
     end
 
     if ws.tensor_cache !== nothing
-        apply_tensor_interaction_step!(
-            ws.state.psi, ws.tensor_cache, ws.spin_matrices, dt_outer, ndim; imaginary_time
+        @timeit_debug TIMER "tensor" apply_tensor_interaction_step!(
+            ws.state.psi, ws.tensor_cache, ws.spin_matrices, dt_outer, ndim;
+            imaginary_time, psi_mf,
         )
     end
 
+    _apply_transverse_zeeman_step!(ws, t_eval, dt_outer, ndim, imaginary_time)
+
     if ws.raman !== nothing
-        raman_now = raman_at(ws.raman, ws.state.t)
-        apply_raman_step!(
+        raman_now = raman_at(ws.raman, t_eval)
+        @timeit_debug TIMER "raman" apply_raman_step!(
             ws.state.psi, ws.spin_matrices, raman_now, ws.grid, dt_outer; imaginary_time
         )
     end
+    nothing
 end
 
 """
-Outer part of half-potential step, backward direction: raman → tensor → singlet_pair → SM → diag
-"""
-function _outer_potential_bwd!(ws::Workspace{N}, dt_outer, n_comp, ndim, imaginary_time) where {N}
-    gpu = _is_gpu(ws.state.psi)
+    _outer_operators_bwd!(ws, dt_outer, ndim, imaginary_time; t_eval, ip,
+                          zeeman_diag, psi_mf, mg_active)
 
+Backward (reversed-order) half of the V(dt/2) outer operator chain. Kwargs
+match `_outer_operators_fwd!`. The pair fwd-then-bwd is a Strang sandwich
+around the inner DDI step (RTP path) or a pair of half-V's separated by an
+explicit DDI call (ITP path).
+"""
+function _outer_operators_bwd!(
+    ws::Workspace{N}, dt_outer, ndim, imaginary_time;
+    t_eval::Float64=ws.state.t,
+    ip::InteractionParams=ws.interactions,
+    zeeman_diag=nothing,
+    psi_mf::Union{Nothing, AbstractArray}=nothing,
+    mg_active::Bool=false,
+) where {N}
     if ws.raman !== nothing
-        raman_now = raman_at(ws.raman, ws.state.t)
-        apply_raman_step!(
+        raman_now = raman_at(ws.raman, t_eval)
+        @timeit_debug TIMER "raman" apply_raman_step!(
             ws.state.psi, ws.spin_matrices, raman_now, ws.grid, dt_outer; imaginary_time
         )
     end
 
+    _apply_transverse_zeeman_step!(ws, t_eval, dt_outer, ndim, imaginary_time)
+
     if ws.tensor_cache !== nothing
-        apply_tensor_interaction_step!(
-            ws.state.psi, ws.tensor_cache, ws.spin_matrices, dt_outer, ndim; imaginary_time
+        @timeit_debug TIMER "tensor" apply_tensor_interaction_step!(
+            ws.state.psi, ws.tensor_cache, ws.spin_matrices, dt_outer, ndim;
+            imaginary_time, psi_mf,
         )
     end
 
-    c2 = get_cn(ws.interactions, 2)
+    c2 = get_cn(ip, 2)
     if abs(c2) > 1e-30
-        apply_singlet_pair_step!(
-            ws.state.psi, ws.interactions, ws.spin_matrices.system.F, dt_outer, ndim; imaginary_time
+        @timeit_debug TIMER "singlet_pair" apply_singlet_pair_step!(
+            ws.state.psi, ip, ws.spin_matrices.system.F, dt_outer, ndim; imaginary_time, psi_mf
         )
     end
 
-    if abs(ws.interactions[1]) > 1e-30
-        apply_spin_mixing_step!(
-            ws.state.psi, ws.spin_matrices, ws.interactions[1], dt_outer, ndim; imaginary_time
+    if abs(ip[1]) > 1e-30
+        @timeit_debug TIMER "spin_mixing" apply_spin_mixing_step!(
+            ws.state.psi, ws.spin_matrices, ip[1], dt_outer, ndim; imaginary_time, psi_mf
         )
     end
 
     if ws.light_shift !== nothing && !ws.light_shift.is_diagonal
-        apply_light_shift_step!(ws.state.psi, ws.light_shift, dt_outer, ndim; imaginary_time)
+        @timeit_debug TIMER "light_shift" apply_light_shift_step!(
+            ws.state.psi, ws.light_shift, dt_outer, ndim; imaginary_time
+        )
     end
 
-    zee = zeeman_at(ws.zeeman, ws.state.t)
-    zeeman_diag = zeeman_diagonal(zee, ws.spin_matrices, ws.sim_params.spin_rotating_frame_omega)
-    _dispatch_diagonal_step!(ws, Val(N), zeeman_diag, dt_outer, imaginary_time)
+    zd = if zeeman_diag === nothing
+        begin
+            zee = zeeman_at(ws.zeeman, t_eval)
+            zeeman_diagonal(zee, ws.spin_matrices, ws.sim_params.spin_rotating_frame_omega)
+        end
+    else
+        zeeman_diag
+    end
+
+    mg_active && _apply_mg_to_V!(ws, t_eval)
+    @timeit_debug TIMER "diagonal" _dispatch_diagonal_step!(
+        ws, Val(N), zd, dt_outer, imaginary_time, ip; psi_mf
+    )
+    mg_active && _remove_mg_from_V!(ws, t_eval)
+    nothing
+end
+
+# --- ITP leapfrog wrappers ---
+# Split V(dt/2) into outer (everything except DDI) and inner DDI step. Outer
+# part can be merged between adjacent steps; DDI stays at dt/2.
+
+"""
+Outer part of half-potential step: everything except DDI.
+Forward direction; delegates to the shared `_outer_operators_fwd!` helper.
+"""
+function _outer_potential_fwd!(ws::Workspace{N}, dt_outer, n_comp, ndim, imaginary_time) where {N}
+    _outer_operators_fwd!(ws, dt_outer, ndim, imaginary_time)
+end
+
+"""
+Outer part of half-potential step, backward direction; delegates to
+`_outer_operators_bwd!`.
+"""
+function _outer_potential_bwd!(ws::Workspace{N}, dt_outer, n_comp, ndim, imaginary_time) where {N}
+    _outer_operators_bwd!(ws, dt_outer, ndim, imaginary_time)
 end
 
 """
