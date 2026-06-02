@@ -9,7 +9,7 @@ function apply_spin_mixing_step!(
     imaginary_time::Bool=false,
     psi_mf::Union{Nothing, AbstractArray}=nothing,
 ) where {M, D}
-    abs(c1) < 1e-30 && return nothing
+    is_active(c1) || return nothing
     # Use `Val(M - 1)` (spatial dim count from psi's array dimensionality)
     # rather than `ntuple(f, ndim::Int)` so the resulting `n_pts` is a
     # type-stable `NTuple{M-1, Int}`. Without this, the inner

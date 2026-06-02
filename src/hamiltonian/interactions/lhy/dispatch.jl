@@ -69,7 +69,7 @@ function compute_spinor_lhy_polar_two_channel(;
     n_points >= 3 || throw(ArgumentError("n_points must be >= 3"))
     n_max > 0 || throw(ArgumentError("n_max must be positive"))
 
-    eps_dd = abs(c0) > 1e-30 ? c_dd / c0 : 0.0
+    eps_dd = is_active(c0) ? c_dd / c0 : 0.0
     Q5 = lima_pelster_Q5(eps_dd)
 
     densities = collect(range(0.0, n_max; length=n_points))
@@ -80,8 +80,8 @@ function compute_spinor_lhy_polar_two_channel(;
     for (i, n) in enumerate(densities)
         n < 1e-30 && continue
         n52 = n^2 * sqrt(n)
-        density_part = abs(c0) > 1e-30 ? abs(c0)^(5 / 2) * n52 * Q5 : 0.0
-        spin_part = abs(c1) > 1e-30 ? 2.0 * F * abs(c1)^(5 / 2) * n52 : 0.0
+        density_part = is_active(c0) ? abs(c0)^(5 / 2) * n52 * Q5 : 0.0
+        spin_part = is_active(c1) ? 2.0 * F * abs(c1)^(5 / 2) * n52 : 0.0
         energy[i] = prefactor * (density_part + spin_part)
     end
 
@@ -160,7 +160,7 @@ function _compute_lhy_at_density(
     D = 2F + 1
     h_mf, M_anom, zee, _ = _bdg_contact_matrices(spinor, F, interactions, zeeman)
 
-    if abs(c_dd) > 1e-30
+    if is_active(c_dd)
         # The LHY zero-point integral inherits the DDI's k̂-anisotropy via
         # `_q_tensor_direction(k̂)` — the spherical average of the per-mode
         # ω_b(k) is anisotropic, so direction sampling matters. The earlier
@@ -192,7 +192,7 @@ function _compute_lhy_at_density(
         h_total = copy(h_mf)
         M_total = copy(M_anom)
 
-        if abs(c_dd) > 1e-30
+        if is_active(c_dd)
             k_hat = collect(dir)
             k_norm = norm(k_hat)
             k_norm > 0 && (k_hat ./= k_norm)

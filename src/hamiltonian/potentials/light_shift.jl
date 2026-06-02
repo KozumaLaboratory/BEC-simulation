@@ -31,14 +31,14 @@ function _build_light_shift_operator(
     M = zeros(ComplexF64, D, D)
 
     # Vector part: α_v/F × (iε̂*×ε̂)·F̂
-    if abs(alpha_v) > 1e-30
+    if is_active(alpha_v)
         cross_vec = im .* cross(conj.(eps), eps)
         Mv = (real(cross_vec[1]) * Fx + real(cross_vec[2]) * Fy + real(cross_vec[3]) * Fz)
         M .+= (alpha_v / F) .* Mv
     end
 
     # Tensor part: α_t × (3(ε̂·F̂)² − F(F+1)I) / (F(2F−1))
-    if abs(alpha_t) > 1e-30
+    if is_active(alpha_t)
         eFhat = eps[1] * Fx + eps[2] * Fy + eps[3] * Fz
         eFhat_sq = eFhat' * eFhat
         Mt = 3.0 .* eFhat_sq .- F * (F + 1) * I(D)

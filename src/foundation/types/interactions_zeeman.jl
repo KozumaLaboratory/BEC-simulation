@@ -97,7 +97,7 @@ singlet_pair step; only k ≥ 4 needs the general tensor_cache.
 """
 function has_higher_rank_couplings(ip::InteractionParams)
     for (k, v) in ip.c
-        k >= 4 && abs(v) > 1e-30 && return true
+        k >= 4 && is_active(v) && return true
     end
     false
 end

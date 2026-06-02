@@ -69,7 +69,7 @@ function make_tensor_interaction_cache(
     c_dict = Dict{Int, Float64}()
     for k in 0:2:2F
         ck = get_cn(interactions, k)
-        abs(ck) > 1e-30 && (c_dict[k] = ck)
+        is_active(ck) && (c_dict[k] = ck)
     end
     isempty(c_dict) && return nothing
 
@@ -88,7 +88,7 @@ function make_tensor_interaction_cache(
     g_values = Float64[]
     for S in 0:2:2F
         gS = get(g_dict, S, 0.0)
-        abs(gS) > 1e-30 || continue
+        is_active(gS) || continue
         push!(active_channels, S)
         push!(g_values, gS)
     end
@@ -113,7 +113,7 @@ function _make_tensor_cache_from_channels(F::Int, g_dict::Dict{Int, Float64})
     g_values = Float64[]
     for S in 0:2:2F
         gS = get(g_dict, S, 0.0)
-        abs(gS) > 1e-30 || continue
+        is_active(gS) || continue
         push!(active_channels, S)
         push!(g_values, gS)
     end

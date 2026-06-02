@@ -63,7 +63,7 @@ function split_step_rotating!(
     apply_spatial_diagonal_step!(ws, half; imaginary_time)
     apply_local_spin_step!(ws, half, t_mid; imaginary_time)
 
-    if abs(ws.c1) > 1e-30
+    if is_active(ws.c1)
         apply_spin_mixing_step!(
             ws.psi_tilde, ws.spin_matrices, Float64(ws.c1), Float64(half), N;
             imaginary_time,
@@ -72,7 +72,7 @@ function split_step_rotating!(
 
     apply_ddi_step_rotating!(ws, dt, t_mid; imaginary_time)
 
-    if abs(ws.c1) > 1e-30
+    if is_active(ws.c1)
         apply_spin_mixing_step!(
             ws.psi_tilde, ws.spin_matrices, Float64(ws.c1), Float64(half), N;
             imaginary_time,

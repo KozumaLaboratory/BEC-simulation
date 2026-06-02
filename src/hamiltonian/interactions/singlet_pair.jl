@@ -47,7 +47,7 @@ function apply_singlet_pair_step!(
     psi_mf::Union{Nothing, AbstractArray}=nothing,
 )
     c2 = get_cn(interactions, 2)
-    abs(c2) < 1e-30 && return nothing
+    is_active(c2) || return nothing
 
     D = 2F + 1
     n_pts = ntuple(d -> size(psi, d), ndim)

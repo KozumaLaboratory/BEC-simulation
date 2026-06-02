@@ -36,12 +36,12 @@ function _energy_decomposition_cpu(ws::Workspace{N}) where {N}
     zee = zeeman_at(ws.zeeman, ws.state.t)
     E_zee = _zeeman_energy(psi, zee, ws.spin_matrices.system, n_comp, N, n_pts, dV)
 
-    E_c0 = if abs(ws.interactions[0]) > 1e-30
+    E_c0 = if is_active(ws.interactions[0])
         _density_interaction_energy(psi, ws.interactions[0], n_comp, N, n_pts, dV)
     else
         0.0
     end
-    E_c1 = if abs(ws.interactions[1]) > 1e-30
+    E_c1 = if is_active(ws.interactions[1])
         _spin_interaction_energy(psi, ws.spin_matrices, ws.interactions[1], n_comp, N, n_pts, dV)
     else
         0.0
@@ -71,7 +71,7 @@ function _energy_decomposition_cpu(ws::Workspace{N}) where {N}
     E_tensor = begin
         e = 0.0
         c2 = get_cn(ws.interactions, 2)
-        abs(c2) > 1e-30 &&
+        is_active(c2) &&
             (e += _singlet_pair_energy(psi, ws.spin_matrices.system.F, c2, N, n_pts, dV))
         ws.tensor_cache !== nothing &&
             (e += _tensor_interaction_energy(psi, ws.tensor_cache, N, n_pts, dV))
@@ -94,7 +94,7 @@ function _energy_decomposition_cpu(ws::Workspace{N}) where {N}
     # vortex / FL ground states under finite rotating_frame_omega; without it,
     # `dE` tracks H_lab while the propagator drives toward H_rot's minimum.
     Ω = ws.sim_params.rotating_frame_omega
-    E_coriolis = if abs(Ω) > 1e-15 && N >= 2
+    E_coriolis = if is_active(Ω, ROTATION_TOL) && N >= 2
         -Ω * orbital_angular_momentum(psi, grid, plans)
     else
         0.0

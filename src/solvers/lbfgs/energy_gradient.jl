@@ -118,7 +118,7 @@ function _grad_coriolis!(
     grad, psi, ws, fft_buf, deriv_buf, n_pts, D, ::Val{N}
 ) where {N}
     Ω = ws.sim_params.rotating_frame_omega
-    (abs(Ω) > 1e-15 && N >= 2) || return nothing
+    (is_active(Ω, ROTATION_TOL) && N >= 2) || return nothing
     grid = ws.grid
     x_bcast = _axis_broadcast(fft_buf, grid.x[1], 1)
     y_bcast = _axis_broadcast(fft_buf, grid.x[2], 2)
@@ -161,7 +161,7 @@ end
 
 function _grad_c0_density!(grad, psi, ws, n_density, n_pts, D, ::Val{N}) where {N}
     c0 = ws.interactions[0]
-    abs(c0) > 1e-30 || return nothing
+    is_active(c0) || return nothing
     for c in 1:D
         idx = _component_slice(N, n_pts, c)
         view(grad, idx...) .+= c0 .* n_density .* view(psi, idx...)
@@ -182,7 +182,7 @@ end
 
 function _grad_c1_spin!(grad, psi, ws, fx, fy, fz, n_pts, D, ::Val{N}) where {N}
     c1 = ws.interactions[1]
-    abs(c1) > 1e-30 || return nothing
+    is_active(c1) || return nothing
     sm = ws.spin_matrices
     F = ws.atom.F
     _compute_spin_density!(fx, fy, fz, psi, sm, Val(D), N, n_pts)
@@ -285,7 +285,7 @@ function _project_constraints!(
             mz_grad += m * real(dot(pc, gc)) * dV
             mz_norm += m^2 * sum(abs2, pc) * dV
         end
-        if mz_norm > 1e-30
+        if is_active(mz_norm)
             λ = mz_grad / mz_norm
             for c in 1:D
                 m = Float64(F - (c - 1))

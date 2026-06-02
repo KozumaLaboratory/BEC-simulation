@@ -210,7 +210,7 @@ direct field-access bypass; we re-check defensively.
 """
 function _dict_to_delta_gS(F::Int, c_dict::Dict{Int, Float64})
     for (k, val) in c_dict
-        if k >= 3 && isodd(k) && abs(val) > 1e-30
+        if k >= 3 && isodd(k) && is_active(val)
             throw(
                 ArgumentError(
                     "c_$k is odd-rank and not a physical tensor coupling. " *
@@ -220,7 +220,7 @@ function _dict_to_delta_gS(F::Int, c_dict::Dict{Int, Float64})
         end
         # Silent-drop guard: reject k > 2F so high-rank entries don't
         # silently disappear when the user passes c_8 for an F=2 atom.
-        if k > 2F && abs(val) > 1e-30
+        if k > 2F && is_active(val)
             throw(
                 ArgumentError(
                     "c_$k coupling supplied but F=$F only supports up to c_$(2F). " *
@@ -230,7 +230,7 @@ function _dict_to_delta_gS(F::Int, c_dict::Dict{Int, Float64})
     end
     extra = Dict{Int, Float64}()
     for (k, val) in c_dict
-        k >= 2 && k <= 2F && iseven(k) && abs(val) > 1e-30 && (extra[k] = val)
+        k >= 2 && k <= 2F && iseven(k) && is_active(val) && (extra[k] = val)
     end
     isempty(extra) && return Dict{Int, Float64}()
     _cn_to_gS(F, extra)

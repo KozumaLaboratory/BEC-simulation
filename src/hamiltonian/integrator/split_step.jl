@@ -159,7 +159,7 @@ function _apply_transverse_zeeman_step!(
     # Optional spin rotating frame: rotate (Bx, By) into the RF coords;
     # when ω_R = ω_drive the transverse field becomes static in RF.
     omega_R = ws.sim_params.spin_rotating_frame_omega
-    bx, by = if abs(omega_R) > 1e-30
+    bx, by = if is_active(omega_R, ROTATION_TOL)
         c = cos(omega_R * t);
         s = sin(omega_R * t)
         (bx_lab * c + by_lab * s, -bx_lab * s + by_lab * c)
@@ -673,14 +673,14 @@ function _outer_operators_fwd!(
         )
     end
 
-    if abs(ip[1]) > 1e-30
+    if is_active(ip[1])
         @timeit_debug TIMER "spin_mixing" apply_spin_mixing_step!(
             ws.state.psi, ws.spin_matrices, ip[1], dt_outer, ndim; imaginary_time, psi_mf
         )
     end
 
     c2 = get_cn(ip, 2)
-    if abs(c2) > 1e-30
+    if is_active(c2)
         @timeit_debug TIMER "singlet_pair" apply_singlet_pair_step!(
             ws.state.psi, ip, ws.spin_matrices.system.F, dt_outer, ndim; imaginary_time, psi_mf
         )
@@ -738,13 +738,13 @@ function _outer_operators_bwd!(
     end
 
     c2 = get_cn(ip, 2)
-    if abs(c2) > 1e-30
+    if is_active(c2)
         @timeit_debug TIMER "singlet_pair" apply_singlet_pair_step!(
             ws.state.psi, ip, ws.spin_matrices.system.F, dt_outer, ndim; imaginary_time, psi_mf
         )
     end
 
-    if abs(ip[1]) > 1e-30
+    if is_active(ip[1])
         @timeit_debug TIMER "spin_mixing" apply_spin_mixing_step!(
             ws.state.psi, ws.spin_matrices, ip[1], dt_outer, ndim; imaginary_time, psi_mf
         )

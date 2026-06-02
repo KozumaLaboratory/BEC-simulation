@@ -94,10 +94,9 @@ function find_ground_state_lbfgs(;
     # direction is missing those contributions, so LBFGS would converge
     # to a wrong minimum. Warn the user to fall back to ITP.
     c2_val = abs(get_cn(ws.interactions, 2))
-    has_high_rank = any(((k, v),) -> k >= 2 && abs(v) > 1e-30,
-        ws.interactions.c)
+    has_high_rank = any(((k, v),) -> k >= 2 && is_active(v), ws.interactions.c)
     has_tensor = ws.tensor_cache !== nothing
-    if c2_val > 1e-30 || has_high_rank || has_tensor
+    if is_active(c2_val) || has_high_rank || has_tensor
         @warn "find_ground_state_lbfgs: gradient does NOT include c2 singlet-pair " *
             "or tensor_cache contributions. The optimizer will converge " *
             "to a biased minimum. Use find_ground_state (ITP) for these channels, " *
@@ -215,7 +214,7 @@ function find_ground_state_lbfgs(;
         # `size(grad)` temporaries.
         y_k = grad_new .- grad
         ys = real(dot(s_k, y_k)) * dV
-        if ys > 1e-30
+        if is_active(ys)
             push!(s_hist, copy(s_k))
             push!(y_hist, copy(y_k))
             push!(rho_hist, 1.0 / ys)

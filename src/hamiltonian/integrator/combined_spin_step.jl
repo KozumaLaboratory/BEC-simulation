@@ -80,7 +80,7 @@ function _apply_combined_spin_step!(
     zee = zeeman_at(ws.zeeman, t)
     bx_lab, by_lab = transverse_b(zee, t)
     omega_R = ws.sim_params.spin_rotating_frame_omega
-    bx, by = if abs(omega_R) > 1e-30
+    bx, by = if is_active(omega_R, ROTATION_TOL)
         cs = cos(omega_R * t)
         sn = sin(omega_R * t)
         (bx_lab * cs + by_lab * sn, -bx_lab * sn + by_lab * cs)
@@ -97,7 +97,7 @@ function _apply_combined_spin_step!(
     bufs.Phi_z .+= c1 .* bufs.Fz_r
 
     # If everything is zero (no SM, no DDI, no transverse), skip.
-    something_active = abs(c1) > 1e-30 || ddi_active || (abs(bx) + abs(by) > 1e-30)
+    something_active = is_active(c1) || ddi_active || is_active(abs(bx) + abs(by))
     something_active || return nothing
 
     # Single Euler rotation per voxel (batched gemm + cis recurrence on
