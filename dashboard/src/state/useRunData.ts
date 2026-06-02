@@ -33,9 +33,18 @@ export function useRunData(): RunDataState {
   const setSelectedRun = useCallback(
     (name: string) => {
       userPickedRef.current = true
-      setUrlState({ run: name, point: 0, snap: null })
+      // From a global surface (Catalog/Queue) the run only round-trips
+      // through ?run=…; nothing on screen changes until we flip the tab
+      // too. Per-run tabs are left alone so the user can switch runs
+      // while staying on Slice / 3D / Config.
+      const leaveTab = urlState.tab !== 'catalog' && urlState.tab !== 'queue'
+      setUrlState(
+        leaveTab
+          ? { run: name, point: 0, snap: null }
+          : { run: name, point: 0, snap: null, tab: 'overview' },
+      )
     },
-    [setUrlState],
+    [setUrlState, urlState.tab],
   )
 
   useEffect(() => {
