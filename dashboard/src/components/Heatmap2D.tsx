@@ -23,8 +23,17 @@ interface Props {
 /**
  * 2D heatmap rendered via R3F + a single textured plane. Drop-in for the
  * old Plotly `<heatmap>` panel: an `r32float` `DataTexture` carries the
- * raw values, a 256-stop 1D LUT applies the colormap in the fragment
- * shader, and bilinear texture filtering smooths between cells.
+ * raw values and a 256-stop 1D LUT applies the colormap in the fragment
+ * shader.
+ *
+ * Texture filtering is `NearestFilter` so per-cell values are NOT
+ * interpolated between neighbours. Sweep data is **discrete**: a
+ * (B, Ω) cell is one resolved measurement, not a sample from a
+ * continuous field. Bilinear filtering (the previous default) drew
+ * smooth-looking gradients between cells that didn't exist, which
+ * over-suggested structure at cell boundaries and made adjacent
+ * unconverged vs converged cells blend into each other visually.
+ * See `docs/architecture/sweep_view.md` for the rationale.
  *
  * Why R3F instead of Plotly: 14 panels × 60 fps fit easily on a GPU but
  * crushed Plotly's CPU heatmap path; bundle savings of removing Plotly
@@ -146,8 +155,10 @@ function HeatmapMesh({ data, nx, ny, zmin, zmax, colormap, mask }: MeshProps) {
   // handle via `needsUpdate` below to avoid GPU churn.
   const dataTex = useMemo(() => {
     const tex = new THREE.DataTexture(data, nx, ny, THREE.RedFormat, THREE.FloatType)
-    tex.minFilter = THREE.LinearFilter
-    tex.magFilter = THREE.LinearFilter
+    // NearestFilter (not Linear): sweep cells are discrete measurements,
+    // not samples of a continuum. See header comment.
+    tex.minFilter = THREE.NearestFilter
+    tex.magFilter = THREE.NearestFilter
     tex.wrapS = THREE.ClampToEdgeWrapping
     tex.wrapT = THREE.ClampToEdgeWrapping
     tex.unpackAlignment = 1
@@ -174,8 +185,9 @@ function HeatmapMesh({ data, nx, ny, zmin, zmax, colormap, mask }: MeshProps) {
       THREE.RedFormat,
       THREE.FloatType,
     )
-    tex.minFilter = THREE.LinearFilter
-    tex.magFilter = THREE.LinearFilter
+    // Same NearestFilter rationale as the data texture above.
+    tex.minFilter = THREE.NearestFilter
+    tex.magFilter = THREE.NearestFilter
     tex.wrapS = THREE.ClampToEdgeWrapping
     tex.wrapT = THREE.ClampToEdgeWrapping
     tex.unpackAlignment = 1
