@@ -16,47 +16,23 @@
 
 using Printf
 
-# Scratch buffer cache for energy_gradient! — avoids ~0.5 MB/call alloc that
-# accumulates over LBFGS iterations on GPU (each `similar(psi, ...)` returned
-# a fresh CuArray that the CUDA memory pool kept growing for, leading to
-# 30 GB RSS at 1000 LBFGS steps before this fix).
-# Keyed by (typeof(psi), spatial_n_pts). Single-threaded Julia assumption.
-# The 5th buffer is the Coriolis derivative scratch (∂_x ψ or ∂_y ψ) used
-# when `rotating_frame_omega ≠ 0`.
-const _ENERGY_GRADIENT_SCRATCH = IdDict{Any, NTuple{5, AbstractArray}}()
-
+# Scratch buffers (fft_buf, fx/fy/fz spin-density, Coriolis derivative)
+# backed by the shared scratch registry. Avoids ~0.5 MB/call CuArray pool
+# churn that OOM'd 1000+-step LBFGS sweeps pre-2026-06-02.
 function _energy_gradient_scratch(psi, n_pts)
-    key = (typeof(psi), n_pts)
-    sc = get(_ENERGY_GRADIENT_SCRATCH, key, nothing)
-    if sc === nothing
-        sc = (
+    scratch_get!(:energy_gradient, (typeof(psi), n_pts)) do
+        (
             similar(psi, ComplexF64, n_pts),  # fft_buf
             similar(psi, Float64, n_pts),     # fx scratch
             similar(psi, Float64, n_pts),     # fy scratch
             similar(psi, Float64, n_pts),     # fz scratch
-            similar(psi, ComplexF64, n_pts),  # coriolis derivative scratch
+            similar(psi, ComplexF64, n_pts),  # Coriolis derivative scratch
         )
-        _ENERGY_GRADIENT_SCRATCH[key] = sc
     end
-    return sc
 end
 
-# Build a device-resident, broadcast-shaped view of a CPU-side coordinate
-# or wavenumber vector onto a single axis of an N-dim spatial array. Used
-# by the Coriolis gradient term. CPU path returns a `reshape` of the
-# original vector (zero-copy); GPU path copies once to the device. The
-# result is a singleton-padded ND array suitable for broadcasting against
-# `fft_buf` (and the spinor `grad` view per component).
-function _coord_broadcast(template::AbstractArray, vec::AbstractVector, axis::Int)
-    N = ndims(template)
-    shape = ntuple(d -> d == axis ? length(vec) : 1, N)
-    if template isa Array
-        return reshape(vec, shape)
-    else
-        dev = copyto!(similar(template, eltype(vec), length(vec)), vec)
-        return reshape(dev, shape)
-    end
-end
+# `_axis_broadcast` lives in `src/foundation/backend.jl`; reused here for
+# the Coriolis −Ω·L_z·ψ term's per-axis coordinate / wavenumber arrays.
 
 """
     energy_gradient!(grad, psi, ws; k_squared_dev) → E
@@ -82,24 +58,46 @@ function energy_gradient!(
     ws::Workspace{N};
     k_squared_dev::AbstractArray{<:AbstractFloat}=ws.grid.k_squared,
 ) where {N}
-    grid = ws.grid
-    n_comp = ws.spin_matrices.system.n_components
-    F = ws.atom.F
-    dV = cell_volume(grid)
     n_pts = ntuple(d -> size(psi, d), Val(N))
-    D = n_comp
+    D = ws.spin_matrices.system.n_components
 
     fill!(grad, zero(ComplexF64))
+    copyto!(ws.state.psi, psi)  # sync ws for energy evaluation
 
-    # Sync workspace psi for energy evaluation
-    copyto!(ws.state.psi, psi)
+    fft_buf, fx_scratch, fy_scratch, fz_scratch, deriv_buf = _energy_gradient_scratch(psi, n_pts)
 
-    # --- Kinetic: (-∇²/2) ψ via FFT ---
-    # Scratch reused across LBFGS iterations (avoids ~0.5 MB/call leak that
-    # OOMs at 1000+ LBFGS steps on GPU). Keyed by (typeof, spatial_size).
-    fft_buf, _fx_scratch, _fy_scratch, _fz_scratch, deriv_buf = _energy_gradient_scratch(
-        psi, n_pts
-    )
+    # Linear-in-ψ terms (always accumulate). Order chosen to share the
+    # fft_buf scratch productively: kinetic consumes it first, then
+    # Coriolis can re-use it as a per-component FFT workspace.
+    _grad_kinetic!(grad, psi, ws, fft_buf, k_squared_dev, n_pts, D, Val(N))
+    _grad_coriolis!(grad, psi, ws, fft_buf, deriv_buf, n_pts, D, Val(N))
+    _grad_trap!(grad, psi, ws, n_pts, D, Val(N))
+    _grad_zeeman!(grad, psi, ws, n_pts, D, Val(N))
+
+    # Nonlinear (density / spin) terms; gated by coupling magnitude.
+    n_density = total_density(psi, N)
+    _grad_c0_density!(grad, psi, ws, n_density, n_pts, D, Val(N))
+    _grad_lhy!(grad, psi, ws, n_density, n_pts, D, Val(N))
+    _grad_c1_spin!(grad, psi, ws, fx_scratch, fy_scratch, fz_scratch, n_pts, D, Val(N))
+    _grad_light_shift!(grad, psi, ws, n_pts, D, Val(N))
+    _grad_ddi!(grad, psi, ws, n_pts, D, Val(N))
+
+    # Scale gradient by 2 for complex ψ convention:
+    # δE = 2 Re ∫ (δE/δψ*)* · δψ dV, so grad_R = 2 × δE/δψ*
+    # makes δE = Re ∫ grad_R* · δψ dV (standard real inner product)
+    grad .*= 2
+
+    energy_decomposition(ws).total
+end
+
+# --- per-term gradient helpers ---
+#
+# Each helper mutates `grad` in place with its term's contribution to
+# δE/δψ* (BEFORE the final ×2 complex-convention scaling done by the
+# parent `energy_gradient!`). Helpers are gated on coupling magnitude so
+# they no-op when the term is inactive.
+
+function _grad_kinetic!(grad, psi, ws, fft_buf, k_squared_dev, n_pts, D, ::Val{N}) where {N}
     for c in 1:D
         idx = _component_slice(N, n_pts, c)
         fft_buf .= view(psi, idx...)
@@ -108,151 +106,149 @@ function energy_gradient!(
         ws.fft_plans.inverse * fft_buf
         view(grad, idx...) .+= fft_buf
     end
+    nothing
+end
 
-    # --- Coriolis: −Ω·L_z·ψ ---
-    # L_z = −i(x·∂_y − y·∂_x); δE_cor/δψ* = +iΩ·(x·∂_y − y·∂_x)·ψ.
-    # Closes the rotating-frame functional alongside the Barnett shift
-    # (already folded into ws.zeeman via `_shift_zeeman_for_rotating_frame`
-    # at workspace construction) and the centrifugal trap modification
-    # (already in ws.potential_values). Pre-2026-06-02 this term was
-    # absent — LBFGS in rotating frame silently minimised the wrong
-    # functional. See [[feedback_never_patch_when_root_fix_is_available]].
+# Coriolis: −Ω·L_z·ψ where L_z = −i(x·∂_y − y·∂_x). The δE_cor/δψ*
+# contribution is +iΩ·(x·∂_y − y·∂_x)·ψ. Closes the rotating-frame
+# functional alongside the Barnett Zeeman shift (in ws.zeeman) and the
+# centrifugal trap modification (in ws.potential_values). Active only
+# when `rotating_frame_omega ≠ 0` and N ≥ 2.
+function _grad_coriolis!(
+    grad, psi, ws, fft_buf, deriv_buf, n_pts, D, ::Val{N}
+) where {N}
     Ω = ws.sim_params.rotating_frame_omega
-    if abs(Ω) > 1e-15 && N >= 2
-        x_bcast = _coord_broadcast(fft_buf, grid.x[1], 1)
-        y_bcast = _coord_broadcast(fft_buf, grid.x[2], 2)
-        kx_bcast = _coord_broadcast(fft_buf, grid.k[1], 1)
-        ky_bcast = _coord_broadcast(fft_buf, grid.k[2], 2)
-        iΩ = im * Ω
-        for c in 1:D
-            idx = _component_slice(N, n_pts, c)
-            fft_buf .= view(psi, idx...)
-            ws.fft_plans.forward * fft_buf
-            # +iΩ · x · ∂_y ψ
-            deriv_buf .= fft_buf .* (im .* ky_bcast)
-            ws.fft_plans.inverse * deriv_buf
-            view(grad, idx...) .+= iΩ .* x_bcast .* deriv_buf
-            # −iΩ · y · ∂_x ψ
-            deriv_buf .= fft_buf .* (im .* kx_bcast)
-            ws.fft_plans.inverse * deriv_buf
-            view(grad, idx...) .-= iΩ .* y_bcast .* deriv_buf
-        end
+    (abs(Ω) > 1e-15 && N >= 2) || return nothing
+    grid = ws.grid
+    x_bcast = _axis_broadcast(fft_buf, grid.x[1], 1)
+    y_bcast = _axis_broadcast(fft_buf, grid.x[2], 2)
+    kx_bcast = _axis_broadcast(fft_buf, grid.k[1], 1)
+    ky_bcast = _axis_broadcast(fft_buf, grid.k[2], 2)
+    iΩ = im * Ω
+    for c in 1:D
+        idx = _component_slice(N, n_pts, c)
+        fft_buf .= view(psi, idx...)
+        ws.fft_plans.forward * fft_buf
+        # +iΩ · x · ∂_y ψ
+        deriv_buf .= fft_buf .* (im .* ky_bcast)
+        ws.fft_plans.inverse * deriv_buf
+        view(grad, idx...) .+= iΩ .* x_bcast .* deriv_buf
+        # −iΩ · y · ∂_x ψ
+        deriv_buf .= fft_buf .* (im .* kx_bcast)
+        ws.fft_plans.inverse * deriv_buf
+        view(grad, idx...) .-= iΩ .* y_bcast .* deriv_buf
     end
+    nothing
+end
 
-    # --- Trap potential: V_trap ψ ---
+function _grad_trap!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
     for c in 1:D
         idx = _component_slice(N, n_pts, c)
         view(grad, idx...) .+= ws.potential_values .* view(psi, idx...)
     end
+    nothing
+end
 
-    # --- Zeeman ---
+function _grad_zeeman!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
     zee = zeeman_at(ws.zeeman, ws.state.t)
     zee_vals = zeeman_energies(zee, ws.spin_matrices.system)
     for c in 1:D
         idx = _component_slice(N, n_pts, c)
         view(grad, idx...) .+= zee_vals[c] .* view(psi, idx...)
     end
+    nothing
+end
 
-    # --- Density interaction: c₀ n ψ ---
-    n_density = total_density(psi, N)
+function _grad_c0_density!(grad, psi, ws, n_density, n_pts, D, ::Val{N}) where {N}
     c0 = ws.interactions[0]
-    if abs(c0) > 1e-30
-        for c in 1:D
-            idx = _component_slice(N, n_pts, c)
-            view(grad, idx...) .+= c0 .* n_density .* view(psi, idx...)
-        end
+    abs(c0) > 1e-30 || return nothing
+    for c in 1:D
+        idx = _component_slice(N, n_pts, c)
+        view(grad, idx...) .+= c0 .* n_density .* view(psi, idx...)
     end
+    nothing
+end
 
-    # --- LHY ---
+function _grad_lhy!(grad, psi, ws, n_density, n_pts, D, ::Val{N}) where {N}
     c_lhy_val = ws.interactions.c_lhy
-    if c_lhy_val != 0.0
-        v_lhy = c_lhy_val .* n_density .* sqrt.(max.(n_density, 0.0))
-        for c in 1:D
-            idx = _component_slice(N, n_pts, c)
-            view(grad, idx...) .+= v_lhy .* view(psi, idx...)
-        end
+    c_lhy_val != 0.0 || return nothing
+    v_lhy = c_lhy_val .* n_density .* sqrt.(max.(n_density, 0.0))
+    for c in 1:D
+        idx = _component_slice(N, n_pts, c)
+        view(grad, idx...) .+= v_lhy .* view(psi, idx...)
     end
+    nothing
+end
 
-    # --- Spin interaction: c₁ (F⃗·f⃗) ψ ---
+function _grad_c1_spin!(grad, psi, ws, fx, fy, fz, n_pts, D, ::Val{N}) where {N}
     c1 = ws.interactions[1]
-    if abs(c1) > 1e-30
-        sm = ws.spin_matrices
-        # device-aware buffers from scratch cache (allocated once per shape)
-        fx, fy, fz = _fx_scratch, _fy_scratch, _fz_scratch
-        _compute_spin_density!(fx, fy, fz, psi, sm, Val(D), N, n_pts)
-        # Fz part (diagonal)
+    abs(c1) > 1e-30 || return nothing
+    sm = ws.spin_matrices
+    F = ws.atom.F
+    _compute_spin_density!(fx, fy, fz, psi, sm, Val(D), N, n_pts)
+    # Fz part (diagonal)
+    for c in 1:D
+        idx = _component_slice(N, n_pts, c)
+        m = Float64(F - (c - 1))
+        view(grad, idx...) .+= c1 .* m .* fz .* view(psi, idx...)
+    end
+    # F+/F− parts (tridiagonal)
+    for c in 2:D
+        idx_c = _component_slice(N, n_pts, c)
+        idx_cm1 = _component_slice(N, n_pts, c - 1)
+        fp = sqrt(Float64(F * (F + 1) - (F - c + 1) * (F - c + 2)))
+        view(grad, idx_cm1...) .+= c1 .* 0.5 .* fp .* (fx .- im .* fy) .* view(psi, idx_c...)
+        view(grad, idx_c...) .+= c1 .* 0.5 .* fp .* (fx .+ im .* fy) .* view(psi, idx_cm1...)
+    end
+    nothing
+end
+
+function _grad_light_shift!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
+    ws.light_shift !== nothing || return nothing
+    ls = ws.light_shift
+    profile = _to_host(ls.profile)
+    if ls.is_diagonal
         for c in 1:D
             idx = _component_slice(N, n_pts, c)
-            m = Float64(F - (c - 1))
-            view(grad, idx...) .+= c1 .* m .* fz .* view(psi, idx...)
+            view(grad, idx...) .+= ls.eigvals[c] .* profile .* view(psi, idx...)
         end
-        # F+/F- parts (tridiagonal)
-        for c in 2:D
+    else
+        M_full = ls.U * Diagonal(ls.eigvals) * ls.U'
+        for c in 1:D
             idx_c = _component_slice(N, n_pts, c)
-            idx_cm1 = _component_slice(N, n_pts, c - 1)
-            fp = sqrt(Float64(F * (F + 1) - (F - c + 1) * (F - c + 2)))
-            # (F⃗·f⃗)ψ has off-diagonal: fp/2 × [(fx-ify)ψ_{c} in row c-1, (fx+ify)ψ_{c-1} in row c]
-            view(grad, idx_cm1...) .+= c1 .* 0.5 .* fp .* (fx .- im .* fy) .* view(psi, idx_c...)
-            view(grad, idx_c...) .+= c1 .* 0.5 .* fp .* (fx .+ im .* fy) .* view(psi, idx_cm1...)
-        end
-    end
-
-    # --- Light shift: M × I(r) × ψ ---
-    if ws.light_shift !== nothing
-        ls = ws.light_shift
-        profile = _to_host(ls.profile)
-        if ls.is_diagonal
-            for c in 1:D
-                idx = _component_slice(N, n_pts, c)
-                view(grad, idx...) .+= ls.eigvals[c] .* profile .* view(psi, idx...)
-            end
-        else
-            M_full = ls.U * Diagonal(ls.eigvals) * ls.U'
-            for c in 1:D
-                idx_c = _component_slice(N, n_pts, c)
-                for c2 in 1:D
-                    abs(M_full[c, c2]) < 1e-30 && continue
-                    idx_c2 = _component_slice(N, n_pts, c2)
-                    view(grad, idx_c...) .+= M_full[c, c2] .* profile .* view(psi, idx_c2...)
-                end
+            for c2 in 1:D
+                abs(M_full[c, c2]) < 1e-30 && continue
+                idx_c2 = _component_slice(N, n_pts, c2)
+                view(grad, idx_c...) .+= M_full[c, c2] .* profile .* view(psi, idx_c2...)
             end
         end
     end
+    nothing
+end
 
-    # --- DDI: (Φ⃗·f⃗) ψ ---
-    if ws.ddi !== nothing
-        sm = ws.spin_matrices
-        bufs = ws.ddi_bufs
-        _compute_spin_density!(bufs.Fx_r, bufs.Fy_r, bufs.Fz_r, psi, sm, Val(D), N, n_pts)
-        compute_ddi_potential!(ws.ddi, bufs)
-
-        # Keep on device (bufs.Phi_* already live on the workspace backend)
-        phi_x = bufs.Phi_x
-        phi_y = bufs.Phi_y
-        phi_z = bufs.Phi_z
-
-        # Fz part
-        for c in 1:D
-            idx = _component_slice(N, n_pts, c)
-            m = Float64(F - (c - 1))
-            view(grad, idx...) .+= m .* phi_z .* view(psi, idx...)
-        end
-        # F+/F- parts
-        for c in 2:D
-            idx_c = _component_slice(N, n_pts, c)
-            idx_cm1 = _component_slice(N, n_pts, c - 1)
-            fp = sqrt(Float64(F * (F + 1) - (F - c + 1) * (F - c + 2)))
-            view(grad, idx_cm1...) .+= 0.5 .* fp .* (phi_x .- im .* phi_y) .* view(psi, idx_c...)
-            view(grad, idx_c...) .+= 0.5 .* fp .* (phi_x .+ im .* phi_y) .* view(psi, idx_cm1...)
-        end
+function _grad_ddi!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
+    ws.ddi !== nothing || return nothing
+    sm = ws.spin_matrices
+    F = ws.atom.F
+    bufs = ws.ddi_bufs
+    _compute_spin_density!(bufs.Fx_r, bufs.Fy_r, bufs.Fz_r, psi, sm, Val(D), N, n_pts)
+    compute_ddi_potential!(ws.ddi, bufs)
+    phi_x, phi_y, phi_z = bufs.Phi_x, bufs.Phi_y, bufs.Phi_z
+    # Fz part (diagonal)
+    for c in 1:D
+        idx = _component_slice(N, n_pts, c)
+        m = Float64(F - (c - 1))
+        view(grad, idx...) .+= m .* phi_z .* view(psi, idx...)
     end
-
-    # Scale gradient by 2 for complex ψ convention:
-    # δE = 2 Re ∫ (δE/δψ*)* · δψ dV, so grad_R = 2 × δE/δψ*
-    # makes δE = Re ∫ grad_R* · δψ dV (standard real inner product)
-    grad .*= 2
-
-    energy_decomposition(ws).total
+    # F+/F− parts (tridiagonal)
+    for c in 2:D
+        idx_c = _component_slice(N, n_pts, c)
+        idx_cm1 = _component_slice(N, n_pts, c - 1)
+        fp = sqrt(Float64(F * (F + 1) - (F - c + 1) * (F - c + 2)))
+        view(grad, idx_cm1...) .+= 0.5 .* fp .* (phi_x .- im .* phi_y) .* view(psi, idx_c...)
+        view(grad, idx_c...) .+= 0.5 .* fp .* (phi_x .+ im .* phi_y) .* view(psi, idx_cm1...)
+    end
+    nothing
 end
 
 """

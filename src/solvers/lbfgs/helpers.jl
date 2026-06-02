@@ -1,22 +1,13 @@
 # L-BFGS internal helpers: Sobolev preconditioner + 2-loop direction
 # update + line search.
 
-# Scratch cache for LBFGS — avoids per-iteration allocations that accumulate
-# to GB-scale memory pressure during long LBFGS runs on GPU. Keyed by
-# (typeof, size). Single-threaded Julia assumption.
-const _LBFGS_SCRATCH = IdDict{Any, NamedTuple}()
-
+# Scratch buffers for LBFGS direction update + line search, backed by the
+# shared scratch registry. Avoids per-iteration allocations that
+# accumulated to GB-scale CUDA pool pressure during long LBFGS runs on GPU.
 function _lbfgs_scratch(template)
-    key = (typeof(template), size(template))
-    sc = get(_LBFGS_SCRATCH, key, nothing)
-    if sc === nothing
-        sc = (
-            q=similar(template),
-            psi_trial=similar(template),
-        )
-        _LBFGS_SCRATCH[key] = sc
+    scratch_get!(:lbfgs, (typeof(template), size(template))) do
+        (q=similar(template), psi_trial=similar(template))
     end
-    return sc
 end
 
 function _sobolev_precondition!(
