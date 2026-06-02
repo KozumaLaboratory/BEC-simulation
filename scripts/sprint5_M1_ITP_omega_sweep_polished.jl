@@ -126,10 +126,11 @@ function run_cell(omega::Float64, B_nT::Float64)
     CUDA.reclaim()
     return (
         omega=omega, B_nT=B_nT,
-        E=E, conv_itp=conv_itp, dE_itp=dE_itp, dpsi_itp=dpsi_itp,
+        E=E, E_itp=E_itp,
+        conv_lbfgs=conv_lbfgs, grad_norm=grad_norm,
         fx_total=fx_total, fy_total=fy_total, fz_total=fz_total,
         Lz=Lz, f_max=f_max, m_dist=m_dist,
-        time_itp_min=t_itp/60,
+        time_itp_min=t_itp/60, time_lbfgs_min=t_lbfgs/60,
     )
 end
 
@@ -156,20 +157,21 @@ function main()
             @printf "\n[cell %d/%d] B=%.1f nT, Ω=%.2f\n" icell n_total B_nT Ω
             flush(stdout)
             r = run_cell(Ω, B_nT)
-            gate = r.conv_itp ? "✓" : "✗"
-            @printf "  E=%.6f conv=%s dE=%.2e dψ=%.2e ⟨F_z⟩=%+.3e ⟨L_z⟩=%+.3e f_max=%.3f (%.1f min)\n" r.E gate r.dE_itp r.dpsi_itp r.fz_total r.Lz r.f_max r.time_itp_min
+            gate = (r.conv_lbfgs && r.grad_norm < TOL_LBFGS) ? "✓✓" : (
+                r.conv_lbfgs ? "✓∇" : "✗"
+            )
+            @printf "  E=%.6f conv=%s ‖∇E‖=%.3e ⟨F_z⟩=%+.3e ⟨L_z⟩=%+.3e f_max=%.3f (ITP %.1f / LBFGS %.1f min)\n" r.E gate r.grad_norm r.fz_total r.Lz r.f_max r.time_itp_min r.time_lbfgs_min
             push!(results, r)
 
             partial = [
                 Dict(
                     "omega" => r.omega, "B_nT" => r.B_nT,
-                    "E" => r.E,
-                    "conv_itp" => r.conv_itp,
-                    "dE_itp" => r.dE_itp, "dpsi_itp" => r.dpsi_itp,
+                    "E" => r.E, "E_itp" => r.E_itp,
+                    "conv_lbfgs" => r.conv_lbfgs, "grad_norm" => r.grad_norm,
                     "fx_total" => r.fx_total, "fy_total" => r.fy_total,
                     "fz_total" => r.fz_total, "Lz" => r.Lz, "f_max" => r.f_max,
                     "m_dist" => r.m_dist,
-                    "time_itp_min" => r.time_itp_min,
+                    "time_itp_min" => r.time_itp_min, "time_lbfgs_min" => r.time_lbfgs_min,
                 ) for r in results
             ]
             @save partial_path partial icell n_total
@@ -177,10 +179,10 @@ function main()
     end
 
     println("\n\n=== Polished Ω×B sweep — per-cell summary ===\n")
-    @printf "%-10s %-6s %-13s %-9s %-9s %-13s %-13s %-13s %-13s\n" "B[nT]" "Ω" "E" "dE" "dψ" "⟨F_z⟩" "⟨L_z⟩" "⟨F_x⟩" "f_max"
+    @printf "%-10s %-6s %-13s %-9s %-13s %-13s %-13s %-13s\n" "B[nT]" "Ω" "E" "‖∇E‖" "⟨F_z⟩" "⟨L_z⟩" "⟨F_x⟩" "f_max"
     for r in results
-        gate = r.conv_itp ? "✓" : "✗"
-        @printf "%-10.2f %-6.2f %.6f %.2e %.2e %+.4e %+.4e %+.4e %.4f  %s\n" r.B_nT r.omega r.E r.dE_itp r.dpsi_itp r.fz_total r.Lz r.fx_total r.f_max gate
+        gate = (r.conv_lbfgs && r.grad_norm < TOL_LBFGS) ? "✓✓" : "✗"
+        @printf "%-10.2f %-6.2f %.6f %.3e %+.4e %+.4e %+.4e %.4f  %s\n" r.B_nT r.omega r.E r.grad_norm r.fz_total r.Lz r.fx_total r.f_max gate
     end
 
     println("\n--- ⟨F_z⟩(B, Ω) ---")
