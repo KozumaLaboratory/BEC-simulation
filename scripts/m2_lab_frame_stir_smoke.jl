@@ -1,32 +1,39 @@
 #!/usr/bin/env julia
-# scripts/m2_lab_frame_klaus_stir_smoke.jl
+# scripts/m2_lab_frame_stir_smoke.jl
 #
-# M2 lab-frame Klaus-stir smoke. Protocol per user's "Ω=0 static GS →
-# stir on" framing:
+# M2 lab-frame stir smoke. Protocol per user's "Ω=0 static GS → stir on"
+# framing:
 #
 #   Phase 1 (t < 0): equilibrate at Ω = 0 with static Bz = B_static.
-#                    This stage is BUG-FREE — no `rotating_frame_omega`,
-#                    so the GPU-energy-missing-Coriolis bug is inactive.
+#                    Bug-trivially-inactive — no `rotating_frame_omega`.
 #
 #   Phase 2 (t ≥ 0): turn on rotating transverse B field:
 #                       B_x(t) = B_perp · cos(Ω_d · t)
 #                       B_y(t) = B_perp · sin(Ω_d · t)
 #                    Real-time evolution under H_lab(t) — uses the
-#                    independently-audited split-step propagator
-#                    (6-sign Coriolis + Barnett shift). NO
+#                    independently-audited split-step propagator. NO
 #                    `energy_gradient!`, NO LBFGS, NO
-#                    `rotating_frame_omega` — completely outside today's
-#                    bug's blast radius regardless of fix status.
+#                    `rotating_frame_omega`. Outside today's bug's blast
+#                    radius regardless of fix status.
 #
-# Observable: ⟨F_z⟩(t) Barnett pumping curve. Per
-# `barnett_spin_pumping_observed_2026_05_16`, at weak Bz and Ω = ±0.5
-# we expect τ_pump ~ 5–10 ω_ref⁻¹ (~7–14 ms) and a sign-dependent
-# saturation: +Ω_d → ⟨F_z⟩/N stuck near +F (~5), −Ω_d → relaxation.
+# Observable: ⟨F_z⟩(t) — the dynamical Barnett pumping curve.
 #
-# This smoke runs ONE (Bz, B_perp, Ω_d) cell to surface the curve.
+# Reference anchors (NOT a "Klaus" paper — that name was a confabulation):
+#   * Experiment: Dy Innsbruck 2022 (arXiv:2206.12265) — rotating-B
+#     spin pumping in a strongly dipolar BEC.
+#   * Theory benchmark: Prasad 2019 (arXiv:1906.08664) — rotating-
+#     polarisation scalar dipolar BEC long-time dynamics.
+#
+# Load-bearing in this smoke is QUALITATIVE ONLY:
+#   ✓ sign of ⟨F_z⟩(t) drift (Barnett pumping in the predicted direction)
+#   ✓ presence/absence of resonant pumping at Ω_d ≈ Larmor frequency
+#   ✓ co-aligned ⟨L_z⟩ + ⟨F_z⟩ at saturation (EdH oracle)
+# Absolute τ_pump and saturation rates are NOT load-bearing — the
+# lab-frame RTP shares the M0 5–10× time-constant anomaly (still
+# unresolved). Calibrate rates after M0 is closed.
 #
 # Run: LD_LIBRARY_PATH=/usr/lib/wsl/lib julia --project=. \
-#      scripts/m2_lab_frame_klaus_stir_smoke.jl
+#      scripts/m2_lab_frame_stir_smoke.jl
 #
 # Cost: 8000 steps × ~40 ms/step on 24³ Eu ≈ 5 min GPU.
 
