@@ -73,6 +73,7 @@ include("hamiltonian/terms/raman.jl")
 include("hamiltonian/terms/light_shift.jl")
 include("hamiltonian/terms/magnetic_gradient.jl")
 include("hamiltonian/terms/loss.jl")
+include("hamiltonian/terms/registry.jl")
 
 # Integrators.
 include("hamiltonian/integrator/propagators.jl")
