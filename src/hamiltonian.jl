@@ -60,6 +60,7 @@ include("hamiltonian/potentials/light_shift.jl")
 # See `docs/conventions/sign_bug_proof_architecture.md`.
 include("hamiltonian/terms/base.jl")
 include("hamiltonian/terms/zeeman_z.jl")
+include("hamiltonian/terms/zeeman_transverse.jl")
 
 # Integrators.
 include("hamiltonian/integrator/propagators.jl")
