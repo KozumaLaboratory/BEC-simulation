@@ -250,6 +250,51 @@ using FFTW
         @test cy1 ≈ -x_offset atol=0.15
     end
 
+    @testset "Static +Bx aligns ⟨F_x⟩ > 0 (transverse Zeeman sign oracle)" begin
+        # User-spec convention (`b_block_builders.jl:27`):
+        #   `H_Zeeman = -(g_F μ_B B · F) + q F_z²`
+        # → For +Bx, H gets `-bx·F_x` → low energy at ⟨F_x⟩ > 0
+        # → spin aligns WITH +Bx, not against it.
+        #
+        # Pre-2026-06-04 the propagator applied `+bx·F_x` (opposite
+        # sign), which gave ⟨F_x⟩ → −F at +Bx. The bug was caught by
+        # the M2 lab-frame stir asymmetry showing EdH-inverted direction
+        # (CCW rotation pumped ⟨F_z⟩ negative instead of positive).
+        # This test pins the corrected convention as a permanent guard.
+        #
+        # Setup: F=1, c1=0, both +Bz and +Bx active. FM_z initial
+        # state breaks the F_x parity (polar/FM_z superposition has
+        # ⟨F_x⟩=0 by symmetry — needs a Bz-aligned seed for the +Bx
+        # tilt to drive ⟨F_x⟩ off zero). GS lives in (x, z) plane with
+        # ⟨F_x⟩ > 0 ALWAYS (the diagnostic), and ⟨F_z⟩ > 0 too.
+        config = GridConfig((8, 8, 8), (4.0, 4.0, 4.0))
+        grid = make_grid(config)
+        atom = Rb87
+        interactions = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
+        # TimeDependentZeeman(p_wf, q_wf, bx_wf, by_wf) — p first = Bz.
+        zeeman = TimeDependentZeeman(
+            ConstantWaveform(1.0),   # Bz = 1 (parity breaker)
+            ConstantWaveform(0.0),   # q = 0
+            ConstantWaveform(2.0),   # Bx = 2 (dominant)
+            ConstantWaveform(0.0),   # By = 0
+        )
+        r = find_ground_state(;
+            grid, atom, interactions, zeeman,
+            potential=HarmonicTrap((1.0, 1.0, 1.0)),
+            dt=0.005, n_steps=500, tol=0.0,
+            initial_state=:m_plus_F, verbose=false,
+            enable_ddi=false,
+        )
+        psi = Array(r.workspace.state.psi)
+        sm = r.workspace.spin_matrices
+        fx, fy, fz = spin_density_vector(psi, sm, 3)
+        dV = cell_volume(grid)
+        Fx = sum(fx) * dV
+        Fz = sum(fz) * dV
+        @test Fx > 0.1   # spin tilts toward +Bx (post-fix); pre-fix gave −0.x
+        @test Fz > 0.1   # Bz dominates the polar pull → mostly along +z
+    end
+
     @testset "Coriolis step amplifies +L_z component (IMAGINARY TIME direction)" begin
         # In ITP the substep implements exp(+Ω·L_z·dτ), descending on the
         # rotating-frame functional H_rot = H − Ω·L_z. On an L_z = +1

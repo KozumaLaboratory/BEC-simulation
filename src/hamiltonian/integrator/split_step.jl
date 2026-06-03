@@ -166,8 +166,13 @@ function _apply_transverse_zeeman_step!(
     else
         (bx_lab, by_lab)
     end
+    # User-spec convention (`b_block_builders.jl:27`): H_Zeeman = -(g_F μ_B B · F).
+    # `apply_uniform_spin_rotation!` applies `exp(-i·dt·(phi·F̂))` i.e. H = +phi·F̂.
+    # To get the user-spec H = -bx·F_x - by·F_y, pass (-bx, -by) as phi.
+    # Fixed 2026-06-04 after sign-inversion oracle. See
+    # `mistake_transverse_zeeman_sign_inversion_2026_06_04`.
     @timeit_debug TIMER "transverse_zeeman" apply_uniform_spin_rotation!(
-        ws.state.psi, ws.spin_matrices, bx, by, 0.0, dt_frac, ndim;
+        ws.state.psi, ws.spin_matrices, -bx, -by, 0.0, dt_frac, ndim;
         imaginary_time, scratch=ws.state.psi_scratch,
     )
     nothing

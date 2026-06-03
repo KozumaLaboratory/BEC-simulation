@@ -75,8 +75,10 @@ function _apply_combined_spin_step!(
         fill!(bufs.Phi_z, 0.0)
     end
 
-    # Linear transverse Zeeman: bx F_x + by F_y. Optionally rotate into
-    # the spin-rotating frame so a resonant drive becomes static there.
+    # Linear transverse Zeeman: H = -(bx F_x + by F_y) per user-spec
+    # `b_block_builders.jl:27` (H_Zeeman = -g_F·μ_B·B·F). Optionally
+    # rotate into the spin-rotating frame so a resonant drive becomes
+    # static there.
     zee = zeeman_at(ws.zeeman, t)
     bx_lab, by_lab = transverse_b(zee, t)
     omega_R = ws.sim_params.spin_rotating_frame_omega
@@ -92,8 +94,14 @@ function _apply_combined_spin_step!(
     # The linear z-Zeeman -p F_z is NOT here — it sits in V_diag where
     # its m-diagonal action is computed as a per-component phase.
     # Broadcast (not a manual loop) so this works on GPU arrays too.
-    bufs.Phi_x .+= c1 .* bufs.Fx_r .+ bx
-    bufs.Phi_y .+= c1 .* bufs.Fy_r .+ by
+    # 2026-06-04 sign fix: subtract `bx, by` to match user-spec
+    # `H_Zeeman = -(g_F μ_B B · F)`. `_apply_ddi_rotation!` applies
+    # `exp(-i·dt·(phi·F̂))` which has H = +phi·F̂; user's +Bx must enter
+    # as -bx in phi so the resulting H is -bx·F_x. Pre-fix used `.+ bx`
+    # which silently inverted Bx, By sign. See
+    # `mistake_transverse_zeeman_sign_inversion_2026_06_04`.
+    bufs.Phi_x .+= c1 .* bufs.Fx_r .- bx
+    bufs.Phi_y .+= c1 .* bufs.Fy_r .- by
     bufs.Phi_z .+= c1 .* bufs.Fz_r
 
     # If everything is zero (no SM, no DDI, no transverse), skip.
