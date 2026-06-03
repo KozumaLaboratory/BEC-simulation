@@ -61,6 +61,7 @@ include("hamiltonian/potentials/light_shift.jl")
 include("hamiltonian/terms/base.jl")
 include("hamiltonian/terms/zeeman_z.jl")
 include("hamiltonian/terms/zeeman_transverse.jl")
+include("hamiltonian/terms/coriolis.jl")
 
 # Integrators.
 include("hamiltonian/integrator/propagators.jl")
