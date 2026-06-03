@@ -96,27 +96,35 @@ CLAUDE.md "Conventions (do NOT 'fix')".)
 
 ### Known gaps requiring follow-up
 
-- **[GAP-1] `_zeeman_energy` AND `_grad_zeeman!` BOTH miss transverse Zeeman.**
-  (`energy.jl:164-178` reads only `zeeman.p`, `zeeman.q`;
-  `energy_gradient.jl:152-160` uses only `zeeman_energies` which is the
-  diagonal piece). At bx, by ≠ 0:
-  - Propagator includes transverse (correct sign post-2026-06-04 fix) ✓
-  - CPU energy reported is missing transverse contribution ✗
-  - GPU energy reported is missing transverse contribution ✗ (inherits via `_zeeman_energy`)
-  - Gradient missing transverse contribution ✗
-  Same structural bug class as 2026-06-04 GPU energy missing
-  Coriolis/light_shift. Affects LBFGS-polished runs with transverse
-  fields, plus any energy diagnostic involving transverse B. Found by
-  this systematic audit — was NOT caught by the per-cell FD audit
-  earlier today because all those cells had bx = by = 0.
+- **[GAP-1] FIXED 2026-06-04 PM.** `_zeeman_energy` + `_grad_zeeman!`
+  (CPU) and `_energy_decomposition_gpu` (GPU) now include the
+  transverse contribution via the new `_transverse_zeeman_energy` helper
+  and an inline call to `add_gradient!(TransverseZeeman(bx, by), ...)`.
+  Bit-identity to the registry-based path verified at machine precision
+  (`Δ = 0.0` for energy, `3.5e-15` for gradient on a random 8³ state
+  with bx=0.3, by=0.2). Phase 3.1 + 3.2 of the sign-bug-proof
+  architecture (`docs/conventions/sign_bug_proof_architecture.md`)
+  added the registry path that *structurally* caught this. Blast
+  radius retro: any past Eu LBFGS-polished run with non-zero
+  transverse B (none in current M1/M2 work — all used Bz only).
 
-- **TODO: 11 missing directional tests** above. Highest priority for next session: c1 sign (FM vs polar), DDI axis alignment, light_shift state direction.
+### Phase 3 status (sign-bug-proof architecture)
 
-- **TODO: Fix [GAP-1]** — extend `_zeeman_energy` and `_grad_zeeman!` to
-  include the transverse `-bx·F_x - by·F_y` contributions, with a
-  per-term FD audit at non-zero bx/by to verify the fix. Blast
-  radius: any past Eu LBFGS-polished run with non-zero transverse B
-  (but most M1/M2 work used Bz only).
+- **All 14 H terms registered as `<: HamTerm`** in `src/hamiltonian/terms/`.
+  Sign convention is declared in ONE line per term; propagator /
+  energy / gradient methods derive from it.
+- **`build_h_terms_registry(ws)`** returns an `NTuple{14, HamTerm}` —
+  type-stable, zero-overhead iteration.
+- **`total_energy_via_registry(ws)`** is bit-identical to
+  `energy_decomposition(ws).total` (verified Δ = 0.0).
+- **`add_gradient_via_registry!(grad, ws)`** is bit-identical to
+  `energy_gradient!` body modulo Wirtinger ×2 (verified Δ = 3.5e-15).
+- **`test/oracles/test_term_consistency.jl`** runs FD oracle + sign
+  oracle per registered term. CI gate against regressions.
+
+- **TODO: 11 missing directional tests** for terms whose sign was
+  always universal (c0, c1, DDI, LHY, etc.) — lower priority since
+  no historical bug there.
 
 ---
 
