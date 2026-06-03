@@ -55,7 +55,7 @@ const A_HO = sqrt(SpinorBEC.Units.HBAR / (ATOM.mass * OMEGA_REF))
 const C_TOTAL = 4π * (ATOM.a_s / A_HO) * N_ATOMS
 
 # Matsui dynamics Bz = 2.6 nT  →  p_dimless = g_F μ_B B / (ℏ ω_ref)
-const P_PER_NT = (1.163 * SpinorBEC.Units.MU_B / SpinorBEC.Units.HBAR) * 1e-9 / OMEGA_REF
+const P_PER_NT = (1.163 * SpinorBEC.Units.MU_BOHR / SpinorBEC.Units.HBAR) * 1e-9 / OMEGA_REF
 const P_DYNAMICS = 2.6 * P_PER_NT
 const BZ_NT = 2.6
 
@@ -83,7 +83,7 @@ function main()
     @printf "c_dd_dimless=%.2f  C_TOTAL=%.1f\n\n" C_DD_DIMLESS C_TOTAL
 
     # Analytic anchor (A1) Larmor
-    omega_L_rad_per_s = 1.163 * SpinorBEC.Units.MU_B / SpinorBEC.Units.HBAR * 2.6e-9
+    omega_L_rad_per_s = 1.163 * SpinorBEC.Units.MU_BOHR / SpinorBEC.Units.HBAR * 2.6e-9
     T_L_ms = 1000 * 2π / omega_L_rad_per_s
     T_L_dimless = 2π / P_DYNAMICS
     @printf "(A1) Larmor T_L = %.2f ms physical = %.2f ω_ref⁻¹\n\n" T_L_ms T_L_dimless
