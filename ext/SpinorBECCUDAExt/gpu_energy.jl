@@ -110,7 +110,10 @@ function SpinorBEC._energy_decomposition_gpu(ws::SpinorBEC.Workspace{N}) where {
     E_kin = SpinorBEC._kinetic_energy(psi, grid, plans, fft_buf, n_comp, N, n_pts, dV)
     E_trap = SpinorBEC._trap_energy(psi, V_trap, n_comp, N, n_pts, dV)
     zee = SpinorBEC.zeeman_at(ws.zeeman, ws.state.t)
-    E_zee = SpinorBEC._zeeman_energy(psi, zee, ws.spin_matrices.system, n_comp, N, n_pts, dV)
+    E_zee_diag = SpinorBEC._zeeman_energy(psi, zee, ws.spin_matrices.system, n_comp, N, n_pts, dV)
+    bx_gpu, by_gpu = SpinorBEC.transverse_b(ws.zeeman, ws.state.t)
+    E_zee_transverse = SpinorBEC._transverse_zeeman_energy(psi, bx_gpu, by_gpu, ws.spin_matrices, N, dV)
+    E_zee = E_zee_diag + E_zee_transverse
 
     E_c0 = if abs(ws.interactions[0]) > 1e-30
         SpinorBEC._density_interaction_energy(psi, ws.interactions[0], n_comp, N, n_pts, dV)

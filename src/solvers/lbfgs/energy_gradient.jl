@@ -150,11 +150,19 @@ function _grad_trap!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
 end
 
 function _grad_zeeman!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
+    # Diagonal Zeeman: -p·F_z + q·F_z². Pre-2026-06-04 this routine
+    # silently dropped transverse contributions ([GAP-1]). Now: also
+    # adds -bx·F_x - by·F_y via the TransverseZeeman HamTerm dispatch.
     zee = zeeman_at(ws.zeeman, ws.state.t)
     zee_vals = zeeman_energies(zee, ws.spin_matrices.system)
     for c in 1:D
         idx = _component_slice(N, n_pts, c)
         view(grad, idx...) .+= zee_vals[c] .* view(psi, idx...)
+    end
+    # Transverse Zeeman contribution via HamTerm dispatch.
+    bx, by = transverse_b(ws.zeeman, ws.state.t)
+    if !(bx == 0.0 && by == 0.0)
+        add_gradient!(grad, TransverseZeeman(bx, by), psi, ws)
     end
     nothing
 end

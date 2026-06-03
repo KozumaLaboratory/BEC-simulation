@@ -74,6 +74,27 @@ function total_energy_via_registry(ws)
 end
 
 """
+    add_gradient_via_registry!(grad, ws) → grad
+
+Build δE/δψ* by iterating the registry. Bit-identical to the in-place
+sum performed by `energy_gradient!` modulo the `* 2` Wirtinger scaling
+that `energy_gradient!` applies at the end.
+
+Use this for CI bit-identity tests (asserting that the registry sum
+matches the legacy hand-written sum) and as the future replacement
+for `energy_gradient!`'s body.
+"""
+function add_gradient_via_registry!(grad, ws)
+    fill!(grad, zero(eltype(grad)))
+    registry = build_h_terms_registry(ws)
+    psi = _to_host(ws.state.psi)
+    for term in registry
+        add_gradient!(grad, term, psi, ws)
+    end
+    return grad
+end
+
+"""
     energy_breakdown_via_registry(ws) → NamedTuple
 
 Per-term energy breakdown via the registry. Returns a NamedTuple with

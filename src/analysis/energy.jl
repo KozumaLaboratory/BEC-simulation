@@ -34,7 +34,12 @@ function _energy_decomposition_cpu(ws::Workspace{N}) where {N}
     E_kin = _kinetic_energy(psi, grid, plans, fft_buf, n_comp, N, n_pts, dV)
     E_trap = _trap_energy(psi, V_trap, n_comp, N, n_pts, dV)
     zee = zeeman_at(ws.zeeman, ws.state.t)
-    E_zee = _zeeman_energy(psi, zee, ws.spin_matrices.system, n_comp, N, n_pts, dV)
+    E_zee_diag = _zeeman_energy(psi, zee, ws.spin_matrices.system, n_comp, N, n_pts, dV)
+    # Transverse Zeeman: -bx·⟨F_x⟩ - by·⟨F_y⟩. Pre-2026-06-04 silently
+    # missing ([GAP-1]). Fixed via systematic audit + HamTerm registry.
+    bx, by = transverse_b(ws.zeeman, ws.state.t)
+    E_zee_transverse = _transverse_zeeman_energy(psi, bx, by, ws.spin_matrices, N, dV)
+    E_zee = E_zee_diag + E_zee_transverse
 
     E_c0 = if is_active(ws.interactions[0])
         _density_interaction_energy(psi, ws.interactions[0], n_comp, N, n_pts, dV)
@@ -162,9 +167,11 @@ function _trap_energy(psi, V_trap, n_comp, ndim, n_pts, dV)
 end
 
 function _zeeman_energy(psi, zeeman, sys, n_comp, ndim, n_pts, dV)
-    # Inline `(-z.p m + z.q m²) |ψ_m|²` instead of materialising the
-    # `zeeman_energies` Vector{Float64} per call (saves ~104 B / 1 alloc
-    # per `energy_decomposition` call at D=13).
+    # Inline `(-z.p m + z.q m²) |ψ_m|²` for the diagonal piece. Pre-2026-06-04
+    # this routine silently dropped transverse Zeeman contributions
+    # ([GAP-1] of the systematic audit). Now: diagonal + transverse,
+    # consistent with `b_block_builders.jl:27` user spec
+    # `H_Zeeman = -(g_F μ_B B · F)`.
     p = zeeman.p
     q = zeeman.q
     E = 0.0
@@ -175,6 +182,16 @@ function _zeeman_energy(psi, zeeman, sys, n_comp, ndim, n_pts, dV)
         E += zee_c * sum(abs2, view(psi, idx...)) * dV
     end
     E
+end
+
+# Transverse Zeeman energy `-bx⟨F_x⟩ - by⟨F_y⟩`. Added 2026-06-04 to
+# close [GAP-1] (zeeman energy missing transverse contribution).
+# The call site at line ~37 of `_energy_decomposition_cpu` /
+# `_energy_decomposition_gpu` must add this when bx or by ≠ 0.
+function _transverse_zeeman_energy(psi, bx::Real, by::Real, sm, ndim, dV)
+    (bx == 0.0 && by == 0.0) && return 0.0
+    fx, fy, _ = spin_density_vector(psi, sm, ndim)
+    return (-bx) * sum(fx) * dV + (-by) * sum(fy) * dV
 end
 
 function _density_interaction_energy(psi, c0, n_comp, ndim, n_pts, dV)
