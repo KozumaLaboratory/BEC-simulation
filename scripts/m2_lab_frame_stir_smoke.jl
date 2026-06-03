@@ -70,7 +70,7 @@ function spin_density_sum(psi_cpu, sm, dV)
 end
 
 function main()
-    println("=== M2 lab-frame Klaus-stir smoke ===")
+    println("=== M2 lab-frame stir smoke ===")
     @printf "Bz_static = %.2f nT  B_perp_amp = %.2f nT  Ω_drive = %.2f ω_ref⁻¹\n" BZ_STATIC_NT B_PERP_NT OMEGA_DRIVE
     @printf "T_phase2  = %.1f ω_ref⁻¹  (N=%d steps, sample every %d)\n\n" T_PHASE2 N_PHASE2 SAMPLE_EVERY
 
@@ -157,7 +157,7 @@ function main()
         psi_phase1=psi_phase1_cpu,
         psi_final=Array(ws.state.psi),
         timestamp=string(time()),
-        note="Lab-frame Klaus-stir smoke (post-2026-06-04 GPU energy fix); single cell.",
+        note="Lab-frame stir smoke (post-2026-06-04 GPU energy fix); single cell.",
     )
     @printf "Wrote %s\n" OUTPUT_JLD2
 end

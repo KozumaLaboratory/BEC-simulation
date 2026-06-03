@@ -38,7 +38,7 @@
 #   Bz_dynamics = 2.6 nT
 #   T_evolve = 30 ω_ref⁻¹ ≈ 48 ms physical
 #
-# Observable: max_t (N_{-5} + N_{-4}) / N — the Klaus-pivot load-bearing
+# Observable: max_t (N_{-5} + N_{-4}) / N — the post-quench spin excitation load-bearing
 # observable per memory `klaus_quench_protocol_pivot_2026_05_26`. Track
 # the time at which it first exceeds 0.05 (5% threshold from F1
 # falsifier); compare to Matsui experimental ring at ~5 ms.
