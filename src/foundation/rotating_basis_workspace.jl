@@ -20,7 +20,7 @@ n = N |ψ̃|² / a_ho³ and divide by ℏω_ref using g/(ℏω_ref) = 4π a_s a_
 
     μ_LHY/(ℏω_ref) = γ_LHY |ψ̃|³ , γ_LHY = (128 √π / 3) (a_s/a_ho)^(5/2) N^(3/2) Q5
 
-Validation reference: Klaus 2022 Dy164 (a_s/a_ho ≈ 4.4e-3, N=60000, ε_dd=1.42)
+Validation reference: Dy Innsbruck 2022 [arXiv:2206.12265] Dy164 (a_s/a_ho ≈ 4.4e-3, N=60000, ε_dd=1.42)
 gives γ_LHY ≈ 6080, ratio to c0=3306 ≈ 1.8. LHY contribution at ψ̃²_peak~0.04
 is ~36% of contact — substantial as expected for the Klaus regime.
 """

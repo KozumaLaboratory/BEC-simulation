@@ -15,7 +15,7 @@ of bounds. Each BO evaluation:
 
 This is the production integration for parameter scans whose target
 quantity is non-trivial enough that uniform/Latin sweeps are wasteful —
-e.g. find c1 that maximizes m=+F-1 transfer in Klaus magnetostir.
+e.g. find c1 that maximizes m=+F-1 transfer in rotating-B magnetostir.
 
 `bounds` is a Vector{Tuple{Float64,Float64}} matching `override_paths`
 length. `objective_fn` takes the pipeline result NamedTuple and returns

@@ -75,7 +75,7 @@ end
 Accept Real (already-dimensionless ω/ω_ref) or string ("226 Hz", "1.42 kHz",
 "314 rad/s"). Returns the dimensionless ratio used internally.
 
-Eliminates the documented Klaus 2022 magnetostir footgun where
+Eliminates the documented rotating-B magnetostir footgun where
 `phi_omega: 4.524` was sometimes computed as `f/f_ref` instead of
 `(2π·f)/ω_ref` — the 2π factor.
 """

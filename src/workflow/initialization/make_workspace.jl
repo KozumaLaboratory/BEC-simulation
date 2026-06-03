@@ -114,7 +114,7 @@ function make_workspace(;
         # had the wrong sign and over-confined any rotating-frame ITP /
         # RTP, biasing FL / cyclic / vortex-lattice scans where Ω
         # approaches a non-trivial fraction of ω_⊥. Fixed 2026-04-27
-        # after code review caught it. (Klaus 2022 lab-frame magnetostir
+        # after code review caught it. (Dy Innsbruck 2022 lab-frame magnetostir
         # runs with rotating_frame_omega = 0 are unaffected.)
         omega_sq_half = U(0.5 * omega^2)
         @inbounds for I in CartesianIndices(grid.config.n_points)

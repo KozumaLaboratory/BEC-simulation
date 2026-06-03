@@ -80,7 +80,7 @@ function _save_dynamics_timeseries!(f, result)
     # only the LAST step's snapshots / times survive on disk — the
     # dashboard then shows the steady-state stir alone instead of the
     # full GS → tilt → chirp → stir animation. Caught 2026-04-27 on
-    # Klaus 2022.
+    # Dy Innsbruck 2022 [arXiv:2206.12265].
     history = get(result, :dynamics_history, nothing)
     if history !== nothing && length(history) > 1 &&
         all(h -> hasproperty(h.dynamics_result, :times), history)

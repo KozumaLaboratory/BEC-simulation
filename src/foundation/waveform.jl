@@ -55,7 +55,8 @@ multiplies by `2π`, the YAML/Julia `frequency` field is
 NOT `f_phys / f_ref`. With the typical `ω_ref = 2π · 50 rad/s ≈ 314.159`,
 a 226 Hz drive needs `frequency ≈ 0.72`, not `4.52`. The `4.52` form
 gives a 2π× rotation and a quasi-DC field as far as the BEC is concerned
-(caught 2026-04-27 in the Klaus 2022 magnetostir reproduction).
+(caught 2026-04-27 in the rotating-B magnetostir reproduction; reference
+Dy Innsbruck 2022 [arXiv:2206.12265] for the experimental protocol).
 """
 struct SinusoidalWaveform <: Waveform
     center::Float64

@@ -173,6 +173,12 @@ const CI_EXTRA = [
     "workflow/test_calibration.jl",
     "workflow/test_phase4.jl",
     "analysis/test_physics_invariants.jl",
+    # Sign-bug-proof architecture oracle suite (Phase 1-3 deliverables).
+    # Each test runs in seconds; CI tier inclusion gates the bug class
+    # documented in `docs/conventions/sign_bug_proof_architecture.md`.
+    "oracles/test_hamiltonian_sign_oracles.jl",
+    "oracles/test_term_legacy_equivalence.jl",
+    "oracles/test_term_consistency.jl",
 ]
 
 # ── Full tier: everything (ci + remaining heavy tests) ──

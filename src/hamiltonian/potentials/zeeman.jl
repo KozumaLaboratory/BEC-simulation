@@ -24,7 +24,7 @@ end
 # call as the transverse Bx F_x + By F_y so the full linear spin
 # Hamiltonian is computed as one exact matrix exponential — eliminating the
 # Strang error between -p F_z and ±B_⊥·F_⊥ that scrambles the spin in
-# strong-field runs (Klaus 2022 magnetostir, etc.).
+# strong-field runs (rotating-B magnetostir, etc.).
 function zeeman_diagonal_quadratic_only(z::ZeemanParams, sm::SpinMatrices{D}) where {D}
     F = sm.system.F
     SVector{D, Float64}(ntuple(c -> z.q * (F - (c - 1))^2, Val(D)))

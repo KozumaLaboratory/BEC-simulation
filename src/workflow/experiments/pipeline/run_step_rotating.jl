@@ -30,7 +30,7 @@
 #
 # Future-extensible: full waveform spec for theta(t), theta_dot(t),
 # phi(t), phi_dot(t) (deferred this session — constant tilt + linear
-# rotation covers Klaus magnetostir).
+# rotation covers rotating-B magnetostir).
 #
 # 557-line monolith split into 4 sub-files (2026-05-11 refactor):
 #

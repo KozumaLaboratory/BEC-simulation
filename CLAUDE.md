@@ -79,6 +79,26 @@ Each subsystem umbrella `Foo.jl` `include`s sub-files in dependency order. Publi
 - **ITP Zeeman shift**: subtracts `min(E_m)` to prevent overflow.
 - **Scalar LHY**: `@warn` present. Known approximation.
 - **`_YOSHIDA_W0 < 0`**: correct (backward middle substep, all operators time-reversible).
+- **Hamiltonian sign source-of-truth**: `b_block_builders.jl:27` documents
+  `H_Zeeman = -(g_F μ_B B · F) + q F_z²`. Every term in
+  `src/hamiltonian/terms/<term>.jl` (HamTerm protocol, Phase 1-3 of the
+  sign-bug-proof architecture, `docs/conventions/sign_bug_proof_architecture.md`)
+  declares its sign in ONE coefficient function;
+  `apply_step!`/`energy_contribution`/`add_gradient!` all derive from it.
+
+## Adding a new Hamiltonian term
+
+1. Create `src/hamiltonian/terms/<your_term>.jl` with a `struct <YourTerm> <: HamTerm`.
+2. Declare the sign convention in ONE coefficient function (e.g. `_diag_coef(term, m) = ...`).
+3. Implement `apply_step!` / `energy_contribution` / `add_gradient!` from it. Delegate to existing audited routines when possible.
+4. Add directional `sign_oracle(::Type{<YourTerm>})` returning `(name, predicate)`.
+5. Register in `src/hamiltonian.jl` include list AND `build_h_terms_registry` (`src/hamiltonian/terms/registry.jl`).
+6. Add a directional test to `test/oracles/test_hamiltonian_sign_oracles.jl`.
+7. Run `julia --project=. -e 'using SpinorBEC, Test, FFTW; include("test/oracles/test_term_consistency.jl")'` and verify FD oracle pass.
+
+The reactive cycle (per-bug fix as bugs surface) ended 2026-06-04 PM
+with Phase 3 install of the registry pattern. New H terms cannot
+silently mismatch CPU/GPU energy or omit gradient terms.
 
 ## ¹⁵¹Eu
 

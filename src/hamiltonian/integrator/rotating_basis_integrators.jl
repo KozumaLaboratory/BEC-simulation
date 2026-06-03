@@ -313,7 +313,7 @@ weighted multi-time H evaluation.
 
 Until that infrastructure exists, prefer `yoshida4_step_rotating!` (verified
 order 4) or `yoshida6_step_rotating!` (verified order 6) for production runs
-in the slow-time-dep regime (Klaus magnetostir, B-1 scan).
+in the slow-time-dep regime (rotating-B magnetostir, B-1 scan).
 
 Coefficients (Alvermann-Fehske CF4:4exp palindromic form):
     τ₁ = t + (1/2 - √3/6)·dt  ;  τ₂ = t + (1/2 + √3/6)·dt
