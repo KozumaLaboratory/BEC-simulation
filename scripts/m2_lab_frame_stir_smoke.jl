@@ -97,7 +97,7 @@ function main()
     dV = SpinorBEC.cell_volume(TW.grid)
     fx0, fy0, fz0 = spin_density_sum(psi_phase1_cpu, sm, dV)
     @printf "  Phase-1 wall: %.1fs   E = %.4f\n" (time() - t0) r_itp.energy
-    @printf "  ⟨F_x⟩=%+.3e  ⟨F_y⟩=%+.3e  ⟨F_z⟩=%+.3e  (sanity: polar at +Bz → ⟨F_z⟩≈+F)\n\n" fx0 fy0 fz0
+    @printf "  ⟨F_x⟩=%+.3e  ⟨F_y⟩=%+.3e  ⟨F_z⟩=%+.3e  (polar GS at weak Bz: ⟨F_z⟩≈0)\n\n" fx0 fy0 fz0
 
     # --- Phase 2: turn on rotating transverse B; real-time evolution.
     println("--- Phase 2: turn on rotating B_⊥; RT evolve ---")
@@ -108,12 +108,13 @@ function main()
     )
     sp = SimParams(; dt=DT, n_steps=N_PHASE2, imaginary_time=false,
         normalize_every=0, save_every=SAMPLE_EVERY)
+    # rotating_frame_omega = 0.0 by default in SimParams — no kwarg needed.
     ws = make_workspace(;
         grid=TW.grid, atom=TW.atom, interactions=TW.interactions,
         zeeman=zeeman_phase2, potential=TW.potential, sim_params=sp,
         psi_init=psi_phase1_cpu,
         enable_ddi=true, c_dd=TW.c_dd, secular_ddi=false,
-        rotating_frame_omega=0.0, backend=CUDABackend(),
+        backend=CUDABackend(),
     )
 
     times = Float64[0.0]
