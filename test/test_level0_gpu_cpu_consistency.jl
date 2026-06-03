@@ -106,29 +106,59 @@ using SpinorBEC: energy_gradient!, energy_decomposition, _to_device
         ed_cpu = energy_decomposition(ws_cpu)
         ed_gpu = energy_decomposition(ws_gpu)
 
-        # The CPU NamedTuple currently includes `light_shift` and
-        # `coriolis` while the GPU version does not (Workspace.light_shift
-        # / rotating-frame Coriolis kernels are CPU-only). When the
-        # corresponding workspace fields are unset (as in this smoke
-        # test), the missing GPU entries would be 0.0 — so we restrict
-        # the comparison to the field intersection and assert agreement
-        # on every common term.
-        common_fields = intersect(propertynames(ed_cpu), propertynames(ed_gpu))
-        @test :total in common_fields
-        for field in common_fields
+        # Pre-2026-06-04 the GPU NamedTuple was missing `light_shift`
+        # and `coriolis` (silently dropped from both the field list and
+        # the E_total sum in `ext/SpinorBECCUDAExt/gpu_energy.jl`).
+        # This created a gradient-vs-energy mismatch on the rotating
+        # frame at Ω ≠ 0 — see `mistake_gpu_energy_decomposition_missing_coriolis_2026_06_04`.
+        # Now: full-field parity is required.
+        @test propertynames(ed_cpu) == propertynames(ed_gpu)
+        for field in propertynames(ed_cpu)
             v_cpu = Float64(getproperty(ed_cpu, field))
             v_gpu = Float64(getproperty(ed_gpu, field))
             tol_rel = abs(v_cpu) > 1e-8 ? 1e-10 : 0.0
             atol = 1e-12
             @test isapprox(v_cpu, v_gpu; rtol=tol_rel, atol=atol)
         end
-        # Surface the divergence as an info message so it's visible in
-        # validation reports without failing the test (the GPU values
-        # for the missing terms are 0 by construction when unset).
-        cpu_only = setdiff(propertynames(ed_cpu), propertynames(ed_gpu))
-        isempty(cpu_only) ||
-            @info "GPU energy_decomposition missing fields (always 0 when " *
-                "workspace term is unset): $cpu_only"
+    end
+
+    @testset "Energy decomposition match at Ω ≠ 0 (Coriolis-active cell)" begin
+        # 2D grid is required for Coriolis to fire (N ≥ 2 in
+        # `_grad_coriolis!` / energy.jl:97). Use a non-axisymmetric ψ so
+        # ⟨L_z⟩ ≠ 0 → E_coriolis ≠ 0 → fields with content to compare.
+        grid = make_grid(GridConfig{2}((16, 16), (8.0, 8.0)))
+        atom = Rb87
+        interactions = InteractionParams(Dict(0 => 5.0, 1 => 0.1))
+        omega = 0.4
+        sp = SimParams(; dt=0.01, n_steps=1, rotating_frame_omega=omega)
+        ws_cpu = make_workspace(; grid, atom, interactions,
+            zeeman=ZeemanParams(0.0, 0.0),
+            potential=HarmonicTrap((1.0, 1.0)), sim_params=sp)
+        ws_gpu = make_workspace(; grid, atom, interactions,
+            zeeman=ZeemanParams(0.0, 0.0),
+            potential=HarmonicTrap((1.0, 1.0)), sim_params=sp,
+            backend=CUDABackend())
+
+        # Single-vortex state `(x + i y) · gauss(r)` has L_z = +1.
+        psi_host = zeros(ComplexF64, 16, 16, 3)
+        for I in CartesianIndices((16, 16))
+            x = grid.x[1][I[1]];
+            y = grid.x[2][I[2]]
+            psi_host[I, 2] = (x + im * y) * exp(-(x^2 + y^2) / 4)
+        end
+        # Normalise.
+        dV = cell_volume(grid)
+        psi_host ./= sqrt(sum(abs2, psi_host) * dV)
+        copyto!(ws_cpu.state.psi, psi_host)
+        copyto!(ws_gpu.state.psi, psi_host)
+
+        ed_cpu = energy_decomposition(ws_cpu)
+        ed_gpu = energy_decomposition(ws_gpu)
+
+        @test haskey(ed_cpu, :coriolis) && haskey(ed_gpu, :coriolis)
+        @test ed_cpu.coriolis != 0.0   # state has L_z ≈ +1, so non-zero
+        @test isapprox(ed_cpu.coriolis, ed_gpu.coriolis; rtol=1e-8)
+        @test isapprox(ed_cpu.total, ed_gpu.total; rtol=1e-8)
     end
 
     @testset "Ground-state ITP energy match: F=1 polar 1D" begin
