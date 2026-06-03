@@ -56,6 +56,11 @@ include("hamiltonian/potentials/laser_potential.jl")
 include("hamiltonian/potentials/optical_trap.jl")
 include("hamiltonian/potentials/light_shift.jl")
 
+# HamTerm protocol (sign-bug-proof architecture, Phase 1).
+# See `docs/conventions/sign_bug_proof_architecture.md`.
+include("hamiltonian/terms/base.jl")
+include("hamiltonian/terms/zeeman_z.jl")
+
 # Integrators.
 include("hamiltonian/integrator/propagators.jl")
 include("hamiltonian/integrator/yoshida.jl")
