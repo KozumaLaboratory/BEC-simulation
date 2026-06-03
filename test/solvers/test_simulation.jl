@@ -204,6 +204,94 @@ using FFTW
         @test psi ≈ psi_copy
     end
 
+    @testset "Coriolis step rotates ψ clockwise (REAL TIME direction)" begin
+        # Convention: H_rot = H_lab − Ω·L_z. The RT Coriolis substep
+        # implements exp(−i·(−Ω·L_z)·dt) = exp(+iΩ·L_z·dt). Recalling
+        # R̂(α) = exp(−iα·L_z) (active CCW rotation by α), this equals
+        # R̂(−Ω·dt) — active CLOCKWISE rotation of ψ by Ω·dt. A Gaussian
+        # centred at (3, 0) rotated by −π/2 must land at (0, −3).
+        #
+        # Norm preservation (the test above) is necessary but NOT
+        # sufficient — it holds for any unitary rotation, including the
+        # wrong direction. The 2026-06-03 audit
+        # (`mistake_coriolis_substep_sign_2026_06_03.md`) reverted an
+        # earlier over-correction that had inverted the substep to CCW;
+        # this test pins the correct CW direction.
+        config = GridConfig((64, 64), (16.0, 16.0))
+        grid = make_grid(config)
+        psi = zeros(ComplexF64, 64, 64, 3)
+        σ = 0.6
+        x_offset = 3.0
+        for I in CartesianIndices((64, 64))
+            x = grid.x[1][I[1]]
+            y = grid.x[2][I[2]]
+            psi[I, 2] = exp(-((x - x_offset)^2 + y^2) / (2 * σ^2))
+        end
+        dV = cell_volume(grid)
+        psi ./= sqrt(sum(abs2, psi) * dV)
+
+        # Centre of mass before: should be at (x_offset, 0).
+        n_before = SpinorBEC.total_density(psi, 2)
+        x_vec = grid.x[1]
+        y_vec = grid.x[2]
+        cx0 = sum(I -> x_vec[I[1]] * n_before[I], CartesianIndices((64, 64))) * dV
+        cy0 = sum(I -> y_vec[I[2]] * n_before[I], CartesianIndices((64, 64))) * dV
+        @test cx0 ≈ x_offset atol=0.01
+        @test cy0 ≈ 0.0 atol=0.01
+
+        # Apply Coriolis with Ω·dt = π/2 → 90° clockwise rotation.
+        SpinorBEC._apply_coriolis_step!(psi, grid, 1.0, π/2, false)
+
+        n_after = SpinorBEC.total_density(psi, 2)
+        cx1 = sum(I -> x_vec[I[1]] * n_after[I], CartesianIndices((64, 64))) * dV
+        cy1 = sum(I -> y_vec[I[2]] * n_after[I], CartesianIndices((64, 64))) * dV
+        # Expected (CW): peak (3, 0) → (0, −3).
+        @test cx1 ≈ 0.0 atol=0.15
+        @test cy1 ≈ -x_offset atol=0.15
+    end
+
+    @testset "Coriolis step amplifies +L_z component (IMAGINARY TIME direction)" begin
+        # In ITP the substep implements exp(+Ω·L_z·dτ), descending on the
+        # rotating-frame functional H_rot = H − Ω·L_z. On an L_z = +1
+        # eigenstate (single-vortex `(x + iy)·gauss`), amplitudes are
+        # multiplied by exp(+Ω·dτ); on L_z = −1 by exp(−Ω·dτ). A
+        # wrong-sign substep would flip both ratios.
+        config = GridConfig((48, 48), (12.0, 12.0))
+        grid = make_grid(config)
+        dV = cell_volume(grid)
+        σ = 1.0
+
+        ψplus = zeros(ComplexF64, 48, 48, 3)
+        ψminus = zeros(ComplexF64, 48, 48, 3)
+        for I in CartesianIndices((48, 48))
+            x = grid.x[1][I[1]];
+            y = grid.x[2][I[2]]
+            envelope = exp(-(x^2 + y^2) / (2 * σ^2))
+            ψplus[I, 2] = (x + im*y) * envelope
+            ψminus[I, 2] = (x - im*y) * envelope
+        end
+
+        ω = 0.7
+        dτ = 0.1
+        nrm_plus_before = sum(abs2, ψplus) * dV
+        nrm_minus_before = sum(abs2, ψminus) * dV
+
+        SpinorBEC._apply_coriolis_step!(ψplus, grid, ω, dτ, true)
+        SpinorBEC._apply_coriolis_step!(ψminus, grid, ω, dτ, true)
+
+        nrm_plus_after = sum(abs2, ψplus) * dV
+        nrm_minus_after = sum(abs2, ψminus) * dV
+
+        # Ratio for L_z = ℓ should be exp(2·Ω·dτ·ℓ). Allow modest
+        # tolerance: the 3-shear is exact only for matrix exp of an
+        # idealised L_z; on a 48² grid with σ=1 there's a few-% error
+        # from finite resolution.
+        expected_plus = exp(+2 * ω * dτ)   # ℓ = +1
+        expected_minus = exp(-2 * ω * dτ)   # ℓ = −1
+        @test nrm_plus_after / nrm_plus_before ≈ expected_plus rtol=0.05
+        @test nrm_minus_after / nrm_minus_before ≈ expected_minus rtol=0.05
+    end
+
     @testset "SimParams rotating_frame_omega" begin
         sp = SimParams(; dt=0.01, n_steps=100, rotating_frame_omega=0.5)
         @test sp.rotating_frame_omega == 0.5

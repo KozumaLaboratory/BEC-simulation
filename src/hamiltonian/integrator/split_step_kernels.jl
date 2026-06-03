@@ -30,6 +30,30 @@ function _apply_coriolis_step!(
 
     theta = omega * dt
 
+    # Convention: H_rot = H_lab − Ω·(L_z + F_z). RT Coriolis substep is
+    # exp(−i·H_coriolis·dt) = exp(+iΩ·L_z·dt) = R̂(−Ω·dt) (active
+    # rotation operator R̂(α) = exp(−iα·L_z)), i.e. CW rotation of ψ by
+    # Ω·dt. Equivalently, evaluate ψ at coordinates transformed by
+    # R(+Ω·dt). With the FFT shear order in this routine being
+    # y-shears outer (see `_apply_1d_shear_batch!` calls below), the
+    # R(+θ) decomposition is (+tan(θ/2), −sin θ, +tan(θ/2)) — the
+    # factors used here.
+    #
+    # IT branch via analytic continuation dt = −i·dτ: substep becomes
+    # exp(+Ω·L_z·dτ), which amplifies the +L_z component (descent on
+    # the Coriolis piece of H_rot). Same shear order with hyperbolic
+    # factors gives (+tanh(θ/2), −sinh θ, +tanh(θ/2)).
+    #
+    # A 2026-06-03 "fix" inverted these factors after misreading the
+    # freeze diagnostic at a stalled LBFGS state (where ΔE_total ≈ 0.5%
+    # of E_total is splitting-noise-dominated and not a clean
+    # propagator-vs-energy oracle). The audit on 2026-06-03 reverted
+    # that flip after verifying mutual consistency with E_coriolis
+    # (−Ω·⟨L_z⟩), the Barnett shift (p_eff = p_lab + Ω), and the
+    # transverse-spin RT-Barnett direction (CW Larmor) — all under the
+    # single H_rot = H − Ω·(L_z + F_z) convention, with the EdH oracle
+    # (⟨L_z⟩ and ⟨F_z⟩ co-aligned) as final anchor. See
+    # `mistake_coriolis_substep_sign_2026_06_03.md` for the lesson.
     if imaginary_time
         a_y = tanh(theta / 2)
         a_x = -sinh(theta)
