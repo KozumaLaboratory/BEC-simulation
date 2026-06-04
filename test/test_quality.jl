@@ -45,7 +45,12 @@ using JET
         # - CUDA / Makie / HTTP / WriteVTK: weak-dep extension triggers
         # - BenchmarkTools: used by scripts/bench/ which share the package
         #   env (no scripts/Project.toml). Keep in [deps].
-        stale_deps=(ignore=[:CUDA, :Makie, :HTTP, :WriteVTK, :BenchmarkTools],),
+        # - PackageCompiler: same justification — scripts/build_sysimage*.jl
+        #   build a SpinorBEC sysimage; sharing the package env keeps the
+        #   sysimage's Project.toml identical to runtime.
+        stale_deps=(
+            ignore=[:CUDA, :Makie, :HTTP, :WriteVTK, :BenchmarkTools, :PackageCompiler],
+        ),
         deps_compat=(check_extras=false,),
     )
 end
