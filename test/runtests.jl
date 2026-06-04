@@ -179,6 +179,8 @@ const CI_EXTRA = [
     "oracles/test_hamiltonian_sign_oracles.jl",
     "oracles/test_term_legacy_equivalence.jl",
     "oracles/test_term_consistency.jl",
+    # Phase 3.3 proof-of-concept: registry-driven Strang step.
+    "oracles/test_registry_strang_step_equivalence.jl",
 ]
 
 # ── Full tier: everything (ci + remaining heavy tests) ──

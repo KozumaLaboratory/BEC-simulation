@@ -95,6 +95,63 @@ function add_gradient_via_registry!(grad, ws)
 end
 
 """
+    is_kinetic_term(::Type{T}) -> Bool
+
+Classify a HamTerm as kinetic (the K piece of the Strang `V K V` sandwich)
+or potential (the V piece). Default: false (assume potential).
+"""
+is_kinetic_term(::Type{<:HamTerm}) = false
+is_kinetic_term(::Type{Kinetic}) = true
+
+"""
+    strang_step_via_registry!(ws, dt)
+
+Apply ONE Strang step `V(dt/2) K(dt) V(dt/2)` by iterating the
+HamTerm registry. Each substep dispatches via `apply_step!`. The
+imaginary_time flag is read from `ws.sim_params.imaginary_time`.
+
+Phase 3.3 proof-of-concept: structurally identical to the legacy
+`split_step!` for workspaces where the V piece is just the diagonal
+Zeeman + trap + light_shift terms (no DDI, c1, raman, etc. — those
+require the nested Strang sandwich which this minimal version doesn't
+reproduce). Bit-identity to legacy verified in
+`test/oracles/test_registry_strang_step_equivalence.jl` for the
+restricted-config case.
+
+Production use requires:
+1. Generalising the V piece to the nested Strang sandwich pattern
+   `(diag → SM → singlet_pair → ... → DDI → ... → diag)` per
+   `split_step.jl:13-17`. This in turn needs each HamTerm to declare
+   its position in that nested sandwich.
+2. Adding GPU dispatch for `apply_step!` on each term.
+3. Time-dependent Zeeman handling — currently `build_h_terms_registry`
+   samples Zeeman at t=0; should re-sample per call.
+
+For now this serves as the architectural skeleton.
+"""
+function strang_step_via_registry!(ws, dt)
+    registry = build_h_terms_registry(ws)
+    it = ws.sim_params.imaginary_time
+
+    # V(dt/2): apply all potential-class terms with half step
+    for term in registry
+        is_kinetic_term(typeof(term)) || apply_step!(term, ws.state.psi, dt / 2, it, ws)
+    end
+    # K(dt): apply kinetic
+    for term in registry
+        is_kinetic_term(typeof(term)) && apply_step!(term, ws.state.psi, dt, it, ws)
+    end
+    # V(dt/2): apply all potential-class terms with half step
+    for term in registry
+        is_kinetic_term(typeof(term)) || apply_step!(term, ws.state.psi, dt / 2, it, ws)
+    end
+
+    ws.state.t += it ? 0.0 : dt
+    ws.state.step += 1
+    return nothing
+end
+
+"""
     energy_breakdown_via_registry(ws) → NamedTuple
 
 Per-term energy breakdown via the registry. Returns a NamedTuple with

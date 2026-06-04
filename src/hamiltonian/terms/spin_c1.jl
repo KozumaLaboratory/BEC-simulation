@@ -11,10 +11,10 @@ end
 @inline _spin_sign(term::SpinC1) = +term.c1
 
 function apply_step!(term::SpinC1, psi, dt::Real, imaginary_time::Bool, ws)
-    # Delegate to existing spin-mixing step. The legacy routine reads
-    # c1 from ws.interactions; we temporarily install our term.c1.
+    # Delegate to existing spin-mixing step.
+    is_active(term.c1) || return nothing
     apply_spin_mixing_step!(
-        psi, ws.spin_matrices, term.c1, dt, ndims(psi) - 1, ws.density_buf;
+        psi, ws.spin_matrices, term.c1, dt, ndims(psi) - 1;
         imaginary_time=imaginary_time,
     )
     return nothing

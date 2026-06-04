@@ -132,6 +132,30 @@ using SpinorBEC
         @test nrm_after / nrm_before > 1.05
     end
 
+    # NOTE: SpinC1 sign (c1<0 → FM vs c1>0 → polar) is covered by the
+    # existing test_simulation.jl:6-50 ground-state assertions; no
+    # need for a redundant version here.
+
+    # --- DensityC0 sign: +c0 → repulsive → ground-state TF width > non-interacting ---
+    @testset "DensityC0: +c0 → repulsive (TF profile widens)" begin
+        grid = make_grid(GridConfig{1}((32,), (10.0,)))
+        # Compare GS width with c0=0 vs c0=10
+        r0 = find_ground_state(;
+            grid, atom=Rb87,
+            interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
+            potential=HarmonicTrap((1.0,)),
+            n_steps=300, dt=0.005, tol=1e-7, initial_state=:polar, verbose=false)
+        r_repulsive = find_ground_state(;
+            grid, atom=Rb87,
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => 0.0)),
+            potential=HarmonicTrap((1.0,)),
+            n_steps=300, dt=0.005, tol=1e-7, initial_state=:polar, verbose=false)
+        n0 = SpinorBEC.total_density(Array(r0.workspace.state.psi), 1)
+        n1 = SpinorBEC.total_density(Array(r_repulsive.workspace.state.psi), 1)
+        # Repulsive c0>0 spreads density → lower peak density.
+        @test maximum(n1) < maximum(n0)
+    end
+
     # --- Barnett shift: +Ω makes p_eff = p + Ω (descent on -Ω·F_z) ---
     # Replicates test_rotating_frame_regression.jl's
     # "energy_decomposition includes -Ω⟨L_z⟩" check + adds the spin
