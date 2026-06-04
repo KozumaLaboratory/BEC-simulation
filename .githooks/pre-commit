@@ -32,7 +32,8 @@ if [ $SKIP_GITLEAKS -eq 0 ]; then
     gitleaks protect --staged --redact --exit-code 1
 fi
 
-# ── JuliaFormatter: format-check on staged src/, test/ .jl files ──
+# ── JuliaFormatter: auto-format staged src/, test/ .jl files and fold
+#    drift into this commit (no separate fmt commit). ──
 if [ $SKIP_FORMAT -eq 0 ]; then
     staged_jl=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^(src|test)/.*\.jl$' || true)
     if [ -n "$staged_jl" ]; then
@@ -44,17 +45,28 @@ if [ $SKIP_FORMAT -eq 0 ]; then
         fi
 
         if [ -z "$JULIA" ]; then
-            echo "warn: julia not found on PATH or in ~/.juliaup/bin/. Skipping format check (CI will catch drift)."
+            echo "warn: julia not found on PATH or in ~/.juliaup/bin/. Skipping format (CI will catch drift)."
         else
-            # JuliaFormatter format(...; overwrite=false) returns true if
-            # already-formatted, false if drift exists. Exit non-zero on
-            # drift so this commit is blocked.
-            if ! $JULIA --startup-file=no -e 'using JuliaFormatter; exit(format(ARGS; overwrite=false) ? 0 : 1)' $staged_jl; then
-                echo
-                echo "Formatting drift in staged .jl files. Fix with:"
-                echo "  $JULIA -e 'using JuliaFormatter; format([\"src/\", \"test/\"])'"
-                echo "Then re-stage and commit. Bypass with: SKIP=format git commit ..."
-                exit 1
+            # Format in place (default overwrite=true). Then re-stage any
+            # files the formatter actually touched so the commit lands
+            # formatter-clean as a single atomic change.
+            #
+            # Caveat: partial staging (`git add -p` on a file the formatter
+            # touches) is clobbered by the re-stage. Acceptable for this
+            # repo's workflow; revisit if multi-author partial staging
+            # becomes common.
+            # shellcheck disable=SC2086
+            $JULIA --startup-file=no -e 'using JuliaFormatter; format(ARGS)' $staged_jl
+
+            # `git diff --name-only -- <staged_jl>` lists files whose
+            # working-tree differs from the index — exactly the files the
+            # formatter modified.
+            # shellcheck disable=SC2086
+            modified=$(git diff --name-only -- $staged_jl)
+            if [ -n "$modified" ]; then
+                echo "$modified" | xargs git add
+                echo "pre-commit: folded format drift into this commit:"
+                echo "$modified" | sed 's/^/  /'
             fi
         fi
     fi
