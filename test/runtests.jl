@@ -193,6 +193,12 @@ const CI_EXTRA = [
     # placeholders with real physics: FM vs polar GS, prolate vs oblate DDI,
     # n^{5/2} convexity, singlet polar vs FM.
     "oracles/test_physics_aware_sign_oracles.jl",
+    # GPU per-term parity gate — covers the 7 terms not exercised by
+    # test_level0_gpu_cpu_consistency.jl (TransverseZeeman, DDI, LHY,
+    # Tensor, Raman, LightShift, MagneticGradient). Closes the same
+    # blind-spot class as the 2026-06-04 GPU-Coriolis miss.
+    # Gates on CUDA.functional(); no-op on CPU-only CI.
+    "oracles/test_gpu_cpu_per_term_parity.jl",
 ]
 
 # ── Full tier: everything (ci + remaining heavy tests) ──
