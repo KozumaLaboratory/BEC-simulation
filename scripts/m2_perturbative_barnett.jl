@@ -33,6 +33,15 @@ import CUDA
 using SpinorBEC
 using Printf
 using JLD2
+using Random
+
+# Inline noise helper (avoids the eu_digital_twin dependency).
+function _add_noise!(psi::AbstractArray, amp::Float64, seed::Int, grid)
+    Random.seed!(seed)
+    psi .+= amp .* randn(ComplexF64, size(psi))
+    psi ./= sqrt(sum(abs2, psi) * cell_volume(grid))
+    return psi
+end
 
 # ============================================================================
 # Dimensionless setup (ω_ref = 1, Rb87 F=1 atom).
@@ -47,11 +56,15 @@ const F_FLOAT = 1.0
 const ATOM = Rb87
 
 # p_lab grid in dimensionless ω_ref units (= γ_F · Bx).
-# Larmor frequencies span 1.5 decades; all perturbative vs trap (ω_trap=1).
-const PLAB_GRID = [0.02, 0.05, 0.1, 0.2]
+# Picked Larmor-pinned regime (p_lab ≫ ω_trap=1) so the χ_low formula
+# `⟨F_z⟩ = F·Ω/p_lab` is the correct limit. Initial sweep at smaller
+# p_lab (≤0.2) landed in trap-dominated regime — see
+# `m2_perturbative_barnett_design_notes` memory.
+const PLAB_GRID = [5.0, 10.0, 30.0, 50.0]
 
-# Ω grid: all values ≪ min(PLAB_GRID)=0.02 → χ_low regime always
-const OMEGA_GRID = [0.002, 0.005, 0.01, 0.02]
+# Ω ≪ p_lab/5 keeps the rotation a small perturbation on the
+# Larmor-pinned spin.
+const OMEGA_GRID = [0.05, 0.1, 0.3, 1.0]
 
 const N_ITP = 600
 const DT = 0.01
@@ -91,7 +104,7 @@ function cell_observables(p_lab::Float64, omega::Float64)
     psi_init ./= sqrt(sum(abs2, psi_init) * cell_volume(grid))
 
     # 1% symmetry-breaking noise so the small Larmor regime can pick a direction.
-    add_noise!(psi_init, 0.01, 1, grid)
+    _add_noise!(psi_init, 0.01, 1, grid)
 
     r = find_ground_state(;
         grid=grid, atom=ATOM, interactions=ip, zeeman=zeeman,
