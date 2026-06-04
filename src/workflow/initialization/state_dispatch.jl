@@ -172,7 +172,7 @@ function init_psi(
             psi[I, 1] = gauss[I] * f_outer * cis(charge * phi) / sqrt(2.0)
             psi[I, D] = gauss[I] * f_outer * cis(-charge * phi) / sqrt(2.0)
         end
-    elseif state == :soliton_bright
+    elseif state == :bright_soliton
         # Bright soliton in 1D: sech profile
         c_mid = (D + 1) ÷ 2
         w = grid.config.box_size[1] / 10
@@ -180,7 +180,7 @@ function init_psi(
             x = grid.x[1][I[1]]
             psi[I, c_mid] = complex(1.0 / cosh(x / w))
         end
-    elseif state == :soliton_dark
+    elseif state == :dark_soliton
         # Dark soliton in 1D: tanh profile
         c_mid = (D + 1) ÷ 2
         w = grid.config.box_size[1] / 20
@@ -226,7 +226,7 @@ function init_psi(
             psi[I, 1] = gauss[I] * sqrt(f_left)
             psi[I, D] = gauss[I] * sqrt(f_right)
         end
-    elseif state == :two_packet
+    elseif state == :two_packets
         # Two counter-propagating wavepackets for collision studies
         c_mid = (D + 1) ÷ 2
         sep = grid.config.box_size[1] / 4

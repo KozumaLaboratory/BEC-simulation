@@ -5,7 +5,7 @@ export init_psi_uniform, init_psi_antiferromagnetic, init_psi_random
 export init_psi_spin_coherent, init_psi_fl_vortex, init_psi_spin_helix
 export init_psi_cyclic, init_psi_biaxial_nematic, init_psi_polar_core_vortex
 export init_psi_bright_soliton, init_psi_dark_soliton, init_psi_skyrmion
-export init_psi_wavepacket, init_psi_domain_wall, init_psi_two_packets
+export init_psi_gaussian_wavepacket, init_psi_domain_wall, init_psi_two_packets
 export init_psi_chiral_spin_vortex, init_psi_magnetic_domain
 export init_psi_vortex_lattice, init_psi_skyrmion_lattice
 
@@ -21,19 +21,20 @@ export init_psi_vortex_lattice, init_psi_skyrmion_lattice
 const _ZOO_NAMES = (
     :polar, :m_plus_F, :m_minus_F, :uniform, :antiferromagnetic,
     :random, :spin_coherent, :fl_vortex, :spin_helix, :cyclic, :biaxial_nematic,
-    :polar_core_vortex, :soliton_bright, :soliton_dark, :skyrmion,
-    :gaussian_wavepacket, :domain_wall, :two_packet, :chiral_spin_vortex,
+    :polar_core_vortex, :bright_soliton, :dark_soliton, :skyrmion,
+    :gaussian_wavepacket, :domain_wall, :two_packets, :chiral_spin_vortex,
     :magnetic_domain, :vortex_lattice, :skyrmion_lattice,
 )
 
 # --- Trivial pass-through wrappers (auto-generated) --------------------
 #
-# Each entry below maps to `init_psi(grid, sys; state=:NAME,
-# init_state_params=Dict(kwargs...))`. Wrappers whose function name does
-# NOT match their state symbol (e.g. `init_psi_bright_soliton` →
-# `:soliton_bright`), or which apply default values / argument renaming
-# (e.g. `init_psi_fl_vortex`'s `winding` → `vortex_charge`), live in
-# their own hand-written `init_psi_<name>` blocks below.
+# Each entry below maps to `init_psi(grid, sys; state=:NAME, kwargs...)`.
+# Wrappers that need argument renaming (e.g. `init_psi_fl_vortex`'s
+# `winding` → `init_vortex_charge`) or default values live in their own
+# hand-written `init_psi_<name>` blocks below. As of the 2026-06-03
+# cleanup the wrapper name always equals the dispatch symbol — earlier
+# divergences (`init_psi_bright_soliton` ↔ `:soliton_bright`, etc.) were
+# unified onto the wrapper side of the rename.
 const _TRIVIAL_ZOO_STATES = (
     (:polar,
         "Polar (m=0) initial state — all population in m=0 component."),
@@ -148,7 +149,7 @@ derived from the grid box size inside `init_psi`; the kwarg is
 accepted for API symmetry.
 """
 init_psi_bright_soliton(grid, sys; m_state=:max, width::Real=1.0) = init_psi(
-    grid, sys; state=:soliton_bright
+    grid, sys; state=:bright_soliton
 )
 
 """
@@ -158,16 +159,16 @@ Dark soliton kink in the central m component. `position` is fixed at
 0 inside `init_psi`; the kwarg is accepted for API symmetry.
 """
 init_psi_dark_soliton(grid, sys; m_state=:max, position::Real=0.0) = init_psi(
-    grid, sys; state=:soliton_dark
+    grid, sys; state=:dark_soliton
 )
 
 """
-    init_psi_wavepacket(grid, sys; momentum=0.0, width=1.0, m_state=1)
+    init_psi_gaussian_wavepacket(grid, sys; momentum=0.0, width=1.0, m_state=1)
 
 Gaussian wavepacket with momentum kick along dim 1. `momentum` plumbs
 through `init_theta` (which `init_psi` uses as k₀ for this state).
 """
-init_psi_wavepacket(grid, sys;
+init_psi_gaussian_wavepacket(grid, sys;
     momentum::Real=0.0, width::Real=1.0, m_state::Int=1) = init_psi(
     grid, sys; state=:gaussian_wavepacket, init_theta=momentum
 )
@@ -192,7 +193,7 @@ plumbs through `init_theta`; `separation` is fixed inside `init_psi`.
 """
 init_psi_two_packets(grid, sys;
     separation::Real=2.0, momentum_kick::Real=1.0) = init_psi(
-    grid, sys; state=:two_packet, init_theta=momentum_kick
+    grid, sys; state=:two_packets, init_theta=momentum_kick
 )
 
 """

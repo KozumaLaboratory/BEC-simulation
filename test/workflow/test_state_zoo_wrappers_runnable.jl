@@ -74,9 +74,9 @@ using SpinorBEC
         _check_psi(psi, 2; tag="dark_soliton")
     end
 
-    @testset "init_psi_wavepacket" begin
-        psi = init_psi_wavepacket(grid2, sys; momentum=0.5)
-        _check_psi(psi, 2; tag="wavepacket")
+    @testset "init_psi_gaussian_wavepacket" begin
+        psi = init_psi_gaussian_wavepacket(grid2, sys; momentum=0.5)
+        _check_psi(psi, 2; tag="gaussian_wavepacket")
     end
 
     @testset "init_psi_domain_wall" begin

@@ -272,8 +272,8 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
             "uniform", "antiferromagnetic", "random",
             "spin_coherent", "fl_vortex", "spin_helix",
             "cyclic", "biaxial_nematic", "polar_core_vortex",
-            "soliton_bright", "soliton_dark", "skyrmion",
-            "gaussian_wavepacket", "domain_wall", "two_packet",
+            "bright_soliton", "dark_soliton", "skyrmion",
+            "gaussian_wavepacket", "domain_wall", "two_packets",
             "chiral_spin_vortex", "magnetic_domain",
             "vortex_lattice", "skyrmion_lattice",
             # `from_jld2`: load the initial ψ from a prior run's

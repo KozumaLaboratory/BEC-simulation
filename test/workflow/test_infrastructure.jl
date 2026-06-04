@@ -144,13 +144,13 @@ const _SKIP_HEAVY_YAML_INFRA =
             @test sum(abs2, psi) * cell_volume(grid2d) ≈ 1.0 atol=1e-10
         end
 
-        @testset "soliton_bright" begin
-            psi = init_psi(grid1d, sys1; state=:soliton_bright)
+        @testset "bright_soliton" begin
+            psi = init_psi(grid1d, sys1; state=:bright_soliton)
             @test sum(abs2, psi) * cell_volume(grid1d) ≈ 1.0 atol=1e-10
         end
 
-        @testset "soliton_dark" begin
-            psi = init_psi(grid1d, sys1; state=:soliton_dark)
+        @testset "dark_soliton" begin
+            psi = init_psi(grid1d, sys1; state=:dark_soliton)
             @test sum(abs2, psi) * cell_volume(grid1d) ≈ 1.0 atol=1e-10
         end
 
@@ -171,8 +171,8 @@ const _SKIP_HEAVY_YAML_INFRA =
             @test sum(abs2, psi[1:20, 1]) > sum(abs2, psi[1:20, 3])
         end
 
-        @testset "two_packet" begin
-            psi = init_psi(grid1d, sys1; state=:two_packet)
+        @testset "two_packets" begin
+            psi = init_psi(grid1d, sys1; state=:two_packets)
             @test sum(abs2, psi) * cell_volume(grid1d) ≈ 1.0 atol=1e-10
         end
 
@@ -315,8 +315,8 @@ const _SKIP_HEAVY_YAML_INFRA =
             "uniform", "antiferromagnetic", "random",
             "spin_coherent", "fl_vortex", "spin_helix",
             "cyclic", "biaxial_nematic", "polar_core_vortex",
-            "soliton_bright", "soliton_dark", "skyrmion",
-            "gaussian_wavepacket", "domain_wall", "two_packet",
+            "bright_soliton", "dark_soliton", "skyrmion",
+            "gaussian_wavepacket", "domain_wall", "two_packets",
         ]
         for s in all_states
             d = Dict{String, Any}(
@@ -567,8 +567,8 @@ pipeline:
             "uniform", "antiferromagnetic", "random",
             "spin_coherent", "fl_vortex", "spin_helix",
             "cyclic", "biaxial_nematic", "polar_core_vortex",
-            "soliton_bright", "soliton_dark", "skyrmion",
-            "gaussian_wavepacket", "domain_wall", "two_packet",
+            "bright_soliton", "dark_soliton", "skyrmion",
+            "gaussian_wavepacket", "domain_wall", "two_packets",
             "chiral_spin_vortex", "magnetic_domain",
             "vortex_lattice", "skyrmion_lattice",
         ]
