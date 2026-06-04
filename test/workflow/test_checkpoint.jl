@@ -139,4 +139,35 @@ using SpinorBEC: Checkpoint, get_or_compute!, fork!, has_checkpoint,
             @test load_checkpoint(cp, "B=1.0/Ω=0.6:seed=polar").v == 99
         end
     end
+
+    @testset "Wavefunction roundtrip (CPU array)" begin
+        mktempdir() do dir
+            cp = Checkpoint(dir)
+            # Realistic wavefunction shape: 16³ × 13 (Eu F=6 spinor)
+            psi = randn(ComplexF64, 16, 16, 16, 13)
+            result = (; psi=psi, E=1.234, step=100, conv=false)
+            save_checkpoint!(cp, "psi_state", result)
+            loaded = load_checkpoint(cp, "psi_state")
+            @test loaded.psi isa Array{ComplexF64, 4}
+            @test size(loaded.psi) == size(psi)
+            @test loaded.psi == psi   # bit-identical
+            @test loaded.E == 1.234
+            @test loaded.step == 100
+            @test loaded.conv == false
+        end
+    end
+
+    @testset "Wavefunction roundtrip after fork! (extension pattern)" begin
+        mktempdir() do dir
+            cp = Checkpoint(dir)
+            psi0 = randn(ComplexF64, 8, 8, 8, 3)
+            save_checkpoint!(cp, "psi_step_0", (; psi=psi0, step=0))
+            # Simulate extend pass: in-place fork! that advances psi
+            fork!(cp, "psi_step_0", "psi_step_0",
+                prev -> (; psi=prev.psi .* exp(-0.01), step=prev.step + 100))
+            loaded = load_checkpoint(cp, "psi_step_0")
+            @test loaded.step == 100
+            @test loaded.psi ≈ psi0 .* exp(-0.01)
+        end
+    end
 end

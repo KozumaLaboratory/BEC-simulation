@@ -104,6 +104,28 @@ end
 Persist `result` under `key`. Optional `metadata` is saved alongside
 (`JLD2.load(path, "metadata")`). Overwrites any existing checkpoint
 at `key`.
+
+# Portability note for wavefunctions
+
+`result` is serialised by JLD2 verbatim. Plain CPU arrays (Array,
+SVector, NamedTuple of scalars) round-trip cleanly with no special
+handling. **CuArray fields ALSO save** (CUDA.jl provides the
+serialiser) but the loaded value reconstructs ON the GPU at load
+time, which:
+
+  - requires CUDA at load (fails on CPU-only restart),
+  - allocates GPU memory immediately (fails if GPU is busy),
+  - is tied to the specific device (non-portable across hosts).
+
+For checkpoint files that should survive process / host changes,
+convert wavefunctions to CPU arrays before saving:
+
+```julia
+result = (; psi=Array(ws.state.psi), E=ws.energy, ...)
+save_checkpoint!(cp, key, result)
+```
+
+This is the convention used by `scripts/sprint5_M1_*.jl`.
 """
 function save_checkpoint!(cp::Checkpoint, key, result; metadata=nothing)
     mkpath(cp.cache_dir)
