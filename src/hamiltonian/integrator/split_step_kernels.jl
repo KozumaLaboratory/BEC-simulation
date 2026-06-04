@@ -7,102 +7,18 @@
 
 # --- Coriolis (rotating frame L_z) ---
 
-"""
-Apply Coriolis step exp(iΩ·L_z·dt) via 3-shear FFT decomposition.
-
-Implements the -Ω·L_z term from the rotating frame Hamiltonian H_rot = H - Ω·J_z.
-L_z = x·p_y - y·p_x is the orbital angular momentum.
-
-Real time: spatial rotation by angle Ω·dt.
-Imaginary time: rotation by imaginary angle with real exponential shear factors
-(stable for small Ωτ, renormalized each ITP step).
-"""
-function _apply_coriolis_step!(
+# Authoritative kernel `_apply_coriolis_step_core!` (with full sign-audit
+# commentary) lives in `src/hamiltonian/terms/coriolis.jl` (Part B
+# collapse, 2026-06-04). This shim preserves the legacy entry point for
+# `split_step!` and `strang_step_via_registry!`.
+_apply_coriolis_step!(
     psi::AbstractArray{<:Complex},
     grid::Grid{N},
     omega::Float64,
     dt::Float64,
     imaginary_time::Bool,
     cache::Union{Nothing, CoriolisCache}=nothing,
-) where {N}
-    N < 2 && return nothing
-    abs(omega) < 1e-15 && return nothing
-
-    theta = omega * dt
-
-    # Convention: H_rot = H_lab − Ω·(L_z + F_z). RT Coriolis substep is
-    # exp(−i·H_coriolis·dt) = exp(+iΩ·L_z·dt) = R̂(−Ω·dt) (active
-    # rotation operator R̂(α) = exp(−iα·L_z)), i.e. CW rotation of ψ by
-    # Ω·dt. Equivalently, evaluate ψ at coordinates transformed by
-    # R(+Ω·dt). With the FFT shear order in this routine being
-    # y-shears outer (see `_apply_1d_shear_batch!` calls below), the
-    # R(+θ) decomposition is (+tan(θ/2), −sin θ, +tan(θ/2)) — the
-    # factors used here.
-    #
-    # IT branch via analytic continuation dt = −i·dτ: substep becomes
-    # exp(+Ω·L_z·dτ), which amplifies the +L_z component (descent on
-    # the Coriolis piece of H_rot). Same shear order with hyperbolic
-    # factors gives (+tanh(θ/2), −sinh θ, +tanh(θ/2)).
-    #
-    # A 2026-06-03 "fix" inverted these factors after misreading the
-    # freeze diagnostic at a stalled LBFGS state (where ΔE_total ≈ 0.5%
-    # of E_total is splitting-noise-dominated and not a clean
-    # propagator-vs-energy oracle). The audit on 2026-06-03 reverted
-    # that flip after verifying mutual consistency with E_coriolis
-    # (−Ω·⟨L_z⟩), the Barnett shift (p_eff = p_lab + Ω), and the
-    # transverse-spin RT-Barnett direction (CW Larmor) — all under the
-    # single H_rot = H − Ω·(L_z + F_z) convention, with the EdH oracle
-    # (⟨L_z⟩ and ⟨F_z⟩ co-aligned) as final anchor. See
-    # `mistake_coriolis_substep_sign_2026_06_03.md` for the lesson.
-    if imaginary_time
-        a_y = tanh(theta / 2)
-        a_x = -sinh(theta)
-    else
-        a_y = tan(theta / 2)
-        a_x = -sin(theta)
-    end
-
-    if cache !== nothing
-        _apply_1d_shear_batch!(
-            psi,
-            grid.x[1],
-            grid.k[2],
-            2,
-            1,
-            a_y,
-            imaginary_time,
-            cache.fwd_dim2,
-            cache.inv_dim2,
-        )
-        _apply_1d_shear_batch!(
-            psi,
-            grid.x[2],
-            grid.k[1],
-            1,
-            2,
-            a_x,
-            imaginary_time,
-            cache.fwd_dim1,
-            cache.inv_dim1,
-        )
-        _apply_1d_shear_batch!(
-            psi,
-            grid.x[1],
-            grid.k[2],
-            2,
-            1,
-            a_y,
-            imaginary_time,
-            cache.fwd_dim2,
-            cache.inv_dim2,
-        )
-    else
-        _apply_1d_shear_batch!(psi, grid.x[1], grid.k[2], 2, 1, a_y, imaginary_time)
-        _apply_1d_shear_batch!(psi, grid.x[2], grid.k[1], 1, 2, a_x, imaginary_time)
-        _apply_1d_shear_batch!(psi, grid.x[1], grid.k[2], 2, 1, a_y, imaginary_time)
-    end
-    nothing
-end
+) where {N} = _apply_coriolis_step_core!(psi, grid, omega, dt, imaginary_time, cache)
 
 """
 Apply diagonal phase `psi .*= imaginary_time ? exp.(arg) : cis.(arg)` where

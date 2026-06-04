@@ -22,6 +22,24 @@ function apply_step!(::TensorTerm, psi, dt::Real, imaginary_time::Bool, ws)
     return nothing
 end
 
+# ============================================================================
+# Canonical energy kernel: c2 singlet-pair (`_tensor_interaction_energy`
+# stays in `interactions/tensor_interaction.jl`; it has its own tensor-cache
+# subsystem and is genuinely architectural, not delegation).
+# ============================================================================
+
+"""
+    _singlet_pair_energy_core(psi, F, c2, ndim, n_pts, dV)
+
+`E_pair = (c2/2) ∫ |A(r)|² d³r` where `A(r)` is the S=0 singlet-pair
+amplitude. Active iff `is_active(c2)`. Sign: c2>0 polar suppresses
+singlet; c2<0 FM amplifies.
+"""
+function _singlet_pair_energy_core(psi, F, c2, ndim, n_pts, dV)
+    A = singlet_pair_amplitude(psi, F, ndim)
+    0.5 * c2 * sum(abs2, A) * dV
+end
+
 function energy_contribution(::TensorTerm, psi::AbstractArray{<:Complex}, ws)
     F = ws.spin_matrices.system.F
     N = ndims(psi) - 1
@@ -30,7 +48,7 @@ function energy_contribution(::TensorTerm, psi::AbstractArray{<:Complex}, ws)
     E = 0.0
     c2 = get_cn(ws.interactions, 2)
     if is_active(c2)
-        E += _singlet_pair_energy(psi, F, c2, N, n_pts, dV)
+        E += _singlet_pair_energy_core(psi, F, c2, N, n_pts, dV)
     end
     if ws.tensor_cache !== nothing
         E += _tensor_interaction_energy(psi, ws.tensor_cache, N, n_pts, dV)

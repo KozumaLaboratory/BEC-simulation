@@ -31,19 +31,94 @@ function apply_step!(::LightShiftTerm, psi, dt::Real, imaginary_time::Bool, ws)
     return nothing
 end
 
+# ============================================================================
+# Canonical energy + gradient kernels. Propagator stays as-is (folded into
+# `_diagonal_step_with_ls!` for the diagonal case + standalone fallback above).
+# ============================================================================
+
+"""
+    _light_shift_energy_core(psi, ls::LightShift, n_comp, ndim, n_pts, dV)
+
+`E_LS = ∫ I(r) Σ_k λ_k |⟨k|ψ(r)⟩|² dV` where `λ_k = ls.eigvals` and
+`I(r) = ls.profile`. Diagonal fast path when `ls.is_diagonal`;
+otherwise project ψ onto eigenbasis via `Uadj = ls.U'`.
+"""
+function _light_shift_energy_core(psi, ls::LightShift, n_comp, ndim, n_pts, dV)
+    profile = _to_host(ls.profile)
+    psi_h = _to_host(psi)
+    eigvals = ls.eigvals
+    D = n_comp
+
+    if ls.is_diagonal
+        E = 0.0
+        @inbounds for I in CartesianIndices(n_pts)
+            intensity = profile[I]
+            for c in 1:D
+                E += eigvals[c] * abs2(psi_h[I, c]) * intensity
+            end
+        end
+        return E * dV
+    end
+
+    Uadj = ls.U'
+    E = 0.0
+    @inbounds for I in CartesianIndices(n_pts)
+        intensity = profile[I]
+        for k in 1:D
+            proj = zero(ComplexF64)
+            for c in 1:D
+                proj += Uadj[k, c] * psi_h[I, c]
+            end
+            E += eigvals[k] * abs2(proj) * intensity
+        end
+    end
+    E * dV
+end
+
+"""
+    _grad_light_shift_core!(grad, psi, ws, n_pts, D, ::Val{N})
+
+`∂E_LS/∂ψ*_c`: diagonal `eigvals[c]·profile·ψ_c`; off-diagonal
+`Σ_c2 M_full[c,c2]·profile·ψ_c2` with `M_full = U·diag(eigvals)·U†`.
+"""
+function _grad_light_shift_core!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
+    ws.light_shift !== nothing || return nothing
+    ls = ws.light_shift
+    profile = _to_host(ls.profile)
+    if ls.is_diagonal
+        for c in 1:D
+            idx = _component_slice(N, n_pts, c)
+            view(grad, idx...) .+= ls.eigvals[c] .* profile .* view(psi, idx...)
+        end
+    else
+        M_full = ls.U * Diagonal(ls.eigvals) * ls.U'
+        for c in 1:D
+            idx_c = _component_slice(N, n_pts, c)
+            for c2 in 1:D
+                abs(M_full[c, c2]) < 1e-30 && continue
+                idx_c2 = _component_slice(N, n_pts, c2)
+                view(grad, idx_c...) .+= M_full[c, c2] .* profile .* view(psi, idx_c2...)
+            end
+        end
+    end
+    nothing
+end
+
 function energy_contribution(::LightShiftTerm, psi::AbstractArray{<:Complex}, ws)
     ws.light_shift === nothing && return 0.0
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
     n_comp = size(psi, N + 1)
-    return _light_shift_energy(psi, ws.light_shift, n_comp, N, n_pts, cell_volume(ws.grid))
+    return _light_shift_energy_core(
+        psi, ws.light_shift, n_comp, N, n_pts, cell_volume(ws.grid)
+    )
 end
 
 function add_gradient!(grad, ::LightShiftTerm, psi, ws)
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
     D = ws.spin_matrices.system.n_components
-    _grad_light_shift!(grad, psi, ws, n_pts, D, Val(N))
+    _grad_light_shift_core!(grad, psi, ws, n_pts, D, Val(N))
     return nothing
 end
 

@@ -180,11 +180,10 @@ end
 # close [GAP-1] (zeeman energy missing transverse contribution).
 # The call site at line ~37 of `_energy_decomposition_cpu` /
 # `_energy_decomposition_gpu` must add this when bx or by ≠ 0.
-function _transverse_zeeman_energy(psi, bx::Real, by::Real, sm, ndim, dV)
-    (bx == 0.0 && by == 0.0) && return 0.0
-    fx, fy, _ = spin_density_vector(psi, sm, ndim)
-    return (-bx) * sum(fx) * dV + (-by) * sum(fy) * dV
-end
+# Authoritative kernel `_transverse_zeeman_energy_core` lives in
+# `src/hamiltonian/terms/zeeman_transverse.jl` (Part B collapse, 2026-06-04).
+_transverse_zeeman_energy(psi, bx::Real, by::Real, sm, ndim, dV) =
+    _transverse_zeeman_energy_core(psi, bx, by, sm, ndim, dV)
 
 # Magnetic gradient energy `+g_F·grad(t)·∫ x_axis·n(r) d³r`. Added
 # 2026-06-04 to close [GAP-2] (MG silently dropped from energy
@@ -311,139 +310,30 @@ function _lhy_energy(psi, lhy::TabulatedLHY, n_comp, ndim, n_pts, dV)
     E * dV
 end
 
-function _spin_interaction_energy(psi, sm, c1, n_comp, ndim, n_pts, dV)
-    fx, fy, fz = spin_density_vector(psi, sm, ndim)
-    # Broadcast `fx.^2 .+ fy.^2 .+ fz.^2` materialised an n_pts-shape
-    # temporary every call. Inline the reduction.
-    s = 0.0
-    @inbounds for i in eachindex(fx, fy, fz)
-        s += fx[i]^2 + fy[i]^2 + fz[i]^2
-    end
-    0.5 * c1 * s * dV
-end
+# Authoritative kernel `_spin_interaction_energy_core` lives in
+# `src/hamiltonian/terms/spin_c1.jl` (Part B collapse, 2026-06-04).
+_spin_interaction_energy(psi, sm, c1, n_comp, ndim, n_pts, dV) =
+    _spin_interaction_energy_core(psi, sm, c1, n_comp, ndim, n_pts, dV)
 
-function _singlet_pair_energy(psi, F, c2, ndim, n_pts, dV)
-    A = singlet_pair_amplitude(psi, F, ndim)
-    0.5 * c2 * sum(abs2, A) * dV
-end
+# Authoritative kernel `_singlet_pair_energy_core` lives in
+# `src/hamiltonian/terms/tensor.jl` (Part B collapse, 2026-06-04).
+_singlet_pair_energy(psi, F, c2, ndim, n_pts, dV) =
+    _singlet_pair_energy_core(psi, F, c2, ndim, n_pts, dV)
 
-function _ddi_energy(
-    psi,
-    sm::SpinMatrices{D},
-    ddi,
-    ddi_bufs,
-    n_comp,
-    ndim,
-    n_pts,
-    dV;
-    ddi_padded=nothing,
-) where {D}
-    if ddi_padded !== nothing
-        _compute_and_convolve_ddi_padded!(psi, sm, ddi, ddi_padded, Val(D), ndim, n_pts)
-        E = 0.0
-        @inbounds for I in CartesianIndices(n_pts)
-            E +=
-                ddi_padded.Phi_x_pad[I] * ddi_padded.Fx_pad[I] +
-                ddi_padded.Phi_y_pad[I] * ddi_padded.Fy_pad[I] +
-                ddi_padded.Phi_z_pad[I] * ddi_padded.Fz_pad[I]
-        end
-        return 0.5 * E * dV
-    end
-    _compute_spin_density!(
-        ddi_bufs.Fx_r,
-        ddi_bufs.Fy_r,
-        ddi_bufs.Fz_r,
-        psi,
-        sm,
-        Val(D),
-        ndim,
-        n_pts,
+# Authoritative kernels `_ddi_energy_core` / `_ddi_energy_from_gpu_core`
+# live in `src/hamiltonian/terms/ddi.jl` (Part B collapse, 2026-06-04).
+# Shims preserve legacy entry points for `_energy_decomposition_cpu` /
+# `_energy_decomposition_gpu`.
+_ddi_energy(psi, sm, ddi, ddi_bufs, n_comp, ndim, n_pts, dV; ddi_padded=nothing) =
+    _ddi_energy_core(psi, sm, ddi, ddi_bufs, n_comp, ndim, n_pts, dV; ddi_padded)
+
+_ddi_energy_from_gpu(psi_host, sm, ddi_gpu, ddi_bufs_gpu, n_comp, ndim, n_pts, dV;
+    ddi_padded=nothing) =
+    _ddi_energy_from_gpu_core(
+        psi_host, sm, ddi_gpu, ddi_bufs_gpu, n_comp, ndim, n_pts, dV; ddi_padded
     )
-    compute_ddi_potential!(ddi, ddi_bufs)
-    E = 0.0
-    @inbounds for I in CartesianIndices(n_pts)
-        E +=
-            ddi_bufs.Phi_x[I] * ddi_bufs.Fx_r[I] +
-            ddi_bufs.Phi_y[I] * ddi_bufs.Fy_r[I] +
-            ddi_bufs.Phi_z[I] * ddi_bufs.Fz_r[I]
-    end
-    0.5 * E * dV
-end
 
-function _ddi_energy_from_gpu(
-    psi_host,
-    sm::SpinMatrices{D},
-    ddi_gpu,
-    ddi_bufs_gpu,
-    n_comp,
-    ndim,
-    n_pts,
-    dV;
-    ddi_padded=nothing,
-) where {D}
-    Fx_r = zeros(Float64, n_pts)
-    Fy_r = zeros(Float64, n_pts)
-    Fz_r = zeros(Float64, n_pts)
-    _compute_spin_density!(Fx_r, Fy_r, Fz_r, psi_host, sm, Val(D), ndim, n_pts)
-
-    ddi_host = DDIParams(ddi_gpu.C_dd, _to_host(ddi_gpu.Q_xx), _to_host(ddi_gpu.Q_xy),
-        _to_host(ddi_gpu.Q_xz), _to_host(ddi_gpu.Q_yy), _to_host(ddi_gpu.Q_yz),
-        _to_host(ddi_gpu.Q_zz))
-    rfft_plans = make_rfft_plans(n_pts)
-    Fx_rk = rfft_plans.forward * Fx_r
-    Fy_rk = similar(Fx_rk)
-    Fz_rk = similar(Fx_rk)
-    Phi_x_rk = similar(Fx_rk)
-    Phi_y_rk = similar(Fx_rk)
-    Phi_z_rk = similar(Fx_rk)
-    Phi_x = similar(Fx_r)
-    Phi_y = similar(Fx_r)
-    Phi_z = similar(Fx_r)
-    bufs_host = DDIBuffers(rfft_plans, Fx_r, Fy_r, Fz_r, Fx_rk, Fy_rk, Fz_rk,
-        Phi_x_rk, Phi_y_rk, Phi_z_rk, Phi_x, Phi_y, Phi_z)
-
-    compute_ddi_potential!(ddi_host, bufs_host)
-
-    E = 0.0
-    @inbounds for I in CartesianIndices(n_pts)
-        E +=
-            bufs_host.Phi_x[I] * bufs_host.Fx_r[I] +
-            bufs_host.Phi_y[I] * bufs_host.Fy_r[I] +
-            bufs_host.Phi_z[I] * bufs_host.Fz_r[I]
-    end
-    0.5 * E * dV
-end
-
-function _raman_energy(
-    psi,
-    sm::SpinMatrices{D},
-    raman::RamanCoupling{N},
-    grid::Grid{N},
-    ndim,
-    n_pts,
-    dV,
-) where {D, N}
-    F = sm.system.F
-    Ff1 = Float64(F * (F + 1))
-    m_vals = ntuple(c -> Float64(F - (c - 1)), Val(D))
-    fp_coeffs = ntuple(c -> c == 1 ? 0.0 : sqrt(Ff1 - m_vals[c] * (m_vals[c] + 1.0)), Val(D))
-
-    E = 0.0
-    @inbounds for I in CartesianIndices(n_pts)
-        kr = sum(ntuple(d -> raman.k_eff[d] * grid.x[d][I[d]], Val(N)))
-        phase = exp(1im * kr)
-
-        fz_val = 0.0
-        for c in 1:D
-            fz_val += m_vals[c] * abs2(psi[I, c])
-        end
-
-        fp_val = zero(ComplexF64)
-        for c in 2:D
-            fp_val += fp_coeffs[c] * conj(psi[I, c - 1]) * psi[I, c]
-        end
-
-        E += (raman.delta * fz_val + raman.Omega_R * real(phase * fp_val)) * dV
-    end
-    E
-end
+# Authoritative kernel `_raman_energy_core` lives in
+# `src/hamiltonian/terms/raman.jl` (Part B collapse, 2026-06-04).
+_raman_energy(psi, sm, raman, grid, ndim, n_pts, dV) =
+    _raman_energy_core(psi, sm, raman, grid, ndim, n_pts, dV)

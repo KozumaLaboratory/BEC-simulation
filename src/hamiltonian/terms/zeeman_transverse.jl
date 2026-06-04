@@ -43,15 +43,24 @@ function apply_step!(term::TransverseZeemanTerm, psi, dt::Real, imaginary_time::
     return nothing
 end
 
+"""
+    _transverse_zeeman_energy_core(psi, bx, by, sm, ndim, dV)
+
+`⟨H_perp⟩ = -bx·⟨F_x⟩ - by·⟨F_y⟩` for the spatially-uniform
+transverse-Zeeman term. Closes [GAP-1] — pre-2026-06-04 the legacy
+`_zeeman_energy` silently dropped this contribution.
+"""
+function _transverse_zeeman_energy_core(psi, bx::Real, by::Real, sm, ndim, dV)
+    (bx == 0.0 && by == 0.0) && return 0.0
+    fx, fy, _ = spin_density_vector(psi, sm, ndim)
+    return (-bx) * sum(fx) * dV + (-by) * sum(fy) * dV
+end
+
 function energy_contribution(term::TransverseZeemanTerm, psi::AbstractArray{<:Complex}, ws)
-    # ⟨H_perp⟩ = -bx·⟨F_x⟩ - by·⟨F_y⟩
-    # where ⟨F_α⟩ = ∫ ψ̄·F_α·ψ d³r is the spatial-integrated spin
-    # density along axis α.
     sm = ws.spin_matrices
     N = ndims(psi) - 1
     dV = cell_volume(ws.grid)
-    fx, fy, _ = spin_density_vector(psi, sm, N)
-    return (-term.bx) * sum(fx) * dV + (-term.by) * sum(fy) * dV
+    return _transverse_zeeman_energy_core(psi, term.bx, term.by, sm, N, dV)
 end
 
 function add_gradient!(grad::AbstractArray{<:Complex}, term::TransverseZeemanTerm,

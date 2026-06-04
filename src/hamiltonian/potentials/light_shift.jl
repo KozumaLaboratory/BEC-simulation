@@ -170,39 +170,7 @@ function apply_light_shift_step!(
     end
 end
 
-"""
-    _light_shift_energy(psi, ls, n_comp, ndim, n_pts, dV) → Float64
-
-Energy contribution from the light shift: E = ∫ I(r) Σ_k λ_k |⟨k|ψ(r)⟩|² dV.
-"""
-function _light_shift_energy(psi, ls::LightShift, n_comp, ndim, n_pts, dV)
-    profile = _to_host(ls.profile)
-    psi_h = _to_host(psi)
-    eigvals = ls.eigvals
-    D = n_comp
-
-    if ls.is_diagonal
-        E = 0.0
-        @inbounds for I in CartesianIndices(n_pts)
-            intensity = profile[I]
-            for c in 1:D
-                E += eigvals[c] * abs2(psi_h[I, c]) * intensity
-            end
-        end
-        return E * dV
-    end
-
-    Uadj = ls.U'
-    E = 0.0
-    @inbounds for I in CartesianIndices(n_pts)
-        intensity = profile[I]
-        for k in 1:D
-            proj = zero(ComplexF64)
-            for c in 1:D
-                proj += Uadj[k, c] * psi_h[I, c]
-            end
-            E += eigvals[k] * abs2(proj) * intensity
-        end
-    end
-    E * dV
-end
+# Authoritative kernel `_light_shift_energy_core` lives in
+# `src/hamiltonian/terms/light_shift.jl` (Part B collapse, 2026-06-04).
+_light_shift_energy(psi, ls::LightShift, n_comp, ndim, n_pts, dV) =
+    _light_shift_energy_core(psi, ls, n_comp, ndim, n_pts, dV)

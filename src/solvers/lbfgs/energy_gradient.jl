@@ -116,32 +116,11 @@ _grad_kinetic!(grad, psi, ws, fft_buf, k_squared_dev, n_pts, D, vN) =
 # functional alongside the Barnett Zeeman shift (in ws.zeeman) and the
 # centrifugal trap modification (in ws.potential_values). Active only
 # when `rotating_frame_omega ≠ 0` and N ≥ 2.
-function _grad_coriolis!(
-    grad, psi, ws, fft_buf, deriv_buf, n_pts, D, ::Val{N}
-) where {N}
-    Ω = ws.sim_params.rotating_frame_omega
-    (is_active(Ω, ROTATION_TOL) && N >= 2) || return nothing
-    grid = ws.grid
-    x_bcast = _axis_broadcast(fft_buf, grid.x[1], 1)
-    y_bcast = _axis_broadcast(fft_buf, grid.x[2], 2)
-    kx_bcast = _axis_broadcast(fft_buf, grid.k[1], 1)
-    ky_bcast = _axis_broadcast(fft_buf, grid.k[2], 2)
-    iΩ = im * Ω
-    for c in 1:D
-        idx = _component_slice(N, n_pts, c)
-        fft_buf .= view(psi, idx...)
-        ws.fft_plans.forward * fft_buf
-        # +iΩ · x · ∂_y ψ
-        deriv_buf .= fft_buf .* (im .* ky_bcast)
-        ws.fft_plans.inverse * deriv_buf
-        view(grad, idx...) .+= iΩ .* x_bcast .* deriv_buf
-        # −iΩ · y · ∂_x ψ
-        deriv_buf .= fft_buf .* (im .* kx_bcast)
-        ws.fft_plans.inverse * deriv_buf
-        view(grad, idx...) .-= iΩ .* y_bcast .* deriv_buf
-    end
-    nothing
-end
+# Authoritative kernel `_grad_coriolis_core!` lives in
+# `src/hamiltonian/terms/coriolis.jl` (Part B collapse, 2026-06-04).
+# This shim preserves the legacy entry point for `energy_gradient!`.
+_grad_coriolis!(grad, psi, ws, fft_buf, deriv_buf, n_pts, D, vN) =
+    _grad_coriolis_core!(grad, psi, ws, fft_buf, deriv_buf, n_pts, D, vN)
 
 function _grad_trap!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
     for c in 1:D
@@ -190,76 +169,20 @@ function _grad_lhy!(grad, psi, ws, n_density, n_pts, D, ::Val{N}) where {N}
     nothing
 end
 
-function _grad_c1_spin!(grad, psi, ws, fx, fy, fz, n_pts, D, ::Val{N}) where {N}
-    c1 = ws.interactions[1]
-    is_active(c1) || return nothing
-    sm = ws.spin_matrices
-    F = ws.atom.F
-    _compute_spin_density!(fx, fy, fz, psi, sm, Val(D), N, n_pts)
-    # Fz part (diagonal)
-    for c in 1:D
-        idx = _component_slice(N, n_pts, c)
-        m = Float64(F - (c - 1))
-        view(grad, idx...) .+= c1 .* m .* fz .* view(psi, idx...)
-    end
-    # F+/F− parts (tridiagonal)
-    for c in 2:D
-        idx_c = _component_slice(N, n_pts, c)
-        idx_cm1 = _component_slice(N, n_pts, c - 1)
-        fp = sqrt(Float64(F * (F + 1) - (F - c + 1) * (F - c + 2)))
-        view(grad, idx_cm1...) .+= c1 .* 0.5 .* fp .* (fx .- im .* fy) .* view(psi, idx_c...)
-        view(grad, idx_c...) .+= c1 .* 0.5 .* fp .* (fx .+ im .* fy) .* view(psi, idx_cm1...)
-    end
-    nothing
-end
+# Authoritative kernel `_grad_c1_spin_core!` lives in
+# `src/hamiltonian/terms/spin_c1.jl` (Part B collapse, 2026-06-04).
+_grad_c1_spin!(grad, psi, ws, fx, fy, fz, n_pts, D, vN) =
+    _grad_c1_spin_core!(grad, psi, ws, fx, fy, fz, n_pts, D, vN)
 
-function _grad_light_shift!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
-    ws.light_shift !== nothing || return nothing
-    ls = ws.light_shift
-    profile = _to_host(ls.profile)
-    if ls.is_diagonal
-        for c in 1:D
-            idx = _component_slice(N, n_pts, c)
-            view(grad, idx...) .+= ls.eigvals[c] .* profile .* view(psi, idx...)
-        end
-    else
-        M_full = ls.U * Diagonal(ls.eigvals) * ls.U'
-        for c in 1:D
-            idx_c = _component_slice(N, n_pts, c)
-            for c2 in 1:D
-                abs(M_full[c, c2]) < 1e-30 && continue
-                idx_c2 = _component_slice(N, n_pts, c2)
-                view(grad, idx_c...) .+= M_full[c, c2] .* profile .* view(psi, idx_c2...)
-            end
-        end
-    end
-    nothing
-end
+# Authoritative kernel `_grad_light_shift_core!` lives in
+# `src/hamiltonian/terms/light_shift.jl` (Part B collapse, 2026-06-04).
+_grad_light_shift!(grad, psi, ws, n_pts, D, vN) =
+    _grad_light_shift_core!(grad, psi, ws, n_pts, D, vN)
 
-function _grad_ddi!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
-    ws.ddi !== nothing || return nothing
-    sm = ws.spin_matrices
-    F = ws.atom.F
-    bufs = ws.ddi_bufs
-    _compute_spin_density!(bufs.Fx_r, bufs.Fy_r, bufs.Fz_r, psi, sm, Val(D), N, n_pts)
-    compute_ddi_potential!(ws.ddi, bufs)
-    phi_x, phi_y, phi_z = bufs.Phi_x, bufs.Phi_y, bufs.Phi_z
-    # Fz part (diagonal)
-    for c in 1:D
-        idx = _component_slice(N, n_pts, c)
-        m = Float64(F - (c - 1))
-        view(grad, idx...) .+= m .* phi_z .* view(psi, idx...)
-    end
-    # F+/F− parts (tridiagonal)
-    for c in 2:D
-        idx_c = _component_slice(N, n_pts, c)
-        idx_cm1 = _component_slice(N, n_pts, c - 1)
-        fp = sqrt(Float64(F * (F + 1) - (F - c + 1) * (F - c + 2)))
-        view(grad, idx_cm1...) .+= 0.5 .* fp .* (phi_x .- im .* phi_y) .* view(psi, idx_c...)
-        view(grad, idx_c...) .+= 0.5 .* fp .* (phi_x .+ im .* phi_y) .* view(psi, idx_cm1...)
-    end
-    nothing
-end
+# Authoritative kernel `_grad_ddi_core!` lives in
+# `src/hamiltonian/terms/ddi.jl` (Part B collapse, 2026-06-04).
+_grad_ddi!(grad, psi, ws, n_pts, D, vN) =
+    _grad_ddi_core!(grad, psi, ws, n_pts, D, vN)
 
 """
 Project gradient onto constraint tangent space:

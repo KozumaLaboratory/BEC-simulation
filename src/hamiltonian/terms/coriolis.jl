@@ -1,17 +1,24 @@
-# --- CoriolisTerm HamTerm ---
+# --- CoriolisTerm HamTerm + canonical Coriolis kernels ---
 #
 # Single-source-of-truth declaration of `H_coriolis = -Ω·L_z` where
 # `L_z = x·p_y - y·p_x = -i·(x·∂_y - y·∂_x)`. This is the orbital
-# CoriolisTerm piece of the rotating-frame Hamiltonian
+# Coriolis piece of the rotating-frame Hamiltonian
 # `H_rot = H_lab - Ω·(L_z + F_z)` (the F_z piece is handled
 # separately via `_shift_zeeman_for_rotating_frame`).
 #
-# Phase 2 (2026-06-04): consolidates the 2026-06-03 sign-audit work
-# (`mistake_coriolis_substep_sign_2026_06_03`) into the HamTerm
-# protocol. The 3-shear factor signs in `_apply_coriolis_step!`
-# remain authoritative — `apply_step!` delegates to it. Energy and
-# gradient delegate to the audited `orbital_angular_momentum` /
-# `_grad_coriolis!` routines.
+# This file owns the THREE canonical Coriolis kernels:
+#
+#   `_apply_coriolis_step_core!` — RT/IT propagator (3-shear FFT decomposition).
+#   `orbital_angular_momentum`   — observable ⟨L_z⟩ stays in `analysis/currents.jl`
+#                                  (it's a general observable, not Coriolis-specific).
+#   `_grad_coriolis_core!`       — δE_cor/δψ* for LBFGS.
+#
+# The legacy entry points (`_apply_coriolis_step!` in
+# `integrator/split_step_kernels.jl`, `_grad_coriolis!` in
+# `solvers/lbfgs/energy_gradient.jl`) are one-line shims forwarding to
+# these `_core` helpers.
+#
+# Per-term collapse landed 2026-06-04 PM (Part B of plan c-greedy-blum.md).
 
 """
 CoriolisTerm (orbital) piece of the rotating-frame Hamiltonian.
@@ -26,13 +33,139 @@ end
 # so descent on -Ω·L_z amplifies +L_z components in ITP.
 @inline _coriolis_sign(term::CoriolisTerm) = -term.Ω
 
+# ============================================================================
+# Canonical kernel: RT/IT propagator (3-shear FFT decomposition)
+# ============================================================================
+
+"""
+    _apply_coriolis_step_core!(psi, grid, omega, dt, imaginary_time, cache=nothing)
+
+Apply Coriolis step `exp(iΩ·L_z·dt)` via 3-shear FFT decomposition.
+
+Implements the `-Ω·L_z` term from the rotating frame Hamiltonian
+`H_rot = H - Ω·J_z`. `L_z = x·p_y - y·p_x` is the orbital angular momentum.
+
+Real time: spatial rotation by angle Ω·dt.
+Imaginary time: rotation by imaginary angle with real exponential shear
+factors (stable for small Ωτ, renormalized each ITP step).
+
+SIGN CONVENTION (load-bearing — do not "fix"):
+H_rot = H_lab − Ω·(L_z + F_z). RT Coriolis substep is
+`exp(−i·H_coriolis·dt) = exp(+iΩ·L_z·dt) = R̂(−Ω·dt)` (active
+rotation operator `R̂(α) = exp(−iα·L_z)`), i.e. CW rotation of ψ by
+Ω·dt. Equivalently, evaluate ψ at coordinates transformed by
+R(+Ω·dt). With the FFT shear order being y-shears outer (see
+`_apply_1d_shear_batch!` calls below), the R(+θ) decomposition is
+`(+tan(θ/2), −sin θ, +tan(θ/2))` — the factors used here.
+
+IT branch via analytic continuation `dt = −i·dτ`: substep becomes
+`exp(+Ω·L_z·dτ)`, which amplifies the +L_z component (descent on
+the Coriolis piece of H_rot). Same shear order with hyperbolic
+factors gives `(+tanh(θ/2), −sinh θ, +tanh(θ/2))`.
+
+A 2026-06-03 "fix" inverted these factors after misreading the
+freeze diagnostic at a stalled LBFGS state (where ΔE_total ≈ 0.5%
+of E_total is splitting-noise-dominated and not a clean
+propagator-vs-energy oracle). The audit on 2026-06-03 reverted
+that flip after verifying mutual consistency with E_coriolis
+(`−Ω·⟨L_z⟩`), the Barnett shift (`p_eff = p_lab + Ω`), and the
+transverse-spin RT-Barnett direction (CW Larmor) — all under the
+single `H_rot = H − Ω·(L_z + F_z)` convention, with the EdH oracle
+(⟨L_z⟩ and ⟨F_z⟩ co-aligned) as final anchor. See
+`mistake_coriolis_substep_sign_2026_06_03.md` for the lesson.
+"""
+function _apply_coriolis_step_core!(
+    psi::AbstractArray{<:Complex},
+    grid::Grid{N},
+    omega::Float64,
+    dt::Float64,
+    imaginary_time::Bool,
+    cache::Union{Nothing, CoriolisCache}=nothing,
+) where {N}
+    N < 2 && return nothing
+    abs(omega) < 1e-15 && return nothing
+
+    theta = omega * dt
+
+    if imaginary_time
+        a_y = tanh(theta / 2)
+        a_x = -sinh(theta)
+    else
+        a_y = tan(theta / 2)
+        a_x = -sin(theta)
+    end
+
+    if cache !== nothing
+        _apply_1d_shear_batch!(
+            psi, grid.x[1], grid.k[2], 2, 1, a_y, imaginary_time,
+            cache.fwd_dim2, cache.inv_dim2,
+        )
+        _apply_1d_shear_batch!(
+            psi, grid.x[2], grid.k[1], 1, 2, a_x, imaginary_time,
+            cache.fwd_dim1, cache.inv_dim1,
+        )
+        _apply_1d_shear_batch!(
+            psi, grid.x[1], grid.k[2], 2, 1, a_y, imaginary_time,
+            cache.fwd_dim2, cache.inv_dim2,
+        )
+    else
+        _apply_1d_shear_batch!(psi, grid.x[1], grid.k[2], 2, 1, a_y, imaginary_time)
+        _apply_1d_shear_batch!(psi, grid.x[2], grid.k[1], 1, 2, a_x, imaginary_time)
+        _apply_1d_shear_batch!(psi, grid.x[1], grid.k[2], 2, 1, a_y, imaginary_time)
+    end
+    nothing
+end
+
+# ============================================================================
+# Canonical kernel: δE_cor/δψ*
+# ============================================================================
+
+"""
+    _grad_coriolis_core!(grad, psi, ws, fft_buf, deriv_buf, n_pts, D, ::Val{N})
+
+Add the Coriolis (`-Ω·L_z·ψ`) contribution to `grad`. The `δE_cor/δψ*`
+contribution is `+iΩ·(x·∂_y − y·∂_x)·ψ`. Active only when
+`rotating_frame_omega ≠ 0` and N ≥ 2. Shared `fft_buf` / `deriv_buf`
+let the integrator reuse two ComplexF64 arrays across all components.
+"""
+function _grad_coriolis_core!(
+    grad, psi, ws, fft_buf, deriv_buf, n_pts, D, ::Val{N}
+) where {N}
+    Ω = ws.sim_params.rotating_frame_omega
+    (is_active(Ω, ROTATION_TOL) && N >= 2) || return nothing
+    grid = ws.grid
+    x_bcast = _axis_broadcast(fft_buf, grid.x[1], 1)
+    y_bcast = _axis_broadcast(fft_buf, grid.x[2], 2)
+    kx_bcast = _axis_broadcast(fft_buf, grid.k[1], 1)
+    ky_bcast = _axis_broadcast(fft_buf, grid.k[2], 2)
+    iΩ = im * Ω
+    for c in 1:D
+        idx = _component_slice(N, n_pts, c)
+        fft_buf .= view(psi, idx...)
+        ws.fft_plans.forward * fft_buf
+        # +iΩ · x · ∂_y ψ
+        deriv_buf .= fft_buf .* (im .* ky_bcast)
+        ws.fft_plans.inverse * deriv_buf
+        view(grad, idx...) .+= iΩ .* x_bcast .* deriv_buf
+        # −iΩ · y · ∂_x ψ
+        deriv_buf .= fft_buf .* (im .* kx_bcast)
+        ws.fft_plans.inverse * deriv_buf
+        view(grad, idx...) .-= iΩ .* y_bcast .* deriv_buf
+    end
+    nothing
+end
+
+# ============================================================================
+# HamTerm interface
+# ============================================================================
+
 function apply_step!(term::CoriolisTerm, psi, dt::Real, imaginary_time::Bool, ws)
-    _apply_coriolis_step!(psi, ws.grid, term.Ω, dt, imaginary_time, ws.coriolis_cache)
+    _apply_coriolis_step_core!(psi, ws.grid, term.Ω, dt, imaginary_time, ws.coriolis_cache)
     return nothing
 end
 
 function energy_contribution(term::CoriolisTerm, psi::AbstractArray{<:Complex}, ws)
-    # E_coriolis = -Ω · ⟨L_z⟩ (energy.jl:97-98 convention).
+    # E_coriolis = -Ω · ⟨L_z⟩ (energy.jl convention).
     N = ndims(psi) - 1
     N >= 2 || return 0.0
     return _coriolis_sign(term) * orbital_angular_momentum(psi, ws.grid, ws.fft_plans)
@@ -40,26 +173,17 @@ end
 
 function add_gradient!(grad::AbstractArray{<:Complex}, term::CoriolisTerm,
     psi::AbstractArray{<:Complex}, ws)
-    # ∂E/∂ψ̄ = -Ω · L_z · ψ = +iΩ · (x·∂_y - y·∂_x) · ψ
-    # Delegate to existing `_grad_coriolis!`, which encodes the
-    # +iΩ·(x∂_y - y∂_x) decomposition correctly (energy_gradient.jl:117).
-    # We just need scratch buffers it expects.
     N = ndims(psi) - 1
     N >= 2 || return nothing
     abs(term.Ω) < SpinorBEC.ROTATION_TOL && return nothing
     D = ws.spin_matrices.system.n_components
     n_pts = ntuple(d -> size(psi, d), Val(N))
-    # `_grad_coriolis!` requires fft_buf and deriv_buf scratch.
     fft_buf = similar(psi, ComplexF64, n_pts...)
     deriv_buf = similar(psi, ComplexF64, n_pts...)
-    # Use the workspace's stored Ω temporarily, then restore.
     Ω_save = ws.sim_params.rotating_frame_omega
-    ws_overridden = ws  # NOTE: rotating_frame_omega is a field of sim_params; for
-    # the consistency test we mutate-and-restore. In a future
-    # refactor, we lift Ω out of sim_params entirely.
     @assert isapprox(Ω_save, term.Ω; atol=1e-12) ||
         isapprox(Ω_save, 0.0; atol=1e-12) "CoriolisTerm term Ω mismatch — workspace and HamTerm should agree"
-    _grad_coriolis!(grad, psi, ws, fft_buf, deriv_buf, n_pts, D, Val(N))
+    _grad_coriolis_core!(grad, psi, ws, fft_buf, deriv_buf, n_pts, D, Val(N))
     return nothing
 end
 
@@ -70,7 +194,7 @@ function add_gradient!(grad::AbstractArray{<:Complex}, term::CoriolisTerm,
     N >= 2 || return nothing
     abs(term.Ω) < SpinorBEC.ROTATION_TOL && return nothing
     D = ws.spin_matrices.system.n_components
-    _grad_coriolis!(grad, psi, ws, ctx.fft_buf, ctx.deriv_buf, ctx.n_pts, D, Val(N))
+    _grad_coriolis_core!(grad, psi, ws, ctx.fft_buf, ctx.deriv_buf, ctx.n_pts, D, Val(N))
     return nothing
 end
 
@@ -88,11 +212,6 @@ function sign_oracle(::Type{CoriolisTerm})
     return (
         name="CoriolisTerm: +Ω ⇒ amplifies +L_z component",
         predicate=function (psi, ws)
-            # The vortex (x+iy)·gauss seed has L_z = +1. After ITP with
-            # +Ω, its norm² grows by exp(+2Ω·dτ) per step.
-            # Implementation: caller must seed the state appropriately;
-            # the predicate checks that ⟨L_z⟩ has increased relative
-            # to the seed value (caller passes seed_Lz via ws).
             Lz_now = orbital_angular_momentum(psi, ws.grid, ws.fft_plans)
             return Lz_now > 0.5  # for (x+iy)·gauss seed, ⟨L_z⟩ ≈ 1
         end,
