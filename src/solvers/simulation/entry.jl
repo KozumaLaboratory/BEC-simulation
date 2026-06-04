@@ -23,7 +23,7 @@ Run time evolution simulation with optional event-driven monitoring.
 result = run_simulation!(ws)
 
 # With live monitoring
-monitor = LiveMonitor(output_file="live_data.json", update_interval=50)
+monitor = LiveMonitor(output_file="live_data.json")  # cadence: sim_params.save_every
 result = run_simulation!(ws, live_monitor=monitor)
 
 # With custom callbacks
@@ -99,10 +99,14 @@ end
 function run_simulation_checkpointed!(
     ws::Workspace{N};
     checkpoint_dir::String="checkpoints",
-    checkpoint_every::Int=1000,
     callbacks::Union{Nothing, SimulationCallbacks}=nothing,
     resume::Bool=false,
 ) where {N}
+    # Unified observation cadence (2026-06-04): disk checkpoint fires at
+    # `sim_params.save_every`, same as every other observation sink
+    # (callbacks, live monitor). The separate `checkpoint_every` knob was
+    # dropped because it duplicated `save_every` and the cost asymmetry
+    # (disk I/O vs. callback cost) is small at typical cadences.
     mkpath(checkpoint_dir)
 
     if resume
@@ -128,10 +132,8 @@ function run_simulation_checkpointed!(
     checkpoint_callbacks = SimulationCallbacks(;
         on_snapshot=function (ws_cb, step, snapshot)
             global_step = start_step + step
-            if global_step % checkpoint_every == 0
-                fname = joinpath(checkpoint_dir, "step_$(lpad(global_step, 8, '0')).jld2")
-                save_state(fname, ws_cb)
-            end
+            fname = joinpath(checkpoint_dir, "step_$(lpad(global_step, 8, '0')).jld2")
+            save_state(fname, ws_cb)
             if callbacks !== nothing && callbacks.on_snapshot !== nothing
                 callbacks.on_snapshot(ws_cb, step, snapshot)
             end

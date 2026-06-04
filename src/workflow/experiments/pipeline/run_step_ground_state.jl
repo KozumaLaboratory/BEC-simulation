@@ -264,7 +264,13 @@ function _run_step(
             secular_ddi=secular, quasi_2d_ddi=q2d, l_z_ddi=lz,
             target_magnetization=target_mz, backend, on_step,
             checkpoint_dir=checkpoint_dir,
-            checkpoint_every=checkpoint_dir !== nothing ? max(1, n_steps ÷ 10) : 0,
+            # save_every overridden when user wants a coarser checkpoint
+            # cadence (pipeline default was n_steps/10).
+            save_every=if checkpoint_dir !== nothing
+                max(1, n_steps ÷ 10)
+            else
+                max(1, n_steps ÷ 100)
+            end,
             light_shift=gs_light_shift,
             spinor_lhy=spinor_lhy_mode,
             rotating_frame_omega=gs_rf_omega,

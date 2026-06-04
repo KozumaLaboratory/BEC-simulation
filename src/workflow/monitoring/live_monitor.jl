@@ -8,42 +8,37 @@ using JSON
     LiveMonitor
 
 Real-time simulation monitor that exports data to JSON or WebSocket.
+Fires at the workspace's `sim_params.save_every` cadence (unified
+observation cadence, 2026-06-04) — no separate `update_interval`.
 
 # Fields
 - `output_file::Union{Nothing, String}`: JSON file path for output
-- `update_interval::Int`: Minimum steps between updates
-- `last_update_step::Int`: Last updated step (internal state)
 - `extract_observables::Function`: Custom observable extraction function
 
 # Example
 ```julia
-monitor = LiveMonitor(
-    output_file="live_data.json",
-    update_interval=50
-)
-
-ws = make_workspace(...)
+monitor = LiveMonitor(output_file="live_data.json")
+ws = make_workspace(...)   # sim_params controls cadence
 result = run_simulation!(ws, live_monitor=monitor)
 ```
 """
 mutable struct LiveMonitor{F}
     output_file::Union{Nothing, String}
-    update_interval::Int
-    last_update_step::Int
     extract_observables::F
 end
 
 # Parameterising on F<:Function (instead of an abstract `::Function` field)
-# means `monitor.extract_observables(ws)` is statically dispatched. The
-# previous form re-resolved the function call dynamically every
-# `update_interval` steps; for a custom extractor that allocated, this
-# was a non-trivial fraction of the total cost in long EdH runs.
+# means `monitor.extract_observables(ws)` is statically dispatched.
 function LiveMonitor(;
     output_file::Union{Nothing, String}=nothing,
-    update_interval::Int=10,
     extract_observables::F=default_observable_extractor,
+    update_interval=nothing,  # deprecated alias; warns
 ) where {F <: Function}
-    LiveMonitor{F}(output_file, update_interval, 0, extract_observables)
+    if update_interval !== nothing
+        @warn "LiveMonitor `update_interval` is removed (2026-06-04 unification). " *
+            "Cadence now follows `sim_params.save_every`. Ignoring update_interval=$update_interval." maxlog=1
+    end
+    LiveMonitor{F}(output_file, extract_observables)
 end
 
 """
@@ -65,13 +60,8 @@ Update live monitor with current simulation state.
 Writes data to JSON file if configured.
 """
 function update!(monitor::LiveMonitor, ws::Workspace{N}, step::Int) where {N}
-    # Throttle updates
-    if step - monitor.last_update_step < monitor.update_interval
-        return nothing
-    end
-    monitor.last_update_step = step
-
-    # Extract observables
+    # No throttle here — caller (run_simulation!) only invokes update!
+    # at sim_params.save_every cadence. Single observation knob.
     observables = monitor.extract_observables(ws)
 
     # Build data structure

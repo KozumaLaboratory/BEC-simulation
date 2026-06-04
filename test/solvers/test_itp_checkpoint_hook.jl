@@ -1,17 +1,25 @@
 # test/solvers/test_itp_checkpoint_hook.jl
 #
-# Verifies that `find_ground_state(...; checkpoint=Checkpoint(...),
-# checkpoint_every=N)` auto-snapshots the ITP state every N steps to
-# the keyed store, and that the snapshot is usable as a `fork!`
-# source for branching or resumption.
+# Verifies the Checkpoint-primitive integration in find_ground_state.
+#
+# Semantics:
+#   checkpoint=cp                  → ALWAYS save terminal state to key
+#                                    (the load-bearing "keep final psi"
+#                                    guarantee)
+#   checkpoint=cp, save_every=N → also save every N steps
+#                                    (enables branching from mid-flight
+#                                    via fork! on the same key)
+#
+# No "snapshot" concept — it's all checkpoints, overwriting the same key.
+# Test the unified model + verify fork! ancestry works on intermediates.
 
 using Test
 using FFTW
 using SpinorBEC
 using SpinorBEC: Checkpoint, fork!, load_checkpoint, has_checkpoint, ancestry
 
-@testset "find_ground_state auto-snapshot via Checkpoint primitive" begin
-    @testset "checkpoint_every=N saves snapshots during ITP" begin
+@testset "find_ground_state Checkpoint integration" begin
+    @testset "save_every=N saves periodically during ITP" begin
         mktempdir() do dir
             cp = Checkpoint(dir)
             grid = make_grid(GridConfig{1}((16,), (8.0,)))
@@ -21,20 +29,20 @@ using SpinorBEC: Checkpoint, fork!, load_checkpoint, has_checkpoint, ancestry
                 grid=grid, atom=atom, interactions=ip,
                 potential=HarmonicTrap((1.0,)),
                 dt=0.005, n_steps=200, tol=1e-12,
-                checkpoint=cp, checkpoint_key="run1", checkpoint_every=50,
+                checkpoint=cp, checkpoint_key="run1", save_every=50,
                 verbose=false,
             )
-            # Snapshot exists
+            # Checkpoint exists
             @test has_checkpoint(cp, "run1")
             snap = load_checkpoint(cp, "run1")
             @test snap.psi isa Array{ComplexF64, 2}
             @test size(snap.psi) == (16, 3)
             @test snap.step > 0
-            @test snap.step % 50 == 0  # saved on a multiple of checkpoint_every
+            @test snap.step % 50 == 0  # saved on a multiple of save_every
         end
     end
 
-    @testset "Snapshot psi matches workspace psi at save time" begin
+    @testset "Checkpoint psi matches workspace psi at save time" begin
         mktempdir() do dir
             cp = Checkpoint(dir)
             grid = make_grid(GridConfig{1}((16,), (8.0,)))
@@ -44,18 +52,18 @@ using SpinorBEC: Checkpoint, fork!, load_checkpoint, has_checkpoint, ancestry
                 grid=grid, atom=atom, interactions=ip,
                 potential=HarmonicTrap((1.0,)),
                 dt=0.005, n_steps=100, tol=1e-12,
-                checkpoint=cp, checkpoint_key="match", checkpoint_every=100,
+                checkpoint=cp, checkpoint_key="match", save_every=100,
                 verbose=false,
             )
             snap = load_checkpoint(cp, "match")
-            # checkpoint_every=100 with n_steps=100 → save fires at step 100
+            # save_every=100 with n_steps=100 → save fires at step 100
             # which is the FINAL state, so snap.psi == ws.state.psi
             @test snap.psi ≈ Array(r.workspace.state.psi)
             @test isapprox(snap.E, r.energy; rtol=1e-10)
         end
     end
 
-    @testset "Branching from intermediate ITP snapshot" begin
+    @testset "Branching from intermediate ITP checkpoint" begin
         mktempdir() do dir
             cp = Checkpoint(dir)
             grid = make_grid(GridConfig{1}((16,), (8.0,)))
@@ -66,7 +74,7 @@ using SpinorBEC: Checkpoint, fork!, load_checkpoint, has_checkpoint, ancestry
                 grid=grid, atom=atom, interactions=ip_warm,
                 potential=HarmonicTrap((1.0,)),
                 dt=0.005, n_steps=100, tol=1e-12,
-                checkpoint=cp, checkpoint_key="warm", checkpoint_every=100,
+                checkpoint=cp, checkpoint_key="warm", save_every=100,
                 verbose=false,
             )
             @test has_checkpoint(cp, "warm")
@@ -115,9 +123,81 @@ using SpinorBEC: Checkpoint, fork!, load_checkpoint, has_checkpoint, ancestry
                 dt=0.005, n_steps=50, tol=1e-12,
                 verbose=false,
             )
-            # Default: no checkpoint kwarg → no snapshot
+            # Default: no checkpoint kwarg → no checkpoint
             @test !has_checkpoint(cp, "itp_state")
             @test isempty(filter(f -> endswith(f, ".jld2"), readdir(dir)))
+        end
+    end
+
+    @testset "Final state ALWAYS saved (save_every misaligned with n_steps)" begin
+        mktempdir() do dir
+            cp = Checkpoint(dir)
+            grid = make_grid(GridConfig{1}((16,), (8.0,)))
+            atom = Rb87
+            ip = InteractionParams(Dict(0 => 1.0, 1 => 0.05))
+            # save_every=300, n_steps=100 — naive logic would NEVER fire
+            # the periodic save (step never reaches 300). The guaranteed
+            # final-state save catches this.
+            r = find_ground_state(;
+                grid=grid, atom=atom, interactions=ip,
+                potential=HarmonicTrap((1.0,)),
+                dt=0.005, n_steps=100, tol=1e-12,
+                checkpoint=cp, checkpoint_key="final_save",
+                save_every=300,
+                verbose=false,
+            )
+            @test has_checkpoint(cp, "final_save")
+            snap = load_checkpoint(cp, "final_save")
+            @test snap.psi ≈ Array(r.workspace.state.psi)
+            @test snap.step == 100  # actual final step, not 300
+        end
+    end
+
+    @testset "Final state saved on early convergence break" begin
+        mktempdir() do dir
+            cp = Checkpoint(dir)
+            grid = make_grid(GridConfig{1}((16,), (8.0,)))
+            atom = Rb87
+            # Easy convergence: weak interactions, large tol → break early
+            ip = InteractionParams(Dict(0 => 0.1, 1 => 0.0))
+            r = find_ground_state(;
+                grid=grid, atom=atom, interactions=ip,
+                potential=HarmonicTrap((1.0,)),
+                dt=0.005, n_steps=5000, tol=1e-4,
+                checkpoint=cp, checkpoint_key="early_conv",
+                save_every=1000,
+                verbose=false,
+            )
+            @test r.converged
+            @test r.last_step < 5000  # broke early
+            @test has_checkpoint(cp, "early_conv")
+            snap = load_checkpoint(cp, "early_conv")
+            # checkpoint.step matches the actual break point, not some
+            # save_every multiple before it
+            @test snap.step == r.last_step
+            @test snap.converged == true
+        end
+    end
+
+    @testset "No save_every needed for final save (every=0)" begin
+        mktempdir() do dir
+            cp = Checkpoint(dir)
+            grid = make_grid(GridConfig{1}((16,), (8.0,)))
+            atom = Rb87
+            ip = InteractionParams(Dict(0 => 1.0, 1 => 0.05))
+            # save_every=0 (default) — no periodic saves, but the
+            # final state should still land in the checkpoint store.
+            r = find_ground_state(;
+                grid=grid, atom=atom, interactions=ip,
+                potential=HarmonicTrap((1.0,)),
+                dt=0.005, n_steps=50, tol=1e-12,
+                checkpoint=cp, checkpoint_key="only_final",
+                # save_every NOT specified → 0
+                verbose=false,
+            )
+            @test has_checkpoint(cp, "only_final")
+            snap = load_checkpoint(cp, "only_final")
+            @test snap.psi ≈ Array(r.workspace.state.psi)
         end
     end
 end

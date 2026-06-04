@@ -9,7 +9,7 @@
             potential=HarmonicTrap((1.0,)),
             dt=0.01, n_steps=100, tol=1e-20,  # tol impossible → runs all steps
             checkpoint_dir=ckpt_dir,
-            checkpoint_every=50,
+            save_every=50,
         )
 
         ckpt_file = joinpath(ckpt_dir, "itp_checkpoint.jld2")
@@ -35,7 +35,7 @@
             potential=HarmonicTrap((1.0,)),
             dt=0.01, n_steps=50, tol=1e-20,
             checkpoint_dir=ckpt_dir,
-            checkpoint_every=50,
+            save_every=50,
         )
         @test r1.last_step == 50
 

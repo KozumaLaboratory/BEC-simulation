@@ -111,6 +111,7 @@ function find_ground_state(;
     dt=0.001,
     n_steps=10000,
     tol=1e-10,
+    save_every::Int=max(1, n_steps ÷ 100),  # unified observation cadence
     initial_state=:polar,
     init_state_params::Dict{Symbol, Float64}=Dict{Symbol, Float64}(),
     psi_init=nothing,
@@ -132,17 +133,17 @@ function find_ground_state(;
     l_z::Float64=0.0,
     backend::AbstractBackend=CPUBackend(),
     on_step::Union{Nothing, Function}=nothing,  # (ws, step, n_steps) → update ws params
+    # Observation sinks — all fire at `sim_params.save_every` cadence
+    # (the unified observation cadence). Pass any subset:
+    #   `checkpoint_dir` — legacy single-file checkpoint
+    #   `checkpoint`     — Checkpoint primitive (fork!/ancestry-enabled)
+    # Both fire at save_every; both also save the terminal state on exit
+    # (so `n_steps` need not align with save_every to capture the end).
     checkpoint_dir::Union{Nothing, String}=nothing,
-    checkpoint_every::Int=0,
-    # New (2026-06-04): Checkpoint primitive integration.
-    # Pass a `Checkpoint` object + key to enable keyed-store auto-snapshot.
-    # Coexists with `checkpoint_dir`; the keyed-store path is preferred for
-    # new code because it supports `fork!` branching and `ancestry` walks.
     checkpoint::Union{Nothing, Checkpoint}=nothing,
     checkpoint_key::String="itp_state",
     _start_step::Int=0,        # internal: for resume
     _checkpoint_dir::Union{Nothing, String}=nothing,  # internal alias
-    _checkpoint_every::Int=0,   # internal alias
     light_shift::Union{Nothing, LightShift}=nothing,
     dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
     spinor_lhy::Union{Nothing, Symbol}=nothing,
@@ -267,7 +268,7 @@ function find_ground_state(;
         n_steps,
         imaginary_time=true,
         normalize_every=norm_every,
-        save_every=max(1, n_steps ÷ 100),
+        save_every=save_every,
         rotating_frame_omega,
     )
     ws = make_workspace(;
@@ -307,12 +308,10 @@ function find_ground_state(;
     end
 
     ckpt_dir = checkpoint_dir !== nothing ? checkpoint_dir : _checkpoint_dir
-    ckpt_every = checkpoint_every > 0 ? checkpoint_every : _checkpoint_every
 
     _run_itp_loop!(ws, n_steps, tol, on_step, target_magnetization;
         start_step=_start_step,
         checkpoint_dir=ckpt_dir,
-        checkpoint_every=ckpt_every,
         checkpoint=checkpoint,
         checkpoint_key=checkpoint_key,
         verbose=verbose,

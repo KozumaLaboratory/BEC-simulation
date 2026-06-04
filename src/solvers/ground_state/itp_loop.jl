@@ -9,14 +9,12 @@
 function _run_itp_loop!(
     ws, n_steps, tol, on_step, target_magnetization;
     start_step::Int=0,
+    # Checkpoint observation sinks — both fire at `sp.save_every` cadence
+    # (the unified observation cadence) and on terminal state. Pass any
+    # subset:
+    #   `checkpoint_dir` — legacy single-file `itp_checkpoint.jld2`
+    #   `checkpoint`     — Checkpoint primitive (fork!/ancestry-enabled)
     checkpoint_dir::Union{Nothing, String}=nothing,
-    checkpoint_every::Int=0,
-    # Checkpoint primitive integration (2026-06-04). If `checkpoint`
-    # is non-nothing, save_checkpoint!(checkpoint, checkpoint_key, …)
-    # fires every `checkpoint_every` steps with the current state.
-    # The keyed-store path supports `fork!` branching and `ancestry`
-    # tracking that the legacy `checkpoint_dir` single-file path does
-    # not. Both coexist; pass whichever fits.
     checkpoint::Union{Nothing, Checkpoint}=nothing,
     checkpoint_key::String="itp_state",
     verbose::Bool=true,
@@ -134,17 +132,17 @@ function _run_itp_loop!(
             end
             last_step = step
 
-            if checkpoint_dir !== nothing && checkpoint_every > 0 && step % checkpoint_every == 0
+            # Observation cadence is unified: both checkpoint paths and
+            # the log/convergence-check below fire at `sp.save_every`.
+            # No separate `checkpoint_every` knob — one observation knob
+            # controls all sinks (sink-pluggable observation, 2026-06-04).
+            obs_now = sp.save_every > 0 && step % sp.save_every == 0
+            if obs_now && checkpoint_dir !== nothing
                 _save_itp_checkpoint(
                     checkpoint_dir, ws, step, n_steps, E_prev, final_dE, final_dpsi, converged, tol
                 )
             end
-            # Keyed-store checkpoint (new path). Overwrites checkpoint_key
-            # each save — branching from intermediate state uses fork! with
-            # a fresh target key. Energy is recomputed at save time so the
-            # snapshot is self-consistent (E_prev can be stale by one
-            # save_every cycle vs the real current state).
-            if checkpoint !== nothing && checkpoint_every > 0 && step % checkpoint_every == 0
+            if obs_now && checkpoint !== nothing
                 save_checkpoint!(checkpoint, checkpoint_key,
                     (;
                         psi=_to_host(ws.state.psi),
@@ -241,6 +239,23 @@ function _run_itp_loop!(
             println("  Keyed checkpoint saved to $(checkpoint.cache_dir)/<$checkpoint_key>")
             flush(stdout)
         end
+    end
+
+    # Guaranteed final-state save: any simulation that finishes (normal
+    # completion OR early convergence break) ALWAYS saves its terminal
+    # psi to the keyed store when `checkpoint` is provided. Without this,
+    # users had to align `checkpoint_every` with `n_steps` or risk
+    # losing the actual end state. Now: pass `checkpoint=cp` and the
+    # last state is always reachable via load_checkpoint(cp, key).
+    if !interrupted && checkpoint !== nothing
+        save_checkpoint!(checkpoint, checkpoint_key,
+            (;
+                psi=_to_host(ws.state.psi),
+                step=last_step, n_steps=n_steps,
+                E=total_energy(ws), dE=final_dE, dpsi=final_dpsi,
+                converged=converged, dt=ws.sim_params.dt, tol=tol,
+                atom_name=ws.atom.name,
+            ); metadata=(; saved_at=time(), final=true))
     end
 
     (

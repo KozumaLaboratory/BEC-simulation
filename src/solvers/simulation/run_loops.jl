@@ -25,11 +25,10 @@ function _run_simulation_standard!(
                 callbacks.on_step(ws, step, times, energies)
             end
 
-            if live_monitor !== nothing
-                update!(live_monitor, ws, step)
-            end
-
             if step % sp.save_every == 0
+                if live_monitor !== nothing
+                    update!(live_monitor, ws, step)
+                end
                 _record_snapshot!(
                     times, energies, norms, mags, snapshots, ws, sys;
                     keep_psi=(!stream_snapshots),
@@ -153,11 +152,10 @@ function _run_simulation_leapfrog!(
                 callbacks.on_step(ws, step, times, energies)
             end
 
-            if live_monitor !== nothing
-                update!(live_monitor, ws, step)
-            end
-
             if is_save
+                if live_monitor !== nothing
+                    update!(live_monitor, ws, step)
+                end
                 _record_snapshot!(
                     times, energies, norms, mags, snapshots, ws, sys;
                     keep_psi=(!stream_snapshots),

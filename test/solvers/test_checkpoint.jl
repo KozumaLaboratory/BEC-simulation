@@ -12,7 +12,7 @@
         ws = make_workspace(; grid, atom, interactions, sim_params=sp)
 
         run_simulation_checkpointed!(ws;
-            checkpoint_dir=dir, checkpoint_every=50)
+            checkpoint_dir=dir)
 
         files = filter(f -> endswith(f, ".jld2"), readdir(dir))
         @test length(files) >= 1
@@ -33,7 +33,7 @@
         ws1 = make_workspace(; grid, atom, interactions, sim_params=sp1,
             psi_init=copy(psi0))
         run_simulation_checkpointed!(ws1;
-            checkpoint_dir=dir, checkpoint_every=50)
+            checkpoint_dir=dir)
 
         # Resume for remaining 50 steps
         sp2 = SimParams(; dt=dt, n_steps=100, save_every=50)
@@ -61,7 +61,7 @@
 
         cb_count = Ref(0)
         run_simulation_checkpointed!(ws;
-            checkpoint_dir=dir, checkpoint_every=25,
+            checkpoint_dir=dir,
             callbacks=SimulationCallbacks(
                 on_snapshot=(_, _, _) -> cb_count[] += 1))
 

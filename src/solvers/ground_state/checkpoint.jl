@@ -67,7 +67,6 @@ function resume_ground_state(checkpoint::ITPCheckpoint;
     tol::Float64=checkpoint.tol,
     dt::Float64=checkpoint.dt,
     checkpoint_dir::Union{Nothing, String}=nothing,
-    checkpoint_every::Int=0,
     kwargs...,
 )
     checkpoint.converged &&
@@ -89,7 +88,6 @@ function resume_ground_state(checkpoint::ITPCheckpoint;
         dt, n_steps, tol,
         _start_step=checkpoint.step,
         _checkpoint_dir=checkpoint_dir,
-        _checkpoint_every=checkpoint_every,
         kwargs...,
     )
 end
@@ -111,7 +109,6 @@ function refine_ground_state(result::NamedTuple;
     dt::Float64=result.workspace.sim_params.dt,
     n_steps::Int=result.workspace.sim_params.n_steps,
     checkpoint_dir::Union{Nothing, String}=nothing,
-    checkpoint_every::Int=0,
     on_step::Union{Nothing, Function}=nothing,
     target_magnetization::Union{Nothing, Float64}=nothing,
 )
@@ -130,6 +127,5 @@ function refine_ground_state(result::NamedTuple;
     _run_itp_loop!(ws_new, n_steps, tol, on_step, target_magnetization;
         start_step=0,
         checkpoint_dir,
-        checkpoint_every,
     )
 end
