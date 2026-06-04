@@ -9,16 +9,16 @@
 """
 Universal kinetic energy `H = (1/2) k²` in momentum space.
 """
-struct Kinetic <: HamTerm end
+struct KineticTerm <: HamTerm end
 
 @inline _kinetic_sign() = +0.5  # H = +(1/2)·k²; no user-spec sign question
 
-function apply_step!(::Kinetic, psi, dt::Real, imaginary_time::Bool, ws)
+function apply_step!(::KineticTerm, psi, dt::Real, imaginary_time::Bool, ws)
     apply_kinetic_step_batched!(psi, ws.batched_kinetic)
     return nothing
 end
 
-function energy_contribution(::Kinetic, psi::AbstractArray{<:Complex}, ws)
+function energy_contribution(::KineticTerm, psi::AbstractArray{<:Complex}, ws)
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
     n_comp = size(psi, N + 1)
@@ -27,7 +27,7 @@ function energy_contribution(::Kinetic, psi::AbstractArray{<:Complex}, ws)
     return _kinetic_energy(psi, ws.grid, ws.fft_plans, fft_buf, n_comp, N, n_pts, dV)
 end
 
-function add_gradient!(grad, ::Kinetic, psi, ws)
+function add_gradient!(grad, ::KineticTerm, psi, ws)
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
     D = ws.spin_matrices.system.n_components
@@ -37,4 +37,19 @@ function add_gradient!(grad, ::Kinetic, psi, ws)
     return nothing
 end
 
-sign_oracle(::Type{Kinetic}) = (name="Kinetic: norm-preserving in RT", predicate=(_, _) -> true)
+# Context-aware specialisation: borrow ctx.fft_buf instead of allocating.
+function add_gradient!(grad, ::KineticTerm, psi, ws, ctx::GradientContext)
+    N = ndims(psi) - 1
+    D = ws.spin_matrices.system.n_components
+    k_squared_dev = _to_device(ws.backend, ws.grid.k_squared)
+    _grad_kinetic!(grad, psi, ws, ctx.fft_buf, k_squared_dev, ctx.n_pts, D, Val(N))
+    return nothing
+end
+
+sign_oracle(::Type{KineticTerm}) = (
+    name="KineticTerm: ⟨k²/2⟩ ≥ 0 always",
+    predicate=function (psi, ws)
+        E = energy_contribution(KineticTerm(), psi, ws)
+        return E >= -1e-12  # FFT roundoff floor
+    end,
+)

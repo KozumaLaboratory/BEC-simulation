@@ -4,9 +4,9 @@
 # the propagator/energy/gradient go through ws.lhy.
 
 """LHY beyond-mean-field correction. Repulsive by physics."""
-struct LHY <: HamTerm end
+struct LHYTerm <: HamTerm end
 
-function apply_step!(::LHY, psi, dt::Real, imaginary_time::Bool, ws)
+function apply_step!(::LHYTerm, psi, dt::Real, imaginary_time::Bool, ws)
     # LHY is folded into the diagonal step in the legacy implementation;
     # at the HamTerm level we delegate via apply_lhy_step! if available.
     ws.lhy === nothing && ws.interactions.c_lhy == 0.0 && return nothing
@@ -14,7 +14,7 @@ function apply_step!(::LHY, psi, dt::Real, imaginary_time::Bool, ws)
     return nothing
 end
 
-function energy_contribution(::LHY, psi::AbstractArray{<:Complex}, ws)
+function energy_contribution(::LHYTerm, psi::AbstractArray{<:Complex}, ws)
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
     n_comp = size(psi, N + 1)
@@ -26,7 +26,7 @@ function energy_contribution(::LHY, psi::AbstractArray{<:Complex}, ws)
     return 0.0
 end
 
-function add_gradient!(grad, ::LHY, psi, ws)
+function add_gradient!(grad, ::LHYTerm, psi, ws)
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
     D = ws.spin_matrices.system.n_components
@@ -35,4 +35,19 @@ function add_gradient!(grad, ::LHY, psi, ws)
     return nothing
 end
 
-sign_oracle(::Type{LHY}) = (name="LHY: repulsive", predicate=(_, _) -> true)
+# Context-aware: borrow ctx.n_density.
+function add_gradient!(grad, ::LHYTerm, psi, ws, ctx::GradientContext)
+    N = ndims(psi) - 1
+    D = ws.spin_matrices.system.n_components
+    _grad_lhy!(grad, psi, ws, ctx.n_density, ctx.n_pts, D, Val(N))
+    return nothing
+end
+
+sign_oracle(::Type{LHYTerm}) = (
+    name="LHYTerm: c_lhy > 0 ⇒ E_LHY > 0 (repulsive correction)",
+    predicate=function (psi, ws)
+        c_lhy = ws.lhy === nothing ? ws.interactions.c_lhy : 1.0
+        E = energy_contribution(LHYTerm(), psi, ws)
+        return c_lhy >= 0.0 ? E >= -1e-12 : E <= 1e-12
+    end,
+)

@@ -6,9 +6,9 @@
 # and falls back to ITP for these); we mirror that limitation here.
 
 """Tensor (singlet-pair + higher-rank) spin-spin interaction."""
-struct TensorInteraction <: HamTerm end
+struct TensorTerm <: HamTerm end
 
-function apply_step!(::TensorInteraction, psi, dt::Real, imaginary_time::Bool, ws)
+function apply_step!(::TensorTerm, psi, dt::Real, imaginary_time::Bool, ws)
     # Apply singlet-pair (c2) + tensor cache.
     F = ws.spin_matrices.system.F
     N = ndims(psi) - 1
@@ -22,7 +22,7 @@ function apply_step!(::TensorInteraction, psi, dt::Real, imaginary_time::Bool, w
     return nothing
 end
 
-function energy_contribution(::TensorInteraction, psi::AbstractArray{<:Complex}, ws)
+function energy_contribution(::TensorTerm, psi::AbstractArray{<:Complex}, ws)
     F = ws.spin_matrices.system.F
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
@@ -38,14 +38,19 @@ function energy_contribution(::TensorInteraction, psi::AbstractArray{<:Complex},
     return E
 end
 
-function add_gradient!(grad, ::TensorInteraction, psi, ws)
+function add_gradient!(grad, ::TensorTerm, psi, ws)
     # Legacy energy_gradient! does NOT cover tensor terms (LBFGS
     # falls back to ITP). Mirror that limitation; FD-consistency
     # CI test should skip this term explicitly.
     return nothing
 end
 
-sign_oracle(::Type{TensorInteraction}) = (
-    name="TensorInteraction: not covered by gradient (KNOWN-LIMIT)",
-    predicate=(_, _) -> true,
+sign_oracle(::Type{TensorTerm}) = (
+    name="TensorTerm: c2 polar singlet ⇒ E_pair ≥ 0; gradient KNOWN-LIMIT",
+    predicate=function (psi, ws)
+        c2 = get_cn(ws.interactions, 2)
+        E = energy_contribution(TensorTerm(), psi, ws)
+        is_active(c2) || return isfinite(E)
+        return c2 >= 0.0 ? E >= -1e-12 : E <= 1e-12
+    end,
 )

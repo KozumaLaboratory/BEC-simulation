@@ -4,9 +4,9 @@
 # question. Delegates to the existing diagonal step.
 
 """External trap potential `H = +V_trap(r)`."""
-struct Trap <: HamTerm end
+struct TrapTerm <: HamTerm end
 
-function apply_step!(::Trap, psi, dt::Real, imaginary_time::Bool, ws)
+function apply_step!(::TrapTerm, psi, dt::Real, imaginary_time::Bool, ws)
     # V_trap is applied as part of the diagonal step. As a standalone
     # term application: psi *= exp(-V_trap·dt) per voxel (IT) or
     # cis(-V_trap·dt) (RT).
@@ -24,7 +24,7 @@ function apply_step!(::Trap, psi, dt::Real, imaginary_time::Bool, ws)
     return nothing
 end
 
-function energy_contribution(::Trap, psi::AbstractArray{<:Complex}, ws)
+function energy_contribution(::TrapTerm, psi::AbstractArray{<:Complex}, ws)
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
     n_comp = size(psi, N + 1)
@@ -32,7 +32,7 @@ function energy_contribution(::Trap, psi::AbstractArray{<:Complex}, ws)
     return _trap_energy(psi, V, n_comp, N, n_pts, cell_volume(ws.grid))
 end
 
-function add_gradient!(grad, ::Trap, psi, ws)
+function add_gradient!(grad, ::TrapTerm, psi, ws)
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
     D = ws.spin_matrices.system.n_components
@@ -40,4 +40,11 @@ function add_gradient!(grad, ::Trap, psi, ws)
     return nothing
 end
 
-sign_oracle(::Type{Trap}) = (name="Trap: positive coupling", predicate=(_, _) -> true)
+sign_oracle(::Type{TrapTerm}) = (
+    name="TrapTerm: V_trap≥0 ⇒ ⟨V_trap⟩ ≥ 0",
+    predicate=function (psi, ws)
+        any(<(0), ws.potential_values) && return true
+        E = energy_contribution(TrapTerm(), psi, ws)
+        return E >= -1e-12
+    end,
+)

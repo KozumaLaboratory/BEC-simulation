@@ -1,4 +1,4 @@
-# --- TransverseZeeman HamTerm ---
+# --- TransverseZeemanTerm HamTerm ---
 #
 # Single-source-of-truth declaration of `H_perp = -bx·F_x - by·F_y`. The
 # user-spec convention (`b_block_builders.jl:27`) is
@@ -9,14 +9,14 @@
 # `_zeeman_energy` and `_grad_zeeman!` silently dropped transverse
 # contributions because they only read `zeeman.p` and `zeeman.q`. The
 # HamTerm-based dispatch makes this structurally impossible: a
-# Workspace that contains a `TransverseZeeman` in its term registry
+# Workspace that contains a `TransverseZeemanTerm` in its term registry
 # has its energy and gradient automatically include the transverse
 # contribution via `energy_contribution` / `add_gradient!`.
 
 """
 Linear transverse Zeeman: `H = -bx·F_x - by·F_y` per user spec.
 """
-struct TransverseZeeman <: HamTerm
+struct TransverseZeemanTerm <: HamTerm
     bx::Float64
     by::Float64
 end
@@ -25,10 +25,10 @@ end
 # Returns the (D × D) spatially-uniform Hamiltonian matrix. Flipping
 # the signs flips propagator AND energy AND gradient simultaneously;
 # the sign_oracle test catches it.
-@inline _h_matrix(term::TransverseZeeman, sm) =
+@inline _h_matrix(term::TransverseZeemanTerm, sm) =
     (-term.bx) .* Matrix(sm.Fx) .+ (-term.by) .* Matrix(sm.Fy)
 
-function apply_step!(term::TransverseZeeman, psi, dt::Real, imaginary_time::Bool, ws)
+function apply_step!(term::TransverseZeemanTerm, psi, dt::Real, imaginary_time::Bool, ws)
     # `apply_uniform_spin_rotation!` applies `exp(-i·dt·(phi·F̂))`, i.e.
     # H_eff = +phi_x·F_x + phi_y·F_y. To realise `H = -bx·F_x - by·F_y`,
     # pass phi = (-bx, -by). This was the source of the 2026-06-04
@@ -43,7 +43,7 @@ function apply_step!(term::TransverseZeeman, psi, dt::Real, imaginary_time::Bool
     return nothing
 end
 
-function energy_contribution(term::TransverseZeeman, psi::AbstractArray{<:Complex}, ws)
+function energy_contribution(term::TransverseZeemanTerm, psi::AbstractArray{<:Complex}, ws)
     # ⟨H_perp⟩ = -bx·⟨F_x⟩ - by·⟨F_y⟩
     # where ⟨F_α⟩ = ∫ ψ̄·F_α·ψ d³r is the spatial-integrated spin
     # density along axis α.
@@ -54,7 +54,7 @@ function energy_contribution(term::TransverseZeeman, psi::AbstractArray{<:Comple
     return (-term.bx) * sum(fx) * dV + (-term.by) * sum(fy) * dV
 end
 
-function add_gradient!(grad::AbstractArray{<:Complex}, term::TransverseZeeman,
+function add_gradient!(grad::AbstractArray{<:Complex}, term::TransverseZeemanTerm,
     psi::AbstractArray{<:Complex}, ws)
     # ∂E/∂ψ̄_m = (H_perp · ψ)_m. With H_perp = -bx·F_x - by·F_y and
     # F_x = (F_+ + F_-)/2, F_y = (F_+ - F_-)/(2i):
@@ -98,14 +98,14 @@ function add_gradient!(grad::AbstractArray{<:Complex}, term::TransverseZeeman,
 end
 
 """
-Directional sign oracle for `TransverseZeeman`. With +bx and a small
+Directional sign oracle for `TransverseZeemanTerm`. With +bx and a small
 +Bz parity breaker, ITP from `:m_plus_F` should give ⟨F_x⟩ > 0 (spin
 aligns WITH +Bx as the user spec demands). Pre-2026-06-04 the sign
 was inverted (⟨F_x⟩ < 0 at +Bx) — this oracle catches the regression.
 """
-function sign_oracle(::Type{TransverseZeeman})
+function sign_oracle(::Type{TransverseZeemanTerm})
     return (
-        name="TransverseZeeman: +bx ⇒ ⟨F_x⟩ > 0",
+        name="TransverseZeemanTerm: +bx ⇒ ⟨F_x⟩ > 0",
         predicate=function (psi, ws)
             sm = ws.spin_matrices
             N = ndims(psi) - 1

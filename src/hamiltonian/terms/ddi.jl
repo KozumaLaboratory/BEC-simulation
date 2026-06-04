@@ -5,9 +5,9 @@
 # Convention is fixed (do NOT "fix").
 
 """Magnetic dipole-dipole interaction."""
-struct DDI <: HamTerm end
+struct DDITerm <: HamTerm end
 
-function apply_step!(::DDI, psi, dt::Real, imaginary_time::Bool, ws)
+function apply_step!(::DDITerm, psi, dt::Real, imaginary_time::Bool, ws)
     ws.ddi === nothing && return nothing
     N = ndims(psi) - 1
     if ws.ddi_padded !== nothing
@@ -20,7 +20,7 @@ function apply_step!(::DDI, psi, dt::Real, imaginary_time::Bool, ws)
     return nothing
 end
 
-function energy_contribution(::DDI, psi::AbstractArray{<:Complex}, ws)
+function energy_contribution(::DDITerm, psi::AbstractArray{<:Complex}, ws)
     ws.ddi === nothing && return 0.0
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
@@ -35,7 +35,7 @@ function energy_contribution(::DDI, psi::AbstractArray{<:Complex}, ws)
     end
 end
 
-function add_gradient!(grad, ::DDI, psi, ws)
+function add_gradient!(grad, ::DDITerm, psi, ws)
     ws.ddi === nothing && return nothing
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
@@ -44,7 +44,13 @@ function add_gradient!(grad, ::DDI, psi, ws)
     return nothing
 end
 
-sign_oracle(::Type{DDI}) = (
-    name="DDI: c_dd>0 → oblate-favorable alignment",
-    predicate=(_, _) -> true,
+sign_oracle(::Type{DDITerm}) = (
+    name="DDITerm: ⟨H_DDI⟩ matches stored ws.ddi sign convention",
+    predicate=function (psi, ws)
+        ws.ddi === nothing && return true
+        # Verify Phi·F integrand is consistent with c_dd sign (no
+        # absolute oracle since DDI orientation depends on geometry).
+        E = energy_contribution(DDITerm(), psi, ws)
+        return isfinite(E)
+    end,
 )

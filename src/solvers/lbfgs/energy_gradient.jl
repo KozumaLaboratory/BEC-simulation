@@ -82,6 +82,14 @@ function energy_gradient!(
     _grad_light_shift!(grad, psi, ws, n_pts, D, Val(N))
     _grad_ddi!(grad, psi, ws, n_pts, D, Val(N))
 
+    # Magnetic gradient (post-[GAP-2] 2026-06-04): closes the same gap
+    # in the LBFGS gradient that `_magnetic_gradient_energy` closed in
+    # `energy_decomposition`. Pre-fix LBFGS minimised a Hamiltonian
+    # missing the MG term, biasing the converged state when MG ≠ 0.
+    if ws.magnetic_gradient !== nothing
+        add_gradient!(grad, MagneticGradientTerm(), psi, ws)
+    end
+
     # Scale gradient by 2 for complex ψ convention:
     # δE = 2 Re ∫ (δE/δψ*)* · δψ dV, so grad_R = 2 × δE/δψ*
     # makes δE = Re ∫ grad_R* · δψ dV (standard real inner product)
@@ -152,7 +160,7 @@ end
 function _grad_zeeman!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
     # Diagonal Zeeman: -p·F_z + q·F_z². Pre-2026-06-04 this routine
     # silently dropped transverse contributions ([GAP-1]). Now: also
-    # adds -bx·F_x - by·F_y via the TransverseZeeman HamTerm dispatch.
+    # adds -bx·F_x - by·F_y via the TransverseZeemanTerm HamTerm dispatch.
     zee = zeeman_at(ws.zeeman, ws.state.t)
     zee_vals = zeeman_energies(zee, ws.spin_matrices.system)
     for c in 1:D
@@ -162,7 +170,7 @@ function _grad_zeeman!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
     # Transverse Zeeman contribution via HamTerm dispatch.
     bx, by = transverse_b(ws.zeeman, ws.state.t)
     if !(bx == 0.0 && by == 0.0)
-        add_gradient!(grad, TransverseZeeman(bx, by), psi, ws)
+        add_gradient!(grad, TransverseZeemanTerm(bx, by), psi, ws)
     end
     nothing
 end

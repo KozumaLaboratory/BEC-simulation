@@ -13,11 +13,11 @@
 using Test
 using FFTW
 using SpinorBEC
-using SpinorBEC: LinearZeemanZ, apply_step!, energy_contribution,
+using SpinorBEC: LinearZeemanZTerm, apply_step!, energy_contribution,
     add_gradient!
 
 @testset "HamTerm ↔ legacy bit-identity" begin
-    @testset "LinearZeemanZ vs legacy _diagonal_step + _zeeman_energy + _grad_zeeman!" begin
+    @testset "LinearZeemanZTerm vs legacy _diagonal_step + _zeeman_energy + _grad_zeeman!" begin
         grid = make_grid(GridConfig((8, 8, 8), (4.0, 4.0, 4.0)))
         atom = Rb87
         F = atom.F;
@@ -41,7 +41,7 @@ using SpinorBEC: LinearZeemanZ, apply_step!, energy_contribution,
         copyto!(ws_leg.state.psi, psi_ref)
         E_legacy = SpinorBEC.energy_decomposition(ws_leg).zeeman
 
-        term = LinearZeemanZ(0.7, 0.2)
+        term = LinearZeemanZTerm(0.7, 0.2)
         E_new = energy_contribution(term, psi_ref, ws_leg)
 
         # Strict bit-identity: should agree to F64 ULP scale (~1e-14).

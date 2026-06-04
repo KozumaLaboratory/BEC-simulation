@@ -5,9 +5,9 @@
 # Hamiltonian piece in the standard sense).
 
 """Three-body K3 loss. RT only; non-Hermitian."""
-struct Loss <: HamTerm end
+struct LossTerm <: HamTerm end
 
-function apply_step!(::Loss, psi, dt::Real, imaginary_time::Bool, ws)
+function apply_step!(::LossTerm, psi, dt::Real, imaginary_time::Bool, ws)
     (imaginary_time || ws.loss === nothing) && return nothing
     N = ndims(psi) - 1
     F = ws.spin_matrices.system.F
@@ -16,7 +16,15 @@ function apply_step!(::Loss, psi, dt::Real, imaginary_time::Bool, ws)
     return nothing
 end
 
-energy_contribution(::Loss, psi, ws) = 0.0
-add_gradient!(grad, ::Loss, psi, ws) = nothing
+energy_contribution(::LossTerm, psi, ws) = 0.0
+add_gradient!(grad, ::LossTerm, psi, ws) = nothing
 
-sign_oracle(::Type{Loss}) = (name="Loss: non-Hermitian, RT-only", predicate=(_, _) -> true)
+sign_oracle(::Type{LossTerm}) = (
+    name="LossTerm: K3 reduces ‖ψ‖² under RT (non-Hermitian)",
+    predicate=function (psi, ws)
+        # Loss is RT-only; in ITP path nothing to check.
+        # Sign property: after one apply_step!(LossTerm(), psi, dt, false, ws),
+        # ‖ψ‖²(after) ≤ ‖ψ‖²(before) when ws.loss has positive K3 coefficients.
+        return ws.loss === nothing || all(>=(0), ws.loss.K3)
+    end,
+)

@@ -5,9 +5,9 @@
 # GPU implementation (fixed as part of the GAP analysis).
 
 """Optical light-shift potential."""
-struct LightShift <: HamTerm end
+struct LightShiftTerm <: HamTerm end
 
-function apply_step!(::LightShift, psi, dt::Real, imaginary_time::Bool, ws)
+function apply_step!(::LightShiftTerm, psi, dt::Real, imaginary_time::Bool, ws)
     ws.light_shift === nothing && return nothing
     # Light shift is folded into the diagonal step with `_diagonal_step_with_ls!`.
     # Standalone application: per-component for diagonal LightShift.
@@ -31,7 +31,7 @@ function apply_step!(::LightShift, psi, dt::Real, imaginary_time::Bool, ws)
     return nothing
 end
 
-function energy_contribution(::LightShift, psi::AbstractArray{<:Complex}, ws)
+function energy_contribution(::LightShiftTerm, psi::AbstractArray{<:Complex}, ws)
     ws.light_shift === nothing && return 0.0
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
@@ -39,7 +39,7 @@ function energy_contribution(::LightShift, psi::AbstractArray{<:Complex}, ws)
     return _light_shift_energy(psi, ws.light_shift, n_comp, N, n_pts, cell_volume(ws.grid))
 end
 
-function add_gradient!(grad, ::LightShift, psi, ws)
+function add_gradient!(grad, ::LightShiftTerm, psi, ws)
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
     D = ws.spin_matrices.system.n_components
@@ -47,7 +47,11 @@ function add_gradient!(grad, ::LightShift, psi, ws)
     return nothing
 end
 
-sign_oracle(::Type{LightShift}) = (
-    name="LightShift: per-state eigval-defined sign",
-    predicate=(_, _) -> true,
+sign_oracle(::Type{LightShiftTerm}) = (
+    name="LightShiftTerm: ⟨H_LS⟩ matches stored eigvals × profile sign",
+    predicate=function (psi, ws)
+        ws.light_shift === nothing && return true
+        E = energy_contribution(LightShiftTerm(), psi, ws)
+        return isfinite(E)
+    end,
 )

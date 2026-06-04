@@ -18,7 +18,7 @@
 using Test
 using FFTW
 using SpinorBEC
-using SpinorBEC: HamTerm, LinearZeemanZ, TransverseZeeman,
+using SpinorBEC: HamTerm, LinearZeemanZTerm, TransverseZeemanTerm,
     apply_step!, energy_contribution, add_gradient!, sign_oracle
 using Random
 
@@ -79,23 +79,23 @@ end
     psi_ref = _random_state(ws)
     δψ = _random_perturbation(psi_ref)
 
-    @testset "LinearZeemanZ" begin
-        term = LinearZeemanZ(0.7, 0.2)
+    @testset "LinearZeemanZTerm" begin
+        term = LinearZeemanZTerm(0.7, 0.2)
         fd, inner, ratio = _fd_vs_inner(term, ws, psi_ref, δψ)
         @test isapprox(fd, inner; rtol=1e-3)
     end
 
-    @testset "TransverseZeeman" begin
-        term = TransverseZeeman(0.5, 0.3)
+    @testset "TransverseZeemanTerm" begin
+        term = TransverseZeemanTerm(0.5, 0.3)
         fd, inner, ratio = _fd_vs_inner(term, ws, psi_ref, δψ)
         @test isapprox(fd, inner; rtol=1e-3)
     end
 end
 
 @testset "HamTerm directional sign oracles" begin
-    @testset "LinearZeemanZ: +p ⇒ ⟨F_z⟩ > 0" begin
+    @testset "LinearZeemanZTerm: +p ⇒ ⟨F_z⟩ > 0" begin
         ws = _ref_workspace()
-        term = LinearZeemanZ(2.0, 0.0)
+        term = LinearZeemanZTerm(2.0, 0.0)
         # ITP loop only this term — start from m_plus_F, apply 500 steps
         sys = SpinSystem(1)
         psi = init_psi(ws.grid, sys; state=:m_plus_F)
@@ -103,25 +103,25 @@ end
             apply_step!(term, psi, 0.005, true, ws)
             psi ./= sqrt(sum(abs2, psi) * cell_volume(ws.grid))
         end
-        oracle = sign_oracle(LinearZeemanZ)
+        oracle = sign_oracle(LinearZeemanZTerm)
         @test oracle.predicate(psi, ws)
     end
 
-    @testset "TransverseZeeman: +bx ⇒ ⟨F_x⟩ > 0" begin
+    @testset "TransverseZeemanTerm: +bx ⇒ ⟨F_x⟩ > 0" begin
         ws = _ref_workspace()
-        term = TransverseZeeman(2.0, 0.0)
+        term = TransverseZeemanTerm(2.0, 0.0)
         sys = SpinSystem(1)
         psi = init_psi(ws.grid, sys; state=:m_plus_F)
         # Phase-1 ITP with a +Bz parity breaker (TransverseZeeman alone
         # from m_plus_F can leave ⟨F_x⟩ = 0 by symmetry; need a small
         # +Bz tilt to break the F_x parity).
-        term_z = LinearZeemanZ(0.5, 0.0)
+        term_z = LinearZeemanZTerm(0.5, 0.0)
         for _ in 1:500
             apply_step!(term_z, psi, 0.005, true, ws)
             apply_step!(term, psi, 0.005, true, ws)
             psi ./= sqrt(sum(abs2, psi) * cell_volume(ws.grid))
         end
-        oracle = sign_oracle(TransverseZeeman)
+        oracle = sign_oracle(TransverseZeemanTerm)
         @test oracle.predicate(psi, ws)
     end
 end

@@ -105,9 +105,14 @@ function _energy_decomposition_cpu(ws::Workspace{N}) where {N}
         0.0
     end
 
+    # Magnetic gradient (post-[GAP-2] 2026-06-04): included for runs
+    # with active `ws.magnetic_gradient`. Pre-fix this was silently
+    # dropped — see `_magnetic_gradient_energy` docstring.
+    E_mg = _magnetic_gradient_energy(psi, ws, N, n_pts, dV)
+
     E_total =
         E_kin + E_trap + E_zee + E_c0 + E_c1 + E_ddi + E_lhy + E_tensor + E_raman +
-        E_light_shift + E_coriolis
+        E_light_shift + E_coriolis + E_mg
     (
         kinetic=E_kin,
         trap=E_trap,
@@ -120,6 +125,7 @@ function _energy_decomposition_cpu(ws::Workspace{N}) where {N}
         raman=E_raman,
         light_shift=E_light_shift,
         coriolis=E_coriolis,
+        magnetic_gradient=E_mg,
         total=E_total,
     )
 end
@@ -192,6 +198,38 @@ function _transverse_zeeman_energy(psi, bx::Real, by::Real, sm, ndim, dV)
     (bx == 0.0 && by == 0.0) && return 0.0
     fx, fy, _ = spin_density_vector(psi, sm, ndim)
     return (-bx) * sum(fx) * dV + (-by) * sum(fy) * dV
+end
+
+# Magnetic gradient energy `+g_F·grad(t)·∫ x_axis·n(r) d³r`. Added
+# 2026-06-04 to close [GAP-2] (MG silently dropped from energy
+# because `_apply_mg_to_V!` adds-and-removes the ramp from V_trap
+# bracketing the diagonal step, leaving V_trap clean between calls).
+# Convention matches `_apply_mg_to_V!` (split_step.jl:130): MG is
+# SPIN-INDEPENDENT in the current implementation — `g_F` is a generic
+# scalar prefactor, not the Landé factor times F_z. See
+# `src/hamiltonian/terms/magnetic_gradient.jl` for the canonical
+# docstring.
+function _magnetic_gradient_energy(psi, ws, ndim, n_pts, dV)
+    mg = ws.magnetic_gradient
+    mg === nothing && return 0.0
+    grad_val = if mg isa TimeDependentMagneticGradient
+        evaluate(mg.gradient_wf, ws.state.t)
+    else
+        mg.gradient
+    end
+    coeff = mg.g_F * grad_val
+    coeff == 0.0 && return 0.0
+    D = size(psi, ndim + 1)
+    x_axis = _to_host(ws.grid.x[mg.axis])
+    E = 0.0
+    @inbounds for I in CartesianIndices(n_pts)
+        n_I = 0.0
+        for c in 1:D
+            n_I += abs2(psi[I, c])
+        end
+        E += x_axis[I[mg.axis]] * n_I
+    end
+    return coeff * E * dV
 end
 
 function _density_interaction_energy(psi, c0, n_comp, ndim, n_pts, dV)

@@ -1,4 +1,4 @@
-# --- LinearZeemanZ HamTerm: proof-of-concept ---
+# --- LinearZeemanZTerm HamTerm: proof-of-concept ---
 #
 # Single-source-of-truth declaration of `H_z = -p·F_z + q·F_z²`. The
 # convention in `b_block_builders.jl:27` is `H_Zeeman = -(g_F μ_B B · F) + q F_z²`;
@@ -16,7 +16,7 @@ Linear z-Zeeman + quadratic z-Zeeman.
 
 `H = -p·F_z + q·F_z²` per user spec (`b_block_builders.jl:27`).
 """
-struct LinearZeemanZ <: HamTerm
+struct LinearZeemanZTerm <: HamTerm
     p::Float64
     q::Float64
 end
@@ -25,9 +25,9 @@ end
 # Every method below derives from this. Flipping `-p*m` to `+p*m`
 # flips propagator AND energy AND gradient simultaneously — the
 # sign_oracle test catches it immediately.
-@inline _diag_coef(term::LinearZeemanZ, m::Real) = -term.p * m + term.q * m * m
+@inline _diag_coef(term::LinearZeemanZTerm, m::Real) = -term.p * m + term.q * m * m
 
-function apply_step!(term::LinearZeemanZ, psi::AbstractArray{<:Complex},
+function apply_step!(term::LinearZeemanZTerm, psi::AbstractArray{<:Complex},
     dt::Real, imaginary_time::Bool, ws)
     sm = ws.spin_matrices
     F = sm.system.F
@@ -57,7 +57,7 @@ function apply_step!(term::LinearZeemanZ, psi::AbstractArray{<:Complex},
     return nothing
 end
 
-function energy_contribution(term::LinearZeemanZ, psi::AbstractArray{<:Complex}, ws)
+function energy_contribution(term::LinearZeemanZTerm, psi::AbstractArray{<:Complex}, ws)
     sm = ws.spin_matrices
     F = sm.system.F
     D = sm.system.n_components
@@ -73,7 +73,7 @@ function energy_contribution(term::LinearZeemanZ, psi::AbstractArray{<:Complex},
     return E
 end
 
-function add_gradient!(grad::AbstractArray{<:Complex}, term::LinearZeemanZ,
+function add_gradient!(grad::AbstractArray{<:Complex}, term::LinearZeemanZTerm,
     psi::AbstractArray{<:Complex}, ws)
     sm = ws.spin_matrices
     F = sm.system.F
@@ -89,15 +89,15 @@ function add_gradient!(grad::AbstractArray{<:Complex}, term::LinearZeemanZ,
 end
 
 """
-Directional sign oracle for `LinearZeemanZ`. With +p (representing
+Directional sign oracle for `LinearZeemanZTerm`. With +p (representing
 +Bz), ITP from `:m_plus_F` initial state should preserve ⟨F_z⟩ ≈ +F.
 With −p (representing −Bz), ITP should push ⟨F_z⟩ toward −F.
 """
-function sign_oracle(::Type{LinearZeemanZ})
+function sign_oracle(::Type{LinearZeemanZTerm})
     return (
-        name="LinearZeemanZ: +p ⇒ ⟨F_z⟩ > 0",
+        name="LinearZeemanZTerm: +p ⇒ ⟨F_z⟩ > 0",
         # `predicate(ws)` is called by the test harness after the
-        # workspace is constructed with `[LinearZeemanZ(0.5, 0.0)]`
+        # workspace is constructed with `[LinearZeemanZTerm(0.5, 0.0)]`
         # as the only HamTerm and an ITP loop has run for ~100 steps.
         # Returns Bool: does the observable have the expected sign?
         predicate=function (psi, ws)

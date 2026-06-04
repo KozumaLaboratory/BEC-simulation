@@ -183,9 +183,14 @@ function SpinorBEC._energy_decomposition_gpu(ws::SpinorBEC.Workspace{N}) where {
         0.0
     end
 
+    # Magnetic gradient (post-[GAP-2] 2026-06-04): mirror the CPU
+    # path's call into `_magnetic_gradient_energy`. The helper operates
+    # on the host-side `psi` already prepared above.
+    E_mg = SpinorBEC._magnetic_gradient_energy(psi, ws, N, n_pts, dV)
+
     E_total =
         E_kin + E_trap + E_zee + E_c0 + E_c1 + E_ddi + E_lhy + E_tensor + E_raman +
-        E_light_shift + E_coriolis
+        E_light_shift + E_coriolis + E_mg
     (
         kinetic=E_kin,
         trap=E_trap,
@@ -198,6 +203,7 @@ function SpinorBEC._energy_decomposition_gpu(ws::SpinorBEC.Workspace{N}) where {
         raman=E_raman,
         light_shift=E_light_shift,
         coriolis=E_coriolis,
+        magnetic_gradient=E_mg,
         total=E_total,
     )
 end

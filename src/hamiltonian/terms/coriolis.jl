@@ -1,8 +1,8 @@
-# --- Coriolis HamTerm ---
+# --- CoriolisTerm HamTerm ---
 #
 # Single-source-of-truth declaration of `H_coriolis = -Ω·L_z` where
 # `L_z = x·p_y - y·p_x = -i·(x·∂_y - y·∂_x)`. This is the orbital
-# Coriolis piece of the rotating-frame Hamiltonian
+# CoriolisTerm piece of the rotating-frame Hamiltonian
 # `H_rot = H_lab - Ω·(L_z + F_z)` (the F_z piece is handled
 # separately via `_shift_zeeman_for_rotating_frame`).
 #
@@ -14,31 +14,31 @@
 # `_grad_coriolis!` routines.
 
 """
-Coriolis (orbital) piece of the rotating-frame Hamiltonian.
+CoriolisTerm (orbital) piece of the rotating-frame Hamiltonian.
 `H = -Ω · L_z` where `L_z = -i·(x·∂_y - y·∂_x)`.
 """
-struct Coriolis <: HamTerm
+struct CoriolisTerm <: HamTerm
     Ω::Float64
 end
 
 # THE ONE LINE. Sign convention `H_coriolis = -Ω·L_z` lives here.
 # Read this way: positive Ω makes negative ΔE on +L_z eigenstates,
 # so descent on -Ω·L_z amplifies +L_z components in ITP.
-@inline _coriolis_sign(term::Coriolis) = -term.Ω
+@inline _coriolis_sign(term::CoriolisTerm) = -term.Ω
 
-function apply_step!(term::Coriolis, psi, dt::Real, imaginary_time::Bool, ws)
+function apply_step!(term::CoriolisTerm, psi, dt::Real, imaginary_time::Bool, ws)
     _apply_coriolis_step!(psi, ws.grid, term.Ω, dt, imaginary_time, ws.coriolis_cache)
     return nothing
 end
 
-function energy_contribution(term::Coriolis, psi::AbstractArray{<:Complex}, ws)
+function energy_contribution(term::CoriolisTerm, psi::AbstractArray{<:Complex}, ws)
     # E_coriolis = -Ω · ⟨L_z⟩ (energy.jl:97-98 convention).
     N = ndims(psi) - 1
     N >= 2 || return 0.0
     return _coriolis_sign(term) * orbital_angular_momentum(psi, ws.grid, ws.fft_plans)
 end
 
-function add_gradient!(grad::AbstractArray{<:Complex}, term::Coriolis,
+function add_gradient!(grad::AbstractArray{<:Complex}, term::CoriolisTerm,
     psi::AbstractArray{<:Complex}, ws)
     # ∂E/∂ψ̄ = -Ω · L_z · ψ = +iΩ · (x·∂_y - y·∂_x) · ψ
     # Delegate to existing `_grad_coriolis!`, which encodes the
@@ -58,24 +58,35 @@ function add_gradient!(grad::AbstractArray{<:Complex}, term::Coriolis,
     # the consistency test we mutate-and-restore. In a future
     # refactor, we lift Ω out of sim_params entirely.
     @assert isapprox(Ω_save, term.Ω; atol=1e-12) ||
-        isapprox(Ω_save, 0.0; atol=1e-12) "Coriolis term Ω mismatch — workspace and HamTerm should agree"
+        isapprox(Ω_save, 0.0; atol=1e-12) "CoriolisTerm term Ω mismatch — workspace and HamTerm should agree"
     _grad_coriolis!(grad, psi, ws, fft_buf, deriv_buf, n_pts, D, Val(N))
     return nothing
 end
 
+# Context-aware specialisation: borrow ctx.fft_buf / ctx.deriv_buf.
+function add_gradient!(grad::AbstractArray{<:Complex}, term::CoriolisTerm,
+    psi::AbstractArray{<:Complex}, ws, ctx::GradientContext)
+    N = ndims(psi) - 1
+    N >= 2 || return nothing
+    abs(term.Ω) < SpinorBEC.ROTATION_TOL && return nothing
+    D = ws.spin_matrices.system.n_components
+    _grad_coriolis!(grad, psi, ws, ctx.fft_buf, ctx.deriv_buf, ctx.n_pts, D, Val(N))
+    return nothing
+end
+
 """
-Directional sign oracle for `Coriolis`. In ITP, the substep
+Directional sign oracle for `CoriolisTerm`. In ITP, the substep
 `exp(+Ω·L_z·dτ)` amplifies the +L_z eigenstate `(x+iy)·gauss`
 relative to the -L_z eigenstate `(x-iy)·gauss`. With +Ω, the ratio
 of post-step `||ψ_+||²` to pre-step is `exp(+2Ω·dτ)`.
 
-The Coriolis directional test is **already enshrined** in
+The CoriolisTerm directional test is **already enshrined** in
 `test/solvers/test_simulation.jl:253` — this oracle is the
 HamTerm-facing wrapper for documentation/CI integration.
 """
-function sign_oracle(::Type{Coriolis})
+function sign_oracle(::Type{CoriolisTerm})
     return (
-        name="Coriolis: +Ω ⇒ amplifies +L_z component",
+        name="CoriolisTerm: +Ω ⇒ amplifies +L_z component",
         predicate=function (psi, ws)
             # The vortex (x+iy)·gauss seed has L_z = +1. After ITP with
             # +Ω, its norm² grows by exp(+2Ω·dτ) per step.

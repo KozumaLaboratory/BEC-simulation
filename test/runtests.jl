@@ -181,6 +181,13 @@ const CI_EXTRA = [
     "oracles/test_term_consistency.jl",
     # Phase 3.3 proof-of-concept: registry-driven Strang step.
     "oracles/test_registry_strang_step_equivalence.jl",
+    # Rename regression: HamTerm subtype names no longer shadow potential types.
+    "oracles/test_registry_collision_regression.jl",
+    # [GAP-2] closure: MagneticGradientTerm energy/gradient/sign-oracle.
+    "oracles/test_magnetic_gradient_gap.jl",
+    # Phase 5: registry breakdown bit-identical to legacy energy_decomposition
+    # (modulo the now-restored MG slot).
+    "oracles/test_registry_energy_decomposition_parity.jl",
 ]
 
 # ── Full tier: everything (ci + remaining heavy tests) ──

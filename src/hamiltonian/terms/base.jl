@@ -16,7 +16,7 @@
 # `Vector{HamTerm}`) to hold the term list in `Workspace`. The Julia
 # compiler then specializes `for term in tuple` per-element, producing
 # code equivalent to direct hand-written calls — zero abstraction
-# overhead. Concrete `<: HamTerm` subtypes (e.g. `LinearZeemanZ`) make
+# overhead. Concrete `<: HamTerm` subtypes (e.g. `LinearZeemanZTerm`) make
 # `apply_step!(term, ...)` a compile-time dispatch.
 
 """
@@ -61,3 +61,51 @@ to zero), measures a physical observable, and returns whether the
 sign matches the user-spec convention.
 """
 function sign_oracle end
+
+# ============================================================================
+# Shared scratch contexts (forward-declared so term files can specialise
+# `add_gradient!(grad, term, psi, ws, ctx::GradientContext)` /
+# `energy_contribution(term, psi, ws, ctx::EnergyContext)` without an
+# include-order trap). Builders live in `registry.jl`.
+# ============================================================================
+
+"""
+    EnergyContext
+
+Per-call scratch container shared across `energy_contribution(term,
+psi, ws, ctx)` invocations. Pre-builds the total density and
+spatial-spin density (`fx, fy, fz`) so DensityC0Term, SpinC1Term,
+LHYTerm, TransverseZeemanTerm, CoriolisTerm and others do not
+duplicate that work.
+"""
+struct EnergyContext{ND, FFTPlan, SM, NRho, NF}
+    psi_host::Array{ComplexF64, ND}
+    fft_buf::Array{ComplexF64, ND}
+    plans::FFTPlan
+    spin_matrices::SM
+    n_density::NRho
+    fx::NF
+    fy::NF
+    fz::NF
+    dV::Float64
+    n_pts::NTuple{ND, Int}
+end
+
+"""
+    GradientContext
+
+Per-call scratch container shared across `add_gradient!(grad, term,
+psi, ws, ctx)` invocations. Pre-builds the total density, spin
+density, FFT buffer, and a `deriv_buf` scratch so the registry path
+matches the legacy `_grad_*` helpers' allocation pattern (no extra
+allocs vs the hand-written sum in `energy_gradient!`).
+"""
+struct GradientContext{N, TF, TC, TD}
+    fft_buf::TC
+    deriv_buf::TC
+    fx::TF
+    fy::TF
+    fz::TF
+    n_density::TD
+    n_pts::NTuple{N, Int}
+end
