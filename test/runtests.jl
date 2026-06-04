@@ -188,6 +188,11 @@ const CI_EXTRA = [
     # Phase 5: registry breakdown bit-identical to legacy energy_decomposition
     # (modulo the now-restored MG slot).
     "oracles/test_registry_energy_decomposition_parity.jl",
+    # Physics-aware per-term directional oracles for the high-risk GS-phase
+    # terms (SpinC1 / DDI / LHY / Tensor). Replaces formula-tautology
+    # placeholders with real physics: FM vs polar GS, prolate vs oblate DDI,
+    # n^{5/2} convexity, singlet polar vs FM.
+    "oracles/test_physics_aware_sign_oracles.jl",
 ]
 
 # ── Full tier: everything (ci + remaining heavy tests) ──
