@@ -58,20 +58,35 @@ function energy_gradient!(
     ws::Workspace{N};
     k_squared_dev::AbstractArray{<:AbstractFloat}=ws.grid.k_squared,
 ) where {N}
-    # Phase 4 (2026-06-04): production path delegates to
-    # `add_gradient_via_registry!` which iterates the HamTerm registry.
-    # Bit-identical to the legacy per-term call chain (verified at
-    # 1 ULP, F64 precision, 24³ Eu-like config). 2.8× faster and
-    # ~1,758× fewer allocations than the old hand-written body.
-    #
-    # The HamTerm registry is the canonical source-of-truth for
-    # every Hamiltonian term's sign convention; any new term added
-    # to the registry is automatically included in the gradient,
-    # closing the missing-term bug class (`[GAP-1]`, GPU energy
-    # missing Coriolis) structurally.
+    n_pts = ntuple(d -> size(psi, d), Val(N))
+    D = ws.spin_matrices.system.n_components
+
+    fill!(grad, zero(ComplexF64))
     copyto!(ws.state.psi, psi)  # sync ws for energy evaluation
-    add_gradient_via_registry!(grad, ws)
-    grad .*= 2  # Wirtinger convention (see `add_gradient_via_registry!`)
+
+    fft_buf, fx_scratch, fy_scratch, fz_scratch, deriv_buf = _energy_gradient_scratch(psi, n_pts)
+
+    # Linear-in-ψ terms (always accumulate). Order chosen to share the
+    # fft_buf scratch productively: kinetic consumes it first, then
+    # Coriolis can re-use it as a per-component FFT workspace.
+    _grad_kinetic!(grad, psi, ws, fft_buf, k_squared_dev, n_pts, D, Val(N))
+    _grad_coriolis!(grad, psi, ws, fft_buf, deriv_buf, n_pts, D, Val(N))
+    _grad_trap!(grad, psi, ws, n_pts, D, Val(N))
+    _grad_zeeman!(grad, psi, ws, n_pts, D, Val(N))
+
+    # Nonlinear (density / spin) terms; gated by coupling magnitude.
+    n_density = total_density(psi, N)
+    _grad_c0_density!(grad, psi, ws, n_density, n_pts, D, Val(N))
+    _grad_lhy!(grad, psi, ws, n_density, n_pts, D, Val(N))
+    _grad_c1_spin!(grad, psi, ws, fx_scratch, fy_scratch, fz_scratch, n_pts, D, Val(N))
+    _grad_light_shift!(grad, psi, ws, n_pts, D, Val(N))
+    _grad_ddi!(grad, psi, ws, n_pts, D, Val(N))
+
+    # Scale gradient by 2 for complex ψ convention:
+    # δE = 2 Re ∫ (δE/δψ*)* · δψ dV, so grad_R = 2 × δE/δψ*
+    # makes δE = Re ∫ grad_R* · δψ dV (standard real inner product)
+    grad .*= 2
+
     energy_decomposition(ws).total
 end
 
