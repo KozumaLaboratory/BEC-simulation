@@ -419,12 +419,11 @@ function _make_batched_kinetic_cache(
     BatchedKineticCache(fwd, inv, kp_bc)
 end
 
-function apply_kinetic_step_batched!(psi, cache::BatchedKineticCache)
-    cache.forward * psi
-    psi .*= cache.kinetic_phase_bc
-    cache.inverse * psi
-    nothing
-end
+# Authoritative kernel `_apply_kinetic_step_core!` lives in
+# `src/hamiltonian/terms/kinetic.jl` (Part B collapse, 2026-06-04).
+# This shim preserves the legacy entry point name for external callers.
+apply_kinetic_step_batched!(psi, cache::BatchedKineticCache) =
+    _apply_kinetic_step_core!(psi, cache)
 
 function _make_coriolis_cache(psi, backend::AbstractBackend=CPUBackend(); flags=FFTW.MEASURE)
     plan_buf = _similar(backend, psi)

@@ -134,26 +134,12 @@ function total_energy(ws::Workspace{N}) where {N}
     energy_decomposition(ws).total
 end
 
-function _kinetic_energy(psi, grid, plans, fft_buf, n_comp, ndim, n_pts, dV)
-    E = 0.0
-    inv_npts = 1.0 / prod(n_pts)
-    k_sq = grid.k_squared
-    @inbounds for c in 1:n_comp
-        idx = _component_slice(ndim, n_pts, c)
-        fft_buf .= view(psi, idx...)
-        plans.forward * fft_buf
-        # Manual reduction loop: avoids materialising an `n_pts`-shaped
-        # `k_squared .* abs2.(fft_buf)` temporary every component
-        # (saves D × n_pts × 8 B per energy call — ~425 KB per call at
-        # 16³ × D=13).
-        Ec = 0.0
-        for i in eachindex(k_sq, fft_buf)
-            Ec += k_sq[i] * abs2(fft_buf[i])
-        end
-        E += Ec * dV * inv_npts
-    end
-    0.5 * E
-end
+# Authoritative kernel `_kinetic_energy_core` lives in
+# `src/hamiltonian/terms/kinetic.jl` (Part B collapse, 2026-06-04).
+# This shim preserves the legacy entry point name for the GPU
+# `_energy_decomposition_gpu` and the CPU dispatcher.
+_kinetic_energy(psi, grid, plans, fft_buf, n_comp, ndim, n_pts, dV) =
+    _kinetic_energy_core(psi, grid, plans, fft_buf, n_comp, ndim, n_pts, dV)
 
 function _trap_energy(psi, V_trap, n_comp, ndim, n_pts, dV)
     E = 0.0
