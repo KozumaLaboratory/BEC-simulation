@@ -112,6 +112,9 @@ end
 
 function add_gradient!(grad, ::MagneticGradientTerm, psi, ws)
     # ∂E_MG/∂ψ*_c = g_F · grad · x_axis · ψ_c (same coefficient per component).
+    # GPU-safe: broadcast against a per-voxel `delta_V = coeff · x_axis`
+    # array reshaped to the spatial axes; multiplication with `psi_c` is
+    # then a pure CuArray broadcast (no scalar indexing).
     p = _mg_at(ws)
     p === nothing && return nothing
     coeff = p.g_F * p.grad
@@ -119,14 +122,14 @@ function add_gradient!(grad, ::MagneticGradientTerm, psi, ws)
     N = ndims(psi) - 1
     D = size(psi, N + 1)
     n_pts = ntuple(d -> size(psi, d), Val(N))
-    x_axis = _to_host(ws.grid.x[p.axis])
+    # Broadcast x_axis along the MG axis. On CPU this is a Vector reshape;
+    # on GPU we need a device-resident array, so route through
+    # `_axis_broadcast` (foundation/backend.jl — same helper Coriolis uses).
+    x_bcast = _axis_broadcast(view(psi, ntuple(_ -> :, Val(N))..., 1),
+        ws.grid.x[p.axis], p.axis)
     for c in 1:D
         idx = _component_slice(N, n_pts, c)
-        psi_c = view(psi, idx...)
-        grad_c = view(grad, idx...)
-        @inbounds for I in CartesianIndices(n_pts)
-            grad_c[I] += coeff * x_axis[I[p.axis]] * psi_c[I]
-        end
+        view(grad, idx...) .+= coeff .* x_bcast .* view(psi, idx...)
     end
     return nothing
 end

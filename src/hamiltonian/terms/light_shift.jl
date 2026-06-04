@@ -80,11 +80,17 @@ end
 
 `∂E_LS/∂ψ*_c`: diagonal `eigvals[c]·profile·ψ_c`; off-diagonal
 `Σ_c2 M_full[c,c2]·profile·ψ_c2` with `M_full = U·diag(eigvals)·U†`.
+
+GPU-safe: route `profile` through `_to_device(ws.backend, …)` so the
+broadcast is pure-CuArray when grad is on GPU. Pre-collapse code used
+`_to_host(ls.profile)` and broadcast it against a CuArray grad — the
+GPU kernel compiler rejected this with "non-bitstype argument".
+Latent bug caught by 2026-06-04 GPU per-term parity gate.
 """
 function _grad_light_shift_core!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
     ws.light_shift !== nothing || return nothing
     ls = ws.light_shift
-    profile = _to_host(ls.profile)
+    profile = _to_device(ws.backend, ls.profile)
     if ls.is_diagonal
         for c in 1:D
             idx = _component_slice(N, n_pts, c)

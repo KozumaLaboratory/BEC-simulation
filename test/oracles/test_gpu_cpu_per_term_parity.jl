@@ -95,7 +95,10 @@ end
             else
                 make_workspace(; kwargs...)
             end
-            psi = init_psi(ws.grid, SpinSystem(1); state=:polar)
+            # spin_coherent (θ=π/4) ensures ⟨F_x⟩ ≠ 0 so transverse Zeeman
+            # contributes; polar (m=0 only) has ⟨F_x⟩=⟨F_y⟩=0 by symmetry
+            # and the term would silently no-op.
+            psi = init_psi(ws.grid, SpinSystem(1); state=:spin_coherent, init_theta=π / 4)
             copyto!(ws.state.psi, psi)
             ws
         end
@@ -277,7 +280,10 @@ end
             else
                 make_workspace(; kwargs...)
             end
-            psi = init_psi(ws.grid, SpinSystem(1); state=:polar)
+            # spin_coherent gives non-zero F+ amplitude so the Ω_R·Re(e^{ik·r}·F+)
+            # term in `_raman_energy_core` is active; polar (m=0 only) has F+=0
+            # and the sanity check would no-op.
+            psi = init_psi(ws.grid, SpinSystem(1); state=:spin_coherent, init_theta=π / 4)
             copyto!(ws.state.psi, psi)
             ws
         end
