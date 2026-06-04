@@ -105,17 +105,11 @@ end
 # parent `energy_gradient!`). Helpers are gated on coupling magnitude so
 # they no-op when the term is inactive.
 
-function _grad_kinetic!(grad, psi, ws, fft_buf, k_squared_dev, n_pts, D, ::Val{N}) where {N}
-    for c in 1:D
-        idx = _component_slice(N, n_pts, c)
-        fft_buf .= view(psi, idx...)
-        ws.fft_plans.forward * fft_buf
-        fft_buf .*= (0.5 .* k_squared_dev)
-        ws.fft_plans.inverse * fft_buf
-        view(grad, idx...) .+= fft_buf
-    end
-    nothing
-end
+# Authoritative kernel `_grad_kinetic_core!` lives in
+# `src/hamiltonian/terms/kinetic.jl` (Part B collapse, 2026-06-04).
+# This shim preserves the legacy entry point name for `energy_gradient!`.
+_grad_kinetic!(grad, psi, ws, fft_buf, k_squared_dev, n_pts, D, vN) =
+    _grad_kinetic_core!(grad, psi, ws, fft_buf, k_squared_dev, n_pts, D, vN)
 
 # Coriolis: −Ω·L_z·ψ where L_z = −i(x·∂_y − y·∂_x). The δE_cor/δψ*
 # contribution is +iΩ·(x·∂_y − y·∂_x)·ψ. Closes the rotating-frame
