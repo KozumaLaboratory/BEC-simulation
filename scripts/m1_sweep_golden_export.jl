@@ -16,7 +16,8 @@
 
 using SpinorBEC
 using SpinorBEC: SweepAxis, SweepObservable, SweepResult,
-    write_golden_per_cell_table
+    ModelSpec, Hypothesis,
+    write_golden_per_cell_table, write_viewspec
 using JLD2
 using JSON
 using Dates
@@ -54,9 +55,10 @@ function build_m1_sweep_result(partial::Vector)
     ]
 
     observables = [
-        SweepObservable(; key=:fz_total, label="⟨F_z⟩", kind=:signed,
-            center=0.0, oracle=0.24,
-            oracle_label="F·Barnett/Zeeman @ B=100, Ω=0.6"),
+        # No `oracle` here anymore — predictions live on the Hypothesis,
+        # not the observable. `fz_total` is just "z magnetization"; what
+        # we expect from it depends on the sweep's regime.
+        SweepObservable(; key=:fz_total, label="⟨F_z⟩", kind=:signed, center=0.0),
         SweepObservable(; key=:Lz, label="⟨L_z⟩", kind=:signed, center=0.0),
         SweepObservable(; key=:fx_total, label="⟨F_x⟩", kind=:signed, center=0.0),
         SweepObservable(; key=:fy_total, label="⟨F_y⟩", kind=:signed, center=0.0),
@@ -91,6 +93,73 @@ function build_m1_sweep_result(partial::Vector)
         :conv_column => :conv,
         :run_kind => "rotating_frame_barnett_sweep",
         :exported_at => string(now()),
+        # Narrative + Hypothesis: the sweep's question and the
+        # theoretical apparatus that tests it. For rotating-frame
+        # Barnett, the model is ⟨F_z⟩_pred = F·Ω·ℏω_ref / (g_F μ_B B).
+        # Prefactor calibrated so that fn(B=100 nT, Ω=0.6) ≈ 0.24
+        # (consistent with the prior oracle).
+        #
+        # We pick `:collapse` as the inference instrument: plot ⟨F_z⟩
+        # vs the dimensionless Barnett/Zeeman ratio. If all 30 cells
+        # land on one curve, the ratio is the supporting parameter; if
+        # the theory band is wide in collapse coords, the chosen
+        # variable doesn't factor the model.
+        :narrative => Dict{Symbol, Any}(
+            :title => "Rotating-frame Barnett effect · Eu-151 (F=6)",
+            :question =>
+                "Does ⟨F_z⟩ collapse onto x_BZ ≡ Ω·ℏω_ref / (g_F μ_B B)? " *
+                "Theory: ⟨F_z⟩_pred = F·x_BZ (Barnett/Zeeman limit).",
+            :hypothesis => Hypothesis(;
+                question=
+                "⟨F_z⟩ vs x_BZ ≡ Ω·ℏω_ref/(g_F μ_B B) — does data " *
+                "collapse onto y = F·x?",
+                relation=:collapse,
+                primary_obs=:fz_total,
+                # NOTE — model is the **small-x linear approximation**.
+                # The real Barnett/Zeeman saturates at the spin projection
+                # bound |⟨F_z⟩| ≤ F, so `F·x` only matches the rotating-
+                # frame result for x ≪ 1. Prior unconverged data showed
+                # ⟨F_z⟩ peak ~0.75·F → we sit close to the breakdown.
+                #
+                # WHEN THE PREFACTOR IS RECALIBRATED to the physical
+                # value (`g_F μ_B / ℏω_ref` in our unit system, replacing
+                # the placeholder 0.0667):
+                #   1. Compute x_max = max(collapse_var_fn) over the
+                #      swept (B_nT, Ω) grid.
+                #   2. If x_max ≪ 1  → linear F·x is fine, leave as is.
+                #   3. If x_max ≳ 1  → REPLACE `fn` with a saturating form
+                #      that matches F·x at small x and asymptotes to F at
+                #      large x (the exact rotating-frame closed form
+                #      respects the |⟨F_z⟩| ≤ F bound). Without this fix
+                #      the theory envelope at large-x is wrong by O(F),
+                #      and any "data falls below theory" reading will
+                #      misdiagnose the expected saturation as missing
+                #      physics.
+                # IMPORTANT: F·x is the NON-INTERACTING upper bound, not
+                # the prediction. Eu is AFM/polar (c_1 > 0); spin–spin
+                # interactions suppress ⟨F_z⟩ below this bound. Data
+                # falling **below** the theory band in the collapse plot
+                # is CORRECT physics (legitimate c_1 suppression), NOT
+                # "missing physics". The reading "data > theory band"
+                # is the failure mode to flag (the prior ⟨F_z⟩ = 4.5
+                # artifact). See oracle gate in
+                # sprint5_M1_ITP_omega_sweep_converged.jl (one-sided).
+                models=Dict(
+                    :fz_total => ModelSpec(;
+                        # PLACEHOLDER 0.0667 — calibrated only so that
+                        # fn(B=100 nT, Ω=0.6) = 6·0.6·0.0667/1 = 0.24
+                        # (matches the prior oracle within the linear
+                        # regime). Replace with the real `g_F μ_B/ℏω_ref`.
+                        fn=(ax) -> 6.0 * ax.omega * 0.0667 / ax.B_nT,
+                        label="F · Ω · ℏω_ref / (g_F μ_B B)  " *
+                              "[non-interacting UPPER BOUND; AFM c_1 suppresses below]",
+                        collapse_var_fn=
+                        (ax) -> ax.omega * 0.0667 / ax.B_nT,
+                        collapse_var_label="x_BZ ≡ Ω·ℏω_ref / (g_F μ_B B)",
+                    ),
+                ),
+            ),
+        ),
     )
     return SweepResult(axes, observables, data; meta=meta)
 end
@@ -111,15 +180,26 @@ function main()
             continue
         end
         result = build_m1_sweep_result(partial)
-        out = joinpath(run_dir, "golden", "per_cell_table.json")
-        write_golden_per_cell_table(out, result;
+        golden_out = joinpath(run_dir, "golden", "per_cell_table.json")
+        write_golden_per_cell_table(golden_out, result;
             signed_clip=Dict(),         # default ±F (=±6)
             positive_clip=Dict(),       # auto via converged-only p05/p95
             spectrum_margin=0.1,
             F=6)
+        # The viewspec is the same dispatcher's output that the React +
+        # Makie renderers paint. Emit alongside the golden table; the
+        # dashboard `/api/sweep/<run>` route reads viewspec.json directly.
+        viewspec_out = joinpath(run_dir, "viewspec.json")
+        write_viewspec(viewspec_out, result;
+            signed_clip=Dict(),
+            positive_clip=Dict(),
+            spectrum_margin=0.1,
+            F=6,
+            quality_threshold=1e-5,
+            quality_dynamic_range_decades=4.0)
         n_cells = length(partial)
         n_conv = count(r -> r[:conv], result.data)
-        @printf "wrote %s  (%d cells, %d converged, axes: %d B × %d Ω)\n" out n_cells n_conv (
+        @printf "wrote %s + viewspec.json  (%d cells, %d converged, %d B × %d Ω)\n" golden_out n_cells n_conv (
             length(result.axes[1].values)
         ) length(result.axes[2].values)
     end

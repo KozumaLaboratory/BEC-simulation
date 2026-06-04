@@ -28,6 +28,9 @@
     "shiki": "^4.0.2",
     "tailwind-merge": "^3.5.0",
     "three": "^0.184.0",
+    "vega": "~6.2.0",
+    "vega-embed": "~7.1.0",
+    "vega-lite": "~6.4.3",
     "yaml": "^2.8.3",
     "zustand": "^5.0.12"
   },

@@ -328,6 +328,8 @@ function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache
         (200, "application/json", "[" * join(["\"$r\"" for r in runs], ",") * "]")
     elseif startswith(path, "/api/data/")
         return _route_data(path, base_dir, data_cache)
+    elseif startswith(path, "/api/sweep/")
+        return _route_sweep(path, base_dir)
     elseif startswith(path, "/api/effective_config/")
         return _route_effective_config(path, base_dir)
     elseif path == "/api/tags"

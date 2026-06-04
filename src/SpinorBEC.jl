@@ -167,7 +167,8 @@ function plot_density end
 function plot_spinor end
 function plot_spin_texture end
 function animate_dynamics end
-export plot_density, plot_spinor, plot_spin_texture, animate_dynamics
+function plot_sweep end
+export plot_density, plot_spinor, plot_spin_texture, animate_dynamics, plot_sweep
 
 include("precompile.jl")
 

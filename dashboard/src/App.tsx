@@ -41,6 +41,9 @@ const EffectiveConfigPanel = lazy(() =>
     default: m.EffectiveConfigPanel,
   })),
 )
+const SweepView = lazy(() =>
+  import('@/components/SweepView').then((m) => ({ default: m.SweepView })),
+)
 const ScanGroupView = lazy(() => import('@/components/ScanGroupView'))
 const QueuePanel = lazy(() =>
   import('@/components/QueuePanel').then((m) => ({ default: m.QueuePanel })),
@@ -523,11 +526,13 @@ function DraftingSelect({
   )
 }
 
-// The Overview adapts to the run type. A parameter scan (n_points > 1)
-// plots each metric across the scan axis. A single dynamics run collapses
-// every per-point chart to one marker, so when the sole point carries a
-// `dynamics/*` block we plot the time evolution instead — otherwise the
-// page looks empty (the original "few points" bug report).
+// The Overview adapts to the run type. When the run has a sweep export
+// (`/api/sweep/<run>` returns non-null), the Vega-Lite heatmap grid is
+// stacked **above** the per-point line charts — sweep heatmap is the
+// headline, line charts stay as supplementary detail. Single dynamics
+// runs collapse to `DynamicsOverview` (time series replaces the line
+// charts, but the sweep headline is independent and still shown if
+// present).
 function OverviewPanel({
   data,
   selectedRun,
@@ -539,12 +544,51 @@ function OverviewPanel({
   xKey: string
   runFilter: string
 }) {
+  // Probe for a sweep viewspec. Null → no headline; non-null → mount
+  // SweepView above the rest.
+  const [hasSweep, setHasSweep] = useState<boolean | undefined>(undefined)
+  useEffect(() => {
+    if (!selectedRun) {
+      setHasSweep(undefined)
+      return
+    }
+    let cancel = false
+    setHasSweep(undefined)
+    api
+      .getSweepViewspec(selectedRun)
+      .then((s) => {
+        if (!cancel) setHasSweep(s !== null)
+      })
+      .catch(() => {
+        if (!cancel) setHasSweep(false)
+      })
+    return () => {
+      cancel = true
+    }
+  }, [selectedRun])
+
   const singleFile =
     data && data.points.length === 1 ? data.points[0].file : null
   const dyn = useDynamicsSeries(
     singleFile ? selectedRun : null,
     singleFile,
   )
+
+  // SweepView is mode-aware (FailureAlert when 0/N converged) and
+  // gates its own thumbnails. The legacy §01 Energy / §02 Mz / §03
+  // Populations panels below have ZERO convergence gating — rendering
+  // them under the FailureAlert produces an active self-contradiction:
+  // alert says "do not read as physics", legacy panels show clean
+  // sawtooth/tangle curves as if they were valid. Suppress legacy
+  // entirely when the run has a sweep export. The drill-in path is
+  // SweepView's thumbnails + the Effective config tab.
+  if (hasSweep === true) {
+    return (
+      <Suspense fallback={<TabFallback />}>
+        <SweepView run={selectedRun} />
+      </Suspense>
+    )
+  }
 
   if (singleFile && dyn.data?.has_dynamics) {
     return <DynamicsOverview series={dyn.data} />

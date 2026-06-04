@@ -905,6 +905,94 @@ export const api = {
       throw e
     }
   },
+
+  /** Resolved Vega-Lite viewspec for a sweep run. Server returns
+   * `<base>/<run>/viewspec.json` produced by `to_viewspec(::SweepResult)`
+   * (see `src/analysis/sweep.jl`). 404 → null when the run has no sweep
+   * export, which is the common case for non-sweep runs. The spec is the
+   * single source of truth — see `docs/architecture/sweep_view.md`. */
+  async getSweepViewspec(run: string): Promise<SweepViewspec | null> {
+    try {
+      return await json<SweepViewspec>(`/api/sweep/${encodeURIComponent(run)}`)
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith('404')) return null
+      throw e
+    }
+  },
+}
+
+// --- Sweep viewspec -----------------------------------------------------
+// Loose typing — vega-embed accepts the spec object directly and we only
+// peek at our own `_meta` annotations for the panel chrome (title, axis
+// summary). Keeping the spec body as `unknown` avoids pinning to a
+// specific vega-lite version's TypeScript types.
+
+export interface SweepViewspecAxisMeta {
+  name: string
+  unit: string
+  scale: 'linear' | 'log'
+  n_values: number
+}
+
+export interface SweepViewspecObservableMeta {
+  key: string
+  kind: 'signed' | 'positive' | 'wide' | 'spectrum'
+  role: 'data' | 'quality'
+}
+
+export type SweepMode = 'failed' | 'partial' | 'complete'
+
+export type SweepRelation =
+  | 'asymptote'
+  | 'collapse'
+  | 'residual'
+  | 'scaling'
+  | 'correlation'
+
+export interface SweepModelMeta {
+  label: string
+  has_collapse_var: boolean
+  collapse_var_label: string | null
+}
+
+export interface SweepHypothesis {
+  question: string
+  relation: SweepRelation
+  primary_obs: string
+  models: Record<string, SweepModelMeta>
+  params: Record<string, unknown>
+}
+
+export interface SweepNarrative {
+  title: string
+  question: string
+  hypothesis: SweepHypothesis | null
+  n_total: number
+  n_converged: number
+  mode: SweepMode
+}
+
+export interface SweepViewspecMeta {
+  schema_version: string
+  colormap_version: string
+  F: number
+  quality_observable: string | null
+  axes: SweepViewspecAxisMeta[]
+  observables: SweepViewspecObservableMeta[]
+  run_meta: Record<string, unknown>
+  narrative?: SweepNarrative | null
+  mode?: SweepMode
+}
+
+export interface SweepViewspec {
+  $schema: string
+  config?: Record<string, unknown>
+  vconcat?: unknown[]
+  hconcat?: unknown[]
+  layer?: unknown[]
+  _view_shape: 'heatmap' | 'line' | 'scalar'
+  _panels_count?: number
+  _meta: SweepViewspecMeta
 }
 
 // --- Effective-config inspector ----------------------------------------

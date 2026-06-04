@@ -76,6 +76,7 @@ include("dashboard/routes/budget.jl")            # /api/budget — autopilot bud
 include("dashboard/routes/autopilot_why.jl")     # /api/queue/why/<cid> — failure analysis
 include("dashboard/routes/tags.jl")              # /api/tags — GET + POST (catalog)
 include("dashboard/routes/catalog.jl")           # /api/index — navigable flat catalog
+include("dashboard/routes/sweep.jl")             # /api/sweep/<run> — Vega-Lite viewspec
 include("dashboard/server/data_export.jl")  # generate_dashboard_data + export_dashboard
 include("dashboard/server/router.jl")     # serve_dashboard + _route_dashboard
 include("dashboard/server/static.jl")     # static asset + HTTP response helpers
