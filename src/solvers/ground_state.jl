@@ -134,6 +134,12 @@ function find_ground_state(;
     on_step::Union{Nothing, Function}=nothing,  # (ws, step, n_steps) → update ws params
     checkpoint_dir::Union{Nothing, String}=nothing,
     checkpoint_every::Int=0,
+    # New (2026-06-04): Checkpoint primitive integration.
+    # Pass a `Checkpoint` object + key to enable keyed-store auto-snapshot.
+    # Coexists with `checkpoint_dir`; the keyed-store path is preferred for
+    # new code because it supports `fork!` branching and `ancestry` walks.
+    checkpoint::Union{Nothing, Checkpoint}=nothing,
+    checkpoint_key::String="itp_state",
     _start_step::Int=0,        # internal: for resume
     _checkpoint_dir::Union{Nothing, String}=nothing,  # internal alias
     _checkpoint_every::Int=0,   # internal alias
@@ -307,6 +313,8 @@ function find_ground_state(;
         start_step=_start_step,
         checkpoint_dir=ckpt_dir,
         checkpoint_every=ckpt_every,
+        checkpoint=checkpoint,
+        checkpoint_key=checkpoint_key,
         verbose=verbose,
     )
 end

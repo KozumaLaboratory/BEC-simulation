@@ -167,6 +167,7 @@ const CI_EXTRA = [
     "solvers/test_simulation.jl",
     "solvers/test_ground_state.jl",
     "solvers/test_checkpoint.jl",
+    "solvers/test_itp_checkpoint_hook.jl",
     "analysis/test_energy.jl",
     "workflow/test_losses.jl",
     "workflow/test_config.jl",
