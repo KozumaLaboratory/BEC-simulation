@@ -42,7 +42,8 @@ include("workflow/monitoring.jl")      # logging + telemetry + LiveMonitor
 
 include("workflow/experiments.jl")     # schema + runtime + pipeline + analyzers
 include("workflow/validation.jl")      # RunResult + spec-driven validation (Phase 0: types only)
-include("workflow/checkpointed_sweep.jl")  # per-cell JLD2 cache + skip + extend (multi-cell sweeps)
+include("workflow/checkpoint.jl")          # general keyed JLD2 store + refine + fork
+include("workflow/checkpointed_sweep.jl")  # thin sweep wrapper over Checkpoint
 include("solvers/projected_gp.jl")
 include("solvers/photon_heating.jl")
 include("solvers/sgpe.jl")

@@ -4,8 +4,9 @@
 
 using Test
 using SpinorBEC
-using SpinorBEC: CheckpointedSweep, run_cell!, run_sweep!,
-    extend_unconverged!, load_cell, collect_results, cell_path
+using SpinorBEC:
+    CheckpointedSweep, run_cell!, run_sweep!,
+    extend_unconverged!, load_cell, collect_results
 
 @testset "CheckpointedSweep" begin
     @testset "run_cell! caches, second call returns cached" begin
