@@ -48,7 +48,7 @@ function SimParams(;
     spin_rotating_frame_omega::Float64=0.0,
 )
     dt > 0 || throw(ArgumentError("dt must be positive"))
-    n_steps > 0 || throw(ArgumentError("n_steps must be positive"))
+    n_steps >= 0 || throw(ArgumentError("n_steps must be non-negative"))
     SimParams(
         dt,
         n_steps,
