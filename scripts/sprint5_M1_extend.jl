@@ -128,6 +128,17 @@ function extend_cell!(cp::String, cached::Dict)
     grad_norm_new = r_lbfgs.grad_norm
     @printf "  → new ‖∇E‖=%.3e  conv=%s  Δ⟨F_z⟩=%+.4f  (%.1f min)\n" grad_norm_new r_lbfgs.converged (fz_total - Float64(result["fz_total"])) (t_lbfgs/60)
 
+    # Safety guard: warm-restart loses the L-BFGS history (s_hist/y_hist
+    # start empty), so the first iteration falls back to steepest-descent
+    # in the Sobolev metric. In degenerate cells (e.g. B=0/Ω=0 where the
+    # ground-state manifold is wide) this can overshoot and drive ‖∇E‖
+    # *higher* than the warm-start state. Reject the result whenever the
+    # gradient norm did not improve — keeps the cached cell intact.
+    if grad_norm_new >= grad_norm_old && !r_lbfgs.converged
+        @printf "  ⚠ regression detected (new ≥ old, conv=false) — NOT overwriting cell file\n"
+        return false
+    end
+
     # In-place update of the cell file. Preserve `all_attempts_summaries`
     # (those came from the original multistart and don't change here).
     result_new = Dict(
