@@ -38,7 +38,7 @@ include("hamiltonian.jl")   # interactions + potentials + integrators
 include("workflow/io/units.jl")        # Units module (needed by atoms.jl)
 include("workflow/initialization.jl")  # atoms + init_psi + Workspace factory + state zoo
 include("workflow/io.jl")              # save_state + dashboard + VTK + run summary + budget
-include("workflow/monitoring.jl")      # logging + telemetry + LiveMonitor
+include("workflow/monitoring.jl")      # logging + telemetry
 
 include("workflow/experiments.jl")     # schema + runtime + pipeline + analyzers
 include("workflow/validation.jl")      # RunResult + spec-driven validation (Phase 0: types only)

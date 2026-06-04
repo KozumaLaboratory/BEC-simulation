@@ -5,14 +5,13 @@
 export run_simulation!, run_simulation_checkpointed!
 
 """
-    run_simulation!(ws::Workspace; callbacks=nothing, live_monitor=nothing)
+    run_simulation!(ws::Workspace; callbacks=nothing)
 
 Run time evolution simulation with optional event-driven monitoring.
 
 # Arguments
 - `ws::Workspace`: Simulation workspace
 - `callbacks::Union{Nothing,SimulationCallbacks}`: Event-driven callbacks
-- `live_monitor::Union{Nothing,LiveMonitor}`: Real-time monitoring
 
 # Returns
 - `SimulationResult`: Times, energies, norms, magnetizations, and snapshots
@@ -22,14 +21,16 @@ Run time evolution simulation with optional event-driven monitoring.
 # Basic usage
 result = run_simulation!(ws)
 
-# With live monitoring
-monitor = LiveMonitor(output_file="live_data.json")  # cadence: sim_params.save_every
-result = run_simulation!(ws, live_monitor=monitor)
-
-# With custom callbacks
+# Dashboard JSON push — plain on_step callback
 callbacks = SimulationCallbacks(
-    on_step = (ws, step, times, energies) -> @info "Step \$step",
-    on_snapshot = (ws, step, snapshot) -> save_debug("snapshot_\$step.jld2", snapshot)
+    on_step = (ws, step, times, energies) -> begin
+        step % 50 == 0 || return nothing
+        open("live_data.json", "w") do f
+            JSON.print(f, Dict("step"=>step, "t"=>ws.state.t,
+                "E"=>(isempty(energies) ? NaN : energies[end])))
+        end
+    end,
+    on_snapshot = (ws, step, snapshot) -> save_debug("snapshot_\$step.jld2", snapshot),
 )
 result = run_simulation!(ws, callbacks=callbacks)
 ```
@@ -37,7 +38,6 @@ result = run_simulation!(ws, callbacks=callbacks)
 function run_simulation!(
     ws::Workspace{N};
     callbacks::Union{Nothing, SimulationCallbacks}=nothing,
-    live_monitor::Union{Nothing, LiveMonitor}=nothing,
     stream_snapshots::Bool=false,
 ) where {N}
     sp = ws.sim_params
@@ -66,8 +66,7 @@ function run_simulation!(
             norms,
             mags,
             snapshots,
-            cbs,
-            live_monitor;
+            cbs;
             stream_snapshots,
         )
     else
@@ -80,8 +79,7 @@ function run_simulation!(
             norms,
             mags,
             snapshots,
-            cbs,
-            live_monitor;
+            cbs;
             stream_snapshots,
         )
     end

@@ -12,8 +12,7 @@ function _run_simulation_standard!(
     norms,
     mags,
     snapshots,
-    callbacks::SimulationCallbacks,
-    live_monitor::Union{Nothing, LiveMonitor};
+    callbacks::SimulationCallbacks;
     stream_snapshots::Bool=false,
 ) where {N}
     t_start = time()
@@ -26,9 +25,6 @@ function _run_simulation_standard!(
             end
 
             if step % sp.save_every == 0
-                if live_monitor !== nothing
-                    update!(live_monitor, ws, step)
-                end
                 _record_snapshot!(
                     times, energies, norms, mags, snapshots, ws, sys;
                     keep_psi=(!stream_snapshots),
@@ -87,8 +83,7 @@ function _run_simulation_leapfrog!(
     norms,
     mags,
     snapshots,
-    callbacks::SimulationCallbacks,
-    live_monitor::Union{Nothing, LiveMonitor};
+    callbacks::SimulationCallbacks;
     stream_snapshots::Bool=false,
 ) where {N}
     dt = sp.dt
@@ -153,9 +148,6 @@ function _run_simulation_leapfrog!(
             end
 
             if is_save
-                if live_monitor !== nothing
-                    update!(live_monitor, ws, step)
-                end
                 _record_snapshot!(
                     times, energies, norms, mags, snapshots, ws, sys;
                     keep_psi=(!stream_snapshots),

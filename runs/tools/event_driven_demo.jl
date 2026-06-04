@@ -49,54 +49,62 @@ callbacks = SimulationCallbacks(
 
 result = run_simulation!(ws, callbacks=callbacks)
 
-println("\n2. Live monitor demo")
+println("\n2. JSON status callback demo")
 println("-" ^60)
 
-# Create live monitor
-monitor = LiveMonitor(
-    output_file = "demo_live_data.json",
-    update_interval = 25
+using JSON
+
+# Dashboard JSON push is a plain on_step callback — no separate type.
+json_callbacks = SimulationCallbacks(
+    on_step = (ws, step, times, energies) -> begin
+        step % 25 == 0 || return nothing
+        data = Dict(
+            "step" => step,
+            "time" => ws.state.t,
+            "energy" => length(energies) > 0 ? energies[end] : total_energy(ws),
+        )
+        open("demo_live_data.json", "w") do f; JSON.print(f, data); end
+    end,
 )
 
-println("  Running with LiveMonitor (update every 25 steps)...")
-result2 = run_simulation!(ws, live_monitor=monitor)
+println("  Running with JSON callback (every 25 steps)...")
+result2 = run_simulation!(ws, callbacks=json_callbacks)
 
-# Check output
 if isfile("demo_live_data.json")
-    using JSON
     data = JSON.parsefile("demo_live_data.json")
     println("  ✓ Live data saved to demo_live_data.json")
     println("    Last step: $(data["step"])")
     println("    Last time: $(round(data["time"], digits=4))")
-    println("    Energy: $(round(data["observables"]["energy"], sigdigits=6))")
+    println("    Energy: $(round(data["energy"], sigdigits=6))")
     rm("demo_live_data.json")
 else
     println("  ⚠ No live data file created")
 end
 
-println("\n3. Custom observable extractor")
+println("\n3. Custom observable extractor (callback form)")
 println("-" ^60)
 
-custom_monitor = LiveMonitor(
-    output_file = "demo_custom.json",
-    update_interval = 30,
-    extract_observables = ws -> begin
-        Dict(
+custom_callbacks = SimulationCallbacks(
+    on_step = (ws, step, _times, _energies) -> begin
+        step % 30 == 0 || return nothing
+        data = Dict(
+            "step" => step,
             "energy" => total_energy(ws),
             "norm" => total_norm(ws.state.psi, ws.grid),
             "magnetization" => magnetization(ws.state.psi, ws.grid, ws.spin_matrices.system),
-            "custom_metric" => sum(abs2, ws.state.psi) * ws.state.t
+            "custom_metric" => sum(abs2, ws.state.psi) * ws.state.t,
         )
-    end
+        open("demo_custom.json", "w") do f; JSON.print(f, data); end
+    end,
 )
 
-result3 = run_simulation!(ws, live_monitor=custom_monitor)
+result3 = run_simulation!(ws, callbacks=custom_callbacks)
 
 if isfile("demo_custom.json")
-    using JSON
     data = JSON.parsefile("demo_custom.json")
     println("  ✓ Custom observables extracted:")
-    for (key, val) in data["observables"]
+    for (key, val) in data
+        key in ("step",) && continue
         println("    - $key: $(round(val, sigdigits=6))")
     end
     rm("demo_custom.json")
