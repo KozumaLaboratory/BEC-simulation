@@ -62,15 +62,43 @@ using Random
     # exponential of the SUM equals the PRODUCT of exponentials
     # because they commute (both diagonal in m AND in r), so bit
     # identity holds.)
-    @info "max |Δ| between registry strang_step and legacy split_step:" diff
-    # Note: NOT bit-identical because the registry's simple V K V pattern
-    # doesn't reproduce the legacy nested Strang sandwich
-    # (diag(dt/4) → SM(dt/4) → ... → DDI(dt/2) → ... → SM(dt/4) → diag(dt/4)).
-    # For the diagonal-only configuration here, the operators commute
-    # so the FINAL state magnitudes are similar but ordering of fp
-    # operations differs. Full bit-identity requires capturing the
-    # nested ordering in the HamTerm protocol — a follow-up sprint.
-    # This proof-of-concept gates the architecture: registry CAN drive
-    # the propagator; the remaining work is the Strang scheduler.
-    @test diff < 0.1   # demonstrates feasibility, not equivalence
+    @info "max |Δ| between registry strang_step and legacy split_step (diag-only):" diff
+    # Bit-identity: `strang_step_via_registry!` delegates the
+    # nested-sandwich scheduler to `_half_potential_step!` (same
+    # function as legacy), so per-operator output is identical.
+    @test diff == 0.0
+end
+
+@testset "strang_step_via_registry! ≡ split_step! (full config: c1+transverse+rotation)" begin
+    # Heavier config: c1 ≠ 0 (spin-mixing), bx,by ≠ 0 (transverse Zeeman),
+    # Ω ≠ 0 (Coriolis+Barnett). Exercises the full nested sandwich.
+    grid = make_grid(GridConfig((8, 8, 8), (4.0, 4.0, 4.0)))
+    interactions = InteractionParams(Dict(0 => 5.0, 1 => 0.5))
+    zeeman = TimeDependentZeeman(
+        ConstantWaveform(0.5), ConstantWaveform(0.1),
+        ConstantWaveform(0.3), ConstantWaveform(0.2),
+    )
+    sp = SimParams(; dt=0.01, n_steps=1, imaginary_time=true, rotating_frame_omega=0.4)
+    ws_a = make_workspace(;
+        grid, atom=Rb87, interactions, zeeman,
+        potential=HarmonicTrap((1.0, 1.0, 1.0)),
+        sim_params=sp, fft_flags=FFTW.ESTIMATE, enable_ddi=false,
+    )
+    ws_b = make_workspace(;
+        grid, atom=Rb87, interactions, zeeman,
+        potential=HarmonicTrap((1.0, 1.0, 1.0)),
+        sim_params=sp, fft_flags=FFTW.ESTIMATE, enable_ddi=false,
+    )
+    Random.seed!(42)
+    psi_ref = randn(ComplexF64, 8, 8, 8, 3)
+    psi_ref ./= sqrt(sum(abs2, psi_ref) * cell_volume(grid))
+    copyto!(ws_a.state.psi, psi_ref)
+    copyto!(ws_b.state.psi, psi_ref)
+
+    SpinorBEC.split_step!(ws_a)
+    SpinorBEC.strang_step_via_registry!(ws_b, 0.01)
+
+    diff = maximum(abs, Array(ws_b.state.psi) .- Array(ws_a.state.psi))
+    @info "max |Δ| (full config: c1+transverse+rotation):" diff
+    @test diff == 0.0
 end
