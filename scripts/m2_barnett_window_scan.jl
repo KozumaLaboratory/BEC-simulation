@@ -42,12 +42,21 @@ function cell_observables(B_nT::Float64, omega::Float64)
         ConstantWaveform(p_lab), ConstantWaveform(0.0),
     )
 
+    # Symmetry-breaking noise on the seed — without it, B=0 cells stay
+    # locked at ⟨F_z⟩ = 0 to machine precision because the polar state
+    # has perfect Z₂ spin symmetry. 1% noise + Bz/Ω matches the
+    # working recipe in sprint5_M1_barnett_postfix.jl.
+    sys = SpinSystem(TW.F)
+    psi_init = init_psi(TW.grid, sys; state=:polar)
+    add_noise!(psi_init, 0.01, 1, TW.grid)
+
     # Phase 1: ITP warm-start
     r_itp = find_ground_state(;
         grid=TW.grid, atom=TW.atom, interactions=TW.interactions,
         zeeman=zeeman, potential=TW.potential,
         dt=DT, n_steps=N_ITP, tol=1e-7,
         initial_state=:polar, verbose=false,
+        psi_init=psi_init,
         enable_ddi=true, c_dd=TW.c_dd, secular_ddi=false,
         rotating_frame_omega=omega, backend=CUDABackend(),
     )
@@ -95,7 +104,7 @@ function main()
     @printf "Ω  grid:      %s\n" string(OMEGA_GRID)
     @printf "N_ITP=%d  N_LBFGS=%d  sobolev_α=%.3f\n\n" N_ITP N_LBFGS SOBOLEV
 
-    rows = Tuple{Float64, Float64, Float64, Float64, Float64, Float64, Float64, Bool, Int}[]
+    rows = Vector{Any}()
     @printf "%6s  %6s  %10s  %10s  %10s  %10s  %10s  %6s  %s\n" "Bz" "Ω" "E_rot" "⟨F_z⟩" "⟨L_z⟩" "⟨F_z⟩/Ω" "‖P_⊥∇E‖" "conv" "stp"
     println("-"^104)
     t_total = time()
