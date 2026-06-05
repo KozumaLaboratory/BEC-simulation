@@ -53,6 +53,22 @@ function energy_contribution(::TensorTerm, psi::AbstractArray{<:Complex}, ws)
     if ws.tensor_cache !== nothing
         E += _tensor_interaction_energy(psi, ws.tensor_cache, N, n_pts, dV)
     end
+    # CRITICAL trinity consistency check: TensorTerm.apply_operator! is
+    # KNOWN-LIMIT (no-op), so if energy_contribution computes a non-zero
+    # E, LBFGS gradient sees a different landscape than this energy. That's
+    # the freeze-class inconsistency the trinity is supposed to kill. Warn
+    # LOUDLY so the silent break doesn't bite a future user with c_S ≠ 0.
+    if !iszero(E)
+        @warn """TensorTerm: energy_contribution = $E (non-zero) but
+        apply_operator! / add_gradient! are NO-OP (legacy KNOWN-LIMIT).
+        LBFGS gradient MISSES this energy. Multi-start GS will converge
+        on an incomplete Hamiltonian (H without tensor channels). Either:
+          (a) For Eu nominal (c_2..c_12 = 0), this branch should never
+              fire — verify your `interactions:` block does not set rank
+              ≥ 2 coefficients.
+          (b) If c_S ≠ 0 is intentional, implement TensorTerm.apply_operator!
+              and lift the KNOWN-LIMIT.""" maxlog=1
+    end
     return E
 end
 
