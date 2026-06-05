@@ -58,7 +58,7 @@ const TW = eu_digital_twin()  # 24³, N=5×10⁴
 const DT_ITP = 0.005
 const N_ITP = 3000
 const TOL_ITP = 1e-7
-const N_LBFGS = 5000
+const N_LBFGS = 15000
 const TOL_LBFGS = 1e-5
 const SOBOLEV = 0.05
 const NOISE_AMP = 0.01
