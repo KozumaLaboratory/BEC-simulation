@@ -49,4 +49,4 @@ include("analysis/phases/sign_pattern.jl")  # Paper #3 §VI Sign Pattern Lemma 1
 include("analysis/phases/F6_phase_diagram.jl")  # Paper #2 (g_10, g_12) scan
 include("analysis/phases/polyhedral_classifier.jl")  # σ_S fingerprint classifier + direct ΔE
 include("analysis/rotating_basis.jl")  # per-m norms / L_z / coord buffers for Klaus regime
-include("analysis/sweep.jl")  # SweepResult contract + dominant-m margin + reference colormaps
+include("analysis/sweep.jl")  # umbrella: SweepResult contract + colormaps + golden table + viewspec
