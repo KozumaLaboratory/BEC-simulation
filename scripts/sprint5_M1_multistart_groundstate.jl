@@ -62,6 +62,10 @@ const TOL_E_SADDLE = 1e-5         # E_reconv < E_cand − TOL → saddle (found 
 # ─── Seed taxonomy (per m1_multistart_seedset_2026_06_05.md) ───────────────
 
 # Tier 1 — texture primary (real basins per Phase-1 arc closure)
+# NOTE: :ksu_circulation in north_star plan is axial m_plus_F + winding
+# but no init_psi builder exists; future addition. Currently covered
+# approximately by :polar_core_vortex (axial polar core) + :fl_vortex
+# (xy winding) + :chiral_spin_vortex (chiral winding).
 const TIER1_SEEDS = [
     :polar_core_vortex,
     :fl_vortex,
@@ -77,8 +81,9 @@ const TIER2_SEEDS = [:polar]
 const TIER3_SEEDS = [:m_plus_F]
 
 # Tier 4 — phantom-validation (Ω>0 revival candidates)
+# NOTE: :icosahedral_explicit not in state_zoo (gap); use :cyclic/:biaxial
+# as the polyhedral revival probes. Documented future addition.
 const TIER4_SEEDS = [
-    :icosahedral_explicit,
     :cyclic,
     :biaxial_nematic,
     :spin_helix,
@@ -120,8 +125,6 @@ function build_seed(seed::Symbol, grid)
         init_psi(grid, sys; state=:polar)
     elseif seed === :m_plus_F
         init_psi(grid, sys; state=:m_plus_F)
-    elseif seed === :icosahedral_explicit
-        init_psi(grid, sys; state=:icosahedral_explicit)
     elseif seed === :cyclic
         init_psi(grid, sys; state=:cyclic)
     elseif seed === :biaxial_nematic
@@ -257,6 +260,37 @@ function run_seed(B_nT::Float64, Ω::Float64, seed::Symbol;
     )
 end
 
+# ─── Winner selection (pure; unit-testable in isolation) ─────────────────
+#
+# Critical contract: **stability filter PRECEDES E-ranking**. A lower-E
+# saddle MUST NOT win over a higher-E true minimum — `:saddle` and
+# `:ambiguous` candidates are excluded from the winner pool before
+# `argmin` runs. Without this ordering, the runner would silently report
+# saddles as the GS at degenerate-landscape cells (the cyclic-saddle
+# case in M1 cells with Ω=0).
+#
+# Returns `(winner, competing, used_fallback)` where:
+#   - `winner` is the selected candidate (NamedTuple from the candidates
+#     vector).
+#   - `competing` is the other `:stable && converged` candidates,
+#     sorted by E ascending.
+#   - `used_fallback` is `true` when no `:stable && converged` candidate
+#     exists (full-set argmin fallback was used; the caller may want to
+#     print a warning).
+#
+# Empty `candidates` is an upstream programming error; we throw.
+
+function _select_winner(candidates::AbstractVector)
+    isempty(candidates) && throw(ArgumentError("_select_winner: empty candidate list"))
+    stable = filter(c -> c.stability === :stable && c.converged, candidates)
+    used_fallback = isempty(stable)
+    pool = used_fallback ? candidates : stable
+    winner = pool[argmin([c.E for c in pool])]
+    competing = filter(c -> c !== winner && c.stability === :stable && c.converged, candidates)
+    sort!(competing, by=c -> c.E)
+    return (winner, competing, used_fallback)
+end
+
 # ─── Per-cell driver ──────────────────────────────────────────────────────
 
 function run_cell(B_nT::Float64, Ω::Float64;
@@ -283,17 +317,10 @@ function run_cell(B_nT::Float64, Ω::Float64;
         end
     end
 
-    # Filter to stable candidates
-    stable = filter(c -> c.stability === :stable && c.converged, candidates)
-    if isempty(stable)
+    winner, competing, used_fallback = _select_winner(candidates)
+    if used_fallback
         @printf "  ⚠ NO stable converged candidate; using lowest-E from full set\n"
-        stable = candidates
     end
-    winner = stable[argmin([c.E for c in stable])]
-
-    # Competing candidates (other stable basins within 1% of winner)
-    competing = filter(c -> c !== winner && c.stability === :stable, candidates)
-    sort!(competing, by=c -> c.E)
 
     @printf "  ✓ winner: seed=%s  E=%.6f  ‖∇E‖=%.3e  competing=%d\n" string(winner.seed) winner.E winner.grad_norm length(competing)
 
@@ -361,4 +388,8 @@ function main()
     @info "Sweep complete. Cells in OUT_DIR." OUT_DIR
 end
 
-main()
+# Guard so test files (and other includers) can load `_select_winner` and
+# friends without triggering the full GPU sweep.
+if abspath(PROGRAM_FILE) == @__FILE__
+    main()
+end
