@@ -164,8 +164,37 @@ function apply_step!(term::CoriolisTerm, psi, dt::Real, imaginary_time::Bool, ws
     return nothing
 end
 
+# ============================================================================
+# Trinity authoritative kernel: apply_operator!
+# H_cor = -Ω·L_z (linear). δE/δψ̄ = -Ω·L_z·ψ = +iΩ·(x∂_y - y∂_x)·ψ.
+# `_grad_coriolis_core!` already implements this; apply_operator! is a wrapper.
+# ============================================================================
+
+function apply_operator!(out::AbstractArray, term::CoriolisTerm, ws, psi::AbstractArray)
+    fill!(out, zero(eltype(out)))
+    N = ndims(psi) - 1
+    (N >= 2 && is_active(term.Ω, ROTATION_TOL)) || return out
+    D = ws.spin_matrices.system.n_components
+    n_pts = ntuple(d -> size(psi, d), Val(N))
+    fft_buf = similar(psi, ComplexF64, n_pts...)
+    deriv_buf = similar(psi, ComplexF64, n_pts...)
+    Ω_save = ws.sim_params.rotating_frame_omega
+    @assert isapprox(Ω_save, term.Ω; atol=1e-12) ||
+        isapprox(Ω_save, 0.0; atol=1e-12) "CoriolisTerm Ω mismatch with workspace"
+    _grad_coriolis_core!(out, psi, ws, fft_buf, deriv_buf, n_pts, D, Val(N))
+    return out
+end
+
+# ============================================================================
+# Derived: energy + gradient from the single source.
+# ============================================================================
+
 function energy_contribution(term::CoriolisTerm, psi::AbstractArray{<:Complex}, ws)
-    # E_coriolis = -Ω · ⟨L_z⟩ (energy.jl convention).
+    # Linear: E = Re⟨ψ, H·ψ⟩ · dV = -Ω · ⟨L_z⟩.
+    # NOTE: orbital_angular_momentum returns ⟨L_z⟩ already integrated (× dV
+    # inside). Direct equivalence: orbital_angular_momentum(ψ) =
+    # Re⟨ψ, L_z·ψ⟩·dV (= ⟨L_z⟩ × N for normalized ψ since dV*N=1). Use it
+    # for efficiency (skips the apply_operator alloc when already cached).
     N = ndims(psi) - 1
     N >= 2 || return 0.0
     return _coriolis_sign(term) * orbital_angular_momentum(psi, ws.grid, ws.fft_plans)
@@ -173,17 +202,9 @@ end
 
 function add_gradient!(grad::AbstractArray{<:Complex}, term::CoriolisTerm,
     psi::AbstractArray{<:Complex}, ws)
-    N = ndims(psi) - 1
-    N >= 2 || return nothing
-    abs(term.Ω) < SpinorBEC.ROTATION_TOL && return nothing
-    D = ws.spin_matrices.system.n_components
-    n_pts = ntuple(d -> size(psi, d), Val(N))
-    fft_buf = similar(psi, ComplexF64, n_pts...)
-    deriv_buf = similar(psi, ComplexF64, n_pts...)
-    Ω_save = ws.sim_params.rotating_frame_omega
-    @assert isapprox(Ω_save, term.Ω; atol=1e-12) ||
-        isapprox(Ω_save, 0.0; atol=1e-12) "CoriolisTerm term Ω mismatch — workspace and HamTerm should agree"
-    _grad_coriolis_core!(grad, psi, ws, fft_buf, deriv_buf, n_pts, D, Val(N))
+    buf = similar(psi)
+    apply_operator!(buf, term, ws, psi)
+    grad .+= buf
     return nothing
 end
 

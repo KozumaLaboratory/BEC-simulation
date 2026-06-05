@@ -17,7 +17,9 @@
 using Test
 using SpinorBEC
 using SpinorBEC: apply_operator!, energy_contribution, HamTerm
-using SpinorBEC: TrapTerm, LinearZeemanZTerm, DensityC0Term
+using SpinorBEC:
+    TrapTerm, LinearZeemanZTerm, DensityC0Term,
+    SpinC1Term, TransverseZeemanTerm, CoriolisTerm
 using LinearAlgebra
 using Random
 
@@ -143,5 +145,57 @@ end
         term = DensityC0Term(0.5)
         ratios = fd_ratio(term, ws, psi; rng)
         @test all(abs.(ratios .- 1.0) .< 5e-3)
+    end
+
+    @testset "SpinC1Term (mean-field |F|², factor 1/2)" begin
+        ws = _tiny_ws()
+        psi = init_psi(ws.grid, SpinSystem(1); state=:spin_coherent, init_theta=π/4)
+        dV = SpinorBEC.cell_volume(ws.grid)
+        psi ./= sqrt(sum(abs2, psi) * dV)
+        term = SpinC1Term(0.3)
+        ratios = fd_ratio(term, ws, psi; rng)
+        @test all(abs.(ratios .- 1.0) .< 5e-3)
+    end
+
+    @testset "TransverseZeemanTerm (linear, off-diagonal in m)" begin
+        # Need a workspace whose `zeeman` is TimeDependentZeeman with non-zero
+        # bx/by — uniform ZeemanParams is z-only. Workspace constructed
+        # explicitly here.
+        grid = make_grid(GridConfig{1}((8,), (6.0,)))
+        atom = Rb87
+        ip = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
+        zeeman_td = TimeDependentZeeman(
+            ConstantWaveform(0.0), ConstantWaveform(0.0),
+            ConstantWaveform(0.3), ConstantWaveform(0.2),
+        )
+        sp = SimParams(; dt=0.005, n_steps=1, imaginary_time=true,
+            normalize_every=1)
+        ws = make_workspace(;
+            grid, atom, interactions=ip, zeeman=zeeman_td,
+            potential=HarmonicTrap((1.0,)), sim_params=sp)
+        psi = init_psi(grid, SpinSystem(1); state=:spin_coherent, init_theta=π/4)
+        dV = SpinorBEC.cell_volume(grid)
+        psi ./= sqrt(sum(abs2, psi) * dV)
+        term = TransverseZeemanTerm(0.3, 0.2)
+        ratios = fd_ratio(term, ws, psi; rng)
+        @test all(abs.(ratios .- 1.0) .< 5e-3)
+    end
+
+    @testset "CoriolisTerm (linear, FFT-based L_z, 2D required)" begin
+        grid = make_grid(GridConfig{2}((8, 8), (4.0, 4.0)))
+        atom = Rb87
+        ip = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
+        sp = SimParams(; dt=0.005, n_steps=1, imaginary_time=true,
+            normalize_every=1, rotating_frame_omega=0.3)
+        ws = make_workspace(;
+            grid, atom, interactions=ip,
+            zeeman=ZeemanParams(0.0, 0.0),
+            potential=HarmonicTrap((1.0, 1.0)), sim_params=sp)
+        psi = init_psi(grid, SpinSystem(1); state=:fl_vortex)
+        dV = SpinorBEC.cell_volume(grid)
+        psi ./= sqrt(sum(abs2, psi) * dV)
+        term = CoriolisTerm(0.3)
+        ratios = fd_ratio(term, ws, psi; rng)
+        @test all(abs.(ratios .- 1.0) .< 1e-2)
     end
 end

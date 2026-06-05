@@ -73,22 +73,42 @@ function _grad_c1_spin_core!(grad, psi, ws, fx, fy, fz, n_pts, D, ::Val{N}) wher
     nothing
 end
 
-function energy_contribution(term::SpinC1Term, psi::AbstractArray{<:Complex}, ws)
-    N = ndims(psi) - 1
-    n_pts = ntuple(d -> size(psi, d), Val(N))
-    n_comp = size(psi, N + 1)
-    return _spin_interaction_energy_core(psi, ws.spin_matrices, term.c1, n_comp, N, n_pts,
-        cell_volume(ws.grid))
-end
+# ============================================================================
+# Trinity authoritative kernel: apply_operator!
+# H_c1 mean-field: δE/δψ̄ = c1·(F_z·m + (F_+·F_- + F_-·F_+)/2) summed channel-wise.
+# `_grad_c1_spin_core!` already implements this; apply_operator! is a fill-then-call.
+# ============================================================================
 
-function add_gradient!(grad, term::SpinC1Term, psi, ws)
+function apply_operator!(out::AbstractArray, term::SpinC1Term, ws, psi::AbstractArray)
+    fill!(out, zero(eltype(out)))
+    is_active(term.c1) || return out
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
     D = ws.spin_matrices.system.n_components
     fx = similar(psi, ComplexF64, n_pts...)
     fy = similar(psi, ComplexF64, n_pts...)
     fz = similar(psi, ComplexF64, n_pts...)
-    _grad_c1_spin_core!(grad, psi, ws, fx, fy, fz, n_pts, D, Val(N))
+    _grad_c1_spin_core!(out, psi, ws, fx, fy, fz, n_pts, D, Val(N))
+    return out
+end
+
+# ============================================================================
+# Derived: energy + gradient from the single source.
+# ============================================================================
+
+function energy_contribution(term::SpinC1Term, psi::AbstractArray{<:Complex}, ws)
+    # Mean-field: E = (1/2)·Re⟨ψ, apply_op(ψ)⟩·dV = (c1/2)·∫|F|²·dV
+    out = similar(psi)
+    fill!(out, zero(eltype(out)))
+    apply_operator!(out, term, ws, psi)
+    return 0.5 * real(dot(vec(psi), vec(out))) * cell_volume(ws.grid)
+end
+
+function add_gradient!(grad, term::SpinC1Term, psi, ws)
+    buf = similar(psi)
+    fill!(buf, zero(eltype(buf)))
+    apply_operator!(buf, term, ws, psi)
+    grad .+= buf
     return nothing
 end
 
