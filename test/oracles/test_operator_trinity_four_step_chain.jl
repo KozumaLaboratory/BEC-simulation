@@ -57,11 +57,16 @@ function _build_full_ws()
     grid = make_grid(GridConfig{3}((6, 6, 6), (4.0, 4.0, 4.0)))
     atom = Rb87
     ip = InteractionParams(Dict(0 => 0.5, 1 => 0.1); c_lhy=0.3)
+    # Field order is (p_wf, q_wf, bx_wf, by_wf) — see
+    # foundation/types/interactions_zeeman.jl:121. The comment labels
+    # below were historically inverted (bx/by/p/q); the VALUES were
+    # always fine — only the labels were wrong. Do not "fix" the order
+    # to match old comments: that silently swaps p ↔ bx.
     zeeman = TimeDependentZeeman(
-        ConstantWaveform(0.2),   # bx — TransverseZeeman
-        ConstantWaveform(0.15),  # by — TransverseZeeman
-        ConstantWaveform(0.3),   # p  — LinearZeemanZ
-        ConstantWaveform(0.05),  # q  — LinearZeemanZ
+        ConstantWaveform(0.2),   # p_wf  — LinearZeemanZ (Bz)
+        ConstantWaveform(0.15),  # q_wf  — quadratic Zeeman
+        ConstantWaveform(0.3),   # bx_wf — TransverseZeeman
+        ConstantWaveform(0.05),  # by_wf — TransverseZeeman
     )
     sp = SimParams(; dt=0.005, n_steps=1, imaginary_time=true,
         normalize_every=1, rotating_frame_omega=0.2)  # Coriolis

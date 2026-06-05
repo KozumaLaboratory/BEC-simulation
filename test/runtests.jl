@@ -206,6 +206,14 @@ const CI_EXTRA = [
     # blind-spot class as the 2026-06-04 GPU-Coriolis miss.
     # Gates on CUDA.functional(); no-op on CPU-only CI.
     "oracles/test_gpu_cpu_per_term_parity.jl",
+    # Consolidated term property suite (docs/design/term_oracle_bootstrap.md):
+    # step0 FD trust bootstrap (ε-scaling valley) + harness canaries.
+    # Grows to absorb the per-term FD / Hermiticity / canary oracles.
+    "oracles/test_term_properties.jl",
+    # T-CG: CG projection-structure oracle — the magnitude blind-spot
+    # killer (arch doc §4.3). Three independent routes (KU / 6j /
+    # channel_kernel) + literature inverse anchors, F-swept.
+    "oracles/test_cg_projection_oracle.jl",
 ]
 
 # ── Full tier: everything (ci + remaining heavy tests) ──
