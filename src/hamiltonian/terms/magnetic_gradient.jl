@@ -110,27 +110,33 @@ function energy_contribution(::MagneticGradientTerm, psi::AbstractArray{<:Comple
     return coeff * E * dV
 end
 
-function add_gradient!(grad, ::MagneticGradientTerm, psi, ws)
-    # ∂E_MG/∂ψ*_c = g_F · grad · x_axis · ψ_c (same coefficient per component).
-    # GPU-safe: broadcast against a per-voxel `delta_V = coeff · x_axis`
-    # array reshaped to the spatial axes; multiplication with `psi_c` is
-    # then a pure CuArray broadcast (no scalar indexing).
+# ============================================================================
+# Trinity authoritative kernel: apply_operator!
+# H_MG = g_F·grad·x_axis (linear, spin-independent). δE/δψ̄ = coeff·x_axis·ψ.
+# ============================================================================
+
+function apply_operator!(out::AbstractArray, ::MagneticGradientTerm, ws, psi::AbstractArray)
+    fill!(out, zero(eltype(out)))
     p = _mg_at(ws)
-    p === nothing && return nothing
+    p === nothing && return out
     coeff = p.g_F * p.grad
-    coeff == 0.0 && return nothing
+    coeff == 0.0 && return out
     N = ndims(psi) - 1
     D = size(psi, N + 1)
     n_pts = ntuple(d -> size(psi, d), Val(N))
-    # Broadcast x_axis along the MG axis. On CPU this is a Vector reshape;
-    # on GPU we need a device-resident array, so route through
-    # `_axis_broadcast` (foundation/backend.jl — same helper Coriolis uses).
     x_bcast = _axis_broadcast(view(psi, ntuple(_ -> :, Val(N))..., 1),
         ws.grid.x[p.axis], p.axis)
     for c in 1:D
         idx = _component_slice(N, n_pts, c)
-        view(grad, idx...) .+= coeff .* x_bcast .* view(psi, idx...)
+        view(out, idx...) .= coeff .* x_bcast .* view(psi, idx...)
     end
+    return out
+end
+
+function add_gradient!(grad, ::MagneticGradientTerm, psi, ws)
+    buf = similar(psi)
+    apply_operator!(buf, MagneticGradientTerm(), ws, psi)
+    grad .+= buf
     return nothing
 end
 

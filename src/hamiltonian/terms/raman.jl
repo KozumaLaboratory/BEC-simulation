@@ -60,8 +60,10 @@ function energy_contribution(::RamanTerm, psi::AbstractArray{<:Complex}, ws)
     )
 end
 
-# Raman gradient not covered in legacy energy_gradient! (LBFGS
-# limitation). Mirror.
+# Operator-trinity KNOWN-LIMIT: Raman gradient not implemented in legacy
+# (LBFGS skip). apply_operator! nil to match; ITP path (apply_step!)
+# remains active.
+apply_operator!(out, ::RamanTerm, ws, psi) = (fill!(out, zero(eltype(out))); out)
 add_gradient!(grad, ::RamanTerm, psi, ws) = nothing
 
 sign_oracle(::Type{RamanTerm}) = (

@@ -110,7 +110,26 @@ function apply_step!(::KineticTerm, psi, dt::Real, imaginary_time::Bool, ws)
     return nothing
 end
 
+# ============================================================================
+# Trinity authoritative kernel: apply_operator!
+# H_kin = -½∇² (linear). apply_operator! returns (½k²·ψ̂)→ifft per-voxel.
+# Energy = Re⟨ψ, H·ψ⟩·dV; gradient = H·ψ.
+# ============================================================================
+
+function apply_operator!(out::AbstractArray, ::KineticTerm, ws, psi::AbstractArray)
+    fill!(out, zero(eltype(out)))
+    N = ndims(psi) - 1
+    n_pts = ntuple(d -> size(psi, d), Val(N))
+    D = ws.spin_matrices.system.n_components
+    fft_buf = similar(psi, ComplexF64, n_pts...)
+    k_squared_dev = _to_device(ws.backend, ws.grid.k_squared)
+    _grad_kinetic_core!(out, psi, ws, fft_buf, k_squared_dev, n_pts, D, Val(N))
+    return out
+end
+
 function energy_contribution(::KineticTerm, psi::AbstractArray{<:Complex}, ws)
+    # Linear: E = Re⟨ψ, H·ψ⟩·dV. Retains the manual reduction form
+    # (faster than apply_operator + dot at scale; bit-equivalent for H_kin).
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
     n_comp = size(psi, N + 1)
@@ -122,12 +141,9 @@ function energy_contribution(::KineticTerm, psi::AbstractArray{<:Complex}, ws)
 end
 
 function add_gradient!(grad, ::KineticTerm, psi, ws)
-    N = ndims(psi) - 1
-    n_pts = ntuple(d -> size(psi, d), Val(N))
-    D = ws.spin_matrices.system.n_components
-    fft_buf = similar(psi, ComplexF64, n_pts...)
-    k_squared_dev = _to_device(ws.backend, ws.grid.k_squared)
-    _grad_kinetic_core!(grad, psi, ws, fft_buf, k_squared_dev, n_pts, D, Val(N))
+    buf = similar(psi)
+    apply_operator!(buf, KineticTerm(), ws, psi)
+    grad .+= buf
     return nothing
 end
 

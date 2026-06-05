@@ -19,7 +19,8 @@ using SpinorBEC
 using SpinorBEC: apply_operator!, energy_contribution, HamTerm
 using SpinorBEC:
     TrapTerm, LinearZeemanZTerm, DensityC0Term,
-    SpinC1Term, TransverseZeemanTerm, CoriolisTerm
+    SpinC1Term, TransverseZeemanTerm, CoriolisTerm,
+    KineticTerm, DDITerm, LHYTerm, LightShiftTerm, MagneticGradientTerm
 using LinearAlgebra
 using Random
 
@@ -179,6 +180,98 @@ end
         term = TransverseZeemanTerm(0.3, 0.2)
         ratios = fd_ratio(term, ws, psi; rng)
         @test all(abs.(ratios .- 1.0) .< 5e-3)
+    end
+
+    @testset "KineticTerm (linear, FFT-based H_kin = -½∇²)" begin
+        ws = _tiny_ws()
+        psi = init_psi(ws.grid, SpinSystem(1); state=:spin_coherent, init_theta=π/4)
+        dV = SpinorBEC.cell_volume(ws.grid)
+        psi ./= sqrt(sum(abs2, psi) * dV)
+        ratios = fd_ratio(KineticTerm(), ws, psi; rng)
+        @test all(abs.(ratios .- 1.0) .< 5e-3)
+    end
+
+    @testset "MagneticGradientTerm (linear)" begin
+        grid = make_grid(GridConfig{1}((8,), (6.0,)))
+        atom = Rb87
+        ip = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
+        sp = SimParams(; dt=0.005, n_steps=1, imaginary_time=true,
+            normalize_every=1)
+        ws = make_workspace(;
+            grid, atom, interactions=ip,
+            zeeman=ZeemanParams(0.0, 0.0),
+            potential=HarmonicTrap((1.0,)),
+            magnetic_gradient=MagneticGradient{1}(0.4, 1, 1.0),
+            sim_params=sp)
+        psi = zeros(ComplexF64, 8, 3)
+        for i in 1:8
+            psi[i, 2] = exp(-(ws.grid.x[1][i] - 0.5)^2 / 2)
+        end
+        psi ./= sqrt(sum(abs2, psi) * SpinorBEC.cell_volume(grid))
+        ratios = fd_ratio(MagneticGradientTerm(), ws, psi; rng)
+        @test all(abs.(ratios .- 1.0) .< 5e-3)
+    end
+
+    @testset "LightShiftTerm (linear, diagonal)" begin
+        grid = make_grid(GridConfig{1}((8,), (6.0,)))
+        atom = Rb87
+        ip = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
+        profile = [0.3 * exp(-grid.x[1][i]^2 / 2) for i in 1:8]
+        eigvals = [0.2, -0.1, 0.4]
+        U = Matrix{ComplexF64}(LinearAlgebra.I, 3, 3)
+        ls = LightShift(profile, eigvals, U, true)
+        sp = SimParams(; dt=0.005, n_steps=1, imaginary_time=true,
+            normalize_every=1)
+        ws = make_workspace(;
+            grid, atom, interactions=ip,
+            zeeman=ZeemanParams(0.0, 0.0),
+            potential=HarmonicTrap((1.0,)),
+            light_shift=ls, sim_params=sp)
+        psi = init_psi(grid, SpinSystem(1); state=:polar)
+        psi ./= sqrt(sum(abs2, psi) * SpinorBEC.cell_volume(grid))
+        ratios = fd_ratio(LightShiftTerm(), ws, psi; rng)
+        @test all(abs.(ratios .- 1.0) .< 5e-3)
+    end
+
+    @testset "DDITerm (mean-field, 3D)" begin
+        grid = make_grid(GridConfig{3}((6, 6, 6), (4.0, 4.0, 4.0)))
+        atom = Rb87
+        ip = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
+        sp = SimParams(; dt=0.005, n_steps=1, imaginary_time=true,
+            normalize_every=1)
+        ws = make_workspace(;
+            grid, atom, interactions=ip,
+            zeeman=ZeemanParams(0.0, 0.0),
+            potential=HarmonicTrap((1.0, 1.0, 1.0)),
+            enable_ddi=true, c_dd=0.5, secular_ddi=true,
+            sim_params=sp)
+        psi = zeros(ComplexF64, 6, 6, 6, 3)
+        for I in CartesianIndices((6, 6, 6))
+            x, y, z = grid.x[1][I[1]], grid.x[2][I[2]], grid.x[3][I[3]]
+            psi[I, 1] = exp(-(x^2 + y^2 + z^2) / 2)
+        end
+        psi ./= sqrt(sum(abs2, psi) * SpinorBEC.cell_volume(grid))
+        ratios = fd_ratio(DDITerm(), ws, psi; rng)
+        @test all(abs.(ratios .- 1.0) .< 1e-2)
+    end
+
+    @testset "LHYTerm (mean-field n^(5/2), factor 2/5)" begin
+        grid = make_grid(GridConfig{1}((8,), (6.0,)))
+        atom = Rb87
+        ip = InteractionParams(Dict(0 => 0.5, 1 => 0.0); c_lhy=0.3)
+        sp = SimParams(; dt=0.005, n_steps=1, imaginary_time=true,
+            normalize_every=1)
+        ws = make_workspace(;
+            grid, atom, interactions=ip,
+            zeeman=ZeemanParams(0.0, 0.0),
+            potential=HarmonicTrap((1.0,)), sim_params=sp)
+        psi = init_psi(grid, SpinSystem(1); state=:polar)
+        psi ./= sqrt(sum(abs2, psi) * SpinorBEC.cell_volume(grid))
+        ratios = fd_ratio(LHYTerm(), ws, psi; rng)
+        # LHY uses 5/2 factor in energy (not 2× linear or 1× mean-field);
+        # fd_ratio's "pick closer" heuristic catches whichever convention.
+        # Relax tolerance — LHY's nonlinearity makes FD noisier.
+        @test all(abs.(ratios .- 1.0) .< 5e-2)
     end
 
     @testset "CoriolisTerm (linear, FFT-based L_z, 2D required)" begin

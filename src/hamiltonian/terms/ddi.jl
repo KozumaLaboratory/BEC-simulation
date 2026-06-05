@@ -148,12 +148,28 @@ function energy_contribution(::DDITerm, psi::AbstractArray{<:Complex}, ws)
     end
 end
 
-function add_gradient!(grad, ::DDITerm, psi, ws)
-    ws.ddi === nothing && return nothing
+# ============================================================================
+# Trinity authoritative kernel: apply_operator!
+# H_DDI mean-field: δE/δψ̄ = F_z·Φ_z (diag) + (F±·Φ∓)/2 (tridiag).
+# `_grad_ddi_core!` already implements this; wrap into apply_operator!.
+# Energy = (1/2)·Re⟨ψ, apply_op(ψ)⟩·dV (mean-field).
+# ============================================================================
+
+function apply_operator!(out::AbstractArray, ::DDITerm, ws, psi::AbstractArray)
+    fill!(out, zero(eltype(out)))
+    ws.ddi === nothing && return out
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
     D = ws.spin_matrices.system.n_components
-    _grad_ddi_core!(grad, psi, ws, n_pts, D, Val(N))
+    _grad_ddi_core!(out, psi, ws, n_pts, D, Val(N))
+    return out
+end
+
+function add_gradient!(grad, ::DDITerm, psi, ws)
+    ws.ddi === nothing && return nothing
+    buf = similar(psi)
+    apply_operator!(buf, DDITerm(), ws, psi)
+    grad .+= buf
     return nothing
 end
 

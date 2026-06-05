@@ -26,12 +26,27 @@ function energy_contribution(::LHYTerm, psi::AbstractArray{<:Complex}, ws)
     return 0.0
 end
 
-function add_gradient!(grad, ::LHYTerm, psi, ws)
+# ============================================================================
+# Trinity authoritative kernel: apply_operator!
+# E_LHY = (2/5)·c_lhy·∫n^(5/2)·dV (scalar) or ws.lhy's specific formula.
+# δE/δψ̄ = c_lhy·n^(3/2)·ψ (scalar LHY). `_grad_lhy!` implements this;
+# apply_operator! is a fill-then-call wrapper.
+# ============================================================================
+
+function apply_operator!(out::AbstractArray, ::LHYTerm, ws, psi::AbstractArray)
+    fill!(out, zero(eltype(out)))
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
     D = ws.spin_matrices.system.n_components
     n_density = total_density(psi, N)
-    _grad_lhy!(grad, psi, ws, n_density, n_pts, D, Val(N))
+    _grad_lhy!(out, psi, ws, n_density, n_pts, D, Val(N))
+    return out
+end
+
+function add_gradient!(grad, ::LHYTerm, psi, ws)
+    buf = similar(psi)
+    apply_operator!(buf, LHYTerm(), ws, psi)
+    grad .+= buf
     return nothing
 end
 

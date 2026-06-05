@@ -16,6 +16,11 @@ function apply_step!(::LossTerm, psi, dt::Real, imaginary_time::Bool, ws)
     return nothing
 end
 
+# Operator-trinity KNOWN-LIMIT: LossTerm is anti-Hermitian (non-conservative
+# K3 three-body loss). It does NOT contribute to GP energy and has no
+# Hermitian operator to expose via apply_operator!. Explicitly nil to make
+# the trinity-skipping intent structural rather than accidental.
+apply_operator!(out, ::LossTerm, ws, psi) = (fill!(out, zero(eltype(out))); out)
 energy_contribution(::LossTerm, psi, ws) = 0.0
 add_gradient!(grad, ::LossTerm, psi, ws) = nothing
 

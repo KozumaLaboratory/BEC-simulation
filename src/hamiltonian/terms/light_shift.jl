@@ -120,11 +120,26 @@ function energy_contribution(::LightShiftTerm, psi::AbstractArray{<:Complex}, ws
     )
 end
 
-function add_gradient!(grad, ::LightShiftTerm, psi, ws)
+# ============================================================================
+# Trinity authoritative kernel: apply_operator!
+# H_LS = M_LS·profile (linear); δE/δψ̄ = M_LS·profile·ψ via diagonal or
+# full-matrix form. `_grad_light_shift_core!` implements this.
+# ============================================================================
+
+function apply_operator!(out::AbstractArray, ::LightShiftTerm, ws, psi::AbstractArray)
+    fill!(out, zero(eltype(out)))
+    ws.light_shift === nothing && return out
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
     D = ws.spin_matrices.system.n_components
-    _grad_light_shift_core!(grad, psi, ws, n_pts, D, Val(N))
+    _grad_light_shift_core!(out, psi, ws, n_pts, D, Val(N))
+    return out
+end
+
+function add_gradient!(grad, ::LightShiftTerm, psi, ws)
+    buf = similar(psi)
+    apply_operator!(buf, LightShiftTerm(), ws, psi)
+    grad .+= buf
     return nothing
 end
 

@@ -56,10 +56,13 @@ function energy_contribution(::TensorTerm, psi::AbstractArray{<:Complex}, ws)
     return E
 end
 
+# Operator-trinity KNOWN-LIMIT: TensorTerm gradient (c2/c4/...) was
+# never implemented in legacy `energy_gradient!` (see commit log /
+# CLAUDE.md "Tensor c2/c4 not in energy_gradient!"). LBFGS falls back
+# to ITP for tensor-active configurations. apply_operator! is nil to
+# match — propagator (apply_step!) is the active path for ITP.
+apply_operator!(out, ::TensorTerm, ws, psi) = (fill!(out, zero(eltype(out))); out)
 function add_gradient!(grad, ::TensorTerm, psi, ws)
-    # Legacy energy_gradient! does NOT cover tensor terms (LBFGS
-    # falls back to ITP). Mirror that limitation; FD-consistency
-    # CI test should skip this term explicitly.
     return nothing
 end
 
