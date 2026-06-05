@@ -23,8 +23,9 @@
 
 using Test
 using SpinorBEC
-using SpinorBEC: HamTerm, apply_operator!, energy_contribution
-using SpinorBEC: KineticTerm, LinearZeemanZTerm, DensityC0Term
+using SpinorBEC: HamTerm, apply_operator!, energy_contribution, apply_step!
+using SpinorBEC: KineticTerm, LinearZeemanZTerm, DensityC0Term,
+    LHYTerm, TensorTerm, RamanTerm
 using Random
 
 include(joinpath(@__DIR__, "..", "helpers", "fd_gradient.jl"))
@@ -151,5 +152,76 @@ end
             @test v.kind === :valley
             @test v.min_err < VALLEY_MIN
         end
+    end
+end
+
+@testset "defect regressions — propagator faces + Raman energy (App. A 1-3)" begin
+    # Defect 1: LHYTerm.apply_step! used to call `apply_lhy_step!`,
+    # defined nowhere (UndefVarError on first call). Now a real phase
+    # sharing `_lhy_V` with the production fused diagonal.
+    @testset "LHYTerm.apply_step! — exists, unitary (RT), matches operator" begin
+        ws, psi = oracle_full_ws()    # scalar c_lhy = 0.3 active
+        dt = 1e-4
+        ψ = copy(psi)
+        apply_step!(LHYTerm(), ψ, dt, false, ws)
+        @test sum(abs2, ψ) ≈ sum(abs2, psi) rtol = 1e-12  # diagonal phase ⇒ exact norm
+        @test maximum(abs, ψ .- psi) > 1e-10              # actually acted
+        # Small-dt consistency with the operator face (scalar LHY:
+        # V = c_lhy·n^{3/2}, operator = V·ψ): (ψ' − ψ)/(−i·dt) ≈ H·ψ.
+        g = similar(psi)
+        fill!(g, 0)
+        apply_operator!(g, LHYTerm(), ws, psi)
+        deriv = (ψ .- psi) ./ (-im * dt)
+        @test isapprox(deriv, g; rtol=1e-3)
+    end
+
+    # Defect 2: TensorTerm.apply_step! called a stale singlet signature
+    # and a nonexistent `apply_tensor_step!`. Now delegates to the real
+    # kernels. c2 singlet is independent at F=1 (KU); a polar state has
+    # a guaranteed singlet amplitude (A₀₀ ∝ ψ₀²).
+    @testset "TensorTerm.apply_step! — exists, unitary (RT, c2 active)" begin
+        grid = make_grid(GridConfig{1}((8,), (6.0,)))
+        sp = SimParams(; dt=0.005, n_steps=1, imaginary_time=true, normalize_every=1)
+        ws = make_workspace(;
+            grid, atom=Rb87,
+            interactions=InteractionParams(Dict(0 => 0.5, 1 => 0.1, 2 => 0.2)),
+            zeeman=ZeemanParams(0.1, 0.0), potential=HarmonicTrap((1.0,)),
+            sim_params=sp,
+        )
+        psi = init_psi(grid, SpinSystem(1); state=:polar)
+        psi ./= sqrt(sum(abs2, psi) * SpinorBEC.cell_volume(grid))
+        ψ = copy(psi)
+        apply_step!(TensorTerm(), ψ, 1e-3, false, ws)
+        @test sum(abs2, ψ) ≈ sum(abs2, psi) rtol = 1e-10  # unitary pair mixing
+        @test maximum(abs, ψ .- psi) > 1e-12              # actually acted
+    end
+
+    # Defect 3: RamanTerm.energy_contribution passed raw ws.raman into
+    # `_raman_energy(::RamanCoupling)` — MethodError for
+    # TimeDependentRaman (reachable: post-B1 the registry is the only
+    # CPU energy path). Now resolved via raman_at at ws.state.t.
+    @testset "RamanTerm energy resolves TimeDependentRaman" begin
+        grid = make_grid(GridConfig{1}((8,), (6.0,)))
+        sp = SimParams(; dt=0.005, n_steps=1, imaginary_time=false, normalize_every=0)
+        td = TimeDependentRaman{1}(ConstantWaveform(0.4), ConstantWaveform(0.1), (0.7,))
+        ws = make_workspace(;
+            grid, atom=Rb87,
+            interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
+            zeeman=ZeemanParams(0.0, 0.0), potential=HarmonicTrap((1.0,)),
+            sim_params=sp, raman=td,
+        )
+        psi = init_psi(grid, SpinSystem(1); state=:spin_coherent, init_theta=π / 4)
+        E_td = energy_contribution(RamanTerm(), psi, ws)   # used to throw
+        @test isfinite(E_td)
+        # Must equal the energy under the statically-resolved coupling:
+        ws_static = make_workspace(;
+            grid, atom=Rb87,
+            interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
+            zeeman=ZeemanParams(0.0, 0.0), potential=HarmonicTrap((1.0,)),
+            sim_params=sp, raman=SpinorBEC.raman_at(td, ws.state.t),
+        )
+        E_static = energy_contribution(RamanTerm(), psi, ws_static)
+        @test E_td ≈ E_static rtol = 1e-14
+        @test abs(E_td) > 1e-12   # nonzero coupling on a coherent state
     end
 end

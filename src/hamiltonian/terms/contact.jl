@@ -252,14 +252,19 @@ sign_oracle(::Type{SpinC1Term}) = (
 struct TensorTerm <: HamTerm end
 
 function apply_step!(::TensorTerm, psi, dt::Real, imaginary_time::Bool, ws)
+    # Delegates to the audited production kernels with their REAL
+    # signatures. The previous body called `apply_singlet_pair_step!`
+    # with a stale (sm, c2) signature and a nonexistent
+    # `apply_tensor_step!` — dead-wrong code, latent UndefVarError
+    # (arch doc App. A defect 2). `apply_singlet_pair_step!` gates on
+    # `is_active(c2)` internally.
     F = ws.spin_matrices.system.F
     N = ndims(psi) - 1
-    c2 = get_cn(ws.interactions, 2)
-    if is_active(c2)
-        apply_singlet_pair_step!(psi, ws.spin_matrices, c2, dt, N; imaginary_time)
-    end
+    apply_singlet_pair_step!(psi, ws.interactions, F, Float64(dt), N; imaginary_time)
     if ws.tensor_cache !== nothing
-        apply_tensor_step!(psi, ws.tensor_cache, ws.spin_matrices, dt, N; imaginary_time)
+        apply_tensor_interaction_step!(
+            psi, ws.tensor_cache, ws.spin_matrices, Float64(dt), N; imaginary_time
+        )
     end
     return nothing
 end

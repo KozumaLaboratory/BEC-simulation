@@ -7,10 +7,24 @@
 struct LHYTerm <: HamTerm end
 
 function apply_step!(::LHYTerm, psi, dt::Real, imaginary_time::Bool, ws)
-    # LHY is folded into the diagonal step in the legacy implementation;
-    # at the HamTerm level we delegate via apply_lhy_step! if available.
+    # Standalone per-term LHY phase. Production folds LHY into the
+    # fused diagonal step (`_diagonal_step_svec!`); this face shares
+    # that SAME potential function `_lhy_V`, so the sign/coefficient
+    # source is common: phase = exp(−V_LHY·dτ) (IT) / cis(−V_LHY·dt)
+    # (RT) with V_LHY = _lhy_V(n, lhy). The previous body called
+    # `apply_lhy_step!`, which was defined nowhere — latent
+    # UndefVarError (arch doc App. A defect 1).
     ws.lhy === nothing && ws.interactions.c_lhy == 0.0 && return nothing
-    apply_lhy_step!(psi, ws, dt; imaginary_time=imaginary_time)
+    lhy = ws.lhy !== nothing ? ws.lhy : ws.interactions.c_lhy
+    N = ndims(psi) - 1
+    n = total_density(psi, N)
+    V = _lhy_V.(n, Ref(lhy))
+    phase = imaginary_time ? exp.(.-V .* dt) : cis.(.-V .* dt)
+    D = size(psi, N + 1)
+    idx = ntuple(_ -> :, Val(N))
+    for c in 1:D
+        view(psi, idx..., c) .*= phase
+    end
     return nothing
 end
 

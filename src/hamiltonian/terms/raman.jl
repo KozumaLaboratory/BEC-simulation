@@ -53,10 +53,15 @@ end
 
 function energy_contribution(::RamanTerm, psi::AbstractArray{<:Complex}, ws)
     ws.raman === nothing && return 0.0
+    # Resolve at ws.state.t — the SAME resolution apply_step! uses above.
+    # Passing raw ws.raman MethodErrors on TimeDependentRaman (post-B1
+    # the registry is the only CPU energy path, so that was a reachable
+    # crash — arch doc App. A defect 3).
+    raman_now = raman_at(ws.raman, ws.state.t)
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
     return _raman_energy(
-        psi, ws.spin_matrices, ws.raman, ws.grid, N, n_pts, cell_volume(ws.grid)
+        psi, ws.spin_matrices, raman_now, ws.grid, N, n_pts, cell_volume(ws.grid)
     )
 end
 
