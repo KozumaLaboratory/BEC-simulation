@@ -35,6 +35,35 @@ Apply `exp(-i·dt·H_term)` (RT) or `exp(-H_term·dτ)` (IT) to `psi`.
 function apply_step! end
 
 """
+    apply_operator!(out, term::HamTerm, ws, psi) -> out
+
+THE single source for the term's operator action on `psi`. Returns
+`out[I, c] = (δE_term / δψ̄)[I, c]` — the per-voxel variational
+derivative (i.e. `H · ψ` for linear Hermitian terms; the GP mean-field
+linearized operator `H_eff(ψ) · ψ` for nonlinear terms).
+
+Convention for the trinity:
+- Linear terms (kinetic, trap, zeeman, light_shift, raman, coriolis,
+  magnetic_gradient): `energy_contribution = Re⟨ψ, apply_operator(ψ)⟩ · dV`.
+- Mean-field terms (density_c0, spin_c1, ddi, tensor):
+  `energy_contribution = (1/2) · Re⟨ψ, apply_operator(ψ)⟩ · dV`.
+- LHY (n^(5/2) integrand): `energy = (2/5) · Re⟨ψ, apply_operator(ψ)⟩ · dV`.
+- `add_gradient!(grad, term, ws, ψ) = grad .+= apply_operator(ψ)`
+  (the outer LBFGS driver applies the Wirtinger ×2).
+- `apply_step!(term, ws, dt)` uses the SAME coefficient (e.g. the `c0`
+  inside `apply_operator`) inside `exp(-i·dt·...)`. The propagator and
+  the operator action share their coefficient source.
+
+The FD-consistency oracle in
+`test/oracles/test_operator_trinity_per_term.jl` verifies that
+`δE_term[ψ]/δψ̄` measured via finite differences agrees with
+`apply_operator!(...)` for every term. If they drift, either
+`energy_contribution` or `apply_operator!` is wrong, and the operator
+is the single source of truth.
+"""
+function apply_operator! end
+
+"""
     energy_contribution(term::HamTerm, psi, ws) -> Float64
 
 Return this term's contribution to total energy `⟨ψ|H_term|ψ⟩`.

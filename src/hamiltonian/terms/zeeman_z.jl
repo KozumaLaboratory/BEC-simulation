@@ -27,8 +27,50 @@ end
 # sign_oracle test catches it immediately.
 @inline _diag_coef(term::LinearZeemanZTerm, m::Real) = -term.p * m + term.q * m * m
 
+# ============================================================================
+# Trinity authoritative kernel: apply_operator!
+# H_z is diagonal in m: H · ψ[I, c] = coef(m_c) · ψ[I, c]
+# ============================================================================
+
+function apply_operator!(out::AbstractArray, term::LinearZeemanZTerm, ws, psi::AbstractArray)
+    sm = ws.spin_matrices
+    F = sm.system.F
+    D = sm.system.n_components
+    N = ndims(psi) - 1
+    @inbounds for c in 1:D
+        m = F - (c - 1)
+        coef = _diag_coef(term, m)
+        view(out, ntuple(_ -> :, Val(N))..., c) .=
+            coef .* view(psi, ntuple(_ -> :, Val(N))..., c)
+    end
+    return out
+end
+
+# ============================================================================
+# Derived: energy + gradient + propagator from the single source.
+# ============================================================================
+
+function energy_contribution(term::LinearZeemanZTerm, psi::AbstractArray{<:Complex}, ws)
+    # Linear: E = Re⟨ψ, H·ψ⟩ · dV. apply_operator returns H·ψ.
+    out = similar(psi)
+    fill!(out, zero(eltype(out)))
+    apply_operator!(out, term, ws, psi)
+    return real(dot(vec(psi), vec(out))) * cell_volume(ws.grid)
+end
+
+function add_gradient!(grad::AbstractArray{<:Complex}, term::LinearZeemanZTerm,
+    psi::AbstractArray{<:Complex}, ws)
+    buf = similar(psi)
+    fill!(buf, zero(eltype(buf)))
+    apply_operator!(buf, term, ws, psi)
+    grad .+= buf
+    return nothing
+end
+
 function apply_step!(term::LinearZeemanZTerm, psi::AbstractArray{<:Complex},
     dt::Real, imaginary_time::Bool, ws)
+    # Propagator: psi[I, c] *= exp(-coef·dt) (IT) or cis(-coef·dt) (RT).
+    # Uses the SAME `_diag_coef` as apply_operator (single source).
     sm = ws.spin_matrices
     F = sm.system.F
     D = sm.system.n_components
@@ -53,37 +95,6 @@ function apply_step!(term::LinearZeemanZTerm, psi::AbstractArray{<:Complex},
                 psi[I, c] *= factor
             end
         end
-    end
-    return nothing
-end
-
-function energy_contribution(term::LinearZeemanZTerm, psi::AbstractArray{<:Complex}, ws)
-    sm = ws.spin_matrices
-    F = sm.system.F
-    D = sm.system.n_components
-    N = ndims(psi) - 1
-    n_pts = ntuple(d -> size(psi, d), Val(N))
-    dV = cell_volume(ws.grid)
-    E = 0.0
-    @inbounds for c in 1:D
-        m = F - (c - 1)
-        coef = _diag_coef(term, m)
-        E += coef * sum(abs2, view(psi, ntuple(_ -> :, Val(N))..., c)) * dV
-    end
-    return E
-end
-
-function add_gradient!(grad::AbstractArray{<:Complex}, term::LinearZeemanZTerm,
-    psi::AbstractArray{<:Complex}, ws)
-    sm = ws.spin_matrices
-    F = sm.system.F
-    D = sm.system.n_components
-    N = ndims(psi) - 1
-    @inbounds for c in 1:D
-        m = F - (c - 1)
-        coef = _diag_coef(term, m)
-        view(grad, ntuple(_ -> :, Val(N))..., c) .+=
-            coef .* view(psi, ntuple(_ -> :, Val(N))..., c)
     end
     return nothing
 end
