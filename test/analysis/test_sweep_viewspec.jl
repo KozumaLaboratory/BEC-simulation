@@ -17,6 +17,14 @@
 using Test
 using SpinorBEC
 
+# The five hypothesis-relation builders + the spectrum mark builder are ~700
+# lines of deeply-nested closures (capturing ~20 heterogeneous locals). Their
+# first-time JIT compilation is expensive enough (~5 min, capture-induced
+# inference) to blow the fast tier's 15-min budget, so the testsets that force
+# it are gated behind the heavy flag: they run in the nightly `full` tier
+# (SPINORBEC_RUN_HEAVY_YAML=true, 90-min budget), not the per-push inner loop.
+const _SKIP_HEAVY_VIEWSPEC = get(ENV, "SPINORBEC_RUN_HEAVY_YAML", "false") != "true"
+
 # Minimal 2-axis sweep (B_nT log x omega linear). Mirrors the proven observable
 # kinds from scripts/m1_sweep_golden_export.jl (signed / positive / wide-quality
 # + optional spectrum). `hypothesis` (opt-in) selects the primary-mark relation;
@@ -170,21 +178,29 @@ end
         @test haskey(spec, "_panels_count") && spec["_panels_count"] >= 1
     end
 
-    @testset "to_viewspec -- all hypothesis relation paths" begin
-        # Each relation drives a distinct primary-mark builder (~700 lines of
-        # the function reachable only with a hypothesis set).
-        for (name, hyp) in _hypotheses()
-            spec = to_viewspec(_sweep_result(; hypothesis=hyp))
-            @test spec isa AbstractDict
+    # Heavy paths (gated to nightly/full -- see _SKIP_HEAVY_VIEWSPEC note above).
+    # Each relation drives a distinct ~150-line primary-mark builder reachable
+    # only with a hypothesis set; the spectrum path compiles the m_dist mark
+    # builder. Correct, but compile-expensive, so kept out of the fast inner loop.
+    if _SKIP_HEAVY_VIEWSPEC
+        @testset "to_viewspec -- relation + spectrum paths (heavy, gated)" begin
+            @test_skip false
+        end
+    else
+        @testset "to_viewspec -- all hypothesis relation paths" begin
+            for (name, hyp) in _hypotheses()
+                spec = to_viewspec(_sweep_result(; hypothesis=hyp))
+                @test spec isa AbstractDict
+                @test spec["_view_shape"] == "heatmap"
+                @test haskey(spec, "vconcat") && !isempty(spec["vconcat"])
+            end
+        end
+
+        @testset "to_viewspec -- spectrum observable path" begin
+            spec = to_viewspec(_sweep_result(; spectrum=true))
             @test spec["_view_shape"] == "heatmap"
             @test haskey(spec, "vconcat") && !isempty(spec["vconcat"])
         end
-    end
-
-    @testset "to_viewspec -- spectrum observable path" begin
-        spec = to_viewspec(_sweep_result(; spectrum=true))
-        @test spec["_view_shape"] == "heatmap"
-        @test haskey(spec, "vconcat") && !isempty(spec["vconcat"])
     end
 
     @testset "to_viewspec -- 1-axis degenerate path" begin
