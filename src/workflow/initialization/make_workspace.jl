@@ -315,6 +315,24 @@ function make_workspace(;
         nothing
     end
 
+    # Ensure LightShift.profile lives on the same device as the workspace
+    # arrays. User-constructed `LightShift(host_profile, ...)` would otherwise
+    # leave a `Vector{Float64}` host array inside a CuArray broadcast
+    # (`_diagonal_step_with_ls!` at propagators.jl:385/396) and the GPU kernel
+    # compilation fails with KernelError: passing non-bitstype argument.
+    # The `make_light_shift_*` constructors already do this transfer; this
+    # catches direct `LightShift(...)` invocations.
+    light_shift_resolved = if light_shift !== nothing && !(backend isa CPUBackend)
+        LightShift(
+            _to_device(backend, light_shift.profile),
+            light_shift.eigvals,
+            light_shift.U,
+            light_shift.is_diagonal,
+        )
+    else
+        light_shift
+    end
+
     Workspace(
         state,
         plans,
@@ -339,7 +357,7 @@ function make_workspace(;
         backend,
         lhy,
         abs_mask,
-        light_shift,
+        light_shift_resolved,
         time_dep_interactions,
         magnetic_gradient,
     )
