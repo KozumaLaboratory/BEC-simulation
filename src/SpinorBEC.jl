@@ -94,6 +94,12 @@ include("manuscript.jl")  # manuscript figure registry + builders
 
 include("validation/reference_rhs.jl")
 
+# The dumb reference: blatantly-correct full energy/RHS statements per
+# term — the master-oracle anchor behind architectural commitment #3
+# (gated redundancy). See docs/design/hamiltonian_layered_architecture.md
+# and test/oracles/test_master_oracle.jl.
+include("validation/dumb_reference.jl")
+
 # ========================================
 # EXPERIMENT / BATCH: unified workflow model
 # ========================================

@@ -214,6 +214,11 @@ const CI_EXTRA = [
     # killer (arch doc §4.3). Three independent routes (KU / 6j /
     # channel_kernel) + literature inverse anchors, F-swept.
     "oracles/test_cg_projection_oracle.jl",
+    # Master oracle: dumb reference vs production registry per term —
+    # the gated-redundancy mechanism behind commitment #3. Includes the
+    # set-equivalence meta-test and both sides of the declared
+    # KNOWN-LIMIT gaps (raman/tensor RHS).
+    "oracles/test_master_oracle.jl",
 ]
 
 # ── Full tier: everything (ci + remaining heavy tests) ──
