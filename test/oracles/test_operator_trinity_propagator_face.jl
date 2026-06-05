@@ -120,6 +120,31 @@ end
         @test res < 1e-2
     end
 
+    @testset "CoriolisTerm (RT, 3-shear FFT propagator)" begin
+        # 2D required for L_z. The Coriolis propagator uses a 3-shear FFT
+        # decomposition; apply_operator uses +iΩ·(x∂_y - y∂_x). Both must
+        # agree at Δt→0. THIS IS WHERE THE 2026-06-04 SIGN BUG LIVED —
+        # the 3-shear factor signs got flipped, then reverted. This oracle
+        # would catch any future drift between propagator shear factors
+        # and the operator's L_z action.
+        grid = make_grid(GridConfig{2}((8, 8), (4.0, 4.0)))
+        atom = Rb87
+        ip = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
+        sp = SimParams(; dt=1e-4, n_steps=1, imaginary_time=false,
+            normalize_every=0, rotating_frame_omega=0.3)
+        ws = make_workspace(;
+            grid, atom, interactions=ip,
+            zeeman=ZeemanParams(0.0, 0.0),
+            potential=HarmonicTrap((1.0, 1.0)), sim_params=sp)
+        psi = init_psi(grid, SpinSystem(1); state=:fl_vortex)
+        dV = SpinorBEC.cell_volume(grid)
+        psi ./= sqrt(sum(abs2, psi) * dV)
+        term = CoriolisTerm(0.3)
+        res = propagator_residual(term, ws, psi; dt=1e-4, imaginary_time=false)
+        # 3-shear FFT has O(dt) leading error in the residual; tolerance 1e-2
+        @test res < 1e-2
+    end
+
     @testset "KineticTerm (RT, dt matched to cached kinetic_phase)" begin
         # `_apply_kinetic_step_core!` uses a CACHED kinetic_phase built
         # at workspace construction time with the workspace's sim_params.dt.
