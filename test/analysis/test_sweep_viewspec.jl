@@ -4,9 +4,11 @@
 # this file; only scripts/m1_sweep_golden_export.jl exercised the sweep
 # emitters. These tests pin the externally-observable contract of the pure
 # helpers (LUTs, per-cell hex resolution, dominant-m margin, VSUP alpha) and a
-# smoke characterization of the 2-axis heatmap emitter + the golden / viewspec
-# writers, so a future decomposition of that god-function can be verified
-# behaviour-preserving rather than refactored blind.
+# structural characterization of EVERY execution path of the 2-axis heatmap
+# emitter (the hypothesis-free panel grid + all five hypothesis relations +
+# the spectrum observable + the 1-axis degenerate path), so a future
+# decomposition of that god-function can be verified behaviour-preserving
+# rather than refactored blind.
 #
 # Assertions are deliberately structural (shape + frozen endpoints + documented
 # boundary cases), not pixel-exact, so they characterize behaviour without
@@ -14,6 +16,98 @@
 
 using Test
 using SpinorBEC
+
+# Minimal 2-axis sweep (B_nT log x omega linear). Mirrors the proven observable
+# kinds from scripts/m1_sweep_golden_export.jl (signed / positive / wide-quality
+# + optional spectrum). `hypothesis` (opt-in) selects the primary-mark relation;
+# `b_vals` / `w_vals` control the swept-axis count (drop one to a singleton to
+# exercise the 1-axis degenerate path).
+function _sweep_result(; hypothesis=nothing, spectrum::Bool=false, F::Int=6,
+    b_vals=[100.0, 200.0], w_vals=[0.3, 0.6])
+    axes = SweepAxis[
+        SweepAxis(:B_nT, "nT", :log, b_vals),
+        SweepAxis(:omega, "rad", :linear, w_vals),
+    ]
+    observables = SweepObservable[
+        SweepObservable(; key=:fz_total, kind=:signed, center=0.0),
+        SweepObservable(; key=:E, kind=:positive, scale=:linear),
+        SweepObservable(; key=:grad_norm, kind=:wide, scale=:log, role=:quality),
+    ]
+    if spectrum
+        push!(observables, SweepObservable(; key=:m_dist, kind=:spectrum, index=:m))
+    end
+    data = Dict{Symbol, Any}[]
+    for b in b_vals
+        for w in w_vals
+            row = Dict{Symbol, Any}(
+                :B_nT => b,
+                :omega => w,
+                :fz_total => 0.1 * w,
+                :E => 1.0 + 0.1 * b,
+                :grad_norm => 1.0e-6,
+                :conv => true,
+            )
+            if spectrum
+                row[:m_dist] = fill(1.0 / (2F + 1), 2F + 1)
+            end
+            push!(data, row)
+        end
+    end
+    meta = Dict{Symbol, Any}(:conv_column => :conv)
+    if hypothesis !== nothing
+        meta[:narrative] = Dict{Symbol, Any}(:hypothesis => hypothesis)
+    end
+    return SweepResult(axes, observables, data; meta=meta)
+end
+
+# One Hypothesis per relation, each wired with the minimum inputs its builder
+# reads (mapped from src/analysis/sweep/viewspec.jl): a ModelSpec for the
+# primary observable, plus relation-specific params (collapse needs
+# collapse_var_fn; correlation needs obs_y; scaling/asymptote read axis).
+function _hypotheses()
+    base_model = ModelSpec(; fn=(ax) -> 0.05 * ax.omega, label="0.05 * omega")
+    collapse_model = ModelSpec(;
+        fn=(ax) -> 0.05 * ax.omega,
+        label="0.05 * omega",
+        collapse_var_fn=(ax) -> ax.omega / ax.B_nT,
+        collapse_var_label="omega / B",
+    )
+    asymptote = Hypothesis(;
+        relation=:asymptote,
+        primary_obs=:fz_total,
+        models=Dict(:fz_total => base_model),
+        params=Dict{Symbol, Any}(:axis => :B_nT),
+    )
+    collapse = Hypothesis(;
+        relation=:collapse,
+        primary_obs=:fz_total,
+        models=Dict(:fz_total => collapse_model),
+    )
+    residual = Hypothesis(;
+        relation=:residual,
+        primary_obs=:fz_total,
+        models=Dict(:fz_total => base_model),
+    )
+    scaling = Hypothesis(;
+        relation=:scaling,
+        primary_obs=:fz_total,
+        models=Dict(:fz_total => base_model),
+        params=Dict{Symbol, Any}(:axis => :B_nT, :exponent => -1.0),
+    )
+    correlation = Hypothesis(;
+        relation=:correlation,
+        primary_obs=:fz_total,
+        models=Dict(:fz_total => base_model),
+        params=Dict{Symbol, Any}(:obs_y => :E),
+    )
+    return [
+        ("asymptote", asymptote),
+        ("collapse", collapse),
+        ("residual", residual),
+        ("scaling", scaling),
+        ("correlation", correlation),
+    ]
+end
 
 @testset "sweep-view system" begin
     @testset "dominant_m_with_margin -- margin gate" begin
@@ -65,45 +159,8 @@ using SpinorBEC
         end
     end
 
-    # Minimal 2-axis sweep (B_nT log x omega linear), all converged. Mirrors the
-    # proven observable kinds from scripts/m1_sweep_golden_export.jl (signed /
-    # positive / wide-quality); the spectrum kind is exercised by the script,
-    # not needed for the structural smoke here.
-    function _minimal_sweep_result()
-        axes = SweepAxis[
-            SweepAxis(:B_nT, "nT", :log, [100.0, 200.0]),
-            SweepAxis(:omega, "rad", :linear, [0.3, 0.6]),
-        ]
-        observables = [
-            SweepObservable(; key=:fz_total, kind=:signed, center=0.0),
-            SweepObservable(; key=:E, kind=:positive, scale=:linear),
-            SweepObservable(; key=:grad_norm, kind=:wide, scale=:log, role=:quality),
-        ]
-        cells = [
-            (100.0, 0.3, 0.12, 1.5, 1.0e-6),
-            (100.0, 0.6, 0.24, 1.6, 2.0e-6),
-            (200.0, 0.3, 0.06, 1.4, 1.0e-6),
-            (200.0, 0.6, 0.12, 1.5, 3.0e-6),
-        ]
-        data = Dict{Symbol, Any}[]
-        for (b, w, fz, e, g) in cells
-            row = Dict{Symbol, Any}(
-                :B_nT => b,
-                :omega => w,
-                :fz_total => fz,
-                :E => e,
-                :grad_norm => g,
-                :conv => true,
-            )
-            push!(data, row)
-        end
-        meta = Dict{Symbol, Any}(:conv_column => :conv)
-        return SweepResult(axes, observables, data; meta=meta)
-    end
-
-    @testset "to_viewspec -- 2-axis heatmap smoke" begin
-        result = _minimal_sweep_result()
-        spec = to_viewspec(result)
+    @testset "to_viewspec -- 2-axis heatmap (hypothesis-free)" begin
+        spec = to_viewspec(_sweep_result())
         @test spec isa AbstractDict
         @test occursin("vega", lowercase(String(spec["\$schema"])))
         @test spec["_view_shape"] == "heatmap"
@@ -113,8 +170,33 @@ using SpinorBEC
         @test haskey(spec, "_panels_count") && spec["_panels_count"] >= 1
     end
 
+    @testset "to_viewspec -- all hypothesis relation paths" begin
+        # Each relation drives a distinct primary-mark builder (~700 lines of
+        # the function reachable only with a hypothesis set).
+        for (name, hyp) in _hypotheses()
+            spec = to_viewspec(_sweep_result(; hypothesis=hyp))
+            @test spec isa AbstractDict
+            @test spec["_view_shape"] == "heatmap"
+            @test haskey(spec, "vconcat") && !isempty(spec["vconcat"])
+        end
+    end
+
+    @testset "to_viewspec -- spectrum observable path" begin
+        spec = to_viewspec(_sweep_result(; spectrum=true))
+        @test spec["_view_shape"] == "heatmap"
+        @test haskey(spec, "vconcat") && !isempty(spec["vconcat"])
+    end
+
+    @testset "to_viewspec -- 1-axis degenerate path" begin
+        # Single swept axis -> "line" view shape; 1D heatmap is not emitted yet
+        # (empty vconcat for safety), so the path must not error.
+        spec = to_viewspec(_sweep_result(; w_vals=[0.3]))
+        @test spec["_view_shape"] == "line"
+        @test haskey(spec, "vconcat") && isempty(spec["vconcat"])
+    end
+
     @testset "write_viewspec / write_golden_per_cell_table -- JSON round-trip" begin
-        result = _minimal_sweep_result()
+        result = _sweep_result()
         mktempdir() do dir
             vpath = joinpath(dir, "viewspec.json")
             gpath = joinpath(dir, "golden.json")
