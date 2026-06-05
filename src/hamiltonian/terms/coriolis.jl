@@ -1,24 +1,8 @@
-# --- CoriolisTerm HamTerm + canonical Coriolis kernels ---
+# --- CoriolisTerm: H_cor = -Ω·L_z (rotating-frame orbital piece) ---
 #
-# Single-source-of-truth declaration of `H_coriolis = -Ω·L_z` where
-# `L_z = x·p_y - y·p_x = -i·(x·∂_y - y·∂_x)`. This is the orbital
-# Coriolis piece of the rotating-frame Hamiltonian
-# `H_rot = H_lab - Ω·(L_z + F_z)` (the F_z piece is handled
-# separately via `_shift_zeeman_for_rotating_frame`).
-#
-# This file owns the THREE canonical Coriolis kernels:
-#
-#   `_apply_coriolis_step_core!` — RT/IT propagator (3-shear FFT decomposition).
-#   `orbital_angular_momentum`   — observable ⟨L_z⟩ stays in `analysis/currents.jl`
-#                                  (it's a general observable, not Coriolis-specific).
-#   `_grad_coriolis_core!`       — δE_cor/δψ* for LBFGS.
-#
-# The legacy entry points (`_apply_coriolis_step!` in
-# `integrator/split_step_kernels.jl`, `_grad_coriolis!` in
-# `solvers/lbfgs/energy_gradient.jl`) are one-line shims forwarding to
-# these `_core` helpers.
-#
-# Per-term collapse landed 2026-06-04 PM (Part B of plan c-greedy-blum.md).
+# L_z = -i·(x·∂_y - y·∂_x). H_rot = H_lab - Ω·(L_z + F_z); the F_z
+# piece is handled by `_shift_zeeman_for_rotating_frame`. ⟨L_z⟩
+# observable lives in `analysis/currents.jl`.
 
 """
 CoriolisTerm (orbital) piece of the rotating-frame Hamiltonian.
@@ -38,7 +22,7 @@ end
 # ============================================================================
 
 """
-    _apply_coriolis_step_core!(psi, grid, omega, dt, imaginary_time, cache=nothing)
+    _apply_coriolis_step!(psi, grid, omega, dt, imaginary_time, cache=nothing)
 
 Apply Coriolis step `exp(iΩ·L_z·dt)` via 3-shear FFT decomposition.
 
@@ -74,7 +58,7 @@ single `H_rot = H − Ω·(L_z + F_z)` convention, with the EdH oracle
 (⟨L_z⟩ and ⟨F_z⟩ co-aligned) as final anchor. See
 `mistake_coriolis_substep_sign_2026_06_03.md` for the lesson.
 """
-function _apply_coriolis_step_core!(
+function _apply_coriolis_step!(
     psi::AbstractArray{<:Complex},
     grid::Grid{N},
     omega::Float64,
@@ -121,14 +105,14 @@ end
 # ============================================================================
 
 """
-    _grad_coriolis_core!(grad, psi, ws, fft_buf, deriv_buf, n_pts, D, ::Val{N})
+    _grad_coriolis!(grad, psi, ws, fft_buf, deriv_buf, n_pts, D, ::Val{N})
 
 Add the Coriolis (`-Ω·L_z·ψ`) contribution to `grad`. The `δE_cor/δψ*`
 contribution is `+iΩ·(x·∂_y − y·∂_x)·ψ`. Active only when
 `rotating_frame_omega ≠ 0` and N ≥ 2. Shared `fft_buf` / `deriv_buf`
 let the integrator reuse two ComplexF64 arrays across all components.
 """
-function _grad_coriolis_core!(
+function _grad_coriolis!(
     grad, psi, ws, fft_buf, deriv_buf, n_pts, D, ::Val{N}
 ) where {N}
     Ω = ws.sim_params.rotating_frame_omega
@@ -160,14 +144,14 @@ end
 # ============================================================================
 
 function apply_step!(term::CoriolisTerm, psi, dt::Real, imaginary_time::Bool, ws)
-    _apply_coriolis_step_core!(psi, ws.grid, term.Ω, dt, imaginary_time, ws.coriolis_cache)
+    _apply_coriolis_step!(psi, ws.grid, term.Ω, dt, imaginary_time, ws.coriolis_cache)
     return nothing
 end
 
 # ============================================================================
 # Trinity authoritative kernel: apply_operator!
 # H_cor = -Ω·L_z (linear). δE/δψ̄ = -Ω·L_z·ψ = +iΩ·(x∂_y - y∂_x)·ψ.
-# `_grad_coriolis_core!` already implements this; apply_operator! is a wrapper.
+# `_grad_coriolis!` already implements this; apply_operator! is a wrapper.
 # ============================================================================
 
 function apply_operator!(out::AbstractArray, term::CoriolisTerm, ws, psi::AbstractArray)
@@ -181,7 +165,7 @@ function apply_operator!(out::AbstractArray, term::CoriolisTerm, ws, psi::Abstra
     Ω_save = ws.sim_params.rotating_frame_omega
     @assert isapprox(Ω_save, term.Ω; atol=1e-12) ||
         isapprox(Ω_save, 0.0; atol=1e-12) "CoriolisTerm Ω mismatch with workspace"
-    _grad_coriolis_core!(out, psi, ws, fft_buf, deriv_buf, n_pts, D, Val(N))
+    _grad_coriolis!(out, psi, ws, fft_buf, deriv_buf, n_pts, D, Val(N))
     return out
 end
 
@@ -215,7 +199,7 @@ function add_gradient!(grad::AbstractArray{<:Complex}, term::CoriolisTerm,
     N >= 2 || return nothing
     abs(term.Ω) < SpinorBEC.ROTATION_TOL && return nothing
     D = ws.spin_matrices.system.n_components
-    _grad_coriolis_core!(grad, psi, ws, ctx.fft_buf, ctx.deriv_buf, ctx.n_pts, D, Val(N))
+    _grad_coriolis!(grad, psi, ws, ctx.fft_buf, ctx.deriv_buf, ctx.n_pts, D, Val(N))
     return nothing
 end
 

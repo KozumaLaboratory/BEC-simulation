@@ -170,7 +170,3 @@ function apply_light_shift_step!(
     end
 end
 
-# Authoritative kernel `_light_shift_energy_core` lives in
-# `src/hamiltonian/terms/light_shift.jl` (Part B collapse, 2026-06-04).
-_light_shift_energy(psi, ls::LightShift, n_comp, ndim, n_pts, dV) =
-    _light_shift_energy_core(psi, ls, n_comp, ndim, n_pts, dV)

@@ -19,12 +19,12 @@ end
 # ============================================================================
 
 """
-    _raman_energy_core(psi, sm, raman, grid, ndim, n_pts, dV)
+    _raman_energy(psi, sm, raman, grid, ndim, n_pts, dV)
 
 `E_Raman = ∫ d³r [δ·⟨F_z⟩ + Ω_R·Re(e^{ik·r}·⟨F_+⟩)]` per voxel.
 Manual per-voxel reduction inlines the kr phase + Fz/F+ contractions.
 """
-function _raman_energy_core(psi, sm::SpinMatrices{D}, raman::RamanCoupling{N},
+function _raman_energy(psi, sm::SpinMatrices{D}, raman::RamanCoupling{N},
     grid::Grid{N}, ndim, n_pts, dV) where {D, N}
     F = sm.system.F
     Ff1 = Float64(F * (F + 1))
@@ -55,7 +55,7 @@ function energy_contribution(::RamanTerm, psi::AbstractArray{<:Complex}, ws)
     ws.raman === nothing && return 0.0
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
-    return _raman_energy_core(
+    return _raman_energy(
         psi, ws.spin_matrices, ws.raman, ws.grid, N, n_pts, cell_volume(ws.grid)
     )
 end

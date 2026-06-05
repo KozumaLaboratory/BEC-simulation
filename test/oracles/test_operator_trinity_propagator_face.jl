@@ -146,7 +146,7 @@ end
     end
 
     @testset "KineticTerm (RT, dt matched to cached kinetic_phase)" begin
-        # `_apply_kinetic_step_core!` uses a CACHED kinetic_phase built
+        # `apply_kinetic_step_batched!` uses a CACHED kinetic_phase built
         # at workspace construction time with the workspace's sim_params.dt.
         # The apply_step!(::KineticTerm, ..., dt, ...) signature looks like
         # it honors dt but the cache-based implementation ignores it (perf

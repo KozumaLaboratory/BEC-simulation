@@ -60,19 +60,15 @@ include("hamiltonian/potentials/light_shift.jl")
 # HamTerm protocol (sign-bug-proof architecture, Phase 1).
 # See `docs/conventions/sign_bug_proof_architecture.md`.
 include("hamiltonian/terms/base.jl")
-include("hamiltonian/terms/zeeman_z.jl")
-include("hamiltonian/terms/zeeman_transverse.jl")
+include("hamiltonian/terms/zeeman.jl")        # LinearZeemanZ + TransverseZeeman + MagneticGradient
 include("hamiltonian/terms/coriolis.jl")
 include("hamiltonian/terms/kinetic.jl")
 include("hamiltonian/terms/trap.jl")
-include("hamiltonian/terms/density_c0.jl")
-include("hamiltonian/terms/spin_c1.jl")
+include("hamiltonian/terms/contact.jl")       # DensityC0 + SpinC1 + Tensor
 include("hamiltonian/terms/ddi.jl")
 include("hamiltonian/terms/lhy.jl")
-include("hamiltonian/terms/tensor.jl")
 include("hamiltonian/terms/raman.jl")
 include("hamiltonian/terms/light_shift.jl")
-include("hamiltonian/terms/magnetic_gradient.jl")
 include("hamiltonian/terms/loss.jl")
 include("hamiltonian/terms/registry.jl")
 

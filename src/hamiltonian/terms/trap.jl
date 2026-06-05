@@ -60,6 +60,40 @@ function apply_step!(::TrapTerm, psi, dt::Real, imaginary_time::Bool, ws)
     return nothing
 end
 
+"""
+    _trap_energy(psi, V_trap, n_comp, ndim, n_pts, dV)
+
+`E_trap = Σ_c ∫ V(r)·|ψ_c(r)|² dV`. Body used by `_energy_decomposition_cpu`.
+Manual reduction loop avoids the `n_pts`-shaped temporary that
+`V_trap .* abs2.(psi_c)` would materialise per component.
+"""
+function _trap_energy(psi, V_trap, n_comp, ndim, n_pts, dV)
+    E = 0.0
+    @inbounds for c in 1:n_comp
+        idx = _component_slice(ndim, n_pts, c)
+        psi_c = view(psi, idx...)
+        Ec = 0.0
+        for i in eachindex(V_trap, psi_c)
+            Ec += V_trap[i] * abs2(psi_c[i])
+        end
+        E += Ec * dV
+    end
+    E
+end
+
+"""
+    _grad_trap!(grad, psi, ws, n_pts, D, ::Val{N})
+
+Add V_trap(r)·ψ contribution to `grad`. Body used by `energy_gradient!`.
+"""
+function _grad_trap!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
+    for c in 1:D
+        idx = _component_slice(N, n_pts, c)
+        view(grad, idx...) .+= ws.potential_values .* view(psi, idx...)
+    end
+    nothing
+end
+
 sign_oracle(::Type{TrapTerm}) = (
     name="TrapTerm: V_trap≥0 ⇒ ⟨V_trap⟩ ≥ 0",
     predicate=function (psi, ws)

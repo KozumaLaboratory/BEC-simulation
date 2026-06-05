@@ -37,13 +37,13 @@ end
 # ============================================================================
 
 """
-    _light_shift_energy_core(psi, ls::LightShift, n_comp, ndim, n_pts, dV)
+    _light_shift_energy(psi, ls::LightShift, n_comp, ndim, n_pts, dV)
 
 `E_LS = ∫ I(r) Σ_k λ_k |⟨k|ψ(r)⟩|² dV` where `λ_k = ls.eigvals` and
 `I(r) = ls.profile`. Diagonal fast path when `ls.is_diagonal`;
 otherwise project ψ onto eigenbasis via `Uadj = ls.U'`.
 """
-function _light_shift_energy_core(psi, ls::LightShift, n_comp, ndim, n_pts, dV)
+function _light_shift_energy(psi, ls::LightShift, n_comp, ndim, n_pts, dV)
     profile = _to_host(ls.profile)
     psi_h = _to_host(psi)
     eigvals = ls.eigvals
@@ -76,7 +76,7 @@ function _light_shift_energy_core(psi, ls::LightShift, n_comp, ndim, n_pts, dV)
 end
 
 """
-    _grad_light_shift_core!(grad, psi, ws, n_pts, D, ::Val{N})
+    _grad_light_shift!(grad, psi, ws, n_pts, D, ::Val{N})
 
 `∂E_LS/∂ψ*_c`: diagonal `eigvals[c]·profile·ψ_c`; off-diagonal
 `Σ_c2 M_full[c,c2]·profile·ψ_c2` with `M_full = U·diag(eigvals)·U†`.
@@ -87,7 +87,7 @@ broadcast is pure-CuArray when grad is on GPU. Pre-collapse code used
 GPU kernel compiler rejected this with "non-bitstype argument".
 Latent bug caught by 2026-06-04 GPU per-term parity gate.
 """
-function _grad_light_shift_core!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
+function _grad_light_shift!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
     ws.light_shift !== nothing || return nothing
     ls = ws.light_shift
     profile = _to_device(ws.backend, ls.profile)
@@ -115,7 +115,7 @@ function energy_contribution(::LightShiftTerm, psi::AbstractArray{<:Complex}, ws
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
     n_comp = size(psi, N + 1)
-    return _light_shift_energy_core(
+    return _light_shift_energy(
         psi, ws.light_shift, n_comp, N, n_pts, cell_volume(ws.grid)
     )
 end
@@ -123,7 +123,7 @@ end
 # ============================================================================
 # Trinity authoritative kernel: apply_operator!
 # H_LS = M_LS·profile (linear); δE/δψ̄ = M_LS·profile·ψ via diagonal or
-# full-matrix form. `_grad_light_shift_core!` implements this.
+# full-matrix form. `_grad_light_shift!` implements this.
 # ============================================================================
 
 function apply_operator!(out::AbstractArray, ::LightShiftTerm, ws, psi::AbstractArray)
@@ -132,7 +132,7 @@ function apply_operator!(out::AbstractArray, ::LightShiftTerm, ws, psi::Abstract
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
     D = ws.spin_matrices.system.n_components
-    _grad_light_shift_core!(out, psi, ws, n_pts, D, Val(N))
+    _grad_light_shift!(out, psi, ws, n_pts, D, Val(N))
     return out
 end
 

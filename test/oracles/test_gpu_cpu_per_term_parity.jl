@@ -281,7 +281,7 @@ end
                 make_workspace(; kwargs...)
             end
             # spin_coherent gives non-zero F+ amplitude so the Ω_R·Re(e^{ik·r}·F+)
-            # term in `_raman_energy_core` is active; polar (m=0 only) has F+=0
+            # term in `_raman_energy` is active; polar (m=0 only) has F+=0
             # and the sanity check would no-op.
             psi = init_psi(ws.grid, SpinSystem(1); state=:spin_coherent, init_theta=π / 4)
             copyto!(ws.state.psi, psi)

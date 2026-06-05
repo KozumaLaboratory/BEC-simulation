@@ -105,84 +105,13 @@ end
 # parent `energy_gradient!`). Helpers are gated on coupling magnitude so
 # they no-op when the term is inactive.
 
-# Authoritative kernel `_grad_kinetic_core!` lives in
-# `src/hamiltonian/terms/kinetic.jl` (Part B collapse, 2026-06-04).
-# This shim preserves the legacy entry point name for `energy_gradient!`.
-_grad_kinetic!(grad, psi, ws, fft_buf, k_squared_dev, n_pts, D, vN) =
-    _grad_kinetic_core!(grad, psi, ws, fft_buf, k_squared_dev, n_pts, D, vN)
 
-# Coriolis: −Ω·L_z·ψ where L_z = −i(x·∂_y − y·∂_x). The δE_cor/δψ*
-# contribution is +iΩ·(x·∂_y − y·∂_x)·ψ. Closes the rotating-frame
-# functional alongside the Barnett Zeeman shift (in ws.zeeman) and the
-# centrifugal trap modification (in ws.potential_values). Active only
-# when `rotating_frame_omega ≠ 0` and N ≥ 2.
-# Authoritative kernel `_grad_coriolis_core!` lives in
-# `src/hamiltonian/terms/coriolis.jl` (Part B collapse, 2026-06-04).
-# This shim preserves the legacy entry point for `energy_gradient!`.
-_grad_coriolis!(grad, psi, ws, fft_buf, deriv_buf, n_pts, D, vN) =
-    _grad_coriolis_core!(grad, psi, ws, fft_buf, deriv_buf, n_pts, D, vN)
-
-function _grad_trap!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
-    for c in 1:D
-        idx = _component_slice(N, n_pts, c)
-        view(grad, idx...) .+= ws.potential_values .* view(psi, idx...)
-    end
-    nothing
-end
-
-function _grad_zeeman!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
-    # Diagonal Zeeman: -p·F_z + q·F_z². Pre-2026-06-04 this routine
-    # silently dropped transverse contributions ([GAP-1]). Now: also
-    # adds -bx·F_x - by·F_y via the TransverseZeemanTerm HamTerm dispatch.
-    zee = zeeman_at(ws.zeeman, ws.state.t)
-    zee_vals = zeeman_energies(zee, ws.spin_matrices.system)
-    for c in 1:D
-        idx = _component_slice(N, n_pts, c)
-        view(grad, idx...) .+= zee_vals[c] .* view(psi, idx...)
-    end
-    # Transverse Zeeman contribution via HamTerm dispatch.
-    bx, by = transverse_b(ws.zeeman, ws.state.t)
-    if !(bx == 0.0 && by == 0.0)
-        add_gradient!(grad, TransverseZeemanTerm(bx, by), psi, ws)
-    end
-    nothing
-end
-
-function _grad_c0_density!(grad, psi, ws, n_density, n_pts, D, ::Val{N}) where {N}
-    c0 = ws.interactions[0]
-    is_active(c0) || return nothing
-    for c in 1:D
-        idx = _component_slice(N, n_pts, c)
-        view(grad, idx...) .+= c0 .* n_density .* view(psi, idx...)
-    end
-    nothing
-end
-
-function _grad_lhy!(grad, psi, ws, n_density, n_pts, D, ::Val{N}) where {N}
-    c_lhy_val = ws.interactions.c_lhy
-    c_lhy_val != 0.0 || return nothing
-    v_lhy = c_lhy_val .* n_density .* sqrt.(max.(n_density, 0.0))
-    for c in 1:D
-        idx = _component_slice(N, n_pts, c)
-        view(grad, idx...) .+= v_lhy .* view(psi, idx...)
-    end
-    nothing
-end
-
-# Authoritative kernel `_grad_c1_spin_core!` lives in
-# `src/hamiltonian/terms/spin_c1.jl` (Part B collapse, 2026-06-04).
-_grad_c1_spin!(grad, psi, ws, fx, fy, fz, n_pts, D, vN) =
-    _grad_c1_spin_core!(grad, psi, ws, fx, fy, fz, n_pts, D, vN)
-
-# Authoritative kernel `_grad_light_shift_core!` lives in
-# `src/hamiltonian/terms/light_shift.jl` (Part B collapse, 2026-06-04).
-_grad_light_shift!(grad, psi, ws, n_pts, D, vN) =
-    _grad_light_shift_core!(grad, psi, ws, n_pts, D, vN)
-
-# Authoritative kernel `_grad_ddi_core!` lives in
-# `src/hamiltonian/terms/ddi.jl` (Part B collapse, 2026-06-04).
-_grad_ddi!(grad, psi, ws, n_pts, D, vN) =
-    _grad_ddi_core!(grad, psi, ws, n_pts, D, vN)
+# Per-term gradient bodies (_grad_trap!, _grad_zeeman!, _grad_c0_density!,
+# _grad_lhy!) now live with their HamTerm subtypes in src/hamiltonian/terms/.
+# `energy_gradient!` above calls each by its canonical name — Julia resolves
+# to the terms/ definition. The trinity dispatch
+# (`add_gradient!(grad, ::Term, psi, ws)`) provides the same physics via
+# the registry.
 
 """
 Project gradient onto constraint tangent space:

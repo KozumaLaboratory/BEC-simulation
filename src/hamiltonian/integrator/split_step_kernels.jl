@@ -5,21 +5,6 @@
 # GPU DDI step. Extracted from split_step.jl 2026-05-01 for readability —
 # behaviour is bit-identical to the prior in-line versions.
 
-# --- Coriolis (rotating frame L_z) ---
-
-# Authoritative kernel `_apply_coriolis_step_core!` (with full sign-audit
-# commentary) lives in `src/hamiltonian/terms/coriolis.jl` (Part B
-# collapse, 2026-06-04). This shim preserves the legacy entry point for
-# `split_step!` and `strang_step_via_registry!`.
-_apply_coriolis_step!(
-    psi::AbstractArray{<:Complex},
-    grid::Grid{N},
-    omega::Float64,
-    dt::Float64,
-    imaginary_time::Bool,
-    cache::Union{Nothing, CoriolisCache}=nothing,
-) where {N} = _apply_coriolis_step_core!(psi, grid, omega, dt, imaginary_time, cache)
-
 """
 Apply diagonal phase `psi .*= imaginary_time ? exp.(arg) : cis.(arg)` where
 `arg = factor * coord_vals[I[coord_dim]] * k_vals[I[fft_dim]]`. CPU uses the

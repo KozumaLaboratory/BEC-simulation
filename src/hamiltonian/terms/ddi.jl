@@ -28,13 +28,13 @@ end
 # ============================================================================
 
 """
-    _ddi_energy_core(psi, sm, ddi, ddi_bufs, n_comp, ndim, n_pts, dV; ddi_padded)
+    _ddi_energy(psi, sm, ddi, ddi_bufs, n_comp, ndim, n_pts, dV; ddi_padded)
 
 `E_DDI = (1/2) ∫ d³r [Φ·F](r)`. CPU path; padded variant when
 `ddi_padded !== nothing`. Reuses `ddi_bufs.Phi_*` after
 `compute_ddi_potential!` populates them.
 """
-function _ddi_energy_core(psi, sm::SpinMatrices{D}, ddi, ddi_bufs,
+function _ddi_energy(psi, sm::SpinMatrices{D}, ddi, ddi_bufs,
     n_comp, ndim, n_pts, dV; ddi_padded=nothing) where {D}
     if ddi_padded !== nothing
         _compute_and_convolve_ddi_padded!(psi, sm, ddi, ddi_padded, Val(D), ndim, n_pts)
@@ -62,12 +62,12 @@ function _ddi_energy_core(psi, sm::SpinMatrices{D}, ddi, ddi_bufs,
 end
 
 """
-    _ddi_energy_from_gpu_core(psi_host, sm, ddi_gpu, ddi_bufs_gpu, ...)
+    _ddi_energy_from_gpu(psi_host, sm, ddi_gpu, ddi_bufs_gpu, ...)
 
 GPU path: rebuilds a host-side DDIParams + DDIBuffers, runs the host
 convolution, reduces. Used when `_is_gpu(ws.ddi_bufs.Fx_r)`.
 """
-function _ddi_energy_from_gpu_core(psi_host, sm::SpinMatrices{D}, ddi_gpu, ddi_bufs_gpu,
+function _ddi_energy_from_gpu(psi_host, sm::SpinMatrices{D}, ddi_gpu, ddi_bufs_gpu,
     n_comp, ndim, n_pts, dV; ddi_padded=nothing) where {D}
     Fx_r = zeros(Float64, n_pts)
     Fy_r = zeros(Float64, n_pts)
@@ -103,12 +103,12 @@ function _ddi_energy_from_gpu_core(psi_host, sm::SpinMatrices{D}, ddi_gpu, ddi_b
 end
 
 """
-    _grad_ddi_core!(grad, psi, ws, n_pts, D, ::Val{N})
+    _grad_ddi!(grad, psi, ws, n_pts, D, ::Val{N})
 
 `∂E_DDI/∂ψ*_m`: F_z·Φ_z (diagonal) + (F±·Φ∓)/2 (tridiagonal).
 Computes spin density + DDI potential first, then accumulates.
 """
-function _grad_ddi_core!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
+function _grad_ddi!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
     ws.ddi !== nothing || return nothing
     sm = ws.spin_matrices
     F = ws.atom.F
@@ -140,10 +140,10 @@ function energy_contribution(::DDITerm, psi::AbstractArray{<:Complex}, ws)
     n_comp = size(psi, N + 1)
     dV = cell_volume(ws.grid)
     if _is_gpu(ws.ddi_bufs.Fx_r)
-        return _ddi_energy_from_gpu_core(psi, ws.spin_matrices, ws.ddi, ws.ddi_bufs,
+        return _ddi_energy_from_gpu(psi, ws.spin_matrices, ws.ddi, ws.ddi_bufs,
             n_comp, N, n_pts, dV; ddi_padded=ws.ddi_padded)
     else
-        return _ddi_energy_core(psi, ws.spin_matrices, ws.ddi, ws.ddi_bufs,
+        return _ddi_energy(psi, ws.spin_matrices, ws.ddi, ws.ddi_bufs,
             n_comp, N, n_pts, dV; ddi_padded=ws.ddi_padded)
     end
 end
@@ -151,7 +151,7 @@ end
 # ============================================================================
 # Trinity authoritative kernel: apply_operator!
 # H_DDI mean-field: δE/δψ̄ = F_z·Φ_z (diag) + (F±·Φ∓)/2 (tridiag).
-# `_grad_ddi_core!` already implements this; wrap into apply_operator!.
+# `_grad_ddi!` already implements this; wrap into apply_operator!.
 # Energy = (1/2)·Re⟨ψ, apply_op(ψ)⟩·dV (mean-field).
 # ============================================================================
 
@@ -161,7 +161,7 @@ function apply_operator!(out::AbstractArray, ::DDITerm, ws, psi::AbstractArray)
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
     D = ws.spin_matrices.system.n_components
-    _grad_ddi_core!(out, psi, ws, n_pts, D, Val(N))
+    _grad_ddi!(out, psi, ws, n_pts, D, Val(N))
     return out
 end
 

@@ -135,9 +135,9 @@ end
         fill!(Hpsi, 0)
         apply_operator!(Hpsi, KineticTerm(), ws, psi)
 
-        # 2. energy_via_operator matches the production `_kinetic_energy_core`
+        # 2. energy_via_operator matches the production `_kinetic_energy`
         E_op = energy_via_operator(KineticTerm(), ws, psi)
-        E_prod = SpinorBEC._kinetic_energy_core(
+        E_prod = SpinorBEC._kinetic_energy(
             psi, ws.grid, ws.fft_plans,
             similar(psi, ntuple(d -> size(psi, d), 1)...),
             ws.spin_matrices.system.n_components, 1,
