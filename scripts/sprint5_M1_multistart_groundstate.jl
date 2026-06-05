@@ -80,19 +80,18 @@ const TIER2_SEEDS = [:polar]
 # Tier 3 — FM (Larmor-driven uniform; high Ω + high B)
 const TIER3_SEEDS = [:m_plus_F]
 
-# Tier 4 — phantom-validation (Ω>0 revival candidates)
-# NOTE: :icosahedral_explicit not in state_zoo (gap); use :cyclic/:biaxial
-# as the polyhedral revival probes. Documented future addition.
-# :axial_spin_texture folded here per the 2026-06-05 KSU undercut probe
-# (m1_ksu_undercut_probe_2026_06_05.md): no undercut at 12³ probed cells,
-# all seeds find the same basin. Kept in revival-tier as a safety net
-# in case 24³ landscape differs.
+# Tier 4 — phantom-validation (Ω>0 revival candidates) — actively run
+# at boundary cells. :axial_spin_texture folded here per the 2026-06-05
+# KSU undercut probe (m1_ksu_undercut_probe_2026_06_05.md): no undercut
+# at 12³ probed cells, all seeds find the same basin. Kept in revival-
+# tier as a safety net in case 24³ landscape differs.
+# NOTE: :icosahedral_explicit / :vortex_lattice not yet wired here.
+# Documented future additions.
 const TIER4_SEEDS = [
     :cyclic,
     :biaxial_nematic,
     :spin_helix,
-    :vortex_lattice,
-    :axial_spin_texture,
+    :axial_spin_texture,        # KSU revival, per 2026-06-05 probe
 ]
 
 """
@@ -105,9 +104,10 @@ function seeds_for_cell(B_nT::Float64, Ω::Float64)
     if B_nT >= 10.0 || Ω >= 0.4
         append!(seeds, TIER3_SEEDS)                      # Ω-large or B-large
     end
-    # Boundary cells: low B + high Ω OR very high Ω
+    # Boundary cells: low B + high Ω OR very high Ω — run full Tier-4
+    # revival set (polyhedral inerts + KSU axial texture).
     if (B_nT < 2.6 && Ω >= 0.4) || Ω >= 0.6
-        append!(seeds, TIER4_SEEDS[1:3])                 # icosahedral / cyclic / biaxial revival check
+        append!(seeds, TIER4_SEEDS)
     end
     return seeds
 end
