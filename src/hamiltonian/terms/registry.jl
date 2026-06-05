@@ -162,7 +162,7 @@ that `energy_gradient!` applies at the end. The
 """
 function add_gradient_via_registry!(grad, ws)
     fill!(grad, zero(eltype(grad)))
-    psi = _to_host(ws.state.psi)
+    psi = ws.state.psi  # same-device as grad; trinity methods are device-aware
     ctx = build_gradient_context(psi, ws)
     registry = build_h_terms_registry(ws)
     for term in registry

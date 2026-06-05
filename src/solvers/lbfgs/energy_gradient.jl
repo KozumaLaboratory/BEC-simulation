@@ -58,44 +58,16 @@ function energy_gradient!(
     ws::Workspace{N};
     k_squared_dev::AbstractArray{<:AbstractFloat}=ws.grid.k_squared,
 ) where {N}
-    n_pts = ntuple(d -> size(psi, d), Val(N))
-    D = ws.spin_matrices.system.n_components
-
-    fill!(grad, zero(ComplexF64))
-    copyto!(ws.state.psi, psi)  # sync ws for energy evaluation
-
-    fft_buf, fx_scratch, fy_scratch, fz_scratch, deriv_buf = _energy_gradient_scratch(psi, n_pts)
-
-    # Linear-in-ψ terms (always accumulate). Order chosen to share the
-    # fft_buf scratch productively: kinetic consumes it first, then
-    # Coriolis can re-use it as a per-component FFT workspace.
-    _grad_kinetic!(grad, psi, ws, fft_buf, k_squared_dev, n_pts, D, Val(N))
-    _grad_coriolis!(grad, psi, ws, fft_buf, deriv_buf, n_pts, D, Val(N))
-    _grad_trap!(grad, psi, ws, n_pts, D, Val(N))
-    _grad_zeeman!(grad, psi, ws, n_pts, D, Val(N))
-
-    # Nonlinear (density / spin) terms; gated by coupling magnitude.
-    n_density = total_density(psi, N)
-    _grad_c0_density!(grad, psi, ws, n_density, n_pts, D, Val(N))
-    _grad_lhy!(grad, psi, ws, n_density, n_pts, D, Val(N))
-    _grad_c1_spin!(grad, psi, ws, fx_scratch, fy_scratch, fz_scratch, n_pts, D, Val(N))
-    _grad_light_shift!(grad, psi, ws, n_pts, D, Val(N))
-    _grad_ddi!(grad, psi, ws, n_pts, D, Val(N))
-
-    # Magnetic gradient (post-[GAP-2] 2026-06-04): closes the same gap
-    # in the LBFGS gradient that `_magnetic_gradient_energy` closed in
-    # `energy_decomposition`. Pre-fix LBFGS minimised a Hamiltonian
-    # missing the MG term, biasing the converged state when MG ≠ 0.
-    if ws.magnetic_gradient !== nothing
-        add_gradient!(grad, MagneticGradientTerm(), psi, ws)
-    end
-
-    # Scale gradient by 2 for complex ψ convention:
-    # δE = 2 Re ∫ (δE/δψ*)* · δψ dV, so grad_R = 2 × δE/δψ*
-    # makes δE = Re ∫ grad_R* · δψ dV (standard real inner product)
+    # Trinity-only: iterate the HamTerm registry, each term contributes
+    # via `add_gradient!(grad, ::Term, psi, ws, ctx::GradientContext)`.
+    # The ctx pre-builds shared scratch (fft_buf, fx/fy/fz, n_density)
+    # so each term's hot-path skips per-call alloc.
+    copyto!(ws.state.psi, psi)
+    add_gradient_via_registry!(grad, ws)
+    # Wirtinger scaling: δE = 2·Re⟨δE/δψ̄, δψ⟩ ⇒ grad_R = 2·δE/δψ̄
+    # makes δE = Re⟨grad_R, δψ⟩ (standard real inner product).
     grad .*= 2
-
-    energy_decomposition(ws).total
+    return energy_decomposition(ws).total
 end
 
 # --- per-term gradient helpers ---
