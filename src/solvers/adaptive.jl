@@ -162,9 +162,9 @@ function _adaptive_step_change_loop!(
         fsal_deferred = false
 
         omega = ws.sim_params.rotating_frame_omega
-        _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt_step / 2, false, ws.coriolis_cache)
-        apply_kinetic_step_batched!(ws.state.psi, bk)
-        _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt_step / 2, false, ws.coriolis_cache)
+        apply_step!(CoriolisTerm(omega), ws.state.psi, dt_step / 2, false, ws)
+        apply_step!(KineticTerm(), ws.state.psi, 0.0, false, ws)
+        apply_step!(CoriolisTerm(omega), ws.state.psi, dt_step / 2, false, ws)
 
         rel_change = 0.0
         if may_reject
@@ -250,9 +250,9 @@ end
     _half_potential_step!(
         ws, dt_step / 2, n_comp, N, false; t_eval=t_base + dt_step / 4, t_start=t_base
     )
-    _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt_step / 2, false, ws.coriolis_cache)
-    apply_kinetic_step_batched!(ws.state.psi, bk)
-    _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt_step / 2, false, ws.coriolis_cache)
+    apply_step!(CoriolisTerm(omega), ws.state.psi, dt_step / 2, false, ws)
+    apply_step!(KineticTerm(), ws.state.psi, 0.0, false, ws)
+    apply_step!(CoriolisTerm(omega), ws.state.psi, dt_step / 2, false, ws)
     _half_potential_step!(
         ws,
         dt_step / 2,

@@ -92,10 +92,10 @@ function _strang_core!(
 ) where {N}
     omega = ws.sim_params.rotating_frame_omega
     _half_potential_step!(ws, dt / 2, n_comp, N, false; t_eval=t_base + dt / 4, t_start=t_base)
-    _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, false, ws.coriolis_cache)
+    apply_step!(CoriolisTerm(omega), ws.state.psi, dt / 2, false, ws)
     _update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, dt)
-    apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
-    _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, false, ws.coriolis_cache)
+    apply_step!(KineticTerm(), ws.state.psi, 0.0, false, ws)
+    apply_step!(CoriolisTerm(omega), ws.state.psi, dt / 2, false, ws)
     _half_potential_step!(
         ws, dt / 2, n_comp, N, false; t_eval=t_base + 3dt / 4, t_start=t_base + dt / 2
     )
@@ -122,71 +122,29 @@ function _yoshida_core!(
         ws, w1 * dt / 2, n_comp, N, false; t_eval=t_base + w1 * dt / 4, t_start=t_base
     )
 
-    _apply_coriolis_step!(
-        ws.state.psi,
-        ws.grid,
-        omega,
-        w1 * dt / 2,
-        false,
-        ws.coriolis_cache,
-    )
+    apply_step!(CoriolisTerm(omega), ws.state.psi, w1 * dt / 2, false, ws)
     _update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, w1 * dt)
-    apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
-    _apply_coriolis_step!(
-        ws.state.psi,
-        ws.grid,
-        omega,
-        w1 * dt / 2,
-        false,
-        ws.coriolis_cache,
-    )
+    apply_step!(KineticTerm(), ws.state.psi, 0.0, false, ws)
+    apply_step!(CoriolisTerm(omega), ws.state.psi, w1 * dt / 2, false, ws)
 
     # V-step 2: merged boundary, covers [t_base + w1*dt/2, t_base + w1*dt/2 + wm*dt]
     t_v2 = t_base + w1 * dt / 2
     _half_potential_step!(ws, wm * dt, n_comp, N, false; t_eval=t_v2 + wm * dt / 2, t_start=t_v2)
 
-    _apply_coriolis_step!(
-        ws.state.psi,
-        ws.grid,
-        omega,
-        w0 * dt / 2,
-        false,
-        ws.coriolis_cache,
-    )
+    apply_step!(CoriolisTerm(omega), ws.state.psi, w0 * dt / 2, false, ws)
     _update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, w0 * dt)
-    apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
-    _apply_coriolis_step!(
-        ws.state.psi,
-        ws.grid,
-        omega,
-        w0 * dt / 2,
-        false,
-        ws.coriolis_cache,
-    )
+    apply_step!(KineticTerm(), ws.state.psi, 0.0, false, ws)
+    apply_step!(CoriolisTerm(omega), ws.state.psi, w0 * dt / 2, false, ws)
 
     # V-step 3: merged boundary, covers [t_base + (w1+w0)*dt/2 + wm*dt/2, ...]
     # = [t_base + dt - w1*dt/2 - wm*dt, t_base + dt - w1*dt/2]
     t_v3 = t_base + w1 * dt / 2 + wm * dt
     _half_potential_step!(ws, wm * dt, n_comp, N, false; t_eval=t_v3 + wm * dt / 2, t_start=t_v3)
 
-    _apply_coriolis_step!(
-        ws.state.psi,
-        ws.grid,
-        omega,
-        w1 * dt / 2,
-        false,
-        ws.coriolis_cache,
-    )
+    apply_step!(CoriolisTerm(omega), ws.state.psi, w1 * dt / 2, false, ws)
     _update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, w1 * dt)
-    apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
-    _apply_coriolis_step!(
-        ws.state.psi,
-        ws.grid,
-        omega,
-        w1 * dt / 2,
-        false,
-        ws.coriolis_cache,
-    )
+    apply_step!(KineticTerm(), ws.state.psi, 0.0, false, ws)
+    apply_step!(CoriolisTerm(omega), ws.state.psi, w1 * dt / 2, false, ws)
 
     # V-step 4: covers [t_base + dt - w1*dt/2, t_base + dt], midpoint at t_base + dt - w1*dt/4
     _half_potential_step!(
@@ -229,10 +187,10 @@ function _aba_step!(
     t_cur += a[1] * dt
 
     for i in 1:Sk
-        _apply_coriolis_step!(ws.state.psi, ws.grid, omega, b[i] * dt / 2, false, ws.coriolis_cache)
+        apply_step!(CoriolisTerm(omega), ws.state.psi, b[i] * dt / 2, false, ws)
         _update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, b[i] * dt)
-        apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
-        _apply_coriolis_step!(ws.state.psi, ws.grid, omega, b[i] * dt / 2, false, ws.coriolis_cache)
+        apply_step!(KineticTerm(), ws.state.psi, 0.0, false, ws)
+        apply_step!(CoriolisTerm(omega), ws.state.psi, b[i] * dt / 2, false, ws)
 
         _half_potential_step!(
             ws,

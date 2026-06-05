@@ -322,7 +322,7 @@ function split_step_forcegrad!(ws::Workspace{N};
         )
 
         # Stage 2: K(dt/2)
-        @timeit_debug TIMER "kinetic" apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
+        @timeit_debug TIMER "kinetic" apply_step!(KineticTerm(), ws.state.psi, 0.0, false, ws)
 
         # Stage 3: Ṽ(2dt/3) — midpoint MF + FG correction.
         @timeit_debug TIMER "fgrad_Vtilde" _diagonal_step_forcegrad!(
@@ -331,7 +331,7 @@ function split_step_forcegrad!(ws::Workspace{N};
         )
 
         # Stage 4: K(dt/2)
-        @timeit_debug TIMER "kinetic" apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
+        @timeit_debug TIMER "kinetic" apply_step!(KineticTerm(), ws.state.psi, 0.0, false, ws)
 
         # Stage 5: V(dt/6) — endpoint MF.
         @timeit_debug TIMER "fgrad_V" _diagonal_step_forcegrad!(
@@ -409,7 +409,7 @@ function _strang_substep_on_copy!(
         _diagonal_step_forcegrad!(Val(N), psi_buf, ws.potential_values, zeeman_diag,
             ws.interactions[0], target_dt / 2, density_buf, fgrad_buf, 0.0, it)
         _update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, target_dt)
-        apply_kinetic_step_batched!(psi_buf, ws.batched_kinetic)
+        apply_step!(KineticTerm(), psi_buf, 0.0, false, ws)
         _diagonal_step_forcegrad!(Val(N), psi_buf, ws.potential_values, zeeman_diag,
             ws.interactions[0], target_dt / 2, density_buf, fgrad_buf, 0.0, it)
     finally

@@ -91,9 +91,9 @@ function _run_itp_loop!(
             end
 
             # Kinetic step K(dt)
-            _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, it, cc)
-            apply_kinetic_step_batched!(ws.state.psi, bk)
-            _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, it, cc)
+            apply_step!(CoriolisTerm(omega), ws.state.psi, dt / 2, it, ws)
+            apply_step!(KineticTerm(), ws.state.psi, 0.0, false, ws)
+            apply_step!(CoriolisTerm(omega), ws.state.psi, dt / 2, it, ws)
 
             # Close: V(dt/2). On non-checkpoint steps the loop's reopen
             # block at the end appends another V(dt/2), so DDI gets the

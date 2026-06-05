@@ -106,9 +106,9 @@ function _run_simulation_leapfrog!(
                 apply_orszag_2_3_filter!(ws.state.psi, ws.fft_plans, n_comp, N)
             end
 
-            _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, false, cc)
-            apply_kinetic_step_batched!(ws.state.psi, bk)
-            _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, false, cc)
+            apply_step!(CoriolisTerm(omega), ws.state.psi, dt / 2, false, ws)
+            apply_step!(KineticTerm(), ws.state.psi, 0.0, false, ws)
+            apply_step!(CoriolisTerm(omega), ws.state.psi, dt / 2, false, ws)
 
             is_save = (step % sp.save_every == 0)
             is_last = (step == sp.n_steps)

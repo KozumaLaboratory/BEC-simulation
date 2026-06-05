@@ -291,9 +291,9 @@ function split_step_combined!(ws::Workspace{N}) where {N}
     )
 
     omega = ws.sim_params.rotating_frame_omega
-    _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, it, ws.coriolis_cache)
-    apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
-    _apply_coriolis_step!(ws.state.psi, ws.grid, omega, dt / 2, it, ws.coriolis_cache)
+    apply_step!(CoriolisTerm(omega), ws.state.psi, dt / 2, it, ws)
+    apply_step!(KineticTerm(), ws.state.psi, 0.0, false, ws)
+    apply_step!(CoriolisTerm(omega), ws.state.psi, dt / 2, it, ws)
 
     _half_potential_step_combined!(
         ws, dt / 2, n_comp, N, it; t_eval=t_eval_2, t_start=it ? NaN : t + dt / 2

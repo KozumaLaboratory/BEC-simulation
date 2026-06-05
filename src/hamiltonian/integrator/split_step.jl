@@ -37,25 +37,14 @@ function split_step!(ws::Workspace{N}) where {N}
     )
 
     omega = ws.sim_params.rotating_frame_omega
-    @timeit_debug TIMER "coriolis" _apply_coriolis_step!(
-        ws.state.psi,
-        ws.grid,
-        omega,
-        dt / 2,
-        it,
-        ws.coriolis_cache,
+    @timeit_debug TIMER "coriolis" apply_step!(
+        CoriolisTerm(omega), ws.state.psi, dt / 2, it, ws,
     )
-    @timeit_debug TIMER "kinetic" apply_kinetic_step_batched!(
-        ws.state.psi,
-        ws.batched_kinetic,
+    @timeit_debug TIMER "kinetic" apply_step!(
+        KineticTerm(), ws.state.psi, 0.0, false, ws,
     )
-    @timeit_debug TIMER "coriolis" _apply_coriolis_step!(
-        ws.state.psi,
-        ws.grid,
-        omega,
-        dt / 2,
-        it,
-        ws.coriolis_cache,
+    @timeit_debug TIMER "coriolis" apply_step!(
+        CoriolisTerm(omega), ws.state.psi, dt / 2, it, ws,
     )
 
     @timeit_debug TIMER "half_potential" _half_potential_step!(
@@ -312,17 +301,17 @@ function split_step_midpoint!(ws::Workspace{N}; dt::Float64=ws.sim_params.dt) wh
     )
 
     omega = ws.sim_params.rotating_frame_omega
-    @timeit_debug TIMER "coriolis" _apply_coriolis_step!(
-        ws.state.psi, ws.grid, omega, dt / 2, it, ws.coriolis_cache
+    @timeit_debug TIMER "coriolis" apply_step!(
+        CoriolisTerm(omega), ws.state.psi, dt / 2, it, ws,
     )
     # Always-update-on-entry semantics: the batched kinetic phase cache is
     # synced to the dt passed in. Costs O(N^ndim) elementwise cis per call.
     _update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, dt)
-    @timeit_debug TIMER "kinetic" apply_kinetic_step_batched!(
-        ws.state.psi, ws.batched_kinetic
+    @timeit_debug TIMER "kinetic" apply_step!(
+        KineticTerm(), ws.state.psi, 0.0, false, ws,
     )
-    @timeit_debug TIMER "coriolis" _apply_coriolis_step!(
-        ws.state.psi, ws.grid, omega, dt / 2, it, ws.coriolis_cache
+    @timeit_debug TIMER "coriolis" apply_step!(
+        CoriolisTerm(omega), ws.state.psi, dt / 2, it, ws,
     )
 
     @timeit_debug TIMER "half_potential_mid" _half_potential_step_midpoint!(
@@ -576,14 +565,14 @@ function split_step_trap!(ws::Workspace{N}) where {N}
     )
 
     omega = ws.sim_params.rotating_frame_omega
-    @timeit_debug TIMER "coriolis" _apply_coriolis_step!(
-        ws.state.psi, ws.grid, omega, dt / 2, it, ws.coriolis_cache
+    @timeit_debug TIMER "coriolis" apply_step!(
+        CoriolisTerm(omega), ws.state.psi, dt / 2, it, ws,
     )
-    @timeit_debug TIMER "kinetic" apply_kinetic_step_batched!(
-        ws.state.psi, ws.batched_kinetic
+    @timeit_debug TIMER "kinetic" apply_step!(
+        KineticTerm(), ws.state.psi, 0.0, false, ws,
     )
-    @timeit_debug TIMER "coriolis" _apply_coriolis_step!(
-        ws.state.psi, ws.grid, omega, dt / 2, it, ws.coriolis_cache
+    @timeit_debug TIMER "coriolis" apply_step!(
+        CoriolisTerm(omega), ws.state.psi, dt / 2, it, ws,
     )
 
     @timeit_debug TIMER "half_potential_trap" _half_potential_step_trap!(

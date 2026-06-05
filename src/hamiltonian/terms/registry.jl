@@ -223,15 +223,11 @@ function strang_step_via_registry!(ws, dt)
     )
 
     omega = ws.sim_params.rotating_frame_omega
-    SpinorBEC._apply_coriolis_step!(
-        ws.state.psi, ws.grid, omega, dt / 2, it, ws.coriolis_cache
-    )
+    SpinorBEC.apply_step!(CoriolisTerm(omega), ws.state.psi, dt / 2, it, ws)
 
-    SpinorBEC.apply_kinetic_step_batched!(ws.state.psi, ws.batched_kinetic)
+    SpinorBEC.apply_step!(KineticTerm(), ws.state.psi, 0.0, false, ws)
 
-    SpinorBEC._apply_coriolis_step!(
-        ws.state.psi, ws.grid, omega, dt / 2, it, ws.coriolis_cache
-    )
+    SpinorBEC.apply_step!(CoriolisTerm(omega), ws.state.psi, dt / 2, it, ws)
 
     SpinorBEC._half_potential_step!(
         ws, dt / 2, n_comp, N, it; t_eval=t_eval_2, t_start=it ? NaN : t + dt / 2
