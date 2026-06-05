@@ -21,10 +21,7 @@
 import CUDA
 using SpinorBEC
 using Printf
-
-include(joinpath(@__DIR__, "lib", "eu_digital_twin.jl"))
-
-const TW_LARGE = eu_digital_twin()  # for atom/c_dd/p_per_nT
+const TW_LARGE = eu151_preset()  # for atom/c_dd/p_per_nT
 const ATOM = TW_LARGE.atom
 
 # Override grid for parity test — match TW physical params but use 16³.

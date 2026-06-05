@@ -35,10 +35,7 @@ using SpinorBEC
 using LinearAlgebra
 using Printf
 using JLD2
-
-include(joinpath(@__DIR__, "lib", "eu_digital_twin.jl"))
-
-const TW = eu_digital_twin()
+const TW = eu151_preset()
 const DT_ITP = 0.005
 const N_ITP = 500   # scout level
 const TOL_ITP = 1e-7
@@ -75,7 +72,7 @@ function run_cell(omega::Float64, B_nT::Float64, seed_state::Symbol)
     )
 
     psi_init = build_seed(seed_state, TW.grid)
-    add_noise!(psi_init, NOISE_AMP, NOISE_SEED, TW.grid)
+    add_white_noise!(psi_init, NOISE_AMP, NOISE_SEED, TW.grid)
 
     initial_state_for_fgs = seed_state == :fl_vortex ? :fl_vortex : :polar
 

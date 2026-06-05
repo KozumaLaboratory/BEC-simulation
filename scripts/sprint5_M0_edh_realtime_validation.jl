@@ -21,10 +21,7 @@ using SpinorBEC
 using LinearAlgebra
 using Printf
 using JLD2
-
-include(joinpath(@__DIR__, "lib", "eu_digital_twin.jl"))
-
-const TW = eu_digital_twin()
+const TW = eu151_preset()
 
 # Matsui Zeeman: GS prep at 1 μT, quench to 2.6 nT for dynamics
 # Use the dynamics value for the evolution

@@ -27,11 +27,8 @@ using JLD2
 
 const F = 6
 const D = 2F + 1
-const ATOM = SpinorBEC.Eu151
-const N_ATOMS = 50000
-const OMEGA_REF = 691.15
-const GRID_40 = make_grid(GridConfig((40, 40, 40), (30.0, 30.0, 26.0)))
-const POT = HarmonicTrap{3}((1.0, 1.0, 1.1818))
+const TW = eu151_preset(; n_pts=(40, 40, 40))
+const GRID_40 = TW.grid
 const ZEEMAN = ZeemanParams(0.0, 0.0)
 const DT_ITP = 0.005
 const N_ITP = 40000          # 2× more than 32³ to compensate for finer grid
@@ -40,13 +37,6 @@ const N_LBFGS = 12000         # 1.5× more LBFGS iterations
 const TOL_LBFGS = 1e-10
 const SOBOLEV_ALPHA = 0.02    # Sobolev preconditioning for fine 3D grid (40³ box=30, k_max² ≈ 11)
 const SEED = 1
-
-const A_HO = sqrt(SpinorBEC.Units.HBAR / (ATOM.mass * OMEGA_REF))
-const C_TOTAL = 4π * (ATOM.a_s / A_HO) * N_ATOMS
-const C0 = C_TOTAL / (1 + F^2 / 36.0)
-const C1 = C0 / 36.0
-const C_DD = SpinorBEC.compute_c_dd_dimless(ATOM;
-    N_atoms=N_ATOMS, omega_ref=OMEGA_REF)
 
 const OUT_DIR = "runs/sprint5_A1_v3_step3b_grid40"
 
@@ -111,15 +101,14 @@ function main()
     psi_init = build_PCV_BdG(GRID_40, sys)
     apply_noise!(psi_init, 0.01, SEED, GRID_40)
 
-    ip = InteractionParams(Dict{Int, Float64}(0 => C0, 1 => C1))
     t0 = time()
     ws_itp, _, E_itp, _, _ = find_ground_state(;
-        grid=GRID_40, atom=ATOM, interactions=ip,
-        zeeman=ZEEMAN, potential=POT,
+        grid=GRID_40, atom=TW.atom, interactions=TW.interactions,
+        zeeman=ZEEMAN, potential=TW.potential,
         dt=DT_ITP, n_steps=N_ITP, tol=TOL_ITP,
         initial_state=:polar, verbose=false,
         psi_init=psi_init,
-        enable_ddi=true, c_dd=C_DD, secular_ddi=false,
+        enable_ddi=true, c_dd=TW.c_dd, secular_ddi=false,
         backend=CUDABackend())
     psi_after_itp = Array(ws_itp.state.psi)
     @printf "ITP   E=%.10f (%.1f min)\n" E_itp ((time() - t0) / 60)
@@ -127,11 +116,11 @@ function main()
 
     t1 = time()
     res = find_ground_state_lbfgs(;
-        grid=GRID_40, atom=ATOM, interactions=ip,
-        zeeman=ZEEMAN, potential=POT,
+        grid=GRID_40, atom=TW.atom, interactions=TW.interactions,
+        zeeman=ZEEMAN, potential=TW.potential,
         n_steps=N_LBFGS, tol=TOL_LBFGS,
         initial_state=:polar, psi_init=psi_after_itp,
-        enable_ddi=true, c_dd=C_DD, secular_ddi=false,
+        enable_ddi=true, c_dd=TW.c_dd, secular_ddi=false,
         backend=CUDABackend(), verbose=false,
         sobolev_alpha=SOBOLEV_ALPHA)
     E_pol = res.energy

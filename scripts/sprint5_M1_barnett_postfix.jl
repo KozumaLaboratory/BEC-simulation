@@ -11,15 +11,12 @@ import CUDA
 using SpinorBEC
 using LinearAlgebra
 using Printf
-
-include(joinpath(@__DIR__, "lib", "eu_digital_twin.jl"))
-
-const TW = eu_digital_twin()
+const TW = eu151_preset()
 
 function fz_lz_at(p_lab::Float64, omega::Float64)
     sys = SpinSystem(TW.F)
     psi_init = init_psi(TW.grid, sys; state=:polar)
-    add_noise!(psi_init, 0.01, 1, TW.grid)
+    add_white_noise!(psi_init, 0.01, 1, TW.grid)
     zeeman = ZeemanParams(p_lab, 0.0)
     ws, conv, E, _, _ = find_ground_state(;
         grid=TW.grid, atom=TW.atom, interactions=TW.interactions,

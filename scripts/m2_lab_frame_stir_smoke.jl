@@ -41,10 +41,7 @@ import CUDA
 using SpinorBEC
 using Printf
 using JLD2
-
-include(joinpath(@__DIR__, "lib", "eu_digital_twin.jl"))
-
-const TW = eu_digital_twin()
+const TW = eu151_preset()
 
 const BZ_STATIC_NT = 1.0          # nT — weak static bias (above Earth, below trap)
 const B_PERP_NT = 0.5             # nT — transverse rotating field amplitude

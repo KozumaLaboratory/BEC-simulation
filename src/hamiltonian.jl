@@ -50,6 +50,7 @@ include("hamiltonian/interactions/absorbing_boundary.jl")
 # Potentials.
 include("hamiltonian/potentials/potentials.jl")
 include("hamiltonian/potentials/zeeman.jl")
+include("hamiltonian/potentials/zeeman_builders.jl")
 include("hamiltonian/potentials/raman.jl")
 include("hamiltonian/potentials/optics.jl")  # Must precede laser_potential (defines OpticalBeam)
 include("hamiltonian/potentials/laser_potential.jl")

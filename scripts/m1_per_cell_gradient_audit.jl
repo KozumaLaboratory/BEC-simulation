@@ -26,10 +26,7 @@ import CUDA
 using SpinorBEC
 using Printf
 using JLD2
-
-include(joinpath(@__DIR__, "lib", "eu_digital_twin.jl"))
-
-const TW = eu_digital_twin()
+const TW = eu151_preset()
 const BZ_NT_GRID = [0.0, 2.0, 5.0, 10.0]
 const OMEGA_GRID = [0.1, 0.2, 0.4, 0.6]
 const N_ITP_WARM = 300
@@ -45,7 +42,7 @@ function audit_cell(B_nT::Float64, omega::Float64)
     )
     sys = SpinSystem(TW.F)
     psi_init = init_psi(TW.grid, sys; state=:polar)
-    add_noise!(psi_init, 0.01, 1, TW.grid)
+    add_white_noise!(psi_init, 0.01, 1, TW.grid)
 
     # Warm-start workspace (short ITP — just to populate buffers + relax 1 step)
     r = find_ground_state(;

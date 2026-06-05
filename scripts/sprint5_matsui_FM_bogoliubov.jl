@@ -17,10 +17,7 @@
 using SpinorBEC
 using LinearAlgebra
 using Printf
-
-include(joinpath(@__DIR__, "lib", "eu_digital_twin.jl"))
-
-const TW = eu_digital_twin()
+const TW = eu151_preset()
 const F = TW.F          # convenience local binding (preserves original symbol)
 const D = TW.D
 

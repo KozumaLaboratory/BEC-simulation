@@ -20,6 +20,7 @@ include("foundation/types/workspace.jl")         # Workspace + workspace_T (depe
 include("foundation/types/results.jl")           # TOFParams, BdGResult, InstabilityMap, RotonParams, etc
 include("foundation/types/scan.jl")              # OverrideScan, ConstrainedJzScan, ITPCheckpoint
 include("foundation/types/tdhfb_state.jl")        # TDHFBState (Phase 1 scaffold; kernels live in hamiltonian/tdhfb/)
+include("foundation/types/preset.jl")             # Preset (frozen atom/grid/interactions bundle for sweep scripts)
 
 # Mathematical foundation.
 include("foundation/grid.jl")

@@ -1,6 +1,32 @@
 export add_thermal_seed!, add_thermal_seed
 export thermal_noise_amplitude, bec_critical_temperature
 export add_symmetry_breaking_seed!, add_deterministic_mode_seed!
+export add_white_noise!
+
+"""
+    add_white_noise!(psi, amp, seed, grid) → psi
+
+IID complex-Gaussian noise of amplitude `amp` added to every grid point
+of `psi`, then renormalised so `∫|ψ|² dV = 1`. The cheapest
+symmetry-breaking primitive — distinct from `add_thermal_seed`
+(energy-weighted Bose population) and `add_symmetry_breaking_seed!`
+(targeted at the spinor component neighbouring the dominant one).
+
+Used by sweep drivers to inject a structured seed's symmetry-breaking
+perturbation before ITP.
+"""
+function add_white_noise!(
+    psi::AbstractArray, amp::Real, seed::Integer, grid::Grid
+)
+    rng = Random.MersenneTwister(seed)
+    amp_f = Float64(amp)
+    @inbounds for i in eachindex(psi)
+        psi[i] += amp_f * (randn(rng) + im * randn(rng))
+    end
+    norm = sqrt(sum(abs2, psi) * cell_volume(grid))
+    psi ./= norm
+    return psi
+end
 
 """
     bec_critical_temperature(N, omega_geometric_mean) → T_c (Kelvin)

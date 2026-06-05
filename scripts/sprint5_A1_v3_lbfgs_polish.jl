@@ -27,21 +27,10 @@ using Printf
 using JLD2
 
 const F = 6
-const ATOM = SpinorBEC.Eu151
-const N_ATOMS = 50000
-const OMEGA_REF = 691.15
-const GRID = make_grid(GridConfig((24, 24, 24), (30.0, 30.0, 26.0)))
-const POT = HarmonicTrap{3}((1.0, 1.0, 1.1818))
+const TW = eu151_preset()
 const ZEEMAN = ZeemanParams(0.0, 0.0)
 const N_STEPS_LBFGS = 8000
 const TOL_LBFGS = 1e-10
-
-const A_HO = sqrt(SpinorBEC.Units.HBAR / (ATOM.mass * OMEGA_REF))
-const C_TOTAL = 4π * (ATOM.a_s / A_HO) * N_ATOMS
-const C0 = C_TOTAL / (1 + F^2 / 36.0)
-const C1 = C0 / 36.0
-const C_DD_DIMLESS = SpinorBEC.compute_c_dd_dimless(ATOM;
-    N_atoms=N_ATOMS, omega_ref=OMEGA_REF)
 
 const REFINED_PATH = "runs/sprint5_A1_v3_digital_twin_gpu/refined_states.jld2"
 
@@ -83,8 +72,6 @@ function main()
     @load REFINED_PATH snapshot
     @info "Loaded refined states" length(snapshot)
 
-    ip = InteractionParams(Dict{Int, Float64}(0 => C0, 1 => C1))
-
     results = []
     for s in snapshot
         label = s["init"]
@@ -97,11 +84,11 @@ function main()
         t0 = time()
         try
             res = find_ground_state_lbfgs(;
-                grid=GRID, atom=ATOM, interactions=ip,
-                zeeman=ZEEMAN, potential=POT,
+                grid=TW.grid, atom=TW.atom, interactions=TW.interactions,
+                zeeman=ZEEMAN, potential=TW.potential,
                 n_steps=N_STEPS_LBFGS, tol=TOL_LBFGS,
                 initial_state=:polar, psi_init=psi_seed,
-                enable_ddi=true, c_dd=C_DD_DIMLESS, secular_ddi=false,
+                enable_ddi=true, c_dd=TW.c_dd, secular_ddi=false,
                 backend=CUDABackend(), verbose=false)
             t_run = time() - t0
             E_pol = res.energy

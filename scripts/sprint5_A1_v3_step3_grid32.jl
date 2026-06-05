@@ -29,13 +29,9 @@ using JLD2
 
 const F = 6
 const D = 2F + 1
-const ATOM = SpinorBEC.Eu151
-const N_ATOMS = 50000
-const OMEGA_REF = 691.15
-
 # 32³ at same box dimensions as 24³ digital twin
-const GRID_32 = make_grid(GridConfig((32, 32, 32), (30.0, 30.0, 26.0)))
-const POT = HarmonicTrap{3}((1.0, 1.0, 1.1818))
+const TW = eu151_preset(; n_pts=(32, 32, 32))
+const GRID_32 = TW.grid
 const ZEEMAN = ZeemanParams(0.0, 0.0)
 const DT_ITP = 0.005
 const N_ITP = 20000
@@ -43,13 +39,6 @@ const TOL_ITP = 1e-9
 const N_LBFGS = 8000
 const TOL_LBFGS = 1e-10
 const SEED = 1
-
-const A_HO = sqrt(SpinorBEC.Units.HBAR / (ATOM.mass * OMEGA_REF))
-const C_TOTAL = 4π * (ATOM.a_s / A_HO) * N_ATOMS
-const C0 = C_TOTAL / (1 + F^2 / 36.0)
-const C1 = C0 / 36.0
-const C_DD = SpinorBEC.compute_c_dd_dimless(ATOM;
-    N_atoms=N_ATOMS, omega_ref=OMEGA_REF)
 
 const OUT_DIR = "runs/sprint5_A1_v3_step3_grid32"
 
@@ -109,7 +98,6 @@ function compute_grad_norm(ws::Workspace, k_squared_dev)
 end
 
 function relax_polish(label::String, psi_init::Array{ComplexF64, 4}, grid::Grid)
-    ip = InteractionParams(Dict{Int, Float64}(0 => C0, 1 => C1))
     sys = SpinSystem(F)
     apply_noise!(psi_init, 0.01, SEED, grid)
 
@@ -119,23 +107,23 @@ function relax_polish(label::String, psi_init::Array{ComplexF64, 4}, grid::Grid)
 
     t0 = time()
     ws_itp, _, E_itp, _, _ = find_ground_state(;
-        grid=grid, atom=ATOM, interactions=ip,
-        zeeman=ZEEMAN, potential=POT,
+        grid=grid, atom=TW.atom, interactions=TW.interactions,
+        zeeman=ZEEMAN, potential=TW.potential,
         dt=DT_ITP, n_steps=N_ITP, tol=TOL_ITP,
         initial_state=:polar, verbose=false,
         psi_init=psi_init,
-        enable_ddi=true, c_dd=C_DD, secular_ddi=false,
+        enable_ddi=true, c_dd=TW.c_dd, secular_ddi=false,
         backend=CUDABackend())
     psi_after = Array(ws_itp.state.psi)
     @printf "  ITP   E=%.10f (%.1f min)\n" E_itp ((time() - t0) / 60)
 
     t1 = time()
     res = find_ground_state_lbfgs(;
-        grid=grid, atom=ATOM, interactions=ip,
-        zeeman=ZEEMAN, potential=POT,
+        grid=grid, atom=TW.atom, interactions=TW.interactions,
+        zeeman=ZEEMAN, potential=TW.potential,
         n_steps=N_LBFGS, tol=TOL_LBFGS,
         initial_state=:polar, psi_init=psi_after,
-        enable_ddi=true, c_dd=C_DD, secular_ddi=false,
+        enable_ddi=true, c_dd=TW.c_dd, secular_ddi=false,
         backend=CUDABackend(), verbose=false)
     E_pol = res.energy
     ws = res.workspace

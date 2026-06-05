@@ -31,14 +31,11 @@ using SpinorBEC
 using Printf
 using JLD2
 using FFTW
-
-include(joinpath(@__DIR__, "lib", "eu_digital_twin.jl"))
-
 const USE_SMOKE = "--smoke" in ARGS
 const USE_CPU = USE_SMOKE
 const BACKEND = USE_CPU ? CPUBackend() : CUDABackend()
 
-const TW = eu_digital_twin()
+const TW = eu151_preset()
 const CACHED_PATH = "runs/sprint5_M1_basin_valley_B0.0_Om0.4.jld2"
 const B_NT = 0.0
 const OMEGA = 0.4

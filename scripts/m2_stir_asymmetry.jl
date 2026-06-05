@@ -20,10 +20,7 @@ import CUDA
 using SpinorBEC
 using Printf
 using JLD2
-
-include(joinpath(@__DIR__, "lib", "eu_digital_twin.jl"))
-
-const TW = eu_digital_twin()
+const TW = eu151_preset()
 const BZ_STATIC_NT = 2.0
 const B_PERP_NT = 0.2
 const OMEGA_D_GRID = [+0.5, -0.5]

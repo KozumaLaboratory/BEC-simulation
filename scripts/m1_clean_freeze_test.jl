@@ -44,9 +44,6 @@ end
 using SpinorBEC
 using Printf
 using JLD2
-
-include(joinpath(@__DIR__, "lib", "eu_digital_twin.jl"))
-
 function get_arg_str(name::String, default::String)
     for (i, a) in enumerate(ARGS)
         a == name && i + 1 <= length(ARGS) && return ARGS[i + 1]
@@ -54,7 +51,7 @@ function get_arg_str(name::String, default::String)
     default
 end
 
-const TW = eu_digital_twin()
+const TW = eu151_preset()
 const SEED = Symbol(get_arg_str("--seed", "polar"))
 const ALPHAS = let s = get_arg_str("--alphas", "1e-2,1e-3,1e-4,1e-5")
     parse.(Float64, split(s, ","))

@@ -30,10 +30,7 @@ using SpinorBEC
 using LinearAlgebra
 using Printf
 using JLD2
-
-include(joinpath(@__DIR__, "lib", "eu_digital_twin.jl"))
-
-const TW = eu_digital_twin()  # 24³, N=5×10⁴
+const TW = eu151_preset()  # 24³, N=5×10⁴
 const DT_ITP = 0.005
 const N_ITP_NOOP = 0           # warm-start: skip ITP entirely
 const TOL_ITP = 1e-7

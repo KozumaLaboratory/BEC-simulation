@@ -31,10 +31,7 @@ import CUDA
 using SpinorBEC
 using Printf
 using JLD2
-
-include(joinpath(@__DIR__, "lib", "eu_digital_twin.jl"))
-
-const TW = eu_digital_twin()
+const TW = eu151_preset()
 const CACHED_PATH = "runs/sprint5_M1_basin_valley_B0.0_Om0.4.jld2"
 const ε_FD = 1e-5
 

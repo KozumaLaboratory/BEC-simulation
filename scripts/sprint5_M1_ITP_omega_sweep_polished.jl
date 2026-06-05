@@ -25,10 +25,7 @@ using SpinorBEC
 using LinearAlgebra
 using Printf
 using JLD2
-
-include(joinpath(@__DIR__, "lib", "eu_digital_twin.jl"))
-
-const TW = eu_digital_twin()  # 24³, N=5×10⁴, box=(30,30,26)
+const TW = eu151_preset()  # 24³, N=5×10⁴, box=(30,30,26)
 const DT_ITP = 0.005
 const N_ITP = 2000
 const TOL_ITP = 1e-7
@@ -53,7 +50,7 @@ function run_cell(omega::Float64, B_nT::Float64)
 
     sys = SpinSystem(TW.F)
     psi_init = init_psi(TW.grid, sys; state=:polar)
-    add_noise!(psi_init, NOISE_AMP, NOISE_SEED, TW.grid)
+    add_white_noise!(psi_init, NOISE_AMP, NOISE_SEED, TW.grid)
 
     # Stage 1: ITP warm-up (Strang propagator includes Coriolis substep).
     t0 = time()

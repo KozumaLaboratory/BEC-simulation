@@ -20,10 +20,7 @@ import CUDA
 using SpinorBEC
 using Printf
 using JLD2
-
-include(joinpath(@__DIR__, "lib", "eu_digital_twin.jl"))
-
-const TW = eu_digital_twin()
+const TW = eu151_preset()
 const BZ_STATIC_NT = 10.0       # strong Bz for clear Larmor
 const B_PERP_NT = 0.5            # perturbative transverse
 const OMEGA_D_GRID = [+0.05, -0.05]  # adiabatic: Ω_d ≪ ω_L

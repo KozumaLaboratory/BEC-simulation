@@ -39,9 +39,6 @@ end
 using SpinorBEC
 using Printf
 using JLD2
-
-include(joinpath(@__DIR__, "lib", "eu_digital_twin.jl"))
-
 function get_arg_str(name::String, default::String)
     for (i, a) in enumerate(ARGS)
         a == name && i + 1 <= length(ARGS) && return ARGS[i + 1]
@@ -61,7 +58,7 @@ function get_arg_float(name::String, default::Float64)
     default
 end
 
-const TW = eu_digital_twin()
+const TW = eu151_preset()
 const SEED = Symbol(get_arg_str("--seed", "polar"))
 const N_STEPS = USE_SMOKE ? 5 : get_arg_int("--n-steps", 200)
 const DT = get_arg_float("--dt", 0.005)

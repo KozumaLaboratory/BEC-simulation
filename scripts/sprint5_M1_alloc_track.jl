@@ -23,10 +23,7 @@ end
 
 const T0 = time()
 mark(s) = @printf "[%6.1fs RSS=%5d] %s\n" (time() - T0) rss_mb() s
-
-include(joinpath(@__DIR__, "lib", "eu_digital_twin.jl"))
-
-const TW = eu_digital_twin()
+const TW = eu151_preset()
 
 function build_seed(state::Symbol, grid)
     sys = SpinSystem(TW.F)
@@ -37,7 +34,7 @@ function run_cell(omega::Float64, B_nT::Float64, seed_state::Symbol)
     p_lab = B_nT * TW.p_per_nT
     zeeman = ZeemanParams(p_lab, 0.0)
     psi_init = build_seed(seed_state, TW.grid)
-    add_noise!(psi_init, 0.01, 1, TW.grid)
+    add_white_noise!(psi_init, 0.01, 1, TW.grid)
     initial_state_for_fgs = seed_state == :fl_vortex ? :fl_vortex : :polar
     mark("about to call find_ground_state inside run_cell")
     ws_itp, conv_itp, E_itp, _, _ = find_ground_state(;

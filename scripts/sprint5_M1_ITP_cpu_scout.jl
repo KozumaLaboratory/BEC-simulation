@@ -21,11 +21,8 @@ using LinearAlgebra
 using Random
 using Printf
 using JLD2
-
-include(joinpath(@__DIR__, "lib", "eu_digital_twin.jl"))
-
 # Smaller grid for CPU envelope (16³, box=(20,20,18) vs digital-twin default 24³).
-const TW = eu_digital_twin(; n_pts=(16, 16, 16), box=(20.0, 20.0, 18.0))
+const TW = eu151_preset(; n_pts=(16, 16, 16), box=(20.0, 20.0, 18.0))
 
 const DT_ITP = 0.005
 const N_ITP = 8000
@@ -53,7 +50,7 @@ function run_cell(omega::Float64, B_nT::Float64)
     zeeman = ZeemanParams(p_lab, 0.0)
     sys = SpinSystem(TW.F)
     psi_init = init_psi(TW.grid, sys; state=:polar)
-    add_noise!(psi_init, 0.01, 1, TW.grid)
+    add_white_noise!(psi_init, 0.01, 1, TW.grid)
 
     t0 = time()
     ws, conv, E, _, _ = find_ground_state(;

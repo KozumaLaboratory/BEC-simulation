@@ -15,38 +15,29 @@ using Random
 using Printf
 
 const F = 6
-const ATOM = SpinorBEC.Eu151
-const N_ATOMS = 50000
-const OMEGA_REF = 691.15
-const A_HO = sqrt(SpinorBEC.Units.HBAR / (ATOM.mass * OMEGA_REF))
-const C_TOTAL = 4π * (ATOM.a_s / A_HO) * N_ATOMS
-const C0 = C_TOTAL / (1 + F^2 / 36.0)
-const C1 = C0 / 36.0
-const C_DD = SpinorBEC.compute_c_dd_dimless(ATOM; N_atoms=N_ATOMS, omega_ref=OMEGA_REF)
-const GRID = make_grid(GridConfig((24, 24, 24), (30.0, 30.0, 26.0)))
-const POT = HarmonicTrap{3}((1.0, 1.0, 1.1818))
+const TW = eu151_preset()
 const D = 13
 
 function fz_at(p_input::Float64, omega::Float64)
-    ip = InteractionParams(Dict{Int, Float64}(0 => C0, 1 => C1))
+    ip = TW.interactions
     sys = SpinSystem(F)
-    psi_init = init_psi(GRID, sys; state=:polar)
+    psi_init = init_psi(TW.grid, sys; state=:polar)
     rng = MersenneTwister(1)
     @inbounds for i in eachindex(psi_init)
         ;
         psi_init[i] += 0.01*(randn(rng)+im*randn(rng));
     end
-    psi_init ./= sqrt(sum(abs2, psi_init) * SpinorBEC.cell_volume(GRID))
+    psi_init ./= sqrt(sum(abs2, psi_init) * SpinorBEC.cell_volume(TW.grid))
     zeeman = ZeemanParams(p_input, 0.0)
     ws, conv, E, _, _ = find_ground_state(;
-        grid=GRID, atom=ATOM, interactions=ip, zeeman=zeeman, potential=POT,
+        grid=TW.grid, atom=TW.atom, interactions=ip, zeeman=zeeman, potential=TW.potential,
         dt=0.005, n_steps=500, tol=1e-7, initial_state=:polar, verbose=false,
-        psi_init=psi_init, enable_ddi=true, c_dd=C_DD, secular_ddi=false,
+        psi_init=psi_init, enable_ddi=true, c_dd=TW.c_dd, secular_ddi=false,
         rotating_frame_omega=omega, backend=CUDABackend())
     psi = Array(ws.state.psi)
     sm = ws.spin_matrices
     fx, fy, fz = spin_density_vector(psi, sm, 3)
-    fz_total = sum(fz) * SpinorBEC.cell_volume(GRID)
+    fz_total = sum(fz) * SpinorBEC.cell_volume(TW.grid)
     return fz_total, E
 end
 

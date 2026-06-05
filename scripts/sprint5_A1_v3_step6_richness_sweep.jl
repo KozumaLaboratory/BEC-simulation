@@ -27,11 +27,7 @@ using Printf
 using JLD2
 
 const F = 6
-const ATOM = SpinorBEC.Eu151
-const N_ATOMS = 50000
-const OMEGA_REF = 691.15
-const GRID = make_grid(GridConfig((24, 24, 24), (30.0, 30.0, 26.0)))
-const POT = HarmonicTrap{3}((1.0, 1.0, 1.1818))
+const TW = eu151_preset()
 const ZEEMAN = ZeemanParams(0.0, 0.0)
 const DT_ITP = 0.005
 const N_ITP = 20000
@@ -39,13 +35,6 @@ const TOL_ITP = 1e-9
 const N_LBFGS = 8000
 const TOL_LBFGS = 1e-10
 const SEED = 1
-
-const A_HO = sqrt(SpinorBEC.Units.HBAR / (ATOM.mass * OMEGA_REF))
-const C_TOTAL = 4π * (ATOM.a_s / A_HO) * N_ATOMS
-const C0 = C_TOTAL / (1 + F^2 / 36.0)
-const C1 = C0 / 36.0
-const C_DD_DIMLESS = SpinorBEC.compute_c_dd_dimless(ATOM;
-    N_atoms=N_ATOMS, omega_ref=OMEGA_REF)
 
 const OUT_DIR = "runs/sprint5_A1_v3_step6_richness"
 
@@ -127,35 +116,34 @@ function apply_noise!(psi::AbstractArray, amp::Float64, seed::Int)
     @inbounds for i in eachindex(psi)
         psi[i] += amp * (randn(rng) + im * randn(rng))
     end
-    n = sqrt(sum(abs2, psi) * SpinorBEC.cell_volume(GRID))
+    n = sqrt(sum(abs2, psi) * SpinorBEC.cell_volume(TW.grid))
     psi ./= n
 end
 
 function relax_and_polish(label::String, psi_init::Array{ComplexF64, 4})
-    ip = InteractionParams(Dict{Int, Float64}(0 => C0, 1 => C1))
     @printf "\n--- %s ---\n" label
     flush(stdout)
     t0 = time()
     apply_noise!(psi_init, 0.01, SEED)
     # ITP warm-up
     ws, conv_itp, E_itp, _, _ = find_ground_state(;
-        grid=GRID, atom=ATOM, interactions=ip,
-        zeeman=ZEEMAN, potential=POT,
+        grid=TW.grid, atom=TW.atom, interactions=TW.interactions,
+        zeeman=ZEEMAN, potential=TW.potential,
         dt=DT_ITP, n_steps=N_ITP, tol=TOL_ITP,
         initial_state=:polar, verbose=false,
         psi_init=psi_init,
-        enable_ddi=true, c_dd=C_DD_DIMLESS, secular_ddi=false,
+        enable_ddi=true, c_dd=TW.c_dd, secular_ddi=false,
         backend=CUDABackend())
     psi_after_itp = Array(ws.state.psi)
     @printf "  ITP   E=%.10f conv=%s (%.1f min)\n" E_itp (conv_itp ? "✓" : "✗") ((time() - t0) / 60)
     # LBFGS polish on top of ITP
     t1 = time()
     res = find_ground_state_lbfgs(;
-        grid=GRID, atom=ATOM, interactions=ip,
-        zeeman=ZEEMAN, potential=POT,
+        grid=TW.grid, atom=TW.atom, interactions=TW.interactions,
+        zeeman=ZEEMAN, potential=TW.potential,
         n_steps=N_LBFGS, tol=TOL_LBFGS,
         initial_state=:polar, psi_init=psi_after_itp,
-        enable_ddi=true, c_dd=C_DD_DIMLESS, secular_ddi=false,
+        enable_ddi=true, c_dd=TW.c_dd, secular_ddi=false,
         backend=CUDABackend(), verbose=false)
     t_lbfgs = time() - t1
     E_pol = res.energy
@@ -216,18 +204,18 @@ function main()
 
     # PCV1..PCV6 ansatze
     for k in 1:6
-        psi = build_pcv_k(GRID, sys, k; polar_amp=1.0, side_amp=0.1)
+        psi = build_pcv_k(TW.grid, sys, k; polar_amp=1.0, side_amp=0.1)
         res = relax_and_polish("PCV_$k", psi)
         push!(results, res)
     end
 
     # I_h vortex
-    psi_Ih = build_Ih_vortex(GRID, sys)
+    psi_Ih = build_Ih_vortex(TW.grid, sys)
     res = relax_and_polish("I_h_vortex", psi_Ih)
     push!(results, res)
 
     # KSU(F)
-    psi_ksu = build_KSU_F(GRID, sys)
+    psi_ksu = build_KSU_F(TW.grid, sys)
     res = relax_and_polish("KSU_F", psi_ksu)
     push!(results, res)
 

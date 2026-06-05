@@ -68,9 +68,6 @@ using SpinorBEC
 using LinearAlgebra
 using Printf
 using JLD2
-
-include(joinpath(@__DIR__, "lib", "eu_digital_twin.jl"))
-
 function get_arg_float(name::String, default::Float64)
     for (i, a) in enumerate(ARGS)
         if a == name && i + 1 <= length(ARGS)
@@ -88,7 +85,7 @@ function get_arg_int(name::String, default::Int)
     return default
 end
 
-const TW = eu_digital_twin()
+const TW = eu151_preset()
 const B_NT = get_arg_float("--B-nT", 0.0)
 const OMEGA = get_arg_float("--omega", 0.4)
 const N_LBFGS = get_arg_int("--n-lbfgs", 5000)
@@ -175,7 +172,7 @@ function run_one_seed(seed_state::Symbol, label::String)
         ConstantWaveform(p_lab), ConstantWaveform(0.0),
     )
     psi_init = build_seed(seed_state, TW.grid)
-    add_noise!(psi_init, NOISE_AMP, NOISE_SEED, TW.grid)
+    add_white_noise!(psi_init, NOISE_AMP, NOISE_SEED, TW.grid)
     # When psi_init is supplied, find_ground_state ignores `initial_state`
     # — but the kwarg is required. Map our internal seed labels to a
     # valid symbol in init_psi's dispatch table.

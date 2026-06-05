@@ -39,10 +39,7 @@ using SpinorBEC
 using Random
 using LinearAlgebra
 using Printf
-
-include(joinpath(@__DIR__, "lib", "eu_digital_twin.jl"))
-
-const TW = eu_digital_twin()
+const TW = eu151_preset()
 const N_ITP_PREP = USE_CPU ? 80 : 200   # CPU is ~3× slower per ITP step
                                         # at 24³; smaller prep is fine.
 const FD_EPS = [1e-4, 1e-5, 1e-6, 1e-7]

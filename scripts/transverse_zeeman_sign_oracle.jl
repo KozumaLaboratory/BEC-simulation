@@ -22,10 +22,7 @@
 import CUDA
 using SpinorBEC
 using Printf
-
-include(joinpath(@__DIR__, "lib", "eu_digital_twin.jl"))
-
-const TW = eu_digital_twin()
+const TW = eu151_preset()
 const BX_NT = 5.0           # +5 nT in +x direction
 const N_ITP = 1000
 
@@ -44,7 +41,7 @@ function main()
     )
     sys = SpinSystem(TW.F)
     psi_init = init_psi(TW.grid, sys; state=:polar)
-    add_noise!(psi_init, 0.01, 1, TW.grid)
+    add_white_noise!(psi_init, 0.01, 1, TW.grid)
 
     r = find_ground_state(;
         grid=TW.grid, atom=TW.atom, interactions=TW.interactions,

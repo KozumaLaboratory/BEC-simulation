@@ -20,22 +20,11 @@ using Printf
 using JLD2
 
 const F = 6
-const ATOM = SpinorBEC.Eu151
-const N_ATOMS = 50000
-const OMEGA_REF = 691.15
-const GRID = make_grid(GridConfig((24, 24, 24), (30.0, 30.0, 26.0)))
-const POT = HarmonicTrap{3}((1.0, 1.0, 1.1818))
+const TW = eu151_preset()
 const ZEEMAN = ZeemanParams(0.0, 0.0)
 const DT_ITP = 0.005
 const N_STEPS_ITP = 60000   # 3× the original
 const TOL_ITP = 1e-9        # 2 orders tighter
-
-const A_HO = sqrt(SpinorBEC.Units.HBAR / (ATOM.mass * OMEGA_REF))
-const C_TOTAL = 4π * (ATOM.a_s / A_HO) * N_ATOMS
-const C0 = C_TOTAL / (1 + F^2 / 36.0)
-const C1 = C0 / 36.0
-const C_DD_DIMLESS = SpinorBEC.compute_c_dd_dimless(ATOM;
-    N_atoms=N_ATOMS, omega_ref=OMEGA_REF)
 
 const REFINE_INITS = [:polar_core_vortex, :icosahedral_explicit, :cyclic]
 const SEED = 1
@@ -43,18 +32,18 @@ const SEED = 1
 function build_psi(state::Symbol, sys)
     if state === :icosahedral_explicit
         ζ = SpinorBEC.IcosahedralMod.ZETA_F6_IH
-        psi = init_psi(GRID, sys; state=:polar)
+        psi = init_psi(TW.grid, sys; state=:polar)
         for k in 1:size(psi, 3), j in 1:size(psi, 2), i in 1:size(psi, 1)
             spatial_amp = sqrt(sum(abs2, view(psi, i, j, k, :)))
             for c in 1:size(psi, 4)
                 psi[i, j, k, c] = spatial_amp * ζ[c]
             end
         end
-        n = sqrt(sum(abs2, psi) * SpinorBEC.cell_volume(GRID))
+        n = sqrt(sum(abs2, psi) * SpinorBEC.cell_volume(TW.grid))
         n > 0 && (psi ./= n)
         return psi
     else
-        return init_psi(GRID, sys; state=state)
+        return init_psi(TW.grid, sys; state=state)
     end
 end
 
@@ -63,23 +52,22 @@ function apply_noise!(psi::AbstractArray, amp::Float64, seed::Int)
     @inbounds for i in eachindex(psi)
         psi[i] += amp * (randn(rng) + im * randn(rng))
     end
-    n = sqrt(sum(abs2, psi) * SpinorBEC.cell_volume(GRID))
+    n = sqrt(sum(abs2, psi) * SpinorBEC.cell_volume(TW.grid))
     psi ./= n
 end
 
 function run_one(init_state::Symbol)
-    ip = InteractionParams(Dict{Int, Float64}(0 => C0, 1 => C1))
     sys = SpinSystem(F)
     psi_init = build_psi(init_state, sys)
     apply_noise!(psi_init, 0.01, SEED)
     initial_state_for_fgs = init_state === :icosahedral_explicit ? :polar : init_state
     ws, conv, E, _, _ = find_ground_state(;
-        grid=GRID, atom=ATOM, interactions=ip,
-        zeeman=ZEEMAN, potential=POT,
+        grid=TW.grid, atom=TW.atom, interactions=TW.interactions,
+        zeeman=ZEEMAN, potential=TW.potential,
         dt=DT_ITP, n_steps=N_STEPS_ITP, tol=TOL_ITP,
         initial_state=initial_state_for_fgs, verbose=false,
         psi_init=psi_init,
-        enable_ddi=true, c_dd=C_DD_DIMLESS, secular_ddi=false,
+        enable_ddi=true, c_dd=TW.c_dd, secular_ddi=false,
         backend=CUDABackend())
     return ws, E, conv
 end
