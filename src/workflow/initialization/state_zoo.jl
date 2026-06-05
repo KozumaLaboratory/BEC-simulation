@@ -8,6 +8,7 @@ export init_psi_bright_soliton, init_psi_dark_soliton, init_psi_skyrmion
 export init_psi_gaussian_wavepacket, init_psi_domain_wall, init_psi_two_packets
 export init_psi_chiral_spin_vortex, init_psi_magnetic_domain
 export init_psi_vortex_lattice, init_psi_skyrmion_lattice
+export init_psi_axial_spin_texture
 
 # Thin wrappers around `init_psi(grid, sys; state=:..., init_state_params=...)`
 # so callers can write `init_psi_polar(grid, sys)` instead of remembering
@@ -24,6 +25,7 @@ const _ZOO_NAMES = (
     :polar_core_vortex, :bright_soliton, :dark_soliton, :skyrmion,
     :gaussian_wavepacket, :domain_wall, :two_packets, :chiral_spin_vortex,
     :magnetic_domain, :vortex_lattice, :skyrmion_lattice,
+    :axial_spin_texture,
 )
 
 # --- Trivial pass-through wrappers (auto-generated) --------------------
@@ -239,6 +241,23 @@ square pattern is implemented inside `init_psi`).
 init_psi_vortex_lattice(grid, sys;
     n_vortices::Int=4, lattice::Symbol=:triangular) = init_psi(grid, sys; state=:vortex_lattice,
     init_vortex_charge=n_vortices)
+
+"""
+    init_psi_axial_spin_texture(grid, sys; winding=1, init_phi=0.0)
+
+KSU-style axial spin texture (Kawaguchi-Saito-Ueda spontaneous-circulation
+analog). ⟨F̂(r)⟩ direction varies axially (`θ(z)` ramps 0 → π) AND
+azimuthally (`φ` winding with `winding`). This is **unambiguously a spin
+texture**, distinguishable at static-state inspection from the
+mass-vortex-on-FM construction (uniform ⟨F̂⟩ + phase winding on one
+m-component) — see [[north-star-phase-diagram-plan-2026-06-02]] for the
+caveat the prior `:ksu_circulation` analog tripped on.
+
+Requires N≥3 (needs an axial direction along grid axis 3).
+"""
+init_psi_axial_spin_texture(grid, sys; winding::Int=1, init_phi::Real=0.0) =
+    init_psi(grid, sys; state=:axial_spin_texture,
+        init_vortex_charge=winding, init_phi=init_phi)
 
 """
     init_psi_skyrmion_lattice(grid, sys; q_vector=(2π,0,0))

@@ -299,6 +299,44 @@ function init_psi(
             end
             psi[I, 1] = gauss[I] * cis(phase_acc)
         end
+    elseif state == :axial_spin_texture
+        # KSU-style axial spin texture (Kawaguchi-Saito-Ueda spontaneous
+        # circulation analog): ⟨F̂(r)⟩ DIRECTION varies AXIALLY along z
+        # AND azimuthally in xy. Unambiguously a spin texture, not a
+        # mass-vortex-on-FM (the latter has uniform ⟨F̂⟩ + phase winding
+        # on one m-component — see north_star plan's old "m_plus_F +
+        # winding-1 on m=+F as KSU analog" entry, which IS mass-vortex
+        # on FM and was NOT a real KSU texture).
+        #
+        # Construction:
+        #   θ(z) ramps 0 → π as z runs −Lz/2 → +Lz/2  (axial wind)
+        #   φ(x,y) = ℓ·atan(y, x) + init_phi          (azimuthal wind)
+        #   spinor = Rz(φ) Ry(θ) |m=+F⟩
+        # Result:
+        #   z = −Lz/2 :  ⟨F̂⟩ = +ẑ   (m=+F dominant)
+        #   z = 0     :  ⟨F̂⟩ ∈ xy   (azimuthally winding)
+        #   z = +Lz/2 :  ⟨F̂⟩ = −ẑ   (m=−F dominant)
+        # This is unambiguous: ⟨F_z(r)⟩ flips sign with z (spatial spin
+        # direction variation), distinguishable from mass-vortex-on-FM
+        # at static (no-ITP) wind-check time.
+        N >= 3 || throw(ArgumentError(
+            ":axial_spin_texture requires N >= 3 (needs an axial direction)"))
+        sm = spin_matrices(F)
+        charge = init_vortex_charge_i == 0 ? 1 : init_vortex_charge_i
+        Lz = grid.config.box_size[3]
+        @inbounds for I in CartesianIndices(n_pts)
+            x = grid.x[1][I[1]]
+            y = grid.x[2][I[2]]
+            z = grid.x[3][I[3]]
+            theta = clamp(π * (z + Lz / 2) / Lz, 0.0, π)
+            phi_local = charge * atan(y, x) + init_phi_f
+            U_y = exp(-1im * theta * Matrix(sm.Fy))
+            c_base = U_y[:, 1]  # column for |m=+F⟩
+            for c in 1:D
+                m = F - (c - 1)
+                psi[I, c] = gauss[I] * c_base[c] * cis(-m * phi_local)
+            end
+        end
     elseif state == :skyrmion_lattice
         # Skyrmion lattice: periodic array of skyrmions via triple-Q ansatz
         N >= 2 || throw(ArgumentError(":skyrmion_lattice requires N >= 2"))
