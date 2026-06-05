@@ -123,7 +123,9 @@ function energy_contribution(::KineticTerm, psi::AbstractArray{<:Complex}, ws)
     n_pts = ntuple(d -> size(psi, d), Val(N))
     n_comp = size(psi, N + 1)
     dV = cell_volume(ws.grid)
-    fft_buf = zeros(ComplexF64, ws.grid.config.n_points)
+    # Device-aware buffer: matches psi's device so the FFT plan (also
+    # ws.fft_plans, matching ws.state.psi's device) operates correctly.
+    fft_buf = similar(psi, ComplexF64, ws.grid.config.n_points)
     return _kinetic_energy(
         psi, ws.grid, ws.fft_plans, fft_buf, n_comp, N, n_pts, dV
     )

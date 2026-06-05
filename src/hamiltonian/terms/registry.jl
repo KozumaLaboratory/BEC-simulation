@@ -144,7 +144,7 @@ any well-formed workspace (asserted by
 """
 function total_energy_via_registry(ws)
     registry = build_h_terms_registry(ws)
-    psi = _to_host(ws.state.psi)
+    psi = ws.state.psi  # same-device as ws; trinity methods handle GPU vs CPU
     E = 0.0
     for term in registry
         E += energy_contribution(term, psi, ws)
@@ -259,7 +259,7 @@ slot in this implementation directly.
 """
 function energy_breakdown_via_registry(ws)
     registry = build_h_terms_registry(ws)
-    psi = _to_host(ws.state.psi)
+    psi = ws.state.psi  # same-device as ws; trinity methods handle GPU vs CPU
     contributions = map(term -> energy_contribution(term, psi, ws), registry)
     total = sum(contributions)
     return NamedTuple{(H_TERMS_CANONICAL_ORDER..., :total)}((contributions..., total))
