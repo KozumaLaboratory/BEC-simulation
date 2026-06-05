@@ -83,11 +83,16 @@ const TIER3_SEEDS = [:m_plus_F]
 # Tier 4 — phantom-validation (Ω>0 revival candidates)
 # NOTE: :icosahedral_explicit not in state_zoo (gap); use :cyclic/:biaxial
 # as the polyhedral revival probes. Documented future addition.
+# :axial_spin_texture folded here per the 2026-06-05 KSU undercut probe
+# (m1_ksu_undercut_probe_2026_06_05.md): no undercut at 12³ probed cells,
+# all seeds find the same basin. Kept in revival-tier as a safety net
+# in case 24³ landscape differs.
 const TIER4_SEEDS = [
     :cyclic,
     :biaxial_nematic,
     :spin_helix,
     :vortex_lattice,
+    :axial_spin_texture,
 ]
 
 """
