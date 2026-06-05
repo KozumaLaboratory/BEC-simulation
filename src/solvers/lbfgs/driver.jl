@@ -233,26 +233,17 @@ function find_ground_state_lbfgs(;
         last_step = step
     end
 
-    copyto!(ws.state.psi, psi)
-    E_final = total_energy(ws)
-
-    # Recompute the physical residual at the final point so callers can
-    # gate verdict claims on ‖∇E‖ without having to plumb `k_squared_dev`
-    # to the device themselves. Same expression LBFGS uses internally for
-    # its convergence test (line 130). `grad` may still hold the
-    # preconditioned direction from the last accepted step, so refill it
-    # cleanly before measuring.
-    E_at_final = energy_gradient!(grad, psi, ws; k_squared_dev)
-    _project_constraints!(grad, psi, grid, target_magnetization, F)
-    grad_norm_final = sqrt(real(sum(abs2, grad)) * dV)
-
-    (
-        workspace=ws,
-        converged=converged,
-        energy=E_final,
-        dE=abs(E_final - E_prev),
-        grad_norm=grad_norm_final,
-        last_step=last_step,
+    # Atomic finalization (spine G, 2026-06-05). Guarantees the returned
+    # NamedTuple's {ws.state.psi, energy, grad_norm} all refer to the
+    # SAME iterate. The legacy inline sequence (copyto! + total_energy +
+    # energy_gradient! + _project_constraints! + sqrt) had a subtle drift
+    # found on 2026-06-05 (13/22 M1 cells: disk grad_norm ≠ fresh re-eval
+    # at saved ψ by 30-50×). `_finalize_lbfgs_atomic!` does a single
+    # explicit psi snapshot, evaluates everything from it, and re-syncs
+    # ws.state.psi to the snapshot at exit. See atomic.jl docstring.
+    _finalize_lbfgs_atomic!(
+        ws, psi, converged, last_step;
+        k_squared_dev, target_magnetization, F, E_prev=Float64(E_prev),
     )
 end
 

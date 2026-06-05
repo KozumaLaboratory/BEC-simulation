@@ -25,6 +25,7 @@ include("solvers/adaptive.jl")
 include("solvers/embedded_adaptive.jl")
 include("solvers/lbfgs/energy_gradient.jl")
 include("solvers/lbfgs/helpers.jl")
+include("solvers/lbfgs/atomic.jl")
 include("solvers/lbfgs/driver.jl")
 include("solvers/ground_state/polished.jl")  # ITP+LBFGS chain over a Preset
 include("solvers/continuation/scan_1d.jl")
