@@ -77,6 +77,31 @@ GradientContext-style pass); cache the device k² array.
 Target: ≤ 100 KB/call on both faces. Gate: identity-class agreement
 with current outputs + the shipped FD/driver pins.
 
+**SHIPPED 2026-06-06 (CPU)** — measured after:
+
+| face | before | after |
+|---|---|---|
+| `energy_decomposition` | 9.5 ms / 16.3 MB | **5.5 ms / 0.99 MB** (1.75× / 16×) |
+| `energy_gradient!` | 25.4 ms / 33.9 MB | **10.8 ms / 1.28 MB** (2.35× / 26×) |
+| LBFGS iteration (E + ∇E) | ~35 ms | **~16 ms** (2.1×) |
+
+Mechanism: derived (`similar(psi)` + `apply_operator!` + `dot`) face
+bodies replaced by fused zero-alloc loops / direct broadcast
+accumulation — **legitimised by the master oracle** (267 per-term
+identity assertions); the device-generic derived bodies remain as the
+`AbstractArray` methods (GPU parity 133/133). Gate-before-allocate for
+TransverseZeeman / MagneticGradient / LightShift / DDI. `EnergyContext`
+revived scratch-backed and wired into `energy_breakdown_via_registry`
+(its struct definition was latently broken — `psi_host` typed at the
+spatial dimension count — undetectable while it had zero callers).
+Residual ~1 MB/call (registry rebuild + Coriolis/LHY non-ctx energies)
+left for a follow-up pass; the ≤100 KB target stands. GPU faces
+unchanged (P2). Incidentally fixed: App. A defect 7 (GPU energy
+NamedTuple lacked `:loss` — every GPU run of the per-term parity gate
+had been failing at the shape assertion, masking an unreachable
+`LinearAlgebra.I` import bug in the test itself; both fixed, parity
+expanded 98 → 133 assertions).
+
 ## P2 — device-resident energy (one orchestrator, no copy)
 
 `_energy_decomposition_gpu` copies ψ to host and recomputes on CPU

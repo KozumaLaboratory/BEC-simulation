@@ -138,6 +138,19 @@ function add_gradient!(grad, ::KineticTerm, psi, ws)
     return nothing
 end
 
+# Context-aware energy: borrow ctx.fft_buf instead of allocating the
+# 1.1 MB complex buffer per call (P1).
+function energy_contribution(
+    ::KineticTerm, psi::AbstractArray{<:Complex}, ws, ctx::EnergyContext
+)
+    N = ndims(psi) - 1
+    n_pts = ntuple(d -> size(psi, d), Val(N))
+    n_comp = size(psi, N + 1)
+    return _kinetic_energy(
+        psi, ws.grid, ctx.plans, ctx.fft_buf, n_comp, N, n_pts, ctx.dV
+    )
+end
+
 # Context-aware specialisation: borrow ctx.fft_buf instead of allocating.
 function add_gradient!(grad, ::KineticTerm, psi, ws, ctx::GradientContext)
     N = ndims(psi) - 1

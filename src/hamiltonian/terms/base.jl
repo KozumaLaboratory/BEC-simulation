@@ -107,8 +107,14 @@ spatial-spin density (`fx, fy, fz`) so DensityC0Term, SpinC1Term,
 LHYTerm, TransverseZeemanTerm, CoriolisTerm and others do not
 duplicate that work.
 """
-struct EnergyContext{ND, FFTPlan, SM, NRho, NF}
-    psi_host::Array{ComplexF64, ND}
+struct EnergyContext{ND, PsiT, FFTPlan, SM, NRho, NF}
+    # NOTE: the original definition typed psi_host as Array{ComplexF64, ND}
+    # while n_pts/fft_buf are ND-dimensional SPATIAL objects — ψ has ND+1
+    # dims, so the constructor could never be called. It had zero callers
+    # until P1 wired the ctx into energy_breakdown_via_registry, which is
+    # when the latent mismatch surfaced (dead scaffolding cannot be wrong
+    # in a detectable way until something consumes it).
+    psi_host::PsiT
     fft_buf::Array{ComplexF64, ND}
     plans::FFTPlan
     spin_matrices::SM

@@ -137,9 +137,14 @@ function apply_operator!(out::AbstractArray, ::LightShiftTerm, ws, psi::Abstract
 end
 
 function add_gradient!(grad, ::LightShiftTerm, psi, ws)
-    buf = similar(psi)
-    apply_operator!(buf, LightShiftTerm(), ws, psi)
-    grad .+= buf
+    # Direct accumulation: `_grad_light_shift!` gates on ws.light_shift
+    # internally and broadcasts device-generically — the similar(psi)
+    # wrapper was a 2.9 MB/call tax even when inactive (P1).
+    ws.light_shift === nothing && return nothing
+    N = ndims(psi) - 1
+    n_pts = ntuple(d -> size(psi, d), Val(N))
+    D = ws.spin_matrices.system.n_components
+    _grad_light_shift!(grad, psi, ws, n_pts, D, Val(N))
     return nothing
 end
 

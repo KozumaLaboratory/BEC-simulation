@@ -166,10 +166,14 @@ function apply_operator!(out::AbstractArray, ::DDITerm, ws, psi::AbstractArray)
 end
 
 function add_gradient!(grad, ::DDITerm, psi, ws)
+    # Direct accumulation: `_grad_ddi!` already writes into grad using
+    # the workspace-owned ddi_bufs scratch — the similar(psi) wrapper
+    # was a 2.9 MB/call tax at 24³×D=13 (P1).
     ws.ddi === nothing && return nothing
-    buf = similar(psi)
-    apply_operator!(buf, DDITerm(), ws, psi)
-    grad .+= buf
+    N = ndims(psi) - 1
+    n_pts = ntuple(d -> size(psi, d), Val(N))
+    D = ws.spin_matrices.system.n_components
+    _grad_ddi!(grad, psi, ws, n_pts, D, Val(N))
     return nothing
 end
 

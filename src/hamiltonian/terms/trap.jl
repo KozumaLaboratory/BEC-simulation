@@ -27,19 +27,28 @@ end
 # ============================================================================
 
 function energy_contribution(term::TrapTerm, psi::AbstractArray{<:Complex}, ws)
-    # Linear term: E = Re⟨ψ, V·ψ⟩ · dV (no outer 1/2)
+    # Linear term: E = Re⟨ψ, V·ψ⟩ · dV (no outer 1/2). Device-generic
+    # derived body; the Array specialization below is the zero-alloc
+    # CPU fast path (P1) — both gated per-term by the master oracle.
     out = similar(psi)
     fill!(out, zero(eltype(out)))
     apply_operator!(out, term, ws, psi)
     return real(dot(vec(psi), vec(out))) * cell_volume(ws.grid)
 end
 
-function add_gradient!(grad, term::TrapTerm, psi, ws)
-    # δE/δψ̄ per-voxel = V · ψ = apply_operator!(...) action
-    buf = similar(psi)
-    fill!(buf, zero(eltype(buf)))
-    apply_operator!(buf, term, ws, psi)
-    grad .+= buf
+function energy_contribution(::TrapTerm, psi::Array{<:Complex}, ws)
+    N = ndims(psi) - 1
+    n_pts = ntuple(d -> size(psi, d), Val(N))
+    n_comp = size(psi, N + 1)
+    return _trap_energy(psi, ws.potential_values, n_comp, N, n_pts, cell_volume(ws.grid))
+end
+
+function add_gradient!(grad, ::TrapTerm, psi, ws)
+    # Direct broadcast accumulation (device-generic, zero-alloc).
+    N = ndims(psi) - 1
+    n_pts = ntuple(d -> size(psi, d), Val(N))
+    D = size(psi, N + 1)
+    _grad_trap!(grad, psi, ws, n_pts, D, Val(N))
     return nothing
 end
 

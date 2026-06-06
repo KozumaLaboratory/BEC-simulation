@@ -42,10 +42,21 @@ end
 
 function energy_contribution(term::DensityC0Term, psi::AbstractArray{<:Complex}, ws)
     # Mean-field: E = (1/2) · Re⟨ψ, apply_op(ψ)⟩ · dV = (c0/2)·∫n²·dV.
+    # Device-generic derived body; Array specialization below is the
+    # fused zero-alloc CPU path (P1), gated by the master oracle.
     out = similar(psi)
     fill!(out, zero(eltype(out)))
     apply_operator!(out, term, ws, psi)
     return 0.5 * real(dot(vec(psi), vec(out))) * cell_volume(ws.grid)
+end
+
+function energy_contribution(term::DensityC0Term, psi::Array{<:Complex}, ws)
+    N = ndims(psi) - 1
+    n_pts = ntuple(d -> size(psi, d), Val(N))
+    n_comp = size(psi, N + 1)
+    return _density_interaction_energy(
+        psi, term.c0, n_comp, N, n_pts, cell_volume(ws.grid)
+    )
 end
 
 function add_gradient!(grad, term::DensityC0Term, psi, ws)
@@ -207,11 +218,35 @@ function apply_operator!(out::AbstractArray, term::SpinC1Term, ws, psi::Abstract
 end
 
 function energy_contribution(term::SpinC1Term, psi::AbstractArray{<:Complex}, ws)
-    # Mean-field: E = (1/2)·Re⟨ψ, apply_op(ψ)⟩·dV = (c1/2)·∫|F|²·dV
+    # Mean-field: E = (1/2)·Re⟨ψ, apply_op(ψ)⟩·dV = (c1/2)·∫|F|²·dV.
+    # Device-generic derived body; the fused CPU body and the
+    # ctx-aware overload below are the P1 fast paths.
     out = similar(psi)
     fill!(out, zero(eltype(out)))
     apply_operator!(out, term, ws, psi)
     return 0.5 * real(dot(vec(psi), vec(out))) * cell_volume(ws.grid)
+end
+
+function energy_contribution(term::SpinC1Term, psi::Array{<:Complex}, ws)
+    is_active(term.c1) || return 0.0
+    N = ndims(psi) - 1
+    n_pts = ntuple(d -> size(psi, d), Val(N))
+    n_comp = size(psi, N + 1)
+    return _spin_interaction_energy(
+        psi, ws.spin_matrices, term.c1, n_comp, N, n_pts, cell_volume(ws.grid)
+    )
+end
+
+# Context-aware: reuse the shared fx/fy/fz — zero allocation.
+function energy_contribution(
+    term::SpinC1Term, psi::AbstractArray{<:Complex}, ws, ctx::EnergyContext
+)
+    is_active(term.c1) || return 0.0
+    s = 0.0
+    @inbounds for i in eachindex(ctx.fx, ctx.fy, ctx.fz)
+        s += ctx.fx[i]^2 + ctx.fy[i]^2 + ctx.fz[i]^2
+    end
+    return 0.5 * term.c1 * s * ctx.dV
 end
 
 function add_gradient!(grad, term::SpinC1Term, psi, ws)

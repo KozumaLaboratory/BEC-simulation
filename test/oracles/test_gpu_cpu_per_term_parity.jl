@@ -21,6 +21,9 @@
 using Test
 using SpinorBEC
 using SpinorBEC: energy_gradient!, energy_decomposition, _to_device
+using LinearAlgebra: I   # LightShift fixture identity; this line was
+# unreachable until the App. A defect-7 shape fix — every GPU run died
+# at the shape assertion before reaching the LightShift testset.
 
 # Convenience: build two identical workspaces, one CPU one GPU, and
 # run the per-term + composite-Hψ parity check.

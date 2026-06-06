@@ -100,16 +100,28 @@ end
 # Shared scratch context builders (struct defs are in `base.jl`)
 # ============================================================================
 
-function build_energy_context(psi_host::AbstractArray{<:Complex, ND_psi}, ws) where {ND_psi}
+function build_energy_context(psi_host::Array{<:Complex, ND_psi}, ws) where {ND_psi}
+    # Scratch-backed (P1): the previous builder allocated a full ψ copy
+    # + 5 grid-sized buffers per call (~4 MB at 24³×D=13) and had zero
+    # callers. Buffers come from the shared scratch registry; ψ is
+    # never copied (CPU-only entry point — the GPU energy path is
+    # `_energy_decomposition_gpu`, P2 territory).
     N = ND_psi - 1
     n_pts = ntuple(d -> size(psi_host, d), Val(N))
     dV = cell_volume(ws.grid)
-    n_density = total_density(psi_host, N)
-    fx, fy, fz = spin_density_vector(psi_host, ws.spin_matrices, N)
-    fft_buf = zeros(ComplexF64, n_pts)
-    plans = ws.fft_plans
+    n_comp = size(psi_host, ND_psi)
+    fft_buf, n_density, fx, fy, fz = scratch_get!(
+        :energy_context, (eltype(psi_host), n_pts)
+    ) do
+        (
+            zeros(ComplexF64, n_pts), zeros(Float64, n_pts),
+            zeros(Float64, n_pts), zeros(Float64, n_pts), zeros(Float64, n_pts),
+        )
+    end
+    _total_density!(n_density, psi_host, n_comp, N, n_pts)
+    _compute_spin_density!(fx, fy, fz, psi_host, ws.spin_matrices, Val(n_comp), N, n_pts)
     return EnergyContext(
-        Array(psi_host), fft_buf, plans, ws.spin_matrices,
+        psi_host, fft_buf, ws.fft_plans, ws.spin_matrices,
         n_density, fx, fy, fz, dV, n_pts,
     )
 end
@@ -117,11 +129,23 @@ end
 function build_gradient_context(psi, ws)
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
+    D = ws.spin_matrices.system.n_components
     fft_buf, fx_scratch, fy_scratch, fz_scratch, deriv_buf = _energy_gradient_scratch(psi, n_pts)
-    n_density = total_density(psi, N)
+    # Scratch-backed density on CPU (P1: total_density allocated a
+    # grid-sized array per LBFGS gradient call); the GPU branch keeps
+    # the device-aware allocating helper until P2.
+    n_density = if psi isa Array
+        buf = scratch_get!(:gradient_n_density, (eltype(psi), n_pts)) do
+            zeros(Float64, n_pts)
+        end
+        _total_density!(buf, psi, D, N, n_pts)
+        buf
+    else
+        total_density(psi, N)
+    end
     _compute_spin_density!(
         fx_scratch, fy_scratch, fz_scratch, psi, ws.spin_matrices,
-        Val(ws.spin_matrices.system.n_components), N, n_pts,
+        Val(D), N, n_pts,
     )
     return GradientContext(
         fft_buf, deriv_buf, fx_scratch, fy_scratch, fz_scratch,
@@ -260,7 +284,14 @@ slot in this implementation directly.
 function energy_breakdown_via_registry(ws)
     registry = build_h_terms_registry(ws)
     psi = ws.state.psi  # same-device as ws; trinity methods handle GPU vs CPU
-    contributions = map(term -> energy_contribution(term, psi, ws), registry)
+    contributions = if psi isa Array
+        # P1 hot path: shared EnergyContext (scratch-backed) lets the
+        # ctx-aware overloads skip per-term grid-sized allocations.
+        ctx = build_energy_context(psi, ws)
+        map(term -> energy_contribution(term, psi, ws, ctx), registry)
+    else
+        map(term -> energy_contribution(term, psi, ws), registry)
+    end
     total = sum(contributions)
     return NamedTuple{(H_TERMS_CANONICAL_ORDER..., :total)}((contributions..., total))
 end

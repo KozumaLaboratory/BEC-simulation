@@ -206,6 +206,13 @@ function SpinorBEC._energy_decomposition_gpu(ws::SpinorBEC.Workspace{N}) where {
         light_shift=E_light_shift,
         coriolis=E_coriolis,
         magnetic_gradient=E_mg,
+        # Shape parity with the CPU registry path (App. A defect 7):
+        # B1 added :loss to energy_decomposition_via_registry_legacy_shape
+        # (identically zero — K3 loss is non-Hermitian, no GP energy);
+        # the GPU tuple lacked it and the per-term parity gate's shape
+        # assertion failed the moment the GPU-gated ci oracles actually
+        # ran. Same value semantics as LossTerm.energy_contribution ≡ 0.
+        loss=0.0,
         total=E_total,
     )
 end
