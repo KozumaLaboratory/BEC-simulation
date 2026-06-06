@@ -19,15 +19,6 @@ export init_psi_axial_spin_texture
 # Coverage matches the state-type list in initialization.jl as of
 # Phase 1.1 closeout.
 
-const _ZOO_NAMES = (
-    :polar, :m_plus_F, :m_minus_F, :uniform, :antiferromagnetic,
-    :random, :spin_coherent, :fl_vortex, :spin_helix, :cyclic, :biaxial_nematic,
-    :polar_core_vortex, :bright_soliton, :dark_soliton, :skyrmion,
-    :gaussian_wavepacket, :domain_wall, :two_packets, :chiral_spin_vortex,
-    :magnetic_domain, :vortex_lattice, :skyrmion_lattice,
-    :axial_spin_texture,
-)
-
 # --- Trivial pass-through wrappers (auto-generated) --------------------
 #
 # Each entry below maps to `init_psi(grid, sys; state=:NAME, kwargs...)`.

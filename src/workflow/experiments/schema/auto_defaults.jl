@@ -22,7 +22,6 @@
 
 const _DEFAULT_TF_BOX_SAFETY = 1.5      # box = TF_radius × safety
 const _DEFAULT_TF_NYQUIST = 16          # min n per spatial dimension
-const _DEFAULT_NUMERICS_INTEGRATOR = "yoshida6"
 
 """
     apply_auto_defaults!(data::Dict) -> Dict

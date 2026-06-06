@@ -215,14 +215,19 @@ instruments below are non-retrofittable and early:
   at F ∈ {1,2,3,6}. Kills the rank-vs-channel class (`ip[n] ≠ g_S`
   gotcha). Absolute a_S stay unknown — that is physics (the SBI
   target), not a bug.
-- **Fisher identifiability**: `I(θ) ≈ Jᵀ Σ⁻¹ J` with `J =
-  ∂(observables)/∂θ` from AD-on-dumb. Before an SBI campaign: the
-  observable set must span the 7-channel subspace (well-conditioned I,
-  no near-zero eigenvalues). Catches "the experiment cannot constrain
-  the physics" — a protocol bug no code oracle sees. Placement:
-  preflight instrument (protocol-dependent), not the test suite. Cost:
-  static observables cheap via AD; dynamic observables FD-in-θ = 2×7
-  forward runs per protocol point, TSUBAME-parallel.
+- **Fisher identifiability — the instrument PREEXISTED**:
+  `src/analysis/fisher.jl` (`fisher_jacobian` / `fisher_information` /
+  `identifiable_directions`), written for the Eu SBI Sprint-2 question
+  and carrying the prior-aware absolute cutoff (the relative-cutoff
+  trap) + Cramér-Rao posterior σ. A duplicate was briefly created and
+  deleted 2026-06-06 (caught by the repo sweep; lesson: grep for prior
+  art first). Preflight anchors:
+  `test/oracles/test_fisher_identifiability.jl` — linearity
+  identities, θ-valley certification, degenerate-protocol detection
+  (E_total-only ⇒ rank 1), channel-space chain through the T-CG map.
+  Catches "the experiment cannot constrain the physics" — a protocol
+  bug no code oracle sees. Dynamic observables: 2·n_θ forward runs per
+  protocol point, TSUBAME-parallel.
 
 ## 6. Build order
 

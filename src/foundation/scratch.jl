@@ -16,8 +16,6 @@ Usage:
 The factory closure runs ONCE per `(category, key)`; subsequent calls
 return the cached value. `key` should be hashable and capture the
 allocation shape + device (typically `(typeof(template), shape...)`).
-`scratch_clear!(:my_category)` empties one category — useful when the
-grid changes mid-session.
 
 `SCRATCH_REGISTRY` is single-threaded by construction; callers running
 under multi-threading should partition by thread id in their `key`.
@@ -31,14 +29,3 @@ function scratch_get!(factory::Function, category::Symbol, key)
     return get!(factory, cache, key)
 end
 
-function scratch_clear!(category::Symbol)
-    haskey(SCRATCH_REGISTRY, category) && empty!(SCRATCH_REGISTRY[category])
-    nothing
-end
-
-function scratch_clear_all!()
-    for cat in keys(SCRATCH_REGISTRY)
-        empty!(SCRATCH_REGISTRY[cat])
-    end
-    nothing
-end

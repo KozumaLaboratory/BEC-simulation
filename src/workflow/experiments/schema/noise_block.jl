@@ -35,15 +35,6 @@
 # estimation), use `noise: {twa: {...}}` alone — initial.thermal is
 # implicitly handled by the Wigner sampling.
 
-const _NOISE_KEY_MAP = Dict(
-    # Top-level noise: → split into internal flat fields
-    "seed" => "noise_seed",
-    "thermal" => "temperature_ratio",
-    "twa" => "twa",
-    "sgpe" => "sgpe",
-    "photon_scattering" => "photon_scattering",
-)
-
 """
     apply_noise_block_normalize!(data::Dict) -> Dict
 

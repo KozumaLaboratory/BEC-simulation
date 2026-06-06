@@ -9,7 +9,7 @@
 
 # Type definitions (must come first; Workspace depends on everything above).
 include("foundation/waveform.jl")
-include("foundation/types/grid.jl")              # AbstractBackend, GridConfig, Grid, GridF64
+include("foundation/types/grid.jl")              # AbstractBackend, GridConfig, Grid
 include("foundation/types/potentials.jl")        # AbstractPotential + 12 trap / beam / lattice / gradient subtypes
 include("foundation/types/spin_atom.jl")         # SpinSystem, SpinMatrices, AtomSpecies
 include("foundation/types/interactions_zeeman.jl") # InteractionParams, ZeemanParams, TimeDependent*, Raman, accessors

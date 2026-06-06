@@ -92,9 +92,6 @@ function _parse_dimless_freq(node, omega_ref::Real)
         "frequency: expected Real (dimensionless) or quantity string"))
 end
 
-_to_int_vec(v::Vector) = Int[Int(x) for x in v]
-_to_int_vec(v) = Int[Int(v)]
-
 # Convert each element to Float64; quantity strings ("3157 Hz", "2π·50 rad/s")
 # are parsed via `_parse_angular_frequency`. This lets calibration outputs
 # like `omega: ["3157 Hz", "3157 Hz", "5980 Hz"]` flow through downstream

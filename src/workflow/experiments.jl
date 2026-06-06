@@ -7,8 +7,6 @@
 # defined first. (Once the dust settles on the YAML schema we may be
 # able to reorder per-subdir; for now keep the proven order.)
 
-include("experiments/runtime/adaptive_advice.jl")
-
 # Schema parsers + auto-defaults (run before pipeline parses).
 include("experiments/schema/config_override.jl")
 include("experiments/schema/schema.jl")

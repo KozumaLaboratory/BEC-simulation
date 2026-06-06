@@ -355,19 +355,6 @@ _step_params(s::RotatingBasisGroundStateStep) = s.params
 _step_params(s::RotatingBasisDynamicsStep) = s.params
 _step_params(::AnalyzeStep) = nothing
 
-function _has_nonzero_direction(b_dir::AbstractDict)
-    for k in ("theta", "phi")
-        v = get(b_dir, k, 0.0)
-        if v isa Real
-            v != 0 && return true
-        elseif v isa AbstractDict
-            # Any ramp / waveform form counts as non-trivial direction control.
-            return true
-        end
-    end
-    return false
-end
-
 _step_path(::GroundStateStep) = :split_step
 _step_path(::DynamicsStep) = :split_step
 _step_path(::BinaryGroundStateStep) = :binary

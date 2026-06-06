@@ -5,21 +5,6 @@
 # a GPU→CPU sync point.
 
 """
-Compute per-component norms ∫|ψ_c|² dV for all components in one pass.
-Returns a host Vector{Float64} of length D.
-"""
-function _gpu_component_norms(psi::CuArray{<:Complex}, dV::Float64, ndim::Int, D::Int)
-    N = prod(ntuple(d -> size(psi, d), ndim))
-    psi_2d = reshape(psi, N, D)
-    # Compute sum(abs2, col) for each component as a single GPU operation
-    # abs2_psi is N×D, sum over dim 1 gives 1×D on GPU → single transfer
-    norms_gpu = sum(abs2, psi_2d; dims=1)  # 1×D CuArray — one kernel
-    norms_host = vec(Array(norms_gpu))       # single GPU→CPU transfer
-    norms_host .*= dV
-    norms_host
-end
-
-"""
 GPU-native normalize: compute total norm in one GPU reduction.
 """
 function SpinorBEC._normalize_psi!(psi::CuArray{<:Complex}, grid, n_components, ndim)

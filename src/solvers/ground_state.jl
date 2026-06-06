@@ -1,7 +1,6 @@
 export find_ground_state
 
 const _ITP_EXPONENT_LIMIT = 50.0
-const _ITP_DDI_WARN_EXPONENT = 20.0
 
 function _check_itp_overflow(ws, step::Int)
     if any(isnan, ws.state.psi)

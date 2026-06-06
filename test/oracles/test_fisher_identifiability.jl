@@ -1,51 +1,58 @@
-# Fisher identifiability — the preflight instrument for the trust
-# ledger's third column (docs/design/hamiltonian_layered_architecture.md
-# §4.7, §5). Verifies, on a tiny static protocol:
+# Fisher identifiability — preflight anchors for the trust ledger's
+# third column (docs/design/hamiltonian_layered_architecture.md §4.7,
+# §5), built on the EXISTING `src/analysis/fisher.jl` machinery
+# (fisher_jacobian / fisher_information / identifiable_directions —
+# written for exactly this mission: "probe whether the EdH ring-stage
+# observables determine all 7 spin-6 channel scattering lengths").
+#
+# History note: a duplicate validation/fisher_identifiability.jl was
+# briefly created 2026-06-06 without grepping for prior art and deleted
+# the same day when the repo-wide sweep caught the collision (two
+# same-name fisher_information methods with different return shapes).
+# The unique value of that unit was these TESTS, now wired to the real
+# API:
 #
 #   1. linearity anchors — every parameter here enters its energy slot
 #      linearly, so central FD is EXACT and ∂E_T/∂c = E_T/c is a free
-#      identity (the §3 "checked, never declared" rule);
-#   2. θ-valley — the FD-in-θ machinery certified by the same
-#      valley_scan as the ψ-space bootstrap (:exact_floor for linear
-#      parameters);
+#      identity (the "checked, never declared" rule);
+#   2. θ-valley — FD-in-θ certified by the same valley_scan as the
+#      ψ-space bootstrap (:exact_floor for linear parameters);
 #   3. degenerate-protocol DETECTION — a protocol measuring only
-#      E_total cannot identify 4 parameters: the report must say so
-#      (null directions found, identifiable == false). This is the
-#      failure class no code oracle sees: green suite + unidentifiable
-#      protocol = confidently wrong posteriors;
+#      E_total cannot identify 4 parameters: identifiable_directions
+#      must report rank 1 (the failure class no code oracle sees:
+#      green suite + unidentifiable protocol = confidently wrong
+#      posteriors);
 #   4. rich-protocol verdict — per-slot energies identify all 4;
-#   5. channel-space chain (the SBI shape, F=1): identifiability
-#      transported to channel couplings (g₀, g₂) through the
-#      T-CG-verified inverse map — J_chan = J_c · ∂(c₀,c₁)/∂(g₀,g₂).
+#   5. channel-space chain (the SBI shape, F=1): J_g = J_c · ∂c/∂g
+#      through the T-CG-verified inverse map.
 #
-# Observables are computed on the DUMB side (independence) for a FIXED
-# reference state — the static cost regime. Dynamic protocols reuse
-# the same machinery with f wrapping full forward runs (2·n_θ runs,
-# TSUBAME-parallel); that wiring lands with the first real campaign.
+# Observables on the DUMB side (independence), fixed reference state —
+# the static cost regime. Dynamic protocols reuse fisher_jacobian with
+# f wrapping full forward runs (2·n_θ runs, TSUBAME-parallel).
 
 using Test
 using SpinorBEC
-using SpinorBEC: fd_jacobian, fisher_information, identifiability_report
+using SpinorBEC: fisher_jacobian, fisher_information, identifiable_directions
 using SpinorBEC: dumb_energy_breakdown
 using Random
 
 include(joinpath(@__DIR__, "..", "helpers", "fd_gradient.jl"))
 
-# θ = [c0, c1, c_dd, p]; ws rebuilt per evaluation (the FD-in-θ way);
-# observables on a fixed reference state.
+# θ = [c0, c1, c_dd, p]; ws rebuilt per evaluation; observables on a
+# fixed reference state.
 const GRID_F = make_grid(GridConfig{1}((8,), (6.0,)))
 const PSI_F = let
     psi = init_psi(GRID_F, SpinSystem(1); state=:spin_coherent, init_theta=π / 4)
     psi ./ sqrt(sum(abs2, psi) * SpinorBEC.cell_volume(GRID_F))
 end
 
-function _ws_at(θ::AbstractVector{Float64})
+function _ws_at(θ::AbstractVector{<:Real})
     sp = SimParams(; dt=0.005, n_steps=1, imaginary_time=false, normalize_every=0)
     return make_workspace(;
         grid=GRID_F, atom=Rb87,
-        interactions=InteractionParams(Dict(0 => θ[1], 1 => θ[2])),
-        zeeman=ZeemanParams(θ[4], 0.0), potential=HarmonicTrap((1.0,)),
-        sim_params=sp, enable_ddi=true, c_dd=θ[3], secular_ddi=false,
+        interactions=InteractionParams(Dict(0 => Float64(θ[1]), 1 => Float64(θ[2]))),
+        zeeman=ZeemanParams(Float64(θ[4]), 0.0), potential=HarmonicTrap((1.0,)),
+        sim_params=sp, enable_ddi=true, c_dd=Float64(θ[3]), secular_ddi=false,
     )
 end
 
@@ -57,16 +64,15 @@ end
 _total_energy_only(θ) = [sum(_slot_energies(θ))]
 
 const θ0 = [0.5, 0.1, 0.05, 0.3]
+const PNAMES = ["c0", "c1", "c_dd", "p"]
 
-@testset "Fisher identifiability (preflight instrument)" begin
+@testset "Fisher identifiability (preflight anchors on analysis/fisher.jl)" begin
     @testset "linearity anchors: ∂E_slot/∂c = E_slot/c, FD exact" begin
-        J = fd_jacobian(_slot_energies, θ0)
+        J = fisher_jacobian(_slot_energies, θ0, identity)
         E = _slot_energies(θ0)
         for (i, j) in ((1, 1), (2, 2), (3, 3), (4, 4))
             @test isapprox(J[i, j], E[i] / θ0[j]; rtol=1e-9)
         end
-        # cross-terms vanish: each slot energy depends only on its own
-        # coefficient (fixed state, linear entry)
         for i in 1:4, j in 1:4
             i == j && continue
             @test abs(J[i, j]) < 1e-9 * max(abs(J[i, i]), 1.0)
@@ -86,23 +92,22 @@ const θ0 = [0.5, 0.1, 0.05, 0.3]
         @test v.kind === :exact_floor   # linear in c1: central FD exact
     end
 
-    @testset "degenerate protocol DETECTED (E_total only)" begin
-        rep = identifiability_report(
-            _total_energy_only, θ0;
-            param_names=["c0", "c1", "c_dd", "p"],
-        )
-        @test rep.identifiable == false
-        @test length(rep.null_directions) == 3   # rank 1 from 4 params
+    @testset "degenerate protocol DETECTED (E_total only ⇒ rank 1)" begin
+        J = fisher_jacobian(_total_energy_only, θ0, identity)
+        fish = fisher_information(J, [1.0])
+        rep = identifiable_directions(fish; param_names=PNAMES)
+        @test rep.measurable_count == 1
+        @test count(!, rep.is_identifiable) == 3   # 3 null directions
+        @test count(isinf, rep.posterior_sigma) == 3
     end
 
     @testset "rich protocol identifies all 4 (per-slot energies)" begin
-        rep = identifiability_report(
-            _slot_energies, θ0;
-            param_names=["c0", "c1", "c_dd", "p"],
-        )
-        @test rep.identifiable == true
-        @test isempty(rep.null_directions)
-        @test isfinite(rep.cond)
+        J = fisher_jacobian(_slot_energies, θ0, identity)
+        fish = fisher_information(J, ones(4))
+        rep = identifiable_directions(fish; param_names=PNAMES)
+        @test rep.measurable_count == 4
+        @test all(rep.is_identifiable)
+        @test all(isfinite, rep.posterior_sigma)
     end
 
     @testset "channel-space chain (F=1 SBI shape): J_g = J_c · ∂c/∂g" begin
@@ -112,15 +117,15 @@ const θ0 = [0.5, 0.1, 0.05, 0.3]
         f_chan = g -> _slot_energies(
             [(g[1] + 2g[2]) / 3, (g[2] - g[1]) / 3, θ0[3], θ0[4]]
         )
-        J_g = fd_jacobian(f_chan, g0vec)
+        J_g = fisher_jacobian(f_chan, g0vec, identity)
         c_of_g = [(g0vec[1] + 2g0vec[2]) / 3, (g0vec[2] - g0vec[1]) / 3, θ0[3], θ0[4]]
-        J_c = fd_jacobian(_slot_energies, c_of_g)
-        @test isapprox(J_g, J_c[:, 1:2] * M; rtol=1e-7, atol=1e-10)
-        # And the channel protocol is identifiable from the two contact
-        # slots alone:
-        rep = identifiability_report(
-            g -> f_chan(g)[1:2], g0vec; param_names=["g0", "g2"]
+        J_c = fisher_jacobian(_slot_energies, c_of_g, identity)
+        @test isapprox(J_g, J_c[:, 1:2] * M; rtol=1e-6, atol=1e-10)
+        # Channel protocol identifiable from the two contact slots alone:
+        J2 = fisher_jacobian(g -> f_chan(g)[1:2], g0vec, identity)
+        rep = identifiable_directions(
+            fisher_information(J2, ones(2)); param_names=["g0", "g2"]
         )
-        @test rep.identifiable == true
+        @test rep.measurable_count == 2
     end
 end

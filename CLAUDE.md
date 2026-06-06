@@ -108,7 +108,7 @@ Four primitives:
 | **hamiltonian/tdhfb/** | Time-Dependent HFB local-approximation engine — voxel-local BdG Strang step (channel kernel + HF self-energy + Δ from φφ + κ) + Y4-midpoint Picard wrapper + total-energy functional conserved by step. | Engine **parallel to GP**; YAML pipeline integration deferred. Do NOT wire `dynamics.tdhfb` into `run_yaml` without explicit ask. |
 | **analysis/** | observables + energy_decomposition + currents + vorticity + vortex_extraction + diagnostics + Majorana stars + icosahedral order + TOF + tomography + Faraday + imaging + Fisher + topology (winding / monopole / holonomy) + synthetic_dimension + time_resolved + stability_analysis + spin_rotation. | `_get_spinor(psi, I, Val(13))` allocates 352 B/call at D=13 (SROA elides inside hot loops). Use `Matrix` / `MVector`; `SMatrix` heap-allocates at D=13. |
 | **analysis/phases/** | phase_classification + phase_boundary + Bogoliubov spectrum + scan + sign_pattern + F6 phase diagram + polyhedral classifier (σ_S fingerprint + direct ΔE) + canonical polyhedral states. | Bogoliubov k=0 Goldstone μ convention: `omega[:, 1]` is column-index k-mode 1, NOT `omega[1, :]`. |
-| **solvers/ground_state + lbfgs** | ITP (`find_ground_state`) + checkpoint + adaptive + advanced (multistart + Jz-constrained) + LBFGS with Sobolev preconditioner. | ITP Zeeman shift subtracts `min(E_m)`. `find_ground_state_lbfgs` returns `(workspace, converged, energy, dE, last_step)` — no grad_norm. Tensor c2/c4 falls back to ITP with `@warn`. |
+| **solvers/ground_state + lbfgs** | ITP (`find_ground_state`) + checkpoint + adaptive + advanced (multistart + Jz-constrained) + LBFGS with Sobolev preconditioner. | ITP Zeeman shift subtracts `min(E_m)`. `find_ground_state_lbfgs` returns an atomic NamedTuple incl. `grad_norm` (spine G). Tensor c2/c4 falls back to ITP with `@warn`. |
 | **solvers/continuation** | scan_1d + scan_2d + boundary tracing + pseudo_arclength + triple_point. | `make_params(val)` returns kwarg NamedTuple or `InteractionParams`. Legacy `make_interactions` removed. |
 | **solvers/simulation + twa + sgpe + projected_gp + photon_heating + binary** | RTP (`run_simulation!`) + adaptive + embedded-adaptive + Truncated Wigner + SGPE callback (true thermal init) + projected GP + photon scattering + two-component GP. | TWA σ/μ is chaotic-dipolar divergence, NOT classical thermalization. |
 | **workflow/experiments/{schema,runtime,analyzers,pipeline}** | YAML compile (units + templates + mixins + defaults + B-block + noise-block + auto-defaults + ε hardening) + runtime helpers (b_block_builders, pulse_sequence, STA counter-diabatic, Feshbach ramp) + analyzers + pipeline runner. | `_step_dispatch!` has `@noinline` + `@nospecialize(step)` — the inference firewall. |
@@ -248,7 +248,7 @@ NOT bugs — don't "fix".
 - **`secular_ddi=true` is user-chosen**, not auto. `make_workspace` `@info` advisory in secular regime.
 - **`spin_rotating_frame_omega ≠ 0` requires `secular_ddi=true`** (enforced via `ArgumentError`). Full DDI's off-diagonal components Larmor-average to zero only in secular limit.
 - **`even_c_extra(F; c2, c4, c6, …)` is canonical** — hand-written `[c2, c4, c6]` silently misindexes for F ≥ 3.
-- **`split_step_captured!` on GPU silently falls back** to `split_step!`. CUDA-Graph in `ext/SpinorBECCUDAExt/gpu_graph.jl` disabled (replay drift, 4× slower).
+- CUDA-Graph in `ext/SpinorBECCUDAExt/gpu_graph.jl` disabled (replay drift, 4× slower); `split_step_captured!` itself was deleted 2026-05-22.
 - **Tensor c2/c4 not in `energy_gradient!`** — LBFGS warns, falls back to ITP. `[KNOWN-LIMIT]`.
 - **TDHFB has no YAML pipeline integration.** `dynamics.tdhfb` does NOT exist. Engine parallel-track to GP; do not wire in without explicit ask.
 
@@ -358,7 +358,7 @@ When CLAUDE.md and a memory file disagree: **CLAUDE.md wins for structural quest
 - `spin_matrices(F::Int)` takes the spin quantum number (e.g. 6 for ¹⁵¹Eu), NOT 2F+1.
 - `|F/n|²` = density-weighted avg of `(f/n)²`, NOT `f²/n`.
 - Ramp `:log` scale = time-warp `g(t) = log(1 + (e-1) t)`, NOT geometric. Scan `:log` IS geometric.
-- `find_ground_state_lbfgs` returns `(workspace, converged, energy, dE, last_step)` (no grad_norm).
+- `find_ground_state_lbfgs` returns an atomic NamedTuple **including `grad_norm`** (spine G, recomputed at the returned ψ — never trust disk-cached grad_norm).
 - `_run_analyzer` needs `ws_prev` even on cache hit.
 - `pipeline_runner.jl` doesn't forward `verbose` to ITP (loud); does forward to LBFGS (silent).
 - `_cuda_reclaim_callback` runs between scan points.

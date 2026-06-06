@@ -9,15 +9,12 @@
 # Per-workspace cache. Parameterised on T (Float32 / Float64).
 mutable struct GPUSMCache{D, T <: AbstractFloat}
     V::CuArray{Complex{T}, 2}          # D×D Fy eigenvectors V
-    Vt::CuArray{Complex{T}, 2}         # D×D V_adj = (V^T)* (legacy gemm path)
     conj_V::CuArray{Complex{T}, 2}     # D×D V* (for shared apply_euler_5stage_fused!)
-    V_T::CuArray{Complex{T}, 2}        # D×D V^T (for shared helper)
     λ::CuArray{T, 2}                    # (1,D) Fy eigenvalues (for Ry fusion)
     m_vals::CuArray{T, 2}               # (1,D) m-values (for Rz fusion)
     m_shift::CuArray{T, 2}              # (1,D) m_vals - F (ITP Dz shift)
     F::T
     # Work buffers
-    tmp::CuArray{Complex{T}, 2}        # (N, D)
     fz::CuArray{T, 1}                   # (N,)
     fx::CuArray{T, 1}                   # (N,)
     fy::CuArray{T, 1}                   # (N,)
@@ -45,14 +42,11 @@ function _get_gpu_sm_cache(
     V_host = Matrix{Complex{T}}(sm.Fy_eigvecs)
     cache = GPUSMCache{D, T}(
         CuArray(V_host),
-        CuArray(Matrix{Complex{T}}(sm.Fy_eigvecs_adj)),
         CuArray(conj.(V_host)),
-        CuArray(transpose(V_host) |> Matrix),
         CuArray(reshape(λ_host, 1, D)),
         CuArray(reshape(m_vals, 1, D)),
         CuArray(reshape(m_shift_host, 1, D)),
         F,
-        CUDA.zeros(Complex{T}, N, D),
         CUDA.zeros(T, N),
         CUDA.zeros(T, N),
         CUDA.zeros(T, N),
@@ -91,7 +85,6 @@ function SpinorBEC.apply_spin_mixing_step!(
     psi_mf_2d = psi_mf === nothing ?
                 psi_2d :
                 reshape(psi_mf::CuArray{Complex{T}}, N, D)
-    tmp = cache.tmp
     fz = cache.fz
     fx = cache.fx
     fy = cache.fy

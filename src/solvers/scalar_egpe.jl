@@ -31,7 +31,6 @@ struct ScalarSimWS{T <: AbstractFloat, N, FP, IP}
 
     # static parts
     V_trap::Array{T, N}
-    kinetic_phase::Array{Complex{T}, N}   # exp(-i k²/2 · dt) precomputed for chosen dt
 
     # couplings (all in dimensionless reference units)
     g_contact::T          # 4π·a_s·N (scalar contact)
@@ -47,7 +46,6 @@ function make_scalar_ws(
     c_dd::Real,
     F::Real,
     gamma_lhy::Real=0.0,
-    dt::Real=0.0,
 ) where {N, T <: AbstractFloat}
     n_pts = grid.config.n_points
     psi = zeros(Complex{T}, n_pts...)
@@ -59,21 +57,10 @@ function make_scalar_ws(
     fft_fwd = plan_fft!(similar(psi))
     fft_inv = plan_ifft!(similar(psi))
 
-    # Pre-build kinetic_phase if dt provided (callers can rebuild later)
-    kinetic_phase = if dt > 0
-        kp = zeros(Complex{T}, n_pts...)
-        @inbounds for I in CartesianIndices(n_pts)
-            kp[I] = cis(-T(dt) * grid.k_squared[I] / 2)
-        end
-        kp
-    else
-        zeros(Complex{T}, n_pts...)
-    end
-
     ScalarSimWS{T, N, typeof(fft_fwd), typeof(fft_inv)}(
         psi, grid, fft_fwd, fft_inv,
         psi_k, rho, rho_c, V_dd,
-        Array(V_trap), kinetic_phase,
+        Array(V_trap),
         T(g_contact), T(c_dd), T(F), T(gamma_lhy),
     )
 end
@@ -180,17 +167,6 @@ function apply_kinetic_step_scalar!(
         @inbounds for I in eachindex(ws.psi)
             ws.psi[I] *= cis(-T(dt) * ws.grid.k_squared[I] / 2)
         end
-    end
-    ws.fft_inv * ws.psi
-    nothing
-end
-
-"""Faster kinetic step that uses the precomputed `ws.kinetic_phase`.
-Caller is responsible for ensuring kinetic_phase matches the dt being passed."""
-function apply_kinetic_step_cached!(ws::ScalarSimWS{T, N}) where {T, N}
-    ws.fft_fwd * ws.psi
-    @inbounds for I in eachindex(ws.psi)
-        ws.psi[I] *= ws.kinetic_phase[I]
     end
     ws.fft_inv * ws.psi
     nothing

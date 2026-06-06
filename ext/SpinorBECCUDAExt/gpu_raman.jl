@@ -5,14 +5,11 @@
 
 mutable struct GPURamanCache{D, T <: AbstractFloat}
     V::CuArray{Complex{T}, 2}
-    Vt::CuArray{Complex{T}, 2}
     conj_V::CuArray{Complex{T}, 2}    # D×D V* (for shared apply_euler_5stage_fused!)
-    V_T::CuArray{Complex{T}, 2}       # D×D V^T (for shared helper)
     λ::CuArray{T, 2}                  # (1, D) — fused with (N, 1) for D-wide broadcast
     m_vals::CuArray{T, 2}             # (1, D)
     m_shift::CuArray{T, 2}            # (1, D)  m_vals - F
     F::T
-    tmp::CuArray{Complex{T}, 2}
     β::CuArray{T, 2}                  # (N, 1)
     α::CuArray{T, 2}                  # (N, 1)
     θ::CuArray{T, 2}                  # (N, 1)
@@ -48,14 +45,11 @@ function _get_gpu_raman_cache(
     V_host = Matrix{Complex{T}}(sm.Fy_eigvecs)
     cache = GPURamanCache{D, T}(
         CuArray(V_host),
-        CuArray(Matrix{Complex{T}}(sm.Fy_eigvecs_adj)),
         CuArray(conj.(V_host)),
-        CuArray(transpose(V_host) |> Matrix),
         CuArray(reshape(λ_host, 1, D)),
         CuArray(reshape(m_vals, 1, D)),
         CuArray(reshape(m_shift, 1, D)),
         F,
-        CUDA.zeros(Complex{T}, N_spatial, D),
         CUDA.zeros(T, N_spatial, 1),
         CUDA.zeros(T, N_spatial, 1),
         CUDA.zeros(T, N_spatial, 1),
@@ -80,7 +74,6 @@ function SpinorBEC.apply_raman_step!(
     F = cache.F
 
     psi_2d = reshape(psi, N_spatial, D)
-    tmp = cache.tmp
     β = cache.β
     α = cache.α
     θ = cache.θ

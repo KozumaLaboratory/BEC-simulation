@@ -10,7 +10,6 @@ mutable struct EnergyHostCache
     plans::Any  # FFTPlanPair
     ddi_host::Union{Nothing, SpinorBEC.DDIParams}
     ddi_bufs::Union{Nothing, SpinorBEC.DDIBuffers}
-    n_pts::Tuple
     # Reused buffers for per-call host transfers (avoid ~5 MB/call leak
     # at 24³ × D=13 that accumulated to 23 GB over 1000 LBFGS iterations).
     psi_host::Union{Nothing, Array{ComplexF64}}
@@ -51,7 +50,7 @@ function _get_energy_cache(ws::SpinorBEC.Workspace{N}) where {N}
         )
     end
 
-    cache = EnergyHostCache(fft_buf, plans, ddi_host, ddi_bufs, n_pts, nothing, nothing)
+    cache = EnergyHostCache(fft_buf, plans, ddi_host, ddi_bufs, nothing, nothing)
     _ENERGY_CACHE[key] = cache
     cache
 end
@@ -63,7 +62,7 @@ function _cached_ddi_energy(
     psi_host,
     sm::SpinorBEC.SpinMatrices{D},
     ecache::EnergyHostCache,
-    n_comp, ndim, n_pts, dV,
+    ndim, n_pts, dV,
 ) where {D}
     bufs = ecache.ddi_bufs
     SpinorBEC._compute_spin_density!(
@@ -132,7 +131,7 @@ function SpinorBEC._energy_decomposition_gpu(ws::SpinorBEC.Workspace{N}) where {
 
     E_ddi = if ws.ddi !== nothing
         if SpinorBEC._is_gpu(ws.ddi_bufs.Fx_r) && ecache.ddi_host !== nothing
-            _cached_ddi_energy(psi, ws.spin_matrices, ecache, n_comp, N, n_pts, dV)
+            _cached_ddi_energy(psi, ws.spin_matrices, ecache, N, n_pts, dV)
         elseif SpinorBEC._is_gpu(ws.ddi_bufs.Fx_r)
             SpinorBEC._ddi_energy_from_gpu(
                 psi, ws.spin_matrices, ws.ddi, ws.ddi_bufs, n_comp, N, n_pts, dV;

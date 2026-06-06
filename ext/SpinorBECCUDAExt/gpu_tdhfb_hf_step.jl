@@ -23,7 +23,6 @@ mutable struct GPUTDHFBScratch{TC <: Complex, TR <: AbstractFloat}
     # W and matrix-exp scratch (2D × 2D × N_vox)
     W::CuArray{TC, 3}
     M::CuArray{TC, 3}
-    Minv::CuArray{TC, 3}
     A_scratch::CuArray{TC, 3}          # matrix-exp Taylor scratch
     A_tmp::CuArray{TC, 3}
     P_tmp::CuArray{TC, 3}
@@ -56,7 +55,6 @@ function _get_or_build_scratch(
         CUDA.zeros(TC, D, D, N_vox),
         CUDA.zeros(TC, D, D, N_vox),
         CUDA.zeros(TC, D, D, N_vox),
-        CUDA.zeros(TC, twoD, twoD, N_vox),
         CUDA.zeros(TC, twoD, twoD, N_vox),
         CUDA.zeros(TC, twoD, twoD, N_vox),
         CUDA.zeros(TC, twoD, twoD, N_vox),

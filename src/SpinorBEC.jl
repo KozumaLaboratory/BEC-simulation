@@ -100,11 +100,6 @@ include("validation/reference_rhs.jl")
 # and test/oracles/test_master_oracle.jl.
 include("validation/dumb_reference.jl")
 
-# Fisher identifiability — the preflight instrument guarding the
-# trust ledger's third column (the no-anchor SBI regime). See
-# docs/design/hamiltonian_layered_architecture.md §4.7 + §5.
-include("validation/fisher_identifiability.jl")
-
 # ========================================
 # EXPERIMENT / BATCH: unified workflow model
 # ========================================

@@ -165,30 +165,3 @@ function hf_matrix_F1(
     return hf_matrix_F1!(h_hf, phi, rho, kappa, c0, c1)
 end
 
-# Smoke test: at the trivial vacuum (rho=0, kappa=0), h^HF reduces to
-# mean-field-only c_0 |φ|² + c_1 |⟨F⟩|² contributions.
-function _test_hf_matrix_F1_vacuum()
-    # Test on a 1D grid with 4 points
-    nx = 4
-    phi = zeros(ComplexF64, nx, 3)
-    rho = zeros(ComplexF64, nx, 3, 3)
-    kappa = zeros(ComplexF64, nx, 3, 3)
-
-    # Initialize phi to a polar state: phi = (0, 1, 0)
-    phi[:, 2] .= 1.0 + 0im
-
-    c0 = 1.0
-    c1 = 0.1
-
-    h_hf = hf_matrix_F1(phi, rho, kappa, c0, c1)
-
-    # Expected: polar mean-field, ⟨F⟩ = 0, n = 1 everywhere
-    # h^HF = c_0 · 1 · I = diag(c_0, c_0, c_0)
-    # Plus c_1 · 0 (zero ⟨F⟩ contribution) = 0
-    # So h^HF_{m,m'} = c_0 · δ_{m,m'} = δ_{m,m'}
-    for i in 1:nx, m in 1:3, m_prime in 1:3
-        expected = (m == m_prime) ? c0 : 0.0
-        @assert abs(h_hf[i, m, m_prime] - expected) < 1e-12 "F=1 vacuum HF mismatch at ($i, $m, $m_prime)"
-    end
-    return true
-end
