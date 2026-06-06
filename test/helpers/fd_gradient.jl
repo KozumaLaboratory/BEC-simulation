@@ -37,26 +37,17 @@ canonical_projection(g, δ, dV) = 2 * dV * real(sum(conj.(g) .* δ))
 const FD_H_DECADES = [10.0^k for k in -1.0:-1.0:-8.0]
 
 """
-    fd_valley(E, ψ, δ, ref; hs=FD_H_DECADES, floor_tol=1e-9) -> NamedTuple
+    valley_scan(res; hs, floor_tol=1e-9, healthy_min=1e-7) -> NamedTuple
 
-ε-scaling sweep (§3). `rel_err(h) = |fd_directional(E,ψ,δ,h) − ref| /
-max(|ref|, eps())` over decades of h. Returns
-`(hs, errs, min_err, i_min, slope, kind)` with
-
-- `kind = :exact_floor` — already at roundoff for the LARGEST h: E is
-  (at most) quadratic along δ, central FD is exact up to roundoff.
-  Healthy, and stronger than a valley.
-- `kind = :valley` — truncation descent into a floor below 1e-7;
-  healthy nonlinear-E pair. `slope` is the log-log LSQ fit over the
-  truncation band (indices 2 .. i_min−1; NaN when < 2 points) and
-  should be ≈ +2 for central differences.
-- `kind = :plateau` — h-independent disagreement: the reference and the
-  FD measure different derivatives. Real bug; magnitude of the plateau
-  ≈ relative size of the bug (factor 2 ⇒ ~0.5, sign flip ⇒ ~2).
+Shared valley classifier over a relative-residual function `res(h)`:
+`:exact_floor` (already at roundoff for the largest h), `:valley`
+(descends below `healthy_min`; `slope` = log-log LSQ over the
+truncation band, indices 2..i_min−1), `:plateau` (h-independent
+disagreement — a real bug). Used by `fd_valley` (h = FD step,
+slope ≈ +2) and by the propagator dt-valleys (h = dt, slope ≈ +1).
 """
-function fd_valley(E, ψ, δ, ref; hs=FD_H_DECADES, floor_tol=1e-9)
-    scale = max(abs(ref), eps())
-    errs = [abs(fd_directional(E, ψ, δ, h) - ref) / scale for h in hs]
+function valley_scan(res::Function; hs, floor_tol=1e-9, healthy_min=1e-7)
+    errs = [res(h) for h in hs]
     i_min = argmin(errs)
     min_err = errs[i_min]
     if errs[1] < floor_tol
@@ -72,8 +63,25 @@ function fd_valley(E, ψ, δ, ref; hs=FD_H_DECADES, floor_tol=1e-9)
     else
         NaN
     end
-    kind = min_err < 1e-7 ? :valley : :plateau
+    kind = min_err < healthy_min ? :valley : :plateau
     return (; hs, errs, min_err, i_min, slope, kind)
+end
+
+"""
+    fd_valley(E, ψ, δ, ref; hs=FD_H_DECADES, floor_tol=1e-9) -> NamedTuple
+
+ε-scaling sweep (§3): `valley_scan` over the FD residual
+`|fd_directional(E,ψ,δ,h) − ref| / max(|ref|, eps())`. Healthy slope
+≈ +2 (central differences); plateau magnitude ≈ relative size of the
+bug (factor 2 ⇒ ~0.5, sign flip ⇒ ~2); `:exact_floor` for (at most)
+quadratic E along δ — exact central FD, stronger than a valley.
+"""
+function fd_valley(E, ψ, δ, ref; hs=FD_H_DECADES, floor_tol=1e-9)
+    scale = max(abs(ref), eps())
+    return valley_scan(
+        h -> abs(fd_directional(E, ψ, δ, h) - ref) / scale;
+        hs, floor_tol, healthy_min=1e-7,
+    )
 end
 
 """

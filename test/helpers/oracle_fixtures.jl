@@ -24,7 +24,7 @@ TODO(week-1 §7): variants with MagneticGradient, LightShift, Raman,
 Loss active — every slot of `H_TERMS_CANONICAL_ORDER` needs an active
 fixture before its canary mutants mean anything.
 """
-function oracle_full_ws(; rotating_frame_omega=0.2, box=4.0)
+function oracle_full_ws(; rotating_frame_omega=0.2, box=4.0, ddi=true)
     grid = make_grid(GridConfig{3}((6, 6, 6), (box, box, box)))
     zeeman = TimeDependentZeeman(
         ConstantWaveform(0.3),   # p_wf  — linear Zeeman (Bz)
@@ -40,7 +40,35 @@ function oracle_full_ws(; rotating_frame_omega=0.2, box=4.0)
         grid, atom=Rb87,
         interactions=InteractionParams(Dict(0 => 0.5, 1 => 0.1); c_lhy=0.3),
         zeeman, potential=HarmonicTrap((1.0, 1.0, 1.0)), sim_params=sp,
-        enable_ddi=true, c_dd=0.05, secular_ddi=true,
+        enable_ddi=ddi, c_dd=ddi ? 0.05 : 0.0, secular_ddi=ddi,
+    )
+    psi = init_psi(grid, SpinSystem(1); state=:spin_coherent, init_theta=π / 4)
+    psi ./= sqrt(sum(abs2, psi) * SpinorBEC.cell_volume(grid))
+    return ws, psi
+end
+
+"""
+    aux_ws() -> (ws, psi)
+
+Auxiliary fixture: the terms the full fixture leaves inactive —
+MagneticGradient + diagonal LightShift + static Raman + c2 singlet —
+on a 1D grid (F=1). Together with `oracle_full_ws`, every
+non-deferred slot of `H_TERMS_CANONICAL_ORDER` is active in at least
+one fixture (§7 requirement: inactive terms have invisible bugs).
+"""
+function aux_ws()
+    grid = make_grid(GridConfig{1}((8,), (6.0,)))
+    sp = SimParams(; dt=0.005, n_steps=1, imaginary_time=false, normalize_every=0)
+    prof = [exp(-x^2 / 4) for x in grid.x[1]]
+    U = ComplexF64[1 0 0; 0 1 0; 0 0 1]
+    ws = make_workspace(;
+        grid, atom=Rb87,
+        interactions=InteractionParams(Dict(0 => 0.5, 1 => 0.1, 2 => 0.2)),
+        zeeman=ZeemanParams(0.3, 0.05), potential=HarmonicTrap((1.0,)),
+        sim_params=sp,
+        raman=RamanCoupling{1}(0.4, 0.1, (0.7,)),
+        light_shift=LightShift(prof, [0.2, -0.1, 0.4], U, true),
+        magnetic_gradient=MagneticGradient{1}(0.4, 1, 1.0),
     )
     psi = init_psi(grid, SpinSystem(1); state=:spin_coherent, init_theta=π / 4)
     psi ./= sqrt(sum(abs2, psi) * SpinorBEC.cell_volume(grid))

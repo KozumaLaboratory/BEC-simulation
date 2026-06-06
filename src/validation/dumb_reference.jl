@@ -539,3 +539,53 @@ function dumb_rhs_breakdown(ws, ψ::AbstractArray{<:Complex})
         magnetic_gradient=g_mg, loss=zed(),
     )
 end
+
+# ============================================================================
+# Total RHS + dumb RK4 time integration (reference trajectories)
+# ============================================================================
+
+"""
+    dumb_rhs_total(ws, ψ) -> Array
+
+Sum of all implemented per-slot canonical gradients — the full
+H_eff[ψ]·ψ of the dumb statement. Errors if a deferred slot is active
+(DDI): a reference that silently omits an active term is the
+rotted-reference failure mode, not a reference.
+"""
+function dumb_rhs_total(ws, ψ::AbstractArray{<:Complex})
+    ws.ddi === nothing || error(
+        "dumb_rhs_total: DDI is active but the dumb DDI statement is " *
+        "deferred (own unit). Use a DDI-free fixture.",
+    )
+    G = dumb_rhs_breakdown(ws, ψ)
+    total = zeros(ComplexF64, size(ψ))
+    for slot in keys(G)
+        g = G[slot]
+        g === nothing && continue
+        total .+= g
+    end
+    return total
+end
+
+"""
+    dumb_rk4_evolve(ws, ψ0, T, nsteps) -> Array
+
+Classical RK4 on the full nonlinear dumb RHS, `dψ/dt = −i·G(ψ)` (real
+time, autonomous fields — time-dependent waveforms are evaluated at
+the frozen ws.state.t). Global error O(dt⁴): at tiny grids and small T
+this is the reference trajectory the split-step order test (slope ≈ 2
+for Strang) is measured against.
+"""
+function dumb_rk4_evolve(ws, ψ0::AbstractArray{<:Complex}, T::Float64, nsteps::Int)
+    dt = T / nsteps
+    ψ = ComplexF64.(copy(ψ0))
+    f(ϕ) = -im .* dumb_rhs_total(ws, ϕ)
+    for _ in 1:nsteps
+        k1 = f(ψ)
+        k2 = f(ψ .+ (dt / 2) .* k1)
+        k3 = f(ψ .+ (dt / 2) .* k2)
+        k4 = f(ψ .+ dt .* k3)
+        ψ .+= (dt / 6) .* (k1 .+ 2 .* k2 .+ 2 .* k3 .+ k4)
+    end
+    return ψ
+end

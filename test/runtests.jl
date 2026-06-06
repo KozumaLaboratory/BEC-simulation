@@ -219,6 +219,10 @@ const CI_EXTRA = [
     # set-equivalence meta-test and both sides of the declared
     # KNOWN-LIMIT gaps (raman/tensor RHS).
     "oracles/test_master_oracle.jl",
+    # Propagator references: per-term dt-valleys (step residual vs the
+    # dumb RHS, slope ≈ 1) + Strang order slope vs dumb RK4 (slope ≈ 2).
+    # Limit-class oracles for the face where both 2026-06 sign bugs lived.
+    "oracles/test_propagator_references.jl",
 ]
 
 # ── Full tier: everything (ci + remaining heavy tests) ──

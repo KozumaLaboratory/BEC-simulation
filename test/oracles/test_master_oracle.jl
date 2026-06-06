@@ -47,27 +47,9 @@ const E_ATOL = 1e-12
 const G_RTOL = 1e-10
 const G_ATOL = 1e-11
 
-"""Auxiliary fixture: the terms the full fixture leaves inactive —
-MagneticGradient + diagonal LightShift + static Raman + c2 singlet —
-on a 1D grid (F=1)."""
-function aux_ws()
-    grid = make_grid(GridConfig{1}((8,), (6.0,)))
-    sp = SimParams(; dt=0.005, n_steps=1, imaginary_time=false, normalize_every=0)
-    prof = [exp(-x^2 / 4) for x in grid.x[1]]
-    U = ComplexF64[1 0 0; 0 1 0; 0 0 1]
-    ws = make_workspace(;
-        grid, atom=Rb87,
-        interactions=InteractionParams(Dict(0 => 0.5, 1 => 0.1, 2 => 0.2)),
-        zeeman=ZeemanParams(0.3, 0.05), potential=HarmonicTrap((1.0,)),
-        sim_params=sp,
-        raman=RamanCoupling{1}(0.4, 0.1, (0.7,)),
-        light_shift=LightShift(prof, [0.2, -0.1, 0.4], U, true),
-        magnetic_gradient=MagneticGradient{1}(0.4, 1, 1.0),
-    )
-    psi = init_psi(grid, SpinSystem(1); state=:spin_coherent, init_theta=π / 4)
-    psi ./= sqrt(sum(abs2, psi) * SpinorBEC.cell_volume(grid))
-    return ws, psi
-end
+# `aux_ws` (the MG/light-shift/Raman/c2 fixture) lives in
+# test/helpers/oracle_fixtures.jl — shared with the propagator
+# reference suite.
 
 function compare_all_slots(ws, ψ, label)
     Ed = dumb_energy_breakdown(ws, ψ)
