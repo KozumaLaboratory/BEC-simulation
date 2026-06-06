@@ -57,7 +57,7 @@ function _parse_higher_rank_c_n(inter::Dict, ::Int)
                 "(e.g. KU's c_3 = S=2 pair channel), use `scattering_lengths` on " *
                 "the AtomSpecies or `_make_tensor_cache_from_channels(F, " *
                 "Dict(S => g_S, ...))` directly. " *
-                "See src/hamiltonian/interactions/singlet_pair.jl docstring."),
+                "See src/hamiltonian/terms/contact/singlet_pair.jl docstring."),
         )
     end
     out

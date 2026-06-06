@@ -1,7 +1,7 @@
 # --- Reference loss kernels (K3, L3, dipolar) + analytic uniform-density
 # K3 rate test ---
 #
-# Production lives in src/hamiltonian/interactions/losses.jl as
+# Production lives in src/hamiltonian/terms/loss/losses.jl as
 # `apply_loss_step!`. Production multiplies ψ by exp(-rate·dt/2) twice
 # per step (Strang-symmetric loss substep). Reference: apply the
 # *rate* directly to ψ — the "Hψ" of a dissipative term is purely

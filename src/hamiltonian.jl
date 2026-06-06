@@ -1,75 +1,89 @@
 # --- Hamiltonian subsystem umbrella ---
 #
-# Interaction kernels + scalar potentials + integrator primitives. Files
-# group by topic and rely on foundation types being already in scope.
+# Coefficient algebra + per-term kernels + integrator primitives. Files
+# group by term or shared role; foundation types must already be in scope.
 #
-#   interactions/{interactions,spin_mixing,singlet_pair,tensor_interaction}
-#       — c0/c1 contact + spin-mixing + S=0 singlet-pair + general-F tensor
-#   interactions/ddi/{qtensor,convolution,rotation} + ddi.jl + ddi_padded.jl
+#   coefficients.jl
+#       — c↔g coefficient algebra (c0/c1 contact, tensor channels, TDHFB,
+#         Bogoliubov); shared by all contact-family terms
+#   shared/{rotation,spin_rotation}.jl
+#       — Euler 5-stage spinor rotation + rotation cache (used by DDI
+#         propagator and spin_mixing); spatially uniform spin rotation
+#         (used by Raman propagator, transverse Zeeman, and rotating basis)
+#   terms/contact/{spin_mixing,singlet_pair,tensor_interaction}
+#       — c0/c1 contact + S=0 singlet-pair + general-F tensor
+#   terms/ddi/{qtensor,convolution} + apply_ddi_step + ddi_term + ddi_padded
 #       — k-space DDI Q-tensor + 6-FFT convolution + Euler 5-stage spinor
 #         rotation + zero-padded DDI for non-periodic geometries
-#   interactions/lhy/{phi_one_reg,polar_contact,polar_dipolar,fm_contact,
-#                     fm_dipolar,icosahedral,modes_round45,dispatch}
+#   terms/lhy/{phi_one_reg,polar_contact,polar_dipolar,fm_contact,
+#              fm_dipolar,icosahedral,modes_round45,dispatch}
 #       — closed-form spinor LHY tables for various spin phases
-#   interactions/{losses,absorbing_boundary} — dipolar relaxation + ABC
+#   terms/loss/{losses} + loss_term — dipolar relaxation + ABC
 #   dynamics/{sinatra_helpers,utils_resolution_sinatra}
 #       — TWA validity checks + resolution suggestion utilities
-#   potentials/{potentials,zeeman,raman,optics,laser_potential,
-#                optical_trap,light_shift}
-#       — trap evaluators + Zeeman + Raman coupling + Gaussian-beam optics
-#         + dipole trap + AC Stark / light shift
+#   terms/trap/{evaluate_potential} + trap_term
+#       — trap evaluators and potential application
+#   terms/zeeman/{accessors,zeeman_builders} + zeeman_term
+#       — Zeeman accessors, builders, and HamTerm
+#   terms/raman/{raman} + raman_term; shared/spin_rotation for uniform rotation
+#       — Raman coupling + spatially uniform spin rotation
+#   optics/{optics,laser_potential,optical_trap}
+#       — Gaussian-beam optics + dipole trap builders (not HamTerms)
+#   terms/light_shift/{light_shift_builders} + light_shift_term
+#       — AC Stark / light shift
 #   integrator/{propagators,yoshida,split_step_kernels,split_step,
-#                split_step_composers}
+#                split_step_composers,absorbing_boundary}
 #       — kinetic/potential primitives, adaptive Yoshida driver,
 #         Coriolis/shear/DDI GPU kernels, top-level split_step!,
-#         Yoshida/Suzuki/Blanes-Moan composers
+#         Yoshida/Suzuki/Blanes-Moan composers, absorbing boundary condition
 
-# Interactions.
-include("hamiltonian/interactions/interactions.jl")
-include("hamiltonian/interactions/spin_mixing.jl")
-include("hamiltonian/interactions/singlet_pair.jl")
-include("hamiltonian/interactions/tensor_interaction.jl")
-include("hamiltonian/interactions/ddi/qtensor.jl")
-include("hamiltonian/interactions/ddi/convolution.jl")
-include("hamiltonian/interactions/ddi/rotation.jl")
-include("hamiltonian/interactions/ddi.jl")
-include("hamiltonian/interactions/ddi_padded.jl")
-include("hamiltonian/interactions/lhy/phi_one_reg.jl")
-include("hamiltonian/interactions/lhy/polar_contact.jl")
-include("hamiltonian/interactions/lhy/polar_dipolar.jl")
-include("hamiltonian/interactions/lhy/fm_contact.jl")
-include("hamiltonian/interactions/lhy/fm_dipolar.jl")
-include("hamiltonian/interactions/lhy/icosahedral.jl")
-include("hamiltonian/interactions/lhy/modes_round45.jl")
+# Coefficient algebra (shared by contact family, TDHFB, Bogoliubov).
+include("hamiltonian/coefficients.jl")
+include("hamiltonian/terms/contact/spin_mixing.jl")
+include("hamiltonian/terms/contact/singlet_pair.jl")
+include("hamiltonian/terms/contact/tensor_interaction.jl")
+include("hamiltonian/terms/ddi/qtensor.jl")
+include("hamiltonian/terms/ddi/convolution.jl")
+include("hamiltonian/shared/rotation.jl")
+include("hamiltonian/terms/ddi/apply_ddi_step.jl")
+include("hamiltonian/terms/ddi/ddi_padded.jl")
+include("hamiltonian/terms/lhy/phi_one_reg.jl")
+include("hamiltonian/terms/lhy/polar_contact.jl")
+include("hamiltonian/terms/lhy/polar_dipolar.jl")
+include("hamiltonian/terms/lhy/fm_contact.jl")
+include("hamiltonian/terms/lhy/fm_dipolar.jl")
+include("hamiltonian/terms/lhy/icosahedral.jl")
+include("hamiltonian/terms/lhy/modes_round45.jl")
 include("dynamics/sinatra_helpers.jl")
 include("dynamics/utils_resolution_sinatra.jl")
-include("hamiltonian/interactions/lhy/dispatch.jl")
-include("hamiltonian/interactions/losses.jl")
-include("hamiltonian/interactions/absorbing_boundary.jl")
+include("hamiltonian/terms/lhy/dispatch.jl")
+include("hamiltonian/terms/loss/losses.jl")
+include("hamiltonian/integrator/absorbing_boundary.jl")
 
-# Potentials.
-include("hamiltonian/potentials/potentials.jl")
-include("hamiltonian/potentials/zeeman.jl")
-include("hamiltonian/potentials/zeeman_builders.jl")
-include("hamiltonian/potentials/raman.jl")
-include("hamiltonian/potentials/optics.jl")  # Must precede laser_potential (defines OpticalBeam)
-include("hamiltonian/potentials/laser_potential.jl")
-include("hamiltonian/potentials/optical_trap.jl")
-include("hamiltonian/potentials/light_shift.jl")
+# Potentials / builders.
+include("hamiltonian/terms/trap/evaluate_potential.jl")
+include("hamiltonian/terms/zeeman/accessors.jl")
+include("hamiltonian/terms/zeeman/zeeman_builders.jl")
+include("hamiltonian/shared/spin_rotation.jl")
+include("hamiltonian/terms/raman/raman.jl")
+include("hamiltonian/optics/optics.jl")  # Must precede laser_potential (defines OpticalBeam)
+include("hamiltonian/optics/laser_potential.jl")
+include("hamiltonian/optics/optical_trap.jl")
+include("hamiltonian/terms/light_shift/light_shift_builders.jl")
 
 # HamTerm protocol (sign-bug-proof architecture, Phase 1).
 # See `docs/conventions/sign_bug_proof_architecture.md`.
 include("hamiltonian/terms/base.jl")
-include("hamiltonian/terms/zeeman.jl")        # LinearZeemanZ + TransverseZeeman + MagneticGradient
+include("hamiltonian/terms/zeeman/zeeman.jl")        # LinearZeemanZ + TransverseZeeman + MagneticGradient
 include("hamiltonian/terms/coriolis.jl")
 include("hamiltonian/terms/kinetic.jl")
-include("hamiltonian/terms/trap.jl")
-include("hamiltonian/terms/contact.jl")       # DensityC0 + SpinC1 + Tensor
-include("hamiltonian/terms/ddi.jl")
-include("hamiltonian/terms/lhy.jl")
-include("hamiltonian/terms/raman.jl")
-include("hamiltonian/terms/light_shift.jl")
-include("hamiltonian/terms/loss.jl")
+include("hamiltonian/terms/trap/trap.jl")
+include("hamiltonian/terms/contact/contact.jl")       # DensityC0 + SpinC1 + Tensor
+include("hamiltonian/terms/ddi/ddi_term.jl")
+include("hamiltonian/terms/lhy/lhy_term.jl")
+include("hamiltonian/terms/raman/raman_term.jl")
+include("hamiltonian/terms/light_shift/light_shift_term.jl")
+include("hamiltonian/terms/loss/loss_term.jl")
 include("hamiltonian/terms/registry.jl")
 
 # Integrators.

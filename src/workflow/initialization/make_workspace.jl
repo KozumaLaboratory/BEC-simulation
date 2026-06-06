@@ -513,7 +513,7 @@ end
 #   coefficients (g_2, g_4, g_8 cancel) are specific to F=6 I_h. F=10/12 I_h
 #   states share the point group but have different closed forms — dispatch
 #   them through their own builder, not this branch.
-# See: src/hamiltonian/interactions/lhy/icosahedral.jl
+# See: src/hamiltonian/terms/lhy/icosahedral.jl
 function _build_spinor_lhy(::Val{:icosahedral}, atom, ws, psi_init, c_dd, enable_ddi)
     atom.F == 6 || throw(ArgumentError(
         ":icosahedral spinor_lhy is F=6 only (got F=$(atom.F))"))

@@ -2,7 +2,7 @@
 #
 # The RotatingBasisWS struct, the `make_rotating_basis_ws` factory, and the
 # U_B / U_B† basis-change helpers. The Lima-Pelster Q5 closed form lives in
-# `src/hamiltonian/interactions/interactions.jl` (canonical, F64-exact); the
+# `src/hamiltonian/coefficients.jl` (canonical, F64-exact); the
 # earlier composite-Simpson copy here was an O(numerical-integration) duplicate
 # and was removed during the LHY refactor (commit C4).
 # Extracted from rotating_basis_gpe.jl 2026-05-01.

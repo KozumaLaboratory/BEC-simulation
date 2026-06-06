@@ -7,13 +7,13 @@
 # STATUS: standalone reference, NOT yet wired into SpinorBEC.jl. The
 # skeleton's split-step + simplified DDI will be replaced by the existing
 # `src/solvers/embedded_adaptive.jl` Yoshida S4 + L2-adaptive-dt and the
-# existing full F̂-tensor `src/hamiltonian/interactions/ddi.jl`. The
+# existing full F̂-tensor `src/hamiltonian/terms/ddi/apply_ddi_step.jl`. The
 # closed-form `eps_LHY_F6_polar_DDI` and `phi1_reg` are the load-bearing
 # additions; everything else duplicates production code at lower fidelity.
 #
 # Integration plan (see bench/eu_droplet_INTEGRATION_NOTES.md):
 #   1. Move `phi1_reg` + `eps_LHY_F6_polar_DDI` into
-#      `src/hamiltonian/interactions/lhy.jl` as a new `:closed_form_F6_polar`
+#      `src/hamiltonian/terms/lhy/dispatch.jl` as a new `:closed_form_F6_polar`
 #      mode of `compute_spinor_lhy_table` (currently has :two_channel +
 #      :full_bdg; the closed form adds a third, F=6-specific mode).
 #   2. Drop the in-skeleton evolution loop; the production

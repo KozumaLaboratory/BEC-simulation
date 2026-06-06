@@ -45,7 +45,7 @@ end
 #   s-wave length is exactly (a_0 + 2 a_2)/3 (Ohmi-Machida 1998). For F≥2 the
 #   channel-resolved a_S is the right input and `a_s` is just the nominal a_0
 #   placeholder; downstream `scattering_lengths` dict carries the physics.
-# See: src/hamiltonian/interactions/interactions.jl (compute_interaction_params)
+# See: src/hamiltonian/coefficients.jl (compute_interaction_params)
 @inline _compute_mean_scattering_length(F::Int, a0::Float64, a2::Float64) =
     F == 1 ? (a0 + 2a2) / 3 : a0
 

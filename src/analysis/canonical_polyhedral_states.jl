@@ -13,7 +13,7 @@
 # and index 2F+1 is m=-F. F=0 component lives at index F+1.
 #
 # F=6 I_h canonical state lives in `IcosahedralMod.ZETA_F6_IH`
-# (`src/hamiltonian/interactions/lhy/icosahedral.jl`) — the function
+# (`src/hamiltonian/terms/lhy/icosahedral.jl`) — the function
 # `canonical_polyhedral_spinor(6)` delegates there so all callers go
 # through one accessor.
 

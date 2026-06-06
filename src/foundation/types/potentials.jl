@@ -3,7 +3,7 @@
 # Trap potentials and exotic Hamiltonian add-ons (light-shift profiles,
 # magnetic gradients, Laguerre-Gauss beams, optical lattices, etc.).
 # All inherit from `AbstractPotential`. Pure type definitions; the
-# evaluators live in `src/hamiltonian/potentials/`.
+# evaluators live in `src/hamiltonian/terms/trap/evaluate_potential.jl`.
 
 export AbstractPotential
 export HarmonicTrap, NoPotential, GravityPotential, CompositePotential

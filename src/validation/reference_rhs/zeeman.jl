@@ -1,7 +1,7 @@
 # --- Reference Hψ: Zeeman (diagonal + transverse) ---
 #
 # Sign conventions (matched to src/analysis/energy.jl `_zeeman_energy`
-# and src/hamiltonian/potentials/raman.jl `apply_uniform_spin_rotation!`):
+# and src/hamiltonian/shared/spin_rotation.jl `apply_uniform_spin_rotation!`):
 #
 #   Diagonal:    (H_Z ψ)_c(r) = (-p m_c + q m_c²) ψ_c(r)
 #   Transverse:  (H_Z⊥ ψ)_c(r) = (b_x F_x + b_y F_y)_{c,c'} ψ_{c'}(r)

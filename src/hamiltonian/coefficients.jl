@@ -31,7 +31,7 @@ function compute_interaction_params(
     #   reduction from a_0, a_2 — entire physics fits two scalars. For F≥2
     #   channel couplings g_S live in TensorInteractionCache; this function
     #   returns an empty `InteractionParams` and the tensor step takes over.
-    # See: src/hamiltonian/interactions/tensor_interaction.jl, KU 2012 §3.2
+    # See: src/hamiltonian/terms/contact/tensor_interaction.jl, KU 2012 §3.2
     if atom.F == 1
         a0, a2, m = atom.a0, atom.a2, atom.mass
         hbar = Units.HBAR
@@ -127,23 +127,6 @@ The F² from the spin operators is accounted for separately in ε_dd calculation
 function compute_a_dd(atom::AtomSpecies)
     atom.mu_mag == 0.0 && return 0.0
     Units.MU_0 * atom.mu_mag^2 * atom.mass / (12π * Units.HBAR^2)
-end
-
-function compute_interaction_params_dimless(
-    atom::AtomSpecies;
-    N_atoms::Int=1,
-    dims::Int=1,
-    omega::Float64=1.0,
-)
-    hbar = Units.HBAR
-    m = atom.mass
-    a_ho = sqrt(hbar / (m * omega))
-
-    params_si = compute_interaction_params(atom; N_atoms, dims, length_scale=a_ho)
-
-    energy_scale = hbar * omega
-    InteractionParams(Dict(0 => params_si[0] / energy_scale,
-        1 => params_si[1] / energy_scale))
 end
 
 """

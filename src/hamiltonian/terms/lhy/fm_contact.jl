@@ -3,7 +3,7 @@
 # Why: σ_m/δ_m lookup is keyed by F and we only ship the F=6 sympy-derived
 #   rationals. The single-mode collapse (Watanabe-Brauner Type-B Goldstone) is
 #   general for any F, but per-m coefficients still require offline CG work.
-# See: src/hamiltonian/interactions/lhy/sigma_delta_fm_F6.jl, Paper #3 §V.E
+# See: src/hamiltonian/terms/lhy/sigma_delta_fm_F6.jl, Paper #3 §V.E
 #
 # fm_contact_lhy.jl
 # =================================================================

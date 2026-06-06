@@ -1,4 +1,4 @@
-# Tests for src/hamiltonian/interactions/lhy_modes_round45.jl —
+# Tests for src/hamiltonian/terms/lhy/modes_round45.jl —
 # standalone LHY closed forms for the Round-4/Round-5 polyhedral
 # phase verifications.
 

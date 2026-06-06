@@ -11,7 +11,7 @@ export make_lhy
 #   whenever g_S varies across S, generic for F≥2. ~0.3-1.5% at F=2,
 #   ~3-9% at F=3, **30-70% at F=6**. Prefer PolarContact / FMContact /
 #   IcosahedralLHY closed forms for F≥2.
-# See: src/hamiltonian/interactions/lhy/polar_contact.jl, dispatch.jl docstring below
+# See: src/hamiltonian/terms/lhy/polar_contact.jl, dispatch.jl docstring below
 
 """
     compute_spinor_lhy_polar_two_channel(; F, c0, c1, c_dd, n_max, n_points) → PolarTwoChannelLHY

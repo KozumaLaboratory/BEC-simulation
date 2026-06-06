@@ -4,7 +4,7 @@
 #   rationals (Paper #3 §V.E, parallel-session 2026-05-07). Runtime CG would be
 #   correct but ~10-100× slower per BdG eval. Pre-cache requires offline
 #   build-time script re-run for each new F.
-# See: src/hamiltonian/interactions/lhy/sigma_delta_polar_F1_F8.jl (polar variant)
+# See: src/hamiltonian/terms/lhy/sigma_delta_polar_F1_F8.jl (polar variant)
 #
 # sigma_delta_fm_F6.jl
 # ====================
