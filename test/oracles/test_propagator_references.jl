@@ -68,8 +68,8 @@ function step_residual(term::HamTerm, ws, ψ, g, dt)
     return num / sqrt(sum(abs2, g))
 end
 
-function dt_valley_for(slot, term, ws, ψ)
-    G = dumb_rhs_breakdown(ws, ψ)
+function dt_valley_for(slot, term, ws, ψ; ddi_secular=nothing)
+    G = dumb_rhs_breakdown(ws, ψ; ddi_secular)
     g = G[slot]
     nrm = sqrt(sum(abs2, g))
     @test nrm > 1e-8   # slot active AND state non-degenerate
@@ -104,6 +104,17 @@ end
         )
             @testset "$slot" begin
                 dt_valley_for(slot, _registry_term(ws, T), ws, psi)
+            end
+        end
+    end
+
+    @testset "ddi dt-valley (3D, secular + full kernels)" begin
+        for secular in (true, false)
+            ws, psi = oracle_full_ws(; secular)
+            @testset "secular=$secular" begin
+                dt_valley_for(
+                    :ddi, _registry_term(ws, DDITerm), ws, psi; ddi_secular=secular
+                )
             end
         end
     end
@@ -153,5 +164,38 @@ end
         @test 1.6 < slope < 2.4
         @test errs[end] < 1e-5      # absolute sanity at the smallest dt
         @test errs[1] > errs[end]   # actually converging, not noise
+    end
+
+    @testset "Strang order slope WITH secular DDI vs dumb RK4 (3D)" begin
+        # DDI sits innermost in the V sandwich and has its own history
+        # of placement bugs (the *_ddi_strang_save_every regression
+        # family). End-to-end order 2 with DDI active gates the
+        # placement, the kernel, and the dt accounting together.
+        ws, psi = oracle_full_ws()
+        dV = SpinorBEC.cell_volume(ws.grid)
+        n_comp = ws.spin_matrices.system.n_components
+        T_total = 0.02
+        ψref = dumb_rk4_evolve(ws, psi, T_total, 100; ddi_secular=true)
+
+        dts = [2e-3, 1e-3, 5e-4]
+        errs = Float64[]
+        for dt in dts
+            copyto!(ws.state.psi, psi)
+            nsteps = round(Int, T_total / dt)
+            for _ in 1:nsteps
+                SpinorBEC._strang_core!(ws, dt, n_comp)
+            end
+            push!(errs, sqrt(sum(abs2, ws.state.psi .- ψref) * dV))
+        end
+        copyto!(ws.state.psi, psi)
+
+        xs = log10.(dts)
+        ys = log10.(errs)
+        x̄ = sum(xs) / length(xs)
+        ȳ = sum(ys) / length(ys)
+        slope = sum((xs .- x̄) .* (ys .- ȳ)) / sum(abs2, xs .- x̄)
+        @test 1.6 < slope < 2.4
+        @test errs[end] < 1e-5
+        @test errs[1] > errs[end]
     end
 end

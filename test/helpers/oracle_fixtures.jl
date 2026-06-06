@@ -24,7 +24,7 @@ TODO(week-1 §7): variants with MagneticGradient, LightShift, Raman,
 Loss active — every slot of `H_TERMS_CANONICAL_ORDER` needs an active
 fixture before its canary mutants mean anything.
 """
-function oracle_full_ws(; rotating_frame_omega=0.2, box=4.0, ddi=true)
+function oracle_full_ws(; rotating_frame_omega=0.2, box=4.0, ddi=true, secular=true)
     grid = make_grid(GridConfig{3}((6, 6, 6), (box, box, box)))
     zeeman = TimeDependentZeeman(
         ConstantWaveform(0.3),   # p_wf  — linear Zeeman (Bz)
@@ -40,7 +40,7 @@ function oracle_full_ws(; rotating_frame_omega=0.2, box=4.0, ddi=true)
         grid, atom=Rb87,
         interactions=InteractionParams(Dict(0 => 0.5, 1 => 0.1); c_lhy=0.3),
         zeeman, potential=HarmonicTrap((1.0, 1.0, 1.0)), sim_params=sp,
-        enable_ddi=ddi, c_dd=ddi ? 0.05 : 0.0, secular_ddi=ddi,
+        enable_ddi=ddi, c_dd=ddi ? 0.05 : 0.0, secular_ddi=ddi && secular,
     )
     psi = init_psi(grid, SpinSystem(1); state=:spin_coherent, init_theta=π / 4)
     psi ./= sqrt(sum(abs2, psi) * SpinorBEC.cell_volume(grid))

@@ -28,13 +28,19 @@
 #   over cleverness everywhere.
 #
 # Coverage (slots of H_TERMS_CANONICAL_ORDER):
-# - implemented: kinetic, trap, zeeman_z, zeeman_transverse,
-#   density_c0, spin_c1, lhy (scalar), tensor (c2 singlet part),
-#   raman, light_shift, coriolis, magnetic_gradient, loss (≡ 0).
-# - DEFERRED (own unit, arch doc §6): ddi — its dumb statement is the
-#   same subtle physics in slower code and ships together with its
-#   physics anchors. Slot returns NaN / nothing; the master oracle
-#   carries the explicit deferral list.
+# - implemented: ALL 14 — kinetic, trap, zeeman_z, zeeman_transverse,
+#   density_c0, spin_c1, ddi (periodic, full + secular kernels), lhy
+#   (scalar), tensor (c2 singlet part), raman, light_shift, coriolis,
+#   magnetic_gradient, loss (≡ 0).
+# - DDI model declaration: the secular flag is NOT read back from the
+#   baked ws.ddi.Q arrays — those are exactly what is under test. The
+#   caller passes `ddi_secular::Bool` explicitly (it is part of the
+#   model declaration, like θ), and the dumb side rebuilds Q from the
+#   formula: Q_αβ = k̂_αk̂_β − δ_αβ/3, Q(0) = 0, secular ⇒
+#   Q = diag(−q/2, −q/2, q) with q = k̂_z² − 1/3 (CLAUDE.md pinned
+#   conventions: c_dd = μ₀μ², no 4π, no 1/(4π)).
+#   The PADDED (non-periodic) DDI variant is a follow-up sub-unit
+#   (App. A defect 9 verdict lives there).
 # - DECLARED PRODUCTION GAPS made visible here: raman and tensor RHS
 #   exist on the dumb side while production apply_operator! is nil
 #   (KNOWN-LIMIT) — the master oracle asserts both sides of that gap.
@@ -265,12 +271,106 @@ function dumb_Lz_action(ψ, ws)
 end
 
 # ============================================================================
+# Dumb DDI (periodic): Q from the formula + dense-DFT convolution
+# ============================================================================
+
+"""Kernel wavenumbers for the rfft-halved axis: like `dumb_k_axis` but
+the even-n Nyquist representative is **+n/2·dk** — production builds Q
+with `rfftfreq` on axis 1, so the Nyquist-plane kernel value (a pure
+discretization convention; Q_offdiag is odd in k_x and the continuum
+does not pick a sign there) is pinned to the production choice. Same
+gotcha is documented at `validation/reference_rhs/ddi.jl:22`. On a
+random state at n=6, ~1/6 of modes sit on that plane — an unpinned
+convention shifts E_DDI at O(1)."""
+function dumb_k_axis_rfft(n::Int, L::Float64)
+    dk = 2π / L
+    return [dk * (j0 <= n ÷ 2 ? j0 : j0 - n) for j0 in 0:(n - 1)]
+end
+
+"""
+    dumb_ddi_potential(ws, fx, fy, fz, nd; secular) -> (Φx, Φy, Φz)
+
+`Φ_α = c_dd · IDFT[ Q_αβ(k) · DFT(f_β) ]` with Q restated from the
+pinned convention (NOT read from ws.ddi.Q — the baked arrays are what
+the master oracle tests). Missing axes (nd < 3) have k-component 0,
+matching the production builder; axis 1 uses the rfft Nyquist
+representative (see `dumb_k_axis_rfft`).
+"""
+function dumb_ddi_potential(ws, fx, fy, fz, nd; secular::Bool)
+    c_dd = ws.ddi.C_dd
+    sizes = size(fx)
+    kaxes = [
+        d == 1 ? dumb_k_axis_rfft(sizes[d], Float64(ws.grid.config.box_size[d])) :
+        dumb_k_axis(sizes[d], Float64(ws.grid.config.box_size[d])) for d in 1:nd
+    ]
+    # The production convolution runs on the rfft HALF-grid (kx ≥ 0
+    # stored; the kx < 0 half is implied by Hermitian symmetry). Its
+    # effective full-grid kernel is therefore Q∘rep — Q evaluated at
+    # the STORED REPRESENTATIVE of each mode. rep is the identity on
+    # the stored half; on the kx < 0 half it is the index mirror
+    # j → (j == 1 ? 1 : n + 2 − j) on every axis. For interior indices
+    # the mirror negates k (and full evenness of Q makes rep invisible),
+    # but the 0- and Nyquist-indices are their OWN mirrors (the
+    # Nyquist value −n/2·dk does not flip), so on ky/kz-Nyquist planes
+    # Q∘rep ≠ Q — the effective kernel breaks full k-evenness there.
+    # Localized empirically (k-space diff concentrated on index-4
+    # planes at n = 6) and pinned here. Physically irrelevant on
+    # resolved states (Nyquist power → 0; the smooth-state comparison
+    # passes at 1e-10 with or without this), but the dumb statement
+    # reproduces the production discretization exactly per the pinning
+    # rule. The secular kernel is even in every axis separately —
+    # Nyquist-immune, no rep needed.
+    mirror(j, n) = j == 1 ? 1 : n + 2 - j
+    f̂ = (dumb_dft(ComplexF64.(fx)), dumb_dft(ComplexF64.(fy)), dumb_dft(ComplexF64.(fz)))
+    Φ̂ = (zeros(ComplexF64, sizes), zeros(ComplexF64, sizes), zeros(ComplexF64, sizes))
+    for I in CartesianIndices(sizes)
+        kx = kaxes[1][I[1]]
+        ky = nd >= 2 ? kaxes[2][I[2]] : 0.0
+        kz = nd >= 3 ? kaxes[3][I[3]] : 0.0
+        if kx < 0.0   # not stored: evaluate Q at the rfft representative
+            kx = -kx  # interior mirror on the rfft axis
+            ky = nd >= 2 ? kaxes[2][mirror(I[2], sizes[2])] : 0.0
+            kz = nd >= 3 ? kaxes[3][mirror(I[3], sizes[3])] : 0.0
+        end
+        k2 = kx^2 + ky^2 + kz^2
+        k2 == 0.0 && continue   # Q(0) = 0 (pinned convention)
+        if secular
+            q = kz^2 / k2 - 1 / 3
+            Φ̂[1][I] = -q / 2 * f̂[1][I]
+            Φ̂[2][I] = -q / 2 * f̂[2][I]
+            Φ̂[3][I] = q * f̂[3][I]
+        else
+            kv = (kx, ky, kz)
+            for α in 1:3, β in 1:3
+                Q = kv[α] * kv[β] / k2 - (α == β ? 1 / 3 : 0.0)
+                Φ̂[α][I] += Q * f̂[β][I]
+            end
+        end
+    end
+    return (
+        c_dd .* real.(dumb_idft(Φ̂[1])),
+        c_dd .* real.(dumb_idft(Φ̂[2])),
+        c_dd .* real.(dumb_idft(Φ̂[3])),
+    )
+end
+
+_require_ddi_flag(ws, ddi_secular) =
+    ws.ddi !== nothing && ddi_secular === nothing && error(
+        "dumb reference: ws has active DDI — pass ddi_secular::Bool " *
+        "explicitly (the secular flag is model declaration; reading it " *
+        "back from the baked Q arrays would erase the independence of " *
+        "the kernel construction).",
+    )
+
+# ============================================================================
 # Per-slot energies
 # ============================================================================
 
-const DUMB_DEFERRED_SLOTS = (:ddi,)
+const DUMB_DEFERRED_SLOTS = ()
 
-function dumb_energy_breakdown(ws, ψ::AbstractArray{<:Complex})
+function dumb_energy_breakdown(
+    ws, ψ::AbstractArray{<:Complex}; ddi_secular::Union{Nothing, Bool}=nothing
+)
     nd = ndims(ψ) - 1
     D = _dumb_D(ψ)
     F = (D - 1) ÷ 2
@@ -325,13 +425,24 @@ function dumb_energy_breakdown(ws, ψ::AbstractArray{<:Complex})
     clhy = dumb_lhy_coefficient(ws)
     E_lhy = (2 / 5) * clhy * sum(x -> x^(5 / 2), n) * dV
 
-    # tensor slot: c2 singlet part (higher channels deferred with the cache)
+    # ddi: E = ½ Σ_α ∫ Φ_α f_α dV (c_dd inside Φ; mean-field d = 4)
+    _require_ddi_flag(ws, ddi_secular)
+    E_ddi = 0.0
+    if ws.ddi !== nothing
+        Φx, Φy, Φz = dumb_ddi_potential(ws, fx, fy, fz, nd; secular=ddi_secular)
+        for I in _dumb_spatial(ψ)
+            E_ddi += Φx[I] * fx[I] + Φy[I] * fy[I] + Φz[I] * fz[I]
+        end
+        E_ddi *= 0.5 * dV
+    end
+
+    # tensor slot: c2 singlet part (higher channels not implemented)
     c2 = get_cn(ws.interactions, 2)
     A = dumb_singlet_amplitude(ψ)
     E_singlet = 0.5 * c2 * sum(abs2, A) * dV
     ws.tensor_cache === nothing || error(
-        "dumb reference: tensor_cache channels not implemented (deferred " *
-        "with the DDI unit); fixture must not activate the cache.",
+        "dumb reference: tensor_cache channels not implemented; " *
+        "fixture must not activate the cache.",
     )
 
     # raman: Σ [δ·f_z + Ω·Re(e^{ik·x} f₊)] dV with f₊ = ⟨F₊⟩ per voxel.
@@ -391,7 +502,7 @@ function dumb_energy_breakdown(ws, ψ::AbstractArray{<:Complex})
 
     return (
         kinetic=E_kin, trap=E_trap, zeeman_z=E_zz, zeeman_transverse=E_zt,
-        density_c0=E_c0, spin_c1=E_c1, ddi=NaN, lhy=E_lhy,
+        density_c0=E_c0, spin_c1=E_c1, ddi=E_ddi, lhy=E_lhy,
         tensor=E_singlet, raman=E_raman, light_shift=E_ls, coriolis=E_cor,
         magnetic_gradient=E_mg, loss=0.0,
     )
@@ -402,13 +513,16 @@ end
 # ============================================================================
 
 """
-    dumb_rhs_breakdown(ws, ψ) -> NamedTuple of arrays (or nothing)
+    dumb_rhs_breakdown(ws, ψ; ddi_secular=nothing) -> NamedTuple of arrays
 
-Per-slot canonical gradients. `nothing` marks the deferred DDI slot
-ONLY; production KNOWN-LIMIT gaps (raman, tensor) are present HERE —
-the master oracle asserts production is nil where these are not.
+Per-slot canonical gradients. Production KNOWN-LIMIT gaps (raman,
+tensor) are present HERE — the master oracle asserts production is nil
+where these are not. `ddi_secular` is required when ws has active DDI
+(model declaration, see `dumb_ddi_potential`).
 """
-function dumb_rhs_breakdown(ws, ψ::AbstractArray{<:Complex})
+function dumb_rhs_breakdown(
+    ws, ψ::AbstractArray{<:Complex}; ddi_secular::Union{Nothing, Bool}=nothing
+)
     nd = ndims(ψ) - 1
     D = _dumb_D(ψ)
     F = (D - 1) ÷ 2
@@ -488,6 +602,23 @@ function dumb_rhs_breakdown(ws, ψ::AbstractArray{<:Complex})
         end
     end
 
+    # ddi: g = Σ_α Φ_α · (F_α ψ) per voxel
+    _require_ddi_flag(ws, ddi_secular)
+    g_ddi = zed()
+    if ws.ddi !== nothing
+        Φx, Φy, Φz = dumb_ddi_potential(ws, fx, fy, fz, nd; secular=ddi_secular)
+        for I in _dumb_spatial(ψ)
+            H = Φx[I] .* sm.Fx .+ Φy[I] .* sm.Fy .+ Φz[I] .* sm.Fz
+            for c in 1:D
+                s = zero(ComplexF64)
+                for cp in 1:D
+                    s += H[c, cp] * ψ[I, cp]
+                end
+                g_ddi[I, c] = s
+            end
+        end
+    end
+
     # raman: δ·F_z ψ + (Ω/2)(e^{ik·x}F₊ + e^{−ik·x}F₋)ψ
     rm = dumb_raman_resolved(ws)
     g_raman = zed()
@@ -534,7 +665,7 @@ function dumb_rhs_breakdown(ws, ψ::AbstractArray{<:Complex})
 
     return (
         kinetic=g_kin, trap=g_trap, zeeman_z=g_zz, zeeman_transverse=g_zt,
-        density_c0=g_c0, spin_c1=g_c1, ddi=nothing, lhy=g_lhy,
+        density_c0=g_c0, spin_c1=g_c1, ddi=g_ddi, lhy=g_lhy,
         tensor=g_singlet, raman=g_raman, light_shift=g_ls, coriolis=g_cor,
         magnetic_gradient=g_mg, loss=zed(),
     )
@@ -545,24 +676,18 @@ end
 # ============================================================================
 
 """
-    dumb_rhs_total(ws, ψ) -> Array
+    dumb_rhs_total(ws, ψ; ddi_secular=nothing) -> Array
 
-Sum of all implemented per-slot canonical gradients — the full
-H_eff[ψ]·ψ of the dumb statement. Errors if a deferred slot is active
-(DDI): a reference that silently omits an active term is the
-rotted-reference failure mode, not a reference.
+Sum of all per-slot canonical gradients — the full H_eff[ψ]·ψ of the
+dumb statement.
 """
-function dumb_rhs_total(ws, ψ::AbstractArray{<:Complex})
-    ws.ddi === nothing || error(
-        "dumb_rhs_total: DDI is active but the dumb DDI statement is " *
-        "deferred (own unit). Use a DDI-free fixture.",
-    )
-    G = dumb_rhs_breakdown(ws, ψ)
+function dumb_rhs_total(
+    ws, ψ::AbstractArray{<:Complex}; ddi_secular::Union{Nothing, Bool}=nothing
+)
+    G = dumb_rhs_breakdown(ws, ψ; ddi_secular)
     total = zeros(ComplexF64, size(ψ))
     for slot in keys(G)
-        g = G[slot]
-        g === nothing && continue
-        total .+= g
+        total .+= G[slot]
     end
     return total
 end
@@ -576,10 +701,13 @@ the frozen ws.state.t). Global error O(dt⁴): at tiny grids and small T
 this is the reference trajectory the split-step order test (slope ≈ 2
 for Strang) is measured against.
 """
-function dumb_rk4_evolve(ws, ψ0::AbstractArray{<:Complex}, T::Float64, nsteps::Int)
+function dumb_rk4_evolve(
+    ws, ψ0::AbstractArray{<:Complex}, T::Float64, nsteps::Int;
+    ddi_secular::Union{Nothing, Bool}=nothing,
+)
     dt = T / nsteps
     ψ = ComplexF64.(copy(ψ0))
-    f(ϕ) = -im .* dumb_rhs_total(ws, ϕ)
+    f(ϕ) = -im .* dumb_rhs_total(ws, ϕ; ddi_secular)
     for _ in 1:nsteps
         k1 = f(ψ)
         k2 = f(ψ .+ (dt / 2) .* k1)

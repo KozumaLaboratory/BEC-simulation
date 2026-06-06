@@ -51,9 +51,9 @@ const G_ATOL = 1e-11
 # test/helpers/oracle_fixtures.jl — shared with the propagator
 # reference suite.
 
-function compare_all_slots(ws, ψ, label)
-    Ed = dumb_energy_breakdown(ws, ψ)
-    Gd = dumb_rhs_breakdown(ws, ψ)
+function compare_all_slots(ws, ψ, label; ddi_secular=nothing)
+    Ed = dumb_energy_breakdown(ws, ψ; ddi_secular)
+    Gd = dumb_rhs_breakdown(ws, ψ; ddi_secular)
     registry = build_h_terms_registry(ws)
     for slot in H_TERMS_CANONICAL_ORDER
         slot in DUMB_DEFERRED_SLOTS && continue
@@ -91,18 +91,23 @@ end
         Gd = dumb_rhs_breakdown(ws, psi)
         @test Tuple(keys(Ed)) == H_TERMS_CANONICAL_ORDER
         @test Tuple(keys(Gd)) == H_TERMS_CANONICAL_ORDER
-        @test DUMB_DEFERRED_SLOTS == (:ddi,)
-        for s in DUMB_DEFERRED_SLOTS
-            @test s in H_TERMS_CANONICAL_ORDER
-        end
+        @test DUMB_DEFERRED_SLOTS == ()   # full 14/14 coverage since the DDI unit
     end
 
-    @testset "fixture A (3D, full): kinetic/trap/zeeman/c0/c1/lhy/coriolis" begin
+    @testset "fixture A (3D, full incl. secular DDI)" begin
         rng = MersenneTwister(2026)
         ws, psi = oracle_full_ws()
-        compare_all_slots(ws, psi, "A:coherent")
+        compare_all_slots(ws, psi, "A:coherent"; ddi_secular=true)
         ψr = rand_offmanifold_state(ws; rng)
-        compare_all_slots(ws, ψr, "A:random")
+        compare_all_slots(ws, ψr, "A:random"; ddi_secular=true)
+    end
+
+    @testset "fixture A′ (3D, FULL DDI kernel)" begin
+        rng = MersenneTwister(2027)
+        ws, psi = oracle_full_ws(; secular=false)
+        compare_all_slots(ws, psi, "A′:coherent"; ddi_secular=false)
+        ψr = rand_offmanifold_state(ws; rng)
+        compare_all_slots(ws, ψr, "A′:random"; ddi_secular=false)
     end
 
     @testset "fixture B (1D, aux): mg/light_shift/raman/c2-singlet" begin
