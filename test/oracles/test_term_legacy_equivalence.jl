@@ -1,7 +1,7 @@
 # test/oracles/test_term_legacy_equivalence.jl
 #
 # Bit-identicity safety net. For each `HamTerm` implementation, verify
-# that `apply_step!` / `energy_contribution` / `add_gradient!` produce
+# that `apply_step!` / `energy_contribution` / `apply_operator!` produce
 # results bit-identical to the legacy hand-written routines they will
 # eventually replace. This must pass BEFORE any migration step retires
 # the legacy code.
@@ -14,7 +14,7 @@ using Test
 using FFTW
 using SpinorBEC
 using SpinorBEC: LinearZeemanZTerm, apply_step!, energy_contribution,
-    add_gradient!
+    apply_operator!
 
 @testset "HamTerm ↔ legacy bit-identity" begin
     @testset "LinearZeemanZTerm vs legacy _diagonal_step + _zeeman_energy + _grad_zeeman!" begin
@@ -58,7 +58,7 @@ using SpinorBEC: LinearZeemanZTerm, apply_step!, energy_contribution,
         SpinorBEC._grad_zeeman!(grad_legacy, psi_ref, ws_leg, n_pts, D, Val(3))
 
         grad_new = zero(psi_ref)
-        add_gradient!(grad_new, term, psi_ref, ws_leg)
+        apply_operator!(grad_new, term, ws_leg, psi_ref)
 
         # Bit-identity per-element.
         @test maximum(abs, grad_new .- grad_legacy) < 1e-14

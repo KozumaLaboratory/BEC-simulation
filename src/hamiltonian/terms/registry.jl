@@ -7,7 +7,7 @@
 # Hot paths (`energy_decomposition`, `energy_gradient!`,
 # `split_step!`) delegate to the registry; per-term implementations
 # declare their sign in one place (`apply_step!` /
-# `energy_contribution` / `add_gradient!`) and CI oracles
+# `energy_contribution` / `apply_operator!`) and CI oracles
 # (`test/oracles/`) verify both directional sign and FD consistency
 # between energy and gradient.
 #
@@ -70,7 +70,7 @@ should rebuild after `ws.state.t` changes.
 
 Inactive terms are still emitted with neutral state so the NTuple is
 type-stable across configurations. Methods on each `HamTerm` subtype
-short-circuit at the top of `energy_contribution` / `add_gradient!` /
+short-circuit at the top of `energy_contribution` / `apply_operator!` /
 `apply_step!` when their controlling workspace field is `nothing` or
 coefficients are zero.
 """
@@ -177,30 +177,32 @@ function total_energy_via_registry(ws)
 end
 
 """
-    add_gradient_via_registry!(grad, ws) → grad
+    apply_operator_via_registry!(grad, ws) → grad
 
 Build δE/δψ* by iterating the registry. Bit-identical to the in-place
 sum performed by `energy_gradient!` modulo the `* 2` Wirtinger scaling
 that `energy_gradient!` applies at the end. The
 `GradientContext`-aware overload below is the production path.
+
+Callers receive an accumulated result: `grad` is zeroed here before
+the registry loop so callers get bare H·ψ, not H·ψ added to whatever
+was in `grad` before the call.
 """
-function add_gradient_via_registry!(grad, ws)
+function apply_operator_via_registry!(grad, ws)
     fill!(grad, zero(eltype(grad)))
     psi = ws.state.psi  # same-device as grad; trinity methods are device-aware
     ctx = build_gradient_context(psi, ws)
     registry = build_h_terms_registry(ws)
     for term in registry
-        add_gradient!(grad, term, psi, ws, ctx)
+        apply_operator!(grad, term, ws, psi, ctx)
     end
     return grad
 end
 
 # Default fallback: terms that have not opted into ctx-aware dispatch
-# fall back to the simpler signature. Defining this here means each
-# term can choose to provide a ctx-aware specialisation later without
-# breaking the registry call site.
-@inline add_gradient!(grad, term::HamTerm, psi, ws, ::GradientContext) =
-    add_gradient!(grad, term, psi, ws)
+# fall back to the simpler signature (zero `out` first, then accumulate).
+@inline apply_operator!(out, term::HamTerm, ws, psi, ::GradientContext) =
+    apply_operator!(out, term, ws, psi)
 
 @inline energy_contribution(term::HamTerm, psi, ws, ::EnergyContext) =
     energy_contribution(term, psi, ws)

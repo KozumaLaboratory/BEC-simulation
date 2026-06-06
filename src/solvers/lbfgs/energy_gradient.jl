@@ -59,11 +59,11 @@ function energy_gradient!(
     k_squared_dev::AbstractArray{<:AbstractFloat}=ws.grid.k_squared,
 ) where {N}
     # Trinity-only: iterate the HamTerm registry, each term contributes
-    # via `add_gradient!(grad, ::Term, psi, ws, ctx::GradientContext)`.
+    # via `apply_operator!(out, ::Term, ws, psi, ctx::GradientContext)`.
     # The ctx pre-builds shared scratch (fft_buf, fx/fy/fz, n_density)
     # so each term's hot-path skips per-call alloc.
     copyto!(ws.state.psi, psi)
-    add_gradient_via_registry!(grad, ws)
+    apply_operator_via_registry!(grad, ws)
     # Wirtinger scaling: δE = 2·Re⟨δE/δψ̄, δψ⟩ ⇒ grad_R = 2·δE/δψ̄
     # makes δE = Re⟨grad_R, δψ⟩ (standard real inner product).
     grad .*= 2
@@ -82,7 +82,7 @@ end
 # _grad_lhy!) now live with their HamTerm subtypes in src/hamiltonian/terms/.
 # `energy_gradient!` above calls each by its canonical name — Julia resolves
 # to the terms/ definition. The trinity dispatch
-# (`add_gradient!(grad, ::Term, psi, ws)`) provides the same physics via
+# (`apply_operator!(out, ::Term, ws, psi)`) provides the same physics via
 # the registry.
 
 """

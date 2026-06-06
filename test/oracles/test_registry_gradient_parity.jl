@@ -1,6 +1,6 @@
 # test/oracles/test_registry_gradient_parity.jl
 #
-# Phase 4 gate: `add_gradient_via_registry!` produces a gradient
+# Phase 4 gate: `apply_operator_via_registry!` produces a gradient
 # bit-identical to the legacy `energy_gradient!` (modulo the outer ×2
 # Wirtinger scaling that the latter applies). When this passes,
 # `energy_gradient!` can delegate to the registry path without
@@ -17,8 +17,8 @@ using Test
 using FFTW
 using LinearAlgebra
 using SpinorBEC
-using SpinorBEC: add_gradient_via_registry!, build_gradient_context,
-    add_gradient!, KineticTerm, CoriolisTerm, DensityC0Term, SpinC1Term,
+using SpinorBEC: apply_operator_via_registry!, build_gradient_context,
+    apply_operator!, KineticTerm, CoriolisTerm, DensityC0Term, SpinC1Term,
     LHYTerm, GradientContext
 using Random
 
@@ -36,7 +36,7 @@ function _gradient_test_ws(; Ω::Float64=0.2)
     return ws
 end
 
-@testset "Phase 4: add_gradient_via_registry! ≡ energy_gradient! body" begin
+@testset "Phase 4: apply_operator_via_registry! ≡ energy_gradient! body" begin
     @testset "Bit-identity (Bz + q + c0 + c1 + Ω + transverse)" begin
         ws_reg = _gradient_test_ws(Ω=0.2)
         ws_leg = _gradient_test_ws(Ω=0.2)
@@ -51,10 +51,10 @@ end
         grad_leg = zero(psi)
         E_leg = SpinorBEC.energy_gradient!(grad_leg, psi, ws_leg)
 
-        # Registry: add_gradient_via_registry! WITHOUT the *2 scaling.
+        # Registry: apply_operator_via_registry! WITHOUT the *2 scaling.
         # To compare like-for-like, scale up.
         grad_reg = zero(psi)
-        add_gradient_via_registry!(grad_reg, ws_reg)
+        apply_operator_via_registry!(grad_reg, ws_reg)
         grad_reg .*= 2
 
         diff = maximum(abs, grad_reg .- grad_leg)
@@ -82,30 +82,30 @@ end
 
         # Kinetic ctx-aware path: bit-identical to no-ctx version.
         grad1 = zero(psi)
-        add_gradient!(grad1, KineticTerm(), psi, ws)
+        apply_operator!(grad1, KineticTerm(), ws, psi)
         grad2 = zero(psi)
-        add_gradient!(grad2, KineticTerm(), psi, ws, ctx)
+        apply_operator!(grad2, KineticTerm(), ws, psi, ctx)
         @test maximum(abs, grad1 .- grad2) < 1e-13
 
         # SpinC1 ctx-aware path:
         grad1 .= 0
         grad2 .= 0
-        add_gradient!(grad1, SpinC1Term(ws.interactions[1]), psi, ws)
-        add_gradient!(grad2, SpinC1Term(ws.interactions[1]), psi, ws, ctx)
+        apply_operator!(grad1, SpinC1Term(ws.interactions[1]), ws, psi)
+        apply_operator!(grad2, SpinC1Term(ws.interactions[1]), ws, psi, ctx)
         @test maximum(abs, grad1 .- grad2) < 1e-13
 
         # DensityC0 ctx-aware path:
         grad1 .= 0
         grad2 .= 0
-        add_gradient!(grad1, DensityC0Term(ws.interactions[0]), psi, ws)
-        add_gradient!(grad2, DensityC0Term(ws.interactions[0]), psi, ws, ctx)
+        apply_operator!(grad1, DensityC0Term(ws.interactions[0]), ws, psi)
+        apply_operator!(grad2, DensityC0Term(ws.interactions[0]), ws, psi, ctx)
         @test maximum(abs, grad1 .- grad2) < 1e-13
 
         # Coriolis ctx-aware path:
         grad1 .= 0
         grad2 .= 0
-        add_gradient!(grad1, CoriolisTerm(0.2), psi, ws)
-        add_gradient!(grad2, CoriolisTerm(0.2), psi, ws, ctx)
+        apply_operator!(grad1, CoriolisTerm(0.2), ws, psi)
+        apply_operator!(grad2, CoriolisTerm(0.2), ws, psi, ctx)
         @test maximum(abs, grad1 .- grad2) < 1e-13
     end
 end

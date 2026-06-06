@@ -5,7 +5,7 @@
 #
 # Each concrete `<: HamTerm` subtype declares its sign convention in
 # ONE location. Propagator (`apply_step!`), energy
-# (`energy_contribution`), gradient (`add_gradient!`), and directional
+# (`energy_contribution`), gradient (`apply_operator!`), and directional
 # sign oracle (`sign_oracle`) are all derived from that single
 # declaration. The FD-consistency test in
 # `test/oracles/test_term_consistency.jl` auto-verifies that the
@@ -22,7 +22,7 @@
 """
 Abstract type for a single Hamiltonian term. Concrete subtypes
 declare their sign convention via one coefficient function and
-derive `apply_step!`, `energy_contribution`, `add_gradient!`, and
+derive `apply_step!`, `energy_contribution`, `apply_operator!`, and
 `sign_oracle` from it.
 """
 abstract type HamTerm end
@@ -37,10 +37,20 @@ function apply_step! end
 """
     apply_operator!(out, term::HamTerm, ws, psi) -> out
 
-THE single source for the term's operator action on `psi`. Returns
-`out[I, c] = (δE_term / δψ̄)[I, c]` — the per-voxel variational
-derivative (i.e. `H · ψ` for linear Hermitian terms; the GP mean-field
-linearized operator `H_eff(ψ) · ψ` for nonlinear terms).
+THE single source for the term's operator action on `psi`. ACCUMULATES:
+`out .+= H·ψ` per voxel. Never `fill!(out, …)` inside an implementation.
+
+Gate-first rule: inactive terms return `out` untouched BEFORE any
+allocation:
+  `ws.ddi === nothing && return out`
+  `(term.bx == 0.0 && term.by == 0.0) && return out`
+
+Callers needing the bare action H·ψ must zero `out` first:
+  `fill!(out, zero(eltype(out))); apply_operator!(out, term, ws, psi)`
+
+Context-aware overload: `apply_operator!(out, term, ws, psi, ctx::GradientContext)`
+reuses pre-built density/spin-density/FFT buffers from `ctx` to skip
+per-call allocations on the hot registry path.
 
 Convention for the trinity:
 - Linear terms (kinetic, trap, zeeman, light_shift, raman, coriolis,
@@ -48,8 +58,9 @@ Convention for the trinity:
 - Mean-field terms (density_c0, spin_c1, ddi, tensor):
   `energy_contribution = (1/2) · Re⟨ψ, apply_operator(ψ)⟩ · dV`.
 - LHY (n^(5/2) integrand): `energy = (2/5) · Re⟨ψ, apply_operator(ψ)⟩ · dV`.
-- `add_gradient!(grad, term, ws, ψ) = grad .+= apply_operator(ψ)`
-  (the outer LBFGS driver applies the Wirtinger ×2).
+- Gradient IS `apply_operator!` accumulation: callers zero `out`, then
+  `apply_operator!(out, term, ws, psi)` to obtain `out = H·ψ`.
+  The outer LBFGS driver applies the Wirtinger ×2.
 - `apply_step!(term, ws, dt)` uses the SAME coefficient (e.g. the `c0`
   inside `apply_operator`) inside `exp(-i·dt·...)`. The propagator and
   the operator action share their coefficient source.
@@ -71,16 +82,6 @@ Return this term's contribution to total energy `⟨ψ|H_term|ψ⟩`.
 function energy_contribution end
 
 """
-    add_gradient!(grad, term::HamTerm, psi, ws)
-
-Add this term's contribution to `grad += δE/δψ*`. The standard
-SpinorBEC convention is that `grad` later gets multiplied by 2 in
-the outer `energy_gradient!` (see `energy_gradient.jl:85-88`). So
-each `add_gradient!` adds `δE_term/δψ*` (no factor of 2).
-"""
-function add_gradient! end
-
-"""
     sign_oracle(term::HamTerm) -> NamedTuple{(:name, :predicate)}
 
 Return a directional sign-oracle for this term as a NamedTuple
@@ -93,7 +94,7 @@ function sign_oracle end
 
 # ============================================================================
 # Shared scratch contexts (forward-declared so term files can specialise
-# `add_gradient!(grad, term, psi, ws, ctx::GradientContext)` /
+# `apply_operator!(out, term, ws, psi, ctx::GradientContext)` /
 # `energy_contribution(term, psi, ws, ctx::EnergyContext)` without an
 # include-order trap). Builders live in `registry.jl`.
 # ============================================================================
@@ -129,8 +130,8 @@ end
 """
     GradientContext
 
-Per-call scratch container shared across `add_gradient!(grad, term,
-psi, ws, ctx)` invocations. Pre-builds the total density, spin
+Per-call scratch container shared across `apply_operator!(out, term,
+ws, psi, ctx)` invocations. Pre-builds the total density, spin
 density, FFT buffer, and a `deriv_buf` scratch so the registry path
 matches the legacy `_grad_*` helpers' allocation pattern (no extra
 allocs vs the hand-written sum in `energy_gradient!`).

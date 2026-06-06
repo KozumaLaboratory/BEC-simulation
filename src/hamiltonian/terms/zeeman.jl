@@ -38,15 +38,17 @@ end
 @inline _diag_coef(term::LinearZeemanZTerm, m::Real) = -term.p * m + term.q * m * m
 
 function apply_operator!(out::AbstractArray, term::LinearZeemanZTerm, ws, psi::AbstractArray)
+    # Direct broadcast accumulation (device-generic, zero-alloc).
     sm = ws.spin_matrices
     F = sm.system.F
     D = sm.system.n_components
     N = ndims(psi) - 1
-    @inbounds for c in 1:D
-        m = F - (c - 1)
-        coef = _diag_coef(term, m)
-        view(out, ntuple(_ -> :, Val(N))..., c) .=
-            coef .* view(psi, ntuple(_ -> :, Val(N))..., c)
+    n_pts = ntuple(d -> size(psi, d), Val(N))
+    for c in 1:D
+        coef = _diag_coef(term, F - (c - 1))
+        coef == 0.0 && continue
+        idx = _component_slice(N, n_pts, c)
+        view(out, idx...) .+= coef .* view(psi, idx...)
     end
     return out
 end
@@ -67,23 +69,6 @@ function energy_contribution(term::LinearZeemanZTerm, psi::AbstractArray{<:Compl
         E += coef * sum(abs2, view(psi, idx...))
     end
     return E * cell_volume(ws.grid)
-end
-
-function add_gradient!(grad::AbstractArray{<:Complex}, term::LinearZeemanZTerm,
-    psi::AbstractArray{<:Complex}, ws)
-    # Direct broadcast accumulation (device-generic, zero-alloc, P1).
-    sm = ws.spin_matrices
-    F = sm.system.F
-    D = sm.system.n_components
-    N = ndims(psi) - 1
-    n_pts = ntuple(d -> size(psi, d), Val(N))
-    for c in 1:D
-        coef = _diag_coef(term, F - (c - 1))
-        coef == 0.0 && continue
-        idx = _component_slice(N, n_pts, c)
-        view(grad, idx...) .+= coef .* view(psi, idx...)
-    end
-    return nothing
 end
 
 function apply_step!(term::LinearZeemanZTerm, psi::AbstractArray{<:Complex},
@@ -138,7 +123,7 @@ end
 
 Add the full Zeeman gradient (diagonal + transverse) to `grad`. The
 diagonal piece is folded inline; the transverse piece dispatches to
-`TransverseZeemanTerm.add_gradient!` to close [GAP-1] (pre-2026-06-04
+`TransverseZeemanTerm.apply_operator!` to close [GAP-1] (pre-2026-06-04
 the routine silently dropped the transverse contribution).
 """
 function _grad_zeeman!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
@@ -150,7 +135,7 @@ function _grad_zeeman!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
     end
     bx, by = transverse_b(ws.zeeman, ws.state.t)
     if !(bx == 0.0 && by == 0.0)
-        add_gradient!(grad, TransverseZeemanTerm(bx, by), psi, ws)
+        apply_operator!(grad, TransverseZeemanTerm(bx, by), ws, psi)
     end
     nothing
 end
@@ -180,7 +165,7 @@ end
 # contributions because they only read `zeeman.p` and `zeeman.q`. The
 # HamTerm-based dispatch makes this structurally impossible: a
 # Workspace whose registry contains a `TransverseZeemanTerm` includes
-# the transverse contribution via `energy_contribution` / `add_gradient!`
+# the transverse contribution via `energy_contribution` / `apply_operator!`
 # automatically.
 
 """
@@ -222,7 +207,8 @@ function _transverse_zeeman_energy(psi, bx::Real, by::Real, sm, ndim, dV)
 end
 
 function apply_operator!(out::AbstractArray, term::TransverseZeemanTerm, ws, psi::AbstractArray)
-    fill!(out, zero(eltype(out)))
+    # Gate-first + direct ladder accumulation (device-generic broadcast,
+    # zero-alloc; same coefficients as the original body).
     (term.bx == 0.0 && term.by == 0.0) && return out
     sm = ws.spin_matrices
     F = sm.system.F
@@ -246,6 +232,7 @@ function energy_contribution(term::TransverseZeemanTerm, psi::AbstractArray{<:Co
     # full similar(psi) + dot on every energy_decomposition call).
     (term.bx == 0.0 && term.by == 0.0) && return 0.0
     out = similar(psi)
+    fill!(out, zero(eltype(out)))
     apply_operator!(out, term, ws, psi)
     return real(dot(vec(psi), vec(out))) * cell_volume(ws.grid)
 end
@@ -260,28 +247,6 @@ function energy_contribution(
         s += -term.bx * ctx.fx[i] - term.by * ctx.fy[i]
     end
     return s * ctx.dV
-end
-
-function add_gradient!(grad::AbstractArray{<:Complex}, term::TransverseZeemanTerm,
-    psi::AbstractArray{<:Complex}, ws)
-    # Gate-first + direct ladder accumulation (device-generic broadcast,
-    # zero-alloc; same coefficients as apply_operator!).
-    (term.bx == 0.0 && term.by == 0.0) && return nothing
-    sm = ws.spin_matrices
-    F = sm.system.F
-    D = sm.system.n_components
-    N = ndims(psi) - 1
-    n_pts = ntuple(d -> size(psi, d), Val(N))
-    coeff_lower = -(term.bx + im * term.by) / 2
-    coeff_upper = -(term.bx - im * term.by) / 2
-    for c in 2:D
-        idx_c = _component_slice(N, n_pts, c)
-        idx_cm1 = _component_slice(N, n_pts, c - 1)
-        fp = sqrt(Float64(F * (F + 1) - (F - c + 1) * (F - c + 2)))
-        view(grad, idx_c...) .+= (coeff_lower * fp) .* view(psi, idx_cm1...)
-        view(grad, idx_cm1...) .+= (coeff_upper * fp) .* view(psi, idx_c...)
-    end
-    return nothing
 end
 
 """
@@ -405,7 +370,8 @@ function energy_contribution(::MagneticGradientTerm, psi::AbstractArray{<:Comple
 end
 
 function apply_operator!(out::AbstractArray, ::MagneticGradientTerm, ws, psi::AbstractArray)
-    fill!(out, zero(eltype(out)))
+    # Gate-first + direct accumulation (P1: the inactive term used to
+    # allocate a full similar(psi) before short-circuiting).
     p = _mg_at(ws)
     p === nothing && return out
     coeff = p.g_F * p.grad
@@ -417,28 +383,9 @@ function apply_operator!(out::AbstractArray, ::MagneticGradientTerm, ws, psi::Ab
         ws.grid.x[p.axis], p.axis)
     for c in 1:D
         idx = _component_slice(N, n_pts, c)
-        view(out, idx...) .= coeff .* x_bcast .* view(psi, idx...)
+        view(out, idx...) .+= coeff .* x_bcast .* view(psi, idx...)
     end
     return out
-end
-
-function add_gradient!(grad, ::MagneticGradientTerm, psi, ws)
-    # Gate-first + direct accumulation (P1: the inactive term used to
-    # allocate a full similar(psi) before short-circuiting).
-    p = _mg_at(ws)
-    p === nothing && return nothing
-    coeff = p.g_F * p.grad
-    coeff == 0.0 && return nothing
-    N = ndims(psi) - 1
-    D = size(psi, N + 1)
-    n_pts = ntuple(d -> size(psi, d), Val(N))
-    x_bcast = _axis_broadcast(view(psi, ntuple(_ -> :, Val(N))..., 1),
-        ws.grid.x[p.axis], p.axis)
-    for c in 1:D
-        idx = _component_slice(N, n_pts, c)
-        view(grad, idx...) .+= coeff .* x_bcast .* view(psi, idx...)
-    end
-    return nothing
 end
 
 """

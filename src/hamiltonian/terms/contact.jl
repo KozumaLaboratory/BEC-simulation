@@ -35,7 +35,7 @@ function apply_operator!(out::AbstractArray, term::DensityC0Term, ws, psi::Abstr
     n_density = total_density(psi, N)
     @inbounds for c in 1:D
         idx = ntuple(_ -> :, Val(N))
-        view(out, idx..., c) .= term.c0 .* n_density .* view(psi, idx..., c)
+        view(out, idx..., c) .+= term.c0 .* n_density .* view(psi, idx..., c)
     end
     return out
 end
@@ -59,23 +59,15 @@ function energy_contribution(term::DensityC0Term, psi::Array{<:Complex}, ws)
     )
 end
 
-function add_gradient!(grad, term::DensityC0Term, psi, ws)
-    buf = similar(psi)
-    fill!(buf, zero(eltype(buf)))
-    apply_operator!(buf, term, ws, psi)
-    grad .+= buf
-    return nothing
-end
-
 # Context-aware specialisation: reuse ctx.n_density to skip the recompute.
-function add_gradient!(grad, term::DensityC0Term, psi, ws, ctx::GradientContext)
+function apply_operator!(out, term::DensityC0Term, ws, psi, ctx::GradientContext)
     N = ndims(psi) - 1
     D = ws.spin_matrices.system.n_components
     @inbounds for c in 1:D
         idx = ntuple(_ -> :, Val(N))
-        view(grad, idx..., c) .+= term.c0 .* ctx.n_density .* view(psi, idx..., c)
+        view(out, idx..., c) .+= term.c0 .* ctx.n_density .* view(psi, idx..., c)
     end
-    return nothing
+    return out
 end
 
 function apply_step!(term::DensityC0Term, psi, dt::Real, imaginary_time::Bool, ws)
@@ -205,7 +197,6 @@ function _grad_c1_spin!(grad, psi, ws, fx, fy, fz, n_pts, D, ::Val{N}) where {N}
 end
 
 function apply_operator!(out::AbstractArray, term::SpinC1Term, ws, psi::AbstractArray)
-    fill!(out, zero(eltype(out)))
     is_active(term.c1) || return out
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
@@ -249,20 +240,12 @@ function energy_contribution(
     return 0.5 * term.c1 * s * ctx.dV
 end
 
-function add_gradient!(grad, term::SpinC1Term, psi, ws)
-    buf = similar(psi)
-    fill!(buf, zero(eltype(buf)))
-    apply_operator!(buf, term, ws, psi)
-    grad .+= buf
-    return nothing
-end
-
 # Context-aware: borrow ctx.fx / ctx.fy / ctx.fz to avoid 3× allocation.
-function add_gradient!(grad, term::SpinC1Term, psi, ws, ctx::GradientContext)
+function apply_operator!(out, term::SpinC1Term, ws, psi, ctx::GradientContext)
     N = ndims(psi) - 1
     D = ws.spin_matrices.system.n_components
-    _grad_c1_spin!(grad, psi, ws, ctx.fx, ctx.fy, ctx.fz, ctx.n_pts, D, Val(N))
-    return nothing
+    _grad_c1_spin!(out, psi, ws, ctx.fx, ctx.fy, ctx.fz, ctx.n_pts, D, Val(N))
+    return out
 end
 
 sign_oracle(::Type{SpinC1Term}) = (
@@ -336,7 +319,7 @@ function energy_contribution(::TensorTerm, psi::AbstractArray{<:Complex}, ws)
     # LOUDLY so the silent break doesn't bite a future user with c_S ≠ 0.
     if !iszero(E)
         @warn """TensorTerm: energy_contribution = $E (non-zero) but
-        apply_operator! / add_gradient! are NO-OP (legacy KNOWN-LIMIT).
+        apply_operator! is a NO-OP (KNOWN-LIMIT: tensor gradient not implemented).
         LBFGS gradient MISSES this energy. Multi-start GS will converge
         on an incomplete Hamiltonian (H without tensor channels). Either:
           (a) For Eu nominal (c_2..c_12 = 0), this branch should never
@@ -352,10 +335,7 @@ end
 # implemented in legacy `energy_gradient!`. LBFGS falls back to ITP for
 # tensor-active configurations. apply_operator! is nil to match — propagator
 # (apply_step!) is the active path for ITP.
-apply_operator!(out, ::TensorTerm, ws, psi) = (fill!(out, zero(eltype(out))); out)
-function add_gradient!(grad, ::TensorTerm, psi, ws)
-    return nothing
-end
+apply_operator!(out, ::TensorTerm, ws, psi) = out
 
 sign_oracle(::Type{TensorTerm}) = (
     name="TensorTerm: c2 polar singlet ⇒ E_pair ≥ 0; gradient KNOWN-LIMIT",

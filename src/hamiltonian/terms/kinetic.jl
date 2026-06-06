@@ -5,7 +5,7 @@
 #   _kinetic_energy             — ⟨ψ|H_kin|ψ⟩
 #   _grad_kinetic!              — δE_kin/δψ*
 # All three are also reachable via the trinity dispatch
-# (apply_step! / energy_contribution / apply_operator! / add_gradient!).
+# (apply_step! / energy_contribution / apply_operator!).
 
 """
 Universal kinetic energy `H = (1/2) k²` in momentum space.
@@ -106,7 +106,6 @@ end
 # ============================================================================
 
 function apply_operator!(out::AbstractArray, ::KineticTerm, ws, psi::AbstractArray)
-    fill!(out, zero(eltype(out)))
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
     D = ws.spin_matrices.system.n_components
@@ -131,13 +130,6 @@ function energy_contribution(::KineticTerm, psi::AbstractArray{<:Complex}, ws)
     )
 end
 
-function add_gradient!(grad, ::KineticTerm, psi, ws)
-    buf = similar(psi)
-    apply_operator!(buf, KineticTerm(), ws, psi)
-    grad .+= buf
-    return nothing
-end
-
 # Context-aware energy: borrow ctx.fft_buf instead of allocating the
 # 1.1 MB complex buffer per call (P1).
 function energy_contribution(
@@ -152,12 +144,12 @@ function energy_contribution(
 end
 
 # Context-aware specialisation: borrow ctx.fft_buf instead of allocating.
-function add_gradient!(grad, ::KineticTerm, psi, ws, ctx::GradientContext)
+function apply_operator!(out, ::KineticTerm, ws, psi, ctx::GradientContext)
     N = ndims(psi) - 1
     D = ws.spin_matrices.system.n_components
     k_squared_dev = _to_device(ws.backend, ws.grid.k_squared)
-    _grad_kinetic!(grad, psi, ws, ctx.fft_buf, k_squared_dev, ctx.n_pts, D, Val(N))
-    return nothing
+    _grad_kinetic!(out, psi, ws, ctx.fft_buf, k_squared_dev, ctx.n_pts, D, Val(N))
+    return out
 end
 
 sign_oracle(::Type{KineticTerm}) = (

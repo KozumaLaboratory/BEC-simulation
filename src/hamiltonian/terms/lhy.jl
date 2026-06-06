@@ -48,7 +48,6 @@ end
 # ============================================================================
 
 function apply_operator!(out::AbstractArray, ::LHYTerm, ws, psi::AbstractArray)
-    fill!(out, zero(eltype(out)))
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
     D = ws.spin_matrices.system.n_components
@@ -57,19 +56,12 @@ function apply_operator!(out::AbstractArray, ::LHYTerm, ws, psi::AbstractArray)
     return out
 end
 
-function add_gradient!(grad, ::LHYTerm, psi, ws)
-    buf = similar(psi)
-    apply_operator!(buf, LHYTerm(), ws, psi)
-    grad .+= buf
-    return nothing
-end
-
 # Context-aware: borrow ctx.n_density.
-function add_gradient!(grad, ::LHYTerm, psi, ws, ctx::GradientContext)
+function apply_operator!(out, ::LHYTerm, ws, psi, ctx::GradientContext)
     N = ndims(psi) - 1
     D = ws.spin_matrices.system.n_components
-    _grad_lhy!(grad, psi, ws, ctx.n_density, ctx.n_pts, D, Val(N))
-    return nothing
+    _grad_lhy!(out, psi, ws, ctx.n_density, ctx.n_pts, D, Val(N))
+    return out
 end
 
 sign_oracle(::Type{LHYTerm}) = (

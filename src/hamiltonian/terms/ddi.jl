@@ -156,25 +156,13 @@ end
 # ============================================================================
 
 function apply_operator!(out::AbstractArray, ::DDITerm, ws, psi::AbstractArray)
-    fill!(out, zero(eltype(out)))
+    # Gate-first: `_grad_ddi!` accumulates using workspace-owned ddi_bufs.
     ws.ddi === nothing && return out
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
     D = ws.spin_matrices.system.n_components
     _grad_ddi!(out, psi, ws, n_pts, D, Val(N))
     return out
-end
-
-function add_gradient!(grad, ::DDITerm, psi, ws)
-    # Direct accumulation: `_grad_ddi!` already writes into grad using
-    # the workspace-owned ddi_bufs scratch — the similar(psi) wrapper
-    # was a 2.9 MB/call tax at 24³×D=13 (P1).
-    ws.ddi === nothing && return nothing
-    N = ndims(psi) - 1
-    n_pts = ntuple(d -> size(psi, d), Val(N))
-    D = ws.spin_matrices.system.n_components
-    _grad_ddi!(grad, psi, ws, n_pts, D, Val(N))
-    return nothing
 end
 
 sign_oracle(::Type{DDITerm}) = (

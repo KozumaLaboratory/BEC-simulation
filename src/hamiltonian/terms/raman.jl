@@ -68,8 +68,7 @@ end
 # Operator-trinity KNOWN-LIMIT: Raman gradient not implemented in legacy
 # (LBFGS skip). apply_operator! nil to match; ITP path (apply_step!)
 # remains active.
-apply_operator!(out, ::RamanTerm, ws, psi) = (fill!(out, zero(eltype(out))); out)
-add_gradient!(grad, ::RamanTerm, psi, ws) = nothing
+apply_operator!(out, ::RamanTerm, ws, psi) = out
 
 sign_oracle(::Type{RamanTerm}) = (
     name="RamanTerm: KNOWN-LIMIT (no gradient implemented)",

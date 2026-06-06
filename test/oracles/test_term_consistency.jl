@@ -3,7 +3,7 @@
 # Per-HamTerm consistency check (the structural anti-recurrence gate
 # for sign-bug class). For every HamTerm, we verify:
 #
-#   1. `energy_contribution` and `add_gradient!` are FD-consistent:
+#   1. `energy_contribution` and `apply_operator!` are FD-consistent:
 #         (E(ψ + ε·δψ) - E(ψ)) / ε ≈ Re⟨grad, δψ⟩
 #      This catches any sign/missing-term mismatch between energy and
 #      gradient — the bug class found in 2026-06-04 GAP-1.
@@ -19,7 +19,7 @@ using Test
 using FFTW
 using SpinorBEC
 using SpinorBEC: HamTerm, LinearZeemanZTerm, TransverseZeemanTerm,
-    apply_step!, energy_contribution, add_gradient!, sign_oracle
+    apply_step!, energy_contribution, apply_operator!, sign_oracle
 using Random
 
 # Reference test setup used by every term-consistency test.
@@ -55,7 +55,7 @@ end
 
 """
 FD consistency check: for a HamTerm and a reference state, verify
-that the FD slope of energy_contribution matches Re⟨add_gradient!, δψ⟩.
+that the FD slope of energy_contribution matches Re⟨apply_operator!, δψ⟩.
 Returns (fd_slope, inner_product, ratio).
 """
 function _fd_vs_inner(term::HamTerm, ws, psi_ref, δψ; ε=1e-7)
@@ -65,7 +65,7 @@ function _fd_vs_inner(term::HamTerm, ws, psi_ref, δψ; ε=1e-7)
     fd_slope = (E_ε - E_0) / ε
 
     grad = zero(psi_ref)
-    add_gradient!(grad, term, psi_ref, ws)
+    apply_operator!(grad, term, ws, psi_ref)
     # Convention: energy_gradient! later scales `grad` by 2 (Wirtinger).
     # So the inner product against δψ that matches dE/dε is
     # `2 · Re⟨grad, δψ⟩` (since `grad` here is δE/δψ*).

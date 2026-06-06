@@ -118,6 +118,41 @@ end
         compare_all_slots(ws, ψr, "B:random")
     end
 
+    # Hermiticity of the LINEAR production faces: ⟨φ|Hχ⟩ = ⟨Hφ|χ⟩ on
+    # random pairs (frozen-field ambiguity does not exist for linear
+    # terms). Absorbed from the retired 4-step chain, whose blanket
+    # version was conceptually wrong for mean-field terms (it compared
+    # H[ψ]ψ against H[φ]φ — different frozen fields) and whose step0
+    # monotone heuristic was roundoff-fragile for exactly-quadratic
+    # energies. Mean-field/pairing Hermitian structure = second-
+    # variation symmetry on the dumb side (bootstrap doc §5),
+    # registry-wide mutant canaries = §7 — both still-open items.
+    @testset "linear-face Hermiticity (production apply_operator!)" begin
+        rng = MersenneTwister(53)
+        ws, _ = aux_ws()
+        φ = rand_offmanifold_state(ws; rng)
+        χ = rand_offmanifold_state(ws; rng)
+        registry = build_h_terms_registry(ws)
+        for slot in (:kinetic, :trap, :zeeman_z, :zeeman_transverse,
+            :light_shift, :magnetic_gradient)
+            T = getfield(SLOT_TERM, slot)
+            term = nothing
+            for t in registry
+                t isa T && (term = t)
+            end
+            Hχ = zero(χ)
+            apply_operator!(Hχ, term, ws, χ)
+            Hφ = zero(φ)
+            apply_operator!(Hφ, term, ws, φ)
+            a = sum(conj.(φ) .* Hχ)
+            c = sum(conj.(Hφ) .* χ)
+            scale = max(abs(a), abs(c), 1e-30)
+            @testset "$slot" begin
+                @test abs(a - c) / scale < 1e-10
+            end
+        end
+    end
+
     # Dumb-internal variational identity: the dumb energy and dumb RHS
     # of one slot must satisfy dE/dh = 2·dV·Re⟨g, δ⟩ — the FD valley,
     # run against the DUMB side only. Notably includes the PAIRING term

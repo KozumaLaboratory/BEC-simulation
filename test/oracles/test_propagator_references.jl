@@ -36,7 +36,7 @@ using SpinorBEC
 using SpinorBEC: HamTerm, apply_step!, build_h_terms_registry
 using SpinorBEC: dumb_rhs_breakdown, dumb_rk4_evolve
 using SpinorBEC: KineticTerm, TrapTerm, LinearZeemanZTerm, TransverseZeemanTerm,
-    DensityC0Term, SpinC1Term, LHYTerm, TensorTerm, RamanTerm,
+    DensityC0Term, SpinC1Term, DDITerm, LHYTerm, TensorTerm, RamanTerm,
     LightShiftTerm, CoriolisTerm, MagneticGradientTerm
 using Random
 

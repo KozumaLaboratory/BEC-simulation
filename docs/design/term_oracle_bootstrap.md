@@ -275,12 +275,22 @@ atomic `{ψ, E, ∇E, gate}` object (spine G).
 
 ## 10. Consolidation map (do not write a fifth harness)
 
-ε-scaling, Hermiticity, and a canary already exist in
-`test_operator_trinity_four_step_chain.jl` (e1001d30); the FD harness
-exists in four near-copies (`test_operator_trinity_per_term.jl`,
-`four_step_chain`, `test_term_consistency.jl`,
-`test_magnetic_gradient_gap.jl`). Week 1 is **consolidate + complete +
-register**, not greenfield:
+ε-scaling, Hermiticity, and a canary existed in
+`test_operator_trinity_four_step_chain.jl` (e1001d30) — **absorbed and
+DELETED 2026-06-06**: its step0 monotone heuristic was
+roundoff-fragile for exactly-quadratic energies (superseded by
+`valley_scan`'s `:exact_floor` classification), its step1 used the
+pick-closer factor heuristic (superseded by the Euler-derived factor +
+master-oracle identity), its step2 blanket Hermiticity was
+conceptually wrong for mean-field terms (compared `H[ψ]ψ` against
+`H[φ]φ`; linear-face Hermiticity now lives in the master oracle,
+mean-field/pairing second-variation symmetry per §5 is an open item),
+and its two canaries are covered by the harness canaries here
+(registry-wide mutant table per §7 is an open item). The FD harness
+previously existed in four near-copies (`test_operator_trinity_per_term.jl`,
+`test_term_consistency.jl`, `test_magnetic_gradient_gap.jl`, the
+deleted chain). Week 1 is **consolidate + complete + register**, not
+greenfield:
 
 - new `src/validation/fd_gradient.jl` — directional FD estimator with
   ε-sweep + valley/slope diagnostics (reusable by scripts;

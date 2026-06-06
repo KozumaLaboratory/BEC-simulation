@@ -20,9 +20,8 @@ end
 # K3 three-body loss). It does NOT contribute to GP energy and has no
 # Hermitian operator to expose via apply_operator!. Explicitly nil to make
 # the trinity-skipping intent structural rather than accidental.
-apply_operator!(out, ::LossTerm, ws, psi) = (fill!(out, zero(eltype(out))); out)
+apply_operator!(out, ::LossTerm, ws, psi) = out
 energy_contribution(::LossTerm, psi, ws) = 0.0
-add_gradient!(grad, ::LossTerm, psi, ws) = nothing
 
 sign_oracle(::Type{LossTerm}) = (
     name="LossTerm: K3 reduces ‖ψ‖² under RT (non-Hermitian)",

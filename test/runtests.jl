@@ -227,6 +227,11 @@ const CI_EXTRA = [
     # no-anchor SBI regime (trust ledger column 3) — linearity anchors,
     # θ-valley, degenerate-protocol detection, channel-space chain.
     "oracles/test_fisher_identifiability.jl",
+    # Registry gradient path ≡ driver body + the A.0 trinity
+    # proof-of-concept — registered 2026-06-06 with the apply_operator!
+    # accumulate-contract consolidation (previously dormant orphans).
+    "oracles/test_registry_gradient_parity.jl",
+    "oracles/test_operator_ad_consistency.jl",
 ]
 
 # ── Full tier: everything (ci + remaining heavy tests) ──

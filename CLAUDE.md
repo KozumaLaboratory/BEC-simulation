@@ -104,7 +104,7 @@ Four primitives:
 | **foundation/types/** | All structs (`Grid`, `Workspace`, `AbstractPotential` + 12 subtypes, spin / atom / Zeeman / Raman / FFT / DDI / Loss / LightShift / TensorCache / Integrator config / SimulationResult / TWA / TOF / BdG / scan / checkpoint / TDHFBState …). | New structs go here first. Workspace type params are derived. `Val(N)` from type parameter, not `Val(ndim::Int)`. |
 | **hamiltonian/interactions/** | c0/c1 + singlet_pair + tensor + DDI (k-space 6-FFT convolution + Euler 5-stage spinor rotation + secular option + zero-padded variant) + LHY (closed forms + φ₁-reg + Modes-round-45 + Sigma-Delta polar F1-F8/FM F6 dispatch + Lima-Pelster Q5) + losses + absorbing_boundary. | Two interaction paths auto-selected in `make_workspace` (c₀/c₁ vs scattering-lengths). |
 | **hamiltonian/potentials/** | Trap + Zeeman (Linear z + Quadratic z + Transverse x/y + time-dep) + Raman + Gaussian-beam optics + laser_potential + optical_trap + light_shift. | Unified `B:` block; Zeeman sign source = `H_Zeeman = -(g_F μ_B B · F) + q F_z²` at `experiments/runtime/b_block_builders.jl`. |
-| **hamiltonian/terms/** | **HamTerm protocol.** Each term — Kinetic, Trap, LinearZeemanZ, TransverseZeeman, DensityC0, SpinC1, DDI, LHY, Tensor, Raman, LightShift, Coriolis, MagneticGradient, Loss — declares its sign in ONE coefficient function; `apply_step!` / `energy_contribution` / `add_gradient!` / `sign_oracle` derive from it. `build_h_terms_registry(ws) → NTuple{N, HamTerm}` is type-stable and unrolled. | New H terms go here. Registry pattern is load-bearing for bug-class elimination — do NOT bypass for new physics; do NOT introduce parallel sign declarations. |
+| **hamiltonian/terms/** | **HamTerm protocol.** Each term — Kinetic, Trap, LinearZeemanZ, TransverseZeeman, DensityC0, SpinC1, DDI, LHY, Tensor, Raman, LightShift, Coriolis, MagneticGradient, Loss — declares its sign in ONE coefficient function; `apply_step!` / `energy_contribution` / `apply_operator!` (ACCUMULATES `out .+= H·ψ`; gate-first; the gradient face) / `sign_oracle` derive from it. `build_h_terms_registry(ws) → NTuple{N, HamTerm}` is type-stable and unrolled. | New H terms go here. Registry pattern is load-bearing for bug-class elimination — do NOT bypass for new physics; do NOT introduce parallel sign declarations. |
 | **hamiltonian/integrator/** | Split-step + adaptive Yoshida + Coriolis 3-shear + Yoshida/Suzuki/Blanes-Moan composers + force_gradient + combined_spin_step + dealias + adaptive-dt + rotating-basis propagators/integrators. | `V(dt/2) Coriolis(dt/2) K(dt) Coriolis(dt/2) V(dt/2)` Strang sandwich. `_YOSHIDA_W0 < 0` correct (backward middle substep). |
 | **hamiltonian/tdhfb/** | Time-Dependent HFB local-approximation engine — voxel-local BdG Strang step (channel kernel + HF self-energy + Δ from φφ + κ) + Y4-midpoint Picard wrapper + total-energy functional conserved by step. | Engine **parallel to GP**; YAML pipeline integration deferred. Do NOT wire `dynamics.tdhfb` into `run_yaml` without explicit ask. |
 | **analysis/** | observables + energy_decomposition + currents + vorticity + vortex_extraction + diagnostics + Majorana stars + icosahedral order + TOF + tomography + Faraday + imaging + Fisher + topology (winding / monopole / holonomy) + synthetic_dimension + time_resolved + stability_analysis + spin_rotation. | `_get_spinor(psi, I, Val(13))` allocates 352 B/call at D=13 (SROA elides inside hot loops). Use `Matrix` / `MVector`; `SMatrix` heap-allocates at D=13. |
@@ -142,7 +142,7 @@ Four primitives:
 The historical pattern: same physics in N hand-duplicated locations; one drift, others stay correct, tests still pass. Linear z-Zeeman alone used to live in 8 places. The forward commitment:
 
 - **One sign declaration per term.** `_diag_coef(term, m)` / `_h_matrix(term, sm)` / `_<op>(term, …)` at top of `src/hamiltonian/terms/<term>.jl`.
-- **All paths via the registry.** `apply_step!` (propagator) / `energy_contribution` (CPU + GPU) / `add_gradient!` (LBFGS) call the same coefficient function.
+- **All paths via the registry.** `apply_step!` (propagator) / `energy_contribution` (CPU + GPU) / `apply_operator!` (the accumulating gradient face, LBFGS) call the same coefficient function. There is no separate `add_gradient!` — it was the same mathematical object as `apply_operator!` and was consolidated 2026-06-06.
 - **Inactive terms short-circuit at top of each method.** Registry is `NTuple{N, HamTerm}` (type-stable, compiler-unrolled); zero per-call cost for inactive terms.
 - **Shared scratch via `EnergyContext` / `GradientContext`.** Context-aware overloads reuse pre-built density / spin density / FFT buffer across terms in one pass. New terms benefiting from shared scratch should provide the `ctx`-aware specialization.
 
@@ -152,12 +152,12 @@ The historical pattern: same physics in N hand-duplicated locations; one drift, 
 
 1. Create `src/hamiltonian/terms/<your_term>.jl` with `struct <YourTerm> <: HamTerm`.
 2. Declare the sign convention in ONE coefficient function.
-3. Implement `apply_step!` / `energy_contribution` / `add_gradient!` from it. Delegate to existing audited routines (`_apply_coriolis_step!`, `apply_kinetic_step_batched!`, …) when possible.
+3. Implement `apply_step!` / `energy_contribution` / `apply_operator!` (accumulate contract: `out .+= H·ψ`, gate-first, never `fill!` inside; callers zero `out` for the bare action) from it. Delegate to existing audited routines (`_apply_coriolis_step!`, `apply_kinetic_step_batched!`, …) when possible.
 4. Provide `sign_oracle(::Type{<YourTerm>})` → `(name, predicate)` — a directional physics observable the *correct* sign produces (FM `⟨|F|²⟩=F²` vs polar 0, prolate vs oblate, `⟨F_z⟩>0` under `+p`, …). A predicate returning `true` regardless is a placeholder, not an oracle.
 5. Register in `src/hamiltonian.jl` include list AND `build_h_terms_registry` AND `H_TERMS_CANONICAL_ORDER`.
 6. Add a directional test to `test/oracles/test_hamiltonian_sign_oracles.jl`. If term has `sign(E) = sign(c)·X²` shape (tautology), additionally add a physics-anchored oracle to `test/oracles/test_physics_aware_sign_oracles.jl`.
 7. Run the oracle suite — every gate must pass:
-   - `test_term_consistency.jl` (FD oracle: `add_gradient!` ↔ FD of `energy_contribution`).
+   - `test_term_consistency.jl` (FD oracle: `apply_operator!` ↔ FD of `energy_contribution`).
    - `test_gpu_cpu_per_term_parity.jl` (per-term GPU↔CPU; closes blind spot where term contributes zero in aggregate test).
    - `test_registry_{energy_decomposition,gradient,strang_step}_parity.jl` (registry vs hand-written bit-identity).
    - `test_magnetic_gradient_gap.jl` style: per-term audit gate when term has a non-obvious path (transverse, off-diagonal, propagator that mutates V).
@@ -174,7 +174,7 @@ Tier membership is **explicit in `test/runtests.jl`** — no auto-discovery.
 |---|---|
 | `test_hamiltonian_sign_oracles.jl` | Directional physics per HamTerm: `+p ⇒ ⟨F_z⟩ > 0`, `+Ω ⇒ ⟨L_z⟩ > 0`, `+g_F·grad ⇒ ⟨x⟩ < 0`, etc. |
 | `test_physics_aware_sign_oracles.jl` | Physics-anchored oracles for terms with tautology-shape directional tests (SpinC1, DDI, LHY, Tensor). |
-| `test_term_consistency.jl` | FD oracle: `add_gradient!` vs finite-difference of `energy_contribution`. Catches energy ↔ gradient drift. |
+| `test_term_consistency.jl` | FD oracle: `apply_operator!` vs finite-difference of `energy_contribution`. Catches energy ↔ gradient drift. |
 | `test_gpu_cpu_per_term_parity.jl` | One-term-active GPU vs CPU `energy_decomposition` and `Hψ`. Forbids "term contributes zero in test config, missing GPU path invisible". |
 | `test_registry_{energy_decomposition,gradient,strang_step}_parity.jl` | Registry path vs legacy bit-identity. |
 | `test_term_legacy_equivalence.jl` | Per-term: new HamTerm `apply_step!` vs legacy routine. |

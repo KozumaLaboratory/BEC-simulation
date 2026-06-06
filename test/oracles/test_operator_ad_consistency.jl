@@ -5,7 +5,7 @@
 # Demonstrates the structural identity that closes the sign-cascade class:
 # for each HamTerm H, the trinity
 #   energy_contribution   ≈   0.5 · ⟨ψ, apply_operator(term, ψ)⟩
-#   add_gradient!         ≈   apply_operator(term, ψ)
+#   apply_operator!       ≈   apply_operator(term, ψ)  (accumulates: fill! first)
 #   apply_step! coefs     ↔   same H used in exp(-i·dt·H)
 # is enforced by ONE source: `apply_operator!(out, term, ws, psi)`.
 #
@@ -24,41 +24,12 @@ using SpinorBEC
 using SpinorBEC: KineticTerm, _component_slice
 using LinearAlgebra
 
-# ─── A.0 interface (test-local) ────────────────────────────────────────────
-# This will move to src/hamiltonian/terms/operator_interface.jl in A.1.
-
-"""
-    apply_operator!(out, term::HamTerm, ws, psi) -> out
-
-Compute `out .= H·ψ` where H is the Hermitian operator the term represents.
-The trinity (energy ⟨ψ|H|ψ⟩/2, gradient H·ψ, propagator coefficient inside
-exp(-i·dt·H)) all derive from this single function.
-
-This is the LOAD-BEARING entry point for the sign-cascade structural
-closure: changing the sign of the coefficient here changes all three
-derived paths at once.
-"""
-function apply_operator! end
-
-# ─── KineticTerm implementation ────────────────────────────────────────────
-# H_kin = -½ ∇²; in Fourier, multiplication by (1/2)|k|².
-
-function apply_operator!(out::AbstractArray, ::KineticTerm, ws, psi::AbstractArray)
-    n_comp = ws.spin_matrices.system.n_components
-    ndim = ndims(psi) - 1
-    n_pts = ntuple(d -> size(psi, d), ndim)
-    fft_buf = similar(psi, ntuple(d -> size(psi, d), ndim)...)
-    k_sq = ws.grid.k_squared
-    for c in 1:n_comp
-        idx = _component_slice(ndim, n_pts, c)
-        fft_buf .= view(psi, idx...)
-        ws.fft_plans.forward * fft_buf
-        fft_buf .*= (0.5 .* k_sq)
-        ws.fft_plans.inverse * fft_buf
-        copyto!(view(out, idx...), fft_buf)
-    end
-    return out
-end
+# ─── A.0 interface note ────────────────────────────────────────────────────
+# The production `apply_operator!` now lives in SpinorBEC source and
+# ACCUMULATES (`out .+= H·ψ`). This file exercises KineticTerm via the
+# production implementation (imported above via SpinorBEC: KineticTerm).
+# The local helper below is retained for the FD oracle's energy calculation
+# and uses fill!-first + apply_operator! in the accumulate contract.
 
 # ─── Helpers ───────────────────────────────────────────────────────────────
 

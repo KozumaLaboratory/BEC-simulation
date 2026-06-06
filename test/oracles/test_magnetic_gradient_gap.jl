@@ -9,7 +9,7 @@
 # clean V_trap, so they saw no MG.
 #
 # Post-fix (2026-06-04): MagneticGradientTerm is a first-class HamTerm
-# whose `energy_contribution` and `add_gradient!` compute the same
+# whose `energy_contribution` and `apply_operator!` compute the same
 # integral that the propagator implements. This test pins:
 #
 #   1. Propagator ↔ HamTerm bit-identity for ITP / RT single step.
@@ -22,7 +22,7 @@ using FFTW
 using LinearAlgebra
 using SpinorBEC
 using SpinorBEC: MagneticGradientTerm, apply_step!, energy_contribution,
-    add_gradient!, sign_oracle, build_h_terms_registry,
+    apply_operator!, sign_oracle, build_h_terms_registry,
     energy_breakdown_via_registry
 using Random
 
@@ -96,7 +96,7 @@ end
         fd_slope = (Eε - E0) / ε
 
         grad = zero(psi_ref)
-        add_gradient!(grad, MagneticGradientTerm(), psi_ref, ws)
+        apply_operator!(grad, MagneticGradientTerm(), ws, psi_ref)
         # Convention: energy_gradient! later scales grad by 2 (Wirtinger).
         inner = 2 * real(sum(conj.(grad) .* δψ)) * cell_volume(ws.grid)
 

@@ -17,7 +17,7 @@ function apply_operator!(out::AbstractArray, ::TrapTerm, ws, psi::AbstractArray)
     V = ws.potential_values
     @inbounds for c in 1:D
         idx = ntuple(_ -> :, Val(N))
-        view(out, idx..., c) .= V .* view(psi, idx..., c)
+        view(out, idx..., c) .+= V .* view(psi, idx..., c)
     end
     return out
 end
@@ -41,15 +41,6 @@ function energy_contribution(::TrapTerm, psi::Array{<:Complex}, ws)
     n_pts = ntuple(d -> size(psi, d), Val(N))
     n_comp = size(psi, N + 1)
     return _trap_energy(psi, ws.potential_values, n_comp, N, n_pts, cell_volume(ws.grid))
-end
-
-function add_gradient!(grad, ::TrapTerm, psi, ws)
-    # Direct broadcast accumulation (device-generic, zero-alloc).
-    N = ndims(psi) - 1
-    n_pts = ntuple(d -> size(psi, d), Val(N))
-    D = size(psi, N + 1)
-    _grad_trap!(grad, psi, ws, n_pts, D, Val(N))
-    return nothing
 end
 
 function apply_step!(::TrapTerm, psi, dt::Real, imaginary_time::Bool, ws)

@@ -155,7 +155,6 @@ end
 # ============================================================================
 
 function apply_operator!(out::AbstractArray, term::CoriolisTerm, ws, psi::AbstractArray)
-    fill!(out, zero(eltype(out)))
     N = ndims(psi) - 1
     (N >= 2 && is_active(term.Ω, ROTATION_TOL)) || return out
     D = ws.spin_matrices.system.n_components
@@ -170,7 +169,7 @@ function apply_operator!(out::AbstractArray, term::CoriolisTerm, ws, psi::Abstra
 end
 
 # ============================================================================
-# Derived: energy + gradient from the single source.
+# Derived: energy from the single source.
 # ============================================================================
 
 function energy_contribution(term::CoriolisTerm, psi::AbstractArray{<:Complex}, ws)
@@ -184,23 +183,15 @@ function energy_contribution(term::CoriolisTerm, psi::AbstractArray{<:Complex}, 
     return _coriolis_sign(term) * orbital_angular_momentum(psi, ws.grid, ws.fft_plans)
 end
 
-function add_gradient!(grad::AbstractArray{<:Complex}, term::CoriolisTerm,
-    psi::AbstractArray{<:Complex}, ws)
-    buf = similar(psi)
-    apply_operator!(buf, term, ws, psi)
-    grad .+= buf
-    return nothing
-end
-
 # Context-aware specialisation: borrow ctx.fft_buf / ctx.deriv_buf.
-function add_gradient!(grad::AbstractArray{<:Complex}, term::CoriolisTerm,
-    psi::AbstractArray{<:Complex}, ws, ctx::GradientContext)
+function apply_operator!(out::AbstractArray{<:Complex}, term::CoriolisTerm,
+    ws, psi::AbstractArray{<:Complex}, ctx::GradientContext)
     N = ndims(psi) - 1
-    N >= 2 || return nothing
-    abs(term.Ω) < SpinorBEC.ROTATION_TOL && return nothing
+    N >= 2 || return out
+    abs(term.Ω) < SpinorBEC.ROTATION_TOL && return out
     D = ws.spin_matrices.system.n_components
-    _grad_coriolis!(grad, psi, ws, ctx.fft_buf, ctx.deriv_buf, ctx.n_pts, D, Val(N))
-    return nothing
+    _grad_coriolis!(out, psi, ws, ctx.fft_buf, ctx.deriv_buf, ctx.n_pts, D, Val(N))
+    return out
 end
 
 """
