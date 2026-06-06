@@ -26,8 +26,6 @@ struct DensityC0Term <: HamTerm
     c0::Float64
 end
 
-@inline _density_sign(term::DensityC0Term) = +term.c0   # positive c0 = repulsive
-
 function apply_operator!(out::AbstractArray, term::DensityC0Term, ws, psi::AbstractArray)
     # Mean-field nonlinear: δE/δψ̄[I, c] = c0 · n(r) · ψ[I, c] where n(r) = Σ_c' |ψ[r, c']|².
     N = ndims(psi) - 1
@@ -138,8 +136,6 @@ sign_oracle(::Type{DensityC0Term}) = (
 struct SpinC1Term <: HamTerm
     c1::Float64
 end
-
-@inline _spin_sign(term::SpinC1Term) = +term.c1
 
 function apply_step!(term::SpinC1Term, psi, dt::Real, imaginary_time::Bool, ws)
     is_active(term.c1) || return nothing

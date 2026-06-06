@@ -66,7 +66,7 @@ Convention for the trinity:
   the operator action share their coefficient source.
 
 The FD-consistency oracle in
-`test/oracles/test_operator_trinity_per_term.jl` verifies that
+`test/oracles/test_master_oracle.jl` verifies that
 `δE_term[ψ]/δψ̄` measured via finite differences agrees with
 `apply_operator!(...)` for every term. If they drift, either
 `energy_contribution` or `apply_operator!` is wrong, and the operator

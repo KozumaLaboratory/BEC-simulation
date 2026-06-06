@@ -158,25 +158,6 @@ end
 # ============================================================================
 
 """
-    total_energy_via_registry(ws) → Float64
-
-Compute `E_total = Σ energy_contribution(term, psi, ws)` by iterating
-the registry. Bit-identical to `energy_decomposition(ws).total` for
-any well-formed workspace (asserted by
-`test/oracles/test_registry_strang_step_equivalence.jl` and
-`test_term_legacy_equivalence.jl`).
-"""
-function total_energy_via_registry(ws)
-    registry = build_h_terms_registry(ws)
-    psi = ws.state.psi  # same-device as ws; trinity methods handle GPU vs CPU
-    E = 0.0
-    for term in registry
-        E += energy_contribution(term, psi, ws)
-    end
-    return E
-end
-
-"""
     apply_operator_via_registry!(grad, ws) → grad
 
 Build δE/δψ* by iterating the registry. Bit-identical to the in-place
@@ -206,69 +187,6 @@ end
 
 @inline energy_contribution(term::HamTerm, psi, ws, ::EnergyContext) =
     energy_contribution(term, psi, ws)
-
-# ============================================================================
-# Strang step
-# ============================================================================
-
-"""
-    is_kinetic_term(::Type{T}) -> Bool
-
-Classify a HamTerm as kinetic (the K piece of the Strang `V K V` sandwich)
-or potential (the V piece). Default: false (assume potential).
-"""
-is_kinetic_term(::Type{<:HamTerm}) = false
-is_kinetic_term(::Type{KineticTerm}) = true
-
-"""
-    strang_step_via_registry!(ws, dt)
-
-Apply ONE full Strang split-step using the HamTerm registry. The
-structure mirrors `split_step!` exactly:
-
-    V_inner(dt/2) → Coriolis(dt/2) → K(dt) → Coriolis(dt/2) → V_inner(dt/2)
-
-Bit-identity to `split_step!` is guaranteed because the nested-sandwich
-machinery delegates to the same legacy helpers (`_half_potential_step!`,
-`_apply_coriolis_step!`, `apply_kinetic_step_batched!`). The HamTerm
-registry serves as the single-source-of-truth sign declaration that
-each `apply_step!` method already uses internally; the Strang sandwich
-scheduler is the legacy `_half_potential_step!` which we re-use rather
-than re-implement to avoid introducing FP-order differences.
-"""
-function strang_step_via_registry!(ws, dt)
-    it = ws.sim_params.imaginary_time
-    n_comp = ws.spin_matrices.system.n_components
-    N = ndims(ws.state.psi) - 1
-    t = ws.state.t
-    t_eval_1 = it ? 0.0 : t + dt / 4
-    t_eval_2 = it ? 0.0 : t + 3 * dt / 4
-
-    SpinorBEC._half_potential_step!(
-        ws, dt / 2, n_comp, N, it; t_eval=t_eval_1, t_start=it ? NaN : t
-    )
-
-    omega = ws.sim_params.rotating_frame_omega
-    SpinorBEC.apply_step!(CoriolisTerm(omega), ws.state.psi, dt / 2, it, ws)
-
-    SpinorBEC.apply_step!(KineticTerm(), ws.state.psi, 0.0, false, ws)
-
-    SpinorBEC.apply_step!(CoriolisTerm(omega), ws.state.psi, dt / 2, it, ws)
-
-    SpinorBEC._half_potential_step!(
-        ws, dt / 2, n_comp, N, it; t_eval=t_eval_2, t_start=it ? NaN : t + dt / 2
-    )
-
-    ws.state.t += it ? 0.0 : dt
-    ws.state.step += 1
-
-    if it && ws.sim_params.normalize_every > 0
-        if ws.state.step % ws.sim_params.normalize_every == 0
-            SpinorBEC._normalize_psi!(ws.state.psi, ws.grid, n_comp, N)
-        end
-    end
-    return nothing
-end
 
 # ============================================================================
 # Per-term energy breakdown

@@ -186,8 +186,6 @@ const CI_EXTRA = [
     "oracles/test_hamiltonian_sign_oracles.jl",
     "oracles/test_term_legacy_equivalence.jl",
     "oracles/test_term_consistency.jl",
-    # Phase 3.3 proof-of-concept: registry-driven Strang step.
-    "oracles/test_registry_strang_step_equivalence.jl",
     # Rename regression: HamTerm subtype names no longer shadow potential types.
     "oracles/test_registry_collision_regression.jl",
     # [GAP-2] closure: MagneticGradientTerm energy/gradient/sign-oracle.
@@ -227,11 +225,14 @@ const CI_EXTRA = [
     # no-anchor SBI regime (trust ledger column 3) — linearity anchors,
     # θ-valley, degenerate-protocol detection, channel-space chain.
     "oracles/test_fisher_identifiability.jl",
-    # Registry gradient path ≡ driver body + the A.0 trinity
-    # proof-of-concept — registered 2026-06-06 with the apply_operator!
-    # accumulate-contract consolidation (previously dormant orphans).
+    # Registry ctx-vs-plain gradient identity per term — registered
+    # 2026-06-06 with the apply_operator! consolidation.
     "oracles/test_registry_gradient_parity.jl",
-    "oracles/test_operator_ad_consistency.jl",
+    # Fused production diagonal kernel ≡ Σ per-term operators (Δt → 0):
+    # the fused==unfused identity gate — the one place the dt-valley
+    # suite does not reach (it tests per-term apply_step!, not the
+    # fused production kernel). Registered 2026-06-06.
+    "oracles/test_operator_trinity_fused_face.jl",
 ]
 
 # ── Full tier: everything (ci + remaining heavy tests) ──

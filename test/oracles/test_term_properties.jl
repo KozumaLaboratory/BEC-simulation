@@ -15,11 +15,11 @@
 #
 # Growth path (§10–§11): step1 across the registry, step2 by operator
 # class, symmetry declarations (§6), canary mutants (§7), collapse gate
-# (§9), meta_completeness (§8). This file absorbs
-# test_operator_trinity_per_term / four_step_chain /
-# test_term_consistency / test_magnetic_gradient_gap as each property
-# lands — every absorbed property deletes its old statement in the same
-# commit.
+# (§9), meta_completeness (§8). Absorbed + deleted so far:
+# test_operator_trinity_per_term, _propagator_face, _four_step_chain,
+# _ad_consistency (with the master oracle + dt-valley suites); still
+# carrying unique value: test_term_consistency (directional anchors),
+# test_magnetic_gradient_gap (named bit-identity regression).
 
 using Test
 using SpinorBEC

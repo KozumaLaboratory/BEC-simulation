@@ -194,30 +194,31 @@ end
         @test grad_norm_2 <= max(grad_norm_1 * 10, 1e-6)
     end
 
-    @testset "8. Registry strang_step ≡ split_step! (bit-identity)" begin
-        # The HamTerm registry path (strang_step_via_registry!) must
-        # produce bit-identical psi to the legacy split_step! for the
-        # same workspace, after one full Strang sandwich step. Drift here
-        # signals a registry bug (terms added, removed, or with sign drift).
+    @testset "8. split_step! one-step residual vs dumb reference" begin
+        # Replaced 2026-06-06: the old check compared split_step! against
+        # strang_step_via_registry!, which post-B3 shared the same
+        # apply_step! calls AND delegated its V chain to the same legacy
+        # helpers — a near-self-comparison (both deleted). This version
+        # checks production against the INDEPENDENT dumb statement:
+        # (ψ' − ψ)/(−i·dt) after one split_step! must match
+        # dumb_rhs_total(ψ) to O(dt) — a missing, dropped, or
+        # sign-flipped term in the production sandwich shows up as an
+        # O(1) residual.
         grid = make_grid(GridConfig{1}((16,), (8.0,)))
         atom = Rb87
         ip = InteractionParams(Dict(0 => 1.0, 1 => 0.05))
         zeeman = ZeemanParams(0.2, 0.05)
         sp = SimParams(; dt=0.005, n_steps=1, imaginary_time=false)
-        ws_a = make_workspace(;
-            grid, atom, interactions=ip, zeeman,
-            potential=HarmonicTrap((1.0,)), sim_params=sp)
-        ws_b = make_workspace(;
+        ws = make_workspace(;
             grid, atom, interactions=ip, zeeman,
             potential=HarmonicTrap((1.0,)), sim_params=sp)
         psi0 = init_psi(grid, SpinSystem(1); state=:spin_coherent, init_theta=π / 4)
-        copyto!(ws_a.state.psi, psi0)
-        copyto!(ws_b.state.psi, psi0)
-        split_step!(ws_a)
-        SpinorBEC.strang_step_via_registry!(ws_b, sp.dt)
-        diff = Array(ws_a.state.psi) .- Array(ws_b.state.psi)
-        rel = sqrt(sum(abs2, diff)) / sqrt(sum(abs2, Array(ws_a.state.psi)))
-        @test rel < 1e-13
+        copyto!(ws.state.psi, psi0)
+        g = SpinorBEC.dumb_rhs_total(ws, Array(psi0))
+        split_step!(ws)
+        deriv = (Array(ws.state.psi) .- Array(psi0)) ./ (-im * sp.dt)
+        rel = sqrt(sum(abs2, deriv .- g)) / sqrt(sum(abs2, g))
+        @test rel < 0.2   # O(dt·⟨H²⟩/⟨H⟩) ≈ 0.05 here; a term drop ⇒ O(1)
     end
 end
 

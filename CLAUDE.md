@@ -176,7 +176,7 @@ Tier membership is **explicit in `test/runtests.jl`** — no auto-discovery.
 | `test_physics_aware_sign_oracles.jl` | Physics-anchored oracles for terms with tautology-shape directional tests (SpinC1, DDI, LHY, Tensor). |
 | `test_term_consistency.jl` | FD oracle: `apply_operator!` vs finite-difference of `energy_contribution`. Catches energy ↔ gradient drift. |
 | `test_gpu_cpu_per_term_parity.jl` | One-term-active GPU vs CPU `energy_decomposition` and `Hψ`. Forbids "term contributes zero in test config, missing GPU path invisible". |
-| `test_registry_{energy_decomposition,gradient,strang_step}_parity.jl` | Registry path vs legacy bit-identity. |
+| `test_registry_{energy_decomposition,gradient}_parity.jl` | Registry path identities (legacy shape; ctx vs plain faces). The strang-step variant was deleted 2026-06-06 (post-B3 near-self-comparison); the propagator gate is the dt-valley + RK4-slope suite vs the dumb reference. |
 | `test_term_legacy_equivalence.jl` | Per-term: new HamTerm `apply_step!` vs legacy routine. |
 | `test_registry_collision_regression.jl` | HamTerm subtype names don't shadow potential types. |
 | `test_magnetic_gradient_gap.jl` | Per-term audit for terms whose propagator mutates+restores V (so legacy energy reads clean V and reports zero). |

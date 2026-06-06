@@ -176,10 +176,6 @@ struct TransverseZeemanTerm <: HamTerm
     by::Float64
 end
 
-# THE ONE LINE. Sign convention -bx·F_x - by·F_y lives here exclusively.
-@inline _h_matrix(term::TransverseZeemanTerm, sm) =
-    (-term.bx) .* Matrix(sm.Fx) .+ (-term.by) .* Matrix(sm.Fy)
-
 function apply_step!(term::TransverseZeemanTerm, psi, dt::Real, imaginary_time::Bool, ws)
     # `apply_uniform_spin_rotation!` applies `exp(-i·dt·(phi·F̂))`, i.e.
     # H_eff = +phi_x·F_x + phi_y·F_y. To realise `H = -bx·F_x - by·F_y`,

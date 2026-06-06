@@ -12,8 +12,6 @@ Universal kinetic energy `H = (1/2) k²` in momentum space.
 """
 struct KineticTerm <: HamTerm end
 
-@inline _kinetic_sign() = +0.5  # H = +(1/2)·k²; no user-spec sign question
-
 # ============================================================================
 # Canonical kernel: RT/IT propagator (batched FFT pair)
 # ============================================================================
