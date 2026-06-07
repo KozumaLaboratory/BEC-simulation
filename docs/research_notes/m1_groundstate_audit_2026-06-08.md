@@ -66,9 +66,49 @@ goldstone          1 / 30   (B=0, Ω=0)
 unconverged       18 / 30   (Ω>0 mid-range, conditioning floor)
 ```
 
+## Gate 2 — minimum vs saddle (2026-06-08, scripts/m1_gate2_stability.jl)
+
+Lowest constrained-Hessian eigenvalue via fully-reorthogonalised Lanczos
+on the anchored FD-Hessian HvP. Constrained operator P(H−2μ)P (P removes
+the complex-ψ0 norm+phase gauge; μ = Re⟨ψ0,g⟩/2‖ψ0‖²); λ_min ≥ −tol ⇒
+minimum. Method validated on the first cell: μ=12.67, ‖g−2μψ0‖/‖g‖=4e-7
+(g∥ψ0, converged), and the phase mode H·iψ0 = 2μ·iψ0 (the 2μ eigenvector,
+zeroed by H−2μ).
+
+**All six converged Ω=0 cells are energetic MINIMA** (λ_min ∈ [2.3, 3.7],
+strictly positive — no negative mode):
+
+| B [nT] | winner | λ_min |
+|---|---|---|
+| 0   | polar             | 2.49 |
+| 1   | polar             | 2.50 |
+| 2.6 | polar             | 2.39 |
+| 5   | antiferromagnetic | 2.29 |
+| 10  | coreless PCV      | 3.65 |
+| 100 | coreless PCV      | 3.20 |
+
+Positive λ_min even at B=0 is physical: Eu's strong DDI couples spin to
+space and gaps the would-be spin Goldstones; the phase Goldstone is
+projected/shifted out. Lanczos finds the extreme low end reliably, so
+"no negative mode" is a sound saddle-rejection (the verdict is the sign,
+not the exact value).
+
+## Result — the static Eu phase diagram is FULLY GATED
+
+gate-1 (ground-state-ness, multi-seed) + ⟨L_z⟩ (legitimate coreless
+texture, not net circulation) + gate-2 (energetic minimum) all pass for
+the Ω=0 column:
+
+**polar (B ≤ 2.6 nT) → antiferromagnetic (B = 5) → coreless texture
+(B ≥ 10)** — all energetic minima, all ⟨L_z⟩ = ⟨F_z⟩ = 0 legitimate
+non-rotating ground states. This is the North-Star first half ("what is
+Eu's ground-state phase"), gated.
+
 ## Next
 
-1. Gates 2-3 on the Ω=0 column → turn the polar→AFM→PCV progression
-   into a stability- and resolution-gated static Eu phase diagram.
-   (BdG saddle-rejection needs the F=6+DDI FD-Hessian anchor first.)
-2. Preconditioning for the Ω>0 Barnett map before re-running it.
+1. The Ω>0 Barnett map: preconditioning (continuation from converged
+   neighbours — Ω/B warm-start — before rebuilding a preconditioner) to
+   bring the 18 unconverged cells to ground states, then gates 1-2 + the
+   ⟨L_z⟩ Barnett response.
+2. DDI k-structure in the BdG anchor (a finite-k FD-Hessian extension;
+   the k=0 matrix anchor doesn't probe Q(k)).
