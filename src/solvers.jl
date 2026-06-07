@@ -26,6 +26,7 @@ include("solvers/lbfgs/energy_gradient.jl")
 include("solvers/lbfgs/helpers.jl")
 include("solvers/lbfgs/atomic.jl")
 include("solvers/lbfgs/driver.jl")
+include("solvers/hessian.jl")  # second-variation HvP + trapped-BdG λ_min
 include("solvers/ground_state/polished.jl")  # ITP+LBFGS chain over a Preset
 include("solvers/continuation/scan_1d.jl")
 include("solvers/continuation/scan_2d.jl")

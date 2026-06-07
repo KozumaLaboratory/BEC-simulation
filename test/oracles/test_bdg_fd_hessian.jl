@@ -57,13 +57,14 @@ function _fd_hessian_blocks(F, ζ; c0, c1, ε=1e-5, n=4)
     for I in CartesianIndices((n, n, n)), c in 1:D
         ψ0[I, c] = ζ[c]
     end
-    g(ψ) = (gr=similar(ψ); fill!(gr, 0); energy_gradient!(gr, ψ, ws); gr)
+    # directional HvP via the SINGLE-SOURCE src operator — this anchor
+    # now gates `hessian_vector_product` itself, not a local copy.
     function Dg(vc)
         v = zeros(ComplexF64, n, n, n, D)
         for I in CartesianIndices((n, n, n)), c in 1:D
             v[I, c] = vc[c]
         end
-        dg = (g(ψ0 .+ ε .* v) .- g(ψ0 .- ε .* v)) ./ (2ε)
+        dg = SpinorBEC.hessian_vector_product(ws, ψ0, v; ε)
         ComplexF64[dg[1, 1, 1, c] for c in 1:D]   # uniform ⇒ any voxel
     end
     Lop = zeros(ComplexF64, D, D)

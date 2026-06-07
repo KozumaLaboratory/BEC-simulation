@@ -7,12 +7,11 @@
 # "stability" field was left "ambiguous" by the sweep; this is the gate.
 #
 # Constrained energetic stability: ψ0 minimises E at fixed N ⟺ the
-# constrained Hessian (H_E − 2μ) is ≥ 0 on the tangent ⊥_complex ψ0
-# (the complex projection removes the norm AND phase gauge modes; the
-# −2μ is the norm-constraint shift, μ = Re⟨ψ0,g⟩/(2‖ψ0‖²) since
-# g = 2·δE/δψ̄ = 2μψ0 at the GS). Lowest eigenvalue via hand-rolled
-# fully-reorthogonalised Lanczos on the HvP (no KrylovKit in deps);
-# λ_min ≥ −tol ⇒ minimum, < −tol ⇒ saddle.
+# constrained Hessian P(H_E − 2μ)P is ≥ 0 on the complex tangent ⊥ ψ0.
+# The verdict (λ_min) and μ come from the SINGLE-SOURCE src operator
+# `trapped_bdg_lowest_eigenvalue` (src/solvers/hessian.jl), anchored by
+# test_bdg_fd_hessian; λ_min ≥ −tol ⇒ minimum, < −tol ⇒ saddle. This
+# script is the disk-cell driver + the method-validation prints.
 #
 # Method validation (printed, before any verdict — point-3 discipline):
 #  - phase mode: H·(iψ0) = 2μ·(iψ0) (E phase-invariance makes the phase
@@ -24,7 +23,8 @@
 # Cost: ~2 grad evals / Lanczos iter; ~niter·2·(5-10s) per cell.
 
 using SpinorBEC
-using SpinorBEC: energy_gradient!
+using SpinorBEC: energy_gradient!, hessian_vector_product,
+    trapped_bdg_lowest_eigenvalue
 using JLD2
 using Printf
 using LinearAlgebra
@@ -51,21 +51,23 @@ end
 
 _ipR(a, b, dV) = real(sum(conj.(a) .* b)) * dV
 _grad(ws, ψ) = (g=similar(ψ); fill!(g, 0); energy_gradient!(g, ψ, ws); g)
-_hvp(ws, ψ0, δ) = (_grad(ws, ψ0 .+ ε .* δ) .- _grad(ws, ψ0 .- ε .* δ)) ./ (2ε)
 
+# Verdict + μ come from the SINGLE-SOURCE src operators (anchored by
+# test_bdg_fd_hessian / trapped_bdg_lowest_eigenvalue). This script only
+# adds the method-validation prints and the disk-cell plumbing.
 function gate2_cell(B_nT, Ω; validate=false)
     f = joinpath(DIR, @sprintf("cell_B%.1f_Om%.2f.jld2", B_nT, Ω))
     ψ0 = JLD2.load(f, "psi")
     ws = build_cpu_ws(B_nT, Ω)
-    dV = SpinorBEC.cell_volume(TW.grid)
-    n2 = _ipR(ψ0, ψ0, dV)
-    g0 = _grad(ws, ψ0)
-    μ = _ipR(ψ0, g0, dV) / (2 * n2)             # g = 2μψ0 at the GS
 
     if validate
-        Hiψ = _hvp(ws, ψ0, im .* ψ0)
+        dV = SpinorBEC.cell_volume(TW.grid)
+        n2 = _ipR(ψ0, ψ0, dV)
+        g0 = _grad(ws, ψ0)
+        μ = _ipR(ψ0, g0, dV) / (2 * n2)         # g = 2μψ0 at the GS
+        Hiψ = hessian_vector_product(ws, ψ0, im .* ψ0; ε)
         rng_v = randn(ComplexF64, size(ψ0))
-        Hrnd = _hvp(ws, ψ0, rng_v)
+        Hrnd = hessian_vector_product(ws, ψ0, rng_v; ε)
         rphase = sqrt(_ipR(Hiψ, Hiψ, dV)) / sqrt(_ipR(im .* ψ0, im .* ψ0, dV))
         rrand = sqrt(_ipR(Hrnd, Hrnd, dV)) / sqrt(_ipR(rng_v, rng_v, dV))
         gres = sqrt(_ipR(g0 .- 2μ .* ψ0, g0 .- 2μ .* ψ0, dV)) /
@@ -75,31 +77,7 @@ function gate2_cell(B_nT, Ω; validate=false)
             B_nT, Ω, μ, rphase, 2μ, rrand, gres)
     end
 
-    proj(δ) = δ .- ψ0 .* (sum(conj.(ψ0) .* δ) * dV / n2)
-    Hc(δ) = (pδ=proj(δ); proj(_hvp(ws, ψ0, pδ) .- 2μ .* pδ))
-
-    # fully-reorthogonalised Lanczos in the real inner product
-    V = Vector{typeof(ψ0)}()
-    v = proj(randn(ComplexF64, size(ψ0)))
-    v ./= sqrt(_ipR(v, v, dV))
-    push!(V, v)
-    α = Float64[]
-    β = Float64[]
-    for j in 1:NITER
-        w = Hc(V[end])
-        αj = _ipR(V[end], w, dV)
-        push!(α, αj)
-        for u in V                              # full reorth
-            w = w .- u .* (_ipR(u, w, dV))
-        end
-        βj = sqrt(_ipR(w, w, dV))
-        βj < 1e-10 && break
-        push!(β, βj)
-        push!(V, w ./ βj)
-    end
-    T = SymTridiagonal(α, β[1:(length(α) - 1)])
-    λ = eigvals(T)
-    minimum(λ), μ
+    trapped_bdg_lowest_eigenvalue(ws, ψ0; niter=NITER, ε)
 end
 
 function main()
