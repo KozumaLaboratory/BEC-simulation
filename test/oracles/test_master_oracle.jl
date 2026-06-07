@@ -43,6 +43,24 @@ const SLOT_TERM = (;
 
 const PRODUCTION_RHS_GAPS = (:raman, :tensor)
 
+"""Source-faithful sign mutant: a copy of `term` with every numeric
+field negated. The registry term carries its coefficients in struct
+fields (`_diag_coef(term,m) = -term.p·m + term.q·m²`, `term.c0`,
+`term.c1`, …), so the mutant runs the REAL production faces with a
+flipped coefficient — for these linear terms negating all fields gives
+exactly −energy and −Hψ. Returns `nothing` for coefficient-less terms
+(Kinetic/DDI/LHY/…, whose coefficient lives in `ws`) or all-zero
+fields (negation would be a no-op)."""
+function _sign_mutant(term)
+    T = typeof(term)
+    fns = fieldnames(T)
+    isempty(fns) && return nothing
+    vals = map(f -> getfield(term, f), fns)
+    all(v -> v isa Number, vals) || return nothing
+    any(v -> abs(v) > 1e-14, vals) || return nothing
+    T(map(-, vals)...)
+end
+
 const E_RTOL = 1e-10
 const E_ATOL = 1e-12
 const G_RTOL = 1e-10
@@ -193,6 +211,85 @@ end
                 v = fd_valley(E, ψv, δ, ref)
                 @test v.kind in (:valley, :exact_floor)
                 @test v.min_err < 1e-7
+            end
+        end
+    end
+
+    # SELF-CANARY: the beam's own canary. The set-equivalence + per-term
+    # comparisons above only prove "dumb == production TODAY". They do
+    # NOT, by themselves, prove the comparison would turn RED if a term's
+    # sign drifted — a verifier's airtight-ness requirement. Here we
+    # demonstrate the teeth, per ACTIVE term, two ways:
+    #
+    #   (1) source-faithful construction mutant: build a term with every
+    #       coefficient negated (running the REAL production faces) — the
+    #       SAME isapprox(dumb, production; rtol) the oracle uses must
+    #       REJECT it. Covers every coefficient-bearing term.
+    #   (2) value-perturbation: for EVERY active slot (incl. the
+    #       coefficient-less terms whose coefficient lives in ws), the
+    #       oracle comparison must reject −production and 2·production.
+    #
+    # Completeness: ≥1 source-faithful mutant must actually run (so the
+    # faithful path is exercised, not skipped), and every coefficient-
+    # bearing term active in a fixture must be mutant-canaried — a new
+    # such term with no teeth is a red here, not a silent hole.
+    @testset "self-canary: the master-oracle comparison has teeth" begin
+        for (mkws, label, secular) in (
+            (oracle_full_ws, "A", true), (aux_ws, "B", nothing)
+        )
+            ws, ψ = mkws()
+            Ed = dumb_energy_breakdown(ws, ψ; ddi_secular=secular)
+            Gd = dumb_rhs_breakdown(ws, ψ; ddi_secular=secular)
+            registry = build_h_terms_registry(ws)
+            mutant_checked = Symbol[]
+            for slot in H_TERMS_CANONICAL_ORDER
+                slot in DUMB_DEFERRED_SLOTS && continue
+                T = getfield(SLOT_TERM, slot)
+                term = nothing
+                for t in registry
+                    t isa T && (term = t)
+                end
+                term === nothing && continue
+                Ef = energy_contribution(term, ψ, ws)
+                g = zero(ψ)
+                apply_operator!(g, term, ws, ψ)
+                gnorm = sqrt(sum(abs2, g))
+                (abs(Ef) > 1e-8 || gnorm > 1e-8) || continue   # active in this fixture
+                @testset "$label / $slot teeth" begin
+                    # (2) value-perturbation: flip + factor-2 rejected
+                    if abs(Ef) > 1e-8
+                        @test !isapprox(Ed[slot], -Ef; rtol=E_RTOL, atol=E_ATOL)
+                        @test !isapprox(Ed[slot], 2 * Ef; rtol=E_RTOL, atol=E_ATOL)
+                    end
+                    if !(slot in PRODUCTION_RHS_GAPS) && gnorm > 1e-8
+                        @test !isapprox(Gd[slot], -g; rtol=G_RTOL, atol=G_ATOL)
+                        @test !isapprox(Gd[slot], 2 .* g; rtol=G_RTOL, atol=G_ATOL)
+                    end
+                    # (1) source-faithful construction mutant. CoriolisTerm
+                    # binds Ω to ws (apply_operator! asserts term.Ω ==
+                    # ws's Ω, since the Coriolis cache is ws-bound), so a
+                    # flipped-Ω mutant is rejected by design — it gets
+                    # teeth from the value-perturbation block above.
+                    # (Authoring this canary surfaced a real single-source
+                    # defect: SpinC1Term's gradient face read ws.interactions[1]
+                    # instead of term.c1 — now fixed, so the c1 mutant flips.)
+                    mut = term isa CoriolisTerm ? nothing : _sign_mutant(term)
+                    if mut !== nothing
+                        push!(mutant_checked, slot)
+                        if abs(Ed[slot]) > 1e-8
+                            Ef_m = energy_contribution(mut, ψ, ws)
+                            @test !isapprox(Ed[slot], Ef_m; rtol=E_RTOL, atol=E_ATOL)
+                        end
+                        if !(slot in PRODUCTION_RHS_GAPS) && gnorm > 1e-8
+                            gm = zero(ψ)
+                            apply_operator!(gm, mut, ws, ψ)
+                            @test !isapprox(Gd[slot], gm; rtol=G_RTOL, atol=G_ATOL)
+                        end
+                    end
+                end
+            end
+            @testset "$label canary completeness" begin
+                @test !isempty(mutant_checked)   # faithful path actually exercised
             end
         end
     end

@@ -163,14 +163,19 @@ function _spin_interaction_energy(psi, sm, c1, n_comp, ndim, n_pts, dV)
 end
 
 """
-    _grad_c1_spin!(grad, psi, ws, fx, fy, fz, n_pts, D, ::Val{N})
+    _grad_c1_spin!(grad, psi, ws, c1, fx, fy, fz, n_pts, D, ::Val{N})
 
 `∂E_c1/∂ψ*_m`: F_z·m·F_z (diagonal) + (F±·F∓·F_z)/2 (tridiagonal).
-Caller pre-populates `fx, fy, fz` scratch via `_compute_spin_density!`
-or passes ctx.fx/fy/fz. Active iff `is_active(c1)`.
+`c1` is the SpinC1Term's own coefficient — passed in, NOT read from
+`ws.interactions[1]`. (Pre-2026-06-07 this read ws directly, so the
+gradient face silently bypassed `term.c1` while the energy face used
+it: a single-source violation that coincided in the registry path —
+where term.c1 == ws.interactions[1] — but broke for any term built
+with a different c1. Found by the master-oracle self-canary.) Caller
+pre-populates `fx, fy, fz` scratch via `_compute_spin_density!` or
+passes ctx.fx/fy/fz. Active iff `is_active(c1)`.
 """
-function _grad_c1_spin!(grad, psi, ws, fx, fy, fz, n_pts, D, ::Val{N}) where {N}
-    c1 = ws.interactions[1]
+function _grad_c1_spin!(grad, psi, ws, c1, fx, fy, fz, n_pts, D, ::Val{N}) where {N}
     is_active(c1) || return nothing
     sm = ws.spin_matrices
     F = ws.atom.F
@@ -200,7 +205,7 @@ function apply_operator!(out::AbstractArray, term::SpinC1Term, ws, psi::Abstract
     fx = similar(psi, ComplexF64, n_pts...)
     fy = similar(psi, ComplexF64, n_pts...)
     fz = similar(psi, ComplexF64, n_pts...)
-    _grad_c1_spin!(out, psi, ws, fx, fy, fz, n_pts, D, Val(N))
+    _grad_c1_spin!(out, psi, ws, term.c1, fx, fy, fz, n_pts, D, Val(N))
     return out
 end
 
@@ -240,7 +245,7 @@ end
 function apply_operator!(out, term::SpinC1Term, ws, psi, ctx::GradientContext)
     N = ndims(psi) - 1
     D = ws.spin_matrices.system.n_components
-    _grad_c1_spin!(out, psi, ws, ctx.fx, ctx.fy, ctx.fz, ctx.n_pts, D, Val(N))
+    _grad_c1_spin!(out, psi, ws, term.c1, ctx.fx, ctx.fy, ctx.fz, ctx.n_pts, D, Val(N))
     return out
 end
 
