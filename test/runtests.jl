@@ -221,6 +221,10 @@ const CI_EXTRA = [
     # dumb RHS, slope ≈ 1) + Strang order slope vs dumb RK4 (slope ≈ 2).
     # Limit-class oracles for the face where both 2026-06 sign bugs lived.
     "oracles/test_propagator_references.jl",
+    # Config-path coverage: counts (term × config) not per term — the
+    # meta-test that would have RED-flagged padded-DDI and the absorbing
+    # epilogue omission (each a gate-less variant of a "covered" term).
+    "oracles/test_path_coverage.jl",
     # Fisher identifiability: the preflight instrument for the
     # no-anchor SBI regime (trust ledger column 3) — linearity anchors,
     # θ-valley, degenerate-protocol detection, channel-space chain.
