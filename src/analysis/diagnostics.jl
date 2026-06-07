@@ -4,7 +4,7 @@ export spin_mixing_period, spin_mixing_period_si
 export quadratic_zeeman_si, quadratic_zeeman_dimless_si
 export healing_length_contact, healing_length_spin, healing_length_ddi
 export thomas_fermi_radius, thomas_fermi_radius_harmonic
-export phase_diagram_point, component_populations, make_conservation_monitor
+export phase_diagram_point, component_populations
 export power_spectrum
 
 function _elliptic_k(m::Float64)
@@ -131,47 +131,6 @@ function phase_diagram_point(;
         xi_dd=xi_dd,
         R_TF=R_TF,
     )
-end
-
-# --- Conservation monitoring ---
-
-"""
-    make_conservation_monitor(ws; track_Jz=false) → (callback, data)
-
-Create a callback for `run_simulation!` or `run_simulation_yoshida!` that records
-conserved quantities at each save point.
-
-Returns a `(callback, data)` tuple where `data` is a mutable named tuple holder.
-After simulation completes, `data` contains:
-- `t`: time stamps
-- `E`: total energy
-- `N`: total norm
-- `Sz`: magnetization ⟨Fz⟩
-- `Jz`: total angular momentum (only if `track_Jz=true`, requires 2D+)
-
-Usage:
-    cb, mon = make_conservation_monitor(ws)
-    run_simulation!(ws; callbacks=SimulationCallbacks(on_snapshot=cb))
-    # mon.t, mon.E, mon.N, mon.Sz now contain time series
-"""
-function make_conservation_monitor(ws::Workspace{N}; track_Jz::Bool=false) where {N}
-    sys = ws.spin_matrices.system
-    grid = ws.grid
-    plans = ws.fft_plans
-
-    data = (t=Float64[], E=Float64[], N=Float64[], Sz=Float64[], Jz=Float64[])
-
-    function callback(ws_cb, step)
-        push!(data.t, ws_cb.state.t)
-        push!(data.E, total_energy(ws_cb))
-        push!(data.N, total_norm(ws_cb.state.psi, grid))
-        push!(data.Sz, magnetization(ws_cb.state.psi, grid, sys))
-        if track_Jz && N >= 2
-            push!(data.Jz, total_angular_momentum(ws_cb.state.psi, grid, plans, sys))
-        end
-    end
-
-    (callback, data)
 end
 
 # --- Probe A: Component populations ---

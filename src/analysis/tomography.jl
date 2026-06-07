@@ -1,6 +1,6 @@
 # --- Synthetic Spin Tomography ---
 
-export spin_tomography, tomography_sinogram
+export spin_tomography
 
 # Simulates the experimental spin tomography protocol:
 #   1. Rotate the spinor by angle θ around axis n̂ (= change quantization axis)
@@ -147,31 +147,4 @@ function _compute_differential(images, populations, m_values, ref_idx)
         end
     end
     diff
-end
-
-"""
-    tomography_sinogram(tomo_result, m::Int) → Matrix{Float64}
-
-Extract the sinogram (angle × position) for component `m` from a
-tomography result. For 2D images, takes the central row.
-"""
-function tomography_sinogram(tomo_result, m::Int)
-    imgs = tomo_result.images[m]
-    n_angles = length(imgs)
-    n_pixels = if ndims(imgs[1]) == 1
-        length(imgs[1])
-    else
-        size(imgs[1], 1)  # take first spatial dimension
-    end
-
-    sino = zeros(Float64, n_angles, n_pixels)
-    for (i, img) in enumerate(imgs)
-        if ndims(img) == 1
-            sino[i, :] = img
-        else
-            mid = size(img, 2) ÷ 2 + 1
-            sino[i, :] = img[:, mid]
-        end
-    end
-    sino
 end

@@ -94,7 +94,6 @@ include("hamiltonian/integrator/dealias.jl")
 include("hamiltonian/integrator/split_step.jl")
 include("hamiltonian/integrator/split_step_composers.jl")
 include("hamiltonian/integrator/combined_spin_step.jl")
-include("hamiltonian/integrator/force_gradient.jl")
 include("hamiltonian/integrator/adaptive.jl")
 
 # Rotating-basis (Klaus-regime) propagators + integrators. Cross-layer

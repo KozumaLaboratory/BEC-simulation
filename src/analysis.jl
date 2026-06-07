@@ -12,8 +12,8 @@
 #   diagnostics                    — Zeeman/healing-length/TF radius helpers
 #   majorana                       — Majorana stars + icosahedral order
 #   tof/tomography/faraday/imaging — synthetic detection + imaging models
-#   topology/synthetic_dimension/time_resolved — winding, monopole,
-#       holonomy, synthetic-dim observables, time-resolved tomography
+#   topology/synthetic_dimension — winding, monopole, holonomy,
+#       synthetic-dim observables
 #   stability_analysis             — splitting error + conservation checks
 #   spin_rotation                  — spin rotation matrix + EdH/FL helpers
 #   phases/{phase_classification,phase_boundary,bogoliubov,bogoliubov/scan}
@@ -36,7 +36,6 @@ include("analysis/imaging.jl")
 include("analysis/fisher.jl")
 include("analysis/topology.jl")
 include("analysis/synthetic_dimension.jl")
-include("analysis/time_resolved.jl")
 include("analysis/stability_analysis.jl")
 include("analysis/spin_rotation.jl")
 

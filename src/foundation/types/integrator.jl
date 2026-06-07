@@ -1,6 +1,6 @@
 # --- Integrator config + simulation/ensemble result types ---
 #
-# `AdaptiveDtParams` parametrises the embedded-error / Richardson dt
+# `AdaptiveDtParams` parametrises the Richardson / step-change dt
 # controller; `IntegratorConfig` selects between :strang / :yoshida /
 # :adaptive. `SimulationResult` is the per-trajectory output bundle
 # (times, energies, norms, magnetisations, snapshot tower);
@@ -29,9 +29,9 @@ struct AdaptiveDtParams
         dt_min > 0 || throw(ArgumentError("dt_min must be positive"))
         dt_max >= dt_min || throw(ArgumentError("dt_max must be >= dt_min"))
         tol > 0 || throw(ArgumentError("tol must be positive"))
-        error_mode in (:step_change, :richardson, :embedded) || throw(
+        error_mode in (:step_change, :richardson) || throw(
             ArgumentError(
-                "error_mode must be :step_change, :richardson, or :embedded, got :$error_mode"
+                "error_mode must be :step_change or :richardson, got :$error_mode"
             ),
         )
         new(dt_init, dt_min, dt_max, tol, error_mode)

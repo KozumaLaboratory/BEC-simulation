@@ -6,7 +6,7 @@
 #   ground_state*          — ITP entry, loop kernel, checkpointing,
 #                            adaptive ITP, multistart + Jz-constrained
 #   simulation             — RTP entry + SimulationCallbacks
-#   adaptive/embedded_adaptive — adaptive-dt + embedded-error variants
+#   adaptive               — adaptive-dt (step_change + richardson modes)
 #   lbfgs/{energy_gradient,helpers,driver}
 #                          — energy + gradient + Sobolev pre + line search
 #                            + find_ground_state_lbfgs entry
@@ -22,7 +22,6 @@ include("solvers/ground_state/adaptive.jl")
 include("solvers/ground_state/advanced.jl")
 include("solvers/simulation.jl")
 include("solvers/adaptive.jl")
-include("solvers/embedded_adaptive.jl")
 include("solvers/lbfgs/energy_gradient.jl")
 include("solvers/lbfgs/helpers.jl")
 include("solvers/lbfgs/atomic.jl")

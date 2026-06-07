@@ -171,8 +171,8 @@ function find_ground_state(;
         ArgumentError(
             "find_ground_state: method=:$method not supported " *
             "(known: :strang, :lbfgs). The :sc4 path was disabled pending verified " *
-            "complex-coefficient symmetric-conjugate weights — see " *
-            "src/solvers/embedded_adaptive.jl for the design note."),
+            "complex-coefficient symmetric-conjugate weights (Sheng-Suzuki barrier " *
+            "— see git history of src/solvers/embedded_adaptive.jl for the design note)."),
     )
 
     psi0 = if psi_init === nothing

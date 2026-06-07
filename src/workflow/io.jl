@@ -13,7 +13,6 @@
 #   run_summary         — print_run_summary, compare_runs
 #   html_report         — generate_html_report (self-contained static HTML)
 #   budget              — estimate_run_budget (VRAM / RAM / disk forecast)
-#   scan_summary        — scan_summary, scan_energy_comparison
 #   catalog             — human-navigation layer (tags) over the CAS store
 
 include("io/io.jl")
@@ -23,6 +22,5 @@ include("io/vtk_export.jl")
 include("io/run_summary.jl")
 include("io/html_report.jl")
 include("io/budget.jl")
-include("io/scan_summary.jl")
 include("io/catalog.jl")
 include("io/catalog_index.jl")

@@ -225,7 +225,7 @@ const ADAPTIVE_DT_SCHEMA = Dict{String, FieldSpec}(
     "dt_max" => FieldSpec(; type=Number, range=(1e-8, 1.0)),
     "tol" => FieldSpec(; type=Number, range=(1e-12, 1.0)),
     "error_mode" => FieldSpec(; type=String,
-        enum=["step_change", "richardson", "embedded"]),
+        enum=["step_change", "richardson"]),
 )
 
 const DDI_SCHEMA = Dict{String, FieldSpec}(

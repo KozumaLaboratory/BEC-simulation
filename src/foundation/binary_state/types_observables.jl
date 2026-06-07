@@ -5,7 +5,6 @@
 export BinaryCouplings, BinaryState
 export is_immiscible, droplet_regime_petrov
 export binary_overlap, binary_separation_radius
-export SpinorBinaryCouplings, SpinorBinaryState
 
 struct BinaryCouplings
     g_AA::Float64       # intra-species A-A
@@ -90,40 +89,4 @@ function _coord_axis_array(grid::Grid{N}, d::Int, ::Int) where {N}
     coords = grid.x[d]
     shape = ntuple(i -> i == d ? length(coords) : 1, N)
     reshape(coords, shape)
-end
-
-# --- Spinor binary types -----------------------------------------------
-
-"""
-    SpinorBinaryCouplings(; F_A, F_B, c0_A, c1_A, c0_B, c1_B, g_AB)
-
-Couplings for two spinor species with intra-species (c0/c1 in standard
-SpinorBEC convention) and an inter-species Hartree contact term g_AB
-(applied to total densities only).
-
-Per-channel spinor-spinor coupling (e.g. spin-2 + spin-2 with separate
-F_pair=0,2,4 channels) is a follow-up — for now g_AB is a single scalar.
-"""
-struct SpinorBinaryCouplings
-    F_A::Int
-    F_B::Int
-    c0_A::Float64
-    c1_A::Float64
-    c0_B::Float64
-    c1_B::Float64
-    g_AB::Float64
-end
-
-SpinorBinaryCouplings(; F_A::Int, F_B::Int, c0_A::Real, c1_A::Real,
-    c0_B::Real, c1_B::Real, g_AB::Real) = SpinorBinaryCouplings(F_A, F_B,
-    Float64(c0_A), Float64(c1_A),
-    Float64(c0_B), Float64(c1_B),
-    Float64(g_AB))
-
-mutable struct SpinorBinaryState{N, A1 <: AbstractArray, A2 <: AbstractArray}
-    psi_A::A1                # shape (n_pts..., 2F_A+1)
-    psi_B::A2                # shape (n_pts..., 2F_B+1)
-    couplings::SpinorBinaryCouplings
-    t::Float64
-    step::Int
 end
