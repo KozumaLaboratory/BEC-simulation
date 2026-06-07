@@ -81,17 +81,7 @@ function run_simulation_yoshida!(
             continue
         end
 
-        if ws.loss !== nothing
-            apply_loss_step!(
-                ws.state.psi,
-                ws.loss,
-                sys.F,
-                dt_step,
-                n_comp,
-                N,
-                ws.density_buf,
-            )
-        end
+        apply_rt_dissipation!(ws, dt_step, n_comp, N)
 
         ws.state.t += dt_step
         ws.state.step += 1

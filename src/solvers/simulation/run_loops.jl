@@ -136,9 +136,7 @@ function _run_simulation_leapfrog!(
                 ws, dt / 2, n_comp, N, false; t_eval=t_now + 3dt / 4, t_start=t_now + dt / 2
             )
 
-            if ws.loss !== nothing
-                apply_loss_step!(ws.state.psi, ws.loss, sys.F, dt, n_comp, N, ws.density_buf)
-            end
+            apply_rt_dissipation!(ws, dt, n_comp, N)
 
             ws.state.t += dt
             ws.state.step += 1

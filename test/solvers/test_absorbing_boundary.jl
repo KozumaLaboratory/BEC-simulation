@@ -169,6 +169,91 @@
         @test mask1[5] < mask2[5]
     end
 
+    @testset "absorbing applied on every production driver (App. A epilogue audit)" begin
+        # THE regression for the live bug: run_simulation! (leapfrog,
+        # the production RTP default), run_simulation_yoshida!, and
+        # run_simulation_adaptive! each hand-write the per-step epilogue
+        # and PRE-FIX applied loss but OMITTED the absorbing mask — only
+        # split_step! had it, and no test routed an absorber through the
+        # drivers. So a production `dynamics: {absorbing_boundary: {...}}`
+        # built the mask and silently discarded it. With c0=c1=0 the RTP
+        # core is exactly unitary, so the ONLY thing that can drop the
+        # norm is the absorbing mask. Pre-fix: norm ratio ≈ 1.0 (RED);
+        # post-fix: a packet sitting in the absorbing zone is damped.
+        function _edge_ws(; dt=0.005, n_steps=120)
+            grid = make_grid(GridConfig(128, 20.0))
+            psi = zeros(ComplexF64, 128, 3)
+            for i in 1:128
+                psi[i, 1] = exp(-(grid.x[1][i] - 7.0)^2 / (2 * 0.5^2))
+            end
+            psi ./= sqrt(sum(abs2, psi) * grid.config.box_size[1] / 128)
+            ab = AbsorbingBoundary(strength=50.0, width=4.0, power=2)
+            sp = SimParams(; dt=dt, n_steps=n_steps)
+            make_workspace(;
+                grid, atom=Rb87,
+                interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
+                sim_params=sp, absorbing_boundary=ab, psi_init=psi,
+            )
+        end
+
+        @testset "run_simulation! (leapfrog — production RTP default)" begin
+            ws = _edge_ws()
+            N0 = total_norm(ws.state.psi, ws.grid)
+            run_simulation!(ws)
+            @test total_norm(ws.state.psi, ws.grid) < 0.97 * N0
+        end
+
+        @testset "run_simulation_yoshida!" begin
+            ws = _edge_ws()
+            N0 = total_norm(ws.state.psi, ws.grid)
+            run_simulation_yoshida!(ws; t_end=0.4, save_interval=0.1)
+            @test total_norm(ws.state.psi, ws.grid) < 0.97 * N0
+        end
+
+        @testset "run_simulation_adaptive!" begin
+            ws = _edge_ws()
+            N0 = total_norm(ws.state.psi, ws.grid)
+            run_simulation_adaptive!(ws; t_end=0.4, save_interval=0.1)
+            @test total_norm(ws.state.psi, ws.grid) < 0.97 * N0
+        end
+    end
+
+    @testset "apply_rt_dissipation! co-applies loss AND absorbing" begin
+        # Unit gate on the consolidated helper: loss and the absorbing
+        # mask are inseparable. A workspace with BOTH active must damp
+        # more than either alone — pins that the helper never drops a
+        # channel (the term-omission that hid in the driver loops).
+        grid = make_grid(GridConfig(64, 20.0))
+        ab = AbsorbingBoundary(strength=20.0, width=3.0, power=2)
+        loss = LossParams(; K3_cubic=0.5)
+        function _ws(; with_loss, with_abs)
+            sp = SimParams(; dt=0.01, n_steps=1)
+            make_workspace(;
+                grid, atom=Rb87,
+                interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
+                sim_params=sp,
+                loss=with_loss ? loss : nothing,
+                absorbing_boundary=with_abs ? ab : nothing,
+            )
+        end
+        seed = zeros(ComplexF64, 64, 3)
+        for i in 1:64
+            seed[i, 1] = exp(-(grid.x[1][i] - 8.0)^2 / 2) + 0.3
+        end
+        n_of(ws) = begin
+            copyto!(ws.state.psi, seed)
+            SpinorBEC.apply_rt_dissipation!(ws, 0.05, 3, 1)
+            total_norm(ws.state.psi, ws.grid)
+        end
+        n_both = n_of(_ws(with_loss=true, with_abs=true))
+        n_loss = n_of(_ws(with_loss=true, with_abs=false))
+        n_abs = n_of(_ws(with_loss=false, with_abs=true))
+        n_none = n_of(_ws(with_loss=false, with_abs=false))
+        @test n_none ≈ total_norm(seed, grid) rtol = 1e-12   # neither ⇒ untouched
+        @test n_both < n_loss                                # absorbing still acts with loss on
+        @test n_both < n_abs                                 # loss still acts with absorbing on
+    end
+
     @testset "YAML parsing of absorbing_boundary" begin
         yaml = """
         pipeline:

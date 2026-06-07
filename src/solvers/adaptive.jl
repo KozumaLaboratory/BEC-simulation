@@ -179,17 +179,7 @@ function _adaptive_step_change_loop!(
         fsal_deferred = true
         fsal_dt = dt_step
 
-        if ws.loss !== nothing
-            apply_loss_step!(
-                ws.state.psi,
-                ws.loss,
-                ws.spin_matrices.system.F,
-                dt_step,
-                n_comp,
-                N,
-                ws.density_buf,
-            )
-        end
+        apply_rt_dissipation!(ws, dt_step, n_comp, N)
 
         ws.state.t += dt_step
         ws.state.step += 1
@@ -319,17 +309,7 @@ function _adaptive_richardson_loop!(
             continue
         end
 
-        if ws.loss !== nothing
-            apply_loss_step!(
-                ws.state.psi,
-                ws.loss,
-                ws.spin_matrices.system.F,
-                dt_step,
-                n_comp,
-                N,
-                ws.density_buf,
-            )
-        end
+        apply_rt_dissipation!(ws, dt_step, n_comp, N)
 
         ws.state.t += dt_step
         ws.state.step += 1

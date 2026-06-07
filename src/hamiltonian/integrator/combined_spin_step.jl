@@ -314,15 +314,7 @@ function split_step_combined!(ws::Workspace{N}) where {N}
         ws, dt / 2, n_comp, N, it; t_eval=t_eval_2, t_start=it ? NaN : t + dt / 2
     )
 
-    if !it && ws.loss !== nothing
-        apply_loss_step!(
-            ws.state.psi, ws.loss, ws.spin_matrices.system.F,
-            dt, n_comp, N, ws.density_buf,
-        )
-    end
-    if !it && ws.absorbing_mask !== nothing
-        apply_absorbing_boundary!(ws.state.psi, ws.absorbing_mask, n_comp, N)
-    end
+    it || apply_rt_dissipation!(ws, dt, n_comp, N)
 
     ws.state.t += it ? 0.0 : dt
     ws.state.step += 1
