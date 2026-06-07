@@ -35,8 +35,20 @@ the in-plane field:
 
 → **polar → AFM → polar-core-vortex** as B increases (gate-1 confident).
 The phase *identity* (these are seed labels of the winning basin) still
-needs gate 2 (stability: minimum vs saddle) + gate 3 (vortex
-resolution) before it is a phase verdict.
+needs gate 2 (stability: minimum vs saddle) before it is a phase
+verdict.
+
+**⟨L_z⟩ flag — the PCV is legitimate (not suspicious).** Every
+converged Ω=0 cell has ⟨L_z⟩ = 0 AND ⟨F_z⟩ = 0 (per-atom), **including
+the B≥10 PCV winners**. A mass-circulation vortex winning at Ω=0 would
+be suspicious (it costs energy with no rotation to pay for it) and show
+⟨L_z⟩ ≠ 0; the measured ⟨L_z⟩ = 0 means the PCV here is a **coreless
+spin texture** (Mermin-Ho-like, zero net circulation) — a legitimate
+non-rotating ground state. So the polar→AFM→coreless-texture
+progression is a clean Ω=0 phase sequence; "polar_core_vortex" is a
+seed-label, the physics is a coreless texture. (Ω>0 cells show ⟨L_z⟩
+ramping with Ω — the Barnett response — but they are unconverged /
+single-seed, not yet trustworthy.)
 
 **Ω>0 columns (the Barnett map): BLOCKED.** 18/30 cells unconverged
 (‖∇E‖ ~ 1-4) — the vortex-soft-mode conditioning floor. Only the

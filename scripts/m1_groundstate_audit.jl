@@ -23,7 +23,7 @@
 # Cost: ~5 s/cell CPU re-eval (GPU=CPU parity gated). 30 cells ≈ 3 min.
 
 using SpinorBEC
-using SpinorBEC: energy_gradient!
+using SpinorBEC: energy_gradient!, orbital_angular_momentum, magnetization
 using JLD2
 using Printf
 using LinearAlgebra
@@ -79,6 +79,14 @@ function audit_cell(f::String)
     )
     gnorm_re = sqrt(sum(abs2, grad) * SpinorBEC.cell_volume(TW.grid))
 
+    # physics flag (per-atom): ⟨L_z⟩ and ⟨F_z⟩. For a PCV winning at
+    # Ω=0, ⟨L_z⟩≈0 ⇒ coreless spin texture (legitimate GS); ⟨L_z⟩≠0 ⇒
+    # net mass circulation = "a vortex beats the GS at Ω=0", suspicious
+    # (phase-identity, not coverage). ⟨L_z⟩ here IS that discriminator.
+    Nrm = sum(abs2, ws.state.psi) * SpinorBEC.cell_volume(TW.grid)
+    Lz = orbital_angular_momentum(ws.state.psi, ws.grid, ws.fft_plans) / Nrm
+    Fz = magnetization(ws.state.psi, ws.grid, ws.spin_matrices.system) / Nrm
+
     cls = if B == 0.0
         gnorm_re < TOL_B0 ? :goldstone : :unconverged
     elseif gnorm_re < TOL
@@ -89,7 +97,7 @@ function audit_cell(f::String)
 
     (; B, Ω, winner, winnerE, n_seeds=length(cands), n_basin, gap,
         gnorm_disk=Float64(r["grad_norm"]), gnorm_re,
-        E_reeval=Float64(Ere), cls)
+        E_reeval=Float64(Ere), Lz, Fz, cls)
 end
 
 function main()
@@ -99,17 +107,17 @@ function main()
             readdir(DIR; join=true)),
     )
     @printf("Gate (1) ground-state-ness audit — %d cells in %s\n\n", length(files), DIR)
-    @printf("%-7s %-6s %-22s %12s %5s %5s %10s %11s %11s  %s\n",
-        "B[nT]", "Ω", "winner", "E", "seed", "basn", "gap", "‖∇E‖disk", "‖∇E‖fresh", "class")
-    println("-"^118)
+    @printf("%-7s %-6s %-20s %11s %5s %5s %11s %9s %9s  %s\n",
+        "B[nT]", "Ω", "winner", "E", "seed", "basn", "‖∇E‖fresh", "⟨L_z⟩", "⟨F_z⟩", "class")
+    println("-"^110)
     rows = []
     for f in files
         a = audit_cell(f)
         a === nothing && continue
         push!(rows, a)
-        @printf("%-7.1f %-6.2f %-22s %12.5f %5d %5d %10.2e %11.2e %11.2e  %s\n",
+        @printf("%-7.1f %-6.2f %-20s %11.4f %5d %5d %11.2e %9.3f %9.3f  %s\n",
             a.B, a.Ω, a.winner, a.winnerE, a.n_seeds, a.n_basin,
-            a.gap, a.gnorm_disk, a.gnorm_re, a.cls)
+            a.gnorm_re, a.Lz, a.Fz, a.cls)
     end
     println("-"^118)
     for c in (:GS_confident, :converged_single, :goldstone, :unconverged)
