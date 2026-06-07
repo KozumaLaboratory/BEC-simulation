@@ -225,6 +225,11 @@ const CI_EXTRA = [
     # meta-test that would have RED-flagged padded-DDI and the absorbing
     # epilogue omission (each a gate-less variant of a "covered" term).
     "oracles/test_path_coverage.jl",
+    # Directional / parity gates pinning the ungated physics-duplication
+    # clusters the 2026-06-07 redundancy audit upheld as drift-risks
+    # (vortex / monopole sign, manuscript spinors vs SSoT, init_psi vs
+    # classifier candidates, spin_texture_xy Fx/Fy orientation).
+    "oracles/test_redundancy_gates.jl",
     # Fisher identifiability: the preflight instrument for the
     # no-anchor SBI regime (trust ledger column 3) — linearity anchors,
     # θ-valley, degenerate-protocol detection, channel-space chain.
