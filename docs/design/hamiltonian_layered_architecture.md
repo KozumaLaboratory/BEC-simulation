@@ -427,11 +427,18 @@ and the FM density branch √(εk(εk+2(c₀+c₁)n)) + free-particle magnon
 EXACTLY) but was UNGATED. Now gated by `test_bogoliubov_anchor.jl`
 (declaration-independent: the test states the closed form, the code
 states the operator), red-checked (scaling the anomalous M by 2 reds
-the polar branches). REMAINING for the actual Eu verdict: the F=6 + DDI
-operator the sweep uses is not covered by the F=1 analytic forms — its
-anchor is the FD-Hessian (L(k=0) = finite-difference of the
-already-gated `energy_gradient!` on a uniform grid), the
-chains-off-the-gated-gradient counterpart, its own next unit. Authoring
+the polar branches). The F=6 operator the sweep uses is anchored by the
+FD-Hessian (`test_bdg_fd_hessian.jl`, 2026-06-08): the central-
+difference Hessian of the already-gated `energy_gradient!` reproduces
+BOTH blocks of the hand-built BdG — normal `L_op = 2·h_mf` AND
+anomalous `M_op = M_anom` — at machine precision, F-swept to Eu F=6.
+The v/iv extraction (`L_op[:,c]=(D_{e_c}g − i·D_{i e_c}g)/4`) carries
+the anomalous block where the conditioning-floor / PCV-onset soft modes
+live. Red-checked (scaling the hand-built M reds the M_op assertion
+across all F). So the BdG operator is doubly anchored: spectrum-level
+(F=1 analytic dispersion) + matrix-level (FD-of-gated-gradient,
+F-swept). REMAINING: DDI's k-structure (Q(k=0)=0 so the k=0 matrix
+anchor doesn't probe it) — a finite-k FD-Hessian follow-on. Authoring
 note: the gate caught an incomplete FM model (a gapped FM mode exceeds
 the density branch at small k) — asserted only the unambiguous closed
 forms, not unverified physics.

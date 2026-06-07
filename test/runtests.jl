@@ -235,6 +235,12 @@ const CI_EXTRA = [
     # to the known Ueda F=1 polar/FM closed forms + universal polar
     # density branch (was correct-but-ungated; declaration-independent).
     "oracles/test_bogoliubov_anchor.jl",
+    # BdG ≡ FD-Hessian of the gated gradient: matrix-level anchor of BOTH
+    # blocks (normal 2·h_mf + anomalous M_anom) to the finite-difference
+    # Hessian of energy_gradient!, F-swept to Eu F=6 — the
+    # chains-off-the-gated-gradient counterpart (anomalous block carries
+    # the soft modes the saddle-rejection verdict rides on).
+    "oracles/test_bdg_fd_hessian.jl",
     # Fisher identifiability: the preflight instrument for the
     # no-anchor SBI regime (trust ledger column 3) — linearity anchors,
     # θ-valley, degenerate-protocol detection, channel-space chain.
