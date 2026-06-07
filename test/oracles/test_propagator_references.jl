@@ -108,6 +108,39 @@ end
         end
     end
 
+    @testset "spin-rotating-frame dt-valleys (defect-5 gate, ω_R ≠ 0, t ≠ 0)" begin
+        # Term-face ↔ dumb consistency under the RF model: the registry
+        # bakes (p − ω_R, rotated bx/by) into the term structs, the
+        # dumb side applies the same model independently.
+        ws, psi = omega_R_ws()
+        for (slot, T) in (
+            (:zeeman_z, LinearZeemanZTerm),
+            (:zeeman_transverse, TransverseZeemanTerm),
+        )
+            @testset "$slot" begin
+                dt_valley_for(slot, _registry_term(ws, T), ws, psi)
+            end
+        end
+    end
+
+    @testset "split_step! ≡ dumb RHS in the spin rotating frame (defect-5 end-to-end)" begin
+        # THE defect-5 gate: the PRODUCTION propagator applies the RF
+        # Hamiltonian via zeeman_diagonal(z, sm, ω_R) and the rotated
+        # transverse step; pre-fix the registry/dumb faces were
+        # lab-frame, so this one-step residual plateaued at the frame
+        # mismatch (~3e-2 here) instead of O(dt) (~4e-4 at dt = 1e-4).
+        ws, psi = omega_R_ws()
+        n_comp = ws.spin_matrices.system.n_components
+        dt = 1e-4
+        g = SpinorBEC.dumb_rhs_total(ws, Array(psi))
+        copyto!(ws.state.psi, psi)
+        SpinorBEC._strang_core!(ws, dt, n_comp)
+        deriv = (Array(ws.state.psi) .- Array(psi)) ./ (-im * dt)
+        rel = sqrt(sum(abs2, deriv .- g)) / sqrt(sum(abs2, g))
+        @test rel < 5e-3
+        copyto!(ws.state.psi, psi)
+    end
+
     @testset "ddi dt-valley (3D, secular + full kernels)" begin
         for secular in (true, false)
             ws, psi = oracle_full_ws(; secular)

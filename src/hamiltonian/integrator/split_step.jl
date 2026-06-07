@@ -38,13 +38,13 @@ function split_step!(ws::Workspace{N}) where {N}
 
     omega = ws.sim_params.rotating_frame_omega
     @timeit_debug TIMER "coriolis" apply_step!(
-        CoriolisTerm(omega), ws.state.psi, dt / 2, it, ws,
+        CoriolisTerm(omega), ws.state.psi, dt / 2, it, ws
     )
     @timeit_debug TIMER "kinetic" apply_step!(
-        KineticTerm(), ws.state.psi, 0.0, false, ws,
+        KineticTerm(), ws.state.psi, 0.0, false, ws
     )
     @timeit_debug TIMER "coriolis" apply_step!(
-        CoriolisTerm(omega), ws.state.psi, dt / 2, it, ws,
+        CoriolisTerm(omega), ws.state.psi, dt / 2, it, ws
     )
 
     @timeit_debug TIMER "half_potential" _half_potential_step!(
@@ -302,16 +302,16 @@ function split_step_midpoint!(ws::Workspace{N}; dt::Float64=ws.sim_params.dt) wh
 
     omega = ws.sim_params.rotating_frame_omega
     @timeit_debug TIMER "coriolis" apply_step!(
-        CoriolisTerm(omega), ws.state.psi, dt / 2, it, ws,
+        CoriolisTerm(omega), ws.state.psi, dt / 2, it, ws
     )
     # Always-update-on-entry semantics: the batched kinetic phase cache is
     # synced to the dt passed in. Costs O(N^ndim) elementwise cis per call.
     _update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, dt)
     @timeit_debug TIMER "kinetic" apply_step!(
-        KineticTerm(), ws.state.psi, 0.0, false, ws,
+        KineticTerm(), ws.state.psi, 0.0, false, ws
     )
     @timeit_debug TIMER "coriolis" apply_step!(
-        CoriolisTerm(omega), ws.state.psi, dt / 2, it, ws,
+        CoriolisTerm(omega), ws.state.psi, dt / 2, it, ws
     )
 
     @timeit_debug TIMER "half_potential_mid" _half_potential_step_midpoint!(
@@ -431,7 +431,6 @@ function _half_potential_step_midpoint!(
     )
     nothing
 end
-
 
 # --- Outer-operator chain: single source of truth ---
 #
@@ -607,7 +606,13 @@ Outer part of half-potential step: everything except DDI.
 Forward direction; delegates to the shared `_outer_operators_fwd!` helper.
 """
 function _outer_potential_fwd!(ws::Workspace{N}, dt_outer, n_comp, ndim, imaginary_time) where {N}
-    _outer_operators_fwd!(ws, dt_outer, ndim, imaginary_time)
+    # mg_active=true (defect-6 fix, 2026-06-06): the ITP/RTP chain
+    # unification (21c97f92) left the ITP wrappers at the default
+    # mg_active=false with no recorded rationale — ground states of
+    # MagneticGradient-active configs were found WITHOUT the tilt
+    # while the LBFGS gradient included it (ITP and LBFGS optimized
+    # different Hamiltonians). No runs/ config was affected (latent).
+    _outer_operators_fwd!(ws, dt_outer, ndim, imaginary_time; mg_active=true)
 end
 
 """
@@ -615,7 +620,8 @@ Outer part of half-potential step, backward direction; delegates to
 `_outer_operators_bwd!`.
 """
 function _outer_potential_bwd!(ws::Workspace{N}, dt_outer, n_comp, ndim, imaginary_time) where {N}
-    _outer_operators_bwd!(ws, dt_outer, ndim, imaginary_time)
+    # mg_active=true — see _outer_potential_fwd! (defect-6 fix).
+    _outer_operators_bwd!(ws, dt_outer, ndim, imaginary_time; mg_active=true)
 end
 
 """

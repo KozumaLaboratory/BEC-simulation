@@ -28,6 +28,16 @@ function zeeman_diagonal(z::ZeemanParams, sm::SpinMatrices{D}, omega_R::Float64)
     SVector{D, Float64}(ntuple(c -> -p_eff * (F - (c - 1)) + z.q * (F - (c - 1))^2, Val(D)))
 end
 
+"""
+    zeeman_at(zeeman, t) -> ZeemanParams
+
+DIAGONAL-ONLY accessor: collapses `TimeDependentZeeman` to
+`ZeemanParams(p(t), q(t))`, **dropping bx/by**. Calling
+`transverse_b` on the collapsed value is identically (0, 0) — read
+the transverse components from the ORIGINAL object:
+`transverse_b(ws.zeeman, t)`. (This trap was App. A defect 8: the
+combined_spin_step transverse branch was structurally dead for it.)
+"""
 zeeman_at(z::ZeemanParams, ::Float64) = z
 zeeman_at(z::TimeDependentZeeman, t::Float64) = ZeemanParams(
     evaluate(z.p_wf, t), evaluate(z.q_wf, t)

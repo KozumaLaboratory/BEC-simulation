@@ -75,13 +75,28 @@ short-circuit at the top of `energy_contribution` / `apply_operator!` /
 coefficients are zero.
 """
 function build_h_terms_registry(ws)
-    z = zeeman_at(ws.zeeman, ws.state.t)
-    bx, by = transverse_b(ws.zeeman, ws.state.t)
+    t = ws.state.t
+    z = zeeman_at(ws.zeeman, t)
+    bx, by = transverse_b(ws.zeeman, t)
     Ω = ws.sim_params.rotating_frame_omega
+    # Spin-rotating-frame corrections (App. A defect-5 fix, 2026-06-06):
+    # the propagator evolves in the RF — `zeeman_diagonal(z, sm, ω_R)`
+    # uses p_eff = p − ω_R (accessors.jl) and the transverse step
+    # rotates (bx, by) into RF coordinates at t (split_step.jl). The
+    # registry faces must present the SAME effective Hamiltonian, or
+    # LBFGS optimizes a lab-frame functional while the dynamics run a
+    # rotated one. Conventions mirror those two production sites.
+    ω_R = ws.sim_params.spin_rotating_frame_omega
+    p_eff = z.p - ω_R
+    if is_active(ω_R, ROTATION_TOL)
+        cR = cos(ω_R * t)
+        sR = sin(ω_R * t)
+        bx, by = bx * cR + by * sR, -bx * sR + by * cR
+    end
     return (
         KineticTerm(),
         TrapTerm(),
-        LinearZeemanZTerm(z.p, z.q),
+        LinearZeemanZTerm(p_eff, z.q),
         TransverseZeemanTerm(bx, by),
         DensityC0Term(ws.interactions[0]),
         SpinC1Term(ws.interactions[1]),

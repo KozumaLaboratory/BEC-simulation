@@ -21,7 +21,8 @@
 
 using Test
 using SpinorBEC
-using SpinorBEC: HamTerm, apply_operator!, energy_contribution,
+using SpinorBEC:
+    HamTerm, apply_operator!, energy_contribution,
     H_TERMS_CANONICAL_ORDER, build_h_terms_registry
 using SpinorBEC: dumb_energy_breakdown, dumb_rhs_breakdown, DUMB_DEFERRED_SLOTS
 using SpinorBEC: KineticTerm, TrapTerm, LinearZeemanZTerm, TransverseZeemanTerm,
@@ -116,6 +117,18 @@ end
         compare_all_slots(ws, psi, "B:coherent")
         ψr = rand_offmanifold_state(ws; rng)
         compare_all_slots(ws, ψr, "B:random")
+    end
+
+    @testset "fixture R (1D, spin rotating frame ω_R ≠ 0, t ≠ 0)" begin
+        # App. A defect-5 gate: registry faces and the dumb statement
+        # both apply the RF model (p → p − ω_R; (bx,by) rotated at t)
+        # INDEPENDENTLY — identity here means the production registry
+        # presents the same effective Hamiltonian the propagator runs.
+        rng = MersenneTwister(17)
+        ws, psi = omega_R_ws()
+        compare_all_slots(ws, psi, "R:coherent")
+        ψr = rand_offmanifold_state(ws; rng)
+        compare_all_slots(ws, ψr, "R:random")
     end
 
     # Hermiticity of the LINEAR production faces: ⟨φ|Hχ⟩ = ⟨Hφ|χ⟩ on

@@ -76,6 +76,36 @@ function aux_ws()
 end
 
 """
+    omega_R_ws(; omega_R=0.3) -> (ws, psi)
+
+Spin-rotating-frame fixture (App. A defect-5 gate): 1D F=1 with
+TimeDependentZeeman (p, q, bx, by all active) and
+`spin_rotating_frame_omega = omega_R`, no DDI (ω_R ≠ 0 requires
+secular DDI; simplest to omit). `ws.state.t` is advanced to a
+NONZERO time so the RF rotation of (bx, by) is exercised — at t = 0
+the rotation is the identity and a missing rotation is invisible.
+"""
+function omega_R_ws(; omega_R=0.3)
+    grid = make_grid(GridConfig{1}((8,), (6.0,)))
+    zeeman = TimeDependentZeeman(
+        ConstantWaveform(0.4),   # p_wf
+        ConstantWaveform(0.07),  # q_wf
+        ConstantWaveform(0.25),  # bx_wf
+        ConstantWaveform(0.15),  # by_wf
+    )
+    sp = SimParams(; dt=0.005, n_steps=1, imaginary_time=false,
+        normalize_every=0, spin_rotating_frame_omega=omega_R)
+    ws = make_workspace(;
+        grid, atom=Rb87, interactions=InteractionParams(Dict(0 => 0.5, 1 => 0.1)),
+        zeeman, potential=HarmonicTrap((1.0,)), sim_params=sp,
+    )
+    ws.state.t = 0.7   # nonzero: RF rotation must actually rotate
+    psi = init_psi(grid, SpinSystem(1); state=:spin_coherent, init_theta=π / 4)
+    psi ./= sqrt(sum(abs2, psi) * SpinorBEC.cell_volume(grid))
+    return ws, psi
+end
+
+"""
     rand_offmanifold_state(ws; rng)
 
 Unnormalized complex Gaussian field — off-manifold by design (§3):

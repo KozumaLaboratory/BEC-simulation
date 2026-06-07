@@ -330,25 +330,37 @@ self-referential post-B1. Dead decorations: `_h_matrix`,
 `_density_sign`, `_spin_sign`, `_kinetic_sign`, `EnergyContext` (zero
 callers); `fd_directional_grad` half-written.
 
-**Verified live defects**:
+**Verified live defects** (status as of 2026-06-06: 1-8 FIXED with
+day-0 gates, 9 open):
 
-1. `LHYTerm.apply_step!` → `apply_lhy_step!` undefined
+1. FIXED — `LHYTerm.apply_step!` → `apply_lhy_step!` undefined
    (`terms/lhy.jl:13`); `TensorTerm` → `apply_tensor_step!` undefined +
    stale singlet signature (`contact.jl:259,262`).
-2. GPU + active c2/tensor crashes on `psi_mf` kwarg
+2. FIXED — GPU + active c2/tensor crashes on `psi_mf` kwarg
    (`split_step.jl:672-688` vs `gpu_singlet_pair.jl:39`).
-3. `RamanTerm.energy_contribution` MethodErrors on `TimeDependentRaman`
-   (raw `ws.raman`, no `raman_at` resolution; post-B1 reachable).
-4. `reference_rhs` transverse Zeeman sign opposite to production
-   (`reference_rhs/zeeman.jl:95-130`).
-5. ω_R ≠ 0: registry energy/gradient evaluate lab-frame H while the
-   propagator applies the rotated H — LBFGS optimizes a different
-   Hamiltonian (θ-resolver frame rule is the structural fix).
-6. ITP propagates without MagneticGradient (`mg_active=false`) while
-   the registry gradient includes it.
-7. CPU/GPU `energy_decomposition` NamedTuple shape divergence (`:loss`).
-8. `zeeman_at(::TimeDependentZeeman)` lossy collapse —
-   `combined_spin_step` transverse path structurally dead.
+3. FIXED — `RamanTerm.energy_contribution` MethodErrors on
+   `TimeDependentRaman` (raw `ws.raman`, no `raman_at` resolution).
+4. FIXED — `reference_rhs` transverse Zeeman sign opposite to
+   production. Triply unseen: bx=by=0 test defaults AND
+   `reference_total_energy` summed the diagonal only AND a stale file
+   header. Gate: transverse-active regression in
+   `test_reference_rhs.jl` (energy + operator level).
+5. FIXED — ω_R ≠ 0: registry energy/gradient evaluated lab-frame H
+   while the propagator applies the rotated H. Registry and dumb
+   reference now apply the RF model independently (p_eff = p − ω_R;
+   (bx, by) rotated at t). Gates: master-oracle fixture R, RF
+   dt-valleys, and the end-to-end `split_step!` one-step residual vs
+   `dumb_rhs_total` (the dt-valley alone does NOT reach the production
+   propagator — pre-fix both its faces were lab-frame and it passed).
+6. FIXED — ITP propagated without MagneticGradient (`mg_active=false`)
+   while the registry gradient includes it. Gate: ITP displacement
+   regression in `test_magnetic_gradient_gap.jl`.
+7. FIXED — CPU/GPU `energy_decomposition` shape divergence (`:loss`).
+8. FIXED — `zeeman_at(::TimeDependentZeeman)` lossy collapse —
+   `combined_spin_step` transverse path structurally dead. Gate:
+   directional d⟨Fy⟩/dt = bx⟨Fz⟩ regression in
+   `test_combined_spin_step.jl`, red-check measured (pre-fix revert
+   fails exactly the fix-dependent assertions).
 9. SUSPECTED (numeric verdict pending): padded-DDI 2D/3D crop
    (`ddi_padded.jl:184-190` → `rotation.jl:40-50` linear indexing).
 

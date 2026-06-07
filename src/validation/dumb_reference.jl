@@ -139,15 +139,32 @@ end
 function dumb_zeeman_pqbxby(ws)
     z = ws.zeeman
     t = ws.state.t
-    z === nothing && return (0.0, 0.0, 0.0, 0.0)
-    if z isa ZeemanParams
-        return (z.p, z.q, 0.0, 0.0)
+    p, q, bx, by = if z === nothing
+        (0.0, 0.0, 0.0, 0.0)
+    elseif z isa ZeemanParams
+        (z.p, z.q, 0.0, 0.0)
     elseif z isa TimeDependentZeeman
-        bx = z.bx_wf === nothing ? 0.0 : evaluate(z.bx_wf, t)
-        by = z.by_wf === nothing ? 0.0 : evaluate(z.by_wf, t)
-        return (evaluate(z.p_wf, t), evaluate(z.q_wf, t), bx, by)
+        (
+            evaluate(z.p_wf, t), evaluate(z.q_wf, t),
+            z.bx_wf === nothing ? 0.0 : evaluate(z.bx_wf, t),
+            z.by_wf === nothing ? 0.0 : evaluate(z.by_wf, t),
+        )
+    else
+        error("dumb_zeeman_pqbxby: unsupported zeeman type $(typeof(z))")
     end
-    error("dumb_zeeman_pqbxby: unsupported zeeman type $(typeof(z))")
+    # Spin-rotating-frame model (declaration, restated independently):
+    # the production frame is H_RF with p → p − ω_R and (bx, by)
+    # rotated by −ω_R·t into RF coordinates. Same model, own
+    # expression — the master oracle then checks the production
+    # registry implements it identically (gates defect 5).
+    ω_R = ws.sim_params.spin_rotating_frame_omega
+    p -= ω_R
+    if ω_R != 0.0
+        cR = cos(ω_R * t)
+        sR = sin(ω_R * t)
+        bx, by = bx * cR + by * sR, -bx * sR + by * cR
+    end
+    return (p, q, bx, by)
 end
 
 function dumb_lhy_coefficient(ws)
@@ -300,8 +317,11 @@ function dumb_ddi_potential(ws, fx, fy, fz, nd; secular::Bool)
     c_dd = ws.ddi.C_dd
     sizes = size(fx)
     kaxes = [
-        d == 1 ? dumb_k_axis_rfft(sizes[d], Float64(ws.grid.config.box_size[d])) :
-        dumb_k_axis(sizes[d], Float64(ws.grid.config.box_size[d])) for d in 1:nd
+        if d == 1
+            dumb_k_axis_rfft(sizes[d], Float64(ws.grid.config.box_size[d]))
+        else
+            dumb_k_axis(sizes[d], Float64(ws.grid.config.box_size[d]))
+        end for d in 1:nd
     ]
     # The production convolution runs on the rfft HALF-grid (kx ≥ 0
     # stored; the kx < 0 half is implied by Hermitian symmetry). Its
@@ -355,7 +375,8 @@ function dumb_ddi_potential(ws, fx, fy, fz, nd; secular::Bool)
 end
 
 _require_ddi_flag(ws, ddi_secular) =
-    ws.ddi !== nothing && ddi_secular === nothing && error(
+    ws.ddi !== nothing && ddi_secular === nothing &&
+    error(
         "dumb reference: ws has active DDI — pass ddi_secular::Bool " *
         "explicitly (the secular flag is model declaration; reading it " *
         "back from the baked Q arrays would erase the independence of " *

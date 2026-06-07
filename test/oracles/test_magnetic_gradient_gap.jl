@@ -128,6 +128,32 @@ end
         @test oracle.predicate(psi, ws)
     end
 
+    @testset "ITP outer wrappers include MG (App. A defect-6 regression)" begin
+        # The ITP/RTP chain unification (21c97f92) left
+        # _outer_potential_fwd!/bwd! at the default mg_active=false with
+        # no recorded rationale: ITP relaxed MG-active configs WITHOUT
+        # the tilt while the LBFGS gradient included it — two optimizers,
+        # two Hamiltonians. Pre-fix both sides here evolve identically
+        # and the strict inequality reds.
+        ws_mg = _mg_workspace(0.8)
+        ws_ctl = _mg_workspace(0.0)
+        sys = SpinSystem(1)
+        psi0 = init_psi(ws_mg.grid, sys; state=:m_plus_F)
+        for ws in (ws_mg, ws_ctl)
+            copyto!(ws.state.psi, psi0)
+            for _ in 1:200
+                SpinorBEC._outer_potential_fwd!(ws, 0.01, 3, 1, true)
+            end
+        end
+        x_axis = ws_mg.grid.x[1]
+        function mean_x(ws)
+            n = vec(sum(abs2, Array(ws.state.psi); dims=2))
+            sum(x_axis .* n) / sum(n)
+        end
+        @test abs(mean_x(ws_ctl)) < 1e-10          # control stays centered
+        @test mean_x(ws_mg) < mean_x(ws_ctl) - 0.05  # +g_F·grad ⇒ tilt to −x
+    end
+
     @testset "Registry energy_breakdown reports non-zero MG slot" begin
         ws = _mg_workspace(0.5)
         sys = SpinSystem(1)

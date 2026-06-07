@@ -68,7 +68,11 @@ function reference_total_energy(ws::Workspace{N}; t::Real=ws.state.t) where {N}
     sm = ws.spin_matrices
     e_kin = reference_kinetic_energy(psi, grid)
     e_trap = reference_trap_energy(psi, ws.potential_values, grid)
-    e_zee = reference_zeeman_diag_energy(psi, ws.zeeman, sm.system, grid, Float64(t))
+    # Combined diag + transverse — comparable to production's legacy
+    # `:zeeman` slot (zeeman_z + zeeman_transverse since the GAP-1
+    # fix). The pre-2026-06-06 version summed the diagonal only, which
+    # is why the defect-4 transverse sign never reached a comparison.
+    e_zee = reference_zeeman_energy(psi, ws.zeeman, sm, grid, Float64(t))
     ip = interactions_at(ws.interactions, Float64(t))
     c0 = get_cn(ip, 0)
     e_c0 = abs(c0) > 1e-30 ? reference_density_energy(psi, c0, grid) : 0.0

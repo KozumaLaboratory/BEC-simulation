@@ -1,20 +1,16 @@
 # --- Reference Hψ: Zeeman (diagonal + transverse) ---
 #
-# Sign conventions (matched to src/analysis/energy.jl `_zeeman_energy`
-# and src/hamiltonian/shared/spin_rotation.jl `apply_uniform_spin_rotation!`):
+# Sign convention — user spec `H_Zeeman = −(g_F μ_B B·F) + q F_z²`
+# declared at `workflow/experiments/runtime/b_block_builders.jl`:
 #
 #   Diagonal:    (H_Z ψ)_c(r) = (-p m_c + q m_c²) ψ_c(r)
-#   Transverse:  (H_Z⊥ ψ)_c(r) = (b_x F_x + b_y F_y)_{c,c'} ψ_{c'}(r)
+#   Transverse:  (H_Z⊥ ψ)_c(r) = (−b_x F_x − b_y F_y)_{c,c'} ψ_{c'}(r)
 #
 # `p`, `q`, `b_x`, `b_y` come from `linear_p`, `quadratic_q`,
 # `transverse_b` so that ZeemanParams and TimeDependentZeeman are
-# handled uniformly.
-#
-# Production applies `exp(-i (b_x F_x + b_y F_y) dt_frac)`, so the
-# operator action being exponentiated is `(b_x F_x + b_y F_y) ψ` — the
-# sign convention is *additive* (not -μ·B times anything explicit;
-# `b_x`, `b_y` carry whatever sign the caller supplied). Reference
-# matches.
+# handled uniformly. Production exponentiates the same −b·F action
+# since the 2026-06-04 transverse sign fix (split_step.jl passes
+# (−bx, −by) into the rotation).
 
 export reference_zeeman_diag_apply!, reference_zeeman_diag_energy
 export reference_zeeman_transverse_apply!, reference_zeeman_transverse_energy
@@ -79,8 +75,13 @@ end
 """
     reference_zeeman_transverse_apply!(out, psi, sm, b_x, b_y)
 
-Write `(b_x F_x + b_y F_y)_{c,c'} ψ_{c'}(r)` into `out`. Reads
-F_x, F_y from `sm` (SpinMatrices).
+Write `(−b_x F_x − b_y F_y)_{c,c'} ψ_{c'}(r)` into `out` — the
+user-spec convention `H_Zeeman = −(g_F μ_B B·F)` declared at
+`workflow/experiments/runtime/b_block_builders.jl`, matching the
+production sign fixed 2026-06-04. The pre-2026-06-06 version of THIS
+function carried the opposite (+b·F) sign — App. A defect 4; it was
+never exercised by a registered comparison (the test defaults were
+bx=by=0), which is how it rotted unseen.
 """
 function reference_zeeman_transverse_apply!(
     out::AbstractArray{<:Complex},
@@ -97,7 +98,7 @@ function reference_zeeman_transverse_apply!(
         for c in 1:D
             s = zero(ComplexF64)
             for cp in 1:D
-                s += (b_x * Fx[c, cp] + b_y * Fy[c, cp]) * psi[I, cp]
+                s += -(b_x * Fx[c, cp] + b_y * Fy[c, cp]) * psi[I, cp]
             end
             out[I, c] = s
         end
@@ -108,10 +109,11 @@ end
 """
     reference_zeeman_transverse_energy(psi, sm, b_x, b_y, grid) → Float64
 
-`⟨ψ| b_x F_x + b_y F_y |ψ⟩ = ∫ (b_x f_x(r) + b_y f_y(r)) dV` where
-`f_α(r) = ⟨ψ(r)|F_α|ψ(r)⟩`. There is no corresponding term in
-`_zeeman_energy`; this is here for completeness of the
-self-contained chain.
+`⟨ψ| −b_x F_x − b_y F_y |ψ⟩ = −∫ (b_x f_x(r) + b_y f_y(r)) dV` —
+user-spec sign (see `reference_zeeman_transverse_apply!`). Production
+has carried the matching `zeeman_transverse` slot since the GAP-1 fix
+(2026-06-04); the previous claim here that production omits it was
+stale.
 """
 function reference_zeeman_transverse_energy(
     psi::AbstractArray{<:Complex},
@@ -124,7 +126,7 @@ function reference_zeeman_transverse_energy(
     dV = cell_volume(grid)
     s = 0.0
     @inbounds for i in eachindex(fx, fy)
-        s += b_x * fx[i] + b_y * fy[i]
+        s += -(b_x * fx[i] + b_y * fy[i])
     end
     s * dV
 end
@@ -155,9 +157,9 @@ end
 """
     reference_zeeman_energy(psi, zeeman, sm, grid, t=0.0) → Float64
 
-Combined Zeeman energy: diagonal + transverse. For comparison against
-`_zeeman_energy` (production), only the diagonal part is comparable;
-production currently omits the transverse term from energy_decomposition.
+Combined Zeeman energy: diagonal + transverse — directly comparable to
+production's `:zeeman` legacy-shape slot (= zeeman_z + zeeman_transverse
+since the GAP-1 fix).
 """
 function reference_zeeman_energy(
     psi::AbstractArray{<:Complex},

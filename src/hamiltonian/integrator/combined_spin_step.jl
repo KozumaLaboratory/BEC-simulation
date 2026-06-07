@@ -80,7 +80,12 @@ function _apply_combined_spin_step!(
     # rotate into the spin-rotating frame so a resonant drive becomes
     # static there.
     zee = zeeman_at(ws.zeeman, t)
-    bx_lab, by_lab = transverse_b(zee, t)
+    # Defect-8 fix (2026-06-06): transverse_b must read the ORIGINAL
+    # ws.zeeman — zeeman_at collapses TimeDependentZeeman to a
+    # diagonal-only ZeemanParams (drops bx/by), so the old
+    # `transverse_b(zee, t)` was identically (0, 0) and this entire
+    # transverse branch was structurally dead.
+    bx_lab, by_lab = transverse_b(ws.zeeman, t)
     omega_R = ws.sim_params.spin_rotating_frame_omega
     bx, by = if is_active(omega_R, ROTATION_TOL)
         cs = cos(omega_R * t)

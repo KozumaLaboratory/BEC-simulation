@@ -6,8 +6,9 @@
 # paths:
 #
 #   path A — `energy_gradient!(grad, ψ, ws)` from solvers/lbfgs/
-#            (grad = 2·δE/δψ* covers kinetic, trap, Zeeman diag, c₀,
-#             c₁, DDI, LHY scalar, light_shift; misses c₂/c_n/transverse)
+#            (grad = 2·δE/δψ* covers kinetic, trap, Zeeman diag +
+#             transverse [GAP-1 fix], c₀, c₁, DDI, LHY scalar,
+#             light_shift; misses c₂/c_n)
 #
 #   path B — `energy_decomposition(ws)` per-term scalar oracle
 #            (covers every term including c₂ and transverse Zeeman if
@@ -142,6 +143,33 @@ end
         @test _rel_scalar(ref.trap, prod.trap) < 1e-12
         @test _rel_scalar(ref.density, prod.density) < 1e-12
         @test _rel_scalar(ref.spin, prod.spin) < 1e-12
+    end
+
+    @testset "F=1 transverse Zeeman active (App. A defect-4 regression)" begin
+        # The transverse reference carried a +b·F sign (production is
+        # −b·F) from 2026-06-04 to 2026-06-06 — unseen because every
+        # testset here defaulted bx=by=0, AND reference_total_energy
+        # summed the diagonal Zeeman only. This testset keeps both
+        # alive: pre-fix it reds on `zeeman` (energy) and on the
+        # operator diff.
+        ws = _make_test_ws_3d(1, Rb87; c0=2.5, c1=0.1, p=0.7, q=0.3,
+            bx=0.4, by=0.25)
+        prod = energy_decomposition(ws)
+        ref = reference_total_energy(ws)
+        # Signal precondition: the transverse contribution must be
+        # non-trivial, or the sign is untested all over again.
+        e_diag = SpinorBEC.reference_zeeman_diag_energy(
+            ws.state.psi, ws.zeeman, ws.spin_matrices.system, ws.grid, 0.0
+        )
+        @test abs(ref.zeeman - e_diag) > 1e-6
+        @test _rel_scalar(ref.zeeman, prod.zeeman) < 1e-12
+
+        grad = similar(ws.state.psi)
+        fill!(grad, zero(eltype(grad)))
+        energy_gradient!(grad, ws.state.psi, ws)
+        hpsi_prod = Array(grad) ./ 2
+        hpsi_ref = reference_total_hpsi(ws)
+        @test _rel_l2(hpsi_ref, hpsi_prod) < 1e-12
     end
 end
 

@@ -99,6 +99,51 @@ end
         @test isapprox(Mz_seq, Mz_comb; atol=0.01)
     end
 
+    @testset "Transverse Zeeman alive in combined path (App. A defect-8 regression)" begin
+        # `zeeman_at` collapses TimeDependentZeeman to a diagonal-only
+        # value, so the old `transverse_b(zee, t)` inside
+        # `_apply_combined_spin_step!` returned (0, 0) — the combined
+        # path's transverse branch was structurally dead. Directional
+        # gate: H ⊃ −bx·Fx gives d⟨Fy⟩/dt = bx·⟨Fz⟩ > 0 from m=+F;
+        # pre-fix the combined step left ⟨Fy⟩ at exactly 0 while the
+        # sequential path rotated.
+        dt = 0.002
+        bx = 0.4
+        sp = SimParams(; dt=dt, n_steps=1, imaginary_time=false)
+        zeeman = TimeDependentZeeman(
+            ConstantWaveform(0.5), ConstantWaveform(0.1),
+            ConstantWaveform(bx), ConstantWaveform(0.0),
+        )
+        function _mk_transverse_ws()
+            ws = make_workspace(;
+                grid=_GRID, atom=Eu151,
+                interactions=InteractionParams(Dict(0 => 50.0, 1 => 1.0)),
+                zeeman, potential=HarmonicTrap(1.0, 1.0, 1.0),
+                sim_params=sp,
+                enable_ddi=true, c_dd=100.0,
+            )
+            psi0 = init_psi(_GRID, SpinSystem(6); state=:m_plus_F)
+            copyto!(ws.state.psi, psi0)
+            SpinorBEC._normalize_psi!(ws.state.psi, ws.grid, 13, 3)
+            ws
+        end
+        function _fy_total(ws)
+            _, fy, _ = SpinorBEC.spin_density_vector(
+                Array(ws.state.psi), ws.spin_matrices, 3
+            )
+            sum(fy) * SpinorBEC.cell_volume(ws.grid)
+        end
+        ws_seq = _mk_transverse_ws()
+        SpinorBEC.split_step!(ws_seq)
+        ws_comb = _mk_transverse_ws()
+        SpinorBEC.split_step_combined!(ws_comb)
+        fy_seq = _fy_total(ws_seq)
+        fy_comb = _fy_total(ws_comb)
+        @test fy_seq > 1e-4                       # sequential sees the drive
+        @test fy_comb > 1e-4                      # combined does too (defect 8)
+        @test isapprox(fy_comb, fy_seq; rtol=0.05)  # same physics, O(dt²) apart
+    end
+
     @testset "Asserts on incompatible workspace" begin
         # c2 ≠ 0 should throw. Note c_extra[1] = c2, c_extra[2] = c3, ...
         # (so [1.0] sets c2=1).
