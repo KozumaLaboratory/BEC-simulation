@@ -168,5 +168,21 @@ end
             enable_ddi=false,
         )
         @test_throws ArgumentError SpinorBEC.split_step_combined!(ws_nodi)
+
+        # Padded DDI: the combined path always runs the UNPADDED
+        # convolution, so a configured padded context would be silently
+        # ignored. Refuse loudly instead (App. A defect-9 audit).
+        # Rb87 F=1 keeps the c0/c1 path (no tensor_cache) so the padded
+        # guard is the ONLY incompatibility that fires.
+        gridp = make_grid(GridConfig((8, 8), (6.0, 6.0)))
+        ws_pad = make_workspace(;
+            grid=gridp, atom=Rb87,
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => 0.5)),
+            zeeman=ZeemanParams(0.5, 0.1), potential=HarmonicTrap((1.0, 1.0)),
+            sim_params=SimParams(; dt=0.005, n_steps=1),
+            enable_ddi=true, c_dd=10.0, ddi_padding=true,
+        )
+        @test ws_pad.ddi_padded !== nothing
+        @test_throws ArgumentError SpinorBEC.split_step_combined!(ws_pad)
     end
 end

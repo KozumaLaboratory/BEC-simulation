@@ -75,6 +75,110 @@
         @test diff < 0.1
     end
 
+    @testset "Padded rotation crops to corner (App. A defect 9, 2D/3D)" begin
+        # THE defect-9 regression. The padded convolution returns Φ on
+        # the 2×-per-dim grid; the rotation must read psi's [1:n...]
+        # corner. The 2026-05-10 batched-gemm rewrite switched to LINEAR
+        # indexing, which for ndim ≥ 2 walks full padded columns into the
+        # pad region (56/64 voxels wrong at 8×8). Decisive test: rotating
+        # with a marker-filled padded Φ must equal rotating with the
+        # explicitly-cropped corner. Pre-fix: max|Δ| ≈ 0.25; post-fix 0.
+        for (dims, box) in (((8, 8), (4.0, 4.0)), ((4, 4, 4), (4.0, 4.0, 4.0)))
+            nd = length(dims)
+            grid = make_grid(GridConfig(dims, box))
+            sp = SimParams(; dt=0.01, n_steps=1)
+            ws = make_workspace(;
+                grid, atom=Rb87,
+                interactions=InteractionParams(Dict(0 => 0.5, 1 => 0.1)),
+                zeeman=ZeemanParams(0.0, 0.0),
+                potential=HarmonicTrap(ntuple(_ -> 1.0, nd)),
+                sim_params=sp,
+            )
+            sm = ws.spin_matrices
+            D = sm.system.n_components
+            pad = ntuple(d -> 2 * dims[d], nd)
+            crop = CartesianIndices(dims)
+
+            psi0 = zeros(ComplexF64, dims..., D)
+            for I in CartesianIndices(dims), c in 1:D
+                psi0[I, c] = cis(0.3 * (sum(Tuple(I)) + c)) * (1.0 + 0.1c)
+            end
+            # padded fields: marker 7.77 everywhere, physical corner
+            # overwritten with a deterministic pattern.
+            mkpad(s) = begin
+                a = fill(7.77, pad)
+                for I in CartesianIndices(dims)
+                    a[I] = cos(s * sum(Tuple(I)) + s)
+                end
+                a
+            end
+            px, py, pz = mkpad(1.0), mkpad(2.0), mkpad(3.0)
+            cx, cy, cz = px[crop], py[crop], pz[crop]   # contiguous corner copies
+
+            @testset "nd=$nd imaginary_time=$it" for it in (false, true)
+                A = copy(psi0)
+                SpinorBEC._apply_ddi_rotation!(
+                    A, px, py, pz, sm, 0.05, nd; imaginary_time=it
+                )
+                B = copy(psi0)
+                SpinorBEC._apply_ddi_rotation!(
+                    B, cx, cy, cz, sm, 0.05, nd; imaginary_time=it
+                )
+                @test maximum(abs, A .- B) < 1e-13
+                # the rotation must actually DO something (else 0≡0 is vacuous)
+                @test maximum(abs, B .- psi0) > 1e-3
+            end
+        end
+    end
+
+    @testset "Padded DDI step ≡ dumb padded RHS (dt-valley, 2D smooth)" begin
+        # Independent-statement physics gate: the production padded
+        # propagator step's first-order action must equal the dumb
+        # zero-padded DDI RHS (dumb_rhs_ddi_padded, an aperiodic
+        # convolution on the doubled box, cropped back). Smooth state ⇒
+        # Nyquist power → 0, so the rfft Nyquist/rep convention is
+        # invisible and the residual descends as O(dt). Also a second
+        # witness to the crop: pre-fix the scrambled rotation plateaus.
+        grid = make_grid(GridConfig((16, 16), (12.0, 12.0)))
+        sp = SimParams(; dt=0.01, n_steps=1)
+        ws = make_workspace(;
+            grid, atom=Cr52,
+            interactions=InteractionParams(Dict(0 => 0.5, 1 => 0.01)),
+            zeeman=ZeemanParams(0.0, 0.0), potential=HarmonicTrap((1.0, 1.0)),
+            sim_params=sp, enable_ddi=true, c_dd=5.0, secular_ddi=false,
+            ddi_padding=true,
+        )
+        sm = ws.spin_matrices
+        D = sm.system.n_components
+        psi = zeros(ComplexF64, 16, 16, D)
+        for I in CartesianIndices((16, 16))
+            x = grid.x[1][I[1]]
+            y = grid.x[2][I[2]]
+            gg = exp(-(x^2 + y^2) / 2)
+            for c in 1:D
+                psi[I, c] = gg * cis(0.2c)
+            end
+        end
+        psi ./= sqrt(sum(abs2, psi) * SpinorBEC.cell_volume(grid))
+
+        g = SpinorBEC.dumb_rhs_ddi_padded(ws, psi; secular=false)
+        ng = sqrt(sum(abs2, g))
+        @test ng > 1e-8
+        res(dt) = begin
+            p = copy(psi)
+            SpinorBEC.apply_ddi_step!(
+                p, sm, ws.ddi, ws.ddi_bufs, dt, 2, ws.ddi_padded
+            )
+            sqrt(sum(abs2, (p .- psi) ./ (-im * dt) .- g)) / ng
+        end
+        r1 = res(1e-3)
+        r2 = res(1e-4)
+        @test r2 < r1                      # descending (Taylor truncation)
+        @test r2 < 5e-2                    # reaches the O(dt) floor
+        slope = (log10(r1) - log10(r2)) / (log10(1e-3) - log10(1e-4))
+        @test 0.6 < slope < 1.5            # first-order
+    end
+
     @testset "ddi_padding=false gives nothing" begin
         config = GridConfig(64, 20.0)
         grid = make_grid(config)

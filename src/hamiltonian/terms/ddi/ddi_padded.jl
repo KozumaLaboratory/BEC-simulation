@@ -180,10 +180,12 @@ function apply_ddi_step!(
         n_pts,
     )
 
-    # Phi_*_pad are 2n-sized (padded) arrays, but _apply_ddi_rotation! iterates
-    # over CartesianIndices(n_pts) — the original n-sized grid — so only the
-    # first n_pts elements of each padded array are read.  This is the implicit
-    # crop from padded convolution back to the physical domain.
+    # Phi_*_pad are 2n-sized (padded) arrays. _apply_ddi_rotation!
+    # crops them to psi's physical [1:n...] corner via `_ddi_crop_phi`
+    # (rotation.jl) before computing Euler angles. (Pre-2026-06-07 this
+    # comment claimed an "implicit crop" via CartesianIndices(n_pts) —
+    # true before the 2026-05-10 batched-gemm rewrite, which silently
+    # switched to linear indexing and broke 2D/3D: App. A defect 9.)
     @timeit_debug TIMER "ddi_rotation" _apply_ddi_rotation!(
         psi, ddi_padded.Phi_x_pad, ddi_padded.Phi_y_pad, ddi_padded.Phi_z_pad,
         sm, dt_frac, ndim;

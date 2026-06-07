@@ -30,6 +30,20 @@ function _apply_ddi_rotation!(
     nothing
 end
 
+# Crop a (possibly zero-padded) dipolar field to psi's physical
+# [1:n_pts...] corner. The padded-DDI convolution returns Φ on the
+# 2×-per-dim grid (ddi_padded.jl); the rotation must read the corner,
+# NOT the first N_spatial LINEAR elements (those walk full padded
+# columns into the pad region for ndim ≥ 2 — App. A defect 9, the
+# 2026-05-10 batched-gemm rewrite dropped the CartesianIndices crop).
+# Unpadded fields (size == n_pts, every production DDI run) return
+# unchanged — zero copy, the hot @simd path below is untouched.
+@inline function _ddi_crop_phi(phi_x, phi_y, phi_z, n_pts)
+    size(phi_x) == n_pts && return (phi_x, phi_y, phi_z)
+    crop = CartesianIndices(n_pts)
+    return (phi_x[crop], phi_y[crop], phi_z[crop])
+end
+
 @inline function _ddi_compute_angles!(
     alpha::Vector{T}, beta::Vector{T}, theta::Vector{T},
     phi_x::Array{<:AbstractFloat}, phi_y::Array{<:AbstractFloat}, phi_z::Array{<:AbstractFloat},
@@ -63,10 +77,12 @@ function _apply_ddi_rotation_batched_real!(
     psi::Array{Complex{T}}, phi_x, phi_y, phi_z,
     sm::SpinMatrices{D}, dt_frac::Float64, ndim::Int,
 ) where {T <: AbstractFloat, D}
-    N_spatial = prod(ntuple(d -> size(psi, d), ndim))
+    n_pts = ntuple(d -> size(psi, d), ndim)
+    N_spatial = prod(n_pts)
     F = T(sm.system.F)
     rc = _get_ddi_rotation_cache_cpu(psi, sm, ndim)
 
+    phi_x, phi_y, phi_z = _ddi_crop_phi(phi_x, phi_y, phi_z, n_pts)
     _ddi_compute_angles!(rc.alpha, rc.beta, rc.theta,
         phi_x, phi_y, phi_z, dt_frac, N_spatial)
     P = reshape(psi, N_spatial, D)
@@ -80,10 +96,12 @@ function _apply_ddi_rotation_batched_imag!(
     psi::Array{Complex{T}}, phi_x, phi_y, phi_z,
     sm::SpinMatrices{D}, dt_frac::Float64, ndim::Int,
 ) where {T <: AbstractFloat, D}
-    N_spatial = prod(ntuple(d -> size(psi, d), ndim))
+    n_pts = ntuple(d -> size(psi, d), ndim)
+    N_spatial = prod(n_pts)
     F = T(sm.system.F)
     rc = _get_ddi_rotation_cache_cpu(psi, sm, ndim)
 
+    phi_x, phi_y, phi_z = _ddi_crop_phi(phi_x, phi_y, phi_z, n_pts)
     _ddi_compute_angles!(rc.alpha, rc.beta, rc.theta,
         phi_x, phi_y, phi_z, dt_frac, N_spatial)
     P = reshape(psi, N_spatial, D)
@@ -271,10 +289,15 @@ function _apply_ddi_rotation!(
     dt_t = RT(dt_frac)
     F_t = RT(F)
     if phi_x isa Array
+        # Read the cropped views (phi_*_v), NOT raw phi_x[i] — raw
+        # linear indexing of a padded field walks the pad region for
+        # ndim ≥ 2 (App. A defect 9). This branch is currently
+        # unreachable in production (CPU psi → Method 1), but carries
+        # the identical latent defect; keep it on the crop views.
         @inbounds @simd for i in 1:N_spatial
-            px = phi_x[i];
-            py = phi_y[i];
-            pz = phi_z[i]
+            px = phi_x_v[i];
+            py = phi_y_v[i];
+            pz = phi_z_v[i]
             pm = sqrt(px * px + py * py + pz * pz)
             phi_mag[i] = pm
             alpha[i] = atan(py, px)

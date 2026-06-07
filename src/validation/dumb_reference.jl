@@ -314,13 +314,74 @@ matching the production builder; axis 1 uses the rfft Nyquist
 representative (see `dumb_k_axis_rfft`).
 """
 function dumb_ddi_potential(ws, fx, fy, fz, nd; secular::Bool)
-    c_dd = ws.ddi.C_dd
+    boxes = ntuple(d -> Float64(ws.grid.config.box_size[d]), nd)
+    return _dumb_ddi_kernel(ws.ddi.C_dd, fx, fy, fz, nd, boxes; secular)
+end
+
+"""
+    dumb_ddi_potential_padded(ws, fx, fy, fz, nd; secular) -> (Φx, Φy, Φz)
+
+Zero-padded variant: pad the spin density into the 2×-per-dim grid,
+run the SAME kernel statement on the doubled box (production's padded
+axes are `rfftfreq(2n, 2π/dx)` — sample spacing dk/2, i.e. the 2L
+box), and crop the [1:n, …] corner back. Independent statement of
+`_compute_and_convolve_ddi_padded!` + the crop the rotation step is
+supposed to read (App. A defect 9).
+"""
+function dumb_ddi_potential_padded(ws, fx, fy, fz, nd; secular::Bool)
+    sizes = size(fx)
+    pads = ntuple(d -> 2 * sizes[d], nd)
+    crop = CartesianIndices(sizes)
+    fxp = zeros(Float64, pads)
+    fyp = zeros(Float64, pads)
+    fzp = zeros(Float64, pads)
+    fxp[crop] .= fx
+    fyp[crop] .= fy
+    fzp[crop] .= fz
+    boxes = ntuple(d -> 2.0 * Float64(ws.grid.config.box_size[d]), nd)
+    Φx, Φy, Φz = _dumb_ddi_kernel(ws.ddi.C_dd, fxp, fyp, fzp, nd, boxes; secular)
+    return (Φx[crop], Φy[crop], Φz[crop])
+end
+
+"""
+    dumb_rhs_ddi_padded(ws, ψ; secular) -> Array
+
+DDI slot of the canonical RHS with the ZERO-PADDED convolution — the
+variational counterpart of the padded propagator step
+(`apply_ddi_step!` with a `DDIPaddedContext`). No production
+energy/gradient face uses the padded kernel (registry DDI is
+unpadded), so this exists purely as the dt-valley reference for the
+padded step.
+"""
+function dumb_rhs_ddi_padded(ws, ψ::AbstractArray{<:Complex}; secular::Bool)
+    D = _dumb_D(ψ)
+    nd = ndims(ψ) - 1
+    sm = dumb_spin_matrices((D - 1) ÷ 2)
+    fx = dumb_local_expectation(ψ, sm.Fx)
+    fy = dumb_local_expectation(ψ, sm.Fy)
+    fz = dumb_local_expectation(ψ, sm.Fz)
+    Φx, Φy, Φz = dumb_ddi_potential_padded(ws, fx, fy, fz, nd; secular)
+    g = zeros(ComplexF64, size(ψ))
+    for I in _dumb_spatial(ψ)
+        H = Φx[I] .* sm.Fx .+ Φy[I] .* sm.Fy .+ Φz[I] .* sm.Fz
+        for c in 1:D
+            s = zero(ComplexF64)
+            for cp in 1:D
+                s += H[c, cp] * ψ[I, cp]
+            end
+            g[I, c] = s
+        end
+    end
+    return g
+end
+
+function _dumb_ddi_kernel(c_dd, fx, fy, fz, nd, boxes; secular::Bool)
     sizes = size(fx)
     kaxes = [
         if d == 1
-            dumb_k_axis_rfft(sizes[d], Float64(ws.grid.config.box_size[d]))
+            dumb_k_axis_rfft(sizes[d], boxes[d])
         else
-            dumb_k_axis(sizes[d], Float64(ws.grid.config.box_size[d]))
+            dumb_k_axis(sizes[d], boxes[d])
         end for d in 1:nd
     ]
     # The production convolution runs on the rfft HALF-grid (kx ≥ 0

@@ -361,8 +361,27 @@ day-0 gates, 9 open):
    directional d⟨Fy⟩/dt = bx⟨Fz⟩ regression in
    `test_combined_spin_step.jl`, red-check measured (pre-fix revert
    fails exactly the fix-dependent assertions).
-9. SUSPECTED (numeric verdict pending): padded-DDI 2D/3D crop
-   (`ddi_padded.jl:184-190` → `rotation.jl:40-50` linear indexing).
+9. FIXED — padded-DDI 2D/3D crop. CONFIRMED bug (10-agent numeric
+   workflow, both refutations stood): commit `fc937c69` (2026-05-10
+   batched-gemm rewrite) replaced `for I in CartesianIndices(n_pts)`
+   with linear `phi_x[i]` in `_ddi_compute_angles!`, so the CPU
+   propagator read the first `N_spatial` linear elements of the
+   2×-padded Φ — full padded columns into the pad region for ndim ≥ 2
+   (2D error 0.255, 3D 0.264; 1D accidentally correct; GPU and the
+   padded energy face crop correctly). Root fix: `_ddi_crop_phi`
+   (rotation.jl) crops Φ to psi's `[1:n...]` corner before the angle
+   loop — zero-copy on the unpadded hot path (size == n_pts). Method 2's
+   latent CPU-scalar branch switched to the crop views. Gates: 2D/3D
+   marker-parity (padded-Φ rotation ≡ cropped-Φ rotation) + a dumb
+   zero-padded RHS dt-valley (`dumb_rhs_ddi_padded` /
+   `dumb_ddi_potential_padded`), both red-checked. Blast radius zero:
+   no YAML key, default `false`, no `runs/` config enables it.
+   SCOPED KNOWN-LIMIT (not silently wrong, just half-plumbed): with
+   `ddi_padding=true` the padded convolution reaches only the
+   propagator — the CPU/GPU energy faces and the LBFGS gradient face
+   use the unpadded kernel, and `split_step_combined!` now REFUSES a
+   padded context loudly rather than silently running unpadded. Full
+   energy/gradient padding is deferred until a caller needs it.
 
 **Design tensions** (resolution targets): verification vacuum; GPU
 energy fork; fictional propagator face; protocol expressiveness

@@ -206,6 +206,16 @@ function _assert_combined_step_compatible(ws::Workspace)
             "split_step_combined! requires DDI buffers (the spin density " *
             "and Φ buffers live there). Construct workspace with enable_ddi=true."),
     )
+    # The combined path always runs the UNPADDED _compute_and_convolve_ddi!
+    # (combined_spin_step.jl:67-69); silently ignoring a configured padded
+    # context would give the caller unpadded physics behind a padded
+    # request. Refuse loudly rather than mislead (App. A defect-9 audit).
+    ws.ddi_padded === nothing || throw(
+        ArgumentError(
+            "split_step_combined! does not support zero-padded DDI " *
+            "(ddi_padding=true). The combined step uses the unpadded " *
+            "convolution; use the standard split_step! for padded DDI."),
+    )
     nothing
 end
 
