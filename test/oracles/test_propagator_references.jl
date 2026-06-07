@@ -49,7 +49,27 @@ include(joinpath(@__DIR__, "..", "helpers", "oracle_fixtures.jl"))
 # eps·‖ψ‖/(dt·‖g‖) stays ≲ 1e-9 even at dt = 1e-8.
 const DT_LIST = [10.0^k for k in -1.0:-0.5:-8.0]
 const DT_HEALTHY_MIN = 1e-5
-const DT_SLOPE_BAND = (0.7, 2.6)
+
+# Slope band, set from the measured full-band log-log fit (2026-06-07,
+# over fixtures A / B / DDI / spin-rotating-frame). The single-term step
+# residual is r(dt) = (dt/2)·‖H²ψ‖/‖Hψ‖ + O(dt²): leading order 1, with
+# a quadratic admixture. CONFIRMED: every term's claimed order is 1 —
+# no order-2 face masquerading as 1. The *fitted* slope over the band,
+# though, is not a clean 1.0: the dt² admixture's weight grows when the
+# operator's leading coefficient is small, so it is (term × fixture)-
+# dependent, not per-term. Measured:
+#   stiff/large-coefficient → slope ≈ 1.0  (kinetic 1.00, trap 1.00,
+#     fixture-A zeeman_z 0.98, transverse 1.00, density_c0 1.00, ddi
+#     1.00, raman 1.00, light_shift 1.00, coriolis 1.00, mg 0.99)
+#   small-coefficient / soft mean-field → higher  (spin_c1 1.51, lhy
+#     1.84, and RF zeeman_z 1.46 because p_eff = p − ω_R = 0.1 is small)
+# So a per-term band is the wrong model (zeeman_z is 0.98 OR 1.46 by
+# fixture). One band bracketing the measured max (1.84) + margin; this
+# is tighter than the prior over-cautious 2.6, justified by the data.
+# A sign / missing-operator bug does NOT shift the slope — it PLATEAUS
+# (kind ≠ :valley), caught by the `kind` assertion; the band guards
+# order-of-accuracy drift only.
+const DT_SLOPE_BAND = (0.7, 2.2)
 
 """Per-term step residual at one dt (RT). Copies ψ so the caller's
 state is untouched; syncs the kinetic phase cache when needed (the
