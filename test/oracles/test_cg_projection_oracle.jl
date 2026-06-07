@@ -28,7 +28,7 @@
 
 using Test
 using SpinorBEC
-using SpinorBEC: _c0c1_to_gS, _cn_to_gS, channel_kernel, spin_matrices
+using SpinorBEC: _c0c1_to_gS, _cn_to_gS, channel_kernel, spin_matrices, wigner_6j
 using LinearAlgebra
 using Random
 
@@ -95,8 +95,9 @@ using Random
             fx = real(φ' * (sm.Fx * φ))
             fy = real(φ' * (sm.Fy * φ))
             fz = real(φ' * (sm.Fz * φ))
-            h_gp = c0 .* n .* φ .+
-                   c1 .* (fx .* (sm.Fx * φ) .+ fy .* (sm.Fy * φ) .+ fz .* (sm.Fz * φ))
+            h_gp =
+                c0 .* n .* φ .+
+                c1 .* (fx .* (sm.Fx * φ) .+ fy .* (sm.Fy * φ) .+ fz .* (sm.Fz * φ))
 
             h_ck = zeros(ComplexF64, D)
             for c in 1:D, cp in 1:D, c2 in 1:D, c2p in 1:D
@@ -104,6 +105,59 @@ using Random
             end
 
             @test isapprox(h_ck, h_gp; rtol=1e-10, atol=1e-12)
+        end
+    end
+
+    # ── Part 4: first-principles λ_S — the spectrum of F̂₁·F̂₂ ──────────
+    # The most elementary independent statement: build the two-body
+    # operator F̂₁·F̂₂ = F1x F2x + F1y F2y + F1z F2z explicitly from the
+    # (independently SO(3)-tested) spin matrices and diagonalize. Its
+    # eigenvalues ARE the channel λ_S = ½(S(S+1)−2F(F+1)), each with
+    # multiplicity 2S+1. No closed form, no CG primitive, no channel
+    # kernel — pure operator spectrum. This anchors the c₁ channel
+    # MAGNITUDE absolutely at every F including Eu F=6 (the homogeneous-
+    # coefficient blind spot the file targets); a wrong factor in
+    # `_c0c1_to_gS`'s λ_S would diverge from the spectrum here even where
+    # the cross-route ratio test (relative) stays green. Coefficient-
+    # source class: a face reading c₁ with the wrong magnitude / channel
+    # is sign-invisible, so this absolute spectrum anchor — not the
+    # sign-canary — is the load-bearing guard (SpinC1 pedigree).
+    @testset "first-principles λ_S = spec(F̂₁·F̂₂) (F-swept)" begin
+        for F in (1, 2, 3, 6)
+            sm = spin_matrices(F)
+            D = 2F + 1
+            Fx = Matrix{ComplexF64}(sm.Fx)
+            Fy = Matrix{ComplexF64}(sm.Fy)
+            Fz = Matrix{ComplexF64}(sm.Fz)
+            F1F2 = kron(Fx, Fx) .+ kron(Fy, Fy) .+ kron(Fz, Fz)
+            ev = sort(real.(eigvals(Hermitian((F1F2 .+ F1F2') ./ 2))))
+            expected = Float64[]
+            for S in 0:(2F), _ in 1:(2S + 1)
+                push!(expected, (S * (S + 1) - 2F * (F + 1)) / 2)
+            end
+            @test length(ev) == D^2
+            @test isapprox(sort(expected), ev; atol=1e-8)
+            # the even-S eigenvalues are exactly the pure-c₁ g_S channels
+            g = _c0c1_to_gS(F, 0.0, 1.0)
+            for S in 0:2:(2F)
+                @test any(λ -> isapprox(λ, g[S]; atol=1e-8), ev)
+            end
+        end
+    end
+
+    # ── Part 5: the 6j primitive itself, vs a closed-form special case ─
+    # The higher-rank channel route (`_cn_to_gS`, k ≥ 2) rides on
+    # `wigner_6j`; Part 2 only cross-routes k=1, so the primitive that
+    # carries the c₄…c₁₂ Eu channels is otherwise unanchored. Pin it on
+    # the j6=0 closed form (a standard 6j special case, independent of
+    # the Racah sum the implementation uses):
+    #   {a b c; 0 c b} = (−1)^{a+b+c} / √((2b+1)(2c+1))   if △(a,b,c).
+    @testset "wigner_6j j6=0 closed form (independent of Racah sum)" begin
+        triads = ((1, 1, 1), (2, 2, 2), (1, 2, 2), (2, 3, 3), (3, 3, 4), (2, 4, 6))
+        for (a, b, c) in triads
+            (abs(a - b) <= c <= a + b) || continue   # triangle
+            expected = (-1)^(a + b + c) / sqrt((2b + 1) * (2c + 1))
+            @test isapprox(wigner_6j(a, b, c, 0, c, b), expected; atol=1e-12)
         end
     end
 end

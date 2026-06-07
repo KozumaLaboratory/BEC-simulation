@@ -383,6 +383,51 @@ day-0 gates, 9 open):
    padded context loudly rather than silently running unpadded. Full
    energy/gradient padding is deferred until a caller needs it.
 
+**Post-audit additions (2026-06-07).** The redundancy audit upheld an
+absorbing-boundary live bug (loss+absorbing epilogue applied on
+`split_step!` but OMITTED by the leapfrog / Yoshida / adaptive drivers;
+`run_simulation!` → leapfrog, so a production `dynamics:
+{absorbing_boundary}` built the mask and discarded it). Root fix:
+`apply_rt_dissipation!` binds loss+absorbing inseparably; all 7 sites
+route through it. **Blast radius ADJUDICATED = ZERO** (provenance, not
+assumed): no `runs/` config enables `absorbing_boundary` (the
+matsui_edh baseline configs don't), the turn_15 "absorbing-boundary at
+m=−6" is the analytic master-equation spin-ladder terminal (unrelated
+to the spatial mask), and the turn_74/t81 mentions are the schema
+validator's key-list in error messages from runs that FAILED config
+validation (no jld2). The earlier commit-message claim that
+"Matsui-EdH runs configured an absorber" was an overstatement (grepped
+"absorbing", assumed spatial) — corrected here.
+
+**SpinC1 single-source defect (found by the master-oracle self-canary).**
+Gradient face `_grad_c1_spin!` read `ws.interactions[1]` while the
+energy face used `term.c1` — a coefficient-SOURCE violation (distinct
+from the sign class). Blast radius ZERO: `build_h_terms_registry`
+(registry.jl:102) and the legacy energy path always construct
+`SpinC1Term(ws.interactions[1])`, so the two sources are equal in every
+production path; the gradient always read the right value. Mechanism
+worth recording: **FD-valley sees energy↔gradient consistency at the
+test point** (green where both sources hold the same value); **the
+self-canary sees responsiveness to the canonical source** (flip
+`term.c1` ⇒ must propagate). A single-source violation where both
+sources agree at the test point is FD-valley-invisible, canary-visible.
+The canary is a CLASS guard (every active numeric-field term gets the
+source-responsiveness check; CoriolisTerm exempt as ws-locked; fieldless
+terms read one ws source so no parallel-source risk exists).
+
+**Resume scope-corrections (verifier, 2026-06-07):**
+- The F32 reduction measurement (pairwise sum ~1.6e-8) and the parity
+  gate (`test_mixed_precision.jl`) are **CPU**. P2's real body is the
+  **GPU** reduction (tree vs atomic differs by orders); the CPU "no
+  problem" does NOT inherit. When P2 is built, measure the GPU reduction
+  on a production grid under the same c0=200 cancellation stress.
+- **Stage 3 defer rationale**: NOT "no target bug" — the SpinC1
+  single-source violation IS the motivating bug a type-enforced
+  single-source would PREVENT. The correct rationale is the same
+  detection-not-prevention trade as commitment #3: the self-canary
+  already gives detection, and the 23-param-Workspace JIT-cascade risk
+  of inner-constructor enforcement outweighs the prevention benefit.
+
 **Design tensions** (resolution targets): verification vacuum; GPU
 energy fork; fictional propagator face; protocol expressiveness
 (psi_mf / t_eval / dt-cache); coefficient residence (→ θ); +4%

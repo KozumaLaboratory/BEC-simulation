@@ -288,8 +288,30 @@ end
                     end
                 end
             end
-            @testset "$label canary completeness" begin
-                @test !isempty(mutant_checked)   # faithful path actually exercised
+            # CLASS guard, not instance. The source-faithful mutant
+            # (flip term.<coeff> ⇒ energy AND RHS must respond) is what
+            # caught SpinC1's single-source violation (gradient read
+            # ws.interactions[1], bypassing term.c1). For this to close
+            # the CLASS — not just SpinC1 — every active term carrying a
+            # numeric coefficient field must receive that check. The
+            # H_TERMS_CANONICAL_ORDER loop + `_sign_mutant` does so
+            # structurally (and the set-equivalence meta-test guarantees
+            # a new term is in the loop); we pin the load-bearing members
+            # by name so a regression that silently drops one reds here.
+            # CoriolisTerm is exempt (it binds Ω to ws by assertion —
+            # single effective source). Fieldless terms (DDI/LHY/Tensor/
+            # Raman/LightShift/MG/Loss) read one ws source — no parallel
+            # source to drift to, so no violation is possible to guard.
+            @testset "$label canary completeness (class guard)" begin
+                @test !isempty(mutant_checked)
+                expected = if label == "A"
+                    (:zeeman_z, :zeeman_transverse, :density_c0, :spin_c1)
+                else
+                    (:zeeman_z, :density_c0, :spin_c1)
+                end
+                for slot in expected
+                    @test slot in mutant_checked
+                end
             end
         end
     end

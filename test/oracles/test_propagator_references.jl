@@ -51,13 +51,17 @@ const DT_LIST = [10.0^k for k in -1.0:-0.5:-8.0]
 const DT_HEALTHY_MIN = 1e-5
 
 # Slope band, set from the measured full-band log-log fit (2026-06-07,
-# over fixtures A / B / DDI / spin-rotating-frame). The single-term step
-# residual is r(dt) = (dt/2)·‖H²ψ‖/‖Hψ‖ + O(dt²): leading order 1, with
-# a quadratic admixture. CONFIRMED: every term's claimed order is 1 —
-# no order-2 face masquerading as 1. The *fitted* slope over the band,
-# though, is not a clean 1.0: the dt² admixture's weight grows when the
-# operator's leading coefficient is small, so it is (term × fixture)-
-# dependent, not per-term. Measured:
+# over fixtures A / B / DDI / spin-rotating-frame). The order itself is
+# NOT inferred from the slope: every per-term step is the SAME
+# first-order exp(−i·dt·H) substep, so each term is order 1 BY
+# CONSTRUCTION (the splitting scheme), and the slope is merely a
+# CONSISTENCY CHECK of that — never the justification. The single-term
+# residual is r(dt) = (dt/2)·‖H²ψ‖/‖Hψ‖ + O(dt²); the *fitted* slope
+# over the band is not a clean 1.0 because the dt² admixture's weight
+# grows when the operator's leading coefficient is small, so it is
+# (term × fixture)-dependent. (For lhy/spin_c1 the full band cannot
+# separate that admixture from a true order-2 — a gray zone — which is
+# exactly why order is read from the scheme, not the slope.) Measured:
 #   stiff/large-coefficient → slope ≈ 1.0  (kinetic 1.00, trap 1.00,
 #     fixture-A zeeman_z 0.98, transverse 1.00, density_c0 1.00, ddi
 #     1.00, raman 1.00, light_shift 1.00, coriolis 1.00, mg 0.99)
