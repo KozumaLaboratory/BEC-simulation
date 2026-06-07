@@ -104,23 +104,35 @@ end
 
 function main()
     af = JLD2.load(joinpath(DIR, "groundstate_audit.jld2"), "rows")
-    converged = [r for r in af if r.Ω == 0.0 && r.cls in (:GS_confident, :goldstone)]
+    # default: the Ω=0 column (the static phase diagram). M1_CLASS lets the
+    # diagnostic also target the converged Ω>0 corner (converged_single) to
+    # read λ_min(Ω) across the convergence boundary — physical-vs-numerical.
+    wanted = if haskey(ENV, "M1_CLASS")
+        Tuple(Symbol.(split(ENV["M1_CLASS"], ",")))
+    else
+        (:GS_confident, :goldstone)
+    end
+    converged = [r for r in af if r.cls in wanted]
+    haskey(ENV, "M1_CLASS") || (converged = [r for r in converged if r.Ω == 0.0])
     if haskey(ENV, "M1_CELLS")
         keep = parse.(Float64, split(ENV["M1_CELLS"], ","))
         converged = [r for r in converged if r.B in keep]
     end
+    sort!(converged; by=x -> (x.B, x.Ω))
     @printf("Gate (2) minimum-vs-saddle — %d converged Ω=0 cells, Lanczos niter=%d\n\n",
         length(converged), NITER)
     first_done = false
-    @printf("%-7s %-20s %12s %12s   %s\n", "B[nT]", "winner", "λ_min", "λ_min/|E|", "verdict")
-    println("-"^70)
-    for r in sort(converged; by=x -> x.B)
+    @printf(
+        "%-7s %-6s %-20s %12s %12s   %s\n", "B[nT]", "Ω", "winner", "λ_min", "λ_min/|E|", "verdict"
+    )
+    println("-"^74)
+    for r in converged
         λmin, μ = gate2_cell(r.B, r.Ω; validate=(!first_done))
         first_done = true
         tol = 1e-3 * max(abs(r.winnerE), 1.0)
         verdict = λmin > -tol ? "MINIMUM" : "SADDLE"
-        @printf("%-7.1f %-20s %12.5f %12.2e   %s\n",
-            r.B, r.winner, λmin, λmin / max(abs(r.winnerE), 1.0), verdict)
+        @printf("%-7.1f %-6.2f %-20s %12.5f %12.2e   %s\n",
+            r.B, r.Ω, r.winner, λmin, λmin / max(abs(r.winnerE), 1.0), verdict)
     end
 end
 
