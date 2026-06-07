@@ -415,6 +415,27 @@ The canary is a CLASS guard (every active numeric-field term gets the
 source-responsiveness check; CoriolisTerm exempt as ws-locked; fieldless
 terms read one ws source so no parallel-source risk exists).
 
+**BdG/linearize functor anchored (2026-06-08).** The
+saddle-rejection that gates every phase claim from the M1
+rotating-frame sweep rides on `bogoliubov_spectrum` — a single
+hand-built CG-sum derivation whose only tests were structural/smoke
+(types, growth ≥ 0, roton detection); nothing pinned the spectrum
+VALUE (the §4.3-named "FD-Hessian + uniform-gas" anchor was
+unimplemented). Measured: the operator is numerically CORRECT (it
+reproduces the Ueda F=1 polar branches √(εk(εk+2c₀n)) + 2× √(εk(εk+2c₁n))
+and the FM density branch √(εk(εk+2(c₀+c₁)n)) + free-particle magnon
+EXACTLY) but was UNGATED. Now gated by `test_bogoliubov_anchor.jl`
+(declaration-independent: the test states the closed form, the code
+states the operator), red-checked (scaling the anomalous M by 2 reds
+the polar branches). REMAINING for the actual Eu verdict: the F=6 + DDI
+operator the sweep uses is not covered by the F=1 analytic forms — its
+anchor is the FD-Hessian (L(k=0) = finite-difference of the
+already-gated `energy_gradient!` on a uniform grid), the
+chains-off-the-gated-gradient counterpart, its own next unit. Authoring
+note: the gate caught an incomplete FM model (a gapped FM mode exceeds
+the density branch at small k) — asserted only the unambiguous closed
+forms, not unverified physics.
+
 **Resume scope-corrections (verifier, 2026-06-07):**
 - The F32 reduction measurement (pairwise sum ~1.6e-8) and the parity
   gate (`test_mixed_precision.jl`) are **CPU**. P2's real body is the

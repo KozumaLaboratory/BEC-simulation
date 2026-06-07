@@ -230,6 +230,11 @@ const CI_EXTRA = [
     # (vortex / monopole sign, manuscript spinors vs SSoT, init_psi vs
     # classifier candidates, spin_texture_xy Fx/Fy orientation).
     "oracles/test_redundancy_gates.jl",
+    # BdG / Bogoliubov analytic-dispersion anchor: the linearize/Hessian
+    # functor every stability (saddle-rejection) verdict rides on, pinned
+    # to the known Ueda F=1 polar/FM closed forms + universal polar
+    # density branch (was correct-but-ungated; declaration-independent).
+    "oracles/test_bogoliubov_anchor.jl",
     # Fisher identifiability: the preflight instrument for the
     # no-anchor SBI regime (trust ledger column 3) — linearity anchors,
     # θ-valley, degenerate-protocol detection, channel-space chain.
