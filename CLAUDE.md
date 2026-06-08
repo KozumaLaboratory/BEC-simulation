@@ -53,7 +53,7 @@ ext/        SpinorBEC{CUDA, Makie, HTTP, VTK}Ext (weak-dep extensions)
 test/       subdirs mirror src/ + test/oracles/ (sign-bug-proof gates) + test/helpers/
 scripts/    one-off audit drivers (m1_*, m2_*, fisher_*, build_sysimage*, cli.jl, deploy_dashboard_auth.sh)
 dashboard/  React + WebGPU frontend (Vite + R3F + Three WebGPU + TSL + leva + shadcn + Tailwind v4)
-runs/       YAML configs + per-config jld2 cache + `_loop/` autonomous-research-loop record
+runs/       YAML configs + per-config jld2 cache  (the `_loop/` loop record was RETIRED 2026-06-08 → /home/suzume/workspace/BEC-simulation-archive/loop_record_2026_06_08/ (outside the repo))
 docs/       api/ architecture/ conventions/ design/ guides/ reference/ refs/ research_notes/ theory/ validation/ manuscript/
 bench/      benchmarks
 ```
@@ -118,7 +118,8 @@ Four primitives:
 | **workflow/initialization + state_zoo** | atoms + `init_psi` dispatch + 22 named `init_psi_<name>` wrappers + Thomas-Fermi + heuristic thermal seed + TWA vacuum noise. | Wrap, don't fork: every named state is `init_psi(state=:..., init_state_params=...)` under the hood. For `:transverse_x` use `init_psi_spin_coherent(grid, sys; theta=π/2, phi=0)`. True thermal init uses SGPE callback. |
 | **manuscript.jl + manuscript/figures/** | Figure registry keyed by (paper, FIG-N). Emitters: CSV / Python / TikZ. CLI via `scripts/cli.jl figure --paper <p> --fig <n>` or `--list`. | Paper #1 = F-generic LHY closed forms; Paper #2 = F6 phase diagram; Paper #3 = Sign Pattern Lemma 1 + Universal Theorem; thesis Ch.1-7 in `docs/manuscript/thesis/`. |
 | **validation/reference_rhs/** | Independent term-by-term `reference_<term>_apply!` and `reference_<term>_energy` with same numeric prefactor as production. Diff oracle. | Holds self-contained validation claim. External Ueda is `BLOCKED_EXTERNAL` — see `docs/validation/ueda_status.md`. |
-| **`.claude/` + `runs/_loop/`** | Autonomous research-loop infrastructure. `.claude/scripts/loop.sh` drives turns as `claude -p /run-loop`. State in `runs/_loop/state.json`; subdirs `conclusions/`, `sim/`, `judge/`, `debug/`, `critic/`, `director/`, `by_subagent/`, `by_paper/`, `by_tag/`, `regression/`, `research/`, `patterns.yaml`, `schedule.yaml`. | OAuth (Max plan) only — `loop.sh` aggressively unsets `ANTHROPIC_API_KEY`. |
+| **autonomous research** (external) | Successor to the retired loop: the gated harness at `/home/suzume/workspace/spinorbec-autoresearch/` (OUTER project; this repo is its inner `repo/` worktree on `autoresearch/base`). Own `.claude/` (solver/verifier + require-evidence hook), `spec/` (INVARIANTS/DECISIONS/MATHCODE_MAP), `gate.sh` (independent re-run L0–L4; never trusts Solver metrics). | Lives outside this repo. See `/home/suzume/workspace/spinorbec-autoresearch/CLAUDE.md`. |
+| **`.claude/` loop** (RETIRED 2026-06-08) | First autonomous research loop. `loop.sh` guarded (exits RETIRED). Machinery (≈30 scripts + 6 agents + run-loop.md + design docs) moved to `…/BEC-simulation-archive/loop_machinery_2026_06_08/`; record to `…/loop_record_2026_06_08/`. Both OUTSIDE the repo. | Root `.claude/` keeps only shared/CC-internal: `settings.json`, the 2 referenced hooks (`hook_pre_bash` API-key guard, `hook_post_write`), `cache/` `logs/` `projects/` `worktrees/`. |
 
 ## Wavefunction conventions
 
@@ -223,7 +224,7 @@ Stateless meta-loop over the queue. Permanent invariants:
 - **Divergence kill**: reap loop watches `_live_status.json`, cancels divergent runs, classifies `:killed_data`.
 - **Failure classification**: `outcome.toml` → `:killed_data` (NaN divergence) or `:killed_bug` (OOM / TIMEOUT / NODE_FAIL). OOM is resource-permanent — retry escalates resource class, not the recipe.
 
-**Autonomous research loop**: `.claude/scripts/loop.sh` drives turns. Each dispatches one subagent role (director / theorist / implementer / researcher / critic / judge). State + history in `runs/_loop/state.json`. Conclusions in `runs/_loop/conclusions/`. Critical: script aggressively unsets `ANTHROPIC_API_KEY` so OAuth (Max plan) is forced — never API billing.
+**Autonomous research loop** (RETIRED 2026-06-08): the first loop (`.claude/scripts/loop.sh`, dispatching director / theorist / implementer / researcher / critic) is superseded by the gated harness at `/home/suzume/workspace/spinorbec-autoresearch/` (OUTER project; this repo is its inner `repo/` worktree). `loop.sh` is guarded (exits RETIRED; `LOOP_FORCE_RETIRED_RUN=1` for forensics) and the loop machinery was moved to `/home/suzume/workspace/BEC-simulation-archive/loop_machinery_2026_06_08/`; the record to `…/loop_record_2026_06_08/`. The OAuth-forcing / API-key-guard discipline lives on in the protective hook `hook_pre_bash.sh` (still active for all sessions). Active successor: `/home/suzume/workspace/spinorbec-autoresearch/CLAUDE.md`.
 
 ## Conventions (do NOT "fix")
 

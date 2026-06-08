@@ -1,8 +1,0 @@
-{
-  "turn": 104,
-  "status": "FAIL_NO_METRICS",
-  "issues": [
-    "sim/turn_104.md missing or \u00a74 JSON unparseable"
-  ],
-  "metrics": null
-}
