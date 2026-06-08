@@ -90,6 +90,33 @@ end
         fd, inner, ratio = _fd_vs_inner(term, ws, psi_ref, δψ)
         @test isapprox(fd, inner; rtol=1e-3)
     end
+
+    # TensorTerm: c₂ singlet-pair + higher-rank tensor channels. The gradient
+    # face is ANOMALOUS (conj(ψ)) and was a KNOWN-LIMIT no-op until 2026-06-09;
+    # this gate pins the FD consistency that unlocks Newton-CG/LBFGS on tensor
+    # physics. Needs tensor-active workspaces (F≥2), built inline.
+    @testset "TensorTerm (c2 singlet + tensor channels)" begin
+        gr = make_grid(GridConfig((4, 4, 4), (4.0, 4.0, 4.0)))
+        cases = (
+            (Rb85, 2, Dict(0 => 1.0, 1 => 0.2, 2 => 0.5)),
+            (Cr52, 3, Dict(0 => 1.0, 1 => 0.2, 4 => 0.3)),
+            (Eu151, 6, Dict(0 => 1.0, 1 => 0.1, 4 => 0.2, 6 => 0.15, 10 => 0.1, 12 => 0.08)),
+        )
+        for (atom, F, chans) in cases
+            wst = make_workspace(; grid=gr, atom,
+                interactions=InteractionParams(chans),
+                zeeman=ZeemanParams(0.0, 0.0), potential=NoPotential(),
+                sim_params=SimParams(; dt=0.005, n_steps=1, imaginary_time=true),
+                fft_flags=FFTW.ESTIMATE)
+            Random.seed!(7)
+            psi = randn(ComplexF64, 4, 4, 4, 2F + 1)
+            psi ./= sqrt(sum(abs2, psi) * cell_volume(gr))
+            δ = randn(ComplexF64, 4, 4, 4, 2F + 1)
+            δ ./= sqrt(sum(abs2, δ) * cell_volume(gr))
+            fd, inner, _ = _fd_vs_inner(SpinorBEC.TensorTerm(), wst, psi, δ)
+            @test isapprox(fd, inner; rtol=1e-3)
+        end
+    end
 end
 
 @testset "HamTerm directional sign oracles" begin

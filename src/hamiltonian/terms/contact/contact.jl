@@ -313,33 +313,47 @@ function energy_contribution(::TensorTerm, psi::AbstractArray{<:Complex}, ws)
     if ws.tensor_cache !== nothing
         E += _tensor_interaction_energy(psi, ws.tensor_cache, N, n_pts, dV)
     end
-    # CRITICAL trinity consistency check: TensorTerm.apply_operator! is
-    # KNOWN-LIMIT (no-op), so if energy_contribution computes a non-zero
-    # E, LBFGS gradient sees a different landscape than this energy. That's
-    # the freeze-class inconsistency the trinity is supposed to kill. Warn
-    # LOUDLY so the silent break doesn't bite a future user with c_S ≠ 0.
-    if !iszero(E)
-        @warn """TensorTerm: energy_contribution = $E (non-zero) but
-        apply_operator! is a NO-OP (KNOWN-LIMIT: tensor gradient not implemented).
-        LBFGS gradient MISSES this energy. Multi-start GS will converge
-        on an incomplete Hamiltonian (H without tensor channels). Either:
-          (a) For Eu nominal (c_2..c_12 = 0), this branch should never
-              fire — verify your `interactions:` block does not set rank
-              ≥ 2 coefficients.
-          (b) If c_S ≠ 0 is intentional, implement TensorTerm.apply_operator!
-              and lift the KNOWN-LIMIT.""" maxlog=1
-    end
     return E
 end
 
-# Operator-trinity KNOWN-LIMIT: TensorTerm gradient (c2/c4/...) was never
-# implemented in legacy `energy_gradient!`. LBFGS falls back to ITP for
-# tensor-active configurations. apply_operator! is nil to match — propagator
-# (apply_step!) is the active path for ITP.
-apply_operator!(out, ::TensorTerm, ws, psi) = out
+"""c₂ singlet-pair gradient face (anomalous): `(δE/δψ̄)_c += (c₂/√D) σ_c A₀₀
+conj(ψ_{c_pair})`, σ_c=(-1)^{F-m_c}, c_pair=D-c+1. Matches the gated reference
+`reference_singlet_pair_apply!`; ACCUMULATES."""
+function _accumulate_singlet_pair_operator!(out, psi, F, c2, ndim)
+    D = 2F + 1
+    n_pts = ntuple(d -> size(psi, d), ndim)
+    A = singlet_pair_amplitude(psi, F, ndim)
+    coeff = c2 / sqrt(Float64(D))
+    @inbounds for I in CartesianIndices(n_pts)
+        AI = A[I]
+        for c in 1:D
+            m_c = F - (c - 1)
+            sgn = iseven(F - m_c) ? 1.0 : -1.0
+            out[I, c] += coeff * sgn * AI * conj(psi[I, D - c + 1])
+        end
+    end
+    out
+end
+
+# Gradient face = δE/δψ̄ (the ANOMALOUS pairing operator, conj(ψ); NOT the
+# Hartree-Fock mean-field the propagator `apply_step!` builds — different
+# decompositions of the same quartic energy). Covers c₂ singlet-pair +
+# tensor_cache, mirroring `energy_contribution`. Gated by the FD oracle
+# `test_term_consistency` + the reference_rhs c₂ statement.
+function apply_operator!(out, ::TensorTerm, ws, psi)
+    F = ws.spin_matrices.system.F
+    N = ndims(psi) - 1
+    c2 = get_cn(ws.interactions, 2)
+    active_c2 = is_active(c2)
+    has_tensor = ws.tensor_cache !== nothing
+    (active_c2 || has_tensor) || return out
+    active_c2 && _accumulate_singlet_pair_operator!(out, psi, F, c2, N)
+    has_tensor && _accumulate_tensor_operator!(out, psi, ws.tensor_cache, N)
+    out
+end
 
 sign_oracle(::Type{TensorTerm}) = (
-    name="TensorTerm: c2 polar singlet ⇒ E_pair ≥ 0; gradient KNOWN-LIMIT",
+    name="TensorTerm: c2 polar singlet ⇒ E_pair ≥ 0 (gradient implemented)",
     predicate=function (psi, ws)
         c2 = get_cn(ws.interactions, 2)
         E = energy_contribution(TensorTerm(), psi, ws)

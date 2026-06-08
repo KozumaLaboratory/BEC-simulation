@@ -314,6 +314,50 @@ function _tensor_interaction_energy(psi, cache::TensorInteractionCache, ndim, n_
     E * dV
 end
 
+"""
+    _accumulate_tensor_operator!(out, psi, cache, ndim)
+
+Accumulate the tensor-channel gradient face `(δE/δψ̄)` into `out`. For the
+pairing energy `E = (1/2) Σ_S g_S Σ_M |A_{SM}|²` (A bilinear in ψ), the
+functional derivative is the ANOMALOUS form (picks `conj(ψ)`, not ψ — same
+structure as the c₂ singlet operator):
+    `(δE/δψ̄)_{c1} += (1/2) g_S A_{SM} CG conj(ψ_{c2})` and the c1↔c2 partner.
+Reuses `_precompute_pair_entries`, so A_{SM} and the operator share the exact
+ordered-pair convention (the FD oracle `test_term_consistency` verifies the
+factors). ACCUMULATES — callers zero `out` for the bare action.
+"""
+function _accumulate_tensor_operator!(out, psi, cache::TensorInteractionCache, ndim)
+    D = cache.D
+    n_pts = ntuple(d -> size(psi, d), ndim)
+    pair_entries = _precompute_pair_entries(cache)
+    n_A = sum(2S + 1 for S in cache.active_channels)
+    a_to_si = Vector{Int}(undef, n_A)
+    offset = 0
+    for (si, S) in enumerate(cache.active_channels)
+        for mi in 1:(2S + 1)
+            a_to_si[offset + mi] = si
+        end
+        offset += 2S + 1
+    end
+    spinor = Vector{ComplexF64}(undef, D)
+    A_SM = Vector{ComplexF64}(undef, n_A)
+    @inbounds for I in CartesianIndices(n_pts)
+        for c in 1:D
+            spinor[c] = psi[I, c]
+        end
+        fill!(A_SM, zero(ComplexF64))
+        for e in pair_entries
+            A_SM[e.a_idx] += e.cg * spinor[e.c1] * spinor[e.c2]
+        end
+        for e in pair_entries
+            half_gA = 0.5 * cache.g_values[a_to_si[e.a_idx]] * A_SM[e.a_idx] * e.cg
+            out[I, e.c1] += half_gA * conj(spinor[e.c2])
+            out[I, e.c2] += half_gA * conj(spinor[e.c1])
+        end
+    end
+    out
+end
+
 struct PairEntry
     a_idx::Int
     c1::Int

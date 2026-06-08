@@ -86,24 +86,12 @@ function find_ground_state_lbfgs(;
     D = 2F + 1
     dV = cell_volume(grid)
 
-    # Gradient-coverage guard: energy_gradient! covers kinetic + trap +
-    # Zeeman + c0 + c_lhy + c1 + light_shift + DDI. It does NOT cover
-    # the c2 singlet-pair channel (apply_singlet_pair_step!) nor the
-    # tensor_cache higher-rank tensor (c4, c6, …) terms. Energy *evaluation* is
-    # correct (energy_decomposition.total at line ~95), but the gradient
-    # direction is missing those contributions, so LBFGS would converge
-    # to a wrong minimum. Warn the user to fall back to ITP.
-    c2_val = abs(get_cn(ws.interactions, 2))
-    has_high_rank = any(((k, v),) -> k >= 2 && is_active(v), ws.interactions.c)
-    has_tensor = ws.tensor_cache !== nothing
-    if is_active(c2_val) || has_high_rank || has_tensor
-        @warn "find_ground_state_lbfgs: gradient does NOT include c2 singlet-pair " *
-            "or tensor_cache contributions. The optimizer will converge " *
-            "to a biased minimum. Use find_ground_state (ITP) for these channels, " *
-            "or only LBFGS-polish a state that has already been ITP-converged with " *
-            "the full Hamiltonian. " *
-            "(c2=$(round(c2_val; sigdigits=3)), has_high_rank=$has_high_rank, tensor=$has_tensor)"
-    end
+    # Gradient coverage: energy_gradient! is registry-only, so it now covers
+    # EVERY HamTerm including TensorTerm (c2 singlet-pair + tensor_cache
+    # higher-rank channels), whose anomalous gradient face was implemented
+    # 2026-06-09 (FD-gated in test_term_consistency). The old "falls back to
+    # ITP for tensor" warning is retired — LBFGS/Newton-CG optimise the full
+    # Hamiltonian for tensor-active configurations.
 
     # Device-resident k² for energy_gradient! (matches ws.state.psi's backend)
     k_squared_dev = _to_device(ws.backend, grid.k_squared)
