@@ -10,6 +10,8 @@
 #       current, superfluid velocity/vorticity
 #   vortex_extraction              — per-m vortex line tracing (3D)
 #   diagnostics                    — Zeeman/healing-length/TF radius helpers
+#   sinatra_diagnostics/grid_resolution — TWA-validity (Sinatra) per-knob
+#       helpers + grid/box planning (suggest_grid via ATOM_REGISTRY)
 #   majorana                       — Majorana stars + icosahedral order
 #   tof/tomography/faraday/imaging — synthetic detection + imaging models
 #   topology/synthetic_dimension — winding, monopole, holonomy,
@@ -27,6 +29,8 @@ include("analysis/currents.jl")
 include("analysis/vorticity.jl")
 include("analysis/vortex_extraction.jl")
 include("analysis/diagnostics.jl")
+include("analysis/sinatra_diagnostics.jl")  # TWA-validity (Sinatra) per-knob helpers
+include("analysis/grid_resolution.jl")  # planning: suggest_grid + sinatra_check (ATOM_REGISTRY)
 include("analysis/canonical_polyhedral_states.jl")
 include("analysis/majorana.jl")
 include("analysis/tof.jl")

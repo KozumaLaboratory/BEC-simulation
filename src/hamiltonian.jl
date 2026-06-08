@@ -19,8 +19,6 @@
 #              fm_dipolar,icosahedral,modes_round45,dispatch}
 #       — closed-form spinor LHY tables for various spin phases
 #   terms/loss/{losses} + loss_term — dipolar relaxation + ABC
-#   dynamics/{sinatra_helpers,utils_resolution_sinatra}
-#       — TWA validity checks + resolution suggestion utilities
 #   terms/trap/{evaluate_potential} + trap_term
 #       — trap evaluators and potential application
 #   terms/zeeman/{accessors,zeeman_builders} + zeeman_term
@@ -54,8 +52,6 @@ include("hamiltonian/terms/lhy/fm_contact.jl")
 include("hamiltonian/terms/lhy/fm_dipolar.jl")
 include("hamiltonian/terms/lhy/icosahedral.jl")
 include("hamiltonian/terms/lhy/modes_round45.jl")
-include("dynamics/sinatra_helpers.jl")
-include("dynamics/utils_resolution_sinatra.jl")
 include("hamiltonian/terms/lhy/dispatch.jl")
 include("hamiltonian/terms/loss/losses.jl")
 include("hamiltonian/integrator/absorbing_boundary.jl")

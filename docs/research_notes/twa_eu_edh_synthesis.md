@@ -94,4 +94,4 @@ Neither is implemented. They would target the same phenomenology this TWA scan m
 
 ## Sinatra criterion in one paragraph
 
-The TWA truncation `ψ_classical + δψ_stochastic` is controlled when `N_modes_eff × D ≪ N_atoms`. Eu's N=10⁴ on 32³ × D=13 gives ratio ≈ 43 — well into the danger regime — but the σ/μ chaos signal is physics-bounded (not noise-bounded), so the contamination question is moot for chaotic-regime σ/μ. Mean-field observables (FWHM, on-axis ratio) are unaffected by the criterion regardless. Full theory: `docs/theory/sinatra_criterion_F6.md` (kept for the per-knob sampling helpers exposed in `src/dynamics/sinatra_helpers.jl`).
+The TWA truncation `ψ_classical + δψ_stochastic` is controlled when `N_modes_eff × D ≪ N_atoms`. Eu's N=10⁴ on 32³ × D=13 gives ratio ≈ 43 — well into the danger regime — but the σ/μ chaos signal is physics-bounded (not noise-bounded), so the contamination question is moot for chaotic-regime σ/μ. Mean-field observables (FWHM, on-axis ratio) are unaffected by the criterion regardless. Full theory: `docs/theory/sinatra_criterion_F6.md` (kept for the per-knob sampling helpers exposed in `src/analysis/sinatra_diagnostics.jl`).

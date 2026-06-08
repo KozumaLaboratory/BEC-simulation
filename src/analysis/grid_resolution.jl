@@ -1,6 +1,6 @@
-# Standalone resolution + Sinatra-criterion utilities for spinor BEC
-# simulation planning. NEW FILE; not integrated into make_workspace or
-# the YAML schema. Final integration round will wire in.
+# Resolution + Sinatra-criterion utilities for spinor BEC simulation
+# planning (analysis-layer diagnostics; not wired into make_workspace or
+# the YAML schema — planning helpers a user calls by hand).
 #
 # Two diagnostics:
 #   * `suggest_grid(species, n_atoms; ...)` returns a recommended
@@ -13,39 +13,17 @@
 #     ratio N_modes_eff × D / N_atoms with a verdict band
 #     (clean / marginal / contaminated).
 #
-# Self-contained — does not depend on src/dynamics/sinatra_helpers.jl
-# or any other SpinorBEC module. Atomic data hardcoded for Eu, Cr, Er,
-# Dy (the four canonical dipolar species).
+# Atom data (F, mass, scalar scattering length a0) comes from the
+# canonical `ATOM_REGISTRY` via `resolve_atom`; SI constants from `Units`.
 
-module UtilsResolutionSinatra
+export suggest_grid, sinatra_check
 
-export suggest_grid, sinatra_check, SPECIES_DATA
-
-# --- SI constants -----------------------------------------------------------
-const HBAR = 1.0545718e-34          # J·s
-const A_B = 5.291772109e-11         # Bohr radius, m
-const AMU = 1.660539067e-27         # atomic mass unit, kg
-
-# --- Species data (hyperfine spin F, mass in amu, scalar a_s in a_B) -------
-# Approximate values for the four canonical dipolar species.
-const SPECIES_DATA = Dict{Symbol, NamedTuple}(
-    :Eu151 => (F=6, M_amu=151.0, a_s_aB=110.0),
-    :Cr52 => (F=3, M_amu=52.0, a_s_aB=50.0),       # representative scalar a_s
-    :Er168 => (F=6, M_amu=168.0, a_s_aB=75.0),
-    :Dy164 => (F=8, M_amu=164.0, a_s_aB=92.0),
-)
-
-# Aliases for short names
-const _ALIASES = Dict{Symbol, Symbol}(
+# Short-name aliases onto the canonical ATOM_REGISTRY keys.
+const _SINATRA_SPECIES_ALIAS = Dict{Symbol, Symbol}(
     :Eu => :Eu151, :Cr => :Cr52, :Er => :Er168, :Dy => :Dy164
 )
 
-@inline function _lookup_species(s::Symbol)
-    key = get(_ALIASES, s, s)
-    haskey(SPECIES_DATA, key) ||
-        throw(ArgumentError("Unknown species $s; available: $(collect(keys(SPECIES_DATA)))"))
-    SPECIES_DATA[key]
-end
+_lookup_species(s::Symbol) = resolve_atom(get(_SINATRA_SPECIES_ALIAS, s, s))
 
 @inline _next_pow2(n::Integer) = n <= 1 ? 1 : 2^ceil(Int, log2(n))
 
@@ -89,13 +67,13 @@ function suggest_grid(species::Symbol, n_atoms::Real;
     target_resolution >= 1 || throw(ArgumentError("target_resolution must be ≥ 1"))
 
     sp = _lookup_species(species)
-    M = sp.M_amu * AMU                  # kg
-    a_s = sp.a_s_aB * A_B               # m
+    M = sp.mass                         # kg (canonical ATOM_REGISTRY value)
+    a_s = sp.a0                         # m, scalar background scattering length
     D = 2 * sp.F + 1
 
     # Geometric-mean trap frequency → reference oscillator
     ω_ref = (trap_ωxy^2 * trap_ωz)^(1 / 3)
-    a_ho = sqrt(HBAR / (M * ω_ref))    # m
+    a_ho = sqrt(Units.HBAR / (M * ω_ref))   # m
     aspect_z = trap_ωz / ω_ref          # axial trap aspect ratio
 
     # Dimensionless coupling (4π·a_s/a_ho · N) — appears in the
@@ -266,5 +244,3 @@ function _count_modes_below(nx, ny, nz, Lx, Ly, Lz, k_cut::Real)
     end
     count
 end
-
-end # module UtilsResolutionSinatra

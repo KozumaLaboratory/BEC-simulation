@@ -28,7 +28,7 @@ This is well into the danger regime — most published TWA work targets ratio �
 
 2. **Energy-space mode cutoff**. `add_vacuum_noise(...; cutoff_energy=E_cut)` zeros plane-wave noise modes with `ε_k = k²/2 > E_cut`. Convention: `k_cut = 2 / ξ`, twice the inverse healing length, so modes carrying physical structure of the GS are kept and high-k thermal-like populations are dropped. For `M = ℏ = 1`, this is `E_cut = 2 g n`.
 
-`src/dynamics/sinatra_helpers.jl` exposes the conversions:
+`src/analysis/sinatra_diagnostics.jl` exposes the conversions:
 
 * `healing_length(g, n)` → ξ = 1/√(2 g n)
 * `cutoff_energy_from_xi(ξ; factor=2.0)` → `E_cut = (factor/ξ)²/2`

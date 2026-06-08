@@ -38,7 +38,7 @@ include("hamiltonian.jl")   # interactions + potentials + integrators
 include("workflow/io/units.jl")        # Units module (needed by atoms.jl)
 include("workflow/initialization.jl")  # atoms + init_psi + Workspace factory + state zoo
 include("workflow/io.jl")              # save_state + dashboard + VTK + run summary + budget
-include("workflow/monitoring.jl")      # logging + telemetry
+include("workflow/monitoring.jl")      # Slack webhook notifications (notify_slack)
 
 include("workflow/experiments.jl")     # schema + runtime + pipeline + analyzers
 include("workflow/validation.jl")      # RunResult + spec-driven validation (Phase 0: types only)
@@ -88,17 +88,11 @@ include("manuscript.jl")  # manuscript figure registry + builders
 # ========================================
 # VALIDATION: self-contained reference RHS
 # ========================================
-# Independent term-by-term Hψ implementations used as a diff oracle by
-# `test/test_reference_rhs.jl`. Replaces the Ueda-comparison path
-# (BLOCKED_EXTERNAL — see `docs/validation/ueda_status.md`).
-
-include("validation/reference_rhs.jl")
-
-# The dumb reference: blatantly-correct full energy/RHS statements per
-# term — the master-oracle anchor behind architectural commitment #3
-# (gated redundancy). See docs/design/hamiltonian_layered_architecture.md
-# and test/oracles/test_master_oracle.jl.
-include("validation/dumb_reference.jl")
+# Independent, deliberately-redundant Hamiltonian statements used as diff
+# oracles for the self-contained validation chain (gated redundancy,
+# architectural commitment #3): reference_rhs (term-by-term Hψ oracle) +
+# dumb_reference (master-oracle anchor). See src/validation.jl header.
+include("validation.jl")
 
 # ========================================
 # EXPERIMENT / BATCH: unified workflow model

@@ -32,15 +32,14 @@ src/
 ├── SpinorBEC.jl               # umbrella module
 ├── foundation.jl              # types (Grid, Workspace, AbstractPotential…) + math primitives + backend dispatch + Clebsch-Gordan + spherical harmonics
 ├── hamiltonian.jl             # terms/<term>/ (HamTerm faces + engines: contact ddi lhy zeeman raman light_shift loss trap) + coefficients.jl (c↔g) + shared/ (rotation + spin_rotation) + optics/ + integrator/ (split_step + Yoshida + composers + Coriolis + adaptive + rotating_basis + absorbing_boundary) + tdhfb/
-├── analysis.jl                # observables + energy + currents + vorticity + tomography/Faraday/imaging + topology + Fisher + spin_rotation + phases/ (Bogoliubov + sign-pattern + F6 diagram + polyhedral classifier)
-├── solvers.jl                 # ground_state + lbfgs + continuation/{1d,2d,boundary,arclength,triple_point} + simulation + adaptive + TWA + binary + scalar_egpe + projected_gp + photon_heating + sgpe
+├── analysis.jl                # observables + energy + currents + vorticity + tomography/Faraday/imaging + topology + Fisher + spin_rotation + Sinatra TWA-validity + grid_resolution planning + phases/ (Bogoliubov + sign-pattern + F6 diagram + polyhedral classifier)
+├── solvers.jl                 # ground_state + lbfgs + hessian (HvP + trapped-BdG λ_min) + continuation/{1d,2d,boundary,arclength,triple_point} + simulation + adaptive + TWA + binary + scalar_egpe + projected_gp + photon_heating + sgpe
 ├── manuscript.jl              # figure registry (CSV / Python / TikZ emitters keyed by (paper, FIG-N))
-├── validation/reference_rhs/  # independent term-by-term Hψ — diff oracle for self-contained validation chain
-├── dynamics/                  # Sinatra TWA-validity helpers + resolution heuristics
+├── validation.jl              # umbrella → validation/{reference_rhs, dumb_reference} — independent term-by-term Hψ + dumb-statement oracle for the self-contained validation chain
 └── workflow/
     ├── initialization.jl      # atoms (ATOM_REGISTRY) + init_psi dispatch + state_zoo (22 named builders) + make_workspace + thermal/vacuum noise + Thomas-Fermi
     ├── io.jl                  # save_state + Units submodule + budget + run_summary + html_report + vtk_export (weak ext) + catalog + cluster
-    ├── monitoring.jl          # logging + JSON status + ASCII plots + Slack/desktop notifications + progress + resource monitor
+    ├── monitoring.jl          # Slack webhook notifications (notify_slack); live-JSON status lives in experiments/pipeline/pipeline_callbacks.jl
     ├── experiments.jl         # YAML schema (lab-units + templates + mixins + defaults + B-block + noise-block + auto-defaults) + runtime helpers + analyzers + pipeline runner
     ├── experiments/calibration.jl    # module Calibration — lab-units preprocess + week-to-week drift sampling
     ├── experiments/optimization.jl   # module Optimization — Bayesian opt + multi-fidelity + active-learning phase scan + Faraday fit
@@ -101,7 +100,7 @@ Four primitives:
 
 | Subsystem | Role | Discipline |
 |---|---|---|
-| **foundation/types/** | All structs (`Grid`, `Workspace`, `AbstractPotential` + 12 subtypes, spin / atom / Zeeman / Raman / FFT / DDI / Loss / LightShift / TensorCache / Integrator config / SimulationResult / TWA / TOF / BdG / scan / checkpoint / TDHFBState …). | New structs go here first. Workspace type params are derived. `Val(N)` from type parameter, not `Val(ndim::Int)`. |
+| **foundation/types/** | Primary home for cross-cutting structs (`Grid`, `Workspace`, `AbstractPotential` + 12 subtypes, spin / atom / Zeeman / Raman / FFT / DDI / Loss / LightShift / TensorCache / Integrator config / SimulationResult / TWA / TOF / BdG / scan / checkpoint / TDHFBState …). Subsystem-local structs (waveform, backend, pipeline steps, validation specs, calibration, …) co-locate with their machinery — `types/` is the default, not an invariant. | Cross-cutting structs go here first. Workspace type params are derived. `Val(N)` from type parameter, not `Val(ndim::Int)`. |
 | **hamiltonian/terms/<term>/** (merged 2026-06-06; was interactions/ + potentials/) | Per-term face + engine cohesion: contact/ (c0/c1 + singlet_pair + tensor) + ddi/ (k-space 6-FFT convolution + secular option + zero-padded variant) + lhy/ (closed forms + φ₁-reg + Modes-round-45 + Sigma-Delta dispatch + Lima-Pelster Q5) + zeeman/ (accessors + builders) + raman/ + light_shift/ + loss/ + trap/ (evaluators). Shared machinery is EXPLICIT: `hamiltonian/coefficients.jl` (c↔g algebra — shared with TDHFB + Bogoliubov), `hamiltonian/shared/` (Euler rotation cache: DDI + spin_mixing; uniform spin rotation: TransverseZeeman + Raman + rotating_basis), `hamiltonian/optics/` (beam/config builders), absorbing_boundary in integrator/. | Two interaction paths auto-selected in `make_workspace` (c₀/c₁ vs scattering-lengths). Unified `B:` block; Zeeman sign source = `H_Zeeman = -(g_F μ_B B · F) + q F_z²` at `experiments/runtime/b_block_builders.jl`. |
 | **hamiltonian/terms/** | **HamTerm protocol.** Each term — Kinetic, Trap, LinearZeemanZ, TransverseZeeman, DensityC0, SpinC1, DDI, LHY, Tensor, Raman, LightShift, Coriolis, MagneticGradient, Loss — declares its sign in ONE coefficient function; `apply_step!` / `energy_contribution` / `apply_operator!` (ACCUMULATES `out .+= H·ψ`; gate-first; the gradient face) / `sign_oracle` derive from it. `build_h_terms_registry(ws) → NTuple{N, HamTerm}` is type-stable and unrolled. | New H terms go here. Registry pattern is load-bearing for bug-class elimination — do NOT bypass for new physics; do NOT introduce parallel sign declarations. |
 | **hamiltonian/integrator/** | Split-step + adaptive Yoshida + Coriolis 3-shear + Yoshida/Suzuki/Blanes-Moan composers + force_gradient + combined_spin_step + dealias + adaptive-dt + rotating-basis propagators/integrators. | `V(dt/2) Coriolis(dt/2) K(dt) Coriolis(dt/2) V(dt/2)` Strang sandwich. `_YOSHIDA_W0 < 0` correct (backward middle substep). |
@@ -273,7 +272,7 @@ F = 6, g_J = 1.9934, g_F ≈ 1.163, μ ≈ 6.977 μ_B, a_s ≈ 110 a₀. 7 unkno
 
 ## Constraints
 
-- All structs in `src/foundation/types/` (loaded first). New structs go there.
+- Cross-cutting structs live in `src/foundation/types/` (loaded first); subsystem-local structs co-locate with their machinery. `types/` is the default home, not an invariant.
 - Workspace has 23+ type params — never write explicit type params.
 - D=13 (Eu): `SMatrix` heap-allocates. Use `Matrix` / `MVector` in hot loops.
 - `Val(N)` from a type parameter, not `Val(ndim::Int)`.

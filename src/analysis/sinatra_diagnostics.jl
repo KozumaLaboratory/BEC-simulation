@@ -1,4 +1,4 @@
-# sinatra_helpers.jl
+# sinatra_diagnostics.jl
 # =================================================================
 # Helpers for the Sinatra criterion check on TWA validity.
 #

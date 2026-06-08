@@ -1,18 +1,20 @@
-# Tests for src/dynamics/utils_resolution_sinatra.jl
+# Tests for src/analysis/grid_resolution.jl
 #
-# Module wired into SpinorBEC; pull exports via the qualified path.
+# Flat-namespace analysis helpers; atom data sourced from ATOM_REGISTRY.
 
 using Test
-using SpinorBEC.UtilsResolutionSinatra
+using SpinorBEC
 
 @testset "Resolution + Sinatra utilities" begin
-    @testset "Species data lookup" begin
-        @test haskey(SPECIES_DATA, :Eu151)
-        @test SPECIES_DATA[:Eu151].F == 6
-        @test SPECIES_DATA[:Eu151].a_s_aB ≈ 110.0
-        @test SPECIES_DATA[:Cr52].F == 3
-        @test SPECIES_DATA[:Er168].F == 6
-        @test SPECIES_DATA[:Dy164].F == 8
+    @testset "all 4 dipolar species are grid-suggestable via ATOM_REGISTRY" begin
+        # suggest_grid resolves species through resolve_atom; a positive,
+        # sane recommendation for each confirms registry coverage + a0 > 0.
+        for sp in (:Eu151, :Cr52, :Er168, :Dy164)
+            rec = suggest_grid(sp, 10000)
+            @test rec.nx > 0
+            @test rec.xi > 0
+            @test rec.dx > 0
+        end
     end
 
     @testset "suggest_grid: Eu defaults return positive sane values" begin
