@@ -1,0 +1,111 @@
+# ---------------------------------------------------------------------
+# Project A — Fine B-field scan, full DDI (secular=false), 12 points
+#
+# Identical to survey_B_fine_random but with:
+#   ddi: {enabled: true, secular: false}   ← full DDI tensor (6 components)
+#
+# B: 0, 2, 4, 6, 8, 10, 15, 20, 25, 30, 40, 60 μG
+# c1_ratio = 1/36 (Matsui EdH fitting), initial_state = m_minus_F
+# 32³, n_steps = 8000, thermal = 0.40
+#
+# RUN_ROOT: ~/bec-runs/projectA_ground_state/survey_B_secular_false_fine
+# ---------------------------------------------------------------------
+
+metadata:
+  owner: Mitsuki Gotou
+  project: Project A — full DDI fine B-sweep
+  note: |
+    Full DDI (secular=false) fine scan. Direct comparison baseline
+    against survey_B_fine_random (secular=true).
+    c1=1/36 (Matsui), thermal=0.40, initial_state=m_minus_F.
+
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 50000, omega_ref: 691.1504}
+
+dealias:
+  enabled: true
+  k_cut: 16.0
+  auto_dt: true
+  dt_safety: 10.0
+
+mixins:
+  eu151_fullDDI_fine:
+    atom: Eu151
+    grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+    potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+    interactions:
+      N_atoms: 50000
+      omega_ref: 691.1504
+      c1_ratio: 0.0277777778   # = 1/36 (Matsui fitting, antiferromagnetic)
+
+pipeline:
+  - ground_state:
+      use: [eu151_fullDDI_fine]
+      method: itp
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B: {Bz: "0.0 Gauss", theta: 0.0, phi: 0.0}
+      initial_state: m_minus_F
+      noise:
+        seed: 20260608
+        initial:
+          thermal: 0.40
+      dt: 0.005
+      n_steps: 8000
+      tol: 1.0e-9
+
+  - analyze:
+      - phase_classify: {}
+      - energy_decomposition: {}
+
+scan:
+  comparison_runs:
+    - name: h01_B0
+      override:
+        pipeline.0.B.Bz: "0.0 Gauss"
+
+    - name: h02_B2uG
+      override:
+        pipeline.0.B.Bz: "2.0e-6 Gauss"
+
+    - name: h03_B4uG
+      override:
+        pipeline.0.B.Bz: "4.0e-6 Gauss"
+
+    - name: h04_B6uG
+      override:
+        pipeline.0.B.Bz: "6.0e-6 Gauss"
+
+    - name: h05_B8uG
+      override:
+        pipeline.0.B.Bz: "8.0e-6 Gauss"
+
+    - name: h06_B10uG
+      override:
+        pipeline.0.B.Bz: "1.0e-5 Gauss"
+
+    - name: h07_B15uG
+      override:
+        pipeline.0.B.Bz: "1.5e-5 Gauss"
+
+    - name: h08_B20uG
+      override:
+        pipeline.0.B.Bz: "2.0e-5 Gauss"
+
+    - name: h09_B25uG
+      override:
+        pipeline.0.B.Bz: "2.5e-5 Gauss"
+
+    - name: h10_B30uG
+      override:
+        pipeline.0.B.Bz: "3.0e-5 Gauss"
+
+    - name: h11_B40uG
+      override:
+        pipeline.0.B.Bz: "4.0e-5 Gauss"
+
+    - name: h12_B60uG
+      override:
+        pipeline.0.B.Bz: "6.0e-5 Gauss"

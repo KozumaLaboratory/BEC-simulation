@@ -1,0 +1,65 @@
+# ---------------------------------------------------------------------
+# Project A - Eu151 F=6 flower-phase ground-state ITP twin, 32^3, 5000 steps.
+#
+# Same physics as config.yaml but n_steps=5000 to allow full convergence
+# of the c1_matsui_1over36 scan point (2000 steps was insufficient: dpsi
+# still 1.8e-7 at step 2000; extrapolation → conv at ~3000 steps).
+#
+# RUN_ROOT: ~/bec-runs/projectA_ground_state/itp_twin32_5k
+# ---------------------------------------------------------------------
+
+metadata:
+  owner: Mitsuki Gotou
+  project: Project A ground-state flower phase
+  dependency_policy: external SpinorBEC via SIM_ROOT; do not copy BEC-simulation
+  spinorbec_reference_commit_mac: a81dd915
+  note: n_steps increased from 2000 to 5000 for c1_matsui convergence
+
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 50000, omega_ref: 691.1504}
+
+dealias:
+  enabled: true
+  k_cut: 16.0
+  auto_dt: true
+  dt_safety: 10.0
+
+mixins:
+  eu151_projectA_itp32:
+    atom: Eu151
+    grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+    potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+    interactions:
+      N_atoms: 50000
+      omega_ref: 691.1504
+      c1_ratio: 0.0277777778  # = 1/36 (Matsui fitting)
+
+pipeline:
+  - ground_state:
+      use: [eu151_projectA_itp32]
+      method: itp
+      ddi: {enabled: true, secular: true}
+      lhy: {kind: none}
+      B: {Bz: "0.001 Gauss", theta: 0.0, phi: 0.0}
+      initial_state: m_minus_F
+      noise:
+        seed: 20260607
+        initial:
+          thermal: 0.016
+      dt: 0.005
+      n_steps: 5000
+      tol: 1.0e-9
+
+  - analyze:
+      - phase_classify: {}
+      - energy_decomposition: {}
+
+scan:
+  comparison_runs:
+    - name: c1_zero
+      override:
+        pipeline.0.interactions.c1_ratio: 0.0
+    - name: c1_matsui_1over36
+      override: {}   # use the mixin value (1/36)

@@ -1,0 +1,80 @@
+# ---------------------------------------------------------------------
+# Project A - Eu151 F=6 flower-phase ground-state ITP twin, 32^3 smoke.
+#
+# This is a research-side YAML wrapper. It intentionally depends on the
+# external SpinorBEC.jl/BEC-simulation checkout selected by SIM_ROOT at
+# execution time; do not vendor or copy the solver code into Eu-mitsuki.
+#
+# Goal:
+#   Compute the full 13-component spinor GPE + secular DDI ground state
+#   under Matsui/Science-2026 Eu151 conditions, then compare the two c1
+#   branches needed for the impure-flower diagnosis:
+#
+#     c1_zero           : c1_ratio = 0
+#     c1_matsui_1over36 : c1/c0 = 1/36
+#
+# This file is deliberately 32^3. After 16^3 CPU/GPU smoke agreement,
+# make the production 64^3 copy by changing only grid.n and n_steps.
+# ---------------------------------------------------------------------
+
+metadata:
+  owner: Mitsuki Gotou
+  project: Project A ground-state flower phase
+  dependency_policy: external SpinorBEC via SIM_ROOT; do not copy BEC-simulation
+  spinorbec_reference_commit_mac: a81dd915
+  runner_default_sim_root: ~/bec-runs
+  note: run_itp_twin.sh logs the actual SIM_ROOT git commit before execution
+
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 50000, omega_ref: 691.1504}
+
+dealias:
+  enabled: true
+  k_cut: 16.0
+  auto_dt: true
+  dt_safety: 10.0
+
+mixins:
+  eu151_projectA_itp32:
+    atom: Eu151
+    grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+    potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}  # 110/110/130 Hz
+    interactions:
+      N_atoms: 50000
+      omega_ref: 691.1504
+      c1_ratio: 0.0277777778                                  # = 1/36
+
+pipeline:
+  # Weak-field ITP from the m_F=-6 stretched Gaussian seed.
+  # Standard spinor init_psi uses sigma=box/8, so box=12 gives sigma=1.5.
+  # `seed_amplitude` is not a supported ground_state schema key in the
+  # current SpinorBEC.jl pipeline. The thermal seed below is the supported
+  # symmetry-breaking route; T/Tc=0.016 gives eta=sqrt(T^3/4) ~= 1e-3.
+  - ground_state:
+      use: [eu151_projectA_itp32]
+      method: itp
+      ddi: {enabled: true, secular: true}                      # Eu weak-field GS convention
+      lhy: {kind: none}
+      B: {Bz: "0.001 Gauss", theta: 0.0, phi: 0.0}
+      initial_state: m_minus_F
+      noise:
+        seed: 20260607
+        initial:
+          thermal: 0.016
+      dt: 0.005
+      n_steps: 2000
+      tol: 1.0e-9
+
+  - analyze:
+      - phase_classify: {}
+      - energy_decomposition: {}
+
+scan:
+  comparison_runs:
+    - name: c1_zero
+      override:
+        pipeline.0.interactions.c1_ratio: 0.0
+    - name: c1_matsui_1over36
+      override: {}                                             # use the mixin value

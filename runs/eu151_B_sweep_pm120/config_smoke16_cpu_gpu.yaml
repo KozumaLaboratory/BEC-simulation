@@ -1,0 +1,74 @@
+# ---------------------------------------------------------------------
+# Project A - Eu151 F=6 DDI ITP CPU/GPU smoke gate, 16^3.
+#
+# Purpose:
+#   Exercise the same code path as config.yaml before spending TSUBAME
+#   time on the 32^3 twin. This is the required first gate for F=6+DDI:
+#   both CPU and GPU must load the YAML, build the workspace, run ITP,
+#   and save analyzer outputs. Compare the CPU/GPU energies after the run.
+# ---------------------------------------------------------------------
+
+metadata:
+  owner: Mitsuki Gotou
+  project: Project A ground-state smoke gate
+  dependency_policy: external SpinorBEC via SIM_ROOT; do not copy BEC-simulation
+  spinorbec_reference_commit_mac: a81dd915
+  expected_use: run before projectA_ground_state/configs/config.yaml
+
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 50000, omega_ref: 691.1504}
+
+dealias:
+  enabled: true
+  k_cut: 8.0
+  auto_dt: true
+  dt_safety: 10.0
+
+mixins:
+  eu151_projectA_itp16:
+    atom: Eu151
+    grid: {n: [16, 16, 16], box: [12.0, 12.0, 12.0]}
+    potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+    interactions:
+      N_atoms: 50000
+      omega_ref: 691.1504
+      c1_ratio: 0.0277777778
+
+pipeline:
+  - ground_state:
+      use: [eu151_projectA_itp16]
+      method: itp
+      ddi: {enabled: true, secular: true}
+      lhy: {kind: none}
+      B: {Bz: "0.001 Gauss", theta: 0.0, phi: 0.0}
+      initial_state: m_minus_F
+      noise:
+        seed: 20260607
+        initial:
+          thermal: 0.016
+      dt: 0.005
+      n_steps: 300
+      tol: 1.0e-7
+
+  - analyze:
+      - phase_classify: {}
+      - energy_decomposition: {}
+
+scan:
+  comparison_runs:
+    - name: cpu_c1_zero
+      override:
+        pipeline.0.backend: cpu
+        pipeline.0.interactions.c1_ratio: 0.0
+    - name: gpu_c1_zero
+      override:
+        pipeline.0.backend: gpu
+        pipeline.0.interactions.c1_ratio: 0.0
+    - name: cpu_c1_matsui_1over36
+      override:
+        pipeline.0.backend: cpu
+    - name: gpu_c1_matsui_1over36
+      override:
+        pipeline.0.backend: gpu

@@ -1,0 +1,117 @@
+# ---------------------------------------------------------------------
+# Project A — Fine B-field scan with maximum random initial noise
+#
+# 12 scan points: Bz = 0 to -60 μG (fine resolution near phase boundary)
+# All points: thermal = 0.40 (most disordered ITP start)
+#
+# Fixed: c1 = 1/36 (Matsui), initial_state = m_minus_F, 32³, n_steps=8000
+# Goal: resolve flower-phase boundary between B=0 and B≈-30 μG
+#
+# RUN_ROOT: ~/bec-runs/projectA_ground_state/survey_B_fine_random
+# Estimated wall time: ~2.5 h (12 points × ~450 s/point, 8000 steps)
+# ---------------------------------------------------------------------
+
+metadata:
+  owner: Mitsuki Gotou
+  project: Project A phase survey — fine B-field scan, random initial state
+  note: |
+    12 scan points.
+    B-axis: 0.0, -2, -4, -6, -8, -10, -15, -20, -25, -30, -40, -60 μG.
+    thermal = 0.40 fixed for all points (most disordered available).
+    c1=1/36 (Matsui), initial_state=m_minus_F.
+
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 50000, omega_ref: 691.1504}
+
+dealias:
+  enabled: true
+  k_cut: 16.0
+  auto_dt: true
+  dt_safety: 10.0
+
+mixins:
+  eu151_fineBscan:
+    atom: Eu151
+    grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+    potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+    interactions:
+      N_atoms: 50000
+      omega_ref: 691.1504
+      c1_ratio: 0.0277777778   # = 1/36 (Matsui fitting)
+
+pipeline:
+  - ground_state:
+      use: [eu151_fineBscan]
+      method: itp
+      ddi: {enabled: true, secular: true}
+      lhy: {kind: none}
+      B: {Bz: "0.0 Gauss", theta: 0.0, phi: 0.0}
+      initial_state: m_minus_F
+      noise:
+        seed: 20260608
+        initial:
+          thermal: 0.40
+      dt: 0.005
+      n_steps: 8000
+      tol: 1.0e-9
+
+  - analyze:
+      - phase_classify: {}
+      - energy_decomposition: {}
+
+scan:
+  comparison_runs:
+    # ── B = 0 (flower-phase candidate) ─────────────────────────────────
+    - name: f01_B0
+      override:
+        pipeline.0.B.Bz: "0.0 Gauss"
+
+    # ── Very-low field: 2 – 8 μG (near transition) ─────────────────────
+    - name: f02_B2uG
+      override:
+        pipeline.0.B.Bz: "2.0e-6 Gauss"
+
+    - name: f03_B4uG
+      override:
+        pipeline.0.B.Bz: "4.0e-6 Gauss"
+
+    - name: f04_B6uG
+      override:
+        pipeline.0.B.Bz: "6.0e-6 Gauss"
+
+    - name: f05_B8uG
+      override:
+        pipeline.0.B.Bz: "8.0e-6 Gauss"
+
+    # ── Low field: 10 – 15 μG ──────────────────────────────────────────
+    - name: f06_B10uG
+      override:
+        pipeline.0.B.Bz: "1.0e-5 Gauss"
+
+    - name: f07_B15uG
+      override:
+        pipeline.0.B.Bz: "1.5e-5 Gauss"
+
+    # ── Mid field: 20 – 30 μG ──────────────────────────────────────────
+    - name: f08_B20uG
+      override:
+        pipeline.0.B.Bz: "2.0e-5 Gauss"
+
+    - name: f09_B25uG
+      override:
+        pipeline.0.B.Bz: "2.5e-5 Gauss"
+
+    - name: f10_B30uG
+      override:
+        pipeline.0.B.Bz: "3.0e-5 Gauss"
+
+    # ── High field: 40 – 60 μG (polarized-phase reference) ─────────────
+    - name: f11_B40uG
+      override:
+        pipeline.0.B.Bz: "4.0e-5 Gauss"
+
+    - name: f12_B60uG
+      override:
+        pipeline.0.B.Bz: "6.0e-5 Gauss"

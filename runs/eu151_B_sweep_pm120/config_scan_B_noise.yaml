@@ -1,0 +1,175 @@
+# ---------------------------------------------------------------------
+# Project A — 5×5 Phase Survey: B-field × initial thermal noise
+#
+# Axes:
+#   X (b1→b5): Bz = -1e-3, -3e-4, -1e-4, -3e-5, 0.0 Gauss
+#   Y (n1→n5): thermal noise = 0.0, 0.016, 0.05, 0.15, 0.40
+#
+# Fixed: c1 = 1/36 (Matsui), initial_state = m_minus_F, 32³, n_steps=5000
+# Goal: find the crossover from stretched (m=-6) to flower/mixed phase
+#
+# RUN_ROOT: ~/bec-runs/projectA_ground_state/survey_B_noise
+# Estimated wall time: ~90 min (25 points × ~200-300 s/point at worst)
+# ---------------------------------------------------------------------
+
+metadata:
+  owner: Mitsuki Gotou
+  project: Project A phase survey — B-field vs initial noise
+  note: |
+    5×5 = 25 scan points.
+    B-axis  (b1→b5): -1e-3, -3e-4, -1e-4, -3e-5, 0.0 Gauss.
+    Noise-axis (n1→n5): thermal = 0.0, 0.016, 0.05, 0.15, 0.40.
+    c1=1/36 (Matsui), initial_state=m_minus_F for all points.
+
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 50000, omega_ref: 691.1504}
+
+dealias:
+  enabled: true
+  k_cut: 16.0
+  auto_dt: true
+  dt_safety: 10.0
+
+mixins:
+  eu151_survey:
+    atom: Eu151
+    grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+    potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+    interactions:
+      N_atoms: 50000
+      omega_ref: 691.1504
+      c1_ratio: 0.0277777778   # = 1/36 (Matsui fitting)
+
+pipeline:
+  - ground_state:
+      use: [eu151_survey]
+      method: itp
+      ddi: {enabled: true, secular: true}
+      lhy: {kind: none}
+      B: {Bz: "0.001 Gauss", theta: 0.0, phi: 0.0}
+      initial_state: m_minus_F
+      noise:
+        seed: 20260607
+        initial:
+          thermal: 0.016
+      dt: 0.005
+      n_steps: 5000
+      tol: 1.0e-9
+
+  - analyze:
+      - phase_classify: {}
+      - energy_decomposition: {}
+
+scan:
+  comparison_runs:
+    # ── b1: Bz = -0.001 Gauss ─────────────────────────────────────────
+    - name: b1_n1
+      override:
+        pipeline.0.B.Bz: "0.001 Gauss"
+        pipeline.0.noise.initial.thermal: 0.0
+    - name: b1_n2
+      override:
+        pipeline.0.B.Bz: "0.001 Gauss"
+        pipeline.0.noise.initial.thermal: 0.016
+    - name: b1_n3
+      override:
+        pipeline.0.B.Bz: "0.001 Gauss"
+        pipeline.0.noise.initial.thermal: 0.05
+    - name: b1_n4
+      override:
+        pipeline.0.B.Bz: "0.001 Gauss"
+        pipeline.0.noise.initial.thermal: 0.15
+    - name: b1_n5
+      override:
+        pipeline.0.B.Bz: "0.001 Gauss"
+        pipeline.0.noise.initial.thermal: 0.40
+
+    # ── b2: Bz = -0.0003 Gauss ────────────────────────────────────────
+    - name: b2_n1
+      override:
+        pipeline.0.B.Bz: "0.0003 Gauss"
+        pipeline.0.noise.initial.thermal: 0.0
+    - name: b2_n2
+      override:
+        pipeline.0.B.Bz: "0.0003 Gauss"
+        pipeline.0.noise.initial.thermal: 0.016
+    - name: b2_n3
+      override:
+        pipeline.0.B.Bz: "0.0003 Gauss"
+        pipeline.0.noise.initial.thermal: 0.05
+    - name: b2_n4
+      override:
+        pipeline.0.B.Bz: "0.0003 Gauss"
+        pipeline.0.noise.initial.thermal: 0.15
+    - name: b2_n5
+      override:
+        pipeline.0.B.Bz: "0.0003 Gauss"
+        pipeline.0.noise.initial.thermal: 0.40
+
+    # ── b3: Bz = -0.0001 Gauss ────────────────────────────────────────
+    - name: b3_n1
+      override:
+        pipeline.0.B.Bz: "0.0001 Gauss"
+        pipeline.0.noise.initial.thermal: 0.0
+    - name: b3_n2
+      override:
+        pipeline.0.B.Bz: "0.0001 Gauss"
+        pipeline.0.noise.initial.thermal: 0.016
+    - name: b3_n3
+      override:
+        pipeline.0.B.Bz: "0.0001 Gauss"
+        pipeline.0.noise.initial.thermal: 0.05
+    - name: b3_n4
+      override:
+        pipeline.0.B.Bz: "0.0001 Gauss"
+        pipeline.0.noise.initial.thermal: 0.15
+    - name: b3_n5
+      override:
+        pipeline.0.B.Bz: "0.0001 Gauss"
+        pipeline.0.noise.initial.thermal: 0.40
+
+    # ── b4: Bz = -0.00003 Gauss ───────────────────────────────────────
+    - name: b4_n1
+      override:
+        pipeline.0.B.Bz: "0.00003 Gauss"
+        pipeline.0.noise.initial.thermal: 0.0
+    - name: b4_n2
+      override:
+        pipeline.0.B.Bz: "0.00003 Gauss"
+        pipeline.0.noise.initial.thermal: 0.016
+    - name: b4_n3
+      override:
+        pipeline.0.B.Bz: "0.00003 Gauss"
+        pipeline.0.noise.initial.thermal: 0.05
+    - name: b4_n4
+      override:
+        pipeline.0.B.Bz: "0.00003 Gauss"
+        pipeline.0.noise.initial.thermal: 0.15
+    - name: b4_n5
+      override:
+        pipeline.0.B.Bz: "0.00003 Gauss"
+        pipeline.0.noise.initial.thermal: 0.40
+
+    # ── b5: Bz = 0.0 Gauss (zero field) ──────────────────────────────
+    - name: b5_n1
+      override:
+        pipeline.0.B.Bz: "0.0 Gauss"
+        pipeline.0.noise.initial.thermal: 0.0
+    - name: b5_n2
+      override:
+        pipeline.0.B.Bz: "0.0 Gauss"
+        pipeline.0.noise.initial.thermal: 0.016
+    - name: b5_n3
+      override:
+        pipeline.0.B.Bz: "0.0 Gauss"
+        pipeline.0.noise.initial.thermal: 0.05
+    - name: b5_n4
+      override:
+        pipeline.0.B.Bz: "0.0 Gauss"
+        pipeline.0.noise.initial.thermal: 0.15
+    - name: b5_n5
+      override:
+        pipeline.0.B.Bz: "0.0 Gauss"
+        pipeline.0.noise.initial.thermal: 0.40

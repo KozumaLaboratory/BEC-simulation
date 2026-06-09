@@ -1,0 +1,186 @@
+# ---------------------------------------------------------------------
+# Project A — Symmetric B-field sweep -120 to +120 μG (27 points)
+#              Full DDI (secular=false)
+#
+# Sign convention (fixed 2026-06-09):
+#   H_Zeeman = +(g_F μ_B B·F)   =>   Bz > 0  means B pointing up (+z)
+#   Eu151 g_F = +1.163  =>  Bz > 0  gives m=-6 as ground state  (correct)
+#
+# B points (μG):
+#  -120, -100, -80, -60, -40, -30, -20, -15, -10, -8, -6, -4, -2,
+#    0,
+#    +2, +4, +6, +8, +10, +15, +20, +30, +40, +60, +80, +100, +120
+#
+# Naming: g01_Bn120uG..g13_Bn2uG = negative B
+#         g14_B0              = zero
+#         g15_B2uG..g27_B120uG = positive B
+#
+# c1_ratio = 1/36 (Matsui EdH), initial_state = m_minus_F for all points
+# (ITP does not conserve Mz; will converge to correct ground state regardless)
+# 32³, n_steps = 12000, thermal = 0.40
+#
+# RUN_ROOT: ~/bec-runs/projectA_ground_state/survey_B_secular_false_pm120
+# ---------------------------------------------------------------------
+
+metadata:
+  owner: Mitsuki Gotou
+  project: Project A — full DDI symmetric ±120 μG sweep
+  note: |
+    Full DDI (secular=false) symmetric scan -120..+120 μG.
+    New sign convention: Bz > 0 = physical B pointing up (+z) = m=-6 ground state.
+    Negative Bz: m=+6 becomes ground state (field pointing down).
+    c1=1/36 (Matsui), thermal=0.40, initial_state=m_minus_F, n_steps=12000.
+
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 50000, omega_ref: 691.1504}
+
+dealias:
+  enabled: true
+  k_cut: 16.0
+  auto_dt: true
+  dt_safety: 10.0
+
+mixins:
+  eu151_fullDDI_pm120:
+    atom: Eu151
+    grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+    potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+    interactions:
+      N_atoms: 50000
+      omega_ref: 691.1504
+      c1_ratio: 0.0277777778   # = 1/36 (Matsui fitting, antiferromagnetic)
+
+pipeline:
+  - ground_state:
+      use: [eu151_fullDDI_pm120]
+      method: itp
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B: {Bz: "0.0 Gauss", theta: 0.0, phi: 0.0}
+      initial_state: m_minus_F
+      noise:
+        seed: 20260609
+        initial:
+          thermal: 0.40
+      dt: 0.005
+      n_steps: 12000
+      tol: 1.0e-9
+
+  - analyze:
+      - phase_classify: {}
+      - energy_decomposition: {}
+
+scan:
+  comparison_runs:
+    # ── Negative B: B pointing down, m=+6 preferred at large |B| ────────────
+    - name: g01_Bn120uG
+      override:
+        pipeline.0.B.Bz: "-1.2e-4 Gauss"
+
+    - name: g02_Bn100uG
+      override:
+        pipeline.0.B.Bz: "-1.0e-4 Gauss"
+
+    - name: g03_Bn80uG
+      override:
+        pipeline.0.B.Bz: "-8.0e-5 Gauss"
+
+    - name: g04_Bn60uG
+      override:
+        pipeline.0.B.Bz: "-6.0e-5 Gauss"
+
+    - name: g05_Bn40uG
+      override:
+        pipeline.0.B.Bz: "-4.0e-5 Gauss"
+
+    - name: g06_Bn30uG
+      override:
+        pipeline.0.B.Bz: "-3.0e-5 Gauss"
+
+    - name: g07_Bn20uG
+      override:
+        pipeline.0.B.Bz: "-2.0e-5 Gauss"
+
+    - name: g08_Bn15uG
+      override:
+        pipeline.0.B.Bz: "-1.5e-5 Gauss"
+
+    - name: g09_Bn10uG
+      override:
+        pipeline.0.B.Bz: "-1.0e-5 Gauss"
+
+    - name: g10_Bn8uG
+      override:
+        pipeline.0.B.Bz: "-8.0e-6 Gauss"
+
+    - name: g11_Bn6uG
+      override:
+        pipeline.0.B.Bz: "-6.0e-6 Gauss"
+
+    - name: g12_Bn4uG
+      override:
+        pipeline.0.B.Bz: "-4.0e-6 Gauss"
+
+    - name: g13_Bn2uG
+      override:
+        pipeline.0.B.Bz: "-2.0e-6 Gauss"
+
+    # ── B = 0 ────────────────────────────────────────────────────────────────
+    - name: g14_B0
+      override:
+        pipeline.0.B.Bz: "0.0 Gauss"
+
+    # ── Positive B: B pointing up, m=-6 preferred at large |B| ──────────────
+    - name: g15_B2uG
+      override:
+        pipeline.0.B.Bz: "2.0e-6 Gauss"
+
+    - name: g16_B4uG
+      override:
+        pipeline.0.B.Bz: "4.0e-6 Gauss"
+
+    - name: g17_B6uG
+      override:
+        pipeline.0.B.Bz: "6.0e-6 Gauss"
+
+    - name: g18_B8uG
+      override:
+        pipeline.0.B.Bz: "8.0e-6 Gauss"
+
+    - name: g19_B10uG
+      override:
+        pipeline.0.B.Bz: "1.0e-5 Gauss"
+
+    - name: g20_B15uG
+      override:
+        pipeline.0.B.Bz: "1.5e-5 Gauss"
+
+    - name: g21_B20uG
+      override:
+        pipeline.0.B.Bz: "2.0e-5 Gauss"
+
+    - name: g22_B30uG
+      override:
+        pipeline.0.B.Bz: "3.0e-5 Gauss"
+
+    - name: g23_B40uG
+      override:
+        pipeline.0.B.Bz: "4.0e-5 Gauss"
+
+    - name: g24_B60uG
+      override:
+        pipeline.0.B.Bz: "6.0e-5 Gauss"
+
+    - name: g25_B80uG
+      override:
+        pipeline.0.B.Bz: "8.0e-5 Gauss"
+
+    - name: g26_B100uG
+      override:
+        pipeline.0.B.Bz: "1.0e-4 Gauss"
+
+    - name: g27_B120uG
+      override:
+        pipeline.0.B.Bz: "1.2e-4 Gauss"

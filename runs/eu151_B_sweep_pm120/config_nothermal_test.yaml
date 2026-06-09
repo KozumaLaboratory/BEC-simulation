@@ -1,0 +1,52 @@
+# config_nothermal_test.yaml
+# thermal noise = 0 のテスト: B=-120uG と B=-40uG の2点
+# 目的: xy対称性破れがthermal noiseによるものか検証
+
+metadata:
+  owner: Mitsuki Gotou
+  note: thermal=0 test. 2 points only. Compare with v2 (thermal=0.40).
+
+defaults:
+  kind: spinor
+  backend: gpu
+
+dealias:
+  enabled: true
+  k_cut: 16.0
+  auto_dt: true
+  dt_safety: 10.0
+
+mixins:
+  eu151_fullDDI_nothermal:
+    atom: Eu151
+    grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+    potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+    interactions:
+      N_atoms: 50000
+      omega_ref: 691.1504
+      c1_ratio: 0.0277777778
+
+pipeline:
+  - ground_state:
+      use: [eu151_fullDDI_nothermal]
+      method: itp
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B: {Bz: "0.0 Gauss", theta: 0.0, phi: 0.0}
+      initial_state: m_minus_F
+      dt: 0.005
+      n_steps: 12000
+      tol: 1.0e-7
+
+  - analyze:
+      - phase_classify: {}
+      - energy_decomposition: {}
+
+scan:
+  comparison_runs:
+    - name: g01_Bn120uG
+      override:
+        pipeline.0.B.Bz: "-1.2e-4 Gauss"
+    - name: g05_Bn40uG
+      override:
+        pipeline.0.B.Bz: "-4.0e-5 Gauss"

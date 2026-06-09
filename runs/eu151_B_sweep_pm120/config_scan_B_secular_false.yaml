@@ -1,0 +1,97 @@
+# ---------------------------------------------------------------------
+# Project A — Full DDI (secular=false) comparison scan
+#
+# 6 scan points: Bz = 0 to -30 μG
+# secular=false: full non-secular DDI (physically correct for μG fields
+# where ω_Larmor ≪ ω_DDI — secular approximation is NOT justified here)
+#
+# All other parameters identical to survey_B_fine_random:
+#   c1=1/36 (Matsui), initial_state=m_minus_F, 32³, n_steps=8000
+#
+# Goal: determine whether non-secular DDI terms drive transverse spin
+#       texture (flower-phase onset) that secular=true suppresses.
+#
+# RUN_ROOT: ~/bec-runs/projectA_ground_state/survey_B_secular_false
+# Estimated wall time: ~1.5 h (6 points × ~450 s × 1.4 DDI overhead)
+# ---------------------------------------------------------------------
+
+metadata:
+  owner: Mitsuki Gotou
+  project: Project A — full DDI comparison (secular=false)
+  note: |
+    6 scan points: B = 0, -2, -10, -20, -30 μG + -60 μG reference.
+    secular=false: off-diagonal Q_xy, Q_xz, Q_yz components active.
+    These terms drive transverse spin relaxation and may stabilize
+    flower-phase texture at weak fields.
+    c1=1/36 (Matsui EdH fitting), initial_state=m_minus_F, thermal=0.40.
+
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 50000, omega_ref: 691.1504}
+
+dealias:
+  enabled: true
+  k_cut: 16.0
+  auto_dt: true
+  dt_safety: 10.0
+
+mixins:
+  eu151_fullDDI:
+    atom: Eu151
+    grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+    potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+    interactions:
+      N_atoms: 50000
+      omega_ref: 691.1504
+      c1_ratio: 0.0277777778   # = 1/36 (Matsui fitting, antiferromagnetic)
+
+pipeline:
+  - ground_state:
+      use: [eu151_fullDDI]
+      method: itp
+      ddi: {enabled: true, secular: false}   # full DDI — key difference
+      lhy: {kind: none}
+      B: {Bz: "0.0 Gauss", theta: 0.0, phi: 0.0}
+      initial_state: m_minus_F
+      noise:
+        seed: 20260608
+        initial:
+          thermal: 0.40
+      dt: 0.005
+      n_steps: 8000
+      tol: 1.0e-9
+
+  - analyze:
+      - phase_classify: {}
+      - energy_decomposition: {}
+
+scan:
+  comparison_runs:
+    # ── B = 0 (most important: no Larmor, secular ≡ full DDI meaningless) ─
+    - name: g01_B0_full
+      override:
+        pipeline.0.B.Bz: "0.0 Gauss"
+
+    # ── Very-low field ────────────────────────────────────────────────────
+    - name: g02_B2uG_full
+      override:
+        pipeline.0.B.Bz: "2.0e-6 Gauss"
+
+    - name: g03_B10uG_full
+      override:
+        pipeline.0.B.Bz: "1.0e-5 Gauss"
+
+    # ── Mid field ─────────────────────────────────────────────────────────
+    - name: g04_B20uG_full
+      override:
+        pipeline.0.B.Bz: "2.0e-5 Gauss"
+
+    - name: g05_B30uG_full
+      override:
+        pipeline.0.B.Bz: "3.0e-5 Gauss"
+
+    # ── High field reference (should match secular run) ───────────────────
+    - name: g06_B60uG_full
+      override:
+        pipeline.0.B.Bz: "6.0e-5 Gauss"
