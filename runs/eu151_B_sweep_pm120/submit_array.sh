@@ -39,6 +39,10 @@ mkdir -p "$OUTPUT_ROOT/logs"
 cd "$PROJECT_ROOT"
 source scripts/tsubame_setup.sh
 
+# Compute nodes don't inherit the login shell's PATH; juliaup lives in
+# the group's shared area. Prepend so `julia` resolves below.
+export PATH="/gs/fs/tga-kozuma-kouhi/shared/.juliaup/bin:$PATH"
+
 # ── Stage config into the output dir (idempotent) ──────────────────────
 # Naming as config.yaml means run_yaml treats $OUTPUT_ROOT itself as the
 # run directory and writes point_*.jld2 alongside.
