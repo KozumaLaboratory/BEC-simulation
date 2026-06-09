@@ -40,10 +40,11 @@ cd "$PROJECT_ROOT"
 source scripts/tsubame_setup.sh
 set -euo pipefail  # tsubame_setup.sh resets errexit; restore it
 
-# tsubame_setup.sh sets JULIA_DEPOT_PATH to a fresh NVMe temp (fast writes)
-# but that temp is empty — packages live in $HOME/.julia. Append the home
-# depot so Julia can find existing packages while writing cache to NVMe.
-export JULIA_DEPOT_PATH="$JULIA_DEPOT_PATH:$HOME/.julia"
+# tsubame_setup.sh overrides JULIA_DEPOT_PATH to a fresh NVMe temp (fast
+# writes) but that temp is empty. Packages are in the group-shared depot.
+# Append it so Julia finds existing packages while writing cache to NVMe.
+SHARED_DEPOT=/gs/fs/tga-kozuma-kouhi/shared/.julia
+export JULIA_DEPOT_PATH="$JULIA_DEPOT_PATH:$SHARED_DEPOT"
 
 # Use the direct Julia binary — bypasses juliaup launcher which tries to
 # update juliaupself.json in the group-shared area (no write permission).
