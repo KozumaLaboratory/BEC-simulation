@@ -1,0 +1,142 @@
+# config_scan_B_pm120_v3.yaml
+# ============================
+# Project A — ±120 μG sweep v3: 47-point sweep, 64³ grid, array-job ready
+#
+# Changes from v2 (config_scan_B_pm120_v2.yaml):
+#   - Grid: 32³ → 64³  (same box 12³ → halved spacing, 8× memory)
+#   - Points: 27 → 47  (denser around ±50/55/60/65/70 μG band)
+#   - Scan form: comparison_runs → scan.product with explicit unit-string
+#     list. This makes each Bz point an outer scan.points[i], so the
+#     array-job hook SPINORBEC_SCAN_ONLY_INDEX selects exactly one point
+#     per UGE task. (comparison_runs are the INNER loop and the hook does
+#     not filter them.)
+#   - Output dir: survey_B_secular_false_pm120_v3
+#   - Same physics: full DDI (secular=false), c1=1/36, thermal=0.40,
+#     initial_state=m_minus_F, ITP tol=1e-7 relative.
+#   - Nyquist DDI symmetry fix (kx/ky/kz odd off-diagonals zeroed,
+#     commit 091367fd on main) is now in effect.
+#
+# RUN: see runs/eu151_B_sweep_pm120/submit_array.sh
+#   qsub -g <GROUP> runs/eu151_B_sweep_pm120/submit_array.sh
+#
+# Per-task output: point_<TASK_ID>.jld2  (1..47, NaN-padded to 003 prefix)
+# ============================
+
+metadata:
+  owner: Mitsuki Gotou
+  project: Project A — full DDI symmetric ±120 μG sweep v3 (64³, 47 pts)
+  note: |
+    Full DDI (secular=false) symmetric scan -120..+120 μG, 47 points,
+    dense ±50–70 μG band, 64³ grid. Designed for UGE array submission:
+    each task picks scan.points[SGE_TASK_ID] via SPINORBEC_SCAN_ONLY_INDEX.
+    c1=1/36 (Matsui), thermal=0.40, initial_state=m_minus_F, tol=1e-7 (relative).
+    Uses Nyquist DDI symmetry fix (kx/ky/kz, main @ 091367fd).
+
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 50000, omega_ref: 691.1504}
+
+dealias:
+  enabled: true
+  k_cut: 16.0
+  auto_dt: true
+  dt_safety: 10.0
+
+mixins:
+  eu151_fullDDI_pm120_v3:
+    atom: Eu151
+    grid: {n: [64, 64, 64], box: [12.0, 12.0, 12.0]}
+    potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+    interactions:
+      N_atoms: 50000
+      omega_ref: 691.1504
+      c1_ratio: 0.0277777778   # = 1/36 (Matsui fitting, antiferromagnetic)
+
+pipeline:
+  - ground_state:
+      use: [eu151_fullDDI_pm120_v3]
+      method: itp
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B: {Bz: "0.0 Gauss", theta: 0.0, phi: 0.0}
+      initial_state: m_minus_F
+      noise:
+        seed: 20260610
+        initial:
+          thermal: 0.40
+      dt: 0.005
+      n_steps: 12000
+      tol: 1.0e-7      # relative: dE/|E| < 1e-7
+
+  - analyze:
+      - phase_classify: {}
+      - energy_decomposition: {}
+
+# 47-point Bz sweep as an explicit list (μG units → Gauss strings).
+# Ordered most-negative → most-positive. Array task i picks element i.
+#
+# Index | Bz (μG)
+#   1   | -120        13  | -40         24  |   0         35  |  +45
+#   2   | -110        14  | -35         25  |  +2         36  |  +50
+#   3   | -100        15  | -30         26  |  +4         37  |  +55
+#   4   |  -90        16  | -25         27  |  +6         38  |  +60
+#   5   |  -80        17  | -20         28  |  +8         39  |  +65
+#   6   |  -75        18  | -15         29  | +10         40  |  +70
+#   7   |  -70        19  | -10         30  | +15         41  |  +75
+#   8   |  -65        20  |  -8         31  | +20         42  |  +80
+#   9   |  -60        21  |  -6         32  | +25         43  |  +90
+#  10   |  -55        22  |  -4         33  | +30         44  | +100
+#  11   |  -50        23  |  -2         34  | +35         45  | +110
+#  12   |  -45                                            46  | +120
+#                                                        47  | (reserved; trim to 1-47 in -t)
+scan:
+  product:
+    pipeline.0.B.Bz:
+      - "-1.20e-4 Gauss"   # 01: -120 μG
+      - "-1.10e-4 Gauss"   # 02: -110 μG
+      - "-1.00e-4 Gauss"   # 03: -100 μG
+      - "-9.0e-5 Gauss"    # 04:  -90 μG
+      - "-8.0e-5 Gauss"    # 05:  -80 μG
+      - "-7.5e-5 Gauss"    # 06:  -75 μG
+      - "-7.0e-5 Gauss"    # 07:  -70 μG
+      - "-6.5e-5 Gauss"    # 08:  -65 μG
+      - "-6.0e-5 Gauss"    # 09:  -60 μG
+      - "-5.5e-5 Gauss"    # 10:  -55 μG
+      - "-5.0e-5 Gauss"    # 11:  -50 μG
+      - "-4.5e-5 Gauss"    # 12:  -45 μG
+      - "-4.0e-5 Gauss"    # 13:  -40 μG
+      - "-3.5e-5 Gauss"    # 14:  -35 μG
+      - "-3.0e-5 Gauss"    # 15:  -30 μG
+      - "-2.5e-5 Gauss"    # 16:  -25 μG
+      - "-2.0e-5 Gauss"    # 17:  -20 μG
+      - "-1.5e-5 Gauss"    # 18:  -15 μG
+      - "-1.0e-5 Gauss"    # 19:  -10 μG
+      - "-8.0e-6 Gauss"    # 20:   -8 μG
+      - "-6.0e-6 Gauss"    # 21:   -6 μG
+      - "-4.0e-6 Gauss"    # 22:   -4 μG
+      - "-2.0e-6 Gauss"    # 23:   -2 μG
+      - "0.0 Gauss"        # 24:    0 μG
+      - "2.0e-6 Gauss"     # 25:   +2 μG
+      - "4.0e-6 Gauss"     # 26:   +4 μG
+      - "6.0e-6 Gauss"     # 27:   +6 μG
+      - "8.0e-6 Gauss"     # 28:   +8 μG
+      - "1.0e-5 Gauss"     # 29:  +10 μG
+      - "1.5e-5 Gauss"     # 30:  +15 μG
+      - "2.0e-5 Gauss"     # 31:  +20 μG
+      - "2.5e-5 Gauss"     # 32:  +25 μG
+      - "3.0e-5 Gauss"     # 33:  +30 μG
+      - "3.5e-5 Gauss"     # 34:  +35 μG
+      - "4.0e-5 Gauss"     # 35:  +40 μG
+      - "4.5e-5 Gauss"     # 36:  +45 μG
+      - "5.0e-5 Gauss"     # 37:  +50 μG
+      - "5.5e-5 Gauss"     # 38:  +55 μG
+      - "6.0e-5 Gauss"     # 39:  +60 μG
+      - "6.5e-5 Gauss"     # 40:  +65 μG
+      - "7.0e-5 Gauss"     # 41:  +70 μG
+      - "7.5e-5 Gauss"     # 42:  +75 μG
+      - "8.0e-5 Gauss"     # 43:  +80 μG
+      - "9.0e-5 Gauss"     # 44:  +90 μG
+      - "1.00e-4 Gauss"    # 45: +100 μG
+      - "1.10e-4 Gauss"    # 46: +110 μG
+      - "1.20e-4 Gauss"    # 47: +120 μG
