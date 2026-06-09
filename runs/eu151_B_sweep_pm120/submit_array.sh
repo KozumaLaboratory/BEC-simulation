@@ -38,10 +38,11 @@ mkdir -p "$OUTPUT_ROOT/logs"
 # ── Environment (depot on NVMe, modules, threads) ──────────────────────
 cd "$PROJECT_ROOT"
 source scripts/tsubame_setup.sh
+set -euo pipefail  # tsubame_setup.sh resets errexit; restore it
 
-# Compute nodes don't inherit the login shell's PATH; juliaup lives in
-# the group's shared area. Prepend so `julia` resolves below.
-export PATH="/gs/fs/tga-kozuma-kouhi/shared/.juliaup/bin:$PATH"
+# Use the direct Julia binary — bypasses juliaup launcher which tries to
+# update juliaupself.json in the group-shared area (no write permission).
+JULIA=/gs/fs/tga-kozuma-kouhi/shared/.juliaup/juliaup/julia-1.12.6+0.x64.linux.gnu/bin/julia
 
 # ── Stage config into the output dir (idempotent) ──────────────────────
 # Naming as config.yaml means run_yaml treats $OUTPUT_ROOT itself as the
@@ -57,6 +58,6 @@ export SPINORBEC_SCAN_ONLY_INDEX=$SGE_TASK_ID
 echo "[task $SGE_TASK_ID/$SGE_TASK_LAST] running point $SGE_TASK_ID on $(hostname)"
 nvidia-smi -L || true
 
-julia --project=. -e "using SpinorBEC; run_yaml(\"$CONFIG_DST\")"
+"$JULIA" --project=. -e "using SpinorBEC; run_yaml(\"$CONFIG_DST\")"
 
 echo "[task $SGE_TASK_ID] done"
