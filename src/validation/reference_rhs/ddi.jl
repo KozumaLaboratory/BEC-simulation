@@ -18,12 +18,14 @@
 #                                         production folds it inside the
 #                                         k-space contraction buffer).
 #
-# Uses real FFT (rfft) for the first axis, matching production's
-# Nyquist convention (rfftfreq returns +k_Nyquist with positive sign,
-# whereas full-complex fftfreq returns -k_Nyquist; the off-diagonal
-# Q_αβ products differ by a sign at the Nyquist row when the two
-# conventions are mixed). Independence is preserved by building a
-# fresh plan and Q-tensor inside the function.
+# Uses real FFT (rfft) for the first axis, matching production's grid.
+# rfftfreq stores +k_Nyquist on axis 1 while fftfreq stores −k_Nyquist on
+# the full-complex axes, so the odd-in-k off-diagonal Q_αβ would acquire
+# an axis-asymmetric sign at the Nyquist planes. The continuum kernel of
+# an odd function at a folded Nyquist mode is 0, so we zero the off-diagonals
+# there (every odd-axis Nyquist plane) — this is what keeps the DDI mean
+# field x↔y(↔z) symmetric and matches production `_build_q_tensor!`.
+# Independence is preserved by building a fresh plan and Q-tensor here.
 
 export reference_ddi_apply!, reference_ddi_energy
 export reference_ddi_potentials
@@ -56,6 +58,13 @@ function reference_ddi_potentials(
     ky = N >= 2 ? grid.k[2] : Float64[]
     kz = N >= 3 ? grid.k[3] : Float64[]
 
+    # Nyquist index per axis (0 = none). The off-diagonal Q components are
+    # odd in their two axes; their continuum value at a folded Nyquist mode
+    # is 0, and keeping the asymmetric rfft(+k_Nyq)/fft(−k_Nyq) representative
+    # would break x↔y(↔z) symmetry. Zero them on every odd-axis Nyquist plane
+    # (matches production `_build_q_tensor!`).
+    nyq = ntuple(d -> iseven(n_pts[d]) ? n_pts[d] ÷ 2 + 1 : 0, Val(N))
+
     Phi_x_rk = zeros(ComplexF64, rk_shape)
     Phi_y_rk = zeros(ComplexF64, rk_shape)
     Phi_z_rk = zeros(ComplexF64, rk_shape)
@@ -79,9 +88,12 @@ function reference_ddi_potentials(
         else
             Q_xx = kv_x * kv_x * inv_k2 - 1.0 / 3.0
             Q_yy = kv_y * kv_y * inv_k2 - 1.0 / 3.0
-            Q_xy = kv_x * kv_y * inv_k2
-            Q_xz = kv_x * kv_z * inv_k2
-            Q_yz = kv_y * kv_z * inv_k2
+            x_nyq = nyq[1] != 0 && I[1] == nyq[1]
+            y_nyq = N >= 2 && nyq[2] != 0 && I[2] == nyq[2]
+            z_nyq = N >= 3 && nyq[3] != 0 && I[3] == nyq[3]
+            Q_xy = (x_nyq || y_nyq) ? 0.0 : kv_x * kv_y * inv_k2
+            Q_xz = (x_nyq || z_nyq) ? 0.0 : kv_x * kv_z * inv_k2
+            Q_yz = (y_nyq || z_nyq) ? 0.0 : kv_y * kv_z * inv_k2
         end
         fxk = Fx_rk[I]
         fyk = Fy_rk[I]

@@ -79,6 +79,7 @@ const FAST_TESTS = [
     "hamiltonian/test_spin_mixing.jl",
     "analysis/test_observables.jl",
     "hamiltonian/test_ddi.jl",
+    "hamiltonian/test_ddi_nyquist_xy_symmetry.jl",
     "hamiltonian/test_potentials.jl",
     "analysis/test_physics_level0.jl",
     "analysis/test_physics_level1.jl",

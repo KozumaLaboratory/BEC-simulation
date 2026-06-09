@@ -80,6 +80,7 @@ function make_ddi_padded(
             k_sq_rk,
             rk_shape;
             secular,
+            full_n=padded_shape,
         )
     end
 

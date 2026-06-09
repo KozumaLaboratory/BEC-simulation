@@ -99,7 +99,8 @@ function _find_ground_state_adaptive(;
                 flush(stdout)
             end
         else
-            dE = abs(E - E_prev)
+            dE_abs = abs(E - E_prev)
+            dE = abs(E) > 0 ? dE_abs / abs(E) : dE_abs   # relative (see itp_loop.jl)
             psi_max = maximum(abs, ws.state.psi)
             dpsi = psi_max > 0 ? maximum(abs, ws.state.psi .- psi_backup) / psi_max : 0.0
             final_dE = dE
@@ -110,7 +111,7 @@ function _find_ground_state_adaptive(;
                 frac = total_steps / n_steps
                 eta = frac > 0 ? elapsed / frac * (1 - frac) : NaN
                 println(
-                    "  ITP $(total_steps)/$(n_steps) | E=$(round(E; sigdigits=8)) dE=$(round(dE; sigdigits=3)) " *
+                    "  ITP $(total_steps)/$(n_steps) | E=$(round(E; sigdigits=8)) dE/|E|=$(round(dE; sigdigits=3)) " *
                     "dpsi=$(round(dpsi; sigdigits=3)) dt=$(round(current_dt; sigdigits=3)) | " *
                     "$(round(elapsed; digits=1))s elapsed, ETA $(round(eta; digits=0))s",
                 )

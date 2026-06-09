@@ -112,6 +112,7 @@ function _make_ddi_params_full(
         k_sq_rk,
         rk_shape;
         secular,
+        full_n=n_pts,
     )
 
     DDIParams(C_dd, Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz)
