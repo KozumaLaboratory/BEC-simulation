@@ -322,4 +322,33 @@
             grid, atom=Eu151, interactions, sim_params=sp, enable_ddi=true
         )
     end
+
+    @testset "DDI rfft Nyquist symmetry (Hermitian-consistency fix)" begin
+        # At kx = Nyquist (last rfft bin, index n÷2+1), Q_xy and Q_xz are
+        # antisymmetric under (ky,kz)→(−ky,−kz):  Q_αβ[Nyq,j,k] = −Q_αβ[Nyq,−j,−k].
+        # A fixed non-zero value there violates the Hermitian-symmetry contract
+        # that the DDI Q-tensor must satisfy so that Φ = irfft(Q·F̃) is well-defined.
+        # The fix zeros those slices so the stored Q tensor is self-consistent.
+        # Secular and quasi-2D paths are zero by construction and are unaffected.
+        config = GridConfig((8, 8, 8), (10.0, 10.0, 10.0))
+        grid   = make_grid(config)
+        ddi    = make_ddi_params(grid, Eu151; secular=false)
+        nyq    = size(ddi.Q_xy, 1)   # = 8÷2+1 = 5
+
+        # Structural check: Nyquist slice of off-diagonal terms must be zero.
+        @test all(iszero, @view ddi.Q_xy[nyq, :, :])
+        @test all(iszero, @view ddi.Q_xz[nyq, :, :])
+
+        # Diagonal and Q_yz at Nyquist are computed from Q_αα = k̂_α² − 1/3 and
+        # Q_yz = ky*kz/k² — these are symmetric under (ky,kz)→(−ky,−kz) and
+        # must NOT be zeroed; spot-check that they are non-trivially populated.
+        @test any(!iszero, @view ddi.Q_xx[nyq, :, :])
+        @test any(!iszero, @view ddi.Q_yy[nyq, :, :])
+        @test any(!iszero, @view ddi.Q_zz[nyq, :, :])
+
+        # Secular variant: all off-diagonal are zero everywhere (not just Nyquist).
+        ddi_sec = make_ddi_params(grid, Eu151; secular=true)
+        @test all(iszero, @view ddi_sec.Q_xy[nyq, :, :])
+        @test all(iszero, @view ddi_sec.Q_xz[nyq, :, :])
+    end
 end

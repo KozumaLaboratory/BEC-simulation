@@ -55,6 +55,23 @@ function _build_q_tensor!(
             Q_yz[I] = kv_y * kv_z * inv_k2
         end
     end
+
+    # Enforce rfft Hermitian symmetry at kx = Nyquist (last rfft bin, index n_pts[1]).
+    # Q_xy and Q_xz are antisymmetric there: Q_αβ[Nyq,j,k] = −Q_αβ[Nyq,−j,−k].
+    # This violates irfft's conjugate-symmetry assumption and injects a systematic
+    # chiral bias into the DDI potential (manifests as a fixed -45° spin texture
+    # direction that is independent of the random seed). Zeroing the Nyquist slice
+    # removes the artifact; the mode carries no physical energy in a properly
+    # dealiased simulation. The secular and quasi-2D paths already set these to
+    # zero everywhere, so no fix is needed for those branches.
+    if !secular
+        nyq_ix = n_pts[1]  # rfft_output_shape[1] = grid_n[1] ÷ 2 + 1
+        fill!(selectdim(Q_xy, 1, nyq_ix), zero(T))
+        if N >= 3
+            fill!(selectdim(Q_xz, 1, nyq_ix), zero(T))
+        end
+    end
+
     nothing
 end
 

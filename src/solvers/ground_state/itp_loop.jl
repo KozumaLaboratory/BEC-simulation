@@ -168,18 +168,26 @@ function _run_itp_loop!(
                 final_dE = dE
                 final_dpsi = dpsi
 
+                # Relative energy convergence: scale dE by |E| so that tol is
+                # dimensionless and works across energy scales. Guard against E≈0
+                # with a floor of 1. Old absolute criterion (dE < tol) would never
+                # trigger for DDI systems where E ~ O(10–100) and tol = 1e-9.
+                E_scale = max(abs(E), one(typeof(E)))
+                dE_rel = dE / E_scale
+
                 if verbose
                     elapsed = time() - t_start
                     frac = step / n_steps
                     eta = frac > 0 ? elapsed / frac * (1 - frac) : NaN
                     println(
-                        "  ITP $(step)/$(n_steps) | E=$(round(E; sigdigits=8)) dE=$(round(dE; sigdigits=3)) " *
+                        "  ITP $(step)/$(n_steps) | E=$(round(E; sigdigits=8)) " *
+                        "dE=$(round(dE; sigdigits=3)) rel=$(round(dE_rel; sigdigits=3)) " *
                         "dpsi=$(round(dpsi; sigdigits=3)) | $(round(elapsed; digits=1))s elapsed, ETA $(round(eta; digits=0))s",
                     )
                     flush(stdout)
                 end
 
-                if dE < tol
+                if dE_rel < tol
                     converged = true
                     break
                 end
