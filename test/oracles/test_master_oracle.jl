@@ -41,7 +41,7 @@ const SLOT_TERM = (;
     magnetic_gradient=MagneticGradientTerm, loss=LossTerm,
 )
 
-const PRODUCTION_RHS_GAPS = (:raman, :tensor)
+const PRODUCTION_RHS_GAPS = (:raman,)  # :tensor gradient implemented 2026-06-09
 
 """Source-faithful sign mutant: a copy of `term` with every numeric
 field negated. The registry term carries its coefficients in struct

@@ -126,3 +126,18 @@ function SpinorBEC.apply_tensor_interaction_step!(
 
     nothing
 end
+
+# TensorTerm gradient face on GPU — CPU fallback. The anomalous tensor/c2
+# gradient kernel (`apply_operator!`) is CPU-only for now; the cache
+# metadata (g_values / cg_table / active_channels) is host-side, so we
+# compute on the host and copy back. Correct result ⇒ GPU=CPU per-term
+# parity holds honestly (a GPU kernel is a perf follow-on, not a
+# correctness fix). ACCUMULATES, matching the CPU contract.
+function SpinorBEC.apply_operator!(
+    out::CuArray, term::SpinorBEC.TensorTerm, ws, psi::CuArray
+)
+    out_h = Array(out)
+    SpinorBEC.apply_operator!(out_h, term, ws, Array(psi))
+    copyto!(out, out_h)
+    out
+end
