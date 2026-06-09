@@ -205,6 +205,10 @@ const CI_EXTRA = [
     "oracles/test_velocity_planewave.jl",
     "oracles/test_global_phase_covariance.jl",
     "oracles/test_ddi_translation_covariance.jl",
+    "oracles/test_coriolis_energy_sign.jl",
+    "oracles/test_ddi_energy_potential_crosscheck.jl",
+    "oracles/test_kinetic_translation_covariance.jl",
+    "oracles/test_continuity_equation.jl",
     "oracles/test_term_legacy_equivalence.jl",
     "oracles/test_term_consistency.jl",
     # Rename regression: HamTerm subtype names no longer shadow potential types.
