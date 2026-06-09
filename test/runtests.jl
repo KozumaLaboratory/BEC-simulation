@@ -198,6 +198,10 @@ const CI_EXTRA = [
     "oracles/test_transverse_zeeman_analytic.jl",
     "oracles/test_spin_c1_analytic.jl",
     "oracles/test_ddi_qtensor_relations.jl",
+    "oracles/test_meanfield_energy_half.jl",
+    "oracles/test_spin_density_consistency.jl",
+    "oracles/test_magnetization_conservation_rtp.jl",
+    "oracles/test_harmonic_virial.jl",
     "oracles/test_term_legacy_equivalence.jl",
     "oracles/test_term_consistency.jl",
     # Rename regression: HamTerm subtype names no longer shadow potential types.
