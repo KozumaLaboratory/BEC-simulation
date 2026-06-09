@@ -191,7 +191,9 @@ function make_rotating_basis_ws(
         N >= 3 && (k2 += kz[I[3]]^2)
         k_sq_rk[I] = k2
     end
-    _build_q_tensor!(Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz, kx_r, ky, kz, k_sq_rk, rk_shape)
+    _build_q_tensor!(
+        Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz, kx_r, ky, kz, k_sq_rk, rk_shape; full_n=n_pts
+    )
     # DDIParams.C_dd is a Float64 scalar by struct definition (across both F32
     # and F64 workspaces); the Q_αβ field arrays carry the precision. Q_αβ × C_dd
     # broadcasts will promote intermediates to Float64 but final result is the

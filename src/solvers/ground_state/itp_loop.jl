@@ -155,7 +155,11 @@ function _run_itp_loop!(
 
             if step % sp.save_every == 0
                 E = total_energy(ws)
-                dE = abs(E - E_prev)
+                # Relative energy-change convergence: scale-invariant so a
+                # single `tol` works across systems whose E spans orders of
+                # magnitude. Falls back to the absolute change when E ≈ 0.
+                dE_abs = abs(E - E_prev)
+                dE = abs(E) > 0 ? dE_abs / abs(E) : dE_abs
                 psi_max = maximum(abs, ws.state.psi)
                 dpsi = if psi_max > 0
                     # Fuse subtraction + abs into map-reduce (avoids temp array alloc)
@@ -173,7 +177,7 @@ function _run_itp_loop!(
                     frac = step / n_steps
                     eta = frac > 0 ? elapsed / frac * (1 - frac) : NaN
                     println(
-                        "  ITP $(step)/$(n_steps) | E=$(round(E; sigdigits=8)) dE=$(round(dE; sigdigits=3)) " *
+                        "  ITP $(step)/$(n_steps) | E=$(round(E; sigdigits=8)) dE/|E|=$(round(dE; sigdigits=3)) " *
                         "dpsi=$(round(dpsi; sigdigits=3)) | $(round(elapsed; digits=1))s elapsed, ETA $(round(eta; digits=0))s",
                     )
                     flush(stdout)

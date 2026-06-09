@@ -1,10 +1,43 @@
 # --- DDI Q-tensor builders (k-space + quasi-2D erfcx kernel) ---
 
 """
-    _build_q_tensor!(Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz, k_vectors, k_squared, n_pts; secular=false)
+    _zero_odd_offdiag_at_nyquist!(Q_xy, Q_xz, Q_yz, full_n)
 
-Shared Q tensor construction for both padded and unpadded DDI.
-Q_αβ(k) = k̂_α k̂_β - δ_αβ/3 (or secular approximation).
+Enforce the x↔y(↔z) symmetry of the DDI kernel by zeroing the off-diagonal
+Q components on the Nyquist plane(s) of the axes they are ODD in
+(Q_xy: axes 1,2 · Q_xz: axes 1,3 · Q_yz: axes 2,3).
+
+A Nyquist mode is its own mirror under k → −k (the grid folds ±k_Nyq onto
+one bin), so an ODD kernel must vanish there — exactly as an odd function
+vanishes at 0. Production stores +k_Nyq on the rfft axis but −k_Nyq on the
+full-fft axes, so the raw representative is nonzero and axis-asymmetric; a
+z-polarized cloud then relaxes into a spuriously squished shape despite a
+symmetric trap, field and dipole axis. See
+`scripts/ddi_nyquist_xy_asymmetry_probe.jl` and the regression test
+`test/hamiltonian/test_ddi_nyquist_xy_symmetry.jl`.
+"""
+function _zero_odd_offdiag_at_nyquist!(Q_xy, Q_xz, Q_yz, full_n::NTuple{N, Int}) where {N}
+    odd_axes = ((Q_xy, (1, 2)), (Q_xz, (1, 3)), (Q_yz, (2, 3)))
+    for d in 1:N
+        iseven(full_n[d]) || continue          # odd length ⇒ no self-mirror mode
+        idx = full_n[d] ÷ 2 + 1                 # rfft last bin = fft Nyquist bin
+        for (Q, axes) in odd_axes
+            d in axes && fill!(selectdim(Q, d, idx), zero(eltype(Q)))
+        end
+    end
+    return nothing
+end
+
+"""
+    _build_q_tensor!(Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz, kx, ky, kz, k_squared, rk_shape;
+                     secular=false, full_n=nothing)
+
+Shared Q tensor construction for both padded and unpadded DDI:
+`Q_αβ(k) = k̂_α k̂_β - δ_αβ/3` (or the secular approximation), on the rfft
+half-grid `rk_shape`. Pass `full_n` (the un-halved spatial grid size per
+axis) to enforce kernel symmetry at the Nyquist planes via
+[`_zero_odd_offdiag_at_nyquist!`](@ref). The diagonals are even in every
+axis (Nyquist-safe); the secular branch leaves the off-diagonals at 0.
 """
 function _build_q_tensor!(
     Q_xx,
@@ -17,13 +50,14 @@ function _build_q_tensor!(
     ky,
     kz,
     k_squared,
-    n_pts::NTuple{N, Int};
+    rk_shape::NTuple{N, Int};
     secular::Bool=false,
+    full_n::Union{Nothing, NTuple{N, Int}}=nothing,
 ) where {N}
     T = eltype(Q_xx)
     third = T(1) / T(3)
     half = T(1) / T(2)
-    @inbounds for I in CartesianIndices(n_pts)
+    @inbounds for I in CartesianIndices(rk_shape)
         k2 = k_squared[I]
         if iszero(k2)
             Q_xx[I] = zero(T);
@@ -55,6 +89,7 @@ function _build_q_tensor!(
             Q_yz[I] = kv_y * kv_z * inv_k2
         end
     end
+    secular || full_n === nothing || _zero_odd_offdiag_at_nyquist!(Q_xy, Q_xz, Q_yz, full_n)
     nothing
 end
 

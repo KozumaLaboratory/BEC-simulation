@@ -292,13 +292,12 @@ end
 # ============================================================================
 
 """Kernel wavenumbers for the rfft-halved axis: like `dumb_k_axis` but
-the even-n Nyquist representative is **+n/2·dk** — production builds Q
-with `rfftfreq` on axis 1, so the Nyquist-plane kernel value (a pure
-discretization convention; Q_offdiag is odd in k_x and the continuum
-does not pick a sign there) is pinned to the production choice. Same
-gotcha is documented at `validation/reference_rhs/ddi.jl:22`. On a
-random state at n=6, ~1/6 of modes sit on that plane — an unpinned
-convention shifts E_DDI at O(1)."""
+the even-n Nyquist representative is **+n/2·dk**, matching production's
+`rfftfreq` on axis 1. The diagonal Q is even, so this representative is
+sign-independent there; the odd off-diagonals are zeroed on the Nyquist
+planes by `_dumb_ddi_kernel` (see the note there and the matching
+production zeroing in `_build_q_tensor!`), which is what removes the
+former O(1) x↔y asymmetry on broadband states."""
 function dumb_k_axis_rfft(n::Int, L::Float64)
     dk = 2π / L
     return [dk * (j0 <= n ÷ 2 ? j0 : j0 - n) for j0 in 0:(n - 1)]
@@ -389,19 +388,20 @@ function _dumb_ddi_kernel(c_dd, fx, fy, fz, nd, boxes; secular::Bool)
     # effective full-grid kernel is therefore Q∘rep — Q evaluated at
     # the STORED REPRESENTATIVE of each mode. rep is the identity on
     # the stored half; on the kx < 0 half it is the index mirror
-    # j → (j == 1 ? 1 : n + 2 − j) on every axis. For interior indices
-    # the mirror negates k (and full evenness of Q makes rep invisible),
-    # but the 0- and Nyquist-indices are their OWN mirrors (the
-    # Nyquist value −n/2·dk does not flip), so on ky/kz-Nyquist planes
-    # Q∘rep ≠ Q — the effective kernel breaks full k-evenness there.
-    # Localized empirically (k-space diff concentrated on index-4
-    # planes at n = 6) and pinned here. Physically irrelevant on
-    # resolved states (Nyquist power → 0; the smooth-state comparison
-    # passes at 1e-10 with or without this), but the dumb statement
-    # reproduces the production discretization exactly per the pinning
-    # rule. The secular kernel is even in every axis separately —
-    # Nyquist-immune, no rep needed.
+    # j → (j == 1 ? 1 : n + 2 − j) on every axis. For the DIAGONAL Q
+    # (even in every axis) the mirror is invisible. The OFF-DIAGONALS
+    # are odd in two axes: at a Nyquist mode (its own mirror; −n/2·dk
+    # does not flip) the continuum kernel of an odd function is 0, and
+    # the raw representative would be axis-asymmetric (rfft stores
+    # +k_Nyq on axis 1, fft stores −k_Nyq on the others). Production
+    # therefore zeros each off-diagonal on its odd axes' Nyquist planes
+    # to keep the kernel x↔y(↔z) symmetric; this dumb statement does the
+    # same below. Physically negligible on resolved states (Nyquist
+    # power → 0) but order-unity on broadband fields. The secular kernel
+    # is even in every axis separately — Nyquist-immune, no rep needed.
     mirror(j, n) = j == 1 ? 1 : n + 2 - j
+    # Nyquist index per axis (its own mirror; -1 = no Nyquist for odd n).
+    nyqidx = ntuple(d -> iseven(sizes[d]) ? sizes[d] ÷ 2 + 1 : -1, nd)
     f̂ = (dumb_dft(ComplexF64.(fx)), dumb_dft(ComplexF64.(fy)), dumb_dft(ComplexF64.(fz)))
     Φ̂ = (zeros(ComplexF64, sizes), zeros(ComplexF64, sizes), zeros(ComplexF64, sizes))
     for I in CartesianIndices(sizes)
@@ -415,6 +415,9 @@ function _dumb_ddi_kernel(c_dd, fx, fy, fz, nd, boxes; secular::Bool)
         end
         k2 = kx^2 + ky^2 + kz^2
         k2 == 0.0 && continue   # Q(0) = 0 (pinned convention)
+        # Nyquist flag per axis (index is mirror-invariant, so test I, not k).
+        nyqf = ntuple(d -> I[d] == nyqidx[d], nd)
+        on_nyq(a) = a <= nd && nyqf[a]
         if secular
             q = kz^2 / k2 - 1 / 3
             Φ̂[1][I] = -q / 2 * f̂[1][I]
@@ -423,6 +426,13 @@ function _dumb_ddi_kernel(c_dd, fx, fy, fz, nd, boxes; secular::Bool)
         else
             kv = (kx, ky, kz)
             for α in 1:3, β in 1:3
+                # Off-diagonals are odd in axes α and β; their folded-Nyquist
+                # continuum value is 0. Zero them on either axis's Nyquist
+                # plane so the kernel stays x↔y(↔z) symmetric (matches
+                # production `_build_q_tensor!`).
+                if α != β && (on_nyq(α) || on_nyq(β))
+                    continue
+                end
                 Q = kv[α] * kv[β] / k2 - (α == β ? 1 / 3 : 0.0)
                 Φ̂[α][I] += Q * f̂[β][I]
             end
