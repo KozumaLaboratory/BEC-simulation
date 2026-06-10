@@ -71,6 +71,6 @@ export SPINORBEC_SCAN_ONLY_INDEX=$SGE_TASK_ID
 echo "[task $SGE_TASK_ID/$SGE_TASK_LAST] running point $SGE_TASK_ID on $(hostname)"
 nvidia-smi -L || true
 
-"$JULIA" --project=. -e "using SpinorBEC; run_yaml(\"$CONFIG_DST\")"
+"$JULIA" --project=. -e "import CUDA; using SpinorBEC; run_yaml(\"$CONFIG_DST\")"
 
 echo "[task $SGE_TASK_ID] done"
