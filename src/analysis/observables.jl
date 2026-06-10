@@ -16,6 +16,8 @@
 #   observables/spin_snapshot.jl  — extract_spin_snapshot: one-pass
 #                                    bundle (fx/fy/fz totals + f_max +
 #                                    m_dist + Lz) for sweep scripts
+#   observables/density_moments.jl — cloud shape: covariance tensor,
+#                                    widths, aspect ratio, tilt angle
 #
 # Public API is unchanged from pre-refactor; this umbrella exports
 # nothing of its own — each sub-file owns its own exports.
@@ -26,3 +28,4 @@ include("observables/nematic.jl")
 include("observables/multipole.jl")
 include("observables/structure.jl")
 include("observables/spin_snapshot.jl")
+include("observables/density_moments.jl")

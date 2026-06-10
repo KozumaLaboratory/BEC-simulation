@@ -152,6 +152,35 @@ function _analyze_trap_population(psi, grid, atom, params, ws_prev)
     merge(pop, (radius=radius,))
 end
 
+"""
+    _analyze_cloud_shape(psi, grid, atom, params, ws_prev) -> NamedTuple
+
+Cloud shape descriptors from the total-density covariance tensor: center
+of mass, per-axis RMS widths, principal-axis widths, aspect ratio, and the
+in-plane tilt angle. Recording it across a dynamics snapshot series turns a
+density movie into quantitative deformation (anisotropic expansion, shear,
+bending).
+
+YAML usage:
+
+    analyze:
+      - cloud_shape: {}
+
+Returns `(mass, com, widths, principal_widths, aspect_ratio, tilt)` with
+the vector quantities as plain `Vector{Float64}` for serialisation.
+"""
+function _analyze_cloud_shape(psi, grid, atom, params, ws_prev)
+    m = density_moments(psi, grid)
+    (
+        mass=m.mass,
+        com=collect(m.com),
+        widths=collect(m.widths),
+        principal_widths=collect(m.principal_widths),
+        aspect_ratio=m.aspect_ratio,
+        tilt=m.tilt,
+    )
+end
+
 function _analyze_summary_json(psi, grid, atom, params, ws_prev, pipeline_results)
     output_path = String(get(params, "path", "summary.json"))
     extras = get(params, "extras", Dict{String, Any}())

@@ -102,6 +102,8 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev=nothing,
         return _analyze_hpsi_export(psi, grid, atom, params, ws_prev)
     elseif name == :trap_population
         return _analyze_trap_population(psi, grid, atom, params, ws_prev)
+    elseif name == :cloud_shape
+        return _analyze_cloud_shape(psi, grid, atom, params, ws_prev)
     elseif name == :summary_json
         return _analyze_summary_json(psi, grid, atom, params, ws_prev, pipeline_results)
     end
@@ -116,6 +118,6 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev=nothing,
         "bragg_spectroscopy, droplet_profile, bogoliubov_dispersion, " *
         "bogoliubov_mode, skyrmion_detect, synthetic_dim, non_abelian_homotopy, " *
         "monopole_charge, majorana_order, winding_field, rosensweig_pattern, " *
-        "column_density_movie, hpsi_export, trap_population, summary_json"
+        "column_density_movie, hpsi_export, trap_population, cloud_shape, summary_json"
     throw(ArgumentError("Unknown analyzer: $name. Supported: $_known"))
 end
