@@ -469,6 +469,7 @@ A list of analyzers, each `{<name>: <params>}`. Names include:
 - `column_density_movie` (axis, multi_step)
 - `larmor_phase`, `berry_connection`
 - `population_history`
+- `trap_population` (radius, center) — inside-vs-outside-trap norm split; tracks atoms spilling toward the absorbing boundary
 
 Full list in `src/workflow/experiments/analyzers/`.
 

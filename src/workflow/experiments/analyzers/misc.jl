@@ -122,6 +122,36 @@ function _analyze_hpsi_export(psi, grid, atom, params, ws_prev)
     )
 end
 
+"""
+    _analyze_trap_population(psi, grid, atom, params, ws_prev) -> NamedTuple
+
+Split the surviving norm into the part still inside the trap region
+(`r ≤ radius`) and the part that has spilled outside it. Quantifies atoms
+that drifted toward the absorbing boundary / loss region; recording it
+across the time series turns the bare norm decay into an inside-vs-outside
+budget.
+
+YAML usage:
+
+    analyze:
+      - trap_population:
+          radius: 8.0          # optional; default = inscribed sphere (min box half-extent)
+          center: [0.0, 0.0]   # optional; default grid origin
+
+Returns `(inside, outside, total, outside_fraction, radius)` where the
+first three are `∫|ψ|² dV` over the respective region.
+"""
+function _analyze_trap_population(psi, grid, atom, params, ws_prev)
+    N = length(grid.config.n_points)
+    default_radius = 0.5 * minimum(grid.config.box_size)
+    radius = Float64(get(params, "radius", default_radius))
+    center = let v = get(params, "center", nothing)
+        v === nothing ? ntuple(_ -> 0.0, N) : ntuple(d -> Float64(v[d]), N)
+    end
+    pop = population_inside_radius(psi, grid, radius; center=center)
+    merge(pop, (radius=radius,))
+end
+
 function _analyze_summary_json(psi, grid, atom, params, ws_prev, pipeline_results)
     output_path = String(get(params, "path", "summary.json"))
     extras = get(params, "extras", Dict{String, Any}())

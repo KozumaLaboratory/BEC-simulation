@@ -234,4 +234,44 @@ using FFTW
             @test SpinorBEC.cg_lookup(cg_arr, S, M, m1) ≈ expected atol = 1e-14
         end
     end
+
+    @testset "population_inside_radius" begin
+        # Explicit narrow Gaussian centred at the origin so the inside/outside
+        # split is decoupled from any init_psi profile default.
+        config = GridConfig(128, 40.0)
+        grid = make_grid(config)
+        x = grid.x[1]
+        psi = zeros(ComplexF64, 128, 1)
+        @. psi[:, 1] = exp(-x^2 / 2)  # σ = 1
+        N = total_norm(psi, grid)
+
+        big = population_inside_radius(psi, grid, 15.0)
+        @test big.total ≈ N atol = 1e-12
+        @test big.inside + big.outside ≈ big.total atol = 1e-12
+        @test big.inside ≈ N rtol = 1e-6
+        @test big.outside_fraction < 1e-6
+
+        # Inside + outside partition is exact and monotone in radius.
+        small = population_inside_radius(psi, grid, 1.0)
+        @test small.inside < big.inside
+        @test small.outside > big.outside
+        @test small.inside + small.outside ≈ N atol = 1e-12
+
+        # Radius 0 ⇒ everything is "outside".
+        zero_r = population_inside_radius(psi, grid, 0.0)
+        @test zero_r.inside ≈ 0.0 atol = 1e-12
+        @test zero_r.outside_fraction ≈ 1.0 atol = 1e-10
+
+        # Off-centre region: a window around the cloud's centre captures
+        # essentially everything; the same-radius window far away captures none.
+        centred = population_inside_radius(psi, grid, 5.0; center=(0.0,))
+        @test centred.inside ≈ N rtol = 1e-6
+        far = population_inside_radius(psi, grid, 5.0; center=(15.0,))
+        @test far.inside < 1e-6 * N
+
+        # Empty wavefunction ⇒ guarded fraction is 0, not NaN.
+        empty = population_inside_radius(zeros(ComplexF64, 128, 3), grid, 5.0)
+        @test empty.total == 0.0
+        @test empty.outside_fraction == 0.0
+    end
 end
