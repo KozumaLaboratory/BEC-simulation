@@ -1,11 +1,10 @@
-# test/oracles/test_transverse_zeeman_analytic.jl
+# test/oracles/test_zeeman_full_analytic.jl
 #
-# Analytic pin of the TRANSVERSE Zeeman operator: H = −bx·F_x − by·F_y
-# (source of truth H_Zeeman = −(g_F μ_B B·F)). `apply_operator!` must equal
-# that exact matrix acting voxel-wise. This is the locus of the 2026-06-04
-# sign-inversion bug (propagator applied +bx,+by); a directional oracle
-# already guards it, but this pins the full matrix (sign AND ladder
-# coefficients) at machine precision for every F.
+# The merged ZeemanTerm is one operator H = −(bx·F_x + by·F_y + bz·F_z) + q·F_z²
+# (user spec, b_block_builders.jl). With the linear+transverse merge, ALL four
+# coefficients live in one declaration, which closes the [GAP-1] class (a face
+# that read only (bz,q) and dropped (bx,by)). Pin the full operator against the
+# explicit matrix, all coefficients active at once, for F=1 and F=6.
 
 using Test
 using FFTW
@@ -13,7 +12,7 @@ using LinearAlgebra
 using SpinorBEC
 using SpinorBEC: ZeemanTerm, apply_operator!, spin_matrices
 
-@testset "TransverseZeeman = −bx·F_x − by·F_y" begin
+@testset "ZeemanTerm = −(bx·Fx+by·Fy+bz·Fz) + q·Fz²" begin
     for (atom, F) in ((Rb87, 1), (Eu151, 6))
         grid = make_grid(GridConfig((6, 6, 6), (4.0, 4.0, 4.0)))
         ws = make_workspace(;
@@ -25,11 +24,12 @@ using SpinorBEC: ZeemanTerm, apply_operator!, spin_matrices
         )
         D = 2F + 1
         sm = spin_matrices(F)
-        bx, by = 0.6, -0.4
-        M = -bx * Matrix(sm.Fx) - by * Matrix(sm.Fy)   # D×D Hermitian
+        Fx = Matrix(sm.Fx); Fy = Matrix(sm.Fy); Fz = Matrix(sm.Fz)
+        bx, by, bz, q = 0.5, -0.3, 0.7, 0.2
+        M = -(bx * Fx + by * Fy + bz * Fz) + q * Fz^2     # D×D Hermitian
         psi = randn(ComplexF64, 6, 6, 6, D)
         out = zero(psi)
-        apply_operator!(out, ZeemanTerm(bx, by, 0.0, 0.0), ws, psi)
+        apply_operator!(out, ZeemanTerm(bx, by, bz, q), ws, psi)
         expected = similar(psi)
         @inbounds for I in CartesianIndices((6, 6, 6))
             expected[I, :] = M * psi[I, :]

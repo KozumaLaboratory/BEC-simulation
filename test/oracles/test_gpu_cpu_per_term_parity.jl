@@ -77,9 +77,9 @@ end
     end
 
     # -----------------------------------------------------------------
-    # TransverseZeemanTerm — bx/by ≠ 0 via TimeDependentZeeman slot 3/4
+    # ZeemanTerm (transverse) — bx/by ≠ 0 via TimeDependentZeeman slot 3/4
     # -----------------------------------------------------------------
-    @testset "TransverseZeemanTerm: bx ≠ 0" begin
+    @testset "ZeemanTerm transverse: bx ≠ 0" begin
         function _build(gpu::Bool)
             grid = make_grid(GridConfig{1}((16,), (8.0,)))
             atom = Rb87

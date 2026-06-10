@@ -18,12 +18,12 @@
 #   terms/lhy/{phi_one_reg,polar_contact,polar_dipolar,fm_contact,
 #              fm_dipolar,icosahedral,modes_round45,dispatch}
 #       — closed-form spinor LHY tables for various spin phases
-#   terms/loss/{losses} + loss_term — dipolar relaxation + ABC
+#   terms/loss (engine + LossTerm) — dipolar relaxation + ABC
 #   terms/trap/{evaluate_potential} + trap_term
 #       — trap evaluators and potential application
-#   terms/zeeman/{accessors,zeeman_builders} + zeeman_term
+#   terms/zeeman (accessors + builders + ZeemanTerm) + magnetic_gradient
 #       — Zeeman accessors, builders, and HamTerm
-#   terms/raman/{raman} + raman_term; shared/spin_rotation for uniform rotation
+#   terms/raman (engine + RamanTerm); shared/spin_rotation for uniform rotation
 #       — Raman coupling + spatially uniform spin rotation
 #   optics/{optics,laser_potential,optical_trap}
 #       — Gaussian-beam optics + dipole trap builders (not HamTerms)
@@ -53,15 +53,11 @@ include("hamiltonian/terms/lhy/fm_dipolar.jl")
 include("hamiltonian/terms/lhy/icosahedral.jl")
 include("hamiltonian/terms/lhy/modes_round45.jl")
 include("hamiltonian/terms/lhy/dispatch.jl")
-include("hamiltonian/terms/loss/losses.jl")
 include("hamiltonian/integrator/absorbing_boundary.jl")
 
 # Potentials / builders.
 include("hamiltonian/terms/trap/evaluate_potential.jl")
-include("hamiltonian/terms/zeeman/accessors.jl")
-include("hamiltonian/terms/zeeman/zeeman_builders.jl")
 include("hamiltonian/shared/spin_rotation.jl")
-include("hamiltonian/terms/raman/raman.jl")
 include("hamiltonian/optics/optics.jl")  # Must precede laser_potential (defines OpticalBeam)
 include("hamiltonian/optics/laser_potential.jl")
 include("hamiltonian/optics/optical_trap.jl")
@@ -70,16 +66,17 @@ include("hamiltonian/terms/light_shift/light_shift_builders.jl")
 # HamTerm protocol (sign-bug-proof architecture, Phase 1).
 # See `docs/conventions/sign_bug_proof_architecture.md`.
 include("hamiltonian/terms/base.jl")
-include("hamiltonian/terms/zeeman/zeeman.jl")        # LinearZeemanZ + TransverseZeeman + MagneticGradient
+include("hamiltonian/terms/zeeman.jl")               # accessors + builders + ZeemanTerm
+include("hamiltonian/terms/magnetic_gradient.jl")    # MagneticGradientTerm (spin-independent tilt)
 include("hamiltonian/terms/coriolis.jl")
 include("hamiltonian/terms/kinetic.jl")
 include("hamiltonian/terms/trap/trap.jl")
 include("hamiltonian/terms/contact/contact.jl")       # DensityC0 + SpinC1 + Tensor
 include("hamiltonian/terms/ddi/ddi_term.jl")
 include("hamiltonian/terms/lhy/lhy_term.jl")
-include("hamiltonian/terms/raman/raman_term.jl")
+include("hamiltonian/terms/raman.jl")                # engine + RamanTerm
 include("hamiltonian/terms/light_shift/light_shift_term.jl")
-include("hamiltonian/terms/loss/loss_term.jl")
+include("hamiltonian/terms/loss.jl")                 # engine + LossTerm
 include("hamiltonian/terms/registry.jl")
 
 # Integrators.

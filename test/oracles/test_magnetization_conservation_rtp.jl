@@ -10,7 +10,7 @@
 using Test
 using FFTW
 using SpinorBEC
-using SpinorBEC: KineticTerm, TrapTerm, LinearZeemanZTerm, DensityC0Term,
+using SpinorBEC: KineticTerm, TrapTerm, ZeemanTerm, DensityC0Term,
     SpinC1Term, apply_step!
 
 @testset "⟨F_z⟩ conserved under spin-mixing real-time evolution" begin
@@ -33,7 +33,7 @@ using SpinorBEC: KineticTerm, TrapTerm, LinearZeemanZTerm, DensityC0Term,
 
     Fz0 = Fz(psi); N0 = norm(psi)
     dt = 0.005
-    terms = (LinearZeemanZTerm(0.3, 0.05), DensityC0Term(1.0),
+    terms = (ZeemanTerm(0.0, 0.0, 0.3, 0.05), DensityC0Term(1.0),
         SpinC1Term(0.5), TrapTerm(), KineticTerm())
     for _ in 1:30
         for term in terms

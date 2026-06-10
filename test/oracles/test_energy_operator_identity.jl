@@ -11,7 +11,7 @@
 using Test
 using FFTW
 using SpinorBEC
-using SpinorBEC: KineticTerm, TrapTerm, LinearZeemanZTerm, TransverseZeemanTerm,
+using SpinorBEC: KineticTerm, TrapTerm, ZeemanTerm,
     CoriolisTerm, apply_operator!, energy_contribution
 
 @testset "Linear term energy = Re⟨ψ|Hψ⟩·dV" begin
@@ -33,8 +33,9 @@ using SpinorBEC: KineticTerm, TrapTerm, LinearZeemanZTerm, TransverseZeemanTerm,
     for (name, term) in (
         ("Kinetic", KineticTerm()),
         ("Trap", TrapTerm()),
-        ("LinearZeemanZ", LinearZeemanZTerm(0.7, 0.2)),
-        ("TransverseZeeman", TransverseZeemanTerm(0.5, 0.3)),
+        ("ZeemanZ", ZeemanTerm(0.0, 0.0, 0.7, 0.2)),
+        ("ZeemanTransverse", ZeemanTerm(0.5, 0.3, 0.0, 0.0)),
+        ("ZeemanFull", ZeemanTerm(0.5, 0.3, 0.7, 0.2)),
         ("Coriolis", CoriolisTerm(0.6)),
     )
         @testset "$name" begin

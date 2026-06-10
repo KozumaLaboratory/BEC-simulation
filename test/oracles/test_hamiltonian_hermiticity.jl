@@ -16,7 +16,7 @@
 using Test
 using FFTW
 using SpinorBEC
-using SpinorBEC: KineticTerm, TrapTerm, LinearZeemanZTerm, TransverseZeemanTerm,
+using SpinorBEC: KineticTerm, TrapTerm, ZeemanTerm,
     CoriolisTerm, apply_operator!
 using Random
 
@@ -64,11 +64,14 @@ end
     @testset "TrapTerm (real V(x) multiplication)" begin
         @test _herm_violation(TrapTerm(), ws, phi, psi) < 1e-12
     end
-    @testset "LinearZeemanZTerm (real diagonal)" begin
-        @test _herm_violation(LinearZeemanZTerm(0.7, 0.2), ws, phi, psi) < 1e-12
+    @testset "ZeemanTerm (real diagonal)" begin
+        @test _herm_violation(ZeemanTerm(0.0, 0.0, 0.7, 0.2), ws, phi, psi) < 1e-12
     end
-    @testset "TransverseZeemanTerm (Hermitian F_x,F_y)" begin
-        @test _herm_violation(TransverseZeemanTerm(0.5, 0.3), ws, phi, psi) < 1e-12
+    @testset "ZeemanTerm (Hermitian transverse F_x,F_y)" begin
+        @test _herm_violation(ZeemanTerm(0.5, 0.3, 0.0, 0.0), ws, phi, psi) < 1e-12
+    end
+    @testset "ZeemanTerm (full: diagonal + transverse)" begin
+        @test _herm_violation(ZeemanTerm(0.5, 0.3, 0.7, 0.2), ws, phi, psi) < 1e-12
     end
 
     @testset "CoriolisTerm (L_z = x p_y − y p_x; first-derivative)" begin

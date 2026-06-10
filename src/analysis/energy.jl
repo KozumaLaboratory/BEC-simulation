@@ -20,8 +20,8 @@ function _energy_decomposition_gpu end
 function _energy_decomposition_cpu(ws::Workspace{N}) where {N}
     # Trinity-only: iterate the HamTerm registry, each term computes its
     # own contribution via `energy_contribution(::Term, psi, ws)`. The
-    # legacy-shape adapter merges `zeeman_z + zeeman_transverse` into
-    # `:zeeman` and maps `density_c0`/`spin_c1` to `:density`/`:spin`.
+    # legacy-shape adapter maps `density_c0`/`spin_c1` to
+    # `:density`/`:spin`; `:zeeman` is already a single slot (ZeemanTerm).
     return energy_decomposition_via_registry_legacy_shape(ws)
 end
 

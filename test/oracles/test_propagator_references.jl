@@ -35,7 +35,7 @@ using Test
 using SpinorBEC
 using SpinorBEC: HamTerm, apply_step!, build_h_terms_registry
 using SpinorBEC: dumb_rhs_breakdown, dumb_rk4_evolve
-using SpinorBEC: KineticTerm, TrapTerm, LinearZeemanZTerm, TransverseZeemanTerm,
+using SpinorBEC: KineticTerm, TrapTerm, ZeemanTerm,
     DensityC0Term, SpinC1Term, DDITerm, LHYTerm, TensorTerm, RamanTerm,
     LightShiftTerm, CoriolisTerm, MagneticGradientTerm
 using Random
@@ -121,8 +121,7 @@ end
         ws, psi = oracle_full_ws(; ddi=false)
         for (slot, T) in (
             (:kinetic, KineticTerm), (:trap, TrapTerm),
-            (:zeeman_z, LinearZeemanZTerm),
-            (:zeeman_transverse, TransverseZeemanTerm),
+            (:zeeman, ZeemanTerm),
             (:density_c0, DensityC0Term), (:spin_c1, SpinC1Term),
             (:lhy, LHYTerm), (:coriolis, CoriolisTerm),
         )
@@ -138,8 +137,7 @@ end
         # dumb side applies the same model independently.
         ws, psi = omega_R_ws()
         for (slot, T) in (
-            (:zeeman_z, LinearZeemanZTerm),
-            (:zeeman_transverse, TransverseZeemanTerm),
+            (:zeeman, ZeemanTerm),
         )
             @testset "$slot" begin
                 dt_valley_for(slot, _registry_term(ws, T), ws, psi)

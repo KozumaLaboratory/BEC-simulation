@@ -18,7 +18,7 @@
 using Test
 using FFTW
 using SpinorBEC
-using SpinorBEC: HamTerm, LinearZeemanZTerm, TransverseZeemanTerm,
+using SpinorBEC: HamTerm, ZeemanTerm,
     apply_step!, energy_contribution, apply_operator!, sign_oracle
 using Random
 
@@ -79,14 +79,20 @@ end
     psi_ref = _random_state(ws)
     δψ = _random_perturbation(psi_ref)
 
-    @testset "LinearZeemanZTerm" begin
-        term = LinearZeemanZTerm(0.7, 0.2)
+    @testset "ZeemanTerm (diagonal)" begin
+        term = ZeemanTerm(0.0, 0.0, 0.7, 0.2)
         fd, inner, ratio = _fd_vs_inner(term, ws, psi_ref, δψ)
         @test isapprox(fd, inner; rtol=1e-3)
     end
 
-    @testset "TransverseZeemanTerm" begin
-        term = TransverseZeemanTerm(0.5, 0.3)
+    @testset "ZeemanTerm (transverse)" begin
+        term = ZeemanTerm(0.5, 0.3, 0.0, 0.0)
+        fd, inner, ratio = _fd_vs_inner(term, ws, psi_ref, δψ)
+        @test isapprox(fd, inner; rtol=1e-3)
+    end
+
+    @testset "ZeemanTerm (full: diagonal + transverse)" begin
+        term = ZeemanTerm(0.5, 0.3, 0.7, 0.2)
         fd, inner, ratio = _fd_vs_inner(term, ws, psi_ref, δψ)
         @test isapprox(fd, inner; rtol=1e-3)
     end
@@ -120,9 +126,9 @@ end
 end
 
 @testset "HamTerm directional sign oracles" begin
-    @testset "LinearZeemanZTerm: +p ⇒ ⟨F_z⟩ > 0" begin
+    @testset "ZeemanTerm: +bz ⇒ ⟨F_z⟩ > 0" begin
         ws = _ref_workspace()
-        term = LinearZeemanZTerm(2.0, 0.0)
+        term = ZeemanTerm(0.0, 0.0, 2.0, 0.0)
         # ITP loop only this term — start from m_plus_F, apply 500 steps
         sys = SpinSystem(1)
         psi = init_psi(ws.grid, sys; state=:m_plus_F)
@@ -130,25 +136,23 @@ end
             apply_step!(term, psi, 0.005, true, ws)
             psi ./= sqrt(sum(abs2, psi) * cell_volume(ws.grid))
         end
-        oracle = sign_oracle(LinearZeemanZTerm)
+        oracle = sign_oracle(ZeemanTerm)
         @test oracle.predicate(psi, ws)
     end
 
-    @testset "TransverseZeemanTerm: +bx ⇒ ⟨F_x⟩ > 0" begin
+    @testset "ZeemanTerm: +bx ⇒ ⟨F_x⟩ > 0" begin
         ws = _ref_workspace()
-        term = TransverseZeemanTerm(2.0, 0.0)
+        # Transverse +bx with a small +bz parity breaker in ONE term
+        # (transverse alone from m_plus_F can leave ⟨F_x⟩ = 0 by symmetry).
+        term = ZeemanTerm(2.0, 0.0, 0.5, 0.0)
         sys = SpinSystem(1)
         psi = init_psi(ws.grid, sys; state=:m_plus_F)
-        # Phase-1 ITP with a +Bz parity breaker (TransverseZeeman alone
-        # from m_plus_F can leave ⟨F_x⟩ = 0 by symmetry; need a small
-        # +Bz tilt to break the F_x parity).
-        term_z = LinearZeemanZTerm(0.5, 0.0)
         for _ in 1:500
-            apply_step!(term_z, psi, 0.005, true, ws)
             apply_step!(term, psi, 0.005, true, ws)
             psi ./= sqrt(sum(abs2, psi) * cell_volume(ws.grid))
         end
-        oracle = sign_oracle(TransverseZeemanTerm)
-        @test oracle.predicate(psi, ws)
+        sm = ws.spin_matrices
+        fx, _, _ = SpinorBEC.spin_density_vector(psi, sm, ndims(psi) - 1)
+        @test sum(fx) * cell_volume(ws.grid) > 0.0
     end
 end

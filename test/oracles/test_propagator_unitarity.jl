@@ -10,7 +10,7 @@
 using Test
 using FFTW
 using SpinorBEC
-using SpinorBEC: KineticTerm, TrapTerm, LinearZeemanZTerm, TransverseZeemanTerm,
+using SpinorBEC: KineticTerm, TrapTerm, ZeemanTerm,
     CoriolisTerm, apply_step!
 
 @testset "Unitary propagators conserve norm (real time)" begin
@@ -31,8 +31,9 @@ using SpinorBEC: KineticTerm, TrapTerm, LinearZeemanZTerm, TransverseZeemanTerm,
     terms = (
         ("Kinetic", KineticTerm()),
         ("Trap", TrapTerm()),
-        ("LinearZeemanZ", LinearZeemanZTerm(0.7, 0.2)),
-        ("TransverseZeeman", TransverseZeemanTerm(0.5, 0.3)),
+        ("ZeemanZ", ZeemanTerm(0.0, 0.0, 0.7, 0.2)),
+        ("ZeemanTransverse", ZeemanTerm(0.5, 0.3, 0.0, 0.0)),
+        ("ZeemanFull", ZeemanTerm(0.5, 0.3, 0.7, 0.2)),
         ("Coriolis", CoriolisTerm(0.5)),
     )
     for (name, term) in terms
