@@ -24,8 +24,9 @@ using SpinorBEC
         )
         @test p.c_dd == c_dd_check
 
-        # Eu γ_F / (2π) ≈ 16.28 Hz/nT at ω_ref = 2π·110 Hz ⇒ p_per_nT ≈ 0.148.
-        @test isapprox(p.p_per_nT, 0.148; atol=2e-3)
+        # Eu γ_F / (2π) ≈ 16.28 Hz/nT at ω_ref = 2π·110 Hz ⇒ p_per_nT ≈ -0.148
+        # (K-U convention p ≡ -g_F μ_B B; sign in Units.bfield_to_p).
+        @test isapprox(p.p_per_nT, -0.148; atol=2e-3)
 
         # a_ho is the right scale: √(ℏ/(m·ω)) ≈ 0.6 µm for Eu151 @ 110 Hz.
         @test 1e-7 < p.a_ho < 1e-6
