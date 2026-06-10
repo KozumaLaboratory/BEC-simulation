@@ -23,9 +23,10 @@ const _SKIP_HEAVY_YAML_ZEEMAN =
 
     @testset "Gauss → dimensionless scalar" begin
         # Dy164 F=8, g_F ≈ 1.24 (approximate — exact value in atoms.jl)
-        # 1 Gauss at ω_ref = 2π·50 Hz should give p ≈ 3.5e4
+        # 1 Gauss at ω_ref = 2π·50 Hz: p = -g_F μ_B B/(ℏω) ≈ -3.5e4
+        # (K-U convention p ≡ -g_F μ_B B; sign in Units.bfield_to_p).
         p = SpinorBEC._gauss_to_dimless(1.0, 1.24, 2π * 50.0)
-        @test p ≈ 34710.68 atol=1.0
+        @test p ≈ -34710.68 atol=1.0
         # Linearity: 0.5 G → half
         @test SpinorBEC._gauss_to_dimless(0.5, 1.24, 2π * 50.0) ≈ p / 2
         # Scaling with g_F
@@ -83,12 +84,12 @@ const _SKIP_HEAVY_YAML_ZEEMAN =
 
         # t=0: pure z
         @test evaluate(tdz.p_wf, 0.0) ≈ unit_p rtol=1e-2
-        @test abs(evaluate(tdz.bx_wf, 0.0)) < unit_p * 1e-2
+        @test abs(evaluate(tdz.bx_wf, 0.0)) < abs(unit_p) * 1e-2
         # t=1: pure x
-        @test abs(evaluate(tdz.p_wf, 1.0)) < unit_p * 1e-2
+        @test abs(evaluate(tdz.p_wf, 1.0)) < abs(unit_p) * 1e-2
         @test evaluate(tdz.bx_wf, 1.0) ≈ unit_p rtol=1e-2
         # by always zero (phi=0)
-        @test abs(evaluate(tdz.by_wf, 0.5)) < unit_p * 1e-6
+        @test abs(evaluate(tdz.by_wf, 0.5)) < abs(unit_p) * 1e-6
     end
 
     @testset "Unitful string: Cartesian Bz" begin
@@ -129,7 +130,7 @@ const _SKIP_HEAVY_YAML_ZEEMAN =
         expected = SpinorBEC.Units.bfield_to_p(0.819, atom.g_F, omega_ref)
         # At theta=90, B is pure x → bx = full p, p (z) ≈ 0
         @test evaluate(tdz.bx_wf, 0.5) ≈ expected rtol=1e-6
-        @test abs(evaluate(tdz.p_wf, 0.5)) < expected * 1e-6
+        @test abs(evaluate(tdz.p_wf, 0.5)) < abs(expected) * 1e-6
     end
 
     @testset "omega_ref resolution priority" begin

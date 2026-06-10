@@ -28,13 +28,13 @@ using SpinorBEC
 
 @testset "Hamiltonian sign oracles" begin
 
-    # --- Linear Zeeman (z): +Bz → ⟨F_z⟩ > 0 ---
-    # User spec: H_z = -p · F_z. +p means physical +Bz, low E at +F_z.
-    # Setup: start from m_plus_F (broken polar symmetry), apply +Bz +
-    # small +Bx (parity breaker so the m=+F state isn't trivially
-    # immune to any perturbation). ITP should converge to ⟨F_z⟩ > 0
-    # (and ⟨F_x⟩ > 0 from the Bx component).
-    @testset "+Bz → ⟨F_z⟩ > 0 (with Bx parity breaker)" begin
+    # --- Linear Zeeman (z): +p → ⟨F_z⟩ > 0 (operator H = -p·F_z) ---
+    # `p` is the dimensionless Kawaguchi-Ueda coefficient (p ≡ -g_F μ_B B),
+    # set directly here — NOT a physical field. The operator H_z = -p·F_z
+    # has low E at +F_z for +p, so ITP converges to ⟨F_z⟩ > 0. (Physical
+    # +Bz on a g_F>0 atom maps to p<0 → spin down; see the physical-units
+    # oracle below.) Start from m_plus_F + small +Bx parity breaker.
+    @testset "+p → ⟨F_z⟩ > 0 (operator H = -p·F_z)" begin
         # TimeDependentZeeman(p_wf, q_wf, bx_wf, by_wf) — p first = Bz.
         grid = make_grid(GridConfig((8, 8, 8), (4.0, 4.0, 4.0)))
         zeeman = TimeDependentZeeman(
@@ -108,6 +108,38 @@ using SpinorBEC
         dV = cell_volume(grid)
         @test sum(fy) * dV > 0.5
         @test sum(fz) * dV > 0.1
+    end
+
+    # --- Physical-units oracle: +Bz (Gauss) on a g_F>0 atom → ⟨F_z⟩ < 0 ---
+    # The gate that locks the B→p conversion sign (`Units.bfield_to_p`). It
+    # exercises the full physical chain (g_F applied to a Gauss field) and is
+    # anchored to the convention-free fact that the atomic moment is
+    # anti-parallel to F (μ = -g_F μ_B F): at +Bz a g_F>0 atom (He*, Eu, Cr)
+    # has its angular momentum point DOWN. He4* (g_F = +2, pure electron spin
+    # S=1) is the cleanest case. See
+    # `mistake_zeeman_groundstate_direction_inverted_2026_06_10`.
+    @testset "physical +Bz on g_F>0 atom → ⟨F_z⟩ < 0" begin
+        grid = make_grid(GridConfig((8, 8, 8), (4.0, 4.0, 4.0)))
+        omega_ref = 2π * 1.0e6
+        bz = SpinorBEC._gauss_to_dimless(1.0, He4star.g_F, omega_ref)  # +Bz = 1 G
+        @test He4star.g_F > 0 && bz < 0    # g_F>0: +Bz maps to p<0 (K-U)
+        zeeman = TimeDependentZeeman(
+            ConstantWaveform(bz), ConstantWaveform(0.0),
+            ConstantWaveform(0.0), ConstantWaveform(0.0),
+        )
+        r = find_ground_state(;
+            grid, atom=He4star,
+            interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
+            zeeman, potential=HarmonicTrap((1.0, 1.0, 1.0)),
+            dt=0.01, n_steps=400, tol=0.0,
+            initial_state=:spin_coherent,
+            init_state_params=Dict(:init_theta => π / 2, :init_phi => 0.0),
+            verbose=false, enable_ddi=false,
+        )
+        psi = Array(r.workspace.state.psi)
+        sm = r.workspace.spin_matrices
+        _, _, fz = spin_density_vector(psi, sm, 3)
+        @test sum(fz) * cell_volume(grid) < -0.5   # spin DOWN (moment ∥ +B)
     end
 
     # --- Coriolis (orbital): +Ω → vortex (x+iy)·gauss amplified ---
