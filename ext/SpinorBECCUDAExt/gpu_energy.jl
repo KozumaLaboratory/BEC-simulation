@@ -189,9 +189,20 @@ function SpinorBEC._energy_decomposition_gpu(ws::SpinorBEC.Workspace{N}) where {
     # on the host-side `psi` already prepared above.
     E_mg = SpinorBEC._magnetic_gradient_energy(psi, ws, N, n_pts, dV)
 
+    # Spatial Zeeman (arbitrary B(r)): always 0 on a GPU workspace
+    # (make_workspace rejects spatial_zeeman + GPU backend), but the slot
+    # must exist for shape parity with the CPU registry NamedTuple.
+    E_sz = if ws.spatial_zeeman === nothing
+        0.0
+    else
+        sm = ws.spin_matrices
+        SpinorBEC._spatial_zeeman_energy(
+            psi, ws.spatial_zeeman, sm, sm.system.F, sm.system.n_components, N, n_pts, dV)
+    end
+
     E_total =
         E_kin + E_trap + E_zee + E_c0 + E_c1 + E_ddi + E_lhy + E_tensor + E_raman +
-        E_light_shift + E_coriolis + E_mg
+        E_light_shift + E_coriolis + E_mg + E_sz
     (
         kinetic=E_kin,
         trap=E_trap,
@@ -205,6 +216,7 @@ function SpinorBEC._energy_decomposition_gpu(ws::SpinorBEC.Workspace{N}) where {
         light_shift=E_light_shift,
         coriolis=E_coriolis,
         magnetic_gradient=E_mg,
+        spatial_zeeman=E_sz,
         # Shape parity with the CPU registry path (App. A defect 7):
         # B1 added :loss to energy_decomposition_via_registry_legacy_shape
         # (identically zero — K3 loss is non-Hermitian, no GP energy);

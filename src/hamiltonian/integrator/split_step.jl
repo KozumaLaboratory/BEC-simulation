@@ -439,6 +439,16 @@ Forward half of the V(dt/2) outer operator chain. Applied at time `t_eval`
 operators that consume it. `mg_active=true` wraps the diag step in
 magnetic-gradient apply/remove (RTP only).
 """
+# Arbitrary B(r) spatial Zeeman step (CPU-only; gated off when inactive, and
+# make_workspace forbids spatial_zeeman on a GPU backend so ws.state.psi is a
+# host Array whenever this fires). Time-independent field in v1.
+@inline function _apply_spatial_zeeman_step!(ws, dt, imaginary_time)
+    ws.spatial_zeeman === nothing && return nothing
+    apply_spatial_zeeman_step!(
+        ws.state.psi, ws.spatial_zeeman, ws.spin_matrices, dt, imaginary_time)
+    nothing
+end
+
 function _outer_operators_fwd!(
     ws::Workspace{N}, dt_outer, ndim, imaginary_time;
     t_eval::Float64=ws.state.t,
@@ -490,6 +500,8 @@ function _outer_operators_fwd!(
 
     _apply_transverse_zeeman_step!(ws, t_eval, dt_outer, ndim, imaginary_time)
 
+    _apply_spatial_zeeman_step!(ws, dt_outer, imaginary_time)
+
     if ws.raman !== nothing
         raman_now = raman_at(ws.raman, t_eval)
         @timeit_debug TIMER "raman" apply_raman_step!(
@@ -522,6 +534,8 @@ function _outer_operators_bwd!(
             ws.state.psi, ws.spin_matrices, raman_now, ws.grid, dt_outer; imaginary_time
         )
     end
+
+    _apply_spatial_zeeman_step!(ws, dt_outer, imaginary_time)
 
     _apply_transverse_zeeman_step!(ws, t_eval, dt_outer, ndim, imaginary_time)
 

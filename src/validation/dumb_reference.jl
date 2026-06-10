@@ -196,6 +196,15 @@ function dumb_mg_resolved(ws)
     return (gradient=g, axis=mg.axis, g_F=mg.g_F)
 end
 
+# Spatial Zeeman field arrays read DIRECTLY off the workspace (independence
+# contract: bypass the production accessors). Restates the operator
+# H(r) = -(bx·F_x + by·F_y + bz·F_z) + q·F_z² as per-voxel field data.
+function dumb_spatial_zeeman(ws)
+    sz = ws.spatial_zeeman
+    sz === nothing && return nothing
+    return (bx=sz.bx, by=sz.by, bz=sz.bz, q=sz.q)
+end
+
 # ============================================================================
 # Dumb spinor field helpers
 # ============================================================================
@@ -592,11 +601,24 @@ function dumb_energy_breakdown(
         E_mg *= dV
     end
 
+    # spatial zeeman: per-voxel -(bz·F_z + bx·F_x + by·F_y) + q·F_z²
+    sz = dumb_spatial_zeeman(ws)
+    E_sz = 0.0
+    if sz !== nothing
+        for I in _dumb_spatial(ψ)
+            for c in 1:D
+                E_sz += (-sz.bz[I] * sm.m[c] + sz.q[I] * sm.m[c]^2) * abs2(ψ[I, c])
+            end
+            E_sz += -sz.bx[I] * fx[I] - sz.by[I] * fy[I]
+        end
+        E_sz *= dV
+    end
+
     return (
         kinetic=E_kin, trap=E_trap, zeeman=E_zz + E_zt,
         density_c0=E_c0, spin_c1=E_c1, ddi=E_ddi, lhy=E_lhy,
         tensor=E_singlet, raman=E_raman, light_shift=E_ls, coriolis=E_cor,
-        magnetic_gradient=E_mg, loss=0.0,
+        magnetic_gradient=E_mg, spatial_zeeman=E_sz, loss=0.0,
     )
 end
 
@@ -755,11 +777,30 @@ function dumb_rhs_breakdown(
         end
     end
 
+    # spatial zeeman: per-voxel matrix H(r)·ψ, H = -(bx Fx + by Fy + bz Fz) + q Fz²
+    sz = dumb_spatial_zeeman(ws)
+    g_sz = zed()
+    if sz !== nothing
+        for I in _dumb_spatial(ψ)
+            H = (-sz.bx[I]) .* sm.Fx .+ (-sz.by[I]) .* sm.Fy .+ (-sz.bz[I]) .* sm.Fz
+            for c in 1:D
+                H[c, c] += sz.q[I] * sm.m[c]^2
+            end
+            for c in 1:D
+                s = zero(ComplexF64)
+                for cp in 1:D
+                    s += H[c, cp] * ψ[I, cp]
+                end
+                g_sz[I, c] = s
+            end
+        end
+    end
+
     return (
         kinetic=g_kin, trap=g_trap, zeeman=g_zz .+ g_zt,
         density_c0=g_c0, spin_c1=g_c1, ddi=g_ddi, lhy=g_lhy,
         tensor=g_singlet, raman=g_raman, light_shift=g_ls, coriolis=g_cor,
-        magnetic_gradient=g_mg, loss=zed(),
+        magnetic_gradient=g_mg, spatial_zeeman=g_sz, loss=zed(),
     )
 end
 

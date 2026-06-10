@@ -155,6 +155,11 @@ struct Workspace{
     # parameterised on N which is already a Workspace type parameter,
     # so Union splitting gives the call site a concrete narrowed type.
     magnetic_gradient::Union{Nothing, MagneticGradient{N}, TimeDependentMagneticGradient{N}}
+    # `spatial_zeeman::Union{Nothing, SpatialZeemanField{N}}` — arbitrary B(r)
+    # Zeeman field (SpatialZeemanTerm). Concrete arm is parameterised on N
+    # (already a Workspace param), so Union splitting narrows to concrete.
+    # CPU-only propagator; make_workspace rejects GPU / spin-rotating frame.
+    spatial_zeeman::Union{Nothing, SpatialZeemanField{N}}
 end
 
 """

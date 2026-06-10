@@ -17,7 +17,7 @@ const _MAKE_WORKSPACE_KWARGS = (
     :grid, :atom, :interactions, :sim_params,
     # Optional physics terms
     :zeeman, :potential, :raman, :loss, :light_shift,
-    :magnetic_gradient, :time_dep_interactions, :absorbing_boundary,
+    :magnetic_gradient, :spatial_zeeman, :time_dep_interactions, :absorbing_boundary,
     # DDI bundle
     :enable_ddi, :c_dd, :secular_ddi, :quasi_2d_ddi, :l_z_ddi, :ddi_padding,
     # Quasi-2D bundle
@@ -53,6 +53,7 @@ function make_workspace(;
     light_shift::Union{Nothing, LightShift}=nothing,
     time_dep_interactions::Union{Nothing, TimeDependentInteractions}=nothing,
     magnetic_gradient::Union{Nothing, MagneticGradient, TimeDependentMagneticGradient}=nothing,
+    spatial_zeeman::Union{Nothing, SpatialZeemanField}=nothing,
     dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
 ) where {N, T <: AbstractFloat}
     U = dtype === nothing ? T : dtype
@@ -62,6 +63,14 @@ function make_workspace(;
         ),
     )
     backend = _resolve_backend(backend, grid)
+    if spatial_zeeman !== nothing
+        backend isa CPUBackend || throw(ArgumentError(
+            "spatial_zeeman (arbitrary B(r)) has a CPU-only per-voxel propagator; " *
+            "run on a CPU backend"))
+        is_active(sim_params.spin_rotating_frame_omega, ROTATION_TOL) && throw(ArgumentError(
+            "spatial_zeeman is not supported together with a spin-rotating frame " *
+            "(spin_rotating_frame_omega ≠ 0) in v1"))
+    end
     if quasi_2d
         N == 2 || throw(ArgumentError("quasi_2d requires 2D grid, got $(N)D"))
         l_z > 0 || throw(ArgumentError("quasi_2d requires l_z > 0"))
@@ -360,6 +369,7 @@ function make_workspace(;
         light_shift_resolved,
         time_dep_interactions,
         magnetic_gradient,
+        spatial_zeeman,
     )
 end
 

@@ -27,7 +27,7 @@ using SpinorBEC:
 using SpinorBEC: dumb_energy_breakdown, dumb_rhs_breakdown, DUMB_DEFERRED_SLOTS
 using SpinorBEC: KineticTerm, TrapTerm, ZeemanTerm,
     DensityC0Term, SpinC1Term, DDITerm, LHYTerm, TensorTerm, RamanTerm,
-    LightShiftTerm, CoriolisTerm, MagneticGradientTerm, LossTerm
+    LightShiftTerm, CoriolisTerm, MagneticGradientTerm, SpatialZeemanTerm, LossTerm
 using Random
 
 include(joinpath(@__DIR__, "..", "helpers", "fd_gradient.jl"))
@@ -38,7 +38,8 @@ const SLOT_TERM = (;
     density_c0=DensityC0Term,
     spin_c1=SpinC1Term, ddi=DDITerm, lhy=LHYTerm, tensor=TensorTerm,
     raman=RamanTerm, light_shift=LightShiftTerm, coriolis=CoriolisTerm,
-    magnetic_gradient=MagneticGradientTerm, loss=LossTerm,
+    magnetic_gradient=MagneticGradientTerm, spatial_zeeman=SpatialZeemanTerm,
+    loss=LossTerm,
 )
 
 const PRODUCTION_RHS_GAPS = (:raman,)  # :tensor gradient implemented 2026-06-09
@@ -147,6 +148,29 @@ end
         compare_all_slots(ws, psi, "R:coherent")
         ψr = rand_offmanifold_state(ws; rng)
         compare_all_slots(ws, ψr, "R:random")
+    end
+
+    @testset "fixture SZ (1D, arbitrary B(r) active)" begin
+        # Activates SpatialZeemanTerm with a non-trivial varying field so the
+        # dumb-vs-production comparison of the :spatial_zeeman slot is
+        # non-trivial (every other slot is inactive ⇒ 0 = 0).
+        rng = MersenneTwister(31)
+        grid = make_grid(GridConfig{1}((12,), (6.0,)))
+        sys = SpinSystem(1)
+        field = spatial_zeeman_field(grid;
+            bz=(x,) -> 0.4 + 0.15x,
+            bx=(x,) -> 0.2 - 0.1x,
+            by=(x,) -> 0.05x^2,
+            q=(x,) -> 0.03 + 0.02x^2)
+        ws = make_workspace(; grid, atom=Rb87,
+            interactions=InteractionParams(Dict{Int, Float64}()),
+            potential=HarmonicTrap((1.0,)),
+            sim_params=SimParams(; dt=0.01, n_steps=1),
+            spatial_zeeman=field)
+        psi = init_psi(grid, sys; state=:m_plus_F)
+        compare_all_slots(ws, psi, "SZ:coherent")
+        ψr = rand_offmanifold_state(ws; rng)
+        compare_all_slots(ws, ψr, "SZ:random")
     end
 
     # Hermiticity of the LINEAR production faces: ⟨φ|Hχ⟩ = ⟨Hφ|χ⟩ on
