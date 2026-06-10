@@ -16,7 +16,7 @@
 # `Vector{HamTerm}`) to hold the term list in `Workspace`. The Julia
 # compiler then specializes `for term in tuple` per-element, producing
 # code equivalent to direct hand-written calls — zero abstraction
-# overhead. Concrete `<: HamTerm` subtypes (e.g. `LinearZeemanZTerm`) make
+# overhead. Concrete `<: HamTerm` subtypes (e.g. `ZeemanTerm`) make
 # `apply_step!(term, ...)` a compile-time dispatch.
 
 """
@@ -105,7 +105,7 @@ function sign_oracle end
 Per-call scratch container shared across `energy_contribution(term,
 psi, ws, ctx)` invocations. Pre-builds the total density and
 spatial-spin density (`fx, fy, fz`) so DensityC0Term, SpinC1Term,
-LHYTerm, TransverseZeemanTerm, CoriolisTerm and others do not
+LHYTerm, ZeemanTerm, CoriolisTerm and others do not
 duplicate that work.
 """
 struct EnergyContext{ND, PsiT, FFTPlan, SM, NRho, NF}

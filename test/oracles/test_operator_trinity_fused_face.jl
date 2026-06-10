@@ -28,7 +28,7 @@ using Test
 using SpinorBEC
 using SpinorBEC: apply_operator!, _diagonal_step_svec!
 using SpinorBEC:
-    TrapTerm, LinearZeemanZTerm, DensityC0Term, LHYTerm, LightShiftTerm
+    TrapTerm, ZeemanTerm, DensityC0Term, LHYTerm, LightShiftTerm
 using LinearAlgebra
 using StaticArrays
 using Random
@@ -53,7 +53,7 @@ using Random
         Hpsi_sum = zero(psi)
         buf = similar(psi)
         for term in (TrapTerm(), DensityC0Term(0.5), LHYTerm(),
-            LinearZeemanZTerm(0.2, 0.05))
+            ZeemanTerm(0.0, 0.0, 0.2, 0.05))
             fill!(buf, 0)
             apply_operator!(buf, term, ws, psi)
             Hpsi_sum .+= buf
@@ -101,7 +101,7 @@ using Random
         Hpsi_sum = zero(psi)
         buf = similar(psi)
         for term in (TrapTerm(), DensityC0Term(0.5), LHYTerm(),
-            LinearZeemanZTerm(0.2, 0.05))
+            ZeemanTerm(0.0, 0.0, 0.2, 0.05))
             fill!(buf, 0)
             apply_operator!(buf, term, ws, psi)
             Hpsi_sum .+= buf

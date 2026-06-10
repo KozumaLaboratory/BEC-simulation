@@ -28,7 +28,7 @@
 #   over cleverness everywhere.
 #
 # Coverage (slots of H_TERMS_CANONICAL_ORDER):
-# - implemented: ALL 14 — kinetic, trap, zeeman_z, zeeman_transverse,
+# - implemented: ALL 13 — kinetic, trap, zeeman,
 #   density_c0, spin_c1, ddi (periodic, full + secular kernels), lhy
 #   (scalar), tensor (c2 singlet part), raman, light_shift, coriolis,
 #   magnetic_gradient, loss (≡ 0).
@@ -593,7 +593,7 @@ function dumb_energy_breakdown(
     end
 
     return (
-        kinetic=E_kin, trap=E_trap, zeeman_z=E_zz, zeeman_transverse=E_zt,
+        kinetic=E_kin, trap=E_trap, zeeman=E_zz + E_zt,
         density_c0=E_c0, spin_c1=E_c1, ddi=E_ddi, lhy=E_lhy,
         tensor=E_singlet, raman=E_raman, light_shift=E_ls, coriolis=E_cor,
         magnetic_gradient=E_mg, loss=0.0,
@@ -756,7 +756,7 @@ function dumb_rhs_breakdown(
     end
 
     return (
-        kinetic=g_kin, trap=g_trap, zeeman_z=g_zz, zeeman_transverse=g_zt,
+        kinetic=g_kin, trap=g_trap, zeeman=g_zz .+ g_zt,
         density_c0=g_c0, spin_c1=g_c1, ddi=g_ddi, lhy=g_lhy,
         tensor=g_singlet, raman=g_raman, light_shift=g_ls, coriolis=g_cor,
         magnetic_gradient=g_mg, loss=zed(),

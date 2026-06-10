@@ -10,7 +10,7 @@
 # The fused group is:
 #   c0 (density)          ← DensityC0Term
 #   c1 (spin-mixing)      ← SpinC1Term
-#   zeeman_z (linear)     ← LinearZeemanZTerm  (p F_z + q F_z²)
+#   zeeman (diagonal)     ← ZeemanTerm  (-p F_z + q F_z²)
 #   light_shift           ← LightShiftTerm   (diagonal in m basis)
 #   LHY                   ← LHYTerm
 #

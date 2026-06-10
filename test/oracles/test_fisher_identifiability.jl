@@ -58,7 +58,7 @@ end
 
 function _slot_energies(θ)
     Ed = dumb_energy_breakdown(_ws_at(θ), PSI_F; ddi_secular=false)
-    return [Ed.density_c0, Ed.spin_c1, Ed.ddi, Ed.zeeman_z]
+    return [Ed.density_c0, Ed.spin_c1, Ed.ddi, Ed.zeeman]
 end
 
 _total_energy_only(θ) = [sum(_slot_energies(θ))]

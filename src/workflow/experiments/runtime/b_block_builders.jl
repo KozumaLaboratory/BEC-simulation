@@ -24,8 +24,14 @@ const _ZEEMAN_SAMPLE_N = 1024  # default — override via `B.n_samples`.
 
 The Zeeman Hamiltonian has two mathematically independent contributions:
 
-    H_Zeeman = -(g_F μ_B B · F) + q F_z²
-               ↑ vector (chooses coord system)   ↑ scalar (orthogonal)
+    H_Zeeman = -p·F_z + q F_z²,  p ≡ -g_F μ_B B   (Kawaguchi-Ueda form)
+             = +(g_F μ_B B · F) + q F_z²          (physical: μ = -g_F μ_B F)
+               ↑ vector (chooses coord system)    ↑ scalar (orthogonal)
+
+    The operator form is -p·F_z (every spinor-BEC paper). The lab field
+    enters via p = -g_F μ_B B (the single signed conversion lives in
+    `Units.bfield_to_p`), so +Bz on a g_F>0 atom gives ground state m=-F
+    (spin down). Sign corrected 2026-06-10.
 
 Auto-detect the vector-term coord system from keys:
 
@@ -93,15 +99,15 @@ end
 """
     _gauss_to_dimless(B_gauss, g_F, omega_ref) -> Float64
 
-Pure scalar conversion `p = g_F · μ_B · B[T] / (ℏ · ω_ref)`. Used by tests
-and by `_convert_B_waveform`.
+Gauss → dimensionless linear Zeeman `p`. Delegates to `Units.bfield_to_p`,
+the single signed SSoT (`p = -g_F · μ_B · B[T] / (ℏ · ω_ref)`, K-U convention).
 """
 @inline function _gauss_to_dimless(B_gauss::Float64, g_F::Float64, omega_ref::Float64)
-    g_F * Units.MU_BOHR * B_gauss * _GAUSS_TO_TESLA / (Units.HBAR * omega_ref)
+    Units.bfield_to_p(B_gauss, g_F, omega_ref)
 end
 
 @inline function _gauss_to_dimless_factor(g_F::Float64, omega_ref::Float64)
-    g_F * Units.BOHR_MAGNETON * _GAUSS_TO_TESLA / (Units.HBAR * omega_ref)
+    Units.bfield_to_p(1.0, g_F, omega_ref)   # per-Gauss factor (1 G)
 end
 
 """

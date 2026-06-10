@@ -24,7 +24,7 @@
 using Test
 using SpinorBEC
 using SpinorBEC: HamTerm, apply_operator!, energy_contribution, apply_step!
-using SpinorBEC: KineticTerm, LinearZeemanZTerm, DensityC0Term,
+using SpinorBEC: KineticTerm, ZeemanTerm, DensityC0Term,
     LHYTerm, TensorTerm, RamanTerm
 using Random
 
@@ -59,8 +59,8 @@ end
         v.kind === :valley && @test SLOPE_BAND[1] < v.slope < SLOPE_BAND[2]
     end
 
-    @testset "LinearZeemanZTerm (quadratic, spin-diagonal)" begin
-        v, _, _ = step0_valley(registry_term(ws, LinearZeemanZTerm), ws, psi; rng)
+    @testset "ZeemanTerm (quadratic energy)" begin
+        v, _, _ = step0_valley(registry_term(ws, ZeemanTerm), ws, psi; rng)
         @test v.kind in (:exact_floor, :valley)
         @test v.min_err < VALLEY_MIN
         v.kind === :valley && @test SLOPE_BAND[1] < v.slope < SLOPE_BAND[2]

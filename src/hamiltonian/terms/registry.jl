@@ -3,7 +3,7 @@
 # Phase 3 (Phase 1-3 = the "sign-bug-proof architecture";
 # `docs/conventions/sign_bug_proof_architecture.md`).
 #
-# The registry is an `NTuple{14, HamTerm}` derived from a Workspace.
+# The registry is an `NTuple{13, HamTerm}` derived from a Workspace.
 # Hot paths (`energy_decomposition`, `energy_gradient!`,
 # `split_step!`) delegate to the registry; per-term implementations
 # declare their sign in one place (`apply_step!` /
@@ -46,8 +46,7 @@ and `energy_breakdown_via_registry` use. Adding a new term means:
 const H_TERMS_CANONICAL_ORDER = (
     :kinetic,
     :trap,
-    :zeeman_z,
-    :zeeman_transverse,
+    :zeeman,
     :density_c0,
     :spin_c1,
     :ddi,
@@ -61,7 +60,7 @@ const H_TERMS_CANONICAL_ORDER = (
 )
 
 """
-    build_h_terms_registry(ws) → NTuple{14, HamTerm}
+    build_h_terms_registry(ws) → NTuple{13, HamTerm}
 
 Build a fresh NTuple from `ws` for the current `t = ws.state.t`. For
 time-dependent fields (Zeeman, MagneticGradient, Coriolis Ω) the
@@ -96,8 +95,7 @@ function build_h_terms_registry(ws)
     return (
         KineticTerm(),
         TrapTerm(),
-        LinearZeemanZTerm(p_eff, z.q),
-        TransverseZeemanTerm(bx, by),
+        ZeemanTerm(bx, by, p_eff, z.q),
         DensityC0Term(ws.interactions[0]),
         SpinC1Term(ws.interactions[1]),
         DDITerm(),
@@ -241,8 +239,6 @@ in the historic shape `(kinetic, trap, zeeman, density, spin, ddi,
 lhy, tensor, raman, light_shift, coriolis, total)`.
 """
 function legacy_energy_field_for(slot::Symbol)
-    slot === :zeeman_z && return :zeeman_z_only
-    slot === :zeeman_transverse && return :zeeman_transverse_only
     slot === :density_c0 && return :density
     slot === :spin_c1 && return :spin
     return slot
@@ -261,11 +257,10 @@ present and is reported in the extra `_extra` NamedTuple).
 """
 function energy_decomposition_via_registry_legacy_shape(ws)
     bd = energy_breakdown_via_registry(ws)
-    zeeman = bd.zeeman_z + bd.zeeman_transverse
     return (
         kinetic=bd.kinetic,
         trap=bd.trap,
-        zeeman=zeeman,
+        zeeman=bd.zeeman,
         density=bd.density_c0,
         spin=bd.spin_c1,
         ddi=bd.ddi,

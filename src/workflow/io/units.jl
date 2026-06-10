@@ -52,15 +52,26 @@ end
 """
     bfield_to_p(B, g_F, omega_ref) -> Float64
 
-Dimensionless linear Zeeman p = g_F · μ_B · B / (ℏ · ω_ref) for B given as
-either a Quantity (any magnetic-flux-density unit, e.g. Gauss, Tesla, mT)
-or a `Real` in **Gauss** (default unit for B-fields in this codebase).
+THE single source for the lab-field → dimensionless linear-Zeeman conversion.
+Kawaguchi–Ueda convention:
+
+    p = -g_F · μ_B · B / (ℏ · ω_ref)
+
+The minus sign is physical: the atomic moment is μ = -g_F μ_B F (g_F>0 ⇒
+anti-parallel to F), so the linear Zeeman operator H = -p·F_z equals
++g_F μ_B B·F_z, and +Bz on a g_F>0 atom (Eu, Cr, He*) lands the ground
+state at m = -F (spin down). g_F is stored at its literature (Steck/NIST)
+sign. Every B→p conversion (`_gauss_to_dimless`, `_gauss_to_dimless_factor`,
+`Preset.p_per_field`) delegates here — the sign lives in ONE place. Sign
+corrected 2026-06-10; see `mistake_zeeman_groundstate_direction_inverted_2026_06_10`.
+
+`B` is a Quantity (any magnetic-flux-density unit) or a `Real` in **Gauss**.
 """
 function bfield_to_p(B::Quantity, g_F::Real, omega_ref::Real)
     dimension(B) == DIM_BFIELD ||
         throw(ArgumentError("bfield_to_p expects magnetic-flux-density; got $(unit(B))"))
     B_T = ustrip(u"T", B)
-    g_F * BOHR_MAGNETON * B_T / (HBAR * omega_ref)
+    -g_F * BOHR_MAGNETON * B_T / (HBAR * omega_ref)
 end
 bfield_to_p(B::Real, g_F::Real, omega_ref::Real) = bfield_to_p(
     Float64(B) * u"Gauss", g_F, omega_ref

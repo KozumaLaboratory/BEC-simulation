@@ -63,7 +63,7 @@ function Preset(
     c_dd::Real,
 ) where {N, P <: AbstractPotential}
     a_ho = sqrt(Units.HBAR / (atom.mass * omega_ref))
-    p_per_field = atom.g_F * Units.MU_BOHR / (Units.HBAR * omega_ref)
+    p_per_field = Units.bfield_to_p(1.0e4, atom.g_F, omega_ref)  # per Tesla (1e4 G = 1 T); signed SSoT
     p_per_nT = 1.0e-9 * p_per_field
     c0 = get(interactions.c, 0, 0.0)
     c1 = get(interactions.c, 1, 0.0)

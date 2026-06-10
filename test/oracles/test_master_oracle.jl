@@ -25,7 +25,7 @@ using SpinorBEC:
     HamTerm, apply_operator!, energy_contribution,
     H_TERMS_CANONICAL_ORDER, build_h_terms_registry
 using SpinorBEC: dumb_energy_breakdown, dumb_rhs_breakdown, DUMB_DEFERRED_SLOTS
-using SpinorBEC: KineticTerm, TrapTerm, LinearZeemanZTerm, TransverseZeemanTerm,
+using SpinorBEC: KineticTerm, TrapTerm, ZeemanTerm,
     DensityC0Term, SpinC1Term, DDITerm, LHYTerm, TensorTerm, RamanTerm,
     LightShiftTerm, CoriolisTerm, MagneticGradientTerm, LossTerm
 using Random
@@ -34,8 +34,8 @@ include(joinpath(@__DIR__, "..", "helpers", "fd_gradient.jl"))
 include(joinpath(@__DIR__, "..", "helpers", "oracle_fixtures.jl"))
 
 const SLOT_TERM = (;
-    kinetic=KineticTerm, trap=TrapTerm, zeeman_z=LinearZeemanZTerm,
-    zeeman_transverse=TransverseZeemanTerm, density_c0=DensityC0Term,
+    kinetic=KineticTerm, trap=TrapTerm, zeeman=ZeemanTerm,
+    density_c0=DensityC0Term,
     spin_c1=SpinC1Term, ddi=DDITerm, lhy=LHYTerm, tensor=TensorTerm,
     raman=RamanTerm, light_shift=LightShiftTerm, coriolis=CoriolisTerm,
     magnetic_gradient=MagneticGradientTerm, loss=LossTerm,
@@ -110,7 +110,7 @@ end
         Gd = dumb_rhs_breakdown(ws, psi)
         @test Tuple(keys(Ed)) == H_TERMS_CANONICAL_ORDER
         @test Tuple(keys(Gd)) == H_TERMS_CANONICAL_ORDER
-        @test DUMB_DEFERRED_SLOTS == ()   # full 14/14 coverage since the DDI unit
+        @test DUMB_DEFERRED_SLOTS == ()   # full 13/13 coverage since the DDI unit
     end
 
     @testset "fixture A (3D, full incl. secular DDI)" begin
@@ -164,7 +164,7 @@ end
         φ = rand_offmanifold_state(ws; rng)
         χ = rand_offmanifold_state(ws; rng)
         registry = build_h_terms_registry(ws)
-        for slot in (:kinetic, :trap, :zeeman_z, :zeeman_transverse,
+        for slot in (:kinetic, :trap, :zeeman,
             :light_shift, :magnetic_gradient)
             T = getfield(SLOT_TERM, slot)
             term = nothing
@@ -304,11 +304,7 @@ end
             # source to drift to, so no violation is possible to guard.
             @testset "$label canary completeness (class guard)" begin
                 @test !isempty(mutant_checked)
-                expected = if label == "A"
-                    (:zeeman_z, :zeeman_transverse, :density_c0, :spin_c1)
-                else
-                    (:zeeman_z, :density_c0, :spin_c1)
-                end
+                expected = (:zeeman, :density_c0, :spin_c1)
                 for slot in expected
                     @test slot in mutant_checked
                 end
