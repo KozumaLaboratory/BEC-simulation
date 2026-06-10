@@ -169,4 +169,3 @@ function apply_light_shift_step!(
         apply_light_shift_step!(p, ls, dt_frac, ndim; imaginary_time)
     end
 end
-

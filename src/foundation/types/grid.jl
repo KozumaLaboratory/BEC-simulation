@@ -40,4 +40,3 @@ struct Grid{N, T <: AbstractFloat}
     dk::NTuple{N, T}
     k_squared::Array{T, N}
 end
-

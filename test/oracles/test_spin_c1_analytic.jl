@@ -27,7 +27,9 @@ using SpinorBEC: SpinC1Term, apply_operator!, energy_contribution, spin_matrices
         D = 2F + 1
         dV = cell_volume(grid)
         sm = spin_matrices(F)
-        Fx = Matrix(sm.Fx); Fy = Matrix(sm.Fy); Fz = Matrix(sm.Fz)
+        Fx = Matrix(sm.Fx);
+        Fy = Matrix(sm.Fy);
+        Fz = Matrix(sm.Fz)
         c1 = 0.4
         psi = randn(ComplexF64, 6, 6, 6, D)
         psi ./= sqrt(sum(abs2, psi) * dV)
@@ -37,7 +39,9 @@ using SpinorBEC: SpinC1Term, apply_operator!, energy_contribution, spin_matrices
         f2int = 0.0
         @inbounds for I in CartesianIndices((6, 6, 6))
             v = psi[I, :]
-            fx = real(v' * Fx * v); fy = real(v' * Fy * v); fz = real(v' * Fz * v)
+            fx = real(v' * Fx * v);
+            fy = real(v' * Fy * v);
+            fz = real(v' * Fz * v)
             expected[I, :] = c1 * (fx * Fx + fy * Fy + fz * Fz) * v
             f2int += fx^2 + fy^2 + fz^2
         end

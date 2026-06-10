@@ -11,7 +11,8 @@
 using Test
 using FFTW
 using SpinorBEC
-using SpinorBEC: KineticTerm, TrapTerm, ZeemanTerm,
+using SpinorBEC:
+    KineticTerm, TrapTerm, ZeemanTerm,
     CoriolisTerm, apply_operator!, energy_contribution
 
 @testset "Linear term energy = Re⟨ψ|Hψ⟩·dV" begin

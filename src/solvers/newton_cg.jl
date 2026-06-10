@@ -86,7 +86,7 @@ function newton_cg_ground_state(
 
     energy_at(ϕ) = (copyto!(ws.state.psi, ϕ); total_energy(ws))
     # M-inner-product pieces (fresh M·v so callers never alias fft_buf).
-    Mmul(v) = (mv = copy(v); _sobolev_metric!(mv, ws, k2, sobolev_alpha); mv)
+    Mmul(v) = (mv=copy(v); _sobolev_metric!(mv, ws, k2, sobolev_alpha); mv)
     Mdot(a, b) = ipR(a, Mmul(b))
     function Minv(r, prm)               # preconditioned residual, re-projected
         z = copy(r)

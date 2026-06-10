@@ -21,7 +21,8 @@ using Test
 using FFTW
 using LinearAlgebra
 using SpinorBEC
-using SpinorBEC: LightShiftTerm, apply_operator!, energy_contribution,
+using SpinorBEC:
+    LightShiftTerm, apply_operator!, energy_contribution,
     spin_matrices, make_light_shift
 
 @testset "LightShiftTerm = profile·M·ψ, E = ∫ I ⟨ψ|M|ψ⟩" begin

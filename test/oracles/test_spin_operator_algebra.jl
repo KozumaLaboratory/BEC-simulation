@@ -16,7 +16,9 @@ using SpinorBEC: spin_matrices
 @testset "Spin operator algebra (su(2))" begin
     for F in 1:6
         sm = spin_matrices(F)
-        Fx = Matrix(sm.Fx); Fy = Matrix(sm.Fy); Fz = Matrix(sm.Fz)
+        Fx = Matrix(sm.Fx);
+        Fy = Matrix(sm.Fy);
+        Fz = Matrix(sm.Fz)
         D = 2F + 1
         Id = Matrix{ComplexF64}(I, D, D)
         @testset "F=$F" begin

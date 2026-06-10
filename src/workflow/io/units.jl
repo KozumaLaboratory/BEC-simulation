@@ -137,5 +137,4 @@ function k3_si(q::Quantity)
     Float64(ustrip(u"m^6/s", q))
 end
 
-
 end # module

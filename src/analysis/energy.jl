@@ -35,4 +35,3 @@ end
 # above calls each by its canonical name — Julia resolves to the terms/
 # definition. The trinity dispatch (`energy_contribution(::Term, psi, ws)`)
 # provides the same physics via the registry.
-

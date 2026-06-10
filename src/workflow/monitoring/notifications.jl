@@ -46,4 +46,3 @@ function notify_slack(
     end
     send_slack_notification(String(url), String(title), String(msg), status)
 end
-

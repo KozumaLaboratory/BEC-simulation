@@ -33,7 +33,8 @@ using SpinorBEC: build_h_terms_registry, apply_operator!, compute_c_dd
 
     n_active = 0
     for term in build_h_terms_registry(ws)
-        once = zero(psi); apply_operator!(once, term, ws, psi)
+        once = zero(psi);
+        apply_operator!(once, term, ws, psi)
         twice = zero(psi)
         apply_operator!(twice, term, ws, psi)
         apply_operator!(twice, term, ws, psi)

@@ -10,7 +10,8 @@
 using Test
 using FFTW
 using SpinorBEC
-using SpinorBEC: KineticTerm, apply_step!, probability_current,
+using SpinorBEC:
+    KineticTerm, apply_step!, probability_current,
     total_density, _fft_partial_derivative
 
 @testset "Continuity ∂n/∂t + ∇·j = 0 (free flow)" begin
@@ -27,7 +28,9 @@ using SpinorBEC: KineticTerm, apply_step!, probability_current,
     # smooth Gaussian wavepacket with a transverse phase gradient (moving)
     psi = zeros(ComplexF64, 24, 24, 24, D)
     @inbounds for I in CartesianIndices((24, 24, 24))
-        x = ws.grid.x[1][I[1]]; y = ws.grid.x[2][I[2]]; z = ws.grid.x[3][I[3]]
+        x = ws.grid.x[1][I[1]];
+        y = ws.grid.x[2][I[2]];
+        z = ws.grid.x[3][I[3]]
         psi[I, 1] = exp(-0.5 * (x^2 + y^2 + z^2)) * cis(0.7 * x + 0.4 * y)
     end
     psi ./= sqrt(sum(abs2, psi) * cell_volume(grid))
@@ -41,9 +44,10 @@ using SpinorBEC: KineticTerm, apply_step!, probability_current,
 
     dndt = (n1 .- n0) ./ dt
     jm = ntuple(d -> 0.5 .* (j0[d] .+ j1[d]), 3)      # time-centred current
-    divj = _fft_partial_derivative(jm[1], grid, ws.fft_plans, 1) .+
-           _fft_partial_derivative(jm[2], grid, ws.fft_plans, 2) .+
-           _fft_partial_derivative(jm[3], grid, ws.fft_plans, 3)
+    divj =
+        _fft_partial_derivative(jm[1], grid, ws.fft_plans, 1) .+
+        _fft_partial_derivative(jm[2], grid, ws.fft_plans, 2) .+
+        _fft_partial_derivative(jm[3], grid, ws.fft_plans, 3)
 
     resid = dndt .+ divj
     @test maximum(abs, resid) < 1e-3 * maximum(abs, dndt)

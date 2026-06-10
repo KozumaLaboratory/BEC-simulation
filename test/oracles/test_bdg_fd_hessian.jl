@@ -39,15 +39,17 @@ function _fd_hessian_blocks(F, ζ; c0, c1, ε=1e-5, n=4)
     D = 2F + 1
     grid = make_grid(GridConfig{3}((n, n, n), (4.0, 4.0, 4.0)))
     ws = make_workspace(;
-        grid, atom=(if F == 1
-            Rb87
-        elseif F == 2
-            Rb85
-        elseif F == 3
-            Cr52
-        else
-            Eu151
-        end),
+        grid, atom=(
+            if F == 1
+                Rb87
+            elseif F == 2
+                Rb85
+            elseif F == 3
+                Cr52
+            else
+                Eu151
+            end
+        ),
         interactions=InteractionParams(Dict(0 => c0, 1 => c1)),
         zeeman=ZeemanParams(0.0, 0.0),
         potential=HarmonicTrap(ntuple(_ -> 0.0, 3)),

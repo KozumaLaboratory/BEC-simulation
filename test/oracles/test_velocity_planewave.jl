@@ -21,7 +21,9 @@ using SpinorBEC: superfluid_velocity
     )
     D = ws.spin_matrices.system.n_components
     L = 4.0
-    kx = 2π / L * 1; ky = 2π / L * 2; kz = -2π / L * 1   # integer modes on the grid
+    kx = 2π / L * 1;
+    ky = 2π / L * 2;
+    kz = -2π / L * 1   # integer modes on the grid
 
     psi = zeros(ComplexF64, 8, 8, 8, D)
     @inbounds for I in CartesianIndices((8, 8, 8))

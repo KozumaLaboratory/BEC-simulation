@@ -48,9 +48,12 @@ end
         apply_operator!(out, TrapTerm(), ws, psi)
         expected = similar(psi)
         @inbounds for I in CartesianIndices((8, 8, 8))
-            V = 0.5 * (ωx^2 * ws.grid.x[1][I[1]]^2 +
-                       ωy^2 * ws.grid.x[2][I[2]]^2 +
-                       ωz^2 * ws.grid.x[3][I[3]]^2)
+            V =
+                0.5 * (
+                    ωx^2 * ws.grid.x[1][I[1]]^2 +
+                    ωy^2 * ws.grid.x[2][I[2]]^2 +
+                    ωz^2 * ws.grid.x[3][I[3]]^2
+                )
             for c in 1:D
                 expected[I, c] = V * psi[I, c]
             end

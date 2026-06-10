@@ -31,8 +31,10 @@ using SpinorBEC: build_h_terms_registry, apply_operator!, compute_c_dd
     θ = 0.7
     psiθ = cis(θ) .* psi
     for term in build_h_terms_registry(ws)
-        H1 = zero(psi); apply_operator!(H1, term, ws, psi)
-        H2 = zero(psi); apply_operator!(H2, term, ws, psiθ)
+        H1 = zero(psi);
+        apply_operator!(H1, term, ws, psi)
+        H2 = zero(psi);
+        apply_operator!(H2, term, ws, psiθ)
         # skip inactive terms (both ~0); test covariance on active ones
         if maximum(abs, H1) > 1e-10
             @testset "$(typeof(term))" begin

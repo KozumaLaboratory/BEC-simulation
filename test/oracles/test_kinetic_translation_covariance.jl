@@ -22,7 +22,7 @@ using SpinorBEC: KineticTerm, apply_operator!
     D = ws.spin_matrices.system.n_components
     psi = randn(ComplexF64, 8, 8, 8, D)
     shift = (3, -2, 1)
-    Kp(p) = (o = zero(p); apply_operator!(o, KineticTerm(), ws, p); o)
+    Kp(p) = (o=zero(p); apply_operator!(o, KineticTerm(), ws, p); o)
 
     lhs = Kp(circshift(psi, (shift..., 0)))
     rhs = circshift(Kp(psi), (shift..., 0))

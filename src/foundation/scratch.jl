@@ -28,4 +28,3 @@ function scratch_get!(factory::Function, category::Symbol, key)
     end
     return get!(factory, cache, key)
 end
-

@@ -164,4 +164,3 @@ function hf_matrix_F1(
     h_hf = similar(rho)
     return hf_matrix_F1!(h_hf, phi, rho, kappa, c0, c1)
 end
-

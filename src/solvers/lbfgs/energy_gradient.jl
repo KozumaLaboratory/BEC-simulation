@@ -77,7 +77,6 @@ end
 # parent `energy_gradient!`). Helpers are gated on coupling magnitude so
 # they no-op when the term is inactive.
 
-
 # Per-term gradient bodies (_grad_trap!, _grad_zeeman!, _grad_c0_density!,
 # _grad_lhy!) now live with their HamTerm subtypes in src/hamiltonian/terms/.
 # `energy_gradient!` above calls each by its canonical name — Julia resolves

@@ -10,7 +10,8 @@
 using Test
 using FFTW
 using SpinorBEC
-using SpinorBEC: DensityC0Term, SpinC1Term, DDITerm, apply_operator!,
+using SpinorBEC:
+    DensityC0Term, SpinC1Term, DDITerm, apply_operator!,
     energy_contribution, compute_c_dd
 
 @testset "Nonlinear term energy = ½·Re⟨ψ|Hψ⟩·dV" begin

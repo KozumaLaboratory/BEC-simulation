@@ -24,7 +24,9 @@ using SpinorBEC: ZeemanTerm, apply_operator!, spin_matrices
         )
         D = 2F + 1
         sm = spin_matrices(F)
-        Fx = Matrix(sm.Fx); Fy = Matrix(sm.Fy); Fz = Matrix(sm.Fz)
+        Fx = Matrix(sm.Fx);
+        Fy = Matrix(sm.Fy);
+        Fz = Matrix(sm.Fz)
         bx, by, bz, q = 0.5, -0.3, 0.7, 0.2
         M = -(bx * Fx + by * Fy + bz * Fz) + q * Fz^2     # D×D Hermitian
         psi = randn(ComplexF64, 6, 6, 6, D)

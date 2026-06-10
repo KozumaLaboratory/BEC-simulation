@@ -47,7 +47,7 @@ end
     @test maximum(abs, [x[_mir(i, 8)] + x[i] for i in 1:8]) < 1e-14
 
     psi = randn(ComplexF64, 8, 8, 8, D)
-    Hpsi(p) = (o = zero(p);
+    Hpsi(p) = (o=zero(p);
         apply_operator!(o, KineticTerm(), ws, p);
         apply_operator!(o, TrapTerm(), ws, p); o)
 

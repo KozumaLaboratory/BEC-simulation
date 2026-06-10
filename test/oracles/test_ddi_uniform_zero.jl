@@ -9,7 +9,8 @@
 using Test
 using FFTW
 using SpinorBEC
-using SpinorBEC: DDITerm, apply_operator!, energy_contribution,
+using SpinorBEC:
+    DDITerm, apply_operator!, energy_contribution,
     reference_ddi_potentials, compute_c_dd
 
 @testset "Uniform magnetization ⇒ zero DDI field" begin

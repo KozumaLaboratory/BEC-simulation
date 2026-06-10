@@ -10,7 +10,8 @@
 using Test
 using FFTW
 using SpinorBEC
-using SpinorBEC: DDITerm, energy_contribution, reference_ddi_potentials,
+using SpinorBEC:
+    DDITerm, energy_contribution, reference_ddi_potentials,
     spin_density_vector, compute_c_dd
 
 @testset "E_DDI = (c_dd/2)∫Φ·f (production vs reference)" begin

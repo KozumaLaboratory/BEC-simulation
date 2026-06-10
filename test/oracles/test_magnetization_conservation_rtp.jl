@@ -31,7 +31,8 @@ using SpinorBEC: KineticTerm, TrapTerm, ZeemanTerm, DensityC0Term,
     Fz(p) = sum((F - (c - 1)) * sum(abs2, @view p[:, :, :, c]) for c in 1:D) * dV
     norm(p) = sum(abs2, p) * dV
 
-    Fz0 = Fz(psi); N0 = norm(psi)
+    Fz0 = Fz(psi);
+    N0 = norm(psi)
     dt = 0.005
     terms = (ZeemanTerm(0.0, 0.0, 0.3, 0.05), DensityC0Term(1.0),
         SpinC1Term(0.5), TrapTerm(), KineticTerm())

@@ -83,7 +83,8 @@ const PNAMES = ["c0", "c1", "c_dd", "p"]
         E_c1 = θ -> _slot_energies(θ)[2]
         ref = _slot_energies(θ0)[2] / θ0[2]   # exact ∂E_c1/∂c1
         v = valley_scan(; hs=[10.0^k for k in -1.0:-1.0:-6.0]) do h
-            θp = copy(θ0); θm = copy(θ0)
+            θp = copy(θ0);
+            θm = copy(θ0)
             θp[2] += h * θ0[2]
             θm[2] -= h * θ0[2]
             fd = (E_c1(θp) - E_c1(θm)) / (2h * θ0[2])

@@ -20,7 +20,8 @@ using Test
 using FFTW
 using LinearAlgebra
 using SpinorBEC
-using SpinorBEC: RamanTerm, RamanCoupling, apply_operator!, energy_contribution,
+using SpinorBEC:
+    RamanTerm, RamanCoupling, apply_operator!, energy_contribution,
     spin_matrices, cell_volume
 
 @testset "RamanTerm energy = ∫[δ⟨Fz⟩ + Ω_R Re(e^{ik·r}⟨F₊⟩)], grad = nil" begin
@@ -42,7 +43,9 @@ using SpinorBEC: RamanTerm, RamanCoupling, apply_operator!, energy_contribution,
         )
 
         sm = spin_matrices(F)
-        Fx = Matrix(sm.Fx); Fy = Matrix(sm.Fy); Fz = Matrix(sm.Fz)
+        Fx = Matrix(sm.Fx);
+        Fy = Matrix(sm.Fy);
+        Fz = Matrix(sm.Fz)
         Fp = Fx + im * Fy   # raising operator F_+
 
         psi = randn(ComplexF64, 6, 6, 6, D)
@@ -52,9 +55,10 @@ using SpinorBEC: RamanTerm, RamanCoupling, apply_operator!, energy_contribution,
         expected_E = 0.0
         @inbounds for I in CartesianIndices((6, 6, 6))
             v = psi[I, :]
-            kr = k_eff[1] * grid.x[1][I[1]] +
-                 k_eff[2] * grid.x[2][I[2]] +
-                 k_eff[3] * grid.x[3][I[3]]
+            kr =
+                k_eff[1] * grid.x[1][I[1]] +
+                k_eff[2] * grid.x[2][I[2]] +
+                k_eff[3] * grid.x[3][I[3]]
             fz = real(v' * Fz * v)
             fp = v' * Fp * v                       # ⟨F_+⟩ (complex)
             expected_E += (delta * fz + Omega_R * real(exp(im * kr) * fp)) * dV

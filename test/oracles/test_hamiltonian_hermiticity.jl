@@ -45,8 +45,10 @@ end
 # H must satisfy ⟨φ|Hψ⟩ = ⟨Hφ|ψ⟩. Returns relative violation.
 function _herm_violation(term, ws, phi, psi)
     dV = cell_volume(ws.grid)
-    Hpsi = zero(psi); apply_operator!(Hpsi, term, ws, psi)
-    Hphi = zero(phi); apply_operator!(Hphi, term, ws, phi)
+    Hpsi = zero(psi);
+    apply_operator!(Hpsi, term, ws, psi)
+    Hphi = zero(phi);
+    apply_operator!(Hphi, term, ws, phi)
     lhs = sum(conj.(phi) .* Hpsi) * dV       # ⟨φ|Hψ⟩
     rhs = sum(conj.(Hphi) .* psi) * dV       # ⟨Hφ|ψ⟩
     scale = max(abs(lhs), abs(rhs), eps())
