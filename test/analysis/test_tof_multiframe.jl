@@ -105,6 +105,61 @@ end
         end
     end
 
+    @testset "interacting (co-expanding Phase A) vs brute-force" begin
+        # Contact c0: Phase A in the co-expanding frame keeps χ frozen-width
+        # (no chirp); handoff measures the physical COM + velocity (capturing
+        # the inter-component mean-field repulsion). COM is near-exact; the
+        # width carries the controlled "interactions negligible post-t_sep"
+        # approximation — ~8% in 1D (worst case; the density drops as 1/∏b, so
+        # it is far tighter in 2D/3D).
+        c0 = 4.0
+        Gi = 2.5
+        tsep = 1.4
+        tff = 2.5
+        gA = make_grid(GridConfig{1}((256,), (16.0,)))
+        psiA = zeros(ComplexF64, 256, D)
+        xa = gA.x[1]
+        for c in 1:D
+            @. psiA[:, c] = exp(-ω * xa^2 / 2)
+        end
+        psiA ./= sqrt(sum(abs2, psiA) * cell_volume(gA))
+        state = simulate_tof_multiframe_interacting(psiA, gA, sys;
+            c0=c0, gradient=Gi, gradient_axis=axis, omega=(ω,),
+            t_sep=tsep, t_f=tff, n_steps_A=500)
+
+        gB = make_grid(GridConfig{1}((512,), (44.0,)))
+        psiB = zeros(ComplexF64, 512, D)
+        xb = gB.x[1]
+        for c in 1:D
+            @. psiB[:, c] = exp(-ω * xb^2 / 2)
+        end
+        psiB ./= sqrt(sum(abs2, psiB) * cell_volume(gB))
+        wsB = make_workspace(; grid=gB, atom=Rb87,
+            interactions=InteractionParams(Dict(0 => c0)),
+            potential=NoPotential(), zeeman=ZeemanParams(),
+            sim_params=SimParams(; dt=tff / 1000, n_steps=1000,
+                imaginary_time=false, normalize_every=0),
+            psi_init=psiB, spatial_zeeman=spatial_zeeman_field(gB; bz=(xx,) -> Gi * xx))
+        for _ in 1:1000
+            split_step!(wsB)
+        end
+
+        frame_by_m = Dict(state.frames[i].m => state.frames[i]
+                          for i in eachindex(state.frames))
+        width_by_m = Dict(state.frames[i].m => component_widths(state)[i]
+                          for i in eachindex(state.frames))
+        dVb = cell_volume(gB)
+        for c in 1:D
+            m = Float64(sys.m_values[c])
+            bf = _centroid_width(abs2.(Array(view(wsB.state.psi, :, c))), xb, dVb)
+            # COM captured to ~1% (Ehrenfest + measured repulsion kick)
+            @test isapprox(bf.centroid, frame_by_m[m].R[1]; atol=0.05,
+                rtol=0.02)
+            # width within the post-t_sep-interaction approximation (1D worst case)
+            @test isapprox(bf.width, width_by_m[m][1]; rtol=0.12)
+        end
+    end
+
     @testset "find_t_sep" begin
         t_sep = find_t_sep(grid, sys; gradient=G, gradient_axis=axis,
             omega=(ω,), sigma0=σ0, kappa=3.0)

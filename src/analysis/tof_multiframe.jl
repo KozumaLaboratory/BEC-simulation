@@ -20,6 +20,7 @@
 export TOFFrame, MultiFrameTOFState, simulate_tof_multiframe
 export boost_phase, frame_params, component_centroids, component_widths
 export far_field_density, find_t_sep
+export simulate_tof_multiframe_interacting
 
 """
 Affine frame for one spin component: center of mass `R`, COM velocity `Rdot`,
@@ -237,4 +238,160 @@ function find_t_sep(grid::Grid{N}, sys::SpinSystem; gradient::Real, gradient_axi
         separated(mid) ? (hi = mid) : (lo = mid)
     end
     hi
+end
+
+# ---------------------------------------------------------------------------
+# Build 2a: interacting two-phase TOF (co-expanding Phase A)
+#
+# Phase A runs t=0→t_sep in the CO-EXPANDING frame (Castin-Dum Λ removes the
+# breathing, so χ stays frozen-WIDTH — no chirp), evolving the full spinor under
+# the residual harmonic + rescaled contact c0 + the m-dependent SG (bz(x)=G·x).
+# Reuses `_scaling_kinetic_step!`; the potential half-step is inlined to carry
+# the SpatialZeeman SG sign (V_m = -G·x·m ⇒ a_m = +m·G). At t_sep each component
+# is de-boosted (ξ-momentum) + re-centered (ξ-COM) into a frozen residual. The
+# COM trajectory is EXACT by Ehrenfest (linear force ⇒ R_m(t)=½ m G t²,
+# interaction-independent); Λ(t)=√(1+ω²t²) is shared. χ frozen for t>t_sep
+# (interactions negligible post-separation — dilute TOF). DDI in Phase A is a
+# Build 2b follow-up (needs the scaling-frame dipolar kernel).
+# ---------------------------------------------------------------------------
+
+# Potential half-step in the co-expanding frame: residual harmonic + c0/∏Λ
+# density + SG (V_m = -G·b·ξ·m). Mirrors tof.jl `_scaling_potential_halfstep!`
+# but with the SpatialZeeman SG sign.
+function _mf_pot_halfstep!(chi, grid::Grid{N}, b, bdd, c0::Float64,
+    G::Float64, gaxis::Int, sys, dtf::Float64) where {N}
+    n_pts = grid.config.n_points
+    D = sys.n_components
+    inv_pb = 1.0 / prod(b)
+    harm = ntuple(d -> 0.5 * b[d] * bdd[d], Val(N))
+    dens = c0 != 0.0 ? total_density(chi, N) : nothing
+    xg = grid.x
+    for c in 1:D
+        m = Float64(sys.m_values[c])
+        gco = -G * b[gaxis] * m
+        cv = view(chi, _component_slice(N, n_pts, c)...)
+        @inbounds for I in CartesianIndices(n_pts)
+            v = 0.0
+            for d in 1:N
+                xd = xg[d][I[d]]
+                v += harm[d] * xd * xd
+            end
+            dens !== nothing && (v += c0 * inv_pb * dens[I])
+            v += gco * xg[gaxis][I[gaxis]]
+            cv[I] *= cis(-dtf * v)
+        end
+    end
+    nothing
+end
+
+# ξ-space COM and FFT-centroid momentum of one component (for the handoff).
+function _xi_com_momentum(chi::Array{ComplexF64, N}, grid::Grid{N}, plans) where {N}
+    n_pts = grid.config.n_points
+    dens = abs2.(chi)
+    mass = sum(dens)
+    R = ntuple(Val(N)) do d
+        s = 0.0
+        @inbounds for I in CartesianIndices(n_pts)
+            s += grid.x[d][I[d]] * dens[I]
+        end
+        s / mass
+    end
+    densk = abs2.(plans.forward * copy(chi))
+    massk = sum(densk)
+    p = ntuple(Val(N)) do d
+        s = 0.0
+        @inbounds for I in CartesianIndices(n_pts)
+            s += grid.k[d][I[d]] * densk[I]
+        end
+        s / massk
+    end
+    (R, p)
+end
+
+"""
+    simulate_tof_multiframe_interacting(psi0, grid, sys; c0, gradient,
+        gradient_axis, omega, t_sep, t_f, n_steps_A) -> MultiFrameTOFState
+
+Interacting (contact c0) Stern-Gerlach TOF. Phase A evolves the spinor in the
+co-expanding frame to `t_sep` (so χ keeps frozen width — no chirp), then hands
+off to per-component frozen residuals with the exact ballistic COM
+`R_m(t)=½ m·gradient·t²` and shared Castin-Dum `Λ(t)=√(1+ω²t²)`. `t_sep` is the
+overlap→separated handoff time (e.g. from `find_t_sep`); `t_f` the imaging time.
+"""
+function simulate_tof_multiframe_interacting(psi0::AbstractArray{<:Complex},
+    grid::Grid{N}, sys::SpinSystem; c0::Real, gradient::Real, gradient_axis::Int,
+    omega::NTuple{N, Float64}, t_sep::Real, t_f::Real, n_steps_A::Int) where {N}
+    n_steps_A > 0 || throw(ArgumentError("n_steps_A must be positive"))
+    t_f >= t_sep || throw(ArgumentError("t_f must be ≥ t_sep"))
+    n_pts = grid.config.n_points
+    D = sys.n_components
+    dV = cell_volume(grid)
+    G = Float64(gradient)
+    c0f = Float64(c0)
+
+    plans = make_fft_plans(n_pts)
+    fft_buf = zeros(ComplexF64, n_pts...)
+    kphase = zeros(ComplexF64, n_pts...)
+    chi_A = ComplexF64.(Array(psi0))
+    dt = Float64(t_sep) / n_steps_A
+    _b(t) = ntuple(d -> sqrt(1 + omega[d]^2 * t^2), Val(N))
+    _bdd(b) = ntuple(d -> omega[d]^2 / b[d]^3, Val(N))
+
+    # --- Phase A: co-expanding evolution to t_sep (save state one step before
+    # t_sep for the finite-difference COM velocity at handoff) ---
+    t = 0.0
+    chi_prev = copy(chi_A)
+    t_prev = 0.0
+    for step in 1:n_steps_A
+        step == n_steps_A && (chi_prev = copy(chi_A); t_prev = t)
+        b0 = _b(t)
+        _mf_pot_halfstep!(chi_A, grid, b0, _bdd(b0), c0f, G, gradient_axis, sys, dt / 2)
+        _scaling_kinetic_step!(chi_A, fft_buf, kphase, grid, _b(t + dt / 2), plans, D, dt)
+        t += dt
+        b1 = _b(t)
+        _mf_pot_halfstep!(chi_A, grid, b1, _bdd(b1), c0f, G, gradient_axis, sys, dt / 2)
+    end
+
+    # --- Handoff at t_sep + frame advance to t_f ---
+    b_sep = _b(Float64(t_sep))
+    b_pprev = _b(t_prev)
+    b_f = _b(Float64(t_f))
+    bdot_f = ntuple(d -> omega[d]^2 * Float64(t_f) / b_f[d], Val(N))
+    Δ = Float64(t_f) - Float64(t_sep)
+    total = sum(abs2, chi_A) * dV
+    frames = TOFFrame{N}[]
+    chis = Array{ComplexF64, N}[]
+    norm0 = Float64[]
+    for c in 1:D
+        m = Float64(sys.m_values[c])
+        idx = _component_slice(N, n_pts, c)
+        chi = ComplexF64.(Array(view(chi_A, idx...)))
+        nrm = sum(abs2, chi) * dV
+        nrm < 1e-12 * max(total, eps()) && continue
+        ξR, ξp = _xi_com_momentum(chi, grid, plans)
+        # Physical COM and (finite-difference) COM velocity at t_sep — captures
+        # the inter-component mean-field repulsion kick that pure-SG Ehrenfest
+        # misses. R_phys = b·ξ_COM; v_phys = d(b·ξ_COM)/dt.
+        ξR_prev, _ = _xi_com_momentum(
+            ComplexF64.(Array(view(chi_prev, idx...))), grid, plans)
+        R_sep = ntuple(d -> b_sep[d] * ξR[d], Val(N))
+        v_sep = ntuple(d -> (b_sep[d] * ξR[d] - b_pprev[d] * ξR_prev[d]) /
+                            (Float64(t_sep) - t_prev), Val(N))
+        # de-boost ξ-momentum, re-center ξ-COM → frozen residual
+        fb = TOFFrame{N}(m, ξR, ξp, ntuple(_ -> 1.0, Val(N)), ntuple(_ -> 0.0, Val(N)),
+            Float64(t_sep))
+        _apply_boost!(chi, fb, grid, -1.0)
+        for d in 1:N
+            sp = round(Int, ξR[d] / grid.dx[d])
+            sp != 0 && (chi = _circshift_axis(chi, -sp, d, Val(N)))
+        end
+        # Phase B: SG continues (½ a Δ²); v_sep carries pre-t_sep SG + repulsion.
+        a = ntuple(d -> d == gradient_axis ? m * G : 0.0, Val(N))
+        R = ntuple(d -> R_sep[d] + v_sep[d] * Δ + 0.5 * a[d] * Δ^2, Val(N))
+        Rdot = ntuple(d -> v_sep[d] + a[d] * Δ, Val(N))
+        push!(frames, TOFFrame{N}(m, R, Rdot, b_f, bdot_f, Float64(t_f)))
+        push!(chis, chi)
+        push!(norm0, nrm)
+    end
+    MultiFrameTOFState{N}(grid, sys, frames, chis, Float64(t_f), plans, norm0)
 end
