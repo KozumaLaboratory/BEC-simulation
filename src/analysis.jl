@@ -34,6 +34,7 @@ include("analysis/grid_resolution.jl")  # planning: suggest_grid + sinatra_check
 include("analysis/canonical_polyhedral_states.jl")
 include("analysis/majorana.jl")
 include("analysis/tof.jl")
+include("analysis/tof_multiframe.jl")  # multi-frame (3-layer × far-field) TOF skeleton
 include("analysis/tomography.jl")
 include("analysis/faraday.jl")
 include("analysis/imaging.jl")
