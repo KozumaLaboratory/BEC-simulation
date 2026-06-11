@@ -160,6 +160,87 @@ end
         end
     end
 
+    @testset "DDI in co-expanding frame (isotropic Λ) vs fixed-grid" begin
+        # Dipolar anisotropic expansion (the Eu/Er TOF signature): an x-polarized
+        # cloud elongates under the DDI. The co-expanding embedding (1/∏Λ
+        # prefactor + scale-free kernel for isotropic Λ) must reproduce a
+        # fixed-grid evolution using the SAME audited apply_ddi_step! primitive —
+        # this validates the SCALING embedding (the new part), not the DDI
+        # primitive (covered by the production DDI tests). 2D, isotropic trap.
+        c0d = 2.0
+        cdd = 3.0
+        Td = 1.2
+        coef = [0.5, 1 / sqrt(2), 0.5]   # F=1 transverse-x spin coherent (M ∥ x)
+        function mkpsi2d(grd)
+            xx = grd.x[1]
+            yy = grd.x[2]
+            p = zeros(ComplexF64, length(xx), length(yy), D)
+            for c in 1:D, j in eachindex(yy), i in eachindex(xx)
+                p[i, j, c] = coef[c] * exp(-ω * (xx[i]^2 + yy[j]^2) / 2)
+            end
+            p ./= sqrt(sum(abs2, p) * cell_volume(grd))
+            p
+        end
+        function aspect2d(n, gx, gy, dV)
+            m = sum(n) * dV
+            xb = sum(I -> gx[I[1]] * n[I], CartesianIndices(n)) * dV / m
+            yb = sum(I -> gy[I[2]] * n[I], CartesianIndices(n)) * dV / m
+            wx = sqrt(sum(I -> (gx[I[1]] - xb)^2 * n[I], CartesianIndices(n)) * dV / m)
+            wy = sqrt(sum(I -> (gy[I[2]] - yb)^2 * n[I], CartesianIndices(n)) * dV / m)
+            wx / wy
+        end
+
+        sm = spin_matrices(F)
+        g2 = make_grid(GridConfig{2}((64, 64), (14.0, 14.0)))
+        st = simulate_tof_multiframe_interacting(mkpsi2d(g2), g2, sys;
+            c0=c0d, gradient=0.0, gradient_axis=1, omega=(ω, ω),
+            t_sep=Td, t_f=Td, n_steps_A=300, atom=Er168, c_dd=cdd)
+        totχ = zeros(Float64, 64, 64)
+        for ch in st.chis
+            totχ .+= abs2.(ch)
+        end
+        ar_coexp = aspect2d(totχ, g2.x[1], g2.x[2], cell_volume(g2))  # AR scale-invariant
+
+        # fixed-grid brute-force: same DDI primitive, no scaling
+        gB = make_grid(GridConfig{2}((96, 96), (22.0, 22.0)))
+        nB = gB.config.n_points
+        ddi = SpinorBEC.make_ddi_params(gB, Er168; c_dd=cdd)
+        bufs = SpinorBEC.make_ddi_buffers(nB)
+        plans = SpinorBEC.make_fft_plans(nB)
+        fbuf = zeros(ComplexF64, nB...)
+        kph = zeros(ComplexF64, nB...)
+        psi = mkpsi2d(gB)
+        dtb = Td / 400
+        for _ in 1:400
+            dens = total_density(psi, 2)
+            for c in 1:D
+                cv = view(psi, SpinorBEC._component_slice(2, nB, c)...)
+                @. cv *= cis(-(dtb / 2) * c0d * dens)
+            end
+            SpinorBEC.apply_ddi_step!(psi, sm, ddi, bufs, dtb / 2, 2)
+            SpinorBEC._scaling_kinetic_step!(psi, fbuf, kph, gB, (1.0, 1.0), plans, D, dtb)
+            SpinorBEC.apply_ddi_step!(psi, sm, ddi, bufs, dtb / 2, 2)
+            dens = total_density(psi, 2)
+            for c in 1:D
+                cv = view(psi, SpinorBEC._component_slice(2, nB, c)...)
+                @. cv *= cis(-(dtb / 2) * c0d * dens)
+            end
+        end
+        nb = zeros(Float64, nB...)
+        for c in 1:D
+            nb .+= abs2.(view(psi, :, :, c))
+        end
+        ar_brute = aspect2d(nb, gB.x[1], gB.x[2], cell_volume(gB))
+
+        @test ar_coexp > 1.01                 # DDI produced visible x-elongation
+        @test isapprox(ar_coexp, ar_brute; rtol=0.02)
+
+        # anisotropic Λ DDI is rejected (not yet supported)
+        @test_throws ArgumentError simulate_tof_multiframe_interacting(
+            mkpsi2d(g2), g2, sys; c0=c0d, gradient=0.0, gradient_axis=1,
+            omega=(ω, 2ω), t_sep=Td, t_f=Td, n_steps_A=10, atom=Er168, c_dd=cdd)
+    end
+
     @testset "find_t_sep" begin
         t_sep = find_t_sep(grid, sys; gradient=G, gradient_axis=axis,
             omega=(ω,), sigma0=σ0, kappa=3.0)

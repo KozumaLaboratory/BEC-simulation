@@ -320,7 +320,9 @@ overlap→separated handoff time (e.g. from `find_t_sep`); `t_f` the imaging tim
 """
 function simulate_tof_multiframe_interacting(psi0::AbstractArray{<:Complex},
     grid::Grid{N}, sys::SpinSystem; c0::Real, gradient::Real, gradient_axis::Int,
-    omega::NTuple{N, Float64}, t_sep::Real, t_f::Real, n_steps_A::Int) where {N}
+    omega::NTuple{N, Float64}, t_sep::Real, t_f::Real, n_steps_A::Int,
+    atom::Union{Nothing, AtomSpecies}=nothing, c_dd::Real=0.0,
+    secular_ddi::Bool=false) where {N}
     n_steps_A > 0 || throw(ArgumentError("n_steps_A must be positive"))
     t_f >= t_sep || throw(ArgumentError("t_f must be ≥ t_sep"))
     n_pts = grid.config.n_points
@@ -329,6 +331,23 @@ function simulate_tof_multiframe_interacting(psi0::AbstractArray{<:Complex},
     G = Float64(gradient)
     c0f = Float64(c0)
 
+    # DDI in the co-expanding frame is exact only for ISOTROPIC Λ (k̂ invariant
+    # under a scalar rescale ⇒ Q unchanged; only the 1/∏Λ density prefactor
+    # remains, applied as dt/∏Λ). Anisotropic Λ needs the kernel re-evaluated at
+    # k/Λ each step — a Build 2b-anisotropic follow-up.
+    enable_ddi = c_dd != 0.0
+    sm = spin_matrices(sys.F)
+    ddi = nothing
+    ddi_bufs = nothing
+    if enable_ddi
+        all(≈(omega[1]), omega) || throw(ArgumentError(
+            "DDI in the co-expanding frame requires isotropic Λ (equal omega per " *
+            "axis); anisotropic Λ DDI is not yet supported"))
+        atom === nothing && throw(ArgumentError("DDI (c_dd≠0) requires `atom`"))
+        ddi = make_ddi_params(grid, atom; c_dd=Float64(c_dd), secular=secular_ddi)
+        ddi_bufs = make_ddi_buffers(n_pts)
+    end
+
     plans = make_fft_plans(n_pts)
     fft_buf = zeros(ComplexF64, n_pts...)
     kphase = zeros(ComplexF64, n_pts...)
@@ -336,6 +355,9 @@ function simulate_tof_multiframe_interacting(psi0::AbstractArray{<:Complex},
     dt = Float64(t_sep) / n_steps_A
     _b(t) = ntuple(d -> sqrt(1 + omega[d]^2 * t^2), Val(N))
     _bdd(b) = ntuple(d -> omega[d]^2 / b[d]^3, Val(N))
+    # Co-expanding DDI half-step: physical Φ = (1/∏Λ)·Φ_χ, applied as dt/∏Λ.
+    _ddi_half!(chi, b, dtf) = enable_ddi &&
+        apply_ddi_step!(chi, sm, ddi, ddi_bufs, dtf / prod(b), N)
 
     # --- Phase A: co-expanding evolution to t_sep (save state one step before
     # t_sep for the finite-difference COM velocity at handoff) ---
@@ -346,9 +368,11 @@ function simulate_tof_multiframe_interacting(psi0::AbstractArray{<:Complex},
         step == n_steps_A && (chi_prev = copy(chi_A); t_prev = t)
         b0 = _b(t)
         _mf_pot_halfstep!(chi_A, grid, b0, _bdd(b0), c0f, G, gradient_axis, sys, dt / 2)
+        _ddi_half!(chi_A, b0, dt / 2)
         _scaling_kinetic_step!(chi_A, fft_buf, kphase, grid, _b(t + dt / 2), plans, D, dt)
         t += dt
         b1 = _b(t)
+        _ddi_half!(chi_A, b1, dt / 2)
         _mf_pot_halfstep!(chi_A, grid, b1, _bdd(b1), c0f, G, gradient_axis, sys, dt / 2)
     end
 
