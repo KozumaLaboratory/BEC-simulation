@@ -284,6 +284,29 @@ function _mf_pot_halfstep!(chi, grid::Grid{N}, b, bdd, c0::Float64,
     nothing
 end
 
+# Rebuild the DDI Q-tensor IN PLACE at the rescaled momentum k_ξ/Λ (per axis).
+# Q_αβ = k̂_α k̂_β − δ_αβ/3 is scale-free in |k|, so feeding rescaled axes gives
+# Q(k_ξ/Λ) — the anisotropic-Λ kernel. For isotropic Λ this returns the same Q
+# (k̂ invariant). Called each DDI substep since Λ(t) changes.
+function _rebuild_ddi_q!(ddi::DDIParams{N}, grid::Grid{N}, Λ, secular::Bool) where {N}
+    n_pts = grid.config.n_points
+    rk_shape = rfft_output_shape(n_pts)
+    T = eltype(ddi.Q_xx)
+    kx = collect(T, rfftfreq(n_pts[1], n_pts[1] * grid.dk[1])) ./ T(Λ[1])
+    ky = N >= 2 ? (T.(grid.k[2]) ./ T(Λ[2])) : T[]
+    kz = N >= 3 ? (T.(grid.k[3]) ./ T(Λ[3])) : T[]
+    k_sq = zeros(T, rk_shape)
+    @inbounds for I in CartesianIndices(rk_shape)
+        s = kx[I[1]]^2
+        N >= 2 && (s += ky[I[2]]^2)
+        N >= 3 && (s += kz[I[3]]^2)
+        k_sq[I] = s
+    end
+    _build_q_tensor!(ddi.Q_xx, ddi.Q_xy, ddi.Q_xz, ddi.Q_yy, ddi.Q_yz, ddi.Q_zz,
+        kx, ky, kz, k_sq, rk_shape; secular, full_n=n_pts)
+    nothing
+end
+
 # ξ-space COM and FFT-centroid momentum of one component (for the handoff).
 function _xi_com_momentum(chi::Array{ComplexF64, N}, grid::Grid{N}, plans) where {N}
     n_pts = grid.config.n_points
@@ -331,18 +354,16 @@ function simulate_tof_multiframe_interacting(psi0::AbstractArray{<:Complex},
     G = Float64(gradient)
     c0f = Float64(c0)
 
-    # DDI in the co-expanding frame is exact only for ISOTROPIC Λ (k̂ invariant
-    # under a scalar rescale ⇒ Q unchanged; only the 1/∏Λ density prefactor
-    # remains, applied as dt/∏Λ). Anisotropic Λ needs the kernel re-evaluated at
-    # k/Λ each step — a Build 2b-anisotropic follow-up.
+    # DDI in the co-expanding frame: E_dd = (1/∏Λ)·(c_dd/2)∫Q(k_ξ/Λ)M̃*M̃ dk_ξ.
+    # The kernel Q is re-evaluated at the rescaled momentum k_ξ/Λ each substep
+    # (`_rebuild_ddi_q!`) — exact for ANISOTROPIC Λ (isotropic is the special
+    # case where Q is invariant); the 1/∏Λ density prefactor is applied as
+    # dt/∏Λ on the audited apply_ddi_step! primitive.
     enable_ddi = c_dd != 0.0
     sm = spin_matrices(sys.F)
     ddi = nothing
     ddi_bufs = nothing
     if enable_ddi
-        all(≈(omega[1]), omega) || throw(ArgumentError(
-            "DDI in the co-expanding frame requires isotropic Λ (equal omega per " *
-            "axis); anisotropic Λ DDI is not yet supported"))
         atom === nothing && throw(ArgumentError("DDI (c_dd≠0) requires `atom`"))
         ddi = make_ddi_params(grid, atom; c_dd=Float64(c_dd), secular=secular_ddi)
         ddi_bufs = make_ddi_buffers(n_pts)
@@ -355,9 +376,14 @@ function simulate_tof_multiframe_interacting(psi0::AbstractArray{<:Complex},
     dt = Float64(t_sep) / n_steps_A
     _b(t) = ntuple(d -> sqrt(1 + omega[d]^2 * t^2), Val(N))
     _bdd(b) = ntuple(d -> omega[d]^2 / b[d]^3, Val(N))
-    # Co-expanding DDI half-step: physical Φ = (1/∏Λ)·Φ_χ, applied as dt/∏Λ.
-    _ddi_half!(chi, b, dtf) = enable_ddi &&
+    # Co-expanding DDI half-step: rebuild Q(k_ξ/Λ) for the current Λ, then apply
+    # with the 1/∏Λ prefactor folded into dt.
+    function _ddi_half!(chi, b, dtf)
+        enable_ddi || return nothing
+        _rebuild_ddi_q!(ddi, grid, b, secular_ddi)
         apply_ddi_step!(chi, sm, ddi, ddi_bufs, dtf / prod(b), N)
+        nothing
+    end
 
     # --- Phase A: co-expanding evolution to t_sep (save state one step before
     # t_sep for the finite-difference COM velocity at handoff) ---
