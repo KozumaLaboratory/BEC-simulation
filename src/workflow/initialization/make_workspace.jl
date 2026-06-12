@@ -87,6 +87,22 @@ function make_workspace(;
     sys = SpinSystem(atom.F)
     sm = spin_matrices(atom.F)
 
+    # The spinor dimension is set by the ATOM's F; a psi_init with the wrong
+    # component count (or spatial shape) otherwise segfaults later in the
+    # diagonal / spin steps reading past the array. Fail loudly here instead.
+    if psi_init !== nothing
+        ndims(psi_init) == N + 1 || throw(ArgumentError(
+            "psi_init has $(ndims(psi_init)) dims; expected $(N + 1) " *
+            "($(N) spatial + 1 spin) for this grid"))
+        size(psi_init, N + 1) == sys.n_components || throw(ArgumentError(
+            "psi_init has $(size(psi_init, N + 1)) spin components but atom " *
+            "$(atom.name) (F=$(atom.F)) needs $(sys.n_components); pass a state " *
+            "matching the atom's F"))
+        ntuple(d -> size(psi_init, d), N) == grid.config.n_points || throw(ArgumentError(
+            "psi_init spatial size $(ntuple(d -> size(psi_init, d), N)) ≠ grid " *
+            "$(grid.config.n_points)"))
+    end
+
     psi = if psi_init === nothing
         init_psi(grid, sys; dtype=U)
     else
