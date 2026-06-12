@@ -22,6 +22,7 @@ export boost_phase, frame_params, component_centroids, component_widths
 export far_field_density, find_t_sep
 export simulate_tof_multiframe_interacting
 export recombine_field, recombine_density, simulate_bragg_tof
+export simulate_rf_sg_tof
 
 """
 Affine frame for one spin component: center of mass `R`, COM velocity `Rdot`,
@@ -601,4 +602,23 @@ function simulate_bragg_tof(envelope::AbstractArray{<:Complex}, grid::Grid{N},
         push!(norm0, sum(abs2, chi) * dV)
     end
     MultiFrameTOFState{N}(grid, sys, frames, chis, Float64(t), plans, norm0)
+end
+
+"""
+    simulate_rf_sg_tof(psi0, grid, sys; theta, phi=0.0, gradient,
+        gradient_axis, t, omega) -> MultiFrameTOFState
+
+RF + Stern-Gerlach TOF: a hard RF pulse (area `theta`, in-plane axis at azimuth
+`phi`) rotates the spin BEFORE the SG-TOF, so the per-component populations
+encode the spin projection along the rotated axis (the tomography knob). The
+pulse precedes release, so it composes with the skeleton multi-frame path
+(`apply_rf_pulse` then `simulate_tof_multiframe`). Scan `(theta, phi)` and read
+the per-m populations to reconstruct the spin density (see `rf_tomography`).
+"""
+function simulate_rf_sg_tof(psi0::AbstractArray{<:Complex}, grid::Grid{N},
+    sys::SpinSystem; theta::Real, phi::Real=0.0, gradient::Real, gradient_axis::Int,
+    t::Real, omega::NTuple{N, Float64}) where {N}
+    psi_rot = apply_rf_pulse(psi0, sys.F; theta=theta, phi=phi)
+    simulate_tof_multiframe(psi_rot, grid, sys; gradient=gradient,
+        gradient_axis=gradient_axis, t=t, omega=omega)
 end

@@ -437,3 +437,58 @@ end
     # lab density within the documented post-t_sep-interaction approximation
     @test sqrt(sum(abs2, n_rec .- n_bf)) / sqrt(sum(abs2, n_bf)) < 0.2
 end
+
+@testset "RF + SG tomography" begin
+    ω = 1.0
+    F = 1
+    sys = SpinSystem(F)
+    D = 3
+    sm = spin_matrices(F)
+    g = make_grid(GridConfig{1}((64,), (16.0,)))
+    xx = g.x[1]
+    dV = cell_volume(g)
+
+    @testset "rf_tomography == spin_density_vector (operator identity)" begin
+        # Arbitrary normalized spinor: the RF-rotation readout must equal the
+        # direct operator for ANY state — this pins the (θ, φ, sign) convention.
+        psi = zeros(ComplexF64, 64, D)
+        for c in 1:D
+            @. psi[:, c] = (c + 0.3im * c) * exp(-xx^2 / 2) * cis(0.7 * c * xx)
+        end
+        psi ./= sqrt(sum(abs2, psi) * dV)
+        fx, fy, fz = rf_tomography(psi, sys, 1)
+        gx, gy, gz = spin_density_vector(psi, sm, 1)
+        @test maximum(abs.(fx .- gx)) < 1e-10
+        @test maximum(abs.(fy .- gy)) < 1e-10
+        @test maximum(abs.(fz .- gz)) < 1e-10
+    end
+
+    @testset "apply_rf_pulse: θ=0 identity, unitary" begin
+        psi = init_psi_spin_coherent(g, sys; theta=0.0, phi=0.0)  # along +z
+        @test apply_rf_pulse(psi, F; theta=0.0) ≈ psi
+        rot = apply_rf_pulse(psi, F; theta=0.8, phi=0.3)
+        @test sum(abs2, rot) ≈ sum(abs2, psi)        # norm preserved (unitary)
+    end
+
+    @testset "π/2 pulse brings transverse spin into the SG basis" begin
+        # +x-pointing spin-coherent state: ⟨F_z⟩=0 ⇒ symmetric SG populations.
+        psi = init_psi_spin_coherent(g, sys; theta=π / 2, phi=0.0)
+        gx, _, gz = spin_density_vector(psi, sm, 1)
+        Fx_tot = sum(gx) * dV
+        @test sum(gz) * dV ≈ 0 atol = 1e-10           # transverse: no longitudinal
+        @test abs(Fx_tot) > 0.9 * F                   # spin polarized in-plane
+
+        # SG-TOF with NO RF: Σ_m m·P_m = ⟨F_z⟩ = 0.
+        st0 = simulate_rf_sg_tof(psi, g, sys; theta=0.0,
+            gradient=2.0, gradient_axis=1, t=1.0, omega=(ω,))
+        m0 = sum(st0.frames[i].m * st0.norm0[i] for i in eachindex(st0.frames))
+        @test m0 ≈ 0 atol = 1e-6
+
+        # π/2 about ŷ maps ⟨F_x⟩ into the longitudinal basis: Σ_m m·P_m = -⟨F_x⟩.
+        st1 = simulate_rf_sg_tof(psi, g, sys; theta=π / 2, phi=π / 2,
+            gradient=2.0, gradient_axis=1, t=1.0, omega=(ω,))
+        m1 = sum(st1.frames[i].m * st1.norm0[i] for i in eachindex(st1.frames))
+        @test m1 ≈ -Fx_tot rtol = 1e-6
+        @test abs(m1) > 0.9 * F                       # substantial transfer
+    end
+end
