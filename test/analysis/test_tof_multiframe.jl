@@ -2,8 +2,9 @@ using Test
 using FFTW
 using SpinorBEC
 using SpinorBEC: frame_params, component_centroids, component_widths,
-    _apply_boost!, boost_phase, TOFFrame, find_t_sep,
-    recombine_field, recombine_density, simulate_bragg_tof
+    _apply_boost!, boost_phase, TOFFrame, MultiFrameTOFState, find_t_sep,
+    recombine_field, recombine_density, simulate_bragg_tof,
+    simulate_tof_multiframe_interacting, make_fft_plans
 
 # Weighted centroid + RMS width of a 1D component density.
 function _centroid_width(nc, x, dV)
@@ -342,4 +343,97 @@ end
         @test n_rec[n ÷ 2] ≈ n_rec[n ÷ 2 + 1] rtol = 1e-6 # mirror about x=0
         @test n_rec[n ÷ 2 - 5] ≈ n_rec[n ÷ 2 + 6] rtol = 1e-6
     end
+
+    @testset "distinct spin states add incoherently (no spurious fringes)" begin
+        # Two frames, SAME envelope, opposite boosts ±v, but DISTINCT internal
+        # states (m=+1, m=-1). Orthogonal ⇒ they must NOT interfere: the physical
+        # density is |ψ_+|²+|ψ_-|² (smooth), not |ψ_++ψ_-|² (which WOULD fringe).
+        # recombine_density groups by m; recombine_field (coherent over all) does
+        # not — the contrast between them is exactly the orthogonality check.
+        fp = frame_params(1.0, (ω,); t=t, gradient=0.0, gradient_axis=1, V0=(v,))
+        fm = frame_params(-1.0, (ω,); t=t, gradient=0.0, gradient_axis=1, V0=(-v,))
+        plans = make_fft_plans(g1.config.n_points)
+        nrm = sum(abs2, env) * dV
+        st = MultiFrameTOFState{1}(g1, sys, [fp, fm], [copy(env), copy(env)],
+            t, plans, [nrm, nrm])
+
+        n_inc = recombine_density(st)        # grouped: incoherent across m
+        n_coh = abs2.(recombine_field(st))   # wrong-for-distinct-m: coherent
+
+        fband(d) = begin
+            s = abs.(rfft(d))
+            kb = 2π .* (0:(length(s) - 1)) ./ L
+            maximum(s[(kb .> 2v / Λ ^ 2 - 1) .& (kb .< 2v / Λ ^ 2 + 1)]) / maximum(s)
+        end
+        @test fband(n_inc) < 1e-3            # no sideband — smooth, incoherent
+        @test fband(n_coh) > 0.05            # coherent sum WOULD fringe
+        # incoherent density = sum of the two single-frame Castin-Dum Gaussians
+        d_plus = recombine_density(
+            simulate_bragg_tof(env, g1, sys;
+                orders=[(k=(v,), amp=1.0 + 0im)], omega=(ω,), t=t, m=1.0),
+        )
+        d_minus = recombine_density(
+            simulate_bragg_tof(env, g1, sys;
+                orders=[(k=(-v,), amp=1.0 + 0im)], omega=(ω,), t=t, m=-1.0),
+        )
+        @test sqrt(sum(abs2, n_inc .- (d_plus .+ d_minus))) /
+              sqrt(sum(abs2, n_inc)) < 1e-12
+    end
+end
+
+@testset "Multi-frame TOF (interacting recombination)" begin
+    # End-to-end: the interacting SG path hands off DE-BOOSTED residuals; the
+    # density read-out reconstructs them faithfully (magnitude drops the boost
+    # phase, R_m/Λ_m carry position/width) and adds the orthogonal spin
+    # components incoherently. Validate against a full brute-force split-step
+    # lab density.
+    ω = 1.0
+    F = 1
+    sys = SpinSystem(F)
+    D = 2F + 1
+    c0 = 4.0
+    Gi = 2.5
+    tsep = 1.4
+    tff = 2.5
+    axis = 1
+
+    gA = make_grid(GridConfig{1}((256,), (16.0,)))
+    psiA = zeros(ComplexF64, 256, D)
+    xa = gA.x[1]
+    for c in 1:D
+        @. psiA[:, c] = exp(-ω * xa^2 / 2)
+    end
+    psiA ./= sqrt(sum(abs2, psiA) * cell_volume(gA))
+    state = simulate_tof_multiframe_interacting(psiA, gA, sys;
+        c0=c0, gradient=Gi, gradient_axis=axis, omega=(ω,),
+        t_sep=tsep, t_f=tff, n_steps_A=500)
+
+    gB = make_grid(GridConfig{1}((512,), (44.0,)))
+    xb = gB.x[1]
+    dVb = cell_volume(gB)
+    psiB = zeros(ComplexF64, 512, D)
+    for c in 1:D
+        @. psiB[:, c] = exp(-ω * xb^2 / 2)
+    end
+    psiB ./= sqrt(sum(abs2, psiB) * cell_volume(gB))
+    wsB = make_workspace(; grid=gB, atom=Rb87,
+        interactions=InteractionParams(Dict(0 => c0)),
+        potential=NoPotential(), zeeman=ZeemanParams(),
+        sim_params=SimParams(; dt=tff / 1000, n_steps=1000,
+            imaginary_time=false, normalize_every=0),
+        psi_init=psiB, spatial_zeeman=spatial_zeeman_field(gB; bz=(xx,) -> Gi * xx))
+    for _ in 1:1000
+        split_step!(wsB)
+    end
+    n_bf = zeros(Float64, 512)
+    for c in 1:D
+        n_bf .+= abs2.(Array(view(wsB.state.psi, :, c)))
+    end
+
+    n_rec = recombine_density(state; lab_grid=gB)
+    # mass conserved through the reconstruction
+    @test sum(n_rec) * dVb ≈ 1.0 rtol = 1e-2
+    @test sum(n_rec) * dVb ≈ sum(n_bf) * dVb rtol = 1e-2
+    # lab density within the documented post-t_sep-interaction approximation
+    @test sqrt(sum(abs2, n_rec .- n_bf)) / sqrt(sum(abs2, n_bf)) < 0.2
 end

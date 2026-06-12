@@ -461,9 +461,15 @@ end
 #   φ_boost,n(x) = `boost_phase(frame_n, x)`        (the single source of truth)
 # `boost_phase` carries the −½Ṙ·R constant; using the SAME function for the
 # de-boost (handoff) and the re-add (here) is what keeps the inter-frame phase
-# difference — hence the fringe positions — physical. χ here is the lab residual
-# (skeleton / Bragg convention: NOT de-boosted); the interacting-handoff residual
-# is de-boosted, so recombining it is a separate Build-2 concern.
+# difference — hence the fringe positions — physical.
+#
+# Internal-state orthogonality: frames of the SAME state (`frame.m`) interfere
+# (Bragg orders); distinct spin states are orthogonal and add as |ψ|². So the
+# physical image groups by m: coherent within, incoherent across (`recombine_
+# density`). The de-boosted interacting-handoff residual therefore reconstructs
+# faithfully in the DENSITY (magnitude drops the boost phase); only COHERENT
+# interference between de-boosted SAME-m residuals would need the handoff frame
+# re-added — a case the one-frame-per-m interacting path never produces.
 # ---------------------------------------------------------------------------
 
 # N-linear interpolation of χ (defined on `grid`) at ξ; 0 outside the box.
@@ -488,26 +494,19 @@ end
     acc
 end
 
-"""
-    recombine_field(state; lab_grid=state.grid) -> Array{ComplexF64,N}
-
-Coherent lab-frame complex field ψ(x) = Σ_n ψ_n(x), each frame reconstructed as
-the exact Castin-Dum × Galilean solution (scaling + boost phase via
-`boost_phase`). Where frames overlap their relative phase produces matter-wave
-fringes. χ is interpolated N-linearly onto `lab_grid` (the only approximation;
-controlled by resolution). Assumes the skeleton / Bragg residual convention
-(χ NOT de-boosted).
-"""
-function recombine_field(state::MultiFrameTOFState{N};
-    lab_grid::Grid{N}=state.grid) where {N}
-    field = zeros(ComplexF64, lab_grid.config.n_points...)
+# Accumulate (in place) the coherent lab field of a SUBSET of frames. Same
+# internal state assumed — the caller groups by it. Each frame is the exact
+# Castin-Dum × Galilean solution; the boost / scaling phase only matters where
+# same-state frames overlap (the interference term).
+function _accumulate_field!(field::Array{ComplexF64, N}, frames, chis,
+    src_grid::Grid{N}, lab_grid::Grid{N}) where {N}
     xg = lab_grid.x
-    for (f, chi) in zip(state.frames, state.chis)
+    for (f, chi) in zip(frames, chis)
         inv_sqrt_Λ = 1.0 / sqrt(prod(f.Λ))
         @inbounds for I in CartesianIndices(field)
             x = ntuple(d -> Float64(xg[d][I[d]]), Val(N))
             ξ = ntuple(d -> (x[d] - f.R[d]) / f.Λ[d], Val(N))
-            amp = _interp_linear(chi, state.grid, ξ)
+            amp = _interp_linear(chi, src_grid, ξ)
             amp == 0 && continue
             φ = 0.0
             for d in 1:N
@@ -522,13 +521,52 @@ function recombine_field(state::MultiFrameTOFState{N};
 end
 
 """
+    recombine_field(state; lab_grid=state.grid) -> Array{ComplexF64,N}
+
+Coherent lab-frame complex field ψ(x) = Σ_n ψ_n(x) over ALL frames, each
+reconstructed as the exact Castin-Dum × Galilean solution (scaling + boost phase
+via `boost_phase`). Physical ONLY when every frame shares the same internal state
+(e.g. Bragg momentum orders) — distinct spin components are orthogonal and must
+NOT be added coherently; use `recombine_density` for the physical image, which
+groups by internal state. χ is interpolated N-linearly onto `lab_grid` (the only
+approximation). Assumes the skeleton / Bragg residual convention (χ NOT
+de-boosted); for the interacting handoff only the magnitude is reconstructed
+faithfully — see `recombine_density`.
+"""
+function recombine_field(state::MultiFrameTOFState{N};
+    lab_grid::Grid{N}=state.grid) where {N}
+    field = zeros(ComplexF64, lab_grid.config.n_points...)
+    _accumulate_field!(field, state.frames, state.chis, state.grid, lab_grid)
+end
+
+"""
     recombine_density(state; lab_grid=state.grid) -> Array{Float64,N}
 
-Coherent lab-frame density |Σ_n ψ_n(x)|² — the interference image.
-See [`recombine_field`](@ref).
+Physical lab-frame density: coherent WITHIN each internal state (frames sharing
+`frame.m` interfere — the matter-wave / Bragg fringe term) and INCOHERENT across
+distinct states (orthogonal spin components add as |ψ|², no spurious fringes):
+
+    n(x) = Σ_m |Σ_{n: m_n=m} ψ_n(x)|².
+
+For a single internal state (all `m` equal, e.g. Bragg orders) this is
+`|Σ_n ψ_n|²`. For the multi-spin SG paths (skeleton / interacting, one frame per
+m) it is `Σ_m |ψ_m|²` — and since `|ψ_m|²` is independent of the boost / scaling
+phase, the de-boosted interacting-handoff residual reconstructs faithfully (only
+R_m and Λ_m enter the magnitude).
 """
-recombine_density(state::MultiFrameTOFState; kwargs...) =
-    abs2.(recombine_field(state; kwargs...))
+function recombine_density(state::MultiFrameTOFState{N};
+    lab_grid::Grid{N}=state.grid) where {N}
+    dens = zeros(Float64, lab_grid.config.n_points...)
+    field = zeros(ComplexF64, lab_grid.config.n_points...)
+    for mval in unique(f.m for f in state.frames)
+        idxs = findall(f -> f.m == mval, state.frames)
+        fill!(field, 0)
+        _accumulate_field!(field, view(state.frames, idxs),
+            view(state.chis, idxs), state.grid, lab_grid)
+        dens .+= abs2.(field)
+    end
+    dens
+end
 
 """
     simulate_bragg_tof(envelope, grid, sys; orders, omega, t,
