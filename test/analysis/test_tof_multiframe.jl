@@ -1,7 +1,9 @@
 using Test
+using FFTW
 using SpinorBEC
 using SpinorBEC: frame_params, component_centroids, component_widths,
-    _apply_boost!, boost_phase, TOFFrame, find_t_sep
+    _apply_boost!, boost_phase, TOFFrame, find_t_sep,
+    recombine_field, recombine_density, simulate_bragg_tof
 
 # Weighted centroid + RMS width of a 1D component density.
 function _centroid_width(nc, x, dV)
@@ -82,8 +84,10 @@ end
         state = simulate_tof_multiframe(psi0, grid, sys;
             gradient=G, gradient_axis=axis, t=t_f, omega=(ω,))
         frame_by_m = Dict(f.m => f for f in state.frames)
-        width_by_m = Dict(state.frames[i].m => component_widths(state)[i]
-                          for i in eachindex(state.frames))
+        width_by_m = Dict(
+            state.frames[i].m => component_widths(state)[i]
+            for i in eachindex(state.frames)
+        )
         for c in 1:D
             m = Float64(sys.m_values[c])
             nc = abs2.(Array(view(ws.state.psi, :, c)))
@@ -146,8 +150,10 @@ end
 
         frame_by_m = Dict(state.frames[i].m => state.frames[i]
                           for i in eachindex(state.frames))
-        width_by_m = Dict(state.frames[i].m => component_widths(state)[i]
-                          for i in eachindex(state.frames))
+        width_by_m = Dict(
+            state.frames[i].m => component_widths(state)[i]
+            for i in eachindex(state.frames)
+        )
         dVb = cell_volume(gB)
         for c in 1:D
             m = Float64(sys.m_values[c])
@@ -231,7 +237,7 @@ end
         end
         nb = zeros(Float64, nB...)
         for c in 1:D
-            nb .+= abs2.(view(psi, :, :, c))
+            nb .+= abs2.(view(psi,:,:,c))
         end
         wx_brute, wy_brute = widths2d(nb, gB.x[1], gB.x[2], cell_volume(gB))
 
@@ -251,5 +257,89 @@ end
         # gradient = 0 ⇒ Inf
         @test find_t_sep(grid, sys; gradient=0.0, gradient_axis=axis,
             omega=(ω,), sigma0=σ0) == Inf
+    end
+end
+
+@testset "Multi-frame TOF (Bragg interference)" begin
+    ω = 1.0
+    F = 1
+    sys = SpinSystem(F)
+    σ0 = 1 / sqrt(2ω)
+    v = 4.0           # Bragg recoil velocity (relative momentum 2v)
+    t = 0.1           # early enough that the ±v orders still overlap
+    Λ = sqrt(1 + ω^2 * t^2)
+    n = 512
+    L = 24.0
+    g1 = make_grid(GridConfig{1}((n,), (L,)))
+    x = g1.x[1]
+    dV = cell_volume(g1)
+    env = ComplexF64.(exp.(-ω .* x .^ 2 ./ 2))
+    env ./= sqrt(sum(abs2, env) * dV)
+    orders = [(k=(v,), amp=1.0 + 0im), (k=(-v,), amp=1.0 + 0im)]
+
+    state = simulate_bragg_tof(env, g1, sys; orders=orders, omega=(ω,), t=t)
+    n_rec = recombine_density(state)
+
+    @testset "vs brute-force free expansion" begin
+        # The oracle: split-step free expansion of the SAME coherent initial
+        # field (e^{ivx}+e^{-ivx})·g. Castin-Dum is exact for the free Gaussian,
+        # so only the N-linear interpolation of the (smooth) envelope differs.
+        psi0 = zeros(ComplexF64, n, sys.n_components)
+        @. psi0[:, 1] = (cis(v * x) + cis(-v * x)) * env
+        ws = make_workspace(; grid=g1, atom=Rb87,
+            interactions=InteractionParams(Dict{Int, Float64}()),
+            potential=NoPotential(), zeeman=ZeemanParams(),
+            sim_params=SimParams(; dt=t / 400, n_steps=400,
+                imaginary_time=false, normalize_every=0),
+            psi_init=psi0)
+        for _ in 1:400
+            split_step!(ws)
+        end
+        n_bf = abs2.(Array(view(ws.state.psi, :, 1)))
+        # global Gouy phase is common to both orders ⇒ cancels in the density
+        @test sqrt(sum(abs2, n_rec .- n_bf)) / sqrt(sum(abs2, n_bf)) < 0.03
+        @test sum(n_rec) * dV ≈ sum(n_bf) * dV rtol = 1e-2
+    end
+
+    @testset "fringe wavevector ≈ 2v" begin
+        # density cross-term oscillates at k_fringe = 2v/Λ²; the envelope FT
+        # decays by k~3 so the sideband peak is isolated.
+        spec = abs.(rfft(n_rec))
+        kbins = 2π .* (0:(length(spec) - 1)) ./ L
+        mask = kbins .> 4.0
+        kpeak = kbins[mask][argmax(spec[mask])]
+        @test isapprox(kpeak, 2v / Λ^2; rtol=0.05)
+        # interference is actually present: deep fringe nulls near the center
+        mid = (n ÷ 2 - 40):(n ÷ 2 + 40)
+        @test minimum(n_rec[mid]) < 0.1 * maximum(n_rec[mid])
+    end
+
+    @testset "single order → Castin-Dum Gaussian, no fringes" begin
+        st1 = simulate_bragg_tof(env, g1, sys;
+            orders=[(k=(v,), amp=1.0 + 0im)], omega=(ω,), t=t)
+        d1 = recombine_density(st1)
+        # centroid at v·t, width Λ·σ0, mass preserved
+        mass = sum(d1) * dV
+        xbar = sum(d1 .* x) * dV / mass
+        wid = sqrt(sum(d1 .* (x .- xbar) .^ 2) * dV / mass)
+        @test xbar ≈ v * t atol = 1e-2
+        @test wid ≈ Λ * σ0 rtol = 1e-2
+        @test mass ≈ 1.0 rtol = 1e-2
+        # no sideband: the smooth Gaussian density has only its monotone tail at
+        # the fringe band (k≈2v/Λ²), where the two-order case shows a clear peak.
+        spec = abs.(rfft(d1))
+        kbins = 2π .* (0:(length(spec) - 1)) ./ L
+        band = (kbins .> 2v / Λ^2 - 1) .& (kbins .< 2v / Λ^2 + 1)
+        @test maximum(spec[band]) < 1e-3 * maximum(spec)
+    end
+
+    @testset "boost single-source sets the fringe phase" begin
+        # The −½Ṙ·R constant lives inside boost_phase; both orders see it through
+        # the SAME function, so the ±v pair interferes CONSTRUCTIVELY at x=0 (the
+        # phases coincide there) — a sign/constant drift would shift the fringes
+        # off center. The cell-centered grid straddles x=0 at indices n/2, n/2+1.
+        @test n_rec[n ÷ 2] > 0.95 * maximum(n_rec)        # central fringe is a peak
+        @test n_rec[n ÷ 2] ≈ n_rec[n ÷ 2 + 1] rtol = 1e-6 # mirror about x=0
+        @test n_rec[n ÷ 2 - 5] ≈ n_rec[n ÷ 2 + 6] rtol = 1e-6
     end
 end

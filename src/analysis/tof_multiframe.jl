@@ -21,6 +21,7 @@ export TOFFrame, MultiFrameTOFState, simulate_tof_multiframe
 export boost_phase, frame_params, component_centroids, component_widths
 export far_field_density, find_t_sep
 export simulate_tof_multiframe_interacting
+export recombine_field, recombine_density, simulate_bragg_tof
 
 """
 Affine frame for one spin component: center of mass `R`, COM velocity `Rdot`,
@@ -228,7 +229,7 @@ function find_t_sep(grid::Grid{N}, sys::SpinSystem; gradient::Real, gradient_axi
     ω = omega[ax]
     σ0 = Float64(sigma0)
     # minimum adjacent acceleration gap (slowest-separating pair sets t_sep)
-    da = minimum(abs(g * (ms[i+1] - ms[i])) for i in 1:(length(ms)-1))
+    da = minimum(abs(g * (ms[i + 1] - ms[i])) for i in 1:(length(ms) - 1))
     da == 0.0 && return Inf
     separated(t) = 0.5 * da * t^2 > kappa * σ0 * sqrt(1 + ω^2 * t^2)
     separated(t_max) || return Float64(t_max)
@@ -391,7 +392,7 @@ function simulate_tof_multiframe_interacting(psi0::AbstractArray{<:Complex},
     chi_prev = copy(chi_A)
     t_prev = 0.0
     for step in 1:n_steps_A
-        step == n_steps_A && (chi_prev = copy(chi_A); t_prev = t)
+        step == n_steps_A && (chi_prev=copy(chi_A); t_prev=t)
         b0 = _b(t)
         _mf_pot_halfstep!(chi_A, grid, b0, _bdd(b0), c0f, G, gradient_axis, sys, dt / 2)
         _ddi_half!(chi_A, b0, dt / 2)
@@ -425,8 +426,9 @@ function simulate_tof_multiframe_interacting(psi0::AbstractArray{<:Complex},
         ξR_prev, _ = _xi_com_momentum(
             ComplexF64.(Array(view(chi_prev, idx...))), grid, plans)
         R_sep = ntuple(d -> b_sep[d] * ξR[d], Val(N))
-        v_sep = ntuple(d -> (b_sep[d] * ξR[d] - b_pprev[d] * ξR_prev[d]) /
-                            (Float64(t_sep) - t_prev), Val(N))
+        v_sep = ntuple(
+            d -> (b_sep[d] * ξR[d] - b_pprev[d] * ξR_prev[d]) /
+                 (Float64(t_sep) - t_prev), Val(N))
         # de-boost ξ-momentum, re-center ξ-COM → frozen residual
         fb = TOFFrame{N}(m, ξR, ξp, ntuple(_ -> 1.0, Val(N)), ntuple(_ -> 0.0, Val(N)),
             Float64(t_sep))
@@ -444,4 +446,121 @@ function simulate_tof_multiframe_interacting(psi0::AbstractArray{<:Complex},
         push!(norm0, nrm)
     end
     MultiFrameTOFState{N}(grid, sys, frames, chis, Float64(t_f), plans, norm0)
+end
+
+# ---------------------------------------------------------------------------
+# Build 3 (①): coherent recombination → matter-wave / Bragg interference
+#
+# `far_field_density` places each |χ̃_m|² at R_m — INCOHERENT, valid only where
+# the clouds are disjoint (SG-separated). When clouds OVERLAP (Bragg momentum
+# orders of one spin state, or a zero-gradient release) the fringes come from
+# the RELATIVE phase between frames. We rebuild the coherent lab field
+#   ψ(x) = Σ_n (1/√∏Λ_n) χ_n((x−R_n)/Λ_n) · exp(i[φ_scal,n(x) + φ_boost,n(x)])
+# the exact Castin-Dum × Galilean single-component solution, with
+#   φ_scal,n(x) = Σ_d ½ (Λ̇/Λ)_{n,d} (x−R_n)_d²    (Castin-Dum expansion phase)
+#   φ_boost,n(x) = `boost_phase(frame_n, x)`        (the single source of truth)
+# `boost_phase` carries the −½Ṙ·R constant; using the SAME function for the
+# de-boost (handoff) and the re-add (here) is what keeps the inter-frame phase
+# difference — hence the fringe positions — physical. χ here is the lab residual
+# (skeleton / Bragg convention: NOT de-boosted); the interacting-handoff residual
+# is de-boosted, so recombining it is a separate Build-2 concern.
+# ---------------------------------------------------------------------------
+
+# N-linear interpolation of χ (defined on `grid`) at ξ; 0 outside the box.
+@inline function _interp_linear(chi::Array{ComplexF64, N}, grid::Grid{N},
+    ξ::NTuple{N, Float64}) where {N}
+    n_pts = grid.config.n_points
+    r = ntuple(d -> (ξ[d] - grid.x[d][1]) / grid.dx[d], Val(N))
+    lo = ntuple(d -> floor(Int, r[d]), Val(N))
+    frac = ntuple(d -> r[d] - lo[d], Val(N))
+    acc = zero(ComplexF64)
+    @inbounds for c in 0:((1 << N) - 1)
+        w = 1.0
+        ok = true
+        idx = ntuple(d -> lo[d] + 1 + ((c >> (d - 1)) & 1), Val(N))
+        for d in 1:N
+            b = (c >> (d - 1)) & 1
+            w *= b == 1 ? frac[d] : (1.0 - frac[d])
+            (idx[d] < 1 || idx[d] > n_pts[d]) && (ok = false)
+        end
+        ok && (acc += w * chi[CartesianIndex(idx)])
+    end
+    acc
+end
+
+"""
+    recombine_field(state; lab_grid=state.grid) -> Array{ComplexF64,N}
+
+Coherent lab-frame complex field ψ(x) = Σ_n ψ_n(x), each frame reconstructed as
+the exact Castin-Dum × Galilean solution (scaling + boost phase via
+`boost_phase`). Where frames overlap their relative phase produces matter-wave
+fringes. χ is interpolated N-linearly onto `lab_grid` (the only approximation;
+controlled by resolution). Assumes the skeleton / Bragg residual convention
+(χ NOT de-boosted).
+"""
+function recombine_field(state::MultiFrameTOFState{N};
+    lab_grid::Grid{N}=state.grid) where {N}
+    field = zeros(ComplexF64, lab_grid.config.n_points...)
+    xg = lab_grid.x
+    for (f, chi) in zip(state.frames, state.chis)
+        inv_sqrt_Λ = 1.0 / sqrt(prod(f.Λ))
+        @inbounds for I in CartesianIndices(field)
+            x = ntuple(d -> Float64(xg[d][I[d]]), Val(N))
+            ξ = ntuple(d -> (x[d] - f.R[d]) / f.Λ[d], Val(N))
+            amp = _interp_linear(chi, state.grid, ξ)
+            amp == 0 && continue
+            φ = 0.0
+            for d in 1:N
+                dxr = x[d] - f.R[d]
+                φ += 0.5 * (f.Λdot[d] / f.Λ[d]) * dxr * dxr
+            end
+            φ += boost_phase(f, x)
+            field[I] += inv_sqrt_Λ * amp * cis(φ)
+        end
+    end
+    field
+end
+
+"""
+    recombine_density(state; lab_grid=state.grid) -> Array{Float64,N}
+
+Coherent lab-frame density |Σ_n ψ_n(x)|² — the interference image.
+See [`recombine_field`](@ref).
+"""
+recombine_density(state::MultiFrameTOFState; kwargs...) =
+    abs2.(recombine_field(state; kwargs...))
+
+"""
+    simulate_bragg_tof(envelope, grid, sys; orders, omega, t,
+        m=0.0, gradient=0.0, gradient_axis=1) -> MultiFrameTOFState
+
+Bragg / matter-wave TOF: one spin state (`m`) split into momentum `orders`
+(each `(k=Δv-tuple, amp=complex)`) that co-expand from a shared `envelope` and
+interfere on recombination. A Bragg order is just an affine frame with initial
+velocity `V0 = k` (no SG by default), so it falls out of `frame_params`; the
+fringes appear in `recombine_density`. `omega` is the pre-release trap frequency
+(drives Λ). For ±v symmetric orders the overlap-center fringe wavevector is
+`2v/Λ²` with `Λ=√(1+ω²t²)`.
+"""
+function simulate_bragg_tof(envelope::AbstractArray{<:Complex}, grid::Grid{N},
+    sys::SpinSystem; orders, omega::NTuple{N, Float64}, t::Real,
+    m::Real=0.0, gradient::Real=0.0, gradient_axis::Int=1) where {N}
+    isempty(orders) && throw(ArgumentError("orders must be non-empty"))
+    plans = make_fft_plans(grid.config.n_points)
+    dV = cell_volume(grid)
+    env = ComplexF64.(Array(envelope))
+    frames = TOFFrame{N}[]
+    chis = Array{ComplexF64, N}[]
+    norm0 = Float64[]
+    for ord in orders
+        k = ntuple(d -> Float64(ord.k[d]), Val(N))
+        amp = ComplexF64(ord.amp)
+        f = frame_params(m, omega; t=t, gradient=gradient,
+            gradient_axis=gradient_axis, V0=k)
+        chi = amp .* env
+        push!(frames, f)
+        push!(chis, chi)
+        push!(norm0, sum(abs2, chi) * dV)
+    end
+    MultiFrameTOFState{N}(grid, sys, frames, chis, Float64(t), plans, norm0)
 end
