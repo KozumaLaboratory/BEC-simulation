@@ -42,6 +42,7 @@ include("analysis/topology.jl")
 include("analysis/synthetic_dimension.jl")
 include("analysis/stability_analysis.jl")
 include("analysis/spin_rotation.jl")
+include("analysis/larmor_adiabaticity.jl")  # local-field tilt + Larmor vs rotation rate
 
 # Phase exploration (needs experiments for ScanExperiment).
 include("analysis/phases/phase_classification.jl")
