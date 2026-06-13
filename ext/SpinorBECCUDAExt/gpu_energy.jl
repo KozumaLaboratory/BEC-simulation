@@ -189,16 +189,11 @@ function SpinorBEC._energy_decomposition_gpu(ws::SpinorBEC.Workspace{N}) where {
     # on the host-side `psi` already prepared above.
     E_mg = SpinorBEC._magnetic_gradient_energy(psi, ws, N, n_pts, dV)
 
-    # Spatial Zeeman (arbitrary B(r)): always 0 on a GPU workspace
-    # (make_workspace rejects spatial_zeeman + GPU backend), but the slot
-    # must exist for shape parity with the CPU registry NamedTuple.
-    E_sz = if ws.spatial_zeeman === nothing
-        0.0
-    else
-        sm = ws.spin_matrices
-        SpinorBEC._spatial_zeeman_energy(
-            psi, ws.spatial_zeeman, sm, sm.system.F, sm.system.n_components, N, n_pts, dV)
-    end
+    # Spatial Zeeman (arbitrary B(r,t)): always 0 on a GPU workspace —
+    # make_workspace rejects a spatial field + GPU backend, so ws.zeeman is
+    # always the uniform arm here. The slot must exist for shape parity with
+    # the CPU registry NamedTuple.
+    E_sz = 0.0
 
     E_total =
         E_kin + E_trap + E_zee + E_c0 + E_c1 + E_ddi + E_lhy + E_tensor + E_raman +

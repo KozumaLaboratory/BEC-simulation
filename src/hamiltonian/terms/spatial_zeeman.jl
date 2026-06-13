@@ -1,9 +1,10 @@
 # --- SpatialZeemanTerm — arbitrary B(r) Zeeman coupling as a HamTerm ---
 #
 # The m-dependent counterpart of `MagneticGradientTerm` (which is a
-# spin-INDEPENDENT tilt). Couples a spatially-varying field B(r) as
-#   H(r) = -(bx(r)·F_x + by(r)·F_y + bz(r)·F_z) + q(r)·F_z²
-# reading the per-voxel arrays from `ws.spatial_zeeman`. Data type, builders,
+# spin-INDEPENDENT tilt). Couples a spatially-varying field B(r,t) as
+#   H(r,t) = -(bx(r,t)·F_x + by(r,t)·F_y + bz(r,t)·F_z) + q(r,t)·F_z²
+# reading the non-uniform arm of the unified `ws.zeeman` (a `ZeemanField` whose
+# per-voxel arrays come from `field_arrays_at(field, t)`). Data type, builders,
 # and the per-voxel propagator kernel live in
 # `foundation/types/spatial_zeeman.jl`; this file is the HamTerm trinity.
 #
@@ -13,13 +14,15 @@
 # path (which copies ψ to host) still gets a `spatial_zeeman` slot.
 
 """
-Arbitrary spatially-varying Zeeman field as one HamTerm. Data lives in
-`ws.spatial_zeeman::SpatialZeemanField`; this struct is a marker (like
-`MagneticGradientTerm`).
+Arbitrary spatially-varying Zeeman field B(r,t) as one HamTerm. Reads the
+non-uniform arm of `ws.zeeman` (a spatial `ZeemanField`); this struct is a
+marker (like `MagneticGradientTerm`).
 """
 struct SpatialZeemanTerm <: HamTerm end
 
-@inline _spatial_zeeman(ws) = ws.spatial_zeeman
+# The spatial Zeeman field is the non-uniform arm of the unified ws.zeeman
+# (nothing when the field is uniform — slot 3 ZeemanTerm carries it then).
+@inline _spatial_zeeman(ws) = is_uniform(ws.zeeman) ? nothing : ws.zeeman
 
 # ---------------------------------------------------------------------------
 # Operator face (gradient): out .+= H(r)·ψ
@@ -33,7 +36,7 @@ function apply_operator!(out::AbstractArray, ::SpatialZeemanTerm, ws, psi::Abstr
     D = sm.system.n_components
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
-    bx, by, bz, q = field.bx, field.by, field.bz, field.q
+    bx, by, bz, q = field_arrays_at(field, ws.state.t)
     m_vals = ntuple(c -> Float64(F - (c - 1)), Val(D))
     fp = ntuple(c -> c == 1 ? 0.0 :
                      sqrt(Float64(F * (F + 1)) - m_vals[c] * (m_vals[c] + 1.0)), Val(D))
@@ -68,7 +71,8 @@ function energy_contribution(::SpatialZeemanTerm, psi::AbstractArray{<:Complex},
     D = sm.system.n_components
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
-    return _spatial_zeeman_energy(psi, field, sm, F, D, N, n_pts, cell_volume(ws.grid))
+    bx, by, bz, q = field_arrays_at(field, ws.state.t)
+    return _spatial_zeeman_energy(psi, bx, by, bz, q, sm, F, D, N, n_pts, cell_volume(ws.grid))
 end
 
 """
@@ -118,7 +122,8 @@ function apply_step!(::SpatialZeemanTerm, psi::AbstractArray{<:Complex},
     dt::Real, imaginary_time::Bool, ws)
     field = _spatial_zeeman(ws)
     field === nothing && return nothing
-    apply_spatial_zeeman_step!(psi, field, ws.spin_matrices, dt, imaginary_time)
+    bx, by, bz, q = field_arrays_at(field, ws.state.t)
+    apply_spatial_zeeman_step!(psi, bx, by, bz, q, ws.spin_matrices, dt, imaginary_time)
     return nothing
 end
 

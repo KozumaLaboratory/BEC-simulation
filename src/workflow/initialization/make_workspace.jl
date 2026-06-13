@@ -32,7 +32,7 @@ function make_workspace(;
     grid::Grid{N, T},
     atom::AtomSpecies,
     interactions::InteractionParams,
-    zeeman::Union{ZeemanParams, TimeDependentZeeman}=ZeemanParams(),
+    zeeman::Union{ZeemanParams, TimeDependentZeeman, ZeemanField}=ZeemanParams(),
     potential::AbstractPotential=NoPotential(),
     sim_params::SimParams,
     psi_init::Union{Nothing, AbstractArray{<:Complex}}=nothing,
@@ -63,16 +63,18 @@ function make_workspace(;
         ),
     )
     backend = _resolve_backend(backend, grid)
-    if spatial_zeeman !== nothing
+    # Fold the legacy zeeman / spatial_zeeman inputs into the one unified field.
+    zfield = _to_zeeman_field(zeeman, spatial_zeeman)
+    if !is_uniform(zfield)
         backend isa CPUBackend || throw(
             ArgumentError(
-                "spatial_zeeman (arbitrary B(r)) has a CPU-only per-voxel propagator; " *
+                "a spatial Zeeman field B(r,t) has a CPU-only per-voxel propagator; " *
                 "run on a CPU backend"),
         )
         is_active(sim_params.spin_rotating_frame_omega, ROTATION_TOL) && throw(
             ArgumentError(
-                "spatial_zeeman is not supported together with a spin-rotating frame " *
-                "(spin_rotating_frame_omega ≠ 0) in v1"),
+                "a spatial Zeeman field is not supported together with a spin-rotating " *
+                "frame (spin_rotating_frame_omega ≠ 0) in v1"),
         )
     end
     if quasi_2d
@@ -160,9 +162,9 @@ function make_workspace(;
     V = _to_device(backend, V)
 
     effective_zeeman = if is_active(omega, ROTATION_TOL)
-        _shift_zeeman_for_rotating_frame(zeeman, omega)
+        _shift_zeeman_for_rotating_frame(zfield, omega)
     else
-        zeeman
+        zfield
     end
 
     ddi = if enable_ddi
@@ -200,7 +202,7 @@ function make_workspace(;
         # experiments live deep in this regime (ω_L ~ kHz, c_dd × n ~ Hz).
         # Only @info, not error: the user may intentionally want the full
         # kernel to study transverse Larmor-coherent dynamics.
-        p_now = linear_p(zeeman)   # uniform accessor handles both forms
+        p_now = linear_p(zfield)   # uniform arm → bz; spatial arm → 0 (advisory only)
         if !secular_ddi && is_active(p_now, ROTATION_TOL) && is_active(c_dd_val)
             n_peak_est =
                 sum(abs2, _to_host(psi)) / cell_volume(grid) /
@@ -395,7 +397,6 @@ function make_workspace(;
         light_shift_resolved,
         time_dep_interactions,
         magnetic_gradient,
-        spatial_zeeman,
     )
 end
 

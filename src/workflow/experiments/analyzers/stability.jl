@@ -48,7 +48,11 @@ function _analyze_bogoliubov_dispersion(psi, grid, atom, params, ws_prev)
     n0 > 1e-30 && (spinor ./= sqrt(n0))
     interactions = ws_prev.interactions
     c_dd_val = ws_prev.ddi === nothing ? 0.0 : ws_prev.ddi.C_dd
-    zeeman = ws_prev.zeeman isa ZeemanParams ? ws_prev.zeeman : ZeemanParams(0.0, 0.0)
+    zeeman = if is_uniform(ws_prev.zeeman)
+        ZeemanParams(linear_p(ws_prev.zeeman), quadratic_q(ws_prev.zeeman))
+    else
+        ZeemanParams(0.0, 0.0)
+    end
     k_max = Float64(get(params, "k_max", 10.0))
     n_k = Int(get(params, "n_k", 200))
     k_dir_raw = get(params, "k_direction", [0.0, 0.0, 1.0])
@@ -106,7 +110,11 @@ function _run_bogoliubov_analyzer(psi, grid, atom, params, ws_prev)
 
     interactions = ws_prev.interactions
     c_dd_val = ws_prev.ddi === nothing ? 0.0 : ws_prev.ddi.C_dd
-    zeeman = ws_prev.zeeman isa ZeemanParams ? ws_prev.zeeman : ZeemanParams(0.0, 0.0)
+    zeeman = if is_uniform(ws_prev.zeeman)
+        ZeemanParams(linear_p(ws_prev.zeeman), quadratic_q(ws_prev.zeeman))
+    else
+        ZeemanParams(0.0, 0.0)
+    end
 
     k_max = Float64(get(params, "k_max", 10.0))
     n_k = Int(get(params, "n_k", 200))

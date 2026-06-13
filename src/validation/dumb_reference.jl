@@ -149,6 +149,21 @@ function dumb_zeeman_pqbxby(ws)
             z.bx_wf === nothing ? 0.0 : evaluate(z.bx_wf, t),
             z.by_wf === nothing ? 0.0 : evaluate(z.by_wf, t),
         )
+    elseif z isa ZeemanField
+        # Independent restatement of the unified uniform arm (waveform overrides
+        # scalar). Component order is (bx, by, bz, q); p ≡ bz. A spatial arm's
+        # uniform part is zero (dumb_spatial_zeeman carries the per-voxel field).
+        if is_uniform(z)
+            sc, wf = z.scalars, z.waveforms
+            (
+                wf[3] === nothing ? sc[3] : evaluate(wf[3], t),
+                wf[4] === nothing ? sc[4] : evaluate(wf[4], t),
+                wf[1] === nothing ? sc[1] : evaluate(wf[1], t),
+                wf[2] === nothing ? sc[2] : evaluate(wf[2], t),
+            )
+        else
+            (0.0, 0.0, 0.0, 0.0)
+        end
     else
         error("dumb_zeeman_pqbxby: unsupported zeeman type $(typeof(z))")
     end
@@ -200,9 +215,9 @@ end
 # contract: bypass the production accessors). Restates the operator
 # H(r) = -(bx·F_x + by·F_y + bz·F_z) + q·F_z² as per-voxel field data.
 function dumb_spatial_zeeman(ws)
-    sz = ws.spatial_zeeman
-    sz === nothing && return nothing
-    return (bx=sz.bx, by=sz.by, bz=sz.bz, q=sz.q)
+    is_uniform(ws.zeeman) && return nothing
+    bx, by, bz, q = field_arrays_at(ws.zeeman, ws.state.t)
+    return (bx=bx, by=by, bz=bz, q=q)
 end
 
 # ============================================================================
