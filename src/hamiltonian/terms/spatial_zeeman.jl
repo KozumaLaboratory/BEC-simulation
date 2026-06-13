@@ -72,14 +72,15 @@ function energy_contribution(::SpatialZeemanTerm, psi::AbstractArray{<:Complex},
 end
 
 """
-    _spatial_zeeman_energy(psi, field, sm, F, D, N, n_pts, dV)
+    _spatial_zeeman_energy(psi, bx, by, bz, q, sm, F, D, N, n_pts, dV)
 
 `E = ∫ [Σ_c (-bz(r)·m + q(r)·m²)|ψ_c|² - bx(r)·f_x(r) - by(r)·f_y(r)] dV`,
-the per-voxel expectation of the spatially-varying Zeeman operator. Host-side;
-also used by the GPU energy path (which copies ψ to host).
+the per-voxel expectation of the spatially-varying Zeeman operator from four
+per-voxel arrays (already sampled at the current time). Host-side; also used by
+the GPU energy path (which copies ψ to host). A `SpatialZeemanField` overload
+delegates here.
 """
-function _spatial_zeeman_energy(psi, field::SpatialZeemanField, sm, F, D, N, n_pts, dV)
-    bx, by, bz, q = field.bx, field.by, field.bz, field.q
+function _spatial_zeeman_energy(psi, bx, by, bz, q, sm, F, D, N, n_pts, dV)
     m_vals = ntuple(c -> Float64(F - (c - 1)), Val(D))
     fp = ntuple(c -> c == 1 ? 0.0 :
                      sqrt(Float64(F * (F + 1)) - m_vals[c] * (m_vals[c] + 1.0)), Val(D))
@@ -103,6 +104,11 @@ function _spatial_zeeman_energy(psi, field::SpatialZeemanField, sm, F, D, N, n_p
     end
     return E * dV
 end
+
+# Legacy SpatialZeemanField overload — delegates to the array form.
+_spatial_zeeman_energy(psi, field::SpatialZeemanField, sm, F, D, N, n_pts, dV) =
+    _spatial_zeeman_energy(
+        psi, field.bx, field.by, field.bz, field.q, sm, F, D, N, n_pts, dV)
 
 # ---------------------------------------------------------------------------
 # Propagator face: exp(-i·dt·H(r)) (RT) / exp(-dt·H(r)) (IT)
