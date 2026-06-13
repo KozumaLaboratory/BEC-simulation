@@ -173,6 +173,28 @@ end
         compare_all_slots(ws, ψr, "SZ:random")
     end
 
+    @testset "fixture SZ+ (spatial B(r) coexisting with c0 + c1)" begin
+        # Gates the spatial Zeeman term INTERACTING with contact terms in the
+        # registry composition — the prior fixture SZ runs spatial alone (every
+        # other slot 0 = 0). Here density_c0, spin_c1 AND spatial_zeeman are all
+        # non-trivial, so a spatial-vs-contact cross-corruption reds the per-slot
+        # dumb-vs-production comparison.
+        rng = MersenneTwister(37)
+        grid = make_grid(GridConfig{1}((12,), (6.0,)))
+        sys = SpinSystem(1)
+        field = spatial_zeeman_field(grid;
+            bz=(x,) -> 0.3 + 0.1x, bx=(x,) -> 0.15 - 0.05x, q=(x,) -> 0.02x^2)
+        ws = make_workspace(; grid, atom=Rb87,
+            interactions=InteractionParams(Dict(0 => 0.5, 1 => -0.3)),
+            potential=HarmonicTrap((1.0,)),
+            sim_params=SimParams(; dt=0.01, n_steps=1),
+            spatial_zeeman=field)
+        psi = init_psi(grid, sys; state=:spin_coherent, init_theta=π / 4)
+        compare_all_slots(ws, psi, "SZ+:coherent")
+        ψr = rand_offmanifold_state(ws; rng)
+        compare_all_slots(ws, ψr, "SZ+:random")
+    end
+
     # Hermiticity of the LINEAR production faces: ⟨φ|Hχ⟩ = ⟨Hφ|χ⟩ on
     # random pairs (frozen-field ambiguity does not exist for linear
     # terms). Absorbed from the retired 4-step chain, whose blanket

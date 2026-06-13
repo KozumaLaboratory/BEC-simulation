@@ -37,7 +37,10 @@ const FAST_TESTS = [
     "analysis/test_faraday.jl",
     "analysis/test_sign_pattern.jl",
     "analysis/test_polyhedral_classifier.jl",
-    "analysis/test_dipole_field.jl",
+    # TODO(dipole_field): re-add when test/analysis/test_dipole_field.jl lands —
+    # the referenced file was never committed (left a dangling include that
+    # reddened the full suite). src/analysis/dipole_field.jl is likewise absent.
+    # "analysis/test_dipole_field.jl",
     "workflow/test_phi_omega_convention.jl",
     "workflow/test_schema_validation_edge_cases.jl",
     "workflow/test_calibration_edge_cases.jl",
