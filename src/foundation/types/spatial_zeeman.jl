@@ -167,11 +167,17 @@ end
 """
     field_scalars_at(f::ZeemanField{Nothing}, t) -> (bx, by, bz, q)
 
-Uniform field sampled at time `t`: `scalars .* waveform(t)`.
+Uniform field sampled at time `t`. For each component the waveform, when
+present, IS the value (matching `TimeDependentZeeman` semantics and keeping the
+rotating-frame Barnett shift a simple `ShiftedWaveform`); the static `scalars`
+baseline is used where no waveform is given.
 """
 @inline function field_scalars_at(f::ZeemanField{Nothing}, t::Real=0.0)
-    s = _zeeman_time_scales(f, t)
-    (f.scalars[1] * s[1], f.scalars[2] * s[2], f.scalars[3] * s[3], f.scalars[4] * s[4])
+    ntuple(
+        k -> f.waveforms[k] === nothing ? f.scalars[k] :
+             evaluate(f.waveforms[k], Float64(t)),
+        Val(4),
+    )
 end
 
 # Uniform-arm Zeeman accessors — same contract as ZeemanParams /
