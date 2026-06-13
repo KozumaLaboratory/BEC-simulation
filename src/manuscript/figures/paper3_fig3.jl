@@ -83,10 +83,7 @@ ax.grid(alpha=0.3, which='both')
 ax.legend(loc='upper right', fontsize=9, framealpha=0.95)
 plt.tight_layout()
 
-base = __file__.replace('.py', '')
-plt.savefig(base + '.pdf', bbox_inches='tight')
-plt.savefig(base + '.svg', bbox_inches='tight')
-print(f'Wrote {base}.pdf and .svg')
+$(_PY_SAVEFIG_FOOTER)
 """
     _emit_csv_py(io, paper, fig, csv, py)
 end

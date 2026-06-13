@@ -66,7 +66,7 @@ function simulate_tof(
 
             # Column integrate along imaging_axis
             ax = min(params.imaging_axis, N)
-            integrated = dropdims(sum(mom_density; dims=ax); dims=ax)
+            integrated = _integrate_out_axis(mom_density, ax)
             result[m] = integrated
         end
     end
@@ -188,8 +188,7 @@ function simulate_tof_with_gradient(
         if N == 1
             result[m] = density_c
         else
-            ax = imaging_axis
-            integrated = dropdims(sum(density_c; dims=ax); dims=ax)
+            integrated = _integrate_out_axis(density_c, imaging_axis)
             result[m] = integrated
         end
     end
@@ -310,8 +309,7 @@ function simulate_tof_scaling(
     for c in 1:D
         m = sys.m_values[c]
         dens = Array(abs2.(view(chi, _component_slice(N, n_pts, c)...)))
-        chi_density[Int(m)] = N == 1 ? dens :
-                              dropdims(sum(dens; dims=imaging_axis); dims=imaging_axis)
+        chi_density[Int(m)] = N == 1 ? dens : _integrate_out_axis(dens, imaging_axis)
     end
 
     norm_drift = abs(sum(abs2, chi) * cell_volume(grid) - norm0)

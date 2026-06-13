@@ -153,6 +153,11 @@ function newton_cg_ground_state(
     energy_gradient!(g, ψ, ws)
     gp = _tangent_project(g, ψ, prm.dV, prm.n2)
     gnorm = sqrt(ipR(gp, gp))
+    # Re-sync ws.state.psi to ψ: total_energy / energy_gradient! may mutate
+    # ws.state.psi away from the returned iterate (same guard as
+    # _finalize_lbfgs_atomic!). Without it ws.state.psi can drift from the
+    # reported {energy, grad_norm}.
+    copyto!(ws.state.psi, ψ)
     (; psi=ψ, energy=Efinal, grad_norm=gnorm, converged, iterations=iters, mu=prm.μ)
 end
 

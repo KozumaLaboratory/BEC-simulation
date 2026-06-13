@@ -227,8 +227,7 @@ function imaging_forward(density::AbstractArray{<:Real, N}, grid::Grid{N};
     if N == 3
         1 <= imaging_axis <= 3 ||
             throw(ArgumentError("imaging_axis=$imaging_axis out of range"))
-        col = dropdims(sum(density; dims=imaging_axis); dims=imaging_axis) .*
-              grid.dx[imaging_axis]
+        col = _integrate_out_axis(density, imaging_axis) .* grid.dx[imaging_axis]
         inplane = Tuple(d for d in 1:3 if d != imaging_axis)
     elseif N == 2
         col = Matrix{Float64}(density)
@@ -512,7 +511,7 @@ function momentum_distribution(
     if N == 1
         return (k_coords=(grid.k[1],), n_k=n_k_total)
     end
-    col = dropdims(sum(n_k_total; dims=axis); dims=axis)
+    col = _integrate_out_axis(n_k_total, axis)
     remaining_axes = Int[d for d in 1:N if d != axis]
     k_coords = ntuple(i -> grid.k[remaining_axes[i]], Val(N-1))
     (k_coords=k_coords, n_k=col)

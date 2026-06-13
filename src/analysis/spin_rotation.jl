@@ -210,7 +210,7 @@ function column_density(
     n_pts = ntuple(d -> size(psi, d), ndim)
     idx = _component_slice(ndim, n_pts, component)
     ρ = abs2.(view(psi, idx...))
-    dropdims(sum(ρ; dims=axis); dims=axis)
+    _integrate_out_axis(ρ, axis)
 end
 
 # --- RF pulse + spin tomography ---

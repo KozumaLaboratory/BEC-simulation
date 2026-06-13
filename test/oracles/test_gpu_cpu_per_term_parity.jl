@@ -293,4 +293,29 @@ end
         result = _parity_check(_build; label="Raman")
         @test abs(result.ed_cpu.raman) > 1e-6
     end
+
+    # -----------------------------------------------------------------
+    # SpatialZeemanTerm — the 14th HamTerm (arbitrary B(r), added
+    # 2026-06-10) is CPU-only: it has a per-voxel host propagator and no
+    # GPU kernel. The correct GPU behaviour is therefore "refuse", not
+    # "match" — so the gate is that `make_workspace` REJECTS a GPU
+    # backend at construction rather than silently no-op'ing the term.
+    # Without this, the same blind-spot class as
+    # `mistake_gpu_energy_decomposition_missing_coriolis_2026_06_04`
+    # reopens for the one term whose GPU contract is rejection.
+    # (Coriolis GPU/CPU parity is gated in test_level0_gpu_cpu_consistency.jl.)
+    # -----------------------------------------------------------------
+    @testset "SpatialZeemanTerm: GPU backend rejected" begin
+        grid = make_grid(GridConfig{1}((16,), (8.0,)))
+        field = quadrupole_field(grid; gradient=0.4, bias=0.3)
+        sp = SimParams(; dt=0.01, n_steps=1)
+        kwargs = (; grid, atom=Rb87,
+            interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
+            zeeman=ZeemanParams(0.0, 0.0),
+            potential=HarmonicTrap((1.0,)),
+            spatial_zeeman=field, sim_params=sp)
+        ws_cpu = make_workspace(; kwargs...)
+        @test ws_cpu.backend isa CPUBackend
+        @test_throws ArgumentError make_workspace(; kwargs..., backend=CUDABackend())
+    end
 end
