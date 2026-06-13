@@ -112,6 +112,7 @@ const FAST_TESTS = [
     "analysis/test_spectral.jl",
     "analysis/test_tof.jl",
     "analysis/test_spatial_zeeman.jl",
+    "analysis/test_zeeman_field_brt.jl",
     "analysis/test_tof_multiframe.jl",
     "analysis/test_bogoliubov.jl",
     "workflow/test_phase_scan.jl",
