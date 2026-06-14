@@ -315,6 +315,7 @@ const FULL_EXTRA = [
     "workflow/test_phase_boundary.jl",
     "analysis/test_physics_level2.jl",
     "analysis/test_physics_level3.jl",
+    "analysis/test_larmor_precession.jl",
     "solvers/test_quasi_2d.jl",
     "solvers/test_quasi_2d_api.jl",
     "hamiltonian/test_tensor_interaction.jl",
@@ -375,6 +376,7 @@ const PHYSICS_TESTS = [
     "analysis/test_physics_level1.jl",
     "analysis/test_physics_level2.jl",
     "analysis/test_physics_level3.jl",
+    "analysis/test_larmor_precession.jl",
     "analysis/test_analytic_ground_states.jl",
     "analysis/test_analytical_validation.jl",
 ]
