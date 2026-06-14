@@ -44,3 +44,4 @@ include("solvers/evaporation/trap_geometry.jl")
 include("solvers/evaporation/evaporation_model.jl")
 include("solvers/evaporation/evaporation_solve.jl")
 include("solvers/evaporation/evaporation_optimize.jl")
+include("solvers/evaporation/euv3.jl")  # lab FORT calibration + the euv3 evaporation ramp

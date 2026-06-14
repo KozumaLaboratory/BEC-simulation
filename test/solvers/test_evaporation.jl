@@ -8,7 +8,9 @@ using SpinorBEC: GaussianBeam, CrossedDipoleTrap, Eu151, Units,
     crossed_trap_frequencies, mean_trap_frequency, crossed_trap_depth,
     EvapTrap, EvapParams, evap_rhs, phase_space_density,
     FortRamp, fort_power_at, trap_at, run_evaporation,
-    ramp_from_params, optimize_evaporation_ramp
+    ramp_from_params, optimize_evaporation_ramp,
+    hfort_power, hfort_volts, vfort_power, vfort_volts, sfort_power, sfort_volts,
+    euv3_evaporation_ramp
 
 const _λ = 1064e-9
 const _w0 = 30e-6
@@ -146,6 +148,28 @@ _euv3_ramp() = FortRamp(
         @test out.result.reached_bec
         @test out.bo.best_y > 1                         # a real BEC atom number
         @test out.result.N_BEC == out.bo.best_y
+    end
+
+    @testset "euv3 FORT calibration + evaporation ramp" begin
+        # power ↔ voltage invertibility per beam
+        for P in (0.099, 1.0, 6.0)
+            @test hfort_power(hfort_volts(P)) ≈ P rtol = 1e-12
+            @test vfort_power(vfort_volts(P)) ≈ P rtol = 1e-12
+            @test sfort_power(sfort_volts(P)) ≈ P rtol = 1e-12
+        end
+        @test hfort_volts(6.0) ≈ (6.0 + 0.0010) / 0.6198      # transcribed constant
+        # the lab ramp
+        r = euv3_evaporation_ramp()
+        @test size(r.powers_W, 1) == 3                        # H, V, S
+        @test r.times[end] ≈ 2.7
+        @test r.powers_W[1, 1] ≈ 6.0 && r.powers_W[1, end] ≈ 0.14   # HFORT 6 → 0.14 W
+        @test r.powers_W[2, 1] ≈ 0.0 && r.powers_W[2, end] ≈ 0.09   # VFORT 0 → 0.09 W
+        @test all(==(0.0), r.powers_W[3, :])                  # SFORT off
+        @test issorted(r.times)
+        # drives the model to BEC just like the hand-written ramp
+        res = run_evaporation(_eu_trap(), r,
+            EvapParams(; a_s=_as, tau_bg=10.0, K3=0.0); N0=2e6, T0=40e-6)
+        @test res.reached_bec
     end
 
     # End-to-end validation against the lab NumberOfAtoms.csv requires the real
