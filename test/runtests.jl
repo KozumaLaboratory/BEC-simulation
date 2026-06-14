@@ -21,23 +21,23 @@ const TEST_TIER = lowercase(get(ENV, "SPINORBEC_TEST_TIER", "full"))
 # ── Fast tier: pure unit tests, no find_ground_state / run_simulation ──
 const FAST_TESTS = [
     "test_quality.jl",
-    "test_dealias_2_3.jl",
     "test_level1_scalar_exact.jl",
     "test_level2_strang_convergence.jl",
     "test_level3_zeeman_only.jl",
-    "test_level4_f1_phase_emergence.jl",
-    "test_level4_general_F_phase_emergence.jl",
     "test_cn_gS_basis_mapping.jl",
     "test_interactions_dict_api.jl",
     "test_level10_hpsi_self_consistency.jl",
     "test_reference_rhs.jl",
-    "test_level11_convergence_sweep.jl",
     "test_level12_production_audit.jl",
     "test_level0_gpu_cpu_consistency.jl",
     "analysis/test_faraday.jl",
     "analysis/test_sign_pattern.jl",
     "analysis/test_polyhedral_classifier.jl",
     "analysis/test_larmor_adiabaticity.jl",
+    # TODO(dipole_field): re-add when test/analysis/test_dipole_field.jl lands —
+    # the referenced file was never committed (left a dangling include that
+    # reddened the full suite). src/analysis/dipole_field.jl is likewise absent.
+    # "analysis/test_dipole_field.jl",
     "workflow/test_phi_omega_convention.jl",
     "workflow/test_schema_validation_edge_cases.jl",
     "workflow/test_calibration_edge_cases.jl",
@@ -110,7 +110,6 @@ const FAST_TESTS = [
     "analysis/test_nematic_tensor.jl",
     "foundation/test_spherical_harmonics.jl",
     "analysis/test_spectral.jl",
-    "analysis/test_tof.jl",
     "analysis/test_bogoliubov.jl",
     "workflow/test_phase_scan.jl",
     "workflow/test_initialization.jl",
@@ -128,12 +127,9 @@ const FAST_TESTS = [
     "hamiltonian/test_lhy_modes_round45.jl",
     "analysis/test_sinatra_diagnostics.jl",
     "analysis/test_grid_resolution.jl",
-    "dynamics/test_twa_N_scan.jl",
-    "solvers/test_absorbing_boundary.jl",
     "dynamics/test_waveform.jl",
     "hamiltonian/test_raman_timedep.jl",
     "workflow/test_vtk_export.jl",
-    "workflow/test_infrastructure.jl",
     "hamiltonian/test_b_block_builders.jl",
     "hamiltonian/test_zeeman_accessors.jl",
     # TDHFB local-approximation engine (channel kernel + Δ + voxel BdG step
@@ -175,6 +171,23 @@ const CI_EXTRA = [
     "solvers/test_checkpoint.jl",
     "solvers/test_itp_checkpoint_hook.jl",
     "analysis/test_energy.jl",
+    # Demoted from FAST 2026-06-15 (#15): run find_ground_state / run_simulation!
+    # / run_yaml-scan / full pipeline (ITP/RTP), violating the fast-tier "no
+    # ITP/RTP" contract. Validation-ladder anchors (Level 4/11) still gate here
+    # + nightly full.
+    "test_level4_f1_phase_emergence.jl",
+    "test_level4_general_F_phase_emergence.jl",
+    "test_level11_convergence_sweep.jl",
+    "test_dealias_2_3.jl",
+    "dynamics/test_twa_N_scan.jl",
+    "solvers/test_absorbing_boundary.jl",
+    "workflow/test_infrastructure.jl",
+    # Spatial / B(r,t) Zeeman + TOF (#14): split_step / simulate_* (per-voxel
+    # propagation, multi-frame TOF) — integration weight, not fast-tier units.
+    "analysis/test_tof.jl",
+    "analysis/test_spatial_zeeman.jl",
+    "analysis/test_zeeman_field_brt.jl",
+    "analysis/test_tof_multiframe.jl",
     "workflow/test_losses.jl",
     "workflow/test_config.jl",
     "workflow/test_experiment.jl",

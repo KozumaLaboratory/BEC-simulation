@@ -7,6 +7,7 @@
 
 export total_density, component_density, total_norm, magnetization
 export spin_density_vector
+export population_inside_radius
 
 function total_density(psi::AbstractArray{<:Complex}, ndim::Int)
     n_comp = size(psi, ndim + 1)
@@ -24,6 +25,50 @@ function total_norm(psi::AbstractArray{<:Complex}, grid::Grid{N}) where {N}
     # ∫|ψ|² dV — sum |ψ|² across all components and spatial cells, no
     # need to materialise the per-cell density first.
     sum(abs2, psi) * cell_volume(grid)
+end
+
+"""
+Split the norm into the part inside a region `r ≤ radius` and the part
+that has spilled outside it. `r` is the Euclidean distance from `center`
+(default the grid origin) using the real-space axes in `grid.x`.
+
+Returns `(inside, outside, total, outside_fraction)` where each of the
+first three is `∫|ψ|² dV` over the respective region. Particles absorbed
+or lost are already gone from `ψ`; this only measures what remains — pair
+it across the time series to quantify what leaked toward the boundary.
+"""
+function population_inside_radius(
+    psi::AbstractArray{<:Complex},
+    grid::Grid{N},
+    radius::Real;
+    center::NTuple{N, <:Real}=ntuple(_ -> 0.0, Val(N)),
+) where {N}
+    dV = cell_volume(grid)
+    r2_max = Float64(radius)^2
+    axes_sq = ntuple(d -> (grid.x[d] .- center[d]) .^ 2, Val(N))
+    n_pts = ntuple(d -> size(psi, d), Val(N))
+    n_comp = size(psi, N + 1)
+
+    inside = 0.0
+    total = 0.0
+    @inbounds for I in CartesianIndices(n_pts)
+        r2 = 0.0
+        for d in 1:N
+            r2 += axes_sq[d][I[d]]
+        end
+        cell = 0.0
+        for c in 1:n_comp
+            cell += abs2(psi[I, c])
+        end
+        total += cell
+        r2 <= r2_max && (inside += cell)
+    end
+
+    inside *= dV
+    total *= dV
+    outside = total - inside
+    frac = total > 0 ? outside / total : 0.0
+    (inside=inside, outside=outside, total=total, outside_fraction=frac)
 end
 
 """

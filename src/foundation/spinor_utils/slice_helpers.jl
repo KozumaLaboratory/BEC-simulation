@@ -13,6 +13,13 @@
     end
 end
 
+# Column-integrate a field by summing out one axis, dropping it from the
+# shape (3D → 2D, 2D → 1D). The shared primitive behind `column_density`,
+# the TOF per-component projections, and `imaging_forward`.
+@inline function _integrate_out_axis(field::AbstractArray, axis::Int)
+    dropdims(sum(field; dims=axis); dims=axis)
+end
+
 @inline function _get_spinor(psi, I, n_comp)
     SVector{n_comp, ComplexF64}(ntuple(c -> psi[I, c], n_comp))
 end

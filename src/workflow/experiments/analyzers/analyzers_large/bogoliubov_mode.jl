@@ -18,7 +18,11 @@ function _analyze_bogoliubov_mode(psi, grid, atom, params, ws_prev)
 
     interactions = ws_prev.interactions
     c_dd_val = ws_prev.ddi === nothing ? 0.0 : ws_prev.ddi.C_dd
-    zeeman = ws_prev.zeeman isa ZeemanParams ? ws_prev.zeeman : ZeemanParams(0.0, 0.0)
+    zeeman = if is_uniform(ws_prev.zeeman)
+        ZeemanParams(linear_p(ws_prev.zeeman), quadratic_q(ws_prev.zeeman))
+    else
+        ZeemanParams(0.0, 0.0)
+    end
 
     # First locate the peak-growth k via the existing scan
     imap = bogoliubov_instability_scan(;

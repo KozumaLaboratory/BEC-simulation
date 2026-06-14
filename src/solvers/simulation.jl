@@ -18,3 +18,4 @@
 include("simulation/callbacks.jl")
 include("simulation/run_loops.jl")
 include("simulation/entry.jl")
+include("simulation/field_dynamics.jl")              # simulate_field_dynamics (arbitrary B(r))

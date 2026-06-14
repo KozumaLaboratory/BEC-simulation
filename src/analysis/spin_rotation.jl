@@ -1,5 +1,6 @@
 export spin_rotation_matrix, rotate_quantization_axis
 export dipolar_field, apply_edh_rotation, apply_fl_alignment, column_density
+export apply_rf_pulse, rf_tomography
 
 """
     spin_rotation_matrix(F, theta_x, theta_y, theta_z) → Matrix{ComplexF64}
@@ -209,5 +210,63 @@ function column_density(
     n_pts = ntuple(d -> size(psi, d), ndim)
     idx = _component_slice(ndim, n_pts, component)
     ρ = abs2.(view(psi, idx...))
-    dropdims(sum(ρ; dims=axis); dims=axis)
+    _integrate_out_axis(ρ, axis)
+end
+
+# --- RF pulse + spin tomography ---
+#
+# A hard RF pulse is a uniform spin rotation about an in-plane axis n̂(φ) =
+# (cos φ, sin φ, 0) by the pulse area θ = Ω_Rabi · τ: U = exp(-iθ n̂·F). It is the
+# experimental knob that brings a transverse spin projection into the
+# longitudinal (F_z) basis, so a Stern-Gerlach / population read-out can measure
+# ⟨F_x⟩, ⟨F_y⟩ — not just ⟨F_z⟩. Built on `rotate_quantization_axis` (the same
+# U); the only addition is the (θ, φ) → (θ_x, θ_y) parametrisation.
+
+"""
+    apply_rf_pulse(psi, F; theta, phi=0.0) -> psi_rotated
+
+Hard RF pulse: rotate the spinor by area `theta` about the in-plane axis at
+azimuth `phi` (`U = exp(-iθ(cosφ F_x + sinφ F_y))`). `phi=0` ⇒ about x̂,
+`phi=π/2` ⇒ about ŷ. Non-mutating. `theta = Ω_Rabi · τ`.
+"""
+function apply_rf_pulse(psi::AbstractArray{<:Complex}, F::Int; theta::Real, phi::Real=0.0)
+    rotate_quantization_axis(psi, F,
+        Float64(theta) * cos(Float64(phi)), Float64(theta) * sin(Float64(phi)), 0.0)
+end
+
+# Local longitudinal magnetization density m_z(r) = Σ_c m_c |ψ_c(r)|² — what a
+# population read-out (SG + count) measures.
+function _longitudinal_spin_density(psi::AbstractArray{<:Complex}, sys::SpinSystem,
+    ndim::Int)
+    n_pts = ntuple(d -> size(psi, d), ndim)
+    mz = zeros(Float64, n_pts)
+    for (c, m) in enumerate(sys.m_values)
+        comp = view(psi, _component_slice(ndim, n_pts, c)...)
+        mc = Float64(m)
+        @inbounds for I in CartesianIndices(n_pts)
+            mz[I] += mc * abs2(comp[I])
+        end
+    end
+    mz
+end
+
+"""
+    rf_tomography(psi, sys, ndim) -> (fx, fy, fz)
+
+Reconstruct the local spin density vector by the RF-rotation protocol: measure
+the longitudinal magnetization with no pulse (⟨F_z⟩) and after two π/2 pulses
+that map the transverse axes into the longitudinal one. For `U=exp(-iθn̂·F)` the
+Heisenberg rotation gives `U†F_zU = -F_x` (π/2 about ŷ) and `+F_y` (π/2 about x̂),
+so `fx = -m_z'[ŷ]`, `fy = +m_z'[x̂]`. The result equals
+[`spin_density_vector`](@ref) exactly — this is the experimental readout chain
+(populations only), validated against the direct operator.
+"""
+function rf_tomography(psi::AbstractArray{<:Complex}, sys::SpinSystem, ndim::Int)
+    F = sys.F
+    fz = _longitudinal_spin_density(psi, sys, ndim)
+    fx = -_longitudinal_spin_density(apply_rf_pulse(psi, F; theta=π / 2, phi=π / 2),
+        sys, ndim)
+    fy = _longitudinal_spin_density(apply_rf_pulse(psi, F; theta=π / 2, phi=0.0),
+        sys, ndim)
+    (fx, fy, fz)
 end

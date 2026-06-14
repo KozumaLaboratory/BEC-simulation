@@ -68,6 +68,7 @@ include("hamiltonian/terms/light_shift/light_shift_builders.jl")
 include("hamiltonian/terms/base.jl")
 include("hamiltonian/terms/zeeman.jl")               # accessors + builders + ZeemanTerm
 include("hamiltonian/terms/magnetic_gradient.jl")    # MagneticGradientTerm (spin-independent tilt)
+include("hamiltonian/terms/spatial_zeeman.jl")       # SpatialZeemanField + per-voxel kernel (arbitrary B(r))
 include("hamiltonian/terms/coriolis.jl")
 include("hamiltonian/terms/kinetic.jl")
 include("hamiltonian/terms/trap/trap.jl")

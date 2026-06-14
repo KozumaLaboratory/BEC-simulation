@@ -99,8 +99,7 @@ function _find_ground_state_adaptive(;
                 flush(stdout)
             end
         else
-            dE_abs = abs(E - E_prev)
-            dE = abs(E) > 0 ? dE_abs / abs(E) : dE_abs   # relative (see itp_loop.jl)
+            dE = _relative_energy_change(E, E_prev)
             psi_max = maximum(abs, ws.state.psi)
             dpsi = psi_max > 0 ? maximum(abs, ws.state.psi .- psi_backup) / psi_max : 0.0
             final_dE = dE

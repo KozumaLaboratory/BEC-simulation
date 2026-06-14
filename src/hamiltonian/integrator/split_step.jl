@@ -121,6 +121,16 @@ function _remove_mg_from_V!(ws::Workspace{N}, t::Float64) where {N}
     nothing
 end
 
+# Diagonal Zeeman SVector at time `t`. Uniform arm: -bz(t)·m + q(t)·m² (with the
+# rotating-frame p_eff shift). Spatial arms carry their full diagonal in the
+# per-voxel spatial step, so the uniform diagonal here is zero (spatial +
+# rotating frame is rejected, so ω_R = 0 ⇒ ZeemanParams(0,0) is exactly zero).
+@inline function _resolve_zeeman_diag(ws, t::Float64)
+    ωR = ws.sim_params.spin_rotating_frame_omega
+    is_uniform(ws.zeeman) || return zeeman_diagonal(ZeemanParams(0.0, 0.0), ws.spin_matrices, ωR)
+    zeeman_diagonal(zeeman_at(ws.zeeman, t), ws.spin_matrices, ωR)
+end
+
 function _apply_transverse_zeeman_step!(
     ws::Workspace, t::Float64, dt_frac::Float64, ndim::Int, imaginary_time::Bool
 )
@@ -188,19 +198,14 @@ function _half_potential_step!(
     # and the field is time-dependent — preserves 2nd-order accuracy in the
     # symmetric Strang sandwich when the field has appreciable drift over
     # a single dt_half. Otherwise fall back to a single t_eval sample.
-    zeeman_diag_fwd, zeeman_diag_bwd = if !isnan(t_start) && ws.zeeman isa TimeDependentZeeman
-        zee_fwd = zeeman_at(ws.zeeman, t_start + dt_half / 4)
-        zee_bwd = zeeman_at(ws.zeeman, t_start + 3 * dt_half / 4)
-        (zeeman_diagonal(zee_fwd, ws.spin_matrices, ws.sim_params.spin_rotating_frame_omega),
-            zeeman_diagonal(zee_bwd, ws.spin_matrices, ws.sim_params.spin_rotating_frame_omega),
-        )
-    else
-        zd = zeeman_diagonal(
-            zeeman_at(ws.zeeman, t_eval), ws.spin_matrices,
-            ws.sim_params.spin_rotating_frame_omega,
-        )
-        (zd, zd)
-    end
+    zeeman_diag_fwd, zeeman_diag_bwd =
+        if !isnan(t_start) && is_uniform(ws.zeeman) && _has_time_dependence(ws.zeeman)
+            (_resolve_zeeman_diag(ws, t_start + dt_half / 4),
+                _resolve_zeeman_diag(ws, t_start + 3 * dt_half / 4))
+        else
+            zd = _resolve_zeeman_diag(ws, t_eval)
+            (zd, zd)
+        end
     gpu = _is_gpu(ws.state.psi)
 
     # Forward outer chain — shared with ITP via `_outer_operators_fwd!`.
@@ -439,6 +444,30 @@ Forward half of the V(dt/2) outer operator chain. Applied at time `t_eval`
 operators that consume it. `mg_active=true` wraps the diag step in
 magnetic-gradient apply/remove (RTP only).
 """
+# Arbitrary B(r) spatial Zeeman step (CPU-only; gated off when inactive, and
+# make_workspace forbids spatial_zeeman on a GPU backend so ws.state.psi is a
+# host Array whenever this fires). Time-independent field in v1.
+@inline function _apply_spatial_zeeman_step!(ws, t_eval, dt, imaginary_time)
+    is_uniform(ws.zeeman) && return nothing
+    # The general B(r,t) arm is stored abstractly in the shared Workspace
+    # (`ZeemanField{<:SpatioTemporalProfiles{N}}`) so the closures don't leak into
+    # the 23-param Workspace specialisation. Route through a @noinline barrier so
+    # this one per-step call is a runtime dispatch that recovers the CONCRETE arm —
+    # after which `field_arrays_at` → `_materialise_general!` → the per-voxel `f(…)`
+    # closure call is monomorphic (allocation-free). Inlining here would instead bind
+    # the barrier to the abstract bound and box every voxel call (~1.8 MB/step).
+    _spatial_zeeman_step_barrier!(ws.state.psi, ws.zeeman, ws.spin_matrices, t_eval, dt,
+        imaginary_time)
+    nothing
+end
+
+@noinline function _spatial_zeeman_step_barrier!(
+    psi, zf::ZeemanField, spin_matrices, t_eval, dt, imaginary_time)
+    apply_spatial_zeeman_step!(
+        psi, field_arrays_at(zf, t_eval)..., spin_matrices, dt, imaginary_time)
+    nothing
+end
+
 function _outer_operators_fwd!(
     ws::Workspace{N}, dt_outer, ndim, imaginary_time;
     t_eval::Float64=ws.state.t,
@@ -447,14 +476,7 @@ function _outer_operators_fwd!(
     psi_mf::Union{Nothing, AbstractArray}=nothing,
     mg_active::Bool=false,
 ) where {N}
-    zd = if zeeman_diag === nothing
-        begin
-            zee = zeeman_at(ws.zeeman, t_eval)
-            zeeman_diagonal(zee, ws.spin_matrices, ws.sim_params.spin_rotating_frame_omega)
-        end
-    else
-        zeeman_diag
-    end
+    zd = zeeman_diag === nothing ? _resolve_zeeman_diag(ws, t_eval) : zeeman_diag
 
     mg_active && _apply_mg_to_V!(ws, t_eval)
     @timeit_debug TIMER "diagonal" _dispatch_diagonal_step!(
@@ -490,6 +512,8 @@ function _outer_operators_fwd!(
 
     _apply_transverse_zeeman_step!(ws, t_eval, dt_outer, ndim, imaginary_time)
 
+    _apply_spatial_zeeman_step!(ws, t_eval, dt_outer, imaginary_time)
+
     if ws.raman !== nothing
         raman_now = raman_at(ws.raman, t_eval)
         @timeit_debug TIMER "raman" apply_raman_step!(
@@ -523,6 +547,8 @@ function _outer_operators_bwd!(
         )
     end
 
+    _apply_spatial_zeeman_step!(ws, t_eval, dt_outer, imaginary_time)
+
     _apply_transverse_zeeman_step!(ws, t_eval, dt_outer, ndim, imaginary_time)
 
     if ws.tensor_cache !== nothing
@@ -551,14 +577,7 @@ function _outer_operators_bwd!(
         )
     end
 
-    zd = if zeeman_diag === nothing
-        begin
-            zee = zeeman_at(ws.zeeman, t_eval)
-            zeeman_diagonal(zee, ws.spin_matrices, ws.sim_params.spin_rotating_frame_omega)
-        end
-    else
-        zeeman_diag
-    end
+    zd = zeeman_diag === nothing ? _resolve_zeeman_diag(ws, t_eval) : zeeman_diag
 
     mg_active && _apply_mg_to_V!(ws, t_eval)
     @timeit_debug TIMER "diagonal" _dispatch_diagonal_step!(

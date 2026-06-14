@@ -18,13 +18,16 @@ using SpinorBEC
             n_zeeman_traces = sum(1 for s in ins.steps
                                         if any(t -> t.kind === :zeeman, s.traces))
             @test n_zeeman_traces == 5
-            # Step #3 is the Bz quench — verify Bz ramps from -148 to ~-0.385.
+            # Step #3 is the Bz quench. The trace channels are the internal
+            # operator coefficients (bx, by, bz, q in H = -(b·F) + q·F_z²), so
+            # bz = p = -g_F μ_B B_z (K-U convention, B→p sign fix 5d75649d). The
+            # dimensionless bz quenches from +148 to ~+0.385.
             quench = ins.steps[3]
             bz_trace = first(t for t in quench.traces if t.kind === :zeeman)
             bz = bz_trace.channels[:bz]
-            @test first(bz) ≈ -148.0 rtol=0.01
+            @test first(bz) ≈ 148.0 rtol=0.01
             @test abs(last(bz)) < 1.0      # near-zero by end of quench
-            @test minimum(bz) < first(bz) || isapprox(minimum(bz), first(bz))
+            @test maximum(bz) > last(bz) || isapprox(maximum(bz), last(bz))
         end
     end
 
@@ -49,9 +52,11 @@ using SpinorBEC
         @test length(warns) == 1
         @test warns[1].severity === :warn
         @test warns[1].step_index == 1
-        # The resolved Bz should be positive (proving theta=π in radians did NOT flip it).
+        # theta=π in radians must NOT flip the field. The trace carries the
+        # INTERNAL operator coefficient bz = p = -g_F μ_B B_z, which is negative
+        # for an un-flipped +z lab field (a flip to -z would make it positive).
         bz_trace = first(t for t in ins.steps[1].traces if t.kind === :zeeman)
-        @test first(bz_trace.channels[:bz]) > 0
+        @test first(bz_trace.channels[:bz]) < 0
     end
 
     @testset "W1 suppressed when direction is exactly zero" begin

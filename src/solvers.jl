@@ -15,6 +15,7 @@
 #   twa                    — Truncated Wigner Approximation driver
 #   binary_simulation      — two-component GP real-time propagation
 
+include("solvers/convergence_metrics.jl")
 include("solvers/ground_state.jl")
 include("solvers/ground_state/itp_loop.jl")
 include("solvers/ground_state/checkpoint.jl")

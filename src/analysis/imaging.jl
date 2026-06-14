@@ -7,6 +7,7 @@
 export gaussian_psf_convolve, apply_shot_noise, apply_saturation
 export synthesise_absorption_image, faraday_polarization_components
 export apply_sg_overlap, apply_fringe_noise!, synthesise_image_ensemble
+export pixel_bin, imaging_forward, image_multiframe
 #   2. Saturation:  OD_raw = -log((N_probe - N_obs) / N_probe)
 #                   becomes non-linear at OD ≳ 2; we invert it.
 #   3. Poisson shot noise on photon counts
@@ -150,6 +151,129 @@ function synthesise_absorption_image(
         end
     end
     img
+end
+
+# --- Physical-units forward model: density → camera image ---
+#
+# `gaussian_psf_convolve` / `apply_saturation` / `apply_shot_noise` above act on
+# a 2D column density already in pixel units. The forward model below closes the
+# gap from a reconstructed N-D LAB density (e.g. `recombine_density`,
+# `far_field_density`, or a raw |ψ|² slice) to what the camera records:
+#   3D density --(line-of-sight integral, physical dr)--> 2D column density
+#             --(σ_abs)--> optical depth --(PSF, physical σ)--> blurred
+#             --(saturation)--> --(camera pixel binning)--> --(noise)--> image.
+# Pixel binning (magnification × camera pixel pitch) is the genuinely new piece;
+# the rest composes the existing chain in physical units.
+
+"""
+    pixel_bin(img, fine_dx, pixel_size; combine=:mean)
+        -> (image, bin, pixel_dx)
+
+Bin a fine 2D image onto camera pixels. `fine_dx=(dx,dy)` is the simulation-grid
+spacing; `pixel_size` (scalar or `(px,py)`) is the camera pixel pitch in the same
+physical units (after magnification). The bin factor per axis is
+`round(pixel_size/fine_dx)` (≥1); the image is cropped to a whole number of
+pixels. `combine=:mean` keeps density / OD units (downsample); `:sum` gives
+per-pixel counts. Number is conserved either way: `Σ image · prod(pixel_dx)`
+(`:mean`) or `Σ image · prod(fine_dx)` (`:sum`) equals the fine-grid total.
+"""
+function pixel_bin(img::AbstractMatrix{<:Real}, fine_dx::NTuple{2, <:Real},
+    pixel_size; combine::Symbol=:mean)
+    combine in (:mean, :sum) || throw(ArgumentError("combine must be :mean or :sum"))
+    ps = if pixel_size isa Tuple
+        (Float64(pixel_size[1]), Float64(pixel_size[2]))
+    else
+        (Float64(pixel_size), Float64(pixel_size))
+    end
+    nx, ny = size(img)
+    bx = max(1, round(Int, ps[1] / fine_dx[1]))
+    by = max(1, round(Int, ps[2] / fine_dx[2]))
+    nbx, nby = nx ÷ bx, ny ÷ by
+    (nbx >= 1 && nby >= 1) ||
+        throw(ArgumentError("pixel_size $ps too large for grid spacing $fine_dx"))
+    out = zeros(Float64, nbx, nby)
+    @inbounds for J in 1:nby, I in 1:nbx
+        s = 0.0
+        for jj in 1:by, ii in 1:bx
+            s += Float64(img[(I - 1) * bx + ii, (J - 1) * by + jj])
+        end
+        out[I, J] = combine === :sum ? s : s / (bx * by)
+    end
+    (image=out, bin=(bx, by), pixel_dx=(bx * fine_dx[1], by * fine_dx[2]))
+end
+
+# block-mean of a coordinate axis (pixel centers from fine-grid coords)
+function _bin_coords(xs::AbstractVector, b::Int, nb::Int)
+    [sum(@view xs[((I - 1) * b + 1):(I * b)]) / b for I in 1:nb]
+end
+
+"""
+    imaging_forward(density, grid; imaging_axis=N, psf_sigma=0, pixel_size=0,
+        sigma_abs=0, OD_sat=Inf, photons_per_unit=0, read_noise_sigma=0, seed)
+        -> (image, x, y, pixel_dx, bin)
+
+Camera forward model for a 2D or 3D real density. A 3D density is line-of-sight
+integrated along `imaging_axis` (physical dr) to a 2D column density; a 2D
+density is taken as the image directly. Then: optional optical depth
+`OD = sigma_abs · n_col`; Gaussian PSF of PHYSICAL width `psf_sigma` (requires
+isotropic in-plane spacing); `apply_saturation(OD_sat)`; camera `pixel_bin`;
+optional shot + read noise. Each stage is opt-in (0 / Inf skips it). Returns the
+image and physical pixel-center coordinates.
+"""
+function imaging_forward(density::AbstractArray{<:Real, N}, grid::Grid{N};
+    imaging_axis::Int=N, psf_sigma::Real=0.0, pixel_size::Real=0.0,
+    sigma_abs::Real=0.0, OD_sat::Real=Inf, photons_per_unit::Real=0.0,
+    read_noise_sigma::Real=0.0, seed::Union{Nothing, Int}=nothing) where {N}
+    if N == 3
+        1 <= imaging_axis <= 3 ||
+            throw(ArgumentError("imaging_axis=$imaging_axis out of range"))
+        col = _integrate_out_axis(density, imaging_axis) .* grid.dx[imaging_axis]
+        inplane = Tuple(d for d in 1:3 if d != imaging_axis)
+    elseif N == 2
+        col = Matrix{Float64}(density)
+        inplane = (1, 2)
+    else
+        throw(ArgumentError("imaging_forward needs a 2D or 3D density (got $(N)D)"))
+    end
+    dx_ip = (grid.dx[inplane[1]], grid.dx[inplane[2]])
+    img = Matrix{Float64}(col)
+    sigma_abs > 0 && (img = Float64(sigma_abs) .* img)
+    if psf_sigma > 0
+        isapprox(dx_ip[1], dx_ip[2]; rtol=1e-6) || throw(ArgumentError(
+            "psf_sigma needs isotropic in-plane spacing; got $dx_ip"))
+        img = gaussian_psf_convolve(img, Float64(psf_sigma) / dx_ip[1])
+    end
+    isfinite(OD_sat) && (img = apply_saturation(img, OD_sat))
+    x_ip, y_ip = collect(grid.x[inplane[1]]), collect(grid.x[inplane[2]])
+    bin = (1, 1)
+    pdx = dx_ip
+    if pixel_size > 0
+        pb = pixel_bin(img, dx_ip, pixel_size)
+        img, bin, pdx = pb.image, pb.bin, pb.pixel_dx
+        x_ip = _bin_coords(x_ip, bin[1], size(img, 1))
+        y_ip = _bin_coords(y_ip, bin[2], size(img, 2))
+    end
+    photons_per_unit > 0 && (img = apply_shot_noise(img, photons_per_unit; seed))
+    if read_noise_sigma > 0
+        rng = seed === nothing ? Random.default_rng() :
+              Random.MersenneTwister(seed + 1)
+        img = img .+ Float64(read_noise_sigma) .* randn(rng, size(img))
+    end
+    (image=img, x=x_ip, y=y_ip, pixel_dx=pdx, bin=bin)
+end
+
+"""
+    image_multiframe(state; lab_grid=state.grid, imaging_axis=N, kwargs...)
+
+Camera image of a multi-frame TOF state: reconstruct the physical lab density
+(`recombine_density`, coherent within / incoherent across internal states) and
+run `imaging_forward`. `lab_grid` chooses the reconstruction grid; remaining
+kwargs (`psf_sigma`, `pixel_size`, `sigma_abs`, `OD_sat`, noise) pass through.
+"""
+function image_multiframe(state::MultiFrameTOFState{N};
+    lab_grid::Grid{N}=state.grid, imaging_axis::Int=N, kwargs...) where {N}
+    dens = recombine_density(state; lab_grid=lab_grid)
+    imaging_forward(dens, lab_grid; imaging_axis=imaging_axis, kwargs...)
 end
 
 # --- SG overlap + σ_eff(m) weighted composition ---
@@ -387,7 +511,7 @@ function momentum_distribution(
     if N == 1
         return (k_coords=(grid.k[1],), n_k=n_k_total)
     end
-    col = dropdims(sum(n_k_total; dims=axis); dims=axis)
+    col = _integrate_out_axis(n_k_total, axis)
     remaining_axes = Int[d for d in 1:N if d != axis]
     k_coords = ntuple(i -> grid.k[remaining_axes[i]], Val(N-1))
     (k_coords=k_coords, n_k=col)

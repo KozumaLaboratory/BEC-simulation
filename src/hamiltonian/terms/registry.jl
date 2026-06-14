@@ -3,7 +3,7 @@
 # Phase 3 (Phase 1-3 = the "sign-bug-proof architecture";
 # `docs/conventions/sign_bug_proof_architecture.md`).
 #
-# The registry is an `NTuple{13, HamTerm}` derived from a Workspace.
+# The registry is an `NTuple{14, HamTerm}` derived from a Workspace.
 # Hot paths (`energy_decomposition`, `energy_gradient!`,
 # `split_step!`) delegate to the registry; per-term implementations
 # declare their sign in one place (`apply_step!` /
@@ -56,11 +56,12 @@ const H_TERMS_CANONICAL_ORDER = (
     :light_shift,
     :coriolis,
     :magnetic_gradient,
+    :spatial_zeeman,
     :loss,
 )
 
 """
-    build_h_terms_registry(ws) → NTuple{13, HamTerm}
+    build_h_terms_registry(ws) → NTuple{14, HamTerm}
 
 Build a fresh NTuple from `ws` for the current `t = ws.state.t`. For
 time-dependent fields (Zeeman, MagneticGradient, Coriolis Ω) the
@@ -105,6 +106,7 @@ function build_h_terms_registry(ws)
         LightShiftTerm(),
         CoriolisTerm(Ω),
         MagneticGradientTerm(),
+        SpatialZeemanTerm(),
         LossTerm(),
     )
 end
@@ -270,6 +272,7 @@ function energy_decomposition_via_registry_legacy_shape(ws)
         light_shift=bd.light_shift,
         coriolis=bd.coriolis,
         magnetic_gradient=bd.magnetic_gradient,
+        spatial_zeeman=bd.spatial_zeeman,
         loss=bd.loss,
         total=bd.total,
     )
