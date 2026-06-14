@@ -7,7 +7,7 @@
 # milliseconds — a dependency on an external ODE package is unwarranted). The run
 # stops at the BEC onset (PSD ≥ ζ(3)) or when η drops below the validity floor.
 
-export FortRamp, fort_power_at, trap_at, run_evaporation
+export FortRamp, fort_power_at, trap_at, run_evaporation, evaporation_summary
 
 """
     FortRamp(times, powers_W)
@@ -151,7 +151,7 @@ function run_evaporation(
         end
 
         N, T, t = N_new, T_new, t + h
-        (s % save_every == 0 || s == nsteps) && record!(U2, ω2)
+        (s % save_every == 0 || s == nsteps || reached) && record!(U2, ω2)
         reached && break
     end
 
@@ -167,4 +167,22 @@ function run_evaporation(
     end
 
     EvapResult(ts, Ns, Ts, ηs, ρs, γs, ω̄s, Us, N_BEC, T_BEC, t_BEC, reached, γ_eff)
+end
+
+"""
+    evaporation_summary(result) -> NamedTuple
+
+Condensed human-readable metrics of an `EvapResult`: BEC reached?, atom number,
+temperature [µK], onset time [s], efficiency `γ_eff = -dlnρ/dlnN`, the surviving
+fraction `N_BEC/N₀`, the peak phase-space density, and the η at onset.
+"""
+function evaporation_summary(r::EvapResult)
+    (reached_bec=r.reached_bec,
+        N_BEC=r.N_BEC,
+        T_BEC_uK=r.T_BEC * 1e6,
+        t_BEC_s=r.t_BEC,
+        gamma_eff=r.gamma_eff,
+        survival=isempty(r.N) ? NaN : r.N_BEC / r.N[1],
+        peak_psd=isempty(r.psd) ? NaN : maximum(r.psd),
+        eta_onset=isempty(r.eta) ? NaN : r.eta[end])
 end

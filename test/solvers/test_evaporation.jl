@@ -11,7 +11,8 @@ using SpinorBEC: GaussianBeam, CrossedDipoleTrap, Eu151, Units,
     ramp_from_params, optimize_evaporation_ramp,
     hfort_power, hfort_volts, vfort_power, vfort_volts, sfort_power, sfort_volts,
     euv3_evaporation_ramp,
-    final_trap_frequencies, bec_handoff, harmonic_trap_dimless, HarmonicTrap, Units
+    final_trap_frequencies, bec_handoff, harmonic_trap_dimless, HarmonicTrap, Units,
+    euv3_evap_trap, run_euv3_evaporation, evaporation_summary
 
 const _λ = 1064e-9
 const _w0 = 30e-6
@@ -190,6 +191,21 @@ _euv3_ramp() = FortRamp(
         @test ht isa HarmonicTrap
         ωx, ωy, ωz = final_trap_frequencies(trap, ramp)
         @test all(>(0), (ωx, ωy, ωz))
+    end
+
+    @testset "euv3 one-call convenience + summary" begin
+        # scalar waist applies to all three beams
+        trap = euv3_evap_trap(; waists=_w0, alpha=_α)
+        @test length(trap.waists) == 3 && all(==(_w0), trap.waists)
+        @test trap.mass == Eu151.mass
+        res = run_euv3_evaporation(; waists=_w0, alpha=_α, N0=2e6, T0=40e-6)
+        @test res.reached_bec
+        s = evaporation_summary(res)
+        @test s.reached_bec
+        @test s.N_BEC == res.N_BEC
+        @test s.T_BEC_uK ≈ res.T_BEC * 1e6
+        @test 0 < s.survival < 1                       # atoms lost but some survive
+        @test s.peak_psd >= 1.202                      # crossed BEC onset
     end
 
     # End-to-end validation against the lab NumberOfAtoms.csv requires the real
