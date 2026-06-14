@@ -52,9 +52,9 @@ using SpinorBEC
         @test length(warns) == 1
         @test warns[1].severity === :warn
         @test warns[1].step_index == 1
-        # theta was dropped (default theta_deg = 0 ⇒ +z field), so bz = p =
-        # -g_F μ_B B_z < 0. (Had theta=3.14159 been read as π radians it would
-        # flip the field to −z and give bz > 0 — this asserts it did NOT.)
+        # theta=π in radians must NOT flip the field. The trace carries the
+        # INTERNAL operator coefficient bz = p = -g_F μ_B B_z, which is negative
+        # for an un-flipped +z lab field (a flip to -z would make it positive).
         bz_trace = first(t for t in ins.steps[1].traces if t.kind === :zeeman)
         @test first(bz_trace.channels[:bz]) < 0
     end
