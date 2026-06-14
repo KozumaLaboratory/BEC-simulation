@@ -8,7 +8,7 @@ using SpinorBEC: GaussianBeam, CrossedDipoleTrap, Eu151, Units,
     crossed_trap_frequencies, mean_trap_frequency, crossed_trap_depth,
     EvapTrap, EvapParams, evap_rhs, phase_space_density,
     FortRamp, fort_power_at, trap_at, run_evaporation,
-    ramp_from_params, optimize_evaporation_ramp,
+    ramp_from_params, optimize_evaporation_ramp, scan_ramp_param,
     hfort_power, hfort_volts, vfort_power, vfort_volts, sfort_power, sfort_volts,
     euv3_evaporation_ramp,
     final_trap_frequencies, bec_handoff, harmonic_trap_dimless, HarmonicTrap, Units,
@@ -191,6 +191,18 @@ _euv3_ramp() = FortRamp(
         @test ht isa HarmonicTrap
         ωx, ωy, ωz = final_trap_frequencies(trap, ramp)
         @test all(>(0), (ωx, ωy, ωz))
+    end
+
+    @testset "scan_ramp_param 1-D landscape" begin
+        trap = _eu_trap()
+        p = EvapParams(; a_s=_as, tau_bg=10.0, K3=0.0)
+        base = _euv3_ramp()
+        scan = scan_ramp_param(trap, p, base; index=1, values=[1.0, 2.0, 3.0], N0=2e6, T0=40e-6)
+        @test length(scan) == 3
+        @test all(s -> haskey(s, :N_BEC) && haskey(s, :reached), scan)
+        @test scan[1].value == 1.0
+        # baseline (index=1, value=1) is the unmodified ramp ⇒ reaches BEC
+        @test scan[1].reached
     end
 
     @testset "euv3 one-call convenience + summary" begin

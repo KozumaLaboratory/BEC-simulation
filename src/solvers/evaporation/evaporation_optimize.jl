@@ -8,7 +8,7 @@
 # as a kwarg so this file does not depend on the load position of module
 # Optimization.
 
-export ramp_from_params, optimize_evaporation_ramp
+export ramp_from_params, optimize_evaporation_ramp, scan_ramp_param
 
 """
     ramp_from_params(x, base) -> FortRamp
@@ -61,4 +61,28 @@ function optimize_evaporation_ramp(
     best_ramp = ramp_from_params(bo.best_p, base_ramp)
     best_res = run_evaporation(trap, best_ramp, p; N0=N0, T0=T0)
     (bo=bo, ramp=best_ramp, result=best_res)
+end
+
+"""
+    scan_ramp_param(trap, p, base_ramp; index, values, base_params=[1,1,1], N0, T0)
+        -> Vector{NamedTuple}
+
+Sweep one ramp-transform parameter (`index` ∈ 1:3 = duration scale / final-power
+scale / warp γ) over `values`, holding the others at `base_params`, and return per
+value `(; value, N_BEC, reached, gamma_eff)`. A cheap 1-D landscape to sanity-check
+the dependence before (or instead of) the Bayesian optimizer. `N_BEC` is `NaN`
+where BEC is not reached.
+"""
+function scan_ramp_param(
+    trap::EvapTrap, p::EvapParams, base_ramp::FortRamp;
+    index::Int, values, base_params=[1.0, 1.0, 1.0], N0::Float64, T0::Float64)
+    map(values) do v
+        x = collect(Float64, base_params)
+        x[index] = Float64(v)
+        res = run_evaporation(trap, ramp_from_params(x, base_ramp), p; N0=N0, T0=T0)
+        (value=Float64(v),
+            N_BEC=res.reached_bec ? res.N_BEC : NaN,
+            reached=res.reached_bec,
+            gamma_eff=res.gamma_eff)
+    end
 end
