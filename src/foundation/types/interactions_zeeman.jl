@@ -11,7 +11,7 @@
 # Raman-laser parameters; `TimeDependentInteractions` swaps c0/c1 in
 # time with `interactions_at(td, t)`.
 
-export InteractionParams, ZeemanParams, TimeDependentZeeman, c_dict
+export InteractionParams, AbstractZeemanField, ZeemanParams, TimeDependentZeeman, c_dict
 export RamanCoupling, TimeDependentRaman, TimeDependentInteractions
 export linear_p, quadratic_q, transverse_b, interactions_at
 
@@ -111,14 +111,25 @@ max_rank(ip::InteractionParams) = isempty(ip.c) ? -1 : maximum(keys(ip.c))
 
 # --- Zeeman Parameters ---
 
-struct ZeemanParams
+# The field the Zeeman coupling `H = -(B·F) + q·F_z²` reads. Concrete arms:
+#   ZeemanParams                  — uniform, static
+#   TimeDependentZeeman           — uniform, time-dependent (waveforms)
+#   SpatialZeemanField{N}         — arbitrary B(r), static          (spatial_zeeman.jl)
+#   TimeDependentSpatialZeemanField{N} — arbitrary B(r,t)           (spatial_zeeman.jl)
+# A single `ZeemanTerm` dispatches its propagator / energy / operator faces on
+# the concrete arm: the uniform arms hit the diagonal-exp + uniform-rotation
+# fast path (GPU-capable, Ω-foldable); the spatial arms hit the per-voxel Euler
+# path (CPU-only). One sign declaration (`_diag_coef`) is shared by all arms.
+abstract type AbstractZeemanField end
+
+struct ZeemanParams <: AbstractZeemanField
     p::Float64      # linear Zeeman (energy)
     q::Float64      # quadratic Zeeman (energy)
 end
 
 ZeemanParams() = ZeemanParams(0.0, 0.0)
 
-struct TimeDependentZeeman
+struct TimeDependentZeeman <: AbstractZeemanField
     p_wf::Waveform
     q_wf::Waveform
     bx_wf::Union{Nothing, Waveform}

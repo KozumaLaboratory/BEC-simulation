@@ -116,12 +116,19 @@ struct Workspace{
     grid::Grid{N, T}
     atom::AtomSpecies
     interactions::InteractionParams
-    # `zeeman::Union{ZeemanParams, TimeDependentZeeman}` — 2-way Union of
-    # two non-parametric structs. Phase 3 drop (TC pattern). Hot-path
-    # accessors (linear_p / quadratic_q / transverse_b) dispatch on the
-    # concrete type via Julia's Union splitting; the parametric form
-    # carried no additional information.
-    zeeman::Union{ZeemanParams, TimeDependentZeeman}
+    # The unified Zeeman field B(r,t). One field for every case — uniform /
+    # spatial × static / time-dependent — as a closed concrete 3-arm Union
+    # (parameterised only on N, mirroring `magnetic_gradient` below): the
+    # uniform arm `ZeemanField{Nothing}` hits the diagonal-exp + uniform-rotation
+    # fast path (GPU); the spatial arms (`B(r,t)` profiles / functions) hit the
+    # per-voxel Euler path (CPU). Replaces the former `zeeman` + `spatial_zeeman`
+    # fields. Hot-path accessors (linear_p / quadratic_q / transverse_b /
+    # zeeman_at) and `field_arrays_at` dispatch on the arm via Union splitting.
+    zeeman::Union{
+        ZeemanField{Nothing},
+        ZeemanField{NTuple{4, Array{Float64, N}}},
+        ZeemanField{<:SpatioTemporalProfiles{N}},
+    }
     potential::AbstractPotential
     sim_params::SimParams
     ddi::DDI

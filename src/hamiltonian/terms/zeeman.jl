@@ -65,6 +65,15 @@ zeeman_at(z::ZeemanParams, ::Float64) = z
 zeeman_at(z::TimeDependentZeeman, t::Float64) = ZeemanParams(
     evaluate(z.p_wf, t), evaluate(z.q_wf, t)
 )
+# Unified uniform arm: collapse to ZeemanParams(p(t), q(t)), same diagonal-only
+# trap-semantics as the TimeDependentZeeman version (read transverse via
+# `transverse_b(field, t)`).
+zeeman_at(f::ZeemanField{Nothing}, t::Float64) =
+    (s=field_scalars_at(f, t); ZeemanParams(s[3], s[4]))
+# Spatial arm: the uniform slot-3 ZeemanTerm is neutral (the SpatialZeemanTerm
+# slot carries the per-voxel diagonal). Lets build_h_terms_registry build slot 3
+# without a method error for a spatial workspace.
+zeeman_at(::ZeemanField, ::Float64) = ZeemanParams(0.0, 0.0)
 
 # ============================================================================
 # Builders — static Zeeman constructors

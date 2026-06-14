@@ -153,7 +153,7 @@ function _half_potential_step_combined!(
         ws.interactions
     end
 
-    zeeman_diag = if !isnan(t_start) && ws.zeeman isa TimeDependentZeeman
+    zeeman_diag = if !isnan(t_start) && _has_time_dependence(ws.zeeman)
         zee_fwd = zeeman_at(ws.zeeman, t_start + dt_half / 4)
         zeeman_diagonal(zee_fwd, ws.spin_matrices, ws.sim_params.spin_rotating_frame_omega)
     else
@@ -195,6 +195,11 @@ function _assert_combined_step_compatible(ws::Workspace)
         ArgumentError(
             "split_step_combined! does not yet support Raman coupling. " *
             "Use standard split_step!."),
+    )
+    is_uniform(ws.zeeman) || throw(
+        ArgumentError(
+            "split_step_combined! does not support a spatial Zeeman field B(r,t). " *
+            "Use the standard split_step!."),
     )
     ws.light_shift === nothing || throw(
         ArgumentError(

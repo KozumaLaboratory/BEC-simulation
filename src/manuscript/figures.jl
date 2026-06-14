@@ -14,6 +14,7 @@ export MANUSCRIPT_FIGURE_REGISTRY,
 using Printf
 
 include("figures/paths.jl")
+include("figures/emitters.jl")
 include("figures/canonical_states.jl")
 include("figures/paper1_fig1.jl")
 include("figures/paper1_fig2.jl")

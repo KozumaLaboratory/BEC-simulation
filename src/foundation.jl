@@ -13,6 +13,7 @@ include("foundation/types/grid.jl")              # AbstractBackend, GridConfig, 
 include("foundation/types/potentials.jl")        # AbstractPotential + 12 trap / beam / lattice / gradient subtypes
 include("foundation/types/spin_atom.jl")         # SpinSystem, SpinMatrices, AtomSpecies
 include("foundation/types/interactions_zeeman.jl") # InteractionParams, ZeemanParams, TimeDependent*, Raman, accessors
+include("foundation/types/spatial_zeeman.jl")    # SpatialZeemanField + builders + per-voxel kernel (arbitrary B(r))
 include("foundation/types/sim_fft.jl")           # SimParams, SimState, FFTPlans, RFFT, BatchedKineticCache, CoriolisCache, AbsorbingBoundary
 include("foundation/types/ddi_loss.jl")          # DDIParams, DDIBuffers, DDIPaddedContext, LossParams, LightShift, TensorInteractionCache
 include("foundation/types/integrator.jl")        # AdaptiveDtParams, IntegratorConfig, SimulationResult, TWAConfig, EnsembleResult

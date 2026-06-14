@@ -123,6 +123,29 @@ end
             @test isapprox(fd, inner; rtol=1e-3)
         end
     end
+
+    # SpatialZeemanTerm: arbitrary B(r). Energy ↔ gradient FD consistency with
+    # a non-trivial varying field (diagonal + transverse + q all spatial).
+    @testset "SpatialZeemanTerm (arbitrary B(r))" begin
+        gr = make_grid(GridConfig((8, 8, 8), (4.0, 4.0, 4.0)))
+        field = spatial_zeeman_field(gr;
+            bz=(x, y, z) -> 0.5 + 0.1x,
+            bx=(x, y, z) -> 0.3 - 0.05y,
+            by=(x, y, z) -> 0.05z,
+            q=(x, y, z) -> 0.1 + 0.02x^2)
+        wsz = make_workspace(; grid=gr, atom=Rb87,
+            interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
+            zeeman=ZeemanParams(0.0, 0.0), potential=HarmonicTrap((1.0, 1.0, 1.0)),
+            sim_params=SimParams(; dt=0.01, n_steps=1, imaginary_time=true),
+            spatial_zeeman=field, fft_flags=FFTW.ESTIMATE)
+        Random.seed!(7)
+        psi = randn(ComplexF64, 8, 8, 8, 3)
+        psi ./= sqrt(sum(abs2, psi) * cell_volume(gr))
+        δ = randn(ComplexF64, 8, 8, 8, 3)
+        δ ./= sqrt(sum(abs2, δ) * cell_volume(gr))
+        fd, inner, _ = _fd_vs_inner(SpinorBEC.SpatialZeemanTerm(), wsz, psi, δ)
+        @test isapprox(fd, inner; rtol=1e-3)
+    end
 end
 
 @testset "HamTerm directional sign oracles" begin
@@ -154,5 +177,24 @@ end
         sm = ws.spin_matrices
         fx, _, _ = SpinorBEC.spin_density_vector(psi, sm, ndims(psi) - 1)
         @test sum(fx) * cell_volume(ws.grid) > 0.0
+    end
+
+    @testset "SpatialZeemanTerm: uniform +bz ⇒ ⟨F_z⟩ > 0" begin
+        # Constant +bz spatial field ≡ uniform Zeeman; ITP from m_plus_F
+        # must preserve ⟨F_z⟩ > 0 (the directional sign of the field).
+        gr = make_grid(GridConfig((8, 8, 8), (4.0, 4.0, 4.0)))
+        field = spatial_zeeman_field(gr; bz=2.0)
+        ws = make_workspace(; grid=gr, atom=Rb87,
+            interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
+            zeeman=ZeemanParams(0.0, 0.0), potential=HarmonicTrap((1.0, 1.0, 1.0)),
+            sim_params=SimParams(; dt=0.01, n_steps=1, imaginary_time=true),
+            spatial_zeeman=field, fft_flags=FFTW.ESTIMATE)
+        term = SpinorBEC.SpatialZeemanTerm()
+        psi = init_psi(gr, SpinSystem(1); state=:m_plus_F)
+        for _ in 1:500
+            apply_step!(term, psi, 0.005, true, ws)
+            psi ./= sqrt(sum(abs2, psi) * cell_volume(ws.grid))
+        end
+        @test sign_oracle(SpinorBEC.SpatialZeemanTerm).predicate(psi, ws)
     end
 end

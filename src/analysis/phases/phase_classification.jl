@@ -44,14 +44,12 @@ export PhaseReference, DEFAULT_PHASE_REFERENCES
 # closed-form sign-change boundary S_bd(F) = √(2F(F+1))) is exposed
 # at runtime via U3 (separate task).
 
-"""
-    classify_phase(psi, F, grid, sm) → NamedTuple
-
-Compute order parameters and classify the spinor phase.
-
-Returns `(spin_order, nematic_order, channel_weights, phase, magnetization_density)`.
-"""
-function classify_phase(
+# Shared magnetic-order / channel-weight axis computed by both
+# `classify_phase` and `classify_phase_detailed`. Returns the order
+# parameters plus the density field and `dV` the detailed extensions
+# reuse, and `is_vacuum` so each caller can emit its own (different-arity)
+# vacuum NamedTuple.
+function _order_parameters_core(
     psi::AbstractArray{<:Complex},
     F::Int,
     grid::Grid{N},
@@ -59,21 +57,24 @@ function classify_phase(
 ) where {N}
     D = 2F + 1
     dV = cell_volume(grid)
-    n_pts = ntuple(d -> size(psi, d), N)
-    sys = sm.system
 
     n_total = total_density(psi, N)
     # `sum(n_total .^ 2)` allocates an n_pts-shape temp; `sum(x->x*x, n)`
     # reduces in-place.
     n_sum = sum(n_total) * dV
     n_sq_sum = sum(x -> x * x, n_total) * dV
-    n_sum < 1e-30 && return (
-        spin_order=0.0,
-        nematic_order=0.0,
-        channel_weights=Dict{Int, Float64}(),
-        phase=:vacuum,
-        magnetization_density=0.0,
-    )
+    if n_sum < 1e-30
+        return (
+            spin_order=0.0,
+            nematic_order=0.0,
+            channel_weights=Dict{Int, Float64}(),
+            magnetization_density=0.0,
+            phase=:vacuum,
+            n_total=n_total,
+            dV=dV,
+            is_vacuum=true,
+        )
+    end
 
     fx, fy, fz = spin_density_vector(psi, sm, N)
     f_mag_sq_sum = 0.0
@@ -91,17 +92,41 @@ function classify_phase(
     end
 
     nematic_order = get(spec.channel_weights, 0, 0.0) / (n_sq_sum / D)
-
-    Mz = magnetization(psi, grid, sys) / n_sum
-
+    Mz = magnetization(psi, grid, sm.system) / n_sum
     phase = _label_phase(spin_order, nematic_order, cw_norm, F)
 
     (
         spin_order=spin_order,
         nematic_order=nematic_order,
         channel_weights=cw_norm,
-        phase=phase,
         magnetization_density=Mz,
+        phase=phase,
+        n_total=n_total,
+        dV=dV,
+        is_vacuum=false,
+    )
+end
+
+"""
+    classify_phase(psi, F, grid, sm) → NamedTuple
+
+Compute order parameters and classify the spinor phase.
+
+Returns `(spin_order, nematic_order, channel_weights, phase, magnetization_density)`.
+"""
+function classify_phase(
+    psi::AbstractArray{<:Complex},
+    F::Int,
+    grid::Grid{N},
+    sm::SpinMatrices,
+) where {N}
+    core = _order_parameters_core(psi, F, grid, sm)
+    (
+        spin_order=core.spin_order,
+        nematic_order=core.nematic_order,
+        channel_weights=core.channel_weights,
+        phase=core.phase,
+        magnetization_density=core.magnetization_density,
     )
 end
 
@@ -403,14 +428,8 @@ function classify_phase_detailed(
     sm::SpinMatrices;
     sampling::Float64=1.0,
 ) where {N}
-    D = 2F + 1
-    dV = cell_volume(grid)
-    n_pts = ntuple(d -> size(psi, d), N)
-
-    n_total = total_density(psi, N)
-    n_sum = sum(n_total) * dV
-    n_sq_sum = sum(x -> x * x, n_total) * dV
-    if n_sum < 1e-30
+    core = _order_parameters_core(psi, F, grid, sm)
+    if core.is_vacuum
         return (
             spin_order=0.0,
             nematic_order=0.0,
@@ -424,22 +443,8 @@ function classify_phase_detailed(
         )
     end
 
-    fx, fy, fz = spin_density_vector(psi, sm, N)
-    f_mag_sq_sum = 0.0
-    @inbounds for i in eachindex(fx, fy, fz)
-        f_mag_sq_sum += fx[i]^2 + fy[i]^2 + fz[i]^2
-    end
-    f_mag_sq_sum *= dV
-    spin_order = f_mag_sq_sum / (Float64(F)^2 * n_sq_sum)
-
-    spec = pair_amplitude_spectrum(psi, F, grid)
-    total_weight = sum(values(spec.channel_weights))
-    cw_norm = Dict{Int, Float64}()
-    for (S, w) in spec.channel_weights
-        cw_norm[S] = total_weight > 0 ? w / total_weight : 0.0
-    end
-
-    nematic_order = get(spec.channel_weights, 0, 0.0) / (n_sq_sum / D)
+    n_total = core.n_total
+    dV = core.dV
 
     l1, l2, l3 = nematic_tensor_eigenvalues(psi, sm, N)
     biax = biaxiality_parameter(l1, l2, l3)
@@ -450,22 +455,17 @@ function classify_phase_detailed(
 
     star_entropy = _mean_majorana_entropy(psi, F, N, n_total, dV; sampling)
 
-    sys = sm.system
-    Mz = magnetization(psi, grid, sys) / n_sum
-
-    phase = _label_phase(spin_order, nematic_order, cw_norm, F)
-
     pg = _peak_point_group(psi, F, N, n_total, dV)
 
     (
-        spin_order=spin_order,
-        nematic_order=nematic_order,
+        spin_order=core.spin_order,
+        nematic_order=core.nematic_order,
         biaxiality=mean_biax,
         Q6=mean_Q6,
         star_entropy=star_entropy,
-        channel_weights=cw_norm,
-        magnetization_density=Mz,
-        phase=phase,
+        channel_weights=core.channel_weights,
+        magnetization_density=core.magnetization_density,
+        phase=core.phase,
         point_group=pg,
     )
 end

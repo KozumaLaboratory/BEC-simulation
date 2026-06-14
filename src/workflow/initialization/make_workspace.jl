@@ -17,7 +17,7 @@ const _MAKE_WORKSPACE_KWARGS = (
     :grid, :atom, :interactions, :sim_params,
     # Optional physics terms
     :zeeman, :potential, :raman, :loss, :light_shift,
-    :magnetic_gradient, :time_dep_interactions, :absorbing_boundary,
+    :magnetic_gradient, :spatial_zeeman, :time_dep_interactions, :absorbing_boundary,
     # DDI bundle
     :enable_ddi, :c_dd, :secular_ddi, :quasi_2d_ddi, :l_z_ddi, :ddi_padding,
     # Quasi-2D bundle
@@ -32,7 +32,7 @@ function make_workspace(;
     grid::Grid{N, T},
     atom::AtomSpecies,
     interactions::InteractionParams,
-    zeeman::Union{ZeemanParams, TimeDependentZeeman}=ZeemanParams(),
+    zeeman::Union{ZeemanParams, TimeDependentZeeman, ZeemanField}=ZeemanParams(),
     potential::AbstractPotential=NoPotential(),
     sim_params::SimParams,
     psi_init::Union{Nothing, AbstractArray{<:Complex}}=nothing,
@@ -53,6 +53,7 @@ function make_workspace(;
     light_shift::Union{Nothing, LightShift}=nothing,
     time_dep_interactions::Union{Nothing, TimeDependentInteractions}=nothing,
     magnetic_gradient::Union{Nothing, MagneticGradient, TimeDependentMagneticGradient}=nothing,
+    spatial_zeeman::Union{Nothing, SpatialZeemanField}=nothing,
     dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
 ) where {N, T <: AbstractFloat}
     U = dtype === nothing ? T : dtype
@@ -62,6 +63,20 @@ function make_workspace(;
         ),
     )
     backend = _resolve_backend(backend, grid)
+    # Fold the legacy zeeman / spatial_zeeman inputs into the one unified field.
+    zfield = _to_zeeman_field(zeeman, spatial_zeeman)
+    if !is_uniform(zfield)
+        backend isa CPUBackend || throw(
+            ArgumentError(
+                "a spatial Zeeman field B(r,t) has a CPU-only per-voxel propagator; " *
+                "run on a CPU backend"),
+        )
+        is_active(sim_params.spin_rotating_frame_omega, ROTATION_TOL) && throw(
+            ArgumentError(
+                "a spatial Zeeman field is not supported together with a spin-rotating " *
+                "frame (spin_rotating_frame_omega ≠ 0) in v1"),
+        )
+    end
     if quasi_2d
         N == 2 || throw(ArgumentError("quasi_2d requires 2D grid, got $(N)D"))
         l_z > 0 || throw(ArgumentError("quasi_2d requires l_z > 0"))
@@ -77,6 +92,28 @@ function make_workspace(;
 
     sys = SpinSystem(atom.F)
     sm = spin_matrices(atom.F)
+
+    # The spinor dimension is set by the ATOM's F; a psi_init with the wrong
+    # component count (or spatial shape) otherwise segfaults later in the
+    # diagonal / spin steps reading past the array. Fail loudly here instead.
+    if psi_init !== nothing
+        ndims(psi_init) == N + 1 || throw(
+            ArgumentError(
+                "psi_init has $(ndims(psi_init)) dims; expected $(N + 1) " *
+                "($(N) spatial + 1 spin) for this grid"),
+        )
+        size(psi_init, N + 1) == sys.n_components || throw(
+            ArgumentError(
+                "psi_init has $(size(psi_init, N + 1)) spin components but atom " *
+                "$(atom.name) (F=$(atom.F)) needs $(sys.n_components); pass a state " *
+                "matching the atom's F"),
+        )
+        ntuple(d -> size(psi_init, d), N) == grid.config.n_points || throw(
+            ArgumentError(
+                "psi_init spatial size $(ntuple(d -> size(psi_init, d), N)) ≠ grid " *
+                "$(grid.config.n_points)"),
+        )
+    end
 
     psi = if psi_init === nothing
         init_psi(grid, sys; dtype=U)
@@ -125,9 +162,9 @@ function make_workspace(;
     V = _to_device(backend, V)
 
     effective_zeeman = if is_active(omega, ROTATION_TOL)
-        _shift_zeeman_for_rotating_frame(zeeman, omega)
+        _shift_zeeman_for_rotating_frame(zfield, omega)
     else
-        zeeman
+        zfield
     end
 
     ddi = if enable_ddi
@@ -165,7 +202,7 @@ function make_workspace(;
         # experiments live deep in this regime (ω_L ~ kHz, c_dd × n ~ Hz).
         # Only @info, not error: the user may intentionally want the full
         # kernel to study transverse Larmor-coherent dynamics.
-        p_now = linear_p(zeeman)   # uniform accessor handles both forms
+        p_now = linear_p(zfield)   # uniform arm → bz; spatial arm → 0 (advisory only)
         if !secular_ddi && is_active(p_now, ROTATION_TOL) && is_active(c_dd_val)
             n_peak_est =
                 sum(abs2, _to_host(psi)) / cell_volume(grid) /
@@ -397,6 +434,59 @@ _shift_zeeman_for_rotating_frame(z::ZeemanParams, omega::Float64) = ZeemanParams
 # see CLAUDE.md "Type stability boundaries".)
 function _shift_zeeman_for_rotating_frame(z::TimeDependentZeeman, omega::Float64)
     TimeDependentZeeman(ShiftedWaveform(z.p_wf, -omega), z.q_wf, z.bx_wf, z.by_wf)
+end
+
+# Barnett shift on the unified uniform arm: effective bz(t) = bz(t) + Ω. Shift
+# the static baseline when bz has no waveform, else the bz waveform (mirrors the
+# ZeemanParams / TimeDependentZeeman variants above). Spatial arms + rotating
+# frame are rejected upstream, so only the uniform arm needs this.
+function _shift_zeeman_for_rotating_frame(f::ZeemanField{Nothing}, omega::Float64)
+    sc, wf = f.scalars, f.waveforms
+    if wf[3] === nothing
+        ZeemanField{Nothing}((sc[1], sc[2], sc[3] + omega, sc[4]), nothing, wf)
+    else
+        ZeemanField{Nothing}(
+            sc, nothing, (wf[1], wf[2], ShiftedWaveform(wf[3], -omega), wf[4]))
+    end
+end
+
+# --- input → unified ZeemanField converter ---------------------------------
+#
+# make_workspace accepts the legacy `zeeman` (ZeemanParams / TimeDependentZeeman)
+# and `spatial_zeeman` (SpatialZeemanField) inputs, or a ZeemanField directly,
+# and folds them into the ONE field the Workspace stores. v1 forbids a uniform
+# `zeeman` and a `spatial_zeeman` at once (a uniform offset on a gradient is
+# expressible via `quadrupole_field(bias=…)`).
+_uniform_zeeman_field(z::ZeemanParams) = ZeemanField{Nothing}(
+    (0.0, 0.0, z.p, z.q), nothing, (nothing, nothing, nothing, nothing))
+_uniform_zeeman_field(z::TimeDependentZeeman) = ZeemanField{Nothing}(
+    (0.0, 0.0, 0.0, 0.0), nothing, (z.bx_wf, z.by_wf, z.p_wf, z.q_wf))
+
+function _spatial_zeeman_field_unify(s::SpatialZeemanField)
+    profiles = (s.bx, s.by, s.bz, s.q)
+    ZeemanField{typeof(profiles)}(
+        (0.0, 0.0, 0.0, 0.0), profiles, (nothing, nothing, nothing, nothing))
+end
+
+_is_zero_uniform_zeeman(z::ZeemanParams) = z.p == 0.0 && z.q == 0.0
+_is_zero_uniform_zeeman(::TimeDependentZeeman) = false
+
+function _to_zeeman_field(zeeman, spatial_zeeman)
+    if spatial_zeeman !== nothing
+        _is_zero_uniform_zeeman(zeeman) || throw(
+            ArgumentError(
+                "uniform `zeeman` and `spatial_zeeman` cannot both be set (v1); " *
+                "put a uniform offset into the spatial field, e.g. quadrupole_field(bias=…)."),
+        )
+        return _spatial_zeeman_field_unify(spatial_zeeman)
+    end
+    _uniform_zeeman_field(zeeman)
+end
+# A ZeemanField passed directly (e.g. spatiotemporal_zeeman_field) is used as-is.
+function _to_zeeman_field(zeeman::ZeemanField, spatial_zeeman)
+    spatial_zeeman === nothing || throw(ArgumentError(
+        "pass either a ZeemanField `zeeman` or a `spatial_zeeman`, not both."))
+    zeeman
 end
 
 # ---------------------------------------------------------------------------

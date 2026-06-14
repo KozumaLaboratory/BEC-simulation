@@ -55,10 +55,7 @@ ax.set_xticks([]); ax.set_yticks([]); ax.set_zticks([])
 ax.set_title('F=2 cyclic Majorana configuration\\n(regular tetrahedron, T_d symmetry)',
              fontsize=10)
 plt.tight_layout()
-base = __file__.replace('.py', '')
-plt.savefig(base + '.pdf', bbox_inches='tight')
-plt.savefig(base + '.svg', bbox_inches='tight')
-print(f'Wrote {base}.pdf and .svg')
+$(_PY_SAVEFIG_FOOTER)
 """
     _emit_csv_py(io, paper, fig, csv, py)
 end

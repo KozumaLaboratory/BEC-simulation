@@ -33,6 +33,10 @@ const FAST_TESTS = [
     "analysis/test_faraday.jl",
     "analysis/test_sign_pattern.jl",
     "analysis/test_polyhedral_classifier.jl",
+    # TODO(dipole_field): re-add when test/analysis/test_dipole_field.jl lands —
+    # the referenced file was never committed (left a dangling include that
+    # reddened the full suite). src/analysis/dipole_field.jl is likewise absent.
+    # "analysis/test_dipole_field.jl",
     "workflow/test_phi_omega_convention.jl",
     "workflow/test_schema_validation_edge_cases.jl",
     "workflow/test_calibration_edge_cases.jl",
@@ -166,18 +170,23 @@ const CI_EXTRA = [
     "solvers/test_checkpoint.jl",
     "solvers/test_itp_checkpoint_hook.jl",
     "analysis/test_energy.jl",
-    # Demoted from FAST 2026-06-15: these run find_ground_state / run_simulation!
-    # / run_yaml-scan / simulate_tof / full pipeline (ITP/RTP), violating the
-    # fast-tier "no ITP/RTP" contract and dominating its wall-clock. The
-    # validation-ladder anchors (Level 4/11) still gate here + nightly full.
+    # Demoted from FAST 2026-06-15 (#15): run find_ground_state / run_simulation!
+    # / run_yaml-scan / full pipeline (ITP/RTP), violating the fast-tier "no
+    # ITP/RTP" contract. Validation-ladder anchors (Level 4/11) still gate here
+    # + nightly full.
     "test_level4_f1_phase_emergence.jl",
     "test_level4_general_F_phase_emergence.jl",
     "test_level11_convergence_sweep.jl",
     "test_dealias_2_3.jl",
-    "analysis/test_tof.jl",
     "dynamics/test_twa_N_scan.jl",
     "solvers/test_absorbing_boundary.jl",
     "workflow/test_infrastructure.jl",
+    # Spatial / B(r,t) Zeeman + TOF (#14): split_step / simulate_* (per-voxel
+    # propagation, multi-frame TOF) — integration weight, not fast-tier units.
+    "analysis/test_tof.jl",
+    "analysis/test_spatial_zeeman.jl",
+    "analysis/test_zeeman_field_brt.jl",
+    "analysis/test_tof_multiframe.jl",
     "workflow/test_losses.jl",
     "workflow/test_config.jl",
     "workflow/test_experiment.jl",

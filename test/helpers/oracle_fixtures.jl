@@ -7,6 +7,18 @@
 # the fixture they mutate.
 
 """
+    normalize_state!(psi, grid) → psi
+
+Normalize a spinor field to unit norm under the grid measure
+(`∫|ψ|² dV = 1`). Replaces the `psi ./= sqrt(sum(abs2, psi) * cell_volume(grid))`
+idiom. In-place; returns `psi`.
+"""
+function normalize_state!(psi::AbstractArray, grid)
+    psi ./= sqrt(sum(abs2, psi) * cell_volume(grid))
+    psi
+end
+
+"""
     oracle_full_ws(; rotating_frame_omega=0.2) -> (ws, psi)
 
 3D 6³ Rb87 F=1 CPU workspace with as many terms simultaneously active

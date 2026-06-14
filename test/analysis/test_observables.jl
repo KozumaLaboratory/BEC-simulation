@@ -234,4 +234,89 @@ using FFTW
             @test SpinorBEC.cg_lookup(cg_arr, S, M, m1) ≈ expected atol = 1e-14
         end
     end
+
+    @testset "population_inside_radius" begin
+        # Explicit narrow Gaussian centred at the origin so the inside/outside
+        # split is decoupled from any init_psi profile default.
+        config = GridConfig(128, 40.0)
+        grid = make_grid(config)
+        x = grid.x[1]
+        psi = zeros(ComplexF64, 128, 1)
+        @. psi[:, 1] = exp(-x^2 / 2)  # σ = 1
+        N = total_norm(psi, grid)
+
+        big = population_inside_radius(psi, grid, 15.0)
+        @test big.total ≈ N atol = 1e-12
+        @test big.inside + big.outside ≈ big.total atol = 1e-12
+        @test big.inside ≈ N rtol = 1e-6
+        @test big.outside_fraction < 1e-6
+
+        # Inside + outside partition is exact and monotone in radius.
+        small = population_inside_radius(psi, grid, 1.0)
+        @test small.inside < big.inside
+        @test small.outside > big.outside
+        @test small.inside + small.outside ≈ N atol = 1e-12
+
+        # Radius 0 ⇒ everything is "outside".
+        zero_r = population_inside_radius(psi, grid, 0.0)
+        @test zero_r.inside ≈ 0.0 atol = 1e-12
+        @test zero_r.outside_fraction ≈ 1.0 atol = 1e-10
+
+        # Off-centre region: a window around the cloud's centre captures
+        # essentially everything; the same-radius window far away captures none.
+        centred = population_inside_radius(psi, grid, 5.0; center=(0.0,))
+        @test centred.inside ≈ N rtol = 1e-6
+        far = population_inside_radius(psi, grid, 5.0; center=(15.0,))
+        @test far.inside < 1e-6 * N
+
+        # Empty wavefunction ⇒ guarded fraction is 0, not NaN.
+        empty = population_inside_radius(zeros(ComplexF64, 128, 3), grid, 5.0)
+        @test empty.total == 0.0
+        @test empty.outside_fraction == 0.0
+    end
+
+    @testset "density_moments" begin
+        # 2D anisotropic Gaussian, displaced and axis-aligned. The density
+        # weights by |ψ|², squaring the amplitude Gaussian, so
+        #   n ∝ exp(-2(x-x0)²/σx² - 2(y-y0)²/σy²)  ⇒ RMS widths σx/2, σy/2.
+        config = GridConfig((128, 128), (40.0, 40.0))
+        grid = make_grid(config)
+        x = grid.x[1]
+        y = grid.x[2]
+        σx, σy = 2.0, 1.0
+        x0, y0 = 3.0, -2.0
+        psi = zeros(ComplexF64, 128, 128, 1)
+        for j in 1:128, i in 1:128
+            psi[i, j, 1] = exp(-(x[i] - x0)^2 / σx^2 - (y[j] - y0)^2 / σy^2)
+        end
+
+        m = density_moments(psi, grid)
+        @test m.com[1] ≈ x0 atol = 1e-6
+        @test m.com[2] ≈ y0 atol = 1e-6
+        @test m.widths[1] ≈ σx / 2 rtol = 1e-4
+        @test m.widths[2] ≈ σy / 2 rtol = 1e-4
+        # Axis-aligned ⇒ principal widths match per-axis widths, tilt ≈ 0.
+        @test m.aspect_ratio ≈ σx / σy rtol = 1e-4
+        @test abs(m.tilt) < 1e-6
+        @test m.mass ≈ total_norm(psi, grid) atol = 1e-12
+
+        # Same cloud rotated 30° in-plane ⇒ tilt tracks the rotation while
+        # the aspect ratio (a rotation invariant) is unchanged.
+        θ = π / 6
+        psi_rot = zeros(ComplexF64, 128, 128, 1)
+        for j in 1:128, i in 1:128
+            xr = cos(θ) * (x[i] - x0) + sin(θ) * (y[j] - y0)
+            yr = -sin(θ) * (x[i] - x0) + cos(θ) * (y[j] - y0)
+            psi_rot[i, j, 1] = exp(-xr^2 / σx^2 - yr^2 / σy^2)
+        end
+        mr = density_moments(psi_rot, grid)
+        @test mr.tilt ≈ θ atol = 1e-3
+        @test mr.aspect_ratio ≈ σx / σy rtol = 1e-3
+
+        # Empty state ⇒ guarded zeros, aspect_ratio defaults to 1.
+        empty = density_moments(zeros(ComplexF64, 128, 128, 1), grid)
+        @test empty.mass == 0.0
+        @test empty.aspect_ratio == 1.0
+        @test empty.tilt == 0.0
+    end
 end

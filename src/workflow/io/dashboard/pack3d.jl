@@ -1,5 +1,26 @@
 # --- 3D density / phase / vorticity / vector / coherence binary packers ---
 
+# Standard 3D volume binary: 24-byte header (nx, ny, nz, n_comp, F, component)
+# + normalized per-component populations + the Float32 volume payload. Shared
+# by density3d / phase3d / vorticity3d / rotated-density so the frontend parses
+# one layout. `data` may be a flat Vector or an n_pts-shaped Array — `write`
+# serializes column-major either way.
+function _pack_3d_volume(psi, n_comp, ndim, n_pts, F, component,
+    data::AbstractArray{Float32})
+    pops = Float32[
+        Float32(sum(abs2, view(psi, _component_slice(ndim, n_pts, m)...); init=0.0))
+        for m in 1:n_comp
+    ]
+    pops ./= max(sum(pops), 1.0f-30)
+    N = prod(n_pts)
+    buf = IOBuffer(; sizehint=24 + n_comp * 4 + N * 4)
+    write(buf, Int32(n_pts[1]), Int32(n_pts[2]), Int32(n_pts[3]))
+    write(buf, Int32(n_comp), Int32(F), Int32(component))
+    write(buf, pops)
+    write(buf, data)
+    take!(buf)
+end
+
 function _compute_3d_density_binary(psi, n_comp, ndim, n_pts, F; component::Int=0)
     ndim == 3 || throw(ArgumentError("3D density requires 3D data"))
     _pack_3d_binary(psi, n_comp, ndim, n_pts, F, component)
@@ -41,18 +62,7 @@ function _compute_3d_vorticity_binary(psi, n_comp, ndim, n_pts, F, box_size)
         end
     end
 
-    pops = Float32[
-        Float32(sum(abs2, view(psi, _component_slice(ndim, n_pts, m)...))) for m in 1:n_comp
-    ]
-    total_pop = sum(pops)
-    pops ./= max(total_pop, 1.0f-30)
-
-    buf = IOBuffer(; sizehint=24 + n_comp * 4 + N * 4)
-    write(buf, Int32(n_pts[1]), Int32(n_pts[2]), Int32(n_pts[3]))
-    write(buf, Int32(n_comp), Int32(F), Int32(0))
-    write(buf, pops)
-    write(buf, mag)
-    take!(buf)
+    _pack_3d_volume(psi, n_comp, ndim, n_pts, F, 0, mag)
 end
 
 """
@@ -71,19 +81,7 @@ function _compute_3d_phase_binary(psi, n_comp, ndim, n_pts, F; component::Int=0)
         phase[i] = Float32(angle(psi_c[i]))
     end
 
-    pops = Float32[
-        Float32(sum(abs2, view(psi, _component_slice(ndim, n_pts, m)...))) for m in 1:n_comp
-    ]
-    total_pop = sum(pops)
-    pops ./= max(total_pop, 1.0f-30)
-
-    N = prod(n_pts)
-    buf = IOBuffer(; sizehint=24 + n_comp * 4 + N * 4)
-    write(buf, Int32(n_pts[1]), Int32(n_pts[2]), Int32(n_pts[3]))
-    write(buf, Int32(n_comp), Int32(F), Int32(c))
-    write(buf, pops)
-    write(buf, phase)
-    take!(buf)
+    _pack_3d_volume(psi, n_comp, ndim, n_pts, F, c, phase)
 end
 
 """
@@ -112,23 +110,10 @@ function _compute_rotated_3d_density_binary(
     psi_c_rot = psi_flat * conj.(R_row)  # (N,D) * (D,) → (N,) complex
     dens = Float32.(abs2.(psi_c_rot))
 
-    # Compute rotated populations (cheap: just norms of R * population_vector)
-    pops_orig = Float32[
-        Float32(sum(abs2, view(psi, _component_slice(ndim, n_pts, m)...))) for m in 1:n_comp
-    ]
-    total_pop = sum(pops_orig)
-    pops_orig ./= max(total_pop, 1.0f-30)
-
-    buf = IOBuffer(; sizehint=24 + n_comp * 4 + N * 4)
-    write(buf, Int32(n_pts[1]), Int32(n_pts[2]), Int32(n_pts[3]))
-    write(buf, Int32(n_comp), Int32(F), Int32(component))
-    write(buf, pops_orig)
-    write(buf, dens)
-    take!(buf)
+    _pack_3d_volume(psi, n_comp, ndim, n_pts, F, component, dens)
 end
 
 function _pack_3d_binary(psi, n_comp, ndim, n_pts, F, component)
-    N = prod(n_pts)
     # Use 3D array matching psi_c shape (eachindex returns CartesianIndices for SubArray)
     dens = zeros(Float32, n_pts...)
     if component == 0
@@ -146,23 +131,7 @@ function _pack_3d_binary(psi, n_comp, ndim, n_pts, F, component)
         end
     end
 
-    pops = zeros(Float32, n_comp)
-    for c in 1:n_comp
-        s = 0.0
-        for v in view(psi, _component_slice(ndim, n_pts, c)...)
-            s += abs2(v)
-        end
-        pops[c] = Float32(s)
-    end
-    total_pop = sum(pops)
-    pops ./= max(total_pop, 1.0f-30)
-
-    buf = IOBuffer(; sizehint=24 + n_comp * 4 + N * 4)
-    write(buf, Int32(n_pts[1]), Int32(n_pts[2]), Int32(n_pts[3]))
-    write(buf, Int32(n_comp), Int32(F), Int32(component))
-    write(buf, pops)
-    write(buf, vec(dens))  # flatten to column-major 1D
-    take!(buf)
+    _pack_3d_volume(psi, n_comp, ndim, n_pts, F, component, vec(dens))
 end
 
 """

@@ -189,7 +189,7 @@ end
             sim_params=sp,
         )
         psi = init_psi(grid, SpinSystem(1); state=:polar)
-        psi ./= sqrt(sum(abs2, psi) * SpinorBEC.cell_volume(grid))
+        normalize_state!(psi, grid)
         ψ = copy(psi)
         apply_step!(TensorTerm(), ψ, 1e-3, false, ws)
         @test sum(abs2, ψ) ≈ sum(abs2, psi) rtol = 1e-10  # unitary pair mixing

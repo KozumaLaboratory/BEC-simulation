@@ -18,13 +18,16 @@ using SpinorBEC
             n_zeeman_traces = sum(1 for s in ins.steps
                                         if any(t -> t.kind === :zeeman, s.traces))
             @test n_zeeman_traces == 5
-            # Step #3 is the Bz quench — verify Bz ramps from -148 to ~-0.385.
+            # Step #3 is the Bz quench. The trace channels are the internal
+            # operator coefficients (bx, by, bz, q in H = -(b·F) + q·F_z²), so
+            # bz = p = -g_F μ_B B_z (K-U convention, B→p sign fix 5d75649d). The
+            # dimensionless bz quenches from +148 to ~+0.385.
             quench = ins.steps[3]
             bz_trace = first(t for t in quench.traces if t.kind === :zeeman)
             bz = bz_trace.channels[:bz]
-            @test first(bz) ≈ -148.0 rtol=0.01
+            @test first(bz) ≈ 148.0 rtol=0.01
             @test abs(last(bz)) < 1.0      # near-zero by end of quench
-            @test minimum(bz) < first(bz) || isapprox(minimum(bz), first(bz))
+            @test maximum(bz) > last(bz) || isapprox(maximum(bz), last(bz))
         end
     end
 

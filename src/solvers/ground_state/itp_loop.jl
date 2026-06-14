@@ -155,11 +155,7 @@ function _run_itp_loop!(
 
             if step % sp.save_every == 0
                 E = total_energy(ws)
-                # Relative energy-change convergence: scale-invariant so a
-                # single `tol` works across systems whose E spans orders of
-                # magnitude. Falls back to the absolute change when E ≈ 0.
-                dE_abs = abs(E - E_prev)
-                dE = abs(E) > 0 ? dE_abs / abs(E) : dE_abs
+                dE = _relative_energy_change(E, E_prev)
                 psi_max = maximum(abs, ws.state.psi)
                 dpsi = if psi_max > 0
                     # Fuse subtraction + abs into map-reduce (avoids temp array alloc)

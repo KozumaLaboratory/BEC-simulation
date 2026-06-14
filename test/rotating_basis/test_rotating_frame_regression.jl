@@ -200,14 +200,14 @@ using SpinorBEC: _rebuild_workspace_with_dt
             zeeman=ZeemanParams(0.3, 0.05), sim_params=sp,
             fft_flags=FFTW.ESTIMATE)
         # Effective p should be lab + Ω, not lab − Ω.
-        @test ws.zeeman.p ≈ 0.8
-        @test ws.zeeman.q ≈ 0.05
+        @test linear_p(ws.zeeman) ≈ 0.8
+        @test quadratic_q(ws.zeeman) ≈ 0.05
         # Ω = 0 path must NOT shift.
         sp0 = SimParams(; dt=0.01, n_steps=10, imaginary_time=true,
             rotating_frame_omega=0.0)
         ws0 = make_workspace(; grid, atom=Rb87, interactions,
             zeeman=ZeemanParams(0.3, 0.05), sim_params=sp0,
             fft_flags=FFTW.ESTIMATE)
-        @test ws0.zeeman.p ≈ 0.3
+        @test linear_p(ws0.zeeman) ≈ 0.3
     end
 end
