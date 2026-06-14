@@ -113,10 +113,6 @@ const FAST_TESTS = [
     "analysis/test_nematic_tensor.jl",
     "foundation/test_spherical_harmonics.jl",
     "analysis/test_spectral.jl",
-    "analysis/test_tof.jl",
-    "analysis/test_spatial_zeeman.jl",
-    "analysis/test_zeeman_field_brt.jl",
-    "analysis/test_tof_multiframe.jl",
     "analysis/test_bogoliubov.jl",
     "workflow/test_phase_scan.jl",
     "workflow/test_initialization.jl",
@@ -181,6 +177,12 @@ const CI_EXTRA = [
     "solvers/test_checkpoint.jl",
     "solvers/test_itp_checkpoint_hook.jl",
     "analysis/test_energy.jl",
+    # Spatial / B(r,t) Zeeman + TOF: run split_step / simulate_* (per-voxel
+    # propagation, multi-frame TOF) — integration weight, not fast-tier units.
+    "analysis/test_tof.jl",
+    "analysis/test_spatial_zeeman.jl",
+    "analysis/test_zeeman_field_brt.jl",
+    "analysis/test_tof_multiframe.jl",
     "workflow/test_losses.jl",
     "workflow/test_config.jl",
     "workflow/test_experiment.jl",
