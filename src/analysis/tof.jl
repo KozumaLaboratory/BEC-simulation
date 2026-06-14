@@ -265,9 +265,11 @@ function simulate_tof_scaling(
     elseif ws_source.potential isa HarmonicTrap
         ws_source.potential.omega
     else
-        throw(ArgumentError(
-            "simulate_tof_scaling needs the pre-release trap frequencies; pass " *
-            "`omega=(ω₁,…,ω_N)` or release from a HarmonicTrap source potential."))
+        throw(
+            ArgumentError(
+                "simulate_tof_scaling needs the pre-release trap frequencies; pass " *
+                "`omega=(ω₁,…,ω_N)` or release from a HarmonicTrap source potential."),
+        )
     end
 
     c0 = 0.0
@@ -352,7 +354,7 @@ function _scaling_potential_halfstep!(
 end
 
 function _scaling_kinetic_step!(
-    chi, fft_buf, kphase, grid::Grid{N}, b, plans, D::Int, dt::Float64,
+    chi, fft_buf, kphase, grid::Grid{N}, b, plans, D::Int, dt::Float64
 ) where {N}
     n_pts = grid.config.n_points
     inv_b2 = ntuple(d -> 1.0 / b[d]^2, Val(N))

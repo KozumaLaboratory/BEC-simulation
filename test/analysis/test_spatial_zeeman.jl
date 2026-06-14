@@ -3,7 +3,7 @@ using SpinorBEC
 using SpinorBEC: ZeemanTerm, apply_step!, _materialize_field
 using Random
 
-_std(v) = (m = sum(v) / length(v); sqrt(sum(abs2, v .- m) / length(v)))
+_std(v) = (m=sum(v) / length(v); sqrt(sum(abs2, v .- m) / length(v)))
 
 @testset "Spatial Zeeman B(r)" begin
     @testset "Uniform limit ≡ ZeemanTerm (bit-identical, q=0)" begin

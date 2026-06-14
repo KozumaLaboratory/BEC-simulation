@@ -35,11 +35,17 @@ function simulate_field_dynamics(
     drop_interactions::Bool=false,
 ) where {N}
     ws_source.backend isa CPUBackend ||
-        error("simulate_field_dynamics is CPU-only (per-voxel spatial Zeeman); " *
-              "got backend $(typeof(ws_source.backend))")
+        error(
+            "simulate_field_dynamics is CPU-only (per-voxel spatial Zeeman); " *
+            "got backend $(typeof(ws_source.backend))",
+        )
     size(field.bz) == ws_source.grid.config.n_points ||
-        throw(ArgumentError("field shape $(size(field.bz)) ≠ grid " *
-                            "$(ws_source.grid.config.n_points)"))
+        throw(
+            ArgumentError(
+                "field shape $(size(field.bz)) ≠ grid " *
+                "$(ws_source.grid.config.n_points)",
+            ),
+        )
     t_total >= 0 || throw(ArgumentError("t_total must be non-negative"))
     n_steps > 0 || throw(ArgumentError("n_steps must be positive"))
     save_every > 0 || throw(ArgumentError("save_every must be positive"))
