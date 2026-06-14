@@ -153,6 +153,7 @@ const FAST_TESTS = [
     "hamiltonian/test_multipole_q_spectrum.jl",
     "solvers/test_compare.jl",
     "solvers/test_pseudo_arclength.jl",
+    "solvers/test_evaporation.jl",
     "workflow/test_active_learning.jl",
     "workflow/test_inspect_config.jl",
     "workflow/test_diff_dicts.jl",
