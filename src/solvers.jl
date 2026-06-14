@@ -45,3 +45,4 @@ include("solvers/evaporation/evaporation_model.jl")
 include("solvers/evaporation/evaporation_solve.jl")
 include("solvers/evaporation/evaporation_optimize.jl")
 include("solvers/evaporation/euv3.jl")  # lab FORT calibration + the euv3 evaporation ramp
+include("solvers/evaporation/evaporation_handoff.jl")  # evaporation endpoint → GP trap config

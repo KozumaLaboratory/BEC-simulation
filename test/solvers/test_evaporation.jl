@@ -10,7 +10,8 @@ using SpinorBEC: GaussianBeam, CrossedDipoleTrap, Eu151, Units,
     FortRamp, fort_power_at, trap_at, run_evaporation,
     ramp_from_params, optimize_evaporation_ramp,
     hfort_power, hfort_volts, vfort_power, vfort_volts, sfort_power, sfort_volts,
-    euv3_evaporation_ramp
+    euv3_evaporation_ramp,
+    final_trap_frequencies, bec_handoff, harmonic_trap_dimless, HarmonicTrap, Units
 
 const _λ = 1064e-9
 const _w0 = 30e-6
@@ -170,6 +171,25 @@ _euv3_ramp() = FortRamp(
         res = run_evaporation(_eu_trap(), r,
             EvapParams(; a_s=_as, tau_bg=10.0, K3=0.0); N0=2e6, T0=40e-6)
         @test res.reached_bec
+    end
+
+    @testset "BEC handoff → dimensionless GP trap" begin
+        trap = _eu_trap()
+        ramp = _euv3_ramp()
+        res = run_evaporation(trap, ramp, EvapParams(; a_s=_as, tau_bg=10.0); N0=2e6, T0=40e-6)
+        h = bec_handoff(trap, ramp, res)
+        # default ω_ref = geometric mean ⇒ dimensionless ω̄ = 1
+        @test cbrt(prod(h.omega_dimless)) ≈ 1.0 rtol = 1e-9
+        @test h.a_ho ≈ sqrt(Units.HBAR / (trap.mass * h.omega_ref))
+        @test h.N_BEC == res.N_BEC
+        @test 0.5 < h.T_over_Tc < 2.0              # at onset T_BEC ≈ T_c
+        # explicit ω_ref rescales
+        h2 = bec_handoff(trap, ramp, res; omega_ref=2π * 100)
+        @test h2.omega_ref ≈ 2π * 100
+        ht = harmonic_trap_dimless(trap, ramp, res)
+        @test ht isa HarmonicTrap
+        ωx, ωy, ωz = final_trap_frequencies(trap, ramp)
+        @test all(>(0), (ωx, ωy, ωz))
     end
 
     # End-to-end validation against the lab NumberOfAtoms.csv requires the real
