@@ -127,7 +127,7 @@ struct Workspace{
     zeeman::Union{
         ZeemanField{Nothing},
         ZeemanField{NTuple{4, Array{Float64, N}}},
-        ZeemanField{SpatioTemporalProfiles{N}},
+        ZeemanField{<:SpatioTemporalProfiles{N}},
     }
     potential::AbstractPotential
     sim_params::SimParams

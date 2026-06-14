@@ -449,8 +449,22 @@ magnetic-gradient apply/remove (RTP only).
 # host Array whenever this fires). Time-independent field in v1.
 @inline function _apply_spatial_zeeman_step!(ws, t_eval, dt, imaginary_time)
     is_uniform(ws.zeeman) && return nothing
+    # The general B(r,t) arm is stored abstractly in the shared Workspace
+    # (`ZeemanField{<:SpatioTemporalProfiles{N}}`) so the closures don't leak into
+    # the 23-param Workspace specialisation. Route through a @noinline barrier so
+    # this one per-step call is a runtime dispatch that recovers the CONCRETE arm —
+    # after which `field_arrays_at` → `_materialise_general!` → the per-voxel `f(…)`
+    # closure call is monomorphic (allocation-free). Inlining here would instead bind
+    # the barrier to the abstract bound and box every voxel call (~1.8 MB/step).
+    _spatial_zeeman_step_barrier!(ws.state.psi, ws.zeeman, ws.spin_matrices, t_eval, dt,
+        imaginary_time)
+    nothing
+end
+
+@noinline function _spatial_zeeman_step_barrier!(
+    psi, zf::ZeemanField, spin_matrices, t_eval, dt, imaginary_time)
     apply_spatial_zeeman_step!(
-        ws.state.psi, field_arrays_at(ws.zeeman, t_eval)..., ws.spin_matrices, dt, imaginary_time)
+        psi, field_arrays_at(zf, t_eval)..., spin_matrices, dt, imaginary_time)
     nothing
 end
 

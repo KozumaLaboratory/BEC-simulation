@@ -240,16 +240,20 @@ function zeeman_field(grid::Grid{N}; bz=0.0, bx=0.0, by=0.0, q=0.0,
 end
 
 # General `B(r,t)` arm: the spatial SHAPE may vary with t (moving gradient).
-# Each component is a function `(coords..., t) -> Float64`, stored as a
-# type-erased `Function` field so the Workspace Union stays a closed concrete
-# 3-arm Union (no extra type params). The functions are touched only in the
-# cold per-step materialisation, which goes through a function barrier
-# (`_fill_component!`) so the per-voxel loop is monomorphic.
-struct SpatioTemporalProfiles{N}
-    bx::Function
-    by::Function
-    bz::Function
-    q::Function
+# Each component is a function `(coords..., t) -> Float64`, stored in a CONCRETE
+# field parameterised on the closure type (`FBX…FQ`) — NOT an abstract `::Function`
+# field — because the per-voxel `f(coords…,t)` call is allocation-free only when
+# `f` is concretely typed (Julia does not auto-specialise on `::Function` args).
+# The shared Workspace stores this arm as `ZeemanField{<:SpatioTemporalProfiles{N}}`
+# (abstract over the closures → no Workspace type-param explosion); a `@noinline`
+# function barrier (`_apply_spatial_zeeman_step!` in split_step.jl) does ONE runtime
+# dispatch per step to recover the concrete arm, after which the per-voxel loop is
+# fully monomorphic.
+struct SpatioTemporalProfiles{N, FBX, FBY, FBZ, FQ}
+    bx::FBX
+    by::FBY
+    bz::FBZ
+    q::FQ
     scratch::NTuple{4, Array{Float64, N}}        # materialisation buffers (reused)
     coords::NTuple{N, Vector{Float64}}           # grid axes (cached)
 end
@@ -269,8 +273,9 @@ function spatiotemporal_zeeman_field(grid::Grid{N};
     n_pts = grid.config.n_points
     scratch = ntuple(_ -> zeros(Float64, n_pts), Val(4))
     coords = ntuple(d -> collect(Float64, grid.x[d]), Val(N))
-    profiles = SpatioTemporalProfiles{N}(bx, by, bz, q, scratch, coords)
-    ZeemanField{SpatioTemporalProfiles{N}}((0.0, 0.0, 0.0, 0.0), profiles, _NO_WF)
+    profiles = SpatioTemporalProfiles{N, typeof(bx), typeof(by), typeof(bz), typeof(q)}(
+        bx, by, bz, q, scratch, coords)
+    ZeemanField{typeof(profiles)}((0.0, 0.0, 0.0, 0.0), profiles, _NO_WF)
 end
 
 # Time dependence present? (any envelope, or the general functional arm).
@@ -321,6 +326,19 @@ end
 field_arrays_at(f::ZeemanField{<:SpatioTemporalProfiles}, t::Real) =
     _materialise_general!(f.profiles, Float64(t))
 
+"""
+    materialise_field_arrays(field::ZeemanField, t) -> (bx, by, bz, q)
+
+`@noinline` barrier around `field_arrays_at`. The general arm is stored abstractly
+in the shared Workspace (`ZeemanField{<:SpatioTemporalProfiles{N}}`); calling
+`field_arrays_at` directly from a face that holds the abstract value would bind the
+per-voxel closure call to the abstract bound and box every voxel. Going through this
+barrier turns the call into ONE runtime dispatch that recovers the concrete arm, after
+which `_materialise_general!` runs monomorphically (allocation-free). The returned
+arrays are concrete `Array`s for every arm, so downstream loops stay type-stable.
+"""
+@noinline materialise_field_arrays(field::ZeemanField, t::Real) = field_arrays_at(field, t)
+
 # ---------------------------------------------------------------------------
 # Per-voxel propagator: exp(-i·dt·H(r)) (RT) / exp(-dt·H(r)) (IT)
 # ---------------------------------------------------------------------------
@@ -357,6 +375,15 @@ function apply_spatial_zeeman_step!(
     dtf = Float64(dt)
     has_q = any(!=(0.0), q)
 
+    # Diagonal fast path: with no transverse field, exp(-i·dt·H) is purely
+    # diagonal (H = -bz·F_z + q·F_z²), so skip the per-voxel Euler rotation
+    # (D² matrix products with β∈{0,π}) and apply one diagonal phase per voxel.
+    # This is the per-voxel analogue of the uniform Zeeman diagonal fast path.
+    if !any(!=(0.0), bx) && !any(!=(0.0), by)
+        _spatial_diagonal_step!(psi, bz, q, m_vals, dtf, imaginary_time, n_pts, Val(D))
+        return nothing
+    end
+
     has_q && _spatial_q_halfstep!(psi, q, m_vals, dtf / 2, imaginary_time, n_pts, Val(D))
 
     Threads.@threads for I in CartesianIndices(n_pts)
@@ -380,6 +407,40 @@ end
 )
     apply_spatial_zeeman_step!(
         psi, field.bx, field.by, field.bz, field.q, sm, dt, imaginary_time)
+end
+
+# Diagonal-field full step: exp(-i·dt·(-bz·m + q·m²)) (RT) / exp(-dt·(…)) (IT)
+# per voxel, used when the field has no transverse component (bx ≡ by ≡ 0).
+# Combines the bz rotation and both q half-steps into one diagonal phase.
+# IT subtracts the per-voxel min over m (overflow guard, removed by the
+# subsequent normalization), mirroring the uniform ZeemanTerm "ITP Zeeman shift".
+function _spatial_diagonal_step!(
+    psi, bz, q, m_vals::SVector{D, Float64}, dtf::Float64,
+    imaginary_time::Bool, n_pts, ::Val{D},
+) where {D}
+    Threads.@threads for I in CartesianIndices(n_pts)
+        @inbounds begin
+            bzI, qI = bz[I], q[I]
+            if imaginary_time
+                e1 = -bzI * m_vals[1] + qI * m_vals[1]^2
+                shift = e1
+                for c in 2:D
+                    e = -bzI * m_vals[c] + qI * m_vals[c]^2
+                    e < shift && (shift = e)
+                end
+                for c in 1:D
+                    e = -bzI * m_vals[c] + qI * m_vals[c]^2
+                    psi[I, c] *= exp(-(e - shift) * dtf)
+                end
+            else
+                for c in 1:D
+                    e = -bzI * m_vals[c] + qI * m_vals[c]^2
+                    psi[I, c] *= cis(-e * dtf)
+                end
+            end
+        end
+    end
+    nothing
 end
 
 # Per-voxel diagonal q(r)·F_z² factor. IT subtracts the per-voxel min over m

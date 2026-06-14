@@ -31,12 +31,19 @@ struct SpatialZeemanTerm <: HamTerm end
 function apply_operator!(out::AbstractArray, ::SpatialZeemanTerm, ws, psi::AbstractArray)
     field = _spatial_zeeman(ws)
     field === nothing && return out
-    sm = ws.spin_matrices
+    bx, by, bz, q = materialise_field_arrays(field, ws.state.t)
+    _spatial_zeeman_apply!(out, psi, bx, by, bz, q, ws.spin_matrices)
+    return out
+end
+
+# `D` from `SpinMatrices{D}`, `N` from the per-voxel array rank → `Val(D)`/`Val(N)`
+# are type-stable. Reading `D = sm.system.n_components` as a runtime Int and then
+# `Val(D)` would box the entire per-voxel loop (~28 MB/call at D=13).
+function _spatial_zeeman_apply!(
+    out::AbstractArray, psi::AbstractArray,
+    bx, by, bz::AbstractArray{Float64, N}, q, sm::SpinMatrices{D}) where {N, D}
     F = sm.system.F
-    D = sm.system.n_components
-    N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
-    bx, by, bz, q = field_arrays_at(field, ws.state.t)
     m_vals = ntuple(c -> Float64(F - (c - 1)), Val(D))
     fp = ntuple(c -> c == 1 ? 0.0 :
                      sqrt(Float64(F * (F + 1)) - m_vals[c] * (m_vals[c] + 1.0)), Val(D))
@@ -66,25 +73,25 @@ end
 function energy_contribution(::SpatialZeemanTerm, psi::AbstractArray{<:Complex}, ws)
     field = _spatial_zeeman(ws)
     field === nothing && return 0.0
-    sm = ws.spin_matrices
-    F = sm.system.F
-    D = sm.system.n_components
-    N = ndims(psi) - 1
-    n_pts = ntuple(d -> size(psi, d), Val(N))
-    bx, by, bz, q = field_arrays_at(field, ws.state.t)
-    return _spatial_zeeman_energy(psi, bx, by, bz, q, sm, F, D, N, n_pts, cell_volume(ws.grid))
+    bx, by, bz, q = materialise_field_arrays(field, ws.state.t)
+    return _spatial_zeeman_energy(psi, bx, by, bz, q, ws.spin_matrices, cell_volume(ws.grid))
 end
 
 """
-    _spatial_zeeman_energy(psi, bx, by, bz, q, sm, F, D, N, n_pts, dV)
+    _spatial_zeeman_energy(psi, bx, by, bz, q, sm, dV)
 
 `E = ∫ [Σ_c (-bz(r)·m + q(r)·m²)|ψ_c|² - bx(r)·f_x(r) - by(r)·f_y(r)] dV`,
 the per-voxel expectation of the spatially-varying Zeeman operator from four
 per-voxel arrays (already sampled at the current time). Host-side; also used by
-the GPU energy path (which copies ψ to host). A `SpatialZeemanField` overload
-delegates here.
+the GPU energy path (which copies ψ to host). `D` is taken from `SpinMatrices{D}`
+and `N` from the per-voxel array rank so `Val(D)`/`Val(N)` are type-stable. A
+`SpatialZeemanField` overload delegates here.
 """
-function _spatial_zeeman_energy(psi, bx, by, bz, q, sm, F, D, N, n_pts, dV)
+function _spatial_zeeman_energy(
+    psi::AbstractArray, bx, by, bz::AbstractArray{Float64, N}, q,
+    sm::SpinMatrices{D}, dV) where {N, D}
+    F = sm.system.F
+    n_pts = ntuple(d -> size(psi, d), Val(N))
     m_vals = ntuple(c -> Float64(F - (c - 1)), Val(D))
     fp = ntuple(c -> c == 1 ? 0.0 :
                      sqrt(Float64(F * (F + 1)) - m_vals[c] * (m_vals[c] + 1.0)), Val(D))
@@ -110,9 +117,8 @@ function _spatial_zeeman_energy(psi, bx, by, bz, q, sm, F, D, N, n_pts, dV)
 end
 
 # Legacy SpatialZeemanField overload — delegates to the array form.
-_spatial_zeeman_energy(psi, field::SpatialZeemanField, sm, F, D, N, n_pts, dV) =
-    _spatial_zeeman_energy(
-        psi, field.bx, field.by, field.bz, field.q, sm, F, D, N, n_pts, dV)
+_spatial_zeeman_energy(psi, field::SpatialZeemanField, sm, dV) =
+    _spatial_zeeman_energy(psi, field.bx, field.by, field.bz, field.q, sm, dV)
 
 # ---------------------------------------------------------------------------
 # Propagator face: exp(-i·dt·H(r)) (RT) / exp(-dt·H(r)) (IT)
@@ -122,7 +128,7 @@ function apply_step!(::SpatialZeemanTerm, psi::AbstractArray{<:Complex},
     dt::Real, imaginary_time::Bool, ws)
     field = _spatial_zeeman(ws)
     field === nothing && return nothing
-    bx, by, bz, q = field_arrays_at(field, ws.state.t)
+    bx, by, bz, q = materialise_field_arrays(field, ws.state.t)
     apply_spatial_zeeman_step!(psi, bx, by, bz, q, ws.spin_matrices, dt, imaginary_time)
     return nothing
 end
