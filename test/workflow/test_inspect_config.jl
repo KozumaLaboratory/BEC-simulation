@@ -49,9 +49,11 @@ using SpinorBEC
         @test length(warns) == 1
         @test warns[1].severity === :warn
         @test warns[1].step_index == 1
-        # The resolved Bz should be positive (proving theta=π in radians did NOT flip it).
+        # theta=π in radians must NOT flip the field. The trace carries the
+        # INTERNAL operator coefficient bz = p = -g_F μ_B B_z, which is negative
+        # for an un-flipped +z lab field (a flip to -z would make it positive).
         bz_trace = first(t for t in ins.steps[1].traces if t.kind === :zeeman)
-        @test first(bz_trace.channels[:bz]) > 0
+        @test first(bz_trace.channels[:bz]) < 0
     end
 
     @testset "W1 suppressed when direction is exactly zero" begin
