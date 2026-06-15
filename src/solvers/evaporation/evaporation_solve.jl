@@ -105,6 +105,25 @@ function run_evaporation(
 
     rhs(Nv, Tv, U, ω̄) = evap_rhs(Nv, Tv, U, ω̄, p, m)
 
+    # Precompute (U, ω̄) on a fine time grid and linearly interpolate during the RK4:
+    # the trap-DEPTH scan is the per-substep cost, but the ramp is piecewise-linear so
+    # (U(t), ω̄(t)) are smooth and a dense grid is exact — turns ~12k depth scans into ~ngrid.
+    ngrid = clamp(8 * length(ramp.times) + nsteps ÷ 20, 120, 400)
+    tg = collect(range(t0, tend; length=ngrid))
+    Ug = Vector{Float64}(undef, ngrid)
+    ωg = Vector{Float64}(undef, ngrid)
+    for i in 1:ngrid
+        Ug[i], ωg[i] = _trap_at_time(trap, ramp, tg[i])
+    end
+    dtg = ngrid > 1 ? (tend - t0) / (ngrid - 1) : 1.0
+    @inline function trap_interp(tq::Float64)
+        tq <= t0 && return (Ug[1], ωg[1])
+        tq >= tend && return (Ug[ngrid], ωg[ngrid])
+        j = clamp(floor(Int, (tq - t0) / dtg) + 1, 1, ngrid - 1)
+        f = (tq - (t0 + (j - 1) * dtg)) / dtg
+        (Ug[j] * (1 - f) + Ug[j + 1] * f, ωg[j] * (1 - f) + ωg[j + 1] * f)
+    end
+
     function record!(U, ω̄)
         η = U / (Units.KB * T)
         n0 = N * (m * ω̄^2 / (2π * Units.KB * T))^1.5
@@ -119,19 +138,19 @@ function run_evaporation(
         push!(Us, U)
     end
 
-    U, ω̄ = _trap_at_time(trap, ramp, t)
+    U, ω̄ = trap_interp(t)
     record!(U, ω̄)
 
     for s in 1:nsteps
         h = min(dt, tend - t)
         h <= 0 && break
         # RK4 with trap (U, ω̄) sampled at t, t+h/2, t+h
-        U1, ω1 = _trap_at_time(trap, ramp, t)
+        U1, ω1 = trap_interp(t)
         k1N, k1T = rhs(N, T, U1, ω1)
-        Um, ωm = _trap_at_time(trap, ramp, t + h / 2)
+        Um, ωm = trap_interp(t + h / 2)
         k2N, k2T = rhs(N + h / 2 * k1N, T + h / 2 * k1T, Um, ωm)
         k3N, k3T = rhs(N + h / 2 * k2N, T + h / 2 * k2T, Um, ωm)
-        U2, ω2 = _trap_at_time(trap, ramp, t + h)
+        U2, ω2 = trap_interp(t + h)
         k4N, k4T = rhs(N + h * k3N, T + h * k3T, U2, ω2)
 
         N_new = N + h / 6 * (k1N + 2k2N + 2k3N + k4N)
