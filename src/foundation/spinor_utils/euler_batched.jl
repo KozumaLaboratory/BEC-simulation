@@ -135,12 +135,17 @@ mode stays bounded by 1."""
     end
     mul!(P, W, V_T)
 
-    # Stage 3 — Dz(θ): ITP uses exp(-(m+F)·θ), recurrence ratio exp(θ).
-    two_F = T(2) * F
+    # Stage 3 — Dz(θ) imaginary time: weight component m by exp(-m·θ),
+    # the F_z eigenvalue weight. The previous exp(-(m+F)·θ) form added a
+    # per-voxel exp(-F·θ) overflow shift; since θ ∝ |f(r)| is spatially
+    # varying, that factor is a density reweighting that survives global
+    # normalization (only its spatial mean is removed) and biases the ITP
+    # fixed point off the variational GP minimum. The real-time variant is
+    # immune (there the same factor is an irrelevant global phase).
     @inbounds for i in 1:N_spatial
         ti = theta[i]
         dz_step = exp(ti)
-        dz_r = exp(-two_F * ti)
+        dz_r = exp(-F * ti)        # c=1 (m=+F): exp(-F·θ) = exp(-m·θ)
         for c in 1:D
             P[i, c] *= dz_r
             dz_r *= dz_step

@@ -346,12 +346,15 @@ function _apply_ddi_rotation!(
         end
         _gpu_matmul_V!(P, W, V_T, Val(D))
 
-        # Step 3: Dz(θ)
+        # Step 3: Dz(θ) imaginary time — weight component m by exp(-m·θ).
+        # Must NOT add a per-voxel (m+F) overflow shift: θ ∝ |Φ(r)| is
+        # spatially varying, so exp(-F·θ(r)) is a density reweighting that
+        # survives global normalization and biases the ITP fixed point.
         if imaginary_time
             for c in 1:D
                 m_c = RT(F - (c - 1))
                 pc = view(P, :, c)
-                @. pc = pc * exp(-(m_c + F_t) * theta)
+                @. pc = pc * exp(-m_c * theta)
             end
         else
             for c in 1:D
