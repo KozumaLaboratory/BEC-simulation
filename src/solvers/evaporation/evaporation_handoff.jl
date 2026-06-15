@@ -8,6 +8,7 @@
 # `make_workspace` / `find_ground_state`.
 
 export final_trap_frequencies, bec_handoff, harmonic_trap_dimless
+export bec_gp_coupling, bec_workspace_kwargs
 
 """
     final_trap_frequencies(trap, ramp) -> (ωx, ωy, ωz) [rad/s]
@@ -57,4 +58,34 @@ function harmonic_trap_dimless(
     trap::EvapTrap, ramp::FortRamp, result::EvapResult; omega_ref=nothing
 )
     HarmonicTrap(bec_handoff(trap, ramp, result; omega_ref=omega_ref).omega_dimless)
+end
+
+"""
+    bec_gp_coupling(N, a_ho; a_s=Eu151.a_s) -> c0
+
+Dimensionless 3-D contact coupling `c0 = 4π N a_s / a_ho` (ℏ=m=ω_ref=1) — the GP
+density nonlinearity for `N` atoms, scattering length `a_s`, oscillator length
+`a_ho` (SI lengths). This is the c₀ in `InteractionParams(Dict(0 => c0, …))`.
+"""
+bec_gp_coupling(N::Real, a_ho::Real; a_s::Real=Eu151.a_s) = 4π * N * a_s / a_ho
+
+"""
+    bec_workspace_kwargs(trap, ramp, result; a_s=Eu151.a_s, c1=0.0, omega_ref=nothing)
+        -> NamedTuple
+
+Physics bundle to seed a GP ground state from the evaporation endpoint:
+`(; potential, atom, interactions, N_BEC, c0, a_ho, omega_dimless)`. `potential` is the
+dimensionless final-trap `HarmonicTrap`, `atom` is `Eu151`, `interactions` carries
+`c0 = bec_gp_coupling(N_BEC, a_ho)` (and `c1`; the Eu spin channels are unknown so the
+default 0 gives a c₀-only BEC). Splat the first three into `make_workspace`, add a
+`grid`/`sim_params`, then `find_ground_state`. Touches no GP machinery itself.
+"""
+function bec_workspace_kwargs(trap::EvapTrap, ramp::FortRamp, result::EvapResult;
+    a_s::Real=Eu151.a_s, c1::Real=0.0, omega_ref=nothing)
+    h = bec_handoff(trap, ramp, result; omega_ref=omega_ref)
+    c0 = bec_gp_coupling(h.N_BEC, h.a_ho; a_s=a_s)
+    (potential=HarmonicTrap(h.omega_dimless),
+        atom=Eu151,
+        interactions=InteractionParams(Dict(0 => c0, 1 => Float64(c1))),
+        N_BEC=h.N_BEC, c0=c0, a_ho=h.a_ho, omega_dimless=h.omega_dimless)
 end
