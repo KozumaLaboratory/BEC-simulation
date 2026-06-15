@@ -125,7 +125,7 @@ lab schedule) to maximize `N_BEC`. Returns `(; bo, ramp, result)`.
 function optimize_euv3_evaporation(; waists=_EUV3_WAISTS, alpha::Real=_EUV3_ALPHA,
     N0::Real=_EUV3_N0, T0::Real=_EUV3_T0,
     tau_bg::Real=_EUV3_TAU_BG, K3::Real=_EUV3_K3, a_s::Real=Eu151.a_s,
-    bounds::Vector{Tuple{Float64, Float64}}=[(1.0, 5.0), (0.005, 0.05), (0.5, 3.0)],
+    bounds::Vector{Tuple{Float64, Float64}}=[(0.5, 3.0), (0.3, 2.0), (0.5, 2.0)],
     n_init::Int=8, n_iter::Int=40, trap_kwargs...)
     trap = euv3_evap_trap(; waists=waists, alpha=alpha, trap_kwargs...)
     p = EvapParams(; a_s=Float64(a_s), tau_bg=Float64(tau_bg), K3=Float64(K3))

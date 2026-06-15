@@ -5,7 +5,8 @@
 using Test
 using SpinorBEC
 using SpinorBEC: Eu151, EvapTrap, EvapParams, FortRamp, run_evaporation,
-    optimize_evaporation_ramp, scan_ramp_param, scan_ramp_2d, fit_euv3_K3
+    optimize_evaporation_ramp, scan_ramp_param, scan_ramp_2d, fit_euv3_K3,
+    optimize_euv3_evaporation, run_euv3_evaporation
 
 const _as_t = Eu151.a_s
 
@@ -27,7 +28,7 @@ _euv3_ramp_t() = FortRamp(
         p = EvapParams(; a_s=_as_t, tau_bg=10.0, K3=0.0)
         base = _euv3_ramp_t()
         # deterministic grid-search stub matching the bayesian_optimize contract
-        function grid_opt(obj, bounds; n_init, n_iter, minimise)
+        function grid_opt(obj, bounds; n_init, n_iter, minimise, n_grid=0)
             best_p = [(lo + hi) / 2 for (lo, hi) in bounds]
             best_y = obj(best_p)
             for x1 in range(bounds[1]...; length=2), x2 in range(bounds[2]...; length=2),
@@ -76,5 +77,16 @@ _euv3_ramp_t() = FortRamp(
         @test 1e-41 < fit.K3 < 1e-39                     # ≈ the default 1e-40
         hi = fit_euv3_K3(; target_N_BEC=1e8, K3_lo=1e-41, K3_hi=1e-39)
         @test !hi.converged                              # unreachable target clamps
+    end
+
+    @testset "real bayesian_optimize end-to-end (regression: verbose/n_grid)" begin
+        # Exercises the actual bayesian_optimize path — guards two bugs this caught:
+        # _default_solver_verbose not imported into module Optimization, and the
+        # n_grid^d candidate mesh OOM at the default n_grid=100 for d=3.
+        out = optimize_euv3_evaporation(; n_init=3, n_iter=3)
+        @test out.result.reached_bec
+        # the optimum is ≥ the unmodified lab ramp (bounds bracket the baseline [1,1,1])
+        base = run_euv3_evaporation()
+        @test out.result.N_BEC >= 0.95 * base.N_BEC
     end
 end

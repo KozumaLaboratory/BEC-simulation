@@ -39,8 +39,9 @@ Returns the `bayesian_optimize` named tuple, the best `FortRamp`, and its
 `EvapResult`. Each evaluation is a millisecond-scale `run_evaporation`, so
 `n_iter` can be large.
 
-`bounds` default to `[(1, 5), (0.005, 0.05), (0.5, 3)]` (duration scale,
-final-power scale, warp γ). `optimizer` is injected (default `bayesian_optimize`)
+`bounds` default to `[(0.5, 3), (0.3, 2), (0.5, 2)]` (duration scale, final-power
+scale, warp γ) — bracketing the baseline `[1, 1, 1]` (the unmodified `base_ramp`),
+so the optimizer can recover or beat it. `optimizer` is injected (default `bayesian_optimize`)
 so the call is load-order independent and stubbable in tests. Ramps that never
 reach BEC score `max(PSD)/ζ(3) − 1 ∈ [−1, 0)`, guiding the search toward onset;
 any ramp that reaches BEC (`N_BEC ≥ 1`) outranks all failures.
@@ -48,8 +49,8 @@ any ramp that reaches BEC (`N_BEC ≥ 1`) outranks all failures.
 function optimize_evaporation_ramp(
     trap::EvapTrap, p::EvapParams, base_ramp::FortRamp;
     N0::Float64, T0::Float64,
-    bounds::Vector{Tuple{Float64, Float64}}=[(1.0, 5.0), (0.005, 0.05), (0.5, 3.0)],
-    n_init::Int=8, n_iter::Int=40, optimizer::Function=bayesian_optimize)
+    bounds::Vector{Tuple{Float64, Float64}}=[(0.5, 3.0), (0.3, 2.0), (0.5, 2.0)],
+    n_init::Int=8, n_iter::Int=40, n_grid::Int=15, optimizer::Function=bayesian_optimize)
     function objective(x::AbstractVector{<:Real})
         ramp = ramp_from_params(x, base_ramp)
         res = run_evaporation(trap, ramp, p; N0=N0, T0=T0)
@@ -57,7 +58,9 @@ function optimize_evaporation_ramp(
         ρmax = isempty(res.psd) ? 0.0 : maximum(res.psd)
         ρmax / _ZETA3 - 1.0
     end
-    bo = optimizer(objective, bounds; n_init=n_init, n_iter=n_iter, minimise=false)
+    # n_grid kept small: bayesian_optimize evaluates EI on an n_grid^d candidate mesh,
+    # so the default 100 would be 10⁶ points (OOM) for this d=3 ramp parametrization.
+    bo = optimizer(objective, bounds; n_init=n_init, n_iter=n_iter, minimise=false, n_grid=n_grid)
     best_ramp = ramp_from_params(bo.best_p, base_ramp)
     best_res = run_evaporation(trap, best_ramp, p; N0=N0, T0=T0)
     (bo=bo, ramp=best_ramp, result=best_res)
