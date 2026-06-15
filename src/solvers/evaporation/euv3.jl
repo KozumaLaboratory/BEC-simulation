@@ -35,6 +35,12 @@ const _EUV3_ALPHA = 1.25e-36
 const _EUV3_N0 = 3.5e6
 const _EUV3_T0 = 50e-6
 const _EUV3_TAU_BG = 15.0                    # not in the paper; typical lanthanide ODT
+# K3 ≈ 1e-40 m⁶/s: a single-parameter FIT, not a measurement — Eu's 3-body rate is
+# unmeasured. With α/τ_bg/ramp fixed, K3=1e-40 brings the predicted endpoint to
+# N_BEC ≈ 4.9e4, T_BEC ≈ 0.53 µK, matching the measured 5.0e4 @ 349 nK to ~1.5×.
+# 3-body loss limits N at the high density near BEC (K3=0 over-predicts N by ~20×).
+# In the lanthanide range (Dy/Er ~1e-41…1e-40). Refit once Eu K3 / current data exist.
+const _EUV3_K3 = 1e-40
 
 hfort_volts(P_W::Real) = (P_W + 0.0010) / 0.6198
 vfort_volts(P_W::Real) = (P_W + 0.0027) / 0.5739
@@ -84,16 +90,17 @@ function euv3_evap_trap(; waists=_EUV3_WAISTS, alpha::Real=_EUV3_ALPHA,
 end
 
 """
-    run_euv3_evaporation(; waists, alpha, N0, T0, tau_bg=10.0, K3=0.0, a_s=Eu151.a_s,
-                         trap_kwargs...) -> EvapResult
+    run_euv3_evaporation(; waists, alpha, N0, T0, tau_bg, K3, a_s, trap_kwargs...) -> EvapResult
 
 One-call evaporation of the euv3 ramp: build the trap from `waists`/`alpha`
 (+ optional geometry overrides), then `run_evaporation` over `euv3_evaporation_ramp`
-from `(N0, T0)`. `a_s`, `tau_bg`, `K3` set `EvapParams`.
+from `(N0, T0)`. All default to `euv3_defaults()`; with those defaults the predicted
+endpoint (N_BEC ≈ 4.9e4 @ 0.53 µK) matches the measured 5.0e4 @ 349 nK (the K3=1e-40
+default is fitted to that — see `_EUV3_K3`).
 """
 function run_euv3_evaporation(; waists=_EUV3_WAISTS, alpha::Real=_EUV3_ALPHA,
     N0::Real=_EUV3_N0, T0::Real=_EUV3_T0,
-    tau_bg::Real=_EUV3_TAU_BG, K3::Real=0.0, a_s::Real=Eu151.a_s, trap_kwargs...)
+    tau_bg::Real=_EUV3_TAU_BG, K3::Real=_EUV3_K3, a_s::Real=Eu151.a_s, trap_kwargs...)
     trap = euv3_evap_trap(; waists=waists, alpha=alpha, trap_kwargs...)
     p = EvapParams(; a_s=Float64(a_s), tau_bg=Float64(tau_bg), K3=Float64(K3))
     run_evaporation(trap, euv3_evaporation_ramp(), p; N0=Float64(N0), T0=Float64(T0))
@@ -108,7 +115,7 @@ lab schedule) to maximize `N_BEC`. Returns `(; bo, ramp, result)`.
 """
 function optimize_euv3_evaporation(; waists=_EUV3_WAISTS, alpha::Real=_EUV3_ALPHA,
     N0::Real=_EUV3_N0, T0::Real=_EUV3_T0,
-    tau_bg::Real=_EUV3_TAU_BG, K3::Real=0.0, a_s::Real=Eu151.a_s,
+    tau_bg::Real=_EUV3_TAU_BG, K3::Real=_EUV3_K3, a_s::Real=Eu151.a_s,
     bounds::Vector{Tuple{Float64, Float64}}=[(1.0, 5.0), (0.005, 0.05), (0.5, 3.0)],
     n_init::Int=8, n_iter::Int=40, trap_kwargs...)
     trap = euv3_evap_trap(; waists=waists, alpha=alpha, trap_kwargs...)
@@ -132,6 +139,7 @@ euv3_defaults() = (
     N0=_EUV3_N0,                           # 3.5e6 atoms at start of evaporation
     T0=_EUV3_T0,                           # 50 µK
     tau_bg=_EUV3_TAU_BG,                   # 15 s estimate (not in paper)
+    K3=_EUV3_K3,                           # 1e-40 m⁶/s FIT to reproduce N_BEC — NOT measured
     a_s=Eu151.a_s,                         # 110 a₀
     measured_N_BEC=5.02e4,                 # validation target
     measured_T_BEC=349e-9,                 # 349 nK

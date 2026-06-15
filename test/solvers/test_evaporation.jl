@@ -211,7 +211,7 @@ _euv3_ramp() = FortRamp(
         trap = euv3_evap_trap(; waists=_w0, alpha=_α)
         @test length(trap.waists) == 3 && all(==(_w0), trap.waists)
         @test trap.mass == Eu151.mass
-        res = run_euv3_evaporation(; waists=_w0, alpha=_α, N0=2e6, T0=40e-6)
+        res = run_euv3_evaporation(; waists=_w0, alpha=_α, N0=2e6, T0=40e-6, K3=0.0)
         @test res.reached_bec
         s = evaporation_summary(res)
         @test s.reached_bec
@@ -226,11 +226,11 @@ _euv3_ramp() = FortRamp(
         @test d.wavelength == 1550e-9
         @test length(d.waists) == 3
         # no-arg run uses the researched defaults (1550 nm, 31/42 µm, calibrated α,
-        # N₀=3.5e6 @ 50 µK) and should reach BEC with the right order of magnitude.
+        # N₀=3.5e6 @ 50 µK, K3 fitted) and reproduces the measured BEC endpoint within ~3×.
         res = run_euv3_evaporation()
         @test res.reached_bec
-        @test 1e4 < res.N_BEC < 3.5e6                 # between measured 5e4 and start
-        @test 1e-7 < res.T_BEC < 1e-5                 # sub-µK..few-µK BEC onset
+        @test 0.3 < res.N_BEC / d.measured_N_BEC < 3.0   # ≈ measured 5.0e4
+        @test 0.3 < res.T_BEC / d.measured_T_BEC < 3.0   # ≈ measured 349 nK
         # α calibration is self-consistent: build a beam at α, measure ω_r, recover α
         b = GaussianBeam(d.wavelength, 1.2, 42e-6, (0.0, 0.0, 0.0), (0.0, 0.0, 1.0))
         ωr, _ = beam_frequencies(b, d.alpha, Eu151.mass)
