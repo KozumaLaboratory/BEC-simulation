@@ -1,44 +1,41 @@
 # test/oracles/test_imag_time_propagator_generator.jl
 #
-# Generator-consistency oracle for the imaginary-time spin-rotation
-# propagators (spin-mixing c1 + DDI). For a split-step substep
-# `step(ψ; dt) = exp(∓dt·H)ψ` the small-dt generator must reproduce the
-# registry operator `apply_operator!`:
+# Generator-consistency oracle for the imaginary-time propagators of the
+# spin-rotation / diagonal-shift family (spin-mixing c1, DDI, uniform Zeeman,
+# spatial Zeeman). For a split-step substep `step(ψ; dt) = exp(∓dt·H)ψ` the
+# small-dt generator must reproduce the registry operator `apply_operator!`:
 #
 #   imaginary time:  (ψ − step(ψ; dt)) / dt  →   H·ψ        ( = apply_operator! )
 #   real time:       (ψ − step(ψ; dt)) / dt  →  i·H·ψ
 #
-# This gates the bug class found 2026-06-15: the imaginary-time Euler
-# Stage-3 used a per-voxel exp(-(m+F)·θ) overflow shift; because θ ∝
-# |f(r)| / |Φ(r)| is spatially varying, the spurious exp(-F·θ(r)) factor
-# was a density reweighting (not removed by global normalization) that
-# moved the ITP fixed point off the variational GP minimum. The real-time
-# path was immune (same factor = irrelevant global phase), so an ITP-only
-# or RTP-only check could not see it — only the propagator-vs-operator
-# generator comparison does. It fills the gap left when the propagator↔
-# energy strang-step parity gate was deleted 2026-06-06.
+# ...MODULO a global scalar multiple of ψ. An imaginary-time propagator may
+# subtract a constant overflow shift `exp(-dt(H − c·I))` = `exp(c·dt)·exp(-dt·H)`;
+# the global scalar `exp(c·dt)` is removed by per-step normalization, so it is
+# physically harmless and appears in the raw generator as `c·ψ`. We therefore
+# compare the generators after projecting out the ψ-component.
+#
+# The bug this gates (2026-06-15): the imaginary-time Euler Stage-3 used a
+# PER-VOXEL `exp(-(m+F)·θ)` shift with θ ∝ |f(r)| / |Φ(r)| / |B(r)|. A
+# per-voxel `c(r)·ψ` is NOT a global scalar multiple of ψ — projection cannot
+# absorb it — so it survives normalization and biases the ITP fixed point.
+# Found in spin-mixing + DDI (euler_batched / euler_per_voxel / rotation.jl
+# GPU) and in spatial-Zeeman diagonal/q steps. Fills the gap left when the
+# propagator↔energy strang-step parity gate was deleted 2026-06-06.
 
 using Test
 using FFTW
 using SpinorBEC
-using SpinorBEC: SpinC1Term, DDITerm, apply_operator!, apply_spin_mixing_step!,
-    apply_ddi_step!, make_workspace, cell_volume
+using SpinorBEC: SpinC1Term, DDITerm, ZeemanTerm, SpatialZeemanTerm,
+    apply_operator!, apply_step!, build_h_terms_registry, make_workspace,
+    cell_volume, zeeman_field
+using LinearAlgebra
 using Random
 
-# Textured F=6 (Eu) state: mostly stretched + transverse admixture so the
-# spin density f(r) is non-uniform (the regime where the per-voxel shift bites).
-function _gen_ws_and_state(; c1::Float64, enable_ddi::Bool, seed::Int=7)
-    grid = make_grid(GridConfig((8, 8, 8), (6.0, 6.0, 6.0)))
-    interactions = InteractionParams(Dict(0 => 1.0, 1 => c1))
-    sp = SimParams(; dt=0.01, n_steps=1, imaginary_time=true)
-    ws = make_workspace(;
-        grid, atom=Eu151, interactions, zeeman=ZeemanParams(0.0, 0.0),
-        potential=HarmonicTrap((1.0, 1.0, 1.0)), sim_params=sp,
-        enable_ddi=enable_ddi, c_dd=(enable_ddi ? 0.5 : NaN),
-        fft_flags=FFTW.ESTIMATE,
-    )
+# Textured F=6 state: mostly stretched + transverse admixture so the spin
+# density f(r) is non-uniform (the regime where a per-voxel shift bites).
+function _textured_state(ws)
     D = ws.spin_matrices.system.n_components
-    Random.seed!(seed)
+    Random.seed!(7)
     psi = zeros(ComplexF64, 8, 8, 8, D)
     for k in 1:8, j in 1:8, i in 1:8
         g = exp(-0.08 * ((i - 4.5)^2 + (j - 4.5)^2 + (k - 4.5)^2))
@@ -48,46 +45,81 @@ function _gen_ws_and_state(; c1::Float64, enable_ddi::Bool, seed::Int=7)
         end
     end
     psi ./= sqrt(sum(abs2, psi) * cell_volume(ws.grid))
-    return ws, psi
+    return psi
 end
 
-# generator (ψ − step(ψ; dt)) / dt for an in-place propagator `step!`
+# residual of (G − target) after removing its (complex) ψ-component — a
+# global scalar·ψ overflow/phase shift is harmless and projected out; a
+# per-voxel or operator-shape mismatch is not.
+function _residual_mod_psi(G, target, psi)
+    diff = G .- target
+    c = dot(vec(psi), vec(diff)) / dot(vec(psi), vec(psi))
+    perp = diff .- c .* psi
+    return sqrt(sum(abs2, perp)) / sqrt(sum(abs2, target))
+end
+
+# (ψ − step!(ψ; dt)) / dt for an in-place propagator
 function _generator(psi, step!; dt::Float64=1e-6)
-    psi_after = copy(psi)
-    step!(psi_after, dt)
-    return (psi .- psi_after) ./ dt
+    p = copy(psi); step!(p, dt); return (psi .- p) ./ dt
 end
 
-_relerr(a, b) = sqrt(sum(abs2, a .- b)) / sqrt(sum(abs2, b))
+# pull the live term from the registry (correct construction from ws)
+function _term_of(::Type{T}, ws) where {T}
+    for t in build_h_terms_registry(ws)
+        t isa T && return t
+    end
+    error("no $T active in registry")
+end
 
-@testset "imaginary-time propagator generator == registry operator" begin
-    TOL = 1e-3   # FD generator is O(dt) accurate; dt=1e-6
+function _check(::Type{T}, ws, psi; tol=1e-3) where {T}
+    term = _term_of(T, ws)
+    g = zero(psi); apply_operator!(g, term, ws, psi)
+    Gi = _generator(psi, (p, dt) -> apply_step!(term, p, dt, true, ws))
+    Gr = _generator(psi, (p, dt) -> apply_step!(term, p, dt, false, ws))
+    @test _residual_mod_psi(Gi, g, psi) < tol         # imag generator == H·ψ (mod ψ)
+    @test _residual_mod_psi(Gr, im .* g, psi) < tol   # real generator == i·H·ψ (mod ψ)
+end
 
-    @testset "spin-mixing (c1)" begin
-        ws, psi = _gen_ws_and_state(; c1=0.4, enable_ddi=false)
-        g = zero(psi)
-        apply_operator!(g, SpinC1Term(0.4), ws, psi)   # H·ψ
+@testset "imaginary-time propagator generator == registry operator (mod ψ)" begin
+    grid = make_grid(GridConfig((8, 8, 8), (6.0, 6.0, 6.0)))
 
-        G_imag = _generator(psi, (p, dt) ->
-            apply_spin_mixing_step!(p, ws.spin_matrices, 0.4, dt, 3; imaginary_time=true))
-        G_real = _generator(psi, (p, dt) ->
-            apply_spin_mixing_step!(p, ws.spin_matrices, 0.4, dt, 3; imaginary_time=false))
-
-        @test _relerr(G_imag, g) < TOL          # imag generator == H·ψ
-        @test _relerr(G_real, im .* g) < TOL     # real generator == i·H·ψ
+    @testset "spin-mixing c1" begin
+        ws = make_workspace(; grid, atom=Eu151,
+            interactions=InteractionParams(Dict(0 => 1.0, 1 => 0.4)),
+            zeeman=ZeemanParams(0.0, 0.0), potential=HarmonicTrap((1.0, 1.0, 1.0)),
+            sim_params=SimParams(; dt=0.01, n_steps=1, imaginary_time=true),
+            enable_ddi=false, fft_flags=FFTW.ESTIMATE)
+        _check(SpinC1Term, ws, _textured_state(ws))
     end
 
     @testset "DDI" begin
-        ws, psi = _gen_ws_and_state(; c1=0.0, enable_ddi=true)
-        g = zero(psi)
-        apply_operator!(g, DDITerm(), ws, psi)
+        ws = make_workspace(; grid, atom=Eu151,
+            interactions=InteractionParams(Dict(0 => 1.0, 1 => 0.0)),
+            zeeman=ZeemanParams(0.0, 0.0), potential=HarmonicTrap((1.0, 1.0, 1.0)),
+            sim_params=SimParams(; dt=0.01, n_steps=1, imaginary_time=true),
+            enable_ddi=true, c_dd=0.5, fft_flags=FFTW.ESTIMATE)
+        _check(DDITerm, ws, _textured_state(ws))
+    end
 
-        G_imag = _generator(psi, (p, dt) ->
-            apply_ddi_step!(p, ws.spin_matrices, ws.ddi, ws.ddi_bufs, dt, 3; imaginary_time=true))
-        G_real = _generator(psi, (p, dt) ->
-            apply_ddi_step!(p, ws.spin_matrices, ws.ddi, ws.ddi_bufs, dt, 3; imaginary_time=false))
+    @testset "uniform Zeeman (p + q): harmless global shift is projected out" begin
+        ws = make_workspace(; grid, atom=Eu151,
+            interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
+            zeeman=ZeemanParams(0.7, 0.2), potential=HarmonicTrap((1.0, 1.0, 1.0)),
+            sim_params=SimParams(; dt=0.01, n_steps=1, imaginary_time=true),
+            enable_ddi=false, fft_flags=FFTW.ESTIMATE)
+        _check(ZeemanTerm, ws, _textured_state(ws))
+    end
 
-        @test _relerr(G_imag, g) < TOL
-        @test _relerr(G_real, im .* g) < TOL
+    @testset "spatial Zeeman B(r): per-voxel shift must NOT bias density" begin
+        # spatially-varying bz(r) + q(r): the regime where a per-voxel overflow
+        # shift would survive normalization and bias ψ. Post-fix the shift is a
+        # global constant, so the generator matches the operator (mod ψ).
+        zf = zeeman_field(grid; bz=(x, y, z) -> 0.5 + 0.2 * x, q=(x, y, z) -> 0.1 + 0.05 * y)
+        ws = make_workspace(; grid, atom=Eu151,
+            interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
+            zeeman=zf, potential=HarmonicTrap((1.0, 1.0, 1.0)),
+            sim_params=SimParams(; dt=0.01, n_steps=1, imaginary_time=true),
+            enable_ddi=false, fft_flags=FFTW.ESTIMATE)
+        _check(SpatialZeemanTerm, ws, _textured_state(ws))
     end
 end
