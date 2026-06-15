@@ -5,7 +5,7 @@ using SpinorBEC
 using SpinorBEC: bxpyp,
     coil2_xp_volts, coil2_yp_volts, coil2_z_volts, coil2_q_volts,
     coil2_xp_field, coil2_yp_field, coil2_z_field, coil2_q_grad,
-    coil1_z_volts, horizontal_bias_volts
+    coil1_z_volts, horizontal_bias_volts, euv3_bias_field
 
 @testset "euv3 coil/field calibration" begin
     @testset "bxpyp non-orthogonal projection" begin
@@ -41,5 +41,20 @@ using SpinorBEC: bxpyp,
         s, t = bxpyp(θ)
         @test coil2_xp_field(Vxp) ≈ B * s rtol = 1e-12
         @test coil2_yp_field(Vyp) ≈ B * t rtol = 1e-12
+    end
+
+    @testset "euv3_bias_field → Cartesian B (for the GP B-block)" begin
+        # vertical-only voltage ⇒ pure +z field
+        bx, by, bz = euv3_bias_field(; v_z=coil2_z_volts(2.0))
+        @test (bx, by) == (0.0, 0.0) && bz ≈ 2.0
+        # round-trip: horizontal_bias_volts(B, θ) → coil V → euv3_bias_field == (B cosθ, B sinθ, 0)
+        for (B, θ) in ((1.0, 0.0), (1.5, 35.0 / 180 * π), (0.8, -50.0 / 180 * π))
+            Vxp, Vyp = horizontal_bias_volts(B, θ)
+            Bx, By, Bz = euv3_bias_field(; v_xp=Vxp, v_yp=Vyp)
+            @test Bx ≈ B * cos(θ) atol = 1e-9
+            @test By ≈ B * sin(θ) atol = 1e-9
+            @test Bz == 0.0
+            @test hypot(Bx, By) ≈ B rtol = 1e-9       # magnitude preserved
+        end
     end
 end

@@ -13,7 +13,7 @@
 export bxpyp, coil2_xp_volts, coil2_yp_volts, coil2_z_volts, coil2_q_volts
 export coil2_xp_field, coil2_yp_field, coil2_z_field, coil2_q_grad
 export coil1_v_volts, coil1_w_volts, coil1_z_volts, coil1_q_volts
-export horizontal_bias_volts
+export horizontal_bias_volts, euv3_bias_field
 
 const _EUV3_THETA_XP = -10.0 / 180 * π    # Coil2 Xp axis direction [rad]
 const _EUV3_THETA_YP = +98.0 / 180 * π    # Coil2 Yp axis direction [rad]
@@ -62,4 +62,22 @@ the per-coil G→V calibration.
 function horizontal_bias_volts(B_gauss::Real, theta::Real)
     s, t = bxpyp(theta)
     (coil2_xp_volts(B_gauss * s), coil2_yp_volts(B_gauss * t))
+end
+
+"""
+    euv3_bias_field(; v_xp, v_yp, v_z) -> (Bx, By, Bz)
+
+Net Cartesian bias field [G] at the atoms from the three Coil2 bias control
+voltages, resolving the non-orthogonal horizontal coils (Xp at -10°, Yp at +98°
+in-plane; x = glass-cell axis) into lab x/y and the vertical Z coil into z. Feeds
+the GP simulator's B-block (`B: {Bx, By, Bz}` in Gauss). Inverse of
+`horizontal_bias_volts` for the in-plane part.
+"""
+function euv3_bias_field(; v_xp::Real=0.0, v_yp::Real=0.0, v_z::Real=0.0)
+    Bxp = coil2_xp_field(v_xp)
+    Byp = coil2_yp_field(v_yp)
+    Bx = Bxp * cos(_EUV3_THETA_XP) + Byp * cos(_EUV3_THETA_YP)
+    By = Bxp * sin(_EUV3_THETA_XP) + Byp * sin(_EUV3_THETA_YP)
+    Bz = coil2_z_field(v_z)
+    (Bx, By, Bz)
 end
