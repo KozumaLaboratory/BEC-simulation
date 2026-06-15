@@ -88,12 +88,18 @@ phase_space_density(N::Real, T::Real, ω̄::Real) =
     N * (Units.HBAR * ω̄ / (Units.KB * T))^3
 
 """
-    evap_rhs(N, T, U, ω̄, p, m) -> (dN, dT)
+    evap_rhs(N, T, U, ω̄, p, m; dlnω_dt=0.0) -> (dN, dT)
 
 Right-hand side of the (N, T) evaporation ODEs at trap depth `U` [J] and mean
 frequency `ω̄` [rad/s]. Allocation-free. Evaporation contributes only for η > 4.
+`dlnω_dt = d(ln ω̄)/dt` [1/s] is the instantaneous logarithmic rate of change of the
+trap frequency from the ramp; it drives adiabatic compression/expansion heating
+(`dT/T = dω̄/ω̄`, since `T ∝ ω̄` keeps the phase-space density invariant under a
+pure harmonic-trap change). Without it, re-tightening the trap would raise ρ for
+free — a non-physical path the optimizer exploits.
 """
-function evap_rhs(N::Float64, T::Float64, U::Float64, ω̄::Float64, p::EvapParams, m::Float64)
+function evap_rhs(N::Float64, T::Float64, U::Float64, ω̄::Float64, p::EvapParams,
+    m::Float64; dlnω_dt::Float64=0.0)
     kB = Units.KB
     η = U / (kB * T)
     # peak density n₀ = N (m ω̄² / (2π k_B T))^{3/2}
@@ -114,7 +120,10 @@ function evap_rhs(N::Float64, T::Float64, U::Float64, ω̄::Float64, p::EvapPara
     dN_3b = -p.K3 * n2avg * N
     dTT_3b = N > 0 ? -(dN_3b / N) * (1.0 / 3.0) : 0.0
 
+    # adiabatic compression/expansion from the ramped trap (T ∝ ω̄)
+    dTT_adia = dlnω_dt
+
     dN = dN_evap + dN_bg + dN_3b
-    dT = T * (dTT_evap + dTT_3b)
+    dT = T * (dTT_evap + dTT_3b + dTT_adia)
     (dN, dT)
 end

@@ -27,10 +27,18 @@ State `N`, `T`; truncation `η = U/(k_B T)`. With peak density
 per-atom rate `γ_el = n₀ σ v̄/√2`:
 
 - evaporation `dN/dt = -N γ_el (η-4) e^{-η}` (valid η ≳ 4),
-- temperature `dT/T = (dN/N)(η+κ-3)/3` (κ ≈ 1),
+- temperature `dT/T = (dN/N)(η+κ-3)/3 + dω̄/ω̄` (κ ≈ 1),
 - background 1-body `-N/τ_bg`, optional 3-body `-K3 ⟨n²⟩ N` (+ heating),
 - gravity lowers the vertical escape barrier (shallow end-trap),
 - BEC onset at `ρ = N(ℏω̄/k_B T)³ = ζ(3) ≈ 1.202`.
+
+The `dω̄/ω̄` term is **adiabatic compression/expansion heating**: a harmonic trap
+obeys the adiabatic invariant `E ∝ ω̄`, so a change of trap frequency from the ramp
+gives `dT/T = dω̄/ω̄` (energy balance `E = 3Nk_BT` + evaporated atoms carrying
+`(η+κ)k_BT` reproduces both terms). Lowering the trap (ω̄↓) cools; re-tightening
+(ω̄↑) heats, keeping `ρ` invariant under a *pure* compression — without this term a
+ramp could re-tighten the trap to spike `ρ` across `ζ(3)` for free, a non-physical
+path the optimizer will otherwise exploit.
 
 ## Researched tentative defaults
 
@@ -41,11 +49,13 @@ evaporation **3.5×10⁶ atoms @ 50 µK**, measured BEC **5.02×10⁴ @ 349 nK**
 **(97, 226, 217) Hz**. The polarizability **α ≈ 1.25×10⁻³⁶ J/(W/m²) (≈400 a.u.)** is
 **calibrated** from those measured trap frequencies at the euv3 ramp-endpoint powers
 (νz and νx agree) — Eu has no published 1550 nm value. `τ_bg = 15 s` is an estimate.
-With these defaults the model reaches BEC at the right order of magnitude (predicted
-N_BEC/T_BEC are ~10–20× the measured values — expected for a 0-D model with estimated
-α/τ_bg and a possibly-different current ramp; tighten with `calibrate_polarizability`
-and by fitting α/τ_bg to the lab data). **Replace with the current euv3 r14 notebook
-values when known.**
+The evaporation ramp starts from the **loaded crossed trap** (both FORTs on; the
+VFORT turn-on is trap loading, not evaporation — see `euv3_evaporation_ramp`), and
+with the adiabatic-heating term and a single fitted 3-body rate `K₃ = 1.61×10⁻⁴⁰ m⁶/s`
+the predicted endpoint is **N_BEC ≈ 5.0×10⁴** — matching the measured 5.02×10⁴ @ 349 nK
+(`fit_euv3_K3` recovers this K₃; verification type **C**, caveat: 1-parameter K₃ fit,
+Eu's 3-body rate is unmeasured). **Replace with the current euv3 r14 notebook values
+when known.**
 
 ## Required lab inputs (from the experiment notebook)
 
@@ -65,8 +75,9 @@ These override the researched defaults and pin the model to the current setup:
 
 ## Usage
 
-One-call over the actual euv3 ramp (HFORT 6→0.14 W, VFORT 0→0.09 W, 2.7 s). With no
-args it uses the researched defaults; override any with the lab values:
+One-call over the euv3 evaporation ramp (from the loaded crossed trap: HFORT 4→0.14 W,
+VFORT 1.8→0.09 W, 2.4 s; pass `from_loaded=false` for the raw logged schedule incl. the
+VFORT turn-on). With no args it uses the researched defaults; override with lab values:
 
 ```julia
 using SpinorBEC
@@ -78,7 +89,7 @@ evaporation_summary(res)        # (; reached_bec, N_BEC, T_BEC_uK, t_BEC_s, gamm
 calibrate_polarizability(; waist=42e-6, power_W=1.2, freq_Hz=217.0)
 ```
 
-Optimize the ramp for max `N_BEC`. Two optimizers:
+Optimize the ramp for max `N_BEC`. Three optimizers, increasing in reach:
 
 ```julia
 # (a) 3-param transform (duration / final-power / warp) via Bayesian optimization —
@@ -86,13 +97,21 @@ Optimize the ramp for max `N_BEC`. Two optimizers:
 out = optimize_euv3_evaporation(; n_iter=40)
 out.bo.best_p          # [duration_scale, final_power_scale, warp_γ]
 
-# (b) per-breakpoint coordinate descent — reshapes the FULL ramp (one power
-#     multiplier per breakpoint), richer than the grid-Bayesian optimizer can reach.
-#     Finds N_BEC ≈ 1.56× the lab ramp on the model (the lab ramp is NOT optimal:
-#     lower the early-mid powers = evaporate harder early, plus a late power bump).
-trap = euv3_evap_trap(); p = EvapParams(; a_s=Eu151.a_s, tau_bg=15, K3=1e-40)
-out = optimize_ramp_coordinate(trap, p, euv3_evaporation_ramp(); N0=3.5e6, T0=50e-6, free=2:9)
-out.mults              # per-breakpoint power multipliers; out.ramp is the optimized FortRamp
+# (b) MONOTONE per-beam optimizer — the PHYSICAL evaporation family (the trap is only
+#     ever lowered; each beam steps down independently). Warm-started from the lab
+#     ramp's own ratios, so it can only improve. This is the trustworthy optimizer:
+#     a schedule the lab can actually run. On the experiment-matched defaults it finds
+#     N_BEC ≈ 3.2× the lab ramp by evaporating HARDER EARLY (steeper initial power
+#     drop, at high collision rate), η staying in the valid 4.5–11 range throughout.
+trap = euv3_evap_trap(); p = EvapParams(; a_s=Eu151.a_s, tau_bg=15, K3=1.61e-40)
+out = optimize_ramp_monotone(trap, p, euv3_evaporation_ramp(); N0=3.5e6, T0=50e-6)
+out.ramp               # the optimized, monotone-decreasing FortRamp; out.fracs are the drops
+
+# (c) per-breakpoint coordinate descent — UNCONSTRAINED (can re-tighten the trap).
+#     Useful as a diagnostic, but a re-tightening path leans on the adiabatic-heating
+#     term being modelled exactly; prefer (b) for a schedule to hand to the lab.
+out = optimize_ramp_coordinate(trap, p, euv3_evaporation_ramp(); N0=3.5e6, T0=50e-6, free=2:8)
+out.mults              # per-breakpoint power multipliers
 ```
 
 1-D landscape before trusting the optimizer:
@@ -108,7 +127,7 @@ the actual Eu F=6 BEC ground state — the full "to BEC" pipeline:
 
 ```julia
 trap, ramp = euv3_evap_trap(), euv3_evaporation_ramp()
-res = run_evaporation(trap, ramp, EvapParams(; a_s=Eu151.a_s, tau_bg=15, K3=1e-40); N0=3.5e6, T0=50e-6)
+res = run_evaporation(trap, ramp, EvapParams(; a_s=Eu151.a_s, tau_bg=15, K3=1.61e-40); N0=3.5e6, T0=50e-6)
 
 kw  = bec_workspace_kwargs(trap, ramp, res)   # (; potential, atom, interactions, N_BEC, c0, a_ho, omega_dimless)
 grid = make_grid(GridConfig((32,32,32), (16.0,16.0,16.0)))
@@ -134,15 +153,19 @@ built from logged control voltages.
 
 `test/solvers/test_evaporation.jl` (fast tier): single-beam geometry vs closed
 form, RHS scaling coefficient, no-loss / background-loss limits, gravity-lowers-depth,
-ramp transform, BO wrapper, handoff consistency (`T_BEC = T_c` at onset), and the
-euv3 ramp reaching BEC. **Verification type A/B** (code + physics-internal).
-End-to-end agreement with the lab `NumberOfAtoms.csv` (type C) is `@test_skip`
-until the lab inputs above are supplied — see `EvapTrap` / `run_euv3_evaporation`.
+**adiabatic invariant** (`T ∝ ω̄`, `ρ` conserved under pure compression; recompression
+≠ BEC), ramp transform, BO wrapper, handoff consistency (`T_BEC = T_c` at onset), and
+the euv3 ramp reaching BEC. **Verification type A/B** (code + physics-internal).
+`test/solvers/test_evaporation_tools.jl` (ci tier): optimizers (3-param BO, per-beam
+monotone, coordinate descent) + `fit_euv3_K3`. End-to-end agreement with the lab
+`NumberOfAtoms.csv` (type C) beyond the K₃ fit is `@test_skip` until further lab
+inputs are supplied — see `EvapTrap` / `run_euv3_evaporation`.
 
 ## Files
 
 `src/solvers/evaporation/`: `trap_geometry.jl` (depth/frequencies on `GaussianBeam`),
-`evaporation_model.jl` (structs + `evap_rhs`), `evaporation_solve.jl` (`FortRamp`,
-RK4 `run_evaporation`, `evaporation_summary`), `evaporation_optimize.jl`
-(`optimize_evaporation_ramp`, `scan_ramp_param`), `evaporation_handoff.jl`
+`evaporation_model.jl` (structs + `evap_rhs`, incl. adiabatic-heating term),
+`evaporation_solve.jl` (`FortRamp`, RK4 `run_evaporation`, `evaporation_summary`),
+`evaporation_optimize.jl` (`optimize_ramp_monotone`, `optimize_ramp_coordinate`,
+`optimize_evaporation_ramp`, `scan_ramp_param`), `evaporation_handoff.jl`
 (`bec_handoff`), `euv3.jl` (lab calibration + ramp + one-call entry points).

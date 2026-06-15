@@ -35,12 +35,13 @@ const _EUV3_ALPHA = 1.25e-36
 const _EUV3_N0 = 3.5e6
 const _EUV3_T0 = 50e-6
 const _EUV3_TAU_BG = 15.0                    # not in the paper; typical lanthanide ODT
-# K3 ≈ 1e-40 m⁶/s: a single-parameter FIT, not a measurement — Eu's 3-body rate is
-# unmeasured. With α/τ_bg/ramp fixed, K3=1e-40 brings the predicted endpoint to
-# N_BEC ≈ 4.9e4, T_BEC ≈ 0.53 µK, matching the measured 5.0e4 @ 349 nK to ~1.5×.
+# K3 ≈ 1.6e-40 m⁶/s: a single-parameter FIT, not a measurement — Eu's 3-body rate is
+# unmeasured. With α/τ_bg fixed and the evaporation ramp starting from the loaded
+# crossed trap (adiabatic-compression heating included), K3=1.61e-40 brings the
+# predicted endpoint to N_BEC ≈ 5.02e4 (matches the measured 5.02e4 @ 349 nK).
 # 3-body loss limits N at the high density near BEC (K3=0 over-predicts N by ~20×).
 # In the lanthanide range (Dy/Er ~1e-41…1e-40). Refit once Eu K3 / current data exist.
-const _EUV3_K3 = 1e-40
+const _EUV3_K3 = 1.6107615346177146e-40
 
 hfort_volts(P_W::Real) = (P_W + 0.0010) / 0.6198
 vfort_volts(P_W::Real) = (P_W + 0.0027) / 0.5739
@@ -51,7 +52,7 @@ vfort_power(V::Real) = 0.5739 * V - 0.0027
 sfort_power(V::Real) = 0.5246 * V + 0.0024
 
 """
-    euv3_evaporation_ramp(; config=:tateyoko) -> FortRamp
+    euv3_evaporation_ramp(; config=:tateyoko, from_loaded=true) -> FortRamp
 
 The `euv3 r14` evaporative-cooling power schedule (Watts), beams ordered
 `[HFORT, VFORT, SFORT]`. Nine linear segments over 2.7 s. The last segment selects
@@ -60,8 +61,15 @@ the final trap geometry:
 - `:yokoyoko` (横横) — the lab script's commented alternative: HFORT 0.099→0.036 W,
   VFORT → 0, SFORT 0→1.2 W (two horizontal beams).
 Breakpoint times: cumulative 0.3, 0.5, 0.4, 0.6, 0.3, 0.2, 0.1, 0.2, 0.1 s.
+
+`from_loaded=true` (default) drops the first segment (HFORT 6→4 W while VFORT turns
+on 0→1.8 W), which is crossed-trap **loading**, not evaporation: it compresses the
+trap (ω̄ rises) and so adiabatically *heats* the gas. Evaporation begins once both
+FORTs are loaded — exactly where `N0`/`T0` (3.5×10⁶ @ 50 µK) are defined — so the
+evaporation ramp starts at the loaded crossed trap and lowers ω̄ monotonically.
+Pass `from_loaded=false` to model the raw logged schedule incl. the loading transient.
 """
-function euv3_evaporation_ramp(; config::Symbol=:tateyoko)
+function euv3_evaporation_ramp(; config::Symbol=:tateyoko, from_loaded::Bool=true)
     times = [0.0, 0.3, 0.8, 1.2, 1.8, 2.1, 2.3, 2.4, 2.6, 2.7]
     hfort = [6.0, 4.0, 2.0, 1.0, 0.56, 0.26, 0.16, 0.12, 0.099, 0.14]
     vfort = [0.0, 1.8, 1.7, 1.6, 1.5, 1.4, 1.0, 0.6, 0.09, 0.09]
@@ -73,7 +81,11 @@ function euv3_evaporation_ramp(; config::Symbol=:tateyoko)
     elseif config !== :tateyoko
         throw(ArgumentError("config must be :tateyoko or :yokoyoko"))
     end
-    FortRamp(times, permutedims(hcat(hfort, vfort, sfort)))
+    powers = permutedims(hcat(hfort, vfort, sfort))
+    if from_loaded
+        return FortRamp(times[2:end] .- times[2], powers[:, 2:end])
+    end
+    FortRamp(times, powers)
 end
 
 # Default euv3 crossed-trap beam axes: HFORT horizontal (x), VFORT vertical (z),

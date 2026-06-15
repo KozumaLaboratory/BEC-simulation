@@ -103,7 +103,7 @@ function run_evaporation(
     T_BEC = T0
     t_BEC = tend
 
-    rhs(Nv, Tv, U, ω̄) = evap_rhs(Nv, Tv, U, ω̄, p, m)
+    rhs(Nv, Tv, U, ω̄, dlnω) = evap_rhs(Nv, Tv, U, ω̄, p, m; dlnω_dt=dlnω)
 
     # Precompute (U, ω̄) on a fine time grid and linearly interpolate during the RK4:
     # the trap-DEPTH scan is the per-substep cost, but the ramp is piecewise-linear so
@@ -116,12 +116,16 @@ function run_evaporation(
         Ug[i], ωg[i] = _trap_at_time(trap, ramp, tg[i])
     end
     dtg = ngrid > 1 ? (tend - t0) / (ngrid - 1) : 1.0
+    # returns (U, ω̄, dlnω̄/dt); the trap grid is piecewise-linear so dω̄/dt is the
+    # local segment slope (zero outside the ramp where the trap is clamped).
     @inline function trap_interp(tq::Float64)
-        tq <= t0 && return (Ug[1], ωg[1])
-        tq >= tend && return (Ug[ngrid], ωg[ngrid])
+        tq <= t0 && return (Ug[1], ωg[1], 0.0)
+        tq >= tend && return (Ug[ngrid], ωg[ngrid], 0.0)
         j = clamp(floor(Int, (tq - t0) / dtg) + 1, 1, ngrid - 1)
         f = (tq - (t0 + (j - 1) * dtg)) / dtg
-        (Ug[j] * (1 - f) + Ug[j + 1] * f, ωg[j] * (1 - f) + ωg[j + 1] * f)
+        ω = ωg[j] * (1 - f) + ωg[j + 1] * f
+        dlnω = ω > 0 ? ((ωg[j + 1] - ωg[j]) / dtg) / ω : 0.0
+        (Ug[j] * (1 - f) + Ug[j + 1] * f, ω, dlnω)
     end
 
     function record!(U, ω̄)
@@ -138,20 +142,20 @@ function run_evaporation(
         push!(Us, U)
     end
 
-    U, ω̄ = trap_interp(t)
+    U, ω̄, _ = trap_interp(t)
     record!(U, ω̄)
 
     for s in 1:nsteps
         h = min(dt, tend - t)
         h <= 0 && break
-        # RK4 with trap (U, ω̄) sampled at t, t+h/2, t+h
-        U1, ω1 = trap_interp(t)
-        k1N, k1T = rhs(N, T, U1, ω1)
-        Um, ωm = trap_interp(t + h / 2)
-        k2N, k2T = rhs(N + h / 2 * k1N, T + h / 2 * k1T, Um, ωm)
-        k3N, k3T = rhs(N + h / 2 * k2N, T + h / 2 * k2T, Um, ωm)
-        U2, ω2 = trap_interp(t + h)
-        k4N, k4T = rhs(N + h * k3N, T + h * k3T, U2, ω2)
+        # RK4 with trap (U, ω̄, dlnω̄/dt) sampled at t, t+h/2, t+h
+        U1, ω1, dω1 = trap_interp(t)
+        k1N, k1T = rhs(N, T, U1, ω1, dω1)
+        Um, ωm, dωm = trap_interp(t + h / 2)
+        k2N, k2T = rhs(N + h / 2 * k1N, T + h / 2 * k1T, Um, ωm, dωm)
+        k3N, k3T = rhs(N + h / 2 * k2N, T + h / 2 * k2T, Um, ωm, dωm)
+        U2, ω2, dω2 = trap_interp(t + h)
+        k4N, k4T = rhs(N + h * k3N, T + h * k3T, U2, ω2, dω2)
 
         N_new = N + h / 6 * (k1N + 2k2N + 2k3N + k4N)
         T_new = T + h / 6 * (k1T + 2k2T + 2k3T + k4T)

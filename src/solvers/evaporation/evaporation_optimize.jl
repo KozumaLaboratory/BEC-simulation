@@ -9,7 +9,7 @@
 # Optimization.
 
 export ramp_from_params, optimize_evaporation_ramp, scan_ramp_param, scan_ramp_2d
-export ramp_scale_powers, optimize_ramp_coordinate
+export ramp_scale_powers, optimize_ramp_coordinate, optimize_ramp_monotone
 
 """
     ramp_from_params(x, base) -> FortRamp
@@ -143,46 +143,165 @@ end
 
 """
     optimize_ramp_coordinate(trap, p, base_ramp; N0, T0, mult_bounds=(0.3, 2.5),
-                             n_sweeps=4, n_line=13, free=:) -> (; mults, ramp, result, N_BEC, score)
+                             n_sweeps=6, n_line=13, free=:, restarts=0, seed=1)
+        -> (; mults, ramp, result, N_BEC, score)
 
 Coordinate-descent over the per-breakpoint power multipliers (a `d = n_breakpoints`
 search the grid-mesh `bayesian_optimize` cannot reach), starting from the unmodified
 lab ramp (all multipliers 1). Each sweep line-searches every free breakpoint over
 `n_line` points in `mult_bounds`, keeping the best; sweeps repeat until no
 improvement or `n_sweeps`. `free` selects which breakpoints to vary (default all;
-pass e.g. `2:9` to pin the first/last). Deterministic; ~`n_sweeps·|free|·n_line`
-model runs (each ms-scale). This is the genuine test of whether the lab ramp is
-optimal — a richer family than the 3-parameter transform.
+pass e.g. `2:9` to pin the first/last). With `restarts>0` it ALSO descends from that
+many seeded-random starts and keeps the global best — escaping local optima for a
+near-global optimum. ~`(restarts+1)·n_sweeps·|free|·n_line` model runs (each ~ms).
+The genuine test of whether the lab ramp is optimal (richer than the 3-param transform).
 """
 function optimize_ramp_coordinate(
     trap::EvapTrap, p::EvapParams, base_ramp::FortRamp;
     N0::Float64, T0::Float64, mult_bounds::Tuple{Float64, Float64}=(0.3, 2.5),
-    n_sweeps::Int=4, n_line::Int=13, free=:)
+    n_sweeps::Int=6, n_line::Int=13, free=:, restarts::Int=0, seed::Int=1)
     nb = length(base_ramp.times)
     idxs = free === Colon() ? collect(1:nb) : collect(free)
-    mults = ones(nb)
-    best_score, best_res = _ramp_score(trap, p, ramp_scale_powers(mults, base_ramp), N0, T0)
     line = collect(range(mult_bounds[1], mult_bounds[2]; length=n_line))
-    for _ in 1:n_sweeps
-        improved = false
-        for i in idxs
-            orig = mults[i]
-            local_best, local_val = best_score, orig
-            for v in line
-                v == orig && continue
-                mults[i] = v
-                sc, _ = _ramp_score(trap, p, ramp_scale_powers(mults, base_ramp), N0, T0)
-                if sc > local_best
-                    local_best, local_val = sc, v
+    score_of(mults) = _ramp_score(trap, p, ramp_scale_powers(mults, base_ramp), N0, T0)[1]
+
+    # one coordinate-descent run from a starting multiplier vector
+    function descend(start::Vector{Float64})
+        mults = copy(start)
+        best = score_of(mults)
+        for _ in 1:n_sweeps
+            improved = false
+            for i in idxs
+                local_best, local_val = best, mults[i]
+                for v in line
+                    mults[i] = v
+                    sc = score_of(mults)
+                    sc > local_best && (local_best=sc; local_val=v)
                 end
+                mults[i] = local_val
+                local_best > best && (best=local_best; improved=true)
             end
-            mults[i] = local_val
-            local_best > best_score && (best_score=local_best; improved=true)
+            improved || break
         end
-        improved || break
+        (mults, best)
     end
-    best_ramp = ramp_scale_powers(mults, base_ramp)
+
+    best_mults, best_score = descend(ones(nb))
+    if restarts > 0
+        rng = MersenneTwister(seed)
+        lo, hi = mult_bounds
+        for _ in 1:restarts
+            start = ones(nb)
+            for i in idxs
+                start[i] = lo + rand(rng) * (hi - lo)
+            end
+            m, sc = descend(start)
+            sc > best_score && (best_score=sc; best_mults=m)
+        end
+    end
+
+    best_ramp = ramp_scale_powers(best_mults, base_ramp)
     _, best_res = _ramp_score(trap, p, best_ramp, N0, T0)
-    (mults=mults, ramp=best_ramp, result=best_res,
+    (mults=best_mults, ramp=best_ramp, result=best_res,
+        N_BEC=best_res.reached_bec ? best_res.N_BEC : NaN, score=best_score)
+end
+
+"""
+    _baseline_drop_fractions(base_ramp, frac_bounds) -> Matrix
+
+The lab ramp's own per-beam step-to-step power ratios, clamped to `frac_bounds`
+(≤ 1 enforces monotone-decreasing). `fr[b,s] = P[b,s+1]/P[b,s]`; a zero/!finite
+ratio (beam off) becomes 1. The natural warm start for the monotone optimizer.
+"""
+function _baseline_drop_fractions(base_ramp::FortRamp, frac_bounds::Tuple{Float64, Float64})
+    nbeam, nb = size(base_ramp.powers_W)
+    lo, hi = frac_bounds
+    fr = ones(nbeam, nb - 1)
+    for b in 1:nbeam, s in 1:(nb - 1)
+        p0 = base_ramp.powers_W[b, s]
+        r = p0 > 0 ? base_ramp.powers_W[b, s + 1] / p0 : 1.0
+        fr[b, s] = isfinite(r) ? clamp(r, lo, hi) : 1.0
+    end
+    fr
+end
+
+"""
+    optimize_ramp_monotone(trap, p, base_ramp; N0, T0, frac_bounds=(0.02, 1.0),
+                           n_sweeps=10, n_line=21, restarts=8, seed=1)
+        -> (; fracs, ramp, result, N_BEC, score)
+
+Optimize the FORT ramp over the **monotone-decreasing** family — the physical
+evaporation constraint that the trap is only ever lowered. Each beam's breakpoint
+power is `P[b,i] = P[b,1] · ∏_{k<i} fracs[b,k]` with `fracs[b,k] ∈ frac_bounds ⊆ (0,1]`,
+so every beam steps down **independently** from the loaded start `P[:,1]`. The lab
+ramp itself lies in this family (its per-beam ratios), so the search starts there and
+can only improve; `restarts` seeded-random starts then probe for a better basin.
+
+Unlike [`optimize_ramp_coordinate`](@ref), which can re-tighten the trap (a path that
+relies on adiabatic-compression heating being modelled exactly), this stays inside the
+realizable monotone family — so its optimum is a schedule the lab can actually run.
+On the experiment-matched euv3 defaults it finds N_BEC ≈ 3.2× the lab ramp by
+evaporating harder early (a steeper initial power drop, at high collision rate).
+"""
+function optimize_ramp_monotone(
+    trap::EvapTrap, p::EvapParams, base_ramp::FortRamp;
+    N0::Float64, T0::Float64, frac_bounds::Tuple{Float64, Float64}=(0.02, 1.0),
+    n_sweeps::Int=10, n_line::Int=21, restarts::Int=8, seed::Int=1)
+    nbeam, nb = size(base_ramp.powers_W)
+    base1 = base_ramp.powers_W[:, 1]
+    active = [(b, s) for b in 1:nbeam if base1[b] > 0 for s in 1:(nb - 1)]
+    line = collect(range(frac_bounds[1], frac_bounds[2]; length=n_line))
+
+    function mono_ramp(fr::Matrix{Float64})
+        pw = copy(base_ramp.powers_W)
+        for b in 1:nbeam
+            acc = 1.0
+            for i in 2:nb
+                acc *= fr[b, i - 1]
+                pw[b, i] = base1[b] * acc
+            end
+        end
+        FortRamp(base_ramp.times, pw)
+    end
+    score(fr) = _ramp_score(trap, p, mono_ramp(fr), N0, T0)[1]
+
+    function descend(start::Matrix{Float64})
+        fr = copy(start)
+        best = score(fr)
+        for _ in 1:n_sweeps
+            improved = false
+            for (b, s) in active
+                local_best, local_val = best, fr[b, s]
+                for v in line
+                    fr[b, s] = v
+                    sc = score(fr)
+                    sc > local_best && (local_best=sc; local_val=v)
+                end
+                fr[b, s] = local_val
+                local_best > best && (best=local_best; improved=true)
+            end
+            improved || break
+        end
+        (fr, best)
+    end
+
+    # warm start from the lab ramp's own ratios ⇒ the optimum can only beat it
+    best_fracs, best_score = descend(_baseline_drop_fractions(base_ramp, frac_bounds))
+    if restarts > 0
+        rng = MersenneTwister(seed)
+        lo, hi = frac_bounds
+        for _ in 1:restarts
+            start = ones(nbeam, nb - 1)
+            for (b, s) in active
+                start[b, s] = lo + rand(rng) * (hi - lo)
+            end
+            fr, sc = descend(start)
+            sc > best_score && (best_score=sc; best_fracs=fr)
+        end
+    end
+
+    best_ramp = mono_ramp(best_fracs)
+    _, best_res = _ramp_score(trap, p, best_ramp, N0, T0)
+    (fracs=best_fracs, ramp=best_ramp, result=best_res,
         N_BEC=best_res.reached_bec ? best_res.N_BEC : NaN, score=best_score)
 end

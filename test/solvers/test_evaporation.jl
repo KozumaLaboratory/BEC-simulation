@@ -30,12 +30,14 @@ _eu_trap() = EvapTrap(;
     positions=[(0.0, 0.0, 0.0), (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)],
     mass=_m, gravity_axis=3)
 
-# euv3-shaped ramp (H 6→0.099 W, V 0→0.09 W, S 0, over 2.7 s)
+# euv3-shaped ramp from the LOADED crossed trap (both FORTs on): H 2→0.099 W,
+# V 1.8→0.09 W over 2.1 s. ω̄ decreases monotonically (the V-turn-on loading
+# transient is excluded — it would adiabatically heat; see euv3_evaporation_ramp).
 _euv3_ramp() = FortRamp(
-    [0.0, 0.6, 1.5, 2.1, 2.7],
-    [6.0 2.0 0.56 0.16 0.099;
-        0.0 1.8 1.6 1.0 0.09;
-        0.0 0.0 0.0 0.0 0.0])
+    [0.0, 0.9, 1.5, 2.1],
+    [2.0 0.56 0.16 0.099;
+        1.8 1.6 1.0 0.09;
+        0.0 0.0 0.0 0.0])
 
 @testset "Evaporative cooling (truncated Boltzmann)" begin
     @testset "single-beam geometry vs closed form" begin
@@ -71,6 +73,28 @@ _euv3_ramp() = FortRamp(
         Ulow = 3.0 * Units.KB * T                       # η = 3 < eta_min
         dN_low, _ = evap_rhs(N, T, Ulow, ω̄, p, _m)
         @test dN_low ≈ 0.0 atol = 1e-6
+    end
+
+    @testset "adiabatic trap change ⇒ T ∝ ω̄, ρ invariant" begin
+        # pure compression/expansion (no evaporation, no loss): dT/T = dω̄/ω̄, so the
+        # phase-space density is conserved — the oracle that forbids the optimizer's
+        # "drop the trap then recompress for free" path.
+        p = EvapParams(; a_s=_as, tau_bg=Inf, K3=0.0)
+        N, T, ω̄ = 1e6, 1e-6, 2π * 100
+        Udeep = 50.0 * Units.KB * T                      # η huge ⇒ evaporation inert
+        for dlnω in (+0.5, -0.5)                         # compress / expand
+            _, dT = evap_rhs(N, T, Udeep, ω̄, p, _m; dlnω_dt=dlnω)
+            @test dT / T ≈ dlnω rtol = 1e-12             # dT/T = dω̄/ω̄
+            # ρ = N(ℏω̄/kT)³ rate: dlnρ/dt = 3(dlnω̄ - dlnT) = 0 under pure adiabatic
+            @test 3 * (dlnω - dT / T) ≈ 0.0 atol = 1e-12
+        end
+        # a ramp that drops the trap then re-tightens must NOT manufacture BEC:
+        # without adiabatic heating the recompression spiked ρ across ζ(3) for free.
+        trap = _eu_trap()
+        recompress = FortRamp([0.0, 0.5, 1.0], [6.0 0.3 6.0; 0.0 0.3 6.0; 0.0 0.0 0.0])
+        res = run_evaporation(trap, recompress, EvapParams(; a_s=_as, tau_bg=Inf, K3=0.0);
+            N0=2e6, T0=40e-6)
+        @test !res.reached_bec                           # recompression alone ≠ BEC
     end
 
     @testset "no-loss frozen limit (N, T constant)" begin
@@ -138,14 +162,19 @@ _euv3_ramp() = FortRamp(
             @test sfort_power(sfort_volts(P)) ≈ P rtol = 1e-12
         end
         @test hfort_volts(6.0) ≈ (6.0 + 0.0010) / 0.6198      # transcribed constant
-        # the lab ramp
+        # raw logged schedule (from_loaded=false): full 6→0.14 W incl. the V turn-on
+        raw = euv3_evaporation_ramp(; from_loaded=false)
+        @test size(raw.powers_W, 1) == 3                      # H, V, S
+        @test raw.times[end] ≈ 2.7
+        @test raw.powers_W[1, 1] ≈ 6.0 && raw.powers_W[1, end] ≈ 0.14   # HFORT 6 → 0.14 W
+        @test raw.powers_W[2, 1] ≈ 0.0 && raw.powers_W[2, end] ≈ 0.09   # VFORT 0 → 0.09 W
+        @test all(==(0.0), raw.powers_W[3, :])                # SFORT off
+        @test issorted(raw.times)
+        # default ramp starts from the LOADED crossed trap (V turn-on dropped, retimed)
         r = euv3_evaporation_ramp()
-        @test size(r.powers_W, 1) == 3                        # H, V, S
-        @test r.times[end] ≈ 2.7
-        @test r.powers_W[1, 1] ≈ 6.0 && r.powers_W[1, end] ≈ 0.14   # HFORT 6 → 0.14 W
-        @test r.powers_W[2, 1] ≈ 0.0 && r.powers_W[2, end] ≈ 0.09   # VFORT 0 → 0.09 W
-        @test all(==(0.0), r.powers_W[3, :])                  # SFORT off
-        @test issorted(r.times)
+        @test r.times[1] ≈ 0.0 && r.times[end] ≈ 2.4          # 2.7 − 0.3 loading segment
+        @test r.powers_W[1, 1] ≈ 4.0 && r.powers_W[2, 1] ≈ 1.8   # both FORTs loaded
+        @test r.powers_W[1, end] ≈ 0.14 && r.powers_W[2, end] ≈ 0.09
         # drives the model to BEC just like the hand-written ramp
         res = run_evaporation(_eu_trap(), r,
             EvapParams(; a_s=_as, tau_bg=10.0, K3=0.0); N0=2e6, T0=40e-6)

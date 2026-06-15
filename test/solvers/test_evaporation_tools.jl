@@ -7,7 +7,7 @@ using SpinorBEC
 using SpinorBEC: Eu151, EvapTrap, EvapParams, FortRamp, run_evaporation,
     optimize_evaporation_ramp, scan_ramp_param, scan_ramp_2d, fit_euv3_K3,
     optimize_euv3_evaporation, run_euv3_evaporation,
-    ramp_scale_powers, optimize_ramp_coordinate
+    ramp_scale_powers, optimize_ramp_coordinate, optimize_ramp_monotone
 
 const _as_t = Eu151.a_s
 
@@ -17,11 +17,12 @@ _eu_trap_t() = EvapTrap(;
     positions=[(0.0, 0.0, 0.0), (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)],
     mass=Eu151.mass, gravity_axis=3)
 
+# from the loaded crossed trap (both FORTs on); ω̄ decreases monotonically.
 _euv3_ramp_t() = FortRamp(
-    [0.0, 0.6, 1.5, 2.1, 2.7],
-    [6.0 2.0 0.56 0.16 0.099;
-        0.0 1.8 1.6 1.0 0.09;
-        0.0 0.0 0.0 0.0 0.0])
+    [0.0, 0.9, 1.5, 2.1],
+    [2.0 0.56 0.16 0.099;
+        1.8 1.6 1.0 0.09;
+        0.0 0.0 0.0 0.0])
 
 @testset "Evaporation optimization tools (ci)" begin
     @testset "optimize_evaporation_ramp improves N_BEC (stub optimizer)" begin
@@ -93,7 +94,7 @@ _euv3_ramp_t() = FortRamp(
 
     @testset "ramp_scale_powers + coordinate-descent optimizer" begin
         base = _euv3_ramp_t()
-        s = ramp_scale_powers([1.0, 2.0, 0.5, 1.0, 1.0], base)
+        s = ramp_scale_powers([1.0, 2.0, 0.5, 1.0], base)
         @test s.times == base.times
         @test s.powers_W[:, 2] ≈ 2.0 .* base.powers_W[:, 2]
         @test s.powers_W[:, 3] ≈ 0.5 .* base.powers_W[:, 3]
@@ -107,5 +108,40 @@ _euv3_ramp_t() = FortRamp(
         @test length(out.mults) == length(base.times)
         @test out.result.reached_bec
         @test out.N_BEC >= baseN * 0.999          # ≥ baseline (descent can't worsen it)
+
+        # multi-start (restarts>0) never does worse than the single baseline descent
+        single = optimize_ramp_coordinate(trap, p, base; N0=2e6, T0=40e-6,
+            free=2:4, n_sweeps=2, n_line=5)
+        multi = optimize_ramp_coordinate(trap, p, base; N0=2e6, T0=40e-6,
+            free=2:4, n_sweeps=2, n_line=5, restarts=3, seed=11)
+        @test multi.score >= single.score - 1e-9   # extra starts can only help
+        @test multi.result.reached_bec
+        # seeded ⇒ deterministic
+        multi2 = optimize_ramp_coordinate(trap, p, base; N0=2e6, T0=40e-6,
+            free=2:4, n_sweeps=2, n_line=5, restarts=3, seed=11)
+        @test multi.mults == multi2.mults
+    end
+
+    @testset "monotone-constrained ramp optimizer" begin
+        trap = _eu_trap_t()
+        p = EvapParams(; a_s=_as_t, tau_bg=10.0, K3=0.0)
+        base = _euv3_ramp_t()
+        baseN = run_evaporation(trap, base, p; N0=2e6, T0=40e-6).N_BEC
+        out = optimize_ramp_monotone(trap, p, base; N0=2e6, T0=40e-6,
+            n_sweeps=3, n_line=9, restarts=2, seed=4)
+        @test out.result.reached_bec
+        @test size(out.fracs) == (size(base.powers_W, 1), length(base.times) - 1)
+        @test all(0.0 .< out.fracs .<= 1.0)                # drop fractions in (0,1]
+        # the produced ramp is monotone-decreasing per beam (the physical constraint)
+        for b in 1:size(out.ramp.powers_W, 1)
+            @test all(diff(out.ramp.powers_W[b, :]) .<= 1e-12)
+        end
+        # the lab ramp is in the family (its own ratios) and is the warm start, so the
+        # monotone optimum is never worse than the (already monotone) baseline
+        @test out.N_BEC >= baseN * 0.999
+        # seeded ⇒ deterministic
+        out2 = optimize_ramp_monotone(trap, p, base; N0=2e6, T0=40e-6,
+            n_sweeps=3, n_line=9, restarts=2, seed=4)
+        @test out.fracs == out2.fracs
     end
 end
