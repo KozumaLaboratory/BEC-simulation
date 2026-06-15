@@ -8,14 +8,14 @@ using SpinorBEC: GaussianBeam, CrossedDipoleTrap, Eu151, Units,
     crossed_trap_frequencies, mean_trap_frequency, crossed_trap_depth,
     EvapTrap, EvapParams, evap_rhs, phase_space_density,
     FortRamp, fort_power_at, trap_at, run_evaporation,
-    ramp_from_params, optimize_evaporation_ramp, scan_ramp_param, scan_ramp_2d,
+    ramp_from_params,
     hfort_power, hfort_volts, vfort_power, vfort_volts, sfort_power, sfort_volts,
     euv3_evaporation_ramp,
     final_trap_frequencies, bec_handoff, harmonic_trap_dimless, HarmonicTrap, Units,
     bec_gp_coupling, bec_workspace_kwargs, InteractionParams,
     gravity_strength_dimless, CompositePotential, GravityPotential,
     euv3_evap_trap, run_euv3_evaporation, evaporation_summary,
-    euv3_defaults, calibrate_polarizability, beam_frequencies, fit_euv3_K3
+    euv3_defaults, calibrate_polarizability, beam_frequencies
 
 const _λ = 1064e-9
 const _w0 = 30e-6
@@ -129,32 +129,6 @@ _euv3_ramp() = FortRamp(
         @test fort_power_at(r, r.times[1]) ≈ r.powers_W[:, 1]
     end
 
-    @testset "optimize_evaporation_ramp improves N_BEC (stub optimizer)" begin
-        trap = _eu_trap()
-        p = EvapParams(; a_s=_as, tau_bg=10.0, K3=0.0)
-        base = _euv3_ramp()
-        # deterministic grid-search stub matching the bayesian_optimize contract
-        function grid_opt(obj, bounds; n_init, n_iter, minimise)
-            best_p = [(lo + hi) / 2 for (lo, hi) in bounds]
-            best_y = obj(best_p)
-            for x1 in range(bounds[1]...; length=2), x2 in range(bounds[2]...; length=2),
-                x3 in range(bounds[3]...; length=2)
-
-                y = obj([x1, x2, x3])
-                if (minimise && y < best_y) || (!minimise && y > best_y)
-                    best_y = y
-                    best_p = [x1, x2, x3]
-                end
-            end
-            (best_p=best_p, best_y=best_y, X_history=Float64[], y_history=Float64[])
-        end
-        out = optimize_evaporation_ramp(trap, p, base; N0=2e6, T0=40e-6,
-            n_init=2, n_iter=2, optimizer=grid_opt)
-        @test out.result.reached_bec
-        @test out.bo.best_y > 1                         # a real BEC atom number
-        @test out.result.N_BEC == out.bo.best_y
-    end
-
     @testset "euv3 FORT calibration + evaporation ramp" begin
         # power ↔ voltage invertibility per beam
         for P in (0.099, 1.0, 6.0)
@@ -219,27 +193,6 @@ _euv3_ramp() = FortRamp(
         @test any(p -> p isa GravityPotential, kwg.potential.components)
     end
 
-    @testset "scan_ramp_param 1-D landscape" begin
-        trap = _eu_trap()
-        p = EvapParams(; a_s=_as, tau_bg=10.0, K3=0.0)
-        base = _euv3_ramp()
-        scan = scan_ramp_param(trap, p, base; index=1, values=[1.0, 2.0, 3.0], N0=2e6, T0=40e-6)
-        @test length(scan) == 3
-        @test all(s -> haskey(s, :N_BEC) && haskey(s, :reached), scan)
-        @test scan[1].value == 1.0
-        # baseline (index=1, value=1) is the unmodified ramp ⇒ reaches BEC
-        @test scan[1].reached
-    end
-
-    @testset "scan_ramp_2d landscape matrix" begin
-        trap = _eu_trap()
-        p = EvapParams(; a_s=_as, tau_bg=10.0, K3=0.0)
-        M = scan_ramp_2d(trap, p, _euv3_ramp(); index1=1, values1=[1.0, 2.0],
-            index2=2, values2=[0.5, 1.0, 1.5], N0=2e6, T0=40e-6)
-        @test size(M) == (2, 3)
-        @test all(x -> isnan(x) || x > 0, M)
-    end
-
     @testset "euv3 yokoyoko trap config" begin
         t = euv3_evaporation_ramp()                       # :tateyoko default
         y = euv3_evaporation_ramp(; config=:yokoyoko)
@@ -281,18 +234,6 @@ _euv3_ramp() = FortRamp(
         ωr, _ = beam_frequencies(b, d.alpha, Eu151.mass)
         @test calibrate_polarizability(; waist=42e-6, power_W=1.2, freq_Hz=ωr / 2π) ≈ d.alpha rtol =
             1e-9
-    end
-
-    @testset "fit_euv3_K3 hits a target N_BEC" begin
-        # N_BEC decreasing in K3 ⇒ bisection recovers the K3 reproducing a target.
-        # Tight bracket (2 decades) + loose rtol keeps the bisection cheap.
-        fit = fit_euv3_K3(; target_N_BEC=5.0e4, K3_lo=1e-41, K3_hi=1e-39, rtol=0.05)
-        @test fit.converged
-        @test 0.95 < fit.N_BEC / 5.0e4 < 1.05      # within the requested tolerance
-        @test 1e-41 < fit.K3 < 1e-39               # ≈ the default 1e-40
-        # an unreachably-high target clamps to K3_lo (most atoms), not converged
-        hi = fit_euv3_K3(; target_N_BEC=1e8, K3_lo=1e-41, K3_hi=1e-39)
-        @test !hi.converged
     end
 
     # End-to-end validation against the lab NumberOfAtoms.csv requires the real
