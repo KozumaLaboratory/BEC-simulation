@@ -155,6 +155,7 @@ const FAST_TESTS = [
     "solvers/test_pseudo_arclength.jl",
     "solvers/test_evaporation.jl",
     "workflow/test_euv3_coils.jl",
+    "workflow/test_feshbach.jl",
     "workflow/test_active_learning.jl",
     "workflow/test_inspect_config.jl",
     "workflow/test_diff_dicts.jl",
