@@ -15,7 +15,8 @@ using SpinorBEC: GaussianBeam, CrossedDipoleTrap, Eu151, Units,
     bec_gp_coupling, bec_workspace_kwargs, InteractionParams,
     gravity_strength_dimless, CompositePotential, GravityPotential,
     euv3_evap_trap, run_euv3_evaporation, evaporation_summary,
-    euv3_defaults, calibrate_polarizability, beam_frequencies
+    euv3_defaults, calibrate_polarizability, beam_frequencies,
+    thermal_cloud_widths, thermal_cloud_density
 
 const _λ = 1064e-9
 const _w0 = 30e-6
@@ -234,6 +235,23 @@ _euv3_ramp() = FortRamp(
         ωr, _ = beam_frequencies(b, d.alpha, Eu151.mass)
         @test calibrate_polarizability(; waist=42e-6, power_W=1.2, freq_Hz=ωr / 2π) ≈ d.alpha rtol =
             1e-9
+    end
+
+    @testset "thermal cloud spatial profile during evaporation" begin
+        trap = _eu_trap()
+        ramp = _euv3_ramp()
+        res = run_evaporation(trap, ramp, EvapParams(; a_s=_as, tau_bg=10.0); N0=2e6, T0=40e-6)
+        w = thermal_cloud_widths(trap, ramp, res)
+        @test length(w.t) == length(res.t)
+        @test all(>(0), w.sigma_bar) && all(>(0), w.n0)
+        @test w.sigma_bar[end] < w.sigma_bar[1]        # cloud shrinks as it cools
+        @test w.n0[end] > w.n0[1]                       # and densifies
+        @test w.n0[1] ≈ res.N[1] / ((2π)^1.5 * w.sigma_x[1] * w.sigma_y[1] * w.sigma_z[1])
+        # density snapshot integrates to N and peaks at n₀
+        x, y, z, n = thermal_cloud_density(trap, ramp, res, 1; npts=41, span=4.0)
+        dV = (x[2] - x[1]) * (y[2] - y[1]) * (z[2] - z[1])
+        @test sum(n) * dV ≈ res.N[1] rtol = 0.05        # Gaussian integrates to N
+        @test maximum(n) ≈ w.n0[1] rtol = 1e-9          # peak n₀ at the centre (odd npts)
     end
 
     # End-to-end validation against the lab NumberOfAtoms.csv requires the real
