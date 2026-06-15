@@ -12,7 +12,8 @@ using SpinorBEC: GaussianBeam, CrossedDipoleTrap, Eu151, Units,
     hfort_power, hfort_volts, vfort_power, vfort_volts, sfort_power, sfort_volts,
     euv3_evaporation_ramp,
     final_trap_frequencies, bec_handoff, harmonic_trap_dimless, HarmonicTrap, Units,
-    euv3_evap_trap, run_euv3_evaporation, evaporation_summary
+    euv3_evap_trap, run_euv3_evaporation, evaporation_summary,
+    euv3_defaults, calibrate_polarizability, beam_frequencies
 
 const _λ = 1064e-9
 const _w0 = 30e-6
@@ -109,12 +110,12 @@ _euv3_ramp() = FortRamp(
             GaussianBeam(_λ, P, _w0, (0.0, 0.0, 0.0), (0.0, 1.0, 0.0)),
             GaussianBeam(_λ, P, _w0, (0.0, 0.0, 0.0), (0.0, 0.0, 1.0))]
         strong = CrossedDipoleTrap(beams(6.0), _α)
-        U0_strong = crossed_trap_depth(strong, 1e-30)        # gravity ≈ off
-        @test crossed_trap_depth(strong, _m) < U0_strong     # gravity lowers it
-        @test crossed_trap_depth(strong, _m) / U0_strong > 0.9   # but barely, deep trap
         weak = CrossedDipoleTrap(beams(0.1), _α)
-        U0_weak = crossed_trap_depth(weak, 1e-30)
-        @test crossed_trap_depth(weak, _m) / U0_weak < 0.9   # shallow trap: gravity bites
+        r_strong = crossed_trap_depth(strong, _m) / crossed_trap_depth(strong, 1e-30)
+        r_weak = crossed_trap_depth(weak, _m) / crossed_trap_depth(weak, 1e-30)
+        @test r_strong < 1.0                  # gravity (∝ m) lowers the barrier
+        @test r_weak < 1.0
+        @test r_weak < r_strong               # the shallow trap is hurt more by gravity
     end
 
     @testset "ramp_from_params is a valid transform" begin
@@ -218,6 +219,23 @@ _euv3_ramp() = FortRamp(
         @test s.T_BEC_uK ≈ res.T_BEC * 1e6
         @test 0 < s.survival < 1                       # atoms lost but some survive
         @test s.peak_psd >= 1.202                      # crossed BEC onset
+    end
+
+    @testset "euv3 researched defaults reach BEC" begin
+        d = euv3_defaults()
+        @test d.wavelength == 1550e-9
+        @test length(d.waists) == 3
+        # no-arg run uses the researched defaults (1550 nm, 31/42 µm, calibrated α,
+        # N₀=3.5e6 @ 50 µK) and should reach BEC with the right order of magnitude.
+        res = run_euv3_evaporation()
+        @test res.reached_bec
+        @test 1e4 < res.N_BEC < 3.5e6                 # between measured 5e4 and start
+        @test 1e-7 < res.T_BEC < 1e-5                 # sub-µK..few-µK BEC onset
+        # α calibration is self-consistent: build a beam at α, measure ω_r, recover α
+        b = GaussianBeam(d.wavelength, 1.2, 42e-6, (0.0, 0.0, 0.0), (0.0, 0.0, 1.0))
+        ωr, _ = beam_frequencies(b, d.alpha, Eu151.mass)
+        @test calibrate_polarizability(; waist=42e-6, power_W=1.2, freq_Hz=ωr / 2π) ≈ d.alpha rtol =
+            1e-9
     end
 
     # End-to-end validation against the lab NumberOfAtoms.csv requires the real

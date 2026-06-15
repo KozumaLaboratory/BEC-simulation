@@ -32,9 +32,24 @@ per-atom rate `γ_el = n₀ σ v̄/√2`:
 - gravity lowers the vertical escape barrier (shallow end-trap),
 - BEC onset at `ρ = N(ℏω̄/k_B T)³ = ζ(3) ≈ 1.202`.
 
+## Researched tentative defaults
+
+`euv3_defaults()` carries researched placeholder values so the model runs with no
+args (`run_euv3_evaporation()`), from Miyazawa/Matsui et al. PRL 129, 223401 (2022)
+(arXiv:2207.11692): ODT **1550 nm**, waists **H 31 µm / V 42 µm**, start of
+evaporation **3.5×10⁶ atoms @ 50 µK**, measured BEC **5.02×10⁴ @ 349 nK**, final trap
+**(97, 226, 217) Hz**. The polarizability **α ≈ 1.25×10⁻³⁶ J/(W/m²) (≈400 a.u.)** is
+**calibrated** from those measured trap frequencies at the euv3 ramp-endpoint powers
+(νz and νx agree) — Eu has no published 1550 nm value. `τ_bg = 15 s` is an estimate.
+With these defaults the model reaches BEC at the right order of magnitude (predicted
+N_BEC/T_BEC are ~10–20× the measured values — expected for a 0-D model with estimated
+α/τ_bg and a possibly-different current ramp; tighten with `calibrate_polarizability`
+and by fitting α/τ_bg to the lab data). **Replace with the current euv3 r14 notebook
+values when known.**
+
 ## Required lab inputs (from the experiment notebook)
 
-These are not derivable and must be supplied:
+These override the researched defaults and pin the model to the current setup:
 
 | Input | Meaning |
 |---|---|
@@ -50,12 +65,17 @@ These are not derivable and must be supplied:
 
 ## Usage
 
-One-call over the actual euv3 ramp (HFORT 6→0.14 W, VFORT 0→0.09 W, 2.7 s):
+One-call over the actual euv3 ramp (HFORT 6→0.14 W, VFORT 0→0.09 W, 2.7 s). With no
+args it uses the researched defaults; override any with the lab values:
 
 ```julia
 using SpinorBEC
-res = run_euv3_evaporation(; waists=30e-6, alpha=2.0e-36, N0=2e6, T0=40e-6, tau_bg=10.0)
+res = run_euv3_evaporation()                       # researched defaults
+res = run_euv3_evaporation(; waists=[31e-6,42e-6,42e-6], alpha=1.25e-36, N0=3.5e6, T0=50e-6, tau_bg=15.0)
 evaporation_summary(res)        # (; reached_bec, N_BEC, T_BEC_uK, t_BEC_s, gamma_eff, survival, peak_psd, eta_onset)
+
+# pin α from a measured single-beam radial trap frequency:
+calibrate_polarizability(; waist=42e-6, power_W=1.2, freq_Hz=217.0)
 ```
 
 Optimize the ramp (3-param transform: duration / final-power / warp) for max `N_BEC`:

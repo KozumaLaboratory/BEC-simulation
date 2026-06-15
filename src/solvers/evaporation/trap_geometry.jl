@@ -118,22 +118,36 @@ that sets `η = U / (k_B T)`. Returns `0.0` if the trap is not bound (no positiv
 barrier — e.g. gravity overwhelms a near-zero-power trap).
 """
 function crossed_trap_depth(
-    trap::CrossedDipoleTrap, m::Real; gravity_axis::Int=3, n_scan::Int=400, reach::Float64=8.0)
+    trap::CrossedDipoleTrap, m::Real; gravity_axis::Int=3, n_scan::Int=600, reach::Float64=6.0)
     isempty(trap.beams) && return 0.0
-    wmax = maximum(b.waist for b in trap.beams)
-    Lscan = reach * wmax
     grav(s, a) = a == gravity_axis ? m * _G_EARTH * s : 0.0
     Vc = _trap_potential_point(trap, (0.0, 0.0, 0.0)) + grav(0.0, gravity_axis)
     Udepth = Inf
-    @inbounds for a in 1:3, sgn in (-1.0, 1.0)
-        barrier = -Inf
-        for i in 1:n_scan
-            s = sgn * Lscan * i / n_scan
-            r = ntuple(k -> k == a ? s : 0.0, 3)
-            V = _trap_potential_point(trap, r) + grav(s, gravity_axis)
-            barrier = max(barrier, V - Vc)
+    @inbounds for a in 1:3
+        # per-axis scan length: a beam confines weakly (∝ Rayleigh range) ALONG its
+        # own axis and tightly (∝ waist) transverse to it. Use the largest relevant
+        # scale so both the radial barrier (~1.5 w₀) and the axial one (~z_R) are
+        # resolved — a single beam's escape is axial over z_R ≫ w₀.
+        Lscale = 0.0
+        for b in trap.beams
+            b.power <= 0 && continue
+            d = b.direction
+            nrm = sqrt(d[1]^2 + d[2]^2 + d[3]^2)
+            nrm == 0 && continue
+            da = abs(d[a] / nrm)
+            Lscale = max(Lscale, da > 0.7 ? rayleigh_range(b) : b.waist)
         end
-        Udepth = min(Udepth, barrier)
+        Lscale == 0 && continue
+        for sgn in (-1.0, 1.0)
+            barrier = -Inf
+            for i in 1:n_scan
+                s = sgn * reach * Lscale * i / n_scan
+                r = ntuple(k -> k == a ? s : 0.0, 3)
+                V = _trap_potential_point(trap, r) + grav(s, a)
+                barrier = max(barrier, V - Vc)
+            end
+            Udepth = min(Udepth, barrier)
+        end
     end
-    max(Udepth, 0.0)
+    isfinite(Udepth) ? max(Udepth, 0.0) : 0.0
 end
