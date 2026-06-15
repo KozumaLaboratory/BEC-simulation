@@ -8,7 +8,7 @@ using SpinorBEC: GaussianBeam, CrossedDipoleTrap, Eu151, Units,
     crossed_trap_frequencies, mean_trap_frequency, crossed_trap_depth,
     EvapTrap, EvapParams, evap_rhs, phase_space_density,
     FortRamp, fort_power_at, trap_at, run_evaporation,
-    ramp_from_params, optimize_evaporation_ramp, scan_ramp_param,
+    ramp_from_params, optimize_evaporation_ramp, scan_ramp_param, scan_ramp_2d,
     hfort_power, hfort_volts, vfort_power, vfort_volts, sfort_power, sfort_volts,
     euv3_evaporation_ramp,
     final_trap_frequencies, bec_handoff, harmonic_trap_dimless, HarmonicTrap, Units,
@@ -219,6 +219,26 @@ _euv3_ramp() = FortRamp(
         @test scan[1].value == 1.0
         # baseline (index=1, value=1) is the unmodified ramp ⇒ reaches BEC
         @test scan[1].reached
+    end
+
+    @testset "scan_ramp_2d landscape matrix" begin
+        trap = _eu_trap()
+        p = EvapParams(; a_s=_as, tau_bg=10.0, K3=0.0)
+        M = scan_ramp_2d(trap, p, _euv3_ramp(); index1=1, values1=[1.0, 2.0],
+            index2=2, values2=[0.5, 1.0, 1.5], N0=2e6, T0=40e-6)
+        @test size(M) == (2, 3)
+        @test all(x -> isnan(x) || x > 0, M)
+    end
+
+    @testset "euv3 yokoyoko trap config" begin
+        t = euv3_evaporation_ramp()                       # :tateyoko default
+        y = euv3_evaporation_ramp(; config=:yokoyoko)
+        @test t.powers_W[1, end] ≈ 0.14 && t.powers_W[3, end] ≈ 0.0   # tateyoko: SFORT off
+        @test y.powers_W[1, end] ≈ 0.036                  # yokoyoko: HFORT lower
+        @test y.powers_W[2, end] ≈ 0.0                    # VFORT off
+        @test y.powers_W[3, end] ≈ 1.2                    # SFORT on
+        @test t.times == y.times                          # same breakpoints
+        @test_throws ArgumentError euv3_evaporation_ramp(; config=:bogus)
     end
 
     @testset "euv3 one-call convenience + summary" begin

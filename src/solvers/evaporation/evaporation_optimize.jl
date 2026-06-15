@@ -8,7 +8,7 @@
 # as a kwarg so this file does not depend on the load position of module
 # Optimization.
 
-export ramp_from_params, optimize_evaporation_ramp, scan_ramp_param
+export ramp_from_params, optimize_evaporation_ramp, scan_ramp_param, scan_ramp_2d
 
 """
     ramp_from_params(x, base) -> FortRamp
@@ -85,4 +85,28 @@ function scan_ramp_param(
             reached=res.reached_bec,
             gamma_eff=res.gamma_eff)
     end
+end
+
+"""
+    scan_ramp_2d(trap, p, base_ramp; index1, values1, index2, values2,
+                 base_params=[1,1,1], N0, T0) -> Matrix{Float64}
+
+2-D `N_BEC` landscape over two ramp-transform parameters (`index1`/`index2` ∈ 1:3),
+holding the third at `base_params`. Returns `M[i,j] = N_BEC` at
+`(values1[i], values2[j])` (`NaN` where BEC is not reached) — for contour/heatmap
+inspection of the optimization surface before the Bayesian optimizer.
+"""
+function scan_ramp_2d(
+    trap::EvapTrap, p::EvapParams, base_ramp::FortRamp;
+    index1::Int, values1, index2::Int, values2,
+    base_params=[1.0, 1.0, 1.0], N0::Float64, T0::Float64)
+    [
+        begin
+            x = collect(Float64, base_params)
+            x[index1] = Float64(v1)
+            x[index2] = Float64(v2)
+            res = run_evaporation(trap, ramp_from_params(x, base_ramp), p; N0=N0, T0=T0)
+            res.reached_bec ? res.N_BEC : NaN
+        end for v1 in values1, v2 in values2
+    ]
 end

@@ -51,19 +51,28 @@ vfort_power(V::Real) = 0.5739 * V - 0.0027
 sfort_power(V::Real) = 0.5246 * V + 0.0024
 
 """
-    euv3_evaporation_ramp() -> FortRamp
+    euv3_evaporation_ramp(; config=:tateyoko) -> FortRamp
 
 The `euv3 r14` evaporative-cooling power schedule (Watts), beams ordered
-`[HFORT, VFORT, SFORT]`. Nine linear segments over 2.7 s ending in the
-"縦横" (vertical+horizontal) trap config; SFORT stays off (the "横横" alternative
-that ramps SFORT is commented out in the lab script). Breakpoint times are the
-cumulative segment durations: 0.3, 0.5, 0.4, 0.6, 0.3, 0.2, 0.1, 0.2, 0.1 s.
+`[HFORT, VFORT, SFORT]`. Nine linear segments over 2.7 s. The last segment selects
+the final trap geometry:
+- `:tateyoko` (縦横, default) — HFORT+VFORT crossed (the 2-beam BEC config), SFORT off.
+- `:yokoyoko` (横横) — the lab script's commented alternative: HFORT 0.099→0.036 W,
+  VFORT → 0, SFORT 0→1.2 W (two horizontal beams).
+Breakpoint times: cumulative 0.3, 0.5, 0.4, 0.6, 0.3, 0.2, 0.1, 0.2, 0.1 s.
 """
-function euv3_evaporation_ramp()
+function euv3_evaporation_ramp(; config::Symbol=:tateyoko)
     times = [0.0, 0.3, 0.8, 1.2, 1.8, 2.1, 2.3, 2.4, 2.6, 2.7]
     hfort = [6.0, 4.0, 2.0, 1.0, 0.56, 0.26, 0.16, 0.12, 0.099, 0.14]
     vfort = [0.0, 1.8, 1.7, 1.6, 1.5, 1.4, 1.0, 0.6, 0.09, 0.09]
     sfort = zeros(length(times))
+    if config === :yokoyoko
+        hfort[end] = 0.036
+        vfort[end] = 0.0
+        sfort[end] = 1.2
+    elseif config !== :tateyoko
+        throw(ArgumentError("config must be :tateyoko or :yokoyoko"))
+    end
     FortRamp(times, permutedims(hcat(hfort, vfort, sfort)))
 end
 
