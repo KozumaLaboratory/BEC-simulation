@@ -78,12 +78,21 @@ evaporation_summary(res)        # (; reached_bec, N_BEC, T_BEC_uK, t_BEC_s, gamm
 calibrate_polarizability(; waist=42e-6, power_W=1.2, freq_Hz=217.0)
 ```
 
-Optimize the ramp (3-param transform: duration / final-power / warp) for max `N_BEC`:
+Optimize the ramp for max `N_BEC`. Two optimizers:
 
 ```julia
-out = optimize_euv3_evaporation(; waists=30e-6, alpha=2.0e-36, N0=2e6, T0=40e-6, n_iter=40)
+# (a) 3-param transform (duration / final-power / warp) via Bayesian optimization —
+#     fast but a narrow family: on the experiment-matched defaults it only finds +2%.
+out = optimize_euv3_evaporation(; n_iter=40)
 out.bo.best_p          # [duration_scale, final_power_scale, warp_γ]
-evaporation_summary(out.result)
+
+# (b) per-breakpoint coordinate descent — reshapes the FULL ramp (one power
+#     multiplier per breakpoint), richer than the grid-Bayesian optimizer can reach.
+#     Finds N_BEC ≈ 1.56× the lab ramp on the model (the lab ramp is NOT optimal:
+#     lower the early-mid powers = evaporate harder early, plus a late power bump).
+trap = euv3_evap_trap(); p = EvapParams(; a_s=Eu151.a_s, tau_bg=15, K3=1e-40)
+out = optimize_ramp_coordinate(trap, p, euv3_evaporation_ramp(); N0=3.5e6, T0=50e-6, free=2:9)
+out.mults              # per-breakpoint power multipliers; out.ramp is the optimized FortRamp
 ```
 
 1-D landscape before trusting the optimizer:
