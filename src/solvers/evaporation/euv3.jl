@@ -15,7 +15,7 @@
 export hfort_volts, vfort_volts, sfort_volts
 export hfort_power, vfort_power, sfort_power
 export euv3_evaporation_ramp, euv3_evap_trap, run_euv3_evaporation, optimize_euv3_evaporation
-export euv3_defaults, calibrate_polarizability
+export euv3_defaults, calibrate_polarizability, fit_euv3_K3
 
 # --- Researched TENTATIVE defaults (Miyazawa/Matsui et al., PRL 129, 223401 (2022),
 # arXiv:2207.11692). Replace with the current euv3 r14 notebook values when known. ---
@@ -154,6 +154,43 @@ euv3_defaults() = (
     measured_T_BEC=349e-9,                 # 349 nK
     measured_trap_freqs_Hz=(97.0, 226.0, 217.0),
     source="Miyazawa/Matsui PRL 129, 223401 (2022); α,τ_bg estimated")
+
+"""
+    fit_euv3_K3(; target_N_BEC, K3_lo=1e-43, K3_hi=1e-38, rtol=0.02, max_iter=40,
+                trap_kwargs...) -> (; K3, N_BEC, result, converged)
+
+Fit the 3-body coefficient `K3` so the euv3 evaporation reaches a target BEC atom
+number — `N_BEC` decreases monotonically with `K3`, so bisect on `log10(K3)`. Use
+this to pin `K3` (and hence the model) to the CURRENT measured BEC number; pass any
+`run_euv3_evaporation` kwargs (waists, alpha, N0, T0, tau_bg) to fix the rest first.
+Returns the fitted `K3`, the achieved `N_BEC`, the `EvapResult`, and whether the
+target lay inside `[f(K3_hi), f(K3_lo)]`.
+"""
+function fit_euv3_K3(; target_N_BEC::Real, K3_lo::Real=1e-43, K3_hi::Real=1e-38,
+    rtol::Real=0.02, max_iter::Int=40, trap_kwargs...)
+    nbec(K3) = (r=run_euv3_evaporation(; K3=K3, trap_kwargs...);
+        (r.reached_bec ? r.N_BEC : 0.0, r))
+    f_lo, _ = nbec(K3_lo)        # low loss  → most atoms
+    f_hi, _ = nbec(K3_hi)        # high loss → fewest atoms
+    tgt = Float64(target_N_BEC)
+    # target outside the bracket: clamp to the nearer end (not converged)
+    if tgt >= f_lo
+        n, r = nbec(K3_lo)
+        return (K3=Float64(K3_lo), N_BEC=n, result=r, converged=false)
+    elseif tgt <= f_hi
+        n, r = nbec(K3_hi)
+        return (K3=Float64(K3_hi), N_BEC=n, result=r, converged=false)
+    end
+    lo, hi = log10(Float64(K3_lo)), log10(Float64(K3_hi))
+    local n, r, K3
+    for _ in 1:max_iter
+        K3 = 10.0^((lo + hi) / 2)
+        n, r = nbec(K3)
+        abs(n - tgt) <= rtol * tgt && return (K3=K3, N_BEC=n, result=r, converged=true)
+        n > tgt ? (lo = (lo + hi) / 2) : (hi = (lo + hi) / 2)   # more loss ⇒ raise K3
+    end
+    (K3=K3, N_BEC=n, result=r, converged=true)
+end
 
 """
     calibrate_polarizability(; waist, power_W, freq_Hz, mass=Eu151.mass) -> α [J/(W/m²)]

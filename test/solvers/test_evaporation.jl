@@ -14,7 +14,7 @@ using SpinorBEC: GaussianBeam, CrossedDipoleTrap, Eu151, Units,
     final_trap_frequencies, bec_handoff, harmonic_trap_dimless, HarmonicTrap, Units,
     bec_gp_coupling, bec_workspace_kwargs, InteractionParams,
     euv3_evap_trap, run_euv3_evaporation, evaporation_summary,
-    euv3_defaults, calibrate_polarizability, beam_frequencies
+    euv3_defaults, calibrate_polarizability, beam_frequencies, fit_euv3_K3
 
 const _λ = 1064e-9
 const _w0 = 30e-6
@@ -271,6 +271,18 @@ _euv3_ramp() = FortRamp(
         ωr, _ = beam_frequencies(b, d.alpha, Eu151.mass)
         @test calibrate_polarizability(; waist=42e-6, power_W=1.2, freq_Hz=ωr / 2π) ≈ d.alpha rtol =
             1e-9
+    end
+
+    @testset "fit_euv3_K3 hits a target N_BEC" begin
+        # N_BEC decreasing in K3 ⇒ bisection recovers the K3 reproducing a target.
+        # Tight bracket (2 decades) + loose rtol keeps the bisection cheap.
+        fit = fit_euv3_K3(; target_N_BEC=5.0e4, K3_lo=1e-41, K3_hi=1e-39, rtol=0.05)
+        @test fit.converged
+        @test 0.95 < fit.N_BEC / 5.0e4 < 1.05      # within the requested tolerance
+        @test 1e-41 < fit.K3 < 1e-39               # ≈ the default 1e-40
+        # an unreachably-high target clamps to K3_lo (most atoms), not converged
+        hi = fit_euv3_K3(; target_N_BEC=1e8, K3_lo=1e-41, K3_hi=1e-39)
+        @test !hi.converged
     end
 
     # End-to-end validation against the lab NumberOfAtoms.csv requires the real
