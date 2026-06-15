@@ -94,13 +94,23 @@ p    = EvapParams(; a_s=Eu151.a_s, tau_bg=10.0)
 scan_ramp_param(trap, p, euv3_evaporation_ramp(); index=1, values=0.5:0.5:3.0, N0=2e6, T0=40e-6)
 ```
 
-Hand off the endpoint to the GP simulator (dimensionless trap, ℏ=m=ω_ref=1):
+Hand off the endpoint to the GP simulator (dimensionless trap, ℏ=m=ω_ref=1) and build
+the actual Eu F=6 BEC ground state — the full "to BEC" pipeline:
 
 ```julia
-h  = bec_handoff(trap, euv3_evaporation_ramp(), res)   # (; omega_ref, omega_dimless, a_ho, N_BEC, T_BEC, T_over_Tc)
-ht = harmonic_trap_dimless(trap, euv3_evaporation_ramp(), res)
-# ws = make_workspace(; potential=ht, atom=Eu151, ...); find_ground_state(ws)
+trap, ramp = euv3_evap_trap(), euv3_evaporation_ramp()
+res = run_evaporation(trap, ramp, EvapParams(; a_s=Eu151.a_s, tau_bg=15, K3=1e-40); N0=3.5e6, T0=50e-6)
+
+kw  = bec_workspace_kwargs(trap, ramp, res)   # (; potential, atom, interactions, N_BEC, c0, a_ho, omega_dimless)
+grid = make_grid(GridConfig((32,32,32), (16.0,16.0,16.0)))
+gs  = find_ground_state(; grid, kw.atom, interactions=kw.interactions, potential=kw.potential,
+                        dt=0.001, n_steps=2000)   # gs.workspace.state.psi is the Eu F=6 condensate
 ```
+
+`c0 = bec_gp_coupling(N_BEC, a_ho) = 4π N a_s / a_ho`; `c1 = 0` by default (the Eu spin
+channels are unknown, so this is a c₀-only BEC). For the lower-level handoff use
+`bec_handoff` (`; omega_ref, omega_dimless, a_ho, N_BEC, T_BEC, T_over_Tc`) or
+`harmonic_trap_dimless`.
 
 A general (non-euv3) ramp is a `FortRamp(times, powers_W)` (`n_beams × n_breakpoints`),
 fed to `run_evaporation(trap, ramp, p; N0, T0)`.
