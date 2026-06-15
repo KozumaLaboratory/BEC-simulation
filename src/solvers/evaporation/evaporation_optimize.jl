@@ -9,6 +9,7 @@
 # Optimization.
 
 export ramp_from_params, optimize_evaporation_ramp, scan_ramp_param, scan_ramp_2d
+export ramp_scale_powers, optimize_ramp_coordinate
 
 """
     ramp_from_params(x, base) -> FortRamp
@@ -112,4 +113,76 @@ function scan_ramp_2d(
             res.reached_bec ? res.N_BEC : NaN
         end for v1 in values1, v2 in values2
     ]
+end
+
+# Objective shared by the optimizers: maximise N_BEC; ramps that never reach BEC
+# score in [−1, 0) by how close their peak PSD came to ζ(3), guiding the search.
+function _ramp_score(trap::EvapTrap, p::EvapParams, ramp::FortRamp, N0::Float64, T0::Float64)
+    res = run_evaporation(trap, ramp, p; N0=N0, T0=T0)
+    res.reached_bec && return (res.N_BEC, res)
+    ρmax = isempty(res.psd) ? 0.0 : maximum(res.psd)
+    (ρmax / _ZETA3 - 1.0, res)
+end
+
+"""
+    ramp_scale_powers(mults, base) -> FortRamp
+
+Scale every beam's power at breakpoint `i` by `mults[i]` (length = n_breakpoints),
+keeping the breakpoint times. The full per-breakpoint reshaping the
+3-parameter `ramp_from_params` cannot express.
+"""
+function ramp_scale_powers(mults::AbstractVector{<:Real}, base::FortRamp)
+    length(mults) == length(base.times) ||
+        throw(ArgumentError("mults length must equal the number of breakpoints"))
+    new_powers = copy(base.powers_W)
+    @inbounds for i in eachindex(mults)
+        @views new_powers[:, i] .*= Float64(mults[i])
+    end
+    FortRamp(base.times, new_powers)
+end
+
+"""
+    optimize_ramp_coordinate(trap, p, base_ramp; N0, T0, mult_bounds=(0.3, 2.5),
+                             n_sweeps=4, n_line=13, free=:) -> (; mults, ramp, result, N_BEC, score)
+
+Coordinate-descent over the per-breakpoint power multipliers (a `d = n_breakpoints`
+search the grid-mesh `bayesian_optimize` cannot reach), starting from the unmodified
+lab ramp (all multipliers 1). Each sweep line-searches every free breakpoint over
+`n_line` points in `mult_bounds`, keeping the best; sweeps repeat until no
+improvement or `n_sweeps`. `free` selects which breakpoints to vary (default all;
+pass e.g. `2:9` to pin the first/last). Deterministic; ~`n_sweeps·|free|·n_line`
+model runs (each ms-scale). This is the genuine test of whether the lab ramp is
+optimal — a richer family than the 3-parameter transform.
+"""
+function optimize_ramp_coordinate(
+    trap::EvapTrap, p::EvapParams, base_ramp::FortRamp;
+    N0::Float64, T0::Float64, mult_bounds::Tuple{Float64, Float64}=(0.3, 2.5),
+    n_sweeps::Int=4, n_line::Int=13, free=:)
+    nb = length(base_ramp.times)
+    idxs = free === Colon() ? collect(1:nb) : collect(free)
+    mults = ones(nb)
+    best_score, best_res = _ramp_score(trap, p, ramp_scale_powers(mults, base_ramp), N0, T0)
+    line = collect(range(mult_bounds[1], mult_bounds[2]; length=n_line))
+    for _ in 1:n_sweeps
+        improved = false
+        for i in idxs
+            orig = mults[i]
+            local_best, local_val = best_score, orig
+            for v in line
+                v == orig && continue
+                mults[i] = v
+                sc, _ = _ramp_score(trap, p, ramp_scale_powers(mults, base_ramp), N0, T0)
+                if sc > local_best
+                    local_best, local_val = sc, v
+                end
+            end
+            mults[i] = local_val
+            local_best > best_score && (best_score=local_best; improved=true)
+        end
+        improved || break
+    end
+    best_ramp = ramp_scale_powers(mults, base_ramp)
+    _, best_res = _ramp_score(trap, p, best_ramp, N0, T0)
+    (mults=mults, ramp=best_ramp, result=best_res,
+        N_BEC=best_res.reached_bec ? best_res.N_BEC : NaN, score=best_score)
 end

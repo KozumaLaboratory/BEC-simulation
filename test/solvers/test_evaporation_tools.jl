@@ -6,7 +6,8 @@ using Test
 using SpinorBEC
 using SpinorBEC: Eu151, EvapTrap, EvapParams, FortRamp, run_evaporation,
     optimize_evaporation_ramp, scan_ramp_param, scan_ramp_2d, fit_euv3_K3,
-    optimize_euv3_evaporation, run_euv3_evaporation
+    optimize_euv3_evaporation, run_euv3_evaporation,
+    ramp_scale_powers, optimize_ramp_coordinate
 
 const _as_t = Eu151.a_s
 
@@ -88,5 +89,23 @@ _euv3_ramp_t() = FortRamp(
         # the optimum is ≥ the unmodified lab ramp (bounds bracket the baseline [1,1,1])
         base = run_euv3_evaporation()
         @test out.result.N_BEC >= 0.95 * base.N_BEC
+    end
+
+    @testset "ramp_scale_powers + coordinate-descent optimizer" begin
+        base = _euv3_ramp_t()
+        s = ramp_scale_powers([1.0, 2.0, 0.5, 1.0, 1.0], base)
+        @test s.times == base.times
+        @test s.powers_W[:, 2] ≈ 2.0 .* base.powers_W[:, 2]
+        @test s.powers_W[:, 3] ≈ 0.5 .* base.powers_W[:, 3]
+        @test_throws ArgumentError ramp_scale_powers([1.0, 2.0], base)
+        # coordinate descent starts from the baseline (all 1s) and never regresses
+        trap = _eu_trap_t()
+        p = EvapParams(; a_s=_as_t, tau_bg=10.0, K3=0.0)
+        baseN = run_evaporation(trap, base, p; N0=2e6, T0=40e-6).N_BEC
+        out = optimize_ramp_coordinate(trap, p, base; N0=2e6, T0=40e-6,
+            free=2:3, n_sweeps=1, n_line=3)
+        @test length(out.mults) == length(base.times)
+        @test out.result.reached_bec
+        @test out.N_BEC >= baseN * 0.999          # ≥ baseline (descent can't worsen it)
     end
 end
