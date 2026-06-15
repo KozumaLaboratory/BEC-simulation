@@ -66,12 +66,13 @@ end
 const _EUV3_DIRECTIONS = [(1.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0)]
 
 """
-    euv3_evap_trap(; waists, alpha, wavelength=1064e-9, directions=euv3 default,
-                   positions=origin, mass=Eu151.mass, gravity_axis=3) -> EvapTrap
+    euv3_evap_trap(; waists, alpha, wavelength, directions, positions, mass, gravity_axis)
+        -> EvapTrap
 
 Build the euv3 crossed FORT geometry. `waists` is a 3-vector [m] (H, V, S) or a
 single scalar applied to all three; `alpha` is the Eu scalar polarizability
-[J/(W/m²)]. All but `waists`/`alpha` have lab-typical defaults.
+[J/(W/m²)]. Every argument defaults to `euv3_defaults()` (1550 nm, H 31 µm/V 42 µm,
+calibrated α).
 """
 function euv3_evap_trap(; waists=_EUV3_WAISTS, alpha::Real=_EUV3_ALPHA,
     wavelength::Real=_EUV3_WAVELENGTH,
