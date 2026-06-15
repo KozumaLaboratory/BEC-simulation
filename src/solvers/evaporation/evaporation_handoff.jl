@@ -8,7 +8,23 @@
 # `make_workspace` / `find_ground_state`.
 
 export final_trap_frequencies, bec_handoff, harmonic_trap_dimless
-export bec_gp_coupling, bec_workspace_kwargs
+export bec_gp_coupling, bec_workspace_kwargs, gravity_strength_dimless
+
+const _G_EARTH_SI = 9.80665   # m/s²
+
+"""
+    gravity_strength_dimless(omega_ref; mass=Eu151.mass, g=9.80665) -> g̃
+
+Dimensionless gravity strength for a `GravityPotential` (V = g̃·z in ℏ=m=ω_ref=1
+units): `g̃ = m g a_ho / (ℏ ω_ref)`, `a_ho = √(ℏ/(m ω_ref))`, with `omega_ref` in
+rad/s. The sag is `z_sag = g̃/ω_z²` oscillator lengths — sizeable for a weak trap
+(≈11 a_ho in a 200 Hz Eu trap), so the grid box must accommodate it (or compensate
+gravity with a field gradient).
+"""
+function gravity_strength_dimless(omega_ref::Real; mass::Real=Eu151.mass, g::Real=_G_EARTH_SI)
+    a_ho = sqrt(Units.HBAR / (mass * omega_ref))
+    mass * g * a_ho / (Units.HBAR * omega_ref)
+end
 
 """
     final_trap_frequencies(trap, ramp) -> (ωx, ωy, ωz) [rad/s]
@@ -70,21 +86,32 @@ density nonlinearity for `N` atoms, scattering length `a_s`, oscillator length
 bec_gp_coupling(N::Real, a_ho::Real; a_s::Real=Eu151.a_s) = 4π * N * a_s / a_ho
 
 """
-    bec_workspace_kwargs(trap, ramp, result; a_s=Eu151.a_s, c1=0.0, omega_ref=nothing)
-        -> NamedTuple
+    bec_workspace_kwargs(trap, ramp, result; a_s=Eu151.a_s, c1=0.0, omega_ref=nothing,
+                         gravity=false, gravity_axis=3) -> NamedTuple
 
 Physics bundle to seed a GP ground state from the evaporation endpoint:
 `(; potential, atom, interactions, N_BEC, c0, a_ho, omega_dimless)`. `potential` is the
 dimensionless final-trap `HarmonicTrap`, `atom` is `Eu151`, `interactions` carries
 `c0 = bec_gp_coupling(N_BEC, a_ho)` (and `c1`; the Eu spin channels are unknown so the
-default 0 gives a c₀-only BEC). Splat the first three into `make_workspace`, add a
-`grid`/`sim_params`, then `find_ground_state`. Touches no GP machinery itself.
+default 0 gives a c₀-only BEC). With `gravity=true` the potential becomes a
+`CompositePotential` of the trap + a `GravityPotential` (g̃ from
+`gravity_strength_dimless`) along `gravity_axis` — physical for a weak trap (≈10 a_ho
+sag), so size the grid box accordingly. Splat the first three into `make_workspace`,
+add a `grid`/`sim_params`, then `find_ground_state`.
 """
 function bec_workspace_kwargs(trap::EvapTrap, ramp::FortRamp, result::EvapResult;
-    a_s::Real=Eu151.a_s, c1::Real=0.0, omega_ref=nothing)
+    a_s::Real=Eu151.a_s, c1::Real=0.0, omega_ref=nothing,
+    gravity::Bool=false, gravity_axis::Int=3)
     h = bec_handoff(trap, ramp, result; omega_ref=omega_ref)
     c0 = bec_gp_coupling(h.N_BEC, h.a_ho; a_s=a_s)
-    (potential=HarmonicTrap(h.omega_dimless),
+    ht = HarmonicTrap(h.omega_dimless)
+    potential = if gravity
+        g̃ = gravity_strength_dimless(h.omega_ref; mass=trap.mass)
+        CompositePotential{3}(AbstractPotential[ht, GravityPotential{3}(g̃, gravity_axis)])
+    else
+        ht
+    end
+    (potential=potential,
         atom=Eu151,
         interactions=InteractionParams(Dict(0 => c0, 1 => Float64(c1))),
         N_BEC=h.N_BEC, c0=c0, a_ho=h.a_ho, omega_dimless=h.omega_dimless)

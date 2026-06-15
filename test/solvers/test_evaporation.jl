@@ -13,6 +13,7 @@ using SpinorBEC: GaussianBeam, CrossedDipoleTrap, Eu151, Units,
     euv3_evaporation_ramp,
     final_trap_frequencies, bec_handoff, harmonic_trap_dimless, HarmonicTrap, Units,
     bec_gp_coupling, bec_workspace_kwargs, InteractionParams,
+    gravity_strength_dimless, CompositePotential, GravityPotential,
     euv3_evap_trap, run_euv3_evaporation, evaporation_summary,
     euv3_defaults, calibrate_polarizability, beam_frequencies, fit_euv3_K3
 
@@ -207,6 +208,15 @@ _euv3_ramp() = FortRamp(
         @test kw.c0 > 0                                # repulsive BEC (a_s > 0)
         @test kw.c0 ≈ 4π * res.N_BEC * _as / kw.a_ho   # dimensionless contact coupling
         @test kw.N_BEC == res.N_BEC
+        # gravity sag: g̃ = m g a_ho / (ℏ ω_ref); ~10.7 in a 200 Hz Eu trap
+        ω = 2π * 200
+        @test gravity_strength_dimless(ω) ≈
+            Eu151.mass * 9.80665 * sqrt(Units.HBAR / (Eu151.mass * ω)) / (Units.HBAR * ω)
+        @test gravity_strength_dimless(ω) > 5            # sizeable sag at 200 Hz
+        kwg = bec_workspace_kwargs(trap, ramp, res; gravity=true)
+        @test kwg.potential isa CompositePotential
+        @test length(kwg.potential.components) == 2
+        @test any(p -> p isa GravityPotential, kwg.potential.components)
     end
 
     @testset "scan_ramp_param 1-D landscape" begin
