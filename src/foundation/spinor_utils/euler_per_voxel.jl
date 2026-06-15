@@ -78,12 +78,14 @@ Handles both real-time (Dz: cis) and imaginary-time (Dz: exp) propagation.
     end
 
     # Dz(θ): RTP uses cis(-mθ), ITP uses exp(-mθ).
-    # ITP applies a constant -F shift so the largest factor is exp(0)=1
-    # (m=-F gets factor 1, m=+F gets exp(-2F·θ)). Without this shift the
-    # m=-F component gets exp(+F·θ) and explodes (constant shift is removed
-    # by the subsequent normalization step).
+    # NOTE: do NOT apply a per-voxel (m+F) overflow shift. θ here is the
+    # per-voxel rotation angle (∝ |spin density(r)| or |Φ(r)|), so a -F·θ
+    # shift is spatially varying — global normalization removes only its
+    # spatial mean, leaving a density reweighting that biases the ITP fixed
+    # point off the variational GP minimum. The real-time branch is immune
+    # (there the same factor is an irrelevant global phase).
     if imaginary_time
-        dz_r = exp(-2.0 * F * theta)
+        dz_r = exp(-F * theta)
         dz_step = exp(theta)
         @inbounds for c in 1:D
             v[c] *= dz_r
