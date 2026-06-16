@@ -24,14 +24,16 @@ export euv3_defaults, calibrate_polarizability, fit_euv3_K3
 # BEC 5.02e4 atoms @ 349 nK. a_s = 110 a₀ (Eu151).
 const _EUV3_WAVELENGTH = 1550e-9
 const _EUV3_WAISTS = [31e-6, 42e-6, 42e-6]   # H, V, S(unused)
-# α ≈ 1.25e-36 J/(W/m²) (≈ 400 a.u.): CALIBRATED from the measured final-trap
-# frequencies (νx,νy,νz)=(97,226,217) Hz at the euv3 ramp-endpoint powers
-# (HFORT 0.14 W / VFORT 0.09 W) — νz (H 31 µm, 0.14 W) ⇒ 1.21e-36 and νx
-# (V 42 µm, 0.09 W) ⇒ 1.26e-36 agree, so α ≈ 1.25e-36. Eu ⁸S₇/₂ is an S-state ⇒
-# scalar/near-static; this is NOT a published number — pin it with
-# `calibrate_polarizability` once a direct light-shift / trap-freq + power is known.
-# (At this α the euv3 start (HFORT 6 W) gives η ≈ 7 at 50 µK, so evaporation runs.)
-const _EUV3_ALPHA = 1.25e-36
+# α ≈ 5.88e-37 J/(W/m²): anchored to the 2022 PRL loading depth (350 µK at 10 W single-H,
+# waist √(31·25)=27.8 µm ⇒ 340 µK, agrees). The SAME α reproduces the measured final-trap
+# frequencies (νx,νy,νz)=(97,226,217) Hz, ω̄/2π≈168 Hz, at a crossed power H=V≈0.18 W — i.e.
+# the PRL endpoint, NOT the current euv3 縦横 endpoint (0.14/0.09 W, ω̄≈118 Hz here). An earlier
+# value 1.25e-36 was an EPOCH-MIXING artifact: it forced the PRL frequencies onto the euv3
+# powers, manufacturing a spurious 2× discrepancy. α is an atomic constant (Eu ⁸S₇/₂ at 1550 nm)
+# — it does not change between apparatus; the depth and frequency anchors agree on 5.88e-37
+# once each is evaluated at its own powers. Pin directly with `calibrate_polarizability` when a
+# light-shift / trap-freq + power pair is logged.
+const _EUV3_ALPHA = 5.88e-37
 const _EUV3_N0 = 3.5e6
 const _EUV3_T0 = 50e-6
 const _EUV3_TAU_BG = 15.0                    # not in the paper; typical lanthanide ODT
@@ -157,7 +159,7 @@ notebook values. Also carries the measured BEC endpoint for validation.
 euv3_defaults() = (
     wavelength=_EUV3_WAVELENGTH,           # 1550 nm fiber-laser ODT
     waists=copy(_EUV3_WAISTS),             # H 31 µm, V 42 µm (S unused)
-    alpha=_EUV3_ALPHA,                     # ≈400 a.u., calibrated from measured trap freqs — NOT published
+    alpha=_EUV3_ALPHA,                     # 5.88e-37, anchored to PRL depth (350µK@10W) ⊃ freqs@0.18W
     N0=_EUV3_N0,                           # 3.5e6 atoms at start of evaporation
     T0=_EUV3_T0,                           # 50 µK
     tau_bg=_EUV3_TAU_BG,                   # 15 s estimate (not in paper)
