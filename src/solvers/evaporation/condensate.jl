@@ -64,6 +64,7 @@ end
 # Two-component RHS for (N_total, T): evaporation acts on the thermal cloud (saturated
 # density below T_c), three-body loss on the dense condensate.
 function _evap_rhs_bec(N::Float64, T::Float64, U::Float64, ω̄::Float64, p::EvapParams, m::Float64)
+    (N <= 0 || T <= 0) && return (0.0, 0.0)   # RK4 may transiently overshoot to ≤ 0
     kB = Units.KB
     N0, Nth = condensate_split(N, T, ω̄)
     η = U / (kB * T)

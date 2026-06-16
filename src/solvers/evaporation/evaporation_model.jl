@@ -111,7 +111,7 @@ prefactor. (At the ¹⁵¹Eu BEC loading point N=3.5×10⁶, T=50 µK, ω̄=2π�
 ≈ 3.1×10¹³ cm⁻³, matching the measured 3.3×10¹³ — see `EvapParams.evap_scale`.)
 """
 thermal_peak_density(N::Real, T::Real, ω̄::Real, m::Real) =
-    N * (m * ω̄^2 / (2π * Units.KB * T))^1.5
+    (N <= 0 || T <= 0) ? 0.0 : N * (m * ω̄^2 / (2π * Units.KB * T))^1.5
 
 """
     evap_volume_factor(η) -> (V_evap/V_eff, κ̃)
@@ -153,6 +153,9 @@ free — a non-physical path the optimizer exploits.
 """
 function evap_rhs(N::Float64, T::Float64, U::Float64, ω̄::Float64, p::EvapParams,
     m::Float64; dlnω_dt::Float64=0.0)
+    # RK4 intermediate stages can transiently push N or T non-positive on an aggressive
+    # ramp; the rates are then meaningless (and √T / Tᵃ would throw) — return zero.
+    (N <= 0 || T <= 0) && return (0.0, 0.0)
     kB = Units.KB
     η = U / (kB * T)
     # peak density n₀ = N (m ω̄² / (2π k_B T))^{3/2}

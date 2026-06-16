@@ -101,6 +101,17 @@ _euv3_ramp() = FortRamp(
         @test dN_s ≈ 0.5 * dN rtol = 1e-12
     end
 
+    @testset "evap_rhs robust to RK4 overshoot (non-positive N or T)" begin
+        # an aggressive ramp can drive an RK4 intermediate stage to N<0 or T<0; the rate
+        # must return (0,0) rather than throw on √T or Tᵃ (regression: optimizer crash).
+        p = EvapParams(; a_s=_as, tau_bg=10.0)
+        ω̄, U = 2π * 200, 8.0 * Units.KB * 30e-6
+        @test evap_rhs(-1e5, 30e-6, U, ω̄, p, _m) == (0.0, 0.0)
+        @test evap_rhs(1e6, -5e-6, U, ω̄, p, _m) == (0.0, 0.0)
+        @test thermal_peak_density(-1e5, 30e-6, ω̄, _m) == 0.0
+        @test thermal_peak_density(1e6, -5e-6, ω̄, _m) == 0.0
+    end
+
     @testset "evap_volume_factor: 3D Luiten form, no free parameter" begin
         # 3D harmonic (a=3, P3/P4) recovers the textbook (η−4)e^{−η}; a 2-D mistake
         # (P2/P3) would give (η−3)e^{−η}. κ̃ → 0 at large η (evaporated atom carries ~ηkT).
