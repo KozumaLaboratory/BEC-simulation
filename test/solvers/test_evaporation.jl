@@ -69,10 +69,17 @@ _euv3_ramp() = FortRamp(
         @test dN < 0                                   # atoms leave
         # dT/T = (dN/N)(η+κ-3)/3  ⇒  (dT/dN)(N/T) = (η+κ-3)/3
         @test (dT / dN) * (N / T) ≈ (η + 1.0 - 3) / 3 rtol = 1e-10
-        # below the validity floor evaporation is inert (only bg+3b, here both off)
-        Ulow = 3.0 * Units.KB * T                       # η = 3 < eta_min
-        dN_low, _ = evap_rhs(N, T, Ulow, ω̄, p, _m)
-        @test dN_low ≈ 0.0 atol = 1e-6
+        # all-η Luiten form: still evaporates below η=4 (spilling), faster than at η=8
+        dN_low, _ = evap_rhs(N, T, 3.0 * Units.KB * T, ω̄, p, _m)   # η = 3
+        @test dN_low < 0                                # active (not inert)
+        @test dN_low < dN                               # lower η ⇒ stronger loss
+        # very deep trap ⇒ evaporation exponentially suppressed
+        dN_deep, _ = evap_rhs(N, T, 20.0 * Units.KB * T, ω̄, p, _m)  # η = 20
+        @test abs(dN_deep) < abs(dN) * 1e-3
+        # evap_scale linearly scales the rate
+        ps = EvapParams(; a_s=_as, tau_bg=Inf, K3=0.0, kappa=1.0, evap_scale=0.5)
+        dN_s, _ = evap_rhs(N, T, U, ω̄, ps, _m)
+        @test dN_s ≈ 0.5 * dN rtol = 1e-12
     end
 
     @testset "adiabatic trap change ⇒ T ∝ ω̄, ρ invariant" begin

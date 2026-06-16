@@ -40,7 +40,10 @@ n_beams(t::EvapTrap) = length(t.waists)
 
 Tunable physics knobs. `a_s` s-wave length [m], `tau_bg` 1-body vacuum lifetime
 [s], `K3` three-body loss coefficient [m⁶/s] (Eu unknown ⇒ default 0), `kappa`
-the excess-energy factor in dT/T, `eta_min` the truncated-Boltzmann validity floor.
+the excess-energy factor in dT/T, `eta_min` a soft truncated-Boltzmann floor (the
+evaporation rate is the all-η Luiten incomplete-gamma form, valid below it too),
+`evap_scale` a dimensionless calibration prefactor on the elastic collision rate
+(< 1 when the cloud is less dense than the peak-thermal estimate, e.g. gravity sag).
 """
 Base.@kwdef struct EvapParams
     a_s::Float64
@@ -48,6 +51,7 @@ Base.@kwdef struct EvapParams
     K3::Float64 = 0.0
     kappa::Float64 = 1.0
     eta_min::Float64 = 4.0
+    evap_scale::Float64 = 1.0
 end
 
 """Mutable integration state: atom number `N`, temperature `T` [K], time `t` [s]."""
@@ -91,7 +95,8 @@ phase_space_density(N::Real, T::Real, ω̄::Real) =
     evap_rhs(N, T, U, ω̄, p, m; dlnω_dt=0.0) -> (dN, dT)
 
 Right-hand side of the (N, T) evaporation ODEs at trap depth `U` [J] and mean
-frequency `ω̄` [rad/s]. Allocation-free. Evaporation contributes only for η > 4.
+frequency `ω̄` [rad/s]. Allocation-free. The evaporation rate is the all-η Luiten
+incomplete-gamma form (positive for every η > 0; no hard η-floor cutoff).
 `dlnω_dt = d(ln ω̄)/dt` [1/s] is the instantaneous logarithmic rate of change of the
 trap frequency from the ramp; it drives adiabatic compression/expansion heating
 (`dT/T = dω̄/ω̄`, since `T ∝ ω̄` keeps the phase-space density invariant under a
@@ -108,8 +113,15 @@ function evap_rhs(N::Float64, T::Float64, U::Float64, ω̄::Float64, p::EvapPara
     σ = 8π * p.a_s^2
     γel = n0 * σ * v̄ / sqrt(2)                       # per-atom elastic rate
 
-    # evaporation (truncated Boltzmann); inert below the validity floor
-    dN_evap = η > p.eta_min ? -N * γel * (η - 4) * exp(-η) : 0.0
+    # evaporation (truncated Boltzmann, Luiten-Reynolds-Walraven incomplete-gamma form,
+    # valid for ALL η): rate ∝ e^{-η}(η·P(2,η) − 3·P(3,η))/P(2,η)², with the regularized
+    # lower incomplete gammas P(2,η)=1−e^{-η}(1+η), P(3,η)=1−e^{-η}(1+η+η²/2) in closed
+    # form. → ~(η−3)e^{-η} at large η, stays positive (spilling) at low η — no hard cutoff.
+    eη = exp(-η)
+    P2 = 1 - eη * (1 + η)
+    P3 = 1 - eη * (1 + η + η^2 / 2)
+    evap_factor = P2 > 1e-9 ? max(eη * (η * P2 - 3 * P3) / P2^2, 0.0) : 0.0
+    dN_evap = -N * γel * p.evap_scale * evap_factor
     dTT_evap = N > 0 ? (dN_evap / N) * (η + p.kappa - 3) / 3 : 0.0
 
     # background 1-body loss

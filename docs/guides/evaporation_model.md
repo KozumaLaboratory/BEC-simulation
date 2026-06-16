@@ -26,7 +26,13 @@ State `N`, `T`; truncation `η = U/(k_B T)`. With peak density
 `n₀ = N (m ω̄²/2π k_B T)^{3/2}`, `v̄ = √(8 k_B T/π m)`, elastic `σ = 8π a_s²`,
 per-atom rate `γ_el = n₀ σ v̄/√2`:
 
-- evaporation `dN/dt = -N γ_el (η-4) e^{-η}` (valid η ≳ 4),
+- evaporation `dN/dt = -N γ_el · evap_scale · e^{-η}(η P(2,η) − 3 P(3,η))/P(2,η)²` —
+  the **all-η Luiten–Reynolds–Walraven** incomplete-gamma rate (`P(2,η)=1−e^{-η}(1+η)`,
+  `P(3,η)=1−e^{-η}(1+η+η²/2)` closed form). → `~(η−3)e^{-η}` at large η, but stays
+  **positive at low η** (spilling) — unlike the simple `(η−4)e^{-η}`, which goes
+  unphysically negative (atoms *gained*) below η=4. `evap_scale` is a dimensionless
+  calibration prefactor on the collision rate (peak-thermal `γ_el` overestimates the
+  real rate for a gravity-sagged / cigar cloud),
 - temperature `dT/T = (dN/N)(η+κ-3)/3 + dω̄/ω̄` (κ ≈ 1),
 - background 1-body `-N/τ_bg`, optional 3-body `-K3 ⟨n²⟩ N` (+ heating),
 - gravity lowers the vertical escape barrier (shallow end-trap),
