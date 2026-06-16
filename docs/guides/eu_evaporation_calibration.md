@@ -131,13 +131,17 @@ magnetic levitation gradient (sets `EvapTrap.gravity_factor`).
   have identified *physical* causes, not hidden knobs:
   - **2022 PRL**: needs the actual (improved, higher-N) ramp; the thesis ramp is a
     different generation.
-  - **2023-07 Exp A**: a single-beam trap. NOT a dimensionality issue — for an optical
-    dipole trap the beam-edge anharmonicity restores 3D evaporation even when elongated/
-    gravity-tilted (Hung et al. 2008; microgravity DSMC), so the 3D rate is correct. The
-    ~3× residual is the **density uncertainty** (`n₀ ∝ U₀^{3/2}/w⁴`, hyper-sensitive to
-    the waist): the depth-derived w (54 µm) ≠ the frequency-derived w — the same
-    depth-vs-frequency ambiguity the 2022 elliptical-beam measurement resolved. Closing
-    it needs the 2023 single-beam **trap frequency**, not a new theory term.
+  - **2023-07 Exp A**: a single-beam trap. The single-beam physics is already fully
+    determined — the thesis measures the waists with a beam profiler (30×26 µm) and
+    derives ω̄ "from ODT beam waists and power, and polarizability" (thesis §7.1.2),
+    exactly as this model does; with those, the model matches (γ_eff). It is also NOT a
+    dimensionality issue — for an ODT the beam-edge anharmonicity restores 3D evaporation
+    even when elongated/gravity-tilted (Hung et al. 2008; microgravity DSMC). The ~3×
+    residual is simply that the **2023 setup had degraded** (the notebook notes the IR
+    power dropped; depth 66 µK vs the thesis ~243 µK@7 W) and the degraded beam's waist
+    was **not re-measured** (only the depth was) — a gap in that old notebook, not in the
+    physics. The density `n₀ ∝ U₀^{3/2}/w⁴` is hyper-sensitive to the waist, so the stale
+    waist is enough to explain it. Nothing to fix in the model.
   - **2023-11**: the degraded beam (effective waist 54 µm vs the thesis 28 µm — the
     measured 66 µK@7W) plus a gravity-limited final trap.
 
