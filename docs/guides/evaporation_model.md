@@ -65,6 +65,11 @@ when known.**
 
 ## Required lab inputs (from the experiment notebook)
 
+> **Calibration data by epoch** (2022 paper / 2023 notebooks / now) is collected in
+> [`eu_evaporation_calibration.md`](eu_evaporation_calibration.md). The trap drifts
+> between epochs — validate against the 2022 paper, but optimize against fresh
+> current-setup measurements; do **not** mix epochs (it caused a spurious α conflict).
+
 These override the researched defaults and pin the model to the current setup:
 
 | Input | Meaning |
