@@ -63,32 +63,24 @@ end
 
 # Two-component RHS for (N_total, T): evaporation acts on the thermal cloud (saturated
 # density below T_c), three-body loss on the dense condensate.
-function _evap_rhs_bec(N::Float64, T::Float64, U::Float64, ω̄::Float64, p::EvapParams, m::Float64)
+function _evap_rhs_bec(N::Float64, T::Float64, U::Float64, ω̄::Float64, p::EvapParams,
+    m::Float64; dlnω_dt::Float64=0.0)
     (N <= 0 || T <= 0) && return (0.0, 0.0)   # RK4 may transiently overshoot to ≤ 0
-    kB = Units.KB
     N0, Nth = condensate_split(N, T, ω̄)
-    η = U / (kB * T)
-    # thermal peak density: saturated (ζ(3/2)/λ³) below T_c, peak-thermal above
-    if N0 > 0
-        λ = Units.HBAR * sqrt(2π / (m * kB * T))          # thermal de Broglie wavelength
-        n_th = 2.6123753486854883 / λ^3                   # ζ(3/2) = 2.612…
+    η = U / (Units.KB * T)
+    # thermal-cloud density: saturated (ζ(3/2)/λ³) below T_c, peak-thermal above.
+    n_th = if N0 > 0
+        λ = Units.HBAR * sqrt(2π / (m * Units.KB * T))     # thermal de Broglie wavelength
+        2.6123753486854883 / λ^3                           # ζ(3/2) = 2.612…
     else
-        n_th = thermal_peak_density(N, T, ω̄, m)
+        thermal_peak_density(N, T, ω̄, m)
     end
-    v̄ = sqrt(8 * kB * T / (π * m))
-    σ = 8π * p.a_s^2
-    γel = n_th * σ * v̄ / sqrt(2)
-
-    evap_factor, κ̃ = evap_volume_factor(η)                 # 3D Luiten, no free parameter
-    dN_evap = -Nth * γel * p.evap_scale * evap_factor      # only thermal atoms evaporate
-    dTT_evap = Nth > 0 ? (dN_evap / Nth) * (η + κ̃ - 3) / 3 : 0.0
-
-    dN_bg = -N / p.tau_bg
-    dN_3b = -_condensate_three_body_rate(N0, ω̄, p, m) * N0  # condensate three-body loss
-
-    dN = dN_evap + dN_bg + dN_3b
-    dT = T * dTT_evap
-    (dN, dT)
+    # evaporation + heating: the SAME shared declaration the thermal-only evap_rhs uses, here
+    # on the thermal fraction Nth at density n_th (above T_c, Nth=N ⇒ identical to evap_rhs).
+    dN_th, dT = _thermal_evap_rates(Nth, T, η, n_th, p, m, dlnω_dt)
+    dN_bg = -N / p.tau_bg                                   # 1-body acts on all atoms
+    dN_3b = -_condensate_three_body_rate(N0, ω̄, p, m) * N0  # 3-body on the dense condensate
+    (dN_th + dN_bg + dN_3b, dT)
 end
 
 """
@@ -148,6 +140,14 @@ function run_evaporation_bec(
         push!(ηs, U / (Units.KB * T))
     end
 
+    # d(ln ω̄)/dt from the trap ramp (drives adiabatic compression/expansion heating)
+    @inline function dlnω(tq::Float64)
+        δ = dtg / 4
+        _, ωp = trap_interp(min(tq + δ, tend))
+        _, ωm = trap_interp(max(tq - δ, t0))
+        (ωp > 0 && ωm > 0) ? (log(ωp) - log(ωm)) / (2δ) : 0.0
+    end
+
     U, ω̄ = trap_interp(t)
     record!(U, ω̄)
 
@@ -155,12 +155,13 @@ function run_evaporation_bec(
         h = min(dt, tend - t)
         h <= 0 && break
         U1, ω1 = trap_interp(t)
-        k1N, k1T = _evap_rhs_bec(N, T, U1, ω1, p, m)
+        k1N, k1T = _evap_rhs_bec(N, T, U1, ω1, p, m; dlnω_dt=dlnω(t))
         Um, ωm = trap_interp(t + h / 2)
-        k2N, k2T = _evap_rhs_bec(N + h / 2 * k1N, T + h / 2 * k1T, Um, ωm, p, m)
-        k3N, k3T = _evap_rhs_bec(N + h / 2 * k2N, T + h / 2 * k2T, Um, ωm, p, m)
+        dlm = dlnω(t + h / 2)
+        k2N, k2T = _evap_rhs_bec(N + h / 2 * k1N, T + h / 2 * k1T, Um, ωm, p, m; dlnω_dt=dlm)
+        k3N, k3T = _evap_rhs_bec(N + h / 2 * k2N, T + h / 2 * k2T, Um, ωm, p, m; dlnω_dt=dlm)
         U2, ω2 = trap_interp(t + h)
-        k4N, k4T = _evap_rhs_bec(N + h * k3N, T + h * k3T, U2, ω2, p, m)
+        k4N, k4T = _evap_rhs_bec(N + h * k3N, T + h * k3T, U2, ω2, p, m; dlnω_dt=dlnω(t + h))
 
         N = max(N + h / 6 * (k1N + 2k2N + 2k3N + k4N), 1.0)
         T = max(T + h / 6 * (k1T + 2k2T + 2k3T + k4T), 1e-12)

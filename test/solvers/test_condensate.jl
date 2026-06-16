@@ -5,7 +5,8 @@ using Test
 using SpinorBEC
 using SpinorBEC: Eu151, Units, EvapTrap, EvapParams, FortRamp,
     bec_critical_temperature, condensate_split, run_evaporation_bec, EvapBecResult,
-    euv3_evap_trap, trap_at
+    euv3_evap_trap, trap_at, evap_rhs
+using SpinorBEC: _evap_rhs_bec
 
 const _m_c = Eu151.mass
 const _as_c = Eu151.a_s
@@ -64,6 +65,31 @@ _ramp_c() = FortRamp(
         @test r.Nth[1] ≈ r.N[1]                       # starts fully thermal
         @test r.Nth[end] < maximum(r.Nth)             # thermal cloud crashes below T_c
         @test r.N0[end] > r.Nth[end]                  # mostly condensed at the end
+    end
+
+    # ANTI-DRIFT GATE: above T_c the two-component RHS must be BIT-IDENTICAL to the thermal
+    # evap_rhs (same evaporation rate, excess-energy heating, thermal three-body, adiabatic
+    # term, background loss). Both call the single _thermal_evap_rates declaration, so the two
+    # paths cannot silently diverge — this test fails the instant a term is added to one only.
+    @testset "RHS parity gate: _evap_rhs_bec ≡ evap_rhs above T_c (no drift)" begin
+        ω̄ = 2π * 300
+        for K3 in (0.0, 5e-41), dlnω in (0.0, -0.7, 1.1)
+            p = EvapParams(; a_s=_as_c, tau_bg=12.0, K3=K3)
+            N, T = 5e5, 30e-6
+            U = 6.0 * Units.KB * T                          # η = 6
+            @test T > bec_critical_temperature(N, ω̄)        # genuinely above T_c (N0 = 0)
+            a = evap_rhs(N, T, U, ω̄, p, _m_c; dlnω_dt=dlnω)
+            b = _evap_rhs_bec(N, T, U, ω̄, p, _m_c; dlnω_dt=dlnω)
+            @test a[1] == b[1]                              # dN identical
+            @test a[2] == b[2]                              # dT identical
+        end
+        # and below T_c the two genuinely differ (condensate 3-body + saturated thermal cloud)
+        p = EvapParams(; a_s=_as_c, tau_bg=12.0, K3=5e-41)
+        Nlo, ω̄2 = 2e6, 2π * 300
+        Tlo = 0.3 * bec_critical_temperature(Nlo, ω̄2)       # well below T_c
+        Ulo = 6.0 * Units.KB * Tlo
+        @test _evap_rhs_bec(Nlo, Tlo, Ulo, ω̄2, p, _m_c) !=
+            evap_rhs(Nlo, Tlo, Ulo, ω̄2, p, _m_c)
     end
 
     @testset "above T_c reduces to the thermal model (no condensate)" begin

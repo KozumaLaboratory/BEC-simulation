@@ -140,48 +140,51 @@ case (`a=2` would be a 2-D trap). → `(η−3)e^{-η}`, `κ̃→0` at large η;
 end
 
 """
+    _thermal_evap_rates(Nev, T, η, n, p, m, dlnω_dt) -> (dN_thermal, dT)
+
+**Single declaration of the thermal-cloud evaporation + heating physics**: the Luiten
+evaporation rate and its excess-energy temperature law, the thermal three-body loss with
+its antievaporative heating, and the adiabatic compression/expansion term. Both the
+thermal-only [`evap_rhs`](@ref) and the two-component `_evap_rhs_bec` call this with their
+own evaporating population `Nev` and peak density `n`, so the physics **cannot drift**
+between the two paths (a gate test pins `_evap_rhs_bec ≡ evap_rhs` above `T_c`). Background
+1-body loss and the condensate three-body channel act on different populations and are
+added by the caller.
+"""
+@inline function _thermal_evap_rates(Nev::Float64, T::Float64, η::Float64, n::Float64,
+    p::EvapParams, m::Float64, dlnω_dt::Float64)
+    kB = Units.KB
+    v̄ = sqrt(8 * kB * T / (π * m))
+    γel = n * 8π * p.a_s^2 * v̄ / sqrt(2)             # per-atom elastic rate, γ = n σ v̄/√2
+    # evaporation: 3D-harmonic truncated-Boltzmann (Luiten), no free parameter.
+    evap_factor, κ̃ = evap_volume_factor(η)
+    dN_evap = -Nev * γel * p.evap_scale * evap_factor
+    dTT_evap = Nev > 0 ? (dN_evap / Nev) * (η + κ̃ - 3) / 3 : 0.0
+    # three-body loss + antievaporative heating (center-weighted, ⟨n²⟩ = n²/3^{3/2})
+    dN_3b = -p.K3 * (n^2 / 3.0^1.5) * Nev
+    dTT_3b = Nev > 0 ? -(dN_3b / Nev) * (1.0 / 3.0) : 0.0
+    # adiabatic compression/expansion from the ramped trap (T ∝ ω̄)
+    (dN_evap + dN_3b, T * (dTT_evap + dTT_3b + dlnω_dt))
+end
+
+"""
     evap_rhs(N, T, U, ω̄, p, m; dlnω_dt=0.0) -> (dN, dT)
 
-Right-hand side of the (N, T) evaporation ODEs at trap depth `U` [J] and mean
+Right-hand side of the thermal-cloud (N, T) evaporation ODEs at trap depth `U` [J] and mean
 frequency `ω̄` [rad/s]. Allocation-free. The evaporation rate is the all-η Luiten
-incomplete-gamma form (positive for every η > 0; no hard η-floor cutoff).
-`dlnω_dt = d(ln ω̄)/dt` [1/s] is the instantaneous logarithmic rate of change of the
-trap frequency from the ramp; it drives adiabatic compression/expansion heating
-(`dT/T = dω̄/ω̄`, since `T ∝ ω̄` keeps the phase-space density invariant under a
-pure harmonic-trap change). Without it, re-tightening the trap would raise ρ for
-free — a non-physical path the optimizer exploits.
+incomplete-gamma form (positive for every η > 0; no hard η-floor cutoff). `dlnω_dt =
+d(ln ω̄)/dt` [1/s] drives adiabatic compression/expansion heating (`dT/T = dω̄/ω̄`). The
+evaporation + heating physics lives in [`_thermal_evap_rates`](@ref) (shared with the
+two-component BEC RHS); here it acts on the full cloud at the peak-thermal density, plus
+background 1-body loss.
 """
 function evap_rhs(N::Float64, T::Float64, U::Float64, ω̄::Float64, p::EvapParams,
     m::Float64; dlnω_dt::Float64=0.0)
     # RK4 intermediate stages can transiently push N or T non-positive on an aggressive
     # ramp; the rates are then meaningless (and √T / Tᵃ would throw) — return zero.
     (N <= 0 || T <= 0) && return (0.0, 0.0)
-    kB = Units.KB
-    η = U / (kB * T)
-    # peak density n₀ = N (m ω̄² / (2π k_B T))^{3/2}
+    η = U / (Units.KB * T)
     n0 = thermal_peak_density(N, T, ω̄, m)
-    v̄ = sqrt(8 * kB * T / (π * m))
-    σ = 8π * p.a_s^2
-    γel = n0 * σ * v̄ / sqrt(2)                       # per-atom elastic rate
-
-    # evaporation: 3D-harmonic truncated-Boltzmann (Luiten), no free parameter. The
-    # volume factor V_evap/V_eff and the excess-energy κ̃ are both fixed by η.
-    evap_factor, κ̃ = evap_volume_factor(η)
-    dN_evap = -N * γel * p.evap_scale * evap_factor
-    dTT_evap = N > 0 ? (dN_evap / N) * (η + κ̃ - 3) / 3 : 0.0
-
-    # background 1-body loss
-    dN_bg = -N / p.tau_bg
-
-    # three-body loss + antievaporative heating (center-weighted, ⟨n²⟩ = n₀²/3^{3/2})
-    n2avg = n0^2 / 3.0^1.5
-    dN_3b = -p.K3 * n2avg * N
-    dTT_3b = N > 0 ? -(dN_3b / N) * (1.0 / 3.0) : 0.0
-
-    # adiabatic compression/expansion from the ramped trap (T ∝ ω̄)
-    dTT_adia = dlnω_dt
-
-    dN = dN_evap + dN_bg + dN_3b
-    dT = T * (dTT_evap + dTT_3b + dTT_adia)
-    (dN, dT)
+    dN_th, dT = _thermal_evap_rates(N, T, η, n0, p, m, dlnω_dt)
+    (dN_th - N / p.tau_bg, dT)
 end
