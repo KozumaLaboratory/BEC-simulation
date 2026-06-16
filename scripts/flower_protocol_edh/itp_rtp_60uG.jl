@@ -8,8 +8,9 @@
 
 import CUDA
 using SpinorBEC
-using HDF5, JLD2, LinearAlgebra
+using HDF5, JLD2, LinearAlgebra, Dates
 using SpinorBEC: Units, eu151_preset, ZeemanParams, find_ground_state,
+                 find_ground_state_lbfgs,
                  CUDABackend, CPUBackend, make_workspace, run_simulation!,
                  SimulationCallbacks, total_energy, total_norm, SimParams,
                  magnetization, rotate_quantization_axis, SpinSystem
@@ -29,6 +30,20 @@ const ITP_N_STEPS = 100_000        # cap; expected to converge well before this
 const ITP_DT      = 0.005
 const ITP_TOL_DE  = 1.0e-10        # dE/|E| (relative energy change per save_every)
 const ITP_TOL_DRHO = 1.0e-7        # max|Δρ|/max|ρ| (density change, gauge-invariant)
+
+# LBFGS polish — driven to (near-)variational convergence.
+# Sobolev preconditioner is the key to taming stiff spinor+DDI GP: without
+# it, vanilla LBFGS crawls because the Hessian condition number explodes
+# in the high-k spinor sectors. α=0.5 typically buys 10–100× iter speedup.
+# tol=1e-7 is a realistic target on F=6/64³ (float64 floor ≈ 1e-9).
+const LBFGS_N_STEPS = 500          # iterations PER RUN (additive when cache exists)
+const LBFGS_TOL     = 1.0e-7       # ‖∇E‖ / dV target
+const LBFGS_M       = 10           # quasi-Newton memory depth
+const LBFGS_SOBOLEV_ALPHA = 0.5    # 0 = vanilla, >0 = Sobolev preconditioner
+# Set LBFGS_CONTINUE=true to ADD `LBFGS_N_STEPS` more iterations starting
+# from the cached ψ instead of reusing the cache as-is. Useful for
+# incremental polish without losing previous work.
+const LBFGS_CONTINUE = true
 
 # RTP (constant B = 60 μG hold)
 const RTP_DURATION = 13.823    # internal time ≈ 20 ms @ ω_ref = 2π·110
@@ -212,7 +227,91 @@ function main()
         end
     end
 
-    # --- RTP: rebuild workspace with imaginary_time=false, seed with ITP ψ ---
+    # --- LBFGS polish — drives ψ from ITP-near-GS to the true variational
+    #     minimum via direct minimisation of the GP energy functional.
+    #     Cache behavior:
+    #       LBFGS_CONTINUE=true  + cache exists  → load + run more iterations
+    #       LBFGS_CONTINUE=false + cache exists  → load + skip LBFGS
+    #       cache absent                         → fresh run
+    # ---
+    LBFGS_CACHE = joinpath(OUT_DIR, "lbfgs_60uG_final_psi.jld2")
+    cache_present = isfile(LBFGS_CACHE)
+
+    seed_psi, prev_meta = if cache_present
+        println("[itp_rtp_60uG] LBFGS cache present → $LBFGS_CACHE")
+        jldopen(LBFGS_CACHE, "r") do f
+            psi = f["psi"]
+            meta = Dict{String,Any}()
+            for k in keys(f); meta[k] = f[k]; end
+            (psi, meta)
+        end
+    else
+        (psi_init_rtp, Dict{String,Any}())
+    end
+
+    run_lbfgs = !cache_present || LBFGS_CONTINUE
+
+    psi_init_rtp_lbfgs = if run_lbfgs
+        action = cache_present ? "CONTINUE (+$(LBFGS_N_STEPS) iter)" : "FRESH ($(LBFGS_N_STEPS) iter)"
+        println("[itp_rtp_60uG] LBFGS polish $action — tol=$LBFGS_TOL  m=$LBFGS_M  α=$LBFGS_SOBOLEV_ALPHA")
+        gs_lbfgs = find_ground_state_lbfgs(;
+            grid=preset.grid, atom=preset.atom,
+            interactions=preset.interactions, zeeman=zeeman, potential=preset.potential,
+            psi_init=seed_psi,
+            n_steps=LBFGS_N_STEPS, tol=LBFGS_TOL, m_lbfgs=LBFGS_M,
+            sobolev_alpha=LBFGS_SOBOLEV_ALPHA,
+            enable_ddi=true, c_dd=preset.c_dd, secular_ddi=false,
+            backend=backend, verbose=true,
+        )
+        println("[itp_rtp_60uG] LBFGS done.  E=$(gs_lbfgs.energy)  grad_norm=$(gs_lbfgs.grad_norm)")
+        psi_lbfgs_host = Array{ComplexF64}(gs_lbfgs.workspace.state.psi)
+
+        # Accumulated iter count across resumes (provenance).
+        prev_iter = Int(get(prev_meta, "lbfgs_iter_total", 0))
+        total_iter = prev_iter + LBFGS_N_STEPS
+
+        git_sha = try
+            strip(read(`git -C $(@__DIR__)/../.. rev-parse HEAD`, String))
+        catch
+            "unknown"
+        end
+
+        try
+            jldopen(LBFGS_CACHE, "w") do f
+                f["psi"]               = psi_lbfgs_host
+                f["E"]                 = gs_lbfgs.energy
+                f["grad_norm"]         = gs_lbfgs.grad_norm
+                f["lbfgs_iter_this"]   = LBFGS_N_STEPS
+                f["lbfgs_iter_total"]  = total_iter
+                f["lbfgs_tol"]         = LBFGS_TOL
+                f["lbfgs_m"]           = LBFGS_M
+                f["sobolev_alpha"]     = LBFGS_SOBOLEV_ALPHA
+                f["n_atoms"]           = 50_000
+                f["B_gauss"]           = B_GAUSS
+                f["c_dd"]              = preset.c_dd
+                f["grid_n"]            = collect(NX for _ in 1:3)
+                f["grid_box"]          = collect(L_BOX for _ in 1:3)
+                f["atom"]              = "Eu151"
+                f["F"]                 = F
+                f["secular_ddi"]       = false
+                f["git_sha"]           = git_sha
+                f["created_utc"]       = string(now())
+                f["method"]            = "ITP 100k → LBFGS $(total_iter) (Sobolev α=$(LBFGS_SOBOLEV_ALPHA))"
+            end
+            println("  cached LBFGS ψ + metadata → $LBFGS_CACHE  (total iter=$total_iter)")
+        catch e
+            @warn "could not cache LBFGS ψ: $e"
+        end
+        psi_lbfgs_host
+    else
+        prev_E = get(prev_meta, "E", NaN)
+        prev_g = get(prev_meta, "grad_norm", NaN)
+        println("[itp_rtp_60uG] reusing cached LBFGS ψ (E=$prev_E  |∇|=$prev_g)")
+        seed_psi
+    end
+    psi_init_rtp = psi_init_rtp_lbfgs
+
+    # --- RTP: rebuild workspace with imaginary_time=false, seed with LBFGS-polished ψ ---
     println("[itp_rtp_60uG] RTP build ...")
     n_steps_rtp = round(Int, RTP_DURATION / RTP_DT)
     sp_rtp = SimParams(; dt=RTP_DT, n_steps=n_steps_rtp,
