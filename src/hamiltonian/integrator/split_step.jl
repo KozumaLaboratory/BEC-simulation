@@ -292,7 +292,7 @@ function split_step_midpoint!(ws::Workspace{N}; dt::Float64=ws.sim_params.dt) wh
     )
     # Always-update-on-entry semantics: the batched kinetic phase cache is
     # synced to the dt passed in. Costs O(N^ndim) elementwise cis per call.
-    _update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, dt)
+    _update_batched_kinetic_phase!(ws.batched_kinetic, ws.grid.k_squared, dt, it)
     @timeit_debug TIMER "kinetic" apply_step!(
         KineticTerm(), ws.state.psi, 0.0, false, ws
     )
