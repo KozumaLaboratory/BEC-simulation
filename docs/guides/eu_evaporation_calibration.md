@@ -10,10 +10,35 @@ spurious 5.6× polarizability conflict during model development. **Rule: pick on
 
 ---
 
+## 2021 — Miyazawa PhD thesis (Kozuma lab) — MOST AUTHORITATIVE for the trap + rates
+
+The thesis states the load-bearing constants directly (the PRL only quotes results).
+**Use these for the trap/rate calibration.**
+
+| Quantity | Value |
+|---|---|
+| Scalar polarizability | **α_s = 189(5) a.u. = 5.87×10⁻³⁷ J/(W/m²)** (= 189·4πϵ₀a₀³/(2ϵ₀c)) |
+| Vector / tensor pol. | **α_v = 0(3), α_t = 0(5) a.u.** ⇒ **no vector/tensor light shift** (scalar trap) |
+| H-ODT | elliptical **30 µm (h) × 26 µm (v)**, max **11.5 W**, max depth **400 µK** |
+| V-ODT | waist **47 µm**, max **7.4 W**, max depth **90 µK**, crossed at 12° (78° to hODT) |
+| Loading | 1.4×10⁶ atoms @ 50 µK in hODT (11.5 W, 40 ms from red-MOT, ~5 % efficiency) |
+| Ramp (Fig 7.1/7.3) | hODT **10 → 0.5 W over 7.4 s**; vODT added midway, **reduced to ¼ in the last stage** (cuts 3-body); bias 3.0 G + loosening vODT = the optimization |
+| **Background lifetime** | **τ_bg > 150 s** (collisional loss with background < 0.1 s⁻¹) |
+| **Evaporation efficiency** | **γ = −ln(ρ_f/ρ_i)/ln(N_f/N_i) = 3.6** (measured; typical 2.5–3.5). Model gives γ_eff ≈ 3.9 — agree to 8 %. |
+| **Three-body loss** | **L ≈ 10⁻²⁹ cm⁶/s = 10⁻⁴¹ m⁶/s** (1/e BEC lifetime 1.4 s; a_s=135 a_B, ω̄=2π·204 Hz). Mind the K₃ convention vs `EvapParams.K3` (dN=−K₃⟨n²⟩N). |
+| Scattering length | a_s = 135 a_B (thesis) → **110(4) a_B** (PRL refined) |
+| T_c | **T_c⁰ = 0.94 (ℏω̄/k_B) N^{1/3}** — identical to `bec_critical_temperature`; corrections δT_fs = −0.73(⟨ω⟩/ω̄)N^{-1/3}T_c⁰, δT_int = −1.33(a_s/a_HO)N^{1/6}T_c⁰ |
+| First BEC / optimized | 3×10³ / 1.5×10⁴ atoms (this thesis, earlier than the PRL's 5×10⁴) |
+
+**These confirm the model's independently-derived calibration: α (5.88e-37 ✓), the
+γ_eff efficiency (3.9 vs 3.6 ✓), and the T_c formula. `evap_scale = 1` stands.** The
+PRL (below) is the later, higher-N generation of the same apparatus.
+
 ## 2022 — Miyazawa/Matsui et al., PRL 129, 223401 (arXiv:2207.11692)
 
-The gold-standard reference: complete and internally consistent. Used for the model's
-C-validation (parameter-free agreement to 6–15 %, `test/solvers/test_condensate.jl`).
+The published BEC (later generation, N=5.02×10⁴). Complete and internally consistent;
+used for the model's C-validation (parameter-free agreement to 6–15 %,
+`test/solvers/test_condensate.jl`).
 
 | Quantity | Value |
 |---|---|
