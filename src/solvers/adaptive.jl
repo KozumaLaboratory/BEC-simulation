@@ -114,7 +114,9 @@ function _adaptive_step_change_loop!(
         may_reject = !is_clamped && dt_step > adaptive.dt_min * 1.01
 
         if dt_step != current_kinetic_dt
-            _update_batched_kinetic_phase!(bk, ws.grid.k_squared, dt_step)
+            _update_batched_kinetic_phase!(
+                bk, ws.grid.k_squared, dt_step, ws.sim_params.imaginary_time
+            )
             current_kinetic_dt = dt_step
         end
 
@@ -289,13 +291,13 @@ function _adaptive_richardson_loop!(
 
         psi_saved .= ws.state.psi
 
-        _update_batched_kinetic_phase!(bk, ws.grid.k_squared, dt_step)
+        _update_batched_kinetic_phase!(bk, ws.grid.k_squared, dt_step, ws.sim_params.imaginary_time)
         _full_strang_step!(ws, dt_step, n_comp, bk)
         psi_full .= ws.state.psi
 
         ws.state.psi .= psi_saved
         dt_half = dt_step / 2
-        _update_batched_kinetic_phase!(bk, ws.grid.k_squared, dt_half)
+        _update_batched_kinetic_phase!(bk, ws.grid.k_squared, dt_half, ws.sim_params.imaginary_time)
         _full_strang_step!(ws, dt_half, n_comp, bk)
         _full_strang_step!(ws, dt_half, n_comp, bk)
 
