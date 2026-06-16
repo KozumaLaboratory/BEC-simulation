@@ -4,9 +4,14 @@ The trap has **changed across epochs**, so calibration values must not be mixed.
 Mixing the 2022 paper's trap *frequencies* with the 2023 notebook's *depth* produced a
 spurious 5.6× polarizability conflict during model development. **Rule: pick one epoch.**
 
-- **Validate the model** → use the **2022 paper** (complete, self-consistent, published).
-- **Optimize the current apparatus** → use **fresh measurements** (the setup is shallower
-  now; see below). Do not optimize against old data.
+Epochs: **2021 thesis (Miyazawa)** → **2022 PRL** → **2023 notebooks** (degraded) →
+**2025 EdH paper (Matsui, current gen, 5×10⁴ BEC)**.
+
+- **Validate the model's physics** → 2021 thesis (complete, self-consistent; gives α,
+  γ=3.6, T_c — all epoch-independent and confirmed).
+- **Optimize the current apparatus** → the 2025 generation (arXiv:2504.17357). Its
+  evaporation ramp is only in Matsui's PhD thesis (not on arXiv) — the remaining input.
+  Do not optimize against the degraded 2023 data.
 
 ---
 
@@ -61,6 +66,23 @@ trap = euv3_evap_trap(; alpha=5.88e-37, waists=[sqrt(31e-6*25e-6), 42e-6, 42e-6]
 ```
 
 ---
+
+## 2025 — Matsui et al., Einstein–de Haas effect (arXiv:2504.17357)
+
+The current-generation apparatus (Matsui, Miyazawa, Goto, Nakano, Kawaguchi, Ueda,
+Kozuma). A Science-format paper — brief methods, so the evaporation ramp powers are
+**not** here (they are in Matsui's PhD thesis, not on arXiv).
+
+| Quantity | Value |
+|---|---|
+| MOT→MOT transfer | **26(3) %** (vs ~5 % in the 2021 thesis — improved) |
+| Evaporation | crossed ODT (horizontal + vertically-inclined beam), bias **0.3 mT** vertical, into F=6,m=−6; both-beam ramp |
+| Science (round) trap | two horizontal beams (one waist **50 µm**, axes 10 µm apart, 0.2 s linear transfer) → depth **1.3 µK**, **(110, 110, 130) Hz** (nearly spherical), **N ≈ 5×10⁴**, negligible thermal |
+| Imaging | 460 nm, σ-polarized; SG gradient 42 mT/m |
+
+T_c check: `bec_critical_temperature(5e4, 2π·116)` ≈ 192 nK (ω̄ = (110·110·130)^{1/3} =
+116 Hz) — consistent with the 1.3 µK depth holding a sub-µK condensate. **Still need
+Matsui's thesis (off-arXiv) for the evaporation ramp** — that closes the last gap.
 
 ## 2023-07-19 — notebook (蒸発冷却), single-beam holds
 
