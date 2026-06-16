@@ -16,12 +16,16 @@ export evap_rhs, phase_space_density
 const _ZETA3 = 1.2020569031595942   # ζ(3), BEC onset PSD in a harmonic trap
 
 """
-    EvapTrap(; wavelength, alpha, waists, directions, positions, mass, gravity_axis=3)
+    EvapTrap(; wavelength, alpha, waists, directions, positions, mass,
+             gravity_axis=3, gravity_factor=1.0)
 
 Fixed FORT geometry: per-beam waists/directions/positions + wavelength + scalar
 polarizability `alpha` [J/(W/m²)] + atom `mass` [kg]. The instantaneous powers
 are supplied separately (the ramp), so a `CrossedDipoleTrap` is rebuilt on the fly
-from these + the powers to evaluate depth/frequencies.
+from these + the powers to evaluate depth/frequencies. `gravity_factor` scales the
+effective gravity in the escape-barrier depth (1 = full g; < 1 models a magnetic
+gradient levitating the atoms — e.g. ¹⁵¹Eu's μ≈7μ_B needs only ~0.4 G/cm to cancel
+g, so a weak crossed FORT can still hold against gravity down to BEC).
 """
 Base.@kwdef struct EvapTrap
     wavelength::Float64
@@ -31,6 +35,7 @@ Base.@kwdef struct EvapTrap
     positions::Vector{NTuple{3, Float64}}
     mass::Float64
     gravity_axis::Int = 3
+    gravity_factor::Float64 = 1.0
 end
 
 n_beams(t::EvapTrap) = length(t.waists)

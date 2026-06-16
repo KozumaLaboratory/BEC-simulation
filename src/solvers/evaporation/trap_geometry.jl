@@ -108,40 +108,50 @@ _trap_potential_point(trap::CrossedDipoleTrap, r::NTuple{3, Float64}) =
     sum(_beam_potential_point(b, trap.polarizability, r) for b in trap.beams)
 
 """
-    crossed_trap_depth(trap, m; gravity_axis=3, n_scan=400, reach=8.0) -> U [J]
+    crossed_trap_depth(trap, m; gravity_axis=3, n_scan=400, reach=6.0) -> U [J]
 
 Gravity-corrected trap depth: the smallest escape barrier over the six ±lab-axis
 directions. Along each axis the total optical potential (plus `m g s` gravitational
-tilt on `gravity_axis`) is scanned out to `reach` × the largest beam waist; the
-barrier is `max V_outward − V_center`. The minimum over directions is the depth
-that sets `η = U / (k_B T)`. Returns `0.0` if the trap is not bound (no positive
-barrier — e.g. gravity overwhelms a near-zero-power trap).
+tilt on `gravity_axis`) is scanned **log-spaced** from the finest beam waist out to
+`reach` × the largest relevant scale; the barrier is `max V_outward − V_center`, the
+minimum over directions is the depth setting `η = U / (k_B T)`. Log spacing is
+load-bearing: a tight beam's radial barrier peaks at ~1–2 waists (tens of µm) while
+the reach must span a loose beam's Rayleigh range (mm) for gravity — a uniform grid
+coarse enough to reach mm skips the µm-scale barrier and spuriously reports depth ≈ 0.
+Returns `0.0` if the trap is genuinely not bound (gravity overwhelms a weak trap).
 """
 function crossed_trap_depth(
-    trap::CrossedDipoleTrap, m::Real; gravity_axis::Int=3, n_scan::Int=600, reach::Float64=6.0)
+    trap::CrossedDipoleTrap, m::Real; gravity_axis::Int=3, n_scan::Int=400,
+    reach::Float64=6.0, gravity_factor::Float64=1.0)
     isempty(trap.beams) && return 0.0
-    grav(s, a) = a == gravity_axis ? m * _G_EARTH * s : 0.0
-    Vc = _trap_potential_point(trap, (0.0, 0.0, 0.0)) + grav(0.0, gravity_axis)
+    grav(s, a) = a == gravity_axis ? gravity_factor * m * _G_EARTH * s : 0.0
+    Vc = _trap_potential_point(trap, (0.0, 0.0, 0.0))
+    # finest active waist sets the inner resolution (resolve the tightest barrier)
+    wmin = Inf
+    for b in trap.beams
+        b.power > 0 && (wmin = min(wmin, b.waist))
+    end
+    isfinite(wmin) || return 0.0
     Udepth = Inf
     @inbounds for a in 1:3
-        # per-axis scan length: a beam confines weakly (∝ Rayleigh range) ALONG its
-        # own axis and tightly (∝ waist) transverse to it. Use the largest relevant
-        # scale so both the radial barrier (~1.5 w₀) and the axial one (~z_R) are
-        # resolved — a single beam's escape is axial over z_R ≫ w₀.
-        Lscale = 0.0
+        # largest relevant scale on this axis sets the outer reach (z_R along a beam's
+        # own axis, waist transverse to it) — for gravity over a loose direction.
+        Lmax = 0.0
         for b in trap.beams
             b.power <= 0 && continue
             d = b.direction
             nrm = sqrt(d[1]^2 + d[2]^2 + d[3]^2)
             nrm == 0 && continue
             da = abs(d[a] / nrm)
-            Lscale = max(Lscale, da > 0.7 ? rayleigh_range(b) : b.waist)
+            Lmax = max(Lmax, da > 0.7 ? rayleigh_range(b) : b.waist)
         end
-        Lscale == 0 && continue
+        Lmax == 0 && continue
+        smin = wmin / 20
+        smax = reach * Lmax
         for sgn in (-1.0, 1.0)
             barrier = -Inf
-            for i in 1:n_scan
-                s = sgn * reach * Lscale * i / n_scan
+            for i in 0:n_scan
+                s = sgn * smin * (smax / smin)^(i / n_scan)     # log-spaced
                 r = ntuple(k -> k == a ? s : 0.0, 3)
                 V = _trap_potential_point(trap, r) + grav(s, a)
                 barrier = max(barrier, V - Vc)

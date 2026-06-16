@@ -104,10 +104,11 @@ calibrated α).
 function euv3_evap_trap(; waists=_EUV3_WAISTS, alpha::Real=_EUV3_ALPHA,
     wavelength::Real=_EUV3_WAVELENGTH,
     directions=_EUV3_DIRECTIONS, positions=fill((0.0, 0.0, 0.0), 3),
-    mass::Real=Eu151.mass, gravity_axis::Int=3)
+    mass::Real=Eu151.mass, gravity_axis::Int=3, gravity_factor::Real=1.0)
     w = waists isa Real ? fill(Float64(waists), 3) : collect(Float64, waists)
     EvapTrap(; wavelength=Float64(wavelength), alpha=Float64(alpha), waists=w,
-        directions=directions, positions=positions, mass=Float64(mass), gravity_axis=gravity_axis)
+        directions=directions, positions=positions, mass=Float64(mass),
+        gravity_axis=gravity_axis, gravity_factor=Float64(gravity_factor))
 end
 
 """

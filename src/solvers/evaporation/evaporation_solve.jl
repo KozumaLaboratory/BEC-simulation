@@ -64,7 +64,9 @@ per-beam powers [W].
 """
 function trap_at(trap::EvapTrap, powers::Vector{Float64})
     cdt = _trap_from_powers(trap, powers)
-    (crossed_trap_depth(cdt, trap.mass; gravity_axis=trap.gravity_axis),
+    (
+        crossed_trap_depth(cdt, trap.mass; gravity_axis=trap.gravity_axis,
+            gravity_factor=trap.gravity_factor),
         mean_trap_frequency(cdt, trap.mass))
 end
 
