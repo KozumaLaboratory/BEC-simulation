@@ -131,8 +131,13 @@ magnetic levitation gradient (sets `EvapTrap.gravity_factor`).
   have identified *physical* causes, not hidden knobs:
   - **2022 PRL**: needs the actual (improved, higher-N) ramp; the thesis ramp is a
     different generation.
-  - **2023-07 Exp A**: a single-beam **cigar** trap — evaporation there is quasi-1D, so
-    the 3D-harmonic rate over-predicts by ~3× (a regime limit, the next theory step).
+  - **2023-07 Exp A**: a single-beam trap. NOT a dimensionality issue — for an optical
+    dipole trap the beam-edge anharmonicity restores 3D evaporation even when elongated/
+    gravity-tilted (Hung et al. 2008; microgravity DSMC), so the 3D rate is correct. The
+    ~3× residual is the **density uncertainty** (`n₀ ∝ U₀^{3/2}/w⁴`, hyper-sensitive to
+    the waist): the depth-derived w (54 µm) ≠ the frequency-derived w — the same
+    depth-vs-frequency ambiguity the 2022 elliptical-beam measurement resolved. Closing
+    it needs the 2023 single-beam **trap frequency**, not a new theory term.
   - **2023-11**: the degraded beam (effective waist 54 µm vs the thesis 28 µm — the
     measured 66 µK@7W) plus a gravity-limited final trap.
 
