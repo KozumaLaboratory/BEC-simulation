@@ -7,6 +7,7 @@ using SpinorBEC: GaussianBeam, CrossedDipoleTrap, Eu151, Units,
     rayleigh_range, beam_depth, beam_frequencies,
     crossed_trap_frequencies, mean_trap_frequency, crossed_trap_depth,
     EvapTrap, EvapParams, evap_rhs, phase_space_density, thermal_peak_density,
+    evap_volume_factor,
     FortRamp, fort_power_at, trap_at, run_evaporation, evaporation_diagnostics,
     ramp_from_params,
     hfort_power, hfort_volts, vfort_power, vfort_volts, sfort_power, sfort_volts,
@@ -77,14 +78,16 @@ _euv3_ramp() = FortRamp(
     end
 
     @testset "evap_rhs scaling coefficient + thresholds" begin
-        p = EvapParams(; a_s=_as, tau_bg=Inf, K3=0.0, kappa=1.0)   # evaporation only
+        p = EvapParams(; a_s=_as, tau_bg=Inf, K3=0.0)   # evaporation only
         N, T, ω̄ = 1e6, 30e-6, 2π * 200
         η = 8.0
         U = η * Units.KB * T
         dN, dT = evap_rhs(N, T, U, ω̄, p, _m)
         @test dN < 0                                   # atoms leave
-        # dT/T = (dN/N)(η+κ-3)/3  ⇒  (dT/dN)(N/T) = (η+κ-3)/3
-        @test (dT / dN) * (N / T) ≈ (η + 1.0 - 3) / 3 rtol = 1e-10
+        # dT/T = (dN/N)(η+κ̃-3)/3 with the THEORETICAL κ̃(η) (not a constant)
+        _, κ̃ = evap_volume_factor(η)
+        @test (dT / dN) * (N / T) ≈ (η + κ̃ - 3) / 3 rtol = 1e-10
+        @test 0 < κ̃ < 0.5                              # excess energy small + decreasing at high η
         # all-η Luiten form: still evaporates below η=4 (spilling), faster than at η=8
         dN_low, _ = evap_rhs(N, T, 3.0 * Units.KB * T, ω̄, p, _m)   # η = 3
         @test dN_low < 0                                # active (not inert)
@@ -93,9 +96,22 @@ _euv3_ramp() = FortRamp(
         dN_deep, _ = evap_rhs(N, T, 20.0 * Units.KB * T, ω̄, p, _m)  # η = 20
         @test abs(dN_deep) < abs(dN) * 1e-3
         # evap_scale linearly scales the rate
-        ps = EvapParams(; a_s=_as, tau_bg=Inf, K3=0.0, kappa=1.0, evap_scale=0.5)
+        ps = EvapParams(; a_s=_as, tau_bg=Inf, K3=0.0, evap_scale=0.5)
         dN_s, _ = evap_rhs(N, T, U, ω̄, ps, _m)
         @test dN_s ≈ 0.5 * dN rtol = 1e-12
+    end
+
+    @testset "evap_volume_factor: 3D Luiten form, no free parameter" begin
+        # 3D harmonic (a=3, P3/P4) recovers the textbook (η−4)e^{−η}; a 2-D mistake
+        # (P2/P3) would give (η−3)e^{−η}. κ̃ → 0 at large η (evaporated atom carries ~ηkT).
+        for η in (8.0, 10.0, 12.0)
+            f, κ̃ = evap_volume_factor(η)
+            @test f ≈ (η - 4) * exp(-η) rtol = 0.05
+            @test 0 <= κ̃ < 0.1
+        end
+        @test evap_volume_factor(4.0)[2] > evap_volume_factor(8.0)[2]  # more excess at low η
+        @test evap_volume_factor(3.0)[1] > 0                           # spilling at low η
+        @test evap_volume_factor(15.0)[1] < evap_volume_factor(6.0)[1] # suppressed at high η
     end
 
     @testset "adiabatic trap change ⇒ T ∝ ω̄, ρ invariant" begin

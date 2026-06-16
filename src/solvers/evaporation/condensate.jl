@@ -78,12 +78,9 @@ function _evap_rhs_bec(N::Float64, T::Float64, U::Float64, ω̄::Float64, p::Eva
     σ = 8π * p.a_s^2
     γel = n_th * σ * v̄ / sqrt(2)
 
-    eη = exp(-η)
-    P2 = 1 - eη * (1 + η)
-    P3 = 1 - eη * (1 + η + η^2 / 2)
-    evap_factor = P2 > 1e-9 ? max(eη * (η * P2 - 3 * P3) / P2^2, 0.0) : 0.0
+    evap_factor, κ̃ = evap_volume_factor(η)                 # 3D Luiten, no free parameter
     dN_evap = -Nth * γel * p.evap_scale * evap_factor      # only thermal atoms evaporate
-    dTT_evap = Nth > 0 ? (dN_evap / Nth) * (η + p.kappa - 3) / 3 : 0.0
+    dTT_evap = Nth > 0 ? (dN_evap / Nth) * (η + κ̃ - 3) / 3 : 0.0
 
     dN_bg = -N / p.tau_bg
     dN_3b = -_condensate_three_body_rate(N0, ω̄, p, m) * N0  # condensate three-body loss

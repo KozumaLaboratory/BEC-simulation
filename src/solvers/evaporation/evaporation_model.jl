@@ -11,7 +11,7 @@
 # for a 3-D harmonic trap. Background 1-body and (optional) 3-body loss included.
 
 export EvapTrap, EvapParams, EvapState, EvapResult
-export evap_rhs, phase_space_density, thermal_peak_density
+export evap_rhs, phase_space_density, thermal_peak_density, evap_volume_factor
 
 const _ZETA3 = 1.2020569031595942   # ζ(3), BEC onset PSD in a harmonic trap
 
@@ -45,8 +45,9 @@ n_beams(t::EvapTrap) = length(t.waists)
 
 Tunable physics knobs. `a_s` s-wave length [m], `tau_bg` 1-body vacuum lifetime
 [s], `K3` three-body loss coefficient [m⁶/s] (Eu unknown ⇒ default 0), `kappa`
-the excess-energy factor in dT/T, `eta_min` a soft truncated-Boltzmann floor (the
-evaporation rate is the all-η Luiten incomplete-gamma form, valid below it too),
+DEPRECATED/unused — the excess-energy factor in dT/T is now the theoretical `κ̃(η)`
+from [`evap_volume_factor`](@ref), not a constant. `eta_min` a soft truncated-Boltzmann
+floor (the evaporation rate is the all-η Luiten incomplete-gamma form, valid below it too),
 `evap_scale` a dimensionless prefactor on the elastic collision rate whose
 **theoretical value is 1** — the rate `γ_el = n₀ σ v̄/√2` is fully determined
 (`σ = 8π a_s²`, `v̄ = √(8k_BT/πm)`, and the peak density `n₀` matches the measured
@@ -113,6 +114,32 @@ thermal_peak_density(N::Real, T::Real, ω̄::Real, m::Real) =
     N * (m * ω̄^2 / (2π * Units.KB * T))^1.5
 
 """
+    evap_volume_factor(η) -> (V_evap/V_eff, κ̃)
+
+Truncated-Boltzmann evaporation in a 3D harmonic trap (Luiten–Reynolds–Walraven
+PRA 53, 381 (1996); Sackett et al.), with **no free parameter**. Returns the ratio
+of evaporation to effective volume — the fraction of elastic collisions that eject an
+atom — `V_evap/V_eff = e^{-η}(η P(3,η) − 4 P(4,η))/P(3,η)²`, and the excess-energy
+parameter `κ̃ = [1 − P(5,η)/P(3,η)]/[η − 4 P(4,η)/P(3,η)]` (energy carried by an
+evaporated atom beyond η k_B T, sets `dT/T = (dN/N)(η+κ̃−3)/3`). The `P(a,η)` are
+regularized lower incomplete gammas, closed form for integer `a`:
+`P(a,η) = 1 − e^{-η} Σ_{k<a} η^k/k!`. The `a=3` (P3,P4) values are the 3D-harmonic
+case (`a=2` would be a 2-D trap). → `(η−3)e^{-η}`, `κ̃→0` at large η; positive
+(spilling) at low η.
+"""
+@inline function evap_volume_factor(η::Float64)
+    eη = exp(-η)
+    P3 = 1 - eη * (1 + η + η^2 / 2)
+    P4 = 1 - eη * (1 + η + η^2 / 2 + η^3 / 6)
+    P5 = 1 - eη * (1 + η + η^2 / 2 + η^3 / 6 + η^4 / 24)
+    P3 <= 1e-9 && return (0.0, 0.0)
+    factor = max(eη * (η * P3 - 4 * P4) / P3^2, 0.0)
+    denom = η - 4 * P4 / P3
+    κ̃ = abs(denom) > 1e-9 ? (1 - P5 / P3) / denom : 0.0
+    (factor, κ̃)
+end
+
+"""
     evap_rhs(N, T, U, ω̄, p, m; dlnω_dt=0.0) -> (dN, dT)
 
 Right-hand side of the (N, T) evaporation ODEs at trap depth `U` [J] and mean
@@ -134,16 +161,11 @@ function evap_rhs(N::Float64, T::Float64, U::Float64, ω̄::Float64, p::EvapPara
     σ = 8π * p.a_s^2
     γel = n0 * σ * v̄ / sqrt(2)                       # per-atom elastic rate
 
-    # evaporation (truncated Boltzmann, Luiten-Reynolds-Walraven incomplete-gamma form,
-    # valid for ALL η): rate ∝ e^{-η}(η·P(2,η) − 3·P(3,η))/P(2,η)², with the regularized
-    # lower incomplete gammas P(2,η)=1−e^{-η}(1+η), P(3,η)=1−e^{-η}(1+η+η²/2) in closed
-    # form. → ~(η−3)e^{-η} at large η, stays positive (spilling) at low η — no hard cutoff.
-    eη = exp(-η)
-    P2 = 1 - eη * (1 + η)
-    P3 = 1 - eη * (1 + η + η^2 / 2)
-    evap_factor = P2 > 1e-9 ? max(eη * (η * P2 - 3 * P3) / P2^2, 0.0) : 0.0
+    # evaporation: 3D-harmonic truncated-Boltzmann (Luiten), no free parameter. The
+    # volume factor V_evap/V_eff and the excess-energy κ̃ are both fixed by η.
+    evap_factor, κ̃ = evap_volume_factor(η)
     dN_evap = -N * γel * p.evap_scale * evap_factor
-    dTT_evap = N > 0 ? (dN_evap / N) * (η + p.kappa - 3) / 3 : 0.0
+    dTT_evap = N > 0 ? (dN_evap / N) * (η + κ̃ - 3) / 3 : 0.0
 
     # background 1-body loss
     dN_bg = -N / p.tau_bg
