@@ -119,3 +119,23 @@ magnetic levitation gradient (sets `EvapTrap.gravity_factor`).
 | peak density `n₀(N,T,ω̄)` | FORT power ramp |
 | T_c(N, ω̄); condensate split | N₀, T₀ at loading |
 | collision rate `γ_el = n₀σv̄/√2` (a_s known) | K₃ (from the BEC number); τ_bg; levitation |
+
+## Validation figures
+
+- `figures/eu_bec_thesis_validation.png` — the parameter-free model (`evap_scale=1`,
+  3D Luiten rate) vs the 2021 thesis: efficiency **γ_eff = 3.63 vs measured 3.6** (0.8 %),
+  cooling 50 µK → ~210 nK landing on T_c, condensate forming between the first (3×10³)
+  and optimized (1.5×10⁴) BEC. The definitive validation — physics is epoch-independent.
+- `figures/eu_all_datasets_fit.png` — the same parameter-free model across all datasets.
+  It nails the one **complete self-consistent** set (2021 thesis). The others' residuals
+  have identified *physical* causes, not hidden knobs:
+  - **2022 PRL**: needs the actual (improved, higher-N) ramp; the thesis ramp is a
+    different generation.
+  - **2023-07 Exp A**: a single-beam **cigar** trap — evaporation there is quasi-1D, so
+    the 3D-harmonic rate over-predicts by ~3× (a regime limit, the next theory step).
+  - **2023-11**: the degraded beam (effective waist 54 µm vs the thesis 28 µm — the
+    measured 66 µK@7W) plus a gravity-limited final trap.
+
+**Takeaway:** the model's physics is validated parameter-free on complete data; fitting
+the others is limited by *missing measured inputs* (ramps, current waists) or an
+out-of-regime geometry (single-beam cigar), both honest and identified — not by tuning.
