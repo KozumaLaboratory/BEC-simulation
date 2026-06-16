@@ -7,7 +7,7 @@ using SpinorBEC: GaussianBeam, CrossedDipoleTrap, Eu151, Units,
     rayleigh_range, beam_depth, beam_frequencies,
     crossed_trap_frequencies, mean_trap_frequency, crossed_trap_depth,
     EvapTrap, EvapParams, evap_rhs, phase_space_density,
-    FortRamp, fort_power_at, trap_at, run_evaporation,
+    FortRamp, fort_power_at, trap_at, run_evaporation, evaporation_diagnostics,
     ramp_from_params,
     hfort_power, hfort_volts, vfort_power, vfort_volts, sfort_power, sfort_volts,
     euv3_evaporation_ramp,
@@ -128,6 +128,28 @@ _euv3_ramp() = FortRamp(
         @test 1 < res.N_BEC < 2e6
         @test res.gamma_eff > 1                        # efficient (PSD↑ per atom lost)
         @test phase_space_density(res.N_BEC, res.T_BEC, res.omega_bar[end]) ≈ 1.202 rtol = 0.1
+    end
+
+    @testset "evaporation_diagnostics figures of merit" begin
+        trap = _eu_trap()
+        p = EvapParams(; a_s=_as, tau_bg=10.0, K3=0.0)
+        res = run_evaporation(trap, _euv3_ramp(), p; N0=2e6, T0=40e-6)
+        d = evaporation_diagnostics(res, trap, p)
+        @test d.eta_start ≈ res.eta[1]
+        @test d.eta_min ≈ minimum(res.eta)
+        @test d.runaway                                  # this config runs away to BEC
+        @test d.collision_ratio_R > 1                    # elastic ≫ loss (here τ=10, K3=0)
+        @test d.collisions_per_atom > 0
+        @test d.gamma_el_peak >= d.gamma_el_start
+        # R scales with the loss rate: shorter τ_bg ⇒ more bad events ⇒ lower R
+        dτ = evaporation_diagnostics(
+            run_evaporation(trap, _euv3_ramp(), EvapParams(; a_s=_as, tau_bg=1.0, K3=0.0);
+                N0=2e6, T0=40e-6), trap, EvapParams(; a_s=_as, tau_bg=1.0, K3=0.0))
+        @test dτ.collision_ratio_R < d.collision_ratio_R
+        # a deep static trap never reaches BEC ⇒ not a runaway
+        deep = run_evaporation(trap, FortRamp([0.0, 1.0], fill(50.0, 3, 2)), p;
+            N0=2e6, T0=40e-6, dt=1e-3)
+        @test !evaporation_diagnostics(deep, trap, p).runaway
     end
 
     @testset "gravity lowers the trap depth" begin

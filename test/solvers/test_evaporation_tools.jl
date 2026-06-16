@@ -7,7 +7,8 @@ using SpinorBEC
 using SpinorBEC: Eu151, EvapTrap, EvapParams, FortRamp, run_evaporation,
     optimize_evaporation_ramp, scan_ramp_param, scan_ramp_2d, fit_euv3_K3,
     optimize_euv3_evaporation, run_euv3_evaporation,
-    ramp_scale_powers, optimize_ramp_coordinate, optimize_ramp_monotone
+    ramp_scale_powers, optimize_ramp_coordinate, optimize_ramp_monotone,
+    param_uncertainty_ensemble
 
 const _as_t = Eu151.a_s
 
@@ -143,5 +144,37 @@ _euv3_ramp_t() = FortRamp(
         out2 = optimize_ramp_monotone(trap, p, base; N0=2e6, T0=40e-6,
             n_sweeps=3, n_line=9, restarts=2, seed=4)
         @test out.fracs == out2.fracs
+    end
+
+    @testset "robust (worst-case ensemble) monotone optimizer" begin
+        trap = _eu_trap_t()
+        p = EvapParams(; a_s=_as_t, tau_bg=10.0, K3=1e-40)   # nonzero ⇒ K3 scaling differs
+        base = _euv3_ramp_t()
+        # ensemble over α and K3 uncertainty; nominal (1,1) omitted, added internally
+        ens = param_uncertainty_ensemble(trap, p; alpha_factors=(1.0, 1.1), K3_factors=(1.0, 2.0))
+        @test all(m -> m isa Tuple{EvapTrap, EvapParams}, ens)
+        @test !any(m -> m[1].alpha == trap.alpha && m[2].K3 == p.K3, ens)  # nominal omitted
+        out = optimize_ramp_monotone(trap, p, base; N0=2e6, T0=40e-6,
+            n_sweeps=3, n_line=9, restarts=1, seed=2, ensemble=ens)
+        @test out.result.reached_bec                       # nominal reaches BEC
+        # the chosen schedule reaches BEC for EVERY ensemble member (worst-case ≥ 1)
+        for (t, pp) in ens
+            @test run_evaporation(t, out.ramp, pp; N0=2e6, T0=40e-6).reached_bec
+        end
+    end
+
+    @testset "summary exposes eta_start + cooled; N_BEC=NaN when not reached" begin
+        trap = _eu_trap_t()
+        p = EvapParams(; a_s=_as_t, tau_bg=10.0, K3=0.0)
+        # deep static trap ⇒ no evaporation, no cooling, no BEC (only background N decay)
+        deep = FortRamp([0.0, 1.0], [50.0 50.0; 50.0 50.0; 50.0 50.0])
+        s = evaporation_summary(run_evaporation(trap, deep, p; N0=2e6, T0=40e-6, dt=1e-3))
+        @test !s.reached_bec
+        @test isnan(s.N_BEC)                               # no BEC ⇒ NaN, not leftover N
+        @test !s.cooled                                    # T held (background loss ≠ cooling)
+        @test s.eta_start > 4                              # deep trap ⇒ high η
+        # a ramp that does reach BEC reports finite N_BEC + cooled
+        s2 = evaporation_summary(run_evaporation(trap, _euv3_ramp_t(), p; N0=2e6, T0=40e-6))
+        @test s2.reached_bec && isfinite(s2.N_BEC) && s2.cooled
     end
 end

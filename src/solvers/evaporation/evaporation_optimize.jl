@@ -10,6 +10,7 @@
 
 export ramp_from_params, optimize_evaporation_ramp, scan_ramp_param, scan_ramp_2d
 export ramp_scale_powers, optimize_ramp_coordinate, optimize_ramp_monotone
+export param_uncertainty_ensemble
 
 """
     ramp_from_params(x, base) -> FortRamp
@@ -207,6 +208,37 @@ function optimize_ramp_coordinate(
 end
 
 """
+    param_uncertainty_ensemble(trap, p; alpha_factors=(0.9,1.0,1.1), K3_factors=(1.0,2.0))
+        -> Vector{Tuple{EvapTrap,EvapParams}}
+
+Build the `(trap, p)` uncertainty set for the robust `optimize_ramp_monotone(...;
+ensemble=...)`: the Cartesian product of `trap` with `alpha` scaled by each
+`alpha_factors` and `p` with `K3` scaled by each `K3_factors` (the calibration
+uncertainties most relevant to the BEC atom number). The nominal `(1.0, 1.0)` member
+is omitted — `optimize_ramp_monotone` adds the nominal `(trap, p)` itself.
+
+NOTE: pick `alpha_factors` so every member can still evaporate — if `α` is low enough
+that the loaded `η_start ≤ eta_min` the gas cannot evaporate for ANY ramp (a shallow
+*loaded trap*, not a ramp the optimizer can fix), and the worst case is then always
+failure. Check `evaporation_summary(...).eta_start` at the low-α member first.
+"""
+function param_uncertainty_ensemble(
+    trap::EvapTrap, p::EvapParams;
+    alpha_factors=(0.9, 1.0, 1.1), K3_factors=(1.0, 2.0))
+    ens = Tuple{EvapTrap, EvapParams}[]
+    for af in alpha_factors, kf in K3_factors
+        (af == 1.0 && kf == 1.0) && continue
+        t = EvapTrap(; wavelength=trap.wavelength, alpha=trap.alpha * af,
+            waists=trap.waists, directions=trap.directions, positions=trap.positions,
+            mass=trap.mass, gravity_axis=trap.gravity_axis)
+        pp = EvapParams(; a_s=p.a_s, tau_bg=p.tau_bg, K3=p.K3 * kf,
+            kappa=p.kappa, eta_min=p.eta_min)
+        push!(ens, (t, pp))
+    end
+    ens
+end
+
+"""
     _baseline_drop_fractions(base_ramp, frac_bounds) -> Matrix
 
 The lab ramp's own per-beam step-to-step power ratios, clamped to `frac_bounds`
@@ -242,15 +274,25 @@ relies on adiabatic-compression heating being modelled exactly), this stays insi
 realizable monotone family — so its optimum is a schedule the lab can actually run.
 On the experiment-matched euv3 defaults it finds N_BEC ≈ 3.2× the lab ramp by
 evaporating harder early (a steeper initial power drop, at high collision rate).
+
+`ensemble` (a `Vector{Tuple{EvapTrap,EvapParams}}`, default empty) makes the search
+**distributionally robust**: the score becomes the WORST-CASE `N_BEC` over the nominal
+`(trap,p)` plus every ensemble member, so a schedule is rewarded only if it reaches BEC
+*and* keeps a high atom number across the whole uncertainty set (e.g. `α` and `K₃`
+scaled by their calibration uncertainty — build it with [`param_uncertainty_ensemble`](@ref)).
+This trades peak N_BEC for a schedule that does not sit on a cliff. The returned
+`result`/`N_BEC` are still evaluated at the nominal `(trap,p)`.
 """
 function optimize_ramp_monotone(
     trap::EvapTrap, p::EvapParams, base_ramp::FortRamp;
     N0::Float64, T0::Float64, frac_bounds::Tuple{Float64, Float64}=(0.02, 1.0),
-    n_sweeps::Int=10, n_line::Int=21, restarts::Int=8, seed::Int=1)
+    n_sweeps::Int=10, n_line::Int=21, restarts::Int=8, seed::Int=1,
+    ensemble::Vector{Tuple{EvapTrap, EvapParams}}=Tuple{EvapTrap, EvapParams}[])
     nbeam, nb = size(base_ramp.powers_W)
     base1 = base_ramp.powers_W[:, 1]
     active = [(b, s) for b in 1:nbeam if base1[b] > 0 for s in 1:(nb - 1)]
     line = collect(range(frac_bounds[1], frac_bounds[2]; length=n_line))
+    members = vcat([(trap, p)], ensemble)   # nominal first; worst-case over all
 
     function mono_ramp(fr::Matrix{Float64})
         pw = copy(base_ramp.powers_W)
@@ -263,7 +305,17 @@ function optimize_ramp_monotone(
         end
         FortRamp(base_ramp.times, pw)
     end
-    score(fr) = _ramp_score(trap, p, mono_ramp(fr), N0, T0)[1]
+    # worst-case _ramp_score across the uncertainty ensemble (single nominal member ⇒
+    # the plain objective). A member that misses BEC scores in [−1,0), dragging the min
+    # below any BEC-reaching schedule — so the optimizer first makes ALL members reach BEC.
+    function score(fr)
+        ramp = mono_ramp(fr)
+        worst = Inf
+        for (t, pp) in members
+            worst = min(worst, _ramp_score(t, pp, ramp, N0, T0)[1])
+        end
+        worst
+    end
 
     function descend(start::Matrix{Float64})
         fr = copy(start)

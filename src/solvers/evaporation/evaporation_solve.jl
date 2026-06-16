@@ -8,6 +8,7 @@
 # stops at the BEC onset (PSD ≥ ζ(3)) or when η drops below the validity floor.
 
 export FortRamp, fort_power_at, trap_at, run_evaporation, evaporation_summary
+export evaporation_diagnostics
 
 """
     FortRamp(times, powers_W)
@@ -195,17 +196,74 @@ end
 """
     evaporation_summary(result) -> NamedTuple
 
-Condensed human-readable metrics of an `EvapResult`: BEC reached?, atom number,
+Condensed human-readable metrics of an `EvapResult`: BEC reached?, atom number
+(`NaN` when BEC is not reached — `r.N_BEC` is the final non-condensed `N` then),
 temperature [µK], onset time [s], efficiency `γ_eff = -dlnρ/dlnN`, the surviving
-fraction `N_BEC/N₀`, the peak phase-space density, and the η at onset.
+fraction `N_BEC/N₀`, the peak phase-space density, the η at onset, the η at the
+*loaded start* (`eta_start` — if ≲ `eta_min` evaporation can't even begin: a shallow
+loaded trap, NOT a ramp problem), and whether the gas cooled at all (`cooled` — a deep
+static trap with only background loss decays `N` but keeps `T`, so `cooled=false`).
 """
 function evaporation_summary(r::EvapResult)
-    (reached_bec=r.reached_bec,
-        N_BEC=r.N_BEC,
+    reached = r.reached_bec
+    (reached_bec=reached,
+        N_BEC=reached ? r.N_BEC : NaN,
         T_BEC_uK=r.T_BEC * 1e6,
         t_BEC_s=r.t_BEC,
         gamma_eff=r.gamma_eff,
-        survival=isempty(r.N) ? NaN : r.N_BEC / r.N[1],
+        survival=(reached && !isempty(r.N)) ? r.N_BEC / r.N[1] : NaN,
         peak_psd=isempty(r.psd) ? NaN : maximum(r.psd),
-        eta_onset=isempty(r.eta) ? NaN : r.eta[end])
+        eta_onset=isempty(r.eta) ? NaN : r.eta[end],
+        eta_start=isempty(r.eta) ? NaN : r.eta[1],
+        cooled=length(r.T) >= 2 && r.T[end] < r.T[1] * (1 - 1e-6))
+end
+
+# trapezoidal ∫ y dx over matching vectors
+function _trapz(x::Vector{Float64}, y::Vector{Float64})
+    s = 0.0
+    @inbounds for i in 2:length(x)
+        s += 0.5 * (y[i] + y[i - 1]) * (x[i] - x[i - 1])
+    end
+    s
+end
+
+"""
+    evaporation_diagnostics(r, trap, p) -> NamedTuple
+
+Standard evaporative-cooling figures of merit from an `EvapResult` — the questions an
+experimentalist asks *before* trusting a ramp, independent of whether it happened to
+reach BEC:
+
+- `eta_start` / `eta_min` — the truncation at the loaded start and its minimum over the
+  run. `eta_start ≲ eta_min(model) = 4` means the loaded trap is too shallow to evaporate
+  at all (raise the depth or lower `T₀`), NOT a ramp the optimizer can fix.
+- `collision_ratio_R = γ_el / (1/τ_bg + K₃⟨n²⟩)` at the start — the **good-to-bad
+  collision ratio**. Runaway evaporation needs `R` large (≳ 10²–10³); `R ≲ 50` means
+  background/3-body losses outrun elastic rethermalisation and evaporation stalls.
+- `gamma_el_start` / `gamma_el_peak` [1/s] — the elastic collision rate (sets the timescale).
+- `collisions_per_atom = ∫ γ_el dt` — total elastic collisions per atom over the ramp; a
+  few hundred is healthy, ≲ 10 is collisionally limited (too fast for the density).
+- `gamma_eff = −dlnρ/dlnN` — the realised efficiency; `runaway` — did ρ actually rise to BEC.
+
+`R` and `collisions_per_atom` are the model's answer to "is this trap configuration
+*capable* of runaway evaporation?", which `optimize_ramp_*` cannot change (they reshape
+the ramp, not the trap depth / collision rate).
+"""
+function evaporation_diagnostics(r::EvapResult, trap::EvapTrap, p::EvapParams)
+    isempty(r.t) && return (eta_start=NaN, eta_min=NaN, collision_ratio_R=NaN,
+        gamma_el_start=NaN, gamma_el_peak=NaN, collisions_per_atom=NaN,
+        gamma_eff=r.gamma_eff, runaway=false)
+    m = trap.mass
+    kB = Units.KB
+    n0_start = r.N[1] * (m * r.omega_bar[1]^2 / (2π * kB * r.T[1]))^1.5
+    loss_start = 1.0 / p.tau_bg + p.K3 * n0_start^2 / 3.0^1.5     # per-atom bad-event rate
+    R_start = loss_start > 0 ? r.gamma_el[1] / loss_start : Inf
+    (eta_start=r.eta[1],
+        eta_min=minimum(r.eta),
+        collision_ratio_R=R_start,
+        gamma_el_start=r.gamma_el[1],
+        gamma_el_peak=maximum(r.gamma_el),
+        collisions_per_atom=_trapz(r.t, r.gamma_el),
+        gamma_eff=r.gamma_eff,
+        runaway=length(r.psd) >= 2 && r.psd[end] > r.psd[1] && r.reached_bec)
 end

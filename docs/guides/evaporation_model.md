@@ -83,11 +83,32 @@ VFORT turn-on). With no args it uses the researched defaults; override with lab 
 using SpinorBEC
 res = run_euv3_evaporation()                       # researched defaults
 res = run_euv3_evaporation(; waists=[31e-6,42e-6,42e-6], alpha=1.25e-36, N0=3.5e6, T0=50e-6, tau_bg=15.0)
-evaporation_summary(res)        # (; reached_bec, N_BEC, T_BEC_uK, t_BEC_s, gamma_eff, survival, peak_psd, eta_onset)
+evaporation_summary(res)        # (; reached_bec, N_BEC[=NaN if !reached], T_BEC_uK, t_BEC_s, gamma_eff, survival, peak_psd, eta_onset, eta_start, cooled)
 
 # pin α from a measured single-beam radial trap frequency:
 calibrate_polarizability(; waist=42e-6, power_W=1.2, freq_Hz=217.0)
 ```
+
+### Is the trap capable of runaway evaporation? — `evaporation_diagnostics`
+
+Before optimizing the *ramp*, check whether the *trap* even supports runaway evaporation
+(the ramp optimizers reshape the schedule, not the trap depth or collision rate):
+
+```julia
+trap, p = euv3_evap_trap(), EvapParams(; a_s=Eu151.a_s, tau_bg=15, K3=1.61e-40)
+r = run_evaporation(trap, euv3_evaporation_ramp(), p; N0=3.5e6, T0=50e-6)
+evaporation_diagnostics(r, trap, p)
+# (; eta_start, eta_min, collision_ratio_R, gamma_el_start, gamma_el_peak,
+#    collisions_per_atom, gamma_eff, runaway)
+```
+
+On the researched euv3 defaults: `collision_ratio_R ≈ 6.4×10³` (good-to-bad collisions
+≫ the ~10²–10³ runaway threshold), `collisions_per_atom ≈ 6.7×10³` (≫ the few hundred
+needed — not collisionally limited), `γ_el ≈ 12 kHz`, `runaway = true`. The trap is
+**collisionally excellent**; the *only* marginal quantity is `eta_start ≈ 4.5` (the
+loaded depth vs `T₀ = 50 µK`, near the `eta_min = 4` floor). Real setups load at
+η ~ 7–10, so if your `eta_start` comes out near 4.5 the model is likely *under*estimating
+the loaded depth (raise `α`/power or lower `T₀` to match the measured loaded η).
 
 Optimize the ramp for max `N_BEC`. Three optimizers, increasing in reach:
 
@@ -113,6 +134,37 @@ out.ramp               # the optimized, monotone-decreasing FortRamp; out.fracs 
 out = optimize_ramp_coordinate(trap, p, euv3_evaporation_ramp(); N0=3.5e6, T0=50e-6, free=2:8)
 out.mults              # per-breakpoint power multipliers
 ```
+
+### Robustness — the optimum is near a cliff
+
+The ~3× headroom is a model prediction at a fitted `K₃` and a calibrated `α`. A
+sensitivity sweep shows the **headroom ratio is robust** (~3.1–3.5×) wherever
+evaporation works — across `K₃` ×0.5–1, `α` ×1.0–1.15, `τ_bg` 8–30 s. But the
+*aggressive* schedule sits near two cliffs:
+
+- **Loaded-depth floor.** Evaporation can only start if the loaded `η_start = U/(k_BT₀)`
+  exceeds `eta_min ≈ 4`. At the researched defaults `η_start ≈ 4.5` — marginal (real
+  setups load at η ~ 7–10, so the model likely *under*estimates the loaded depth). If
+  `α` is ~15 % below calibration, `η_start < 4` and **no ramp evaporates at all** —
+  check `evaporation_summary(...).eta_start` before trusting any optimization.
+- **3-body cliff.** The aggressive ramp reaches high density fast; if `K₃` is ~2× the
+  fit, it over-loses and may miss BEC while the gentle lab ramp still reaches it.
+
+For a schedule that does **not** sit on a cliff, optimize the **worst case** over the
+calibration-uncertainty set:
+
+```julia
+ens = param_uncertainty_ensemble(trap, p; alpha_factors=(0.95,1.1), K3_factors=(1.0,2.0))
+out = optimize_ramp_monotone(trap, p, euv3_evaporation_ramp();
+                             N0=3.5e6, T0=50e-6, ensemble=ens)   # max worst-case N_BEC
+```
+
+On the experiment-matched defaults (ensemble `α`×{0.95,1.1}, `K₃`×{1,2}), both the lab
+ramp **and** the aggressive optimum miss BEC somewhere in the box (worst-case N_BEC = 0).
+The robust schedule keeps essentially the full headroom (nominal 1.56×10⁵ ≈ 3.1×, vs the
+aggressive 1.57×10⁵) **and** reaches BEC across the whole box (worst-case ≈ 8.5×10⁴) —
+the cliff was a narrow basin, so the robustness costs < 1 % of peak atoms. Keep
+`alpha_factors` above the `η_start = eta_min` floor, or every member fails by construction.
 
 1-D landscape before trusting the optimizer:
 
@@ -165,7 +217,8 @@ inputs are supplied — see `EvapTrap` / `run_euv3_evaporation`.
 
 `src/solvers/evaporation/`: `trap_geometry.jl` (depth/frequencies on `GaussianBeam`),
 `evaporation_model.jl` (structs + `evap_rhs`, incl. adiabatic-heating term),
-`evaporation_solve.jl` (`FortRamp`, RK4 `run_evaporation`, `evaporation_summary`),
+`evaporation_solve.jl` (`FortRamp`, RK4 `run_evaporation`, `evaporation_summary`,
+`evaporation_diagnostics`),
 `evaporation_optimize.jl` (`optimize_ramp_monotone`, `optimize_ramp_coordinate`,
 `optimize_evaporation_ramp`, `scan_ramp_param`), `evaporation_handoff.jl`
 (`bec_handoff`), `euv3.jl` (lab calibration + ramp + one-call entry points).
