@@ -72,7 +72,7 @@ function _evap_rhs_bec(N::Float64, T::Float64, U::Float64, ω̄::Float64, p::Eva
         λ = Units.HBAR * sqrt(2π / (m * kB * T))          # thermal de Broglie wavelength
         n_th = 2.6123753486854883 / λ^3                   # ζ(3/2) = 2.612…
     else
-        n_th = N * (m * ω̄^2 / (2π * kB * T))^1.5
+        n_th = thermal_peak_density(N, T, ω̄, m)
     end
     v̄ = sqrt(8 * kB * T / (π * m))
     σ = 8π * p.a_s^2

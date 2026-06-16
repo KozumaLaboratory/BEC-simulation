@@ -133,7 +133,7 @@ function run_evaporation(
 
     function record!(U, ω̄)
         η = U / (Units.KB * T)
-        n0 = N * (m * ω̄^2 / (2π * Units.KB * T))^1.5
+        n0 = thermal_peak_density(N, T, ω̄, m)
         γel = n0 * (8π * p.a_s^2) * sqrt(8 * Units.KB * T / (π * m)) / sqrt(2)
         push!(ts, t)
         push!(Ns, N)

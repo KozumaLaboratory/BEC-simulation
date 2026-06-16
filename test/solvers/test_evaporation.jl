@@ -6,7 +6,7 @@ using SpinorBEC
 using SpinorBEC: GaussianBeam, CrossedDipoleTrap, Eu151, Units,
     rayleigh_range, beam_depth, beam_frequencies,
     crossed_trap_frequencies, mean_trap_frequency, crossed_trap_depth,
-    EvapTrap, EvapParams, evap_rhs, phase_space_density,
+    EvapTrap, EvapParams, evap_rhs, phase_space_density, thermal_peak_density,
     FortRamp, fort_power_at, trap_at, run_evaporation, evaporation_diagnostics,
     ramp_from_params,
     hfort_power, hfort_volts, vfort_power, vfort_volts, sfort_power, sfort_volts,
@@ -58,6 +58,22 @@ _euv3_ramp() = FortRamp(
     @testset "phase-space density formula" begin
         N, T, ω̄ = 1e5, 1e-6, 2π * 100
         @test phase_space_density(N, T, ω̄) ≈ N * (Units.HBAR * ω̄ / (Units.KB * T))^3
+    end
+
+    @testset "collision rate is theory-determined (evap_scale = 1)" begin
+        # at the Eu BEC loading point (PRL 129,223401: N=3.5e6, 50µK, ω̄=2π·432 Hz) the
+        # peak density and PSD match the measured values ⇒ γ_el = n₀σv̄/√2 is fixed, no
+        # free prefactor: evap_scale's physical value is 1.
+        N, T, ω̄ = 3.5e6, 50e-6, 2π * (30 * 1500 * 1800)^(1 / 3)
+        n0 = thermal_peak_density(N, T, ω̄, _m)
+        @test n0 / 1e6 ≈ 3.3e13 rtol = 0.1                 # paper: 3.3×10¹³ cm⁻³
+        @test phase_space_density(N, T, ω̄) ≈ 2.7e-4 rtol = 0.1  # paper: 2.7×10⁻⁴
+        @test EvapParams(; a_s=_as, tau_bg=1.0).evap_scale == 1.0   # default = theory
+        # evap_scale multiplies the rate linearly (it is a prefactor, not a knob to tune)
+        ω, U = 2π * 200, 8.0 * Units.KB * 30e-6
+        p1 = EvapParams(; a_s=_as, tau_bg=Inf, evap_scale=1.0)
+        p2 = EvapParams(; a_s=_as, tau_bg=Inf, evap_scale=2.0)
+        @test evap_rhs(1e6, 30e-6, U, ω, p2, _m)[1] ≈ 2 * evap_rhs(1e6, 30e-6, U, ω, p1, _m)[1]
     end
 
     @testset "evap_rhs scaling coefficient + thresholds" begin

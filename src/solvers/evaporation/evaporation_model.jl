@@ -11,7 +11,7 @@
 # for a 3-D harmonic trap. Background 1-body and (optional) 3-body loss included.
 
 export EvapTrap, EvapParams, EvapState, EvapResult
-export evap_rhs, phase_space_density
+export evap_rhs, phase_space_density, thermal_peak_density
 
 const _ZETA3 = 1.2020569031595942   # ζ(3), BEC onset PSD in a harmonic trap
 
@@ -47,8 +47,12 @@ Tunable physics knobs. `a_s` s-wave length [m], `tau_bg` 1-body vacuum lifetime
 [s], `K3` three-body loss coefficient [m⁶/s] (Eu unknown ⇒ default 0), `kappa`
 the excess-energy factor in dT/T, `eta_min` a soft truncated-Boltzmann floor (the
 evaporation rate is the all-η Luiten incomplete-gamma form, valid below it too),
-`evap_scale` a dimensionless calibration prefactor on the elastic collision rate
-(< 1 when the cloud is less dense than the peak-thermal estimate, e.g. gravity sag).
+`evap_scale` a dimensionless prefactor on the elastic collision rate whose
+**theoretical value is 1** — the rate `γ_el = n₀ σ v̄/√2` is fully determined
+(`σ = 8π a_s²`, `v̄ = √(8k_BT/πm)`, and the peak density `n₀` matches the measured
+¹⁵¹Eu BEC loading value to ~6 %, see [`thermal_peak_density`](@ref)). It is NOT a fit
+parameter; keep it at 1 and treat any need to move it as a model-regime symptom to fix
+(e.g. the peak-thermal density is a poor proxy for a strongly-truncated η≲4 cloud).
 """
 Base.@kwdef struct EvapParams
     a_s::Float64
@@ -97,6 +101,18 @@ phase_space_density(N::Real, T::Real, ω̄::Real) =
     N * (Units.HBAR * ω̄ / (Units.KB * T))^3
 
 """
+    thermal_peak_density(N, T, ω̄, m) -> n₀ [m⁻³]
+
+Peak density of a thermal cloud, `n₀ = N (m ω̄²/(2π k_B T))^{3/2}`. Together with the
+known cross section `σ = 8π a_s²` and mean speed `v̄ = √(8 k_B T/π m)` this FULLY
+determines the elastic collision rate `γ_el = n₀ σ v̄/√2` — there is no free
+prefactor. (At the ¹⁵¹Eu BEC loading point N=3.5×10⁶, T=50 µK, ω̄=2π·432 Hz it gives
+≈ 3.1×10¹³ cm⁻³, matching the measured 3.3×10¹³ — see `EvapParams.evap_scale`.)
+"""
+thermal_peak_density(N::Real, T::Real, ω̄::Real, m::Real) =
+    N * (m * ω̄^2 / (2π * Units.KB * T))^1.5
+
+"""
     evap_rhs(N, T, U, ω̄, p, m; dlnω_dt=0.0) -> (dN, dT)
 
 Right-hand side of the (N, T) evaporation ODEs at trap depth `U` [J] and mean
@@ -113,7 +129,7 @@ function evap_rhs(N::Float64, T::Float64, U::Float64, ω̄::Float64, p::EvapPara
     kB = Units.KB
     η = U / (kB * T)
     # peak density n₀ = N (m ω̄² / (2π k_B T))^{3/2}
-    n0 = N * (m * ω̄^2 / (2π * kB * T))^1.5
+    n0 = thermal_peak_density(N, T, ω̄, m)
     v̄ = sqrt(8 * kB * T / (π * m))
     σ = 8π * p.a_s^2
     γel = n0 * σ * v̄ / sqrt(2)                       # per-atom elastic rate
