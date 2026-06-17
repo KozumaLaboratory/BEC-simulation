@@ -170,3 +170,41 @@ magnetic levitation gradient (sets `EvapTrap.gravity_factor`).
 **Takeaway:** the model's physics is validated parameter-free on complete data; fitting
 the others is limited by *missing measured inputs* (ramps, current waists) or an
 out-of-regime geometry (single-beam cigar), both honest and identified — not by tuning.
+
+## Validated physics (2026-06-17) — all parameter-free, no `evap_scale` fudge
+
+Three corrections turned the model from order-of-magnitude to quantitative, each pinned to
+DIRECT data, none a fit knob:
+
+1. **Polarizability α = 5.88×10⁻³⁷ J/(W·m⁻²)** (≈189 a.u.). Fixed by the 2022 PRL loading
+   depth (350 µK @ 10 W single-H, waist √(31·25)=27.8 µm). The SAME α reproduces the measured
+   (97,226,217) Hz final trap at a crossed H=V≈0.18 W. The earlier 1.25×10⁻³⁶ was an
+   epoch-mixing artifact (PRL frequencies forced onto the current euv3 0.14/0.09 W powers) +
+   a wrong waist (31 µm long axis instead of the 25 µm short axis for ν_z).
+
+2. **Cooling law `L = dlnT/dlnN = (ε̄−3)/3`**, ε̄ = 3(1−P4)/(1−P3) (O'Hara energy balance,
+   evaporated atom carries ε̄≈η+1 k_BT). → (η−2)/3 at large η, gently → 0 at low η. The old
+   `(η−3)/3` form mis-cooled. **Validated against the 7 W single-FORT hold**: measured
+   dlnT/dlnN ≈ 0.8 at η≈4, model 0.82.
+
+3. **Energy-dependent cross section `σ(E) = 8πa²/(1+E/E₀)`**, E₀=ℏ²/(m a²)≈95 µK, with the
+   evaporative-collision energy ≈ 2η k_BT. This rate-limits HOT/high-η evaporation (the 7 W
+   hold plateaus at η=6.3, not the σ-constant η=8 — matching the note) and leaves COLD clouds
+   at full σ. It is the regime-distinguishing term that resolved the opposite-pull between the
+   7 W and 1.1 W holds (the note's Feshbach remark corroborates a tunable σ).
+
+Lab ground truth (蒸発冷却.pdf, 2023-07-19): 7 W hold @ **0.2 G**, depth **66 µK**, η **3.7→6.3**
+over 7 s, τ_bg **36 s**, first 0.2 s = loading transient. 1.1 W hold: depth 5 µK (gravity halves
+the shallow trap). With/without 3 G near-identical (the note itself blames possible 583 nm noise
+for the small difference — not a clean spin effect). The 1.1 W under-cools in the model (super-
+dilute, ~2 collisions/atom; the note flags its N data as too noisy to trust).
+
+## Design recommendation — narrow the FORT waist (answers the note's question)
+
+The note ends asking "ビームウエストを細くするしかないのだろうか" (must we narrow the beam?).
+The validated model says **yes, and quantifies it** (`eu_evaporation_waist_design.png`): at the
+current ~53.6 µm the cloud loads at η≈2.9 (marginal — slow spilling, the lab's pain), and a 7 W
+hold never reaches η=8 in 10 s, retaining only ~29 % of atoms. **Narrowing to ~40–45 µm** lifts
+the loading to η≈5 (the efficient regime), reaches η=8 in ~2 s, and retains ~50 %. Physics:
+depth ∝ 1/w², density ∝ 1/w⁴ — both push evaporation out of the marginal regime. The note's goal
+"η~8 for efficient evaporation" is reached at w ≲ 40 µm.
