@@ -165,7 +165,14 @@ added by the caller.
     p::EvapParams, m::Float64, dlnω_dt::Float64)
     kB = Units.KB
     v̄ = sqrt(8 * kB * T / (π * m))
-    γel = n * 8π * p.a_s^2 * v̄ / sqrt(2)             # per-atom elastic rate, γ = n σ v̄/√2
+    # energy-dependent s-wave cross section σ(E)=8πa²/(1+E/E₀), E₀=ℏ²/(m a²) (k²a²=1). The atoms
+    # that drive EVAPORATION collide at relative energy ≈ 2η k_BT (the escaping atom carries
+    # >η k_BT), so the effective σ is reduced for a hot, deeply-truncated cloud. This is the
+    # regime-distinguishing term: it rate-limits hot/high-η evaporation (validated — the 7W ¹⁵¹Eu
+    # hold plateaus at η=6.3, not the σ-constant η=8) while leaving cold (low-η) clouds at full σ.
+    E0 = Units.HBAR^2 / (m * p.a_s^2)
+    σ = 8π * p.a_s^2 / (1 + 2 * η * kB * T / E0)
+    γel = n * σ * v̄ / sqrt(2)                        # per-atom elastic rate, γ = n σ v̄/√2
     # evaporation: 3D-harmonic truncated-Boltzmann (Luiten), no free parameter. evap_factor is
     # the eject fraction (all-η spilling rate); L = dlnT/dlnN is the O'Hara energy-balance
     # cooling law (gentle at low η, → (η−2)/3 at large η — no clamp needed).
