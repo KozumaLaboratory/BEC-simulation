@@ -77,27 +77,27 @@ _euv3_ramp() = FortRamp(
         @test evap_rhs(1e6, 30e-6, U, ω, p2, _m)[1] ≈ 2 * evap_rhs(1e6, 30e-6, U, ω, p1, _m)[1]
     end
 
-    @testset "energy-dependent cross section σ(E) rate-limits hot/high-η evaporation" begin
-        # σ(E)=8πa²/(1+2η k_BT/E₀), E₀=ℏ²/(m a²). Evaporating atoms collide at ~2η k_BT, so the
-        # effective σ drops for a hot, deeply-truncated cloud — the regime-distinguishing term.
+    @testset "s-wave unitarity cross section σ(T) lowers the hot-cloud rate" begin
+        # σ(T)=8πa²/(1+k²a²), k²a²=2(m k_BT/ℏ²)a² (flux-weighted 2k_BT). T-dependent (NOT η), so it
+        # reduces the elastic rate of a HOT cloud and leaves a COLD cloud near full s-wave σ.
         ħ = Units.HBAR
-        E0 = ħ^2 / (_m * _as^2)
         ω̄, N = 2π * 200, 1e6
-        # extract the effective σ from the evaporation-only rate (no bg/3-body)
         p = EvapParams(; a_s=_as, tau_bg=Inf, K3=0.0)
+        # extract the effective σ from the evaporation-only rate (no bg/3-body)
         function σ_eff(T, η)
             dN, _ = evap_rhs(N, T, η * Units.KB * T, ω̄, p, _m)
             n0 = thermal_peak_density(N, T, ω̄, _m)
             v̄ = sqrt(8 * Units.KB * T / (π * _m))
             f, _ = evap_volume_factor(η)
-            -dN / (N * n0 * v̄ / sqrt(2) * f)            # = σ(E)
+            -dN / (N * n0 * v̄ / sqrt(2) * f)            # = σ(T)
         end
+        σ0 = 8π * _as^2
         for (T, η) in ((5e-6, 5.0), (30e-6, 6.0), (60e-6, 8.0))
-            @test σ_eff(T, η) ≈ 8π * _as^2 / (1 + 2 * η * Units.KB * T / E0) rtol = 1e-9
+            @test σ_eff(T, η) ≈ σ0 / (1 + 2 * _m * Units.KB * T / ħ^2 * _as^2) rtol = 1e-9
+            @test σ_eff(T, η) ≈ σ_eff(T, η + 2.0) rtol = 1e-9   # depends on T only, NOT η
         end
-        # cold/low-η → full s-wave σ; hot/high-η → suppressed
-        @test σ_eff(0.5e-6, 3.0) ≈ 8π * _as^2 rtol = 0.05            # ≈ unitless-limit σ₀
-        @test σ_eff(60e-6, 8.0) < 0.6 * 8π * _as^2                   # strongly reduced when hot+deep
+        @test σ_eff(0.2e-6, 3.0) ≈ σ0 rtol = 0.02       # cold → full s-wave σ₀
+        @test σ_eff(60e-6, 8.0) < 0.85 * σ0             # reduced when hot (unitarity)
     end
 
     @testset "evap_rhs scaling coefficient + thresholds" begin

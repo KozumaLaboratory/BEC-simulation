@@ -165,13 +165,14 @@ added by the caller.
     p::EvapParams, m::Float64, dlnω_dt::Float64)
     kB = Units.KB
     v̄ = sqrt(8 * kB * T / (π * m))
-    # energy-dependent s-wave cross section σ(E)=8πa²/(1+E/E₀), E₀=ℏ²/(m a²) (k²a²=1). The atoms
-    # that drive EVAPORATION collide at relative energy ≈ 2η k_BT (the escaping atom carries
-    # >η k_BT), so the effective σ is reduced for a hot, deeply-truncated cloud. This is the
-    # regime-distinguishing term: it rate-limits hot/high-η evaporation (validated — the 7W ¹⁵¹Eu
-    # hold plateaus at η=6.3, not the σ-constant η=8) while leaving cold (low-η) clouds at full σ.
-    E0 = Units.HBAR^2 / (m * p.a_s^2)
-    σ = 8π * p.a_s^2 / (1 + 2 * η * kB * T / E0)
+    # s-wave unitarity (effective-range) cross section σ(T)=8πa²/(1+k²a²), with the flux-weighted
+    # mean relative collision energy 2k_BT ⇒ k²a² = 2(m k_BT/ℏ²)a². Textbook directional correction:
+    # it lowers the elastic rate of a HOT cloud (~15% at 16µK, ~10% at 10µK for Eu a=110a₀), and
+    # leaves a COLD cloud near the full s-wave σ. The σ-constant form over-counts hot-cloud
+    # collisions and over-evaporates (the 7W ¹⁵¹Eu hold's one-sided model-too-cold residual). This
+    # is NOT the spurious 2× dipolar enhancement (retracted); it is the unitarity limit.
+    k2a2 = 2 * m * kB * T / Units.HBAR^2 * p.a_s^2
+    σ = 8π * p.a_s^2 / (1 + k2a2)
     γel = n * σ * v̄ / sqrt(2)                        # per-atom elastic rate, γ = n σ v̄/√2
     # evaporation: 3D-harmonic truncated-Boltzmann (Luiten), no free parameter. evap_factor is
     # the eject fraction (all-η spilling rate); L = dlnT/dlnN is the O'Hara energy-balance
