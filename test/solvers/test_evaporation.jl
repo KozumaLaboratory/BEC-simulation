@@ -84,14 +84,10 @@ _euv3_ramp() = FortRamp(
         U = η * Units.KB * T
         dN, dT = evap_rhs(N, T, U, ω̄, p, _m)
         @test dN < 0                                   # atoms leave
-        # dT/T = (dN/N)·L with the truncated-cloud energy-balance coefficient L(η), η>eta_min
+        # dT/T = (dN/N)·L with the O'Hara energy-balance cooling coefficient L(η) = (ε̄−3)/3
         _, L = evap_volume_factor(η)
         @test (dT / dN) * (N / T) ≈ L rtol = 1e-10
-        # below eta_min the energy-balance L is clamped (quasi-equilibrium breaks); the rate is not
-        η_lo = 2.5
-        _, dT_lo = evap_rhs(N, T, η_lo * Units.KB * T, ω̄, p, _m)
-        dN_lo2, _ = evap_rhs(N, T, η_lo * Units.KB * T, ω̄, p, _m)
-        @test (dT_lo / dN_lo2) * (N / T) ≈ evap_volume_factor(p.eta_min)[2] rtol = 1e-10
+        @test 0 < L                                    # net cooling at η=8
         # all-η Luiten form: still evaporates below η=4 (spilling), faster than at η=8
         dN_low, _ = evap_rhs(N, T, 3.0 * Units.KB * T, ω̄, p, _m)   # η = 3
         @test dN_low < 0                                # active (not inert)
@@ -122,15 +118,14 @@ _euv3_ramp() = FortRamp(
         for η in (8.0, 10.0, 12.0)
             @test evap_volume_factor(η)[1] ≈ (η - 4) * exp(-η) rtol = 0.05
         end
-        # L = dlnT/dlnN → (η−2)/3 (O'Hara) only asymptotically (c→3 slowly)
+        # L = dlnT/dlnN = (ε̄−3)/3 → (η−2)/3 (O'Hara) at large η, gently → 0 at low η.
         for η in (20.0, 30.0, 50.0)
             @test evap_volume_factor(η)[2] ≈ (η - 2) / 3 rtol = 0.02
         end
-        # L is U-shaped: steep at low η (truncated cloud cools efficiently), min near η≈8, then
-        # grows ~(η−2)/3. Low-η L is far above the old (η−3)/3 form (which → 0 at η=3).
-        @test evap_volume_factor(3.0)[2] > evap_volume_factor(6.0)[2]   # steep low-η side
-        @test evap_volume_factor(8.0)[2] < evap_volume_factor(20.0)[2]  # rises again at high η
-        @test evap_volume_factor(3.0)[2] > 3.0                          # L(η=3) ≫ (η−3)/3 = 0
+        # L is monotone increasing and gentle at low η (validated: 7 W hold dlnT/dlnN≈0.8 at η≈4)
+        @test evap_volume_factor(3.0)[2] < evap_volume_factor(6.0)[2] < evap_volume_factor(12.0)[2]
+        @test 0 < evap_volume_factor(4.0)[2] < 1.0                      # L(η=4) ≈ 0.82 (matches hold)
+        @test evap_volume_factor(2.0)[2] < 0.5                          # gentle at low η (no runaway)
         @test evap_volume_factor(3.0)[1] > 0                            # spilling at low η
         @test evap_volume_factor(15.0)[1] < evap_volume_factor(6.0)[1] # suppressed at high η
     end

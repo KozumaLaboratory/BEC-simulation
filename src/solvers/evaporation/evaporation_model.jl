@@ -139,14 +139,13 @@ PRA 53, 381 (1996); O'Hara PRA 64, 051403 (2001)), with **no free parameter**. R
     P4 = 1 - eη * (1 + η + η^2 / 2 + η^3 / 6)
     P3 <= 1e-9 && return (0.0, 0.0)
     factor = max(eη * (η * P3 - 4 * P4) / P3^2, 0.0)
-    # temperature-law coefficient L = dlnT/dlnN from the truncated-cloud energy balance
-    c = 3 * P4 / P3                               # ⟨E⟩/kT of the trapped cloud
-    ε̄ = (1 - P3) > 1e-12 ? 3 * (1 - P4) / (1 - P3) : η + 1.0  # evaporated-atom energy /kT
-    P3p = eη * η^2 / 2                            # dP3/dη
-    P4p = eη * η^3 / 6                            # dP4/dη
-    cp = 3 * (P4p * P3 - P4 * P3p) / P3^2         # dc/dη
-    denom = c - η * cp
-    L = abs(denom) > 1e-9 ? (ε̄ - c) / denom : (η - 2) / 3
+    # temperature-law coefficient L = dlnT/dlnN (O'Hara energy balance, 3-D harmonic cloud,
+    # mean energy 3 k_BT). An evaporated atom (ε>η) carries ε̄ = Γ(4,η)/Γ(3,η) = 3(1−P4)/(1−P3) k_BT
+    # (≈ η+1 at large η, → 3 at η→0). L = (ε̄ − 3)/3 → (η−2)/3 at large η, and → 0 gently at low η
+    # (no runaway — a barely-trapped cloud's escaping atoms carry ≈ the mean energy, so they
+    # cool little). Validated against a 7 W single-beam hold: T 17.7→10.7 µK, dlnT/dlnN ≈ 0.8.
+    ε̄ = (1 - P3) > 1e-12 ? 3 * (1 - P4) / (1 - P3) : η + 1.0
+    L = (ε̄ - 3) / 3
     (factor, L)
 end
 
@@ -167,13 +166,10 @@ added by the caller.
     kB = Units.KB
     v̄ = sqrt(8 * kB * T / (π * m))
     γel = n * 8π * p.a_s^2 * v̄ / sqrt(2)             # per-atom elastic rate, γ = n σ v̄/√2
-    # evaporation: 3D-harmonic truncated-Boltzmann (Luiten), no free parameter. evap_factor
-    # is the eject fraction (all-η spilling rate); L = dlnT/dlnN is the truncated-cloud
-    # energy-balance cooling law. Below η = eta_min the quasi-equilibrium assumption fails
-    # (the cloud cannot rethermalise faster than it spills) and the energy-balance L diverges
-    # unphysically — clamp L to its eta_min value there (the rate itself stays the real η form).
-    evap_factor, _ = evap_volume_factor(η)
-    _, L = evap_volume_factor(max(η, p.eta_min))
+    # evaporation: 3D-harmonic truncated-Boltzmann (Luiten), no free parameter. evap_factor is
+    # the eject fraction (all-η spilling rate); L = dlnT/dlnN is the O'Hara energy-balance
+    # cooling law (gentle at low η, → (η−2)/3 at large η — no clamp needed).
+    evap_factor, L = evap_volume_factor(η)
     dN_evap = -Nev * γel * p.evap_scale * evap_factor
     dTT_evap = Nev > 0 ? (dN_evap / Nev) * L : 0.0
     # three-body loss + antievaporative heating (center-weighted, ⟨n²⟩ = n²/3^{3/2})
