@@ -114,29 +114,40 @@ thermal_peak_density(N::Real, T::Real, ω̄::Real, m::Real) =
     (N <= 0 || T <= 0) ? 0.0 : N * (m * ω̄^2 / (2π * Units.KB * T))^1.5
 
 """
-    evap_volume_factor(η) -> (V_evap/V_eff, κ̃)
+    evap_volume_factor(η) -> (V_evap/V_eff, L)
 
 Truncated-Boltzmann evaporation in a 3D harmonic trap (Luiten–Reynolds–Walraven
-PRA 53, 381 (1996); Sackett et al.), with **no free parameter**. Returns the ratio
-of evaporation to effective volume — the fraction of elastic collisions that eject an
-atom — `V_evap/V_eff = e^{-η}(η P(3,η) − 4 P(4,η))/P(3,η)²`, and the excess-energy
-parameter `κ̃ = [1 − P(5,η)/P(3,η)]/[η − 4 P(4,η)/P(3,η)]` (energy carried by an
-evaporated atom beyond η k_B T, sets `dT/T = (dN/N)(η+κ̃−3)/3`). The `P(a,η)` are
-regularized lower incomplete gammas, closed form for integer `a`:
-`P(a,η) = 1 − e^{-η} Σ_{k<a} η^k/k!`. The `a=3` (P3,P4) values are the 3D-harmonic
-case (`a=2` would be a 2-D trap). → `(η−3)e^{-η}`, `κ̃→0` at large η; positive
-(spilling) at low η.
+PRA 53, 381 (1996); O'Hara PRA 64, 051403 (2001)), with **no free parameter**. Returns:
+
+1. `V_evap/V_eff = e^{-η}(η P(3,η) − 4 P(4,η))/P(3,η)²` — the fraction of elastic
+   collisions that eject an atom (→ `(η−4)e^{-η}` at large η; `a=2`/P2,P3 would be a 2-D
+   trap). `P(a,η) = 1 − e^{-η} Σ_{k<a} η^k/k!` are regularized lower incomplete gammas.
+
+2. `L = dln T / dln N` — the **temperature-law coefficient** from the truncated-cloud
+   ENERGY BALANCE (NOT the η≳6 approximation). A 3-D harmonic trapped cloud truncated at η
+   has mean energy `⟨E⟩/k_BT = c(η) = 3 P(4,η)/P(3,η)` (→ 3 at large η, but `< 3` at low η —
+   the high-energy tail is cut). An evaporated atom (ε>η) carries `ε̄ = Γ(4,η)/Γ(3,η) =
+   3(1−P4)/(1−P3) ≈ η+1`. Conserving energy at fixed trap depth gives
+   `L = (ε̄ − c)/(c − η dc/dη)`, which → `(η−2)/3` at large η (O'Hara) and grows steeply at
+   low η (a truncated cloud cools far more efficiently per atom lost than `(η−3)/3` implies).
+   This is what lets η≲4 forced evaporation reach BEC efficiently — the regime the old
+   `(η+κ̃−3)/3` form badly under-cooled. `dT/T = (dN/N)·L`.
 """
 @inline function evap_volume_factor(η::Float64)
     eη = exp(-η)
     P3 = 1 - eη * (1 + η + η^2 / 2)
     P4 = 1 - eη * (1 + η + η^2 / 2 + η^3 / 6)
-    P5 = 1 - eη * (1 + η + η^2 / 2 + η^3 / 6 + η^4 / 24)
     P3 <= 1e-9 && return (0.0, 0.0)
     factor = max(eη * (η * P3 - 4 * P4) / P3^2, 0.0)
-    denom = η - 4 * P4 / P3
-    κ̃ = abs(denom) > 1e-9 ? (1 - P5 / P3) / denom : 0.0
-    (factor, κ̃)
+    # temperature-law coefficient L = dlnT/dlnN from the truncated-cloud energy balance
+    c = 3 * P4 / P3                               # ⟨E⟩/kT of the trapped cloud
+    ε̄ = (1 - P3) > 1e-12 ? 3 * (1 - P4) / (1 - P3) : η + 1.0  # evaporated-atom energy /kT
+    P3p = eη * η^2 / 2                            # dP3/dη
+    P4p = eη * η^3 / 6                            # dP4/dη
+    cp = 3 * (P4p * P3 - P4 * P3p) / P3^2         # dc/dη
+    denom = c - η * cp
+    L = abs(denom) > 1e-9 ? (ε̄ - c) / denom : (η - 2) / 3
+    (factor, L)
 end
 
 """
@@ -156,10 +167,15 @@ added by the caller.
     kB = Units.KB
     v̄ = sqrt(8 * kB * T / (π * m))
     γel = n * 8π * p.a_s^2 * v̄ / sqrt(2)             # per-atom elastic rate, γ = n σ v̄/√2
-    # evaporation: 3D-harmonic truncated-Boltzmann (Luiten), no free parameter.
-    evap_factor, κ̃ = evap_volume_factor(η)
+    # evaporation: 3D-harmonic truncated-Boltzmann (Luiten), no free parameter. evap_factor
+    # is the eject fraction (all-η spilling rate); L = dlnT/dlnN is the truncated-cloud
+    # energy-balance cooling law. Below η = eta_min the quasi-equilibrium assumption fails
+    # (the cloud cannot rethermalise faster than it spills) and the energy-balance L diverges
+    # unphysically — clamp L to its eta_min value there (the rate itself stays the real η form).
+    evap_factor, _ = evap_volume_factor(η)
+    _, L = evap_volume_factor(max(η, p.eta_min))
     dN_evap = -Nev * γel * p.evap_scale * evap_factor
-    dTT_evap = Nev > 0 ? (dN_evap / Nev) * (η + κ̃ - 3) / 3 : 0.0
+    dTT_evap = Nev > 0 ? (dN_evap / Nev) * L : 0.0
     # three-body loss + antievaporative heating (center-weighted, ⟨n²⟩ = n²/3^{3/2})
     dN_3b = -p.K3 * (n^2 / 3.0^1.5) * Nev
     dTT_3b = Nev > 0 ? -(dN_3b / Nev) * (1.0 / 3.0) : 0.0
