@@ -67,12 +67,18 @@ const GOTO_VALUES_G = [
 const RTP_DURATION = GOTO_TIMES_G[end]
 
 const THETA_Q_DEG = (-16.0, 0.0, +16.0)
+const VOL_STRIDE = 2
+const VOL_IDXS = collect(1:VOL_STRIDE:NX)
+const NVOL = length(VOL_IDXS)
+const STORED_3D_M = (-6, -5, -4)
+const STORED_3D_COMPONENTS = ntuple(i -> Int(F - STORED_3D_M[i] + 1), length(STORED_3D_M))
 
 const OUT_DIR        = get(ENV, "FPE_ROOT",
     "/gs/bs/work/6/ue06186/bec-runs/flower_protocol_edh")
 const OUT            = joinpath(OUT_DIR, "rtp_10mG_goto.h5")
 const PSI_ITP_CACHE  = joinpath(OUT_DIR, "itp_10mG_final_psi.jld2")
 const PSI_LBFGS_CACHE = joinpath(OUT_DIR, "lbfgs_10mG_final_psi.jld2")
+const REUSE_LBFGS_ONLY = lowercase(get(ENV, "FPE_REUSE_LBFGS_ONLY", "false")) in ("1", "true", "yes")
 
 # Spin matrices
 function spin_matrices_F6()
@@ -140,6 +146,50 @@ function tilted_yint(psi)
     out
 end
 
+function extract_3d_observables(psi)
+    n_total = zeros(Float32, NVOL, NVOL, NVOL)
+    n_m6    = zeros(Float32, NVOL, NVOL, NVOL)
+    n_m5    = zeros(Float32, NVOL, NVOL, NVOL)
+    n_m4    = zeros(Float32, NVOL, NVOL, NVOL)
+    arg_m6  = zeros(Float32, NVOL, NVOL, NVOL)
+    arg_m5  = zeros(Float32, NVOL, NVOL, NVOL)
+    arg_m4  = zeros(Float32, NVOL, NVOL, NVOL)
+    Fx_3d   = zeros(Float32, NVOL, NVOL, NVOL)
+    Fy_3d   = zeros(Float32, NVOL, NVOL, NVOL)
+    Fz_3d   = zeros(Float32, NVOL, NVOL, NVOL)
+
+    @inbounds for (ii, i) in enumerate(VOL_IDXS), (jj, j) in enumerate(VOL_IDXS), (kk, k) in enumerate(VOL_IDXS)
+        ψ = @view psi[i, j, k, :]
+        s = 0.0
+        fx = 0.0 + 0.0im
+        fy = 0.0 + 0.0im
+        fz = 0.0 + 0.0im
+        for a in 1:D
+            ψa = ψ[a]
+            s += abs2(ψa)
+            cψa = conj(ψa)
+            for b in 1:D
+                ψb = ψ[b]
+                fx += cψa * FX[a, b] * ψb
+                fy += cψa * FY[a, b] * ψb
+                fz += cψa * FZ[a, b] * ψb
+            end
+        end
+        n_total[ii, jj, kk] = Float32(s)
+        n_m6[ii, jj, kk] = Float32(abs2(ψ[D]))
+        n_m5[ii, jj, kk] = Float32(abs2(ψ[D - 1]))
+        n_m4[ii, jj, kk] = Float32(abs2(ψ[D - 2]))
+        arg_m6[ii, jj, kk] = Float32(angle(ψ[D]))
+        arg_m5[ii, jj, kk] = Float32(angle(ψ[D - 1]))
+        arg_m4[ii, jj, kk] = Float32(angle(ψ[D - 2]))
+        Fx_3d[ii, jj, kk] = Float32(real(fx))
+        Fy_3d[ii, jj, kk] = Float32(real(fy))
+        Fz_3d[ii, jj, kk] = Float32(real(fz))
+    end
+
+    (; n_total, n_m6, n_m5, n_m4, arg_m6, arg_m5, arg_m4, Fx_3d, Fy_3d, Fz_3d)
+end
+
 function scalar_Fz(psi)
     nx, ny, nz, _ = size(psi)
     N = 0.0; Fze = 0.0
@@ -168,12 +218,26 @@ mutable struct RTPBuf
     Fx_xz::Vector{Matrix{Float32}}; Fy_xz::Vector{Matrix{Float32}}; Fz_xz::Vector{Matrix{Float32}}
     arg_xy::Vector{Matrix{Float32}}; arg_xz::Vector{Matrix{Float32}}
     tilt::Vector{Array{Float32,3}}
+    n_total_3d::Vector{Array{Float32,3}}
+    n_m6_3d::Vector{Array{Float32,3}}
+    n_m5_3d::Vector{Array{Float32,3}}
+    n_m4_3d::Vector{Array{Float32,3}}
+    arg_m6_3d::Vector{Array{Float32,3}}
+    arg_m5_3d::Vector{Array{Float32,3}}
+    arg_m4_3d::Vector{Array{Float32,3}}
+    Fx_3d::Vector{Array{Float32,3}}
+    Fy_3d::Vector{Array{Float32,3}}
+    Fz_3d::Vector{Array{Float32,3}}
 end
 RTPBuf() = RTPBuf(Float64[], Float64[], Float64[], Float64[], Float64[], Float64[],
     Vector{Array{Float32,3}}(), Vector{Array{Float32,3}}(),
     Vector{Matrix{Float32}}(), Vector{Matrix{Float32}}(), Vector{Matrix{Float32}}(),
     Vector{Matrix{Float32}}(), Vector{Matrix{Float32}}(), Vector{Matrix{Float32}}(),
     Vector{Matrix{Float32}}(), Vector{Matrix{Float32}}(),
+    Vector{Array{Float32,3}}(),
+    Vector{Array{Float32,3}}(), Vector{Array{Float32,3}}(), Vector{Array{Float32,3}}(),
+    Vector{Array{Float32,3}}(), Vector{Array{Float32,3}}(), Vector{Array{Float32,3}}(),
+    Vector{Array{Float32,3}}(), Vector{Array{Float32,3}}(), Vector{Array{Float32,3}}(),
     Vector{Array{Float32,3}}())
 
 function _b_at(t::Float64)
@@ -193,6 +257,7 @@ function record!(buf::RTPBuf, ws)
     psi = Array{ComplexF64}(ws.state.psi)
     sl = extract_slices(psi)
     tl = tilted_yint(psi)
+    vol = extract_3d_observables(psi)
     push!(buf.t, ws.state.t)
     push!(buf.E, total_energy(ws))
     push!(buf.N, total_norm(ws.state.psi, ws.grid))
@@ -204,6 +269,16 @@ function record!(buf::RTPBuf, ws)
     push!(buf.Fx_xz, sl.Fx_xz); push!(buf.Fy_xz, sl.Fy_xz); push!(buf.Fz_xz, sl.Fz_xz)
     push!(buf.arg_xy, sl.arg_xy); push!(buf.arg_xz, sl.arg_xz)
     push!(buf.tilt, tl)
+    push!(buf.n_total_3d, vol.n_total)
+    push!(buf.n_m6_3d, vol.n_m6)
+    push!(buf.n_m5_3d, vol.n_m5)
+    push!(buf.n_m4_3d, vol.n_m4)
+    push!(buf.arg_m6_3d, vol.arg_m6)
+    push!(buf.arg_m5_3d, vol.arg_m5)
+    push!(buf.arg_m4_3d, vol.arg_m4)
+    push!(buf.Fx_3d, vol.Fx_3d)
+    push!(buf.Fy_3d, vol.Fy_3d)
+    push!(buf.Fz_3d, vol.Fz_3d)
     println("  RTP snap t=$(round(ws.state.t; digits=3)) B=$(round(buf.B_gauss[end]*1e3; sigdigits=3))mG  E=$(round(buf.E[end]; sigdigits=8))  N=$(round(buf.N[end]; sigdigits=8))  Fz=$(round(buf.Fz[end]; sigdigits=4))")
     flush(stdout)
 end
@@ -261,49 +336,74 @@ function main()
         (f["psi"], m)
     end : (psi_after_itp, Dict{String,Any}())
 
-    lbfgs_steps_this = lbfgs_present ? LBFGS_EXTRA_STEPS : LBFGS_INITIAL_STEPS
-    action = lbfgs_present ? "CONTINUE (+$LBFGS_EXTRA_STEPS)" : "FRESH ($LBFGS_INITIAL_STEPS)"
+    lbfgs_steps_this = if REUSE_LBFGS_ONLY
+        0
+    elseif lbfgs_present
+        LBFGS_EXTRA_STEPS
+    else
+        LBFGS_INITIAL_STEPS
+    end
+    action = if REUSE_LBFGS_ONLY
+        "REUSE CACHED ψ"
+    elseif lbfgs_present
+        "CONTINUE (+$LBFGS_EXTRA_STEPS)"
+    else
+        "FRESH ($LBFGS_INITIAL_STEPS)"
+    end
     println("[goto_10mG] LBFGS polish $action  tol=$LBFGS_TOL  m=$LBFGS_M  α=$LBFGS_SOBOLEV_ALPHA")
-    gs_lbfgs = find_ground_state_lbfgs(;
-        grid=preset.grid, atom=preset.atom,
-        interactions=preset.interactions, zeeman=zeeman_static, potential=preset.potential,
-        psi_init=seed_psi,
-        n_steps=lbfgs_steps_this, tol=LBFGS_TOL, m_lbfgs=LBFGS_M,
-        sobolev_alpha=LBFGS_SOBOLEV_ALPHA,
-        enable_ddi=true, c_dd=preset.c_dd, secular_ddi=false,
-        backend=backend, verbose=true,
-    )
-    println("[goto_10mG] LBFGS done.  E=$(gs_lbfgs.energy)  grad_norm=$(gs_lbfgs.grad_norm)")
-    psi_lbfgs_host = Array{ComplexF64}(gs_lbfgs.workspace.state.psi)
-
+    psi_lbfgs_host = Array{ComplexF64}(seed_psi)
+    lbfgs_energy = Float64(get(prev_meta, "E", NaN))
+    lbfgs_grad_norm = Float64(get(prev_meta, "grad_norm", NaN))
     prev_iter = Int(get(prev_meta, "lbfgs_iter_total", 0))
-    total_iter = prev_iter + lbfgs_steps_this
+    total_iter = prev_iter
+    if !REUSE_LBFGS_ONLY
+        gs_lbfgs = find_ground_state_lbfgs(;
+            grid=preset.grid, atom=preset.atom,
+            interactions=preset.interactions, zeeman=zeeman_static, potential=preset.potential,
+            psi_init=seed_psi,
+            n_steps=lbfgs_steps_this, tol=LBFGS_TOL, m_lbfgs=LBFGS_M,
+            sobolev_alpha=LBFGS_SOBOLEV_ALPHA,
+            enable_ddi=true, c_dd=preset.c_dd, secular_ddi=false,
+            backend=backend, verbose=true,
+        )
+        println("[goto_10mG] LBFGS done.  E=$(gs_lbfgs.energy)  grad_norm=$(gs_lbfgs.grad_norm)")
+        psi_lbfgs_host = Array{ComplexF64}(gs_lbfgs.workspace.state.psi)
+        lbfgs_energy = gs_lbfgs.energy
+        lbfgs_grad_norm = gs_lbfgs.grad_norm
+        total_iter = prev_iter + lbfgs_steps_this
+    elseif !lbfgs_present
+        error("FPE_REUSE_LBFGS_ONLY=true but no LBFGS cache found at $PSI_LBFGS_CACHE")
+    else
+        println("[goto_10mG] reusing cached LBFGS ψ without extra optimization")
+    end
     git_sha = try; strip(read(`git -C $(@__DIR__)/../.. rev-parse HEAD`, String)); catch; "unknown"; end
 
-    try
-        jldopen(PSI_LBFGS_CACHE, "w") do f
-            f["psi"]              = psi_lbfgs_host
-            f["E"]                = gs_lbfgs.energy
-            f["grad_norm"]        = gs_lbfgs.grad_norm
-            f["lbfgs_iter_this"]  = lbfgs_steps_this
-            f["lbfgs_iter_total"] = total_iter
-            f["lbfgs_tol"]        = LBFGS_TOL
-            f["lbfgs_m"]          = LBFGS_M
-            f["sobolev_alpha"]    = LBFGS_SOBOLEV_ALPHA
-            f["n_atoms"]          = 50_000
-            f["B_gauss"]          = B_INIT_GAUSS
-            f["c_dd"]             = preset.c_dd
-            f["grid_n"]           = [NX, NX, NX]
-            f["grid_box"]         = [L_BOX, L_BOX, L_BOX]
-            f["atom"]             = "Eu151"
-            f["F"]                = F
-            f["secular_ddi"]      = false
-            f["git_sha"]          = git_sha
-            f["created_utc"]      = string(now())
-            f["method"]           = "ITP 100k → LBFGS $(total_iter) (Sobolev α=$(LBFGS_SOBOLEV_ALPHA)) @ B=10mG"
-        end
-        println("  cached LBFGS ψ + metadata → $PSI_LBFGS_CACHE  (total iter=$total_iter)")
-    catch e; @warn "could not cache LBFGS ψ: $e"; end
+    if !REUSE_LBFGS_ONLY
+        try
+            jldopen(PSI_LBFGS_CACHE, "w") do f
+                f["psi"]              = psi_lbfgs_host
+                f["E"]                = lbfgs_energy
+                f["grad_norm"]        = lbfgs_grad_norm
+                f["lbfgs_iter_this"]  = lbfgs_steps_this
+                f["lbfgs_iter_total"] = total_iter
+                f["lbfgs_tol"]        = LBFGS_TOL
+                f["lbfgs_m"]          = LBFGS_M
+                f["sobolev_alpha"]    = LBFGS_SOBOLEV_ALPHA
+                f["n_atoms"]          = 50_000
+                f["B_gauss"]          = B_INIT_GAUSS
+                f["c_dd"]             = preset.c_dd
+                f["grid_n"]           = [NX, NX, NX]
+                f["grid_box"]         = [L_BOX, L_BOX, L_BOX]
+                f["atom"]             = "Eu151"
+                f["F"]                = F
+                f["secular_ddi"]      = false
+                f["git_sha"]          = git_sha
+                f["created_utc"]      = string(now())
+                f["method"]           = "ITP 100k → LBFGS $(total_iter) (Sobolev α=$(LBFGS_SOBOLEV_ALPHA)) @ B=10mG"
+            end
+            println("  cached LBFGS ψ + metadata → $PSI_LBFGS_CACHE  (total iter=$total_iter)")
+        catch e; @warn "could not cache LBFGS ψ: $e"; end
+    end
 
     # --- Phase 3: RTP with Goto B(t) trajectory ---
     println("[goto_10mG] RTP build  (TimeDependentZeeman PWL across $(length(GOTO_TIMES_G)) control pts)")
@@ -344,6 +444,16 @@ function main()
     Fx_xz_arr = zeros(Float32, Nf, NX, NX); Fy_xz_arr = zeros(Float32, Nf, NX, NX); Fz_xz_arr = zeros(Float32, Nf, NX, NX)
     arg_arr = zeros(Float32, Nf, NX, NX);   arg_xz_arr = zeros(Float32, Nf, NX, NX)
     tilt_arr = zeros(Float32, Nf, length(THETA_Q_DEG), NX, NX)
+    n_total_3d_arr = zeros(Float32, Nf, NVOL, NVOL, NVOL)
+    n_m6_3d_arr = zeros(Float32, Nf, NVOL, NVOL, NVOL)
+    n_m5_3d_arr = zeros(Float32, Nf, NVOL, NVOL, NVOL)
+    n_m4_3d_arr = zeros(Float32, Nf, NVOL, NVOL, NVOL)
+    arg_m6_3d_arr = zeros(Float32, Nf, NVOL, NVOL, NVOL)
+    arg_m5_3d_arr = zeros(Float32, Nf, NVOL, NVOL, NVOL)
+    arg_m4_3d_arr = zeros(Float32, Nf, NVOL, NVOL, NVOL)
+    Fx_3d_arr = zeros(Float32, Nf, NVOL, NVOL, NVOL)
+    Fy_3d_arr = zeros(Float32, Nf, NVOL, NVOL, NVOL)
+    Fz_3d_arr = zeros(Float32, Nf, NVOL, NVOL, NVOL)
     for k in 1:Nf
         n_xy_arr[k, :, :, :] .= buf.n_xy[k]
         n_xz_arr[k, :, :, :] .= buf.n_xz[k]
@@ -352,6 +462,16 @@ function main()
         arg_arr[k, :, :]    .= buf.arg_xy[k]
         arg_xz_arr[k, :, :] .= buf.arg_xz[k]
         tilt_arr[k, :, :, :] .= buf.tilt[k]
+        n_total_3d_arr[k, :, :, :] .= buf.n_total_3d[k]
+        n_m6_3d_arr[k, :, :, :] .= buf.n_m6_3d[k]
+        n_m5_3d_arr[k, :, :, :] .= buf.n_m5_3d[k]
+        n_m4_3d_arr[k, :, :, :] .= buf.n_m4_3d[k]
+        arg_m6_3d_arr[k, :, :, :] .= buf.arg_m6_3d[k]
+        arg_m5_3d_arr[k, :, :, :] .= buf.arg_m5_3d[k]
+        arg_m4_3d_arr[k, :, :, :] .= buf.arg_m4_3d[k]
+        Fx_3d_arr[k, :, :, :] .= buf.Fx_3d[k]
+        Fy_3d_arr[k, :, :, :] .= buf.Fy_3d[k]
+        Fz_3d_arr[k, :, :, :] .= buf.Fz_3d[k]
     end
 
     h5open(OUT, "w") do h5
@@ -365,8 +485,11 @@ function main()
         h5["meta/rtp_dt"]       = RTP_DT
         h5["meta/goto_times"]   = GOTO_TIMES_G
         h5["meta/goto_b_values_gauss"] = GOTO_VALUES_G
-        h5["meta/lbfgs_E"]      = gs_lbfgs.energy
-        h5["meta/lbfgs_grad_norm"] = gs_lbfgs.grad_norm
+        h5["meta/lbfgs_E"]      = lbfgs_energy
+        h5["meta/lbfgs_grad_norm"] = lbfgs_grad_norm
+        h5["meta/vol_stride"]   = VOL_STRIDE
+        h5["meta/vol_sample_indices"] = VOL_IDXS
+        h5["meta/stored_3d_m_channels"] = collect(STORED_3D_M)
         h5["t"]      = buf.t
         h5["E"]      = buf.E
         h5["N"]      = buf.N
@@ -380,6 +503,16 @@ function main()
         h5["arg_psi_m6_xy"] = arg_arr
         h5["arg_psi_m6_xz"] = arg_xz_arr
         h5["n_m6_tilted"]   = tilt_arr
+        h5["n_total_3d"] = n_total_3d_arr
+        h5["n_m6_3d"] = n_m6_3d_arr
+        h5["n_m5_3d"] = n_m5_3d_arr
+        h5["n_m4_3d"] = n_m4_3d_arr
+        h5["arg_psi_m6_3d"] = arg_m6_3d_arr
+        h5["arg_psi_m5_3d"] = arg_m5_3d_arr
+        h5["arg_psi_m4_3d"] = arg_m4_3d_arr
+        h5["Fx_3d"] = Fx_3d_arr
+        h5["Fy_3d"] = Fy_3d_arr
+        h5["Fz_3d"] = Fz_3d_arr
     end
     println("[goto_10mG] wrote $OUT")
 end

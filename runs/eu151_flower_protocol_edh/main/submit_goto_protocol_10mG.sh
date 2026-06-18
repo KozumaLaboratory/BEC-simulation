@@ -26,4 +26,8 @@ echo "[goto_10mG] julia done — generating combined GIF"
 python3 scripts/flower_protocol_edh/plot_rtp_10mG_goto.py
 echo "[goto_10mG] tilted diff GIF"
 python3 scripts/flower_protocol_edh/plot_rtp_10mG_goto_tilted_diff.py
+echo "[goto_10mG] 3-D density/phase GIF"
+python3 scripts/flower_protocol_edh/plot_rtp_10mG_goto_3d_density_phase.py
+echo "[goto_10mG] 3-D spin GIF"
+python3 scripts/flower_protocol_edh/plot_rtp_10mG_goto_3d_spin.py
 echo "[goto_10mG] all done"
