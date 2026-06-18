@@ -38,6 +38,22 @@ runs/_loop/_local/
 # Stray scratch notes occasionally dropped at repo root by tools / sessions.
 # Real plans live in docs/design/ or docs/research_notes/.
 /PLAN.md
+
+# macOS Finder metadata, Python bytecode caches — never commit
+.DS_Store
+**/.DS_Store
+__pycache__/
+**/__pycache__/
+*.pyc
+
+# Thesis PDF lives at repo root for convenience but is not part of the codebase.
+/修士論文_*.pdf
+
+# Per-experiment heavy data (h5, jld2) is generated on Tsubame and pulled
+# into runs/<exp>/data/ on demand. Figures under runs/<exp>/figures/ ARE
+# tracked (small PNG/GIF documenting results).
+runs/eu151_flower_protocol_edh/data/
+runs/eu151_flower_vs_edh/data/
 /plan.md
 
 # Simulation binary data (large, reproducible from config)
