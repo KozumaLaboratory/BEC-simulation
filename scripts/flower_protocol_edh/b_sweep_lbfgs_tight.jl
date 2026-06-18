@@ -84,8 +84,15 @@ const RETIGHTEN_BAR        = 7.5e-4     # skip cached file if its grad_norm ≤ 
 # polarized m=-F initial state to get a coarse but unbiased GS, then hand it
 # to LBFGS for the precise polish. For retighten (cache present), we skip
 # ITP and continue LBFGS from the cached ψ.
+#
+# Like LBFGS, ITP is also chunked so the user can watch progress: each
+# ITP_CHUNK_STEPS we report E + drho and update progress.json. The first
+# chunk pays JIT compile (~3-5 min on T4); subsequent chunks ~ITP_CHUNK_STEPS
+# × dt actual.
 const ITP_DT          = 0.01
-const ITP_N_STEPS     = 30_000
+const ITP_CHUNK_STEPS = 5_000
+const ITP_TOTAL_STEPS = 30_000
+const ITP_CHUNKS      = ITP_TOTAL_STEPS ÷ ITP_CHUNK_STEPS
 const ITP_TOL_DE      = 1.0e-7
 const ITP_TOL_DRHO    = 1.0e-5
 
@@ -140,21 +147,45 @@ function solve_point!(preset, backend, B_uG::Int, seed_psi, target_path::Abstrac
     t_start = time()
 
     # --- Optional ITP precondition (rough → precise) for fresh points ---
+    # Chunked so the user can watch ITP progress between LBFGS chunks.
     if do_itp
-        logprint("  [B=$(B_uG) μG] ITP precondition from m=-F init ($(ITP_N_STEPS) steps)")
+        logprint("  [B=$(B_uG) μG] ITP precondition from m=-F init ($(ITP_TOTAL_STEPS) steps, $(ITP_CHUNKS) chunks of $(ITP_CHUNK_STEPS))")
         itp_t0 = time()
-        gs_itp = find_ground_state(;
-            grid=preset.grid, atom=preset.atom,
-            interactions=preset.interactions, zeeman=zeeman_t, potential=preset.potential,
-            dt=ITP_DT, n_steps=ITP_N_STEPS, tol=ITP_TOL_DE, tol_drho=ITP_TOL_DRHO,
-            save_every=2000,
-            initial_state=:m_minus_F,
-            enable_ddi=true, c_dd=preset.c_dd, secular_ddi=false,
-            backend=backend, verbose=false,
-        )
-        psi_cur = Array{ComplexF64}(gs_itp.workspace.state.psi)
-        logprint(@sprintf("  [B=%4d μG] ITP done: E=%+.6f  last_step=%d  wall=%.1fs",
-                          B_uG, gs_itp.energy, gs_itp.last_step, time() - itp_t0))
+        psi_itp = nothing  # nothing on first chunk → start from :m_minus_F
+        for ichunk in 1:ITP_CHUNKS
+            gs_chunk = if psi_itp === nothing
+                find_ground_state(;
+                    grid=preset.grid, atom=preset.atom,
+                    interactions=preset.interactions, zeeman=zeeman_t, potential=preset.potential,
+                    dt=ITP_DT, n_steps=ITP_CHUNK_STEPS,
+                    tol=0.0, tol_drho=0.0,           # disable early exit
+                    save_every=ITP_CHUNK_STEPS,
+                    initial_state=:m_minus_F,
+                    enable_ddi=true, c_dd=preset.c_dd, secular_ddi=false,
+                    backend=backend, verbose=false,
+                )
+            else
+                find_ground_state(;
+                    grid=preset.grid, atom=preset.atom,
+                    interactions=preset.interactions, zeeman=zeeman_t, potential=preset.potential,
+                    dt=ITP_DT, n_steps=ITP_CHUNK_STEPS,
+                    tol=0.0, tol_drho=0.0,
+                    save_every=ITP_CHUNK_STEPS,
+                    psi_init=psi_itp,
+                    enable_ddi=true, c_dd=preset.c_dd, secular_ddi=false,
+                    backend=backend, verbose=false,
+                )
+            end
+            psi_itp = Array{ComplexF64}(gs_chunk.workspace.state.psi)
+            step_total = ichunk * ITP_CHUNK_STEPS
+            wall = time() - itp_t0
+            logprint(@sprintf("  [B=%4d μG] ITP chunk %d/%d  step=%5d  E=%+.6f  wall=%.1fs",
+                              B_uG, ichunk, ITP_CHUNKS, step_total, gs_chunk.energy, wall))
+            write_progress(B_uG, ichunk, step_total, gs_chunk.energy, NaN, wall,
+                           "itp_running")
+        end
+        psi_cur = psi_itp
+        logprint(@sprintf("  [B=%4d μG] ITP done.  total_wall=%.1fs  → LBFGS polish", B_uG, time() - itp_t0))
     end
 
     for chunk in 1:MAX_CHUNKS_PER_POINT
