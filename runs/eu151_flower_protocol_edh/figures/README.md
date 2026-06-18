@@ -33,13 +33,16 @@ snapshots.
 
 | File | Source script | Source data |
 |---|---|---|
-| `volume_density_phase.gif`     | `scripts/flower_protocol_edh/plot_rtp_10mG_goto_3d_density_phase.py` | `data/rtp_10mG_goto.h5` |
-| `isosurface_mass95_m6_t0.png`  | `scripts/flower_protocol_edh/plot_goto_3d_isosurface.py`             | same |
-| `isosurface_peak30_m6.gif`     | `scripts/flower_protocol_edh/plot_rtp_10mG_goto_isosurface_m6.py`    | same |
+| `volume_density_phase.gif`                  | `scripts/flower_protocol_edh/plot_rtp_10mG_goto_3d_density_phase.py`           | `data/rtp_10mG_goto.h5` |
+| `isosurface_mass95_m6_t0.png`               | `scripts/flower_protocol_edh/plot_goto_3d_isosurface.py`                       | same |
+| `isosurface_peak30_m6.gif`                  | `scripts/flower_protocol_edh/plot_rtp_10mG_goto_isosurface_m6.py`              | same |
+| `isosurface_peak30_m6m5m4_secondhalf.gif`   | `scripts/flower_protocol_edh/plot_rtp_10mG_goto_isosurface_m6m5m4_second_half.py` | same |
 
-The `peak30` cut (iso = 30 % × per-frame peak) is the stricter alternative
-to the `mass95` cut — preserves fine structure of the m = −6 cloud that
-the 95 %-mass envelope smears out.
+The `peak30` cut (iso = 30 % × per-component frame peak) is the stricter
+alternative to the `mass95` cut — preserves fine structure that the
+95 %-mass envelope smears out. The `m6m5m4_secondhalf` variant crops to
+the latter half of the trajectory (t > 125 ms, |B| < ~500 μG) where the
+spinor dynamics activate and m = −5, −4 populations become visible.
 
 ## Regenerating
 
