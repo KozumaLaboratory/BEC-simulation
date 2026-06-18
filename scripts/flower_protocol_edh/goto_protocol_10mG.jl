@@ -41,28 +41,41 @@ const LBFGS_TOL           = 1.0e-7
 const LBFGS_M             = 10
 const LBFGS_SOBOLEV_ALPHA = 0.5
 
-# RTP — Goto Ch.6 Flower protocol (units: internal time, B in Gauss)
-#   Phase 1: 10 mG → 1 mG  linear,    50 ms   = 34.55752 internal
-#   Phase 2: 1 mG → 63 μG  parabolic, 200 ms  = 138.23008 internal (8 control pts)
-#   Phase 3: 63 μG → 0 G   linear snap, 100 μs = 0.069115 internal (non-adiabatic)
-# Total duration = 172.85671 internal ≈ 250.1 ms @ ω_ref = 2π·110
-const RTP_DT         = 0.005   # dt resolves Phase 3 snap (14 steps) marginally; Phase 1+2 are slow
-const RTP_SAVE_EVERY = 250     # ~140 snapshots over the run
+# RTP — Goto Ch.6 Flower protocol, extended (units: internal time, B in Gauss)
+#   Phase 1: 10 mG → 1 mG       linear,    50 ms  = 34.55752 internal
+#   Phase 2: 1 mG → 0 G          parabolic, 267 ms = 184.5371 internal (12 ctrl pts)
+#                                B(τ) = 1 mG · (1 − 0.749 τ)²,
+#                                τ ∈ [0, 1.335] where τ = (t − 50 ms)/200 ms
+#                                — no linear snap: parabola extended naturally to 0
+#   Phase 3: B = 0 hold,         100 ms = 69.11504 internal
+# Total duration ≈ 288.2 internal ≈ 417 ms @ ω_ref = 2π·110
+const RTP_DT         = 0.005
+const RTP_SAVE_EVERY = 250     # ~230 snapshots over the run
 
 # Combined PWL trajectory for the unified pipeline.
 # Times relative to RTP start, values in Gauss.
 const GOTO_TIMES_G = [
-    0.0,            #  0   ms     start, B = 10 mG
-    34.55752,       # 50   ms     end of Phase 1, B = 1 mG
-    51.83628, 69.11504, 86.39380, 103.67256, 120.95132, 138.23008, 155.50884,
-    172.79760,      # 250  ms     end of Phase 2, B = 63 μG
-    172.86671,      # 250.1 ms    end of Phase 3 snap, B = 0
+    0.0,            #   0  ms     start, B = 10 mG
+    34.55752,       #  50  ms     end of Phase 1, B = 1 mG
+    51.83628,       #  75  ms     Phase 2 parabola samples (τ = 0.125, 0.25, ..., 1.0)
+    69.11504,       # 100  ms
+    86.39380,       # 125  ms
+    103.67256,      # 150  ms
+    120.95132,      # 175  ms
+    138.23008,      # 200  ms
+    155.50884,      # 225  ms
+    172.78760,      # 250  ms     B = 63 μG (old endpoint, parabola continues)
+    190.06636,      # 275  ms     parabola extension toward 0
+    207.34512,      # 300  ms
+    219.09504,      # 317  ms     B = 0 (parabola natural endpoint, τ = 1.335)
+    288.21008,      # 417  ms     end of B = 0 hold
 ]
 const GOTO_VALUES_G = [
     1.00e-2, 1.00e-3,                                              # Phase 1
     8.207e-4, 6.609e-4, 5.174e-4, 3.909e-4, 2.833e-4,
-    1.924e-4, 1.190e-4, 6.300e-5,                                  # Phase 2
-    0.0,                                                            # Phase 3 endpoint
+    1.924e-4, 1.190e-4, 6.300e-5,                                  # Phase 2 original samples
+    2.460e-5, 4.050e-6, 0.0,                                        # Phase 2 extension
+    0.0,                                                            # Phase 3 hold
 ]
 const RTP_DURATION = GOTO_TIMES_G[end]
 

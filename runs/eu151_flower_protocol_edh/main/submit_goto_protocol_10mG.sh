@@ -36,4 +36,6 @@ echo "[goto_10mG] m=-6 stricter isosurface time-lapse"
 python3 scripts/flower_protocol_edh/plot_rtp_10mG_goto_isosurface_m6.py
 echo "[goto_10mG] 3-panel m=-6/-5/-4 second-half isosurface time-lapse"
 python3 scripts/flower_protocol_edh/plot_rtp_10mG_goto_isosurface_m6m5m4_second_half.py
+echo "[goto_10mG] vortex analysis (Lz, top-bottom phase, ring winding)"
+python3 scripts/flower_protocol_edh/plot_rtp_10mG_goto_vortex_analysis.py
 echo "[goto_10mG] all done"
