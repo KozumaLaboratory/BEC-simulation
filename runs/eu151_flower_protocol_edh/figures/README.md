@@ -36,13 +36,15 @@ snapshots.
 | `volume_density_phase.gif`                  | `scripts/flower_protocol_edh/plot_rtp_10mG_goto_3d_density_phase.py`           | `data/rtp_10mG_goto.h5` |
 | `isosurface_mass95_m6_t0.png`               | `scripts/flower_protocol_edh/plot_goto_3d_isosurface.py`                       | same |
 | `isosurface_peak30_m6.gif`                  | `scripts/flower_protocol_edh/plot_rtp_10mG_goto_isosurface_m6.py`              | same |
-| `isosurface_peak30_m6m5m4_secondhalf.gif`   | `scripts/flower_protocol_edh/plot_rtp_10mG_goto_isosurface_m6m5m4_second_half.py` | same |
+| `isosurface_peak30_m6m5m4_secondhalf.gif`     | `scripts/flower_protocol_edh/plot_rtp_10mG_goto_isosurface_m6m5m4_second_half.py` (`ISO_PEAK_RATIO_M6=0.30`) | same |
+| `isosurface_peak70m6_30m5m4_secondhalf.gif`   | same script, default per-component ratios | same |
 
-The `peak30` cut (iso = 30 % × per-component frame peak) is the stricter
-alternative to the `mass95` cut — preserves fine structure that the
-95 %-mass envelope smears out. The `m6m5m4_secondhalf` variant crops to
-the latter half of the trajectory (t > 125 ms, |B| < ~500 μG) where the
-spinor dynamics activate and m = −5, −4 populations become visible.
+`peak30` = uniform 30 % × per-component peak (m=-5/-4 well-resolved, m=-6
+shows its bulk envelope). `peak70m6_30m5m4` = stricter 70 % × peak on the
+m=-6 panel to expose the DDI-driven prolate (lemon-shaped) tip that the
+30 % cut smears out, while keeping m=-5/-4 at 30 % so they remain visible.
+The `secondhalf` suffix crops to t > 125 ms (|B| < ~500 μG) where the
+spinor dynamics activate and m=-5, -4 populations become non-trivial.
 
 ## Regenerating
 

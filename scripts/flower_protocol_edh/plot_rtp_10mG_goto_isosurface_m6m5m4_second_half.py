@@ -16,7 +16,10 @@ iso would render them as empty panels.
 Env knobs:
   RTP_H5            input H5 (default = Tsubame canonical path)
   OUT_GIF           output GIF path
-  ISO_PEAK_RATIO    iso fraction of per-component peak (default 0.30)
+  ISO_PEAK_RATIO    fallback iso fraction (default 0.30)
+  ISO_PEAK_RATIO_M6 m=-6 panel override (default 0.70 — exposes DDI prolate)
+  ISO_PEAK_RATIO_M5 m=-5 panel override (default = ISO_PEAK_RATIO)
+  ISO_PEAK_RATIO_M4 m=-4 panel override (default = ISO_PEAK_RATIO)
   FRAME_START_FRAC  first frame as fraction of total (default 0.5)
   FRAME_DURATION_MS GIF frame duration (default 120)
 """
@@ -38,9 +41,14 @@ H5_DEFAULT = "/gs/fs/tga-kozuma-kouhi/ue06186/bec-runs/flower_protocol_edh/rtp_1
 H5 = Path(os.environ.get("RTP_H5", H5_DEFAULT))
 OUT_GIF = Path(os.environ.get(
     "OUT_GIF",
-    "runs/eu151_flower_protocol_edh/figures/goto_protocol_10mG/isosurface_peak30_m6m5m4_secondhalf.gif",
+    "runs/eu151_flower_protocol_edh/figures/goto_protocol_10mG/isosurface_peak70m6_30m5m4_secondhalf.gif",
 ))
 ISO_PEAK_RATIO = float(os.environ.get("ISO_PEAK_RATIO", "0.30"))
+ISO_RATIO_PER_M = {
+    -6: float(os.environ.get("ISO_PEAK_RATIO_M6", "0.70")),
+    -5: float(os.environ.get("ISO_PEAK_RATIO_M5", str(ISO_PEAK_RATIO))),
+    -4: float(os.environ.get("ISO_PEAK_RATIO_M4", str(ISO_PEAK_RATIO))),
+}
 FRAME_START_FRAC = float(os.environ.get("FRAME_START_FRAC", "0.5"))
 FRAME_DURATION_MS = int(os.environ.get("FRAME_DURATION_MS", "120"))
 
@@ -182,7 +190,8 @@ def render_frame(loaded, coords, Lbox, t_ms, B_uG, k):
         dens_k = loaded[m][0][k]
         phase_k = loaded[m][1][k]
         peak = float(dens_k.max())
-        iso = ISO_PEAK_RATIO * peak
+        ratio = ISO_RATIO_PER_M.get(m, ISO_PEAK_RATIO)
+        iso = ratio * peak
         tris, tri_phase = marching_tetrahedra(dens_k, phase_k, coords, iso)
         if tris:
             poly = Poly3DCollection(
@@ -201,9 +210,10 @@ def render_frame(loaded, coords, Lbox, t_ms, B_uG, k):
         ax.set_ylabel("y [μm]", labelpad=3)
         ax.set_zlabel("z [μm]", labelpad=3)
         ax.tick_params(labelsize=8, pad=0)
-        ax.set_title(f"m = {m}\npeak = {peak:.3e}   iso = {iso:.3e}",
+        ax.set_title(f"m = {m}   ({ratio:.0%} × peak)\n"
+                     f"peak = {peak:.3e}   iso = {iso:.3e}",
                      fontsize=11, pad=6)
-        summary.append(f"m={m}: peak={peak:.3e} iso={iso:.3e}")
+        summary.append(f"m={m}: ratio={ratio:.0%} peak={peak:.3e} iso={iso:.3e}")
 
     sm = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
     sm.set_array([])
@@ -211,9 +221,10 @@ def render_frame(loaded, coords, Lbox, t_ms, B_uG, k):
     cbar.set_label(r"phase $\arg(\psi_m)$ [rad]")
     cbar.ax.tick_params(labelsize=8)
 
+    ratio_tag = "/".join(f"{ISO_RATIO_PER_M[m]:.0%}" for m, _, _ in COMPONENTS)
     fig.suptitle(
         f"Goto 10 mG  |  m = -6,-5,-4 isosurfaces  |  "
-        f"iso = {ISO_PEAK_RATIO:.0%} × per-component peak  |  "
+        f"iso = ({ratio_tag}) × per-component peak  |  "
         f"B = {B_uG:.2f} μG  |  t = {t_ms:.2f} ms",
         fontsize=14, y=0.95,
     )
@@ -236,8 +247,9 @@ def main():
     k0 = int(round(FRAME_START_FRAC * n_total))
     frame_ids = list(range(k0, n_total))
     coords = build_coords(loaded[-6][0].shape[1:], Lbox, NX, vol_stride)
+    ratio_tag = ", ".join(f"m={m}:{ISO_RATIO_PER_M[m]:.0%}" for m, _, _ in COMPONENTS)
     print(f"second half: frames {k0}..{n_total - 1} ({len(frame_ids)} frames)  "
-          f"iso = {ISO_PEAK_RATIO:.0%} × per-component peak")
+          f"iso ratios = {ratio_tag} × per-component peak")
 
     frames = []
     for n, k in enumerate(frame_ids, 1):
