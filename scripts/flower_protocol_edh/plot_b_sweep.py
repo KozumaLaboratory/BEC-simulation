@@ -46,6 +46,20 @@ with h5py.File(H5, "r") as f:
     arg_xy = f["arg_psi_m6_xy"][:].transpose(2, 1, 0)
     arg_xz = f["arg_psi_m6_xz"][:].transpose(2, 1, 0)
 
+# Playback should walk from high B to low B.
+order = np.argsort(B_uG)[::-1]
+B_uG = B_uG[order]
+E = E[order]
+Fz_t = Fz_t[order]
+n_xy = n_xy[order]
+n_xz = n_xz[order]
+Fx_xy = Fx_xy[order]
+Fy_xy = Fy_xy[order]
+Fx_xz = Fx_xz[order]
+Fz_xz_arr = Fz_xz_arr[order]
+arg_xy = arg_xy[order]
+arg_xz = arg_xz[order]
+
 Nb = len(B_uG)
 print(f"loaded {Nb} B values: {list(B_uG)} μG")
 
