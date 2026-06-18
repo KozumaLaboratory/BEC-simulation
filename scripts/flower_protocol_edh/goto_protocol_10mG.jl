@@ -41,42 +41,82 @@ const LBFGS_TOL           = 1.0e-7
 const LBFGS_M             = 10
 const LBFGS_SOBOLEV_ALPHA = 0.5
 
-# RTP — Goto Ch.6 Flower protocol, extended (units: internal time, B in Gauss)
-#   Phase 1: 10 mG → 1 mG       linear,    50 ms  = 34.55752 internal
-#   Phase 2: 1 mG → 0 G          parabolic, 267 ms = 184.5371 internal (12 ctrl pts)
-#                                B(τ) = 1 mG · (1 − 0.749 τ)²,
-#                                τ ∈ [0, 1.335] where τ = (t − 50 ms)/200 ms
-#                                — no linear snap: parabola extended naturally to 0
-#   Phase 3: B = 0 hold,         100 ms = 69.11504 internal
-# Total duration ≈ 288.2 internal ≈ 417 ms @ ω_ref = 2π·110
+# RTP — Goto Ch.6 Flower protocol (units: internal time, B in Gauss)
+#
+# Trajectory mode is selectable via GOTO_MODE env var:
+#   full_descend  Phase 1 (10 mG → 1 mG, 50 ms linear with smoothed junction)
+#                 + Phase 2 (1 mG → 0 G, 267 ms parabola B(τ) = 1mG·(1-0.749τ)²
+#                            τ ∈ [0, 1.335])
+#                 + Phase 3 (B = 0 hold, 100 ms)
+#                 Total ≈ 417 ms.  Output: rtp_10mG_goto.h5
+#
+#   hold_63ug     Phase 1 (10 mG → 1 mG, 50 ms with smoothed junction)
+#                 + Phase 2 (1 mG → 63 μG, 200 ms parabola τ ∈ [0, 1])
+#                 + Phase 3 (B = 63 μG hold, 167 ms — same total wall as full_descend
+#                            so the two variants are directly comparable)
+#                 Total ≈ 417 ms.  Output: rtp_10mG_goto_hold63ug.h5
+#
+# **Smoothed junction**: the Phase 1→2 corner at t = 50 ms had a 24× slope
+# discontinuity in the old version (Phase 1 linear at -180 mG/s slamming into
+# Phase 2 parabolic at -7.5 mG/s). This caused an abrupt dB/dt step that the
+# atomic Larmor following would feel. Replace the last 10 ms of Phase 1
+# (t ∈ [40, 50] ms) with a quadratic blend
+#   B(t) = a·(t-50)² + b·(t-50) + 1 mG
+# chosen so that B(40) = 2.8 mG matches the prior linear value AND
+# dB/dt(50) = -7.49e-3 mG/ms matches Phase 2's tangent. C¹-continuous corner.
+# PWL samples the blend at 2 ms cadence (t = 40, 42, 44, 46, 48, 50 ms).
 const RTP_DT         = 0.005
 const RTP_SAVE_EVERY = 250     # ~230 snapshots over the run
 
-# Combined PWL trajectory for the unified pipeline.
-# Times relative to RTP start, values in Gauss.
-const GOTO_TIMES_G = [
-    0.0,            #   0  ms     start, B = 10 mG
-    34.55752,       #  50  ms     end of Phase 1, B = 1 mG
-    51.83628,       #  75  ms     Phase 2 parabola samples (τ = 0.125, 0.25, ..., 1.0)
-    69.11504,       # 100  ms
-    86.39380,       # 125  ms
-    103.67256,      # 150  ms
-    120.95132,      # 175  ms
-    138.23008,      # 200  ms
-    155.50884,      # 225  ms
-    172.78760,      # 250  ms     B = 63 μG (old endpoint, parabola continues)
-    190.06636,      # 275  ms     parabola extension toward 0
-    207.34512,      # 300  ms
-    219.09504,      # 317  ms     B = 0 (parabola natural endpoint, τ = 1.335)
-    288.21008,      # 417  ms     end of B = 0 hold
-]
-const GOTO_VALUES_G = [
-    1.00e-2, 1.00e-3,                                              # Phase 1
-    8.207e-4, 6.609e-4, 5.174e-4, 3.909e-4, 2.833e-4,
-    1.924e-4, 1.190e-4, 6.300e-5,                                  # Phase 2 original samples
-    2.460e-5, 4.050e-6, 0.0,                                        # Phase 2 extension
-    0.0,                                                            # Phase 3 hold
-]
+const GOTO_MODE = lowercase(get(ENV, "GOTO_MODE", "full_descend"))
+
+# Internal-time conversion factor: ω_ref = 691.1504 rad/s, so 1 ms = 0.6911504 internal.
+const _IT(ms) = ms * 0.6911504
+
+# Phase 1 (smoothed last 10 ms): blend coefficients computed from
+#   B(50) = 1 mG,  dB/dt(50) = -7.49e-3 mG/ms,  B(40) = 2.8 mG (Phase-1 linear value)
+# →  b = -7.49e-3,  c = 1,  a = (2.8 - 1 - 0.0749) / 100 = 0.017251
+const _BLEND_A = 0.017251
+const _BLEND_B = -0.00749
+const _BLEND_C = 1.0  # mG at t=50ms
+_blend_mG(t_ms) = _BLEND_A * (t_ms - 50.0)^2 + _BLEND_B * (t_ms - 50.0) + _BLEND_C
+
+# Common segments (in milliseconds → values in Gauss).
+# Phase 1 linear (0 ≤ t ≤ 40 ms): 10 mG → 2.8 mG
+# Phase 1 smoothed corner (40 ≤ t ≤ 50 ms): blend down to 1 mG
+const _SEG_PHASE1 = let
+    samples_ms = [0.0, 10.0, 20.0, 30.0, 40.0,
+                  42.0, 44.0, 46.0, 48.0, 50.0]
+    pairs = [(_IT(ms), ms ≤ 40.0 ?
+                          (10.0 - (10.0 - 2.8) * ms / 40.0) * 1e-3 :  # linear part
+                          _blend_mG(ms) * 1e-3                          # blend part
+            ) for ms in samples_ms]
+    pairs
+end
+
+# Phase 2 parabola: 1 mG · (1 − 0.749 τ)², τ = (t − 50)/200 in ms.
+function _parabola_pairs(tau_endpoints)
+    [(_IT(50.0 + 200.0 * τ), 1e-3 * (1.0 - 0.749 * τ)^2) for τ in tau_endpoints]
+end
+
+const GOTO_TIMES_G, GOTO_VALUES_G = if GOTO_MODE == "full_descend"
+    # Phase 2 τ ∈ [0.125, 0.25, ..., 1.0, 1.125, 1.25, 1.335]  (12 samples)
+    parabola = _parabola_pairs([0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875,
+                                1.0, 1.125, 1.25, 1.335])
+    # Phase 3: hold at 0 for 100 ms → t_end = 317 + 100 = 417 ms
+    hold = [(_IT(417.0), 0.0)]
+    all_pairs = vcat(_SEG_PHASE1, parabola, hold)
+    (first.(all_pairs), last.(all_pairs))
+elseif GOTO_MODE == "hold_63ug"
+    # Phase 2 τ ∈ [0.125, ..., 1.0]  (truncate at parabola endpoint = 63 μG)
+    parabola = _parabola_pairs([0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1.0])
+    # Phase 3: hold at 63 μG for 167 ms → t_end = 250 + 167 = 417 ms
+    hold = [(_IT(417.0), 63.0e-6)]
+    all_pairs = vcat(_SEG_PHASE1, parabola, hold)
+    (first.(all_pairs), last.(all_pairs))
+else
+    error("Unknown GOTO_MODE='$GOTO_MODE' (expected full_descend or hold_63ug)")
+end
 const RTP_DURATION = GOTO_TIMES_G[end]
 
 const THETA_Q_DEG = (-16.0, 0.0, +16.0)
@@ -86,9 +126,10 @@ const NVOL = length(VOL_IDXS)
 const STORED_3D_M = (-6, -5, -4)
 const STORED_3D_COMPONENTS = ntuple(i -> Int(F - STORED_3D_M[i] + 1), length(STORED_3D_M))
 
+const _H5_NAME = GOTO_MODE == "full_descend" ? "rtp_10mG_goto.h5" : "rtp_10mG_goto_$(GOTO_MODE).h5"
 const OUT_DIR        = get(ENV, "FPE_ROOT",
     "/gs/bs/work/6/ue06186/bec-runs/flower_protocol_edh")
-const OUT            = joinpath(OUT_DIR, "rtp_10mG_goto.h5")
+const OUT            = joinpath(OUT_DIR, _H5_NAME)
 const PSI_ITP_CACHE  = joinpath(OUT_DIR, "itp_10mG_final_psi.jld2")
 const PSI_LBFGS_CACHE = joinpath(OUT_DIR, "lbfgs_10mG_final_psi.jld2")
 const REUSE_LBFGS_ONLY = lowercase(get(ENV, "FPE_REUSE_LBFGS_ONLY", "false")) in ("1", "true", "yes")
