@@ -40,10 +40,16 @@ const POLISH_B = [-10, -5, 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 52, 54,
 const LBFGS_TOL           = 5.0e-5
 const LBFGS_M             = 30
 const LBFGS_SOBOLEV_ALPHA = 0.5
-const CHUNK_STEPS         = 200
-const MAX_CHUNKS_PER_POINT = 50            # cap: 10000 iters / point
+const CHUNK_STEPS         = 50             # finer step → more frequent LBFGS Hessian reset
+const MAX_CHUNKS_PER_POINT = 200           # cap: 10000 iters / point
 const POLISH_TARGET       = 7.5e-5         # skip if already below this
-const FLOOR_DETECT_EPS    = 1.0e-6         # chunk-to-chunk grad_norm improvement floor
+# Floor detector v2 (the v1 abs-improvement check failed when grad_norm
+# oscillated by ±7e-3 around a floor — abs(improvement) was always > 1e-6
+# so the check never fired. Replace with a windowed range-ratio test:
+# if max/min of the last K chunk grad_norms is within FLOOR_RATIO, declare
+# the optimizer stuck at numerical floor and move on.
+const FLOOR_WINDOW        = 8              # look back 8 chunks
+const FLOOR_RATIO         = 1.5            # if max/min < 1.5 → oscillating at floor
 
 const OUT_DIR = get(ENV, "FPE_ROOT",
     "/gs/bs/work/6/ue06186/bec-runs/flower_protocol_edh")
@@ -88,10 +94,9 @@ function polish_point!(preset, backend, B_uG::Int, seed_psi, target_path::Abstra
 
     psi_cur = seed_psi
     grad_norm = input_grad_norm
-    grad_prev = Inf
+    grad_window = Float64[]
     E = NaN
     total_iter = 0
-    floor_hits = 0
     converged = false
     t_start = time()
 
@@ -110,8 +115,10 @@ function polish_point!(preset, backend, B_uG::Int, seed_psi, target_path::Abstra
         E = gs.energy
         total_iter += CHUNK_STEPS
         wall = time() - t_start
-        improvement = grad_prev - grad_norm
-        grad_prev = grad_norm
+        push!(grad_window, grad_norm)
+        if length(grad_window) > FLOOR_WINDOW
+            popfirst!(grad_window)
+        end
         converged = grad_norm ≤ LBFGS_TOL
 
         # Persist every chunk
@@ -136,31 +143,36 @@ function polish_point!(preset, backend, B_uG::Int, seed_psi, target_path::Abstra
             f["wall_seconds"]     = wall
             f["converged"]        = converged
             f["chunk_steps"]      = CHUNK_STEPS
-            f["floor_hits"]       = floor_hits
-            f["method"]           = "polish-LBFGS (chunk=$CHUNK_STEPS, cap=$(CHUNK_STEPS*MAX_CHUNKS_PER_POINT), tol=$LBFGS_TOL, m=$LBFGS_M, α=$LBFGS_SOBOLEV_ALPHA)"
+            f["floor_window_min"] = isempty(grad_window) ? grad_norm : minimum(grad_window)
+            f["method"]           = "polish-LBFGS v2 (chunk=$CHUNK_STEPS, cap=$(CHUNK_STEPS*MAX_CHUNKS_PER_POINT), tol=$LBFGS_TOL, m=$LBFGS_M, α=$LBFGS_SOBOLEV_ALPHA, floor_window=$FLOOR_WINDOW, floor_ratio=$FLOOR_RATIO)"
         end
         write_progress(B_uG, chunk, total_iter, E, grad_norm, wall,
                        converged ? "converged" : "running")
-        logprint(@sprintf("  [polish B=%4d μG] chunk %2d/%2d  iter=%5d  E=%+.8f  |∇|=%.4e  Δ|∇|=%+.2e  wall=%6.1fs  %s",
+        # Floor detection v2: range ratio over recent window
+        floor_detected = false
+        ratio = NaN
+        if length(grad_window) == FLOOR_WINDOW
+            ratio = maximum(grad_window) / max(minimum(grad_window), 1e-30)
+            if ratio < FLOOR_RATIO
+                floor_detected = true
+            end
+        end
+        logprint(@sprintf("  [polish B=%4d μG] chunk %3d/%3d  iter=%5d  E=%+.8f  |∇|=%.4e  win_ratio=%s  wall=%6.1fs  %s",
                           B_uG, chunk, MAX_CHUNKS_PER_POINT, total_iter, E, grad_norm,
-                          improvement, wall,
-                          converged ? "✓ converged" : ""))
+                          isnan(ratio) ? "—" : @sprintf("%.2f", ratio),
+                          wall,
+                          converged ? "✓ converged" : (floor_detected ? "△ floor" : "")))
         if converged
             break
         end
-        # Floor detection: stop if chunks improve by less than EPS for 3 in a row
-        if abs(improvement) < FLOOR_DETECT_EPS
-            floor_hits += 1
-            if floor_hits ≥ 3
-                logprint("  [polish B=$(B_uG) μG] floor detected (Δ|∇| < $FLOOR_DETECT_EPS for $floor_hits chunks) — stop")
-                break
-            end
-        else
-            floor_hits = 0
+        if floor_detected
+            logprint(@sprintf("  [polish B=%4d μG] floor v2 (window=%d, range_ratio=%.2f<%.2f) — stop and move on",
+                              B_uG, FLOOR_WINDOW, ratio, FLOOR_RATIO))
+            break
         end
     end
     return (E=E, grad_norm=grad_norm, total_iter=total_iter, converged=converged,
-            wall=time()-t_start, floor_hits=floor_hits)
+            wall=time()-t_start)
 end
 
 function main()
