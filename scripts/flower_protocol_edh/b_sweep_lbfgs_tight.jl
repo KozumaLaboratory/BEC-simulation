@@ -27,8 +27,8 @@
 import CUDA
 using SpinorBEC
 using HDF5, JLD2, LinearAlgebra, Dates, Printf
-using SpinorBEC: Units, eu151_preset, ZeemanParams, find_ground_state_lbfgs,
-                 CUDABackend, CPUBackend
+using SpinorBEC: Units, eu151_preset, ZeemanParams, find_ground_state,
+                 find_ground_state_lbfgs, CUDABackend, CPUBackend
 
 const F = 6
 const D = 2F + 1
@@ -73,12 +73,21 @@ const B_SWEEP_PLAN = [
     (B_target=-10, seed=-5),
 ]
 
-const LBFGS_TOL           = 1.0e-4
+const LBFGS_TOL           = 5.0e-4
 const LBFGS_M             = 15
 const LBFGS_SOBOLEV_ALPHA = 0.5
 const CHUNK_STEPS         = 100         # iters per LBFGS sub-call (= observable cadence)
-const MAX_CHUNKS_PER_POINT = 50         # cap: 50 × 100 = 5000 iters per B point
-const RETIGHTEN_BAR        = 1.5e-4     # skip cached file if its grad_norm ≤ this
+const MAX_CHUNKS_PER_POINT = 25         # cap: 25 × 100 = 2500 iters per B point
+const RETIGHTEN_BAR        = 7.5e-4     # skip cached file if its grad_norm ≤ this
+
+# ITP preconditioning. For points with NO existing cache we run ITP from a
+# polarized m=-F initial state to get a coarse but unbiased GS, then hand it
+# to LBFGS for the precise polish. For retighten (cache present), we skip
+# ITP and continue LBFGS from the cached ψ.
+const ITP_DT          = 0.01
+const ITP_N_STEPS     = 30_000
+const ITP_TOL_DE      = 1.0e-7
+const ITP_TOL_DRHO    = 1.0e-5
 
 const OUT_DIR = get(ENV, "FPE_ROOT",
     "/gs/bs/work/6/ue06186/bec-runs/flower_protocol_edh")
@@ -118,7 +127,7 @@ function logprint(args...)
 end
 
 function solve_point!(preset, backend, B_uG::Int, seed_psi, target_path::AbstractString;
-                      git_sha::AbstractString, B_seed_uG::Int)
+                      git_sha::AbstractString, B_seed_uG::Int, do_itp::Bool=false)
     B_target_g = B_uG * 1e-6
     p_target = Units.bfield_to_p(B_target_g, preset.atom.g_F, preset.omega_ref)
     zeeman_t = ZeemanParams(p_target, 0.0)
@@ -129,6 +138,24 @@ function solve_point!(preset, backend, B_uG::Int, seed_psi, target_path::Abstrac
     E = NaN
     converged = false
     t_start = time()
+
+    # --- Optional ITP precondition (rough → precise) for fresh points ---
+    if do_itp
+        logprint("  [B=$(B_uG) μG] ITP precondition from m=-F init ($(ITP_N_STEPS) steps)")
+        itp_t0 = time()
+        gs_itp = find_ground_state(;
+            grid=preset.grid, atom=preset.atom,
+            interactions=preset.interactions, zeeman=zeeman_t, potential=preset.potential,
+            dt=ITP_DT, n_steps=ITP_N_STEPS, tol=ITP_TOL_DE, tol_drho=ITP_TOL_DRHO,
+            save_every=2000,
+            initial_state=:m_minus_F,
+            enable_ddi=true, c_dd=preset.c_dd, secular_ddi=false,
+            backend=backend, verbose=false,
+        )
+        psi_cur = Array{ComplexF64}(gs_itp.workspace.state.psi)
+        logprint(@sprintf("  [B=%4d μG] ITP done: E=%+.6f  last_step=%d  wall=%.1fs",
+                          B_uG, gs_itp.energy, gs_itp.last_step, time() - itp_t0))
+    end
 
     for chunk in 1:MAX_CHUNKS_PER_POINT
         gs = find_ground_state_lbfgs(;
@@ -229,17 +256,19 @@ function main()
             continue
         end
 
-        # If retightening, prefer the existing target ψ (already closer).
-        seed_psi = if isfile(path_t)
-            logprint("[b_sweep_tight] target B=$(B_t)μG  ← warm-start from PRIOR cache at same B")
-            jldopen(path_t, "r") do f; f["psi"]; end
-        else
-            logprint("[b_sweep_tight] target B=$(B_t)μG  ← warm-start from B=$(B_s)μG")
+        # Fresh point (no cache) → ITP→LBFGS pipeline (rough then precise).
+        # Retighten (cache exists) → continue LBFGS from cached ψ, skip ITP.
+        is_fresh = !isfile(path_t)
+        seed_psi = if is_fresh
+            logprint("[b_sweep_tight] target B=$(B_t)μG  FRESH (ITP→LBFGS) — warm-start ψ from B=$(B_s)μG as fallback if ITP disabled")
             jldopen(path_s, "r") do f; f["psi"]; end
+        else
+            logprint("[b_sweep_tight] target B=$(B_t)μG  RETIGHTEN — continue LBFGS from cached ψ")
+            jldopen(path_t, "r") do f; f["psi"]; end
         end
 
         result = solve_point!(preset, backend, B_t, seed_psi, path_t;
-                              git_sha=git_sha, B_seed_uG=B_s)
+                              git_sha=git_sha, B_seed_uG=B_s, do_itp=is_fresh)
         marker = result.converged ? "✓" : "△"
         logprint("  $marker  B=$(B_t)μG done.  E=$(result.E)  |∇|=$(round(result.grad_norm; sigdigits=4))  iter=$(result.total_iter)  wall=$(round(result.wall; digits=1))s")
         n_done += 1
