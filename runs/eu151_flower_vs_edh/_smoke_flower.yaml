@@ -1,0 +1,44 @@
+# Smoke config: 1-point, 16³, ITP-only.
+# Mirrors flower_B_sweep.yaml schema with minimal cost so we can
+# verify run_yaml parses + executes the pipeline without errors.
+# DO NOT use for physics — grid/step counts are too small.
+
+metadata:
+  owner: smoke
+  project: flower smoke
+
+defaults:
+  kind: spinor
+  backend: cpu
+  interactions: {N_atoms: 50000, omega_ref: 691.1504}
+
+dealias:
+  enabled: true
+  k_cut: 6.0
+  auto_dt: true
+  dt_safety: 10.0
+
+mixins:
+  eu151_smoke:
+    atom: Eu151
+    grid: {n: [16, 16, 16], box: [12.0, 12.0, 12.0]}
+    potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+    interactions:
+      N_atoms: 50000
+      omega_ref: 691.1504
+      c1_ratio: 0.0277777778
+
+pipeline:
+  - ground_state:
+      use: [eu151_smoke]
+      method: itp
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B: {Bz: "6.0e-5 Gauss", theta: 0.0, phi: 0.0}    # +60 μG (mid-sweep)
+      initial_state: m_plus_F
+      dt: 0.005
+      n_steps: 200
+      tol: 1.0e-5
+
+  - analyze:
+      - phase_classify: {}
