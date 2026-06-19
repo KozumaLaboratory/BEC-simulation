@@ -21,6 +21,9 @@ const TEST_TIER = lowercase(get(ENV, "SPINORBEC_TEST_TIER", "full"))
 # ── Fast tier: pure unit tests, no find_ground_state / run_simulation ──
 const FAST_TESTS = [
     "test_quality.jl",
+    # Meta-test: every test_*.jl under test/ is in exactly one tier or the
+    # MANUAL allowlist (enforces CLAUDE.md commitment #7 structurally).
+    "test_tier_membership.jl",
     "test_level1_scalar_exact.jl",
     "test_level2_strang_convergence.jl",
     "test_level3_zeeman_only.jl",
@@ -161,6 +164,11 @@ const FAST_TESTS = [
     "workflow/test_autopilot.jl",
     "workflow/test_catalog.jl",
     "workflow/test_catalog_index.jl",
+    # Orphan-resolution 2026-06-19: pure-introspection dispatch-coverage
+    # guards (kwarg forwarding / kwarg-list invariants) — fast, independent,
+    # no ITP/RTP. Were unregistered (ran nowhere); now FAST so CI gates them.
+    "solvers/test_lbfgs_forward_coverage.jl",
+    "workflow/test_make_workspace_kwarg_coverage.jl",
 ]
 
 # ── CI tier: fast + core integration tests that run ITP/RTP ──
@@ -307,6 +315,17 @@ const CI_EXTRA = [
     # suite does not reach (it tests per-term apply_step!, not the
     # fused production kernel). Registered 2026-06-06.
     "oracles/test_operator_trinity_fused_face.jl",
+    # Orphan-resolution 2026-06-19: three load-bearing gates that had
+    # fallen out of every tier (ran nowhere). Promoted to CI:
+    #  - outer_operator_equivalence: ITP/RTP V(dt/2) chain equivalence;
+    #    guards the 2026-06-02 transverse-Zeeman-missing-from-ITP class.
+    #  - gpu_cpu_fused_group_parity: closes the fused-broadcast axis the
+    #    per-term GPU parity gate cannot reach (CUDA-gated; no-op on CPU).
+    #  - multistart_winner_selection: stability-filter-precedes-E-ranking
+    #    contract (a lower-E saddle must not beat a higher-E true minimum).
+    "hamiltonian/test_outer_operator_equivalence.jl",
+    "oracles/test_gpu_cpu_fused_group_parity.jl",
+    "oracles/test_multistart_winner_selection.jl",
 ]
 
 # ── Full tier: everything (ci + remaining heavy tests) ──
@@ -384,6 +403,21 @@ const PHYSICS_TESTS = [
     "analysis/test_larmor_precession.jl",
     "analysis/test_analytic_ground_states.jl",
     "analysis/test_analytical_validation.jl",
+]
+
+# ── Manual allowlist: tests intentionally NOT run by any tier ──
+# These depend on environment conditions the default runner cannot
+# guarantee (GPU hardware, opt-in heavy YAML, a free TCP port). They are
+# documented in test/MANUAL_TESTS.md with the exact invocation. Listed
+# here so the tier-membership meta-test counts them as "accounted for"
+# (i.e. they are deliberately manual, not orphaned). Run them by hand.
+const MANUAL_TESTS_ALLOWLIST = [
+    "gpu/test_cuda.jl",                              # coarse CUDA smoke (gated, but needs GPU to be useful)
+    "rotating_basis/test_rotating_basis_gpu.jl",     # errors (not skips) without CUDA
+    "workflow/test_active_learning_yaml.jl",         # heavy YAML (SPINORBEC_RUN_HEAVY_YAML)
+    "workflow/test_multi_fidelity_yaml.jl",          # heavy YAML (SPINORBEC_RUN_HEAVY_YAML)
+    "workflow/test_klaus_validation.jl",             # heavy YAML scenario pending schema audit
+    "workflow/test_live_monitor.jl",                 # spawns dashboard server on a TCP port
 ]
 
 function select_tests(tier::String)

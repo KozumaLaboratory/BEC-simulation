@@ -85,6 +85,32 @@ the default tier because TCP binding can collide on CI agents.
 julia --project=. -e 'using SpinorBEC; include("test/workflow/test_live_monitor.jl")'
 ```
 
+## Re-audit (2026-06-19)
+
+Second orphan sweep. Of 12 files outside every tier list, the 6 above
+remained manual (now also enumerated in `MANUAL_TESTS_ALLOWLIST` in
+`runtests.jl` so the new tier-membership meta-test can tell "deliberately
+manual" from "orphaned"). The other 6 had fallen through entirely
+(neither in a tier nor here) and were resolved:
+
+- Promoted to **CI_EXTRA** (load-bearing gates that ran nowhere):
+  `hamiltonian/test_outer_operator_equivalence.jl`,
+  `oracles/test_gpu_cpu_fused_group_parity.jl`,
+  `oracles/test_multistart_winner_selection.jl`.
+- Promoted to **FAST_TESTS** (pure-introspection dispatch-coverage,
+  fast + independent): `solvers/test_lbfgs_forward_coverage.jl`,
+  `workflow/test_make_workspace_kwarg_coverage.jl`.
+- **Relocated out of `test/`**: `validation/test_validation_matrix.jl`
+  was a CSV/Markdown-emitting runner script, not a test — moved to
+  `scripts/validation/run_validation_matrix.jl` (its documented home;
+  `@__DIR__/../..` still resolves to the repo root, so the test paths it
+  loads are unaffected). This also un-breaks the doc links in
+  `docs/validation/*` that already pointed at the `scripts/` path.
+
+A new FAST meta-test, `test/test_tier_membership.jl`, now enforces that
+every `test_*.jl` under `test/` is in exactly one tier list or this
+allowlist — so the orphan-drift state cannot recur unnoticed.
+
 ## Classification audit (2026-05-25)
 
 This file was produced by the orphan-test audit step of the
