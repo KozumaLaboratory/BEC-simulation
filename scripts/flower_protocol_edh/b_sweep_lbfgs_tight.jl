@@ -1,5 +1,10 @@
 # scripts/flower_protocol_edh/b_sweep_lbfgs_tight.jl
 # ===================================================
+# [DEPRECATED 2026-06-19] superseded by `b_sweep_all.jl` (two-phase
+# pipeline: ITP-only for uncached B + LBFGS polish for all B, with shared
+# B_LIST and dashboard). Left here for reproducibility of the early
+# tight-sweep runs.
+#
 # Extended + tightened LBFGS B-sweep, with OBSERVABLE PROGRESS.
 #
 # Differences vs `b_sweep_lbfgs.jl`:

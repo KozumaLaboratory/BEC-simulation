@@ -1,4 +1,8 @@
 #!/bin/bash
+# [DEPRECATED 2026-06-19] use `submit_b_sweep_all.sh` instead — the
+# `b_sweep_lbfgs_tight.jl` script it points to has been superseded by
+# the two-phase `b_sweep_all.jl`.
+#
 # UGE submission: tightened LBFGS B-sweep, 200 μG → -10 μG, 28 control pts,
 # tol=1e-4 / cap=10000 iter / m=15, chain warm-start.
 #

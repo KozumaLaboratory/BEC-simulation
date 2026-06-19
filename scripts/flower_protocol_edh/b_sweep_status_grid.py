@@ -17,7 +17,10 @@ import os, math, h5py
 ROOT = os.environ.get("FPE_ROOT",
     "/gs/bs/work/6/ue06186/bec-runs/flower_protocol_edh")
 
-B_LIST = [-10, -5, 0, 5, 10, 15, 20, 25, 30, 35, 40, 45,
+# Single source of truth — must match `B_LIST` in `b_sweep_all.jl`.
+# Low-B thinned to 10 μG step; fine 2 μG step in 50–70 μG (DDI/Zeeman crossover);
+# coarse above 70 μG.
+B_LIST = [-10, 0, 10, 20, 30, 40,
           50, 52, 54, 55, 56, 58, 60, 62, 64, 65, 66, 68, 70,
           80, 90, 100, 120, 150, 200]
 

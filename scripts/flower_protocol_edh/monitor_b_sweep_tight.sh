@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# [DEPRECATED 2026-06-19] use `b_sweep_status_grid.py` instead — it shows
+# the unified Phase 1 + Phase 2 dashboard for the b_sweep_all pipeline.
+#
 # Poll the b_sweep_tight progress file + recent cache writes via ssh t4.
 # Usage: bash scripts/flower_protocol_edh/monitor_b_sweep_tight.sh [interval_sec]
 set -euo pipefail

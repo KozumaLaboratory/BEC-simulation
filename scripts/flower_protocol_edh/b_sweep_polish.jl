@@ -1,5 +1,10 @@
 # scripts/flower_protocol_edh/b_sweep_polish.jl
 # ================================================
+# [DEPRECATED 2026-06-19] superseded by `b_sweep_all.jl` Phase 2.
+# Polish caches written by this script (`lbfgs_<B>uG_polish_psi.jld2`)
+# are still read by b_sweep_all as a fallback seed when they're better
+# than the primary cache, so the historical outputs remain useful.
+#
 # Polish pass — runs in parallel with the primary `b_sweep_lbfgs_tight.jl`.
 #
 # Goal: push already-converged-enough caches *further* toward the true GS

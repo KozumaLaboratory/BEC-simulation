@@ -1,4 +1,7 @@
 #!/bin/bash
+# [DEPRECATED 2026-06-19] use `submit_b_sweep_all.sh` — polish is now
+# Phase 2 of the unified b_sweep_all pipeline.
+#
 # UGE submission: parallel POLISH pass for already-cached B points.
 # Runs alongside primary `b_sweep_lbfgs_tight` (different node, no shared writes).
 #

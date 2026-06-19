@@ -108,9 +108,30 @@ function best_cached_psi(B_uG::Int)
     return (path=chosen_path, psi=psi, grad_norm=chosen_gn)
 end
 
-# Phase 1 only runs for B with NO existing cache (either slot).
+# Phase 1 ITP runs when:
+#   (a) no cache slot exists at all, OR
+#   (b) the only cache is an incomplete phase1-ITP record (iter < 30000).
+# In both cases we have no usable rough GS yet. Existing LBFGS-touched
+# caches (any method other than phase1-ITP, or phase1-ITP at full 30000
+# steps) are preserved.
 function phase1_needed(B_uG::Int)
-    return !isfile(final_path(B_uG)) && !isfile(polish_path(B_uG))
+    fp = final_path(B_uG)
+    pp = polish_path(B_uG)
+    # If a polish cache exists, we always have a usable ψ — skip Phase 1.
+    isfile(pp) && return false
+    # If no final cache at all, must run Phase 1.
+    isfile(fp) || return true
+    # Final exists — is it a stalled phase1-ITP (partial)?
+    try
+        jldopen(fp, "r") do f
+            method = haskey(f, "method") ? String(f["method"]) : ""
+            iter   = haskey(f, "lbfgs_iter_total") ? Int(f["lbfgs_iter_total"]) : 0
+            # phase1-ITP partial → needs Phase 1 redo
+            return occursin("phase1-ITP", method) && iter < ITP_TOTAL_STEPS
+        end
+    catch
+        return false   # if we can't read it, leave alone
+    end
 end
 
 function write_progress(phase::AbstractString, B_uG::Int, chunk::Int,
