@@ -125,13 +125,26 @@ function crossed_trap_depth(
     reach::Float64=6.0, gravity_factor::Float64=1.0)
     isempty(trap.beams) && return 0.0
     grav(s, a) = a == gravity_axis ? gravity_factor * m * _G_EARTH * s : 0.0
-    Vc = _trap_potential_point(trap, (0.0, 0.0, 0.0))
     # finest active waist sets the inner resolution (resolve the tightest barrier)
     wmin = Inf
     for b in trap.beams
         b.power > 0 && (wmin = min(wmin, b.waist))
     end
     isfinite(wmin) || return 0.0
+    # the trap minimum SAGS along the gravity axis under gravity; reference the barriers from the
+    # sagged minimum, not the beam centre — else gravity is over-counted (depth under-estimated,
+    # catastrophically when m g w ~ U₀: a shallow trap that holds atoms reports a spurious 0). The
+    # sag is the first local minimum going down; stop before the (lower) gravity-dominated wing.
+    Vc = _trap_potential_point(trap, (0.0, 0.0, 0.0))
+    let a = gravity_axis, Vprev = Vc
+        for i in 1:n_scan
+            s = -2.0 * wmin * i / n_scan                    # scan downward (−gravity axis)
+            V = _trap_potential_point(trap, ntuple(k -> k == a ? s : 0.0, 3)) + grav(s, a)
+            V > Vprev && break                              # passed the sag (local min)
+            Vc = min(Vc, V)
+            Vprev = V
+        end
+    end
     Udepth = Inf
     @inbounds for a in 1:3
         # largest relevant scale on this axis sets the outer reach (z_R along a beam's

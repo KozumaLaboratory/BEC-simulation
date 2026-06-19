@@ -260,6 +260,10 @@ _euv3_ramp() = FortRamp(
         @test r_strong < 1.0                  # gravity (∝ m) lowers the barrier
         @test r_weak < 1.0
         @test r_weak < r_strong               # the shallow trap is hurt more by gravity
+        # SAG-reference regression: a gravity-marginal trap (m g w ~ U₀) still HOLDS atoms, so the
+        # barrier (referenced from the sagged minimum, not the beam centre) must be POSITIVE — the
+        # old V(0) reference reported a spurious 0 here (catastrophic over-count of gravity).
+        @test crossed_trap_depth(weak, _m) > 0.0
     end
 
     @testset "ramp_from_params is a valid transform" begin
