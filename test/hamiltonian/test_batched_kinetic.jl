@@ -50,7 +50,7 @@
         bk = SpinorBEC._make_batched_kinetic_cache(psi, kp, 1)
 
         new_dt = 0.005
-        SpinorBEC._update_batched_kinetic_phase!(bk, grid.k_squared, new_dt)
+        SpinorBEC._update_batched_kinetic_phase!(bk, grid.k_squared, new_dt, false)
 
         kp_new = prepare_kinetic_phase(grid, new_dt)
         @test bk.kinetic_phase_bc[:, 1] ≈ kp_new rtol = 1e-14

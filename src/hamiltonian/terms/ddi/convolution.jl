@@ -9,15 +9,18 @@ function make_ddi_params(
     secular::Bool=false,
     quasi_2d::Bool=false,
     l_z::Float64=0.0,
+    trunc_radius::Union{Nothing, Float64}=nothing,
     dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
 ) where {N, T <: AbstractFloat}
     U = dtype === nothing ? T : dtype
     if quasi_2d
         N == 2 || throw(ArgumentError("quasi_2d DDI requires a 2D grid (N=2), got N=$N"))
         l_z > 0.0 || throw(ArgumentError("quasi_2d DDI requires l_z > 0, got l_z=$l_z"))
+        # The quasi-2D kernel is the analytically z-integrated (erfcx) form,
+        # already smooth at k=0; the spherical truncation factor does not apply.
         return _make_ddi_params_quasi2d(grid, c_dd, l_z; dtype=U)
     end
-    _make_ddi_params_full(grid, atom; c_dd, secular, dtype=U)
+    _make_ddi_params_full(grid, atom; c_dd, secular, trunc_radius, dtype=U)
 end
 
 function _make_ddi_params_quasi2d(
@@ -64,6 +67,7 @@ function _make_ddi_params_full(
     atom::AtomSpecies;
     c_dd::Float64=compute_c_dd(atom),
     secular::Bool=false,
+    trunc_radius::Union{Nothing, Float64}=nothing,
     dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
 ) where {N, T <: AbstractFloat}
     U = dtype === nothing ? T : dtype
@@ -113,6 +117,7 @@ function _make_ddi_params_full(
         rk_shape;
         secular,
         full_n=n_pts,
+        trunc_radius,
     )
 
     DDIParams(C_dd, Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz)
