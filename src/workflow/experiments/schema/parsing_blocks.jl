@@ -438,7 +438,9 @@ factors (anisotropic padding).
 """
 function _parse_ddi_pad_factor(raw)
     raw === nothing && return 2.0
-    raw isa AbstractVector && return Float64.(raw)
+    # Return an NTuple (not a Vector) so it satisfies the `Union{Real, NTuple}`
+    # kwarg type on make_workspace / the solver entry points.
+    raw isa AbstractVector && return Tuple(Float64.(raw))
     Float64(raw)
 end
 
