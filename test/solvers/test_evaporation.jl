@@ -203,19 +203,21 @@ _euv3_ramp() = FortRamp(
         @test !res.reached_bec
     end
 
-    @testset "spilling cap: η<1 trap cannot hold a cloud hotter than its depth" begin
-        # a gravity-marginal trap (low power → shallow) loaded above its depth must spill to T≈U/k_B.
-        # Validated: the 1.1 W ¹⁵¹Eu hold (downward barrier ~1µK) cools to the measured 1.0µK.
+    @testset "η<1 soft spilling: trap cannot hold a cloud hotter than its depth" begin
+        # a gravity-marginal trap (low power → shallow) loaded above its depth spills DOWN toward
+        # T≈U/k_B (smooth −3γ_el(1−η) relaxation, not a hard cap). Validated: the 1.1 W ¹⁵¹Eu hold
+        # cools 1.86→1.0µK ≈ its ~1µK downward barrier.
         trap = _eu_trap()
-        ramp = FortRamp([0.0, 1.0], [0.06 0.06; 0.0 0.0; 0.0 0.0])    # very shallow single beam
+        ramp = FortRamp([0.0, 4.0], [0.06 0.06; 0.0 0.0; 0.0 0.0])    # very shallow single beam
         U = trap_at(trap, [0.06, 0.0, 0.0])[1]
-        η0 = U / (Units.KB * 5e-6)
-        @test η0 < 1                                                  # loaded hotter than the depth
+        @test U / (Units.KB * 5e-6) < 1                               # loaded hotter than the depth
         res = run_evaporation(trap, ramp, EvapParams(; a_s=_as, tau_bg=Inf, K3=0.0);
             N0=1e5, T0=5e-6, dt=1e-3)
-        @test res.T[end] <= U / Units.KB * 1.001                      # capped at the trap depth
-        # a deep trap (η≫1) is untouched by the cap — T stays high
-        deep = run_evaporation(trap, FortRamp([0.0, 1.0], [50.0 50.0; 0.0 0.0; 0.0 0.0]),
+        @test res.T[end] < 5e-6                                       # cooled below the loaded T
+        @test res.T[end] < U / Units.KB * 1.3                         # relaxed toward the depth
+        @test all(diff(res.T) .<= 1e-12)                              # monotone (smooth, not a jump)
+        # a deep trap (η≫1) is untouched by the spilling term — T stays high
+        deep = run_evaporation(trap, FortRamp([0.0, 4.0], [50.0 50.0; 0.0 0.0; 0.0 0.0]),
             EvapParams(; a_s=_as, tau_bg=Inf, K3=0.0); N0=1e5, T0=5e-6, dt=1e-3)
         @test deep.T[end] ≈ 5e-6 rtol = 0.1                           # no spill (T ≪ depth)
     end

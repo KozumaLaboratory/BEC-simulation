@@ -164,12 +164,7 @@ function run_evaporation(
         T_new = T + h / 6 * (k1T + 2k2T + 2k3T + k4T)
         N_new = max(N_new, 1.0)
         T_new = max(T_new, 1e-12)
-        # spilling cap: a trap of depth U cannot hold a cloud hotter than its depth (η ≥ 1). When
-        # the dynamics push T above U/k_B (a gravity-marginal trap loaded too hot, η < 1) the excess
-        # energy spills with the escaping atoms — the equilibrium-evaporation cooling law (which uses
-        # the rethermalised c=3 heat capacity) does NOT capture this non-equilibrium truncation, so
-        # cap T at U/k_B. (η ≳ 1 throughout normal runs ⇒ no effect; only gravity-marginal holds.)
-        T_new = min(T_new, U2 / Units.KB)
+        # (the η<1 spilling that bounds T at the trap depth is a smooth −γ_el(1−η) term in the RHS)
 
         # BEC-onset crossing on the post-step trap
         ρ_old = phase_space_density(N, T, ω2)

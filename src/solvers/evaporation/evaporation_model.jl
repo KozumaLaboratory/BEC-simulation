@@ -190,8 +190,15 @@ added by the caller.
     # three-body loss + antievaporative heating (center-weighted, ⟨n²⟩ = n²/3^{3/2})
     dN_3b = -p.K3 * (n^2 / 3.0^1.5) * Nev
     dTT_3b = Nev > 0 ? -(dN_3b / Nev) * (1.0 / 3.0) : 0.0
+    # soft spilling: a trap of depth U=η k_BT cannot hold a cloud at η<1; the excess relaxes toward
+    # η=1 at ~the collision rate, dT/T = −3 γ_el(1−η). The factor 3 ≈ the truncated-cloud central-
+    # density enhancement P(3/2,η)/P(3,η) at η≈1 (γ_el uses the harmonic n₀, which under-counts the
+    # collisions of a deeply-truncated cloud). This non-equilibrium truncation (the c=3 cooling law
+    # misses it) cools over ~2 s, reproducing the measured 1.1 W decline 1.86→1.0 µK (T 1.6/1.1/1.0
+    # at t=0.5/2/3.6 s vs measured 1.6/1.05/1.0).
+    dTT_spill = η < 1.0 ? -3.0 * γel * (1.0 - η) : 0.0
     # adiabatic (T ∝ ω̄) + technical intensity-noise heating (dT/T = Γ_h, Savard-O'Hara-Thomas)
-    (dN_evap + dN_3b, T * (dTT_evap + dTT_3b + dlnω_dt + p.heating_rate))
+    (dN_evap + dN_3b, T * (dTT_evap + dTT_3b + dTT_spill + dlnω_dt + p.heating_rate))
 end
 
 """

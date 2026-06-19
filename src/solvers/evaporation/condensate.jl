@@ -165,7 +165,6 @@ function run_evaporation_bec(
 
         N = max(N + h / 6 * (k1N + 2k2N + 2k3N + k4N), 1.0)
         T = max(T + h / 6 * (k1T + 2k2T + 2k3T + k4T), 1e-12)
-        T = min(T, U2 / Units.KB)        # spilling cap: a depth-U trap cannot hold a cloud at η<1
         t += h
 
         if isnan(t_bec)
