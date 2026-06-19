@@ -190,16 +190,29 @@ function apply_local_spin_step!(
         end
     end
 
-    # Build U = exp(-iH·dt) (RTP) / exp(-H·dt + shift) (ITP) via eigendecomp.
-    # Fuse U[i,j] = Σ_k V[i,k]·phase[k]·conj(V[j,k]) directly into MMatrix to
-    # drop the Diagonal-Vector + 2 intermediate matmul heap allocations.
-    # Use a per-workspace cached Matrix buffer + eigen! so we don't pay
-    # `Matrix(H_static)` (~2.7 KB) every call. eigen!'s own values/vectors
-    # allocations remain (LAPACK heevr internals), but the dense-copy is
-    # gone — saves ~6 allocs / 6 KB / call.
-    H_dense = _local_spin_h_buffer(ws)
+    # Build U = exp(-iH·dt) (RTP) / exp(-H·dt + shift) (ITP) eigen-exactly,
+    # then apply U to every grid point of ψ̃ via the spatially-uniform
+    # spin-axis rotation helper.
+    U_loc = _eigenexact_unitary(ws, Hz, dt; imaginary_time)
+    _apply_rotation_to_spin_axis!(ws.psi_tilde, U_loc, N; scratch=ws.rotation_scratch)
+    nothing
+end
+
+# ----------------------------------------------------------------------------
+# Eigen-exact matrix exponential of a Hermitian D×D spin Hamiltonian, shared
+# by the rotating local-spin (n̂=ẑ) and lab-spin (n̂=B̂(t)) steps. Build
+# U = exp(-iH·dt) (RTP) / exp(-H·dt + shift) (ITP) via eigendecomposition,
+# fusing U[i,j] = Σ_k V[i,k]·phase[k]·conj(V[j,k]) directly into an MMatrix to
+# drop the Diagonal-Vector + 2 intermediate matmul heap allocations. A
+# per-workspace cached dense buffer + `eigen!` avoids paying `Matrix(H)`
+# (~2.7 KB) every call; eigen!'s own LAPACK heevr allocations remain.
+# ----------------------------------------------------------------------------
+function _eigenexact_unitary(
+    ws::RotatingBasisWS{T, N, D}, H::AbstractMatrix, dt::T; imaginary_time::Bool
+) where {T, N, D}
+    H_dense = _eigenexact_h_buffer(ws)
     @inbounds for j in 1:D, i in 1:D
-        H_dense[i, j] = Hz[i, j]
+        H_dense[i, j] = H[i, j]
     end
     eigs = eigen!(Hermitian(H_dense))
     λ = eigs.values
@@ -218,24 +231,21 @@ function apply_local_spin_step!(
         end
         U_buf[i, j] = s
     end
-    U_loc = SMatrix{D, D, ComplexF64}(U_buf)
-
-    # Apply U_loc to every grid point of ψ̃ via the existing
-    # spatially-uniform spin-axis rotation helper.
-    _apply_rotation_to_spin_axis!(ws.psi_tilde, U_loc, N; scratch=ws.rotation_scratch)
-    nothing
+    return SMatrix{D, D, ComplexF64}(U_buf)
 end
 
-# Per-workspace cache of the D×D dense buffer used by `apply_local_spin_step!`
-# to feed `eigen!` without rebuilding `Matrix(H_static)` per call. Same pattern
-# as `_ROTATING_K2_CACHE` / `_ROTATION_RT_CACHE`: objectid-keyed lookup so
-# multiple workspaces don't collide.
-const _LOCAL_SPIN_H_CACHE = Dict{UInt, Matrix{ComplexF64}}()
-function _local_spin_h_buffer(ws::RotatingBasisWS{T, N, D}) where {T, N, D}
+# Per-workspace cache of the D×D dense buffer `_eigenexact_unitary` feeds to
+# `eigen!` without rebuilding `Matrix(H)` per call. Same pattern as
+# `_ROTATING_K2_CACHE` / `_ROTATION_RT_CACHE`: objectid-keyed lookup so
+# multiple workspaces don't collide. Local and lab spin steps never
+# interleave on one ws (a run uses one or the other; each is called twice
+# sequentially per Strang step), so they safely share the entry.
+const _EIGENEXACT_H_CACHE = Dict{UInt, Matrix{ComplexF64}}()
+function _eigenexact_h_buffer(ws::RotatingBasisWS{T, N, D}) where {T, N, D}
     key = objectid(ws)
-    haskey(_LOCAL_SPIN_H_CACHE, key) && return _LOCAL_SPIN_H_CACHE[key]
+    haskey(_EIGENEXACT_H_CACHE, key) && return _EIGENEXACT_H_CACHE[key]
     buf = Matrix{ComplexF64}(undef, D, D)
-    _LOCAL_SPIN_H_CACHE[key] = buf
+    _EIGENEXACT_H_CACHE[key] = buf
     buf
 end
 
@@ -326,22 +336,12 @@ function apply_lab_spin_step!(
     bz = cos(theta)
 
     # H_lab = -p (F·B̂) + q (F·B̂)² — the SAME field-direction Zeeman as the
-    # rotating local-spin step, here with n̂=B̂(t). One shared declaration.
+    # rotating local-spin step, here with n̂=B̂(t). One shared declaration,
+    # one shared eigen-exact exponential.
     Hb = MMatrix{D, D, ComplexF64}(undef)
     zeeman_field_matrix!(Hb, sm, ws.p, ws.q, bx, by, bz)
 
-    H_static = SMatrix{D, D, ComplexF64}(Hb)
-    Hh = Hermitian(Matrix(H_static))
-    eigs = eigen(Hh)
-    λ = eigs.values
-    Vmat = eigs.vectors
-    U_loc = if imaginary_time
-        λ_min = minimum(λ)
-        SMatrix{D, D, ComplexF64}(Vmat * Diagonal([exp(-(λ[i] - λ_min) * dt) for i in 1:D]) * Vmat')
-    else
-        SMatrix{D, D, ComplexF64}(Vmat * Diagonal([cis(-λ[i] * dt) for i in 1:D]) * Vmat')
-    end
-
+    U_loc = _eigenexact_unitary(ws, Hb, dt; imaginary_time)
     _apply_rotation_to_spin_axis!(ws.psi_tilde, U_loc, N; scratch=ws.rotation_scratch)
     nothing
 end
