@@ -135,6 +135,23 @@ _euv3_ramp() = FortRamp(
         @test thermal_peak_density(1e6, -5e-6, ω̄, _m) == 0.0
     end
 
+    @testset "technical heating term: dT/T = Γ_h (intensity noise), directional" begin
+        # in a deep trap (η huge ⇒ no evaporation), no loss, the only dT is the heating Γ_h·T
+        Γh = 0.025
+        p = EvapParams(; a_s=_as, tau_bg=Inf, K3=0.0, heating_rate=Γh)
+        N, T, ω̄ = 1e6, 12e-6, 2π * 200
+        Udeep = 25.0 * Units.KB * T               # η = 25 ⇒ evaporation negligible
+        dN, dT = evap_rhs(N, T, Udeep, ω̄, p, _m)
+        @test dT / T ≈ Γh rtol = 1e-3             # pure exponential heating
+        @test dN / N ≈ 0 atol = 1e-3              # no loss (deep, τ_bg=Inf, K3=0)
+        # it always HEATS (directional), and adds to evaporative cooling
+        c, h = evap_rhs(1e6, 12e-6, 6.0 * Units.KB * 12e-6, ω̄, p, _m),
+        evap_rhs(1e6, 12e-6, 6.0 * Units.KB * 12e-6, ω̄,
+            EvapParams(; a_s=_as, tau_bg=Inf, K3=0.0), _m)
+        @test c[2] > h[2]                          # heating makes dT less negative than without
+        @test EvapParams(; a_s=_as, tau_bg=1.0).heating_rate == 0.0   # default off
+    end
+
     @testset "evap_volume_factor: 3D Luiten form, no free parameter" begin
         # 3D harmonic (a=3, P3/P4) recovers the textbook (η−4)e^{−η}; a 2-D mistake
         # (P2/P3) would give (η−3)e^{−η}.

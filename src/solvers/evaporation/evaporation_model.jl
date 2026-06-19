@@ -54,6 +54,12 @@ floor (the evaporation rate is the all-η Luiten incomplete-gamma form, valid be
 ¹⁵¹Eu BEC loading value to ~6 %, see [`thermal_peak_density`](@ref)). It is NOT a fit
 parameter; keep it at 1 and treat any need to move it as a model-regime symptom to fix
 (e.g. the peak-thermal density is a poor proxy for a strongly-truncated η≲4 cloud).
+`heating_rate` an exponential technical-heating rate `Γ_h` [1/s] from FORT intensity
+noise (`dT/dt = Γ_h T`, Savard–O'Hara–Thomas PRA 56 R1095): `Γ_h = π² ν_r² S_I(2ν_r)`
+with `ν_r` the (tight, radial) trap frequency and `S_I` the fractional-intensity-noise
+PSD. A measurable lab quantity (NOT a fudge); default 0. It is a DIRECTIONAL systematic
+(always heats) — the leading explanation for the 7 W hold's model-too-cold residual
+(a degraded-beam RIN S_I~2×10⁻⁸/Hz at ν_r=358 Hz gives Γ_h~0.025/s ⇒ +2 µK over 7 s).
 """
 Base.@kwdef struct EvapParams
     a_s::Float64
@@ -62,6 +68,7 @@ Base.@kwdef struct EvapParams
     kappa::Float64 = 1.0
     eta_min::Float64 = 4.0
     evap_scale::Float64 = 1.0
+    heating_rate::Float64 = 0.0
 end
 
 """Mutable integration state: atom number `N`, temperature `T` [K], time `t` [s]."""
@@ -183,8 +190,8 @@ added by the caller.
     # three-body loss + antievaporative heating (center-weighted, ⟨n²⟩ = n²/3^{3/2})
     dN_3b = -p.K3 * (n^2 / 3.0^1.5) * Nev
     dTT_3b = Nev > 0 ? -(dN_3b / Nev) * (1.0 / 3.0) : 0.0
-    # adiabatic compression/expansion from the ramped trap (T ∝ ω̄)
-    (dN_evap + dN_3b, T * (dTT_evap + dTT_3b + dlnω_dt))
+    # adiabatic (T ∝ ω̄) + technical intensity-noise heating (dT/T = Γ_h, Savard-O'Hara-Thomas)
+    (dN_evap + dN_3b, T * (dTT_evap + dTT_3b + dlnω_dt + p.heating_rate))
 end
 
 """
