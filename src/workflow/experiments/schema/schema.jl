@@ -237,6 +237,9 @@ const DDI_SCHEMA = Dict{String, FieldSpec}(
     # Ronen spherical-truncation radius (Tier A): a number (physical R), or
     # "auto"/"box_half" for half the smallest box extent.
     "trunc_radius" => FieldSpec(; type=Union{Number, String}),
+    # Tier B: zero-padded, image-free convolution + optional anisotropic pad.
+    "padded" => FieldSpec(; type=Bool, default=false),
+    "pad_factor" => FieldSpec(; type=Union{Number, Vector}),
 )
 
 # `kind` selects the solver path:

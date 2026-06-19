@@ -369,7 +369,8 @@ function _parse_gs_interactions(inter::Dict, atom)
 end
 
 """
-    _parse_gs_ddi(ddi_d, inter, atom) -> (enabled, c_dd, secular, quasi_2d, l_z, trunc_radius)
+    _parse_gs_ddi(ddi_d, inter, atom)
+        -> (enabled, c_dd, secular, quasi_2d, l_z, trunc_radius, padded, pad_factor)
 
 Parse the `ddi:` block of a step. Assumes `apply_schema_defaults!` has
 already run, so for a ground_state step `ddi_d` is at least `Dict{}`;
@@ -378,14 +379,15 @@ or pass an explicit user value here. Opt-outs: `ddi: false` or
 `ddi: {enabled: false}` ⇒ disabled. Without N_atoms+ω_ref c_dd can't
 be derived, so DDI ends up off too.
 
-`trunc_radius` (Ronen spherical-cutoff radius, Tier A) is returned as a
-`Float64` sentinel for `make_workspace`: `NaN` = off (default), `≤ 0` =
-auto (half the smallest box extent), `> 0` = explicit physical radius. The
-YAML accepts a number or the strings `"auto"` / `"box_half"`.
+`trunc_radius` (Ronen spherical-cutoff radius) is a `Float64` sentinel for
+`make_workspace`: `NaN` = off (default), `≤ 0` = auto, `> 0` = explicit R.
+`padded` (Bool) enables the zero-padded, image-free convolution (Tier B);
+`pad_factor` (a number or per-axis vector) sets the zero-pad multiple
+(default `2`; smaller on thin axes for anisotropic padding).
 """
 function _parse_gs_ddi(ddi_d, inter, atom)
     if ddi_d === false || (ddi_d isa Dict && get(ddi_d, "enabled", true) === false)
-        return (false, NaN, false, false, 0.0, NaN)
+        return (false, NaN, false, false, 0.0, NaN, false, 2.0)
     end
     ddi_d isa Dict || (ddi_d = Dict{String, Any}())
 
@@ -405,7 +407,9 @@ function _parse_gs_ddi(ddi_d, inter, atom)
     q2d = Bool(get(ddi_d, "quasi_2d", false))
     lz = Float64(get(ddi_d, "l_z", 0.0))
     trunc = _parse_ddi_trunc_radius(get(ddi_d, "trunc_radius", nothing))
-    (enabled, c_dd, secular, q2d, lz, trunc)
+    padded = Bool(get(ddi_d, "padded", false))
+    pad_factor = _parse_ddi_pad_factor(get(ddi_d, "pad_factor", nothing))
+    (enabled, c_dd, secular, q2d, lz, trunc, padded, pad_factor)
 end
 
 """
@@ -422,6 +426,19 @@ function _parse_ddi_trunc_radius(raw)
         (s == "auto" || s == "box_half") && return -1.0
         throw(ArgumentError("ddi.trunc_radius string must be \"auto\"/\"box_half\", got \"$raw\""))
     end
+    Float64(raw)
+end
+
+"""
+    _parse_ddi_pad_factor(raw) -> Float64 or Vector{Float64}
+
+Map a YAML `ddi.pad_factor` value to `make_workspace`'s `ddi_pad_factor`:
+`nothing` ⇒ `2.0` (default); a number ⇒ scalar factor; a vector ⇒ per-axis
+factors (anisotropic padding).
+"""
+function _parse_ddi_pad_factor(raw)
+    raw === nothing && return 2.0
+    raw isa AbstractVector && return Float64.(raw)
     Float64(raw)
 end
 

@@ -130,4 +130,31 @@ using SpinorBEC: ddi_trunc_factor, make_ddi_params, make_ddi_buffers, Eu151
         @test all(isfinite, bufs.Phi_z)
         @test maximum(abs, bufs.Phi_z) > 0.0
     end
+
+    @testset "padded grid sizing (Tier B + anisotropic pad)" begin
+        gs = SpinorBEC._padded_grid_size
+        # factor 2 keeps the exact historical 2n (backward-compatible).
+        @test gs(2, 32) == 64
+        @test gs(2, 48) == 96
+        # other factors round factor·n UP to an FFT-friendly size, ≥ n+1.
+        @test gs(1.5, 32) >= 48 && gs(1.5, 32) == nextprod((2, 3, 5, 7), 48)
+        @test gs(2.73, 64) >= ceil(Int, 2.73 * 64)
+        @test gs(1.0, 32) >= 33                      # ≥ n+1 even at factor 1
+        @test_throws ArgumentError gs(0.5, 32)       # factor < 1 rejected
+    end
+
+    @testset "make_ddi_padded honors pad_factor (scalar + anisotropic)" begin
+        n = 8
+        grid = make_grid(GridConfig((n, n, n), (10.0, 10.0, 10.0)))
+        # default: 2n per axis.
+        ctx2 = make_ddi_padded(grid, Eu151; trunc_radius=5.0)
+        @test ctx2.padded_shape == (2n, 2n, 2n)
+        # anisotropic: thin z padded less than xy ⇒ smaller z, fewer points overall.
+        ctx_a = make_ddi_padded(grid, Eu151; trunc_radius=4.0, pad_factor=(2.0, 2.0, 1.5))
+        @test ctx_a.padded_shape[1] == 2n
+        @test ctx_a.padded_shape[3] < 2n
+        @test prod(ctx_a.padded_shape) < prod(ctx2.padded_shape)
+        # the truncated tensor is still traceless on the padded grid.
+        @test all(isfinite, ctx_a.Q_zz)
+    end
 end

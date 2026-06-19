@@ -60,11 +60,11 @@ present).
     if haskey(p, "ddi")
         return _parse_gs_ddi(p["ddi"], get(p, "interactions", Dict()), atom)
     elseif ws_prev !== nothing && ws_prev.ddi !== nothing
-        return (true, ws_prev.ddi.C_dd, false, false, 0.0, NaN)
+        return (true, ws_prev.ddi.C_dd, false, false, 0.0, NaN, false, 2.0)
     elseif haskey(p, "interactions")
         return _parse_gs_ddi(Dict{String, Any}(), p["interactions"], atom)
     else
-        return (false, NaN, false, false, 0.0, NaN)
+        return (false, NaN, false, false, 0.0, NaN, false, 2.0)
     end
 end
 
@@ -101,7 +101,7 @@ function _run_step(
     grid, ndim = _resolve_gs_grid(p, grid_prev)
     interactions = _resolve_gs_interactions(p, ws_prev, atom)::InteractionParams
     gs_ddi = _resolve_gs_ddi_inheritance(p, ws_prev, atom)
-    enable_ddi, c_dd_val, secular, q2d, lz, ddi_trunc = gs_ddi
+    enable_ddi, c_dd_val, secular, q2d, lz, ddi_trunc, ddi_padded_b, ddi_pf = gs_ddi
     potential = _resolve_gs_potential(p, ws_prev, ndim)
 
     backend = if haskey(p, "backend")
@@ -143,6 +143,7 @@ function _run_step(
             psi_init=psi_out,
             enable_ddi, c_dd=c_dd_val,
             secular_ddi=secular, quasi_2d_ddi=q2d, l_z_ddi=lz, ddi_trunc_radius=ddi_trunc,
+            ddi_padding=ddi_padded_b, ddi_pad_factor=ddi_pf,
             backend,
         )
         step_result = Dict{Symbol, Any}(
@@ -263,6 +264,7 @@ function _run_step(
             dt, n_steps, tol, initial_state, init_state_params, psi_init,
             enable_ddi, c_dd=c_dd_val,
             secular_ddi=secular, quasi_2d_ddi=q2d, l_z_ddi=lz, ddi_trunc_radius=ddi_trunc,
+            ddi_padding=ddi_padded_b, ddi_pad_factor=ddi_pf,
             target_magnetization=target_mz, backend, on_step,
             checkpoint_dir=checkpoint_dir,
             save_every=max(1, n_steps ÷ 100),
@@ -290,6 +292,7 @@ function _run_step(
                 n_steps, tol, m_lbfgs, initial_state, init_state_params, psi_init,
                 enable_ddi, c_dd=c_dd_val,
                 secular_ddi=secular, quasi_2d_ddi=q2d, l_z_ddi=lz, ddi_trunc_radius=ddi_trunc,
+                ddi_padding=ddi_padded_b, ddi_pad_factor=ddi_pf,
                 target_magnetization=target_mz, backend,
                 verbose,
                 light_shift=gs_light_shift,

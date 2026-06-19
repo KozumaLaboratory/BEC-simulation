@@ -163,6 +163,18 @@ Semantic details + interactions live in `docs/reference/dynamics.md`.
 | `quasi_2d` | Bool | false |
 | `l_z` | Real [0, 100] | — |
 | `trunc_radius` | Number or `"auto"`/`"box_half"` | off |
+| `padded` | Bool | false |
+| `pad_factor` | Number or per-axis Vector | 2 |
+
+**`padded`** (Tier B) enables the zero-padded, image-free convolution
+(Vico–Greengard): combined with `trunc_radius: auto` it removes the periodic
+images *exactly* (not just suppresses them), giving near-machine accuracy at
+fixed resolution. Cost: ~`prod(pad_factor)`× the grid FFT work + memory (≈8× at
+the default 2× pad in 3D). **`pad_factor`** sets the zero-pad multiple — a scalar
+or a per-axis vector. Use a smaller factor on thin axes for **anisotropic
+padding** (e.g. `pad_factor: [2.73, 2.73, 1.5]` for a pancake) to cut memory; the
+auto `trunc_radius` caps R at `(pad_factor_d − 1)·L_d` per axis to stay
+wrap-around-free. Only meaningful with `padded: true`.
 
 **`trunc_radius`** applies the spherically-truncated DDI kernel
 (Ronen–Bortolotti–Bohn cutoff; Vico–Greengard–Ferrando spectral form). Every

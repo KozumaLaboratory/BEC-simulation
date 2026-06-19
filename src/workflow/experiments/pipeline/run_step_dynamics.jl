@@ -84,15 +84,17 @@ function _run_step(
     else
         prev_c_dd
     end
-    # DDI spherical-truncation radius (Tier A). Like `secular`, this is not
-    # carried on the inherited `DDIParams` (the Q tensor already bakes h(kR)
-    # in), so dynamics only applies it when an explicit dynamics `ddi:` block
-    # requests it; otherwise the bare kernel is rebuilt.
+    # DDI truncation / padding (Tier A/B). Like `secular`, these are not carried
+    # on the inherited `DDIParams` (the kernel bakes them in), so dynamics only
+    # applies them when an explicit dynamics `ddi:` block requests it; otherwise
+    # the bare kernel is rebuilt.
     ddi_trunc = if ddi_raw isa Dict
         _parse_ddi_trunc_radius(get(ddi_raw, "trunc_radius", nothing))
     else
         NaN
     end
+    ddi_padded_b = ddi_raw isa Dict ? Bool(get(ddi_raw, "padded", false)) : false
+    ddi_pf = ddi_raw isa Dict ? _parse_ddi_pad_factor(get(ddi_raw, "pad_factor", nothing)) : 2.0
 
     # Match the GS path: route the inner B dict through
     # `_build_zeeman_from_b_block` (:dimless → `_parse_zeeman`,
@@ -176,6 +178,7 @@ function _run_step(
         sim_params=sp,
         psi_init=psi_prev,
         enable_ddi, c_dd=c_dd_val, ddi_trunc_radius=ddi_trunc,
+        ddi_padding=ddi_padded_b, ddi_pad_factor=ddi_pf,
         backend,
         absorbing_boundary,
         light_shift,
