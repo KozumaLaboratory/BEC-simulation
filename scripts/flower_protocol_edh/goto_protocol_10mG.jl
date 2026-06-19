@@ -18,7 +18,8 @@ using SpinorBEC: Units, eu151_preset, ZeemanParams, TimeDependentZeeman,
                  find_ground_state, find_ground_state_lbfgs,
                  CUDABackend, CPUBackend, make_workspace, run_simulation!,
                  SimulationCallbacks, total_energy, total_norm, SimParams,
-                 magnetization, rotate_quantization_axis, SpinSystem
+                 magnetization, rotate_quantization_axis, SpinSystem,
+                 LossParams
 
 const F = 6
 const D = 2F + 1
@@ -69,6 +70,14 @@ const RTP_DT         = 0.005
 const RTP_SAVE_EVERY = 250     # ~230 snapshots over the run
 
 const GOTO_MODE = lowercase(get(ENV, "GOTO_MODE", "full_descend"))
+
+# RTP-only three-body loss K_3 (SI units, m^6/s). Default 0 = K3 off
+# (bit-identical to pre-Issue#26 behaviour). Matsui-aligned value ≈ 2.1e-40.
+# Applied ONLY in Phase 3 RTP — K3 is non-Hermitian (loss.jl: "RT only").
+# SI→dimless conversion follows parsing_blocks.jl:186-195:
+#   a_ho = sqrt(ℏ / (m · ω_ref));  n0 = N / a_ho^3;  K3_dimless = K3_SI · n0² / ω_ref.
+const K3_PER_M_SI = parse(Float64, get(ENV, "GOTO_K3_PER_M_SI", "0.0"))
+const _K3_TAG = K3_PER_M_SI > 0 ? "_k3_$(string(K3_PER_M_SI))" : ""
 
 # Internal-time conversion factor: ω_ref = 691.1504 rad/s, so 1 ms = 0.6911504 internal.
 const _IT(ms) = ms * 0.6911504
@@ -126,7 +135,7 @@ const NVOL = length(VOL_IDXS)
 const STORED_3D_M = (-6, -5, -4)
 const STORED_3D_COMPONENTS = ntuple(i -> Int(F - STORED_3D_M[i] + 1), length(STORED_3D_M))
 
-const _H5_NAME = GOTO_MODE == "full_descend" ? "rtp_10mG_goto.h5" : "rtp_10mG_goto_$(GOTO_MODE).h5"
+const _H5_NAME = (GOTO_MODE == "full_descend" ? "rtp_10mG_goto" : "rtp_10mG_goto_$(GOTO_MODE)") * _K3_TAG * ".h5"
 const OUT_DIR        = get(ENV, "FPE_ROOT",
     "/gs/bs/work/6/ue06186/bec-runs/flower_protocol_edh")
 const OUT            = joinpath(OUT_DIR, _H5_NAME)
@@ -466,6 +475,17 @@ function main()
     q_wf = ConstantWaveform(0.0)
     zeeman_rt = TimeDependentZeeman(p_wf, q_wf)
 
+    # Three-body loss K_3 (RT-only). See header comment on K3_PER_M_SI.
+    loss_rt = if K3_PER_M_SI > 0
+        a_ho = sqrt(Units.HBAR / (preset.atom.mass * preset.omega_ref))
+        n0   = 50_000.0 / a_ho^3
+        k3_dimless = K3_PER_M_SI * n0^2 / preset.omega_ref
+        println("[goto_10mG] K_3 = $(K3_PER_M_SI) m^6/s  →  dimless = $(round(k3_dimless; sigdigits=4))  (n0=$(round(n0; sigdigits=4)) m^-3)")
+        LossParams(K3_per_m_cubic = fill(k3_dimless, D))
+    else
+        nothing
+    end
+
     n_steps_rtp = round(Int, RTP_DURATION / RTP_DT)
     sp_rtp = SimParams(; dt=RTP_DT, n_steps=n_steps_rtp,
                        imaginary_time=false,
@@ -478,6 +498,7 @@ function main()
         sim_params=sp_rtp,
         psi_init=psi_lbfgs_host,
         enable_ddi=true, c_dd=preset.c_dd, secular_ddi=false,
+        loss=loss_rt,
         backend=backend,
     )
 
