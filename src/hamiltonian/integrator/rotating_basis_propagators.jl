@@ -159,6 +159,10 @@ into one matrix exponential is exact at any dt.
 For ITP the imaginary-time path uses exp(-H_spin·dt) shifted to keep the
 lowest-energy mode bounded by 1 (constant shift removed via norm
 renormalization).
+
+When Â = 0 (static field) H_spin is diagonal, so U is a per-component phase:
+the step takes a fast path (`_apply_diagonal_spin_phase!`) that skips the
+eigendecomposition and the full D×D rotation entirely.
 """
 function apply_local_spin_step!(
     ws::RotatingBasisWS{T, N, D}, dt::T, t::T;
@@ -166,35 +170,78 @@ function apply_local_spin_step!(
 ) where {T, N, D}
     sm = ws.spin_matrices
 
-    # Zeeman_diag: -p F_z + q F_z² (n̂=ẑ in the rotating basis). Built from
-    # the shared `zeeman_field_matrix!` so the sign convention lives in ONE
-    # declaration with the standard registry (`_diag_coef(ZeemanTerm)`).
+    # Static field (Â = 0): H_spin = -p F_z + q F_z² is diagonal, so U is a
+    # per-component phase. Take the fast path that skips BOTH the
+    # eigendecomposition and the full D×D spin-axis rotation (per-voxel cost
+    # D² → D) — the common case for ITP ground states and static-B̂ RTP.
+    has_gauge =
+        !iszero(ws.theta_dot_func(Float64(t))) || !iszero(ws.phi_dot_func(Float64(t)))
+    if !has_gauge
+        _apply_diagonal_spin_phase!(ws, dt; imaginary_time)
+        return nothing
+    end
+
+    # Gauge-active path: H_spin = (-p F_z + q F_z²) - Â(t) is dense. Build the
+    # Zeeman part via the shared `zeeman_field_matrix!` (sign single-sourced
+    # with the registry's `_diag_coef(ZeemanTerm)`), subtract the gauge
+    # connection Â, and exponentiate eigen-exactly.
     Fz = sm.Fz
     Hz = MMatrix{D, D, ComplexF64}(undef)
     zeeman_field_matrix!(Hz, sm, ws.p, ws.q, 0.0, 0.0, 1.0)
 
-    # Â / ℏ contribution
-    if !iszero(ws.theta_dot_func(Float64(t))) || !iszero(ws.phi_dot_func(Float64(t)))
-        theta = ws.theta_func(Float64(t))
-        theta_dot = ws.theta_dot_func(Float64(t))
-        phi_dot = ws.phi_dot_func(Float64(t))
-        # Â / ℏ = θ̇ F_y + φ̇(cosθ F_z - sinθ F_x). With gauge fix (χ̇=-φ̇cosθ),
-        # the F_z piece is absorbed: Â/ℏ → θ̇ F_y - φ̇ sinθ F_x.
-        a_x = -phi_dot * sin(theta)
-        a_y = theta_dot
-        a_z = ws.gauge_fix ? 0.0 : phi_dot * cos(theta)
-        Fx = sm.Fx;
-        Fy = sm.Fy
-        @inbounds for j in 1:D, i in 1:D
-            Hz[i, j] -= a_x * Fx[i, j] + a_y * Fy[i, j] + a_z * Fz[i, j]
-        end
+    theta = ws.theta_func(Float64(t))
+    a_x, a_y, a_z = _gauge_connection_vector(
+        theta, ws.theta_dot_func(Float64(t)), ws.phi_dot_func(Float64(t)), ws.gauge_fix
+    )
+    Fx = sm.Fx
+    Fy = sm.Fy
+    @inbounds for j in 1:D, i in 1:D
+        Hz[i, j] -= a_x * Fx[i, j] + a_y * Fy[i, j] + a_z * Fz[i, j]
     end
 
-    # Build U = exp(-iH·dt) (RTP) / exp(-H·dt + shift) (ITP) eigen-exactly,
-    # then apply U to every grid point of ψ̃ via the spatially-uniform
-    # spin-axis rotation helper.
     U_loc = _eigenexact_unitary(ws, Hz, dt; imaginary_time)
     _apply_rotation_to_spin_axis!(ws.psi_tilde, U_loc, N; scratch=ws.rotation_scratch)
+    nothing
+end
+
+# THE gauge connection Â(t)/ℏ = θ̇ F_y + φ̇(cosθ F_z - sinθ F_x), returned as
+# the component vector (Âx, Ây, Âz). With gauge_fix the F_z piece is absorbed
+# (χ̇ = -φ̇ cosθ ⇒ Âz = 0). Single declaration consumed by BOTH the
+# gauge-active local-spin step (which folds -Â into H) and `apply_gauge_step!`
+# (which applies the generator -Â directly); the sign relationship between the
+# two consumers is explicit at their call sites. Pinned in
+# `test/oracles/test_redundancy_gates.jl (g)`.
+@inline function _gauge_connection_vector(
+    theta::Real, theta_dot::Real, phi_dot::Real, gauge_fix::Bool
+)
+    a_x = -phi_dot * sin(theta)
+    a_y = theta_dot
+    a_z = gauge_fix ? 0.0 : phi_dot * cos(theta)
+    return (a_x, a_y, a_z)
+end
+
+# Diagonal spin step for a static field (n̂ = ẑ, no gauge connection): multiply
+# each spinor component c by exp(-i E_c dt) (RTP) / the shifted
+# exp(-(E_c - E_min) dt) (ITP), where E_c = -p m + q m² is the diagonal Zeeman
+# energy — single-sourced from `zeeman_field_matrix!` (n̂=ẑ). GPU-safe: scalar
+# phase broadcast per spinor slab, like `apply_spatial_diagonal_step!`.
+function _apply_diagonal_spin_phase!(
+    ws::RotatingBasisWS{T, N, D}, dt::T; imaginary_time::Bool
+) where {T, N, D}
+    Hd = MMatrix{D, D, ComplexF64}(undef)
+    zeeman_field_matrix!(Hd, ws.spin_matrices, ws.p, ws.q, 0.0, 0.0, 1.0)
+    E = ntuple(c -> real(Hd[c, c]), Val(D))
+    phases = if imaginary_time
+        E_min = minimum(E)
+        ntuple(c -> ComplexF64(exp(-(E[c] - E_min) * dt)), Val(D))
+    else
+        ntuple(c -> cis(-E[c] * dt), Val(D))
+    end
+    @inbounds for c in 1:D
+        ph = phases[c]
+        slab = selectdim(ws.psi_tilde, N + 1, c)
+        @. slab *= ph
+    end
     nothing
 end
 
@@ -304,13 +351,14 @@ function apply_gauge_step!(
 
     abs(theta_dot) + abs(phi_dot) < 1e-30 && return nothing
 
-    phi_x = phi_dot * sin(theta)
-    phi_y = -theta_dot
-    phi_z = ws.gauge_fix ? zero(Float64) : -phi_dot * cos(theta)
+    # Generator is -Â: applying exp(-i(-Â)·F dt) = exp(+iÂ·F dt). Â comes from
+    # the single `_gauge_connection_vector` declaration shared with the
+    # gauge-active local-spin step.
+    a_x, a_y, a_z = _gauge_connection_vector(theta, theta_dot, phi_dot, ws.gauge_fix)
 
     apply_uniform_spin_rotation!(
         ws.psi_tilde, ws.spin_matrices,
-        Float64(phi_x), Float64(phi_y), Float64(phi_z),
+        Float64(-a_x), Float64(-a_y), Float64(-a_z),
         Float64(dt), N;
         imaginary_time, scratch=ws.rotation_scratch,
     )

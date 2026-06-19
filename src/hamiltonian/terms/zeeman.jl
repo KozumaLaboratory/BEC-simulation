@@ -109,6 +109,17 @@ function zeeman_field_matrix!(
     Fx = sm.Fx
     Fy = sm.Fy
     Fz = sm.Fz
+    if iszero(nx) && iszero(ny)
+        # Axis-aligned (n̂ ∥ ẑ): H = -p nz F_z + q (nz F_z)² is diagonal.
+        # Skip the F_x/F_y assembly and the dense (n̂·F)² matmul — keeps the
+        # rotating local-spin build at O(D) instead of O(D³).
+        fill!(H, zero(ComplexF64))
+        @inbounds for i in 1:D
+            m = nz * real(Fz[i, i])
+            H[i, i] = -p * m + q * m * m
+        end
+        return H
+    end
     @inbounds for j in 1:D, i in 1:D
         H[i, j] = -p * (nx * Fx[i, j] + ny * Fy[i, j] + nz * Fz[i, j])
     end
