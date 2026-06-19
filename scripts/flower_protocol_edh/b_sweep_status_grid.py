@@ -34,7 +34,7 @@ def gn(path):
 
 
 def best(b):
-    """Return min(tight, polish) grad_norm, or None. NaN-safe."""
+    """Return min(tight, polish) grad_norm, or None. NaN-safe. May return Inf."""
     candidates = []
     for tag in ("final", "polish"):
         g = gn(os.path.join(ROOT, f"lbfgs_{b}uG_{tag}_psi.jld2"))
@@ -43,6 +43,14 @@ def best(b):
     if not candidates:
         return None
     return min(candidates)
+
+
+def file_present(b):
+    """True if EITHER final or polish file exists on disk (even if grad_norm Inf/NaN)."""
+    for tag in ("final", "polish"):
+        if os.path.exists(os.path.join(ROOT, f"lbfgs_{b}uG_{tag}_psi.jld2")):
+            return True
+    return False
 
 
 # Precision levels (top → bottom = tightest → loosest)
@@ -57,6 +65,7 @@ LEVELS = [
 
 
 bests = [best(b) for b in B_LIST]
+presents = [file_present(b) for b in B_LIST]
 
 # B-axis header (top)
 print()
@@ -67,15 +76,18 @@ print("                                  " + "".join(["─"] * (5 * len(B_LIST))
 # Each row: precision level, with '@' if cache reaches that level
 for label, threshold in LEVELS:
     cells = []
-    for g in bests:
-        if g is None:
-            cells.append("    .")     # no cache
+    for g, present in zip(bests, presents):
+        if not present:
+            cells.append("    .")                  # no cache at all
+        elif g is None or g == float('inf'):
+            cells.append("    ?")                  # ITP-only (Inf sentinel)
         elif g <= threshold:
-            cells.append("    @")     # cache reaches this level
+            cells.append("    @")                  # cache reaches this level
         else:
-            cells.append("     ")     # cache exists but not at this level
+            cells.append("     ")                  # cache exists but coarser
     print(f"  {label:>32}: " + "".join(cells))
 print("                                  " + "".join(["─"] * (5 * len(B_LIST))))
+print("  legend:  . no cache   ? ITP-only (no LBFGS yet)   blank cache exists but coarser   @ at this precision")
 
 # Footer: per-B numerical best
 print()
