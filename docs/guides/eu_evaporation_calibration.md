@@ -187,17 +187,38 @@ DIRECT data, none a fit knob:
    `(η−3)/3` form mis-cooled. **Validated against the 7 W single-FORT hold**: measured
    dlnT/dlnN ≈ 0.8 at η≈4, model 0.82.
 
-3. **Energy-dependent cross section `σ(E) = 8πa²/(1+E/E₀)`**, E₀=ℏ²/(m a²)≈95 µK, with the
-   evaporative-collision energy ≈ 2η k_BT. This rate-limits HOT/high-η evaporation (the 7 W
-   hold plateaus at η=6.3, not the σ-constant η=8 — matching the note) and leaves COLD clouds
-   at full σ. It is the regime-distinguishing term that resolved the opposite-pull between the
-   7 W and 1.1 W holds (the note's Feshbach remark corroborates a tunable σ).
+3. **s-wave unitarity cross section `σ(T) = 8πa²/(1+k²a²)`**, `k²a² = 2(m k_BT/ℏ²)a²`
+   (flux-weighted mean collision energy 2k_BT). T-dependent, parameter-free: ~15 % lower σ at
+   16 µK, ~10 % at 10 µK for Eu — it lowers the HOT-cloud elastic rate and leaves COLD clouds
+   at full σ. (An earlier ad-hoc `σ(E)=…2η k_BT` tied to the evaporation energy was wrong —
+   the spurious "2× dipolar enhancement"; the textbook unitarity limit is the correct term.)
 
-Lab ground truth (蒸発冷却.pdf, 2023-07-19): 7 W hold @ **0.2 G**, depth **66 µK**, η **3.7→6.3**
-over 7 s, τ_bg **36 s**, first 0.2 s = loading transient. 1.1 W hold: depth 5 µK (gravity halves
-the shallow trap). With/without 3 G near-identical (the note itself blames possible 583 nm noise
-for the small difference — not a clean spin effect). The 1.1 W under-cools in the model (super-
-dilute, ~2 collisions/atom; the note flags its N data as too noisy to trust).
+Lab ground truth (蒸発冷却.pdf, 2023-07-19): 7 W hold @ **0.2 G**, η **3.7→6.3** over 7 s,
+τ_bg **36 s**, first 0.2 s = loading transient. **Depth caveat:** the note's "66 µK" is the
+OPTICAL depth `α·2P/πw²`; the physical escape barrier is GRAVITY-reduced to ~51 µK (mg·w≈9.5 µK
+cuts the downward barrier), so the real η_start≈2.9, not 3.7 — `crossed_trap_depth` is correct,
+the note over-estimates η. 1.1 W hold: optical 10 µK → gravity-reduced ~5 µK.
+
+### The 7 W hold residual = directional systematics (NOT symmetric 0-D noise)
+
+The σ-constant model is COLDER than the data at EVERY η — a ONE-SIDED residual, the signature of
+a directional bias (symmetric ±X % errors sum in quadrature and sometimes overshoot; they do not
+pile up one-sided). Three NAMED, directional (always model-too-cold) mechanisms, measured not
+guessed:
+
+- **(C) s-wave unitarity** [done, parameter-free] — lowers the hot rate, ~30 % of the gap.
+- **(A) finite-escape-time / reduced ergodicity** (Surkov) — **NEGLIGIBLE** here: the cigar escapes
+  over the tight radial (gravity-vertical) barrier, transit 2.8 ms ≪ collision-limited evap 9.7 s
+  (ratio 3×10⁻⁴). Collision-limited, not transit-limited. Not implemented.
+- **(B) technical intensity-noise heating** (Savard–O'Hara–Thomas PRA 56 R1095): `dT/dt = Γ_h T`,
+  `Γ_h = π²ν_r²S_I(2ν_r)` — `EvapParams.heating_rate`, default 0. A degraded-beam RIN
+  `S_I~2×10⁻⁸/Hz` at ν_r=358 Hz gives Γ_h~0.025/s ⇒ +2 µK over 7 s = the residual. The coefficient
+  is a measurable lab quantity (RIN × ν_r²), not a fudge; ∝ν_r² so worst on the cigar's tight radial.
+
+**Decisive separation (ramp-speed scan):** re-take the 7 W endpoint at 2× slower / 2× faster ramp.
+Slower → COLDER ⇒ rate-limited (C); slower → same/WARMER ⇒ heating-limited (B). The two have opposite
+signs, so one scan settles it. 1.1 W under-cools (super-dilute, ~2 collisions/atom; note flags its N
+data as too noisy to trust) — a data/regime wall, separate from the directional systematics.
 
 ## Design recommendation — narrow the FORT waist (answers the note's question)
 
