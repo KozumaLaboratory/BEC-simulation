@@ -59,7 +59,7 @@ using Test
         @info "DANGLING test paths — listed but absent on disk" dangling
 
     # 3. No file in more than one run-tier (would execute twice).
-    seen = Dict{String,Int}()
+    seen = Dict{String, Int}()
     for tier in run_tiers, f in tier
         seen[f] = get(seen, f, 0) + 1
     end
