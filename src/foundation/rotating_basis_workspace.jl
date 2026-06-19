@@ -108,6 +108,13 @@ struct RotatingBasisWS{T <: AbstractFloat, N, D,
     c0::T              # contact (4π a_s N / a_ho or equivalent)
     c1::T              # spin-mixing (set 0 to skip)
     gamma_lhy::T       # scalar LHY: V += γ_LHY · ρ^(3/2). Stabilizes ε_dd > 1.
+    # Singlet-pair (S=0 / c₂) channel. Held as an InteractionParams (the carrier
+    # `apply_singlet_pair_step!` reads `get_cn(·, 2)` from) so the SAME shared
+    # CPU+GPU step the standard path uses is reused here — no rotating-specific
+    # reimplementation. Inactive (c₂=0) short-circuits inside the step. The
+    # S=0 channel is rotationally invariant, so it applies directly on ψ̃ (no
+    # U_B wrap), exactly like spin-mixing c₁.
+    singlet_interactions::InteractionParams
 
     # B̂(t) angles + their derivatives. Each maps t → Float64. Stored
     # under their concrete callable type (TF/PF/TDF/PDF) — declaring
@@ -140,6 +147,7 @@ function make_rotating_basis_ws(
     V_trap::AbstractArray{T, N};
     p::Real, q::Real,
     c0::Real, c1::Real=0.0,
+    c2::Real=0.0,
     c_dd::Real=0.0,
     gamma_lhy::Real=0.0,
     # Untyped kwargs so each callable's concrete type flows into the
@@ -168,6 +176,9 @@ function make_rotating_basis_ws(
     xspace_phase_buf = _zeros(backend, Complex{T}, n_pts...)
 
     sm = spin_matrices(F)
+
+    # Singlet-pair carrier: only c₂ is read by apply_singlet_pair_step!.
+    singlet_interactions = InteractionParams(Dict(2 => Float64(c2)))
 
     fft_fwd, fft_inv = let plans = make_fft_plans(n_pts, backend; dtype=T)
         plans.forward, plans.inverse
@@ -220,6 +231,7 @@ function make_rotating_basis_ws(
         fft_fwd, fft_inv,
         ddi_params, ddi_bufs,
         V_trap_dev, T(p), T(q), T(c0), T(c1), T(gamma_lhy),
+        singlet_interactions,
         theta_func, phi_func, theta_dot_func, phi_dot_func,
         gauge_fix, loss, backend,
     )

@@ -70,7 +70,18 @@ function split_step_rotating!(
         )
     end
 
+    # Singlet-pair (S=0 / c₂): rotationally invariant, applied directly on ψ̃ via
+    # the shared CPU+GPU step (self-skips when c₂=0). Sits between spin-mixing
+    # and DDI, mirroring the standard inner order "SM singlet_pair … DDI".
+    apply_singlet_pair_step!(
+        ws.psi_tilde, ws.singlet_interactions, F_atom, Float64(half), N; imaginary_time
+    )
+
     apply_ddi_step_rotating!(ws, dt, t_mid; imaginary_time)
+
+    apply_singlet_pair_step!(
+        ws.psi_tilde, ws.singlet_interactions, F_atom, Float64(half), N; imaginary_time
+    )
 
     if is_active(ws.c1)
         apply_spin_mixing_step!(
