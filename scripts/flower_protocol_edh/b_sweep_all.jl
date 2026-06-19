@@ -36,7 +36,10 @@ const B_LIST = [-10, 0, 10, 20, 30, 40,
                 80, 90, 100, 120, 150, 200]
 
 # Skip thresholds.
-const PHASE1_SKIP_GN   = 5.0e-2   # if cache |grad| ≤ this, Phase 1 already done
+# Phase 1 (ITP from m=-F init) is ONLY for points with no cache at all —
+# any existing LBFGS-touched cache, however loose, is a vastly better seed
+# than a fresh ITP that traps in the m=-F local minimum (E ~30% too high
+# at B values where the true GS is not stretched m=-F).
 const PHASE2_TARGET_GN = 5.0e-4   # Phase 2 target
 
 # Phase 1 (ITP) configuration.
@@ -56,7 +59,8 @@ const FLOOR_RATIO         = 1.5
 
 const OUT_DIR = get(ENV, "FPE_ROOT",
     "/gs/bs/work/6/ue06186/bec-runs/flower_protocol_edh")
-cache_path(B_uG::Int) = joinpath(OUT_DIR, "lbfgs_$(B_uG)uG_final_psi.jld2")
+final_path(B_uG::Int) = joinpath(OUT_DIR, "lbfgs_$(B_uG)uG_final_psi.jld2")
+polish_path(B_uG::Int) = joinpath(OUT_DIR, "lbfgs_$(B_uG)uG_polish_psi.jld2")
 const PROGRESS_PATH = joinpath(OUT_DIR, "b_sweep_all_progress.json")
 
 # --------------------------------------------------------------------
@@ -74,11 +78,39 @@ function cache_grad_norm(path::AbstractString)
     isfile(path) || return Inf
     try
         return jldopen(path, "r") do f
-            haskey(f, "grad_norm") ? Float64(f["grad_norm"]) : Inf
+            if haskey(f, "grad_norm")
+                g = Float64(f["grad_norm"])
+                return isnan(g) ? Inf : g
+            else
+                return Inf
+            end
         end
     catch
         return Inf
     end
+end
+
+# Best ψ across both cache slots (final + polish). Returns (path, psi, gn)
+# of whichever has the lower grad_norm; nothing if neither exists.
+function best_cached_psi(B_uG::Int)
+    fp = final_path(B_uG)
+    pp = polish_path(B_uG)
+    gf = cache_grad_norm(fp)
+    gp = cache_grad_norm(pp)
+    if !isfile(fp) && !isfile(pp)
+        return nothing
+    end
+    chosen_path = gp < gf ? pp : fp
+    chosen_gn   = min(gf, gp)
+    psi = jldopen(chosen_path, "r") do f
+        Array{ComplexF64}(f["psi"])
+    end
+    return (path=chosen_path, psi=psi, grad_norm=chosen_gn)
+end
+
+# Phase 1 only runs for B with NO existing cache (either slot).
+function phase1_needed(B_uG::Int)
+    return !isfile(final_path(B_uG)) && !isfile(polish_path(B_uG))
 end
 
 function write_progress(phase::AbstractString, B_uG::Int, chunk::Int,
@@ -188,14 +220,19 @@ end
 # Phase 2: LBFGS polish
 # --------------------------------------------------------------------
 
-function phase2_lbfgs!(preset, backend, B_uG::Int, target_path::AbstractString;
+function phase2_lbfgs!(preset, backend, B_uG::Int;
                        git_sha::AbstractString, p1_done::Int, p2_done::Int, n_pts::Int)
     B_target_g = B_uG * 1e-6
     p_target = Units.bfield_to_p(B_target_g, preset.atom.g_F, preset.omega_ref)
     zeeman_t = ZeemanParams(p_target, 0.0)
 
-    psi_cur = jldopen(target_path, "r") do f; f["psi"]; end
-    psi_cur = Array{ComplexF64}(psi_cur)
+    # Seed from the best of (final, polish) — preserves prior LBFGS work
+    # rather than starting from a possibly worse Phase 1 ITP result.
+    best = best_cached_psi(B_uG)
+    best === nothing && error("No cache for B=$(B_uG) μG — Phase 1 should have created one")
+    psi_cur = best.psi
+    target_path = final_path(B_uG)
+    logprint("  Phase2 | B=$(B_uG)μG seed from $(basename(best.path)) (|grad|=$(round(best.grad_norm; sigdigits=3)))")
     grad_norm = Inf
     E = NaN
     total_iter = 0
@@ -272,45 +309,48 @@ function main()
     n_pts = length(B_LIST)
     logprint("[b_sweep_all] backend=$backend  c_dd=$(round(preset.c_dd; sigdigits=4))")
     logprint("[b_sweep_all] grid ($n_pts pts): $B_LIST")
-    logprint("[b_sweep_all] Phase 1 ITP: dt=$ITP_DT, steps=$ITP_TOTAL_STEPS, skip if cache |grad|≤$PHASE1_SKIP_GN")
+    logprint("[b_sweep_all] Phase 1 ITP: dt=$ITP_DT, steps=$ITP_TOTAL_STEPS — runs ONLY for B without any existing cache")
     logprint("[b_sweep_all] Phase 2 LBFGS: chunk=$LBFGS_CHUNK_STEPS, cap=$(LBFGS_CHUNK_STEPS*LBFGS_MAX_CHUNKS), tol=$LBFGS_TOL, target |grad|≤$PHASE2_TARGET_GN")
 
-    # ====== PHASE 1: ITP for all B ======
-    p1_done_initial = count(b -> cache_grad_norm(cache_path(b)) ≤ PHASE1_SKIP_GN, B_LIST)
-    logprint("\n[b_sweep_all] === PHASE 1 (ITP) === ($(p1_done_initial)/$n_pts already past Phase 1 quality)")
+    # ====== PHASE 1: ITP for B with NO existing cache ======
+    fresh_B = filter(phase1_needed, B_LIST)
+    p1_done_initial = n_pts - length(fresh_B)
+    logprint("\n[b_sweep_all] === PHASE 1 (ITP only for uncached B) === ($(p1_done_initial)/$n_pts already have some cache; $(length(fresh_B)) need ITP)")
     p1_done = p1_done_initial
     for B_t in B_LIST
-        path_t = cache_path(B_t)
-        existing_gn = cache_grad_norm(path_t)
-        if existing_gn ≤ PHASE1_SKIP_GN
-            logprint("  Phase1 $(progress_bar(p1_done, n_pts)) | B=$(B_t)μG SKIP (cache |∇|=$(round(existing_gn; sigdigits=3)) already past Phase 1)")
+        if !phase1_needed(B_t)
+            best = best_cached_psi(B_t)
+            gn_str = best === nothing ? "?" : @sprintf("%.2e", best.grad_norm)
+            logprint("  Phase1 $(progress_bar(p1_done, n_pts)) | B=$(B_t)μG SKIP (cache exists, best |∇|=$gn_str — preserving prior LBFGS work)")
             continue
         end
-        result = phase1_itp!(preset, backend, B_t, path_t;
+        result = phase1_itp!(preset, backend, B_t, final_path(B_t);
                              git_sha=git_sha, p1_done=p1_done, p2_done=0, n_pts=n_pts)
         p1_done += 1
         logprint(@sprintf("  Phase1 %s %d/%d | B=%4d μG ITP done E=%+.6f wall=%.1fs",
                           progress_bar(p1_done, n_pts), p1_done, n_pts, B_t,
                           result.E, result.wall))
     end
-    logprint("[b_sweep_all] PHASE 1 complete: $(p1_done)/$n_pts done")
+    logprint("[b_sweep_all] PHASE 1 complete: $(p1_done)/$n_pts have at least rough cache")
 
-    # ====== PHASE 2: LBFGS polish for all B ======
-    p2_done_initial = count(b -> cache_grad_norm(cache_path(b)) ≤ PHASE2_TARGET_GN, B_LIST)
-    logprint("\n[b_sweep_all] === PHASE 2 (LBFGS polish) === ($(p2_done_initial)/$n_pts already at target)")
+    # ====== PHASE 2: LBFGS polish for ALL B (seeded from best existing ψ) ======
+    p2_done_initial = count(b -> begin
+        best = best_cached_psi(b)
+        best !== nothing && best.grad_norm ≤ PHASE2_TARGET_GN
+    end, B_LIST)
+    logprint("\n[b_sweep_all] === PHASE 2 (LBFGS polish, all B) === ($(p2_done_initial)/$n_pts already at target)")
     p2_done = p2_done_initial
     for B_t in B_LIST
-        path_t = cache_path(B_t)
-        existing_gn = cache_grad_norm(path_t)
-        if existing_gn ≤ PHASE2_TARGET_GN
-            logprint("  Phase2 $(progress_bar(p2_done, n_pts)) | B=$(B_t)μG SKIP (cache |∇|=$(round(existing_gn; sigdigits=3)) already at target)")
+        best = best_cached_psi(B_t)
+        if best === nothing
+            logprint("  Phase2 | B=$(B_t)μG SKIP (no cache at all — Phase 1 should have created one)")
             continue
         end
-        if !isfile(path_t)
-            logprint("  Phase2 | B=$(B_t)μG SKIP (no Phase 1 cache — failed earlier?)")
+        if best.grad_norm ≤ PHASE2_TARGET_GN
+            logprint("  Phase2 $(progress_bar(p2_done, n_pts)) | B=$(B_t)μG SKIP (best |∇|=$(round(best.grad_norm; sigdigits=3)) already at target)")
             continue
         end
-        result = phase2_lbfgs!(preset, backend, B_t, path_t;
+        result = phase2_lbfgs!(preset, backend, B_t;
                                git_sha=git_sha, p1_done=p1_done,
                                p2_done=p2_done, n_pts=n_pts)
         if result.converged
