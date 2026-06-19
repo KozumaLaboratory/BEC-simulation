@@ -123,17 +123,20 @@ function apply_spatial_diagonal_step!(
     V = ws.V_trap
     ρ = ws.rho_buf
     Φ = ws.xspace_phase_buf
+    # LHY term `γ ρ^(3/2)` delegates to the shared `_lhy_V` dispatcher (the
+    # scalar production formula `c_lhy n √n`), so the closed form lives in
+    # ONE place instead of being hand-inlined here.
     if imaginary_time
         if γ == zero(T)
             @. Φ = exp(-(V + c0 * ρ) * dt)
         else
-            @. Φ = exp(-(V + c0 * ρ + γ * ρ * sqrt(ρ)) * dt)
+            @. Φ = exp(-(V + c0 * ρ + _lhy_V(ρ, γ)) * dt)
         end
     else
         if γ == zero(T)
             @. Φ = cis(-(V + c0 * ρ) * dt)
         else
-            @. Φ = cis(-(V + c0 * ρ + γ * ρ * sqrt(ρ)) * dt)
+            @. Φ = cis(-(V + c0 * ρ + _lhy_V(ρ, γ)) * dt)
         end
     end
     @inbounds for m_idx in 1:D
@@ -163,19 +166,12 @@ function apply_local_spin_step!(
 ) where {T, N, D}
     sm = ws.spin_matrices
 
-    # Zeeman_diag: -p F_z + q F_z²
+    # Zeeman_diag: -p F_z + q F_z² (n̂=ẑ in the rotating basis). Built from
+    # the shared `zeeman_field_matrix!` so the sign convention lives in ONE
+    # declaration with the standard registry (`_diag_coef(ZeemanTerm)`).
     Fz = sm.Fz
     Hz = MMatrix{D, D, ComplexF64}(undef)
-    @inbounds for j in 1:D, i in 1:D
-        Hz[i, j] = -ws.p * Fz[i, j]
-    end
-    # Add q F_z² (only diagonal contributes since Fz is diagonal)
-    if abs(ws.q) > 1e-30
-        @inbounds for i in 1:D
-            mval = ws.spin_matrices.system.m_values[i]
-            Hz[i, i] += ws.q * mval * mval
-        end
-    end
+    zeeman_field_matrix!(Hz, sm, ws.p, ws.q, 0.0, 0.0, 1.0)
 
     # Â / ℏ contribution
     if !iszero(ws.theta_dot_func(Float64(t))) || !iszero(ws.phi_dot_func(Float64(t)))
@@ -328,25 +324,11 @@ function apply_lab_spin_step!(
     bx = sin(theta) * cos(phi)
     by = sin(theta) * sin(phi)
     bz = cos(theta)
-    Fx = sm.Fx;
-    Fy = sm.Fy;
-    Fz = sm.Fz
 
+    # H_lab = -p (F·B̂) + q (F·B̂)² — the SAME field-direction Zeeman as the
+    # rotating local-spin step, here with n̂=B̂(t). One shared declaration.
     Hb = MMatrix{D, D, ComplexF64}(undef)
-    @inbounds for j in 1:D, i in 1:D
-        Hb[i, j] = -ws.p * (bx * Fx[i, j] + by * Fy[i, j] + bz * Fz[i, j])
-    end
-    if abs(ws.q) > 1e-30
-        # (F·B̂)² is dense but Hermitian; build it
-        FB = MMatrix{D, D, ComplexF64}(undef)
-        @inbounds for j in 1:D, i in 1:D
-            FB[i, j] = bx * Fx[i, j] + by * Fy[i, j] + bz * Fz[i, j]
-        end
-        FB_sq = FB * FB
-        @inbounds for j in 1:D, i in 1:D
-            Hb[i, j] += ws.q * FB_sq[i, j]
-        end
-    end
+    zeeman_field_matrix!(Hb, sm, ws.p, ws.q, bx, by, bz)
 
     H_static = SMatrix{D, D, ComplexF64}(Hb)
     Hh = Hermitian(Matrix(H_static))

@@ -156,4 +156,30 @@ _fidelity(a, b) =
         @test sum(res_y.Fy[:, :, 1]) > 1e-6      # i phase ⇒ ⟨Fy⟩ > 0
         @test abs(sum(res_y.Fx[:, :, 1])) < 1e-8 # and ⟨Fx⟩ ≈ 0
     end
+
+    # (f) Rotating-basis Zeeman vs the registry SSoT. apply_local_spin_step!
+    # (Klaus-regime production) and apply_lab_spin_step! now build the spin
+    # Hamiltonian via zeeman_field_matrix!; the standard registry declares the
+    # SAME sign once in _diag_coef(ZeemanTerm). Pin the n̂=ẑ reduction of the
+    # rotating builder to _diag_coef entry-by-entry (and assert it is purely
+    # diagonal) so a sign/coefficient flip in either copy turns this gate red
+    # instead of silently breaking the rotating path (which has no per-term
+    # oracle of its own).
+    @testset "(f) rotating zeeman_field_matrix! == _diag_coef (n̂=ẑ)" begin
+        for F in (1, 2, 6)
+            sm = SpinorBEC.spin_matrices(F)
+            D = 2F + 1
+            p, q = 1.7, 0.35
+            H = zeros(ComplexF64, D, D)
+            SpinorBEC.zeeman_field_matrix!(H, sm, p, q, 0.0, 0.0, 1.0)
+            term = SpinorBEC.ZeemanTerm(0.0, 0.0, p, q)
+            @testset "F=$F" begin
+                for (c, m) in enumerate(sm.system.m_values)
+                    @test H[c, c] ≈ SpinorBEC._diag_coef(term, m) atol = 1e-12
+                end
+                # n̂=ẑ ⇒ purely diagonal (no off-diagonal coupling)
+                @test maximum(abs, H - Diagonal(diag(H))) < 1e-12
+            end
+        end
+    end
 end

@@ -342,6 +342,7 @@ const FULL_EXTRA = [
     "rotating_basis/test_rotating_basis_phase_iii.jl",
     "rotating_basis/test_rotating_basis_pipeline_parsing.jl",
     "rotating_basis/test_rotating_basis_f32.jl",
+    "rotating_basis/test_rotating_basis_sign_oracle.jl",
     # Higher-order integrator tests
     "hamiltonian/test_higher_order_integrators.jl",
     "hamiltonian/test_integrator_order_meanfield.jl",

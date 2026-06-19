@@ -75,6 +75,57 @@ zeeman_at(f::ZeemanField{Nothing}, t::Float64) =
 # without a method error for a spatial workspace.
 zeeman_at(::ZeemanField, ::Float64) = ZeemanParams(0.0, 0.0)
 
+# ----------------------------------------------------------------------------
+# Dense field-direction Zeeman matrix — matrix form of the SAME sign
+# convention as `_diag_coef(ZeemanTerm)`. The rotating-basis local-spin
+# (n̂=ẑ) and lab-spin (n̂=B̂(t)) steps need the full D×D operator for an
+# eigen-exact exp(-iH·dt); this gives them ONE declaration instead of two
+# hand-built copies. For n̂=ẑ the diagonal reduces entry-by-entry to
+# `_diag_coef` (zero off-diagonal) — pinned by the redundancy gate in
+# `test/oracles/test_redundancy_gates.jl` so the rotating copy and the
+# registry declaration cannot drift apart.
+# ----------------------------------------------------------------------------
+
+export zeeman_field_matrix!
+
+"""
+    zeeman_field_matrix!(H, sm, p, q, nx, ny, nz) -> H
+
+Fill the preallocated D×D matrix `H` with the Zeeman Hamiltonian for a
+field of linear strength `p` along unit direction n̂=(nx,ny,nz) plus a
+quadratic `q` along the same axis:
+
+    H = -p (n̂·F) + q (n̂·F)²
+
+The sign convention is identical to `_diag_coef(ZeemanTerm)`
+(`H_z(m) = -p·m + q·m²` for n̂=ẑ). Used by the rotating-basis local-spin
+(n̂=ẑ) and lab-spin (n̂=B̂(t)) eigen-exact steps so a single declaration
+drives both.
+"""
+function zeeman_field_matrix!(
+    H::AbstractMatrix{ComplexF64}, sm::SpinMatrices{D},
+    p::Real, q::Real, nx::Real, ny::Real, nz::Real,
+) where {D}
+    Fx = sm.Fx
+    Fy = sm.Fy
+    Fz = sm.Fz
+    @inbounds for j in 1:D, i in 1:D
+        H[i, j] = -p * (nx * Fx[i, j] + ny * Fy[i, j] + nz * Fz[i, j])
+    end
+    if abs(q) > 1e-30
+        # Quadratic along the field axis: q (n̂·F)². Build n̂·F, then square.
+        FdotN = MMatrix{D, D, ComplexF64}(undef)
+        @inbounds for j in 1:D, i in 1:D
+            FdotN[i, j] = nx * Fx[i, j] + ny * Fy[i, j] + nz * Fz[i, j]
+        end
+        FN2 = FdotN * FdotN
+        @inbounds for j in 1:D, i in 1:D
+            H[i, j] += q * FN2[i, j]
+        end
+    end
+    return H
+end
+
 # ============================================================================
 # Builders — static Zeeman constructors
 # ============================================================================
