@@ -64,7 +64,7 @@ end
         SpinorBEC.evolve_rotating!(ws, 40, 0.005)
         @test SpinorBEC.rotating_norm(ws) ≈ 1.0 atol = 1e-7
         # Singlet pairing couples (m=+1, m=-1) with net F_z = 0 ⇒ ⟨F_z⟩ fixed.
-        @test isapprox(_rot_fz(ws), fz0; atol = 1e-6)
+        @test isapprox(_rot_fz(ws), fz0; atol=1e-6)
     end
 
     @testset "c₂ ≠ 0 changes the dynamics (wiring is reached)" begin
