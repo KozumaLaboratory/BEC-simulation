@@ -20,6 +20,7 @@ const _MAKE_WORKSPACE_KWARGS = (
     :magnetic_gradient, :spatial_zeeman, :time_dep_interactions, :absorbing_boundary,
     # DDI bundle
     :enable_ddi, :c_dd, :secular_ddi, :quasi_2d_ddi, :l_z_ddi, :ddi_padding,
+    :ddi_trunc_radius,
     # Quasi-2D bundle
     :quasi_2d, :l_z,
     # LHY dispatch
@@ -43,6 +44,7 @@ function make_workspace(;
     loss::Union{Nothing, LossParams}=nothing,
     fft_flags=FFTW.MEASURE,
     ddi_padding::Bool=false,
+    ddi_trunc_radius::Float64=NaN,
     quasi_2d_ddi::Bool=false,
     l_z_ddi::Float64=0.0,
     quasi_2d::Bool=false,
@@ -167,6 +169,20 @@ function make_workspace(;
         zfield
     end
 
+    # Resolve the DDI spherical-truncation radius (Ronen cutoff, Tier A).
+    #   NaN  ⇒ off (bare periodic kernel; backward-compatible default).
+    #   ≤ 0  ⇒ auto: half the smallest box extent. The cutoff must stay
+    #          inside the box to avoid wrap-around in the periodic
+    #          convolution, so we use the *smallest* axis half-length.
+    #   > 0  ⇒ explicit physical radius.
+    ddi_trunc = if isnan(ddi_trunc_radius)
+        nothing
+    elseif ddi_trunc_radius <= 0.0
+        minimum(ntuple(d -> grid.config.n_points[d] * grid.dx[d], N)) / 2
+    else
+        ddi_trunc_radius
+    end
+
     ddi = if enable_ddi
         if isnan(c_dd) && atom.mu_mag > 0.0
             throw(
@@ -221,6 +237,7 @@ function make_workspace(;
             secular=secular_ddi,
             quasi_2d=quasi_2d_ddi,
             l_z=l_z_ddi,
+            trunc_radius=ddi_trunc,
             dtype=U,
         )
         _ddi_params_to_device(ddi_params_cpu, backend)
@@ -248,6 +265,7 @@ function make_workspace(;
             secular=secular_ddi,
             quasi_2d=quasi_2d_ddi,
             l_z=l_z_ddi,
+            trunc_radius=ddi_trunc,
             backend,
             dtype=U,
         )

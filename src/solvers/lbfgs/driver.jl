@@ -20,6 +20,7 @@ function find_ground_state_lbfgs(;
     enable_ddi::Bool=false,
     c_dd::Float64=NaN,
     secular_ddi::Bool=false,
+    ddi_trunc_radius::Float64=NaN,
     quasi_2d_ddi::Bool=false,
     l_z_ddi::Float64=0.0,
     target_magnetization::Union{Nothing, Float64}=nothing,
@@ -77,7 +78,7 @@ function find_ground_state_lbfgs(;
         ws = make_workspace(;
             grid, atom, interactions, zeeman, potential,
             sim_params=sp, psi_init,
-            enable_ddi, c_dd, secular_ddi, quasi_2d_ddi, l_z_ddi, backend,
+            enable_ddi, c_dd, secular_ddi, ddi_trunc_radius, quasi_2d_ddi, l_z_ddi, backend,
             light_shift, dtype,
         )
     end

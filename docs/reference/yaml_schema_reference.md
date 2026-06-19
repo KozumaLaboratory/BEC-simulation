@@ -162,6 +162,23 @@ Semantic details + interactions live in `docs/reference/dynamics.md`.
 | `secular` | Bool | false |
 | `quasi_2d` | Bool | false |
 | `l_z` | Real [0, 100] | — |
+| `trunc_radius` | Number or `"auto"`/`"box_half"` | off |
+
+**`trunc_radius`** applies the spherically-truncated DDI kernel
+(Ronen–Bortolotti–Bohn cutoff; Vico–Greengard–Ferrando spectral form). Every
+k-space tensor component is multiplied by `h(|k|R) = 1 + 3cos(x)/x² − 3sin(x)/x³`
+(`x = |k|R`), the Fourier transform of the dipolar kernel truncated in real
+space at radius `R`. This kills the lattice-anisotropy main term — the angular
+discontinuity of `k̂_α k̂_β` at the origin and the periodic-image tails of the
+un-padded convolution — with spectral accuracy at *fixed* resolution, rather than
+trying to converge it away by refining the grid. `h(0)=0` keeps the `Q(k=0)=0`
+spherical-cavity convention (no contact / −δ term is introduced); `h(x)→1` for
+`|k|R ≫ 1` leaves the bulk physics intact. A number sets `R` (in `a_ho` units);
+`"auto"`/`"box_half"` uses half the smallest box extent (the largest cutoff that
+avoids wrap-around in the periodic convolution). The quasi-2D kernel is the
+analytically z-integrated form and is already smooth, so `trunc_radius` does not
+apply there. Off by default (backward-compatible). Diagnostic:
+`scripts/ddi_truncation_isotropy_probe.jl`.
 
 ### `B` — unified Zeeman block
 

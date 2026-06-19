@@ -96,7 +96,7 @@ end
 const _LBFGS_FORWARD_KWARGS = (
     :grid, :atom, :interactions, :zeeman, :potential,
     :n_steps, :tol, :initial_state, :init_state_params, :psi_init,
-    :enable_ddi, :c_dd, :secular_ddi, :quasi_2d_ddi, :l_z_ddi,
+    :enable_ddi, :c_dd, :secular_ddi, :quasi_2d_ddi, :l_z_ddi, :ddi_trunc_radius,
     :target_magnetization, :backend, :m_lbfgs, :verbose, :light_shift,
     :dtype, :sobolev_alpha, :rotating_frame_omega,
 )
@@ -117,6 +117,7 @@ function find_ground_state(;
     enable_ddi::Bool=false,
     c_dd::Float64=NaN,
     secular_ddi::Bool=false,
+    ddi_trunc_radius::Float64=NaN,
     adaptive_dt::Bool=false,
     dt_max::Float64=10.0 * dt,
     fft_flags=FFTW.MEASURE,
@@ -162,7 +163,7 @@ function find_ground_state(;
         return find_ground_state_lbfgs(;
             grid, atom, interactions, zeeman, potential,
             n_steps, tol, initial_state, init_state_params, psi_init,
-            enable_ddi, c_dd, secular_ddi, quasi_2d_ddi, l_z_ddi,
+            enable_ddi, c_dd, secular_ddi, quasi_2d_ddi, l_z_ddi, ddi_trunc_radius,
             target_magnetization, backend, m_lbfgs, verbose, light_shift,
             dtype, sobolev_alpha, rotating_frame_omega,
         )
@@ -213,6 +214,7 @@ function find_ground_state(;
             enable_ddi,
             c_dd,
             secular_ddi,
+            ddi_trunc_radius,
             adaptive_dt,
             dt_max,
             fft_flags,
@@ -247,6 +249,7 @@ function find_ground_state(;
             enable_ddi,
             c_dd,
             secular_ddi,
+            ddi_trunc_radius,
             dt_max,
             fft_flags,
             rotating_frame_omega,
@@ -281,6 +284,7 @@ function find_ground_state(;
         enable_ddi,
         c_dd,
         secular_ddi,
+        ddi_trunc_radius,
         fft_flags,
         quasi_2d_ddi,
         l_z_ddi,

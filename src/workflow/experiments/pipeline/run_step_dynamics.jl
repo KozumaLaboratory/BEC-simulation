@@ -84,6 +84,15 @@ function _run_step(
     else
         prev_c_dd
     end
+    # DDI spherical-truncation radius (Tier A). Like `secular`, this is not
+    # carried on the inherited `DDIParams` (the Q tensor already bakes h(kR)
+    # in), so dynamics only applies it when an explicit dynamics `ddi:` block
+    # requests it; otherwise the bare kernel is rebuilt.
+    ddi_trunc = if ddi_raw isa Dict
+        _parse_ddi_trunc_radius(get(ddi_raw, "trunc_radius", nothing))
+    else
+        NaN
+    end
 
     # Match the GS path: route the inner B dict through
     # `_build_zeeman_from_b_block` (:dimless → `_parse_zeeman`,
@@ -166,7 +175,7 @@ function _run_step(
         zeeman, potential,
         sim_params=sp,
         psi_init=psi_prev,
-        enable_ddi, c_dd=c_dd_val,
+        enable_ddi, c_dd=c_dd_val, ddi_trunc_radius=ddi_trunc,
         backend,
         absorbing_boundary,
         light_shift,

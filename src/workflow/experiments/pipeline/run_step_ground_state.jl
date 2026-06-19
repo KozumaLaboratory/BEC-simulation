@@ -60,11 +60,11 @@ present).
     if haskey(p, "ddi")
         return _parse_gs_ddi(p["ddi"], get(p, "interactions", Dict()), atom)
     elseif ws_prev !== nothing && ws_prev.ddi !== nothing
-        return (true, ws_prev.ddi.C_dd, false, false, 0.0)
+        return (true, ws_prev.ddi.C_dd, false, false, 0.0, NaN)
     elseif haskey(p, "interactions")
         return _parse_gs_ddi(Dict{String, Any}(), p["interactions"], atom)
     else
-        return (false, NaN, false, false, 0.0)
+        return (false, NaN, false, false, 0.0, NaN)
     end
 end
 
@@ -100,7 +100,8 @@ function _run_step(
     atom = _resolve_gs_atom(p, atom_prev; verbose)::AtomSpecies
     grid, ndim = _resolve_gs_grid(p, grid_prev)
     interactions = _resolve_gs_interactions(p, ws_prev, atom)::InteractionParams
-    enable_ddi, c_dd_val, secular, q2d, lz = _resolve_gs_ddi_inheritance(p, ws_prev, atom)
+    gs_ddi = _resolve_gs_ddi_inheritance(p, ws_prev, atom)
+    enable_ddi, c_dd_val, secular, q2d, lz, ddi_trunc = gs_ddi
     potential = _resolve_gs_potential(p, ws_prev, ndim)
 
     backend = if haskey(p, "backend")
@@ -141,7 +142,7 @@ function _run_step(
             sim_params=SimParams(; dt, n_steps=1, save_every=1),
             psi_init=psi_out,
             enable_ddi, c_dd=c_dd_val,
-            secular_ddi=secular, quasi_2d_ddi=q2d, l_z_ddi=lz,
+            secular_ddi=secular, quasi_2d_ddi=q2d, l_z_ddi=lz, ddi_trunc_radius=ddi_trunc,
             backend,
         )
         step_result = Dict{Symbol, Any}(
@@ -261,7 +262,7 @@ function _run_step(
             grid, atom, interactions, zeeman, potential,
             dt, n_steps, tol, initial_state, init_state_params, psi_init,
             enable_ddi, c_dd=c_dd_val,
-            secular_ddi=secular, quasi_2d_ddi=q2d, l_z_ddi=lz,
+            secular_ddi=secular, quasi_2d_ddi=q2d, l_z_ddi=lz, ddi_trunc_radius=ddi_trunc,
             target_magnetization=target_mz, backend, on_step,
             checkpoint_dir=checkpoint_dir,
             save_every=max(1, n_steps ÷ 100),
@@ -288,7 +289,7 @@ function _run_step(
                 grid, atom, interactions, zeeman, potential,
                 n_steps, tol, m_lbfgs, initial_state, init_state_params, psi_init,
                 enable_ddi, c_dd=c_dd_val,
-                secular_ddi=secular, quasi_2d_ddi=q2d, l_z_ddi=lz,
+                secular_ddi=secular, quasi_2d_ddi=q2d, l_z_ddi=lz, ddi_trunc_radius=ddi_trunc,
                 target_magnetization=target_mz, backend,
                 verbose,
                 light_shift=gs_light_shift,

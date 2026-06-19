@@ -234,6 +234,9 @@ const DDI_SCHEMA = Dict{String, FieldSpec}(
     "secular" => FieldSpec(; type=Bool, default=false),
     "quasi_2d" => FieldSpec(; type=Bool, default=false),
     "l_z" => FieldSpec(; type=Number, range=(0.0, 100.0)),
+    # Ronen spherical-truncation radius (Tier A): a number (physical R), or
+    # "auto"/"box_half" for half the smallest box extent.
+    "trunc_radius" => FieldSpec(; type=Union{Number, String}),
 )
 
 # `kind` selects the solver path:

@@ -13,6 +13,7 @@ function make_ddi_padded(
     secular::Bool=false,
     quasi_2d::Bool=false,
     l_z::Float64=0.0,
+    trunc_radius::Union{Nothing, Float64}=nothing,
     backend::AbstractBackend=CPUBackend(),
     dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
 ) where {N, T <: AbstractFloat}
@@ -81,6 +82,7 @@ function make_ddi_padded(
             rk_shape;
             secular,
             full_n=padded_shape,
+            trunc_radius,
         )
     end
 

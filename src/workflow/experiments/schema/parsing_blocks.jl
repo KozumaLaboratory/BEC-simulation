@@ -369,7 +369,7 @@ function _parse_gs_interactions(inter::Dict, atom)
 end
 
 """
-    _parse_gs_ddi(ddi_d, inter, atom) -> (enabled, c_dd, secular, quasi_2d, l_z)
+    _parse_gs_ddi(ddi_d, inter, atom) -> (enabled, c_dd, secular, quasi_2d, l_z, trunc_radius)
 
 Parse the `ddi:` block of a step. Assumes `apply_schema_defaults!` has
 already run, so for a ground_state step `ddi_d` is at least `Dict{}`;
@@ -377,10 +377,15 @@ dynamics steps either inherit DDI from `ws_prev` (handled in the caller)
 or pass an explicit user value here. Opt-outs: `ddi: false` or
 `ddi: {enabled: false}` ⇒ disabled. Without N_atoms+ω_ref c_dd can't
 be derived, so DDI ends up off too.
+
+`trunc_radius` (Ronen spherical-cutoff radius, Tier A) is returned as a
+`Float64` sentinel for `make_workspace`: `NaN` = off (default), `≤ 0` =
+auto (half the smallest box extent), `> 0` = explicit physical radius. The
+YAML accepts a number or the strings `"auto"` / `"box_half"`.
 """
 function _parse_gs_ddi(ddi_d, inter, atom)
     if ddi_d === false || (ddi_d isa Dict && get(ddi_d, "enabled", true) === false)
-        return (false, NaN, false, false, 0.0)
+        return (false, NaN, false, false, 0.0, NaN)
     end
     ddi_d isa Dict || (ddi_d = Dict{String, Any}())
 
@@ -399,7 +404,25 @@ function _parse_gs_ddi(ddi_d, inter, atom)
     secular = Bool(get(ddi_d, "secular", false))
     q2d = Bool(get(ddi_d, "quasi_2d", false))
     lz = Float64(get(ddi_d, "l_z", 0.0))
-    (enabled, c_dd, secular, q2d, lz)
+    trunc = _parse_ddi_trunc_radius(get(ddi_d, "trunc_radius", nothing))
+    (enabled, c_dd, secular, q2d, lz, trunc)
+end
+
+"""
+    _parse_ddi_trunc_radius(raw) -> Float64
+
+Map a YAML `ddi.trunc_radius` value to the `make_workspace` sentinel:
+`nothing` ⇒ `NaN` (off); `"auto"`/`"box_half"` ⇒ `-1.0` (auto); a number ⇒
+that value.
+"""
+function _parse_ddi_trunc_radius(raw)
+    raw === nothing && return NaN
+    if raw isa AbstractString
+        s = lowercase(strip(raw))
+        (s == "auto" || s == "box_half") && return -1.0
+        throw(ArgumentError("ddi.trunc_radius string must be \"auto\"/\"box_half\", got \"$raw\""))
+    end
+    Float64(raw)
 end
 
 """
