@@ -7,7 +7,7 @@ Cell    = '@' if ANY cache (tight or polish) at this B reaches that level
 
 Reads `lbfgs_<B>uG_final_psi.jld2` and `lbfgs_<B>uG_polish_psi.jld2`.
 """
-import os, h5py
+import os, math, h5py
 
 ROOT = os.environ.get("FPE_ROOT",
     "/gs/bs/work/6/ue06186/bec-runs/flower_protocol_edh")
@@ -18,23 +18,27 @@ B_LIST = [-10, -5, 0, 5, 10, 15, 20, 25, 30, 35, 40, 45,
 
 
 def gn(path):
+    """Read grad_norm; treat NaN as 'unmeasured by this cache'."""
     if not os.path.exists(path):
         return None
     try:
         with h5py.File(path, "r") as f:
             if "grad_norm" in f:
-                return float(f["grad_norm"][()])
+                g = float(f["grad_norm"][()])
+                if math.isnan(g):
+                    return None  # Phase 1 ITP writes NaN — skip
+                return g
     except Exception:
         pass
     return None
 
 
 def best(b):
-    """Return min(tight, polish) grad_norm, or None."""
+    """Return min(tight, polish) grad_norm, or None. NaN-safe."""
     candidates = []
     for tag in ("final", "polish"):
         g = gn(os.path.join(ROOT, f"lbfgs_{b}uG_{tag}_psi.jld2"))
-        if g is not None:
+        if g is not None and not math.isnan(g):
             candidates.append(g)
     if not candidates:
         return None

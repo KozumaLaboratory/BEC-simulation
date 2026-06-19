@@ -168,8 +168,10 @@ function phase1_itp!(preset, backend, B_uG::Int, target_path::AbstractString;
         E = gs.energy
         total_step = ichunk * ITP_CHUNK_STEPS
         wall = time() - t_start
-        # Persist ψ (no grad_norm available from ITP, store NaN)
-        persist_cache(target_path, psi_cur, E, NaN, total_step, B_uG, preset,
+        # Persist ψ. ITP doesn't expose a usable grad_norm, but writing NaN
+        # made downstream readers (status grid, etc.) choke on `min(NaN, …)`.
+        # Use Inf as a sentinel: "exists, but precision unmeasured / very loose".
+        persist_cache(target_path, psi_cur, E, Inf, total_step, B_uG, preset,
                       "phase1-ITP ($(ITP_TOTAL_STEPS) steps, dt=$(ITP_DT))",
                       false, wall, git_sha)
         write_progress("phase1", B_uG, ichunk, total_step, E, NaN, wall,
