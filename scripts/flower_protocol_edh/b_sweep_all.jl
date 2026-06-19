@@ -108,6 +108,20 @@ function best_cached_psi(B_uG::Int)
     return (path=chosen_path, psi=psi, grad_norm=chosen_gn)
 end
 
+# Cache marked with floor_reached=true means a prior LBFGS run hit the
+# numerical floor at this B — re-attempting would just waste compute.
+function cache_floor_reached(B_uG::Int)
+    fp = final_path(B_uG)
+    isfile(fp) || return false
+    try
+        return jldopen(fp, "r") do f
+            haskey(f, "floor_reached") ? Bool(f["floor_reached"]) : false
+        end
+    catch
+        return false
+    end
+end
+
 # Phase 1 ITP runs when:
 #   (a) no cache slot exists at all, OR
 #   (b) the only cache is an incomplete phase1-ITP record (iter < 30000).
@@ -157,11 +171,12 @@ function write_progress(phase::AbstractString, B_uG::Int, chunk::Int,
 end
 
 function persist_cache(path, psi, E, grad_norm, total_iter, B_uG, preset,
-                       method, converged, wall, git_sha)
+                       method, converged, wall, git_sha; floor_reached::Bool=false)
     jldopen(path, "w") do f
         f["psi"]              = psi
         f["E"]                = E
         f["grad_norm"]        = grad_norm
+        f["floor_reached"]    = floor_reached
         f["lbfgs_iter_total"] = total_iter
         f["lbfgs_tol"]        = LBFGS_TOL
         f["lbfgs_m"]          = LBFGS_M
@@ -283,10 +298,6 @@ function phase2_lbfgs!(preset, backend, B_uG::Int;
         end
         converged = grad_norm ≤ LBFGS_TOL
 
-        persist_cache(target_path, psi_cur, E, grad_norm, total_iter, B_uG, preset,
-                      "phase2-LBFGS chunked (cap=$(LBFGS_CHUNK_STEPS*LBFGS_MAX_CHUNKS), tol=$LBFGS_TOL, m=$LBFGS_M, α=$LBFGS_SOBOLEV_ALPHA)",
-                      converged, wall, git_sha)
-
         ratio = if length(grad_window) == FLOOR_WINDOW
             maximum(grad_window) / max(minimum(grad_window), 1e-30)
         else
@@ -295,6 +306,11 @@ function phase2_lbfgs!(preset, backend, B_uG::Int;
         if !isnan(ratio) && ratio < FLOOR_RATIO
             floor_detected = true
         end
+
+        persist_cache(target_path, psi_cur, E, grad_norm, total_iter, B_uG, preset,
+                      "phase2-LBFGS chunked (cap=$(LBFGS_CHUNK_STEPS*LBFGS_MAX_CHUNKS), tol=$LBFGS_TOL, m=$LBFGS_M, α=$LBFGS_SOBOLEV_ALPHA)",
+                      converged, wall, git_sha;
+                      floor_reached=floor_detected)
 
         write_progress("phase2", B_uG, chunk, total_iter, E, grad_norm, wall,
                        p1_done, p2_done, n_pts,
@@ -369,6 +385,10 @@ function main()
         end
         if best.grad_norm ≤ PHASE2_TARGET_GN
             logprint("  Phase2 $(progress_bar(p2_done, n_pts)) | B=$(B_t)μG SKIP (best |∇|=$(round(best.grad_norm; sigdigits=3)) already at target)")
+            continue
+        end
+        if cache_floor_reached(B_t)
+            logprint("  Phase2 $(progress_bar(p2_done, n_pts)) | B=$(B_t)μG SKIP (floor already reached in prior run, |∇|=$(round(best.grad_norm; sigdigits=3)) — re-attempting would just waste compute)")
             continue
         end
         result = phase2_lbfgs!(preset, backend, B_t;
