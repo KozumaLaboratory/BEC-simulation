@@ -30,6 +30,12 @@ jobs:
     env:
       SPINORBEC_TEST_TIER: full
       SPINORBEC_RUN_HEAVY_YAML: "true"
+      # Parallel test execution (see test/runtests.jl). Conservative worker
+      # count here: the full tier runs heavy ITP/RTP + pipeline tests whose
+      # peak memory is far higher than the fast tier's units, so cap at 2 to
+      # stay clear of the 16 GB runner ceiling. Raise once nightly memory
+      # headroom is observed.
+      SPINORBEC_TEST_WORKERS: "2"
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2

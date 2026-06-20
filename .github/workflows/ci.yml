@@ -19,9 +19,12 @@ jobs:
   test:
     name: Test (Julia 1.12, tier=fast)
     runs-on: ubuntu-latest
-    # FAST tier (~8 min tests) + setup/precompile ~3-5 min = ~12 min
-    # steady-state. 15 min is comfortable; bumps would signal a real
-    # regression rather than CI flake.
+    # FAST tier parallelised across the runner's cores (SPINORBEC_TEST_WORKERS
+    # =auto): the files are split into one independent julia process per CPU
+    # thread (see test/runtests.jl). Test wall-time ~8 min serial → ~3-4 min on
+    # the 4-vCPU runner; with setup/precompile ~3-5 min the job lands ~6-8 min.
+    # 15 min stays as generous headroom — a bump signals a real regression,
+    # not CI flake.
     timeout-minutes: 15
     env:
       # Per-push CI runs the `fast` tier: unit tests only, no
@@ -29,6 +32,9 @@ jobs:
       # (everything) tiers — both ~30-45 min — run in the nightly
       # workflow.
       SPINORBEC_TEST_TIER: fast
+      # Parallel test execution (see test/runtests.jl). `auto` = one process
+      # per CPU thread on the runner.
+      SPINORBEC_TEST_WORKERS: auto
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
