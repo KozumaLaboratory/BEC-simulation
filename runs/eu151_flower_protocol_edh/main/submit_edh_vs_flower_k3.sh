@@ -43,13 +43,20 @@ run_one () {
     mkdir -p "$fig_dir"
 
     echo "[edh_vs_flower] === ${mode} ==="
-    GOTO_MODE="${mode}" "$JULIA" --project=. scripts/flower_protocol_edh/goto_protocol_10mG.jl
+    # Skip RTP if h5 already has psi_full_re (i.e. a previous successful run exists).
+    if [[ -f "$h5_path" ]] && python3 -c "import h5py; f=h5py.File('${h5_path}','r'); exit(0 if 'psi_full_re' in f else 1)" 2>/dev/null; then
+        echo "[edh_vs_flower] [${mode}] existing h5 with psi_full_re found → skip RTP"
+    else
+        GOTO_MODE="${mode}" "$JULIA" --project=. scripts/flower_protocol_edh/goto_protocol_10mG.jl
+    fi
 
     echo "[edh_vs_flower] [${mode}] mass current analysis"
-    "$JULIA" --project=. scripts/flower_protocol_edh/mass_current_analysis.jl "$h5_path"
+    "$JULIA" --project=. scripts/flower_protocol_edh/mass_current_analysis.jl "$h5_path" || \
+        echo "[edh_vs_flower] [${mode}] WARN: mass_current_analysis failed, continuing"
 
     echo "[edh_vs_flower] [${mode}] mass current plots → $fig_dir"
-    python3 scripts/flower_protocol_edh/plot_mass_current.py "$h5_path" "$fig_dir/mass_current"
+    python3 scripts/flower_protocol_edh/plot_mass_current.py "$h5_path" "$fig_dir/mass_current" || \
+        echo "[edh_vs_flower] [${mode}] WARN: plot_mass_current failed, continuing"
 
     # Re-use existing plotting for density / vortex / spin-texture
     GOTO_H5="$h5_path" RTP_H5="$h5_path" \

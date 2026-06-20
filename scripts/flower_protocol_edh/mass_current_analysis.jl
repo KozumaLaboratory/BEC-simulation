@@ -15,10 +15,9 @@
 # twice with different files.
 
 using SpinorBEC
-using SpinorBEC: Grid, GridConfig, FFTPlans, make_fft_plans, SpinSystem,
-                 SpinMatrices, eu151_preset, probability_current,
-                 superfluid_velocity, total_density, magnetization
-using HDF5, LinearAlgebra
+using SpinorBEC: Grid, GridConfig, make_grid, make_fft_plans, SpinSystem,
+                 probability_current, superfluid_velocity, total_density
+using HDF5, LinearAlgebra, FFTW
 
 if length(ARGS) < 1
     error("usage: julia mass_current_analysis.jl <h5_path>")
@@ -46,11 +45,12 @@ try
 
     println("[mca] Nf_psi=$Nf_psi  NVOL=$NVOL  D=$D  dx_sub=$DX_sub")
 
-    # Build a minimal Grid + plans matching the sub-sampled saved ψ
-    config = GridConfig(; n_points=(NVOL, NVOL, NVOL), spacing=(DX_sub, DX_sub, DX_sub))
-    grid = Grid(config)
-    plans = make_fft_plans((NVOL, NVOL, NVOL))
-    sys = SpinSystem(F)
+    # Build a minimal Grid + plans matching the sub-sampled saved ψ.
+    # GridConfig signature: (n_points::NTuple, box_size::NTuple)
+    config = GridConfig((NVOL, NVOL, NVOL), (Float64(L_BOX), Float64(L_BOX), Float64(L_BOX)))
+    grid = make_grid(config)
+    plans = make_fft_plans((NVOL, NVOL, NVOL); flags=FFTW.ESTIMATE)
+    sys = SpinSystem(Int(F))
 
     # Output buffers: j (3 components), v (3 components), |F_perp|, ∇·F proxy
     jx = zeros(Float32, Nf_psi, NVOL, NVOL, NVOL)
