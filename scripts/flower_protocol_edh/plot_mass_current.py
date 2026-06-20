@@ -24,12 +24,16 @@ with h5py.File(H5_PATH, "r") as f:
     if "mass_current" not in f:
         sys.exit("h5 has no mass_current/ group — run mass_current_analysis.jl first")
     mc = f["mass_current"]
-    jx = mc["jx"][:]          # (Nf, NVOL, NVOL, NVOL)
-    jy = mc["jy"][:]
-    jz = mc["jz"][:]
-    vx = mc["vx"][:]
-    vy = mc["vy"][:]
-    curl_v_z = mc["curl_v_z"][:]
+    # HDF5.jl writes Julia column-major arrays; h5py reads them with axis
+    # order reversed. Julia: (Nf, NVOL, NVOL, NVOL) → Python: (NVOL, NVOL,
+    # NVOL, Nf). Transpose to canonical (Nf, NVOL, NVOL, NVOL).
+    _rev = (3, 2, 1, 0)
+    jx = mc["jx"][:].transpose(_rev)
+    jy = mc["jy"][:].transpose(_rev)
+    jz = mc["jz"][:].transpose(_rev)
+    vx = mc["vx"][:].transpose(_rev)
+    vy = mc["vy"][:].transpose(_rev)
+    curl_v_z = mc["curl_v_z"][:].transpose(_rev)
     n_max     = mc["n_max"][:]
     j_mag_max = mc["j_mag_max"][:]
     circ      = mc["circulation_midz"][:]
