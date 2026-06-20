@@ -12,6 +12,9 @@ using Test
 using SpinorBEC
 
 include(joinpath(@__DIR__, "_run_files.jl"))
+# Tier lists + MANUAL_TESTS_ALLOWLIST, so a config meta-test (e.g.
+# test_tier_membership.jl) that reads them works inside a chunk process too.
+include(joinpath(@__DIR__, "_tiers.jl"))
 
 failed, timings = run_test_files(ARGS)
 print_timing(timings, get(ENV, "SPINORBEC_TEST_TIER", "?"))
