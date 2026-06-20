@@ -81,4 +81,13 @@ run_one hold_63ug    flower_63uG_k3_1e-40   rtp_10mG_goto_hold_63ug
 # variant B: sudden quench (EdH hypothesis)
 run_one quench_63ug  edh_quench_63uG_k3_1e-40   rtp_quench_63uG
 
+echo "[edh_vs_flower] cross-variant comparison"
+FLOWER_H5=${WORK_DIR}/rtp_10mG_goto_hold_63ug_k3_1.0e-40.h5
+QUENCH_H5=${WORK_DIR}/rtp_quench_63uG_k3_1.0e-40.h5
+CMP_DIR=runs/eu151_flower_protocol_edh/figures/edh_vs_flower_compare_k3_1e-40
+mkdir -p "$CMP_DIR"
+python3 scripts/flower_protocol_edh/compare_edh_vs_flower.py \
+    "$FLOWER_H5" "$QUENCH_H5" "$CMP_DIR" || \
+    echo "[edh_vs_flower] WARN: cross-variant comparison plot failed"
+
 echo "[edh_vs_flower] all done"

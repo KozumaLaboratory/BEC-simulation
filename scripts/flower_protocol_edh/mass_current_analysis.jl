@@ -16,7 +16,8 @@
 
 using SpinorBEC
 using SpinorBEC: Grid, GridConfig, make_grid, make_fft_plans, SpinSystem,
-                 probability_current, superfluid_velocity, total_density
+                 probability_current, superfluid_velocity, total_density,
+                 spin_matrices, berry_curvature, spin_texture_charge
 using HDF5, LinearAlgebra, FFTW
 
 if length(ARGS) < 1
@@ -51,6 +52,7 @@ try
     grid = make_grid(config)
     plans = make_fft_plans((NVOL, NVOL, NVOL); flags=FFTW.ESTIMATE)
     sys = SpinSystem(Int(F))
+    sm = spin_matrices(Int(F))
 
     # Output buffers: j (3 components), v (3 components), |F_perp|, ∇·F proxy
     jx = zeros(Float32, Nf_psi, NVOL, NVOL, NVOL)
@@ -61,10 +63,16 @@ try
     vz = zeros(Float32, Nf_psi, NVOL, NVOL, NVOL)
     # Vorticity from finite-difference of v (curl_z in xy plane is the headline diagnostic)
     curl_v_z = zeros(Float32, Nf_psi, NVOL, NVOL, NVOL)
+    # Mermin-Ho RHS: Berry curvature from the spin texture (Ω_z component).
+    # If Mermin-Ho holds (Flower phase), curl_v_z ≈ −(ℏ F / m) · berry_z.
+    # Big mismatch ⇒ vortex-dominated regime (EdH) where the texture-derived
+    # prediction breaks down at the singular cores.
+    berry_z = zeros(Float32, Nf_psi, NVOL, NVOL, NVOL)
     # Scalar diagnostics per frame
     n_max     = zeros(Float64, Nf_psi)
     j_mag_max = zeros(Float64, Nf_psi)
     circ_total = zeros(Float64, Nf_psi)   # ∫ ω_z dA on z=NVOL/2 midplane
+    skyrmion_charge = zeros(Float64, Nf_psi)  # ∫ Ω · dA / 4π integer for textures
 
     for k in 1:Nf_psi
         # Reconstruct ψ: (D, NVOL, NVOL, NVOL) → (NVOL, NVOL, NVOL, D) for the
@@ -90,14 +98,20 @@ try
             curl_v_z[k, ii, jj, kk] = Float32(dvy_dx - dvx_dy)
         end
 
+        # Berry curvature (Mermin-Ho RHS) — full 3D, take z component
+        Ω = berry_curvature(psi, grid, plans, sm; density_cutoff=1e-12)
+        berry_z[k, :, :, :] .= Float32.(Ω[3])
+
+        # Skyrmion / pontryagin charge on z-midplane (Mermin–Ho LHS area-integral / 4π)
+        midz = NVOL ÷ 2 + 1
+        skyrmion_charge[k] = sum(Ω[3][:, :, midz]) * DX_sub^2 / (4π)
+
         n = total_density(psi, 3)
         n_max[k] = maximum(n)
         j_mag_max[k] = maximum(sqrt.(j[1].^2 .+ j[2].^2 .+ j[3].^2))
-        # Circulation over the z-midplane = sum of ω_z · dA there
-        midz = NVOL ÷ 2 + 1
         circ_total[k] = sum(curl_v_z[k, :, :, midz]) * DX_sub^2
 
-        println("  [$k/$Nf_psi]  t=$(round(t_psi[k]; digits=3))  B=$(round(Bpsi[k]*1e6; sigdigits=4)) µG  n_max=$(round(n_max[k]; sigdigits=4))  |j|_max=$(round(j_mag_max[k]; sigdigits=4))  ∫ω_z dA=$(round(circ_total[k]; sigdigits=4))")
+        println("  [$k/$Nf_psi]  t=$(round(t_psi[k]; digits=3))  B=$(round(Bpsi[k]*1e6; sigdigits=4)) µG  n_max=$(round(n_max[k]; sigdigits=4))  |j|_max=$(round(j_mag_max[k]; sigdigits=4))  ∫ω_z dA=$(round(circ_total[k]; sigdigits=4))  Q_sk=$(round(skyrmion_charge[k]; sigdigits=4))")
         flush(stdout)
     end
 
@@ -109,9 +123,11 @@ try
     grp["jx"] = jx; grp["jy"] = jy; grp["jz"] = jz
     grp["vx"] = vx; grp["vy"] = vy; grp["vz"] = vz
     grp["curl_v_z"] = curl_v_z
+    grp["berry_z"] = berry_z
     grp["n_max"] = n_max
     grp["j_mag_max"] = j_mag_max
     grp["circulation_midz"] = circ_total
+    grp["skyrmion_charge_midz"] = skyrmion_charge
     grp["dx_sub"] = DX_sub
     println("[mca] mass_current/ datasets written ($(Nf_psi) frames)")
 finally
