@@ -9,8 +9,11 @@
 #   (3) c₂ ≠ 0 has a non-trivial effect vs c₂ = 0 (proves the call is reached).
 #
 # A stronger rotating-vs-standard ground-state parity gate (static B̂ = ẑ, where
-# the tilde basis coincides with the lab basis) is the natural follow-up once
-# run against a standard `Workspace` ITP.
+# the tilde basis coincides with the lab basis) lives in
+# test_rotating_basis_standard_parity.jl — it descends both the standard
+# `find_ground_state` and `find_ground_state_rotating!` from one seed in the
+# broken-axisymmetry phase and asserts per-m + density agree (canary-verified to
+# catch a dropped c₂).
 
 using Test
 using SpinorBEC

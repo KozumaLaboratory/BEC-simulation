@@ -344,6 +344,7 @@ const FULL_EXTRA = [
     "rotating_basis/test_rotating_basis_f32.jl",
     "rotating_basis/test_rotating_basis_sign_oracle.jl",
     "rotating_basis/test_rotating_basis_singlet_pair.jl",
+    "rotating_basis/test_rotating_basis_standard_parity.jl",
     # Higher-order integrator tests
     "hamiltonian/test_higher_order_integrators.jl",
     "hamiltonian/test_integrator_order_meanfield.jl",

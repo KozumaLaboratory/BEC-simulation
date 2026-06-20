@@ -118,7 +118,20 @@ by the layout convention `c=1 → m=F`), so lower priority than the term wiring.
 ## Testing
 
 Each wired term must pass a rotating-vs-standard parity gate on a **static
-field** (where the two frames coincide): same config, assert per-term energy /
-final-state fidelity agree. This is the rotating-path analogue of the standard
+field** (where the two frames coincide): same config, assert ground-state
+populations / density agree. This is the rotating-path analogue of the standard
 per-term oracle suite, and closes the per-term-oracle blind spot the rotating
 path has had.
+
+The gate exists: `test/rotating_basis/test_rotating_basis_standard_parity.jl`
+descends both `find_ground_state` (standard) and `find_ground_state_rotating!`
+(rotating, B̂=ẑ) from the *same* seed and asserts per-m populations + the
+basis-invariant density agree. The config is the spin-1 **broken-axisymmetry**
+phase (ferromagnetic c₁<0, 0 < q < q_c ≈ |c₁|·n_peak) — the only static-B̂=ẑ
+regime where the ground state is genuinely 3-component and ALL of c₀/c₁/c₂/q
+shape the populations (the polar and antiferromagnetic phases are c₁- and/or
+c₂-blind because ⟨F⟩=0 and singlet pairing is population-invariant). This pins
+kinetic + trap + c₀ + c₁ + c₂ + diagonal Zeeman in one shot; canary checks
+confirm dropping c₁ moves per-m by ~0.25 and dropping c₂ by ~0.03, both ≫ the
+2e-3 tolerance. A second testset pins the c₂ energetic sign (attractive singlet
+lowers μ). New terms extend this file with their own static-field config.
