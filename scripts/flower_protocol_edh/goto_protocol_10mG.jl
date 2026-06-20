@@ -79,6 +79,12 @@ const GOTO_MODE = lowercase(get(ENV, "GOTO_MODE", "full_descend"))
 const K3_PER_M_SI = parse(Float64, get(ENV, "GOTO_K3_PER_M_SI", "0.0"))
 const _K3_TAG = K3_PER_M_SI > 0 ? "_k3_$(string(K3_PER_M_SI))" : ""
 
+# Full ψ snapshot save cadence for post-hoc mass current analysis (Issue #32).
+# Every PSI_SAVE_EVERY-th snapshot pushes the full 13-component ψ array.
+# Default 8 → ~30 ψ saves over the 230-frame RTP. Set 1 for every-frame
+# (warning: ~1.5 GB extra per run).
+const PSI_SAVE_EVERY = parse(Int, get(ENV, "GOTO_PSI_SAVE_EVERY", "8"))
+
 # Internal-time conversion factor: ω_ref = 691.1504 rad/s, so 1 ms = 0.6911504 internal.
 const _IT(ms) = ms * 0.6911504
 
@@ -123,8 +129,17 @@ elseif GOTO_MODE == "hold_63ug"
     hold = [(_IT(417.0), 63.0e-6)]
     all_pairs = vcat(_SEG_PHASE1, parabola, hold)
     (first.(all_pairs), last.(all_pairs))
+elseif GOTO_MODE == "quench_63ug"
+    # Issue #32: Matsui-style sudden quench from 10 mG directly to 63 µG in
+    # 0.20 ms (= 0.14 internal at ω_ref = 691.15 rad/s), then hold at 63 µG
+    # for the remainder so total duration matches `hold_63ug` (~417 ms).
+    # Convention reference: runs/eu151_edh_v2/config.yaml:86.
+    quench_pairs = [(_IT(0.0), 10.0e-3),
+                    (_IT(0.20), 63.0e-6),
+                    (_IT(417.0), 63.0e-6)]
+    (first.(quench_pairs), last.(quench_pairs))
 else
-    error("Unknown GOTO_MODE='$GOTO_MODE' (expected full_descend or hold_63ug)")
+    error("Unknown GOTO_MODE='$GOTO_MODE' (expected full_descend, hold_63ug, or quench_63ug)")
 end
 const RTP_DURATION = GOTO_TIMES_G[end]
 
@@ -135,7 +150,9 @@ const NVOL = length(VOL_IDXS)
 const STORED_3D_M = (-6, -5, -4)
 const STORED_3D_COMPONENTS = ntuple(i -> Int(F - STORED_3D_M[i] + 1), length(STORED_3D_M))
 
-const _H5_NAME = (GOTO_MODE == "full_descend" ? "rtp_10mG_goto" : "rtp_10mG_goto_$(GOTO_MODE)") * _K3_TAG * ".h5"
+const _H5_NAME = (GOTO_MODE == "full_descend" ? "rtp_10mG_goto" :
+                  GOTO_MODE == "quench_63ug" ? "rtp_quench_63uG" :
+                  "rtp_10mG_goto_$(GOTO_MODE)") * _K3_TAG * ".h5"
 const OUT_DIR        = get(ENV, "FPE_ROOT",
     "/gs/bs/work/6/ue06186/bec-runs/flower_protocol_edh")
 const OUT            = joinpath(OUT_DIR, _H5_NAME)
@@ -291,6 +308,10 @@ mutable struct RTPBuf
     Fx_3d::Vector{Array{Float32,3}}
     Fy_3d::Vector{Array{Float32,3}}
     Fz_3d::Vector{Array{Float32,3}}
+    # full ψ snapshots for mass current analysis (Issue #32, every PSI_SAVE_EVERY frames)
+    t_psi::Vector{Float64}
+    B_gauss_psi::Vector{Float64}
+    psi_full::Vector{Array{ComplexF64,4}}   # each: (NVOL, NVOL, NVOL, D)
 end
 RTPBuf() = RTPBuf(Float64[], Float64[], Float64[], Float64[], Float64[], Float64[],
     Vector{Array{Float32,3}}(), Vector{Array{Float32,3}}(),
@@ -301,7 +322,8 @@ RTPBuf() = RTPBuf(Float64[], Float64[], Float64[], Float64[], Float64[], Float64
     Vector{Array{Float32,3}}(), Vector{Array{Float32,3}}(), Vector{Array{Float32,3}}(),
     Vector{Array{Float32,3}}(), Vector{Array{Float32,3}}(), Vector{Array{Float32,3}}(),
     Vector{Array{Float32,3}}(), Vector{Array{Float32,3}}(), Vector{Array{Float32,3}}(),
-    Vector{Array{Float32,3}}())
+    Vector{Array{Float32,3}}(),
+    Float64[], Float64[], Vector{Array{ComplexF64,4}}())
 
 function _b_at(t::Float64)
     # PWL interpolation on (GOTO_TIMES_G, GOTO_VALUES_G)
@@ -342,7 +364,14 @@ function record!(buf::RTPBuf, ws)
     push!(buf.Fx_3d, vol.Fx_3d)
     push!(buf.Fy_3d, vol.Fy_3d)
     push!(buf.Fz_3d, vol.Fz_3d)
-    println("  RTP snap t=$(round(ws.state.t; digits=3)) B=$(round(buf.B_gauss[end]*1e3; sigdigits=3))mG  E=$(round(buf.E[end]; sigdigits=8))  N=$(round(buf.N[end]; sigdigits=8))  Fz=$(round(buf.Fz[end]; sigdigits=4))")
+    # Full ψ snapshot at sub-sampled spatial grid (NVOL = NX/VOL_STRIDE) every PSI_SAVE_EVERY snapshots.
+    if (length(buf.t) - 1) % PSI_SAVE_EVERY == 0
+        psi_sub = psi[VOL_IDXS, VOL_IDXS, VOL_IDXS, :]
+        push!(buf.psi_full, ComplexF64.(psi_sub))
+        push!(buf.t_psi, ws.state.t)
+        push!(buf.B_gauss_psi, buf.B_gauss[end])
+    end
+    println("  RTP snap t=$(round(ws.state.t; digits=3)) B=$(round(buf.B_gauss[end]*1e3; sigdigits=3))mG  E=$(round(buf.E[end]; sigdigits=8))  N=$(round(buf.N[end]; sigdigits=8))  Fz=$(round(buf.Fz[end]; sigdigits=4))  ψ_saves=$(length(buf.psi_full))")
     flush(stdout)
 end
 
@@ -588,6 +617,25 @@ function main()
         h5["Fx_3d"] = Fx_3d_arr
         h5["Fy_3d"] = Fy_3d_arr
         h5["Fz_3d"] = Fz_3d_arr
+
+        # Full ψ snapshots for mass current analysis (Issue #32).
+        # psi_full shape: (Nf_psi, D, NVOL, NVOL, NVOL) ComplexF64
+        Nf_psi = length(buf.psi_full)
+        if Nf_psi > 0
+            psi_arr_re = zeros(Float32, Nf_psi, D, NVOL, NVOL, NVOL)
+            psi_arr_im = zeros(Float32, Nf_psi, D, NVOL, NVOL, NVOL)
+            for k in 1:Nf_psi
+                @views psi_arr_re[k, :, :, :, :] .= real.(permutedims(buf.psi_full[k], (4, 1, 2, 3)))
+                @views psi_arr_im[k, :, :, :, :] .= imag.(permutedims(buf.psi_full[k], (4, 1, 2, 3)))
+            end
+            h5["psi_full_re"] = psi_arr_re
+            h5["psi_full_im"] = psi_arr_im
+            h5["t_psi"]       = buf.t_psi
+            h5["B_gauss_psi"] = buf.B_gauss_psi
+            h5["meta/psi_save_every"] = PSI_SAVE_EVERY
+            h5["meta/nvol"]           = NVOL
+            println("[goto_10mG] saved $(Nf_psi) full ψ snapshots (re+im, Float32, NVOL=$NVOL)")
+        end
     end
     println("[goto_10mG] wrote $OUT")
 end
