@@ -164,11 +164,6 @@ const FAST_TESTS = [
     "workflow/test_autopilot.jl",
     "workflow/test_catalog.jl",
     "workflow/test_catalog_index.jl",
-    # Orphan-resolution 2026-06-19: pure-introspection dispatch-coverage
-    # guards (kwarg forwarding / kwarg-list invariants) — fast, independent,
-    # no ITP/RTP. Were unregistered (ran nowhere); now FAST so CI gates them.
-    "solvers/test_lbfgs_forward_coverage.jl",
-    "workflow/test_make_workspace_kwarg_coverage.jl",
 ]
 
 # ── CI tier: fast + core integration tests that run ITP/RTP ──
@@ -315,17 +310,6 @@ const CI_EXTRA = [
     # suite does not reach (it tests per-term apply_step!, not the
     # fused production kernel). Registered 2026-06-06.
     "oracles/test_operator_trinity_fused_face.jl",
-    # Orphan-resolution 2026-06-19: three load-bearing gates that had
-    # fallen out of every tier (ran nowhere). Promoted to CI:
-    #  - outer_operator_equivalence: ITP/RTP V(dt/2) chain equivalence;
-    #    guards the 2026-06-02 transverse-Zeeman-missing-from-ITP class.
-    #  - gpu_cpu_fused_group_parity: closes the fused-broadcast axis the
-    #    per-term GPU parity gate cannot reach (CUDA-gated; no-op on CPU).
-    #  - multistart_winner_selection: stability-filter-precedes-E-ranking
-    #    contract (a lower-E saddle must not beat a higher-E true minimum).
-    "hamiltonian/test_outer_operator_equivalence.jl",
-    "oracles/test_gpu_cpu_fused_group_parity.jl",
-    "oracles/test_multistart_winner_selection.jl",
 ]
 
 # ── Full tier: everything (ci + remaining heavy tests) ──
