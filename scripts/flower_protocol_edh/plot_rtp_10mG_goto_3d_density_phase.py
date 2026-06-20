@@ -22,8 +22,8 @@ from matplotlib.animation import FuncAnimation, PillowWriter
 
 ROOT = os.environ.get("FPE_ROOT",
     "/gs/bs/work/6/ue06186/bec-runs/flower_protocol_edh")
-H5 = os.path.join(ROOT, os.environ.get("RTP_H5_NAME", "rtp_10mG_goto.h5"))
-OUT_GIF = H5.replace(".h5", "_3d_density_phase.gif")
+H5 = os.environ.get("RTP_H5") or os.path.join(ROOT, os.environ.get("RTP_H5_NAME", "rtp_10mG_goto.h5"))
+OUT_GIF = os.environ.get("OUT_GIF", H5.replace(".h5", "_3d_density_phase.gif"))
 
 ISO_TOTAL = float(os.environ.get("FPE_3D_ISO_TOTAL", "0.10"))
 ISO_M6 = float(os.environ.get("FPE_3D_ISO_M6", "0.12"))

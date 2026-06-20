@@ -17,7 +17,7 @@
 using SpinorBEC
 using SpinorBEC: Grid, GridConfig, make_grid, make_fft_plans, SpinSystem,
                  probability_current, superfluid_velocity, total_density,
-                 spin_matrices, berry_curvature, spin_texture_charge
+                 spin_matrices, berry_curvature
 using HDF5, LinearAlgebra, FFTW
 
 if length(ARGS) < 1

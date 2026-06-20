@@ -58,16 +58,21 @@ run_one () {
     python3 scripts/flower_protocol_edh/plot_mass_current.py "$h5_path" "$fig_dir/mass_current" || \
         echo "[edh_vs_flower] [${mode}] WARN: plot_mass_current failed, continuing"
 
-    # Re-use existing plotting for density / vortex / spin-texture
-    GOTO_H5="$h5_path" RTP_H5="$h5_path" \
+    # Re-use existing plotting for density / vortex / spin-texture.
+    # Different plot scripts read different env vars (legacy);
+    # set BOTH `RTP_H5` (full path; isosurface/vortex_analysis) and
+    # `RTP_H5_NAME` (basename joined with FPE_ROOT; goto.py and 3d_density).
+    local h5_basename_actual; h5_basename_actual=$(basename "$h5_path")
+    GOTO_H5="$h5_path" RTP_H5="$h5_path" RTP_H5_NAME="$h5_basename_actual" \
+        OUT_GIF="${fig_dir}/density_phase_2d.gif" \
         python3 scripts/flower_protocol_edh/plot_rtp_10mG_goto.py || true
-    GOTO_H5="$h5_path" RTP_H5="$h5_path" \
+    GOTO_H5="$h5_path" RTP_H5="$h5_path" RTP_H5_NAME="$h5_basename_actual" \
         OUT_GIF="${fig_dir}/volume_density_phase.gif" \
         python3 scripts/flower_protocol_edh/plot_rtp_10mG_goto_3d_density_phase.py || true
-    GOTO_H5="$h5_path" RTP_H5="$h5_path" \
+    GOTO_H5="$h5_path" RTP_H5="$h5_path" RTP_H5_NAME="$h5_basename_actual" \
         OUT_GIF="${fig_dir}/isosurface_peak30_m6.gif" \
         python3 scripts/flower_protocol_edh/plot_rtp_10mG_goto_isosurface_m6.py || true
-    GOTO_H5="$h5_path" RTP_H5="$h5_path" \
+    GOTO_H5="$h5_path" RTP_H5="$h5_path" RTP_H5_NAME="$h5_basename_actual" \
         OUT_PNG="${fig_dir}/vortex_analysis_m6m5m4.png" \
         OUT_CSV="${fig_dir}/vortex_analysis_m6m5m4.csv" \
         python3 scripts/flower_protocol_edh/plot_rtp_10mG_goto_vortex_analysis.py || true

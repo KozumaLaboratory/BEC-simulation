@@ -25,8 +25,8 @@ plt.rcParams.update({
 
 ROOT = os.environ.get("FPE_ROOT",
     "/gs/bs/work/6/ue06186/bec-runs/flower_protocol_edh")
-H5      = os.path.join(ROOT, os.environ.get("RTP_H5_NAME", "rtp_10mG_goto.h5"))
-OUT_GIF = H5.replace(".h5", ".gif")
+H5      = os.environ.get("RTP_H5") or os.path.join(ROOT, os.environ.get("RTP_H5_NAME", "rtp_10mG_goto.h5"))
+OUT_GIF = os.environ.get("OUT_GIF", H5.replace(".h5", ".gif"))
 
 with h5py.File(H5, "r") as f:
     t     = f["t"][:]
