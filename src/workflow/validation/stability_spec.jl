@@ -138,10 +138,18 @@ function check(spec::StabilitySpec, ws, ψ; rng=Random.default_rng())
     )
 
     # --- combine -------------------------------------------------------
-    axes = (stat_status, energetic, dyn_status)
-    overall = if any(==(:fail), axes)
+    # Stationarity is a PRECONDITION, not a co-equal axis: the energetic and
+    # dynamical (second-variation) verdicts are built at ψ and are only
+    # meaningful AT a stationary point — a :fail from them at a non-stationary ψ
+    # is an artifact (the operator is built at the wrong point; cf.
+    # mistake_stability_verdict_from_nonstationary_point). So when stationarity
+    # is not :pass the gate ABSTAINS regardless of the other axes (which stay in
+    # `details` as diagnostics) — it does not REJECT on an untrustworthy reading.
+    overall = if stat_status !== :pass
+        :indeterminate
+    elseif energetic === :fail || dyn_status === :fail
         :fail
-    elseif any(==(:indeterminate), axes)
+    elseif energetic === :indeterminate || dyn_status === :indeterminate
         :indeterminate
     else
         :pass
