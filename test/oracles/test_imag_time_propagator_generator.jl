@@ -60,7 +60,9 @@ end
 
 # (ψ − step!(ψ; dt)) / dt for an in-place propagator
 function _generator(psi, step!; dt::Float64=1e-6)
-    p = copy(psi); step!(p, dt); return (psi .- p) ./ dt
+    p = copy(psi);
+    step!(p, dt);
+    return (psi .- p) ./ dt
 end
 
 # pull the live term from the registry (correct construction from ws)
@@ -73,7 +75,8 @@ end
 
 function _check(::Type{T}, ws, psi; tol=1e-3) where {T}
     term = _term_of(T, ws)
-    g = zero(psi); apply_operator!(g, term, ws, psi)
+    g = zero(psi);
+    apply_operator!(g, term, ws, psi)
     Gi = _generator(psi, (p, dt) -> apply_step!(term, p, dt, true, ws))
     Gr = _generator(psi, (p, dt) -> apply_step!(term, p, dt, false, ws))
     @test _residual_mod_psi(Gi, g, psi) < tol         # imag generator == H·ψ (mod ψ)

@@ -1,3 +1,7 @@
+using Test
+using SpinorBEC
+using LinearAlgebra: Hermitian, tr
+
 @testset "Tensor interaction" begin
     @testset "make_tensor_interaction_cache returns nothing for c2-only" begin
         ip = InteractionParams(Dict(0 => 100.0, 1 => 10.0, 2 => 5.0); c_lhy=0.0)

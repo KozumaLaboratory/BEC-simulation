@@ -11,6 +11,7 @@
 
 using SpinorBEC
 using Test
+using LinearAlgebra: norm
 
 # 3-fold symmetric (equilateral): phase i has centre at the i-th
 # vertex of an equilateral triangle inscribed in the unit circle.
@@ -112,6 +113,3 @@ end
         end
     end
 end
-
-# `norm` import (LinearAlgebra) is needed for the tests above; load it.
-using LinearAlgebra: norm

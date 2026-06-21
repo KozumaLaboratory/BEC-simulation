@@ -1,6 +1,7 @@
 # --- P2.10: Feshbach-resonance ramp builder ---
 
 export feshbach_ramp, feshbach_c0_wf
+export feshbach_scattering_length, eu_feshbach_resonance, eu_feshbach_ramp
 
 # Scattering length as a function of magnetic field near an s-wave Feshbach
 # resonance (for a spinor BEC, c0 ∝ a_s at leading order):
@@ -102,3 +103,39 @@ Convenience for when you only need the c0(t) channel. Same arguments as
 `feshbach_ramp`.
 """
 feshbach_c0_wf(; kwargs...) = feshbach_ramp(; kwargs...)[1]
+
+"""
+    feshbach_scattering_length(B; a_bg, Delta, B0) -> a_s
+
+`a_s(B) = a_bg (1 − Δ/(B − B0))` (a₀ units): the background `a_bg` far from the
+pole, divergence at `B = B0`, zero crossing at `B = B0 + Δ`. Pure scalar form for
+inspection / plotting (the same model `feshbach_ramp` samples).
+"""
+function feshbach_scattering_length(B::Real; a_bg::Real, Delta::Real, B0::Real)
+    denom = Float64(B) - Float64(B0)
+    abs(denom) < 1e-12 ? sign(denom) * 1.0e12 * a_bg : a_bg * (1.0 - Delta / denom)
+end
+
+"""
+    eu_feshbach_resonance() -> NamedTuple
+
+¹⁵¹Eu s-wave Feshbach resonance from Miyazawa/Matsui et al. PRL 129, 223401 (2022):
+pole `B0 = 1.32 G`, width `Δ = 10 mG`, background `a_bg = 110 a₀`. Eu's S-state
+ground term gives a sparse, non-chaotic resonance spectrum.
+"""
+eu_feshbach_resonance() = (B0=1.32, Delta=0.010, a_bg=110.0,
+    source="Miyazawa/Matsui PRL 129, 223401 (2022): 1.32 G pole, 10 mG width, 110 a₀ bg")
+
+"""
+    eu_feshbach_ramp(; B_start, B_end, duration, kwargs...) -> (c0_wf, a_s_wf, B_wf)
+
+`feshbach_ramp` across the ¹⁵¹Eu 1.32 G resonance (parameters from
+`eu_feshbach_resonance`). Crossing the 1.32 G pole flips the contact interaction
+sign (BEC → attractive → collapse) — straddle it deliberately. Pass `c_scale` to
+map a_s [a₀] to the dimensionless c0, `ramp_shape`, etc., as in `feshbach_ramp`.
+"""
+function eu_feshbach_ramp(; B_start::Real, B_end::Real, duration::Real, kwargs...)
+    r = eu_feshbach_resonance()
+    feshbach_ramp(; a_bg=r.a_bg, Delta=r.Delta, B0=r.B0,
+        B_start=B_start, B_end=B_end, duration=duration, kwargs...)
+end

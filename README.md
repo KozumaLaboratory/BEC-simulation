@@ -89,10 +89,32 @@ subsystem design notes live under `docs/design/`.
 
 ```bash
 SPINORBEC_TEST_TIER=fast julia --project=. -e 'using Pkg; Pkg.test()'
+
+# Parallel across CPU cores (files split into N independent julia processes).
+# ~2× faster on a 4-core box, more on bigger ones.
+SPINORBEC_TEST_WORKERS=auto SPINORBEC_TEST_TIER=fast \
+    julia --project=. -e 'using Pkg; Pkg.test()'
 ```
 
 Tiers: `fast` (unit tests only), `ci` (fast + ITP/RTP integration),
 `full` (everything; default), `physics` (analytic-validation only).
-CI runs `full`; the nightly workflow additionally flips
-`SPINORBEC_RUN_HEAVY_YAML=true` to cover the gated YAML integration
+Per-push CI runs `fast`; the nightly workflow runs `full` with
+`SPINORBEC_RUN_HEAVY_YAML=true` to also cover the gated YAML integration
 blocks (see CLAUDE.md "Current cascade cost").
+
+Runner knobs (all read by `test/runtests.jl`):
+
+- `SPINORBEC_TEST_WORKERS` — `1` (default, serial in-process) or `N` / `auto`
+  (parallel: files split into N independent julia processes — `run_chunk.jl`
+  per chunk — aggregated by exit code; `auto` = one process per CPU thread).
+  Both modes share one per-file run/fail path (`test/_run_files.jl`): every
+  file runs under its own testset, all files run (one failure never hides
+  another), and the run exits non-zero iff anything failed.
+- `SPINORBEC_TEST_SKIP` — comma-separated relative paths to omit (e.g.
+  CUDA-importing oracles on a machine whose driver probe crashes the
+  precompiler).
+- `SPINORBEC_TEST_TIMING=quiet` — suppress the per-file timing table that
+  otherwise prints at the end of every run.
+- `SPINORBEC_TEST_TIMEOUT` — per-chunk wall-clock cap in seconds under
+  parallelism (default 1800; `0` disables). A hung chunk is killed and
+  reported as failed (exit 124) rather than stalling the whole suite.

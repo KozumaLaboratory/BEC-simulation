@@ -18,7 +18,7 @@ using StaticArrays: SVector
 
     ws = SpinorBEC.make_scalar_ws(
         grid, V_trap;
-        g_contact=100.0, c_dd=0.0, F=6.0, gamma_lhy=0.0, dt=0.01,
+        g_contact=100.0, c_dd=0.0, F=6.0, gamma_lhy=0.0,
     )
 
     # Initial Gaussian centered at origin, normalized to 1
@@ -51,7 +51,7 @@ using StaticArrays: SVector
     # With DDI on, V_dd should be nonzero in interior
     ws2 = SpinorBEC.make_scalar_ws(
         grid, V_trap;
-        g_contact=100.0, c_dd=50.0, F=6.0, gamma_lhy=0.0, dt=0.01,
+        g_contact=100.0, c_dd=50.0, F=6.0, gamma_lhy=0.0,
     )
     @inbounds for I in CartesianIndices(ws2.psi)
         x = grid.x[1][I[1]];

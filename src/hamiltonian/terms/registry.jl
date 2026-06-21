@@ -123,7 +123,10 @@ function build_energy_context(psi_host::Array{<:Complex, ND_psi}, ws) where {ND_
     # `_energy_decomposition_gpu`, P2 territory).
     N = ND_psi - 1
     n_pts = ntuple(d -> size(psi_host, d), Val(N))
-    dV = cell_volume(ws.grid)
+    # EnergyContext.dV is Float64; a mixed-precision (F32) grid returns a
+    # Float32 cell_volume, which would miss the auto-constructor's ::Float64
+    # slot (a scalar Float64 lock is the intended F32-path convention anyway).
+    dV = Float64(cell_volume(ws.grid))
     n_comp = size(psi_host, ND_psi)
     fft_buf, n_density, fx, fy, fz = scratch_get!(
         :energy_context, (eltype(psi_host), n_pts)

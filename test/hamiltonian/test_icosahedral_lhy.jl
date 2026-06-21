@@ -1,6 +1,7 @@
 using Test
 using SpinorBEC
 using SpinorBEC.IcosahedralMod
+using LinearAlgebra: Diagonal
 
 # F=6 icosahedral (I_h) closed-form contact LHY tests (Round-3 Task 1).
 # Formula derived in parallel session 2026-05-07; numerical values

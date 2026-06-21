@@ -10,6 +10,7 @@ using Test
 using FFTW
 using SpinorBEC
 using SpinorBEC: LossTerm, apply_step!
+using LinearAlgebra: norm
 
 @testset "Loss is non-unitary: norm strictly decreases" begin
     F = 1

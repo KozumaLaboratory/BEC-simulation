@@ -1,9 +1,28 @@
 export make_ddi_padded
 
 """
+    _padded_grid_size(factor, n) -> Int
+
+Padded length for one axis at zero-pad `factor` (≥ 1). `factor == 2` keeps the
+exact `2n` (historical default; preserves bit-for-bit the existing padded path).
+Any other factor rounds `factor·n` UP to the next FFT-friendly size (product of
+2,3,5,7) so the padded FFT stays fast for anisotropic / optimal padding.
+"""
+function _padded_grid_size(factor::Real, n::Int)
+    factor == 2 && return 2n
+    factor >= 1 || throw(ArgumentError("pad_factor must be ≥ 1, got $factor"))
+    nextprod((2, 3, 5, 7), max(n + 1, ceil(Int, factor * n)))
+end
+
+"""
 Build zero-padded DDI context for reduced aliasing.
 
-Doubles grid size in each dimension. Builds Q tensor and rFFT plans on padded grid.
+`pad_factor` (a scalar or per-axis `NTuple`) sets the zero-pad multiple per
+dimension; default `2` reproduces the historical `2n` padded grid. Smaller
+factors on thin axes (anisotropic padding, e.g. `(2.73, 2.73, 1.5)` for a
+pancake) cut memory — valid as long as the truncation radius obeys
+`R ≤ (factor_d − 1)·L_d` on every axis (the caller's auto-`trunc_radius`
+enforces this). Builds the Q tensor and rFFT plans on the padded grid.
 """
 function make_ddi_padded(
     grid::Grid{N, T},
@@ -13,12 +32,15 @@ function make_ddi_padded(
     secular::Bool=false,
     quasi_2d::Bool=false,
     l_z::Float64=0.0,
+    trunc_radius::Union{Nothing, Float64}=nothing,
+    pad_factor::Union{Real, NTuple{N, Real}}=2,
     backend::AbstractBackend=CPUBackend(),
     dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
 ) where {N, T <: AbstractFloat}
     U = dtype === nothing ? T : dtype
     n_pts = grid.config.n_points
-    padded_shape = ntuple(d -> 2 * n_pts[d], N)
+    pf = pad_factor isa Real ? ntuple(_ -> pad_factor, N) : pad_factor
+    padded_shape = ntuple(d -> _padded_grid_size(pf[d], n_pts[d]), N)
     rk_shape = rfft_output_shape(padded_shape)
 
     dx = grid.dx
@@ -81,6 +103,7 @@ function make_ddi_padded(
             rk_shape;
             secular,
             full_n=padded_shape,
+            trunc_radius,
         )
     end
 
