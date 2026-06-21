@@ -10,6 +10,7 @@
 using Test
 using FFTW
 using SpinorBEC
+using LinearAlgebra: norm
 using SpinorBEC: KineticTerm, TrapTerm, ZeemanTerm, DensityC0Term,
     SpinC1Term, apply_step!
 

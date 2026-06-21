@@ -7,6 +7,20 @@
 
 using Test
 
+# Standard test-environment preamble. The serial runner historically left these
+# stdlibs in `Main` for later files (whoever `using`d them first leaked them);
+# many test files use `norm`, `I`, `MersenneTwister`, `mean`, `@printf`, … with
+# no local import and only passed by that accident. Each parallel chunk is a
+# fresh process, so a file landing in a chunk with no such sibling would hit
+# `UndefVarError`. Provide them explicitly — alongside the Test + SpinorBEC that
+# both runners already supply — so a file behaves identically run with siblings
+# or alone. This is the test environment contract; files may still import their
+# own extras (FFTW, StaticArrays, …).
+using LinearAlgebra
+using Random
+using Statistics
+using Printf
+
 """
     run_test_files(files; dir=@__DIR__) -> (failed::Bool, timings)
 

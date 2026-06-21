@@ -53,9 +53,11 @@ function _src_files_with(needle::AbstractString)
     out
 end
 
-"""Test files quoted in runtests.jl tier lists (the set that actually runs)."""
+"""Test files quoted in the tier lists (the set that actually runs). The tier
+lists live in `_tiers.jl` (runtests.jl only orchestrates); reading runtests.jl
+would instead pick up the scheduler's `_COST` keys and helper filenames."""
 function _tier_registered_files()
-    txt = read(joinpath(_COV_TEST_ROOT, "runtests.jl"), String)
+    txt = read(joinpath(_COV_TEST_ROOT, "_tiers.jl"), String)
     Set(m.captures[1] for m in eachmatch(r"\"([\w/]+\.jl)\"", txt))
 end
 
