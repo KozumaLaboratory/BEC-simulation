@@ -18,8 +18,8 @@ from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 
 ROOT = os.environ.get("FPE_ROOT",
     "/gs/bs/work/6/ue06186/bec-runs/flower_protocol_edh")
-H5 = os.path.join(ROOT, os.environ.get("RTP_H5_NAME", "rtp_10mG_goto.h5"))
-OUT_GIF = H5.replace(".h5", "_3d_spin.gif")
+H5 = os.environ.get("RTP_H5") or os.path.join(ROOT, os.environ.get("RTP_H5_NAME", "rtp_10mG_goto.h5"))
+OUT_GIF = os.environ.get("OUT_GIF", H5.replace(".h5", "_3d_spin.gif"))
 
 DENSITY_THRESH = float(os.environ.get("FPE_3D_SPIN_THRESH", "0.12"))
 SHELL_THRESH = float(os.environ.get("FPE_3D_SHELL_THRESH", "0.10"))
