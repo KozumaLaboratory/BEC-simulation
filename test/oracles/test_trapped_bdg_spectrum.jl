@@ -52,6 +52,9 @@ using SpinorBEC: _bdg_contact_matrices, trapped_bdg_spectrum, energy_gradient!,
     @test tr.dense_ok
     @test tr.dim == 2 * length(ψ)
     @test tr.quartet_residual < 1e-10          # ω↦−conj(ω) to machine precision
+    # This generic uniform spinor is dynamically UNSTABLE — exercise the
+    # complex-ω instability detection (the dynamical :fail path's engine).
+    @test tr.max_growth > 1e-2
 
     # Homogeneous reference at the box's discrete k-modes — SAME μ so the
     # comparison isolates the operator structure from the μ definition.

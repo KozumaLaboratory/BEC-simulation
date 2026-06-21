@@ -54,13 +54,16 @@ end
 _tangent_project(δ, ψ, dV, n2) = δ .- ψ .* (sum(conj.(ψ) .* δ) * dV / n2)
 
 """
-    constrained_hessian_params(ws, ψ) → (; μ, dV, n2)
+    constrained_hessian_params(ws, ψ) → (; μ, dV, n2, g)
 
 Manifold scalars at a (near-)stationary `ψ`: the chemical potential
 `μ = Re⟨ψ,g⟩/(2‖ψ‖²)` (`g = energy_gradient! = 2μψ` at a stationary
-point), the cell volume `dV`, and `n2 = ‖ψ‖²`. Calibrated by the gate-2
-self-check `H·(iψ) = 2μ·(iψ)` (the phase Goldstone is the 2μ eigenvector
-of the raw H). Reuse-ready for any consumer of the constrained Hessian.
+point), the cell volume `dV`, `n2 = ‖ψ‖²`, and the gradient `g` itself
+(returned so callers needing the stationarity residual `‖g−2μψ‖` reuse
+this single evaluation rather than recomputing `energy_gradient!`).
+Calibrated by the gate-2 self-check `H·(iψ) = 2μ·(iψ)` (the phase
+Goldstone is the 2μ eigenvector of the raw H). The SINGLE source of `μ`
+for every consumer of the constrained Hessian.
 """
 function constrained_hessian_params(ws, ψ)
     dV = cell_volume(ws.grid)
@@ -69,7 +72,7 @@ function constrained_hessian_params(ws, ψ)
     fill!(g0, 0)
     energy_gradient!(g0, ψ, ws)
     μ = (real(sum(conj.(ψ) .* g0)) * dV) / (2 * n2)
-    (; μ, dV, n2)
+    (; μ, dV, n2, g=g0)
 end
 
 """
@@ -90,7 +93,8 @@ function constrained_hessian_action(ws, ψ, δ; μ, dV, n2, ε::Float64=1e-5)
 end
 
 """
-    trapped_bdg_lowest_eigenvalue(ws, ψ; niter=24, ε=1e-5, tol_ritz=1e-2, rng=…)
+    trapped_bdg_lowest_eigenvalue(ws, ψ; niter=24, ε=1e-5, tol_ritz=1e-2,
+                                  params=nothing, rng=…)
         → (; λ_min, μ, ritz_residual, niter_used, converged)
 
 Lowest eigenvalue of the constrained second variation `P(H−2μ)P` at a
@@ -111,12 +115,20 @@ is exactly a large `ritz_residual` the bare value hides. `converged` flags
 
 `λ_min` and `μ` are the first two NamedTuple fields, so legacy
 `λ, _ = trapped_bdg_lowest_eigenvalue(...)` and `…[1]` still yield λ_min.
+Pass `params` (a `constrained_hessian_params` result) to reuse an already-
+computed `(μ, dV, n2)` and skip the redundant `energy_gradient!`. `niter < 1`
+returns `converged=false` (λ_min=NaN) rather than erroring on an empty
+Krylov space — the gate abstains, it does not crash.
 """
 function trapped_bdg_lowest_eigenvalue(
     ws, ψ; niter::Int=24, ε::Float64=1e-5, tol_ritz::Float64=1e-2,
-    rng=Random.default_rng(),
+    params=nothing, rng=Random.default_rng(),
 )
-    p = constrained_hessian_params(ws, ψ)
+    p = params === nothing ? constrained_hessian_params(ws, ψ) : params
+    if niter < 1
+        return (;
+            λ_min=NaN, μ=p.μ, ritz_residual=Inf, niter_used=0, converged=false)
+    end
     ipR(a, b) = real(sum(conj.(a) .* b)) * p.dV
     Hc(δ) = constrained_hessian_action(ws, ψ, δ; p.μ, p.dV, p.n2, ε)
 

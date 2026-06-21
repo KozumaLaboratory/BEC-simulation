@@ -12,7 +12,7 @@
 #   * `check(spec::ConservationSpec, ::RunSweep)`       — per-row verdict vector
 #   * `check(spec::OperatorRHSSpec,  ::RunComparison)`  — A/B diff verdict
 
-export ConservationSpec, OperatorRHSSpec, CheckResult, check
+export ConservationSpec, OperatorRHSSpec, CheckResult, check, passed
 
 """
     CheckResult(status::Symbol, details, summary)
@@ -23,9 +23,8 @@ Verdict produced by `check(spec, target)`. `status ∈ {:pass, :fail,
 (precondition unmet / solver not converged) instead of emitting a false
 PASS or FAIL. The binary `Bool` constructor maps `true → :pass`,
 `false → :fail`, so binary specs (conservation / operator-RHS) need no
-change. `pass` is a derived property (`status === :pass`) — existing
-binary consumers keep reading `r.pass` and treat anything non-`:pass`
-(fail OR indeterminate) as not-green, the conservative default.
+change. Use `passed(r)` (== `r.status === :pass`) for the green/not-green
+question; anything non-`:pass` (fail OR indeterminate) is not green.
 
 `details` is a vector of `(name => (got=…, bound=…, pass=…))`- or
 `(name => (…, status=…))`-style entries so downstream code can format
@@ -49,16 +48,16 @@ end
 CheckResult(pass::Bool, details, summary) =
     CheckResult(pass ? :pass : :fail, details, summary)
 
-function Base.getproperty(r::CheckResult, s::Symbol)
-    s === :pass ? getfield(r, :status) === :pass : getfield(r, s)
-end
+"""
+    passed(r::CheckResult) -> Bool
 
-Base.propertynames(::CheckResult) = (:status, :pass, :details, :summary)
+`true` iff the verdict is `:pass`. The blessed green/not-green accessor —
+`:fail` and `:indeterminate` are both not-green.
+"""
+passed(r::CheckResult) = r.status === :pass
 
 Base.show(io::IO, r::CheckResult) = print(
-    io,
-    "CheckResult(status=:$(getfield(r, :status)), " *
-    "$(length(getfield(r, :details))) checks)",
+    io, "CheckResult(status=:$(r.status), $(length(r.details)) checks)"
 )
 
 """

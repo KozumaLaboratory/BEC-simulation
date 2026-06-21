@@ -36,7 +36,17 @@ stationarity residual bound; `tol_ritz` = Lanczos Ritz residual relative
 to |λ_min| for the energetic sign to count as converged; `λ_tol` = |λ_min|
 below which the curvature is treated as marginal (not a saddle); `couple`
 = require |λ_min| > couple·‖g−2μψ‖ for the sign to be resolvable above the
-stationarity error; `niter` = Lanczos iterations.
+stationarity error; `niter` = Lanczos iterations; `tol_dyn` = growth-rate
+threshold RELATIVE to the spectral radius; `tol_quartet` = BdG symmetry
+self-check bound; `bdg_dim_cap` = max dense BdG dimension before the
+dynamical axis abstains.
+
+CONTRACT NOTE: unlike the jld2-target specs (`check(::ConservationSpec,
+::RunResult)` etc.), `check(::StabilitySpec, ws, ψ)` operates on a LIVE
+`(Workspace, ψ)` because the second-variation operator needs the
+Hamiltonian, which a `RunResult` does not carry. It is therefore invoked
+directly, not through the single-target collection funnel
+(`check(spec, exp::Experiment)`).
 """
 struct StabilitySpec
     ε_stat::Float64
@@ -63,15 +73,15 @@ function check(spec::StabilitySpec, ws, ψ; rng=Random.default_rng())
     details = Pair{Symbol, Any}[]
 
     # --- stationarity axis ---------------------------------------------
-    dV = cell_volume(ws.grid)
-    n2 = real(sum(abs2, ψ)) * dV
-    g = similar(ψ)
-    fill!(g, 0)
-    energy_gradient!(g, ψ, ws)
-    μ = real(sum(conj.(ψ) .* g)) * dV / (2 * n2)
-    gproj = g .- 2μ .* ψ
-    stat_abs = sqrt(real(sum(abs2, gproj)) * dV)
-    g_abs = sqrt(real(sum(abs2, g)) * dV)
+    # ONE constrained_hessian_params call is the single source of (μ, dV, n2)
+    # and the gradient g; the energetic axis reuses `p` (params=) so the
+    # expensive energy_gradient! runs once. The stationarity residual is the
+    # tangent projection of g (= g − 2μψ, since μ = ⟨ψ,g⟩dV/2n2), reusing the
+    # constrained-Hessian's own _tangent_project rather than open-coding it.
+    p = constrained_hessian_params(ws, ψ)
+    gproj = _tangent_project(p.g, ψ, p.dV, p.n2)
+    stat_abs = sqrt(real(sum(abs2, gproj)) * p.dV)
+    g_abs = sqrt(real(sum(abs2, p.g)) * p.dV)
     stat_rel = stat_abs / max(g_abs, 1e-30)
     stat_status = stat_rel < spec.ε_stat ? :pass : :indeterminate
     push!(details, :stationarity => (
@@ -79,7 +89,7 @@ function check(spec::StabilitySpec, ws, ψ; rng=Random.default_rng())
 
     # --- energetic axis (constrained-Hessian λ_min, self-certifying) ---
     bdg = trapped_bdg_lowest_eigenvalue(
-        ws, ψ; niter=spec.niter, tol_ritz=spec.tol_ritz, rng)
+        ws, ψ; niter=spec.niter, tol_ritz=spec.tol_ritz, params=p, rng)
     energetic = if !bdg.converged
         :indeterminate                      # Ritz residual not ≪ |λ_min|
     elseif bdg.λ_min < -spec.λ_tol
@@ -87,7 +97,12 @@ function check(spec::StabilitySpec, ws, ψ; rng=Random.default_rng())
     else
         :pass                               # energetic minimum (λ_min ≥ −λ_tol)
     end
-    # joint resolution: a slightly-off ψ can flip a small λ_min's sign.
+    # Joint resolution: a slightly-off ψ can flip a small λ_min's sign. This
+    # is a HEURISTIC guard, not a derived bound — it compares the curvature
+    # |λ_min| against `couple ×` the absolute stationarity residual `stat_abs`
+    # (= ‖g−2μψ‖). The two are commensurate only under the fixed-norm
+    # convention (‖ψ‖²dV = N), so `couple` is a dimensionless safety factor
+    # tuned for N≈1; revisit if a campaign normalises ψ differently.
     if energetic !== :indeterminate && abs(bdg.λ_min) < spec.couple * stat_abs
         energetic = :indeterminate
     end
@@ -99,12 +114,18 @@ function check(spec::StabilitySpec, ws, ψ; rng=Random.default_rng())
     )
 
     # --- dynamical axis (trapped non-Hermitian BdG, dense) -------------
-    dynbdg = trapped_bdg_spectrum(ws, ψ; μ, dim_cap=spec.bdg_dim_cap)
+    # `dense_ok` is checked FIRST and is load-bearing: on abstain the spectrum
+    # fields are NaN, and `NaN > tol` is false, so a reordering that read
+    # max_growth before dense_ok would silently report :pass. The growth
+    # threshold is RELATIVE to the spectral radius so it scales with the
+    # problem; near the FD noise floor (see trapped_bdg_spectrum) the verdict
+    # is noise-limited — phase 2b removes that floor.
+    dynbdg = trapped_bdg_spectrum(ws, ψ; μ=p.μ, dim_cap=spec.bdg_dim_cap)
     dyn_status = if !dynbdg.dense_ok
         :indeterminate                      # too large for dense; Arnoldi unbuilt
     elseif dynbdg.quartet_residual > spec.tol_quartet
         :indeterminate                      # ω↦−conj(ω) symmetry broken: solve suspect
-    elseif dynbdg.max_growth > spec.tol_dyn
+    elseif dynbdg.max_growth > spec.tol_dyn * dynbdg.radius
         :fail                               # complex ω ⇒ exponential growth
     else
         :pass                               # spectrum real ⇒ dynamically stable

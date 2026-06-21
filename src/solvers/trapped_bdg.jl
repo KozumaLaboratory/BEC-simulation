@@ -22,42 +22,49 @@
 
 export trapped_bdg_spectrum
 
-# L_op·w and M_op·w from the gated HvP via the v/iv real representation:
-#   D_w g = 2(L_op w + M_op w̄),  D_{iw} g = 2i(L_op w − M_op w̄)
-# ⇒ L_op w = (D_w g − i D_{iw} g)/4,  M_op w = (D_{w̄} g + i D_{iw̄} g)/4.
-_bdg_L_action(ws, ψ, w, ε) =
-    (hessian_vector_product(ws, ψ, w; ε) .-
-     im .* hessian_vector_product(ws, ψ, im .* w; ε)) ./ 4
-_bdg_M_action(ws, ψ, w, ε) =
-    (
-        hessian_vector_product(ws, ψ, conj.(w); ε) .+
-        im .* hessian_vector_product(ws, ψ, im .* conj.(w); ε)
-    ) ./ 4
-
-# H_BdG action on (u, v) (both ψ-shaped). `skip_u`/`skip_v` short-circuit
-# the zero half during dense column assembly (conj(M_op)·u = conj(M_op·ū),
-# conj(L_op−μ)·v = conj(L_op·v̄) − μ v).
-function _bdg_apply(ws, ψ, u, v, μ, ε; skip_u::Bool=false, skip_v::Bool=false)
-    Lu = skip_u ? zero(u) : _bdg_L_action(ws, ψ, u, ε)
-    Mv = skip_v ? zero(v) : _bdg_M_action(ws, ψ, v, ε)
-    top = Lu .- μ .* u .+ Mv
-    McU = skip_u ? zero(u) : _bdg_M_action(ws, ψ, conj.(u), ε)
-    LcV = skip_v ? zero(v) : _bdg_L_action(ws, ψ, conj.(v), ε)
-    bottom = .-conj.(McU) .- conj.(LcV) .+ μ .* v
-    top, bottom
+# Dense-assembly column for a REAL one-hot basis vector `e`. From the v/iv
+# real representation of the gated HvP:
+#   D_e g = 2(L_op e + M_op ē),  D_{ie} g = 2i(L_op e − M_op ē)
+# ⇒ with hp = D_e g and hip = D_{ie} g computed ONCE,
+#   L_op e = (hp − i·hip)/4,  M_op e = (hp + i·hip)/4.
+# Because `e` is real (conj(e)=e), M_op·conj(e)=M_op·e and L_op·conj(e)=
+# L_op·e, so BOTH BdG blocks reuse the SAME two HvPs — 2 HvP = 4 gradient
+# evals per column, vs 4 HvP = 8 if the L and M actions were evaluated
+# separately. `is_u` selects the upper (u, v=0) or lower (v, u=0) block:
+#   u-column: top = (L_op−μ)·e,  bottom = −conj(M_op)·e = −conj(M_op·ē)
+#   v-column: top = M_op·e,      bottom = −conj(L_op−μ)·e = −conj(L_op·ē)+μe
+function _bdg_column(ws, ψ, e, μ, ε, is_u::Bool)
+    hp = hessian_vector_product(ws, ψ, e; ε)
+    hip = hessian_vector_product(ws, ψ, im .* e; ε)
+    Le = (hp .- im .* hip) ./ 4
+    Me = (hp .+ im .* hip) ./ 4
+    is_u ? (Le .- μ .* e, .-conj.(Me)) : (Me, .-conj.(Le) .+ μ .* e)
 end
 
 """
     trapped_bdg_spectrum(ws, ψ; μ, ε=1e-5, dim_cap=4000)
-        → (; omega, max_growth, quartet_residual, dim, dense_ok)
+        → (; omega, max_growth, quartet_residual, radius, dim, dense_ok)
 
 Dense trapped BdG spectrum at a stationary `ψ` with chemical potential `μ`.
 `omega::Vector{ComplexF64}` are all `2·length(ψ)` eigenvalues;
 `max_growth = maximum(imag, omega)` (> 0 ⇒ dynamical instability);
-`quartet_residual` is the relative violation of the `ω ↦ −conj(ω)` spectral
-symmetry (a self-consistency check on the assembly + solve). When
-`dim = 2·length(ψ) > dim_cap`, returns `dense_ok=false` with empty `omega`
-— the caller abstains rather than over-claim.
+`radius = maximum(abs, omega)` (the spectral scale, so callers can apply a
+RELATIVE growth threshold); `quartet_residual` is the relative violation of
+the `ω ↦ −conj(ω)` symmetry (a weak self-check — see the loop comment).
+
+FD-FLOOR CAVEAT (phase 2a): `H` is assembled from central-difference HvP
+(ε), so its entries carry ~ε truncation/roundoff and `max_growth` /
+`quartet_residual` have a noise floor of that order. A growth rate at the
+floor is indistinguishable from a stable real spectrum — verdicts within a
+few × the floor are noise-limited. The matrix-free Arnoldi (phase 2b) on
+the analytic operator removes this floor.
+
+`dim_cap = 4000` bounds the dense path (a 4000×4000 non-Hermitian eigvals
+is seconds; assembly is `O(dim · HvP)`). PRODUCTION Eu F=6 grids
+(`2·N·13 ≫ 4000`) therefore exceed it: `dense_ok=false`, empty `omega`,
+`max_growth=NaN` — the caller MUST branch on `dense_ok` first (NaN compares
+false, so a forgotten guard would silently read it as stable). The
+dynamical axis stays `:indeterminate` for production until phase 2b.
 """
 function trapped_bdg_spectrum(ws, ψ; μ::Real, ε::Float64=1e-5, dim_cap::Int=4000)
     P = length(ψ)
@@ -65,30 +72,31 @@ function trapped_bdg_spectrum(ws, ψ; μ::Real, ε::Float64=1e-5, dim_cap::Int=4
     if dim > dim_cap
         return (;
             omega=ComplexF64[], max_growth=NaN, quartet_residual=NaN,
-            dim, dense_ok=false,
+            radius=NaN, dim, dense_ok=false,
         )
     end
     sz = size(ψ)
-    z = zeros(ComplexF64, sz)
     H = zeros(ComplexF64, dim, dim)
     for col in 1:dim
-        if col <= P
-            u = zeros(ComplexF64, sz)
-            u[col] = 1
-            top, bottom = _bdg_apply(ws, ψ, u, z, μ, ε; skip_v=true)
-        else
-            v = zeros(ComplexF64, sz)
-            v[col - P] = 1
-            top, bottom = _bdg_apply(ws, ψ, z, v, μ, ε; skip_u=true)
-        end
+        is_u = col <= P
+        e = zeros(ComplexF64, sz)
+        e[is_u ? col : col - P] = 1               # real one-hot basis vector
+        top, bottom = _bdg_column(ws, ψ, e, μ, ε, is_u)
         H[1:P, col] .= vec(top)
         H[(P + 1):dim, col] .= vec(bottom)
     end
 
     omega = eigvals(H)
     max_growth = maximum(imag, omega)
-
     radius = maximum(abs, omega) + 1e-30
+
+    # ω↦−conj(ω) symmetry: a NECESSARY-but-not-sufficient self-check. It is a
+    # property of the [[A,B],[−conj(B),−conj(A)]] block PATTERN and holds for
+    # ANY A,B, so it catches a corrupted assembly/solve but NOT a sign error
+    # inside L_op/M_op/μ that preserves the pattern (and a purely-imaginary ω
+    # is its own −conj(ω) partner ⇒ contributes 0). Operator-level correctness
+    # is gated offline by test_trapped_bdg_spectrum.jl (uniform limit ≡
+    # homogeneous BdG), not by this runtime residual.
     qr = 0.0
     for ω in omega
         target = -conj(ω)
@@ -97,5 +105,5 @@ function trapped_bdg_spectrum(ws, ψ; μ::Real, ε::Float64=1e-5, dim_cap::Int=4
     end
     quartet_residual = qr / radius
 
-    (; omega, max_growth, quartet_residual, dim, dense_ok=true)
+    (; omega, max_growth, quartet_residual, radius, dim, dense_ok=true)
 end
