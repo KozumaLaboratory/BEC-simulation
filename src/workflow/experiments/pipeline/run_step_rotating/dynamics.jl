@@ -112,91 +112,115 @@
     loss_params = _parse_loss_params(get(p, "loss", nothing);
         atom=loss_atom, N_atoms=loss_n_atoms, omega_ref=loss_omega_ref_arg)
     loss_resolved = loss_params === nothing ? LossParams() : loss_params
-    ws = make_rotating_basis_ws(grid, F_atom, V_trap;
-        p=ws_prev.p, q=ws_prev.q,
-        c0=ws_prev.c0, c1=ws_prev.c1,
-        c_dd=ws_prev.ddi_params.C_dd, gamma_lhy=ws_prev.gamma_lhy,
-        theta_func=theta_func, phi_func=phi_func,
-        theta_dot_func=theta_dot_func, phi_dot_func=phi_dot_func,
-        gauge_fix=ws_prev.gauge_fix,
-        loss=loss_resolved,
-        backend=ws_prev.backend,                  # inherit device from GS
+    # --- UNIFIED PATH (2026-06-21): evolve on the STANDARD split-step path. ---
+    # The rotating frame is no longer a separate engine: the standard path now
+    # applies the Zeeman eigen-exactly with field-axis q, and `split_step_midpoint!`
+    # (implicit-midpoint Picard) reproduces the rotating yoshida6 magnetostir to
+    # ~1e-5 per-m at the same dt / step count, p-independently (gated by
+    # test_rotating_yoshida6_vs_lab_midpoint.jl + the recorded-array parity gate).
+    # We drive a lab-frame TimeDependentZeeman B̂(t)=(θ(t),φ(t)) and record the
+    # SAME tilde-basis observables by transforming ψ_lab(t) → ψ̃(t)=U_B(t)†ψ_lab(t),
+    # so the :rotating_basis_dynamics dict (consumer contract) is byte-compatible.
+    sm = ws_prev.spin_matrices
+    F_val = F_atom
+    N_dim = length(grid.config.n_points)
+    p_zee = ws_prev.p
+    bz_wf = FunctionWaveform(t -> p_zee * cos(theta_func(t)))
+    bx_wf = FunctionWaveform(t -> p_zee * sin(theta_func(t)) * cos(phi_func(t)))
+    by_wf = FunctionWaveform(t -> p_zee * sin(theta_func(t)) * sin(phi_func(t)))
+    zee_field = TimeDependentZeeman(bz_wf, ConstantWaveform(ws_prev.q), bx_wf, by_wf)
+
+    c_dd_val = ws_prev.ddi_params.C_dd
+    atom_for_ws = get(pipeline_results, :rotating_basis_atom, nothing)
+    atom_for_ws = if atom_for_ws === nothing
+        AtomSpecies("RotatingBasis", 1.66e-25, F_val, 0.0, 0.0, 0.0)
+    else
+        atom_for_ws
+    end
+    interactions = InteractionParams(
+        Dict(0 => Float64(ws_prev.c0), 1 => Float64(ws_prev.c1));
+        c_lhy=Float64(ws_prev.gamma_lhy),
     )
-    copyto!(ws.psi_tilde, ws_prev.psi_tilde)
+
+    # ψ_lab(0) = U_B(0) · ψ̃_GS (the GS tilde state, at the t=0 field orientation).
+    psi_lab0 = Array{ComplexF64}(undef, size(ws_prev.psi_tilde)...)
+    copyto!(psi_lab0, ws_prev.psi_tilde)
+    _apply_UB!(psi_lab0, sm, Float64(theta_func(0.0)), Float64(phi_func(0.0)), N_dim)
+
+    ws = make_workspace(;
+        grid, atom=atom_for_ws, interactions, zeeman=zee_field,
+        potential=NoPotential(),
+        sim_params=SimParams(; dt=dt_rtp, n_steps, imaginary_time=false, save_every),
+        psi_init=psi_lab0,
+        enable_ddi=abs(c_dd_val) > 1e-30, c_dd=Float64(c_dd_val),
+        loss=loss_resolved, backend=ws_prev.backend,
+    )
+    copyto!(ws.potential_values, ws_prev.V_trap)  # reuse the GS trap (array form)
 
     times_arr = Float64[]
     norms_arr = Float64[]
     Lz_arr = Float64[]
     per_m_arr = Vector{Vector{Float64}}()
-    Fz_arr = Float64[]                   # ⟨F_z⟩(t) for EdH conservation
+    Fz_arr = Float64[]
     Fx_arr = Float64[];
     Fy_arr = Float64[]
-    # ψ̃ snapshots: optional, controlled by save.psi flag (nested).
-    # Enables per-m density (Fig 4), spin texture (Fig 3) — heavy memory but
-    # only every save_every step, so 200ms × dt=0.005 / save_every=50 = 80 frames.
     save_block = get(p, "save", Dict{Any, Any}())::AbstractDict
     save_psi = Bool(get(save_block, "psi", true))::Bool
     psi_snapshots = Vector{Array{ComplexF64, 4}}()
+    ψtilde = similar(ws.state.psi)   # scratch for the per-save U_B† transform
 
     if verbose
         dt_source =
             haskey(p, "dt") ? "explicit" :
             (haskey(p, "epsilon") ? "ε=$(p["epsilon"])" : "default")
-        println("  rotating_basis dynamics: ", n_steps, " steps × dt=", round(dt_rtp; sigdigits=3),
-            " ($dt_source, integrator=", integrator_name,
+        println("  rotating_basis dynamics (unified→standard split_step_midpoint!): ",
+            n_steps, " steps × dt=", round(dt_rtp; sigdigits=3),
+            " ($dt_source, requested=", integrator_name,
             ", θ_repr=", round(θ_repr; digits=3),
             ", φ_omega_repr=", round(φ_omega_repr; digits=3),
             ", save_psi=", save_psi, ")")
     end
 
-    # Integrator dispatch
-    evolve_fn = if integrator_name == "strang"
-        evolve_rotating!
-    elseif integrator_name == "yoshida4"
-        evolve_rotating_yoshida4!
-    elseif integrator_name == "yoshida6"
-        evolve_rotating_yoshida6!
-    elseif integrator_name == "cfet4"
-        evolve_rotating_cfet4_real!   # experimental, not order-4 in current form
-    else
-        throw(
-            ArgumentError(
-                "Unknown integrator '$integrator_name'. Use: strang, yoshida4, yoshida6, cfet4"
-            ),
-        )
-    end
-
-    evolve_fn(ws, n_steps, dt_rtp; t0=0.0,
-        on_step=(step, t, w) -> begin
+    dV = prod(grid.dx)
+    _record =
+        (step, t) -> begin
             if step == 1 || step % save_every == 0
                 push!(times_arr, t)
-                push!(norms_arr, rotating_norm(w))
-                if length(grid.config.n_points) == 3
-                    push!(Lz_arr, rotating_Lz(w))
+                push!(norms_arr, sqrt(sum(abs2, ws.state.psi) * dV))
+                # ⟨L_z⟩ is invariant under the spatially-uniform spin rotation U_B, so
+                # compute it directly on ψ_lab.
+                if N_dim == 3
+                    push!(Lz_arr, orbital_angular_momentum(ws.state.psi, grid, ws.fft_plans))
                 end
-                pm = rotating_per_m_norms(w)
+                # per-m in the tilde (field-following) frame: ψ̃ = U_B(t)† ψ_lab.
+                copyto!(ψtilde, ws.state.psi)
+                _apply_UB!(
+                    ψtilde,
+                    sm,
+                    Float64(theta_func(t)),
+                    Float64(phi_func(t)),
+                    N_dim;
+                    inverse=true,
+                )
+                pm = [sum(abs2, selectdim(ψtilde, N_dim + 1, c)) * dV for c in 1:(2F_val + 1)]
+                psum = sum(pm)
+                psum > 0 && (pm ./= psum)
                 push!(per_m_arr, pm)
-                # ⟨F_z⟩ = Σ_m m·N_m (m runs F, F-1, ..., -F as idx 1..D)
-                F_val = w.spin_matrices.system.F
-                fz_sum = 0.0
-                for m_idx in 1:length(pm)
-                    fz_sum += (F_val - (m_idx - 1)) * pm[m_idx]
-                end
-                push!(Fz_arr, fz_sum)
-                # ⟨F_x⟩, ⟨F_y⟩ from spinor-resolved current density (defer for now;
-                # placeholder zeros — implemented in next analyzer iteration if
-                # needed for spin texture animation. Total magnetization
-                # in lab frame can be derived via Û_B(t) rotation in post.)
+                push!(Fz_arr, sum((F_val - (c - 1)) * pm[c] for c in 1:length(pm)))
                 push!(Fx_arr, 0.0);
                 push!(Fy_arr, 0.0)
                 if save_psi
-                    snap = Array{ComplexF64, 4}(undef, size(w.psi_tilde)...)
-                    copyto!(snap, w.psi_tilde)
+                    snap = Array{ComplexF64, 4}(undef, size(ψtilde)...)
+                    copyto!(snap, ψtilde)
                     push!(psi_snapshots, snap)
                 end
             end
-        end,
-    )
+        end
+
+    for step in 1:n_steps
+        split_step_midpoint!(ws)
+        _record(step, step * dt_rtp)
+    end
 
     placeholder_atom = AtomSpecies("RotatingBasis", 1.66e-25, F_atom, 0.0, 0.0, 0.0)
     dyn_dict = Dict{Symbol, Any}(
@@ -222,14 +246,21 @@
     if !isempty(psi_snapshots)
         dyn_dict[:psi_snapshots] = psi_snapshots
     end
+    # Final tilde state ψ̃(T) = U_B(T)† ψ_lab(T) — the dynamics step's terminal ψ,
+    # in the same tilde basis the old rotating engine returned.
+    psi_tilde_final = Array{ComplexF64}(undef, size(ws.state.psi)...)
+    copyto!(psi_tilde_final, ws.state.psi)
+    _apply_UB!(psi_tilde_final, sm, Float64(theta_func(n_steps * dt_rtp)),
+        Float64(phi_func(n_steps * dt_rtp)), N_dim; inverse=true)
+    per_m_final = if isempty(per_m_arr)
+        [sum(abs2, selectdim(psi_tilde_final, N_dim + 1, c)) * dV for c in 1:(2F_val + 1)]
+    else
+        per_m_arr[end]
+    end
     step_result = Dict{Symbol, Any}(
-        :rotating_basis_ws => ws,
         :rotating_basis_F => F_atom,
-        :rotating_basis_per_m_final => rotating_per_m_norms(ws),
+        :rotating_basis_per_m_final => per_m_final,
         :rotating_basis_dynamics => dyn_dict,
     )
-    # See note in _run_rotating_basis_ground_state_step: ws stashed in Dict only,
-    # psi_tilde concrete-typed (Complex eltype, supports both F32 and F64).
-    psi_concrete = ws.psi_tilde::AbstractArray{<:Complex, 4}
-    return (psi_concrete, grid, placeholder_atom, nothing, step_result)
+    return (psi_tilde_final, grid, placeholder_atom, nothing, step_result)
 end
