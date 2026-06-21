@@ -20,6 +20,7 @@ const _MAKE_WORKSPACE_KWARGS = (
     :magnetic_gradient, :spatial_zeeman, :time_dep_interactions, :absorbing_boundary,
     # DDI bundle
     :enable_ddi, :c_dd, :secular_ddi, :quasi_2d_ddi, :l_z_ddi, :ddi_padding,
+    :ddi_trunc_radius, :ddi_pad_factor,
     # Quasi-2D bundle
     :quasi_2d, :l_z,
     # LHY dispatch
@@ -43,6 +44,8 @@ function make_workspace(;
     loss::Union{Nothing, LossParams}=nothing,
     fft_flags=FFTW.MEASURE,
     ddi_padding::Bool=false,
+    ddi_trunc_radius::Float64=NaN,
+    ddi_pad_factor::Union{Real, NTuple{N, Real}}=2,
     quasi_2d_ddi::Bool=false,
     l_z_ddi::Float64=0.0,
     quasi_2d::Bool=false,
@@ -167,6 +170,36 @@ function make_workspace(;
         zfield
     end
 
+    # Resolve the DDI spherical-truncation radius (Ronen cutoff).
+    #   NaN  ⇒ off (bare periodic kernel; backward-compatible default).
+    #   > 0  ⇒ explicit physical radius (used as-is for both paths).
+    #   ≤ 0  ⇒ auto, geometry-dependent:
+    #     · un-padded (Tier A): half the smallest box extent — the largest R
+    #       that avoids wrap-around in the periodic (un-padded) convolution.
+    #     · padded (Tier B): the box diagonal, capped per axis at
+    #       (pad_factor_d − 1)·L_d — the largest R the zero-pad can hold
+    #       without wrap-around (validated: exceeding it re-introduces images).
+    box = ntuple(d -> grid.config.n_points[d] * grid.dx[d], N)
+    pf_t = if ddi_pad_factor isa Real
+        ntuple(_ -> Float64(ddi_pad_factor), N)
+    else
+        ntuple(d -> Float64(ddi_pad_factor[d]), N)
+    end
+    ddi_trunc = if isnan(ddi_trunc_radius)
+        nothing
+    elseif ddi_trunc_radius <= 0.0
+        minimum(box) / 2
+    else
+        ddi_trunc_radius
+    end
+    ddi_trunc_pad = if isnan(ddi_trunc_radius)
+        nothing
+    elseif ddi_trunc_radius <= 0.0
+        min(sqrt(sum(b -> b^2, box)), minimum(ntuple(d -> (pf_t[d] - 1) * box[d], N)))
+    else
+        ddi_trunc_radius
+    end
+
     ddi = if enable_ddi
         if isnan(c_dd) && atom.mu_mag > 0.0
             throw(
@@ -221,6 +254,7 @@ function make_workspace(;
             secular=secular_ddi,
             quasi_2d=quasi_2d_ddi,
             l_z=l_z_ddi,
+            trunc_radius=ddi_trunc,
             dtype=U,
         )
         _ddi_params_to_device(ddi_params_cpu, backend)
@@ -248,6 +282,8 @@ function make_workspace(;
             secular=secular_ddi,
             quasi_2d=quasi_2d_ddi,
             l_z=l_z_ddi,
+            trunc_radius=ddi_trunc_pad,
+            pad_factor=ddi_pad_factor,
             backend,
             dtype=U,
         )

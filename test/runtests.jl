@@ -81,6 +81,7 @@ const FAST_TESTS = [
     "analysis/test_observables.jl",
     "hamiltonian/test_ddi.jl",
     "hamiltonian/test_ddi_nyquist_xy_symmetry.jl",
+    "hamiltonian/test_ddi_truncated_kernel.jl",
     "hamiltonian/test_potentials.jl",
     "analysis/test_physics_level0.jl",
     "analysis/test_physics_level1.jl",
@@ -242,6 +243,10 @@ const CI_EXTRA = [
     "oracles/test_raman_analytic.jl",
     "oracles/test_term_legacy_equivalence.jl",
     "oracles/test_term_consistency.jl",
+    # Imaginary-time propagator generator == registry operator (spin-mixing
+    # + DDI). Gates the 2026-06-15 per-voxel exp(-(m+F)θ) density-bias class
+    # that only the propagator↔operator generator comparison can see.
+    "oracles/test_imag_time_propagator_generator.jl",
     # Rename regression: HamTerm subtype names no longer shadow potential types.
     "oracles/test_registry_collision_regression.jl",
     # [GAP-2] closure: MagneticGradientTerm energy/gradient/sign-oracle.

@@ -101,8 +101,12 @@ Stage 5: Rz(+α) — phase recurrence
 end
 
 """ITP variant of `_apply_euler_5stage_batched_real!`. Same structure but
-Stage 3 uses `exp(-(m + F)·θ)` (recurrence in `exp(θ)`) so the lowest
-mode stays bounded by 1."""
+Stage 3 uses the real F_z eigenvalue weight `exp(-m·θ)` (recurrence in
+`exp(θ)`). It must NOT add a per-voxel `(m+F)` overflow shift: θ ∝ |f(r)|
+is spatially varying, so `exp(-F·θ(r))` is a density reweighting that
+survives global normalization and biases the ITP fixed point. The
+per-substep angle θ is tiny, so `exp(-m·θ)` cannot overflow (the real-time
+path runs the same shift-free `cis(-m·θ)`)."""
 @inline function _apply_euler_5stage_batched_imag!(
     P, W, conj_V, V_T, alpha, beta, theta, F::T, ::Val{D}
 ) where {T <: AbstractFloat, D}
@@ -135,12 +139,17 @@ mode stays bounded by 1."""
     end
     mul!(P, W, V_T)
 
-    # Stage 3 — Dz(θ): ITP uses exp(-(m+F)·θ), recurrence ratio exp(θ).
-    two_F = T(2) * F
+    # Stage 3 — Dz(θ) imaginary time: weight component m by exp(-m·θ),
+    # the F_z eigenvalue weight. The previous exp(-(m+F)·θ) form added a
+    # per-voxel exp(-F·θ) overflow shift; since θ ∝ |f(r)| is spatially
+    # varying, that factor is a density reweighting that survives global
+    # normalization (only its spatial mean is removed) and biases the ITP
+    # fixed point off the variational GP minimum. The real-time variant is
+    # immune (there the same factor is an irrelevant global phase).
     @inbounds for i in 1:N_spatial
         ti = theta[i]
         dz_step = exp(ti)
-        dz_r = exp(-two_F * ti)
+        dz_r = exp(-F * ti)        # c=1 (m=+F): exp(-F·θ) = exp(-m·θ)
         for c in 1:D
             P[i, c] *= dz_r
             dz_r *= dz_step

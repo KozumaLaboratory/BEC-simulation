@@ -412,25 +412,34 @@ end
 # Diagonal-field full step: exp(-i·dt·(-bz·m + q·m²)) (RT) / exp(-dt·(…)) (IT)
 # per voxel, used when the field has no transverse component (bx ≡ by ≡ 0).
 # Combines the bz rotation and both q half-steps into one diagonal phase.
-# IT subtracts the per-voxel min over m (overflow guard, removed by the
-# subsequent normalization), mirroring the uniform ZeemanTerm "ITP Zeeman shift".
+# IT overflow guard subtracts a GLOBAL-CONSTANT min over (voxel, m) — NOT a
+# per-voxel min. bz(r)/q(r) vary in space, so a per-voxel shift exp(+shift(r)·dt)
+# is a density reweighting that survives global normalization (only its spatial
+# mean is removed) and biases the ITP fixed point. A spatially-constant shift
+# factors out as a global scalar and cancels under normalization.
 function _spatial_diagonal_step!(
     psi, bz, q, m_vals::SVector{D, Float64}, dtf::Float64,
     imaginary_time::Bool, n_pts, ::Val{D},
 ) where {D}
+    gshift = 0.0
+    if imaginary_time
+        gshift = Inf
+        @inbounds for I in CartesianIndices(n_pts)
+            bzI, qI = bz[I], q[I]
+            for c in 1:D
+                e = -bzI * m_vals[c] + qI * m_vals[c]^2
+                e < gshift && (gshift = e)
+            end
+        end
+        isfinite(gshift) || (gshift = 0.0)
+    end
     Threads.@threads for I in CartesianIndices(n_pts)
         @inbounds begin
             bzI, qI = bz[I], q[I]
             if imaginary_time
-                e1 = -bzI * m_vals[1] + qI * m_vals[1]^2
-                shift = e1
-                for c in 2:D
-                    e = -bzI * m_vals[c] + qI * m_vals[c]^2
-                    e < shift && (shift = e)
-                end
                 for c in 1:D
                     e = -bzI * m_vals[c] + qI * m_vals[c]^2
-                    psi[I, c] *= exp(-(e - shift) * dtf)
+                    psi[I, c] *= exp(-(e - gshift) * dtf)
                 end
             else
                 for c in 1:D
@@ -443,25 +452,33 @@ function _spatial_diagonal_step!(
     nothing
 end
 
-# Per-voxel diagonal q(r)·F_z² factor. IT subtracts the per-voxel min over m
-# to prevent overflow (removed by the subsequent normalization), mirroring
-# the uniform ZeemanTerm "ITP Zeeman shift".
+# Per-voxel diagonal q(r)·F_z² factor. IT overflow guard subtracts a
+# GLOBAL-CONSTANT min over (voxel, m), not a per-voxel min — see
+# `_spatial_diagonal_step!` for why a per-voxel shift biases the ITP density.
 function _spatial_q_halfstep!(
     psi, q, m_vals::SVector{D, Float64}, dtf::Float64,
     imaginary_time::Bool, n_pts, ::Val{D},
 ) where {D}
+    gshift = 0.0
+    if imaginary_time
+        gshift = Inf
+        @inbounds for I in CartesianIndices(n_pts)
+            qI = q[I]
+            qI == 0.0 && continue
+            for c in 1:D
+                e = qI * m_vals[c]^2
+                e < gshift && (gshift = e)
+            end
+        end
+        isfinite(gshift) || (gshift = 0.0)
+    end
     Threads.@threads for I in CartesianIndices(n_pts)
         @inbounds begin
             qI = q[I]
             qI == 0.0 && continue
             if imaginary_time
-                shift = qI * m_vals[1]^2
-                for c in 2:D
-                    e = qI * m_vals[c]^2
-                    e < shift && (shift = e)
-                end
                 for c in 1:D
-                    psi[I, c] *= exp(-(qI * m_vals[c]^2 - shift) * dtf)
+                    psi[I, c] *= exp(-(qI * m_vals[c]^2 - gshift) * dtf)
                 end
             else
                 for c in 1:D

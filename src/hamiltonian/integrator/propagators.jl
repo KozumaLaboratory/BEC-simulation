@@ -429,20 +429,36 @@ function _make_coriolis_cache(psi, backend::AbstractBackend=CPUBackend(); flags=
     CoriolisCache(fwd1, inv1, fwd2, inv2)
 end
 
-function _update_batched_kinetic_phase!(cache::BatchedKineticCache, k_squared, dt)
+function _update_batched_kinetic_phase!(
+    cache::BatchedKineticCache, k_squared, dt, imaginary_time::Bool
+)
     kp = cache.kinetic_phase_bc
     ndim = ndims(kp) - 1
     n_pts = ntuple(d -> size(kp, d), ndim)
     RT = eltype(k_squared)
     half = RT(0.5)
     dt_t = RT(dt)
+    # Imaginary time: exp(-½k²dt) (decaying); real time: cis(-½k²dt) (phase).
+    # The earlier always-cis form silently turned the kinetic substep into a
+    # real-time rotation during ITP (e.g. split_step_midpoint! used for an
+    # imaginary-time ground state), so the high-k modes did not decay.
     if kp isa Array
         @inbounds for I in CartesianIndices(n_pts)
-            kp[I, 1] = cis(-half * k_squared[I] * dt_t)
+            arg = -half * k_squared[I] * dt_t
+            kp[I, 1] = imaginary_time ? complex(exp(arg)) : cis(arg)
         end
     else
+        # GPU: `k_squared` is a host Array — broadcasting it into a device
+        # kernel is illegal (non-bitstype). Move it to a device array that
+        # matches `kp` first, then build the phase on-device.
+        k_sq_dev = similar(kp, RT, size(k_squared))
+        copyto!(k_sq_dev, k_squared)
         kp_view = selectdim(kp, ndim + 1, 1)
-        kp_view .= cis.(-half .* k_squared .* dt_t)
+        if imaginary_time
+            kp_view .= exp.(-half .* k_sq_dev .* dt_t)
+        else
+            kp_view .= cis.(-half .* k_sq_dev .* dt_t)
+        end
     end
     nothing
 end
