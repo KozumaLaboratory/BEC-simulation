@@ -197,6 +197,13 @@ Both pipeline handlers are migrated to the standard split-step path and committe
 The `RotatingBasisWS` engine is now used by NOTHING in production except the
 `precompile.jl` warmup block — everything else is comments. It is dead code.
 
+### Engine removal — DONE 2026-06-21 (commit `retire the RotatingBasisWS engine`, −2580 lines)
+
+Executed exactly as the recipe below. `using SpinorBEC` loads; kept tests green
+(pipeline-parsing 31/31, analyzers 33/33, frame-regression 26/26); no runtime
+dangling refs. Only remaining item: a real magnetostir YAML Fig-6 numeric diff
+vs a pre-deletion reference (full GPU/TSUBAME compute) for final confidence.
+
 ### Engine-removal recipe (surgical — NOT `rm` the files)
 
 ⚠ The migrated handlers depend on `_apply_UB!`, `_apply_UB_to!`,
