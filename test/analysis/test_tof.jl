@@ -123,4 +123,25 @@
         r_explicit = simulate_tof_scaling(ws; t_tof=2.0, omega=(ω,), n_steps=200)
         @test r_explicit.b[1] ≈ sqrt(1 + ω^2 * 4) rtol = 1e-12
     end
+
+    @testset "sg_separation_peaks recovers known centers" begin
+        # Per-m density images with a single spike each; the peak finder must
+        # return the center in the ORIGINAL coordinates of the non-imaging
+        # axes. Asymmetric per-axis box ⇒ catches an imaging_axis/remaining
+        # axis mix-up (grid.x[axis] vs grid.x[remaining]).
+        grid = make_grid(GridConfig((16, 18, 20), (8.0, 12.0, 16.0)))
+        result = Dict{Int, Array{Float64, 2}}()
+        truth = Dict{Int, Tuple{Float64, Float64}}()
+        for (m, ix, iy) in ((1, 5, 13), (0, 8, 9), (-1, 14, 4))
+            a = zeros(16, 18)
+            a[ix, iy] = 1.0
+            result[m] = a
+            truth[m] = (grid.x[1][ix], grid.x[2][iy])      # imaging_axis=3 ⇒ axes 1,2
+        end
+        pk = SpinorBEC.sg_separation_peaks(result, grid, 3)
+        for m in keys(truth)
+            @test isapprox(pk[m][1], truth[m][1]; atol=1e-12)
+            @test isapprox(pk[m][2], truth[m][2]; atol=1e-12)
+        end
+    end
 end

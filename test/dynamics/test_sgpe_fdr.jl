@@ -144,3 +144,18 @@ end
         @test (μ < 0.5 * k0^2) == (ratio < 1.0)
     end
 end
+
+@testset "SGPE noise amplitude = 2γT·dt/dV" begin
+    # _sgpe_add_noise! adds complex 𝒩 with per-point variance σ²=2γT·dt/dV.
+    # The dV (cell-volume) dependence is the grid-spacing-sensitive part the
+    # FDR slope test cannot pin.
+    grid = make_grid(GridConfig((40, 40), (8.0, 8.0)))
+    ws = make_workspace(; grid, atom=Rb87,
+        interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
+        sim_params=SimParams(; dt=0.01, n_steps=1), fft_flags=FFTW.ESTIMATE)
+    ws.state.psi .= 0
+    γ, T, dt = 0.4, 1.3, 0.02
+    SpinorBEC._sgpe_add_noise!(ws, γ, T, dt; seed=11)
+    meas = sum(abs2, ws.state.psi[:, :, 1]) / length(ws.state.psi[:, :, 1])
+    @test isapprox(meas, 2.0 * γ * T * dt / cell_volume(grid); rtol=0.1)
+end
