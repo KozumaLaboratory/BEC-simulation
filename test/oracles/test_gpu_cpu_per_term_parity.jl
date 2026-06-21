@@ -63,6 +63,30 @@ function _parity_check(builder; rtol_energy=1e-9, rtol_grad=1e-9,
     return (; ed_cpu, ed_gpu, rel_l2, E_cpu, E_gpu)
 end
 
+# Propagator-face parity. `_parity_check` exercises only the energy +
+# gradient faces; the GPU PROPAGATOR kernels (gpu_spin_mixing batched
+# Euler rotation, gpu_tensor batched-eigen) are reached only by
+# `apply_step!`. level0's multi-step split_step uses a polar state
+# (⟨F⟩=0 ⇒ spin-mixing inert) and no tensor channels, so neither kernel
+# was pinned in an isolated GPU=CPU assertion. Real-time steps are
+# unitary, so the evolved ψ is compared directly (no normalisation).
+function _propagator_parity(builder, nsteps; rtol=1e-6, label="")
+    ws_cpu = builder(false)
+    ws_gpu = builder(true)
+    psi0 = Array(ws_cpu.state.psi)
+    copyto!(ws_gpu.state.psi, psi0)
+    for _ in 1:nsteps
+        split_step!(ws_cpu)
+        split_step!(ws_gpu)
+    end
+    psi_cpu = Array(ws_cpu.state.psi)
+    psi_gpu = Array(ws_gpu.state.psi)
+    rel = sqrt(sum(abs2, psi_cpu .- psi_gpu)) /
+          max(sqrt(sum(abs2, psi_cpu)), 1e-30)
+    @test rel < rtol
+    return (; psi0, psi_cpu, rel)
+end
+
 @testset "GPU/CPU per-term parity (gated)" begin
     cuda_available = try
         import CUDA
@@ -292,6 +316,61 @@ end
         end
         result = _parity_check(_build; label="Raman")
         @test abs(result.ed_cpu.raman) > 1e-6
+    end
+
+    # -----------------------------------------------------------------
+    # SpinC1 + singlet PROPAGATOR — gpu_spin_mixing batched-Euler and
+    # gpu_singlet_pair Bogoliubov kernels. Both take the frozen-field
+    # `psi_mf` kwarg from the symmetric inner-V chain; a spin-coherent
+    # (⟨F⟩≠0) start keeps both active (polar would no-op spin-mixing).
+    # -----------------------------------------------------------------
+    @testset "SpinC1 + singlet propagator (spin-mixing + Bogoliubov)" begin
+        function _build(gpu::Bool)
+            grid = make_grid(GridConfig{1}((16,), (8.0,)))
+            ip = InteractionParams(Dict(0 => 0.0, 1 => 0.5, 2 => 0.3))
+            sp = SimParams(; dt=0.01, n_steps=1)
+            kwargs = (; grid, atom=Rb87, interactions=ip,
+                zeeman=ZeemanParams(0.0, 0.0),
+                potential=HarmonicTrap((1.0,)), sim_params=sp)
+            ws = if gpu
+                make_workspace(; kwargs..., backend=CUDABackend())
+            else
+                make_workspace(; kwargs...)
+            end
+            psi = init_psi(ws.grid, SpinSystem(1); state=:spin_coherent, init_theta=π / 4)
+            copyto!(ws.state.psi, psi)
+            ws
+        end
+        r = _propagator_parity(_build, 20; label="SpinMixing+Singlet")
+        # the kernels actually moved the spinor (not a silent no-op)
+        @test sqrt(sum(abs2, r.psi_cpu .- r.psi0)) > 1e-3
+    end
+
+    # -----------------------------------------------------------------
+    # Tensor PROPAGATOR — gpu_tensor batched-eigen path. A mixed-m start
+    # makes the per-voxel tensor field off-diagonal, so the GPU branch
+    # `offdiag·dt ≥ 1e-6` (cuSOLVER heevjBatched), NOT the diagonal fast
+    # path, runs. The c4 channel (F=3 Cr52) is the genuine tensor route.
+    # -----------------------------------------------------------------
+    @testset "Tensor propagator: batched-eigen path (off-diagonal field)" begin
+        function _build(gpu::Bool)
+            grid = make_grid(GridConfig{1}((12,), (8.0,)))
+            ip = InteractionParams(Dict(0 => 0.0, 1 => 0.2, 4 => 0.3))
+            sp = SimParams(; dt=0.01, n_steps=1)
+            kwargs = (; grid, atom=Cr52, interactions=ip,
+                zeeman=ZeemanParams(0.0, 0.0),
+                potential=HarmonicTrap((1.0,)), sim_params=sp)
+            ws = if gpu
+                make_workspace(; kwargs..., backend=CUDABackend())
+            else
+                make_workspace(; kwargs...)
+            end
+            psi = init_psi(ws.grid, SpinSystem(3); state=:spin_coherent, init_theta=π / 4)
+            copyto!(ws.state.psi, psi)
+            ws
+        end
+        r = _propagator_parity(_build, 5; rtol=1e-6, label="TensorBatchedEigen")
+        @test sqrt(sum(abs2, r.psi_cpu .- r.psi0)) > 1e-4
     end
 
     # -----------------------------------------------------------------
