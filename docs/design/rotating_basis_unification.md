@@ -184,6 +184,45 @@ sub-1e-5 is ever needed, compose `split_step_midpoint!` as Y6-mid. **Retirement
 is viable: the migrated dynamics handler must use `split_step_midpoint!` (NOT
 `split_step!` Strang at the config dt, NOT `run_simulation_yoshida!`).**
 
+## STATUS 2026-06-21: pipeline is engine-free; engine is dead code
+
+Both pipeline handlers are migrated to the standard split-step path and committed:
+- `ground_state.jl`: standard imaginary-time `split_step!` under a static tilted
+  `TimeDependentZeeman`; hands off a plain `:rotating_basis_gs` NamedTuple
+  (couplings + sm + tilde ψ), not a `RotatingBasisWS`.
+- `dynamics.jl`: `split_step_midpoint!` under `TimeDependentZeeman(θ(t),φ(t))`;
+  records tilde observables via `U_B(t)†`; `:rotating_basis_dynamics` dict
+  byte-compatible. Validated: `test_rotating_basis_pipeline_parsing` 31/31.
+
+The `RotatingBasisWS` engine is now used by NOTHING in production except the
+`precompile.jl` warmup block — everything else is comments. It is dead code.
+
+### Engine-removal recipe (surgical — NOT `rm` the files)
+
+⚠ The migrated handlers depend on `_apply_UB!`, `_apply_UB_to!`,
+`_UB_combined_rotation` (the lab↔tilde frame rotation), which currently live in
+`rotating_basis_propagators.jl`. They depend only on shared helpers
+(`_compute_uniform_rotation_matrix`, `_apply_rotation_to_spin_axis!` in
+`shared/spin_rotation.jl`). So:
+
+1. **Extract** those 3 U_B functions into a kept file (e.g.
+   `hamiltonian/shared/frame_rotation.jl`); add its include.
+2. **Delete** the engine: rest of `rotating_basis_propagators.jl` (spin steps,
+   gauge, eigen-exact, DDI-rotating, caches), `rotating_basis_integrators.jl`
+   (evolve_rotating!/yoshida/find_ground_state_rotating!),
+   `foundation/rotating_basis_workspace.jl` (`RotatingBasisWS`),
+   `analysis/rotating_basis.jl` (rotating_per_m_norms/Lz/total_density/_coord_buffer).
+3. Remove their includes (foundation.jl, hamiltonian.jl, analysis.jl) + the
+   `precompile.jl` rotating block.
+4. **Delete the engine + equivalence-gate tests** (they construct
+   `make_rotating_basis_ws`, so they cannot run without the engine; they served
+   their purpose proving the migration): the rotating_basis test files that use
+   the engine, and update `runtests.jl`. Keep `test_rotating_basis_pipeline_parsing.jl`
+   (engine-free) + the analyzers tests (dict-based).
+5. **Verify** `using SpinorBEC` loads + pipeline test passes, then run a real
+   magnetostir YAML end-to-end and diff the Fig-6 arrays against a pre-deletion
+   reference (full compute — do on GPU/TSUBAME).
+
 ## Testing
 
 Each wired term must pass a rotating-vs-standard parity gate on a **static
