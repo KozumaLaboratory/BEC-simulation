@@ -342,10 +342,9 @@ const FULL_EXTRA = [
     # and the dict-based analyzers.
     "rotating_basis/test_rotating_basis_analyzers.jl",
     "rotating_basis/test_rotating_basis_pipeline_parsing.jl",
-    # Higher-order integrator tests
-    "hamiltonian/test_higher_order_integrators.jl",
-    "hamiltonian/test_integrator_order_meanfield.jl",
-    "hamiltonian/test_cfet4_order.jl",
+    # Higher-order integrator tests. (The Strang/Yoshida4/Yoshida6/CFET4
+    # order-convergence suites tested the retired rotating-basis engine's
+    # integrators and were removed with it on 2026-06-21.)
     "hamiltonian/test_adaptive_dt.jl",
     # Lima-Pelster Q5 + scalar eGPE
     "hamiltonian/test_lima_pelster_q5.jl",
