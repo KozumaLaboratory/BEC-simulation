@@ -106,4 +106,40 @@
 
         @test psi1 ≈ psi2 atol=1e-14
     end
+
+    @testset "Diagonal time-dependent field: closed-form phases" begin
+        # Uniform spinor on a 1-mode grid with c0=c1=0, NoPotential: kinetic
+        # (k=0) and contact are identity, so split_step! applies ONLY the
+        # diagonal Zeeman phase exp(-i(-p(t)m + q m²)dt). For a linear ramp
+        # p(t)=p0+αt the midpoint rule integrates p exactly, giving the
+        # closed form φ_m = -(p0 T + ½α T²) m + q0 m² T. Pins both signs
+        # (−p·m and +q·m²) and the time-integration of the midpoint branch —
+        # the existing test above is only a sign-blind self-convergence check.
+        F = 1
+        D = 2F + 1
+        dt = 0.005
+        n = 200
+        T = n * dt
+        for (p0, α, q0) in ((0.4, 0.0, 0.2), (0.3, 0.5, 0.2))
+            grid = make_grid(GridConfig((4,), (4.0,)))
+            zee = TimeDependentZeeman(FunctionWaveform(t -> p0 + α * t),
+                ConstantWaveform(q0))
+            ws = make_workspace(; grid, atom=Rb87,
+                interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
+                zeeman=zee, potential=NoPotential(),
+                sim_params=SimParams(; dt=dt, n_steps=n))
+            psi0 = ones(ComplexF64, 4, D) ./ 2
+            copyto!(ws.state.psi, psi0)
+            for _ in 1:n
+                split_step!(ws)
+            end
+            for c in 1:D
+                m = F - (c - 1)
+                φ = -(p0 * T + 0.5 * α * T^2) * m + q0 * m^2 * T
+                @test isapprox(abs(ws.state.psi[1, c]), abs(psi0[1, c]); atol=1e-10)
+                got = angle(ws.state.psi[1, c] / psi0[1, c])
+                @test abs(mod(got + φ + π, 2π) - π) < 1e-9   # got ≈ −φ (wrapped)
+            end
+        end
+    end
 end

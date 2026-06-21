@@ -165,7 +165,11 @@ function apply_light_shift_step!(
     ndim::Int;
     imaginary_time::Bool=false,
 )
+    # GPU path: the host loop indexes `ls.profile` element-wise, so gather
+    # it to host first (U / eigvals are already host). Without this the
+    # off-diagonal step scalar-indexes a device array.
+    ls_host = LightShift(Array(ls.profile), ls.eigvals, ls.U, ls.is_diagonal)
     _run_on_host!(psi) do p
-        apply_light_shift_step!(p, ls, dt_frac, ndim; imaginary_time)
+        apply_light_shift_step!(p, ls_host, dt_frac, ndim; imaginary_time)
     end
 end

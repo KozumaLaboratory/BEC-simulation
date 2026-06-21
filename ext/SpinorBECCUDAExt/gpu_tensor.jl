@@ -19,6 +19,7 @@ function SpinorBEC.apply_tensor_interaction_step!(
     dt::Float64,
     ndim::Int;
     imaginary_time::Bool=false,
+    psi_mf::Union{Nothing, AbstractArray}=nothing,
 ) where {T <: AbstractFloat}
     D = cache.D
     n_pts = ntuple(d -> size(psi, d), ndim)
@@ -33,6 +34,11 @@ function SpinorBEC.apply_tensor_interaction_step!(
     end
 
     psi_2d = reshape(psi, N, D)
+    # Field source: psi_mf (frozen mean-field) when given, else psi (SMA).
+    # Matches the CPU `psi_mf_eff` — exp(-i h dt) below still acts on
+    # psi_2d; only the Hermitian field h is built from psi_mf_2d.
+    psi_mf_2d = psi_mf === nothing ? psi_2d :
+                reshape(psi_mf::CuArray{Complex{T}}, N, D)
 
     needed_pairs = Set{Tuple{Int, Int}}()
     for e in hf_entries
@@ -41,7 +47,7 @@ function SpinorBEC.apply_tensor_interaction_step!(
 
     rho = Dict{Tuple{Int, Int}, CuArray{Complex{T}, 1}}()
     for (mu, nu) in needed_pairs
-        rho[(mu, nu)] = conj.(view(psi_2d, :, mu)) .* view(psi_2d, :, nu)
+        rho[(mu, nu)] = conj.(view(psi_mf_2d, :, mu)) .* view(psi_mf_2d, :, nu)
     end
 
     h_fields = Matrix{Union{Nothing, CuArray{Complex{T}, 1}}}(nothing, D, D)

@@ -1,4 +1,5 @@
 export spin_matrices, fp_ladder_coeff, fp_ladder_coeffs, singlet_pair_sign
+export spin_pair_eigenvalue
 
 """
     fp_ladder_coeff([T=Float64,] F, m) -> √(F(F+1) − m(m+1))
@@ -30,6 +31,18 @@ Sign factor σ_c = (−1)^{F−m} of the spin-singlet pair amplitude. **Single s
 for the c₂ singlet-pairing propagator and gradient.
 """
 @inline singlet_pair_sign(F::Integer, m::Integer) = iseven(F - m) ? 1.0 : -1.0
+
+"""
+    spin_pair_eigenvalue(S, F) -> λ_S = (S(S+1) − 2F(F+1)) / 2
+
+Eigenvalue of the two-body spin-pair operator F̂₁·F̂₂ on the total-spin-S
+subspace. **Single source** for the c₀/c₁ → g_S channel algebra
+(`g_S = c₀ + c₁·λ_S`, `hamiltonian/coefficients.jl`) and the Sign-Pattern
+Goldstone-stiffness prefactor (`analysis/phases/sign_pattern.jl`). Anchored to
+spec(F̂₁·F̂₂) by `test/oracles/test_cg_projection_oracle.jl`.
+"""
+@inline spin_pair_eigenvalue(S::Integer, F::Integer) =
+    (S * (S + 1) - 2 * F * (F + 1)) / 2
 
 function spin_matrices(F::Int)
     sys = SpinSystem(F)

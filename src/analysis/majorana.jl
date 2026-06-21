@@ -88,7 +88,8 @@ end
 Steinhardt Q₆ bond-orientational order parameter, normalized so Q₆ = 1
 for a perfect icosahedron.
 
-Q₆_raw = √(4π/13 · (1/N²) Σ_{i,j} P₆(n̂_i · n̂_j))
+Q₆_raw = √((1/N²) Σ_{i,j} P₆(n̂_i · n̂_j))  (the Σ_m|q₆ₘ|² and 4π/13
+addition-theorem prefactors cancel — see Steinhardt Eq. 1.3).
 Normalized: Q₆ = Q₆_raw / Q₆_icosa where Q₆_icosa ≈ 0.6633.
 Q₆_icosa is computed from 12 vertices of a regular icosahedron (Steinhardt Table I).
 
@@ -110,7 +111,7 @@ function _steinhardt_q6(points::Vector{NTuple{3, Float64}})
         end
     end
 
-    q6_raw = sqrt(4π / 13.0 * s / N^2)
+    q6_raw = sqrt(s / N^2)
     q6_raw / 0.6633
 end
 

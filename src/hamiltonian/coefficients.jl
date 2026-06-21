@@ -145,7 +145,7 @@ couplings (n ≥ 4) via the InteractionParams Dict, or use
 `_make_tensor_cache_from_channels` directly.
 """
 function _c0c1_to_gS(F::Int, c0::Float64, c1::Float64)
-    Dict{Int, Float64}(S => c0 + c1 * (S * (S + 1) - 2 * F * (F + 1)) / 2 for S in 0:2:2F)
+    Dict{Int, Float64}(S => c0 + c1 * spin_pair_eigenvalue(S, F) for S in 0:2:2F)
 end
 
 """

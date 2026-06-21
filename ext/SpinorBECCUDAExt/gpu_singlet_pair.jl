@@ -43,6 +43,7 @@ function SpinorBEC.apply_singlet_pair_step!(
     dt::Float64,
     ndim::Int;
     imaginary_time::Bool=false,
+    psi_mf::Union{Nothing, AbstractArray}=nothing,
 ) where {T <: AbstractFloat}
     c2 = SpinorBEC.get_cn(interactions, 2)
     abs(c2) < 1e-30 && return nothing
@@ -58,6 +59,11 @@ function SpinorBEC.apply_singlet_pair_step!(
     signs = T[SpinorBEC.singlet_pair_sign(F, F - (c - 1)) for c in 1:D]
 
     psi_2d = reshape(psi, N, D)
+    # Field source: psi_mf (frozen mean-field) when given, else psi (SMA).
+    # Matches the CPU `psi_mf_eff` — the Bogoliubov rotation below still
+    # acts on psi_2d; only the A00 field is built from psi_mf_2d.
+    psi_mf_2d = psi_mf === nothing ? psi_2d :
+                reshape(psi_mf::CuArray{Complex{T}}, N, D)
     cache = _get_gpu_singlet_pair_cache(N, T)
     A00 = cache.A00
     V_buf = cache.V_buf
@@ -73,7 +79,7 @@ function SpinorBEC.apply_singlet_pair_step!(
     for c in 1:D
         c_pair = D - c + 1
         s = signs[c]
-        A00 .+= s .* view(psi_2d, :, c) .* view(psi_2d, :, c_pair)
+        A00 .+= s .* view(psi_mf_2d, :, c) .* view(psi_mf_2d, :, c_pair)
     end
     A00 .*= inv_sqrt_D
 

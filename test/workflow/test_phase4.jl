@@ -176,4 +176,60 @@ using SpinorBEC
         # State has changed
         @test sum(abs2, ws.state.psi) != n0
     end
+
+    @testset "P4.4b Projected GP: exact low-pass in k-space" begin
+        # Hard Fourier projector: in-band mode preserved bit-exactly,
+        # out-of-band mode annihilated to machine zero (asserted in k-space;
+        # real-space norm is a fragile proxy).
+        N = 32
+        grid = make_grid(GridConfig((N, N), (2π, 2π)))   # dk=1 ⇒ |k|=k_index
+        plans = SpinorBEC.make_fft_plans((N, N))
+        kbin(field, p) = (buf=copy(field); plans.forward * buf; abs(buf[p + 1, 1]))
+        mkws() = make_workspace(; grid, atom=Rb87,
+            interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
+            sim_params=SimParams(; dt=0.01, n_steps=1))
+        ws = mkws()
+        for j in 1:N, i in 1:N
+            ws.state.psi[i, j, 1] = cis(2π * (i - 1) * 2 / N)    # |k|=2 < 4
+        end
+        b_in = kbin(ws.state.psi[:, :, 1], 2)
+        SpinorBEC.apply_projected_gp!(ws, 4.0)
+        @test isapprox(kbin(ws.state.psi[:, :, 1], 2), b_in; rtol=1e-12)
+        ws2 = mkws()
+        for j in 1:N, i in 1:N
+            ws2.state.psi[i, j, 1] = cis(2π * (i - 1) * 8 / N)   # |k|=8 > 4
+        end
+        SpinorBEC.apply_projected_gp!(ws2, 4.0)
+        @test kbin(ws2.state.psi[:, :, 1], 8) < 1e-10
+        ws3 = mkws()
+        for c in 1:3, j in 1:N, i in 1:N
+            ws3.state.psi[i, j, c] = cis(2π * (i - 1) * (c + 1) / N)
+        end
+        SpinorBEC.apply_projected_gp!(ws3, 4.0)
+        once = copy(ws3.state.psi)
+        SpinorBEC.apply_projected_gp!(ws3, 4.0)
+        @test isapprox(ws3.state.psi, once; rtol=1e-12)        # idempotent
+    end
+
+    @testset "P4.5 Photon scattering: phase variance = Γ·dt" begin
+        # cis(phase) per voxel, phase ~ 𝒩(0, σ²=Γ·dt). Pins the kick
+        # amplitude and the dt power (variance ∝ dt, not dt²).
+        grid = make_grid(GridConfig((48, 48), (8.0, 8.0)))
+        Γ = 0.3
+        function phasestats(dt, seed)
+            ws = make_workspace(; grid, atom=Rb87,
+                interactions=InteractionParams(Dict(0 => 5.0, 1 => 0.0)),
+                sim_params=SimParams(; dt=0.01, n_steps=1))
+            ws.state.psi .= 1.0
+            SpinorBEC.apply_photon_scattering!(ws, Γ, dt; seed=seed)
+            dθ = [angle(ws.state.psi[i, j, 1]) for i in 1:48, j in 1:48]
+            mean = sum(dθ) / length(dθ)
+            (mean, sum(abs2, dθ .- mean) / (length(dθ) - 1))
+        end
+        m1, v1 = phasestats(0.02, 7)
+        _, v2 = phasestats(0.04, 9)
+        @test isapprox(v1, Γ * 0.02; rtol=0.15)
+        @test abs(m1) < 0.02
+        @test isapprox(v2 / v1, 2.0; rtol=0.2)
+    end
 end

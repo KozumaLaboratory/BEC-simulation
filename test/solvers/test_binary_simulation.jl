@@ -78,3 +78,46 @@ using SpinorBEC
         @test n_B > n_A
     end
 end
+
+@testset "Binary total energy — closed form (g=0 harmonic GS)" begin
+    # Two non-interacting species in the 2D isotropic trap V=½(x²+y²): each
+    # is the exact ground state ψ=exp(-r²/2), with E=dω/2=1 (virial:
+    # E_kin=E_pot=½). So binary_total_energy must be exactly 2.0. A missing
+    # 1/N_pts FFT-Parseval factor in the kinetic term overcounts E_kin by
+    # N_pts (≈4097 on a 64² grid) — this gate pins the normalisation.
+    grid = make_grid(GridConfig((64, 64), (12.0, 12.0)))
+    dV = cell_volume(grid)
+    psi = zeros(ComplexF64, 64, 64)
+    for I in CartesianIndices((64, 64))
+        x = grid.x[1][I[1]]
+        y = grid.x[2][I[2]]
+        psi[I] = exp(-(x^2 + y^2) / 2)
+    end
+    psi ./= sqrt(sum(abs2, psi) * dV)
+    sim = make_binary_simulation(grid;
+        couplings=BinaryCouplings(g_AA=0.0, g_BB=0.0, g_AB=0.0),
+        potential_A=HarmonicTrap((1.0, 1.0)), potential_B=HarmonicTrap((1.0, 1.0)),
+        psi_A_init=copy(psi), psi_B_init=copy(psi))
+    @test isapprox(binary_total_energy(sim), 2.0; atol=2e-2)
+end
+
+@testset "Binary Rabi — closed form n_B = sin²(ΩT/2)" begin
+    # All-A start, no interactions/trap/detuning: an exact two-level Rabi
+    # cycle. n_B(T)=sin²(ΩT/2), n_A(T)=cos²(ΩT/2). Pins the Rabi 2×2 unitary
+    # in binary_split_step! (rotation generator + angle).
+    grid = make_grid(GridConfig((8, 8), (10.0, 10.0)))
+    dV = cell_volume(grid)
+    Ω = π
+    n = grid.config.n_points
+    A = ones(ComplexF64, n...) ./ sqrt(prod(n) * dV)
+    B = zeros(ComplexF64, n...)
+    sim = make_binary_simulation(grid;
+        couplings=BinaryCouplings(g_AA=0.0, g_BB=0.0, g_AB=0.0, omega_coupling=Ω),
+        psi_A_init=A, psi_B_init=B)
+    for T in (0.3, 0.7, 1.0, 1.7)
+        run_binary_simulation!(sim; duration=(T - sim.t), dt=1e-3)
+        nA, nB = binary_norms(sim)
+        @test isapprox(nB, sin(Ω * T / 2)^2; atol=2e-3)
+        @test isapprox(nA, cos(Ω * T / 2)^2; atol=2e-3)
+    end
+end

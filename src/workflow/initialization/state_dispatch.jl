@@ -44,8 +44,7 @@ function init_psi(
     elseif state == :antiferromagnetic
         for c in 1:D
             m = F - (c - 1)
-            sign = iseven(F - m) ? 1.0 : -1.0
-            _set_component!(psi, sign * gauss / sqrt(D), N, n_pts, c)
+            _set_component!(psi, singlet_pair_sign(F, m) * gauss / sqrt(D), N, n_pts, c)
         end
     elseif state == :random
         rng = Random.MersenneTwister(seed)

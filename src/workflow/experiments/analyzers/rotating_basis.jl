@@ -91,33 +91,11 @@ function spin_texture_xy(dyn::Dict; frame_idxs::AbstractVector{Int}=Int[])
     Nx, Ny, Nz, D = size(sample)
     F_val = (D - 1) / 2
 
-    # Build F_x, F_y, F_z matrix elements (D × D, sparse for F_x/F_y, diagonal for F_z)
-    # F_z[i,i] = m_i = F - (i-1)
-    # F_x = (F_+ + F_-)/2, F_+[i,j]=√(F(F+1)-m_j(m_j+1)) when m_i = m_j+1
-    Fx_mat = zeros(ComplexF64, D, D)
-    Fy_mat = zeros(ComplexF64, D, D)
-    Fz_mat = zeros(ComplexF64, D, D)
-    @inbounds for i in 1:D
-        m_i = F_val - (i - 1)
-        Fz_mat[i, i] = m_i
-    end
-    @inbounds for j in 1:D
-        m_j = F_val - (j - 1)
-        # F_+[i,j] (raises): row m_i = m_j+1 → i = j-1
-        if j - 1 >= 1
-            i = j - 1
-            elem = sqrt(F_val * (F_val + 1) - m_j * (m_j + 1))
-            Fx_mat[i, j] += elem / 2
-            Fy_mat[i, j] += elem / (2im)
-        end
-        # F_-[i,j] (lowers): row m_i = m_j-1 → i = j+1
-        if j + 1 <= D
-            i = j + 1
-            elem = sqrt(F_val * (F_val + 1) - m_j * (m_j - 1))
-            Fx_mat[i, j] += elem / 2
-            Fy_mat[i, j] -= elem / (2im)
-        end
-    end
+    # F_x/F_y/F_z from the single spin-matrix source (c=1 ↔ m=+F layout).
+    sm = spin_matrices((D - 1) ÷ 2)
+    Fx_mat = Matrix{ComplexF64}(sm.Fx)
+    Fy_mat = Matrix{ComplexF64}(sm.Fy)
+    Fz_mat = Matrix{ComplexF64}(sm.Fz)
 
     # Output: 3 × Nx × Ny × len(frames) array of column-projected spin
     Fx_xy = zeros(Float64, Nx, Ny, length(frame_idxs))

@@ -11,6 +11,31 @@ using LinearAlgebra
             @test all(isinf, stars)
         end
 
+        @testset "spin-coherent roots = cot(θ/2) (closed form)" begin
+            # |F,+F⟩ → all roots ∞ (north), |F,-F⟩ → all 0 (south); a θ-tilted
+            # coherent state has a single 2F-degenerate root at z = cot(θ/2).
+            for F in (1, 2, 6)
+                D = 2F + 1
+                up = zeros(ComplexF64, D);
+                up[1] = 1.0
+                @test all(isinf, majorana_stars(up, F))
+                dn = zeros(ComplexF64, D);
+                dn[D] = 1.0
+                @test all(z -> isfinite(z) && abs(z) < 1e-8, majorana_stars(dn, F))
+            end
+            for F in (1, 2)
+                sm = spin_matrices(F)
+                up = zeros(ComplexF64, 2F + 1);
+                up[1] = 1.0
+                θ = π / 3
+                ψ = exp(-im * θ * Matrix(sm.Fy)) * up
+                ψ ./= norm(ψ)
+                rs = filter(isfinite, majorana_stars(ComplexF64.(ψ), F))
+                @test length(rs) == 2F
+                @test all(z -> isapprox(abs(z), cot(θ / 2); rtol=1e-3), rs)
+            end
+        end
+
         @testset "F=1 polar: roots at 0 and Inf" begin
             spinor = ComplexF64[0.0, 1.0, 0.0]
             stars = majorana_stars(spinor, 1)
@@ -153,6 +178,20 @@ using LinearAlgebra
 
         @testset "icosahedron has 12 vertices" begin
             @test length(SpinorBEC._make_icosahedron_vertices()) == 12
+        end
+
+        @testset "Steinhardt Q6 normalizes to 1 for a perfect icosahedron" begin
+            # Steinhardt q6 = √((1/N²)ΣᵢⱼP₆(n̂ᵢ·n̂ⱼ)); the 4π/(2l+1) and the
+            # addition-theorem (2l+1)/(4π) prefactors cancel (Steinhardt-Nelson-
+            # Ronchetti, PRB 28, 784 (1983)). The icosahedron value 0.6633 is the
+            # normalizer, so the order parameter must be exactly 1 there. A
+            # spurious 4π/13 (the historical double-normalization) gives 0.983.
+            q6 = SpinorBEC._steinhardt_q6(SpinorBEC._make_icosahedron_vertices())
+            @test isapprox(q6, 1.0; atol=1e-3)
+            # a non-icosahedral set (octahedron vertices) is strictly below 1
+            octa = [(1.0, 0.0, 0.0), (-1.0, 0.0, 0.0), (0.0, 1.0, 0.0),
+                (0.0, -1.0, 0.0), (0.0, 0.0, 1.0), (0.0, 0.0, -1.0)]
+            @test SpinorBEC._steinhardt_q6(octa) < 0.99
         end
 
         @testset "spectrum RMS is 0 for identical" begin
