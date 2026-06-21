@@ -165,8 +165,38 @@ Resolution, minimal and on the existing seam:
   The "max-idle policy on the existing budget + kill breaker" promised in the
   parent design is exactly this — no new cost machinery, just lease-aware terms.
 
-`max_idle_minutes` is conservative by default (e.g. 10 min) because idle `node_f`
-is the single most expensive failure mode here.
+`max_idle_minutes` is **not a guess to hardcode** — it is set from the probe's
+C1 idle burn rate (see "Policy constants" below). Pending that number it stays a
+conservative placeholder, because idle `node_f` is the single most expensive
+failure mode here.
+
+## Policy constants — set from the probe, not guessed
+
+The lease parameters below are currently **placeholders**. `scripts/tsubame/ums_probe.sh`
+measures the real numbers on TSUBAME; **2b is held until it returns** so the
+lease model is written without assumptions (retrofitting a single-tenant lease
+into a multi-tenant one is expensive — resolve the seam first).
+
+| probe output | sets | placeholder |
+|---|---|---|
+| **C1** `idle_points_per_hour` | `max_idle_minutes`; and the **Phase 2↔3 lease-isolation seam** (below) | 10 min |
+| **C2** `warm_speedup_x` (cold qsub ÷ warm dispatch) | go/no-go for UMS itself — if ≈ 1 the premise collapses | assumed ≫ 1 |
+| **C3** `umslist_appear_lag_s` / `missed_polls` | `UMS_DISPATCH_GRACE` floor; whether `job_status` needs a missed-poll debounce | 30 s grace |
+
+**The Phase 2↔3 lease-isolation seam (decide before 2b writes the lease model).**
+C1 alone picks the lease topology, and the choice is painful to reverse:
+
+- **cheap idle node_f** → **per-user lease**: each principal (Phase 3) gets its
+  own lease, isolation is trivial, cost attribution is exact (the lease bills its
+  owner). The `UMSLease` is a per-principal object.
+- **expensive idle node_f** → **single shared warm pool + fair-share**: one lease
+  serves all interactive users, scheduled fairly; cost goes to a shared `infra`
+  principal, not a person. The `UMSLease` is a singleton with a fair-share queue.
+
+Writing 2b against the wrong topology means re-plumbing ownership through the
+lease later. So the `UMSLease` shape (per-principal vs singleton) is **gated on
+C1** and must be fixed before 2b — this is the same decision as multi_user
+`O1`/lease-cost-attribution, surfaced early.
 
 ## Routing
 
@@ -215,10 +245,14 @@ existing backend-full path), `budget.jl` (lease-aware `predicted` + `lease_reali
    `ums-start`, passes job-id). `prepare_status_snapshot`=`ums-list`, `job_status`
    with the grace guard (Problem A). Verify a single task round-trips end-to-end.
 
-**2b — lease state machine**
-3. `UMSLease` + `.ums_lease.toml` persistence + `ums_lease_tick!` (acquire →
-   start → drain → release) wired into `autopilot_tick!`.
-4. Budget integration (Problem D); conservative `max_idle_minutes`.
+**2b — lease state machine** — ⛔ GATED on the probe (C1/C2/C3). Do not write the
+`UMSLease` shape until C1 fixes the per-principal-vs-singleton seam (above), or it
+will need re-plumbing for Phase 3. If C2 shows no warm speedup, UMS is dropped
+entirely and this phase is moot.
+3. `UMSLease` (per-principal **or** singleton, per C1) + `.ums_lease.toml`
+   persistence + `ums_lease_tick!` (acquire → start → drain → release) wired into
+   `autopilot_tick!`.
+4. Budget integration (Problem D); `max_idle_minutes` from C1.
 5. Crash-recovery reconcile against `qstat`.
 
 **2c — divergence + routing + verify**
@@ -230,6 +264,9 @@ existing backend-full path), `budget.jl` (lease-aware `predicted` + `lease_reali
    `qsub` (the headline win).
 
 ## Open questions
+
+All of these are answered by `scripts/tsubame/ums_probe.sh` in one run (yes/no
+gates O1/O2/O3/O5 + policy constants C1/C2/C3). 2b stays blocked until it has run.
 
 - **O1**: does UMS accept a plain serial (non-MPI) Julia command? The doc's
   "non-OpenMPI unsupported" note must be cleared first — it could block the whole
