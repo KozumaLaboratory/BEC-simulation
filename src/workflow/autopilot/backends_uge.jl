@@ -219,139 +219,52 @@ end
 
 # ── command builders (separate so tests can assert shape) ────────────
 #
-# SSH ControlMaster pools all the tick's ssh/rsync calls into a single
-# persistent connection — without it, each `ssh tsubame qstat …` opens
-# a fresh TCP+SSH handshake (~hundreds of ms each), and a tick reaping
-# N running entries pays that cost N+1 times. With ControlPersist=60s
-# the socket survives across the tick body AND across the next tick
-# (5-min systemd timer beats 60s persist, but tick-on-enqueue and
-# closely-spaced ticks benefit).
-#
-# `ControlPath=/tmp/ssh-spinorbec-%C` — %C is a hash of host:port:user
-# so different SSH targets get different sockets; safe to share across
-# spinor-autopilot.service / spinor-dashboard.service since both run
-# as the same user.
-
-const _SSH_CM_OPTS = [
-    "-o", "ControlMaster=auto",
-    "-o", "ControlPath=/tmp/ssh-spinorbec-%C",
-    "-o", "ControlPersist=60s",
-]
-
-# Pre-quoted string for rsync's -e (which takes a single shell-tokenised
-# argument). Must match _SSH_CM_OPTS exactly.
-const _RSYNC_SSH_CM = "ssh -o ControlMaster=auto -o ControlPath=/tmp/ssh-spinorbec-%C -o ControlPersist=60s"
-
-_ssh_cm(host::AbstractString) = `ssh $_SSH_CM_OPTS $host`
+# The SSH ControlMaster + rsync transport is shared with UMSBackend and
+# lives in ssh_transport.jl (`_ssh_cm`, `_rsync_*`, Manifest-hash
+# helpers). The `_uge_*` wrappers below adapt a UGEBackend to those
+# primitives so the call sites (stage_in / pull_live / collect! /
+# dispatch!) and the command-shape tests are unchanged.
 
 _uge_mkdir_cmd(b::UGEBackend, remote_dir::AbstractString) =
-    `$(_ssh_cm(b.ssh_host)) mkdir -p $(remote_dir)`
+    _ssh_mkdir_cmd(b.ssh_host, remote_dir)
 
 _uge_rsync_config_cmd(b::UGEBackend, entry::QueueEntry,
     remote_dir::AbstractString) =
-    `rsync -e $_RSYNC_SSH_CM $(entry.spec_path) $(b.ssh_host):$(remote_dir)/`
+    _rsync_push_cmd(b.ssh_host, entry.spec_path, remote_dir)
 
 _uge_pull_live_cmd(b::UGEBackend, entry::QueueEntry,
     remote_dir::AbstractString) =
-    `rsync -e $_RSYNC_SSH_CM --ignore-missing-args $(b.ssh_host):$(remote_dir)/_live_status.json $(entry.run_dir)/_live_status.json`
+    _rsync_pull_missing_cmd(b.ssh_host, "$(remote_dir)/_live_status.json",
+        "$(entry.run_dir)/_live_status.json")
 
 _uge_collect_cmd(b::UGEBackend, entry::QueueEntry,
     remote_dir::AbstractString) =
-    `rsync -av -e $_RSYNC_SSH_CM --exclude=state.toml --exclude=.state.lock $(b.ssh_host):$(remote_dir)/ $(entry.run_dir)/`
+    _rsync_collect_cmd(b.ssh_host, remote_dir, entry.run_dir)
 
 _uge_rsync_script_cmd(b::UGEBackend, local_script::AbstractString,
     remote_script::AbstractString) =
-    `rsync -e $_RSYNC_SSH_CM $(local_script) $(b.ssh_host):$(remote_script)`
+    _rsync_file_cmd(b.ssh_host, local_script, remote_script)
 
-# Sync the LOCAL project working tree to remote project_root via rsync.
-# Earlier impl used `git fetch && git checkout <code_sha>` which only
-# worked when entry.code_sha had been pushed to a GitHub remote that
-# the cluster could reach. rsync avoids that — TSUBAME doesn't need
-# GitHub round-trip, the dispatcher's exact files (including
-# uncommitted edits) become the remote state.
-#
-# Trade-off: `entry.code_sha` in state.toml is informational (which
-# commit was HEAD at enqueue) but not what gets executed — last-write-
-# wins on the remote project_root. For single-user iterative work
-# this is what the operator wants; for strict per-SHA reproducibility,
-# push first and wrap the dispatch in a git-checkout step.
-#
-# Excludes match the bootstrap rsync (runs/ lives in remote_runs_root,
-# .git/ is heavy and unused on remote, jld2/dist/cache are build
-# artefacts). `--update` is a guardrail: never clobber files that are
-# newer on remote (protects in-flight edits made directly on TSUBAME).
-function _uge_code_sync_cmd(b::UGEBackend)
-    local_root = _uge_local_project_root()
-    # `--exclude=*.jld2` must be a single quoted token in Julia
-    # backticks (raw `*` is unquoted-special). Interpolate via a String
-    # so the glob reaches rsync verbatim.
-    jld_excl = "--exclude=*.jld2"
-    `rsync -az --update -e $_RSYNC_SSH_CM --exclude=runs/ --exclude=.git/ --exclude=node_modules/ --exclude=dashboard/dist/ --exclude=dashboard/.vite/ --exclude=.venv/ $jld_excl $(local_root)/ $(b.ssh_host):$(b.project_root)/`
-end
+_uge_code_sync_cmd(b::UGEBackend) =
+    _rsync_code_sync_cmd(b.ssh_host, _ssh_local_project_root(), b.project_root)
 
-# Resolve the LOCAL Julia project directory (where Project.toml sits).
-# `Base.active_project()` returns the path to the Project.toml file;
-# dirname() gives the project dir. Robust against cwd shenanigans.
-_uge_local_project_root() = dirname(Base.active_project())
-
-# Manifest-hash helpers for auto-instantiate. The remote stores a
-# `.manifest_hash` file under project_root containing the sha256 of
-# the Manifest.toml that was last `Pkg.instantiate`d there. After
-# rsync, we compare local hash → remote hash; differ → run instantiate
-# + write new hash. Same → skip (instantiate is 10-60s, not free).
-_uge_local_manifest_path() =
-    joinpath(_uge_local_project_root(), "Manifest.toml")
-
-_uge_local_manifest_hash() =
-    if isfile(_uge_local_manifest_path())
-        bytes2hex(SHA.sha256(read(_uge_local_manifest_path())))
-    else
-        ""
-    end
-
-_uge_remote_manifest_hash_path(b::UGEBackend) =
-    joinpath(b.project_root, ".manifest_hash")
-
-function _uge_remote_manifest_hash(b::UGEBackend)
-    b.ssh_host === nothing && return ""
-    try
-        strip(read(`$(_ssh_cm(b.ssh_host)) cat $(_uge_remote_manifest_hash_path(b))`,
-            String))
-    catch
-        ""   # file absent / first run / ssh blip — treat as "differs"
-    end
-end
+# Tested directly (test_autopilot.jl) — keep as a thin alias over the
+# shared helper.
+_uge_local_manifest_hash() = _ssh_local_manifest_hash()
 
 """
     _uge_instantiate_if_needed(b::UGEBackend) -> Bool
 
-After `_uge_code_sync_cmd` rsyncs the local tree, check whether the
-remote needs `Pkg.instantiate` re-run. Returns true iff instantiate
-was actually invoked. No-op when ssh_host is unset, when there's no
-local Manifest.toml, or when local hash matches remote.
+After `_uge_code_sync_cmd` rsyncs the local tree, run `Pkg.instantiate`
+on the remote iff the local Manifest.toml hash differs from the remote's.
+No-op when ssh_host is unset. Delegates to `_ssh_instantiate_if_needed`.
 """
-function _uge_instantiate_if_needed(b::UGEBackend)
-    b.ssh_host === nothing && return false
-    local_hash = _uge_local_manifest_hash()
-    isempty(local_hash) && return false
-    remote_hash = _uge_remote_manifest_hash(b)
-    local_hash == remote_hash && return false
-    @info "autopilot: Manifest.toml changed; running Pkg.instantiate on remote" host=b.ssh_host local_sha=local_hash[1:8] remote_sha=(
-        isempty(remote_hash) ? "none" : remote_hash[1:8]
-    )
-    # Single ssh round-trip: instantiate + write hash. depot_export is
-    # important — without it the compute node's $JULIA_DEPOT_PATH might
-    # differ from the login node's, instantiating into the wrong depot.
-    depot_export = isempty(b.julia_depot) ? "" :
-                   "export JULIA_DEPOT_PATH=\"$(b.julia_depot)\"; "
-    snippet =
-        depot_export *
-        "cd $(b.project_root) && " *
-        "$(b.julia_path) --project=. -e 'using Pkg; Pkg.instantiate()' && " *
-        "printf %s $(local_hash) > $(_uge_remote_manifest_hash_path(b))"
-    run(`$(_ssh_cm(b.ssh_host)) bash -lc $snippet`)
-    return true
-end
+_uge_instantiate_if_needed(b::UGEBackend) =
+    if b.ssh_host === nothing
+        false
+    else
+        _ssh_instantiate_if_needed(b.ssh_host, b.project_root, b.julia_path, b.julia_depot)
+    end
 
 function _uge_qsub_cmd(b::UGEBackend, remote_script::AbstractString)
     # On TSUBAME 4 `-g <group>` MUST be on the qsub command line (not as

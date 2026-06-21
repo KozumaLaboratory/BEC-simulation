@@ -8,6 +8,7 @@
 # Composition is strictly bottom-up:
 #   queue.jl       — types + serialization + enqueue/dequeue
 #   backends.jl    — Local subprocess dispatch
+#   ssh_transport.jl — shared ssh/rsync transport (UGE + UMS)
 #   backends_uge.jl — UGE (TSUBAME) dispatch
 #   monitor.jl     — _live_status.json divergence detector
 #   on_complete.jl — callback registry + lineage
@@ -22,6 +23,7 @@ include("autopilot/types.jl")       # AutopilotConfig, AutopilotStats, Autopilot
 include("autopilot/queue.jl")
 include("autopilot/queue_toml.jl")  # QueueEntry ⇄ state.toml (de)serialization + migrations
 include("autopilot/backends.jl")
+include("autopilot/ssh_transport.jl") # shared ssh/rsync transport (UGE + UMS)
 include("autopilot/backends_uge.jl")
 include("autopilot/monitor.jl")
 include("autopilot/on_complete.jl")
