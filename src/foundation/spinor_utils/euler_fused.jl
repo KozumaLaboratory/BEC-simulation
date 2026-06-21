@@ -57,7 +57,10 @@ on the rotation block.
         W .*= cis.(β_col .* λ_row)
         mul!(P, W, V_T)
         if imaginary_time
-            P .*= exp.(.-m_shift_row .* θ_col)
+            # exp(-m·θ), NOT exp(-(m-F)·θ): the overflow shift is a spatially
+            # varying density reweighting that biases the ITP fixed point
+            # (see mistake_itp_imaginary_time_euler_stage3_density_bias).
+            P .*= exp.(.-m_row .* θ_col)
         else
             P .*= cis.(.-m_row .* θ_col)
         end
@@ -74,9 +77,9 @@ on the rotation block.
         @. cis_PD = cis(β_col * λ_row)         # reuse same scratch on W (same shape)
         @. W *= cis_PD
         mul!(P, W, V_T)
-        # Step 3: D_z(θ)
+        # Step 3: D_z(θ) — exp(-m·θ) (see imaginary_time note above).
         if imaginary_time
-            @. cis_PD = exp(-m_shift_row * θ_col)
+            @. cis_PD = exp(-m_row * θ_col)
         else
             @. cis_PD = cis(-m_row * θ_col)
         end
