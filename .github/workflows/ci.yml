@@ -41,6 +41,19 @@ jobs:
         with:
           version: "1.12"
       - uses: julia-actions/cache@v2
+        with:
+          # Share ONE depot cache across the per-PR `test` + `oracles` jobs: same
+          # Project/Manifest/Julia/OS ⇒ byte-identical depot. The action's
+          # default cache-name embeds `job=<name>`, so each job kept its own
+          # ~1.3 GB cache; 3 jobs × N branches pushed the repo past GitHub's
+          # 10 GB cache ceiling (10.7 GB on 2026-06-21) → LRU eviction → silent
+          # cold runs (the new `oracles` job ran cold every time). Dropping the
+          # `job=` segment unifies them; `test` finishes first and wins the save
+          # race, so `oracles` restores `test`'s rich compiled/ cache instead of
+          # precompiling cold. Keep `bench` (push/main-only) on its own key so a
+          # fast main-push bench run can't overwrite the shared cache with a thin
+          # depot.
+          cache-name: julia-cache;workflow=${{ github.workflow }}
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
         with:
@@ -70,6 +83,9 @@ jobs:
         with:
           version: "1.12"
       - uses: julia-actions/cache@v2
+        with:
+          # Shared with the `test` job — see the rationale on that job's cache step.
+          cache-name: julia-cache;workflow=${{ github.workflow }}
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
         with:

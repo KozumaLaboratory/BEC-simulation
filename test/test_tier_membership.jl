@@ -19,9 +19,9 @@
 #      check).
 #
 # Runs as a pure file-glob + set comparison (no SpinorBEC needed); lives
-# in FAST so every push enforces it. The tier-list constants and
-# MANUAL_TESTS_ALLOWLIST are defined in runtests.jl, which include()s
-# this file in global scope.
+# in FAST so every push enforces it. The tier-list constants,
+# MANUAL_TESTS_ALLOWLIST and the _COST balance model are defined in
+# _tiers.jl, include()d in global scope before this file runs.
 
 using Test
 
@@ -67,4 +67,27 @@ using Test
     @test isempty(double_listed)
     isempty(double_listed) ||
         @info "DOUBLE-LISTED across FAST/CI/FULL — would run twice" double_listed
+end
+
+# The parallel-balance cost model + its degradation guard. Pinned here so the
+# guard that keeps CI wall-time honest cannot itself silently break.
+@testset "Cost model + drift guard" begin
+    # Every _COST key must reference a real, accounted-for test file — a stale
+    # key (renamed/deleted file) silently stops weighting anything.
+    test_root = @__DIR__
+    for f in keys(_COST)
+        @test isfile(joinpath(test_root, f))
+    end
+
+    @test _cost("test_dealias_2_3.jl") == _COST["test_dealias_2_3.jl"]
+    @test _cost("file_with_no_entry.jl") == _DEFAULT_COST
+
+    # Drift guard: flag a gross under-estimate, ignore near-estimate and sub-floor.
+    stale = warn_cost_drift([
+        ("solvers/test_3d.jl", 60.0),   # 60s vs 5s estimate → stale
+        ("test_quality.jl", 42.0),      # 42s vs 40s estimate → within factor
+        ("tiny.jl", 4.0),               # below floor_s → ignored
+    ])
+    @test length(stale) == 1
+    @test stale[1].file == "solvers/test_3d.jl"
 end
