@@ -1,14 +1,9 @@
 using SpinorBEC
-using SpinorBEC: PhiOneReg, PolarContactMod, PolarDipolarMod, FMContactMod, FMDipolarMod
-using SpinorBEC.PhiOneReg: phi_1_reg, T_KNOTS, VAL_KNOTS, DERIV_KNOTS
-using SpinorBEC.PolarContactMod: lhy_energy_polar, sigma_polar, delta_polar,
-    build_polar_lhy_coefs
-using SpinorBEC.PolarDipolarMod:
-    lhy_energy_polar_dipolar, antisym_branch,
-    sym_branch, sym_branch_quad
-using SpinorBEC.FMContactMod: lhy_energy_fm, sigma_fm, delta_fm,
-    build_fm_lhy_coefs
-using SpinorBEC.FMDipolarMod: lhy_energy_fm_dipolar
+using SpinorBEC: phi_1_reg, T_KNOTS, VAL_KNOTS, DERIV_KNOTS,
+    lhy_energy_polar, sigma_polar, delta_polar, build_polar_lhy_coefs,
+    lhy_energy_polar_dipolar, antisym_branch, sym_branch, sym_branch_quad,
+    lhy_energy_fm, sigma_fm, delta_fm, build_fm_lhy_coefs,
+    lhy_energy_fm_dipolar
 using SpinorBEC: lima_pelster_Q5
 using Test
 using LinearAlgebra: norm

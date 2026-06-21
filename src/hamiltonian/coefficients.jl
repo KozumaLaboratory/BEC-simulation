@@ -5,7 +5,6 @@ export compute_c_total, compute_c_dd_dimless, linear_zeeman_p
 export compute_eu151_interactions
 export compute_lhy_2d_params
 export compute_quadratic_zeeman
-export get_cn
 
 """
     compute_interaction_params(atom; N_atoms, dims, length_scale)

@@ -12,7 +12,7 @@
 # Component order: index k corresponds to m = F-k+1, so index 1 is m=+F
 # and index 2F+1 is m=-F. F=0 component lives at index F+1.
 #
-# F=6 I_h canonical state lives in `IcosahedralMod.ZETA_F6_IH`
+# F=6 I_h canonical state lives in `ZETA_F6_IH`
 # (`src/hamiltonian/terms/lhy/icosahedral.jl`) — the function
 # `canonical_polyhedral_spinor(6)` delegates there so all callers go
 # through one accessor.
@@ -99,7 +99,7 @@ Return the canonical Paper #3 §V inert-state spinor for spin-F.
 | 2  | §V.A    | T_d         | `ZETA_F2_TD_CYCLIC`       |
 | 3  | §V.B    | O (A_2)     | `ZETA_F3_O_A2`            |
 | 4  | §V.C    | O_h (A_1)   | `ZETA_F4_OH_A1`           |
-| 6  | §V.D    | I_h         | `IcosahedralMod.ZETA_F6_IH` |
+| 6  | §V.D    | I_h         | `ZETA_F6_IH` |
 | 8  | §V.E    | O_h (A_1)   | `ZETA_F8_OH_A1`           |
 | 10 | §V.F    | I_h         | `ZETA_F10_IH_DODEC`       |
 | 12 | §V.G    | I_h (A)     | `ZETA_F12_IH_A`           |
@@ -116,7 +116,7 @@ function canonical_polyhedral_spinor(F::Int)
     elseif F == 4
         return ZETA_F4_OH_A1
     elseif F == 6
-        return IcosahedralMod.ZETA_F6_IH
+        return ZETA_F6_IH
     elseif F == 8
         return ZETA_F8_OH_A1
     elseif F == 10

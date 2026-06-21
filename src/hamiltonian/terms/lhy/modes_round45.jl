@@ -30,8 +30,6 @@
 # `docs/manuscript/papers/paper3_universal_theorem/main.md` §V (Round 5
 # Paper #3 v3) and the F=2 BN edge case in §VII.B.
 
-module LHYModesRound45
-
 export lhy_F2_BN, lhy_F3_octa, lhy_F4_cube, lhy_F8_octa, lhy_F10_dodec
 
 @inline function _prefactor(M::Real, hbar::Real)::Float64
@@ -178,5 +176,3 @@ function lhy_F10_dodec(g0::Real, g6::Real, g10::Real, g12::Real,
     _prefactor(M, hbar) * Float64(n)^2.5 *
     (c0^2.5 + 3 * abs(λspin)^2.5)
 end
-
-end # module LHYModesRound45

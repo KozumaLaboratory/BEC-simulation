@@ -22,19 +22,6 @@
 # intrinsic to the polar phase dipole geometry and independent of F.
 # F=6 Eu is the primary application (paper #1).
 
-module PolarDipolarMod
-
-function _phi_1_reg(t)
-    return parentmodule(@__MODULE__).PhiOneReg.phi_1_reg(t)
-end
-const phi_1_reg = _phi_1_reg
-
-# σ_m / δ_m and the cache live in PolarContactMod (sibling module already
-# loaded by SpinorBEC before this one).
-function _polar_contact()
-    return parentmodule(@__MODULE__).PolarContactMod
-end
-
 export lhy_energy_polar_dipolar
 export antisym_branch, sym_branch, sym_branch_quad
 
@@ -147,7 +134,7 @@ test_lhy_polar.jl).
 """
 function lhy_energy_polar_dipolar(n::Float64, F::Int, g_dict, eps_tilde_dd::Float64;
     M_mass::Float64=1.0, hbar::Float64=1.0)::Float64
-    coefs = _polar_contact().build_polar_lhy_coefs(F, g_dict)
+    coefs = build_polar_lhy_coefs(F, g_dict)
     return lhy_energy_polar_dipolar(n, coefs, eps_tilde_dd; M_mass, hbar)
 end
 
@@ -185,5 +172,3 @@ function lhy_energy_polar_dipolar(n::Float64, coefs, eps_tilde_dd::Float64;
 
     return prefactor * total
 end
-
-end # module PolarDipolarMod

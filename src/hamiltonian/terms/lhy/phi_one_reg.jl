@@ -14,8 +14,6 @@
 #
 # F-independent: any spinor LHY using the closed form re-uses this evaluator.
 
-module PhiOneReg
-
 export phi_1_reg, T_KNOTS, VAL_KNOTS, DERIV_KNOTS
 
 const T_KNOTS = Float64[
@@ -131,5 +129,3 @@ gap parameter `t = ξ/|Δ| - 1`.
             DERIV_KNOTS[lo], DERIV_KNOTS[hi])
     end
 end
-
-end # module PhiOneReg

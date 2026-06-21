@@ -21,15 +21,6 @@
 # Eq. (266); for F=2 UN it reproduces Eq. (305-307); F=6 is the main
 # application (paper #1).
 
-module PolarContactMod
-
-# PhiOneReg lives one level up under SpinorBEC (included once there to avoid
-# duplicate module definitions). Reach it via parentmodule().
-function _phi_1_reg(t)
-    return parentmodule(@__MODULE__).PhiOneReg.phi_1_reg(t)
-end
-const phi_1_reg = _phi_1_reg
-
 export PolarLHYCoefs, build_polar_lhy_coefs, lhy_energy_polar
 export sigma_polar, delta_polar
 
@@ -119,5 +110,3 @@ function lhy_energy_polar(n::Float64, coefs::PolarLHYCoefs;
 
     return prefactor * total
 end
-
-end # module PolarContactMod

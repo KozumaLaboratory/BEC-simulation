@@ -29,14 +29,6 @@
 # Stage C spinor extension (proper S=2F-2 channel coupling) is research-
 # open and NOT covered here — see paper #2 "Open issues".
 
-module FMDipolarMod
-
-# Canonical `lima_pelster_Q5` (closed form, interactions.jl) reached via
-# parentmodule() to avoid `using SpinorBEC` cycles at module-load time.
-function _fm_contact()
-    return parentmodule(@__MODULE__).FMContactMod
-end
-
 export lhy_energy_fm_dipolar
 
 """
@@ -56,7 +48,7 @@ realistic dipolar atoms:
 """
 function lhy_energy_fm_dipolar(n::Float64, F::Int, g_dict, eps_dd::Real;
     M_mass::Float64=1.0, hbar::Float64=1.0)::Float64
-    coefs = _fm_contact().build_fm_lhy_coefs(F, g_dict)
+    coefs = build_fm_lhy_coefs(F, g_dict)
     return lhy_energy_fm_dipolar(n, coefs, eps_dd; M_mass, hbar)
 end
 
@@ -65,8 +57,6 @@ function lhy_energy_fm_dipolar(n::Float64, coefs, eps_dd::Real;
     prefactor = (8.0 * sqrt(M_mass^3)) / (15.0 * π^2 * hbar^3)
     kappa = coefs.delta_F     # δ_+F = g_{2F}, the only non-zero δ_m for FM
     kappa < 1e-12 && return 0.0
-    Q5 = parentmodule(@__MODULE__).lima_pelster_Q5(Float64(eps_dd))
+    Q5 = lima_pelster_Q5(Float64(eps_dd))
     return prefactor * (n * kappa)^2.5 * Q5
 end
-
-end # module FMDipolarMod

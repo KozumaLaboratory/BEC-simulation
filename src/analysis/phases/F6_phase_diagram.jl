@@ -62,7 +62,7 @@ function _f6_pd_candidate_spinors()::Dict{Symbol, Vector{ComplexF64}}
     cyclic[D] = inv_sqrt3 * cis(4π / 3)
 
     Dict(:polar => polar, :FM => fm, :cyclic => cyclic,
-        :I_h => copy(IcosahedralMod.ZETA_F6_IH))
+        :I_h => copy(ZETA_F6_IH))
 end
 
 function _f6_pd_sigma_S(F::Int, S::Int, ζ::AbstractVector{ComplexF64})::Float64

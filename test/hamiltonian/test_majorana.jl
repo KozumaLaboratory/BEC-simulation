@@ -67,13 +67,13 @@ using LinearAlgebra
         end
 
         @testset "Paper #3 §V.D — F=6 I_h ζ_{I_h} → :I_h (post-U2 stereo fix)" begin
-            # Canonical F=6 I_h state from IcosahedralMod. Pre-U2 this
+            # Canonical F=6 I_h state (ZETA_F6_IH). Pre-U2 this
             # returned :unknown due to a stereographic-projection bug
             # mapping both z=0 and z=∞ to the south pole — see the
             # `_stereo_to_sphere` docstring for the bug archaeology.
             # Post-fix the 12 Majorana stars form the icosahedron and
             # `detect_point_group` returns `:I_h` cleanly.
-            zeta_Ih = SpinorBEC.IcosahedralMod.ZETA_F6_IH
+            zeta_Ih = SpinorBEC.ZETA_F6_IH
             @test detect_point_group(zeta_Ih, 6) === :I_h
         end
 

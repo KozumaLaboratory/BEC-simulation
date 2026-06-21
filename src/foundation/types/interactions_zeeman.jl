@@ -11,7 +11,7 @@
 # Raman-laser parameters; `TimeDependentInteractions` swaps c0/c1 in
 # time with `interactions_at(td, t)`.
 
-export InteractionParams, AbstractZeemanField, ZeemanParams, TimeDependentZeeman, c_dict
+export InteractionParams, AbstractZeemanField, ZeemanParams, TimeDependentZeeman, c_dict, get_cn
 export RamanCoupling, TimeDependentRaman, TimeDependentInteractions
 export linear_p, quadratic_q, transverse_b, interactions_at
 
