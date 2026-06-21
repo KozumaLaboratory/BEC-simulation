@@ -115,6 +115,42 @@ analysis, dumb_reference). Optionally single-source via
 `sm.system.m_values`. Low physics-risk (trivial formula, also pinned indirectly
 by the layout convention `c=1 → m=F`), so lower priority than the term wiring.
 
+## Retirement plan (delete RotatingBasisWS — scoped 2026-06-21)
+
+The enabling physics is DONE: the standard split-step path now applies the
+Zeeman **eigen-exact with field-axis q(b̂·F)²** (commit `feat(zeeman): unify…`),
+so for a tilted/rotating B̂(t) it is numerically equal to the rotating-basis
+path. Pinned by `test_rotating_basis_standard_parity.jl` (static GS) and
+`test_rotating_vs_standard_dynamics.jl` (time-dependent B̂; per-m Δ<1e-3,
+density overlap >0.9999). No dt/efficiency advantage for the rotating frame —
+both obey the same Larmor guard `p·F·dt<π` (measured F=1/F=6, with DDI).
+
+**Scope is small — NOT a 25-file rewrite.** Grep shows NOTHING outside
+`run_step_rotating/` reads `:rotating_basis_ws` (the WS object). Every external
+consumer (analyzers = thesis Fig 6, `save_rotating_result`, `bayesian_opt_yaml`,
+`runner`) reads only the `:rotating_basis_dynamics` **dict of recorded arrays**
+(`times`, `per_m_history`, `Lz`, `Fz`, `psi_snapshots`). So the retirement is:
+
+1. **dynamics handler** (`run_step_rotating/dynamics.jl`): build a standard
+   `Workspace` with `TimeDependentZeeman(bx,by,bz from θ(t),φ(t); q)`, seed
+   `ψ_lab(0)=U_B(0)·ψ̃_GS`, run `run_simulation!` (map integrator: strang→
+   split_step, yoshida4/6→composers). In `on_step`, transform `ψ_lab(t)→ψ̃(t)=
+   U_B(t)†ψ_lab(t)` and record the SAME tilde observables (per_m, Lz, Fz,
+   ψ̃ snapshots) → identical `:rotating_basis_dynamics` dict. Consumers unchanged.
+2. **ground_state handler** (`run_step_rotating/ground_state.jl`): standard
+   `find_ground_state` with the tilted `TimeDependentZeeman` (eigen-exact now
+   handles the tilt); stash the couplings + ψ̃-equivalent the dynamics step needs
+   (replace the internal `:rotating_basis_ws` handoff with plain params).
+3. **Delete** `RotatingBasisWS`, `rotating_basis_propagators.jl`,
+   `rotating_basis_integrators.jl` (engine ~815 lines) + the rotating analyzers'
+   dependence on the WS, once both handlers no longer construct it.
+4. **Validate** a real magnetostir YAML end-to-end (rotating output vs migrated
+   standard output: per_m_history / Lz arrays match) BEFORE removing the engine,
+   then regenerate the Fig-6 panels and diff.
+
+Each step is independently committable; the equivalence gates above protect the
+migration.
+
 ## Testing
 
 Each wired term must pass a rotating-vs-standard parity gate on a **static
