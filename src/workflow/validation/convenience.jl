@@ -17,7 +17,7 @@ function call.
 ```julia
 res = audit("runs/eu_ham_only_conservation/eu_ham_only_24_nonsec.yaml";
             spec=ConservationSpec(norm_drift=1e-12, Jz_drift=5e-2))
-res.pass            # Bool
+passed(res)         # Bool (status === :pass)
 res.summary         # human-readable summary
 ```
 """

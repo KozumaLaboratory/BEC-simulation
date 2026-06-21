@@ -54,13 +54,16 @@ end
 _tangent_project(δ, ψ, dV, n2) = δ .- ψ .* (sum(conj.(ψ) .* δ) * dV / n2)
 
 """
-    constrained_hessian_params(ws, ψ) → (; μ, dV, n2)
+    constrained_hessian_params(ws, ψ) → (; μ, dV, n2, g)
 
 Manifold scalars at a (near-)stationary `ψ`: the chemical potential
 `μ = Re⟨ψ,g⟩/(2‖ψ‖²)` (`g = energy_gradient! = 2μψ` at a stationary
-point), the cell volume `dV`, and `n2 = ‖ψ‖²`. Calibrated by the gate-2
-self-check `H·(iψ) = 2μ·(iψ)` (the phase Goldstone is the 2μ eigenvector
-of the raw H). Reuse-ready for any consumer of the constrained Hessian.
+point), the cell volume `dV`, `n2 = ‖ψ‖²`, and the gradient `g` itself
+(returned so callers needing the stationarity residual `‖g−2μψ‖` reuse
+this single evaluation rather than recomputing `energy_gradient!`).
+Calibrated by the gate-2 self-check `H·(iψ) = 2μ·(iψ)` (the phase
+Goldstone is the 2μ eigenvector of the raw H). The SINGLE source of `μ`
+for every consumer of the constrained Hessian.
 """
 function constrained_hessian_params(ws, ψ)
     dV = cell_volume(ws.grid)
@@ -69,7 +72,7 @@ function constrained_hessian_params(ws, ψ)
     fill!(g0, 0)
     energy_gradient!(g0, ψ, ws)
     μ = (real(sum(conj.(ψ) .* g0)) * dV) / (2 * n2)
-    (; μ, dV, n2)
+    (; μ, dV, n2, g=g0)
 end
 
 """
@@ -90,19 +93,42 @@ function constrained_hessian_action(ws, ψ, δ; μ, dV, n2, ε::Float64=1e-5)
 end
 
 """
-    trapped_bdg_lowest_eigenvalue(ws, ψ; niter=24, ε=1e-5, rng=…) → (λ_min, μ)
+    trapped_bdg_lowest_eigenvalue(ws, ψ; niter=24, ε=1e-5, tol_ritz=1e-2,
+                                  params=nothing, rng=…)
+        → (; λ_min, μ, ritz_residual, niter_used, converged)
 
 Lowest eigenvalue of the constrained second variation `P(H−2μ)P` at a
 STATIONARY ψ — the gate-2 minimum-vs-saddle verdict for a trapped state.
 Hand-rolled fully-reorthogonalised Lanczos on `constrained_hessian_action`
 (no KrylovKit dependency); `λ_min ≥ −tol` ⇒ energetic minimum, `< −tol` ⇒
 saddle. Requires ψ converged (`g ∥ ψ`); on a non-stationary ψ the `μ` and
-the verdict are not meaningful.
+the verdict are not meaningful — `StabilitySpec` enforces that precondition
+before reading the sign.
+
+Self-certifying: `ritz_residual = |β_m · sₘ[end]|` is the classical
+a-posteriori Lanczos bound on the lowest Ritz value — `β_m` the residual
+norm of the last Lanczos vector, `sₘ` the tridiagonal eigenvector of the
+lowest Ritz value. A `λ_min` whose `ritz_residual` is not ≪ |λ_min| is NOT
+converged; the historical "λ_min still dropping at niter=200" false verdict
+is exactly a large `ritz_residual` the bare value hides. `converged` flags
+`ritz_residual < tol_ritz·(|λ_min| + 1e-10)`.
+
+`λ_min` and `μ` are the first two NamedTuple fields, so legacy
+`λ, _ = trapped_bdg_lowest_eigenvalue(...)` and `…[1]` still yield λ_min.
+Pass `params` (a `constrained_hessian_params` result) to reuse an already-
+computed `(μ, dV, n2)` and skip the redundant `energy_gradient!`. `niter < 1`
+returns `converged=false` (λ_min=NaN) rather than erroring on an empty
+Krylov space — the gate abstains, it does not crash.
 """
 function trapped_bdg_lowest_eigenvalue(
-    ws, ψ; niter::Int=24, ε::Float64=1e-5, rng=Random.default_rng()
+    ws, ψ; niter::Int=24, ε::Float64=1e-5, tol_ritz::Float64=1e-2,
+    params=nothing, rng=Random.default_rng(),
 )
-    p = constrained_hessian_params(ws, ψ)
+    p = params === nothing ? constrained_hessian_params(ws, ψ) : params
+    if niter < 1
+        return (;
+            λ_min=NaN, μ=p.μ, ritz_residual=Inf, niter_used=0, converged=false)
+    end
     ipR(a, b) = real(sum(conj.(a) .* b)) * p.dV
     Hc(δ) = constrained_hessian_action(ws, ψ, δ; p.μ, p.dV, p.n2, ε)
 
@@ -121,5 +147,13 @@ function trapped_bdg_lowest_eigenvalue(
         push!(β, βj)
         push!(V, w ./ βj)
     end
-    minimum(eigvals(SymTridiagonal(α, β[1:(length(α) - 1)]))), p.μ
+    decomp = eigen(SymTridiagonal(α, β[1:(length(α) - 1)]))
+    λ_min = decomp.values[1]
+    s_min = @view decomp.vectors[:, 1]
+    # β_m (residual norm of the last Lanczos vector) is present iff the loop
+    # ran to `niter`; on early break the residual is ≈0 (exact eigenvector).
+    β_m = length(β) >= length(α) ? β[end] : 0.0
+    ritz_residual = abs(β_m * s_min[end])
+    converged = ritz_residual < tol_ritz * (abs(λ_min) + 1e-10)
+    (; λ_min, μ=p.μ, ritz_residual, niter_used=length(α), converged)
 end

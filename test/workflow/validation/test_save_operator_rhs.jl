@@ -89,7 +89,7 @@ using JLD2
             c = compare_runs(ra, rb; label_a="ours", label_b="theirs")
             spec = OperatorRHSSpec(; tol_hpsi=1e-14, tol_per_term_E=1e-14)
             res = check(spec, c)
-            @test res.pass == true
+            @test passed(res)
             hp = first(p for p in res.details if p.first === :hpsi_rel_l2)
             @test hp.second.got == 0.0                  # bit-identical artefact
         finally

@@ -12,26 +12,52 @@
 #   * `check(spec::ConservationSpec, ::RunSweep)`       — per-row verdict vector
 #   * `check(spec::OperatorRHSSpec,  ::RunComparison)`  — A/B diff verdict
 
-export ConservationSpec, OperatorRHSSpec, CheckResult, check
+export ConservationSpec, OperatorRHSSpec, CheckResult, check, passed
 
 """
-    CheckResult(pass::Bool, details::Vector{Pair{Symbol,Any}}, summary::String)
+    CheckResult(status::Symbol, details, summary)
+    CheckResult(pass::Bool,     details, summary)   # binary convenience
 
-Verdict produced by `check(spec, target)`. `details` is a vector of
-`(observable_name => (got=..., bound=..., pass=...))`-style entries so
-downstream code can format tables or filter failures.
+Verdict produced by `check(spec, target)`. `status ∈ {:pass, :fail,
+:indeterminate}` — three-valued so a verifier can REFUSE to judge
+(precondition unmet / solver not converged) instead of emitting a false
+PASS or FAIL. The binary `Bool` constructor maps `true → :pass`,
+`false → :fail`, so binary specs (conservation / operator-RHS) need no
+change. Use `passed(r)` (== `r.status === :pass`) for the green/not-green
+question; anything non-`:pass` (fail OR indeterminate) is not green.
 
-`Base.show` prints a compact one-line form; `summary` is a human-
-readable multi-line description.
+`details` is a vector of `(name => (got=…, bound=…, pass=…))`- or
+`(name => (…, status=…))`-style entries so downstream code can format
+tables or filter failures. `summary` is a human-readable description.
 """
 struct CheckResult
-    pass::Bool
+    status::Symbol
     details::Vector{Pair{Symbol, Any}}
     summary::String
+
+    function CheckResult(status::Symbol, details, summary)
+        status in (:pass, :fail, :indeterminate) || throw(
+            ArgumentError(
+                "CheckResult status must be :pass/:fail/:indeterminate, " *
+                "got :$status"),
+        )
+        new(status, details, summary)
+    end
 end
 
+CheckResult(pass::Bool, details, summary) =
+    CheckResult(pass ? :pass : :fail, details, summary)
+
+"""
+    passed(r::CheckResult) -> Bool
+
+`true` iff the verdict is `:pass`. The blessed green/not-green accessor —
+`:fail` and `:indeterminate` are both not-green.
+"""
+passed(r::CheckResult) = r.status === :pass
+
 Base.show(io::IO, r::CheckResult) = print(
-    io, "CheckResult(pass=$(r.pass), $(length(r.details)) checks)"
+    io, "CheckResult(status=:$(r.status), $(length(r.details)) checks)"
 )
 
 """
