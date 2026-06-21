@@ -52,13 +52,14 @@ provenance / reconcile), and identify the task by `--name = _uge_jobname(cid) =
 "sb_<cid>"` — the same naming already used for UGE reconcile (`backends_uge.jl:132`).
 `job_status` looks up by **name**, not job_id.
 
-**Shared machinery (explicit, per the repo ethos).** The `_ssh_cm` /
-`_RSYNC_SSH_CM` / `_uge_rsync_config_cmd` / `_uge_pull_live_cmd` /
-`_uge_collect_cmd` / `_uge_code_sync_cmd` / Manifest-hash helpers
-(`backends_uge.jl:235-354`) are scheduler-agnostic. Extract them to a shared
-`autopilot/ssh_transport.jl` consumed by both `UGEBackend` and `UMSBackend`
-(rename `_uge_*` → `_ssh_*`). Do **not** copy-paste — that is exactly the
-duplicated-physics-drift class this repo forbids.
+**Shared machinery (explicit, per the repo ethos). — DONE in Phase 2a.** The
+ControlMaster ssh + rsync push/pull/collect/code-sync + Manifest-hash helpers
+were scheduler-agnostic and have been extracted to `autopilot/ssh_transport.jl`
+(`_ssh_cm` / `_rsync_*` / `_ssh_instantiate_if_needed`), parameterized by
+primitives (host, paths). `UGEBackend`'s `_uge_*` builders now delegate to them
+(byte-identical, 217/217 autopilot tests green). `UMSBackend` reuses the same
+transport rather than copy-pasting it — the duplicated-physics-drift class this
+repo forbids.
 
 ## Problem A — status without a terminal signal
 
@@ -73,7 +74,7 @@ if present
 else
     # absent: either finished, or not-yet-scheduled (race after dispatch!)
     collect!(b, entry)                       # pull outcome.toml if it landed
-    outcome = read runs/<cid>/outcome.toml   # same branch as UGE backends_uge.jl:523-541
+    outcome = read runs/<cid>/outcome.toml   # same branch as UGE backends_uge.jl:437-451
     outcome.terminal == "done"               → :done
     outcome.terminal in (killed_data,bug)    → :failed
     # no outcome yet:
@@ -206,8 +207,9 @@ existing backend-full path), `budget.jl` (lease-aware `predicted` + `lease_reali
 ## Implementation checklist (Phase 2a → 2c)
 
 **2a — backend skeleton (no lease yet, manual lease)**
-1. Extract `ssh_transport.jl`; re-point `UGEBackend` at it (parity test: UGE
-   command builders byte-identical before/after).
+1. ~~Extract `ssh_transport.jl`; re-point `UGEBackend` at it (parity test: UGE
+   command builders byte-identical before/after).~~ **DONE** — byte-identical,
+   217/217 autopilot tests green.
 2. `UMSBackend` with `stage_in`/`pull_live`/`collect!` (reuse), `dispatch!` via
    `ums-submit` against a **manually-started** lease (operator runs `qsub` +
    `ums-start`, passes job-id). `prepare_status_snapshot`=`ums-list`, `job_status`
