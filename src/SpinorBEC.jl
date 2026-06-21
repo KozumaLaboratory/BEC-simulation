@@ -57,7 +57,8 @@ include("workflow/experiments/pipeline/pipeline_api.jl")
 include("workflow/experiments/pipeline/pipeline_continuation.jl")
 include("workflow/experiments/pipeline/run_registry.jl")
 include("workflow/experiments/diff_dicts.jl")
-include("workflow/experiments/inspect.jl")
+include("workflow/experiments/inspect.jl")          # check framework + entry points + per-step traces + CLI/JSON
+include("workflow/experiments/inspect_checks.jl")   # concrete A/B/C/D checks + registry registration
 include("workflow/experiments/inspect_batch.jl")
 
 # Calibration subsystem (real submodule, 2 files: core + drift).
@@ -104,7 +105,9 @@ include("validation.jl")
 #             run_observables (find_run_dir, peak_density_trajectory,
 #             spin_populations_trajectory, classify_collapse), and
 #             runfactory's internal _set_path!.
-include("workflow/experiment.jl")
+include("workflow/experiment.jl")               # CAS + Experiment type + lifecycle + memo + check/compare/audit
+include("workflow/experiment_observables.jl")   # observables (plain functions on Experiment)
+include("workflow/experiment_collections.jl")   # spec_diff / sweep / twin / tabulate
 include("workflow/io/cluster.jl")  # cluster helpers (needs Experiment)
 include("workflow/autopilot.jl")   # queue + tick + on_complete + retry
 
