@@ -30,7 +30,8 @@ end
 
 # Option γ rotating-basis spinor GP steps. Same isolation pattern as binary GP:
 # concrete types so the spinor `_run_step(::GroundStateStep)` / `(::DynamicsStep)`
-# inference world is not widened by a third RotatingBasisWS-typed return tuple.
+# inference world is not widened by these handlers's returns. (They run on
+# the standard split-step path now; the RotatingBasisWS engine was retired.)
 struct RotatingBasisGroundStateStep
     params::Dict{String, Any}
 end

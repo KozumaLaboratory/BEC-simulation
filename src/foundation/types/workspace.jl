@@ -37,23 +37,13 @@
 # any future refactor.
 # See: CLAUDE.md §"Type stability boundaries", MEMORY pitfall_partial_type_params_in_struct_fields
 #
-# DESIGN NOTE — why Workspace and RotatingBasisWS are NOT a shared AbstractWorkspace
-# (re-evaluated 2026-05-13; permanent decision):
-# (1) Tiny common surface — only grid::Grid{N,T}, spin_matrices, backend overlap.
-#     The other ~13/~10 fields are mutually exclusive (Workspace: tensor_cache,
-#     coriolis_cache, time_dep_interactions, magnetic_gradient, absorbing_mask,
-#     loss, light_shift, raman; RotatingBasisWS: theta/phi_func + their dots,
-#     psi_tilde + psi_lab + rotation_scratch + kspace/xspace phase buffers).
-# (2) Pipeline inference firewall — `run_step_rotating/ground_state.jl:197`
-#     deliberately keeps RotatingBasisWS OUT of the returned pipeline tuple
-#     because the combined inference space (Workspace ∪ RotatingBasisWS
-#     through an AbstractWorkspace-typed local) is the textbook trigger for
-#     the 30-min JIT hang documented in CLAUDE.md.
-# (3) No call-site demand — propagators already dispatch on the concrete
-#     struct (`split_step!(::Workspace{N})` vs `apply_local_spin_step!(::RotatingBasisWS)`).
-# Trait dispatch (HasGauge/NoGauge) was considered and rejected on the same
-# grounds: functionally equivalent to concrete dispatch but adds a layer the
-# compiler must resolve, with no measurable benefit.
+# HISTORICAL NOTE — there used to be a separate `RotatingBasisWS` (16 type params)
+# for the magnetostir path, deliberately kept out of `Workspace` to avoid a
+# combined-inference JIT blowup. It was RETIRED 2026-06-21
+# (docs/design/rotating_basis_unification.md): the magnetostir now runs on the
+# standard `Workspace` split-step path (field-axis eigen-exact Zeeman +
+# split_step_midpoint! reproduce the rotating yoshida6 at equal cost), so there
+# is one workspace type again.
 #
 # --- Workspace: the master per-simulation state container ---
 #

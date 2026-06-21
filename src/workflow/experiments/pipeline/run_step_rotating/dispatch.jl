@@ -2,7 +2,8 @@
 # kept `@noinline` to maintain the type-stability boundary documented in
 # CLAUDE.md / memory `pitfall_pipeline_inference.md`: abstract dispatch
 # on PipelineStep would otherwise propagate Dict{Symbol,Any} eltypes
-# into make_rotating_basis_ws inference.
+# into make_workspace inference. (Handlers run on the standard path; the
+# RotatingBasisWS engine was retired 2026-06-21.)
 
 @noinline function _run_step(
     step::RotatingBasisGroundStateStep,

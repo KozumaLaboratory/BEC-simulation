@@ -10,10 +10,11 @@
     end
 end
 
-# Option γ rotating-basis ground_state step: ITP from a Gaussian seed
-# in the rotating-basis workspace. Sets up grid, V_trap, B̂ initial
-# orientation, and persists ws to pipeline_results for the subsequent
-# dynamics step.
+# Option γ magnetostir ground_state step: standard split-step ITP from a
+# Gaussian seed under a static tilted field B̂=(θ_init,φ_init). Sets up grid,
+# V_trap, the initial orientation, and stashes the couplings + tilde GS state
+# (:rotating_basis_gs NamedTuple) for the subsequent dynamics step. (The
+# standalone RotatingBasisWS engine was retired 2026-06-21.)
 
 @noinline function _run_rotating_basis_ground_state_step(
     p::Dict{String, Any}; verbose::Bool=true
@@ -273,14 +274,10 @@ end
     ps_gs > 0 && (per_m_gs ./= ps_gs)
 
     placeholder_atom = AtomSpecies("RotatingBasis", 1.66e-25, F_atom, 0.0, 0.0, 0.0)
-    # IMPORTANT: keep RotatingBasisWS OUT of the return tuple. The 23-type-param
-    # Workspace (or our 6-param RotatingBasisWS) propagates through abstract
-    # PipelineStep dispatch into make_workspace inference combinatorics, which
-    # the memory `pitfall_pipeline_inference.md` documents as a 30+ min hang.
-    # Stash ws inside the Dict{Symbol,Any} step_result (Any-typed, inference-safe).
-    # Also type-assert psi_tilde to a CONCRETE 4D array — RotatingBasisWS.psi_tilde
-    # is declared as `Array{Complex{T}}` (any dim), and an abstract array element
-    # in the return tuple pollutes downstream step's psi argument inference.
+    # The GS handoff is a plain NamedTuple stashed in the Any-typed step_result
+    # Dict (never in the typed return tuple) — keeps PipelineStep dispatch
+    # inference narrow (memory `pitfall_pipeline_inference.md`). psi is type-
+    # asserted to a concrete 4D Complex array for the same reason.
     step_result = Dict{Symbol, Any}(
         # Handoff to the dynamics step: plain couplings + sm + tilde GS state
         # (NOT a RotatingBasisWS — the engine is retired). Stashed in the
