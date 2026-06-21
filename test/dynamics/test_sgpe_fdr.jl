@@ -118,3 +118,29 @@ using SpinorBEC
         # at ~5000 SGPE steps on 32² grid
     end
 end
+
+@testset "SGPE damping per-mode factor exact" begin
+    # _sgpe_damp_kinetic! multiplies mode k by exp(-γ(½k²-μ)dt). A single
+    # plane-wave seed makes the round-trip amplitude scale by exactly that
+    # factor (global phase cancels in |·|²). Pins the coefficient AND the μ
+    # sign — the part the noisy FDR slope test cannot reach.
+    grid = make_grid(GridConfig((32, 32), (2π, 2π)))
+    ws = make_workspace(; grid, atom=Rb87,
+        interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
+        sim_params=SimParams(; dt=0.01, n_steps=1), fft_flags=FFTW.ESTIMATE)
+    k0 = grid.k[1][2]            # dk = 1 ⇒ ½k₀² = 0.5
+    γ = 0.5
+    dt = 0.02
+    for μ in (0.1, 0.9)         # decay (μ<½k₀²) and growth (μ>½k₀²)
+        psi = ws.state.psi
+        fill!(psi, 0)
+        for j in 1:32, i in 1:32
+            psi[i, j, 1] = cis(k0 * grid.x[1][i])
+        end
+        before = sum(abs2, psi)
+        SpinorBEC._sgpe_damp_kinetic!(ws, γ, μ, dt)
+        ratio = sqrt(sum(abs2, ws.state.psi) / before)
+        @test isapprox(ratio, exp(-γ * (0.5 * k0^2 - μ) * dt); rtol=1e-6)
+        @test (μ < 0.5 * k0^2) == (ratio < 1.0)
+    end
+end
