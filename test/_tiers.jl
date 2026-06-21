@@ -304,6 +304,11 @@ const CI_EXTRA = [
     # λ_min, when stationarity or the Lanczos Ritz residual is unmet, and
     # abstains overall while the trapped dynamical BdG axis is unbuilt.
     "oracles/test_stability_indeterminate.jl",
+    # Sneaky-prover (adversarial verifier hardening): hands the StabilitySpec
+    # gate a stationary SADDLE (polar at c1<0) and asserts the energetic axis
+    # catches its negative mode (:fail) — a false ACCEPT would be a Lanczos
+    # hidden-mode hole. The active-adversary upgrade of the frozen replay.
+    "oracles/test_stability_sneaky_prover.jl",
     # Fisher identifiability: the preflight instrument for the
     # no-anchor SBI regime (trust ledger column 3) — linearity anchors,
     # θ-valley, degenerate-protocol detection, channel-space chain.
