@@ -123,9 +123,8 @@ end
 
 function _compute_spin_density!(fx, fy, fz, psi::Array, sm, ::Val{D}, ndim, n_pts) where {D}
     F = sm.system.F
-    Ff1 = Float64(F * (F + 1))
     m_vals = ntuple(c -> Float64(F - (c - 1)), Val(D))
-    fp_coeffs = ntuple(c -> c == 1 ? 0.0 : sqrt(Ff1 - m_vals[c] * (m_vals[c] + 1.0)), Val(D))
+    fp_coeffs = fp_ladder_coeffs(F, Val(D))
 
     Threads.@threads for I in CartesianIndices(n_pts)
         @inbounds begin
@@ -150,9 +149,8 @@ end
 
 function _compute_spin_density!(fx, fy, fz, psi::AbstractArray, sm, ::Val{D}, ndim, n_pts) where {D}
     F = sm.system.F
-    Ff1 = Float64(F * (F + 1))
     m_vals = ntuple(c -> Float64(F - (c - 1)), Val(D))
-    fp_coeffs = ntuple(c -> c == 1 ? 0.0 : sqrt(Ff1 - m_vals[c] * (m_vals[c] + 1.0)), Val(D))
+    fp_coeffs = fp_ladder_coeffs(F, Val(D))
 
     spatial_idx = ntuple(d -> 1:n_pts[d], ndim)
     fz_v = view(fz, spatial_idx...)

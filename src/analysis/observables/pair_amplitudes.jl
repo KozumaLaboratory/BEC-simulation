@@ -22,8 +22,7 @@ function singlet_pair_amplitude(psi::AbstractArray{<:Complex}, F::Int, ndim::Int
         for c in 1:D
             m = F - (c - 1)
             c_pair = D - c + 1
-            sign = iseven(F - m) ? 1.0 : -1.0
-            s += sign * psi[I, c] * psi[I, c_pair]
+            s += singlet_pair_sign(F, m) * psi[I, c] * psi[I, c_pair]
         end
         A[I] = s * inv_sqrt_D
     end
