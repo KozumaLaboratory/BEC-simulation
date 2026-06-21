@@ -201,8 +201,47 @@ The `RotatingBasisWS` engine is now used by NOTHING in production except the
 
 Executed exactly as the recipe below. `using SpinorBEC` loads; kept tests green
 (pipeline-parsing 31/31, analyzers 33/33, frame-regression 26/26); no runtime
-dangling refs. Only remaining item: a real magnetostir YAML Fig-6 numeric diff
-vs a pre-deletion reference (full GPU/TSUBAME compute) for final confidence.
+dangling refs.
+
+### Fig-6 numeric diff — DONE 2026-06-21 (the migration *corrects* a retired-engine bug)
+
+Ran the actual magnetostir pipeline (F=6, DDI, tilted rotating B̂) on the current
+migrated tree AND on the pre-deletion engine (`8c084d95`), same config, and
+diffed the `:rotating_basis_dynamics` arrays. Layered isolation:
+
+| case | `|new − old|` max·per-m | reading |
+|---|---|---|
+| ground state (ITP) | **0.0 (bit-identical)** | same seed into dynamics |
+| static tilted field (φ̇=0) | **0.0 (bit-identical)** | static Hamiltonian representation agrees exactly |
+| rotating field (φ̇≠0), full c0/c1/DDI | **1.76e-3** | systematic, **dt-independent** (\|new@0.01 − new@0.005\|=9e-7) and **DDI-independent** (off: 1.77e-3) |
+
+The 1.76e-3 is not truncation error (both integrators are individually
+dt-converged to ~1e-6) — it is a genuine Hamiltonian-level difference confined
+entirely to the **rotating-frame inertial term** (−φ̇·F_z): it vanishes the
+instant φ̇→0 and is identical with interactions on or off.
+
+**Arbitration against a first-principles reference settles which path is right.**
+With c1=c_dd=0 the spin sector is a single particle (c0 is spin-scalar), so the
+pipeline's per-m must equal the exact single-spin evolution of H(t)=−p(B̂(t)·F),
+transformed into the recorded tilde basis (ψ̃ = U_B(t)†ψ_lab). Fine lab-frame
+integration gives that reference with zero frame ambiguity:
+
+| | max\|Δ\| vs exact (tilde basis) |
+|---|---|
+| **unified lab-frame path (new)** | **6.2e-6** ✅ |
+| retired rotating engine (old) | **1.78e-3** ❌ |
+
+**The unified path is correct; the retired `RotatingBasisWS` engine carried a
+~1.8e-3 (0.2%) systematic error in its rotating-frame inertial term** — the
+"frame transformation half-term" bug class (cf.
+`mistake_frame_transformation_half_term_silent_cancellation`,
+`mistake_coriolis_substep_sign_2026_06_03`). So the migration is not merely
+equivalent: it eliminates a small engine error. Thesis Fig-6 panels regenerated
+on the unified path are *more* accurate by ~0.2%.
+
+Regression gate: `test/rotating_basis/test_magnetostir_rotating_field_analytic.jl`
+(FULL tier) pins the lab-frame per-m against the exact single-spin reference at
+5e-4 — fails loudly on the φ̇-term bug class, passes the unified path.
 
 ### Engine-removal recipe (surgical — NOT `rm` the files)
 

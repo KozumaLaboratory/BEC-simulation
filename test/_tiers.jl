@@ -344,6 +344,11 @@ const FULL_EXTRA = [
     "rotating_basis/test_rotating_basis_analyzers.jl",
     "rotating_basis/test_rotating_basis_pipeline_parsing.jl",
     "rotating_basis/test_magnetostir_pipeline_physics.jl",
+    # First-principles φ̇≠0 gate: lab-frame pipeline vs exact single-spin
+    # reference. Arbitrated the engine retirement — the retired engine's
+    # rotating-frame inertial term was ~1.8e-3 off; the unified path matches
+    # the exact dynamics to ~1e-5.
+    "rotating_basis/test_magnetostir_rotating_field_analytic.jl",
     "hamiltonian/test_adaptive_dt.jl",
     # Lima-Pelster Q5 + scalar eGPE
     "hamiltonian/test_lima_pelster_q5.jl",
