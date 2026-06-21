@@ -345,7 +345,7 @@ end
 Dimensionless linear Zeeman shift: p = g_F × μ_B × B / (ℏ × omega_ref).
 """
 function linear_zeeman_p(atom::AtomSpecies, B::Float64, omega_ref::Float64)
-    atom.g_F * Units.MU_BOHR * B / (Units.HBAR * omega_ref)
+    atom.g_F * Units.BOHR_MAGNETON * B / (Units.HBAR * omega_ref)
 end
 
 # --- Quasi-2D LHY ---

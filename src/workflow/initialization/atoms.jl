@@ -126,7 +126,7 @@ const Cr52 = AtomSpecies(
     3,
     112.0 * Units.BOHR_RADIUS,
     0.0,
-    2.0 * 3.0 * Units.MU_BOHR,
+    2.0 * 3.0 * Units.BOHR_MAGNETON,
     2.0,
     Dict{Int, Float64}(
         2 => 112.0 * Units.BOHR_RADIUS,
@@ -145,7 +145,7 @@ const Dy164 = AtomSpecies(
     8,
     92.0 * Units.BOHR_RADIUS,
     0.0,
-    1.24 * 8.0 * Units.MU_BOHR,
+    1.24 * 8.0 * Units.BOHR_MAGNETON,
     1.24,
 )
 
@@ -158,7 +158,7 @@ const Dy162 = AtomSpecies(
     8,
     122.0 * Units.BOHR_RADIUS,
     0.0,
-    1.24 * 8.0 * Units.MU_BOHR,
+    1.24 * 8.0 * Units.BOHR_MAGNETON,
     1.24,
 )
 
@@ -172,7 +172,7 @@ const Er168 = AtomSpecies(
     6,
     137.0 * Units.BOHR_RADIUS,
     0.0,
-    1.16 * 6.0 * Units.MU_BOHR,
+    1.16 * 6.0 * Units.BOHR_MAGNETON,
     1.16,
 )
 
@@ -185,7 +185,7 @@ const Er166 = AtomSpecies(
     6,
     67.0 * Units.BOHR_RADIUS,
     0.0,
-    1.16 * 6.0 * Units.MU_BOHR,
+    1.16 * 6.0 * Units.BOHR_MAGNETON,
     1.16,
 )
 
@@ -211,7 +211,7 @@ const Eu151 = AtomSpecies(
     6,
     110.0 * Units.BOHR_RADIUS,
     0.0,
-    _EU151_G_J * 3.5 * Units.MU_BOHR,
+    _EU151_G_J * 3.5 * Units.BOHR_MAGNETON,
     _EU151_G_J * 7.0 / 12.0;
     Delta_E_hf=121.0e6 * 2π * Units.HBAR,
     g_J=_EU151_G_J,
@@ -229,7 +229,7 @@ const Eu151_f1_effective = AtomSpecies(
     1,
     21.0 * Units.BOHR_RADIUS,
     21.0 * Units.BOHR_RADIUS,
-    4.5 * Units.MU_BOHR,
+    4.5 * Units.BOHR_MAGNETON,
     4.5;
     Delta_E_hf=121.0e6 * 2π * Units.HBAR,
     q_geometry=35.0 / 144.0,
@@ -279,7 +279,7 @@ const He4star = AtomSpecies(
     1,
     20.0 * Units.BOHR_RADIUS,
     7.512 * Units.BOHR_RADIUS,
-    2.0 * 1.0 * Units.MU_BOHR,
+    2.0 * 1.0 * Units.BOHR_MAGNETON,
     2.0,
 )
 

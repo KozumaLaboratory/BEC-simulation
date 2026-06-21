@@ -20,6 +20,7 @@ using Printf
 
 include("autopilot/types.jl")       # AutopilotConfig, AutopilotStats, AutopilotBackend
 include("autopilot/queue.jl")
+include("autopilot/queue_toml.jl")  # QueueEntry ⇄ state.toml (de)serialization + migrations
 include("autopilot/backends.jl")
 include("autopilot/backends_uge.jl")
 include("autopilot/monitor.jl")

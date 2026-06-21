@@ -66,27 +66,16 @@ function compute_spinor_lhy_polar_two_channel(;
     n_points::Int=200,
 )
     F >= 1 || throw(ArgumentError("F must be ≥ 1 (got F=$F)"))
-    n_points >= 3 || throw(ArgumentError("n_points must be >= 3"))
-    n_max > 0 || throw(ArgumentError("n_max must be positive"))
 
     eps_dd = is_active(c0) ? c_dd / c0 : 0.0
     Q5 = lima_pelster_Q5(eps_dd)
-
-    densities = collect(range(0.0, n_max; length=n_points))
-
     prefactor = 8.0 / (15.0 * Float64(π)^2)
-    energy = zeros(Float64, n_points)
+    density_coef = is_active(c0) ? abs(c0)^(5 / 2) * Q5 : 0.0
+    spin_coef = is_active(c1) ? 2.0 * F * abs(c1)^(5 / 2) : 0.0
 
-    for (i, n) in enumerate(densities)
-        n < 1e-30 && continue
-        n52 = n^2 * sqrt(n)
-        density_part = is_active(c0) ? abs(c0)^(5 / 2) * n52 * Q5 : 0.0
-        spin_part = is_active(c1) ? 2.0 * F * abs(c1)^(5 / 2) * n52 : 0.0
-        energy[i] = prefactor * (density_part + spin_part)
+    _tabulate_lhy(PolarTwoChannelLHY; n_max, n_points) do n
+        prefactor * (density_coef + spin_coef) * n^2 * sqrt(n)
     end
-
-    potential_values = _numerical_derivative(densities, energy)
-    PolarTwoChannelLHY(densities, potential_values)
 end
 
 """
@@ -107,7 +96,6 @@ function compute_spinor_lhy_table(;
     k_max::Float64=20.0,
     n_k::Int=200,
 )
-    n_points >= 3 || throw(ArgumentError("n_points must be >= 3"))
     D = 2F + 1
     length(spinor) == D ||
         throw(DimensionMismatch("spinor length $(length(spinor)) != 2F+1 = $D"))
@@ -127,16 +115,9 @@ function compute_spinor_lhy_table(;
             "with DDI) for F=6 polar; FullBdG remains valid for other phases." maxlog=1
     end
 
-    densities = collect(range(0.0, n_max; length=n_points))
-    energy = zeros(Float64, n_points)
-
-    for (i, n0) in enumerate(densities)
-        n0 < 1e-30 && continue
-        energy[i] = _compute_lhy_at_density(spinor, n0, F, interactions, zeeman, c_dd, k_max, n_k)
+    _tabulate_lhy(FullBdGLHY; n_max, n_points) do n0
+        _compute_lhy_at_density(spinor, n0, F, interactions, zeeman, c_dd, k_max, n_k)
     end
-
-    potential_values = _numerical_derivative(densities, energy)
-    FullBdGLHY(densities, potential_values)
 end
 
 # Detect "polar" spinor: m=0 channel dominates (purity > 99%).
@@ -271,18 +252,8 @@ function compute_spinor_lhy_polar_contact(;
     n_max::Float64=100.0,
     n_points::Int=200,
 )
-    n_points >= 3 || throw(ArgumentError("n_points must be >= 3"))
-    n_max > 0 || throw(ArgumentError("n_max must be positive"))
     coefs = build_polar_lhy_coefs(F, g_dict)
-
-    densities = collect(range(0.0, n_max; length=n_points))
-    energy = zeros(Float64, n_points)
-    for (i, n) in enumerate(densities)
-        n < 1e-30 && continue
-        energy[i] = lhy_energy_polar(n, coefs)
-    end
-    potential_values = _numerical_derivative(densities, energy)
-    PolarContactLHY(densities, potential_values)
+    _tabulate_lhy(n -> lhy_energy_polar(n, coefs), PolarContactLHY; n_max, n_points)
 end
 
 """
@@ -300,18 +271,9 @@ function compute_spinor_lhy_polar_dipolar(;
     n_max::Float64=100.0,
     n_points::Int=200,
 )
-    n_points >= 3 || throw(ArgumentError("n_points must be >= 3"))
-    n_max > 0 || throw(ArgumentError("n_max must be positive"))
     coefs = build_polar_lhy_coefs(F, g_dict)
-
-    densities = collect(range(0.0, n_max; length=n_points))
-    energy = zeros(Float64, n_points)
-    for (i, n) in enumerate(densities)
-        n < 1e-30 && continue
-        energy[i] = lhy_energy_polar_dipolar(n, coefs, eps_tilde_dd)
-    end
-    potential_values = _numerical_derivative(densities, energy)
-    PolarDipolarLHY(densities, potential_values)
+    _tabulate_lhy(n -> lhy_energy_polar_dipolar(n, coefs, eps_tilde_dd),
+        PolarDipolarLHY; n_max, n_points)
 end
 
 """
@@ -329,18 +291,9 @@ function compute_spinor_lhy_fm_dipolar(;
     n_max::Float64=100.0,
     n_points::Int=200,
 )
-    n_points >= 3 || throw(ArgumentError("n_points must be >= 3"))
-    n_max > 0 || throw(ArgumentError("n_max must be positive"))
     coefs = build_fm_lhy_coefs(F, g_dict)
-
-    densities = collect(range(0.0, n_max; length=n_points))
-    energy = zeros(Float64, n_points)
-    for (i, n) in enumerate(densities)
-        n < 1e-30 && continue
-        energy[i] = lhy_energy_fm_dipolar(n, coefs, eps_dd)
-    end
-    potential_values = _numerical_derivative(densities, energy)
-    FMDipolarLHY(densities, potential_values)
+    _tabulate_lhy(n -> lhy_energy_fm_dipolar(n, coefs, eps_dd),
+        FMDipolarLHY; n_max, n_points)
 end
 
 """
@@ -359,18 +312,8 @@ function compute_spinor_lhy_fm_contact(;
     n_max::Float64=100.0,
     n_points::Int=200,
 )
-    n_points >= 3 || throw(ArgumentError("n_points must be >= 3"))
-    n_max > 0 || throw(ArgumentError("n_max must be positive"))
     coefs = build_fm_lhy_coefs(F, g_dict)
-
-    densities = collect(range(0.0, n_max; length=n_points))
-    energy = zeros(Float64, n_points)
-    for (i, n) in enumerate(densities)
-        n < 1e-30 && continue
-        energy[i] = lhy_energy_fm(n, coefs)
-    end
-    potential_values = _numerical_derivative(densities, energy)
-    FMContactLHY(densities, potential_values)
+    _tabulate_lhy(n -> lhy_energy_fm(n, coefs), FMContactLHY; n_max, n_points)
 end
 
 """
@@ -396,17 +339,7 @@ function compute_spinor_lhy_icosahedral(;
             "compute_spinor_lhy_icosahedral is F=6 only (got F=$F); the I_h closed " *
             "form is specific to the F=6 even-S channel structure"),
     )
-    n_points >= 3 || throw(ArgumentError("n_points must be >= 3"))
-    n_max > 0 || throw(ArgumentError("n_max must be positive"))
-
-    densities = collect(range(0.0, n_max; length=n_points))
-    energy = zeros(Float64, n_points)
-    for (i, n) in enumerate(densities)
-        n < 1e-30 && continue
-        energy[i] = epsilon_LHY_F6_Ih(n, g_dict)
-    end
-    potential_values = _numerical_derivative(densities, energy)
-    IcosahedralLHY(densities, potential_values)
+    _tabulate_lhy(n -> epsilon_LHY_F6_Ih(n, g_dict), IcosahedralLHY; n_max, n_points)
 end
 
 """
@@ -473,6 +406,25 @@ function make_lhy(state::Symbol; ddi::Bool=false, F::Int, kwargs...)
                 ":polar, :fm, :icosahedral, :polar_two_channel, :full_bdg"),
         )
     end
+end
+
+# Shared tabulation skeleton for every density-only LHY closed form:
+# sample n ∈ [0, n_max], evaluate ε_LHY(n) via `energy_fn`, then tabulate
+# V_LHY = dε_LHY/dn by central differences. Cold path (called once at
+# workspace setup), so the `energy_fn` closure costs nothing in the hot
+# loop. Keeping the derivative path in ONE place means a future change to
+# the finite-difference scheme can't silently drift between modes.
+function _tabulate_lhy(energy_fn, ::Type{ResultT};
+    n_max::Float64, n_points::Int) where {ResultT}
+    n_points >= 3 || throw(ArgumentError("n_points must be >= 3"))
+    n_max > 0 || throw(ArgumentError("n_max must be positive"))
+    densities = collect(range(0.0, n_max; length=n_points))
+    energy = zeros(Float64, n_points)
+    for (i, n) in enumerate(densities)
+        n < 1e-30 && continue
+        energy[i] = energy_fn(n)
+    end
+    ResultT(densities, _numerical_derivative(densities, energy))
 end
 
 function _numerical_derivative(x::Vector{Float64}, y::Vector{Float64})

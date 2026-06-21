@@ -75,7 +75,7 @@
     @testset "Eu151 unchanged" begin
         @test Eu151.F == 6
         @test Eu151.a_s ≈ 110.0 * SpinorBEC.Units.BOHR_RADIUS rtol = 1e-6
-        @test Eu151.mu_mag > 6.0 * SpinorBEC.Units.MU_BOHR
+        @test Eu151.mu_mag > 6.0 * SpinorBEC.Units.BOHR_MAGNETON
     end
 
     @testset "Hyperfine splitting for alkali" begin
@@ -94,8 +94,8 @@
     end
 
     @testset "Dy/Er large magnetic moment" begin
-        @test Dy164.mu_mag > 9.0 * SpinorBEC.Units.MU_BOHR
-        @test Er168.mu_mag > 6.0 * SpinorBEC.Units.MU_BOHR
+        @test Dy164.mu_mag > 9.0 * SpinorBEC.Units.BOHR_MAGNETON
+        @test Er168.mu_mag > 6.0 * SpinorBEC.Units.BOHR_MAGNETON
         @test Dy164.F == 8
         @test Er168.F == 6
     end

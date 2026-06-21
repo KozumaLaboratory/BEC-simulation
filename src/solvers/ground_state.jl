@@ -61,7 +61,7 @@ function _validate_itp_interactions(
     end
 
     max_c = max(abs(interactions[0]), abs(interactions[1]))
-    if max_c > 1e-30
+    if is_active(max_c)
         max_exponent = max_c * n_peak * dt / 4
         if max_exponent > _ITP_EXPONENT_LIMIT
             throw(

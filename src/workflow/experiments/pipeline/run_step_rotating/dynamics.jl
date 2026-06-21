@@ -156,7 +156,7 @@
         potential=NoPotential(),
         sim_params=SimParams(; dt=dt_rtp, n_steps, imaginary_time=false, save_every),
         psi_init=psi_lab0,
-        enable_ddi=abs(c_dd_val) > 1e-30, c_dd=Float64(c_dd_val),
+        enable_ddi=is_active(c_dd_val), c_dd=Float64(c_dd_val),
         loss=loss_resolved, backend=ws_prev.backend,
     )
     copyto!(ws.potential_values, ws_prev.V_trap)  # reuse the GS trap (array form)

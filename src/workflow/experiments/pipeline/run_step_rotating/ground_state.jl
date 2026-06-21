@@ -239,7 +239,7 @@ end
             dt=dt_itp, n_steps=max(n_steps, 1), imaginary_time=true, normalize_every=0
         ),
         psi_init=psi_lab_seed,
-        enable_ddi=abs(c_dd) > 1e-30, c_dd=Float64(c_dd),
+        enable_ddi=is_active(c_dd), c_dd=Float64(c_dd),
         backend=backend_obj, dtype=T_float,
     )
     copyto!(ws.potential_values, V_trap)
