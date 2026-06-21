@@ -20,6 +20,7 @@ const FAST_TESTS = [
     "test_level12_production_audit.jl",
     "test_level0_gpu_cpu_consistency.jl",
     "analysis/test_faraday.jl",
+    "analysis/test_spin_rotation.jl",
     "analysis/test_sign_pattern.jl",
     "analysis/test_polyhedral_classifier.jl",
     "analysis/test_larmor_adiabaticity.jl",

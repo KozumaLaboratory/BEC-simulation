@@ -78,3 +78,25 @@ using SpinorBEC
         @test n_B > n_A
     end
 end
+
+@testset "Binary total energy — closed form (g=0 harmonic GS)" begin
+    # Two non-interacting species in the 2D isotropic trap V=½(x²+y²): each
+    # is the exact ground state ψ=exp(-r²/2), with E=dω/2=1 (virial:
+    # E_kin=E_pot=½). So binary_total_energy must be exactly 2.0. A missing
+    # 1/N_pts FFT-Parseval factor in the kinetic term overcounts E_kin by
+    # N_pts (≈4097 on a 64² grid) — this gate pins the normalisation.
+    grid = make_grid(GridConfig((64, 64), (12.0, 12.0)))
+    dV = cell_volume(grid)
+    psi = zeros(ComplexF64, 64, 64)
+    for I in CartesianIndices((64, 64))
+        x = grid.x[1][I[1]]
+        y = grid.x[2][I[2]]
+        psi[I] = exp(-(x^2 + y^2) / 2)
+    end
+    psi ./= sqrt(sum(abs2, psi) * dV)
+    sim = make_binary_simulation(grid;
+        couplings=BinaryCouplings(g_AA=0.0, g_BB=0.0, g_AB=0.0),
+        potential_A=HarmonicTrap((1.0, 1.0)), potential_B=HarmonicTrap((1.0, 1.0)),
+        psi_A_init=copy(psi), psi_B_init=copy(psi))
+    @test isapprox(binary_total_energy(sim), 2.0; atol=2e-2)
+end

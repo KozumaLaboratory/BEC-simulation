@@ -155,6 +155,20 @@ using LinearAlgebra
             @test length(SpinorBEC._make_icosahedron_vertices()) == 12
         end
 
+        @testset "Steinhardt Q6 normalizes to 1 for a perfect icosahedron" begin
+            # Steinhardt q6 = √((1/N²)ΣᵢⱼP₆(n̂ᵢ·n̂ⱼ)); the 4π/(2l+1) and the
+            # addition-theorem (2l+1)/(4π) prefactors cancel (Steinhardt-Nelson-
+            # Ronchetti, PRB 28, 784 (1983)). The icosahedron value 0.6633 is the
+            # normalizer, so the order parameter must be exactly 1 there. A
+            # spurious 4π/13 (the historical double-normalization) gives 0.983.
+            q6 = SpinorBEC._steinhardt_q6(SpinorBEC._make_icosahedron_vertices())
+            @test isapprox(q6, 1.0; atol=1e-3)
+            # a non-icosahedral set (octahedron vertices) is strictly below 1
+            octa = [(1.0, 0.0, 0.0), (-1.0, 0.0, 0.0), (0.0, 1.0, 0.0),
+                (0.0, -1.0, 0.0), (0.0, 0.0, 1.0), (0.0, 0.0, -1.0)]
+            @test SpinorBEC._steinhardt_q6(octa) < 0.99
+        end
+
         @testset "spectrum RMS is 0 for identical" begin
             v = [1.0, 2.0, 3.0]
             @test SpinorBEC._spectrum_rms(v, v) ≈ 0.0 atol = 1e-15

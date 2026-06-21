@@ -108,7 +108,9 @@ function _binary_energy(psi_A, psi_B, V_A, V_B, K, plans, c::BinaryCouplings, dV
     @inbounds for i in eachindex(K, psi_kA, psi_kB)
         E_kin += K[i] * (abs2(psi_kA[i]) + abs2(psi_kB[i]))
     end
-    E_kin *= 0.5 * dV
+    # `plans.forward` is the unnormalised FFT, so Parseval carries 1/N_pts:
+    # Σ_n|ψ_n|² = (1/N_pts) Σ_k|ψ̂_k|². Matches reference_kinetic_energy.
+    E_kin *= 0.5 * dV / length(psi_A)
 
     E_pot = 0.0
     E_int_AA = 0.0

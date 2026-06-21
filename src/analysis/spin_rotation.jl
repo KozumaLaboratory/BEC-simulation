@@ -170,19 +170,20 @@ function apply_fl_alignment(
 
         spinor = SVector{D, ComplexF64}(ntuple(c -> psi_fl[I, c], Val(D)))
         m_vals = SVector{D, Float64}(ntuple(c -> Float64(F - (c - 1)), Val(D)))
-        rotated = _apply_euler_spin_rotation(
+        # Send |m=+F⟩ (along +ẑ) to B̂ = (sinβcosα, sinβsinα, cosβ) via
+        # U = R_z(α) R_y(β): tilt by β about ŷ, then rotate azimuth α about ẑ.
+        rotated_y = _apply_euler_spin_rotation(
             spinor,
-            0.0, sin(beta), cos(beta),
-            alpha,
+            0.0, 1.0, 0.0,
+            beta,
             F, m_vals,
             sm.Fy_eigvecs, sm.Fy_eigvecs_adj, sm.Fy_eigvals,
             sm, false,
         )
-
-        spinor2 = _apply_euler_spin_rotation(
-            rotated,
+        rotated = _apply_euler_spin_rotation(
+            rotated_y,
             0.0, 0.0, 1.0,
-            0.0,
+            alpha,
             F, m_vals,
             sm.Fy_eigvecs, sm.Fy_eigvecs_adj, sm.Fy_eigvals,
             sm, false,
