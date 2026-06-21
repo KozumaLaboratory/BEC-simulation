@@ -273,6 +273,20 @@ using FFTW
                 @test size(sk) == grid.config.n_points
             end
         end
+
+        @testset "growth-rate estimator = exact log-linear slope" begin
+            # The saddle-rejection signal. Manufactured exponentials pin it
+            # exactly: a sign flip or a per-sample-vs-per-time scale bug
+            # shifts the fitted slope. (Pure function; no ITP.)
+            dt = 0.05
+            for γ in (0.37, -0.21, 0.0)
+                ts = Float64[0.01 * exp(γ * (i - 1) * dt) for i in 1:20]
+                @test isapprox(SpinorBEC._estimate_growth_rate(ts, dt), γ; atol=1e-9)
+            end
+            # same curve, doubled sample spacing ⇒ reported slope halves
+            ts = Float64[0.01 * exp(0.37 * (i - 1) * dt) for i in 1:20]
+            @test isapprox(SpinorBEC._estimate_growth_rate(ts, 2dt), 0.37 / 2; atol=1e-9)
+        end
     end
 
     @testset "Phase classification" begin

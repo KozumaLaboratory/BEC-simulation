@@ -100,3 +100,24 @@ end
         psi_A_init=copy(psi), psi_B_init=copy(psi))
     @test isapprox(binary_total_energy(sim), 2.0; atol=2e-2)
 end
+
+@testset "Binary Rabi — closed form n_B = sin²(ΩT/2)" begin
+    # All-A start, no interactions/trap/detuning: an exact two-level Rabi
+    # cycle. n_B(T)=sin²(ΩT/2), n_A(T)=cos²(ΩT/2). Pins the Rabi 2×2 unitary
+    # in binary_split_step! (rotation generator + angle).
+    grid = make_grid(GridConfig((8, 8), (10.0, 10.0)))
+    dV = cell_volume(grid)
+    Ω = π
+    n = grid.config.n_points
+    A = ones(ComplexF64, n...) ./ sqrt(prod(n) * dV)
+    B = zeros(ComplexF64, n...)
+    sim = make_binary_simulation(grid;
+        couplings=BinaryCouplings(g_AA=0.0, g_BB=0.0, g_AB=0.0, omega_coupling=Ω),
+        psi_A_init=A, psi_B_init=B)
+    for T in (0.3, 0.7, 1.0, 1.7)
+        run_binary_simulation!(sim; duration=(T - sim.t), dt=1e-3)
+        nA, nB = binary_norms(sim)
+        @test isapprox(nB, sin(Ω * T / 2)^2; atol=2e-3)
+        @test isapprox(nA, cos(Ω * T / 2)^2; atol=2e-3)
+    end
+end

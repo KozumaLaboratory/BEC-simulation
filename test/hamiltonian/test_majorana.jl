@@ -11,6 +11,31 @@ using LinearAlgebra
             @test all(isinf, stars)
         end
 
+        @testset "spin-coherent roots = cot(θ/2) (closed form)" begin
+            # |F,+F⟩ → all roots ∞ (north), |F,-F⟩ → all 0 (south); a θ-tilted
+            # coherent state has a single 2F-degenerate root at z = cot(θ/2).
+            for F in (1, 2, 6)
+                D = 2F + 1
+                up = zeros(ComplexF64, D);
+                up[1] = 1.0
+                @test all(isinf, majorana_stars(up, F))
+                dn = zeros(ComplexF64, D);
+                dn[D] = 1.0
+                @test all(z -> isfinite(z) && abs(z) < 1e-8, majorana_stars(dn, F))
+            end
+            for F in (1, 2)
+                sm = spin_matrices(F)
+                up = zeros(ComplexF64, 2F + 1);
+                up[1] = 1.0
+                θ = π / 3
+                ψ = exp(-im * θ * Matrix(sm.Fy)) * up
+                ψ ./= norm(ψ)
+                rs = filter(isfinite, majorana_stars(ComplexF64.(ψ), F))
+                @test length(rs) == 2F
+                @test all(z -> isapprox(abs(z), cot(θ / 2); rtol=1e-3), rs)
+            end
+        end
+
         @testset "F=1 polar: roots at 0 and Inf" begin
             spinor = ComplexF64[0.0, 1.0, 0.0]
             stars = majorana_stars(spinor, 1)
