@@ -43,25 +43,6 @@ using PrecompileTools
             write(iob, Float32[0, 1, 0, 1])
             take!(iob)
 
-            # Rotating-basis specialisation primer: build tiny workspaces for
-            # both Float64 and Float32 + exercise one split_step call so the
-            # runtime JIT does not have to specialise make_rotating_basis_ws{T,...}
-            # and the inner kinetic / diagonal / spin substeps for each T at
-            # first use. F=1 D=3 on a 4³ grid keeps the specialisation work tiny.
-            for T in (Float64, Float32)
-                config_rb = GridConfig((4, 4, 4), (T(2.0), T(2.0), T(2.0)))
-                grid_rb = make_grid(config_rb)
-                V_rb = zeros(T, 4, 4, 4)
-                ws_rb = make_rotating_basis_ws(grid_rb, 1, V_rb;
-                    p=T(1.0), q=T(0.0), c0=T(1.0), c1=T(0.0),
-                    c_dd=T(0.0), gamma_lhy=T(0.0),
-                    theta_func=t -> 0.0, phi_func=t -> 0.0,
-                    theta_dot_func=t -> 0.0, phi_dot_func=t -> 0.0,
-                    gauge_fix=false)
-                normalize_rotating!(ws_rb)
-                split_step_rotating!(ws_rb, T(0.01), T(0.0))
-            end
-
             # Loss-kernel primer: seed apply_loss_step! for both the linear
             # L3_per_m (linear-in-n) and the true-3-body K3_per_m_cubic
             # (quadratic-in-n) paths so EdH / K3 runs don't pay JIT on first

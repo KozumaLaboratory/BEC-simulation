@@ -335,19 +335,13 @@ const FULL_EXTRA = [
     "hamiltonian/test_tdhfb_gpu_phase5ab.jl",
     "hamiltonian/test_tdhfb_gpu_phase5c_expm.jl",
     "hamiltonian/test_tdhfb_gpu_phase5c_hf.jl",
-    # Option γ rotating-basis tests (added 2026-04-27..29).
-    "rotating_basis/test_rotating_basis_gpe.jl",
+    # Option γ magnetostir pipeline (rotating-basis YAML kind). The standalone
+    # RotatingBasisWS engine + its equivalence-gate tests were retired 2026-06-21
+    # (docs/design/rotating_basis_unification.md): the magnetostir GS+dynamics now
+    # run on the standard split-step path, validated by the pipeline-parsing test
+    # and the dict-based analyzers.
     "rotating_basis/test_rotating_basis_analyzers.jl",
-    "rotating_basis/test_rotating_basis_phase_ii.jl",
-    "rotating_basis/test_rotating_basis_phase_iii.jl",
     "rotating_basis/test_rotating_basis_pipeline_parsing.jl",
-    "rotating_basis/test_rotating_basis_f32.jl",
-    "rotating_basis/test_rotating_basis_sign_oracle.jl",
-    "rotating_basis/test_rotating_basis_singlet_pair.jl",
-    "rotating_basis/test_rotating_basis_standard_parity.jl",
-    "rotating_basis/test_rotating_vs_standard_dynamics.jl",
-    "rotating_basis/test_rotating_dynamics_pipeline_parity.jl",
-    "rotating_basis/test_rotating_yoshida6_vs_lab_midpoint.jl",
     # Higher-order integrator tests
     "hamiltonian/test_higher_order_integrators.jl",
     "hamiltonian/test_integrator_order_meanfield.jl",
