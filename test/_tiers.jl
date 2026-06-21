@@ -294,6 +294,12 @@ const CI_EXTRA = [
     # chains-off-the-gated-gradient counterpart (anomalous block carries
     # the soft modes the saddle-rejection verdict rides on).
     "oracles/test_bdg_fd_hessian.jl",
+    # StabilitySpec three-valued gate: replays the non-stationary /
+    # non-converged false-verdict class (mistake_stability_verdict_from_
+    # nonstationary_point) — gate returns :indeterminate, not a confident
+    # λ_min, when stationarity or the Lanczos Ritz residual is unmet, and
+    # abstains overall while the trapped dynamical BdG axis is unbuilt.
+    "oracles/test_stability_indeterminate.jl",
     # Fisher identifiability: the preflight instrument for the
     # no-anchor SBI regime (trust ledger column 3) — linearity anchors,
     # θ-valley, degenerate-protocol detection, channel-space chain.

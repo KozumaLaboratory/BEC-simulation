@@ -69,14 +69,30 @@ function Base.show(io::IO, ::MIME"text/plain", c::RunComparison)
     end
 end
 
+_check_mark(s::Symbol) =
+    if s === :pass
+        "✓ "
+    elseif s === :fail
+        "✗ "
+    else
+        "? "
+    end
+
+function _detail_status(d)
+    d isa NamedTuple || return :fail
+    haskey(d, :status) && return d.status
+    haskey(d, :pass) && return d.pass ? :pass : :fail
+    :fail
+end
+
 function Base.show(io::IO, ::MIME"text/plain", r::CheckResult)
-    print(io, r.pass ? "✓ " : "✗ ")
+    print(io, _check_mark(r.status))
     println(io, r.summary)
     if !isempty(r.details)
         for p in r.details
             obs = p.first
             d = p.second
-            marker = d isa NamedTuple && d.pass ? "  ✓ " : "  ✗ "
+            marker = "  " * _check_mark(_detail_status(d))
             got_str = if d isa NamedTuple && haskey(d, :got)
                 d.got isa Number ? @sprintf("%.4e", d.got) : repr(d.got)
             else

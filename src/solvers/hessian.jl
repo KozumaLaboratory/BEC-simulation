@@ -90,17 +90,31 @@ function constrained_hessian_action(ws, ψ, δ; μ, dV, n2, ε::Float64=1e-5)
 end
 
 """
-    trapped_bdg_lowest_eigenvalue(ws, ψ; niter=24, ε=1e-5, rng=…) → (λ_min, μ)
+    trapped_bdg_lowest_eigenvalue(ws, ψ; niter=24, ε=1e-5, tol_ritz=1e-2, rng=…)
+        → (; λ_min, μ, ritz_residual, niter_used, converged)
 
 Lowest eigenvalue of the constrained second variation `P(H−2μ)P` at a
 STATIONARY ψ — the gate-2 minimum-vs-saddle verdict for a trapped state.
 Hand-rolled fully-reorthogonalised Lanczos on `constrained_hessian_action`
 (no KrylovKit dependency); `λ_min ≥ −tol` ⇒ energetic minimum, `< −tol` ⇒
 saddle. Requires ψ converged (`g ∥ ψ`); on a non-stationary ψ the `μ` and
-the verdict are not meaningful.
+the verdict are not meaningful — `StabilitySpec` enforces that precondition
+before reading the sign.
+
+Self-certifying: `ritz_residual = |β_m · sₘ[end]|` is the classical
+a-posteriori Lanczos bound on the lowest Ritz value — `β_m` the residual
+norm of the last Lanczos vector, `sₘ` the tridiagonal eigenvector of the
+lowest Ritz value. A `λ_min` whose `ritz_residual` is not ≪ |λ_min| is NOT
+converged; the historical "λ_min still dropping at niter=200" false verdict
+is exactly a large `ritz_residual` the bare value hides. `converged` flags
+`ritz_residual < tol_ritz·(|λ_min| + 1e-10)`.
+
+`λ_min` and `μ` are the first two NamedTuple fields, so legacy
+`λ, _ = trapped_bdg_lowest_eigenvalue(...)` and `…[1]` still yield λ_min.
 """
 function trapped_bdg_lowest_eigenvalue(
-    ws, ψ; niter::Int=24, ε::Float64=1e-5, rng=Random.default_rng()
+    ws, ψ; niter::Int=24, ε::Float64=1e-5, tol_ritz::Float64=1e-2,
+    rng=Random.default_rng(),
 )
     p = constrained_hessian_params(ws, ψ)
     ipR(a, b) = real(sum(conj.(a) .* b)) * p.dV
@@ -121,5 +135,13 @@ function trapped_bdg_lowest_eigenvalue(
         push!(β, βj)
         push!(V, w ./ βj)
     end
-    minimum(eigvals(SymTridiagonal(α, β[1:(length(α) - 1)]))), p.μ
+    decomp = eigen(SymTridiagonal(α, β[1:(length(α) - 1)]))
+    λ_min = decomp.values[1]
+    s_min = @view decomp.vectors[:, 1]
+    # β_m (residual norm of the last Lanczos vector) is present iff the loop
+    # ran to `niter`; on early break the residual is ≈0 (exact eigenvector).
+    β_m = length(β) >= length(α) ? β[end] : 0.0
+    ritz_residual = abs(β_m * s_min[end])
+    converged = ritz_residual < tol_ritz * (abs(λ_min) + 1e-10)
+    (; λ_min, μ=p.μ, ritz_residual, niter_used=length(α), converged)
 end
