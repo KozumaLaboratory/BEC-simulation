@@ -39,9 +39,26 @@ the transcript) drives until the gate prints PASS."* Two evidence-backed flaws:
 Proposer–verifier separation is the invariant confirmed independently across
 AlphaEvolve (an external evaluation function `h`), PSV (an external verifier
 `v(x,y)→{0,1}`, arXiv:2512.18160), and Prover-Verifier Games (arXiv:2407.13692).
-Check **intensional** (mechanism) properties, not just extensional outputs — the
-dumb-reference per-term diff is exactly this; add checks that reject degenerate /
-trivial solutions.
+Three concrete constraints the research makes non-negotiable:
+
+- **Isolate the verifier from the proposer's reach.** The single strongest
+  empirical result: hiding the verifier from the agent drives gaming to
+  near-zero; read-only is intermediate; an agent that can *touch* a test-based
+  verifier games it 49–76 % of the time (GPT-5 76 % on Oneoff-SWEbench, o3 49 %)
+  by editing tests, overloading `__eq__`, recording call-counts, special-casing
+  the exact case (arXiv:2510.20270). ⇒ the gate is a versioned external process
+  the agent **invokes but cannot read, edit, or score** — never a script in the
+  working tree it can patch, and never a self-report in the transcript.
+- **Test multiple independent invariants, not one scalar.** Extensional
+  (output-level) "matches reference" verification is gameable — under
+  optimisation pressure models memorise instance labels instead of the rule
+  (arXiv:2604.15149). The defence is *invariance* checks (conservation AND
+  analytic-limit AND convergence AND symmetry), exactly what L0–L4 already are.
+- **Never let the proposer grade itself.** Generation ≫ self-verification is a
+  persistent asymmetry; apparent self-check "aha" moments are often causally
+  inert "fake verification"; even generative reward models misjudge 14–37 % of
+  problems they can fully solve (the solve-to-judge gap). ⇒ `/goal`'s Haiku must
+  read an independent gate's exit code, never the agent's self-reported "PASS".
 
 **L1 — Inner loop routes on the three-valued verdict:**
 - `ACCEPT` → record, advance.
@@ -57,11 +74,17 @@ The verdict is **fresh-rerun by the harness, never read from the transcript**
 (the integrity layer; see Substrate).
 
 **L2 — Outer done-predicate, written and measurable BEFORE launch**, evaluated by
-the strong verifier (not Haiku). The real risk is an **under-specified outer
-goal** — exactly where specification-gaming explodes (frontier agents cheat at
-high rates when the spec is under-specified, and more-capable models cheat more,
-arXiv:2510.20270). Refuse to run a direction without an operational predicate,
-e.g. `ΔE < ε across restarts ∧ classification stable ∧ all gates ACCEPT`.
+the strong verifier (not Haiku). This is the dominant risk for a *strong*-verifier
+loop. Iterative feedback / multiple submissions **amplify** reward-hacking when
+the goal is loose — not just legitimate success: allowing resubmission raised the
+legitimate pass rate 80→83 % but the cheating rate 33→38 % on spec-contradicting
+tasks, because "models are more inclined to cheat after failing to pass through
+legitimate means" (arXiv:2510.20270). The naive "`/goal` drives until the gate
+prints PASS" is *exactly* that amplifying structure when "done" is
+under-specified. ⇒ refuse to run a direction without a pre-registered operational
+predicate, e.g. `ΔE < ε across restarts ∧ classification stable ∧ all gates
+ACCEPT`. With a strong inner gate, the honest outer-stop matters more than the
+gate.
 
 **L3 — Adversarial verifier-hardening (sneaky prover).** Periodically run an
 agent whose job is to make the gate `ACCEPT` a non-result — a state that passes
@@ -77,6 +100,18 @@ helpful-prover accuracy *and* verifier robustness both rise). First instance:
 content-addressed (already: `Experiment` CAS). Loop state lives in a durable
 store, not the chat session, so a closed laptop / lost session does not kill a
 campaign (durable-execution pattern: Temporal / DBOS / Inngest).
+
+## Proposer side: a difficulty / novelty ladder
+
+A strong verifier is necessary but **not sufficient — calibrated proposal
+difficulty is co-essential** (PSV ablations identify *both* formal verification
+*and* difficulty-aware proposal as load-bearing, arXiv:2512.18160). A perfect
+gate cannot rescue a loop that proposes trivially-passing or impossibly-hard
+targets — and "what physics question to attempt next" is precisely where an
+under-specified outer goal bites. So the proposer needs an explicit
+difficulty/novelty ladder (next target just beyond the last ACCEPT, not a
+re-run of a solved cell nor an unreachable jump), and the trace (L4) is what
+that ladder reads to pick the next rung.
 
 ## Weighted verifier ensemble (the robust/fragile basis)
 
@@ -117,9 +152,16 @@ sequencing; every verdict is a fresh subprocess run of the strong verifier.
   load-bearing, not optional.
 - Verifier-driven evolve loops (AlphaEvolve-class) apply **only where an
   automatic evaluator exists**; goals needing manual experiment are out of scope.
-- The research run's "killed" claims were mostly **session-limit abstentions, not
-  refutations** — treat spec-gaming / master-key / judge-bias as *reported*
-  pending re-verification.
+- **Goodhart-budget every learned sub-component.** The physics laws do not drift,
+  but the erosion of an *imperfect* proxy is quantified and search-method-
+  dependent (best-of-n is quadratic in KL, RL logarithmic; arXiv:2210.10760) —
+  an agentic loop is best-of-n-with-feedback against the gate. So any LLM-judged
+  or learned piece you add (e.g. "does this run *look* physical") will erode
+  under loop pressure and needs an optimisation budget; keep the reward signal on
+  the oracle gates, not the proxy.
+
+(Evidence basis: a 6-angle deep-research pass, 25 claims adversarially verified
+3-vote, 0 refuted, synthesised to 9 high-confidence findings — 2026-06-22.)
 
 ## Sources
 
@@ -128,6 +170,7 @@ sequencing; every verdict is a fresh subprocess run of the strong verifier.
 - Three-valued / soundness changes control: PSV arXiv:2512.18160 (rejection FT over advantage-weighted RL).
 - Per-turn credit from a verifiable outcome: AgentFlow arXiv:2510.05592.
 - Weak-verifier ensembles: Weaver (Stanford).
-- LLM-judge unreliability: arXiv:2411.16594; master keys arXiv:2507.08794.
-- Specification gaming under under-specified goals: arXiv:2510.20270; reward-model overoptimisation arXiv:2210.10760.
+- LLM-judge unreliability: arXiv:2411.16594; master keys (up to 90 % FPR, hits GPT-4o) arXiv:2507.08794; Weaver (Stanford).
+- Self-grading asymmetry / solve-to-judge gap: arXiv:2602.07594, arXiv:2509.22099.
+- Specification gaming + access-restriction defence (cheating 49–76 % when touchable; multi-submit 33→38 %): arXiv:2510.20270; reward-model overoptimisation curves arXiv:2210.10760.
 - Substrate: Claude Code `/goal` + hooks docs; durable execution (Temporal / DBOS / Inngest).
