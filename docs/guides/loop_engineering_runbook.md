@@ -21,30 +21,30 @@ physics gate as the reward signal — not "tests pass," not an LLM judge.
    budget. See `rb87_stable_polar.toml` (a stable minimum ⇒ ACCEPT) and
    `rb87_polar_saddle.toml` (a saddle ⇒ REJECT) for the schema.
 
-2. **Wire the Stop hook** in `.claude/settings.json` (one-time):
-   ```json
-   { "hooks": {
-       "Stop":        [ { "matcher": "*", "hooks": [ { "type": "command",
-         "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/loop/loop_gate.sh\"" } ] } ],
-       "SubagentStop":[ { "matcher": "*", "hooks": [ { "type": "command",
-         "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/loop/loop_gate.sh\"" } ] } ] } }
-   ```
-   The hook no-ops unless `BEC_LOOP_DIRECTION` is set, so it is inert outside a
-   campaign.
-
-3. **Launch** (headless, resumable):
+2. **Launch** — the Stop hook is injected ONLY into the campaign sub-session via
+   `--settings`, so it is **campaign-scoped**: it never touches the shared
+   `.claude/settings.json` and your normal interactive sessions are never
+   affected (no Stop hook fires on the main session at all). Prompt via stdin so
+   `--allowedTools` does not consume it:
    ```bash
-   BEC_LOOP_DIRECTION=runs/directions/<name>.toml \
-   claude -p --max-turns 15 "/goal $(cat <<'G'
-   The latest turn contains a line matching ^VERIFY: ACCEPT  produced by running
-   `julia --project=. scripts/loop/verify.jl runs/directions/<name>.toml` THIS
-   turn (not echoed from earlier). If it shows ABSTAIN, read the StabilitySpec
-   reason and ESCALATE the gate budget — raise `niter` in the TOML (or tighten
-   the solve) — then re-run verify. If it shows REJECT, the physics is wrong:
-   stop and report. Stop after 12 turns.
-   G
-   )"
+   HOOK='{"hooks":{"Stop":[{"matcher":"*","hooks":[{"type":"command",
+     "command":"bash \"$CLAUDE_PROJECT_DIR/scripts/loop/loop_gate.sh\""}]}],
+     "SubagentStop":[{"matcher":"*","hooks":[{"type":"command",
+     "command":"bash \"$CLAUDE_PROJECT_DIR/scripts/loop/loop_gate.sh\""}]}]}}'
+   printf '%s' 'Run `julia --project=. scripts/loop/verify.jl runs/directions/<name>.toml`
+   and report its full VERIFY line verbatim.
+   /goal The latest turn contains a line matching ^VERIFY: ACCEPT produced by running
+   verify.jl on runs/directions/<name>.toml THIS turn (not echoed). On ABSTAIN, read
+   the StabilitySpec reason and ESCALATE the gate budget (raise `niter` in the TOML)
+   then re-run. On REJECT, the physics is wrong: stop and report. Stop after 12 turns.' \
+   | BEC_LOOP_DIRECTION=runs/directions/<name>.toml \
+     claude --print --max-turns 15 --settings "$HOOK" \
+       --allowedTools "Bash(julia *),Read(./**),Edit(runs/directions/**)"
    ```
+   `--settings` MERGES onto the project settings, so the sub-session keeps the
+   API-key guard etc. AND gains the loop gate; the main session, launched without
+   it, has neither. (Do NOT commit the hook into `.claude/settings.json` — that
+   would fire `loop_gate.sh` on every interactive Stop. It is opt-in, per run.)
 
 ## How the loop actually turns
 
