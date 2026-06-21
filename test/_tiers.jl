@@ -294,6 +294,10 @@ const CI_EXTRA = [
     # chains-off-the-gated-gradient counterpart (anomalous block carries
     # the soft modes the saddle-rejection verdict rides on).
     "oracles/test_bdg_fd_hessian.jl",
+    # Trapped non-Hermitian BdG (dynamical axis) ≡ homogeneous BdG in the
+    # uniform limit: matrix-free σ_z[L M; M* L*] from the gated HvP vs the
+    # CG-sum homogeneous matrices at the box k-modes + quartet symmetry.
+    "oracles/test_trapped_bdg_spectrum.jl",
     # StabilitySpec three-valued gate: replays the non-stationary /
     # non-converged false-verdict class (mistake_stability_verdict_from_
     # nonstationary_point) — gate returns :indeterminate, not a confident

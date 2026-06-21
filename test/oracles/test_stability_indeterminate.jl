@@ -54,7 +54,7 @@ using Random: MersenneTwister
         ws_init=ws, psi_init=seed, n_steps=600, tol=1e-10, verbose=false)
     ψ_gs = copy(ws.state.psi)        # atomic return sets ws.state.psi = GS
 
-    @testset "converged GS ⇒ stationary + energetic min, ABSTAINS overall" begin
+    @testset "converged GS ⇒ all three axes pass ⇒ overall :pass" begin
         res = check(StabilitySpec(), ws, ψ_gs; rng=MersenneTwister(1))
         stat = first(p.second for p in res.details if p.first === :stationarity)
         ener = first(p.second for p in res.details if p.first === :energetic)
@@ -63,8 +63,10 @@ using Random: MersenneTwister
         @test ener.status === :pass
         @test ener.converged
         @test ener.λ_min > -StabilitySpec().λ_tol
-        @test dyn.status === :indeterminate       # trapped dynamical BdG unbuilt
-        @test res.status === :indeterminate       # abstains, does not over-claim
+        @test dyn.status === :pass               # GS is dynamically stable (real ω)
+        @test dyn.dense_ok                       # small system ⇒ dense BdG solved
+        @test dyn.quartet_residual < StabilitySpec().tol_quartet
+        @test res.status === :pass               # energetic min ⇒ dynamically stable
     end
 
     @testset "too few Lanczos iters ⇒ energetic :indeterminate (self-cert)" begin
@@ -72,5 +74,13 @@ using Random: MersenneTwister
         ener = first(p.second for p in res.details if p.first === :energetic)
         @test !ener.converged                     # Ritz residual ≫ tol at niter=1
         @test ener.status === :indeterminate
+    end
+
+    @testset "dense BdG past cap ⇒ dynamical abstains (:indeterminate)" begin
+        res = check(StabilitySpec(; bdg_dim_cap=10), ws, ψ_gs; rng=MersenneTwister(1))
+        dyn = first(p.second for p in res.details if p.first === :dynamical)
+        @test !dyn.dense_ok                       # 2·length(ψ)=144 > cap=10
+        @test dyn.status === :indeterminate
+        @test res.status === :indeterminate       # abstains for production-size
     end
 end

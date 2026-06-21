@@ -16,11 +16,12 @@
 #                  (converged) AND (b) |λ_min| is resolvable above the
 #                  stationarity error — a slightly-off ψ builds the operator
 #                  at the wrong point and can flip a small λ_min's sign.
-#   dynamical    — complex BdG frequency ⇒ exponential growth. The TRAPPED
-#                  non-Hermitian BdG is not built yet (phase 2), so this
-#                  axis returns :indeterminate; overall status therefore
-#                  never reaches :pass until it exists. A half-built
-#                  verifier abstains; it does not over-claim.
+#   dynamical    — complex BdG frequency ⇒ exponential growth. The trapped
+#                  non-Hermitian BdG (`trapped_bdg_spectrum`) is dense
+#                  (phase 2a): real spectrum ⇒ :pass, complex ω ⇒ :fail.
+#                  Systems past the dense cap abstain (:indeterminate) until
+#                  the matrix-free Arnoldi (phase 2b) lands — a half-built
+#                  verifier abstains, it does not over-claim.
 #
 # overall = :fail if any axis fails; else :indeterminate if any axis is
 # indeterminate; else :pass.
@@ -43,13 +44,18 @@ struct StabilitySpec
     λ_tol::Float64
     couple::Float64
     niter::Int
+    tol_dyn::Float64
+    tol_quartet::Float64
+    bdg_dim_cap::Int
 
     StabilitySpec(;
         ε_stat::Real=1.0e-4, tol_ritz::Real=1.0e-2, λ_tol::Real=1.0e-6,
         couple::Real=10.0, niter::Integer=60,
+        tol_dyn::Real=1.0e-6, tol_quartet::Real=1.0e-6, bdg_dim_cap::Integer=4000,
     ) = new(
         Float64(ε_stat), Float64(tol_ritz), Float64(λ_tol),
         Float64(couple), Int(niter),
+        Float64(tol_dyn), Float64(tol_quartet), Int(bdg_dim_cap),
     )
 end
 
@@ -92,10 +98,23 @@ function check(spec::StabilitySpec, ws, ψ; rng=Random.default_rng())
             niter_used=bdg.niter_used, converged=bdg.converged, status=energetic),
     )
 
-    # --- dynamical axis (trapped non-Hermitian BdG — phase 2, abstain) -
-    dyn_status = :indeterminate
-    push!(details, :dynamical => (
-        got="trapped non-Hermitian BdG not built", status=dyn_status))
+    # --- dynamical axis (trapped non-Hermitian BdG, dense) -------------
+    dynbdg = trapped_bdg_spectrum(ws, ψ; μ, dim_cap=spec.bdg_dim_cap)
+    dyn_status = if !dynbdg.dense_ok
+        :indeterminate                      # too large for dense; Arnoldi unbuilt
+    elseif dynbdg.quartet_residual > spec.tol_quartet
+        :indeterminate                      # ω↦−conj(ω) symmetry broken: solve suspect
+    elseif dynbdg.max_growth > spec.tol_dyn
+        :fail                               # complex ω ⇒ exponential growth
+    else
+        :pass                               # spectrum real ⇒ dynamically stable
+    end
+    push!(
+        details,
+        :dynamical => (
+            max_growth=dynbdg.max_growth, quartet_residual=dynbdg.quartet_residual,
+            bdg_dim=dynbdg.dim, dense_ok=dynbdg.dense_ok, status=dyn_status),
+    )
 
     # --- combine -------------------------------------------------------
     axes = (stat_status, energetic, dyn_status)
