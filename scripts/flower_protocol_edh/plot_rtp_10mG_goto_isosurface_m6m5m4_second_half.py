@@ -53,7 +53,8 @@ ISO_RATIO_PER_M = {
     -4: float(os.environ.get("ISO_PEAK_RATIO_M4", str(ISO_PEAK_RATIO))),
 }
 FRAME_START_FRAC = float(os.environ.get("FRAME_START_FRAC", "0.25"))
-FPS = int(os.environ.get("FPE_FPS", "24"))
+FPS = int(os.environ.get("FPE_FPS", "60"))
+DURATION_S = float(os.environ.get("FPE_DURATION_S", "20.0"))
 FRAME_DURATION_MS = int(os.environ.get("FRAME_DURATION_MS", str(max(1, int(round(1000 / FPS))))))
 
 COMPONENTS = [
@@ -265,7 +266,7 @@ def main():
                   f"t={t_ms:7.3f} ms  B={B_uG:+8.3f} μG")
 
     OUT_GIF.parent.mkdir(parents=True, exist_ok=True)
-    save_pil_frames(frames, OUT_GIF, fps=FPS, duration_ms=FRAME_DURATION_MS)
+    save_pil_frames(frames, OUT_GIF, fps=FPS, duration_s=DURATION_S)
     print(f"wrote {OUT_GIF}")
 
 

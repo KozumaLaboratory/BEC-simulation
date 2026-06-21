@@ -42,7 +42,8 @@ OUT_GIF = Path(os.environ.get(
 ))
 ISO_PEAK_RATIO = float(os.environ.get("ISO_PEAK_RATIO", "0.30"))
 MAX_FRAMES = int(os.environ.get("MAX_FRAMES", "0"))
-FPS = int(os.environ.get("FPE_FPS", "24"))
+FPS = int(os.environ.get("FPE_FPS", "60"))
+DURATION_S = float(os.environ.get("FPE_DURATION_S", "20.0"))
 FRAME_DURATION_MS = int(os.environ.get("FRAME_DURATION_MS", str(max(1, int(round(1000 / FPS))))))
 
 TETS = [
@@ -232,7 +233,7 @@ def main():
             print(f"  frame {k + 1:3d}/{n_frames}  t={t_ms:7.3f} ms  B={B_uG:+8.3f} μG  peak={peak:.3e}")
 
     OUT_GIF.parent.mkdir(parents=True, exist_ok=True)
-    save_pil_frames(frames, OUT_GIF, fps=FPS, duration_ms=FRAME_DURATION_MS)
+    save_pil_frames(frames, OUT_GIF, fps=FPS, duration_s=DURATION_S)
     print(f"wrote {OUT_GIF}")
 
 

@@ -19,8 +19,7 @@ import h5py
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
-from _anim_writer import save_matplotlib_anim
+from _anim_writer import save_via_png_dup
 
 ROOT = os.environ.get("FPE_ROOT",
     "/gs/bs/work/6/ue06186/bec-runs/flower_protocol_edh")
@@ -29,8 +28,8 @@ OUT_GIF = os.environ.get("OUT_GIF", H5.replace(".h5", "_3d_density_phase.mp4"))
 
 ISO_TOTAL = float(os.environ.get("FPE_3D_ISO_TOTAL", "0.10"))
 ISO_M6 = float(os.environ.get("FPE_3D_ISO_M6", "0.12"))
-FPS = int(os.environ.get("FPE_3D_FPS", os.environ.get("FPE_FPS", "24")))
-INTERVAL_MS = int(os.environ.get("FPE_3D_INTERVAL_MS", str(max(1, int(round(1000 / FPS))))))
+FPS = int(os.environ.get("FPE_3D_FPS", os.environ.get("FPE_FPS", "60")))
+DURATION_S = float(os.environ.get("FPE_DURATION_S", "20.0"))
 
 with h5py.File(H5, "r") as f:
     required = ("n_total_3d", "n_m6_3d", "arg_psi_m6_3d")
@@ -149,11 +148,7 @@ def draw_frame(k):
     vB.set_xdata([t_ms[k], t_ms[k]])
     hud.set_text(f"frame = {k+1:3d}/{Nf}\niso(total) = {ISO_TOTAL:.2f} nmax\niso(m=-6) = {ISO_M6:.2f} nmax")
 
-def update(frame_idx):
-    draw_frame(frame_idx)
-    return ()
-
-print(f"rendering {len(frames)} frames → {OUT_GIF}")
-anim = FuncAnimation(fig, update, frames=frames, interval=INTERVAL_MS, blit=False)
-save_matplotlib_anim(anim, OUT_GIF, fps=FPS)
+print(f"data frames: {len(frames)}  output fps: {FPS}  duration: {DURATION_S:.1f}s  → {OUT_GIF}")
+save_via_png_dup(fig, lambda i: draw_frame(frames[i]), len(frames), OUT_GIF,
+                 fps=FPS, duration_s=DURATION_S)
 print("done.")

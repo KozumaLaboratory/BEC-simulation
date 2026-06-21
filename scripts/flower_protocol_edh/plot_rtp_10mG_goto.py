@@ -15,8 +15,7 @@ import h5py
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
-from _anim_writer import save_matplotlib_anim
+from _anim_writer import save_via_png_dup
 from matplotlib import colors as mcolors
 
 plt.rcParams.update({
@@ -29,7 +28,8 @@ ROOT = os.environ.get("FPE_ROOT",
     "/gs/bs/work/6/ue06186/bec-runs/flower_protocol_edh")
 H5      = os.environ.get("RTP_H5") or os.path.join(ROOT, os.environ.get("RTP_H5_NAME", "rtp_10mG_goto.h5"))
 OUT_GIF = os.environ.get("OUT_GIF", H5.replace(".h5", ".mp4"))
-FPS     = int(os.environ.get("FPE_FPS", "24"))
+FPS     = int(os.environ.get("FPE_FPS", "60"))
+DURATION_S = float(os.environ.get("FPE_DURATION_S", "20.0"))
 
 with h5py.File(H5, "r") as f:
     t     = f["t"][:]
@@ -209,7 +209,7 @@ def update(k):
 stride = max(1, Nf // 200)
 frames = list(range(0, Nf, stride))
 if frames[-1] != Nf - 1: frames.append(Nf - 1)
-print(f"rendering {len(frames)} frames → {OUT_GIF}")
-anim = FuncAnimation(fig, update, frames=frames, interval=140, blit=False)
-save_matplotlib_anim(anim, OUT_GIF, fps=FPS)
+print(f"data frames: {len(frames)}  fps: {FPS}  duration: {DURATION_S:.1f}s  → {OUT_GIF}")
+save_via_png_dup(fig, lambda i: update(frames[i]), len(frames), OUT_GIF,
+                 fps=FPS, duration_s=DURATION_S)
 print("done.")
