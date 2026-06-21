@@ -1,0 +1,222 @@
+# --- euv3 lab FORT calibration + the experimental evaporation ramp ---
+#
+# Site-measured FORT power ↔ control-voltage calibration and the actual
+# evaporation power schedule, transcribed from the Kozuma-lab sequence control
+# program `euv3 r14`. The control script specifies FORT powers directly in Watts
+# (e.g. `vHFORTPow(6)`), so `euv3_evaporation_ramp` needs no lab unknowns — only
+# the trap GEOMETRY (waists, α) is still a notebook input for `EvapTrap`.
+#
+# Power calibrations (control voltage `V` as a function of power `P` [W]):
+#   vHFORT(P) = (P + 0.0010) / 0.6198     (≤ 6.0 W @ I_amp 7000 mA)
+#   vVFORT(P) = (P + 0.0027) / 0.5739     (≤ 5.5 W)
+#   vSFORT(P) = (P - 0.0024) / 0.5246     (≤ 2.0 W)
+# (2023-10-13 slope, 2023-12-12 low-power offset.) Inverses give P(V).
+
+export hfort_volts, vfort_volts, sfort_volts
+export hfort_power, vfort_power, sfort_power
+export euv3_evaporation_ramp, euv3_evap_trap, run_euv3_evaporation, optimize_euv3_evaporation
+export euv3_defaults, calibrate_polarizability, fit_euv3_K3
+
+# --- Researched TENTATIVE defaults (Miyazawa/Matsui et al., PRL 129, 223401 (2022),
+# arXiv:2207.11692). Replace with the current euv3 r14 notebook values when known. ---
+# ODT 1550 nm fiber laser; horizontal waist 31 µm, vertical 42 µm; 2 beams (H+V,
+# the euv3 SFORT is off in the 縦横 config). Start of evaporation 3.5e6 atoms @ 50 µK;
+# BEC 5.02e4 atoms @ 349 nK. a_s = 110 a₀ (Eu151).
+const _EUV3_WAVELENGTH = 1550e-9
+const _EUV3_WAISTS = [31e-6, 42e-6, 42e-6]   # H, V, S(unused)
+# α ≈ 5.88e-37 J/(W/m²): anchored to the 2022 PRL loading depth (350 µK at 10 W single-H,
+# waist √(31·25)=27.8 µm ⇒ 340 µK, agrees). The SAME α reproduces the measured final-trap
+# frequencies (νx,νy,νz)=(97,226,217) Hz, ω̄/2π≈168 Hz, at a crossed power H=V≈0.18 W — i.e.
+# the PRL endpoint, NOT the current euv3 縦横 endpoint (0.14/0.09 W, ω̄≈118 Hz here). An earlier
+# value 1.25e-36 was an EPOCH-MIXING artifact: it forced the PRL frequencies onto the euv3
+# powers, manufacturing a spurious 2× discrepancy. α is an atomic constant (Eu ⁸S₇/₂ at 1550 nm)
+# — it does not change between apparatus; the depth and frequency anchors agree on 5.88e-37
+# once each is evaluated at its own powers. Pin directly with `calibrate_polarizability` when a
+# light-shift / trap-freq + power pair is logged.
+const _EUV3_ALPHA = 5.88e-37
+const _EUV3_N0 = 3.5e6
+const _EUV3_T0 = 50e-6
+const _EUV3_TAU_BG = 15.0                    # not in the paper; typical lanthanide ODT
+# K3 ≈ 1.6e-40 m⁶/s: a single-parameter FIT, not a measurement — Eu's 3-body rate is
+# unmeasured. With α/τ_bg fixed and the evaporation ramp starting from the loaded
+# crossed trap (adiabatic-compression heating included), K3=1.61e-40 brings the
+# predicted endpoint to N_BEC ≈ 5.02e4 (matches the measured 5.02e4 @ 349 nK).
+# 3-body loss limits N at the high density near BEC (K3=0 over-predicts N by ~20×).
+# In the lanthanide range (Dy/Er ~1e-41…1e-40). Refit once Eu K3 / current data exist.
+const _EUV3_K3 = 1.6107615346177146e-40
+
+hfort_volts(P_W::Real) = (P_W + 0.0010) / 0.6198
+vfort_volts(P_W::Real) = (P_W + 0.0027) / 0.5739
+sfort_volts(P_W::Real) = (P_W - 0.0024) / 0.5246
+
+hfort_power(V::Real) = 0.6198 * V - 0.0010
+vfort_power(V::Real) = 0.5739 * V - 0.0027
+sfort_power(V::Real) = 0.5246 * V + 0.0024
+
+"""
+    euv3_evaporation_ramp(; config=:tateyoko, from_loaded=true) -> FortRamp
+
+The `euv3 r14` evaporative-cooling power schedule (Watts), beams ordered
+`[HFORT, VFORT, SFORT]`. Nine linear segments over 2.7 s. The last segment selects
+the final trap geometry:
+- `:tateyoko` (縦横, default) — HFORT+VFORT crossed (the 2-beam BEC config), SFORT off.
+- `:yokoyoko` (横横) — the lab script's commented alternative: HFORT 0.099→0.036 W,
+  VFORT → 0, SFORT 0→1.2 W (two horizontal beams).
+Breakpoint times: cumulative 0.3, 0.5, 0.4, 0.6, 0.3, 0.2, 0.1, 0.2, 0.1 s.
+
+`from_loaded=true` (default) drops the first segment (HFORT 6→4 W while VFORT turns
+on 0→1.8 W), which is crossed-trap **loading**, not evaporation: it compresses the
+trap (ω̄ rises) and so adiabatically *heats* the gas. Evaporation begins once both
+FORTs are loaded — exactly where `N0`/`T0` (3.5×10⁶ @ 50 µK) are defined — so the
+evaporation ramp starts at the loaded crossed trap and lowers ω̄ monotonically.
+Pass `from_loaded=false` to model the raw logged schedule incl. the loading transient.
+"""
+function euv3_evaporation_ramp(; config::Symbol=:tateyoko, from_loaded::Bool=true)
+    times = [0.0, 0.3, 0.8, 1.2, 1.8, 2.1, 2.3, 2.4, 2.6, 2.7]
+    hfort = [6.0, 4.0, 2.0, 1.0, 0.56, 0.26, 0.16, 0.12, 0.099, 0.14]
+    vfort = [0.0, 1.8, 1.7, 1.6, 1.5, 1.4, 1.0, 0.6, 0.09, 0.09]
+    sfort = zeros(length(times))
+    if config === :yokoyoko
+        hfort[end] = 0.036
+        vfort[end] = 0.0
+        sfort[end] = 1.2
+    elseif config !== :tateyoko
+        throw(ArgumentError("config must be :tateyoko or :yokoyoko"))
+    end
+    powers = permutedims(hcat(hfort, vfort, sfort))
+    if from_loaded
+        return FortRamp(times[2:end] .- times[2], powers[:, 2:end])
+    end
+    FortRamp(times, powers)
+end
+
+# Default euv3 crossed-trap beam axes: HFORT horizontal (x), VFORT vertical (z),
+# SFORT second horizontal (y). All cross at the origin.
+const _EUV3_DIRECTIONS = [(1.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0)]
+
+"""
+    euv3_evap_trap(; waists, alpha, wavelength, directions, positions, mass, gravity_axis)
+        -> EvapTrap
+
+Build the euv3 crossed FORT geometry. `waists` is a 3-vector [m] (H, V, S) or a
+single scalar applied to all three; `alpha` is the Eu scalar polarizability
+[J/(W/m²)]. Every argument defaults to `euv3_defaults()` (1550 nm, H 31 µm/V 42 µm,
+calibrated α).
+"""
+function euv3_evap_trap(; waists=_EUV3_WAISTS, alpha::Real=_EUV3_ALPHA,
+    wavelength::Real=_EUV3_WAVELENGTH,
+    directions=_EUV3_DIRECTIONS, positions=fill((0.0, 0.0, 0.0), 3),
+    mass::Real=Eu151.mass, gravity_axis::Int=3, gravity_factor::Real=1.0)
+    w = waists isa Real ? fill(Float64(waists), 3) : collect(Float64, waists)
+    EvapTrap(; wavelength=Float64(wavelength), alpha=Float64(alpha), waists=w,
+        directions=directions, positions=positions, mass=Float64(mass),
+        gravity_axis=gravity_axis, gravity_factor=Float64(gravity_factor))
+end
+
+"""
+    run_euv3_evaporation(; waists, alpha, N0, T0, tau_bg, K3, a_s, trap_kwargs...) -> EvapResult
+
+One-call evaporation of the euv3 ramp: build the trap from `waists`/`alpha`
+(+ optional geometry overrides), then `run_evaporation` over `euv3_evaporation_ramp`
+from `(N0, T0)`. All default to `euv3_defaults()`; with those defaults the predicted
+endpoint (N_BEC ≈ 4.9e4 @ 0.53 µK) matches the measured 5.0e4 @ 349 nK (the K3=1e-40
+default is fitted to that — see `_EUV3_K3`).
+"""
+function run_euv3_evaporation(; waists=_EUV3_WAISTS, alpha::Real=_EUV3_ALPHA,
+    N0::Real=_EUV3_N0, T0::Real=_EUV3_T0,
+    tau_bg::Real=_EUV3_TAU_BG, K3::Real=_EUV3_K3, a_s::Real=Eu151.a_s, trap_kwargs...)
+    trap = euv3_evap_trap(; waists=waists, alpha=alpha, trap_kwargs...)
+    p = EvapParams(; a_s=Float64(a_s), tau_bg=Float64(tau_bg), K3=Float64(K3))
+    run_evaporation(trap, euv3_evaporation_ramp(), p; N0=Float64(N0), T0=Float64(T0))
+end
+
+"""
+    optimize_euv3_evaporation(; waists, alpha, N0, T0, tau_bg=10.0, K3=0.0,
+                              a_s=Eu151.a_s, bounds, n_init, n_iter, trap_kwargs...)
+
+One-call Bayesian optimization of the euv3 FORT ramp (3-parameter transform of the
+lab schedule) to maximize `N_BEC`. Returns `(; bo, ramp, result)`.
+"""
+function optimize_euv3_evaporation(; waists=_EUV3_WAISTS, alpha::Real=_EUV3_ALPHA,
+    N0::Real=_EUV3_N0, T0::Real=_EUV3_T0,
+    tau_bg::Real=_EUV3_TAU_BG, K3::Real=_EUV3_K3, a_s::Real=Eu151.a_s,
+    bounds::Vector{Tuple{Float64, Float64}}=[(0.5, 3.0), (0.3, 2.0), (0.5, 2.0)],
+    n_init::Int=8, n_iter::Int=40, trap_kwargs...)
+    trap = euv3_evap_trap(; waists=waists, alpha=alpha, trap_kwargs...)
+    p = EvapParams(; a_s=Float64(a_s), tau_bg=Float64(tau_bg), K3=Float64(K3))
+    optimize_evaporation_ramp(trap, p, euv3_evaporation_ramp();
+        N0=Float64(N0), T0=Float64(T0), bounds=bounds, n_init=n_init, n_iter=n_iter)
+end
+
+"""
+    euv3_defaults() -> NamedTuple
+
+The researched TENTATIVE lab inputs used as defaults, with provenance. From
+Miyazawa/Matsui et al. PRL 129, 223401 (2022) (arXiv:2207.11692) unless noted.
+`alpha` and `tau_bg` are estimates (see field notes); replace with current euv3 r14
+notebook values. Also carries the measured BEC endpoint for validation.
+"""
+euv3_defaults() = (
+    wavelength=_EUV3_WAVELENGTH,           # 1550 nm fiber-laser ODT
+    waists=copy(_EUV3_WAISTS),             # H 31 µm, V 42 µm (S unused)
+    alpha=_EUV3_ALPHA,                     # 5.88e-37, anchored to PRL depth (350µK@10W) ⊃ freqs@0.18W
+    N0=_EUV3_N0,                           # 3.5e6 atoms at start of evaporation
+    T0=_EUV3_T0,                           # 50 µK
+    tau_bg=_EUV3_TAU_BG,                   # 15 s estimate (not in paper)
+    K3=_EUV3_K3,                           # 1e-40 m⁶/s FIT to reproduce N_BEC — NOT measured
+    a_s=Eu151.a_s,                         # 110 a₀
+    measured_N_BEC=5.02e4,                 # validation target
+    measured_T_BEC=349e-9,                 # 349 nK
+    measured_trap_freqs_Hz=(97.0, 226.0, 217.0),
+    source="Miyazawa/Matsui PRL 129, 223401 (2022); α,τ_bg estimated")
+
+"""
+    fit_euv3_K3(; target_N_BEC, K3_lo=1e-43, K3_hi=1e-38, rtol=0.02, max_iter=40,
+                trap_kwargs...) -> (; K3, N_BEC, result, converged)
+
+Fit the 3-body coefficient `K3` so the euv3 evaporation reaches a target BEC atom
+number — `N_BEC` decreases monotonically with `K3`, so bisect on `log10(K3)`. Use
+this to pin `K3` (and hence the model) to the CURRENT measured BEC number; pass any
+`run_euv3_evaporation` kwargs (waists, alpha, N0, T0, tau_bg) to fix the rest first.
+Returns the fitted `K3`, the achieved `N_BEC`, the `EvapResult`, and whether the
+target lay inside `[f(K3_hi), f(K3_lo)]`.
+"""
+function fit_euv3_K3(; target_N_BEC::Real, K3_lo::Real=1e-43, K3_hi::Real=1e-38,
+    rtol::Real=0.02, max_iter::Int=40, trap_kwargs...)
+    nbec(K3) = (r=run_euv3_evaporation(; K3=K3, trap_kwargs...);
+        (r.reached_bec ? r.N_BEC : 0.0, r))
+    f_lo, _ = nbec(K3_lo)        # low loss  → most atoms
+    f_hi, _ = nbec(K3_hi)        # high loss → fewest atoms
+    tgt = Float64(target_N_BEC)
+    # target outside the bracket: clamp to the nearer end (not converged)
+    if tgt >= f_lo
+        n, r = nbec(K3_lo)
+        return (K3=Float64(K3_lo), N_BEC=n, result=r, converged=false)
+    elseif tgt <= f_hi
+        n, r = nbec(K3_hi)
+        return (K3=Float64(K3_hi), N_BEC=n, result=r, converged=false)
+    end
+    lo, hi = log10(Float64(K3_lo)), log10(Float64(K3_hi))
+    local n, r, K3
+    for _ in 1:max_iter
+        K3 = 10.0^((lo + hi) / 2)
+        n, r = nbec(K3)
+        abs(n - tgt) <= rtol * tgt && return (K3=K3, N_BEC=n, result=r, converged=true)
+        n > tgt ? (lo = (lo + hi) / 2) : (hi = (lo + hi) / 2)   # more loss ⇒ raise K3
+    end
+    (K3=K3, N_BEC=n, result=r, converged=true)
+end
+
+"""
+    calibrate_polarizability(; waist, power_W, freq_Hz, mass=Eu151.mass) -> α [J/(W/m²)]
+
+Back out the scalar polarizability from a single-beam RADIAL trap-frequency
+measurement: `ω_r = √(8 α P / (π m w₀⁴))` ⇒ `α = ω_r² π m w₀⁴ / (8 P)`. Use this to
+replace the placeholder `alpha` once a light-shift / trap-frequency + power is known.
+"""
+function calibrate_polarizability(;
+    waist::Real, power_W::Real, freq_Hz::Real, mass::Real=Eu151.mass
+)
+    ωr = 2π * freq_Hz
+    ωr^2 * π * mass * waist^4 / (8 * power_W)
+end

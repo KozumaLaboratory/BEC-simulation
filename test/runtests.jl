@@ -154,6 +154,10 @@ const FAST_TESTS = [
     "hamiltonian/test_multipole_q_spectrum.jl",
     "solvers/test_compare.jl",
     "solvers/test_pseudo_arclength.jl",
+    "solvers/test_evaporation.jl",
+    "solvers/test_condensate.jl",
+    "workflow/test_euv3_coils.jl",
+    "workflow/test_feshbach.jl",
     "workflow/test_active_learning.jl",
     "workflow/test_inspect_config.jl",
     "workflow/test_diff_dicts.jl",
@@ -172,6 +176,9 @@ const CI_EXTRA = [
     "solvers/test_checkpoint.jl",
     "solvers/test_itp_checkpoint_hook.jl",
     "analysis/test_energy.jl",
+    # Evaporation OPTIMIZATION/SCAN tools run the scalar model in loops (optimizer,
+    # parameter scans, K3 fit) — aggregate-heavy, kept out of the per-push fast tier.
+    "solvers/test_evaporation_tools.jl",
     # Demoted from FAST 2026-06-15 (#15): run find_ground_state / run_simulation!
     # / run_yaml-scan / full pipeline (ITP/RTP), violating the fast-tier "no
     # ITP/RTP" contract. Validation-ladder anchors (Level 4/11) still gate here

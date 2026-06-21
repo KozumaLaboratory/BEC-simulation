@@ -38,3 +38,13 @@ include("solvers/continuation/triple_point.jl")
 include("solvers/twa.jl")
 include("solvers/binary_simulation.jl")
 include("solvers/scalar_egpe.jl")  # adiabatic-elimination scalar GPE (Klaus regime alt)
+# 0-D truncated-Boltzmann evaporative-cooling model (thermal-cloud → BEC ramp
+# optimization). Parallel to GP: scalar N(t)/T(t) kinetics, not a wavefunction.
+include("solvers/evaporation/trap_geometry.jl")
+include("solvers/evaporation/evaporation_model.jl")
+include("solvers/evaporation/evaporation_solve.jl")
+include("solvers/evaporation/condensate.jl")  # two-component thermal+condensate (BEC transition)
+include("solvers/evaporation/evaporation_optimize.jl")
+include("solvers/evaporation/euv3.jl")  # lab FORT calibration + the euv3 evaporation ramp
+include("solvers/evaporation/evaporation_handoff.jl")  # evaporation endpoint → GP trap config
+include("solvers/evaporation/cloud_profile.jl")  # thermal-cloud spatial profile during evaporation
