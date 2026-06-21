@@ -51,21 +51,24 @@ end
 ) where {T <: AbstractFloat}
     z = zero(T)
     one_t = one(T)
-    @inbounds @simd for i in 1:N_spatial
-        px = T(phi_x[i])
-        py = T(phi_y[i])
-        pz = T(phi_z[i])
-        pm = sqrt(px * px + py * py + pz * pz)
-        if pm < T(1e-100)
-            alpha[i] = z
-            beta[i] = z
-            theta[i] = z
-        else
-            alpha[i] = atan(py, px)
-            cb = pz / pm
-            cb = cb > one_t ? one_t : (cb < -one_t ? -one_t : cb)
-            beta[i] = acos(cb)
-            theta[i] = pm * T(dt_frac)
+    dt_t = T(dt_frac)
+    _voxel_loop!(N_spatial) do i
+        @inbounds begin
+            px = T(phi_x[i])
+            py = T(phi_y[i])
+            pz = T(phi_z[i])
+            pm = sqrt(px * px + py * py + pz * pz)
+            if pm < T(1e-100)
+                alpha[i] = z
+                beta[i] = z
+                theta[i] = z
+            else
+                alpha[i] = atan(py, px)
+                cb = pz / pm
+                cb = cb > one_t ? one_t : (cb < -one_t ? -one_t : cb)
+                beta[i] = acos(cb)
+                theta[i] = pm * dt_t
+            end
         end
     end
     nothing

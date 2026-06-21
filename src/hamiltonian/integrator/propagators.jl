@@ -189,21 +189,25 @@ function _diagonal_step_svec_real!(
     c0, c_lhy, dt_frac, density_buf,
 ) where {N, D}
     n_pts = ntuple(d -> size(psi, d), Val(N))
-    @inbounds for I in CartesianIndices(n_pts)
-        s = 0.0
-        for c in 1:D
-            s += abs2(psi_mf[I, c])
-        end
-        density_buf[I] = s
-    end
+    Ns = prod(n_pts)
     zee_dt = SVector{D, Float64}(ntuple(c -> zeeman_diag[c] * dt_frac, Val(D)))
     zee_cis = SVector{D, ComplexF64}(ntuple(c -> cis(-zee_dt[c]), Val(D)))
-    @inbounds for I in CartesianIndices(n_pts)
-        n = density_buf[I]
-        V_int = c0 * n + _lhy_V(n, c_lhy)
-        cis_base = cis(-(V_trap[I] + V_int) * dt_frac)
-        for c in 1:D
-            psi[I, c] *= cis_base * zee_cis[c]
+    P = reshape(psi, Ns, D)
+    Pmf = reshape(psi_mf, Ns, D)
+    Vt = reshape(V_trap, Ns)
+    db = reshape(density_buf, Ns)
+    _voxel_loop!(Ns) do i
+        @inbounds begin
+            s = 0.0
+            for c in 1:D
+                s += abs2(Pmf[i, c])
+            end
+            db[i] = s
+            V_int = c0 * s + _lhy_V(s, c_lhy)
+            cis_base = cis(-(Vt[i] + V_int) * dt_frac)
+            for c in 1:D
+                P[i, c] *= cis_base * zee_cis[c]
+            end
         end
     end
     nothing
@@ -214,22 +218,26 @@ function _diagonal_step_svec_imag!(
     c0, c_lhy, dt_frac, density_buf,
 ) where {N, D}
     n_pts = ntuple(d -> size(psi, d), Val(N))
-    @inbounds for I in CartesianIndices(n_pts)
-        s = 0.0
-        for c in 1:D
-            s += abs2(psi_mf[I, c])
-        end
-        density_buf[I] = s
-    end
+    Ns = prod(n_pts)
     zee_shift = minimum(zeeman_diag)
     zee_dt = SVector{D, Float64}(ntuple(c -> (zeeman_diag[c] - zee_shift) * dt_frac, Val(D)))
     zee_exp = SVector{D, Float64}(ntuple(c -> exp(-zee_dt[c]), Val(D)))
-    @inbounds for I in CartesianIndices(n_pts)
-        n = density_buf[I]
-        V_int = c0 * n + _lhy_V(n, c_lhy)
-        exp_base = exp(-(V_trap[I] + V_int) * dt_frac)
-        for c in 1:D
-            psi[I, c] *= exp_base * zee_exp[c]
+    P = reshape(psi, Ns, D)
+    Pmf = reshape(psi_mf, Ns, D)
+    Vt = reshape(V_trap, Ns)
+    db = reshape(density_buf, Ns)
+    _voxel_loop!(Ns) do i
+        @inbounds begin
+            s = 0.0
+            for c in 1:D
+                s += abs2(Pmf[i, c])
+            end
+            db[i] = s
+            V_int = c0 * s + _lhy_V(s, c_lhy)
+            exp_base = exp(-(Vt[i] + V_int) * dt_frac)
+            for c in 1:D
+                P[i, c] *= exp_base * zee_exp[c]
+            end
         end
     end
     nothing
