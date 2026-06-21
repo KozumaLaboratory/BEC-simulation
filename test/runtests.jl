@@ -47,6 +47,9 @@ const _SKIP = Set(filter(!isempty, split(get(ENV, "SPINORBEC_TEST_SKIP", ""), ",
 const _NWORKERS = let w = get(ENV, "SPINORBEC_TEST_WORKERS", "1")
     w == "auto" ? max(1, Sys.CPU_THREADS) : parse(Int, w)
 end
+# Per-chunk wall-clock cap (seconds) under parallelism; 0 disables. Generous by
+# default — catches a genuine hang, not a merely-slow chunk (cold F32 ≈ 600 s).
+const _TIMEOUT = parse(Float64, get(ENV, "SPINORBEC_TEST_TIMEOUT", "1800"))
 
 # Per-file cost estimate (seconds), measured on the full tier, used only to
 # balance the parallel chunks. Only the heavy outliers need an entry; the long
@@ -137,8 +140,26 @@ else
         isempty(files) && return (k, 0, "")
         cmd = `$jl --startup-file=no --project=$proj --pkgimages=existing $runner $files`
         buf = IOBuffer()
-        p = run(pipeline(ignorestatus(cmd); stdout=buf, stderr=buf); wait=true)
-        (k, p.exitcode, String(take!(buf)))
+        p = run(pipeline(ignorestatus(cmd); stdout=buf, stderr=buf); wait=false)
+        # Per-chunk wall-clock guard: a hung test (non-converging ITP, deadlock)
+        # would otherwise stall the whole suite until the CI job timeout. Kill
+        # the chunk and report it as failed (exit 124) instead.
+        t0 = time()
+        timed_out = false
+        while process_running(p)
+            if _TIMEOUT > 0 && time() - t0 > _TIMEOUT
+                kill(p)
+                sleep(1.0)
+                process_running(p) && kill(p, Base.SIGKILL)
+                timed_out = true
+                break
+            end
+            sleep(0.5)
+        end
+        wait(p)
+        out = String(take!(buf))
+        timed_out && (out *= "\n⏱  chunk $k TIMED OUT after $(_TIMEOUT)s — killed\n")
+        (k, timed_out ? 124 : p.exitcode, out)
     end
 
     for (k, code, out) in results

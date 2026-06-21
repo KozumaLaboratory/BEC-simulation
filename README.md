@@ -115,3 +115,6 @@ Runner knobs (all read by `test/runtests.jl`):
   precompiler).
 - `SPINORBEC_TEST_TIMING=quiet` — suppress the per-file timing table that
   otherwise prints at the end of every run.
+- `SPINORBEC_TEST_TIMEOUT` — per-chunk wall-clock cap in seconds under
+  parallelism (default 1800; `0` disables). A hung chunk is killed and
+  reported as failed (exit 124) rather than stalling the whole suite.
