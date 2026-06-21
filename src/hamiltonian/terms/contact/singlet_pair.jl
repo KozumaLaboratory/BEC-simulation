@@ -60,10 +60,7 @@ function _singlet_pair_loop!(psi, psi_mf, ::Val{D}, n_pts, c2, dt, imaginary_tim
     F = (D - 1) ÷ 2
     inv_sqrt_D = 1.0 / sqrt(Float64(D))
 
-    signs = ntuple(Val(D)) do c
-        m = F - (c - 1)
-        iseven(F - m) ? 1.0 : -1.0
-    end
+    signs = ntuple(c -> singlet_pair_sign(F, F - (c - 1)), Val(D))
 
     mid = (D + 1) ÷ 2
 
