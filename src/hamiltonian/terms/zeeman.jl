@@ -373,19 +373,18 @@ function _uniform_spin_expectation(
 end
 
 # out[r] .+= M·ψ[r] for a spatially-uniform D×D spin matrix M (CPU accumulate).
+# out[I,i] += Σ_j M[i,j]·ψ[I,j]  ≡  out_2d += ψ_2d · Mᵀ over the (N_spatial, D)
+# reshape. Batched matmul (not a per-voxel scalar loop) so the same body is
+# GPU-safe: a CuArray scalar `getindex(psi, I, j)` would error. M is moved to
+# psi's device via similar+copyto! — the established uniform-rotation idiom.
 function _accumulate_uniform_spin!(
     out::AbstractArray, M::AbstractMatrix{ComplexF64}, psi::AbstractArray, D::Int, N::Int
 )
-    n_pts = ntuple(d -> size(psi, d), N)
-    @inbounds for I in CartesianIndices(n_pts)
-        for i in 1:D
-            acc = zero(ComplexF64)
-            for j in 1:D
-                acc += M[i, j] * psi[I, j]
-            end
-            out[I, i] += acc
-        end
-    end
+    n_spatial = prod(ntuple(d -> size(psi, d), N))
+    MT = similar(psi, ComplexF64, D, D)
+    copyto!(MT, permutedims(M))                       # Mᵀ on psi's device
+    mul!(reshape(out, n_spatial, D), reshape(psi, n_spatial, D), MT,
+        one(ComplexF64), one(ComplexF64))             # out_2d += ψ_2d · Mᵀ
     out
 end
 
