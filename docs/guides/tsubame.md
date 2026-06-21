@@ -1,6 +1,6 @@
 # Running SpinorBEC on TSUBAME 4.0
 
-Day-to-day workflow + scaling knobs for TSUBAME 4.0 (or any SLURM + CUDA cluster).
+Day-to-day workflow + scaling knobs for TSUBAME 4.0 (Altair Grid Engine / UGE + CUDA).
 
 ## One-time setup
 
@@ -17,9 +17,9 @@ julia --project=. -e 'using Pkg; Pkg.instantiate()'
 `scripts/tsubame_setup.sh` exports `JULIA_DEPOT_PATH=$T4_TMPDIR/.julia`
 (node-local NVMe to avoid Lustre metadata storms),
 `SPINORBEC_SCRATCH_DIR=$T4_TMPDIR/spinorbec_snaps` (streamed snapshot
-scratch), `JULIA_NUM_THREADS=$SLURM_CPUS_PER_TASK`, and runs
-`module load cuda + julia`. Falls back gracefully on dev machines
-without `$T4_TMPDIR`.
+scratch), `JULIA_NUM_THREADS` sized from `$NSLOTS` (UGE slot count;
+falls back to 4), and runs `module load cuda + julia`. Falls back
+gracefully on dev machines without `$T4_TMPDIR`.
 
 ## Memory and disk budget
 
@@ -66,34 +66,37 @@ $EDITOR runs/eu151_edh_ext/config.yaml
 # Dry-run check (calibration applied? schema OK?)
 julia --project=. -e 'using SpinorBEC; run_yaml("runs/eu151_edh_ext/config.yaml"; dry_run=true)'
 
-# Suggested SLURM flags from grid + scan size
-julia --project=. -e 'using SpinorBEC; suggest_sbatch_flags(ARGS[1])' \
-    runs/eu151_edh_ext/config.yaml
-
-# Preview the rendered sbatch script (no submission):
+# Preview the rendered qsub script (no submission):
 julia --project=. -e 'using SpinorBEC;
-    print(render_sbatch_script("default", "runs/eu151_edh_ext/config.yaml"))'
+    print(render_uge_script("default", "runs/eu151_edh_ext/config.yaml";
+        project_root=pwd(), log_dir="logs/tsubame"))'
 
-# Submit through the autopilot (renders sbatch on the fly):
+# Submit through the autopilot (renders the qsub script on the fly):
 julia --project=. scripts/cli.jl autopilot enqueue runs/eu151_edh_ext/config.yaml
-julia --project=. scripts/cli.jl autopilot tick    # dispatches via SlurmBackend
+julia --project=. scripts/cli.jl autopilot tick    # dispatches via UGEBackend
 
-# Or submit a single config directly (auto-rendered into a tmpfile):
+# Or submit a single config directly:
 julia --project=. -e '
     using SpinorBEC
-    b = SlurmBackend()
+    b = UGEBackend(; ssh_host="tsubame", project_root="...", remote_runs_root="...")
     e = enqueue!(Experiment("runs/eu151_edh_ext/config.yaml"))
     dispatch!(b, e)
 '
 
-squeue -u $USER
+qstat -u $USER
 tail -f logs/spinorbec-*.out
 ```
 
-The SBATCH directives live in `PROFILE_DIRECTIVES` in
-`src/workflow/autopilot/backends.jl` — edit there to tune memory /
-walltime / GPU class. Profiles escalate on OOM/TIMEOUT via the
-`next_profile` chain (see `docs/guides/autopilot.md`).
+On TSUBAME the autopilot auto-registers a `UGEBackend` from the
+`SPINORBEC_TSUBAME_{HOST,PROJECT_ROOT,RUNS_ROOT,GROUP,JULIA,DEPOT,SYSIMAGE,CUDA_MODULE,SYNC_CODE}`
+env vars (the HOST/PROJECT_ROOT/RUNS_ROOT triple is required; the rest
+default). The qsub resource directives live in `UGE_PROFILE_DIRECTIVES`
+in `src/workflow/autopilot/backends_uge.jl` (`default` / `node_h` /
+`node_f` / `gpu_1` / `long_q`) — edit there to tune walltime / node
+class. Profiles escalate on OOM/TIMEOUT via the `next_profile` chain
+(see `docs/guides/autopilot.md`). Note: `-g <group>` is passed as a
+qsub CLI flag, not an `#$ -g` directive (the TSUBAME4 wrapper rejects
+the directive form).
 
 ### Array jobs (multi-point scans)
 
@@ -102,17 +105,18 @@ julia --project=. -e 'using SpinorBEC; println(scan_point_count(ARGS[1]))' \
     runs/foo/config.yaml   # → 144
 ```
 
-For an array submission, prepend `#SBATCH --array=1-N%K` to the
-rendered script — extend `PROFILE_DIRECTIVES` with a new `"scan_array"`
-profile carrying the array directive, or pipe `render_sbatch_script`
+For an array submission, add `#$ -t 1-N` + `#$ -tc K` to the rendered
+script — extend `UGE_PROFILE_DIRECTIVES` with a new `"scan_array"`
+profile carrying the array directive, or pipe `render_uge_script`
 output through `sed`. Each task writes `runs/foo/point_NNN.jld2`;
 resumable — re-submitting skips cached files (`SPINORBEC_SCAN_ONLY_INDEX`
 env var inside `_run_yaml_scan`).
 
-### TSUBAME 3 / SGE-style submission
+### Manual per-job qsub script
 
-For SGE-based clusters (`qsub` / `qstat` / `qdel`), use a per-job
-script of the shape:
+The autopilot's `UGEBackend` renders this shape automatically via
+`render_uge_script`. To submit by hand (`qsub` / `qstat` / `qdel`),
+use a per-job script of the form:
 
 ```bash
 #!/bin/bash
@@ -138,9 +142,10 @@ Add `#$ -t 1-N` + `#$ -tc K` for array jobs; `mapfile -t CONFIGS < <(ls -d runs/
 then `RUN_NAME="${CONFIGS[$((SGE_TASK_ID - 1))]}"` to pick the per-task
 config.
 
-A SLURM-native `SgeBackend` is not implemented — the autopilot ships
-with `SlurmBackend` only. SGE clusters operate the cli.jl entry
-manually for now.
+The autopilot ships two backends: `LocalBackend` (subprocess on the
+current host) and `UGEBackend` (TSUBAME / Altair Grid Engine over SSH).
+TSUBAME 4 dispatch goes through `UGEBackend`; the manual script above is
+only needed for ad-hoc one-offs outside the queue.
 
 ## Recommended YAML knobs at scale
 
@@ -183,7 +188,7 @@ Dashboard runs on the compute node; SSH-tunnel via the login node:
 # laptop
 ssh -L 8765:cnode-h100-12:8765 tsubame
 
-# compute node (via srun --pty bash)
+# compute node (interactive via qrsh)
 julia --project=. -e 'using SpinorBEC; serve_dashboard(8765)' &
 
 # laptop browser → http://localhost:8765
@@ -193,7 +198,7 @@ Lab-image push uses the same tunnel: `curl --data-binary @absorption_shot.png ht
 
 ## Checkpoint and resume
 
-`run_pipeline` writes periodic checkpoints to `$run_dir/.checkpoints/<filename>` during a dynamics step. Restart with the same `run_yaml(...)` call — the cache/resume logic picks up from the last checkpoint. Pair with SLURM `--requeue` for automatic restart after preemption.
+`run_pipeline` writes periodic checkpoints to `$run_dir/.checkpoints/<filename>` during a dynamics step. Restart with the same `run_yaml(...)` call — the cache/resume logic picks up from the last checkpoint. Pair with a rerunnable job (`#$ -r y`) for automatic restart after preemption.
 
 For multi-attempt mixes of crashes + preemption: enqueue via
 `julia --project=. scripts/cli.jl autopilot enqueue runs/foo/config.yaml`
@@ -267,7 +272,7 @@ julia --project=. -e '
 | First run very slow (~10 min before any output) | precompile on Lustre | confirm `$JULIA_DEPOT_PATH` points at NVMe (`echo $JULIA_DEPOT_PATH` after sourcing) |
 | `unable to load CUDA driver` | module not loaded | `source scripts/tsubame_setup.sh` first |
 | `ENOSPC` mid-run | streamed snapshots filled `$T4_TMPDIR` | bigger `nvme:NN` or coarser `save.psi` cadence |
-| Job killed at exact wall-clock limit | `--requeue` not set | re-submit; SLURM resumes from checkpoint |
-| Phase-diagram scan progresses one-at-a-time | not using array job | switch to `scan_array.sbatch` with `--array=1-N%K` |
+| Job killed at exact wall-clock limit | job not rerunnable | re-submit (or `#$ -r y`); resumes from checkpoint |
+| Phase-diagram scan progresses one-at-a-time | not using array job | switch to a `scan_array` profile with `#$ -t 1-N -tc K` |
 | GC pressure on big ψ across many scan points | implicit retention | `GC.gc()` between phases; `CUDA.memory_status()` to inspect |
 | FFTW wisdom replanning on each new node | wisdom not shared | bake wisdom into `runs/shared/fftw.wisdom` if hopping CPU generations |
