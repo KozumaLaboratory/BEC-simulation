@@ -7,12 +7,16 @@
     p::Dict{String, Any}, grid, pipeline_results::Dict;
     verbose::Bool=true,
 )
-    haskey(pipeline_results, :rotating_basis_ws) || throw(
+    haskey(pipeline_results, :rotating_basis_gs) || throw(
         ArgumentError(
             "rotating_basis dynamics requires preceding ground_state with kind: rotating_basis"
         ),
     )
-    ws_prev = pipeline_results[:rotating_basis_ws]::RotatingBasisWS
+    # GS handoff: a plain NamedTuple (couplings + sm + tilde GS state), not a
+    # RotatingBasisWS — the rotating engine is retired; both steps run on the
+    # standard split-step path. Fields: p,q,c0,c1,c_dd,gamma_lhy,F,sm,psi_tilde,
+    # V_trap,backend.
+    ws_prev = pipeline_results[:rotating_basis_gs]
 
     duration = Float64(p["duration"])
     integrator_name = String(get(p, "integrator", _default_rotating_integrator(duration)))::String
@@ -42,7 +46,7 @@
     # This is a *predictive* check, not enforcing; user can pass an
     # explicit `dt:` to override.
     p_zeeman_abs = abs(ws_prev.p)
-    F_atom_int = ws_prev.spin_matrices.system.F
+    F_atom_int = ws_prev.F
     larmor_phase = p_zeeman_abs * F_atom_int * dt_rtp
     if larmor_phase > π && !haskey(p, "dt")
         # Hard error in the audit-confirmed danger regime (ε ≥ 1e-3,
@@ -101,7 +105,7 @@
 
     # Build a NEW workspace re-using the same physics couplings + state, but
     # with the time-dep B̂(t) hooked up.
-    F_atom = ws_prev.spin_matrices.system.F
+    F_atom = ws_prev.F
     V_trap = ws_prev.V_trap
     # Optional `loss:` block. SI K_3 conversion needs (atom, N_atoms, ω_ref);
     # all three are stashed in pipeline_results by the GS step.
@@ -121,7 +125,7 @@
     # We drive a lab-frame TimeDependentZeeman B̂(t)=(θ(t),φ(t)) and record the
     # SAME tilde-basis observables by transforming ψ_lab(t) → ψ̃(t)=U_B(t)†ψ_lab(t),
     # so the :rotating_basis_dynamics dict (consumer contract) is byte-compatible.
-    sm = ws_prev.spin_matrices
+    sm = ws_prev.sm
     F_val = F_atom
     N_dim = length(grid.config.n_points)
     p_zee = ws_prev.p
@@ -130,7 +134,7 @@
     by_wf = FunctionWaveform(t -> p_zee * sin(theta_func(t)) * sin(phi_func(t)))
     zee_field = TimeDependentZeeman(bz_wf, ConstantWaveform(ws_prev.q), bx_wf, by_wf)
 
-    c_dd_val = ws_prev.ddi_params.C_dd
+    c_dd_val = ws_prev.c_dd
     atom_for_ws = get(pipeline_results, :rotating_basis_atom, nothing)
     atom_for_ws = if atom_for_ws === nothing
         AtomSpecies("RotatingBasis", 1.66e-25, F_val, 0.0, 0.0, 0.0)

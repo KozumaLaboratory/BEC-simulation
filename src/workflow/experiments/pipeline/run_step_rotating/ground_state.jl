@@ -145,14 +145,7 @@ end
         CPUBackend()
     end
 
-    ws = make_rotating_basis_ws(grid, F_atom, V_trap;
-        p=p_z, q=q_z, c0=c0, c1=c1, c_dd=c_dd, gamma_lhy=γ,
-        theta_func=_ConstAngle(θ_init), phi_func=_ConstAngle(φ_init),
-        theta_dot_func=_ZERO_FUNC, phi_dot_func=_ZERO_FUNC,
-        gauge_fix=gauge_fix_flag,
-        backend=backend_obj,
-    )
-
+    sm = spin_matrices(F_atom)
     D = 2F_atom + 1
     init_m_idx = Int(get(p, "init_m_idx", p_z > 0 ? 1 : D))::Int
     # Auto-derive init_sigma from Thomas-Fermi radius if user omits.
@@ -211,28 +204,73 @@ end
         end
         host
     end
-    copyto!(ws.psi_tilde, psi_init_host)
-    normalize_rotating!(ws)
-
-    # Default ITP step count: 200 normally, 0 for from_jld2 (the loaded
-    # ψ is *already* near a ground state of the source run's Hamiltonian
-    # — re-equilibrating on the same Hamiltonian is a no-op, on a
-    # changed Hamiltonian the user should choose n_steps explicitly).
     n_steps = Int(get(p, "n_steps", use_from_jld2 ? 0 : 200))
     dt_itp = Float64(get(p, "dt", 0.005))
+    ndim = length(n)
+
+    # UNIFIED (2026-06-21): GS on the STANDARD split-step path (rotating engine
+    # retired). Static tilted field B̂=(θ_init,φ_init) via TimeDependentZeeman
+    # (eigen-exact, field-axis q). The seed `psi_init_host` is in the tilde basis
+    # (m=init_m_idx aligned with B̂); lift it to the lab frame ψ_lab = U_B·ψ̃ for
+    # the lab-frame ITP, and transform the converged GS back to tilde for the
+    # dynamics handoff.
+    psi_lab_seed = Array{Complex{T_float}}(undef, size(psi_init_host)...)
+    copyto!(psi_lab_seed, psi_init_host)
+    _apply_UB!(psi_lab_seed, sm, Float64(θ_init), Float64(φ_init), ndim)
+
+    atom_ws = if atom_obj === nothing
+        AtomSpecies("RotatingBasis", 1.66e-25, F_atom, 0.0, 0.0, 0.0)
+    else
+        atom_obj
+    end
+    zee_gs = TimeDependentZeeman(
+        ConstantWaveform(p_z * cos(θ_init)), ConstantWaveform(q_z),
+        ConstantWaveform(p_z * sin(θ_init) * cos(φ_init)),
+        ConstantWaveform(p_z * sin(θ_init) * sin(φ_init)),
+    )
+    ws = make_workspace(;
+        grid, atom=atom_ws,
+        interactions=InteractionParams(
+            Dict(0 => Float64(c0), 1 => Float64(c1)); c_lhy=Float64(γ)
+        ),
+        zeeman=zee_gs, potential=NoPotential(),
+        sim_params=SimParams(;
+            dt=dt_itp, n_steps=max(n_steps, 1), imaginary_time=true, normalize_every=0
+        ),
+        psi_init=psi_lab_seed,
+        enable_ddi=abs(c_dd) > 1e-30, c_dd=Float64(c_dd),
+        backend=backend_obj, dtype=T_float,
+    )
+    copyto!(ws.potential_values, V_trap)
 
     if verbose
         seed_kind = use_from_jld2 ? "from_jld2" : "gaussian"
-        println("  rotating_basis GS: F=", F_atom, " D=", D,
-            " p=", p_z, " ε_dd_eff=", round(c_dd * F_atom^2 / (3 * c0); digits=3),
+        println("  rotating_basis GS (unified→standard split_step!): F=", F_atom,
+            " D=", D, " p=", p_z,
+            " ε_dd_eff=", round(c_dd * F_atom^2 / (3 * c0); digits=3),
             " seed=", seed_kind, " ITP_steps=", n_steps)
     end
 
-    μ_final = if n_steps > 0
-        find_ground_state_rotating!(ws, n_steps, T_float(dt_itp))
-    else
-        0.0
+    # Imaginary-time loop with manual norm-decay μ estimate (same definition as
+    # the retired rotating ITP: μ = -ln‖ψ‖/(2dt) per step, then renormalize).
+    dV_gs = prod(grid.dx)
+    μ_final = 0.0
+    for _ in 1:n_steps
+        split_step!(ws)
+        n_before = sqrt(sum(abs2, ws.state.psi) * dV_gs)
+        if n_before > 0
+            μ_final = -log(n_before) / (2 * dt_itp)
+            ws.state.psi ./= n_before
+        end
     end
+
+    # ψ̃_GS = U_B(θ_init,φ_init)† ψ_lab_GS — tilde basis for the dynamics handoff.
+    psi_tilde_gs = Array{Complex{T_float}}(undef, size(ws.state.psi)...)
+    copyto!(psi_tilde_gs, ws.state.psi)
+    _apply_UB!(psi_tilde_gs, sm, Float64(θ_init), Float64(φ_init), ndim; inverse=true)
+    per_m_gs = [sum(abs2, selectdim(psi_tilde_gs, ndim + 1, c)) * dV_gs for c in 1:D]
+    ps_gs = sum(per_m_gs)
+    ps_gs > 0 && (per_m_gs ./= ps_gs)
 
     placeholder_atom = AtomSpecies("RotatingBasis", 1.66e-25, F_atom, 0.0, 0.0, 0.0)
     # IMPORTANT: keep RotatingBasisWS OUT of the return tuple. The 23-type-param
@@ -244,10 +282,17 @@ end
     # is declared as `Array{Complex{T}}` (any dim), and an abstract array element
     # in the return tuple pollutes downstream step's psi argument inference.
     step_result = Dict{Symbol, Any}(
-        :rotating_basis_ws => ws,
+        # Handoff to the dynamics step: plain couplings + sm + tilde GS state
+        # (NOT a RotatingBasisWS — the engine is retired). Stashed in the
+        # Any-typed Dict so it never pollutes PipelineStep dispatch inference.
+        :rotating_basis_gs => (
+            p=p_z, q=q_z, c0=Float64(c0), c1=Float64(c1), c_dd=Float64(c_dd),
+            gamma_lhy=Float64(γ), F=F_atom, sm=sm,
+            psi_tilde=psi_tilde_gs, V_trap=V_trap, backend=backend_obj,
+        ),
         :rotating_basis_F => F_atom,
         :rotating_basis_mu => μ_final,
-        :rotating_basis_per_m => rotating_per_m_norms(ws),
+        :rotating_basis_per_m => per_m_gs,
         # Stash omega_ref so downstream rotating_basis dynamics steps
         # can convert physical-unit fields ("226 Hz") to dimensionless
         # ratios via _parse_dimless_freq. NaN if manual c0/c_dd path.
@@ -263,7 +308,7 @@ end
     # eltype). Earlier this hard-asserted ComplexF64 to keep downstream
     # inference narrow, but that broke the F32 path. The Complex Union
     # still constrains inference enough to avoid abstract dispatch.
-    psi_concrete = ws.psi_tilde::AbstractArray{<:Complex, 4}
+    psi_concrete = psi_tilde_gs::AbstractArray{<:Complex, 4}
     return (psi_concrete, grid, placeholder_atom, nothing, step_result)
 end
 
