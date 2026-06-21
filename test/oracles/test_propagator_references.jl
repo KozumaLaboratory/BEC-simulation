@@ -82,7 +82,7 @@ function step_residual(term::HamTerm, ws, ψ, g, dt)
     ψc = copy(ψ)
     if term isa KineticTerm
         SpinorBEC._update_batched_kinetic_phase!(
-            ws.batched_kinetic, ws.grid.k_squared, dt
+            ws.batched_kinetic, ws.grid.k_squared, dt, false
         )
         apply_step!(term, ψc, 0.0, false, ws)
     else
