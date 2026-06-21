@@ -96,7 +96,7 @@ function _run_simulation_leapfrog!(
         apply_orszag_2_3_filter!(ws.state.psi, ws.fft_plans, n_comp, N)
     end
 
-    _half_potential_step!(
+    _half_potential!(
         ws, dt / 2, n_comp, N, false; t_eval=(ws.state.t + dt / 4), t_start=ws.state.t
     )
 
@@ -132,7 +132,7 @@ function _run_simulation_leapfrog!(
             # fix in itp_loop.jl: drop the merge, always do close +
             # reopen so DDI is substepped. Cost: 2× _half_potential_step!
             # calls per step instead of 1 in the previously-merged path.
-            _half_potential_step!(
+            _half_potential!(
                 ws, dt / 2, n_comp, N, false; t_eval=t_now + 3dt / 4, t_start=t_now + dt / 2
             )
 
@@ -160,7 +160,7 @@ function _run_simulation_leapfrog!(
             # Reopen V(dt/2) for the next K-step. Skipped on the final
             # step since there's no further K to chain into.
             if !is_last
-                _half_potential_step!(
+                _half_potential!(
                     ws, dt / 2, n_comp, N, false; t_eval=(ws.state.t + dt / 4), t_start=ws.state.t
                 )
             end
@@ -168,7 +168,7 @@ function _run_simulation_leapfrog!(
     catch e
         if e isa InterruptException
             # Close the open half-step so psi is in a valid Strang-split state
-            _half_potential_step!(
+            _half_potential!(
                 ws, dt / 2, n_comp, N, false; t_eval=(ws.state.t + dt / 4), t_start=ws.state.t
             )
             _record_snapshot!(

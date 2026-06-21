@@ -388,6 +388,7 @@ const FULL_EXTRA = [
     "hamiltonian/test_light_shift.jl",
     "solvers/test_conservation_properties.jl",
     "solvers/test_itp_ddi_strang_save_every.jl",      # Bug-4 ITP regression pin
+    "solvers/test_ddi_strang_order.jl",               # DDI 2nd-order (midpoint MF)
     "solvers/test_lbfgs_sobolev_preconditioner.jl",
     "solvers/test_rtp_ddi_strang_save_every.jl",      # Bug-4 RTP regression pin
     "workflow/test_phase_diff_eval.jl",
