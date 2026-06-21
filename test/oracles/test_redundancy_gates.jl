@@ -183,21 +183,9 @@ _fidelity(a, b) =
         end
     end
 
-    # (g) Rotating-basis gauge connection Â. The gauge-active local-spin step
-    # folds -Â into H; apply_gauge_step! applies the generator -Â. Both now
-    # read ONE declaration, `_gauge_connection_vector`. Pin its closed form
-    # (Âx,Ây,Âz) = (-φ̇ sinθ, θ̇, φ̇ cosθ) and the gauge_fix F_z absorption so a
-    # formula edit turns this red instead of silently desyncing the two steps.
-    @testset "(g) rotating gauge connection Â single-source" begin
-        θ, θdot, φdot = π / 3, 0.7, 1.3
-        ax, ay, az = SpinorBEC._gauge_connection_vector(θ, θdot, φdot, false)
-        @test ax ≈ -φdot * sin(θ)
-        @test ay ≈ θdot
-        @test az ≈ φdot * cos(θ)
-        # gauge_fix absorbs the F_z piece (Âz = 0), transverse intact.
-        ax2, ay2, az2 = SpinorBEC._gauge_connection_vector(θ, θdot, φdot, true)
-        @test az2 == 0.0
-        @test ax2 ≈ ax
-        @test ay2 ≈ ay
-    end
+    # (g) RETIRED: the rotating-basis gauge connection Â (`_gauge_connection_vector`)
+    # lived in the RotatingBasisWS engine retired 2026-06-?? (commit 12a80058,
+    # −2580 lines). Magnetostir now routes through the standard lab-frame path,
+    # which has no separate gauge connection, so there is nothing left to pin.
+    # The previous gate referenced the deleted symbol and errored at load.
 end

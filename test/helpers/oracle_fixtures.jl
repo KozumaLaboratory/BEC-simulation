@@ -36,7 +36,9 @@ TODO(week-1 §7): variants with MagneticGradient, LightShift, Raman,
 Loss active — every slot of `H_TERMS_CANONICAL_ORDER` needs an active
 fixture before its canary mutants mean anything.
 """
-function oracle_full_ws(; rotating_frame_omega=0.2, box=4.0, ddi=true, secular=true)
+function oracle_full_ws(;
+    rotating_frame_omega=0.2, box=4.0, ddi=true, secular=true, imaginary_time=true
+)
     grid = make_grid(GridConfig{3}((6, 6, 6), (box, box, box)))
     zeeman = TimeDependentZeeman(
         ConstantWaveform(0.3),   # p_wf  — linear Zeeman (Bz)
@@ -44,9 +46,12 @@ function oracle_full_ws(; rotating_frame_omega=0.2, box=4.0, ddi=true, secular=t
         ConstantWaveform(0.2),   # bx_wf — transverse Zeeman
         ConstantWaveform(0.15),  # by_wf — transverse Zeeman
     )
+    # Real-time callers (Strang↔RK4 order checks) must not renormalize: the
+    # reference is the unitary -iH RK4 flow, and an imaginary-time renormalize
+    # would diverge from it.
     sp = SimParams(;
-        dt=0.005, n_steps=1, imaginary_time=true,
-        normalize_every=1, rotating_frame_omega,
+        dt=0.005, n_steps=1, imaginary_time,
+        normalize_every=imaginary_time ? 1 : 0, rotating_frame_omega,
     )
     ws = make_workspace(;
         grid, atom=Rb87,
