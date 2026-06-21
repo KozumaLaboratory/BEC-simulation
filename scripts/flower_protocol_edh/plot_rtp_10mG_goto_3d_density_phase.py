@@ -12,23 +12,25 @@ This script expects the downsampled 3-D datasets written by
 `goto_protocol_10mG.jl`:
   n_total_3d, n_m6_3d, arg_psi_m6_3d
 """
-import os
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import numpy as np
 import h5py
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation, PillowWriter
+from matplotlib.animation import FuncAnimation
+from _anim_writer import save_matplotlib_anim
 
 ROOT = os.environ.get("FPE_ROOT",
     "/gs/bs/work/6/ue06186/bec-runs/flower_protocol_edh")
 H5 = os.environ.get("RTP_H5") or os.path.join(ROOT, os.environ.get("RTP_H5_NAME", "rtp_10mG_goto.h5"))
-OUT_GIF = os.environ.get("OUT_GIF", H5.replace(".h5", "_3d_density_phase.gif"))
+OUT_GIF = os.environ.get("OUT_GIF", H5.replace(".h5", "_3d_density_phase.mp4"))
 
 ISO_TOTAL = float(os.environ.get("FPE_3D_ISO_TOTAL", "0.10"))
 ISO_M6 = float(os.environ.get("FPE_3D_ISO_M6", "0.12"))
-FPS = int(os.environ.get("FPE_3D_FPS", "7"))
-INTERVAL_MS = int(os.environ.get("FPE_3D_INTERVAL_MS", "140"))
+FPS = int(os.environ.get("FPE_3D_FPS", "30"))
+INTERVAL_MS = int(os.environ.get("FPE_3D_INTERVAL_MS", "33"))
 
 with h5py.File(H5, "r") as f:
     required = ("n_total_3d", "n_m6_3d", "arg_psi_m6_3d")
@@ -153,5 +155,5 @@ def update(frame_idx):
 
 print(f"rendering {len(frames)} frames → {OUT_GIF}")
 anim = FuncAnimation(fig, update, frames=frames, interval=INTERVAL_MS, blit=False)
-anim.save(OUT_GIF, writer=PillowWriter(fps=FPS))
+save_matplotlib_anim(anim, OUT_GIF, fps=FPS)
 print("done.")

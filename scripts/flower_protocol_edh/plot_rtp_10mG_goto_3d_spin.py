@@ -6,26 +6,28 @@ Visualisation:
   - sparse 3-D quiver arrows from the downsampled spin field
   - arrow colour = local Fz / n_total
 """
-import os
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import numpy as np
 import h5py
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-from matplotlib.animation import FuncAnimation, PillowWriter
+from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+from _anim_writer import save_matplotlib_anim
 
 ROOT = os.environ.get("FPE_ROOT",
     "/gs/bs/work/6/ue06186/bec-runs/flower_protocol_edh")
 H5 = os.environ.get("RTP_H5") or os.path.join(ROOT, os.environ.get("RTP_H5_NAME", "rtp_10mG_goto.h5"))
-OUT_GIF = os.environ.get("OUT_GIF", H5.replace(".h5", "_3d_spin.gif"))
+OUT_GIF = os.environ.get("OUT_GIF", H5.replace(".h5", "_3d_spin.mp4"))
 
 DENSITY_THRESH = float(os.environ.get("FPE_3D_SPIN_THRESH", "0.12"))
 SHELL_THRESH = float(os.environ.get("FPE_3D_SHELL_THRESH", "0.10"))
 ARROW_STEP = int(os.environ.get("FPE_3D_ARROW_STEP", "2"))
-FPS = int(os.environ.get("FPE_3D_FPS", "7"))
-INTERVAL_MS = int(os.environ.get("FPE_3D_INTERVAL_MS", "140"))
+FPS = int(os.environ.get("FPE_3D_FPS", "30"))
+INTERVAL_MS = int(os.environ.get("FPE_3D_INTERVAL_MS", "33"))
 
 with h5py.File(H5, "r") as f:
     required = ("n_total_3d", "Fx_3d", "Fy_3d", "Fz_3d")
@@ -166,5 +168,5 @@ def update(frame_idx):
 
 print(f"rendering {len(frames)} frames → {OUT_GIF}")
 anim = FuncAnimation(fig, update, frames=frames, interval=INTERVAL_MS, blit=False)
-anim.save(OUT_GIF, writer=PillowWriter(fps=FPS))
+save_matplotlib_anim(anim, OUT_GIF, fps=FPS)
 print("done.")

@@ -25,21 +25,25 @@ import h5py
 import matplotlib
 
 matplotlib.use("Agg")
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.gridspec import GridSpec
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from PIL import Image
+from _anim_writer import save_pil_frames
 
 H5_DEFAULT = "/gs/fs/tga-kozuma-kouhi/ue06186/bec-runs/flower_protocol_edh/rtp_10mG_goto.h5"
 H5 = Path(os.environ.get("RTP_H5", H5_DEFAULT))
 OUT_GIF = Path(os.environ.get(
     "OUT_GIF",
-    "runs/eu151_flower_protocol_edh/figures/goto_protocol_10mG/isosurface_peak30_m6.gif",
+    "runs/eu151_flower_protocol_edh/figures/goto_protocol_10mG/isosurface_peak30_m6.mp4",
 ))
 ISO_PEAK_RATIO = float(os.environ.get("ISO_PEAK_RATIO", "0.30"))
 MAX_FRAMES = int(os.environ.get("MAX_FRAMES", "0"))
-FRAME_DURATION_MS = int(os.environ.get("FRAME_DURATION_MS", "120"))
+FRAME_DURATION_MS = int(os.environ.get("FRAME_DURATION_MS", "33"))
+FPS = int(os.environ.get("FPE_FPS", str(max(1, int(round(1000 / FRAME_DURATION_MS))))))
 
 TETS = [
     (0, 1, 3, 7), (0, 3, 2, 7), (0, 2, 6, 7),
@@ -228,10 +232,7 @@ def main():
             print(f"  frame {k + 1:3d}/{n_frames}  t={t_ms:7.3f} ms  B={B_uG:+8.3f} μG  peak={peak:.3e}")
 
     OUT_GIF.parent.mkdir(parents=True, exist_ok=True)
-    frames[0].save(
-        OUT_GIF, save_all=True, append_images=frames[1:],
-        duration=FRAME_DURATION_MS, loop=0,
-    )
+    save_pil_frames(frames, OUT_GIF, fps=FPS, duration_ms=FRAME_DURATION_MS)
     print(f"wrote {OUT_GIF}")
 
 

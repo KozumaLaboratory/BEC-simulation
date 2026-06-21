@@ -8,13 +8,15 @@ plot_rtp_10mG_goto.py — Goto protocol RTP visualization.
   Row 3: populations bar | E(t) | B(t) | HUD (2 cols)
 Plus dedicated B(t) trace (log scale) so the protocol structure is visible.
 """
-import os
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import numpy as np
 import h5py
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation, PillowWriter
+from matplotlib.animation import FuncAnimation
+from _anim_writer import save_matplotlib_anim
 from matplotlib import colors as mcolors
 
 plt.rcParams.update({
@@ -26,7 +28,8 @@ plt.rcParams.update({
 ROOT = os.environ.get("FPE_ROOT",
     "/gs/bs/work/6/ue06186/bec-runs/flower_protocol_edh")
 H5      = os.environ.get("RTP_H5") or os.path.join(ROOT, os.environ.get("RTP_H5_NAME", "rtp_10mG_goto.h5"))
-OUT_GIF = os.environ.get("OUT_GIF", H5.replace(".h5", ".gif"))
+OUT_GIF = os.environ.get("OUT_GIF", H5.replace(".h5", ".mp4"))
+FPS     = int(os.environ.get("FPE_FPS", "30"))
 
 with h5py.File(H5, "r") as f:
     t     = f["t"][:]
@@ -208,5 +211,5 @@ frames = list(range(0, Nf, stride))
 if frames[-1] != Nf - 1: frames.append(Nf - 1)
 print(f"rendering {len(frames)} frames → {OUT_GIF}")
 anim = FuncAnimation(fig, update, frames=frames, interval=140, blit=False)
-anim.save(OUT_GIF, writer=PillowWriter(fps=7))
+save_matplotlib_anim(anim, OUT_GIF, fps=FPS)
 print("done.")

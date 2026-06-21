@@ -25,10 +25,13 @@ Env knobs:
 """
 import io
 import os
+import sys
 from pathlib import Path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import h5py
 import matplotlib
+from _anim_writer import save_pil_frames
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -50,7 +53,8 @@ ISO_RATIO_PER_M = {
     -4: float(os.environ.get("ISO_PEAK_RATIO_M4", str(ISO_PEAK_RATIO))),
 }
 FRAME_START_FRAC = float(os.environ.get("FRAME_START_FRAC", "0.25"))
-FRAME_DURATION_MS = int(os.environ.get("FRAME_DURATION_MS", "120"))
+FRAME_DURATION_MS = int(os.environ.get("FRAME_DURATION_MS", "33"))
+FPS = int(os.environ.get("FPE_FPS", str(max(1, int(round(1000 / FRAME_DURATION_MS))))))
 
 COMPONENTS = [
     (-6, "n_m6_3d", "arg_psi_m6_3d"),
@@ -261,10 +265,7 @@ def main():
                   f"t={t_ms:7.3f} ms  B={B_uG:+8.3f} μG")
 
     OUT_GIF.parent.mkdir(parents=True, exist_ok=True)
-    frames[0].save(
-        OUT_GIF, save_all=True, append_images=frames[1:],
-        duration=FRAME_DURATION_MS, loop=0,
-    )
+    save_pil_frames(frames, OUT_GIF, fps=FPS, duration_ms=FRAME_DURATION_MS)
     print(f"wrote {OUT_GIF}")
 
 
