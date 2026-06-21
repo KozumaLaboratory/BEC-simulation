@@ -407,6 +407,14 @@ const MANUAL_TESTS_ALLOWLIST = [
     "workflow/test_live_monitor.jl",                 # spawns dashboard server on a TCP port
 ]
 
+# Derived view (NOT a partition list): every `oracles/` gate, regardless of which
+# tier list it lives in. The `oracles` pseudo-tier runs JUST these so the per-PR
+# CI can gate the bug classes cheaply (the full `ci` tier is ~30-45 min and only
+# runs nightly — that is how 5 oracle gates rotted RED unprotected, 2026-06-21).
+# Auto-maintaining: a new `test/oracles/<x>.jl` added to any tier list is picked
+# up here for free.
+const ORACLE_TESTS = filter(t -> startswith(t, "oracles/"), vcat(FAST_TESTS, CI_EXTRA, FULL_EXTRA))
+
 function select_tests(tier::String)
     if tier == "fast"
         return FAST_TESTS
@@ -416,6 +424,8 @@ function select_tests(tier::String)
         return vcat(FAST_TESTS, CI_EXTRA, FULL_EXTRA)
     elseif tier == "physics"
         return PHYSICS_TESTS
+    elseif tier == "oracles"
+        return ORACLE_TESTS
     else
         @warn "Unknown SPINORBEC_TEST_TIER=$tier, falling back to full"
         return vcat(FAST_TESTS, CI_EXTRA, FULL_EXTRA)
