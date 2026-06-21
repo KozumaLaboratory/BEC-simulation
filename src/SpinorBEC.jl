@@ -41,6 +41,7 @@ include("workflow/io.jl")              # save_state + dashboard + VTK + run summ
 include("workflow/monitoring.jl")      # Slack webhook notifications (notify_slack)
 
 include("workflow/experiments.jl")     # schema + runtime + pipeline + analyzers
+include("workflow/experiments/euv3_coils.jl")  # euv3 lab coil/field calibration
 include("workflow/validation.jl")      # RunResult + spec-driven validation (Phase 0: types only)
 include("workflow/checkpoint.jl")          # general keyed JLD2 store + refine + fork
 include("workflow/checkpointed_sweep.jl")  # thin sweep wrapper over Checkpoint

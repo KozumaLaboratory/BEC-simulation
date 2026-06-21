@@ -22,6 +22,10 @@ using Printf
 # Pipeline + classification helpers come from SpinorBEC.
 using ..SpinorBEC: parse_pipeline, run_pipeline, apply_overrides
 using ..SpinorBEC: OverrideMap
+# `_default_solver_verbose` is the default for the `verbose` kwarg of
+# `bayesian_optimize` / `active_learn_*` — it lives in the umbrella module, so it
+# must be imported here or those defaults raise UndefVarError when not passed.
+using ..SpinorBEC: _default_solver_verbose
 
 include("optimization/faraday_fit.jl")
 include("optimization/bayesian_opt.jl")
