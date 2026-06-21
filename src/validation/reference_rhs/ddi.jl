@@ -1,7 +1,7 @@
 # --- Reference Hψ: dipole-dipole interaction (DDI) ---
 #
 # Production path: src/hamiltonian/terms/ddi/qtensor.jl,
-# convolution.jl; src/hamiltonian/shared/rotation.jl. We re-derive the same operator from
+# convolution.jl; src/hamiltonian/terms/ddi/rotation.jl. We re-derive the same operator from
 # scratch on a fresh rfft plan, with no precomputed Q-tensor cache
 # and no reuse of production DDIBuffers, so any bug in the production
 # cache or buffer plumbing shows up as a diff.

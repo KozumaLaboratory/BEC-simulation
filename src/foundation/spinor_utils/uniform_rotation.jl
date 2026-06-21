@@ -2,11 +2,11 @@ export apply_uniform_spin_rotation!
 
 # Spatially uniform spin rotation kernel.
 #
-# Serves both the Raman propagator (terms/raman/raman.jl) and the
-# transverse-Zeeman step (integrator/split_step.jl), and is borrowed by
-# rotating_basis_propagators.jl for frame-change rotations.
-#
-# Moved from src/hamiltonian/potentials/raman.jl (pure file-reorganization).
+# Serves both the Raman propagator (hamiltonian/terms/raman.jl) and the
+# transverse-Zeeman step (hamiltonian/integrator/split_step.jl), and is
+# borrowed by rotating_basis_propagators.jl for frame-change rotations.
+# Lives in foundation alongside its Euler-rotation siblings (euler_*.jl)
+# since every dependency is foundation-level and it is shared across terms.
 
 """
     apply_uniform_spin_rotation!(psi, sm, phi_x, phi_y, phi_z, dt_frac, ndim; imaginary_time)

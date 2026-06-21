@@ -1,7 +1,7 @@
 # --- Crossed optical-dipole-trap geometry: depth + frequencies (analytic) ---
 #
 # Analytic helpers layered on the existing `GaussianBeam` / `CrossedDipoleTrap`
-# (src/hamiltonian/optics/optical_trap.jl). No `Grid` — these feed the 0-D
+# (src/hamiltonian/terms/trap/optical_trap.jl). No `Grid` — these feed the 0-D
 # evaporation model with the instantaneous trap depth U [J] and mean trap
 # frequency ω̄ [rad/s] as the FORT powers are ramped.
 #
