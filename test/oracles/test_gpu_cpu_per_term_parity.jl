@@ -21,7 +21,7 @@
 using Test
 using SpinorBEC
 using SpinorBEC: energy_gradient!, energy_decomposition, _to_device
-using LinearAlgebra: I   # LightShift fixture identity; this line was
+using LinearAlgebra: I, eigvecs   # LightShift fixture identity; this line was
 # unreachable until the App. A defect-7 shape fix — every GPU run died
 # at the shape assertion before reaching the LightShift testset.
 
@@ -371,6 +371,126 @@ end
         end
         r = _propagator_parity(_build, 5; rtol=1e-6, label="TensorBatchedEigen")
         @test sqrt(sum(abs2, r.psi_cpu .- r.psi0)) > 1e-4
+    end
+
+    # -----------------------------------------------------------------
+    # Remaining propagator faces (transverse-Zeeman, Raman, DDI,
+    # Coriolis). Each has a GPU=CPU energy/gradient gate above but the
+    # PROPAGATOR kernel (apply_step!) was reached only via composite
+    # level0 on inert states. One real-time chain each, mixed-m / shifted
+    # / rotating so the kernel is genuinely active.
+    # -----------------------------------------------------------------
+    @testset "Transverse Zeeman propagator (bx ≠ 0)" begin
+        function _build(gpu::Bool)
+            grid = make_grid(GridConfig{1}((16,), (8.0,)))
+            zee = TimeDependentZeeman(ConstantWaveform(0.2), ConstantWaveform(0.0),
+                ConstantWaveform(0.7), ConstantWaveform(0.0))
+            kw = (; grid, atom=Rb87,
+                interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
+                zeeman=zee, potential=HarmonicTrap((1.0,)),
+                sim_params=SimParams(; dt=0.01, n_steps=1))
+            ws = gpu ? make_workspace(; kw..., backend=CUDABackend()) :
+                 make_workspace(; kw...)
+            copyto!(ws.state.psi,
+                init_psi(ws.grid, SpinSystem(1); state=:spin_coherent, init_theta=π / 4))
+            ws
+        end
+        r = _propagator_parity(_build, 20; label="TransverseZeemanProp")
+        @test sqrt(sum(abs2, r.psi_cpu .- r.psi0)) > 1e-3
+    end
+
+    @testset "Raman propagator (Ω_R ≠ 0)" begin
+        function _build(gpu::Bool)
+            grid = make_grid(GridConfig{1}((16,), (8.0,)))
+            kw = (; grid, atom=Rb87,
+                interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
+                zeeman=ZeemanParams(0.0, 0.0), potential=HarmonicTrap((1.0,)),
+                raman=RamanCoupling{1}(0.3, 0.05, (0.5,)),
+                sim_params=SimParams(; dt=0.01, n_steps=1))
+            ws = gpu ? make_workspace(; kw..., backend=CUDABackend()) :
+                 make_workspace(; kw...)
+            copyto!(ws.state.psi,
+                init_psi(ws.grid, SpinSystem(1); state=:spin_coherent, init_theta=π / 4))
+            ws
+        end
+        r = _propagator_parity(_build, 20; label="RamanProp")
+        @test sqrt(sum(abs2, r.psi_cpu .- r.psi0)) > 1e-3
+    end
+
+    @testset "DDI propagator (secular, c_dd ≠ 0)" begin
+        function _build(gpu::Bool)
+            grid = make_grid(GridConfig{3}((12, 12, 12), (6.0, 6.0, 6.0)))
+            kw = (; grid, atom=Rb87,
+                interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
+                zeeman=ZeemanParams(0.0, 0.0),
+                potential=HarmonicTrap((1.0, 1.0, 1.0)),
+                enable_ddi=true, c_dd=1.0, secular_ddi=true,
+                sim_params=SimParams(; dt=0.01, n_steps=1))
+            ws = gpu ? make_workspace(; kw..., backend=CUDABackend()) :
+                 make_workspace(; kw...)
+            psi = zeros(ComplexF64, 12, 12, 12, 3)
+            for I in CartesianIndices((12, 12, 12))
+                x = ws.grid.x[1][I[1]]
+                y = ws.grid.x[2][I[2]]
+                z = ws.grid.x[3][I[3]]
+                psi[I, 1] = exp(-(x^2 + y^2 + z^2 * 0.4) / 2)
+            end
+            psi ./= sqrt(sum(abs2, psi) * cell_volume(ws.grid))
+            copyto!(ws.state.psi, psi)
+            ws
+        end
+        r = _propagator_parity(_build, 10; rtol=1e-7, label="DDIProp")
+        @test sqrt(sum(abs2, r.psi_cpu .- r.psi0)) > 1e-4
+    end
+
+    @testset "Coriolis propagator (Ω ≠ 0)" begin
+        function _build(gpu::Bool)
+            grid = make_grid(GridConfig{2}((24, 24), (8.0, 8.0)))
+            kw = (; grid, atom=Rb87,
+                interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
+                zeeman=ZeemanParams(0.0, 0.0),
+                potential=HarmonicTrap((1.0, 1.0)),
+                sim_params=SimParams(; dt=0.01, n_steps=1, rotating_frame_omega=0.4))
+            ws = gpu ? make_workspace(; kw..., backend=CUDABackend()) :
+                 make_workspace(; kw...)
+            psi = zeros(ComplexF64, 24, 24, 3)
+            for I in CartesianIndices((24, 24))
+                x = ws.grid.x[1][I[1]]
+                y = ws.grid.x[2][I[2]]
+                psi[I, 1] = exp(-((x - 0.8)^2 + y^2) / 2)
+            end
+            psi ./= sqrt(sum(abs2, psi) * cell_volume(ws.grid))
+            copyto!(ws.state.psi, psi)
+            ws
+        end
+        r = _propagator_parity(_build, 20; label="CoriolisProp")
+        @test sqrt(sum(abs2, r.psi_cpu .- r.psi0)) > 1e-3
+    end
+
+    # Off-diagonal light-shift propagator: non-identity U (eigvecs of F_x)
+    # makes the per-voxel operator non-diagonal, so split_step takes the
+    # legacy `apply_light_shift_step!` host-fallback. The fallback gathers
+    # ψ to host but `ls.profile` lives on-device — the source of a real
+    # scalar-indexing crash this gate pins.
+    @testset "Light-shift propagator: off-diagonal U" begin
+        function _build(gpu::Bool)
+            grid = make_grid(GridConfig{1}((16,), (8.0,)))
+            n_pts = grid.config.n_points
+            profile = [exp(-grid.x[1][i]^2 / 2) for i in 1:n_pts[1]]
+            U = Matrix{ComplexF64}(eigvecs(Matrix(spin_matrices(1).Fx)))
+            ls = LightShift(profile, [0.3, -0.1, 0.5], U, false)
+            kw = (; grid, atom=Rb87,
+                interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
+                zeeman=ZeemanParams(0.0, 0.0), potential=HarmonicTrap((1.0,)),
+                light_shift=ls, sim_params=SimParams(; dt=0.01, n_steps=1))
+            ws = gpu ? make_workspace(; kw..., backend=CUDABackend()) :
+                 make_workspace(; kw...)
+            copyto!(ws.state.psi,
+                init_psi(ws.grid, SpinSystem(1); state=:spin_coherent, init_theta=π / 4))
+            ws
+        end
+        r = _propagator_parity(_build, 20; label="LightShiftOffDiagProp")
+        @test sqrt(sum(abs2, r.psi_cpu .- r.psi0)) > 1e-3
     end
 
     # -----------------------------------------------------------------
