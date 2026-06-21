@@ -53,7 +53,7 @@ ISO_RATIO_PER_M = {
     -4: float(os.environ.get("ISO_PEAK_RATIO_M4", str(ISO_PEAK_RATIO))),
 }
 FRAME_START_FRAC = float(os.environ.get("FRAME_START_FRAC", "0.25"))
-FPS = int(os.environ.get("FPE_FPS", "12"))
+FPS = int(os.environ.get("FPE_FPS", "24"))
 FRAME_DURATION_MS = int(os.environ.get("FRAME_DURATION_MS", str(max(1, int(round(1000 / FPS))))))
 
 COMPONENTS = [

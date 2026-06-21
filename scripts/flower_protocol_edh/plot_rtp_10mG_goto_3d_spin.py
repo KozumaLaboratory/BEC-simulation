@@ -26,7 +26,7 @@ OUT_GIF = os.environ.get("OUT_GIF", H5.replace(".h5", "_3d_spin.mp4"))
 DENSITY_THRESH = float(os.environ.get("FPE_3D_SPIN_THRESH", "0.12"))
 SHELL_THRESH = float(os.environ.get("FPE_3D_SHELL_THRESH", "0.10"))
 ARROW_STEP = int(os.environ.get("FPE_3D_ARROW_STEP", "2"))
-FPS = int(os.environ.get("FPE_3D_FPS", os.environ.get("FPE_FPS", "12")))
+FPS = int(os.environ.get("FPE_3D_FPS", os.environ.get("FPE_FPS", "24")))
 INTERVAL_MS = int(os.environ.get("FPE_3D_INTERVAL_MS", str(max(1, int(round(1000 / FPS))))))
 
 with h5py.File(H5, "r") as f:
