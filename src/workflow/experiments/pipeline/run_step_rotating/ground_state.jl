@@ -161,7 +161,7 @@ end
         a_ho = sqrt(Units.HBAR / (atom_obj.mass * ω_ref))
         N = Float64(n_atoms_node)
         μ = 0.5 * (15.0 * N * atom_obj.a_s / a_ho)^(2.0 / 5.0)
-        ω_axes = ntuple(i -> Float64(V_trap.omega[i]), length(V_trap.omega))
+        ω_axes = ntuple(i -> ω_vec[i], length(ω_vec))
         R_TF = ntuple(i -> sqrt(2.0 * μ / ω_axes[i]^2), length(ω_axes))
         prod_R = prod(R_TF)
         prod_R^(1.0 / length(R_TF))
