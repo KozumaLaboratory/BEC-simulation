@@ -387,4 +387,34 @@ using FFTW
         @test isfinite(r.energy)
         @test !any(isnan, r.workspace.state.psi)
     end
+
+    @testset "leapfrog RT driver ≡ split_step! loop (cross-path)" begin
+        # run_simulation! (leapfrog) must reproduce a plain split_step! loop
+        # bit-for-bit: the "always close+reopen, never merge the boundary V"
+        # contract (Bug-4 RTP analogue). All inner-V terms active so a dropped
+        # or merged substep would show up — c0, c1, transverse Zeeman, Coriolis.
+        function build()
+            grid = make_grid(GridConfig((16, 16), (8.0, 8.0)))
+            zee = TimeDependentZeeman(ConstantWaveform(0.2), ConstantWaveform(0.1),
+                ConstantWaveform(0.3), ConstantWaveform(0.0))   # p, q, bx, by
+            sp = SimParams(; dt=0.005, n_steps=20, imaginary_time=false,
+                rotating_frame_omega=0.3, save_every=20)
+            ws = make_workspace(; grid, atom=Rb87,
+                interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.5)),
+                zeeman=zee, potential=HarmonicTrap((1.0, 1.0)), sim_params=sp,
+                fft_flags=FFTW.ESTIMATE)
+            copyto!(ws.state.psi,
+                init_psi_spin_coherent(grid, SpinSystem(1); theta=π / 3, phi=0.0))
+            ws
+        end
+        ws_a = build()
+        run_simulation!(ws_a)
+        ws_b = build()
+        for _ in 1:20
+            split_step!(ws_b)
+        end
+        @test ws_a.state.psi == ws_b.state.psi                 # bit-identical
+        # the dynamics genuinely evolved (not a trivial no-op match)
+        @test sqrt(sum(abs2, ws_b.state.psi .- build().state.psi)) > 0.1
+    end
 end
