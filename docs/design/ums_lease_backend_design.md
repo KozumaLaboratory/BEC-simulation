@@ -1,7 +1,24 @@
 # UMS low-latency path — leased `node_f` + `UMSBackend`
 
-**Status**: design. Phase 2 of `compute_gateway_design.md`. The genuinely new
-work: turn "run this param set" from a fresh `qsub` (minutes of `qw`) into an
+**Status: DEFERRED — premise not met (2026-06-21).** UMS exists to kill queue
+wait. A direct measurement on TSUBAME shows there is none worth killing:
+**trial-mode `qsub`→running latency = 7.8 s** (and trial is *lowest priority* =
+worst case; a real `-g` job is at least as fast). At ~8 s the autopilot's plain
+`qsub` path already gives an interactive-feeling loop, so the lease machinery is
+a solution to a non-problem. Not building it. This doc stands as the considered
+design should the premise change.
+
+**Revisit only if** a concrete friction appears: (a) `node_f`/multi-node
+allocations waiting minutes under congestion (untested — the measurement was
+`gpu_1`, uncongested, one sample), or (b) rapid-fire many-tiny-jobs where
+per-submit JIT dominates — and even (b) is largely covered by the existing
+sysimage support (`UGEBackend.sysimage_path`). The probe
+(`scripts/tsubame/ums_probe.sh`) is the insurance instrument for (a).
+
+---
+
+**Original framing (design, not active).** Phase 2 of `compute_gateway_design.md`.
+The work would have been: turn "run this param set" from a fresh `qsub` into an
 instant dispatch to a held allocation. Fits the existing `AutopilotBackend`
 contract; the hard parts are three UMS-specific semantic gaps, resolved below.
 

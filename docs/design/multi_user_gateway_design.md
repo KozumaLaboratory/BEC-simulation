@@ -160,15 +160,10 @@ lineage. Keep out of Phase 3 unless a concrete campaign needs it.
 
 ## Open questions
 
-- **O1**: lease (Phase 2) cost attribution — per-trigger principal vs a shared
-  `infra` line? A lease serving many users' interactive tasks is naturally shared;
-  charging one user is unfair, charging `infra` hides it from per-user caps.
-  **This is the same decision as the UMS doc's Phase 2↔3 lease-isolation seam and
-  is gated on one number: the probe's C1 idle node_f burn rate.** Cheap idle →
-  per-user lease (exact attribution, simple isolation); expensive idle → one
-  shared warm pool + fair-share (cost to `infra`). Must be resolved before Phase 2b
-  writes the `UMSLease` shape — retrofitting multi-tenancy onto a single-tenant
-  lease is the expensive path. See `ums_lease_backend_design.md` → "Policy constants".
+- **O1**: lease cost attribution — **MOOT for now: UMS is deferred** (queue
+  measured at ~8 s, `ums_lease_backend_design.md`). With no lease, all compute is
+  per-entry and meters cleanly by `owner`. The per-user-lease vs shared-warm-pool
+  seam only re-opens if UMS is revived under observed `node_f` congestion.
 - **O2**: admin principal source — config list, or a tailnet/OAuth group claim?
 - **O3**: do we trust `SPINORBEC_PRINCIPAL` on the interactive MCP path, or
   require the same OAuth as the dashboard? (stdio MCP has no proxy in front.)

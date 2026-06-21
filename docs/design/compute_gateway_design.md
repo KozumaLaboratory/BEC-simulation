@@ -60,7 +60,11 @@ them. Use `config([...])` / `Experiment(spec)` / `run!` / `run_yaml`.
 
 **Genuinely new — where the work goes:**
 
-1. **UMS low-latency path** (§ Decision 2) — no `ums-submit`/`ums-list` anywhere.
+1. ~~**UMS low-latency path** (§ Decision 2).~~ **DEFERRED (2026-06-21)** — measured
+   the premise and it doesn't hold: trial `qsub`→running = **7.8 s** (worst case;
+   trial is lowest priority). No queue wait worth a lease. See
+   `ums_lease_backend_design.md` (Status). Revisit only on observed `node_f`
+   congestion or rapid-fire JIT friction (latter ≈ covered by sysimage).
 2. **Submit-time DAG / `-hold_jid`** — `on_complete` is a *post-completion* trigger,
    not a submit-time dependency graph.
 3. **Multi-user / namespace / per-user quota** — `enqueued_by` is a provenance
@@ -115,6 +119,9 @@ guard it).
 
 ## Decision 2 — lease the UMS allocation, do not hold it permanently
 
+**Superseded (2026-06-21): UMS deferred — queue measured at ~8 s, so there is no
+lease to manage. The decision below stands only if UMS is revived.**
+
 Resolves the cost tension (a live `node_f` ⊥ a lightweight always-on Gateway):
 
 - The **coordinator** is always-on and cheap; the **`node_f` allocation is an
@@ -153,11 +160,12 @@ are already live.
   (they already do).
 - Code-guard the login-node compute ban.
 
-### Phase 2 — UMS low-latency path (the core new work)
-- `node_f` lease + `ums-submit` dispatch + `ums-list` status; max-idle reap via
-  budget + kill breaker.
+### Phase 2 — headless harness (UMS dropped)
+- ~~`node_f` lease + `ums-submit`/`ums-list` low-latency path.~~ **DEFERRED** —
+  queue measured at ~8 s (`ums_lease_backend_design.md`); no wait to remove.
 - Headless Agent SDK harness as a Gateway service; L0–L4 gates as the verification
-  stage; only gate-passing runs promote to "validated" in CAS.
+  stage; only gate-passing runs promote to "validated" in CAS. **This is the real
+  Phase-2 work now** — it never depended on UMS; it runs on the existing `qsub` path.
 
 ### Phase 3 — multi-user (all new)
 - Per-user identity/namespace (replace provenance-only `enqueued_by`), per-user
