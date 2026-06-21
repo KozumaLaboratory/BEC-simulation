@@ -51,49 +51,9 @@ end
 # default — catches a genuine hang, not a merely-slow chunk (cold F32 ≈ 600 s).
 const _TIMEOUT = parse(Float64, get(ENV, "SPINORBEC_TEST_TIMEOUT", "1800"))
 
-# Per-file cost estimate (seconds), measured on the full tier, used only to
-# balance the parallel chunks. Only the heavy outliers need an entry; the long
-# tail defaults to _DEFAULT_COST. A wrong estimate costs balance, never
-# correctness.
-#
-# Note on rotating_basis F32: its first-time JIT is ~10 min, but it is cached
-# afterwards (CLAUDE.md), and the depot cache persists across nightly runs, so
-# the steady-state cost is small — estimate it modestly (30 s) so it leads
-# without monopolising a whole chunk. Pinning it at the cold 600 s would idle an
-# entire worker on every (warm) run.
-const _DEFAULT_COST = 3.0
-const _COST = Dict{String, Float64}(
-    "workflow/test_multi_fidelity_bo.jl" => 161.0,
-    "workflow/test_triple_point.jl" => 127.0,
-    "test_dealias_2_3.jl" => 76.0,
-    "solvers/test_continuation.jl" => 58.0,
-    "test_quality.jl" => 40.0,
-    "rotating_basis/test_rotating_basis_f32.jl" => 30.0,  # warm; ~10 min only on a cold cache
-    "workflow/test_pipeline.jl" => 17.0,
-    "workflow/test_infrastructure.jl" => 15.0,
-    "workflow/test_active_learning.jl" => 15.0,
-    "test_level4_general_F_phase_emergence.jl" => 13.0,
-    "test_level10_hpsi_self_consistency.jl" => 12.0,
-    "workflow/test_autopilot.jl" => 12.0,
-    "oracles/test_propagator_references.jl" => 11.0,
-    "oracles/test_master_oracle.jl" => 11.0,
-    "oracles/test_path_coverage.jl" => 10.0,
-    "analysis/test_tof_multiframe.jl" => 9.5,
-    "gpu/test_mixed_precision.jl" => 9.0,
-    "rotating_basis/test_rotating_basis_gpe.jl" => 9.0,
-    "dynamics/test_tdhfb_f1_validation.jl" => 8.5,
-    "analysis/test_physics_invariants.jl" => 8.0,
-    "solvers/test_simulation.jl" => 8.0,
-    "test_reference_rhs.jl" => 7.5,
-    "solvers/test_lbfgs_sobolev_preconditioner.jl" => 6.5,
-    "rotating_basis/test_rotating_basis_pipeline_parsing.jl" => 6.0,
-    "hamiltonian/test_integrator_order_meanfield.jl" => 5.0,
-    "solvers/test_3d.jl" => 5.0,
-    "dynamics/test_twa.jl" => 5.0,
-    "solvers/test_lbfgs.jl" => 5.0,
-)
-
-_cost(f) = get(_COST, f, _DEFAULT_COST)
+# _DEFAULT_COST / _COST / _cost (the per-file balance model) + warn_cost_drift
+# live in _tiers.jl, shared with the chunk processes (run_chunk.jl) so the
+# drift guard runs against the same numbers everywhere.
 
 # Greedy longest-processing-time bin-packing: assign each file (heaviest first)
 # to the currently-lightest chunk. Minimises makespan for the skewed full-tier
@@ -120,6 +80,7 @@ include(joinpath(@__DIR__, "_run_files.jl"))
 if _NWORKERS <= 1
     failed, timings = run_test_files(_FILES)
     print_timing(timings, TEST_TIER)
+    warn_cost_drift(timings)
     failed && error("SpinorBEC test suite (tier=$TEST_TIER): failures above")
     println("\nSpinorBEC ($(length(_FILES)) files, tier=$TEST_TIER): all passed")
 else

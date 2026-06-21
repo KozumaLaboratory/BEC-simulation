@@ -19,6 +19,8 @@ using CUDA: CuArray, CuGraph, CuGraphExec, @captured
 
 include("backend.jl")
 include("gpu_euler_kernel.jl")
+include("gpu_ddi_rotation.jl")
+include("gpu_diagonal.jl")
 include("gpu_spin_mixing.jl")
 include("gpu_normalize.jl")
 include("gpu_singlet_pair.jl")

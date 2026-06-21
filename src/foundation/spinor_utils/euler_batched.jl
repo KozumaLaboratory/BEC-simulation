@@ -3,6 +3,26 @@
 # but the V_Fy eigenmatrix is constant. Two variants: real-time (cis on
 # the diagonal stage) and imaginary-time (exp with -F shift).
 
+# Per-voxel phase stages are memory-bandwidth bound; `Threads.@threads`
+# only pays off above ~16k voxels. Below that (≤16³ smoke / test grids)
+# task-spawn overhead + per-task allocation make threading a net loss, so
+# run serial. `f` is a `where {F}` parameter so the captured closure stays
+# concretely typed — no boxing on either branch.
+const _VOXEL_THREAD_MIN = 1 << 14   # 16384 ≈ 25³
+
+@inline function _voxel_loop!(f::F, n::Integer) where {F}
+    if n >= _VOXEL_THREAD_MIN
+        Threads.@threads :static for i in 1:n
+            f(i)
+        end
+    else
+        @inbounds for i in 1:n
+            f(i)
+        end
+    end
+    nothing
+end
+
 """
     _apply_euler_5stage_batched_real!(P, W, conj_V, V_T, alpha, beta, theta, F, Val(D))
 
@@ -35,66 +55,76 @@ Stage 5: Rz(+α) — phase recurrence
     F_int = Int(F)
 
     # Stage 1 — Rz(-α): P[i, c] *= cis((F - c + 1) · α[i])
-    @inbounds for i in 1:N_spatial
-        ai = alpha[i]
-        sa, ca = sincos(ai)
-        z_a = Complex{T}(ca, -sa)         # cis(-α) — Complex{T} keeps F32 workspaces F32
-        phase = Complex{T}(ca, sa)^F_int  # cis(F·α) = cis(α)^F
-        for c in 1:D
-            P[i, c] *= phase
-            phase *= z_a
+    _voxel_loop!(N_spatial) do i
+        @inbounds begin
+            ai = alpha[i]
+            sa, ca = sincos(ai)
+            z_a = Complex{T}(ca, -sa)         # cis(-α) — Complex{T} keeps F32 workspaces F32
+            phase = Complex{T}(ca, sa)^F_int  # cis(F·α) = cis(α)^F
+            for c in 1:D
+                P[i, c] *= phase
+                phase *= z_a
+            end
         end
     end
 
     # Stage 2 — Ry(-β) = V · diag(exp(+iβλ)) · V†, λ_Fy = -F..F ascending
     mul!(W, P, conj_V)
-    @inbounds for i in 1:N_spatial
-        bi = beta[i]
-        sb, cb = sincos(bi)
-        z_b = Complex{T}(cb, sb)              # cis(β)
-        phase = Complex{T}(cb, -sb)^F_int      # cis(-F·β) = cis(-β)^F
-        for j in 1:D
-            W[i, j] *= phase
-            phase *= z_b
+    _voxel_loop!(N_spatial) do i
+        @inbounds begin
+            bi = beta[i]
+            sb, cb = sincos(bi)
+            z_b = Complex{T}(cb, sb)              # cis(β)
+            phase = Complex{T}(cb, -sb)^F_int      # cis(-F·β) = cis(-β)^F
+            for j in 1:D
+                W[i, j] *= phase
+                phase *= z_b
+            end
         end
     end
     mul!(P, W, V_T)
 
     # Stage 3 — Dz(θ): P[i, c] *= cis(-(F - c + 1) · θ[i])
-    @inbounds for i in 1:N_spatial
-        ti = theta[i]
-        st, ct = sincos(ti)
-        z_t = Complex{T}(ct, st)              # cis(θ)
-        phase = Complex{T}(ct, -st)^F_int      # cis(-F·θ)
-        for c in 1:D
-            P[i, c] *= phase
-            phase *= z_t
+    _voxel_loop!(N_spatial) do i
+        @inbounds begin
+            ti = theta[i]
+            st, ct = sincos(ti)
+            z_t = Complex{T}(ct, st)              # cis(θ)
+            phase = Complex{T}(ct, -st)^F_int      # cis(-F·θ)
+            for c in 1:D
+                P[i, c] *= phase
+                phase *= z_t
+            end
         end
     end
 
     # Stage 4 — Ry(+β) = conj of Stage 2 phases
     mul!(W, P, conj_V)
-    @inbounds for i in 1:N_spatial
-        bi = beta[i]
-        sb, cb = sincos(bi)
-        z_b = Complex{T}(cb, -sb)              # cis(-β)
-        phase = Complex{T}(cb, sb)^F_int        # cis(F·β)
-        for j in 1:D
-            W[i, j] *= phase
-            phase *= z_b
+    _voxel_loop!(N_spatial) do i
+        @inbounds begin
+            bi = beta[i]
+            sb, cb = sincos(bi)
+            z_b = Complex{T}(cb, -sb)              # cis(-β)
+            phase = Complex{T}(cb, sb)^F_int        # cis(F·β)
+            for j in 1:D
+                W[i, j] *= phase
+                phase *= z_b
+            end
         end
     end
     mul!(P, W, V_T)
 
     # Stage 5 — Rz(+α)
-    @inbounds for i in 1:N_spatial
-        ai = alpha[i]
-        sa, ca = sincos(ai)
-        z_a = Complex{T}(ca, sa)               # cis(α)
-        phase = Complex{T}(ca, -sa)^F_int       # cis(-F·α)
-        for c in 1:D
-            P[i, c] *= phase
-            phase *= z_a
+    _voxel_loop!(N_spatial) do i
+        @inbounds begin
+            ai = alpha[i]
+            sa, ca = sincos(ai)
+            z_a = Complex{T}(ca, sa)               # cis(α)
+            phase = Complex{T}(ca, -sa)^F_int       # cis(-F·α)
+            for c in 1:D
+                P[i, c] *= phase
+                phase *= z_a
+            end
         end
     end
     nothing
@@ -114,27 +144,31 @@ path runs the same shift-free `cis(-m·θ)`)."""
     F_int = Int(F)
 
     # Stage 1 — Rz(-α)
-    @inbounds for i in 1:N_spatial
-        ai = alpha[i]
-        sa, ca = sincos(ai)
-        z_a = Complex{T}(ca, -sa)
-        phase = Complex{T}(ca, sa)^F_int
-        for c in 1:D
-            P[i, c] *= phase
-            phase *= z_a
+    _voxel_loop!(N_spatial) do i
+        @inbounds begin
+            ai = alpha[i]
+            sa, ca = sincos(ai)
+            z_a = Complex{T}(ca, -sa)
+            phase = Complex{T}(ca, sa)^F_int
+            for c in 1:D
+                P[i, c] *= phase
+                phase *= z_a
+            end
         end
     end
 
     # Stage 2 — Ry(-β)
     mul!(W, P, conj_V)
-    @inbounds for i in 1:N_spatial
-        bi = beta[i]
-        sb, cb = sincos(bi)
-        z_b = Complex{T}(cb, sb)
-        phase = Complex{T}(cb, -sb)^F_int
-        for j in 1:D
-            W[i, j] *= phase
-            phase *= z_b
+    _voxel_loop!(N_spatial) do i
+        @inbounds begin
+            bi = beta[i]
+            sb, cb = sincos(bi)
+            z_b = Complex{T}(cb, sb)
+            phase = Complex{T}(cb, -sb)^F_int
+            for j in 1:D
+                W[i, j] *= phase
+                phase *= z_b
+            end
         end
     end
     mul!(P, W, V_T)
@@ -146,39 +180,45 @@ path runs the same shift-free `cis(-m·θ)`)."""
     # normalization (only its spatial mean is removed) and biases the ITP
     # fixed point off the variational GP minimum. The real-time variant is
     # immune (there the same factor is an irrelevant global phase).
-    @inbounds for i in 1:N_spatial
-        ti = theta[i]
-        dz_step = exp(ti)
-        dz_r = exp(-F * ti)        # c=1 (m=+F): exp(-F·θ) = exp(-m·θ)
-        for c in 1:D
-            P[i, c] *= dz_r
-            dz_r *= dz_step
+    _voxel_loop!(N_spatial) do i
+        @inbounds begin
+            ti = theta[i]
+            dz_step = exp(ti)
+            dz_r = exp(-F * ti)        # c=1 (m=+F): exp(-F·θ) = exp(-m·θ)
+            for c in 1:D
+                P[i, c] *= dz_r
+                dz_r *= dz_step
+            end
         end
     end
 
     # Stage 4 — Ry(+β)
     mul!(W, P, conj_V)
-    @inbounds for i in 1:N_spatial
-        bi = beta[i]
-        sb, cb = sincos(bi)
-        z_b = Complex{T}(cb, -sb)
-        phase = Complex{T}(cb, sb)^F_int
-        for j in 1:D
-            W[i, j] *= phase
-            phase *= z_b
+    _voxel_loop!(N_spatial) do i
+        @inbounds begin
+            bi = beta[i]
+            sb, cb = sincos(bi)
+            z_b = Complex{T}(cb, -sb)
+            phase = Complex{T}(cb, sb)^F_int
+            for j in 1:D
+                W[i, j] *= phase
+                phase *= z_b
+            end
         end
     end
     mul!(P, W, V_T)
 
     # Stage 5 — Rz(+α)
-    @inbounds for i in 1:N_spatial
-        ai = alpha[i]
-        sa, ca = sincos(ai)
-        z_a = Complex{T}(ca, sa)
-        phase = Complex{T}(ca, -sa)^F_int
-        for c in 1:D
-            P[i, c] *= phase
-            phase *= z_a
+    _voxel_loop!(N_spatial) do i
+        @inbounds begin
+            ai = alpha[i]
+            sa, ca = sincos(ai)
+            z_a = Complex{T}(ca, sa)
+            phase = Complex{T}(ca, -sa)^F_int
+            for c in 1:D
+                P[i, c] *= phase
+                phase *= z_a
+            end
         end
     end
     nothing

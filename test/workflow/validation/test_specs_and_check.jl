@@ -40,7 +40,7 @@ end
         spec = ConservationSpec(norm_drift=1e-12, Fz_drift=1.0)
         result = check(spec, r)
         @test result isa CheckResult
-        @test result.pass == true
+        @test passed(result)
         @test length(result.details) == 2
         @test all(p.second.pass for p in result.details)
     end
@@ -49,7 +49,7 @@ end
         r = _fixture_run(; norm_drift_factor=1e-3)   # large drift
         spec = ConservationSpec(norm_drift=1e-12)
         result = check(spec, r)
-        @test result.pass == false
+        @test !passed(result)
         d = result.details[1]
         @test d.first === :norm_drift
         @test d.second.pass == false
@@ -64,9 +64,9 @@ end
         spec = ConservationSpec(norm_drift=1e-12)
         results = check(spec, sweep)
         @test length(results) == 3
-        @test results[1].pass == true
-        @test results[2].pass == true
-        @test results[3].pass == false
+        @test passed(results[1])
+        @test passed(results[2])
+        @test !passed(results[3])
     end
 
     @testset "check(OperatorRHSSpec, RunComparison) — both have Hpsi" begin
@@ -86,7 +86,7 @@ end
         c = compare_runs(a, b; label_a="ours", label_b="theirs")
         spec = OperatorRHSSpec(; tol_hpsi=1e-6, tol_per_term_E=1e-6)
         result = check(spec, c)
-        @test result.pass == true
+        @test passed(result)
         hp = first(p for p in result.details if p.first === :hpsi_rel_l2)
         @test hp.second.pass == true
         @test hp.second.got < 1e-6
@@ -102,7 +102,7 @@ end
         b = RunResult("/tmp/b.jld2", psi, grid, atom, ip)
         c = compare_runs(a, b)
         result = check(OperatorRHSSpec(), c)
-        @test result.pass == false
+        @test !passed(result)
         @test any(p.first === :hpsi_missing for p in result.details)
     end
 

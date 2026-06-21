@@ -300,6 +300,21 @@ const CI_EXTRA = [
     # chains-off-the-gated-gradient counterpart (anomalous block carries
     # the soft modes the saddle-rejection verdict rides on).
     "oracles/test_bdg_fd_hessian.jl",
+    # Trapped non-Hermitian BdG (dynamical axis) ≡ homogeneous BdG in the
+    # uniform limit: matrix-free σ_z[L M; M* L*] from the gated HvP vs the
+    # CG-sum homogeneous matrices at the box k-modes + quartet symmetry.
+    "oracles/test_trapped_bdg_spectrum.jl",
+    # StabilitySpec three-valued gate: replays the non-stationary /
+    # non-converged false-verdict class (mistake_stability_verdict_from_
+    # nonstationary_point) — gate returns :indeterminate, not a confident
+    # λ_min, when stationarity or the Lanczos Ritz residual is unmet, and
+    # abstains overall while the trapped dynamical BdG axis is unbuilt.
+    "oracles/test_stability_indeterminate.jl",
+    # Sneaky-prover (adversarial verifier hardening): hands the StabilitySpec
+    # gate a stationary SADDLE (polar at c1<0) and asserts the energetic axis
+    # catches its negative mode (:fail) — a false ACCEPT would be a Lanczos
+    # hidden-mode hole. The active-adversary upgrade of the frozen replay.
+    "oracles/test_stability_sneaky_prover.jl",
     # Fisher identifiability: the preflight instrument for the
     # no-anchor SBI regime (trust ledger column 3) — linearity anchors,
     # θ-valley, degenerate-protocol detection, channel-space chain.
@@ -415,6 +430,80 @@ const MANUAL_TESTS_ALLOWLIST = [
 # Auto-maintaining: a new `test/oracles/<x>.jl` added to any tier list is picked
 # up here for free.
 const ORACLE_TESTS = filter(t -> startswith(t, "oracles/"), vcat(FAST_TESTS, CI_EXTRA, FULL_EXTRA))
+
+# ── Parallel-balance cost model ───────────────────────────────────────
+# Per-file cost estimate (seconds), measured on the full tier, used only to
+# balance the parallel chunks (LPT bin-packing in runtests.jl). Only the heavy
+# outliers need an entry; the long tail defaults to _DEFAULT_COST. A wrong
+# estimate costs balance, never correctness — but a silently-stale estimate lets
+# CI wall-time regress unnoticed, which `warn_cost_drift` (below) guards against.
+# Lives here (not runtests.jl) so the chunk processes (run_chunk.jl) can run the
+# drift check against the same numbers. Every key must reference a real file —
+# the Cost-model meta-test in test_tier_membership.jl enforces that, so a
+# renamed/retired test can't leave dead weight in the balancer.
+const _DEFAULT_COST = 3.0
+const _COST = Dict{String, Float64}(
+    "workflow/test_multi_fidelity_bo.jl" => 161.0,
+    "workflow/test_triple_point.jl" => 127.0,
+    "test_dealias_2_3.jl" => 76.0,
+    "solvers/test_continuation.jl" => 58.0,
+    "test_quality.jl" => 48.0,           # Aqua/JET static analysis (warm-measured)
+    "workflow/test_active_learning.jl" => 41.0,  # GP/BO, no spinor workspace — real file cost
+    "workflow/test_pipeline.jl" => 17.0,
+    "workflow/test_infrastructure.jl" => 15.0,
+    "test_level4_general_F_phase_emergence.jl" => 13.0,
+    "test_level10_hpsi_self_consistency.jl" => 12.0,
+    "workflow/test_autopilot.jl" => 12.0,
+    "oracles/test_propagator_references.jl" => 11.0,
+    "oracles/test_master_oracle.jl" => 11.0,
+    "oracles/test_path_coverage.jl" => 10.0,
+    "analysis/test_tof_multiframe.jl" => 9.5,
+    "gpu/test_mixed_precision.jl" => 9.0,
+    "dynamics/test_tdhfb_f1_validation.jl" => 8.5,
+    "analysis/test_physics_invariants.jl" => 8.0,
+    "solvers/test_simulation.jl" => 8.0,
+    "test_reference_rhs.jl" => 7.5,
+    "solvers/test_lbfgs_sobolev_preconditioner.jl" => 6.5,
+    "rotating_basis/test_rotating_basis_pipeline_parsing.jl" => 6.0,
+    "solvers/test_3d.jl" => 5.0,
+    "dynamics/test_twa.jl" => 5.0,
+    "solvers/test_lbfgs.jl" => 5.0,
+)
+
+_cost(f) = get(_COST, f, _DEFAULT_COST)
+
+"""
+    warn_cost_drift(timings; factor=3.0, abs_gap=15.0, floor_s=8.0) -> stale
+
+Degradation guard for the `_COST` balance model. If a file's *measured* time
+grossly exceeds its estimate, the LPT balancer mis-packs the chunks and CI
+wall-time regresses silently. Emit a GitHub-Actions `::warning` annotation (so it
+surfaces on the run) for each such file. One-directional — only under-estimates
+hurt makespan; an over-estimate merely over-reserves a slot. Returns the stale
+entries (for tests).
+"""
+function warn_cost_drift(
+    timings; factor::Float64=3.0, abs_gap::Float64=15.0, floor_s::Float64=8.0
+)
+    stale = NamedTuple{(:file, :measured, :estimate), Tuple{String, Float64, Float64}}[]
+    for (f, t) in timings
+        est = _cost(f)
+        if t > floor_s && t > factor * est && (t - est) > abs_gap
+            push!(stale, (file=f, measured=t, estimate=est))
+        end
+    end
+    isempty(stale) && return stale
+    ci = lowercase(get(ENV, "GITHUB_ACTIONS", "")) == "true"
+    for s in stale
+        msg = string(
+            s.file, " took ", round(s.measured; digits=1), "s but _COST estimates ",
+            round(s.estimate; digits=1), "s — update _COST in test/_tiers.jl to keep ",
+            "parallel CI balanced",
+        )
+        println(ci ? "::warning title=Stale test-cost estimate::$msg" : "⚠️  cost drift: $msg")
+    end
+    return stale
+end
 
 function select_tests(tier::String)
     if tier == "fast"

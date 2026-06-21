@@ -1,0 +1,20 @@
+# Adversarial fixture: c1<0 ⇒ ferromagnetic ground; the polar state is a
+# stationary SADDLE. A correct verifier must REJECT (or ABSTAIN), never ACCEPT.
+name = "rb87_polar_saddle"
+
+[physics]
+atom = "Rb87"
+dims = [32]
+box  = [12.0]
+c0 = 1.0
+c1 = -0.3
+q  = 0.0
+
+[solve]
+n_steps = 800
+tol = 1.0e-10
+
+[gate]
+niter = 200
+eps_stat = 1.0e-4
+bdg_dim_cap = 4000

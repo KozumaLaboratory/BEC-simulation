@@ -18,5 +18,9 @@ include(joinpath(@__DIR__, "_tiers.jl"))
 
 failed, timings = run_test_files(ARGS)
 print_timing(timings, get(ENV, "SPINORBEC_TEST_TIER", "?"))
+# Flag files whose measured time has drifted above the _COST estimate — the
+# parent relays this chunk's stdout to the CI log, so the ::warning annotation
+# surfaces on the run (keeps the LPT balance honest as tests get heavier).
+warn_cost_drift(timings)
 
 exit(failed ? 1 : 0)

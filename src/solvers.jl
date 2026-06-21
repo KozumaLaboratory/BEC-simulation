@@ -28,6 +28,7 @@ include("solvers/lbfgs/helpers.jl")
 include("solvers/lbfgs/atomic.jl")
 include("solvers/lbfgs/driver.jl")
 include("solvers/hessian.jl")  # second-variation HvP + trapped-BdG λ_min
+include("solvers/trapped_bdg.jl")  # dense non-Hermitian trapped BdG (dynamical axis)
 include("solvers/newton_cg.jl")  # trust-region Newton-CG on the gate-2 operator
 include("solvers/ground_state/polished.jl")  # ITP+LBFGS chain over a Preset
 include("solvers/continuation/scan_1d.jl")
