@@ -16,8 +16,8 @@ iso would render them as empty panels.
 Env knobs:
   RTP_H5            input H5 (default = Tsubame canonical path)
   OUT_GIF           output GIF path
-  ISO_PEAK_RATIO    fallback iso fraction (default 0.30)
-  ISO_PEAK_RATIO_M6 m=-6 panel override (default 0.70 — exposes DDI prolate)
+  ISO_PEAK_RATIO    fallback iso fraction for all three m panels (default 0.30)
+  ISO_PEAK_RATIO_M6 m=-6 panel override (default = ISO_PEAK_RATIO)
   ISO_PEAK_RATIO_M5 m=-5 panel override (default = ISO_PEAK_RATIO)
   ISO_PEAK_RATIO_M4 m=-4 panel override (default = ISO_PEAK_RATIO)
   FRAME_START_FRAC  first frame as fraction of total (default 0.5)
@@ -44,17 +44,17 @@ H5_DEFAULT = "/gs/fs/tga-kozuma-kouhi/ue06186/bec-runs/flower_protocol_edh/rtp_1
 H5 = Path(os.environ.get("RTP_H5", H5_DEFAULT))
 OUT_GIF = Path(os.environ.get(
     "OUT_GIF",
-    "runs/eu151_flower_protocol_edh/figures/goto_protocol_10mG/isosurface_peak70m6_30m5m4_secondhalf.gif",
+    "runs/eu151_flower_protocol_edh/figures/goto_protocol_10mG/isosurface_peak30_m6m5m4_secondhalf.mp4",
 ))
 ISO_PEAK_RATIO = float(os.environ.get("ISO_PEAK_RATIO", "0.30"))
 ISO_RATIO_PER_M = {
-    -6: float(os.environ.get("ISO_PEAK_RATIO_M6", "0.70")),
+    -6: float(os.environ.get("ISO_PEAK_RATIO_M6", str(ISO_PEAK_RATIO))),
     -5: float(os.environ.get("ISO_PEAK_RATIO_M5", str(ISO_PEAK_RATIO))),
     -4: float(os.environ.get("ISO_PEAK_RATIO_M4", str(ISO_PEAK_RATIO))),
 }
 FRAME_START_FRAC = float(os.environ.get("FRAME_START_FRAC", "0.25"))
-FRAME_DURATION_MS = int(os.environ.get("FRAME_DURATION_MS", "33"))
-FPS = int(os.environ.get("FPE_FPS", str(max(1, int(round(1000 / FRAME_DURATION_MS))))))
+FPS = int(os.environ.get("FPE_FPS", "12"))
+FRAME_DURATION_MS = int(os.environ.get("FRAME_DURATION_MS", str(max(1, int(round(1000 / FPS))))))
 
 COMPONENTS = [
     (-6, "n_m6_3d", "arg_psi_m6_3d"),

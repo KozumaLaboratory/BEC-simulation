@@ -26,8 +26,8 @@ OUT_GIF = os.environ.get("OUT_GIF", H5.replace(".h5", "_3d_spin.mp4"))
 DENSITY_THRESH = float(os.environ.get("FPE_3D_SPIN_THRESH", "0.12"))
 SHELL_THRESH = float(os.environ.get("FPE_3D_SHELL_THRESH", "0.10"))
 ARROW_STEP = int(os.environ.get("FPE_3D_ARROW_STEP", "2"))
-FPS = int(os.environ.get("FPE_3D_FPS", "30"))
-INTERVAL_MS = int(os.environ.get("FPE_3D_INTERVAL_MS", "33"))
+FPS = int(os.environ.get("FPE_3D_FPS", os.environ.get("FPE_FPS", "12")))
+INTERVAL_MS = int(os.environ.get("FPE_3D_INTERVAL_MS", str(max(1, int(round(1000 / FPS))))))
 
 with h5py.File(H5, "r") as f:
     required = ("n_total_3d", "Fx_3d", "Fy_3d", "Fz_3d")
@@ -104,7 +104,10 @@ def draw_frame(k):
     ax3.set_facecolor(BG)
     sample = np.zeros_like(n_total_3d[k], dtype=bool)
     sample[::ARROW_STEP, ::ARROW_STEP, ::ARROW_STEP] = True
-    mask = sample & (n_total_3d[k] >= DENSITY_THRESH * n_total_max)
+    # Per-frame peak so arrows track the (shrinking) cloud as K_3 loss
+    # depletes the BEC — using a global max made later frames disappear.
+    n_peak_k = max(float(np.max(n_total_3d[k])), 1e-15)
+    mask = sample & (n_total_3d[k] >= DENSITY_THRESH * n_peak_k)
     xq = X[mask]
     yq = Y[mask]
     zq = Z[mask]

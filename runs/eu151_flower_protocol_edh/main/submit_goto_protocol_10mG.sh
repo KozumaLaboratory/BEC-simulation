@@ -50,11 +50,7 @@ run_plots () {
         OUT_GIF="${fig_dir}/isosurface_peak30_m6.gif" \
         python3 scripts/flower_protocol_edh/plot_rtp_10mG_goto_isosurface_m6.py
     GOTO_H5="$h5_path" RTP_H5="$h5_path" \
-        ISO_PEAK_RATIO_M6=0.30 \
-        OUT_GIF="${fig_dir}/isosurface_peak30_m6m5m4_secondhalf.gif" \
-        python3 scripts/flower_protocol_edh/plot_rtp_10mG_goto_isosurface_m6m5m4_second_half.py
-    GOTO_H5="$h5_path" RTP_H5="$h5_path" \
-        OUT_GIF="${fig_dir}/isosurface_peak70m6_30m5m4_secondhalf.gif" \
+        OUT_GIF="${fig_dir}/isosurface_peak30_m6m5m4_secondhalf.mp4" \
         python3 scripts/flower_protocol_edh/plot_rtp_10mG_goto_isosurface_m6m5m4_second_half.py
     GOTO_H5="$h5_path" RTP_H5="$h5_path" \
         OUT_PNG="${fig_dir}/vortex_analysis_m6m5m4.png" \

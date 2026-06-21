@@ -42,8 +42,8 @@ OUT_GIF = Path(os.environ.get(
 ))
 ISO_PEAK_RATIO = float(os.environ.get("ISO_PEAK_RATIO", "0.30"))
 MAX_FRAMES = int(os.environ.get("MAX_FRAMES", "0"))
-FRAME_DURATION_MS = int(os.environ.get("FRAME_DURATION_MS", "33"))
-FPS = int(os.environ.get("FPE_FPS", str(max(1, int(round(1000 / FRAME_DURATION_MS))))))
+FPS = int(os.environ.get("FPE_FPS", "12"))
+FRAME_DURATION_MS = int(os.environ.get("FRAME_DURATION_MS", str(max(1, int(round(1000 / FPS))))))
 
 TETS = [
     (0, 1, 3, 7), (0, 3, 2, 7), (0, 2, 6, 7),

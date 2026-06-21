@@ -29,8 +29,8 @@ OUT_GIF = os.environ.get("OUT_GIF", H5.replace(".h5", "_3d_density_phase.mp4"))
 
 ISO_TOTAL = float(os.environ.get("FPE_3D_ISO_TOTAL", "0.10"))
 ISO_M6 = float(os.environ.get("FPE_3D_ISO_M6", "0.12"))
-FPS = int(os.environ.get("FPE_3D_FPS", "30"))
-INTERVAL_MS = int(os.environ.get("FPE_3D_INTERVAL_MS", "33"))
+FPS = int(os.environ.get("FPE_3D_FPS", os.environ.get("FPE_FPS", "12")))
+INTERVAL_MS = int(os.environ.get("FPE_3D_INTERVAL_MS", str(max(1, int(round(1000 / FPS))))))
 
 with h5py.File(H5, "r") as f:
     required = ("n_total_3d", "n_m6_3d", "arg_psi_m6_3d")
