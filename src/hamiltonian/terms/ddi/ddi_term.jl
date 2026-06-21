@@ -126,7 +126,7 @@ function _grad_ddi!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
     for c in 2:D
         idx_c = _component_slice(N, n_pts, c)
         idx_cm1 = _component_slice(N, n_pts, c - 1)
-        fp = sqrt(Float64(F * (F + 1) - (F - c + 1) * (F - c + 2)))
+        fp = fp_ladder_coeff(F, F - c + 1)
         view(grad, idx_cm1...) .+= 0.5 .* fp .* (phi_x .- im .* phi_y) .* view(psi, idx_c...)
         view(grad, idx_c...) .+= 0.5 .* fp .* (phi_x .+ im .* phi_y) .* view(psi, idx_cm1...)
     end

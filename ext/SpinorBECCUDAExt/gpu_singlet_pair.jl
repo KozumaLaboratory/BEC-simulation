@@ -55,7 +55,7 @@ function SpinorBEC.apply_singlet_pair_step!(
     c2_t = T(c2)
     dt_t = T(dt)
 
-    signs = T[iseven(F - (F - (c - 1))) ? one(T) : -one(T) for c in 1:D]
+    signs = T[SpinorBEC.singlet_pair_sign(F, F - (c - 1)) for c in 1:D]
 
     psi_2d = reshape(psi, N, D)
     cache = _get_gpu_singlet_pair_cache(N, T)

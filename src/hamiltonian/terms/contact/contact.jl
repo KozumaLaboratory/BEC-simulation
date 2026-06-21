@@ -190,7 +190,7 @@ function _grad_c1_spin!(grad, psi, ws, c1, fx, fy, fz, n_pts, D, ::Val{N}) where
     for c in 2:D
         idx_c = _component_slice(N, n_pts, c)
         idx_cm1 = _component_slice(N, n_pts, c - 1)
-        fp = sqrt(Float64(F * (F + 1) - (F - c + 1) * (F - c + 2)))
+        fp = fp_ladder_coeff(F, F - c + 1)
         view(grad, idx_cm1...) .+= c1 .* 0.5 .* fp .* (fx .- im .* fy) .* view(psi, idx_c...)
         view(grad, idx_c...) .+= c1 .* 0.5 .* fp .* (fx .+ im .* fy) .* view(psi, idx_cm1...)
     end
@@ -327,8 +327,7 @@ function _accumulate_singlet_pair_operator!(out, psi, F, c2, ndim)
     @inbounds for I in CartesianIndices(n_pts)
         AI = A[I]
         for c in 1:D
-            m_c = F - (c - 1)
-            sgn = iseven(F - m_c) ? 1.0 : -1.0
+            sgn = singlet_pair_sign(F, F - (c - 1))
             out[I, c] += coeff * sgn * AI * conj(psi[I, D - c + 1])
         end
     end

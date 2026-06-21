@@ -1,4 +1,35 @@
-export spin_matrices
+export spin_matrices, fp_ladder_coeff, fp_ladder_coeffs, singlet_pair_sign
+
+"""
+    fp_ladder_coeff([T=Float64,] F, m) -> √(F(F+1) − m(m+1))
+
+The F₊ raising-operator matrix element ⟨F,m+1|F₊|F,m⟩. **Single source** for every
+spin-ladder coefficient in the codebase — c₁ spin mixing, Raman, spatial-Zeeman,
+and the DDI/c₁ gradients all delegate here so a sign or algebra change can only
+happen in one place. Matches the off-diagonal of `spin_matrices(F).Fp`.
+"""
+@inline fp_ladder_coeff(::Type{T}, F::Integer, m) where {T <: AbstractFloat} =
+    sqrt(T(F * (F + 1)) - T(m) * (T(m) + one(T)))
+@inline fp_ladder_coeff(F::Integer, m) = fp_ladder_coeff(Float64, F, m)
+
+"""
+    fp_ladder_coeffs([T=Float64,] F, ::Val{D}) -> NTuple{D,T}
+
+Per-component F₊ coefficients for the spinor layout ψ[...,c] (c=1→m=F), with the
+top component (c=1) set to 0. Built from [`fp_ladder_coeff`](@ref).
+"""
+@inline fp_ladder_coeffs(::Type{T}, F::Integer, ::Val{D}) where {T <: AbstractFloat, D} =
+    ntuple(c -> c == 1 ? zero(T) : fp_ladder_coeff(T, F, F - (c - 1)), Val(D))
+@inline fp_ladder_coeffs(F::Integer, ::Val{D}) where {D} =
+    fp_ladder_coeffs(Float64, F, Val(D))
+
+"""
+    singlet_pair_sign(F, m) -> ±1.0
+
+Sign factor σ_c = (−1)^{F−m} of the spin-singlet pair amplitude. **Single source**
+for the c₂ singlet-pairing propagator and gradient.
+"""
+@inline singlet_pair_sign(F::Integer, m::Integer) = iseven(F - m) ? 1.0 : -1.0
 
 function spin_matrices(F::Int)
     sys = SpinSystem(F)
@@ -19,7 +50,7 @@ function spin_matrices(F::Int)
     # We need m[i] = m[j] + 1
     for j in 1:n, i in 1:n
         if m[i] == m[j] + 1
-            Fp_dense[i, j] = sqrt(F * (F + 1) - m[j] * (m[j] + 1))
+            Fp_dense[i, j] = fp_ladder_coeff(F, m[j])
         end
     end
 

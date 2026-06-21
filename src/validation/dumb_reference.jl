@@ -182,6 +182,23 @@ function dumb_zeeman_pqbxby(ws)
     return (p, q, bx, by)
 end
 
+# Independent restatement of the UNIFORM Zeeman operator for a tilted field:
+#   H = -(b·F) + q(b̂·F)²,  b = (bx, by, p),  b̂ = b/|b|.
+# Field-axis quadratic (the unified production convention, 2026-06-21), built from
+# this module's own dumb_spin_matrices — NOT production's `zeeman_field_matrix!`,
+# so it stays an independent statement (the oracle's whole value). B∥ẑ keeps the
+# diagonal -p·m + q·m² form (which equals q(b̂·F)² when b̂ = ẑ), so callers only
+# invoke this for a transverse field.
+function dumb_uniform_zeeman_matrix(sm, bx, by, p, q)
+    BdotF = bx .* sm.Fx .+ by .* sm.Fy .+ p .* sm.Fz
+    M = ComplexF64.(-BdotF)
+    bmag2 = bx^2 + by^2 + p^2
+    if abs(q) > 1e-30 && bmag2 > 0.0
+        M = M .+ (q / bmag2) .* (BdotF * BdotF)
+    end
+    return M
+end
+
 function dumb_lhy_coefficient(ws)
     l = ws.lhy
     l === nothing && return ws.interactions.c_lhy
@@ -518,20 +535,27 @@ function dumb_energy_breakdown(
     end
     E_trap *= dV
 
-    # zeeman
+    # zeeman: H = -(b·F) + q(b̂·F)², b = (bx, by, p). B∥ẑ (bx=by=0) reduces to the
+    # diagonal -p·m + q·m²; a tilted field uses the field-axis quadratic matrix.
     p, q, bx, by = dumb_zeeman_pqbxby(ws)
-    E_zz = 0.0
-    for c in 1:D
-        coef = -p * sm.m[c] + q * sm.m[c]^2
-        for I in _dumb_spatial(ψ)
-            E_zz += coef * abs2(ψ[I, c])
+    if abs(bx) + abs(by) <= 1e-30
+        E_zz = 0.0
+        for c in 1:D
+            coef = -p * sm.m[c] + q * sm.m[c]^2
+            for I in _dumb_spatial(ψ)
+                E_zz += coef * abs2(ψ[I, c])
+            end
         end
+        E_zz *= dV
+        E_zt = 0.0
+    else
+        Hz = dumb_uniform_zeeman_matrix(sm, bx, by, p, q)
+        E_zz = sum(dumb_local_expectation(ψ, Hz)) * dV
+        E_zt = 0.0
     end
-    E_zz *= dV
     fx = dumb_local_expectation(ψ, sm.Fx)
     fy = dumb_local_expectation(ψ, sm.Fy)
     fz = dumb_local_expectation(ψ, sm.Fz)
-    E_zt = sum(-bx .* fx .- by .* fy) * dV
 
     # contact + LHY
     c0 = ws.interactions[0]
@@ -680,17 +704,22 @@ function dumb_rhs_breakdown(
         g_trap[I, c] = ws.potential_values[I] * ψ[I, c]
     end
 
+    # zeeman: H = -(b·F) + q(b̂·F)², b = (bx, by, p). B∥ẑ keeps the diagonal
+    # -p·m + q·m²; a tilted field applies the field-axis quadratic matrix.
     p, q, bx, by = dumb_zeeman_pqbxby(ws)
     g_zz = zed()
-    for c in 1:D
-        coef = -p * sm.m[c] + q * sm.m[c]^2
-        for I in _dumb_spatial(ψ)
-            g_zz[I, c] = coef * ψ[I, c]
-        end
-    end
-    Ht = ComplexF64.(-bx .* sm.Fx .- by .* sm.Fy)
     g_zt = zed()
-    dumb_add_matrix_action!(g_zt, ψ, Ht, _ -> 1.0)
+    if abs(bx) + abs(by) <= 1e-30
+        for c in 1:D
+            coef = -p * sm.m[c] + q * sm.m[c]^2
+            for I in _dumb_spatial(ψ)
+                g_zz[I, c] = coef * ψ[I, c]
+            end
+        end
+    else
+        Hz = dumb_uniform_zeeman_matrix(sm, bx, by, p, q)
+        dumb_add_matrix_action!(g_zz, ψ, Hz, _ -> 1.0)
+    end
 
     c0 = ws.interactions[0]
     c1 = ws.interactions[1]

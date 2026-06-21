@@ -66,9 +66,7 @@ function _spin_mixing_loop!(
     # Saves 30–35% on the per-step rotation cost (matched the DDI win).
     N_spatial = prod(n_pts)
     F = T(sm.system.F)
-    Ff1 = T(sm.system.F * (sm.system.F + 1))
-    fp_coeffs = ntuple(c -> c == 1 ? T(0) :
-                            sqrt(Ff1 - T(F - (c - 1)) * T(F - (c - 1) + 1)), Val(D))
+    fp_coeffs = fp_ladder_coeffs(T, sm.system.F, Val(D))
 
     rc = _get_ddi_rotation_cache_cpu(psi, sm, ndim_from_n_pts(n_pts))
     alpha = rc.alpha
@@ -150,10 +148,9 @@ function _spin_mixing_loop!(
     psi, psi_mf::AbstractArray, sm, c1, dt_frac, ::Val{D}, n_pts, imaginary_time
 ) where {D}
     F = sm.system.F
-    Ff1 = Float64(F * (F + 1))
     m_vals = SVector{D, Float64}(ntuple(c -> F - (c - 1), Val(D)))
     m_vals_t = ntuple(c -> Float64(F - (c - 1)), Val(D))
-    fp_coeffs = ntuple(c -> c == 1 ? 0.0 : sqrt(Ff1 - m_vals_t[c] * (m_vals_t[c] + 1.0)), Val(D))
+    fp_coeffs = fp_ladder_coeffs(F, Val(D))
 
     V_Fy = sm.Fy_eigvecs
     Vt_Fy = sm.Fy_eigvecs_adj

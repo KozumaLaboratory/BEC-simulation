@@ -235,6 +235,11 @@ const CI_EXTRA = [
     "oracles/test_raman_analytic.jl",
     "oracles/test_term_legacy_equivalence.jl",
     "oracles/test_term_consistency.jl",
+    # Single-source gate for the F₊ ladder coefficient √(F(F+1)−m(m+1)) and the
+    # singlet-pair sign (−1)^{F−m}. Pins every spin-ladder propagator/energy/
+    # gradient to `fp_ladder_coeff` / `singlet_pair_sign`, so the formula can no
+    # longer drift independently across c₁ / Raman / spatial-Zeeman / DDI sites.
+    "oracles/test_spin_ladder_single_source.jl",
     # Imaginary-time propagator generator == registry operator (spin-mixing
     # + DDI). Gates the 2026-06-15 per-voxel exp(-(m+F)θ) density-bias class
     # that only the propagator↔operator generator comparison can see.

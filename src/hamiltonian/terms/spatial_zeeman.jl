@@ -45,8 +45,7 @@ function _spatial_zeeman_apply!(
     F = sm.system.F
     n_pts = ntuple(d -> size(psi, d), Val(N))
     m_vals = ntuple(c -> Float64(F - (c - 1)), Val(D))
-    fp = ntuple(c -> c == 1 ? 0.0 :
-                     sqrt(Float64(F * (F + 1)) - m_vals[c] * (m_vals[c] + 1.0)), Val(D))
+    fp = fp_ladder_coeffs(F, Val(D))
     @inbounds for I in CartesianIndices(n_pts)
         # diagonal: (-bz·m + q·m²)
         bzI, qI = bz[I], q[I]
@@ -93,8 +92,7 @@ function _spatial_zeeman_energy(
     F = sm.system.F
     n_pts = ntuple(d -> size(psi, d), Val(N))
     m_vals = ntuple(c -> Float64(F - (c - 1)), Val(D))
-    fp = ntuple(c -> c == 1 ? 0.0 :
-                     sqrt(Float64(F * (F + 1)) - m_vals[c] * (m_vals[c] + 1.0)), Val(D))
+    fp = fp_ladder_coeffs(F, Val(D))
     E = 0.0
     @inbounds for I in CartesianIndices(n_pts)
         bzI, qI = bz[I], q[I]

@@ -108,10 +108,9 @@ function SpinorBEC.apply_spin_mixing_step!(
 
     fx .= zero(T)
     fy .= zero(T)
+    fp_coeffs = SpinorBEC.fp_ladder_coeffs(T, sm.system.F, Val(D))
     for c in 2:D
-        # fp = sqrt(F(F+1) - m(m+1)) where m = F - (c-1)
-        m = F_t - T(c - 1)
-        fp = sqrt(F_t * (F_t + one(T)) - m * (m + one(T)))
+        fp = fp_coeffs[c]
         pb .= conj.(view(psi_mf_2d, :, c-1)) .* view(psi_mf_2d, :, c)
         fx .+= fp .* real.(pb)
         fy .+= fp .* imag.(pb)

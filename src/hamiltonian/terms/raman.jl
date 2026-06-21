@@ -92,9 +92,8 @@ Manual per-voxel reduction inlines the kr phase + Fz/F+ contractions.
 function _raman_energy(psi, sm::SpinMatrices{D}, raman::RamanCoupling{N},
     grid::Grid{N}, ndim, n_pts, dV) where {D, N}
     F = sm.system.F
-    Ff1 = Float64(F * (F + 1))
     m_vals = ntuple(c -> Float64(F - (c - 1)), Val(D))
-    fp_coeffs = ntuple(c -> c == 1 ? 0.0 : sqrt(Ff1 - m_vals[c] * (m_vals[c] + 1.0)), Val(D))
+    fp_coeffs = fp_ladder_coeffs(F, Val(D))
 
     E = 0.0
     @inbounds for I in CartesianIndices(n_pts)
@@ -135,7 +134,21 @@ end
 # remains active.
 apply_operator!(out, ::RamanTerm, ws, psi) = out
 
-sign_oracle(::Type{RamanTerm}) = (
-    name="RamanTerm: KNOWN-LIMIT (no gradient implemented)",
-    predicate=(_, _) -> true,
-)
+# Directional oracle anchored on the PROPAGATOR (apply_raman_step!), since the
+# gradient face is a declared no-op. With δ·F_z the dominant term, ITP minimises
+# the energy δ·⟨F_z⟩, so the converged ⟨F_z⟩ takes the sign opposite to δ. A
+# flipped δ sign in the propagator inverts ⟨F_z⟩ and trips this. (δ = 0 — pure
+# transverse drive — has no F_z anchor and short-circuits to true.)
+function sign_oracle(::Type{RamanTerm})
+    return (
+        name="RamanTerm: +δ ⇒ ⟨F_z⟩ < 0 (energy δ⟨F_z⟩ minimised by ITP)",
+        predicate=function (psi, ws)
+            ws.raman === nothing && return true
+            r = raman_at(ws.raman, ws.state.t)
+            abs(r.delta) <= 1e-30 && return true
+            sm = ws.spin_matrices
+            _, _, fz = spin_density_vector(psi, sm, ndims(psi) - 1)
+            return sign(sum(fz) * cell_volume(ws.grid)) == -sign(r.delta)
+        end,
+    )
+end
