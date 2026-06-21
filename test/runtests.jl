@@ -347,6 +347,7 @@ const FULL_EXTRA = [
     "rotating_basis/test_rotating_basis_standard_parity.jl",
     "rotating_basis/test_rotating_vs_standard_dynamics.jl",
     "rotating_basis/test_rotating_dynamics_pipeline_parity.jl",
+    "rotating_basis/test_rotating_yoshida6_vs_lab_midpoint.jl",
     # Higher-order integrator tests
     "hamiltonian/test_higher_order_integrators.jl",
     "hamiltonian/test_integrator_order_meanfield.jl",

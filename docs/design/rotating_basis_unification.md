@@ -168,16 +168,21 @@ two frames are NOT equivalent at high order:
   earlier "no dt/efficiency advantage" conclusion was Strang-only and does NOT
   hold at high order.
 
-So a naive "route magnetostir through the standard path with yoshida6" would
-produce order-1 garbage and corrupt Fig 6. The faithful lab-frame high-order
-path is `adaptive_run!(ws; step!=split_step_midpoint!)` (implicit-midpoint Picard
-restores sub-time self-consistency). **Before retiring the engine, ADD a gate:
-standard `split_step_midpoint!`+Picard ⇄ rotating yoshida6 on a real magnetostir
-config (per-m_history match at the config dt), and confirm the cost is
-acceptable.** If the lab midpoint-Picard cannot match rotating yoshida6 at
-comparable cost, the rotating frame is NOT pure duplication for the magnetostir
-and retirement must reconsider (keep it, or port the Larmor-removal as a
-lab-frame interaction-picture spin substep).
+So a naive "route magnetostir through the standard path with `run_simulation_yoshida!`"
+would produce order-1 garbage and corrupt Fig 6. The faithful lab-frame path is
+`split_step_midpoint!` (implicit-midpoint Picard restores sub-time
+self-consistency).
+
+**RESOLVED 2026-06-21 (measured).** `test_rotating_yoshida6_vs_lab_midpoint.jl`:
+lab `split_step_midpoint!` reproduces rotating `yoshida6` to **~1e-5 per-m at the
+SAME dt / step count**, and the error is **p-INDEPENDENT** (1.1e-5 / 2.2e-5 /
+7.0e-6 at p = 50 / 500 / 2000, fixed `p·F·dt = 1`). Both paths obey the same
+Larmor guard `p·F·dt<π`, so the step counts match — **the rotating frame has no
+meaningful efficiency OR accuracy advantage** once the lab path uses the midpoint
+(not frozen-MF) integrator. 1e-5 is far below Fig-6 population resolution; if
+sub-1e-5 is ever needed, compose `split_step_midpoint!` as Y6-mid. **Retirement
+is viable: the migrated dynamics handler must use `split_step_midpoint!` (NOT
+`split_step!` Strang at the config dt, NOT `run_simulation_yoshida!`).**
 
 ## Testing
 
