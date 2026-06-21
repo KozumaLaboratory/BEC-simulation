@@ -34,7 +34,7 @@ function _analyze_bogoliubov_mode(psi, grid, atom, params, ws_prev)
     k_peak = imap.most_unstable_k
     # Build BdG matrix at k_peak, k̂ = best_direction; diagonalize
     h_mf, M_anom, zee, _ = SpinorBEC._bdg_contact_matrices(spinor, F, interactions, zeeman)
-    if abs(c_dd_val) > 1e-30
+    if is_active(c_dd_val)
         sm_for_ddi = spin_matrices(F)
         k_hat = collect(imap.most_unstable_direction)
         kn = sqrt(sum(abs2, k_hat));

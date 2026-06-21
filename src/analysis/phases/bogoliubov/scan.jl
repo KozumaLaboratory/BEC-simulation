@@ -90,7 +90,7 @@ function bogoliubov_instability_scan(;
 
     h_contact, M_contact, zee, _ = _bdg_contact_matrices(spinor, F, interactions, zeeman)
 
-    has_ddi = abs(c_dd) > 1e-30
+    has_ddi = is_active(c_dd)
     sm = has_ddi ? spin_matrices(F) : nothing
 
     growth_rates = zeros(Float64, n_k, n_dir)

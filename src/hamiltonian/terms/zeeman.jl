@@ -123,7 +123,7 @@ function zeeman_field_matrix!(
     @inbounds for j in 1:D, i in 1:D
         H[i, j] = -p * (nx * Fx[i, j] + ny * Fy[i, j] + nz * Fz[i, j])
     end
-    if abs(q) > 1e-30
+    if is_active(q)
         # Quadratic along the field axis: q (n̂·F)². Build n̂·F, then square.
         FdotN = MMatrix{D, D, ComplexF64}(undef)
         @inbounds for j in 1:D, i in 1:D

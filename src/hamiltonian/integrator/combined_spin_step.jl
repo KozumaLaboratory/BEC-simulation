@@ -64,7 +64,7 @@ function _apply_combined_spin_step!(
     # field in bufs.{Phi_x, Phi_y, Phi_z}. When DDI is off we still need
     # the spin density (for c1 ⟨F⟩) but the convolution is skipped and
     # Phi_* is treated as zero.
-    ddi_active = ws.ddi !== nothing && abs(ws.ddi.C_dd) > 1e-30
+    ddi_active = ws.ddi !== nothing && is_active(ws.ddi.C_dd)
     if ddi_active
         _compute_and_convolve_ddi!(psi, sm, ws.ddi, bufs, Val(D), N, n_pts)
     else

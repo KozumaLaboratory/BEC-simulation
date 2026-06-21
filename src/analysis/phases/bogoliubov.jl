@@ -34,7 +34,7 @@ function bogoliubov_spectrum(;
 
     h_mf, M_anom, zee, D_out = _bdg_contact_matrices(spinor, F, interactions, zeeman)
 
-    if abs(c_dd) > 1e-30
+    if is_active(c_dd)
         sm = spin_matrices(F)
         k_hat = collect(k_direction)
         k_norm = norm(k_hat)
@@ -278,7 +278,7 @@ function instability_angular_map(;
         throw(DimensionMismatch("spinor length $(length(spinor)) != 2F+1 = $D"))
 
     h_contact, M_contact, zee, _ = _bdg_contact_matrices(spinor, F, interactions, zeeman)
-    has_ddi = abs(c_dd) > 1e-30
+    has_ddi = is_active(c_dd)
     sm = has_ddi ? spin_matrices(F) : nothing
 
     theta_vals = collect(range(0.0, Float64(π) / 2; length=n_theta))

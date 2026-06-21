@@ -55,7 +55,7 @@ function quadratic_zeeman_si(atom::AtomSpecies, B_tesla::Float64)
             "atom $(atom.name): missing g_J or q_geometry; cannot compute q. " *
             "Fill in src/workflow/initialization/atoms.jl."),
     )
-    (atom.g_J * Units.MU_BOHR * B_tesla)^2 * atom.q_geometry / atom.Delta_E_hf
+    (atom.g_J * Units.BOHR_MAGNETON * B_tesla)^2 * atom.q_geometry / atom.Delta_E_hf
 end
 
 """
