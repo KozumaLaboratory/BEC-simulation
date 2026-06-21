@@ -147,4 +147,24 @@ using FFTW
         expected = 1.0 - 3.0 / (2.0 * V)
         @test all(isapprox.(corrected, expected; atol=1e-12))
     end
+
+    @testset "Welford recurrence ≡ direct mean/variance" begin
+        # The TWA ensemble mean/var are accumulated by _welford_update!; pin
+        # the online recurrence against the two-pass formulas exactly. A
+        # delta/(i-1) vs delta/i slip would pass a variance-only check, so
+        # gate BOTH mean and (sample) variance.
+        samples = [[1.0, -2.0], [3.0, 0.5], [-1.0, 4.0], [2.0, 1.0], [0.0, -1.5]]
+        n = length(samples)
+        mean = zeros(2)
+        M2 = zeros(2)
+        for i in 1:n
+            SpinorBEC._welford_update!(mean, M2, samples[i], i)
+        end
+        for k in 1:2
+            xs = [s[k] for s in samples]
+            μ = sum(xs) / n
+            @test isapprox(mean[k], μ; rtol=1e-12)
+            @test isapprox(M2[k] / (n - 1), sum((xs .- μ) .^ 2) / (n - 1); rtol=1e-12)
+        end
+    end
 end

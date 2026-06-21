@@ -91,3 +91,50 @@ end
     @test isapprox(e[2], 0.75; atol=2e-2)    # E_trap
     @test isapprox(e[5], 1.5; atol=2e-2)     # total
 end
+
+@testset "scalar_egpe energy ↔ Hψ FD identity (contact + DDI)" begin
+    # Sharp deterministic check: the central difference of E_total along a
+    # fixed δ equals the GP directional derivative 2·Re⟨δ|Hψ⟩·dV, with Hψ
+    # built from the SAME pieces the propagator uses. Exercises the contact
+    # AND dipolar nonlinear terms (the ½'s in g|ψ|⁴/2 and ρV_dd/2 cancel the
+    # modulus-derivative 2). g=c_dd≠0 so the interaction terms are live.
+    n = 16
+    L = 8.0
+    grid = SpinorBEC.make_grid(GridConfig((n, n, n), (L, L, L)))
+    V = [
+        0.5 * (grid.x[1][I[1]]^2 + grid.x[2][I[2]]^2 + grid.x[3][I[3]]^2)
+        for I in CartesianIndices((n, n, n))
+    ]
+    ws = SpinorBEC.make_scalar_ws(grid, V; g_contact=5.0, c_dd=1.0, F=6.0)
+    dV = prod(grid.dx)
+    Bhat = SVector{3, Float64}(0.0, 0.0, 1.0)
+
+    base = [
+        cis(0.3i - 0.2j + 0.1k) * exp(-0.05 * ((i - 8)^2 + (j - 8)^2 + (k - 8)^2))
+        for i in 1:n, j in 1:n, k in 1:n
+    ]
+    δ = [(0.7 + 0.3i - 0.2j + 0.4k) + im * (0.1i + 0.5j - 0.3k)
+         for i in 1:n, j in 1:n, k in 1:n]
+    δ ./= sqrt(sum(abs2, δ))
+
+    Eval(ψ) = begin
+        copyto!(ws.psi, ψ)
+        SpinorBEC.compute_tilted_dipole_potential!(ws, Bhat)
+        ws.rho .= abs2.(ws.psi)                 # scalar_energies reads ws.rho
+        SpinorBEC.scalar_energies(ws, Bhat)[5]
+    end
+
+    copyto!(ws.psi, base)
+    ws.rho .= abs2.(ws.psi)
+    SpinorBEC.compute_tilted_dipole_potential!(ws, Bhat)
+    kin = copy(ws.psi)
+    ws.fft_fwd * kin
+    kin .*= 0.5 .* ws.grid.k_squared
+    ws.fft_inv * kin
+    Hψ = kin .+ (ws.V_trap .+ ws.g_contact .* abs2.(ws.psi) .+ ws.V_dd) .* ws.psi
+    inner = 2 * real(sum(conj.(δ) .* Hψ)) * dV
+
+    ε = 1e-6
+    fd = (Eval(base .+ ε .* δ) - Eval(base .- ε .* δ)) / (2ε)
+    @test isapprox(fd, inner; rtol=1e-3)
+end

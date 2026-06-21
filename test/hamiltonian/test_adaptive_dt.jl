@@ -117,3 +117,27 @@ end
     # Tighter tol should require more (or equal) steps.
     @test r_tight.n_accept >= r_loose.n_accept
 end
+
+@testset "midpoint ITP ≡ Strang ITP: same ground-state energy" begin
+    # split_step_midpoint! derives its decaying imaginary-time kinetic phase
+    # from _update_batched_kinetic_phase!, while split_step! prepares it
+    # independently — two statements of exp(-½k²dt). Both ITP paths must
+    # converge to the SAME ground-state energy.
+    function gs_energy(stepper)
+        grid = make_grid(GridConfig((32,), (10.0,)))
+        sp = SimParams(; dt=0.01, n_steps=1, imaginary_time=true)
+        ws = make_workspace(; grid, atom=Rb87,
+            interactions=InteractionParams(Dict(0 => 5.0, 1 => 0.0)),
+            potential=HarmonicTrap(1.0), sim_params=sp)
+        copyto!(ws.state.psi, init_psi(grid, SpinSystem(1); state=:polar))
+        dV = cell_volume(grid)
+        for _ in 1:600
+            stepper(ws)
+            ws.state.psi ./= sqrt(sum(abs2, ws.state.psi) * dV)
+        end
+        SpinorBEC.total_energy(ws)
+    end
+    e_mid = gs_energy(split_step_midpoint!)
+    e_str = gs_energy(split_step!)
+    @test isapprox(e_mid, e_str; rtol=2e-3)
+end
