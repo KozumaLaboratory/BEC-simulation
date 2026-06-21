@@ -663,11 +663,8 @@ let F = 9, group = :T, irrep = :A, seeds = 1:10, tol = 1e-8
         f4_verdict, f4_dev_from_m_rep)
 end
 
-# =====================================================================
-# F3 regression: the 29-channel mult-1 closed-form must still PASS.
-# include() runs the standalone regression script untouched.
-# =====================================================================
-@printf("\n%s\n", "="^70)
-@printf("F3 REGRESSION: lemma1_general_S_verification.jl\n")
-@printf("%s\n", "="^70)
-include(joinpath(@__DIR__, "test_lemma1_general_S.jl"))
+# F3 regression (29-channel mult-1 closed-form) lives in its own file,
+# `test_lemma1_general_S.jl`, registered independently in FAST_TESTS.
+# It is intentionally NOT include()d here: doing so executed it twice and
+# coupled this file's pass/fail to another tier member (independence
+# violation). Run it standalone via the runner.

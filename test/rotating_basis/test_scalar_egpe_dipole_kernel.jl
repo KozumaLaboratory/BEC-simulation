@@ -9,7 +9,7 @@ using StaticArrays: SVector
     V_trap = zeros(Float64, 32, 32, 32)
     ws = SpinorBEC.make_scalar_ws(
         grid, V_trap;
-        g_contact=1.0, c_dd=100.0, F=1.0, gamma_lhy=0.0, dt=0.0,
+        g_contact=1.0, c_dd=100.0, F=1.0, gamma_lhy=0.0,
     )
 
     # Spherically symmetric Gaussian density

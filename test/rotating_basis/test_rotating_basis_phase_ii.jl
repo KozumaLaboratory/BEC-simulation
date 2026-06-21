@@ -26,7 +26,7 @@ using StaticArrays: SVector
 
     # --- Scalar eGPE ITP ---
     ws_s = SpinorBEC.make_scalar_ws(grid, V_trap;
-        g_contact=g_t, c_dd=c_t, F=Float64(F_t), gamma_lhy=0.0, dt=0.0)
+        g_contact=g_t, c_dd=c_t, F=Float64(F_t), gamma_lhy=0.0)
     σ = 1.0
     @inbounds for I in CartesianIndices(grid.config.n_points)
         x = grid.x[1][I[1]];
@@ -114,7 +114,7 @@ end
         p_t = 1000.0
 
         ws_s = SpinorBEC.make_scalar_ws(grid, V_trap;
-            g_contact=g_t, c_dd=c_t, F=Float64(F_t), gamma_lhy=0.0, dt=0.0)
+            g_contact=g_t, c_dd=c_t, F=Float64(F_t), gamma_lhy=0.0)
         σ = 1.0
         @inbounds for I in CartesianIndices(grid.config.n_points)
             x = grid.x[1][I[1]];

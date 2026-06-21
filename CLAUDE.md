@@ -17,13 +17,14 @@ Anchors:
 
 ```bash
 julia --project=. -e 'using Pkg; Pkg.test()'                     # all tests at default tier
+SPINORBEC_TEST_WORKERS=auto julia --project=. -e 'using Pkg; Pkg.test()'  # parallel (1 worker/core)
 julia --project=. -e 'using SpinorBEC; include("test/test_X.jl")' # single test
 julia --project=. -e 'using Pkg; Pkg.instantiate()'               # install deps
 LD_LIBRARY_PATH=/usr/lib/wsl/lib julia --project=.                # GPU REPL on WSL2
 julia --project=. scripts/cli.jl <subcmd> [args]                  # unified CLI (inspect / launch / figure / preflight / autopilot / tag / catalog / tsubame)
 ```
 
-`SPINORBEC_TEST_TIER` ∈ `{fast, ci, full, physics}`. Tier membership is **explicit in `test/runtests.jl`** — every test belongs to exactly one list. New tests get added to a list, not auto-discovered.
+`SPINORBEC_TEST_TIER` ∈ `{fast, ci, full, physics}`. Tier membership is **explicit in `test/runtests.jl`** — every test belongs to exactly one list. New tests get added to a list, not auto-discovered. The runner also honours `SPINORBEC_TEST_WORKERS` (`1` default = serial in-process / `N` / `auto` = split files into N **independent julia processes**, slow files spread across chunks — separate processes, not Distributed workers, so each loads SpinorBEC once in a clean session; a shared worker pool reloads the package mid-run and `x isa T` flakes false), `SPINORBEC_TEST_SKIP` (comma-separated paths to omit), and `SPINORBEC_TEST_TIMING=quiet`. Parallel mode requires each test file to stay a dependency-free unit (own `using` / `@testset` / `@__DIR__` helpers, no cross-file fixed `/tmp` paths) — preserve that when adding tests.
 
 ## Project structure
 
