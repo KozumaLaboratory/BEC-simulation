@@ -125,37 +125,65 @@ end
 # rotating-frame p_eff shift). Spatial arms carry their full diagonal in the
 # per-voxel spatial step, so the uniform diagonal here is zero (spatial +
 # rotating frame is rejected, so ω_R = 0 ⇒ ZeemanParams(0,0) is exactly zero).
+#
+# Fast-path / proper-compute split (memory: feedback_fast_path_proper_compute):
+# B∥ẑ (no transverse) folds the FULL diagonal `-bz·m + q·m²` into the cheap
+# per-component spatial phase here — `q F_z²` is exactly the field-axis form
+# `q(b̂·F)²` when b̂=ẑ. A TILTED field (bx≠0||by≠0) with NO spin rotating frame
+# instead applies the WHOLE Zeeman (linear + field-axis q(b̂·F)²) as one
+# eigen-exact matrix in `_apply_transverse_zeeman_step!`, so we fold NOTHING
+# here in that case (returning a zero diagonal). The spin-rotating-frame path
+# (ω_R≠0) keeps the legacy diagonal-q + linear-transverse split.
 @inline function _resolve_zeeman_diag(ws, t::Float64)
     ωR = ws.sim_params.spin_rotating_frame_omega
     is_uniform(ws.zeeman) || return zeeman_diagonal(ZeemanParams(0.0, 0.0), ws.spin_matrices, ωR)
+    if !is_active(ωR, ROTATION_TOL)
+        bx, by = transverse_b(ws.zeeman, t)
+        (bx != 0.0 || by != 0.0) &&
+            return zeeman_diagonal(ZeemanParams(0.0, 0.0), ws.spin_matrices, ωR)
+    end
     zeeman_diagonal(zeeman_at(ws.zeeman, t), ws.spin_matrices, ωR)
 end
 
+# Zeeman step taken when a transverse field is present. Two regimes:
+#
+#  * ω_R = 0 (no spin rotating frame): the diagonal fold carried NO Zeeman
+#    (see `_resolve_zeeman_diag`), so apply the WHOLE operator
+#    `H = -(b·F) + q(b̂·F)²` as one eigen-exact D×D matrix exp. The quadratic is
+#    along the FIELD axis b̂ (physical; matches the rotating-basis path),
+#    single-sourced through `_zeeman_propagator` (shared with the HamTerm faces).
+#    This is the "proper compute" branch for a tilted field.
+#  * ω_R ≠ 0 (spin rotating frame): the diagonal q stayed folded (lab-z) and
+#    only the linear transverse (Bx,By), rotated into RF coords, is applied here
+#    — the legacy split, untouched.
 function _apply_transverse_zeeman_step!(
     ws::Workspace, t::Float64, dt_frac::Float64, ndim::Int, imaginary_time::Bool
 )
     bx_lab, by_lab = transverse_b(ws.zeeman, t)
     (bx_lab == 0.0 && by_lab == 0.0) && return nothing
-    # Optional spin rotating frame: rotate (Bx, By) into the RF coords;
-    # when ω_R = ω_drive the transverse field becomes static in RF.
     omega_R = ws.sim_params.spin_rotating_frame_omega
-    bx, by = if is_active(omega_R, ROTATION_TOL)
-        c = cos(omega_R * t);
+    if is_active(omega_R, ROTATION_TOL)
+        # Spin rotating frame: rotate (Bx, By) into RF; q stays in the lab-z
+        # diagonal fold. User-spec convention `H = -(g_F μ_B B·F)`;
+        # `apply_uniform_spin_rotation!` realizes `exp(-i·dt·(phi·F̂))`, so pass
+        # (-bx, -by). Fixed 2026-06-04 (mistake_transverse_zeeman_sign_inversion).
+        c = cos(omega_R * t)
         s = sin(omega_R * t)
-        (bx_lab * c + by_lab * s, -bx_lab * s + by_lab * c)
-    else
-        (bx_lab, by_lab)
+        bx = bx_lab * c + by_lab * s
+        by = -bx_lab * s + by_lab * c
+        @timeit_debug TIMER "transverse_zeeman" apply_uniform_spin_rotation!(
+            ws.state.psi, ws.spin_matrices, -bx, -by, 0.0, dt_frac, ndim;
+            imaginary_time, scratch=ws.state.psi_scratch,
+        )
+        return nothing
     end
-    # User-spec convention (`b_block_builders.jl:27`): H_Zeeman = -(g_F μ_B B · F).
-    # `apply_uniform_spin_rotation!` applies `exp(-i·dt·(phi·F̂))` i.e. H = +phi·F̂.
-    # To get the user-spec H = -bx·F_x - by·F_y, pass (-bx, -by) as phi.
-    # Fixed 2026-06-04 after sign-inversion oracle. See
-    # `mistake_transverse_zeeman_sign_inversion_2026_06_04`.
-    @timeit_debug TIMER "transverse_zeeman" apply_uniform_spin_rotation!(
-        ws.state.psi, ws.spin_matrices, -bx, -by, 0.0, dt_frac, ndim;
-        imaginary_time, scratch=ws.state.psi_scratch,
+    zp = zeeman_at(ws.zeeman, t)   # ZeemanParams(p(t), q(t)); p ≡ bz
+    term = ZeemanTerm(bx_lab, by_lab, zp.p, zp.q)
+    P = _zeeman_propagator(ws.spin_matrices, term, dt_frac, imaginary_time)
+    @timeit_debug TIMER "transverse_zeeman" _apply_rotation_to_spin_axis!(
+        ws.state.psi, P, ndim; scratch=ws.state.psi_scratch
     )
-    nothing
+    return nothing
 end
 
 """
