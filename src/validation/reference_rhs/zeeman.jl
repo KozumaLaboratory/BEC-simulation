@@ -131,11 +131,31 @@ function reference_zeeman_transverse_energy(
     s * dV
 end
 
+# Independent hand-built D×D Zeeman matrix `H = -(b·F) + q(b̂·F)²`, b=(bx,by,bz),
+# b̂=b/|b|. Field-axis quadratic (matches the unified production convention) but
+# written from raw Fx/Fy/Fz here — NOT via production's `zeeman_field_matrix!` —
+# so this stays an INDEPENDENT reference statement (the oracle's whole value).
+function _reference_zeeman_matrix(
+    sm::SpinMatrices{D}, b_x::Real, b_y::Real, b_z::Real, q::Real
+) where {D}
+    Fx = Matrix(sm.Fx)
+    Fy = Matrix(sm.Fy)
+    Fz = Matrix(sm.Fz)
+    BdotF = b_x .* Fx .+ b_y .* Fy .+ b_z .* Fz
+    M = -BdotF
+    bmag2 = b_x^2 + b_y^2 + b_z^2
+    if abs(q) > 1e-30 && bmag2 > 0.0
+        M = M .+ (q / bmag2) .* (BdotF * BdotF)
+    end
+    M
+end
+
 """
     reference_zeeman_apply!(out, psi, zeeman, sm, t=0.0)
 
-Combined Zeeman action: diagonal + transverse (if `zeeman` carries
-transverse components via `transverse_b`).
+Combined Zeeman action `H = -(b·F) + q(b̂·F)²`. B∥ẑ keeps the diagonal
+`-p·m + q·m²` form (q(b̂·F)² = q F_z²). A tilted field applies the full
+field-axis operator via an independent hand-built D×D matrix.
 """
 function reference_zeeman_apply!(
     out::AbstractArray{<:Complex},
@@ -144,12 +164,21 @@ function reference_zeeman_apply!(
     sm::SpinMatrices{D},
     t::Real=0.0,
 ) where {D}
-    reference_zeeman_diag_apply!(out, psi, zeeman, sm.system, t)
     b_x, b_y = transverse_b(zeeman, t)
-    if abs(b_x) + abs(b_y) > 1e-30
-        tmp = similar(out)
-        reference_zeeman_transverse_apply!(tmp, psi, sm, b_x, b_y)
-        @. out += tmp
+    if abs(b_x) + abs(b_y) <= 1e-30
+        return reference_zeeman_diag_apply!(out, psi, zeeman, sm.system, t)
+    end
+    M = _reference_zeeman_matrix(sm, b_x, b_y, linear_p(zeeman, t), quadratic_q(zeeman, t))
+    ndim = ndims(psi) - 1
+    n_pts = ntuple(d -> size(psi, d), ndim)
+    @inbounds for I in CartesianIndices(n_pts)
+        for c in 1:D
+            s = zero(ComplexF64)
+            for cp in 1:D
+                s += M[c, cp] * psi[I, cp]
+            end
+            out[I, c] = s
+        end
     end
     out
 end
@@ -157,9 +186,9 @@ end
 """
     reference_zeeman_energy(psi, zeeman, sm, grid, t=0.0) → Float64
 
-Combined Zeeman energy: diagonal + transverse — directly comparable to
-production's `:zeeman` legacy-shape slot (= zeeman_z + zeeman_transverse
-since the GAP-1 fix).
+Combined Zeeman energy `⟨ψ| -(b·F) + q(b̂·F)² |ψ⟩` — directly comparable to
+production's `:zeeman` legacy-shape slot. B∥ẑ uses the diagonal form; a tilted
+field uses the independent field-axis matrix expectation.
 """
 function reference_zeeman_energy(
     psi::AbstractArray{<:Complex},
@@ -168,12 +197,23 @@ function reference_zeeman_energy(
     grid::Grid{N},
     t::Real=0.0,
 ) where {D, N}
-    e_diag = reference_zeeman_diag_energy(psi, zeeman, sm.system, grid, t)
     b_x, b_y = transverse_b(zeeman, t)
-    e_trans = if (abs(b_x) + abs(b_y) > 1e-30)
-        reference_zeeman_transverse_energy(psi, sm, b_x, b_y, grid)
-    else
-        0.0
+    if abs(b_x) + abs(b_y) <= 1e-30
+        return reference_zeeman_diag_energy(psi, zeeman, sm.system, grid, t)
     end
-    e_diag + e_trans
+    M = _reference_zeeman_matrix(sm, b_x, b_y, linear_p(zeeman, t), quadratic_q(zeeman, t))
+    dV = cell_volume(grid)
+    ndim = ndims(psi) - 1
+    n_pts = ntuple(d -> size(psi, d), Val(N))
+    E = 0.0
+    @inbounds for I in CartesianIndices(n_pts)
+        for c in 1:D
+            acc = zero(ComplexF64)
+            for cp in 1:D
+                acc += M[c, cp] * psi[I, cp]
+            end
+            E += real(conj(psi[I, c]) * acc)
+        end
+    end
+    E * dV
 end

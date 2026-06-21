@@ -1,10 +1,13 @@
 # test/oracles/test_zeeman_full_analytic.jl
 #
-# The merged ZeemanTerm is one operator H = −(bx·F_x + by·F_y + bz·F_z) + q·F_z²
-# (user spec, b_block_builders.jl). With the linear+transverse merge, ALL four
-# coefficients live in one declaration, which closes the [GAP-1] class (a face
-# that read only (bz,q) and dropped (bx,by)). Pin the full operator against the
-# explicit matrix, all coefficients active at once, for F=1 and F=6.
+# The merged ZeemanTerm is one operator H = −(b·F) + q·(b̂·F)², b = (bx,by,bz),
+# b̂ = b/|b| (user spec, b_block_builders.jl). The quadratic is along the FIELD
+# axis b̂ (physical: q is the field's own second-order shift; matches the
+# rotating-basis convention) and reduces to q·F_z² when b ∥ ẑ. With the
+# linear+transverse merge, ALL four coefficients live in one declaration, which
+# closes the [GAP-1] class (a face that read only (bz,q) and dropped (bx,by)).
+# Pin the full operator against the explicit matrix, all coefficients active at
+# once, for F=1 and F=6.
 
 using Test
 using FFTW
@@ -28,7 +31,10 @@ using SpinorBEC: ZeemanTerm, apply_operator!, spin_matrices
         Fy = Matrix(sm.Fy);
         Fz = Matrix(sm.Fz)
         bx, by, bz, q = 0.5, -0.3, 0.7, 0.2
-        M = -(bx * Fx + by * Fy + bz * Fz) + q * Fz^2     # D×D Hermitian
+        BdotF = bx * Fx + by * Fy + bz * Fz
+        bmag2 = bx^2 + by^2 + bz^2
+        # H = −(b·F) + q (b̂·F)²  (field-axis quadratic, b̂ = b/|b|)
+        M = -BdotF + q * (BdotF * BdotF) / bmag2          # D×D Hermitian
         psi = randn(ComplexF64, 6, 6, 6, D)
         out = zero(psi)
         apply_operator!(out, ZeemanTerm(bx, by, bz, q), ws, psi)

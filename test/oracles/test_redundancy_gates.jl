@@ -156,4 +156,48 @@ _fidelity(a, b) =
         @test sum(res_y.Fy[:, :, 1]) > 1e-6      # i phase ⇒ ⟨Fy⟩ > 0
         @test abs(sum(res_y.Fx[:, :, 1])) < 1e-8 # and ⟨Fx⟩ ≈ 0
     end
+
+    # (f) Rotating-basis Zeeman vs the registry SSoT. apply_local_spin_step!
+    # (Klaus-regime production) and apply_lab_spin_step! now build the spin
+    # Hamiltonian via zeeman_field_matrix!; the standard registry declares the
+    # SAME sign once in _diag_coef(ZeemanTerm). Pin the n̂=ẑ reduction of the
+    # rotating builder to _diag_coef entry-by-entry (and assert it is purely
+    # diagonal) so a sign/coefficient flip in either copy turns this gate red
+    # instead of silently breaking the rotating path (which has no per-term
+    # oracle of its own).
+    @testset "(f) rotating zeeman_field_matrix! == _diag_coef (n̂=ẑ)" begin
+        for F in (1, 2, 6)
+            sm = SpinorBEC.spin_matrices(F)
+            D = 2F + 1
+            p, q = 1.7, 0.35
+            H = zeros(ComplexF64, D, D)
+            SpinorBEC.zeeman_field_matrix!(H, sm, p, q, 0.0, 0.0, 1.0)
+            term = SpinorBEC.ZeemanTerm(0.0, 0.0, p, q)
+            @testset "F=$F" begin
+                for (c, m) in enumerate(sm.system.m_values)
+                    @test H[c, c] ≈ SpinorBEC._diag_coef(term, m) atol = 1e-12
+                end
+                # n̂=ẑ ⇒ purely diagonal (no off-diagonal coupling)
+                @test maximum(abs, H - Diagonal(diag(H))) < 1e-12
+            end
+        end
+    end
+
+    # (g) Rotating-basis gauge connection Â. The gauge-active local-spin step
+    # folds -Â into H; apply_gauge_step! applies the generator -Â. Both now
+    # read ONE declaration, `_gauge_connection_vector`. Pin its closed form
+    # (Âx,Ây,Âz) = (-φ̇ sinθ, θ̇, φ̇ cosθ) and the gauge_fix F_z absorption so a
+    # formula edit turns this red instead of silently desyncing the two steps.
+    @testset "(g) rotating gauge connection Â single-source" begin
+        θ, θdot, φdot = π / 3, 0.7, 1.3
+        ax, ay, az = SpinorBEC._gauge_connection_vector(θ, θdot, φdot, false)
+        @test ax ≈ -φdot * sin(θ)
+        @test ay ≈ θdot
+        @test az ≈ φdot * cos(θ)
+        # gauge_fix absorbs the F_z piece (Âz = 0), transverse intact.
+        ax2, ay2, az2 = SpinorBEC._gauge_connection_vector(θ, θdot, φdot, true)
+        @test az2 == 0.0
+        @test ax2 ≈ ax
+        @test ay2 ≈ ay
+    end
 end

@@ -15,6 +15,9 @@
 #                                       (spatially uniform spin rotation;
 #                                       shared by transverse Zeeman, Raman,
 #                                       rotating basis)
+#   spinor_utils/frame_rotation.jl   — _apply_UB! (lab↔field-following Û_B(t)
+#                                       transform; used by the magnetostir
+#                                       pipeline handlers)
 #
 # The euler helpers are internal, consumed from inside SpinorBEC's
 # diagonal / spin-mixing / raman propagators; apply_uniform_spin_rotation!
@@ -25,3 +28,4 @@ include("spinor_utils/euler_per_voxel.jl")
 include("spinor_utils/euler_batched.jl")
 include("spinor_utils/euler_fused.jl")
 include("spinor_utils/uniform_rotation.jl")
+include("spinor_utils/frame_rotation.jl")

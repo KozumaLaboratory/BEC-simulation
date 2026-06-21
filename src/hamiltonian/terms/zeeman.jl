@@ -75,6 +75,68 @@ zeeman_at(f::ZeemanField{Nothing}, t::Float64) =
 # without a method error for a spatial workspace.
 zeeman_at(::ZeemanField, ::Float64) = ZeemanParams(0.0, 0.0)
 
+# ----------------------------------------------------------------------------
+# Dense field-direction Zeeman matrix — matrix form of the SAME sign
+# convention as `_diag_coef(ZeemanTerm)`. The rotating-basis local-spin
+# (n̂=ẑ) and lab-spin (n̂=B̂(t)) steps need the full D×D operator for an
+# eigen-exact exp(-iH·dt); this gives them ONE declaration instead of two
+# hand-built copies. For n̂=ẑ the diagonal reduces entry-by-entry to
+# `_diag_coef` (zero off-diagonal) — pinned by the redundancy gate in
+# `test/oracles/test_redundancy_gates.jl` so the rotating copy and the
+# registry declaration cannot drift apart.
+# ----------------------------------------------------------------------------
+
+export zeeman_field_matrix!
+
+"""
+    zeeman_field_matrix!(H, sm, p, q, nx, ny, nz) -> H
+
+Fill the preallocated D×D matrix `H` with the Zeeman Hamiltonian for a
+field of linear strength `p` along unit direction n̂=(nx,ny,nz) plus a
+quadratic `q` along the same axis:
+
+    H = -p (n̂·F) + q (n̂·F)²
+
+The sign convention is identical to `_diag_coef(ZeemanTerm)`
+(`H_z(m) = -p·m + q·m²` for n̂=ẑ). Used by the rotating-basis local-spin
+(n̂=ẑ) and lab-spin (n̂=B̂(t)) eigen-exact steps so a single declaration
+drives both.
+"""
+function zeeman_field_matrix!(
+    H::AbstractMatrix{ComplexF64}, sm::SpinMatrices{D},
+    p::Real, q::Real, nx::Real, ny::Real, nz::Real,
+) where {D}
+    Fx = sm.Fx
+    Fy = sm.Fy
+    Fz = sm.Fz
+    if iszero(nx) && iszero(ny)
+        # Axis-aligned (n̂ ∥ ẑ): H = -p nz F_z + q (nz F_z)² is diagonal.
+        # Skip the F_x/F_y assembly and the dense (n̂·F)² matmul — keeps the
+        # rotating local-spin build at O(D) instead of O(D³).
+        fill!(H, zero(ComplexF64))
+        @inbounds for i in 1:D
+            m = nz * real(Fz[i, i])
+            H[i, i] = -p * m + q * m * m
+        end
+        return H
+    end
+    @inbounds for j in 1:D, i in 1:D
+        H[i, j] = -p * (nx * Fx[i, j] + ny * Fy[i, j] + nz * Fz[i, j])
+    end
+    if abs(q) > 1e-30
+        # Quadratic along the field axis: q (n̂·F)². Build n̂·F, then square.
+        FdotN = MMatrix{D, D, ComplexF64}(undef)
+        @inbounds for j in 1:D, i in 1:D
+            FdotN[i, j] = nx * Fx[i, j] + ny * Fy[i, j] + nz * Fz[i, j]
+        end
+        FN2 = FdotN * FdotN
+        @inbounds for j in 1:D, i in 1:D
+            H[i, j] += q * FN2[i, j]
+        end
+    end
+    return H
+end
+
 # ============================================================================
 # Builders — static Zeeman constructors
 # ============================================================================
@@ -179,25 +241,21 @@ function apply_operator!(out::AbstractArray, term::ZeemanTerm, ws, psi::Abstract
     F = sm.system.F
     D = sm.system.n_components
     N = ndims(psi) - 1
+    # Transverse / tilted field: full general operator -(b·F) + q(b̂·F)² via the
+    # shared matrix builder (field-axis quadratic). Single declaration shared
+    # with the propagator + energy faces.
+    if _has_transverse(term)
+        M = Matrix{ComplexF64}(undef, D, D)
+        _zeeman_term_matrix!(M, sm, term)
+        return _accumulate_uniform_spin!(out, M, psi, D, N)
+    end
+    # Diagonal-only (b∥ẑ): per-component -bz·m + q·m² (= the b̂=ẑ special case).
     n_pts = ntuple(d -> size(psi, d), Val(N))
-    # diagonal (-bz·m + q·m²)
     for c in 1:D
         coef = _diag_coef(term, F - (c - 1))
         coef == 0.0 && continue
         idx = _component_slice(N, n_pts, c)
         view(out, idx...) .+= coef .* view(psi, idx...)
-    end
-    # transverse (-bx·F_x - by·F_y) via ladder accumulation
-    if _has_transverse(term)
-        coeff_lower = -(term.bx + im * term.by) / 2   # acts at c reading psi at c-1
-        coeff_upper = -(term.bx - im * term.by) / 2   # acts at c-1 reading psi at c
-        for c in 2:D
-            idx_c = _component_slice(N, n_pts, c)
-            idx_cm1 = _component_slice(N, n_pts, c - 1)
-            fp = sqrt(Float64(F * (F + 1) - (F - c + 1) * (F - c + 2)))
-            view(out, idx_c...) .+= coeff_lower .* fp .* view(psi, idx_cm1...)
-            view(out, idx_cm1...) .+= coeff_upper .* fp .* view(psi, idx_c...)
-        end
     end
     return out
 end
@@ -212,8 +270,14 @@ function energy_contribution(term::ZeemanTerm, psi::AbstractArray{<:Complex}, ws
     F = sm.system.F
     D = sm.system.n_components
     N = ndims(psi) - 1
-    n_pts = ntuple(d -> size(psi, d), Val(N))
     dV = cell_volume(ws.grid)
+    # Transverse / tilted: ⟨ψ| -(b·F)+q(b̂·F)² |ψ⟩ via the shared matrix builder.
+    if _has_transverse(term)
+        M = Matrix{ComplexF64}(undef, D, D)
+        _zeeman_term_matrix!(M, sm, term)
+        return _uniform_spin_expectation(M, psi, D, N, dV)
+    end
+    n_pts = ntuple(d -> size(psi, d), Val(N))
     E = 0.0
     for c in 1:D
         coef = _diag_coef(term, F - (c - 1))
@@ -221,12 +285,7 @@ function energy_contribution(term::ZeemanTerm, psi::AbstractArray{<:Complex}, ws
         idx = _component_slice(N, n_pts, c)
         E += coef * sum(abs2, view(psi, idx...))
     end
-    E *= dV
-    if _has_transverse(term)
-        fx, fy, _ = spin_density_vector(psi, sm, N)
-        E += ((-term.bx) * sum(fx) + (-term.by) * sum(fy)) * dV
-    end
-    return E
+    return E * dV
 end
 
 # Context-aware: diagonal via per-component density (CPU Array, no big
@@ -239,6 +298,14 @@ function energy_contribution(
     F = sm.system.F
     D = sm.system.n_components
     N = ndims(psi) - 1
+    # Transverse / tilted: full operator via the shared matrix builder. The
+    # ctx spin-density shortcut (fx,fy) only covers the linear transverse part,
+    # not the field-axis quadratic, so route through the matrix expectation.
+    if _has_transverse(term)
+        M = Matrix{ComplexF64}(undef, D, D)
+        _zeeman_term_matrix!(M, sm, term)
+        return _uniform_spin_expectation(M, psi, D, N, ctx.dV)
+    end
     n_pts = ntuple(d -> size(psi, d), Val(N))
     E = 0.0
     for c in 1:D
@@ -247,15 +314,7 @@ function energy_contribution(
         idx = _component_slice(N, n_pts, c)
         E += coef * sum(abs2, view(psi, idx...))
     end
-    E *= ctx.dV
-    if _has_transverse(term)
-        s = 0.0
-        @inbounds for i in eachindex(ctx.fx, ctx.fy)
-            s += -term.bx * ctx.fx[i] - term.by * ctx.fy[i]
-        end
-        E += s * ctx.dV
-    end
-    return E
+    return E * ctx.dV
 end
 
 # ---------------------------------------------------------------------------
@@ -267,6 +326,69 @@ end
 # to the spin axis — exact, no Strang split between the diagonal and
 # transverse pieces, and GPU-safe via `_apply_rotation_to_spin_axis!`.
 
+# ---------------------------------------------------------------------------
+# General field-direction Zeeman operator for a ZeemanTerm, single-sourced
+# through `zeeman_field_matrix!` (the SAME builder the rotating-basis path
+# uses): H = -(b·F) + q(b̂·F)², b = (bx,by,bz). The quadratic is along the
+# field axis b̂ (physical: q is the field's own second-order shift), reducing
+# to q F_z² when b ∥ ẑ. Used by the transverse propagator / energy / gradient
+# faces so they share ONE declaration; the diagonal-only (b∥ẑ) fast paths keep
+# the per-component scalar form (`_diag_coef`), the exact b̂=ẑ special case.
+# ---------------------------------------------------------------------------
+function _zeeman_term_matrix!(
+    M::AbstractMatrix{ComplexF64}, sm::SpinMatrices{D}, term::ZeemanTerm
+) where {D}
+    b2 = term.bx^2 + term.by^2 + term.bz^2
+    if b2 == 0.0
+        # No linear field: legacy pure-quadratic along lab z (q F_z²).
+        zeeman_field_matrix!(M, sm, 0.0, term.q, 0.0, 0.0, 1.0)
+    else
+        bmag = sqrt(b2)
+        zeeman_field_matrix!(
+            M, sm, bmag, term.q, term.bx / bmag, term.by / bmag, term.bz / bmag
+        )
+    end
+    return M
+end
+
+# ⟨ψ|M|ψ⟩·dV for a spatially-uniform D×D spin matrix M (CPU). Shares M with
+# the propagator/gradient so the transverse Zeeman faces cannot drift. D is a
+# plain Int (≤13); the inner spin loops are cheap and avoid a runtime-`Val(D)`.
+function _uniform_spin_expectation(
+    M::AbstractMatrix{ComplexF64}, psi::AbstractArray{<:Complex}, D::Int, N::Int,
+    dV::Float64,
+)
+    n_pts = ntuple(d -> size(psi, d), N)
+    E = 0.0
+    @inbounds for I in CartesianIndices(n_pts)
+        for i in 1:D
+            acc = zero(ComplexF64)
+            for j in 1:D
+                acc += M[i, j] * psi[I, j]
+            end
+            E += real(conj(psi[I, i]) * acc)
+        end
+    end
+    E * dV
+end
+
+# out[r] .+= M·ψ[r] for a spatially-uniform D×D spin matrix M (CPU accumulate).
+function _accumulate_uniform_spin!(
+    out::AbstractArray, M::AbstractMatrix{ComplexF64}, psi::AbstractArray, D::Int, N::Int
+)
+    n_pts = ntuple(d -> size(psi, d), N)
+    @inbounds for I in CartesianIndices(n_pts)
+        for i in 1:D
+            acc = zero(ComplexF64)
+            for j in 1:D
+                acc += M[i, j] * psi[I, j]
+            end
+            out[I, i] += acc
+        end
+    end
+    out
+end
+
 """
 Build the D×D Zeeman propagator: `exp(-i·dt·H)` (RT) or
 `exp(-dt·(H − λ_min·I))` (IT). The IT shift subtracts the minimum
@@ -277,15 +399,8 @@ Zeeman shift").
 function _zeeman_propagator(
     sm::SpinMatrices{D}, term::ZeemanTerm, dt::Float64, imaginary_time::Bool
 ) where {D}
-    F = sm.system.F
     M = Matrix{ComplexF64}(undef, D, D)
-    @inbounds for j in 1:D, i in 1:D
-        M[i, j] = -term.bx * sm.Fx[i, j] - term.by * sm.Fy[i, j] - term.bz * sm.Fz[i, j]
-    end
-    @inbounds for c in 1:D
-        m = F - (c - 1)
-        M[c, c] += term.q * m * m
-    end
+    _zeeman_term_matrix!(M, sm, term)
     P = if imaginary_time
         shift = minimum(real, eigvals(Hermitian(M)))
         exp(-dt * (M - shift * I))

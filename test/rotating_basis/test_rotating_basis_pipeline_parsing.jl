@@ -148,7 +148,10 @@ end
         @test psi isa Array{ComplexF64, 4}
         @test size(psi, 4) == 3   # F=1 → D=3
         @test workspace === nothing
-        @test haskey(step_result, :rotating_basis_ws)
+        # Handoff is now a plain NamedTuple (:rotating_basis_gs), not a
+        # RotatingBasisWS — both steps run on the standard split-step path.
+        @test haskey(step_result, :rotating_basis_gs)
+        @test step_result[:rotating_basis_gs].psi_tilde isa Array{<:Complex, 4}
         @test haskey(step_result, :rotating_basis_mu)
         @test step_result[:rotating_basis_F] == 1
     end

@@ -335,17 +335,20 @@ const FULL_EXTRA = [
     "hamiltonian/test_tdhfb_gpu_phase5ab.jl",
     "hamiltonian/test_tdhfb_gpu_phase5c_expm.jl",
     "hamiltonian/test_tdhfb_gpu_phase5c_hf.jl",
-    # Option γ rotating-basis tests (added 2026-04-27..29).
-    "rotating_basis/test_rotating_basis_gpe.jl",
+    # Option γ magnetostir pipeline (kind: rotating_basis). The standalone
+    # RotatingBasisWS engine + its equivalence-gate / integrator-order tests were
+    # retired 2026-06-21 (docs/design/rotating_basis_unification.md): the
+    # magnetostir GS+dynamics now run on the standard split-step path, validated
+    # by the pipeline-parsing test, the self-contained physics gate, and the
+    # dict-based analyzers.
     "rotating_basis/test_rotating_basis_analyzers.jl",
-    "rotating_basis/test_rotating_basis_phase_ii.jl",
-    "rotating_basis/test_rotating_basis_phase_iii.jl",
     "rotating_basis/test_rotating_basis_pipeline_parsing.jl",
-    "rotating_basis/test_rotating_basis_f32.jl",
-    # Higher-order integrator tests
-    "hamiltonian/test_higher_order_integrators.jl",
-    "hamiltonian/test_integrator_order_meanfield.jl",
-    "hamiltonian/test_cfet4_order.jl",
+    "rotating_basis/test_magnetostir_pipeline_physics.jl",
+    # First-principles φ̇≠0 gate: lab-frame pipeline vs exact single-spin
+    # reference. Arbitrated the engine retirement — the retired engine's
+    # rotating-frame inertial term was ~1.8e-3 off; the unified path matches
+    # the exact dynamics to ~1e-5.
+    "rotating_basis/test_magnetostir_rotating_field_analytic.jl",
     "hamiltonian/test_adaptive_dt.jl",
     # Lima-Pelster Q5 + scalar eGPE
     "hamiltonian/test_lima_pelster_q5.jl",
@@ -393,7 +396,6 @@ const PHYSICS_TESTS = [
 # (i.e. they are deliberately manual, not orphaned). Run them by hand.
 const MANUAL_TESTS_ALLOWLIST = [
     "gpu/test_cuda.jl",                              # coarse CUDA smoke (gated, but needs GPU to be useful)
-    "rotating_basis/test_rotating_basis_gpu.jl",     # errors (not skips) without CUDA
     "workflow/test_active_learning_yaml.jl",         # heavy YAML (SPINORBEC_RUN_HEAVY_YAML)
     "workflow/test_multi_fidelity_yaml.jl",          # heavy YAML (SPINORBEC_RUN_HEAVY_YAML)
     "workflow/test_klaus_validation.jl",             # heavy YAML scenario pending schema audit
