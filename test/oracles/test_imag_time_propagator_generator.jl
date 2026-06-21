@@ -26,6 +26,7 @@ using Test
 using FFTW
 using SpinorBEC
 using SpinorBEC: SpinC1Term, DDITerm, ZeemanTerm, SpatialZeemanTerm,
+    RamanTerm, RamanCoupling, dumb_rhs_breakdown,
     apply_operator!, apply_step!, build_h_terms_registry, make_workspace,
     cell_volume, zeeman_field
 using LinearAlgebra
@@ -124,5 +125,25 @@ end
             sim_params=SimParams(; dt=0.01, n_steps=1, imaginary_time=true),
             enable_ddi=false, fft_flags=FFTW.ESTIMATE)
         _check(SpatialZeemanTerm, ws, _textured_state(ws))
+    end
+
+    @testset "Raman propagator: gate vs INDEPENDENT dumb RHS (gradient face is nil)" begin
+        # RamanTerm.apply_operator! is a declared no-op, so _check (which targets
+        # apply_operator!) cannot gate the propagator. The Raman direction (δ, Ω,
+        # ±k phase, F₊↔F₋) was only pinned on the energy face. Gate the PROPAGATOR
+        # generator against the independent dumb Raman RHS H_R·ψ instead.
+        raman = RamanCoupling{3}(1.3, -0.7, (0.6, -0.3, 0.9))
+        ws = make_workspace(; grid, atom=Eu151,
+            interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
+            zeeman=ZeemanParams(0.0, 0.0), potential=HarmonicTrap((1.0, 1.0, 1.0)),
+            raman=raman,
+            sim_params=SimParams(; dt=0.01, n_steps=1, imaginary_time=true),
+            enable_ddi=false, fft_flags=FFTW.ESTIMATE)
+        psi = _textured_state(ws)
+        HR = dumb_rhs_breakdown(ws, psi).raman              # independent H_R·ψ
+        Gi = _generator(psi, (p, dt) -> apply_step!(RamanTerm(), p, dt, true, ws))
+        Gr = _generator(psi, (p, dt) -> apply_step!(RamanTerm(), p, dt, false, ws))
+        @test _residual_mod_psi(Gi, HR, psi) < 1e-3         # imag generator == H_R·ψ
+        @test _residual_mod_psi(Gr, im .* HR, psi) < 1e-3   # real generator == i·H_R·ψ
     end
 end

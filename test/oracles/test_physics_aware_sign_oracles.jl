@@ -21,8 +21,8 @@ using Test
 using FFTW
 using SpinorBEC
 using SpinorBEC:
-    SpinC1Term, DDITerm, LHYTerm, TensorTerm,
-    apply_step!, energy_contribution, spin_density_vector
+    SpinC1Term, DDITerm, LHYTerm, TensorTerm, RamanTerm, RamanCoupling,
+    apply_step!, energy_contribution, spin_density_vector, sign_oracle, cell_volume
 using Random
 
 # ============================================================================
@@ -236,4 +236,44 @@ end
     @test E_polar > 0  # c2 > 0 + polar → positive E_pair
     @test abs(E_fm) < 1e-10  # FM stretched has zero singlet amplitude
     @test E_polar > E_fm
+end
+
+# ============================================================================
+# (5) RamanTerm:  +δ → ⟨F_z⟩ < 0  (energy δ·⟨F_z⟩ minimised by ITP)
+# ============================================================================
+#
+# RamanTerm's gradient face is a declared no-op, so the previous in-term
+# sign_oracle was the placeholder `predicate=true` — it could not detect a
+# δ-sign flip in the PROPAGATOR (apply_raman_step!), the face production
+# actually runs. Here we anchor on the propagator: ITP under H = δ·F_z (Ω=0,
+# k=0) from a transverse (⟨F_z⟩=0) start drives ⟨F_z⟩ to the sign opposite to
+# δ. This also gives the now-real sign_oracle predicate teeth.
+
+@testset "Physics-aware sign oracle: RamanTerm (+δ ⇒ ⟨F_z⟩ < 0)" begin
+    grid = make_grid(GridConfig((8,), (8.0,)))
+    dV = cell_volume(grid)
+    for δ in (0.8, -0.8)
+        raman = RamanCoupling{1}(0.0, δ, (0.0,))   # pure δ·F_z propagator
+        ws = make_workspace(; grid, atom=Rb87,
+            interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
+            zeeman=ZeemanParams(0.0, 0.0), potential=NoPotential(),
+            raman=raman,
+            sim_params=SimParams(; dt=0.01, n_steps=1, imaginary_time=true),
+            fft_flags=FFTW.ESTIMATE)
+        # transverse start: equal weight on m=+1,0,−1 ⇒ ⟨F_z⟩ = 0 initially.
+        psi = zeros(ComplexF64, 8, 3)
+        for i in 1:8
+            g = exp(-0.1 * (i - 4.5)^2)
+            psi[i, :] .= g / sqrt(3)
+        end
+        psi ./= sqrt(sum(abs2, psi) * dV)
+        for _ in 1:600
+            apply_step!(RamanTerm(), psi, 0.01, true, ws)
+            psi ./= sqrt(sum(abs2, psi) * dV)
+        end
+        _, _, fz = spin_density_vector(psi, ws.spin_matrices, ndims(psi) - 1)
+        fzsum = sum(fz) * dV
+        @test sign(fzsum) == -sign(δ)
+        @test sign_oracle(RamanTerm).predicate(psi, ws)
+    end
 end
