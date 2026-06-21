@@ -621,7 +621,7 @@ end
 function _build_spinor_lhy(::Val{:polar_dipolar}, atom, ws, psi_init, c_dd, enable_ddi)
     g_dict = _lhy_g_dict(atom, ws)
     c_dd_eff = enable_ddi && !isnan(c_dd) ? c_dd : 0.0
-    delta_1 = PolarContactMod.delta_polar(atom.F, 1, g_dict)
+    delta_1 = delta_polar(atom.F, 1, g_dict)
     eps_tilde_dd = abs(delta_1) > 1e-12 ? abs(c_dd_eff) / abs(delta_1) : 0.0
     compute_spinor_lhy_polar_dipolar(;
         F=atom.F, g_dict=g_dict, eps_tilde_dd=eps_tilde_dd,

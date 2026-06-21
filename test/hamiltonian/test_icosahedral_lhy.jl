@@ -1,6 +1,6 @@
 using Test
 using SpinorBEC
-using SpinorBEC.IcosahedralMod
+using SpinorBEC: ZETA_F6_IH, compute_c0_lambda_F6_Ih, epsilon_LHY_F6_Ih
 using LinearAlgebra: Diagonal
 
 # F=6 icosahedral (I_h) closed-form contact LHY tests (Round-3 Task 1).
@@ -141,8 +141,8 @@ using LinearAlgebra: Diagonal
         for g in (1.0, 5.0, 50.0)
             gd = Dict(2k => g for k in 0:6)
             sca = (8.0 / (15.0 * π^2)) * (g * 1.0)^2.5
-            pol = SpinorBEC.PolarContactMod.lhy_energy_polar(1.0, 6, gd)
-            ico = SpinorBEC.IcosahedralMod.epsilon_LHY_F6_Ih(1.0, gd)
+            pol = SpinorBEC.lhy_energy_polar(1.0, 6, gd)
+            ico = SpinorBEC.epsilon_LHY_F6_Ih(1.0, gd)
             @test isapprox(pol, sca; rtol=1e-10)
             @test isapprox(ico, sca; rtol=1e-10)
         end
@@ -153,10 +153,10 @@ using LinearAlgebra: Diagonal
         # the ratio so a future "fix" that collapses one to the other
         # would be caught.
         g_eu = SpinorBEC._c0c1_to_gS(6, 100.0, 5.0)
-        pol = SpinorBEC.PolarContactMod.lhy_energy_polar(1.0, 6, g_eu)
-        ico = SpinorBEC.IcosahedralMod.epsilon_LHY_F6_Ih(1.0, g_eu)
+        pol = SpinorBEC.lhy_energy_polar(1.0, 6, g_eu)
+        ico = SpinorBEC.epsilon_LHY_F6_Ih(1.0, g_eu)
         # I_h c_0 must be positive (else I_h not the GS, NaN returned).
-        c0_ico, _ = SpinorBEC.IcosahedralMod.compute_c0_lambda_F6_Ih(g_eu)
+        c0_ico, _ = SpinorBEC.compute_c0_lambda_F6_Ih(g_eu)
         @test c0_ico > 0
         @test isfinite(ico) && ico > 0
         @test 1.3 < pol / ico < 1.6     # measured 1.4617 (2026-05-12)
@@ -165,10 +165,10 @@ using LinearAlgebra: Diagonal
         # state-dependence (Polar/I_h ratio ~ 2.4).
         g_ih = Dict(0 => 5.0, 2 => 2.0, 4 => 2.0, 6 => 5.0,
             8 => 2.0, 10 => 10.0, 12 => 50.0)
-        c0_ico2, _ = SpinorBEC.IcosahedralMod.compute_c0_lambda_F6_Ih(g_ih)
+        c0_ico2, _ = SpinorBEC.compute_c0_lambda_F6_Ih(g_ih)
         @test c0_ico2 > 0
-        pol2 = SpinorBEC.PolarContactMod.lhy_energy_polar(1.0, 6, g_ih)
-        ico2 = SpinorBEC.IcosahedralMod.epsilon_LHY_F6_Ih(1.0, g_ih)
+        pol2 = SpinorBEC.lhy_energy_polar(1.0, 6, g_ih)
+        ico2 = SpinorBEC.epsilon_LHY_F6_Ih(1.0, g_ih)
         @test 2.0 < pol2 / ico2 < 3.0   # measured 2.4440 (2026-05-12)
     end
 end

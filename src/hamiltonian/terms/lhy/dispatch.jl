@@ -246,7 +246,7 @@ function _compute_lhy_at_density(
 end
 
 # =================================================================
-# Closed-form polar LHY wrappers (PhiOneReg + PolarContactMod + PolarDipolarMod)
+# Closed-form polar LHY wrappers (phi_one_reg + polar_contact + polar_dipolar)
 # =================================================================
 #
 # These produce a TabulatedLHY identical in shape to :polar_two_channel /
@@ -273,13 +273,13 @@ function compute_spinor_lhy_polar_contact(;
 )
     n_points >= 3 || throw(ArgumentError("n_points must be >= 3"))
     n_max > 0 || throw(ArgumentError("n_max must be positive"))
-    coefs = PolarContactMod.build_polar_lhy_coefs(F, g_dict)
+    coefs = build_polar_lhy_coefs(F, g_dict)
 
     densities = collect(range(0.0, n_max; length=n_points))
     energy = zeros(Float64, n_points)
     for (i, n) in enumerate(densities)
         n < 1e-30 && continue
-        energy[i] = PolarContactMod.lhy_energy_polar(n, coefs)
+        energy[i] = lhy_energy_polar(n, coefs)
     end
     potential_values = _numerical_derivative(densities, energy)
     PolarContactLHY(densities, potential_values)
@@ -302,13 +302,13 @@ function compute_spinor_lhy_polar_dipolar(;
 )
     n_points >= 3 || throw(ArgumentError("n_points must be >= 3"))
     n_max > 0 || throw(ArgumentError("n_max must be positive"))
-    coefs = PolarContactMod.build_polar_lhy_coefs(F, g_dict)
+    coefs = build_polar_lhy_coefs(F, g_dict)
 
     densities = collect(range(0.0, n_max; length=n_points))
     energy = zeros(Float64, n_points)
     for (i, n) in enumerate(densities)
         n < 1e-30 && continue
-        energy[i] = PolarDipolarMod.lhy_energy_polar_dipolar(n, coefs, eps_tilde_dd)
+        energy[i] = lhy_energy_polar_dipolar(n, coefs, eps_tilde_dd)
     end
     potential_values = _numerical_derivative(densities, energy)
     PolarDipolarLHY(densities, potential_values)
@@ -331,13 +331,13 @@ function compute_spinor_lhy_fm_dipolar(;
 )
     n_points >= 3 || throw(ArgumentError("n_points must be >= 3"))
     n_max > 0 || throw(ArgumentError("n_max must be positive"))
-    coefs = FMContactMod.build_fm_lhy_coefs(F, g_dict)
+    coefs = build_fm_lhy_coefs(F, g_dict)
 
     densities = collect(range(0.0, n_max; length=n_points))
     energy = zeros(Float64, n_points)
     for (i, n) in enumerate(densities)
         n < 1e-30 && continue
-        energy[i] = FMDipolarMod.lhy_energy_fm_dipolar(n, coefs, eps_dd)
+        energy[i] = lhy_energy_fm_dipolar(n, coefs, eps_dd)
     end
     potential_values = _numerical_derivative(densities, energy)
     FMDipolarLHY(densities, potential_values)
@@ -361,13 +361,13 @@ function compute_spinor_lhy_fm_contact(;
 )
     n_points >= 3 || throw(ArgumentError("n_points must be >= 3"))
     n_max > 0 || throw(ArgumentError("n_max must be positive"))
-    coefs = FMContactMod.build_fm_lhy_coefs(F, g_dict)
+    coefs = build_fm_lhy_coefs(F, g_dict)
 
     densities = collect(range(0.0, n_max; length=n_points))
     energy = zeros(Float64, n_points)
     for (i, n) in enumerate(densities)
         n < 1e-30 && continue
-        energy[i] = FMContactMod.lhy_energy_fm(n, coefs)
+        energy[i] = lhy_energy_fm(n, coefs)
     end
     potential_values = _numerical_derivative(densities, energy)
     FMContactLHY(densities, potential_values)
@@ -403,7 +403,7 @@ function compute_spinor_lhy_icosahedral(;
     energy = zeros(Float64, n_points)
     for (i, n) in enumerate(densities)
         n < 1e-30 && continue
-        energy[i] = IcosahedralMod.epsilon_LHY_F6_Ih(n, g_dict)
+        energy[i] = epsilon_LHY_F6_Ih(n, g_dict)
     end
     potential_values = _numerical_derivative(densities, energy)
     IcosahedralLHY(densities, potential_values)

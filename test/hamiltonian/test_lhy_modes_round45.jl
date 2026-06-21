@@ -3,7 +3,7 @@
 # phase verifications.
 
 using Test
-using SpinorBEC.LHYModesRound45
+using SpinorBEC: lhy_F2_BN, lhy_F3_octa, lhy_F4_cube, lhy_F8_octa, lhy_F10_dodec
 
 @testset "LHY modes (Round 4-5 closed forms)" begin
     # Universal scalar prefactor at M = ℏ = 1

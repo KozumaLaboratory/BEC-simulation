@@ -82,7 +82,7 @@ using Test
         # Under C_5z (axis=z, angle=2π/5): |m⟩ → e^{-i 2πm/5} |m⟩
         # m=±5 picks up e^{∓i 2π} = +1; m=0 picks up +1.
         # So ζ is invariant under C_5z → character +1.
-        zeta_Ih = Vector{ComplexF64}(SpinorBEC.IcosahedralMod.ZETA_F6_IH)
+        zeta_Ih = Vector{ComplexF64}(SpinorBEC.ZETA_F6_IH)
         chi = polyhedral_op_character(zeta_Ih, 6; axis=(0.0, 0.0, 1.0), angle=2π/5)
         @test isapprox(real(chi), 1.0; atol=1e-10)
         @test isapprox(imag(chi), 0.0; atol=1e-10)

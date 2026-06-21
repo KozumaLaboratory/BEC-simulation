@@ -41,13 +41,6 @@
 # with rank-2 spherical tensor coupling to m=+F-1 and m=+F-2 (parallel
 # session future deliverable).
 
-module FMContactMod
-
-function _phi_1_reg(t)
-    return parentmodule(@__MODULE__).PhiOneReg.phi_1_reg(t)
-end
-const phi_1_reg = _phi_1_reg
-
 export FMLHYCoefs, build_fm_lhy_coefs, lhy_energy_fm
 export sigma_fm, delta_fm
 
@@ -102,5 +95,3 @@ function lhy_energy_fm(n::Float64, coefs::FMLHYCoefs;
     kappa < 1e-12 && return 0.0
     return prefactor * (n * kappa)^2.5    # ν=1, t=0, φ_1^reg(0)=1
 end
-
-end # module FMContactMod
