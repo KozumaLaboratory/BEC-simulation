@@ -342,6 +342,7 @@ const FULL_EXTRA = [
     # and the dict-based analyzers.
     "rotating_basis/test_rotating_basis_analyzers.jl",
     "rotating_basis/test_rotating_basis_pipeline_parsing.jl",
+    "rotating_basis/test_magnetostir_pipeline_physics.jl",
     # Higher-order integrator tests. (The Strang/Yoshida4/Yoshida6/CFET4
     # order-convergence suites tested the retired rotating-basis engine's
     # integrators and were removed with it on 2026-06-21.)
