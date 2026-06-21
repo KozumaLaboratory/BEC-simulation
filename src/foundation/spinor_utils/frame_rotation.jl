@@ -6,8 +6,9 @@
 # remaining consumers are the magnetostir pipeline handlers
 # (run_step_rotating/{ground_state,dynamics}.jl): they evolve in the LAB frame
 # on the standard split-step path and use this transform purely to seed from /
-# report in the field-following frame. Depends only on the shared spin-rotation
-# helpers (`_compute_uniform_rotation_matrix`, `_apply_rotation_to_spin_axis!`).
+# report in the field-following frame. Depends only on the uniform spin-rotation
+# helpers (`_compute_uniform_rotation_matrix`, `_apply_rotation_to_spin_axis!` in
+# spinor_utils/uniform_rotation.jl).
 
 """
 ψ_lab = Û_B(t) ψ̃  with  Û_B = exp(-iφ F_z) exp(-iθ F_y).

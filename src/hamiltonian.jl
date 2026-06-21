@@ -6,15 +6,16 @@
 #   coefficients.jl
 #       — c↔g coefficient algebra (c0/c1 contact, tensor channels, TDHFB,
 #         Bogoliubov); shared by all contact-family terms
-#   shared/{rotation,spin_rotation}.jl
-#       — Euler 5-stage spinor rotation + rotation cache (used by DDI
-#         propagator and spin_mixing); spatially uniform spin rotation
-#         (used by Raman propagator, transverse Zeeman, and rotating basis)
 #   terms/contact/{spin_mixing,singlet_pair,tensor_interaction}
 #       — c0/c1 contact + S=0 singlet-pair + general-F tensor
-#   terms/ddi/{qtensor,convolution} + apply_ddi_step + ddi_term + ddi_padded
-#       — k-space DDI Q-tensor + 6-FFT convolution + Euler 5-stage spinor
-#         rotation + zero-padded DDI for non-periodic geometries
+#   terms/ddi/{qtensor,convolution} + rotation + apply_ddi_step + ddi_term
+#       + ddi_padded
+#       — k-space DDI Q-tensor + 6-FFT convolution + DDI Euler 5-stage
+#         spinor rotation (the rotation cache is borrowed by spin_mixing) +
+#         zero-padded DDI for non-periodic geometries.
+#         The spatially-uniform spin rotation primitive
+#         (apply_uniform_spin_rotation!, used by transverse Zeeman / Raman /
+#         rotating basis) lives in foundation/spinor_utils/uniform_rotation.jl.
 #   terms/lhy/{phi_one_reg,polar_contact,polar_dipolar,fm_contact,
 #              fm_dipolar,icosahedral,modes_round45,dispatch}
 #       — closed-form spinor LHY tables for various spin phases
@@ -23,10 +24,12 @@
 #       — trap evaluators and potential application
 #   terms/zeeman (accessors + builders + ZeemanTerm) + magnetic_gradient
 #       — Zeeman accessors, builders, and HamTerm
-#   terms/raman (engine + RamanTerm); shared/spin_rotation for uniform rotation
-#       — Raman coupling + spatially uniform spin rotation
-#   optics/{optics,laser_potential,optical_trap}
-#       — Gaussian-beam optics + dipole trap builders (not HamTerms)
+#   terms/raman (engine + RamanTerm)
+#       — Raman coupling (uniform spin rotation from foundation)
+#   terms/trap/{laser_potential,optical_trap}
+#       — dipole-trap potentials built on foundation's Gaussian-beam model
+#         (OpticalBeam in foundation/optics.jl); these are AbstractPotentials,
+#         not HamTerms
 #   terms/light_shift/{light_shift_builders} + light_shift_term
 #       — AC Stark / light shift
 #   integrator/{propagators,yoshida,split_step_kernels,split_step,
@@ -42,7 +45,7 @@ include("hamiltonian/terms/contact/singlet_pair.jl")
 include("hamiltonian/terms/contact/tensor_interaction.jl")
 include("hamiltonian/terms/ddi/qtensor.jl")
 include("hamiltonian/terms/ddi/convolution.jl")
-include("hamiltonian/shared/rotation.jl")
+include("hamiltonian/terms/ddi/rotation.jl")
 include("hamiltonian/terms/ddi/apply_ddi_step.jl")
 include("hamiltonian/terms/ddi/ddi_padded.jl")
 include("hamiltonian/terms/lhy/phi_one_reg.jl")
@@ -55,12 +58,11 @@ include("hamiltonian/terms/lhy/modes_round45.jl")
 include("hamiltonian/terms/lhy/dispatch.jl")
 include("hamiltonian/integrator/absorbing_boundary.jl")
 
-# Potentials / builders.
+# Potentials / builders. Dipole-trap potentials build on the Gaussian-beam
+# model (OpticalBeam) defined in foundation/optics.jl.
 include("hamiltonian/terms/trap/evaluate_potential.jl")
-include("hamiltonian/shared/spin_rotation.jl")
-include("hamiltonian/optics/optics.jl")  # Must precede laser_potential (defines OpticalBeam)
-include("hamiltonian/optics/laser_potential.jl")
-include("hamiltonian/optics/optical_trap.jl")
+include("hamiltonian/terms/trap/laser_potential.jl")   # LaserBeamPotential (full Gaussian-beam dipole trap)
+include("hamiltonian/terms/trap/optical_trap.jl")       # GaussianBeam + CrossedDipoleTrap
 include("hamiltonian/terms/light_shift/light_shift_builders.jl")
 
 # HamTerm protocol (sign-bug-proof architecture, Phase 1).
@@ -89,11 +91,6 @@ include("hamiltonian/integrator/split_step.jl")
 include("hamiltonian/integrator/split_step_composers.jl")
 include("hamiltonian/integrator/combined_spin_step.jl")
 include("hamiltonian/integrator/adaptive.jl")
-
-# Frame rotation Û_B (lab↔field-following) — the only survivor of the retired
-# rotating-basis engine; the magnetostir pipeline handlers use it to seed
-# from / report in the field-following frame while evolving on the standard path.
-include("hamiltonian/shared/frame_rotation.jl")
 
 # TDHFB local-approximation engine (channel kernel + HF / Δ kernels +
 # voxel-local BdG Strang step + energy functional). YAML pipeline integration
