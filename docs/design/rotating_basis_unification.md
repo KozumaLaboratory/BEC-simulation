@@ -151,6 +151,34 @@ consumer (analyzers = thesis Fig 6, `save_rotating_result`, `bayesian_opt_yaml`,
 Each step is independently committable; the equivalence gates above protect the
 migration.
 
+### ⚠ Integrator subtlety (found 2026-06-21 — corrects the "no efficiency advantage" claim)
+
+The Strang⇄Strang equivalence is gated (`test_rotating_vs_standard_dynamics.jl`,
+`test_rotating_dynamics_pipeline_parity.jl`). BUT the production magnetostir
+defaults to **yoshida6** (`_default_rotating_integrator → "yoshida6"`), and the
+two frames are NOT equivalent at high order:
+
+- The standard-path high-order driver `run_simulation_yoshida!` uses a **frozen
+  mean-field** base (`_strang_core!`); its docstring measures it degrading to
+  **order ~1.0 for Y6** on the lab path (time-dependent Zeeman + DDI, Eu151 F=6)
+  because the spin precesses fast (Larmor) between frozen sub-times.
+- The rotating frame REMOVES the fast Larmor precession, so the tilde-frame
+  dynamics is slow and frozen-MF Yoshida keeps its nominal order. **This is a
+  genuine numerical advantage of the rotating frame for the magnetostir** — my
+  earlier "no dt/efficiency advantage" conclusion was Strang-only and does NOT
+  hold at high order.
+
+So a naive "route magnetostir through the standard path with yoshida6" would
+produce order-1 garbage and corrupt Fig 6. The faithful lab-frame high-order
+path is `adaptive_run!(ws; step!=split_step_midpoint!)` (implicit-midpoint Picard
+restores sub-time self-consistency). **Before retiring the engine, ADD a gate:
+standard `split_step_midpoint!`+Picard ⇄ rotating yoshida6 on a real magnetostir
+config (per-m_history match at the config dt), and confirm the cost is
+acceptable.** If the lab midpoint-Picard cannot match rotating yoshida6 at
+comparable cost, the rotating frame is NOT pure duplication for the magnetostir
+and retirement must reconsider (keep it, or port the Larmor-removal as a
+lab-frame interaction-picture spin substep).
+
 ## Testing
 
 Each wired term must pass a rotating-vs-standard parity gate on a **static
