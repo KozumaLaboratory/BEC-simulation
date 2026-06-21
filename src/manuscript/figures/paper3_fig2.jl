@@ -6,9 +6,9 @@
 function build_paper3_fig2(io::IO, paper::AbstractString, fig::AbstractString)
     lines = ["F,S,prefactor_lambda_over_c0,sign_boundary_S_bd"]
     for F in (3, 4, 6, 8, 10, 12)
-        S_bd = sqrt(2.0 * F * (F + 1))
+        S_bd = sign_change_boundary_S_bd(F)
         for S in 0:2:(2F)
-            prefactor = (S * (S + 1) - 2 * F * (F + 1)) / (2 * F * (F + 1))
+            prefactor = sign_pattern_beta_lambda_spin(S, F, 1.0)
             push!(lines, "$F,$S,$prefactor,$S_bd")
         end
     end

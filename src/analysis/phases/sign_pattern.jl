@@ -61,7 +61,7 @@ function sign_pattern_beta_lambda_spin(S::Int, F::Int, beta_c0::Real)
     F >= 1 || throw(ArgumentError("F must be ≥ 1 (got F=$F)"))
     0 <= S <= 2F || throw(ArgumentError("S=$S must be in 0..2F=$(2F)"))
     iseven(S) || throw(ArgumentError("S=$S must be even (bosonic Bogoliubov)"))
-    prefactor = (S * (S + 1) - 2 * F * (F + 1)) / (2 * F * (F + 1))
+    prefactor = spin_pair_eigenvalue(S, F) / (F * (F + 1))
     Float64(prefactor) * Float64(beta_c0)
 end
 
@@ -98,7 +98,7 @@ target S > S_bd(F) channels for positive λ_spin contribution.
 """
 function predict_lambda_spin_sign(F::Int, S::Int)::Symbol
     F >= 1 || throw(ArgumentError("F must be ≥ 1 (got F=$F)"))
-    discriminant = S * (S + 1) - 2 * F * (F + 1)
+    discriminant = spin_pair_eigenvalue(S, F)
     discriminant > 0 ? :positive : (discriminant < 0 ? :negative : :zero)
 end
 
