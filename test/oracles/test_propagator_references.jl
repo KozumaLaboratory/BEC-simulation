@@ -192,7 +192,10 @@ end
     end
 
     @testset "Strang order slope vs dumb RK4 (3D, no DDI)" begin
-        ws, psi = oracle_full_ws(; ddi=false)
+        # Real-time fixture: dumb_rk4_evolve integrates the unitary -iH flow, so
+        # the production Strang must also be real-time (imaginary-time exp(-dtH)
+        # would plateau against it at a constant ~0.1, not converge).
+        ws, psi = oracle_full_ws(; ddi=false, imaginary_time=false)
         dV = SpinorBEC.cell_volume(ws.grid)
         n_comp = ws.spin_matrices.system.n_components
         T_total = 0.02
@@ -226,7 +229,7 @@ end
         # of placement bugs (the *_ddi_strang_save_every regression
         # family). End-to-end order 2 with DDI active gates the
         # placement, the kernel, and the dt accounting together.
-        ws, psi = oracle_full_ws()
+        ws, psi = oracle_full_ws(; imaginary_time=false)   # real-time vs -iH RK4
         dV = SpinorBEC.cell_volume(ws.grid)
         n_comp = ws.spin_matrices.system.n_components
         T_total = 0.02

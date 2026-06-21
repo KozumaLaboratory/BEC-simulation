@@ -50,6 +50,31 @@ jobs:
           # julia-actions/cache@v2 restore actually hit on test-time precompile.
           coverage: false
 
+  oracles:
+    name: Oracle gates (tier=oracles)
+    runs-on: ubuntu-latest
+    # The sign-bug-proof / validation oracle gates live in the `ci` tier, which
+    # only runs nightly — so a PR could break one and merge green. It happened:
+    # master_oracle + 4 sibling gates sat RED at HEAD (2026-06-21), undetected
+    # for weeks. This job runs JUST the oracle gates (`test/oracles/`, a few
+    # minutes) so they are a per-PR merge gate. GPU-only oracle assertions
+    # (gpu_cpu_per_term_parity) still no-op here — they need a GPU runner
+    # (nightly / TSUBAME), not the CPU ubuntu runner.
+    timeout-minutes: 15
+    env:
+      SPINORBEC_TEST_TIER: oracles
+      SPINORBEC_TEST_WORKERS: auto
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.12"
+      - uses: julia-actions/cache@v2
+      - uses: julia-actions/julia-buildpkg@v1
+      - uses: julia-actions/julia-runtest@v1
+        with:
+          coverage: false
+
   format:
     name: JuliaFormatter check
     runs-on: ubuntu-latest
