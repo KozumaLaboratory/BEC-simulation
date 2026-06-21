@@ -236,6 +236,28 @@ using LinearAlgebra
             @test haskey(r, :omega)
             @test abs(r.Jz) < 0.5
         end
+
+        @testset "J_z(Ω) is non-decreasing (Jz-bracket premise)" begin
+            # rotating_frame_omega drives −Ω·L_z, so the ground-state J_z is
+            # non-decreasing in Ω (vortex entry). The Jz bisection bracket
+            # relies on this direction; an inverted bracket (the historical
+            # bug) diverges for any positive target. Measured here directly:
+            # at high Ω the GS nucleates vortices even from a plain seed.
+            grid = make_grid(GridConfig((24, 24), (10.0, 10.0)))
+            jz(omega) = begin
+                r = find_ground_state(; grid, atom=Rb87,
+                    interactions=InteractionParams(Dict(0 => 10.0, 1 => 0.0)),
+                    potential=HarmonicTrap(1.0, 1.0), rotating_frame_omega=omega,
+                    n_steps=3000, dt=0.005, fft_flags=FFTW.ESTIMATE)
+                ws = r.workspace
+                total_angular_momentum(ws.state.psi, grid, ws.fft_plans,
+                    ws.spin_matrices.system)
+            end
+            jz_lo = jz(0.0)
+            jz_hi = jz(1.0)
+            @test abs(jz_lo) < 0.5            # no rotation ⇒ J_z ≈ 0
+            @test jz_hi > jz_lo + 0.5         # rotation ⇒ strictly more J_z
+        end
     end
 
     @testset "validate_conservation with track_Jz" begin

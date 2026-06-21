@@ -162,8 +162,11 @@ end
 """
 Bisection on rotating_frame_omega to find ground state with target J_z.
 
-Higher Ω shifts the energy minimum to lower J_z, so:
-  J_z(Ω) is a decreasing function of Ω.
+rotating_frame_omega drives the Coriolis term −Ω·L_z, so a larger Ω
+lowers the energy of higher-L_z states (vortex entry):
+  J_z(Ω) is a non-decreasing function of Ω.
+(Measured: J_z ≈ 0, 0, 24, 41 at Ω = 0.2, 0.5, 0.8, 1.1 for c₀=10 on a
+32² trap.) The bracket update below relies on this monotonicity.
 """
 function _find_ground_state_Jz(;
     grid,
@@ -257,10 +260,12 @@ function _find_ground_state_Jz(;
             )
         end
 
+        # J_z is non-decreasing in Ω, so J_z above target ⇒ lower the
+        # ceiling (less Ω); below target ⇒ raise the floor (more Ω).
         if Jz > target_Jz
-            omega_lo = omega_trial
-        else
             omega_hi = omega_trial
+        else
+            omega_lo = omega_trial
         end
 
         prev_psi = copy(ws.state.psi)
