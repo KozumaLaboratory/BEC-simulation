@@ -61,11 +61,15 @@ using Random: MersenneTwister
     # Small bdg_dim_cap ⇒ the dynamical axis abstains (keeps this fast); the
     # sneaky claim is entirely about the energetic verdict.
 
-    # (1) At the default Lanczos budget the gate cannot certify the sign and
+    # (1) At a TINY Lanczos budget the gate cannot certify the sign and
     # ABSTAINS — it does NOT falsely ACCEPT, and crucially it does NOT guess
-    # :fail without convergence. (Here niter=60 under-resolves a 64-pt system —
-    # exactly the abstain the three-valued discipline exists for.)
-    res_lo = check(StabilitySpec(; bdg_dim_cap=100), ws, ψ_saddle; rng=MersenneTwister(1))
+    # :fail without convergence. (niter=5 genuinely under-resolves a 64-pt
+    # system — exactly the abstain the three-valued discipline exists for. The
+    # default budget (niter=300) + adaptive early-stop now RESOLVES this
+    # well-separated saddle, so the abstain invariant is exercised with an
+    # explicit tiny budget rather than the default.)
+    res_lo = check(StabilitySpec(; bdg_dim_cap=100, niter=5), ws, ψ_saddle;
+        rng=MersenneTwister(1))
     stat = first(p.second for p in res_lo.details if p.first === :stationarity)
     en_lo = first(p.second for p in res_lo.details if p.first === :energetic)
     @test stat.status === :pass                  # the polar saddle IS a stationary point
