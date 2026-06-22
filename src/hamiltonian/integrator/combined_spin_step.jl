@@ -49,9 +49,15 @@ construction) — that's where the buffers live.
 function _apply_combined_spin_step!(
     ws::Workspace{N}, dt::Float64, t::Float64;
     imaginary_time::Bool=false,
+    psi_mf::Union{Nothing, AbstractArray}=nothing,
 ) where {N}
     sm = ws.spin_matrices
     psi = ws.state.psi
+    # Mean field (spin density Φ_DDI, c₁⟨F⟩) is computed from `psi_mf` when
+    # supplied (the Picard-midpoint state), else from the running ψ. The
+    # rotation is always applied to `psi`. Mirrors the sequential path's
+    # psi_mf contract so split_step_combined! can be midpoint-symmetrised.
+    psi_mf_eff = psi_mf === nothing ? psi : psi_mf
     bufs = ws.ddi_bufs
     n_comp = sm.system.n_components
     n_pts = ntuple(d -> size(psi, d), Val(N))
@@ -66,10 +72,10 @@ function _apply_combined_spin_step!(
     # Phi_* is treated as zero.
     ddi_active = ws.ddi !== nothing && is_active(ws.ddi.C_dd)
     if ddi_active
-        _compute_and_convolve_ddi!(psi, sm, ws.ddi, bufs, Val(D), N, n_pts)
+        _compute_and_convolve_ddi!(psi_mf_eff, sm, ws.ddi, bufs, Val(D), N, n_pts)
     else
         _compute_spin_density!(bufs.Fx_r, bufs.Fy_r, bufs.Fz_r,
-            psi, sm, Val(D), N, n_pts)
+            psi_mf_eff, sm, Val(D), N, n_pts)
         fill!(bufs.Phi_x, 0.0)
         fill!(bufs.Phi_y, 0.0)
         fill!(bufs.Phi_z, 0.0)
@@ -138,6 +144,7 @@ end
 function _half_potential_step_combined!(
     ws::Workspace{N}, dt_half::Float64, n_comp::Int, ndim::Int, imaginary_time::Bool;
     t_eval::Float64=ws.state.t, t_start::Float64=NaN,
+    psi_mf::Union{Nothing, AbstractArray}=nothing,
 ) where {N}
     # Caveat enforcement: combined step is c0+c1+DDI only.
     _assert_combined_step_compatible(ws)
@@ -162,17 +169,71 @@ function _half_potential_step_combined!(
     end
 
     _apply_mg_to_V!(ws, t_eval)
-    _dispatch_diagonal_step!(ws, Val(N), zeeman_diag, dt_half / 2, imaginary_time, ip)
+    _dispatch_diagonal_step!(ws, Val(N), zeeman_diag, dt_half / 2, imaginary_time, ip; psi_mf)
     _remove_mg_from_V!(ws, t_eval)
 
     # ψ is now at the midpoint of the dt_half interval — evaluate
-    # n_tot(r) here for Magnus midpoint accuracy.
-    _apply_combined_spin_step!(ws, dt_half, t_eval; imaginary_time)
+    # n_tot(r) here for Magnus midpoint accuracy (or use the frozen
+    # `psi_mf` midpoint when the predictor-corrector wrapper supplies it).
+    _apply_combined_spin_step!(ws, dt_half, t_eval; imaginary_time, psi_mf)
 
     _apply_mg_to_V!(ws, t_eval)
-    _dispatch_diagonal_step!(ws, Val(N), zeeman_diag, dt_half / 2, imaginary_time, ip)
+    _dispatch_diagonal_step!(ws, Val(N), zeeman_diag, dt_half / 2, imaginary_time, ip; psi_mf)
     _remove_mg_from_V!(ws, t_eval)
     nothing
+end
+
+# Midpoint (Picard predictor-corrector) wrapper for the combined half-V,
+# analogous to `_half_potential_step_midpoint!`. Freezes the mean field at the
+# half-step temporal midpoint for ALL substeps (diag c₀ density + combined
+# DDI/c₁⟨F⟩), restoring the same 2nd-order Mz-conserving accuracy the
+# sequential `split_step!` gets — the plain combined step's single Magnus
+# midpoint leaks Mz under stiff DDI. n_picard=1 suffices (matches split_step!).
+function _half_potential_step_combined_midpoint!(
+    ws::Workspace{N}, dt_half::Float64, n_comp::Int, ndim::Int, imaginary_time::Bool;
+    t_eval::Float64=ws.state.t, t_start::Float64=NaN, n_picard::Int=1,
+) where {N}
+    psi_orig = ws.state.psi
+    psi_mid_prev, psi_mid_curr = _get_midpoint_scratch(psi_orig)
+
+    copyto!(psi_mid_curr, psi_orig)
+    ws.state.psi = psi_mid_curr
+    try
+        _half_potential_step_combined!(ws, dt_half / 2, n_comp, ndim, imaginary_time;
+            t_eval, t_start, psi_mf=psi_orig)
+    finally
+        ws.state.psi = psi_orig
+    end
+    for _ in 2:n_picard
+        copyto!(psi_mid_prev, psi_mid_curr)
+        copyto!(psi_mid_curr, psi_orig)
+        ws.state.psi = psi_mid_curr
+        try
+            _half_potential_step_combined!(ws, dt_half / 2, n_comp, ndim, imaginary_time;
+                t_eval, t_start, psi_mf=psi_mid_prev)
+        finally
+            ws.state.psi = psi_orig
+        end
+    end
+    _half_potential_step_combined!(ws, dt_half, n_comp, ndim, imaginary_time;
+        t_eval, t_start, psi_mf=psi_mid_curr)
+    nothing
+end
+
+# Dispatcher: midpoint when RT + DDI active (and the toggle is on), matching
+# `_half_potential!` for the sequential path so both production propagators
+# get the same 2nd-order mean-field treatment.
+@inline function _half_potential_combined!(
+    ws::Workspace{N}, dt_half::Float64, n_comp::Int, ndim::Int, imaginary_time::Bool;
+    t_eval::Float64=ws.state.t, t_start::Float64=NaN,
+) where {N}
+    if MEANFIELD_MIDPOINT_ENABLED[] && ws.ddi !== nothing && !imaginary_time
+        _half_potential_step_combined_midpoint!(ws, dt_half, n_comp, ndim, imaginary_time;
+            t_eval, t_start, n_picard=1)
+    else
+        _half_potential_step_combined!(ws, dt_half, n_comp, ndim, imaginary_time;
+            t_eval, t_start)
+    end
 end
 
 # Pre-flight check: combined step is only valid when contact interaction
@@ -233,10 +294,13 @@ rotation per half-potential step. Compared with `split_step!`:
 
 * 6 spin rotations / step → 2 — the dominant cost saving (each rotation
   is the batched 5-stage Euler decomposition at full ψ-array size).
-* Same Strang O(dt²) global accuracy via Magnus midpoint evaluation
-  inside each half-potential step.
-* Bit-different from `split_step!` to O(dt²) (different splitting),
-  but converges to the same continuum limit.
+* Same Strang O(dt²) global accuracy. When DDI is active (and
+  `MEANFIELD_MIDPOINT_ENABLED[]`) the mean field is frozen at the
+  implicit-midpoint via a Picard predictor-corrector (`_half_potential_
+  step_combined_midpoint!`, n_picard=1) — the same treatment `split_step!`
+  uses — which conserves M_z under stiff DDI (the plain single Magnus
+  midpoint leaks it). The two splittings then agree to O(dt³).
+* Converges to the same continuum limit as `split_step!`.
 
 # Why no `:yoshida6` composition kwarg
 
@@ -249,13 +313,13 @@ we observe Y6 dropping to order ≈ 1 once any mean-field channel is
 active; for general nonlinear Schrödinger settings Choi & Vaníček
 [arXiv:2006.16902, 2020] document explicit splitting losing to
 first-order accuracy and propose implicit-midpoint compositions as
-the fix. Implementing that here would mean a predictor-corrector
-iteration on `Φ_DDI[ψ]` / `⟨F⟩[ψ]` per V substep, doubling per-V cost
-and erasing most of the combined-vs-sequential saving. For now: stick
-with Strang+combined (order 2, fast), or use `run_simulation_yoshida!`
-with the sequential split_step path if you need a higher-order method
-on a problem that's effectively autonomous (where Yoshida's assumptions
-hold).
+the fix. The per-half-step predictor-corrector that fix needs IS now
+applied here for DDI (`_half_potential_step_combined_midpoint!`,
+n_picard=1) — it doubles the per-half-V cost (predictor + corrector) but
+restores M_z conservation; the combined path is still cheaper than the
+sequential midpoint (2 fused rotations vs 6 per V). A full Yoshida-N
+composition on this nonlinear V remains out of scope (use
+`run_simulation_yoshida!` for high-order on the sequential path).
 
 The codebase's Y6 weights (`_COMP_YOSHIDA_S6` in
 `split_step_composers.jl`) are Yoshida 1990 Solution A: bs =
@@ -306,7 +370,7 @@ function split_step_combined!(ws::Workspace{N}) where {N}
     t_eval_1 = it ? 0.0 : t + dt / 4
     t_eval_2 = it ? 0.0 : t + 3dt / 4
 
-    _half_potential_step_combined!(
+    _half_potential_combined!(
         ws, dt / 2, n_comp, N, it; t_eval=t_eval_1, t_start=it ? NaN : t
     )
 
@@ -315,7 +379,7 @@ function split_step_combined!(ws::Workspace{N}) where {N}
     apply_step!(KineticTerm(), ws.state.psi, 0.0, false, ws)
     apply_step!(CoriolisTerm(omega), ws.state.psi, dt / 2, it, ws)
 
-    _half_potential_step_combined!(
+    _half_potential_combined!(
         ws, dt / 2, n_comp, N, it; t_eval=t_eval_2, t_start=it ? NaN : t + dt / 2
     )
 
