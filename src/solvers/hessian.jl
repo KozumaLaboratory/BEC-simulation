@@ -21,7 +21,7 @@
 
 export hessian_vector_product,
     constrained_hessian_params, constrained_hessian_action,
-    trapped_bdg_lowest_eigenvalue
+    trapped_bdg_lowest_eigenvalue, trapped_bdg_low_modes
 
 """
     hessian_vector_product(ws, ψ, δ; ε=1e-5) → array
@@ -159,5 +159,151 @@ function trapped_bdg_lowest_eigenvalue(
     β_m = length(β) >= length(α) ? β[end] : 0.0
     ritz_residual = abs(β_m * s_min[end])
     converged = ritz_residual < tol_ritz * (abs(λ_min) + 1e-10)
-    (; λ_min, μ=p.μ, ritz_residual, niter_used=length(α), converged)
+
+    # Two-sided certificate (Kato–Temple). The Ritz value `λ_min = θ₁` is an
+    # UPPER bound on the true λ_min (Ritz values converge from above). The
+    # LOWER bound is `θ₁ − ρ²/δ` with ρ = ritz_residual and δ the gap to the
+    # next eigenvalue (estimated by the Ritz gap θ₂ − θ₁). Because ρ enters
+    # SQUARED, the certified interval is far tighter than the naive `±ρ`:
+    # ρ=5e-3, δ=0.1 ⇒ ±2.5e-4, not ±5e-3. Valid when δ > ρ (θ₂ a real
+    # separation); otherwise fall back to the loose `±ρ`. At a soft point δ
+    # shrinks and the bound loosens — that is where a preconditioned solver
+    # must drive ρ down directly (see the LOBPCG path).
+    θ2 = length(decomp.values) >= 2 ? decomp.values[2] : λ_min
+    gap = θ2 - λ_min
+    λ_lower = gap > ritz_residual ? λ_min - ritz_residual^2 / gap : λ_min - ritz_residual
+    (; λ_min, μ=p.μ, ritz_residual, niter_used=length(α), converged, λ_lower, gap)
+end
+
+# In-place kinetic Fourier preconditioner M⁻¹ = (½k² + α)⁻¹ per spin component.
+# The constrained Hessian's stiffness is the kinetic λ_max ~ 1/dx²; flattening
+# it restores the relative gap (λ₂−λ₁)/(λ_max−λ₁) that an unpreconditioned
+# Lanczos/LOBPCG is bound by. `α` ~ the low-mode scale (≈ μ).
+function _kinetic_precondition!(v::AbstractArray{<:Complex}, ws, k2, α::Float64)
+    N = ndims(ws.grid.k_squared)
+    n_pts = ntuple(d -> size(v, d), N)
+    n_comp = ws.spin_matrices.system.n_components
+    buf = ws.state.fft_buf
+    @inbounds for c in 1:n_comp
+        idx = _component_slice(N, n_pts, c)
+        buf .= view(v, idx...)
+        ws.fft_plans.forward * buf
+        buf ./= (0.5 .* k2 .+ α)
+        ws.fft_plans.inverse * buf
+        view(v, idx...) .= buf
+    end
+    v
+end
+
+# Modified Gram–Schmidt orthonormalisation in a given real inner product,
+# dropping near-dependent directions (so [X, W, P_prev] can be fed raw).
+function _mgs_ortho(vecs, ipR; tol::Float64=1e-10)
+    out = empty(vecs)
+    for v in vecs
+        w = copy(v)
+        for u in out
+            w = w .- u .* ipR(u, w)
+        end
+        nw = sqrt(max(ipR(w, w), 0.0))
+        nw > tol && push!(out, w ./ nw)
+    end
+    out
+end
+
+# Linear combination of a vector list by columns of C: returns [Σⱼ C[j,k] S[j]].
+_combine(S, C) = [reduce(.+, (C[j, k] .* S[j] for j in 1:length(S))) for k in 1:size(C, 2)]
+
+"""
+    trapped_bdg_low_modes(ws, ψ; nev=1, block=8, ...) → (; λ, λ_lower, residuals, converged, μ, iterations)
+
+Lowest `nev` eigenvalues of the constrained second variation `P(H−2μ)P` via
+block **LOBPCG with a kinetic Fourier preconditioner** — the
+preconditioned counterpart of `trapped_bdg_lowest_eigenvalue` (bare Lanczos).
+
+The bare Lanczos is bound by the relative gap `(λ₂−λ₁)/(λ_max−λ₁)`, which the
+kinetic `λ_max ~ 1/dx²` crushes; the preconditioner `M⁻¹ = (½k²+α)⁻¹`
+flattens that span (THIS, not the solver name, is what makes it converge — at
+a soft point it sets the certified-interval width, not just the speed). A
+block larger than the low-mode cluster + a recycled previous block (the
+conjugate term) handle clustered / crossing modes that defeat single-vector
+iteration.
+
+Returns the Ritz values `λ` (upper bounds), per-mode Kato–Temple lower bounds
+`λ_lower` (`θₖ − ρₖ²/δₖ`), residual norms, and `converged` (all `nev`
+residuals < `tol`). `extra_nullspace` projects out known Goldstone modes
+beyond the gauge `iψ` (vortex rotation / free-space translation) — these are
+DEFLATED (removed), the physical soft mode is NOT (the block grabs it).
+
+Keywords: `nev`, `block` (≥ nev+2), `max_iter`, `tol` (residual stop),
+`α_pre` (preconditioner shift, defaults to `max(|μ|, 1e-3)`), `ε`+`order`
+(HvP), `extra_nullspace`, `rng`.
+"""
+function trapped_bdg_low_modes(
+    ws, ψ;
+    nev::Int=1, block::Int=8, max_iter::Int=30, tol::Float64=1e-6,
+    α_pre::Union{Nothing, Float64}=nothing, ε::Float64=1e-5, order::Int=2,
+    extra_nullspace=nothing, params=nothing, rng=Random.default_rng(),
+)
+    p = params === nothing ? constrained_hessian_params(ws, ψ) : params
+    k2 = ws.grid.k_squared
+    ipR(a, b) = real(sum(conj.(a) .* b)) * p.dV
+    α = α_pre === nothing ? max(abs(p.μ), 1e-3) : α_pre
+
+    function project(v)
+        w = _tangent_project(v, ψ, p.dV, p.n2)
+        if extra_nullspace !== nothing
+            for m in extra_nullspace
+                w = w .- m .* (ipR(m, w) / ipR(m, m))
+            end
+        end
+        w
+    end
+    Tprec(v) = project(_kinetic_precondition!(copy(v), ws, k2, α))
+    A(v) = constrained_hessian_action(ws, ψ, v; p.μ, p.dV, p.n2, ε, order)
+
+    b = max(block, nev + 2)
+    X = _mgs_ortho([project(randn(rng, ComplexF64, size(ψ))) for _ in 1:b], ipR)
+    AX = [A(x) for x in X]
+    Xprev = typeof(ψ)[]
+    θ = zeros(length(X))
+    resn = fill(Inf, length(X))
+    iters = 0
+
+    for it in 1:max_iter
+        iters = it
+        # Rayleigh-Ritz on the current block → rotate X, AX to Ritz vectors.
+        nb = length(X)
+        Θ = [ipR(X[i], AX[j]) for i in 1:nb, j in 1:nb]
+        e = eigen(Symmetric((Θ .+ Θ') ./ 2))
+        X = _combine(X, e.vectors)
+        AX = _combine(AX, e.vectors)
+        θ = e.values
+        R = [AX[i] .- θ[i] .* X[i] for i in 1:nb]
+        resn = [sqrt(max(ipR(r, r), 0.0)) for r in R]
+        maximum(@view resn[1:min(nev, nb)]) < tol && break
+
+        W = [Tprec(R[i]) for i in 1:nb]
+        S = _mgs_ortho(vcat(X, W, Xprev), ipR)
+        AS = [A(s) for s in S]
+        ns = length(S)
+        Hs = [ipR(S[i], AS[j]) for i in 1:ns, j in 1:ns]
+        es = eigen(Symmetric((Hs .+ Hs') ./ 2))
+        keep = min(b, ns)
+        C = es.vectors[:, 1:keep]
+        Xprev = X
+        X = _combine(S, C)
+        AX = _combine(AS, C)
+    end
+
+    nb = length(X)
+    m = min(nev, nb)
+    λ = θ[1:m]
+    λ_lower = map(1:m) do k
+        δ = (k < nb ? θ[k + 1] : θ[k]) - θ[k]
+        δ > resn[k] ? θ[k] - resn[k]^2 / δ : θ[k] - resn[k]
+    end
+    (;
+        λ, λ_lower, residuals=resn[1:m], converged=maximum(@view resn[1:m]) < tol,
+        μ=p.μ, iterations=iters,
+    )
 end
