@@ -8,6 +8,59 @@
 
 export split_step!, split_step_midpoint!
 
+# --- 2nd-order mean-field (midpoint) half-potential ---
+#
+# The plain `_half_potential_step!` evaluates each inner-V substep's mean field
+# (Φ_DDI, c₀|ψ|², c₁⟨F⟩, c₂A₀₀, tensor h) at that substep's ENTRY ψ. With DDI
+# active the central DDI substep's one-sided O(τ) mean-field error does NOT
+# cancel, collapsing the Strang order from 2 to ~1 (measured: Eu F=6 + DDI
+# drops to ~1.0-1.5; the c_dd=0 control stays 2.0). The midpoint predictor-
+# corrector freezes the mean field at the half-step's TEMPORAL midpoint for all
+# substeps, restoring 2nd order. A single Picard iteration (n_picard=1) is
+# sufficient for 2nd order (n_picard≥2 is only needed for MPS-4/Y6 order
+# recovery). See `bench/conv_order.jl`.
+#
+# `_half_potential!` is the dispatcher used by `split_step!` and the RTP
+# leapfrog loop: midpoint when DDI is active (and the toggle is on), plain
+# otherwise (already 2nd order, cheaper). Toggle off to reproduce the legacy
+# 1st-order DDI path.
+const MEANFIELD_MIDPOINT_ENABLED = Ref(true)
+
+@inline function _half_potential!(
+    ws::Workspace{N}, dt_half, n_comp, ndim, imaginary_time;
+    t_eval::Float64=ws.state.t, t_start::Float64=NaN,
+) where {N}
+    # Midpoint is for REAL-TIME dynamics accuracy (Strang dt²-order). Imaginary
+    # time is relaxation to a fixed point — its dt-order is irrelevant and the
+    # non-norm-conserving predictor can overflow — so ITP keeps the plain path.
+    if MEANFIELD_MIDPOINT_ENABLED[] && ws.ddi !== nothing && !imaginary_time
+        _half_potential_step_midpoint!(
+            ws, dt_half, n_comp, ndim, imaginary_time; t_eval, t_start, n_picard=1
+        )
+    else
+        _half_potential_step!(
+            ws, dt_half, n_comp, ndim, imaginary_time; t_eval, t_start
+        )
+    end
+end
+
+# Persistent midpoint scratch (one pair per (size, eltype, array-type)) so the
+# predictor-corrector does not allocate `similar(psi)` every step — at 128³ F64
+# that would churn ~1.7 GB/step through the GC. Buffers are reused across the
+# two halves of a step (sequential, no aliasing); only the first is needed for
+# n_picard=1, both for n_picard≥2.
+const _MIDPOINT_SCRATCH = Dict{UInt64, Any}()
+
+function _get_midpoint_scratch(psi::A) where {A <: AbstractArray}
+    key = hash((size(psi), eltype(psi), nameof(typeof(psi).name.wrapper)))
+    bufs = get(_MIDPOINT_SCRATCH, key, nothing)
+    if bufs === nothing
+        bufs = (similar(psi), similar(psi))
+        _MIDPOINT_SCRATCH[key] = bufs
+    end
+    bufs::Tuple{A, A}
+end
+
 """
 Perform one Strang-split time step: V(dt/2) K(dt) V(dt/2).
 
@@ -32,7 +85,7 @@ function split_step!(ws::Workspace{N}) where {N}
         )
     end
 
-    @timeit_debug TIMER "half_potential" _half_potential_step!(
+    @timeit_debug TIMER "half_potential" _half_potential!(
         ws, dt / 2, n_comp, N, it; t_eval=t_eval_1, t_start=it ? NaN : t
     )
 
@@ -47,7 +100,7 @@ function split_step!(ws::Workspace{N}) where {N}
         CoriolisTerm(omega), ws.state.psi, dt / 2, it, ws
     )
 
-    @timeit_debug TIMER "half_potential" _half_potential_step!(
+    @timeit_debug TIMER "half_potential" _half_potential!(
         ws, dt / 2, n_comp, N, it; t_eval=t_eval_2, t_start=it ? NaN : t + dt / 2
     )
 
@@ -369,9 +422,9 @@ end
 # The predictor's accuracy only needs to be O(dt²) for the corrector to
 # achieve a fully symmetric V step, so frozen-MF Strang half-step suffices.
 #
-# Allocation note: this implementation calls `similar(psi)` per invocation
-# to obtain the midpoint buffer. For production tuning move to a dedicated
-# Workspace field; for Phase-0 validation per-call alloc is acceptable.
+# Allocation note: midpoint buffers come from `_get_midpoint_scratch` (a
+# persistent per-(size,eltype,array-type) cache) so the hot loop does not
+# allocate `similar(psi)` every step.
 # Transverse Zeeman / Raman currently use `ws.state.psi_scratch` as an
 # intermediate; they remain compatible with the midpoint variant because the
 # midpoint buffer is allocated separately from `psi_scratch`.
@@ -399,8 +452,7 @@ function _half_potential_step_midpoint!(
     # n_picard=2 lifts the time-reversal residual to O(τ⁴), which is sufficient
     # for MPS-4 order recovery. Cost: `n_picard × half-V-step + full V-step`.
     psi_orig = ws.state.psi
-    psi_mid_prev = similar(psi_orig)
-    psi_mid_curr = similar(psi_orig)
+    psi_mid_prev, psi_mid_curr = _get_midpoint_scratch(psi_orig)
 
     # Iteration 1: predictor with frozen MF = ψ_orig.
     copyto!(psi_mid_curr, psi_orig)
