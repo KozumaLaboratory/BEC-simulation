@@ -1,16 +1,25 @@
-# GPU DDI Euler rotation via the single-launch phi-angle kernel.
+# GPU DDI spin rotation: exp(z·Φ·F) per voxel, z = -i·dt (RT) / -dt (IT).
 #
-# The generic `SpinorBEC._apply_ddi_rotation!(::AbstractArray, …)` drove the
-# GPU through the broadcast-+-cuBLAS chain (~4 gemms + ~9 elementwise launches
-# + W HBM round-trips, twice per step). This override computes the per-voxel
-# Euler angles from the dipolar field IN the rotation kernel
-# (`apply_ddi_euler_fused_kernel!`, gpu_euler_kernel.jl) — one launch, no
-# separate angle-broadcast pass, no α/β/θ scratch round-trip.
+# Two exact realizations of the SAME operator, selected by the per-step
+# rotation angle R = dt·max|Φ|·F:
 #
-# Math matches the CPU batched path to machine epsilon and the prior GPU
-# broadcast path (Step1 +m·α, Ry(β), Dz ∓m·θ, Ry(-β), Step5 -m·α). Padded-DDI
-# fields are cropped to the spatial corner first (matches `_ddi_crop_phi`).
+#  * Adaptive tridiagonal Taylor–Horner (default). The generator A = Φ·F is
+#    Hermitian tridiagonal in the F_z basis (F_z diagonal, F_x/F_y ladder
+#    bands), built directly from `sm.Fx/Fy/Fz` (single physics declaration).
+#    `exp(zA)ψ` is evaluated as w←ψ; for k=K..1: w←ψ+(z/k)(A·w), where A·w is a
+#    nearest-neighbour shfl matvec (warp-cooperative, one component per lane —
+#    no local-memory spill, no Fy-eigenvector matrices, no atan/acos). The
+#    degree K is chosen per step from the backward-error bound
+#    R^{K+1}/(K+1)! ≤ tol; in the Eu EdH regime (R≈0.03–0.2) K≈5–9 reaches
+#    machine precision. Imaginary time uses real z=-dt → genuine exp(-dt Φ·F)
+#    weight, no overflow shift needed.
+#  * Exact Euler 5-stage (`apply_ddi_euler_fused_kernel!`) — used as a fallback
+#    when R exceeds `_DDI_TAYLOR_RMAX[]` (never reached in production). Machine
+#    precision at all R.
 
+using StaticArrays: SVector
+
+# --- Euler fallback eigenvector cache (Fy diagonalization) ---
 mutable struct GPUDDIRotCache{D, T <: AbstractFloat}
     V::CuArray{Complex{T}, 2}        # D×D Fy eigenvectors
     conj_V::CuArray{Complex{T}, 2}   # D×D conj(V)
@@ -43,6 +52,32 @@ function _get_gpu_ddi_rot_cache(
     cache
 end
 
+# --- Taylor tridiagonal-generator coefficients (host SVectors, by value) ---
+struct GPUDDITaylorCoef{D, T}
+    mz::SVector{D, T}               # F_z diagonal m_c
+    sxu::SVector{D, Complex{T}}     # F_x super-diagonal [c,c+1] (0 at c=D)
+    syu::SVector{D, Complex{T}}     # F_y super-diagonal [c,c+1] (0 at c=D)
+end
+
+const _GPU_DDI_TAYLOR_CACHE = Dict{UInt64, Any}()
+
+function _get_taylor_coef(
+    ::CuArray{Complex{T}}, sm::SpinorBEC.SpinMatrices{D},
+) where {D, T <: AbstractFloat}
+    key = hash((objectid(sm), D, T))
+    c = get(_GPU_DDI_TAYLOR_CACHE, key, nothing)
+    c !== nothing && return c::GPUDDITaylorCoef{D, T}
+    Fx = sm.Fx
+    Fy = sm.Fy
+    Fz = sm.Fz
+    mz = SVector{D, T}(ntuple(i -> T(real(Fz[i, i])), Val(D)))
+    sxu = SVector{D, Complex{T}}(ntuple(i -> i < D ? Complex{T}(Fx[i, i + 1]) : zero(Complex{T}), Val(D)))
+    syu = SVector{D, Complex{T}}(ntuple(i -> i < D ? Complex{T}(Fy[i, i + 1]) : zero(Complex{T}), Val(D)))
+    coef = GPUDDITaylorCoef{D, T}(mz, sxu, syu)
+    _GPU_DDI_TAYLOR_CACHE[key] = coef
+    coef
+end
+
 # Crop a (possibly padded) dipolar field to the spatial corner and flatten to
 # (N,). Unpadded (size == n_pts, every production run) is a zero-copy reshape.
 @inline function _gpu_phi_vec(phi::CuArray, n_pts::NTuple{M, Int}, N::Int) where {M}
@@ -50,6 +85,93 @@ end
     reshape(phi[CartesianIndices(n_pts)], N)
 end
 
+# --- Adaptive degree selection ---
+# EXPERIMENTAL, off by default. On H100 the Taylor kernel measured ~4× SLOWER
+# than the warp Euler (one-component-per-lane forces the by-value SVector
+# coefficients into local memory; the Horner chain is also dependency-bound).
+# Euler stays the production path. Set true to A/B the Taylor path.
+const _DDI_USE_TAYLOR = Ref(false)
+const _DDI_TAYLOR_RMAX = Ref(1.0)     # R above which we fall back to Euler
+const _DDI_TAYLOR_TOL = Ref(1.0e-13)  # backward-error target
+const _DDI_R_OVERRIDE = Ref(NaN)      # set to skip the max|Φ| reduction
+
+# smallest K with R^K/K! ≤ tol (⇒ omitted term R^{K+1}/(K+1)! < tol), K ≥ 2.
+function _taylor_degree(R::Real, tol::Real)
+    t = 1.0
+    k = 0
+    while k < 40
+        k += 1
+        t *= R / k
+        t <= tol && return max(k, 2)
+    end
+    return 40
+end
+
+function _ddi_spectral_R(px, py, pz, dt::T, F::T) where {T <: AbstractFloat}
+    pm2 = maximum(px .* px .+ py .* py .+ pz .* pz)
+    dt * sqrt(pm2) * F
+end
+
+# --- Taylor–Horner warp kernel (one spin component per lane) ---
+@inline function _ddi_taylor_warp_kernel!(
+    P, px, py, pz, mz, sxu, syu, z::Complex{T}, K::Int32, ::Val{D},
+) where {T, D}
+    CT = Complex{T}
+    W = 16
+    tib = CUDA.threadIdx().x
+    lane0 = (tib - 1) & 31
+    sg = lane0 >> 4
+    sl = lane0 & 15
+    warp_in_block = (tib - 1) >> 5
+    gwarp = (CUDA.blockIdx().x - 1) * (CUDA.blockDim().x >> 5) + warp_in_block
+    vox = gwarp * 2 + sg + 1
+    N = size(P, 1)
+    active = sl < D
+    in_range = vox <= N
+    c = active ? sl + 1 : 1
+
+    Px = in_range ? (@inbounds px[vox]) : zero(T)
+    Py = in_range ? (@inbounds py[vox]) : zero(T)
+    Pz = in_range ? (@inbounds pz[vox]) : zero(T)
+
+    diag_c = Pz * (@inbounds mz[c])                       # real F_z diagonal
+    b_c = Px * (@inbounds sxu[c]) + Py * (@inbounds syu[c])  # A[c,c+1]
+    # lower coupling conj(A[c-1,c]) = conj(b_{c-1}); b_{c-1} from lane c-1
+    cdn = c > 1 ? c - 1 : 1
+    bm_raw = _shfl_c(b_c, cdn, Val(W))
+    bm = c > 1 ? bm_raw : zero(CT)
+
+    psi0 = (active && in_range) ? (@inbounds P[vox, c]) : zero(CT)
+    w = psi0
+    k = K
+    while k >= one(Int32)
+        wup = _shfl_c(w, c + 1, Val(W))                  # w_{c+1} (idle→0 at c=D)
+        wdn_raw = _shfl_c(w, cdn, Val(W))
+        wdn = c > 1 ? wdn_raw : zero(CT)
+        Aw = diag_c * w + b_c * wup + conj(bm) * wdn
+        w = psi0 + (z / T(k)) * Aw
+        k -= one(Int32)
+    end
+
+    if active && in_range
+        @inbounds P[vox, c] = w
+    end
+    nothing
+end
+
+function _apply_ddi_taylor!(
+    P, px, py, pz, coef::GPUDDITaylorCoef{D, T}, z::Complex{T}, K::Integer,
+) where {D, T}
+    N = size(P, 1)
+    voxels_per_block = 16
+    threads = 256
+    blocks = cld(N, voxels_per_block)
+    CUDA.@cuda threads = threads blocks = blocks _ddi_taylor_warp_kernel!(
+        P, px, py, pz, coef.mz, coef.sxu, coef.syu, z, Int32(K), Val(D))
+    nothing
+end
+
+# --- Dispatcher: Taylor (adaptive) with exact-Euler fallback ---
 function SpinorBEC._apply_ddi_rotation!(
     psi::CuArray{Complex{T}},
     phi_x::CuArray,
@@ -62,13 +184,27 @@ function SpinorBEC._apply_ddi_rotation!(
 ) where {T <: AbstractFloat, D}
     n_pts = ntuple(d -> size(psi, d), ndim)
     N = prod(n_pts)
-    cache = _get_gpu_ddi_rot_cache(psi, sm, ndim)
-
     P = reshape(psi, N, D)
     px = _gpu_phi_vec(phi_x, n_pts, N)
     py = _gpu_phi_vec(phi_y, n_pts, N)
     pz = _gpu_phi_vec(phi_z, n_pts, N)
 
+    if _DDI_USE_TAYLOR[]
+        F = T(sm.system.F)
+        R = isnan(_DDI_R_OVERRIDE[]) ?
+            _ddi_spectral_R(px, py, pz, T(dt_frac), F) : T(_DDI_R_OVERRIDE[])
+        if R <= T(_DDI_TAYLOR_RMAX[])
+            K = _taylor_degree(R, _DDI_TAYLOR_TOL[])
+            coef = _get_taylor_coef(psi, sm)
+            z = imaginary_time ? Complex{T}(-T(dt_frac), zero(T)) :
+                Complex{T}(zero(T), -T(dt_frac))
+            _apply_ddi_taylor!(P, px, py, pz, coef, z, K)
+            return nothing
+        end
+    end
+
+    # Fallback: exact Euler 5-stage (large/unknown R).
+    cache = _get_gpu_ddi_rot_cache(psi, sm, ndim)
     apply_ddi_euler_fused_kernel!(
         P, px, py, pz, cache.m_row, cache.λ_row, cache.V, cache.conj_V, dt_frac;
         imaginary_time=imaginary_time,
