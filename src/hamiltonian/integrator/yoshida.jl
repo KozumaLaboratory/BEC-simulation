@@ -8,21 +8,18 @@ measure of splitting error that the L2 estimator misses.
 PI controller exponent: (tol/err)^{1/(p+1)} with p=4 (4th-order global).
 Cost: ~4 Strang steps per accepted step; benefits from larger dt at same accuracy.
 
-!!! warning "Frozen mean-field base — order degrades on lab path"
-    The base scheme is `_strang_core!` (frozen MF), which is order 2 only
-    for autonomous V. On the SpinorBEC lab path (c₀, c₁, DDI, tensor
-    cache, time-dependent Zeeman, …) the mean field at intermediate
-    Yoshida sub-times is held frozen at the start-of-step value, so
-    composition coefficients no longer deliver their nominal order:
-    measured order ~3.4 for Y4 and ~1.0 for Y6 on Eu151 F=6 spinor+DDI
-    (handover §4). The Y4/Y6 coefficients themselves are correct
-    (`_COMP_YOSHIDA_*` matches Yoshida 1990).
-
-    For production high-order on the lab path use
-    `adaptive_run!(ws; step!=split_step_midpoint!)` — the implicit-
-    midpoint Picard predictor restores self-consistency at each
-    sub-time. For TDHFB use `tdhfb_y4_midpoint_step!` with
-    `picard_midpoint=true` (A4 palindromic substep).
+!!! note "DDI lab path: midpoint base restores nominal order"
+    The plain base `_strang_core!` evaluates the mean field at each inner-V
+    substep's entry; on the DDI lab path the central DDI substep's one-sided
+    O(τ) error breaks time symmetry and the composition collapses (measured
+    ~1.0 for Y4 on Eu151 F=6 spinor+DDI). When DDI is active (and
+    `MEANFIELD_MIDPOINT_ENABLED[]`) this routine instead composes the
+    time-symmetric midpoint core as an UN-MERGED triple-jump
+    (`_composition_midpoint_core!`), recovering the nominal order — measured
+    Y4 → 4.0 on Eu F=6 + DDI (`bench/conv_order4c.jl`). The merged-ABA form
+    caps at ~2.5 regardless of Picard count; un-merged full-step composition
+    is the fix. Without DDI the cheaper merged `_aba_step!` is used (already
+    nominal order). The Y4/Y6 coefficients match Yoshida 1990.
 """
 function run_simulation_yoshida!(
     ws::Workspace{N};
@@ -65,11 +62,30 @@ function run_simulation_yoshida!(
         psi_old .= ws.state.psi
         t_base = ws.state.t
 
-        _strang_core!(ws, dt_step, n_comp; t_base)
+        # On the DDI lab path the plain composition (mean field at substep
+        # entry) collapses below its nominal order; the midpoint base composed
+        # as an un-merged triple-jump restores it. The S₂ error estimate uses
+        # the matching midpoint core so ‖S_high − S₂‖ stays a clean estimate.
+        use_mid = MEANFIELD_MIDPOINT_ENABLED[] && ws.ddi !== nothing
+
+        # n_picard=3: the implicit-midpoint Picard must converge enough that
+        # the base is time-symmetric to the order the 4th-order Richardson
+        # cancellation needs. Measured Y4 order vs n_picard (Eu F=6 + DDI,
+        # bench/conv_order4c.jl): np=1 → 3.85, np=2 → 3.8, np=3 → 3.99. np<3
+        # leaves a residual ~3rd-order term.
+        if use_mid
+            _strang_midpoint_core!(ws, dt_step, n_comp; t_base, n_picard=3)
+        else
+            _strang_core!(ws, dt_step, n_comp; t_base)
+        end
         psi_strang .= ws.state.psi
 
         ws.state.psi .= psi_old
-        _aba_step!(ws, dt_step, n_comp, comp.a, comp.b; t_base)
+        if use_mid
+            _composition_midpoint_core!(ws, dt_step, n_comp, comp.b; t_base, n_picard=3)
+        else
+            _aba_step!(ws, dt_step, n_comp, comp.a, comp.b; t_base)
+        end
 
         err = _wavefunction_l2_change(ws.state.psi, psi_strang)
 

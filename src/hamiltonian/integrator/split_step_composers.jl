@@ -105,6 +105,65 @@ function _strang_core!(
 end
 
 """
+Midpoint-mean-field Strang core: V_mid(dt/2) K(dt) V_mid(dt/2), where V_mid is
+the implicit-midpoint half-potential (mean field frozen at the half-step
+temporal midpoint via Picard). No t-advance / dissipation (the caller owns
+those), so it composes cleanly. RTP only.
+
+This is the TIME-SYMMETRIC 2nd-order base required for high-order composition
+on the DDI lab path: composing this in the Yoshida/Suzuki/Blanes-Moan
+triple-jump (`_composition_midpoint_core!`) recovers the nominal order, whereas
+the plain `_strang_core!` (mean field at substep entry) collapses to ~1st order
+under DDI. For TRUE 4th order the Picard iteration must converge the implicit
+midpoint enough that the base is time-symmetric to the order the Richardson
+cancellation needs: measured Y4 order vs n_picard (Eu F=6 + DDI, fine-reference
+convergence) is np=1 → 3.85, np=2 → 3.8, **np=3 → 3.99** (`bench/conv_order4c.jl`).
+The MERGED `_aba_step!` form caps at ~2.5 regardless of n_picard — V-merging
+across substeps breaks the per-step time symmetry; un-merged full-step
+composition is required.
+"""
+function _strang_midpoint_core!(
+    ws::Workspace{N}, dt::Float64, n_comp::Int;
+    t_base::Float64=ws.state.t, n_picard::Int=1,
+) where {N}
+    omega = ws.sim_params.rotating_frame_omega
+    _half_potential_step_midpoint!(
+        ws, dt / 2, n_comp, N, false; t_eval=t_base + dt / 4, t_start=t_base, n_picard
+    )
+    apply_step!(CoriolisTerm(omega), ws.state.psi, dt / 2, false, ws)
+    _update_batched_kinetic_phase!(
+        ws.batched_kinetic, ws.grid.k_squared, dt, ws.sim_params.imaginary_time
+    )
+    apply_step!(KineticTerm(), ws.state.psi, 0.0, false, ws)
+    apply_step!(CoriolisTerm(omega), ws.state.psi, dt / 2, false, ws)
+    _half_potential_step_midpoint!(
+        ws, dt / 2, n_comp, N, false;
+        t_eval=t_base + 3dt / 4, t_start=t_base + dt / 2, n_picard,
+    )
+    nothing
+end
+
+"""
+High-order composition as a TRIPLE-JUMP of complete symmetric midpoint cores:
+S(dt) = ∏ᵢ S₂_mid(bᵢ·dt) at the composition's S₂ weights `b` (which equal the
+Yoshida/Suzuki/etc. sub-step sizes). Un-merged on purpose — merging adjacent
+V-steps (as `_aba_step!` does) breaks the per-step time symmetry and caps the
+order at ~2.5 on the DDI lab path. With the symmetric midpoint base this
+delivers the composition's nominal order (4 for Yoshida-S4). No t-advance.
+"""
+function _composition_midpoint_core!(
+    ws::Workspace{N}, dt::Float64, n_comp::Int, b::NTuple{Sk, Float64};
+    t_base::Float64=ws.state.t, n_picard::Int=1,
+) where {N, Sk}
+    t = t_base
+    for i in 1:Sk
+        _strang_midpoint_core!(ws, b[i] * dt, n_comp; t_base=t, n_picard)
+        t += b[i] * dt
+    end
+    nothing
+end
+
+"""
 One 4th-order Yoshida step with merged boundary V-steps: 4V + 3K stages.
 
 w₀ < 0 causes reverse evolution in the middle substep.
