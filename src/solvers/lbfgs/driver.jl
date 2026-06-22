@@ -244,15 +244,21 @@ function find_ground_state_lbfgs(;
         last_step = step
     end
 
-    # Optional second-order polish: L-BFGS is first-order, so its projected
-    # gradient floors near √(machine-eps)·scale (~6e-8 on the scalar harmonic
-    # GS) even when the energy is already machine-exact. A trust-region
-    # Newton-CG pass (the gate-2 constrained Hessian via finite-difference
-    # HvP) drives the stationarity residual ~10× lower (6e-8 → 5e-9; energy
-    # unchanged to ~1e-15) — useful when ‖∇E‖ is itself the certificate
-    # (BdG / stability gates). Finite-difference ε floors the gain (ε≈1e-6
-    # optimal; smaller ε is dominated by FD noise), so this is not a route to
-    # machine-zero gradients. Opt-in: it costs ~max_outer × max_cg HvPs.
+    # Optional second-order polish. Both L-BFGS (line search) and Newton-CG
+    # (trust region) accept steps by an ENERGY comparison, so neither can
+    # resolve a step whose energy reduction (~‖∇E‖²/curvature) falls below the
+    # energy-evaluation roundoff (~eps·|E|). That puts a floor on the projected
+    # gradient at ‖∇E‖ ~ √eps·‖g‖ (≈ √eps·2|E|; measured `‖∇E‖/|E| ≈ 1.4e-7`
+    # constant as |E| is swept 256×, and INDEPENDENT of the HvP finite-
+    # difference order — a 4th-order stencil does not lower it). The Newton-CG
+    # pass still buys ~10× over L-BFGS (6.6e-8 → 5e-9 on the scalar harmonic;
+    # energy unchanged to ~1e-15) by getting closer to that √eps floor, but it
+    # is NOT a route below it — the bottleneck is the energy comparison, not
+    # the HvP, so a better (AD / analytic-Bogoliubov) HvP would not help. To
+    # break √eps·‖g‖ needs an eigenvector-residual iteration (RQI / inverse
+    # iteration) that drives (H−μ)ψ→0 directly, without energy-gated steps.
+    # Useful when ‖∇E‖ is itself the certificate (BdG / stability gates).
+    # Opt-in: it costs ~max_outer × max_cg HvPs (2 gradient evals each).
     if newton_polish
         rn = newton_cg_ground_state(
             ws, psi;
