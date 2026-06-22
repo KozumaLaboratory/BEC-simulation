@@ -152,7 +152,7 @@ function find_ground_state(;
     spinor_lhy::Union{Nothing, Symbol}=nothing,
     method::Symbol=:strang,
     m_lbfgs::Int=10,
-    sobolev_alpha::Float64=0.0,
+    sobolev_alpha::Union{Float64, Symbol}=:auto,
     verbose::Bool=_default_solver_verbose(),
 )
     # KEEP IN SYNC: `_LBFGS_FORWARD_KWARGS` below lists every kwarg this

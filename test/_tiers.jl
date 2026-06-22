@@ -345,6 +345,7 @@ const FULL_EXTRA = [
     "solvers/test_quasi_2d_api.jl",
     "hamiltonian/test_tensor_interaction.jl",
     "solvers/test_lbfgs.jl",
+    "solvers/test_lbfgs_accuracy_floor.jl",
     "workflow/test_pipeline.jl",
     "solvers/test_pause_resume.jl",
     "dynamics/test_twa.jl",
@@ -470,6 +471,7 @@ const _COST = Dict{String, Float64}(
     "solvers/test_3d.jl" => 5.0,
     "dynamics/test_twa.jl" => 5.0,
     "solvers/test_lbfgs.jl" => 5.0,
+    "solvers/test_lbfgs_accuracy_floor.jl" => 6.0,
 )
 
 _cost(f) = get(_COST, f, _DEFAULT_COST)

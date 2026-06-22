@@ -31,10 +31,23 @@ function _sobolev_precondition!(
     grad
 end
 
-"""Two-loop L-BFGS direction."""
+"""
+Two-loop L-BFGS direction, evaluated under the manifold inner product
+`⟨a,b⟩ = real(dot(a,b))·dV` — the same convention the driver uses for
+`rho_hist` (`1/(⟨s,y⟩)`), `slope`, and `grad_norm`.
+
+The `·dV` on the `alphas`/`β` dot products is load-bearing: `rho_hist`
+already carries a `1/dV`, so omitting `dV` here under-weights every
+correction term by `1/dV` (≈8× on a 128-pt/L=16 grid), mis-scaling the
+search direction. That inconsistency was masked for years by the old
+shrink-only line search capping the step at `α=0.01`; once the line
+search takes the natural `α≈1` step the mis-scaling dominates. `γ` is
+invariant under the `dV` rescaling (it cancels), so it is unchanged.
+"""
 function _lbfgs_direction(
     grad::AbstractArray{<:Complex},
     s_hist::Vector, y_hist::Vector, rho_hist::Vector{Float64},
+    dV::Float64,
 )
     sc = _lbfgs_scratch(grad)
     q = sc.q
@@ -48,7 +61,7 @@ function _lbfgs_direction(
     # array — for a 16³ × D=13 spinor that's ~640 KB per call, repeated
     # 2m+1 times per L-BFGS direction).
     for i in m:-1:1
-        alphas[i] = rho_hist[i] * real(dot(s_hist[i], q))
+        alphas[i] = rho_hist[i] * real(dot(s_hist[i], q)) * dV
         q .-= alphas[i] .* y_hist[i]
     end
 
@@ -60,7 +73,7 @@ function _lbfgs_direction(
     end
 
     for i in 1:m
-        β = rho_hist[i] * real(dot(y_hist[i], q))
+        β = rho_hist[i] * real(dot(y_hist[i], q)) * dV
         q .+= (alphas[i] - β) .* s_hist[i]
     end
 
@@ -69,20 +82,37 @@ function _lbfgs_direction(
 end
 
 """
-Line search on the constraint manifold: require E_trial < E0 (strict decrease).
-No slope condition — avoids the retraction/normalization mismatch that makes
-Armijo unreliable on the sphere.
+Backtracking-Armijo line search on the constraint manifold, starting from
+the natural L-BFGS step `α_init = 1`.
+
+The L-BFGS direction is already curvature-scaled (the two-loop recursion
+multiplies by `γ = ⟨s,y⟩/⟨y,y⟩`), so it is an approximate Newton step whose
+natural length is `α ≈ 1` — the historical `α_init = 0.01` shrink-only search
+could never take more than 1 % of that step, capping LBFGS far above its
+gradient floor (scalar harmonic GS plateaued at `|∇E|≈4e-3`, `errE≈2e-6`, vs
+ITP's `2e-12`). Starting at `α = 1` and backtracking restores the Newton step.
+
+Acceptance is the Armijo sufficient-decrease test `E(α) ≤ E0 + c1·α·slope`
+(`slope = ⟨∇E, d⟩·dV ≤ 0` is the manifold directional derivative, passed from
+the driver). When `slope` is not supplied (`0`) it degrades to the strict-
+decrease test `E(α) < E0`, preserving the old manifold-safe behaviour.
+
+`expand=true` (used for the steepest-descent step, whose scale is unknown)
+permits a bounded doubling phase when `α = 1` already decreases, so the first
+unscaled step auto-finds its scale instead of being stuck at the Newton length.
 """
 function _line_search_energy_decrease(
     psi, direction, E0, ws, grid, dV, target_Mz, F;
-    α_init::Float64=0.01, shrink::Float64=0.5, max_iter::Int=30,
+    slope::Float64=0.0,
+    α_init::Float64=1.0, shrink::Float64=0.5, grow::Float64=2.0,
+    c1::Float64=1.0e-4, max_iter::Int=30, max_expand::Int=6,
+    expand::Bool=false,
 )
     D = 2F + 1
     N_dim = length(grid.config.n_points)
     psi_trial = _lbfgs_scratch(psi).psi_trial
 
-    α = α_init
-    for _ in 1:max_iter
+    eval_energy = function (α)
         psi_trial .= psi .+ α .* direction
         # Retraction: normalize back to manifold
         norm_sq = sum(abs2, psi_trial) * dV
@@ -90,15 +120,41 @@ function _line_search_energy_decrease(
         if target_Mz !== nothing
             _normalize_psi_constrained!(psi_trial, grid, D, N_dim, target_Mz, F)
         end
-
         copyto!(ws.state.psi, psi_trial)
-        E_trial = total_energy(ws)
+        total_energy(ws)
+    end
 
-        if E_trial < E0
+    # Armijo sufficient decrease (slope ≤ 0). slope == 0 ⇒ strict decrease.
+    accept(α, E) = slope < 0 ? (E ≤ E0 + c1 * α * slope) : (E < E0)
+
+    α = α_init
+    E_trial = eval_energy(α)
+
+    if accept(α, E_trial)
+        # Optional bounded expansion: only when the curvature step is not yet
+        # the local minimiser along the ray (steepest-descent scale finding).
+        if expand
+            best_α, best_E = α, E_trial
+            for _ in 1:max_expand
+                α2 = best_α * grow
+                E2 = eval_energy(α2)
+                (E2 < best_E && accept(α2, E2)) || break
+                best_α, best_E = α2, E2
+            end
+            best_α == α || eval_energy(best_α)  # leave ws.state.psi at best
+            return best_α, best_E
+        end
+        return α, E_trial
+    end
+
+    # Backtracking from α_init.
+    for _ in 1:max_iter
+        α *= shrink
+        E_trial = eval_energy(α)
+        if accept(α, E_trial)
             return α, E_trial
         end
-        α *= shrink
     end
-    # No decrease found — return zero step
+    # No sufficient decrease found — return zero step.
     (0.0, E0)
 end

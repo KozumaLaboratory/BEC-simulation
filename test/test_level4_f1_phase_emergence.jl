@@ -307,11 +307,23 @@ using SpinorBEC: classify_phase, spin_matrices, bogoliubov_spectrum, BdGResult
             r.energy
         end
 
-        # c₁ < 0 (FM-favored): energy monotonically decreases with |Mz|.
+        # c₁ < 0 (FM-favored): energy is NON-increasing in |Mz|, with a
+        # plateau. Tilting out of the untilted |⟨F⟩|=0 saddle at Mz=0 into
+        # a finite-Mz FM state lowers E; but the FM energy depends on
+        # |⟨F⟩|, not Mz — in a single spatial mode a tilted FM reaches the
+        # fully-polarised |⟨F⟩|=1 for ANY |Mz|≤1, so E(Mz=0.5) ≈ E(Mz=1.0)
+        # rather than strictly greater. (Pre-2026-06-22 the assertion was
+        # strict `E[1]>E[2]>E[3]`; it only held because L-BFGS had not
+        # converged — gnorm ~1e-2 — and the residual faked an ordering.
+        # Once the line-search/dV fixes let L-BFGS reach its gradient floor
+        # the Mz=0.5 and Mz=1.0 energies coincide to ~10 digits.)
+        atol = 1e-5
         E_neg = [_energy_at_Mz(-0.5, Mz) for Mz in Mz_targets]
-        @test E_neg[1] > E_neg[2] > E_neg[3]
+        @test E_neg[1] > E_neg[2] + atol     # saddle → FM tilt lowers E
+        @test E_neg[3] ≤ E_neg[2] + atol     # FM plateau: |Mz|→1 not higher
 
-        # c₁ > 0 (polar-favored): energy monotonically increases with |Mz|.
+        # c₁ > 0 (polar-favored): energy monotonically increases with |Mz|
+        # (the polar Mz=0 state is the GS; forcing magnetization costs E).
         E_pos = [_energy_at_Mz(+0.5, Mz) for Mz in Mz_targets]
         @test E_pos[1] < E_pos[2] < E_pos[3]
     end

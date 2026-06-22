@@ -1,0 +1,65 @@
+using Test
+using SpinorBEC
+
+# Regression gate for the L-BFGS ground-state accuracy floor.
+#
+# Before 2026-06-22 the L-BFGS solver could not reach its gradient floor:
+# the shrink-only line search capped every step at α=0.01 (1% of the
+# curvature-scaled, ≈Newton, two-loop direction), AND the two-loop
+# recursion omitted the `·dV` factor that `rho_hist` carries — mis-scaling
+# the direction by 1/dV. Together they stalled L-BFGS far above its floor:
+# on the trivially-conditioned scalar harmonic GS it plateaued at
+# E-error ≈ 1.9e-6 / |∇E| ≈ 4e-3 (vs the exact 0.5), while ITP reached
+# 1e-12. These tests pin the post-fix behaviour — machine-precision energy
+# and a true gradient floor — so the line-search / inner-product scaling
+# cannot silently regress.
+
+@testset "L-BFGS accuracy floor" begin
+    @testset "scalar harmonic GS reaches machine-precision energy" begin
+        # 1D ω=1 harmonic, no interactions: exact GS is the Gaussian with
+        # E_0 = 0.5. The minimiser is smooth and well-conditioned, so any
+        # competent optimiser should drive E to ~machine precision.
+        grid = make_grid(GridConfig(128, 16.0))
+        interactions = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
+        trap = HarmonicTrap(1.0)
+
+        r = find_ground_state_lbfgs(;
+            grid, atom=Rb87, interactions, potential=trap,
+            n_steps=500, tol=1e-10,
+            initial_state=:polar, verbose=false,
+        )
+
+        # Pre-fix: errE ≈ 1.9e-6. Post-fix: < 1e-15. 1e-9 cleanly separates.
+        @test abs(r.energy - 0.5) < 1e-9
+        # Pre-fix: |∇E| ≈ 4e-3. Post-fix: < 1e-7 (F64 grid floor).
+        @test r.grad_norm < 1e-6
+    end
+
+    @testset "L-BFGS reaches its floor within a small step budget" begin
+        # A spinor F=1 problem with interactions + trap. L-BFGS should hit
+        # its gradient floor quickly (≈100 steps) rather than crawling for
+        # thousands. Pin: |∇E| floor reached by 200 steps, and the energy
+        # is no worse than a deeply-converged ITP run (L-BFGS optimises the
+        # exact functional, so it matches or beats split-step ITP).
+        grid = make_grid(GridConfig(64, 16.0))
+        interactions = InteractionParams(Dict(0 => 10.0, 1 => -0.5))
+        trap = HarmonicTrap(1.0)
+
+        r_itp = find_ground_state(;
+            grid, atom=Rb87, interactions, potential=trap,
+            dt=0.002, n_steps=20000, tol=1e-12,
+            initial_state=:m_plus_F, verbose=false,
+        )
+
+        r = find_ground_state_lbfgs(;
+            grid, atom=Rb87, interactions, potential=trap,
+            n_steps=200, tol=1e-10,
+            initial_state=:m_plus_F, verbose=false,
+        )
+
+        @test r.grad_norm < 1e-6
+        # L-BFGS energy is at or below ITP's (allow tiny slack for ITP's
+        # own residual). Pre-fix L-BFGS sat ABOVE ITP by ~1e-5.
+        @test r.energy ≤ r_itp.energy + 1e-7
+    end
+end

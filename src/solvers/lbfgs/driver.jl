@@ -31,7 +31,7 @@ function find_ground_state_lbfgs(;
     verbose::Bool=_default_solver_verbose(),
     light_shift::Union{Nothing, LightShift}=nothing,
     dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
-    sobolev_alpha::Float64=0.0,
+    sobolev_alpha::Union{Float64, Symbol}=:auto,
     rotating_frame_omega::Float64=0.0,
 )
     # F32 gradient norm floors around unit roundoff (~1e-7 scaled by grid dV).
@@ -89,6 +89,17 @@ function find_ground_state_lbfgs(;
     F = atom.F
     D = 2F + 1
     dV = cell_volume(grid)
+
+    # Grid-adaptive Sobolev preconditioner default. `α = 1/k_max²` damps the
+    # highest-k (Nyquist) gradient mode by half — a mass-matrix preconditioner
+    # that improves the L-BFGS gradient floor on ill-conditioned (DDI / soft-
+    # manifold) problems for free (Eu F=6 24³+DDI: |∇E| floor 6.1e-6 → 3.4e-6,
+    # same energy, slightly faster) and is ≈identity on smooth, well-conditioned
+    # GS (no high-k gradient content to damp). Pass an explicit Float64 (incl.
+    # `0.0` to disable) to override.
+    sobolev_alpha =
+        sobolev_alpha === :auto ?
+        1.0 / Float64(maximum(grid.k_squared)) : Float64(sobolev_alpha)
 
     # Gradient coverage: energy_gradient! is registry-only, so it now covers
     # EVERY HamTerm including TensorTerm (c2 singlet-pair + tensor_cache
@@ -151,10 +162,11 @@ function find_ground_state_lbfgs(;
         end
 
         # L-BFGS direction (steepest descent for first step)
-        direction = if isempty(rho_hist)
+        is_sd = isempty(rho_hist)
+        direction = if is_sd
             -grad
         else
-            _lbfgs_direction(grad, s_hist, y_hist, rho_hist)
+            _lbfgs_direction(grad, s_hist, y_hist, rho_hist, dV)
         end
 
         # Ensure descent direction (`real(dot(a, b))` skips two
@@ -163,11 +175,14 @@ function find_ground_state_lbfgs(;
         if slope >= 0
             direction .= .-grad  # fall back to steepest descent
             slope = -sum(abs2, grad) * dV
+            is_sd = true
         end
 
-        # Line search: pure energy decrease (no slope condition — safe on manifold)
+        # Backtracking-Armijo line search from the natural L-BFGS step α=1.
+        # `expand` lets the unscaled steepest-descent step auto-find its scale.
         α, E_trial = _line_search_energy_decrease(
-            psi, direction, E, ws, grid, dV, target_magnetization, F
+            psi, direction, E, ws, grid, dV, target_magnetization, F;
+            slope=slope, expand=is_sd,
         )
 
         # Line search failed — reset L-BFGS and try steepest descent next
