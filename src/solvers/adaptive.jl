@@ -37,12 +37,10 @@ For unitary evolution (‖ψ_new‖ = ‖ψ_old‖, exact for split-step):
 Cost: identical to density estimator (one O(N) pass).
 """
 function _wavefunction_l2_change(psi_new, psi_old)
-    diff_sq = 0.0
-    old_sq = 0.0
-    @inbounds for i in eachindex(psi_new, psi_old)
-        diff_sq += abs2(psi_new[i] - psi_old[i])
-        old_sq += abs2(psi_old[i])
-    end
+    # mapreduce (not a scalar `for i` loop) so this is allocation-free on CPU
+    # AND runs on the GPU — `run_simulation_yoshida!` drives this every step.
+    diff_sq = mapreduce((a, b) -> abs2(a - b), +, psi_new, psi_old)
+    old_sq = sum(abs2, psi_old)
     diff_sq / max(old_sq, 1e-300)
 end
 
