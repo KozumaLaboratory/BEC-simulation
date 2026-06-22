@@ -97,9 +97,9 @@ function constrained_hessian_action(ws, ψ, δ; μ, dV, n2, ε::Float64=1e-5, or
 end
 
 """
-    trapped_bdg_lowest_eigenvalue(ws, ψ; niter=24, ε=1e-5, tol_ritz=1e-2,
-                                  params=nothing, rng=…)
-        → (; λ_min, μ, ritz_residual, niter_used, converged)
+    trapped_bdg_lowest_eigenvalue(ws, ψ; niter=300, atol=1e-6, ε=1e-5,
+                                  tol_ritz=1e-2, params=nothing, rng=…)
+        → (; λ_min, μ, ritz_residual, niter_used, converged, λ_lower, gap, width, goldstone)
 
 Lowest eigenvalue of the constrained second variation `P(H−2μ)P` at a
 STATIONARY ψ — the gate-2 minimum-vs-saddle verdict for a trapped state.
@@ -109,29 +109,38 @@ saddle. Requires ψ converged (`g ∥ ψ`); on a non-stationary ψ the `μ` and
 the verdict are not meaningful — `StabilitySpec` enforces that precondition
 before reading the sign.
 
-Self-certifying: `ritz_residual = |β_m · sₘ[end]|` is the classical
-a-posteriori Lanczos bound on the lowest Ritz value — `β_m` the residual
-norm of the last Lanczos vector, `sₘ` the tridiagonal eigenvector of the
-lowest Ritz value. A `λ_min` whose `ritz_residual` is not ≪ |λ_min| is NOT
-converged; the historical "λ_min still dropping at niter=200" false verdict
-is exactly a large `ritz_residual` the bare value hides. `converged` flags
-`ritz_residual < tol_ritz·(|λ_min| + 1e-10)`.
+**Two-sided certificate (Kato–Temple).** The min Ritz value `λ_min = θ₁` is an
+UPPER bound on the true eigenvalue (Ritz values converge from above); the
+LOWER bound is `λ_lower = θ₁ − ρ²/δ` (`ρ` = ritz_residual, `δ` = Ritz gap to θ₂).
+`ρ` enters SQUARED, so the certified interval `width = θ₁ − λ_lower` is far
+tighter than the naive `±ρ`. **The convergence test is on `width`, not the
+bare residual:** `converged = width < max(atol, tol_ritz·|λ_min|)`. This is the
+fix for soft / Goldstone modes — a purely RELATIVE test `ρ < tol_ritz·|λ_min|`
+is unsatisfiable as `λ_min → 0` (false negatives exactly where you care), while
+the absolute `atol` floor certifies `λ_min` once it is pinned to `±atol`.
 
-`λ_min` and `μ` are the first two NamedTuple fields, so legacy
-`λ, _ = trapped_bdg_lowest_eigenvalue(...)` and `…[1]` still yield λ_min.
-Pass `params` (a `constrained_hessian_params` result) to reuse an already-
-computed `(μ, dV, n2)` and skip the redundant `energy_gradient!`. `niter < 1`
-returns `converged=false` (λ_min=NaN) rather than erroring on an empty
-Krylov space — the gate abstains, it does not crash.
+**Adaptive:** the Lanczos loop early-stops as soon as `converged`, so easy
+(gapped) cells finish in tens of iterations while soft cells run to the `niter`
+cap. The historical "λ_min still dropping at niter=200" verdict is exactly a
+`converged=false` the bare value used to hide — trust the flag, not the value.
+
+**Goldstone:** `goldstone=true` flags a converged `|λ_min| < atol` — a marginal
+zero mode (e.g. the polar-phase spin Goldstone), classified as a minimum (NOT a
+saddle). The complex-ψ tangent projection removes only the U(1) gauge `iψ`;
+physical broken-symmetry Goldstones remain at `λ_min ≈ 0` and are correct.
+
+`λ_min` and `μ` are the first two NamedTuple fields (legacy `[1]`/`[2]` and
+`λ, _ = …` still yield λ_min, μ). Pass `params` to reuse `(μ, dV, n2)`.
+`niter < 1` returns `converged=false` (λ_min=NaN) — the gate abstains, no crash.
 """
 function trapped_bdg_lowest_eigenvalue(
-    ws, ψ; niter::Int=24, ε::Float64=1e-5, tol_ritz::Float64=1e-2,
-    params=nothing, rng=Random.default_rng(),
+    ws, ψ; niter::Int=300, atol::Float64=1e-6, ε::Float64=1e-5,
+    tol_ritz::Float64=1e-2, params=nothing, rng=Random.default_rng(),
 )
     p = params === nothing ? constrained_hessian_params(ws, ψ) : params
     if niter < 1
-        return (;
-            λ_min=NaN, μ=p.μ, ritz_residual=Inf, niter_used=0, converged=false)
+        return (; λ_min=NaN, μ=p.μ, ritz_residual=Inf, niter_used=0,
+            converged=false, λ_lower=NaN, gap=NaN, width=Inf, goldstone=false)
     end
     ipR(a, b) = real(sum(conj.(a) .* b)) * p.dV
     Hc(δ) = constrained_hessian_action(ws, ψ, δ; p.μ, p.dV, p.n2, ε)
@@ -141,39 +150,50 @@ function trapped_bdg_lowest_eigenvalue(
     V[1] ./= sqrt(ipR(V[1], V[1]))
     α = Float64[]
     β = Float64[]
+    λ_min = NaN
+    ritz_residual = Inf
+    gap = NaN
+    λ_lower = NaN
+    width = Inf
+    converged = false
+
     for _ in 1:niter
         w = Hc(V[end])
         push!(α, ipR(V[end], w))
         for u in V                              # full reorthogonalisation
             w = w .- u .* ipR(u, w)
         end
-        βj = sqrt(ipR(w, w))
-        βj < 1e-10 && break
+        βj = sqrt(max(ipR(w, w), 0.0))
+
+        # Ritz value + Kato–Temple width of the CURRENT Krylov space, with the
+        # candidate residual βj as the a-posteriori bound. Check convergence
+        # in-loop so easy cells stop early (β has length(α)-1 here).
+        if length(α) >= 2
+            decomp = eigen(SymTridiagonal(copy(α), copy(β)))
+            λ_min = decomp.values[1]
+            s_min = @view decomp.vectors[:, 1]
+            ritz_residual = abs(βj * s_min[end])
+            θ2 = decomp.values[2]
+            gap = θ2 - λ_min
+            width = gap > ritz_residual ? ritz_residual^2 / gap : ritz_residual
+            λ_lower = λ_min - width
+            if width < max(atol, tol_ritz * abs(λ_min))
+                converged = true
+                break
+            end
+        elseif length(α) == 1
+            λ_min = α[1]
+            λ_lower = λ_min
+        end
+
+        βj < 1e-10 && break                     # invariant subspace ⇒ exact
         push!(β, βj)
         push!(V, w ./ βj)
     end
-    decomp = eigen(SymTridiagonal(α, β[1:(length(α) - 1)]))
-    λ_min = decomp.values[1]
-    s_min = @view decomp.vectors[:, 1]
-    # β_m (residual norm of the last Lanczos vector) is present iff the loop
-    # ran to `niter`; on early break the residual is ≈0 (exact eigenvector).
-    β_m = length(β) >= length(α) ? β[end] : 0.0
-    ritz_residual = abs(β_m * s_min[end])
-    converged = ritz_residual < tol_ritz * (abs(λ_min) + 1e-10)
 
-    # Two-sided certificate (Kato–Temple). The Ritz value `λ_min = θ₁` is an
-    # UPPER bound on the true λ_min (Ritz values converge from above). The
-    # LOWER bound is `θ₁ − ρ²/δ` with ρ = ritz_residual and δ the gap to the
-    # next eigenvalue (estimated by the Ritz gap θ₂ − θ₁). Because ρ enters
-    # SQUARED, the certified interval is far tighter than the naive `±ρ`:
-    # ρ=5e-3, δ=0.1 ⇒ ±2.5e-4, not ±5e-3. Valid when δ > ρ (θ₂ a real
-    # separation); otherwise fall back to the loose `±ρ`. At a soft point δ
-    # shrinks and the bound loosens — that is where a preconditioned solver
-    # must drive ρ down directly (see the LOBPCG path).
-    θ2 = length(decomp.values) >= 2 ? decomp.values[2] : λ_min
-    gap = θ2 - λ_min
-    λ_lower = gap > ritz_residual ? λ_min - ritz_residual^2 / gap : λ_min - ritz_residual
-    (; λ_min, μ=p.μ, ritz_residual, niter_used=length(α), converged, λ_lower, gap)
+    goldstone = converged && abs(λ_min) < atol
+    (; λ_min, μ=p.μ, ritz_residual, niter_used=length(α), converged,
+        λ_lower, gap, width, goldstone)
 end
 
 # In-place kinetic Fourier preconditioner M⁻¹ = (½k² + α)⁻¹ per spin component.

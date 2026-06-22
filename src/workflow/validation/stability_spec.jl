@@ -29,14 +29,18 @@
 export StabilitySpec
 
 """
-    StabilitySpec(; ε_stat=1e-4, tol_ritz=1e-2, λ_tol=1e-6, couple=10.0, niter=60)
+    StabilitySpec(; ε_stat=1e-4, tol_ritz=1e-2, λ_tol=1e-6, couple=10.0, niter=300)
 
 Bounds for the three-valued stability gate. `ε_stat` = relative
 stationarity residual bound; `tol_ritz` = Lanczos Ritz residual relative
 to |λ_min| for the energetic sign to count as converged; `λ_tol` = |λ_min|
 below which the curvature is treated as marginal (not a saddle); `couple`
 = require |λ_min| > couple·‖g−2μψ‖ for the sign to be resolvable above the
-stationarity error; `niter` = Lanczos iterations; `tol_dyn` = growth-rate
+stationarity error; `niter` = Lanczos iteration CAP (adaptive early-stop ⇒
+gapped cells finish in tens of iters; soft cells near a phase boundary, where
+λ_min→0, need the larger cap — production strong-coupling Eu needed ~400, so
+the default is 300 with the `converged` flag honestly reporting when even that
+is short); `tol_dyn` = growth-rate
 threshold RELATIVE to the spectral radius; `tol_quartet` = BdG symmetry
 self-check bound; `bdg_dim_cap` = max dense BdG dimension before the
 dynamical axis abstains.
