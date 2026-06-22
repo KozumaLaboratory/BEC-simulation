@@ -37,10 +37,14 @@ function _make_ws_with_active_spin(dt::Float64; imaginary_time::Bool=false)
 end
 
 @testset "split_step_combined!" begin
-    @testset "Order-2 convergence vs split_step!" begin
-        # The two splittings (sequential SM-DDI-SM vs single Combined)
-        # differ at O(dt²). Halving dt should drop the per-step diff
-        # by ~4×.
+    @testset "Convergence vs split_step! (shared midpoint ⇒ O(dt³) agreement)" begin
+        # Both `split_step!` and `split_step_combined!` now freeze the DDI/c₁
+        # mean field at the implicit-midpoint (Picard predictor-corrector) when
+        # DDI is active, so their leading O(dt²) Strang error terms MATCH and
+        # the two splittings (sequential SM-DDI-SM vs fused Combined) differ
+        # only at O(dt³): halving dt drops the per-step diff by ~8×. (Before
+        # the combined path was midpoint-symmetrised it leaked Mz and the two
+        # differed at O(dt²) → ~4×.)
         diffs = Float64[]
         for dt in (0.005, 0.0025, 0.00125)
             ws = _make_ws_with_active_spin(dt)
@@ -60,11 +64,11 @@ end
 
             push!(diffs, sqrt(sum(abs2, psi_seq .- psi_comb)) / n0)
         end
-        # diff should scale as dt² → ratio ~4× per halving.
+        # diff now scales as dt³ → ratio ~8× per halving (shared midpoint MF).
         ratio_1 = diffs[1] / diffs[2]
         ratio_2 = diffs[2] / diffs[3]
-        @test 3.5 < ratio_1 < 4.5
-        @test 3.5 < ratio_2 < 4.5
+        @test 5.5 < ratio_1 < 11.0
+        @test 5.5 < ratio_2 < 11.0
     end
 
     @testset "Norm conservation over 200 steps" begin
