@@ -33,6 +33,10 @@ function find_ground_state_lbfgs(;
     dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
     sobolev_alpha::Union{Float64, Symbol}=:auto,
     rotating_frame_omega::Float64=0.0,
+    newton_polish::Bool=false,
+    newton_max_outer::Int=20,
+    newton_max_cg::Int=40,
+    newton_eps::Float64=1.0e-6,
 )
     # F32 gradient norm floors around unit roundoff (~1e-7 scaled by grid dV).
     # Relax the default convergence test so F32 runs don't burn all n_steps.
@@ -238,6 +242,24 @@ function find_ground_state_lbfgs(;
 
         E_prev = E_trial
         last_step = step
+    end
+
+    # Optional second-order polish: L-BFGS is first-order, so its projected
+    # gradient floors near √(machine-eps)·scale (~6e-8 on the scalar harmonic
+    # GS) even when the energy is already machine-exact. A trust-region
+    # Newton-CG pass (the gate-2 constrained Hessian via finite-difference
+    # HvP) drives the stationarity residual ~10× lower (6e-8 → 5e-9; energy
+    # unchanged to ~1e-15) — useful when ‖∇E‖ is itself the certificate
+    # (BdG / stability gates). Finite-difference ε floors the gain (ε≈1e-6
+    # optimal; smaller ε is dominated by FD noise), so this is not a route to
+    # machine-zero gradients. Opt-in: it costs ~max_outer × max_cg HvPs.
+    if newton_polish
+        rn = newton_cg_ground_state(
+            ws, psi;
+            tol=min(tol, 1.0e-12), max_outer=newton_max_outer, max_cg=newton_max_cg,
+            sobolev_alpha=sobolev_alpha, ε=newton_eps, verbose,
+        )
+        copyto!(psi, rn.psi)
     end
 
     # Atomic finalization (spine G, 2026-06-05). Guarantees the returned

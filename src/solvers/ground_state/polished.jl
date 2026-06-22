@@ -38,6 +38,9 @@ Kwargs:
   * `enable_ddi`, `secular_ddi` — DDI controls; `c_dd` is taken from `preset`
   * `n_itp`, `dt_itp`, `tol_itp` — ITP knobs
   * `n_lbfgs`, `tol_lbfgs`, `sobolev_alpha` — LBFGS polish knobs
+  * `newton_polish` — append a trust-region Newton-CG pass after LBFGS
+                      (second-order; tightens the gradient residual ~10×
+                      for the stability/BdG gates, energy already converged)
   * `backend` — `CPUBackend()` or `CUDABackend()`
 """
 function find_ground_state_polished(
@@ -56,6 +59,7 @@ function find_ground_state_polished(
     n_lbfgs::Int=1000,
     tol_lbfgs::Float64=1e-5,
     sobolev_alpha::Float64=0.02,
+    newton_polish::Bool=false,
     backend::AbstractBackend=CPUBackend(),
 )
     if psi_init === nothing
@@ -85,6 +89,7 @@ function find_ground_state_polished(
             ws_init=ws_itp,
             n_steps=n_lbfgs, tol=tol_lbfgs,
             verbose=false, sobolev_alpha=sobolev_alpha,
+            newton_polish=newton_polish,
         )
         t_lbfgs = time() - t0
         ws = r_lbfgs.workspace

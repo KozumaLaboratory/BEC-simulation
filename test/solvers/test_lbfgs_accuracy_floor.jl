@@ -62,4 +62,27 @@ using SpinorBEC
         # own residual). Pre-fix L-BFGS sat ABOVE ITP by ~1e-5.
         @test r.energy ≤ r_itp.energy + 1e-7
     end
+
+    @testset "Newton-CG polish tightens the gradient floor" begin
+        # L-BFGS is first-order, so its projected gradient floors near
+        # √(machine-eps)·scale even at a machine-exact energy. The opt-in
+        # `newton_polish` second-order pass drives the stationarity residual
+        # below that floor (≈10× on the scalar harmonic) without moving the
+        # (already converged) energy.
+        grid = make_grid(GridConfig(128, 16.0))
+        interactions = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
+        trap = HarmonicTrap(1.0)
+
+        base = (;
+            grid, atom=Rb87, interactions, potential=trap,
+            n_steps=500, tol=1e-12, initial_state=:polar, verbose=false,
+        )
+        r_lbfgs = find_ground_state_lbfgs(; base...)
+        r_poly = find_ground_state_lbfgs(; base..., newton_polish=true)
+
+        # Polish lowers the gradient residual by a clear margin.
+        @test r_poly.grad_norm < 0.5 * r_lbfgs.grad_norm
+        # Energy stays at machine precision (polish must not regress it).
+        @test abs(r_poly.energy - 0.5) < 1e-12
+    end
 end
