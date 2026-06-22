@@ -134,3 +134,34 @@ function run_simulation_yoshida!(
         final_dt=dt,
     )
 end
+
+"""
+    split_step_yoshida4_midpoint!(ws; dt=ws.sim_params.dt)
+
+One 4th-order Yoshida step with the `(ws; dt)` signature `adaptive_step!`
+expects, advancing `ws.state.t` by `dt`. On the DDI lab path it composes the
+time-symmetric implicit-midpoint core as an un-merged triple-jump (n_picard=3,
+the count that makes the base time-symmetric enough for the 4th-order Richardson
+cancellation — see `_composition_midpoint_core!`); otherwise the cheaper plain
+`_yoshida_core!` (already 4th order without DDI). RTP.
+
+This is the 4th-order base for `adaptive_run!`: with it the Hairer-Wanner defect
+estimator and the p=4 controller are consistent, giving a genuinely 4th-order
+adaptive integrator on the DDI path (the previous default `split_step_midpoint!`
+is only 2nd order, so `adaptive_run!` was 2nd order despite the p=4 controller).
+"""
+function split_step_yoshida4_midpoint!(ws::Workspace{N}; dt::Float64=ws.sim_params.dt) where {N}
+    n_comp = ws.spin_matrices.system.n_components
+    t_base = ws.state.t
+    if MEANFIELD_MIDPOINT_ENABLED[] && ws.ddi !== nothing
+        _composition_midpoint_core!(ws, dt, n_comp, _COMP_YOSHIDA.b; t_base, n_picard=3)
+    else
+        _yoshida_core!(ws, dt, n_comp; t_base)
+    end
+    ws.sim_params.imaginary_time || apply_rt_dissipation!(ws, dt, n_comp, N)
+    ws.state.t = t_base + dt
+    ws.state.step += 1
+    nothing
+end
+
+export split_step_yoshida4_midpoint!

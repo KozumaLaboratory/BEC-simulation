@@ -41,8 +41,10 @@ Take one adaptive timestep on `ws` using the Hairer-Wanner defect
 estimator and the Söderlind PI3.4 controller.
 
 Defect: `defect = ‖S(dt) ψ - S(dt/2)² ψ‖` where S is the `step!` function
-(default `split_step_midpoint!`). This estimates the local truncation
-error of the full step at order p (default 4 for Y4-mid).
+(default `split_step_yoshida4_midpoint!`, a genuine 4th-order step on the DDI
+path). This estimates the local truncation error of the full step at order p
+(default 4, consistent with the 4th-order default step). Pass
+`step!=split_step_midpoint!` with `p=2` for the cheaper 2nd-order adaptive.
 
 Tolerance: accept when `defect ≤ tol_abs + tol_rel · ‖ψ_half‖`.
 
@@ -68,7 +70,7 @@ function adaptive_step!(ws::Workspace{N}, state::AdaptiveDtState;
     max_factor::Float64=5.0,
     min_factor::Float64=0.05,
     max_rejects::Int=12,
-    step!::F=(split_step_midpoint!),
+    step!::F=(split_step_yoshida4_midpoint!),
 ) where {N, F}
     α = pi_alpha
     β = pi_beta

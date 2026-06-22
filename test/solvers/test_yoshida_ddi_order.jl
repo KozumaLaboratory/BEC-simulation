@@ -47,11 +47,17 @@ using Test
         for _ in 1:Int(round(T / dt))
             if base === :mid
                 SB._composition_midpoint_core!(ws, dt, 13, b; t_base=ws.state.t, n_picard=3)
+                ws.state.t += dt
+                ws.state.step += 1
+            elseif base === :y4step
+                # the public 4th-order step (adaptive_run!'s default base);
+                # advances ws.state.t internally
+                split_step_yoshida4_midpoint!(ws; dt=dt)
             else
                 SB._aba_step!(ws, dt, 13, a, b; t_base=ws.state.t)
+                ws.state.t += dt
+                ws.state.step += 1
             end
-            ws.state.t += dt
-            ws.state.step += 1
         end
         Array(ws.state.psi)
     end
@@ -74,6 +80,10 @@ using Test
     end
     @testset "c_dd=0 control → 4th order" begin
         r1, _ = ratios(; c_dd=0.0, base=:mid)
+        @test r1 > 3.5
+    end
+    @testset "public split_step_yoshida4_midpoint! → 4th order (adaptive base)" begin
+        r1, _ = ratios(; c_dd=100.0, base=:y4step)
         @test r1 > 3.5
     end
 end
