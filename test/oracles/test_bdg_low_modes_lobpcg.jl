@@ -43,3 +43,39 @@ using Random
     # LOBPCG per-mode lower bound also ≤ its Ritz value.
     @test lobpcg.λ_lower[1] ≤ lobpcg.λ[1] + 1e-12
 end
+
+# Regression for the convergence-flag fix. The OLD flag was purely RELATIVE
+# (`ρ < tol_ritz·(|λ_min|+1e-10)`), so it false-negatived as λ_min→0 — exactly
+# the soft / Goldstone modes the gate-2 verdict cares about. The flag is now
+# width-based (`width < max(atol, tol_ritz·|λ_min|)`) with adaptive early-stop.
+# A polar (c₁>0, q=0) GS breaks spin-rotation symmetry ⇒ a spin-Goldstone zero
+# mode at λ_min≈0 — the case that used to misreport converged=false.
+@testset "gate-2 convergence flag: width-based + adaptive + Goldstone" begin
+    grid = make_grid(GridConfig(16, 10.0))
+    interactions = InteractionParams(Dict(0 => 4.0, 1 => 0.3))
+    r = find_ground_state_lbfgs(;
+        grid, atom=Rb87, interactions, potential=HarmonicTrap(1.0),
+        n_steps=500, tol=1e-10, initial_state=:polar, verbose=false,
+    )
+    ws = r.workspace
+    ψ = copy(ws.state.psi)
+
+    res = trapped_bdg_lowest_eigenvalue(ws, ψ; niter=300, atol=1e-6, rng=MersenneTwister(1))
+
+    # Adaptive early-stop: a tiny 16-pt problem converges well before the cap.
+    @test res.converged
+    @test res.niter_used < 300
+    # Kato–Temple bracket internal consistency.
+    @test res.width ≥ 0
+    @test res.λ_lower ≤ res.λ_min + 1e-12
+    @test isapprox(res.λ_lower, res.λ_min - res.width; atol=1e-12)
+    # converged ⇒ width under the absolute/relative threshold.
+    @test res.width < max(1e-6, 1e-2 * abs(res.λ_min)) + 1e-12
+    # goldstone flag is exactly "converged & |λ_min| < atol".
+    @test res.goldstone == (res.converged && abs(res.λ_min) < 1e-6)
+    # Polar GS spin Goldstone ⇒ λ_min≈0, tightly bracketed, flagged (the case
+    # the pre-fix relative-only flag would have called converged=false).
+    @test abs(res.λ_min) < 1e-5
+    @test res.width < 1e-6
+    @test res.goldstone
+end
