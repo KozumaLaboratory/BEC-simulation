@@ -63,6 +63,40 @@ using SpinorBEC
         @test r.energy ≤ r_itp.energy + 1e-7
     end
 
+    @testset "residual-Newton breaks the energy-comparison floor" begin
+        # The L-BFGS line search and the energy-gated Newton-CG trust region
+        # both floor the projected gradient at √eps·‖g‖ (~6e-8 here): a step
+        # whose energy reduction (~‖∇E‖²/κ) drops below the energy roundoff
+        # (~eps·|E|) can't be resolved. `residual_newton_refine` accepts steps
+        # by the RESIDUAL norm instead (evaluable to ~eps·κ_max), so it breaks
+        # that floor — down to the finite-difference HvP floor: eps^(2/3)≈2e-11
+        # at order=2, eps^(4/5)≈1.6e-13 at order=4. (Gapped/in-basin only;
+        # the scalar harmonic is the clean well-conditioned anchor.)
+        grid = make_grid(GridConfig(128, 16.0))
+        interactions = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
+        trap = HarmonicTrap(1.0)
+
+        r0 = find_ground_state_lbfgs(;
+            grid, atom=Rb87, interactions, potential=trap,
+            n_steps=500, tol=1e-12, initial_state=:polar, verbose=false,
+        )
+        ws = r0.workspace
+        psi0 = copy(ws.state.psi)
+
+        r2 = residual_newton_refine(ws, psi0; tol=1e-14, max_outer=40, max_cg=120,
+            sobolev_alpha=0.04, ε=1e-5, hvp_order=2)
+        r4 = residual_newton_refine(ws, psi0; tol=1e-15, max_outer=40, max_cg=120,
+            sobolev_alpha=0.04, ε=6e-4, hvp_order=4)
+
+        # order=2 → finite-difference HvP floor eps^(2/3)≈2e-11 (≫ below LBFGS).
+        @test r2.grad_norm < 1e-10
+        @test r2.grad_norm < 0.05 * r0.grad_norm
+        # order=4 → eps^(4/5)≈1.6e-13.
+        @test r4.grad_norm < 1e-11
+        # Energy never regresses (already machine-exact).
+        @test abs(r4.energy - 0.5) < 1e-12
+    end
+
     @testset "Newton-CG polish tightens the gradient floor" begin
         # L-BFGS is first-order, so its projected gradient floors near
         # √(machine-eps)·scale even at a machine-exact energy. The opt-in

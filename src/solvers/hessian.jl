@@ -37,14 +37,18 @@ extraction in the anchor test). Central difference ⇒ O(ε²) truncation;
 ε=1e-5 sits at the roundoff/truncation optimum for the gated gradient.
 Anchored: `test/oracles/test_bdg_fd_hessian.jl` (≡ the hand-built BdG).
 """
-function hessian_vector_product(ws, ψ, δ; ε::Float64=1e-5)
-    gp = similar(ψ)
-    fill!(gp, 0)
-    energy_gradient!(gp, ψ .+ ε .* δ, ws)
-    gm = similar(ψ)
-    fill!(gm, 0)
-    energy_gradient!(gm, ψ .- ε .* δ, ws)
-    (gp .- gm) ./ (2ε)
+function hessian_vector_product(ws, ψ, δ; ε::Float64=1e-5, order::Int=2)
+    _g(s) = (out=similar(ψ); fill!(out, 0); energy_gradient!(out, ψ .+ s .* δ, ws); out)
+    if order == 4
+        # 5-point stencil: truncation O(ε⁴), so the finite-difference HvP
+        # cancellation floor drops from eps^(2/3)≈2e-11 (3-point) to
+        # eps^(4/5)≈1.6e-13, at a larger ε* ~ eps^(1/5)≈6e-4 (farther from the
+        # roundoff cliff). Only matters once the energy-comparison floor is
+        # removed (see residual_newton_refine); under an energy-gated step it
+        # is invisible. Costs 4 gradient evals.
+        return (_g(-2ε) .- 8 .* _g(-ε) .+ 8 .* _g(ε) .- _g(2ε)) ./ (12ε)
+    end
+    (_g(ε) .- _g(-ε)) ./ (2ε)   # 3-point central, O(ε²)
 end
 
 # Tangent projection: remove the complex-ψ gauge direction (norm AND phase
@@ -85,10 +89,10 @@ the ‖ψ‖²=N manifold at a stationary `ψ` — the SINGLE operator behind bo
 the gate-2 minimum-vs-saddle eigenvalue query and the Newton-CG linear
 solve. Pass `(μ, dV, n2)` from `constrained_hessian_params`.
 """
-function constrained_hessian_action(ws, ψ, δ; μ, dV, n2, ε::Float64=1e-5)
+function constrained_hessian_action(ws, ψ, δ; μ, dV, n2, ε::Float64=1e-5, order::Int=2)
     pδ = _tangent_project(δ, ψ, dV, n2)
     _tangent_project(
-        hessian_vector_product(ws, ψ, pδ; ε) .- 2μ .* pδ, ψ, dV, n2
+        hessian_vector_product(ws, ψ, pδ; ε, order) .- 2μ .* pδ, ψ, dV, n2
     )
 end
 
