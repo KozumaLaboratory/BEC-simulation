@@ -238,6 +238,15 @@ DEFLATED (removed), the physical soft mode is NOT (the block grabs it).
 Keywords: `nev`, `block` (≥ nev+2), `max_iter`, `tol` (residual stop),
 `α_pre` (preconditioner shift, defaults to `max(|μ|, 1e-3)`), `ε`+`order`
 (HvP), `extra_nullspace`, `rng`.
+
+VALIDITY REGIME: correctness gated (≡ Lanczos λ_min) on gapped states. The
+preconditioner's convergence ADVANTAGE is NOT yet realised at Eu production
+scale — there the stiffness is interaction-dominated (`c₀·n~2343`), which the
+kinetic-only `(½k²+α)⁻¹` does not capture (production run: `ρ~2` at max_iter=40,
+worse than Lanczos). A combined kinetic+potential preconditioner and L_z
+symmetry-sector decomposition (one anomalous mode per `m` ⇒ recovered relative
+gap) are the documented next step; do NOT trust a production λ_min from this
+until it reports `converged=true`.
 """
 function trapped_bdg_low_modes(
     ws, ψ;

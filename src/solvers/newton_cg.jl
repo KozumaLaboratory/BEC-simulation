@@ -225,6 +225,13 @@ RESIDUAL-norm decrease `‖gp‖`, not energy. `‖gp‖` is evaluable to `~eps�
 the floor drops to the finite-difference HvP floor (`eps^(2/3)≈2e-11` at
 `order=2`; `eps^(4/5)≈1.6e-13` at `order=4`).
 
+VALIDITY REGIME: validated on gapped / in-basin / converged states (scalar
+harmonic, weak-coupling spinor). NOT validated at strong coupling — at Eu
+production scale (c₀·n≫1, μ~12) the kinetic-only inner preconditioner is
+insufficient and the polish stalls on a still-unconverged GS; that regime needs
+a combined kinetic+potential preconditioner (separate work). Do NOT read a
+stability verdict off a polish that has not actually reached its floor.
+
 PRECONDITION: `ψ0` must be in the convex basin (projected Hessian positive
 definite — i.e. a Bogoliubov-stable stationary point). This is a polish, NOT a
 globalized solver; seed it from L-BFGS / `newton_cg_ground_state`. On negative
