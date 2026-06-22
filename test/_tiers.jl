@@ -304,6 +304,10 @@ const CI_EXTRA = [
     # uniform limit: matrix-free σ_z[L M; M* L*] from the gated HvP vs the
     # CG-sum homogeneous matrices at the box k-modes + quartet symmetry.
     "oracles/test_trapped_bdg_spectrum.jl",
+    # gate-2 eigensolver: preconditioned block LOBPCG (trapped_bdg_low_modes)
+    # ≡ bare Lanczos (trapped_bdg_lowest_eigenvalue) on λ_min, + Kato–Temple
+    # two-sided certificate bracket.
+    "oracles/test_bdg_low_modes_lobpcg.jl",
     # StabilitySpec three-valued gate: replays the non-stationary /
     # non-converged false-verdict class (mistake_stability_verdict_from_
     # nonstationary_point) — gate returns :indeterminate, not a confident
@@ -345,6 +349,7 @@ const FULL_EXTRA = [
     "solvers/test_quasi_2d_api.jl",
     "hamiltonian/test_tensor_interaction.jl",
     "solvers/test_lbfgs.jl",
+    "solvers/test_lbfgs_accuracy_floor.jl",
     "workflow/test_pipeline.jl",
     "solvers/test_pause_resume.jl",
     "dynamics/test_twa.jl",
@@ -470,6 +475,7 @@ const _COST = Dict{String, Float64}(
     "solvers/test_3d.jl" => 5.0,
     "dynamics/test_twa.jl" => 5.0,
     "solvers/test_lbfgs.jl" => 5.0,
+    "solvers/test_lbfgs_accuracy_floor.jl" => 6.0,
 )
 
 _cost(f) = get(_COST, f, _DEFAULT_COST)

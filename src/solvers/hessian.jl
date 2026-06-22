@@ -21,7 +21,7 @@
 
 export hessian_vector_product,
     constrained_hessian_params, constrained_hessian_action,
-    trapped_bdg_lowest_eigenvalue
+    trapped_bdg_lowest_eigenvalue, trapped_bdg_low_modes
 
 """
     hessian_vector_product(ws, ψ, δ; ε=1e-5) → array
@@ -37,14 +37,18 @@ extraction in the anchor test). Central difference ⇒ O(ε²) truncation;
 ε=1e-5 sits at the roundoff/truncation optimum for the gated gradient.
 Anchored: `test/oracles/test_bdg_fd_hessian.jl` (≡ the hand-built BdG).
 """
-function hessian_vector_product(ws, ψ, δ; ε::Float64=1e-5)
-    gp = similar(ψ)
-    fill!(gp, 0)
-    energy_gradient!(gp, ψ .+ ε .* δ, ws)
-    gm = similar(ψ)
-    fill!(gm, 0)
-    energy_gradient!(gm, ψ .- ε .* δ, ws)
-    (gp .- gm) ./ (2ε)
+function hessian_vector_product(ws, ψ, δ; ε::Float64=1e-5, order::Int=2)
+    _g(s) = (out=similar(ψ); fill!(out, 0); energy_gradient!(out, ψ .+ s .* δ, ws); out)
+    if order == 4
+        # 5-point stencil: truncation O(ε⁴), so the finite-difference HvP
+        # cancellation floor drops from eps^(2/3)≈2e-11 (3-point) to
+        # eps^(4/5)≈1.6e-13, at a larger ε* ~ eps^(1/5)≈6e-4 (farther from the
+        # roundoff cliff). Only matters once the energy-comparison floor is
+        # removed (see residual_newton_refine); under an energy-gated step it
+        # is invisible. Costs 4 gradient evals.
+        return (_g(-2ε) .- 8 .* _g(-ε) .+ 8 .* _g(ε) .- _g(2ε)) ./ (12ε)
+    end
+    (_g(ε) .- _g(-ε)) ./ (2ε)   # 3-point central, O(ε²)
 end
 
 # Tangent projection: remove the complex-ψ gauge direction (norm AND phase
@@ -85,10 +89,10 @@ the ‖ψ‖²=N manifold at a stationary `ψ` — the SINGLE operator behind bo
 the gate-2 minimum-vs-saddle eigenvalue query and the Newton-CG linear
 solve. Pass `(μ, dV, n2)` from `constrained_hessian_params`.
 """
-function constrained_hessian_action(ws, ψ, δ; μ, dV, n2, ε::Float64=1e-5)
+function constrained_hessian_action(ws, ψ, δ; μ, dV, n2, ε::Float64=1e-5, order::Int=2)
     pδ = _tangent_project(δ, ψ, dV, n2)
     _tangent_project(
-        hessian_vector_product(ws, ψ, pδ; ε) .- 2μ .* pδ, ψ, dV, n2
+        hessian_vector_product(ws, ψ, pδ; ε, order) .- 2μ .* pδ, ψ, dV, n2
     )
 end
 
@@ -132,7 +136,8 @@ function trapped_bdg_lowest_eigenvalue(
     ipR(a, b) = real(sum(conj.(a) .* b)) * p.dV
     Hc(δ) = constrained_hessian_action(ws, ψ, δ; p.μ, p.dV, p.n2, ε)
 
-    V = [_tangent_project(randn(rng, ComplexF64, size(ψ)), ψ, p.dV, p.n2)]
+    _randvec() = _to_device(ws.backend, randn(rng, ComplexF64, size(ψ)))
+    V = [_tangent_project(_randvec(), ψ, p.dV, p.n2)]
     V[1] ./= sqrt(ipR(V[1], V[1]))
     α = Float64[]
     β = Float64[]
@@ -155,5 +160,161 @@ function trapped_bdg_lowest_eigenvalue(
     β_m = length(β) >= length(α) ? β[end] : 0.0
     ritz_residual = abs(β_m * s_min[end])
     converged = ritz_residual < tol_ritz * (abs(λ_min) + 1e-10)
-    (; λ_min, μ=p.μ, ritz_residual, niter_used=length(α), converged)
+
+    # Two-sided certificate (Kato–Temple). The Ritz value `λ_min = θ₁` is an
+    # UPPER bound on the true λ_min (Ritz values converge from above). The
+    # LOWER bound is `θ₁ − ρ²/δ` with ρ = ritz_residual and δ the gap to the
+    # next eigenvalue (estimated by the Ritz gap θ₂ − θ₁). Because ρ enters
+    # SQUARED, the certified interval is far tighter than the naive `±ρ`:
+    # ρ=5e-3, δ=0.1 ⇒ ±2.5e-4, not ±5e-3. Valid when δ > ρ (θ₂ a real
+    # separation); otherwise fall back to the loose `±ρ`. At a soft point δ
+    # shrinks and the bound loosens — that is where a preconditioned solver
+    # must drive ρ down directly (see the LOBPCG path).
+    θ2 = length(decomp.values) >= 2 ? decomp.values[2] : λ_min
+    gap = θ2 - λ_min
+    λ_lower = gap > ritz_residual ? λ_min - ritz_residual^2 / gap : λ_min - ritz_residual
+    (; λ_min, μ=p.μ, ritz_residual, niter_used=length(α), converged, λ_lower, gap)
+end
+
+# In-place kinetic Fourier preconditioner M⁻¹ = (½k² + α)⁻¹ per spin component.
+# The constrained Hessian's stiffness is the kinetic λ_max ~ 1/dx²; flattening
+# it restores the relative gap (λ₂−λ₁)/(λ_max−λ₁) that an unpreconditioned
+# Lanczos/LOBPCG is bound by. `α` ~ the low-mode scale (≈ μ).
+function _kinetic_precondition!(v::AbstractArray{<:Complex}, ws, k2, α::Float64)
+    N = ndims(ws.grid.k_squared)
+    n_pts = ntuple(d -> size(v, d), N)
+    n_comp = ws.spin_matrices.system.n_components
+    buf = ws.state.fft_buf
+    @inbounds for c in 1:n_comp
+        idx = _component_slice(N, n_pts, c)
+        buf .= view(v, idx...)
+        ws.fft_plans.forward * buf
+        buf ./= (0.5 .* k2 .+ α)
+        ws.fft_plans.inverse * buf
+        view(v, idx...) .= buf
+    end
+    v
+end
+
+# Modified Gram–Schmidt orthonormalisation in a given real inner product,
+# dropping near-dependent directions (so [X, W, P_prev] can be fed raw).
+function _mgs_ortho(vecs, ipR; tol::Float64=1e-10)
+    out = empty(vecs)
+    for v in vecs
+        w = copy(v)
+        for u in out
+            w = w .- u .* ipR(u, w)
+        end
+        nw = sqrt(max(ipR(w, w), 0.0))
+        nw > tol && push!(out, w ./ nw)
+    end
+    out
+end
+
+# Linear combination of a vector list by columns of C: returns [Σⱼ C[j,k] S[j]].
+_combine(S, C) = [reduce(.+, (C[j, k] .* S[j] for j in 1:length(S))) for k in 1:size(C, 2)]
+
+"""
+    trapped_bdg_low_modes(ws, ψ; nev=1, block=8, ...) → (; λ, λ_lower, residuals, converged, μ, iterations)
+
+Lowest `nev` eigenvalues of the constrained second variation `P(H−2μ)P` via
+block **LOBPCG with a kinetic Fourier preconditioner** — the
+preconditioned counterpart of `trapped_bdg_lowest_eigenvalue` (bare Lanczos).
+
+The bare Lanczos is bound by the relative gap `(λ₂−λ₁)/(λ_max−λ₁)`, which the
+kinetic `λ_max ~ 1/dx²` crushes; the preconditioner `M⁻¹ = (½k²+α)⁻¹`
+flattens that span (THIS, not the solver name, is what makes it converge — at
+a soft point it sets the certified-interval width, not just the speed). A
+block larger than the low-mode cluster + a recycled previous block (the
+conjugate term) handle clustered / crossing modes that defeat single-vector
+iteration.
+
+Returns the Ritz values `λ` (upper bounds), per-mode Kato–Temple lower bounds
+`λ_lower` (`θₖ − ρₖ²/δₖ`), residual norms, and `converged` (all `nev`
+residuals < `tol`). `extra_nullspace` projects out known Goldstone modes
+beyond the gauge `iψ` (vortex rotation / free-space translation) — these are
+DEFLATED (removed), the physical soft mode is NOT (the block grabs it).
+
+Keywords: `nev`, `block` (≥ nev+2), `max_iter`, `tol` (residual stop),
+`α_pre` (preconditioner shift, defaults to `max(|μ|, 1e-3)`), `ε`+`order`
+(HvP), `extra_nullspace`, `rng`.
+
+VALIDITY REGIME: correctness gated (≡ Lanczos λ_min) on gapped states. The
+preconditioner's convergence ADVANTAGE is NOT yet realised at Eu production
+scale — there the stiffness is interaction-dominated (`c₀·n~2343`), which the
+kinetic-only `(½k²+α)⁻¹` does not capture (production run: `ρ~2` at max_iter=40,
+worse than Lanczos). A combined kinetic+potential preconditioner and L_z
+symmetry-sector decomposition (one anomalous mode per `m` ⇒ recovered relative
+gap) are the documented next step; do NOT trust a production λ_min from this
+until it reports `converged=true`.
+"""
+function trapped_bdg_low_modes(
+    ws, ψ;
+    nev::Int=1, block::Int=8, max_iter::Int=30, tol::Float64=1e-6,
+    α_pre::Union{Nothing, Float64}=nothing, ε::Float64=1e-5, order::Int=2,
+    extra_nullspace=nothing, params=nothing, rng=Random.default_rng(),
+)
+    p = params === nothing ? constrained_hessian_params(ws, ψ) : params
+    k2 = _to_device(ws.backend, ws.grid.k_squared)
+    ipR(a, b) = real(sum(conj.(a) .* b)) * p.dV
+    α = α_pre === nothing ? max(abs(p.μ), 1e-3) : α_pre
+
+    function project(v)
+        w = _tangent_project(v, ψ, p.dV, p.n2)
+        if extra_nullspace !== nothing
+            for m in extra_nullspace
+                w = w .- m .* (ipR(m, w) / ipR(m, m))
+            end
+        end
+        w
+    end
+    Tprec(v) = project(_kinetic_precondition!(copy(v), ws, k2, α))
+    A(v) = constrained_hessian_action(ws, ψ, v; p.μ, p.dV, p.n2, ε, order)
+
+    b = max(block, nev + 2)
+    _randvec() = _to_device(ws.backend, randn(rng, ComplexF64, size(ψ)))
+    X = _mgs_ortho([project(_randvec()) for _ in 1:b], ipR)
+    AX = [A(x) for x in X]
+    Xprev = typeof(ψ)[]
+    θ = zeros(length(X))
+    resn = fill(Inf, length(X))
+    iters = 0
+
+    for it in 1:max_iter
+        iters = it
+        # Rayleigh-Ritz on the current block → rotate X, AX to Ritz vectors.
+        nb = length(X)
+        Θ = [ipR(X[i], AX[j]) for i in 1:nb, j in 1:nb]
+        e = eigen(Symmetric((Θ .+ Θ') ./ 2))
+        X = _combine(X, e.vectors)
+        AX = _combine(AX, e.vectors)
+        θ = e.values
+        R = [AX[i] .- θ[i] .* X[i] for i in 1:nb]
+        resn = [sqrt(max(ipR(r, r), 0.0)) for r in R]
+        maximum(@view resn[1:min(nev, nb)]) < tol && break
+
+        W = [Tprec(R[i]) for i in 1:nb]
+        S = _mgs_ortho(vcat(X, W, Xprev), ipR)
+        AS = [A(s) for s in S]
+        ns = length(S)
+        Hs = [ipR(S[i], AS[j]) for i in 1:ns, j in 1:ns]
+        es = eigen(Symmetric((Hs .+ Hs') ./ 2))
+        keep = min(b, ns)
+        C = es.vectors[:, 1:keep]
+        Xprev = X
+        X = _combine(S, C)
+        AX = _combine(AS, C)
+    end
+
+    nb = length(X)
+    m = min(nev, nb)
+    λ = θ[1:m]
+    λ_lower = map(1:m) do k
+        δ = (k < nb ? θ[k + 1] : θ[k]) - θ[k]
+        δ > resn[k] ? θ[k] - resn[k]^2 / δ : θ[k] - resn[k]
+    end
+    (;
+        λ, λ_lower, residuals=resn[1:m], converged=maximum(@view resn[1:m]) < tol,
+        μ=p.μ, iterations=iters,
+    )
 end
