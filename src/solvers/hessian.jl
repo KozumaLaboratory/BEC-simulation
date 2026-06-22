@@ -136,7 +136,8 @@ function trapped_bdg_lowest_eigenvalue(
     ipR(a, b) = real(sum(conj.(a) .* b)) * p.dV
     Hc(δ) = constrained_hessian_action(ws, ψ, δ; p.μ, p.dV, p.n2, ε)
 
-    V = [_tangent_project(randn(rng, ComplexF64, size(ψ)), ψ, p.dV, p.n2)]
+    _randvec() = _to_device(ws.backend, randn(rng, ComplexF64, size(ψ)))
+    V = [_tangent_project(_randvec(), ψ, p.dV, p.n2)]
     V[1] ./= sqrt(ipR(V[1], V[1]))
     α = Float64[]
     β = Float64[]
@@ -245,7 +246,7 @@ function trapped_bdg_low_modes(
     extra_nullspace=nothing, params=nothing, rng=Random.default_rng(),
 )
     p = params === nothing ? constrained_hessian_params(ws, ψ) : params
-    k2 = ws.grid.k_squared
+    k2 = _to_device(ws.backend, ws.grid.k_squared)
     ipR(a, b) = real(sum(conj.(a) .* b)) * p.dV
     α = α_pre === nothing ? max(abs(p.μ), 1e-3) : α_pre
 
@@ -262,7 +263,8 @@ function trapped_bdg_low_modes(
     A(v) = constrained_hessian_action(ws, ψ, v; p.μ, p.dV, p.n2, ε, order)
 
     b = max(block, nev + 2)
-    X = _mgs_ortho([project(randn(rng, ComplexF64, size(ψ))) for _ in 1:b], ipR)
+    _randvec() = _to_device(ws.backend, randn(rng, ComplexF64, size(ψ)))
+    X = _mgs_ortho([project(_randvec()) for _ in 1:b], ipR)
     AX = [A(x) for x in X]
     Xprev = typeof(ψ)[]
     θ = zeros(length(X))

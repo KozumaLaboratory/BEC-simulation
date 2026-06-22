@@ -78,7 +78,7 @@ function newton_cg_ground_state(
     verbose::Bool=false,
 )
     ψ = copy(ψ0)
-    k2 = ws.grid.k_squared
+    k2 = _to_device(ws.backend, ws.grid.k_squared)
     dV = cell_volume(ws.grid)
     ipR(a, b) = real(sum(conj.(a) .* b)) * dV
     n2_init = ipR(ψ, ψ)
@@ -251,7 +251,7 @@ function residual_newton_refine(
     verbose::Bool=false,
 )
     ψ = copy(ψ0)
-    k2 = ws.grid.k_squared
+    k2 = _to_device(ws.backend, ws.grid.k_squared)
     dV = cell_volume(ws.grid)
     ipR(a, b) = real(sum(conj.(a) .* b)) * dV
     n2_init = ipR(ψ, ψ)
