@@ -52,11 +52,15 @@ function _get_gpu_ddi_rot_cache(
     cache
 end
 
-# --- Taylor tridiagonal-generator coefficients (host SVectors, by value) ---
-struct GPUDDITaylorCoef{D, T}
-    mz::SVector{D, T}               # F_z diagonal m_c
-    sxu::SVector{D, Complex{T}}     # F_x super-diagonal [c,c+1] (0 at c=D)
-    syu::SVector{D, Complex{T}}     # F_y super-diagonal [c,c+1] (0 at c=D)
+# --- Taylor tridiagonal-generator coefficients (DEVICE arrays) ---
+# Held as small CuArrays, NOT by-value SVectors: each lane loads only its own
+# (mz_c, sxu_c, syu_c) via a cached global read. A by-value SVector indexed by
+# the lane-dependent component would stage all D entries into per-thread local
+# memory and was measured ~4× slower (gotcha_warp_kernel_byvalue_svector…).
+struct GPUDDITaylorCoef{T}
+    mz::CuArray{T, 1}               # F_z diagonal m_c
+    sxu::CuArray{Complex{T}, 1}     # F_x super-diagonal [c,c+1] (0 at c=D)
+    syu::CuArray{Complex{T}, 1}     # F_y super-diagonal [c,c+1] (0 at c=D)
 end
 
 const _GPU_DDI_TAYLOR_CACHE = Dict{UInt64, Any}()
@@ -66,14 +70,14 @@ function _get_taylor_coef(
 ) where {D, T <: AbstractFloat}
     key = hash((objectid(sm), D, T))
     c = get(_GPU_DDI_TAYLOR_CACHE, key, nothing)
-    c !== nothing && return c::GPUDDITaylorCoef{D, T}
+    c !== nothing && return c::GPUDDITaylorCoef{T}
     Fx = sm.Fx
     Fy = sm.Fy
     Fz = sm.Fz
-    mz = SVector{D, T}(ntuple(i -> T(real(Fz[i, i])), Val(D)))
-    sxu = SVector{D, Complex{T}}(ntuple(i -> i < D ? Complex{T}(Fx[i, i + 1]) : zero(Complex{T}), Val(D)))
-    syu = SVector{D, Complex{T}}(ntuple(i -> i < D ? Complex{T}(Fy[i, i + 1]) : zero(Complex{T}), Val(D)))
-    coef = GPUDDITaylorCoef{D, T}(mz, sxu, syu)
+    mz = T[T(real(Fz[i, i])) for i in 1:D]
+    sxu = Complex{T}[i < D ? Complex{T}(Fx[i, i + 1]) : zero(Complex{T}) for i in 1:D]
+    syu = Complex{T}[i < D ? Complex{T}(Fy[i, i + 1]) : zero(Complex{T}) for i in 1:D]
+    coef = GPUDDITaylorCoef{T}(CuArray(mz), CuArray(sxu), CuArray(syu))
     _GPU_DDI_TAYLOR_CACHE[key] = coef
     coef
 end
@@ -86,11 +90,11 @@ end
 end
 
 # --- Adaptive degree selection ---
-# EXPERIMENTAL, off by default. On H100 the Taylor kernel measured ~4× SLOWER
-# than the warp Euler (one-component-per-lane forces the by-value SVector
-# coefficients into local memory; the Horner chain is also dependency-bound).
-# Euler stays the production path. Set true to A/B the Taylor path.
-const _DDI_USE_TAYLOR = Ref(false)
+# Adaptive tridiagonal Taylor–Horner DDI rotation. With the band coefficients in
+# device memory (not by-value SVector) it measured ~2× FASTER than the warp
+# Euler at production R≈0.012 (K=6) on H100, matching Euler to ~1e-15. Euler is
+# the exact-to-roundoff fallback (R > _DDI_TAYLOR_RMAX[]). Set false to force it.
+const _DDI_USE_TAYLOR = Ref(true)
 const _DDI_TAYLOR_RMAX = Ref(1.0)     # R above which we fall back to Euler
 const _DDI_TAYLOR_TOL = Ref(1.0e-13)  # backward-error target
 const _DDI_R_OVERRIDE = Ref(NaN)      # set to skip the max|Φ| reduction
@@ -160,8 +164,8 @@ end
 end
 
 function _apply_ddi_taylor!(
-    P, px, py, pz, coef::GPUDDITaylorCoef{D, T}, z::Complex{T}, K::Integer,
-) where {D, T}
+    P, px, py, pz, coef::GPUDDITaylorCoef{T}, z::Complex{T}, K::Integer, ::Val{D},
+) where {T, D}
     N = size(P, 1)
     voxels_per_block = 16
     threads = 256
@@ -198,7 +202,7 @@ function SpinorBEC._apply_ddi_rotation!(
             coef = _get_taylor_coef(psi, sm)
             z = imaginary_time ? Complex{T}(-T(dt_frac), zero(T)) :
                 Complex{T}(zero(T), -T(dt_frac))
-            _apply_ddi_taylor!(P, px, py, pz, coef, z, K)
+            _apply_ddi_taylor!(P, px, py, pz, coef, z, K, Val(D))
             return nothing
         end
     end
