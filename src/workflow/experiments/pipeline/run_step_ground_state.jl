@@ -275,6 +275,7 @@ function _run_step(
         )
     elseif method === :lbfgs
         m_lbfgs = Int(get(p, "m_lbfgs", 10))
+        newton_polish = get(p, "newton_polish", false) == true
         # Reuse existing workspace when available to preserve DDI flags (secular/q2d/l_z).
         # Skip reuse when backend is explicitly overridden (e.g. GPU ITP → CPU LBFGS).
         if ws_prev !== nothing && !haskey(p, "backend") &&
@@ -282,14 +283,14 @@ function _run_step(
             !haskey(p, "potential") && !haskey(p, "B")
             find_ground_state_lbfgs(;
                 ws_init=ws_prev, psi_init,
-                n_steps, tol, m_lbfgs,
+                n_steps, tol, m_lbfgs, newton_polish,
                 target_magnetization=target_mz,
                 verbose,
             )
         else
             find_ground_state_lbfgs(;
                 grid, atom, interactions, zeeman, potential,
-                n_steps, tol, m_lbfgs, initial_state, init_state_params, psi_init,
+                n_steps, tol, m_lbfgs, newton_polish, initial_state, init_state_params, psi_init,
                 enable_ddi, c_dd=c_dd_val,
                 secular_ddi=secular, quasi_2d_ddi=q2d, l_z_ddi=lz, ddi_trunc_radius=ddi_trunc,
                 ddi_padding=ddi_padded_b, ddi_pad_factor=ddi_pf,
