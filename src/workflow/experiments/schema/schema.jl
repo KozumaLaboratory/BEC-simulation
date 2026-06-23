@@ -273,6 +273,11 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
     "n_steps" => FieldSpec(; type=Number, default=100000, range=(0.0, 1e9)),
     "tol" => FieldSpec(; type=Number, default=1e-8, range=(1e-16, 1.0)),
     "m_lbfgs" => FieldSpec(; type=Number, default=10, range=(1.0, 100.0)),
+    # Append a 2nd-order Newton-CG trust-region pass after LBFGS to drive the
+    # stationarity residual below the first-order √eps gradient floor. Needed
+    # when ∇E (not just E) must be tight — Hessian λ_min / Bogoliubov near
+    # instabilities require a genuinely stationary ψ. lbfgs-only.
+    "newton_polish" => FieldSpec(; type=Bool, default=false),
     "initial_state" => FieldSpec(; type=String, default="polar",
         enum=["polar", "m_plus_F", "m_minus_F",
             "uniform", "antiferromagnetic", "random",
