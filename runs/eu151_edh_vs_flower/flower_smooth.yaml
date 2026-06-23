@@ -1,0 +1,84 @@
+# ─────────────────────────────────────────────────────────────────────────
+#  ¹⁵¹Eu  Flower(smooth) leg of the EdH-vs-Flower adiabaticity comparison.
+#
+#  Sibling of edh_quench.yaml. SAME re-polished 10 mG ground state, SAME final
+#  field (26 µG), SAME weak-field hold — the ONLY difference is dB/dt:
+#
+#    EdH    : 10 mG → 26 µG in 0.20 ms   (sudden quench, non-adiabatic)
+#    Flower : 10 mG → 26 µG over ~14 ms  (smooth parabolic descent, adiabatic)
+#
+#  The descent is a quadratic  B(τ) = B_t + (B0 − B_t)(1−τ)²,  τ = t/T_ramp,
+#  whose slope vanishes as τ→1: the field arrives at the weak value gently,
+#  maximally adiabatic precisely where the Larmor period diverges. If the spin
+#  texture follows B(t) (Flower), the Mermin–Ho relation ω_z = F·Ω_z holds
+#  bulk-wide and the residual ≈ 0; the EdH leg should instead show finite
+#  residual at non-adiabatically nucleated vortex cores.
+#
+#  Parameters match the user's established protocol + Tsubame cached seeds:
+#  N = 5·10⁴, box = 18, NO LHY (prior research did not use it). Internal time
+#  unit 1 = 1.447 ms. NOTE (theory §4): scalar-LHY-free Eu at N=5e4 can run
+#  into a roton/Townes instability at very weak field — observe n_max(t) in the
+#  first H100 run and shorten the hold / add `loss: {gamma_dr}` if it diverges.
+#
+#  K_3 = 0 (pure adiabaticity comparison). Full-ψ f32 streaming on every stage.
+# ─────────────────────────────────────────────────────────────────────────
+
+defaults:
+  kind:         spinor
+  backend:      gpu
+  interactions: {omega_ref: 691.15}
+
+mixins:
+  eu151_edh_phys:
+    atom:         Eu151
+    grid:         {n: [64, 64, 64], box: [18, 18, 18]}
+    potential:    {type: harmonic, omega: [1.0, 1.0, 1.182]}
+    interactions: {N_atoms: 50000, omega_ref: 691.15, c1_ratio: 0.0}
+
+pipeline:
+  # ── Stage 0: 10 mG ground state — LOADED from the SAME re-polished cache as
+  #    the EdH leg (identical path ⇒ computed once total). See edh_quench.yaml
+  #    and scripts/edh_vs_flower/repolish_gs.jl. NO LHY.
+  - ground_state:
+      use:           [eu151_edh_phys]
+      method:        itp                         # cold fallback only; cache wins
+      B:             {Bz: "0.01 Gauss"}
+      initial_state: m_plus_F
+      n_steps:       100000
+      tol:           1.0e-10
+      dt:            0.005
+      cache:         runs/eu151_edh_vs_flower/cache/gs_10mG_repolished.jld2
+
+  # ── Stage 1: the GOTO Ch.6 FLOWER descent 10 mG → 26 µG over 274 ms.
+  #    The user's established protocol: a LINEAR ramp first, then a PARABOLIC
+  #    descent — NOT a pure parabola. Reproduces goto_protocol_10mG.jl:
+  #      Phase 1 linear   (0–40 ms):   10 mG → 2.8 mG
+  #      Phase 1 smoothed (40–50 ms):  C¹ blend → 1 mG (kills the 24× slope
+  #                                    discontinuity at the linear→parabola corner)
+  #      Phase 2 parabola (50–274 ms): B(τ) = 1 mG·(1−0.749τ)², τ=(t−50ms)/200ms,
+  #                                    extended to τ=1.12 to land on 26 µG.
+  #    Internal-time samples (1 internal = 1.447 ms; ω_ref = 691.15). dt 0.005
+  #    → ~37.9k steps; save every 250 → ~152 full-ψ frames. The slope vanishes
+  #    as B→26 µG so the spin follows adiabatically into the weak-field zone.
+  - dynamics:
+      duration: 189.375
+      dt:       0.005
+      B:
+        Bz:
+          piecewise:
+            times:  [0.0, 6.912, 13.823, 20.735, 27.646, 29.028, 30.411, 31.793, 33.175, 34.558, 51.836, 69.115, 86.394, 103.673, 120.951, 138.230, 155.509, 172.788, 189.375]
+            values: [0.01, 0.0082, 0.0064, 0.0046, 0.0028, 0.00216398, 0.00166598, 0.00130598, 0.00108398, 0.001, 0.000821516, 0.000660563, 0.000517141, 0.00039125, 0.000282891, 0.000192063, 0.000118766, 6.3001e-05, 2.59597e-05]
+      save:     {every: 250, psi: true, precision: f32}
+
+  # ── Stage 2: weak-field HOLD at 26 µG. Total wall = 189.375 + 98.625 = 288
+  #    internal (417 ms) — the same total as the Goto protocol, and matched by
+  #    the EdH leg, so the two are directly comparable. Same seed/amplitude as
+  #    EdH so the only difference between legs is the descent (dB/dt).
+  - dynamics:
+      duration:      98.625
+      dt:            0.005
+      B:             {Bz: "2.6e-5 Gauss"}
+      seed_amplitude: 1.0e-6
+      seed_k_cut:     2.5
+      noise_seed:     42
+      save:          {every: 250, psi: true, precision: f32}

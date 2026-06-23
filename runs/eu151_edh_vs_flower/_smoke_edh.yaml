@@ -1,0 +1,56 @@
+# SMOKE test of edh_quench.yaml — tiny grid, CPU, few steps. ~2 min.
+# Purpose: exercise every code path (ITP→LBFGS→quench→hold, full-ψ streaming
+# save) and produce a real result.jld2 to ground the post-hoc analysis script.
+# NOT physics — just plumbing. Mirrors edh_quench.yaml structure exactly.
+
+defaults:
+  kind:         spinor
+  backend:      cpu
+  interactions: {omega_ref: 691.15}
+
+mixins:
+  smoke_phys:
+    atom:         Eu151
+    grid:         {n: [16, 16, 16], box: [12, 12, 12]}
+    potential:    {type: harmonic, omega: [1.0, 1.0, 1.182]}
+    interactions: {N_atoms: 10000, omega_ref: 691.15, c1_ratio: 0.0}
+
+pipeline:
+  - ground_state:
+      use:           [smoke_phys]
+      method:        itp
+      B:             {Bz: "0.01 Gauss"}
+      initial_state: m_plus_F
+      lhy:           {kind: scalar}
+      n_steps:       200
+      tol:           1.0e-8
+      dt:            0.005
+      cache:         runs/eu151_edh_vs_flower/cache/_smoke_gs_itp.jld2
+
+  - ground_state:
+      use:           [smoke_phys]
+      method:        lbfgs
+      B:             {Bz: "0.01 Gauss"}
+      lhy:           {kind: scalar}
+      n_steps:       30
+      tol:           1.0e-7
+      m_lbfgs:       10
+      newton_polish: false
+      cache:         runs/eu151_edh_vs_flower/cache/_smoke_gs_lbfgs.jld2
+
+  - dynamics:
+      duration: 0.02
+      dt:       0.001
+      B:        {Bz: {from: 0.01, to: 2.6e-5, duration: 0.02}}
+      lhy:      {kind: scalar}
+      save:     {every: 5, psi: true, precision: f32}
+
+  - dynamics:
+      duration:      0.05
+      dt:            0.001
+      B:             {Bz: "2.6e-5 Gauss"}
+      lhy:           {kind: scalar}
+      seed_amplitude: 1.0e-6
+      seed_k_cut:     2.5
+      noise_seed:     42
+      save:          {every: 10, psi: true, precision: f32}

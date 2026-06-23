@@ -1,0 +1,96 @@
+# ─────────────────────────────────────────────────────────────────────────
+#  ¹⁵¹Eu  EdH(quench) leg of the EdH-vs-Flower adiabaticity comparison.
+#
+#  Physics axis under test: ADIABATICITY of the Zeeman descent.
+#    EdH  (this file)  : sudden quench 10 mG → 26 µG in 0.20 ms  (NON-adiabatic)
+#    Flower (sibling)  : smooth ramp  10 mG → 26 µG over ~14 ms  (adiabatic)
+#  Both legs share the SAME cached 10 mG ground state and the SAME final
+#  field, so the only physical difference is dB/dt — i.e. whether the spin
+#  texture can follow B(t). This isolates the Einstein–de-Haas (non-adiabatic
+#  spin→orbital angular-momentum transfer, vortex/EdH texture) from the
+#  adiabatic Flower texture.
+#
+#  Target field 26 µG = 2.6 nT is the Matsui et al. (Science 391, 384, 2026)
+#  weak-field value; Larmor ~45 Hz there, while the dipolar field (≲8 nT)
+#  dominates, so EdH transfer is MDDI-driven.
+#
+#  K_3 (three-body loss) = 0 by deliberate choice: a pure adiabaticity
+#  comparison must not mix loss into the non-adiabatic signal (see the run
+#  README and docs/research_notes/edh_vs_flower_theory.md).
+#
+#  Internal time unit: ω_ref = 691.15 rad/s ⇒ 1 internal = 1.447 ms.
+#    0.14 internal = 0.20 ms   (the quench)
+#    1.0  internal = 1.45 ms   (the hold; kept SHORT — scalar-LHY Townes
+#                               collapse sets in ~1.5 ms at the weak field,
+#                               see theory note §4)
+#
+#  COMPREHENSIVE SAVE: every dynamics stage streams the full 13-component ψ
+#  (save.psi=true, f32) so EVERY post-hoc observable — Mermin–Ho residual,
+#  Berry curvature, skyrmion charge, mass/spin current, vortex lines, spin
+#  precession ⟨F⟩(t) — is reconstructable WITHOUT re-running the sim.
+# ─────────────────────────────────────────────────────────────────────────
+
+defaults:
+  kind:         spinor
+  backend:      gpu
+  interactions: {omega_ref: 691.15}    # seed ω_ref for every B→p conversion
+
+mixins:
+  eu151_edh_phys:
+    atom:         Eu151
+    grid:         {n: [64, 64, 64], box: [18, 18, 18]}
+    potential:    {type: harmonic, omega: [1.0, 1.0, 1.182]}    # 110,110,130 Hz
+    interactions: {N_atoms: 50000, omega_ref: 691.15, c1_ratio: 0.0}
+    # N=5·10⁴, box=18 — matches the user's established b_sweep / goto protocol
+    # (Tsubame cached ground states). NO LHY (the prior research did not use
+    # it). c1_ratio:0 = orbital-only (Matsui regime). The 10 mG ground state
+    # is the cached b_sweep seed re-polished under the current scheme.
+
+pipeline:
+  # ── Stage 0: 10 mG ground state — LOADED from the re-polished cache.
+  #    The cache is produced by scripts/edh_vs_flower/repolish_gs.jl, which
+  #    takes the Tsubame b_sweep seed (lbfgs_10mG_final_psi.jld2, N=5e4,
+  #    box=18, old scheme 9925f41a) and re-polishes it with the CURRENT-main
+  #    LBFGS (verified: the old cache is NOT stationary under the new scheme —
+  #    E drops 12.1→9.5 under re-polish; the scheme moved the minimum). When
+  #    the cache file is present this stage loads it instantly; the itp
+  #    fallback below only fires on a cold cache miss. NO LHY (prior research
+  #    did not use it).
+  - ground_state:
+      use:           [eu151_edh_phys]
+      method:        itp                         # cold fallback only; cache wins
+      B:             {Bz: "0.01 Gauss"}          # 10 mG = 1.0 µT (Matsui prep)
+      initial_state: m_plus_F
+      n_steps:       100000
+      tol:           1.0e-10
+      dt:            0.005
+      cache:         runs/eu151_edh_vs_flower/cache/gs_10mG_repolished.jld2
+
+  # ── Stage 1: the QUENCH. Bz 10 mG → 26 µG in 0.20 ms (0.14 internal).
+  #    dt 0.0005 → 280 steps; save every 10 → 28 full-ψ frames over the
+  #    quench. The aligned stretched state is a Zeeman eigenstate during a
+  #    pure-magnitude quench, so the transverse precession that seeds EdH is
+  #    MDDI-driven and switches on as B crosses the dipolar field — captured
+  #    at ~7 µs cadence here.
+  - dynamics:
+      duration: 0.14
+      dt:       0.0005
+      B:        {Bz: {from: 0.01, to: 2.6e-5, duration: 0.14}}
+      save:     {every: 10, psi: true, precision: f32}
+
+  # ── Stage 2: weak-field HOLD at 26 µG. EdH spin→orbital transfer + texture.
+  #    Held to total wall = 0.14 + 287.86 = 288 internal (417 ms) — the SAME
+  #    total as the Flower leg (Goto descent 189.375 + hold 98.625), so the two
+  #    end at the same time and field; only the approach (dB/dt) differs.
+  #    A broadband isotropic symmetry-breaking seed de-pins the transverse spin
+  #    from the cubic-grid C4 axis (see spin_xy_anisotropy_diag.jl): the EdH
+  #    texture azimuth must be physical, not roundoff-pinned. SAME seed as Flower.
+  #    dt 0.005 over the long hold; save every 250 → ~230 full-ψ frames.
+  - dynamics:
+      duration:      287.86
+      dt:            0.005
+      B:             {Bz: "2.6e-5 Gauss"}
+      seed_amplitude: 1.0e-6
+      seed_k_cut:     2.5
+      noise_seed:     42
+      save:          {every: 250, psi: true, precision: f32}
