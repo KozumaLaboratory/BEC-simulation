@@ -2,20 +2,31 @@
 #
 # Hypothesis (lab note + scaling): loosen the trap → lower density → less 3-body loss.
 # The condensate 3-body rate is K₃⟨n²⟩ with TF peak density n₀ = μ/g, μ ∝ ω̄^(6/5), so
-# the per-atom loss rate ∝ ω̄^(12/5) ≈ ω̄^2.4 — lowering ω̄ strongly cuts the *instantaneous*
-# rate. The question is whether that translates into more condensed atoms, given that ω̄
-# also sets T_c ∝ ω̄ (condensation inflow) and γ_el ∝ n (evaporation).
+# the per-atom loss rate ∝ ω̄^(12/5) ≈ ω̄^2.4.
 #
-# Investigated with the two-component model `run_evaporation_bec` — the only path that
-# follows the condensate K₃ depletion past the BEC onset. Five findings:
+# CONCLUSION: the hypothesis is CORRECT — lowering the density (= loosening the trap)
+# reduces K₃ loss exactly as expected. The clean oracle (a FIXED condensate held under
+# K₃-only loss, no evaporation/T_c coupling) shows a held BEC survives 148× better at
+# ν=20 Hz than at ν=200 Hz. The subtlety is WHEN/HOW to loosen: ω̄ also sets T_c ∝ ω̄, so
+# loosening during the forced-evaporation ramp lowers T_c and starves condensate FORMATION
+# (inflow), and loosening too fast during a hold MELTS the condensate into the thermal cloud
+# (N_th ∝ (k_BT/ℏω̄)³). The win is realized by lowering the density AFTER the BEC has formed,
+# adiabatically (T tracks ω̄ ⇒ T/T_c preserved) — the standard "decompress after BEC".
+#
+# Investigated with the two-component model `run_evaporation_bec` (follows the condensate
+# K₃ depletion past the BEC onset) plus a coupling-free condensate-decay oracle:
 #   (B) physics: n₀ ∝ ω̄^1.2, K₃ rate ∝ ω̄^2.4 (analytic, confirmed numerically)
+#   (0) CLEAN oracle: held condensate, K₃-only — survival 0.5% @200Hz → 74% @20Hz (148×).
+#       The hypothesis, isolated from every T_c/inflow confound. THIS is the headline.
 #   (1) regime: euv3 is catastrophically K₃-limited — condensate 156k (K₃=0) → 1.2k (fit)
-#   (2) loosening during evaporation (final-power scale / waist) recovers ~1.0–1.1×: lower
-#       ω̄ cuts K₃ but also lowers T_c, and the two nearly cancel
-#   (3) the dominant K₃ lever is TIMING: forming the BEC as late as possible minimizes the
-#       dense condensate's K₃-exposure time — recovers ~5–9× (keeps the trap TIGHTER, not looser)
-#   (4) during a BEC HOLD, decompression genuinely helps (~1.3–1.4×): lower n₀ slows the
-#       ongoing K₃ bleed ∝ ω̄^2.4 — the regime where the "loosen the trap" intuition is right
+#   (2) loosening DURING evaporation recovers only ~1.0–1.1× — NOT because loosening fails
+#       to cut K₃, but a T_c confound: lower ω̄ ⇒ lower T_c ⇒ the gas barely condenses (the
+#       euv3 ramp is η-limited). The K₃ reduction is real; there is just no condensate to save.
+#   (3) the FORMATION lever is TIMING: forming the BEC as late as possible minimizes the dense
+#       condensate's K₃-exposure time — recovers ~5–9× (keeps the trap TIGHTER, complementary)
+#   (4) decompress AFTER forming the BEC: lower n₀ slows the ongoing K₃ bleed ∝ ω̄^2.4. In this
+#       0-D model the gain is muted (~1.3×) by partial condensate→thermal melting (imperfect
+#       adiabatic tracking: T drops slower than ω̄) — a model-fidelity caveat, not a physics one.
 #
 # Outputs CSVs under figs/k3_trap_decompression/ + a matplotlib plot script.
 
@@ -105,6 +116,34 @@ function physics_scaling()
         "omega_bar_rad_s,nu_bar_Hz,n0_TF_m3,k3_rate_per_s",
         [(ωs[i], ωs[i] / 2π, n0s[i], rates[i]) for i in eachindex(ωs)])
     (p_n0=p_n0, p_rate=p_rate)
+end
+
+# ============================================================================
+# (0) CLEAN oracle: hold a FIXED condensate under K₃-only loss, vary the trap ω̄.
+# No evaporation, no inflow, no T_c coupling — the hypothesis in isolation.
+# dN₀/dt = −K₃(4/7)n₀(N₀,ω̄)² N₀ − N₀/τ_bg
+# ============================================================================
+function clean_condensate_survival(; N0_0=1.0e5, thold=1.0, nsteps=4000)
+    νs = [200.0, 143.0, 100.0, 70.0, 45.0, 30.0, 20.0]
+    rows = NamedTuple[]
+    for ν in νs
+        ω = 2π * ν
+        N0 = N0_0
+        dt = thold / nsteps
+        for _ in 1:nsteps
+            n0 = tf_peak_density(N0, ω)
+            dN = -PARAMS.K3 * (4 / 7) * n0^2 * N0 - N0 / PARAMS.tau_bg
+            N0 = max(N0 + dt * dN, 0.0)
+        end
+        push!(rows, (nu=ν, n0=tf_peak_density(N0_0, ω), N0=N0, survival=N0 / N0_0))
+    end
+    write_csv(joinpath(OUTDIR, "clean_condensate_survival.csv"),
+        "nu_Hz,n0_initial_m3,N0_final,survival_fraction",
+        [(r.nu, r.n0, r.N0, r.survival) for r in rows])
+    @printf("[0] held condensate N0=%.0e, %.1f s, K₃-only: survival %.1f%% @%.0fHz → %.1f%% @%.0fHz (%.0f×)\n",
+        N0_0, thold, rows[1].survival * 100, rows[1].nu,
+        rows[end].survival * 100, rows[end].nu, rows[end].survival / max(rows[1].survival, 1e-9))
+    rows
 end
 
 # ============================================================================
@@ -218,14 +257,20 @@ function main()
     println("="^72)
 
     ps = physics_scaling()
+
+    println("\n--- (0) CLEAN oracle: density↓ (loosen) ⇒ K₃ loss↓, isolated ---")
+    clean_condensate_survival()
+
     rg = regime_diagnostic()
 
-    println("\n--- (2) loosening during evaporation ---")
+    println("\n--- (2) loosening DURING evaporation (T_c confound, not K₃) ---")
     lo = sweep_loosening()
     bp = lo.power[argmax([r.N0 for r in lo.power])]
     bw = lo.waist[argmax([r.N0 for r in lo.waist])]
     @printf("    best final-power scale=%.2f → N0=%.3e (%.2f×) ; best waist×%.2f → N0=%.3e (%.2f×)\n",
         bp.s, bp.N0, bp.N0 / max(rg.n_k3, 1), bw.w, bw.N0, bw.N0 / max(rg.n_k3, 1))
+    println("    (flat NOT because loosening fails to cut K₃ — lower ω̄ lowers T_c so the")
+    println("     η-limited euv3 ramp barely condenses; there is no condensate to save. See (0).)")
 
     println("\n--- (3) timing (the real K₃ lever) ---")
     to = optimize_timing()
