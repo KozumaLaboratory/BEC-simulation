@@ -18,7 +18,8 @@ import CUDA
 using SpinorBEC
 using SpinorBEC: Units, eu151_preset, ZeemanParams, find_ground_state,
     find_ground_state_lbfgs, init_psi, add_white_noise!, SpinSystem, spin_matrices,
-    classify_phase, component_populations, cell_volume, CUDABackend, CPUBackend
+    classify_phase, component_populations, cell_volume, static_zeeman,
+    CUDABackend, CPUBackend
 using DelimitedFiles: writedlm
 using JLD2: jldsave
 using Printf
@@ -34,6 +35,15 @@ const BS    = parse.(Float64, split(get(ENV, "PR_B", SMOKE ? "10,40" : "10,25,40
 # trap aspect ratio λ = ω_z/ω_⊥ (oblate λ>1 / prolate λ<1). The DDI-geometry axis.
 const LAMS  = parse.(Float64, split(get(ENV, "PR_LAMBDA", SMOKE ? "1.1818" : "1.1818"), ","))
 const SEEDNAMES = split(get(ENV, "PR_SEEDS", SMOKE ? "polar,random1" : "polar,m_plus_F,random1,random2"), ",")
+# Opt-in per-cell PIN: weak-field cells sit on a soft Goldstone orbit (|∇E| floors
+# ~0.05 un-pinned). PR_PIN_EPS="4e-3,1e-3,2.5e-4" runs a small bx=ε warm
+# ε-continuation per seed (+ Newton polish) so each cell converges to an isolated
+# minimum. The fingerprint is gauge-invariant, so the ε bias washes out; OFF by
+# default to keep the bias-free boundary-discovery semantics.
+const PIN_EPS = let s = get(ENV, "PR_PIN_EPS", "")
+    isempty(s) ? Float64[] : sort(parse.(Float64, split(s, ",")); rev=true)
+end
+const PINNED = !isempty(PIN_EPS)
 mkpath(OUT)
 
 const HAS_GPU = CUDA.functional()
@@ -63,6 +73,36 @@ potential_for(lam) = eu151_preset(; n_pts=(NX, NX, NX), box=(BOX, BOX, BOX),
 base_kw(p, pot) = (; grid=PRESET.grid, atom=ATOM, interactions=PRESET.interactions,
     potential=pot, zeeman=ZeemanParams(p, 0.0),
     enable_ddi=true, c_dd=PRESET.c_dd, secular_ddi=false, backend=BACKEND)
+# pinned kwargs at strength ε (transverse bx conjugate field), same axial Zeeman p.
+pin_kw(p, pot, eps) = (; grid=PRESET.grid, atom=ATOM, interactions=PRESET.interactions,
+    potential=pot, zeeman=static_zeeman(; Bz=p, Bx=eps, q=0.0),
+    enable_ddi=true, c_dd=PRESET.c_dd, secular_ddi=false, backend=BACKEND)
+
+# Solve one (cell, seed). Un-pinned: ITP→LBFGS (coarse). Pinned: ITP→LBFGS at the
+# largest ε, then warm-continue LBFGS+Newton down the ε ladder ⇒ isolated minimum.
+function solve_seed(p, pot, psi0)
+    if !PINNED
+        gs = find_ground_state(; base_kw(p, pot)..., psi_init=psi0, dt=0.002,
+            n_steps=ITP, tol=1e-12, save_every=max(1, ITP ÷ 5), verbose=false)
+        gl = find_ground_state_lbfgs(; base_kw(p, pot)...,
+            psi_init=Array{ComplexF64}(gs.workspace.state.psi),
+            n_steps=LBFGS, tol=1e-12, m_lbfgs=10, verbose=false)
+        return gl
+    end
+    local gl
+    seed = psi0
+    for (i, eps) in enumerate(PIN_EPS)
+        if i == 1
+            gs = find_ground_state(; pin_kw(p, pot, eps)..., psi_init=seed, dt=0.002,
+                n_steps=ITP, tol=1e-12, save_every=max(1, ITP ÷ 5), verbose=false)
+            seed = Array{ComplexF64}(gs.workspace.state.psi)
+        end
+        gl = find_ground_state_lbfgs(; pin_kw(p, pot, eps)..., psi_init=seed,
+            n_steps=LBFGS, tol=1e-12, m_lbfgs=10, newton_polish=true, verbose=false)
+        seed = Array{ComplexF64}(gl.workspace.state.psi)
+    end
+    return gl
+end
 
 function mean_fz(psi)
     fx, fy, fz = SpinorBEC._spin_expectation_fields(psi, PRESET.grid)
@@ -73,9 +113,10 @@ function mean_fperp(psi)
     sum(sqrt.(fx .^ 2 .+ fy .^ 2)) * DV
 end
 
-@printf("phase recon: grid=%d^3  B=%s uG  λ=%s  seeds=%s  ITP=%d LBFGS=%d %s%s\n",
-    NX, join(BS, ","), join(LAMS, ","), join(SEEDNAMES, ","),
-    ITP, LBFGS, HAS_GPU ? "CUDA" : "CPU", SMOKE ? " [SMOKE]" : "")
+@printf("phase recon: grid=%d^3  B=%s uG  λ=%s  seeds=%s  ITP=%d LBFGS=%d  pin=%s %s%s\n",
+    NX, join(BS, ","), join(LAMS, ","), join(SEEDNAMES, ","), ITP, LBFGS,
+    PINNED ? "ε=$(join(PIN_EPS, ","))" : "off", HAS_GPU ? "CUDA" : "CPU",
+    SMOKE ? " [SMOKE]" : "")
 flush(stdout)
 
 rows = NamedTuple[]
@@ -83,15 +124,10 @@ for lam in LAMS
     pot = potential_for(lam)
     for B in BS
         p = Units.bfield_to_p(B * 1e-6, ATOM.g_F, PRESET.omega_ref)
-        kw = base_kw(p, pot)
         best = nothing
         for sname in SEEDNAMES
             psi0 = Array{ComplexF64}(build_seed_psi(sname))
-            gs = find_ground_state(; kw..., psi_init=psi0,
-                dt=0.002, n_steps=ITP, tol=1e-12, save_every=max(1, ITP ÷ 5), verbose=false)
-            gl = find_ground_state_lbfgs(; kw...,
-                psi_init=Array{ComplexF64}(gs.workspace.state.psi),
-                n_steps=LBFGS, tol=1e-12, m_lbfgs=10, verbose=false)
+            gl = solve_seed(p, pot, psi0)
             psi = Array{ComplexF64}(gl.workspace.state.psi)
             cls = classify_phase(psi, F, PRESET.grid, SM)
             pops = component_populations(psi, PRESET.grid, SYS)
