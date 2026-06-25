@@ -2,7 +2,8 @@
 
 export init_psi_polar, init_psi_m_plus_F, init_psi_m_minus_F
 export init_psi_uniform, init_psi_antiferromagnetic, init_psi_random
-export init_psi_spin_coherent, init_psi_fl_vortex, init_psi_spin_helix
+export init_psi_spin_coherent, init_psi_radial_spin_vortex, init_psi_flower,
+    init_psi_spin_helix
 export init_psi_cyclic, init_psi_biaxial_nematic, init_psi_polar_core_vortex
 export init_psi_bright_soliton, init_psi_dark_soliton, init_psi_skyrmion
 export init_psi_gaussian_wavepacket, init_psi_domain_wall, init_psi_two_packets
@@ -22,7 +23,7 @@ export init_psi_axial_spin_texture
 # --- Trivial pass-through wrappers (auto-generated) --------------------
 #
 # Each entry below maps to `init_psi(grid, sys; state=:NAME, kwargs...)`.
-# Wrappers that need argument renaming (e.g. `init_psi_fl_vortex`'s
+# Wrappers that need argument renaming (e.g. `init_psi_radial_spin_vortex`'s
 # `winding` → `init_vortex_charge`) or default values live in their own
 # hand-written `init_psi_<name>` blocks below. As of the 2026-06-03
 # cleanup the wrapper name always equals the dispatch symbol — earlier
@@ -88,15 +89,29 @@ init_psi_spin_coherent(grid, sys; theta::Real=0.0, phi::Real=0.0) = init_psi(gri
     init_theta=theta, init_phi=phi)
 
 """
-    init_psi_fl_vortex(grid, sys; winding=1)
+    init_psi_radial_spin_vortex(grid, sys; winding=1)
 
-Flux-closure (FL) vortex — spin-coherent texture forced to θ=π/2 with
-the given winding number around the trap centre. (`theta` is fixed
-inside `init_psi` for this state; only `winding` is plumbed through.)
+Radial spin-vortex — in-plane (θ=π/2) spin-coherent texture whose spin
+azimuth equals the position azimuth (n̂ = ρ̂), giving ∇·F = 2/ρ ≠ 0. This
+is a divergent / radial texture, NOT flux-closure. (Historically misnamed
+`fl_vortex`/"flower vortex"; the real flux-closure Flower is
+[`init_psi_flower`](@ref).) Only `winding` is plumbed through; θ is fixed.
 """
-init_psi_fl_vortex(grid, sys; winding::Int=1) = init_psi(
-    grid, sys; state=:fl_vortex, init_vortex_charge=winding
+init_psi_radial_spin_vortex(grid, sys; winding::Int=1) = init_psi(
+    grid, sys; state=:radial_spin_vortex, init_vortex_charge=winding
 )
+
+"""
+    init_psi_flower(grid, sys)
+
+Flux-closure "Flower" phase — in-plane (θ=π/2, winding 1) spin-coherent
+texture whose spin azimuth is the position azimuth + π/2 (n̂ = φ̂), giving
+∇·F = 0 (Kawaguchi–Ueda flux-closure). This is the validated analytic
+seed for the weak-field ¹⁵¹Eu+DDI ground state (flux_closure_fraction ≈
+0.06, far below the 0.577 density-gradient floor). Use as a default seed
+for the weak-field Eu GS basin; converge with pinning/continuation.
+"""
+init_psi_flower(grid, sys) = init_psi(grid, sys; state=:flower)
 
 """
     init_psi_spin_helix(grid, sys; q_vector=ntuple(_->0, N))

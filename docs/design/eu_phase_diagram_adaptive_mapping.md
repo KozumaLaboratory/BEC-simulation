@@ -38,13 +38,17 @@ bottleneck; step count × launch overhead is.
    an EASY unique phase (high B / cigar FM), not in the degenerate region.
 3. **Continue along every cheap axis** (B, λ, resolution): use the nearest
    available seed — spectral upsample (same box), B/λ continuation (same grid),
-   real-space resample (box changes). Tool: `scripts/upsample_spinor.jl` (FFT
-   zero-pad, norm-preserving to 6 digits; preserves phase/winding).
+   real-space resample (box changes). Tool: `upsample_spinor(psi, M)`
+   (`src/workflow/initialization/upsample.jl`; FFT zero-pad, norm-preserving to 6
+   digits; preserves phase/winding).
 4. **Pinning is required for the soft (axisymmetric, weak-field) cells.** Add a
    small symmetry-breaking ε (transverse b_x or elliptical trap), warm-ramp
    ε→small, extrapolate E_bare(ε)=E0+c·ε². Reaches |∇E|~1e-5 (4 orders below the
    un-pinned 0.05 Goldstone floor). NOTE: λ=ω_z/ω_⊥ keeps axial symmetry, so those
    cells still need the pin; only in-plane ellipticity (ω_x≠ω_y) removes it.
+   Exposed as `find_ground_state_lbfgs(; pin, epsilon_ramp=…)` (default off);
+   `pin_transverse_field(; Bz, q)` is the built-in conjugate-field pin
+   (`src/solvers/ground_state/pinned.jl`).
 
 ## Pillar 2 — correctness (verification layer)
 
@@ -93,12 +97,17 @@ Headline = phase diagram with Majorana-star insets per region.
 
 ## Status (2026-06-24) and tooling
 
-Implemented + validated, all LOCAL (TSUBAME points untouched):
-`scripts/eu_pinning_extrapolation.jl`, `eu_truegs_figure_data.jl` (+TG_SEED),
-`eu_truegs_texture.jl`, `upsample_spinor.jl`, `phase_recon.jl` (1D + 2D B×λ), and
-`viz_*` companions. Results: 1D cyclic→FM @57.5µG (matches known ~60µG); 2D (B×λ)
-boundary sweeps with λ, |F⊥| maximal in the oblate+weak-field corner; convergence-
-quality map = soft-manifold map = where pinning is needed.
+Implemented + validated, all LOCAL (TSUBAME points untouched). The durable
+capabilities live in `src/`: the pin ε-continuation + extrapolation
+(`find_ground_state_lbfgs(; pin, epsilon_ramp)` + `pin_transverse_field`,
+`src/solvers/ground_state/pinned.jl`), spectral seeding (`upsample_spinor`,
+`src/workflow/initialization/upsample.jl`), and the gauge/frame-invariant
+classifier (`spinor_fingerprint`, `src/analysis/phases/spinor_fingerprint.jl`,
+flux-closure oracle `test/analysis/test_spinor_fingerprint.jl`). The one-off
+campaign drivers (recon sweeps, figure/texture emitters, viz) are not committed;
+reconstruct from these primitives. Results: 1D cyclic→FM @57.5µG (matches known
+~60µG); 2D (B×λ) boundary sweeps with λ, |F⊥| maximal in the oblate+weak-field
+corner; convergence-quality map = soft-manifold map = where pinning is needed.
 
 Next: refine boundaries (bisection+active-learning); re-converge cyclic cells WITH
 pin (provisional labels are under-converged); seed-up confirmed cells 32→64→128;

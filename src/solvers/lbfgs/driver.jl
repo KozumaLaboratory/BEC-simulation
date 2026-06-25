@@ -39,7 +39,24 @@ function find_ground_state_lbfgs(;
     newton_max_outer::Int=20,
     newton_max_cg::Int=40,
     newton_eps::Float64=1.0e-6,
+    pin::Union{Nothing, Function}=nothing,        # ε -> (; zeeman=…) | (; potential=…)
+    epsilon_ramp::AbstractVector{<:Real}=Float64[],  # non-empty ⇒ pin ε→0 continuation
 )
+    # Soft-manifold pin continuation: a descending ε ramp with a symmetry-breaking
+    # pin reaches an isolated minimum (|∇E|~1e-5) and the ε→0 extrapolation
+    # certifies the degenerate-problem energy. Default-off (empty ramp) ⇒ the
+    # ordinary single solve below runs unchanged.
+    if !isempty(epsilon_ramp)
+        return _lbfgs_pin_continuation(;
+            pin, epsilon_ramp, grid, atom, interactions, zeeman, potential,
+            n_steps, tol, initial_state, init_state_params, psi_init, ws_init,
+            enable_ddi, c_dd, secular_ddi, ddi_trunc_radius, ddi_padding, ddi_pad_factor,
+            quasi_2d_ddi, l_z_ddi, target_magnetization, backend, m_lbfgs, verbose,
+            light_shift, dtype, sobolev_alpha, precond_alpha_v, precond_alpha_k,
+            rotating_frame_omega, newton_polish, newton_max_outer, newton_max_cg, newton_eps,
+        )
+    end
+
     # F32 gradient norm floors around unit roundoff (~1e-7 scaled by grid dV).
     # Relax the default convergence test so F32 runs don't burn all n_steps.
     T_effective = if ws_init !== nothing

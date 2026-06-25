@@ -28,6 +28,7 @@ include("solvers/lbfgs/energy_gradient.jl")
 include("solvers/lbfgs/helpers.jl")
 include("solvers/lbfgs/atomic.jl")
 include("solvers/lbfgs/driver.jl")
+include("solvers/ground_state/pinned.jl")  # symmetry-breaking pin + ε→0 extrapolation (soft manifold)
 include("solvers/hessian.jl")  # second-variation HvP + trapped-BdG λ_min
 include("solvers/trapped_bdg.jl")  # dense non-Hermitian trapped BdG (dynamical axis)
 include("solvers/newton_cg.jl")  # trust-region Newton-CG on the gate-2 operator
