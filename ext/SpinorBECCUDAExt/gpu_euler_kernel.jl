@@ -167,12 +167,118 @@ function apply_euler_5stage_fused_kernel!(
     nothing
 end
 
+# --- Warp-cooperative DDI euler kernel ---
+#
+# The one-thread-per-voxel `_ddi_euler_kernel!` holds the full spinor in two
+# MVector{D} (s + tmp). At D=13 these spill to local memory (464 B/thread F64,
+# measured) and the four dense D×D matvecs read/write that spilled vector — the
+# kernel is local-memory/occupancy bound, not arithmetic bound (F32 == F64
+# wall). This variant maps ONE spin component to ONE warp lane: the spinor
+# lives across lanes in registers (no spill), and each D×D matvec is a
+# shfl-broadcast reduction. Two voxels share a 32-lane warp via width-16
+# subgroups (lanes 13–15 / 29–31 idle). The sign-bearing 5-stage body is the
+# SAME math as `_euler_apply_voxel!` (single physics declaration preserved).
+const _DDI_EULER_WARP = Ref(true)
+
+# Broadcast lane `src` (1-based) within this lane's width-W subgroup.
+@inline function _shfl_c(z::Complex{T}, src::Integer, ::Val{W}) where {T, W}
+    re = CUDA.shfl_sync(0xffffffff, real(z), src, W)
+    im = CUDA.shfl_sync(0xffffffff, imag(z), src, W)
+    Complex{T}(re, im)
+end
+
+# v_out[c] = Σ_k M[linear(c,k)] · s_k, with s_k broadcast from lane k of the
+# subgroup. `lin(c,k)` returns the column-major linear index into the shared
+# D×D matrix for output row `c`, source `k`.
+@inline function _warp_matvec(s::Complex{T}, sh, cc::Int, ::Val{D}, ::Val{W}, lin::F) where {T, D, W, F}
+    acc = zero(Complex{T})
+    @inbounds for k in 1:D
+        a = _shfl_c(s, k, Val(W))
+        acc += sh[lin(cc, k)] * a
+    end
+    acc
+end
+
+@inline function _euler_apply_warp!(
+    psi, vox, in_range, active, cc, α, β, θ, m_c, λ_c, shV, shCV, ::Val{D}, ::Val{IT},
+) where {D, IT}
+    T = real(eltype(psi))
+    CT = Complex{T}
+    W = 16
+    # conjV[k, j] (j=cc) → (cc-1)*D + k ;  V[c, k] (c=cc) → (k-1)*D + cc
+    cvlin = (c, k) -> (c - 1) * D + k
+    vlin  = (c, k) -> (k - 1) * D + c
+
+    s = (active && in_range) ? (@inbounds psi[vox, cc]) : zero(CT)
+
+    # Step 1: R_z(-α) → s_c *= cis(+m_c α)
+    s *= cis(m_c * α)
+    # Step 2: R_y(-β) = V·diag(cis(+βλ))·conj(V)ᵀ
+    s = _warp_matvec(s, shCV, cc, Val(D), Val(W), cvlin) * cis(β * λ_c)
+    s = _warp_matvec(s, shV, cc, Val(D), Val(W), vlin)
+    # Step 3: D_z(θ)
+    s *= IT ? exp(-m_c * θ) : cis(-m_c * θ)
+    # Step 4: R_y(β)
+    s = _warp_matvec(s, shCV, cc, Val(D), Val(W), cvlin) * cis(-β * λ_c)
+    s = _warp_matvec(s, shV, cc, Val(D), Val(W), vlin)
+    # Step 5: R_z(α) → s_c *= cis(-m_c α)
+    s *= cis(-m_c * α)
+
+    if active && in_range
+        @inbounds psi[vox, cc] = s
+    end
+    nothing
+end
+
+@inline function _ddi_euler_warp_kernel!(
+    psi, phi_x, phi_y, phi_z, m_gpu, λ_gpu, V, conj_V, dt::T, ::Val{D}, ::Val{IT},
+) where {T, D, IT}
+    CT = Complex{T}
+    shV = CUDA.CuStaticSharedArray(CT, D * D)
+    shCV = CUDA.CuStaticSharedArray(CT, D * D)
+    _load_shared_eigvecs!(shV, shCV, V, conj_V, Val(D * D))
+
+    tib = CUDA.threadIdx().x
+    lane0 = (tib - 1) & 31
+    sg = lane0 >> 4            # 0 or 1 — subgroup (voxel within warp)
+    sl = lane0 & 15           # 0..15 — local lane = component index
+    warp_in_block = (tib - 1) >> 5
+    gwarp = (CUDA.blockIdx().x - 1) * (CUDA.blockDim().x >> 5) + warp_in_block
+    vox = gwarp * 2 + sg + 1
+    N = size(psi, 1)
+    active = sl < D
+    in_range = vox <= N
+    cc = active ? sl + 1 : 1
+    m_c = active ? (@inbounds m_gpu[1, cc]) : zero(T)
+    λ_c = active ? (@inbounds λ_gpu[1, cc]) : zero(T)
+
+    # Angles are voxel-uniform: compute the transcendentals (atan/acos/sqrt)
+    # ONCE on the subgroup's lane 0 and broadcast — not 13× redundantly.
+    α = zero(T); β = zero(T); θ = zero(T)
+    if sl == 0 && in_range
+        px = @inbounds phi_x[vox]
+        py = @inbounds phi_y[vox]
+        pz = @inbounds phi_z[vox]
+        pm = sqrt(px * px + py * py + pz * pz)
+        α = atan(py, px)
+        β = acos(clamp(pz / max(pm, floatmin(T)), -one(T), one(T)))
+        θ = pm * dt
+    end
+    α = CUDA.shfl_sync(0xffffffff, α, 1, 16)
+    β = CUDA.shfl_sync(0xffffffff, β, 1, 16)
+    θ = CUDA.shfl_sync(0xffffffff, θ, 1, 16)
+    _euler_apply_warp!(psi, vox, in_range, active, cc, α, β, θ,
+        m_c, λ_c, shV, shCV, Val(D), Val(IT))
+    return nothing
+end
+
 """
     apply_ddi_euler_fused_kernel!(psi_2d, phi_x, phi_y, phi_z, m_gpu, λ_gpu, V, conj_V, dt; imaginary_time)
 
 DDI rotation: per-voxel Euler angles computed in-register from the dipolar
 field `Φ` (N-vectors `phi_x/y/z`) then the 5-stage rotation — one launch, no
-separate angle-broadcast pass.
+separate angle-broadcast pass. Uses the warp-cooperative kernel (one component
+per lane, no local-memory spill) unless `_DDI_EULER_WARP[]` is disabled.
 """
 function apply_ddi_euler_fused_kernel!(
     psi_2d::CuArray{Complex{T}, 2},
@@ -184,10 +290,19 @@ function apply_ddi_euler_fused_kernel!(
 ) where {T <: AbstractFloat}
     N = size(psi_2d, 1)
     D = size(psi_2d, 2)
-    threads = min(N, 256)
-    blocks = cld(N, threads)
-    CUDA.@cuda threads = threads blocks = blocks _ddi_euler_kernel!(
-        psi_2d, phi_x, phi_y, phi_z, m_gpu, λ_gpu, V, conj_V, T(dt),
-        Val(D), Val(imaginary_time))
+    if _DDI_EULER_WARP[]
+        voxels_per_block = 16        # 256 threads / 32 × 2 voxels per warp
+        threads = 256
+        blocks = cld(N, voxels_per_block)
+        CUDA.@cuda threads = threads blocks = blocks _ddi_euler_warp_kernel!(
+            psi_2d, phi_x, phi_y, phi_z, m_gpu, λ_gpu, V, conj_V, T(dt),
+            Val(D), Val(imaginary_time))
+    else
+        threads = min(N, 256)
+        blocks = cld(N, threads)
+        CUDA.@cuda threads = threads blocks = blocks _ddi_euler_kernel!(
+            psi_2d, phi_x, phi_y, phi_z, m_gpu, λ_gpu, V, conj_V, T(dt),
+            Val(D), Val(imaginary_time))
+    end
     nothing
 end
