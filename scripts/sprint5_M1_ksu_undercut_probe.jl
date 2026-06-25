@@ -7,7 +7,7 @@
 #
 # Question: does :axial_spin_texture (proper KSU spin texture, NOT the
 # old mass-vortex-on-FM analog) find a lower-E basin than the Tier-1
-# seeds (PCV, fl_vortex, chiral, AFM, skyrmion_lattice) at representative
+# seeds (PCV, radial_spin_vortex, chiral, AFM, skyrmion_lattice) at representative
 # cells?
 #
 # Decision rule:
@@ -50,7 +50,7 @@ const PROBE_CELLS = [
 # Seed roster: existing Tier-1 + the NEW axial_spin_texture
 const PROBE_SEEDS = [
     :polar_core_vortex,
-    :fl_vortex,
+    :radial_spin_vortex,
     :chiral_spin_vortex,
     :antiferromagnetic,
     :m_plus_F,                  # baseline uniform-FM (Larmor in high-B/high-Ω cells)
@@ -63,8 +63,8 @@ function build_seed(seed::Symbol)
     sys = SpinSystem(PROBE_F)
     return if seed === :polar_core_vortex
         init_psi(PROBE_GRID, sys; state=:polar_core_vortex, init_vortex_charge=1)
-    elseif seed === :fl_vortex
-        init_psi(PROBE_GRID, sys; state=:fl_vortex, init_vortex_charge=1)
+    elseif seed === :radial_spin_vortex
+        init_psi(PROBE_GRID, sys; state=:radial_spin_vortex, init_vortex_charge=1)
     elseif seed === :chiral_spin_vortex
         init_psi(PROBE_GRID, sys; state=:chiral_spin_vortex, init_vortex_charge=1)
     elseif seed === :antiferromagnetic

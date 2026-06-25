@@ -64,11 +64,11 @@ const TOL_E_SADDLE = 1e-5         # E_reconv < E_cand − TOL → saddle (found 
 # Tier 1 — texture primary (real basins per Phase-1 arc closure)
 # NOTE: :ksu_circulation in north_star plan is axial m_plus_F + winding
 # but no init_psi builder exists; future addition. Currently covered
-# approximately by :polar_core_vortex (axial polar core) + :fl_vortex
+# approximately by :polar_core_vortex (axial polar core) + :radial_spin_vortex
 # (xy winding) + :chiral_spin_vortex (chiral winding).
 const TIER1_SEEDS = [
     :polar_core_vortex,
-    :fl_vortex,
+    :radial_spin_vortex,
     :antiferromagnetic,
     :chiral_spin_vortex,
     :skyrmion_lattice,
@@ -118,8 +118,8 @@ function build_seed(seed::Symbol, grid)
     sys = SpinSystem(TW.F)
     return if seed === :polar_core_vortex
         init_psi(grid, sys; state=:polar_core_vortex, init_vortex_charge=1)
-    elseif seed === :fl_vortex
-        init_psi(grid, sys; state=:fl_vortex, init_vortex_charge=1)
+    elseif seed === :radial_spin_vortex
+        init_psi(grid, sys; state=:radial_spin_vortex, init_vortex_charge=1)
     elseif seed === :antiferromagnetic
         init_psi(grid, sys; state=:antiferromagnetic)
     elseif seed === :chiral_spin_vortex

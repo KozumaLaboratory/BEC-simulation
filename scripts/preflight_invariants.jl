@@ -148,9 +148,9 @@ end
         ws = make_workspace(;
             grid, atom, interactions=ip, zeeman,
             potential=HarmonicTrap((1.0, 1.0)), sim_params=sp)
-        # fl_vortex: spin_coherent with θ=π/2 + winding 1 (the named-state
+        # radial_spin_vortex: spin_coherent with θ=π/2 + winding 1 (the named-state
         # builder forces both, so this is the safe canonical 2D vortex seed)
-        psi_2d = init_psi(grid, SpinSystem(1); state=:fl_vortex)
+        psi_2d = init_psi(grid, SpinSystem(1); state=:radial_spin_vortex)
         copyto!(ws.state.psi, psi_2d)
         n0 = sqrt(sum(abs2, ws.state.psi) * SpinorBEC.cell_volume(ws.grid))
         ws.state.psi ./= n0
