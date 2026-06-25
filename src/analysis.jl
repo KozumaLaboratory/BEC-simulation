@@ -53,6 +53,7 @@ include("analysis/phases/bogoliubov/scan.jl")
 include("analysis/phases/sign_pattern.jl")  # Paper #3 §VI Sign Pattern Lemma 1
 include("analysis/phases/F6_phase_diagram.jl")  # Paper #2 (g_10, g_12) scan
 include("analysis/phases/polyhedral_classifier.jl")  # σ_S fingerprint classifier + direct ΔE
+include("analysis/phases/spinor_fingerprint.jl")  # gauge/frame-invariant spinor-texture fingerprint
 include("analysis/sweep_contract.jl")    # SweepResult / SweepAxis / Hypothesis + dominant-m margin
 include("analysis/sweep_colormaps.jl")   # frozen reference LUTs + per-cell hex + positive-clip range
 include("analysis/sweep_golden.jl")      # golden per-cell table + VSUP-lite quality alpha

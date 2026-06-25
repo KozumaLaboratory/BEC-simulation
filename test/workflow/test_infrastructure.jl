@@ -313,7 +313,7 @@ const _SKIP_HEAVY_YAML_INFRA =
         all_states = [
             "polar", "m_plus_F", "m_minus_F",
             "uniform", "antiferromagnetic", "random",
-            "spin_coherent", "fl_vortex", "spin_helix",
+            "spin_coherent", "radial_spin_vortex", "flower", "spin_helix",
             "cyclic", "biaxial_nematic", "polar_core_vortex",
             "bright_soliton", "dark_soliton", "skyrmion",
             "gaussian_wavepacket", "domain_wall", "two_packets",
@@ -565,7 +565,7 @@ pipeline:
         all_states = [
             "polar", "ferromagnetic", "ferromagnetic_min",
             "uniform", "antiferromagnetic", "random",
-            "spin_coherent", "fl_vortex", "spin_helix",
+            "spin_coherent", "radial_spin_vortex", "flower", "spin_helix",
             "cyclic", "biaxial_nematic", "polar_core_vortex",
             "bright_soliton", "dark_soliton", "skyrmion",
             "gaussian_wavepacket", "domain_wall", "two_packets",

@@ -23,6 +23,7 @@ const FAST_TESTS = [
     "analysis/test_spin_rotation.jl",
     "analysis/test_sign_pattern.jl",
     "analysis/test_polyhedral_classifier.jl",
+    "analysis/test_spinor_fingerprint.jl",
     "analysis/test_larmor_adiabaticity.jl",
     # TODO(dipole_field): re-add when test/analysis/test_dipole_field.jl lands —
     # the referenced file was never committed (left a dangling include that

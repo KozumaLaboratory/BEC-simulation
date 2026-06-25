@@ -11,7 +11,7 @@
 #   * N_LBFGS = 5000 (5× the polished N_LBFGS = 1000)
 #   * Sobolev α = 0.05 (2.5× the polished α = 0.02; needed for
 #     finer-conditioning of the rotating-frame full functional)
-#   * 2-seed multistart per cell: :polar + :fl_vortex(charge=1).
+#   * 2-seed multistart per cell: :polar + :radial_spin_vortex(charge=1).
 #     Pick the lowest-E cell that passes the ‖∇E‖ gate.
 #
 # ─── PER-CELL CACHE + RESUME ──────────────────────────────────
@@ -62,7 +62,7 @@ const NOISE_AMP = 0.01
 
 const OMEGAS = [0.0, 0.1, 0.2, 0.4, 0.6]
 const B_VALUES_NT = [0.0, 1.0, 2.6, 5.0, 10.0, 100.0]
-const SEEDS = [:polar, :fl_vortex]
+const SEEDS = [:polar, :radial_spin_vortex]
 const NOISE_SEED = 1
 const OUT_DIR = "runs/sprint5_M1_ITP_omega_sweep_converged"
 
@@ -80,8 +80,8 @@ const ORACLE_FZ_UPPER = ORACLE_FZ_HIGH_B * (1 + ORACLE_TOL)   # ≈ 0.312
 
 function build_seed(state::Symbol, grid::Grid)
     sys = SpinSystem(TW.F)
-    if state == :fl_vortex
-        return init_psi(grid, sys; state=:fl_vortex, init_vortex_charge=1)
+    if state == :radial_spin_vortex
+        return init_psi(grid, sys; state=:radial_spin_vortex, init_vortex_charge=1)
     else
         return init_psi(grid, sys; state=state)
     end
@@ -99,7 +99,7 @@ function run_cell_one_seed(omega::Float64, B_nT::Float64, seed_state::Symbol)
     psi_init = build_seed(seed_state, TW.grid)
     add_white_noise!(psi_init, NOISE_AMP, NOISE_SEED, TW.grid)
 
-    initial_state_for_fgs = seed_state == :fl_vortex ? :fl_vortex : :polar
+    initial_state_for_fgs = seed_state == :radial_spin_vortex ? :radial_spin_vortex : :polar
 
     t0 = time()
     r_itp = find_ground_state(;
