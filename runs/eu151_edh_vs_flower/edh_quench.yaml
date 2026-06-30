@@ -33,7 +33,7 @@
 defaults:
   kind:         spinor
   backend:      gpu
-  interactions: {omega_ref: 691.15}    # seed ω_ref for every B→p conversion
+  interactions: {N_atoms: 50000, omega_ref: 691.15}    # in defaults so EVERY step (incl. dynamics K_3) inherits N+ω_ref    # seed ω_ref for every B→p conversion
 
 mixins:
   eu151_edh_phys:
@@ -47,26 +47,39 @@ mixins:
     # is the cached b_sweep seed re-polished under the current scheme.
 
 pipeline:
-  # ── Stage 0: 10 mG ground state — LOADED from the re-polished cache.
-  #    The cache is produced by scripts/edh_vs_flower/repolish_gs.jl, which
-  #    takes the Tsubame b_sweep seed (lbfgs_10mG_final_psi.jld2, N=5e4,
-  #    box=18, old scheme 9925f41a) and re-polishes it with the CURRENT-main
-  #    LBFGS (verified: the old cache is NOT stationary under the new scheme —
-  #    E drops 12.1→9.5 under re-polish; the scheme moved the minimum). When
-  #    the cache file is present this stage loads it instantly; the itp
-  #    fallback below only fires on a cold cache miss. NO LHY (prior research
-  #    did not use it).
+  # ── Stage 0: ITP from a RANDOM initial state — an unbiased global relaxation
+  #    to the current-scheme ground state. No stale seed (the old b_sweep cache
+  #    is from a different scheme and is non-stationary here, so re-polishing it
+  #    risks landing in the wrong local minimum at near-degenerate 10 mG). A
+  #    random start also avoids the m=+F unstable-fixed-point trap. ITP damps
+  #    energy monotonically; a rising E flags a bad state. Loud progress bar
+  #    with live ETA. NO LHY (prior research did not use it).
   - ground_state:
       use:           [eu151_edh_phys]
-      method:        itp                         # cold fallback only; cache wins
+      method:        itp
       B:             {Bz: "0.01 Gauss"}          # 10 mG = 1.0 µT (Matsui prep)
-      initial_state: m_plus_F
+      initial_state: random
       n_steps:       100000
-      tol:           1.0e-10
+      tol:           1.0e-9
       dt:            0.005
-      cache:         runs/eu151_edh_vs_flower/cache/gs_10mG_repolished.jld2
+      cache:         runs/eu151_edh_vs_flower/cache/gs_10mG_itp.jld2
 
-  # ── Stage 1: the QUENCH. Bz 10 mG → 26 µG in 0.20 ms (0.14 internal).
+  # ── Stage 1: LBFGS polish (Sobolev α=0.5, the empirically good value) to a
+  #    research-grade STATIONARY ψ — the ITP stall point alone is not tight
+  #    enough for weak-field dynamics on the near-degenerate manifold. Picks up
+  #    the ITP ψ by continuation; caches the polished result.
+  - ground_state:
+      use:           [eu151_edh_phys]
+      method:        lbfgs
+      B:             {Bz: "0.01 Gauss"}
+      n_steps:       3000
+      tol:           1.0e-7
+      m_lbfgs:       10
+      sobolev_alpha: 0.5
+      checkpoint_every: 150     # save cache every 150 steps → stop/resume anytime
+      cache:         runs/eu151_edh_vs_flower/cache/gs_10mG_lbfgs.jld2
+
+  # ── Stage 2: the QUENCH. Bz 10 mG → 26 µG in 0.20 ms (0.14 internal).
   #    dt 0.0005 → 280 steps; save every 10 → 28 full-ψ frames over the
   #    quench. The aligned stretched state is a Zeeman eigenstate during a
   #    pure-magnitude quench, so the transverse precession that seeds EdH is
@@ -76,6 +89,12 @@ pipeline:
       duration: 0.14
       dt:       0.0005
       B:        {Bz: {from: 0.01, to: 2.6e-5, duration: 0.14}}
+      # Matsui three-body loss K_3 = 2.1e-40 m^6/s (non-Hermitian, RTP only),
+      # uniform across all 13 m-components. SAME value in both legs ⇒ the
+      # comparison stays controlled; K_3 also dissipates the weak-field
+      # Townes/roton collapse core (N=5e4, no LHY) so the long run survives.
+      # Parser converts SI→dimensionless via n0²/ω_ref (needs atom+N+ω_ref).
+      loss:     {K3_per_m_si: ["2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s"]}
       save:     {every: 10, psi: true, precision: f32}
 
   # ── Stage 2: weak-field HOLD at 26 µG. EdH spin→orbital transfer + texture.
@@ -90,6 +109,7 @@ pipeline:
       duration:      287.86
       dt:            0.005
       B:             {Bz: "2.6e-5 Gauss"}
+      loss:          {K3_per_m_si: ["2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s"]}
       seed_amplitude: 1.0e-6
       seed_k_cut:     2.5
       noise_seed:     42

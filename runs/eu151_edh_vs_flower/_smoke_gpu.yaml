@@ -1,0 +1,57 @@
+# GPU SMOKE of the full EdH/Flower pipeline — tiny grid, few steps, GPU backend.
+# Exercises EVERY new code path on TSUBAME hardware before the real job:
+#   ITP(random init) → LBFGS(sobolev_alpha 0.5) → RTP(quench) + K_3 loss
+#   + full-ψ f32 streaming save.  ~minutes on an H100.  NOT physics.
+# Run via:  julia --project=. scripts/edh_vs_flower/run_all.jl \
+#               runs/eu151_edh_vs_flower/_smoke_gpu.yaml runs/eu151_edh_vs_flower/_smoke_gpu.yaml
+
+defaults:
+  kind:         spinor
+  backend:      gpu
+  interactions: {N_atoms: 50000, omega_ref: 691.15}    # in defaults so EVERY step (incl. dynamics K_3) inherits N+ω_ref
+
+mixins:
+  smoke_phys:
+    atom:         Eu151
+    grid:         {n: [16, 16, 16], box: [18, 18, 18]}
+    potential:    {type: harmonic, omega: [1.0, 1.0, 1.182]}
+    interactions: {N_atoms: 50000, omega_ref: 691.15, c1_ratio: 0.0}
+
+pipeline:
+  - ground_state:
+      use:           [smoke_phys]
+      method:        itp
+      B:             {Bz: "0.01 Gauss"}
+      initial_state: random
+      n_steps:       300
+      tol:           1.0e-8
+      dt:            0.005
+      cache:         runs/eu151_edh_vs_flower/cache/_smoke_gpu_itp.jld2
+
+  - ground_state:
+      use:           [smoke_phys]
+      method:        lbfgs
+      B:             {Bz: "0.01 Gauss"}
+      n_steps:       30
+      tol:           1.0e-6
+      m_lbfgs:       10
+      sobolev_alpha: 0.5
+      checkpoint_every: 10
+      cache:         runs/eu151_edh_vs_flower/cache/_smoke_gpu_lbfgs.jld2
+
+  - dynamics:
+      duration: 0.02
+      dt:       0.001
+      B:        {Bz: {from: 0.01, to: 2.6e-5, duration: 0.02}}
+      loss:     {K3_per_m_si: ["2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s"]}
+      save:     {every: 5, psi: true, precision: f32}
+
+  - dynamics:
+      duration:      0.05
+      dt:            0.001
+      B:             {Bz: "2.6e-5 Gauss"}
+      loss:          {K3_per_m_si: ["2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s"]}
+      seed_amplitude: 1.0e-6
+      seed_k_cut:     2.5
+      noise_seed:     42
+      save:          {every: 10, psi: true, precision: f32}

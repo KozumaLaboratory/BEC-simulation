@@ -19,6 +19,7 @@
 #
 # Default: no LHY (matches the original no-LHY b_sweep). Pass --lhy to add the
 # scalar Lima-Pelster LHY (latest physics for Eu near the dipolar boundary).
+import CUDA   # loads the CUDA extension; harmless on CPU-only (functional()=false)
 using SpinorBEC
 using SpinorBEC: eu151_preset, ZeemanParams, find_ground_state_lbfgs, Units,
                  CPUBackend, CUDABackend, InteractionParams

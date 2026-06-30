@@ -19,7 +19,10 @@ def load_cache(path):
             if k == "meta":
                 d["meta"] = {mk: f["meta"][mk][()] for mk in f["meta"].keys()}
             else:
-                d[k] = f[k][()]
+                a = f[k][()]
+                # JLD2 (Julia, column-major) caches read back axis-reversed in
+                # h5py; `.T` restores the Julia (nf, …) logical order.
+                d[k] = a.T if np.ndim(a) > 1 else a
     return d
 
 

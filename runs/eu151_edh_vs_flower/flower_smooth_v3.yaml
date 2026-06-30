@@ -1,0 +1,85 @@
+# Flower v3 (2026-06-29): Goto descent truncated at 118.8uG(~120uG). K3=0. Loads gs_10mG_v3.jld2.
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions:
+    N_atoms: 50000
+    omega_ref: 691.15
+mixins:
+  eu151_edh_phys:
+    atom: Eu151
+    grid:
+      n:
+      - 64
+      - 64
+      - 64
+      box:
+      - 18
+      - 18
+      - 18
+    potential:
+      type: harmonic
+      omega:
+      - 1.0
+      - 1.0
+      - 1.182
+    interactions:
+      N_atoms: 50000
+      omega_ref: 691.15
+      c1_ratio: 0.0
+pipeline:
+- ground_state:
+    use:
+    - eu151_edh_phys
+    method: lbfgs
+    B:
+      Bz: 0.01 Gauss
+    n_steps: 1
+    tol: 1.0e-09
+    cache: runs/eu151_edh_vs_flower/cache/gs_10mG_v3.jld2
+- dynamics:
+    duration: 155.509
+    dt: 0.001
+    B:
+      Bz:
+        piecewise:
+          times:
+          - 0.0
+          - 6.912
+          - 13.823
+          - 20.735
+          - 27.646
+          - 29.028
+          - 30.411
+          - 31.793
+          - 33.175
+          - 34.558
+          - 51.836
+          - 69.115
+          - 86.394
+          - 103.673
+          - 120.951
+          - 138.23
+          - 155.509
+          values:
+          - 0.01
+          - 0.0082
+          - 0.0064
+          - 0.0046
+          - 0.0028
+          - 0.00216398
+          - 0.00166598
+          - 0.00130598
+          - 0.00108398
+          - 0.001
+          - 0.000821516
+          - 0.000660563
+          - 0.000517141
+          - 0.00039125
+          - 0.000282891
+          - 0.000192063
+          - 0.000118766
+    save:
+      every: 500
+      psi: true
+      precision: f32

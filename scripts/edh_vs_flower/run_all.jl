@@ -11,12 +11,16 @@
 # Defaults to the production configs. Returns nonzero on any failure.
 # ============================================================================
 
+import CUDA   # loads CUDA extension so YAML `backend: gpu` runs on the device
 using SpinorBEC
 using SpinorBEC: run_yaml
 include(joinpath(@__DIR__, "mermin_ho_diagnostic.jl"))   # run_mermin_ho_diagnostic
 
 const EDH_YAML = length(ARGS) >= 1 ? ARGS[1] : "runs/eu151_edh_vs_flower/edh_quench.yaml"
 const FLO_YAML = length(ARGS) >= 2 ? ARGS[2] : "runs/eu151_edh_vs_flower/flower_smooth.yaml"
+# Bulky full-ψ RTP results go to a DEDICATED data dir (FPE_RUNS_ROOT), NOT into
+# the code checkout — keeps the repo clean and outputs on the group disk.
+const RUNS_ROOT = get(ENV, "FPE_RUNS_ROOT", "runs")
 
 # Pick the result file: the largest *.jld2 in the run dir (the streamed full-ψ
 # result dwarfs any sidecar). Falls back to a recursive search.
@@ -33,7 +37,7 @@ end
 
 function process(label, yaml)
     println("\n", "="^70, "\n[run_all] $label  ←  $yaml\n", "="^70)
-    run_dir = run_yaml(yaml)
+    run_dir = run_yaml(yaml; base_dir=RUNS_ROOT)
     println("[run_all] $label run dir: $run_dir")
     result = find_result_jld2(run_dir)
     out_h5 = joinpath(run_dir, "mermin_ho_diag.jld2")

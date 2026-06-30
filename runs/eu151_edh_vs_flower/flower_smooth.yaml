@@ -26,7 +26,7 @@
 defaults:
   kind:         spinor
   backend:      gpu
-  interactions: {omega_ref: 691.15}
+  interactions: {N_atoms: 50000, omega_ref: 691.15}    # in defaults so EVERY step (incl. dynamics K_3) inherits N+ω_ref
 
 mixins:
   eu151_edh_phys:
@@ -36,20 +36,31 @@ mixins:
     interactions: {N_atoms: 50000, omega_ref: 691.15, c1_ratio: 0.0}
 
 pipeline:
-  # ── Stage 0: 10 mG ground state — LOADED from the SAME re-polished cache as
-  #    the EdH leg (identical path ⇒ computed once total). See edh_quench.yaml
-  #    and scripts/edh_vs_flower/repolish_gs.jl. NO LHY.
+  # ── Stage 0+1: 10 mG ground state — ITP (random init) → LBFGS (Sobolev 0.5),
+  #    IDENTICAL to the EdH leg (same cache paths ⇒ computed once total, the
+  #    second config loads them). Unbiased fresh search, no stale seed. NO LHY.
   - ground_state:
       use:           [eu151_edh_phys]
-      method:        itp                         # cold fallback only; cache wins
+      method:        itp
       B:             {Bz: "0.01 Gauss"}
-      initial_state: m_plus_F
+      initial_state: random
       n_steps:       100000
-      tol:           1.0e-10
+      tol:           1.0e-9
       dt:            0.005
-      cache:         runs/eu151_edh_vs_flower/cache/gs_10mG_repolished.jld2
+      cache:         runs/eu151_edh_vs_flower/cache/gs_10mG_itp.jld2
 
-  # ── Stage 1: the GOTO Ch.6 FLOWER descent 10 mG → 26 µG over 274 ms.
+  - ground_state:
+      use:           [eu151_edh_phys]
+      method:        lbfgs
+      B:             {Bz: "0.01 Gauss"}
+      n_steps:       3000
+      tol:           1.0e-7
+      m_lbfgs:       10
+      sobolev_alpha: 0.5
+      checkpoint_every: 150     # save cache every 150 steps → stop/resume anytime
+      cache:         runs/eu151_edh_vs_flower/cache/gs_10mG_lbfgs.jld2
+
+  # ── Stage 2: the GOTO Ch.6 FLOWER descent 10 mG → 26 µG over 274 ms.
   #    The user's established protocol: a LINEAR ramp first, then a PARABOLIC
   #    descent — NOT a pure parabola. Reproduces goto_protocol_10mG.jl:
   #      Phase 1 linear   (0–40 ms):   10 mG → 2.8 mG
@@ -68,6 +79,9 @@ pipeline:
           piecewise:
             times:  [0.0, 6.912, 13.823, 20.735, 27.646, 29.028, 30.411, 31.793, 33.175, 34.558, 51.836, 69.115, 86.394, 103.673, 120.951, 138.230, 155.509, 172.788, 189.375]
             values: [0.01, 0.0082, 0.0064, 0.0046, 0.0028, 0.00216398, 0.00166598, 0.00130598, 0.00108398, 0.001, 0.000821516, 0.000660563, 0.000517141, 0.00039125, 0.000282891, 0.000192063, 0.000118766, 6.3001e-05, 2.59597e-05]
+      # Matsui K_3 = 2.1e-40 m^6/s — SAME as the EdH leg (controlled comparison)
+      # + dissipates the weak-field collapse core. Uniform over 13 m-components.
+      loss:     {K3_per_m_si: ["2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s"]}
       save:     {every: 250, psi: true, precision: f32}
 
   # ── Stage 2: weak-field HOLD at 26 µG. Total wall = 189.375 + 98.625 = 288
@@ -78,6 +92,7 @@ pipeline:
       duration:      98.625
       dt:            0.005
       B:             {Bz: "2.6e-5 Gauss"}
+      loss:          {K3_per_m_si: ["2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s","2.1e-40 m^6/s"]}
       seed_amplitude: 1.0e-6
       seed_k_cut:     2.5
       noise_seed:     42

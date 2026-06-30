@@ -14,16 +14,16 @@
 #
 # -g goes on the qsub CLI, NOT as a directive (TSUBAME rejects #$ -g).
 #$ -cwd
-#$ -N edh_vs_flower
+#$ -N edh_flower_v2
 #$ -l gpu_h=1
 #$ -l h_rt=6:00:00
 #$ -j y
-#$ -o /gs/fs/tga-kozuma-kouhi/ue06186/runs/edh_vs_flower/uge.log
+#$ -o /gs/fs/tga-kozuma-kouhi/ue06186/runs/edh_vs_flower_v2/uge.log
 
 set -euo pipefail
 
 PROJECT_ROOT=${SPINORBEC_TSUBAME_PROJECT_ROOT:-/gs/fs/tga-kozuma-kouhi/ue06186/BEC-simulation}
-OUT_DIR=${SPINORBEC_TSUBAME_RUNS_ROOT:-/gs/fs/tga-kozuma-kouhi/ue06186/runs}/edh_vs_flower
+OUT_DIR=${SPINORBEC_TSUBAME_RUNS_ROOT:-/gs/fs/tga-kozuma-kouhi/ue06186/runs}/edh_vs_flower_v2
 DATA_ROOT=${FPE_RUNS_ROOT:-/gs/fs/tga-kozuma-kouhi/ue06186/runs/edh_vs_flower_data}
 
 mkdir -p "$OUT_DIR" "$DATA_ROOT"
@@ -54,8 +54,8 @@ echo "[edh_vs_flower] === precompile warmup ==="
 #         single Julia session (JIT paid once). Loud progress bars with ETA.
 echo "[edh_vs_flower] === ITP→LBFGS→RTP + diagnostic ==="
 "$JULIA" --project=. scripts/edh_vs_flower/run_all.jl \
-    runs/eu151_edh_vs_flower/edh_quench.yaml \
-    runs/eu151_edh_vs_flower/flower_smooth.yaml \
+    runs/eu151_edh_vs_flower/edh_quench_v2.yaml \
+    runs/eu151_edh_vs_flower/flower_smooth_v2.yaml \
     2>&1 | tee "$OUT_DIR/run_all.out"
 
 echo "[edh_vs_flower] done  $(date)"
