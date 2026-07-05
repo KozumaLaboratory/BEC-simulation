@@ -8,6 +8,7 @@ several times. Top row +Omega, bottom row -Omega -> opposite circulation.
 import os, glob
 import numpy as np
 import matplotlib.pyplot as plt
+import figstyle as fs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "vortex_timelapse")
@@ -34,8 +35,8 @@ def main():
     X, Y = np.meshgrid(x, y)  # note: fields are [ix,iy], we plot .T
 
     fig, axes = plt.subplots(2, len(FRAMES), figsize=(3.0 * len(FRAMES), 6.2))
-    rows = [("+0.50", "snaps_tv_pos", r"$+\Omega$ (CCW)", "#1f77b4"),
-            ("-0.50", "snaps_tv_neg", r"$-\Omega$ (CW)", "#d62728")]
+    rows = [("+0.50", "snaps_tv_pos", r"$+\Omega$ (CCW)", fs.POS),
+            ("-0.50", "snaps_tv_neg", r"$-\Omega$ (CW)", fs.NEG)]
 
     for ri, (tag, snapdir, lbl, col) in enumerate(rows):
         for ci, fr in enumerate(FRAMES):
@@ -51,7 +52,7 @@ def main():
                 sp = max(1, len(x) // 24)
                 spd = np.hypot(jx, jy)
                 lw = 1.4 * (spd / (spd.max() + 1e-12)).T
-                ax.streamplot(x, y, jx.T, jy.T, color="cyan", density=1.0,
+                ax.streamplot(x, y, jx.T, jy.T, color=fs.STREAM, density=1.0,
                               linewidth=0.8, arrowsize=0.8)
             if ci == 0:
                 ax.set_ylabel(lbl, fontsize=12, color=col, fontweight="bold")

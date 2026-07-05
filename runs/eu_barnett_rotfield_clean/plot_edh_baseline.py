@@ -10,23 +10,26 @@ Shows (from traj_edh_baseline.csv + snaps_edh/):
 import csv, os
 import numpy as np
 import matplotlib.pyplot as plt
+import figstyle as fs
 from matplotlib import cm
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CSV = os.path.join(HERE, "traj_edh_baseline.csv")
-SNAP = os.path.join(HERE, "snaps_edh")
+CSV = os.path.join(HERE, "traj_edh_final.csv")     # box=18, grid+dt converged
+SNAP = os.path.join(HERE, "snaps_edh_final")
 OUT = os.path.join(HERE, "edh_baseline")
 OTAG = "+0.00"
+F = 6
 
 
 def load():
     r = list(csv.DictReader(open(CSV)))
     t = np.array([float(x["t"]) for x in r])
     d = {k: np.array([float(x[k]) for x in r]) for k in
-         ("Fz", "Lz", "Jz", "vtx_plus", "vtx_minus", "vtx_net", "core_contrast", "peak")}
+         ("Fz", "Lz", "Jz", "peak")}
     ms = sorted((int(k.split("pop_m")[1]) for k in r[0] if k.startswith("pop_m")), reverse=True)
     pops = {m: np.array([float(x[f"pop_m{m}"]) for x in r]) for m in ms}
-    return t, d, pops, ms
+    lzm = {m: np.array([float(x[f"Lz_m{m}"]) for x in r]) for m in ms}
+    return t, d, pops, lzm, ms
 
 
 def fld(frame, name):
@@ -35,7 +38,7 @@ def fld(frame, name):
 
 
 def main():
-    t, d, pops, ms = load()
+    t, d, pops, lzm, ms = load()
     fig = plt.figure(figsize=(15, 9))
     gs = fig.add_gridspec(2, 3, height_ratios=[1, 1.15], hspace=0.30, wspace=0.28)
 
@@ -52,24 +55,35 @@ def main():
 
     # (b) Jz conservation — the EdH proof
     axb = fig.add_subplot(gs[0, 1])
-    axb.plot(t, d["Fz"], color="#d62728", lw=2.2, label=r"$\langle F_z\rangle$ (spin)")
-    axb.plot(t, d["Lz"], color="#1f77b4", lw=2.2, label=r"$\langle L_z\rangle$ (orbital)")
+    axb.plot(t, d["Fz"], color=fs.NEG, lw=2.2, label=r"$\langle F_z\rangle$ (spin)")
+    axb.plot(t, d["Lz"], color=fs.POS, lw=2.2, label=r"$\langle L_z\rangle$ (orbital)")
     axb.plot(t, d["Jz"], color="k", lw=2.2, ls="--", label=r"$\langle J_z\rangle=F_z+L_z$")
     axb.axhline(6.0, color="gray", lw=0.8, ls=":")
+    jz_drift = (d["Jz"][0] - d["Jz"][-1]) / d["Jz"][0] * 100
+    axb.text(0.5, 6.15, f"$J_z$ conserved to {jz_drift:.1f}% (box-limited)",
+             fontsize=8.5, color="#5b5f6b")
     axb.set_xlabel(r"$t\ (\omega_{\rm ref}^{-1})$")
     axb.set_ylabel("angular momentum ($\\hbar$/atom)")
     axb.set_title("(b) Einstein-de Haas: spin $\\to$ orbital, $J_z$ conserved")
-    axb.legend(fontsize=9); axb.grid(alpha=0.3)
+    axb.legend(fontsize=9)
 
-    # (c) vortex census
+    # (c) per-m orbital charge l_m = <L_z>_m / pop_m -> quantised EdH law l = F - m.
+    # Each spin flip m->m-1 transfers one quantum of orbital AM (J_z conservation),
+    # so component m carries vorticity (F - m). Trustworthy (smooth, physical);
+    # replaces the edge-noisy plaquette winding count.
     axc = fig.add_subplot(gs[0, 2])
-    axc.plot(t, d["vtx_plus"], color="#1f77b4", lw=1.8, label="+1 windings")
-    axc.plot(t, d["vtx_minus"], color="#d62728", lw=1.8, label="-1 windings")
-    axc.plot(t, d["vtx_net"], color="k", lw=2.0, ls="--", label="net")
-    axc.set_xlabel(r"$t\ (\omega_{\rm ref}^{-1})$")
-    axc.set_ylabel("quantized vortices (mid-z)")
-    axc.set_title("(c) real vortices (winding census)")
-    axc.legend(fontsize=8); axc.grid(alpha=0.3)
+    it = np.argmax(t)  # final frame
+    mm = [m for m in ms if pops[m][it] > 0.02]
+    charge = [lzm[m][it] / pops[m][it] for m in mm]
+    axc.plot([-m + F for m in mm], charge, "o", color=fs.POS, ms=8, zorder=3,
+             label=r"measured $\langle L_z\rangle_m/n_m$")
+    lo, hi = min(-m + F for m in mm), max(-m + F for m in mm)
+    axc.plot([lo, hi], [lo, hi], "--", color="#5b5f6b", lw=1.6,
+             label=r"EdH law $\ell = F - m$")
+    axc.set_xlabel(r"spin flips $F-m$")
+    axc.set_ylabel(r"orbital charge $\ell_m$ (vortex quanta)")
+    axc.set_title("(c) quantised vortices: $\\ell_m = F - m$")
+    axc.legend(fontsize=9)
 
     # (d),(e): late-time density hole + phase winding
     x = np.loadtxt(os.path.join(SNAP, "grid_x.csv"), delimiter=",")
@@ -100,9 +114,15 @@ def main():
     axf = fig.add_subplot(gs[1, 2])
     ph = fld(frame, f"phase_m{m_show}")
     if ph is not None:
-        im = axf.imshow(ph.T, origin="lower", extent=ext, cmap="hsv", aspect="equal",
-                        vmin=-np.pi, vmax=np.pi)
-        plt.colorbar(im, ax=axf, fraction=0.046, label="phase")
+        # mask phase in the low-density halo (random phase there is noise);
+        # show the 2pi winding only where the component actually lives.
+        if dm is not None:
+            ph = np.ma.masked_where(dm < 0.06 * dm.max(), ph)
+        im = axf.imshow(ph.T, origin="lower", extent=ext, cmap=fs.CMAP_PHASE,
+                        aspect="equal", vmin=-np.pi, vmax=np.pi)
+        cb = plt.colorbar(im, ax=axf, fraction=0.046, ticks=[-np.pi, 0, np.pi])
+        cb.ax.set_yticklabels([r"$-\pi$", "0", r"$\pi$"])
+    axf.set_facecolor("#0c0c14")
     axf.set_title(f"(f) phase of $\\psi_{{m={m_show:+d}}}$ ($2\\pi$ winding = vortex)")
     axf.set_xlabel("x"); axf.set_ylabel("y")
 

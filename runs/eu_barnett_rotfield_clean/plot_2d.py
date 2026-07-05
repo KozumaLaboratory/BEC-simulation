@@ -7,6 +7,7 @@ Usage: plot_2d.py <summary_2d.csv>
 import csv, os, sys
 import numpy as np
 import matplotlib.pyplot as plt
+import figstyle as fs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "optimization_2d")

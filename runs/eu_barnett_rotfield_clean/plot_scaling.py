@@ -10,6 +10,7 @@ Usage: plot_scaling.py <omega_summary.csv> <field_summary.csv>
 import csv, os, sys
 import numpy as np
 import matplotlib.pyplot as plt
+import figstyle as fs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "optimization_scaling")
@@ -17,12 +18,16 @@ OUT = os.path.join(HERE, "optimization_scaling")
 
 def load(path):
     r = list(csv.DictReader(open(path)))
-    return {k: np.array([float(x[k]) for x in r]) for k in r[0]}
+    cols = list(r[0].keys())
+    d = {k: np.array([float(x[k]) for x in r]) for k in cols}
+    if "param" not in d:            # bz-sweep uses "Bz" as the axis column
+        d["param"] = d[cols[0]]
+    return d
 
 
 def main():
     om = load(sys.argv[1]) if len(sys.argv) > 1 and os.path.exists(sys.argv[1]) else None
-    fs = load(sys.argv[2]) if len(sys.argv) > 2 and os.path.exists(sys.argv[2]) else None
+    field = load(sys.argv[2]) if len(sys.argv) > 2 and os.path.exists(sys.argv[2]) else None
     bz = load(sys.argv[3]) if len(sys.argv) > 3 and os.path.exists(sys.argv[3]) else None
 
     ncol = 3 if bz is not None else 2
@@ -32,8 +37,8 @@ def main():
     if om is not None:
         ax = axes[0]
         o = om["param"]
-        ax.plot(o, om["peak_Lz"], "o-", color="#1f77b4", lw=2, ms=7, label=r"peak $|\langle L_z\rangle|$ (vortex)")
-        ax.plot(o, om["peak_Fz"], "s-", color="#d62728", lw=2, ms=7, label=r"peak $|\langle F_z\rangle|$ (Barnett)")
+        ax.plot(o, om["peak_Lz"], "o-", color=fs.POS, lw=2, ms=7, label=r"peak $|\langle L_z\rangle|$ (vortex)")
+        ax.plot(o, om["peak_Fz"], "s-", color=fs.NEG, lw=2, ms=7, label=r"peak $|\langle F_z\rangle|$ (Barnett)")
         iopt = int(np.argmax(om["peak_Lz"]))
         ax.axvline(o[iopt], color="gray", ls=":", lw=1)
         ax.annotate(f"opt $\\Omega$≈{o[iopt]:.2f}", (o[iopt], om['peak_Lz'][iopt]),
@@ -43,14 +48,14 @@ def main():
         ax.set_title("(a) vs rotation strength $\\Omega$")
         ax.legend(fontsize=9); ax.grid(alpha=0.3)
 
-    if fs is not None:
+    if field is not None:
         ax = axes[1]
-        b = fs["param"] * 1e5  # -> units of 1e-5 G
-        ax.plot(b, fs["peak_Lz"], "o-", color="#1f77b4", lw=2, ms=7, label=r"peak $|\langle L_z\rangle|$ (vortex)")
-        ax.plot(b, fs["peak_Fz"], "s-", color="#d62728", lw=2, ms=7, label=r"peak $|\langle F_z\rangle|$ (Barnett)")
-        iopt = int(np.argmax(fs["peak_Lz"]))
+        b = field["param"] * 1e5  # -> units of 1e-5 G
+        ax.plot(b, field["peak_Lz"], "o-", color=fs.POS, lw=2, ms=7, label=r"peak $|\langle L_z\rangle|$ (vortex)")
+        ax.plot(b, field["peak_Fz"], "s-", color=fs.NEG, lw=2, ms=7, label=r"peak $|\langle F_z\rangle|$ (Barnett)")
+        iopt = int(np.argmax(field["peak_Lz"]))
         ax.axvline(b[iopt], color="gray", ls=":", lw=1)
-        ax.annotate(f"opt $B$≈{b[iopt]:.1f}", (b[iopt], fs['peak_Lz'][iopt]),
+        ax.annotate(f"opt $B$≈{b[iopt]:.1f}", (b[iopt], field['peak_Lz'][iopt]),
                     textcoords="offset points", xytext=(6, 8), fontsize=10)
         ax.set_xscale("log")
         ax.set_xlabel(r"rotating-field amplitude $B_\perp$ ($10^{-5}$ G)")
@@ -61,8 +66,8 @@ def main():
     if bz is not None:
         ax = axes[2]
         b = bz["param"] * 1e5
-        ax.plot(b, bz["peak_Lz"], "o-", color="#1f77b4", lw=2, ms=7, label=r"peak $|\langle L_z\rangle|$ (vortex)")
-        ax.plot(b, bz["peak_Fz"], "s-", color="#d62728", lw=2, ms=7, label=r"peak $|\langle F_z\rangle|$ (Barnett)")
+        ax.plot(b, bz["peak_Lz"], "o-", color=fs.POS, lw=2, ms=7, label=r"peak $|\langle L_z\rangle|$ (vortex)")
+        ax.plot(b, bz["peak_Fz"], "s-", color=fs.NEG, lw=2, ms=7, label=r"peak $|\langle F_z\rangle|$ (Barnett)")
         iopt = int(np.argmax(bz["peak_Lz"]))
         ax.axvline(b[iopt], color="gray", ls=":", lw=1)
         ax.set_xlabel(r"static bias $B_z$ ($10^{-5}$ G)")

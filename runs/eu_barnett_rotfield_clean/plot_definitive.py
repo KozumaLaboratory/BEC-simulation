@@ -14,10 +14,11 @@ direction. Omega=0 control does nothing.
 import csv, os, glob
 import numpy as np
 import matplotlib.pyplot as plt
+import figstyle as fs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "barnett_direction_definitive")
-C = {"+0.50": "#1f77b4", "+0.00": "#777777", "-0.50": "#d62728"}
+C = {"+0.50": fs.POS, "+0.00": fs.ZERO, "-0.50": fs.NEG}
 LB = {"+0.50": r"$+\Omega$ (CCW)", "+0.00": r"$\Omega=0$ (control)", "-0.50": r"$-\Omega$ (CW)"}
 FRAME = 15  # ~t=7.5, peak vortex
 
@@ -75,7 +76,7 @@ def main():
         if dens is not None:
             axp.imshow(dens.T, origin="lower", extent=ext, cmap="magma", aspect="equal")
         if jx is not None and jy is not None:
-            axp.streamplot(x, x, jx.T, jy.T, color="cyan", density=1.2,
+            axp.streamplot(x, x, jx.T, jy.T, color=fs.STREAM, density=1.2,
                            linewidth=0.8, arrowsize=1.0)
         axp.set_title(f"{LB[tag]}: density + current ($t$=7.5)\n"
                       f"circulation reverses with rotation")

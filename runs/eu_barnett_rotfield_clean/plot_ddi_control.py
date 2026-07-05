@@ -11,6 +11,7 @@ The <L_z> signal is impossible from uniform forced precession.
 import csv, os
 import numpy as np
 import matplotlib.pyplot as plt
+import figstyle as fs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "ddi_control")
@@ -31,9 +32,9 @@ def main():
 
     def plot(ax, key, ttl, yl):
         if off is not None:
-            ax.plot(off["t"], off[key], color="#2ca02c", lw=2.2, label="DDI OFF (forced Larmor)")
+            ax.plot(off["t"], off[key], color=fs.OFF, lw=2.2, label="DDI OFF (forced Larmor)")
         if on is not None:
-            ax.plot(on["t"], on[key], color="#1f77b4", lw=2.2, label="DDI ON (genuine EdH)")
+            ax.plot(on["t"], on[key], color=fs.POS, lw=2.2, label="DDI ON (genuine EdH)")
         ax.axhline(0, color="k", lw=0.5)
         ax.set_xlabel(r"$t\ (\omega_{\rm ref}^{-1})$"); ax.set_ylabel(yl)
         ax.set_title(ttl); ax.legend(fontsize=9); ax.grid(alpha=0.3)

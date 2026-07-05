@@ -17,10 +17,11 @@ Row 2 (real-space, t=7.5): density + current streamlines
 import csv, os
 import numpy as np
 import matplotlib.pyplot as plt
+import figstyle as fs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "master_figure")
-C_OFF, C_POS, C_NEG = "#2ca02c", "#1f77b4", "#d62728"
+C_OFF, C_POS, C_NEG = fs.OFF, fs.POS, fs.NEG
 FRAME = 15
 
 
@@ -52,7 +53,7 @@ def main():
     ax.plot(onn["t"], onn["Lz"], color=C_NEG, lw=2.4, label=r"DDI ON, $-\Omega$")
     ax.axhline(0, color="k", lw=0.6)
     ax.set_xlabel(r"$t\ (\omega_{\rm ref}^{-1})$"); ax.set_ylabel(r"$\langle L_z\rangle\ (\hbar/\mathrm{atom})$")
-    ax.set_title("(a) VORTICES: genuine EdH + direction-controlled")
+    ax.set_title("(a) vortices $\\langle L_z\\rangle$ \u2014 need DDI", fontsize=11.5)
     ax.legend(fontsize=8.5, loc="lower left"); ax.grid(alpha=0.3)
     ax.text(0.97, 0.06, "no DDI $\\Rightarrow$ no vortices", transform=ax.transAxes,
             ha="right", fontsize=9, color=C_OFF, style="italic")
@@ -64,7 +65,7 @@ def main():
     ax.axhline(6, color="gray", ls=":", lw=1); ax.set_ylim(0, 6.5)
     ax.text(1, 6.12, "$F$=6 fully polarised", fontsize=8.5, color="gray")
     ax.set_xlabel(r"$t\ (\omega_{\rm ref}^{-1})$"); ax.set_ylabel(r"$|\langle\mathbf{F}\rangle|$")
-    ax.set_title("(b) SPIN LENGTH: DDI depolarises (real excitation)")
+    ax.set_title("(b) spin length $|F|$ \u2014 DDI depolarises", fontsize=11.5)
     ax.legend(fontsize=9); ax.grid(alpha=0.3)
     ax.text(0.97, 0.10, "no DDI $\\Rightarrow$ spin only rotates", transform=ax.transAxes,
             ha="right", fontsize=9, color=C_OFF, style="italic")
@@ -76,7 +77,7 @@ def main():
     ax.plot(onn["t"], onn["Fz"], color=C_NEG, lw=2.4, label=r"DDI ON, $-\Omega$")
     ax.axhline(0, color="k", lw=0.6)
     ax.set_xlabel(r"$t\ (\omega_{\rm ref}^{-1})$"); ax.set_ylabel(r"$\langle F_z\rangle\ (\hbar/\mathrm{atom})$")
-    ax.set_title("(c) $\\langle F_z\\rangle$: Larmor precession + Barnett tilt")
+    ax.set_title("(c) $\\langle F_z\\rangle$ \u2014 Larmor + Barnett", fontsize=11.5)
     ax.legend(fontsize=8.5, loc="lower left"); ax.grid(alpha=0.3)
 
     # row 2: real-space density + streamlines
@@ -92,7 +93,7 @@ def main():
         if dens is not None:
             ax.imshow(dens.T, origin="lower", extent=ext, cmap="magma", aspect="equal")
         if jx is not None and jy is not None:
-            ax.streamplot(x, x, jx.T, jy.T, color="cyan", density=1.1,
+            ax.streamplot(x, x, jx.T, jy.T, color=fs.STREAM, density=1.1,
                           linewidth=0.7, arrowsize=1.0)
         ax.set_title(ttl, fontsize=11)
         ax.set_xlabel("x"); ax.set_ylabel("y")

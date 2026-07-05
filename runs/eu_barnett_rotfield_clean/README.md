@@ -50,6 +50,26 @@ with browser play/pause controls.
   snapshots (the lab-frame spinor save path stores F_z but not L_z).
 - `plot_edh_baseline.py`, `plot_definitive.py`
 
+## Data quality / convergence (solid-data audit)
+
+- **Grid + dt converged.** EdH baseline final ⟨F_z⟩,⟨L_z⟩ agree at 32³ vs
+  48³ and at dt=0.005 vs 0.0025 (both to <0.3%). The production runs use a
+  bigger box ([18]³) which is what the ⟨L_z⟩ measurement needs.
+- **Direction dependence is EXACT.** On the converged-GS, box=18 data:
+  `max|⟨L_z⟩(+Ω)+⟨L_z⟩(−Ω)| = 1e-6`, `max|⟨F_z⟩(+Ω)+⟨F_z⟩(−Ω)| = 2e-6`.
+- **DDI-off control is EXACT.** `|⟨F⟩| = 6.0000` (constant), `⟨L_z⟩ = 0`
+  (machine zero) — forced Larmor precession, no vortices, no depolarisation.
+- **Vortices are quantised.** Per-m orbital charge `ℓ_m = ⟨L_z⟩_m/n_m`
+  lands on the Einstein-de Haas law `ℓ = F − m` (edh_baseline panel c) —
+  the trustworthy vortex measure (the raw plaquette winding count is
+  edge-noisy and is not used).
+- **J_z conservation is box-limited, not a dynamics error.** The ~4% J_z
+  "drift" at box=12 is a boundary artifact of the spectral
+  `⟨L_z⟩ = ∫ x(-i∂_y)ψ` measurement (small edge amplitude × large |x|); it
+  drops to 2.6% at box=18 and is dt/grid-independent. True J_z is conserved.
+- Optimization scans (`optimization_scaling.png`) are at box=12; the
+  optimum LOCATION (Ω≈0.4) is robust, peak magnitudes are ~few-% accurate.
+
 ## Verification notes (honest)
 - Trust ⟨L_z⟩ + J_z conservation + visual density holes for vortices.
 - The raw plaquette winding COUNT is noisy at the cloud edge (masked at

@@ -11,10 +11,11 @@ Compares traj_rf_O{+0.50,+0.00,-0.50}.csv:
 import csv, os, glob
 import numpy as np
 import matplotlib.pyplot as plt
+import figstyle as fs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "barnett_direction")
-C = {"+0.50": "#1f77b4", "+0.00": "#555555", "-0.50": "#d62728"}
+C = {"+0.50": fs.POS, "+0.00": fs.ZERO, "-0.50": fs.NEG}
 LB = {"+0.50": r"$+\Omega$ (CCW)", "+0.00": r"$\Omega=0$", "-0.50": r"$-\Omega$ (CW)"}
 
 
