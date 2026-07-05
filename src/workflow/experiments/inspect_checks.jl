@@ -389,14 +389,14 @@ end
 
 const COMPAT_TABLE = CompatRule[
     CompatRule(
-        :rotating_omega_spinor_gpu, :block,
-        "rotating_frame_omega + spinor + GPU will crash",
+        :rotating_omega_spinor_gpu, :warn,
+        "rotating_frame_omega + spinor + GPU: verify Coriolis GPU path",
         _compat_rotating_omega_spinor_gpu,
-        "`_apply_1d_shear_batch!` (the Coriolis term) scalar-indexes " *
-        "GPU arrays. This will throw at runtime, after `make_workspace` " *
-        "has already paid its precompile cost.",
-        "Force `backend: cpu` on this step, or move to the rotating_basis " *
-        "path which has a GPU-compatible shear.",
+        "`_apply_1d_shear_batch!` (the Coriolis term) previously scalar-" *
+        "indexed GPU arrays and crashed. Fixed 2026-06-02 (device-resident " *
+        "reshape + broadcast; verified 2026-07-05 GS ITP on GPU, no crash).",
+        "GPU is supported; if a scalar-indexing error resurfaces, fall back " *
+        "to `backend: cpu` or the rotating_basis path.",
     ),
     CompatRule(
         :polar_two_channel_lhy_high_F, :warn,

@@ -1,6 +1,11 @@
 export probability_current, orbital_angular_momentum, superfluid_velocity
 export total_angular_momentum, spin_texture_charge, circulation
 
+# Cache of CPU FFT plans keyed by spatial shape, so orbital_angular_momentum
+# does not rebuild FFTW plans on every call (per-save polling in the
+# rotating_basis dynamics loop makes that the dominant cost).
+const _ORBITAL_CPU_PLAN_CACHE = Dict{Tuple, Any}()
+
 """
 Probability current density j(r) = Σ_c Im(ψ_c* ∇ψ_c).
 Returns NTuple{N, Array{Float64,N}} of current components.
@@ -49,6 +54,10 @@ function orbital_angular_momentum(
 ) where {N}
     N >= 2 || return 0.0
 
+    # This routine does CPU FFTs (local_plans below); a GPU ψ would
+    # scalar-index in the copies/loops. Bring it host-side once.
+    psi = psi isa Array ? psi : Array(psi)
+
     n_comp = size(psi, N + 1)
     n_pts = ntuple(d -> size(psi, d), N)
     dV = cell_volume(grid)
@@ -62,7 +71,11 @@ function orbital_angular_momentum(
     # When called with `ws.fft_plans` from a GPU workspace, those are
     # CUFFT plans and applying them to a CPU array triggers massive
     # implicit transfers (saw 30 GB RSS spike at 24³ × D=13 before fix).
-    local_plans = make_fft_plans(n_pts; flags=FFTW.ESTIMATE)
+    # Cache CPU plans by shape — recreating them every call is the per-save
+    # bottleneck when this is polled inside a rotating_basis dynamics loop.
+    local_plans = get!(_ORBITAL_CPU_PLAN_CACHE, n_pts) do
+        make_fft_plans(n_pts; flags=FFTW.ESTIMATE)
+    end
 
     Lz = 0.0
 

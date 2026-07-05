@@ -449,3 +449,19 @@ Apply the Lima-Pelster DDI correction to a scalar LHY coefficient:
 function compute_c_lhy_with_ddi(c_lhy_scalar::Float64, eps_dd::Float64)
     c_lhy_scalar * lima_pelster_Q5(eps_dd)
 end
+
+"""
+    compute_gamma_lhy(a_s_over_aho, eps_dd, N_atoms) → Float64
+
+Dimensionless scalar LHY coefficient (Lima-Pelster) for the auto-derive
+path, identical to the non-rotating resolver in `parsing_blocks.jl`:
+
+    c_lhy = (128/(3√π)) · √(|a_s/a_ho|³) · N · Q₅(ε_dd)
+
+Restored after the rotating_basis refactor dropped it (the
+`run_step_rotating/ground_state.jl` auto-path calls it for ε_dd > 0.5).
+"""
+function compute_gamma_lhy(a_s_over_aho::Float64, eps_dd::Float64, N_atoms::Integer)
+    c_lhy_scalar = (128.0 / (3.0 * sqrt(π))) * sqrt(abs(a_s_over_aho)^3) * N_atoms
+    c_lhy_scalar * lima_pelster_Q5(eps_dd)
+end
