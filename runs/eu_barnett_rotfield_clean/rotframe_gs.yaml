@@ -1,0 +1,38 @@
+# Rotating-frame ground-state scan — equilibrium Barnett + vortex vs Omega.
+#
+# Fast, clean concept-validation for "rotation direction controls
+# magnetization (Barnett) AND vortices (L_z)". In the rotating frame
+# H_rot = H - Omega*(L_z + F_z): the -Omega*F_z Barnett term shifts the
+# spin ground state (p_eff = p + Omega), the -Omega*L_z term nucleates
+# vortices above a critical Omega. Both flip sign with rotation direction.
+#
+# This is the EQUILIBRIUM endpoint the dynamical rotating-field run
+# relaxes toward. Full F=6 Eu-151 (a_s=110 -> eps_dd<1, NO collapse,
+# the production regime); scan is over a SCALAR GS param so run_yaml's
+# scan mechanism applies cleanly (unlike sinusoidal.frequency).
+
+defaults:
+  kind:    spinor
+  backend: gpu
+  interactions: {N_atoms: 20000, omega_ref: 691.15}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [40, 40, 20], box: [16, 16, 8]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 2.0]}
+      interactions: {N_atoms: 20000, omega_ref: 691.15, c1_ratio: 0.02778}
+      ddi:   {enabled: true}
+      lhy:   {kind: none}
+      B:     {Bz: "2.6e-6 Gauss"}          # tiny seed field; Omega dominates
+      rotating_frame_omega: 0.0            # scanned below
+      initial_state: m_minus_F
+      init_sigma: 1.5
+      n_steps: 1500
+      tol: 1.0e-8
+      dt: 0.004
+
+scan:
+  product:
+    pipeline.0.ground_state.rotating_frame_omega:
+      [-0.8, -0.6, -0.4, -0.2, 0.0, 0.2, 0.4, 0.6, 0.8]

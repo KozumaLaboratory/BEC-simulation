@@ -1,0 +1,59 @@
+# Rotating field → vortices + Barnett spin excitation (direction-controlled)
+
+¹⁵¹Eu (F=6) dipolar BEC, 32³, N=30000, a_s=110a₀ (ε_dd<1, no collapse),
+full DDI (non-secular), scalar LHY, GPU, unitary (no loss). All angular
+momenta in ℏ/atom.
+
+## Results
+
+### 1. Einstein-de Haas: real vortices + real spin excitation (`edh_baseline.png`)
+`edh_baseline.yaml`: m=+6 GS → step-quench Bz (strong→weak) → DDI drives
+spin relaxation.
+- ⟨F_z⟩ +6 → +1.5 (m-ladder cascade, reaches negative m) = spin excitation.
+- ⟨L_z⟩ 0 → +4.5; **J_z = F_z+L_z ≈ 6 conserved** (spin→orbital transfer).
+- Real vortex in transferred m=+4: density ring + central hole + 2π winding.
+- Chirality here is set by the initial spin (J_z=+6), NOT rotation.
+
+### 2. Direction control needs J_z=0 start (`barnett_direction_definitive.png`)
+`run_transverse_barnett.jl`: GS with **B along +x** → transverse spin,
+⟨F_z⟩=0, J_z=0 → quench + field **rotating around z** at Ω∈{+0.5,0,−0.5}.
+- **Ω=0 control: ⟨F_z⟩=⟨L_z⟩=0 for all time** — rotation is the cause.
+- **⟨L_z⟩(+Ω) = −⟨L_z⟩(−Ω) exactly** (mirror residual 0%); vortices reverse.
+- **⟨F_z⟩(+Ω) = −⟨F_z⟩(−Ω) exactly** — Barnett magnetization, direction-set.
+- Vortex chirality: +Ω → net winding −2, −Ω → +2 (real density cores).
+- Exact mirror because the setup is symmetric under Ω→−Ω combined with z→−z.
+
+### Why a naive m=+F rotating-field run does NOT show clean direction dependence
+`run_rotfield_dyn.jl` (m=+6 start): the EdH from the initial spin (J_z=+6)
+dominates; ±Ω only modulate it ~20–30% (oscillatory, sign-consistency≈0).
+The J_z=0 start removes that bias so rotation alone sets the chirality.
+
+### 3. Optimization: response vs rotation Ω and field strength (`optimization_scaling.png`)
+Transverse start, peak amplitudes over the drive:
+- **vs Ω** (rotation rate): both vortex ⟨L_z⟩ and Barnett ⟨F_z⟩ peak at **Ω≈0.4**
+  (rise from 0 at Ω=0; fall past 0.4 as Ω→ω_⊥=1, centrifugal deconfinement).
+- **vs B_perp** (rotating-field amplitude): Barnett peaks at **B_perp≈4e-5 G**,
+  vortex at **≈8e-5 G**; both fall at large B (spin locks to field, less transfer).
+- **vs B_z** (static bias) — panel (c), and the **2D Ω×B_perp heatmap**
+  (`optimization_2d.png`): the joint optimum surface.
+
+### 4. Animation (`vortex_animation.mp4` / `.html`)
++Ω / Ω=0 / −Ω side by side, vortex-host density + current streamlines,
+24 fps (temporally interpolated), fixed layout, live ⟨L_z⟩/⟨F_z⟩ readout.
+mp4 is pausable/scrubbable in any player / PowerPoint; the `.html` wraps it
+with browser play/pause controls.
+
+## Scripts
+- `edh_baseline.yaml`, `run_rotfield_dyn.jl`, `run_transverse_barnett.jl`
+- `analyze_barnett.jl <result.jld2> <Omega> <out.csv> <snapdir>` —
+  recomputes L_z/F_z/J_z + winding vortex-census + per-m from psi
+  snapshots (the lab-frame spinor save path stores F_z but not L_z).
+- `plot_edh_baseline.py`, `plot_definitive.py`
+
+## Verification notes (honest)
+- Trust ⟨L_z⟩ + J_z conservation + visual density holes for vortices.
+- The raw plaquette winding COUNT is noisy at the cloud edge (masked at
+  0.15·peak); use it only for the sign/chirality, not exact counts.
+- rotating-frame ground-state (`rotframe_gs.yaml`) does NOT give clean
+  vortices (subcritical→none, supercritical→turbulent/deconfined); the
+  dynamical EdH quench is the reliable vortex mechanism.
