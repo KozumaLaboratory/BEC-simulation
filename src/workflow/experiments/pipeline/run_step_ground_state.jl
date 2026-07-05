@@ -368,8 +368,19 @@ function _run_step(
         return (psi_out, grid, atom, ws_cached, step_result)
     end
     initial_state = Symbol(get(p, "initial_state", "polar"))
+    # from_jld2: load ψ from a prior result (mirrors the rotating_basis
+    # path). Its init_state_params carry a path/snap, not Float64s, so
+    # resolve it before the numeric-params loop below.
+    psi_from_jld2 = nothing
+    if initial_state === :from_jld2
+        isp = get(p, "init_state_params", Dict())
+        jpath = get(isp, "path", nothing)
+        jpath === nothing && throw(ArgumentError(
+            "initial_state: from_jld2 requires init_state_params.path"))
+        psi_from_jld2 = _load_psi_from_jld2(String(jpath), get(isp, "snap", "last"))
+    end
     init_state_params = Dict{Symbol, Float64}()
-    if haskey(p, "init_state_params")
+    if initial_state !== :from_jld2 && haskey(p, "init_state_params")
         for (k, v) in p["init_state_params"]
             init_state_params[Symbol(k)] = Float64(v)
         end
@@ -381,7 +392,9 @@ function _run_step(
     end
     temp_ratio = _get_optional_float(p, "temperature_ratio")
 
-    psi_init = psi_prev
+    # Both warm-start routes, in precedence order: an explicit from_jld2 state
+    # wins, then a carried-over psi, then a `seed_from` reference.
+    psi_init = psi_from_jld2 !== nothing ? psi_from_jld2 : psi_prev
     if psi_init === nothing && haskey(p, "seed_from")
         psi_init = _resolve_seed_from(p["seed_from"], p, grid, atom)
         verbose && println("  seed_from: loaded + upsampled warm seed (skips fresh init)")
