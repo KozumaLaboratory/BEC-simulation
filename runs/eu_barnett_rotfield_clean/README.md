@@ -43,6 +43,25 @@ no density heatmaps), run at the **optimal Ω=0.30** (dense-scan vortex peak),
 dominates; ±Ω only modulate it ~20–30% (oscillatory, sign-consistency≈0).
 The J_z=0 start removes that bias so rotation alone sets the chirality.
 
+### 2b. One-sided (chiral) excitation via magnetic resonance (`resonance_onesided.png`)
+The transverse J_z=0 setup gives an *exact ±Ω mirror* — both senses excite
+equally, opposite sign. To instead get **one sense that excites and one that
+does nothing**, break the mirror with a static bias. `run_resonance_compare.jl`:
+start fully polarised at the **top of the ladder** (m=+F, ⟨F_z⟩≈+5.85) with a
+**static B_z** (Bz=−3.07e-5 G → p=+0.5, so m=+F is the *ground* state, stable;
+q=0 keeps the ladder harmonic). A transverse field rotating at **Ω=ω_L=0.5**:
+- **−Ω co-rotating = RESONANT**: drags the whole ladder down —
+  ⟨F_z⟩ 5.85→1.2 (Δ=4.6), |⟨F⟩| 5.85→2.2 (depolarised), peak ⟨L_z⟩=−2.5
+  (EdH vortices).
+- **+Ω counter-rotating = off-resonant** (detuned by 2ω_L=1.0): ⟨F_z⟩ 5.85→5.7
+  (Δ=0.17), |F| unchanged, ⟨L_z⟩≈0 — **nothing happens**.
+- **no drive**: ⟨F_z⟩ Δ=0.05 — confirms the top state is stable with the field
+  on (the off-resonant drive sits just above this floor).
+- **Selectivity ΔF_z ratio ≈ 28×.** Reverse the field's rotation sense and the
+  *same* atoms either fully excite or stay frozen. Standard rotating-wave /
+  co-vs-counter-rotating resonance selection, now with EdH vortices on the
+  resonant side. Line-based figure (no density heatmaps).
+
 ### 3. Optimization: response vs rotation Ω and field strength (`optimization_scaling.png`)
 Transverse start, converged box=18 GS, peak amplitudes over the drive.
 **Densely resolved** — 41 points in Ω, 30 in B_perp (GS-shared `from_jld2`
