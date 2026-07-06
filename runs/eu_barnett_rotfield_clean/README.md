@@ -29,11 +29,19 @@ dominates; ±Ω only modulate it ~20–30% (oscillatory, sign-consistency≈0).
 The J_z=0 start removes that bias so rotation alone sets the chirality.
 
 ### 3. Optimization: response vs rotation Ω and field strength (`optimization_scaling.png`)
-Transverse start, peak amplitudes over the drive:
-- **vs Ω** (rotation rate): both vortex ⟨L_z⟩ and Barnett ⟨F_z⟩ peak at **Ω≈0.4**
-  (rise from 0 at Ω=0; fall past 0.4 as Ω→ω_⊥=1, centrifugal deconfinement).
-- **vs B_perp** (rotating-field amplitude): Barnett peaks at **B_perp≈4e-5 G**,
-  vortex at **≈8e-5 G**; both fall at large B (spin locks to field, less transfer).
+Transverse start, converged box=18 GS, peak amplitudes over the drive.
+**Densely resolved** — 41 points in Ω, 30 in B_perp (GS-shared `from_jld2`
+runs, `run_dense_sweep.jl`); the earlier 6-point scan aliased the peaks.
+- **vs Ω** (rotation rate): the vortex ⟨L_z⟩ and Barnett ⟨F_z⟩ optima are
+  **distinct**, which the dense scan resolves and the sparse one did not:
+  vortex peaks **sharply at Ω≈0.30** (‖L_z‖≈1.55), Barnett peaks **broadly
+  at Ω≈0.40** (‖F_z‖≈3.73). Both rise from 0 at Ω=0 and fall as Ω→ω_⊥=1
+  (centrifugal deconfinement).
+- **vs B_perp** (rotating-field amplitude, Ω=0.5): Barnett peaks at
+  **B_perp≈3.7e-5 G** (‖F_z‖≈4.03); the vortex ⟨L_z⟩ is non-monotonic —
+  a first shoulder near ≈3e-5 G, a dip, then a **global peak at ≈9.8e-5 G**
+  (‖L_z‖≈2.43) before the spin locks to the field at large B. This
+  two-scale vortex structure is only visible with the dense sampling.
 - **vs B_z** (static bias) — panel (c), and the **2D Ω×B_perp heatmap**
   (`optimization_2d.png`): the joint optimum surface.
 
@@ -67,8 +75,10 @@ with browser play/pause controls.
   "drift" at box=12 is a boundary artifact of the spectral
   `⟨L_z⟩ = ∫ x(-i∂_y)ψ` measurement (small edge amplitude × large |x|); it
   drops to 2.6% at box=18 and is dt/grid-independent. True J_z is conserved.
-- Optimization scans (`optimization_scaling.png`) are at box=12; the
-  optimum LOCATION (Ω≈0.4) is robust, peak magnitudes are ~few-% accurate.
+- Optimization scans (`optimization_scaling.png`) use the converged box=18
+  transverse GS (`from_jld2`, GS-shared), 41 Ω-points + 30 B-points. The
+  dense sampling separates the vortex optimum (Ω≈0.30) from the Barnett
+  optimum (Ω≈0.40) — the 6-point scan had aliased both to Ω≈0.4.
 
 ## Verification notes (honest)
 - Trust ⟨L_z⟩ + J_z conservation + visual density holes for vortices.
