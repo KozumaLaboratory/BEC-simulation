@@ -23,6 +23,21 @@ spin relaxation.
 - Vortex chirality: +Ω → net winding −2, −Ω → +2 (real density cores).
 - Exact mirror because the setup is symmetric under Ω→−Ω combined with z→−z.
 
+**Preferred left/right figure — `barnett_direction_lines.png`** (line-based,
+no density heatmaps), run at the **optimal Ω=0.30** (dense-scan vortex peak),
+`run_direction_compare.jl` → `plot_direction_lines.py`:
+- (a) ⟨L_z⟩(t), (b) ⟨F_z⟩(t): +Ω (CCW) and −Ω (CW) are **exact mirror
+  images** (residual 0.0e+00 — the seed-free run is symmetric under
+  Ω→−Ω, y→−y, so the −Ω run *is* the y-reflection of +Ω); Ω=0 flat.
+- (c) J_z = F_z+L_z is **pumped by the drive** (mirror-antisymmetric),
+  NOT conserved — the rotating field exerts a torque about z. (Contrast the
+  field-quench EdH baseline where J_z *is* conserved.)
+- (d) transverse spin (⟨F_x⟩,⟨F_y⟩) winds **CCW for +Ω, CW for −Ω** — the
+  rotation sense read straight off the spin, no heatmap needed.
+- (e) |⟨F⟩| falls from 6 for all three (incl. Ω=0) — genuine DDI-driven
+  depolarisation, not frozen Larmor. The Ω=0 control depolarises but keeps
+  L_z=F_z=0, isolating rotation as the sole source of the axial signal.
+
 ### Why a naive m=+F rotating-field run does NOT show clean direction dependence
 `run_rotfield_dyn.jl` (m=+6 start): the EdH from the initial spin (J_z=+6)
 dominates; ±Ω only modulate it ~20–30% (oscillatory, sign-consistency≈0).
