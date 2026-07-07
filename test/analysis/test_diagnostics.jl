@@ -47,11 +47,23 @@ using FFTW
         # so quadratic_zeeman_si throws.
         @test_throws ArgumentError quadratic_zeeman_si(Rb87, 1e-4)
 
-        # Eu151: full data (g_J=1.9934, q_geometry=35/144, Δ_hf=121 MHz).
-        # At B=1 G = 1e-4 T, expect q/h ≈ 15.6 kHz (per rigorous derivation).
+        # Physics anchor for the geometry formula (independent of any hard-coded
+        # constant). Rb-87 (F=2, I=3/2, J=1/2) has a well-known quadratic Zeeman;
+        # Eu-151 (F=6, I=5/2, J=7/2) matches a direct Clebsch-Gordan evaluation.
+        @test quadratic_zeeman_geometry(2, 3 // 2, 1 // 2) ≈ 0.0625     # 15/240
+        @test quadratic_zeeman_geometry(6, 5 // 2, 7 // 2) ≈ 455 / 20592 # 0.02210 (CG)
+        @test quadratic_zeeman_geometry(1, 5 // 2, 7 // 2) == 0          # F=|I-J| edge
+        # Rb-87 q/h ≈ 71.6 Hz/G² (g_J=2.0023, Δ_hf=6.835 GHz) via the same formula.
+        q_rb = (2.0023 * SpinorBEC.Units.BOHR_MAGNETON * 1e-4)^2 *
+               quadratic_zeeman_geometry(2, 3 // 2, 1 // 2) /
+               (6.834682e9 * 2π * SpinorBEC.Units.HBAR)
+        @test 70.0 < q_rb / (2π * SpinorBEC.Units.HBAR) < 73.0
+
+        # Eu151: full data (g_J=1.9934, q_geometry=455/20592, Δ_hf=121 MHz).
+        # At B=1 G = 1e-4 T, q/h ≈ 1.43 kHz (11× smaller than the 2026-07 bug).
         q_eu = quadratic_zeeman_si(Eu151, 1e-4)
         q_hz = q_eu / (2π * SpinorBEC.Units.HBAR)
-        @test 15.0e3 < q_hz < 16.5e3   # 15.636 kHz/G² ± rounding
+        @test 1.35e3 < q_hz < 1.50e3   # 1.43 kHz/G² (was wrongly pinned at 15.6)
 
         # Dy164 (I=0, no hyperfine) → 0 by physics.
         @test quadratic_zeeman_si(Dy164, 1e-4) == 0.0

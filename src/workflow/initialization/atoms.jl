@@ -202,9 +202,12 @@ const _EU151_G_J = 1.9934
 #   g_F = g_J · 7/12 ≈ 1.1628 (Lande projection for F=I+J=6)
 #   F=6 ↔ F=5 hyperfine splitting: 121.0 MHz (A_hf ≈ -20.0523 MHz; Childs 1991)
 #     → F=6 is the absolute ground state (since A_hf < 0)
-#   q geometry factor for F=6 manifold: 35/144 (closed-form ⟨5,m|J_z|6,m⟩²
-#     = (35/144)(36 - m²); m⁴ correction is exactly zero at 2nd order in B).
-#   q at B=1G with these constants: q/h = 15.636 kHz/G²
+#   q geometry factor for F=6 manifold: 455/20592 = 0.02210 (closed-form
+#     ⟨5,m|J_z|6,m⟩² = 0.02210(36 - m²), verified by direct Clebsch-Gordan;
+#     m⁴ correction exactly zero at 2nd order). Built from the general
+#     quadratic_zeeman_geometry(F, I, J). The earlier hard-coded 35/144 dropped
+#     ((I+J+1)²-F²)/(4F²-1) = 13/143 = 1/11 and was 11× too large.
+#   q at B=1G: q/h = 1.43 kHz/G² (full Breit-Rabi diag, incl. quadrupole)
 const Eu151 = AtomSpecies(
     "151Eu",
     150.919857 * Units.AMU,
@@ -215,7 +218,7 @@ const Eu151 = AtomSpecies(
     _EU151_G_J * 7.0 / 12.0;
     Delta_E_hf=121.0e6 * 2π * Units.HBAR,
     g_J=_EU151_G_J,
-    q_geometry=35.0 / 144.0,
+    q_geometry=quadratic_zeeman_geometry(6, 5 // 2, 7 // 2),
 )
 
 # ¹⁵¹Eu effective F=1 model (Yan-Li-Saito 2026 PRL convention)
@@ -223,6 +226,9 @@ const Eu151 = AtomSpecies(
 #   This gives a_dd ≈ 25.2 a₀; at ε_dd = 1.2 → a_s = 21 a₀.
 #   Mass and hyperfine structure same as physical ¹⁵¹Eu.
 #   Source: T30 theorist §3 Check 2 (lines 320-326); memory yan_li_saito_2026_barnett_paper.md.
+#   q_geometry from the general formula is 0 at the F=|I-J| edge (auto-q disabled);
+#   this fictitious spin-1 truncation has no first-principles quadratic Zeeman —
+#   set `q` explicitly in the config if the model needs one. (Was 35/144: wrong.)
 const Eu151_f1_effective = AtomSpecies(
     "151Eu_f1eff",
     150.919857 * Units.AMU,
@@ -232,7 +238,7 @@ const Eu151_f1_effective = AtomSpecies(
     4.5 * Units.BOHR_MAGNETON,
     4.5;
     Delta_E_hf=121.0e6 * 2π * Units.HBAR,
-    q_geometry=35.0 / 144.0,
+    q_geometry=quadratic_zeeman_geometry(1, 5 // 2, 7 // 2),
 )
 
 # --- Spinless Species (F=0) ---
