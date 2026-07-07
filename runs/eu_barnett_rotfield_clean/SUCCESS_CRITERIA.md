@@ -38,15 +38,36 @@ directly off a realistic Eu state (`run_bdd.jl`, magnetostriction GS, N=30000):
 | **Φ_z (transverse, spin-tipping) rms** | **0.121** | ~7.4 |
 | Φ_z max | 0.40 | ~24 |
 
-**Verdict: Φ_z(rms) = 0.121 vs floor 0.03 → OPEN (4×); peak 0.40 (13×).**
-Max single-stage signal fraction M_z/|F| ≈ Φ_z ≈ **12 %** ≫ 3 % floor.
-- The dimensionless Φ_z=0.12 is primary; the μG uses the g_F-Zeeman γ (moment
-  choice → ±factor), so quote the ratio, not the μG.
-- Caveat: RMS on a z-symmetric GS overestimates the *net*-M_z-driving field
-  (net M_z needs z-symmetry breaking from the vortex/dynamics); the 4× headroom
-  likely survives the discount. **Pass 2**: Φ_z at the vortex core from a
-  P1-stirred state.
-- Φ ∝ N (density); 0.12 is at N=30000 — recompute for the experiment's N.
+**Pass-1 (GS RMS): Φ_z(rms)=0.121 → looked OPEN (12 %).** But RMS is an
+UPPER bound — it is not what drives the *net* M_z.
+
+**Pass-2 (`run_bdd_vortex.jl`, P1-stirred vortex states) overturns the
+optimism** — measured on the Ω=0.74 and 0.85 stir states:
+
+| Φ_z | Ω=0.74 | Ω=0.85 |
+|---|---|---|
+| **NET (density-wtd mean, drives net M_z)** | **0.0005 (0.03 µG)** | **0.010 (0.6 µG)** |
+| RMS (local) | 0.21 (13 µG) | 0.28 (17 µG) |
+| at vortex cores | 0.21 (13 µG) | 0.30 (19 µG) |
+
+The transverse dipolar field is large *locally* (13–19 µG) but the **NET
+(cloud-averaged) field is ~30× smaller, below the floor** — because a straight
+penetrating vortex line in the z-symmetric pancake has a **z-odd Φ_z that
+cancels in the z-average** (the pancake-vs-Saito-torus geometry difference,
+now quantified). The Fz seen in P1 (~0.6 at Ω=0.85) is the **single-particle
+−Ω/γ tilt** (Ω/√(p⊥²+Ω²)·|F|≈0.34 at γB=15), *not* the DDI Barnett (which the
+net Φ_z would put at ~0.004).
+
+**Revised verdict: single-stage pancake net M_z is SUPPRESSED by z-cancellation
+— likely NOT feasible.** The z-cancellation is geometric, so it re-elevates the
+**two-stage quench** (release the spin → it relaxes into a flux-closure /
+z-asymmetric texture that carries net M_z, Saito-scale) from backup to the
+**necessary** path. Decisive test = **P2 regime-B with DDI-off subtraction**
+(does a net M_z above the single-particle background actually develop?) + the
+two-stage m-redistribution check.
+- Φ ∝ N (density); recompute for the experiment's N.
+- Caveat: pass-2 is on the strong-field *locked* state (no spin feedback); the
+  regime-B self-consistent net could differ — P2 settles it.
 
 ## OPEN DECISION — single-stage (primary) vs two-stage (backup)
 
