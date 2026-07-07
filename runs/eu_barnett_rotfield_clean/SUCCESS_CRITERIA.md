@@ -152,6 +152,33 @@ Until resolved (grid/dt convergence + dealias off), the weak F_z=−0.44 cannot 
 trusted as physical, and "vortex AM is lost" cannot be cleanly called physical vs
 numerical. **This is the next gate before any two-stage conclusion.**
 
+## REBUILD RESULT — clean box OVERTURNS box-12: two-stage Barnett WORKS (2026-07-08)
+
+`run_rebuild.jl` on TSUBAME (H100, ~38 min): full two-stage at **box±10/n80**
+(dx=0.25 kept) — GS(γB=15) → Klaus stir → quench B→0, monitoring J_z + edge.
+`figures/rebuild_boxfix.png`. **The box-overflow artifact had INVERTED the physics:**
+
+| quench end | F_z | L_z (start→end) | \|F\| end | edge |
+|---|---|---|---|---|
+| box±6 (overflow) | **−0.44** | 1.16 → −0.07 (collapse) | 1.56 | 8 % |
+| **box±10 (clean)** | **+2.08** | **10.9 → 5.7 (converts)** | 2.18 | 0.3 % |
+
+In the clean box the **two-stage Barnett WORKS**: the quench releases the spin and
+**vortex orbital AM converts to a real net axial magnetisation** — F_z grows
+0.18 → **+2.08** (stable t=20–50), L_z drops 10.9 → 5.7, and the residual spin is
+**~fully axial** (F_z/\|F\|≈0.99). This is the Saito orbital→spin mechanism. The
+box-12 conclusion ("AM lost, F_z=−0.44, no conversion") was a box-overflow artifact
+that suppressed the conversion — edge-fraction 8 % vs 0.3 %.
+
+**Caveat to close (honest):** J_z still drifts in the quench (11.1 → 7.8; loss
+= ΔL_z+ΔF_z = −5.2+2.0 = −3.2) *despite* edge≈0, so it is NOT the same overflow.
+Either physical dissipation (orbital AM → sound as vortices decay) or a smaller
+residual (vortex/sound at the low-density edge; a still-bigger box or dt-check
+settles it). The **direction** (conversion happens, net M_z develops) is robust;
+the exact conversion efficiency needs the residual closed. Also pending: chirality
+(−Ω → −F_z?) and the deferred L_z-collapse re-read (here L_z does NOT collapse — it
+smoothly converts, another box-12-artifact reversal).
+
 ## GATE — the two-stage J_z leak is a BOX-OVERFLOW artifact (2026-07-07)
 
 The healthy-start quench's J_z non-conservation (1.28→−0.5, while norm/energy
