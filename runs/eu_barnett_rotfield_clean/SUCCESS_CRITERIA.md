@@ -69,10 +69,32 @@ two-stage m-redistribution check.
 - Caveat: pass-2 is on the strong-field *locked* state (no spin feedback); the
   regime-B self-consistent net could differ — P2 settles it.
 
-## OPEN DECISION — single-stage (primary) vs two-stage (backup)
+## RESOLVED DECISION — two-stage (single-stage is dead)
 
-Feasibility gate OPEN ⇒ **single-stage is the primary path** (not forced to
-two-stage). Two-stage is now a *signal-boost* backup, not a necessity.
+**P2 regime-B settled it (`run_p2_regimeb.jl`, γB=4, Ω=0.85, DDI on/off):**
+
+| | DDI-off (single-particle) | DDI-on |
+|---|---|---|
+| Fz(end) | 2.42 | 0.74 |
+| \|F\|min | 5.997 (const) | 4.869 (depolarised) |
+| peak L_z | 0 | 1.79 (vortices) |
+| Fz/\|F\| | 0.40 | 0.15 |
+
+The DDI's many-body effect is **depolarisation (|F| 6→4.87) + vortices**, but it
+**does NOT enhance the axial M_z** — DDI-on Fz (0.74) is *below* the
+single-particle −Ω/γ tilt (2.42); the vortex dynamics scramble the coherent
+tilt rather than converting orbital→axial-spin. Net axial M_z is not built
+(the z-cancellation of pass-2, confirmed dynamically). Worse, the depolarisation
+is Ω-EVEN (same for CW/CCW) so it cancels in the direction-controlled CW−CCW
+difference. **Single-stage pancake gives no clean chiral net-M_z Barnett.**
+
+⇒ **Two-stage quench is the necessary path** (nucleate vortices at healthy B →
+quench B→~0 → the released spin relaxes into a flux-closure / z-asymmetric
+texture that carries net M_z, Saito-scale). This is the thesis-novel geometry
+step. The remaining risk — does the quench redistribute the single-component
+vortex into the m-texture so ⟨f_z⟩ rises? — is the next decisive test.
+
+--- (historical: the single-stage analysis below is retained for context) ---
 
 - **Single-stage** (Klaus geometry + Ω/ω_⊥, sweep field strength): honest Klaus
   reproduction; max signal fraction ~12 % (above floor). Still small enough that
