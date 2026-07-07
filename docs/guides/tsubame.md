@@ -58,7 +58,7 @@ Throughput on H100 at 128³ × D=13:
 
 Lustre is bad at many small writes; `dynamics/psi_snapshots_streamed/frame_NNNNN` emits one metadata op per frame, which stacks. `SPINORBEC_SCRATCH_DIR=$T4_TMPDIR` redirects `.tmp` files to NVMe and copies to Lustre on success.
 
-> ⚠️ **The node-local NVMe default only fits SMALL grids.** For n ≳ 100 per-dim, ψ snapshots (112³ F32 = 91 MB/frame) overrun the node-local NVMe; the `tmp → runs/` (Lustre) move then dies `EXDEV` / `sendfile -122` at the final write. Override `SPINORBEC_SCRATCH_DIR` to a **Lustre path on the output's device** (e.g. `$REPO/runs/rb_scratch_lustre`) so the rename is in-place. 80³ squeaks through NVMe; 112³ does not. Baked into `runs/eu_barnett_rotfield_clean/tsubame_rebuild_template.sh`.
+> ⚠️ **The node-local NVMe default only fits SMALL grids — but keep the scratch on NVMe anyway.** For n ≳ 100 per-dim, ψ snapshots (112³ F32 = 91 MB/frame) overrun node-local NVMe; the `tmp → runs/` (Lustre) move then dies `EXDEV` / `sendfile -122`. **Do NOT "fix" this by moving the scratch to Lustre** — JLD2 writes via mmap and **mmap on Lustre `SIGBUS`es** (`signal 7` at `unsafe_store!`). The correct fix is to **shrink the snapshot volume** so the jld2 fits NVMe: raise `save.every` (env `RB_SAVE_EVERY` in `run_rebuild.jl`; n112 → ~2000, n80 fine at 300). Also reap leftover `runs/rb_stir_*` / `rb_quench_*` (tens of GB each) and watch the group quota (`lfs quota -g tga-kozuma-kouhi /gs/fs`, ~1 TB) — over-quota silently breaks `git`/`qsub`. Baked into `runs/eu_barnett_rotfield_clean/tsubame_rebuild_template.sh`.
 
 ## Edit-test-submit loop
 
