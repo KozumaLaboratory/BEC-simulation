@@ -24,11 +24,15 @@ CUDA.functional() || error("CUDA not functional — refusing silent CPU fallback
 const SC = get(ENV, "SPINORBEC_SCRATCH",
     "/tmp/claude-1000/-home-suzume-workspace-BEC-simulation/80199575-e261-4fe8-a6af-74f719f5341c/scratchpad")
 const OUT = "runs/eu_barnett_rotfield_clean"
-const SRC = "runs/p2_on_a5258bf8/point_001.jld2"   # P2 on end state, gamma*B=4, Omega=0.85
+# QSRC: which end state to quench from. Default = P2 regime-B (gamma*B=4, depolarised).
+# Healthy polarised start = P1 Omega_c stir state (gamma*B=15, |F|=5.85, vortices).
+const SRC = get(ENV, "QSRC", "runs/p2_on_a5258bf8/point_001.jld2")
+const QTAG = get(ENV, "QTAG", "")                  # output-name prefix (e.g. "healthy_")
+const QARMS = get(ENV, "QARMS", "on,off")          # which DDI arms to run
 const SMOKE = get(ENV, "SMOKE", "0") == "1"
-const DUR = SMOKE ? 1.0 : 15.0
+const DUR = SMOKE ? 1.0 : parse(Float64, get(ENV, "QDUR", "15.0"))
 const DYN_DT = SMOKE ? 0.004 : 0.0004
-const SAVE_EVERY = SMOKE ? 50 : 150
+const SAVE_EVERY = SMOKE ? 50 : 300
 mkpath(SC)
 isfile(SRC) || error("source end state missing: $SRC")
 
@@ -96,11 +100,12 @@ let rr = open_result(SRC)
         Fx, Fy, Fz, sqrt(Fx^2 + Fy^2), sqrt(Fx^2 + Fy^2 + Fz^2))
 end
 
-for (tag, ddi) in [("ddion", "true"), ("ddioff", "false")]
-    yp = joinpath(SC, "p2quench_$(tag).yaml"); open(yp, "w") do io; write(io, quench_yaml(ddi)); end
-    @printf("\n===== quench %s (B=0, DDI=%s) =====\n", tag, ddi); flush(stdout)
+arms = [(a == "on" ? ("ddion", "true") : ("ddioff", "false")) for a in split(QARMS, ",")]
+for (tag, ddi) in arms
+    yp = joinpath(SC, "p2quench_$(QTAG)$(tag).yaml"); open(yp, "w") do io; write(io, quench_yaml(ddi)); end
+    @printf("\n===== quench %s%s (B=0, DDI=%s, dur=%.0f) =====\n", QTAG, tag, ddi, DUR); flush(stdout)
     rd = run_yaml(yp); pj = joinpath(rd isa AbstractString ? rd : "", "point_001.jld2")
-    outcsv = joinpath(OUT, "traj_p2_quench_$(tag).csv")
+    outcsv = joinpath(OUT, "traj_p2_quench_$(QTAG)$(tag).csv")
     traj(pj, outcsv)
     @printf("[quench] wrote %s\n", outcsv); flush(stdout)
 end

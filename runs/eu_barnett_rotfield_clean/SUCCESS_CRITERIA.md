@@ -113,6 +113,45 @@ by geometry). Full two-stage therefore needs a **healthy polarised start** and
 likely an **explicit z-symmetry-breaking** element — not passive relaxation.
 DECISION POINT before full two-stage build.
 
+## PASS-0 follow-up — HEALTHY polarised start: vortex AM is LOST, not converted (2026-07-07)
+
+The mini-quench above started from the depolarised regime-B state. This tests the
+biggest caveat: quench from a HEALTHY polarised vortex state — the P1 Ω_c stir
+state (`runs/p1_O0.74_db0e3dfb`, γB=15, |F|=5.85, 11 vortices) → B→0, DDI on, t=50
+(`run_p2_quench.jl` with QSRC/QTAG/QDUR; `figures/p2_quench_compare.png`).
+**Pre-committed lines** (fixed before the run, no post-hoc loosening): |F|
+retention 5.85→≥5.0 = degraded-start cause / ≤3.5 = intrinsic / 4.0–5.0 = defer to
+cross-section; F_z "stands" = time-mean F_z/|F| > 3 % imaging floor AND stable.
+
+**Result (read cross-section first — integral F_z cannot separate the branches):**
+
+| healthy end (t=50) | value |
+|---|---|
+| \|F\|_cloud | 1.56 (looks like collapse) |
+| **local \|F\|=\|f\|/n** | **4.1 (HELD)** → SPATIAL texture, NOT local depol |
+| z-cancellation frac | 0.00 → net F_z real, z-odd |
+| ⟨F_z⟩ time-mean (t≥33) | −0.44 ± 0.06 (stable, F_z/\|F\|_cloud=0.28 > floor) |
+| **J_z = L_z+F_z** | **1.28 → −0.5 (NOT conserved)** |
+
+**Cross-section reverses the naive read:** cloud \|F\|→1.56 looks like Option-3
+depolarisation, but local \|F\|=4.1 is HELD → the spin forms a **texture** (74 %
+spatial cancellation), not local depolarisation. z-cancel=0 rules out Option-2
+z-even. By the pre-committed lines that is the Branch-1 signature (texture + real
+z-odd net F_z). **BUT the intended two-stage mechanism FAILS:** L_z collapses
+1.16→0.08 in t<2 (half a trap period) *without* transferring to F_z (J_z 1.28→0.27
+instantly) — the **vortex orbital AM is LOST, not converted to spin**. The later
+F_z=−0.44 develops at t>10 *after* the vortices are gone, so it is a secondary DDI
+texturing effect, NOT the Saito orbital→spin Barnett. Its sign (−) is not tied to
+the +Ω stir chirality.
+
+**GATING ANOMALY — J_z not conserved.** B=0 + isotropic in-plane trap + non-secular
+DDI should conserve J_z, and norm (6e−11) + energy (2.5e−7) ARE conserved — yet
+J_z drifts 1.28→−0.5. Likely a numerical L_z leak (Orszag-2/3 dealias filter is not
+rotationally symmetric on a cubic grid) or 48³ under-resolving the fine texture.
+Until resolved (grid/dt convergence + dealias off), the weak F_z=−0.44 cannot be
+trusted as physical, and "vortex AM is lost" cannot be cleanly called physical vs
+numerical. **This is the next gate before any two-stage conclusion.**
+
 ## RESOLVED DECISION — two-stage (single-stage is dead)
 
 **P2 regime-B settled it (`run_p2_regimeb.jl`, γB=4, Ω=0.85, DDI on/off):**
