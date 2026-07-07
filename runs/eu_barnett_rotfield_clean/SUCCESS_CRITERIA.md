@@ -124,9 +124,53 @@ texture that carries net M_z, Saito-scale). This is the thesis-novel geometry
 step. The remaining risk — does the quench redistribute the single-component
 vortex into the m-texture so ⟨f_z⟩ rises? — is the next decisive test.
 
-**Still open before two-stage (Tasks 2–3):** multi-Ω ΔFz (Klaus Ω_c kink on the
-M_z side?) and the CW−CCW double difference (is single-stage truly dead, or
-"small but separable"?).
+## P2 COMPLETION — Tasks 2–3: single-stage confirmed dead; a real chiral instability found
+
+`run_p2_sweep.jl` (+ `analyze_p2_timeavg.py`, `figures/p2_sweep.png`).
+**All observables are TIME-MEANS over t≥20** — the endpoint Fz is a single-phase
+snapshot of a fast Larmor oscillation (period ~1.6 at γB=4; the sudden 90° field
+turn-on, GS along +x vs rotating field starting at +y, excites a large nutation).
+Endpoint-based numbers (ΔFz~−1.7, double-diff~+2.0) were oscillation-phase noise.
+
+**Task 2 — multi-Ω ΔFz (DDI-off is the single-particle baseline, shared DDI-on GS):**
+
+| Ω | 0.50 | 0.65 | 0.74 | 0.80 | 0.85 |
+|---|---|---|---|---|---|
+| ΔFz = ⟨Fz⟩on − ⟨Fz⟩off | −0.06 | −0.11 | −0.16 | −0.20 | −0.17 |
+| ⟨Fz⟩off ± osc | 0.70±0.5 | 0.92±0.7 | 1.06±0.8 | 1.15±0.8 | 1.23±0.9 |
+| ⟨Lz⟩ on | 0.59 | 0.65 | 1.10 | 0.94 | 0.99 |
+
+ΔFz is a **weak NEGATIVE** DDI suppression (grows mildly with Ω, correlates with
+vortex Lz onset) that sits **within the single-particle oscillation band**. DDI
+suppresses the axial tilt, does not enhance it; no sharp Ω_c kink. Confirms Task-1.
+
+**Task 3 — CW−CCW double difference at Ω_c=0.74 (time-mean):**
+
+| | CCW (+Ω) | CW (−Ω) |
+|---|---|---|
+| ⟨Fz⟩ off | 1.06±0.76 | 1.06±0.76 → **d_off = 0.00 (Ω-EVEN)** |
+| ⟨Fz⟩ on | 0.90±0.11 | 0.30±1.25 → d_on = 0.60 |
+| \|⟨F⟩\| on (end) | 5.12 | **2.26 (runaway)** |
+
+- **Single-particle Fz is Ω-even** → d_off = 0. No chiral net-M_z from the
+  single-particle path (the nutation is set by the shared +y turn-on, not sign(Ω)).
+- **DDI-on CW depolarises catastrophically**: \|⟨F⟩\| runs away 6→2.3, still
+  dropping at t=30. **dt-CONVERGED** (`run_p2_dtcheck.jl`: dt=2e-4 vs 4e-4
+  bit-identical, |F| and Fz to 3 digits at all t) ⇒ this is a **PHYSICAL chiral
+  instability** (counter-rotating drive resonantly pumps spin excitations), NOT a
+  `split_step!` 1st-order-DDI artifact.
+- But the chiral effect is **loss of \|F\|**, not a clean chiral magnetisation:
+  the 0.60 double difference is buried under the CW run's Fz std (1.25) on a
+  non-stationary collapsing-|F| background.
+
+⇒ **Single-stage gives no clean separable chiral net-M_z Barnett — confirmed
+dead.** The one genuine chiral effect (CW depolarisation instability) is not the
+observable we want. Two-stage remains the necessary path (Task-1 mechanism).
+
+**Design note for two-stage / any future single-stage run:** start the rotating
+field ALIGNED with the GS field (B(0)=+x̂, i.e. Bx phase 0 / By phase ∓π/2) to
+kill the 90° turn-on nutation (the ±0.8 single-particle oscillation). Currently
+Bx phase ±π/2 ⇒ B(0)=+ŷ, a sudden 90° jump.
 
 --- (historical: the single-stage analysis below is retained for context) ---
 
