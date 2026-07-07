@@ -20,7 +20,8 @@ import matplotlib.pyplot as plt
 import figstyle as fs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "master_figure")
+OUT = os.path.join(HERE, "figures", "master_figure")
+os.makedirs(os.path.dirname(OUT), exist_ok=True)
 C_OFF, C_POS, C_NEG = fs.OFF, fs.POS, fs.NEG
 FRAME = 15
 

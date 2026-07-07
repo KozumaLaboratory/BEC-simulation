@@ -17,7 +17,8 @@ import matplotlib.pyplot as plt
 import figstyle as fs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "fieldup_onesided")
+OUT = os.path.join(HERE, "figures", "fieldup_onesided")
+os.makedirs(os.path.dirname(OUT), exist_ok=True)
 
 
 def load(tag):

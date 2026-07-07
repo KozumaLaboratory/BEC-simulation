@@ -16,7 +16,8 @@ from matplotlib import cm
 HERE = os.path.dirname(os.path.abspath(__file__))
 CSV = os.path.join(HERE, "traj_edh_final.csv")     # box=18, grid+dt converged
 SNAP = os.path.join(HERE, "snaps_edh_final")
-OUT = os.path.join(HERE, "edh_baseline")
+OUT = os.path.join(HERE, "figures", "edh_baseline")
+os.makedirs(os.path.dirname(OUT), exist_ok=True)
 OTAG = "+0.00"
 F = 6
 

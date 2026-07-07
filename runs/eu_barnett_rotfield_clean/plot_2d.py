@@ -10,7 +10,8 @@ import matplotlib.pyplot as plt
 import figstyle as fs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "optimization_2d")
+OUT = os.path.join(HERE, "figures", "optimization_2d")
+os.makedirs(os.path.dirname(OUT), exist_ok=True)
 
 
 def main():

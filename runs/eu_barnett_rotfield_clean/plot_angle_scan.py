@@ -18,7 +18,8 @@ import matplotlib.pyplot as plt
 import figstyle as fs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "cone_angle_scan")
+OUT = os.path.join(HERE, "figures", "cone_angle_scan")
+os.makedirs(os.path.dirname(OUT), exist_ok=True)
 THETAS = [12, 25, 40, 55]
 GB = 5.1
 

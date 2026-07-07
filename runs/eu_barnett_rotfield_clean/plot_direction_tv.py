@@ -13,7 +13,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "barnett_direction_transverse")
+OUT = os.path.join(HERE, "figures", "barnett_direction_transverse")
+os.makedirs(os.path.dirname(OUT), exist_ok=True)
 C = {"+0.50": "#1f77b4", "+0.00": "#555555", "-0.50": "#d62728"}
 LB = {"+0.50": r"$+\Omega$ (CCW)", "+0.00": r"$\Omega=0$", "-0.50": r"$-\Omega$ (CW)"}
 

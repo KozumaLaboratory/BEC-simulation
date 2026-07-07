@@ -14,7 +14,8 @@ import matplotlib.pyplot as plt
 import figstyle as fs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "ddi_control")
+OUT = os.path.join(HERE, "figures", "ddi_control")
+os.makedirs(os.path.dirname(OUT), exist_ok=True)
 
 
 def load(name):

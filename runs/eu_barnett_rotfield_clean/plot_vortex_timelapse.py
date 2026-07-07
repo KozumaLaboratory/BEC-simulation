@@ -11,7 +11,8 @@ import matplotlib.pyplot as plt
 import figstyle as fs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "vortex_timelapse")
+OUT = os.path.join(HERE, "figures", "vortex_timelapse")
+os.makedirs(os.path.dirname(OUT), exist_ok=True)
 FRAMES = [8, 15, 22, 29, 36]   # t ≈ 3.5, 7.5, 11, 14.5, 18
 
 

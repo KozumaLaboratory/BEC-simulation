@@ -6,7 +6,7 @@ momenta in ℏ/atom.
 
 ## Results
 
-### 1. Einstein-de Haas: real vortices + real spin excitation (`edh_baseline.png`)
+### 1. Einstein-de Haas: real vortices + real spin excitation (`figures/edh_baseline.png`)
 `edh_baseline.yaml`: m=+6 GS → step-quench Bz (strong→weak) → DDI drives
 spin relaxation.
 - ⟨F_z⟩ +6 → +1.5 (m-ladder cascade, reaches negative m) = spin excitation.
@@ -14,7 +14,7 @@ spin relaxation.
 - Real vortex in transferred m=+4: density ring + central hole + 2π winding.
 - Chirality here is set by the initial spin (J_z=+6), NOT rotation.
 
-### 2. Direction control needs J_z=0 start (`barnett_direction_definitive.png`)
+### 2. Direction control needs J_z=0 start (`figures/barnett_direction_definitive.png`)
 `run_transverse_barnett.jl`: GS with **B along +x** → transverse spin,
 ⟨F_z⟩=0, J_z=0 → quench + field **rotating around z** at Ω∈{+0.5,0,−0.5}.
 - **Ω=0 control: ⟨F_z⟩=⟨L_z⟩=0 for all time** — rotation is the cause.
@@ -23,7 +23,7 @@ spin relaxation.
 - Vortex chirality: +Ω → net winding −2, −Ω → +2 (real density cores).
 - Exact mirror because the setup is symmetric under Ω→−Ω combined with z→−z.
 
-**Preferred left/right figure — `barnett_direction_lines.png`** (line-based,
+**Preferred left/right figure — `figures/barnett_direction_lines.png`** (line-based,
 no density heatmaps), run at the **optimal Ω=0.30** (dense-scan vortex peak),
 `run_direction_compare.jl` → `plot_direction_lines.py`:
 - (a) ⟨L_z⟩(t), (b) ⟨F_z⟩(t): +Ω (CCW) and −Ω (CW) are **exact mirror
@@ -43,7 +43,7 @@ no density heatmaps), run at the **optimal Ω=0.30** (dense-scan vortex peak),
 dominates; ±Ω only modulate it ~20–30% (oscillatory, sign-consistency≈0).
 The J_z=0 start removes that bias so rotation alone sets the chirality.
 
-### 2b. One-sided (chiral) excitation via magnetic resonance (`resonance_onesided.png`)
+### 2b. One-sided (chiral) excitation via magnetic resonance (`figures/resonance_onesided.png`)
 The transverse J_z=0 setup gives an *exact ±Ω mirror* — both senses excite
 equally, opposite sign. To instead get **one sense that excites and one that
 does nothing**, break the mirror with a static bias. `run_resonance_compare.jl`:
@@ -62,7 +62,7 @@ q=0 keeps the ladder harmonic). A transverse field rotating at **Ω=ω_L=0.5**:
   co-vs-counter-rotating resonance selection, now with EdH vortices on the
   resonant side. Line-based figure (no density heatmaps).
 
-### 2c. Field-UP metastable variant + relaxation time (`fieldup_onesided.png`)
+### 2c. Field-UP metastable variant + relaxation time (`figures/fieldup_onesided.png`)
 Same idea but with the field applied **UP** (+z), so the top state m=+F is the
 **metastable EXCITED** state (a "field-applied, finite-lifetime" preparation).
 `run_field_test.jl`. Key regime finding:
@@ -77,7 +77,7 @@ Same idea but with the field applied **UP** (+z), so the top state m=+F is the
   vortices** (L_z≈0.5); the EdH vortices live in the *slow relaxation* channel
   (L_z≈1.3).
 
-### 2d. Best field tilt (cone) angle (`cone_angle_scan.png`)
+### 2d. Best field tilt (cone) angle (`figures/cone_angle_scan.png`)
 `run_angle_scan.jl`: single tilted field of fixed magnitude (γB=5.1) precessed
 about z at cone angle θ — B∥=B cosθ sets the gap ω_L=5.1 cosθ (=resonant Ω),
 B⊥=B sinθ sets the Rabi rate Ω_R=5.1 sinθ. Scanned θ∈{12,25,40,55}°, +Ω vs −Ω:
@@ -94,7 +94,7 @@ B⊥=B sinθ sets the Rabi rate Ω_R=5.1 sinθ. Scanned θ∈{12,25,40,55}°, +�
 Requires the **large field** (ω_L ≳ 5) so the metastable relaxation stays slow;
 at small ω_L the state relaxes before any angle helps.
 
-### 3. Optimization: response vs rotation Ω and field strength (`optimization_scaling.png`)
+### 3. Optimization: response vs rotation Ω and field strength (`figures/optimization_scaling.png`)
 Transverse start, converged box=18 GS, peak amplitudes over the drive.
 **Densely resolved** — 41 points in Ω, 30 in B_perp (GS-shared `from_jld2`
 runs, `run_dense_sweep.jl`); the earlier 6-point scan aliased the peaks.
@@ -109,7 +109,7 @@ runs, `run_dense_sweep.jl`); the earlier 6-point scan aliased the peaks.
   (‖L_z‖≈2.43) before the spin locks to the field at large B. This
   two-scale vortex structure is only visible with the dense sampling.
 - **vs B_z** (static bias) — panel (c), and the **2D Ω×B_perp heatmap**
-  (`optimization_2d.png`): the joint optimum surface.
+  (`figures/optimization_2d.png`): the joint optimum surface.
 
 ### 4. Animation (`vortex_animation.mp4` / `.html`)
 +Ω / Ω=0 / −Ω side by side, vortex-host density + current streamlines,
@@ -141,7 +141,7 @@ with browser play/pause controls.
   "drift" at box=12 is a boundary artifact of the spectral
   `⟨L_z⟩ = ∫ x(-i∂_y)ψ` measurement (small edge amplitude × large |x|); it
   drops to 2.6% at box=18 and is dt/grid-independent. True J_z is conserved.
-- Optimization scans (`optimization_scaling.png`) use the converged box=18
+- Optimization scans (`figures/optimization_scaling.png`) use the converged box=18
   transverse GS (`from_jld2`, GS-shared), 41 Ω-points + 30 B-points. The
   dense sampling separates the vortex optimum (Ω≈0.30) from the Barnett
   optimum (Ω≈0.40) — the 6-point scan had aliased both to Ω≈0.4.

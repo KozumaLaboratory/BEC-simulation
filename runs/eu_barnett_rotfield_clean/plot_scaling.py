@@ -13,7 +13,8 @@ import matplotlib.pyplot as plt
 import figstyle as fs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "optimization_scaling")
+OUT = os.path.join(HERE, "figures", "optimization_scaling")
+os.makedirs(os.path.dirname(OUT), exist_ok=True)
 
 
 def load(path):

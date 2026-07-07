@@ -18,7 +18,8 @@ import matplotlib.pyplot as plt
 import figstyle as fs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "barnett_direction_lines")
+OUT = os.path.join(HERE, "figures", "barnett_direction_lines")
+os.makedirs(os.path.dirname(OUT), exist_ok=True)
 OM = 0.30
 
 

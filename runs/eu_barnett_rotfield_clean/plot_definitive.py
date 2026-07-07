@@ -17,7 +17,8 @@ import matplotlib.pyplot as plt
 import figstyle as fs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "barnett_direction_definitive")
+OUT = os.path.join(HERE, "figures", "barnett_direction_definitive")
+os.makedirs(os.path.dirname(OUT), exist_ok=True)
 C = {"+0.50": fs.POS, "+0.00": fs.ZERO, "-0.50": fs.NEG}
 LB = {"+0.50": r"$+\Omega$ (CCW)", "+0.00": r"$\Omega=0$ (control)", "-0.50": r"$-\Omega$ (CW)"}
 FRAME = 15  # ~t=7.5, peak vortex

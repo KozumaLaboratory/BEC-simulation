@@ -21,7 +21,8 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 RUN = sys.argv[1] if len(sys.argv) > 1 else HERE
 SNAP = os.path.join(RUN, "snaps")
-OUT = os.path.join(RUN, "barnett_direction")
+OUT = os.path.join(RUN, "figures", "barnett_direction")
+os.makedirs(os.path.dirname(OUT), exist_ok=True)
 
 C_POS = "#1f77b4"   # +Omega  (CCW)
 C_NEG = "#d62728"   # -Omega  (CW)
