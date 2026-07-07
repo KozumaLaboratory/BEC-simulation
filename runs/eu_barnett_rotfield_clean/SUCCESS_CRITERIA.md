@@ -83,16 +83,50 @@ two-stage m-redistribution check.
 The DDI's many-body effect is **depolarisation (|F| 6→4.87) + vortices**, but it
 **does NOT enhance the axial M_z** — DDI-on Fz (0.74) is *below* the
 single-particle −Ω/γ tilt (2.42); the vortex dynamics scramble the coherent
-tilt rather than converting orbital→axial-spin. Net axial M_z is not built
-(the z-cancellation of pass-2, confirmed dynamically). Worse, the depolarisation
-is Ω-EVEN (same for CW/CCW) so it cancels in the direction-controlled CW−CCW
-difference. **Single-stage pancake gives no clean chiral net-M_z Barnett.**
+tilt rather than converting orbital→axial-spin. Net axial M_z is not built.
+Worse, the depolarisation is Ω-EVEN (same for CW/CCW) so it cancels in the
+direction-controlled CW−CCW difference. **Single-stage pancake gives no clean
+chiral net-M_z Barnett.**
+
+## P2 COMPLETION — Task 1: the failure mechanism is NOT z-cancellation
+
+`analyze_p2_fz_crosssection.jl` on the SAVED P2 end states (`figures/p2_crosssection.png`)
+settles *why* the net M_z vanishes — the two-stage design input:
+
+| end-state (γB=4, Ω=0.85) | DDI-off | DDI-on |
+|---|---|---|
+| Fz | 2.42 | 0.74 |
+| \|F\|_cloud | 5.997 | 4.869 |
+| **local \|F\| = \|f\|/n** (density-wtd) | **6.00** | **5.05** |
+| **z-cancellation frac** (col ∫f_z dxdy) | **0.00** | **0.00** |
+| Fz / \|F\|_cloud | 0.40 | 0.15 |
+
+**The pass-2 z-odd hypothesis is REFUTED dynamically.** The column integral
+∫f_z dx dy is **same-sign at every z** (cancellation frac = 0.00) — there is no
+z-odd f_z texture that cancels in the z-average. Nor is it pure depolarisation:
+local \|F\| only drops 6.00→5.05 (~16 %), far too little to explain Fz dropping
+3.3×. The dominant killer is **in-plane DDI pinning**: the dipolar mean field
+lies along the in-plane magnetisation (Φ_∥ ~ 42 µG ≫ the axial fields), pinning
+the spin *harder* in-plane and suppressing the coherent −Ω/γ axial tilt
+(Fz/\|F\| collapses 0.40→0.15 while \|F\|_cloud stays large). Mild depolarisation
+(near vortex cores) is a secondary effect.
+
+**Consequence for two-stage — bet on flux-closure, not post-quench B_z bias.**
+Single-stage fails because B_ext + Φ_∥ pin the spin in-plane, not because of
+geometric z-cancellation. Quenching B→~0 removes *exactly* that pinning, so the
+released spin is free to relax into a z-asymmetric flux-closure texture. The
+mechanism to design for is Saito flux-closure relaxation; a residual static B_z
+bias would merely restore single-particle pinning and should be nulled.
 
 ⇒ **Two-stage quench is the necessary path** (nucleate vortices at healthy B →
 quench B→~0 → the released spin relaxes into a flux-closure / z-asymmetric
 texture that carries net M_z, Saito-scale). This is the thesis-novel geometry
 step. The remaining risk — does the quench redistribute the single-component
 vortex into the m-texture so ⟨f_z⟩ rises? — is the next decisive test.
+
+**Still open before two-stage (Tasks 2–3):** multi-Ω ΔFz (Klaus Ω_c kink on the
+M_z side?) and the CW−CCW double difference (is single-stage truly dead, or
+"small but separable"?).
 
 --- (historical: the single-stage analysis below is retained for context) ---
 
