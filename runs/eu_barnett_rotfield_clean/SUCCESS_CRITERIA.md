@@ -152,6 +152,39 @@ Until resolved (grid/dt convergence + dealias off), the weak F_z=−0.44 cannot 
 trusted as physical, and "vortex AM is lost" cannot be cleanly called physical vs
 numerical. **This is the next gate before any two-stage conclusion.**
 
+## GATE — the two-stage J_z leak is a BOX-OVERFLOW artifact (2026-07-07)
+
+The healthy-start quench's J_z non-conservation (1.28→−0.5, while norm/energy
+conserved) invalidates BOTH "vortex AM lost" and "F_z=−0.44 real" — a broken
+conservation law contaminates every J_z-dependent claim. Diagnosis (all cheap,
+one-factor-at-a-time; tools `run_jz_check.jl`, `verify_lz_operator.jl`,
+`run_box_toy.jl`):
+
+1. **dt-independent** (dt 4e−4 ≡ 2e−4 bit-identical) → structural *spatial*
+   non-conservation, not time-integration.
+2. Dealias filter: default OFF; turning ON mildly *worsens* → not aliasing.
+3. DDI `trunc_radius`: default disabled → not kernel asymmetry.
+4. **L_z operator EXACT**: (x+iy)^m·G eigenstate test → measured L_z = m to 1e−14
+   for contained states; drifts only at box-overflow → measurement sound.
+5. **DDI-off still leaks L_z (0.8)**, spin frozen → **orbital**, not DDI-coupled.
+6. Density extent: **RMS r_xy=3.95 in a ±6 box, 8 % of density at the edge**
+   (|x,y|>5.5) → **overflow**.
+7. **Toy confirmation** (analytic orbital vortex): leak scales with edge-fraction
+   (σ2.8/2.7 %→0.004, σ4.0/9.9 %→0.17, σ7/20 %→0.32); and the *same* σ=4 cloud
+   **leaks 0.17 at box-12 but conserves (0.0002) at box-20**. Bigger box is the fix.
+
+**Root cause: the ±6 box is too small for this cloud.** Split-step Fourier is
+periodic; density at the edge couples to its images and breaks L_z conservation
+(norm/energy survive). The Barnett cloud (RMS 3.95, elongated) overflows.
+
+**Consequence: every two-stage physics conclusion is provisional** — "AM lost",
+"F_z=−0.44", the L_z collapse — all ride on the contaminated J_z ledger and must be
+re-derived in a bigger box. Caveat: the transient toy caps at leak ~0.3 while
+production leaks 0.8 (sustained overflow + high-k texture from 11 vortices add
+more), so the rebuild uses **box≈20 (n≈80, dx=0.25 kept)** and *checks* J_z closes;
+if a residual remains, finer grid is the follow-up. See gotcha
+`box_overflow_breaks_lz_jz_conservation`.
+
 ## RESOLVED DECISION — two-stage (single-stage is dead)
 
 **P2 regime-B settled it (`run_p2_regimeb.jl`, γB=4, Ω=0.85, DDI on/off):**
