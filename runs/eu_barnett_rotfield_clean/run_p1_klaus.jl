@@ -16,13 +16,22 @@ import CUDA
 using SpinorBEC
 using JLD2, CodecZstd, FFTW, Printf, LinearAlgebra
 
-const SC = "/tmp/claude-1000/-home-suzume-workspace-BEC-simulation/00662cde-2b20-4d46-95e9-97c16408370a/scratchpad"
+# portable config (env overrides for TSUBAME / hi-res convergence runs)
+const SC = get(ENV, "SPINORBEC_SCRATCH",
+    "/tmp/claude-1000/-home-suzume-workspace-BEC-simulation/00662cde-2b20-4d46-95e9-97c16408370a/scratchpad")
+const OUTDIR = get(ENV, "P1_OUT", "runs/eu_barnett_rotfield_clean")
 const SMOKE = get(ENV, "SMOKE", "0") == "1"
 const BXG = "9.216e-4 Gauss"   # gamma*B = 15 (deep-ish scalar lock)
 const BAMP = 9.216e-4          # same, for the rotating drive
-const OMEGAS = SMOKE ? [0.85] : [0.4, 0.55, 0.70, 0.74, 0.85, 0.95]
-const DUR = SMOKE ? 3.0 : 30.0
-const GS_NSTEPS = SMOKE ? 300 : 2500
+_parsef(s) = parse.(Float64, split(s, ","))
+_parsei(s) = parse.(Int, split(s, ","))
+const P1_N = get(ENV, "P1_N", "48,48,24")       # grid points
+const P1_BOX = get(ENV, "P1_BOX", "12.0,12.0,6.0")
+const OMEGAS = SMOKE ? [0.85] :
+    haskey(ENV, "P1_OMEGAS") ? _parsef(ENV["P1_OMEGAS"]) : [0.4, 0.55, 0.70, 0.74, 0.85, 0.95]
+const DUR = SMOKE ? 3.0 : parse(Float64, get(ENV, "P1_DUR", "30.0"))
+const GS_NSTEPS = SMOKE ? 300 : parse(Int, get(ENV, "P1_GS_NSTEPS", "2500"))
+mkpath(SC); mkpath(OUTDIR)
 
 # GS: strong field along +x, spin along +x, pancake trap -> cloud elongated
 # along x by magnetostriction. Prepared once, reused via from_jld2 per Omega.
@@ -31,7 +40,7 @@ defaults: {kind: spinor, backend: gpu, interactions: {N_atoms: 30000, omega_ref:
 pipeline:
   - ground_state:
       atom: Eu151
-      grid: {n: [48, 48, 24], box: [12.0, 12.0, 6.0]}
+      grid: {n: [$P1_N], box: [$P1_BOX]}
       potential: {type: harmonic, omega: [1.0, 1.0, 2.0]}
       interactions: {N_atoms: 30000, omega_ref: 628.3, c1_ratio: -0.005}
       ddi: {enabled: true, secular: false}
@@ -53,7 +62,7 @@ defaults: {kind: spinor, backend: gpu, interactions: {N_atoms: 30000, omega_ref:
 pipeline:
   - ground_state:
       atom: Eu151
-      grid: {n: [48, 48, 24], box: [12.0, 12.0, 6.0]}
+      grid: {n: [$P1_N], box: [$P1_BOX]}
       potential: {type: harmonic, omega: [1.0, 1.0, 2.0]}
       interactions: {N_atoms: 30000, omega_ref: 628.3, c1_ratio: -0.005}
       ddi: {enabled: true, secular: false}
@@ -155,6 +164,6 @@ for Om in OMEGAS
     @printf("\n===== P1 Klaus stir Omega=%.2f =====\n", Om)
     rundir = run_yaml(ypath)
     pj = joinpath(rundir isa AbstractString ? rundir : "", "point_001.jld2")
-    klaus_metrics(pj, Om, @sprintf("runs/eu_barnett_rotfield_clean/traj_p1_O%.2f.csv", Om))
+    klaus_metrics(pj, Om, joinpath(OUTDIR, @sprintf("traj_p1_O%.2f.csv", Om)))
 end
 println("P1_KLAUS_DONE")
