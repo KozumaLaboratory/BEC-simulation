@@ -172,12 +172,34 @@ that suppressed the conversion — edge-fraction 8 % vs 0.3 %.
 
 **Caveat to close (honest):** J_z still drifts in the quench (11.1 → 7.8; loss
 = ΔL_z+ΔF_z = −5.2+2.0 = −3.2) *despite* edge≈0, so it is NOT the same overflow.
-Either physical dissipation (orbital AM → sound as vortices decay) or a smaller
-residual (vortex/sound at the low-density edge; a still-bigger box or dt-check
-settles it). The **direction** (conversion happens, net M_z develops) is robust;
-the exact conversion efficiency needs the residual closed. Also pending: chirality
+The **direction** (conversion happens, net M_z develops) is robust; the exact
+conversion efficiency needs the residual closed. Also pending: chirality
 (−Ω → −F_z?) and the deferred L_z-collapse re-read (here L_z does NOT collapse — it
 smoothly converts, another box-12-artifact reversal).
+
+## RESIDUAL J_z — NOT box, it is grid/dt resolution (2026-07-08)
+
+box±14/n80 (dx=0.35) vs box±10/n80 (dx=0.25) quench, both TSUBAME:
+
+| | J_z drift | ⟨F_z⟩ | L_z(→) | edge_max |
+|---|---|---|---|---|
+| box±10 (dx0.25) | +3.26 | +2.08 | 10.9→5.7 | 0.003 |
+| box±14 (dx0.35) | **+5.16** | +1.87 | 10.9→3.9 | **0.000** |
+
+**The residual is NOT box-overflow** — box±14 has edge_max = 0.000 (fully contained)
+yet the drift *grew* (3.26→5.16). It grew because the box±14/n80 grid is **coarser**
+(dx 0.35 vs 0.25): the residual J_z leak is a **grid/time-discretization effect on
+the fine conversion dynamics** (decaying vortices + spin texture), worse at coarser
+dx — NOT the periodic boundary. Closing it needs **finer dx/dt, not a bigger box**.
+**The conversion is box/grid-robust**: F_z→+1.9…2.1, L_z drops, across both. So
+"two-stage Barnett works, net M_z via orbital→spin" is **confirmed robust**; only
+the exact efficiency (how much of ΔL_z reaches F_z vs numerical leak) awaits a
+grid-convergence run (box±14/n112 dx0.25 + dt-check). **Status: headline CONFIRMED;
+conversion efficiency = grid-convergence pending.**
+
+TSUBAME infra (all fixed + `tsubame_rebuild_template.sh` + gotchas): explicit julia
+path, JULIAUP+package shared depot, NVMe scratch (mmap; RB_SAVE_EVERY to fit big
+grids — Lustre SIGBUSes), reap runs/rb_* + group quota, ssh ControlMaster socket.
 
 ## GATE — the two-stage J_z leak is a BOX-OVERFLOW artifact (2026-07-07)
 
