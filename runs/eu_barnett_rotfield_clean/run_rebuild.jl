@@ -34,7 +34,7 @@ const GS_STEPS = SMOKE ? 50 : parse(Int, get(ENV, "RB_GS_STEPS", "2500"))
 const STIR = SMOKE ? 1.0 : parse(Float64, get(ENV, "RB_STIR", "30.0"))
 const QUENCH = SMOKE ? 1.0 : parse(Float64, get(ENV, "RB_QUENCH", "50.0"))
 const DYN_DT = SMOKE ? 0.004 : parse(Float64, get(ENV, "RB_DT", "0.0004"))  # dynamics dt (dt-check knob)
-const SAVE_EVERY = SMOKE ? 50 : 300
+const SAVE_EVERY = SMOKE ? 50 : parse(Int, get(ENV, "RB_SAVE_EVERY", "300"))  # big grids: raise so the jld2 fits node-local NVMe (Lustre mmap SIGBUSes)
 const TAG = let t = get(ENV, "RB_TAG", ""); isempty(t) ? "" : t * "_" end  # output-name prefix (avoid concurrent-job collisions)
 mkpath(SC); mkpath(joinpath(OUT, "rebuild"))
 
