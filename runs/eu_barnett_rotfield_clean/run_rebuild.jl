@@ -35,6 +35,7 @@ const STIR = SMOKE ? 1.0 : parse(Float64, get(ENV, "RB_STIR", "30.0"))
 const QUENCH = SMOKE ? 1.0 : parse(Float64, get(ENV, "RB_QUENCH", "50.0"))
 const DYN_DT = SMOKE ? 0.004 : parse(Float64, get(ENV, "RB_DT", "0.0004"))  # dynamics dt (dt-check knob)
 const SAVE_EVERY = SMOKE ? 50 : 300
+const TAG = let t = get(ENV, "RB_TAG", ""); isempty(t) ? "" : t * "_" end  # output-name prefix (avoid concurrent-job collisions)
 mkpath(SC); mkpath(joinpath(OUT, "rebuild"))
 
 gs_yaml() = """
@@ -136,11 +137,11 @@ gsdir = run_yaml(gy); gs_path = joinpath(gsdir isa AbstractString ? gsdir : "", 
 println("\n===== REBUILD Stage 1b: Klaus stir (Omega=$OMEGA, t=$STIR) ====="); flush(stdout)
 sy = joinpath(SC, "rb_stir.yaml"); open(sy, "w") do io; write(io, dyn_yaml(gs_path, :stir)); end
 stirdir = run_yaml(sy); stir_path = joinpath(stirdir isa AbstractString ? stirdir : "", "point_001.jld2")
-traj(stir_path, joinpath(OUT, "rebuild", "traj_stir.csv"))
+traj(stir_path, joinpath(OUT, "rebuild", "traj_$(TAG)stir.csv"))
 
 println("\n===== REBUILD Stage 2: quench B->0 (t=$QUENCH) ====="); flush(stdout)
 qy = joinpath(SC, "rb_quench.yaml"); open(qy, "w") do io; write(io, dyn_yaml(stir_path, :quench)); end
 qdir = run_yaml(qy); q_path = joinpath(qdir isa AbstractString ? qdir : "", "point_001.jld2")
-traj(q_path, joinpath(OUT, "rebuild", "traj_quench.csv"))
+traj(q_path, joinpath(OUT, "rebuild", "traj_$(TAG)quench.csv"))
 
 println("\nREBUILD_DONE stir=$stir_path quench=$q_path"); flush(stdout)

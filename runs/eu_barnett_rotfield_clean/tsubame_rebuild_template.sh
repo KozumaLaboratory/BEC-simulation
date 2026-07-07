@@ -41,9 +41,10 @@ export RB_DT="${RB_DT:-0.0004}"
 source scripts/tsubame_setup.sh    # sets threads + (node-local) SPINORBEC_SCRATCH_DIR
 
 # --- CRITICAL: override node-local NVMe scratch -> Lustre (same device as runs/)
-# so large-snapshot tmp->output renames stay in-place (no EXDEV). ---
-export SPINORBEC_SCRATCH_DIR="$REPO/runs/rb_scratch_lustre"
-export SPINORBEC_SCRATCH="$REPO/runs/rb_scratch_lustre"
+# so large-snapshot tmp->output renames stay in-place (no EXDEV). Per-JOB_ID dir
+# so concurrent jobs don't clobber each other's intermediate yamls/snapshots. ---
+export SPINORBEC_SCRATCH_DIR="$REPO/runs/rb_scratch_${JOB_ID:-manual}"
+export SPINORBEC_SCRATCH="$SPINORBEC_SCRATCH_DIR"
 mkdir -p "$SPINORBEC_SCRATCH_DIR"
 
 JULIA=/gs/fs/tga-kozuma-kouhi/shared/.juliaup/bin/julia
