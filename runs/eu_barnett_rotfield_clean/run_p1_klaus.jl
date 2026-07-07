@@ -86,8 +86,8 @@ function klaus_metrics(pj, Om, outcsv)
     sm = spin_matrices(F); plans = make_fft_plans(Tuple(grid.config.n_points); flags=FFTW.ESTIMATE)
     dV = cell_volume(grid)
     npts = grid.config.n_points
-    xs = axis_coords(grid, 1); ys = axis_coords(grid, 2)
-    rows = ["t,AR,ell_angle,field_angle,lag,Lz,Fmag,Fz"]
+    xs = grid.x[1]; ys = grid.x[2]
+    rows = ["t,AR,ell_angle,field_angle,lag,Lz,Fmag,Fz,Nv"]
     jldopen(pj, "r") do f
         times = collect(Float64, f["dynamics/times"]); g = f["dynamics/psi_snapshots_streamed"]
         frames = sort(filter(s -> startswith(s, "frame_"), collect(keys(g))))
@@ -112,8 +112,23 @@ function klaus_metrics(pj, Om, outcsv)
             fx, fy, fz = spin_density_vector(psi, sm, N)
             Fx = sum(fx) * dV; Fy = sum(fy) * dV; Fz = sum(fz) * dV
             Lz = orbital_angular_momentum(psi, grid, plans)
-            push!(rows, @sprintf("%.5f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f",
-                                 t, AR, ell, fang, lag, Lz, sqrt(Fx^2 + Fy^2 + Fz^2), Fz))
+            # vortex-core count: deep local minima of the column density INSIDE
+            # the cloud (surrounded by high density) = vortex cores.
+            pk = maximum(n); nv = 0
+            @inbounds for ix in 2:npts[1]-1, iy in 2:npts[2]-1
+                c = n[ix, iy]
+                c < 0.3 * pk || continue
+                ismin = true
+                for ddx in -1:1, ddy in -1:1
+                    (ddx == 0 && ddy == 0) && continue
+                    if n[ix+ddx, iy+ddy] < c; ismin = false; break; end
+                end
+                ismin || continue
+                surround = (n[ix-1, iy] + n[ix+1, iy] + n[ix, iy-1] + n[ix, iy+1]) / 4
+                surround > 0.2 * pk && (nv += 1)
+            end
+            push!(rows, @sprintf("%.5f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%d",
+                                 t, AR, ell, fang, lag, Lz, sqrt(Fx^2 + Fy^2 + Fz^2), Fz, nv))
         end
     end
     open(outcsv, "w") do io; for r in rows; println(io, r); end; end
