@@ -1,114 +1,103 @@
 #!/usr/bin/env python3
-"""Cone-angle scan: how the one-sided (chiral) excitation depends on the
-field's tilt angle theta, and what angle is best.
+"""Cone-angle scan of the field-UP one-sided excitation: what tilt angle is best.
 
-Single tilted field of fixed magnitude B (gamma*B=0.5) precessing about +z:
-  B_par = B cos(theta) -> Larmor omega_L = 0.5 cos(theta) (= resonant Omega)
-  B_perp = B sin(theta) -> drive Rabi rate Omega_R = 0.5 sin(theta)
-Small theta = selective but slow; large theta = fast but the counter-rotating
-term stops being detuned (selectivity ~ tan(theta)/2). The sweet spot balances
-excitation within the metastable relaxation time against one-sidedness.
+Single tilted field of fixed magnitude B (gamma*B=5.1) precessing about +z:
+  B_par = B cos(theta) -> omega_L = 5.1 cos(theta) (= resonant Omega, the gap)
+  B_perp = B sin(theta) -> drive Rabi rate Omega_R = 5.1 sin(theta)
+Small theta: large gap (spontaneous relaxation frozen) + slow but very
+selective resonant flip. Large theta: gap shrinks (relaxation returns, vortices
+grow) + fast but poorly selective flip (counter-rotating no longer detuned).
 
-Reads traj_angle_{nodrive,th15_res,...,th35_off}.csv from run_angle_scan.jl.
-Line-based (no heatmaps).
+Reads traj_cone_th{12,25,40,55}_{res,off}.csv from run_angle_scan.jl.
+Metric of the resonant Rabi drive = the Fz swing max-min; selectivity =
+resonant swing / off-resonant swing. Line-based (no heatmaps).
 """
-import csv, os, re, math
+import csv, os
 import numpy as np
 import matplotlib.pyplot as plt
 import figstyle as fs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "angle_scan")
-THETAS = [15, 25, 35, 45, 60]
+OUT = os.path.join(HERE, "cone_angle_scan")
+THETAS = [12, 25, 40, 55]
+GB = 5.1
 
 
 def load(tag):
-    p = os.path.join(HERE, f"traj_angle_{tag}.csv")
+    p = os.path.join(HERE, f"traj_cone_{tag}.csv")
     if not os.path.exists(p):
         return None
     r = list(csv.DictReader(open(p)))
     return {k: np.array([float(x[k]) for x in r]) for k in ("t", "Fx", "Fy", "Fz", "Fmag", "Lz")}
 
 
-def metrics(d):
-    return dict(dFz=d["Fz"][0] - np.min(d["Fz"]),
-                pLz=np.max(np.abs(d["Lz"])),
-                Fmin=np.min(d["Fmag"]))
+def swing(d):
+    return np.max(d["Fz"]) - np.min(d["Fz"])
 
 
 def main():
-    nod = load("nodrive")
-    res = {th: load(f"th{th}_res") for th in THETAS}
-    off35 = load("th35_off")
-    res = {th: d for th, d in res.items() if d is not None}
-    if not res:
-        print("no resonant angle runs yet")
+    res = {th: load(f"th{th:02d}_res") for th in THETAS}
+    off = {th: load(f"th{th:02d}_off") for th in THETAS}
+    ths = [th for th in THETAS if res[th] is not None]
+    if not ths:
+        print("no cone runs yet")
         return
 
-    ths = sorted(res)
-    dFz = [metrics(res[t])["dFz"] for t in ths]
-    pLz = [metrics(res[t])["pLz"] for t in ths]
-    base = metrics(nod)["dFz"] if nod is not None else 0.0
-    net = [d - base for d in dFz]  # drive-induced excitation above relaxation
+    sw_r = [swing(res[th]) for th in ths]
+    sw_o = [swing(off[th]) if off[th] is not None else np.nan for th in ths]
+    lz_r = [np.max(np.abs(res[th]["Lz"])) for th in ths]
+    lz_o = [np.max(np.abs(off[th]["Lz"])) if off[th] is not None else np.nan for th in ths]
+    sel = [r / o if (o and o == o and o > 1e-6) else np.nan for r, o in zip(sw_r, sw_o)]
 
-    fig = plt.figure(figsize=(15, 5.2))
-    gs = fig.add_gridspec(1, 3, wspace=0.30)
+    fig = plt.figure(figsize=(15.5, 4.8))
+    gs = fig.add_gridspec(1, 3, wspace=0.42)
 
-    # (a) excitation vs theta
+    # (a) resonant vs off-resonant excitation (Fz swing) vs theta
     axa = fig.add_subplot(gs[0, 0])
-    axa.plot(ths, dFz, "o-", color=fs.NEG, lw=2.2, ms=8, label=r"spin exc. $\Delta\langle F_z\rangle$")
-    axa.plot(ths, pLz, "s-", color=fs.POS, lw=2.2, ms=8, label=r"peak $|\langle L_z\rangle|$ (vortex)")
-    if nod is not None:
-        axa.axhline(base, color=fs.ZERO, ls="--", lw=1.6,
-                    label=f"relaxation only (no drive) = {base:.2f}")
-    iopt = int(np.argmax(net))
-    axa.axvline(ths[iopt], color="gray", ls=":", lw=1)
-    axa.annotate(f"peak drive-\ninduced\n$\\theta$≈{ths[iopt]}°", (ths[iopt], dFz[iopt]),
-                 textcoords="offset points", xytext=(8, -6), fontsize=9)
+    axa.plot(ths, sw_r, "o-", color=fs.NEG, lw=2.3, ms=8, label=r"$+\Omega$ resonant (Rabi swing)")
+    axa.plot(ths, sw_o, "s--", color=fs.POS, lw=2.0, ms=7, label=r"$-\Omega$ off-resonant")
     axa.set_xlabel(r"cone angle $\theta$ (deg)")
-    axa.set_ylabel(r"amplitude ($\hbar$/atom)")
-    axa.set_title("(a) excitation vs tilt angle")
+    axa.set_ylabel(r"$\langle F_z\rangle$ swing (max$-$min)")
+    axa.set_title("(a) resonant flip vs off-resonant")
     axa.legend(fontsize=8.5); axa.grid(alpha=0.3)
 
-    # (b) selectivity: theory tan(theta)/2 off-resonant coupling ratio + measured point
+    # (b) selectivity + vortices vs theta (twin axis)
     axb = fig.add_subplot(gs[0, 1])
-    tt = np.linspace(5, 85, 200)
-    sel = np.tan(np.radians(tt)) / 2.0   # Omega_R / (2 omega_L)
-    axb.plot(tt, sel, color="#5b5f6b", lw=2,
-             label=r"$\Omega_R/2\omega_L=\tan\theta/2$ (off-res coupling)")
-    axb.axhline(1.0, color=fs.NEG, ls=":", lw=1.2, label="selectivity lost (=1)")
-    if off35 is not None:
-        r35 = metrics(res[35])["dFz"] if 35 in res else np.nan
-        o35 = metrics(off35)["dFz"]
-        axb.plot([35], [o35 / max(r35, 1e-6)], "D", color=fs.POS, ms=10, zorder=5,
-                 label=f"measured off/res @35°={o35/max(r35,1e-6):.2f}")
+    axb.plot(ths, sel, "D-", color="#5b5f6b", lw=2.3, ms=8, label="selectivity (res/off swing)")
     axb.set_xlabel(r"cone angle $\theta$ (deg)")
-    axb.set_ylabel(r"counter-/co-rotating response")
-    axb.set_title(r"(b) one-sidedness degrades as $\theta\to$90°")
-    axb.set_ylim(0, 2); axb.legend(fontsize=8.5); axb.grid(alpha=0.3)
+    axb.set_ylabel("selectivity (res / off)")
+    axb.set_title(r"(b) one-sidedness $\downarrow$, vortices $\uparrow$ with $\theta$")
+    axb.grid(alpha=0.3)
+    axr = axb.twinx()
+    axr.plot(ths, lz_r, "o-", color=fs.NEG, lw=1.8, ms=6, label=r"peak $|L_z|$ ($+\Omega$)")
+    axr.plot(ths, lz_o, "s--", color=fs.POS, lw=1.8, ms=6, label=r"peak $|L_z|$ ($-\Omega$)")
+    axr.set_ylabel(r"peak $|L_z|$ (vortices)")
+    l1, la = axb.get_legend_handles_labels()
+    l2, lb = axr.get_legend_handles_labels()
+    axb.legend(l1 + l2, la + lb, fontsize=7.5, loc="lower left")
 
-    # (c) time traces: relaxation vs resonant(optimum) vs off-resonant
+    # (c) resonant Fz(t), zoomed to the first few Rabi flops (faster at larger theta)
     axc = fig.add_subplot(gs[0, 2])
-    if nod is not None:
-        axc.plot(nod["t"], nod["Fz"], color=fs.ZERO, lw=1.8, ls="--", label="no drive (relaxation)")
-    topt = ths[iopt]
-    axc.plot(res[topt]["t"], res[topt]["Fz"], color=fs.NEG, lw=2.4,
-             label=rf"resonant $\theta$={topt}° (excites)")
-    if off35 is not None:
-        axc.plot(off35["t"], off35["Fz"], color=fs.POS, lw=2.0,
-                 label=r"off-resonant $\theta$=35° (frozen)")
-    axc.axhline(6, color="gray", lw=0.8, ls=":")
+    cmap = plt.cm.viridis(np.linspace(0.15, 0.85, len(ths)))
+    for th, c in zip(ths, cmap):
+        d = res[th]
+        m = d["t"] <= 8.0
+        axc.plot(d["t"][m], d["Fz"][m], color=c, lw=2.0,
+                 label=rf"$\theta$={th}° ($\Omega_R$={GB*np.sin(np.radians(th)):.1f})")
+    axc.axhline(0, color="k", lw=0.6)
     axc.set_xlabel(r"$t\ (\omega_{\rm ref}^{-1})$")
     axc.set_ylabel(r"$\langle F_z\rangle$ ($\hbar$/atom)")
-    axc.set_title("(c) excitation vs metastable relaxation time")
-    axc.legend(fontsize=8.5); axc.grid(alpha=0.3)
+    axc.set_title(r"(c) resonant flip is faster at larger $\theta$")
+    axc.legend(fontsize=8, loc="lower right"); axc.grid(alpha=0.3)
 
     fig.suptitle(
-        r"Best field tilt angle for chiral excitation ($^{151}$Eu $F$=6, field UP, "
-        r"$m$=+$F$ metastable, $\gamma B$=0.5)", fontsize=13, y=1.02)
+        r"Best field tilt for field-UP chiral excitation ($^{151}$Eu $F$=6, $m$=+$F$ metastable, $\gamma B$=5.1)",
+        fontsize=13, y=1.03)
     for e in ("png", "pdf"):
         fig.savefig(f"{OUT}.{e}", bbox_inches="tight", dpi=150 if e == "png" else None)
-    print(f"wrote {OUT}.png/pdf  (optimum theta ~ {ths[iopt]} deg)")
+    print(f"wrote {OUT}.png/pdf")
+    for th, r, o, s, l in zip(ths, sw_r, sw_o, sel, lz_r):
+        print(f"  theta={th}: swing_res={r:.2f} swing_off={o:.2f} sel={s:.1f} peakLz_res={l:.2f}")
 
 
 if __name__ == "__main__":

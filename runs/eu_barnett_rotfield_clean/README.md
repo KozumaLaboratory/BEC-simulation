@@ -62,6 +62,38 @@ q=0 keeps the ladder harmonic). A transverse field rotating at **Ω=ω_L=0.5**:
   co-vs-counter-rotating resonance selection, now with EdH vortices on the
   resonant side. Line-based figure (no density heatmaps).
 
+### 2c. Field-UP metastable variant + relaxation time (`fieldup_onesided.png`)
+Same idea but with the field applied **UP** (+z), so the top state m=+F is the
+**metastable EXCITED** state (a "field-applied, finite-lifetime" preparation).
+`run_field_test.jl`. Key regime finding:
+- At ω_L=0.5 the field-up m=+F is **dynamically unstable** (τ≈4): it fully
+  relaxes on its own regardless of drive — no selectivity.
+- Raising the Zeeman gap **above the DDI energy scale** (ω_L=5, Bz=+3.07e-4 G)
+  **Zeeman-suppresses** the spontaneous m→m−1 relaxation (τ≈20). Then only the
+  resonant **+Ω** co-rotating drive excites: it coherently **Rabi-flops** the
+  spin +5.8↔−5.5 (ΔF_z=11.3, t₅₀=1.6, |F| kept high); **−Ω** counter-rotating
+  ≈ the slow no-drive relaxation baseline. One-sided, field-up, finite lifetime.
+- **Tradeoff**: the large-gap resonant drive is a *coherent* flip with **few
+  vortices** (L_z≈0.5); the EdH vortices live in the *slow relaxation* channel
+  (L_z≈1.3).
+
+### 2d. Best field tilt (cone) angle (`cone_angle_scan.png`)
+`run_angle_scan.jl`: single tilted field of fixed magnitude (γB=5.1) precessed
+about z at cone angle θ — B∥=B cosθ sets the gap ω_L=5.1 cosθ (=resonant Ω),
+B⊥=B sinθ sets the Rabi rate Ω_R=5.1 sinθ. Scanned θ∈{12,25,40,55}°, +Ω vs −Ω:
+- The **resonant flip is full (swing≈11.3) at every θ** — only the *rate*
+  changes (Ω_R∝sinθ, so larger θ flips faster).
+- **One-sidedness degrades with θ**: selectivity (res/off swing) 5.4× (12°) →
+  4.8× (25°) → 3.4× (40°) → 1.9× (55°), because as θ grows ω_L shrinks — the
+  counter-rotating term stops being detuned and spontaneous relaxation returns.
+- **Vortices grow with θ** (resonant peak |L_z|: 0.65→1.18→1.21→0.39; the
+  off-resonant/relaxation channel reaches 2.6 at 40°).
+- **Recommended θ ≈ 25°** — near-maximal selectivity (4.8×, clean one-sided)
+  while ~doubling the resonant vortex content vs the small-angle limit. Small θ
+  (~12°) if pure one-sidedness matters most; θ ≳ 40° trades it away for vortices.
+Requires the **large field** (ω_L ≳ 5) so the metastable relaxation stays slow;
+at small ω_L the state relaxes before any angle helps.
+
 ### 3. Optimization: response vs rotation Ω and field strength (`optimization_scaling.png`)
 Transverse start, converged box=18 GS, peak amplitudes over the drive.
 **Densely resolved** — 41 points in Ω, 30 in B_perp (GS-shared `from_jld2`
