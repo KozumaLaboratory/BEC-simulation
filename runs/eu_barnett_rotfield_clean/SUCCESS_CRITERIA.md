@@ -23,20 +23,46 @@ effective axial field (≈ −Ω/γ) driving each spin single-particle. That pat
 stirring supplying the orbital drive for free. So: **Barnett = reverse-EdH
 driven by Klaus stirring**; forward EdH is the cross-check (§8).
 
-## OPEN DECISION — single-stage vs two-stage quench
+## FEASIBILITY GATE — is the window open? (RESULT: **OPEN**, `run_bdd.jl`)
 
-- **Single-stage** (Klaus geometry + Ω/ω_⊥, sweep field strength): the honest
-  Klaus reproduction. Risk: the signal is intrinsically **small** — residual
-  spin tilt ~ B_dd/B_ext ~ 1/(few) (see window tradeoff below) — and must
-  survive noise + single-particle-baseline subtraction.
+The single-stage window opens iff the max achievable signal fraction — the
+transverse (spin-tipping) dipolar field over the adiabaticity-floor external
+field — exceeds the imaging floor: **γB_dd/ω_⊥ = Φ_z ≳ floor (~0.03)**. Because
+H_DDI = −Φ·F, the dipolar field Φ (ω_ref units) *is* γB_dd, so Φ_z is read
+directly off a realistic Eu state (`run_bdd.jl`, magnetostriction GS, N=30000):
+
+| quantity | ω_ref units | (μG, g_F=1.163) |
+|---|---|---|
+| \|Φ\| total (along magnetisation, ~c_dd·n) | 0.61 | ~38 |
+| Φ_∥ (along B_ext=x) rms | 0.68 | ~42 |
+| **Φ_z (transverse, spin-tipping) rms** | **0.121** | ~7.4 |
+| Φ_z max | 0.40 | ~24 |
+
+**Verdict: Φ_z(rms) = 0.121 vs floor 0.03 → OPEN (4×); peak 0.40 (13×).**
+Max single-stage signal fraction M_z/|F| ≈ Φ_z ≈ **12 %** ≫ 3 % floor.
+- The dimensionless Φ_z=0.12 is primary; the μG uses the g_F-Zeeman γ (moment
+  choice → ±factor), so quote the ratio, not the μG.
+- Caveat: RMS on a z-symmetric GS overestimates the *net*-M_z-driving field
+  (net M_z needs z-symmetry breaking from the vortex/dynamics); the 4× headroom
+  likely survives the discount. **Pass 2**: Φ_z at the vortex core from a
+  P1-stirred state.
+- Φ ∝ N (density); 0.12 is at N=30000 — recompute for the experiment's N.
+
+## OPEN DECISION — single-stage (primary) vs two-stage (backup)
+
+Feasibility gate OPEN ⇒ **single-stage is the primary path** (not forced to
+two-stage). Two-stage is now a *signal-boost* backup, not a necessity.
+
+- **Single-stage** (Klaus geometry + Ω/ω_⊥, sweep field strength): honest Klaus
+  reproduction; max signal fraction ~12 % (above floor). Still small enough that
+  confound subtraction (§ error budget) is the real gate, not window closure.
 - **Two-stage** (strong-B Klaus nucleation → quench B→~0 → spin released →
-  topologically-conserved residual vortices relax to their own B_dd → Barnett
-  rises at the large Saito scale): both Klaus nucleation *and* a big signal.
-  Risk: whether the quench correctly redistributes the single-component vortex
-  into the m-texture so ⟨f_z⟩ actually rises is **nontrivial** — this is the
-  core mechanism-ID and is worth checking *before* committing to single-stage.
-
-Decide after Priority 1–2 give the single-stage signal size.
+  topologically-conserved residual vortices relax to their B_dd → Barnett at the
+  large Saito scale): larger signal *and* removes the adiabaticity floor (the
+  vortices are already frozen in, so no stirring-adiabaticity requirement during
+  read-out). Take it if the confound budget (below) squeezes single-stage.
+  Its own risk — does the quench redistribute the single-component vortex into
+  the m-texture so ⟨f_z⟩ rises? — is the core mechanism-ID, verify before use.
 
 ## Signal definition (corrected — physics, not artifact)
 
@@ -97,6 +123,67 @@ In (B) the primary resonance is the **orbital** Ω_c≈0.74 ω_⊥ (quadrupole s
 mode), not a spin q-resonance (that was the (A) centrepiece). Here q is a gate on
 how freely the spin responds to B_dd — it may tune the window width. In-plane
 q-resonance verification is correctly **deferred**.
+
+## Experimental feasibility layer (error budget → go/no-go)
+
+The experiment has two weapons: the **CW−CCW difference** and the **Ω_c
+threshold** (signal turns on *with* the vortices). Split every error by Ω-parity:
+
+- **Ω-even** (mean cancels in CW−CCW): residual B_z, θ-calibration (cosθ
+  projection), static trap anisotropy. Averages out — **but shot-to-shot
+  fluctuations do not** (CW and CCW are separate shots, so σ(B_z) leaks).
+- **Ω-odd** (survives CW−CCW): the −Ω/γ single-particle tilt (smooth in Ω, no
+  threshold) and the true Barnett (turns on at Ω_c *with* the vortices). These
+  two are **not** separable by CW−CCW; only their **Ω-shape** distinguishes them
+  (smooth vs kink-at-Ω_c). DDI on/off is a sim-only knob (can't switch DDI in the
+  lab) → the experimental discriminant is **"M_z excess that turns on at Ω_c,
+  correlated with vortex number"** = the Klaus signature.
+
+**Protocol** (two-step): CW−CCW kills static confounds → the Ω_c kink + vortex
+correlation peels the true Barnett off the single-particle −Ω/γ background.
+
+**Dominant confound + the B_⊥-independent critical condition.** Shot-to-shot
+residual-B_z fluctuation shifts the single-particle M_z directly:
+signal M_z/|F| ~ B_dd/B_⊥; sensitivity ∂M_z^sp/∂B_z ~ |F|/B_⊥. In SNR ~
+ΔM_z/[sensitivity·σ(B_z)] the B_⊥ cancels →
+
+> **σ(B_z)_shot-to-shot ≲ B_dd** — an absolute (B_⊥-independent) requirement,
+> ~μG-scale = **the EdH-grade shielding the lab hit last year [ref 50]**. This
+> is the real "can we do it with what we have?" question.
+
+**Confound vs degrader** (different failure definitions):
+- **Confounds** (systematic bias, "false M_z beats true M_z"): σ(B_z), δθ, δΩ
+  (Ω_c miss). The go/no-go axes.
+- **Degraders** (noise breaks the floor): a_s/ε_dd uncertainty (Klaus 111(9)a₀
+  = ±8 %, moves amplitude *and* the Flower ground phase — needs eGPE ε_dd sweep),
+  N fluctuation, T/thermal fraction (seed needed but excess buries signal),
+  imaging floor (ΔN/N ~2–5 %/shot, /√n_shot), lifetime (Barnett rise < 3-body &
+  vortex lifetime).
+
+**Two-layer simulation** (all-eGPE MC would be fatal):
+- **Surrogate (for the MC sweeps)**: single-particle M_z is analytic —
+  adiabatic follow of B_eff = B_⊥(in-plane) + (−Ω/γ + B_z,res)ẑ,
+  M_z^sp=|F|·B_eff,z/|B_eff|. Closes the −Ω/γ tilt and the B_z confound cheaply.
+  Represent the vortex-DDI term M_z^Barnett(·) by a response surface fit to a
+  **coarse eGPE grid** (Ω, ε_dd, B_⊥). MC the Klaus-Methods error distributions
+  through the surrogate → M_z distribution → SNR.
+- **Full eGPE (verify + nonlinear)**: a few points near Ω_c (nonlinear vortex
+  nucleation), near the ε_dd phase boundary, and the two-stage m-redistribution
+  (the mechanism-ID core).
+
+**Four figures** (feasibility deliverable):
+1. **Tornado** — SNR drop per 1σ of each error, ranked; B_z σ should be longest.
+2. **1D degradation** — SNR (or ΔM_z) vs each error, with the **critical
+   crossing** (SNR=3 / floor) and the **achieved lab value** (Klaus-Methods σ)
+   as two vertical lines: is the achieved value safely left of critical?
+3. **2D go/no-go** — σ(B_z) × B_⊥ plane, detectable region shaded, operating
+   point plotted **with its ±σ error box**; does the box sit inside "go"?
+4. **B_⊥ window** — three lines vs B_⊥: adiabaticity floor (ω_⊥/γ), visibility
+   ceiling (B_dd/floor), σ(B_z) shielding requirement; is the window open and
+   does the single-stage operating point fall in it (else justify two-stage).
+
+Order: **F1 (B_dd, done → OPEN)** → surrogate + coarse eGPE grid → F4 window →
+F3 go/no-go → F1/F2 breakdown. F4 is the conclusion; F3 the with-error verdict.
 
 ---
 
