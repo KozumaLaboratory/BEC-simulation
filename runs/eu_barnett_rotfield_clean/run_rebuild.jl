@@ -33,6 +33,7 @@ const SMOKE = get(ENV, "SMOKE", "0") == "1"
 const GS_STEPS = SMOKE ? 50 : parse(Int, get(ENV, "RB_GS_STEPS", "2500"))
 const STIR = SMOKE ? 1.0 : parse(Float64, get(ENV, "RB_STIR", "30.0"))
 const QUENCH = SMOKE ? 1.0 : parse(Float64, get(ENV, "RB_QUENCH", "50.0"))
+const DYN_DT = SMOKE ? 0.004 : parse(Float64, get(ENV, "RB_DT", "0.0004"))  # dynamics dt (dt-check knob)
 const SAVE_EVERY = SMOKE ? 50 : 300
 mkpath(SC); mkpath(joinpath(OUT, "rebuild"))
 
@@ -91,7 +92,7 @@ pipeline:
       tol: 1.0e-9
   - dynamics:
       duration: $dur
-      dt: 0.0004
+      dt: $DYN_DT
       ddi: {enabled: true, secular: false}
 $bblock
       seed_amplitude: 1.0e-6
