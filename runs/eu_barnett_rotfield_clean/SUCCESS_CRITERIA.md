@@ -69,6 +69,50 @@ two-stage m-redistribution check.
 - Caveat: pass-2 is on the strong-field *locked* state (no spin feedback); the
   regime-B self-consistent net could differ — P2 settles it.
 
+## TWO-STAGE PASS-0 — lock release confirmed (#1), but passive relaxation depolarises (2026-07-07)
+
+Before investing in full two-stage, a gate: is the in-plane spin lock held by the
+external field (#1, quench frees it) or by the DDI's own field (#2, quench can't
+free it)? Two legs, both on the saved P2 on end state (`figures/p2_quench.png`).
+
+**Leg 1 — B_dd decomposition (`analyze_p2_bdd_endstate.jl`):** the DDI's own
+in-plane field is small vs B_ext:
+
+| field on P2 end state | ω_ref | µG |
+|---|---|---|
+| γB_ext (removed by quench) | 4.00 | 246 |
+| **B_dd in-plane rms** (residual pinning) | **0.41** | **25** |
+| B_dd axial (z) rms | 0.20 | 12 |
+| **residual in-plane pinning after B→0** | **0.092** | — |
+
+⇒ **#1 external-field lock.** The quench removes ~91 % of the in-plane pinning;
+B_dd self-lock (#2) is ruled out. Bonus: the residual DDI field's axial component
+(12 µG) is half its in-plane part (25 µG) — a real z-component to drive reorientation.
+
+**Leg 2 — mini-quench dynamics (`run_p2_quench.jl`, B→0, DDI on vs off, t=15):**
+
+| | t=0 | t=15 |
+|---|---|---|
+| DDI-on: \|⟨F⟩\| | 5.01 | **3.18** |
+| DDI-on: F_perp | 4.96 | 3.18 |
+| DDI-on: **F_z** | 0.71 | **−0.06** |
+| DDI-off control (all) | frozen | frozen |
+
+The DDI-off control is frozen (no field, no torque) → any DDI-on change is
+DDI-driven. DDI-on: the state **does evolve** (36 % drop) — confirming the lock is
+released (#1). **BUT the released spin DEPOLARISES** (|F| 5→3.2, F_z pinned ~0) —
+it does **not** spontaneously form a net-M_z flux-closure.
+
+**Pass-0 verdict (nuanced):** the two-stage *premise* holds — quenching B→0 frees
+the spin (#1, not #2). But **naive "quench → passively relax → net M_z" FAILS**:
+the released spin disorders (depolarises) rather than cohering into a net axial
+magnetisation. Caveats: (a) started from the already-depolarised regime-B end
+state (|F|=5), not a healthy fully-polarised vortex state; (b) t=15 ≪ Saito
+flux-closure scale (~100/ω⊥); (c) a pancake flux-closure may be z-even (net F_z=0
+by geometry). Full two-stage therefore needs a **healthy polarised start** and
+likely an **explicit z-symmetry-breaking** element — not passive relaxation.
+DECISION POINT before full two-stage build.
+
 ## RESOLVED DECISION — two-stage (single-stage is dead)
 
 **P2 regime-B settled it (`run_p2_regimeb.jl`, γB=4, Ω=0.85, DDI on/off):**
