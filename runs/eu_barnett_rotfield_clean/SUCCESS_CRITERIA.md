@@ -201,6 +201,35 @@ TSUBAME infra (all fixed + `tsubame_rebuild_template.sh` + gotchas): explicit ju
 path, JULIAUP+package shared depot, NVMe scratch (mmap; RB_SAVE_EVERY to fit big
 grids — Lustre SIGBUSes), reap runs/rb_* + group quota, ssh ControlMaster socket.
 
+### For the next session — do NOT re-litigate these (read before reopening)
+
+1. **Why +2.08 is trustworthy even though J_z isn't fully closed (the DECOUPLING
+   argument).** The box-overflow lesson was "an open J_z ledger can contaminate the
+   numbers" — and there the residual leak *moved with the box*, so the apparent
+   conversion could co-vary with it. Here it does NOT: the conversion is **invariant
+   across 4 points** (box±10/±14 × dx0.25/0.35; F_z→+1.9…2.1, L_z drops) while **only
+   the residual moves** (with grid/dt). Conversion and residual are **decoupled** ⇒
+   the residual does not govern the conversion magnitude ⇒ the order-of-magnitude
+   +2.08 is a real headline *before* J_z fully closes. Discipline is not "always
+   doubt" but "what must you confirm to believe" — here the confirmation is the
+   decoupling. (Counterpart to the "close the ledger" gotcha.)
+
+2. **The residual may still be (c) physical dissipation, not just numerics.** "grid/dt"
+   is confirmed only as "NOT box (edge=0) + worsens at coarse dx." The A(n112,dx0.25)+
+   dt-check must be read for BOTH outcomes: residual → **0** with resolution = (b)
+   numerical; residual → a **nonzero floor** = (c) real dissipation (vortex AM → sound/
+   texture). If (c) survives, the "efficiency" is not a bug — it is the *physical*
+   definition **efficiency = conversion/(conversion+dissipation)**. So "pin the
+   efficiency" means: is it pure conversion (zero dissipation) or a distribution? —
+   design the run to distinguish, don't just minimize.
+
+3. **Chirality (−Ω → −F_z) can be taken in the CURRENT box first.** The *sign* is an
+   Ω-odd qualitative fact, decoupled from the residual leak (grid/dt origin ⇒
+   Ω-independent ⇒ Ω-even-ish), so it should be visible without a fully-closed J_z.
+   The *efficiency* needs the clean (grid-converged) box, but "is it rotation-induced"
+   can be confirmed now — a cheap insurance so the "rotation-induced Barnett" headline
+   stands even if A's grid-convergence is slow. (Just flip the stir Bx phase to −π/2.)
+
 ## GATE — the two-stage J_z leak is a BOX-OVERFLOW artifact (2026-07-07)
 
 The healthy-start quench's J_z non-conservation (1.28→−0.5, while norm/energy
