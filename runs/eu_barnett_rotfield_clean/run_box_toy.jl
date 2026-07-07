@@ -97,25 +97,34 @@ function analyze(pj, box)
     (lz=lz, drift=lz[1]-lz[end], edge_start=ext_start, edge_end=ext_end, rms=rms_start)
 end
 
-const ALLBOXES = Dict(12 => (12.0, 48, 24, 6.0), 20 => (20.0, 80, 40, 10.0))
-const BOXES = [ALLBOXES[parse(Int, b)] for b in split(get(ENV, "TOY_BOXES", "12,20"), ",")]
+# 12 = box±6/dx0.25 ; 121 = box±6/dx0.125 (FINER grid, SAME box — tests the grid knob) ; 20 = box±10/dx0.25
+const ALLBOXES = Dict(12 => (12.0, 48, 24, 6.0), 121 => (12.0, 96, 48, 6.0), 20 => (20.0, 80, 40, 10.0))
+const KEYS = [parse(Int, b) for b in split(get(ENV, "TOY_BOXES", "12,20"), ",")]
 results = Dict{Int,Any}()
-for (box, n, nz, bz) in BOXES
-    vpath = joinpath(SC, "boxtoy_vortex_$(Int(box)).jld2"); write_vortex(vpath, n, nz, box, bz)
-    yp = joinpath(SC, "boxtoy_$(Int(box)).yaml"); open(yp, "w") do io; write(io, cfg(box, n, nz, bz, vpath)); end
-    @printf("\n===== box=%.0f (n=%d, dx=%.3f) sigma=%.1f =====\n", box, n, box/n, SIG); flush(stdout)
+for key in KEYS
+    (box, n, nz, bz) = ALLBOXES[key]
+    vpath = joinpath(SC, "boxtoy_vortex_$(key).jld2"); write_vortex(vpath, n, nz, box, bz)
+    yp = joinpath(SC, "boxtoy_$(key).yaml"); open(yp, "w") do io; write(io, cfg(box, n, nz, bz, vpath)); end
+    @printf("\n===== key=%d box=%.0f (n=%d, dx=%.3f) sigma=%.1f =====\n", key, box, n, box/n, SIG); flush(stdout)
     rd = run_yaml(yp); pj = joinpath(rd isa AbstractString ? rd : "", "point_001.jld2")
-    r = analyze(pj, box); results[Int(box)] = r
-    traj = joinpath(OUT, "traj_boxtoy_$(Int(box)).csv")
+    r = analyze(pj, box); results[key] = r
+    traj = joinpath(OUT, "traj_boxtoy_$(key).csv")
     open(traj, "w") do io; println(io, "i,Lz"); for (i,v) in enumerate(r.lz); println(io, "$i,$v"); end; end
     @printf("[boxtoy box=%.0f] RMS r_xy=%.2f  edge-frac start=%.3f end=%.3f  Lz %.3f->%.3f (drift %.3f)\n",
         box, r.rms, r.edge_start, r.edge_end, r.lz[1], r.lz[end], r.drift); flush(stdout)
 end
 if !(haskey(results, 12) && haskey(results, 20))
-    r = first(values(results))
-    @printf("\n[single-box run sigma=%.1f] edge-frac=%.3f Lz drift=%.3f -> %s\n", SIG,
-        first(values(results)).edge_start, first(values(results)).drift,
-        abs(first(values(results)).drift) > 0.1 ? "LEAKS (overflow drives it)" : "conserved (no leak at this overflow)")
+    @printf("\n[sigma=%.1f summary]\n", SIG)
+    for k in KEYS
+        r = results[k]
+        @printf("  key=%d: edge-frac=%.3f Lz drift=%.3f -> %s\n", k, r.edge_start, r.drift,
+            abs(r.drift) > 0.1 ? "LEAKS" : "conserved")
+    end
+    if issubset([12, 121], KEYS)
+        d12 = abs(results[12].drift); d121 = abs(results[121].drift)
+        println(d121 < 0.5 * d12 ? "=> GRID HELPS: finer dx cut the leak -> k-space/high-k mechanism, grid matters." :
+                "=> GRID IRRELEVANT: finer dx did NOT cut the leak -> position-space boundary, box is the knob.")
+    end
     println("BOX_TOY_DONE"); exit()
 end
 println("\n================ box-size toy verdict ================")
