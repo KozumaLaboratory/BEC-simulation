@@ -7,6 +7,31 @@
 # physical constants for Eu151/Dy164/Rb87/etc.
 
 export SpinSystem, SpinMatrices, AtomSpecies
+export quadratic_zeeman_geometry
+
+"""
+    quadratic_zeeman_geometry(F, I, J) -> dimensionless
+
+Closed-form geometry factor for the second-order (quadratic) Zeeman shift of a
+hyperfine level `F` coupled to `F-1` via `J_z`, from degenerate PT:
+
+    q = (g_J μ_B B)² · quadratic_zeeman_geometry(F, I, J) / |E_F - E_{F-1}|
+
+Derived from `|⟨F-1,m|J_z|F,m⟩|² = geometry · (F² - m²)` (verified against a
+direct Clebsch-Gordan evaluation):
+
+    geometry = [F² - (I-J)²] · [(I+J+1)² - F²] / (4 F² (4F² - 1))
+
+Cross-checks: Rb-87 (F=2, I=3/2, J=1/2) → 15/240 = 0.0625 → q/h = 71.6 Hz/G²;
+¹⁵¹Eu (F=6, I=5/2, J=7/2) → 455/20592 = 0.02210 → q/h = 1.43 kHz/G².
+Vanishes at the manifold edge F = |I-J|. Defined here (loaded before atoms.jl)
+so atom constructors can build `q_geometry` from it instead of hard-coding.
+"""
+function quadratic_zeeman_geometry(F::Real, I::Real, J::Real)
+    num = (F^2 - (I - J)^2) * ((I + J + 1)^2 - F^2)
+    den = 4 * F^2 * (4 * F^2 - 1)
+    Float64(num / den)
+end
 
 # --- Spin System ---
 
