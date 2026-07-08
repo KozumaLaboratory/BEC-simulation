@@ -22,9 +22,45 @@ using LinearAlgebra: norm
     fp = (phi_1_reg(h) - phi_1_reg(-h)) / (2h)
     @test isapprox(fp, 0.625; atol=1e-3)
 
-    # All 39 knots recovered exactly
+    # All 39 knots recovered exactly (spline passes through its own knots —
+    # self-referential; the real gate is the independent quadrature below).
     for i in 1:length(T_KNOTS)
         @test isapprox(phi_1_reg(T_KNOTS[i]), VAL_KNOTS[i]; atol=1e-12)
+    end
+
+    @testset "φ₁ knots ≡ independent Gauss-Legendre quadrature (magic-number gate)" begin
+        # The 78 VAL/DERIV knots are mpmath values pasted into the source. Recompute
+        # φ₁ᵣₑ𝓰(t) = (15/8√2) ∫₀^∞ x²[Re√((x²+t)(x²+t+2)) − (x²+t+1) + 1/(2x²)] dx
+        # from scratch by GL quadrature (x = u/(1−u); split at the branch kink
+        # x²+t=0 for t<0; conjugate form avoids large-x cancellation) and compare
+        # to the stored knots — a genuine re-derivation, not a self-read.
+        function _phi1_integrand(x, t)
+            a = x^2 + t
+            prod = a * (a + 2)
+            diff = prod >= 0 ? 1 / ((a + 1) + sqrt(prod)) : (a + 1)  # (a+1)−Re√, cancel-free
+            x^2 * (diff - 1 / (2x^2))
+        end
+        function _phi1_quad(t; n=300)
+            breaks = t < 0 ? [0.0, sqrt(-t) / (1 + sqrt(-t)), 1.0 - 1e-12] :
+                     [0.0, 1.0 - 1e-12]
+            I = 0.0
+            for p in 1:(length(breaks) - 1)
+                nodes, wts = SpinorBEC._gauss_legendre(n, breaks[p], breaks[p + 1])
+                for (u, w) in zip(nodes, wts)
+                    I += w * _phi1_integrand(u / (1 - u), t) / (1 - u)^2
+                end
+            end
+            -(15 / (8 * sqrt(2))) * I
+        end
+        for t in (-1.0, -0.5, -0.05, 0.0, 0.5, 1.0, 5.0, 20.0, 50.0)
+            @test isapprox(phi_1_reg(t), _phi1_quad(t); atol=1e-6)
+        end
+        # derivative table via central difference of the independent quadrature
+        for t in (-0.5, 0.0, 1.0, 5.0)
+            i = findfirst(≈(t), T_KNOTS)
+            dq = (_phi1_quad(t + 1e-4) - _phi1_quad(t - 1e-4)) / 2e-4
+            @test isapprox(DERIV_KNOTS[i], dq; atol=1e-5)
+        end
     end
 
     # Petrov saturation for t < -1
@@ -199,6 +235,39 @@ end
     # Goldstone identities: σ_+F = δ_+F, 2σ_+(F-1) = σ_+F
     @test isapprox(sigma_fm(6, 6, g_user), delta_fm(6, 6, g_user); atol=1e-10)
     @test isapprox(2 * sigma_fm(6, 5, g_user), sigma_fm(6, 6, g_user); atol=1e-10)
+end
+
+@testset "FM contact LHY: σ_m coefficients ≡ Clebsch-Gordan (magic-number gate)" begin
+    # The hand-entered SIGMA_TABLE_FM coefficients are the CG weights
+    #   coef(m, S) = |⟨F,m; F,+F | S, m+F⟩|²   (even S; condensate at +F).
+    # Recompute every one from clebsch_gordan and compare against what the
+    # accessor returns (one-hot g_S isolates a single coefficient). This gates
+    # the transcribed table against an independent derivation — the same guard
+    # that would have caught the 35/144 quadratic-Zeeman error at commit time.
+    F = 6
+    for m in (-F):F, S in 0:2:(2F)
+        onehot = Dict(s => (s == S ? 1.0 : 0.0) for s in 0:2:(2F))
+        got = sigma_fm(F, m, onehot)                     # coefficient of g_S in σ_m
+        want = clebsch_gordan(F, m, F, F, S, m + F)^2
+        @test isapprox(got, want; atol=1e-12)
+    end
+end
+
+@testset "polar contact LHY: σ_m/δ_m coefficients ≡ Clebsch-Gordan (magic-number gate)" begin
+    # Polar (nematic) condensate at m=0 ⇒ per-S coefficients are pure CG:
+    #   σ_m = |⟨F,m; F,0 | S,m⟩|²                          (normal)
+    #   δ_m = ⟨F,m; F,-m | S,0⟩ · ⟨F,0; F,0 | S,0⟩          (anomalous, pair m_tot=0)
+    # Recompute every SIGMA_TABLE / DELTA_TABLE entry (F=1..8, all m, even S) from
+    # clebsch_gordan and compare to the accessors — gates the ~1000 hand-entered
+    # polar coefficients against an independent derivation (35/144-class guard).
+    for F in 1:8, m in (-F):F, S in 0:2:(2F)
+        onehot = Dict(s => (s == S ? 1.0 : 0.0) for s in 0:2:(2F))
+        @test isapprox(sigma_polar(F, m, onehot),
+            clebsch_gordan(F, m, F, 0, S, m)^2; atol=1e-10)
+        @test isapprox(delta_polar(F, m, onehot),
+            clebsch_gordan(F, m, F, -m, S, 0) * clebsch_gordan(F, 0, F, 0, S, 0);
+            atol=1e-10)
+    end
 end
 
 @testset "FM contact LHY: uniform g_S = c_0 reduces to scalar Lima-Pelster" begin

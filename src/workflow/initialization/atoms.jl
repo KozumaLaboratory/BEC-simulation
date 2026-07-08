@@ -215,10 +215,11 @@ const Eu151 = AtomSpecies(
     110.0 * Units.BOHR_RADIUS,
     0.0,
     _EU151_G_J * 3.5 * Units.BOHR_MAGNETON,
-    _EU151_G_J * 7.0 / 12.0;
+    lande_g_factor(6, 5 // 2, 7 // 2; g_J=_EU151_G_J);   # was 7/12·g_J (hand-typed)
     Delta_E_hf=121.0e6 * 2π * Units.HBAR,
     g_J=_EU151_G_J,
-    q_geometry=quadratic_zeeman_geometry(6, 5 // 2, 7 // 2),
+    nuclear_I=5 // 2,      # ¹⁵¹Eu nuclear spin (I=5/2)
+    electronic_J=7 // 2,   # ⁸S₇/₂ ground state (J=7/2)
 )
 
 # ¹⁵¹Eu effective F=1 model (Yan-Li-Saito 2026 PRL convention)
@@ -226,9 +227,10 @@ const Eu151 = AtomSpecies(
 #   This gives a_dd ≈ 25.2 a₀; at ε_dd = 1.2 → a_s = 21 a₀.
 #   Mass and hyperfine structure same as physical ¹⁵¹Eu.
 #   Source: T30 theorist §3 Check 2 (lines 320-326); memory yan_li_saito_2026_barnett_paper.md.
-#   q_geometry from the general formula is 0 at the F=|I-J| edge (auto-q disabled);
-#   this fictitious spin-1 truncation has no first-principles quadratic Zeeman —
-#   set `q` explicitly in the config if the model needs one. (Was 35/144: wrong.)
+#   Same nucleus (I=5/2, J=7/2) as physical ¹⁵¹Eu, but F=1 sits at the F=|I−J|
+#   edge where quadratic_zeeman_geometry vanishes → q auto-derives to 0. This
+#   fictitious spin-1 truncation has no first-principles quadratic Zeeman; set
+#   `q` explicitly in the config if the model needs one. (Was 35/144: wrong.)
 const Eu151_f1_effective = AtomSpecies(
     "151Eu_f1eff",
     150.919857 * Units.AMU,
@@ -238,7 +240,8 @@ const Eu151_f1_effective = AtomSpecies(
     4.5 * Units.BOHR_MAGNETON,
     4.5;
     Delta_E_hf=121.0e6 * 2π * Units.HBAR,
-    q_geometry=quadratic_zeeman_geometry(1, 5 // 2, 7 // 2),
+    nuclear_I=5 // 2,
+    electronic_J=7 // 2,
 )
 
 # --- Spinless Species (F=0) ---
