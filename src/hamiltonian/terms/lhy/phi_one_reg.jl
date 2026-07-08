@@ -3,7 +3,10 @@
 # φ_1^reg(t) evaluator for spinor LHY corrections.
 #
 # Definition (Petrov-prescribed, UKU 2010):
-#   φ_1^reg(t) = (15/(8√2)) ∫₀^∞ x²[(x²+t+1) - Re√((x²+t)(x²+t+2)) - 1/(2x²)] dx
+#   φ_1^reg(t) = (15/(8√2)) ∫₀^∞ x²[Re√((x²+t)(x²+t+2)) - (x²+t+1) + 1/(2x²)] dx
+#   (the stored knots are POSITIVE and monotone; the bracket is √ − poly, i.e.
+#   the negative of a naive (poly − √) ordering — gated by GL requad in
+#   test/hamiltonian/test_lhy_polar.jl.)
 #
 # Implementation:
 #   1. Cubic Hermite spline on 39 knots over t ∈ [-1, 50] (50-digit reference
