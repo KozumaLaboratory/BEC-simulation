@@ -54,9 +54,10 @@ using FFTW
         @test quadratic_zeeman_geometry(6, 5 // 2, 7 // 2) ≈ 455 / 20592 # 0.02210 (CG)
         @test quadratic_zeeman_geometry(1, 5 // 2, 7 // 2) == 0          # F=|I-J| edge
         # Rb-87 q/h ≈ 71.6 Hz/G² (g_J=2.0023, Δ_hf=6.835 GHz) via the same formula.
-        q_rb = (2.0023 * SpinorBEC.Units.BOHR_MAGNETON * 1e-4)^2 *
-               quadratic_zeeman_geometry(2, 3 // 2, 1 // 2) /
-               (6.834682e9 * 2π * SpinorBEC.Units.HBAR)
+        q_rb =
+            (2.0023 * SpinorBEC.Units.BOHR_MAGNETON * 1e-4)^2 *
+            quadratic_zeeman_geometry(2, 3 // 2, 1 // 2) /
+            (6.834682e9 * 2π * SpinorBEC.Units.HBAR)
         @test 70.0 < q_rb / (2π * SpinorBEC.Units.HBAR) < 73.0
 
         # Eu151: full data (g_J=1.9934, q_geometry=455/20592, Δ_hf=121 MHz).
