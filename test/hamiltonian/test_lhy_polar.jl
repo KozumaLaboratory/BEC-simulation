@@ -217,6 +217,23 @@ end
     end
 end
 
+@testset "polar contact LHY: σ_m/δ_m coefficients ≡ Clebsch-Gordan (magic-number gate)" begin
+    # Polar (nematic) condensate at m=0 ⇒ per-S coefficients are pure CG:
+    #   σ_m = |⟨F,m; F,0 | S,m⟩|²                          (normal)
+    #   δ_m = ⟨F,m; F,-m | S,0⟩ · ⟨F,0; F,0 | S,0⟩          (anomalous, pair m_tot=0)
+    # Recompute every SIGMA_TABLE / DELTA_TABLE entry (F=1..8, all m, even S) from
+    # clebsch_gordan and compare to the accessors — gates the ~1000 hand-entered
+    # polar coefficients against an independent derivation (35/144-class guard).
+    for F in 1:8, m in (-F):F, S in 0:2:(2F)
+        onehot = Dict(s => (s == S ? 1.0 : 0.0) for s in 0:2:(2F))
+        @test isapprox(sigma_polar(F, m, onehot),
+            clebsch_gordan(F, m, F, 0, S, m)^2; atol=1e-10)
+        @test isapprox(delta_polar(F, m, onehot),
+            clebsch_gordan(F, m, F, -m, S, 0) * clebsch_gordan(F, 0, F, 0, S, 0);
+            atol=1e-10)
+    end
+end
+
 @testset "FM contact LHY: uniform g_S = c_0 reduces to scalar Lima-Pelster" begin
     c_0 = 100.0
     g_uniform = Dict(S => c_0 for S in (0, 2, 4, 6, 8, 10, 12))
