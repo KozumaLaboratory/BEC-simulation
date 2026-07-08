@@ -22,9 +22,45 @@ using LinearAlgebra: norm
     fp = (phi_1_reg(h) - phi_1_reg(-h)) / (2h)
     @test isapprox(fp, 0.625; atol=1e-3)
 
-    # All 39 knots recovered exactly
+    # All 39 knots recovered exactly (spline passes through its own knots —
+    # self-referential; the real gate is the independent quadrature below).
     for i in 1:length(T_KNOTS)
         @test isapprox(phi_1_reg(T_KNOTS[i]), VAL_KNOTS[i]; atol=1e-12)
+    end
+
+    @testset "φ₁ knots ≡ independent Gauss-Legendre quadrature (magic-number gate)" begin
+        # The 78 VAL/DERIV knots are mpmath values pasted into the source. Recompute
+        # φ₁ᵣₑ𝓰(t) = (15/8√2) ∫₀^∞ x²[Re√((x²+t)(x²+t+2)) − (x²+t+1) + 1/(2x²)] dx
+        # from scratch by GL quadrature (x = u/(1−u); split at the branch kink
+        # x²+t=0 for t<0; conjugate form avoids large-x cancellation) and compare
+        # to the stored knots — a genuine re-derivation, not a self-read.
+        function _phi1_integrand(x, t)
+            a = x^2 + t
+            prod = a * (a + 2)
+            diff = prod >= 0 ? 1 / ((a + 1) + sqrt(prod)) : (a + 1)  # (a+1)−Re√, cancel-free
+            x^2 * (diff - 1 / (2x^2))
+        end
+        function _phi1_quad(t; n=300)
+            breaks = t < 0 ? [0.0, sqrt(-t) / (1 + sqrt(-t)), 1.0 - 1e-12] :
+                     [0.0, 1.0 - 1e-12]
+            I = 0.0
+            for p in 1:(length(breaks) - 1)
+                nodes, wts = SpinorBEC._gauss_legendre(n, breaks[p], breaks[p + 1])
+                for (u, w) in zip(nodes, wts)
+                    I += w * _phi1_integrand(u / (1 - u), t) / (1 - u)^2
+                end
+            end
+            -(15 / (8 * sqrt(2))) * I
+        end
+        for t in (-1.0, -0.5, -0.05, 0.0, 0.5, 1.0, 5.0, 20.0, 50.0)
+            @test isapprox(phi_1_reg(t), _phi1_quad(t); atol=1e-6)
+        end
+        # derivative table via central difference of the independent quadrature
+        for t in (-0.5, 0.0, 1.0, 5.0)
+            i = findfirst(≈(t), T_KNOTS)
+            dq = (_phi1_quad(t + 1e-4) - _phi1_quad(t - 1e-4)) / 2e-4
+            @test isapprox(DERIV_KNOTS[i], dq; atol=1e-5)
+        end
     end
 
     # Petrov saturation for t < -1
