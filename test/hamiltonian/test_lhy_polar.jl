@@ -201,6 +201,22 @@ end
     @test isapprox(2 * sigma_fm(6, 5, g_user), sigma_fm(6, 6, g_user); atol=1e-10)
 end
 
+@testset "FM contact LHY: σ_m coefficients ≡ Clebsch-Gordan (magic-number gate)" begin
+    # The hand-entered SIGMA_TABLE_FM coefficients are the CG weights
+    #   coef(m, S) = |⟨F,m; F,+F | S, m+F⟩|²   (even S; condensate at +F).
+    # Recompute every one from clebsch_gordan and compare against what the
+    # accessor returns (one-hot g_S isolates a single coefficient). This gates
+    # the transcribed table against an independent derivation — the same guard
+    # that would have caught the 35/144 quadratic-Zeeman error at commit time.
+    F = 6
+    for m in (-F):F, S in 0:2:(2F)
+        onehot = Dict(s => (s == S ? 1.0 : 0.0) for s in 0:2:(2F))
+        got = sigma_fm(F, m, onehot)                     # coefficient of g_S in σ_m
+        want = clebsch_gordan(F, m, F, F, S, m + F)^2
+        @test isapprox(got, want; atol=1e-12)
+    end
+end
+
 @testset "FM contact LHY: uniform g_S = c_0 reduces to scalar Lima-Pelster" begin
     c_0 = 100.0
     g_uniform = Dict(S => c_0 for S in (0, 2, 4, 6, 8, 10, 12))

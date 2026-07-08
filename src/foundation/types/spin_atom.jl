@@ -96,10 +96,14 @@ Atomic species for spinor BEC simulation.
 - `g_J`: electronic Landé g-factor for the ground manifold. Used in
          second-order Zeeman (q) — q ∝ (g_J μ_B B)² / Δ_hf · geometry.
          Zero if not provided (q auto-derive disabled).
+- `nuclear_I`, `electronic_J`: nuclear spin I and electronic angular momentum J
+         of the ground manifold (atom/state-specific primitives, cited). Passed
+         as kwargs; from them `q_geometry` is DERIVED, never hand-entered.
 - `q_geometry`: dimensionless geometry factor for the quadratic Zeeman
-         calculation, q = (g_J μ_B B)² · q_geometry / Δ_hf. Specific to
-         the (J, I, F) manifold. Zero if unknown (q auto-derive
-         requires this; missing → user must set q explicitly).
+         calculation, q = (g_J μ_B B)² · q_geometry / Δ_hf. **Derived** in the
+         constructor via `quadratic_zeeman_geometry(F, nuclear_I, electronic_J)`;
+         0 when I/J are not supplied (q auto-derive disabled) or at the F=|I−J|
+         edge. Not a settable field — set `nuclear_I`/`electronic_J` instead.
 """
 struct AtomSpecies
     name::String
@@ -113,6 +117,8 @@ struct AtomSpecies
     scattering_lengths::Dict{Int, Float64}
     Delta_E_hf::Float64
     g_J::Float64
+    nuclear_I::Float64
+    electronic_J::Float64
     q_geometry::Float64
 
     function AtomSpecies(
@@ -126,11 +132,13 @@ struct AtomSpecies
         scattering_lengths;
         Delta_E_hf::Float64=0.0,
         g_J::Float64=0.0,
-        q_geometry::Float64=0.0,
+        nuclear_I::Real=0.0,
+        electronic_J::Real=0.0,
     )
         a_s = _compute_mean_scattering_length(F, a0, a2)
+        q_geometry = _derive_q_geometry(F, nuclear_I, electronic_J)
         new(name, mass, F, a0, a2, a_s, mu_mag, g_F, scattering_lengths,
-            Delta_E_hf, g_J, q_geometry)
+            Delta_E_hf, g_J, Float64(nuclear_I), Float64(electronic_J), q_geometry)
     end
 
     function AtomSpecies(
@@ -143,7 +151,8 @@ struct AtomSpecies
         g_F::Real;
         Delta_E_hf::Float64=0.0,
         g_J::Float64=0.0,
-        q_geometry::Float64=0.0,
+        nuclear_I::Real=0.0,
+        electronic_J::Real=0.0,
     )
         sl = if F == 1 && (a0 != 0.0 || a2 != 0.0)
             Dict{Int, Float64}(0 => a0, 2 => a2)
@@ -151,8 +160,9 @@ struct AtomSpecies
             Dict{Int, Float64}()
         end
         a_s = _compute_mean_scattering_length(F, a0, a2)
+        q_geometry = _derive_q_geometry(F, nuclear_I, electronic_J)
         new(name, mass, F, a0, a2, a_s, mu_mag, Float64(g_F), sl,
-            Delta_E_hf, g_J, q_geometry)
+            Delta_E_hf, g_J, Float64(nuclear_I), Float64(electronic_J), q_geometry)
     end
 
     function AtomSpecies(
@@ -165,24 +175,34 @@ struct AtomSpecies
         scattering_lengths::Dict;
         Delta_E_hf::Float64=0.0,
         g_J::Float64=0.0,
-        q_geometry::Float64=0.0,
+        nuclear_I::Real=0.0,
+        electronic_J::Real=0.0,
     )
         a_s = _compute_mean_scattering_length(F, a0, a2)
+        q_geometry = _derive_q_geometry(F, nuclear_I, electronic_J)
         new(name, mass, F, a0, a2, a_s, mu_mag, 0.0, scattering_lengths,
-            Delta_E_hf, g_J, q_geometry)
+            Delta_E_hf, g_J, Float64(nuclear_I), Float64(electronic_J), q_geometry)
     end
 
     function AtomSpecies(name, mass, F, a0, a2, mu_mag;
-        Delta_E_hf::Float64=0.0, g_J::Float64=0.0, q_geometry::Float64=0.0)
+        Delta_E_hf::Float64=0.0, g_J::Float64=0.0,
+        nuclear_I::Real=0.0, electronic_J::Real=0.0)
         sl = if F == 1 && (a0 != 0.0 || a2 != 0.0)
             Dict{Int, Float64}(0 => a0, 2 => a2)
         else
             Dict{Int, Float64}()
         end
         a_s = _compute_mean_scattering_length(F, a0, a2)
+        q_geometry = _derive_q_geometry(F, nuclear_I, electronic_J)
         new(name, mass, F, a0, a2, a_s, mu_mag, 0.0, sl,
-            Delta_E_hf, g_J, q_geometry)
+            Delta_E_hf, g_J, Float64(nuclear_I), Float64(electronic_J), q_geometry)
     end
 end
+
+# q_geometry is DERIVED from the atom/state primitives (F, I, J), never
+# hand-entered. Returns 0 when I/J absent (auto-q disabled) or at the F=|I−J|
+# manifold edge (quadratic_zeeman_geometry vanishes there).
+_derive_q_geometry(F, I, J) =
+    (I > 0 && J > 0) ? quadratic_zeeman_geometry(F, I, J) : 0.0
 
 AtomSpecies(name, mass, F, a0, a2) = AtomSpecies(name, mass, F, a0, a2, 0.0)
