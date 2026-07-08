@@ -215,7 +215,7 @@ const Eu151 = AtomSpecies(
     110.0 * Units.BOHR_RADIUS,
     0.0,
     _EU151_G_J * 3.5 * Units.BOHR_MAGNETON,
-    _EU151_G_J * 7.0 / 12.0;
+    lande_g_factor(6, 5 // 2, 7 // 2; g_J=_EU151_G_J);   # was 7/12·g_J (hand-typed)
     Delta_E_hf=121.0e6 * 2π * Units.HBAR,
     g_J=_EU151_G_J,
     nuclear_I=5 // 2,      # ¹⁵¹Eu nuclear spin (I=5/2)

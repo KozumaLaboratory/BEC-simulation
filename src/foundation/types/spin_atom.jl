@@ -7,7 +7,7 @@
 # physical constants for Eu151/Dy164/Rb87/etc.
 
 export SpinSystem, SpinMatrices, AtomSpecies
-export quadratic_zeeman_geometry
+export quadratic_zeeman_geometry, lande_g_factor
 
 """
     quadratic_zeeman_geometry(F, I, J) -> dimensionless
@@ -31,6 +31,23 @@ function quadratic_zeeman_geometry(F::Real, I::Real, J::Real)
     num = (F^2 - (I - J)^2) * ((I + J + 1)^2 - F^2)
     den = 4 * F^2 * (4 * F^2 - 1)
     Float64(num / den)
+end
+
+"""
+    lande_g_factor(F, I, J; g_J=2.0) -> dimensionless
+
+Hyperfine Landé g-factor (electronic part) of level `F`:
+
+    g_F = g_J · [F(F+1) + J(J+1) − I(I+1)] / [2F(F+1)]
+
+The (∼1/1836) nuclear-moment term is dropped, matching the convention used
+throughout the atom registry. Reproduces every hand-entered `g_F`:
+¹⁵¹Eu (F=6,I=5/2,J=7/2,g_J=1.9934) → 7/12·g_J; Rb-87 (F=1,I=3/2,J=1/2) → −1/2;
+Rb-85 (F=2,I=5/2) → −1/3; Cs-133 (F=3,I=7/2) → −1/4. Use this instead of
+hand-typing the Landé fraction (the `35/144`-class trap).
+"""
+function lande_g_factor(F::Real, I::Real, J::Real; g_J::Real=2.0)
+    Float64(g_J * (F * (F + 1) + J * (J + 1) - I * (I + 1)) / (2 * F * (F + 1)))
 end
 
 # --- Spin System ---
