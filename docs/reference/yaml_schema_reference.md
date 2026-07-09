@@ -87,7 +87,7 @@ a typo warning.
 ### `initial_state` enum
 
 `polar`, `m_plus_F`, `m_minus_F`, `uniform`, `antiferromagnetic`,
-`random`, `spin_coherent`, `fl_vortex`, `spin_helix`, `cyclic`,
+`random`, `spin_coherent`, `radial_spin_vortex`, `flower`, `spin_helix`, `cyclic`,
 `biaxial_nematic`, `polar_core_vortex`, `bright_soliton`, `dark_soliton`,
 `skyrmion`, `gaussian_wavepacket`, `domain_wall`, `two_packets`,
 `chiral_spin_vortex`, `magnetic_domain`, `vortex_lattice`,

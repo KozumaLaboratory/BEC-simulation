@@ -33,7 +33,7 @@ Kwargs:
   * `psi_init`        — initial wavefunction. `nothing` ⇒ build from
                         `initial_state` and add `add_white_noise!` for
                         symmetry breaking.
-  * `initial_state`   — seed kind for `init_psi` (`:polar`, `:fl_vortex`, …)
+  * `initial_state`   — seed kind for `init_psi` (`:polar`, `:flower`, …)
   * `noise_amp`, `noise_seed` — applied only when `psi_init === nothing`
   * `enable_ddi`, `secular_ddi` — DDI controls; `c_dd` is taken from `preset`
   * `n_itp`, `dt_itp`, `tol_itp` — ITP knobs

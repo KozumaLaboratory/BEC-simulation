@@ -22,6 +22,25 @@
         @test_throws ArgumentError resolve_atom(:Nonexistent)
     end
 
+    @testset "g_F ≡ Landé g-factor (magic-number gate)" begin
+        # Every registry g_F is the Landé projection g_J·[F(F+1)+J(J+1)-I(I+1)]/(2F(F+1)),
+        # not a hand-typed fraction. Recompute each from (F, I, J, g_J) and compare —
+        # gates the -1/2, -1/3, -1/4, 7/12·g_J literals against the formula (the
+        # 35/144-class guard). (I, J, g_J from standard atomic data.)
+        cases = [
+            (Li7, 1, 3 // 2, 1 // 2, 2.0), (Na23, 1, 3 // 2, 1 // 2, 2.0),
+            (K39, 1, 3 // 2, 1 // 2, 2.0), (K41, 1, 3 // 2, 1 // 2, 2.0),
+            (Rb87, 1, 3 // 2, 1 // 2, 2.0), (Rb85, 2, 5 // 2, 1 // 2, 2.0),
+            (Cs133, 3, 7 // 2, 1 // 2, 2.0), (He4star, 1, 0, 1, 2.0),
+            (Cr52, 3, 0, 3, 2.0), (Dy164, 8, 0, 8, 1.24), (Dy162, 8, 0, 8, 1.24),
+            (Er168, 6, 0, 6, 1.16), (Er166, 6, 0, 6, 1.16),
+            (Eu151, 6, 5 // 2, 7 // 2, 1.9934),
+        ]
+        for (a, F, I, J, gJ) in cases
+            @test isapprox(a.g_F, lande_g_factor(F, I, J; g_J=gJ); atol=1e-4)
+        end
+    end
+
     @testset "F=1 alkali: a_s consistency" begin
         f1_atoms = [Li7, Na23, K39, K41, Rb87, He4star]
         for a in f1_atoms

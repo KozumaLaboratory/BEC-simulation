@@ -300,7 +300,8 @@ In dimensionless internal units (B → p via p = g_F μ_B B / ℏω_ref):
     q_dimless = q_phys / (ℏω_ref)
               = p² · ω_ref · ℏ · (g_J/g_F)² · q_geometry / Δ_hf
 
-For Eu151 F=6: q_geometry = 35/144, exact (m⁴ correction zero at 2nd order).
+The atom's `q_geometry` should be built via [`quadratic_zeeman_geometry`]; for
+Eu151 F=6 it is 455/20592 = 0.02210 (m⁴ correction zero at 2nd order).
 
 Returns 0.0 if the atom lacks `Delta_E_hf` or `q_geometry` (not derivable);
 caller is responsible for either setting `q` explicitly or refusing to

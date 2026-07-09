@@ -269,13 +269,19 @@ function _resolve_q_waveform(z::Dict, p_wf, atom, omega_ref::Float64, duration::
         return _make_waveform(z["q"], duration; omega_ref=omega_ref)
     end
     atom.Delta_E_hf > 0 || return ConstantWaveform(0.0)
+    # Guard: never silently return q=0 when B≠0 for a hyperfine atom. Either the
+    # geometry data is incomplete (fill g_J/q_geometry), or q_geometry is exactly
+    # 0 at the F=|I-J| manifold edge — e.g. effective spin-1 models — where the
+    # 2nd-order path vanishes and there is no physical auto-q. Both require an
+    # explicit `q:` rather than a silent zero.
     (atom.g_J > 0 && atom.q_geometry > 0) || throw(
         ArgumentError(
-            "atom $(atom.name): magnetic field set but quadratic-Zeeman " *
-            "geometry data is incomplete (g_J=$(atom.g_J), " *
-            "q_geometry=$(atom.q_geometry)). Set `q:` explicitly in the " *
-            "B block, or fill in `g_J` and `q_geometry` for this atom " *
-            "in src/workflow/initialization/atoms.jl."),
+            "atom $(atom.name): magnetic field set (B≠0) but quadratic-Zeeman " *
+            "cannot be auto-derived (g_J=$(atom.g_J), q_geometry=$(atom.q_geometry)). " *
+            "q_geometry=0 means the F=|I-J| edge / effective model (no physical " *
+            "auto-q); otherwise the geometry data is incomplete. Set `q:` " *
+            "explicitly in the B block, or build q_geometry via " *
+            "quadratic_zeeman_geometry(F, I, J) for this atom."),
     )
     n = _ZEEMAN_SAMPLE_N
     times = collect(range(0.0, duration; length=n))

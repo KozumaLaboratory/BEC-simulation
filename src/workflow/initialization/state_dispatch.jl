@@ -54,23 +54,32 @@ function init_psi(
                 psi[I, c] *= gauss[I]
             end
         end
-    elseif state == :spin_coherent || state == :fl_vortex
+    elseif state == :spin_coherent || state == :radial_spin_vortex || state == :flower
         # Spin-coherent state: at each grid point, the spinor points in the
         # direction (sin θ cos φ, sin θ sin φ, cos θ), constructed as
         # |ψ⟩ = Rz(φ) Ry(θ) |m=+F⟩.
         #
         # When init_vortex_charge ≠ 0, the azimuthal angle picks up
-        # ℓ × atan(y, x) so the spin texture has winding number ℓ. This
-        # generalizes the flower (FL) vortex (θ=π/2, ℓ=1).
+        # ℓ × atan(y, x) so the spin texture has winding number ℓ.
         #
-        # :fl_vortex is the "flower vortex" named state — equivalent to
-        # :spin_coherent with the kwargs forced to θ=π/2, ℓ=1 (xy-plane spin
-        # texture with unit winding). Public via `init_psi_fl_vortex(grid, sys)`.
-        theta_use, vortex_charge_use = if state == :fl_vortex
-            N >= 2 || throw(ArgumentError(":fl_vortex requires N >= 2 (needs xy-plane)"))
-            (Float64(π) / 2, 1)
+        # Two named in-plane (θ=π/2, ℓ=1) textures differ ONLY by a uniform
+        # spin-azimuth offset, which is the whole physics:
+        #   :radial_spin_vortex — spin azimuth = position azimuth ⇒ n̂ = ρ̂,
+        #       ∇·F = 2/ρ ≠ 0 (a divergent / radial texture; NOT flux-closure).
+        #   :flower             — spin azimuth = position azimuth + π/2 ⇒
+        #       n̂ = φ̂, ∇·F = 0: the Kawaguchi–Ueda flux-closure "Flower"
+        #       phase. This is the validated weak-field ¹⁵¹Eu+DDI GS texture
+        #       (flux_closure_fraction ≈ 0.06 ≪ the 0.577 density-gradient floor).
+        # Public via `init_psi_radial_spin_vortex` / `init_psi_flower`.
+        theta_use, vortex_charge_use, phi_offset = if state == :radial_spin_vortex
+            N >= 2 ||
+                throw(ArgumentError(":radial_spin_vortex requires N >= 2 (needs xy-plane)"))
+            (Float64(π) / 2, 1, 0.0)
+        elseif state == :flower
+            N >= 2 || throw(ArgumentError(":flower requires N >= 2 (needs xy-plane)"))
+            (Float64(π) / 2, 1, Float64(π) / 2)
         else
-            (init_theta_f, init_vortex_charge_i)
+            (init_theta_f, init_vortex_charge_i, 0.0)
         end
         if vortex_charge_use != 0
             N >= 2 || throw(
@@ -83,13 +92,14 @@ function init_psi(
         sm = spin_matrices(F)
         U_y = exp(-1im * theta_use * Matrix(sm.Fy))
         c_base = U_y[:, 1]  # column for |m=+F⟩
+        phi0 = init_phi_f + phi_offset
 
         if vortex_charge_use == 0
-            # Uniform spin direction: precompute Rz(init_phi) c_base.
+            # Uniform spin direction: precompute Rz(phi0) c_base.
             spinor_uniform = Vector{ComplexF64}(undef, D)
             for c in 1:D
                 m = F - (c - 1)
-                spinor_uniform[c] = c_base[c] * cis(-m * init_phi_f)
+                spinor_uniform[c] = c_base[c] * cis(-m * phi0)
             end
             @inbounds for I in CartesianIndices(n_pts)
                 for c in 1:D
@@ -100,7 +110,7 @@ function init_psi(
             @inbounds for I in CartesianIndices(n_pts)
                 x = grid.x[1][I[1]]
                 y = grid.x[2][I[2]]
-                phi_local = init_phi_f + vortex_charge_use * atan(y, x)
+                phi_local = phi0 + vortex_charge_use * atan(y, x)
                 for c in 1:D
                     m = F - (c - 1)
                     psi[I, c] = gauss[I] * c_base[c] * cis(-m * phi_local)

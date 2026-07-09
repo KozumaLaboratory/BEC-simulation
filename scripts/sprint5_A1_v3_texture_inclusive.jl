@@ -12,10 +12,10 @@
 # v3 design (anko 2026-06-02 correction):
 #   - Include the uniform inert seeds (carry-over for cross-check + I_h
 #     explicit reference)
-#   - Add texture seeds: fl_vortex, polar_core_vortex, chiral_spin_vortex,
+#   - Add texture seeds: radial_spin_vortex, polar_core_vortex, chiral_spin_vortex,
 #     spin_helix, magnetic_domain (stripe/square), vortex_lattice,
 #     skyrmion, skyrmion_lattice, domain_wall
-#   - KSU spontaneous-circulation analog ≈ m_plus_F + winding via fl_vortex
+#   - KSU spontaneous-circulation analog ≈ m_plus_F + winding via radial_spin_vortex
 #   - Li-Saito flux-closure analog ≈ vortex_lattice / magnetic_domain
 #   - 2D quasi-2D MDDI (same envelope as v2 for compute parity)
 #   - FULL ε breakdown via `energy_decomposition` → MDDI energy isolated
@@ -58,7 +58,7 @@ const C_DD_DIMLESS = SpinorBEC.compute_c_dd_dimless(ATOM;
 # Uniform inert (carry-over from v2) + texture inits + explicit I_h
 const UNIFORM_INITS = [:m_plus_F, :polar, :antiferromagnetic, :cyclic, :biaxial_nematic]
 const TEXTURE_INITS = [
-    :fl_vortex,
+    :radial_spin_vortex,
     :polar_core_vortex,
     :chiral_spin_vortex,
     :spin_helix,

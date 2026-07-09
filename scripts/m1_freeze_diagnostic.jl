@@ -24,7 +24,7 @@
 #
 # Optional CLI:
 #   --seed SYMBOL    which plateau state to test (default :polar; one of
-#                    :polar, :fl_vortex, :transverse_x, :fl_vortex_q2)
+#                    :polar, :radial_spin_vortex, :transverse_x, :radial_spin_vortex_q2)
 #   --n-steps N      ITP steps (default 200)
 #   --smoke          CPU + tiny N for quick error-class check
 #
