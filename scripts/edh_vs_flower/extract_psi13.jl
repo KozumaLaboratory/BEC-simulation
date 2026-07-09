@@ -22,10 +22,12 @@ using JLD2, Printf
 
 const RES = ARGS[1]; const OUT = ARGS[2]
 _opt(flag, d) = (i = findfirst(==(flag), ARGS); (i === nothing || i == length(ARGS)) ? d : ARGS[i+1])
-const STRIDE  = parse(Int, _opt("--stride", "2"))
+const STRIDE  = parse(Int, _opt("--stride", "1"))   # DEFAULT 1 = FULL computational grid (no subsample)
 const TSTRIDE = parse(Int, _opt("--tstride", "1"))
 const BOX     = parse(Float64, _opt("--box", "18"))
 const F       = parse(Int, _opt("--F", "6"))
+const DTYPE   = _opt("--dtype", "f64")              # f64 preserves the simulation precision for tomography
+const RT      = DTYPE == "f32" ? Float32 : Float64
 const D = 2F + 1
 
 function find_groups(f)
@@ -62,18 +64,18 @@ jldopen(RES, "r") do f
     nv = length(sub)
     @printf("[extract_psi13] %d frames (tstride %d)  %d^3->%d^3  D=%d\n", nf, TSTRIDE, nx, nv, D)
 
-    pre = [zeros(Float32, nf, nv, nv, nv) for _ in 1:D]
-    pim = [zeros(Float32, nf, nv, nv, nv) for _ in 1:D]
-    ntot = zeros(Float32, nf, nv, nv, nv)
+    pre = [zeros(RT, nf, nv, nv, nv) for _ in 1:D]
+    pim = [zeros(RT, nf, nv, nv, nv) for _ in 1:D]
+    ntot = zeros(RT, nf, nv, nv, nv)
     tarr = zeros(Float64, nf)
 
     for (k, (g, key)) in enumerate(framerefs)
         psi = ComplexF64.(f[g][key])
         ps = psi[sub, sub, sub, :]
-        ntot[k, :, :, :] .= Float32.(dropdims(sum(abs2, ps; dims=4); dims=4))
+        ntot[k, :, :, :] .= RT.(dropdims(sum(abs2, ps; dims=4); dims=4))
         for c in 1:D
-            pre[c][k, :, :, :] .= Float32.(real.(ps[:, :, :, c]))
-            pim[c][k, :, :, :] .= Float32.(imag.(ps[:, :, :, c]))
+            pre[c][k, :, :, :] .= RT.(real.(ps[:, :, :, c]))
+            pim[c][k, :, :, :] .= RT.(imag.(ps[:, :, :, c]))
         end
         (k % 20 == 0 || k == nf) && (@printf("  frame %d/%d\n", k, nf); flush(stdout))
     end

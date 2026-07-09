@@ -14,6 +14,7 @@ against the true spin density already in goto.h5.  Two regimes shown honestly:
   (B) column-integrated along z (a single absorption image) -> column-averaged texture
 env: PSI13, GOTO, OUT, FRAME"""
 import os, numpy as np, h5py
+from _floor import mask_from  # FPE_DENSITY_FLOOR (default 0 = full grid)
 from scipy.linalg import expm
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -60,7 +61,7 @@ err_vox=max(np.abs(fz_rec-fz_t).max(),np.abs(fx_rec-fx_t).max(),np.abs(fy_rec-fy
 # === per-atom spin (for plotting the texture) at z=peak slice ===
 zc=int(np.argmax(n.sum(axis=(0,1))))
 def per_atom(fa,sl): nn=np.clip(n[:,:,sl],1e-12,None); return fa[:,:,sl]/nn
-m2d=n[:,:,zc]>0.04*n[:,:,zc].max()
+m2d=mask_from(n[:,:,zc])
 def spin_slice(fx_,fy_,fz_):
     Sx=np.where(m2d,per_atom(fx_,zc),np.nan); Sy=np.where(m2d,per_atom(fy_,zc),np.nan); Sz=np.where(m2d,per_atom(fz_,zc),np.nan)
     return Sx,Sy,Sz
@@ -69,7 +70,7 @@ SxR,SyR,SzR=spin_slice(fx_rec,fy_rec,fz_rec)
 
 # === COLUMN-INTEGRATED regime (single absorption image along z) ===
 col=lambda a:a.sum(axis=2)
-nc=col(n); mc=nc>0.04*nc.max()
+nc=col(n); mc=mask_from(nc)
 fxc_t,fyc_t,fzc_t=col(fx_t),col(fy_t),col(fz_t)
 fxc_r,fyc_r,fzc_r=col(fx_rec),col(fy_rec),col(fz_rec)   # column-int of reconstructed = reconstruction from column images (linear)
 def colspin(fxc,fyc,fzc):

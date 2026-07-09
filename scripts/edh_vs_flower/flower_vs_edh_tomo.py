@@ -9,6 +9,7 @@
  (v)  conservation: all-channel <Fz> and orbital <Lz> (spin->orbital), per state.
 env: EDH, FLOWER, OUT, FRAME_EDH, FRAME_FL"""
 import os, numpy as np, h5py
+from _floor import mask_from  # FPE_DENSITY_FLOOR (default 0 = full grid)
 from scipy.linalg import expm
 import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt
 EDH=os.environ.get("EDH","edh_v3_psi13.jld2"); FLW=os.environ.get("FLOWER","flower_v3_psi13.jld2")
@@ -119,7 +120,7 @@ for name,fn,fr in [("EdH (quench)",EDH,FE),("Flower (adiabatic)",FLW,FF)]:
             else: out+=rf[...,j]*(2*np.imag(Op[a,c]))   # +2 Im(Op_ac): Tr(rho Op) im-param contribution
         return out
     fx_r=F_from_rfield(rfield,Fx); fy_r=F_from_rfield(rfield,Fy); fz_r=F_from_rfield(rfield,Fz)
-    mask=n>0.04*n.max()
+    mask=mask_from(n)
     e1=max(np.abs(fx_r-fx_t)[mask].max(),np.abs(fy_r-fy_t)[mask].max(),np.abs(fz_r-fz_t)[mask].max())
     # observables
     Lz,Lzm=Lz_expectation(psi,L)

@@ -1,0 +1,236 @@
+\documentclass[11pt]{ltjsarticle}
+\usepackage{luatexja}
+\usepackage{amsmath,amssymb,bm}
+\usepackage[margin=25mm]{geometry}
+\usepackage{physics}
+\allowdisplaybreaks
+
+\title{傾斜Stern--Gerlach吸収撮像からのスピンテクスチャ再構成\\
+\normalsize---アルゴリズム・軸対称仮定・巻き数$\ell=+1$の導出---}
+\author{}
+\date{}
+
+\newcommand{\Fv}{\bm{F}}
+\newcommand{\rv}{\bm{r}}
+\newcommand{\expv}[1]{\langle #1 \rangle}
+
+\begin{document}
+\maketitle
+
+\section{問題設定と観測モデル}
+
+対象は${}^{151}$Eu($F=6$、13成分)スピノルBECであり、実験で取得できるのは吸収撮像だけである.
+視線(line of sight)を$\hat{\bm y}$に固定し、撮像面は$(x,z)$とする.
+すなわち観測は必ず$y$方向の積分$\int dy$を伴う.
+Stern--Gerlach(SG)により各磁気副準位$m$に分離できるので、得られる生データは各$m$のカラム密度
+\begin{equation}
+  I_m(x,z)=\int dy\,\bigl|\psi_m(x,y,z)\bigr|^2
+\end{equation}
+である.
+量子化軸(磁場方向)を傾ける操作は、スピン空間の一様回転
+\begin{equation}
+  R_a(\beta)=\exp\!\bigl(-i\beta \hat F_a\bigr),\qquad a\in\{x,y\}
+  \label{eq:R}
+\end{equation}
+を各ボクセルの内部状態$\psi$に作用させることに等しい.
+ここで空間の視線$\int dy$は不変であることに注意する.
+傾けはスピン射影軸の走査であって、空間投影方向の走査ではない.
+本ノートでは、この観測量のみから3次元スピンテクスチャ$\expv{\Fv}(\rv)$をどこまで、どのように復元するかを述べる.
+復元は二段構えである.第一に傾斜SGによるスピンベクトルの角度トモグラフィ(第\ref{sec:core1}節)、
+第二に視線積分の逆変換(第\ref{sec:core2}節)であり、後者が軸対称と巻き数$\ell$の仮定を必要とする.
+
+\section{核その1:傾斜SG重心はスピンの射影である}
+\label{sec:core1}
+
+SGで分離した信号の重心を
+\begin{equation}
+  s(\beta)=\frac{\sum_m m\,N_m}{\sum_m N_m},\qquad N_m=\text{($m$成分の原子数)}
+\end{equation}
+と定義する.
+回転後の状態$R_a\psi$に対する重心は、$\hat F_z$の期待値の回転として書ける:
+\begin{equation}
+  s(\beta)=\expv{R_a^\dagger \hat F_z R_a}
+  =\hat{\bm n}(\beta)\cdot\expv{\Fv}.
+  \label{eq:centroid-projection}
+\end{equation}
+すなわち\emph{重心とはスピン期待値$\expv{\Fv}$を、傾けた軸$\hat{\bm n}(\beta)$へ射影した一成分}にほかならない.
+これが本手法の本質であり、軸$\hat{\bm n}$を走査して射影値を集め、逆に$\expv{\Fv}$を復元するベクトル場トモグラフィである.
+
+\paragraph{演算子の回転.}
+式\eqref{eq:centroid-projection}の具体形を得るには、$\hat F_z$を回転させればよい.
+角運動量代数$[\hat F_x,\hat F_y]=i\hat F_z$(および巡回)から、Heisenberg描像の回転は
+\begin{equation}
+  R_a^\dagger(\beta)\,\hat F_z\,R_a(\beta)
+  =\hat F_z\cos\beta-(\hat{\bm a}\times\hat F)_z\sin\beta
+\end{equation}
+となる.$a=y,x$について成分を書き下すと
+\begin{align}
+  R_y^\dagger(\beta)\,\hat F_z\,R_y(\beta)&=\cos\beta\,\hat F_z-\sin\beta\,\hat F_x,\\
+  R_x^\dagger(\beta)\,\hat F_z\,R_x(\beta)&=\cos\beta\,\hat F_z+\sin\beta\,\hat F_y.
+  \label{eq:rot-id}
+\end{align}
+これらは数値的にも機械精度($\sim10^{-15}$)で確認済みである.
+
+\paragraph{有限差分による逆変換.}
+式\eqref{eq:rot-id}より、傾け角$\beta$を微小として$s(\beta)$をTaylor展開すると
+\begin{equation}
+  s^{y\pm}\equiv s\bigl(R_y(\pm\beta)\bigr)=\cos\beta\,\expv{F_z}\mp\sin\beta\,\expv{F_x}
+\end{equation}
+であるから、正負の傾けの差をとれば$\expv{F_z}$項が消え、$\expv{F_x}$のみが残る.
+同様に$R_x(\pm\beta)$から$\expv{F_y}$が得られる.
+結局、5設定$\{\mathrm{id},R_y(\pm\beta),R_x(\pm\beta)\}$の重心から
+\begin{equation}
+  \boxed{\;
+  \expv{F_z}=s^{(0)},\quad
+  \expv{F_x}=-\frac{s^{y+}-s^{y-}}{2\sin\beta},\quad
+  \expv{F_y}=+\frac{s^{x+}-s^{x-}}{2\sin\beta}
+  \;}
+  \label{eq:fd}
+\end{equation}
+と全3成分が復元される.
+撮像はピクセル$(x,z)$ごとに$\int dy$を含むから、式\eqref{eq:fd}が返すのは\emph{カラム平均ベクトル}$\expv{\Fv}_{\mathrm{col}}(x,z)$である.
+この段階には空間的な仮定が一切入っておらず、全13成分・厳密($\beta=90^\circ$)なら機械精度で厳密である.
+
+\paragraph{可視ブロックと傾け角の妥当性.}
+実験では$m=-6,-5,-4,-3$の可視ブロックのみを重心に用いる.
+純$m=-6$を$R_y(\beta)$で傾けたときの副準位分布は、Wigner $d$行列の1列であり、閉じた形で二項分布
+\begin{equation}
+  \bigl|\bra{m}R_y(\beta)\ket{-6}\bigr|^2
+  =\binom{12}{6+m}\,p^{6+m}(1-p)^{6-m},\qquad p=\sin^2\!\tfrac{\beta}{2}
+  \label{eq:binom}
+\end{equation}
+に一致する($\beta=16^\circ$で$p\simeq0.019$、可視率$\simeq90\%$).
+式\eqref{eq:binom}が数値と完全一致することを確認しており、傾け操作は恣意的でなく解析的に裏付けられている.
+
+\section{核その2:視線積分の逆変換と軸対称仮定}
+\label{sec:core2}
+
+第\ref{sec:core1}節で得た$\expv{\Fv}_{\mathrm{col}}(x,z)$は$y$方向に潰れた量である.
+3次元場$\expv{\Fv}(\rv)$へ戻すには、視線積分作用素
+\begin{equation}
+  g(x,z)=\int dy\,f\bigl(\rho,z\bigr),\qquad \rho=\sqrt{x^2+y^2}
+  \label{eq:abel}
+\end{equation}
+を逆に解く必要がある.
+一般には$\int dy$の零空間($y$について奇な全構造)が復元不能なので、追加仮定が要る.
+本手法が置く仮定は、$z$軸まわりの\emph{軸対称性}である.
+すなわち密度$n$、縦スピン$f_z$、横スピン振幅$a$は$(\rho,z)$のみの関数とする:
+\begin{equation}
+  n=n(\rho,z),\quad f_z=f_z(\rho,z),\quad
+  f_\perp\equiv f_x+if_y=a(\rho,z)\,e^{i(\ell\varphi+\varphi_0)}.
+  \label{eq:axisym}
+\end{equation}
+軸対称の下では式\eqref{eq:abel}はAbel型の線形写像となり、半径プロファイルへ逆変換できる.
+横スピンについては、方位角$\varphi$依存性を巻き数$\ell$と位相オフセット$\varphi_0$で記述する必要がある.
+この$\ell$の値は軸対称性だけからは決まらず、次節の角運動量保存で確定する.
+
+\paragraph{何が復元でき、何ができないか.}
+軸対称の下で$f_z$と$n$の完全3次元分布は$(\rho,z)$プロファイルを$z$軸まわりに回すことで復元できる.
+一方で横スピンには本質的な二つの限界がある.
+第一に、純粋な$\ell=1$では$f_y=a\sin\varphi$が$y$について奇であり、$\int dy$で完全に打ち消される(カラム$\expv{F_y}$は消える).
+第二に、$\ell=+1$と$\ell=-1$は$\int dy$の後で同一のカラムを与え、データからは巻きの符号を区別できない.
+したがって横スピンの巻きは、観測ではなく物理prior(次節)で与える.
+
+\section{巻き数$\ell=+1$の導出:角運動量保存(プロトコル非依存)}
+\label{sec:ell}
+
+$\ell$は角運動量保存則だけで決まり、磁場の下げ方(急冷か断熱か)に依らない.
+これがEdH(急冷)とフラワー(断熱)の双方で$\ell=+1$となる理由である.
+
+\paragraph{保存則.}
+磁場$\bm B\parallel\hat{\bm z}$かつ軸対称トラップの下では、系は$z$軸まわりの回転対称であり、
+Noetherの定理から全角運動量の$z$成分
+\begin{equation}
+  J_z=L_z+S_z
+\end{equation}
+が保存する.MDDI(磁気双極子相互作用)もこの対称性を破らない.
+
+\paragraph{初期条件.}
+初期状態は全原子が$m=-6$かつ渦なし($\ell=0$)である.
+したがって1原子あたり
+\begin{equation}
+  J_z=m+\ell\big|_{\text{初期}}=-6+0=-6.
+\end{equation}
+
+\paragraph{各成分の軌道巻き.}
+成分$m$の軌道波動関数を$e^{i\ell_m\varphi}$とすると、その$J_z$は$m+\ell_m$である.
+保存則$J_z=-6$より
+\begin{equation}
+  \boxed{\;\ell_m=-(6+m)\;}
+  \label{eq:ellm}
+\end{equation}
+を得る.数値でも各成分の巻きが式\eqref{eq:ellm}に一致することを確認した
+($m=-6\!:\!0$、$m=-5\!:\!-1$、$m=-4\!:\!-2$、$\dots$).
+
+\paragraph{横スピンの巻き.}
+横スピンは隣接成分のコヒーレンスから作られる:
+\begin{equation}
+  f_\perp=\expv{\hat F_x+i\hat F_y}=\sum_m c_m\,\psi_{m+1}^*\psi_m.
+\end{equation}
+$\psi_m\propto e^{i\ell_m\varphi}$を代入すると、各項の方位位相は
+\begin{equation}
+  e^{i(\ell_m-\ell_{m+1})\varphi}
+  =e^{i[-(6+m)+(6+m+1)]\varphi}
+  =e^{+i\varphi}
+\end{equation}
+となり、$m$に依らず一定である.したがって
+\begin{equation}
+  \boxed{\;f_\perp\propto e^{+i\varphi}\quad(\ell=+1)\;}
+\end{equation}
+が確定する.これはスピンが起き上がる($\Delta m>0$)分だけ軌道が逆向きに回る、というEinstein--de Haas効果そのものである.
+
+\paragraph{プロトコル非依存性.}
+初期状態($m=-6$)・磁場方向($\hat{\bm z}$)・軸対称・MDDIの4条件が共通なら、
+式\eqref{eq:ellm}と$\ell=+1$は強制される.
+磁場の下げ方$dB/dt$が変えるのは「スピンがどれだけ起き上がるか」という横スピンの\emph{振幅}だけであって、巻きの\emph{符号・数}は変えない.
+実際、EdH(急冷、$|f_\perp|\sim3$)とフラワー(断熱、$|f_\perp|\sim1$)で振幅は異なるが、
+測定した巻き数は全時刻で$\ell_{\mathrm{true}}\simeq+1$であり一致する.
+ゆえに再構成で$\ell=+1$を prior として用いることは、両プロトコルで物理的に正当である.
+
+\section{実装アルゴリズム:二種の線形逆問題}
+\label{sec:impl}
+
+実装は反復最適化や機械学習を用いず、閉じた線形代数に帰着する.
+
+\paragraph{角度方向(核その1).}
+回転\eqref{eq:R}を$\psi'_m=\sum_n R_{mn}\psi_n$として作用させ($R$は$13\times13$、\texttt{expm}で生成)、
+$|\psi'_m|^2$を$y$について和をとって$\int dy$とし、可視ブロックで重心$s^{(k)}(x,z)$を得る.
+式\eqref{eq:fd}の差分でカラムベクトル$\expv{\Fv}_{\mathrm{col}}$を復元する.
+
+\paragraph{実空間方向(核その2).}
+各$(x,z)$ピクセルのカラム値が半径ノード$\{\rho_j\}$へどれだけ寄与するかを線形補間の重み$W$で表し、
+$y$方向に和をとって前方作用素$M$(サイズ$N_x\times N_r$)を組む.
+スカラー場(密度$n$、縦スピン密度$f_z n$)にはそのままの$M_{\mathrm{scl}}$を、
+横スピン振幅には$x/\rho$の幾何因子を含む$M_{\mathrm{vec}}$を用いる.
+逆問題$Mf=g$はTikhonov正則化つき最小二乗
+\begin{equation}
+  f=\bigl(M^{\!\top}M+\lambda\,I\bigr)^{-1}M^{\!\top}g
+  \label{eq:tikhonov}
+\end{equation}
+で安定に解く($\lambda$はリッジ項).
+横スピンの位相$\varphi_0$はカラム$\expv{F_x},\expv{F_y}$の比から取得し、
+$x$について奇な符号付き射影$g=(\expv{F_x}\cos\varphi_0+\expv{F_y}\sin\varphi_0)\,n_{\mathrm{col}}$を$M_{\mathrm{vec}}$の入力とする
+(符号を保つことが振幅を正しく復元する鍵である).
+最後に半径プロファイルを$z$軸まわりに回し、$e^{i(\varphi+\varphi_0)}$($\ell=+1$)を掛けて3次元場を得る.
+
+\paragraph{データフロー.}
+まとめると次の流れである:
+\begin{equation}
+  \psi
+  \xrightarrow[\text{回転}\cdot\int dy\cdot\text{重心}]{\text{核1(厳密)}}
+  \expv{\Fv}_{\mathrm{col}}(x,z)
+  \xrightarrow[\text{Abel逆}+\ell=+1]{\text{核2(仮定)}}
+  \expv{\Fv}(x,y,z).
+\end{equation}
+核その1は仮定ゼロで厳密、核その2は軸対称と$\ell$という最小限の物理priorで$\int dy$の零空間を埋める、という構造になっている.
+
+\section{復元可能性のまとめ}
+
+角度トモグラフィ(核1)はカラム平均ベクトル$\expv{\Fv}(x,z)$を高精度に返す(向きの誤差は密度重みで$<8^\circ$、$\expv{F_z}$は厳密法で機械精度).
+軸対称仮定を加えると、密度と$f_z$の完全3次元分布が復元でき(相関$\sim0.98$)、
+横スピンも$\ell=+1$を与えれば$z$面ごとに相関$0.9$--$1.0$で復元できる.
+一方、視線に沿ったねじれによる横スピン振幅の目減り(局所値の$\sim6$--$9$割)と、
+$y$について奇な構造($\ell$の符号を含む)は原理的に単一視線では取れない.
+後者を解くには別方向撮像や位相干渉の情報が必要である.
+
+\end{document}

@@ -17,8 +17,8 @@ using JLD2, Printf
 
 const RES = ARGS[1]; const OUT = ARGS[2]
 _opt(flag, d) = (i = findfirst(==(flag), ARGS); (i === nothing || i == length(ARGS)) ? d : ARGS[i+1])
-const STRIDE  = parse(Int, _opt("--stride", "2"))
-const TSTRIDE = parse(Int, _opt("--tstride", "2"))
+const STRIDE  = parse(Int, _opt("--stride", "1"))   # DEFAULT 1 = FULL computational grid (no subsample)
+const TSTRIDE = parse(Int, _opt("--tstride", "1"))
 const BOX     = parse(Float64, _opt("--box", "18"))
 const F       = parse(Int, _opt("--F", "6"))
 const D = 2F + 1

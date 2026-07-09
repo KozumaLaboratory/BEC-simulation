@@ -5,6 +5,7 @@ full spinor, reconstruct <F>(r) by the centroid identities, validate vs the true
 spin density. Left=TRUE, middle=RECON, right=running max-error + <Fz>(t).
 env: PSI13, GOTO, OUT(.mp4), DUR, FPS"""
 import os, sys, numpy as np, h5py
+from _floor import mask_from  # FPE_DENSITY_FLOOR (default 0 = full grid)
 from scipy.linalg import expm
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -45,7 +46,7 @@ for k in range(NF):
     cx,cy,cz,n=recon(k)
     maxerr[k]=max(np.abs(cx-FXt[...,k]).max(),np.abs(cy-FYt[...,k]).max(),np.abs(cz-FZt[...,k]).max())
     Fzg[k]=cz.sum()/n.sum()
-    sl=int(np.argmax(n.sum(axis=(0,1)))); m=n[:,:,sl]>0.04*n[:,:,sl].max()
+    sl=int(np.argmax(n.sum(axis=(0,1)))); m=mask_from(n[:,:,sl])
     SLR.append((per_atom(cx,n,sl,m),per_atom(cy,n,sl,m),per_atom(cz,n,sl,m)))
     SLT.append((per_atom(FXt[...,k],n,sl,m),per_atom(FYt[...,k],n,sl,m),per_atom(FZt[...,k],n,sl,m)))
 print(f"max-over-all-frames reconstruction error = {maxerr.max():.2e}")

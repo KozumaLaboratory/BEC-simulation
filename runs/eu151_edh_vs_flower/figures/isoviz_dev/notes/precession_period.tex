@@ -1,0 +1,152 @@
+\documentclass[11pt]{ltjsarticle}
+\usepackage{luatexja}
+\usepackage{amsmath,amssymb,bm}
+\usepackage[margin=25mm]{geometry}
+\usepackage{physics}
+\usepackage{booktabs}
+\allowdisplaybreaks
+
+\title{スピン歳差運動(Larmor歳差)の周期\\
+\normalsize---Zeemanハミルトニアンからの導出とMDDI補正---}
+\author{}
+\date{}
+
+\newcommand{\Fv}{\bm{F}}
+\newcommand{\Bv}{\bm{B}}
+\newcommand{\expv}[1]{\langle #1 \rangle}
+
+\begin{document}
+\maketitle
+
+対象は${}^{151}$Eu($F=6$)スピノルBECである.
+差分撮像パネルの横に描いた歳差周期$T(t)$の理論的裏付けとして、
+その周期をZeemanハミルトニアンからHeisenberg方程式で導出する.
+
+\section{出発点:Zeemanハミルトニアンと磁気モーメント}
+
+磁気モーメントは
+\begin{equation}
+  \bm{\mu} = -\,g_F\mu_B\Fv
+\end{equation}
+であり、外部磁場$\Bv$中のZeemanエネルギーは
+本コードの規約$H=-\bm{p}\cdot\Fv$、$\bm{p}\equiv-g_F\mu_B\Bv$(Kawaguchi--Ueda形)に従って
+\begin{equation}
+  H_Z = -\,\bm{\mu}\cdot\Bv = g_F\mu_B\,\Bv\cdot\Fv
+\end{equation}
+となる.
+ここでスピン角運動量演算子$\Fv=(F_x,F_y,F_z)$は交換関係
+\begin{equation}
+  [F_i,F_j] = i\hbar\,\varepsilon_{ijk}\,F_k
+  \label{eq:comm}
+\end{equation}
+を満たす($\varepsilon_{ijk}$はLevi-Civita記号).
+
+\section{Heisenberg方程式による歳差の運動方程式}
+
+演算子$F_i$の時間発展はHeisenberg方程式
+\begin{equation}
+  \frac{dF_i}{dt} = \frac{i}{\hbar}[H_Z,F_i]
+\end{equation}
+で与えられる.
+$H_Z=g_F\mu_B\,B_j F_j$($j$について和)を代入し、
+交換関係\eqref{eq:comm}を用いると
+\begin{align}
+  \frac{dF_i}{dt}
+  &= \frac{i}{\hbar}\,g_F\mu_B\,B_j\,[F_j,F_i]
+   = \frac{i}{\hbar}\,g_F\mu_B\,B_j\,(i\hbar\,\varepsilon_{jik}F_k) \notag\\
+  &= -\,g_F\mu_B\,\varepsilon_{jik}\,B_j F_k
+   = g_F\mu_B\,\varepsilon_{ijk}\,B_j F_k
+\end{align}
+となる.
+最後の等号で$\varepsilon_{jik}=-\varepsilon_{ijk}$を用いた.
+これはベクトル積の形にまとまり、期待値をとる(平均場近似では$\langle F_jF_k\rangle$の相関を無視して$\expv{\Fv}$のみで閉じる)と
+\begin{equation}
+  \boxed{\;\frac{d\expv{\Fv}}{dt} = \bm{\omega}_L\times\expv{\Fv}\;},
+  \qquad
+  \bm{\omega}_L\equiv\frac{g_F\mu_B}{\hbar}\,\Bv
+  \label{eq:precession}
+\end{equation}
+を得る.
+式\eqref{eq:precession}は古典コマの歳差方程式と同型であり、
+$\expv{\Fv}$は軸$\hat{\Bv}$のまわりを角速度$\omega_L$で回転する.
+縦成分$\expv{\Fv}\cdot\hat{\Bv}$は保存し、横成分だけが回転する.
+
+\section{歳差周期}
+
+角速度の大きさ(Larmor周波数)は
+\begin{equation}
+  \omega_L = \frac{g_F\mu_B}{\hbar}\,|\Bv|,
+  \qquad
+  \nu_L = \frac{\omega_L}{2\pi} = \frac{g_F\mu_B}{h}\,|\Bv|
+\end{equation}
+であり、歳差周期は
+\begin{equation}
+  \boxed{\;T = \frac{2\pi}{\omega_L} = \frac{h}{g_F\mu_B\,|\Bv|} = \frac{1}{\gamma\,|\Bv|}\;},
+  \qquad
+  \gamma\equiv\frac{g_F\mu_B}{h}
+  \label{eq:period}
+\end{equation}
+となる.
+$T\propto1/|\Bv|$であり、磁場が弱いほど周期は長い.
+
+\section{${}^{151}$Euの数値}
+
+$g_F\simeq1.163$、$\mu_B/h=1.3996\ \mathrm{MHz/G}$より
+\begin{equation}
+  \gamma = g_F\,\frac{\mu_B}{h} = 1.163\times1.3996\ \mathrm{MHz/G}
+  \simeq 1.628\ \mathrm{MHz/G}.
+\end{equation}
+代表的な磁場での値を下表に示す.
+\begin{center}
+\begin{tabular}{ccc}
+  \toprule
+  $|B|$ & $\nu_L=\gamma|B|$ & $T=1/\nu_L$ \\
+  \midrule
+  $26\ \mu\mathrm{G}$ (hold到達値) & $42.3\ \mathrm{Hz}$ & $23.6\ \mathrm{ms}$ \\
+  $100\ \mu\mathrm{G}$ & $163\ \mathrm{Hz}$ & $6.1\ \mathrm{ms}$ \\
+  $10\ \mathrm{mG}$ (初期) & $16.3\ \mathrm{kHz}$ & $61\ \mu\mathrm{s}$ \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\section{MDDIによる下限補正}
+
+外部磁場だけでなく、周囲のスピンが作る
+磁気双極子--双極子相互作用(MDDI)の実効局所磁場$B_{dd}$も歳差を駆動する.
+横スピンが感じる実効場は近似的に
+\begin{equation}
+  |\Bv_{\mathrm{eff}}| \simeq \sqrt{B^2+B_{dd}^2},
+  \qquad
+  T_{\mathrm{eff}} = \frac{h}{g_F\mu_B\sqrt{B^2+B_{dd}^2}}
+  \label{eq:eff}
+\end{equation}
+と書ける.
+$B_{dd}$のオーダー見積りは、MDDIのエネルギースケール$E_{dd}=c_{dd}\,n$
+($c_{dd}=\mu_0\mu^2$)を等価磁場に換算して
+\begin{equation}
+  B_{dd} \sim \frac{c_{dd}\,n}{g_F\mu_B}
+  = \frac{\mu_0\mu^2 n}{g_F\mu_B}
+  = \mu_0\,\mu\,n\,F
+  \qquad(\because\ \mu=g_F\mu_B F)
+\end{equation}
+となる.
+実験密度$n\sim10^{14}\ \mathrm{cm^{-3}}$、$\mu\simeq6.98\,\mu_B$を入れると
+$B_{dd}\sim10^{2}\ \mu\mathrm{G}$のオーダーである.
+これが$|\Bv_{\mathrm{eff}}|$の下限を与えるため、
+外部磁場を$26\ \mu\mathrm{G}$まで下げても周期は$23.6\ \mathrm{ms}$までは伸びず、
+\begin{equation}
+  T_{\mathrm{floor}} = \frac{h}{g_F\mu_B\,B_{dd}}
+  \simeq 6.1\ \mathrm{ms}\qquad(B_{dd}\simeq100\ \mu\mathrm{G})
+\end{equation}
+程度で頭打ちになる.
+これはEdHが起こる低磁場領域(断熱性$|\dot{\hat{B}}|\ll\omega_L$が破れる領域)と
+MDDIが支配的になる領域が重なることを意味する.
+
+\bigskip
+\noindent\textbf{まとめ.}\quad
+周期$T=h/(g_F\mu_B|\Bv|)$はHeisenberg方程式
+$d\expv{\Fv}/dt=\bm{\omega}_L\times\expv{\Fv}$の直接の帰結である.
+図の青曲線は外部$B(t)$のみ、赤曲線は$\sqrt{B^2+B_{dd}^2}$(MDDI込み)、
+点線がMDDI下限$T_{\mathrm{floor}}$に対応する.
+
+\end{document}

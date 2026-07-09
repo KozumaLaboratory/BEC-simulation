@@ -26,9 +26,10 @@ const REC = parse(Int, _opt("--record_every","50"))
 const ITP_STEPS = parse(Int, _opt("--itp_steps","20000"))
 const LBFGS_STEPS = parse(Int, _opt("--lbfgs_steps","2000"))
 const C1R = let v=_opt("--c1_ratio","0.0"); v=="1/36" ? 1/36 : parse(Float64,v) end  # Matsui/Buchachenko = 1/36
+const NG = parse(Int, _opt("--n","64"))   # cubic grid points per axis (v6 uses 96)
 
 # --- physics (eu151_edh_phys mixin) ---
-const N=50_000; const NPTS=(64,64,64); const BOX=(18.0,18.0,18.0)
+const N=50_000; const NPTS=(NG,NG,NG); const BOX=(18.0,18.0,18.0)
 const TRAP=(1.0,1.0,1.182); const OMEGA=691.15; const B_G=0.01   # 10 mG
 atom = Eu151
 a_ho = sqrt(Units.HBAR/(atom.mass*OMEGA))

@@ -8,6 +8,7 @@ compared field-by-field and metric-by-metric to the TRUE spin texture.
 Produces: fields (z=peak), fields (column ∫dz), metrics, per-m densities.
 env: PSI13, GOTO, FRAME, OUTDIR"""
 import os, numpy as np, h5py
+from _floor import mask_from  # FPE_DENSITY_FLOOR (default 0 = full grid)
 from scipy.linalg import expm
 import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt
 PSI=os.environ.get("PSI13","edh_v4_psi13.jld2"); GOTO=os.environ.get("GOTO","edh_v4_goto.h5")
@@ -62,7 +63,7 @@ def Frec(Op):
 fzR,fxR,fyR=Frec(Fz),Frec(Fx),Frec(Fy)
 
 # ====== metrics ======
-mask=n>0.04*n.max()
+mask=mask_from(n)
 def metrics(A,B):
     a=A[mask]; b=B[mask]
     rms=np.sqrt(np.mean((a-b)**2)); mx=np.abs(a-b).max()
@@ -95,7 +96,7 @@ fig.suptitle(f"EdH: reconstructed-from-observables vs TRUE — per-atom spin, z=
 fig.savefig(f"{OD}/cmp_fields_zpeak.png",dpi=125,bbox_inches="tight"); plt.close(fig); print("wrote cmp_fields_zpeak.png")
 
 # ====== FIG 2: column-integrated (∫dz, what the camera sees) ======
-col=lambda a:a.sum(axis=2); nc=col(n); mc=nc>0.04*nc.max(); nnc=np.clip(nc,1e-12,None)
+col=lambda a:a.sum(axis=2); nc=col(n); mc=mask_from(nc); nnc=np.clip(nc,1e-12,None)
 def pac(f): return np.where(mc,col(f)/nnc,np.nan)
 fig=plt.figure(figsize=(13,9.5)); gs=fig.add_gridspec(3,4,hspace=0.08,wspace=0.12)
 for i,(lb,T,E,R) in enumerate(zip(labels,TRU,EXA,REA)):

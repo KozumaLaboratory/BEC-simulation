@@ -4,6 +4,7 @@ Left = TRUE <F>(r), mid = recon 5-set ±16°, right-top = per-component correlat
 RMS vs t, right-bottom = global <Fz> and <Lz> (true vs recon-accessible) vs t.
 env: PSI13, GOTO, OUT, DUR, FPS"""
 import os, sys, numpy as np, h5py
+from _floor import mask_from  # FPE_DENSITY_FLOOR (default 0 = full grid)
 from scipy.linalg import expm
 import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
@@ -60,7 +61,7 @@ def Lz_tot(psi):
 # precompute
 SLT=[]; SLR=[]; corr=np.zeros((NF,3)); rms=np.zeros((NF,3)); Fzt=np.zeros(NF); Lzt=np.zeros(NF)
 for k in range(NF):
-    psi=spinor(k); n=NT[...,k]; mask=n>0.04*n.max()
+    psi=spinor(k); n=NT[...,k]; mask=mask_from(n)
     sd=lambda Op: np.real(np.einsum("xyzm,mn,xyzn->xyz",np.conj(psi),Op,psi))
     fT=[sd(Fx),sd(Fy),sd(Fz)]
     rf=(np.concatenate([np.abs(psi.reshape(-1,D)@R.T)**2 for R in Rs],axis=1)@Minv.T).reshape(Ng,Ng,Ng,len(PRI))

@@ -148,6 +148,8 @@ jldopen(RESULT_PATH, "r") do f
     sm     = spin_matrices(Fval)
     dV     = cell_volume(grid)
     zc     = spatial[3] ÷ 2 + 1                  # z-midplane index
+    X3     = reshape(grid.x[1], :, 1, 1)         # physical x,y for orbital Lz
+    Y3     = reshape(grid.x[2], 1, :, 1)
 
     # ---- flatten frames across stages, with global time ----
     all_frames = Tuple{String, String, Float64}[]   # (group_path, frame_key, t)
@@ -173,6 +175,7 @@ jldopen(RESULT_PATH, "r") do f
     Fx_avg     = zeros(Float64, nf)
     Fy_avg     = zeros(Float64, nf)
     Fz_avg     = zeros(Float64, nf)
+    Lz_avg     = zeros(Float64, nf)              # orbital ⟨Lz⟩=∫(x j_y−y j_x)dV (EdH)
     n_max      = zeros(Float64, nf)
     N_tot      = zeros(Float64, nf)
     jmag_max   = zeros(Float64, nf)
@@ -214,6 +217,7 @@ jldopen(RESULT_PATH, "r") do f
         Fx_avg[k] = sum(fx) * dV
         Fy_avg[k] = sum(fy) * dV
         Fz_avg[k] = sum(fz) * dV
+        Lz_avg[k] = sum(X3 .* j[2] .- Y3 .* j[1]) * dV   # orbital angular momentum
         N_tot[k]    = sum(dens) * dV
         n_max[k]    = maximum(dens)
         jmag_max[k] = maximum(jmag)
@@ -221,8 +225,8 @@ jldopen(RESULT_PATH, "r") do f
         wsum = sum(dens)
         eps_wmean[k] = wsum > 0 ? sum(abs.(εz) .* dens) / wsum : 0.0
 
-        @printf("  frame %3d/%3d  t=%.4g  max|ε|=%.3e  wmean|ε|=%.3e  Q_sk=%+.3f  Q_3D=%+.3f  ⟨Fz⟩=%+.4g\n",
-            k, nf, t, eps_absmax[k], eps_wmean[k], Q_sk[k], Q_3D[k], Fz_avg[k])
+        @printf("  frame %3d/%3d  t=%.4g  wmean|ε|=%.3e  Q_sk=%+.3f  ⟨Fz⟩=%+.4g  ⟨Lz⟩=%+.4g\n",
+            k, nf, t, eps_wmean[k], Q_sk[k], Fz_avg[k], Lz_avg[k])
         flush(stdout)
     end
 
@@ -246,6 +250,7 @@ jldopen(RESULT_PATH, "r") do f
         o["Fx_avg"]     = Fx_avg
         o["Fy_avg"]     = Fy_avg
         o["Fz_avg"]     = Fz_avg
+        o["Lz_avg"]     = Lz_avg
         o["n_max"]      = n_max
         o["N_tot"]      = N_tot
         o["jmag_max"]   = jmag_max

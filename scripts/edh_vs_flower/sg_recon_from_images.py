@@ -6,6 +6,7 @@ column-averaged spin texture <F>(x,y) built ONLY from those images via the
 centroid identity <F_a>=Sum_m m*N_m^{set}(x,y)/N(x,y), validated vs the
 column-averaged truth.  env: PSI13, GOTO, OUT, FRAME"""
 import os, numpy as np, h5py
+from _floor import mask_from  # FPE_DENSITY_FLOOR (default 0 = full grid)
 from scipy.linalg import expm
 import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt
 PSI=os.environ.get("PSI13","edh_v4_psi13.jld2"); GOTO=os.environ.get("GOTO","edh_v4_goto.h5")
@@ -31,7 +32,7 @@ def sg_col(R):
     rp=np.einsum("mn,xyzn->xyzm",R,psi); return col(np.abs(rp)**2)   # (x,y,13) column densities
 SETS=[("no tilt",np.eye(D),"⟨Fz⟩"),("R_y(−90°)",Ry,"⟨Fx⟩"),("R_x(+90°)",Rx,"⟨Fy⟩")]
 Nset=[sg_col(R) for _,R,_ in SETS]                                  # 3 x (x,y,13)
-Ncol=col(np.sum(np.abs(psi)**2,axis=-1)); mcol=Ncol>0.04*Ncol.max()
+Ncol=col(np.sum(np.abs(psi)**2,axis=-1)); mcol=mask_from(Ncol)
 # ----- OUTPUT: column-averaged spin texture from the images -----
 def centroid(Nm): return np.einsum("xym,m->xy",Nm,ms.astype(float))
 fz_r=centroid(Nset[0]); fx_r=centroid(Nset[1]); fy_r=centroid(Nset[2])
