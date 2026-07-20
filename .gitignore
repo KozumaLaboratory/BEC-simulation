@@ -166,3 +166,7 @@ verify_outputs/
 
 # Loop Engineering runtime sentinels (tick/done counters)
 .loop/
+
+# macOS Finder metadata / Python bytecode cache — per-machine, never source
+.DS_Store
+__pycache__/

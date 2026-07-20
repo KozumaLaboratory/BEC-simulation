@@ -1,0 +1,80 @@
+# ─────────────────────────────────────────────────────────────────────────
+#  EdH v8 (2026-07-16): moderate-speed ramp to +26 µG, 96³ full-grid, f64.
+#    Same validated physics as v6 (96³ / box18 / Eu151 / N=5e4 / c1=1/36 /
+#    K3=2.1e-41 / trap (1,1,1.182)) and the SAME ground state cache
+#    (gs_10mG_c1_36_96.jld2).  Only the field protocol + save cadence differ.
+#
+#    Protocol (user request 2026-07-16):
+#      EdH  = MODERATE linear ramp  10 mG → 26 µG over 15 internal (~21.7 ms),
+#             then hold at 26 µG for 105 internal.  Total 120 internal (~173.6 ms).
+#    Sibling flower_slow100_v8.yaml is time-matched (same total 120 internal) but
+#      ramps SLOWLY to a HIGHER field (100 µG) — the adiabatic control.
+#    Internal time unit 1 = 1.447 ms.  Fine save cadence for smooth animation.
+#    Extraction after this run uses stride=1 (full 96³, no subsample).
+# ─────────────────────────────────────────────────────────────────────────
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions:
+    N_atoms: 50000
+    omega_ref: 691.15
+mixins:
+  eu151_edh_phys:
+    atom: Eu151
+    grid:
+      n:
+      - 96
+      - 96
+      - 96
+      box:
+      - 18
+      - 18
+      - 18
+    potential:
+      type: harmonic
+      omega:
+      - 1.0
+      - 1.0
+      - 1.182
+    interactions:
+      N_atoms: 50000
+      omega_ref: 691.15
+      c1_ratio: 0.027777777777777776
+pipeline:
+- ground_state:
+    use:
+    - eu151_edh_phys
+    method: lbfgs
+    B:
+      Bz: 0.01 Gauss
+    n_steps: 1
+    tol: 1.0e-09
+    cache: runs/eu151_edh_vs_flower/cache/gs_10mG_c1_36_96.jld2
+- dynamics:
+    duration: 15.0
+    dt: 0.001
+    B:
+      Bz:
+        from: 0.01
+        to: 2.6e-05
+        duration: 15.0
+    loss:
+      K3_per_m_si: ["2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s"]
+    save:
+      every: 150
+      psi: true
+      precision: f64
+- dynamics:
+    duration: 105.0
+    dt: 0.002
+    B:
+      Bz: 2.6e-5 Gauss
+    seed_amplitude: 1.0e-08
+    seed_k_cut: 2.5
+    noise_seed: 42
+    loss:
+      K3_per_m_si: ["2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s"]
+    save:
+      every: 1050
+      psi: true
+      precision: f64

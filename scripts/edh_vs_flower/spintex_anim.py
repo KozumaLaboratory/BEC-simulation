@@ -54,13 +54,15 @@ else:
         fig.clf();a=fig.add_subplot(111,projection="3d")
         N=n[k][::st,::st,::st];sx=per(fx[k][::st,::st,::st],N);sy=per(fy[k][::st,::st,::st],N);sz=per(fz[k][::st,::st,::st],N)
         msk=N>0.08*n[k].max()
-        rgba=hsv_rgba(sx,sy,sz,N)
+        # colour = s_z sign only (red=+z up, blue=-z down); alpha by density
+        cz=np.clip(sz/6.0,-1,1); rgb=plt.cm.RdBu_r((cz+1)/2)[...,:3]
+        al=np.clip((N/(N.max()+1e-30))**0.5,0.2,1); rgba=np.concatenate([rgb,al[...,None]],-1)
         Ln=6.0;sc=(0.9*st*(L/Ng))/Ln
         a.quiver(G0[msk],G1[msk],G2[msk],sx[msk]*sc,sy[msk]*sc,sz[msk]*sc,
                  colors=rgba[msk],length=1.0,normalize=False,linewidth=1.5)
         for s in (a.set_xlim,a.set_ylim,a.set_zlim):s(-L/2,L/2)
         a.set_box_aspect((1,1,1));a.view_init(elev=20,azim=-60)
         a.set_xlabel("x [ℓ₀]");a.set_ylabel("y [ℓ₀]");a.set_zlabel("z [ℓ₀]")
-        a.set_title(f"3D スピンテクスチャ <F>(r)  t={tms[k]:.0f} ms  B={B[k]*1e6:.1f} µG\n色=向き(HSV: 色相=方位角φ_F, 明=+z/暗=-z)",fontsize=10)
+        a.set_title(f"{os.environ.get('LABEL','3D スピンテクスチャ')} <F>(r)  t={tms[k]:.0f} ms  B={B[k]*1e6:.1f} µG\n色=s_z（赤=上向き +z / 青=下向き −z）",fontsize=10)
     save_via_png_dup(fig,draw,nf,OUT,fps=FPS,duration_s=DUR,dpi=115)
 print(f"[spintex] wrote {OUT} (MODE={MODE}, {nf} frames)")

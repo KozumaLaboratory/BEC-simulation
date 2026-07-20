@@ -1,0 +1,31 @@
+# SMOKE of the v6 path: 16^3, f64 snapshots, c1=1/36, tiny quench+hold. ~2 min GPU.
+# Validates config parse, GS-from-cache load, f64 streaming save, and (downstream)
+# stride=1 f64 extraction. Loads a 16^3 smoke GS built by gs_trajectory --n 16.
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 50000, omega_ref: 691.15}
+mixins:
+  eu151_edh_phys:
+    atom: Eu151
+    grid: {n: [16, 16, 16], box: [18, 18, 18]}
+    potential: {type: harmonic, omega: [1.0, 1.0, 1.182]}
+    interactions: {N_atoms: 50000, omega_ref: 691.15, c1_ratio: 0.027777777777777776}
+pipeline:
+- ground_state:
+    use: [eu151_edh_phys]
+    method: lbfgs
+    B: {Bz: "0.01 Gauss"}
+    n_steps: 1
+    tol: 1.0e-9
+    cache: runs/eu151_edh_vs_flower/cache/_smoke_v6_gs.jld2
+- dynamics:
+    duration: 0.05
+    dt: 0.0005
+    B: {Bz: {from: 0.01, to: 2.6e-05, duration: 0.05}}
+    save: {every: 20, psi: true, precision: f64}
+- dynamics:
+    duration: 0.2
+    dt: 0.005
+    B: {Bz: "2.6e-5 Gauss"}
+    save: {every: 20, psi: true, precision: f64}

@@ -1,0 +1,78 @@
+# ─────────────────────────────────────────────────────────────────────────
+#  Flower v8 (2026-07-16): SLOW ramp to +100 µG, 96³ full-grid, f64.
+#    Adiabatic control sibling of edh_ramp26_v8.yaml.  Same 96³ ground state
+#    (gs_10mG_c1_36_96.jld2), same physics (Eu151/N=5e4/c1=1/36/K3=2.1e-41).
+#
+#    Protocol (user request 2026-07-16):
+#      Flower = SLOW linear ramp  10 mG → 100 µG over 100 internal (~144.7 ms),
+#               then hold at 100 µG for 20 internal.  Total 120 internal (~173.6 ms).
+#    Time-matched to EdH v8 (same 120 internal total) but ~7× slower ramp and a
+#    HIGHER landing field → stays adiabatic / spin-coherent (CSS) as the control.
+#    Internal time unit 1 = 1.447 ms.  Fine save cadence; stride=1 extraction.
+# ─────────────────────────────────────────────────────────────────────────
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions:
+    N_atoms: 50000
+    omega_ref: 691.15
+mixins:
+  eu151_edh_phys:
+    atom: Eu151
+    grid:
+      n:
+      - 96
+      - 96
+      - 96
+      box:
+      - 18
+      - 18
+      - 18
+    potential:
+      type: harmonic
+      omega:
+      - 1.0
+      - 1.0
+      - 1.182
+    interactions:
+      N_atoms: 50000
+      omega_ref: 691.15
+      c1_ratio: 0.027777777777777776
+pipeline:
+- ground_state:
+    use:
+    - eu151_edh_phys
+    method: lbfgs
+    B:
+      Bz: 0.01 Gauss
+    n_steps: 1
+    tol: 1.0e-09
+    cache: runs/eu151_edh_vs_flower/cache/gs_10mG_c1_36_96.jld2
+- dynamics:
+    duration: 100.0
+    dt: 0.002
+    B:
+      Bz:
+        from: 0.01
+        to: 1.0e-04
+        duration: 100.0
+    loss:
+      K3_per_m_si: ["2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s"]
+    save:
+      every: 800
+      psi: true
+      precision: f64
+- dynamics:
+    duration: 20.0
+    dt: 0.002
+    B:
+      Bz: 1.0e-4 Gauss
+    seed_amplitude: 1.0e-08
+    seed_k_cut: 2.5
+    noise_seed: 42
+    loss:
+      K3_per_m_si: ["2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s"]
+    save:
+      every: 400
+      psi: true
+      precision: f64

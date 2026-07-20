@@ -1,0 +1,77 @@
+# ─────────────────────────────────────────────────────────────────────────
+#  Flower v6 (2026-07-02): HIGH-PRECISION, FULL-GRID sibling of edh_quench_v6.
+#    SAME 96³ c1=1/36 ground state, SAME final field (26 µG), SAME weak-field
+#    hold, SAME K3 = 2.1e-41 — the ONLY difference from EdH is dB/dt:
+#      EdH    : 10 mG → 26 µG in 0.20 ms  (sudden quench, non-adiabatic)
+#      Flower : 10 mG → 26 µG over ~274 ms (Goto smooth descent, adiabatic)
+#    grid 96³, ψ snapshots f64, dt 0.002 (descent+hold). Total wall 288 internal
+#    (417 ms) → TIME-MATCHED to edh_quench_v6.yaml so the pair is directly
+#    comparable. Goto Ch.6 descent: linear (0–40 ms) → C¹ smooth corner →
+#    parabola landing gently on 26 µG. Loads gs_10mG_c1_36_96.jld2.
+# ─────────────────────────────────────────────────────────────────────────
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions:
+    N_atoms: 50000
+    omega_ref: 691.15
+mixins:
+  eu151_edh_phys:
+    atom: Eu151
+    grid:
+      n:
+      - 96
+      - 96
+      - 96
+      box:
+      - 18
+      - 18
+      - 18
+    potential:
+      type: harmonic
+      omega:
+      - 1.0
+      - 1.0
+      - 1.182
+    interactions:
+      N_atoms: 50000
+      omega_ref: 691.15
+      c1_ratio: 0.027777777777777776
+pipeline:
+- ground_state:
+    use:
+    - eu151_edh_phys
+    method: lbfgs
+    B:
+      Bz: 0.01 Gauss
+    n_steps: 1
+    tol: 1.0e-09
+    cache: runs/eu151_edh_vs_flower/cache/gs_10mG_c1_36_96.jld2
+- dynamics:
+    duration: 189.375
+    dt: 0.002
+    B:
+      Bz:
+        piecewise:
+          times:  [0.0, 6.912, 13.823, 20.735, 27.646, 29.028, 30.411, 31.793, 33.175, 34.558, 51.836, 69.115, 86.394, 103.673, 120.951, 138.230, 155.509, 172.788, 189.375]
+          values: [0.01, 0.0082, 0.0064, 0.0046, 0.0028, 0.00216398, 0.00166598, 0.00130598, 0.00108398, 0.001, 0.000821516, 0.000660563, 0.000517141, 0.00039125, 0.000282891, 0.000192063, 0.000118766, 6.3001e-05, 2.59597e-05]
+    loss:
+      K3_per_m_si: ["2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s"]
+    save:
+      every: 800
+      psi: true
+      precision: f64
+- dynamics:
+    duration: 98.625
+    dt: 0.002
+    B:
+      Bz: 2.6e-5 Gauss
+    seed_amplitude: 1.0e-08
+    seed_k_cut: 2.5
+    noise_seed: 42
+    loss:
+      K3_per_m_si: ["2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s","2.1e-41 m^6/s"]
+    save:
+      every: 800
+      psi: true
+      precision: f64

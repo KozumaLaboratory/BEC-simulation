@@ -13,7 +13,7 @@
 import CUDA
 using SpinorBEC
 using SpinorBEC: Eu151, Units, make_grid, GridConfig, HarmonicTrap, ZeemanParams,
-                 interaction_params_from_constraint, compute_c_dd_dimless,
+                 interaction_params_from_constraint, compute_c_dd_dimless, compute_quadratic_zeeman,
                  find_ground_state, find_ground_state_lbfgs, total_energy,
                  spin_matrices, spin_density_vector, CUDABackend, CPUBackend
 using JLD2, Printf, LinearAlgebra
@@ -39,7 +39,15 @@ c_dd = compute_c_dd_dimless(atom; N_atoms=N, omega_ref=OMEGA)
 grid = make_grid(GridConfig(NPTS, BOX))
 pot  = HarmonicTrap{3}(TRAP)
 p = Units.bfield_to_p(B_G, atom.g_F, OMEGA)   # bfield_to_p(::Real) interprets arg as GAUSS
-zee = ZeemanParams(p, 0.0)
+# Auto-derive the quadratic Zeeman q from B² (same Breit-Rabi path the dynamics
+# yaml uses via _resolve_q_waveform), so the GS Hamiltonian is CONSISTENT with
+# the ramp Hamiltonian. Was hard-coded 0.0 — an unstated q=0 assumption. At
+# 10 mG the GS is field-polarized (m=-6) so q F_z² acts ≈ const, but we no
+# longer assume it: q is now the fixed-geometry value (q_geometry 455/20592).
+q = compute_quadratic_zeeman(atom; p_dimless=p, omega_ref=OMEGA)
+zee = ZeemanParams(p, q)
+@printf("[gs_traj] B=%.4g G  p=%.6g  q=%.6g (dimless)  q/h=%.4g Hz\n",
+        B_G, p, q, q * OMEGA / (2π))
 backend = (BK=="gpu") ? CUDABackend() : CPUBackend()
 sm = spin_matrices(6)
 zc = NPTS[3] ÷ 2 + 1
@@ -91,15 +99,14 @@ g_itp = find_ground_state(; grid=grid, atom=atom, interactions=inter, zeeman=zee
 @printf("[gs_traj] ITP done: E=%.6g\n", total_energy(g_itp.workspace))
 
 # --- LBFGS polish ---
+# NOTE: on_record/record_every (LBFGS-phase trajectory logging) live in a separate
+# LBFGS-checkpoint feature branch, not in main. We only need the GS cache here, so
+# drop them and keep the supported kwargs (sobolev_alpha is in main's driver).
 println("[gs_traj] === LBFGS (Sobolev 0.5) ===")
-lbfgs_cb = function(step, E, gn, psi)
-    record!("lbfgs", step, psi, E, gn)
-end
 g_lb = find_ground_state_lbfgs(; grid=grid, atom=atom, interactions=inter,
     zeeman=zee, potential=pot, psi_init=Array(g_itp.workspace.state.psi),
     n_steps=LBFGS_STEPS, tol=1e-9, m_lbfgs=10, sobolev_alpha=0.5,
-    enable_ddi=true, c_dd=c_dd, secular_ddi=false, backend=backend, verbose=true,
-    on_record=lbfgs_cb, record_every=10)
+    enable_ddi=true, c_dd=c_dd, secular_ddi=false, backend=backend, verbose=true)
 @printf("[gs_traj] LBFGS done: E=%.6g grad_norm=%.3e converged=%s\n",
         g_lb.energy, g_lb.grad_norm, g_lb.converged)
 
