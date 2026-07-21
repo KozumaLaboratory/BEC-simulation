@@ -191,13 +191,24 @@ function _compute_and_convolve_ddi!(
     mul!(bufs.Fy_rk, rp.forward, bufs.Fy_r)
     mul!(bufs.Fz_rk, rp.forward, bufs.Fz_r)
 
+    # Fold the irfft 1/prod(n) normalisation into the k-space contraction and
+    # use an UNNORMALISED brfft plan → drop cuFFT's 3 separate scaling kernels
+    # per step. brfft((C/N)·Q·F_rk) ≡ irfft(C·Q·F_rk) by linearity (bit-equiv).
     C = ddi.C_dd
-    _ddi_k_contraction!(bufs, ddi, C)
-
-    mul!(bufs.Phi_x, rp.inverse, bufs.Phi_x_rk)
-    mul!(bufs.Phi_y, rp.inverse, bufs.Phi_y_rk)
-    mul!(bufs.Phi_z, rp.inverse, bufs.Phi_z_rk)
+    _ddi_k_contraction!(bufs, ddi, C / prod(n_pts))
+    bp = _get_ddi_brfft_plan(bufs.Phi_x_rk, n_pts[1])
+    mul!(bufs.Phi_x, bp, bufs.Phi_x_rk)
+    mul!(bufs.Phi_y, bp, bufs.Phi_y_rk)
+    mul!(bufs.Phi_z, bp, bufs.Phi_z_rk)
     nothing
+end
+
+# Cached unnormalised backward-rFFT plan (per rk-shape/type/backend). The 1/N is
+# folded into the contraction scalar at the call site.
+const _DDI_BRFFT_CACHE = Dict{Any, Any}()
+function _get_ddi_brfft_plan(complex_buf, n1::Int)
+    key = (typeof(complex_buf), size(complex_buf), n1)
+    get!(() -> plan_brfft(complex_buf, n1), _DDI_BRFFT_CACHE, key)
 end
 
 function _ddi_k_contraction_core!(
