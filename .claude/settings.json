@@ -56,19 +56,13 @@
       "Bash(git config --list)",
       "Bash(git config --list *)",
       "Bash(git config -l)",
-      "Write(.claude/**)",
       "Edit(.claude/**)",
-      "Write(runs/_loop/**)",
       "Edit(runs/_loop/**)",
-      "Write(runs/auto/**)",
+      "Edit(runs/auto/**)",
       "Edit(src/**)",
       "Edit(test/**)",
       "Edit(docs/**)",
-      "Edit(scripts/**)",
-      "Write(src/**)",
-      "Write(test/**)",
-      "Write(docs/**)",
-      "Write(scripts/**)"
+      "Edit(scripts/**)"
     ],
     "deny": [
       "Bash(rm -rf *)",
