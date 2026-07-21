@@ -256,10 +256,15 @@ function compute_ddi_potential!(ddi::DDIParams{N}, bufs::DDIBuffers) where {N}
     mul!(bufs.Fy_rk, rp.forward, bufs.Fy_r)
     mul!(bufs.Fz_rk, rp.forward, bufs.Fz_r)
 
-    _ddi_k_contraction!(bufs, ddi, ddi.C_dd)
-
-    mul!(bufs.Phi_x, rp.inverse, bufs.Phi_x_rk)
-    mul!(bufs.Phi_y, rp.inverse, bufs.Phi_y_rk)
-    mul!(bufs.Phi_z, rp.inverse, bufs.Phi_z_rk)
+    # Same unnormalised-brfft + fold-1/N trick as _compute_and_convolve_ddi!
+    # (drops cuFFT's 3 per-call scaling kernels). This is the energy/gradient DDI
+    # path (DDITerm energy_contribution / apply_operator!), so it speeds every
+    # LBFGS/Newton gradient+energy eval and every DDI energy read.
+    n_pts = size(bufs.Phi_x)
+    _ddi_k_contraction!(bufs, ddi, ddi.C_dd / prod(n_pts))
+    bp = _get_ddi_brfft_plan(bufs.Phi_x_rk, n_pts[1])
+    mul!(bufs.Phi_x, bp, bufs.Phi_x_rk)
+    mul!(bufs.Phi_y, bp, bufs.Phi_y_rk)
+    mul!(bufs.Phi_z, bp, bufs.Phi_z_rk)
     nothing
 end
