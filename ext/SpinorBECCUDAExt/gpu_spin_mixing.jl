@@ -97,23 +97,17 @@ function SpinorBEC.apply_spin_mixing_step!(
     m_shift_gpu = cache.m_shift # (1, D)
     F_t = cache.F
 
-    # --- Compute spin vector components (O(D) broadcasts, each over (N,)) ---
-    # Use psi_mf_2d (=== psi_2d when psi_mf was nothing) so the spin
-    # expectation uses the mean-field source per the CPU/SMA contract.
-    fz .= zero(T)
-    for c in 1:D
-        m = T(F_t - T(c - 1))
-        fz .+= m .* abs2.(view(psi_mf_2d, :, c))
-    end
-
-    fx .= zero(T)
-    fy .= zero(T)
-    fp_coeffs = SpinorBEC.fp_ladder_coeffs(T, sm.system.F, Val(D))
-    for c in 2:D
-        fp = fp_coeffs[c]
-        pb .= conj.(view(psi_mf_2d, :, c-1)) .* view(psi_mf_2d, :, c)
-        fx .+= fp .* real.(pb)
-        fy .+= fp .* imag.(pb)
+    # --- Spin vector components in ONE fused launch (reuse _spin_density_kernel!) ---
+    # Replaces ~49 broadcasts (D for F_z + 3(D-1) for F_x/F_y, each round-tripping
+    # ψ and an accumulator through HBM). Same physics (m_c, fp ladder coeffs) as the
+    # removed loop and as the CPU path — machine-precision equivalent, parity-gated.
+    let
+        m_svec = SVector{D, T}(ntuple(c -> T(F_t - T(c - 1)), Val(D)))
+        fp_svec = SpinorBEC.fp_ladder_coeffs(T, sm.system.F, Val(D))
+        thr = min(N, 256)
+        blk = cld(N, thr)
+        CUDA.@cuda threads = thr blocks = blk _spin_density_kernel!(
+            fx, fy, fz, psi_mf_2d, m_svec, fp_svec, Val(D))
     end
 
     # --- Angles (reshape to (N,1) for later fusion with (1,D) diag ---
@@ -126,11 +120,8 @@ function SpinorBEC.apply_spin_mixing_step!(
     α_view .= atan.(fy, fx)
     f_mag_view .*= c1_t * dt_t       # θ = c1 * f_mag * dt
 
-    # Single-launch fused 5-stage rotation (gpu_euler_kernel.jl). Replaces
-    # 7 broadcast + gemm launches with one kernel that processes every
-    # spatial point in registers and reads V/conj_V from shared memory.
-    # Measured 1.47× over the broadcast path on F=6 96³ F32; up to 4×
-    # at smaller grids where launch overhead dominates.
+    # Single-launch fused 5-stage rotation (warp-cooperative kernel, no MVector
+    # local-memory spill at D=13 — see gpu_euler_kernel.jl).
     apply_euler_5stage_fused_kernel!(
         psi_2d, α, β, θ,
         m_gpu, m_shift_gpu, λ_gpu, cache.V, cache.conj_V;
