@@ -27,7 +27,10 @@ function find_ground_state_lbfgs(;
     l_z_ddi::Float64=0.0,
     target_magnetization::Union{Nothing, Float64}=nothing,
     backend::AbstractBackend=CPUBackend(),
-    m_lbfgs::Int=10,
+    m_lbfgs::Int=20,   # history depth. 20 measured ~9× lower grad_norm floor +
+    # ~30% fewer line-search backtracks vs 10 on Eu F=6+DDI
+    # 16³ (m=30 was worse). Memory ~ 2·m·|ψ|: reduce to 10 if
+    # VRAM-constrained at large grids.
     verbose::Bool=_default_solver_verbose(),
     light_shift::Union{Nothing, LightShift}=nothing,
     dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
@@ -39,6 +42,10 @@ function find_ground_state_lbfgs(;
     newton_max_outer::Int=20,
     newton_max_cg::Int=40,
     newton_eps::Float64=1.0e-6,
+    residual_polish::Bool=false,        # eigenvector-residual final polish that
+    residual_hvp_order::Int=2,          # BREAKS the √eps energy-gate floor
+    # (measured 1.1e-7 → 7.7e-12 on Eu 16³);
+    # newton_polish (HvP) cannot — see below.
     pin::Union{Nothing, Function}=nothing,        # ε -> (; zeeman=…) | (; potential=…)
     epsilon_ramp::AbstractVector{<:Real}=Float64[],  # non-empty ⇒ pin ε→0 continuation
 )
@@ -292,6 +299,20 @@ function find_ground_state_lbfgs(;
             sobolev_alpha=sobolev_alpha, ε=newton_eps, verbose,
         )
         copyto!(psi, rn.psi)
+    end
+
+    # Eigenvector-residual polish: drives (H−μ)ψ→0 directly, WITHOUT energy-gated
+    # steps, so it breaks the √eps·‖g‖ floor that both L-BFGS and Newton-CG hit
+    # (see the note above). Opt-in; costs ~max_outer×max_cg HvPs. Use when the
+    # grad_norm floor itself is the certificate (BdG / stability gates).
+    if residual_polish
+        rr = residual_newton_refine(
+            ws, psi;
+            tol=min(tol, 1.0e-13), max_outer=newton_max_outer,
+            max_cg=max(newton_max_cg, 120), ε=newton_eps,
+            hvp_order=residual_hvp_order, verbose,
+        )
+        copyto!(psi, rr.psi)
     end
 
     # Atomic finalization (spine G, 2026-06-05). Guarantees the returned
