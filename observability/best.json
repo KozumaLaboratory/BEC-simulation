@@ -1,0 +1,58 @@
+{
+  "gpu_allocs_bytes/N128/Float64": {
+    "dtype": "Float64",
+    "commit": "unknown",
+    "N": 128,
+    "best": 8480.0,
+    "ts": "2026-07-21T23:02:29.923"
+  },
+  "gpu_spin_mixing_us/N128/Float64": {
+    "dtype": "Float64",
+    "commit": "unknown",
+    "N": 128,
+    "best": 3312.412,
+    "ts": "2026-07-21T23:47:18.134"
+  },
+  "gpu_kinetic_us/N128/Float64": {
+    "dtype": "Float64",
+    "commit": "unknown",
+    "N": 128,
+    "best": 3124.238,
+    "ts": "2026-07-21T22:17:47.034"
+  },
+  "gpu_diagonal_us/N128/Float64": {
+    "dtype": "Float64",
+    "commit": "unknown",
+    "N": 128,
+    "best": 593.384,
+    "ts": "2026-07-21T23:22:01.380"
+  },
+  "gpu_busy_pct/N128/Float64": {
+    "dtype": "Float64",
+    "commit": "unknown",
+    "N": 128,
+    "best": 96.88096826272634,
+    "ts": "2026-07-21T22:00:39.191"
+  },
+  "gpu_ddi_convolve_us/N128/Float64": {
+    "dtype": "Float64",
+    "commit": "unknown",
+    "N": 128,
+    "best": 952.273,
+    "ts": "2026-07-22T00:11:22.757"
+  },
+  "gpu_step_us/N128/Float64": {
+    "dtype": "Float64",
+    "commit": "unknown",
+    "N": 128,
+    "best": 20094.593,
+    "ts": "2026-07-21T22:00:39.191"
+  },
+  "gpu_ddi_rotation_us/N128/Float64": {
+    "dtype": "Float64",
+    "commit": "unknown",
+    "N": 128,
+    "best": 1113.141,
+    "ts": "2026-07-21T23:10:25.038"
+  }
+}

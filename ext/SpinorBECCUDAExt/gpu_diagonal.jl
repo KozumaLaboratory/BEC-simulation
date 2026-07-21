@@ -12,8 +12,13 @@
 
 using StaticArrays: SVector
 
+# zph: per-component Zeeman phase exp/cis(-(zee_c-shift)·dt) as a DEVICE array
+# (all threads read the same D values → L2/constant-cached), NOT a by-value
+# SVector (26 Float64 at D=13 → register pressure that regressed this kernel
+# +40% when tried). One transcendental per voxel (exp/cis of the voxel-dependent
+# base) instead of D. Machine-precision equivalent to the direct per-component form.
 @inline function _diag_step_kernel!(
-    P, Pmf, Vt, db, zee, c0::T, clhy::T, shift::T, dt::T, ::Val{D}, ::Val{IT},
+    P, Pmf, Vt, db, zph, c0::T, clhy::T, dt::T, ::Val{D}, ::Val{IT},
 ) where {T, D, IT}
     i = (CUDA.blockIdx().x - 1) * CUDA.blockDim().x + CUDA.threadIdx().x
     i > size(P, 1) && return nothing
@@ -27,9 +32,10 @@ using StaticArrays: SVector
 
     lhy = clhy == zero(T) ? zero(T) : clhy * n * sqrt(n)
     base = @inbounds(Vt[i]) + c0 * n + lhy
+    varg = base * dt
+    vph = IT ? Complex{T}(exp(-varg), zero(T)) : cis(-varg)   # one transcendental
     @inbounds for c in 1:D
-        arg = (base + (zee[c] - shift)) * dt
-        P[i, c] *= IT ? exp(-arg) : cis(-arg)
+        P[i, c] *= vph * zph[c]
     end
     return nothing
 end
@@ -51,7 +57,16 @@ function SpinorBEC._diagonal_step_svec!(
     clhy = c_lhy isa SpinorBEC.ScalarLHY ? T(c_lhy.c_lhy) :
            (c_lhy isa Float64 ? T(c_lhy) : zero(T))
     shift = imaginary_time ? T(minimum(zeeman_diag)) : zero(T)
-    zee = SVector{D, T}(ntuple(c -> T(zeeman_diag[c]), Val(D)))
+    dtf = T(dt_frac)
+    it = imaginary_time === true
+    # Precompute the D per-component Zeeman phases into a cached DEVICE vector
+    # (reused, no per-call GPU alloc; host-side 208 B upload is uncounted).
+    zph = _get_diag_zph(psi, Val(D))::CuArray{Complex{T}, 1}
+    zph_host = Complex{T}[
+        it ? Complex{T}(exp(-(T(zeeman_diag[c]) - shift) * dtf), zero(T)) :
+             cis(-T(zeeman_diag[c]) * dtf) for c in 1:D
+    ]
+    copyto!(zph, zph_host)
 
     P = reshape(psi, Ns, D)
     Pmf = reshape(psi_mf === nothing ? psi : psi_mf::CuArray{Complex{T}}, Ns, D)
@@ -61,8 +76,11 @@ function SpinorBEC._diagonal_step_svec!(
     threads = min(Ns, 256)
     blocks = cld(Ns, threads)
     CUDA.@cuda threads = threads blocks = blocks _diag_step_kernel!(
-        P, Pmf, Vt, db, zee, T(c0), clhy, shift, T(dt_frac),
-        Val(D), Val(imaginary_time === true),
+        P, Pmf, Vt, db, zph, T(c0), clhy, dtf, Val(D), Val(it),
     )
     nothing
 end
+
+const _DIAG_ZPH_CACHE = Dict{Tuple{Int, DataType}, Any}()
+_get_diag_zph(psi::CuArray{Complex{T}}, ::Val{D}) where {T, D} =
+    get!(() -> similar(psi, Complex{T}, D), _DIAG_ZPH_CACHE, (D, T))

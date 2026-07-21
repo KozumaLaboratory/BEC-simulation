@@ -1,0 +1,158 @@
+# Metric registry for the goal-driven perf/accuracy observability.
+#
+# Philosophy (do NOT add arbitrary numeric targets):
+#   - kind = "ratchet": optimise FOREVER. No finish line. Track best-so-far;
+#     the ONLY reference is a physical/hardware limit (`bound`), never a
+#     chosen target. headroom = gap(best_so_far, bound).
+#   - kind = "threshold": correctness. A physical floor exists (machine eps);
+#     over-optimising past it is noise, so it stays a pass/fail CI gate and is
+#     NOT ratcheted here. Listed for completeness only.
+#
+# `confidence`: deterministic > low_noise > noisy. A noisy metric only moves
+# the record when the change clears its stated noise band.
+# `env_class`: records only compare within the same class (never mix H100/WSL2).
+
+[env]
+ratchet_env_class = "tsubame_h100_node_q"   # stable measurement env for all ratchet metrics
+noise_band_pct    = 5.0                       # wall-clock ratchet metrics: change must exceed this
+
+# ---------------------------------------------------------------- GPU ratchet
+[metrics.gpu_busy_pct]
+dimension  = "speed"
+kind       = "ratchet"
+direction  = "maximize"
+unit       = "percent"
+bound      = 100.0                 # theoretical: zero launch-overhead / no idle gaps
+bound_kind = "hardware_limit"
+confidence = "low_noise"
+source     = "observability/collect_gpu.jl :: busy_pct"
+note       = "Σ(device kernel time × per-step count) / wall step time. THE launch-overhead headline; the ~11–13% baseline lives here."
+
+[metrics.gpu_step_us]
+dimension  = "speed"
+kind       = "ratchet"
+direction  = "minimize"
+unit       = "microseconds"
+bound      = 0.0                   # asymptotic; real floor is per-kernel roofline sum
+bound_kind = "asymptotic"
+confidence = "noisy"
+source     = "observability/collect_gpu.jl :: whole_step_us"
+
+[metrics.gpu_ddi_rotation_us]
+dimension  = "speed"
+kind       = "ratchet"
+direction  = "minimize"
+unit       = "microseconds"
+bound      = 0.0
+bound_kind = "asymptotic"
+confidence = "low_noise"
+source     = "observability/collect_gpu.jl :: kernels.ddi_rotation_us"
+note       = "×2/step. Historical hot spot (wrapper overhead)."
+
+[metrics.gpu_kernel_util_lb_pct]
+dimension  = "speed"
+kind       = "ratchet"
+direction  = "maximize"
+unit       = "percent"
+bound      = 100.0                 # roofline: achieved / peak HBM bandwidth
+bound_kind = "roofline"
+confidence = "low_noise"
+source     = "observability/collect_gpu.jl :: kernels.*.util_lb_pct"
+note       = "LOWER BOUND on per-kernel roofline utilisation (min traffic = 1 r + 1 w of the spinor field). Honest floor, not a fabricated exact figure."
+
+[metrics.gpu_allocs_bytes]
+dimension  = "speed"
+kind       = "ratchet"
+direction  = "minimize"
+unit       = "bytes"
+bound      = 0.0                   # zero transient allocation is the floor
+bound_kind = "hardware_limit"
+confidence = "low_noise"
+source     = "observability/collect_gpu.jl :: allocs_bytes (CUDA.@allocated one split_step)"
+note       = "128³ baseline 67 MB/step; buffer-reuse the per-step transients (R-reduction temp, k_sq_dev H2D copy, …)."
+
+# ---------------------------------------------------------------- CPU ratchet
+# CPU has no clean 'utilisation' analogue to GPU (no profiler achieved/peak);
+# tracked by best-so-far time + deterministic allocations only.
+[metrics.cpu_split_step_ns]
+dimension  = "speed"
+kind       = "ratchet"
+direction  = "minimize"
+unit       = "nanoseconds"
+bound      = 0.0
+bound_kind = "asymptotic"
+confidence = "noisy"
+source     = "bench/bench_regression.jl :: split_step/eu151_16cubed (re-run on ratchet env)"
+
+[metrics.cpu_split_step_allocs]
+dimension  = "speed"
+kind       = "ratchet"
+direction  = "minimize"
+unit       = "count"
+bound      = 0.0                   # 0 allocations is achievable and exact
+bound_kind = "hardware_limit"
+confidence = "deterministic"
+source     = "bench/bench_regression.jl :: split_step/eu151_16cubed"
+
+# ---------------------------------------------------------- operational budget
+# Self-imposed campaign cap: this whole perf/accuracy effort spends at most
+# BUDGET_CAP_POINTS on TSUBAME. Checked before every dispatch (like the
+# autopilot budget gate): spent_so_far + next_job_reservation must stay <= cap.
+[budget]
+cap_points        = 30.0           # HARD ceiling for the campaign (set by anko)
+group             = "tga-kozuma-kouhi"
+
+[metrics.tsubame_points_spent]
+dimension  = "operational"
+kind       = "gauge"               # cumulative points consumed by observability jobs
+direction  = "none"
+unit       = "points"
+bound       = 30.0                 # the campaign cap — dispatch blocked at/above this
+bound_kind  = "budget_cap"
+confidence  = "low_noise"          # node_q RESERVES up front; realized ~= reserved
+source      = "observability/tsubame_points.sh :: spent (accumulated per job reservation)"
+note        = "spent + next reservation <= 30 required to dispatch."
+
+[metrics.tsubame_points_balance]
+dimension  = "operational"
+kind       = "gauge"               # group balance left — low balance also blocks qsub
+direction  = "none"
+unit       = "points"
+bound       = 24.0                 # group deposit ceiling (tga-kozuma-kouhi)
+bound_kind  = "quota"
+confidence  = "deterministic"
+source      = "observability/tsubame_points.sh :: balance"
+note        = "t4-user-info group point -g tga-kozuma-kouhi. balance≈0 → qsub rejected. Refreshes over time. Independent of the 30-pt campaign cap."
+
+[metrics.tsubame_disk_gs_gb]
+dimension  = "operational"
+kind       = "gauge"
+direction  = "none"
+unit       = "gigabytes"
+bound       = 1000.0               # /gs/fs Lustre 1 TB quota
+bound_kind  = "quota"
+confidence  = "deterministic"
+source      = "observability/tsubame_points.sh :: disk_gs_gb"
+
+# --------------------------------------------------- accuracy threshold gates
+# NOT ratcheted (machine-eps floor). Recorded for the unified scorecard view;
+# the real enforcement is the existing CI oracle/ladder gates.
+[metrics.gpu_cpu_parity_rel]
+dimension  = "accuracy"
+type       = "A"
+kind       = "threshold"
+direction  = "minimize"
+unit       = "relative_L2"
+bound      = 1.0e-16               # machine eps floor; over-tightening is noise
+gate       = 1.0e-10
+source     = "test/test_level0_gpu_cpu_consistency.jl"
+
+[metrics.hpsi_self_consistency_rel]
+dimension  = "accuracy"
+type       = "A"
+kind       = "threshold"
+direction  = "minimize"
+unit       = "relative_L2"
+bound      = 1.0e-16
+gate       = 1.0e-12
+source     = "test/test_level10_hpsi_self_consistency.jl"

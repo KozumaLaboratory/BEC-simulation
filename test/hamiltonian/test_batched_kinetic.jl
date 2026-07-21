@@ -53,7 +53,10 @@
         SpinorBEC._update_batched_kinetic_phase!(bk, grid.k_squared, new_dt, false)
 
         kp_new = prepare_kinetic_phase(grid, new_dt)
-        @test bk.kinetic_phase_bc[:, 1] ≈ kp_new rtol = 1e-14
+        # kinetic_phase_bc now folds the ifft 1/prod(n) normalisation (the batched
+        # step applies an UNNORMALISED bfft), so the stored phase = pure-cis / N.
+        inv_n = 1 / prod(grid.config.n_points)
+        @test bk.kinetic_phase_bc[:, 1] ≈ kp_new .* inv_n rtol = 1e-14
     end
 
     @testset "Norm preserved by batched step" begin
