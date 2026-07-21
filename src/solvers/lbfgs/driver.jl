@@ -2,6 +2,29 @@
 
 export find_ground_state_lbfgs
 
+# Projected-Riemannian gradient at ψ + preconditioning, in place on `g`.
+# Returns (E, grad_norm) where grad_norm is the PROJECTED-RAW residual (before
+# preconditioning — the physical convergence certificate). Single source so the
+# initial and per-step gradient (reused across steps, not recomputed) precondition
+# identically. Mirrors the former inline block exactly ⇒ bit-identical trajectory.
+@inline function _lbfgs_grad!(
+    g, psi, ws, k_squared_dev, grid, target_magnetization, F,
+    precond_alpha_v::Float64, precond_alpha_k::Float64, sobolev_alpha::Float64, dV::Float64,
+)
+    E = energy_gradient!(g, psi, ws; k_squared_dev)
+    _project_constraints!(g, psi, grid, target_magnetization, F)
+    grad_norm = sqrt(sum(abs2, g) * dV)
+    if precond_alpha_v >= 0
+        sqrt_pv = build_precond_sqrt_pv(ws, psi, precond_alpha_v)
+        combined_precondition!(g, ws, sqrt_pv, k_squared_dev, precond_alpha_k)
+        _project_constraints!(g, psi, grid, target_magnetization, F)
+    elseif sobolev_alpha > 0
+        _sobolev_precondition!(g, ws, k_squared_dev, sobolev_alpha)
+        _project_constraints!(g, psi, grid, target_magnetization, F)
+    end
+    (E, grad_norm)
+end
+
 # The main public entry point. Uses the energy/gradient + helpers
 # defined in the sibling files of lbfgs/.
 
@@ -166,29 +189,16 @@ function find_ground_state_lbfgs(;
     last_step = 0
     t_start = time()
 
+    # Initial gradient. `grad` is carried across iterations (the gradient at the
+    # accepted ψ becomes the next step's gradient) rather than recomputed at the
+    # top of each step — halving the energy_gradient! evals. grad_norm is the
+    # projected-raw residual; `grad` is left preconditioned for the direction.
+    E, grad_norm = _lbfgs_grad!(
+        grad, psi, ws, k_squared_dev, grid, target_magnetization, F,
+        precond_alpha_v, precond_alpha_k, sobolev_alpha, dV,
+    )
+
     for step in 1:n_steps
-        # Gradient at current psi (Riemannian, used unchanged for the
-        # convergence test — `grad_norm` is the *physical* residual).
-        E = energy_gradient!(grad, psi, ws; k_squared_dev)
-        _project_constraints!(grad, psi, grid, target_magnetization, F)
-        grad_norm = sqrt(sum(abs2, grad) * dV)
-
-        # Sobolev preconditioner: high-k attenuation acts as a mass-matrix
-        # preconditioner for L-BFGS. α = 0 leaves the gradient untouched.
-        # Re-project after preconditioning to restore tangency on the
-        # (norm + Mz) constraint manifold.
-        if precond_alpha_v >= 0
-            # Combined P_C = P_V^½ P_K P_V^½ (state-dependent V_eff rebuilt each
-            # step). Opens the real-space potential stiffness the Sobolev
-            # (kinetic-only) preconditioner leaves untouched.
-            sqrt_pv = build_precond_sqrt_pv(ws, psi, precond_alpha_v)
-            combined_precondition!(grad, ws, sqrt_pv, k_squared_dev, precond_alpha_k)
-            _project_constraints!(grad, psi, grid, target_magnetization, F)
-        elseif sobolev_alpha > 0
-            _sobolev_precondition!(grad, ws, k_squared_dev, sobolev_alpha)
-            _project_constraints!(grad, psi, grid, target_magnetization, F)
-        end
-
         dE = abs(E - E_prev)
 
         # Log
@@ -255,13 +265,13 @@ function find_ground_state_lbfgs(;
             )
         end
 
-        # Gradient at new psi
-        E_new = energy_gradient!(grad_new, psi, ws; k_squared_dev)
-        _project_constraints!(grad_new, psi, grid, target_magnetization, F)
-        if sobolev_alpha > 0
-            _sobolev_precondition!(grad_new, ws, k_squared_dev, sobolev_alpha)
-            _project_constraints!(grad_new, psi, grid, target_magnetization, F)
-        end
+        # Gradient at the new ψ — same preconditioning as the initial gradient so
+        # it can be carried to the next iteration. grad_norm_new is the projected-
+        # raw residual used by the next convergence test.
+        E_new, grad_norm_new = _lbfgs_grad!(
+            grad_new, psi, ws, k_squared_dev, grid, target_magnetization, F,
+            precond_alpha_v, precond_alpha_k, sobolev_alpha, dV,
+        )
 
         # L-BFGS history update — `real(dot(s_k, y_k))` is the same
         # quantity as `real(sum(conj.(s_k) .* y_k))` without the two
@@ -283,6 +293,11 @@ function find_ground_state_lbfgs(;
             empty!(rho_hist)
         end
 
+        # Carry the new gradient/energy to the next iteration (swap buffers so the
+        # old `grad` is reused as scratch for the next `grad_new`).
+        grad, grad_new = grad_new, grad
+        grad_norm = grad_norm_new
+        E = E_new
         E_prev = E_trial
         last_step = step
     end
