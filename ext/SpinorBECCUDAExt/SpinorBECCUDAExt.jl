@@ -16,6 +16,7 @@ module SpinorBECCUDAExt
 using SpinorBEC
 import CUDA
 using CUDA: CuArray, CuGraph, CuGraphExec, @captured
+using LinearAlgebra: dot
 
 include("backend.jl")
 include("gpu_euler_kernel.jl")
