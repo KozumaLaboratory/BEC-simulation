@@ -43,9 +43,10 @@ function find_ground_state_lbfgs(;
     newton_max_cg::Int=40,
     newton_eps::Float64=1.0e-6,
     residual_polish::Bool=false,        # eigenvector-residual final polish that
-    residual_hvp_order::Int=2,          # BREAKS the √eps energy-gate floor
-    # (measured 1.1e-7 → 7.7e-12 on Eu 16³);
-    # newton_polish (HvP) cannot — see below.
+    residual_hvp_order::Int=4,          # BREAKS the √eps energy-gate floor (1.1e-7
+    # → 6.5e-12 on Eu 16³). order-4 HvP stencil is
+    # ~13× deeper than order-2 at equal iters for ~2×
+    # HvP cost. newton_polish (HvP) cannot break it.
     pin::Union{Nothing, Function}=nothing,        # ε -> (; zeeman=…) | (; potential=…)
     epsilon_ramp::AbstractVector{<:Real}=Float64[],  # non-empty ⇒ pin ε→0 continuation
     lbfgs_history=nothing,   # optional (s_hist, y_hist, rho_hist) to warm-start the
