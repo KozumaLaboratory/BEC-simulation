@@ -48,6 +48,10 @@ function find_ground_state_lbfgs(;
     # newton_polish (HvP) cannot — see below.
     pin::Union{Nothing, Function}=nothing,        # ε -> (; zeeman=…) | (; potential=…)
     epsilon_ramp::AbstractVector{<:Real}=Float64[],  # non-empty ⇒ pin ε→0 continuation
+    lbfgs_history=nothing,   # optional (s_hist, y_hist, rho_hist) to warm-start the
+    # two-loop (ε-continuation threads it across rungs so
+    # each rung reuses curvature instead of restarting SD).
+    # Always returned in the result NamedTuple.
 )
     # Soft-manifold pin continuation: a descending ε ramp with a symmetry-breaking
     # pin reaches an isolated minimum (|∇E|~1e-5) and the ε→0 extrapolation
@@ -146,10 +150,15 @@ function find_ground_state_lbfgs(;
     grad = similar(psi)
     grad_new = similar(psi)
 
-    # L-BFGS history
-    s_hist = typeof(psi)[]
-    y_hist = typeof(psi)[]
-    rho_hist = Float64[]
+    # L-BFGS history — warm-start from a supplied history when threading across
+    # ε-continuation rungs (copied so the caller's vectors are not mutated).
+    s_hist, y_hist, rho_hist = if lbfgs_history === nothing
+        (typeof(psi)[], typeof(psi)[], Float64[])
+    else
+        (typeof(psi)[copy(s) for s in lbfgs_history[1]],
+            typeof(psi)[copy(y) for y in lbfgs_history[2]],
+            Float64[ρ for ρ in lbfgs_history[3]])
+    end
 
     E_prev = Inf
     converged = false
@@ -323,10 +332,14 @@ function find_ground_state_lbfgs(;
     # at saved ψ by 30-50×). `_finalize_lbfgs_atomic!` does a single
     # explicit psi snapshot, evaluates everything from it, and re-syncs
     # ws.state.psi to the snapshot at exit. See atomic.jl docstring.
-    _finalize_lbfgs_atomic!(
+    result = _finalize_lbfgs_atomic!(
         ws, psi, converged, last_step;
         k_squared_dev, target_magnetization, F, E_prev=Float64(E_prev),
     )
+    # Expose the final L-BFGS curvature history so ε-continuation (or any warm
+    # restart) can thread it into the next solve. Does not touch the atomic
+    # {ws.state.psi, energy, grad_norm} spine.
+    merge(result, (; lbfgs_history=(s_hist, y_hist, rho_hist)))
 end
 
 """
