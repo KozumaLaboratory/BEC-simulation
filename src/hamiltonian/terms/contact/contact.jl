@@ -60,11 +60,12 @@ end
 # Context-aware specialisation: reuse ctx.n_density to skip the recompute.
 function apply_operator!(out, term::DensityC0Term, ws, psi, ctx::GradientContext)
     N = ndims(psi) - 1
-    D = ws.spin_matrices.system.n_components
-    @inbounds for c in 1:D
-        idx = ntuple(_ -> :, Val(N))
-        view(out, idx..., c) .+= term.c0 .* ctx.n_density .* view(psi, idx..., c)
-    end
+    # Whole-array broadcast: n_density reshaped to broadcast over the component
+    # axis. One GPU kernel instead of D per-component launches (H100 is
+    # broadcast-launch-bound at D=13). Bit-identical elementwise accumulate;
+    # zero-alloc on CPU (reshape is a view, broadcast fuses in place).
+    n_bc = reshape(ctx.n_density, size(ctx.n_density)..., 1)
+    out .+= term.c0 .* n_bc .* psi
     return out
 end
 
@@ -180,20 +181,27 @@ function _grad_c1_spin!(grad, psi, ws, c1, fx, fy, fz, n_pts, D, ::Val{N}) where
     sm = ws.spin_matrices
     F = ws.atom.F
     _compute_spin_density!(fx, fy, fz, psi, sm, Val(D), N, n_pts)
-    # Fz part (diagonal)
-    for c in 1:D
-        idx = _component_slice(N, n_pts, c)
-        m = Float64(F - (c - 1))
-        view(grad, idx...) .+= c1 .* m .* fz .* view(psi, idx...)
-    end
-    # F+/F− parts (tridiagonal)
-    for c in 2:D
-        idx_c = _component_slice(N, n_pts, c)
-        idx_cm1 = _component_slice(N, n_pts, c - 1)
-        fp = fp_ladder_coeff(F, F - c + 1)
-        view(grad, idx_cm1...) .+= c1 .* 0.5 .* fp .* (fx .- im .* fy) .* view(psi, idx_c...)
-        view(grad, idx_c...) .+= c1 .* 0.5 .* fp .* (fx .+ im .* fy) .* view(psi, idx_cm1...)
-    end
+    sl = ntuple(_ -> Colon(), Val(N))
+    fx_bc = reshape(fx, size(fx)..., 1)
+    fy_bc = reshape(fy, size(fy)..., 1)
+    # Fz part (diagonal) — m-vector over components × fz over space, one broadcast.
+    mvec = _to_device(
+        ws.backend, reshape(Float64[F - (c - 1) for c in 1:D], ntuple(_ -> 1, Val(N))..., D)
+    )
+    grad .+= c1 .* mvec .* reshape(fz, size(fz)..., 1) .* psi
+    # F± ladder (tridiagonal) — two shifted whole-array broadcasts over the D-1
+    # component slice (fp-vector over components). Replaces 2·(D-1) per-component
+    # launches. Equal to the loop up to add-reordering (~1e-16).
+    fpvec = _to_device(
+        ws.backend,
+        reshape(
+            Float64[fp_ladder_coeff(F, F - c + 1) for c in 2:D], ntuple(_ -> 1, Val(N))..., D - 1
+        ),
+    )
+    view(grad, sl..., 1:(D - 1)) .+=
+        (c1 * 0.5) .* fpvec .* (fx_bc .- im .* fy_bc) .* view(psi, sl..., 2:D)
+    view(grad, sl..., 2:D) .+=
+        (c1 * 0.5) .* fpvec .* (fx_bc .+ im .* fy_bc) .* view(psi, sl..., 1:(D - 1))
     nothing
 end
 

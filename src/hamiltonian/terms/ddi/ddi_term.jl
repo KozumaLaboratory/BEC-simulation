@@ -116,20 +116,30 @@ function _grad_ddi!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
     _compute_spin_density!(bufs.Fx_r, bufs.Fy_r, bufs.Fz_r, psi, sm, Val(D), N, n_pts)
     compute_ddi_potential!(ws.ddi, bufs)
     phi_x, phi_y, phi_z = bufs.Phi_x, bufs.Phi_y, bufs.Phi_z
-    # Fz part (diagonal)
-    for c in 1:D
-        idx = _component_slice(N, n_pts, c)
-        m = Float64(F - (c - 1))
-        view(grad, idx...) .+= m .* phi_z .* view(psi, idx...)
-    end
-    # F+/F− parts (tridiagonal)
-    for c in 2:D
-        idx_c = _component_slice(N, n_pts, c)
-        idx_cm1 = _component_slice(N, n_pts, c - 1)
-        fp = fp_ladder_coeff(F, F - c + 1)
-        view(grad, idx_cm1...) .+= 0.5 .* fp .* (phi_x .- im .* phi_y) .* view(psi, idx_c...)
-        view(grad, idx_c...) .+= 0.5 .* fp .* (phi_x .+ im .* phi_y) .* view(psi, idx_cm1...)
-    end
+    # Fz part (diagonal) — whole-array broadcast: m-vector (over components) ×
+    # phi_z (over space). One GPU kernel instead of D per-component launches.
+    # Bit-identical; zero-alloc on CPU.
+    mvec = _to_device(
+        ws.backend, reshape(Float64[F - (c - 1) for c in 1:D], ntuple(_ -> 1, Val(N))..., D)
+    )
+    phiz_bc = reshape(phi_z, size(phi_z)..., 1)
+    grad .+= mvec .* phiz_bc .* psi
+    # F± parts (tridiagonal) — two shifted whole-array broadcasts over the D-1
+    # component slice (fp-vector over components), replacing 2·(D-1) per-component
+    # launches. Equal to the loop up to add-reordering (~1e-16).
+    sl = ntuple(_ -> Colon(), Val(N))
+    phix_bc = reshape(phi_x, size(phi_x)..., 1)
+    phiy_bc = reshape(phi_y, size(phi_y)..., 1)
+    fpvec = _to_device(
+        ws.backend,
+        reshape(
+            Float64[fp_ladder_coeff(F, F - c + 1) for c in 2:D], ntuple(_ -> 1, Val(N))..., D - 1
+        ),
+    )
+    view(grad, sl..., 1:(D - 1)) .+=
+        0.5 .* fpvec .* (phix_bc .- im .* phiy_bc) .* view(psi, sl..., 2:D)
+    view(grad, sl..., 2:D) .+=
+        0.5 .* fpvec .* (phix_bc .+ im .* phiy_bc) .* view(psi, sl..., 1:(D - 1))
     nothing
 end
 
