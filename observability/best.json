@@ -1,4 +1,11 @@
 {
+  "gpu_energy_us/N128/Float64": {
+    "dtype": "Float64",
+    "commit": "unknown",
+    "N": 128,
+    "best": 13947.849,
+    "ts": "2026-07-22T10:05:35.066"
+  },
   "gpu_allocs_bytes/N128/Float64": {
     "dtype": "Float64",
     "commit": "unknown",
@@ -54,5 +61,12 @@
     "N": 128,
     "best": 1113.141,
     "ts": "2026-07-21T23:10:25.038"
+  },
+  "gpu_gradient_us/N128/Float64": {
+    "dtype": "Float64",
+    "commit": "unknown",
+    "N": 128,
+    "best": 18717.479,
+    "ts": "2026-07-22T11:02:29.920"
   }
 }

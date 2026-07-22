@@ -128,6 +128,20 @@ SpinorBEC.apply_spin_mixing_step!(psi, sm, SM_C1, 0.00125, 3)   # warm
 CUDA.synchronize()
 t_sm   = timed(() -> SpinorBEC.apply_spin_mixing_step!(psi, sm, SM_C1, 0.00125, 3))
 
+# ---- ground-state path (ITP/LBFGS): energy_decomposition (P2 device-resident)
+# + energy_gradient! (LBFGS gradient face). The split_step RTP profile above
+# does NOT capture these — they dominate the find_ground_state GPU workload.
+grad = similar(psi); fill!(grad, 0)
+k_sq_dev = SpinorBEC._to_device(ws.backend, ws.grid.k_squared)
+SpinorBEC.energy_decomposition(ws)                                              # warm
+SpinorBEC.energy_gradient!(grad, psi, ws; k_squared_dev = k_sq_dev)             # warm
+CUDA.synchronize()
+t_energy = timed(() -> SpinorBEC.energy_decomposition(ws); iters = 30)
+t_grad   = timed(
+    () -> (fill!(grad, 0); SpinorBEC.energy_gradient!(grad, psi, ws; k_squared_dev = k_sq_dev));
+    iters = 30,
+)
+
 # per-kernel isolated-sum (SECONDARY cross-check; best-case, not authoritative)
 kernel_sum_us = 2t_conv + 2t_rot + t_kin + 4t_diag
 
@@ -193,6 +207,8 @@ record = Dict(
         "gpu_device_busy_us" => device_busy_us,       # device-active time per step (profile)
         "gpu_span_per_step_us" => span_per_step_us,
         "gpu_kernel_sum_us"  => kernel_sum_us,        # secondary: isolated per-kernel best-case sum
+        "gpu_energy_us"      => t_energy,             # energy_decomposition (P2 device-resident)
+        "gpu_gradient_us"    => t_grad,               # energy_gradient! (LBFGS gradient face)
         "allocs_bytes"       => allocs_bytes,
         "kernels"            => kernels,
     ),
@@ -220,6 +236,8 @@ end
 @printf("  kinetic           %8.1f μs   (util_lb %.1f%%)\n", t_kin, util_lb(t_kin))
 @printf("  diagonal          %8.1f μs   (util_lb %.1f%%)  <-- ×4/step\n", t_diag, util_lb(t_diag))
 @printf("  spin_mixing       %8.1f μs\n", t_sm)
+@printf("  energy_decomp     %8.1f μs   (P2 device-resident; ground-state path)\n", t_energy)
+@printf("  energy_gradient!  %8.1f μs   (LBFGS gradient face)\n", t_grad)
 @printf("  host allocs/step  %8d bytes\n", allocs_bytes)
 println("\n--- CUDA.@profile (audit) ---\n", profile_text)
 println("\nappended -> $hist")
