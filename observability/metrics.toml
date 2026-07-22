@@ -49,6 +49,28 @@ confidence = "low_noise"
 source     = "observability/collect_gpu.jl :: kernels.ddi_rotation_us"
 note       = "×2/step. Historical hot spot (wrapper overhead)."
 
+[metrics.gpu_energy_us]
+dimension  = "speed"
+kind       = "ratchet"
+direction  = "minimize"
+unit       = "microseconds"
+bound      = 0.0
+bound_kind = "asymptotic"
+confidence = "low_noise"
+source     = "observability/collect_gpu.jl :: gpu_energy_us"
+note       = "energy_decomposition device-resident (P2). Ground-state/LBFGS line-search hot path."
+
+[metrics.gpu_gradient_us]
+dimension  = "speed"
+kind       = "ratchet"
+direction  = "minimize"
+unit       = "microseconds"
+bound      = 0.0
+bound_kind = "asymptotic"
+confidence = "low_noise"
+source     = "observability/collect_gpu.jl :: gpu_gradient_us"
+note       = "energy_gradient! (LBFGS gradient face) = apply_operator_via_registry! + energy. Ground-state per-step cost."
+
 [metrics.gpu_kernel_util_lb_pct]
 dimension  = "speed"
 kind       = "ratchet"
