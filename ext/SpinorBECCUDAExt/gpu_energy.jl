@@ -62,34 +62,56 @@ function _gpu_lhy_energy(psi, ws, n_comp, N, n_pts, dV)
     end
 end
 
-function SpinorBEC._energy_decomposition_gpu(ws::SpinorBEC.Workspace{N}) where {N}
+# Shared core: compute the energy decomposition and, when `grad !== nothing`,
+# accumulate the bare gradient Σ_term H_term·ψ into `grad` in the SAME pass.
+# The per-term `apply_operator!` (kinetic/DDI FFTs) is the expensive part —
+# running it once for both energy and gradient (instead of once each in
+# apply_operator_via_registry! + energy_decomposition) is the fusion win.
+function _gpu_energy_and_optional_grad(ws::SpinorBEC.Workspace{N}, grad) where {N}
     psi = ws.state.psi
     grid = ws.grid
     dV = SpinorBEC.cell_volume(grid)
     n_comp = ws.spin_matrices.system.n_components
     n_pts = ntuple(d -> size(psi, d), Val(N))
+    accumulate = grad !== nothing
 
     ctx = SpinorBEC.build_gradient_context(psi, ws)
     out = similar(psi)
+    accumulate && fill!(grad, zero(eltype(grad)))
 
     # E_term = factor · Re⟨ψ, H_term·ψ⟩ · dV via the gated device gradient face.
+    # When accumulating, `out` (= H_term·ψ) is also added to `grad` — one
+    # apply_operator! serves both faces.
     op_energy = function (term, factor)
         fill!(out, zero(eltype(out)))
         SpinorBEC.apply_operator!(out, term, ws, psi, ctx)
+        accumulate && (grad .+= out)
         return factor * real(dot(vec(psi), vec(out))) * dV
+    end
+    # Accumulate a gradient-blind / separately-computed term's gradient face
+    # (LHY, Tensor, Raman) into `grad` without touching its energy.
+    accum_grad = function (term)
+        accumulate && SpinorBEC.apply_operator!(grad, term, ws, psi, ctx)
+        return nothing
     end
 
     (
-        kin_t, trap_t, zee_t, c0_t, c1_t, ddi_t, _lhy_t, _tensor_t, _raman_t,
-        ls_t, cor_t, mg_t, _sz_t, _loss_t,
+        kin_t, trap_t, zee_t, c0_t, c1_t, ddi_t, lhy_t, tensor_t, raman_t,
+        ls_t, cor_t, mg_t, sz_t, loss_t,
     ) = SpinorBEC.build_h_terms_registry(ws)
 
+    # Inactive linear/mean-field terms are skipped: their apply_operator!
+    # contributes exactly 0 to the gradient (gate-first), so skipping the
+    # energy AND the grad-accumulation is identical to the registry loop.
     E_kin = op_energy(kin_t, 1.0)
     E_trap = op_energy(trap_t, 1.0)
     E_zee = op_energy(zee_t, 1.0)
     E_c0 = abs(ws.interactions[0]) > 1e-30 ? op_energy(c0_t, 0.5) : 0.0
     E_c1 = abs(ws.interactions[1]) > 1e-30 ? op_energy(c1_t, 0.5) : 0.0
     E_ddi = ws.ddi !== nothing ? op_energy(ddi_t, 0.5) : 0.0
+    # LHY: energy via device mapreduce (kind-specific power); gradient via the
+    # gated apply_operator! face (no FFT — a density-power broadcast).
+    accum_grad(lhy_t)
     E_lhy = _gpu_lhy_energy(psi, ws, n_comp, N, n_pts, dV)
     E_light_shift = ws.light_shift !== nothing ? op_energy(ls_t, 1.0) : 0.0
     Ω = ws.sim_params.rotating_frame_omega
@@ -123,6 +145,13 @@ function SpinorBEC._energy_decomposition_gpu(ws::SpinorBEC.Workspace{N}) where {
             )
         end
     end
+    # Gradient faces for the gradient-blind terms (Tensor gate-first host
+    # fallback; Raman/Loss no-op; SpatialZeeman inactive on GPU) — accumulate
+    # into grad to match apply_operator_via_registry! exactly.
+    accum_grad(tensor_t)
+    accum_grad(raman_t)
+    accum_grad(sz_t)
+    accum_grad(loss_t)
 
     # Spatial Zeeman: make_workspace rejects spatial B + GPU, so always 0
     # (slot kept for shape parity with the CPU registry NamedTuple).
@@ -148,4 +177,14 @@ function SpinorBEC._energy_decomposition_gpu(ws::SpinorBEC.Workspace{N}) where {
         loss=0.0,
         total=E_total,
     )
+end
+
+# Energy-only entry (energy_decomposition GPU path).
+SpinorBEC._energy_decomposition_gpu(ws::SpinorBEC.Workspace) =
+    _gpu_energy_and_optional_grad(ws, nothing)
+
+# Fused entry: fill `grad` with the bare gradient Σ_term H_term·ψ AND return the
+# total energy, in one per-term apply_operator! pass (LBFGS energy_gradient!).
+function SpinorBEC._energy_and_gradient_gpu!(grad::CuArray, ws::SpinorBEC.Workspace)
+    return _gpu_energy_and_optional_grad(ws, grad).total
 end

@@ -63,12 +63,25 @@ function energy_gradient!(
     # The ctx pre-builds shared scratch (fft_buf, fx/fy/fz, n_density)
     # so each term's hot-path skips per-call alloc.
     copyto!(ws.state.psi, psi)
-    apply_operator_via_registry!(grad, ws)
+    if _is_gpu(psi)
+        # Fused GPU path: fill grad with Σ_term H_term·ψ AND return total energy
+        # in ONE per-term apply_operator! pass (the FFT-heavy kinetic/DDI faces
+        # run once, not once for grad + once for energy_decomposition). Bit-
+        # equivalent to the two-pass path below; gated by the per-term parity
+        # oracle + a grad/energy-consistency test.
+        E = _energy_and_gradient_gpu!(grad, ws)
+    else
+        apply_operator_via_registry!(grad, ws)
+        E = energy_decomposition(ws).total
+    end
     # Wirtinger scaling: δE = 2·Re⟨δE/δψ̄, δψ⟩ ⇒ grad_R = 2·δE/δψ̄
     # makes δE = Re⟨grad_R, δψ⟩ (standard real inner product).
     grad .*= 2
-    return energy_decomposition(ws).total
+    return E
 end
+
+# GPU fused energy+gradient — implemented in the CUDA extension (gpu_energy.jl).
+function _energy_and_gradient_gpu! end
 
 # --- per-term gradient helpers ---
 #
