@@ -142,6 +142,14 @@ end
 function SpinorBEC.apply_operator!(
     out::CuArray, term::SpinorBEC.TensorTerm, ws, psi::CuArray
 )
+    # Gate-first: an inactive tensor term (no c2 singlet, no tensor_cache) is
+    # the common LBFGS-gradient case. Skip the host round-trip entirely — the
+    # old code paid three device<->host copies of the full spinor field
+    # (~130 ms/gradient at 128³) only for the CPU body to early-return. Result
+    # is identical (accumulate contract: `out` unchanged when inactive).
+    SpinorBEC.is_active(SpinorBEC.get_cn(ws.interactions, 2)) ||
+        ws.tensor_cache !== nothing ||
+        return out
     out_h = Array(out)
     SpinorBEC.apply_operator!(out_h, term, ws, Array(psi))
     copyto!(out, out_h)
