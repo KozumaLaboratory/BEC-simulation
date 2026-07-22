@@ -2,6 +2,29 @@
 
 export find_ground_state_lbfgs
 
+# Projected-Riemannian gradient at ψ + preconditioning, in place on `g`.
+# Returns (E, grad_norm) where grad_norm is the PROJECTED-RAW residual (before
+# preconditioning — the physical convergence certificate). Single source so the
+# initial and per-step gradient (reused across steps, not recomputed) precondition
+# identically. Mirrors the former inline block exactly ⇒ bit-identical trajectory.
+@inline function _lbfgs_grad!(
+    g, psi, ws, k_squared_dev, grid, target_magnetization, F,
+    precond_alpha_v::Float64, precond_alpha_k::Float64, sobolev_alpha::Float64, dV::Float64,
+)
+    E = energy_gradient!(g, psi, ws; k_squared_dev)
+    _project_constraints!(g, psi, grid, target_magnetization, F)
+    grad_norm = sqrt(sum(abs2, g) * dV)
+    if precond_alpha_v >= 0
+        sqrt_pv = build_precond_sqrt_pv(ws, psi, precond_alpha_v)
+        combined_precondition!(g, ws, sqrt_pv, k_squared_dev, precond_alpha_k)
+        _project_constraints!(g, psi, grid, target_magnetization, F)
+    elseif sobolev_alpha > 0
+        _sobolev_precondition!(g, ws, k_squared_dev, sobolev_alpha)
+        _project_constraints!(g, psi, grid, target_magnetization, F)
+    end
+    (E, grad_norm)
+end
+
 # The main public entry point. Uses the energy/gradient + helpers
 # defined in the sibling files of lbfgs/.
 
@@ -27,7 +50,10 @@ function find_ground_state_lbfgs(;
     l_z_ddi::Float64=0.0,
     target_magnetization::Union{Nothing, Float64}=nothing,
     backend::AbstractBackend=CPUBackend(),
-    m_lbfgs::Int=10,
+    m_lbfgs::Int=20,   # history depth. 20 measured ~9× lower grad_norm floor +
+    # ~30% fewer line-search backtracks vs 10 on Eu F=6+DDI
+    # 16³ (m=30 was worse). Memory ~ 2·m·|ψ|: reduce to 10 if
+    # VRAM-constrained at large grids.
     verbose::Bool=_default_solver_verbose(),
     light_shift::Union{Nothing, LightShift}=nothing,
     dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
@@ -39,8 +65,17 @@ function find_ground_state_lbfgs(;
     newton_max_outer::Int=20,
     newton_max_cg::Int=40,
     newton_eps::Float64=1.0e-6,
+    residual_polish::Bool=false,        # eigenvector-residual final polish that
+    residual_hvp_order::Int=4,          # BREAKS the √eps energy-gate floor (1.1e-7
+    # → 6.5e-12 on Eu 16³). order-4 HvP stencil is
+    # ~13× deeper than order-2 at equal iters for ~2×
+    # HvP cost. newton_polish (HvP) cannot break it.
     pin::Union{Nothing, Function}=nothing,        # ε -> (; zeeman=…) | (; potential=…)
     epsilon_ramp::AbstractVector{<:Real}=Float64[],  # non-empty ⇒ pin ε→0 continuation
+    lbfgs_history=nothing,   # optional (s_hist, y_hist, rho_hist) to warm-start the
+    # two-loop (ε-continuation threads it across rungs so
+    # each rung reuses curvature instead of restarting SD).
+    # Always returned in the result NamedTuple.
 )
     # Soft-manifold pin continuation: a descending ε ramp with a symmetry-breaking
     # pin reaches an isolated minimum (|∇E|~1e-5) and the ε→0 extrapolation
@@ -139,39 +174,31 @@ function find_ground_state_lbfgs(;
     grad = similar(psi)
     grad_new = similar(psi)
 
-    # L-BFGS history
-    s_hist = typeof(psi)[]
-    y_hist = typeof(psi)[]
-    rho_hist = Float64[]
+    # L-BFGS history — warm-start from a supplied history when threading across
+    # ε-continuation rungs (copied so the caller's vectors are not mutated).
+    s_hist, y_hist, rho_hist = if lbfgs_history === nothing
+        (typeof(psi)[], typeof(psi)[], Float64[])
+    else
+        (typeof(psi)[copy(s) for s in lbfgs_history[1]],
+            typeof(psi)[copy(y) for y in lbfgs_history[2]],
+            Float64[ρ for ρ in lbfgs_history[3]])
+    end
 
     E_prev = Inf
     converged = false
     last_step = 0
     t_start = time()
 
+    # Initial gradient. `grad` is carried across iterations (the gradient at the
+    # accepted ψ becomes the next step's gradient) rather than recomputed at the
+    # top of each step — halving the energy_gradient! evals. grad_norm is the
+    # projected-raw residual; `grad` is left preconditioned for the direction.
+    E, grad_norm = _lbfgs_grad!(
+        grad, psi, ws, k_squared_dev, grid, target_magnetization, F,
+        precond_alpha_v, precond_alpha_k, sobolev_alpha, dV,
+    )
+
     for step in 1:n_steps
-        # Gradient at current psi (Riemannian, used unchanged for the
-        # convergence test — `grad_norm` is the *physical* residual).
-        E = energy_gradient!(grad, psi, ws; k_squared_dev)
-        _project_constraints!(grad, psi, grid, target_magnetization, F)
-        grad_norm = sqrt(sum(abs2, grad) * dV)
-
-        # Sobolev preconditioner: high-k attenuation acts as a mass-matrix
-        # preconditioner for L-BFGS. α = 0 leaves the gradient untouched.
-        # Re-project after preconditioning to restore tangency on the
-        # (norm + Mz) constraint manifold.
-        if precond_alpha_v >= 0
-            # Combined P_C = P_V^½ P_K P_V^½ (state-dependent V_eff rebuilt each
-            # step). Opens the real-space potential stiffness the Sobolev
-            # (kinetic-only) preconditioner leaves untouched.
-            sqrt_pv = build_precond_sqrt_pv(ws, psi, precond_alpha_v)
-            combined_precondition!(grad, ws, sqrt_pv, k_squared_dev, precond_alpha_k)
-            _project_constraints!(grad, psi, grid, target_magnetization, F)
-        elseif sobolev_alpha > 0
-            _sobolev_precondition!(grad, ws, k_squared_dev, sobolev_alpha)
-            _project_constraints!(grad, psi, grid, target_magnetization, F)
-        end
-
         dE = abs(E - E_prev)
 
         # Log
@@ -238,13 +265,13 @@ function find_ground_state_lbfgs(;
             )
         end
 
-        # Gradient at new psi
-        E_new = energy_gradient!(grad_new, psi, ws; k_squared_dev)
-        _project_constraints!(grad_new, psi, grid, target_magnetization, F)
-        if sobolev_alpha > 0
-            _sobolev_precondition!(grad_new, ws, k_squared_dev, sobolev_alpha)
-            _project_constraints!(grad_new, psi, grid, target_magnetization, F)
-        end
+        # Gradient at the new ψ — same preconditioning as the initial gradient so
+        # it can be carried to the next iteration. grad_norm_new is the projected-
+        # raw residual used by the next convergence test.
+        E_new, grad_norm_new = _lbfgs_grad!(
+            grad_new, psi, ws, k_squared_dev, grid, target_magnetization, F,
+            precond_alpha_v, precond_alpha_k, sobolev_alpha, dV,
+        )
 
         # L-BFGS history update — `real(dot(s_k, y_k))` is the same
         # quantity as `real(sum(conj.(s_k) .* y_k))` without the two
@@ -266,6 +293,11 @@ function find_ground_state_lbfgs(;
             empty!(rho_hist)
         end
 
+        # Carry the new gradient/energy to the next iteration (swap buffers so the
+        # old `grad` is reused as scratch for the next `grad_new`).
+        grad, grad_new = grad_new, grad
+        grad_norm = grad_norm_new
+        E = E_new
         E_prev = E_trial
         last_step = step
     end
@@ -294,6 +326,20 @@ function find_ground_state_lbfgs(;
         copyto!(psi, rn.psi)
     end
 
+    # Eigenvector-residual polish: drives (H−μ)ψ→0 directly, WITHOUT energy-gated
+    # steps, so it breaks the √eps·‖g‖ floor that both L-BFGS and Newton-CG hit
+    # (see the note above). Opt-in; costs ~max_outer×max_cg HvPs. Use when the
+    # grad_norm floor itself is the certificate (BdG / stability gates).
+    if residual_polish
+        rr = residual_newton_refine(
+            ws, psi;
+            tol=min(tol, 1.0e-13), max_outer=newton_max_outer,
+            max_cg=max(newton_max_cg, 120), ε=newton_eps,
+            hvp_order=residual_hvp_order, verbose,
+        )
+        copyto!(psi, rr.psi)
+    end
+
     # Atomic finalization (spine G, 2026-06-05). Guarantees the returned
     # NamedTuple's {ws.state.psi, energy, grad_norm} all refer to the
     # SAME iterate. The legacy inline sequence (copyto! + total_energy +
@@ -302,10 +348,14 @@ function find_ground_state_lbfgs(;
     # at saved ψ by 30-50×). `_finalize_lbfgs_atomic!` does a single
     # explicit psi snapshot, evaluates everything from it, and re-syncs
     # ws.state.psi to the snapshot at exit. See atomic.jl docstring.
-    _finalize_lbfgs_atomic!(
+    result = _finalize_lbfgs_atomic!(
         ws, psi, converged, last_step;
         k_squared_dev, target_magnetization, F, E_prev=Float64(E_prev),
     )
+    # Expose the final L-BFGS curvature history so ε-continuation (or any warm
+    # restart) can thread it into the next solve. Does not touch the atomic
+    # {ws.state.psi, energy, grad_norm} spine.
+    merge(result, (; lbfgs_history=(s_hist, y_hist, rho_hist)))
 end
 
 """

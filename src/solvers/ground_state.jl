@@ -151,7 +151,7 @@ function find_ground_state(;
     dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
     spinor_lhy::Union{Nothing, Symbol}=nothing,
     method::Symbol=:strang,
-    m_lbfgs::Int=10,
+    m_lbfgs::Int=20,   # keep in sync with find_ground_state_lbfgs default
     sobolev_alpha::Union{Float64, Symbol}=:auto,
     verbose::Bool=_default_solver_verbose(),
 )

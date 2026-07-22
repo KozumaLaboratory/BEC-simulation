@@ -126,6 +126,9 @@ function _lbfgs_pin_continuation(;
 
     rows = NamedTuple[]
     local res
+    hist = nothing   # thread the L-BFGS curvature history across rungs: adjacent ε
+    # share a nearly-identical Hessian, so the warm history saves
+    # the steepest-descent restart each rung would otherwise pay.
     for ε in eps
         ov = pin(ε)
         zee = get(ov, :zeeman, zeeman)
@@ -137,7 +140,9 @@ function _lbfgs_pin_continuation(;
             quasi_2d_ddi, l_z_ddi, target_magnetization, backend, m_lbfgs, verbose,
             light_shift, dtype, sobolev_alpha, precond_alpha_v, precond_alpha_k,
             rotating_frame_omega, newton_polish, newton_max_outer, newton_max_cg, newton_eps,
+            lbfgs_history=hist,
         )
+        hist = res.lbfgs_history
         seed = Array{ComplexF64}(res.workspace.state.psi)
         copyto!(bare_ws.state.psi, seed)
         E_bare = Float64(total_energy(bare_ws))
