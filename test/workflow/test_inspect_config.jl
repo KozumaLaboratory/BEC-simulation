@@ -152,12 +152,14 @@ using SpinorBEC
               B: {Bz: "0.01 Gauss"}
         """
         ins = SpinorBEC.inspect_config_string(src)
-        # Structural kind: feature_incompat; :block severity (run-aborter).
+        # Structural kind: feature_incompat; :warn severity (advisory, not a
+        # run-aborter). The Coriolis-shear GPU path bug was fixed 2026-06-02,
+        # so rotating_frame_omega + spinor + GPU is now verify-not-block.
         ws = filter(w -> w.kind === :feature_incompat &&
                          occursin("rotating_frame_omega", w.title),
             ins.warnings)
         @test length(ws) == 1
-        @test ws[1].severity === :block
+        @test ws[1].severity === :warn
         @test ws[1].step_index == 2
     end
 
@@ -211,7 +213,10 @@ using SpinorBEC
     # `dry_run=true` so no simulator work happens. Each test writes a YAML
     # to a tempdir, then asserts on whether run_yaml threw and on what.
 
-    _W4_YAML = """
+    # n_steps <= 0 is a :block boundary rule (a genuine run-aborter). W4
+    # (rotating_frame_omega + GPU) is now :warn, so the audit-abort / bypass
+    # mechanism needs a real blocker to exercise it.
+    _AUDIT_BLOCK_YAML = """
     defaults: {kind: spinor, backend: gpu}
     pipeline:
       - ground_state:
@@ -221,7 +226,7 @@ using SpinorBEC
           interactions: {N_atoms: 1000, omega_ref: 691.1504}
           B: {Bz: "0.01 Gauss"}
           dt: 0.01
-          n_steps: 10
+          n_steps: 0
           tol: 1.0e-6
       - dynamics:
           duration: 1.0
@@ -232,10 +237,10 @@ using SpinorBEC
           B: {Bz: "0.01 Gauss"}
     """
 
-    @testset "audit hook: W4 aborts run_yaml" begin
+    @testset "audit hook: :block severity aborts run_yaml" begin
         mktempdir() do tmp
-            p = joinpath(tmp, "w4.yaml")
-            write(p, _W4_YAML)
+            p = joinpath(tmp, "block.yaml")
+            write(p, _AUDIT_BLOCK_YAML)
             err = nothing
             try
                 run_yaml(p; dry_run=true, verbose=false, base_dir=tmp)
@@ -244,14 +249,14 @@ using SpinorBEC
             end
             @test err isa ArgumentError
             @test occursin("audit blocked", err.msg)
-            @test occursin("rotating_frame_omega", err.msg)
+            @test occursin("n_steps", err.msg)
         end
     end
 
     @testset "audit hook: audit=false bypasses" begin
         mktempdir() do tmp
             p = joinpath(tmp, "w4.yaml")
-            write(p, _W4_YAML)
+            write(p, _AUDIT_BLOCK_YAML)
             # No throw is the success criterion. dry_run reaches the dry-run
             # printer rather than the sim; we only care that the audit didn't
             # intercept.
@@ -268,7 +273,7 @@ using SpinorBEC
     @testset "audit hook: SPINORBEC_AUDIT=0 bypasses" begin
         mktempdir() do tmp
             p = joinpath(tmp, "w4.yaml")
-            write(p, _W4_YAML)
+            write(p, _AUDIT_BLOCK_YAML)
             prev = get(ENV, "SPINORBEC_AUDIT", nothing)
             ENV["SPINORBEC_AUDIT"] = "0"
             ok = try
