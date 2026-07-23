@@ -1,0 +1,39 @@
+# SMOKE: exercises every code path of config.yaml at low res in ≤ ~2 min.
+# 24³ grid, 2×2×2 scan, short ITP. NOT physics — path validation only.
+metadata: {owner: anko, project: Eu GS phase diagram SMOKE}
+
+units: {B: Gauss}
+defaults: {kind: spinor, backend: gpu}
+dealias: {enabled: true, k_cut: 4.0, auto_dt: true, dt_safety: 10.0}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      interactions: {N_atoms: 50000, omega_ref: 691.1504, c1_ratio: 0.0277777778}
+      grid: {n: [24, 24, 24], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      method: itp
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B: {Bz: "0.0 Gauss", theta: 0.0, phi: 0.0}
+      noise: {seed: 20260722, initial: {thermal: 0.40}}
+      dt: 0.002
+      n_steps: 420
+      tol: 1.0e-6
+
+  - analyze:
+      - phase_classify_distance: {}
+      - multipole_order: {}
+      - majorana_order: {}
+      - energy_decomposition: {}
+
+scan:
+  product:
+    pipeline.0.interactions.c1_ratio: [-0.015, 0.0277777778]
+    pipeline.0.B.Bz: ["0.0 Gauss", "6.0e-5 Gauss"]
+    pipeline.0.potential.omega.2: {from: 1.0, to: 2.2, n: 2}
+  comparison_runs:
+    - name: stretched
+      override: {pipeline.0.initial_state: m_plus_F}
+    - name: polar
+      override: {pipeline.0.initial_state: polar}
