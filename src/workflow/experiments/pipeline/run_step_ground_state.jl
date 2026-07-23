@@ -78,6 +78,86 @@ end
     end
 end
 
+# --- seed_from: warm-start a GS solve from a prior run's converged ψ, spectrally
+#     upsampled to this step's grid. Cost-compressed continuation
+#     (docs/design/eu_phase_diagram_adaptive_mapping.md, Pillar 1): a cheap
+#     coarse multi-seed recon is promoted to a fine grid by seed + short polish
+#     instead of a fresh fine ITP per cell. The source point is matched by the
+#     RESOLVED cell signature (c1 / Bz / κ / initial_state), so a scan auto-pairs
+#     each cell to its own recon winner with no index coupling. Fails loud when
+#     nothing matches — never silently falls back to a Gaussian seed.
+
+_seed_bz_gauss(x::Real) = Float64(x)
+_seed_bz_gauss(x::AbstractString) = parse(Float64, split(String(x))[1])
+
+# Resolved (post-override) cell signature read off the step params dict.
+@noinline function _seed_cell_signature(p::Dict{String, Any})
+    c1 = haskey(p, "interactions") ? Float64(get(p["interactions"], "c1_ratio", NaN)) : NaN
+    bz = haskey(p, "B") ? _seed_bz_gauss(get(p["B"], "Bz", 0.0)) : 0.0
+    om = haskey(p, "potential") ? get(p["potential"], "omega", nothing) : nothing
+    kap = (om isa AbstractVector && length(om) >= 3) ? Float64(om[3]) : NaN
+    st = String(get(p, "initial_state", "polar"))
+    (c1, bz, kap, st)
+end
+
+# Same signature read from a source point's saved `override` dict (dotted keys).
+@noinline function _seed_override_signature(ov)
+    c1 = Float64(get(ov, "pipeline.0.interactions.c1_ratio", NaN))
+    bz = _seed_bz_gauss(get(ov, "pipeline.0.B.Bz", 0.0))
+    kap = Float64(get(ov, "pipeline.0.potential.omega.2", NaN))
+    st = String(get(ov, "pipeline.0.initial_state", "polar"))
+    (c1, bz, kap, st)
+end
+
+_seed_sig_match(a, b) =
+    a[4] == b[4] &&
+    isapprox(a[1], b[1]; atol=1e-9, rtol=1e-6) &&
+    isapprox(a[2], b[2]; atol=1e-12, rtol=1e-6) &&
+    isapprox(a[3], b[3]; atol=1e-9, rtol=1e-6)
+
+@noinline function _resolve_seed_from(sf, p::Dict{String, Any}, grid, atom)::Array{ComplexF64, 4}
+    sf isa AbstractDict ||
+        throw(ArgumentError("seed_from must be a mapping {run: <dir>, upsample: <bool>}"))
+    run = get(sf, "run", get(sf, "path", nothing))
+    run === nothing &&
+        throw(ArgumentError("seed_from requires 'run' (a directory of point_*.jld2)"))
+    isdir(run) || throw(ArgumentError("seed_from.run is not a directory: $run"))
+    do_upsample = get(sf, "upsample", true) == true
+    sig = _seed_cell_signature(p)
+    match = nothing
+    for f in readdir(run)
+        (startswith(f, "point_") && endswith(f, ".jld2")) || continue
+        path = joinpath(run, f)
+        ov = try
+            JLD2.load(path, "override")
+        catch
+            continue
+        end
+        if _seed_sig_match(_seed_override_signature(ov), sig)
+            match = path
+            break
+        end
+    end
+    match === nothing &&
+        throw(
+            ArgumentError(
+                "seed_from: no point in $run matches cell (c1=$(sig[1]), Bz=$(sig[2]) G, κ=$(sig[3]), state=$(sig[4]))"
+            ),
+        )
+    psi = Array{ComplexF64}(JLD2.load(match, "psi"))
+    n = grid.config.n_points[1]
+    if size(psi, 1) != n
+        do_upsample ||
+            throw(
+                ArgumentError(
+                    "seed_from: seed side $(size(psi, 1)) ≠ grid side $n and upsample=false"
+                ),
+            )
+        psi = upsample_spinor(psi, n)
+    end
+    _to_host(psi)::Array{ComplexF64, 4}
+end
+
 function _run_step(
     step::GroundStateStep,
     psi_prev,
@@ -168,6 +248,10 @@ function _run_step(
     temp_ratio = _get_optional_float(p, "temperature_ratio")
 
     psi_init = psi_prev
+    if psi_init === nothing && haskey(p, "seed_from")
+        psi_init = _resolve_seed_from(p["seed_from"], p, grid, atom)
+        verbose && println("  seed_from: loaded + upsampled warm seed (skips fresh init)")
+    end
     if psi_init !== nothing
         D = 2 * atom.F + 1
         expected = (grid.config.n_points..., D)

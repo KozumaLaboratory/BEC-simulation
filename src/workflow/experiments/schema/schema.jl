@@ -298,6 +298,11 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
     "temperature_ratio" => FieldSpec(; type=Number, range=(0.0, 1.0)),
     "lhy" => FieldSpec(; type=Dict, schema=LHY_SCHEMA),
     "init_state_params" => FieldSpec(; type=Dict),
+    # `seed_from: {run: <dir of point_*.jld2>, upsample: true}` — warm-start this
+    # GS solve from a prior run's converged ψ, matched by the resolved cell
+    # signature (c1/Bz/κ/initial_state) and spectrally upsampled to this grid.
+    # Cost-compressed continuation (docs/design/eu_phase_diagram_adaptive_mapping.md).
+    "seed_from" => FieldSpec(; type=Dict),
     "cache" => FieldSpec(; type=String),
     "quasi_2d" => FieldSpec(; type=Bool),
     "l_z" => FieldSpec(; type=Number, range=(0.0, 100.0)),
