@@ -166,3 +166,25 @@ verify_outputs/
 
 # Loop Engineering runtime sentinels (tick/done counters)
 .loop/
+
+# ── Per-run research outputs (2026-07-23 cleanup) ──────────────────────
+# EdH / flower-protocol runs drop figures, movies, tomography data, notes and
+# logs under runs/**/. These are reproducible from the tracked *.yaml configs,
+# so ignore the generated artefacts but keep configs / scripts / *.md notes.
+runs/**/*.png
+runs/**/*.mp4
+runs/**/*.gif
+runs/**/*.h5
+runs/**/*.csv
+runs/**/*.log
+runs/**/*.json
+runs/**/*.pdf
+runs/**/*.aux
+runs/**/*.txt
+
+# macOS Finder metadata + Python bytecode caches (never source-of-truth)
+.DS_Store
+__pycache__/
+
+# Local personal document — submitted thesis PDF, not part of the codebase
+/修士論文_後藤_提出版.pdf
