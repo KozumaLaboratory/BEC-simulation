@@ -123,8 +123,14 @@ _seed_sig_match(a, b) =
         throw(ArgumentError("seed_from requires 'run' (a directory of point_*.jld2)"))
     isdir(run) || throw(ArgumentError("seed_from.run is not a directory: $run"))
     do_upsample = get(sf, "upsample", true) == true
+    # `nearest: true` seeds from the CLOSEST computed point (same initial_state +
+    # same c1, nearest in (Bz, κ)) instead of requiring an exact cell match. This
+    # is what lets a boundary-refinement scan warm-start off a coarser map's
+    # winners at brand-new (Bz, κ) points that have no exact seed.
+    nearest = get(sf, "nearest", false) == true
     sig = _seed_cell_signature(p)
     match = nothing
+    best_d = Inf
     for f in readdir(run)
         (startswith(f, "point_") && endswith(f, ".jld2")) || continue
         path = joinpath(run, f)
@@ -133,7 +139,18 @@ _seed_sig_match(a, b) =
         catch
             continue
         end
-        if _seed_sig_match(_seed_override_signature(ov), sig)
+        osig = _seed_override_signature(ov)
+        if nearest
+            # discrete axes (initial_state, c1) must match; minimise scaled
+            # distance in the continuous (Bz [µG-ish], κ) plane.
+            osig[4] == sig[4] || continue
+            isapprox(osig[1], sig[1]; atol=1e-9, rtol=1e-6) || continue
+            d = ((osig[2] - sig[2]) / 100)^2 + ((osig[3] - sig[3]) / 1.2)^2
+            if d < best_d
+                best_d = d
+                match = path
+            end
+        elseif _seed_sig_match(osig, sig)
             match = path
             break
         end

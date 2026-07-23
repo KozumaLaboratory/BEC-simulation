@@ -58,6 +58,22 @@ using JLD2
     # size mismatch with upsample disabled → loud error
     @test_throws ArgumentError SpinorBEC._resolve_seed_from(
         Dict{String, Any}("run" => dir, "upsample" => false), p_match, grid, atom)
+
+    # nearest: a brand-new (Bz, κ) with no exact match warm-starts off the
+    # closest same-(c1, initial_state) point. Cell near point_001 (psi_a).
+    p_near = Dict{String, Any}(
+        "interactions" => Dict{String, Any}("c1_ratio" => 0.0277777778),
+        "B" => Dict{String, Any}("Bz" => "6.0e-5 Gauss"),   # no exact point at 6e-5
+        "potential" => Dict{String, Any}("omega" => [1.0, 1.0, 1.6]),
+        "initial_state" => "m_plus_F")
+    # exact would fail (no 6e-5/κ=1.6 point); nearest resolves to point_001 (psi_a)
+    @test_throws ArgumentError SpinorBEC._resolve_seed_from(
+        Dict{String, Any}("run" => dir), p_near, grid, atom)
+    seed_n = SpinorBEC._resolve_seed_from(
+        Dict{String, Any}("run" => dir, "upsample" => true, "nearest" => true),
+        p_near, grid, atom)
+    @test isapprox(sum(abs2, seed_n) / 16^3, sum(abs2, psi_a) / 8^3; rtol=1e-6)
+    @test !isapprox(sum(abs2, seed_n) / 16^3, sum(abs2, psi_b) / 8^3; rtol=1e-3)
 end
 
 @testset "pin block resolution" begin
