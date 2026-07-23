@@ -169,11 +169,14 @@ function _compute_and_convolve_ddi_padded!(
     mul!(ctx.Fz_pad_rk, rp.forward, ctx.Fz_pad)
 
     C = ddi.C_dd  # C_dd from unpadded DDIParams; both are constructed with the same value
-    _ddi_padded_k_contraction!(ctx, C)
-
-    mul!(ctx.Phi_x_pad, rp.inverse, ctx.Phi_x_pad_rk)
-    mul!(ctx.Phi_y_pad, rp.inverse, ctx.Phi_y_pad_rk)
-    mul!(ctx.Phi_z_pad, rp.inverse, ctx.Phi_z_pad_rk)
+    # Same unnormalised-brfft + fold-1/N as the unpadded paths (drops 3 cuFFT
+    # scaling kernels). Normalisation is 1/prod(padded_shape) for the padded irfft.
+    pad_shape = size(ctx.Phi_x_pad)
+    _ddi_padded_k_contraction!(ctx, C / prod(pad_shape))
+    bp = _get_ddi_brfft_plan(ctx.Phi_x_pad_rk, pad_shape[1])
+    mul!(ctx.Phi_x_pad, bp, ctx.Phi_x_pad_rk)
+    mul!(ctx.Phi_y_pad, bp, ctx.Phi_y_pad_rk)
+    mul!(ctx.Phi_z_pad, bp, ctx.Phi_z_pad_rk)
     nothing
 end
 

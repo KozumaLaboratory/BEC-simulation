@@ -422,8 +422,13 @@ function _make_batched_kinetic_cache(
     dims = ntuple(identity, ndim)
     kw = _fft_kwargs(backend, flags)
     fwd = plan_fft!(plan_buf, dims; kw...)
-    inv = plan_ifft!(plan_buf, dims; kw...)
-    kp_bc = reshape(kinetic_phase, size(kinetic_phase)..., 1)
+    # Unnormalised backward transform: the 1/prod(n) normalisation is folded
+    # into kinetic_phase_bc (below + _update_batched_kinetic_phase!), so the
+    # in-place phase multiply absorbs it and we drop cuFFT's separate scaling
+    # kernel. bfft(phase/N · fft(ψ)) ≡ ifft(phase · fft(ψ)) by linearity.
+    inv = plan_bfft!(plan_buf, dims; kw...)
+    inv_npts = one(real(eltype(kinetic_phase))) / prod(size(kinetic_phase))
+    kp_bc = reshape(kinetic_phase .* inv_npts, size(kinetic_phase)..., 1)
     BatchedKineticCache(fwd, inv, kp_bc)
 end
 
@@ -446,6 +451,9 @@ function _update_batched_kinetic_phase!(
     RT = eltype(k_squared)
     half = RT(0.5)
     dt_t = RT(dt)
+    # 1/prod(n) folded in so apply_kinetic_step_batched! can use the unnormalised
+    # bfft plan and skip cuFFT's separate scaling kernel (see _make_batched_kinetic_cache).
+    inv_npts = one(RT) / prod(n_pts)
     # Imaginary time: exp(-½k²dt) (decaying); real time: cis(-½k²dt) (phase).
     # The earlier always-cis form silently turned the kinetic substep into a
     # real-time rotation during ITP (e.g. split_step_midpoint! used for an
@@ -453,7 +461,7 @@ function _update_batched_kinetic_phase!(
     if kp isa Array
         @inbounds for I in CartesianIndices(n_pts)
             arg = -half * k_squared[I] * dt_t
-            kp[I, 1] = imaginary_time ? complex(exp(arg)) : cis(arg)
+            kp[I, 1] = (imaginary_time ? complex(exp(arg)) : cis(arg)) * inv_npts
         end
     else
         # GPU: `k_squared` is a host Array — broadcasting it into a device
@@ -463,9 +471,9 @@ function _update_batched_kinetic_phase!(
         copyto!(k_sq_dev, k_squared)
         kp_view = selectdim(kp, ndim + 1, 1)
         if imaginary_time
-            kp_view .= exp.(-half .* k_sq_dev .* dt_t)
+            kp_view .= exp.(-half .* k_sq_dev .* dt_t) .* inv_npts
         else
-            kp_view .= cis.(-half .* k_sq_dev .* dt_t)
+            kp_view .= cis.(-half .* k_sq_dev .* dt_t) .* inv_npts
         end
     end
     nothing

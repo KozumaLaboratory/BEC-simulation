@@ -1,201 +1,160 @@
-# GPU-optimized energy computation
+# Device-resident GPU energy_decomposition (P2).
 #
-# Eliminates two major bottlenecks:
-# 1. FFT plan recreation on every checkpoint (cache CPU plans)
-# 2. Q-tensor re-transfer from GPU on every checkpoint (cache host copy)
+# Replaces the old host fork (copy ψ + V + Q to host, recompute the whole
+# decomposition on CPU with FFTW plans) with an on-device evaluation:
+#
+#   E_term = factor · Re⟨ψ, apply_operator!(ψ)⟩ · dV
+#
+# where `apply_operator!` is the gated device-safe gradient face (the same
+# object LBFGS uses; per-term GPU=CPU parity is asserted by
+# test_gpu_cpu_per_term_parity.jl). `factor` is the term's homogeneity
+# degree /2: 1 for linear terms (kinetic, trap, Zeeman, Coriolis, light
+# shift, magnetic gradient), 1/2 for the density mean-field terms
+# (c0, c1, DDI). LHY is a density mapreduce (kind-specific power). The two
+# gradient-blind terms — Tensor (scalar-loop singlet + tensor-cache accumulate)
+# and Raman (apply_operator! is a declared no-op) — keep the host helpers,
+# behind a single ψ→host copy taken only when either is active.
+#
+# The terms are drawn from `build_h_terms_registry(ws)` so the RF-corrected
+# Zeeman/Coriolis match the propagator + gradient exactly.
 
-# Cache for CPU-side energy computation resources
-mutable struct EnergyHostCache
-    fft_buf::Array{ComplexF64}
-    plans::Any  # FFTPlanPair
-    ddi_host::Union{Nothing, SpinorBEC.DDIParams}
-    ddi_bufs::Union{Nothing, SpinorBEC.DDIBuffers}
-    # Reused buffers for per-call host transfers (avoid ~5 MB/call leak
-    # at 24³ × D=13 that accumulated to 23 GB over 1000 LBFGS iterations).
-    psi_host::Union{Nothing, Array{ComplexF64}}
-    V_trap_host::Union{Nothing, Array{Float64}}
-end
+# Reused host buffer for the Tensor/Raman fallback copy (avoids the
+# per-call GB-scale leak the old full-decomposition fork guarded against;
+# now taken ONLY for configs with an active gradient-blind term).
+const _GPU_ENERGY_PSI_HOST = Dict{UInt64, Array{ComplexF64}}()
 
-const _ENERGY_CACHE = Dict{UInt64, EnergyHostCache}()
-
-function _get_energy_cache(ws::SpinorBEC.Workspace{N}) where {N}
-    n_pts = ntuple(d -> size(ws.state.psi, d), Val(N))
-    key = hash((objectid(ws), n_pts))
-    cache = get(_ENERGY_CACHE, key, nothing)
-    cache !== nothing && return cache::EnergyHostCache
-
-    grid = ws.grid
-    fft_buf = zeros(ComplexF64, grid.config.n_points)
-    plans = SpinorBEC.make_fft_plans(grid.config.n_points; flags=SpinorBEC.FFTW.ESTIMATE)
-
-    ddi_host = nothing
-    ddi_bufs = nothing
-    if ws.ddi !== nothing && SpinorBEC._is_gpu(ws.ddi_bufs.Fx_r)
-        ddi_gpu = ws.ddi
-        ddi_host = SpinorBEC.DDIParams(
-            ddi_gpu.C_dd,
-            Array(ddi_gpu.Q_xx), Array(ddi_gpu.Q_xy), Array(ddi_gpu.Q_xz),
-            Array(ddi_gpu.Q_yy), Array(ddi_gpu.Q_yz), Array(ddi_gpu.Q_zz),
-        )
-        rfft_plans = SpinorBEC.make_rfft_plans(n_pts)
-        Fx_r = zeros(Float64, n_pts)
-        Fy_r = zeros(Float64, n_pts)
-        Fz_r = zeros(Float64, n_pts)
-        Fx_rk = rfft_plans.forward * copy(Fx_r)
-        ddi_bufs = SpinorBEC.DDIBuffers(
-            rfft_plans, Fx_r, Fy_r, Fz_r,
-            copy(Fx_rk), similar(Fx_rk), similar(Fx_rk),
-            similar(Fx_rk), similar(Fx_rk), similar(Fx_rk),
-            similar(Fx_r), similar(Fx_r), similar(Fx_r),
-        )
+function _gpu_energy_psi_host(psi, ws)
+    key = hash((objectid(ws), size(psi)))
+    buf = get(_GPU_ENERGY_PSI_HOST, key, nothing)
+    if buf === nothing || size(buf) != size(psi)
+        buf = Array{ComplexF64}(undef, size(psi))
+        _GPU_ENERGY_PSI_HOST[key] = buf
     end
-
-    cache = EnergyHostCache(fft_buf, plans, ddi_host, ddi_bufs, nothing, nothing)
-    _ENERGY_CACHE[key] = cache
-    cache
+    copyto!(buf, psi)
+    buf
 end
 
-"""
-Cached DDI energy using pre-built host plans and Q-tensor (extension-local, not an override).
-"""
-function _cached_ddi_energy(
-    psi_host,
-    sm::SpinorBEC.SpinMatrices{D},
-    ecache::EnergyHostCache,
-    ndim, n_pts, dV,
-) where {D}
-    bufs = ecache.ddi_bufs
-    SpinorBEC._compute_spin_density!(
-        bufs.Fx_r, bufs.Fy_r, bufs.Fz_r,
-        psi_host, sm, Val(D), ndim, n_pts,
-    )
-    SpinorBEC.compute_ddi_potential!(ecache.ddi_host, bufs)
-
-    E = 0.0
-    @inbounds for I in CartesianIndices(n_pts)
-        E +=
-            bufs.Phi_x[I] * bufs.Fx_r[I] +
-            bufs.Phi_y[I] * bufs.Fy_r[I] +
-            bufs.Phi_z[I] * bufs.Fz_r[I]
+# Device LHY energy: mirror `_lhy_energy` but as a mapreduce over the
+# device total density. Scalar/Quasi2D closed forms run on-device; other
+# kinds fall back to the host body (rare on the GPU path).
+function _gpu_lhy_energy(psi, ws, n_comp, N, n_pts, dV)
+    lhy = ws.lhy
+    if lhy === nothing
+        c = ws.interactions.c_lhy
+        c == 0.0 && return 0.0
+        n = SpinorBEC.total_density(psi, N)
+        return (2.0 / 5.0) * c * sum(x -> x * x * sqrt(x), n) * dV
+    elseif lhy isa SpinorBEC.ScalarLHY
+        n = SpinorBEC.total_density(psi, N)
+        return (2.0 / 5.0) * lhy.c_lhy * sum(x -> x * x * sqrt(x), n) * dV
+    elseif lhy isa SpinorBEC.Quasi2DLHY
+        n = SpinorBEC.total_density(psi, N)
+        a2 = lhy.a_2d_sq
+        lc = lhy.log_const
+        E = sum(n) do ni
+            ni < 1e-30 ? zero(ni) : ni * ni * (log(ni * a2) + lc)
+        end
+        return 0.5 * lhy.c_lhy_2d * E * dV
+    else
+        # Tabulated / spinor LHY kinds: host body (single copy).
+        psi_h = _gpu_energy_psi_host(psi, ws)
+        return SpinorBEC._lhy_energy(psi_h, lhy, n_comp, N, n_pts, dV)
     end
-    0.5 * E * dV
 end
 
-"""
-GPU-optimized energy_decomposition: caches FFT plans and DDI host resources.
-"""
-function SpinorBEC._energy_decomposition_gpu(ws::SpinorBEC.Workspace{N}) where {N}
+# Shared core: compute the energy decomposition and, when `grad !== nothing`,
+# accumulate the bare gradient Σ_term H_term·ψ into `grad` in the SAME pass.
+# The per-term `apply_operator!` (kinetic/DDI FFTs) is the expensive part —
+# running it once for both energy and gradient (instead of once each in
+# apply_operator_via_registry! + energy_decomposition) is the fusion win.
+function _gpu_energy_and_optional_grad(ws::SpinorBEC.Workspace{N}, grad) where {N}
+    psi = ws.state.psi
     grid = ws.grid
-    n_comp = ws.spin_matrices.system.n_components
     dV = SpinorBEC.cell_volume(grid)
-    psi_src = ws.state.psi
-    n_pts = ntuple(d -> size(psi_src, d), Val(N))
+    n_comp = ws.spin_matrices.system.n_components
+    n_pts = ntuple(d -> size(psi, d), Val(N))
+    accumulate = grad !== nothing
 
-    ecache = _get_energy_cache(ws)
-    # Reuse host buffers — avoid 5 MB/call * 1000+ LBFGS calls = GB-scale leak
-    if ecache.psi_host === nothing || size(ecache.psi_host) != size(psi_src)
-        ecache.psi_host = Array{ComplexF64}(undef, size(psi_src))
-    end
-    copyto!(ecache.psi_host, psi_src)
-    psi = ecache.psi_host
-    if ecache.V_trap_host === nothing || size(ecache.V_trap_host) != size(ws.potential_values)
-        ecache.V_trap_host = Array{Float64}(undef, size(ws.potential_values))
-    end
-    copyto!(ecache.V_trap_host, ws.potential_values)
-    V_trap = ecache.V_trap_host
-    fft_buf = ecache.fft_buf
-    plans = ecache.plans
+    ctx = SpinorBEC.build_gradient_context(psi, ws)
+    out = similar(psi)
+    accumulate && fill!(grad, zero(eltype(grad)))
 
-    E_kin = SpinorBEC._kinetic_energy(psi, grid, plans, fft_buf, n_comp, N, n_pts, dV)
-    E_trap = SpinorBEC._trap_energy(psi, V_trap, n_comp, N, n_pts, dV)
-    # Energy is computed on the host copy `psi`, so reuse the SAME registry face
-    # the CPU path uses — one declaration, field-axis q(b̂·F)² for tilted fields,
-    # diagonal fast path for B∥ẑ. (Was a separate `_zeeman_energy` (diagonal,
-    # lab-z q) + `_transverse_zeeman_energy` (linear) split that drifted from the
-    # field-axis convention.)
-    zee = SpinorBEC.zeeman_at(ws.zeeman, ws.state.t)
-    bx_gpu, by_gpu = SpinorBEC.transverse_b(ws.zeeman, ws.state.t)
-    E_zee = SpinorBEC.energy_contribution(
-        SpinorBEC.ZeemanTerm(bx_gpu, by_gpu, zee.p, zee.q), psi, ws
-    )
-
-    E_c0 = if abs(ws.interactions[0]) > 1e-30
-        SpinorBEC._density_interaction_energy(psi, ws.interactions[0], n_comp, N, n_pts, dV)
-    else
-        0.0
+    # E_term = factor · Re⟨ψ, H_term·ψ⟩ · dV via the gated device gradient face.
+    # When accumulating, `out` (= H_term·ψ) is also added to `grad` — one
+    # apply_operator! serves both faces.
+    op_energy = function (term, factor)
+        fill!(out, zero(eltype(out)))
+        SpinorBEC.apply_operator!(out, term, ws, psi, ctx)
+        accumulate && (grad .+= out)
+        return factor * real(dot(vec(psi), vec(out))) * dV
     end
-    E_c1 = if abs(ws.interactions[1]) > 1e-30
-        SpinorBEC._spin_interaction_energy(
-            psi, ws.spin_matrices, ws.interactions[1], n_comp, N, n_pts, dV
-        )
-    else
-        0.0
+    # Accumulate a gradient-blind / separately-computed term's gradient face
+    # (LHY, Tensor, Raman) into `grad` without touching its energy.
+    accum_grad = function (term)
+        accumulate && SpinorBEC.apply_operator!(grad, term, ws, psi, ctx)
+        return nothing
     end
 
-    E_ddi = if ws.ddi !== nothing
-        if SpinorBEC._is_gpu(ws.ddi_bufs.Fx_r) && ecache.ddi_host !== nothing
-            _cached_ddi_energy(psi, ws.spin_matrices, ecache, N, n_pts, dV)
-        elseif SpinorBEC._is_gpu(ws.ddi_bufs.Fx_r)
-            SpinorBEC._ddi_energy_from_gpu(
-                psi, ws.spin_matrices, ws.ddi, ws.ddi_bufs, n_comp, N, n_pts, dV;
-                ddi_padded=ws.ddi_padded,
-            )
-        else
-            SpinorBEC._ddi_energy(
-                psi, ws.spin_matrices, ws.ddi, ws.ddi_bufs, n_comp, N, n_pts, dV;
-                ddi_padded=ws.ddi_padded,
+    (
+        kin_t, trap_t, zee_t, c0_t, c1_t, ddi_t, lhy_t, tensor_t, raman_t,
+        ls_t, cor_t, mg_t, sz_t, loss_t,
+    ) = SpinorBEC.build_h_terms_registry(ws)
+
+    # Inactive linear/mean-field terms are skipped: their apply_operator!
+    # contributes exactly 0 to the gradient (gate-first), so skipping the
+    # energy AND the grad-accumulation is identical to the registry loop.
+    E_kin = op_energy(kin_t, 1.0)
+    E_trap = op_energy(trap_t, 1.0)
+    E_zee = op_energy(zee_t, 1.0)
+    E_c0 = abs(ws.interactions[0]) > 1e-30 ? op_energy(c0_t, 0.5) : 0.0
+    E_c1 = abs(ws.interactions[1]) > 1e-30 ? op_energy(c1_t, 0.5) : 0.0
+    E_ddi = ws.ddi !== nothing ? op_energy(ddi_t, 0.5) : 0.0
+    # LHY: energy via device mapreduce (kind-specific power); gradient via the
+    # gated apply_operator! face (no FFT — a density-power broadcast).
+    accum_grad(lhy_t)
+    E_lhy = _gpu_lhy_energy(psi, ws, n_comp, N, n_pts, dV)
+    E_light_shift = ws.light_shift !== nothing ? op_energy(ls_t, 1.0) : 0.0
+    Ω = ws.sim_params.rotating_frame_omega
+    E_coriolis =
+        (SpinorBEC.is_active(Ω, SpinorBEC.ROTATION_TOL) && N >= 2) ?
+        op_energy(cor_t, 1.0) : 0.0
+    E_mg = op_energy(mg_t, 1.0)
+
+    # Gradient-blind terms — Tensor (scalar-loop) + Raman (no-op grad):
+    # host helpers behind a single ψ→host copy, only when active.
+    F = ws.spin_matrices.system.F
+    c2 = SpinorBEC.get_cn(ws.interactions, 2)
+    need_tensor = SpinorBEC.is_active(c2) || ws.tensor_cache !== nothing
+    need_raman = ws.raman !== nothing
+    E_tensor = 0.0
+    E_raman = 0.0
+    if need_tensor || need_raman
+        psi_h = _gpu_energy_psi_host(psi, ws)
+        if need_tensor
+            SpinorBEC.is_active(c2) &&
+                (E_tensor += SpinorBEC._singlet_pair_energy(psi_h, F, c2, N, n_pts, dV))
+            ws.tensor_cache !== nothing &&
+                (E_tensor += SpinorBEC._tensor_interaction_energy(
+                    psi_h, ws.tensor_cache, N, n_pts, dV
+                ))
+        end
+        if need_raman
+            E_raman = SpinorBEC._raman_energy(
+                psi_h, ws.spin_matrices, SpinorBEC.raman_at(ws.raman, ws.state.t),
+                grid, N, n_pts, dV,
             )
         end
-    else
-        0.0
     end
+    # Gradient faces for the gradient-blind terms (Tensor gate-first host
+    # fallback; Raman/Loss no-op; SpatialZeeman inactive on GPU) — accumulate
+    # into grad to match apply_operator_via_registry! exactly.
+    accum_grad(tensor_t)
+    accum_grad(raman_t)
+    accum_grad(sz_t)
+    accum_grad(loss_t)
 
-    E_lhy = if ws.lhy !== nothing
-        SpinorBEC._lhy_energy(psi, ws.lhy, n_comp, N, n_pts, dV)
-    elseif ws.interactions.c_lhy != 0.0
-        SpinorBEC._lhy_energy(psi, ws.interactions.c_lhy, n_comp, N, n_pts, dV)
-    else
-        0.0
-    end
-
-    E_tensor = begin
-        e = 0.0
-        c2 = SpinorBEC.get_cn(ws.interactions, 2)
-        abs(c2) > 1e-30 &&
-            (e += SpinorBEC._singlet_pair_energy(psi, ws.spin_matrices.system.F, c2, N, n_pts, dV))
-        ws.tensor_cache !== nothing &&
-            (e += SpinorBEC._tensor_interaction_energy(psi, ws.tensor_cache, N, n_pts, dV))
-        e
-    end
-
-    E_raman = if ws.raman !== nothing
-        SpinorBEC._raman_energy(psi, ws.spin_matrices, ws.raman, grid, N, n_pts, dV)
-    else
-        0.0
-    end
-
-    E_light_shift = if ws.light_shift !== nothing
-        SpinorBEC._light_shift_energy(psi, ws.light_shift, n_comp, N, n_pts, dV)
-    else
-        0.0
-    end
-
-    Ω = ws.sim_params.rotating_frame_omega
-    E_coriolis = if SpinorBEC.is_active(Ω, SpinorBEC.ROTATION_TOL) && N >= 2
-        -Ω * SpinorBEC.orbital_angular_momentum(psi, grid, plans)
-    else
-        0.0
-    end
-
-    # Magnetic gradient (post-[GAP-2] 2026-06-04): mirror the CPU
-    # path's call into `_magnetic_gradient_energy`. The helper operates
-    # on the host-side `psi` already prepared above.
-    E_mg = SpinorBEC._magnetic_gradient_energy(psi, ws, N, n_pts, dV)
-
-    # Spatial Zeeman (arbitrary B(r,t)): always 0 on a GPU workspace —
-    # make_workspace rejects a spatial field + GPU backend, so ws.zeeman is
-    # always the uniform arm here. The slot must exist for shape parity with
-    # the CPU registry NamedTuple.
+    # Spatial Zeeman: make_workspace rejects spatial B + GPU, so always 0
+    # (slot kept for shape parity with the CPU registry NamedTuple).
     E_sz = 0.0
 
     E_total =
@@ -215,13 +174,17 @@ function SpinorBEC._energy_decomposition_gpu(ws::SpinorBEC.Workspace{N}) where {
         coriolis=E_coriolis,
         magnetic_gradient=E_mg,
         spatial_zeeman=E_sz,
-        # Shape parity with the CPU registry path (App. A defect 7):
-        # B1 added :loss to energy_decomposition_via_registry_legacy_shape
-        # (identically zero — K3 loss is non-Hermitian, no GP energy);
-        # the GPU tuple lacked it and the per-term parity gate's shape
-        # assertion failed the moment the GPU-gated ci oracles actually
-        # ran. Same value semantics as LossTerm.energy_contribution ≡ 0.
         loss=0.0,
         total=E_total,
     )
+end
+
+# Energy-only entry (energy_decomposition GPU path).
+SpinorBEC._energy_decomposition_gpu(ws::SpinorBEC.Workspace) =
+    _gpu_energy_and_optional_grad(ws, nothing)
+
+# Fused entry: fill `grad` with the bare gradient Σ_term H_term·ψ AND return the
+# total energy, in one per-term apply_operator! pass (LBFGS energy_gradient!).
+function SpinorBEC._energy_and_gradient_gpu!(grad::CuArray, ws::SpinorBEC.Workspace)
+    return _gpu_energy_and_optional_grad(ws, grad).total
 end

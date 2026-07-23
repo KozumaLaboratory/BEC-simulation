@@ -141,6 +141,47 @@ using SpinorBEC: lhy_F2_BN, lhy_F3_octa, lhy_F4_cube, lhy_F8_octa, lhy_F10_dodec
         @test lhy_F10_dodec(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0) == 0.0
     end
 
+    @testset "polyhedral c_0/λ ≡ CG σ_S energy reconstruction (magic-number gate)" begin
+        # Each closed form's stiffnesses are c_0 = Σ_S σ_S(ζ) g_S and
+        # λ_spin = Σ_S [(S(S+1)−2F(F+1))/(2F(F+1))] σ_S(ζ) g_S (Sign-Pattern
+        # Lemma 1), with ζ the canonical polyhedral inert state. Reconstruct the
+        # energy from σ_S (independent Clebsch-Gordan via _f6_pd_sigma_S) and
+        # compare to the source function — gates the hand-entered rationals
+        # (1372/12597, 586625/3163581, …) against a from-scratch derivation.
+        σ(F, S, ζ) = SpinorBEC._f6_pd_sigma_S(F, S, Complex{Float64}.(ζ))
+        fac(F, S) = (S * (S + 1) - 2 * F * (F + 1)) / (2 * F * (F + 1))
+        function eps_recon(F, ζ, gd)
+            c0 = sum(σ(F, S, ζ) * get(gd, S, 0.0) for S in 0:2:(2F))
+            λ = sum(fac(F, S) * σ(F, S, ζ) * get(gd, S, 0.0) for S in 0:2:(2F))
+            P_scalar * (c0^2.5 + 3 * abs(λ)^2.5)
+        end
+        let gd = Dict(0 => 1.3, 2 => 0.7, 4 => 1.1, 6 => 0.9)
+            @test isapprox(lhy_F3_octa(gd[0], gd[2], gd[4], gd[6], 1.0, 1.0),
+                eps_recon(3, SpinorBEC.ZETA_F3_O_A2, gd); rtol=1e-9)
+        end
+        let gd = Dict(0 => 1.3, 2 => 0.7, 4 => 1.1, 6 => 0.9, 8 => 1.05)
+            @test isapprox(lhy_F4_cube(gd[0], gd[2], gd[4], gd[6], gd[8], 1.0, 1.0),
+                eps_recon(4, SpinorBEC.ZETA_F4_OH_A1, gd); rtol=1e-9)
+        end
+        let gd = Dict(0 => 1.3, 2 => 0.7, 4 => 1.1, 6 => 0.9, 8 => 1.05,
+                10 => 0.95, 12 => 1.2, 14 => 0.8, 16 => 1.1)
+            @test isapprox(
+                lhy_F8_octa(gd[0], gd[2], gd[4], gd[6], gd[8], gd[10], gd[12],
+                    gd[14], gd[16], 1.0, 1.0),
+                eps_recon(8, SpinorBEC.ZETA_F8_OH_A1, gd); rtol=1e-9)
+        end
+        let gd = Dict(0 => 1.3, 6 => 0.9, 10 => 0.95, 12 => 1.2, 16 => 1.1,
+                18 => 0.85, 20 => 1.05)
+            @test isapprox(
+                lhy_F10_dodec(gd[0], gd[6], gd[10], gd[12], gd[16], gd[18],
+                    gd[20], 1.0, 1.0),
+                eps_recon(10, SpinorBEC.ZETA_F10_IH_DODEC, gd); rtol=1e-9)
+        end
+        # F=2 BN not gated: its D_4-split (λ_z, λ_⊥) inert state is absent from
+        # the canonical registry; its {1/5, 2/7, 18/35} c_0 coefficients remain
+        # a manuscript follow-up.
+    end
+
     @testset "Mass / hbar scaling (dimensional)" begin
         # ε ∝ √M³ / ℏ³ (with all g, n fixed)
         ε1 = lhy_F3_octa(1.0, 0.0, 1.0, 1.0, 1.0, 1.0; hbar=1.0)

@@ -171,4 +171,27 @@ using LinearAlgebra: Diagonal
         ico2 = SpinorBEC.epsilon_LHY_F6_Ih(1.0, g_ih)
         @test 2.0 < pol2 / ico2 < 3.0   # measured 2.4440 (2026-05-12)
     end
+
+    @testset "I_h channel + phase-boundary coefficients ≡ CG σ_S (magic-number gate)" begin
+        # The hand-entered c0/λ_spin rationals (121/323, 980/5681, …) and the
+        # F6-phase-diagram boundary coefficients are σ_S of the icosahedral inert
+        # spinor. Recompute from clebsch_gordan (via _f6_pd_sigma_S) and compare,
+        # instead of the previous sum-only / self-referential checks — the guard
+        # that would have caught a 35/144-style drift in the parallel-session table.
+        σS(Sv, ζ) = SpinorBEC._f6_pd_sigma_S(6, Sv, ζ)
+        unit(i) = (v=zeros(ComplexF64, 13); v[i]=1.0; v)
+        ζ_ih, ζ_fm, ζ_polar = ZETA_F6_IH, unit(1), unit(7)   # I_h, |m=+6>, |m=0>
+        onehot(k) = (g=zeros(7); g[k]=1.0; g)
+        Sidx = Dict(0 => 1, 2 => 2, 4 => 3, 6 => 4, 8 => 5, 10 => 6, 12 => 7)
+        for Sv in 0:2:12
+            c0, λ = compute_c0_lambda_F6_Ih(onehot(Sidx[Sv]))
+            fac = (Sv * (Sv + 1) - 2 * 6 * 7) / (2 * 6 * 7)   # Sign-Pattern Lemma 1
+            @test isapprox(c0, σS(Sv, ζ_ih); atol=1e-10)
+            @test isapprox(λ, fac * σS(Sv, ζ_ih); atol=1e-10)
+            @test isapprox(get(SpinorBEC._F6_PD_COEF_IH_VS_POLAR, Sv, 0.0),
+                σS(Sv, ζ_ih) - σS(Sv, ζ_polar); atol=1e-10)
+            @test isapprox(get(SpinorBEC._F6_PD_COEF_IH_VS_FM, Sv, 0.0),
+                σS(Sv, ζ_ih) - σS(Sv, ζ_fm); atol=1e-10)
+        end
+    end
 end

@@ -61,7 +61,7 @@ function build_cell7_ws()
         enable_ddi=true, c_dd=C_DD, secular_ddi=false,
     )
     # Seed with non-trivial state: spin_coherent θ=π/4 + 1% noise + vortex phase
-    psi = init_psi(grid, SpinSystem(F); state=:fl_vortex)
+    psi = init_psi(grid, SpinSystem(F); state=:radial_spin_vortex)
     rng = MersenneTwister(7)
     for i in eachindex(psi)
         psi[i] += NOISE_AMP * (randn(rng) + im * randn(rng))

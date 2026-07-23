@@ -40,12 +40,12 @@ const NOISE = 0.01
 
 const SEEDS = haskey(ENV, "M1_SEEDS") ?
     Symbol.(split(ENV["M1_SEEDS"], ",")) :
-    [:polar_core_vortex, :fl_vortex, :antiferromagnetic,
+    [:polar_core_vortex, :radial_spin_vortex, :antiferromagnetic,
         :chiral_spin_vortex, :skyrmion_lattice, :polar]
 
 function build_seed(seed::Symbol, grid)
     sys = SpinSystem(TW.F)
-    vortex = (:polar_core_vortex, :fl_vortex, :chiral_spin_vortex)
+    vortex = (:polar_core_vortex, :radial_spin_vortex, :chiral_spin_vortex)
     seed in vortex ?
         init_psi(grid, sys; state=seed, init_vortex_charge=1) :
         init_psi(grid, sys; state=seed)

@@ -146,10 +146,54 @@ end
     return nothing
 end
 
+# Warp-cooperative array-angle kernel: same win as the DDI warp kernel applied to
+# spin_mixing/raman. The one-thread-per-voxel `_euler_5stage_kernel!` spills its
+# MVector{D} spinor to local memory at D=13 (occupancy-bound); this maps one
+# component to one warp lane (register-resident, no spill). Angles are (N,1)
+# voxel-uniform arrays → read on lane 0 of each width-16 subgroup and broadcast.
+# Sign-bearing body is the shared `_euler_apply_warp!` (single physics declaration).
+@inline function _euler_5stage_warp_kernel!(
+    psi, α, β, θ, m_gpu, λ_gpu, V, conj_V, ::Val{D}, ::Val{IT},
+) where {D, IT}
+    T = real(eltype(psi))
+    CT = Complex{T}
+    shV = CUDA.CuStaticSharedArray(CT, D * D)
+    shCV = CUDA.CuStaticSharedArray(CT, D * D)
+    _load_shared_eigvecs!(shV, shCV, V, conj_V, Val(D * D))
+    tib = CUDA.threadIdx().x
+    lane0 = (tib - 1) & 31
+    sg = lane0 >> 4
+    sl = lane0 & 15
+    warp_in_block = (tib - 1) >> 5
+    gwarp = (CUDA.blockIdx().x - 1) * (CUDA.blockDim().x >> 5) + warp_in_block
+    vox = gwarp * 2 + sg + 1
+    N = size(psi, 1)
+    active = sl < D
+    in_range = vox <= N
+    cc = active ? sl + 1 : 1
+    m_c = active ? (@inbounds m_gpu[1, cc]) : zero(T)
+    λ_c = active ? (@inbounds λ_gpu[1, cc]) : zero(T)
+    αv = zero(T); βv = zero(T); θv = zero(T)
+    if sl == 0 && in_range
+        αv = @inbounds α[vox, 1]
+        βv = @inbounds β[vox, 1]
+        θv = @inbounds θ[vox, 1]
+    end
+    αv = CUDA.shfl_sync(0xffffffff, αv, 1, 16)
+    βv = CUDA.shfl_sync(0xffffffff, βv, 1, 16)
+    θv = CUDA.shfl_sync(0xffffffff, θv, 1, 16)
+    _euler_apply_warp!(psi, vox, in_range, active, cc, αv, βv, θv,
+        m_c, λ_c, shV, shCV, Val(D), Val(IT))
+    return nothing
+end
+
+const _SM_EULER_WARP = Ref(true)
+
 """
     apply_euler_5stage_fused_kernel!(psi_2d, α, β, θ, m_gpu, m_shift, λ_gpu, V, conj_V; imaginary_time)
 
 Single-launch fused Euler rotation with angles supplied as `(N,1)` arrays.
+Uses the warp-cooperative kernel (no local-memory spill at D=13) by default.
 """
 function apply_euler_5stage_fused_kernel!(
     psi_2d::CuArray{Complex{T}, 2},
@@ -160,10 +204,17 @@ function apply_euler_5stage_fused_kernel!(
 ) where {T <: AbstractFloat}
     N = size(psi_2d, 1)
     D = size(psi_2d, 2)
-    threads = min(N, 256)
-    blocks = cld(N, threads)
-    CUDA.@cuda threads = threads blocks = blocks _euler_5stage_kernel!(
-        psi_2d, α, β, θ, m_gpu, m_shift, λ_gpu, V, conj_V, Val(D), Val(imaginary_time))
+    if _SM_EULER_WARP[]
+        threads = 256                       # 32 lanes × 8 warps × 2 voxels = 16/block
+        blocks = cld(N, 16)
+        CUDA.@cuda threads = threads blocks = blocks _euler_5stage_warp_kernel!(
+            psi_2d, α, β, θ, m_gpu, λ_gpu, V, conj_V, Val(D), Val(imaginary_time))
+    else
+        threads = min(N, 256)
+        blocks = cld(N, threads)
+        CUDA.@cuda threads = threads blocks = blocks _euler_5stage_kernel!(
+            psi_2d, α, β, θ, m_gpu, m_shift, λ_gpu, V, conj_V, Val(D), Val(imaginary_time))
+    end
     nothing
 end
 

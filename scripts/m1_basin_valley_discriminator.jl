@@ -38,7 +38,7 @@
 # mistake_unconverged_to_new_physics_ignoring_analytical_oracle.md.
 #
 # Procedure: at ONE hard Ω > 0 cell, run two-phase LBFGS (N/2 + N/2)
-# from 3-4 distinct seeds (polar, fl_vortex, transverse-x polarised,
+# from 3-4 distinct seeds (polar, radial_spin_vortex, transverse-x polarised,
 # vortex charge=2). Report:
 #   * E_phase1, E_phase2, ΔE_phase2 (energy progress in second half)
 #   * ‖∇E‖_phase1, ‖∇E‖_phase2, grad_ratio (plateau signal)
@@ -114,15 +114,15 @@ const VERDICT_OVERLAP_SAME = 0.95       # same basin + same state if overlap > t
 const VERDICT_OVERLAP_DIFF = 0.30       # different basin/state if overlap < this
 const VERDICT_DE_BASIN = 0.01           # ΔE > this (and low overlap) ⇒ different basins
 
-# Seed catalog. Two of these (polar, fl_vortex) are what the live
+# Seed catalog. Two of these (polar, radial_spin_vortex) are what the live
 # sweep used; the discriminator's value is in the EXTRA seeds —
 # specifically `transverse_x` (full F_x eigenstate, m=+F along x)
-# and `fl_vortex_q2` (vortex charge 2 instead of 1).
+# and `radial_spin_vortex_q2` (vortex charge 2 instead of 1).
 const SEEDS = [
     (:polar, "polar (m=0)"),
-    (:fl_vortex, "fl_vortex(q=1)"),
+    (:radial_spin_vortex, "radial_spin_vortex(q=1)"),
     (:transverse_x, "transverse-x polarised"),
-    (:fl_vortex_q2, "fl_vortex(q=2)"),
+    (:radial_spin_vortex_q2, "radial_spin_vortex(q=2)"),
 ]
 
 function build_seed(state::Symbol, grid)
@@ -132,10 +132,10 @@ function build_seed(state::Symbol, grid)
     # calls. There is no `init_psi_transverse_x`; the canonical
     # equivalent for "F_x +polarised" is the spin_coherent wrapper
     # at θ=π/2, φ=0.
-    if state == :fl_vortex
-        return SpinorBEC.init_psi_fl_vortex(grid, sys; winding=1)
-    elseif state == :fl_vortex_q2
-        return SpinorBEC.init_psi_fl_vortex(grid, sys; winding=2)
+    if state == :radial_spin_vortex
+        return SpinorBEC.init_psi_radial_spin_vortex(grid, sys; winding=1)
+    elseif state == :radial_spin_vortex_q2
+        return SpinorBEC.init_psi_radial_spin_vortex(grid, sys; winding=2)
     elseif state == :transverse_x
         return SpinorBEC.init_psi_spin_coherent(grid, sys; theta=π/2, phi=0.0)
     else
@@ -176,8 +176,8 @@ function run_one_seed(seed_state::Symbol, label::String)
     # When psi_init is supplied, find_ground_state ignores `initial_state`
     # — but the kwarg is required. Map our internal seed labels to a
     # valid symbol in init_psi's dispatch table.
-    initial_state_for_fgs = if seed_state in (:fl_vortex, :fl_vortex_q2)
-        :fl_vortex
+    initial_state_for_fgs = if seed_state in (:radial_spin_vortex, :radial_spin_vortex_q2)
+        :radial_spin_vortex
     elseif seed_state == :transverse_x
         :spin_coherent
     else

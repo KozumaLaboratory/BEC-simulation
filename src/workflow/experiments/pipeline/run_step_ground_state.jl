@@ -301,7 +301,8 @@ function _run_step(
         else
             find_ground_state_lbfgs(;
                 grid, atom, interactions, zeeman, potential,
-                n_steps, tol, m_lbfgs, newton_polish, initial_state, init_state_params, psi_init,
+                n_steps, tol, m_lbfgs, newton_polish, initial_state, init_state_params,
+                psi_init,
                 enable_ddi, c_dd=c_dd_val,
                 secular_ddi=secular, quasi_2d_ddi=q2d, l_z_ddi=lz, ddi_trunc_radius=ddi_trunc,
                 ddi_padding=ddi_padded_b, ddi_pad_factor=ddi_pf,

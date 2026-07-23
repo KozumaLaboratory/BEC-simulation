@@ -6,7 +6,7 @@
 #
 # Verifies FOUR logic properties (not just "no error"):
 #
-#   (a) All Tier-1 seeds build (PCV, fl_vortex, KSU, AFM, chiral,
+#   (a) All Tier-1 seeds build (PCV, radial_spin_vortex, KSU, AFM, chiral,
 #       skyrmion_lattice). Texture-primary seeds are MUST-BUILD —
 #       a silent drop would lose a real GS candidate.
 #       Tier-4 (revival-check) symbols cross-checked too.
@@ -54,7 +54,7 @@ const SMOKE_SOBOLEV = 0.05
 const ε_PERTURB = 1e-3
 const TOL_OVERLAP_STABLE = 1e-2  # loose for tiny grid
 
-const TIER1_REAL = [:polar_core_vortex, :fl_vortex, :antiferromagnetic,
+const TIER1_REAL = [:polar_core_vortex, :radial_spin_vortex, :antiferromagnetic,
     :chiral_spin_vortex, :skyrmion_lattice]
 const TIER2_BASE = [:polar]
 const TIER3_FM = [:m_plus_F]
@@ -66,8 +66,8 @@ function build_seed_smoke(seed::Symbol)
     sys = SpinSystem(SMOKE_F)
     return if seed === :polar_core_vortex
         init_psi(SMOKE_GRID, sys; state=:polar_core_vortex, init_vortex_charge=1)
-    elseif seed === :fl_vortex
-        init_psi(SMOKE_GRID, sys; state=:fl_vortex, init_vortex_charge=1)
+    elseif seed === :radial_spin_vortex
+        init_psi(SMOKE_GRID, sys; state=:radial_spin_vortex, init_vortex_charge=1)
     elseif seed === :antiferromagnetic
         init_psi(SMOKE_GRID, sys; state=:antiferromagnetic)
     elseif seed === :chiral_spin_vortex

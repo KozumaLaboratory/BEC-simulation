@@ -1,6 +1,6 @@
 # state_zoo wrappers runnable regression.
 #
-# Each parameterized wrapper (init_psi_spin_helix, init_psi_fl_vortex, ...)
+# Each parameterized wrapper (init_psi_spin_helix, init_psi_radial_spin_vortex, ...)
 # must call `init_psi` with kwargs that `init_psi` actually accepts. A
 # 2026-05 refactor flattened `init_psi`'s signature but left the wrappers
 # passing `init_state_params=Dict(...)` — silent MethodError at call time
@@ -44,9 +44,14 @@ using SpinorBEC
         _check_psi(psi, 2; tag="spin_coherent")
     end
 
-    @testset "init_psi_fl_vortex" begin
-        psi = init_psi_fl_vortex(grid2, sys; winding=1)
-        _check_psi(psi, 2; tag="fl_vortex")
+    @testset "init_psi_radial_spin_vortex" begin
+        psi = init_psi_radial_spin_vortex(grid2, sys; winding=1)
+        _check_psi(psi, 2; tag="radial_spin_vortex")
+    end
+
+    @testset "init_psi_flower" begin
+        psi = init_psi_flower(grid2, sys)
+        _check_psi(psi, 2; tag="flower")
     end
 
     @testset "init_psi_biaxial_nematic" begin
