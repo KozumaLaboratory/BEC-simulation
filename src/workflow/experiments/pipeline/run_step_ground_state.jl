@@ -158,6 +158,38 @@ _seed_sig_match(a, b) =
     _to_host(psi)::Array{ComplexF64, 4}
 end
 
+# --- pin: symmetry-breaking ε-continuation for the weak-field soft manifold.
+#     Reads the cell's DIMENSIONLESS linear/quadratic Zeeman (p, q) — NOT lab
+#     Gauss (static_zeeman's `Bz` kwarg is the p slot) — and builds the built-in
+#     transverse conjugate-field pin b_x=ε. find_ground_state_lbfgs warm-ramps
+#     ε→0 and returns the ε→0-extrapolated certified energy. Empty ramp ⇒ no pin.
+_zeeman_pq(z::ZeemanParams) = (z.p, z.q)
+_zeeman_pq(z::TimeDependentZeeman) = (evaluate(z.p_wf, 0.0), evaluate(z.q_wf, 0.0))
+
+@noinline function _resolve_pin_block(pin_block, zeeman)
+    pin_block === nothing && return (nothing, Float64[])
+    pin_block isa AbstractDict ||
+        throw(ArgumentError("pin: must be a mapping {kind: transverse, epsilon_ramp: [...]}"))
+    ramp = get(pin_block, "epsilon_ramp", nothing)
+    ramp === nothing &&
+        throw(
+            ArgumentError(
+                "pin: requires epsilon_ramp (descending εs, e.g. [4.0e-3, 2.0e-3, 1.0e-3, 5.0e-4])"
+            ),
+        )
+    eps = Float64.(collect(ramp))
+    isempty(eps) && throw(ArgumentError("pin.epsilon_ramp is empty"))
+    kind = Symbol(get(pin_block, "kind", "transverse"))
+    kind === :transverse ||
+        throw(
+            ArgumentError(
+                "pin.kind=$kind unsupported via yaml (only :transverse — conjugate field b_x=ε)"
+            ),
+        )
+    p_lin, q_quad = _zeeman_pq(zeeman)
+    (pin_transverse_field(; Bz=p_lin, q=q_quad), eps)
+end
+
 function _run_step(
     step::GroundStateStep,
     psi_prev,
@@ -360,9 +392,11 @@ function _run_step(
     elseif method === :lbfgs
         m_lbfgs = Int(get(p, "m_lbfgs", 10))
         newton_polish = get(p, "newton_polish", false) == true
+        pin_closure, pin_eps = _resolve_pin_block(get(p, "pin", nothing), zeeman)
         # Reuse existing workspace when available to preserve DDI flags (secular/q2d/l_z).
-        # Skip reuse when backend is explicitly overridden (e.g. GPU ITP → CPU LBFGS).
-        if ws_prev !== nothing && !haskey(p, "backend") &&
+        # Skip reuse when backend is overridden OR a pin is active (the pin
+        # ε-continuation builds its own bare workspace and needs grid/atom).
+        if pin_closure === nothing && ws_prev !== nothing && !haskey(p, "backend") &&
             !haskey(p, "interactions") && !haskey(p, "ddi") &&
             !haskey(p, "potential") && !haskey(p, "B")
             find_ground_state_lbfgs(;
@@ -382,6 +416,7 @@ function _run_step(
                 target_magnetization=target_mz, backend,
                 verbose,
                 light_shift=gs_light_shift,
+                pin=pin_closure, epsilon_ramp=pin_eps,
             )
         end
     else
@@ -389,6 +424,9 @@ function _run_step(
     end
 
     psi_out = copy(gs.workspace.state.psi)
+    # With a pin ε-continuation the certified energy is the ε→0 extrapolation,
+    # not the last pinned-rung value.
+    gs_energy = hasproperty(gs, :E0_extrap) ? gs.E0_extrap : gs.energy
     verbose && _print_gs_summary(psi_out, grid, atom, gs)
 
     # Save to cache if specified
@@ -399,7 +437,7 @@ function _run_step(
         try
             jldopen(tmp, "w") do f
                 f["psi"] = psi_host
-                f["energy"] = gs.energy
+                f["energy"] = gs_energy
                 f["converged"] = gs.converged
             end
             mv(tmp, cache_path; force=true)
@@ -411,7 +449,7 @@ function _run_step(
     end
 
     step_result = Dict{Symbol, Any}(
-        :ground_state_energy => gs.energy,
+        :ground_state_energy => gs_energy,
         :ground_state_converged => gs.converged,
         :workspace => gs.workspace,
     )

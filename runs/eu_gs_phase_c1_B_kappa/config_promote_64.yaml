@@ -34,6 +34,14 @@ pipeline:
       lhy: {kind: none}
       B: {Bz: "0.0 Gauss", theta: 0.0, phi: 0.0}
       seed_from: {run: runs/config_recon_335a2216, upsample: true}
+      # Symmetry-breaking pin: lift the weak-field soft-manifold Goldstone floor
+      # (un-pinned |∇E| floors ~0.05) so LBFGS reaches an isolated minimum, then
+      # extrapolate ε→0 for the certified energy. FM (high-Bz) cells are
+      # unaffected (ε→0 recovers the unique polarised GS). Both bx and trap pins
+      # were validated to the same E0 in prior weak-field Eu work.
+      pin:
+        kind: transverse
+        epsilon_ramp: [4.0e-3, 2.0e-3, 1.0e-3, 5.0e-4]
       n_steps: 800
       tol: 1.0e-7
 

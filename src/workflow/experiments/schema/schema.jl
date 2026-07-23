@@ -303,6 +303,12 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
     # signature (c1/Bz/κ/initial_state) and spectrally upsampled to this grid.
     # Cost-compressed continuation (docs/design/eu_phase_diagram_adaptive_mapping.md).
     "seed_from" => FieldSpec(; type=Dict),
+    # `pin: {kind: transverse, epsilon_ramp: [4.0e-3, 2.0e-3, 1.0e-3, 5.0e-4]}`
+    # — lbfgs-only. Adds a symmetry-breaking transverse field b_x=ε, warm-ramps
+    # ε→0, and reports the ε→0-extrapolated energy. Lifts the weak-field
+    # soft-manifold Goldstone floor (|∇E|~0.05 un-pinned → ~1e-5). See
+    # src/solvers/ground_state/pinned.jl + the phase-diagram design doc.
+    "pin" => FieldSpec(; type=Dict),
     "cache" => FieldSpec(; type=String),
     "quasi_2d" => FieldSpec(; type=Bool),
     "l_z" => FieldSpec(; type=Number, range=(0.0, 100.0)),

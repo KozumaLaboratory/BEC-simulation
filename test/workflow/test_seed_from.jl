@@ -59,3 +59,24 @@ using JLD2
     @test_throws ArgumentError SpinorBEC._resolve_seed_from(
         Dict{String, Any}("run" => dir, "upsample" => false), p_match, grid, atom)
 end
+
+@testset "pin block resolution" begin
+    z = SpinorBEC.ZeemanParams(0.7, 0.02)   # (p, q) dimensionless
+
+    pin, eps = SpinorBEC._resolve_pin_block(
+        Dict{String, Any}("kind" => "transverse",
+            "epsilon_ramp" => [2.0e-3, 5.0e-4]), z)
+    @test eps == [2.0e-3, 5.0e-4]
+    @test pin isa Function
+    ov = pin(1.0e-3)                      # ε -> (; zeeman=...)
+    @test haskey(ov, :zeeman)             # pin injects a transverse-field zeeman
+
+    # no pin block → inert
+    @test SpinorBEC._resolve_pin_block(nothing, z) == (nothing, Float64[])
+    # missing ramp → loud
+    @test_throws ArgumentError SpinorBEC._resolve_pin_block(
+        Dict{String, Any}("kind" => "transverse"), z)
+    # unsupported kind → loud
+    @test_throws ArgumentError SpinorBEC._resolve_pin_block(
+        Dict{String, Any}("kind" => "trap", "epsilon_ramp" => [1.0e-3]), z)
+end
