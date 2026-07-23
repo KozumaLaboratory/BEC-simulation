@@ -28,6 +28,11 @@ cd "$PROJECT_ROOT"
 source scripts/tsubame_setup.sh
 set -euo pipefail                       # re-arm: tsubame_setup runs `set +e`
 
+# tsubame_setup points the depot at node-local NVMe (fast precompile writes);
+# append the SHARED depot where packages/artifacts actually live, else a fresh
+# node fails "Package CUDA … not installed". NVMe stays first.
+export JULIA_DEPOT_PATH="${JULIA_DEPOT_PATH}:/gs/fs/tga-kozuma-kouhi/shared/.julia:${HOME}/.julia"
+
 export SPINORBEC_SCAN_ONLY_INDEX=$SGE_TASK_ID   # this task computes one point (2 seeds)
 echo "[task $SGE_TASK_ID/$SGE_TASK_LAST] $(hostname)"; nvidia-smi -L || true
 
