@@ -230,6 +230,49 @@ grids — Lustre SIGBUSes), reap runs/rb_* + group quota, ssh ControlMaster sock
    can be confirmed now — a cheap insurance so the "rotation-induced Barnett" headline
    stands even if A's grid-convergence is slow. (Just flip the stir Bx phase to −π/2.)
 
+## RESULTS — the next-session program is DONE (2026-07-08)
+
+The three pending items above were executed (`run_rebuild.jl` gained the
+`RB_STIR_BXPHASE` / `RB_OMEGA` / `RB_STIR_AMP` knobs; TSUBAME H100). Figures in
+`figures/`. Trajectory CSVs in `rebuild/` (per-frame column dumps are rebuildable
+via the run scripts and are not committed).
+
+### Conversion headline is box / grid / dt robust — NOT a numerical artefact
+(`figures/fig1_conversion.png`, `figures/fig2_robustness.png`)
+The clean-box +Ω two-stage converts vortex orbital AM into a real net axial
+magnetisation: **L_z 10.9 → 5.7, F_z 0.18 → +2.14 (F_z/|F| = 0.99, fully axial)**.
+Settled F_z across box±10/n80 (dx0.25) / box±14/n80 (dx0.35) / dt2e-4 is
+**+2.09 / +1.89 / +1.77** — all in the +2 band. The conversion magnitude does not
+track the (grid/dt-dependent) residual J_z leak → decoupled → real.
+
+### Residual J_z is (b) numerical, not (c) physical dissipation
+(`figures/dtcheck.png`, `run_quench_dtcheck.jl`)
+box±14/n80, +Ω, dt4e-4 vs dt2e-4: the **F_z conversion is dt-robust** (+1.85 vs
++1.77, ΔF_z +0.08) while the **residual J_z moves with dt** (+6.48 vs +7.77). The
+leak is a grid/time-discretisation effect on the fine conversion dynamics, not a
+physical channel — so the "efficiency" question resolves toward pure conversion,
+not a dissipation floor. (Full n112/dx0.25 convergence would pin it to zero.)
+
+### Chirality: rotation-driven, but the ±Ω mirror is BROKEN by F=6 chiral depolarisation
+(`figures/fig3_chirality_3pt.png`, `figures/chirality.png`, `plot_chirality.py`)
+Same transverse (F_z=0) start, `RB_STIR_BXPHASE` flips the rotation sense:
+**+Ω → F_z +2.09, Ω=0 (control) → +0.02, −Ω → −0.52.** The **sign is set by the
+rotation** (Ω-odd) and Ω=0 does nothing → the two-stage Barnett is rotation-driven,
+confirmed. **But the magnitude does NOT mirror**: −Ω nucleates weaker vortices
+(stir L_z −4.8 vs +Ω +12.1) and converts less. Cause: **the CW (−Ω) stir
+depolarises the F=6 state more than the CCW (+Ω) stir** (|F| at stir-end 5.04 vs
+5.99) — the chiral-depolarisation asymmetry predicted in P2/P3, now seen leaking
+into the two-stage quench. This is a real F=6 many-body effect, not a bug; the
+headline is "**direction-controlled** (sign follows Ω)", not "±Ω-symmetric".
+
+### m=−6 floor rectification — vortex chirality rectifies at the spin floor (anko's idea)
+(`figures/fig_m6_ladder.png`, `run_m6_imprint.jl`, `fig_m6*.py`)
+Start at the F_z=−6 floor with an imprinted orbital vortex ℓ=+1 / 0 / −1, quench
+B→0. **ℓ=−1 pins ~30 % of the population at m=−6; ℓ=+1 lets it cascade up the
+ladder (peak m=−3, only ~5 % at m=−6)**; ℓ=0 is the field-free baseline. The
+orbital-vortex sign rectifies against the spin floor — a chiral readout at the
+ladder edge. (`run_m6_ensemble.jl` + lossy/spatial variants explore robustness.)
+
 ## GATE — the two-stage J_z leak is a BOX-OVERFLOW artifact (2026-07-07)
 
 The healthy-start quench's J_z non-conservation (1.28→−0.5, while norm/energy

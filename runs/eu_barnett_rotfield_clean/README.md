@@ -117,12 +117,48 @@ runs, `run_dense_sweep.jl`); the earlier 6-point scan aliased the peaks.
 mp4 is pausable/scrubbable in any player / PowerPoint; the `.html` wraps it
 with browser play/pause controls.
 
+### 5. Two-stage mechanical Barnett: vortex orbital AM → net axial spin
+(`figures/fig1_conversion.png`, `figures/fig2_robustness.png`)
+Healthy polarised start (γB=15 magnetostriction GS) → Klaus stir (Ω=0.74) → quench
+B→0. The released vortex orbital AM **converts** to a real net axial magnetisation:
+**L_z 10.9 → 5.7, F_z 0.18 → +2.14** (F_z/|F| = 0.99, fully axial). Box/grid/dt
+robust: settled F_z = +2.09 / +1.89 / +1.77 across box±10 / box±14 / dt2e-4 — not
+a numerical artefact. (Needs the clean box±10; the ±6 box overflows and *inverts*
+the physics — see SUCCESS_CRITERIA.)
+
+### 5b. Chirality: rotation-driven (sign follows Ω), mirror broken by F=6 depolarisation
+(`figures/fig3_chirality_3pt.png`, `figures/chirality.png`)
+Same transverse (F_z=0) start, stir rotation sense flipped via `RB_STIR_BXPHASE`:
+**+Ω → F_z +2.09, Ω=0 → +0.02, −Ω → −0.52.** The sign is set by the rotation and
+Ω=0 does nothing → the two-stage Barnett is genuinely rotation-driven. The ±Ω
+magnitude does **not** mirror (−Ω nucleates weaker vortices, L_z −4.8 vs +12.1)
+because the CW stir depolarises the F=6 state more (|F| 5.0 vs 6.0) — a real F=6
+chiral effect, so the claim is "direction-controlled", not "±Ω-symmetric".
+
+### 5c. Residual J_z is numerical, not dissipation (`figures/dtcheck.png`)
+box±14, +Ω, dt4e-4 vs dt2e-4: the F_z conversion is dt-robust (+1.85 vs +1.77)
+while the residual J_z moves with dt (+6.48 → +7.77) → the leak is a
+grid/time-discretisation effect, not a physical dissipation channel.
+
+### 5d. m=−6 floor rectification — vortex chirality read off at the spin floor
+(`figures/fig_m6_ladder.png`)
+Imprint an orbital vortex ℓ=+1 / 0 / −1 on the F_z=−6 floor, quench B→0.
+**ℓ=−1 pins ~30 % at m=−6; ℓ=+1 cascades up (peak m=−3, ~5 % at m=−6)**; ℓ=0 is
+the field-free baseline. The orbital-vortex sign rectifies against the spin floor.
+
 ## Scripts
 - `edh_baseline.yaml`, `run_rotfield_dyn.jl`, `run_transverse_barnett.jl`
 - `analyze_barnett.jl <result.jld2> <Omega> <out.csv> <snapdir>` —
   recomputes L_z/F_z/J_z + winding vortex-census + per-m from psi
   snapshots (the lab-frame spinor save path stores F_z but not L_z).
 - `plot_edh_baseline.py`, `plot_definitive.py`
+- **Two-stage (§5):** `run_rebuild.jl` (GS→stir→quench; env knobs `RB_STIR_BXPHASE`
+  = ±Ω sense, `RB_OMEGA`, `RB_STIR_AMP`=0 for the Larmor-free control, `RB_BOX`
+  `RB_N` `RB_DT` `RB_TAG`), `run_quench_dtcheck.jl` (residual-J_z dt sweep),
+  `run_m6_imprint.jl` + `run_m6_ensemble.jl` (m=−6 floor rectification).
+  Plotters: `fig1_conversion.py`, `fig2_robustness.py`, `fig3_chirality_3pt.py`,
+  `plot_chirality.py`, `plot_dtcheck.py`, `fig_m6*.py`.
+  TSUBAME submit templates: `tsubame_{chirality,dtcheck,efficiency,m6,m6ens,omega0}.sh`.
 
 ## Data quality / convergence (solid-data audit)
 

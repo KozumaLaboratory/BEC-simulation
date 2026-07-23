@@ -27,8 +27,8 @@ const N = get(ENV, "RB_N", "80, 80, 40")
 const BOX = get(ENV, "RB_BOX", "20.0, 20.0, 10.0")
 const BHALF = parse(Float64, split(BOX, ",")[1]) / 2      # in-plane box half-width
 const BXG = "9.216e-4 Gauss"        # gamma*B = 15 (magnetostriction, polarised)
-const BAMP = 9.216e-4
-const OMEGA = 0.74
+const BAMP = parse(Float64, get(ENV, "RB_STIR_AMP", "9.216e-4"))  # stir field amplitude; RB_STIR_AMP=0 -> NO stir field (B=0, Larmor-free) = the Omega=0 control
+const OMEGA = parse(Float64, get(ENV, "RB_OMEGA", "0.74"))  # stir rotation rate; RB_OMEGA=0 -> static field (no rotation) = the Omega=0 chirality control
 const SMOKE = get(ENV, "SMOKE", "0") == "1"
 const GS_STEPS = SMOKE ? 50 : parse(Int, get(ENV, "RB_GS_STEPS", "2500"))
 const STIR = SMOKE ? 1.0 : parse(Float64, get(ENV, "RB_STIR", "30.0"))
@@ -36,6 +36,7 @@ const QUENCH = SMOKE ? 1.0 : parse(Float64, get(ENV, "RB_QUENCH", "50.0"))
 const DYN_DT = SMOKE ? 0.004 : parse(Float64, get(ENV, "RB_DT", "0.0004"))  # dynamics dt (dt-check knob)
 const SAVE_EVERY = SMOKE ? 50 : parse(Int, get(ENV, "RB_SAVE_EVERY", "300"))  # big grids: raise so the jld2 fits node-local NVMe (Lustre mmap SIGBUSes)
 const TAG = let t = get(ENV, "RB_TAG", ""); isempty(t) ? "" : t * "_" end  # output-name prefix (avoid concurrent-job collisions)
+const STIR_BXPHASE = parse(Float64, get(ENV, "RB_STIR_BXPHASE", "1.5707963267948966"))  # stir Bx phase: +pi/2 = +Omega (headline); -pi/2 = -Omega (chirality). B(0)=+y unchanged; only rotation sense flips.
 mkpath(SC); mkpath(joinpath(OUT, "rebuild"))
 
 gs_yaml() = """
@@ -60,14 +61,18 @@ pipeline:
 
 # stage: :stir (rotating gamma*B=15 field) or :quench (B=0)
 function dyn_yaml(src, stage)
-    if stage == :stir
+    if stage == :stir && BAMP != 0
         freq = OMEGA / (2π)
         bblock = join([
             "      B:",
             "        Bz: 0.0",
-            "        Bx: {sinusoidal: {amplitude: $BAMP, frequency: $freq, phase: 1.5707963267948966}}",
+            "        Bx: {sinusoidal: {amplitude: $BAMP, frequency: $freq, phase: $STIR_BXPHASE}}",
             "        By: {sinusoidal: {amplitude: $BAMP, frequency: $freq, phase: 0.0}}",
         ], "\n")
+        dur = STIR
+    elseif stage == :stir
+        # RB_STIR_AMP=0 -> Larmor-free control: no stir field (clean B=0 block, not amp-0 sinusoidal)
+        bblock = "      B: {Bz: 0.0, Bx: 0.0, By: 0.0}"
         dur = STIR
     else
         bblock = "      B: {Bz: 0.0, Bx: 0.0, By: 0.0}"
