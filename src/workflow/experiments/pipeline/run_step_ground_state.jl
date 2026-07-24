@@ -180,8 +180,9 @@ end
 #     Gauss (static_zeeman's `Bz` kwarg is the p slot) — and builds the built-in
 #     transverse conjugate-field pin b_x=ε. find_ground_state_lbfgs warm-ramps
 #     ε→0 and returns the ε→0-extrapolated certified energy. Empty ramp ⇒ no pin.
-_zeeman_pq(z::ZeemanParams) = (z.p, z.q)
-_zeeman_pq(z::TimeDependentZeeman) = (evaluate(z.p_wf, 0.0), evaluate(z.q_wf, 0.0))
+# Unified accessors cover ZeemanParams / TimeDependentZeeman / ZeemanField{…}
+# (the last is what a GS step inherits from a prior step's workspace).
+_zeeman_pq(z) = (linear_p(z), quadratic_q(z))
 
 @noinline function _resolve_pin_block(pin_block, zeeman)
     pin_block === nothing && return (nothing, Float64[])
