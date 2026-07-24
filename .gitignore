@@ -166,3 +166,6 @@ verify_outputs/
 
 # Loop Engineering runtime sentinels (tick/done counters)
 .loop/
+
+# result CSVs are regenerable (extract from jld2); keep figures (png), not data
+runs/**/*.csv
