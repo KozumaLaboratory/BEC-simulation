@@ -23,7 +23,7 @@ function ramp_to(fH,fV)                       # log-linear from PST to (fH,fV), 
     FortRamp(times,P)
 end
 
-finals=10 .^ range(log10(0.6),log10(0.004);length=150)   # final hODT depth, fine
+finals=10 .^ range(log10(0.6),log10(2e-4);length=220)    # final hODT depth, fine, down to ~0
 open(joinpath(OUT,"tradeoff.csv"),"w") do io
     println(io,"finalH,N0,T,cf")
     for fH in finals
