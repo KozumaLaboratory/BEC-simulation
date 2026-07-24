@@ -18,10 +18,13 @@
 # textures coh≤0.77.
 
 function classify_spinor_phase(fp;
-    coh_uniform::Float64=0.95, coh_flower::Float64=0.35,
+    coh_texture::Float64=0.65,          # spinor coherence g: <0.65 = genuine spatial
+    #   texture (validated imprints 0.12–0.51); ≥0.65 = uniform-DIRECTION / canting
+    #   (mid-field canting continuum measured at 0.86–0.97). THIS gate is what stops
+    #   the canting continuum being mislabelled a vortex/radial texture.
     fc_flux::Float64=0.45, fc_div::Float64=0.70,
     chi_chiral::Float64=0.10, chi_skyrmion::Float64=0.50,
-    mF_mag::Float64=0.30, mod_thresh::Float64=0.30,
+    mF_mag::Float64=0.30, mF_fm::Float64=0.50, mod_thresh::Float64=0.30,
     inert_tol::Float64=1.0e-3,
 )
     coh = fp.coh
@@ -37,25 +40,27 @@ function classify_spinor_phase(fp;
     if max(smod, dmod) > mod_thresh
         return "modulated"
     end
-    # 2. spatially uniform bulk → point group by σ_S (rotation-invariant)
-    if coh >= coh_uniform
+    # 2. spinor nearly uniform (coh≥coh_texture) ⇒ uniform-direction / CANTING, NOT a
+    #    spatial texture — even if fluxclosure>0.577 (that comes from ∇n of a partial
+    #    magnetisation, not a vortex). Classify by σ_S point group, else by magnitude.
+    if coh >= coh_texture
         if iscore < inert_tol
             return inert === :FM ? "ferromagnetic" : String(inert)
         end
-        return mF < mF_mag ? "nematic_unresolved" : "ferromagnetic"
+        return mF >= mF_fm ? "ferromagnetic" : "nematic_unresolved"   # canting continuum
     end
-    # 3. spatially textured, magnetised
+    # 3. genuinely spatially-textured spinor (coh<coh_texture): name the texture
     if mF < mF_mag
         return "polar_core_vortex"
     elseif χ >= chi_skyrmion && fc > fc_div
         return "skyrmion"
     elseif χ >= chi_chiral
         return "chiral_spin_vortex"
-    elseif coh < coh_flower && fc < fc_flux
-        return "flower"                     # strongly-textured flux-closure
+    elseif fc < fc_flux
+        return "flower"                     # flux-closure, ∇·F≈0
     elseif fc > fc_div
-        return "radial_spin_vortex"
+        return "radial_spin_vortex"         # divergent
     else
-        return "ferromagnetic_textured"     # textured FM, not cleanly flower/radial
+        return "ferromagnetic_textured"
     end
 end

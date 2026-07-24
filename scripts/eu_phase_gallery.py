@@ -46,18 +46,26 @@ for j, key in enumerate(cells):
     # --- mass current ---
     jx = np.asarray(g["jx_xy"]).T; jy = np.asarray(g["jy_xy"]).T
     jmag = np.sqrt(jx**2 + jy**2)
-    jm = np.where(inside, jmag, np.nan)
+    # physical noise floor: current per atom |j|/n ≪ this ⇒ no real flow. Below it
+    # we do NOT plot j (it is machine-zero roundoff — avoids showing a checkerboard).
+    jflow = jmag.max() / (n.max() + 1e-30)   # ~ peak superfluid speed
     ax2 = axes[1][j]
-    im = ax2.imshow(jm, origin="lower", cmap="viridis")
-    # streamlines (mask outside cloud by zeroing)
-    jxs = np.where(inside, jx, 0.0); jys = np.where(inside, jy, 0.0)
-    if jmag[inside].max() > 1e-12:
+    if jflow < 1e-6:
+        ax2.imshow(np.where(inside, 0.0, np.nan), origin="lower", cmap="viridis", vmin=0, vmax=1)
+        ax2.text(nx / 2, ny / 2, r"$j\approx0$" + f"\n(|j|/n~{jflow:.0e})",
+                 ha="center", va="center", fontsize=11, color="0.3")
+        im = None
+    else:
+        jm = np.where(inside, jmag, np.nan)
+        im = ax2.imshow(jm, origin="lower", cmap="viridis")
+        jxs = np.where(inside, jx, 0.0); jys = np.where(inside, jy, 0.0)
         ax2.streamplot(np.arange(nx), np.arange(ny), jxs, jys, color="w",
                        density=1.0, linewidth=0.7, arrowsize=0.8)
     ax2.contour(n, levels=[0.2 * n.max()], colors="gray", linewidths=0.6)
     ax2.set_xticks([]); ax2.set_yticks([])
     if j == 0: ax2.set_ylabel("mass current  j(r)", fontsize=11)
-    fig.colorbar(im, ax=ax2, shrink=0.7, label="|j|")
+    if im is not None:
+        fig.colorbar(im, ax=ax2, shrink=0.7, label="|j|")
 
 fig.suptitle(r"$^{151}$Eu F=6 GS phases: spin texture (top) & mass current (bottom), mid-z plane",
              y=1.01)
