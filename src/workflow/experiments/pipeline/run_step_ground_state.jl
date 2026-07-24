@@ -410,6 +410,7 @@ function _run_step(
     elseif method === :lbfgs
         m_lbfgs = Int(get(p, "m_lbfgs", 10))
         newton_polish = get(p, "newton_polish", false) == true
+        residual_polish = get(p, "residual_polish", false) == true
         pin_closure, pin_eps = _resolve_pin_block(get(p, "pin", nothing), zeeman)
         # Reuse existing workspace when available to preserve DDI flags (secular/q2d/l_z).
         # Skip reuse when backend is overridden OR a pin is active (the pin
@@ -419,7 +420,7 @@ function _run_step(
             !haskey(p, "potential") && !haskey(p, "B")
             find_ground_state_lbfgs(;
                 ws_init=ws_prev, psi_init,
-                n_steps, tol, m_lbfgs, newton_polish,
+                n_steps, tol, m_lbfgs, newton_polish, residual_polish,
                 target_magnetization=target_mz,
                 verbose,
             )
@@ -435,6 +436,7 @@ function _run_step(
                 verbose,
                 light_shift=gs_light_shift,
                 pin=pin_closure, epsilon_ramp=pin_eps,
+                residual_polish,
             )
         end
     else
@@ -469,6 +471,7 @@ function _run_step(
     step_result = Dict{Symbol, Any}(
         :ground_state_energy => gs_energy,
         :ground_state_converged => gs.converged,
+        :ground_state_grad_norm => Float64(get(gs, :grad_norm, NaN)),
         :workspace => gs.workspace,
     )
     (psi_out, grid, atom, gs.workspace, step_result)

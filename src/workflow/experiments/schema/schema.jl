@@ -278,6 +278,10 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
     # when ∇E (not just E) must be tight — Hessian λ_min / Bogoliubov near
     # instabilities require a genuinely stationary ψ. lbfgs-only.
     "newton_polish" => FieldSpec(; type=Bool, default=false),
+    # eigenvector-residual final polish (order-4 HvP) that breaks the √eps
+    # first-order gradient floor (1e-7 → 1e-12); use when the fine GS ordering
+    # (near-degenerate phases) needs a genuinely converged ψ. lbfgs-only.
+    "residual_polish" => FieldSpec(; type=Bool, default=false),
     "initial_state" => FieldSpec(; type=String, default="polar",
         enum=["polar", "m_plus_F", "m_minus_F",
             "uniform", "antiferromagnetic", "random",
