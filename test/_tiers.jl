@@ -385,6 +385,7 @@ const FULL_EXTRA = [
     "rotating_basis/test_rotating_frame_regression.jl",
     "analysis/test_bogoliubov_goldstone.jl",
     "dynamics/test_sgpe_fdr.jl",
+    "dynamics/test_sgpe_stoof.jl",
     # Orphan-test audit 2026-05-25: promoted from unregistered → FULL_EXTRA.
     # All run ITP / RTP / find_ground_state and require the "full" tier.
     # The two Bug-4 regression pins are particularly load-bearing.
