@@ -12,7 +12,7 @@ c1_target = parse(Float64, get(ENV, "SPINORBEC_PHASE_C1", "0.0277777778"))
 
 # deep-converged phase representatives (config_phase_repr): flower / vortex-region
 # / crossover / uniform-FM — the GS (min-E) of each gets j(r)+F(r) rendered.
-targets = [(0.0, 1.0), (2.5e-5, 1.3), (4.8e-5, 1.6), (1.0e-4, 1.0)]
+targets = [(2.5e-5, 1.6), (4.0e-5, 1.9), (4.8e-5, 1.6), (6.2e-5, 1.3)]
 _ug(s) = parse(Float64, split(String(s))[1])
 
 results = Dict{String, Any}()
