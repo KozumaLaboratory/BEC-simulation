@@ -44,20 +44,33 @@ pts = sort(
 isempty(pts) && error("no point_*.jld2 in $RUN")
 
 open(OUT, "w") do io
-    println(io, "c1_ratio,B_uG,kappa,gs_seed,E_gs,mF,coh,fluxclosure,chirality,inert,phase")
+    println(
+        io, "c1_ratio,B_uG,kappa,gs_seed,E_gs,grad_norm,mF,coh,fluxclosure,chirality,inert,phase"
+    )
     for i in pts
+        # min-E over ALL seeds present for this point (seed-set agnostic)
         best = nothing
-        for s in ("stretched", "polar")
-            f = joinpath(RUN, @sprintf("point_%03d_%s.jld2", i, s))
-            isfile(f) || continue
-            E = JLD2.load(f, "energy")
-            (best === nothing || E < best.E) && (best = (; E, f, s))
+        for f in readdir(RUN)
+            m = match(Regex("^point_0*$(i)_(.+)\\.jld2\$"), f)
+            m === nothing && continue
+            fp_ = joinpath(RUN, f)
+            E = try
+                JLD2.load(fp_, "energy")
+            catch
+                ; continue
+            end
+            (best === nothing || E < best.E) && (best = (; E, f=fp_, s=m.captures[1]))
         end
         best === nothing && continue
         psi = ComplexF64.(JLD2.load(best.f, "psi"))
         n = Int.(JLD2.load(best.f, "grid_n_points"))
         box = Float64.(JLD2.load(best.f, "grid_box_size"))
         ov = JLD2.load(best.f, "override")
+        gnorm = try
+            JLD2.load(best.f, "grad_norm")
+        catch
+            ; NaN
+        end
         grid = make_grid(GridConfig(Tuple(n), Tuple(box)))
         fp = spinor_fingerprint(psi, grid, 6)
         c1, B, k = _cellkey(ov)
@@ -65,7 +78,7 @@ open(OUT, "w") do io
         println(
             io,
             join(
-                (c1, B, k, best.s, best.E, fp.mF, fp.coh,
+                (c1, B, k, best.s, best.E, gnorm, fp.mF, fp.coh,
                     fp.fluxclosure, fp.chirality, String(fp.inert), ph), ","),
         )
     end
