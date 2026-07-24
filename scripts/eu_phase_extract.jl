@@ -15,11 +15,17 @@ const OUT = length(ARGS) >= 2 ? ARGS[2] : joinpath(RUN, "phase_table.csv")
 
 _gauss_to_uG(s) = 1e6 * parse(Float64, split(String(s))[1])   # "6.0e-5 Gauss" → µG
 
+# c1 may be fixed in the base config (not a scan axis) — then it is absent from
+# the saved override. Fall back to SPINORBEC_PHASE_C1 (e.g. the boundary scan's
+# fixed physical value) so the table still carries a c1 column.
+const _C1_DEFAULT = parse(Float64, get(ENV, "SPINORBEC_PHASE_C1", "NaN"))
+
 function _cell_key(ov)
-    c1 = get(ov, "pipeline.0.interactions.c1_ratio", missing)
+    c1r = get(ov, "pipeline.0.interactions.c1_ratio", missing)
+    c1 = c1r === missing ? _C1_DEFAULT : Float64(c1r)
     bz = get(ov, "pipeline.0.B.Bz", missing)
     oz = get(ov, "pipeline.0.potential.omega.2", missing)
-    (Float64(c1), _gauss_to_uG(bz), Float64(oz))
+    (c1, _gauss_to_uG(bz), Float64(oz))
 end
 
 # analyze block: Vector of per-step Dicts (see pipeline_analyzers). Pull the
