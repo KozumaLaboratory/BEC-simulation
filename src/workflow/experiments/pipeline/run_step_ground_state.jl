@@ -443,7 +443,10 @@ function _run_step(
         throw(ArgumentError("Unknown ground_state method: $method. Supported: itp, lbfgs"))
     end
 
-    psi_out = copy(gs.workspace.state.psi)
+    # Strip any Nyquist-mode junk the LBFGS/Newton path can accumulate (ITP is
+    # already dealiased) — kills the checkerboard artifact at the source in the
+    # saved/analysed ψ. Host copy: the null uses a CPU FFT.
+    psi_out = _null_nyquist_modes!(_to_host(copy(gs.workspace.state.psi)), grid)
     # With a pin ε-continuation the certified energy is the ε→0 extrapolation,
     # not the last pinned-rung value.
     gs_energy = hasproperty(gs, :E0_extrap) ? gs.E0_extrap : gs.energy

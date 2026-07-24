@@ -82,3 +82,37 @@ function _fft_gradient(
         result
     end
 end
+
+"""
+    _null_nyquist_modes!(psi, grid) -> psi
+
+Zero the Nyquist Fourier mode (k=±N/2 along each even spatial dim) of every
+spinor component, then renormalise. Removes the checkerboard-generating Nyquist
+content that L-BFGS / Newton (which do NOT re-dealias) can accumulate in ψ. The
+split-step dealias already strips it during ITP, so this is a no-op there. Kills
+the artifact at the SOURCE (ψ), complementing the derivative-level Nyquist null.
+"""
+function _null_nyquist_modes!(psi::AbstractArray{<:Complex}, grid::Grid{N}) where {N}
+    n_spatial = ntuple(d -> size(psi, d), N)
+    D = size(psi, N + 1)
+    nrm0 = sqrt(sum(abs2, psi))
+    buf = Array{ComplexF64, N}(undef, n_spatial)
+    local_plans = make_fft_plans(n_spatial; flags=FFTW.ESTIMATE)
+    for c in 1:D
+        comp = @view psi[ntuple(_ -> Colon(), N)..., c]
+        buf .= comp
+        local_plans.forward * buf
+        @inbounds for d in 1:N
+            iseven(n_spatial[d]) || continue
+            nyq = n_spatial[d] ÷ 2 + 1
+            for I in CartesianIndices(n_spatial)
+                I[d] == nyq && (buf[I] = zero(ComplexF64))
+            end
+        end
+        local_plans.inverse * buf
+        comp .= buf
+    end
+    nrm1 = sqrt(sum(abs2, psi))
+    nrm1 > 0 && (psi .*= nrm0 / nrm1)
+    psi
+end
