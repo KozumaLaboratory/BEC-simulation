@@ -41,33 +41,28 @@ end
 n_beams(t::EvapTrap) = length(t.waists)
 
 """
-    EvapParams(; a_s, tau_bg, K3=0.0, kappa=1.0, eta_min=4.0)
+    EvapParams(; a_s, tau_bg, K3=0.0, eta_min=4.0, heating_rate=0.0)
 
-Tunable physics knobs. `a_s` s-wave length [m], `tau_bg` 1-body vacuum lifetime
-[s], `K3` three-body loss coefficient [m⁶/s] (Eu unknown ⇒ default 0), `kappa`
-DEPRECATED/unused — the excess-energy factor in dT/T is now the theoretical `κ̃(η)`
-from [`evap_volume_factor`](@ref), not a constant. `eta_min` a soft truncated-Boltzmann
-floor (the evaporation rate is the all-η Luiten incomplete-gamma form, valid below it too),
-`evap_scale` a dimensionless prefactor on the elastic collision rate whose
-**theoretical value is 1** — the rate `γ_el = n₀ σ v̄/√2` is fully determined
-(`σ = 8π a_s²`, `v̄ = √(8k_BT/πm)`, and the peak density `n₀` matches the measured
-¹⁵¹Eu BEC loading value to ~6 %, see [`thermal_peak_density`](@ref)). It is NOT a fit
-parameter; keep it at 1 and treat any need to move it as a model-regime symptom to fix
-(e.g. the peak-thermal density is a poor proxy for a strongly-truncated η≲4 cloud).
-`heating_rate` an exponential technical-heating rate `Γ_h` [1/s] from FORT intensity
-noise (`dT/dt = Γ_h T`, Savard–O'Hara–Thomas PRA 56 R1095): `Γ_h = π² ν_r² S_I(2ν_r)`
-with `ν_r` the (tight, radial) trap frequency and `S_I` the fractional-intensity-noise
-PSD. A measurable lab quantity (NOT a fudge); default 0. It is a DIRECTIONAL systematic
-(always heats) — the leading explanation for the 7 W hold's model-too-cold residual
-(a degraded-beam RIN S_I~2×10⁻⁸/Hz at ν_r=358 Hz gives Γ_h~0.025/s ⇒ +2 µK over 7 s).
+Physics inputs — **no fit parameters** (the truncated-Boltzmann rates are fully determined
+by these + the trap geometry). `a_s` s-wave length [m]; `tau_bg` 1-body vacuum lifetime [s];
+`K3` three-body loss coefficient [m⁶/s] in the **atoms-lost convention `dN/dt = −K₃⟨n²⟩N`**,
+i.e. `K₃ ≡` the thesis's Söding `L₃` (atom-loss coefficient; 3 atoms leave per recombination
+event are folded into `K₃`). Eu measured ⇒ `L ∼ 10⁻²⁹ cm⁶/s = 1×10⁻⁴¹ m⁶/s` (thesis Fig 7.5,
+consistent with the universal-van-der-Waals estimate — see `euv3.jl`). `eta_min` is a **validity/reporting flag
+only**: the LRW evaporation rate is the all-η incomplete-gamma form and is NOT gated by it —
+the truncated-Boltzmann model itself degrades as η→1 (LRW require kT≪ε_t), and `eta_min` just
+marks where to distrust the output. `heating_rate` an exponential technical-heating rate `Γ_h`
+[1/s] from FORT intensity noise (`dT/dt = Γ_h T`, Savard–O'Hara–Thomas PRA 56 R1095):
+`Γ_h = π² ν_r² S_I(2ν_r)`, `ν_r` the tight radial frequency, `S_I` the fractional-intensity-
+noise PSD. A measurable lab quantity (NOT a fudge); default 0. Directional (always heats) — the
+leading explanation for the 7 W hold's model-too-cold residual (RIN S_I~2×10⁻⁸/Hz at ν_r=358 Hz
+⇒ Γ_h~0.025/s ⇒ +2 µK over 7 s).
 """
 Base.@kwdef struct EvapParams
     a_s::Float64
     tau_bg::Float64
     K3::Float64 = 0.0
-    kappa::Float64 = 1.0
     eta_min::Float64 = 4.0
-    evap_scale::Float64 = 1.0
     heating_rate::Float64 = 0.0
 end
 
@@ -111,48 +106,61 @@ phase_space_density(N::Real, T::Real, ω̄::Real) =
 """
     thermal_peak_density(N, T, ω̄, m) -> n₀ [m⁻³]
 
-Peak density of a thermal cloud, `n₀ = N (m ω̄²/(2π k_B T))^{3/2}`. Together with the
-known cross section `σ = 8π a_s²` and mean speed `v̄ = √(8 k_B T/π m)` this FULLY
-determines the elastic collision rate `γ_el = n₀ σ v̄/√2` — there is no free
-prefactor. (At the ¹⁵¹Eu BEC loading point N=3.5×10⁶, T=50 µK, ω̄=2π·432 Hz it gives
-≈ 3.1×10¹³ cm⁻³, matching the measured 3.3×10¹³ — see `EvapParams.evap_scale`.)
+Peak density of an UNtruncated thermal harmonic cloud, `n_pk = N (m ω̄²/(2π k_B T))^{3/2}`.
+The LRW evaporation/collision rate uses the **reference** density `n₀ = n_pk/P(3,η)` (the
+truncated-Boltzmann partition correction, [`evap_volume_factor`](@ref)); `n_pk` itself sets the
+three-body `⟨n²⟩ = n_pk²/3^{3/2}`. (At the ¹⁵¹Eu BEC loading point N=3.5×10⁶, T=50 µK,
+ω̄=2π·432 Hz `n_pk ≈ 3.1×10¹³ cm⁻³`, matching the measured 3.3×10¹³.)
 """
 thermal_peak_density(N::Real, T::Real, ω̄::Real, m::Real) =
     (N <= 0 || T <= 0) ? 0.0 : N * (m * ω̄^2 / (2π * Units.KB * T))^1.5
 
 """
-    evap_volume_factor(η) -> (V_evap/V_eff, L)
+    evap_volume_factor(η) -> (factor, L)
 
-Truncated-Boltzmann evaporation in a 3D harmonic trap (Luiten–Reynolds–Walraven
-PRA 53, 381 (1996); O'Hara PRA 64, 051403 (2001)), with **no free parameter**. Returns:
+Truncated-Boltzmann (Luiten–Reynolds–Walraven PRA 53 381 (1996); O'Hara PRA 64 051403 (2001);
+Gehm thesis §2.4.2) evaporation kinetics for a 3-D harmonic trap — **parameter-free**, from the
+regularized lower incomplete gammas `P(a,η) = 1 − e^{-η} Σ_{k<a} η^k/k!` (elementary at integer a).
 
-1. `V_evap/V_eff = e^{-η}(η P(3,η) − 4 P(4,η))/P(3,η)²` — the fraction of elastic
-   collisions that eject an atom (→ `(η−4)e^{-η}` at large η; `a=2`/P2,P3 would be a 2-D
-   trap). `P(a,η) = 1 − e^{-η} Σ_{k<a} η^k/k!` are regularized lower incomplete gammas.
+1. `factor = e^{-η}(η P(3,η) − 4 P(4,η))/P(3,η)²` — the eject factor s.t. the per-atom
+   evaporation rate is `dN/dt|_evap = −N · n_pk σ v̄ · factor`, i.e. `−N · n₀ σ v̄ · e^{-η}(η −
+   4P4/P3)` with the LRW **reference** density `n₀ = n_pk/P(3,η)` (the `1/P(3,η)` — folded into
+   the `P(3,η)²` denominator here — is the truncated-cloud partition correction; there is NO
+   free prefactor and `v̄ = √(8k_BT/πm)` carries NO extra 1/√2). → `(η−4)e^{-η}` at large η;
+   `max(·,0)` clamps it where `η P(3,η) − 4 P(4,η) ≤ 0` (the trap can no longer eject — the
+   first-principles replacement for a hard η floor).
 
-2. `L = dln T / dln N` — the **temperature-law coefficient** from the truncated-cloud
-   ENERGY BALANCE (NOT the η≳6 approximation). A 3-D harmonic trapped cloud truncated at η
-   has mean energy `⟨E⟩/k_BT = c(η) = 3 P(4,η)/P(3,η)` (→ 3 at large η, but `< 3` at low η —
-   the high-energy tail is cut). An evaporated atom (ε>η) carries `ε̄ = Γ(4,η)/Γ(3,η) =
-   3(1−P4)/(1−P3) ≈ η+1`. Conserving energy at fixed trap depth gives
-   `L = (ε̄ − c)/(c − η dc/dη)`, which → `(η−2)/3` at large η (O'Hara) and grows steeply at
-   low η (a truncated cloud cools far more efficiently per atom lost than `(η−3)/3` implies).
-   This is what lets η≲4 forced evaporation reach BEC efficiently — the regime the old
-   `(η+κ̃−3)/3` form badly under-cooled. `dT/T = (dN/N)·L`.
+2. `L = dln T/dln N` — the **EXACT** truncated-cloud energy-balance cooling law at fixed depth.
+   A cloud truncated at η has mean energy per atom `c(η) = 3 P(4,η)/P(3,η)` (→ 3 at large η, `< 3`
+   at low η — the tail is cut). Each **evaporated** atom carries `ε_ev = ε_t + W_ev/V_ev = η + 1 −
+   P(5,η)/V_ev`, `V_ev = η P(3,η) − 4 P(4,η)` (LRW Eq 40-42; NOT the mean tail energy). Energy
+   conservation gives `L = (ε_ev − c)/(c − η dc/dη)`, `dc/dη = 3(P₃P₄′ − P₄P₃′)/P₃²`,
+   `P_a′ = η^{a-1}e^{-η}/(a-1)!`. → `(η−2)/3` at large η (O'Hara); GROWS at low η (a truncated
+   cloud's reduced heat capacity `c − η dc/dη` cools it far more per atom lost — the physics that
+   lets η≲5 forced evaporation reach BEC). `dT/T = (dN/N)·L`.
+
+The trap-lowering (adiabatic) term `dT/T = dω̄/ω̄` is added SEPARATELY by the caller; on a fixed-η
+lowered-ODT trajectory (ω̄²∝U∝T ⇒ dω̄/ω̄ = ½ dT/T) the two combine to O'Hara's `2(η'−3)/3`
+(Gehm Eq 2.32) — the separation is exact, not double-counted.
 """
 @inline function evap_volume_factor(η::Float64)
     eη = exp(-η)
     P3 = 1 - eη * (1 + η + η^2 / 2)
     P4 = 1 - eη * (1 + η + η^2 / 2 + η^3 / 6)
+    P5 = 1 - eη * (1 + η + η^2 / 2 + η^3 / 6 + η^4 / 24)
     P3 <= 1e-9 && return (0.0, 0.0)
-    factor = max(eη * (η * P3 - 4 * P4) / P3^2, 0.0)
-    # temperature-law coefficient L = dlnT/dlnN (O'Hara energy balance, 3-D harmonic cloud,
-    # mean energy 3 k_BT). An evaporated atom (ε>η) carries ε̄ = Γ(4,η)/Γ(3,η) = 3(1−P4)/(1−P3) k_BT
-    # (≈ η+1 at large η, → 3 at η→0). L = (ε̄ − 3)/3 → (η−2)/3 at large η, and → 0 gently at low η
-    # (no runaway — a barely-trapped cloud's escaping atoms carry ≈ the mean energy, so they
-    # cool little). Validated against a 7 W single-beam hold: T 17.7→10.7 µK, dlnT/dlnN ≈ 0.8.
-    ε̄ = (1 - P3) > 1e-12 ? 3 * (1 - P4) / (1 - P3) : η + 1.0
-    L = (ε̄ - 3) / 3
+    Vev = η * P3 - 4 * P4                                 # V_ev/(λ³ζ∞), harmonic
+    factor = Vev > 0 ? eη * Vev / P3^2 : 0.0             # eject factor (reference density folded in)
+    Vev <= 1e-12 && return (factor, 0.0)                 # trap cannot eject ⇒ no evap cooling
+    ε_ev = η + 1 - P5 / Vev                              # energy per evaporated atom, ε_t + W_ev/V_ev
+    c = 3 * P4 / P3                                      # mean energy per atom, → 3
+    dP3 = η^2 * eη / 2                                   # P(a,η)′ = η^{a-1} e^{-η}/(a-1)!
+    dP4 = η^3 * eη / 6
+    dc = 3 * (P3 * dP4 - P4 * dP3) / P3^2
+    denom = c - η * dc                                   # reduced (truncated) heat capacity per atom
+    # denom stays > 1.7 for η ≳ 5 (the valid regime); floor it only as an RK4 safety rail against
+    # excursions into the η ≲ 2 model-breakdown region (LRW require kT ≪ ε_t).
+    L = (ε_ev - c) / max(denom, 0.1)
     (factor, L)
 end
 
@@ -180,25 +188,22 @@ added by the caller.
     # is NOT the spurious 2× dipolar enhancement (retracted); it is the unitarity limit.
     k2a2 = 2 * m * kB * T / Units.HBAR^2 * p.a_s^2
     σ = 8π * p.a_s^2 / (1 + k2a2)
-    γel = n * σ * v̄ / sqrt(2)                        # per-atom elastic rate, γ = n σ v̄/√2
-    # evaporation: 3D-harmonic truncated-Boltzmann (Luiten), no free parameter. evap_factor is
-    # the eject fraction (all-η spilling rate); L = dlnT/dlnN is the O'Hara energy-balance
-    # cooling law (gentle at low η, → (η−2)/3 at large η — no clamp needed).
+    # LRW evaporation rate dN/dt = −N · n_pk σ v̄ · factor (Eq 37 + 42a), fully determined — no free
+    # prefactor, no 1/√2 (v̄ = √(8k_BT/πm) is already the mean relative speed). `factor` folds in the
+    # reference-density 1/P(3,η) correction; `n` is the untruncated peak n_pk. The s-wave unitarity
+    # σ(T)=8πa²/(1+k²a²) [k²a²=2(m k_BT/ℏ²)a², flux-weighted 2k_BT] is real physics beyond bare LRW —
+    # it lowers the elastic rate of a HOT cloud (~15% at 16µK for Eu a=110a₀), leaves a COLD cloud at
+    # full s-wave σ. NOT the retracted 2× dipolar enhancement.
     evap_factor, L = evap_volume_factor(η)
-    dN_evap = -Nev * γel * p.evap_scale * evap_factor
+    dN_evap = -Nev * n * σ * v̄ * evap_factor
     dTT_evap = Nev > 0 ? (dN_evap / Nev) * L : 0.0
-    # three-body loss + antievaporative heating (center-weighted, ⟨n²⟩ = n²/3^{3/2})
+    # three-body loss, atoms-lost convention dN = −K₃⟨n²⟩N with ⟨n²⟩ = n_pk²/3^{3/2} (thermal
+    # harmonic cloud) + antievaporation heating: 3-body removes the densest/coldest atoms
+    # (ε̄_lost = 2k_BT vs cloud 3k_BT) ⇒ dT/T = −(1/3) dN/N (derived, not fitted).
     dN_3b = -p.K3 * (n^2 / 3.0^1.5) * Nev
     dTT_3b = Nev > 0 ? -(dN_3b / Nev) * (1.0 / 3.0) : 0.0
-    # soft spilling: a trap of depth U=η k_BT cannot hold a cloud at η<1; the excess relaxes toward
-    # η=1 at ~the collision rate, dT/T = −3 γ_el(1−η). The factor 3 ≈ the truncated-cloud central-
-    # density enhancement P(3/2,η)/P(3,η) at η≈1 (γ_el uses the harmonic n₀, which under-counts the
-    # collisions of a deeply-truncated cloud). This non-equilibrium truncation (the c=3 cooling law
-    # misses it) cools over ~2 s, reproducing the measured 1.1 W decline 1.86→1.0 µK (T 1.6/1.1/1.0
-    # at t=0.5/2/3.6 s vs measured 1.6/1.05/1.0).
-    dTT_spill = η < 1.0 ? -3.0 * γel * (1.0 - η) : 0.0
     # adiabatic (T ∝ ω̄) + technical intensity-noise heating (dT/T = Γ_h, Savard-O'Hara-Thomas)
-    (dN_evap + dN_3b, T * (dTT_evap + dTT_3b + dTT_spill + dlnω_dt + p.heating_rate))
+    (dN_evap + dN_3b, T * (dTT_evap + dTT_3b + dlnω_dt + p.heating_rate))
 end
 
 """
