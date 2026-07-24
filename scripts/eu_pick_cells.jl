@@ -10,11 +10,9 @@ run = ARGS[1]
 out = length(ARGS) >= 2 ? ARGS[2] : joinpath(run, "_picks_slices.jld2")
 c1_target = parse(Float64, get(ENV, "SPINORBEC_PHASE_C1", "0.0277777778"))
 
-# references + discovered distinct phase (cluster 1) + orphans (novel candidates)
-targets = [(0.0, 1.0),          # flower reference (B=0)
-    (1.0e-4, 1.0),               # uniform-FM reference
-    (6.2e-5, 1.6), (7.5e-5, 1.9), (1.0e-4, 2.2),   # cluster 1 (distinct phase)
-    (2.5e-5, 1.3), (4.8e-5, 1.6), (7.5e-5, 2.2)]   # orphans (incl vortex-core)
+# deep-converged phase representatives (config_phase_repr): flower / vortex-region
+# / crossover / uniform-FM — the GS (min-E) of each gets j(r)+F(r) rendered.
+targets = [(0.0, 1.0), (2.5e-5, 1.3), (4.8e-5, 1.6), (1.0e-4, 1.0)]
 _ug(s) = parse(Float64, split(String(s))[1])
 
 results = Dict{String, Any}()
@@ -28,8 +26,10 @@ for (tb, tk) in targets
         catch
             continue
         end
-        c1 = get(ov, "pipeline.0.interactions.c1_ratio", -9.0)
-        (c1 isa Number && abs(c1 - c1_target) < 1e-6) || continue
+        # c1 may be fixed in the base config (absent from override) → treat as target
+        c1r = get(ov, "pipeline.0.interactions.c1_ratio", missing)
+        c1 = c1r === missing ? c1_target : Float64(c1r)
+        abs(c1 - c1_target) < 1e-6 || continue
         bz = _ug(get(ov, "pipeline.0.B.Bz", "0 G"))
         k = Float64(get(ov, "pipeline.0.potential.omega.2", -9.0))
         (abs(bz - tb) < 1e-9 && abs(k - tk) < 1e-6) || continue
