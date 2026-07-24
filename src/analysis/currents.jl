@@ -25,8 +25,15 @@ function probability_current(
         plans.forward * psi_k
 
         for d in 1:N
+            # Null the Nyquist mode of the first derivative: for even N the
+            # k=±N/2 coefficient is real/aliased and has no well-defined odd
+            # derivative, so `ik·ψ_k` there is pure roundoff that shows up as a
+            # checkerboard when the true current is ≈0. Zeroing it is the
+            # standard spectral-differentiation convention.
+            nyq = iseven(n_pts[d]) ? n_pts[d] ÷ 2 + 1 : 0
             @inbounds for I in CartesianIndices(n_pts)
-                dpsi[I] = im * grid.k[d][I[d]] * psi_k[I]
+                dpsi[I] = I[d] == nyq ? zero(ComplexF64) :
+                          im * grid.k[d][I[d]] * psi_k[I]
             end
             plans.inverse * dpsi
             @inbounds for I in CartesianIndices(n_pts)
@@ -73,9 +80,13 @@ function orbital_angular_momentum(
         psi_k .= psi_c
         local_plans.forward * psi_k
 
+        # Null the Nyquist mode of the first derivatives (see probability_current):
+        # ik is aliased/ill-defined at k=±N/2, giving a checkerboard artifact.
+        nqx = iseven(n_pts[1]) ? n_pts[1] ÷ 2 + 1 : 0
+        nqy = iseven(n_pts[2]) ? n_pts[2] ÷ 2 + 1 : 0
         @inbounds for I in CartesianIndices(n_pts)
-            dpsi_x[I] = im * grid.k[1][I[1]] * psi_k[I]
-            dpsi_y[I] = im * grid.k[2][I[2]] * psi_k[I]
+            dpsi_x[I] = I[1] == nqx ? zero(ComplexF64) : im * grid.k[1][I[1]] * psi_k[I]
+            dpsi_y[I] = I[2] == nqy ? zero(ComplexF64) : im * grid.k[2][I[2]] * psi_k[I]
         end
         local_plans.inverse * dpsi_x
         local_plans.inverse * dpsi_y
