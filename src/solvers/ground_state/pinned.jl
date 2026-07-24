@@ -55,7 +55,7 @@ function _lbfgs_pin_continuation(;
     grid::Union{Nothing, Grid},
     atom::Union{Nothing, AtomSpecies},
     interactions::InteractionParams,
-    zeeman::Union{ZeemanParams, TimeDependentZeeman},
+    zeeman::AbstractZeemanField,
     potential::AbstractPotential,
     n_steps::Int,
     tol::Float64,
