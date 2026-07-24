@@ -10,8 +10,11 @@ run = ARGS[1]
 out = length(ARGS) >= 2 ? ARGS[2] : joinpath(run, "_picks_slices.jld2")
 c1_target = parse(Float64, get(ENV, "SPINORBEC_PHASE_C1", "0.0277777778"))
 
-targets = [(0.0, 1.0), (0.0, 2.2), (2.5e-5, 1.3), (4.0e-5, 1.0),
-    (5.5e-5, 1.9), (6.2e-5, 1.6), (1.0e-4, 1.0), (1.0e-4, 2.2)]
+# references + discovered distinct phase (cluster 1) + orphans (novel candidates)
+targets = [(0.0, 1.0),          # flower reference (B=0)
+    (1.0e-4, 1.0),               # uniform-FM reference
+    (6.2e-5, 1.6), (7.5e-5, 1.9), (1.0e-4, 2.2),   # cluster 1 (distinct phase)
+    (2.5e-5, 1.3), (4.8e-5, 1.6), (7.5e-5, 2.2)]   # orphans (incl vortex-core)
 _ug(s) = parse(Float64, split(String(s))[1])
 
 results = Dict{String, Any}()
