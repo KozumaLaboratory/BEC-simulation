@@ -1,0 +1,35 @@
+# DIAGNOSTIC: why does the mid-field cell (B=48µG κ=1.6) floor at |∇E|~1?
+# Test whether a CLEAN single-domain seed (m∓F) + Newton-CG polish escapes the
+# m=±6 frustrated domain-wall stall that pin/LBFGS get stuck in. 48³ local.
+metadata: {owner: anko, project: Eu151 GS — mid-field soft convergence diagnostic}
+
+units: {B: Gauss}
+defaults: {kind: spinor, backend: gpu}
+dealias: {enabled: true, k_cut: 8.0, auto_dt: true, dt_safety: 10.0}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      interactions: {N_atoms: 50000, omega_ref: 691.1504, c1_ratio: 0.0277777778}
+      grid: {n: [48, 48, 48], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.6]}
+      method: itp
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B: {Bz: "4.8e-5 Gauss", theta: 0.0, phi: 0.0}
+      dt: 0.002
+      n_steps: 8000
+      tol: 1.0e-9
+  - ground_state:
+      method: lbfgs
+      m_lbfgs: 20
+      newton_polish: true         # 2nd-order: escape the saddle / domain-wall stall
+      n_steps: 2000
+      tol: 1.0e-9
+  - analyze: [{phase_classify_distance: {}}, {energy_decomposition: {}}]
+
+scan:
+  comparison_runs:
+    - {name: mminusF, override: {pipeline.0.initial_state: m_minus_F}}
+    - {name: mplusF,  override: {pipeline.0.initial_state: m_plus_F}}
+    - {name: polar,   override: {pipeline.0.initial_state: polar}}
