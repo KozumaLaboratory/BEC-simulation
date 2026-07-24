@@ -44,16 +44,21 @@ for (tb, tk) in targets
     grid = make_grid(GridConfig(Tuple(n), Tuple(box)))
     fx, fy, fz = SpinorBEC._spin_expectation_fields(psi, grid)
     dens = dropdims(sum(abs2, psi; dims=4); dims=4)
+    plans = make_fft_plans(Tuple(n))
+    jx, jy, jz = probability_current(psi, grid, plans)   # mass/probability current
     zc = n[3] ÷ 2 + 1
     yc = n[2] ÷ 2 + 1
     key = @sprintf("B%03.0f_k%.1f", tb * 1e6, tk)
     results[key] = Dict(
         "B_uG" => tb * 1e6, "kappa" => tk, "E" => best.E, "box" => box,
-        # mid-z (xy) plane
+        # mid-z (xy) plane — spin
         "fx_xy" => fx[:, :, zc], "fy_xy" => fy[:, :, zc], "fz_xy" => fz[:, :, zc],
         "n_xy" => dens[:, :, zc],
-        # mid-y (xz) plane
+        # mid-y (xz) plane — spin
         "fx_xz" => fx[:, yc, :], "fz_xz" => fz[:, yc, :], "n_xz" => dens[:, yc, :],
+        # mass current (mid-z xy plane)
+        "jx_xy" => jx[:, :, zc], "jy_xy" => jy[:, :, zc],
+        "jx_xz" => jx[:, yc, :], "jz_xz" => jz[:, yc, :],
     )
     @printf("OK  %s  E=%.4f\n", key, best.E)
 end
