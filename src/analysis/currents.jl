@@ -80,13 +80,15 @@ function orbital_angular_momentum(
         psi_k .= psi_c
         local_plans.forward * psi_k
 
-        # Null the Nyquist mode of the first derivatives (see probability_current):
-        # ik is aliased/ill-defined at k=±N/2, giving a checkerboard artifact.
-        nqx = iseven(n_pts[1]) ? n_pts[1] ÷ 2 + 1 : 0
-        nqy = iseven(n_pts[2]) ? n_pts[2] ÷ 2 + 1 : 0
+        # NOTE: do NOT Nyquist-null here. ⟨L_z⟩ enters the Coriolis energy
+        # (energy_contribution(::CoriolisTerm) calls this), which must stay
+        # bit-consistent with the Coriolis apply_operator! / dumb-reference
+        # (un-nulled) for the energy↔operator + master oracles. Nyquist junk is
+        # removed at the SOURCE instead (_null_nyquist_modes! on the GS ψ), so
+        # real states have no Nyquist content for this to matter.
         @inbounds for I in CartesianIndices(n_pts)
-            dpsi_x[I] = I[1] == nqx ? zero(ComplexF64) : im * grid.k[1][I[1]] * psi_k[I]
-            dpsi_y[I] = I[2] == nqy ? zero(ComplexF64) : im * grid.k[2][I[2]] * psi_k[I]
+            dpsi_x[I] = im * grid.k[1][I[1]] * psi_k[I]
+            dpsi_y[I] = im * grid.k[2][I[2]] * psi_k[I]
         end
         local_plans.inverse * dpsi_x
         local_plans.inverse * dpsi_y
