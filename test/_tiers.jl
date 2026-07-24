@@ -63,6 +63,7 @@ const FAST_TESTS = [
     "dynamics/test_tdhfb_f1_validation.jl",
     "hamiltonian/test_ddi_convention_factorial.jl",
     "foundation/test_atoms.jl",
+    "foundation/test_fft_nyquist_null.jl",
     "foundation/test_grid.jl",
     "foundation/test_preset.jl",
     "hamiltonian/test_zeeman_builders.jl",

@@ -31,8 +31,11 @@ function _fft_partial_derivative(
     end
     buf .= f
     local_plans.forward * buf
+    # Null the Nyquist mode: ik is aliased/ill-defined at k=±N/2 for even N, so it
+    # emits a checkerboard artifact in odd (first) derivatives. Standard convention.
+    nyq = iseven(n_pts[dim]) ? n_pts[dim] ÷ 2 + 1 : 0
     @inbounds for I in CartesianIndices(n_pts)
-        buf[I] = im * grid.k[dim][I[dim]] * buf[I]
+        buf[I] = I[dim] == nyq ? zero(ComplexF64) : im * grid.k[dim][I[dim]] * buf[I]
     end
     local_plans.inverse * buf
     result = Array{Float64, N}(undef, n_pts)
@@ -67,8 +70,9 @@ function _fft_gradient(
     local_plans.forward * f_k
 
     ntuple(N) do dim
+        nyq = iseven(n_pts[dim]) ? n_pts[dim] ÷ 2 + 1 : 0   # null Nyquist (see above)
         @inbounds for I in CartesianIndices(n_pts)
-            buf[I] = im * grid.k[dim][I[dim]] * f_k[I]
+            buf[I] = I[dim] == nyq ? zero(ComplexF64) : im * grid.k[dim][I[dim]] * f_k[I]
         end
         local_plans.inverse * buf
         result = Array{Float64, N}(undef, n_pts)
