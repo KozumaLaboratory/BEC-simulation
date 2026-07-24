@@ -1,0 +1,42 @@
+# SMOKE for ramp_par_edh_mild — 32^3, tiny GS + short dynamics. Validates the
+# full GPU runtime path (GS compute -> ramp -> seeded hold -> psi save + CUDA
+# kernels) in a few minutes before the real 64^3 launch. NOT physically meaningful.
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 50000, omega_ref: 691.15}
+mixins:
+  eu151_edh_phys:
+    atom: Eu151
+    grid: {n: [32, 32, 32], box: [18, 18, 18]}
+    potential: {type: harmonic, omega: [1.0, 1.0, 1.182]}
+    interactions: {N_atoms: 50000, omega_ref: 691.15, c1_ratio: 0.027777777777777776}
+pipeline:
+- ground_state:
+    use: [eu151_edh_phys]
+    method: lbfgs
+    initial_state: m_minus_F
+    B: {Bz: 0.01 Gauss, q: 0.0}
+    n_steps: 40
+    tol: 1.0e-06
+    cache: runs/eu151_edh_vs_flower/cache/gs_10mG_polm6_smoke_32.jld2
+- dynamics:
+    duration: 4.0
+    dt: 0.002
+    B:
+      Bz: {from: 0.01, to: 2.6e-5, duration: 4.0}
+    loss:
+      K3_per_m_si: &k [2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s,
+        2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s,
+        2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s]
+    save: {every: 1000, psi: true, precision: f32}
+- dynamics:
+    duration: 4.0
+    dt: 0.002
+    B: {Bz: 2.6e-5 Gauss}
+    seed_amplitude: 1.0e-08
+    seed_k_cut: 2.5
+    noise_seed: 42
+    loss:
+      K3_per_m_si: *k
+    save: {every: 1000, psi: true, precision: f32}

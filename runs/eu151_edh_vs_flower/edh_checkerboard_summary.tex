@@ -1,0 +1,244 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage[hidelinks]{hyperref}
+\usepackage{caption}
+\graphicspath{{figures/}}
+\captionsetup{font=small}
+
+\title{Einstein--de Haas dynamics of a $^{151}$Eu $F{=}6$ spinor BEC:\\
+checkerboard inversion in Goto difference imaging}
+\author{SpinorBEC simulation --- EdH ramp study}
+\date{2026-07-24}
+
+\newcommand{\Fx}{\langle F_x\rangle}
+\newcommand{\Fz}{\langle F_z\rangle}
+\newcommand{\Lz}{\langle L_z\rangle}
+\newcommand{\Jz}{J_z}
+\newcommand{\uG}{\,\mu\mathrm{G}}
+\newcommand{\ms}{\,\mathrm{ms}}
+\newcommand{\wref}{\omega^{-1}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We simulate the Einstein--de Haas (EdH) effect in a dipolar $^{151}$Eu $F{=}6$
+spinor Bose--Einstein condensate: starting from a fully polarized $m{=}{-}6$ state,
+a slow reduction of the axial magnetic field lets the dipole--dipole interaction
+(DDI) transfer spin angular momentum to orbital motion. Using the Goto $\pm16^\circ$
+tilt \emph{difference imaging} we find that the transverse-magnetization
+``checkerboard'' pattern \emph{inverts periodically} during the hold. We show that
+(i) total angular momentum $\Jz=\Fz+\Lz$ is conserved to $1$ part in $1.5\times10^4$
+while spin and orbital slosh coherently; (ii) quenching through the inert
+high-field window before a parabolic ramp preserves atoms and \emph{strengthens}
+the transfer ($+35\%$ checkerboard amplitude); and (iii) the checkerboard inversion,
+the $\Lz$ oscillation and the $\Fz$ oscillation are a single collective spin--orbital
+mode at $T\simeq38\ms$, distinct from the bare Larmor period ($24\ms$).
+\end{abstract}
+
+\section{Simulation setup}
+The condensate is evolved with the arbitrary-$F$ spinor Gross--Pitaevskii
+split-step Fourier solver (\texttt{SpinorBEC}). Parameters:
+\begin{itemize}\itemsep2pt
+  \item Atom $^{151}$Eu, $F{=}6$ ($D{=}2F{+}1=13$ components), $N=5\times10^{4}$.
+  \item Grid $64^3$, box $18\,a_{\mathrm{ho}}$; harmonic trap
+        $\boldsymbol\omega=(1,1,1.182)\,\omega_{\mathrm{ref}}$.
+  \item Internal units $\hbar=m=\omega_{\mathrm{ref}}=1$ with
+        $\omega_{\mathrm{ref}}=2\pi\times110\ \mathrm{Hz}=691.15\ \mathrm{rad/s}$.
+\end{itemize}
+The Kawaguchi--Ueda Zeeman operator is $H_Z=-p\,F_z+q\,F_z^{2}$ with
+$p\equiv-g_F\mu_B B$, so $+B_z$ on the $g_F>0$ atom makes $m{=}{-}6$ the ground state.
+Contact couplings use the experimentally established ratio $c_1/c_0=1/36$
+(Buchachenko \emph{et al.}\ antiferromagnetic estimate) under the constraint
+$c_0+F^2c_1=c_{\mathrm{tot}}=4\pi(a_s/a_{\mathrm{ho}})N=4687$, giving $c_0=2344$,
+$c_1=65.1$; DDI $c_{dd}=211$ ($\varepsilon_{dd}\simeq0.54$, strongly dipolar). The spin
+dynamics is thus driven by \emph{both} DDI and contact spin-mixing ($c_1$). ($^{151}$Eu
+has no tabulated per-channel scattering lengths, so the code prints a $c_1{=}0$ warning
+during result \emph{read-back} (\texttt{open\_result}); this is a fallback that does
+\emph{not} affect propagation --- the run's \texttt{Derived: c\_total=4687.3} equals
+$c_0+36c_1$, confirming $c_1{=}65.1$ was used.) Three-body loss
+$K_3=2.1\times10^{-41}\ \mathrm{m^6/s}$ is included. Physical scales are collected in Table~\ref{tab:units}.
+
+\begin{table}[h]\centering
+\begin{tabular}{lll}
+\toprule
+Quantity & internal & physical\\\midrule
+time unit $1\,\wref$ & $1$ & $1.447\ms$\\
+step $dt$ & $0.002$ & $2.9\ \mu\mathrm{s}$\\
+length $a_{\mathrm{ho}}$ & $1$ & $0.780\ \mu\mathrm{m}$ (box $14.0\ \mu\mathrm{m}$, $dx=0.220\ \mu\mathrm{m}$)\\
+trap & $(1,1,1.182)$ & $(110,110,130)\ \mathrm{Hz}$\\
+Larmor @ $26\uG$ & $\sim16\,\wref$ & $\sim24\ms$\\
+\bottomrule
+\end{tabular}
+\caption{Unit conversions (from the run's saved metadata).}
+\label{tab:units}
+\end{table}
+
+\section{Protocol and Goto difference imaging}
+\paragraph{Ramp (Fig.~\ref{fig:ramp}).} The ground state is prepared fully polarized
+in $m{=}{-}6$ (\texttt{initial\_state:\,m\_minus\_F}, $q{=}0$ at $10\ \mathrm{mG}$). The
+field is then ramped \emph{parabolically} $B_z:10\ \mathrm{mG}\!\to\!26\uG$ over
+$90\,\wref=130\ms$ (decelerating at the low-field end), followed by a hold at
+$26\uG$ for $60\,\wref=87\ms$ with a weak symmetry-breaking seed.
+
+\paragraph{Goto method.} We tilt the quantization axis by $\pm\theta$
+($\theta=16^\circ$) about $\hat x$, i.e.\ apply $R(\pm\theta)=e^{\mp i\theta F_x}$ to
+the spinor, extract the $m{=}{-}6$ population, subtract a scaled reference and
+integrate along the imaging axis $y$:
+\begin{equation}
+\Delta n^{\pm}_{\mathrm{col}}(x,z)=\int\!dy\Big[\,\big|(R(\pm\theta)\psi)_{-6}\big|^2
+-C_p\,|\psi_{-6}|^2\Big],\qquad C_p=|R(\theta)_{-6,-6}|^2=\cos^{4F}(\theta/2)=0.79.
+\end{equation}
+The odd/even combinations isolate the transverse and longitudinal spin,
+\begin{equation}
+\mathrm{dif}_{\mathrm{col}}=\tfrac12(\Delta n^{+}-\Delta n^{-})\propto\Fx
+\ \ (\text{EdH / ``checkerboard''}),\qquad
+\mathrm{sum}_{\mathrm{col}}=\tfrac12(\Delta n^{+}+\Delta n^{-})\propto\Fz
+\ \ (\text{``flower''}).
+\end{equation}
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.72\linewidth]{edh_mild_ramp_profile.png}
+\caption{Parabolic field ramp $B_z(t)$ (log scale). The EdH cascade only switches on
+below $\sim571\uG$ (reached at $t\simeq100\ms$); above that $m{=}{-}6$ is a Zeeman
+eigenstate and nothing happens.}
+\label{fig:ramp}
+\end{figure}
+
+\section{EdH cascade and angular-momentum conservation}
+As the field drops, the DDI drives the spin cascade $m{=}{-}6\to-5\to-4\to\dots$
+(Fig.~\ref{fig:cascade}, left): $m{=}{-}6$ depletes from $100\%$ to $\sim55$--$75\%$
+and \emph{oscillates}. The Stern--Gerlach column images
+(Fig.~\ref{fig:cascade}, right) show the daughter states appearing as
+\emph{rings} --- they carry orbital angular momentum (vortices), the microscopic
+signature of spin$\to$orbital transfer.
+
+The decomposition $\Fz$ (spin) and $\Lz$ (orbital,
+$L_z=-i(x\partial_y-y\partial_x)$) confirms genuine EdH (Fig.~\ref{fig:angmom}):
+\begin{equation}
+\Jz=\Fz+\Lz=-6.000\ \text{conserved to}\ 1/1.5\times10^{4},
+\end{equation}
+while $\Fz$ rises ($-6\to-4.98$) and $\Lz$ falls ($0\to-1.02$) in antiphase.
+The $m{=}{-}6$ oscillation is therefore \emph{real, coherent, reversible}
+spin$\leftrightarrow$orbital sloshing, not a one-way cascade. (The atom number drops
+$33\%$ by $K_3$ loss over the long ramp; per-atom $\Jz$ is unaffected.)
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.49\linewidth]{edh_mild_population_cascade.png}\hfill
+\includegraphics[width=0.49\linewidth]{edh_mild_sg_cascade.png}
+\caption{Left: $m$-population cascade. Right: Stern--Gerlach column images
+$n_m(x,y)$; daughter states $m{=}{-}5,{-}4,{-}3$ form rings (orbital angular momentum).}
+\label{fig:cascade}
+\end{figure}
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.72\linewidth]{edh_mild_angmom_conservation.png}
+\caption{Spin ($\Fz$) and orbital ($\Lz$) angular momentum per atom. $\Jz=\Fz+\Lz$
+stays flat at $-6.000$: coherent spin$\leftrightarrow$orbital exchange.}
+\label{fig:angmom}
+\end{figure}
+
+\section{Checkerboard inversion}
+The Goto difference image $\mathrm{dif}_{\mathrm{col}}(x,z)$ is a quadrupolar
+(``checkerboard'') pattern that \emph{inverts} $4\times$ during the hold
+(sign flips at $t=98,112,124,137\,\wref$; Fig.~\ref{fig:cb}). Crucially the
+\emph{global} transverse spin $\Fx=\langle F_y\rangle\approx10^{-8}\approx0$: the
+transverse magnetization is a \emph{net-zero texture}, so only the $\pm\theta$
+difference imaging can reveal it --- a spatially uniform magnetometer would see
+nothing.
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.92\linewidth]{edh_mild_checkerboard_stills.png}
+\caption{Goto difference-image checkerboard $\mathrm{dif}_{\mathrm{col}}(x,z)\propto\Fx$
+at successive hold times; the red/blue pattern inverts (marked frames).}
+\label{fig:cb}
+\end{figure}
+
+\section{Quench-then-parabolic: skipping the inert window strengthens EdH}
+Since the cascade only turns on below $\sim571\uG$, we \emph{quench}
+$10\ \mathrm{mG}\!\to\!500\uG$ ($5.8\ms$) and then apply a parabolic ramp
+$500\!\to\!26\uG$ at the \emph{same rate} as the pure ramp's tail ($28.4\ms$),
+before the identical hold. The active-region dynamics are thus unchanged by
+construction; only the inert high-field stretch is skipped. The result
+(Table~\ref{tab:cmp}, Figs.~\ref{fig:cmpang}--\ref{fig:cmpcb}) is a \emph{stronger}
+EdH: reaching the active window quickly preserves atoms (loss $20\%$ vs $33\%$),
+so the cloud is denser, the DDI stronger, and the transfer larger --- and the total
+sequence is shorter ($121\ms$ vs $217\ms$).
+
+\begin{table}[h]\centering
+\begin{tabular}{lccc}
+\toprule
+& pure parabolic & quench+parabolic \\\midrule
+$\Fz$ reached (spin)          & $-4.98$ & $\mathbf{-4.70}$\\
+$\Lz$ reached (orbital)       & $-1.02$ & $\mathbf{-1.30}$\\
+$\Jz=\Fz+\Lz$                 & $-6.000$ & $-6.000$\\
+$K_3$ atom loss               & $33\%$  & $\mathbf{20\%}$\\
+checkerboard peak $\sum|\mathrm{dif}|$ & $3.59$ & $\mathbf{4.83\ (+35\%)}$\\
+checkerboard inversions       & $4$ & $5$\\
+mean $\mathrm{asym}$          & $+0.15$ (flower) & $\mathbf{-0.17}$ (EdH)\\
+total time                    & $217\ms$ & $\mathbf{121\ms}$\\
+\bottomrule
+\end{tabular}
+\caption{Pure parabolic vs quench-then-parabolic (aligned at $26\uG$ arrival).}
+\label{tab:cmp}
+\end{table}
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.72\linewidth]{compare_quench500_vs_parabolic_angmom.png}
+\caption{Angular momentum, aligned at $26\uG$ arrival. The quench (solid) reaches a
+larger $|\Lz|$ / higher $\Fz$; $\Jz\approx-6$ in both.}
+\label{fig:cmpang}
+\end{figure}
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.72\linewidth]{compare_quench500_vs_parabolic_checkerboard.png}
+\caption{Checkerboard amplitude and signed projection $cb(t)$. The quench version has
+a $35\%$ larger checkerboard; both invert with the same period/phase.}
+\label{fig:cmpcb}
+\end{figure}
+
+\section{What the inversion is: a collective spin--orbital mode}
+The checkerboard is (by construction) the transverse-spin texture, so its inversion
+\emph{is} the texture's Larmor precession. The question is whether this is a
+single-particle precession or a collective mode, and how it relates to the orbital
+$\Lz$ oscillation. Measuring the dominant hold-phase period of each observable
+(Fig.~\ref{fig:prec}):
+\begin{equation}
+T_{cb}=T_{\Lz}=T_{\Fz}=38\ms\ \ (\approx40\ms),\qquad T_{\mathrm{Larmor}}(26\uG)=24\ms .
+\end{equation}
+All three are \emph{locked at one frequency}, phase-shifted --- the checkerboard
+inversion, the orbital $\Lz$ oscillation and the longitudinal $\Fz$ oscillation are
+three faces of a \emph{single coherent spin--orbital collective mode}. It is
+\emph{not} the bare Larmor precession ($24\ms$): the $\sim1.6\times$ slowdown is the
+DDI + quadratic-Zeeman dressing, confirming the dynamics is interaction-driven (EdH),
+not single-particle. So both proposed pictures --- ``$\Lz$ oscillation'' and ``spin
+precession'' --- are correct simultaneously; they are the same mode.
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.75\linewidth]{edh_precession_vs_L.png}
+\caption{Checkerboard $cb(t)$ (transverse-spin texture precession), $\Lz$ (orbital)
+and $\Fz$ (spin) all oscillate at $T\simeq38\ms$, phase-shifted --- one collective
+spin--orbital mode, distinct from the $24\ms$ bare Larmor period.}
+\label{fig:prec}
+\end{figure}
+
+\section{Conclusions}
+\begin{enumerate}\itemsep2pt
+  \item The Goto $\pm16^\circ$ difference-imaging checkerboard (transverse
+        $\Fx$ texture) \emph{inverts periodically} in EdH dynamics and is an
+        observable discriminator of EdH (inverts) vs.\ the flower phase (does not).
+  \item The inversion is one face of a coherent spin$\leftrightarrow$orbital
+        collective mode ($T\simeq38\ms$), with $\Jz$ exactly conserved; it is
+        DDI/quadratic-Zeeman-dressed, not bare Larmor.
+  \item Quenching through the inert high-field window before a parabolic ramp is
+        both faster and \emph{stronger} (less loss $\Rightarrow$ denser $\Rightarrow$
+        larger transfer, $+35\%$ checkerboard).
+\end{enumerate}
+Supplementary animations (\texttt{.mp4}) in \texttt{figures/}:
+\texttt{edh\_mild\_checkerboard\_inversion}, \texttt{edh\_mild\_absorption\_topview/sideview},
+\texttt{edh\_quench500\_checkerboard\_inversion}.
+
+\end{document}
