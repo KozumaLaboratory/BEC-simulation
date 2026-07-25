@@ -39,7 +39,7 @@ pts = sort(
             Int,
             [
                 m.captures[1] for f in readdir(RUN)
-                for m in (match(r"point_(\d+)_", f),) if m !== nothing
+                for m in (match(r"point_(\d+)[._]", f),) if m !== nothing
             ],
         ),
     ),
@@ -54,15 +54,16 @@ open(OUT, "w") do io
         # min-E over ALL seeds present for this point (seed-set agnostic)
         best = nothing
         for f in readdir(RUN)
-            m = match(Regex("^point_0*$(i)_(.+)\\.jld2\$"), f)
+            m = match(Regex("^point_0*$(i)(?:_(.+))?\\.jld2\$"), f)
             m === nothing && continue
+            seed = m.captures[1] === nothing ? "single" : m.captures[1]
             fp_ = joinpath(RUN, f)
             E = try
                 JLD2.load(fp_, "energy")
             catch
                 ; continue
             end
-            (best === nothing || E < best.E) && (best = (; E, f=fp_, s=m.captures[1]))
+            (best === nothing || E < best.E) && (best = (; E, f=fp_, s=seed))
         end
         best === nothing && continue
         psi = ComplexF64.(JLD2.load(best.f, "psi"))
