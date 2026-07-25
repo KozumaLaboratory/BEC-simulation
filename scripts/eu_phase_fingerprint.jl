@@ -20,13 +20,16 @@ const RUN =
     length(ARGS) >= 1 ? ARGS[1] : error("usage: eu_phase_fingerprint.jl <run_dir> [out.csv]")
 const OUT = length(ARGS) >= 2 ? ARGS[2] : joinpath(RUN, "fingerprint_table.csv")
 const C1DEF = parse(Float64, get(ENV, "SPINORBEC_PHASE_C1", "NaN"))
+# B fallback (µG) for slices where B is a base value, not a scan override.
+const BDEF = parse(Float64, get(ENV, "SPINORBEC_PHASE_B_UG", "NaN"))
 
 _ug(s) = 1e6 * parse(Float64, split(String(s))[1])
 
 function _cellkey(ov)
     c1 = get(ov, "pipeline.0.interactions.c1_ratio", missing)
+    b = get(ov, "pipeline.0.B.Bz", missing)
     (c1 === missing ? C1DEF : Float64(c1),
-        _ug(get(ov, "pipeline.0.B.Bz", "0.0 Gauss")),
+        b === missing ? BDEF : _ug(b),
         Float64(get(ov, "pipeline.0.potential.omega.2", NaN)))
 end
 

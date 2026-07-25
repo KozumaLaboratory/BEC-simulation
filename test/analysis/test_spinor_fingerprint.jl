@@ -103,4 +103,28 @@ flux_of(psi) =
         @test length(fp.winding) == D
         @test haskey(fp, :sigma) && haskey(fp, :inert)
     end
+
+    @testset "non-cubic grid (isotropic dx, cigar z-box)" begin
+        # A cigar trap (κ<1) needs a taller z-box, so the grid is non-cubic but
+        # keeps isotropic spacing (dx=dy=dz). The structure-factor peak used to
+        # assume a cubic shape (NX³ k-grid) and threw a BoundsError here; guard it.
+        nx, nz = 16, 32
+        box_r = 12.0
+        g = make_grid(GridConfig((nx, nx, nz), (box_r, box_r, box_r * nz / nx)))
+        @test (g.x[1][2] - g.x[1][1]) ≈ (g.x[3][2] - g.x[3][1])   # isotropic dx
+        psi = zeros(ComplexF64, nx, nx, nz, D)
+        z0 = ry_col(0.0)
+        w = box_r / 5
+        for k in 1:nz, j in 1:nx, i in 1:nx
+            r2 = g.x[1][i]^2 + g.x[2][j]^2 + g.x[3][k]^2
+            gg = exp(-r2 / (2w^2))
+            for c in 1:D
+                psi[i, j, k, c] = gg * z0[c]
+            end
+        end
+        fp = spinor_fingerprint(psi, g, F)       # must not throw on non-cubic
+        @test fp.mF ≈ 1.0 atol = 1e-6
+        @test isfinite(fp.spin_mod) && isfinite(fp.dens_mod)   # _struct_peak outputs
+        @test isfinite(fp.fluxclosure)
+    end
 end
