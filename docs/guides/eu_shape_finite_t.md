@@ -137,3 +137,29 @@ $>$ box(sudden)** for the condensate, sudden-box worst — confirming the conclu
 at the real Eu formation conditions, not just the model point. The box's uniform-
 density (total-loss) advantage does not convert into a condensate gain here; a
 larger / slower box is the remaining lever to probe.
+
+## Harmonic decompression recipe (no box — the experimentally usable lever)
+
+With no box trap available, the deliverable is the best **harmonic** protocol:
+lower the ODT power. `ft_decompress_optimize` sweeps $(\omega_\mathrm{final},\tau)$
+of the closed-system decompression at the 0-D-calibrated formation conditions
+($\bar\omega=2\pi\cdot284$ Hz, $N=6.6\times10^4$, $T/T_c=0.5$, $34$ ms window);
+`eu_ft_decompress_opt.png` is the $N_0$ heatmap (colour $=N_0/N_0^\mathrm{hold}$,
+$N_0^\mathrm{hold}=44656$).
+
+**Optimum: decompress to $\omega_\mathrm{final}\approx0.65\,\omega_\mathrm{form}$,
+fast ($\tau\to0$) → $N_0=51570$, $+15.5\%$ over holding.**
+
+Two clean features:
+- **Interior optimum in $\omega_\mathrm{final}$** ($\sim0.5$–$0.65$): loosening cuts
+  three-body loss, but over-loosening ($0.35$) drops $T_c\propto\bar\omega$ and melts
+  the condensate — the finite-$T$ trade-off, made quantitative.
+- **Faster is better** ($\tau=0$ wins every row): unlike the box, a harmonic→weaker-
+  harmonic quench is mild (the ground state stays a parabola), so a sudden
+  decompression reaches low density fastest without shattering the BEC. The gentler
+  $\tau\approx7$ ms is within a few % and avoids exciting a breathing mode — the
+  practical choice.
+
+## Next
+Realistic cooling trajectory $T(t),\mu(t)$ fed from `run_evaporation_bec`; a finer
+$\omega_\mathrm{final}$ grid to pin the interior optimum; an adiabatic (ramped) box.
