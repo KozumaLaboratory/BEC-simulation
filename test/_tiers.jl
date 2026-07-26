@@ -359,6 +359,10 @@ const FULL_EXTRA = [
     "workflow/test_calibration_drift.jl",
     "workflow/test_dynamics_knobs.jl",
     "gpu/test_cuda_equivalence.jl",
+    # GPU=CPU parity for the projected-GP momentum cutoff. Gates the host-array
+    # mask broadcast bug (ws.grid.k_squared is a host Array even on a GPU
+    # workspace); no-op on CPU-only CI. CPU high-k-removal sanity always runs.
+    "gpu/test_projected_gp_parity.jl",
     "hamiltonian/test_tdhfb_gpu_phase5ab.jl",
     "hamiltonian/test_tdhfb_gpu_phase5c_expm.jl",
     "hamiltonian/test_tdhfb_gpu_phase5c_hf.jl",
