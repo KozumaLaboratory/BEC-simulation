@@ -194,7 +194,7 @@ same-model baseline), and ramps faster than $\sim0.4\times$ **fail to reach BEC*
 $+42\%$ knife-edge. (`noneq_scale=0` preserves the validated model; the evaporation
 test suite passes unchanged.)
 
-**Two-stage recipe.** Optimize the evaporation ramp (a faster, $\gamma\!\approx\!0.7$
+**Two-stage recipe** (`eu_ft_recipe.png` says it in one figure — *moderate on both knobs; the extremes break the BEC*). Optimize the evaporation ramp (a faster, $\gamma\!\approx\!0.7$
 warped power drop; $+30$–$40\%$ BEC at formation, with the higher end a knife-edge),
 then decompress the ODT to $\bar\omega\approx0.6\,\bar\omega_\mathrm{form}$, fast
 ($+16\%$ condensate) — both experimentally available with the harmonic trap alone.
