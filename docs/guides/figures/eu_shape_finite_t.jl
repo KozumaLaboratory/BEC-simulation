@@ -402,6 +402,57 @@ function ft_shape_calibrated(; T_over_Tc::Float64=0.6, grid_n::Int=64, box::Floa
         n_traj=8, backend, csv_prefix)
 end
 
+# HARMONIC-ONLY decompression optimization (no box — the experimentally available
+# lever is lowering the ODT power). 2-D sweep over (ω_final, ramp duration τ) of the
+# closed-system decompression from the 0-D-calibrated BEC-formation trap; reports the
+# final condensate N₀ heatmap and the optimum — the ODT ramp recipe that keeps the
+# most BEC. bias-corrected N₀ is M-independent, so a modest ensemble suffices.
+function ft_decompress_optimize(; T_over_Tc::Float64=0.5, use_calibration::Bool=true,
+    grid_n::Int=64, box::Float64=20.0, prep_time::Float64=12.0, hold_time::Float64=48.0,
+    dt::Float64=0.01, gs_steps::Int=3000, gamma::Float64=0.1, n_traj::Int=6,
+    omega_finals::Vector{Float64}=[0.35, 0.5, 0.65, 0.8],
+    taus::Vector{Float64}=[0.0, 12.0, 30.0, 48.0],   # ramp duration (internal units)
+    backend=CPUBackend(), csv::String=joinpath(@__DIR__, "eu_ft_decompress_opt.csv"))
+    u = use_calibration ? ft_reservoir_calibration().u : EuUnits(; omega_ref=2π * 420.0)
+    println()
+    s = _setup(u, grid_n, box, gs_steps, backend)
+    Tc = Tc_harmonic(u.N)
+    T = T_over_Tc * Tc
+    k_cut = min(kcut_for(s.mu, T), 0.95 * s.k_max)
+    Tot = prep_time + hold_time
+    to_ms(τ) = τ / u.omega_ref * 1e3
+    @printf "μ=%.3f, T=%.2f (T/Tc=%.2f), k_cut=%.2f, k_max=%.2f, window=%.0f ms\n" s.mu T T_over_Tc k_cut s.k_max to_ms(Tot)
+    gamma_of_t = t -> t < prep_time ? gamma : 0.0
+    # HOLD baseline (no decompression) for reference.
+    hold = run_ensemble(u, s.grid, s.psi0; potential_of_t=harmonic_schedule(_ -> 1.0),
+        gamma_of_t, T, k_cut, mu=s.mu, loss_on=true, n_traj, T_internal=Tot, dt, backend)
+    N0_hold = hold.N0[end]
+    println("=== Harmonic decompression optimization (final condensate N₀) ===")
+    @printf "  HOLD baseline N₀=%.5g\n" N0_hold
+    @printf "  %-8s %-8s %-11s %-9s\n" "ω_final" "τ[ms]" "N₀" "gain/hold"
+    rows = NTuple{4, Float64}[]
+    for ωf in omega_finals, τ in taus
+        ramp = t -> t < prep_time ? 1.0 :
+                    (τ <= 0 ? ωf : max(ωf, 1.0 - (1.0 - ωf) * ((t - prep_time) / τ)))
+        r = run_ensemble(u, s.grid, s.psi0; potential_of_t=harmonic_schedule(ramp),
+            gamma_of_t, T, k_cut, mu=s.mu, loss_on=true, n_traj, T_internal=Tot, dt, backend)
+        N0 = r.N0[end]
+        push!(rows, (ωf, to_ms(τ), N0, N0 / N0_hold))
+        @printf "  %-8.2f %-8.1f %-11.5g %-9.3f\n" ωf to_ms(τ) N0 (N0 / N0_hold)
+    end
+    open(csv, "w") do io
+        println(io, "omega_final,tau_ms,N0,gain_over_hold,N0_hold")
+        for r in rows
+            @printf io "%.4f,%.4f,%.6g,%.6f,%.6g\n" r[1] r[2] r[3] r[4] N0_hold
+        end
+    end
+    best = rows[argmax([r[3] for r in rows])]
+    println()
+    @printf "  OPTIMUM: ω_final=%.2f, τ=%.1f ms → N₀=%.5g (%.1f%% over HOLD)\n" best[1] best[2] best[3] 100 * (best[4] - 1)
+    @printf "  CSV → %s\n" csv
+    (u=u, rows=rows, N0_hold=N0_hold, best=best)
+end
+
 # Quick local logic smoke (small, fast — NOT physical resolution).
 function ft_smoke(; backend=CPUBackend())
     ft_equilibrium(; grid_n=32, box=16.0, T_over_Tc_list=[0.1, 0.6],
@@ -447,6 +498,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
         ft_reservoir_calibration()
     elseif mode == "shape_cal"
         ft_shape_calibrated(; backend=bk)
+    elseif mode == "decompress_opt"
+        ft_decompress_optimize(; backend=bk)
     elseif mode == "kcut"
         ft_kcut_convergence(; backend=bk)
     elseif mode == "shape"
