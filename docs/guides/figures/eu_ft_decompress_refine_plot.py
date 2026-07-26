@@ -14,6 +14,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from _smoothcurve import smooth
 
 here = os.path.dirname(os.path.abspath(__file__))
 csv = sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, "eu_ft_decompress_refine.csv")
@@ -26,7 +27,7 @@ of, N0 = of[o], N0[o]
 imax = int(np.argmax(N0))
 
 fig, ax = plt.subplots(figsize=(6.8, 4.6))
-ax.plot(of, N0, "-o", color="#1f6feb", ms=8, lw=1.8, label="decompress (fast, τ→0)")
+ax.plot(*smooth(of, N0), "-", color="#1f6feb", lw=2.2, label="decompress (fast, τ→0)")
 ax.axhline(N0_hold, ls="--", color="#d1242f", lw=1.5, label=f"HOLD (no decompress) = {N0_hold:.0f}")
 ax.plot(of[imax], N0[imax], "*", color="#2da44e", ms=20, mec="white", mew=0.8,
         label=fr"optimum $\omega_\mathrm{{final}}$={of[imax]:.2f}  (+{100*(N0[imax]/N0_hold-1):.0f}%)")

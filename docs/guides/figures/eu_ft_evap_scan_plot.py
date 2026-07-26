@@ -15,6 +15,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from _smoothcurve import smooth
 
 here = os.path.dirname(os.path.abspath(__file__))
 csv = sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, "eu_ft_evap_ramp_scan.csv")
@@ -31,7 +32,8 @@ for ax, pname, title in zip(axes, params, titles):
     order = np.argsort(v)
     v, N, reached = v[order], N[order], reached[order]
     ok = np.array([r.lower().startswith("t") for r in reached])
-    ax.plot(v[ok], N[ok], "-o", color="#1f6feb", ms=6, label="reached BEC")
+    if ok.sum() >= 2:
+        ax.plot(*smooth(v[ok], N[ok]), "-", color="#1f6feb", lw=2.2, label="reached BEC")
     if (~ok).any():
         ax.plot(v[~ok], N[~ok], "x", color="#d1242f", ms=7, label="no BEC")
     ax.axvline(1.0, ls="--", color="#999", lw=1.2, label="baseline (=1)")

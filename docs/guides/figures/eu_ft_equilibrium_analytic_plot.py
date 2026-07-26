@@ -18,6 +18,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from _smoothcurve import smooth
 
 here = os.path.dirname(os.path.abspath(__file__))
 acsv = sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, "eu_ft_equilibrium_analytic.csv")

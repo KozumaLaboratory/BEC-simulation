@@ -13,6 +13,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from _smoothcurve import smooth
 
 here = os.path.dirname(os.path.abspath(__file__))
 csv = sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, "eu_shape_validation.csv")
@@ -40,11 +41,9 @@ panels = [
 for ax, y, theory, ylabel, title in panels:
     m, b = fit_slope(omega[good], y[good])
     xx = np.linspace(omega.min(), omega.max(), 100)
-    ax.loglog(omega[good], y[good], "o", ms=8, color="#1f6feb", label="GP ground state", zorder=3)
+    ax.loglog(*smooth(omega[good], y[good]), "-", color="#1f6feb", lw=2.2, label="GP ground state", zorder=3)
     if (~good).any():
         ax.loglog(omega[~good], y[~good], "x", ms=8, color="#999", label="box-spill (excluded)", zorder=3)
-    ax.loglog(xx, np.exp(b) * xx**m, "-", color="#1f6feb", lw=1.8,
-              label=fr"fit slope ${m:.2f}$")
     # theory reference through the first good point
     x0, y0 = omega[good][0], y[good][0]
     ax.loglog(xx, y0 * (xx / x0)**theory, "--", color="#d1242f", lw=1.6,

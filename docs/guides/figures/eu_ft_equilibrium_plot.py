@@ -16,6 +16,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from _smoothcurve import smooth
 
 here = os.path.dirname(os.path.abspath(__file__))
 csv = sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, "eu_ft_equilibrium.csv")
@@ -29,8 +30,8 @@ r, N0, Nth, n0n = r[order], N0[order], Nth[order], n0n[order]
 
 fig, (axN, axf) = plt.subplots(1, 2, figsize=(10.5, 4.4))
 
-axN.plot(r, N0, "-o", color="#1f6feb", ms=7, label=r"condensate $N_0$ (physical, IR)")
-axN.plot(r, Nth, "-s", color="#bf8700", ms=6, label=r"thermal $N_{th}$ (classical-field, RJ)")
+axN.plot(*smooth(r, N0), "-", color="#1f6feb", ms=7, label=r"condensate $N_0$ (physical, IR)")
+axN.plot(*smooth(r, Nth), "-", color="#bf8700", ms=6, label=r"thermal $N_{th}$ (classical-field, RJ)")
 axN.axhline(1e4, ls=":", color="#1f6feb", alpha=0.5, lw=1.0, label=r"$N$")
 axN.set_xlabel(r"$T/T_c$")
 axN.set_ylabel("atom number")
@@ -41,7 +42,7 @@ axN.set_ylim(bottom=0)
 
 xx = np.linspace(0, 1, 200)
 axf.plot(xx, 1 - xx**3, "--", color="#999", lw=1.5, label=r"quantum $1-(T/T_c)^3$ (orientation)")
-axf.plot(r, n0n, "-o", color="#1f6feb", ms=7, label=r"$N_0/N$ (SGPE)")
+axf.plot(*smooth(r, n0n), "-", color="#1f6feb", ms=7, label=r"$N_0/N$ (SGPE)")
 axf.set_xlabel(r"$T/T_c$")
 axf.set_ylabel(r"$N_0/N$")
 axf.set_xlim(0, 1)

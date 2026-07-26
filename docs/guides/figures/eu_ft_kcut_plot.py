@@ -20,6 +20,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from _smoothcurve import smooth
 
 here = os.path.dirname(os.path.abspath(__file__))
 csv = sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, "eu_ft_kcut.csv")
@@ -36,9 +37,9 @@ d0 = (N0.max() - N0.min()) / N0.mean()
 dth = (Nth.max() - Nth.min()) / Nth.mean()
 
 fig, ax = plt.subplots(figsize=(6.8, 4.6))
-ax.plot(k, N0, "-o", color="#1f6feb", ms=8, lw=1.7,
+ax.plot(*smooth(k, N0), "-", color="#1f6feb", ms=8, lw=1.7,
         label=fr"condensate $N_0$  (spread {100*d0:.0f}%)")
-ax.plot(k, Nth, "-s", color="#bf8700", ms=7, lw=1.5,
+ax.plot(*smooth(k, Nth), "-", color="#bf8700", ms=7, lw=1.5,
         label=fr"thermal $N_{{th}}$  (spread {100*dth:.0f}%)")
 ax.axvline(k_phys, ls="--", color="#57606a", lw=1.4,
            label=fr"physical cutoff $\varepsilon-\mu\!\approx\!T$ ($k_\mathrm{{cut}}\!=\!{k_phys:.1f}$)")
