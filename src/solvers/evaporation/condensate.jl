@@ -84,18 +84,26 @@ function _evap_rhs_bec(N::Float64, T::Float64, U::Float64, ω̄::Float64, p::Eva
 end
 
 """
-    run_evaporation_bec(trap, ramp, p; N0, T0, dt=ramp_duration/3000, save_every=10)
-        -> EvapBecResult
+    run_evaporation_bec(trap, ramp, p; N0, T0, dt=ramp_duration/3000, save_every=10,
+        omega_mult=(t -> 1.0)) -> EvapBecResult
 
 Two-component evaporation: like [`run_evaporation`](@ref) but does NOT stop at the BEC
 onset — it continues through the transition, tracking the condensate `N₀(t)` and the
 thermal cloud `N_th(t)`. Below `T_c` evaporation acts on the (saturated) thermal cloud
 while three-body loss depletes the dense condensate; the surviving `N₀_final` is the
 BEC atom number. Above `T_c` it reduces to the thermal model (`N₀ = 0`).
+
+`omega_mult(t) -> Float64` is an independent **tightness multiplier** `m_ω(t)` on the
+mean frequency: the run drives `ω̄_eff(t) = m_ω(t)·ω̄_ramp(t)` while the depth `U(t)`
+(hence the evaporation drive) stays set by the power ramp. Physically this is the ODT
+waist `w(t)` — `U∝P/w²`, `ω̄∝√P/w²`, so `(P, w)` give independent `(U, ω̄)`. It feeds the
+condensate density / `T_c` AND the adiabatic heating `dT/T = dln(m_ω·ω̄)/dt` consistently
+(the finite-difference of the effective ω̄). `m_ω ≡ 1` recovers the power-ramp run exactly.
 """
 function run_evaporation_bec(
     trap::EvapTrap, ramp::FortRamp, p::EvapParams;
-    N0::Float64, T0::Float64, dt::Float64=ramp_duration(ramp) / 3000, save_every::Int=10)
+    N0::Float64, T0::Float64, dt::Float64=ramp_duration(ramp) / 3000, save_every::Int=10,
+    omega_mult=(t -> 1.0))
     m = trap.mass
     t0 = ramp.times[1]
     tend = ramp.times[end]
@@ -123,11 +131,16 @@ function run_evaporation_bec(
     end
     dtg = ngrid > 1 ? (tend - t0) / (ngrid - 1) : 1.0
     @inline function trap_interp(tq::Float64)
-        tq <= t0 && return (Ug[1], ωg[1])
-        tq >= tend && return (Ug[ngrid], ωg[ngrid])
-        j = clamp(floor(Int, (tq - t0) / dtg) + 1, 1, ngrid - 1)
-        f = (tq - (t0 + (j - 1) * dtg)) / dtg
-        (Ug[j] * (1 - f) + Ug[j + 1] * f, ωg[j] * (1 - f) + ωg[j + 1] * f)
+        U, ω = if tq <= t0
+            (Ug[1], ωg[1])
+        elseif tq >= tend
+            (Ug[ngrid], ωg[ngrid])
+        else
+            j = clamp(floor(Int, (tq - t0) / dtg) + 1, 1, ngrid - 1)
+            f = (tq - (t0 + (j - 1) * dtg)) / dtg
+            (Ug[j] * (1 - f) + Ug[j + 1] * f, ωg[j] * (1 - f) + ωg[j + 1] * f)
+        end
+        (U, ω * omega_mult(tq))
     end
 
     function record!(U, ω̄)

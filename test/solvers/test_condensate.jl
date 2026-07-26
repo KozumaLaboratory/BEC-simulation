@@ -92,6 +92,26 @@ _ramp_c() = FortRamp(
             evap_rhs(Nlo, Tlo, Ulo, ω̄2, p, _m_c)
     end
 
+    # Independent tightness axis m_ω(t): a multiplier on ω̄ only (the ODT waist), leaving the
+    # depth U (evaporation drive) set by the power ramp. m_ω ≡ 1 must recover the power-ramp run
+    # exactly; loosening collapses T_c ∝ ω̄ and melts the BEC (the numeric form of the
+    # "dilute but not too dilute" constraint).
+    @testset "tightness axis m_ω: identity + T_c-collapse melt" begin
+        trap = _trap_c()
+        p = EvapParams(; a_s=_as_c, tau_bg=10.0, K3=0.0)
+        base = run_evaporation_bec(trap, _ramp_c(), p; N0=2e6, T0=40e-6)
+        # m_ω ≡ 1 is bit-identical to the default (no waist axis engaged)
+        one = run_evaporation_bec(trap, _ramp_c(), p; N0=2e6, T0=40e-6, omega_mult=(t -> 1.0))
+        @test one.N0_final == base.N0_final
+        @test one.T_final == base.T_final
+        @test one.N == base.N
+        @test one.N0 == base.N0
+        @test base.N0_final > 0                        # baseline forms a condensate
+        # loosening far enough collapses T_c ∝ ω̄ ⇒ the condensate melts away
+        loose = run_evaporation_bec(trap, _ramp_c(), p; N0=2e6, T0=40e-6, omega_mult=(t -> 0.2))
+        @test loose.N0_final < base.N0_final
+    end
+
     @testset "above T_c reduces to the thermal model (no condensate)" begin
         trap = _trap_c()
         p = EvapParams(; a_s=_as_c, tau_bg=Inf, K3=0.0)
