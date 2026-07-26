@@ -163,13 +163,25 @@ Two clean features:
 
 The FORT power schedule that forms the BEC is itself optimizable
 (`ft_evap_ramp_optimize`, `eu_ft_evap_ramp.png`): a Bayesian search over the
-researched euv3 ramp (duration / final-power / time-warp transform) lifts the
-condensate at BEC onset from $N_\mathrm{BEC}=6.56\times10^4$ to $8.56\times10^4$
-(**$+30.5\%$**), reaching BEC faster ($t_\mathrm{BEC}$ $1.70\to1.02$ s) via a steeper,
-deeper power ramp. (The optimum sits at the parameter-bound corner — widening the
-bounds could gain more.)
+researched euv3 ramp (duration / final-power / time-warp transform), with the bounds
+widened, lifts the condensate at BEC onset from $N_\mathrm{BEC}=6.56\times10^4$ to
+$8.69\times10^4$ (**$+32.4\%$**, interior optimum $[0.56,0.19,0.71]$), reaching BEC
+faster ($t_\mathrm{BEC}$ $1.70\to1.05$ s) via a steeper ramp.
 
-**Two-stage recipe.** Optimize the evaporation ramp ($+30\%$ BEC at formation),
+**Parameter landscapes** (`eu_ft_evap_scan.png`) show what is really going on:
+- **duration is monotone** — shorter/faster is always better ($N_\mathrm{BEC}$ rises
+  to $\sim9.3\times10^4$, $+42\%$, at the shortest duration that still reaches BEC,
+  $\approx0.39$), because a faster ramp spends less time bleeding to three-body loss.
+  The only hard limit is BEC-reachability (too fast → no condensation). This is a
+  knife-edge, and it is exactly where the 0-D truncated-Boltzmann model's quasi-static
+  assumption weakens (real non-equilibrium heating, unmodeled here) — so the practical
+  recommendation is a *moderate* speedup, not the edge.
+- **final-power is irrelevant** — BEC onset occurs before the ramp ends, so the ramp
+  endpoint is never reached.
+- **time-warp has a genuine interior optimum** $\gamma\approx0.7$ — the robust lever.
+
+**Two-stage recipe.** Optimize the evaporation ramp (a faster, $\gamma\!\approx\!0.7$
+warped power drop; $+30$–$40\%$ BEC at formation, with the higher end a knife-edge),
 then decompress the ODT to $\bar\omega\approx0.6\,\bar\omega_\mathrm{form}$, fast
 ($+16\%$ condensate) — both experimentally available with the harmonic trap alone.
 

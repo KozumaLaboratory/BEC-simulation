@@ -290,14 +290,38 @@ end
 # EVAPORATION RAMP optimization (0-D, CPU) — the FORT power schedule BEFORE the
 # decompression. Bayesian-optimizes the researched euv3 ramp (3-param transform:
 # duration / final-power / time-warp) to maximize the condensate at BEC onset.
-function ft_evap_ramp_optimize(; n_iter::Int=40, n_init::Int=8,
+# `bounds` widened from the default so the corner-optimum can move; the 1-D scans
+# then show whether N_BEC has a real physical peak (spilling / too-short evaporation)
+# or keeps rising to the bound (a model limit needing a constraint).
+function ft_evap_ramp_optimize(; n_iter::Int=50, n_init::Int=10,
+    bounds::Vector{Tuple{Float64, Float64}}=[(0.15, 3.0), (0.05, 2.0), (0.2, 2.0)],
     csv_prefix::String=joinpath(@__DIR__, "eu_ft_evap_ramp"))
     base = SpinorBEC.run_euv3_evaporation()
     @printf "baseline euv3 ramp: reached_bec=%s, N_BEC=%.3g, T_BEC=%.0f nK\n" base.reached_bec base.N_BEC base.T_BEC * 1e9
-    print("Bayesian-optimizing the FORT ramp ($n_iter iters) ... ")
+    print("Bayesian-optimizing the FORT ramp ($n_iter iters, widened bounds) ... ")
     t0 = time()
-    opt = SpinorBEC.optimize_euv3_evaporation(; n_init=n_init, n_iter=n_iter)
+    opt = SpinorBEC.optimize_euv3_evaporation(; n_init=n_init, n_iter=n_iter, bounds=bounds)
     @printf "%.1f s\n" (time() - t0)
+    @printf "  best params [dur, final-P, warp] = %s\n" string(round.(opt.bo.best_p; digits=3))
+    # 1-D landscape scans (hold the other two params at the optimum) to locate the
+    # physical peak of each parameter.
+    trap = SpinorBEC.euv3_evap_trap()
+    base_ramp = SpinorBEC.euv3_evaporation_ramp()
+    p = SpinorBEC.EvapParams(; a_s=Eu151.a_s, tau_bg=15.0, K3=1.6107615346177146e-40)
+    N0load, T0load = 3.5e6, 50e-6
+    names = ("duration", "final_power", "warp")
+    open("$(csv_prefix)_scan.csv", "w") do io
+        println(io, "param,value,N_BEC,reached")
+        for idx in 1:3
+            lo, hi = bounds[idx]
+            for v in range(lo, hi; length=13)
+                sc = SpinorBEC.scan_ramp_param(trap, p, base_ramp; index=idx, values=[v],
+                    base_params=collect(Float64, opt.bo.best_p), N0=N0load, T0=T0load)[1]
+                @printf io "%s,%.4f,%.6g,%s\n" names[idx] v (isnan(sc.N_BEC) ? 0.0 : sc.N_BEC) sc.reached
+            end
+        end
+    end
+    @printf "  scan CSV → %s_scan.csv\n" csv_prefix
     ob, or = base, opt.result
     @printf "  baseline  N_BEC=%.4g  T_BEC=%.0f nK  t_BEC=%.2f s\n" ob.N_BEC ob.T_BEC * 1e9 ob.t_BEC
     @printf "  optimized N_BEC=%.4g  T_BEC=%.0f nK  t_BEC=%.2f s   (%.1f%% more BEC)\n" or.N_BEC or.T_BEC * 1e9 or.t_BEC 100 * (or.N_BEC / ob.N_BEC - 1)
