@@ -1,0 +1,122 @@
+# ¹⁵¹Eu finite-temperature trap-shape optimization
+
+The definitive, finite-temperature version of the $T=0$ trap-shape study
+(`eu_shape_optimization.md`). At $T>0$ the shape optimum is governed by a
+competition the $T=0$ Gross–Pitaevskii picture cannot see, so we evolve the
+**Stoof-form (full-Hamiltonian) Stochastic Projected Gross–Pitaevskii equation**.
+
+Driver: `docs/guides/figures/eu_shape_finite_t.jl`. Runs on TSUBAME H100 via
+`scripts/eu_shape/submit_finite_t.sh` (modes `probe | campaign | equilibrium | kcut | shape`).
+
+## Physics
+
+Three-body loss favours expansion (lower density $\Rightarrow$ less loss,
+$\langle n^2\rangle\propto\bar\omega^{12/5}$). At finite $T$ the counter-force is
+the condensate itself: $T_c\propto\hbar\bar\omega N^{1/3}$ drops as the trap
+loosens, so at fixed $T$ the condensate melts. The resolution — and the reason
+expansion still wins — is adiabaticity: an adiabatic expansion cools the gas
+($T\propto\bar\omega$) in step with $T_c\propto\bar\omega$, so $T/T_c$ is
+**preserved** and the condensate survives while the density (and loss) fall.
+
+Model: a single stretched $|m=-6\rangle$ component (scalar-equivalent), physical
+$K_3$ loss, and the SGPE dissipative + thermal sub-step
+$\psi\leftarrow\psi-\gamma(\hat H[\psi]-\mu)\psi\,dt + \sqrt{2\gamma T\,dt/dV}\,\xi$,
+which relaxes toward the interacting thermal state at $(\mu,T)$.
+
+## Two normalization/physics points that must be right
+
+**Norm-N.** The FDR noise amplitude $\sigma=\sqrt{2\gamma T\,dt/dV}$ assumes
+$|\psi|^2$ is the *physical* density ($\int|\psi|^2=N$). The $T=0$ driver uses
+norm-1 ($\int|\psi|^2=1$, with $N$ folded into $c_0=\tilde g N$); running the SGPE
+there makes the noise $\sqrt N$ too large and the thermal cloud $\sim N\times$ too
+heavy. The finite-T driver therefore runs **norm-N**: seed $\psi_N=\sqrt N\,\psi_1$
+and use the bare couplings $c_0=\tilde g$, $K_3=\tilde K_3$. The mean field
+$\tilde g|\psi_N|^2=\tilde g N|\psi_1|^2$ and the loss $n=|\psi_N|^2$ are then both
+correct, and $\int|\psi|^2$ is the physical atom number.
+
+**Closed-system ramp.** A fixed-$\mu$ Stoof bath is grand-canonical: when the trap
+loosens, the GP fixed point at that $\mu$ holds more atoms, so the bath *pumps*
+the condensate — unphysical for an atom-survival question. So the bath ($\gamma$,
+noise) runs only during the **preparation** phase; the shape ramp is evolved as a
+**closed system** ($\gamma=0$, loss on), where the gas cools adiabatically as it
+expands.
+
+**Condensate measure (bias-corrected).** The raw coherent estimator
+$\int|\langle\psi\rangle|^2$ over-counts by the residual thermal variance $/M$
+($M$ trajectories): $E[|\langle\psi\rangle|^2]=\phi^2+n_{th}/M$, so it depends on
+$M$ (uncorrected: $M{=}3\to10260$, $M{=}8\to8035$ at $T/T_c{=}0.5$ — a fake 28 %
+"physics"). The Penrose–Onsager-consistent correction
+$n_c=|\langle\psi\rangle|^2-(\langle|\psi|^2\rangle-|\langle\psi\rangle|^2)/(M-1)$
+subtracts it, making $N_0=\int n_c\,dV$ unbiased and $M$-independent ($M{=}3\to6448$,
+$M{=}8\to6401$).
+
+**Classical-field cutoff.** The noise populates every mode, so a projection at
+$k_\mathrm{cut}$ with $\varepsilon(k_\mathrm{cut})-\mu\approx T$ (i.e.
+$k_\mathrm{cut}=\sqrt{2(\mu+T)}$) defines the classical region; the grid must
+resolve it ($k_\mathrm{max}=\pi/dx>k_\mathrm{cut}$, hence $\ge 48^3$).
+
+**Single-component / $D$.** All atoms sit in the stretched state with $c_1=0$, so
+the spin matrices never enter and any $F$ gives identical physics — only $D=2F+1$
+(cost) changes. The runs use $F=1$ ($D=3$), $4.3\times$ cheaper than Eu's $D=13$;
+the Eu units live in the explicit $c_0,K_3$.
+
+## Validation (falsifiable, not hand-waved)
+
+| Check | What | Result |
+|---|---|---|
+| **V-FDR** | Rayleigh–Jeans $\langle|\hat\psi(k)|^2\rangle=T/(\tfrac12k^2-\mu)$ | existing `test_sgpe_fdr.jl` ✓ |
+| **V-Stoof** | $T\to0$ → interacting GP ground state | existing `test_sgpe_stoof.jl` ✓ |
+| **V-T0** | $N_0/N\to1$ as $T\to0$ | $0.95$ at $T/T_c{=}0.1$ ✓ |
+| **V-mono** | condensate $N_0$ melts monotonically | $9502\to3100$ over $T/T_c{=}0.1\!\to\!0.9$ ✓ |
+| **estimator** | $N_0$ independent of trajectory count $M$ | $M{=}3\to6448$, $M{=}8\to6401$ ✓ |
+
+**Honest cutoff limitation (not hand-waved).** The classical field IS
+cutoff-dependent. Over $k_\mathrm{cut}\in[4.6,8.0]$ the thermal cloud spreads
+$\sim79\%$ while the condensate $N_0$ moves $\sim30\%$: $N_0$ is the *more robust*
+of the two but NOT cutoff-free. So absolute $N_0$ is quoted at the physical cutoff
+$\varepsilon-\mu\approx T$, and only comparisons at FIXED $k_\mathrm{cut}$ (the
+shape result) are cutoff-clean. The ideal-Bose $1-(T/T_c)^3$ is drawn only for
+orientation — the classical (Rayleigh–Jeans) thermal over-populates, so $N_0/N$
+sits below it; it is not a fit.
+
+## Equilibrium is analytic; the SGPE is for the dynamics
+
+A key clarification (`eu_ft_equilibrium_analytic.png`, `ft_equilibrium_analytic`,
+NO simulation): the fixed-$N$ equilibrium is fixed by the atom + trap + $N$
+properties, because the *quantum* thermal cloud is **bounded**,
+$N_{th}=\zeta(3)(k_BT/\hbar\bar\omega)^3=N(T/T_c)^3$, giving $N_0=N[1-(T/T_c)^3]$ and a
+chemical potential pinned by the condensate,
+$\mu(T)=\mu_\mathrm{GP}(N_0/N)^{2/5}$, $\mu_\mathrm{GP}=\tfrac12\hbar\bar\omega(15N
+a_s/a_\mathrm{ho})^{2/5}=11.76\,\hbar\omega_\mathrm{ref}$ (matching the numerical GS
+$11.93$). The classical-field SGPE, by contrast, over-populates the thermal cloud
+(Rayleigh–Jeans: each classical mode carries $\sim k_BT$), so at fixed $\mu$ its
+total atom number grows with $T$ and its $N_0/N$ sits below the physical curve — a
+method artefact, not physics. **So the equilibrium $\mu(T)$, $T_c$, and condensate
+fraction are taken analytically; the SGPE earns its keep only in the DYNAMICS
+(shape ramp, breathing, sudden-quench dephasing) that no closed form can give.**
+
+## SGPE dynamics results (48³, $D{=}3$, TSUBAME H100)
+
+**Equilibrium cross-check** (`eu_ft_equilibrium.png`): the (classical-field) SGPE
+condensate $N_0$ melts $9502\to3100$ across $T/T_c=0.1\to0.9$ and $N_0/N\to0.95$ as
+$T\to0$ — the right qualitative melting, below the analytic curve as expected.
+
+**Cutoff sensitivity** (`eu_ft_kcut.png`): $N_0$ spread $30\%$ vs thermal $79\%$
+over the $k_\mathrm{cut}$ range — the condensate is the robust observable.
+
+**Shape trade-off** (`eu_ft_shape.png`, prep SGPE at $T/T_c=0.5$ → closed ramp +
+$K_3$, all at fixed $k_\mathrm{cut}$):
+
+| protocol | final $N_0$ | final total $N$ |
+|---|---|---|
+| HOLD (tight) | 7653 | 19050 |
+| DECOMPRESS ($\omega:1\to\tfrac12$) | **8171** | 19340 |
+| BOX (sudden release) | 1152 | **19690** |
+
+Total-atom loss follows density (BOX $<$ DECOMPRESS $<$ HOLD — the density lever
+works). But for the *condensate*, **gradual decompression wins** (retains most
+$N_0$), whereas a **sudden box release cuts total loss the most yet shatters the
+BEC** (violent post-quench breathing dephases the coherent field). The finite-$T$
+lesson refines the $T=0$ levers: the expansion must be **adiabatic** — consistent
+with the "adiabatic expansion preserves $T/T_c$" picture in the theory note. An
+adiabatic (ramped) box is the clean follow-up.
