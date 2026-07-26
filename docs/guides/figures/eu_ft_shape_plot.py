@@ -14,6 +14,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from _smoothcurve import smooth
 
 here = os.path.dirname(os.path.abspath(__file__))
 prefix = sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, "eu_ft_shape")
@@ -30,8 +31,8 @@ for name in ("hold", "decompress", "box_sudden", "box_adiabatic"):
         continue
     d = np.genfromtxt(path, delimiter=",", names=True)
     t, N, N0 = d["t_ms"], d["N"], d["N0"]
-    axN0.plot(t, N0, "-o", color=colors[name], ms=4, label=labels[name])
-    axN.plot(t, N, "-o", color=colors[name], ms=4, label=labels[name])
+    axN0.plot(*smooth(t, N0), "-", color=colors[name], ms=4, label=labels[name])
+    axN.plot(*smooth(t, N), "-", color=colors[name], ms=4, label=labels[name])
     finals[name] = (N0[-1], N[-1])
 
 axN0.set_xlabel("time [ms]")

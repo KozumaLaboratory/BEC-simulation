@@ -13,6 +13,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from _smoothcurve import smooth
 
 here = os.path.dirname(os.path.abspath(__file__))
 csv = sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, "eu_shape_box_lever.csv")
@@ -44,8 +45,7 @@ m, b = np.polyfit(np.log(V), np.log(n2), 1)
 
 fig, ax = plt.subplots(figsize=(6.6, 4.6))
 xx = np.linspace(V.min() * 0.8, V.max() * 1.2, 100)
-ax.loglog(V, n2, "s", ms=9, color="#1f6feb", label="box GP ground state", zorder=3)
-ax.loglog(xx, np.exp(b) * xx**m, "-", color="#1f6feb", lw=1.6, label=fr"box fit slope ${m:.2f}$")
+ax.loglog(*smooth(V, n2), "-", color="#1f6feb", lw=2.2, label="box GP ground state", zorder=3)
 ax.loglog(V, nV2, "--", color="#8250df", lw=1.4, label=r"ideal uniform $(N/V)^2$")
 if harm is not None:
     ax.loglog(harm[0], harm[1], "o", ms=13, color="#d1242f",

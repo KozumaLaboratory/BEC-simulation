@@ -15,6 +15,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from _smoothcurve import smooth
 
 here = os.path.dirname(os.path.abspath(__file__))
 csv = sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, "eu_ft_evap_noneq.csv")
@@ -29,9 +30,9 @@ fig, ax = plt.subplots(figsize=(7.0, 4.7))
 # only plot where BEC is reached (N>0)
 mo = off > 0
 mn = on > 0
-ax.plot(x[mo], off[mo], "-o", color="#8a8a8a", ms=6, lw=1.8,
+ax.plot(*smooth(x[mo], off[mo]), "-", color="#8a8a8a", lw=2.2,
         label="quasi-static (noneq off) — monotone → knife-edge")
-ax.plot(x[mn], on[mn], "-o", color="#1f6feb", ms=7, lw=2,
+ax.plot(*smooth(x[mn], on[mn]), "-", color="#1f6feb", lw=2.4,
         label="finite-rate penalty (noneq on) — physical")
 if mn.any():
     i = np.argmax(on[mn])

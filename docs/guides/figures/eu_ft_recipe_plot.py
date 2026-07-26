@@ -19,6 +19,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from _smoothcurve import smooth
 
 here = os.path.dirname(os.path.abspath(__file__))
 BLUE, GREEN, RED, GREY = "#1f6feb", "#2da44e", "#d1242f", "#8a8a8a"
@@ -43,7 +44,7 @@ fig, (a1, a2) = plt.subplots(1, 2, figsize=(12.2, 5.0))
 a1.axvspan(ex.min() - 0.05, fail_x + 0.02, color=RED, alpha=0.08)
 a1.text(fail_x - 0.02, ey[ok].min() * 0.3, "too fast:\nBEC never\nforms\n(spilling)",
         color=RED, fontsize=9, ha="right", va="center")
-a1.plot(ex[ok], ey[ok], "-o", color=BLUE, ms=6, lw=2)
+a1.plot(*smooth(ex[ok], ey[ok]), "-", color=BLUE, lw=2.4)
 a1.plot(eopt_x, eopt_y, "*", color=GREEN, ms=24, mec="white", mew=1.0, zorder=5)
 a1.annotate(f"sweet spot\n≈ {eopt_x:.1f}× duration", xy=(eopt_x, eopt_y),
             xytext=(eopt_x + 0.35, eopt_y * 0.82), fontsize=10, color=GREEN,
@@ -62,7 +63,7 @@ a2.text(dx.min(), dhold, "  no decompression (HOLD)", color=GREY, fontsize=9, va
 a2.axvspan(dx.min() - 0.02, 0.475, color=RED, alpha=0.08)
 a2.text(0.46, dopt_y * 0.985, "too loose:\n$T_c\\propto\\bar\\omega$ drops,\nBEC melts",
         color=RED, fontsize=9, ha="right", va="top")
-a2.plot(dx, dy, "-o", color=BLUE, ms=6, lw=2)
+a2.plot(*smooth(dx, dy), "-", color=BLUE, lw=2.4)
 a2.plot(dopt_x, dopt_y, "*", color=GREEN, ms=24, mec="white", mew=1.0, zorder=5)
 a2.annotate(fr"sweet spot $\omega_\mathrm{{final}}\approx{dopt_x:.1f}$"
             f"\n(+{100*(dopt_y/dhold-1):.0f}% vs HOLD)", xy=(dopt_x, dopt_y),

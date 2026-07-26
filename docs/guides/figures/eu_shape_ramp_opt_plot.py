@@ -14,6 +14,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from _smoothcurve import smooth
 
 here = os.path.dirname(os.path.abspath(__file__))
 csv = sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, "eu_shape_ramp_opt.csv")
@@ -27,7 +28,7 @@ tau, N = tau[order], N[order]
 imax = int(np.argmax(N))
 
 fig, ax = plt.subplots(figsize=(6.4, 4.4))
-ax.plot(tau, N, "-o", color="#1f6feb", ms=7, lw=1.6, label="decompress ω:1→ω_f", zorder=3)
+ax.plot(*smooth(tau, N), "-", color="#1f6feb", ms=7, lw=1.6, label="decompress ω:1→ω_f", zorder=3)
 ax.axhline(hold_N, ls="--", color="#d1242f", lw=1.5, label="HOLD (no decompress)")
 ax.plot(tau[imax], N[imax], "*", color="#2da44e", ms=18,
         label=fr"optimum τ={tau[imax]:.0f} ms", zorder=4)

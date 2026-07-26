@@ -13,6 +13,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from _smoothcurve import smooth
 
 here = os.path.dirname(os.path.abspath(__file__))
 hold_csv = sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, "eu_shape_ft_hold.csv")
@@ -23,8 +24,8 @@ d = np.genfromtxt(dec_csv, delimiter=",", names=True)
 
 fig, (axN, axf) = plt.subplots(1, 2, figsize=(10.5, 4.4))
 
-axN.plot(h["t_ms"], h["N0"], "-o", color="#d1242f", ms=5, label="HOLD  condensate N₀")
-axN.plot(d["t_ms"], d["N0"], "-o", color="#1f6feb", ms=5, label="DECOMPRESS  condensate N₀")
+axN.plot(*smooth(h["t_ms"], h["N0"]), "-", color="#d1242f", ms=5, label="HOLD  condensate N₀")
+axN.plot(*smooth(d["t_ms"], d["N0"]), "-", color="#1f6feb", ms=5, label="DECOMPRESS  condensate N₀")
 axN.plot(h["t_ms"], h["N"], "--", color="#d1242f", lw=1.2, alpha=0.6, label="HOLD  total N")
 axN.plot(d["t_ms"], d["N"], "--", color="#1f6feb", lw=1.2, alpha=0.6, label="DECOMPRESS  total N")
 axN.set_xlabel("time [ms]")
