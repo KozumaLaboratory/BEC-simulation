@@ -5,6 +5,9 @@ $V(r,t)$: expand or box the trap as the BEC forms to cut three-body loss and
 keep more condensate. Physics derivation: `docs/theory/eu_evaporation_three_body_theory.md`.
 
 Driver: `docs/guides/figures/eu_shape_optimization.jl`. Plot scripts alongside.
+Raw/derived CSVs are archived on TSUBAME at
+`/gs/fs/tga-kozuma-kouhi/uk07267/runs/eu_shape_optimization/data/t0/`; the repo
+carries only figures + code.
 
 ## Model
 
