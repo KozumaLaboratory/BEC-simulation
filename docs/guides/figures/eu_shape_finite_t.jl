@@ -287,6 +287,36 @@ function ft_reservoir_calibration(; N0_load::Float64=3.5e6, T0_load::Float64=50e
     (u=u_cal, T_over_Tc=h.T_over_Tc, N_BEC=h.N_BEC, omega_bar=ωbar, result=r)
 end
 
+# EVAPORATION RAMP optimization (0-D, CPU) — the FORT power schedule BEFORE the
+# decompression. Bayesian-optimizes the researched euv3 ramp (3-param transform:
+# duration / final-power / time-warp) to maximize the condensate at BEC onset.
+function ft_evap_ramp_optimize(; n_iter::Int=40, n_init::Int=8,
+    csv_prefix::String=joinpath(@__DIR__, "eu_ft_evap_ramp"))
+    base = SpinorBEC.run_euv3_evaporation()
+    @printf "baseline euv3 ramp: reached_bec=%s, N_BEC=%.3g, T_BEC=%.0f nK\n" base.reached_bec base.N_BEC base.T_BEC * 1e9
+    print("Bayesian-optimizing the FORT ramp ($n_iter iters) ... ")
+    t0 = time()
+    opt = SpinorBEC.optimize_euv3_evaporation(; n_init=n_init, n_iter=n_iter)
+    @printf "%.1f s\n" (time() - t0)
+    ob, or = base, opt.result
+    @printf "  baseline  N_BEC=%.4g  T_BEC=%.0f nK  t_BEC=%.2f s\n" ob.N_BEC ob.T_BEC * 1e9 ob.t_BEC
+    @printf "  optimized N_BEC=%.4g  T_BEC=%.0f nK  t_BEC=%.2f s   (%.1f%% more BEC)\n" or.N_BEC or.T_BEC * 1e9 or.t_BEC 100 * (or.N_BEC / ob.N_BEC - 1)
+    # write trajectory CSVs (time, N, T, total FORT power)
+    trap = SpinorBEC.euv3_evap_trap()
+    for (tag, res, ramp) in (("baseline", base, SpinorBEC.euv3_evaporation_ramp()),
+        ("optimal", opt.result, opt.ramp))
+        open("$(csv_prefix)_$(tag).csv", "w") do io
+            println(io, "t_s,N,T_uK,power_W")
+            for i in 1:length(res.t)
+                P = sum(SpinorBEC.fort_power_at(ramp, res.t[i]))
+                @printf io "%.5f,%.6g,%.6g,%.6g\n" res.t[i] res.N[i] res.T[i] * 1e6 P
+            end
+        end
+    end
+    @printf "  CSVs → %s_{baseline,optimal}.csv\n" csv_prefix
+    (baseline=base, opt=opt)
+end
+
 # kcut sensitivity: quantify how the condensate N₀ and thermal N_th depend on the
 # classical-field cutoff. Both do (it is a classical field), but the condensate is
 # much less sensitive (~30% vs ~79% over k_cut∈[4.6,8.0]). Absolute numbers hold at
@@ -500,6 +530,12 @@ if abspath(PROGRAM_FILE) == @__FILE__
         ft_shape_calibrated(; backend=bk)
     elseif mode == "decompress_opt"
         ft_decompress_optimize(; backend=bk)
+    elseif mode == "decompress_refine"
+        ft_decompress_optimize(; backend=bk, n_traj=12,
+            omega_finals=[0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75], taus=[0.0],
+            csv=joinpath(@__DIR__, "eu_ft_decompress_refine.csv"))
+    elseif mode == "evap_ramp"
+        ft_evap_ramp_optimize()
     elseif mode == "kcut"
         ft_kcut_convergence(; backend=bk)
     elseif mode == "shape"
