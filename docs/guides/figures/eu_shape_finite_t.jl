@@ -287,6 +287,102 @@ function ft_reservoir_calibration(; N0_load::Float64=3.5e6, T0_load::Float64=50e
     (u=u_cal, T_over_Tc=h.T_over_Tc, N_BEC=h.N_BEC, omega_bar=ωbar, result=r)
 end
 
+# EVAPORATION RAMP optimization (0-D, CPU) — the FORT power schedule BEFORE the
+# decompression. Bayesian-optimizes the researched euv3 ramp (3-param transform:
+# duration / final-power / time-warp) to maximize the condensate at BEC onset.
+# `bounds` widened from the default so the corner-optimum can move; the 1-D scans
+# then show whether N_BEC has a real physical peak (spilling / too-short evaporation)
+# or keeps rising to the bound (a model limit needing a constraint).
+function ft_evap_ramp_optimize(; n_iter::Int=50, n_init::Int=10,
+    bounds::Vector{Tuple{Float64, Float64}}=[(0.15, 3.0), (0.05, 2.0), (0.2, 2.0)],
+    csv_prefix::String=joinpath(@__DIR__, "eu_ft_evap_ramp"))
+    base = SpinorBEC.run_euv3_evaporation()
+    @printf "baseline euv3 ramp: reached_bec=%s, N_BEC=%.3g, T_BEC=%.0f nK\n" base.reached_bec base.N_BEC base.T_BEC * 1e9
+    print("Bayesian-optimizing the FORT ramp ($n_iter iters, widened bounds) ... ")
+    t0 = time()
+    opt = SpinorBEC.optimize_euv3_evaporation(; n_init=n_init, n_iter=n_iter, bounds=bounds)
+    @printf "%.1f s\n" (time() - t0)
+    @printf "  best params [dur, final-P, warp] = %s\n" string(round.(opt.bo.best_p; digits=3))
+    # 1-D landscape scans (hold the other two params at the optimum) to locate the
+    # physical peak of each parameter.
+    trap = SpinorBEC.euv3_evap_trap()
+    base_ramp = SpinorBEC.euv3_evaporation_ramp()
+    p = SpinorBEC.EvapParams(; a_s=Eu151.a_s, tau_bg=15.0, K3=1.6107615346177146e-40)
+    N0load, T0load = 3.5e6, 50e-6
+    names = ("duration", "final_power", "warp")
+    open("$(csv_prefix)_scan.csv", "w") do io
+        println(io, "param,value,N_BEC,reached")
+        for idx in 1:3
+            lo, hi = bounds[idx]
+            for v in range(lo, hi; length=13)
+                sc = SpinorBEC.scan_ramp_param(trap, p, base_ramp; index=idx, values=[v],
+                    base_params=collect(Float64, opt.bo.best_p), N0=N0load, T0=T0load)[1]
+                @printf io "%s,%.4f,%.6g,%s\n" names[idx] v (isnan(sc.N_BEC) ? 0.0 : sc.N_BEC) sc.reached
+            end
+        end
+    end
+    @printf "  scan CSV → %s_scan.csv\n" csv_prefix
+    ob, or = base, opt.result
+    @printf "  baseline  N_BEC=%.4g  T_BEC=%.0f nK  t_BEC=%.2f s\n" ob.N_BEC ob.T_BEC * 1e9 ob.t_BEC
+    @printf "  optimized N_BEC=%.4g  T_BEC=%.0f nK  t_BEC=%.2f s   (%.1f%% more BEC)\n" or.N_BEC or.T_BEC * 1e9 or.t_BEC 100 * (or.N_BEC / ob.N_BEC - 1)
+    # write trajectory CSVs (time, N, T, total FORT power)
+    trap = SpinorBEC.euv3_evap_trap()
+    for (tag, res, ramp) in (("baseline", base, SpinorBEC.euv3_evaporation_ramp()),
+        ("optimal", opt.result, opt.ramp))
+        open("$(csv_prefix)_$(tag).csv", "w") do io
+            println(io, "t_s,N,T_uK,power_W")
+            for i in 1:length(res.t)
+                P = sum(SpinorBEC.fort_power_at(ramp, res.t[i]))
+                @printf io "%.5f,%.6g,%.6g,%.6g\n" res.t[i] res.N[i] res.T[i] * 1e6 P
+            end
+        end
+    end
+    @printf "  CSVs → %s_{baseline,optimal}.csv\n" csv_prefix
+    (baseline=base, opt=opt)
+end
+
+# NON-EQUILIBRIUM evaluation of the duration knife-edge: scan the ramp-duration scale
+# with the finite-evaporation-rate penalty OFF (quasi-static, "faster always better")
+# and ON (fast ramps spill instead of evaporate → less cooling). Shows whether the
+# penalty turns the bare reachability knife-edge into a real physical interior optimum.
+function ft_evap_noneq_eval(; noneq_scale::Float64=1.0,
+    durations=collect(range(0.25, 1.6; length=16)),
+    csv::String=joinpath(@__DIR__, "eu_ft_evap_noneq.csv"))
+    trap = SpinorBEC.euv3_evap_trap()
+    base_ramp = SpinorBEC.euv3_evaporation_ramp()
+    mk(s) = SpinorBEC.EvapParams(; a_s=Eu151.a_s, tau_bg=15.0,
+        K3=1.6107615346177146e-40, noneq_scale=s)
+    N0load, T0load = 3.5e6, 50e-6
+    println("=== Non-equilibrium eval: N_BEC vs ramp-duration scale ===")
+    @printf "  %-10s %-14s %-14s\n" "dur" "N_BEC(noneq off)" "N_BEC(noneq on)"
+    rows = NTuple{3, Float64}[]
+    for d in durations
+        s0 = SpinorBEC.scan_ramp_param(trap, mk(0.0), base_ramp; index=1, values=[d],
+            base_params=[1.0, 1.0, 1.0], N0=N0load, T0=T0load)[1]
+        s1 = SpinorBEC.scan_ramp_param(trap, mk(noneq_scale), base_ramp; index=1, values=[d],
+            base_params=[1.0, 1.0, 1.0], N0=N0load, T0=T0load)[1]
+        n0 = s0.reached ? s0.N_BEC : 0.0
+        n1 = s1.reached ? s1.N_BEC : 0.0
+        push!(rows, (d, n0, n1))
+        @printf "  %-10.3f %-14.5g %-14.5g\n" d n0 n1
+    end
+    open(csv, "w") do io
+        println(io, "duration_scale,N_BEC_noneq_off,N_BEC_noneq_on")
+        for r in rows
+            @printf io "%.4f,%.6g,%.6g\n" r...
+        end
+    end
+    off = [r[2] for r in rows]
+    on = [r[3] for r in rows]
+    i_off = argmax(off)
+    i_on = argmax(on)
+    println()
+    @printf "  noneq OFF: peak at dur=%.2f (N_BEC=%.4g) — %s\n" rows[i_off][1] off[i_off] (i_off == 1 ? "MONOTONE to floor (knife-edge)" : "interior")
+    @printf "  noneq ON : peak at dur=%.2f (N_BEC=%.4g) — %s\n" rows[i_on][1] on[i_on] (1 < i_on < length(on) ? "INTERIOR optimum (physical)" : "at boundary")
+    @printf "  CSV → %s\n" csv
+    (rows=rows,)
+end
+
 # kcut sensitivity: quantify how the condensate N₀ and thermal N_th depend on the
 # classical-field cutoff. Both do (it is a classical field), but the condensate is
 # much less sensitive (~30% vs ~79% over k_cut∈[4.6,8.0]). Absolute numbers hold at
@@ -402,6 +498,57 @@ function ft_shape_calibrated(; T_over_Tc::Float64=0.6, grid_n::Int=64, box::Floa
         n_traj=8, backend, csv_prefix)
 end
 
+# HARMONIC-ONLY decompression optimization (no box — the experimentally available
+# lever is lowering the ODT power). 2-D sweep over (ω_final, ramp duration τ) of the
+# closed-system decompression from the 0-D-calibrated BEC-formation trap; reports the
+# final condensate N₀ heatmap and the optimum — the ODT ramp recipe that keeps the
+# most BEC. bias-corrected N₀ is M-independent, so a modest ensemble suffices.
+function ft_decompress_optimize(; T_over_Tc::Float64=0.5, use_calibration::Bool=true,
+    grid_n::Int=64, box::Float64=20.0, prep_time::Float64=12.0, hold_time::Float64=48.0,
+    dt::Float64=0.01, gs_steps::Int=3000, gamma::Float64=0.1, n_traj::Int=6,
+    omega_finals::Vector{Float64}=[0.35, 0.5, 0.65, 0.8],
+    taus::Vector{Float64}=[0.0, 12.0, 30.0, 48.0],   # ramp duration (internal units)
+    backend=CPUBackend(), csv::String=joinpath(@__DIR__, "eu_ft_decompress_opt.csv"))
+    u = use_calibration ? ft_reservoir_calibration().u : EuUnits(; omega_ref=2π * 420.0)
+    println()
+    s = _setup(u, grid_n, box, gs_steps, backend)
+    Tc = Tc_harmonic(u.N)
+    T = T_over_Tc * Tc
+    k_cut = min(kcut_for(s.mu, T), 0.95 * s.k_max)
+    Tot = prep_time + hold_time
+    to_ms(τ) = τ / u.omega_ref * 1e3
+    @printf "μ=%.3f, T=%.2f (T/Tc=%.2f), k_cut=%.2f, k_max=%.2f, window=%.0f ms\n" s.mu T T_over_Tc k_cut s.k_max to_ms(Tot)
+    gamma_of_t = t -> t < prep_time ? gamma : 0.0
+    # HOLD baseline (no decompression) for reference.
+    hold = run_ensemble(u, s.grid, s.psi0; potential_of_t=harmonic_schedule(_ -> 1.0),
+        gamma_of_t, T, k_cut, mu=s.mu, loss_on=true, n_traj, T_internal=Tot, dt, backend)
+    N0_hold = hold.N0[end]
+    println("=== Harmonic decompression optimization (final condensate N₀) ===")
+    @printf "  HOLD baseline N₀=%.5g\n" N0_hold
+    @printf "  %-8s %-8s %-11s %-9s\n" "ω_final" "τ[ms]" "N₀" "gain/hold"
+    rows = NTuple{4, Float64}[]
+    for ωf in omega_finals, τ in taus
+        ramp = t -> t < prep_time ? 1.0 :
+                    (τ <= 0 ? ωf : max(ωf, 1.0 - (1.0 - ωf) * ((t - prep_time) / τ)))
+        r = run_ensemble(u, s.grid, s.psi0; potential_of_t=harmonic_schedule(ramp),
+            gamma_of_t, T, k_cut, mu=s.mu, loss_on=true, n_traj, T_internal=Tot, dt, backend)
+        N0 = r.N0[end]
+        push!(rows, (ωf, to_ms(τ), N0, N0 / N0_hold))
+        @printf "  %-8.2f %-8.1f %-11.5g %-9.3f\n" ωf to_ms(τ) N0 (N0 / N0_hold)
+    end
+    open(csv, "w") do io
+        println(io, "omega_final,tau_ms,N0,gain_over_hold,N0_hold")
+        for r in rows
+            @printf io "%.4f,%.4f,%.6g,%.6f,%.6g\n" r[1] r[2] r[3] r[4] N0_hold
+        end
+    end
+    best = rows[argmax([r[3] for r in rows])]
+    println()
+    @printf "  OPTIMUM: ω_final=%.2f, τ=%.1f ms → N₀=%.5g (%.1f%% over HOLD)\n" best[1] best[2] best[3] 100 * (best[4] - 1)
+    @printf "  CSV → %s\n" csv
+    (u=u, rows=rows, N0_hold=N0_hold, best=best)
+end
+
 # Quick local logic smoke (small, fast — NOT physical resolution).
 function ft_smoke(; backend=CPUBackend())
     ft_equilibrium(; grid_n=32, box=16.0, T_over_Tc_list=[0.1, 0.6],
@@ -447,6 +594,14 @@ if abspath(PROGRAM_FILE) == @__FILE__
         ft_reservoir_calibration()
     elseif mode == "shape_cal"
         ft_shape_calibrated(; backend=bk)
+    elseif mode == "decompress_opt"
+        ft_decompress_optimize(; backend=bk)
+    elseif mode == "decompress_refine"
+        ft_decompress_optimize(; backend=bk, n_traj=12,
+            omega_finals=[0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75], taus=[0.0],
+            csv=joinpath(@__DIR__, "eu_ft_decompress_refine.csv"))
+    elseif mode == "evap_ramp"
+        ft_evap_ramp_optimize()
     elseif mode == "kcut"
         ft_kcut_convergence(; backend=bk)
     elseif mode == "shape"

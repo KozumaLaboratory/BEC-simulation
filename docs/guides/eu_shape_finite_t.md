@@ -105,18 +105,100 @@ $T\to0$ — the right qualitative melting, below the analytic curve as expected.
 over the $k_\mathrm{cut}$ range — the condensate is the robust observable.
 
 **Shape trade-off** (`eu_ft_shape.png`, prep SGPE at $T/T_c=0.5$ → closed ramp +
-$K_3$, all at fixed $k_\mathrm{cut}$):
+$K_3$, all at fixed $k_\mathrm{cut}$, four protocols):
 
 | protocol | final $N_0$ | final total $N$ |
 |---|---|---|
 | HOLD (tight) | 7653 | 19050 |
 | DECOMPRESS ($\omega:1\to\tfrac12$) | **8171** | 19340 |
-| BOX (sudden release) | 1152 | **19690** |
+| BOX — sudden release | 1152 | **19690** |
+| BOX — adiabatic morph | 7898 | 19390 |
 
 Total-atom loss follows density (BOX $<$ DECOMPRESS $<$ HOLD — the density lever
-works). But for the *condensate*, **gradual decompression wins** (retains most
-$N_0$), whereas a **sudden box release cuts total loss the most yet shatters the
-BEC** (violent post-quench breathing dephases the coherent field). The finite-$T$
-lesson refines the $T=0$ levers: the expansion must be **adiabatic** — consistent
-with the "adiabatic expansion preserves $T/T_c$" picture in the theory note. An
-adiabatic (ramped) box is the clean follow-up.
+works). For the *condensate*, **adiabaticity dominates**: a **sudden** box release
+cuts total loss the most yet **shatters the BEC** ($N_0\!\to\!1152$; violent
+post-quench breathing dephases the coherent field), whereas the **adiabatic** box
+morph ($V=(1{-}s)V_\mathrm{harm}+sV_\mathrm{box}$) **preserves it** ($7898$, above
+HOLD). Gradual decompression is the robust winner. The finite-$T$ lesson refines
+the $T=0$ levers: the expansion must be **adiabatic** — the dynamical confirmation
+of "adiabatic expansion preserves $T/T_c$" from the theory note.
+
+### 0-D reservoir calibration — grounding in the real experiment
+
+The evaporative cooling (seconds) is quasi-static relative to the SGPE dynamics
+(ms), so the 0-D two-component model supplies the physically-calibrated
+$(\bar\omega, N, T/T_c)$ at BEC formation rather than ad-hoc values
+(`ft_reservoir_calibration`, via `run_evaporation`+`bec_handoff` on the researched
+euv3 ramp): **BEC onset at $\bar\omega=2\pi\cdot284$ Hz, $N_\mathrm{BEC}=6.6\times10^4$,
+$T/T_c=1.00$** (matching the measured $\sim5\times10^4$). Running the shape study at
+those calibrated units (`eu_ft_shape_cal.png`, $64^3$, $N=6.6\times10^4$,
+$T/T_c=0.6$) reproduces the same ordering — **decompress $>$ hold $>$ box(adiabatic)
+$>$ box(sudden)** for the condensate, sudden-box worst — confirming the conclusion
+at the real Eu formation conditions, not just the model point. The box's uniform-
+density (total-loss) advantage does not convert into a condensate gain here; a
+larger / slower box is the remaining lever to probe.
+
+## Harmonic decompression recipe (no box — the experimentally usable lever)
+
+With no box trap available, the deliverable is the best **harmonic** protocol:
+lower the ODT power. `ft_decompress_optimize` sweeps $(\omega_\mathrm{final},\tau)$
+of the closed-system decompression at the 0-D-calibrated formation conditions
+($\bar\omega=2\pi\cdot284$ Hz, $N=6.6\times10^4$, $T/T_c=0.5$, $34$ ms window);
+`eu_ft_decompress_opt.png` is the $N_0$ heatmap (colour $=N_0/N_0^\mathrm{hold}$,
+$N_0^\mathrm{hold}=44656$).
+
+Two clean features:
+- **Faster is better** ($\tau=0$ wins every row): unlike the box, a harmonic→weaker-
+  harmonic quench is mild (the ground state stays a parabola), so a sudden
+  decompression reaches low density fastest without shattering the BEC. The gentler
+  $\tau\approx7$ ms is within a few % and avoids exciting a breathing mode — the
+  practical choice.
+- **Interior optimum in $\omega_\mathrm{final}$**: the refined sweep at $\tau=0$
+  (`eu_ft_decompress_refine.png`) pins a broad peak at
+  $\omega_\mathrm{final}\approx0.55$–$0.60$ — **optimum $0.60$, $N_0=51689$, $+15.9\%$
+  over HOLD** ($44612$). Loosening cuts three-body loss, but over-loosening drops
+  $T_c\propto\bar\omega$ and melts the condensate; the finite-$T$ trade-off, pinned.
+
+## Optimizing the evaporation ramp too (0-D, before the decompression)
+
+The FORT power schedule that forms the BEC is itself optimizable
+(`ft_evap_ramp_optimize`, `eu_ft_evap_ramp.png`): a Bayesian search over the
+researched euv3 ramp (duration / final-power / time-warp transform), with the bounds
+widened, lifts the condensate at BEC onset from $N_\mathrm{BEC}=6.56\times10^4$ to
+$8.69\times10^4$ (**$+32.4\%$**, interior optimum $[0.56,0.19,0.71]$), reaching BEC
+faster ($t_\mathrm{BEC}$ $1.70\to1.05$ s) via a steeper ramp.
+
+**Parameter landscapes** (`eu_ft_evap_scan.png`) show what is really going on:
+- **duration is monotone** — shorter/faster is always better ($N_\mathrm{BEC}$ rises
+  to $\sim9.3\times10^4$, $+42\%$, at the shortest duration that still reaches BEC,
+  $\approx0.4$), because a faster ramp spends less time bleeding to three-body loss.
+  The only hard limit is BEC-reachability — a knife-edge, and exactly where the 0-D
+  quasi-static assumption weakens (resolved below).
+- **final-power is irrelevant** — BEC onset occurs before the ramp ends, so the ramp
+  endpoint is never reached.
+- **time-warp has a genuine interior optimum** $\gamma\approx0.7$ — the robust lever.
+
+**Physically resolving the duration knife-edge** (`eu_ft_evap_noneq.png`). The
+"faster is always better" duration is an artefact of the model's quasi-static
+assumption. We added a first-principles **finite-evaporation-rate penalty** to the
+0-D model (`EvapParams.noneq_scale`, off by default): when the trap depth is lowered
+faster than atoms can *evaporate* ($\gamma_\mathrm{ev}=\gamma_\mathrm{el}\cdot
+\mathrm{evap\_factor}(\eta)$, small at large $\eta$), the newly-exposed atoms leave by
+fast, non-selective **spilling** (carrying the threshold energy $\eta k_BT$, cooling
+law $(\eta-3)/3$) instead of by selective evaporation ($\bar\varepsilon$, cooling
+$L$); the cooling law is blended by $\xi=\gamma_\mathrm{ev}/(\gamma_\mathrm{ev}+
+\mathrm{noneq\_scale}\cdot|d\ln U/dt|)$. With the penalty on, the knife-edge becomes a
+**real interior optimum at a moderate duration $\approx0.6\times$** ($+22\%$ over the
+same-model baseline), and ramps faster than $\sim0.4\times$ **fail to reach BEC**
+(spilling kills the cooling) — the honest, physical answer, versus the unphysical
+$+42\%$ knife-edge. (`noneq_scale=0` preserves the validated model; the evaporation
+test suite passes unchanged.)
+
+**Two-stage recipe** (`eu_ft_recipe.png` says it in one figure — *moderate on both knobs; the extremes break the BEC*). Optimize the evaporation ramp (a faster, $\gamma\!\approx\!0.7$
+warped power drop; $+30$–$40\%$ BEC at formation, with the higher end a knife-edge),
+then decompress the ODT to $\bar\omega\approx0.6\,\bar\omega_\mathrm{form}$, fast
+($+16\%$ condensate) — both experimentally available with the harmonic trap alone.
+
+## Next
+Realistic cooling trajectory $T(t),\mu(t)$ fed from `run_evaporation_bec`; widen the
+evaporation-ramp bounds; an adiabatic (ramped) box if a box trap becomes available.

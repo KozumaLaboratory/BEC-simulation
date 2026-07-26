@@ -69,6 +69,16 @@ Base.@kwdef struct EvapParams
     eta_min::Float64 = 4.0
     evap_scale::Float64 = 1.0
     heating_rate::Float64 = 0.0
+    # Non-equilibrium (finite-evaporation-rate) penalty on fast ramps. When the trap
+    # depth is lowered faster than atoms can EVAPORATE (γev = γ_el·evap_factor(η), small
+    # at large η), the newly-exposed atoms leave by fast non-selective SPILLING carrying
+    # the threshold energy η·k_BT (cooling law (η−3)/3) rather than by selective
+    # evaporation (mean-excess ε̄, cooling law L). The cooling law is blended by
+    # ξ = γev/(γev + noneq_scale·|dlnU/dt|); `noneq_scale`=0 (default) recovers the
+    # quasi-static model, =1 turns on the physical finite-rate penalty. This is what
+    # physically bounds the "faster is always better" ramp — a real interior optimum in
+    # duration instead of a bare reachability knife-edge.
+    noneq_scale::Float64 = 0.0
 end
 
 """Mutable integration state: atom number `N`, temperature `T` [K], time `t` [s]."""
@@ -185,6 +195,16 @@ added by the caller.
     # the eject fraction (all-η spilling rate); L = dlnT/dlnN is the O'Hara energy-balance
     # cooling law (gentle at low η, → (η−2)/3 at large η — no clamp needed).
     evap_factor, L = evap_volume_factor(η)
+    # Non-equilibrium finite-rate penalty: if the trap-lowering rate |dlnU/dt| (=2|dlnω̄/dt|
+    # for a FORT, U∝P, ω̄∝√P) outruns the evaporation rate γev=γ_el·evap_scale·evap_factor,
+    # the exposed atoms spill (threshold energy η·k_BT, cooling (η−3)/3) instead of
+    # evaporating (cooling L). Blend by ξ=γev/(γev+noneq_scale·|dlnU/dt|). Off at noneq_scale=0.
+    if p.noneq_scale > 0
+        γev = γel * p.evap_scale * evap_factor
+        ramp = 2.0 * abs(dlnω_dt)
+        ξ = γev / (γev + p.noneq_scale * ramp + 1e-30)
+        L = ξ * L + (1 - ξ) * ((η - 3.0) / 3.0)
+    end
     dN_evap = -Nev * γel * p.evap_scale * evap_factor
     dTT_evap = Nev > 0 ? (dN_evap / Nev) * L : 0.0
     # three-body loss + antievaporative heating (center-weighted, ⟨n²⟩ = n²/3^{3/2})
