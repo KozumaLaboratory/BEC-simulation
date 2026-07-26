@@ -23,9 +23,10 @@ GRP="tga-kozuma-kouhi"
 # an unknown 'pin' key after src reverted). Before submitting, sync the committed
 # src/ + scripts/ so the remote code matches this branch.
 if [ "$SUBMIT" = "--submit" ]; then
-    echo "syncing src/ + scripts/ to TSUBAME (guards code-drift before resume)..."
+    echo "syncing src/ + scripts/ + campaign configs to TSUBAME (guards drift before resume)..."
     rsync -az --delete "$HERE/src/" "tsubame:$PROOT/src/" 2>&1 | tail -1
     rsync -az "$HERE/scripts/" "tsubame:$PROOT/scripts/" 2>&1 | tail -1
+    rsync -az "$HERE/$CDIR/" "tsubame:$PROOT/$CDIR/" 2>&1 | tail -1   # configs + submit + ledger
 fi
 
 remote_check() {   # $1=config basename  $2=job_name  -> DIRN/DIR/ACTIVE/COUNTS/END
