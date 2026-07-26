@@ -5,7 +5,7 @@ using Test
 using SpinorBEC
 using SpinorBEC: Eu151, Units, EvapTrap, EvapParams, FortRamp,
     bec_critical_temperature, condensate_split, run_evaporation_bec, EvapBecResult,
-    euv3_evap_trap, trap_at, evap_rhs
+    euv3_evap_trap, trap_at, evap_rhs, evap_trap_grid, EvapTrapGrid
 using SpinorBEC: _evap_rhs_bec
 
 const _m_c = Eu151.mass
@@ -110,6 +110,27 @@ _ramp_c() = FortRamp(
         # loosening far enough collapses T_c ∝ ω̄ ⇒ the condensate melts away
         loose = run_evaporation_bec(trap, _ramp_c(), p; N0=2e6, T0=40e-6, omega_mult=(t -> 0.2))
         @test loose.N0_final < base.N0_final
+    end
+
+    # Precomputed trap grid (reused across omega_mult scans on a fixed ramp) must give a
+    # bit-identical run to the in-line build — the crossed-dipole (U, ω̄) nodes are the same.
+    @testset "precomputed trap grid is bit-identical" begin
+        trap = _trap_c()
+        p = EvapParams(; a_s=_as_c, tau_bg=10.0, K3=1e-41)
+        ramp = _ramp_c()
+        g = evap_trap_grid(trap, ramp)
+        @test g isa EvapTrapGrid
+        r0 = run_evaporation_bec(trap, ramp, p; N0=2e6, T0=40e-6)
+        r1 = run_evaporation_bec(trap, ramp, p; N0=2e6, T0=40e-6, trap_grid=g)
+        @test r1.N0_final == r0.N0_final
+        @test r1.T_final == r0.T_final
+        @test r1.N == r0.N
+        @test r1.N0 == r0.N0
+        # composes with the tightness axis
+        r2 = run_evaporation_bec(trap, ramp, p; N0=2e6, T0=40e-6,
+            omega_mult=(t -> 0.8), trap_grid=g)
+        r3 = run_evaporation_bec(trap, ramp, p; N0=2e6, T0=40e-6, omega_mult=(t -> 0.8))
+        @test r2.N0_final == r3.N0_final
     end
 
     @testset "above T_c reduces to the thermal model (no condensate)" begin

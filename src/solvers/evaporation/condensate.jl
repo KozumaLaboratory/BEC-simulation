@@ -10,6 +10,7 @@
 # evaporation (e.g. Ketterle–van Druten review; Davis–Gardiner rate equations).
 
 export bec_critical_temperature, condensate_split, run_evaporation_bec, EvapBecResult
+export EvapTrapGrid, evap_trap_grid
 
 """
     bec_critical_temperature(N, ω̄) -> T_c [K]
@@ -83,9 +84,37 @@ function _evap_rhs_bec(N::Float64, T::Float64, U::Float64, ω̄::Float64, p::Eva
     (dN_th + dN_bg + dN_3b, dT)
 end
 
+"""Precomputed `(U, ω̄)` trap grid for a fixed power ramp. The `_trap_at_time` build (a
+crossed-dipole depth + mean-frequency solve at each node) dominates `run_evaporation_bec`'s
+cost; when scanning many `omega_mult` candidates on the SAME ramp (m_ω only rescales ω̄,
+leaving U and the grid untouched), build it once with [`evap_trap_grid`](@ref) and pass it in."""
+struct EvapTrapGrid
+    tg::Vector{Float64}
+    Ug::Vector{Float64}
+    ωg::Vector{Float64}
+    dtg::Float64
+end
+
+# grid node count: 8 per ramp breakpoint + a share of the integration steps (same formula the
+# in-line build used), clamped to [120, 400]. dt must match the run's dt for a bit-identical grid.
+function evap_trap_grid(trap::EvapTrap, ramp::FortRamp; dt::Float64=ramp_duration(ramp) / 3000)
+    t0 = ramp.times[1]
+    tend = ramp.times[end]
+    nsteps = max(1, ceil(Int, (tend - t0) / dt))
+    ngrid = clamp(8 * length(ramp.times) + nsteps ÷ 20, 120, 400)
+    tg = collect(range(t0, tend; length=ngrid))
+    Ug = Vector{Float64}(undef, ngrid)
+    ωg = Vector{Float64}(undef, ngrid)
+    for i in 1:ngrid
+        Ug[i], ωg[i] = _trap_at_time(trap, ramp, tg[i])
+    end
+    dtg = ngrid > 1 ? (tend - t0) / (ngrid - 1) : 1.0
+    EvapTrapGrid(tg, Ug, ωg, dtg)
+end
+
 """
     run_evaporation_bec(trap, ramp, p; N0, T0, dt=ramp_duration/3000, save_every=10,
-        omega_mult=(t -> 1.0)) -> EvapBecResult
+        omega_mult=(t -> 1.0), trap_grid=nothing) -> EvapBecResult
 
 Two-component evaporation: like [`run_evaporation`](@ref) but does NOT stop at the BEC
 onset — it continues through the transition, tracking the condensate `N₀(t)` and the
@@ -99,11 +128,15 @@ mean frequency: the run drives `ω̄_eff(t) = m_ω(t)·ω̄_ramp(t)` while the d
 waist `w(t)` — `U∝P/w²`, `ω̄∝√P/w²`, so `(P, w)` give independent `(U, ω̄)`. It feeds the
 condensate density / `T_c` AND the adiabatic heating `dT/T = dln(m_ω·ω̄)/dt` consistently
 (the finite-difference of the effective ω̄). `m_ω ≡ 1` recovers the power-ramp run exactly.
+
+`trap_grid` optionally supplies a precomputed [`EvapTrapGrid`](@ref) (from `evap_trap_grid`)
+to skip the per-node crossed-dipole solve — reuse it across many `omega_mult` scans on the
+same ramp (build with the same `dt` for a bit-identical grid).
 """
 function run_evaporation_bec(
     trap::EvapTrap, ramp::FortRamp, p::EvapParams;
     N0::Float64, T0::Float64, dt::Float64=ramp_duration(ramp) / 3000, save_every::Int=10,
-    omega_mult=(t -> 1.0))
+    omega_mult=(t -> 1.0), trap_grid::Union{Nothing, EvapTrapGrid}=nothing)
     m = trap.mass
     t0 = ramp.times[1]
     tend = ramp.times[end]
@@ -121,15 +154,13 @@ function run_evaporation_bec(
     t = t0
     t_bec = NaN
 
-    # reuse the precomputed (U, ω̄) trap grid (piecewise-linear ramp ⇒ smooth, exact)
-    ngrid = clamp(8 * length(ramp.times) + nsteps ÷ 20, 120, 400)
-    tg = collect(range(t0, tend; length=ngrid))
-    Ug = Vector{Float64}(undef, ngrid)
-    ωg = Vector{Float64}(undef, ngrid)
-    for i in 1:ngrid
-        Ug[i], ωg[i] = _trap_at_time(trap, ramp, tg[i])
-    end
-    dtg = ngrid > 1 ? (tend - t0) / (ngrid - 1) : 1.0
+    # (U, ω̄) trap grid (piecewise-linear ramp ⇒ smooth, exact); reuse a precomputed one if given
+    grid = trap_grid === nothing ? evap_trap_grid(trap, ramp; dt=dt) : trap_grid
+    tg = grid.tg
+    Ug = grid.Ug
+    ωg = grid.ωg
+    ngrid = length(tg)
+    dtg = grid.dtg
     @inline function trap_interp(tq::Float64)
         U, ω = if tq <= t0
             (Ug[1], ωg[1])
