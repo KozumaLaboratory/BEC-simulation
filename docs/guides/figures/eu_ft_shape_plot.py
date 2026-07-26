@@ -17,18 +17,21 @@ import matplotlib.pyplot as plt
 
 here = os.path.dirname(os.path.abspath(__file__))
 prefix = sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, "eu_ft_shape")
-colors = {"hold": "#d1242f", "decompress": "#1f6feb", "box": "#2da44e"}
+colors = {"hold": "#d1242f", "decompress": "#1f6feb",
+          "box_sudden": "#2da44e", "box_adiabatic": "#8250df"}
+labels = {"hold": "hold", "decompress": "decompress",
+          "box_sudden": "box (sudden)", "box_adiabatic": "box (adiabatic)"}
 
 fig, (axN0, axN) = plt.subplots(1, 2, figsize=(10.5, 4.4))
 finals = {}
-for name in ("hold", "decompress", "box"):
+for name in ("hold", "decompress", "box_sudden", "box_adiabatic"):
     path = f"{prefix}_{name}.csv"
     if not os.path.exists(path):
         continue
     d = np.genfromtxt(path, delimiter=",", names=True)
     t, N, N0 = d["t_ms"], d["N"], d["N0"]
-    axN0.plot(t, N0, "-o", color=colors[name], ms=4, label=name)
-    axN.plot(t, N, "-o", color=colors[name], ms=4, label=name)
+    axN0.plot(t, N0, "-o", color=colors[name], ms=4, label=labels[name])
+    axN.plot(t, N, "-o", color=colors[name], ms=4, label=labels[name])
     finals[name] = (N0[-1], N[-1])
 
 axN0.set_xlabel("time [ms]")

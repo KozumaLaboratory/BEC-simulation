@@ -75,7 +75,7 @@ end
 # (grand-canonical, unphysical for atom survival). Under closed GP the gas cools
 # adiabatically as it expands, so T/T_c is preserved (the physical picture).
 function _sgpe_trajectory!(
-    u, grid, psi0, potential_of_t, gamma_of_t, T, k_cut, μ_of_t,
+    u, grid, psi0, potential_of_t, gamma_of_t, T_of_t, k_cut, μ_of_t,
     T_internal, dt, save_every, backend, seed_base,
     psi_sum, dens_sum, n_tot_sum, save_times, D, loss_on,
 )
@@ -90,10 +90,14 @@ function _sgpe_trajectory!(
     sidx = Ref(0)
     cb = SimulationCallbacks(
         on_step=(w, step, times, energies) -> begin
-            copyto!(w.potential_values, evaluate_potential(potential_of_t(w.state.t), grid))
+            # potential_of_t may return an AbstractPotential OR a ready V-array (used
+            # by the adiabatic morph, which blends two potentials point-by-point).
+            pv = potential_of_t(w.state.t)
+            Varr = pv isa AbstractArray ? pv : evaluate_potential(pv, grid)
+            copyto!(w.potential_values, Varr)
             γ = gamma_of_t(w.state.t)
             if γ > 0
-                apply_sgpe_step!(w, γ, T, dt; μ=μ_of_t(w.state.t), k_cut=k_cut,
+                apply_sgpe_step!(w, γ, T_of_t(w.state.t), dt; μ=μ_of_t(w.state.t), k_cut=k_cut,
                     full_hamiltonian=true, seed=seed_base + step)
                 # scalar model: only the stretched m=-F component is physical; zero the
                 # rest so SGPE noise / μ-pumping cannot fill the empty spin channels.
@@ -124,11 +128,12 @@ end
 # N = ⟨∫|ψ|²⟩. Both in physical atom units (norm-N). Returns time series.
 function run_ensemble(
     u::EuUnits, grid, psi0;
-    potential_of_t, gamma_of_t, T::Float64, k_cut::Float64,
+    potential_of_t, gamma_of_t, T, k_cut::Float64,          # T: scalar OR t→T(t)
     mu::Float64, μ_of_t=(_ -> mu), loss_on::Bool=true,
     n_traj::Int=8, T_internal::Float64, dt::Float64,
     save_every::Int=20, backend=CPUBackend(), seed0::Int=1234,
 )
+    T_of_t = T isa Number ? (_ -> Float64(T)) : T
     n_steps = round(Int, T_internal / dt)
     n_save = fld(n_steps, save_every)
     D = SpinSystem(FT_ATOM.F).n_components
@@ -139,7 +144,7 @@ function run_ensemble(
     n_tot_sum = zeros(Float64, n_save)
     save_times = zeros(Float64, n_save)
     for tr in 1:n_traj
-        _sgpe_trajectory!(u, grid, psiN, potential_of_t, gamma_of_t, T, k_cut, μ_of_t,
+        _sgpe_trajectory!(u, grid, psiN, potential_of_t, gamma_of_t, T_of_t, k_cut, μ_of_t,
             T_internal, dt, save_every, backend, seed0 + tr * 1_000_003,
             psi_sum, dens_sum, n_tot_sum, save_times, D, loss_on)
     end
@@ -256,6 +261,32 @@ function ft_equilibrium_analytic(;
     (u=u, mu_GP=μ_GP, Tc=Tc)
 end
 
+# 0-D RESERVOIR COUPLING. The evaporative cooling (seconds) is quasi-static relative
+# to the SGPE dynamics (ms), so the 0-D two-component model provides the physically
+# calibrated (ω̄, N, T/T_c) at BEC formation that the SGPE shape study should use —
+# replacing the ad-hoc ω_ref=2π·420 Hz, N=1e4, T/T_c=0.5. Returns an EuUnits at the
+# 0-D formation trap + N, and the formation T/T_c. (Full time-dependent T(t) SGPE is
+# infeasible given the s-vs-ms timescale split; calibration is the honest coupling.)
+function ft_reservoir_calibration(; N0_load::Float64=3.5e6, T0_load::Float64=50e-6,
+    a_s::Float64=110 * Units.BOHR_RADIUS, tau_bg::Float64=15.0, K3::Float64=1.6e-40)
+    trap = SpinorBEC.euv3_evap_trap()
+    ramp = SpinorBEC.euv3_evaporation_ramp()          # researched ramp that reaches BEC onset
+    p = SpinorBEC.EvapParams(; a_s=a_s, tau_bg=tau_bg, K3=K3)
+    r = SpinorBEC.run_evaporation(trap, ramp, p; N0=N0_load, T0=T0_load)
+    h = SpinorBEC.bec_handoff(trap, ramp, r)
+    ωbar = h.omega_ref
+    println("=== 0-D evaporation → SGPE reservoir calibration ===")
+    @printf "  loaded N=%.2g @ T=%.1f µK ⇒ BEC onset:\n" N0_load T0_load * 1e6
+    @printf "    ω̄(formation) = 2π·%.0f Hz   (ω_dimless per axis = %s)\n" ωbar / 2π string(round.(h.omega_dimless; digits=3))
+    @printf "    N_BEC        = %.3g atoms\n" h.N_BEC
+    @printf "    T_BEC        = %.0f nK   (T/T_c = %.2f at onset)\n" h.T_BEC * 1e9 h.T_over_Tc
+    @printf "    a_ho         = %.3f µm\n" h.a_ho * 1e6
+    # Build the calibrated EuUnits (formation trap as ω_ref, condensate N).
+    u_cal = EuUnits(; omega_ref=ωbar, a_s=a_s, N=h.N_BEC)
+    @printf "  ⇒ calibrated SGPE units: ω_ref=2π·%.0f Hz, N=%.3g, g̃=%.4g\n" ωbar / 2π h.N_BEC c0_bare(u_cal)
+    (u=u_cal, T_over_Tc=h.T_over_Tc, N_BEC=h.N_BEC, omega_bar=ωbar, result=r)
+end
+
 # kcut sensitivity: quantify how the condensate N₀ and thermal N_th depend on the
 # classical-field cutoff. Both do (it is a classical field), but the condensate is
 # much less sensitive (~30% vs ~79% over k_cut∈[4.6,8.0]). Absolute numbers hold at
@@ -309,8 +340,9 @@ function ft_shape_compare(; grid_n::Int=48, box::Float64=24.0, T_over_Tc::Float6
     prep_time::Float64=20.0, ramp_time::Float64=60.0, dt::Float64=0.01,
     gs_steps::Int=2500, omega_final::Float64=0.5, box_edge::Float64=16.0,
     gamma::Float64=0.1, n_traj::Int=8, backend=CPUBackend(),
+    u::Union{Nothing, EuUnits}=nothing,   # optional 0-D-calibrated units (else default)
     csv_prefix::String=joinpath(@__DIR__, "eu_ft_shape"))
-    u = EuUnits(; omega_ref=2π * 420.0)
+    u === nothing && (u = EuUnits(; omega_ref=2π * 420.0))
     print_units(u)
     s = _setup(u, grid_n, box, gs_steps, backend)
     Tc = Tc_harmonic(u.N)
@@ -319,12 +351,23 @@ function ft_shape_compare(; grid_n::Int=48, box::Float64=24.0, T_over_Tc::Float6
     @printf "μ=%.3f, T=%.2f (T/Tc=%.2f), k_cut=%.2f, k_max=%.2f\n" s.mu T T_over_Tc k_cut s.k_max
     Tot = prep_time + ramp_time
     gamma_of_t = t -> t < prep_time ? gamma : 0.0     # bath during prep, closed during ramp
+    # Precompute the harmonic and box V-arrays once; the ADIABATIC box morphs between
+    # them (V = (1−s)·V_harm + s·V_box, s: 0→1 over the ramp) so the condensate can
+    # follow its instantaneous ground state — vs the SUDDEN box which switches at once.
+    V_harm = evaluate_potential(HarmonicTrap{3}((1.0, 1.0, 1.0)), s.grid)
+    V_box = evaluate_potential(BoxPotential((box_edge, box_edge, box_edge);
+        wall_strength=2000.0, wall_width=0.4), s.grid)
+    morph(t) = begin
+        sfrac = clamp((t - prep_time) / ramp_time, 0.0, 1.0)
+        @. (1 - sfrac) * V_harm + sfrac * V_box
+    end
     schedules = (
         hold=harmonic_schedule(_ -> 1.0),
         decompress=harmonic_schedule(t -> t < prep_time ? 1.0 :
                                           max(omega_final, 1.0 - (1.0 - omega_final) * ((t - prep_time) / ramp_time))),
-        box=(t -> t < prep_time ? HarmonicTrap{3}((1.0, 1.0, 1.0)) :
+        box_sudden=(t -> t < prep_time ? HarmonicTrap{3}((1.0, 1.0, 1.0)) :
                   BoxPotential((box_edge, box_edge, box_edge); wall_strength=2000.0, wall_width=0.4)),
+        box_adiabatic=(t -> t < prep_time ? V_harm : morph(t)),
     )
     out = Dict{Symbol, Any}()
     for (name, sched) in pairs(schedules)
@@ -342,10 +385,21 @@ function ft_shape_compare(; grid_n::Int=48, box::Float64=24.0, T_over_Tc::Float6
         end
     end
     println("\n=== Finite-T shape verdict (final condensate N₀) ===")
-    for name in (:hold, :decompress, :box)
-        @printf "  %-11s N₀=%.4g  (N=%.4g)\n" name out[name].N0[end] out[name].N[end]
+    for name in (:hold, :decompress, :box_sudden, :box_adiabatic)
+        @printf "  %-14s N₀=%.4g  (N=%.4g)\n" name out[name].N0[end] out[name].N[end]
     end
     (u=u, out=out)
+end
+
+# Task B end-to-end: 0-D evaporation calibration → SGPE shape study at the physical
+# (ω_ref, N) the experiment forms the BEC in. T/T_c is set just below the 0-D formation
+# value (=1.0 at onset); the shape optimisation lives in the post-formation regime.
+function ft_shape_calibrated(; T_over_Tc::Float64=0.6, grid_n::Int=64, box::Float64=20.0,
+    backend=CPUBackend(), csv_prefix::String=joinpath(@__DIR__, "eu_ft_shape_cal"))
+    cal = ft_reservoir_calibration()
+    println()
+    ft_shape_compare(; u=cal.u, T_over_Tc, grid_n, box, gs_steps=3000, gamma=0.1,
+        n_traj=8, backend, csv_prefix)
 end
 
 # Quick local logic smoke (small, fast — NOT physical resolution).
@@ -389,6 +443,10 @@ if abspath(PROGRAM_FILE) == @__FILE__
         ft_equilibrium(; backend=bk)
     elseif mode == "analytic"
         ft_equilibrium_analytic()
+    elseif mode == "reservoir"
+        ft_reservoir_calibration()
+    elseif mode == "shape_cal"
+        ft_shape_calibrated(; backend=bk)
     elseif mode == "kcut"
         ft_kcut_convergence(; backend=bk)
     elseif mode == "shape"
