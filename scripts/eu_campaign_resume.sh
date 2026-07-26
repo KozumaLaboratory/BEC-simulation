@@ -18,6 +18,16 @@ PROOT="/gs/fs/tga-kozuma-kouhi/uk07267/BEC-simulation"
 GRP="tga-kozuma-kouhi"
 [ -f "$LEDGER" ] || { echo "no ledger: $LEDGER"; exit 1; }
 
+# Guard code-drift: the CAS content_id depends only on the config spec, NOT the
+# source version, so a stale TSUBAME src can make a byte-stable config fail (e.g.
+# an unknown 'pin' key after src reverted). Before submitting, sync the committed
+# src/ + scripts/ so the remote code matches this branch.
+if [ "$SUBMIT" = "--submit" ]; then
+    echo "syncing src/ + scripts/ to TSUBAME (guards code-drift before resume)..."
+    rsync -az --delete "$HERE/src/" "tsubame:$PROOT/src/" 2>&1 | tail -1
+    rsync -az "$HERE/scripts/" "tsubame:$PROOT/scripts/" 2>&1 | tail -1
+fi
+
 remote_check() {   # $1=config basename  $2=job_name  -> DIRN/DIR/ACTIVE/COUNTS/END
     ssh tsubame "bash -s '$1' '$2' '$PROOT'" <<'REMOTE'
 base=$1; jobname=$2; proot=$3
