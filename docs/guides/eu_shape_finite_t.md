@@ -8,6 +8,12 @@ competition the $T=0$ Gross–Pitaevskii picture cannot see, so we evolve the
 Driver: `docs/guides/figures/eu_shape_finite_t.jl`. Runs on TSUBAME H100 via
 `scripts/eu_shape/submit_finite_t.sh` (modes `probe | campaign | equilibrium | kcut | shape`).
 
+Data provenance: the repo carries only the figures (PNG) + code (driver, plot
+scripts). Raw/derived CSVs backing the GPU-hour runs are archived on TSUBAME
+persistent storage at `/gs/fs/tga-kozuma-kouhi/uk07267/runs/eu_shape_optimization/data/`
+(`t0/` for the $T=0$ trap-shape gate, `finite_t/` for the Stoof-SGPE runs);
+re-fetch a CSV from there to re-run a plot script.
+
 ## Physics
 
 Three-body loss favours expansion (lower density $\Rightarrow$ less loss,
@@ -143,8 +149,7 @@ larger / slower box is the remaining lever to probe.
 With no box trap available, the deliverable is the best **harmonic** protocol:
 lower the ODT power. `ft_decompress_optimize` sweeps $(\omega_\mathrm{final},\tau)$
 of the closed-system decompression at the 0-D-calibrated formation conditions
-($\bar\omega=2\pi\cdot284$ Hz, $N=6.6\times10^4$, $T/T_c=0.5$, $34$ ms window);
-`eu_ft_decompress_opt.png` is the $N_0$ heatmap (colour $=N_0/N_0^\mathrm{hold}$,
+($\bar\omega=2\pi\cdot284$ Hz, $N=6.6\times10^4$, $T/T_c=0.5$, $34$ ms window;
 $N_0^\mathrm{hold}=44656$).
 
 Two clean features:
