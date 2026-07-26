@@ -79,10 +79,27 @@ shape result) are cutoff-clean. The ideal-Bose $1-(T/T_c)^3$ is drawn only for
 orientation — the classical (Rayleigh–Jeans) thermal over-populates, so $N_0/N$
 sits below it; it is not a fit.
 
-## Results (48³, $D{=}3$, TSUBAME H100)
+## Equilibrium is analytic; the SGPE is for the dynamics
 
-**Equilibrium** (`eu_ft_equilibrium.png`): condensate $N_0$ melts $9502\to3100$
-across $T/T_c=0.1\to0.9$ while the thermal cloud grows; $N_0/N\to0.95$ as $T\to0$.
+A key clarification (`eu_ft_equilibrium_analytic.png`, `ft_equilibrium_analytic`,
+NO simulation): the fixed-$N$ equilibrium is fixed by the atom + trap + $N$
+properties, because the *quantum* thermal cloud is **bounded**,
+$N_{th}=\zeta(3)(k_BT/\hbar\bar\omega)^3=N(T/T_c)^3$, giving $N_0=N[1-(T/T_c)^3]$ and a
+chemical potential pinned by the condensate,
+$\mu(T)=\mu_\mathrm{GP}(N_0/N)^{2/5}$, $\mu_\mathrm{GP}=\tfrac12\hbar\bar\omega(15N
+a_s/a_\mathrm{ho})^{2/5}=11.76\,\hbar\omega_\mathrm{ref}$ (matching the numerical GS
+$11.93$). The classical-field SGPE, by contrast, over-populates the thermal cloud
+(Rayleigh–Jeans: each classical mode carries $\sim k_BT$), so at fixed $\mu$ its
+total atom number grows with $T$ and its $N_0/N$ sits below the physical curve — a
+method artefact, not physics. **So the equilibrium $\mu(T)$, $T_c$, and condensate
+fraction are taken analytically; the SGPE earns its keep only in the DYNAMICS
+(shape ramp, breathing, sudden-quench dephasing) that no closed form can give.**
+
+## SGPE dynamics results (48³, $D{=}3$, TSUBAME H100)
+
+**Equilibrium cross-check** (`eu_ft_equilibrium.png`): the (classical-field) SGPE
+condensate $N_0$ melts $9502\to3100$ across $T/T_c=0.1\to0.9$ and $N_0/N\to0.95$ as
+$T\to0$ — the right qualitative melting, below the analytic curve as expected.
 
 **Cutoff sensitivity** (`eu_ft_kcut.png`): $N_0$ spread $30\%$ vs thermal $79\%$
 over the $k_\mathrm{cut}$ range — the condensate is the robust observable.

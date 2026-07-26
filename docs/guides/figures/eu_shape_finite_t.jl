@@ -217,6 +217,45 @@ function ft_equilibrium(; grid_n::Int=48, box::Float64=18.0,
     (u=u, rows=rows, n0_cold=n0_cold, nth_mono=nth_mono)
 end
 
+# ANALYTIC fixed-N equilibrium from atom+trap+N properties — NO simulation. The real
+# (quantum) thermal cloud is BOUNDED (unlike the classical field's Rayleigh-Jeans
+# over-population), so a fixed-N Bose gas in a 3D harmonic trap has
+#   T_c = ℏω̄(N/ζ(3))^{1/3},  N_th = ζ(3)(k_BT/ℏω̄)³ = N(T/T_c)³,  N₀ = N[1−(T/T_c)³],
+# and the interacting μ tracks the condensate density (Thomas-Fermi):
+#   μ(T) = μ_GP · (N₀/N)^{2/5},   μ_GP = ½ℏω̄(15 N a_s/a_ho)^{2/5}.
+# This is the CLEAN equilibrium (no cutoff, no over-thermalisation); the SGPE is kept
+# for the DYNAMICS (shape ramp) it alone can do. Note the leading result is ideal; the
+# interacting + finite-N Tc shift is ΔTc/Tc ≈ −1.33(a_s/a_ho)N^{1/6} − 0.73 N^{−1/3}
+# (Giorgini-Pitaevskii-Stringari), ~−14% here — printed but not folded into the curve.
+function ft_equilibrium_analytic(;
+    T_over_Tc_list::Vector{Float64}=collect(0.05:0.05:0.98),
+    csv::String=joinpath(@__DIR__, "eu_ft_equilibrium_analytic.csv"))
+    u = EuUnits(; omega_ref=2π * 420.0)
+    print_units(u)
+    ah = a_ho(u)
+    ζ3 = 1.2020569031595942
+    μ_GP = 0.5 * (15 * u.N * u.a_s / ah)^(2 / 5)          # Thomas-Fermi, atom props only
+    Tc = (u.N / ζ3)^(1 / 3)                                # kT_c/ℏω_ref at ω̄=1
+    dTc = -1.33 * (u.a_s / ah) * u.N^(1 / 6) - 0.73 * u.N^(-1 / 3)  # GPS correction
+    @printf "μ_GP(TF)=%.3f, T_c(ideal)=%.2f ℏω_ref  (interacting+finite-N ΔTc/Tc≈%.1f%%)\n" μ_GP Tc 100 * dTc
+    println("=== Analytic fixed-N Bose equilibrium (from atom+trap+N, NO simulation) ===")
+    @printf "  %-8s %-10s %-11s %-9s %-9s\n" "T/Tc" "N₀" "N_th" "N₀/N" "μ(T)"
+    open(csv, "w") do io
+        println(io, "T_over_Tc,N0,N_thermal,N0_over_N,mu")
+        for r in T_over_Tc_list
+            f0 = max(1 - r^3, 0.0)
+            N0 = u.N * f0
+            Nth = u.N * r^3
+            μ = μ_GP * f0^(2 / 5)
+            @printf io "%.4f,%.6g,%.6g,%.6f,%.6f\n" r N0 Nth f0 μ
+            (r in (0.1, 0.3, 0.5, 0.7, 0.9)) &&
+                @printf "  %-8.2f %-10.4g %-11.4g %-9.3f %-9.3f\n" r N0 Nth f0 μ
+        end
+    end
+    @printf "  CSV → %s\n" csv
+    (u=u, mu_GP=μ_GP, Tc=Tc)
+end
+
 # kcut sensitivity: quantify how the condensate N₀ and thermal N_th depend on the
 # classical-field cutoff. Both do (it is a classical field), but the condensate is
 # much less sensitive (~30% vs ~79% over k_cut∈[4.6,8.0]). Absolute numbers hold at
@@ -348,6 +387,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
         probe(; backend=bk)
     elseif mode == "equilibrium"
         ft_equilibrium(; backend=bk)
+    elseif mode == "analytic"
+        ft_equilibrium_analytic()
     elseif mode == "kcut"
         ft_kcut_convergence(; backend=bk)
     elseif mode == "shape"
