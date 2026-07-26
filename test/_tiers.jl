@@ -359,6 +359,10 @@ const FULL_EXTRA = [
     "workflow/test_calibration_drift.jl",
     "workflow/test_dynamics_knobs.jl",
     "gpu/test_cuda_equivalence.jl",
+    # GPU=CPU parity for the projected-GP momentum cutoff. Gates the host-array
+    # mask broadcast bug (ws.grid.k_squared is a host Array even on a GPU
+    # workspace); no-op on CPU-only CI. CPU high-k-removal sanity always runs.
+    "gpu/test_projected_gp_parity.jl",
     "hamiltonian/test_tdhfb_gpu_phase5ab.jl",
     "hamiltonian/test_tdhfb_gpu_phase5c_expm.jl",
     "hamiltonian/test_tdhfb_gpu_phase5c_hf.jl",
@@ -385,6 +389,7 @@ const FULL_EXTRA = [
     "rotating_basis/test_rotating_frame_regression.jl",
     "analysis/test_bogoliubov_goldstone.jl",
     "dynamics/test_sgpe_fdr.jl",
+    "dynamics/test_sgpe_stoof.jl",
     # Orphan-test audit 2026-05-25: promoted from unregistered → FULL_EXTRA.
     # All run ITP / RTP / find_ground_state and require the "full" tier.
     # The two Bug-4 regression pins are particularly load-bearing.
