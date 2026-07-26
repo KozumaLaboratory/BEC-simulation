@@ -60,6 +60,17 @@ for B in Bs:
                     a.axvline(cstar, color="green", ls="--", lw=1.3)
                 aE.text(cstar, np.nanmax(ef), f"{cstar:.3f}", color="green", fontsize=7, ha="center")
                 break
+        # FM-branch mF collapse = the PHYSICAL FM/polar boundary (spinodal). The
+        # energy crossing above can be spurious when both seeds are already polar.
+        mfm = np.array([MF.get(c, np.nan) for c in cc])
+        for j in range(len(cc) - 1):
+            if np.isfinite(mfm[j]) and np.isfinite(mfm[j + 1]) and mfm[j] > 0.4 and mfm[j + 1] < 0.1:
+                ccol = cc[j + 1]
+                for a in (aE, amF):
+                    a.axvline(ccol, color="darkorange", ls="-", lw=1.6, alpha=0.8)
+                amF.text(ccol, 0.55, rf"$c_1^*\approx{ccol:.4f}$", color="darkorange",
+                         fontsize=7, ha="right", rotation=90, va="center")
+                break
         aE.set_title(rf"$B={B}\mu$G, $\kappa={K}$", fontsize=9)
         aE.grid(alpha=0.3); amF.grid(alpha=0.3)
         amF.set_ylim(-0.05, 1.05); amF.set_xlabel(r"$c_1/c_0$")
@@ -67,8 +78,9 @@ for B in Bs:
             aE.set_ylabel("energy"); amF.set_ylabel("mF")
             aE.legend(fontsize=7); amF.legend(fontsize=7)
         col += 1
-fig.suptitle(r"$^{151}$Eu FM$\leftrightarrow$polar transition order: two-seed branches "
-             r"(crossing+jump = first-order; single smooth branch = continuous)", y=1.0)
+fig.suptitle(r"$^{151}$Eu FM$\leftrightarrow$polar transition order: two-seed branches. "
+             r"Orange = FM-branch mF collapse (physical boundary); green = E-crossing "
+             r"(spurious once both seeds polar). Sharp mF jump ⇒ first-order.", y=1.0)
 fig.tight_layout()
 fig.savefig(out, dpi=150, bbox_inches="tight")
 print("wrote", out)
