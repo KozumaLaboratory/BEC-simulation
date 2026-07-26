@@ -105,18 +105,35 @@ $T\to0$ — the right qualitative melting, below the analytic curve as expected.
 over the $k_\mathrm{cut}$ range — the condensate is the robust observable.
 
 **Shape trade-off** (`eu_ft_shape.png`, prep SGPE at $T/T_c=0.5$ → closed ramp +
-$K_3$, all at fixed $k_\mathrm{cut}$):
+$K_3$, all at fixed $k_\mathrm{cut}$, four protocols):
 
 | protocol | final $N_0$ | final total $N$ |
 |---|---|---|
 | HOLD (tight) | 7653 | 19050 |
 | DECOMPRESS ($\omega:1\to\tfrac12$) | **8171** | 19340 |
-| BOX (sudden release) | 1152 | **19690** |
+| BOX — sudden release | 1152 | **19690** |
+| BOX — adiabatic morph | 7898 | 19390 |
 
 Total-atom loss follows density (BOX $<$ DECOMPRESS $<$ HOLD — the density lever
-works). But for the *condensate*, **gradual decompression wins** (retains most
-$N_0$), whereas a **sudden box release cuts total loss the most yet shatters the
-BEC** (violent post-quench breathing dephases the coherent field). The finite-$T$
-lesson refines the $T=0$ levers: the expansion must be **adiabatic** — consistent
-with the "adiabatic expansion preserves $T/T_c$" picture in the theory note. An
-adiabatic (ramped) box is the clean follow-up.
+works). For the *condensate*, **adiabaticity dominates**: a **sudden** box release
+cuts total loss the most yet **shatters the BEC** ($N_0\!\to\!1152$; violent
+post-quench breathing dephases the coherent field), whereas the **adiabatic** box
+morph ($V=(1{-}s)V_\mathrm{harm}+sV_\mathrm{box}$) **preserves it** ($7898$, above
+HOLD). Gradual decompression is the robust winner. The finite-$T$ lesson refines
+the $T=0$ levers: the expansion must be **adiabatic** — the dynamical confirmation
+of "adiabatic expansion preserves $T/T_c$" from the theory note.
+
+### 0-D reservoir calibration — grounding in the real experiment
+
+The evaporative cooling (seconds) is quasi-static relative to the SGPE dynamics
+(ms), so the 0-D two-component model supplies the physically-calibrated
+$(\bar\omega, N, T/T_c)$ at BEC formation rather than ad-hoc values
+(`ft_reservoir_calibration`, via `run_evaporation`+`bec_handoff` on the researched
+euv3 ramp): **BEC onset at $\bar\omega=2\pi\cdot284$ Hz, $N_\mathrm{BEC}=6.6\times10^4$,
+$T/T_c=1.00$** (matching the measured $\sim5\times10^4$). Running the shape study at
+those calibrated units (`eu_ft_shape_cal.png`, $64^3$, $N=6.6\times10^4$,
+$T/T_c=0.6$) reproduces the same ordering — **decompress $>$ hold $>$ box(adiabatic)
+$>$ box(sudden)** for the condensate, sudden-box worst — confirming the conclusion
+at the real Eu formation conditions, not just the model point. The box's uniform-
+density (total-loss) advantage does not convert into a condensate gain here; a
+larger / slower box is the remaining lever to probe.

@@ -46,11 +46,11 @@ axN.set_title("total atom number vs time")
 axN.legend(frameon=False, fontsize=9)
 axN.grid(True, alpha=0.25)
 
-sub = "  ".join(f"{k}: N₀={v[0]:.0f}" for k, v in finals.items())
+sub = "  ".join(f"{labels[k]}: N₀={v[0]:.0f}" for k, v in finals.items())
 fig.suptitle("¹⁵¹Eu finite-T trap-shape trade-off (prep SGPE → closed ramp + K₃ loss)\n"
-             "gradual decompression keeps the most condensate; a sudden box release cuts total\n"
-             "loss most but shatters the BEC — expansion must be adiabatic.  " + sub, fontsize=9.5)
-fig.tight_layout(rect=[0, 0, 1, 0.93])
-out = os.path.join(here, "eu_ft_shape.png")
+             "adiabaticity dominates: a SUDDEN box shatters the BEC, a gradual (adiabatic) box\n"
+             "preserves it; gradual decompression is the robust winner.  " + sub, fontsize=9)
+fig.tight_layout(rect=[0, 0, 1, 0.92])
+out = prefix + ".png"
 fig.savefig(out, dpi=150)
 print("wrote", out)
