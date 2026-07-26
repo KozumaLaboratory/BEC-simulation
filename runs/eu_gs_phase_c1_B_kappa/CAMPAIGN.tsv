@@ -1,0 +1,13 @@
+# Eu F=6 GS phase-diagram campaign ledger — the DURABLE record so a session break
+# never redoes finished work. Committed to git = survives any session. Resume with
+#   scripts/eu_campaign_resume.sh            # status (per-config done/partial/missing)
+#   scripts/eu_campaign_resume.sh --submit   # re-qsub ONLY the missing task indices
+# run_yaml is content-addressed: the CAS dir is config_<basename>_<sha8(spec)>, and
+# each point_*.jld2 that already exists is skipped ("(cached)"). So resuming a
+# COMMITTED (byte-stable) config recomputes nothing that is already done.
+# Columns are TAB-separated. n_cells_expected = n_tasks * n_seeds.
+# config_file	submit_script	job_name	n_tasks	n_seeds	h_rt	purpose
+config_c1kappa_B0.yaml	submit_c1kappa.sh	eu_c1k_B0	195	2	0:40:00	c1xkappa plane B=0uG (pin)
+config_c1kappa_B10.yaml	submit_c1kappa.sh	eu_c1k_B10	195	2	0:40:00	c1xkappa plane B=10uG (pin)
+config_c1kappa_B60.yaml	submit_c1kappa.sh	eu_c1k_B60	195	2	0:40:00	c1xkappa plane B=60uG
+config_c1_refine_order.yaml	submit_c1_refine.sh	eu_c1ref	96	2	0:40:00	FM/polar transition ORDER refine
