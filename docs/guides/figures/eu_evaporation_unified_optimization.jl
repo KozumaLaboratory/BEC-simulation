@@ -109,6 +109,7 @@ rA = run_evaporation_bec(trap, ramp_best, p; N0=N0, T0=T0)
 # ---------- Stage B: tightness axis m_ω(t) on the best ramp ----------
 const KW = 6                    # piecewise-linear control points over normalised time τ∈[0,1]
 const MFLOOR = 0.40; const MCEIL = 2.0
+const MONO = length(ARGS) >= 3 ? parse(Bool, ARGS[3]) : false  # constrain m_ω non-increasing (smooth waist opening)
 grid_best = evap_trap_grid(trap, ramp_best)   # fixed ramp ⇒ build the trap grid once, reuse for all m_ω
 dur = ramp_best.times[end] - ramp_best.times[1]
 τnodes = collect(range(0.0, 1.0; length=KW))
@@ -127,8 +128,11 @@ function descendB(m0; n_line=13, n_sweeps=8)
     for _ in 1:n_sweeps
         imp = false
         for i in 1:KW
+            # MONO ⇒ keep m non-increasing: bound coordinate i by its neighbours (smooth waist opening)
+            lov = MONO && i < KW ? max(MFLOOR, m[i+1]) : MFLOOR
+            hiv = MONO && i > 1 ? min(MCEIL, m[i-1]) : MCEIL
             lb, lv = best, m[i]
-            for v in range(MFLOOR, MCEIL; length=n_line)
+            for v in range(lov, hiv; length=n_line)
                 m[i] = v; sc = objB(m); sc > lb && (lb = sc; lv = v)
             end
             m[i] = lv; lb > best && (best = lb; imp = true)
@@ -137,9 +141,11 @@ function descendB(m0; n_line=13, n_sweeps=8)
     end
     (m, best)
 end
+rand_m(rng) = MONO ? sort(MFLOOR .+ (MCEIL - MFLOOR) .* rand(rng, KW); rev=true) :
+              MFLOOR .+ (MCEIL - MFLOOR) .* rand(rng, KW)
 bestm = fill(1.0, KW); bestscB = objB(bestm)   # includes the m_ω≡1 start (= Stage A point)
 for k in 1:NSTART
-    m0 = k == 1 ? fill(1.0, KW) : MFLOOR .+ (MCEIL - MFLOOR) .* rand(rng, KW)
+    m0 = k == 1 ? fill(1.0, KW) : rand_m(rng)
     m, sc = descendB(m0)
     if sc > bestscB
         global bestscB = sc; global bestm = m

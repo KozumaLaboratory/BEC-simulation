@@ -29,22 +29,38 @@ def traj(which, key):
             np.array([float(r[key]) for r in rows]))
 
 
+# time the condensate first appears in the unified run (BEC formation)
+tu, N0u = traj("unified", "N0")
+t_form = tu[np.argmax(N0u > 0)] if (N0u > 0).any() else tu[-1]
+
 fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(12.5, 5.0))
 
-# ---- left: optimal m_ω(t) + effective vs ramp ω̄ ----
-ax0.plot(t, mω, "-", color="#9467bd", lw=2.4, label="optimal $m_\\omega(t)$ (waist axis)")
-ax0.axhline(1.0, color="0.6", ls=":", lw=1.2)
+# ---- left: the actionable knob m_ω(t) (the waist), with the resulting ω̄ on the twin axis ----
+ax0.axhspan(0, 1.0, color="#9467bd", alpha=0.04, lw=0)
+ax0.plot(t, mω, "-", color="#9467bd", lw=2.8, label="waist knob $m_\\omega(t)$  ($\\bar\\omega\\!\\propto\\!m_\\omega$)")
+ax0.axhline(1.0, color="0.55", ls=":", lw=1.3)
+ax0.text(0.05, 1.02, "$m_\\omega\\!=\\!1$: leave trap as-is (lab ramp)", fontsize=8.5, color="0.4")
+ax0.axvline(t_form, color="#d62728", ls=":", lw=1.4)
+ax0.text(t_form + 0.02, 0.12, "BEC forms\n($t$≈%.2f s)" % t_form, color="#d62728", fontsize=9)
+# annotate the two regimes
+ax0.annotate("hold ($\\approx$ lab)", (t[int(len(t) * 0.35)], mω[int(len(t) * 0.35)]),
+             (t[int(len(t) * 0.2)], 0.6), fontsize=9, color="#9467bd",
+             arrowprops=dict(arrowstyle="->", color="#9467bd"))
+ax0.annotate("open the waist %.1f× beyond the ramp\n($m_\\omega$: 1→%.2f)  dilute → 3-body $\\propto\\bar\\omega^3$ ↓"
+             % (1.0 / max(mω[-1], 1e-9), mω[-1]),
+             (t[-1], mω[-1]), (t[int(len(t) * 0.42)], 0.30), fontsize=9, color="#1f77b4",
+             arrowprops=dict(arrowstyle="->", color="#1f77b4"))
 ax0.set_xlabel("time  [s]")
-ax0.set_ylabel("tightness multiplier  $m_\\omega(t)$", color="#9467bd")
+ax0.set_ylabel("waist tightness knob  $m_\\omega(t)$", color="#9467bd")
 ax0.tick_params(axis="y", colors="#9467bd")
-ax0.set_ylim(0, max(2.05, mω.max() * 1.1))
-
+ax0.set_ylim(0, 1.25)
 axw = ax0.twinx()
-axw.plot(t, wr, "--", color="#7f7f7f", lw=1.7, label="power-ramp $\\bar\\omega/2\\pi$ ($m_\\omega\\!=\\!1$)")
-axw.plot(t, we, "-", color="#1f77b4", lw=2.0, label="effective $\\bar\\omega_{\\rm eff}/2\\pi$")
-axw.set_ylabel("mean trap frequency  $\\bar\\omega/2\\pi$  [Hz]", color="#1f77b4")
+axw.plot(t, wr, "--", color="#bbbbbb", lw=1.6, label="power-ramp $\\bar\\omega/2\\pi$")
+axw.plot(t, we, "-", color="#1f77b4", lw=1.8, label="effective $\\bar\\omega_{\\rm eff}/2\\pi$")
+axw.set_ylabel("$\\bar\\omega/2\\pi$  [Hz]", color="#1f77b4")
 axw.tick_params(axis="y", colors="#1f77b4")
-ax0.set_title("Optimal tightness trajectory", fontsize=11)
+axw.set_ylim(bottom=0)
+ax0.set_title("The protocol change: hold the trap, then open the waist late", fontsize=11)
 l0, la0 = ax0.get_legend_handles_labels()
 l1, la1 = axw.get_legend_handles_labels()
 ax0.legend(l0 + l1, la0 + la1, loc="upper right", fontsize=8.5, framealpha=0.9)
