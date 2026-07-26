@@ -76,13 +76,14 @@ function ground_state(u::EuUnits, grid; n_steps::Int, backend=CPUBackend(), verb
 end
 
 # ---------------------------------------------------------------------------
-# Real-time dynamics under a trap-shape schedule ω(t), with physical K₃ loss.
-# `omega_of_t(t)` returns the (isotropic) trap frequency at internal time t.
-# Returns (t_ms, surviving_N) time series.
+# Real-time dynamics under a trap-shape schedule, with physical K₃ loss.
+# `potential_of_t(t)` returns the AbstractPotential in force at internal time t
+# (use `harmonic_schedule(ω(t))` for a harmonic ramp, or a `BoxPotential` closure).
+# Returns (t_ms, surviving_N, peak_n) time series.
 # ---------------------------------------------------------------------------
-function run_shape(
+function run_schedule(
     u::EuUnits, grid, psi0;
-    omega_of_t, T_internal::Float64, dt::Float64,
+    potential_of_t, T_internal::Float64, dt::Float64,
     save_every::Int=10, backend=CPUBackend(),
 )
     n_steps = Int(round(T_internal / dt))
@@ -96,28 +97,31 @@ function run_shape(
         psi_init=psi0, loss, backend)
 
     dV = cell_volume(grid)
+    ah3 = a_ho(u)^3
     N0 = u.N * sum(abs2, ws.state.psi) * dV      # = u.N (∫|ψ|²=1)
     ts_ms = Float64[0.0]
     Ns = Float64[N0]
-    Vbuf = similar(ws.potential_values)
+    peak_n = Float64[u.N * maximum(abs2, ws.state.psi) / ah3]
 
     cb = SimulationCallbacks(
         on_step=(w, step, times, energies) -> begin
             # drive next step's trap shape from the (already advanced) time
-            ω = omega_of_t(w.state.t)
-            copyto!(Vbuf, evaluate_potential(HarmonicTrap{3}((ω, ω, ω)), grid))
-            copyto!(w.potential_values, Vbuf)
+            copyto!(w.potential_values, evaluate_potential(potential_of_t(w.state.t), grid))
             if step % save_every == 0
-                frac = real(sum(abs2, w.state.psi)) * dV
+                rho = abs2.(w.state.psi)
                 push!(ts_ms, w.state.t / u.omega_ref * 1e3)
-                push!(Ns, u.N * frac)
+                push!(Ns, u.N * real(sum(rho)) * dV)
+                push!(peak_n, u.N * maximum(rho) / ah3)
             end
             nothing
         end,
     )
     run_simulation!(ws; callbacks=cb)
-    (t_ms=ts_ms, N=Ns)
+    (t_ms=ts_ms, N=Ns, peak_n=peak_n)
 end
+
+# Harmonic isotropic schedule helper: ω(t) → HarmonicTrap.
+harmonic_schedule(omega_of_t) = t -> HarmonicTrap{3}((omega_of_t(t), omega_of_t(t), omega_of_t(t)))
 
 # ---------------------------------------------------------------------------
 # Smoke: HOLD (ω=1) vs DECOMPRESS (ω: 1 → ω_final) — surviving N must DIFFER,
@@ -140,13 +144,15 @@ function smoke(; grid_n::Int=16, box::Float64=12.0, T_internal::Float64=8.0,
 
     print("HOLD (ω=1) dynamics ... ")
     t0 = time()
-    hold = run_shape(u, grid, copy(psi0); omega_of_t=_ -> 1.0, T_internal, dt, backend)
+    hold = run_schedule(u, grid, copy(psi0);
+        potential_of_t=harmonic_schedule(_ -> 1.0), T_internal, dt, backend)
     @printf "%.1f s | N: %.4g → %.4g\n" (time() - t0) hold.N[1] hold.N[end]
 
     print("DECOMPRESS (ω: 1→$omega_final) dynamics ... ")
     t0 = time()
     ramp = t -> max(omega_final, 1.0 - (1.0 - omega_final) * (t / T_internal))
-    dec = run_shape(u, grid, copy(psi0); omega_of_t=ramp, T_internal, dt, backend)
+    dec = run_schedule(u, grid, copy(psi0);
+        potential_of_t=harmonic_schedule(ramp), T_internal, dt, backend)
     @printf "%.1f s | N: %.4g → %.4g\n" (time() - t0) dec.N[1] dec.N[end]
 
     println()
@@ -242,10 +248,125 @@ function validation_gate(;
     (u=u, rows=rows, s_n0=s_n0, s_n2=s_n2, pass=ok)
 end
 
+# ---------------------------------------------------------------------------
+# Trajectory optimization (task #11) — ramp-RATE sweep.
+# Decompress ω: 1 → ω_final over a ramp duration τ, then hold ω_final to T.
+# Surviving N(τ) has an interior MAXIMUM: too slow (large τ) ⇒ long time at high
+# density (more ∫γ dt); too fast (small τ) ⇒ the sudden loosening excites a
+# breathing mode whose re-compression overshoots density (transient γ spikes).
+# The GP dynamics encodes this adiabaticity trade-off with no ad-hoc penalty, so
+# argmax_τ N is the physical optimum of min ∫γ dt subject to breathing.
+# ---------------------------------------------------------------------------
+function optimize_ramp(;
+    grid_n::Int=32, box::Float64=20.0, T_internal::Float64=120.0, dt::Float64=0.02,
+    omega_final::Float64=0.5, gs_steps::Int=4000,
+    taus::Vector{Float64}=[0.0, 10.0, 25.0, 45.0, 70.0, 100.0, 120.0],
+    backend=CPUBackend(), csv::String=joinpath(@__DIR__, "eu_shape_ramp_opt.csv"),
+)
+    u = EuUnits(; omega_ref=2π * 420.0)
+    print_units(u)
+    grid = make_grid(GridConfig((grid_n, grid_n, grid_n), (box, box, box)))
+    print("Ground state (ω=1) ... ")
+    t0 = time()
+    psi0 = ground_state(u, grid; n_steps=gs_steps, backend)
+    @printf "%.1f s\n" (time() - t0)
+
+    # HOLD baseline (ω=1 throughout) for reference.
+    hold = run_schedule(u, grid, copy(psi0);
+        potential_of_t=harmonic_schedule(_ -> 1.0), T_internal, dt, backend)
+
+    to_ms(τ) = τ / u.omega_ref * 1e3
+    rows = NTuple{3, Float64}[]  # (τ_ms, surviving_N, loss_pct)
+    println("=== Ramp-rate sweep (ω:1→$omega_final, T=$(round(to_ms(T_internal))) ms) ===")
+    @printf "  HOLD baseline: N=%.5g (loss %.2f%%)\n" hold.N[end] 100*(1-hold.N[end]/hold.N[1])
+    @printf "  %-10s %-11s %-9s\n" "τ [ms]" "surviving N" "loss %"
+    for τ in taus
+        ramp = t -> (τ <= 0 ? omega_final :
+                     omega_final + (1.0 - omega_final) * max(0.0, 1.0 - t / τ))
+        r = run_schedule(u, grid, copy(psi0);
+            potential_of_t=harmonic_schedule(ramp), T_internal, dt, backend)
+        loss = 100 * (1 - r.N[end] / r.N[1])
+        push!(rows, (to_ms(τ), r.N[end], loss))
+        @printf "  %-10.2f %-11.5g %-9.3f\n" to_ms(τ) r.N[end] loss
+    end
+
+    open(csv, "w") do io
+        println(io, "tau_ms,surviving_N,loss_pct,hold_N,hold_loss_pct")
+        for r in rows
+            @printf io "%.4f,%.6g,%.6g,%.6g,%.6g\n" r[1] r[2] r[3] hold.N[end] 100*(1-hold.N[end]/hold.N[1])
+        end
+    end
+
+    best = rows[argmax([r[2] for r in rows])]
+    println()
+    @printf "  OPTIMUM: τ=%.2f ms → N=%.5g (loss %.3f%%), vs HOLD loss %.3f%%\n" best[1] best[2] best[3] 100*(1-hold.N[end]/hold.N[1])
+    @printf "  CSV → %s\n" csv
+    (u=u, rows=rows, hold=hold, best=best)
+end
+
+# ---------------------------------------------------------------------------
+# Box lever (task #11) — the geometric knob the theory points to.
+# A harmonic condensate is peaked: ⟨n²⟩ = (8/21) n₀² (shape-invariant). A flat-
+# bottomed BOX holds a uniform bulk n ≈ N/V, so ⟨n²⟩ = (N/V)² is set freely by
+# V — and at a MATCHED footprint the uniform profile carries a much lower ⟨n²⟩
+# (hence loss rate) than the peaked one. GS-only, no dynamics.
+# ---------------------------------------------------------------------------
+function box_lever(;
+    grid_n::Int=48, edges::Vector{Float64}=[8.0, 10.0, 12.0, 15.0, 18.0],
+    gs_steps::Int=5000, backend=CPUBackend(),
+    csv::String=joinpath(@__DIR__, "eu_shape_box_lever.csv"),
+)
+    u = EuUnits(; omega_ref=2π * 420.0)
+    print_units(u)
+    interactions = InteractionParams(Dict{Int, Float64}(0 => c0_coupling(u)))
+    ah = a_ho(u)
+    Nn(rho, dV) = (u.N / ah^3)^2 * sum(x -> x^3, rho) * dV   # ⟨n²⟩_phys
+
+    rows = NTuple{4, Float64}[]  # (edge L, V_phys[m³], ⟨n²⟩[m⁻⁶], (N/V)²[m⁻⁶])
+    println("=== Box lever: ⟨n²⟩ vs box volume (uniform bulk) ===")
+    @printf "  %-8s %-12s %-12s %-12s %-8s\n" "L[a_ho]" "V[m³]" "⟨n²⟩[m⁻⁶]" "(N/V)²" "ratio"
+    for L in edges
+        box = 1.5 * L                                        # grid box ⊃ potential box, room for walls
+        grid = make_grid(GridConfig((grid_n, grid_n, grid_n), (box, box, box)))
+        dV = cell_volume(grid)
+        pot = BoxPotential((L, L, L); wall_strength=2000.0, wall_width=0.4)
+        res = find_ground_state(;
+            grid, atom=Eu151, interactions, potential=pot,
+            dt=0.002, n_steps=gs_steps, tol=1e-9,
+            initial_state=:m_minus_F, backend, verbose=false)
+        rho = dropdims(sum(abs2, Array(res.workspace.state.psi); dims=4); dims=4)
+        n2 = Nn(rho, dV)
+        Vphys = (L * ah)^3
+        nV2 = (u.N / Vphys)^2                                # ideal uniform (N/V)²
+        push!(rows, (L, Vphys, n2, nV2))
+        @printf "  %-8.1f %-12.4g %-12.4g %-12.4g %-8.3f\n" L Vphys n2 nV2 n2/nV2
+    end
+
+    # slope of ⟨n²⟩ vs V (theory (N/V)² ⇒ -2)
+    lV = [log(r[2]) for r in rows]; ln2 = [log(r[3]) for r in rows]
+    n = length(lV); sx = sum(lV); sy = sum(ln2)
+    slope = (n * sum(lV .* ln2) - sx * sy) / (n * sum(abs2, lV) - sx^2)
+
+    open(csv, "w") do io
+        println(io, "edge_aho,V_phys_m3,n2_phys_m6,nV2_ideal_m6")
+        for r in rows
+            @printf io "%.4f,%.6g,%.6g,%.6g\n" r...
+        end
+    end
+    println()
+    @printf "  ⟨n²⟩ ∝ V^%.3f   (uniform-box theory: -2.000)\n" slope
+    @printf "  CSV → %s\n" csv
+    (u=u, rows=rows, slope=slope)
+end
+
 if abspath(PROGRAM_FILE) == @__FILE__
     mode = isempty(ARGS) ? "smoke" : ARGS[1]
     if mode == "validate"
         validation_gate()
+    elseif mode == "optramp"
+        optimize_ramp()
+    elseif mode == "boxlever"
+        box_lever()
     else
         smoke()
     end
