@@ -45,7 +45,8 @@ axN.grid(True, alpha=0.25)
 
 sub = "  ".join(f"{k}: N₀={v[0]:.0f}" for k, v in finals.items())
 fig.suptitle("¹⁵¹Eu finite-T trap-shape trade-off (prep SGPE → closed ramp + K₃ loss)\n"
-             + sub, fontsize=10.5)
+             "gradual decompression keeps the most condensate; a sudden box release cuts total\n"
+             "loss most but shatters the BEC — expansion must be adiabatic.  " + sub, fontsize=9.5)
 fig.tight_layout(rect=[0, 0, 1, 0.93])
 out = os.path.join(here, "eu_ft_shape.png")
 fig.savefig(out, dpi=150)

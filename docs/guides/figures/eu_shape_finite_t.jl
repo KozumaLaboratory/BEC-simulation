@@ -13,12 +13,14 @@
 # the interacting thermal state at (μ, T). In norm-N units the condensate is the
 # phase-fixed ENSEMBLE mean ⟨ψ⟩ (thermal cancels across trajectories), N₀=∫|⟨ψ⟩|²dV.
 #
-# Rigour (see docs/guides/eu_shape_finite_t.md): the thermalisation is pinned by the
+# Rigour (see docs/guides/eu_shape_finite_t.md): thermalisation is pinned by the
 # existing test_sgpe_fdr.jl (Rayleigh-Jeans) and test_sgpe_stoof.jl (T→0→interacting
-# GP GS); this driver adds V-key (f→1 as T→0), V-mono, and V-kcut — the condensate N₀
-# is INDEPENDENT of the classical-field cutoff (only the thermal cloud scales with it),
-# so it is a physical observable, not a control-parameter artefact. A realistic cooling
-# trajectory T(t),μ(t) from the 0-D evaporation model is a later refinement.
+# GP GS); this driver adds V-T0 (N₀→N as T→0) and V-mono (condensate melts). HONEST
+# limitation: the classical field is cutoff-dependent — over k_cut∈[4.6,8.0] the thermal
+# cloud spreads ~79% while the condensate N₀ moves ~30%, i.e. N₀ is the MORE robust of
+# the two but NOT cutoff-free. So absolute numbers are quoted at the physical cutoff
+# (ε(k_cut)−μ≈T) and only comparisons at FIXED k_cut (the shape panel) are cutoff-clean.
+# A realistic cooling trajectory T(t),μ(t) from the 0-D evaporation model is a later step.
 #
 # Run (CPU smoke):  julia --project=. docs/guides/figures/eu_shape_finite_t.jl --smoke
 # Run (GPU):        LD_LIBRARY_PATH=/usr/lib/wsl/lib julia --project=. \
@@ -215,9 +217,11 @@ function ft_equilibrium(; grid_n::Int=48, box::Float64=18.0,
     (u=u, rows=rows, n0_cold=n0_cold, nth_mono=nth_mono)
 end
 
-# V-kcut: the CONDENSATE N₀ must be independent of the UV cutoff k_cut (only the
-# thermal cloud mass scales with it). Flat N₀(k_cut) ⇒ the condensate is NOT a
-# classical-field cutoff artifact — the direct rebuttal to "it's just a control param".
+# kcut sensitivity: quantify how the condensate N₀ and thermal N_th depend on the
+# classical-field cutoff. Both do (it is a classical field), but the condensate is
+# much less sensitive (~30% vs ~79% over k_cut∈[4.6,8.0]). Absolute numbers hold at
+# the physical cutoff ε(k_cut)−μ≈T; the shape comparison runs at FIXED k_cut so it
+# is cutoff-clean. This is the honest statement of the classical-field limitation.
 function ft_kcut_convergence(; grid_n::Int=48, box::Float64=18.0, T_over_Tc::Float64=0.5,
     kcut_fracs::Vector{Float64}=[0.55, 0.65, 0.75, 0.85, 0.95],
     T_equil::Float64=30.0, dt::Float64=0.01, gs_steps::Int=2500,
@@ -250,11 +254,14 @@ function ft_kcut_convergence(; grid_n::Int=48, box::Float64=18.0, T_over_Tc::Flo
         end
     end
     N0s = [r[2] for r in rows]
-    spread = (maximum(N0s) - minimum(N0s)) / (sum(N0s) / length(N0s))
+    Nths = [r[3] for r in rows]
+    spread0 = (maximum(N0s) - minimum(N0s)) / (sum(N0s) / length(N0s))
+    spreadth = (maximum(Nths) - minimum(Nths)) / (sum(Nths) / length(Nths))
     println()
-    @printf "  V-kcut (N₀ flat vs k_cut): spread=%.1f%%  %s   (thermal mass DOES scale with k_cut, as expected)\n" 100 * spread (spread < 0.15 ? "PASS" : "CHECK")
+    @printf "  cutoff sensitivity: condensate N₀ spread=%.0f%%  vs  thermal N_th spread=%.0f%%\n" 100 * spread0 100 * spreadth
+    @printf "  ⇒ N₀ is the MORE robust observable (quote at physical k_cut=√(2(μ+T)); compare at FIXED k_cut).\n"
     @printf "  CSV → %s\n" csv
-    (u=u, rows=rows, spread=spread)
+    (u=u, rows=rows, spread0=spread0, spreadth=spreadth)
 end
 
 # The finite-T SHAPE result: prepare a finite-T state (bath on, HOLD), then a

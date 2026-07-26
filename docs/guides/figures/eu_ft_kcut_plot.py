@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
-"""Finite-T validation V-kcut: the condensate N₀ is independent of the UV cutoff.
+"""Finite-T cutoff sensitivity: condensate N₀ and thermal N_th vs the classical
+cutoff k_cut.
 
-The classical-field total/thermal population depends on where the classical
-region is cut (k_cut) — that dependence is real and expected. The CONDENSATE N₀,
-being an infrared (macroscopically-occupied lowest-mode) quantity, must NOT
-depend on the UV cutoff. A flat N₀(k_cut) with a k_cut-scaling thermal cloud is
-the direct evidence that the condensate observable is physical, not a
-classical-field control-parameter artefact.
+Honest reading of a genuine classical-field limitation: BOTH the condensate and
+the thermal cloud depend on where the classical/quantum boundary k_cut is drawn —
+the classical (Rayleigh–Jeans) field over-populates the sparsely-occupied high
+modes, so pushing k_cut past the physical boundary ε(k_cut)−μ≈T inflates the
+thermal cloud and depletes the condensate. Over k_cut∈[4.6,8.0] the thermal grows
+~127% while the condensate drops ~26%: the condensate is the MORE robust of the
+two, but it is NOT cutoff-free. Absolute numbers must be quoted at the physical
+cutoff (dashed line); only comparisons at FIXED k_cut (e.g. the shape panel) are
+cutoff-independent.
 
 Usage: python3 eu_ft_kcut_plot.py [eu_ft_kcut.csv]
 """
@@ -26,22 +30,26 @@ Nth = np.atleast_1d(d["N_thermal"])
 order = np.argsort(k)
 k, N0, Nth = k[order], N0[order], Nth[order]
 
-N0_mean = N0.mean()
-spread = (N0.max() - N0.min()) / N0_mean
+# physical cutoff: eps(k)-mu ~ T  =>  k = sqrt(2(mu+T)), mu=11.93, T=10.13
+k_phys = np.sqrt(2 * (11.93 + 10.13))
+d0 = (N0.max() - N0.min()) / N0.mean()
+dth = (Nth.max() - Nth.min()) / Nth.mean()
 
-fig, ax = plt.subplots(figsize=(6.6, 4.6))
-ax.plot(k, N0, "-o", color="#1f6feb", ms=8, lw=1.7, label="condensate $N_0$ (IR)")
-ax.plot(k, Nth, "-s", color="#bf8700", ms=7, lw=1.5, label="thermal cloud $N_{th}$ (UV, cutoff-dep.)")
-ax.axhline(N0_mean, ls="--", color="#1f6feb", lw=1.0, alpha=0.6,
-           label=fr"$\langle N_0\rangle$ (spread {100*spread:.1f}%)")
+fig, ax = plt.subplots(figsize=(6.8, 4.6))
+ax.plot(k, N0, "-o", color="#1f6feb", ms=8, lw=1.7,
+        label=fr"condensate $N_0$  (spread {100*d0:.0f}%)")
+ax.plot(k, Nth, "-s", color="#bf8700", ms=7, lw=1.5,
+        label=fr"thermal $N_{{th}}$  (spread {100*dth:.0f}%)")
+ax.axvline(k_phys, ls="--", color="#57606a", lw=1.4,
+           label=fr"physical cutoff $\varepsilon-\mu\!\approx\!T$ ($k_\mathrm{{cut}}\!=\!{k_phys:.1f}$)")
 ax.set_xlabel(r"classical-field cutoff $k_\mathrm{cut}$")
 ax.set_ylabel("atom number")
-ax.set_title("¹⁵¹Eu finite-T V-kcut: condensate is cutoff-independent\n"
-             r"$N_0$ flat while $N_{th}$ scales with $k_\mathrm{cut}$")
-ax.legend(frameon=False, fontsize=9.5)
+ax.set_title("¹⁵¹Eu finite-T cutoff sensitivity (Stoof-SGPE, T/T_c=0.5)\n"
+             r"condensate is less cutoff-sensitive than the thermal cloud")
+ax.legend(frameon=False, fontsize=9)
 ax.grid(True, alpha=0.25)
 ax.set_ylim(bottom=0)
 fig.tight_layout()
 out = os.path.join(here, "eu_ft_kcut.png")
 fig.savefig(out, dpi=150)
-print("wrote", out, "| N0 spread = %.1f%%" % (100 * spread))
+print("wrote", out, "| N0 spread %.0f%%, Nth spread %.0f%%" % (100 * d0, 100 * dth))

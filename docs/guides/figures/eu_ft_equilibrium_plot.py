@@ -34,7 +34,7 @@ axN.plot(r, Nth, "-s", color="#bf8700", ms=6, label=r"thermal $N_{th}$ (classica
 axN.axhline(1e4, ls=":", color="#1f6feb", alpha=0.5, lw=1.0, label=r"$N$")
 axN.set_xlabel(r"$T/T_c$")
 axN.set_ylabel("atom number")
-axN.set_title(r"condensate is cutoff-robust; thermal is Rayleigh–Jeans")
+axN.set_title(r"condensate melts (V-mono); thermal is Rayleigh–Jeans")
 axN.legend(frameon=False, fontsize=8.5)
 axN.grid(True, alpha=0.25)
 axN.set_ylim(bottom=0)

@@ -41,38 +41,65 @@ noise) runs only during the **preparation** phase; the shape ramp is evolved as 
 **closed system** ($\gamma=0$, loss on), where the gas cools adiabatically as it
 expands.
 
-**Condensate measure.** $N_0=\int|\langle\psi\rangle|^2\,dV$, the phase-fixed
-ensemble mean of the stretched component (thermal fluctuations cancel across
-trajectories). This is the coherent condensate; it coincides with the
-Penrose–Onsager condensate up to amplitude-fluctuation ($\langle|a_0|\rangle^2$ vs
-$\langle|a_0|^2\rangle$) corrections, which are second order and small away from
-$T_c$.
+**Condensate measure (bias-corrected).** The raw coherent estimator
+$\int|\langle\psi\rangle|^2$ over-counts by the residual thermal variance $/M$
+($M$ trajectories): $E[|\langle\psi\rangle|^2]=\phi^2+n_{th}/M$, so it depends on
+$M$ (uncorrected: $M{=}3\to10260$, $M{=}8\to8035$ at $T/T_c{=}0.5$ — a fake 28 %
+"physics"). The Penrose–Onsager-consistent correction
+$n_c=|\langle\psi\rangle|^2-(\langle|\psi|^2\rangle-|\langle\psi\rangle|^2)/(M-1)$
+subtracts it, making $N_0=\int n_c\,dV$ unbiased and $M$-independent ($M{=}3\to6448$,
+$M{=}8\to6401$).
 
 **Classical-field cutoff.** The noise populates every mode, so a projection at
 $k_\mathrm{cut}$ with $\varepsilon(k_\mathrm{cut})-\mu\approx T$ (i.e.
 $k_\mathrm{cut}=\sqrt{2(\mu+T)}$) defines the classical region; the grid must
 resolve it ($k_\mathrm{max}=\pi/dx>k_\mathrm{cut}$, hence $\ge 48^3$).
 
+**Single-component / $D$.** All atoms sit in the stretched state with $c_1=0$, so
+the spin matrices never enter and any $F$ gives identical physics — only $D=2F+1$
+(cost) changes. The runs use $F=1$ ($D=3$), $4.3\times$ cheaper than Eu's $D=13$;
+the Eu units live in the explicit $c_0,K_3$.
+
 ## Validation (falsifiable, not hand-waved)
 
-| Check | What | Where |
+| Check | What | Result |
 |---|---|---|
-| **V-FDR** | Rayleigh–Jeans equilibrium $\langle|\hat\psi(k)|^2\rangle=T/(\tfrac12k^2-\mu)$ | existing `test_sgpe_fdr.jl` |
-| **V-Stoof** | $T\to0$ relaxes to the interacting GP ground state | existing `test_sgpe_stoof.jl` |
-| **V-key** | condensate fraction $f\to1$ as $T\to0$ | `ft_equilibrium` |
-| **V-mono** | $f$ monotone decreasing, $\to0$ near $T_c$ | `ft_equilibrium` |
-| **V-kcut** | condensate $N_0$ **independent** of $k_\mathrm{cut}$ (only the thermal cloud scales) | `ft_kcut_convergence` |
+| **V-FDR** | Rayleigh–Jeans $\langle|\hat\psi(k)|^2\rangle=T/(\tfrac12k^2-\mu)$ | existing `test_sgpe_fdr.jl` ✓ |
+| **V-Stoof** | $T\to0$ → interacting GP ground state | existing `test_sgpe_stoof.jl` ✓ |
+| **V-T0** | $N_0/N\to1$ as $T\to0$ | $0.95$ at $T/T_c{=}0.1$ ✓ |
+| **V-mono** | condensate $N_0$ melts monotonically | $9502\to3100$ over $T/T_c{=}0.1\!\to\!0.9$ ✓ |
+| **estimator** | $N_0$ independent of trajectory count $M$ | $M{=}3\to6448$, $M{=}8\to6401$ ✓ |
 
-V-kcut is the direct rebuttal to "the classical-field temperature is just a
-control parameter": the *thermal* population is indeed cutoff-dependent, but the
-*condensate* — an infrared, macroscopically-occupied quantity — is not.
+**Honest cutoff limitation (not hand-waved).** The classical field IS
+cutoff-dependent. Over $k_\mathrm{cut}\in[4.6,8.0]$ the thermal cloud spreads
+$\sim79\%$ while the condensate $N_0$ moves $\sim30\%$: $N_0$ is the *more robust*
+of the two but NOT cutoff-free. So absolute $N_0$ is quoted at the physical cutoff
+$\varepsilon-\mu\approx T$, and only comparisons at FIXED $k_\mathrm{cut}$ (the
+shape result) are cutoff-clean. The ideal-Bose $1-(T/T_c)^3$ is drawn only for
+orientation — the classical (Rayleigh–Jeans) thermal over-populates, so $N_0/N$
+sits below it; it is not a fit.
 
-Reference: $f$ vs the ideal-Bose $1-(T/T_c)^3$. The SGPE sits below it, the
-expected signature of classical-field (Rayleigh–Jeans) thermal over-occupation
-plus interactions; it is not a fit.
+## Results (48³, $D{=}3$, TSUBAME H100)
 
-## Results
+**Equilibrium** (`eu_ft_equilibrium.png`): condensate $N_0$ melts $9502\to3100$
+across $T/T_c=0.1\to0.9$ while the thermal cloud grows; $N_0/N\to0.95$ as $T\to0$.
 
-Figures (from the TSUBAME campaign): `eu_ft_equilibrium.png` (V-key/V-mono),
-`eu_ft_kcut.png` (V-kcut), `eu_ft_shape.png` (HOLD vs DECOMPRESS vs BOX condensate
-survival). Numbers are filled in when the campaign completes.
+**Cutoff sensitivity** (`eu_ft_kcut.png`): $N_0$ spread $30\%$ vs thermal $79\%$
+over the $k_\mathrm{cut}$ range — the condensate is the robust observable.
+
+**Shape trade-off** (`eu_ft_shape.png`, prep SGPE at $T/T_c=0.5$ → closed ramp +
+$K_3$, all at fixed $k_\mathrm{cut}$):
+
+| protocol | final $N_0$ | final total $N$ |
+|---|---|---|
+| HOLD (tight) | 7653 | 19050 |
+| DECOMPRESS ($\omega:1\to\tfrac12$) | **8171** | 19340 |
+| BOX (sudden release) | 1152 | **19690** |
+
+Total-atom loss follows density (BOX $<$ DECOMPRESS $<$ HOLD — the density lever
+works). But for the *condensate*, **gradual decompression wins** (retains most
+$N_0$), whereas a **sudden box release cuts total loss the most yet shatters the
+BEC** (violent post-quench breathing dephases the coherent field). The finite-$T$
+lesson refines the $T=0$ levers: the expansion must be **adiabatic** — consistent
+with the "adiabatic expansion preserves $T/T_c$" picture in the theory note. An
+adiabatic (ramped) box is the clean follow-up.
