@@ -147,19 +147,32 @@ of the closed-system decompression at the 0-D-calibrated formation conditions
 `eu_ft_decompress_opt.png` is the $N_0$ heatmap (colour $=N_0/N_0^\mathrm{hold}$,
 $N_0^\mathrm{hold}=44656$).
 
-**Optimum: decompress to $\omega_\mathrm{final}\approx0.65\,\omega_\mathrm{form}$,
-fast ($\tau\to0$) → $N_0=51570$, $+15.5\%$ over holding.**
-
 Two clean features:
-- **Interior optimum in $\omega_\mathrm{final}$** ($\sim0.5$–$0.65$): loosening cuts
-  three-body loss, but over-loosening ($0.35$) drops $T_c\propto\bar\omega$ and melts
-  the condensate — the finite-$T$ trade-off, made quantitative.
 - **Faster is better** ($\tau=0$ wins every row): unlike the box, a harmonic→weaker-
   harmonic quench is mild (the ground state stays a parabola), so a sudden
   decompression reaches low density fastest without shattering the BEC. The gentler
   $\tau\approx7$ ms is within a few % and avoids exciting a breathing mode — the
   practical choice.
+- **Interior optimum in $\omega_\mathrm{final}$**: the refined sweep at $\tau=0$
+  (`eu_ft_decompress_refine.png`) pins a broad peak at
+  $\omega_\mathrm{final}\approx0.55$–$0.60$ — **optimum $0.60$, $N_0=51689$, $+15.9\%$
+  over HOLD** ($44612$). Loosening cuts three-body loss, but over-loosening drops
+  $T_c\propto\bar\omega$ and melts the condensate; the finite-$T$ trade-off, pinned.
+
+## Optimizing the evaporation ramp too (0-D, before the decompression)
+
+The FORT power schedule that forms the BEC is itself optimizable
+(`ft_evap_ramp_optimize`, `eu_ft_evap_ramp.png`): a Bayesian search over the
+researched euv3 ramp (duration / final-power / time-warp transform) lifts the
+condensate at BEC onset from $N_\mathrm{BEC}=6.56\times10^4$ to $8.56\times10^4$
+(**$+30.5\%$**), reaching BEC faster ($t_\mathrm{BEC}$ $1.70\to1.02$ s) via a steeper,
+deeper power ramp. (The optimum sits at the parameter-bound corner — widening the
+bounds could gain more.)
+
+**Two-stage recipe.** Optimize the evaporation ramp ($+30\%$ BEC at formation),
+then decompress the ODT to $\bar\omega\approx0.6\,\bar\omega_\mathrm{form}$, fast
+($+16\%$ condensate) — both experimentally available with the harmonic trap alone.
 
 ## Next
-Realistic cooling trajectory $T(t),\mu(t)$ fed from `run_evaporation_bec`; a finer
-$\omega_\mathrm{final}$ grid to pin the interior optimum; an adiabatic (ramped) box.
+Realistic cooling trajectory $T(t),\mu(t)$ fed from `run_evaporation_bec`; widen the
+evaporation-ramp bounds; an adiabatic (ramped) box if a box trap becomes available.
