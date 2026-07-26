@@ -40,11 +40,26 @@ using SpinorBEC: apply_sgpe_step!, apply_operator_via_registry!, total_energy
 c0_bare(u::EuUnits) = 4π * (u.a_s / a_ho(u))     # g̃  (norm-N contact)
 k3_bare(u::EuUnits) = k3_tilde(u)                # K̃₃ (norm-N three-body)
 
+# The finite-T model is single-component: all atoms in the stretched state with
+# c₁=0, so the spin matrices never enter (diagonal contact only) and ANY F gives
+# identical physics — only D=2F+1 (hence cost) changes. Use F=1 (D=3), 4.3× cheaper
+# than ¹⁵¹Eu's D=13; the Eu units live entirely in the explicit c₀ and K₃. (A run at
+# D=13 reproduces D=3 to sampling error, confirming the reduction.)
+const FT_ATOM = Rb87
+
+function ft_ground_state(u::EuUnits, grid; n_steps::Int, backend=CPUBackend())
+    interactions = InteractionParams(Dict{Int, Float64}(0 => c0_coupling(u)))
+    res = find_ground_state(; grid, atom=FT_ATOM, interactions,
+        potential=HarmonicTrap{3}((1.0, 1.0, 1.0)), dt=0.002, n_steps, tol=1e-9,
+        initial_state=:m_minus_F, backend, verbose=false)
+    res.workspace.state.psi
+end
+
 # GP chemical potential μ = ⟨ψ|Ĥ|ψ⟩ / ⟨ψ|ψ⟩ of a state in a given trap.
 function gp_chempot(u::EuUnits, grid, psi, potential; backend=CPUBackend())
     interactions = InteractionParams(Dict{Int, Float64}(0 => c0_coupling(u)))
     sp = SimParams(; dt=0.01, n_steps=1, imaginary_time=false, save_every=1, normalize_every=0)
-    ws = make_workspace(; grid, atom=Eu151, interactions, potential, sim_params=sp,
+    ws = make_workspace(; grid, atom=FT_ATOM, interactions, potential, sim_params=sp,
         psi_init=psi, backend)
     hpsi = similar(ws.state.psi)
     apply_operator_via_registry!(hpsi, ws)
@@ -60,13 +75,13 @@ end
 function _sgpe_trajectory!(
     u, grid, psi0, potential_of_t, gamma_of_t, T, k_cut, μ_of_t,
     T_internal, dt, save_every, backend, seed_base,
-    psi_sum, n_tot_sum, save_times, D, loss_on,
+    psi_sum, dens_sum, n_tot_sum, save_times, D, loss_on,
 )
     n_steps = round(Int, T_internal / dt)
     interactions = InteractionParams(Dict{Int, Float64}(0 => c0_bare(u)))   # norm-N
     loss = loss_on ? LossParams(; K3_cubic=k3_bare(u)) : nothing            # norm-N
     sp = SimParams(; dt, n_steps, imaginary_time=false, normalize_every=0, save_every)
-    ws = make_workspace(; grid, atom=Eu151, interactions,
+    ws = make_workspace(; grid, atom=FT_ATOM, interactions,
         potential=HarmonicTrap{3}((1.0, 1.0, 1.0)), sim_params=sp,
         psi_init=copy(psi0), loss, backend)
     dV = cell_volume(grid)
@@ -91,6 +106,7 @@ function _sgpe_trajectory!(
                 ψc = Array(view(w.state.psi, ntuple(_ -> Colon(), 3)..., D))
                 phase = angle(sum(ψc) * dV)          # global-phase gauge fix
                 @. psi_sum[i] += ψc * cis(-phase)
+                @. dens_sum[i] += abs2(ψc)           # ⟨|ψ|²⟩ accumulator (bias correction)
                 n_tot_sum[i] += real(sum(abs2, w.state.psi)) * dV
                 save_times[i] = w.state.t
             end
@@ -113,21 +129,31 @@ function run_ensemble(
 )
     n_steps = round(Int, T_internal / dt)
     n_save = fld(n_steps, save_every)
-    D = SpinSystem(Eu151.F).n_components
+    D = SpinSystem(FT_ATOM.F).n_components
     gpts = grid.config.n_points
     psiN = copy(psi0) .* sqrt(u.N)                 # norm-1 GS → norm-N physical field
     psi_sum = [zeros(ComplexF64, gpts...) for _ in 1:n_save]
+    dens_sum = [zeros(Float64, gpts...) for _ in 1:n_save]
     n_tot_sum = zeros(Float64, n_save)
     save_times = zeros(Float64, n_save)
     for tr in 1:n_traj
         _sgpe_trajectory!(u, grid, psiN, potential_of_t, gamma_of_t, T, k_cut, μ_of_t,
             T_internal, dt, save_every, backend, seed0 + tr * 1_000_003,
-            psi_sum, n_tot_sum, save_times, D, loss_on)
+            psi_sum, dens_sum, n_tot_sum, save_times, D, loss_on)
     end
     dV = cell_volume(grid)
+    M = n_traj
     t_ms = save_times ./ u.omega_ref .* 1e3
-    N_tot = n_tot_sum ./ n_traj                    # norm-N ⇒ already atom number
-    N0 = [sum(abs2, psi_sum[i] ./ n_traj) * dV for i in 1:n_save]
+    N_tot = n_tot_sum ./ M                          # norm-N ⇒ already atom number
+    # Bias-corrected condensate (Penrose-Onsager consistent): the raw coherent
+    # density |⟨ψ⟩|² over-counts by the residual thermal variance /M, so subtract it:
+    #   n_c = |⟨ψ⟩|² − (⟨|ψ|²⟩ − |⟨ψ⟩|²)/(M−1).  Makes N₀ unbiased / M-independent.
+    N0 = map(1:n_save) do i
+        coh = abs2.(psi_sum[i] ./ M)               # |⟨ψ⟩|²
+        meandens = dens_sum[i] ./ M                 # ⟨|ψ|²⟩
+        nc = M > 1 ? coh .- (meandens .- coh) ./ (M - 1) : coh
+        max(sum(nc) * dV, 0.0)
+    end
     (t_ms=t_ms, N=N_tot, N0=N0, frac=N0 ./ max.(N_tot, eps()))
 end
 
@@ -136,13 +162,14 @@ Tc_harmonic(N, ωbar=1.0) = 0.94 * ωbar * N^(1 / 3)   # kT_c/ℏω_ref, ideal B
 
 function _setup(u, grid_n, box, gs_steps, backend)
     grid = make_grid(GridConfig((grid_n, grid_n, grid_n), (box, box, box)))
-    psi0 = ground_state(u, grid; n_steps=gs_steps, backend)
+    psi0 = ft_ground_state(u, grid; n_steps=gs_steps, backend)
     mu = gp_chempot(u, grid, psi0, HarmonicTrap{3}((1.0, 1.0, 1.0)); backend)
     (grid=grid, psi0=psi0, mu=mu, k_max=π / (box / grid_n))
 end
 
-# V-key / V-mono: equilibrium condensate fraction vs T/T_c. Static trap (HOLD, bath
-# on, NO loss) → SGPE thermal equilibrium; plateau f = N₀/N vs ideal-Bose 1−(T/T_c)³.
+# V-T0 / V-mono: finite-T equilibrium condensate NUMBER N₀ + thermal N_th vs T/T_c.
+# Static trap (HOLD, bath on, NO loss) → SGPE thermal equilibrium. N₀ (not the
+# fraction) is the physical, cutoff-robust observable; N_th is classical-field (RJ).
 function ft_equilibrium(; grid_n::Int=48, box::Float64=18.0,
     T_over_Tc_list::Vector{Float64}=[0.1, 0.3, 0.5, 0.7, 0.9],
     T_equil::Float64=30.0, dt::Float64=0.01, gs_steps::Int=2500,
@@ -153,8 +180,12 @@ function ft_equilibrium(; grid_n::Int=48, box::Float64=18.0,
     s = _setup(u, grid_n, box, gs_steps, backend)
     Tc = Tc_harmonic(u.N)
     @printf "μ_GS=%.3f, T_c=%.2f ℏω_ref, k_max=%.2f\n" s.mu Tc s.k_max
-    println("=== Equilibrium condensate fraction vs T/T_c (HOLD, no loss) ===")
-    @printf "  %-8s %-9s %-11s %-10s %-10s\n" "T/Tc" "f_SGPE" "1-(T/Tc)³" "N₀" "N_tot"
+    # PHYSICAL observable = condensate NUMBER N₀ (IR, cutoff-robust; see V-kcut).
+    # The thermal N_th is a classical-field (Rayleigh-Jeans) quantity and is cutoff-
+    # dependent, so f=N₀/N_tot sits BELOW the quantum 1−(T/Tc)³ (classical ≠ quantum
+    # thermal); that reference is printed for orientation only, NOT as a pass gate.
+    println("=== Finite-T equilibrium: condensate N₀ + thermal N_th vs T/T_c (HOLD) ===")
+    @printf "  %-8s %-10s %-11s %-9s %-11s\n" "T/Tc" "N₀" "N_th" "N₀/N" "[1-(T/Tc)³]"
     rows = NTuple{5, Float64}[]
     for r in T_over_Tc_list
         T = r * Tc
@@ -163,25 +194,25 @@ function ft_equilibrium(; grid_n::Int=48, box::Float64=18.0,
             potential_of_t=harmonic_schedule(_ -> 1.0), gamma_of_t=(_ -> gamma),
             T, k_cut, mu=s.mu, loss_on=false, n_traj, T_internal=T_equil, dt, backend)
         i0 = max(1, fld(3 * length(res.frac), 5))          # plateau = last 40%
-        f = sum(@view res.frac[i0:end]) / length(i0:length(res.frac))
-        N0 = sum(@view res.N0[i0:end]) / length(i0:length(res.N0))
-        Nt = sum(@view res.N[i0:end]) / length(i0:length(res.N))
-        push!(rows, (r, f, 1 - r^3, N0, Nt))
-        @printf "  %-8.2f %-9.3f %-11.3f %-10.4g %-10.4g\n" r f (1 - r^3) N0 Nt
+        n = length(i0:length(res.N0))
+        N0 = sum(@view res.N0[i0:end]) / n
+        Nt = sum(@view res.N[i0:end]) / n
+        push!(rows, (r, N0, Nt - N0, N0 / u.N, 1 - r^3))
+        @printf "  %-8.2f %-10.4g %-11.4g %-9.3f %-11.3f\n" r N0 (Nt - N0) (N0 / u.N) (1 - r^3)
     end
     open(csv, "w") do io
-        println(io, "T_over_Tc,f_sgpe,f_ideal,N0,N_tot")
+        println(io, "T_over_Tc,N0,N_thermal,N0_over_N,f_ideal_quantum")
         for r in rows
-            @printf io "%.4f,%.6f,%.6f,%.6g,%.6g\n" r...
+            @printf io "%.4f,%.6g,%.6g,%.6f,%.6f\n" r...
         end
     end
-    f_cold = rows[1][2]
-    mono = all(rows[i][2] >= rows[i + 1][2] - 0.03 for i in 1:(length(rows) - 1))
+    n0_cold = rows[1][4]                                     # N₀/N at the lowest T
+    nth_mono = all(rows[i][3] <= rows[i + 1][3] + 0.05 * u.N for i in 1:(length(rows) - 1))
     println()
-    @printf "  V-key  (f→1 as T→0): f(%.2f)=%.3f  %s\n" rows[1][1] f_cold (f_cold > 0.9 ? "PASS" : "CHECK")
-    @printf "  V-mono (f monotone ↓): %s\n" (mono ? "PASS" : "CHECK")
-    @printf "  CSV → %s\n" csv
-    (u=u, rows=rows, f_cold=f_cold, mono=mono)
+    @printf "  V-T0   (N₀→N as T→0): N₀/N(%.2f)=%.3f  %s\n" rows[1][1] n0_cold (n0_cold > 0.93 ? "PASS" : "CHECK")
+    @printf "  V-mono (N_th grows with T): %s\n" (nth_mono ? "PASS" : "CHECK")
+    @printf "  CSV → %s   (condensate N₀ cutoff-robustness ⇒ run kcut mode)\n" csv
+    (u=u, rows=rows, n0_cold=n0_cold, nth_mono=nth_mono)
 end
 
 # V-kcut: the CONDENSATE N₀ must be independent of the UV cutoff k_cut (only the
@@ -284,18 +315,19 @@ function probe(; backend=CPUBackend())
         T_equil=15.0, gs_steps=2000, gamma=0.1, n_traj=4, backend)
 end
 
-# Production campaign for TSUBAME H100. Sized for ≲5 h on one H100 at D=13.
+# Production campaign for TSUBAME H100. Sized for ≲5 h on one H100 at 48³, D=13
+# (probe: ~25 ms/step ⇒ ~63 s per 2500-step trajectory).
 function campaign(; backend=CPUBackend())
-    println("######## V-key / V-mono: equilibrium condensate fraction ########")
-    ft_equilibrium(; grid_n=64, box=20.0,
-        T_over_Tc_list=[0.15, 0.3, 0.4, 0.5, 0.6, 0.7, 0.85],
-        T_equil=30.0, gs_steps=4000, gamma=0.1, n_traj=12, backend)
+    println("######## V-T0 / V-mono: equilibrium condensate N₀ + thermal ########")
+    ft_equilibrium(; grid_n=48, box=18.0,
+        T_over_Tc_list=[0.15, 0.3, 0.45, 0.6, 0.75, 0.9],
+        T_equil=25.0, gs_steps=3000, gamma=0.1, n_traj=10, backend)
     println("\n######## V-kcut: condensate cutoff-independence ########")
-    ft_kcut_convergence(; grid_n=64, box=20.0, T_over_Tc=0.5,
-        T_equil=30.0, gs_steps=4000, gamma=0.1, n_traj=12, backend)
+    ft_kcut_convergence(; grid_n=48, box=18.0, T_over_Tc=0.5,
+        T_equil=25.0, gs_steps=3000, gamma=0.1, n_traj=10, backend)
     println("\n######## Finite-T shape trade-off ########")
-    ft_shape_compare(; grid_n=64, box=24.0, T_over_Tc=0.5, prep_time=25.0, ramp_time=75.0,
-        gs_steps=4000, gamma=0.1, n_traj=12, backend)
+    ft_shape_compare(; grid_n=48, box=24.0, T_over_Tc=0.5, prep_time=20.0, ramp_time=60.0,
+        gs_steps=3000, gamma=0.1, n_traj=10, backend)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
