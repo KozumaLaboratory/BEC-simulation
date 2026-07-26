@@ -341,6 +341,48 @@ function ft_evap_ramp_optimize(; n_iter::Int=50, n_init::Int=10,
     (baseline=base, opt=opt)
 end
 
+# NON-EQUILIBRIUM evaluation of the duration knife-edge: scan the ramp-duration scale
+# with the finite-evaporation-rate penalty OFF (quasi-static, "faster always better")
+# and ON (fast ramps spill instead of evaporate → less cooling). Shows whether the
+# penalty turns the bare reachability knife-edge into a real physical interior optimum.
+function ft_evap_noneq_eval(; noneq_scale::Float64=1.0,
+    durations=collect(range(0.25, 1.6; length=16)),
+    csv::String=joinpath(@__DIR__, "eu_ft_evap_noneq.csv"))
+    trap = SpinorBEC.euv3_evap_trap()
+    base_ramp = SpinorBEC.euv3_evaporation_ramp()
+    mk(s) = SpinorBEC.EvapParams(; a_s=Eu151.a_s, tau_bg=15.0,
+        K3=1.6107615346177146e-40, noneq_scale=s)
+    N0load, T0load = 3.5e6, 50e-6
+    println("=== Non-equilibrium eval: N_BEC vs ramp-duration scale ===")
+    @printf "  %-10s %-14s %-14s\n" "dur" "N_BEC(noneq off)" "N_BEC(noneq on)"
+    rows = NTuple{3, Float64}[]
+    for d in durations
+        s0 = SpinorBEC.scan_ramp_param(trap, mk(0.0), base_ramp; index=1, values=[d],
+            base_params=[1.0, 1.0, 1.0], N0=N0load, T0=T0load)[1]
+        s1 = SpinorBEC.scan_ramp_param(trap, mk(noneq_scale), base_ramp; index=1, values=[d],
+            base_params=[1.0, 1.0, 1.0], N0=N0load, T0=T0load)[1]
+        n0 = s0.reached ? s0.N_BEC : 0.0
+        n1 = s1.reached ? s1.N_BEC : 0.0
+        push!(rows, (d, n0, n1))
+        @printf "  %-10.3f %-14.5g %-14.5g\n" d n0 n1
+    end
+    open(csv, "w") do io
+        println(io, "duration_scale,N_BEC_noneq_off,N_BEC_noneq_on")
+        for r in rows
+            @printf io "%.4f,%.6g,%.6g\n" r...
+        end
+    end
+    off = [r[2] for r in rows]
+    on = [r[3] for r in rows]
+    i_off = argmax(off)
+    i_on = argmax(on)
+    println()
+    @printf "  noneq OFF: peak at dur=%.2f (N_BEC=%.4g) — %s\n" rows[i_off][1] off[i_off] (i_off == 1 ? "MONOTONE to floor (knife-edge)" : "interior")
+    @printf "  noneq ON : peak at dur=%.2f (N_BEC=%.4g) — %s\n" rows[i_on][1] on[i_on] (1 < i_on < length(on) ? "INTERIOR optimum (physical)" : "at boundary")
+    @printf "  CSV → %s\n" csv
+    (rows=rows,)
+end
+
 # kcut sensitivity: quantify how the condensate N₀ and thermal N_th depend on the
 # classical-field cutoff. Both do (it is a classical field), but the condensate is
 # much less sensitive (~30% vs ~79% over k_cut∈[4.6,8.0]). Absolute numbers hold at

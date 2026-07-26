@@ -171,14 +171,28 @@ faster ($t_\mathrm{BEC}$ $1.70\to1.05$ s) via a steeper ramp.
 **Parameter landscapes** (`eu_ft_evap_scan.png`) show what is really going on:
 - **duration is monotone** — shorter/faster is always better ($N_\mathrm{BEC}$ rises
   to $\sim9.3\times10^4$, $+42\%$, at the shortest duration that still reaches BEC,
-  $\approx0.39$), because a faster ramp spends less time bleeding to three-body loss.
-  The only hard limit is BEC-reachability (too fast → no condensation). This is a
-  knife-edge, and it is exactly where the 0-D truncated-Boltzmann model's quasi-static
-  assumption weakens (real non-equilibrium heating, unmodeled here) — so the practical
-  recommendation is a *moderate* speedup, not the edge.
+  $\approx0.4$), because a faster ramp spends less time bleeding to three-body loss.
+  The only hard limit is BEC-reachability — a knife-edge, and exactly where the 0-D
+  quasi-static assumption weakens (resolved below).
 - **final-power is irrelevant** — BEC onset occurs before the ramp ends, so the ramp
   endpoint is never reached.
 - **time-warp has a genuine interior optimum** $\gamma\approx0.7$ — the robust lever.
+
+**Physically resolving the duration knife-edge** (`eu_ft_evap_noneq.png`). The
+"faster is always better" duration is an artefact of the model's quasi-static
+assumption. We added a first-principles **finite-evaporation-rate penalty** to the
+0-D model (`EvapParams.noneq_scale`, off by default): when the trap depth is lowered
+faster than atoms can *evaporate* ($\gamma_\mathrm{ev}=\gamma_\mathrm{el}\cdot
+\mathrm{evap\_factor}(\eta)$, small at large $\eta$), the newly-exposed atoms leave by
+fast, non-selective **spilling** (carrying the threshold energy $\eta k_BT$, cooling
+law $(\eta-3)/3$) instead of by selective evaporation ($\bar\varepsilon$, cooling
+$L$); the cooling law is blended by $\xi=\gamma_\mathrm{ev}/(\gamma_\mathrm{ev}+
+\mathrm{noneq\_scale}\cdot|d\ln U/dt|)$. With the penalty on, the knife-edge becomes a
+**real interior optimum at a moderate duration $\approx0.6\times$** ($+22\%$ over the
+same-model baseline), and ramps faster than $\sim0.4\times$ **fail to reach BEC**
+(spilling kills the cooling) — the honest, physical answer, versus the unphysical
+$+42\%$ knife-edge. (`noneq_scale=0` preserves the validated model; the evaporation
+test suite passes unchanged.)
 
 **Two-stage recipe.** Optimize the evaporation ramp (a faster, $\gamma\!\approx\!0.7$
 warped power drop; $+30$–$40\%$ BEC at formation, with the higher end a knife-edge),
