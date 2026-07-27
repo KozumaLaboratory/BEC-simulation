@@ -129,6 +129,17 @@ is a warning to always include the geometry lever, not a dead end.
 
 ![c1-DDI orthogonal lever](../../figs/eu_evaporation_optimization/c1_ddi_orthogonal.png)
 
+*Optimal aspect-ratio-scan design.* Building the 2-parameter Fisher matrix from the measured
+spin-mixing sensitivities $[\partial\ln A/\partial\ln c_1,\ \partial\ln A/\partial\ln c_{dd}]$ at
+$\lambda\in\{0.5,1,2\}$ — $(0.64,+0.16)$, $(0.91,-0.09)$, $(1.75,-1.27)$ — quantifies it: a **single**
+$\lambda$ leaves $c_1\!\leftrightarrow\!c_{dd}$ fully degenerate ($\sigma(c_1)\to\infty$), while **two
+geometries** give $\sigma(c_1)/c_1\approx4.5\%$ (cigar $\lambda{=}0.5$ + isotropic) and all three give
+$4.3\%$ (at 5 % per-measurement amplitude noise, $c_{dd}$ marginalized). So the practical recipe is a
+**two-aspect-ratio spin-mixing scan** (cigar + round), which pins $c_1$ to ~5 % despite DDI dominating
+each single trace.
+
+![aspect-ratio design](../../figs/eu_evaporation_optimization/aspect_design.png)
+
 **Overturned claim 2 — "$N_{\rm BEC}$ predictable to ±30 % once evaporation params are measured."**
 REFUTED as too optimistic. MC variance decomposition: $K_3$ 66 %, $a_s$ 34 %, $\tau_{bg}$/$\Gamma_h$
 < 1 %. But $K_3$ carries a **factor-2.6 cross-method systematic** (direct $1.2\times10^{-41}$ vs
