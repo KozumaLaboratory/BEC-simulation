@@ -78,6 +78,69 @@ end
     end
 end
 
+# --- Automatic content-addressed GS stage cache -------------------------------
+# The expensive ITP/LBFGS ground-state solve is a pure function of its RESOLVED
+# physics inputs, not of the downstream `analyze:` block or the enclosing
+# scan/config. Keying a shared artifact on those inputs lets any config (a
+# refined c1 grid, an extended κ range, a changed analyzer list, or an
+# overlapping [1-10] vs [5-10] scan) reuse a ground state computed by any other —
+# closing the per-config / per-scan-index CAS reuse gap. This only AUTO-populates
+# the existing manual `cache:` path (loaded just below, saved near the end of this
+# function); the load/save machinery is unchanged. Opt-in via SPINORBEC_STAGE_CACHE.
+_stage_cache_enabled() =
+    lowercase(get(ENV, "SPINORBEC_STAGE_CACHE", "0")) in ("1", "true", "on", "yes")
+
+# Stage 1: when on, a scan point whose GS was stage-cached is written as a LIGHT
+# point (a `gs_ref` pointer + scalars/analyze, no inline psi) — the heavy psi
+# lives once in the stage store; open_result resolves it back. Requires the stage
+# cache to be producing refs, so it implies _stage_cache_enabled().
+_light_points_enabled() =
+    lowercase(get(ENV, "SPINORBEC_LIGHT_POINTS", "0")) in ("1", "true", "on", "yes")
+
+_gs_stage_dir() = get(ENV, "SPINORBEC_STAGE_DIR",
+    joinpath(get(ENV, "SPINORBEC_STORE", "runs"), "_stage", "gs"))
+
+# content_id refuses to hash NaN/Inf (the gs_ddi tuple carries NaN for an unset
+# ddi_trunc_radius); replace non-finite floats with a stable sentinel, recursively.
+_hashable(x::AbstractFloat) = isfinite(x) ? x : "nonfinite:$(x)"
+_hashable(x::Union{Integer, Bool, AbstractString, Nothing}) = x
+_hashable(x::Symbol) = string(x)
+_hashable(x::Tuple) = Any[_hashable(v) for v in x]
+_hashable(x::AbstractVector) = Any[_hashable(v) for v in x]
+_hashable(x::AbstractDict) = Dict{String, Any}(string(k) => _hashable(v) for (k, v) in x)
+_hashable(x) = string(x)   # last resort: stringify anything exotic
+
+# Canonical key over the resolved physics of a FROM-SCRATCH GS solve. Uses
+# resolved objects where cheap+robust (atom, grid, c-dict, ddi tuple, scalars)
+# and the raw `potential`/`B`/`lhy`/init sub-blocks (which fully determine their
+# resolved objects given atom+grid). Excludes analyze/scan/metadata/cache. Only
+# valid when psi_prev === nothing — warm-started/continuation solves are
+# seed-dependent and are never auto-cached.
+function _gs_cache_key(method, atom, grid, interactions, gs_ddi, tol, n_steps, dt, p)
+    key = Dict{String, Any}(
+        "v" => 1,                                    # key-schema version
+        "method" => string(method),
+        "atom" => atom.name,
+        "F" => atom.F,
+        "n_points" => collect(Int, grid.config.n_points),
+        "box" => collect(Float64, grid.config.box_size),
+        "c" => _hashable(interactions.c),
+        "c_lhy" => _hashable(interactions.c_lhy),
+        "ddi" => _hashable(gs_ddi),
+        "tol" => tol,
+        "n_steps" => n_steps,
+        "dt" => dt,
+        "potential" => _hashable(get(p, "potential", nothing)),
+        "B" => _hashable(get(p, "B", nothing)),
+        "lhy" => _hashable(get(p, "lhy", nothing)),
+        "initial_state" => string(get(p, "initial_state", "polar")),
+        "init_state_params" => _hashable(get(p, "init_state_params", nothing)),
+        "target_magnetization" => _hashable(get(p, "target_magnetization", nothing)),
+        "temperature_ratio" => _hashable(get(p, "temperature_ratio", nothing)),
+    )
+    content_id(key)
+end
+
 function _run_step(
     step::GroundStateStep,
     psi_prev,
@@ -127,6 +190,26 @@ function _run_step(
     # --- Cache: skip ITP/LBFGS if file exists, but build a workspace so
     #     downstream analyzers (e.g. bogoliubov) can inspect the system ---
     cache_path = get(p, "cache", nothing)
+    # Auto content-addressed stage cache: a from-scratch solve keyed on its
+    # resolved physics is reusable by any other config. Only when opted-in, not
+    # already given an explicit `cache:`, and not warm-started (seed-dependent).
+    # `stage_ref` (the content hash) is threaded into step_result so the scan-loop
+    # save can write a light point that references the shared psi (Stage 1).
+    stage_ref = nothing
+    if cache_path === nothing && psi_prev === nothing && _stage_cache_enabled()
+        stage_ref = try
+            _gs_cache_key(method, atom, grid, interactions, gs_ddi, tol, n_steps, dt, p)
+        catch err
+            verbose &&
+                @warn "GS stage-cache key failed; caching disabled for this cell" exception =
+                    err
+            nothing
+        end
+        if stage_ref !== nothing
+            cache_path = joinpath(_gs_stage_dir(), stage_ref * ".jld2")
+            verbose && println("  GS stage-cache key → $(stage_ref)")
+        end
+    end
     if cache_path !== nothing && isfile(cache_path)
         if verbose
             println("  Loading cached GS from $cache_path")
@@ -150,6 +233,7 @@ function _run_step(
             :ground_state_energy => energy,
             :ground_state_converged => converged,
             :workspace => ws_cached,
+            :gs_stage_ref => stage_ref,
         )
         return (psi_out, grid, atom, ws_cached, step_result)
     end
@@ -330,6 +414,7 @@ function _run_step(
         :ground_state_energy => gs.energy,
         :ground_state_converged => gs.converged,
         :workspace => gs.workspace,
+        :gs_stage_ref => stage_ref,
     )
     (psi_out, grid, atom, gs.workspace, step_result)
 end

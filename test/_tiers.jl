@@ -47,6 +47,7 @@ const FAST_TESTS = [
     "workflow/test_state_zoo_wrappers_runnable.jl",
     "workflow/test_checkpoint.jl",
     "workflow/test_checkpointed_sweep.jl",
+    "workflow/test_gs_stage_cache.jl",
     "manuscript/test_lemma1_general_S.jl",
     "manuscript/test_f5_f7_polyhedral.jl",
     "manuscript/test_f9_f11_polyhedral.jl",
