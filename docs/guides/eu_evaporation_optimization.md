@@ -162,6 +162,16 @@ systematic (±20 %) into a statistical one (~4 %) with a standard measurement.
 
 ![omega measurement](../../figs/eu_evaporation_optimization/omega_measurement.png)
 
+**Do-first levers (1)+(2) chained end-to-end — $K_3$ recovery.** Generating synthetic BEC-decay
+data $N_0(t)$ at a known $\bar\omega$, adding atom-number noise, and fitting the analytic 3-body law
+back recovers $K_3$ with **zero bias**, at $\sigma(K_3)/K_3\approx3$–$5\%$ (10–20 shots, 3–5 % atom
+noise) **provided $\bar\omega$ is known to 1 %** — but $\sigma(K_3)$ climbs to ~13 % if $\bar\omega$ is
+only 5 %, because $K_3\propto\bar\omega^{-2.4}$. This closes the chain: the 1 % dipole-mode $\bar\omega$
+(lever 1) makes the BEC-decay $K_3$ (lever 2) a ~4 % statistical measurement — comfortably inside the
+campaign's conservative ±20 %, and it kills the 66 % $K_3$-driven share of the $N_{\rm BEC}$ variance.
+
+![k3 end-to-end](../../figs/eu_evaporation_optimization/k3_endtoend.png)
+
 ## Real-ramp check (experiment-facing)
 
 ![real lab ramp](../../figs/eu_evaporation_optimization/js_lab_ramp.png)
