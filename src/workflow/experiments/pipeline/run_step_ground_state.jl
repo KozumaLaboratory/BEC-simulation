@@ -161,7 +161,7 @@ _seed_sig_match(a, b) =
                 "seed_from: no point in $run matches cell (c1=$(sig[1]), Bz=$(sig[2]) G, κ=$(sig[3]), state=$(sig[4]))"
             ),
         )
-    psi = Array{ComplexF64}(JLD2.load(match, "psi"))
+    psi = load_point_psi(match)   # resolves a light point's gs_ref from the stage store
     n = grid.config.n_points[1]
     if size(psi, 1) != n
         do_upsample ||

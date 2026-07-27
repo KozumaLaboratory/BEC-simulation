@@ -35,6 +35,9 @@ export SPINORBEC_SCAN_ONLY_INDEX=$SGE_TASK_ID
 # Content-addressed GS stage cache: reuse a ground state computed by any other
 # config/scan (shared store at $PROJECT_ROOT/runs/_stage/gs).
 export SPINORBEC_STAGE_CACHE=1
+# Light points: gs_ref pointer instead of inline psi (no point+store duplication);
+# load_point_psi/open_result resolve it, all psi readers are light-aware.
+export SPINORBEC_LIGHT_POINTS=1
 echo "[task $SGE_TASK_ID/$SGE_TASK_LAST] $(hostname) cfg=$CONFIG"; nvidia-smi -L || true
 
 # Guard silent CPU fallback (a broken-CUDA node otherwise burns hours on CPU).

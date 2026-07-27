@@ -37,7 +37,7 @@ open(OUT, "w") do io
             (best === nothing || E < best.E) && (best = (; E, f, s))
         end
         best === nothing && continue
-        psi = ComplexF64.(JLD2.load(best.f, "psi"))
+        psi = SpinorBEC.load_point_psi(best.f)   # light-point aware (gs_ref → stage)
         n = Int.(JLD2.load(best.f, "grid_n_points"))
         box = Float64.(JLD2.load(best.f, "grid_box_size"))
         ov = JLD2.load(best.f, "override")

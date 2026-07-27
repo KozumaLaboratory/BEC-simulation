@@ -44,7 +44,7 @@ open(OUT, "w") do io
             NaN
         end
         mF = try
-            psi = ComplexF64.(JLD2.load(path, "psi"))
+            psi = SpinorBEC.load_point_psi(path)   # light-point aware (gs_ref → stage)
             n = Int.(JLD2.load(path, "grid_n_points"))
             box = Float64.(JLD2.load(path, "grid_box_size"))
             grid = make_grid(GridConfig(Tuple(n), Tuple(box)))

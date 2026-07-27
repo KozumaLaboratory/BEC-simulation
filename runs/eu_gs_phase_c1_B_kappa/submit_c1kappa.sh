@@ -36,6 +36,10 @@ export SPINORBEC_SCAN_ONLY_INDEX=$SGE_TASK_ID
 # config/scan (shared store at $PROJECT_ROOT/runs/_stage/gs). Full points kept
 # (no LIGHT_POINTS) so every existing consumer/dashboard still reads inline psi.
 export SPINORBEC_STAGE_CACHE=1
+# Light points: a stage-cached point stores a gs_ref pointer, not inline psi, so
+# psi is not duplicated (point + store). open_result / load_point_psi resolve it;
+# every psi reader (seed_from, dashboard, eu extraction scripts) is light-aware.
+export SPINORBEC_LIGHT_POINTS=1
 echo "[task $SGE_TASK_ID/$SGE_TASK_LAST] $(hostname) cfg=$CONFIG"; nvidia-smi -L || true
 
 # Guard silent CPU fallback (a broken-CUDA node otherwise burns hours on CPU).

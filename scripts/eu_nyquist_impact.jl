@@ -7,7 +7,7 @@ run = ARGS[1]
 files = filter(f -> startswith(f, "point_") && endswith(f, ".jld2"), readdir(run))
 for f in first(sort(files), 6)
     p = joinpath(run, f)
-    psi = ComplexF64.(JLD2.load(p, "psi"))
+    psi = SpinorBEC.load_point_psi(p)   # light-point aware (gs_ref → stage)
     n = size(psi, 1)
     pk = fft(@view psi[:, :, :, 1])
     nyq = div(n, 2) + 1

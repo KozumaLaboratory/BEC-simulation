@@ -38,7 +38,7 @@ for (tb, tk) in targets
     end
     best === nothing && (@printf("MISS B=%.0f k=%.1f\n", tb * 1e6, tk); continue)
 
-    psi = ComplexF64.(JLD2.load(best.p, "psi"))
+    psi = SpinorBEC.load_point_psi(best.p)   # light-point aware (gs_ref → stage)
     n = Int.(JLD2.load(best.p, "grid_n_points"))
     box = Float64.(JLD2.load(best.p, "grid_box_size"))
     grid = make_grid(GridConfig(Tuple(n), Tuple(box)))
