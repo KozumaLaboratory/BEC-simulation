@@ -142,6 +142,15 @@ variance; (3) $a_s$ is already at 3.6 %; (4) $c_1$ needs an orthogonal DDI-separ
 lone spin-mixing trace. $\tau_{bg},\Gamma_h$ are low-priority for the endpoint (measure in a
 dedicated hold, not on the ramp).
 
+**Do-first lever (1) verified — dipole-mode $\bar\omega$ to 1 %.** A simulated dipole-mode
+measurement (displace the GS, fit the COM oscillation $x(t)=A\sin(\omega t+\varphi)$) recovers
+$\bar\omega$ with **zero fit systematic**, and $\sigma(\bar\omega)/\bar\omega<1\%$ from ~10 imaging
+shots even at 10 % COM noise (0.1–0.5 % at 30 shots). The only requirement is **≥10 shots per 3
+trap periods** — 6 shots aliases (→ ~13 %). So a 1 % $\bar\omega$ turns the $K_3$ density-calibration
+systematic (±20 %) into a statistical one (~4 %) with a standard measurement.
+
+![omega measurement](../../figs/eu_evaporation_optimization/omega_measurement.png)
+
 ## Caveats / open
 
 - $K_3\propto a_s^4$ is the universal smooth envelope; near a Feshbach resonance the real $K_3$
