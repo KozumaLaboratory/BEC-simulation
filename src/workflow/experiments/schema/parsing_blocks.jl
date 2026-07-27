@@ -334,9 +334,7 @@ function _resolve_lhy_block!(p::Dict, inter::Dict, atom, c_dd_val::Float64,
             # equivalently c_lhy/c₀ = (32/3)√((a_s/a_ho)³N/π), which reproduces
             # the textbook ratio μ_LHY/μ_contact = (32/3)√(n_SI·a_s³/π).
             # test/oracles/test_scalar_lhy_si_roundtrip.jl gates exactly that.
-            a_s_dl = abs(atom.a_s / a_ho)
-            c_lhy_scalar = (128.0 * sqrt(π) / 3.0) * a_s_dl^2.5 * float(N_atoms)^1.5
-            lhy_block["c_lhy"] = c_lhy_scalar * lima_pelster_Q5(eps_dd)
+            lhy_block["c_lhy"] = scalar_lhy_coefficient(atom.a_s / a_ho, N_atoms; eps_dd)
         end
     end
     # Normalise to internal fields for downstream consumers.
