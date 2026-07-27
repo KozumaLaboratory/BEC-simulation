@@ -157,6 +157,11 @@ using SpinorBEC: _gs_cache_key, _gs_stage_dir, _hashable, _stage_cache_enabled,
                     @test size(r.psi, 4) == 13         # Eu F=6 → 13 components
                     @test all(isfinite, abs.(r.psi))
                     @test isfile(joinpath(stage, String(d["gs_ref"]) * ".jld2"))
+                    # summary scalars carry the rotation-invariant order param mF,
+                    # so a phase scan reads it without loading psi.
+                    bag = SpinorBEC.run_scalar_summary(r)
+                    @test haskey(bag, "mF")
+                    @test 0.0 <= bag["mF"] <= 1.0 + 1e-9
                 end
             end
         end
