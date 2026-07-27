@@ -28,6 +28,11 @@
 # Run (CPU smoke):  julia --project=. docs/guides/figures/eu_shape_optimization.jl --smoke
 # Run (GPU):        LD_LIBRARY_PATH=/usr/lib/wsl/lib julia --project=. \
 #                     -e 'import CUDA; include("docs/guides/figures/eu_shape_optimization.jl")'
+#
+# Provenance:
+# - shows: DRIVER — computes the T=0 GP trap-shape CSVs (units validation gate, box lever, decompression ramp)
+# - referenced by: docs/guides/eu_shape_optimization.md
+# - supersedes: none (driver)
 
 using SpinorBEC
 using SpinorBEC: Units, cell_volume, evaluate_potential, split_step!

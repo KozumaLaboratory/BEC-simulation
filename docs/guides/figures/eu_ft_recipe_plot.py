@@ -13,6 +13,11 @@ cuts loss, but too loose drops T_c∝ω̄ and melts the BEC. Optimum ≈ 0.6.
 
 Reads eu_ft_evap_noneq.csv and eu_ft_decompress_refine.csv.
 Usage: python3 eu_ft_recipe_plot.py
+
+Provenance:
+- shows: the two-stage recipe headline — moderate on both knobs (faster warped evaporation ramp, then decompress ODT to ~0.6x); extremes break the BEC
+- referenced by: docs/guides/eu_shape_finite_t.md
+- supersedes: none (synthesis / headline figure)
 """
 import os
 import numpy as np

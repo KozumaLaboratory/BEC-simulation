@@ -8,6 +8,11 @@ spill instead of evaporate → less cooling). Turning the physical penalty on co
 the knife-edge into a real interior optimum at a moderate duration. Linear axes.
 
 Usage: python3 eu_ft_evap_noneq_plot.py [eu_ft_evap_noneq.csv]
+
+Provenance:
+- shows: N_BEC vs ramp-duration scale, non-equilibrium penalty OFF (quasi-static, monotone knife-edge) vs ON (physical interior optimum ~0.6x)
+- referenced by: docs/guides/eu_shape_finite_t.md
+- supersedes: eu_ft_evap_ramp_plot.py + eu_ft_evap_scan_plot.py (their +32% / landscape findings folded in as guide text)
 """
 import sys
 import os

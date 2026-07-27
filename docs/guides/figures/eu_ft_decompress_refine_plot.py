@@ -7,6 +7,11 @@ the condensate. Peak = the ODT decompression target that keeps the most BEC.
 Linear axes.
 
 Usage: python3 eu_ft_decompress_refine_plot.py [eu_ft_decompress_refine.csv]
+
+Provenance:
+- shows: surviving condensate N0 vs final trap frequency for the closed-system harmonic decompression (broad interior optimum near 0.6x, +15.9% over HOLD)
+- referenced by: docs/guides/eu_shape_finite_t.md
+- supersedes: eu_shape_ramp_opt (the T=0 GP decompression, deleted)
 """
 import sys
 import os
