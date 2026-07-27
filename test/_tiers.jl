@@ -113,6 +113,7 @@ const FAST_TESTS = [
     "foundation/test_types_validation.jl",
     "analysis/test_currents.jl",
     "analysis/test_superfluid_fraction.jl",
+    "analysis/test_superfluid_fraction_gp_twist.jl",
     "hamiltonian/test_lhy_2d.jl",
     "analysis/test_bogoliubov_enhanced.jl",
     "hamiltonian/test_spinor_lhy.jl",
