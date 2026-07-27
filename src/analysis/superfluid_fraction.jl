@@ -24,7 +24,7 @@ export superfluid_fraction, plane_averaged_density
 Density averaged over the hyperplane perpendicular to axis `d`,
 n̄(x_d) = ⟨n⟩_{other axes}.
 """
-function plane_averaged_density(n::AbstractArray{Float64, N}, d::Int) where {N}
+function plane_averaged_density(n::AbstractArray{<:Real, N}, d::Int) where {N}
     1 <= d <= N || throw(ArgumentError("direction $d outside 1:$N"))
     nd = size(n, d)
     nbar = zeros(Float64, nd)
@@ -62,6 +62,16 @@ total density) or a bare density array `n`.
   `f_s(:relaxed) ≤ f_s(:leggett)`, with equality when the density is modulated
   along `d` only.
 
+!!! warning "Comparing the two branches at a fixed grid"
+    That inequality is a *continuum* statement. `:leggett` is a trapezoid sum
+    over a periodic analytic integrand and is spectrally accurate; `:relaxed`
+    is a second-order finite-volume solve whose truncation error is positive —
+    it approaches the true value from above, by roughly `(k·dx)²` scaled by the
+    density contrast (~1e-4 at 128 points and contrast 0.5, ~8e-3 at 64 points
+    and contrast 0.99). So a *small* excess of `:relaxed` over `:leggett` means
+    the grid is coarse, not that the density reroutes flow. Only a gap well
+    above that scale is physics. Refine until the gap stops shrinking.
+
 Both branches hold the density rigid, so both are upper bounds on the true
 superfluid fraction.
 
@@ -87,12 +97,12 @@ function superfluid_fraction(
     maxiter::Int=0,
 ) where {N}
     superfluid_fraction(
-        total_density(psi, N), grid; direction, method, warn_vacuum, rtol, maxiter
+        total_density(_to_host(psi), N), grid; direction, method, warn_vacuum, rtol, maxiter
     )
 end
 
 function superfluid_fraction(
-    n::AbstractArray{Float64, N},
+    n_any::AbstractArray{<:Real, N},
     grid::Grid{N};
     direction::Int=1,
     method::Symbol=:leggett,
@@ -101,6 +111,10 @@ function superfluid_fraction(
     maxiter::Int=0,
 ) where {N}
     1 <= direction <= N || throw(ArgumentError("direction $direction outside 1:$N"))
+    # Every loop below scalar-indexes, so a device array has to come home; the
+    # widening also accepts the Float32 densities the mixed-precision path
+    # produces, which the solve then carries in Float64.
+    n = convert(Array{Float64, N}, _to_host(n_any))
     all(>=(0.0), n) || throw(ArgumentError("density must be non-negative"))
 
     nbar = plane_averaged_density(n, direction)
@@ -139,7 +153,14 @@ end
     CartesianIndex(ntuple(e -> e == d ? (fwd ? _fwd(I[e], np[e]) : _bwd(I[e], np[e])) : I[e], N))
 end
 
-# Face densities n_{i+1/2} in each direction (arithmetic mean of the two cells).
+# Face densities n_{i+1/2} in each direction, as the ARITHMETIC mean of the two
+# cells. Harmonic averaging — the usual finite-volume choice for a
+# discontinuous coefficient — is wrong here: it satisfies Σ 1/n_face = Σ 1/n
+# but breaks Σ n_face = Σ n, and that second identity is what makes the
+# rigid-flow reference in the f_s ratio consistent with the flux. Concretely, a
+# blob of 21 filled cells surrounded by vacuum has 20 harmonic faces against 21
+# cells of mass and reports f_s = 1/21 instead of the correct 0. Arithmetic
+# faces give the two half-weight edge faces that close the sum exactly.
 function _face_densities(n::AbstractArray{Float64, N}, np::NTuple{N, Int}) where {N}
     ntuple(N) do d
         nf = similar(n)
@@ -172,16 +193,15 @@ function _apply_flux_laplacian!(
 end
 
 function _superfluid_fraction_relaxed(
-    n::AbstractArray{Float64, N},
+    nd::Array{Float64, N},
     grid::Grid{N},
     d0::Int,
     rtol::Float64,
     maxiter::Int,
 ) where {N}
     np = grid.config.n_points
-    size(n) == np || throw(ArgumentError("density size $(size(n)) ≠ grid $(np)"))
+    size(nd) == np || throw(ArgumentError("density size $(size(nd)) ≠ grid $(np)"))
 
-    nd = convert(Array{Float64, N}, n)
     nf = _face_densities(nd, np)
     inv_dx2 = ntuple(d -> 1.0 / grid.dx[d]^2, N)
     inv_dx0 = 1.0 / grid.dx[d0]

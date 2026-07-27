@@ -171,3 +171,53 @@ function _analyze_droplet_profile(psi, grid, atom, params, ws_prev)
         surface_sharpness=sharpness,
         peak_index=collect(peak_idx))
 end
+
+"""
+    _analyze_superfluid_fraction(psi, grid, atom, params, ws_prev) -> NamedTuple
+
+Translational superfluid fraction from the phase-twist free energy, per axis.
+The supersolid counterpart of `droplet_profile`: `droplet_profile` says how
+modulated the density is, this says what that modulation costs in phase
+rigidity.
+
+YAML usage:
+
+    analyze:
+      - superfluid_fraction: {}                          # all axes, both methods
+      - superfluid_fraction: {directions: [1], method: leggett}
+
+Params:
+- `directions` — list of axes (1-based). Default: every spatial axis.
+- `method` — `leggett` (plane-average bound), `relaxed` (full variational
+  minimum), or `both` (default).
+
+Returns `(directions, f_s_leggett, f_s_relaxed)`; the branch that was not
+requested comes back as `NaN`. Both branches hold the density rigid and are
+therefore upper bounds — see `superfluid_fraction` for the caveats, in
+particular that a trapped cloud with vacuum at the box edge legitimately
+reports ≈ 0.
+"""
+function _analyze_superfluid_fraction(psi, grid, atom, params, ws_prev)
+    ndim = length(grid.config.n_points)
+    dirs = Int.(get(params, "directions", collect(1:ndim)))
+    all(d -> 1 <= d <= ndim, dirs) ||
+        throw(ArgumentError("superfluid_fraction: directions must lie in 1:$ndim"))
+    method = Symbol(get(params, "method", "both"))
+    method in (:leggett, :relaxed, :both) || throw(
+        ArgumentError("superfluid_fraction: method must be leggett, relaxed or both")
+    )
+
+    n = total_density(psi, ndim)
+    want_leggett = method === :leggett || method === :both
+    want_relaxed = method === :relaxed || method === :both
+
+    f_leg = [
+        want_leggett ? superfluid_fraction(n, grid; direction=d, method=:leggett) : NaN
+        for d in dirs
+    ]
+    f_rel = [
+        want_relaxed ? superfluid_fraction(n, grid; direction=d, method=:relaxed) : NaN
+        for d in dirs
+    ]
+    (directions=collect(dirs), f_s_leggett=f_leg, f_s_relaxed=f_rel)
+end
