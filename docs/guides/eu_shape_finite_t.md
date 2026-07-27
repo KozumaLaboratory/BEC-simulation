@@ -87,8 +87,8 @@ sits below it; it is not a fit.
 
 ## Equilibrium is analytic; the SGPE is for the dynamics
 
-A key clarification (`eu_ft_equilibrium_analytic.png`, `ft_equilibrium_analytic`,
-NO simulation): the fixed-$N$ equilibrium is fixed by the atom + trap + $N$
+A key clarification (the analytic curve in `eu_ft_equilibrium.png`, NO
+simulation): the fixed-$N$ equilibrium is fixed by the atom + trap + $N$
 properties, because the *quantum* thermal cloud is **bounded**,
 $N_{th}=\zeta(3)(k_BT/\hbar\bar\omega)^3=N(T/T_c)^3$, giving $N_0=N[1-(T/T_c)^3]$ and a
 chemical potential pinned by the condensate,
@@ -103,15 +103,20 @@ fraction are taken analytically; the SGPE earns its keep only in the DYNAMICS
 
 ## SGPE dynamics results (48³, $D{=}3$, TSUBAME H100)
 
-**Equilibrium cross-check** (`eu_ft_equilibrium.png`): the (classical-field) SGPE
-condensate $N_0$ melts $9502\to3100$ across $T/T_c=0.1\to0.9$ and $N_0/N\to0.95$ as
-$T\to0$ — the right qualitative melting, below the analytic curve as expected.
+**Equilibrium cross-check** (`eu_ft_equilibrium.png`): a single-axes plot of
+condensate fraction $N_0/N$ vs $T/T_c$ overlaying the analytic $\mu$-pinned
+bounded-thermal curve $N_0/N=1-(T/T_c)^3$, the ideal-quantum $1-(T/T_c)^3$ dashed
+reference, and the SGPE points — so the analytic equilibrium and its SGPE
+cross-check now live in this ONE figure. The (classical-field) SGPE condensate
+$N_0$ melts $9502\to3100$ across $T/T_c=0.1\to0.9$ and $N_0/N\to0.95$ as $T\to0$ —
+the right qualitative melting, with the SGPE points sitting BELOW the analytic
+curve because the classical field is Rayleigh–Jeans over-populated, as expected.
 
-**Cutoff sensitivity** (`eu_ft_kcut.png`): $N_0$ spread $30\%$ vs thermal $79\%$
+**Cutoff sensitivity**: $N_0$ spread $30\%$ vs thermal $79\%$
 over the $k_\mathrm{cut}$ range — the condensate is the robust observable.
 
-**Shape trade-off** (`eu_ft_shape.png`, prep SGPE at $T/T_c=0.5$ → closed ramp +
-$K_3$, all at fixed $k_\mathrm{cut}$, four protocols):
+**Shape trade-off** (prep SGPE at $T/T_c=0.5$ → closed ramp +
+$K_3$, all at fixed $k_\mathrm{cut}$, four protocols at the model point):
 
 | protocol | final $N_0$ | final total $N$ |
 |---|---|---|
@@ -167,13 +172,13 @@ Two clean features:
 ## Optimizing the evaporation ramp too (0-D, before the decompression)
 
 The FORT power schedule that forms the BEC is itself optimizable
-(`ft_evap_ramp_optimize`, `eu_ft_evap_ramp.png`): a Bayesian search over the
+(`ft_evap_ramp_optimize`): a Bayesian search over the
 researched euv3 ramp (duration / final-power / time-warp transform), with the bounds
 widened, lifts the condensate at BEC onset from $N_\mathrm{BEC}=6.56\times10^4$ to
 $8.69\times10^4$ (**$+32.4\%$**, interior optimum $[0.56,0.19,0.71]$), reaching BEC
 faster ($t_\mathrm{BEC}$ $1.70\to1.05$ s) via a steeper ramp.
 
-**Parameter landscapes** (`eu_ft_evap_scan.png`) show what is really going on:
+**Parameter landscapes** show what is really going on:
 - **duration is monotone** — shorter/faster is always better ($N_\mathrm{BEC}$ rises
   to $\sim9.3\times10^4$, $+42\%$, at the shortest duration that still reaches BEC,
   $\approx0.4$), because a faster ramp spends less time bleeding to three-body loss.
@@ -183,7 +188,10 @@ faster ($t_\mathrm{BEC}$ $1.70\to1.05$ s) via a steeper ramp.
   endpoint is never reached.
 - **time-warp has a genuine interior optimum** $\gamma\approx0.7$ — the robust lever.
 
-**Physically resolving the duration knife-edge** (`eu_ft_evap_noneq.png`). The
+**Physically resolving the duration knife-edge** (`eu_ft_evap_noneq.png`, now THE
+single evaporation-ramp figure — $N_\mathrm{BEC}$ vs ramp-duration with the
+finite-rate penalty off = quasi-static monotone knife-edge, and on = physical
+interior optimum). The
 "faster is always better" duration is an artefact of the model's quasi-static
 assumption. We added a first-principles **finite-evaporation-rate penalty** to the
 0-D model (`EvapParams.noneq_scale`, off by default): when the trap depth is lowered

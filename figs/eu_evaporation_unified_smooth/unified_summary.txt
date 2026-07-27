@@ -1,5 +1,0 @@
-UNIFIED ramp + tightness-axis optimization (K3=1e-41, T<=50nK, cf>=0.90, 24 starts)
-[A] ramp-only (m_ω≡1): N0=1.2645e+05 T=49.7nK cf=0.955 dur=2.22s
-[B] unified (m_ω(t)):  N0=1.6100e+05 T=25.3nK cf=0.929 Tc=61.2nK
-N0 gain = 1.27×
-m_ω control points (τ=0→1): 0.976, 0.976, 0.976, 0.976, 0.880, 0.400

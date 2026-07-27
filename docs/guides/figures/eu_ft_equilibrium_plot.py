@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
-"""Finite-T equilibrium: condensate N₀ and thermal N_th vs T/T_c.
+"""Finite-T equilibrium condensate fraction: analytic (from atom+trap+N) vs SGPE.
 
-The PHYSICAL observable is the condensate number N₀ (infrared, cutoff-robust —
-see the k_cut panel). The thermal cloud N_th is a classical-field (Rayleigh–Jeans)
-quantity: each classical mode carries ~k_B T rather than the Bose occupation, so
-it over-populates relative to a quantum gas and the fraction N₀/N_tot falls below
-the quantum 1−(T/T_c)³. That quantum curve is drawn only for orientation, NOT as a
-fit — the condensate N₀, not the fraction, is what the classical field gets right.
+ONE axes, the money comparison N₀/N vs T/T_c. The fixed-N equilibrium is analytic —
+the quantum thermal cloud is bounded, N_th=ζ(3)(k_BT/ℏω̄)³=N(T/T_c)³, so
+N₀/N=1−(T/T_c)³ (with μ(T)=μ_GP(N₀/N)^{2/5}, μ_GP=½ℏω̄(15N a_s/a_ho)^{2/5}=11.76).
+The classical-field SGPE over-populates the thermal cloud (Rayleigh–Jeans: each
+classical mode carries ~k_B T), so its N₀/N sits BELOW the analytic curve — a method
+artefact, not physics. The condensate N₀ itself (not the fraction) is the robust
+observable; the SGPE earns its keep in the DYNAMICS, not the equilibrium.
 
-Usage: python3 eu_ft_equilibrium_plot.py [eu_ft_equilibrium.csv]
+Overlays analytic curve + SGPE points on the same T/T_c axis (genuine single-plot
+consolidation of the former analytic/SGPE 2-panel pair).
+
+Usage: python3 eu_ft_equilibrium_plot.py [analytic.csv] [sgpe.csv]
 """
 import sys
 import os
@@ -19,40 +23,34 @@ import matplotlib.pyplot as plt
 from _smoothcurve import smooth
 
 here = os.path.dirname(os.path.abspath(__file__))
-csv = sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, "eu_ft_equilibrium.csv")
-d = np.genfromtxt(csv, delimiter=",", names=True)
-r = np.atleast_1d(d["T_over_Tc"])
-N0 = np.atleast_1d(d["N0"])
-Nth = np.atleast_1d(d["N_thermal"])
-n0n = np.atleast_1d(d["N0_over_N"])
-order = np.argsort(r)
-r, N0, Nth, n0n = r[order], N0[order], Nth[order], n0n[order]
+acsv = sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, "eu_ft_equilibrium_analytic.csv")
+scsv = sys.argv[2] if len(sys.argv) > 2 else os.path.join(here, "eu_ft_equilibrium.csv")
+a = np.genfromtxt(acsv, delimiter=",", names=True)
+ar = a["T_over_Tc"]; an = a["N0_over_N"]
+o = np.argsort(ar); ar, an = ar[o], an[o]
 
-fig, (axN, axf) = plt.subplots(1, 2, figsize=(10.5, 4.4))
-
-axN.plot(*smooth(r, N0), "-", color="#1f6feb", ms=7, label=r"condensate $N_0$ (physical, IR)")
-axN.plot(*smooth(r, Nth), "-", color="#bf8700", ms=6, label=r"thermal $N_{th}$ (classical-field, RJ)")
-axN.axhline(1e4, ls=":", color="#1f6feb", alpha=0.5, lw=1.0, label=r"$N$")
-axN.set_xlabel(r"$T/T_c$")
-axN.set_ylabel("atom number")
-axN.set_title(r"condensate melts (V-mono); thermal is Rayleigh–Jeans")
-axN.legend(frameon=False, fontsize=8.5)
-axN.grid(True, alpha=0.25)
-axN.set_ylim(bottom=0)
-
+fig, ax = plt.subplots(figsize=(7.0, 4.7))
 xx = np.linspace(0, 1, 200)
-axf.plot(xx, 1 - xx**3, "--", color="#999", lw=1.5, label=r"quantum $1-(T/T_c)^3$ (orientation)")
-axf.plot(*smooth(r, n0n), "-", color="#1f6feb", ms=7, label=r"$N_0/N$ (SGPE)")
-axf.set_xlabel(r"$T/T_c$")
-axf.set_ylabel(r"$N_0/N$")
-axf.set_xlim(0, 1)
-axf.set_ylim(0, 1.05)
-axf.set_title(r"V-T0: $N_0/N\to1$ as $T\to0$")
-axf.legend(frameon=False, fontsize=9)
-axf.grid(True, alpha=0.25)
-
-fig.suptitle("¹⁵¹Eu finite-T equilibrium (Stoof-SGPE, HOLD trap)", fontsize=11)
-fig.tight_layout(rect=[0, 0, 1, 0.95])
+ax.plot(xx, 1 - xx**3, "--", color="#999", lw=1.6,
+        label=r"ideal quantum $1-(T/T_c)^3$ (orientation)")
+ax.plot(*smooth(ar, an), "-", color="#8250df", lw=2.4,
+        label=r"analytic $N_0/N$ (atom+trap+$N$, $\mu$-pinned)")
+if os.path.exists(scsv):
+    s = np.genfromtxt(scsv, delimiter=",", names=True)
+    ax.plot(np.atleast_1d(s["T_over_Tc"]), np.atleast_1d(s["N0_over_N"]),
+            "o", color="#1f6feb", ms=8, mfc="white", mew=1.4,
+            label=r"SGPE $N_0/N$ (classical field, RJ $\Rightarrow$ below)")
+ax.annotate("SGPE below the analytic curve:\nclassical-field Rayleigh–Jeans\nover-populates the thermal cloud",
+            xy=(0.52, 0.28), fontsize=8.5, color="#555", va="center")
+ax.set_xlabel(r"$T/T_c$")
+ax.set_ylabel(r"condensate fraction $N_0/N$")
+ax.set_xlim(0, 1)
+ax.set_ylim(0, 1.05)
+ax.set_title("¹⁵¹Eu finite-T equilibrium: fraction is analytic; SGPE (RJ) sits below\n"
+             "(V-T0: $N_0/N\\to1$ as $T\\to0$; equilibrium closed-form, SGPE for dynamics)")
+ax.legend(frameon=False, fontsize=9, loc="upper right")
+ax.grid(True, alpha=0.25)
+fig.tight_layout()
 out = os.path.join(here, "eu_ft_equilibrium.png")
 fig.savefig(out, dpi=150)
 print("wrote", out)
