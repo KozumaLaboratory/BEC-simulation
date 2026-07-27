@@ -1,9 +1,0 @@
-model=LRW_first_principles (T0=18.0uK, K3=1.00e-41, alpha=5.880e-37)
-N0=3.500e+06  measured_N_BEC=5.020e+04
-LAB : reached=true N_BEC=2.2876e+05 T_BEC=9.055e-07 (nK=905.5) gamma_eff=1.640
-OPT : reached=true N_BEC=7.9505e+05 T_BEC=8.399e-07 (nK=839.9) gamma_eff=3.029
-improvement factor = 3.476x
-opt fracs (per-beam step ratios):
-  beam 1: 0.020 0.500 0.560 0.464 0.615 0.750 0.825 1.000
-  beam 2: 0.020 0.941 0.938 0.933 0.714 0.600 0.150 1.000
-  beam 3: 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000
