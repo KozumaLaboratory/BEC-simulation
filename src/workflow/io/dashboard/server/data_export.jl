@@ -43,7 +43,10 @@ function generate_dashboard_data(run_dir::String; F::Union{Nothing, Int}=nothing
 
     for fname in jld2_files
         d = JLD2.load(joinpath(run_dir, fname))
-        psi = d["psi"]
+        # Light point (no inline psi) → resolve from the stage store; the M1
+        # scalar-export marker (psi = empty array) keeps its inline empty psi.
+        psi = haskey(d, "psi") ? d["psi"] :
+              load_point_psi(joinpath(run_dir, fname))
 
         # Two paths: psi-bearing point files (the standard YAML-pipeline
         # case) recompute observables on the fly; scalar-only exports

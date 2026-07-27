@@ -31,7 +31,7 @@ function _load_psi_cached(
     get!(cache, key) do
         if snap_idx === nothing
             d = JLD2.load(src_path)
-            psi = d["psi"]
+            psi = haskey(d, "psi") ? d["psi"] : load_point_psi(src_path)  # light point → stage
         else
             # Two on-disk layouts are supported:
             #   (1) streamed — one key per frame, keys

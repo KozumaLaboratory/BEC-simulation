@@ -21,7 +21,26 @@
 # keys when present, otherwise from `units/atom` + `units/N_atoms` +
 # `units/omega_ref_rad_s` via `compute_interaction_params`.
 
-export open_result
+export open_result, load_point_psi
+
+"""
+    load_point_psi(path) -> Array{ComplexF64}
+
+Load the wavefunction from a run point file. Resolves a Stage-1 `gs_ref` pointer
+from the content-addressed stage store when the point is light; returns the inline
+`psi` for a full point. Use this instead of a bare `JLD2.load(path)["psi"]` in any
+consumer that reads a run point's ψ so it keeps working under SPINORBEC_LIGHT_POINTS.
+"""
+function load_point_psi(path::AbstractString)
+    isfile(path) || throw(ArgumentError("load_point_psi: file not found: $path"))
+    d = JLD2.load(path)
+    if haskey(d, "psi")
+        return convert(Array{ComplexF64, ndims(d["psi"])}, d["psi"])
+    end
+    gs_ref = get(d, "gs_ref", nothing)
+    gs_ref !== nothing && return _load_stage_psi(String(gs_ref), path)
+    throw(ArgumentError("load_point_psi: no `psi` or `gs_ref` key in $path"))
+end
 
 """
     open_result(path::String) -> RunResult

@@ -475,7 +475,10 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
                 verbose && println("  ✓ $(basename(psi_file)) (cached)")
                 if scan.continuation
                     d = JLD2.load(psi_file)
-                    chain_state[run_name] = (psi=d["psi"], mz_actual=get(d, "mz_actual", NaN))
+                    psi_c =
+                        haskey(d, "psi") ? d["psi"] :
+                        _load_stage_psi(String(d["gs_ref"]), psi_file)  # light point
+                    chain_state[run_name] = (psi=psi_c, mz_actual=get(d, "mz_actual", NaN))
                 end
                 continue
             end
