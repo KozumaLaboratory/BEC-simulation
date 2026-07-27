@@ -65,6 +65,8 @@ const FAST_TESTS = [
     "foundation/test_atoms.jl",
     "foundation/test_grid.jl",
     "foundation/test_preset.jl",
+    "foundation/test_noise_waveform.jl",
+    "foundation/test_waveform_bandwidth.jl",
     "hamiltonian/test_zeeman_builders.jl",
     "analysis/test_spin_snapshot.jl",
     "foundation/test_spin_matrices.jl",

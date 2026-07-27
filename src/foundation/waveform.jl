@@ -4,7 +4,7 @@ export AbstractWaveform, Waveform
 export ConstantWaveform, RampWaveform, PiecewiseLinearWaveform, FunctionWaveform
 export SinusoidalWaveform, ChirpedSinusoidalWaveform, GaussianPulseWaveform,
     InterpolatedWaveform, CompositeWaveform, StepWaveform
-export evaluate, load_waveform_csv
+export evaluate, load_waveform_csv, max_frequency, resample_count
 
 abstract type AbstractWaveform{T <: Number} end
 
@@ -261,6 +261,72 @@ function load_waveform_csv(path::String; time_col::Int=1, value_col::Int=2,
         push!(values, parse(Float64, parts[value_col]))
     end
     InterpolatedWaveform(times, values)
+end
+
+"""
+    max_frequency(w::Waveform) -> Float64
+
+Highest frequency the waveform actually contains, in the same units as its
+own time argument. Zero for anything a linear interpolant reproduces exactly
+(constants, ramps); `NaN` when it cannot be known (`FunctionWaveform`, and
+the discontinuity of a `StepWaveform`, which no sampling rate resolves).
+
+This exists because several places in the pipeline **resample** a waveform
+onto a fixed grid — `_convert_B_waveform` and `_shift_waveform` in the B-block
+builders both do — and a grid chosen without reference to the content silently
+aliases. Before this, the sample-count rule inspected the raw YAML dict and so
+only knew about `sinusoidal` / `chirped_sinusoidal`; anything else, including
+an already-constructed `Waveform`, fell back to a fixed 1024 points.
+
+Callers should treat `NaN` as "cannot bound — leave the caller's default
+alone", not as zero.
+"""
+max_frequency(::ConstantWaveform) = 0.0
+max_frequency(::RampWaveform) = 0.0                  # linear: exact under linear interp
+max_frequency(w::SinusoidalWaveform) = abs(w.frequency)
+max_frequency(w::ChirpedSinusoidalWaveform) = max(abs(w.freq_start), abs(w.freq_end))
+max_frequency(w::GaussianPulseWaveform) = w.sigma > 0 ? 1.0 / w.sigma : NaN
+max_frequency(::FunctionWaveform) = NaN
+max_frequency(::StepWaveform) = NaN                  # a jump has no band limit
+max_frequency(w::ShiftedWaveform) = max_frequency(w.inner)
+max_frequency(w::PiecewiseLinearWaveform) = _grid_nyquist(w.times)
+max_frequency(w::InterpolatedWaveform) = _grid_nyquist(w.times)
+
+function max_frequency(w::CompositeWaveform)
+    isempty(w.waveforms) && return 0.0
+    fs = map(max_frequency, w.waveforms)
+    any(isnan, fs) && return NaN
+    maximum(fs)
+end
+
+"""
+    resample_count(w::Waveform, duration; floor_n=1024) -> Int
+
+Number of samples needed to put `w` on a uniform grid over `[0, duration]`
+without aliasing: 20 per cycle of `max_frequency(w)`, never below `floor_n`.
+
+Twenty per cycle rather than the Nyquist two, because the consumers here
+interpolate LINEARLY between samples; linear reconstruction of a sinusoid at
+`N` points per cycle carries an rms error of order `1/N²`, so two would be
+formally sufficient and practically useless.
+
+Returns `floor_n` when `max_frequency` is `NaN` — no sampling rate resolves a
+step discontinuity or an opaque `FunctionWaveform`, so there is nothing to
+raise the count to.
+"""
+function resample_count(w::AbstractWaveform, duration::Real; floor_n::Int=1024)
+    f_max = max_frequency(w)
+    d = Float64(duration)
+    (isnan(f_max) || f_max <= 0 || d <= 0) && return floor_n
+    max(floor_n, ceil(Int, 20 * f_max * d))
+end
+
+# A sampled waveform carries no information above the Nyquist frequency of the
+# grid it was built on, so that is its bound.
+function _grid_nyquist(times::Vector{Float64})
+    length(times) < 2 && return 0.0
+    dt = minimum(diff(times))
+    dt > 0 ? 0.5 / dt : NaN
 end
 
 _scale_function(::Val{:linear}, t) = t

@@ -143,22 +143,34 @@ end
 """
     _suggest_sample_count(spec, duration; omega_ref) -> Int
 
-For sinusoidal / chirped specs, return ≥ 20 samples per highest-frequency
-cycle (Nyquist headroom). Returns the default floor otherwise.
+Samples needed to resample `spec` onto the fixed grid without aliasing: ≥ 20
+per cycle of the highest frequency it contains, floored at `_ZEEMAN_SAMPLE_N`.
+
+The bound comes from [`max_frequency`](@ref) on the BUILT waveform rather than
+from pattern-matching the raw YAML. The earlier dict-inspecting version knew
+only `sinusoidal` and `chirped_sinusoidal`, so every other time-dependent form
+— `noise:`, `sum:`, a pre-built `Waveform`, a fine `piecewise:` — silently got
+the 1024-point default and was aliased by the resampling in
+`_convert_B_waveform`. Anything `max_frequency` cannot bound (`NaN`: a
+`FunctionWaveform` or a step discontinuity) keeps the default, since there is
+no rate that would help.
 """
 function _suggest_sample_count(spec, duration::Float64; omega_ref::Float64=NaN)
-    spec isa Dict || return _ZEEMAN_SAMPLE_N
-    _f(node) = isnan(omega_ref) ? Float64(node) :
-               _parse_dimless_freq(node, 2π * omega_ref)
-    if haskey(spec, "sinusoidal")
-        f = _f(get(spec["sinusoidal"], "frequency", 1.0))
-        f > 0 || return _ZEEMAN_SAMPLE_N
-        return max(_ZEEMAN_SAMPLE_N, ceil(Int, 20 * f * duration))
-    elseif haskey(spec, "chirped_sinusoidal")
-        f_end = _f(get(spec["chirped_sinusoidal"], "freq_end", 1.0))
-        return max(_ZEEMAN_SAMPLE_N, ceil(Int, 20 * f_end * duration))
+    duration > 0 || return _ZEEMAN_SAMPLE_N
+    wf = if spec isa Waveform
+        spec
+    elseif spec isa Dict
+        try
+            _make_waveform(spec, duration; omega_ref=omega_ref)
+        catch
+            # Malformed specs are reported by the real build downstream; the
+            # sample-count heuristic must not be the thing that raises.
+            return _ZEEMAN_SAMPLE_N
+        end
+    else
+        return _ZEEMAN_SAMPLE_N
     end
-    _ZEEMAN_SAMPLE_N
+    resample_count(wf, duration; floor_n=_ZEEMAN_SAMPLE_N)
 end
 
 """Wrap a Number / String / Waveform / Dict spec as a `Waveform`. Helper for
