@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SHOWS: the dilute-but-not-too-dilute tension — N₀ vs constant m_ω (melt on the loose side, 3-body on the tight).
+# DOC:   docs/guides/eu_evaporation_optimization.md ("Constraint 2 — the melt tension").
+# REPLACES: nothing (current-best, complementary pedagogical figure).
 """Plot the tightness-axis tension for the Eu evaporation (m_ω sweep + representative
 trajectories). Reads the CSVs emitted by eu_evaporation_omega_mult_tension.jl.
 

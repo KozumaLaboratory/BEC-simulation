@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SHOWS: 3D finite-T Stoof-SGPE verification of the WAIST mechanism (looser retains more N₀).
+# DOC:   docs/guides/eu_evaporation_optimization.md ("3D verification (SGPE)").
+# REPLACES: nothing (current-best 3D verification; harmonic trap ⇒ waist mechanism only, no gravity/Feshbach).
 """Plot the finite-T Stoof-SGPE verification of the 0-D unified evaporation optimum.
 The two post-formation ω̄(t) protocols (ramp-only vs unified waist opening) run on the
 SAME prepared finite-T condensate with real K₃ loss; unified's looser trap cuts 3-body

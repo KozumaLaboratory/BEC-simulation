@@ -35,8 +35,8 @@ Tc_end(ramp, r, mend) = bec_critical_temperature(round(Int, max(r.N[end], 1)), o
 
 # soft-penalised objective shared by both stages (mvals = tightness control points; ≡1 ⇒ ramp-only)
 # grid: optional precomputed EvapTrapGrid (fixed-ramp Stage B) → skips the per-node trap solve.
-function score(ramp, om, mend; grid=nothing)
-    r = run_evaporation_bec(trap, ramp, p; N0=N0, T0=T0, omega_mult=om, trap_grid=grid)
+function score(ramp, om, mend; grid=nothing, am=(t -> 1.0))
+    r = run_evaporation_bec(trap, ramp, p; N0=N0, T0=T0, omega_mult=om, as_mult=am, trap_grid=grid)
     N0f = r.N0_final; c = cf(r); T = r.T_final * 1e9
     margin = Tc_end(ramp, r, mend) - T                       # T_c − T at the effective final ω̄
     pen_cf = c >= PURITY ? 1.0 : (c / PURITY)^3
@@ -113,54 +113,67 @@ const MCEIL = 2.0
 const MONO = length(ARGS) >= 3 ? parse(Bool, ARGS[3]) : false  # constrain m_ω non-increasing (smooth waist opening)
 grid_best = evap_trap_grid(trap, ramp_best)   # fixed ramp ⇒ build the trap grid once, reuse for all m_ω
 dur = ramp_best.times[end] - ramp_best.times[1]
+const ASFLOOR = length(ARGS) >= 6 ? parse(Float64, ARGS[6]) : 0.25  # Feshbach a_s floor (K₃∝a_s⁴)
 τnodes = collect(range(0.0, 1.0; length=KW))
-function build_mω(mv)
-    t0r = ramp_best.times[1]
-    function (t)
-        τ = clamp((t - t0r) / dur, 0.0, 1.0)
-        j = clamp(searchsortedlast(τnodes, τ), 1, KW - 1)
-        f = (τ - τnodes[j]) / (τnodes[j+1] - τnodes[j])
-        mv[j] * (1 - f) + mv[j+1] * f
-    end
+function _interp_nodes(v, t)
+    τ = clamp((t - ramp_best.times[1]) / dur, 0.0, 1.0)
+    j = clamp(searchsortedlast(τnodes, τ), 1, KW - 1)
+    f = (τ - τnodes[j]) / (τnodes[j+1] - τnodes[j])
+    v[j] * (1 - f) + v[j+1] * f
 end
-objB(mv) = score(ramp_best, build_mω(mv), mv[end]; grid=grid_best)[1]
-function descendB(m0; n_line=13, n_sweeps=8)
-    m = copy(m0); best = objB(m)
+build_mω(mv) = (t -> _interp_nodes(mv, t))
+build_as(av) = (t -> _interp_nodes(av, t))
+# JOINT objective over the waist axis m_ω (mv) AND the Feshbach axis a_s (av)
+objB(mv, av) = score(ramp_best, build_mω(mv), mv[end]; grid=grid_best, am=build_as(av))[1]
+# coordinate descent over BOTH axes (2·KW coords); both non-increasing when MONO (hold then drop)
+function descendB(m0, a0; n_line=11, n_sweeps=8)
+    m = copy(m0); a = copy(a0); best = objB(m, a)
     for _ in 1:n_sweeps
         imp = false
-        for i in 1:KW
-            # MONO ⇒ keep m non-increasing: bound coordinate i by its neighbours (smooth waist opening)
+        for i in 1:KW                                   # waist axis
             lov = MONO && i < KW ? max(MFLOOR, m[i+1]) : MFLOOR
             hiv = MONO && i > 1 ? min(MCEIL, m[i-1]) : MCEIL
             lb, lv = best, m[i]
             for v in range(lov, hiv; length=n_line)
-                m[i] = v; sc = objB(m); sc > lb && (lb = sc; lv = v)
+                m[i] = v; sc = objB(m, a); sc > lb && (lb = sc; lv = v)
             end
             m[i] = lv; lb > best && (best = lb; imp = true)
         end
+        for i in 1:KW                                   # Feshbach a_s axis
+            lov = MONO && i < KW ? max(ASFLOOR, a[i+1]) : ASFLOOR
+            hiv = MONO && i > 1 ? min(1.0, a[i-1]) : 1.0
+            lb, lv = best, a[i]
+            for v in range(lov, hiv; length=n_line)
+                a[i] = v; sc = objB(m, a); sc > lb && (lb = sc; lv = v)
+            end
+            a[i] = lv; lb > best && (best = lb; imp = true)
+        end
         imp || break
     end
-    (m, best)
+    (m, a, best)
 end
-rand_m(rng) = MONO ? sort(MFLOOR .+ (MCEIL - MFLOOR) .* rand(rng, KW); rev=true) :
-              MFLOOR .+ (MCEIL - MFLOOR) .* rand(rng, KW)
-bestm = fill(1.0, KW); bestscB = objB(bestm)   # includes the m_ω≡1 start (= Stage A point)
+rand_v(rng, floor) = MONO ? sort(floor .+ (1.0 - floor) .* rand(rng, KW); rev=true) :
+                     floor .+ (1.0 - floor) .* rand(rng, KW)
+bestm = fill(1.0, KW); bestas = fill(1.0, KW); bestscB = objB(bestm, bestas)  # m_ω≡1,a_s≡1 start
 for k in 1:NSTART
-    m0 = k == 1 ? fill(1.0, KW) : rand_m(rng)
-    m, sc = descendB(m0)
+    m0 = k == 1 ? fill(1.0, KW) : rand_v(rng, MFLOOR)
+    a0 = k == 1 ? fill(1.0, KW) : rand_v(rng, ASFLOOR)
+    m, a, sc = descendB(m0, a0)
     if sc > bestscB
-        global bestscB = sc; global bestm = m
+        global bestscB = sc; global bestm = m; global bestas = a
     end
     k % 8 == 0 && (@printf("B: %d/%d starts, best=%.3e\n", k, NSTART, bestscB); flush(stdout))
 end
-om_best = build_mω(bestm)
-rB = run_evaporation_bec(trap, ramp_best, p; N0=N0, T0=T0, omega_mult=om_best, trap_grid=grid_best)
+om_best = build_mω(bestm); am_best = build_as(bestas)
+rB = run_evaporation_bec(trap, ramp_best, p; N0=N0, T0=T0,
+    omega_mult=om_best, as_mult=am_best, trap_grid=grid_best)
 @printf("[B] unified:   N0=%.4e T=%.1fnK cf=%.3f Tc=%.1fnK\n",
     rB.N0_final, rB.T_final * 1e9, cf(rB), Tc_end(ramp_best, rB, bestm[end]))
 gain = rB.N0_final / max(rA.N0_final, 1)
 @printf("\n=== UNIFIED vs RAMP-ONLY (%.0fs) ===  N0 gain = %.2f×  (%.4e → %.4e)\n",
     time() - t0, gain, rA.N0_final, rB.N0_final)
-@printf("optimal m_ω control points (τ=0→1): %s\n", join([@sprintf("%.3f", x) for x in bestm], ", "))
+@printf("optimal m_ω (τ=0→1): %s\n", join([@sprintf("%.3f", x) for x in bestm], ", "))
+@printf("optimal a_s (τ=0→1): %s   (K₃ ∝ a_s⁴)\n", join([@sprintf("%.3f", x) for x in bestas], ", "))
 
 # ---------- dump comparison data ----------
 # effective ω̄(t)/2π for both runs (Hz)
@@ -176,10 +189,10 @@ open(joinpath(OUT, "unified_traj.csv"), "w") do io
 end
 tg = range(0.0, dur; length=400)
 open(joinpath(OUT, "unified_shape.csv"), "w") do io
-    println(io, "t_s,m_omega,omega_ramp_hz,omega_eff_hz")
+    println(io, "t_s,m_omega,omega_ramp_hz,omega_eff_hz,a_s_mult")
     for t in tg
         wr = ωramp_hz(t); mω = om_best(Float64(t))
-        @printf(io, "%.6e,%.5f,%.4f,%.4f\n", t, mω, wr, mω * wr)
+        @printf(io, "%.6e,%.5f,%.4f,%.4f,%.5f\n", t, mω, wr, mω * wr, am_best(Float64(t)))
     end
 end
 open(joinpath(OUT, "unified_summary.txt"), "w") do io

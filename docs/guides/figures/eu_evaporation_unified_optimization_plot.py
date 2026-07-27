@@ -1,89 +1,85 @@
 #!/usr/bin/env python3
-"""Plot the unified ramp + tightness-axis optimization result.
-Left:  optimal tightness m_ω(t) and the resulting effective ω̄(t)/2π vs the power-ramp ω̄(t).
-Right: condensate N₀(t) for ramp-only (m_ω≡1) vs unified (m_ω(t)) — the gain."""
+# SHOWS: the thorough 3-axis Eu evaporation optimum — the two post-formation control knobs
+#        (waist m_ω(t), Feshbach a_s(t)) + the resulting condensate gain vs the ramp-only baseline.
+# DOC:   docs/guides/eu_evaporation_optimization.md (current-best optimal-protocol figure).
+# REPLACES: figs/eu_evaporation_unified/*, figs/eu_evaporation_unified_smooth/eu_evaporation_unified_optimization.*,
+#           figs/eu_evaporation_reopt/eu_evaporation_unified_optimization.* (jagged 1.38× / monotone 1.27× / gravity 1.30×).
+"""Left: the two actionable knobs m_ω(t) (waist, gravity-floored 0.6) and a_s(t) (Feshbach,
+K₃∝a_s⁴, floor 0.25), both held ≈1 through formation then dropped. Right: condensate N₀(t),
+ramp-only vs the joint optimum."""
 import sys, csv
 import numpy as np
 import matplotlib.pyplot as plt
 
-OUT = sys.argv[1] if len(sys.argv) > 1 else "unified_out"
+D = sys.argv[1] if len(sys.argv) > 1 else "joint_out"
 
 
 def load(path):
-    with open(f"{OUT}/{path}") as f:
+    with open(f"{D}/{path}") as f:
         return list(csv.DictReader(f))
 
 
 sh = load("unified_shape.csv")
 t = np.array([float(r["t_s"]) for r in sh])
-mω = np.array([float(r["m_omega"]) for r in sh])
-wr = np.array([float(r["omega_ramp_hz"]) for r in sh])
+mw = np.array([float(r["m_omega"]) for r in sh])
+asm = np.array([float(r["a_s_mult"]) for r in sh])
 we = np.array([float(r["omega_eff_hz"]) for r in sh])
+wr = np.array([float(r["omega_ramp_hz"]) for r in sh])
 
 tj = load("unified_traj.csv")
 
 
 def traj(which, key):
     rows = [r for r in tj if r["which"] == which]
-    return (np.array([float(r["t_s"]) for r in rows]),
-            np.array([float(r[key]) for r in rows]))
+    return (np.array([float(r["t_s"]) for r in rows]), np.array([float(r[key]) for r in rows]))
 
 
-# time the condensate first appears in the unified run (BEC formation)
 tu, N0u = traj("unified", "N0")
 t_form = tu[np.argmax(N0u > 0)] if (N0u > 0).any() else tu[-1]
 
-fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(12.5, 5.0))
+fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(12.8, 5.2))
 
-# ---- left: the actionable knob m_ω(t) (the waist), with the resulting ω̄ on the twin axis ----
-ax0.axhspan(0, 1.0, color="#9467bd", alpha=0.04, lw=0)
-ax0.plot(t, mω, "-", color="#9467bd", lw=2.8, label="waist knob $m_\\omega(t)$  ($\\bar\\omega\\!\\propto\\!m_\\omega$)")
-ax0.axhline(1.0, color="0.55", ls=":", lw=1.3)
-ax0.text(0.05, 1.02, "$m_\\omega\\!=\\!1$: leave trap as-is (lab ramp)", fontsize=8.5, color="0.4")
+# ---- left: the two knobs ----
+ax0.axhline(1.0, color="0.6", ls=":", lw=1.2)
+ax0.text(0.04, 1.02, "= 1: leave trap / $a_s$ as-is (lab)", fontsize=8.5, color="0.4")
+ax0.plot(t, mw, "-", color="#9467bd", lw=2.8, label="waist  $m_\\omega(t)$  ($\\bar\\omega\\propto m_\\omega$)")
+ax0.plot(t, asm, "-", color="#17becf", lw=2.8, label="Feshbach  $a_s(t)/a_s^0$  ($K_3\\propto a_s^4$)")
 ax0.axvline(t_form, color="#d62728", ls=":", lw=1.4)
 ax0.text(t_form + 0.02, 0.12, "BEC forms\n($t$≈%.2f s)" % t_form, color="#d62728", fontsize=9)
-# annotate the two regimes
-ax0.annotate("hold ($\\approx$ lab)", (t[int(len(t) * 0.35)], mω[int(len(t) * 0.35)]),
-             (t[int(len(t) * 0.2)], 0.6), fontsize=9, color="#9467bd",
-             arrowprops=dict(arrowstyle="->", color="#9467bd"))
-ax0.annotate("open the waist %.1f× beyond the ramp\n($m_\\omega$: 1→%.2f)  dilute → 3-body $\\propto\\bar\\omega^3$ ↓"
-             % (1.0 / max(mω[-1], 1e-9), mω[-1]),
-             (t[-1], mω[-1]), (t[int(len(t) * 0.42)], 0.30), fontsize=9, color="#1f77b4",
-             arrowprops=dict(arrowstyle="->", color="#1f77b4"))
+ax0.annotate("hold ≈ lab\n(need density +\ncollisions to form)", (t[int(len(t) * 0.4)], 1.0),
+             (t[int(len(t) * 0.12)], 0.45), fontsize=8.5, color="0.35",
+             arrowprops=dict(arrowstyle="->", color="0.5"))
+ax0.annotate("then dump both:\n$m_\\omega$→0.60 (gravity floor)\n$a_s$→0.25 ($K_3$×%.3f)" % (asm[-1] ** 4),
+             (t[-1], 0.3), (t[int(len(t) * 0.45)], 0.62), fontsize=8.5, color="#0a7",
+             arrowprops=dict(arrowstyle="->", color="#0a7"))
 ax0.set_xlabel("time  [s]")
-ax0.set_ylabel("waist tightness knob  $m_\\omega(t)$", color="#9467bd")
-ax0.tick_params(axis="y", colors="#9467bd")
+ax0.set_ylabel("control knob  (× baseline)")
 ax0.set_ylim(0, 1.25)
-axw = ax0.twinx()
-axw.plot(t, wr, "--", color="#bbbbbb", lw=1.6, label="power-ramp $\\bar\\omega/2\\pi$")
-axw.plot(t, we, "-", color="#1f77b4", lw=1.8, label="effective $\\bar\\omega_{\\rm eff}/2\\pi$")
-axw.set_ylabel("$\\bar\\omega/2\\pi$  [Hz]", color="#1f77b4")
-axw.tick_params(axis="y", colors="#1f77b4")
-axw.set_ylim(bottom=0)
-ax0.set_title("The protocol change: hold the trap, then open the waist late", fontsize=11)
-l0, la0 = ax0.get_legend_handles_labels()
-l1, la1 = axw.get_legend_handles_labels()
-ax0.legend(l0 + l1, la0 + la1, loc="upper right", fontsize=8.5, framealpha=0.9)
+ax0.set_title("The protocol: hold through formation, then dump density + $K_3$", fontsize=11)
+ax0.legend(loc="center left", fontsize=9, framealpha=0.9)
 
-# ---- right: N₀(t) ramp-only vs unified ----
-for which, col, lab in (("ramp_only", "#333333", "ramp-only ($m_\\omega\\!\\equiv\\!1$)"),
-                        ("unified", "#d62728", "unified ($m_\\omega(t)$)")):
+# ---- right: condensate gain ----
+for which, c, lab in (("ramp_only", "#333333", "ramp-only baseline"),
+                      ("unified", "#d62728", "3-axis optimum (waist + Feshbach)")):
     tt, N0 = traj(which, "N0")
     _, Nt = traj(which, "N")
-    ax1.plot(tt, Nt, "-", color=col, lw=1.0, alpha=0.4)
-    ax1.plot(tt, N0, "-", color=col, lw=2.4, label=lab)
-    ax1.plot(tt[-1], N0[-1], "o", color=col, ms=7)
-    ax1.annotate(f"{N0[-1]:.2e}", (tt[-1], N0[-1]), (tt[-1] * 0.72, N0[-1]),
-                 fontsize=9, color=col)
+    ax1.plot(tt, Nt, "-", color=c, lw=1.0, alpha=0.35)
+    ax1.plot(tt, N0, "-", color=c, lw=2.6, label=lab)
+    ax1.plot(tt[-1], N0[-1], "o", color=c, ms=8)
+gain = traj("unified", "N0")[1][-1] / traj("ramp_only", "N0")[1][-1]
+ax1.text(0.03, 0.05, "$N_0$ gain = %.2f×\n(0-D, gravity + melt + cf≥0.9 respected)" % gain,
+         transform=ax1.transAxes, fontsize=11, va="bottom",
+         bbox=dict(boxstyle="round", fc="#fff3f3", ec="#d62728", alpha=0.9))
 ax1.set_xlabel("time  [s]")
-ax1.set_ylabel("atom number   (thin = total $N$, thick = condensate $N_0$)")
-ax1.set_title("Condensate growth: ramp-only vs unified", fontsize=11)
-ax1.legend(loc="upper left", fontsize=9)
+ax1.set_ylabel("atom number  (thin = total $N$, thick = condensate $N_0$)")
+ax1.set_title("Condensate: ramp-only vs 3-axis optimum", fontsize=11)
+ax1.legend(loc="upper right", fontsize=9)
 ax1.set_ylim(bottom=0)
 
-fig.suptitle("Eu evaporation — unified ramp + tightness-axis $m_\\omega(t)$ optimization (issue #75)",
-             fontsize=12, y=1.00)
+fig.suptitle("Eu evaporation — thorough 3-axis optimum (power ramp + waist + Feshbach $a_s$)", fontsize=12, y=1.00)
 fig.tight_layout()
-out = f"{OUT}/eu_evaporation_unified_optimization.png"
+import os
+out = sys.argv[2] if len(sys.argv) > 2 else "figs/eu_evaporation_optimization/optimal_protocol.png"
+os.makedirs(os.path.dirname(out), exist_ok=True)
 fig.savefig(out, dpi=140, bbox_inches="tight")
 print("wrote", out)

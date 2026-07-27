@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SHOWS: type-C absolute-N validation — model N_BEC vs K₃ at the lab operating point vs measured.
+# DOC:   docs/guides/eu_evaporation_optimization.md ("Absolute-number validation (type-C)").
+# REPLACES: nothing (current-best, complementary validation figure).
 """Type-C absolute-N validation: model N_BEC vs K₃ at the real lab operating point, against
 the measured ¹⁵¹Eu BEC number. The model matches at the direct-measured K₃; K₃ is the
 dominant absolute-N uncertainty."""

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SHOWS: gravity floor on the waist axis — real euv3 trap depth with/without gravity vs loosening.
+# DOC:   docs/guides/eu_evaporation_optimization.md ("Constraint 1 — gravity caps the waist").
+# REPLACES: nothing (current-best, complementary constraint figure).
 """Gravity limit on trap loosening for the Eu evaporation. The real euv3 crossed-dipole
 trap depth WITH gravity collapses as ω̄ is loosened — capping the waist axis at m_ω≈0.6."""
 import sys, csv

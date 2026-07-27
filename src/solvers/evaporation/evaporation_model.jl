@@ -179,17 +179,21 @@ between the two paths (a gate test pins `_evap_rhs_bec ≡ evap_rhs` above `T_c`
 added by the caller.
 """
 @inline function _thermal_evap_rates(Nev::Float64, T::Float64, η::Float64, n::Float64,
-    p::EvapParams, m::Float64, dlnω_dt::Float64)
+    p::EvapParams, m::Float64, dlnω_dt::Float64, as_mult::Float64=1.0)
     kB = Units.KB
     v̄ = sqrt(8 * kB * T / (π * m))
+    # Feshbach-tuned scattering length a_eff = a_s·as_mult and the 3-body coefficient it drives,
+    # K3_eff = K3·as_mult⁴ (universal van der Waals K₃∝a_s⁴). as_mult=1 ⇒ unchanged (bit-identical).
+    a_eff = p.a_s * as_mult
+    K3_eff = p.K3 * as_mult^4
     # s-wave unitarity (effective-range) cross section σ(T)=8πa²/(1+k²a²), with the flux-weighted
     # mean relative collision energy 2k_BT ⇒ k²a² = 2(m k_BT/ℏ²)a². Textbook directional correction:
     # it lowers the elastic rate of a HOT cloud (~15% at 16µK, ~10% at 10µK for Eu a=110a₀), and
     # leaves a COLD cloud near the full s-wave σ. The σ-constant form over-counts hot-cloud
     # collisions and over-evaporates (the 7W ¹⁵¹Eu hold's one-sided model-too-cold residual). This
     # is NOT the spurious 2× dipolar enhancement (retracted); it is the unitarity limit.
-    k2a2 = 2 * m * kB * T / Units.HBAR^2 * p.a_s^2
-    σ = 8π * p.a_s^2 / (1 + k2a2)
+    k2a2 = 2 * m * kB * T / Units.HBAR^2 * a_eff^2
+    σ = 8π * a_eff^2 / (1 + k2a2)
     γel = n * σ * v̄ / sqrt(2)                        # per-atom elastic rate, γ = n σ v̄/√2
     # evaporation: 3D-harmonic truncated-Boltzmann (Luiten), no free parameter. evap_factor is
     # the eject fraction (all-η spilling rate); L = dlnT/dlnN is the O'Hara energy-balance
@@ -208,7 +212,7 @@ added by the caller.
     dN_evap = -Nev * γel * p.evap_scale * evap_factor
     dTT_evap = Nev > 0 ? (dN_evap / Nev) * L : 0.0
     # three-body loss + antievaporative heating (center-weighted, ⟨n²⟩ = n²/3^{3/2})
-    dN_3b = -p.K3 * (n^2 / 3.0^1.5) * Nev
+    dN_3b = -K3_eff * (n^2 / 3.0^1.5) * Nev
     dTT_3b = Nev > 0 ? -(dN_3b / Nev) * (1.0 / 3.0) : 0.0
     # soft spilling: a trap of depth U=η k_BT cannot hold a cloud at η<1; the excess relaxes toward
     # η=1 at ~the collision rate, dT/T = −3 γ_el(1−η). The factor 3 ≈ the truncated-cloud central-

@@ -6,7 +6,7 @@ using SpinorBEC
 using SpinorBEC: Eu151, Units, EvapTrap, EvapParams, FortRamp,
     bec_critical_temperature, condensate_split, run_evaporation_bec, EvapBecResult,
     euv3_evap_trap, trap_at, evap_rhs, evap_trap_grid, EvapTrapGrid
-using SpinorBEC: _evap_rhs_bec
+using SpinorBEC: _evap_rhs_bec, _condensate_three_body_rate
 
 const _m_c = Eu151.mass
 const _as_c = Eu151.a_s
@@ -131,6 +131,27 @@ _ramp_c() = FortRamp(
             omega_mult=(t -> 0.8), trap_grid=g)
         r3 = run_evaporation_bec(trap, ramp, p; N0=2e6, T0=40e-6, omega_mult=(t -> 0.8))
         @test r2.N0_final == r3.N0_final
+    end
+
+    # Feshbach a_s axis: as_mult rescales a_s (and K₃=K₃·as_mult⁴, universal van der Waals).
+    # as_mult≡1 must be bit-identical; lowering a_s must cut the condensate 3-body rate.
+    @testset "Feshbach a_s axis: identity + K₃∝a_s⁴ cuts 3-body" begin
+        trap = _trap_c()
+        p = EvapParams(; a_s=_as_c, tau_bg=10.0, K3=1e-41)
+        ramp = _ramp_c()
+        base = run_evaporation_bec(trap, ramp, p; N0=2e6, T0=40e-6)
+        one = run_evaporation_bec(trap, ramp, p; N0=2e6, T0=40e-6, as_mult=(t -> 1.0))
+        @test one.N0_final == base.N0_final       # bit-identical at as_mult≡1
+        @test one.N == base.N
+        # condensate 3-body rate ∝ K₃·n₀² = as_mult⁴·(as_mult^{-3/5})² = as_mult^{2.8}: lower a_s ⇒ lower rate
+        r_full = _condensate_three_body_rate(1e5, 2π * 100, p, _m_c, 1.0)
+        r_half = _condensate_three_body_rate(1e5, 2π * 100, p, _m_c, 0.5)
+        @test r_full > 0
+        @test r_half < r_full
+        @test r_half ≈ r_full * 0.5^2.8 rtol = 1e-6
+        # as_mult≠1 genuinely changes a full run (non-trivial coupling)
+        low = run_evaporation_bec(trap, ramp, p; N0=2e6, T0=40e-6, as_mult=(t -> 0.5))
+        @test low.N0_final != base.N0_final
     end
 
     @testset "above T_c reduces to the thermal model (no condensate)" begin
