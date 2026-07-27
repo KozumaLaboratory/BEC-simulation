@@ -91,7 +91,8 @@ def leg_conversion(leg: dict) -> tuple[float, float, float]:
     return span, peak, b_jump
 
 
-def fig_hysteresis(runs: dict, out: Path) -> None:
+def fig_hysteresis(runs: dict, out: Path,
+                   b_eq_by_kappa: dict[float, float] | None = None) -> None:
     kappas = sorted(runs, reverse=True)
     # +1.7in for the legend, which sits OUTSIDE the last axes: the curves fill both
     # the upper-left (converted branch) and the right (metastable branch), so an
@@ -99,6 +100,7 @@ def fig_hysteresis(runs: dict, out: Path) -> None:
     fig, axes = plt.subplots(1, len(kappas),
                              figsize=(4.6 * len(kappas) + 1.7, 4.0), sharey=True)
     axes = np.atleast_1d(axes)
+    b_eq_by_kappa = b_eq_by_kappa or {}
     taus = sorted({t for e in runs.values() for (_, t) in e["legs"]})
     colour = {t: TAU_RAMP[min(i, len(TAU_RAMP) - 1)]
               for i, t in enumerate(taus)}
@@ -113,6 +115,42 @@ def fig_hysteresis(runs: dict, out: Path) -> None:
             ax.plot(leg["B_uG"], leg["fperp"], color=colour[tau],
                     linestyle="-" if tag == "rise" else "--",
                     solid_capstyle="round", dash_capstyle="round")
+        # Mark where each leg STARTS. The legs begin at different fields because
+        # each is seeded from the converged branch that is metastable in its own
+        # direction, and the library has no low-field flower state at κ = 1.8 — so
+        # the horizontal break between them is missing data, not physics. The
+        # VERTICAL offset at that seam is the physics: two branches coexisting at
+        # the same field, separated by δ⟨F⊥⟩.
+        seeds = {}
+        for tag in ("rise", "fall"):
+            legs = [(t, leg) for (g, t), leg in entry["legs"].items() if g == tag]
+            if not legs:
+                continue
+            _, leg = legs[0]
+            i = 0 if tag == "rise" else 0
+            seeds[tag] = (float(leg["B_uG"][i]), float(leg["fperp"][i]))
+            ax.plot(*seeds[tag], marker="D", markersize=9, color=INK2,
+                    markeredgecolor=SURFACE, markeredgewidth=2.0, zorder=6)
+        # Only meaningful when the two seeds sit at essentially the SAME field —
+        # otherwise the vertical offset between them mixes the branch separation
+        # with the field dependence along one branch.
+        if len(seeds) == 2 and abs(seeds["rise"][0] - seeds["fall"][0]) <= 2.0:
+            (b_r, f_r), (b_f, f_f) = seeds["rise"], seeds["fall"]
+            gap = abs(f_r - f_f)
+            b_mid = 0.5 * (b_r + b_f)
+            ax.annotate("", xy=(b_mid, f_r), xytext=(b_mid, f_f),
+                        arrowprops=dict(arrowstyle="<->", color=INK2, lw=1.2))
+            ax.annotate(f"two branches at the same field\n"
+                        f"$\\delta\\langle F_\\perp\\rangle$ = {gap:.2f}"
+                        + ("  ⇒ bistable" if gap > 0.3 else "  ⇒ one branch"),
+                        xy=(b_mid, 0.5 * (f_r + f_f)), xytext=(12, -6),
+                        textcoords="offset points", ha="left", va="center",
+                        color=INK2, fontsize=9)
+        b_eq = b_eq_by_kappa.get(kappa)
+        if b_eq is not None and math.isfinite(b_eq):
+            ax.axvline(b_eq, color=INK3, lw=1.2, ls=":")
+            ax.annotate(f"$B_{{eq}}$", xy=(b_eq, ax.get_ylim()[1]), xytext=(3, -12),
+                        textcoords="offset points", color=INK2, fontsize=9)
         ax.grid(axis="both", alpha=0.9)
         ax.set_axisbelow(True)
         ax.set_xlabel("magnetic field  $B$  [µG]")
@@ -236,7 +274,8 @@ def main() -> None:
     if not runs:
         raise SystemExit(f"no runs under {a.data}")
     a.out.mkdir(parents=True, exist_ok=True)
-    fig_hysteresis(runs, a.out / "eu_adiabatic_hysteresis.png")
+    fig_hysteresis(runs, a.out / "eu_adiabatic_hysteresis.png",
+                   static_b_eq(a.window))
     fig_conversion(runs, a.out / "eu_adiabatic_conversion.png")
     fig_sg_signal(runs, a.out / "eu_adiabatic_sg_signal.png")
 

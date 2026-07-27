@@ -122,6 +122,22 @@ measures.
 
 ![order parameter vs field](figures/eu_adiabatic_hysteresis.png)
 
+**Reading the break between the two families of curves.** It is two different
+things, and only one of them is physics:
+
+- *Horizontally* (64 → 65 µG at $\kappa = 1.8$) there is simply no data. Each leg
+  starts from the converged ground state of the branch that is metastable in its
+  own direction, and the library has no low-field flower state at $\kappa = 1.8$ —
+  the campaign that built it bracketed $B_{eq}$ and stopped. So the rising leg can
+  only start at 65 µG and the falling leg at 64 µG. Generating flower seeds down to
+  20 µG would let both legs span one window and turn the loop into a single number;
+  that is the natural next run.
+- *Vertically* at that seam is the result: at the same field the two branches sit at
+  $\langle F_\perp\rangle = 0.80$ and $2.26$, i.e. $\delta\langle F_\perp\rangle = 1.46$.
+  Two states coexisting at one field **is** the bistability. The $\kappa = 0.8$ facet
+  has no such offset — its two seeds differ only through the field dependence of one
+  branch, which is why no separation is annotated there.
+
 So the field route *does* prepare the flower state — at $\tau \approx 0.4$ s, sweeping
 to below 30 µG — but the overshoot and ringing say it arrives **excited**, not as a
 cold ground state. The loop is wide and asymmetric: $[\approx 27, > 100]\ \mu$G,
