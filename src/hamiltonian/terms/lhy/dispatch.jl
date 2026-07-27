@@ -151,7 +151,8 @@ end
 """
     compute_spinor_lhy_fm_contact(; F, g_dict, n_max, n_points) → FMContactLHY
 
-F-FM contact LHY closed form (paper #2 contact-only piece, F=6 for now).
+F-FM contact LHY closed form (paper #2 contact-only piece). Any F: the
+single-mode collapse is gated against `full_bdg` at F = 1..8.
 For an FM-polarised condensate (ζ_α = δ_{α,+F}), the closed form collapses
 to a single mode at m=+F: ε = (8/15π²) (g_{2F} n)^(5/2). For uniform
 g_S = c_0 this is identical to scalar Lima-Pelster (no DDI). The mode

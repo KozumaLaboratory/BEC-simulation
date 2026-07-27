@@ -1,10 +1,3 @@
-# NOT GENERALIZABLE: FM-contact LHY accepts F=6 only via sigma_delta_fm_F6 table.
-# Reason: math, performance
-# Why: σ_m/δ_m lookup is keyed by F and we only ship the F=6 sympy-derived
-#   rationals. The single-mode collapse (Watanabe-Brauner Type-B Goldstone) is
-#   general for any F, but per-m coefficients still require offline CG work.
-# See: src/hamiltonian/terms/lhy/sigma_delta_fm_F6.jl, Paper #3 §V.E
-#
 # fm_contact_lhy.jl
 # =================================================================
 # Closed-form contact LHY for spinor BECs in the FM phase
@@ -36,15 +29,13 @@
 # Lima-Pelster (no DDI): (8/15π²) (c_0 n)^(5/2). The mode adds value
 # only when g_S vary across S (realistic Eu/Er/Dy a_S, or non-zero c_1).
 #
-# DDI extension (FM + Q_5-like angular average, "Stage C" in the paper-#2
-# roadmap) is NOT yet implemented — it requires the Q_5(ε_dd^F) reduction
-# with rank-2 spherical tensor coupling to m=+F-1 and m=+F-2 (parallel
-# session future deliverable).
+# Valid for any F: `sigma_fm` / `delta_fm` are closed forms in F, and the
+# single-mode result is gated against `full_bdg` (no ansatz) at F = 1..8.
 
 export FMLHYCoefs, build_fm_lhy_coefs, lhy_energy_fm
 export sigma_fm, delta_fm
 
-include("sigma_delta_fm_F6.jl")
+include("sigma_delta_fm.jl")
 
 """
     FMLHYCoefs(F, sigma, delta)
