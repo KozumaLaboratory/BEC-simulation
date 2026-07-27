@@ -77,13 +77,17 @@ the Eu units live in the explicit $c_0,K_3$.
 | **estimator** | $N_0$ independent of trajectory count $M$ | $M{=}3\to6448$, $M{=}8\to6401$ ✓ |
 
 **Honest cutoff limitation (not hand-waved).** The classical field IS
-cutoff-dependent. Over $k_\mathrm{cut}\in[4.6,8.0]$ the thermal cloud spreads
-$\sim79\%$ while the condensate $N_0$ moves $\sim30\%$: $N_0$ is the *more robust*
-of the two but NOT cutoff-free. So absolute $N_0$ is quoted at the physical cutoff
-$\varepsilon-\mu\approx T$, and only comparisons at FIXED $k_\mathrm{cut}$ (the
-shape result) are cutoff-clean. The ideal-Bose $1-(T/T_c)^3$ is drawn only for
-orientation — the classical (Rayleigh–Jeans) thermal over-populates, so $N_0/N$
-sits below it; it is not a fit.
+cutoff-dependent, and the equilibrium condensate $N_0$ does **NOT converge** with it.
+A 64³/96³ TSUBAME scan (`eu_ft_cutoff_study.png`) shows $N_0$ falling monotonically
+with $k_\mathrm{cut}$ AND, at fixed $k_\mathrm{cut}$, the 96³ curve lying *below* 64³ —
+i.e. refining the grid does not flatten it. This is the grand-canonical classical-field
+problem: at fixed $\mu$, enlarging the classical region adds Rayleigh–Jeans thermal
+modes (unbounded) that dilute the coherent field, so the *equilibrium* $N_0$ is not a
+converged absolute observable (earlier "$N_0$ robust, ~30%" was over the narrow
+$k_\mathrm{cut}\in[4.6,8.0]$ window only). **Consequence:** trust the SGPE for the
+loss-law ARBITER (the $N_0^{9/5}$ decay of a pure, cutoff-free condensate) and for
+relative comparisons at FIXED $k_\mathrm{cut}$ — NOT for an absolute equilibrium $N_0$.
+The ideal-Bose $1-(T/T_c)^3$ is drawn only for orientation, not a fit.
 
 ## Equilibrium is analytic; the SGPE is for the dynamics
 
