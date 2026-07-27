@@ -8,9 +8,9 @@ Three deliverables:
   1. eu_adiabatic_hysteresis.png   ⟨F⊥⟩ vs B, both ramp directions, one facet per κ.
      The loop between the solid (rising B) and dashed (falling B) curves is the
      signature; the κ ≤ 0.9 facet is the control that must show none.
-  2. eu_adiabatic_loop_edges.png   the spinodal pair — the field at which ⟨F⊥⟩
-     jumps on each leg — vs ramp duration. Saturating ⇒ bistability; closing onto
-     B_eq ⇒ the loop was only dynamical lag; no jump at all ⇒ crossover.
+  2. eu_adiabatic_conversion.png   how far each leg converts vs ramp duration.
+     Crossing out of the shaded band = a branch conversion; staying inside it =
+     canting along a single branch.
   3. eu_adiabatic_sg_signal.png    the m_F distribution a Stern-Gerlach + TOF shot
      would return at the end of the slowest ramp — what the experiment actually reads.
 
@@ -54,33 +54,41 @@ def load_runs(data: Path) -> dict[float, dict]:
     return runs
 
 
-def jump_field(leg: dict, sharpness: float = 3.0) -> tuple[float, float]:
-    """Field at which ⟨F⊥⟩ changes fastest along one leg — the spinodal, where
-    the metastable branch stops existing — and how sharp that feature is
-    (max|dF⊥/dB| ÷ median|dF⊥/dB|).
+# A branch CONVERSION moves ⟨F⊥⟩ by ~2 (polarised 0.8 ↔ flower 2.5+); smooth
+# canting along a single branch moves it by ≤ 1. So the span is the discriminator,
+# and it needs no threshold to be plotted. A ratio like peak÷median|dF⊥/dB| is NOT:
+# it divides by the typical slope, so a nearly flat curve with one small bump
+# scores higher than a real conversion (κ=0.8 fall τ=434 ms scores 10.2 on a span
+# of 0.76, above the genuine κ=1.8 conversion's 8.0 on a span of 2.92).
+MIN_SPAN = 1.3          # ⟨F⊥⟩ change that only a branch conversion produces
+MIN_LOCALISATION = 3.0  # peak ÷ mean |dF⊥/dB| — the feature must also be localised
+
+
+def leg_conversion(leg: dict) -> tuple[float, float, float]:
+    """(span, peak |dF⊥/dB|, field of that peak) along one leg.
 
     The two legs deliberately traverse DIFFERENT field ranges (each starts on the
     branch that is metastable in its own direction), so they probe the lower and
-    upper spinodal respectively; the loop is the pair, not an overlap area.
-    `sharpness ≤ 3` means no localised jump — a smooth crossover response — and
-    returns NaN rather than the argmax of noise."""
+    the upper spinodal respectively. The jump field is reported only when the leg
+    both converts (`span ≥ MIN_SPAN`) and does so in a localised way; otherwise
+    the field is NaN and the span still carries the information."""
     order = np.argsort(leg["B_uG"])
     b, f = leg["B_uG"][order], leg["fperp"][order]
     if len(b) < 8 or b[-1] - b[0] <= 0:
-        return math.nan, math.nan
+        return math.nan, math.nan, math.nan
+    span = float(f.max() - f.min())
     bs = np.linspace(b[0], b[-1], 400)
     d = np.abs(np.gradient(np.interp(bs, b, f), bs))
-    med = float(np.median(d))
-    if med <= 0:
-        return math.nan, math.nan
     # np.gradient is one-sided at the ends, which inflates the edge bins — a ramp
-    # that is still evolving when it stops then reports a "jump" at its own last
+    # still evolving when it stops would otherwise report a "jump" at its own last
     # point. Only the interior can carry a resolved feature.
     edge = max(1, len(bs) // 25)
-    interior = slice(edge, -edge)
-    d_in, bs_in = d[interior], bs[interior]
-    sharp = float(d_in.max() / med)
-    return (float(bs_in[int(np.argmax(d_in))]) if sharp > sharpness else math.nan), sharp
+    d_in, bs_in = d[edge:-edge], bs[edge:-edge]
+    peak = float(d_in.max())
+    localised = d.mean() > 0 and peak / float(d.mean()) >= MIN_LOCALISATION
+    b_jump = float(bs_in[int(np.argmax(d_in))]) \
+        if (span >= MIN_SPAN and localised) else math.nan
+    return span, peak, b_jump
 
 
 def fig_hysteresis(runs: dict, out: Path) -> None:
@@ -125,54 +133,48 @@ def fig_hysteresis(runs: dict, out: Path) -> None:
     print(f"wrote {out}")
 
 
-def fig_loop_edges(runs: dict, out: Path, b_eq: dict[float, float]) -> None:
-    """Spinodal pair vs ramp duration: where the metastable branch actually gives
-    way, going up and going down. The band between them is the loop the
-    experiment would see — read the protocol straight off it."""
+def fig_conversion(runs: dict, out: Path) -> None:
+    """How far each leg converts, vs ramp duration. Threshold-free: a branch
+    conversion moves ⟨F⊥⟩ by ~2, canting along one branch by ≤ 1, so the curve
+    crossing the shaded band IS the result. Runs with a resolved jump carry the
+    field it happened at."""
     kappas = sorted(runs, reverse=True)
-    fig, axes = plt.subplots(1, len(kappas), figsize=(4.6 * len(kappas), 4.0),
-                             sharey=False)
-    axes = np.atleast_1d(axes)
-    for ax, kappa in zip(axes, kappas):
+    fig, ax = plt.subplots(figsize=(6.6, 4.2))
+    for i, kappa in enumerate(kappas):
         entry, man = runs[kappa], runs[kappa]["manifest"]
         taus = sorted({t for (_, t) in entry["legs"]})
         ms = [float(man["tau_ms"][np.argmin(np.abs(man["tau"] - t))]) for t in taus]
-        series = {}
-        for tag, label, c in (("rise", "$B$ rising", CAT[0]),
-                              ("fall", "$B$ falling", CAT[1])):
-            ys = [jump_field(entry["legs"][(tag, t)])[0]
-                  if (tag, t) in entry["legs"] else math.nan for t in taus]
-            series[tag] = np.asarray(ys, dtype=float)
-            ax.plot(ms, ys, color=c, marker="o", markersize=8,
-                    markeredgecolor=SURFACE, markeredgewidth=2.0, label=label)
-        both = np.isfinite(series["rise"]) & np.isfinite(series["fall"])
-        if both.any():
-            ax.fill_between(np.asarray(ms)[both], series["fall"][both],
-                            series["rise"][both], color=CAT[0], alpha=0.12,
-                            linewidth=0)
-        if not np.isfinite(series["rise"]).any() and not np.isfinite(series["fall"]).any():
-            ax.text(0.5, 0.5, "no localised jump\non either leg\n(crossover)",
-                    transform=ax.transAxes, ha="center", va="center",
-                    color=INK2, fontsize=10)
-        ref = b_eq.get(kappa)
-        if ref is not None and math.isfinite(ref):
-            ax.axhline(ref, color=INK3, lw=1.2, ls=":")
-            ax.annotate(f"$B_{{eq}}$ = {ref:.1f} µG", xy=(ms[-1], ref),
-                        xytext=(-4, 5), textcoords="offset points", ha="right",
-                        color=INK2, fontsize=8)
-        ax.set_xscale("log")   # the axis IS the rate scan; τ spans decades
-        if ms:                 # explicit limits: a crossover facet has no finite y
-            ax.set_xlim(min(ms) / 1.6, max(ms) * 1.6)
-        ax.set_xlabel(r"ramp duration  $\tau$  [ms]")
-        order = "first-order side" if kappa >= 1.0 else "crossover control"
-        ax.set_title(f"$\\kappa = {kappa:g}$  ({order})", color=INK)
-        ax.grid(alpha=0.9)
-        ax.set_axisbelow(True)
-        ax.legend(loc="best")
-    axes[0].set_ylabel("field of the $\\langle F_\\perp \\rangle$ jump  [µG]")
-    fig.suptitle("Loop edges vs ramp rate — saturating = bistable, "
-                 "closing = dynamical lag", color=INK)
-    fig.tight_layout(rect=(0, 0, 1, 0.94))
+        c = CAT[i % len(CAT)]
+        for tag, style in (("fall", "-"), ("rise", "--")):
+            spans, jumps = [], []
+            for t in taus:
+                leg = entry["legs"].get((tag, t))
+                s, _, bj = leg_conversion(leg) if leg is not None else (math.nan,) * 3
+                spans.append(s)
+                jumps.append(bj)
+            ax.plot(ms, spans, color=c, linestyle=style, marker="o", markersize=8,
+                    markeredgecolor=SURFACE, markeredgewidth=2.0,
+                    label=f"$\\kappa$ = {kappa:g}, $B$ {'falling' if tag == 'fall' else 'rising'}")
+            for x, y, bj in zip(ms, spans, jumps):
+                if math.isfinite(bj):
+                    ax.annotate(f"jump at {bj:.0f} µG", xy=(x, y), xytext=(-6, -14),
+                                textcoords="offset points", ha="right",
+                                color=INK2, fontsize=9)
+    ax.axhspan(0, MIN_SPAN, color=INK3, alpha=0.08, linewidth=0)
+    ax.annotate("canting along one branch", xy=(ax.get_xlim()[0], MIN_SPAN),
+                xytext=(6, -13), textcoords="offset points", color=INK2, fontsize=9)
+    ax.set_xscale("log")   # the axis IS the rate scan; τ spans decades
+    ax.set_xlabel(r"ramp duration  $\tau$  [ms]")
+    ax.set_ylabel(r"$\langle F_\perp \rangle$ change along the leg")
+    ax.set_ylim(bottom=0)
+    ax.grid(alpha=0.9)
+    ax.set_axisbelow(True)
+    # long handles: solid vs dashed is the ramp direction here, and a short
+    # handle with a marker on it reads as dashed either way
+    ax.legend(loc="upper left", handlelength=3.2)
+    ax.set_title("Only the oblate trap converts, and only when the ramp is slow",
+                 color=INK)
+    fig.tight_layout()
     fig.savefig(out, dpi=200)
     print(f"wrote {out}")
 
@@ -235,8 +237,7 @@ def main() -> None:
         raise SystemExit(f"no runs under {a.data}")
     a.out.mkdir(parents=True, exist_ok=True)
     fig_hysteresis(runs, a.out / "eu_adiabatic_hysteresis.png")
-    fig_loop_edges(runs, a.out / "eu_adiabatic_loop_edges.png",
-                   static_b_eq(a.window))
+    fig_conversion(runs, a.out / "eu_adiabatic_conversion.png")
     fig_sg_signal(runs, a.out / "eu_adiabatic_sg_signal.png")
 
 

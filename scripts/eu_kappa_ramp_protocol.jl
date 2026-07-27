@@ -55,7 +55,8 @@ using SpinorBEC: Units, eu151_preset, SpinSystem, make_workspace, SimParams,
     static_zeeman, split_step_midpoint!, evaluate_potential, HarmonicTrap,
     component_populations, total_energy, total_norm, magnetization,
     orbital_angular_momentum, find_ground_state, find_ground_state_lbfgs,
-    init_psi, add_white_noise!, cell_volume, CUDABackend, CPUBackend
+    init_psi, add_white_noise!, pin_transverse_field, cell_volume,
+    CUDABackend, CPUBackend
 using DelimitedFiles: writedlm
 using JLD2: jldsave, jldopen
 using Printf
@@ -68,8 +69,9 @@ const SMOKE = get(ENV, "KR_SMOKE", "") == "1"
 const B_HOLD = getf("KR_B_HOLD", 20.0)
 const K0 = getf("KR_KAPPA_0", 0.8)
 const K1 = getf("KR_KAPPA_1", 1.8)
-const TAUS = SMOKE ? [1.0] :
-             sort(parse.(Float64, split(get(ENV, "KR_TAUS", "3,10,30,100"), ",")))
+const TAUS = SMOKE ? [1.0] : let s = strip(get(ENV, "KR_TAUS", "3,10,30,100"))
+    isempty(s) ? Float64[] : sort(parse.(Float64, split(s, ",")))   # empty ⇒ REF only
+end
 const HOLD = getf("KR_HOLD", 0.0)
 const ROUND_TRIP = !SMOKE && get(ENV, "KR_ROUND_TRIP", "1") == "1"
 const SEED_BRANCH = get(ENV, "KR_SEED_BRANCH", "dn")
@@ -166,10 +168,24 @@ base_kw(κ, ε) = (; grid=PRESET.grid, atom=ATOM, interactions=PRESET.interactio
 
 """Reference branches at (κ_end, B_hold): independent ITP+LBFGS solves from the
 flower and the fully-polarised anchor. Without these the ramp endpoint is just a
-number — the library has no κ=κ_end state at this field."""
+number — the library has no κ=κ_end state at this field.
+
+Plain LBFGS does NOT converge here: at these fields the Eu+DDI ground state sits on
+a soft (Goldstone) manifold and a fixed pin stalls at |∇E| ~ 1e-2, four orders above
+the library's gate. Measured 2026-07-27 at (κ=1.8, B=20 µG): 400 iterations at a
+fixed ε left grad_norm 1.1e-2 (flower) and 2.5e-2 (polarised), both `converged=false`
+— unusable for identifying a branch. The cure is the ε-ladder continuation: solve at
+a strong pin, then step ε down, each stage warm-started from the last. An
+unconverged reference is worse than none, so the result carries `converged`."""
 function reference_branches(ε)
     itp = SMOKE ? 150 : 2000
-    lb = SMOKE ? 40 : 400
+    lb = SMOKE ? 60 : Int(getf("KR_REF_LBFGS", 1500))
+    ramp = if SMOKE
+        Float64[]
+    else
+        sort(parse.(Float64, split(get(ENV, "KR_REF_RAMP", "0.02,0.01,0.005"), ","));
+        rev=true)
+    end
     rows = Any[]
     for anchor in (:flower, :m_minus_F)
         psi0 = init_psi(PRESET.grid, SYS; state=anchor)
@@ -177,9 +193,16 @@ function reference_branches(ε)
         kw = base_kw(K1, ε)
         gs = find_ground_state(; kw..., psi_init=psi0, dt=0.002, n_steps=itp,
             tol=1e-12, save_every=max(1, itp ÷ 4), verbose=false)
-        gl = find_ground_state_lbfgs(; kw...,
+        gl = if isempty(ramp)
+            find_ground_state_lbfgs(; kw...,
             psi_init=Array{ComplexF64}(gs.workspace.state.psi),
             n_steps=lb, tol=1e-5, m_lbfgs=10, newton_polish=false, verbose=false)
+        else
+            find_ground_state_lbfgs(; kw...,
+            psi_init=Array{ComplexF64}(gs.workspace.state.psi),
+            n_steps=lb, tol=1e-5, m_lbfgs=10, newton_polish=false, verbose=false,
+            pin=pin_transverse_field(; Bz=P_HOLD, q=0.0), epsilon_ramp=ramp)
+        end
         psi = Array{ComplexF64}(gl.workspace.state.psi)
         s = spin_scalars(psi, PRESET.grid)
         @printf("  reference %-10s κ=%.2f B=%.1f µG: E=%.6f |∇E|=%.1e ⟨F⊥⟩=%.3f ⟨F_z⟩=%.3f%s\n",
