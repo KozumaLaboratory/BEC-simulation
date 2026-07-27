@@ -120,13 +120,32 @@ measures.
 | rise (flower, 65 → 100 µG) | flower survives at **every** rate 4–434 ms; $\langle F_\perp\rangle$ ends 1.61–1.89. The upper spinodal is above 100 µG |
 | fall (polarised, 64 → 20 µG) | converts only at $\tau = 434$ ms: sharp jump at **$B = 27.4\ \mu$G** (sharpness 8.0, vs 1.65 at 145 ms), $\langle F_\perp\rangle\ 0.80 \to 3.58$, overshooting 3.72 with ringing |
 
+![order parameter vs field](figures/eu_adiabatic_hysteresis.png)
+
 So the field route *does* prepare the flower state — at $\tau \approx 0.4$ s, sweeping
 to below 30 µG — but the overshoot and ringing say it arrives **excited**, not as a
 cold ground state. The loop is wide and asymmetric: $[\approx 27, > 100]\ \mu$G,
 consistent with the 35–85 µG spinodal range the static demagnetisation law implies.
 
 The $\kappa = 0.8$ control shows a single smooth branch with no jump, as a crossover
-must.
+must. Across all 20 runs only the $\kappa = 1.8$ falling leg converts:
+
+![conversion vs ramp duration](figures/eu_adiabatic_conversion.png)
+
+Read the conversion depth, not a slope ratio. A ratio like
+peak ÷ median $|dF_\perp/dB|$ divides by the typical slope, so a nearly flat curve
+with one small bump outscores a real conversion — the $\kappa = 0.8$ control scores
+10.2 on a span of 0.76 (a modest feature at $B = 5.7\ \mu$G, where the field nearly
+vanishes and the soft manifold dominates), above the genuine $\kappa = 1.8$
+conversion's 8.0 on a span of 2.92. A branch conversion moves
+$\langle F_\perp\rangle$ by $\approx 2$; canting along one branch moves it by
+$\le 1$.
+
+What the experiment reads out is the $m_F$ distribution, and the two ramp directions
+end up clearly distinct — $m_F = -6$ carrying 0.63 after the rising ramp, versus a
+spread over $m_F = -2 \ldots -4$ with a $m_F = +6$ component after the falling one:
+
+![predicted Stern-Gerlach readout](figures/eu_adiabatic_sg_signal.png)
 
 Because the conversion is a spinodal collapse rather than an adiabatic following,
 the colder route is to avoid the barrier entirely: prepare on the crossover side and
