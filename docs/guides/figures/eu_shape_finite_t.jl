@@ -554,7 +554,167 @@ function ft_decompress_optimize(; T_over_Tc::Float64=0.5, use_calibration::Bool=
     (u=u, rows=rows, N0_hold=N0_hold, best=best)
 end
 
+# ===========================================================================
+# NUMBER-CONSERVING evaporation SGPE (issue #75, Approach A = Blakie PGPE
+# evaporative cooling, PRA 72 063608). A hot thermal cloud is seeded by an SGPE
+# prep at T_prep, then evolved with the μ-bath OFF (γ=0 ⇒ atom number set by
+# PHYSICS, not a grand-canonical reservoir — avoids the pumping artifact of the
+# fixed-μ formation run). Cooling is by EVAPORATION: in the harmonic trap V=½r²
+# an atom of energy E has classical turning radius r_t=√(2E), so removing |r|>R(t)
+# removes E>½R(t)² — a shrinking R(t) IS the lowering trap depth U(t)=½R(t)².
+# K₃ depletes the dense condensate. Number is conserved up to the two physical
+# loss channels, tracked separately (dN_evap, dN_K3) → a closed budget is the
+# number-conservation check. Refs: Blakie PRA 72 063608; Rooney/Blakie/Bradley
+# arXiv:1210.0952. (GPU note: rr is a host array — for a CUDA backend move it to
+# the device before the knife broadcast.)
+# ===========================================================================
+function _evap_trajectory!(
+    u, grid, psiN, T_prep, k_cut, mu, gamma, prep_time, evap_time,
+    R_init, R_final, evap_rate, dt, save_every, backend, seed_base,
+    psi_sum, dens_sum, n_tot_sum, dN_evap, dN_k3, save_times, D,
+)
+    T_internal = prep_time + evap_time
+    n_steps = round(Int, T_internal / dt)
+    interactions = InteractionParams(Dict{Int, Float64}(0 => c0_bare(u)))   # norm-N
+    loss = LossParams(; K3_cubic=k3_bare(u))                                # norm-N K₃
+    sp = SimParams(; dt, n_steps, imaginary_time=false, normalize_every=0, save_every)
+    ws = make_workspace(; grid, atom=FT_ATOM, interactions,
+        potential=HarmonicTrap{3}((1.0, 1.0, 1.0)), sim_params=sp,
+        psi_init=copy(psiN), loss, backend)
+    dV = cell_volume(grid)
+    sidx = Ref(0)
+    N_prev = Ref(real(sum(abs2, ws.state.psi)) * dV)
+    cb = SimulationCallbacks(
+        on_step=(w, step, times, energies) -> begin
+            t = w.state.t
+            γ = t < prep_time ? gamma : 0.0
+            if γ > 0
+                # PREP: grand-canonical bath thermalises a hot cloud at (μ, T_prep).
+                apply_sgpe_step!(w, γ, T_prep, dt; μ=mu, k_cut=k_cut,
+                    full_hamiltonian=true, seed=seed_base + step)
+                @views for c in 1:(D - 1)
+                    w.state.psi[ntuple(_ -> Colon(), 3)..., c] .= 0
+                end
+                N_prev[] = real(sum(abs2, w.state.psi)) * dV        # baseline for the budget
+            else
+                # CLOSED EVAPORATION (γ=0). K₃ was already applied this step by the
+                # split-step ⇒ account it, then apply the radial energy-knife.
+                N_mid = real(sum(abs2, w.state.psi)) * dV
+                dN_k3[] += max(N_prev[] - N_mid, 0.0)
+                frac = clamp((t - prep_time) / max(evap_time, eps()), 0.0, 1.0)
+                R = R_init + (R_final - R_init) * frac              # shrinking knife
+                # V=½r² (harmonic, already on the backend) ⇒ |r|>R ⟺ V>½R². Using
+                # w.potential_values keeps the knife device-resident (GPU-safe) with
+                # no host rr array. The trap is never overwritten in this mode.
+                ψc = view(w.state.psi, ntuple(_ -> Colon(), 3)..., D)
+                Vh = w.potential_values
+                cutV = 0.5 * R^2
+                @. ψc *= ifelse(Vh > cutV, exp(-evap_rate * dt), one(eltype(ψc)))
+                N_now = real(sum(abs2, w.state.psi)) * dV
+                dN_evap[] += max(N_mid - N_now, 0.0)
+                N_prev[] = N_now
+            end
+            if step % save_every == 0
+                sidx[] += 1
+                i = sidx[]
+                i <= length(psi_sum) || return nothing
+                ψc = Array(view(w.state.psi, ntuple(_ -> Colon(), 3)..., D))
+                phase = angle(sum(ψc) * dV)
+                @. psi_sum[i] += ψc * cis(-phase)
+                @. dens_sum[i] += abs2(ψc)
+                n_tot_sum[i] += real(sum(abs2, w.state.psi)) * dV
+                save_times[i] = t
+            end
+            nothing
+        end,
+    )
+    run_simulation!(ws; callbacks=cb)
+    nothing
+end
+
+function run_evaporation_ensemble(
+    u::EuUnits, grid, psi0;
+    T_prep::Float64, k_cut::Float64, mu::Float64, gamma::Float64,
+    prep_time::Float64, evap_time::Float64, R_init::Float64, R_final::Float64,
+    evap_rate::Float64, dt::Float64, save_every::Int=20, n_traj::Int=8,
+    backend=CPUBackend(), seed0::Int=1234,
+)
+    n_steps = round(Int, (prep_time + evap_time) / dt)
+    n_save = fld(n_steps, save_every)
+    D = SpinSystem(FT_ATOM.F).n_components
+    gpts = grid.config.n_points
+    psiN = copy(psi0) .* sqrt(u.N)
+    psi_sum = [zeros(ComplexF64, gpts...) for _ in 1:n_save]
+    dens_sum = [zeros(Float64, gpts...) for _ in 1:n_save]
+    n_tot_sum = zeros(Float64, n_save)
+    save_times = zeros(Float64, n_save)
+    dN_evap = Ref(0.0);
+    dN_k3 = Ref(0.0)
+    for tr in 1:n_traj
+        _evap_trajectory!(u, grid, psiN, T_prep, k_cut, mu, gamma, prep_time, evap_time,
+            R_init, R_final, evap_rate, dt, save_every, backend, seed0 + tr * 1_000_003,
+            psi_sum, dens_sum, n_tot_sum, dN_evap, dN_k3, save_times, D)
+    end
+    dV = cell_volume(grid)
+    M = n_traj
+    t_ms = save_times ./ u.omega_ref .* 1e3
+    N_tot = n_tot_sum ./ M
+    N0 = map(1:n_save) do i
+        coh = abs2.(psi_sum[i] ./ M)
+        meandens = dens_sum[i] ./ M
+        nc = M > 1 ? coh .- (meandens .- coh) ./ (M - 1) : coh
+        max(sum(nc) * dV, 0.0)
+    end
+    (t_ms=t_ms, N=N_tot, N0=N0, frac=N0 ./ max.(N_tot, eps()),
+        dN_evap=dN_evap[] / M, dN_k3=dN_k3[] / M)
+end
+
+# Driver: closed-system evaporation → condensate, with a per-channel atom budget.
+function ft_evaporation_sgpe(; grid_n::Int=48, box::Float64=20.0,
+    T_prep_over_Tc::Float64=1.3, R_final_frac::Float64=0.55,
+    prep_time::Float64=15.0, evap_time::Float64=40.0, evap_rate::Float64=5.0,
+    dt::Float64=0.01, gs_steps::Int=2500, gamma::Float64=0.1, n_traj::Int=8,
+    save_every::Int=20, backend=CPUBackend(),
+    csv::String=joinpath(@__DIR__, "eu_ft_evap_sgpe.csv"))
+    u = EuUnits(; omega_ref=2π * 420.0)
+    print_units(u)
+    s = _setup(u, grid_n, box, gs_steps, backend)
+    Tc = Tc_harmonic(u.N)
+    T_prep = T_prep_over_Tc * Tc
+    k_cut = min(kcut_for(s.mu, T_prep), 0.95 * s.k_max)
+    R_init = 0.9 * box / 2
+    R_final = R_final_frac * box / 2
+    @printf "μ=%.3f  T_c=%.2f  T_prep=%.2f (%.1f T_c)  k_cut=%.2f  R: %.2f→%.2f\n" s.mu Tc T_prep T_prep_over_Tc k_cut R_init R_final
+    println("=== Closed-system evaporation SGPE (γ=0; evaporate via radial energy-knife + K₃) ===")
+    res = run_evaporation_ensemble(u, s.grid, s.psi0; T_prep, k_cut, mu=s.mu, gamma,
+        prep_time, evap_time, R_init, R_final, evap_rate, dt, save_every, n_traj, backend)
+    # closed phase starts at the first save with t≥prep_time
+    i0 = findfirst(t -> t * 1e3 / u.omega_ref >= 0, res.t_ms)  # all saved; report full series
+    @printf "  %-9s %-11s %-11s %-9s\n" "t[ms]" "N" "N₀" "N₀/N"
+    for i in 1:length(res.t_ms)
+        @printf "  %-9.2f %-11.5g %-11.5g %-9.3f\n" res.t_ms[i] res.N[i] res.N0[i] res.frac[i]
+    end
+    N_start = res.N[1]
+    N_end = res.N[end]
+    budget = N_end + res.dN_evap + res.dN_k3
+    @printf "\n  ATOM BUDGET (closed phase): N_end=%.5g + evap=%.5g + K₃=%.5g = %.5g  vs  N_start=%.5g  (Δ=%.2g%%)\n" N_end res.dN_evap res.dN_k3 budget N_start 100 * (budget - N_start) / max(N_start, eps())
+    @printf "  N₀: %.5g → %.5g   (cond. frac %.3f → %.3f)\n" res.N0[1] res.N0[end] res.frac[1] res.frac[end]
+    open(csv, "w") do io
+        println(io, "t_ms,N,N0,frac")
+        for i in 1:length(res.t_ms)
+            @printf io "%.4f,%.6g,%.6g,%.6f\n" res.t_ms[i] res.N[i] res.N0[i] res.frac[i]
+        end
+    end
+    @printf "  CSV → %s\n" csv
+    (u=u, res=res)
+end
+
 # Quick local logic smoke (small, fast — NOT physical resolution).
+function ft_evap_smoke(; backend=CPUBackend())
+    ft_evaporation_sgpe(; grid_n=24, box=16.0, T_prep_over_Tc=1.2, prep_time=4.0,
+        evap_time=8.0, gs_steps=400, n_traj=2, save_every=40, backend)
+end
+
 function ft_smoke(; backend=CPUBackend())
     ft_equilibrium(; grid_n=32, box=16.0, T_over_Tc_list=[0.1, 0.6],
         T_equil=6.0, gs_steps=800, n_traj=2, backend)
@@ -607,6 +767,10 @@ if abspath(PROGRAM_FILE) == @__FILE__
             csv=joinpath(@__DIR__, "eu_ft_decompress_refine.csv"))
     elseif mode == "evap_ramp"
         ft_evap_ramp_optimize()
+    elseif mode == "evap_sgpe"
+        ft_evaporation_sgpe(; backend=bk)
+    elseif mode == "evap_sgpe_smoke"
+        ft_evap_smoke(; backend=bk)
     elseif mode == "kcut"
         ft_kcut_convergence(; backend=bk)
     elseif mode == "shape"
