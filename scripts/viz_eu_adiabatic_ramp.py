@@ -21,7 +21,6 @@ an identity, so it takes the first two categorical slots.
 from __future__ import annotations
 
 import argparse
-import csv
 import math
 from pathlib import Path
 
@@ -29,39 +28,10 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 
-# --- palette (validated: ordinal blue ramp, categorical slots 1–2) ------------
-TAU_RAMP = ["#86b6ef", "#5598e7", "#2a78d6", "#1c5cab", "#0d366b"]
-CAT = ["#2a78d6", "#eb6834"]
-INK, INK2, INK3 = "#0b0b0b", "#52514e", "#8a8983"
-SURFACE = "#fcfcfb"
+from viz_style import (CAT, INK, INK2, INK3, SURFACE, TAU_RAMP, read_tsv,
+                       use_style)
 
-mpl.rcParams.update({
-    "figure.facecolor": SURFACE, "axes.facecolor": SURFACE,
-    "savefig.facecolor": SURFACE,
-    "font.size": 10, "axes.titlesize": 11, "axes.labelsize": 10,
-    "text.color": INK, "axes.labelcolor": INK, "axes.edgecolor": INK3,
-    "xtick.color": INK2, "ytick.color": INK2,
-    "axes.spines.top": False, "axes.spines.right": False,
-    "axes.linewidth": 0.8, "lines.linewidth": 2.0,
-    "grid.color": "#e6e5e1", "grid.linewidth": 0.7,
-    "legend.frameon": False, "legend.fontsize": 9,
-})
-
-
-def read_tsv(path: Path) -> dict[str, np.ndarray]:
-    with path.open() as fh:
-        rows = list(csv.reader(fh, delimiter="\t"))
-    head, body = rows[0], rows[1:]
-    out: dict[str, list] = {h: [] for h in head}
-    for r in body:
-        if len(r) < len(head):
-            continue
-        for h, v in zip(head, r):
-            try:
-                out[h].append(float(v))
-            except ValueError:
-                out[h].append(v)
-    return {k: np.asarray(v) for k, v in out.items()}
+use_style()
 
 
 def load_runs(data: Path) -> dict[float, dict]:
@@ -103,14 +73,23 @@ def jump_field(leg: dict, sharpness: float = 3.0) -> tuple[float, float]:
     med = float(np.median(d))
     if med <= 0:
         return math.nan, math.nan
-    sharp = float(d.max() / med)
-    return (float(bs[int(np.argmax(d))]) if sharp > sharpness else math.nan), sharp
+    # np.gradient is one-sided at the ends, which inflates the edge bins — a ramp
+    # that is still evolving when it stops then reports a "jump" at its own last
+    # point. Only the interior can carry a resolved feature.
+    edge = max(1, len(bs) // 25)
+    interior = slice(edge, -edge)
+    d_in, bs_in = d[interior], bs[interior]
+    sharp = float(d_in.max() / med)
+    return (float(bs_in[int(np.argmax(d_in))]) if sharp > sharpness else math.nan), sharp
 
 
 def fig_hysteresis(runs: dict, out: Path) -> None:
     kappas = sorted(runs, reverse=True)
-    fig, axes = plt.subplots(1, len(kappas), figsize=(4.6 * len(kappas), 4.0),
-                             sharey=True)
+    # +1.7in for the legend, which sits OUTSIDE the last axes: the curves fill both
+    # the upper-left (converted branch) and the right (metastable branch), so an
+    # in-axes legend collides with data at some τ whatever corner it picks.
+    fig, axes = plt.subplots(1, len(kappas),
+                             figsize=(4.6 * len(kappas) + 1.7, 4.0), sharey=True)
     axes = np.atleast_1d(axes)
     taus = sorted({t for e in runs.values() for (_, t) in e["legs"]})
     colour = {t: TAU_RAMP[min(i, len(TAU_RAMP) - 1)]
@@ -140,9 +119,7 @@ def fig_hysteresis(runs: dict, out: Path) -> None:
         mpl.lines.Line2D([], [], color=INK2, lw=2.0, ls="-", label="$B$ rising"),
         mpl.lines.Line2D([], [], color=INK2, lw=2.0, ls="--", label="$B$ falling"),
     ]
-    axes[-1].legend(handles=handles, loc="best", ncol=1)
-    fig.suptitle("Adiabatic passage through the weak-field $^{151}$Eu transition",
-                 y=0.99, color=INK)
+    axes[-1].legend(handles=handles, loc="upper left", bbox_to_anchor=(1.02, 1.0))
     fig.tight_layout()
     fig.savefig(out, dpi=200)
     print(f"wrote {out}")
@@ -194,8 +171,8 @@ def fig_loop_edges(runs: dict, out: Path, b_eq: dict[float, float]) -> None:
         ax.legend(loc="best")
     axes[0].set_ylabel("field of the $\\langle F_\\perp \\rangle$ jump  [µG]")
     fig.suptitle("Loop edges vs ramp rate — saturating = bistable, "
-                 "closing = dynamical lag", y=0.99, color=INK)
-    fig.tight_layout()
+                 "closing = dynamical lag", color=INK)
+    fig.tight_layout(rect=(0, 0, 1, 0.94))
     fig.savefig(out, dpi=200)
     print(f"wrote {out}")
 
