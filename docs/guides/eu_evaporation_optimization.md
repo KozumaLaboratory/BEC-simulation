@@ -114,12 +114,20 @@ intuitive claims were **overturned by the adversarial pass** — recorded here h
 | $c_2,c_4,c_6$ / 7-channel $a_S$ | — | **not determinable at 5 G (confirmed)** | blocked |
 | $a_s(B), K_3(B)$ | 1.32 G resonance | no calibrated curve; needs ≲1 mG field stability | blocked |
 
-**Overturned claim 1 — "spin-mixing gives a clean $c_1$."** REFUTED for Eu. The DDI spin
-coupling is $c_{dd}/c_0=3\varepsilon_{dd}\approx1.32$ while $c_1/c_0\approx1/36\approx0.028$, so
-$c_{dd}/c_1\approx47$: **DDI is the dominant spin-changing driver and $c_1$ is a small residual
-buried under it** (a 3D spinor-GP run showed DDI on/off changes the spin-mixing amplitude by ~38 %).
-A single spin-mixing trace cannot separate them; an **orthogonal lever** (trap aspect ratio, or
-in-plane vs $z$ magnetization) is required — not yet demonstrated in simulation.
+**Overturned claim 1 — "spin-mixing gives a clean $c_1$."** REFUTED for Eu *as a single trace*.
+The DDI spin coupling is $c_{dd}/c_0=3\varepsilon_{dd}\approx1.32$ while $c_1/c_0\approx1/36\approx0.028$,
+so $c_{dd}/c_1\approx47$: **DDI is the dominant spin-changing driver and $c_1$ is a small residual
+buried under it** (a 3D spinor-GP run showed DDI on/off changes the spin-mixing amplitude by tens of %).
+A single spin-mixing trace cannot separate them — an **orthogonal lever** is required.
+
+*The orthogonal lever works (demonstrated).* Because DDI is anisotropic (geometry-dependent) and
+contact $c_1$ is isotropic, varying the **trap aspect ratio** $\lambda=\omega_z/\omega_r$ breaks the
+degeneracy. A 3D spinor-GP spin-mixing run at $\lambda\in\{0.5,1,2\}$ gives a DDI-induced amplitude
+shift of $-4\%\,/\,-25\%\,/\,-46\%$ — a ~12× swing, while $c_1$ is $\lambda$-independent. So a
+two-geometry (or aspect-ratio-scan) spin-mixing fit **can** extract $c_1$; the lone-trace refutation
+is a warning to always include the geometry lever, not a dead end.
+
+![c1-DDI orthogonal lever](../../figs/eu_evaporation_optimization/c1_ddi_orthogonal.png)
 
 **Overturned claim 2 — "$N_{\rm BEC}$ predictable to ±30 % once evaporation params are measured."**
 REFUTED as too optimistic. MC variance decomposition: $K_3$ 66 %, $a_s$ 34 %, $\tau_{bg}$/$\Gamma_h$
