@@ -152,10 +152,25 @@ needs the resolution and the step count above.
 
 ## Known limits
 
-- Absolute $E_{dd}$ is not converged in the transverse box (item 3). Only
-  branch *differences* are trustworthy at $L_t = 16\,a_{ho}$. A
-  transverse-truncated dipolar kernel (the scalar analogue of
-  `make_ddi_padded`) would fix it; the scalar eGPE has no such option today.
+- Absolute $E_{dd}$ is not converged at $L_t = 16\,a_{ho}$ (item 3), but it is
+  now **quantified and extrapolable** rather than open-ended. `make_scalar_ws`
+  takes `ddi_pad=(1, p, p)`, which pads the dipolar convolution transversally
+  while leaving the axial period exact. Two measured facts:
+  - Padding by $p$ is **exactly** equivalent to an unpadded box $p$ times wider
+    (agreement to round-off, $\le 3\times10^{-12}$ relative). So it is not a
+    truncated kernel — it is a cheaper route to the same large-box limit, with
+    the wavefunction grid staying small: 3.2× faster than the equivalent box at
+    $p = 4$.
+  - The images converge as $1/L_t^{2}$, **not** $1/L_t^{3}$, because they are
+    parallel *lines* of dipoles rather than point clouds. Three independent
+    ratios match the $1/p^2$ prediction to 4 decimals and exclude $1/p^3$.
+    Richardson in $1/p^2$ gives the isolated-tube value; at
+    $\epsilon_{dd} = 1.45$ the unpadded $L_t = 16$ number is **3.6 % low**.
+
+  An actual cylindrically-truncated kernel would remove even that, but it has no
+  closed-form Fourier transform (unlike the spherical Ronen-Bortolotti-Bohn cut
+  the spinor path uses, which is the wrong tool here since it would cut the axial
+  direction too and destroy the ring periodicity).
 - $f_s$ here is the Leggett plane-average closed form. The paper's definition is
   the comoving-frame $1 - \langle P_x\rangle/(Nmv_x)$; those agree at $O(q^2)$
   within mean field, which is the type-B result gated by
