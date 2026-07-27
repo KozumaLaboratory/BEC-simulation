@@ -36,9 +36,9 @@ while spin and orbital slosh coherently; (ii) quenching through the inert
 high-field window before a parabolic ramp preserves atoms and \emph{strengthens}
 the transfer ($+35\%$ checkerboard amplitude); and (iii) the checkerboard inversion,
 the $\Lz$ oscillation and the $\Fz$ oscillation are a single collective spin--orbital
-mode, quantitatively fit at $T=36.9\pm0.3\ms$ (pure parabolic) and
-$39.3\pm0.4\ms$ (quench+parabolic) --- distinct from the bare Larmor period
-($24\ms$) and itself amplitude-dependent.
+mode at $T=38\pm2\ms$, distinct from the bare Larmor period ($24\ms$). The
+oscillation is elliptical rather than a circular precession, and a third (gentle,
+$130\ms$) landing shows the red-shift is protocol-independent.
 \end{abstract}
 
 \section{Simulation setup}
@@ -219,33 +219,41 @@ cross-checked against an independent FFT peak estimate:
   \quad(R^2=0.91\text{--}0.93)
 \end{aligned}
 \end{equation}
-against $T_{\mathrm{Larmor}}(26\uG)=24\ms$. (The FFT-only peak sits
-$\sim15\%$ higher in both cases, consistent with spectral leakage over a
-$\lesssim2$-cycle hold window; the time-domain fit is the more reliable estimate
-and is quoted above.) Within each protocol, $T_{cb}$, $T_{\Fz}$ and $T_{\Lz}$ agree
-to within their sub-ms uncertainties --- the checkerboard inversion, the orbital
-$\Lz$ oscillation and the longitudinal $\Fz$ oscillation are three faces of a
-\emph{single coherent spin--orbital collective mode}. It is \emph{not} the bare
-Larmor precession ($24\ms$): the $\sim1.5$--$1.6\times$ slowdown is the DDI +
-quadratic-Zeeman dressing, confirming the dynamics is interaction-driven (EdH), not
-single-particle. So both proposed pictures --- ``$\Lz$ oscillation'' and ``spin
-precession'' --- are correct simultaneously; they are the same mode.
+against $T_{\mathrm{Larmor}}(26\uG)=24\ms$. Within each protocol, $T_{cb}$, $T_{\Fz}$
+and $T_{\Lz}$ agree --- the checkerboard inversion, the orbital $\Lz$ oscillation and
+the longitudinal $\Fz$ oscillation are three faces of a \emph{single coherent
+spin--orbital collective mode}, and it is clearly \emph{not} the bare Larmor period
+($24\ms$).
 
-A second, new result falls out of comparing the two protocols directly: the mode
-period itself is \emph{amplitude-dependent}. Quench+parabolic reaches a larger
-$|\Fz|,|\Lz|$ excursion (Table~\ref{tab:cmp}) and runs $\sim2.4\ms$ \emph{slower}
-than pure parabolic ($36.5\to38.9\ms$, averaging $cb/\Fz/\Lz$) --- a several-$\sigma$
-difference given the sub-ms fit uncertainties on each side. This is consistent with
-a nonlinear, self-consistent collective-mode frequency (its restoring force comes
-from the mean-field DDI/contact energy, which depends on how far the state has been
-driven from $m{=}{-}6$), not a fixed linear-response resonance.
+\paragraph{Two corrections to the numbers above (2026-07-27).} \emph{(i) The quoted
+$\pm0.3\ms$ is too small.} It is the formal error of a fit that assumes a pure
+sinusoid plus stationary noise. Counting extrema and zero crossings directly, with no
+model, the cycle-to-cycle scatter is $\pm1$--$3\ms$; the honest statement is
+$T=38\pm2\ms$ ($26\pm2$~Hz). The cleanest single measurement is the quench+parabolic
+$\Fz$, whose maxima ($46.8\to85.1\ms$) and minima ($65.6\to104.0\ms$) give $38.3$ and
+$38.4\ms$ --- two independent reads agreeing to $0.1\ms$. \emph{(ii) The amplitude
+dependence claimed here is not established.} Adding a third protocol (a gentle
+$130\ms$ landing) breaks the trend: the pure quench and quench+parabolic have almost
+equal amplitude ($0.85$ vs $0.82$ peak-to-peak in $\Fz$) yet differ by $4$~Hz, and the
+gentle landing has the smallest amplitude but an intermediate frequency. The three
+protocols vary amplitude, hold length and mode content simultaneously, so amplitude
+cannot be isolated from them; a scan that varies only the drive strength is required.
+
+\paragraph{It is not a precession.} The word ``precession'' is used loosely above and
+should not be read literally. Decomposing the complex transverse field
+$\psi_\perp=\Fx+i\langle F_y\rangle$ into $e^{+i\omega t}$ and $e^{-i\omega t}$ gives
+comparable weight to both ($|P|/|Q|\sim2$--$3$, i.e.\ a rotation fraction of only
+$+0.3$--$0.6$), and the overlap of the texture with itself does not wind in phase. A
+rigid rotation about $\hat z$ would put all the weight on one sign and wind by
+$2\pi$ per period. What the data show is an \emph{elliptical, largely linear
+oscillation} of a spin-vortex texture, not a circular precession.
 
 \begin{figure}[h]\centering
 \includegraphics[width=0.75\linewidth]{edh_precession_vs_L.png}
-\caption{Checkerboard $cb(t)$ (transverse-spin texture precession), $\Lz$ (orbital)
-and $\Fz$ (spin) all oscillate at the same fitted period ($36.9\pm0.3\ms$ pure,
-$39.3\pm0.4\ms$ quench), phase-shifted --- one collective spin--orbital mode,
-distinct from the $24\ms$ bare Larmor period.}
+\caption{Checkerboard $cb(t)$, $\Lz$ (orbital) and $\Fz$ (spin) all oscillate at the
+same period ($38\pm2\ms$), phase-shifted --- one collective spin--orbital mode,
+distinct from the $24\ms$ bare Larmor period. The label ``precession'' on this figure
+is loose: the motion is an elliptical, largely linear oscillation (see text).}
 \label{fig:prec}
 \end{figure}
 
@@ -255,9 +263,10 @@ distinct from the $24\ms$ bare Larmor period.}
         $\Fx$ texture) \emph{inverts periodically} in EdH dynamics and is an
         observable discriminator of EdH (inverts) vs.\ the flower phase (does not).
   \item The inversion is one face of a coherent spin$\leftrightarrow$orbital
-        collective mode, quantitatively fit at $T=36.9\pm0.3\ms$ (pure) /
-        $39.3\pm0.4\ms$ (quench) and shown to be amplitude-dependent, with $\Jz$
-        exactly conserved; it is DDI/quadratic-Zeeman-dressed, not bare Larmor.
+        collective mode at $T=38\pm2\ms$, elliptical rather than a circular
+        precession, with $\Jz$ conserved to $2\times10^{-4}$; it is red-shifted from
+        the bare Larmor period, and the red-shift survives landing speeds from
+        $5.8$ to $130\ms$.
   \item Quenching through the inert high-field window before a parabolic ramp is
         both faster and \emph{stronger} (less loss $\Rightarrow$ denser $\Rightarrow$
         larger transfer, $+35\%$ checkerboard).
