@@ -36,7 +36,9 @@ while spin and orbital slosh coherently; (ii) quenching through the inert
 high-field window before a parabolic ramp preserves atoms and \emph{strengthens}
 the transfer ($+35\%$ checkerboard amplitude); and (iii) the checkerboard inversion,
 the $\Lz$ oscillation and the $\Fz$ oscillation are a single collective spin--orbital
-mode at $T\simeq38\ms$, distinct from the bare Larmor period ($24\ms$).
+mode, quantitatively fit at $T=36.9\pm0.3\ms$ (pure parabolic) and
+$39.3\pm0.4\ms$ (quench+parabolic) --- distinct from the bare Larmor period
+($24\ms$) and itself amplitude-dependent.
 \end{abstract}
 
 \section{Simulation setup}
@@ -204,24 +206,46 @@ a $35\%$ larger checkerboard; both invert with the same period/phase.}
 The checkerboard is (by construction) the transverse-spin texture, so its inversion
 \emph{is} the texture's Larmor precession. The question is whether this is a
 single-particle precession or a collective mode, and how it relates to the orbital
-$\Lz$ oscillation. Measuring the dominant hold-phase period of each observable
-(Fig.~\ref{fig:prec}):
+$\Lz$ oscillation. We extract the period quantitatively: a nonlinear least-squares fit of a
+linear-amplitude-drift sinusoid $A(t)\sin(2\pi t/T+\phi)+C$ to the
+\emph{hold-phase only} data (pure: $t\in[90,148]\,\wref$, $n{=}59$; quench:
+$t\in[24,80]\,\wref$, $n{=}57$; ramp segments excluded as non-stationary/chirped),
+cross-checked against an independent FFT peak estimate:
 \begin{equation}
-T_{cb}=T_{\Lz}=T_{\Fz}=38\ms\ \ (\approx40\ms),\qquad T_{\mathrm{Larmor}}(26\uG)=24\ms .
+\begin{aligned}
+\text{pure parabolic:}\quad & T_{cb}=36.1\pm0.4\ms,\ \ T_{\Fz}=T_{\Lz}=36.9\pm0.3\ms
+  \quad(R^2=0.90\text{--}0.93)\\
+\text{quench+parabolic:}\quad & T_{cb}=38.5\pm0.5\ms,\ \ T_{\Fz}=T_{\Lz}=39.3\pm0.4\ms
+  \quad(R^2=0.91\text{--}0.93)
+\end{aligned}
 \end{equation}
-All three are \emph{locked at one frequency}, phase-shifted --- the checkerboard
-inversion, the orbital $\Lz$ oscillation and the longitudinal $\Fz$ oscillation are
-three faces of a \emph{single coherent spin--orbital collective mode}. It is
-\emph{not} the bare Larmor precession ($24\ms$): the $\sim1.6\times$ slowdown is the
-DDI + quadratic-Zeeman dressing, confirming the dynamics is interaction-driven (EdH),
-not single-particle. So both proposed pictures --- ``$\Lz$ oscillation'' and ``spin
+against $T_{\mathrm{Larmor}}(26\uG)=24\ms$. (The FFT-only peak sits
+$\sim15\%$ higher in both cases, consistent with spectral leakage over a
+$\lesssim2$-cycle hold window; the time-domain fit is the more reliable estimate
+and is quoted above.) Within each protocol, $T_{cb}$, $T_{\Fz}$ and $T_{\Lz}$ agree
+to within their sub-ms uncertainties --- the checkerboard inversion, the orbital
+$\Lz$ oscillation and the longitudinal $\Fz$ oscillation are three faces of a
+\emph{single coherent spin--orbital collective mode}. It is \emph{not} the bare
+Larmor precession ($24\ms$): the $\sim1.5$--$1.6\times$ slowdown is the DDI +
+quadratic-Zeeman dressing, confirming the dynamics is interaction-driven (EdH), not
+single-particle. So both proposed pictures --- ``$\Lz$ oscillation'' and ``spin
 precession'' --- are correct simultaneously; they are the same mode.
+
+A second, new result falls out of comparing the two protocols directly: the mode
+period itself is \emph{amplitude-dependent}. Quench+parabolic reaches a larger
+$|\Fz|,|\Lz|$ excursion (Table~\ref{tab:cmp}) and runs $\sim2.4\ms$ \emph{slower}
+than pure parabolic ($36.5\to38.9\ms$, averaging $cb/\Fz/\Lz$) --- a several-$\sigma$
+difference given the sub-ms fit uncertainties on each side. This is consistent with
+a nonlinear, self-consistent collective-mode frequency (its restoring force comes
+from the mean-field DDI/contact energy, which depends on how far the state has been
+driven from $m{=}{-}6$), not a fixed linear-response resonance.
 
 \begin{figure}[h]\centering
 \includegraphics[width=0.75\linewidth]{edh_precession_vs_L.png}
 \caption{Checkerboard $cb(t)$ (transverse-spin texture precession), $\Lz$ (orbital)
-and $\Fz$ (spin) all oscillate at $T\simeq38\ms$, phase-shifted --- one collective
-spin--orbital mode, distinct from the $24\ms$ bare Larmor period.}
+and $\Fz$ (spin) all oscillate at the same fitted period ($36.9\pm0.3\ms$ pure,
+$39.3\pm0.4\ms$ quench), phase-shifted --- one collective spin--orbital mode,
+distinct from the $24\ms$ bare Larmor period.}
 \label{fig:prec}
 \end{figure}
 
@@ -231,8 +255,9 @@ spin--orbital mode, distinct from the $24\ms$ bare Larmor period.}
         $\Fx$ texture) \emph{inverts periodically} in EdH dynamics and is an
         observable discriminator of EdH (inverts) vs.\ the flower phase (does not).
   \item The inversion is one face of a coherent spin$\leftrightarrow$orbital
-        collective mode ($T\simeq38\ms$), with $\Jz$ exactly conserved; it is
-        DDI/quadratic-Zeeman-dressed, not bare Larmor.
+        collective mode, quantitatively fit at $T=36.9\pm0.3\ms$ (pure) /
+        $39.3\pm0.4\ms$ (quench) and shown to be amplitude-dependent, with $\Jz$
+        exactly conserved; it is DDI/quadratic-Zeeman-dressed, not bare Larmor.
   \item Quenching through the inert high-field window before a parabolic ramp is
         both faster and \emph{stronger} (less loss $\Rightarrow$ denser $\Rightarrow$
         larger transfer, $+35\%$ checkerboard).
