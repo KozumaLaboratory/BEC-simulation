@@ -49,8 +49,7 @@ driven by an `on_step` callback overwriting `ws.potential_values` from
 At fixed $N$ a Thomas–Fermi condensate has $n_0\propto\bar\omega^{6/5}$ and
 $\langle n^2\rangle\propto\bar\omega^{12/5}$ (the loss-rate scaling behind the
 $N_0\propto\bar\omega^{-3}$ attractor). Fitted **1.22 / 2.46** vs theory
-**1.20 / 2.40** — PASS. `julia --project=. docs/guides/figures/eu_shape_optimization.jl validate`
-→ `eu_shape_validation.png`.
+**1.20 / 2.40** — PASS. `julia --project=. docs/guides/figures/eu_shape_optimization.jl validate`.
 
 ### Box lever — the geometric knob
 
@@ -70,9 +69,10 @@ density; too fast excites a breathing mode whose re-compression overshoots
 density. The GP breathing dynamics supplies this adiabaticity trade-off with no
 ad-hoc penalty. Over a $45\,\mathrm{ms}$ hold: HOLD loses $10.5\%$, the optimal
 ramp ($\tau\approx4\,\mathrm{ms}$) loses $2.5\%$ — a $\sim 4\times$ reduction.
-`... optramp` → `eu_shape_ramp_opt.png`. (First-pass at $32^3$; the quantitative
+`... optramp`. (First-pass at $32^3$; the quantitative
 $\tau^\ast$ and the shallow instant-vs-optimum margin warrant a finer-grid / GPU
-confirmation.)
+confirmation.) This $T=0$ decompression result is superseded by the finite-$T$
+refinement in `eu_shape_finite_t.md` (`eu_ft_decompress_refine.png`).
 
 ## Status and next
 
