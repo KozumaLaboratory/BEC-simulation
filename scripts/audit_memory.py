@@ -20,11 +20,32 @@ announce themselves:
 3. **Index over budget.** `MEMORY.md` past the read limit gets truncated,
    which silently drops whatever is at the bottom.
 
-Exits non-zero if any check fails, so it can gate.
+Those three are gated (non-zero exit). A fourth is reported but NOT gated:
+
+4. **Path references that do not resolve.** Memories cite `src/...jl`,
+   `scripts/...`, `docs/...` constantly, and the citation is what a future
+   session acts on. Measured 2026-07-27 over 517 such references:
+
+       271  in HEAD
+       154  removed from the repo (mostly in settled historical memories)
+        44  retired `runs/_loop/` — archived outside the repo, correctly historical
+        26  absent everywhere
+        18  untracked in the main checkout
+         4  placeholder (`scripts/foo.jl` in prose)
+
+   The 18 are the ones that matter: 4 INDEXED memories cite artifacts that
+   exist only as untracked files in a single checkout (which held 603 of
+   them). Invisible to every other worktree, and destroyed by a `git clean`
+   or a worktree removal, while the memory index treats them as repo assets.
+
+   Not gated. Resolution depends on which worktree you run in, in-flight work
+   is legitimately uncommitted, and whether to commit someone else's untracked
+   work is a human decision. Report only.
 """
 import argparse
 import pathlib
 import re
+import subprocess
 import sys
 from collections import defaultdict
 
@@ -49,6 +70,62 @@ def prose(text):
     sometimes brackets) out of the link graph.
     """
     return _INLINE.sub(" ", _FENCE.sub(" ", text))
+
+
+_PATH = re.compile(
+    r"\b((?:src|test|scripts|bench|docs|runs|ext|dashboard)"
+    r"/[A-Za-z0-9_\-./]*\.(?:jl|md|py|yaml|yml|toml|sh|json))"
+)
+# `runs/_loop/` was retired 2026-06-08 and archived outside the repo (CLAUDE.md);
+# references to it are correctly historical, not rot.
+_RETIRED_PREFIXES = ("runs/_loop/",)
+
+
+def _placeholder(path):
+    """Illustrative paths in prose, not claims about the repo."""
+    return "..." in path or pathlib.Path(path).stem in {"foo", "bar", "x", "my_config"}
+
+
+def _git(repo, *args):
+    r = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True)
+    return r.stdout if r.returncode == 0 else ""
+
+
+def path_report(texts, index_text, repo, main_checkout):
+    """Classify every repo-path reference in the memories."""
+    head = set(_git(repo, "ls-files").split())
+    ever = set(_git(repo, "log", "--all", "--pretty=format:", "--name-only",
+                    "--diff-filter=AM").split())
+    untracked = set()
+    if main_checkout and main_checkout.is_dir():
+        untracked = {l[3:].strip() for l in
+                     _git(main_checkout, "status", "--porcelain", "-uall").splitlines()
+                     if l.startswith("??")}
+
+    counts = defaultdict(int)
+    untracked_only = defaultdict(list)
+    absent = defaultdict(list)
+    for stem, t in texts.items():
+        indexed = f"({stem}.md)" in index_text
+        # RAW text, not prose(): a path is nearly always written inside
+        # backticks, and being in a code span makes it no less of a claim
+        # about the repo. Scanning stripped prose here saw 48 of 517 refs.
+        for p in sorted(set(_PATH.findall(t))):
+            if _placeholder(p):
+                counts["placeholder"] += 1
+            elif any(p.startswith(r) for r in _RETIRED_PREFIXES):
+                counts["retired (archived outside repo)"] += 1
+            elif p in head:
+                counts["in HEAD"] += 1
+            elif p in untracked:
+                counts["untracked in main checkout"] += 1
+                indexed and untracked_only[stem].append(p)
+            elif p in ever:
+                counts["removed from the repo"] += 1
+            else:
+                counts["absent everywhere"] += 1
+                indexed and absent[stem].append(p)
+    return counts, untracked_only, absent
 
 
 def resolvable_names(texts):
@@ -77,6 +154,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--memory-dir", type=pathlib.Path, default=DEFAULT_DIR)
     ap.add_argument("--limit", type=int, default=17100, help="MEMORY.md byte budget")
+    ap.add_argument("--repo", type=pathlib.Path, default=pathlib.Path.cwd(),
+        help="repo whose paths the memories cite")
+    ap.add_argument("--main-checkout", type=pathlib.Path,
+        default=pathlib.Path("/home/suzume/workspace/BEC-simulation"),
+        help="checkout to look in for untracked files (worktrees cannot see each other's)")
     args = ap.parse_args()
 
     memdir = args.memory_dir
@@ -125,6 +207,25 @@ def main():
     print(f"index -> missing    : {broken_index}")
     if broken_index:
         fails.append(f"index links to {len(broken_index)} missing files")
+
+    counts, untracked_only, absent = path_report(texts, index_text, args.repo,
+        args.main_checkout)
+    print("\npath references cited by memories:")
+    for k in sorted(counts, key=lambda k: -counts[k]):
+        print(f"    {counts[k]:4d}  {k}")
+    if untracked_only:
+        n = sum(len(v) for v in untracked_only.values())
+        print(f"\n  WARN  {n} artifacts cited by {len(untracked_only)} INDEXED memories exist")
+        print("        only as untracked files in one checkout — invisible to other")
+        print("        worktrees, and gone after a `git clean` or worktree removal:")
+        for stem, ps in sorted(untracked_only.items(), key=lambda kv: -len(kv[1])):
+            print(f"          {len(ps):2d}  {stem}")
+    if absent:
+        n = sum(len(v) for v in absent.values())
+        print(f"\n  WARN  {n} paths cited by {len(absent)} INDEXED memories resolve nowhere")
+        print("        (never committed, not untracked either — in-flight or a typo):")
+        for stem, ps in sorted(absent.items(), key=lambda kv: -len(kv[1])):
+            print(f"          {stem}: {', '.join(ps[:3])}")
 
     if fails:
         print("\nFAIL")
