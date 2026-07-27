@@ -77,17 +77,20 @@ flux_of(psi) =
         @test rad > 5 * az                    # ≫ on a known divergent texture (≈0.95)
     end
 
-    @testset "named builders: flower is flux-closure, radial is not" begin
-        # The named seeds must REALISE the physics they are documented as:
-        # :flower → n̂=φ̂ (∇·F=0, flux-closure); :radial_spin_vortex → n̂=ρ̂
-        # (∇·F=2/ρ, divergent). This pins the weak-field Eu GS default seed
-        # to its validated texture and guards against the historical
-        # fl_vortex mislabel (a radial texture named "flower vortex").
+    @testset "named builders: flower is axial (above-crossover), radial is divergent" begin
+        # :flower is the UPPER (high-|B|) side Kawaguchi–Ueda Flower: an AXIAL core
+        # (large ⟨F_z⟩) canting to an in-plane rim so the dipolar flux closes on
+        # RELAXATION. As a seed it therefore has large |⟨F_z⟩| and a divergence
+        # below the uniform floor (0.577) — not the fully-closed in-plane limit
+        # (that is the lower / soft-manifold side, ⟨F_z⟩≈0). :radial_spin_vortex is
+        # a divergent texture (n̂=ρ̂). Guards against the historical fl_vortex mislabel.
         sys = SpinSystem(F)
+        fp_flower = spinor_fingerprint(init_psi(GRID, sys; state=:flower), GRID, F)
         flower = flux_of(init_psi(GRID, sys; state=:flower))
         radial = flux_of(init_psi(GRID, sys; state=:radial_spin_vortex))
-        @test flower < 0.25                   # flux-closure (below 0.577 floor)
-        @test radial > 3 * flower             # radial is a divergent texture
+        @test abs(fp_flower.Fz) > 0.5 * F     # axial magnetisation (⟨F_z⟩ large)
+        @test flower < 0.577                  # below the uniform density-gradient floor
+        @test radial > flower                 # radial is the more divergent texture
     end
 
     @testset "coherence: uniform vs textured" begin
