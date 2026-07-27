@@ -122,13 +122,25 @@ The CONTACT parts are passed in, not rebuilt: they carry no `k̂` dependence.
 `instability_angular_map` and `bogoliubov/scan.jl` hoist the same way; this
 was the odd one out.
 
-Worth what it is and no more. Measured at F=6, `n_dir = 32`, `n_k = 200`:
-`_bdg_contact_matrices` is 1.0 ms, so the rebuild was 0.032 s of a 1.37 s
-table — 2.3%. The bulk is GC pressure from `_bdg_branch_sum`, which allocates
-~104 kB per k-point (a 2D×2D matrix plus `eigen` workspace) for ~650 MB over
-the whole table; the k-loop's own arithmetic is only 0.18 s. That is a cold
-path — one k-integral per workspace, since the `n^(5/2)` scaling collapses the
-density axis — so it has been left alone deliberately.
+Worth what it is and no more. Measured at F=6, `n_dir = 32`, `n_k = 200`
+(breakdown reconciled against the end-to-end time, see `bench/reconcile.jl`):
+
+    contact build  x1     0.001 s    0.1%
+    DDI matrices   x32    0.000 s    0.0%
+    k-loop         x32    1.376 s   ~100%
+    ------------------------------------------
+    measured total        1.353 s
+
+so hoisting the rebuild saves 31 x 1.0 ms = 0.031 s, or 2.3%. Everything else
+is the `_bdg_branch_sum` eigendecomposition, and it is a cold path — one
+k-integral per workspace, since the `n^(5/2)` scaling collapses the density
+axis — so it is left alone deliberately.
+
+One number in that table is worth keeping: the k-loop costs 0.0059 s/direction
+at `c_dd = 0` and 0.0430 s/direction at `c_dd = 0.05`, a 7x jump for an
+anomalous matrix that goes from 1 to 4 non-zeros out of 169. Benchmarking this
+kernel on the contact-only matrices therefore understates the dipolar cost by
+~7x; use a `k̂` direction with the DDI actually switched on.
 
 `sm` is the `spin_matrices(F)` cache, likewise direction-independent; pass
 `nothing` when `c_dd` is inactive.
