@@ -260,12 +260,20 @@ Honest limits: the **evaporation timescale is not physical** — the ms-scale SG
 run the s-scale evaporation ramp (the run above is $\sim60\times$ too fast), so the
 number-conserving SGPE is an arbiter for the **fast physics** (three-body decay, the
 $N_0^{9/5}$ law) and only *illustrative* for the slow evaporation itself. Additionally
-the c-field is cutoff-dependent; the radial knife is a proxy for finite-depth FORT spill;
-and this is not the full SPGPE (it omits the growth + energy-damping scattering reservoir
+the c-field is cutoff-dependent; and this is not the full SPGPE (it omits the growth + energy-damping scattering reservoir
 of Rooney/Blakie/Bradley, arXiv:1210.0952). It is a more principled arbiter than the 0-D
 model on the loss law, not a calibrated absolute-number evaporation.
 
+**Finite-depth FORT spill** (`eu_ft_evap_fort.png`, driver mode `evap_fort`): the
+radial energy-knife is replaced by a physical finite-depth Gaussian FORT
+$V(r)=U_0(t)(1-e^{-V_h/U_0(t)})$ (central $\omega=1$, depth $U_0$); lowering $U_0(t)$
+lets atoms above the barrier climb out and be removed by a box-edge CAP absorbing
+boundary — a physical spill, not an ad-hoc threshold. 48³/D=3 GPU: budget exact
+($\Delta\sim10^{-13}$), condensate fraction $0.44\to0.97$, $N_0$ $50\text{k}\to62\text{k}$
+(the thermal cloud condenses as it is spilled). Same timescale caveat as above.
+
 ## Next
-Higher-resolution ($64^3$–$96^3$) cutoff-convergence study of the evaporation SGPE
-on TSUBAME; a finite-depth Gaussian-FORT spill operator (vs the radial knife); an
-adiabatic (ramped) box if a box trap becomes available.
+The $64^3$–$96^3$ cutoff-convergence study of the evaporation SGPE is running on
+TSUBAME; an adiabatic (ramped) box if a box trap becomes available; and the full
+SPGPE energy-damping scattering reservoir (Rooney/Blakie/Bradley) for the reservoir
+coupling the closed field omits.

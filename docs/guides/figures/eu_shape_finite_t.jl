@@ -435,6 +435,27 @@ function ft_kcut_convergence(; grid_n::Int=48, box::Float64=18.0, T_over_Tc::Flo
     (u=u, rows=rows, spread0=spread0, spreadth=spreadth)
 end
 
+# CUTOFF CONVERGENCE study (TSUBAME): run the k_cut scan at increasing grid resolution
+# (higher k_max ⇒ wider accessible k_cut). If the condensate N₀(k_cut) spread SHRINKS
+# with resolution, the c-field cutoff dependence is a resolution artefact converging
+# away; if it persists, it is the honest classical-field limit. One CSV per grid_n
+# (eu_ft_kcut_<n>.csv) for the overlay plot.
+function ft_cutoff_study(; grid_ns::Vector{Int}=[64, 96], box::Float64=20.0,
+    T_over_Tc::Float64=0.5, kcut_fracs::Vector{Float64}=[0.45, 0.55, 0.65, 0.75, 0.85, 0.95],
+    T_equil::Float64=25.0, gs_steps::Int=3000, gamma::Float64=0.1, n_traj::Int=10,
+    backend=CPUBackend())
+    for gn in grid_ns
+        println("\n######## cutoff study grid_n=$gn ########")
+        ft_kcut_convergence(; grid_n=gn, box, T_over_Tc, kcut_fracs, T_equil, gs_steps,
+            gamma, n_traj, backend, csv=joinpath(@__DIR__, "eu_ft_kcut_$(gn).csv"))
+    end
+end
+
+function ft_cutoff_smoke(; backend=CPUBackend())
+    ft_cutoff_study(; grid_ns=[24], box=16.0, kcut_fracs=[0.6, 0.9], T_equil=6.0,
+        gs_steps=400, n_traj=2, backend)
+end
+
 # The finite-T SHAPE result: prepare a finite-T state (bath on, HOLD), then a
 # CLOSED-system shape ramp (bath off, loss on). HOLD vs DECOMPRESS vs BOX.
 function ft_shape_compare(; grid_n::Int=48, box::Float64=24.0, T_over_Tc::Float64=0.5,
@@ -1004,6 +1025,10 @@ if abspath(PROGRAM_FILE) == @__FILE__
         ft_evaporation_fort(; backend=bk)
     elseif mode == "evap_fort_smoke"
         ft_evap_fort_smoke(; backend=bk)
+    elseif mode == "cutoff_study"
+        ft_cutoff_study(; backend=bk)
+    elseif mode == "cutoff_smoke"
+        ft_cutoff_smoke(; backend=bk)
     elseif mode == "kcut"
         ft_kcut_convergence(; backend=bk)
     elseif mode == "shape"
