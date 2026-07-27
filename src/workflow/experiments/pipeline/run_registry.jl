@@ -525,10 +525,22 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
 
             tmp_file = _scratch_tmp_path(psi_file)
             jld_kwargs = _snapshot_compression_kwargs(result)
+            # Light point (Stage 1): if the GS was stage-cached and the shared psi
+            # artifact exists, store only a `gs_ref` pointer — the heavy psi lives
+            # once in the stage store (open_result resolves it). Falls back to a
+            # full point when the ref/artifact is missing.
+            gs_ref = get(result, :gs_stage_ref, nothing)
+            light_point =
+                _light_points_enabled() && gs_ref !== nothing &&
+                isfile(joinpath(_gs_stage_dir(), gs_ref * ".jld2"))
             try
                 _run_yaml_status(verbose, "writing result: $(basename(psi_file))")
                 jldopen(tmp_file, "w"; jld_kwargs...) do f
-                    f["psi"] = psi_host
+                    if light_point
+                        f["gs_ref"] = gs_ref
+                    else
+                        f["psi"] = psi_host
+                    end
                     f["scan_index"] = i
                     f["run_name"] = run_name
                     f["override"] = merged

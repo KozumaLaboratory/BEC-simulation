@@ -66,12 +66,41 @@ function _extract_hpsi(data::Dict, psi::AbstractArray)
 end
 
 function _extract_psi(data::Dict, path::AbstractString)
-    haskey(data, "psi") ||
-        throw(ArgumentError("open_result: no `psi` key in $path"))
+    if !haskey(data, "psi")
+        # Light point (Stage 1): psi lives once in the content-addressed stage
+        # store; resolve it via the `gs_ref` pointer. Old full points (psi inline)
+        # take the branch below unchanged — full backward compatibility.
+        gs_ref = get(data, "gs_ref", nothing)
+        gs_ref !== nothing && return _load_stage_psi(String(gs_ref), path)
+        throw(ArgumentError("open_result: no `psi` or `gs_ref` key in $path"))
+    end
     psi_raw = data["psi"]
     psi_raw isa AbstractArray ||
         throw(ArgumentError("open_result: `psi` is not an array (got $(typeof(psi_raw)))"))
     convert(Array{ComplexF64, ndims(psi_raw)}, psi_raw)
+end
+
+# Resolve a light point's psi from the stage store. Tries the env-configured stage
+# dir first, then the store root inferred from the point path (<root>/<cfg>/point
+# → <root>/_stage/gs), so results stay readable after a move as long as the store
+# tree is intact. Fails loud (never silently returns a zero/garbage psi).
+function _load_stage_psi(gs_ref::String, point_path::AbstractString)
+    sd_env = get(ENV, "SPINORBEC_STAGE_DIR",
+        joinpath(get(ENV, "SPINORBEC_STORE", "runs"), "_stage", "gs"))
+    root = dirname(dirname(abspath(point_path)))
+    candidates = [joinpath(sd_env, gs_ref * ".jld2"),
+        joinpath(root, "_stage", "gs", gs_ref * ".jld2")]
+    for c in candidates
+        isfile(c) || continue
+        d = JLD2.load(c)
+        haskey(d, "psi") || continue
+        return convert(Array{ComplexF64, ndims(d["psi"])}, d["psi"])
+    end
+    throw(
+        ArgumentError(
+            "open_result: light point $point_path references gs_ref=$gs_ref but no " *
+            "stage artifact was found (looked in: $(join(candidates, ", ")))"),
+    )
 end
 
 function _extract_grid(data::Dict, psi::AbstractArray)

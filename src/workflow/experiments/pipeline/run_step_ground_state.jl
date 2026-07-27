@@ -90,6 +90,13 @@ end
 _stage_cache_enabled() =
     lowercase(get(ENV, "SPINORBEC_STAGE_CACHE", "0")) in ("1", "true", "on", "yes")
 
+# Stage 1: when on, a scan point whose GS was stage-cached is written as a LIGHT
+# point (a `gs_ref` pointer + scalars/analyze, no inline psi) — the heavy psi
+# lives once in the stage store; open_result resolves it back. Requires the stage
+# cache to be producing refs, so it implies _stage_cache_enabled().
+_light_points_enabled() =
+    lowercase(get(ENV, "SPINORBEC_LIGHT_POINTS", "0")) in ("1", "true", "on", "yes")
+
 _gs_stage_dir() = get(ENV, "SPINORBEC_STAGE_DIR",
     joinpath(get(ENV, "SPINORBEC_STORE", "runs"), "_stage", "gs"))
 
@@ -186,19 +193,21 @@ function _run_step(
     # Auto content-addressed stage cache: a from-scratch solve keyed on its
     # resolved physics is reusable by any other config. Only when opted-in, not
     # already given an explicit `cache:`, and not warm-started (seed-dependent).
+    # `stage_ref` (the content hash) is threaded into step_result so the scan-loop
+    # save can write a light point that references the shared psi (Stage 1).
+    stage_ref = nothing
     if cache_path === nothing && psi_prev === nothing && _stage_cache_enabled()
-        cache_path = try
-            joinpath(_gs_stage_dir(),
-                _gs_cache_key(method, atom, grid, interactions, gs_ddi,
-                    tol, n_steps, dt, p) * ".jld2")
+        stage_ref = try
+            _gs_cache_key(method, atom, grid, interactions, gs_ddi, tol, n_steps, dt, p)
         catch err
             verbose &&
                 @warn "GS stage-cache key failed; caching disabled for this cell" exception =
                     err
             nothing
         end
-        if cache_path !== nothing && verbose
-            println("  GS stage-cache key → $(basename(cache_path))")
+        if stage_ref !== nothing
+            cache_path = joinpath(_gs_stage_dir(), stage_ref * ".jld2")
+            verbose && println("  GS stage-cache key → $(stage_ref)")
         end
     end
     if cache_path !== nothing && isfile(cache_path)
@@ -224,6 +233,7 @@ function _run_step(
             :ground_state_energy => energy,
             :ground_state_converged => converged,
             :workspace => ws_cached,
+            :gs_stage_ref => stage_ref,
         )
         return (psi_out, grid, atom, ws_cached, step_result)
     end
@@ -404,6 +414,7 @@ function _run_step(
         :ground_state_energy => gs.energy,
         :ground_state_converged => gs.converged,
         :workspace => gs.workspace,
+        :gs_stage_ref => stage_ref,
     )
     (psi_out, grid, atom, gs.workspace, step_result)
 end

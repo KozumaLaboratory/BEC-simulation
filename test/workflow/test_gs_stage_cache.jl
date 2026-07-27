@@ -7,9 +7,10 @@
 # reuse; these probes flip red on that.
 
 using Test
+using JLD2
 using SpinorBEC
 using SpinorBEC: _gs_cache_key, _gs_stage_dir, _hashable, _stage_cache_enabled,
-    make_grid, GridConfig, InteractionParams, resolve_atom
+    _light_points_enabled, make_grid, GridConfig, InteractionParams, resolve_atom
 
 @testset "GS stage cache" begin
     atom = resolve_atom(:Eu151)
@@ -112,6 +113,50 @@ using SpinorBEC: _gs_cache_key, _gs_stage_dir, _hashable, _stage_cache_enabled,
                     @test n_after_A == 1                        # one GS artifact cached
                     run_yaml(cfgB; base_dir=joinpath(dir, "runsB"), verbose=false)
                     @test length(readdir(stage)) == n_after_A   # different analyze → NO new GS
+                end
+            end
+        end
+
+        # Stage 1: light points carry a gs_ref (no inline psi); open_result resolves
+        # the psi back from the stage store. Old full points stay readable.
+        @testset "light points reference stage psi; open_result resolves them" begin
+            mktempdir() do dir
+                stage = joinpath(dir, "stage")
+                cfg = joinpath(dir, "c.yaml")
+                write(
+                    cfg,
+                    """
+         defaults: {kind: spinor, backend: cpu}
+         pipeline:
+           - ground_state:
+               atom: Eu151
+               interactions: {N_atoms: 5000, omega_ref: 691.1504, c1_ratio: 0.03}
+               grid: {n: [16, 16, 16], box: [8.0, 8.0, 8.0]}
+               potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+               method: lbfgs
+               n_steps: 50
+               tol: 1.0e-7
+           - analyze: [{energy_decomposition: {}}]
+         scan:
+           product: {pipeline.0.interactions.c1_ratio: {from: 0.030, to: 0.031, n: 2}}
+         """,
+                )
+                withenv("SPINORBEC_STAGE_CACHE" => "1", "SPINORBEC_LIGHT_POINTS" => "1",
+                    "SPINORBEC_STAGE_DIR" => stage) do
+                    rd = run_yaml(cfg; base_dir=joinpath(dir, "runs"), verbose=false)
+                    is_point(f) = startswith(f, "point_") && endswith(f, ".jld2")
+                    pts = sort(filter(is_point, readdir(rd)))
+                    @test length(pts) == 2
+                    p1 = joinpath(rd, pts[1])
+                    d = JLD2.load(p1)
+                    @test haskey(d, "gs_ref")          # light: pointer present
+                    @test !haskey(d, "psi")            # light: no inline psi
+                    @test haskey(d, "energy")          # scalars stay inline
+                    # open_result transparently resolves psi from the stage store.
+                    r = open_result(p1)
+                    @test size(r.psi, 4) == 13         # Eu F=6 → 13 components
+                    @test all(isfinite, abs.(r.psi))
+                    @test isfile(joinpath(stage, String(d["gs_ref"]) * ".jld2"))
                 end
             end
         end
