@@ -674,9 +674,10 @@ function ft_evaporation_sgpe(; grid_n::Int=48, box::Float64=20.0,
     T_prep_over_Tc::Float64=1.3, R_final_frac::Float64=0.55,
     prep_time::Float64=15.0, evap_time::Float64=40.0, evap_rate::Float64=5.0,
     dt::Float64=0.01, gs_steps::Int=2500, gamma::Float64=0.1, n_traj::Int=8,
-    save_every::Int=20, backend=CPUBackend(),
+    save_every::Int=20, backend=CPUBackend(), u::Union{EuUnits, Nothing}=nothing,
+    N0_ref::Float64=0.0,                       # 0-D reference N₀ for the arbiter print
     csv::String=joinpath(@__DIR__, "eu_ft_evap_sgpe.csv"))
-    u = EuUnits(; omega_ref=2π * 420.0)
+    u = u === nothing ? EuUnits(; omega_ref=2π * 420.0) : u
     print_units(u)
     s = _setup(u, grid_n, box, gs_steps, backend)
     Tc = Tc_harmonic(u.N)
@@ -699,12 +700,15 @@ function ft_evaporation_sgpe(; grid_n::Int=48, box::Float64=20.0,
     # dN_evap/dN_k3 accumulate only in the closed phase, so by telescoping
     # N_end + dN_evap + dN_k3 = N(closed-start) exactly — that is the conservation check.
     prep_ms = prep_time / u.omega_ref * 1e3
-    ic = something(findfirst(>=(prep_ms), res.t_ms), 1)
+    ic = something(findlast(<(prep_ms), res.t_ms), 1)   # last PREP save = atoms entering the closed phase
     N_start = res.N[ic]
     N_end = res.N[end]
     budget = N_end + res.dN_evap + res.dN_k3
     @printf "\n  ATOM BUDGET (closed phase): N_end=%.5g + evap=%.5g + K₃=%.5g = %.5g  vs  N(closed-start)=%.5g  (Δ=%.2g%%)\n" N_end res.dN_evap res.dN_k3 budget N_start 100 * (budget - N_start) / max(N_start, eps())
     @printf "  N₀ (closed phase): %.5g → %.5g   (cond. frac %.3f → %.3f)\n" res.N0[ic] res.N0[end] res.frac[ic] res.frac[end]
+    if N0_ref > 0
+        @printf "  ARBITER: SGPE final N₀=%.4g  vs  0-D reference N₀=%.4g  (ratio %.2f×)\n" res.N0[end] N0_ref res.N0[end] / N0_ref
+    end
     open(csv, "w") do io
         println(io, "t_ms,N,N0,frac")
         for i in 1:length(res.t_ms)
@@ -719,6 +723,23 @@ end
 function ft_evap_smoke(; backend=CPUBackend())
     ft_evaporation_sgpe(; grid_n=24, box=16.0, T_prep_over_Tc=1.2, prep_time=4.0,
         evap_time=8.0, gs_steps=400, n_traj=2, save_every=40, backend)
+end
+
+# CALIBRATED ARBITER: seed the closed evaporation SGPE at the 0-D formation handoff
+# (ω̄, N_BEC, T/T_c from ft_reservoir_calibration) and compare the ab-initio absolute
+# N₀ to the 0-D formation number — the number-conserving check on the 0-D ~2× systematic.
+function ft_evap_sgpe_cal(; grid_n::Int=48, box::Float64=20.0, n_traj::Int=8,
+    prep_time::Float64=15.0, evap_time::Float64=40.0, gs_steps::Int=2500,
+    T_prep_over_Tc::Float64=1.15, backend=CPUBackend())
+    cal = ft_reservoir_calibration()
+    ft_evaporation_sgpe(; grid_n, box, n_traj, prep_time, evap_time, gs_steps,
+        T_prep_over_Tc, u=cal.u, N0_ref=cal.N_BEC, backend,
+        csv=joinpath(@__DIR__, "eu_ft_evap_sgpe_cal.csv"))
+end
+
+function ft_evap_cal_smoke(; backend=CPUBackend())
+    ft_evap_sgpe_cal(; grid_n=24, box=16.0, prep_time=4.0, evap_time=8.0,
+        gs_steps=400, n_traj=2, backend)
 end
 
 function ft_smoke(; backend=CPUBackend())
@@ -777,6 +798,10 @@ if abspath(PROGRAM_FILE) == @__FILE__
         ft_evaporation_sgpe(; backend=bk)
     elseif mode == "evap_sgpe_smoke"
         ft_evap_smoke(; backend=bk)
+    elseif mode == "evap_sgpe_cal"
+        ft_evap_sgpe_cal(; backend=bk)
+    elseif mode == "evap_sgpe_cal_smoke"
+        ft_evap_cal_smoke(; backend=bk)
     elseif mode == "kcut"
         ft_kcut_convergence(; backend=bk)
     elseif mode == "shape"
