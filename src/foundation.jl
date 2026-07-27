@@ -9,6 +9,7 @@
 
 # Type definitions (must come first; Workspace depends on everything above).
 include("foundation/waveform.jl")
+include("foundation/noise_waveform.jl")           # seeded analytic field-noise waveform
 include("foundation/types/grid.jl")              # AbstractBackend, GridConfig, Grid
 include("foundation/types/potentials.jl")        # AbstractPotential + 12 trap / beam / lattice / gradient subtypes
 include("foundation/types/spin_atom.jl")         # SpinSystem, SpinMatrices, AtomSpecies

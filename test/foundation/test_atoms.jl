@@ -1,7 +1,7 @@
 @testset "Atom Species Library" begin
     all_atoms = [
         Li7, Na23, K39, K41, Rb85, Rb87, Cs133,
-        Cr52, Dy164, Dy162, Er168, Er166, Eu151, Eu151_f1_effective,
+        Cr52, Dy164, Dy162, Er168, Er166, Eu151, Eu153, Eu151_f1_effective,
         Ca40, Sr84, Sr86, Sr88, Yb170, Yb174, Yb176,
         He4star,
     ]
@@ -34,7 +34,7 @@
             (Cs133, 3, 7 // 2, 1 // 2, 2.0), (He4star, 1, 0, 1, 2.0),
             (Cr52, 3, 0, 3, 2.0), (Dy164, 8, 0, 8, 1.24), (Dy162, 8, 0, 8, 1.24),
             (Er168, 6, 0, 6, 1.16), (Er166, 6, 0, 6, 1.16),
-            (Eu151, 6, 5 // 2, 7 // 2, 1.9934),
+            (Eu151, 6, 5 // 2, 7 // 2, 1.9934), (Eu153, 6, 5 // 2, 7 // 2, 1.9934),
         ]
         for (a, F, I, J, gJ) in cases
             @test isapprox(a.g_F, lande_g_factor(F, I, J; g_J=gJ); atol=1e-4)
@@ -67,7 +67,7 @@
     end
 
     @testset "Dipolar atoms: mu_mag > 0" begin
-        dipolar = [Cr52, Dy164, Dy162, Er168, Er166, Eu151, He4star]
+        dipolar = [Cr52, Dy164, Dy162, Er168, Er166, Eu151, Eu153, He4star]
         for a in dipolar
             @test a.mu_mag > 0
             @test a.g_F != 0.0
@@ -95,6 +95,47 @@
         @test Eu151.F == 6
         @test Eu151.a_s ≈ 110.0 * SpinorBEC.Units.BOHR_RADIUS rtol = 1e-6
         @test Eu151.mu_mag > 6.0 * SpinorBEC.Units.BOHR_MAGNETON
+    end
+
+    @testset "Eu153 shares Eu151's electronic structure" begin
+        # Same ⁸S₇/₂ configuration and same nucleus spin (I=5/2), so everything
+        # that depends only on (F, I, J, g_J) must be bit-identical.
+        @test Eu153.F == 6
+        @test Eu153.g_J == Eu151.g_J
+        @test Eu153.g_F == Eu151.g_F
+        @test Eu153.mu_mag == Eu151.mu_mag
+        @test Eu153.q_geometry == Eu151.q_geometry
+        @test Eu153.nuclear_I == 5 / 2
+        @test Eu153.electronic_J == 7 / 2
+
+        # NIST/AME2020 relative atomic masses 152.9212380 / 150.9198578.
+        @test Eu153.mass / Eu151.mass ≈ 152.9212380 / 150.919857 rtol = 1e-9
+        @test Eu153.mass > Eu151.mass
+    end
+
+    @testset "Eu153 hyperfine and quadratic Zeeman" begin
+        # a_hf = -8.853 MHz vs -20.052 MHz (Sandars & Woodgate 1960, as tabulated
+        # in Zaremba-Kopczyk/Żuchowski/Tomza PRA 98, 032704 (2018) Table I).
+        # F=6 ↔ F=5 splitting = 6|a_hf| = 53.1 MHz.
+        @test Eu153.Delta_E_hf ≈ 53.1e6 * 2π * SpinorBEC.Units.HBAR rtol = 1e-9
+        @test Eu153.Delta_E_hf < Eu151.Delta_E_hf
+
+        # q ∝ 1/Δ_hf at fixed B and identical g_J/q_geometry ⇒ ¹⁵³Eu feels a
+        # ~2.3× larger quadratic Zeeman. That is the isotope's headline
+        # difference, so pin it directionally rather than by a bare number.
+        ratio = quadratic_zeeman_si(Eu153, 1e-4) / quadratic_zeeman_si(Eu151, 1e-4)
+        @test ratio ≈ Eu151.Delta_E_hf / Eu153.Delta_E_hf rtol = 1e-12
+        @test 2.2 < ratio < 2.4
+        q_hz = quadratic_zeeman_si(Eu153, 1e-4) / (2π * SpinorBEC.Units.HBAR)
+        @test 3.1e3 < q_hz < 3.4e3     # ≈ 3.3 kHz/G², vs 1.43 kHz/G² for ¹⁵¹Eu
+    end
+
+    @testset "Eu153 scattering length is an unmeasured placeholder" begin
+        # No ¹⁵³Eu measurement exists; the entry carries the ¹⁵¹Eu value of
+        # 110(4) a₀ (Miyazawa et al. PRL 129, 223401 (2022)). This test exists
+        # to make any future substitution a deliberate, documented change.
+        @test Eu153.a_s == Eu151.a_s
+        @test isempty(Eu153.scattering_lengths)
     end
 
     @testset "Hyperfine splitting for alkali" begin

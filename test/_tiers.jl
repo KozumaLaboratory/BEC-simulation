@@ -66,6 +66,8 @@ const FAST_TESTS = [
     "foundation/test_atoms.jl",
     "foundation/test_grid.jl",
     "foundation/test_preset.jl",
+    "foundation/test_noise_waveform.jl",
+    "foundation/test_waveform_bandwidth.jl",
     "hamiltonian/test_zeeman_builders.jl",
     "analysis/test_spin_snapshot.jl",
     "foundation/test_spin_matrices.jl",
@@ -113,6 +115,7 @@ const FAST_TESTS = [
     "foundation/test_property_based.jl",
     "foundation/test_types_validation.jl",
     "analysis/test_currents.jl",
+    "analysis/test_superfluid_fraction.jl",
     "solvers/test_scalar_ddi_transverse_pad.jl",
     "hamiltonian/test_lhy_2d.jl",
     "analysis/test_bogoliubov_enhanced.jl",
@@ -235,6 +238,7 @@ const CI_EXTRA = [
     "oracles/test_loss_nonunitarity.jl",
     "oracles/test_registry_completeness.jl",
     "oracles/test_lhy_analytic.jl",
+    "oracles/test_lhy_full_bdg_closed_form_parity.jl",
     "oracles/test_light_shift_analytic.jl",
     "oracles/test_magnetic_gradient_analytic.jl",
     "oracles/test_tensor_analytic.jl",
@@ -363,6 +367,10 @@ const FULL_EXTRA = [
     "workflow/test_calibration_drift.jl",
     "workflow/test_dynamics_knobs.jl",
     "gpu/test_cuda_equivalence.jl",
+    # GPU=CPU parity for the projected-GP momentum cutoff. Gates the host-array
+    # mask broadcast bug (ws.grid.k_squared is a host Array even on a GPU
+    # workspace); no-op on CPU-only CI. CPU high-k-removal sanity always runs.
+    "gpu/test_projected_gp_parity.jl",
     "hamiltonian/test_tdhfb_gpu_phase5ab.jl",
     "hamiltonian/test_tdhfb_gpu_phase5c_expm.jl",
     "hamiltonian/test_tdhfb_gpu_phase5c_hf.jl",

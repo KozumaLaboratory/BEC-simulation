@@ -10,6 +10,7 @@
 # evaporation (e.g. Ketterle–van Druten review; Davis–Gardiner rate equations).
 
 export bec_critical_temperature, condensate_split, run_evaporation_bec, EvapBecResult
+export EvapTrapGrid, evap_trap_grid
 
 """
     bec_critical_temperature(N, ω̄) -> T_c [K]
@@ -40,13 +41,17 @@ end
 # Thomas–Fermi peak density of an N₀-atom condensate in a harmonic trap, and the per-atom
 # three-body loss rate K₃⟨n²⟩ it produces (atoms-lost convention dN = −K₃⟨n²⟩N, K₃ ≡ Söding L₃).
 # For a TF condensate ⟨n²⟩ = ∫n³/∫n = (8/21) n₀² (NOT 4/7 n₀², which is ⟨n⟩/n₀ — a different moment).
-function _condensate_three_body_rate(N0::Float64, ω̄::Float64, p::EvapParams, m::Float64)
-    (N0 <= 0 || ω̄ <= 0 || p.K3 <= 0) && return 0.0
+# as_mult Feshbach-tunes a_s (K₃∝a_s⁴, universal).
+function _condensate_three_body_rate(N0::Float64, ω̄::Float64, p::EvapParams, m::Float64,
+    as_mult::Float64=1.0)
+    a_eff = p.a_s * as_mult                                      # Feshbach-tuned a_s
+    K3_eff = p.K3 * as_mult^4                                    # K₃∝a_s⁴ (universal)
+    (N0 <= 0 || ω̄ <= 0 || K3_eff <= 0 || a_eff <= 0) && return 0.0
     aho = sqrt(Units.HBAR / (m * ω̄))
-    μ = 0.5 * Units.HBAR * ω̄ * (15 * N0 * p.a_s / aho)^(2 / 5)   # TF chemical potential
-    g = 4π * Units.HBAR^2 * p.a_s / m
+    μ = 0.5 * Units.HBAR * ω̄ * (15 * N0 * a_eff / aho)^(2 / 5)   # TF chemical potential
+    g = 4π * Units.HBAR^2 * a_eff / m
     n0 = μ / g                                                   # TF peak density
-    p.K3 * (8 / 21) * n0^2
+    K3_eff * (8 / 21) * n0^2
 end
 
 """Trajectory of a two-component evaporation run (thermal + condensate)."""
@@ -65,7 +70,7 @@ end
 # Two-component RHS for (N_total, T): evaporation acts on the thermal cloud (saturated
 # density below T_c), three-body loss on the dense condensate.
 function _evap_rhs_bec(N::Float64, T::Float64, U::Float64, ω̄::Float64, p::EvapParams,
-    m::Float64; dlnω_dt::Float64=0.0)
+    m::Float64; dlnω_dt::Float64=0.0, as_mult::Float64=1.0)
     (N <= 0 || T <= 0) && return (0.0, 0.0)   # RK4 may transiently overshoot to ≤ 0
     N0, Nth = condensate_split(N, T, ω̄)
     η = U / (Units.KB * T)
@@ -78,25 +83,66 @@ function _evap_rhs_bec(N::Float64, T::Float64, U::Float64, ω̄::Float64, p::Eva
     end
     # evaporation + heating: the SAME shared declaration the thermal-only evap_rhs uses, here
     # on the thermal fraction Nth at density n_th (above T_c, Nth=N ⇒ identical to evap_rhs).
-    dN_th, dT = _thermal_evap_rates(Nth, T, η, n_th, p, m, dlnω_dt)
+    dN_th, dT = _thermal_evap_rates(Nth, T, η, n_th, p, m, dlnω_dt, as_mult)
     dN_bg = -N / p.tau_bg                                   # 1-body acts on all atoms
-    dN_3b = -_condensate_three_body_rate(N0, ω̄, p, m) * N0  # 3-body on the dense condensate
+    dN_3b = -_condensate_three_body_rate(N0, ω̄, p, m, as_mult) * N0  # 3-body on the dense condensate
     (dN_th + dN_bg + dN_3b, dT)
 end
 
+"""Precomputed `(U, ω̄)` trap grid for a fixed power ramp. The `_trap_at_time` build (a
+crossed-dipole depth + mean-frequency solve at each node) dominates `run_evaporation_bec`'s
+cost; when scanning many `omega_mult` candidates on the SAME ramp (m_ω only rescales ω̄,
+leaving U and the grid untouched), build it once with [`evap_trap_grid`](@ref) and pass it in."""
+struct EvapTrapGrid
+    tg::Vector{Float64}
+    Ug::Vector{Float64}
+    ωg::Vector{Float64}
+    dtg::Float64
+end
+
+# grid node count: 8 per ramp breakpoint + a share of the integration steps (same formula the
+# in-line build used), clamped to [120, 400]. dt must match the run's dt for a bit-identical grid.
+function evap_trap_grid(trap::EvapTrap, ramp::FortRamp; dt::Float64=ramp_duration(ramp) / 3000)
+    t0 = ramp.times[1]
+    tend = ramp.times[end]
+    nsteps = max(1, ceil(Int, (tend - t0) / dt))
+    ngrid = clamp(8 * length(ramp.times) + nsteps ÷ 20, 120, 400)
+    tg = collect(range(t0, tend; length=ngrid))
+    Ug = Vector{Float64}(undef, ngrid)
+    ωg = Vector{Float64}(undef, ngrid)
+    for i in 1:ngrid
+        Ug[i], ωg[i] = _trap_at_time(trap, ramp, tg[i])
+    end
+    dtg = ngrid > 1 ? (tend - t0) / (ngrid - 1) : 1.0
+    EvapTrapGrid(tg, Ug, ωg, dtg)
+end
+
 """
-    run_evaporation_bec(trap, ramp, p; N0, T0, dt=ramp_duration/3000, save_every=10)
-        -> EvapBecResult
+    run_evaporation_bec(trap, ramp, p; N0, T0, dt=ramp_duration/3000, save_every=10,
+        omega_mult=(t -> 1.0), trap_grid=nothing) -> EvapBecResult
 
 Two-component evaporation: like [`run_evaporation`](@ref) but does NOT stop at the BEC
 onset — it continues through the transition, tracking the condensate `N₀(t)` and the
 thermal cloud `N_th(t)`. Below `T_c` evaporation acts on the (saturated) thermal cloud
 while three-body loss depletes the dense condensate; the surviving `N₀_final` is the
 BEC atom number. Above `T_c` it reduces to the thermal model (`N₀ = 0`).
+
+`omega_mult(t) -> Float64` is an independent **tightness multiplier** `m_ω(t)` on the
+mean frequency: the run drives `ω̄_eff(t) = m_ω(t)·ω̄_ramp(t)` while the depth `U(t)`
+(hence the evaporation drive) stays set by the power ramp. Physically this is the ODT
+waist `w(t)` — `U∝P/w²`, `ω̄∝√P/w²`, so `(P, w)` give independent `(U, ω̄)`. It feeds the
+condensate density / `T_c` AND the adiabatic heating `dT/T = dln(m_ω·ω̄)/dt` consistently
+(the finite-difference of the effective ω̄). `m_ω ≡ 1` recovers the power-ramp run exactly.
+
+`trap_grid` optionally supplies a precomputed [`EvapTrapGrid`](@ref) (from `evap_trap_grid`)
+to skip the per-node crossed-dipole solve — reuse it across many `omega_mult` scans on the
+same ramp (build with the same `dt` for a bit-identical grid).
 """
 function run_evaporation_bec(
     trap::EvapTrap, ramp::FortRamp, p::EvapParams;
-    N0::Float64, T0::Float64, dt::Float64=ramp_duration(ramp) / 3000, save_every::Int=10)
+    N0::Float64, T0::Float64, dt::Float64=ramp_duration(ramp) / 3000, save_every::Int=10,
+    omega_mult=(t -> 1.0), as_mult=(t -> 1.0),
+    trap_grid::Union{Nothing, EvapTrapGrid}=nothing)
     m = trap.mass
     t0 = ramp.times[1]
     tend = ramp.times[end]
@@ -114,21 +160,24 @@ function run_evaporation_bec(
     t = t0
     t_bec = NaN
 
-    # reuse the precomputed (U, ω̄) trap grid (piecewise-linear ramp ⇒ smooth, exact)
-    ngrid = clamp(8 * length(ramp.times) + nsteps ÷ 20, 120, 400)
-    tg = collect(range(t0, tend; length=ngrid))
-    Ug = Vector{Float64}(undef, ngrid)
-    ωg = Vector{Float64}(undef, ngrid)
-    for i in 1:ngrid
-        Ug[i], ωg[i] = _trap_at_time(trap, ramp, tg[i])
-    end
-    dtg = ngrid > 1 ? (tend - t0) / (ngrid - 1) : 1.0
+    # (U, ω̄) trap grid (piecewise-linear ramp ⇒ smooth, exact); reuse a precomputed one if given
+    grid = trap_grid === nothing ? evap_trap_grid(trap, ramp; dt=dt) : trap_grid
+    tg = grid.tg
+    Ug = grid.Ug
+    ωg = grid.ωg
+    ngrid = length(tg)
+    dtg = grid.dtg
     @inline function trap_interp(tq::Float64)
-        tq <= t0 && return (Ug[1], ωg[1])
-        tq >= tend && return (Ug[ngrid], ωg[ngrid])
-        j = clamp(floor(Int, (tq - t0) / dtg) + 1, 1, ngrid - 1)
-        f = (tq - (t0 + (j - 1) * dtg)) / dtg
-        (Ug[j] * (1 - f) + Ug[j + 1] * f, ωg[j] * (1 - f) + ωg[j + 1] * f)
+        U, ω = if tq <= t0
+            (Ug[1], ωg[1])
+        elseif tq >= tend
+            (Ug[ngrid], ωg[ngrid])
+        else
+            j = clamp(floor(Int, (tq - t0) / dtg) + 1, 1, ngrid - 1)
+            f = (tq - (t0 + (j - 1) * dtg)) / dtg
+            (Ug[j] * (1 - f) + Ug[j + 1] * f, ωg[j] * (1 - f) + ωg[j + 1] * f)
+        end
+        (U, ω * omega_mult(tq))
     end
 
     function record!(U, ω̄)
@@ -156,13 +205,21 @@ function run_evaporation_bec(
         h = min(dt, tend - t)
         h <= 0 && break
         U1, ω1 = trap_interp(t)
-        k1N, k1T = _evap_rhs_bec(N, T, U1, ω1, p, m; dlnω_dt=dlnω(t))
+        am1 = as_mult(t)
+        k1N, k1T = _evap_rhs_bec(N, T, U1, ω1, p, m; dlnω_dt=dlnω(t), as_mult=am1)
         Um, ωm = trap_interp(t + h / 2)
         dlm = dlnω(t + h / 2)
-        k2N, k2T = _evap_rhs_bec(N + h / 2 * k1N, T + h / 2 * k1T, Um, ωm, p, m; dlnω_dt=dlm)
-        k3N, k3T = _evap_rhs_bec(N + h / 2 * k2N, T + h / 2 * k2T, Um, ωm, p, m; dlnω_dt=dlm)
+        amm = as_mult(t + h / 2)
+        k2N, k2T = _evap_rhs_bec(
+            N + h / 2 * k1N, T + h / 2 * k1T, Um, ωm, p, m; dlnω_dt=dlm, as_mult=amm
+        )
+        k3N, k3T = _evap_rhs_bec(
+            N + h / 2 * k2N, T + h / 2 * k2T, Um, ωm, p, m; dlnω_dt=dlm, as_mult=amm
+        )
         U2, ω2 = trap_interp(t + h)
-        k4N, k4T = _evap_rhs_bec(N + h * k3N, T + h * k3T, U2, ω2, p, m; dlnω_dt=dlnω(t + h))
+        k4N, k4T = _evap_rhs_bec(
+            N + h * k3N, T + h * k3T, U2, ω2, p, m; dlnω_dt=dlnω(t + h), as_mult=as_mult(t + h)
+        )
 
         N = max(N + h / 6 * (k1N + 2k2N + 2k3N + k4N), 1.0)
         T = max(T + h / 6 * (k1T + 2k2T + 2k3T + k4T), 1e-12)
