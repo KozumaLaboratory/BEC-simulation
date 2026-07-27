@@ -565,34 +565,54 @@ function _lhy_texture_spread(psi_init, F::Int)
     N = ndims(psi_init) - 1
     D = size(psi_init, N + 1)
     D == 2F + 1 || return (0.0, 1.0, 1.0)
-    sm = spin_matrices(F)
-    Fx, Fy, Fz = Matrix{ComplexF64}(sm.Fx), Matrix{ComplexF64}(sm.Fy),
-    Matrix{ComplexF64}(sm.Fz)
-    n = dropdims(sum(abs2, psi_init; dims=N + 1); dims=N + 1)
-    nmax = maximum(n)
+    n_pts = ntuple(d -> size(psi_init, d), N)
+
+    # SUBSAMPLED on a stride. This is a threshold decision on a smooth field,
+    # not a physical observable, and `make_workspace` runs per scan point —
+    # CLAUDE.md calls it the hot path for every pipeline step. Full-grid cost
+    # was 26% of a 64³ workspace build and 69% of a 32³ one, to answer a
+    # yes/no question. The stride targets ~8000 samples, which holds the guard
+    # under ~1% while leaving the verdict unchanged on the converged
+    # weak-field Eu states it was calibrated on (spread 0.921 either way).
+    #
+    # `spin_density_vector` is the O(D) ladder form (F± tridiagonal, Fz
+    # diagonal), threaded and already gated. Restating it as explicit 13×13
+    # matrix-vector products cost 0.31 s and 695 MB at 96³.
+    stride = max(1, floor(Int, (prod(n_pts) / 8000)^(1 / N)))
+    fx, fy, fz = spin_density_vector(psi_init, spin_matrices(F), N)
+    sampled = CartesianIndices(ntuple(d -> 1:stride:n_pts[d], N))
+
+    nmax = 0.0
+    @inbounds for I in sampled
+        nsum = 0.0
+        for c in 1:D
+            nsum += abs2(psi_init[I, c])
+        end
+        nmax = max(nmax, nsum)
+    end
     nmax <= 0 && return (0.0, 1.0, 1.0)
     cut = 1e-6 * nmax
-    z = Vector{ComplexF64}(undef, D)
+
     wsum = 0.0
     mean_f = 0.0
     peak_f = 1.0
     lo, hi = Inf, -Inf
-    for I in CartesianIndices(size(n))
-        n[I] < cut && continue
+    @inbounds for I in sampled
+        nsum = 0.0
         for c in 1:D
-            z[c] = psi_init[I, c]
+            nsum += abs2(psi_init[I, c])
         end
-        nz = norm(z)
-        nz < 1e-14 && continue
-        z ./= nz
-        f = sqrt(real(dot(z, Fx * z))^2 + real(dot(z, Fy * z))^2 +
-                 real(dot(z, Fz * z))^2) / F
-        w = n[I]^2.5
+        nsum < cut && continue
+        # fx/fy/fz are DENSITY-weighted (⟨ψ|F|ψ⟩, not normalised), so dividing
+        # by the local density gives the per-spinor |⟨F⟩| the LHY table cares
+        # about — see CLAUDE.md, |F/n|² is a density-weighted average.
+        f = sqrt(fx[I]^2 + fy[I]^2 + fz[I]^2) / (nsum * F)
+        w = nsum^2.5
         wsum += w
         mean_f += w * f
         lo = min(lo, f)
         hi = max(hi, f)
-        n[I] == nmax && (peak_f = f)
+        nsum == nmax && (peak_f = f)
     end
     wsum <= 0 && return (0.0, 1.0, 1.0)
     (hi - lo, peak_f, mean_f / wsum)
@@ -609,13 +629,14 @@ function _warn_lhy_texture(mode::Symbol, psi_init, F::Int)
     spread, peak_f, mean_f = _lhy_texture_spread(psi_init, F)
     spread <= _LHY_TEXTURE_WARN && return nothing
     what = if mode === :full_bdg
-        "built from the peak-density spinor (|⟨F⟩|/F = $(round(peak_f; digits=3)))"
+        "built from the peak-density spinor (|⟨F⟩|/F ≈ $(round(peak_f; digits=2)))"
     else
         "built for the fixed :$mode ansatz"
     end
     @warn "LHY table is $what and then applied at every voxel, but this state " *
-        "is textured in |⟨F⟩|/F: spread $(round(spread; digits=3)) across the " *
-        "cloud, n^(5/2)-weighted mean $(round(mean_f; digits=3)). Measured on " *
+        "is textured in |⟨F⟩|/F: spread ≈ $(round(spread; digits=2)) across the " *
+        "cloud, n^(5/2)-weighted mean ≈ $(round(mean_f; digits=2)) (sampled on " *
+        "a stride, so indicative not exact). Measured on " *
         "converged weak-field Eu ground states that costs up to ~5% in ε_LHY, " *
         "with a sign that flips along a B-scan (so it does not cancel in a " *
         "comparison). Direction textures are free — only the magnitude of " *
