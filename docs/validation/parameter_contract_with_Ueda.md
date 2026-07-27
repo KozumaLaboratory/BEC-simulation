@@ -104,7 +104,7 @@ the Ueda data must be rewritten to make it directly comparable to ours.
 | 6.2 | Scalar LHY potential | `V_LHY = c_lhy · n^(3/2)` (= ∂ε/∂n) | _to fill_ | _to fill_ | `src/hamiltonian/integrator/propagators.jl:140` |
 | 6.3 | c_lhy auto-derivation | scalar: from textbook `c_lhy = (32/(3√π))·g·(m·a/ℏ²)^(3/2)` etc. | _to fill_ | _to fill_ | `lhy: {kind: scalar}` derives from interactions |
 | 6.4 | Spinor LHY F=6 caveat | PolarTwoChannelLHY is **incomplete** at F=6 (~30-70% offset vs PolarContactLHY) | _to fill_ | _to fill_ | Use `PolarContactLHY` / `IcosahedralLHY` for F=6 polar |
-| 6.5 | FullBdGLHY F=6 polar caveat | Emits @warn — ~3000× spurious offset | _to fill_ | _to fill_ | Avoid for F=6 polar |
+| 6.5 | FullBdGLHY F=6 polar | Matches `polar_contact` to ~1e-4 (UV counterterm fixed 2026-07-27) | _to fill_ | _to fill_ | Warns only on dynamical instability |
 
 ## 7. Loss / K3 conventions
 
