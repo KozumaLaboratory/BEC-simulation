@@ -150,6 +150,65 @@ end
 # an AbstractLHY. Dropped in C2 once all callers route through types.
 @inline _lhy_V(n::AbstractFloat, c_lhy::AbstractFloat) = c_lhy * n * sqrt(n)
 
+# --- spatially-varying LHY ---------------------------------------------------
+#
+# `SpatialLHY` needs the local POLARISATION as well as the local density, so it
+# gets its own two-argument form. `_lhy_needs_spin` is the trait that tells the
+# diagonal step whether to bother computing ⟨F⟩ — everything else answers
+# `false`, so the compiler deletes that arithmetic for them entirely and no
+# existing propagator gets slower.
+@inline _lhy_needs_spin(::Any) = false
+@inline _lhy_needs_spin(::SpatialLHY) = true
+
+# (F, F₊ ladder coefficients) for the spin-aware path; `(0, ())` when unused, so
+# the tuple is a compile-time constant and costs nothing for other LHY types.
+@inline _lhy_spin_consts(::Any, ::Val{D}) where {D} = (0, ntuple(_ -> 0.0, Val(D)))
+@inline _lhy_spin_consts(l::SpatialLHY, ::Val{D}) where {D} =
+    (l.F, ntuple(c -> l.fp_coeffs[c], Val(D)))
+
+"""
+    _lhy_V(n, p, lhy)
+
+`V_LHY = ∂ε/∂n` at local density `n` and local polarisation `p = |⟨F⟩|/F`.
+
+For `SpatialLHY` this is `(5/2) n^(3/2) e₁(p)` — the exact `n^(5/2)` scaling of
+ε_LHY at degenerate Zeeman, with the spinor dependence carried by the
+interpolated `e₁`. Every other LHY ignores `p`, which is what lets the same
+call site serve both.
+"""
+@inline _lhy_V(n::AbstractFloat, ::AbstractFloat, l) = _lhy_V(n, l)
+@inline function _lhy_V(n::AbstractFloat, p::AbstractFloat, l::SpatialLHY)
+    n < 1e-30 && return zero(Float64)
+    e1 = _interpolate_1d(l.polarisations, l.e1_values, clamp(Float64(p), 0.0, 1.0))
+    2.5 * e1 * Float64(n) * sqrt(Float64(n))
+end
+
+"""
+    _local_polarisation(Pmf, i, n_local, F, fp_coeffs, ::Val{D})
+
+`|⟨F⟩|/F` for the spinor at flat voxel index `i`, from the SAME component reads
+the density loop already performs. Uses the O(D) ladder form (F₊ tridiagonal,
+Fz diagonal) rather than 13×13 matrix products.
+"""
+@inline function _local_polarisation(Pmf, i::Int, n_local::Float64, F::Int,
+    fp_coeffs, ::Val{D}) where {D}
+    n_local < 1e-30 && return 0.0
+    @inbounds begin
+        fz = 0.0
+        for c in 1:D
+            fz += (F - (c - 1)) * abs2(Pmf[i, c])
+        end
+        fre = 0.0
+        fim = 0.0
+        for c in 2:D
+            pr = conj(Pmf[i, c - 1]) * Pmf[i, c]
+            fre += fp_coeffs[c] * real(pr)
+            fim += fp_coeffs[c] * imag(pr)
+        end
+    end
+    sqrt(fre * fre + fim * fim + fz * fz) / (n_local * F)
+end
+
 function _diagonal_step_svec!(
     ::Val{N},
     psi::Array,
@@ -194,6 +253,8 @@ function _diagonal_step_svec_real!(
     zee_cis = SVector{D, ComplexF64}(ntuple(c -> cis(-zee_dt[c]), Val(D)))
     P = reshape(psi, Ns, D)
     Pmf = reshape(psi_mf, Ns, D)
+    need_spin = _lhy_needs_spin(c_lhy)
+    F_spin, fp_c = _lhy_spin_consts(c_lhy, Val(D))
     Vt = reshape(V_trap, Ns)
     db = reshape(density_buf, Ns)
     _voxel_loop!(Ns) do i
@@ -203,7 +264,12 @@ function _diagonal_step_svec_real!(
                 s += abs2(Pmf[i, c])
             end
             db[i] = s
-            V_int = c0 * s + _lhy_V(s, c_lhy)
+            # `need_spin` is a compile-time constant (see `_lhy_needs_spin`), so
+            # this branch and the ⟨F⟩ arithmetic vanish for every LHY except
+            # SpatialLHY — the existing propagators pay nothing.
+            p_loc = need_spin ?
+                    _local_polarisation(Pmf, i, s, F_spin, fp_c, Val(D)) : 0.0
+            V_int = c0 * s + _lhy_V(s, p_loc, c_lhy)
             cis_base = cis(-(Vt[i] + V_int) * dt_frac)
             for c in 1:D
                 P[i, c] *= cis_base * zee_cis[c]
@@ -224,6 +290,8 @@ function _diagonal_step_svec_imag!(
     zee_exp = SVector{D, Float64}(ntuple(c -> exp(-zee_dt[c]), Val(D)))
     P = reshape(psi, Ns, D)
     Pmf = reshape(psi_mf, Ns, D)
+    need_spin = _lhy_needs_spin(c_lhy)
+    F_spin, fp_c = _lhy_spin_consts(c_lhy, Val(D))
     Vt = reshape(V_trap, Ns)
     db = reshape(density_buf, Ns)
     _voxel_loop!(Ns) do i
@@ -233,7 +301,9 @@ function _diagonal_step_svec_imag!(
                 s += abs2(Pmf[i, c])
             end
             db[i] = s
-            V_int = c0 * s + _lhy_V(s, c_lhy)
+            p_loc = need_spin ?
+                    _local_polarisation(Pmf, i, s, F_spin, fp_c, Val(D)) : 0.0
+            V_int = c0 * s + _lhy_V(s, p_loc, c_lhy)
             exp_base = exp(-(Vt[i] + V_int) * dt_frac)
             for c in 1:D
                 P[i, c] *= exp_base * zee_exp[c]
