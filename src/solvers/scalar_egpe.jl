@@ -334,18 +334,77 @@ function scalar_energies(ws::ScalarSimWS{T, N}, B_hat::SVector{3, T}) where {T, 
     compute_tilted_dipole_potential!(ws, B_hat)
     E_trap = zero(T);
     E_contact = zero(T);
-    E_dd = zero(T)
+    E_dd = zero(T);
+    E_lhy = zero(T)
     g = ws.g_contact
+    γ = ws.gamma_lhy
     @inbounds for I in eachindex(ws.psi)
         ρ = ws.rho[I]
         E_trap += ρ * ws.V_trap[I]
         E_contact += ρ * ρ * g / 2
         E_dd += ρ * ws.V_dd[I] / 2
+        # E_LHY = (2/5)·γ·∫ρ^{5/2}: the functional whose δ/δψ̄ is the γ·ρ^{3/2}ψ
+        # the diagonal propagator already applies. Omitting it (pre-2026-07-27)
+        # left the reported energy inconsistent with the state ITP converges to,
+        # so the total could rise along an imaginary-time trajectory.
+        if γ != zero(T)
+            E_lhy += (2 / 5) * γ * ρ * ρ * sqrt(ρ)
+        end
     end
     E_trap *= dV;
     E_contact *= dV;
-    E_dd *= dV
-    (E_kin, E_trap, E_contact, E_dd, E_kin + E_trap + E_contact + E_dd)
+    E_dd *= dV;
+    E_lhy *= dV
+    (
+        E_kin=E_kin, E_trap=E_trap, E_contact=E_contact, E_dd=E_dd, E_lhy=E_lhy,
+        total=E_kin + E_trap + E_contact + E_dd + E_lhy,
+    )
+end
+
+# --- Symmetry-breaking seeds ---
+#
+# ITP started from a uniform state stays uniform: the unmodulated solution is a
+# stationary point, so a density wave never nucleates however unstable it is.
+# A supersolid ground state has to be seeded.
+
+"""
+    seed_scalar_noise!(ws; amplitude, seed=nothing)
+
+Multiply ψ by `1 + amplitude·ξ` with ξ uniform in [-1, 1) per voxel, then
+renormalise. Broadband, so ITP selects the wavelength itself — use this when the
+modulation period is the answer rather than an input.
+"""
+function seed_scalar_noise!(
+    ws::ScalarSimWS{T, N}; amplitude::Real, seed::Union{Nothing, Integer}=nothing
+) where {T, N}
+    rng = seed === nothing ? Random.default_rng() : Random.MersenneTwister(seed)
+    a = T(amplitude)
+    @inbounds for I in eachindex(ws.psi)
+        ws.psi[I] *= one(T) + a * (2 * rand(rng, T) - one(T))
+    end
+    normalize_scalar!(ws)
+    nothing
+end
+
+"""
+    seed_scalar_mode!(ws; k, amplitude, axis=1)
+
+Multiply ψ by `1 + amplitude·cos(k·x_axis)`, then renormalise. Deterministic
+single-wavelength seed: use it to test a specific period (e.g. the roton
+wavelength) or to reproduce a published droplet count.
+"""
+function seed_scalar_mode!(
+    ws::ScalarSimWS{T, N}; k::Real, amplitude::Real, axis::Int=1
+) where {T, N}
+    1 <= axis <= N || throw(ArgumentError("axis $axis outside 1:$N"))
+    kk = T(k);
+    a = T(amplitude)
+    x = ws.grid.x[axis]
+    @inbounds for I in CartesianIndices(ws.psi)
+        ws.psi[I] *= one(T) + a * cos(kk * x[I[axis]])
+    end
+    normalize_scalar!(ws)
+    nothing
 end
 
 """z-component of orbital angular momentum L_z = -i ⟨ψ|x∂_y - y∂_x|ψ⟩.

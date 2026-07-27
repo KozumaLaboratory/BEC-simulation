@@ -1,5 +1,6 @@
 export Li7, Na23, K39, K41, Rb85, Rb87, Cs133              # alkali metals
-export Cr52, Dy164, Dy162, Er168, Er166, Eu151, Eu151_f1_effective  # magnetic lanthanides
+export Cr52, Dy164, Dy162, Er168, Er166      # magnetic lanthanides
+export Eu151, Eu153, Eu151_f1_effective      # europium
 export Ca40, Sr84, Sr86, Sr88, Yb170, Yb174, Yb176         # spinless
 export He4star                                              # metastable
 export ATOM_REGISTRY, resolve_atom
@@ -196,7 +197,7 @@ const Er166 = AtomSpecies(
 #   μ = g_J × J × μ_B ≈ 6.977μ_B
 #   a_s ≈ 110 a₀ (Matsui et al. Science 2026)
 #   Individual a_S unknown → scattering_lengths empty
-const _EU151_G_J = 1.9934
+const _EU_G_J = 1.9934   # ⁸S₇/₂ electronic g-factor; isotope-independent
 # ¹⁵¹Eu: F=6 ground state (⁸S₇/₂, J=7/2, I=5/2)
 #   g_J = 1.9934 (Sandars & Woodgate 1960)
 #   g_F = g_J · 7/12 ≈ 1.1628 (Lande projection for F=I+J=6)
@@ -214,12 +215,53 @@ const Eu151 = AtomSpecies(
     6,
     110.0 * Units.BOHR_RADIUS,
     0.0,
-    _EU151_G_J * 3.5 * Units.BOHR_MAGNETON,
-    lande_g_factor(6, 5 // 2, 7 // 2; g_J=_EU151_G_J);   # was 7/12·g_J (hand-typed)
+    _EU_G_J * 3.5 * Units.BOHR_MAGNETON,
+    lande_g_factor(6, 5 // 2, 7 // 2; g_J=_EU_G_J);   # was 7/12·g_J (hand-typed)
     Delta_E_hf=121.0e6 * 2π * Units.HBAR,
-    g_J=_EU151_G_J,
+    g_J=_EU_G_J,
     nuclear_I=5 // 2,      # ¹⁵¹Eu nuclear spin (I=5/2)
     electronic_J=7 // 2,   # ⁸S₇/₂ ground state (J=7/2)
+)
+
+# ¹⁵³Eu: F=6 ground state (⁸S₇/₂, J=7/2, I=5/2) — the other stable isotope
+#   (52.19 % natural abundance vs 47.81 % for ¹⁵¹Eu), added for isotope-mixture
+#   work. Same electronic structure as ¹⁵¹Eu, so g_J, μ, g_F and the F=6
+#   q-geometry factor are shared; only the mass and the hyperfine constant differ.
+#
+#   mass       152.921 2380(18) u (NIST/AME2020 relative atomic mass)
+#   a_hf       -8.853 MHz for the ⁸S₇/₂ state, vs -20.052 MHz for ¹⁵¹Eu
+#              (Sandars & Woodgate, Proc. R. Soc. Lond. A 257, 269 (1960);
+#              tabulated side by side in Zaremba-Kopczyk, Żuchowski & Tomza,
+#              Phys. Rev. A 98, 032704 (2018), arXiv:1806.02800, Table I:
+#              "¹⁵¹Eu ⁸S₇/₂ 7/2 5/2 1,...,6 -20.052 / ¹⁵³Eu ⁸S₇/₂ 7/2 5/2
+#              1,...,6 -8.853"). a_hf < 0 ⇒ F = I+J = 6 is the ground manifold.
+#   Δ_hf       F=6 ↔ F=5 splitting = 6·|a_hf| = 53.1 MHz from the magnetic-dipole
+#              term alone; the electric-quadrupole correction is neglected (≲ 2 %),
+#              as in Zaremba-Kopczyk et al. The stored ¹⁵¹Eu value (121.0 MHz)
+#              does include it — the pure dipole part there is 6·20.052 = 120.3 MHz.
+#   q          q ∝ 1/Δ_hf at fixed B (see `quadratic_zeeman_shift`), so ¹⁵³Eu has
+#              ≈ 2.3× the quadratic Zeeman of ¹⁵¹Eu: q/h ≈ 3.3 kHz/G² vs 1.43.
+#   a_s        PLACEHOLDER = the ¹⁵¹Eu measured 110(4) a₀ (Miyazawa et al.,
+#              Phys. Rev. Lett. 129, 223401 (2022), arXiv:2207.11692). No ¹⁵³Eu
+#              measurement exists and the isotope shift is unknown. Tomza's
+#              Eu+Eu ab initio potential fixes only the long range,
+#              C₆ = 3610 a.u. ⇒ R₆ = (2μC₆/ℏ²)^{1/4} = 178 a₀; that work treats
+#              a_{S=7} as a free parameter ("We set the scattering lengths a_S of
+#              the employed potential-energy curves by scaling them with
+#              appropriate factors λ"), illustrating with a_{S=7} = 1.5 R₆.
+#              Override `a_s` explicitly for any quantitative ¹⁵³Eu claim.
+const Eu153 = AtomSpecies(
+    "153Eu",
+    152.9212380 * Units.AMU,
+    6,
+    110.0 * Units.BOHR_RADIUS,
+    0.0,
+    _EU_G_J * 3.5 * Units.BOHR_MAGNETON,
+    lande_g_factor(6, 5 // 2, 7 // 2; g_J=_EU_G_J);
+    Delta_E_hf=53.1e6 * 2π * Units.HBAR,
+    g_J=_EU_G_J,
+    nuclear_I=5 // 2,
+    electronic_J=7 // 2,
 )
 
 # ¹⁵¹Eu effective F=1 model (Yan-Li-Saito 2026 PRL convention)
@@ -308,6 +350,7 @@ const ATOM_REGISTRY = Dict{Symbol, AtomSpecies}(
     :Er168 => Er168,
     :Er166 => Er166,
     :Eu151 => Eu151,
+    :Eu153 => Eu153,
     :Eu151_f1_effective => Eu151_f1_effective,
     :Ca40 => Ca40,
     :Sr84 => Sr84,
