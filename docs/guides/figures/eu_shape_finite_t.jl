@@ -435,6 +435,27 @@ function ft_kcut_convergence(; grid_n::Int=48, box::Float64=18.0, T_over_Tc::Flo
     (u=u, rows=rows, spread0=spread0, spreadth=spreadth)
 end
 
+# CUTOFF CONVERGENCE study (TSUBAME): run the k_cut scan at increasing grid resolution
+# (higher k_max ⇒ wider accessible k_cut). If the condensate N₀(k_cut) spread SHRINKS
+# with resolution, the c-field cutoff dependence is a resolution artefact converging
+# away; if it persists, it is the honest classical-field limit. One CSV per grid_n
+# (eu_ft_kcut_<n>.csv) for the overlay plot.
+function ft_cutoff_study(; grid_ns::Vector{Int}=[64, 96], box::Float64=20.0,
+    T_over_Tc::Float64=0.5, kcut_fracs::Vector{Float64}=[0.45, 0.55, 0.65, 0.75, 0.85, 0.95],
+    T_equil::Float64=25.0, gs_steps::Int=3000, gamma::Float64=0.1, n_traj::Int=10,
+    backend=CPUBackend())
+    for gn in grid_ns
+        println("\n######## cutoff study grid_n=$gn ########")
+        ft_kcut_convergence(; grid_n=gn, box, T_over_Tc, kcut_fracs, T_equil, gs_steps,
+            gamma, n_traj, backend, csv=joinpath(@__DIR__, "eu_ft_kcut_$(gn).csv"))
+    end
+end
+
+function ft_cutoff_smoke(; backend=CPUBackend())
+    ft_cutoff_study(; grid_ns=[24], box=16.0, kcut_fracs=[0.6, 0.9], T_equil=6.0,
+        gs_steps=400, n_traj=2, backend)
+end
+
 # The finite-T SHAPE result: prepare a finite-T state (bath on, HOLD), then a
 # CLOSED-system shape ramp (bath off, loss on). HOLD vs DECOMPRESS vs BOX.
 function ft_shape_compare(; grid_n::Int=48, box::Float64=24.0, T_over_Tc::Float64=0.5,
@@ -719,6 +740,155 @@ function ft_evaporation_sgpe(; grid_n::Int=48, box::Float64=20.0,
     (u=u, res=res)
 end
 
+# ===========================================================================
+# FINITE-DEPTH FORT SPILL evaporation (physical removal; replaces the radial knife).
+# The trap is a Gaussian well V(r)=U₀(t)·(1−exp(−V_h/U₀(t))), V_h=½r² (central ω=1,
+# depth U₀). Lowering U₀(t) IS the real evaporation ramp: atoms with energy > U₀(t)
+# are no longer bound, climb out, and are removed at the box edge by a CAP absorbing
+# boundary — a physical finite-depth spill, not an ad-hoc energy threshold. Still
+# closed (γ=0) + K₃; CAP-removed (evap) and K₃ atoms are tracked ⇒ closed budget.
+# The ms-vs-s timescale caveat still holds — this improves the removal MECHANISM
+# fidelity, not the (compressed) timescale.
+# ===========================================================================
+function _evap_fort_trajectory!(
+    u, grid, psiN, T_prep, k_cut, mu, gamma, prep_time, evap_time,
+    U0_init, U0_final, dt, save_every, backend, seed_base, Vh, cap_mask,
+    psi_sum, dens_sum, n_tot_sum, dN_evap, dN_k3, save_times, D,
+)
+    T_internal = prep_time + evap_time
+    n_steps = round(Int, T_internal / dt)
+    interactions = InteractionParams(Dict{Int, Float64}(0 => c0_bare(u)))
+    loss = LossParams(; K3_cubic=k3_bare(u))
+    sp = SimParams(; dt, n_steps, imaginary_time=false, normalize_every=0, save_every)
+    ws = make_workspace(; grid, atom=FT_ATOM, interactions,
+        potential=HarmonicTrap{3}((1.0, 1.0, 1.0)), sim_params=sp,
+        psi_init=copy(psiN), loss, backend)
+    dV = cell_volume(grid)
+    sidx = Ref(0)
+    N_prev = Ref(real(sum(abs2, ws.state.psi)) * dV)
+    cb = SimulationCallbacks(
+        on_step=(w, step, times, energies) -> begin
+            t = w.state.t
+            frac = clamp((t - prep_time) / max(evap_time, eps()), 0.0, 1.0)
+            U0 = t < prep_time ? U0_init : U0_init + (U0_final - U0_init) * frac
+            @. w.potential_values = U0 * (1 - exp(-Vh / U0))         # Gaussian FORT, depth U₀(t)
+            γ = t < prep_time ? gamma : 0.0
+            if γ > 0
+                apply_sgpe_step!(w, γ, T_prep, dt; μ=mu, k_cut=k_cut,
+                    full_hamiltonian=true, seed=seed_base + step)
+                @views for c in 1:(D - 1)
+                    w.state.psi[ntuple(_ -> Colon(), 3)..., c] .= 0
+                end
+                apply_absorbing_boundary!(w.state.psi, cap_mask, D, 3)
+                N_prev[] = real(sum(abs2, w.state.psi)) * dV
+            else
+                N_mid = real(sum(abs2, w.state.psi)) * dV
+                dN_k3[] += max(N_prev[] - N_mid, 0.0)
+                apply_absorbing_boundary!(w.state.psi, cap_mask, D, 3)   # FORT spill → box-edge removal
+                N_now = real(sum(abs2, w.state.psi)) * dV
+                dN_evap[] += max(N_mid - N_now, 0.0)
+                N_prev[] = N_now
+            end
+            if step % save_every == 0
+                sidx[] += 1
+                i = sidx[]
+                i <= length(psi_sum) || return nothing
+                ψc = Array(view(w.state.psi, ntuple(_ -> Colon(), 3)..., D))
+                phase = angle(sum(ψc) * dV)
+                @. psi_sum[i] += ψc * cis(-phase)
+                @. dens_sum[i] += abs2(ψc)
+                n_tot_sum[i] += real(sum(abs2, w.state.psi)) * dV
+                save_times[i] = t
+            end
+            nothing
+        end,
+    )
+    run_simulation!(ws; callbacks=cb)
+    nothing
+end
+
+function run_fort_evaporation_ensemble(
+    u::EuUnits, grid, psi0;
+    T_prep::Float64, k_cut::Float64, mu::Float64, gamma::Float64,
+    prep_time::Float64, evap_time::Float64, U0_init::Float64, U0_final::Float64,
+    cap_strength::Float64, cap_width_frac::Float64, dt::Float64, save_every::Int=20,
+    n_traj::Int=8, backend=CPUBackend(), seed0::Int=1234,
+)
+    n_steps = round(Int, (prep_time + evap_time) / dt)
+    n_save = fld(n_steps, save_every)
+    D = SpinSystem(FT_ATOM.F).n_components
+    gpts = grid.config.n_points
+    psiN = copy(psi0) .* sqrt(u.N)
+    Vh = SpinorBEC._to_device(backend, evaluate_potential(HarmonicTrap{3}((1.0, 1.0, 1.0)), grid))
+    box = grid.config.box_size[1]
+    ab = AbsorbingBoundary(; strength=cap_strength, width=cap_width_frac * box, power=2)
+    cap_mask = compute_absorbing_mask(grid, ab, dt, backend)
+    psi_sum = [zeros(ComplexF64, gpts...) for _ in 1:n_save]
+    dens_sum = [zeros(Float64, gpts...) for _ in 1:n_save]
+    n_tot_sum = zeros(Float64, n_save)
+    save_times = zeros(Float64, n_save)
+    dN_evap = Ref(0.0);
+    dN_k3 = Ref(0.0)
+    for tr in 1:n_traj
+        _evap_fort_trajectory!(u, grid, psiN, T_prep, k_cut, mu, gamma, prep_time, evap_time,
+            U0_init, U0_final, dt, save_every, backend, seed0 + tr * 1_000_003, Vh, cap_mask,
+            psi_sum, dens_sum, n_tot_sum, dN_evap, dN_k3, save_times, D)
+    end
+    dV = cell_volume(grid)
+    M = n_traj
+    t_ms = save_times ./ u.omega_ref .* 1e3
+    N_tot = n_tot_sum ./ M
+    N0 = map(1:n_save) do i
+        coh = abs2.(psi_sum[i] ./ M)
+        meandens = dens_sum[i] ./ M
+        nc = M > 1 ? coh .- (meandens .- coh) ./ (M - 1) : coh
+        max(sum(nc) * dV, 0.0)
+    end
+    (t_ms=t_ms, N=N_tot, N0=N0, frac=N0 ./ max.(N_tot, eps()),
+        dN_evap=dN_evap[] / M, dN_k3=dN_k3[] / M)
+end
+
+# Driver: finite-depth FORT-spill evaporation at the 0-D formation handoff.
+function ft_evaporation_fort(; grid_n::Int=48, box::Float64=24.0, n_traj::Int=8,
+    prep_time::Float64=15.0, evap_time::Float64=45.0, gs_steps::Int=2500,
+    T_prep_over_Tc::Float64=1.05, U0_init_over_Tprep::Float64=1.5, U0_final_over_mu::Float64=1.3,
+    cap_strength::Float64=30.0, cap_width_frac::Float64=0.15, gamma::Float64=0.1,
+    save_every::Int=20, backend=CPUBackend(),
+    csv::String=joinpath(@__DIR__, "eu_ft_evap_fort.csv"))
+    cal = ft_reservoir_calibration()
+    u = cal.u
+    print_units(u)
+    s = _setup(u, grid_n, box, gs_steps, backend)
+    Tc = Tc_harmonic(u.N)
+    T_prep = T_prep_over_Tc * Tc
+    k_cut = min(kcut_for(s.mu, T_prep), 0.95 * s.k_max)
+    U0_init = U0_init_over_Tprep * T_prep
+    U0_final = U0_final_over_mu * s.mu
+    @printf "μ=%.3f T_c=%.2f T_prep=%.2f k_cut=%.2f  Gaussian-FORT depth U₀: %.1f→%.1f  CAP str=%.0f w=%.1f\n" s.mu Tc T_prep k_cut U0_init U0_final cap_strength cap_width_frac * box
+    println("=== Finite-depth FORT-spill evaporation (γ=0; spill over U₀(t) → box-edge CAP + K₃) ===")
+    res = run_fort_evaporation_ensemble(u, s.grid, s.psi0; T_prep, k_cut, mu=s.mu, gamma,
+        prep_time, evap_time, U0_init, U0_final, cap_strength, cap_width_frac,
+        dt=0.01, save_every, n_traj, backend)
+    prep_ms = prep_time / u.omega_ref * 1e3
+    ic = something(findlast(<(prep_ms), res.t_ms), 1)
+    budget = res.N[end] + res.dN_evap + res.dN_k3
+    @printf "\n  ATOM BUDGET (closed): N_end=%.5g + spill=%.5g + K₃=%.5g = %.5g  vs N(closed-start)=%.5g  (Δ=%.2g%%)\n" res.N[end] res.dN_evap res.dN_k3 budget res.N[ic] 100 * (budget - res.N[ic]) / max(res.N[ic], eps())
+    @printf "  N₀ (closed): %.5g → %.5g   (cond. frac %.3f → %.3f)\n" res.N0[ic] res.N0[end] res.frac[ic] res.frac[end]
+    open(csv, "w") do io
+        println(io, "t_ms,N,N0,frac")
+        for i in 1:length(res.t_ms)
+            @printf io "%.4f,%.6g,%.6g,%.6f\n" res.t_ms[i] res.N[i] res.N0[i] res.frac[i]
+        end
+    end
+    @printf "  CSV → %s\n" csv
+    (u=u, res=res)
+end
+
+function ft_evap_fort_smoke(; backend=CPUBackend())
+    ft_evaporation_fort(; grid_n=24, box=18.0, prep_time=4.0, evap_time=8.0,
+        gs_steps=400, n_traj=2, backend)
+end
+
 # Quick local logic smoke (small, fast — NOT physical resolution).
 function ft_evap_smoke(; backend=CPUBackend())
     ft_evaporation_sgpe(; grid_n=24, box=16.0, T_prep_over_Tc=1.2, prep_time=4.0,
@@ -851,6 +1021,14 @@ if abspath(PROGRAM_FILE) == @__FILE__
         ft_evap_k3_law(; backend=bk)
     elseif mode == "evap_k3law_smoke"
         ft_k3law_smoke(; backend=bk)
+    elseif mode == "evap_fort"
+        ft_evaporation_fort(; backend=bk)
+    elseif mode == "evap_fort_smoke"
+        ft_evap_fort_smoke(; backend=bk)
+    elseif mode == "cutoff_study"
+        ft_cutoff_study(; backend=bk)
+    elseif mode == "cutoff_smoke"
+        ft_cutoff_smoke(; backend=bk)
     elseif mode == "kcut"
         ft_kcut_convergence(; backend=bk)
     elseif mode == "shape"

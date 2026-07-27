@@ -77,13 +77,17 @@ the Eu units live in the explicit $c_0,K_3$.
 | **estimator** | $N_0$ independent of trajectory count $M$ | $M{=}3\to6448$, $M{=}8\to6401$ ✓ |
 
 **Honest cutoff limitation (not hand-waved).** The classical field IS
-cutoff-dependent. Over $k_\mathrm{cut}\in[4.6,8.0]$ the thermal cloud spreads
-$\sim79\%$ while the condensate $N_0$ moves $\sim30\%$: $N_0$ is the *more robust*
-of the two but NOT cutoff-free. So absolute $N_0$ is quoted at the physical cutoff
-$\varepsilon-\mu\approx T$, and only comparisons at FIXED $k_\mathrm{cut}$ (the
-shape result) are cutoff-clean. The ideal-Bose $1-(T/T_c)^3$ is drawn only for
-orientation — the classical (Rayleigh–Jeans) thermal over-populates, so $N_0/N$
-sits below it; it is not a fit.
+cutoff-dependent, and the equilibrium condensate $N_0$ does **NOT converge** with it.
+A 64³/96³ TSUBAME scan (`eu_ft_cutoff_study.png`) shows $N_0$ falling monotonically
+with $k_\mathrm{cut}$ AND, at fixed $k_\mathrm{cut}$, the 96³ curve lying *below* 64³ —
+i.e. refining the grid does not flatten it. This is the grand-canonical classical-field
+problem: at fixed $\mu$, enlarging the classical region adds Rayleigh–Jeans thermal
+modes (unbounded) that dilute the coherent field, so the *equilibrium* $N_0$ is not a
+converged absolute observable (earlier "$N_0$ robust, ~30%" was over the narrow
+$k_\mathrm{cut}\in[4.6,8.0]$ window only). **Consequence:** trust the SGPE for the
+loss-law ARBITER (the $N_0^{9/5}$ decay of a pure, cutoff-free condensate) and for
+relative comparisons at FIXED $k_\mathrm{cut}$ — NOT for an absolute equilibrium $N_0$.
+The ideal-Bose $1-(T/T_c)^3$ is drawn only for orientation, not a fit.
 
 ## Equilibrium is analytic; the SGPE is for the dynamics
 
@@ -260,12 +264,20 @@ Honest limits: the **evaporation timescale is not physical** — the ms-scale SG
 run the s-scale evaporation ramp (the run above is $\sim60\times$ too fast), so the
 number-conserving SGPE is an arbiter for the **fast physics** (three-body decay, the
 $N_0^{9/5}$ law) and only *illustrative* for the slow evaporation itself. Additionally
-the c-field is cutoff-dependent; the radial knife is a proxy for finite-depth FORT spill;
-and this is not the full SPGPE (it omits the growth + energy-damping scattering reservoir
+the c-field is cutoff-dependent; and this is not the full SPGPE (it omits the growth + energy-damping scattering reservoir
 of Rooney/Blakie/Bradley, arXiv:1210.0952). It is a more principled arbiter than the 0-D
 model on the loss law, not a calibrated absolute-number evaporation.
 
+**Finite-depth FORT spill** (`eu_ft_evap_fort.png`, driver mode `evap_fort`): the
+radial energy-knife is replaced by a physical finite-depth Gaussian FORT
+$V(r)=U_0(t)(1-e^{-V_h/U_0(t)})$ (central $\omega=1$, depth $U_0$); lowering $U_0(t)$
+lets atoms above the barrier climb out and be removed by a box-edge CAP absorbing
+boundary — a physical spill, not an ad-hoc threshold. 48³/D=3 GPU: budget exact
+($\Delta\sim10^{-13}$), condensate fraction $0.44\to0.97$, $N_0$ $50\text{k}\to62\text{k}$
+(the thermal cloud condenses as it is spilled). Same timescale caveat as above.
+
 ## Next
-Higher-resolution ($64^3$–$96^3$) cutoff-convergence study of the evaporation SGPE
-on TSUBAME; a finite-depth Gaussian-FORT spill operator (vs the radial knife); an
-adiabatic (ramped) box if a box trap becomes available.
+The $64^3$–$96^3$ cutoff-convergence study of the evaporation SGPE is running on
+TSUBAME; an adiabatic (ramped) box if a box trap becomes available; and the full
+SPGPE energy-damping scattering reservoir (Rooney/Blakie/Bradley) for the reservoir
+coupling the closed field omits.
