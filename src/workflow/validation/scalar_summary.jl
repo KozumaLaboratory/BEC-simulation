@@ -24,7 +24,7 @@ export run_scalar_summary, write_run_summary,
 const RUN_SUMMARY_FILENAME = "summary.json"
 # Bump when extraction logic changes so stale summaries (older extractor)
 # can be targeted for re-backfill via `_extractor_version`.
-const RUN_SUMMARY_EXTRACTOR_VERSION = "1"
+const RUN_SUMMARY_EXTRACTOR_VERSION = "2"  # v2: + rotation-invariant mF
 
 # Run `f()`; on exception record "field: reason" in `errs` and return
 # `missing`. A `nothing` / non-finite result is treated as legitimately
@@ -95,6 +95,30 @@ function run_scalar_summary(r::RunResult)
         tot = sum(Nm)
         tot > 0 ? Nm ./ tot : Nm
     end)
+    # Rotation-invariant order parameter mF = |⟨F⟩|/F of the peak-density (bulk)
+    # spinor. Unlike Mz (=⟨F_z⟩), this stays correct when the FM state lies in the
+    # xy-plane (B=0 DDI soft manifold) — the FM↔polar order variable. Carrying it
+    # here lets a phase scan read the order parameter straight from summary.json,
+    # never loading the heavy psi (Stage 1 / "graphs are the deliverable").
+    bag["mF"] = _try_field(
+        errs,
+        "mF",
+        () -> begin
+            F = r.atom.F
+            D = 2F + 1
+            sdim = ndims(r.psi)
+            dens = dropdims(sum(abs2, r.psi; dims=sdim); dims=sdim)
+            z = ComplexF64[r.psi[argmax(dens), c] for c in 1:D]
+            nz = norm(z)
+            nz > 0 || return missing
+            z ./= nz
+            sm = spin_matrices(F)
+            sqrt(
+                real(dot(z, sm.Fx * z))^2 + real(dot(z, sm.Fy * z))^2 +
+                real(dot(z, sm.Fz * z))^2,
+            ) / F
+        end,
+    )
 
     # Dynamics-only drift metrics (getproperty throws without a series).
     if r.dynamics !== nothing

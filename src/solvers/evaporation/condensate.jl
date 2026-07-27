@@ -38,8 +38,10 @@ function condensate_split(N::Real, T::Real, ω̄::Real)
     (Float64(N) - N_th, N_th)
 end
 
-# Thomas–Fermi peak density of an N₀-atom condensate in a harmonic trap, and the
-# per-atom three-body loss rate K₃⟨n²⟩ it produces (⟨n²⟩_TF = 4/7 n₀²).
+# Thomas–Fermi peak density of an N₀-atom condensate in a harmonic trap, and the per-atom
+# three-body loss rate K₃⟨n²⟩ it produces (atoms-lost convention dN = −K₃⟨n²⟩N, K₃ ≡ Söding L₃).
+# For a TF condensate ⟨n²⟩ = ∫n³/∫n = (8/21) n₀² (NOT 4/7 n₀², which is ⟨n⟩/n₀ — a different moment).
+# as_mult Feshbach-tunes a_s (K₃∝a_s⁴, universal).
 function _condensate_three_body_rate(N0::Float64, ω̄::Float64, p::EvapParams, m::Float64,
     as_mult::Float64=1.0)
     a_eff = p.a_s * as_mult                                      # Feshbach-tuned a_s
@@ -49,7 +51,7 @@ function _condensate_three_body_rate(N0::Float64, ω̄::Float64, p::EvapParams, 
     μ = 0.5 * Units.HBAR * ω̄ * (15 * N0 * a_eff / aho)^(2 / 5)   # TF chemical potential
     g = 4π * Units.HBAR^2 * a_eff / m
     n0 = μ / g                                                   # TF peak density
-    K3_eff * (4 / 7) * n0^2
+    K3_eff * (8 / 21) * n0^2
 end
 
 """Trajectory of a two-component evaporation run (thermal + condensate)."""
