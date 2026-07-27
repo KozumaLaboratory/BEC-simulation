@@ -44,6 +44,39 @@ end
         @test haskey(s, "norm") && haskey(s, "Mz") && haskey(s, "populations")
     end
 
+    @testset "f_s_leggett appears only for box-spanning states" begin
+        # The default fixture puts all the weight in one voxel — a maximally
+        # disconnected "cloud". f_s would be 0 by geometry, so the key must be
+        # absent rather than a zero a scan could read as signal.
+        s = run_scalar_summary(_summary_fixture())
+        @test !haskey(s, "f_s_leggett")
+        @test !any(startswith.(s["extraction_error"], "f_s_leggett"))  # absent ≠ error
+
+        # A uniform state spans the box and is fully superfluid on every axis.
+        grid = make_grid(GridConfig((8, 8), (4.0, 4.0)))
+        atom = AtomSpecies("test", 1.0e-26, 1, 0.0, 0.0, 0.0)
+        psi = zeros(ComplexF64, 8, 8, 3)
+        psi[:, :, 1] .= 1.0 / 8
+        r = RunResult("/tmp/fake.jld2", psi, grid, atom, InteractionParams(Dict(0 => 1.0)))
+        s = run_scalar_summary(r)
+        @test haskey(s, "f_s_leggett")
+        @test length(s["f_s_leggett"]) == 2
+        @test all(≈(1.0; atol=1e-12), s["f_s_leggett"])
+
+        # Modulated along x only: axis 1 impeded by √(1−A²), axis 2 free.
+        A = 0.6
+        kx = 2π / 4.0
+        psi_m = zeros(ComplexF64, 8, 8, 3)
+        for (i, x) in enumerate(grid.x[1])
+            psi_m[i, :, 1] .= sqrt(1.0 + A * cos(kx * x)) / 8
+        end
+        s = run_scalar_summary(
+            RunResult("/tmp/fake.jld2", psi_m, grid, atom, InteractionParams(Dict(0 => 1.0)))
+        )
+        @test s["f_s_leggett"][1] ≈ sqrt(1 - A^2) rtol = 1e-2
+        @test s["f_s_leggett"][2] ≈ 1.0 atol = 1e-12
+    end
+
     @testset "with dynamics → drift keys present" begin
         dyn = DynamicsTimeSeries([0.0, 0.5, 1.0], [1.0, 1.0, 0.99],
             [-6.0, -5.9, -5.8], [-6.0, -5.95, -5.9])
