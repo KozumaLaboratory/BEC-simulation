@@ -24,8 +24,8 @@ include(joinpath(@__DIR__, "eu_shape_finite_t.jl"))
 
 using Printf
 
-const SHAPE_CSV = joinpath(@__DIR__, "..", "..", "..",
-    "figs", "eu_evaporation_unified_smooth", "unified_shape.csv")
+const SHAPE_CSV = get(ENV, "SBEC_SHAPE_CSV", joinpath(@__DIR__, "..", "..", "..",
+    "figs", "eu_evaporation_unified_smooth", "unified_shape.csv"))
 const T_FORM = 1.78    # s — BEC formation time in the 0-D unified run
 
 # Read the 0-D optimum's ω̄(t) and build the two post-formation schedules, normalised to
