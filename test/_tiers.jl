@@ -48,6 +48,7 @@ const FAST_TESTS = [
     "workflow/test_state_zoo_wrappers_runnable.jl",
     "workflow/test_checkpoint.jl",
     "workflow/test_checkpointed_sweep.jl",
+    "workflow/test_gs_stage_cache.jl",
     "manuscript/test_lemma1_general_S.jl",
     "manuscript/test_f5_f7_polyhedral.jl",
     "manuscript/test_f9_f11_polyhedral.jl",
@@ -388,6 +389,7 @@ const FULL_EXTRA = [
     "rotating_basis/test_rotating_frame_regression.jl",
     "analysis/test_bogoliubov_goldstone.jl",
     "dynamics/test_sgpe_fdr.jl",
+    "dynamics/test_sgpe_stoof.jl",
     # Orphan-test audit 2026-05-25: promoted from unregistered → FULL_EXTRA.
     # All run ITP / RTP / find_ground_state and require the "full" tier.
     # The two Bug-4 regression pins are particularly load-bearing.
