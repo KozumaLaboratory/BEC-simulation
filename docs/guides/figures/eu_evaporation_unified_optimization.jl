@@ -107,8 +107,9 @@ rA = run_evaporation_bec(trap, ramp_best, p; N0=N0, T0=T0)
     rA.N0_final, rA.T_final * 1e9, cf(rA), bests * SPAN)
 
 # ---------- Stage B: tightness axis m_ω(t) on the best ramp ----------
-const KW = 6                    # piecewise-linear control points over normalised time τ∈[0,1]
-const MFLOOR = 0.40; const MCEIL = 2.0
+const KW = length(ARGS) >= 4 ? parse(Int, ARGS[4]) : 6   # piecewise-linear control pts over τ∈[0,1]
+const MFLOOR = length(ARGS) >= 5 ? parse(Float64, ARGS[5]) : 0.40
+const MCEIL = 2.0
 const MONO = length(ARGS) >= 3 ? parse(Bool, ARGS[3]) : false  # constrain m_ω non-increasing (smooth waist opening)
 grid_best = evap_trap_grid(trap, ramp_best)   # fixed ramp ⇒ build the trap grid once, reuse for all m_ω
 dur = ramp_best.times[end] - ramp_best.times[1]
