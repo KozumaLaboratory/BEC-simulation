@@ -694,11 +694,17 @@ function ft_evaporation_sgpe(; grid_n::Int=48, box::Float64=20.0,
     for i in 1:length(res.t_ms)
         @printf "  %-9.2f %-11.5g %-11.5g %-9.3f\n" res.t_ms[i] res.N[i] res.N0[i] res.frac[i]
     end
-    N_start = res.N[1]
+    # Budget baseline = N at the START OF THE CLOSED PHASE (t≥prep_time), not the
+    # first save (which is during prep, where the grand-canonical bath still sets N).
+    # dN_evap/dN_k3 accumulate only in the closed phase, so by telescoping
+    # N_end + dN_evap + dN_k3 = N(closed-start) exactly — that is the conservation check.
+    prep_ms = prep_time / u.omega_ref * 1e3
+    ic = something(findfirst(>=(prep_ms), res.t_ms), 1)
+    N_start = res.N[ic]
     N_end = res.N[end]
     budget = N_end + res.dN_evap + res.dN_k3
-    @printf "\n  ATOM BUDGET (closed phase): N_end=%.5g + evap=%.5g + K₃=%.5g = %.5g  vs  N_start=%.5g  (Δ=%.2g%%)\n" N_end res.dN_evap res.dN_k3 budget N_start 100 * (budget - N_start) / max(N_start, eps())
-    @printf "  N₀: %.5g → %.5g   (cond. frac %.3f → %.3f)\n" res.N0[1] res.N0[end] res.frac[1] res.frac[end]
+    @printf "\n  ATOM BUDGET (closed phase): N_end=%.5g + evap=%.5g + K₃=%.5g = %.5g  vs  N(closed-start)=%.5g  (Δ=%.2g%%)\n" N_end res.dN_evap res.dN_k3 budget N_start 100 * (budget - N_start) / max(N_start, eps())
+    @printf "  N₀ (closed phase): %.5g → %.5g   (cond. frac %.3f → %.3f)\n" res.N0[ic] res.N0[end] res.frac[ic] res.frac[end]
     open(csv, "w") do io
         println(io, "t_ms,N,N0,frac")
         for i in 1:length(res.t_ms)
