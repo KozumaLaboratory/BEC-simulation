@@ -46,6 +46,7 @@
 #   KR_SHAPE_AMP=9          :slow_at — peak slow-down factor − 1
 #   KR_SHAPE_REF=<csv>      :const_dF — trajectory to read d⟨F⊥⟩/dκ from
 #   KR_SEED_BRANCH=dn       library branch for the seed (equivalent at κ ≤ 0.9)
+#   KR_SAVE_PSI=0           persist the final ψ (needed for phase-winding analysis)
 #   KR_REF=0                also converge the two reference branches at κ_end
 #   KR_DT=0.002  KR_FRAMES=200  KR_GRID=32  KR_BOX=24
 #   KR_LIB=figs/eu_gs_library   KR_OUT=figs/eu_kappa_ramp
@@ -80,6 +81,7 @@ end
 const HOLD = getf("KR_HOLD", 0.0)
 const ROUND_TRIP = !SMOKE && get(ENV, "KR_ROUND_TRIP", "1") == "1"
 const SEED_BRANCH = get(ENV, "KR_SEED_BRANCH", "dn")
+const SAVE_PSI = get(ENV, "KR_SAVE_PSI", "0") == "1"
 const REF = get(ENV, "KR_REF", "0") == "1"
 const DT = SMOKE ? 0.004 : getf("KR_DT", 0.002)
 const FRAMES = SMOKE ? 20 : Int(getf("KR_FRAMES", 200))
@@ -401,6 +403,17 @@ function run_kappa_ramp(s, τ)
             writedlm(io, reshape(Any[r.kappa, r.t_ms, r.pops...], 1, :))
         end
     end
+    SAVE_PSI && jldsave(base * "_final.jld2";
+        psi=Array(ws.state.psi), t=rows[end].t, kappa=rows[end].kappa,
+        kappa_0=K0, kappa_1=K1, B_uG=B_HOLD, tau=τ, shape=String(SHAPE),
+        pin_bx=s.pin, seed_path=s.path,
+        c0=PRESET.interactions.c[0], c1=PRESET.interactions.c[1],
+        c_dd=PRESET.c_dd, c_lhy=0.0,
+        c_dict=Dict(0 => PRESET.interactions.c[0], 1 => PRESET.interactions.c[1]),
+        zeeman_p=P_HOLD, zeeman_q=0.0,
+        grid_n_points=(GRID_N, GRID_N, GRID_N), grid_box_size=(BOX, BOX, BOX),
+        dt=DT, imaginary_time=false, step=rows[end].step)
+
     (; τ, rows, wall_s=time() - t0)
 end
 
