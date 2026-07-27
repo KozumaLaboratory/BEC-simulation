@@ -413,7 +413,7 @@ function _gauss_legendre(n::Int, a::Float64, b::Float64)
     (nodes, weights)
 end
 
-export lima_pelster_Q5, compute_c_lhy_with_ddi
+export lima_pelster_Q5, compute_c_lhy_with_ddi, scalar_lhy_coefficient
 
 """
     lima_pelster_Q5(eps_dd) → Float64
@@ -449,4 +449,30 @@ Apply the Lima-Pelster DDI correction to a scalar LHY coefficient:
 """
 function compute_c_lhy_with_ddi(c_lhy_scalar::Float64, eps_dd::Float64)
     c_lhy_scalar * lima_pelster_Q5(eps_dd)
+end
+
+"""
+    scalar_lhy_coefficient(a_s_over_a_ho, N_atoms; eps_dd=0.0) → Float64
+
+Dimensionless scalar (Lee-Huang-Yang / quantum-fluctuation) coefficient in this
+repo's per-particle convention: with `∫|ψ|² dV = 1` and `c₀ = 4π(a_s/a_ho)N`,
+
+    E_LHY/N = (2/5)·c_lhy·∫n^{5/2} dV,     μ_LHY = c_lhy·n^{3/2}
+
+Derived from `γ_QF = (32/3)·g·√(a_s³/π)` with `g = 4πℏ²a_s/m`, i.e.
+`γ_QF = (128√π/3)(ℏ²/m)a_s^{5/2}`, which in these units is
+
+    c_lhy = (128√π/3)·(a_s/a_ho)^{5/2}·N^{3/2}·Q₅(ε_dd)
+
+Equivalently `c_lhy/c₀ = (32/3)√((a_s/a_ho)³N/π)`, which reproduces the SI
+ratio `μ_LHY/μ_contact = (32/3)√(n_SI·a_s³/π)` — the statement with no
+convention freedom, gated by `test/oracles/test_scalar_lhy_si_roundtrip.jl`.
+
+Single declaration point: the YAML `lhy: {kind: scalar}` auto-derivation and
+the scalar-eGPE `gamma_lhy` both read it, so the two paths cannot drift.
+"""
+function scalar_lhy_coefficient(a_s_over_a_ho::Real, N_atoms::Real; eps_dd::Real=0.0)
+    ah = abs(Float64(a_s_over_a_ho))
+    n = Float64(N_atoms)
+    (128.0 * sqrt(π) / 3.0) * ah^2.5 * n^1.5 * lima_pelster_Q5(Float64(eps_dd))
 end
