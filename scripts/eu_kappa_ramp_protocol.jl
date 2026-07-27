@@ -4,10 +4,11 @@
 # Why this path. The field-driven route has to cross a barrier: above B_eq the
 # flower is metastable, below it the polarised state is, and a mean-field T=0 ramp
 # cannot leave a metastable minimum until its spinodal. Measured 2026-07-27 at
-# κ=1.8: the flower survives a B ramp to 100 µG at every rate from 4 ms to 434 ms
-# (the upper spinodal is outside the window), and the polarised branch only cants
-# gradually on the way down — so a B ramp does not prepare the flower ground state
-# on these timescales.
+# κ=1.8 over 4–434 ms: the flower survives a B ramp to 100 µG at EVERY rate (the
+# upper spinodal is outside the window), and the polarised branch converts on the
+# way down only once the ramp reaches 434 ms — then sharply, at B = 27.4 µG
+# (sharpness 8.0 vs 1.65 at 145 ms), but overshooting to ⟨F⊥⟩ = 3.72 with ringing.
+# So the field route does reach the flower state, at ~0.4 s, and delivers it HOT.
 #
 # The κ route has no barrier to cross. Below the tricritical point (κ_tc ≈ 0.95)
 # the transition is a CROSSOVER: one branch, δ⟨F⊥⟩ ≈ 10⁻³, so the ground state is

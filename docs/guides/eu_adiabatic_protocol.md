@@ -113,6 +113,28 @@ ramp. **Ramp-speed design is therefore set entirely by the collective texture
 rearrangement timescale**, which has no closed form here and is what the rate scan
 measures.
 
+## Result at $\kappa = 1.8$ (2026-07-27, 32³)
+
+| leg | outcome |
+|---|---|
+| rise (flower, 65 → 100 µG) | flower survives at **every** rate 4–434 ms; $\langle F_\perp\rangle$ ends 1.61–1.89. The upper spinodal is above 100 µG |
+| fall (polarised, 64 → 20 µG) | converts only at $\tau = 434$ ms: sharp jump at **$B = 27.4\ \mu$G** (sharpness 8.0, vs 1.65 at 145 ms), $\langle F_\perp\rangle\ 0.80 \to 3.58$, overshooting 3.72 with ringing |
+
+So the field route *does* prepare the flower state — at $\tau \approx 0.4$ s, sweeping
+to below 30 µG — but the overshoot and ringing say it arrives **excited**, not as a
+cold ground state. The loop is wide and asymmetric: $[\approx 27, > 100]\ \mu$G,
+consistent with the 35–85 µG spinodal range the static demagnetisation law implies.
+
+The $\kappa = 0.8$ control shows a single smooth branch with no jump, as a crossover
+must.
+
+Because the conversion is a spinodal collapse rather than an adiabatic following,
+the colder route is to avoid the barrier entirely: prepare on the crossover side and
+cross the tricritical point along $\kappa$ instead —
+`scripts/eu_kappa_ramp_protocol.jl`, driven by
+`scripts/run_eu_kappa_ramp.sh`. Comparing the two endpoints at the same
+$(B, \kappa)$ is the point of `KR_REF=1`.
+
 ## Limits of the present run
 
 - **Grid 32³** — the library's grid. 32³ and 64³ agreed to < 1 % on early-time Eu
