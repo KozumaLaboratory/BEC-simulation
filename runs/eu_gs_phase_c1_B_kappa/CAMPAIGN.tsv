@@ -13,3 +13,4 @@ config_c1kappa_B60.yaml	submit_c1kappa.sh	eu_c1k_B60	195	2	0:40:00	c1xkappa plan
 config_c1_refine_order.yaml	submit_c1_refine.sh	eu_c1ref	96	2	0:40:00	FM/polar transition ORDER refine
 config_c1_precise_B0k1.yaml	submit_c1_refine.sh	eu_c1prec	13	2	0:40:00	precision c1* (first-order FM/polar, B0 k1)
 config_c1_precise_kappa_B0.yaml	submit_c1_refine.sh	eu_c1prk	34	2	0:40:00	precision c1*(kappa) first-order line B0 (k=0.5,1.5)
+config_c1_precise_kappa2_B0.yaml	submit_c1_refine.sh	eu_c1prk2	34	2	0:40:00	c1*(kappa) tricritical probe B0 (k=2.0,2.5)
