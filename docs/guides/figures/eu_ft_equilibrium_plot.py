@@ -13,6 +13,11 @@ Overlays analytic curve + SGPE points on the same T/T_c axis (genuine single-plo
 consolidation of the former analytic/SGPE 2-panel pair).
 
 Usage: python3 eu_ft_equilibrium_plot.py [analytic.csv] [sgpe.csv]
+
+Provenance:
+- shows: condensate fraction N0/N vs T/Tc — analytic mu-pinned curve + ideal-Bose reference + SGPE points, single axes
+- referenced by: docs/guides/eu_shape_finite_t.md
+- supersedes: eu_ft_equilibrium_analytic_plot.py (its analytic curve is folded into this single-axes plot)
 """
 import sys
 import os

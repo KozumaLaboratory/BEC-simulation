@@ -6,6 +6,11 @@ knob (slope -2 in V). At a matched footprint the uniform profile carries a
 lower ⟨n²⟩ — hence lower 3-body loss rate — than the peaked harmonic condensate.
 
 Usage: python3 eu_shape_box_lever_plot.py [eu_shape_box_lever.csv]
+
+Provenance:
+- shows: box <n^2> = (N/V)^2 geometric loss-rate lever vs the peaked harmonic profile at matched footprint (log-log, slope -2)
+- referenced by: docs/guides/eu_shape_optimization.md
+- supersedes: none
 """
 import sys
 import os

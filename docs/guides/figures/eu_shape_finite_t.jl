@@ -25,6 +25,11 @@
 # Run (CPU smoke):  julia --project=. docs/guides/figures/eu_shape_finite_t.jl --smoke
 # Run (GPU):        LD_LIBRARY_PATH=/usr/lib/wsl/lib julia --project=. \
 #                     -e 'import CUDA; include("docs/guides/figures/eu_shape_finite_t.jl"); ft_smoke(backend=CUDABackend())'
+#
+# Provenance:
+# - shows: DRIVER — computes the finite-T Stoof-SGPE CSVs behind the eu_ft_* figures (equilibrium, evap_noneq, decompress_refine, recipe, shape_cal); runs on TSUBAME H100
+# - referenced by: docs/guides/eu_shape_finite_t.md
+# - supersedes: none (driver)
 
 include(joinpath(@__DIR__, "eu_shape_optimization.jl"))  # EuUnits, ground_state, harmonic_schedule, …
 
