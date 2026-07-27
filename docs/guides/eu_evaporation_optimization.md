@@ -162,6 +162,21 @@ systematic (±20 %) into a statistical one (~4 %) with a standard measurement.
 
 ![omega measurement](../../figs/eu_evaporation_optimization/omega_measurement.png)
 
+## Real-ramp check (experiment-facing)
+
+![real lab ramp](../../figs/eu_evaporation_optimization/js_lab_ramp.png)
+
+Running the **literal 2020-12 lab evaporation sequence** (from `基底状態MOT_20201210更新.js`:
+hFORT $10\,\text{W}\to0.135\,\text{W}$ over $7.35$ s while vFORT $0\to$ max, calibration
+$P=10^{-3.72+0.496V}$) through the 0-D model at the direct-measured $K_3=1.2\times10^{-41}$ gives
+$N_{\rm BEC}\approx7\times10^3$, $T\approx110$ nK, cf $\approx0.96$, with the BEC forming late
+($\sim6.4$ s). That sits right in the 2020-12 epoch's measured window (thesis first BEC $3\times10^3$
+→ optimized $1.5\times10^4$), so the model tracks the real apparatus. It also makes the §"experiment
+guidance" point concrete: the shaping levers (waist + Feshbach, $\sim1.5\times$) sit **on top of** this
+evaporation ramp — the ramp does the heavy lifting (the $10^6\to10^4$ cooling), the shaping adds the
+last $\sim1.5\times$. (Caveat: vFORT's power→depth calibration is not in the JS file — the analog "10"
+is scaled to the thesis vODT max $7.4$ W.)
+
 ## Caveats / open
 
 - $K_3\propto a_s^4$ is the universal smooth envelope; near a Feshbach resonance the real $K_3$
