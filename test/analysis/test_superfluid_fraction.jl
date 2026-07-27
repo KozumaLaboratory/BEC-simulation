@@ -24,24 +24,37 @@ _fs_cosine(A) = sqrt(1 - A^2)
         for A in (0.0, 0.3, 0.6, 0.9)
             n = [1.0 + A * cos(k * x) for x in grid.x[1]]
             # The Leggett branch is a trapezoid sum of 1/n̄ over a period, which
-            # converges geometrically in the point count; the relaxed branch is
-            # a second-order finite-volume solve.
+            # converges geometrically in the point count.
             @test superfluid_fraction(n, grid) ≈ _fs_cosine(A) rtol = 1e-8
             @test superfluid_fraction(n, grid; method=:relaxed) ≈ _fs_cosine(A) rtol = 5e-3
         end
     end
 
-    @testset "relaxed branch is second-order in dx" begin
-        L = 10.0
+    @testset "relaxed converges to Leggett from above, second order" begin
+        # Axis-only modulation ⇒ no transverse rerouting ⇒ the two branches
+        # describe the same continuum number, and any gap is the relaxed
+        # branch's truncation error. Pinning both the sign (always above) and
+        # the order (dx²) is what lets a user tell discretisation from physics
+        # when the two disagree on a real state.
+        L = 7.0
         A = 0.9
         k = 2π / L
-        err = map((32, 64, 128)) do npt
+        gaps = map((32, 64, 128)) do npt
             grid = make_grid(GridConfig(npt, L))
             n = [1.0 + A * cos(k * x) for x in grid.x[1]]
-            abs(superfluid_fraction(n, grid; method=:relaxed) - _fs_cosine(A))
+            superfluid_fraction(n, grid; method=:relaxed) -
+            superfluid_fraction(n, grid; method=:leggett)
         end
-        @test err[1] / err[2] > 3.5
-        @test err[2] / err[3] > 3.5
+        @test all(gaps .> 0)                        # one-sided truncation error
+        @test gaps[1] / gaps[2] > 3.5               # second order
+        @test gaps[2] / gaps[3] > 3.5
+        @test gaps[3] < 1e-3                        # and small once resolved
+
+        # Same in 3D when only the flow axis is modulated.
+        grid3 = make_grid(GridConfig((64, 8, 8), (L, 4.0, 4.0)))
+        n3 = [1.0 + 0.8 * cos(k * x) for x in grid3.x[1], _ in grid3.x[2], _ in grid3.x[3]]
+        @test superfluid_fraction(n3, grid3; method=:relaxed) ≈
+            superfluid_fraction(n3, grid3; method=:leggett) rtol = 5e-3
     end
 
     @testset "f_s decreases monotonically with contrast" begin
@@ -100,6 +113,8 @@ _fs_cosine(A) = sqrt(1 - A^2)
             for d in 1:3
                 f_l = superfluid_fraction(n, grid; direction=d)
                 f_r = superfluid_fraction(n, grid; direction=d, method=:relaxed)
+                # Genuinely 3D structure, so rerouting dominates the relaxed
+                # branch's positive truncation error and the ordering shows.
                 @test 0.0 <= f_r <= f_l <= 1.0 + 1e-10
             end
         end
@@ -135,6 +150,43 @@ _fs_cosine(A) = sqrt(1 - A^2)
             (3 + 6 + 9 + 12) / 4]
         @test plane_averaged_density(n, 2) ≈ [2.0, 5.0, 8.0, 11.0]
         @test_throws ArgumentError plane_averaged_density(n, 3)
+    end
+
+    @testset "YAML analyzer face" begin
+        grid = make_grid(GridConfig((16, 16), (6.0, 6.0)))
+        kx = 2π / 6.0
+        psi = zeros(ComplexF64, 16, 16, 3)
+        for (i, x) in enumerate(grid.x[1]), j in 1:16
+            psi[i, j, 2] = sqrt(1.0 + 0.7 * cos(kx * x))
+        end
+
+        r = SpinorBEC._run_analyzer(
+            :superfluid_fraction, psi, grid, Rb87, Dict{String, Any}()
+        )
+        @test r.directions == [1, 2]
+        # Modulated along x only: axis 1 is impeded, axis 2 is free.
+        @test r.f_s_leggett[1] ≈ _fs_cosine(0.7) rtol = 1e-3
+        @test r.f_s_leggett[2] ≈ 1.0 atol = 1e-12
+        @test r.f_s_relaxed[2] ≈ 1.0 atol = 1e-12
+        @test all(0.0 .< r.f_s_relaxed .<= 1.0 + 1e-10)
+
+        # `method` selects a branch; the other comes back NaN, not silently 0.
+        r_l = SpinorBEC._run_analyzer(
+            :superfluid_fraction, psi, grid, Rb87,
+            Dict{String, Any}("method" => "leggett", "directions" => [1]),
+        )
+        @test r_l.directions == [1]
+        @test isfinite(r_l.f_s_leggett[1])
+        @test isnan(r_l.f_s_relaxed[1])
+
+        @test_throws ArgumentError SpinorBEC._run_analyzer(
+            :superfluid_fraction, psi, grid, Rb87,
+            Dict{String, Any}("method" => "bogus"),
+        )
+        @test_throws ArgumentError SpinorBEC._run_analyzer(
+            :superfluid_fraction, psi, grid, Rb87,
+            Dict{String, Any}("directions" => [3]),
+        )
     end
 
     @testset "argument validation" begin

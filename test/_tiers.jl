@@ -117,6 +117,7 @@ const FAST_TESTS = [
     "foundation/test_types_validation.jl",
     "analysis/test_currents.jl",
     "analysis/test_superfluid_fraction.jl",
+    "analysis/test_superfluid_fraction_gp_twist.jl",
     "solvers/test_scalar_ddi_transverse_pad.jl",
     "hamiltonian/test_lhy_2d.jl",
     "analysis/test_bogoliubov_enhanced.jl",
@@ -368,6 +369,7 @@ const FULL_EXTRA = [
     "workflow/test_calibration_drift.jl",
     "workflow/test_dynamics_knobs.jl",
     "gpu/test_cuda_equivalence.jl",
+    "gpu/test_superfluid_fraction_gpu.jl",
     # GPU=CPU parity for the projected-GP momentum cutoff. Gates the host-array
     # mask broadcast bug (ws.grid.k_squared is a host Array even on a GPU
     # workspace); no-op on CPU-only CI. CPU high-k-removal sanity always runs.
