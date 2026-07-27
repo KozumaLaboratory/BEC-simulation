@@ -743,6 +743,50 @@ function ft_evap_cal_smoke(; backend=CPUBackend())
         gs_steps=400, n_traj=2, backend)
 end
 
+# ARBITER (same-physics): does the ab-initio 3D condensate three-body decay follow
+# the 0-D attractor law dN₀/dt = −γ N₀^{9/5}? (0-D: ⟨n²⟩=8/21 n₀², n₀∝N₀^{2/5} ⇒
+# −dN₀/dt ∝ N₀^{9/5}.) A pure GP condensate at the calibrated (ω̄,N) is evolved
+# CLOSED (γ_sgpe=0, NO evaporation) with K₃ only; the log-log slope of −dN₀/dt vs
+# N₀ should be 9/5=1.8 if the 0-D density/loss law holds ab-initio — which pins the
+# 0-D ~2× systematic to the formation DYNAMICS, not the static three-body law.
+function ft_evap_k3_law(; grid_n::Int=48, box::Float64=18.0, T_internal::Float64=80.0,
+    dt::Float64=0.01, gs_steps::Int=2500, save_every::Int=20, backend=CPUBackend(),
+    csv::String=joinpath(@__DIR__, "eu_ft_evap_k3law.csv"))
+    cal = ft_reservoir_calibration()
+    u = cal.u
+    s = _setup(u, grid_n, box, gs_steps, backend)
+    @printf "μ=%.3f  N=%.3g  (pure condensate, closed γ=0, K₃-only decay)\n" s.mu u.N
+    res = run_ensemble(u, s.grid, s.psi0; potential_of_t=harmonic_schedule(_ -> 1.0),
+        gamma_of_t=(_ -> 0.0), T=0.0, k_cut=Inf, mu=s.mu, loss_on=true,
+        n_traj=1, T_internal, dt, save_every, backend)
+    t = res.t_ms                                    # ms; slope is unit-independent
+    N = res.N
+    # centred finite-difference −dN/dt, fit log(−dN/dt) vs log(N) over decaying pts
+    dNdt = [-(N[i + 1] - N[i - 1]) / (t[i + 1] - t[i - 1]) for i in 2:(length(N) - 1)]
+    Nmid = N[2:(length(N) - 1)]
+    keep = (dNdt .> 0) .& (Nmid .> 0)
+    lx = log.(Nmid[keep]);
+    ly = log.(dNdt[keep])
+    slope = (length(lx) * sum(lx .* ly) - sum(lx) * sum(ly)) /
+            (length(lx) * sum(lx .^ 2) - sum(lx)^2)
+    @printf "\n  ARBITER: ab-initio −dN₀/dt ∝ N₀^%.3f   (0-D attractor law: 9/5 = 1.800)\n" slope
+    @printf "  ⇒ %s\n" (abs(slope - 1.8) < 0.2 ?
+                         "consistent — the 0-D three-body law holds ab-initio; the ~2× systematic is DYNAMICS" :
+                         "DEVIATES — the ab-initio static three-body loss differs from the 0-D N₀^{9/5} law")
+    open(csv, "w") do io
+        println(io, "t_ms,N0,slope_fit")
+        for i in 1:length(N)
+            @printf io "%.4f,%.6g,%.4f\n" t[i] N[i] slope
+        end
+    end
+    @printf "  N₀: %.5g → %.5g   CSV → %s\n" N[1] N[end] csv
+    (u=u, slope=slope, t_ms=t, N0=N)
+end
+
+function ft_k3law_smoke(; backend=CPUBackend())
+    ft_evap_k3_law(; grid_n=24, box=14.0, T_internal=20.0, gs_steps=400, backend)
+end
+
 function ft_smoke(; backend=CPUBackend())
     ft_equilibrium(; grid_n=32, box=16.0, T_over_Tc_list=[0.1, 0.6],
         T_equil=6.0, gs_steps=800, n_traj=2, backend)
@@ -803,6 +847,10 @@ if abspath(PROGRAM_FILE) == @__FILE__
         ft_evap_sgpe_cal(; backend=bk)
     elseif mode == "evap_sgpe_cal_smoke"
         ft_evap_cal_smoke(; backend=bk)
+    elseif mode == "evap_k3law"
+        ft_evap_k3_law(; backend=bk)
+    elseif mode == "evap_k3law_smoke"
+        ft_k3law_smoke(; backend=bk)
     elseif mode == "kcut"
         ft_kcut_convergence(; backend=bk)
     elseif mode == "shape"
