@@ -560,12 +560,18 @@ rotating the spinor leaves ε_LHY invariant to machine precision for contact
 direction texture (flower, spin vortex, skyrmion; all `|⟨F⟩|/F` = 1 everywhere)
 costs nothing. Varying the MAGNITUDE costs ~20% between `|⟨F⟩|/F` = 1 and 0.
 """
-function _lhy_texture_spread(psi_init, F::Int)
-    psi_init === nothing && return (0.0, 1.0, 1.0)
-    N = ndims(psi_init) - 1
-    D = size(psi_init, N + 1)
+_lhy_texture_spread(::Nothing, ::Int) = (0.0, 1.0, 1.0)
+
+# `Val(N)` comes from the ARRAY'S type parameter, never from `ndims(x)` —
+# CLAUDE.md "Type stability boundaries". Taking `N = ndims(psi_init) - 1` as a
+# runtime Int made `ntuple(..., N)` uninferrable and the whole function
+# returned `Tuple{Any,Any,Any}`, inside `make_workspace`, which is precisely
+# the path that documentation warns turns into a multi-minute JIT hang.
+function _lhy_texture_spread(psi_init::AbstractArray{<:Complex, M}, F::Int) where {M}
+    N = M - 1
+    D = size(psi_init, M)
     D == 2F + 1 || return (0.0, 1.0, 1.0)
-    n_pts = ntuple(d -> size(psi_init, d), N)
+    n_pts = ntuple(d -> size(psi_init, d), Val(N))
 
     # SUBSAMPLED on a stride. This is a threshold decision on a smooth field,
     # not a physical observable, and `make_workspace` runs per scan point —
@@ -579,7 +585,9 @@ function _lhy_texture_spread(psi_init, F::Int)
     # diagonal), threaded and already gated. Restating it as explicit 13×13
     # matrix-vector products cost 0.31 s and 695 MB at 96³.
     stride = max(1, floor(Int, (prod(n_pts) / 8000)^(1 / N)))
-    fx, fy, fz = spin_density_vector(psi_init, spin_matrices(F), N)
+    # `spin_matrices(F)` is `SpinMatrices{D}` with D only known at runtime,
+    # so the call's return type has to be narrowed at this boundary.
+    fx, fy, fz = spin_density_vector(psi_init, spin_matrices(F), N)::NTuple{3, Array{Float64, N}}
     sampled = CartesianIndices(ntuple(d -> 1:stride:n_pts[d], N))
 
     nmax = 0.0

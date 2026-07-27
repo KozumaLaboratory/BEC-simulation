@@ -70,6 +70,24 @@ using SpinorBEC: _lhy_texture_spread, _warn_lhy_texture, _LHY_TEXTURE_WARN
         end
     end
 
+    @testset "type-stable — it runs inside make_workspace" begin
+        # CLAUDE.md "Type stability boundaries": Workspace has 23+ type
+        # parameters and widening that reaches `make_workspace` shows up as a
+        # multi-minute JIT hang with no stack trace. This guard sits on that
+        # path, so its inference is part of its contract, not a nicety.
+        #
+        # It failed here first: `N = ndims(psi) - 1` as a runtime Int made
+        # `ntuple(..., N)` uninferrable and the function returned
+        # Tuple{Any,Any,Any}. Val(N) now comes from the array's type parameter.
+        for M in (2, 3, 4)                       # 1D, 2D, 3D grids
+            psi = randn(ComplexF64, ntuple(_ -> 4, M - 1)..., 2F + 1)
+            @inferred _lhy_texture_spread(psi, F)
+            @inferred _warn_lhy_texture(:full_bdg, psi, F)
+        end
+        @inferred _lhy_texture_spread(nothing, F)
+        @test @inferred(_lhy_texture_spread(nothing, F)) == (0.0, 1.0, 1.0)
+    end
+
     @testset "degenerate inputs do not throw" begin
         @test _lhy_texture_spread(nothing, F) == (0.0, 1.0, 1.0)
         @test _lhy_texture_spread(zeros(ComplexF64, 4, 4, 4, 2F + 1), F) ==
