@@ -28,6 +28,7 @@ docs/
 | End-to-end walkthrough (calibration → YAML → run → analyze) | `guides/lab_user_tutorial.md` |
 | YAML pattern recipes (scan, droplet, calibration, …) | `guides/pipeline_cookbook.md` |
 | Klaus 2022 / Eu fast-Larmor production path | `guides/klaus_regime.md` |
+| Adiabatic B-ramp protocol for the weak-field Eu GS transition | `guides/eu_adiabatic_protocol.md` |
 | Upgrade old configs after a convention change | `guides/migration_guide.md` |
 | Pick the right precision / save_every / k_cut | `guides/performance_tuning.md` |
 | Submit jobs on TSUBAME | `guides/tsubame.md` |
