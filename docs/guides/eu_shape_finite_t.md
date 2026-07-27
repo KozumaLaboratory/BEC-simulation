@@ -212,6 +212,44 @@ warped power drop; $+30$–$40\%$ BEC at formation, with the higher end a knife-
 then decompress the ODT to $\bar\omega\approx0.6\,\bar\omega_\mathrm{form}$, fast
 ($+16\%$ condensate) — both experimentally available with the harmonic trap alone.
 
+## Number-conserving evaporation SGPE (ab-initio arbiter)
+
+The 0-D model's absolute $N_0$ carries a $\sim2\times$ systematic (issue #75): it
+reproduces the measured lifetime but forms the BEC while the trap is still tight,
+so it is three-body-limited before decompression. To check that ab-initio without
+the grand-canonical pumping artifact of a fixed-$\mu$ reservoir (which pumps atoms
+into the condensate as the trap opens), we run a **closed-system evaporation SGPE**
+(Blakie PGPE evaporative cooling, PRA 72 063608): a hot thermal cloud is seeded by
+an SGPE prep, then evolved with the $\mu$-bath OFF ($\gamma=0$, so atom number is
+set by physics), cooled by a radial energy-knife that removes $|r|>R(t)$ (in
+$V=\tfrac12 r^2$, energy $>\tfrac12 R(t)^2$ — a shrinking $R(t)$ is the lowering trap
+depth) plus $K_3$. The two loss channels are tracked separately, so the closed atom
+budget $N_\mathrm{end}+\Delta N_\mathrm{evap}+\Delta N_{K_3}=N_\mathrm{start}$ is the
+number-conservation check (driver modes `evap_sgpe`, `evap_sgpe_cal`, `evap_k3law`).
+
+**Calibrated evaporation** (`eu_ft_evap_sgpe_cal.png`, $48^3$/$D{=}3$ GPU, seeded at
+the 0-D formation handoff $\bar\omega=2\pi\cdot284$ Hz, $N_\mathrm{BEC}=6.6\times10^4$,
+$T/T_c=1.0$): the atom budget closes to machine precision ($\Delta\sim10^{-13}$),
+and evaporation cools the cloud to a pure BEC (condensate fraction $0.42\to1.00$)
+with $N_0$ rising $\sim42\text{k}\to52\text{k}$ then $K_3$-eroding in the tight trap
+— the ab-initio confirmation that a tight trap $K_3$-erodes the condensate (diluting
+would preserve the peak, the issue-#75 strategy).
+
+**Same-physics arbiter** (`eu_ft_evap_k3law.png`): a pure condensate at the same
+$(\bar\omega,N)$ decays under $K_3$ only (closed, no evaporation). The 0-D attractor
+law predicts $-\dot N_0\propto N_0^{9/5}$ ($\langle n^2\rangle=\tfrac{8}{21}n_0^2$,
+$n_0\propto N_0^{2/5}$). The ab-initio 3D decay fits **$N_0^{1.796}$ vs the 0-D
+$N_0^{1.800}$** (48³/D=3), and the closed form $[N_0(0)^{-4/5}+\tfrac45\gamma t]^{-5/4}$
+overlays the SGPE data. So the 0-D *static* three-body loss is correct ab-initio,
+which pins the $\sim2\times$ systematic to the formation **dynamics**, not the loss
+law — an independent confirmation of the issue-#75 diagnosis.
+
+Honest limits: the c-field is still cutoff-dependent; the radial knife is a proxy
+for finite-depth FORT spill; and this is not the full SPGPE (it omits the growth +
+energy-damping scattering reservoir of Rooney/Blakie/Bradley, arXiv:1210.0952). It
+is a more principled arbiter than the 0-D model, not a calibrated absolute number.
+
 ## Next
-Realistic cooling trajectory $T(t),\mu(t)$ fed from `run_evaporation_bec`; widen the
-evaporation-ramp bounds; an adiabatic (ramped) box if a box trap becomes available.
+Higher-resolution ($64^3$–$96^3$) cutoff-convergence study of the evaporation SGPE
+on TSUBAME; a finite-depth Gaussian-FORT spill operator (vs the radial knife); an
+adiabatic (ramped) box if a box trap becomes available.
