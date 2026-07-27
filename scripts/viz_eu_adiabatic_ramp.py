@@ -8,9 +8,9 @@ Three deliverables:
   1. eu_adiabatic_hysteresis.png   ⟨F⊥⟩ vs B, both ramp directions, one facet per κ.
      The loop between the solid (rising B) and dashed (falling B) curves is the
      signature; the κ ≤ 0.9 facet is the control that must show none.
-  2. eu_adiabatic_loop_width.png   mean branch separation ⟨|Δ⟨F⊥⟩|⟩ vs ramp
-     duration. Saturating ⇒ bistability; decaying to zero ⇒ the loop was only
-     dynamical lag. The static (τ → ∞) δ⟨F⊥⟩ from the GS library is the target line.
+  2. eu_adiabatic_loop_edges.png   the spinodal pair — the field at which ⟨F⊥⟩
+     jumps on each leg — vs ramp duration. Saturating ⇒ bistability; closing onto
+     B_eq ⇒ the loop was only dynamical lag; no jump at all ⇒ crossover.
   3. eu_adiabatic_sg_signal.png    the m_F distribution a Stern-Gerlach + TOF shot
      would return at the end of the slowest ramp — what the experiment actually reads.
 
@@ -84,21 +84,27 @@ def load_runs(data: Path) -> dict[float, dict]:
     return runs
 
 
-def branch_separation(rise: dict, fall: dict) -> tuple[float, float, float]:
-    """Mean |Δ⟨F⊥⟩| between the two legs over their OVERLAPPING field range,
-    plus that range. Threshold-free stand-in for the loop area: identically zero
-    for a crossover, finite while two branches coexist."""
-    b_lo = max(rise["B_uG"].min(), fall["B_uG"].min())
-    b_hi = min(rise["B_uG"].max(), fall["B_uG"].max())
-    if not (b_hi > b_lo):
-        return math.nan, math.nan, math.nan
-    bs = np.linspace(b_lo, b_hi, 200)
+def jump_field(leg: dict, sharpness: float = 3.0) -> tuple[float, float]:
+    """Field at which ⟨F⊥⟩ changes fastest along one leg — the spinodal, where
+    the metastable branch stops existing — and how sharp that feature is
+    (max|dF⊥/dB| ÷ median|dF⊥/dB|).
 
-    def interp(leg):
-        order = np.argsort(leg["B_uG"])
-        return np.interp(bs, leg["B_uG"][order], leg["fperp"][order])
-
-    return float(np.mean(np.abs(interp(rise) - interp(fall)))), b_lo, b_hi
+    The two legs deliberately traverse DIFFERENT field ranges (each starts on the
+    branch that is metastable in its own direction), so they probe the lower and
+    upper spinodal respectively; the loop is the pair, not an overlap area.
+    `sharpness ≤ 3` means no localised jump — a smooth crossover response — and
+    returns NaN rather than the argmax of noise."""
+    order = np.argsort(leg["B_uG"])
+    b, f = leg["B_uG"][order], leg["fperp"][order]
+    if len(b) < 8 or b[-1] - b[0] <= 0:
+        return math.nan, math.nan
+    bs = np.linspace(b[0], b[-1], 400)
+    d = np.abs(np.gradient(np.interp(bs, b, f), bs))
+    med = float(np.median(d))
+    if med <= 0:
+        return math.nan, math.nan
+    sharp = float(d.max() / med)
+    return (float(bs[int(np.argmax(d))]) if sharp > sharpness else math.nan), sharp
 
 
 def fig_hysteresis(runs: dict, out: Path) -> None:
@@ -142,41 +148,53 @@ def fig_hysteresis(runs: dict, out: Path) -> None:
     print(f"wrote {out}")
 
 
-def fig_loop_width(runs: dict, out: Path, static_ref: dict[float, float]) -> None:
-    fig, ax = plt.subplots(figsize=(5.4, 4.0))
-    for i, kappa in enumerate(sorted(runs, reverse=True)):
-        entry = runs[kappa]
-        taus, seps = [], []
-        for tau in sorted({t for (_, t) in entry["legs"]}):
-            rise, fall = entry["legs"].get(("rise", tau)), entry["legs"].get(("fall", tau))
-            if rise is None or fall is None:
-                continue
-            sep, *_ = branch_separation(rise, fall)
-            man = entry["manifest"]
-            ms = man["tau_ms"][np.argmin(np.abs(man["tau"] - tau))]
-            taus.append(ms)
-            seps.append(sep)
-        if not taus:
-            continue
-        c = CAT[i % len(CAT)]
-        ax.plot(taus, seps, color=c, marker="o", markersize=8,
-                markeredgecolor=SURFACE, markeredgewidth=2.0,
-                label=f"$\\kappa = {kappa:g}$")
-        ref = static_ref.get(kappa)
-        if ref is not None:
-            ax.axhline(ref, color=c, lw=1.2, ls=":", alpha=0.8)
-            ax.annotate(f"static $\\delta\\langle F_\\perp\\rangle$ = {ref:.2f}",
-                        xy=(taus[-1], ref), xytext=(-4, 5),
-                        textcoords="offset points", ha="right",
+def fig_loop_edges(runs: dict, out: Path, b_eq: dict[float, float]) -> None:
+    """Spinodal pair vs ramp duration: where the metastable branch actually gives
+    way, going up and going down. The band between them is the loop the
+    experiment would see — read the protocol straight off it."""
+    kappas = sorted(runs, reverse=True)
+    fig, axes = plt.subplots(1, len(kappas), figsize=(4.6 * len(kappas), 4.0),
+                             sharey=False)
+    axes = np.atleast_1d(axes)
+    for ax, kappa in zip(axes, kappas):
+        entry, man = runs[kappa], runs[kappa]["manifest"]
+        taus = sorted({t for (_, t) in entry["legs"]})
+        ms = [float(man["tau_ms"][np.argmin(np.abs(man["tau"] - t))]) for t in taus]
+        series = {}
+        for tag, label, c in (("rise", "$B$ rising", CAT[0]),
+                              ("fall", "$B$ falling", CAT[1])):
+            ys = [jump_field(entry["legs"][(tag, t)])[0]
+                  if (tag, t) in entry["legs"] else math.nan for t in taus]
+            series[tag] = np.asarray(ys, dtype=float)
+            ax.plot(ms, ys, color=c, marker="o", markersize=8,
+                    markeredgecolor=SURFACE, markeredgewidth=2.0, label=label)
+        both = np.isfinite(series["rise"]) & np.isfinite(series["fall"])
+        if both.any():
+            ax.fill_between(np.asarray(ms)[both], series["fall"][both],
+                            series["rise"][both], color=CAT[0], alpha=0.12,
+                            linewidth=0)
+        if not np.isfinite(series["rise"]).any() and not np.isfinite(series["fall"]).any():
+            ax.text(0.5, 0.5, "no localised jump\non either leg\n(crossover)",
+                    transform=ax.transAxes, ha="center", va="center",
+                    color=INK2, fontsize=10)
+        ref = b_eq.get(kappa)
+        if ref is not None and math.isfinite(ref):
+            ax.axhline(ref, color=INK3, lw=1.2, ls=":")
+            ax.annotate(f"$B_{{eq}}$ = {ref:.1f} µG", xy=(ms[-1], ref),
+                        xytext=(-4, 5), textcoords="offset points", ha="right",
                         color=INK2, fontsize=8)
-    ax.set_xscale("log")   # ramp durations span decades; the axis IS the rate scan
-    ax.set_xlabel(r"ramp duration  $\tau$  [ms]")
-    ax.set_ylabel(r"mean branch separation  $\langle |\Delta \langle F_\perp\rangle| \rangle$")
-    ax.set_ylim(bottom=0)
-    ax.grid(alpha=0.9)
-    ax.set_axisbelow(True)
-    ax.legend(loc="best")
-    ax.set_title("Saturating = bistable; decaying = dynamical lag", color=INK)
+        ax.set_xscale("log")   # the axis IS the rate scan; τ spans decades
+        if ms:                 # explicit limits: a crossover facet has no finite y
+            ax.set_xlim(min(ms) / 1.6, max(ms) * 1.6)
+        ax.set_xlabel(r"ramp duration  $\tau$  [ms]")
+        order = "first-order side" if kappa >= 1.0 else "crossover control"
+        ax.set_title(f"$\\kappa = {kappa:g}$  ({order})", color=INK)
+        ax.grid(alpha=0.9)
+        ax.set_axisbelow(True)
+        ax.legend(loc="best")
+    axes[0].set_ylabel("field of the $\\langle F_\\perp \\rangle$ jump  [µG]")
+    fig.suptitle("Loop edges vs ramp rate — saturating = bistable, "
+                 "closing = dynamical lag", y=0.99, color=INK)
     fig.tight_layout()
     fig.savefig(out, dpi=200)
     print(f"wrote {out}")
@@ -219,13 +237,13 @@ def fig_sg_signal(runs: dict, out: Path) -> None:
     print(f"wrote {out}")
 
 
-def static_separation(window_dir: Path) -> dict[float, float]:
-    """δ⟨F⊥⟩ at the energy crossing from the static library analysis, if present."""
+def static_b_eq(window_dir: Path) -> dict[float, float]:
+    """Energy-crossing field B_eq per κ from the static library analysis."""
     summ = window_dir / "window_summary.csv"
     if not summ.is_file():
         return {}
     t = read_tsv(summ)
-    return {float(k): float(v) for k, v in zip(t["κ"], t["dfperp_max"])}
+    return {float(k): float(v) for k, v in zip(t["κ"], t["B_eq"])}
 
 
 def main() -> None:
@@ -240,8 +258,8 @@ def main() -> None:
         raise SystemExit(f"no runs under {a.data}")
     a.out.mkdir(parents=True, exist_ok=True)
     fig_hysteresis(runs, a.out / "eu_adiabatic_hysteresis.png")
-    fig_loop_width(runs, a.out / "eu_adiabatic_loop_width.png",
-                   static_separation(a.window))
+    fig_loop_edges(runs, a.out / "eu_adiabatic_loop_edges.png",
+                   static_b_eq(a.window))
     fig_sg_signal(runs, a.out / "eu_adiabatic_sg_signal.png")
 
 

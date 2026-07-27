@@ -168,7 +168,9 @@ function frame_scalars(ws)
     ntot = sum(dens) * dV
     Lz = orbital_angular_momentum(psi, PRESET.grid, ws.fft_plans)
     Sz = magnetization(psi, PRESET.grid, SYS)
-    pops = component_populations(psi, PRESET.grid, SYS)
+    # component_populations returns (populations, m_values) — take the vector, or
+    # a splat into the CSV row writes the whole NamedTuple into one column.
+    pops = component_populations(psi, PRESET.grid, SYS).populations
     (; fz=sum(fz) * dV / ntot,
         fperp=sum(sqrt.(fx .^ 2 .+ fy .^ 2)) * dV / ntot,
         Lz, Sz, Jz=Lz + Sz,
@@ -241,8 +243,9 @@ function run_ramp(; branch, B_seed, B_end, τ, tag)
         end
     end
     open(base * "_pops.csv", "w") do io
+        # header from SYS.m_values, not an assumed ordering: column c ↔ m_values[c]
         writedlm(io, reshape(vcat(["B_uG", "t_ms"],
-                ["m$(m)" for m in (ATOM.F):-1:-ATOM.F]), 1, :))
+                ["m$(Int(m))" for m in SYS.m_values]), 1, :))
         for r in rows
             writedlm(io, reshape(Any[r.B_uG, r.t_ms, r.pops...], 1, :))
         end
