@@ -232,6 +232,7 @@ const CI_EXTRA = [
     "oracles/test_loss_nonunitarity.jl",
     "oracles/test_registry_completeness.jl",
     "oracles/test_lhy_analytic.jl",
+    "oracles/test_lhy_full_bdg_closed_form_parity.jl",
     "oracles/test_light_shift_analytic.jl",
     "oracles/test_magnetic_gradient_analytic.jl",
     "oracles/test_tensor_analytic.jl",

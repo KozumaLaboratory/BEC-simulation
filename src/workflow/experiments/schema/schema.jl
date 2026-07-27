@@ -528,8 +528,8 @@ F-dependent cross-field validation that the static schema cannot express:
   `c0 = c_total / (1 + F²·c1_ratio)`, so values at or below `-1/F²` give
   `c0 ≤ 0` — non-physical density attraction).
 - `lhy.kind` ↔ F mapping: `polar_two_channel` is polar-only-up-to-F=2,
-  `icosahedral` is F=6 specific, `full_bdg` at F=6 polar warns
-  (3000× spurious offset — memory `full_bdg_F6_polar_broken.md`).
+  `icosahedral` is F=6 specific, `full_bdg` on an ansatz that has a closed
+  form is correct but ~100× slower (advisory only).
 - Lab-units `B.{p_mv, coil_mode}` requires a top-level `calibration:`
   (or `calibration_history:`) block to expand against.
 
@@ -567,8 +567,7 @@ function _validate_ground_state_physics!(step_params::Dict, path::String,
         end
     end
 
-    # LHY kind ↔ F constraints (memory: `lhy_refactor_2026_05_12.md`,
-    # `full_bdg_F6_polar_broken.md`).
+    # LHY kind ↔ F constraints (memory: `lhy_refactor_2026_05_12.md`).
     lhy = get(step_params, "lhy", nothing)
     if lhy isa Dict
         kind = String(get(lhy, "kind", "none"))
@@ -583,10 +582,11 @@ function _validate_ground_state_physics!(step_params::Dict, path::String,
         elseif kind == "icosahedral" && F != 6
             msg = "$path.lhy.kind = icosahedral is F=6 specific (I_h symmetry); got F=$F."
             strict ? throw(ArgumentError(msg)) : @warn msg
-        elseif kind == "full_bdg" && F == 6 && init == "polar"
-            @warn "$path.lhy.kind = full_bdg at F=6 polar reports ~3000× spurious " *
-                "LHY offset (memory `full_bdg_F6_polar_broken.md`). Use `polar_contact` " *
-                "or `polar_dipolar` for the F=6 polar state."
+        elseif kind == "full_bdg" && init in ("polar", "ferromagnetic")
+            @info "$path.lhy.kind = full_bdg is the general-spinor BdG path; for the " *
+                "$init ansatz the closed form is ~100× cheaper and agrees to ~1e-4 " *
+                "(gated by test/oracles/test_lhy_full_bdg_closed_form_parity.jl). " *
+                "Consider `polar_contact` / `polar_dipolar` / `fm_contact` / `fm_dipolar`."
         end
     end
 
