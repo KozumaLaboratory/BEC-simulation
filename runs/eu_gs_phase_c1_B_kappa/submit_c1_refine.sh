@@ -32,6 +32,9 @@ set -euo pipefail                       # re-arm: tsubame_setup runs `set +e`
 export JULIA_DEPOT_PATH="${JULIA_DEPOT_PATH}:/gs/fs/tga-kozuma-kouhi/shared/.julia:${HOME}/.julia"
 
 export SPINORBEC_SCAN_ONLY_INDEX=$SGE_TASK_ID
+# Content-addressed GS stage cache: reuse a ground state computed by any other
+# config/scan (shared store at $PROJECT_ROOT/runs/_stage/gs).
+export SPINORBEC_STAGE_CACHE=1
 echo "[task $SGE_TASK_ID/$SGE_TASK_LAST] $(hostname) cfg=$CONFIG"; nvidia-smi -L || true
 
 # Guard silent CPU fallback (a broken-CUDA node otherwise burns hours on CPU).
