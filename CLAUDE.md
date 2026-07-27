@@ -250,6 +250,7 @@ NOT bugs — don't "fix".
 - **`spin_rotating_frame_omega ≠ 0` requires `secular_ddi=true`** (enforced via `ArgumentError`). Full DDI's off-diagonal components Larmor-average to zero only in secular limit.
 - **`even_c_extra(F; c2, c4, c6, …)` is canonical** — hand-written `[c2, c4, c6]` silently misindexes for F ≥ 3.
 - CUDA-Graph in `ext/SpinorBECCUDAExt/gpu_graph.jl` disabled (replay drift, 4× slower); `split_step_captured!` itself was deleted 2026-05-22.
+- **Spinor LHY tables are built for ONE spinor and applied at every voxel** — `:full_bdg` takes the peak-density spinor, the closed forms assume their own fixed ansatz. Exact for a uniform state; measured ~5% in ε_LHY on converged weak-field Eu textures, with a sign that FLIPS along a B-scan (so it does not cancel in a comparison). Only the magnitude of ⟨F⟩ matters — a pure direction texture (flower / spin vortex / skyrmion, all |⟨F⟩|/F = 1) is free, since ε_LHY is an SO(3) scalar for contact and moves 0.25% under the DDI. `make_workspace` warns above a |⟨F⟩|/F spread of 0.3 (`test/workflow/test_lhy_texture_warning.jl`). Spatially-varying LHY is not implemented.
 - **Tensor c2/c4 not in `energy_gradient!`** — LBFGS warns, falls back to ITP. `[KNOWN-LIMIT]`.
 - **TDHFB has no YAML pipeline integration.** `dynamics.tdhfb` does NOT exist. Engine parallel-track to GP; do not wire in without explicit ask.
 

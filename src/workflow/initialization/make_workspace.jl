@@ -542,10 +542,93 @@ end
 
 _lhy_g_dict(atom::AtomSpecies, ws::InteractionParams) = c_to_g(atom.F, ws)
 
+"""
+    _lhy_texture_spread(psi_init, F) -> (spread, peak_f, mean_f)
+
+How far the state is from having ONE spinor. Returns the `n^(5/2)`-weighted
+spread of `|⟨F⟩|/F` over the cloud (the weight `ε_LHY ∝ n^(5/2)` actually
+carries), plus the value at the density peak and the weighted mean.
+
+Every spinor LHY table in this file is built for a single spinor and then
+applied at every voxel: `:full_bdg` takes the peak spinor, and the closed forms
+assume their own fixed ansatz outright. That is exact when the state is uniform
+and an approximation when it is not.
+
+Only the SHAPE of the local spinor matters, not its direction. Measured at F=6:
+rotating the spinor leaves ε_LHY invariant to machine precision for contact
+(it is an SO(3) scalar) and to 0.25% with the DDI at ε_dd ~ 0.05 — so a pure
+direction texture (flower, spin vortex, skyrmion; all `|⟨F⟩|/F` = 1 everywhere)
+costs nothing. Varying the MAGNITUDE costs ~20% between `|⟨F⟩|/F` = 1 and 0.
+"""
+function _lhy_texture_spread(psi_init, F::Int)
+    psi_init === nothing && return (0.0, 1.0, 1.0)
+    N = ndims(psi_init) - 1
+    D = size(psi_init, N + 1)
+    D == 2F + 1 || return (0.0, 1.0, 1.0)
+    sm = spin_matrices(F)
+    Fx, Fy, Fz = Matrix{ComplexF64}(sm.Fx), Matrix{ComplexF64}(sm.Fy),
+    Matrix{ComplexF64}(sm.Fz)
+    n = dropdims(sum(abs2, psi_init; dims=N + 1); dims=N + 1)
+    nmax = maximum(n)
+    nmax <= 0 && return (0.0, 1.0, 1.0)
+    cut = 1e-6 * nmax
+    z = Vector{ComplexF64}(undef, D)
+    wsum = 0.0
+    mean_f = 0.0
+    peak_f = 1.0
+    lo, hi = Inf, -Inf
+    for I in CartesianIndices(size(n))
+        n[I] < cut && continue
+        for c in 1:D
+            z[c] = psi_init[I, c]
+        end
+        nz = norm(z)
+        nz < 1e-14 && continue
+        z ./= nz
+        f = sqrt(real(dot(z, Fx * z))^2 + real(dot(z, Fy * z))^2 +
+                 real(dot(z, Fz * z))^2) / F
+        w = n[I]^2.5
+        wsum += w
+        mean_f += w * f
+        lo = min(lo, f)
+        hi = max(hi, f)
+        n[I] == nmax && (peak_f = f)
+    end
+    wsum <= 0 && return (0.0, 1.0, 1.0)
+    (hi - lo, peak_f, mean_f / wsum)
+end
+
+# Above this spread in |⟨F⟩|/F the single-spinor table is worth flagging.
+# Measured on converged weak-field Eu ground states (pinned B-scan,
+# figs/eu_bscan_pin_tight): spread 0.0 gives 0.00% error, 0.375 gives -1.5%,
+# 0.89 gives -4.5%, 0.90 gives +4.9% — and the sign FLIPS across the scan, so
+# it does not cancel in a B-comparison. 0.3 is where it leaves the noise.
+const _LHY_TEXTURE_WARN = 0.3
+
+function _warn_lhy_texture(mode::Symbol, psi_init, F::Int)
+    spread, peak_f, mean_f = _lhy_texture_spread(psi_init, F)
+    spread <= _LHY_TEXTURE_WARN && return nothing
+    what = if mode === :full_bdg
+        "built from the peak-density spinor (|⟨F⟩|/F = $(round(peak_f; digits=3)))"
+    else
+        "built for the fixed :$mode ansatz"
+    end
+    @warn "LHY table is $what and then applied at every voxel, but this state " *
+        "is textured in |⟨F⟩|/F: spread $(round(spread; digits=3)) across the " *
+        "cloud, n^(5/2)-weighted mean $(round(mean_f; digits=3)). Measured on " *
+        "converged weak-field Eu ground states that costs up to ~5% in ε_LHY, " *
+        "with a sign that flips along a B-scan (so it does not cancel in a " *
+        "comparison). Direction textures are free — only the magnitude of " *
+        "⟨F⟩ matters. Treat LHY here as good to ~5%, or keep the state " *
+        "uniform." maxlog=1
+    nothing
+end
+
 # Catch-all: unknown / unsupported mode → nothing (caller falls through).
 _build_spinor_lhy(::Val, atom, ws, psi_init, c_dd, enable_ddi) = nothing
 
 function _build_spinor_lhy(::Val{:polar_two_channel}, atom, ws, psi_init, c_dd, enable_ddi)
+    _warn_lhy_texture(:polar_two_channel, psi_init, atom.F)
     compute_spinor_lhy_polar_two_channel(;
         F=atom.F, c0=ws[0], c1=ws[1],
         c_dd=enable_ddi && !isnan(c_dd) ? c_dd : 0.0,
@@ -553,6 +636,7 @@ function _build_spinor_lhy(::Val{:polar_two_channel}, atom, ws, psi_init, c_dd, 
 end
 
 function _build_spinor_lhy(::Val{:full_bdg}, atom, ws, psi_init, c_dd, enable_ddi)
+    _warn_lhy_texture(:full_bdg, psi_init, atom.F)
     spinor_init = psi_init !== nothing ? _extract_spinor(psi_init) : _default_spinor(atom.F)
     compute_spinor_lhy_table(;
         spinor=spinor_init, F=atom.F, interactions=ws,
@@ -564,6 +648,7 @@ end
 # :full_bdg. Restricted to polar spinors (ζ_α = δ_{α,0}); for post-quench /
 # mixed states fall back to :full_bdg.
 function _build_spinor_lhy(::Val{:polar_contact}, atom, ws, psi_init, c_dd, enable_ddi)
+    _warn_lhy_texture(:polar_contact, psi_init, atom.F)
     compute_spinor_lhy_polar_contact(;
         F=atom.F, g_dict=_lhy_g_dict(atom, ws), n_max=_lhy_n_max(psi_init))
 end
@@ -572,6 +657,7 @@ end
 # m=+F: ε = (8/15π²)(g_{2F}n)^(5/2). For uniform g_S this matches scalar
 # Lima-Pelster; for realistic per-S a_S it differs.
 function _build_spinor_lhy(::Val{:fm_contact}, atom, ws, psi_init, c_dd, enable_ddi)
+    _warn_lhy_texture(:fm_contact, psi_init, atom.F)
     compute_spinor_lhy_fm_contact(;
         F=atom.F, g_dict=_lhy_g_dict(atom, ws), n_max=_lhy_n_max(psi_init))
 end
@@ -584,6 +670,7 @@ end
 # Direct callers that already have scalar eps_dd should use
 # `compute_spinor_lhy_fm_dipolar(; eps_dd)`.
 function _build_spinor_lhy(::Val{:fm_dipolar}, atom, ws, psi_init, c_dd, enable_ddi)
+    _warn_lhy_texture(:fm_dipolar, psi_init, atom.F)
     g_dict = _lhy_g_dict(atom, ws)
     c_dd_eff = enable_ddi && !isnan(c_dd) ? c_dd : 0.0
     g_2F = get(g_dict, 2 * atom.F, 0.0)
@@ -619,6 +706,7 @@ end
 end
 
 function _build_spinor_lhy(::Val{:polar_dipolar}, atom, ws, psi_init, c_dd, enable_ddi)
+    _warn_lhy_texture(:polar_dipolar, psi_init, atom.F)
     g_dict = _lhy_g_dict(atom, ws)
     c_dd_eff = enable_ddi && !isnan(c_dd) ? c_dd : 0.0
     delta_1 = delta_polar(atom.F, 1, g_dict)
@@ -641,6 +729,7 @@ end
 #   them through their own builder, not this branch.
 # See: src/hamiltonian/terms/lhy/icosahedral.jl
 function _build_spinor_lhy(::Val{:icosahedral}, atom, ws, psi_init, c_dd, enable_ddi)
+    _warn_lhy_texture(:icosahedral, psi_init, atom.F)
     atom.F == 6 || throw(ArgumentError(
         ":icosahedral spinor_lhy is F=6 only (got F=$(atom.F))"))
     compute_spinor_lhy_icosahedral(;
