@@ -264,6 +264,47 @@ runs are if anything marginally *worse*, because they spend time at $\kappa_{tc}
 where nothing happens and pay for it at high κ. Critical slowing at the tricritical
 point was the wrong hypothesis, and this is what ruled it out.
 
+### Is the trap-shaping transfer quantised? No.
+
+The 1 ħ traded at $\kappa: 0.8 \to 1.8$ looked like the Matsui/Kozuma
+Einstein–de Haas signature with a mechanical drive instead of a magnetic one. It is
+not. Scanning the ramp endpoint $\kappa_1$ from 1.0 to 3.0 (τ = 145 ms, one-way,
+$B$ = 20 µG throughout):
+
+![quantisation test](figures/eu_edh_quantisation.png)
+
+| $\kappa_1$ | 1.0 | 1.2 | 1.4 | 1.6 | 1.8 | 2.2 | 2.6 | 3.0 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| $\langle L_z\rangle$ | −0.21 | −0.40 | −0.61 | −0.83 | −1.04 | −1.40 | −1.62 | −1.86 |
+| $\sum_m n_m \ell_m$ | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| $J_z$ | −3.1554 | −3.1554 | −3.1552 | −3.1549 | −3.1544 | −3.1537 | −3.1527 | −3.1519 |
+
+$\langle L_z\rangle$ rises smoothly, roughly linearly in $\kappa_1$ with slope ≈ 0.9,
+with no steps — **the "exactly 1 ħ" was a coincidence of the 0.8 → 1.8 span.** And
+the net phase winding is identically zero in every component at every $\kappa_1$, so
+none of the angular momentum is carried by vortices: it is smooth circulation, a
+rotating texture.
+
+Two checks make that null defensible, because an undetected vortex and an absent one
+look the same:
+
+- **The detector was validated** on synthetic $\psi = f(r)e^{i\ell\varphi}$: $\ell$ = 0
+  and ±1 are recovered exactly. ($\ell = 2$ reads 5 on this grid — a doubly charged
+  core makes the phase jump more than π between adjacent points — so $|\ell| \ge 2$
+  is not reliably counted. Every measured value here is 0, so this does not bear on
+  the conclusion.)
+- **The threshold is per-component, not global.** A minority component holding 0.3 %
+  of the atoms sits two to three orders below the total density peak, so a global
+  mask erases it and reports a spurious zero — which is what the first pass did.
+  With per-component thresholds there *are* charged plaquettes (70–314 per state),
+  and they cancel in ±1 pairs. A net zero with charged plaquettes present is a
+  measurement; a net zero with none is a masked read.
+
+What survives is weaker but still usable: trap oblateness is a **continuous dial for
+spin→orbital conversion at fixed $J_z$**, and the prediction is experimentally
+checkable — at fixed field, opening the trap aspect ratio depolarises the
+Stern-Gerlach distribution monotonically, with no vortex nucleation.
+
 **The fix is not a better ramp; it is a protocol that applies a torque about $z$** —
 a large or rotating transverse field, or a rotating anisotropic trap (the same
 mechanism as magnetostriction vortex nucleation). How much of the +0.32 is

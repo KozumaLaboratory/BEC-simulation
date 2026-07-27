@@ -36,16 +36,26 @@ const ROOT = get(ENV, "EW_ROOT", "figs/eu_kappa_scan")
 const OUT = get(ENV, "EW_OUT", joinpath(ROOT, "edh_quantisation.csv"))
 const THRESH = haskey(ENV, "EW_THRESH") ? parse(Float64, ENV["EW_THRESH"]) : 1e-3
 
-"""Population-weighted winding of one component, read in the z-midplane.
+"""Net winding of one component in the z-midplane, plus the number of charged
+plaquettes that produced it.
 
-The winding field is per-plaquette and per-z-slice; the midplane is where the
-condensate is densest, so its plaquette sum is the cleanest integer. Summing the
-plaquette field over the plane counts the enclosed charge, and the density mask
-keeps vacuum phase noise out of it."""
-function component_winding(psi, grid, c::Int, dens_peak::Float64)
-    w = winding_number_field(psi, grid; component=c, threshold=THRESH * dens_peak)
+The threshold is relative to THAT COMPONENT's own peak, not the total density
+peak: a minority component holding 0.3 % of the atoms is two to three orders below
+the global peak, so a global threshold masks it entirely and reports a spurious
+zero. The plaquette count is reported alongside the sum precisely so a zero can be
+told apart from "nothing was measured" — a net zero with charged plaquettes present
+means ±1 defects that cancel, which is a real answer; a net zero with none means
+the mask ate the component.
+
+Detector validated on synthetic ψ = f(r)·e^{iℓφ}: ℓ = 0, ±1 are recovered exactly.
+ℓ = 2 reads 5 on this grid — a doubly charged core makes the phase jump more than π
+between adjacent points — so |ℓ| ≥ 2 is NOT reliably counted here."""
+function component_winding(psi, grid, c::Int)
+    pk = maximum(abs2, view(psi, :, :, :, c))
+    w = winding_number_field(psi, grid; component=c, threshold=THRESH * pk)
     kz = size(psi, 3) ÷ 2 + 1
-    sum(view(w,:,:,kz))
+    plane = view(w,:,:,kz)
+    (sum(plane), count(!iszero, plane))
 end
 
 rows = Any[]
@@ -63,8 +73,9 @@ for kdir in sort(filter(isdir, readdir(ROOT; join=true)))
             Lz = orbital_angular_momentum(d.psi, grid, plans)
             Sz = magnetization(d.psi, grid, sys)
             pops = component_populations(d.psi, grid, sys).populations
-            dens_peak = maximum(sum(abs2, d.psi; dims=4))
-            ws = [component_winding(d.psi, grid, c, dens_peak) for c in 1:size(d.psi, 4)]
+            wc = [component_winding(d.psi, grid, c) for c in 1:size(d.psi, 4)]
+            ws = first.(wc)
+            nzs = last.(wc)
             # only components carrying real population can define a winding
             keep = pops .> 1e-4
             Lz_quant = sum(pops[keep] .* ws[keep])
@@ -79,9 +90,10 @@ for kdir in sort(filter(isdir, readdir(ROOT; join=true)))
             @printf(
                 "κ_1=%.2f  ⟨L_z⟩=%+.4f  Σ n_m ℓ_m=%+.4f  residual=%+.4f  ⟨S_z⟩=%+.4f  J_z=%+.4f\n",
                 d.k1, Lz, Lz_quant, Lz - Lz_quant, Sz, Lz + Sz)
-            @printf("           ℓ = [%s]\n           n = [%s]\n",
+            @printf("           ℓ = [%s]\n           n = [%s]\n           charged plaquettes = %d (a net 0 with these present = ±1 pairs, not a masked read)\n",
                 join(string.(ws[keep]), ", "),
-                join((@sprintf("%.3f", p) for p in pops[keep]), ", "))
+                join((@sprintf("%.3f", p) for p in pops[keep]), ", "),
+                sum(nzs[keep]))
             flush(stdout)
         end
     end
