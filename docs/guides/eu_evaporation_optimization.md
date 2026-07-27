@@ -46,11 +46,13 @@ $K_3=1\times10^{-41}$ m⁶/s:
 - **hold** $m_\omega\approx1$, $a_s\approx a_s^0$ through cooling and formation ($t\approx1.8$ s);
 - then **dump both**: open the waist $\sim1.7\times$ ($m_\omega\to0.60$) and lower $a_s$ to
   $0.25\,a_s^0$ ($K_3\to0.004\,K_3^0$);
-- **$N_0$ gain $=1.46\times$** (ramp-only $1.26\times10^5\to1.84\times10^5$), $T=42$ nK,
-  cf $=0.92$, $T_c=96$ nK (comfortable melt margin).
+- **$N_0$ gain $=1.63\times$** (ramp-only $1.34\times10^5\to2.19\times10^5$), $T=48$ nK,
+  cf $=0.90$, $T_c=103$ nK (comfortable melt margin). [Corrected condensate moment
+  $\langle n^2\rangle=8/21\,n_0^2$; the earlier $4/7$ bug gave $1.46\times$.]
 
-Waist alone gives $1.30\times$, Feshbach alone $\approx1.2\times$; the two are complementary
-(density vs coefficient) and combine to $1.46\times$.
+The two axes are complementary (density vs coefficient): the waist lowers $\bar\omega$ (gravity-
+floored 0.60) and the Feshbach lowers $a_s\to0.25\,a_s^0$ ($K_3\to0.004\,K_3^0$), both dumped
+after formation, combining to $1.63\times$.
 
 ## Constraint 1 — gravity caps the waist
 
@@ -88,10 +90,49 @@ formation run over-counts via a grand-canonical artifact (see
 ![lab absolute](../../figs/eu_evaporation_optimization/lab_absolute.png)
 
 At the **actual lab operating point** (euv3 researched ramp + measured loading $N=1.4\times10^6$,
-$T_0=50\,\mu$K) the 0-D model gives $N_{\rm BEC}=1.51\times10^4$ at the direct-measured
-$K_3=1.2\times10^{-41}$ — matching the thesis-measured $1.5\times10^4$. So the absolute
-calibration is sound at the lab point; the absolute number is dominated by the $K_3$ uncertainty
-($\sim3\times$), while the **$1.46\times$ optimization gain is relative and $K_3$-independent**.
+$T_0=50\,\mu$K) the 0-D model (corrected $\langle n^2\rangle=8/21$) gives $N_{\rm BEC}\approx1.9\times10^4$
+at the direct-measured $K_3=1.2\times10^{-41}$ (~26 % over the thesis-measured $1.5\times10^4$); it
+crosses $1.5\times10^4$ at $K_3\approx1.8\times10^{-41}$. Order-1 agreement, within the $K_3$
+factor-2.6 cross-method systematic (a formation-dynamics effect, not density). The absolute number
+is dominated by the $K_3$ uncertainty, while the **$1.63\times$ optimization gain is relative and
+$K_3$-independent**, so it survives this shift.
+
+## Experimental campaign — what can we pin, and how far
+
+A multi-study campaign (literature + simulation sensitivity + adversarial verification) on
+which parameters the achievable experiments can determine, and to what precision. Two of the
+intuitive claims were **overturned by the adversarial pass** — recorded here honestly.
+
+| parameter | experiment | achievable precision | strength |
+|---|---|---|---|
+| $\bar\omega$ | dipole/Kohn-mode spectroscopy | ~1 % | strong |
+| $K_3$ | BEC decay $N_0(t)$ at known $\bar\omega$ | ~4 % statistical, **±20 % density-limited** ($K_3\propto\bar\omega^{-2.4}$) | medium |
+| $a_s$ | already measured (dipolar TOF) | **110(4) $a_B$ = 3.6 %** | strong |
+| evap_scale | evaporation-trajectory fit | ±6 % | strong |
+| $\tau_{bg}$, $\Gamma_h$ | dedicated long hold (NOT the ramp) | unidentifiable on the ramp | weak/blocked-on-ramp |
+| $c_1$ | spin-mixing quench | **NOT cleanly separable — DDI dominates (see below)** | weak |
+| $c_2,c_4,c_6$ / 7-channel $a_S$ | — | **not determinable at 5 G (confirmed)** | blocked |
+| $a_s(B), K_3(B)$ | 1.32 G resonance | no calibrated curve; needs ≲1 mG field stability | blocked |
+
+**Overturned claim 1 — "spin-mixing gives a clean $c_1$."** REFUTED for Eu. The DDI spin
+coupling is $c_{dd}/c_0=3\varepsilon_{dd}\approx1.32$ while $c_1/c_0\approx1/36\approx0.028$, so
+$c_{dd}/c_1\approx47$: **DDI is the dominant spin-changing driver and $c_1$ is a small residual
+buried under it** (a 3D spinor-GP run showed DDI on/off changes the spin-mixing amplitude by ~38 %).
+A single spin-mixing trace cannot separate them; an **orthogonal lever** (trap aspect ratio, or
+in-plane vs $z$ magnetization) is required — not yet demonstrated in simulation.
+
+**Overturned claim 2 — "$N_{\rm BEC}$ predictable to ±30 % once evaporation params are measured."**
+REFUTED as too optimistic. MC variance decomposition: $K_3$ 66 %, $a_s$ 34 %, $\tau_{bg}$/$\Gamma_h$
+< 1 %. But $K_3$ carries a **factor-2.6 cross-method systematic** (direct $1.2\times10^{-41}$ vs
+BEC-fit $4.6\times10^{-42}$) → $N_{\rm BEC}$ is uncertain by a **factor ~2.8, not ±30 %** — and this is
+a formation-dynamics systematic, not a measurement one, so measuring $K_3$ more precisely does not
+remove it. $\sigma(N_{\rm BEC})<15\%$ would need $K_3\lesssim10\%$ **and** $a_s\lesssim6\%$.
+
+**Do-first (biggest levers):** (1) measure $\bar\omega$ to 1 % (dipole mode) — unblocks the $K_3$
+density calibration; (2) BEC-decay $K_3$ at known $\bar\omega$ — kills 66 % of the $N_{\rm BEC}$
+variance; (3) $a_s$ is already at 3.6 %; (4) $c_1$ needs an orthogonal DDI-separating lever, not a
+lone spin-mixing trace. $\tau_{bg},\Gamma_h$ are low-priority for the endpoint (measure in a
+dedicated hold, not on the ramp).
 
 ## Caveats / open
 

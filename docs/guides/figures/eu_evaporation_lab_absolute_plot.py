@@ -27,15 +27,17 @@ for k3, lab, c in ((4.6, "BEC-fit\n4.6e-42", "#7f7f7f"), (12.0, "direct (Fig 7.5
                 arrowprops=dict(arrowstyle="->", color=c))
 ax.set_xlabel("three-body coefficient  $K_3$  [$10^{-42}$ m⁶/s]")
 ax.set_ylabel("BEC atom number  $N_{\\rm BEC}$")
-ax.set_title("Type-C: model reproduces the measured Eu BEC number at direct $K_3$", fontsize=11)
+ax.set_title("Type-C: model vs measured Eu BEC number (corrected ⟨n²⟩=8/21)", fontsize=11)
 ax.set_xscale("log")
 ax.legend(loc="upper right", fontsize=9.5)
 ax.set_ylim(bottom=0)
 ax.text(0.03, 0.05,
-        "Model matches thesis 1.5×10⁴ at the direct-measured $K_3$=1.2×10⁻⁴¹.\n"
-        "Absolute $N$ is set by $K_3$ (dominant ~3× uncertainty); the\n"
-        "waist-axis GAIN (~1.3×) is relative and $K_3$-independent.",
-        transform=ax.transAxes, fontsize=8.3, va="bottom",
+        "With the corrected condensate moment ⟨n²⟩=8/21·n₀², $N_{\\rm BEC}$=1.5×10⁴\n"
+        "crosses at $K_3$≈1.8×10⁻⁴¹; at the direct-measured $K_3$=1.2×10⁻⁴¹ the model\n"
+        "gives 1.9×10⁴ (~26% over thesis) — order-1 agreement within the $K_3$ factor-2.6\n"
+        "systematic (a formation-dynamics, not density, effect). The optimization GAIN\n"
+        "is relative and $K_3$-independent, so it survives this shift.",
+        transform=ax.transAxes, fontsize=8.0, va="bottom",
         bbox=dict(boxstyle="round", fc="#eef6ff", ec="#1f77b4", alpha=0.9))
 fig.tight_layout()
 import os
