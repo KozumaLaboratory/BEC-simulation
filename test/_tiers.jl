@@ -58,6 +58,7 @@ const FAST_TESTS = [
     "manuscript/test_D2_H_irrep_character_proof.jl",
     "manuscript/test_rank2_cross_channel_vanishing.jl",
     "manuscript/test_paper3_audit.jl",
+    "oracles/test_scalar_lhy_si_roundtrip.jl",
     "validation/test_k3_unit_audit.jl",
     "validation/test_L5_operator_rhs_compare.jl",
     "dynamics/test_tdhfb_f1_validation.jl",
