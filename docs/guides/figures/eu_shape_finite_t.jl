@@ -671,7 +671,7 @@ end
 
 # Driver: closed-system evaporation → condensate, with a per-channel atom budget.
 function ft_evaporation_sgpe(; grid_n::Int=48, box::Float64=20.0,
-    T_prep_over_Tc::Float64=1.3, R_final_frac::Float64=0.55,
+    T_prep_over_Tc::Float64=1.3, R_init_frac::Float64=0.92, R_final_frac::Float64=0.55,
     prep_time::Float64=15.0, evap_time::Float64=40.0, evap_rate::Float64=5.0,
     dt::Float64=0.01, gs_steps::Int=2500, gamma::Float64=0.1, n_traj::Int=8,
     save_every::Int=20, backend=CPUBackend(), u::Union{EuUnits, Nothing}=nothing,
@@ -683,7 +683,7 @@ function ft_evaporation_sgpe(; grid_n::Int=48, box::Float64=20.0,
     Tc = Tc_harmonic(u.N)
     T_prep = T_prep_over_Tc * Tc
     k_cut = min(kcut_for(s.mu, T_prep), 0.95 * s.k_max)
-    R_init = 0.9 * box / 2
+    R_init = R_init_frac * box / 2
     R_final = R_final_frac * box / 2
     @printf "μ=%.3f  T_c=%.2f  T_prep=%.2f (%.1f T_c)  k_cut=%.2f  R: %.2f→%.2f\n" s.mu Tc T_prep T_prep_over_Tc k_cut R_init R_final
     println("=== Closed-system evaporation SGPE (γ=0; evaporate via radial energy-knife + K₃) ===")
@@ -728,12 +728,13 @@ end
 # CALIBRATED ARBITER: seed the closed evaporation SGPE at the 0-D formation handoff
 # (ω̄, N_BEC, T/T_c from ft_reservoir_calibration) and compare the ab-initio absolute
 # N₀ to the 0-D formation number — the number-conserving check on the 0-D ~2× systematic.
-function ft_evap_sgpe_cal(; grid_n::Int=48, box::Float64=20.0, n_traj::Int=8,
-    prep_time::Float64=15.0, evap_time::Float64=40.0, gs_steps::Int=2500,
-    T_prep_over_Tc::Float64=1.15, backend=CPUBackend())
+function ft_evap_sgpe_cal(; grid_n::Int=48, box::Float64=24.0, n_traj::Int=8,
+    prep_time::Float64=15.0, evap_time::Float64=45.0, gs_steps::Int=2500,
+    T_prep_over_Tc::Float64=1.05, R_init_frac::Float64=0.92, R_final_frac::Float64=0.5,
+    backend=CPUBackend())
     cal = ft_reservoir_calibration()
     ft_evaporation_sgpe(; grid_n, box, n_traj, prep_time, evap_time, gs_steps,
-        T_prep_over_Tc, u=cal.u, N0_ref=cal.N_BEC, backend,
+        T_prep_over_Tc, R_init_frac, R_final_frac, u=cal.u, N0_ref=cal.N_BEC, backend,
         csv=joinpath(@__DIR__, "eu_ft_evap_sgpe_cal.csv"))
 end
 

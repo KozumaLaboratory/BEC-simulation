@@ -37,7 +37,7 @@ fig, ax = plt.subplots(figsize=(7.0, 4.7))
 ax.plot(*smooth(t, N), "-", color="#8a8a8a", lw=2.2, label=r"total $N$ (thermal + condensate)")
 ax.plot(*smooth(t, N0), "-", color="#1f6feb", lw=2.4, label=r"condensate $N_0$ (bias-corrected)")
 ax.fill_between(t, N0, N, color="#bf8700", alpha=0.12, label="thermal cloud (evaporated away)")
-ax.annotate(fr"cond. fraction {frac[0]:.2f} $\rightarrow$ {frac[-1]:.2f}",
+ax.annotate(fr"cond. fraction $\rightarrow$ {frac[-1]:.2f}",
             xy=(t[-1], N0[-1]), xytext=(t[len(t) // 3], max(N) * 0.6),
             fontsize=9.5, color="#1f6feb")
 ax.set_xlabel("time [ms]")
@@ -48,6 +48,6 @@ ax.set_title("¹⁵¹Eu number-conserving evaporation SGPE: evaporate the therma
 ax.legend(frameon=False, fontsize=9, loc="upper right")
 ax.grid(True, alpha=0.25)
 fig.tight_layout()
-out = os.path.join(here, "eu_ft_evap_sgpe.png")
+out = os.path.join(here, os.path.splitext(os.path.basename(csv))[0] + ".png")  # name from input CSV
 fig.savefig(out, dpi=150)
 print("wrote", out)
