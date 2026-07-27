@@ -13,10 +13,11 @@ export superfluid_fraction, plane_averaged_density
 #
 #     f_s = min_u ∫ n |ê_d + ∇u|² dV / ∫ n dV
 #
-# The density is held rigid, which makes f_s an upper bound on the true
-# superfluid fraction. Restricting u to depend on x_d alone gives Leggett's
-# closed form — a further upper bound, and the quantity usually reported for
-# supersolids.
+# The density is held rigid — exact at O(q²) within mean field, since the
+# untwisted state is stationary and the density response therefore only reaches
+# the energy at O(q⁴). Restricting u to depend on x_d alone gives Leggett's
+# closed form: a genuine upper bound on the above, and the quantity usually
+# reported for supersolids.
 
 """
     plane_averaged_density(n, d) -> Vector{Float64}
@@ -72,8 +73,17 @@ total density) or a bare density array `n`.
     the grid is coarse, not that the density reroutes flow. Only a gap well
     above that scale is physics. Refine until the gap stops shrinking.
 
-Both branches hold the density rigid, so both are upper bounds on the true
-superfluid fraction.
+Both branches hold the density rigid. Within Gross–Pitaevskii mean field that
+costs nothing at the order that matters: the density response to the twist is
+O(q²), and because the untwisted state is stationary that response only reaches
+the energy at O(q⁴) — so `f_s`, an O(q²) quantity, is *exact*, not an upper
+bound. `test_superfluid_fraction_gp_twist.jl` checks this against a direct
+twisted-boundary-condition GP minimisation across f_s from 1.5e-4 to 0.53.
+
+The upper-bound caveat belongs one level up, beyond mean field: a one-body
+phase cannot represent correlated backflow. That gap is where the long-standing
+solid-⁴He discrepancy lives — the Leggett bound gives ~20 % where experiment
+found ~1 %.
 
 The twist is only meaningful when the cloud connects to itself across the
 periodic box. A trapped cloud surrounded by vacuum has no phase rigidity along
