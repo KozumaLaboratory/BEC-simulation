@@ -40,7 +40,10 @@ def main() -> None:
     man = read_tsv(a.data / "manifest.csv") if (a.data / "manifest.csv").is_file() else None
 
     use_style()
-    fig, ax = plt.subplots(figsize=(6.4, 4.4))
+    # +1.8in for the legend outside the axes: the curves sweep the whole κ range
+    # and the reference markers sit at the right edge, so an in-axes legend
+    # collides with one or the other.
+    fig, ax = plt.subplots(figsize=(8.2, 4.4))
 
     taus = sorted(float(p.stem.split("_tau")[1]) for p in runs)
     ms_per_tau = None
@@ -82,7 +85,8 @@ def main() -> None:
         mlines.Line2D([], [], color=INK2, lw=2.0, ls="-", label=r"$\kappa$ increasing"),
         mlines.Line2D([], [], color=INK2, lw=2.0, ls="--", label="return leg"),
     ]
-    ax.legend(handles=handles, loc="best")
+    ax.legend(handles=handles, loc="upper left", bbox_to_anchor=(1.02, 1.0),
+              handlelength=3.2)
 
     b_hold = float(man["B_uG"][0]) if man is not None else float("nan")
     ax.set_xlabel(r"trap oblateness  $\kappa = \omega_z / \omega_\perp$")

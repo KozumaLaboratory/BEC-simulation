@@ -170,8 +170,74 @@ cross the tricritical point along $\kappa$ instead —
 `scripts/run_eu_kappa_ramp.sh`. Comparing the two endpoints at the same
 $(B, \kappa)$ is the point of `KR_REF=1`.
 
+## The κ route (2026-07-27, B held at 20 µG, round trip κ 0.8 → 1.8 → 0.8)
+
+| τ | ⟨F⊥⟩ at κ = 1.8 | ΔE left after the return |
+|---:|---:|---:|
+| 4.3 ms | 2.540 | 0.960 |
+| 14.5 ms | 2.500 | 0.672 |
+| 43.4 ms | 2.891 | 0.446 |
+| 144.7 ms | 3.213 | 0.348 |
+| 434.1 ms | 3.171 | 0.389 |
+
+Two things are solid. The state **tracks continuously across $\kappa_{tc}$** — there is
+no event at $\kappa \approx 0.95$, which is what starting on the crossover side is
+supposed to buy — and $\langle F_\perp\rangle$ at the endpoint **saturates at
+$\approx 3.2$** for $\tau \gtrsim 145$ ms.
+
+The round trip does **not** close. The energy left in the cloud after returning to
+$(\kappa = 0.8,\ B = 20\ \mu\text{G})$, relative to the seed ground state there,
+falls with τ and then plateaus at $\Delta E \approx 0.35$ (≈ 5 % of the seed's
+7.45) rather than going to zero. ΔE is the measure to use here, not
+$|\langle F_\perp\rangle_{\rm return} - \langle F_\perp\rangle_{\rm start}|$: the
+endpoint oscillates with peak-to-peak 0.04–0.39, so a single-instant order-parameter
+comparison mostly samples the phase of that oscillation, which is why the naive
+reversibility number is non-monotonic in τ (0.56, 0.12, 0.49, 0.06, 0.59) while ΔE
+is not.
+
+![kappa ramp](figures/eu_kappa_ramp_preparation.png)
+
+### Both routes miss the ground state; the κ route misses by half as much
+
+Both end at the *same physical point* — $\kappa = 1.8$, $B = 20\ \mu$G — so they can
+be compared against the same reference. The two branches there, converged
+independently with ε-ladder continuation to $|\nabla E| \sim 9\times10^{-6}$:
+
+| state at $\kappa = 1.8$, $B = 20\ \mu$G | $E$ | excess over the GS | $\langle F_\perp\rangle$ |
+|---|---:|---:|---:|
+| flower — **the ground state** | 10.7314 | — | 5.138 |
+| polarised | 10.8640 | +0.133 | 0.086 |
+| κ ramp, τ = 145 ms | 11.0548 | **+0.323** | 3.213 |
+| κ ramp, τ = 434 ms | 11.0503 | **+0.319** | 3.171 |
+| field ramp, τ = 434 ms | 11.3459 | **+0.615** | 3.585 |
+
+Three readings, in order of how much they matter:
+
+1. **Neither route prepares the ground state.** Both stop far short —
+   $\langle F_\perp\rangle$ of 3.2–3.6 against the ground state's 5.14 — and both
+   excesses are *larger than the gap between the two branches* (0.133). The prepared
+   states are not "the wrong branch"; they are excited states above both.
+2. **The κ route does arrive colder**, by roughly a factor two in excess energy
+   (+0.32 vs +0.62). Avoiding the barrier is worth something, just not enough.
+3. **The κ route's excess has a floor**: +0.323 at 145 ms and +0.319 at 434 ms, and
+   the round-trip ΔE plateaus at the same ≈ 0.35. A 3× slower ramp buys nothing, so
+   the obstruction is not simply "too fast everywhere". The natural suspect is the
+   tricritical crossing, where the relevant mode softens and no constant-rate ramp is
+   adiabatic; the cheap test is a shaped ramp that slows down near $\kappa_{tc}$
+   instead of moving at constant $d\kappa/dt$.
+
+Trap compression is unlikely to be the culprit: the trap period is
+$\sim 1\ \omega_{ref}^{-1} = 1.45$ ms, so even the 145 ms ramp is 100× slower than
+the breathing mode it would excite.
+
 ## Limits of the present run
 
+- **Reference solves need the ε-ladder.** A fixed pin stalls at
+  $|\nabla E| \sim 10^{-2}$ on this soft manifold — four orders above the library
+  gate, and `converged=false`. With `KR_REF_RAMP=0.02,0.01,0.005` and 1500 LBFGS
+  iterations both branches reach $9\times10^{-6}$. Any future reference at a new
+  $(\kappa, B)$ must do the same; an unconverged reference is worse than none,
+  because it looks like a number.
 - **Grid 32³** — the library's grid. 32³ and 64³ agreed to < 1 % on early-time Eu
   dynamics, but the loop width itself is not yet grid-checked.
 - **Mean field at $T = 0$.** No thermal or technical noise, so the measured loop is
