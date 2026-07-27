@@ -38,9 +38,10 @@ function condensate_split(N::Real, T::Real, ω̄::Real)
     (Float64(N) - N_th, N_th)
 end
 
-# Thomas–Fermi peak density of an N₀-atom condensate in a harmonic trap, and the
-# per-atom three-body loss rate K₃⟨n²⟩ it produces. The 3-body-weighted mean-SQUARE density
-# is ⟨n²⟩ = ∫n³/∫n = (8/21) n₀² for a TF profile (NOT 4/7, which is ⟨n⟩ = ∫n²/∫n, the 2-body moment).
+# Thomas–Fermi peak density of an N₀-atom condensate in a harmonic trap, and the per-atom
+# three-body loss rate K₃⟨n²⟩ it produces (atoms-lost convention dN = −K₃⟨n²⟩N, K₃ ≡ Söding L₃).
+# For a TF condensate ⟨n²⟩ = ∫n³/∫n = (8/21) n₀² (NOT 4/7 n₀², which is ⟨n⟩/n₀ — a different moment).
+# as_mult Feshbach-tunes a_s (K₃∝a_s⁴, universal).
 function _condensate_three_body_rate(N0::Float64, ω̄::Float64, p::EvapParams, m::Float64,
     as_mult::Float64=1.0)
     a_eff = p.a_s * as_mult                                      # Feshbach-tuned a_s

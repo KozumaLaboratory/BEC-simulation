@@ -212,6 +212,60 @@ warped power drop; $+30$–$40\%$ BEC at formation, with the higher end a knife-
 then decompress the ODT to $\bar\omega\approx0.6\,\bar\omega_\mathrm{form}$, fast
 ($+16\%$ condensate) — both experimentally available with the harmonic trap alone.
 
+## Number-conserving evaporation SGPE (ab-initio arbiter)
+
+The 0-D model's absolute $N_0$ carries a $\sim2\times$ systematic (issue #75): it
+reproduces the measured lifetime but forms the BEC while the trap is still tight,
+so it is three-body-limited before decompression. To check that ab-initio without
+the grand-canonical pumping artifact of a fixed-$\mu$ reservoir (which pumps atoms
+into the condensate as the trap opens), we run a **closed-system evaporation SGPE**
+(Blakie PGPE evaporative cooling, PRA 72 063608): a hot thermal cloud is seeded by
+an SGPE prep, then evolved with the $\mu$-bath OFF ($\gamma=0$, so atom number is
+set by physics), cooled by a radial energy-knife that removes $|r|>R(t)$ (in
+$V=\tfrac12 r^2$, energy $>\tfrac12 R(t)^2$ — a shrinking $R(t)$ is the lowering trap
+depth) plus $K_3$. The two loss channels are tracked separately, so the closed atom
+budget $N_\mathrm{end}+\Delta N_\mathrm{evap}+\Delta N_{K_3}=N_\mathrm{start}$ is the
+number-conservation check (driver modes `evap_sgpe`, `evap_sgpe_cal`, `evap_k3law`).
+
+**Calibrated evaporation — ILLUSTRATIVE ONLY** (`eu_ft_evap_sgpe_cal.png`, $48^3$/$D{=}3$
+GPU, seeded at the 0-D formation handoff $\bar\omega=2\pi\cdot284$ Hz,
+$N_\mathrm{BEC}=6.6\times10^4$, $T/T_c=1.0$): the atom budget closes to machine precision
+($\Delta\sim10^{-13}$), and evaporation drives the cloud to a pure BEC (condensate
+fraction $0.42\to1.00$). **Do not read the numbers quantitatively.** The knife ramps over
+$\sim25$ ms ($1/\omega_\mathrm{ref}=0.56$ ms/unit), whereas the real evaporation is
+$\sim1$–$2$ s — this run is $\sim60\times$ too fast (the s-vs-ms infeasibility: a physical
+$\sim1$ s ramp is $\sim2000$ internal units $\times$ ensemble, out of reach). At $60\times$
+the removal outruns rethermalisation, so this is non-adiabatic spilling, not quasi-static
+evaporation; it only *illustrates* the qualitative point — a tight trap $K_3$-erodes the
+condensate (diluting would preserve it) — not a calibrated evaporation outcome.
+
+**Same-physics arbiter** (`eu_ft_evap_k3law.png`): a pure condensate at the same
+$(\bar\omega,N)$ decays under $K_3$ only (closed, no evaporation). The 0-D attractor
+law predicts $-\dot N_0\propto N_0^{9/5}$ ($\langle n^2\rangle=\tfrac{8}{21}n_0^2$,
+$n_0\propto N_0^{2/5}$). The ab-initio 3D decay fits **$N_0^{1.796}$ vs the 0-D
+$N_0^{1.800}$** (48³/D=3), and the closed form $[N_0(0)^{-4/5}+\tfrac45\gamma t]^{-5/4}$
+overlays the SGPE data. Unlike the evaporation above, this is a genuine physical
+timescale: the $K_3$ decay is itself a ms-scale process, so the $\sim45$ ms window is
+physical, and the RATE $\gamma$ (not just the exponent) is the 0-D's by construction —
+the run uses the identical `k3_bare` as the 0-D and the ab-initio 3D density, and a TF
+condensate has $\langle n^2\rangle=\tfrac{8}{21}n_0^2$ (verified in PR #80), which the
+exponent match confirms. (The decay is $\sim7\times$ faster than the thesis $1.4$ s BEC
+lifetime because $N=6.6\times10^4$ at $\bar\omega=2\pi\cdot284$ Hz is denser than the
+thesis lifetime conditions — a conditions difference, not a discrepancy.) So the 0-D
+*static* three-body loss law is correct ab-initio, which pins the $\sim2\times$ systematic
+to the formation **dynamics**, not the loss law — an independent confirmation of the
+issue-#75 diagnosis.
+
+Honest limits: the **evaporation timescale is not physical** — the ms-scale SGPE cannot
+run the s-scale evaporation ramp (the run above is $\sim60\times$ too fast), so the
+number-conserving SGPE is an arbiter for the **fast physics** (three-body decay, the
+$N_0^{9/5}$ law) and only *illustrative* for the slow evaporation itself. Additionally
+the c-field is cutoff-dependent; the radial knife is a proxy for finite-depth FORT spill;
+and this is not the full SPGPE (it omits the growth + energy-damping scattering reservoir
+of Rooney/Blakie/Bradley, arXiv:1210.0952). It is a more principled arbiter than the 0-D
+model on the loss law, not a calibrated absolute-number evaporation.
+
 ## Next
-Realistic cooling trajectory $T(t),\mu(t)$ fed from `run_evaporation_bec`; widen the
-evaporation-ramp bounds; an adiabatic (ramped) box if a box trap becomes available.
+Higher-resolution ($64^3$–$96^3$) cutoff-convergence study of the evaporation SGPE
+on TSUBAME; a finite-depth Gaussian-FORT spill operator (vs the radial knife); an
+adiabatic (ramped) box if a box trap becomes available.

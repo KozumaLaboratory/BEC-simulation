@@ -55,6 +55,19 @@ function _make_waveform(spec, duration::Float64; omega_ref::Float64=NaN)
             t_center=_t(get(g, "t_center", duration / 2)),
             sigma=_t(get(g, "sigma", 0.01)),
         )
+    elseif haskey(spec, "sum")
+        # Additive composition — the seam that lets field noise ride on top
+        # of ANY existing waveform without the B-block builders knowing about
+        # noise at all: `Bz: {sum: [{from: …, to: …}, {noise: {…}}]}`.
+        parts = spec["sum"]
+        parts isa AbstractVector && length(parts) >= 1 ||
+            throw(ArgumentError("`sum` must be a non-empty list of waveform specs"))
+        return CompositeWaveform(
+            Waveform[_make_waveform(p, duration; omega_ref) for p in parts];
+            operation=:add,
+        )
+    elseif haskey(spec, "noise")
+        return _make_noise_waveform(spec["noise"], duration, _f)
     elseif haskey(spec, "piecewise")
         p = spec["piecewise"]
         times = Float64.(p["times"])
@@ -124,8 +137,55 @@ function _make_waveform(spec, duration::Float64; omega_ref::Float64=NaN)
         ArgumentError(
             "Unknown waveform spec: keys $(collect(keys(spec))). " *
             "Recognised: sinusoidal, chirped_sinusoidal, gaussian_pulse, " *
-            "piecewise, interpolated, csv, or {from, to, scale}."),
+            "piecewise, interpolated, csv, noise, sum, or {from, to, scale}."),
     )
+end
+
+"""
+    _make_noise_waveform(spec, duration, _f) -> SpectralNoiseWaveform
+
+Build a [`FieldNoiseSpec`](@ref) from the YAML `noise:` mapping and realise
+it. `_f` is the caller's Hz → dimensionless frequency converter, so
+`frequency: "50 Hz"` means the same thing here as in `sinusoidal:`.
+
+Amplitudes (`rms`) are in the units of the field the waveform feeds — Gauss
+for `Bx`/`By`/`Bz`, dimensionless for `p`/`bx`/`by`. They are NOT converted,
+because an amplitude is invariant under the change of time unit that the
+frequencies undergo.
+"""
+function _make_noise_waveform(spec, duration::Float64, _f)
+    spec isa Dict ||
+        throw(ArgumentError("`noise` must be a mapping, got $(typeof(spec))"))
+    known = ("seed", "lines", "broadband", "n_components", "duration")
+    unknown = setdiff(collect(keys(spec)), known)
+    isempty(unknown) || throw(ArgumentError(
+        "noise: unknown keys $(unknown). Recognised: $(join(known, ", "))."))
+
+    lines = Tuple{Float64, Float64}[]
+    for ln in get(spec, "lines", ())
+        ln isa Dict && haskey(ln, "frequency") && haskey(ln, "rms") || throw(
+            ArgumentError("noise.lines entries need {frequency, rms}; got $ln"))
+        push!(lines, (_f(ln["frequency"]), Float64(ln["rms"])))
+    end
+
+    bb = get(spec, "broadband", nothing)
+    shape, rms, f_lo, f_hi, f_corner = if bb === nothing
+        (:none, 0.0, 0.0, 0.0, 0.0)
+    else
+        bb isa Dict || throw(ArgumentError("noise.broadband must be a mapping"))
+        (Symbol(get(bb, "shape", "white")),
+            Float64(get(bb, "rms", 0.0)),
+            _f(get(bb, "f_lo", 0.0)),
+            _f(get(bb, "f_hi", 0.0)),
+            _f(get(bb, "f_corner", 0.0)))
+    end
+
+    ns = FieldNoiseSpec(;
+        seed=Int(get(spec, "seed", 0)),
+        lines, shape, rms, f_lo, f_hi, f_corner,
+        n_components=Int(get(spec, "n_components", 256)),
+    )
+    field_noise_waveform(ns, Float64(get(spec, "duration", duration)))
 end
 
 """
@@ -169,7 +229,8 @@ function _build_phase_zeeman(phase_raw::Dict, t_offset::Float64, duration::Float
 end
 
 """Apply a time shift to a waveform by sampling into a PiecewiseLinearWaveform."""
-function _shift_waveform(wf::Waveform, t_offset::Float64, duration::Float64; n_samples::Int=1024)
+function _shift_waveform(wf::Waveform, t_offset::Float64, duration::Float64;
+    n_samples::Int=resample_count(wf, duration))
     times = collect(range(0.0, duration; length=n_samples))
     values = Float64[evaluate(wf, t - t_offset) for t in times]
     PiecewiseLinearWaveform(times, values)
