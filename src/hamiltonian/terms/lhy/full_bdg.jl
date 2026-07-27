@@ -105,7 +105,7 @@ _zeeman_is_degenerate(zee) =
     maximum(zee) - minimum(zee) <= 1e-14 * max(1.0, maximum(abs, zee))
 
 """
-    _lhy_bdg_stiffness(spinor, n0, F, interactions, zeeman, c_dd, k_hat)
+    _lhy_bdg_stiffness(h_contact, M_contact, zee, spinor, n0, F, c_dd, sm, k_hat)
         → (C, B, mu)
 
 The two k-INDEPENDENT stiffness matrices of the BdG problem at density
@@ -117,21 +117,35 @@ DDI Q-tensor):
 
 so that `H_BdG(k) = [A B; −B̄ −Ā]`. Every UV counterterm is a trace of
 these, which is why the zero-point sum needs no branch labelling.
-"""
-function _lhy_bdg_stiffness(spinor, n0, F, interactions, zeeman, c_dd, k_hat)
-    D = 2F + 1
-    h_mf, M_anom, zee, _ = _bdg_contact_matrices(spinor, F, interactions, zeeman)
 
-    if is_active(c_dd)
-        sm = spin_matrices(F)
+The CONTACT parts are passed in, not rebuilt: they carry no `k̂` dependence.
+`instability_angular_map` and `bogoliubov/scan.jl` hoist the same way; this
+was the odd one out.
+
+Worth what it is and no more. Measured at F=6, `n_dir = 32`, `n_k = 200`:
+`_bdg_contact_matrices` is 1.0 ms, so the rebuild was 0.032 s of a 1.37 s
+table — 2.3%. The bulk is GC pressure from `_bdg_branch_sum`, which allocates
+~104 kB per k-point (a 2D×2D matrix plus `eigen` workspace) for ~650 MB over
+the whole table; the k-loop's own arithmetic is only 0.18 s. That is a cold
+path — one k-integral per workspace, since the `n^(5/2)` scaling collapses the
+density axis — so it has been left alone deliberately.
+
+`sm` is the `spin_matrices(F)` cache, likewise direction-independent; pass
+`nothing` when `c_dd` is inactive.
+"""
+function _lhy_bdg_stiffness(h_contact, M_contact, zee, spinor, n0, F, c_dd, sm, k_hat)
+    D = 2F + 1
+    h_mf, M_anom = if is_active(c_dd)
         h_ddi, M_ddi = _bdg_ddi_matrices(spinor, F, D, sm, c_dd,
             _q_tensor_direction(k_hat))
-        h_mf = h_mf .+ h_ddi
-        M_anom = M_anom .+ M_ddi
+        (h_contact .+ h_ddi, M_contact .+ M_ddi)
+    else
+        (h_contact, M_contact)
     end
 
     # μ = ⟨ψ|(Z + n₀ h)|ψ⟩ — the full quadratic form, not the diagonal
-    # (mirrors the 2026-04-26 fix in phases/bogoliubov.jl).
+    # (mirrors the 2026-04-26 fix in phases/bogoliubov.jl). It depends on the
+    # direction through the DDI part of h, so it stays inside the loop.
     mu = real(dot(spinor, (Diagonal(zee) .+ n0 .* h_mf) * spinor))
 
     C = 2n0 .* h_mf
@@ -189,6 +203,11 @@ function _lhy_bdg_energy_density(spinor, n0, F, interactions, zeeman, c_dd,
     dirs = is_active(c_dd) ? fibonacci_sphere_directions(n_dir) :
            [(0.0, 0.0, 1.0)]
 
+    # Direction-independent, so built once outside the loop.
+    h_contact, M_contact, zee, _ = _bdg_contact_matrices(spinor, F, interactions,
+        zeeman)
+    sm = is_active(c_dd) ? spin_matrices(F) : nothing
+
     # Gauss-Legendre: the integrand is smooth and decays as k⁻², so a
     # rectangle rule on a uniform grid wastes most of its points.
     nodes, weights = _gauss_legendre(n_k, 0.0, k_max)
@@ -199,8 +218,8 @@ function _lhy_bdg_energy_density(spinor, n0, F, interactions, zeeman, c_dd,
     for dir in dirs
         k_hat = collect(dir)
         k_hat ./= norm(k_hat)
-        C, B, _ = _lhy_bdg_stiffness(spinor, n0, F, interactions, zeeman,
-            c_dd, k_hat)
+        C, B, _ = _lhy_bdg_stiffness(h_contact, M_contact, zee, spinor, n0, F,
+            c_dd, sm, k_hat)
 
         tr_C = real(tr(C))
         B_fro2 = real(sum(abs2, B))          # tr(B B̄) for symmetric B
