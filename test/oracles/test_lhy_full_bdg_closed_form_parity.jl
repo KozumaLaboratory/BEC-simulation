@@ -23,7 +23,7 @@ using Test
 using LinearAlgebra
 using SpinorBEC
 using SpinorBEC: _lhy_bdg_energy_density, _lhy_V, _lhy_quadrature,
-    _bdg_branch_sum, _bdg_hessian_posdef, _lhy_bdg_stiffness, _bdg_contact_matrices,
+    _bdg_branch_sum, _bdg_hessian_posdef, _lhy_n_dir, _lhy_bdg_stiffness, _bdg_contact_matrices,
     spin_matrices,
     lhy_energy_polar, lhy_energy_fm, build_polar_lhy_coefs, build_fm_lhy_coefs,
     _c0c1_to_gS
@@ -154,6 +154,55 @@ end
         @test issorted(kms)
         # explicit pins pass straight through
         @test _lhy_quadrature(1e-4, ks, 123.0, 77) == (123.0, 77)
+    end
+
+    @testset "n_dir is derived too, and is 1 without the DDI" begin
+        # Angular quadrature is a separate error axis, and the DDI is what
+        # creates it: with c_dd = 0 the integrand has no k̂ dependence, so 32
+        # directions was 32× wasted work in every contact-only call.
+        @test _lhy_n_dir(1e-4, 0.0, nothing) == 1
+        @test _lhy_n_dir(1e-6, 0.0, nothing) == 1
+        @test _lhy_n_dir(1e-4, 0.05, nothing) > 1
+        # monotone in the request, and capped where the residual stops falling
+        nds = [_lhy_n_dir(rt, 0.05, nothing) for rt in (1e-2, 1e-3, 1e-4, 1e-5)]
+        @test issorted(nds)
+        @test _lhy_n_dir(1e-12, 0.05, nothing) == _lhy_n_dir(1e-9, 0.05, nothing)
+        # explicit wins, DDI or not
+        @test _lhy_n_dir(1e-4, 0.05, 7) == 7
+        @test _lhy_n_dir(1e-4, 0.0, 7) == 7
+    end
+
+    @testset "the rtol contract holds with the DDI active" begin
+        # The demanding direction: with c_dd > 0 both the cutoff refinement and
+        # the angular count have to be right at once.
+        F = 6
+        for (sp, c1) in ((_fm_spinor(F), -0.02), (_polar_spinor(F), 0.1))
+            ip = InteractionParams(Dict(0 => 10.0, 1 => c1))
+            conv = _lhy_bdg_energy_density(sp, 1.0, F, ip, ZeemanParams(), 0.05,
+                200.0, 250, 160)
+            for rt in (1e-3, 1e-4)
+                v = _lhy_bdg_energy_density(sp, 1.0, F, ip, ZeemanParams(), 0.05,
+                    nothing, nothing, nothing; rtol=rt)
+                @test abs(v - conv) / abs(conv) <= rt
+            end
+        end
+    end
+
+    @testset "refinement never returns a round-off-corrupted value" begin
+        # The guard has to be PREDICTIVE. A post-hoc "did the answer move less
+        # than the noise" test passes on both counts once the noise is large,
+        # and accepts the corruption: with the DDI at rtol = 1e-5 that returned
+        # 249.0 against a true 14.29.
+        F, c1 = 6, -0.02
+        ip = InteractionParams(Dict(0 => 10.0, 1 => c1))
+        conv = _lhy_bdg_energy_density(_fm_spinor(F), 1.0, F, ip, ZeemanParams(),
+            0.05, 200.0, 250, 160)
+        for rt in (1e-5, 1e-7, 1e-10)
+            v = _lhy_bdg_energy_density(_fm_spinor(F), 1.0, F, ip, ZeemanParams(),
+                0.05, nothing, nothing, 32; rtol=rt)
+            @test isfinite(v)
+            @test abs(v - conv) / abs(conv) < 1e-2   # degraded at worst, never wild
+        end
     end
 
     @testset "a pinned k_max is honoured, not silently refined" begin

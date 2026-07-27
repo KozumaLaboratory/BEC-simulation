@@ -87,8 +87,14 @@ truncation, not modelling it: the integral is extended by an outer panel to
 term is the size of the correction, not of the residual after it — using that as
 the estimate came out ~30× conservative, 2.6% claimed against 8.1e-4 actual, and
 would have pushed `k_max` far past need. A doubling comparison carries no fitted
-constant. It also catches what the fit could not: with the DDI active the fitted
-constant was ~8× optimistic, because it was calibrated contact-only.)
+constant.)
+
+The starting-cutoff constant travels better than expected: measured with the
+DDI active, `x = 15` already reaches 1e-4, against 19 contact-only. An earlier
+note here claimed the fit was ~8× optimistic under DDI; that was a
+misattribution — the residual it was based on came from a REFERENCE that had
+itself been computed at a large pinned `k_max` and corrupted by the round-off
+cliff described below.
 
 Refinement stops at the round-off floor as well as at `rtol`. The integrand is a
 cancelling difference `Σω − D·ε_k − tr C` whose terms grow as `D k²/2` while the
@@ -128,7 +134,7 @@ function compute_spinor_lhy_table(;
     rtol::Float64=1e-4,
     k_max::Union{Nothing, Float64}=nothing,
     n_k::Union{Nothing, Int}=nothing,
-    n_dir::Int=32,
+    n_dir::Union{Nothing, Int}=nothing,
 )
     D = 2F + 1
     length(spinor) == D ||
@@ -171,6 +177,30 @@ const _LHY_SAFETY = 2.0
 # doublings, and at rtol = 1e-10 the derived x was 2400, past the cliff before a
 # single refinement step.
 const _LHY_X_MAX = 60.0
+
+# Angular (k̂) quadrature is an error axis of its own, and the DDI is what makes
+# it one — with c_dd = 0 a single direction is exact. Measured pure angular
+# error at converged k, F=6 FM, c_dd = 0.05 (the demanding case; polar sits at
+# ≤1e-5 for any n_dir ≥ 8): 3.0e-3, 7.8e-4, 2.3e-4, 8.3e-5, 5.6e-5 at n_dir =
+# 4, 8, 16, 32, 48 — i.e. about 3.0e-3·(4/n_dir)^1.5, so
+# n_dir ≈ 4·(3.0e-3/rtol)^(2/3). Capped at 64: past there the residual stops
+# falling (at c_dd = 0.2 it plateaus near 5e-4 for every n_dir, because that
+# mean field is dynamically unstable and the integrand is not smooth in k̂).
+const _LHY_NDIR_AT_4 = 3.0e-3
+const _LHY_NDIR_MAX = 64
+
+"""
+    _lhy_n_dir(rtol, c_dd, n_dir) -> Int
+
+Directions for the `k̂` average. One when the DDI is off (the integrand has no
+angular dependence then), otherwise derived from `rtol`; an explicit `n_dir` is
+passed through.
+"""
+function _lhy_n_dir(rtol::Float64, c_dd, n_dir)
+    n_dir !== nothing && return Int(n_dir)
+    is_active(c_dd) || return 1
+    clamp(ceil(Int, 4 * (_LHY_NDIR_AT_4 / rtol)^(2 / 3)), 4, _LHY_NDIR_MAX)
+end
 
 """
     _lhy_quadrature(rtol, k_scale, k_max, n_k) -> (k_max, n_k)
@@ -352,9 +382,10 @@ end
 density, spherically averaged over `k̂` when the DDI is active.
 """
 function _lhy_bdg_energy_density(spinor, n0, F, interactions, zeeman, c_dd,
-    k_max, n_k, n_dir::Int; rtol::Float64=1e-4, max_refine::Int=5)
+    k_max, n_k, n_dir; rtol::Float64=1e-4, max_refine::Int=5)
     D = 2F + 1
-    dirs = is_active(c_dd) ? fibonacci_sphere_directions(n_dir) :
+    nd = _lhy_n_dir(rtol, c_dd, n_dir)
+    dirs = is_active(c_dd) ? fibonacci_sphere_directions(nd) :
            [(0.0, 0.0, 1.0)]
 
     # Direction-independent, so built once outside the loop.
@@ -411,37 +442,47 @@ function _lhy_bdg_energy_density(spinor, n0, F, interactions, zeeman, c_dd,
     # Raising k_max is not free of danger, which is the second reason not to
     # model the error. The integrand is a DIFFERENCE, Σω − D·ε_k − tr C, whose
     # terms grow as D·k²/2 while the result decays as k⁻². Double-precision
-    # cancellation noise therefore grows relative to the signal roughly as k⁶,
-    # and past some cutoff the extra panel is pure noise: at rtol = 1e-6 an
-    # unguarded doubling loop ran off that cliff and returned answers wrong by
-    # factors of 4 to 120. So refinement stops at whichever comes first — the
-    # requested tolerance, or the round-off floor.
-    roundoff(bb) = eps(Float64) * D * (bb^2 / 2) * (bb^3 / 3) / (4π^2) /
-                   max(abs(E), 1e-300)
+    # cancellation noise therefore grows relative to the signal as roughly k⁶,
+    # and past some cutoff an extra panel is pure noise.
+    #
+    # The guard has to be PREDICTIVE, refusing a panel before computing it. A
+    # post-hoc "did the answer move less than the noise" test does not work:
+    # when the noise is large the movement is large too, so the test passes on
+    # both counts and the corrupted value gets accepted. That is exactly what
+    # happened — with the DDI at rtol = 1e-5 the refinement returned 249.0
+    # against a true 14.29, and references computed at a large pinned k_max
+    # were corrupted the same way, which poisoned four separate error
+    # attributions during this work before the cause was found.
+    #
+    # Panel [b, 2b] is worth computing while
+    #     noise/signal ≈ eps·D·b⁶ / (2·|Σ tail_coef|)  ≲ 1/10.
+    tail_abs = sum(d -> abs(d.tail_coef), per_dir; init=0.0)
+    panel_is_signal(bb) =
+        tail_abs > 0 && eps(Float64) * D * bb^6 / (2 * tail_abs) <= 0.1
+
     err = NaN
     hit_floor = false
     if refine && rtol > 0
         for _ in 1:max_refine
+            if !panel_is_signal(2b)
+                hit_floor = true
+                break
+            end
             extend!(b, 2b, max(8, n_k ÷ 2))
             E2 = total(2b)
             err = abs(E2 - E) / max(abs(E2), 1e-300)
-            floor_here = roundoff(2b)
             E, b = E2, 2b
             err <= rtol && break
-            if err <= 10 * floor_here
-                hit_floor = true
-                err = max(err, floor_here)
-                break
-            end
         end
         if hit_floor
             @warn "FullBdG LHY: rtol=$rtol is past what Float64 can deliver here. " *
                 "The integrand is a cancelling difference whose round-off grows " *
                 "like k_max⁶, so refinement stopped at k_max=" *
-                "$(round(b; sigdigits=4)) with an estimated accuracy of " *
-                "$(round(err; sigdigits=3)). Ask for a looser rtol (≳1e-5 is " *
-                "reliably reachable)." maxlog=1
-        elseif !(err <= rtol)
+                "$(round(b; sigdigits=4))" *
+                (isnan(err) ? "" : " with an estimated accuracy of $(round(err; sigdigits=3))") *
+                ". Ask for a looser rtol (≳1e-4 is reliably reachable), or reduce " *
+                "the coupling scale." maxlog=1
+        elseif !(err <= rtol) && !isnan(err)
             @warn "FullBdG LHY: after $max_refine cutoff doublings (k_max=" *
                 "$(round(b; sigdigits=4))) the estimated truncation is still " *
                 "$(round(100err; sigdigits=3))% > rtol=$rtol. Treat ε_LHY as " *
