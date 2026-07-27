@@ -40,6 +40,11 @@
 #   KR_TAUS=3,10,30,100     ramp durations [ω_ref⁻¹]  (1 ω_ref⁻¹ = 1.447 ms)
 #   KR_HOLD=0               dwell at κ_end before the return leg [ω_ref⁻¹]
 #   KR_ROUND_TRIP=1         run κ_0 → κ_1 → κ_0 (else one-way)
+#   KR_SHAPE=linear         ramp shape: linear | slow_at | const_dF
+#   KR_SHAPE_KAPPA=0.95     :slow_at — where to dwell (default κ_tc)
+#   KR_SHAPE_WIDTH=0.10     :slow_at — Gaussian width in κ
+#   KR_SHAPE_AMP=9          :slow_at — peak slow-down factor − 1
+#   KR_SHAPE_REF=<csv>      :const_dF — trajectory to read d⟨F⊥⟩/dκ from
 #   KR_SEED_BRANCH=dn       library branch for the seed (equivalent at κ ≤ 0.9)
 #   KR_REF=0                also converge the two reference branches at κ_end
 #   KR_DT=0.002  KR_FRAMES=200  KR_GRID=32  KR_BOX=24
@@ -102,14 +107,97 @@ SpinorBEC.DEALIAS_2_3_ENABLED[] = get(ENV, "KR_DEALIAS", "0") == "1"
 
 # ------------------------------------------------------------ trap ramp driving
 
-"""κ(t) for the ramp: up over τ, optional dwell, optional return leg."""
+# --- ramp SHAPE -------------------------------------------------------------
+#
+# A constant dκ/dt spends equal time everywhere, which is the wrong allocation if
+# the state's response is concentrated somewhere: the ramp is then effectively fast
+# exactly where the physics is slow. Both shapes below are the same construction —
+# a positive weight w(κ) saying "spend this much time per unit κ here" — turned
+# into κ(t) by normalising and inverting its cumulative integral. Total duration is
+# unchanged, so a shaped run costs the same as its linear counterpart and the
+# comparison is like-for-like.
+#
+#   :linear    w = 1
+#   :slow_at   w = 1 + A·exp(−((κ−κ_s)/σ)²)   — a Gaussian dwell at κ_s (default
+#              κ_tc = 0.95), A = KR_SHAPE_AMP. Use when a specific κ is suspect.
+#   :const_dF  w = |d⟨F⊥⟩/dκ| along a reference trajectory, floored so the ramp
+#              never stalls. This is the assumption-free one: equal time per unit
+#              of ORDER-PARAMETER change rather than per unit of κ.
+const SHAPE = Symbol(get(ENV, "KR_SHAPE", "linear"))
+const SHAPE_KAPPA = getf("KR_SHAPE_KAPPA", 0.95)     # κ_tc
+const SHAPE_WIDTH = getf("KR_SHAPE_WIDTH", 0.10)
+const SHAPE_AMP = getf("KR_SHAPE_AMP", 9.0)          # peak slow-down factor − 1
+const SHAPE_REF = get(ENV, "KR_SHAPE_REF", "")
+
+"""Weight → κ(t/τ) table. Returns (fracs, kappas), both ascending, for interpolation."""
+function build_shape()
+    n = 2001
+    ks = collect(range(K0, K1; length=n))
+    w = if SHAPE === :linear
+        ones(n)
+    elseif SHAPE === :slow_at
+        @. 1.0 + SHAPE_AMP * exp(-((ks - SHAPE_KAPPA) / SHAPE_WIDTH)^2)
+    elseif SHAPE === :const_dF
+        isfile(SHAPE_REF) ||
+            error("KR_SHAPE=const_dF needs KR_SHAPE_REF=<a kramp_tau*.csv to read " *
+                  "d⟨F⊥⟩/dκ from>; got '$SHAPE_REF'")
+        rows = readlines(SHAPE_REF)
+        hdr = split(rows[1], '\t')
+        ci = Dict(strip(h) => i for (i, h) in enumerate(hdr))
+        kk, ff = Float64[], Float64[]
+        for ln in rows[2:end]
+            c = split(ln, '\t')
+            length(c) < length(hdr) && continue
+            push!(kk, parse(Float64, c[ci["kappa"]]))
+            push!(ff, parse(Float64, c[ci["fperp"]]))
+        end
+        # outbound leg only, then |dF/dκ| resampled onto ks
+        i = argmax(kk)
+        kk, ff = kk[1:i], ff[1:i]
+        o = sortperm(kk)
+        kk, ff = kk[o], ff[o]
+        f_on_ks = [begin
+            j = searchsortedfirst(kk, κ)
+            j = clamp(j, 2, length(kk))
+            ff[j - 1] + (ff[j] - ff[j - 1]) *
+                        (κ - kk[j - 1]) / max(kk[j] - kk[j - 1], eps())
+        end for κ in ks]
+        d = abs.(diff(f_on_ks) ./ diff(ks))
+        d = vcat(d, d[end])
+        # floor at 15 % of the mean: without it a flat stretch would take zero time
+        # and the ramp would jump discontinuously there.
+        max.(d, 0.15 * sum(d) / n)
+    else
+        error("unknown KR_SHAPE=$SHAPE (linear | slow_at | const_dF)")
+    end
+    c = cumsum(w)
+    c .-= c[1]
+    c ./= c[end]
+    (c, ks)
+end
+
+const SHAPE_FRAC, SHAPE_KS = build_shape()
+
+"""κ at ramp fraction u ∈ [0,1], following the shape."""
+function kappa_of_frac(u)
+    u <= 0 && return K0
+    u >= 1 && return K1
+    j = searchsortedfirst(SHAPE_FRAC, u)
+    j = clamp(j, 2, length(SHAPE_FRAC))
+    f0, f1 = SHAPE_FRAC[j - 1], SHAPE_FRAC[j]
+    k0, k1 = SHAPE_KS[j - 1], SHAPE_KS[j]
+    k0 + (k1 - k0) * (u - f0) / max(f1 - f0, eps())
+end
+
+"""κ(t) for the ramp: up over τ, optional dwell, optional return leg. The return
+leg mirrors the same shape so the path is retraced, not just reversed in time."""
 function kappa_at(t, τ)
     if t <= τ
-        K0 + (K1 - K0) * (t / τ)
+        kappa_of_frac(t / τ)
     elseif t <= τ + HOLD
         K1
     elseif ROUND_TRIP
-        K1 + (K0 - K1) * clamp((t - τ - HOLD) / τ, 0.0, 1.0)
+        kappa_of_frac(1.0 - clamp((t - τ - HOLD) / τ, 0.0, 1.0))
     else
         K1
     end
@@ -184,7 +272,7 @@ function reference_branches(ε)
         Float64[]
     else
         sort(parse.(Float64, split(get(ENV, "KR_REF_RAMP", "0.02,0.01,0.005"), ","));
-        rev=true)
+            rev=true)
     end
     rows = Any[]
     for anchor in (:flower, :m_minus_F)
@@ -195,23 +283,41 @@ function reference_branches(ε)
             tol=1e-12, save_every=max(1, itp ÷ 4), verbose=false)
         gl = if isempty(ramp)
             find_ground_state_lbfgs(; kw...,
-            psi_init=Array{ComplexF64}(gs.workspace.state.psi),
-            n_steps=lb, tol=1e-5, m_lbfgs=10, newton_polish=false, verbose=false)
+                psi_init=Array{ComplexF64}(gs.workspace.state.psi),
+                n_steps=lb, tol=1e-5, m_lbfgs=10, newton_polish=false, verbose=false)
         else
             find_ground_state_lbfgs(; kw...,
-            psi_init=Array{ComplexF64}(gs.workspace.state.psi),
-            n_steps=lb, tol=1e-5, m_lbfgs=10, newton_polish=false, verbose=false,
-            pin=pin_transverse_field(; Bz=P_HOLD, q=0.0), epsilon_ramp=ramp)
+                psi_init=Array{ComplexF64}(gs.workspace.state.psi),
+                n_steps=lb, tol=1e-5, m_lbfgs=10, newton_polish=false, verbose=false,
+                pin=pin_transverse_field(; Bz=P_HOLD, q=0.0), epsilon_ramp=ramp)
         end
         psi = Array{ComplexF64}(gl.workspace.state.psi)
         s = spin_scalars(psi, PRESET.grid)
-        @printf("  reference %-10s κ=%.2f B=%.1f µG: E=%.6f |∇E|=%.1e ⟨F⊥⟩=%.3f ⟨F_z⟩=%.3f%s\n",
-            anchor, K1, B_HOLD, gl.energy, gl.grad_norm, s.fperp, s.fz,
+        # J_z of each branch is the load-bearing number, not a nicety: the κ ramp
+        # conserves J_z (a trap deformation about z is axially symmetric; only the
+        # pin breaks it), so it can only reach states in the seed's J_z sector. If a
+        # reference branch sits in a different sector, NO ramp rate or shape reaches
+        # it — that is a selection rule, not a speed problem.
+        Lz = orbital_angular_momentum(psi, PRESET.grid, gl.workspace.fft_plans)
+        Sz = magnetization(psi, PRESET.grid, SYS)
+        @printf(
+            "  reference %-10s κ=%.2f B=%.1f µG: E=%.6f |∇E|=%.1e ⟨F⊥⟩=%.3f ⟨F_z⟩=%.3f J_z=%+.4f%s\n",
+            anchor, K1, B_HOLD, gl.energy, gl.grad_norm, s.fperp, s.fz, Lz + Sz,
             gl.converged ? " ✓" : " (cap)")
+        jldsave(joinpath(OUT, "reference_$(anchor).jld2");
+            psi, kappa=K1, B_uG=B_HOLD, pin_eps=isempty(ramp) ? ε : minimum(ramp),
+            E=gl.energy, grad_norm=gl.grad_norm, converged=gl.converged,
+            c0=PRESET.interactions.c[0], c1=PRESET.interactions.c[1],
+            c_dd=PRESET.c_dd, grid_n_points=(GRID_N, GRID_N, GRID_N),
+            grid_box_size=(BOX, BOX, BOX), zeeman_p=P_HOLD, zeeman_q=0.0,
+            dt=DT, imaginary_time=true, t=0.0, step=0, c_lhy=0.0,
+            c_dict=Dict(0 => PRESET.interactions.c[0], 1 => PRESET.interactions.c[1]))
         push!(
             rows,
             (; anchor=String(anchor), kappa=K1, B_uG=B_HOLD, E=gl.energy,
-                grad_norm=gl.grad_norm, converged=gl.converged, s.fperp, s.fz),
+                grad_norm=gl.grad_norm, converged=gl.converged, s.fperp, s.fz,
+                Lz, Sz, Jz=Lz + Sz,
+                pin_eps=isempty(ramp) ? ε : minimum(ramp)),
         )
     end
     ks = collect(keys(rows[1]))
@@ -279,7 +385,8 @@ function run_kappa_ramp(s, τ)
         end
     end
 
-    base = joinpath(OUT, @sprintf("kramp_tau%g", τ))
+    tag = SHAPE === :linear ? "" : "_$(SHAPE)"
+    base = joinpath(OUT, @sprintf("kramp%s_tau%g", tag, τ))
     keys_s = (:step, :t, :t_ms, :kappa, :fz, :fperp, :Lz, :Sz, :Jz, :E, :norm)
     open(base * ".csv", "w") do io
         writedlm(io, reshape(String.(collect(keys_s)), 1, :))
@@ -333,7 +440,8 @@ for τ in TAUS
     flush(stdout)
 
     ks = collect(keys(manifest[1]))
-    open(joinpath(OUT, "manifest.csv"), "w") do io
+    open(joinpath(OUT, SHAPE === :linear ? "manifest.csv" :
+                          "manifest_$(SHAPE).csv"), "w") do io
         writedlm(io, reshape(String.(ks), 1, :))
         for m in manifest
             writedlm(io, reshape(Any[getfield(m, k) for k in ks], 1, :))

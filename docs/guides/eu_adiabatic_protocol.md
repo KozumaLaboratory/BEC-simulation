@@ -220,13 +220,57 @@ Three readings, in order of how much they matter:
 2. **The κ route does arrive colder**, by roughly a factor two in excess energy
    (+0.32 vs +0.62). Avoiding the barrier is worth something, just not enough.
 3. **The κ route's excess has a floor**: +0.323 at 145 ms and +0.319 at 434 ms, and
-   the round-trip ΔE plateaus at the same ≈ 0.35. A 3× slower ramp buys nothing, so
-   the obstruction is not simply "too fast everywhere". The natural suspect is the
-   tricritical crossing, where the relevant mode softens and no constant-rate ramp is
-   adiabatic; the cheap test is a shaped ramp that slows down near $\kappa_{tc}$
-   instead of moving at constant $d\kappa/dt$.
+   the round-trip ΔE plateaus at the same ≈ 0.35. A 3× slower ramp buys nothing.
 
-Trap compression is unlikely to be the culprit: the trap period is
+## Why: $J_z$ is conserved and the ground state is in another sector
+
+![angular momentum](figures/eu_kappa_ramp_jz.png)
+
+A trap deformation about $z$ is **axially symmetric**, so $J_z = L_z + S_z$ is a
+constant of the motion up to the tiny pin — measured drift 3×10⁻³ over the whole
+ramp, at every rate. And the target is far away in exactly that quantity:
+
+| state | $J_z$ | $L_z$ | $S_z$ | $\langle F_\perp\rangle$ |
+|---|---:|---:|---:|---:|
+| κ = 0.8 seed | −3.156 | −0.042 | −3.113 | 2.161 |
+| κ-ramp endpoint (every rate) | −3.153 | −1.044 | −2.109 | 3.171 |
+| **flower ground state** | **−1.087** | −0.045 | −1.043 | 5.138 |
+
+The ground state sits **2.07 ħ per atom away in $J_z$**, and no ramp of an axially
+symmetric knob can move it there — a $B_z$ ramp is no better, since $B_z F_z$
+commutes with $J_z$ too. What the ramp *can* do inside its sector is exactly what it
+does: $L_z$ and $S_z$ trade one unit, $-0.04 \to -1.04$ against $-3.11 \to -2.11$.
+That is Einstein–de Haas, driven by trap shaping.
+
+So the endpoint is not a half-converted flower state; it is the **EdH-transferred,
+vortex-carrying member of the seed's $J_z$ sector**. Reaching $S_z = -1.04$ at fixed
+$J_z = -3.16$ would require carrying $L_z = -2.11$, and the state gets half way there.
+
+### The shaped ramp was tested, and it changes nothing
+
+Two shapes were run at τ = 145 ms against the linear ramp of the same duration —
+`slow_at` (a Gaussian dwell at $\kappa_{tc}$, 70 % of the time below κ = 1.1) and
+`const_dF` (equal time per unit of $\langle F_\perp\rangle$ change):
+
+| ramp | $E$ at κ = 1.8 | excess | $\langle F_\perp\rangle$ | $J_z$ |
+|---|---:|---:|---:|---:|
+| linear, τ = 145 ms | 11.0548 | +0.3233 | 3.213 | −3.1544 |
+| `slow_at`, τ = 145 ms | 11.0611 | +0.3296 | 3.143 | −3.1549 |
+| `const_dF`, τ = 145 ms | 11.0697 | +0.3382 | 3.261 | −3.1550 |
+| linear, τ = 434 ms | 11.0503 | +0.3189 | 3.171 | −3.1528 |
+
+All four agree to ±0.02 in excess energy and to four decimals in $J_z$; the shaped
+runs are if anything marginally *worse*, because they spend time at $\kappa_{tc}$
+where nothing happens and pay for it at high κ. Critical slowing at the tricritical
+point was the wrong hypothesis, and this is what ruled it out.
+
+**The fix is not a better ramp; it is a protocol that applies a torque about $z$** —
+a large or rotating transverse field, or a rotating anisotropic trap (the same
+mechanism as magnetostriction vortex nucleation). How much of the +0.32 is
+"wrong sector" versus "excited within the sector" is answerable with a
+$J_z$-constrained ground-state solve.
+
+Trap compression is not the culprit: the trap period is
 $\sim 1\ \omega_{ref}^{-1} = 1.45$ ms, so even the 145 ms ramp is 100× slower than
 the breathing mode it would excite.
 

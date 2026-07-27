@@ -5,7 +5,9 @@ stated once. Both were checked with the data-viz validator on the light surface:
 
   ordinal τ ramp  #86b6ef #5598e7 #2a78d6 #1c5cab #0d366b  — single hue, monotone
                   lightness, light end 2.06:1 vs surface (ALL PASS, --ordinal)
-  categorical     #2a78d6 #eb6834                          — ALL PASS (--pairs all)
+  categorical     #2a78d6 #eb6834 #1baf7a                  — ALL PASS (--pairs all),
+                  with one WARN: aqua is 2.74:1 on this surface, so any chart using
+                  the third slot must direct-label rather than rely on colour alone
 
 τ is a MAGNITUDE, so it gets the one-hue ordinal ramp; ramp direction is carried by
 line style and identity (κ, leg) by the categorical slots. Never colour by rank.
@@ -19,7 +21,7 @@ import matplotlib as mpl
 import numpy as np
 
 TAU_RAMP = ["#86b6ef", "#5598e7", "#2a78d6", "#1c5cab", "#0d366b"]
-CAT = ["#2a78d6", "#eb6834"]
+CAT = ["#2a78d6", "#eb6834", "#1baf7a"]
 INK, INK2, INK3 = "#0b0b0b", "#52514e", "#8a8983"
 SURFACE = "#fcfcfb"
 
