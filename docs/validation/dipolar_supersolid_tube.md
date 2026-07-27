@@ -62,6 +62,18 @@ Below the transition the modulated seed relaxes to the uniform state to
 **bit-level identity** ($\Delta E \sim 10^{-12}$), i.e. no modulated branch
 exists there — not merely a higher one.
 
+A 10-point scan of the same comparison gives the curve
+(`figs/dipolar_supersolid/fs_curve.png`, data + script alongside):
+
+![f_s vs eps_dd](../../figs/dipolar_supersolid/fs_curve.png)
+
+The transition is **bracketed between $\epsilon_{dd} = 1.41$ and $1.44$**, and the
+scan resolves the first-order structure: at 1.41 the modulated branch *exists*
+but sits $+8\times10^{-5}$ above uniform (contrast 0.066), i.e. metastable; by
+1.44 it is $-6.9\times10^{-3}$ below (contrast 0.664, $f_s = 0.733$). Below 1.38
+the modulated seed relaxes onto the uniform state to round-off, so there is no
+second branch at all.
+
 Agreement with the paper's Fig. 2 (upper panel):
 
 - **Transition between 1.35 and 1.45**, i.e. $\epsilon_{dd} \approx 1.40$, where
