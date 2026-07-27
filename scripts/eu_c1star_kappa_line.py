@@ -29,7 +29,8 @@ for path in csvs:
         byk.setdefault(K, {})[float(r["c1_ratio"])] = float(r["mF"])
 
 Ks = sorted(byk)
-colors = {0.5: "royalblue", 1.0: "seagreen", 1.5: "crimson"}
+colors = {0.5: "royalblue", 1.0: "seagreen", 1.5: "crimson",
+          2.0: "darkorange", 2.5: "purple"}
 
 def cstar_and_jump(mf):
     cc = sorted(mf)
@@ -66,7 +67,7 @@ axR2 = axR.twinx()
 axR2.plot(kk, jm, "-s", color="darkorange", lw=1.8, ms=7, label=r"jump $\Delta m_F$")
 axR2.set_ylabel(r"order-param jump $\Delta m_F$ at $c_1^*$", color="darkorange")
 axR2.set_ylim(0, 1.0)
-axR.set_title(r"$c_1^*$ rises, jump shrinks with $\kappa$ (1st-order weakens)")
+axR.set_title(r"$c_1^*$ rises + saturates; jump stays finite $\sim$0.6 (1st-order, no tricritical)")
 l1, la1 = axR.get_legend_handles_labels(); l2, la2 = axR2.get_legend_handles_labels()
 axR.legend(l1 + l2, la1 + la2, fontsize=9, loc="center right")
 
